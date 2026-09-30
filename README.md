@@ -4,6 +4,13 @@ A cozy, Townscaper-style cyberpunk city builder that runs in the browser. Grow a
 
 Built with [Three.js](https://threejs.org/) r128, drawn at 480 lines and scaled up in whole pixels.
 
+## Updates and caching
+
+GitHub Pages takes a minute or two to publish each push, and browsers may keep the old files for up to about
+10 minutes. The `?v=` on each script and stylesheet in `index.html` is bumped with every release so a
+refresh picks up all the new files together; if a change doesn't show, do a hard refresh (Ctrl+Shift+R,
+or Cmd+Shift+R on a Mac).
+
 ## Playing it locally
 
 The game is plain HTML and JavaScript with no build step, but it has to be served over http (browsers block loading the sprite images straight from disk). From this folder:

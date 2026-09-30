@@ -36,6 +36,9 @@ function frame(now){
   if (_sunLast.distanceToSquared(SUN_DIR) > .12/1600){ _sunLast.copy(SUN_DIR); shadowDirty = true; }
   renderer.shadowMap.needsUpdate = shadowDirty; shadowDirty = false;
   GLOW_PTS_UNI.scale.value = H/(2*zoom);
+  { // detail levels: full detail up to a little past the default zoom, simplest at the furthest
+    const t = clamp((zoom - 16)/12, 0, 1), e = t*t*(3 - 2*t);
+    LOD.fine.value = e; LOD.plants.value = e; LOD.lines.value = e; }
   renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
   cam.layers.enableAll(); renderer.render(scene, cam);
   renderer.shadowMap.needsUpdate = false;

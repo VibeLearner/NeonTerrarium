@@ -39,9 +39,10 @@ function hash(...a){ let h = 2166136261; for (const v of a){ const s = String(v)
 // so a whole building is a single draw call no matter how many materials it was modelled with.
 const ATLAS = new THREE.MeshToonMaterial({ color:0xffffff, gradientMap:gradTex, vertexColors:true });
 ATLAS.onBeforeCompile = sh => {
-  sh.uniforms.emI = EM_I; sh.uniforms.fTime = FOL_UNI.time;
+  sh.uniforms.emI = EM_I; sh.uniforms.fTime = FOL_UNI.time; sh.uniforms.lodFine = LOD.fine;
   sh.vertexShader = sh.vertexShader
-    .replace('#include <common>', '#include <common>\nattribute vec4 aEm; attribute float aFlk; uniform float emI[6]; uniform float fTime; varying vec3 vEmis;' + FLK_GLSL)
+    .replace('#include <common>', '#include <common>\nattribute vec4 aEm; attribute float aFlk; attribute float aFine; uniform float emI[6]; uniform float fTime; uniform float lodFine; varying vec3 vEmis;' + FLK_GLSL)
+    .replace('#include <project_vertex>', '#include <project_vertex>\n' + LOD_CULL_GLSL)
     .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEmis = aEm.rgb * emI[int(aEm.a*255.0 + .5)] * flicker(aFlk, fTime);');
   sh.fragmentShader = sh.fragmentShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vEmis;')
@@ -56,7 +57,7 @@ function collect(fn){
   let nAt = 0;
   for (const [mat, b] of buckets){ if (atlasable(mat)) nAt += b.p.length/3; else geo.set(mat, bucketGeometry(b)); }
   if (nAt){
-    const pos = new Float32Array(nAt*3), nrm = new Float32Array(nAt*3), col = new Uint8Array(nAt*3), em = new Uint8Array(nAt*4), flk = new Uint8Array(nAt);
+    const pos = new Float32Array(nAt*3), nrm = new Float32Array(nAt*3), col = new Uint8Array(nAt*3), em = new Uint8Array(nAt*4), flk = new Uint8Array(nAt), fine = new Uint8Array(nAt);
     let o = 0;
     for (const [mat, b] of buckets){
       if (!atlasable(mat)) continue;
@@ -67,12 +68,13 @@ function collect(fn){
       if (k){ const er = Math.min(255, Math.round(mat.emissive.r*255)), eg = Math.min(255, Math.round(mat.emissive.g*255)), eb = Math.min(255, Math.round(mat.emissive.b*255)), ek = EM_KIND[k] || 5;
         for (let i=o;i<o+n;i++){ em[i*4] = er; em[i*4+1] = eg; em[i*4+2] = eb; em[i*4+3] = ek; } }
       if (b.f) flk.set(b.f, o);
+      fine.set(b.d, o);
       o += n;
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
     g.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); g.setAttribute('aEm', new THREE.BufferAttribute(em, 4, true));
-    g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1));
+    g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aFine', new THREE.BufferAttribute(fine, 1));
     geo.set(ATLAS, g);
   }
   for (const g of geo.values()) g.computeBoundingSphere();
@@ -341,7 +343,7 @@ function animMaterials(u){
       .replace('totalEmissiveRadiance = vEmis;', 'totalEmissiveRadiance = vEmis + bandCol * bandOn * step(bandH - 0.16, vWY);');
   };
   atlas.customProgramCacheKey = () => 'animAtlas';
-  const nrm = normalMat.clone(); nrm.clippingPlanes = [u.plane];
+  const nrm = normalMat.clone(); nrm.clippingPlanes = [u.plane]; nrm.onBeforeCompile = normalMat.onBeforeCompile;
   return { atlas, nrm };
 }
 function startAnim(c, kind, y0, y1, zone, w, old){

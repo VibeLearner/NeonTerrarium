@@ -72,7 +72,20 @@ const CLOTH = [M.cloth1,M.cloth2,M.cloth3,M.cloth4];
 const AWN = [M.awn1,M.awn2,M.awn3];
 const VEG = [M.veg1,M.veg2,M.veg3];
 const greenMat = () => pick([M.green1,M.green2,M.green3]);
+// Detail levels for zooming out. At 480 lines a zoomed-out city gets only a few pixels per floor, so one-pixel
+// details (railings, cables, window frames, small plants, crease outlines) turn to noise. Past the default zoom
+// these thin out gradually until the city reads as clean blocks of colour and light. 0 = full detail, 1 = far.
+const LOD = { fine: { value: 0 }, plants: { value: 0 }, lines: { value: 0 } };
+// Thin and tiny pieces carry an id (1-255, 0 = always kept); as LOD.fine rises, more of them are dropped.
+// A dropped piece's triangles are moved outside the view in the vertex shader, which costs nothing.
+const LOD_CULL_GLSL = 'if (aFine > 0.5 && lodFine*255.0 > aFine) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);';
 const normalMat = new THREE.MeshNormalMaterial();
+normalMat.onBeforeCompile = sh => {
+  sh.uniforms.lodFine = LOD.fine;
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nattribute float aFine; uniform float lodFine;')
+    .replace('#include <project_vertex>', '#include <project_vertex>\n' + LOD_CULL_GLSL);
+};
 
 /* ---------- glow billboards ---------- */
 const glowTex = (() => { const c=document.createElement('canvas'); c.width=c.height=32; const g=c.getContext('2d');
@@ -116,8 +129,9 @@ let buckets = new Map();
 // which keeps generating a building quick enough to do mid-click.
 const _nm = new THREE.Matrix3();
 function put(geo, mat, m){
-  let b = buckets.get(mat); if (!b){ b = { p: [], n: [], f: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
+  let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
   const fid = b.f ? flickerId(mat.userData.glow) : 0;
+  const did = b.f ? 0 : detailId(geo, m);   // lights are never dropped: they carry the look from far away
   const P = geo.attributes.position.array, N = geo.attributes.normal ? geo.attributes.normal.array : null, idx = geo.index ? geo.index.array : null;
   const e = m.elements, ne = _nm.getNormalMatrix(m).elements, bp = b.p, bn = b.n;
   const cnt = idx ? idx.length : P.length/3;
@@ -129,7 +143,17 @@ function put(geo, mat, m){
       bn.push(nx/l, ny/l, nz/l); }
     else bn.push(0, 1, 0);
     if (b.f) b.f.push(fid);
+    b.d.push(did);
   }
+}
+// Is this piece a fine detail? Sticks (two thin sides: posts, rails, cables, frames, pipes) and tiny bits
+// (small in every direction). Flat panels, with only one thin side, are kept: they read even when small.
+function detailId(geo, m){
+  let s = geo.userData._size;
+  if (!s){ geo.computeBoundingBox(); const bb = geo.boundingBox; s = geo.userData._size = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z]; }
+  const e = m.elements;
+  const d = [Math.hypot(e[0], e[1], e[2])*s[0], Math.hypot(e[4], e[5], e[6])*s[1], Math.hypot(e[8], e[9], e[10])*s[2]].sort((a, b) => a - b);
+  return (d[1] < .09 || d[2] < .14) ? 1 + Math.floor(Math.random()*255) : 0;
 }
 // which lights flicker: some neon, fewer lamps and trims, the odd window (Math.random, so the city's layout
 // randomness is untouched)

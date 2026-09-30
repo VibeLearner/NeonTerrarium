@@ -77,7 +77,7 @@ const comp = new THREE.ShaderMaterial({
   uniforms: {
     tColor:{value:null}, tDepth:{value:null}, tNormal:{value:null}, res:{value:new THREE.Vector2(1,1)},
     near:{value:NEAR}, far:{value:FAR}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
-    night:{value:0}, starOff:{value:new THREE.Vector2()}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
+    night:{value:0}, lodLines: LOD.lines, starOff:{value:new THREE.Vector2()}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
     pal:{value: PAL_HEX.map(h => { const c=new THREE.Color(h); return new THREE.Vector3(c.r,c.g,c.b); })},
     tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, rainOn:{value:0},
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
@@ -89,7 +89,7 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform float night; uniform vec2 starOff; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
+    uniform float night; uniform float lodLines; uniform vec2 starOff; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
     uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float rainOn; uniform sampler2D tCloud;
@@ -155,7 +155,8 @@ const comp = new THREE.ShaderMaterial({
         float dei = floor(smoothstep(0.25, 0.55, dd)*2.0)/2.0;
         float nei = ne(vec2(px.x,0.0), d, n) + ne(vec2(-px.x,0.0), d, n) + ne(vec2(0.0,px.y), d, n) + ne(vec2(0.0,-px.y), d, n);
         nei = step(0.1, nei);
-        float k = dei > 0.0 ? 1.0 - 0.5*dei : 1.0 + 0.4*nei;
+        // zoomed out: crease lines inside shapes fade away and silhouettes soften, so the city doesn't turn to noise
+        float k = dei > 0.0 ? 1.0 - 0.5*dei*(1.0 - 0.5*lodLines) : 1.0 + 0.4*nei*(1.0 - lodLines);
         col = c.rgb * mix(1.0, k, outlines);
         col = mix(col, haze, 0.35*smoothstep(near+(far-near)*0.5, far, d));
       }

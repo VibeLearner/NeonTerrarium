@@ -103,8 +103,8 @@ const FOL_ATLAS = (() => {
   return { tex, size: new THREE.Vector2(AW, AH) };
 })();
 const FOL_SHADER = new THREE.ShaderMaterial({
-    uniforms: { map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind },
-    vertexShader: `uniform vec2 res; uniform float time; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind;
+    uniforms: { lodPlants: LOD.plants, map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind },
+    vertexShader: `uniform vec2 res; uniform float time; uniform float lodPlants; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind;
       varying vec2 vUv; varying float vShade; varying vec4 vRect; varying vec2 vKind; varying float vFlk;` + FLK_GLSL + `
       void main(){
         vShade = aVar.z; vRect = aRect; vKind = aKind;
@@ -130,6 +130,9 @@ const FOL_SHADER = new THREE.ShaderMaterial({
           vec2 off = floor(vec2(projectionMatrix[0][0], projectionMatrix[1][1]) * local * vec2(sx, sy) * 0.5 * res + 0.5);
           gl_Position = vec4((ap + off)/res*2.0 - 1.0, a.z, 1.0);
         }
+        // zoomed out: thin the plants and laundry (small sprites go first); lit signs always stay
+        float thin = lodPlants * (aRect.w < 24.0 ? 0.85 : 0.5);
+        if (aKind.y < 0.5 && fract(aVar.w*5.17) < thin) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
       }`,
     side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
     fragmentShader: `uniform sampler2D map; uniform vec2 atlasSize; uniform vec3 tint; uniform float normalMode; uniform float neonI;

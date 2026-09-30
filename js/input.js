@@ -160,6 +160,8 @@ $('vclouds').addEventListener('change', e => { S.vclouds = e.target.checked; });
 $('rays').addEventListener('change', e => { S.rays = e.target.checked; });
 $('wet').addEventListener('change', e => { S.wetOn = e.target.checked; });
 $('spin').checked = S.spin; $('spin').addEventListener('change', e => { S.spin = e.target.checked; });
+$('sfxVol').value = sfx.volume; $('sfxVolOut').textContent = Math.round(sfx.volume*100) + '%';
+$('sfxVol').addEventListener('input', e => { sfx.setVolume(+e.target.value); $('sfxVolOut').textContent = Math.round(sfx.volume*100) + '%'; });
 $('paint').checked = S.paint; $('paint').addEventListener('change', e => { S.paint = e.target.checked; selectZone(S.zone); });
 $('rotBL').addEventListener('click', () => { yawT += PI/4; });
 $('rotBR').addEventListener('click', () => { yawT -= PI/4; });

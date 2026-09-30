@@ -359,6 +359,7 @@ function startAnim(c, kind, y0, y1, zone, w, old){
   box.position.set(c.x, (by0 + y1)/2, c.z); box.scale.set(w + .08, Math.max(.1, y1 - by0), w + .08);
   scan.scale.set(w + .2, .001, w + .2);
   for (const l of [box, scan]){ l.layers.set(1); l.renderOrder = 998; scene.add(l); }
+  sfx.play(kind === 'build' ? 'place' : 'remove');
   anims.push({ c, kind, view, old, u, mats, box, scan, x: c.x, z: c.z, y0, y1, t: 0, dur: kind === 'build' ? .15 : .12, reg: regKey(c.i, c.j), held });
 }
 const easeOut = x => 1 - (1 - x)*(1 - x);

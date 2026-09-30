@@ -38,12 +38,14 @@ js/buildings.js         district styles and every building type
 js/ground.js            streets, sidewalks, bridges and cables between buildings
 js/vehicles.js          hover cars, delivery drones, their shadows, chimney steam
 js/sky.js               time of day, the pixel composite (outlines, sky, stars, rain, reflections, light shafts), clouds
+js/audio.js             sound effects (Web Audio), volume setting
 js/world.js             the game world: cells, building stacks, batching, edits, build and remove animations, saving
 js/input.js             camera, mouse / touch / keyboard, settings panel
 js/main.js              start-up and the frame loop
 assets/sprites/         sprite PNGs at true pixel size (one file per sprite; the name is the sprite's id)
 assets/audio/music/     music (coming next)
-assets/audio/sfx/       sound effects (coming next)
+assets/audio/sfx/       sound effects: place.wav (build pop), remove.wav (removal thud)
+assets/audio/sfx/originals/  the untouched source recordings, for re-editing
 ```
 
 The scripts are ordinary (non-module) scripts that share one scope, so the order in `index.html` matters.
@@ -51,4 +53,5 @@ The scripts are ordinary (non-module) scripts that share one scope, so the order
 ## Adding art and sound
 
 - **Sprites:** add the PNG to `assets/sprites/`, then add its size and anchor to the `SPR` table at the top of `js/sprites.js`.
-- **Audio:** compressed `.mp3` or `.ogg` keeps downloads small. Music loops of a few MB and short effects of a few KB are ideal.
+- **Sound effects:** short effects are trimmed and sped up to match the animations, then saved as small mono `.wav` files (no playback delay). Register a new one in `SFX_FILES` at the top of `js/audio.js` and call `sfx.play('name')`.
+- **Music:** compressed `.mp3` or `.ogg` keeps downloads small; a loop of a few MB is fine.

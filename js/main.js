@@ -25,6 +25,7 @@ function frame(now){
   clouds.rotation.y += dt*.008*cDrift;
   comp.uniforms.windR.value = windNow; clouds.position.set(camT.x, 0, camT.z); rain.position.set(camT.x, 0, camT.z);
   comp.uniforms.glowC.value.set(camT.x, camT.z);
+  applyRenderRes(zoom);
   updateCamera(dt);
   comp.uniforms.outlines.value = S.outlines ? 1 : 0;
   comp.uniforms.palOn.value = S.palette ? 1 : 0;
@@ -36,8 +37,9 @@ function frame(now){
   if (_sunLast.distanceToSquared(SUN_DIR) > .12/1600){ _sunLast.copy(SUN_DIR); shadowDirty = true; }
   renderer.shadowMap.needsUpdate = shadowDirty; shadowDirty = false;
   GLOW_PTS_UNI.scale.value = H/(2*zoom);
-  { // detail levels: full detail up to a little past the default zoom, simplest at the furthest
-    const t = clamp((zoom - 16)/12, 0, 1), e = t*t*(3 - 2*t);
+  { // detail levels: only needed once zooming out outruns the screen's resolution (see applyRenderRes)
+    const loss = (zoom/ZOOM_REF)*(BASE_H/H);   // 1 = every building keeps all its pixels
+    const t = clamp((loss - 1.15)/1.0, 0, 1), e = t*t*(3 - 2*t);
     LOD.fine.value = e; LOD.plants.value = e; LOD.lines.value = e; }
   renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
   cam.layers.enableAll(); renderer.render(scene, cam);
@@ -71,7 +73,8 @@ function frame(now){
     comp.uniforms.rayI.value = (1-nt)*(0.45 + 1.1*(1-el)) + nt*.12; }
   clouds.visible = !S.vclouds;
   if (S.vclouds){ renderer.setRenderTarget(rtCloud); renderer.render(cloudScene, compCam); }
-  renderer.setRenderTarget(null); renderer.render(compScene, compCam);
+  renderer.setRenderTarget(rtOut); renderer.render(compScene, compCam);
+  renderer.setRenderTarget(null); renderer.render(upScene, compCam);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

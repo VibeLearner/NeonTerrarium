@@ -77,7 +77,7 @@ const comp = new THREE.ShaderMaterial({
   uniforms: {
     tColor:{value:null}, tDepth:{value:null}, tNormal:{value:null}, res:{value:new THREE.Vector2(1,1)},
     near:{value:NEAR}, far:{value:FAR}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
-    night:{value:0}, lodLines: LOD.lines, starOff:{value:new THREE.Vector2()}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
+    night:{value:0}, lodLines: LOD.lines, pxK:{value:1}, starOff:{value:new THREE.Vector2()}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
     pal:{value: PAL_HEX.map(h => { const c=new THREE.Color(h); return new THREE.Vector3(c.r,c.g,c.b); })},
     tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, rainOn:{value:0},
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
@@ -89,7 +89,7 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform float night; uniform float lodLines; uniform vec2 starOff; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
+    uniform float night; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
     uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float rainOn; uniform sampler2D tCloud;
@@ -135,7 +135,7 @@ const comp = new THREE.ShaderMaterial({
         vec3 sky = mix(skyBot, skyTop, smoothstep(0.05, 0.95, vUv.y));
         // The star field belongs to the sky, not the screen: it turns with the camera (one full turn wraps it
         // exactly) and drifts a little when the view pans, like something very far away.
-        vec2 sp = floor(gl_FragCoord.xy + starOff);
+        vec2 sp = floor(gl_FragCoord.xy*pxK + starOff);   // in base pixels, so stars keep their size when zoomed out
         vec2 cell = vec2(mod(sp.x, 1024.0), sp.y);
         float h = hash(cell);
         float star = step(0.9965, h) * smoothstep(0.12, 0.6, vUv.y) * night * (0.45 + 0.55*fract(h*713.0));   // steady, each star its own brightness
@@ -228,7 +228,7 @@ const comp = new THREE.ShaderMaterial({
           float fl = float(L);
           float layerD = 0.28 + fl*0.17;                                   // near, middle, far
           if (rd < layerD) continue;                                       // something is in front of this layer
-          vec2 p = gl_FragCoord.xy + rainOff*(1.25 - fl*0.25) + vec2(fl*311.0, fl*97.0);
+          vec2 p = (gl_FragCoord.xy + rainOff*(1.25 - fl*0.25))*pxK + vec2(fl*311.0, fl*97.0);   // base pixels, like the stars
           p.x += p.y*(0.03 + windR*0.2);                                   // the slant: near straight down when calm, raking in a storm
           float colm = floor(p.x);
           float speed = (330.0 - fl*90.0)*(0.9 + windR*0.12), len = (6.0 - fl*1.7)*(0.9 + windR*0.15), spacing = 70.0 + fl*25.0;
@@ -409,17 +409,50 @@ function makeTargets(){
   const q = S.cloudQ || 2;
   rtCloud = new THREE.WebGLRenderTarget(Math.ceil(W/q), Math.ceil(H/q), opt);
   comp.uniforms.tCloud.value = rtCloud.texture; cloudMat.uniforms.tDepth.value = rtC.depthTexture;
+  if (rtOut) rtOut.dispose();
+  rtOut = new THREE.WebGLRenderTarget(W, H, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat });
+  upMat.uniforms.t.value = rtOut.texture; upMat.uniforms.srcRes.value.set(W, H); upMat.uniforms.dstRes.value.set(DW, DH);
 }
-// Each render pixel is drawn as an exact whole number of screen pixels. A fractional scale (say 2.25x)
-// makes some pixels 2 wide and some 3 wide, and that uneven grid ripples whenever anything moves.
+// The finished frame is scaled to the screen with "sharp bilinear" filtering: every render pixel stays a crisp
+// square, and where the scale isn't a whole number only the one-screen-pixel seam between two render pixels is
+// blended. So pixels are all the same size (no ripple when things move) at any zoom.
+let rtOut = null;
+const upMat = new THREE.ShaderMaterial({
+  uniforms: { t:{ value:null }, srcRes:{ value:new THREE.Vector2(1,1) }, dstRes:{ value:new THREE.Vector2(1,1) } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  fragmentShader: `uniform sampler2D t; uniform vec2 srcRes; uniform vec2 dstRes; varying vec2 vUv;
+    void main(){
+      vec2 texel = vUv*srcRes, base = floor(texel), s = texel - base;
+      float scale = max(1.0, dstRes.y/srcRes.y);
+      float range = 0.5 - 0.5/scale;
+      vec2 cd = s - 0.5;
+      vec2 f = (cd - clamp(cd, -range, range))*scale + 0.5;
+      gl_FragColor = texture2D(t, (base + f)/srcRes);
+    }`,
+  depthTest:false, depthWrite:false,
+});
+const upScene = new THREE.Scene(); upScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), upMat));
+// Render resolution. At the default zoom and closer the game is drawn at about 480 lines, each render pixel a
+// whole number of screen pixels. Zooming out, it is drawn at more lines in step with the zoom, so every building
+// keeps the same pixels and the pixels themselves get smaller on screen, up to the screen's own resolution.
+// (Past that, the detail levels in main.js take over.) Stars and rain are measured in base pixels (pxK) so they
+// keep their size.
+const ZOOM_REF = 13.2;
+let DW = 1, DH = 1, BASE_H = 270, pxK = 1;
 function resize(){
   const dpr = devicePixelRatio || 1;
-  const dw = Math.max(1, Math.round(innerWidth*dpr)), dh = Math.max(1, Math.round(innerHeight*dpr));
-  const scale = Math.max(1, Math.round(dh / 480));   // the game is drawn at 480 lines, always
-  W = Math.ceil(dw/scale); H = Math.ceil(dh/scale);
-  renderer.setSize(W, H, false);
-  canvas.style.width = (W*scale/dpr)+'px'; canvas.style.height = (H*scale/dpr)+'px';
-  FOL_UNI.res.value.set(W, H);
+  DW = Math.max(1, Math.round(innerWidth*dpr)); DH = Math.max(1, Math.round(innerHeight*dpr));
+  BASE_H = Math.ceil(DH / Math.max(1, Math.round(DH / 480)));
+  renderer.setSize(DW, DH, false);
+  canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
+  H = 0; applyRenderRes(zoom);
+}
+function applyRenderRes(z){
+  const f = Math.max(1, z/ZOOM_REF), step = Math.round(Math.log(f)/Math.log(1.04));   // 4% steps, so targets aren't remade every frame
+  const h = Math.min(DH, Math.round(BASE_H*Math.pow(1.04, step)));
+  if (h === H) return;
+  H = h; W = Math.max(1, Math.round(h*DW/DH)); pxK = BASE_H/H;
+  FOL_UNI.res.value.set(W, H); comp.uniforms.pxK.value = pxK;
   makeTargets();
 }
 addEventListener('resize', resize);

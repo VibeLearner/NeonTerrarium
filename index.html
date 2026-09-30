@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Island Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<canvas id="view" aria-label="Rotating pixel-art view of a floating cyberpunk district"></canvas>
+
+<div class="hud">
+  <div class="brand">NEON <b>ISLAND</b></div>
+  <div class="readout" id="readout">15:30 · Day</div>
+  <div class="hint">WASD moves · Drag the sky or Q/E to rotate · Right-click removes a section · Scroll zooms · 1–4 pick a zone · H recenters</div>
+</div>
+
+<button id="deckToggle" class="deck-toggle" aria-expanded="false" aria-controls="deck">Settings</button>
+
+<nav class="zonebar" aria-label="Zones">
+  <p class="modehint" id="modeHint">Click the sky to grow the platform · pick a zone to build</p>
+  <div class="zones">
+    <button class="rot" id="rotBL" aria-label="Rotate view left">⟲</button>
+    <button class="zone" data-zone="low"  style="--z:#38E8E0" aria-pressed="false"><span class="zin"><b>ZONE A</b><small>Residential</small></span></button>
+    <button class="zone" data-zone="mid"  style="--z:#FFB347" aria-pressed="false"><span class="zin"><b>ZONE B</b><small>Commercial</small></span></button>
+    <button class="zone" data-zone="high" style="--z:#FF4FA3" aria-pressed="false"><span class="zin"><b>ZONE C</b><small>Luxury</small></span></button>
+    <button class="zone" data-zone="ind"  style="--z:#E8E03A" aria-pressed="false"><span class="zin"><b>ZONE D</b><small>Industrial</small></span></button>
+    <button class="rot" id="rotBR" aria-label="Rotate view right">⟳</button>
+  </div>
+</nav>
+
+<aside id="deck" class="deck" aria-label="Playground controls">
+  <section>
+    <h2>Time of day</h2>
+    <div class="clock"><output id="clock">15:30</output><span id="phase">Day</span></div>
+    <input type="range" id="hour" min="0" max="24" step="0.05" value="15.5" aria-label="Hour of day">
+    <div class="chips" id="presets">
+      <button data-h="12">Midday</button>
+      <button data-h="17.2">Golden hour</button>
+      <button data-h="18.9">Dusk</button>
+      <button data-h="22">Night</button>
+    </div>
+    <div class="togs">
+      <label class="tog"><input type="checkbox" id="rain"> Rain</label>
+    </div>
+    <div class="slider stack"><label for="wind">Wind strength <small>sways plants and laundry, slants the rain, pushes the clouds</small></label><input type="range" id="wind" min="0" max="2" step="0.1" value="1"><output id="windOut">Breezy</output></div>
+  </section>
+
+  <section>
+    <h2>New buildings</h2>
+    <p class="note">These set the style of what you build next. Everything already built keeps its look.</p>
+    <select id="district" aria-label="District type" hidden>
+      <option value="mixed">Mixed (all four)</option>
+      <option value="low">Low income residential</option>
+      <option value="mid">Middle income / commercial</option>
+      <option value="high">High income</option>
+      <option value="ind">Industrial</option>
+    </select>
+    <p class="note" id="districtNote" hidden>Market core in the middle, with tenements, towers and factories around it.</p>
+    <div class="slider stack"><label for="clutter">Rooftop and street clutter <small>AC units, crates, pipes, antennas</small></label><input type="range" id="clutter" min="0" max="2" step="0.1" value="1"><output id="clutterOut">Normal</output></div>
+    <div class="slider stack"><label for="green">Plants and greenery <small>vines, potted plants, trees, moss</small></label><input type="range" id="green" min="0" max="2" step="0.1" value="1"><output id="greenOut">Normal</output></div>
+    <div class="slider stack"><label for="neon">Neon and signs <small>signs, light strips, shop lights</small></label><input type="range" id="neon" min="0" max="2" step="0.1" value="1"><output id="neonOut">Normal</output></div>
+  </section>
+
+  <section>
+    <h2>Island</h2>
+    <button id="reseed" class="wide">Clear island</button>
+  </section>
+
+  <section>
+    <h2>Render</h2>
+    <div class="togs">
+      <label class="tog"><input type="checkbox" id="outlines" checked> Outlines</label>
+      <label class="tog"><input type="checkbox" id="vclouds" checked> 3D clouds</label>
+      <label class="tog"><input type="checkbox" id="rays" checked> God rays</label>
+      <label class="tog"><input type="checkbox" id="wet" checked> Wet ground</label>
+      <label class="tog"><input type="checkbox" id="spin"> Auto-turn</label>
+      <label class="tog"><input type="checkbox" id="paint"> Drag to paint</label>
+    </div>
+    <div class="chips" id="cloudChips" aria-label="Cloud quality">
+      <button data-q="3">Clouds: fast</button>
+      <button data-q="2" class="on">Balanced</button>
+      <button data-q="1">Sharp</button>
+    </div>
+  </section>
+
+  <p class="foot">Your island saves automatically in this browser.</p>
+</aside>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
+<script src="js/core.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/buildings.js"></script>
+<script src="js/ground.js"></script>
+<script src="js/vehicles.js"></script>
+<script src="js/sky.js"></script>
+<script src="js/world.js"></script>
+<script src="js/input.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

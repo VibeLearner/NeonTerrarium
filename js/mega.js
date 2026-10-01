@@ -1035,9 +1035,41 @@ function buildPoliceStation(m){
   box(M.polWall2, P, 2.6, CURB + .4, front - .45, 2.0, .7, .5);
   for (let t = -bw/2 + .6; t < bw/2 - .4; t += .8){ box(M.bulb, P, t, CURB + gf - .05, front - .3, .3, .03, .1); glow(P, t, CURB + gf - .2, front - .2, 'cyan', .7); }   // downlights in the soffit
   // upper storeys: a pale box, ledge lines, a glass curtain wall in the middle of the front
-  box(M.polWall, P, bx, CURB + gf + (top - gf)/2, bz, bw, top - gf, bd);
-  box(M.polWall2, P, bx, CURB + gf + .05, bz, bw + .1, .12, bd + .1);
-  box(M.polWall2, P, bx, CURB + top + .12, bz, bw + .2, .24, bd + .2);                                // parapet cap
+  // the back two corners are rounded and glazed: curved glass, lit from inside, with mullions and floor bands
+  const RC = 1.2, uh = top - gf, uy = CURB + gf + uh/2, back = bz - bd/2;
+  box(M.polWall, P, bx, uy, bz + RC/2, bw, uh, bd - RC);
+  box(M.polWall, P, bx, uy, back + RC/2, bw - 2*RC, uh, RC);
+  for (const sx of [-1, 1]){
+    const cx = bx + sx*(bw/2 - RC), cz = back + RC, th0 = sx > 0 ? PI/2 : PI;
+    put(wedgeGeo(RC - .12, uh, th0, PI/2), M.polWall2, under(P, T(cx, uy, cz)));                    // the core behind the glass
+    put(wedgeGeo(RC, uh - .1, th0, PI/2), M.polLobby, under(P, T(cx, uy, cz)));                       // curved glass
+    for (let k=0; k<=6; k++){ const a = th0 + k*PI/12; box(M.polFrame, P, cx + Math.sin(a)*(RC + .02), uy, cz + Math.cos(a)*(RC + .02), .05, uh, .05); }
+    for (const yy of [CURB + gf + 1.35, CURB + gf + 2.7]) put(wedgeGeo(RC + .06, .08, th0, PI/2), M.polWall2, under(P, T(cx, yy, cz)));
+    put(wedgeGeo(RC + .1, .24, th0, PI/2), M.polWall2, under(P, T(cx, CURB + top + .12, cz)));     // cap follows the curve
+  }
+  box(M.polWall2, P, bx, CURB + gf + .05, bz + RC/2, bw + .1, .12, bd - RC + .1);
+  box(M.polWall2, P, bx, CURB + gf + .05, back + RC/2, bw - 2*RC, .12, RC + .1);
+  box(M.polWall2, P, bx, CURB + top + .12, bz + RC/2, bw + .2, .24, bd - RC + .2);                     // parapet cap
+  box(M.polWall2, P, bx, CURB + top + .12, back + RC/2 - .05, bw - 2*RC, .24, RC + .1);
+  // recessed features: dark reveals between floors with a lit lip, sunken window slots, recessed fins on the back
+  const reveal = (F, len, y) => { box(M.polDark, F, 0, y, .01, len - .3, .14, .04); box(M.trimCyan, F, 0, y - .075, .03, len - .4, .02, .02); };
+  for (const [F, len] of [[under(P, T(bw/2, 0, bz + RC/2, PI/2)), bd - RC], [under(P, T(-bw/2, 0, bz + RC/2, -PI/2)), bd - RC], [under(P, T(bx, 0, back, PI)), bw - 2*RC]]){
+    reveal(F, len, CURB + gf + 1.35); reveal(F, len, CURB + gf + 2.75);
+    box(M.polDark, F, 0, CURB + top - .12, .01, len - .2, .1, .04);                                       // shadow line under the parapet
+  }
+  { const F = under(P, T(bx, 0, back, PI));                                                              // back face: sunken slots and fins
+    for (let t = -(bw - 2*RC)/2 + .45; t < (bw - 2*RC)/2 - .3; t += .62){
+      box(M.polDark, F, t, CURB + gf + .7, .01, .34, .9, .04); if (chance(.55)) box(M.polLobby, F, t, CURB + gf + .7, .015, .24, .8, .03);
+      box(M.polDark, F, t, CURB + gf + 2.05, .01, .34, .9, .04); if (chance(.45)) box(M.polLobby, F, t, CURB + gf + 2.05, .015, .24, .8, .03);
+      box(M.polWall2, F, t + .31, CURB + gf + 1.9, .06, .06, uh - .4, .12);                              // fin
+    }
+  }
+  for (const [F, xs] of [[under(P, T(bw/2, 0, bz + RC/2, PI/2)), [-1.6, -.3]], [under(P, T(-bw/2, 0, bz + RC/2, -PI/2)), [1.1, 1.8]]])   // a column of sunken slots on each side
+    for (const t of xs) for (const yy of [CURB + gf + .7, CURB + gf + 2.05, CURB + gf + 3.4]){ box(M.polDark, F, t, yy, .01, .4, .7, .04); box(chance(.5) ? M.polLobby : M.polScreen, F, t, yy, .015, .3, .6, .03); }
+  // a deep recessed entrance portal round the curtain wall
+  box(M.polDark, P, -.2, CURB + 4.2, front + .005, 3.3, 3.7, .02);
+  for (const sx of [-1, 1]) box(M.polWall2, P, -.2 + sx*1.72, CURB + 4.2, front + .12, .14, 3.8, .26);
+  box(M.polWall2, P, -.2, CURB + 6.12, front + .12, 3.58, .14, .26);
   box(M.polLobby, P, -.2, CURB + 4.2, front + .02, 3.0, 3.4, .04);                                     // the curtain wall, lit cool from inside
   for (let t = -1.7; t <= 1.31; t += .5) box(M.polFrame, P, t, CURB + 4.2, front + .05, .04, 3.4, .04);
   for (let y = 2.8; y <= 5.8; y += .85) box(M.polFrame, P, -.2, CURB + y, front + .05, 3.0, .04, .04);
@@ -1055,15 +1087,15 @@ function buildPoliceStation(m){
   const Ff = under(P, T(0, 0, front, 0)), Fr = under(P, T(bw/2, 0, bz, PI/2)), Fl = under(P, T(-bw/2, 0, bz, -PI/2));
   screen(Ff, -3.35, CURB + 4.15, 2.0, 2.12);
   screen(Ff, 3.1, CURB + 4.15, 2.3, 2.44);
-  screen(Fr, .4, CURB + 4.2, 2.6, 2.76);
-  screen(Fr, -2.2, CURB + 1.2, 1.2, 1.28);
-  screen(Fl, -.6, CURB + 4.2, 2.3, 2.44);
+  screen(Fr, .55, CURB + 4.2, 2.3, 2.44);
+  screen(Fr, -2.3, CURB + 1.2, 1.2, 1.28);
+  screen(Fl, -.1, CURB + 4.2, 2.2, 2.34);
   m.screens = screens;
   // the badge and the POLICE fascia over the entrance
   box(M.polDark, Ff, -1.2, CURB + 6.0, .1, 3.0, .7, .12);
   plant('sign_policetext', Ff, -1.85, CURB + 6.0, .18, 1.1, 'c', true); glow(Ff, -1.85, CURB + 6.0, .4, 'cyan', 1.4);
   plant('sign_police', Ff, -.25, CURB + 6.0, .18, .55, 'c', true); glow(Ff, -.25, CURB + 6.0, .4, 'blue', 1.6);
-  plant('sign_police', Fr, 2.6, CURB + 5.6, .05, .8, 'c', true); glow(Fr, 2.6, CURB + 5.6, .3, 'blue', 1.8);
+  plant('sign_police', Fr, -2.3, CURB + 4.7, .05, .7, 'c', true); glow(Fr, -2.3, CURB + 4.7, .3, 'blue', 1.6);
   // vents and service doors on the side, like the reference
   box(M.polDark, Fr, -3.2, CURB + 1.0, .02, .9, 1.9, .04); box(M.polFrame, Fr, -3.2, CURB + 2.1, .06, 1.0, .1, .1);
   for (let k=0; k<3; k++) box(M.polDark, Ff, -3.8 + k*.35, CURB + 6.05, .04, .25, .12, .03);
@@ -1074,10 +1106,33 @@ function buildPoliceStation(m){
     for (let k=0; k<16; k++){ const [x, y, z] = pt(k*TAU/16); glow(P, x, y, z, 'cyan', .8); } }
   // the roof: plant, a mast, a drone pad, the light bar (flashing, in policeFx)
   const ry = CURB + top + .24;
-  box(M.metal, P, -2.8, ry + .3, -2.5, 1.2, .6, .9); box(M.metal, P, -1.2, ry + .25, -2.8, .8, .5, .7);
-  cyl(M.frame, P, 3.6, ry + 1.4, -3.4, .04, 2.8); beaconLight(P, 3.6, ry + 2.85, -3.4, .08, .8);
-  box(M.concDD, P, 2.2, ry + .03, -.6, 2.0, .06, 2.0); box(M.neonCyan, P, 2.2, ry + .07, -.6, 1.6, .01, .06); box(M.neonCyan, P, 2.2, ry + .07, -.6, .06, .01, 1.6);
-  box(M.polCarDark, P, 2.2, ry + .2, -.6, .4, .12, .4); for (const [qx, qz] of [[-.3,-.3],[.3,-.3],[-.3,.3],[.3,.3]]) put(U.cyl16, M.metal, under(P, T(2.2 + qx, ry + .28, -.6 + qz, 0, .32, .02, .32)));   // a docked police drone
+  // a large drone landing pad: a raised dark deck with neon guidelines (rings, an H, approach chevrons, edge lights)
+  const px = -1.8, pz = -1.2, PS = 4.4, py = ry + .22;
+  box(M.polWall2, P, px, ry + .08, pz, PS + .3, .16, PS + .3);
+  box(M.polCarDark, P, px, py - .03, pz, PS, .06, PS);
+  const ring = (r, mat, t) => { const n = 40; for (let k=0; k<n; k++){ const a0 = k*TAU/n, a1 = (k + 1)*TAU/n; strut(mat, P, px + Math.cos(a0)*r, py + .005, pz + Math.sin(a0)*r, px + Math.cos(a1)*r, py + .005, pz + Math.sin(a1)*r, t); } };
+  ring(1.9, M.neonCyan, .05); ring(1.45, M.trimCyan, .03);
+  for (let k=0; k<8; k++){ const a = k*TAU/8; glow(P, px + Math.cos(a)*1.9, py + .05, pz + Math.sin(a)*1.9, 'cyan', .7); }
+  box(M.neonCyan, P, px - .35, py + .005, pz, .07, .01, .9); box(M.neonCyan, P, px + .35, py + .005, pz, .07, .01, .9); box(M.neonCyan, P, px, py + .005, pz, .7, .01, .07);   // the H
+  for (let k=0; k<4; k++){ const a = k*PI/2, F = under(P, T(px + Math.sin(a)*(PS/2 - .35), 0, pz + Math.cos(a)*(PS/2 - .35), a));   // chevrons pointing in
+    for (const o of [0, .22]){ strut(M.neonAmber, F, -.25, py + .005, -o, 0, py + .005, -o - .2, .04); strut(M.neonAmber, F, .25, py + .005, -o, 0, py + .005, -o - .2, .04); } }
+  for (let k=0; k<16; k++){ const t = -PS/2 + .15 + (k % 4)*(PS - .3)/3, side = Math.floor(k/4);   // edge lights
+    const [lx, lz] = [[t, -PS/2], [PS/2, t], [-t, PS/2], [-PS/2, -t]][side]; box(M.bulb, P, px + lx, py + .02, pz + lz, .07, .04, .07); if (k % 2) glow(P, px + lx, py + .05, pz + lz, 'warm', .5); }
+  { const D = under(P, T(px + .2, py, pz + .1, .4));                                                       // a big police drone parked on it
+    box(M.polCar, D, 0, .2, 0, .9, .18, .55); box(M.polCarDark, D, 0, .32, 0, .6, .1, .36); box(M.neonCyan, D, .46, .2, 0, .02, .05, .3);
+    for (const [qx, qz] of [[-.55,-.45],[.55,-.45],[-.55,.45],[.55,.45]]){ strut(M.polCarDark, D, 0, .25, 0, qx, .3, qz, .06); put(U.cyl16, M.metal, under(D, T(qx, .34, qz, 0, .62, .03, .62))); put(U.torus, M.polCarDark, under(D, T(qx, .34, qz, 0, .66, .66, .66, PI/2))); }
+    box(M.blink, D, -.2, .29, .29, .08, .04, .02); box(M.neonCyan, D, .2, .29, .29, .08, .04, .02);
+    for (const sx of [-1, 1]) box(M.frame, D, sx*.3, .05, 0, .04, .1, .5); }
+  // machinery and an antenna on the other side of the roof
+  box(M.metal, P, 3.1, ry + .3, .9, 1.3, .6, 1.0); box(M.metal, P, 3.6, ry + .25, -.6, .8, .5, .7); box(M.metalDark, P, 1.7, ry + .2, 1.4, .7, .4, .6);
+  for (let k=0; k<3; k++) put(U.cyl16, M.polWall2, under(P, T(2.9 + k*.4, ry + .78, .9, 0, .3, .1, .3)));   // fan housings
+  cyl(M.frame, P, 4.2, ry + 1.4, 1.8, .04, 2.8); beaconLight(P, 4.2, ry + 2.85, 1.8, .08, .8);
+  // the radar's pedestal (the rotating head is in policeFx)
+  const rx = 2.7, rz = -2.7;
+  put(U.cyl16, M.polWall2, under(P, T(rx, ry + .3, rz, 0, 1.3, .6, 1.3))); put(U.cyl16, M.polDark, under(P, T(rx, ry + .64, rz, 0, 1.0, .1, 1.0)));
+  put(U.cyl16, M.trimCyan, under(P, T(rx, ry + .6, rz, 0, 1.34, .03, 1.34)));
+  cyl(M.polFrame, P, rx, ry + .95, rz, .12, .6);
+  m.radar = { m: under(P, T(rx, ry + 1.25, rz)).elements.slice() };
   box(M.polDark, P, 0, ry + .2, front - .5, 1.6, .2, .3);
   m.lightbar = { m: under(P, T(0, ry + .38, front - .5)).elements.slice() };
   // out front: patrol cars, officers, a traffic light, bollards, trees in planters
@@ -1135,6 +1190,22 @@ function policeFx(m){
     b.layers.set(1); s2.layers.set(1); bar.add(b, s2); return { b, s2, lm }; };
   const red = mk(0xff2030, -.32), blue = mk(0x2a6cff, .32);
   scene.add(bar); parts.push(bar);
+  // the radar: a turntable carrying a tilted dish with a feed horn, a phased-array panel on its back and a sensor
+  // dome, sweeping round; a cyan scan light pulses across the array as it turns
+  const radar = new THREE.Group(); radar.matrix.fromArray(m.radar.m); radar.matrix.decompose(radar.position, radar.quaternion, radar.scale);
+  const head = new THREE.Group(); radar.add(head);
+  const add = (geo, mat, x, y, z, sx, sy, sz, rx2 = 0, ry2 = 0, rz2 = 0) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.set(rx2, ry2, rz2); head.add(o); return o; };
+  add(U.cyl16, M.polDark, 0, 0, 0, .9, .1, .9);
+  add(U.box, M.polWall2, 0, .25, 0, .5, .4, .3);
+  add(U.dish, M.polWall, 0, .55, .2, 1.6, 1.6, 1.6, .95);                       // the dish, tilted up and forward
+  add(U.cyl16, M.polFrame, 0, .95, .62, .06, .5, .06, .95);
+  add(U.box, M.polDark, 0, .7, -.3, 1.0, .75, .08, -.2);                        // the phased-array panel on the back
+  const scanMat = new THREE.MeshBasicMaterial({ color: 0x38e8e0 });
+  for (let k=0; k<4; k++) add(U.box, scanMat, 0, .44 + k*.17, -.36 - k*.035, .9, .025, .02, -.2);
+  add(U.sph, M.polWall, .55, .45, 0, .32, .32, .32);                              // sensor dome
+  add(U.box, M.blink, -.5, .5, 0, .07, .07, .07);
+  head.traverse(o => { if (o.isMesh) o.layers.set(0); });
+  scene.add(radar); parts.push(radar);
   return {
     update(dt, time){
       for (const s of screens){
@@ -1147,7 +1218,9 @@ function policeFx(m){
       }
       const ph = (time*2.2) % 2, a = ph < 1, flash = (time*14) % 1 < .6;   // alternate, with a quick double-flash
       red.b.visible = red.s2.visible = a && flash; blue.b.visible = blue.s2.visible = !a && flash;
+      head.rotation.y = time*.55;
+      scanMat.color.setRGB(.22, .9, .88).multiplyScalar(.45 + .55*Math.abs(Math.sin(time*3)));
     },
-    dispose(){ for (const p of parts){ scene.remove(p); p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material){ o.material.dispose(); } }); } }
+    dispose(){ for (const p of parts){ scene.remove(p); if (p !== radar) p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } scanMat.dispose(); }
   };
 }

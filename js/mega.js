@@ -12,7 +12,7 @@ const MEGA_TYPES = {
   mall:  { name: 'Sky mall', need: { high: 50, ind: 30 }, odds: 50, w: 3, h: 2, maxLevels: 3,
            colour: '#ffcf7a', build: buildSkyMall },
   square: { name: 'Town square', need: { low: 40, mid: 40 }, odds: 40, w: 5, h: 5, maxLevels: 1,
-           colour: '#9dff6a', build: buildTownSquare },
+           colour: '#9dff6a', build: buildTownSquare, fx: koiFx },
 };
 const megas = new Map();   // kind -> { kind, i, j, w, h, levels, seed, x, z, data, view, roofH, top, cells }
 
@@ -97,6 +97,7 @@ function removeMegaTier(m){
 function removeMega(m){
   if (!m) return;
   finishAnimsOn(m);
+  if (m.fx){ m.fx.dispose(); m.fx = null; }
   const old = { view: m.view, data: m.data }; m.view = null; m.data = null;
   megas.delete(m.kind);
   for (const b of m.cells) b.mega = null;
@@ -104,11 +105,18 @@ function removeMega(m){
   refresh(m.cells.filter(b => cells.get(ckey(b.i, b.j)) === b));
   startAnim(m, 'remove', CURB - .05, m.top + 1, MEGA_TYPES[m.kind].colour, megaSize(m), old);
 }
+// moving parts (like the square's holographic koi) live outside the batched geometry and are updated every frame
+function megaFx(m){
+  if (m.fx){ m.fx.dispose(); m.fx = null; }
+  const t = MEGA_TYPES[m.kind]; if (t.fx) m.fx = t.fx(m);
+}
+function updateMegaFx(dt, time){ for (const m of megas.values()) if (m.fx) m.fx.update(dt, time); }
 function rebuildMega(m){
   finishAnimsOn(m);
   disposeData(m.data);
   m.data = collect(() => MEGA_TYPES[m.kind].build(m));
   cellView(m);
+  megaFx(m);
   for (const b of m.cells) b.height = m.roofH;
   dirtyRegions.add(regKey(m.i, m.j));
 }
@@ -498,16 +506,34 @@ function buildSkyMall(m){
 }
 
 /* ---------- the town square ---------- */
-// A 5x5 open plaza for the neighbourhoods. In the middle stands the Old Tree: a huge, gnarled tree in a round
-// stone planter ringed with a bench and a neon band, its canopy hung with paper lanterns, and strings of lanterns
-// running out from it to poles round the square. Under them, a night market: food carts of three kinds (tall
-// menu-tower bike carts, open hawker stalls under tarps, little food trucks with a serving hatch), tables with
-// umbrellas and stools, crowds, steam rising off the woks. The paving is a pattern of rings round the tree.
-M.trunk2 = toon(0x5a4232, { flat: 1 }); M.leafA = toon(0x3f6a34, { flat: 1 }); M.leafB = toon(0x58833f, { flat: 1 }); M.leafC = toon(0x2f5530, { flat: 1 });
+// A 5x5 open plaza for the neighbourhoods. In the middle, a holographic koi pond: a round, dark pool ringed in
+// stone and cyan neon, with lily pads and lotus lights, where koi made of light circle and flicker. Lantern strings
+// cross over it between poles round the square. Round the pond, a busy night market: food carts of three kinds
+// (menu-tower bike carts, hawker stalls, little food trucks), all piled with food; long market stands with trays
+// of food laid out under tarps, like a street market; tables, queues and crowds, steam rising off the woks.
 M.lantern = toon(0x7a2a1a, { em:0xff8a3a, kind:'bulb' }); M.lantern2 = toon(0x7a5a1a, { em:0xffc04a, kind:'bulb' });
 M.screen = toon(0x10202a, { em:0x4fd8ff, kind:'neon' }); M.screen2 = toon(0x1a1030, { em:0xc070ff, kind:'neon' });
 M.tarp1 = toon(0x3f6f7a); M.tarp2 = toon(0x7a4a5a); M.tarp3 = toon(0x6a6a52);
-// a string of lanterns hanging in a sag from a to b
+// food: warm, saturated colours that read as food even at a few pixels (lit a little so they glow under the lamps)
+const FOOD = [toon(0xe08a2a, { em:0x3a1e06, kind:'window' }), toon(0xf2c04a, { em:0x3a2a06, kind:'window' }), toon(0xc8402a, { em:0x30100a, kind:'window' }),
+              toon(0x8fb03a, { em:0x1a2a06, kind:'window' }), toon(0xb8743a, { em:0x2a1608, kind:'window' }), toon(0xf4e2c0, { em:0x3a3020, kind:'window' }),
+              toon(0xff8aa0, { em:0x3a141a, kind:'window' })];
+const food = () => pick(FOOD);
+M.koiWater = toon(0x1c5868, { em:0x0b3442, kind:'trim' });   // deep teal, dark enough for the glowing koi to read
+// a tray heaped with food
+function foodTray(P, x, y, z, w = .26, d = .18){
+  box(pick([M.metal, M.white2, M.wood]), P, x, y + .01, z, w, .02, d);
+  const f = food(), n = 3 + Math.floor(R()*4);
+  for (let k=0; k<n; k++) put(U.sph, chance(.7) ? f : food(), under(P, T(x + rnd(-w*.35, w*.35), y + .04, z + rnd(-d*.3, d*.3), 0, rnd(.05, .09), rnd(.035, .06), rnd(.05, .09))));
+}
+// a bowl with a mound of noodles or rice
+function foodBowl(P, x, y, z, r = .07){ put(U.cyl16, pick([M.white2, M.awn3, M.pot, M.corrBlue]), under(P, T(x, y + .025, z, 0, 2*r, .05, 2*r))); put(U.sph, food(), under(P, T(x, y + .05, z, 0, 1.6*r, .7*r, 1.6*r))); }
+// skewers standing in a rack
+function skewers(P, x, y, z){ box(M.wood, P, x, y + .02, z, .18, .04, .08); for (let k=0; k<5; k++){ const sx = x - .07 + k*.035; cyl(M.wood, P, sx, y + .12, z, .004, .2); for (let q=0; q<3; q++) box(food(), P, sx, y + .1 + q*.035, z, .028, .028, .028); } }
+// a pot on a burner, steaming
+function steamPot(P, x, y, z){ put(U.cyl16, M.metalDark, under(P, T(x, y + .03, z, 0, .2, .06, .2))); put(U.cyl16, M.metal, under(P, T(x, y + .12, z, 0, .18, .14, .18))); put(U.cyl16, food(), under(P, T(x, y + .19, z, 0, .15, .01, .15))); emitters.push(new THREE.Vector3(x, y + .22, z).applyMatrix4(P)); }
+// hanging food: sausages, roast ducks, lanterns of buns
+function hangingFood(P, x, y, z){ for (let k=0; k<4; k++){ const hx = x + (k - 1.5)*.07; cyl(M.frame, P, hx, y - .04, z, .003, .08); box(pick([FOOD[0], FOOD[4], FOOD[2]]), P, hx, y - .14, z, .045, .12, .04); } }
 function lanternString(P, ax, ay, az, bx, by, bz, sag){
   const n = Math.max(4, Math.round(Math.hypot(bx - ax, bz - az)/.55));
   let px = ax, py = ay, pz = az;
@@ -518,129 +544,182 @@ function lanternString(P, ax, ay, az, bx, by, bz, sag){
     px = x; py = y; pz = z;
   }
 }
-// a little person, two blocks
-function person(P, x, y, z){ const c = pick([M.frame, M.metalDark, M.concDD, M.awn1, M.cloth3, M.white2, M.awn2, M.red2]); box(c, P, x, y + .11, z, .08, .22, .06); box(M.concDD, P, x, y + .26, z, .055, .06, .055); }
-// cart 1: a tall bike cart with a stack of glowing menu boards, after the menu-tower reference
+function person(P, x, y, z){ const c = pick([M.frame, M.metalDark, M.concDD, M.awn1, M.cloth3, M.white2, M.awn2, M.red2, M.cloth1, M.cloth4]); box(c, P, x, y + .11, z, .08, .22, .06); box(M.concDD, P, x, y + .26, z, .055, .06, .055); }
+// cart 1: a tall bike cart with a stack of glowing menu boards (menu-tower reference), its counter full of food
 function menuCart(P, neon){
-  box(M.metalDark, P, 0, .42, 0, .9, .32, .45);                                      // body
-  for (const s of [-1, 1]) for (let k=0; k<2; k++){ const F = under(P, T(0, 0, s*.226, s > 0 ? 0 : PI)); box(neon, F, -.22 + k*.44, .42, 0, .3, .02, .01); box(neon, F, -.22 + k*.44, .42, 0, .02, .24, .01); box(neon, F, -.22 + k*.44 - .1, .45, 0, .02, .14, .01, 0, 0, .7); }   // geometric neon panels
-  box(M.metal, P, 0, .6, 0, .94, .04, .5);                                            // counter
-  for (const s of [-1, 1]) put(U.torus, neon === M.neonPink ? M.metalDark : M.frame, under(P, T(.25*s, .2, .25, 0, .4, .4, .4, PI/2)));   // wheels
-  for (const s of [-1, 1]) put(U.torus, M.frame, under(P, T(.25*s, .2, -.25, 0, .4, .4, .4, PI/2)));
-  for (const [x, z] of [[-.42,-.2],[.42,-.2],[-.42,.2],[.42,.2]]) cyl(M.frame, P, x, .9, z, .015, .6);   // posts
-  box(M.metalDark, P, 0, 1.22, 0, 1.1, .05, .62); box(neon, P, 0, 1.2, .31, 1.1, .03, .02); box(neon, P, 0, 1.2, -.31, 1.1, .03, .02);   // canopy with neon edge
-  box(M.metalDark, P, 0, 1.52, -.05, .8, .55, .4); box(M.screen, P, 0, 1.55, .16, .7, .4, .02); box(M.screen2, P, 0, 1.55, -.26, .7, .4, .02);   // menu tower: lower
-  box(M.metalDark, P, .05, 1.98, -.05, .55, .38, .32); box(M.screen2, P, .05, 2.0, .12, .46, .28, .02); box(neon, P, .05, 2.19, -.05, .6, .03, .36);   // upper
-  glow(P, 0, 1.55, .3, neon === M.neonPink ? 'pink' : 'cyan', 1.2); glow(P, 0, 1.1, .2, 'warm', .8);
-  for (let k=0; k<3; k++) box(pick([M.white2, M.cream2, M.awn3]), P, rnd(-.35, .35), .66, rnd(-.1, .15), .08, .07, .08);   // cups and boxes
-  emitters.push(new THREE.Vector3(-.2, .7, 0).applyMatrix4(P));
+  box(M.metalDark, P, 0, .42, 0, .9, .32, .45);
+  for (const s of [-1, 1]) for (let k=0; k<2; k++){ const F = under(P, T(0, 0, s*.226, s > 0 ? 0 : PI)); box(neon, F, -.22 + k*.44, .42, 0, .3, .02, .01); box(neon, F, -.22 + k*.44, .42, 0, .02, .24, .01); box(neon, F, -.22 + k*.44 - .1, .45, 0, .02, .14, .01, 0, 0, .7); }
+  box(M.metal, P, 0, .6, 0, .94, .04, .5);
+  for (const s of [-1, 1]) for (const z of [.25, -.25]) put(U.torus, M.frame, under(P, T(.25*s, .2, z, 0, .4, .4, .4, PI/2)));
+  for (const [x, z] of [[-.42,-.2],[.42,-.2],[-.42,.2],[.42,.2]]) cyl(M.frame, P, x, .9, z, .015, .6);
+  box(M.metalDark, P, 0, 1.22, 0, 1.1, .05, .62); box(neon, P, 0, 1.2, .31, 1.1, .03, .02); box(neon, P, 0, 1.2, -.31, 1.1, .03, .02);
+  box(M.metalDark, P, 0, 1.52, -.05, .8, .55, .4); box(M.screen, P, 0, 1.55, .16, .7, .4, .02); box(M.screen2, P, 0, 1.55, -.26, .7, .4, .02);
+  box(M.metalDark, P, .05, 1.98, -.05, .55, .38, .32); box(M.screen2, P, .05, 2.0, .12, .46, .28, .02); box(neon, P, .05, 2.19, -.05, .6, .03, .36);
+  glow(P, 0, 1.55, .3, neon === M.neonPink ? 'pink' : 'cyan', 1.2); glow(P, 0, 1.1, .2, 'warm', 1.0);
+  // the food: trays on the counter, a steaming pot, skewers, buns hanging under the canopy
+  foodTray(P, -.3, .62, .1); foodTray(P, 0, .62, .12); steamPot(P, .3, .62, -.05); skewers(P, .32, .62, .17);
+  for (let k=0; k<3; k++) foodBowl(P, -.36 + k*.18, .62, -.14);
+  hangingFood(P, -.25, 1.2, .25);
 }
-// cart 2: an open hawker stall under a sagging tarp, after the street-market reference
+// cart 2: an open hawker stall under a sagging tarp
 function hawkerStall(P){
-  box(M.metal, P, 0, .5, 0, 1.3, .06, .6); box(M.metalDark, P, 0, .28, 0, 1.24, .4, .54);   // steel counter
-  for (let k=0; k<6; k++){ const x = -.5 + k*.2; put(U.cyl16, pick([M.white2, M.awn3, M.pot]), under(P, T(x, .56, rnd(-.12, .15), 0, .16, .06, .16))); box(pick([M.veg1, M.veg2, M.veg3, M.awn3]), P, x, .6, rnd(-.12, .15), .1, .02, .1); }   // bowls of food
-  put(U.cyl16, M.metal, under(P, T(.45, .62, -.12, 0, .3, .12, .3))); emitters.push(new THREE.Vector3(.45, .7, -.12).applyMatrix4(P));   // the wok
+  box(M.metal, P, 0, .5, 0, 1.3, .06, .6); box(M.metalDark, P, 0, .28, 0, 1.24, .4, .54);
+  for (let k=0; k<5; k++) foodTray(P, -.5 + k*.2, .53, .15, .17, .2);                       // a front row of trays
+  for (let k=0; k<4; k++) foodBowl(P, -.45 + k*.2, .53, -.08, .075);
+  steamPot(P, .45, .53, -.15); steamPot(P, .2, .53, -.2);
   for (const [x, z] of [[-.66,-.32],[.66,-.32],[-.66,.4],[.66,.4]]) cyl(M.frame, P, x, .7, z, .015, 1.4 + (z > 0 ? -.2 : 0));
-  box(pick([M.tarp1, M.tarp2, M.tarp3]), P, 0, 1.33, .04, 1.5, .03, .9, 0, -.2);       // tarp, sloping forward
-  for (const x of [-.35, .35]){ cyl(M.frame, P, x, 1.2, 0, .006, .14); put(U.cone, M.metalDark, under(P, T(x, 1.08, 0, 0, .18, .1, .18))); box(M.bulb, P, x, 1.02, 0, .06, .04, .06); glow(P, x, 1.0, 0, 'warm', .9); }   // hanging lamps
-  box(M.metalDark, P, -.68, .65, -.1, .04, .3, .3); box(pick([M.screen, M.screen2]), P, -.7, .7, -.1, .01, .2, .24);   // a little lit menu
-  for (let k=0; k<3; k++){ const x = rnd(-.5, .5); cyl(pick([M.red2, M.awn2, M.white2]), P, x, .16, .55, .08, .3); }   // plastic stools
-  for (let k=0; k<2; k++) put(U.cyl16, pick([M.awn1, M.corrBlue, M.white2]), under(P, T(rnd(-.6, .6), .12, rnd(-.45, -.3), 0, .18, .24, .18)));   // tubs
+  box(pick([M.tarp1, M.tarp2, M.tarp3]), P, 0, 1.33, .04, 1.5, .03, .9, 0, -.2);
+  hangingFood(P, -.3, 1.2, .3); hangingFood(P, .15, 1.22, .3);
+  for (const x of [-.35, .35]){ cyl(M.frame, P, x, 1.2, 0, .006, .14); put(U.cone, M.metalDark, under(P, T(x, 1.08, 0, 0, .18, .1, .18))); box(M.bulb, P, x, 1.02, 0, .06, .04, .06); glow(P, x, 1.0, 0, 'warm', 1.0); }
+  box(M.metalDark, P, -.68, .65, -.1, .04, .3, .3); box(pick([M.screen, M.screen2]), P, -.7, .7, -.1, .01, .2, .24);
+  for (let k=0; k<3; k++){ const x = rnd(-.5, .5); cyl(pick([M.red2, M.awn2, M.white2]), P, x, .16, .55, .08, .3); }
+  for (let k=0; k<3; k++) put(U.cyl16, pick([M.awn1, M.corrBlue, M.white2]), under(P, T(rnd(-.6, .6), .12, rnd(-.45, -.3), 0, .18, .24, .18)));
 }
-// cart 3: a little food truck with its serving hatch open and a neon sign on the roof
+// cart 3: a little food truck, hatch open, food stacked on the counter and a menu board out front
 function foodTruck(P, neon){
   const body = pick([M.corrBlue, M.metalDark, M.teal2, M.concDD]);
-  box(body, P, 0, .5, 0, 1.5, .7, .7); box(body, P, .9, .4, 0, .4, .5, .66);           // box and cab
+  box(body, P, 0, .5, 0, 1.5, .7, .7); box(body, P, .9, .4, 0, .4, .5, .66);
   box(M.glassDark, P, 1.08, .55, 0, .04, .22, .56);
-  box(M.interiorCool, P, -.15, .58, .352, .95, .38, .01);                              // the open hatch, lit inside
-  for (let k=0; k<4; k++) box(pick([M.awn3, M.veg2, M.white2, M.awn1]), P, -.5 + k*.24, .44, .38, .12, .1, .08);   // food on the counter
-  box(body, P, -.15, .86, .5, 1.0, .03, .32, 0, -.5);                                  // the hatch flap, propped up
-  box(M.metal, P, -.15, .4, .42, 1.0, .03, .14);                                        // counter shelf
-  box(neon, P, 0, .16, .352, 1.4, .03, .01); box(neon, P, 0, .16, -.352, 1.4, .03, .01);   // underglow strips
-  glow(P, 0, .12, .45, NEON_NAME.get(neon) || 'pink', 1.0); glow(P, -.15, .58, .5, 'cyan', .7);
-  for (const [x, z] of [[-.45,.36],[.45,.36],[-.45,-.36],[.85,-.34],[.85,.34]]) put(U.cyl16, M.frame, under(P, T(x, .12, z, 0, .24, .06, .24, PI/2)));   // wheels
-  box(M.metalDark, P, -.1, .98, 0, 1.0, .3, .06); const kind = pick(GLYPH_H);           // roof sign
+  box(M.winLit, P, -.15, .58, .352, .95, .38, .01);                                    // the open hatch, warm-lit inside
+  for (let k=0; k<5; k++) box(food(), P, -.5 + k*.17, .52, .34, .1, .12, .04);          // food on shelves inside
+  box(M.metal, P, -.15, .4, .42, 1.0, .03, .16);                                        // counter
+  for (let k=0; k<4; k++) foodTray(P, -.5 + k*.24, .41, .43, .2, .13);
+  box(body, P, -.15, .86, .5, 1.0, .03, .32, 0, -.5);
+  box(neon, P, 0, .16, .352, 1.4, .03, .01); box(neon, P, 0, .16, -.352, 1.4, .03, .01);
+  glow(P, 0, .12, .45, NEON_NAME.get(neon) || 'pink', 1.0); glow(P, -.15, .58, .5, 'warm', .9);
+  for (const [x, z] of [[-.45,.36],[.45,.36],[-.45,-.36],[.85,-.34],[.85,.34]]) put(U.cyl16, M.frame, under(P, T(x, .12, z, 0, .24, .06, .24, PI/2)));
+  box(M.metalDark, P, -.1, .98, 0, 1.0, .3, .06); const kind = pick(GLYPH_H);
   plant(kind, under(P, T(-.1, 0, .04)), 0, .98, 0, .85, 'c', true); glow(P, -.1, .98, .3, GLYPH_GLOW[kind], 1.0);
+  box(M.frame, P, .5, .3, .75, .04, .6, .04, 0, -.2); box(M.screen, P, .5, .5, .76, .3, .34, .02, 0, -.2);   // A-board menu out front
   emitters.push(new THREE.Vector3(.3, .9, 0).applyMatrix4(P));
 }
-// a table with stools and an umbrella
+// a market stand: a long table of food laid out under tarps (street-market reference)
+function marketStand(P){
+  const L = 2.6;
+  box(M.metal, P, 0, .48, .1, L, .05, .7); box(M.metalDark, P, 0, .25, .1, L - .1, .42, .62);   // front table
+  for (let a=0; a<8; a++) for (let b=0; b<2; b++) foodTray(P, -L/2 + .2 + a*.31, .5, -.1 + b*.26, .26, .2);
+  box(M.wood, P, 0, .75, -.42, L, .04, .3); box(M.wood, P, 0, .4, -.42, .05, .7, .3);        // raised back shelf
+  for (let k=0; k<10; k++) chance(.5) ? foodBowl(P, -L/2 + .15 + k*.26, .77, -.42, .08) : box(pick([M.pot, M.awn3, M.white2, M.veg2]), P, -L/2 + .15 + k*.26, .84, -.42, .1, .14, .1);   // jars and bowls
+  steamPot(P, L/2 + .25, .45, 0); box(M.metal, P, L/2 + .25, .22, 0, .4, .44, .4);         // side table with a pot
+  for (const [x, z, h] of [[-L/2,-.6,1.7],[L/2,-.6,1.7],[-L/2,.5,1.45],[L/2,.5,1.45],[0,-.6,1.7]]) cyl(M.frame, P, x, h/2, z, .02, h);
+  box(pick([M.tarp1, M.tarp2, M.tarp3]), P, -L*.25, 1.62, -.05, L*.55, .03, 1.3, 0, -.18);   // two tarps at different heights
+  box(pick([M.tarp1, M.tarp2, M.tarp3]), P, L*.25, 1.55, -.05, L*.55, .03, 1.2, 0, -.15);
+  for (const x of [-L*.35, 0, L*.35]){ cyl(M.frame, P, x, 1.42, 0, .006, .2); put(U.cone, M.metalDark, under(P, T(x, 1.28, 0, 0, .2, .1, .2))); box(M.bulb, P, x, 1.22, 0, .06, .04, .06); glow(P, x, 1.2, .05, 'warm', 1.1); }
+  for (let t = -L/2; t < L/2; t += .25){ box(M.bulb, P, t, 1.5, .55, .04, .04, .04); if (chance(.4)) glow(P, t, 1.48, .55, 'warm', .4); }   // a string of small bulbs
+  hangingFood(P, -L*.2, 1.5, .4); hangingFood(P, L*.3, 1.45, .4);
+  for (let k=0; k<3; k++) person(P, rnd(-L/2 + .3, L/2 - .3), 0, -.75);                     // vendors behind
+  for (let k=0; k<5; k++) person(P, rnd(-L/2, L/2), 0, rnd(.6, 1.1));                       // shoppers in front
+  for (let k=0; k<6; k++){ const x = rnd(-L/2 - .3, L/2 + .3); box(pick([M.crate, M.awn1, M.corrBlue, M.white2, M.red2]), P, x, .12, rnd(-1.0, -.8), .26, .24, .22); }   // crates and tubs
+  for (let k=0; k<4; k++) put(U.cyl16, pick([M.awn1, M.corrBlue, M.white2]), under(P, T(rnd(-L/2, L/2), .1, .55, 0, .2, .2, .2)));
+  const neon = pick([M.neonPink, M.neonCyan, M.neonAmber]);
+  box(M.metalDark, P, 0, 1.85, -.6, 1.1, .26, .04); box(neon, P, 0, 1.85, -.57, .95, .03, .02); box(neon, P, 0, 1.93, -.57, .6, .03, .02); glow(P, 0, 1.88, -.4, NEON_NAME.get(neon), 1.1);   // sign
+}
 function cafeTable(P, x, z){
   const Q = under(P, T(x, 0, z, rnd(0, TAU)));
   put(U.cyl16, M.white2, under(Q, T(0, .3, 0, 0, .44, .03, .44))); cyl(M.frame, Q, 0, .15, 0, .02, .3);
-  for (let k=0; k<3; k++){ const a = k*TAU/3; cyl(pick([M.red2, M.awn2, M.white2]), Q, Math.cos(a)*.34, .1, Math.sin(a)*.34, .06, .2); if (chance(.55)) person(Q, Math.cos(a)*.34, .06, Math.sin(a)*.34); }
+  for (let k=0; k<2; k++) foodBowl(Q, rnd(-.1, .1), .31, rnd(-.1, .1), .05);
+  for (let k=0; k<3; k++){ const a = k*TAU/3; cyl(pick([M.red2, M.awn2, M.white2]), Q, Math.cos(a)*.34, .1, Math.sin(a)*.34, .06, .2); if (chance(.75)) person(Q, Math.cos(a)*.34, .06, Math.sin(a)*.34); }
   if (chance(.6)){ cyl(M.frame, Q, 0, .6, 0, .012, .6); put(U.cone, pick([M.awn1, M.awn2, M.awn3, M.tarp1]), under(Q, T(0, .98, 0, 0, .8, .2, .8))); }
   else { box(M.bulb, Q, 0, .34, 0, .05, .06, .05); glow(Q, 0, .38, 0, 'warm', .5); }
 }
+// flat water whose normals lean a little, so the wet-ground reflection pass leaves it alone (see the mall pool)
+function flatWater(mat, P, y, r){
+  const g = new THREE.CircleGeometry(r, 28); g.rotateX(-PI/2);
+  const n = g.attributes.normal; for (let k=0; k<n.count; k++) n.setXYZ(k, 0, .84, .54);
+  put(g, mat, under(P, T(0, y, 0))); g.dispose();
+}
+const POND_R = 2.5, POND_Y = .2;
 function buildTownSquare(m){
   R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
   const P = T(m.x, 0, m.z, pick([0, PI/2, PI, -PI/2])), S5 = 5*LOT, H = S5/2;
-  // paving: dark stone, with rings of lighter stone round the middle and a border of planters
   box(G.asph, P, 0, .012, 0, S5, .025, S5);
   const n = 25, st = S5/n;
   for (let a=0;a<n;a++) for (let b=0;b<n;b++){
     const x = (a-(n-1)/2)*st, z = (b-(n-1)/2)*st, r = Math.hypot(x, z);
-    if (r < 2.2) continue;
+    if (r < POND_R + .5) continue;
     const ring = Math.floor(r/1.5) % 2, mat = ring ? TILES.mid[(a + b) % 2] : TILES.low[(a*3 + b) % 4];
     if (!chance(.02)) box(mat, P, x, .03, z, st - .04, .045, st - .04);
   }
-  for (const r of [3.0, 6.0]) for (let k=0; k<48; k++){ const a = k*TAU/48; box(M.concL, P, Math.cos(a)*r, .058, Math.sin(a)*r, .4, .012, .08, -a + PI/2); }   // pale ring lines
-  // ---- the Old Tree
-  put(U.cyl16, M.concM, under(P, T(0, .25, 0, 0, 4.0, .45, 4.0)));                   // stone planter
-  put(U.cyl16, M.concD, under(P, T(0, .48, 0, 0, 4.1, .06, 4.1)));
-  put(U.cyl16, M.neonCyan, under(P, T(0, .3, 0, 0, 4.06, .03, 4.06)));                // a neon band round it
-  put(U.cyl16, M.wood, under(P, T(0, .22, 0, 0, 4.7, .06, 4.7)));                     // ring bench
-  put(U.cyl16, M.grass, under(P, T(0, .5, 0, 0, 3.8, .04, 3.8)));
-  for (let k=0; k<6; k++){ const a = k*TAU/6 + rnd(-.2, .2); strut(M.trunk2, P, 0, .9, 0, Math.cos(a)*rnd(.9, 1.4), .5, Math.sin(a)*rnd(.9, 1.4), rnd(.18, .26)); }   // roots
-  strut(M.trunk2, P, 0, .5, 0, .15, 3.0, -.1, .62); strut(M.trunk2, P, .15, 3.0, -.1, -.1, 4.4, .1, .45);   // trunk
-  const tips = [];
-  for (let k=0; k<7; k++){                                                             // branches
-    const a = k*TAU/7 + rnd(-.3, .3), l = rnd(1.8, 2.8), y = rnd(3.0, 4.4);
-    const ex = Math.cos(a)*l, ez = Math.sin(a)*l, ey = y + rnd(.6, 1.3);
-    strut(M.trunk2, P, 0, y - .4, 0, ex, ey, ez, rnd(.14, .22)); tips.push([ex, ey, ez]);
-  }
-  for (const [x, y, z] of tips) for (let k=0; k<5; k++) blob(pick([M.leafA, M.leafB, M.leafC]), P, x + rnd(-.7, .7), y + rnd(-.1, .6), z + rnd(-.7, .7), rnd(.6, 1.0), .7);
-  for (let k=0; k<10; k++) blob(pick([M.leafA, M.leafB, M.leafC]), P, rnd(-1.4, 1.4), rnd(4.8, 5.8), rnd(-1.4, 1.4), rnd(.8, 1.3), .7);   // crown
-  for (const [x, y, z] of tips) for (let k=0; k<3; k++){ const lx = x + rnd(-.5, .5), lz = z + rnd(-.5, .5), ly = y - rnd(.4, .8);   // lanterns hanging in the branches
-    cyl(M.frame, P, lx, ly + .2, lz, .006, .4); box(chance(.5) ? M.lantern : M.lantern2, P, lx, ly, lz, .13, .18, .13); glow(P, lx, ly, lz, 'amber', .7); }
-  for (let k=0; k<6; k++) plant(pick(['h_ivy','vines','h_curtain1']), P, rnd(-1, 1), rnd(3.6, 4.4), rnd(-1, 1), rnd(.8, 1.1), 't');   // hanging greenery
-  // ---- lantern poles round the square, strung to the tree
+  for (const r of [POND_R + 1.4, 6.6]) for (let k=0; k<48; k++){ const a = k*TAU/48; box(M.concL, P, Math.cos(a)*r, .058, Math.sin(a)*r, .5, .012, .08, -a + PI/2); }
+  // ---- the koi pond
+  put(U.cyl16, M.concM, under(P, T(0, .12, 0, 0, 2*POND_R + .7, .2, 2*POND_R + .7)));        // stone rim
+  put(U.cyl16, M.concD, under(P, T(0, .225, 0, 0, 2*POND_R + .8, .04, 2*POND_R + .8)));
+  put(U.cyl16, M.neonCyan, under(P, T(0, .16, 0, 0, 2*POND_R + .74, .03, 2*POND_R + .74)));  // neon band round the rim
+  put(U.cyl16, M.wood, under(P, T(0, .1, 0, 0, 2*POND_R + 1.5, .05, 2*POND_R + 1.5)));       // ring bench
+  flatWater(M.koiWater, P, POND_Y, POND_R + .05);
+  for (let k=0; k<10; k++){ const a = rnd(0, TAU), r = rnd(.6, POND_R - .3);                 // lily pads, a few lotus lights
+    put(U.cyl16, pick([M.green1, M.green2, M.green3]), under(P, T(Math.cos(a)*r, POND_Y + .01, Math.sin(a)*r, 0, rnd(.25, .4), .01, rnd(.25, .4))));
+    if (chance(.4)){ put(U.sph, M.neonPink, under(P, T(Math.cos(a)*r, POND_Y + .05, Math.sin(a)*r, 0, .09, .07, .09))); glow(P, Math.cos(a)*r, POND_Y + .08, Math.sin(a)*r, 'pink', .5); } }
+  for (let k=0; k<5; k++){ const a = k*TAU/5 + .3, r = POND_R*.55; put(U.cyl16, M.concL, under(P, T(Math.cos(a)*r, POND_Y + .02, Math.sin(a)*r, 0, .35, .06, .35))); }   // stepping stones
+  for (let k=0; k<4; k++){ const a = k*TAU/4 + PI/4, r = POND_R + .45;                        // hologram projectors on the rim
+    const Q = under(P, T(Math.cos(a)*r, .25, Math.sin(a)*r, -a));
+    box(M.metalDark, Q, 0, .15, 0, .18, .3, .18); box(M.screen, Q, 0, .32, 0, .12, .04, .12); glow(Q, 0, .34, 0, 'cyan', .7); }
+  for (let k=0; k<6; k++){ const a = rnd(0, TAU), r = POND_R + .55; plant(pick(['bush','bushFlower','g_fern2']), P, Math.cos(a)*r, .25, Math.sin(a)*r, .7); }
+  // ---- lantern poles round the square, strung across the pond and between each other
   const poles = [];
   for (let k=0; k<8; k++){ const a = k*TAU/8 + PI/8, r = 7.9; poles.push([Math.cos(a)*r, Math.sin(a)*r]); }
-  for (const [x, z] of poles){
-    cyl(M.metalDark, P, x, 1.3, z, .05, 2.6); box(M.lantern2, P, x, 2.66, z, .14, .14, .14); glow(P, x, 2.66, z, 'warm', 1.0);
-    lanternString(P, x, 2.55, z, x*.22, 3.9, z*.22, .5);
-  }
-  for (let k=0; k<8; k++){ const [ax, az] = poles[k], [bx, bz] = poles[(k+1)%8]; lanternString(P, ax, 2.5, az, bx, 2.5, bz, .35); }
-  // ---- the night market: carts in a loose ring between the tree and the poles, tables between them
-  const carts = [];
-  for (let k=0; k<12; k++){
-    const a = k*TAU/12 + rnd(-.12, .12), r = rnd(4.4, 5.4) + (k % 2)*1.0;
-    carts.push([Math.cos(a)*r, Math.sin(a)*r, a]);
-  }
+  for (const [x, z] of poles){ cyl(M.metalDark, P, x, 1.6, z, .05, 3.2); box(M.lantern2, P, x, 3.26, z, .14, .14, .14); glow(P, x, 3.26, z, 'warm', 1.0); }
+  for (let k=0; k<4; k++){ const [ax, az] = poles[k], [bx, bz] = poles[k + 4]; lanternString(P, ax, 3.1, az, bx, 3.1, bz, .9); }
+  for (let k=0; k<8; k++){ const [ax, az] = poles[k], [bx, bz] = poles[(k+1)%8]; lanternString(P, ax, 3.0, az, bx, 3.0, bz, .4); }
+  // ---- market stands along the four sides, between the poles, facing in
+  for (let k=0; k<4; k++){ const a = k*PI/2, r = 7.75; marketStand(under(P, T(Math.cos(a)*r, .05, Math.sin(a)*r, -a - PI/2))); }
+  // ---- carts in a ring round the pond, bigger than life so the food reads
+  const carts = [], CS = 1.45;
+  for (let k=0; k<10; k++){ const a = k*TAU/10 + PI/10 + rnd(-.08, .08), r = 5.0 + (k % 2)*.5; carts.push([Math.cos(a)*r, Math.sin(a)*r, a]); }
   carts.forEach(([x, z, a], k) => {
-    const Q = under(P, T(x, .05, z, -a - PI/2 + rnd(-.2, .2)));   // serving side faces the tree
+    const Q = under(P, T(x, .05, z, -a - PI/2 + rnd(-.15, .15))), Qs = under(Q, T(0, 0, 0, 0, CS, CS, CS));
     const r = k % 3;
-    if (r === 0) menuCart(Q, pick([M.neonPink, M.neonCyan, M4.neonPurple]));
-    else if (r === 1) hawkerStall(Q);
-    else foodTruck(Q, pick([M.neonPink, M.neonCyan, M.neonAmber]));
-    for (let q=0; q<irand(1, 4); q++) person(Q, rnd(-.6, .6), 0, rnd(.6, 1.0));        // a queue
+    if (r === 0) menuCart(Qs, pick([M.neonPink, M.neonCyan, M4.neonPurple]));
+    else if (r === 1) hawkerStall(Qs);
+    else foodTruck(Qs, pick([M.neonPink, M.neonCyan, M.neonAmber]));
+    for (let q=0; q<irand(2, 5); q++) person(Q, rnd(-.7, .7), 0, rnd(.9, 1.6));             // a queue
   });
-  for (let k=0; k<14; k++){
-    const a = rnd(0, TAU), r = rnd(2.8, 7.2), x = Math.cos(a)*r, z = Math.sin(a)*r;
-    if (carts.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 1.4)) continue;
+  for (let k=0; k<24; k++){
+    const a = rnd(0, TAU), r = rnd(3.6, 7.0), x = Math.cos(a)*r, z = Math.sin(a)*r;
+    if (carts.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 1.6)) continue;
+    if (Math.abs(Math.abs(x) - 7.75) < 1.4 && Math.abs(z) < 2) continue; if (Math.abs(Math.abs(z) - 7.75) < 1.4 && Math.abs(x) < 2) continue;
     cafeTable(P, x, z);
   }
-  for (let k=0; k<30; k++){ const a = rnd(0, TAU), r = rnd(2.4, 8.5); person(P, Math.cos(a)*r, .05, Math.sin(a)*r); }   // the crowd
-  // ---- the edge: planters with trees at the corners, benches, a lamp on each side
+  for (let k=0; k<70; k++){ const a = rnd(0, TAU), r = rnd(POND_R + .9, 9); const x = Math.cos(a)*r, z = Math.sin(a)*r;   // the crowd, some in little groups
+    person(P, x, .05, z); if (chance(.4)) person(P, x + rnd(-.15, .15), .05, z + rnd(.1, .18)); }
   for (const [sx, sz] of [[1,1],[1,-1],[-1,1],[-1,-1]]){
     const Q = under(P, T(sx*(H - .7), 0, sz*(H - .7)));
     box(M.concM, Q, 0, .2, 0, .9, .4, .9); plant(pick(['bonsai','bamboo']), Q, 0, .4, 0, 1.2); plant('bushFlower', Q, .25, .4, .25, .8);
   }
-  for (const [sx, sz, ry] of [[0,1,0],[0,-1,PI],[1,0,PI/2],[-1,0,-PI/2]]){
-    const Q = under(P, T(sx*(H - .5), 0, sz*(H - .5), ry));
-    for (const o of [-2.5, 2.5]){ box(M.wood, Q, o, .2, 0, .9, .05, .28); box(M.frame, Q, o, .1, 0, .8, .18, .2); }
-    cyl(M.metalDark, Q, 0, .75, 0, .035, 1.5); box(M.bulb, Q, 0, 1.52, 0, .14, .06, .14); glow(Q, 0, 1.48, 0, 'warm', 1.3);
-  }
+  m.pond = { x: m.x, z: m.z, y: POND_Y + .06, r: POND_R };
   m.roofH = CURB + .1;
-  m.top = 6.5;
+  m.top = 5;
+}
+// The holographic koi: glowing, see-through fish of light that circle the pond, weaving in and out, now and then
+// flickering like a projection. Drawn in the colour pass only, additive.
+function koiFx(m){
+  const g = new THREE.Group(), fish = [], p = m.pond;
+  const body = new THREE.SphereGeometry(.5, 8, 6), tail = new THREE.ConeGeometry(.5, 1, 6); tail.rotateX(PI/2);
+  const cols = [0xff9a4a, 0xffe0c0, 0x4fe0ff, 0xff6a6a, 0xffc24a, 0x9af0ff, 0xff8ad8];
+  for (let k=0; k<9; k++){
+    const mat = new THREE.MeshBasicMaterial({ color: cols[k % cols.length], transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false });
+    const f = new THREE.Group();
+    const b = new THREE.Mesh(body, mat); b.scale.set(.16, .07, .42); f.add(b);
+    const t = new THREE.Mesh(tail, mat); t.scale.set(.2, .03, .2); t.position.z = -.28; t.rotation.y = PI; f.add(t);
+    for (const s of [-1, 1]){ const fin = new THREE.Mesh(tail, mat); fin.scale.set(.1, .02, .1); fin.position.set(s*.09, 0, .05); fin.rotation.y = PI + s*.9; f.add(fin); }
+    f.traverse(o => { o.layers.set(1); o.renderOrder = 3; });
+    g.add(f);
+    fish.push({ f, mat, r0: .7 + Math.random()*(p.r - 1.1), a: Math.random()*TAU, sp: (.25 + Math.random()*.25)*(Math.random() < .5 ? 1 : -1), wob: Math.random()*TAU, base: .55 + Math.random()*.3, tailT: t });
+  }
+  scene.add(g);
+  return {
+    update(dt, time){
+      for (const k of fish){
+        k.a += k.sp*dt;
+        const r = k.r0 + Math.sin(time*.4 + k.wob)*.45;
+        const x = p.x + Math.cos(k.a)*r, z = p.z + Math.sin(k.a)*r;
+        k.f.position.set(x, p.y + Math.sin(time*1.3 + k.wob)*.03, z);
+        k.f.rotation.y = Math.atan2(-Math.sin(k.a)*Math.sign(k.sp), Math.cos(k.a)*Math.sign(k.sp)) + Math.sin(time*3 + k.wob)*.25;
+        k.tailT.rotation.y = PI + Math.sin(time*7 + k.wob)*.5;
+        const flick = (Math.sin(time*23 + k.wob*5) + Math.sin(time*5.1 + k.wob)) > 1.6 ? .25 : 1;   // projection glitch
+        k.mat.opacity = k.base*flick;
+      }
+    },
+    dispose(){ scene.remove(g); body.dispose(); tail.dispose(); for (const k of fish) k.mat.dispose(); }
+  };
 }

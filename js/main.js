@@ -17,6 +17,7 @@ function frame(now){
   updateTrips(dt, now/1000);
   updateVehicleShadows();
   updateAnims(dt);
+  updateMegaFx(dt, now/1000);
   updateSteam(dt, night);
   updateRain(dt);
   // wind pushes the clouds: they drift faster in a strong wind and nearly stop when it's calm

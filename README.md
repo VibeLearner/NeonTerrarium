@@ -70,8 +70,9 @@ Landmarks that take over a block of plots once the city is big enough. Each exis
   an open atrium with walkways and boutiques round a central core; the roof is mostly pool under a white canopy.
   Click its roof with a zone picked to stack another tier of two floors (up to 3); right-click takes the top tier off.
 - **Town square:** a 5x5 open plaza. Unlocks at 40 residential and 40 commercial sections, then a 1 in 40 chance
-  per build. The Old Tree in a ringed planter at its heart, lantern strings out to poles round the square, and a
-  night market of food carts (menu-tower bike carts, hawker stalls, little food trucks) with tables and crowds.
+  per build. A holographic koi pond at its heart (koi of light circle and flicker), lantern strings crossing over
+  it, and a night market: food carts piled with food (menu-tower bike carts, hawker stalls, little food trucks),
+  long market stands with trays of food under tarps, tables and crowds.
 - New megastructures go in `MEGA_TYPES` at the top of `js/mega.js` (requirement, odds, footprint, max tiers).
 - For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall) or **B** (town square)
   to bring it in, or remove it, next to the plot under the pointer, skipping the requirement and the odds.

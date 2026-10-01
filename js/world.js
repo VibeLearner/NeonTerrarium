@@ -411,7 +411,7 @@ function finishAnimsOn(c){ for (let i = anims.length - 1; i >= 0; i--) if (anims
 function clearIsland(){
   while (anims.length) endAnim(anims.length - 1);
   for (const c of cells.values()){ disposeData(c.data); c.data = null; cellView(c); }
-  for (const m of megas.values()){ disposeData(m.data); m.data = null; cellView(m); }
+  for (const m of megas.values()){ disposeData(m.data); m.data = null; cellView(m); if (m.fx){ m.fx.dispose(); m.fx = null; } }
   megas.clear();
   for (const k of [...regions.keys()]){ world.remove(regions.get(k)); disposeGroup(regions.get(k)); regions.delete(k); }
   cells.clear();

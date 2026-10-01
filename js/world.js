@@ -255,6 +255,7 @@ function nearPort(){
 function syncAgents(){
   ports = []; carPads = []; emitters = [];
   for (const c of cells.values()){ ports.push(...c.ports); carPads.push(...c.pads); emitters.push(...c.emitters); }
+  for (const m of megas.values()) if (m.data) emitters.push(...m.data.emitters);   // e.g. steam off the food carts
   portLots = [...cells.values()].map(c => ({ x: c.x, z: c.z, height: c.height }));
   setupSteam();
   for (const d of drones) if (!ports.includes(d.at) || (d.phase !== 'inside' && !ports.includes(d.to))){

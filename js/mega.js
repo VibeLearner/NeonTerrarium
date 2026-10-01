@@ -11,6 +11,8 @@ const MEGA_TYPES = {
            colour: '#ff5a4a', sound: 'radioOn', build: buildRadioStation },
   mall:  { name: 'Sky mall', need: { high: 50, ind: 30 }, odds: 50, w: 3, h: 2, maxLevels: 3,
            colour: '#ffcf7a', build: buildSkyMall },
+  square: { name: 'Town square', need: { low: 40, mid: 40 }, odds: 40, w: 5, h: 5, maxLevels: 1,
+           colour: '#9dff6a', build: buildTownSquare },
 };
 const megas = new Map();   // kind -> { kind, i, j, w, h, levels, seed, x, z, data, view, roofH, top, cells }
 
@@ -265,7 +267,7 @@ if (location.hash.includes('dev')){
   let lastPointer = null;
   addEventListener('pointermove', e => { lastPointer = { x: e.clientX, y: e.clientY }; });
   addEventListener('keydown', e => {
-    const kind = { m: 'radio', n: 'mall' }[e.key.toLowerCase()]; if (!kind) return;
+    const kind = { m: 'radio', n: 'mall', b: 'square' }[e.key.toLowerCase()]; if (!kind) return;
     const pk = lastPointer ? pickAt(lastPointer.x, lastPointer.y) : null;
     const c = pk && pk.c ? pk.c : cells.values().next().value;
     if (megas.has(kind)) removeMega(megas.get(kind));
@@ -493,4 +495,152 @@ function buildSkyMall(m){
 
   m.roofH = roof + .17;
   m.top = roof + 1.4;
+}
+
+/* ---------- the town square ---------- */
+// A 5x5 open plaza for the neighbourhoods. In the middle stands the Old Tree: a huge, gnarled tree in a round
+// stone planter ringed with a bench and a neon band, its canopy hung with paper lanterns, and strings of lanterns
+// running out from it to poles round the square. Under them, a night market: food carts of three kinds (tall
+// menu-tower bike carts, open hawker stalls under tarps, little food trucks with a serving hatch), tables with
+// umbrellas and stools, crowds, steam rising off the woks. The paving is a pattern of rings round the tree.
+M.trunk2 = toon(0x5a4232, { flat: 1 }); M.leafA = toon(0x3f6a34, { flat: 1 }); M.leafB = toon(0x58833f, { flat: 1 }); M.leafC = toon(0x2f5530, { flat: 1 });
+M.lantern = toon(0x7a2a1a, { em:0xff8a3a, kind:'bulb' }); M.lantern2 = toon(0x7a5a1a, { em:0xffc04a, kind:'bulb' });
+M.screen = toon(0x10202a, { em:0x4fd8ff, kind:'neon' }); M.screen2 = toon(0x1a1030, { em:0xc070ff, kind:'neon' });
+M.tarp1 = toon(0x3f6f7a); M.tarp2 = toon(0x7a4a5a); M.tarp3 = toon(0x6a6a52);
+// a string of lanterns hanging in a sag from a to b
+function lanternString(P, ax, ay, az, bx, by, bz, sag){
+  const n = Math.max(4, Math.round(Math.hypot(bx - ax, bz - az)/.55));
+  let px = ax, py = ay, pz = az;
+  for (let k=1; k<=n; k++){
+    const t = k/n, x = ax + (bx - ax)*t, z = az + (bz - az)*t, y = ay + (by - ay)*t - sag*Math.sin(PI*t);
+    strut(M.frame, P, px, py, pz, x, y, z, .012);
+    if (k < n){ box(chance(.5) ? M.lantern : M.lantern2, P, x, y - .1, z, .1, .14, .1); if (k % 2) glow(P, x, y - .1, z, chance(.6) ? 'amber' : 'warm', .55); }
+    px = x; py = y; pz = z;
+  }
+}
+// a little person, two blocks
+function person(P, x, y, z){ const c = pick([M.frame, M.metalDark, M.concDD, M.awn1, M.cloth3, M.white2, M.awn2, M.red2]); box(c, P, x, y + .11, z, .08, .22, .06); box(M.concDD, P, x, y + .26, z, .055, .06, .055); }
+// cart 1: a tall bike cart with a stack of glowing menu boards, after the menu-tower reference
+function menuCart(P, neon){
+  box(M.metalDark, P, 0, .42, 0, .9, .32, .45);                                      // body
+  for (const s of [-1, 1]) for (let k=0; k<2; k++){ const F = under(P, T(0, 0, s*.226, s > 0 ? 0 : PI)); box(neon, F, -.22 + k*.44, .42, 0, .3, .02, .01); box(neon, F, -.22 + k*.44, .42, 0, .02, .24, .01); box(neon, F, -.22 + k*.44 - .1, .45, 0, .02, .14, .01, 0, 0, .7); }   // geometric neon panels
+  box(M.metal, P, 0, .6, 0, .94, .04, .5);                                            // counter
+  for (const s of [-1, 1]) put(U.torus, neon === M.neonPink ? M.metalDark : M.frame, under(P, T(.25*s, .2, .25, 0, .4, .4, .4, PI/2)));   // wheels
+  for (const s of [-1, 1]) put(U.torus, M.frame, under(P, T(.25*s, .2, -.25, 0, .4, .4, .4, PI/2)));
+  for (const [x, z] of [[-.42,-.2],[.42,-.2],[-.42,.2],[.42,.2]]) cyl(M.frame, P, x, .9, z, .015, .6);   // posts
+  box(M.metalDark, P, 0, 1.22, 0, 1.1, .05, .62); box(neon, P, 0, 1.2, .31, 1.1, .03, .02); box(neon, P, 0, 1.2, -.31, 1.1, .03, .02);   // canopy with neon edge
+  box(M.metalDark, P, 0, 1.52, -.05, .8, .55, .4); box(M.screen, P, 0, 1.55, .16, .7, .4, .02); box(M.screen2, P, 0, 1.55, -.26, .7, .4, .02);   // menu tower: lower
+  box(M.metalDark, P, .05, 1.98, -.05, .55, .38, .32); box(M.screen2, P, .05, 2.0, .12, .46, .28, .02); box(neon, P, .05, 2.19, -.05, .6, .03, .36);   // upper
+  glow(P, 0, 1.55, .3, neon === M.neonPink ? 'pink' : 'cyan', 1.2); glow(P, 0, 1.1, .2, 'warm', .8);
+  for (let k=0; k<3; k++) box(pick([M.white2, M.cream2, M.awn3]), P, rnd(-.35, .35), .66, rnd(-.1, .15), .08, .07, .08);   // cups and boxes
+  emitters.push(new THREE.Vector3(-.2, .7, 0).applyMatrix4(P));
+}
+// cart 2: an open hawker stall under a sagging tarp, after the street-market reference
+function hawkerStall(P){
+  box(M.metal, P, 0, .5, 0, 1.3, .06, .6); box(M.metalDark, P, 0, .28, 0, 1.24, .4, .54);   // steel counter
+  for (let k=0; k<6; k++){ const x = -.5 + k*.2; put(U.cyl16, pick([M.white2, M.awn3, M.pot]), under(P, T(x, .56, rnd(-.12, .15), 0, .16, .06, .16))); box(pick([M.veg1, M.veg2, M.veg3, M.awn3]), P, x, .6, rnd(-.12, .15), .1, .02, .1); }   // bowls of food
+  put(U.cyl16, M.metal, under(P, T(.45, .62, -.12, 0, .3, .12, .3))); emitters.push(new THREE.Vector3(.45, .7, -.12).applyMatrix4(P));   // the wok
+  for (const [x, z] of [[-.66,-.32],[.66,-.32],[-.66,.4],[.66,.4]]) cyl(M.frame, P, x, .7, z, .015, 1.4 + (z > 0 ? -.2 : 0));
+  box(pick([M.tarp1, M.tarp2, M.tarp3]), P, 0, 1.33, .04, 1.5, .03, .9, 0, -.2);       // tarp, sloping forward
+  for (const x of [-.35, .35]){ cyl(M.frame, P, x, 1.2, 0, .006, .14); put(U.cone, M.metalDark, under(P, T(x, 1.08, 0, 0, .18, .1, .18))); box(M.bulb, P, x, 1.02, 0, .06, .04, .06); glow(P, x, 1.0, 0, 'warm', .9); }   // hanging lamps
+  box(M.metalDark, P, -.68, .65, -.1, .04, .3, .3); box(pick([M.screen, M.screen2]), P, -.7, .7, -.1, .01, .2, .24);   // a little lit menu
+  for (let k=0; k<3; k++){ const x = rnd(-.5, .5); cyl(pick([M.red2, M.awn2, M.white2]), P, x, .16, .55, .08, .3); }   // plastic stools
+  for (let k=0; k<2; k++) put(U.cyl16, pick([M.awn1, M.corrBlue, M.white2]), under(P, T(rnd(-.6, .6), .12, rnd(-.45, -.3), 0, .18, .24, .18)));   // tubs
+}
+// cart 3: a little food truck with its serving hatch open and a neon sign on the roof
+function foodTruck(P, neon){
+  const body = pick([M.corrBlue, M.metalDark, M.teal2, M.concDD]);
+  box(body, P, 0, .5, 0, 1.5, .7, .7); box(body, P, .9, .4, 0, .4, .5, .66);           // box and cab
+  box(M.glassDark, P, 1.08, .55, 0, .04, .22, .56);
+  box(M.interiorCool, P, -.15, .58, .352, .95, .38, .01);                              // the open hatch, lit inside
+  for (let k=0; k<4; k++) box(pick([M.awn3, M.veg2, M.white2, M.awn1]), P, -.5 + k*.24, .44, .38, .12, .1, .08);   // food on the counter
+  box(body, P, -.15, .86, .5, 1.0, .03, .32, 0, -.5);                                  // the hatch flap, propped up
+  box(M.metal, P, -.15, .4, .42, 1.0, .03, .14);                                        // counter shelf
+  box(neon, P, 0, .16, .352, 1.4, .03, .01); box(neon, P, 0, .16, -.352, 1.4, .03, .01);   // underglow strips
+  glow(P, 0, .12, .45, NEON_NAME.get(neon) || 'pink', 1.0); glow(P, -.15, .58, .5, 'cyan', .7);
+  for (const [x, z] of [[-.45,.36],[.45,.36],[-.45,-.36],[.85,-.34],[.85,.34]]) put(U.cyl16, M.frame, under(P, T(x, .12, z, 0, .24, .06, .24, PI/2)));   // wheels
+  box(M.metalDark, P, -.1, .98, 0, 1.0, .3, .06); const kind = pick(GLYPH_H);           // roof sign
+  plant(kind, under(P, T(-.1, 0, .04)), 0, .98, 0, .85, 'c', true); glow(P, -.1, .98, .3, GLYPH_GLOW[kind], 1.0);
+  emitters.push(new THREE.Vector3(.3, .9, 0).applyMatrix4(P));
+}
+// a table with stools and an umbrella
+function cafeTable(P, x, z){
+  const Q = under(P, T(x, 0, z, rnd(0, TAU)));
+  put(U.cyl16, M.white2, under(Q, T(0, .3, 0, 0, .44, .03, .44))); cyl(M.frame, Q, 0, .15, 0, .02, .3);
+  for (let k=0; k<3; k++){ const a = k*TAU/3; cyl(pick([M.red2, M.awn2, M.white2]), Q, Math.cos(a)*.34, .1, Math.sin(a)*.34, .06, .2); if (chance(.55)) person(Q, Math.cos(a)*.34, .06, Math.sin(a)*.34); }
+  if (chance(.6)){ cyl(M.frame, Q, 0, .6, 0, .012, .6); put(U.cone, pick([M.awn1, M.awn2, M.awn3, M.tarp1]), under(Q, T(0, .98, 0, 0, .8, .2, .8))); }
+  else { box(M.bulb, Q, 0, .34, 0, .05, .06, .05); glow(Q, 0, .38, 0, 'warm', .5); }
+}
+function buildTownSquare(m){
+  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  const P = T(m.x, 0, m.z, pick([0, PI/2, PI, -PI/2])), S5 = 5*LOT, H = S5/2;
+  // paving: dark stone, with rings of lighter stone round the middle and a border of planters
+  box(G.asph, P, 0, .012, 0, S5, .025, S5);
+  const n = 25, st = S5/n;
+  for (let a=0;a<n;a++) for (let b=0;b<n;b++){
+    const x = (a-(n-1)/2)*st, z = (b-(n-1)/2)*st, r = Math.hypot(x, z);
+    if (r < 2.2) continue;
+    const ring = Math.floor(r/1.5) % 2, mat = ring ? TILES.mid[(a + b) % 2] : TILES.low[(a*3 + b) % 4];
+    if (!chance(.02)) box(mat, P, x, .03, z, st - .04, .045, st - .04);
+  }
+  for (const r of [3.0, 6.0]) for (let k=0; k<48; k++){ const a = k*TAU/48; box(M.concL, P, Math.cos(a)*r, .058, Math.sin(a)*r, .4, .012, .08, -a + PI/2); }   // pale ring lines
+  // ---- the Old Tree
+  put(U.cyl16, M.concM, under(P, T(0, .25, 0, 0, 4.0, .45, 4.0)));                   // stone planter
+  put(U.cyl16, M.concD, under(P, T(0, .48, 0, 0, 4.1, .06, 4.1)));
+  put(U.cyl16, M.neonCyan, under(P, T(0, .3, 0, 0, 4.06, .03, 4.06)));                // a neon band round it
+  put(U.cyl16, M.wood, under(P, T(0, .22, 0, 0, 4.7, .06, 4.7)));                     // ring bench
+  put(U.cyl16, M.grass, under(P, T(0, .5, 0, 0, 3.8, .04, 3.8)));
+  for (let k=0; k<6; k++){ const a = k*TAU/6 + rnd(-.2, .2); strut(M.trunk2, P, 0, .9, 0, Math.cos(a)*rnd(.9, 1.4), .5, Math.sin(a)*rnd(.9, 1.4), rnd(.18, .26)); }   // roots
+  strut(M.trunk2, P, 0, .5, 0, .15, 3.0, -.1, .62); strut(M.trunk2, P, .15, 3.0, -.1, -.1, 4.4, .1, .45);   // trunk
+  const tips = [];
+  for (let k=0; k<7; k++){                                                             // branches
+    const a = k*TAU/7 + rnd(-.3, .3), l = rnd(1.8, 2.8), y = rnd(3.0, 4.4);
+    const ex = Math.cos(a)*l, ez = Math.sin(a)*l, ey = y + rnd(.6, 1.3);
+    strut(M.trunk2, P, 0, y - .4, 0, ex, ey, ez, rnd(.14, .22)); tips.push([ex, ey, ez]);
+  }
+  for (const [x, y, z] of tips) for (let k=0; k<5; k++) blob(pick([M.leafA, M.leafB, M.leafC]), P, x + rnd(-.7, .7), y + rnd(-.1, .6), z + rnd(-.7, .7), rnd(.6, 1.0), .7);
+  for (let k=0; k<10; k++) blob(pick([M.leafA, M.leafB, M.leafC]), P, rnd(-1.4, 1.4), rnd(4.8, 5.8), rnd(-1.4, 1.4), rnd(.8, 1.3), .7);   // crown
+  for (const [x, y, z] of tips) for (let k=0; k<3; k++){ const lx = x + rnd(-.5, .5), lz = z + rnd(-.5, .5), ly = y - rnd(.4, .8);   // lanterns hanging in the branches
+    cyl(M.frame, P, lx, ly + .2, lz, .006, .4); box(chance(.5) ? M.lantern : M.lantern2, P, lx, ly, lz, .13, .18, .13); glow(P, lx, ly, lz, 'amber', .7); }
+  for (let k=0; k<6; k++) plant(pick(['h_ivy','vines','h_curtain1']), P, rnd(-1, 1), rnd(3.6, 4.4), rnd(-1, 1), rnd(.8, 1.1), 't');   // hanging greenery
+  // ---- lantern poles round the square, strung to the tree
+  const poles = [];
+  for (let k=0; k<8; k++){ const a = k*TAU/8 + PI/8, r = 7.9; poles.push([Math.cos(a)*r, Math.sin(a)*r]); }
+  for (const [x, z] of poles){
+    cyl(M.metalDark, P, x, 1.3, z, .05, 2.6); box(M.lantern2, P, x, 2.66, z, .14, .14, .14); glow(P, x, 2.66, z, 'warm', 1.0);
+    lanternString(P, x, 2.55, z, x*.22, 3.9, z*.22, .5);
+  }
+  for (let k=0; k<8; k++){ const [ax, az] = poles[k], [bx, bz] = poles[(k+1)%8]; lanternString(P, ax, 2.5, az, bx, 2.5, bz, .35); }
+  // ---- the night market: carts in a loose ring between the tree and the poles, tables between them
+  const carts = [];
+  for (let k=0; k<12; k++){
+    const a = k*TAU/12 + rnd(-.12, .12), r = rnd(4.4, 5.4) + (k % 2)*1.0;
+    carts.push([Math.cos(a)*r, Math.sin(a)*r, a]);
+  }
+  carts.forEach(([x, z, a], k) => {
+    const Q = under(P, T(x, .05, z, -a - PI/2 + rnd(-.2, .2)));   // serving side faces the tree
+    const r = k % 3;
+    if (r === 0) menuCart(Q, pick([M.neonPink, M.neonCyan, M4.neonPurple]));
+    else if (r === 1) hawkerStall(Q);
+    else foodTruck(Q, pick([M.neonPink, M.neonCyan, M.neonAmber]));
+    for (let q=0; q<irand(1, 4); q++) person(Q, rnd(-.6, .6), 0, rnd(.6, 1.0));        // a queue
+  });
+  for (let k=0; k<14; k++){
+    const a = rnd(0, TAU), r = rnd(2.8, 7.2), x = Math.cos(a)*r, z = Math.sin(a)*r;
+    if (carts.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 1.4)) continue;
+    cafeTable(P, x, z);
+  }
+  for (let k=0; k<30; k++){ const a = rnd(0, TAU), r = rnd(2.4, 8.5); person(P, Math.cos(a)*r, .05, Math.sin(a)*r); }   // the crowd
+  // ---- the edge: planters with trees at the corners, benches, a lamp on each side
+  for (const [sx, sz] of [[1,1],[1,-1],[-1,1],[-1,-1]]){
+    const Q = under(P, T(sx*(H - .7), 0, sz*(H - .7)));
+    box(M.concM, Q, 0, .2, 0, .9, .4, .9); plant(pick(['bonsai','bamboo']), Q, 0, .4, 0, 1.2); plant('bushFlower', Q, .25, .4, .25, .8);
+  }
+  for (const [sx, sz, ry] of [[0,1,0],[0,-1,PI],[1,0,PI/2],[-1,0,-PI/2]]){
+    const Q = under(P, T(sx*(H - .5), 0, sz*(H - .5), ry));
+    for (const o of [-2.5, 2.5]){ box(M.wood, Q, o, .2, 0, .9, .05, .28); box(M.frame, Q, o, .1, 0, .8, .18, .2); }
+    cyl(M.metalDark, Q, 0, .75, 0, .035, 1.5); box(M.bulb, Q, 0, 1.52, 0, .14, .06, .14); glow(Q, 0, 1.48, 0, 'warm', 1.3);
+  }
+  m.roofH = CURB + .1;
+  m.top = 6.5;
 }

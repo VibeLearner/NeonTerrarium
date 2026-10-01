@@ -34,18 +34,22 @@ function maybeSpawnMegas(c){
   }
 }
 const blockCells = (i, j, w, h) => { const out = []; for (let a=0;a<w;a++) for (let b=0;b<h;b++) out.push(cells.get(ckey(i+a, j+b))); return out; };
-// the block nearest the build, either way round: every plot must exist and be free of other megastructures;
-// among the nearest, the one with the fewest buildings on it wins
+// The block for a megastructure, near the build that brought it in, either way round. Plots that don't exist yet are allowed: the platform grows to fit (a 5x5 square shouldn't need
+// a perfect 5x5 of platform already waiting). Plots under another megastructure are never taken. Preferred:
+// close to the build, few missing plots, few buildings replaced.
 function findMegaBlock(kind, c){
   const t = MEGA_TYPES[kind];
   const shapes = t.w === t.h ? [[t.w, t.h]] : [[t.w, t.h], [t.h, t.w]];
   let best = null;
-  for (const a of cells.values()) for (const [w, h] of shapes){
-    const blk = blockCells(a.i, a.j, w, h);
-    if (blk.some(b => !b || b.mega)) continue;
-    const d = Math.hypot(a.i + (w-1)/2 - c.i, a.j + (h-1)/2 - c.j), secs = blk.reduce((s, b) => s + b.sections.length, 0);
-    const score = d*10 + secs + Math.random()*.5;
-    if (!best || score < best.score) best = { score, i: a.i, j: a.j, w, h };
+  // blocks covering the build first; failing that (say it sits under another megastructure), ones a little further out
+  for (const [w, h] of shapes) for (let i = c.i - w - 3; i <= c.i + 3; i++) for (let j = c.j - h - 3; j <= c.j + 3; j++){
+    if (Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX || Math.abs(i + w - 1) > GRID_MAX || Math.abs(j + h - 1) > GRID_MAX) continue;
+    const blk = blockCells(i, j, w, h);
+    if (blk.some(b => b && b.mega)) continue;
+    const missing = blk.filter(b => !b).length, secs = blk.reduce((s, b) => s + (b ? b.sections.length : 0), 0);
+    const d = Math.hypot(i + (w-1)/2 - c.i, j + (h-1)/2 - c.j);
+    const score = d*4 + missing*3 + secs + Math.random()*.5;
+    if (!best || score < best.score) best = { score, i, j, w, h };
   }
   return best;
 }
@@ -65,11 +69,18 @@ function placeMega(kind, i, j, seed, w, h, levels = 1){
 const megaSize = m => [m.w*LOT, m.h*LOT];
 function spawnMega(kind, near){
   const blk = findMegaBlock(kind, near); if (!blk) return null;
+  const grown = [];
+  for (let a=0; a<blk.w; a++) for (let b=0; b<blk.h; b++){   // grow any missing platform under the block
+    const i = blk.i + a, j = blk.j + b;
+    if (!cells.has(ckey(i, j))){ const c = newCell(i, j); c.style = styleNow(); cells.set(ckey(i, j), c); grown.push(c); }
+  }
   const covered = blockCells(blk.i, blk.j, blk.w, blk.h);
+  // neighbours of new plots lose their railings on the joining side
+  for (const c of grown) for (const [a, b] of SIDES4){ const nb = cells.get(ckey(c.i + a, c.j + b)); if (nb && !nb.mega && !covered.includes(nb)) covered.push(nb); }
   for (const b of covered){ finishAnimsOn(b); if (b.view){ world.remove(b.view); b.view = null; } disposeData(b.data); b.data = null; }
   const m = placeMega(kind, blk.i, blk.j, (Math.random()*1e9)|0, blk.w, blk.h); if (!m) return null;
   holdRegion(m);
-  refresh(covered, [m]);
+  refresh(covered.filter(b => !b.mega || b.mega === kind), [m]);
   startAnim(m, 'build', CURB - .05, m.top + 1, MEGA_TYPES[kind].colour, megaSize(m), null, MEGA_TYPES[kind].sound);
   return m;
 }
@@ -277,7 +288,7 @@ if (location.hash.includes('dev')){
   addEventListener('keydown', e => {
     const kind = { m: 'radio', n: 'mall', b: 'square' }[e.key.toLowerCase()]; if (!kind) return;
     const pk = lastPointer ? pickAt(lastPointer.x, lastPointer.y) : null;
-    const c = pk && pk.c ? pk.c : cells.values().next().value;
+    const c = pk && pk.c ? pk.c : pk && pk.kind === 'sky' ? { i: pk.i, j: pk.j } : cells.values().next().value;
     if (megas.has(kind)) removeMega(megas.get(kind));
     else if (c) spawnMega(kind, c);
   });

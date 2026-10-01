@@ -429,7 +429,7 @@ function buildSkyMall(m){
       (F, t) => { box(M.lux, F, t, fy + .2, 0, .14, .24, .14); box(M.mallGlass, F, t, fy + .5, 0, .2, .36, .2); box(pick([M.gold, M.cloth1, M.cloth3]), F, t, fy + .45, 0, .07, .1, .07); glow(F, t, fy + .5, 0, 'warm', .5); },   // a glass vitrine on a pedestal
       (F, t) => { cyl(M.gold, F, t, fy + .25, 0, .02, .3); box(M.concDD, F, t, fy + .42, 0, .3, .2, .03); box(M.interiorCool, F, t, fy + .42, .02, .26, .16, .01); glow(F, t, fy + .42, .1, 'cyan', .45); },   // a directory screen
       (F, t) => { for (const o of [-.22, .22]){ box(M.lux, F, t + o, fy + .14, 0, .34, .1, .3); box(M.lux, F, t + o, fy + .24, -.13, .34, .18, .05); box(M.gold, F, t + o, fy + .1, 0, .3, .02, .26); } put(U.cyl16, M.gold, under(F, T(t, fy + .16, .25, 0, .2, .02, .2))); },   // a lounge pair round a gold side table
-      (F, t) => { box(M.lux, F, t, fy + .16, 0, .34, .16, .34); box(M.gold, F, t, fy + .245, 0, .36, .02, .36); plant(pick(['bonsai','bamboo','bushFlower']), F, t, fy + .25, 0, rnd(.65, .85)); },   // planter
+      (F, t) => { box(M.lux, F, t, fy + .16, 0, .34, .16, .34); box(M.gold, F, t, fy + .245, 0, .36, .02, .36); plant(pick(['bonsai','bushFlower','bush']), F, t, fy + .25, 0, rnd(.65, .85)); },   // planter (low plants only: tall bamboo poked up through the ceiling into the floor above and the pool)
     ];
     for (const e of (f === 0 ? mid : walk)){
       if (e.len < 1.2) continue;   // corner cuts are too short to furnish
@@ -447,7 +447,7 @@ function buildSkyMall(m){
       const e = voidMid[k], F = under(P, T(e.mx, 0, e.mz, e.ry));
       put(U.cyl16, M.lux, under(F, T(0, fy + .14, 0, 0, 1.2, .12, .7))); put(U.cyl16, M.mallPool, under(F, T(0, fy + .2, 0, 0, 1.05, .02, .58)));
       for (const o of [-.25, 0, .25]) cyl(M.gold, F, o, fy + .4, 0, .015, .4); glow(F, 0, fy + .45, 0, 'cyan', .8);
-      plant('bamboo', F, -.75, fy + .1, 0, 1.1); plant('bamboo', F, .75, fy + .1, 0, 1.0);
+      plant('bamboo', F, -.75, fy + .1, 0, .65); plant('bamboo', F, .75, fy + .1, 0, .6);   // kept below the walkway above
     }
     // the glass itself: one sheet per side, framed in gold only at the corners, with the odd streak of reflection
     for (const e of outer){

@@ -658,10 +658,7 @@ function buildTownSquare(m){
   put(U.cyl16, M.neonCyan, under(P, T(0, .16, 0, 0, 2*POND_R + .74, .03, 2*POND_R + .74)));  // neon band round the rim
   put(U.cyl16, M.wood, under(P, T(0, .1, 0, 0, 2*POND_R + 1.5, .05, 2*POND_R + 1.5)));       // ring bench
   flatWater(M.koiWater, P, POND_Y, POND_R + .05);
-  for (let k=0; k<10; k++){ const a = rnd(0, TAU), r = rnd(.6, POND_R - .3);                 // lily pads, a few lotus lights
-    put(U.cyl16, pick([M.green1, M.green2, M.green3]), under(P, T(Math.cos(a)*r, POND_Y + .01, Math.sin(a)*r, 0, rnd(.25, .4), .01, rnd(.25, .4))));
-    if (chance(.4)){ put(U.sph, M.neonPink, under(P, T(Math.cos(a)*r, POND_Y + .05, Math.sin(a)*r, 0, .09, .07, .09))); glow(P, Math.cos(a)*r, POND_Y + .08, Math.sin(a)*r, 'pink', .5); } }
-  for (let k=0; k<5; k++){ const a = k*TAU/5 + .3, r = POND_R*.55; put(U.cyl16, M.concL, under(P, T(Math.cos(a)*r, POND_Y + .02, Math.sin(a)*r, 0, .35, .06, .35))); }   // stepping stones
+  // the koi themselves are an animated sprite sheet laid on the water (see koiFx)
   for (let k=0; k<4; k++){ const a = k*TAU/4 + PI/4, r = POND_R + .45;                        // hologram projectors on the rim
     const Q = under(P, T(Math.cos(a)*r, .25, Math.sin(a)*r, -a));
     box(M.metalDark, Q, 0, .15, 0, .18, .3, .18); box(M.screen, Q, 0, .32, 0, .12, .04, .12); glow(Q, 0, .34, 0, 'cyan', .7); }
@@ -701,36 +698,28 @@ function buildTownSquare(m){
   m.roofH = CURB + .1;
   m.top = 5;
 }
-// The holographic koi: glowing, see-through fish of light that circle the pond, weaving in and out, now and then
-// flickering like a projection. Drawn in the colour pass only, additive.
+// The holographic koi: a hand-drawn 9-frame sprite sheet (assets/sprites/koi_pond.png, 96x96 per frame) laid
+// flat on the water and looped, so the koi chase each other round the pond. Drawn in the colour pass only, at
+// full brightness like a projection, with nearest-pixel sampling to stay crisp.
+const KOI_FRAMES = 9, KOI_FPS = 7;
+let koiTex = null;
 function koiFx(m){
-  const g = new THREE.Group(), fish = [], p = m.pond;
-  const body = new THREE.SphereGeometry(.5, 8, 6), tail = new THREE.ConeGeometry(.5, 1, 6); tail.rotateX(PI/2);
-  const cols = [0xff9a4a, 0xffe0c0, 0x4fe0ff, 0xff6a6a, 0xffc24a, 0x9af0ff, 0xff8ad8];
-  for (let k=0; k<9; k++){
-    const mat = new THREE.MeshBasicMaterial({ color: cols[k % cols.length], transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false });
-    const f = new THREE.Group();
-    const b = new THREE.Mesh(body, mat); b.scale.set(.16, .07, .42); f.add(b);
-    const t = new THREE.Mesh(tail, mat); t.scale.set(.2, .03, .2); t.position.z = -.28; t.rotation.y = PI; f.add(t);
-    for (const s of [-1, 1]){ const fin = new THREE.Mesh(tail, mat); fin.scale.set(.1, .02, .1); fin.position.set(s*.09, 0, .05); fin.rotation.y = PI + s*.9; f.add(fin); }
-    f.traverse(o => { o.layers.set(1); o.renderOrder = 3; });
-    g.add(f);
-    fish.push({ f, mat, r0: .7 + Math.random()*(p.r - 1.1), a: Math.random()*TAU, sp: (.25 + Math.random()*.25)*(Math.random() < .5 ? 1 : -1), wob: Math.random()*TAU, base: .55 + Math.random()*.3, tailT: t });
+  if (!koiTex){
+    koiTex = new THREE.TextureLoader().load('assets/sprites/koi_pond.png');
+    koiTex.magFilter = koiTex.minFilter = THREE.NearestFilter; koiTex.generateMipmaps = false;
+    koiTex.repeat.set(1/KOI_FRAMES, 1);
   }
-  scene.add(g);
+  const p = m.pond;
+  const mat = new THREE.MeshBasicMaterial({ map: koiTex, alphaTest: .5 });
+  const disc = new THREE.Mesh(new THREE.PlaneGeometry(2*(p.r + .1), 2*(p.r + .1)), mat);
+  disc.rotation.x = -PI/2; disc.position.set(p.x, p.y + .02, p.z);
+  disc.layers.set(1); scene.add(disc);
+  let frame = -1;
   return {
     update(dt, time){
-      for (const k of fish){
-        k.a += k.sp*dt;
-        const r = k.r0 + Math.sin(time*.4 + k.wob)*.45;
-        const x = p.x + Math.cos(k.a)*r, z = p.z + Math.sin(k.a)*r;
-        k.f.position.set(x, p.y + Math.sin(time*1.3 + k.wob)*.03, z);
-        k.f.rotation.y = Math.atan2(-Math.sin(k.a)*Math.sign(k.sp), Math.cos(k.a)*Math.sign(k.sp)) + Math.sin(time*3 + k.wob)*.25;
-        k.tailT.rotation.y = PI + Math.sin(time*7 + k.wob)*.5;
-        const flick = (Math.sin(time*23 + k.wob*5) + Math.sin(time*5.1 + k.wob)) > 1.6 ? .25 : 1;   // projection glitch
-        k.mat.opacity = k.base*flick;
-      }
+      const f = Math.floor(time*KOI_FPS) % KOI_FRAMES;
+      if (f !== frame){ frame = f; koiTex.offset.x = f/KOI_FRAMES; }
     },
-    dispose(){ scene.remove(g); body.dispose(); tail.dispose(); for (const k of fish) k.mat.dispose(); }
+    dispose(){ scene.remove(disc); disc.geometry.dispose(); mat.dispose(); }
   };
 }

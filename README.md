@@ -47,10 +47,13 @@ js/vehicles.js          hover cars, delivery drones, their shadows, chimney stea
 js/sky.js               time of day, the pixel composite (outlines, sky, stars, rain, reflections, light shafts), clouds
 js/audio.js             sound effects (Web Audio), volume setting
 js/mega.js              megastructures: unlocking, placing, removing; the radio station
+js/people.js            people: residents, jobs, daily routines, the sidewalk network, walking door to door
 js/world.js             the game world: cells, building stacks, batching, edits, build and remove animations, saving
 js/input.js             camera, mouse / touch / keyboard, settings panel
 js/main.js              start-up and the frame loop
 assets/sprites/         sprite PNGs at true pixel size (one file per sprite; the name is the sprite's id)
+assets/sprites/people.png  the people atlas: 12 characters, one 16 px row each, 6 walk + 4 idle frames of 12 px
+docs/people.md          the people system: how it works, plan and progress
 assets/audio/music/     music (coming next)
 assets/audio/sfx/       sound effects: place.wav (build pop), remove.wav (removal thud), radio-on.wav (radio station arrives)
 assets/audio/sfx/originals/  the untouched source recordings, for re-editing
@@ -84,6 +87,12 @@ Landmarks that take over a block of plots once the city is big enough. Each exis
 - New megastructures go in `MEGA_TYPES` at the top of `js/mega.js` (requirement, odds, footprint, max tiers).
 - For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall), **B** (town square), **V** (foundry) or **C** (police station)
   to bring it in, or remove it, next to the plot under the pointer, skipping the requirement and the odds.
+
+## People
+
+Residents live in the buildings (seeded per section, so the same people always live in the same place), take
+jobs nearby, and follow a daily routine set by the hour in Settings: busy at lunchtime, quiet late at night. They
+walk the sidewalks door to door and dissolve in and out of doorways. Details and the roadmap: `docs/people.md`.
 
 ## Adding art and sound
 

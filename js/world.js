@@ -265,6 +265,7 @@ function syncAgents(){
   let top = 6; for (const c of cells.values()) if (c.height > top) top = c.height;
   for (const m of megas.values()) if (m.top > top) top = m.top;
   skyTop = top + 2.4;
+  syncPeople();
   shadowDirty = true;
   save();
 }

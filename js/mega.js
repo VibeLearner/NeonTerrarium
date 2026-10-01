@@ -103,11 +103,10 @@ function spawnMega(kind, near){
   // on once it's fully there
   for (const c of grown){ holdRegion(c); startAnim(c, 'build', PLAT_BOTTOM, CURB + .3, MEGA_TYPES[kind].colour, LOT, null, null, { slow: true, quiet: true, bare: true }); }
   if (m.fx){ m.fx.dispose(); m.fx = null; }
-  // The radio clicks on with its own sound as it starts to appear. Every other megastructure arrives in silence and
-  // lands with a deep bass thump the moment the scan finishes and the outline flashes (3.85 s in); its bright tail
-  // rings out as the glow fades.
-  const t = MEGA_TYPES[kind], snd = t.sound || null;
-  startAnim(m, 'build', CURB - .05, m.top + 1, t.colour, megaSize(m), null, snd, { slow: true, quiet: !snd, cue: snd ? null : { at: 3.85, name: 'megaArrive' },
+  // The radio clicks on with its own sound. Every other megastructure plays the arrival sound, a 4.6 s piece made to
+  // run the length of the animation, starting with it.
+  const t = MEGA_TYPES[kind];
+  startAnim(m, 'build', CURB - .05, m.top + 1, t.colour, megaSize(m), null, t.sound || 'megaArrive', { slow: true,
     onEnd: () => { if (megas.get(kind) === m && !m.fx) megaFx(m); } });
   return m;
 }

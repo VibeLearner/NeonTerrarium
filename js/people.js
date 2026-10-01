@@ -341,7 +341,8 @@ function u01(...a){ return hash(...a) / 4294967296; }
 const reachable = pl => !!pl && (pl.doors.length > 0 || (pl.spots && pl.spots.length > 0));
 const crossKey = (c, dx, dz) => dx + dz > 0 ? c.i + ',' + c.j + '|' + dx + ',' + dz : (c.i + dx) + ',' + (c.j + dz) + '|' + (-dx) + ',' + (-dz);
 const DOOR_COLS = [0x4f7f86, 0x8A4A2A, 0x3a4252, 0xc95a7a, 0x6fa8dc, 0xd9b43a, 0x5f7d5b, 0xE3D6BD];
-let patrolNodes = [], doorList = [], hiddenDoors = [], spotByKey = new Map(), doorByKey = new Map();
+const posKey = (x, z) => Math.round(x*1000) + ',' + Math.round(z*1000);
+let crossAt = new Map(), patrolNodes = [], doorList = [], hiddenDoors = [], spotByKey = new Map(), doorByKey = new Map();
 function makeDoor(key, d, mega, old){
   const door = { key, node: ngAdd(key, d.stand.x, d.stand.z), wall: d.wall, stand: d.stand, inside: d.inside, n: d.n, mega, noDraw: !!d.noDraw,
                  open: old ? old.open : 0, want: false, col: DOOR_COLS[hash(key) % DOOR_COLS.length] };
@@ -405,6 +406,7 @@ function buildNetwork(){
     if (p) ngAdd('x:' + k, p.x, p.z);
   }
   patrolNodes = [...cross.values()].filter(Boolean).map(c => ({ key: c.key, node: NG.key.get(c.key), x: c.x, z: c.z }));
+  crossAt = new Map(patrolNodes.map(c => [posKey(c.x, c.z), c]));
   const plotEnds = new Map();   // plot key -> extra endpoints (doors, standing spots)
   const addEnd = (c, e) => { const k = ckey(c.i, c.j); (plotEnds.get(k) || plotEnds.set(k, []).get(k)).push(e); };
   const fresh = new Map();
@@ -691,14 +693,20 @@ function startTrip(p, toId){
 }
 // Police officers on duty walk a beat: from the station (or where they stand) to a street crossing a few blocks
 // away, where they stop and scan for a while, then on to the next. Now and then they head back to the station.
-function startPatrol(p){
+function startPatrol(p, forced){
   const st = places.get(p.job); if (!st || !patrolNodes.length) return false;
   let a, head = [], dA = null;
-  if (p.patrol) a = p.patrol.node;
+  if (p.walk && forced){   // called away mid-walk: keep to the current path as far as its next street crossing, then turn
+    const w = p.walk; let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
+    let j = k; while (j < w.pts.length && !crossAt.has(posKey(w.pts[j][0], w.pts[j][1]))) j++;
+    if (j >= w.pts.length) return false;
+    a = crossAt.get(posKey(w.pts[j][0], w.pts[j][1])).node; head = [[p.x, p.z]].concat(w.pts.slice(k, j)); dA = null;
+  }
+  else if (p.patrol) a = p.patrol.node;
   else { if (p.at !== p.job || !st.doors.length) return false; dA = st.doors[Math.floor(pplRand()*st.doors.length)]; a = dA.node; head = [[dA.inside.x, dA.inside.z], [dA.wall.x, dA.wall.z]]; }
   const cand = patrolNodes.filter(c => c.node !== a && Math.hypot(c.x - st.x, c.z - st.z) < 26);
   if (!cand.length) return false;
-  const tg = cand[Math.floor(pplRand()*cand.length)], mid = route(a, tg.node); if (!mid) return false;
+  const tg = forced || cand[Math.floor(pplRand()*cand.length)], mid = route(a, tg.node); if (!mid) return false;
   const pts = head.concat(mid), cum = [0];
   for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
   p.walk = { pts, cum, len: cum[cum.length - 1], s: 0, to: p.job, doorA: dA, doorB: null, spot: null, beat: tg, safe0: cum[head.length], safe1: cum[cum.length - 1] };
@@ -722,7 +730,9 @@ function decide(p){
   if (!ok) p.until = pplNow + 15 + pplRand()*40;
 }
 function arrive(p){
-  const w = p.walk; p.walk = null;
+  const w = p.walk; p.walk = null; p.hurry = false;
+  if (p.rush){ p.rush = false; if (w.beat){ p.at = w.to; p.patrol = w.beat; p.until = pplNow + 9 + pplRand()*5; return; } }   // at the scene: looking around
+  if (p.callout && w.beat){ const c = p.callout; p.callout = null; p.at = w.to; p.patrol = w.beat; if (startPatrol(p, c)){ p.rush = true; return; } }
   if (w.beat){ p.at = w.to; p.patrol = w.beat; p.until = pplNow + 4 + pplRand()*7; return; }
   if (w.spot && w.spot.kind === 'seat' && p.fed){ p.fed = false; emote(p, 'bowl', 2.8); }
   p.at = w.to; p.spot = w.spot;
@@ -730,7 +740,7 @@ function arrive(p){
   const pl = places.get(p.at);
   p.until = pplNow + (pl ? stayFor(p, pl) : 20);
 }
-const sendHome = p => { if (p.spot && p.spot.by === p.id) p.spot.by = null; p.chain = null; p.patrol = null; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
+const sendHome = p => { if (p.spot && p.spot.by === p.id) p.spot.by = null; p.chain = null; p.patrol = null; p.rush = false; p.hurry = false; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
 
 /* ---------- keeping up with the city ---------- */
 let pplReady = false, pplNow = 0, pplHour = S.hour, pplCursor = 0, pplList = [];
@@ -767,6 +777,7 @@ function syncPeople(){
   pplList = [...people.values()];
   pplReady = true;
   syncBots();
+  syncLurkers();
 }
 
 /* ---------- delivery robots ---------- */
@@ -838,6 +849,99 @@ function updateBots(dt, t){
   }
 }
 
+/* ---------- dark streets and muggings ---------- */
+// On the few dark streets (see isDarkPlot), a shady figure lurks on a street corner at night (20:00 to 5:00).
+// When someone walks past alone, with no police officer in sight, the lurker darts over and robs them: the victim
+// freezes ('!', then a sweat drop), the mugger makes off at a run, and the victim hurries on. The nearest officer
+// on duty rushes to the spot and looks around. Every mugging goes into the city's event log (for the radio host).
+const lurkers = new Map();   // plot key -> lurker
+const cityLog = [];          // { hour, kind, x, z, ... } newest last; kept short
+function logEvent(e){ cityLog.push(Object.assign({ hour: S.hour, at: pplNow }, e)); if (cityLog.length > 60) cityLog.shift(); }
+const isNight = h => h >= 20 || h < 5;
+function syncLurkers(){
+  const keep = new Set();
+  for (const c of cells.values()){
+    if (!c.dark) continue;
+    const k = ckey(c.i, c.j); keep.add(k);
+    const G = cellGrid(c);
+    // a corner of the plot's street that's clear (and stays the same every time)
+    const h = hash('lurk', c.i, c.j); let spot = null;
+    for (let q = 0; q < 4 && !spot; q++){ const [sx, sz] = CORNERS[(h + q) % 4]; spot = approachFor(G, c.x + sx*1.55, c.z + sz*1.55, -sx, -sz); }
+    const old = lurkers.get(k);
+    if (!spot){ lurkers.delete(k); continue; }
+    if (old){ old.home = spot; continue; }
+    lurkers.set(k, { key: k, cell: c, home: spot, x: spot.x, z: spot.z, state: 'away', until: pplNow + 10 + Math.random()*40, row: 9 + h % 3, flip: 1, phase: Math.random()*10, fade: 0 });
+  }
+  for (const k of [...lurkers.keys()]) if (!keep.has(k)) lurkers.delete(k);
+}
+function onDutyCops(){ return pplList.filter(q => q.cop && working(q, S.hour) && (q.patrol || (q.walk && q.walk.beat) || (!q.walk && q.at === q.job))); }
+function updateLurkers(dt, t){
+  const night = isNight(S.hour);
+  for (const L of lurkers.values()){
+    switch (L.state){
+      case 'away':      // not out (daytime, or lying low after a job)
+        L.fade = Math.max(0, L.fade - dt*2);
+        if (night && t >= L.until){ L.state = 'lurk'; L.x = L.home.x; L.z = L.home.z; L.until = t + 4; }
+        break;
+      case 'lurk': {    // loitering on the corner, waiting for someone alone
+        L.fade = Math.min(1, L.fade + dt*1.5);
+        if (!night){ L.state = 'away'; L.until = t + 5; break; }
+        if (t < L.until) break;
+        L.until = t + .5;
+        let victim = null;
+        for (const p of pplList){
+          const w = p.walk; if (!w || p.cop || p.pause > t || w.s < w.safe0 + .3 || w.s > w.safe1 - .3) continue;
+          if ((p.x - L.x)**2 + (p.z - L.z)**2 > 1.4*1.4) continue;
+          if (pplList.some(o => o !== p && o.walk && (o.x - p.x)**2 + (o.z - p.z)**2 < 4)) continue;          // not alone
+          if (pplList.some(o => o.cop && (o.x - p.x)**2 + (o.z - p.z)**2 < 64)) continue;                      // police nearby
+          victim = p; break;
+        }
+        if (victim && pplRand() < .5){ L.state = 'strike'; L.victim = victim; victim.pause = t + 4; emote(victim, 'bang', 1.6); L.t0 = t; }
+        else if (victim) L.until = t + 20;   // thought better of it
+        break;
+      }
+      case 'strike': {  // darting over
+        const v = L.victim, dx = v.x - L.x, dz = v.z - L.z, d = Math.hypot(dx, dz);
+        L.dx = dx; L.dz = dz;
+        if (d < .32 || t - L.t0 > 2){ L.state = 'rob'; L.t0 = t; break; }
+        const step = Math.min(d - .3, dt*2.2); L.x += dx/d*step; L.z += dz/d*step;
+        break;
+      }
+      case 'rob': {     // the hold-up
+        const v = L.victim; L.dx = v.x - L.x; L.dz = v.z - L.z;
+        if (t - L.t0 > .8 && !(v.emoUntil > t)) emote(v, 'sweat', 2.5);
+        if (t - L.t0 > 1.5){
+          logEvent({ kind: 'mugging', x: L.x, z: L.z, plot: L.key, victim: v.id });
+          v.pause = 0; v.hurry = true;
+          // the nearest officer on duty comes running
+          let best = null, bd = 35*35;
+          for (const q of onDutyCops()){ const d2 = (q.x - L.x)**2 + (q.z - L.z)**2; if (d2 < bd){ bd = d2; best = q; } }
+          if (best && patrolNodes.length){
+            const node = patrolNodes.reduce((b, c) => (c.x - L.x)**2 + (c.z - L.z)**2 < (b.x - L.x)**2 + (b.z - L.z)**2 ? c : b);
+            if (startPatrol(best, node) || (best.callout = node, false)){ best.rush = true; emote(best, 'bang', 2); logEvent({ kind: 'police', x: node.x, z: node.z, plot: L.key, officer: best.id }); }
+          }
+          // and off at a run, to a crossing well away from here
+          const far = patrolNodes.filter(c => { const d2 = (c.x - L.x)**2 + (c.z - L.z)**2; return d2 > 49 && d2 < 225; });
+          const near = patrolNodes.length ? patrolNodes.reduce((b, c) => (c.x - L.x)**2 + (c.z - L.z)**2 < (b.x - L.x)**2 + (b.z - L.z)**2 ? c : b) : null;
+          const to = far.length ? far[Math.floor(pplRand()*far.length)] : null, mid = near && to ? route(near.node, to.node) : null;
+          L.walk = mid ? walkOf([[L.x, L.z]].concat(mid), {}) : null;
+          L.victim = null; L.state = L.walk ? 'flee' : 'away'; L.until = t + 90 + pplRand()*120;
+        }
+        break;
+      }
+      case 'flee': {
+        const w = L.walk; w.s += dt*2.0;
+        if (w.s >= w.len){ L.state = 'away'; L.walk = null; break; }
+        let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
+        const a = w.pts[k - 1], c = w.pts[k], seg = w.cum[k] - w.cum[k - 1] || 1, u = (w.s - w.cum[k - 1])/seg;
+        L.x = a[0] + (c[0] - a[0])*u; L.z = a[1] + (c[1] - a[1])*u; L.dx = c[0] - a[0]; L.dz = c[1] - a[1];
+        L.fade = Math.min(1, (w.len - w.s)/.8);   // melts into the dark at the end
+        break;
+      }
+    }
+  }
+}
+
 /* ---------- bumping into each other, and emotes ---------- */
 function emote(p, kind, dur = 2.2){ p.emo = EMO[kind]; p.emoUntil = pplNow + dur; }
 // Walkers (and bots) coming at each other on a narrow path sometimes bump: both stop for a moment and react, with
@@ -889,6 +993,7 @@ function updatePeople(dt, t){
   pplCursor = n ? (pplCursor + slice) % n : 0;
   _camR.set(1, 0, 0).applyQuaternion(cam.quaternion);
   updateBots(dt, t);
+  updateLurkers(dt, t);
   checkBumps(t);
   // fill the draw batch with everyone on show
   const pos = pplMesh.geometry.attributes.aPos, spr = pplMesh.geometry.attributes.aSpr, P = pos.array, Q = spr.array;
@@ -909,7 +1014,7 @@ function updatePeople(dt, t){
     let alpha = 1, walking = false, y = CURB, frame = 0;
     const paused = p.pause > t;
     if (p.walk){
-      const w = p.walk; if (!paused) w.s += dt*p.speed;
+      const w = p.walk; if (!paused) w.s += dt*p.speed*(p.rush ? 2.3 : p.hurry ? 1.6 : 1);
       if (w.s >= w.len){ arrive(p); if (!p.spot && !p.patrol) continue; }
       else {
         walking = true;
@@ -946,10 +1051,18 @@ function updatePeople(dt, t){
         if (face){ const sd = face[0]*_camR.x + face[1]*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }
       }
     }
-    if (walking) frame = paused ? F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle : Math.floor(t*9*p.speed/PPL_SPEED + p.phase) % PPL.walk;
+    if (walking) frame = paused ? F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle : Math.floor(t*9*p.speed/PPL_SPEED*(p.rush ? 2 : p.hurry ? 1.5 : 1) + p.phase) % PPL.walk;
     if (p.cop && p.angry > t) frame = F_ANGRY + Math.min(5, Math.floor((t - p.angry + .9)*7));
     if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
+  }
+  // lurkers on the dark streets
+  for (const L of lurkers.values()){
+    if (L.fade <= 0) continue;
+    if (L.dx !== undefined){ const sd = L.dx*_camR.x + L.dz*_camR.z; if (Math.abs(sd) > 1e-3) L.flip = sd < 0 ? -1 : 1; }
+    const fr = L.state === 'strike' || L.state === 'flee' ? Math.floor(t*16 + L.phase) % PPL.walk
+             : L.state === 'rob' ? F_SPEC + Math.floor(t*7) % 6 : F_IDLE + Math.floor(t*2 + L.phase) % PPL.idle;
+    emit(L.x, CURB, L.z, L.row, fr, L.flip, L.fade >= 1 ? 1 : L.fade*.98);
   }
   // delivery bots and their parcels
   for (const b of bots){
@@ -971,6 +1084,7 @@ function peopleStats(){
   let walking = 0, home = 0, work = 0, out = 0;
   for (const p of people.values()){ if (p.walk) walking++; else if (p.at === p.home) home++; else if (p.at === p.job) work++; else out++; }
   return { people: people.size, jobs: [...people.values()].filter(p => p.job).length, walking, home, work, out, drawn: pplMesh.geometry.instanceCount, nodes: NG.x.length, doors: doorList.length, bots: bots.length, botsOut: bots.filter(b => b.state !== 'in').length,
+    muggings: cityLog.filter(e => e.kind === 'mugging').length, lurkers: lurkers.size, lurking: [...lurkers.values()].filter(l => l.state !== 'away').length,
     patrolling: [...people.values()].filter(p => p.cop && (p.patrol || (p.walk && p.walk.beat))).length, cops: [...people.values()].filter(p => p.cop).length,
     homeless: [...places.values()].filter(pl => pl.cell && !pl.doors.length).length };
 }

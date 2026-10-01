@@ -16,12 +16,14 @@ const FLK_GLSL = `
   float flkH(float n){ return fract(fract(n*0.1031)*(n*0.1031 + 33.33)*(fract(n*0.1031) + 19.19)); }
   float flicker(float id, float t){
     if (id < 0.5) return 1.0;
-    float rate = 0.04 + flkH(id*3.1)*0.09;                 // how often its episodes come round
+    bool heavy = id > 199.5;                               // a dying light on a dark street
+    float rate = heavy ? 0.2 + flkH(id*3.1)*0.25 : 0.04 + flkH(id*3.1)*0.09;   // how often its episodes come round
     float ep = fract(t*rate + flkH(id*7.7));
-    float len = 0.12 + flkH(id*5.3)*0.16;                  // how much of the cycle it spends misbehaving
-    if (ep > len) return 1.0;
+    float len = heavy ? 0.5 + flkH(id*5.3)*0.35 : 0.12 + flkH(id*5.3)*0.16;   // how much of the cycle it spends misbehaving
+    if (ep > len) return heavy ? 0.75 : 1.0;
     float k = floor(t*(9.0 + flkH(id*1.9)*16.0));         // stutter speed
     float r = flkH(k*1.37 + id*11.0);
+    if (heavy) return r < 0.55 ? 0.02 : (r < 0.7 ? 0.35 : 0.9);
     return r < 0.42 ? 0.1 : (r < 0.58 ? 0.5 : 1.0);
   }`;
 const texLoader = new THREE.TextureLoader();
@@ -142,7 +144,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
       void main(){
         vShade = aVar.z; vRect = aRect; vKind = aKind;
         // about one lit sign in ten flickers (picked from its random phase)
-        vFlk = (aKind.y > 0.5 && fract(aVar.w*3.71) < 0.1) ? flicker(1.0 + floor(fract(aVar.w*7.13)*254.0), time) : 1.0;
+        vFlk = aVar.w > 99.0 ? flicker(200.0 + floor(fract(aVar.w*7.13)*54.0), time) : (aKind.y > 0.5 && fract(aVar.w*3.71) < 0.1) ? flicker(1.0 + floor(fract(aVar.w*7.13)*198.0), time) : 1.0;
         vec2 texSize = aRect.zw; float swayType = aKind.x;
         vec2 local = vec2(position.x*aVar.y, position.y + 0.5 - aVar.x);
         // sway happens in the fragment shader by sliding whole texel rows, so the quad itself never bends.
@@ -203,8 +205,10 @@ function plant(kind,P,x,y,z,k=1,anchor,fixed=false){
   const scale = new THREE.Matrix4().makeScale(s[0]/PX*k, s[1]/PX*k, 1);
   const toss = chance(.5)?-1:1, shade = rnd(.85,1.05), phase = rnd(0,TAU);
   const flip = (kind.startsWith('sign_') || kind.startsWith('glyph_')) ? 1 : toss;   // lettering must read the right way round
+  if (DARK && flip === 1 && kind.startsWith('sign_')){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 70) return; }
+  const ph = DARK && kind.startsWith('sign_') ? phase + 100 : phase;   // a sign on a dark street flickers hard
   if (fixed){
-    FOL_LIST[kind].push({ m: under(P, T(x,y,z)).multiply(scale), an, flip, shade, phase, fixed:1 });
+    FOL_LIST[kind].push({ m: under(P, T(x,y,z)).multiply(scale), an, flip, shade, phase: ph, fixed:1 });
   } else {
     const yaw = rnd(0,PI);
     FOL_LIST[kind].push({ m: under(P, T(x,y,z,yaw)).multiply(scale), an, flip, shade, phase, fixed:1 });
@@ -270,7 +274,9 @@ function buildFoliage(){
 let glowList = null;
 const _gv = new THREE.Vector3();
 function glow(P,x,y,z,kind,s=1){
-  if (!glowList){ const sp = new THREE.Sprite(GLOW[kind]); sp.position.set(x,y,z).applyMatrix4(P); sp.scale.set(s,s,1); sp.layers.set(1); glowGroup.add(sp); return; }
+  if (DARK && !KEEP_LIGHT && GLOW_FLK[kind]){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 80) return; }
+  if (DARK && GLOW_FLK[kind]) s = -s;   // marks a halo that flickers hard (see glowPoints)
+  if (!glowList){ const sp = new THREE.Sprite(GLOW[kind]); sp.position.set(x,y,z).applyMatrix4(P); sp.scale.set(Math.abs(s),Math.abs(s),1); sp.layers.set(1); glowGroup.add(sp); return; }
   _gv.set(x,y,z).applyMatrix4(P); (glowList[kind] || (glowList[kind] = [])).push(_gv.x, _gv.y, _gv.z, s);
 }
 const GLOW_PTS_UNI = { scale:{ value: 20 } };
@@ -291,9 +297,9 @@ function glowPoints(gl){
   for (const k in gl){
     const arr = gl[k], c = GLOW[k].color, op = k === 'blink' ? -2 : GLOW_FIXED[k] !== undefined ? GLOW_FIXED[k] : -1;
     for (let q=0;q<arr.length;q+=4, i++){
-      pos[i*3] = arr[q]; pos[i*3+1] = arr[q+1]; pos[i*3+2] = arr[q+2]; size[i] = arr[q+3];
+      pos[i*3] = arr[q]; pos[i*3+1] = arr[q+1]; pos[i*3+2] = arr[q+2]; size[i] = Math.abs(arr[q+3]);
       col[i*4] = c.r; col[i*4+1] = c.g; col[i*4+2] = c.b; col[i*4+3] = op;
-      flk[i] = flickerId(GLOW_FLK[k]);
+      flk[i] = arr[q+3] < 0 ? heavyFlickerId() : flickerId(GLOW_FLK[k]);
     }
   }
   const g = new THREE.BufferGeometry();

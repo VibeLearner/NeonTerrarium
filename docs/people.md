@@ -12,7 +12,7 @@ Code: `js/people.js`. Sprites: `assets/sprites/people.png`.
 | 2b | Real doors that slide open and shut; walking that never clips buildings, furniture or plants | Done |
 | 3 | Stall keepers, queueing and eating at the food stalls, sitting on benches and stools, stopping to chat | Done |
 | 4 | Delivery robots on the sidewalks, bumping into each other, reactions with emote icons | Done |
-| 5 | Dark streets and muggings, police patrols, an event log for the radio RJ | Patrols done; the rest not started |
+| 5 | Dark streets and muggings, police patrols, an event log for the radio RJ | Done (the log is kept; the radio host that reads it is still to come) |
 
 ## How it works
 
@@ -40,6 +40,23 @@ for a moment and react with a bubble over their head (!, ?, a sweat drop or an a
 their angry animation). Emote bubbles also show up in the square: music notes and hearts while chatting, dots
 while waiting for a stall keeper, a bowl when sitting down with food. The eight bubbles are drawn in code in the
 people atlas (row 14) and always drawn bright.
+
+**Dark streets.** About one building in fifteen stands on a dark street (picked from its grid position, so it
+never changes). While a dark plot is generated, about 80% of its windows, lamps, neon and trim are swapped for
+unlit look-alikes (picked by position, so the same ones stay off), most halos and lit signs are left out, and
+whatever still glows flickers hard and often. Every dark plot has one failing street lamp. (Code: `DARK` and
+`KEEP_LIGHT` in core.js, `isDarkPlot` in world.js; the hard flicker is flicker ids 200 to 254 in sprites.js.)
+
+**Muggings.** At night (20:00 to 5:00) a shady figure lurks on a clear corner of each dark plot. When someone walks
+past alone, with no officer within 8 units, the lurker sometimes darts over and robs them: the victim freezes
+('!', then a sweat drop), the mugger runs off to a crossing well away and melts into the dark, and the victim
+hurries on. The nearest officer on duty runs to the spot (keeping to the walkways) and looks around with the
+scanner. A lurker lies low for a few minutes after each job. Muggings and police call-outs go into `cityLog`
+(hour, place, who), kept for the radio host.
+
+**Police drone.** The drone parked on the station's roof pad is live (in `policeFx`, mega.js): every minute or so
+it lifts off with its red and blue lights flashing, climbs high enough to clear the buildings, visits three
+street crossings nearby, hovers over each with a searchlight cone on the street, then flies home and lands.
 
 **What's in the way.** Every plot gets a 5 cm footprint map of everything in the walking band (ankle to head
 height, 0.14 to 0.95 units): its triangles, clipped to the band and stamped from above, plus the solid middle

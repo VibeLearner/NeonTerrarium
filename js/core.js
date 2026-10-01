@@ -131,9 +131,16 @@ let buckets = new Map();
 // Each primitive is transformed straight into its material's vertex list (no per-primitive geometry objects),
 // which keeps generating a building quick enough to do mid-click.
 const _nm = new THREE.Matrix3();
+// Dark streets: a few plots have almost no light. While one is generated, DARK is set: most of its lamps, windows,
+// neon and trim are swapped for unlit look-alikes (picked by position, so the same ones stay off), and whatever
+// still glows flickers badly. KEEP_LIGHT protects a light from going out (the street lamp: it flickers instead).
+let DARK = false, KEEP_LIGHT = false;
+const DARK_SUB = { window: toon(0x22303f), bulb: toon(0x3d3226), neon: toon(0x2a2230), trim: toon(0x2c3438) };
+const posHash = (x, y, z) => hash('lit', Math.round(x*20), Math.round(y*20), Math.round(z*20)) % 100;
 function put(geo, mat, m){
+  if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && posHash(m.elements[12], m.elements[13], m.elements[14]) < 82) mat = DARK_SUB[mat.userData.glow];
   let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
-  const fid = b.f ? flickerId(mat.userData.glow) : 0;
+  const fid = b.f ? (DARK && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow)) : 0;
   const did = b.f ? 0 : detailId(geo, m);   // lights are never dropped: they carry the look from far away
   const P = geo.attributes.position.array, N = geo.attributes.normal ? geo.attributes.normal.array : null, idx = geo.index ? geo.index.array : null;
   const e = m.elements, ne = _nm.getNormalMatrix(m).elements, bp = b.p, bn = b.n;
@@ -161,7 +168,9 @@ function detailId(geo, m){
 // which lights flicker: some neon, fewer lamps and trims, the odd window (Math.random, so the city's layout
 // randomness is untouched)
 const FLK_ODDS = { neon: .08, bulb: .06, trim: .03, window: .02 };
-function flickerId(kind){ return Math.random() < (FLK_ODDS[kind] || 0) ? 1 + Math.floor(Math.random()*254) : 0; }
+function flickerId(kind){ return Math.random() < (FLK_ODDS[kind] || 0) ? 1 + Math.floor(Math.random()*198) : 0; }
+// ids 200 to 254 flicker hard and often: the failing lights of a dark street
+const heavyFlickerId = () => 200 + Math.floor(Math.random()*55);
 function bucketGeometry(b){
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3));

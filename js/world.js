@@ -142,11 +142,11 @@ function buildPlatform(c){
     if (chance(.4)){ const Pb = under(P, T(rnd(-.9,.9), .05, rnd(-.9,.9), pick([0, PI/2]))); box(M.wood, Pb, 0, .14, 0, .5, .04, .15); box(M.frame, Pb, 0, .07, 0, .42, .14, .1);
       for (const sx of [-.13, .13]) spotAt(Pb, sx, .16, 0, 'seat', null, [0, 1]); }
   }
-  if (chance(.45)){   // a street lamp on one corner
-    const [sx,sz] = pick(CORNERS), Pl = T(x + sx*(LOT/2 - .25), 0, z + sz*(LOT/2 - .25));
+  const lamp = ([sx,sz]) => { const Pl = T(x + sx*(LOT/2 - .25), 0, z + sz*(LOT/2 - .25));
     cyl(M.metalDark, Pl, 0, .65, 0, .03, 1.3); box(M.metalDark, Pl, .12, 1.3, 0, .26, .03, .03);
-    box(M.bulb, Pl, .24, 1.26, 0, .12, .05, .1); glow(Pl, .24, 1.2, 0, 'warm', 1.4);
-  }
+    KEEP_LIGHT = true; box(M.bulb, Pl, .24, 1.26, 0, .12, .05, .1); glow(Pl, .24, 1.2, 0, 'warm', 1.4); KEEP_LIGHT = false; };
+  if (chance(.45)) lamp(pick(CORNERS));   // a street lamp on one corner
+  else if (DARK) lamp(CORNERS[hash('lamp', c.i, c.j) % 4]);   // a dark street always has its one failing lamp
 }
 
 /* ---------- a building: a stack of sections, each a complete building from the zone's set of types ---------- */
@@ -186,6 +186,8 @@ function buildStack(c){
   c.height = y;
 }
 
+// About one building in fifteen stands on a dark street: almost no light, and what's left flickers (see DARK in core.js)
+const isDarkPlot = c => !!c.sections.length && !c.mega && hash('dark', c.i, c.j) % 15 === 0;
 /* ---------- rebuilding ---------- */
 // Pieces are batched in regions of REG x REG grid cells; an edit only re-batches the regions it touched.
 const REG = 5, regions = new Map(), dirtyRegions = new Set();
@@ -206,7 +208,9 @@ function rebuildCell(c){
   finishAnimsOn(c);   // a neighbour's edit can rebuild a cell that is still animating
   disposeData(c.data);
   c.height = CURB;
-  c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length) buildStack(c); });
+  c.dark = isDarkPlot(c);
+  DARK = c.dark;
+  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length) buildStack(c); }); } finally { DARK = false; }
   if (c.mega){ const m = megas.get(c.mega); if (m && m.roofH) c.height = m.roofH; }
   cellView(c);
   c.emitters = c.data.emitters; c.pads = c.data.pads; c.ports = c.data.ports;

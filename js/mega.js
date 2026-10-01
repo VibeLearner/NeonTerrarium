@@ -1133,11 +1133,7 @@ function buildPoliceStation(m){
     for (const o of [0, .22]){ strut(M.neonAmber, F, -.25, py + .005, -o, 0, py + .005, -o - .2, .04); strut(M.neonAmber, F, .25, py + .005, -o, 0, py + .005, -o - .2, .04); } }
   for (let k=0; k<16; k++){ const t = -PS/2 + .15 + (k % 4)*(PS - .3)/3, side = Math.floor(k/4);   // edge lights
     const [lx, lz] = [[t, -PS/2], [PS/2, t], [-t, PS/2], [-PS/2, -t]][side]; box(M.bulb, P, px + lx, py + .02, pz + lz, .07, .04, .07); if (k % 2) glow(P, px + lx, py + .05, pz + lz, 'warm', .5); }
-  { const D = under(P, T(px + .2, py, pz + .1, .4));                                                       // a big police drone parked on it
-    box(M.polCar, D, 0, .2, 0, .9, .18, .55); box(M.polCarDark, D, 0, .32, 0, .6, .1, .36); box(M.neonCyan, D, .46, .2, 0, .02, .05, .3);
-    for (const [qx, qz] of [[-.55,-.45],[.55,-.45],[-.55,.45],[.55,.45]]){ strut(M.polCarDark, D, 0, .25, 0, qx, .3, qz, .06); put(U.cyl16, M.metal, under(D, T(qx, .34, qz, 0, .62, .03, .62))); put(U.torus, M.polCarDark, under(D, T(qx, .34, qz, 0, .66, .66, .66, PI/2))); }
-    box(M.blink, D, -.2, .29, .29, .08, .04, .02); box(M.neonCyan, D, .2, .29, .29, .08, .04, .02);
-    for (const sx of [-1, 1]) box(M.frame, D, sx*.3, .05, 0, .04, .1, .5); }
+  m.dronePad = under(P, T(px + .2, py, pz + .1, .4)).elements.slice();   // the police drone parks here (it's live: see policeFx)
   // machinery and an antenna on the other side of the roof
   box(M.metal, P, 3.1, ry + .3, .9, 1.3, .6, 1.0); box(M.metal, P, 3.6, ry + .25, -.6, .8, .5, .7); box(M.metalDark, P, 1.7, ry + .2, 1.4, .7, .4, .6);
   for (let k=0; k<3; k++) put(U.cyl16, M.polWall2, under(P, T(2.9 + k*.4, ry + .78, .9, 0, .3, .1, .3)));   // fan housings
@@ -1186,6 +1182,100 @@ const WANTED_FRAG = `
     vec3 bg = vec3(.02, .07, .11);                                       // the screen behind the projection
     gl_FragColor = vec4(bg + col*1.2, 1.0);
   }`;
+// The station's drone: parked on the roof pad, it now and then lifts off, flashing red and blue, and patrols the
+// streets nearby from the air: it flies from crossing to crossing high enough to clear the buildings, hovers over
+// each with its searchlight on the street, then comes home and lands. It doesn't do anything else.
+function policeDrone(m){
+  const g = new THREE.Group(), pad = new THREE.Matrix4().fromArray(m.dronePad);
+  const restPos = new THREE.Vector3(), restQ = new THREE.Quaternion(), _sc = new THREE.Vector3();
+  pad.decompose(restPos, restQ, _sc);
+  const restYaw = new THREE.Euler().setFromQuaternion(restQ, 'YXZ').y;
+  const part = (geo, mat, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0, to = g) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.set(rx, ry, rz); to.add(o); return o; };
+  part(U.box, M.polCar, 0, .2, 0, .9, .18, .55); part(U.box, M.polCarDark, 0, .32, 0, .6, .1, .36); part(U.box, M.neonCyan, .46, .2, 0, .02, .05, .3);
+  const blades = [];
+  for (const [qx, qz] of [[-.55,-.45],[.55,-.45],[-.55,.45],[.55,.45]]){
+    const arm = part(U.box, M.polCarDark, qx/2, .27, qz/2, Math.hypot(qx, qz), .05, .06); arm.rotation.y = -Math.atan2(qz, qx);
+    part(U.cyl16, M.metal, qx, .34, qz, .1, .06, .1);
+    part(U.torus, M.polCarDark, qx, .34, qz, .66, .66, .66, PI/2);
+    const hub = new THREE.Group(); hub.position.set(qx, .37, qz); g.add(hub); blades.push(hub);
+    part(U.box, M.metal, 0, 0, 0, .58, .015, .07, 0, 0, 0, hub); part(U.box, M.metal, 0, 0, 0, .07, .015, .58, 0, 0, 0, hub);
+  }
+  for (const sx of [-1, 1]) part(U.box, M.frame, sx*.3, .05, 0, .04, .1, .5);
+  // the flashing lights: red on one side, blue on the other, each with a halo
+  const flash = (col, z) => { const lm = new THREE.MeshBasicMaterial({ color: col }); const b = part(new THREE.BoxGeometry(.14, .06, .06), lm, 0, .4, z, 1, 1, 1);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sp.scale.set(1.2, 1.2, 1); sp.position.set(0, .42, z); sp.layers.set(1); g.add(sp);
+    return { b, sp, lm }; };
+  const red = flash(0xff2030, -.16), blue = flash(0x2a6cff, .16);
+  // the searchlight: a faint cone of light down to the street while it hovers
+  const coneMat = new THREE.MeshBasicMaterial({ color: 0xbfefff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(.7, 1, 16, 1, true), coneMat); cone.layers.set(1); cone.renderOrder = 4; scene.add(cone);
+  const spot = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xbfefff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); spot.scale.set(2.2, 2.2, 1); spot.layers.set(1); scene.add(spot);
+  g.traverse(o => { if (o.isMesh && o.layers.mask === 1) o.layers.set(0); });
+  g.position.copy(restPos); g.rotation.y = restYaw; scene.add(g);
+  const st = { mode: 'rest', timer: 20 + Math.random()*30, way: [], yaw: restYaw, spin: 0, hover: 0, k: 0 };
+  const cruiseTo = (a, b) => Math.max(droneCruise(a, b) + 1.2, restPos.y + 1.5);
+  const _to = new THREE.Vector3();
+  function goToward(target, dt, speed){
+    _to.subVectors(target, g.position); const d = _to.length();
+    if (d < .05) return true;
+    const want = Math.atan2(_to.x, _to.z);
+    if (Math.hypot(_to.x, _to.z) > .3){ let dy = want - st.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); st.yaw += dy*Math.min(1, dt*2.5); }
+    g.position.addScaledVector(_to, Math.min(1, speed*dt/d));
+    return d < .1;
+  }
+  return {
+    g, st,
+    update(dt, time){
+      const on = st.mode !== 'rest';
+      st.spin = Math.max(0, Math.min(1, st.spin + (on ? dt : -dt*.5)));
+      for (const h of blades) h.rotation.y += dt*40*st.spin;
+      const ph = (time*2.2) % 2, a = ph < 1, fl = (time*14) % 1 < .6;
+      red.b.visible = red.sp.visible = on && a && fl; blue.b.visible = blue.sp.visible = on && !a && fl;
+      let light = 0;
+      if (st.mode === 'rest'){
+        st.timer -= dt;
+        if (st.timer <= 0){
+          const nodes = (typeof patrolNodes !== 'undefined' ? patrolNodes : []).filter(c => Math.hypot(c.x - restPos.x, c.z - restPos.z) < 22);
+          if (nodes.length){ st.way = []; for (let k = 0; k < 3; k++) st.way.push(nodes[Math.floor(Math.random()*nodes.length)]); st.mode = 'up'; st.k = 0; }
+          else st.timer = 30;
+        }
+      } else if (st.mode === 'up'){
+        st.k = Math.min(1, st.k + dt/2.2);
+        g.position.set(restPos.x, restPos.y + 1.2*st.k*st.k*(3 - 2*st.k), restPos.z);
+        if (st.k >= 1){ st.mode = 'fly'; st.target = null; }
+      } else if (st.mode === 'fly' || st.mode === 'home'){
+        if (!st.target){
+          const w = st.mode === 'fly' ? st.way.shift() : null;
+          const tx = w ? w.x : restPos.x, tz = w ? w.z : restPos.z;
+          _to.set(tx, 0, tz);
+          st.target = new THREE.Vector3(tx, cruiseTo(g.position, _to), tz);
+          st.climb = new THREE.Vector3(g.position.x, st.target.y, g.position.z);   // climb first, then cross
+        }
+        if (st.climb){ if (goToward(st.climb, dt, 1.6)) st.climb = null; }
+        else if (goToward(st.target, dt, 2.4)){
+          st.target = null;
+          if (st.mode === 'home'){ st.mode = 'down'; st.k = 0; st.from = g.position.clone(); }
+          else { st.mode = 'hover'; st.hover = 2.5 + Math.random()*2; }
+        }
+      } else if (st.mode === 'hover'){
+        st.hover -= dt; light = Math.min(1, st.hover*2, 1);
+        g.position.y += Math.sin(time*2.3)*.002;
+        if (st.hover <= 0) st.mode = st.way.length ? 'fly' : 'home';
+      } else if (st.mode === 'down'){
+        st.k = Math.min(1, st.k + dt/2.8); const u = st.k*st.k*(3 - 2*st.k);
+        g.position.lerpVectors(st.from, restPos, u);
+        let dy = restYaw - st.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); st.yaw += dy*Math.min(1, dt*3);
+        if (st.k >= 1){ st.mode = 'rest'; st.timer = 35 + Math.random()*50; st.yaw = restYaw; g.position.copy(restPos); }
+      }
+      g.rotation.y = st.yaw;
+      // searchlight down to the street
+      const h = g.position.y - CURB;
+      cone.visible = spot.visible = light > 0;
+      if (light > 0){ cone.position.set(g.position.x, CURB + h/2, g.position.z); cone.scale.set(1, h, 1); coneMat.opacity = .14*light; spot.position.set(g.position.x, CURB + .05, g.position.z); spot.material.opacity = .55*light; }
+    },
+    dispose(){ scene.remove(g, cone, spot); coneMat.dispose(); cone.geometry.dispose(); spot.material.dispose(); red.lm.dispose(); blue.lm.dispose(); red.sp.material.dispose(); blue.sp.material.dispose(); }
+  };
+}
 function policeFx(m){
   if (!wantedTex){ wantedTex = new THREE.TextureLoader().load('assets/sprites/wanted.png'); wantedTex.magFilter = wantedTex.minFilter = THREE.NearestFilter; wantedTex.generateMipmaps = false; }
   const parts = [], screens = [];
@@ -1221,7 +1311,9 @@ function policeFx(m){
   add(U.box, M.blink, -.5, .5, 0, .07, .07, .07);
   head.traverse(o => { if (o.isMesh) o.layers.set(0); });
   scene.add(radar); parts.push(radar);
+  const drone = policeDrone(m); parts.push(drone.g);
   return {
+    drone,
     update(dt, time){
       for (const s of screens){
         s.u.time.value = time; s.hold -= dt; s.stray -= dt;
@@ -1234,8 +1326,9 @@ function policeFx(m){
       const ph = (time*2.2) % 2, a = ph < 1, flash = (time*14) % 1 < .6;   // alternate, with a quick double-flash
       red.b.visible = red.s2.visible = a && flash; blue.b.visible = blue.s2.visible = !a && flash;
       head.rotation.y = time*.55;
+      drone.update(dt, time);
       scanMat.color.setRGB(.22, .9, .88).multiplyScalar(.45 + .55*Math.abs(Math.sin(time*3)));
     },
-    dispose(){ for (const p of parts){ scene.remove(p); if (p !== radar) p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } scanMat.dispose(); }
+    dispose(){ for (const p of parts){ scene.remove(p); if (p !== radar && p !== drone.g) p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } scanMat.dispose(); drone.dispose(); }
   };
 }

@@ -7,7 +7,7 @@
 // tier, up to maxLevels. Right-click takes the top tier off, or removes it when only one is left; it can come back
 // once the requirement is met again.
 const MEGA_TYPES = {
-  radio: { name: 'Radio station', need: { low: 20, mid: 20, high: 20, ind: 20 }, odds: 30, w: 2, h: 2, maxLevels: 1,
+  radio: { name: 'Radio station', need: { any: 20 }, odds: 1, w: 2, h: 2, maxLevels: 1,   // arrives with the 20th building, of any zone
            colour: '#ff5a4a', sound: 'radioOn', build: buildRadioStation },
   mall:  { name: 'Sky mall', need: { high: 50, ind: 30 }, odds: 50, w: 3, h: 2, maxLevels: 3,
            colour: '#ffcf7a', build: buildSkyMall },
@@ -22,8 +22,8 @@ const megas = new Map();   // kind -> { kind, i, j, w, h, levels, seed, x, z, da
 
 // how many building sections of each zone stand in the city
 function zoneCounts(){
-  const n = { low: 0, mid: 0, high: 0, ind: 0 };
-  for (const c of cells.values()) for (const s of c.sections) if (n[s.zone] !== undefined) n[s.zone]++;
+  const n = { low: 0, mid: 0, high: 0, ind: 0, any: 0 };   // any: buildings of any zone (each built plot counts once)
+  for (const c of cells.values()){ if (c.sections.length) n.any++; for (const s of c.sections) if (n[s.zone] !== undefined) n[s.zone]++; }
   return n;
 }
 function megaUnlocked(kind){

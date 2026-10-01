@@ -65,9 +65,9 @@ The scripts are ordinary (non-module) scripts that share one scope, so the order
 
 Landmarks that take over a block of plots once the city is big enough. Each exists at most once.
 
-- **Radio station:** unlocks when there are 20 building sections of every zone. From then on, each build has a
-  1 in 30 chance of bringing it in, on the 2x2 block nearest that build (replacing what stood there). Right-click
-  removes it; it can come back once the city meets the requirement again.
+- **Radio station:** arrives with the 20th building, of any zone (each built plot counts once; stacking doesn't
+  add to it), on the 2x2 block nearest that build (replacing what stood there). Right-click removes it; with 20 or
+  more buildings standing, the next build brings it back.
 - **Sky mall:** a 3x2 block (either way round). Unlocks at 50 luxury and 30 industrial sections, then a 1 in 50
   chance per build. An octagonal white-and-gold mall on white columns, each side one sheet of glass looking into
   an open atrium with walkways and boutiques round a central core; the roof is mostly pool under a white canopy.

@@ -76,7 +76,8 @@ koi, the drone, the screens) switch on at the end.
   add to it), on free ground near that build. Right-click removes it; with 20 or
   more buildings standing, the next build brings it back.
   While it stands, the radio plays the music in assets/audio/music/, shuffled, fading in slowly once the station has
-  fully arrived. A neon cassette appears under the title showing the song; click it for the next tape. Removing
+  fully arrived. A neon cassette appears under the title showing the song, with previous, play/pause and next
+  buttons and an equalizer that follows the music. Removing
   the station stops the music. Music volume is in Settings, Sound.
 - **Sky mall:** a 3x2 block (either way round). Unlocks at 50 luxury and 30 industrial sections, then a 1 in 50
   chance per build. An octagonal white-and-gold mall on white columns, each side one sheet of glass looking into

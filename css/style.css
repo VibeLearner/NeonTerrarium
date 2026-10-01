@@ -20,7 +20,9 @@ body{margin:0;background:var(--night);color:var(--ink);font-family:var(--font-mo
 
 .hud{position:fixed;top:calc(16px + env(safe-area-inset-top,0px));left:16px;pointer-events:none;display:grid;gap:2px;text-shadow:0 1px 0 rgba(0,0,0,.6)}
 .brand{font-family:var(--font-pixel);font-size:18px;letter-spacing:.06em;color:var(--ink)}
-.brand b{color:var(--pink);font-weight:400}
+/* the name in two neon tubes: hot pink NEON, deep green TERRARIUM; a dark edge keeps it readable over bright sky */
+.n-neon{color:#ff6fb8;text-shadow:0 0 1px #000,0 1px 0 rgba(0,0,0,.7),0 0 4px #ff4fa3,0 0 10px rgba(255,79,163,.75),0 0 18px rgba(255,79,163,.4)}
+.n-terra{color:#24b35f;text-shadow:0 0 1px #000,0 1px 0 rgba(0,0,0,.7),0 0 4px #168a47,0 0 10px rgba(18,120,60,.8),0 0 18px rgba(12,96,46,.5)}
 .readout{font-size:11px;color:var(--ink);font-variant-numeric:tabular-nums;opacity:.9}
 .hint{font-size:11px;color:var(--muted)}
 
@@ -57,6 +59,7 @@ input[type=range]{width:100%;accent-color:var(--cyan);margin:0}
 /* zone bar: four cut-corner boxes with a neon border, Townscaper-minimal */
 .zonebar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));display:grid;justify-items:center;gap:8px;width:max-content;max-width:calc(100% - 32px)}
 .modehint{margin:0;font-size:11px;color:var(--ink);background:rgba(10,16,32,.72);padding:3px 10px;text-align:center}
+.modehint.hint{color:var(--muted)}
 .zones{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .zone{--cut:10px;padding:1.5px;border:0;border-radius:0;background:var(--z);cursor:pointer;
   clip-path:polygon(var(--cut) 0,100% 0,100% calc(100% - var(--cut)),calc(100% - var(--cut)) 100%,0 100%,0 var(--cut));

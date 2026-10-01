@@ -352,7 +352,7 @@ function animMaterials(u){
   const nrm = normalMat.clone(); nrm.clippingPlanes = [u.plane]; nrm.onBeforeCompile = normalMat.onBeforeCompile;
   return { atlas, nrm };
 }
-function startAnim(c, kind, y0, y1, zone, w, old){
+function startAnim(c, kind, y0, y1, zone, w, old, sound){
   const view = kind === 'build' ? c.view : old.view;
   const held = kind === 'build';   // plants and glows arrive when a build finishes, but leave as soon as a removal starts
   if (!view){ if (old) dropView(old); if (held) releaseRegion(regKey(c.i, c.j)); return; }
@@ -367,7 +367,7 @@ function startAnim(c, kind, y0, y1, zone, w, old){
   box.position.set(c.x, (by0 + y1)/2, c.z); box.scale.set(w + .08, Math.max(.1, y1 - by0), w + .08);
   scan.scale.set(w + .2, .001, w + .2);
   for (const l of [box, scan]){ l.layers.set(1); l.renderOrder = 998; scene.add(l); }
-  sfx.play(kind === 'build' ? 'place' : 'remove');
+  if (sound) sfx.play(sound, { spread: 0 }); else sfx.play(kind === 'build' ? 'place' : 'remove');
   anims.push({ c, kind, view, old, u, mats, box, scan, x: c.x, z: c.z, y0, y1, t: 0, dur: kind === 'build' ? .15 : .12, reg: regKey(c.i, c.j), held });
 }
 const easeOut = x => 1 - (1 - x)*(1 - x);

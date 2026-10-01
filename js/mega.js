@@ -5,7 +5,7 @@
 // build has a small chance of bringing it in: it takes over a 2x2 block of plots around that build, replacing what
 // stood there. Removing it (right-click) frees the plots, and it can come back once the requirement is met again.
 const MEGA_TYPES = {
-  radio: { name: 'Radio station', need: 20, odds: 30, colour: '#ff5a4a', build: buildRadioStation },
+  radio: { name: 'Radio station', need: 20, odds: 30, colour: '#ff5a4a', sound: 'radioOn', build: buildRadioStation },
 };
 const megas = new Map();   // kind -> { kind, i, j, seed, x, z, data, view, roofH, top }
 
@@ -56,7 +56,7 @@ function spawnMega(kind, near){
   const m = placeMega(kind, blk.i, blk.j, (Math.random()*1e9)|0); if (!m) return null;
   holdRegion(m);
   refresh(covered, [m]);
-  startAnim(m, 'build', CURB - .05, m.top + 1, MEGA_TYPES[kind].colour, 2*LOT, null);
+  startAnim(m, 'build', CURB - .05, m.top + 1, MEGA_TYPES[kind].colour, 2*LOT, null, MEGA_TYPES[kind].sound);
   return m;
 }
 function removeMega(m){
@@ -162,7 +162,9 @@ function buildRadioStation(m){
   box(M.concL, P, wx, y0 + wh/2, wz, ww, wh, wd);
   box(M.shutter, P, wx + ww/2 + .01, y0 + .42, wz, .03, .8, 1.4);
   box(M.hazard, P, wx + ww/2 + .02, y0 + .86, wz, .03, .06, 1.5);
-  box(M.trimCyan, P, wx, wroof, wz, ww + .08, .05, wd + .08);
+  box(M.concDD, P, wx, wroof + .01, wz, ww - .08, .04, wd - .08);                                      // roof deck
+  for (const [fx, fz, w, d] of [[0, wd/2, ww + .08, .05], [0, -wd/2, ww + .08, .05], [ww/2, 0, .05, wd + .08], [-ww/2, 0, .05, wd + .08]])
+    box(M.trimCyan, P, wx + fx, wroof - .05, wz + fz, w, .05, d);                                       // cyan trim round the wing's roof
   dish(P, wx - .55, wroof, wz - .75, rnd(.85, 1.0), rnd(0, TAU), rnd(.5, .9), true);
   dish(P, wx + .55, wroof, wz + .95, rnd(.7, .85), rnd(0, TAU), rnd(.4, 1.0), true);
   for (const [cx, cz] of [[-1,-1],[1,-1],[1,1]]) beaconLight(P, wx + cx*(ww/2 - .05), wroof + .06, wz + cz*(wd/2 - .05));

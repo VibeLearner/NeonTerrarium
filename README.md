@@ -52,7 +52,7 @@ js/input.js             camera, mouse / touch / keyboard, settings panel
 js/main.js              start-up and the frame loop
 assets/sprites/         sprite PNGs at true pixel size (one file per sprite; the name is the sprite's id)
 assets/audio/music/     music (coming next)
-assets/audio/sfx/       sound effects: place.wav (build pop), remove.wav (removal thud)
+assets/audio/sfx/       sound effects: place.wav (build pop), remove.wav (removal thud), radio-on.wav (radio station arrives)
 assets/audio/sfx/originals/  the untouched source recordings, for re-editing
 ```
 

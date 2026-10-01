@@ -179,7 +179,8 @@ function plant(kind,P,x,y,z,k=1,anchor,fixed=false){
   const s = SPR.size[kind];
   const an = anchor===undefined ? SPR.anchor[kind] : anchor==='b' ? 0 : anchor==='t' ? 1 : anchor==='c' ? .5 : anchor;
   const scale = new THREE.Matrix4().makeScale(s[0]/PX*k, s[1]/PX*k, 1);
-  const flip = chance(.5)?-1:1, shade = rnd(.85,1.05), phase = rnd(0,TAU);
+  const toss = chance(.5)?-1:1, shade = rnd(.85,1.05), phase = rnd(0,TAU);
+  const flip = (kind.startsWith('sign_') || kind.startsWith('glyph_')) ? 1 : toss;   // lettering must read the right way round
   if (fixed){
     FOL_LIST[kind].push({ m: under(P, T(x,y,z)).multiply(scale), an, flip, shade, phase, fixed:1 });
   } else {

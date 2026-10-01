@@ -6,6 +6,7 @@
 const SFX_FILES = {
   place:  'assets/audio/sfx/place.wav',    // a piece built: the mechanical pop
   remove: 'assets/audio/sfx/remove.wav',   // a piece removed: the mechanical thud
+  radioOn: 'assets/audio/sfx/radio-on.wav', // the radio station arrives: clicks on into melodic static (played whole, untouched)
 };
 const SFX_VOL_KEY = 'neonIsland.sfxVolume';
 const sfx = (() => {

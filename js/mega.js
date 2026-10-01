@@ -866,6 +866,14 @@ function fBlock(P, cx, cz, w, d, y0, h, mat, opts = {}){
   }
   // the ledge on top, and the orange strip under it: the signature light of the reference
   box(M.fSteel3, P, cx, y0 + h + .08, cz, w + .5, .16, d + .5);
+  // nature taking the old works back: vines spilling down from every ledge, moss and ferns along it
+  for (const [F, len] of blockFaces(P, cx, cz, w + .5, d + .5)){
+    for (let t = -len/2 + .3; t < len/2 - .2; t += rnd(.45, .9)){
+      if (chance(.55)) plant(pick(['vines','pothos','h_ivy','h_vine3','h_curtain1','h_curtain2','l_mossroots']), F, t, y0 + h + .1, .03, rnd(.9, 1.3), 't', true);
+      if (chance(.4)) plant(pick(['moss','g_moss2','g_fern2','bush','g_cover']), F, t, y0 + h + .16, -.15, rnd(.7, .95));
+    }
+  }
+  for (let k=0; k<Math.round(w*d/5); k++) plant(pick(['g_spread1','g_spread2','g_fern3','moss','bush','bushFlower','g_clover']), P, cx + rnd(-w/2 + .3, w/2 - .3), y0 + h + .16, cz + rnd(-d/2 + .3, d/2 - .3), rnd(.8, 1.1));   // roof garden gone wild
   if (opts.glow !== false) for (const [F, len] of blockFaces(P, cx, cz, w + .5, d + .5)){
     if (chance(opts.glowOdds ?? .75)){
       box(M.fGlow, F, 0, y0 + h - .02, -.08, len - .4, .05, .06);
@@ -884,6 +892,11 @@ function fStack(P, x, z, r, h, opts = {}){
   for (let y = .3; y < h - .4; y += .3) box(M.frame, P, x, CURB + y, z + r + .1, .3, .03, .03);       // ladder rungs
   box(M.frame, P, x - .15, CURB + h/2, z + r + .1, .03, h, .03); box(M.frame, P, x + .15, CURB + h/2, z + r + .1, .03, h, .03);
   emitters.push(new THREE.Vector3(x, CURB + h + .4, z).applyMatrix4(P));
+  for (let k=0; k<Math.round(h/2.5); k++){                                   // ivy hanging off the collars
+    const a = rnd(0, TAU), y = rnd(1.2, h*.75), F = under(P, T(x + Math.sin(a)*(r + .1), 0, z + Math.cos(a)*(r + .1), a));
+    plant(pick(['h_ivy','vines','pothos','l_mossroots']), F, 0, CURB + y, .02, rnd(.9, 1.2), 't', true);
+  }
+  for (let k=0; k<4; k++){ const a = rnd(0, TAU); plant(pick(['bush','g_fern3','g_spread2']), P, x + Math.sin(a)*(r + .3), CURB + .05, z + Math.cos(a)*(r + .3), rnd(.8, 1.1)); }
   if (opts.beacon){ beaconLight(P, x + r + .1, CURB + h + .45, z, .1, 1.1); beaconLight(P, x - r - .1, CURB + h + .45, z, .1, 1.1); }
 }
 function buildFoundry(m){
@@ -898,6 +911,12 @@ function buildFoundry(m){
   box(M.hazard, P, 0, .058, 4.0, L - 2, .012, .1);
   for (let k=0; k<14; k++){ const x = rnd(-L/2 + .6, L/2 - .6), z = rnd(4.4, D/2 - .4);
     chance(.6) ? put(U.cyl16, pick([M.fRust, M.awn3, M.corrBlue, M.fSteel2]), under(P, T(x, .28, z, 0, .4, .52, .4))) : box(pick([M.crate, M.fSteel2]), P, x, .22, z, .5, .44, .5); }
+
+  // ---- greenery in the yard: weeds in the cracks, planters and a few small trees along the front
+  for (let k=0; k<26; k++) plant(pick(['g_clover','g_cover','g_moss2','moss','g_flowers','g_spread1']), P, rnd(-L/2 + .5, L/2 - .5), .06, rnd(2.4, D/2 - .3), rnd(.7, 1.0));
+  for (let k=0; k<6; k++){ const x = -L/2 + 1.2 + k*(L - 2.4)/5, z = D/2 - .5;
+    box(M.concM, P, x, .22, z, .9, .4, .5); plant(pick(['bamboo','bonsai','bushFlower','bush']), P, x, .42, z, rnd(.95, 1.25)); plant('h_ivy', under(P, T(x, 0, z + .25)), 0, .4, .01, .8, 't', true); }
+  for (const x of [-L/2 + .5, L/2 - .5]) for (let z = -D/2 + 1; z < D/2 - 1; z += rnd(1.2, 2.0)) plant(pick(['bamboo','bush','g_fern3','bonsai']), P, x, .06, z, rnd(.9, 1.2));
 
   // ---- the main mass: a podium hall, two tall blocks over it, a rounded hall on top
   fBlock(P, -1.2, -2.0, 11.5, 7.6, CURB, 4.4, M.fSteel, { windows: true });                         // podium
@@ -960,7 +979,8 @@ function buildFoundry(m){
     fPipe(P, ax, y0 + up, az, bx2, y0 + up, bz2, r);
     put(U.sph, M.fSteel2, under(P, T(ax, y0 + up, az, 0, 3*r, 3*r, 3*r))); put(U.sph, M.fSteel2, under(P, T(bx2, y0 + up, bz2, 0, 3*r, 3*r, 3*r)));
   };
-  loop(-2.6, -2.0, .6, -2.0, CURB + 9.2, 2.6, .2);                                                  // from the left block over to the tall one
+  loop(-2.6, -2.0, .6, -2.0, CURB + 9.2, 2.6, .2);
+  for (let t = -2.4; t < .5; t += .5) plant(pick(['vines','pothos','h_vine3']), under(P, T(0, 0, -2.0)), t, CURB + 11.7, 0, rnd(.8, 1.1), 't', true);                                                  // from the left block over to the tall one
   loop(-1.5, -5.0, 1.0, -5.0, CURB + 9.2, 1.6, .14);
   loop(3.6, -3.0, 7.2, -3.0, CURB + 7.0, 1.6, .18);                                                 // tall block to the chimney side
   loop(4.4, -1.2, 6.6, 1.0, CURB + 4.4, 2.2, .16);                                                  // podium to the tank
@@ -970,7 +990,7 @@ function buildFoundry(m){
   // aerials, cables and a few warm work lights up top
   for (const [x, z, h] of [[-5.2, -2.4, 2.4], [2.6, -2.6, 3.2], [1.0, -4.8, 1.8]]) cyl(M.frame, P, x, CURB + 13.6 + h/2 - (x < 0 ? 1.6 : 0), z, .03, h);
   for (const [x, y, z] of [[-6.5, 9.3, 1.0], [3.7, 13.7, -1.9], [-1.3, 4.6, 1.9], [7.3, 4.6, 2.9]]){ box(M.bulb, P, x, CURB + y, z, .14, .08, .1); glow(P, x, CURB + y - .05, z + .1, 'warm', 1.4); }
-  for (let k=0; k<5; k++) plant(pick(['vines','h_ivy','l_mossroots']), P, rnd(-6.5, 3), CURB + rnd(3.0, 4.3), 1.85, rnd(.8, 1.1), 't', true);   // a little growth on the old steel
+  for (let k=0; k<12; k++) plant(pick(['vines','h_ivy','l_mossroots','pothos','h_curtain3']), P, rnd(-6.5, 4), CURB + rnd(3.0, 4.3), 1.85, rnd(.9, 1.2), 't', true);   // growth over the front pipes
   m.roofH = CURB + 4.6;
   m.top = CURB + 23.5;
 }

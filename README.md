@@ -63,10 +63,11 @@ The scripts are ordinary (non-module) scripts that share one scope, so the order
 
 ## Megastructures
 
-Landmarks that take over a block of plots once the city is big enough. Each exists at most once.
+Landmarks that take a block of plots once the city is big enough. Each exists at most once. A megastructure never
+replaces buildings: it takes the nearest free block (open platform, or new platform grown onto the edge of the city).
 
 - **Radio station:** arrives with the 20th building, of any zone (each built plot counts once; stacking doesn't
-  add to it), on the 2x2 block nearest that build (replacing what stood there). Right-click removes it; with 20 or
+  add to it), on free ground near that build. Right-click removes it; with 20 or
   more buildings standing, the next build brings it back.
 - **Sky mall:** a 3x2 block (either way round). Unlocks at 50 luxury and 30 industrial sections, then a 1 in 50
   chance per build. An octagonal white-and-gold mall on white columns, each side one sheet of glass looking into

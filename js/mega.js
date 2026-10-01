@@ -2,8 +2,8 @@
 // All game scripts share one scope and load in order (see index.html).
 'use strict';
 // Each megastructure exists at most once. When its requirement is met (enough buildings of the zones it names),
-// each new build has a small chance of bringing it in: it takes over a block of plots (w x h, either way round)
-// near that build, replacing what stood there. Some can be stacked: clicking the roof with a zone picked adds a
+// each new build has a small chance of bringing it in: it takes a block of free plots (w x h, either way round)
+// near that build, growing the platform where needed; it never replaces a building. Some can be stacked: clicking the roof with a zone picked adds a
 // tier, up to maxLevels. Right-click takes the top tier off, or removes it when only one is left; it can come back
 // once the requirement is met again.
 const MEGA_TYPES = {
@@ -43,21 +43,30 @@ function maybeSpawnMegas(c){
   }
 }
 const blockCells = (i, j, w, h) => { const out = []; for (let a=0;a<w;a++) for (let b=0;b<h;b++) out.push(cells.get(ckey(i+a, j+b))); return out; };
-// The block for a megastructure, near the build that brought it in, either way round. Plots that don't exist yet are allowed: the platform grows to fit (a 5x5 square shouldn't need
-// a perfect 5x5 of platform already waiting). Plots under another megastructure are never taken. Preferred:
-// close to the build, few missing plots, few buildings replaced.
+// The block for a megastructure: free ground near the build that brought it in, either way round. It never
+// replaces anything: every plot in the block is either open platform with nothing built on it, or not there yet
+// (the platform grows to fit). The block must touch the existing platform, so the city stays in one piece.
+// Preferred: close to the build, and using platform that's already there rather than growing new.
 function findMegaBlock(kind, c){
   const t = MEGA_TYPES[kind];
   const shapes = t.w === t.h ? [[t.w, t.h]] : [[t.w, t.h], [t.h, t.w]];
+  const R = 16;
   let best = null;
-  // blocks covering the build first; failing that (say it sits under another megastructure), ones a little further out
-  for (const [w, h] of shapes) for (let i = c.i - w - 3; i <= c.i + 3; i++) for (let j = c.j - h - 3; j <= c.j + 3; j++){
+  for (const [w, h] of shapes) for (let i = c.i - w - R; i <= c.i + R; i++) for (let j = c.j - h - R; j <= c.j + R; j++){
     if (Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX || Math.abs(i + w - 1) > GRID_MAX || Math.abs(j + h - 1) > GRID_MAX) continue;
-    const blk = blockCells(i, j, w, h);
-    if (blk.some(b => b && b.mega)) continue;
-    const missing = blk.filter(b => !b).length, secs = blk.reduce((s, b) => s + (b ? b.sections.length : 0), 0);
     const d = Math.hypot(i + (w-1)/2 - c.i, j + (h-1)/2 - c.j);
-    const score = d*4 + missing*3 + secs + Math.random()*.5;
+    if (best && d*4 > best.score) continue;   // can't beat what we have
+    const blk = blockCells(i, j, w, h);
+    if (blk.some(b => b && (b.mega || b.sections.length))) continue;   // something stands there
+    const missing = blk.filter(b => !b).length;
+    let touches = missing < blk.length;
+    for (let a = -1; a <= w && !touches; a++) for (let q = -1; q <= h && !touches; q++){
+      if (a >= 0 && a < w && q >= 0 && q < h) continue;
+      if ((a === -1 || a === w) && (q === -1 || q === h)) continue;   // corners don't join
+      if (cells.has(ckey(i + a, j + q))) touches = true;
+    }
+    if (!touches) continue;
+    const score = d*4 + missing*1.5 + Math.random()*.5;
     if (!best || score < best.score) best = { score, i, j, w, h };
   }
   return best;

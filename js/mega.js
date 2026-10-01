@@ -1035,16 +1035,14 @@ function buildPoliceStation(m){
   box(M.polWall2, P, 2.6, CURB + .4, front - .45, 2.0, .7, .5);
   for (let t = -bw/2 + .6; t < bw/2 - .4; t += .8){ box(M.bulb, P, t, CURB + gf - .05, front - .3, .3, .03, .1); glow(P, t, CURB + gf - .2, front - .2, 'cyan', .7); }   // downlights in the soffit
   // upper storeys: a pale box, ledge lines, a glass curtain wall in the middle of the front
-  // the back two corners are rounded and glazed: curved glass, lit from inside, with mullions and floor bands
+  // the back two corners are rounded and glazed: a single sheet of curved glass each, lit from inside
   const RC = 1.2, uh = top - gf, uy = CURB + gf + uh/2, back = bz - bd/2;
   box(M.polWall, P, bx, uy, bz + RC/2, bw, uh, bd - RC);
   box(M.polWall, P, bx, uy, back + RC/2, bw - 2*RC, uh, RC);
   for (const sx of [-1, 1]){
     const cx = bx + sx*(bw/2 - RC), cz = back + RC, th0 = sx > 0 ? PI/2 : PI;
     put(wedgeGeo(RC - .12, uh, th0, PI/2), M.polWall2, under(P, T(cx, uy, cz)));                    // the core behind the glass
-    put(wedgeGeo(RC, uh - .1, th0, PI/2), M.polLobby, under(P, T(cx, uy, cz)));                       // curved glass
-    for (let k=0; k<=6; k++){ const a = th0 + k*PI/12; box(M.polFrame, P, cx + Math.sin(a)*(RC + .02), uy, cz + Math.cos(a)*(RC + .02), .05, uh, .05); }
-    for (const yy of [CURB + gf + 1.35, CURB + gf + 2.7]) put(wedgeGeo(RC + .06, .08, th0, PI/2), M.polWall2, under(P, T(cx, yy, cz)));
+    put(wedgeGeo(RC, uh - .1, th0, PI/2), M.polLobby, under(P, T(cx, uy, cz)));                       // one sheet of curved glass, floor to roof
     put(wedgeGeo(RC + .1, .24, th0, PI/2), M.polWall2, under(P, T(cx, CURB + top + .12, cz)));     // cap follows the curve
   }
   box(M.polWall2, P, bx, CURB + gf + .05, bz + RC/2, bw + .1, .12, bd - RC + .1);

@@ -72,8 +72,8 @@ Landmarks that take over a block of plots once the city is big enough. Each exis
   chance per build. An octagonal white-and-gold mall on white columns, each side one sheet of glass looking into
   an open atrium with walkways and boutiques round a central core; the roof is mostly pool under a white canopy.
   Click its roof with a zone picked to stack another tier of two floors (up to 3); right-click takes the top tier off.
-- **Town square:** a 5x5 open plaza. Unlocks at 40 residential and 40 commercial sections, then a 1 in 40 chance
-  per build. A holographic koi pond at its heart (a 10-frame neon sprite sheet, assets/sprites/koi_neon.png, played
+- **Town square:** a 5x5 open plaza. Arrives with the 50th residential building (each plot with a residential
+  section counts once). A holographic koi pond at its heart (a 10-frame neon sprite sheet, assets/sprites/koi_neon.png, played
   through a glitching hologram shader; the full-size original is in assets/sprites/originals/), lantern strings crossing over
   it, and a night market: food carts piled with food (menu-tower bike carts, hawker stalls, little food trucks),
   long market stands with trays of food under tarps, tables and crowds.

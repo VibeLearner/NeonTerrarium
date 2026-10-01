@@ -11,7 +11,7 @@ const MEGA_TYPES = {
            colour: '#ff5a4a', sound: 'radioOn', build: buildRadioStation },
   mall:  { name: 'Sky mall', need: { high: 50, ind: 30 }, odds: 50, w: 3, h: 2, maxLevels: 3,
            colour: '#ffcf7a', build: buildSkyMall },
-  square: { name: 'Town square', need: { low: 40, mid: 40 }, odds: 40, w: 5, h: 5, maxLevels: 1,
+  square: { name: 'Town square', need: { lowPlots: 50 }, odds: 1, w: 5, h: 5, maxLevels: 1,   // arrives with the 50th residential building
            colour: '#9dff6a', build: buildTownSquare, fx: koiFx },
   police: { name: 'Police station', need: { low: 15, mid: 15 }, odds: 20, w: 3, h: 3, maxLevels: 1,
            colour: '#4fb8ff', build: buildPoliceStation, fx: policeFx },
@@ -22,8 +22,13 @@ const megas = new Map();   // kind -> { kind, i, j, w, h, levels, seed, x, z, da
 
 // how many building sections of each zone stand in the city
 function zoneCounts(){
-  const n = { low: 0, mid: 0, high: 0, ind: 0, any: 0 };   // any: buildings of any zone (each built plot counts once)
-  for (const c of cells.values()){ if (c.sections.length) n.any++; for (const s of c.sections) if (n[s.zone] !== undefined) n[s.zone]++; }
+  // per zone: building sections; any: buildings of any zone; lowPlots: residential buildings (each built plot counts once)
+  const n = { low: 0, mid: 0, high: 0, ind: 0, any: 0, lowPlots: 0 };
+  for (const c of cells.values()){
+    if (c.sections.length) n.any++;
+    if (c.sections.some(s => s.zone === 'low')) n.lowPlots++;
+    for (const s of c.sections) if (n[s.zone] !== undefined) n[s.zone]++;
+  }
   return n;
 }
 function megaUnlocked(kind){

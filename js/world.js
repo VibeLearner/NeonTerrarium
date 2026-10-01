@@ -194,7 +194,11 @@ function cellView(c){
   if (c.view){ world.remove(c.view); c.view = null; }
   if (!c.data) return;
   const g = new THREE.Group();
-  for (const [m, geo] of c.data.geo){ const mesh = new THREE.Mesh(geo, m); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh); }
+  for (const [m, geo] of c.data.geo){
+    const mesh = new THREE.Mesh(geo, m);
+    if (m.userData.colorOnly){ mesh.layers.set(1); mesh.renderOrder = 2; } else mesh.castShadow = mesh.receiveShadow = true;   // see-through glass: colour pass only
+    g.add(mesh);
+  }
   world.add(g); c.view = g;
 }
 function rebuildCell(c){
@@ -359,7 +363,7 @@ function startAnim(c, kind, y0, y1, zone, w, old, sound){
   const col = new THREE.Color(zone ? (ZONES[zone] ? ZONES[zone].col : zone) : '#e3d6bd');
   const u = { plane: new THREE.Plane(new THREE.Vector3(0, -1, 0), kind === 'build' ? y0 : y1), h: { value: y0 }, col: { value: col.clone().multiplyScalar(1.6) }, on: { value: 1 } };
   const mats = animMaterials(u);
-  view.traverse(o => { if (!o.isMesh) return; o.userData.baseMat = o.material; o.material = o.material === ATLAS ? mats.atlas : o.material; o.layers.set(3); });
+  view.traverse(o => { if (!o.isMesh) return; o.userData.baseMat = o.material; o.userData.baseLayer = o.layers.mask; o.material = o.material === ATLAS ? mats.atlas : o.material; if (!o.material.userData.colorOnly) o.layers.set(3); });
   if (kind === 'remove' && c.view) c.view.visible = false;   // what's left appears when the sweep is done
   const lineMat = () => new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
   const box = new THREE.LineSegments(OUTLINE_GEO, lineMat()), scan = new THREE.LineSegments(OUTLINE_GEO, lineMat());
@@ -396,7 +400,7 @@ function updateAnims(dt){
 function endAnim(i){
   const a = anims[i]; anims.splice(i, 1);
   for (const l of [a.box, a.scan]){ scene.remove(l); l.material.dispose(); }
-  a.view.traverse(o => { if (o.isMesh){ o.material = o.userData.baseMat || o.material; o.layers.set(0); } });
+  a.view.traverse(o => { if (o.isMesh){ o.material = o.userData.baseMat || o.material; if (o.userData.baseLayer !== undefined) o.layers.mask = o.userData.baseLayer; else o.layers.set(0); } });
   a.mats.atlas.dispose(); a.mats.nrm.dispose();
   if (a.kind === 'remove'){ dropView(a.old); if (a.c.view) a.c.view.visible = true; }
   if (a.held) releaseRegion(a.reg);

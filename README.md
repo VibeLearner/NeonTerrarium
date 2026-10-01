@@ -66,8 +66,9 @@ Landmarks that take over a block of plots once the city is big enough. Each exis
   1 in 30 chance of bringing it in, on the 2x2 block nearest that build (replacing what stood there). Right-click
   removes it; it can come back once the city meets the requirement again.
 - **Sky mall:** a 3x2 block (either way round). Unlocks at 50 luxury and 30 industrial sections, then a 1 in 50
-  chance per build. A glass mall on steel truss legs, every room lit warm from inside, with a roof garden and pool.
-  Click its roof with a zone picked to stack another tier (up to 3); right-click takes the top tier off.
+  chance per build. A pentagonal white-and-gold mall on white columns, each side one sheet of glass looking into
+  a lit concourse with boutiques round a central core; the roof is mostly pool under a white canopy.
+  Click its roof with a zone picked to stack another tier of two floors (up to 3); right-click takes the top tier off.
 - New megastructures go in `MEGA_TYPES` at the top of `js/mega.js` (requirement, odds, footprint, max tiers).
 - For testing, open the game with `#dev` at the end of the address and press **M** (radio station) or **N** (sky mall)
   to bring it in, or remove it, next to the plot under the pointer, skipping the requirement and the odds.

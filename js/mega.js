@@ -274,109 +274,161 @@ if (location.hash.includes('dev')){
 }
 
 /* ---------- the sky mall ---------- */
-// A glass shopping block lifted on steel truss legs over a paved court: a heavy dark deck with a walkway, string
-// lights and planters round its edge, then the glass body, three floors per tier, every bay a warm-lit room seen
-// through floor-to-ceiling glass (furniture and plants in silhouette). The top tier carries a roof garden with a
-// pool, loungers, palms and a pergola strung with bulbs. Lighting is warm and yellow throughout, no neon.
-// rooms burn at a steady brightness day and night (kind 'lamp' isn't dimmed by daylight), so the glass always reads as lit from inside
-M.mallRoom = toon(0x5a4630, { em:0xf2c274, kind:'lamp' });
-M.mallRoom2 = toon(0x5a4a34, { em:0xf6d39c, kind:'lamp' });
-M.mallSteel = toon(0x2b2f37);
-M.mallPool = toon(0x1e4652, { em:0x6fb8c4, kind:'trim' });   // softer, paler water than the neon pools elsewhere
-const MALL_FLOOR = 1.0, MALL_PER_TIER = 3;
+// A pentagonal glass mall in white and gold. It stands on white columns with gold collars above a marble court,
+// and each side is a single sheet of glass, framed only in gold at the corners and floor lines, so you look straight
+// in: a marble concourse runs round a central core lined with lit boutiques, with planters, benches, shoppers,
+// pendant lights and an escalator between floors. The roof is mostly pool, ringed by a white canopy on gold posts.
+// Two floors per tier; lighting is warm throughout, no neon.
+M.lux = toon(0xf4f1ea);               // white stone
+M.lux2 = toon(0xe7e0d2);              // warm off-white
+M.marble = toon(0xefe8da, { em:0x4a3a26, kind:'window' }); M.marble2 = toon(0xdcd2bf, { em:0x3e3020, kind:'window' });   // floors pick up the warm interior light at night
+M.marbleOut = toon(0xefe8da);
+// real see-through glass: drawn in the colour pass only (it never hides the interior from the outline pass)
+M.mallGlass = new THREE.MeshBasicMaterial({ color: 0xd8eef4, transparent: true, opacity: .1, depthWrite: false }); M.mallGlass.userData.colorOnly = true;
+M.mallGlint = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .32, depthWrite: false }); M.mallGlint.userData.colorOnly = true;
+M.gold = toon(0xd6a944);
+M.goldLit = toon(0xb98a2e, { em:0xffcf6a, kind:'trim' });   // gold trim that catches the light at night
+M.mallPool = toon(0x2a6070, { em:0x1f4a55, kind:'trim' });  // pale water, softer than the neon pools elsewhere
+M.shop1 = toon(0x5a4a34, { em:0xffe6b8, kind:'lamp' }); M.shop2 = toon(0x5a4630, { em:0xffcf86, kind:'lamp' }); M.shop3 = toon(0x5c4c3a, { em:0xfff0d4, kind:'lamp' });
+M.canvas = toon(0xf7f3ea);
+const MALL_FLOOR = 1.45, MALL_PER_TIER = 2;   // tall floors, so you can see deep enough inside to reach the shops
+// a pentagonal prism: circumradius 1, from y 0 to 1, one point toward +z
+U.pent = (() => {
+  const s = new THREE.Shape();
+  for (let k=0; k<5; k++){ const a = -PI/2 + k*TAU/5; k ? s.lineTo(Math.cos(a), Math.sin(a)) : s.moveTo(Math.cos(a), Math.sin(a)); }
+  const g = new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false }); g.rotateX(-PI/2);
+  return g.toNonIndexed();
+})();
+// the pentagon's corners and sides at a given size (sx across, sz deep), in the mall's own space
+function pentVerts(sx, sz){ const v = []; for (let k=0; k<5; k++){ const a = -PI/2 + k*TAU/5; v.push([Math.cos(a)*sx, -Math.sin(a)*sz]); } return v; }
+function pentEdges(sx, sz){
+  const v = pentVerts(sx, sz), out = [];
+  for (let k=0; k<5; k++){
+    const [x0, z0] = v[k], [x1, z1] = v[(k+1)%5], mx = (x0 + x1)/2, mz = (z0 + z1)/2;
+    let ry = Math.atan2(-(z1 - z0), x1 - x0);
+    if (Math.sin(ry)*mx + Math.cos(ry)*mz < 0) ry += PI;   // local +z faces out
+    out.push({ mx, mz, len: Math.hypot(x1 - x0, z1 - z0), ry });
+  }
+  return out;
+}
+const pentSlab = (mat, P, y, sx, sz, h) => put(U.pent, mat, under(P, T(0, y, 0, 0, sx, h, sz)));
 function buildSkyMall(m){
   R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
-  const long = m.w >= m.h;
-  const P = T(m.x, 0, m.z, long ? pick([0, PI]) : pick([PI/2, -PI/2]));
-  const L = Math.max(m.w, m.h)*LOT, D = Math.min(m.w, m.h)*LOT;   // long side along the local x axis
-  // the court below
-  box(G.asph, P, 0, .012, 0, L, .025, D);
-  const nx = 21, nz = 14, sx = L/nx, sz = D/nz;
-  for (let a=0;a<nx;a++) for (let b=0;b<nz;b++) if (!chance(.03)) box(pick(TILES.high), P, (a-(nx-1)/2)*sx, .03, (b-(nz-1)/2)*sz, sx - .05, .045, sz - .05);
-  // truss legs: four posts with cross-bracing, footings, and a warm lamp on each
-  const legH = 2.4, deckT = .45, y0 = CURB, deckY = y0 + legH;
-  const lx = L/2 - 1.0, lz = D/2 - 1.0, lw = .32;
-  for (const x of [-lx, 0, lx]) for (const z of [-lz, lz]){
-    box(M.concDD, P, x, y0 + .1, z, 1.0, .2, 1.0);
-    for (const [px, pz] of [[1,1],[1,-1],[-1,-1],[-1,1]]) box(M.mallSteel, P, x + px*lw, y0 + legH/2, z + pz*lw, .11, legH, .11);
-    for (let y = .2; y < legH - .3; y += .7) for (const [ax, az, bx2, bz2] of [[1,1,1,-1],[1,-1,-1,-1],[-1,-1,-1,1],[-1,1,1,1]]){
-      strut(M.frame, P, x + ax*lw, y0 + y, z + az*lw, x + bx2*lw, y0 + y + .7, z + bz2*lw, .035);
-      strut(M.frame, P, x + bx2*lw, y0 + y, z + bz2*lw, x + ax*lw, y0 + y + .7, z + az*lw, .035);
-    }
-    box(M.bulb, P, x + lw + .07, y0 + legH*.55, z, .06, .1, .06); glow(P, x + lw + .1, y0 + legH*.55, z, 'warm', 1.3);
+  const long = m.w >= m.h, L = Math.max(m.w, m.h)*LOT, D = Math.min(m.w, m.h)*LOT;
+  const Pc = T(m.x, 0, m.z, long ? pick([0, PI]) : pick([PI/2, -PI/2]));   // the block, long side on local x
+  const SX = 5.45, SZ = 3.92, P = under(Pc, T(0, 0, -.0955*SZ));            // the pentagon, centred in the block
+
+  // ---- the court: cream and white marble in a check, a gold pentagon inlaid round the building, planters, lamps
+  const nx = 18, nz = 12, cx = L/nx, cz = D/nz;
+  for (let a=0;a<nx;a++) for (let b=0;b<nz;b++) box((a + b) % 2 ? M.lux : M.lux2, Pc, (a-(nx-1)/2)*cx, .03, (b-(nz-1)/2)*cz, cx - .02, .045, cz - .02);
+  for (const e of pentEdges(SX*1.12, SZ*1.12)) box(M.gold, under(P, T(e.mx, 0, e.mz, e.ry)), 0, .058, 0, e.len, .012, .06);
+  for (const [px, pz] of [[1,1],[1,-1],[-1,1],[-1,-1]]){
+    const Q = T(px*(L/2 - .45), 0, pz*(D/2 - .45));
+    box(M.lux, under(Pc, Q), 0, .2, 0, .5, .34, .5); box(M.gold, under(Pc, Q), 0, .38, 0, .54, .03, .54);
+    plant(pick(['bonsai','bamboo']), under(Pc, Q), 0, .39, 0, rnd(.85, 1.05));
   }
-  // the deck: a thick dark slab with beams beneath, a lit edge, a walkway railing and planters
-  box(M.mallSteel, P, 0, deckY + deckT/2, 0, L, deckT, D);
-  for (const z of [-lz, lz]) box(M.metalDark, P, 0, deckY - .12, z, L - .6, .24, .3);
-  for (const x of [-lx, 0, lx]) box(M.metalDark, P, x, deckY - .12, 0, .3, .24, D - .6);
-  const top0 = deckY + deckT;
-  box(M.concDD, P, 0, top0 + .01, 0, L - .05, .03, D - .05);
-  const edge = (fn) => { for (const [len, ox, oz, ry] of [[L, 0, D/2, 0], [L, 0, -D/2, PI], [D, L/2, 0, PI/2], [D, -L/2, 0, -PI/2]]) fn(under(P, T(ox, 0, oz, ry)), len); };
-  edge((F, len) => {
-    for (let t = -len/2 + .25; t < len/2 - .1; t += .5){
-      box(M.bulb, F, t, deckY + deckT*.55, .03, .07, .06, .04);              // bulbs along the deck's face
-      if (Math.round((t + len/2)/.5) % 2 === 0) glow(F, t, deckY + deckT*.5, .12, 'warm', .8);
-      cyl(M.frame, F, t, top0 + .2, -.08, .02, .4);                          // railing posts
-    }
-    box(M.frame, F, 0, top0 + .4, -.08, len - .1, .03, .03);                 // top rail
-    for (let t = -len/2 + .6; t < len/2 - .5; t += rnd(1.8, 3.2)) plant(hangKind(), F, t, top0 - .02, .04, rnd(.7, .9), 't', true);   // sparse, so the legs show
-  });
-  // the glass body, tier by tier
-  const inset = .5, BW = L - 2*inset, BD = D - 2*inset, floors = m.levels*MALL_PER_TIER;
-  let y = top0;
+  for (const [px, pz] of [[1,0],[-1,0]]){
+    const Q = under(Pc, T(px*(L/2 - .3), 0, pz));
+    cyl(M.gold, Q, 0, .7, 0, .03, 1.4); box(M.goldLit, Q, 0, 1.42, 0, .14, .08, .14); glow(Q, 0, 1.4, 0, 'warm', 1.4);
+  }
+
+  // ---- white columns with gold collars lift the mall; a white deck with a gold lip and a ring of warm bulbs
+  const colH = 2.0, y0 = CURB, deckY = y0 + colH, deckT = .38;
+  for (const [vx, vz] of [...pentVerts(SX*.78, SZ*.78), [0, 0]]){
+    cyl(M.lux, P, vx, y0 + colH/2, vz, .26, colH);
+    for (const yy of [y0 + .08, y0 + colH - .1]) put(U.cyl16, M.gold, under(P, T(vx, yy, vz, 0, .64, .07, .64)));
+    put(U.cyl16, M.lux2, under(P, T(vx, y0 + .02, vz, 0, .8, .06, .8)));
+  }
+  pentSlab(M.lux, P, deckY, SX*1.05, SZ*1.05, deckT);
+  for (const e of pentEdges(SX*1.05, SZ*1.05)){
+    const F = under(P, T(e.mx, 0, e.mz, e.ry));
+    box(M.goldLit, F, 0, deckY + deckT - .03, .01, e.len, .05, .04);
+    for (let t = -e.len/2 + .3; t < e.len/2 - .2; t += .55){ box(M.bulb, F, t, deckY + .1, .01, .06, .06, .05); if (chance(.5)) glow(F, t, deckY + .08, .12, 'warm', .8); }
+  }
+
+  // ---- the glass mall, floor by floor
+  const floors = m.levels*MALL_PER_TIER, base = deckY + deckT, CORE = .6;
+  const outer = pentEdges(SX, SZ), core = pentEdges(SX*CORE, SZ*CORE), mid = pentEdges(SX*.82, SZ*.82);
+  const escSide = irand(0, 4);
   for (let f=0; f<floors; f++){
-    const fy = y + f*MALL_FLOOR, tierEdge = f % MALL_PER_TIER === 0;
-    box(M.concDD, P, 0, fy + .045, 0, BW + (tierEdge ? .3 : .14), tierEdge ? .12 : .09, BD + (tierEdge ? .3 : .14));   // floor slab
-    for (const [len, ox, oz, ry] of [[BW, 0, BD/2, 0], [BW, 0, -BD/2, PI], [BD, BW/2, 0, PI/2], [BD, -BW/2, 0, -PI/2]]){
-      const F = under(P, T(ox, 0, oz, ry)), nb = Math.max(2, Math.round(len/.9)), bw = len/nb;
-      for (let b=0; b<nb; b++){
-        const cx = -len/2 + (b + .5)*bw, lit = chance(.9);
-        box(lit ? (chance(.7) ? M.mallRoom : M.mallRoom2) : M.glassDark, F, cx, fy + .52, -.36, bw - .02, .86, .04);   // the lit room behind the glass
-        if (lit && chance(.75)) box(pick([M.frame, M.metalDark, M.wood, M.concDD]), F, cx + rnd(-.22, .22), fy + .09 + rnd(.1, .2), -.22, rnd(.18, .38), rnd(.2, .38), rnd(.14, .24));   // furniture in silhouette
-        if (lit && chance(.2)) plant(pick(['bonsai','bush','succulent']), F, cx + rnd(-.2, .2), fy + .09, -.18, .7);
-        box(M.mallSteel, F, -len/2 + b*bw, fy + .52, 0, .05, .9, .06);       // mullion
+    const fy = base + f*MALL_FLOOR, tierStart = f % MALL_PER_TIER === 0;
+    pentSlab(M.marble, P, fy, SX, SZ, .08);                                      // the marble floor
+    pentSlab(M.marble2, P, fy + .002, SX*.7, SZ*.7, .08);                        // a darker inlay ring round the core
+    for (const e of outer){                                                       // gold floor line on the glass
+      const F = under(P, T(e.mx, 0, e.mz, e.ry));
+      box(tierStart ? M.goldLit : M.gold, F, 0, fy + .04, .02, e.len, tierStart ? .1 : .06, .05);
+    }
+    // the core, lined with boutiques
+    pentSlab(M.lux2, P, fy + .08, SX*CORE, SZ*CORE, MALL_FLOOR - .08);
+    for (const e of core){
+      const F = under(P, T(e.mx, 0, e.mz, e.ry)), n = Math.max(1, Math.floor(e.len/1.05)), w = e.len/n;
+      for (let k=0; k<n; k++){
+        const x = -e.len/2 + (k + .5)*w, shop = pick([M.shop1, M.shop1, M.shop2, M.shop3]);
+        box(shop, F, x, fy + .62, .02, w - .16, 1.0, .04);                        // the lit shopfront
+        box(pick([M.gold, M.lux, M.goldLit]), F, x, fy + 1.24, .04, w - .2, .12, .04);   // the name band over it
+        for (let g=0; g<irand(2, 4); g++){                                         // goods on display
+          const gx = x + rnd(-(w - .4)/2, (w - .4)/2);
+          box(pick([M.cloth1, M.cloth3, M.cloth4, M.awn1, M.awn2, M.gold, M.lux]), F, gx, fy + .08 + rnd(.12, .3), .1, rnd(.08, .16), rnd(.2, .5), .08);
+        }
+        box(M.lux, F, -e.len/2 + k*w, fy + .7, .06, .1, 1.3, .1);                // white pilaster between shops
       }
-      box(M.mallSteel, F, 0, fy + .97, 0, len, .04, .06);                     // transom at the ceiling
-      if (chance(.35)){                                                       // a planter ledge along the glass, greenery spilling over
-        box(M.concDD, F, 0, fy + .14, .1, len - .2, .1, .16);
-        for (let t = -len/2 + .4; t < len/2 - .3; t += rnd(.5, 1.1)) chance(.5) ? plant(hangKind(), F, t, fy + .16, .19, rnd(.7, .95), 't', true) : plant(pick(['bush','g_fern2','bushFlower']), F, t, fy + .19, .1, rnd(.55, .75));
+      box(M.lux, F, e.len/2, fy + .7, .06, .1, 1.3, .1);
+    }
+    // the concourse: planters, benches, shoppers, pendant lights
+    for (const e of mid){
+      const F = under(P, T(e.mx, 0, e.mz, e.ry));
+      for (let t = -e.len/2 + .5; t < e.len/2 - .3; t += rnd(.9, 1.5)){
+        const r = R();
+        if (r < .3){ box(M.lux, F, t, fy + .16, 0, .34, .16, .34); box(M.gold, F, t, fy + .245, 0, .36, .02, .36); plant(pick(['bonsai','bush','bushFlower','succulent']), F, t, fy + .25, 0, rnd(.6, .8)); }
+        else if (r < .5){ box(M.lux2, F, t, fy + .14, 0, .5, .05, .16); box(M.gold, F, t, fy + .1, 0, .46, .08, .04); }
+        if (chance(.75)){ const sx = t + rnd(-.3, .3), sz = rnd(-.35, .35);      // a shopper or two
+          box(pick([M.frame, M.metalDark, M.concDD, M.awn1, M.cloth3]), F, sx, fy + .19, sz, .07, .2, .05); box(M.concDD, F, sx, fy + .32, sz, .05, .05, .05); }
+        if (chance(.5)) glow(F, t, fy + MALL_FLOOR - .2, 0, 'warm', .6);            // pendant light
       }
     }
-    for (const [cx, cz] of [[1,1],[1,-1],[-1,-1],[-1,1]]) box(M.mallSteel, P, cx*BW/2, fy + .5, cz*BD/2, .16, 1.0, .16);   // corner columns
-    // warm strip under each slab edge
-    for (let t = -BW/2 + .3; t < BW/2; t += 1.2){ glow(P, t, fy + .03, BD/2 + .12, 'warm', .55); glow(P, t, fy + .03, -BD/2 - .12, 'warm', .55); }
+    // an escalator to the floor above, with gold handrails
+    if (f < floors - 1){
+      const e = mid[escSide], F = under(P, T(e.mx, 0, e.mz, e.ry)), run = Math.min(1.8, e.len*.5);
+      strut(M.lux2, F, -run/2, fy + .1, .05, run/2, fy + MALL_FLOOR + .05, .05, .26);
+      for (const o of [-.15, .25]) strut(M.gold, F, -run/2, fy + .32, o - .05 + .05, run/2, fy + MALL_FLOOR + .27, o, .025);
+    }
+    // the glass itself: one sheet per side, framed in gold only at the corners, with the odd streak of reflection
+    for (const e of outer){
+      const F = under(P, T(e.mx, 0, e.mz, e.ry));
+      box(M.mallGlass, F, 0, fy + MALL_FLOOR/2 + .04, .03, e.len - .1, MALL_FLOOR - .08, .02);
+      if (chance(.6)){ const gx = rnd(-e.len/2 + .6, e.len/2 - .6); box(M.mallGlint, F, gx, fy + MALL_FLOOR/2, .045, .05, MALL_FLOOR*.8, .01, 0, 0, .5); box(M.mallGlint, F, gx + .18, fy + MALL_FLOOR/2, .045, .025, MALL_FLOOR*.6, .01, 0, 0, .5); }
+    }
+    for (const [vx, vz] of pentVerts(SX, SZ)) box(tierStart ? M.goldLit : M.gold, P, vx, fy + MALL_FLOOR/2, vz, .09, MALL_FLOOR, .09);
   }
-  box(M.concD, P, 0, y + floors*MALL_FLOOR/2, 0, BW - .9, floors*MALL_FLOOR - .1, BD - .9);   // the core, so you never see through
-  const roof = y + floors*MALL_FLOOR;
-  // the tall MALL sign on the front, lit warm
-  const Fs = under(P, T(-BW/2 + .9, 0, BD/2 + .02, 0));
-  box(M.mallSteel, Fs, 0, roof - 1.45, .06, .7, 2.0, .06);
-  plant('sign_mall', Fs, 0, roof - 1.45, .1, 1.0, 'c', true); glow(Fs, 0, roof - 1.45, .35, 'amber', 2.2);
-  // roof garden
-  box(M.concDD, P, 0, roof + .06, 0, BW + .24, .12, BD + .24);
-  box(M3.deckTile, P, 0, roof + .13, 0, BW - .4, .03, BD - .4);
-  for (let t = -BW/2 + .5; t < BW/2 - .3; t += .6) box(M3.deckTile2, P, t, roof + .146, 0, .04, .005, BD - .5);   // deck tile seams
-  edge2();
-  function edge2(){
-    for (const [len, ox, oz, ry] of [[BW + .2, 0, BD/2 + .1, 0], [BW + .2, 0, -BD/2 - .1, PI], [BD + .2, BW/2 + .1, 0, PI/2], [BD + .2, -BW/2 - .1, 0, -PI/2]]){
-      const F = under(P, T(ox, 0, oz, ry));
-      box(M.glassTeal, F, 0, roof + .32, 0, len, .36, .03);                   // glass balustrade
-      box(M.mallSteel, F, 0, roof + .51, 0, len, .03, .05);
-      for (let t = -len/2 + .3; t < len/2; t += .6){ box(M.bulb, F, t, roof + .55, 0, .05, .05, .05); if (chance(.5)) glow(F, t, roof + .58, 0, 'warm', .6); }
+  const roof = base + floors*MALL_FLOOR;
+
+  // ---- the roof: a pool over most of it, a marble walk round it, and a white canopy along every edge
+  pentSlab(M.lux, P, roof, SX*1.03, SZ*1.03, .14);
+  for (const e of pentEdges(SX*1.03, SZ*1.03)) box(M.goldLit, under(P, T(e.mx, 0, e.mz, e.ry)), 0, roof + .1, .01, e.len, .06, .04);
+  pentSlab(M.marbleOut, P, roof + .14, SX*.98, SZ*.98, .03);
+  pentSlab(M.gold, P, roof + .14, SX*.75, SZ*.75, .06);                          // gold coping round the pool
+  pentSlab(M.mallPool, P, roof + .15, SX*.72, SZ*.72, .07);
+  glow(P, 0, roof + .3, 0, 'warm', 1.2);
+  for (const e of pentEdges(SX*.87, SZ*.87)){
+    const F = under(P, T(e.mx, 0, e.mz, e.ry));
+    box(M.canvas, F, 0, roof + 1.0, .02, e.len*.95, .04, .46, 0, -.12);         // canopy, sloping out
+    box(M.goldLit, F, 0, roof + .96, .25, e.len*.95, .04, .04);
+    for (let t = -e.len*.45; t <= e.len*.45 + .01; t += e.len*.9/Math.max(1, Math.round(e.len/1.1))){
+      cyl(M.gold, F, t, roof + .58, .2, .025, .8);                                 // gold posts
+    }
+    for (let t = -e.len*.4; t < e.len*.4; t += .5){ glow(F, t, roof + .9, 0, 'warm', .55); }
+    for (let t = -e.len*.35; t < e.len*.35; t += rnd(.7, 1.0)){                    // loungers in the shade
+      box(M.lux, F, t, roof + .24, -.02, .22, .05, .42); box(M.gold, F, t, roof + .2, -.02, .2, .04, .38);
+      if (chance(.4)) box(pick([M.cloth4, M.awn3, M.cloth2]), F, t, roof + .28, .08, .18, .02, .16);
     }
   }
-  const pw = Math.min(2.6, BW*.3), pd = Math.min(1.3, BD*.32), px0 = BW*.12;
-  box(M.wood, P, px0, roof + .15, 0, pw + 1.2, .04, pd + 1.0);                                          // timber deck round the pool
-  box(M.frame, P, px0, roof + .16, 0, pw + .1, .06, pd + .1); box(M.mallPool, P, px0, roof + .18, 0, pw, .04, pd); glow(P, px0, roof + .24, 0, 'warm', 1.2);
-  for (let k=0; k<4; k++){ const lz2 = (k < 2 ? -1 : 1)*(pd/2 + .32), lx2 = px0 + (k % 2 ? .5 : -.5); box(M.white2, P, lx2, roof + .2, lz2, .22, .06, .46); box(M.awn3, P, lx2, roof + .24, lz2 - .17, .22, .1, .06); }
-  for (let k=0; k<7; k++) plant(pick(['bamboo','bonsai','bush','bushFlower','g_spread2']), P, rnd(-BW/2 + .5, -BW*.18), roof + .15, rnd(-BD/2 + .5, BD/2 - .5), rnd(.8, 1.05));
-  for (let k=0; k<4; k++) plant(pick(['bamboo','bonsai']), P, rnd(px0 + pw/2 + .3, BW/2 - .4), roof + .15, (k % 2 ? 1 : -1)*rnd(.3, BD/2 - .4), rnd(.9, 1.1));
-  // pergola with string lights over a lounge corner
-  const gx = -BW/2 + 1.3, gz = 0;
-  for (const [cx, cz] of [[1,1],[1,-1],[-1,-1],[-1,1]]) box(M.wood, P, gx + cx*.7, roof + .62, gz + cz*.6, .07, .95, .07);
-  for (let t = -.6; t <= .6; t += .3) box(M.wood, P, gx, roof + 1.1, gz + t, 1.55, .05, .05);
-  for (let t = -.7; t <= .7; t += .35){ box(M.bulb, P, gx + t, roof + 1.03, gz, .05, .05, .05); glow(P, gx + t, roof + 1.0, gz, 'warm', .7); }
-  box(M.wood, P, gx, roof + .3, gz, 1.0, .2, .5); box(M.cloth2, P, gx, roof + .42, gz, .9, .06, .42);
-  m.roofH = roof + .12;
-  m.top = roof + 1.3;
+  for (const [vx, vz] of pentVerts(SX*.92, SZ*.92)) plant('bamboo', P, vx, roof + .17, vz, rnd(.9, 1.1));
+
+  // ---- the sign: a white pylon at the front of the court with the MALL panel framed in gold
+  const Fs = under(Pc, T(-L/2 + .7, 0, D/2 - .55, 0));
+  box(M.lux, Fs, 0, 1.25, 0, .62, 2.5, .2); box(M.gold, Fs, 0, 2.52, 0, .66, .06, .24); box(M.gold, Fs, 0, .03, 0, .7, .06, .28);
+  plant('sign_mall', Fs, 0, 1.4, .11, 1.0, 'c', true); glow(Fs, 0, 1.4, .35, 'amber', 2.0);
+
+  m.roofH = roof + .17;
+  m.top = roof + 1.4;
 }

@@ -58,7 +58,7 @@ assets/audio/music/     the music library the radio plays (see the README in tha
 assets/ui/cassette.png  the radio's cassette (from the neon sign sheet)
 js/music.js             the radio: music while the radio station stands, the cassette with the song name
 tools/make_playlist.py  optional: writes assets/audio/music/playlist.json (track order, nicer titles)
-assets/audio/sfx/       sound effects: place.wav (build pop), remove.wav (removal thud), radio-on.wav (radio station arrives)
+assets/audio/sfx/       sound effects: place.wav (build pop), remove.wav (removal thud), radio-on.wav (radio station arrives), mega-arrive.wav (any other megastructure lands, on the flash at the end of its arrival)
 assets/audio/sfx/originals/  the untouched source recordings, for re-editing
 ```
 

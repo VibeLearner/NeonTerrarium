@@ -385,7 +385,7 @@ function startAnim(c, kind, y0, y1, zone, w, old, sound, opts = {}){
   for (const l of trail){ l.scale.copy(scan.scale); lines.push(l); }
   for (const l of lines){ l.layers.set(1); l.renderOrder = 998; scene.add(l); }
   if (!opts.quiet){ if (sound) sfx.play(sound, { spread: 0 }); else sfx.play(kind === 'build' ? 'place' : 'remove'); }
-  const a = { c, kind, view, old, u, mats, box, scan, foot, trail, lines, x: c.x, z: c.z, y0, by0, y1, wx, wz, t: 0, dur: opts.slow ? 4.6 : kind === 'build' ? .15 : .12, slow: !!opts.slow, bare: !!opts.bare, onEnd: opts.onEnd, reg: regKey(c.i, c.j), held };
+  const a = { c, kind, view, old, u, mats, box, scan, foot, trail, lines, x: c.x, z: c.z, y0, by0, y1, wx, wz, t: 0, dur: opts.slow ? 4.6 : kind === 'build' ? .15 : .12, slow: !!opts.slow, bare: !!opts.bare, onEnd: opts.onEnd, cue: opts.cue, reg: regKey(c.i, c.j), held };
   anims.push(a);
   return a;
 }
@@ -415,7 +415,11 @@ function updateAnims(dt){
   for (let i = anims.length - 1; i >= 0; i--){
     const a = anims[i]; a.t += dt;
     const p = Math.min(1, a.t/a.dur);
-    if (a.slow){ slowAnim(a, p); if (p >= 1) endAnim(i); continue; }
+    if (a.slow){
+      // a sound timed to the animation (cue.at seconds in), played once
+      if (a.cue && !a.cued && a.t >= a.cue.at){ a.cued = true; sfx.play(a.cue.name, { spread: 0 }); }
+      slowAnim(a, p); if (p >= 1) endAnim(i); continue;
+    }
     let h, boxOp;
     if (a.kind === 'build'){
       const q = easeOut(clamp((p - .15)/.7, 0, 1));

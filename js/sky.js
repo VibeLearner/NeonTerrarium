@@ -73,13 +73,14 @@ function phaseName(h){
 const PAL_HEX = ['#1B2A4A','#2C3A52','#4A5566','#C9B89A','#E3D6BD','#9EC4E0','#F2C9A5','#F6B35C','#3F5A2C','#6B8A3A','#8FA04A','#8A4A2A','#A0603A','#FFCF7A','#F4A340','#FF4FA3','#38E8E0','#FFB347','#EEF0EE','#7FE8E0',
   '#0B1226','#141C30','#262033','#33302E',
   '#5f9a94','#c98a8a','#c9a24a','#3f6fa8','#d9a55a','#c0674a','#9aa982','#9c5a44','#cfe8e0','#eadbd6','#5f7d5b','#3f5f58','#6b7280','#55585c','#7a7064','#b49a78'];
-// the star map's virtual camera: tilted up by SKY_PITCH (radians), half its vertical field of view is atan(SKY_TAN)
-const SKY_PITCH = .3, SKY_TAN = .55;
+// the star map view: SKY_EL is the elevation at the middle of the screen, SKY_H half the screen's height (radians),
+// SKY_TURN how far the sky turns for each turn of the camera
+const SKY_EL = .3, SKY_H = .5, SKY_TURN = .5;
 const comp = new THREE.ShaderMaterial({
   uniforms: {
     tColor:{value:null}, tDepth:{value:null}, tNormal:{value:null}, res:{value:new THREE.Vector2(1,1)},
     near:{value:NEAR}, far:{value:FAR}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
-    night:{value:0}, lodLines: LOD.lines, pxK:{value:1}, starOff:{value:new THREE.Vector2()}, skyF:{value:new THREE.Vector3(0,0,-1)}, skyR:{value:new THREE.Vector3(1,0,0)}, skyU:{value:new THREE.Vector3(0,1,0)}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
+    night:{value:0}, lodLines: LOD.lines, pxK:{value:1}, starOff:{value:new THREE.Vector2()}, skyYaw:{value:0}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
     pal:{value: PAL_HEX.map(h => { const c=new THREE.Color(h); return new THREE.Vector3(c.r,c.g,c.b); })},
     tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, rainOn:{value:0},
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
@@ -88,11 +89,11 @@ const comp = new THREE.ShaderMaterial({
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
-    const float SKY_TAN = ${SKY_TAN.toFixed(3)};
+    const float SKY_H = ${SKY_H.toFixed(3)}, SKY_EL = ${SKY_EL.toFixed(3)};
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform float night; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform vec3 skyF, skyR, skyU; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
+    uniform float night; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
     uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float rainOn; uniform sampler2D tCloud;
@@ -136,19 +137,17 @@ const comp = new THREE.ShaderMaterial({
       vec3 col;
       if (rd >= 0.99999){
         vec3 sky = mix(skyBot, skyTop, smoothstep(0.05, 0.95, vUv.y));
-        // The stars are a full 360-degree sky map. The game camera is orthographic, so a virtual sky camera with a
-        // real field of view (same heading, tilted up a little) gives each sky pixel a direction; the map is a set of
-        // star cells laid on the sphere in bands of latitude, each cell holding at most one star. Turning the view
-        // shows a different part of the sky; panning and zooming don't move it, as you'd expect of something
-        // infinitely far away. A faint band of denser stars and haze crosses the sky like a galaxy.
+        // The stars are a full 360-degree sky map. The view onto it is a flat strip: heading across, elevation up,
+        // both in whole sky pixels, so turning the camera slides the stars straight sideways at an even pace (a
+        // perspective view swung them through arcs, which felt wrong next to the flat, orthographic city). It turns
+        // at SKY_TURN times the camera's rate, like something far away; panning and zooming don't move it.
         vec2 ndc2 = vUv*2.0 - 1.0;
-        vec3 sd = normalize(skyF + skyR*(ndc2.x*res.x/res.y*SKY_TAN) + skyU*(ndc2.y*SKY_TAN));
-        float pix = 2.0*SKY_TAN/(res.y*pxK);                    // one base pixel, as an angle
-        float cellA = pix*3.5;
-        float el = asin(clamp(sd.y, -1.0, 1.0)), az = atan(sd.z, sd.x) + 3.14159265;
-        float row = floor(el/cellA);
-        float nAz = max(1.0, floor(6.2831853*cos((row + .5)*cellA)/cellA));
-        float colI = floor(az/6.2831853*nAz);
+        float pix = 2.0*SKY_H/(res.y*pxK);                       // one base pixel, as an angle
+        float az = skyYaw + ndc2.x*(res.x/res.y)*SKY_H, el = SKY_EL + ndc2.y*SKY_H;
+        az = floor(az/pix)*pix; el = floor(el/pix)*pix;          // whole pixels, so stars never shimmer while turning
+        vec3 sd = vec3(cos(el)*cos(az), sin(el), cos(el)*sin(az));
+        float cellA = pix*3.5, nAz = floor(6.2831853/cellA);
+        float row = floor(el/cellA), azw = mod(az, 6.2831853), colI = floor(azw/6.2831853*nAz), cw = 6.2831853/nAz;
         vec3 gN = normalize(vec3(.35, .8, .48));
         float band = exp(-pow(dot(sd, gN), 2.0)*30.0);          // the galaxy band
         float hs = hash(vec2(row, colI));
@@ -157,10 +156,9 @@ const comp = new THREE.ShaderMaterial({
           float bright = fract(hs*713.0), big = step(.93, fract(hs*97.0));
           float m0 = big > .5 ? .33 : .2;
           vec2 off = vec2(mix(m0, 1.0 - m0, hash(vec2(colI, row + 31.0))), mix(m0, 1.0 - m0, hash(vec2(row + 7.0, colI))));
-          float sEl = (row + off.y)*cellA, sAz = (colI + off.x)/nAz*6.2831853 - 3.14159265;
-          vec3 sdir = vec3(cos(sEl)*cos(sAz), sin(sEl), cos(sEl)*sin(sAz));
-          float ang = length(sd - sdir);                        // chord length: precise for tiny angles, unlike acos
-          star = step(ang, pix*(big > .5 ? 1.05 : .55))*(.45 + .55*bright)*(big > .5 && ang > pix*.55 ? .5 : 1.0);
+          vec2 d = vec2((azw - (colI + off.x)*cw)/pix, (el - (row + off.y)*cellA)/pix);   // in pixels
+          float r = length(d);
+          star = step(r, big > .5 ? 1.05 : .55)*(.45 + .55*bright)*(big > .5 && r > .55 ? .5 : 1.0);
         }
         float above = smoothstep(-.02, .2, el);
         star *= night*above;

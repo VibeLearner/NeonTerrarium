@@ -62,10 +62,7 @@ function frame(now){
   comp.uniforms.VP.value.copy(cam.projectionMatrix).multiply(cam.matrixWorldInverse);
   comp.uniforms.invVP.value.copy(comp.uniforms.VP.value).invert();
   comp.uniforms.upView.value.set(0,1,0).transformDirection(cam.matrixWorldInverse);
-  { // the virtual sky camera for the star map: the game camera's heading, tilted up so the visible band of sky
-    // sits above the horizon (see the star map in sky.js)
-    const sy = Math.sin(yaw), cy = Math.cos(yaw), sp = Math.sin(SKY_PITCH), cp = Math.cos(SKY_PITCH);
-    comp.uniforms.skyF.value.set(-sy*cp, sp, -cy*cp); comp.uniforms.skyR.value.set(cy, 0, -sy); comp.uniforms.skyU.value.set(sy*sp, cp, cy*sp); }
+  comp.uniforms.skyYaw.value = -yaw*SKY_TURN;   // the star map turns with the camera, at a gentler rate (see sky.js)
   comp.uniforms.rainOff.value.copy(camPix);
   comp.uniforms.wet.value = S.wetOn ? (S.rain ? .75 : .3) : 0; comp.uniforms.rainOn.value = S.rain ? 1 : 0;
   if (sun.shadow.map){ comp.uniforms.shadowMap.value = sun.shadow.map.texture; comp.uniforms.shadowMat.value.copy(sun.shadow.matrix); }

@@ -358,32 +358,59 @@ function buildSkyMall(m){
       const F = under(P, T(e.mx, 0, e.mz, e.ry));
       box(tierStart ? M.goldLit : M.gold, F, 0, fy + .04, .02, e.len, tierStart ? .1 : .06, .05);
     }
-    // the core, lined with boutiques
+    // the core, lined with boutiques of different widths: glass fronts with a lit interior behind, a neon sign
+    // over each, and a sliver of shelving and goods. (One-off landmark, so it can afford the extra detail.)
     pentSlab(M.lux2, P, fy + .08, SX*CORE, SZ*CORE, MALL_FLOOR - .08);
     for (const e of core){
-      const F = under(P, T(e.mx, 0, e.mz, e.ry)), n = Math.max(1, Math.floor(e.len/1.05)), w = e.len/n;
-      for (let k=0; k<n; k++){
-        const x = -e.len/2 + (k + .5)*w, shop = pick([M.shop1, M.shop1, M.shop2, M.shop3]);
-        box(shop, F, x, fy + .62, .02, w - .16, 1.0, .04);                        // the lit shopfront
-        box(pick([M.gold, M.lux, M.goldLit]), F, x, fy + 1.24, .04, w - .2, .12, .04);   // the name band over it
-        for (let g=0; g<irand(2, 4); g++){                                         // goods on display
-          const gx = x + rnd(-(w - .4)/2, (w - .4)/2);
-          box(pick([M.cloth1, M.cloth3, M.cloth4, M.awn1, M.awn2, M.gold, M.lux]), F, gx, fy + .08 + rnd(.12, .3), .1, rnd(.08, .16), rnd(.2, .5), .08);
+      const F = under(P, T(e.mx, 0, e.mz, e.ry));
+      let x = -e.len/2 + .05;
+      while (x < e.len/2 - .4){
+        let w = Math.min(rnd(.6, 1.7), e.len/2 - .05 - x); if (e.len/2 - .05 - (x + w) < .45) w = e.len/2 - .05 - x;
+        const cx = x + w/2, shop = pick([M.shop1, M.shop1, M.shop2, M.shop3]), tall = chance(.35);
+        const sh = tall ? 1.15 : .95;
+        box(shop, F, cx, fy + .08 + sh/2, -.08, w - .12, sh, .04);                              // the lit back wall
+        box(M.lux, F, cx, fy + .1, .02, w - .1, .04, .2);                                       // threshold
+        for (let s2 = cx - (w - .3)/2; s2 <= cx + (w - .3)/2 + .01; s2 += Math.max(.25, (w - .3)/Math.max(1, Math.round(w/.4)))){
+          const r = R();
+          if (r < .4) box(pick([M.gold, M.lux, M.concDD]), F, s2, fy + .4, -.03, .14, .5, .06);    // shelving
+          else if (r < .7){ box(M.lux, F, s2, fy + .18, .06, .16, .2, .12); box(pick([M.cloth1, M.cloth3, M.cloth4, M.awn2, M.gold]), F, s2, fy + .33, .06, .06, .1, .06); }   // a display plinth
+          else box(pick([M.cloth1, M.cloth3, M.cloth4, M.awn1, M.awn2]), F, s2, fy + .34, -.02, .1, .44, .05);   // a mannequin / hanging rail
         }
-        box(M.lux, F, -e.len/2 + k*w, fy + .7, .06, .1, 1.3, .1);                // white pilaster between shops
+        box(M.goldLit, F, cx, fy + .09 + sh, .1, w - .06, .05, .04);                            // gold lintel
+        // the sign: a neon tube outline or a lit glyph sign above the door
+        if (chance(.55)){
+          const nm = pick([M.neonPink, M.neonCyan, M.neonAmber, M4.neonPurple]), nw = Math.min(w - .2, rnd(.35, .8));
+          box(nm, F, cx, fy + .26 + sh, .13, nw, .03, .03); box(nm, F, cx, fy + .44 + sh, .13, nw, .03, .03);
+          box(nm, F, cx - nw/2, fy + .35 + sh, .13, .03, .21, .03); box(nm, F, cx + nw/2, fy + .35 + sh, .13, .03, .21, .03);
+          for (let q = cx - nw/2 + .08; q < cx + nw/2 - .05; q += .09) box(nm, F, q, fy + .35 + sh + rnd(-.05, .05), .13, .025, rnd(.05, .12), .02);   // lettering, implied
+          glow(F, cx, fy + .35 + sh, .3, NEON_NAME.get(nm) || 'pink', .9);
+        } else {
+          const kind = pick(GLYPH_H); plant(kind, F, cx, fy + .36 + sh, .13, .75, 'c', true); glow(F, cx, fy + .36 + sh, .3, GLYPH_GLOW[kind], .8);
+        }
+        box(M.lux, F, x + w, fy + .7, .1, .08, 1.28, .14);                                      // white pilaster
+        x += w;
       }
-      box(M.lux, F, e.len/2, fy + .7, .06, .1, 1.3, .1);
+      box(M.lux, F, -e.len/2 + .05, fy + .7, .1, .08, 1.28, .14);
     }
-    // the concourse: planters, benches, shoppers, pendant lights
+    // the concourse: futuristic luxury furnishings (no two neighbours alike), shoppers, pendant lights
+    const FURN = [
+      (F, t) => { put(U.cyl16, M.lux, under(F, T(t, fy + .14, 0, 0, .7, .1, .36))); put(U.cyl16, M.gold, under(F, T(t, fy + .1, 0, 0, .5, .02, .26))); glow(F, t, fy + .1, 0, 'warm', .5); },   // a floating oval bench, lit underneath
+      (F, t) => { cyl(M.gold, F, t, fy + .14, 0, .03, .12); put(U.torus, M.goldLit, under(F, T(t, fy + .55, 0, 0, .55, .55, .55, PI/2))); put(U.sph, M.lux, under(F, T(t, fy + .55, 0, 0, .16, .16, .16))); },   // gold ring sculpture round a white orb
+      (F, t) => { put(U.cyl16, M.lux, under(F, T(t, fy + .12, 0, 0, .5, .1, .5))); put(U.cyl16, M.mallPool, under(F, T(t, fy + .18, 0, 0, .42, .02, .42))); cyl(M.gold, F, t, fy + .3, 0, .02, .24); glow(F, t, fy + .3, 0, 'cyan', .7); },   // a round fountain
+      (F, t) => { box(M.lux, F, t, fy + .2, 0, .14, .24, .14); box(M.mallGlass, F, t, fy + .5, 0, .2, .36, .2); box(pick([M.gold, M.cloth1, M.cloth3]), F, t, fy + .45, 0, .07, .1, .07); glow(F, t, fy + .5, 0, 'warm', .5); },   // a glass vitrine on a pedestal
+      (F, t) => { cyl(M.gold, F, t, fy + .25, 0, .02, .3); box(M.concDD, F, t, fy + .42, 0, .3, .2, .03); box(M.interiorCool, F, t, fy + .42, .02, .26, .16, .01); glow(F, t, fy + .42, .1, 'cyan', .45); },   // a directory screen
+      (F, t) => { for (const o of [-.22, .22]){ box(M.lux, F, t + o, fy + .14, 0, .34, .1, .3); box(M.lux, F, t + o, fy + .24, -.13, .34, .18, .05); box(M.gold, F, t + o, fy + .1, 0, .3, .02, .26); } put(U.cyl16, M.gold, under(F, T(t, fy + .16, .25, 0, .2, .02, .2))); },   // a lounge pair round a gold side table
+      (F, t) => { box(M.lux, F, t, fy + .16, 0, .34, .16, .34); box(M.gold, F, t, fy + .245, 0, .36, .02, .36); plant(pick(['bonsai','bamboo','bushFlower']), F, t, fy + .25, 0, rnd(.65, .85)); },   // planter
+    ];
     for (const e of mid){
       const F = under(P, T(e.mx, 0, e.mz, e.ry));
-      for (let t = -e.len/2 + .5; t < e.len/2 - .3; t += rnd(.9, 1.5)){
-        const r = R();
-        if (r < .3){ box(M.lux, F, t, fy + .16, 0, .34, .16, .34); box(M.gold, F, t, fy + .245, 0, .36, .02, .36); plant(pick(['bonsai','bush','bushFlower','succulent']), F, t, fy + .25, 0, rnd(.6, .8)); }
-        else if (r < .5){ box(M.lux2, F, t, fy + .14, 0, .5, .05, .16); box(M.gold, F, t, fy + .1, 0, .46, .08, .04); }
-        if (chance(.75)){ const sx = t + rnd(-.3, .3), sz = rnd(-.35, .35);      // a shopper or two
-          box(pick([M.frame, M.metalDark, M.concDD, M.awn1, M.cloth3]), F, sx, fy + .19, sz, .07, .2, .05); box(M.concDD, F, sx, fy + .32, sz, .05, .05, .05); }
-        if (chance(.5)) glow(F, t, fy + MALL_FLOOR - .2, 0, 'warm', .6);            // pendant light
+      let last = -1;
+      for (let t = -e.len/2 + .55; t < e.len/2 - .4; t += rnd(.85, 1.3)){
+        let k = Math.floor(R()*FURN.length); if (k === last) k = (k + 1) % FURN.length; last = k;
+        FURN[k](F, t);
+        if (chance(.7)){ const sx = t + rnd(-.35, .35), sz = rnd(-.38, .38);                  // a shopper or two
+          box(pick([M.frame, M.metalDark, M.concDD, M.awn1, M.cloth3, M.white2]), F, sx, fy + .19, sz, .07, .2, .05); box(M.concDD, F, sx, fy + .32, sz, .05, .05, .05); }
+        if (chance(.6)){ cyl(M.gold, F, t + .4, fy + MALL_FLOOR - .14, 0, .006, .2); put(U.sph, M.bulb, under(F, T(t + .4, fy + MALL_FLOOR - .27, 0, 0, .09, .09, .09))); glow(F, t + .4, fy + MALL_FLOOR - .27, 0, 'warm', .55); }   // pendant
       }
     }
     // an escalator to the floor above, with gold handrails

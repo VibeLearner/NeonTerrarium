@@ -9,7 +9,11 @@ centerView(true);
 selectZone(null);
 let last = performance.now();
 function frame(now){
-  const dt = Math.min(.05, (now-last)/1000); last = now;
+  const dt = Math.min(.05, (now-last)/1000);
+  // day and night cycle: 24 game hours per real hour. Real elapsed time (up to a second, so a slow frame rate
+  // doesn't slow the day), and none while the tab is hidden.
+  if (S.cycle) S.hour = (S.hour + Math.min(1, (now-last)/1000)*24/3600) % 24;
+  last = now;
   const night = applyTime();
   syncTimeUI();
   updateCars(now/1000);

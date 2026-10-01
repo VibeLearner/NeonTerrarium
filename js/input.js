@@ -129,6 +129,8 @@ document.querySelectorAll('#presets button').forEach(b => b.addEventListener('cl
   $('hour').value = S.hour; setPresetActive(b); lastLabel='';
 }));
 $('rain').addEventListener('change', e => { S.rain = e.target.checked; lastLabel=''; });
+// the day and night cycle: the clock runs on its own, a whole day in an hour of real time (see main.js)
+$('cycle').addEventListener('change', e => { S.cycle = e.target.checked; if (S.cycle) setPresetActive(null); });
 const windWord = v => v < .15 ? 'Calm' : v < .7 ? 'Light' : v < 1.3 ? 'Breezy' : v < 1.7 ? 'Windy' : 'Stormy';
 $('wind').addEventListener('input', e => { S.wind = +e.target.value; $('windOut').textContent = windWord(S.wind); });
 const NOTES = {

@@ -983,7 +983,10 @@ function updatePeople(dt, t){
   pplNow = t;
   if (!pplReady) return;
   // the hour was changed in Settings: everyone reconsiders over the next few seconds
-  if (Math.abs(S.hour - pplHour) > .2){ pplHour = S.hour; for (const p of pplList) if (!p.walk) p.until = Math.min(p.until, pplNow + Math.random()*8); }
+  // (with the day and night cycle running, the clock creeps on and people keep to their own pace instead)
+  { const d = Math.abs(S.hour - pplHour), dh = Math.min(d, 24 - d);
+    if (S.cycle && dh < .5) pplHour = S.hour;
+    else if (dh > .2){ pplHour = S.hour; for (const p of pplList) if (!p.walk) p.until = Math.min(p.until, pplNow + Math.random()*8); } }
   // decisions are spread over frames: a slice of the population each time
   const n = pplList.length, slice = Math.min(n, 60);
   for (let k = 0; k < slice; k++){

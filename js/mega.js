@@ -750,6 +750,24 @@ function koiFx(m){
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), mat);
   plane.rotation.x = -PI/2; plane.position.set(p.x, p.y + .03, p.z - (.608 - .5)*ph);
   plane.layers.set(1); plane.renderOrder = 3; scene.add(plane);
+  // the water under the projection: deep blue, lighter toward the middle, with slow drifting shimmer bands and a
+  // darker edge where it meets the stone, all in whole pond pixels
+  const wu = { time: u.time };
+  const wmat = new THREE.ShaderMaterial({ uniforms: wu,
+    vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform float time; varying vec2 vP;
+      void main(){
+        vec2 q = floor(vP*14.0)/14.0; float r = length(q)/${(POND_R + .05).toFixed(2)};
+        vec3 deep = vec3(.05, .22, .40), mid = vec3(.10, .46, .68);
+        vec3 col = mix(mid, deep, smoothstep(.15, 1.0, r));
+        float s = sin(q.x*3.1 + time*.7) + sin(q.y*2.6 - time*.55) + sin((q.x + q.y)*2.2 + time*.4);
+        col += vec3(.05, .12, .15)*step(1.9, s);                    // shimmer
+        col *= 1.0 - .45*smoothstep(.86, 1.0, r);                     // dark edge under the rim
+        gl_FragColor = vec4(col, 1.0);
+      }` });
+  const water = new THREE.Mesh(new THREE.CircleGeometry(p.r + .05, 40), wmat);
+  water.rotation.x = -PI/2; water.position.set(p.x, p.y + .012, p.z);
+  water.layers.set(1); water.renderOrder = 2; scene.add(water);
   let hold = 0, burst = 0, stray = 2 + Math.random()*3;
   return {
     update(dt, time){
@@ -766,6 +784,6 @@ function koiFx(m){
       u.glitch.value = burst > 0 ? Math.min(1, burst*6)*(.6 + .4*Math.random()) : 0;
       if (burst > 0 && Math.random() < .5) u.seed.value = Math.floor(Math.random()*997);   // the tear pattern jumps around while it glitches
     },
-    dispose(){ scene.remove(plane); plane.geometry.dispose(); mat.dispose(); }
+    dispose(){ scene.remove(plane, water); plane.geometry.dispose(); mat.dispose(); water.geometry.dispose(); wmat.dispose(); }
   };
 }

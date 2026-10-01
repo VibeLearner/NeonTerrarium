@@ -545,13 +545,17 @@ function skewers(P, x, y, z){ box(M.wood, P, x, y + .02, z, .18, .04, .08); for 
 function steamPot(P, x, y, z){ put(U.cyl16, M.metalDark, under(P, T(x, y + .03, z, 0, .2, .06, .2))); put(U.cyl16, M.metal, under(P, T(x, y + .12, z, 0, .18, .14, .18))); put(U.cyl16, food(), under(P, T(x, y + .19, z, 0, .15, .01, .15))); emitters.push(new THREE.Vector3(x, y + .22, z).applyMatrix4(P)); }
 // hanging food: sausages, roast ducks, lanterns of buns
 function hangingFood(P, x, y, z){ for (let k=0; k<4; k++){ const hx = x + (k - 1.5)*.07; cyl(M.frame, P, hx, y - .04, z, .003, .08); box(pick([FOOD[0], FOOD[4], FOOD[2]]), P, hx, y - .14, z, .045, .12, .04); } }
+// lights near the pond, collected while the square is generated, for the water to reflect: [x, y, z, r, g, b]
+let reflectLights = null;
+const _rl = new THREE.Vector3();
+function noteLight(P, x, y, z, hex){ if (!reflectLights) return; _rl.set(x, y, z).applyMatrix4(P); const c = new THREE.Color(hex); reflectLights.push([_rl.x, _rl.y, _rl.z, c.r, c.g, c.b]); }
 function lanternString(P, ax, ay, az, bx, by, bz, sag){
   const n = Math.max(4, Math.round(Math.hypot(bx - ax, bz - az)/.55));
   let px = ax, py = ay, pz = az;
   for (let k=1; k<=n; k++){
     const t = k/n, x = ax + (bx - ax)*t, z = az + (bz - az)*t, y = ay + (by - ay)*t - sag*Math.sin(PI*t);
     strut(M.frame, P, px, py, pz, x, y, z, .012);
-    if (k < n){ box(chance(.5) ? M.lantern : M.lantern2, P, x, y - .1, z, .1, .14, .1); if (k % 2) glow(P, x, y - .1, z, chance(.6) ? 'amber' : 'warm', .55); }
+    if (k < n){ box(chance(.5) ? M.lantern : M.lantern2, P, x, y - .1, z, .1, .14, .1); if (k % 2) glow(P, x, y - .1, z, chance(.6) ? 'amber' : 'warm', .55); if (k % 2) noteLight(P, x, y - .1, z, 0xffa040); }
     px = x; py = y; pz = z;
   }
 }
@@ -643,6 +647,7 @@ const POND_R = 2.5, POND_Y = .2;
 function buildTownSquare(m){
   R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
   const P = T(m.x, 0, m.z, pick([0, PI/2, PI, -PI/2])), S5 = 5*LOT, H = S5/2;
+  reflectLights = [];
   box(G.asph, P, 0, .012, 0, S5, .025, S5);
   const n = 25, st = S5/n;
   for (let a=0;a<n;a++) for (let b=0;b<n;b++){
@@ -661,12 +666,12 @@ function buildTownSquare(m){
   // the koi themselves are an animated sprite sheet laid on the water (see koiFx)
   for (let k=0; k<4; k++){ const a = k*TAU/4 + PI/4, r = POND_R + .45;                        // hologram projectors on the rim
     const Q = under(P, T(Math.cos(a)*r, .25, Math.sin(a)*r, -a));
-    box(M.metalDark, Q, 0, .15, 0, .18, .3, .18); box(M.screen, Q, 0, .32, 0, .12, .04, .12); glow(Q, 0, .34, 0, 'cyan', .7); }
+    box(M.metalDark, Q, 0, .15, 0, .18, .3, .18); box(M.screen, Q, 0, .32, 0, .12, .04, .12); glow(Q, 0, .34, 0, 'cyan', .7); noteLight(Q, 0, .34, 0, 0x4fd8ff); }
   for (let k=0; k<6; k++){ const a = rnd(0, TAU), r = POND_R + .55; plant(pick(['bush','bushFlower','g_fern2']), P, Math.cos(a)*r, .25, Math.sin(a)*r, .7); }
   // ---- lantern poles round the square, strung across the pond and between each other
   const poles = [];
   for (let k=0; k<8; k++){ const a = k*TAU/8 + PI/8, r = 7.9; poles.push([Math.cos(a)*r, Math.sin(a)*r]); }
-  for (const [x, z] of poles){ cyl(M.metalDark, P, x, 1.6, z, .05, 3.2); box(M.lantern2, P, x, 3.26, z, .14, .14, .14); glow(P, x, 3.26, z, 'warm', 1.0); }
+  for (const [x, z] of poles){ cyl(M.metalDark, P, x, 1.6, z, .05, 3.2); box(M.lantern2, P, x, 3.26, z, .14, .14, .14); glow(P, x, 3.26, z, 'warm', 1.0); noteLight(P, x, 3.26, z, 0xffcf7a); }
   for (let k=0; k<4; k++){ const [ax, az] = poles[k], [bx, bz] = poles[k + 4]; lanternString(P, ax, 3.1, az, bx, 3.1, bz, .9); }
   for (let k=0; k<8; k++){ const [ax, az] = poles[k], [bx, bz] = poles[(k+1)%8]; lanternString(P, ax, 3.0, az, bx, 3.0, bz, .4); }
   // ---- market stands along the four sides, between the poles, facing in
@@ -694,7 +699,10 @@ function buildTownSquare(m){
     const Q = under(P, T(sx*(H - .7), 0, sz*(H - .7)));
     box(M.concM, Q, 0, .2, 0, .9, .4, .9); plant(pick(['bonsai','bamboo']), Q, 0, .4, 0, 1.2); plant('bushFlower', Q, .25, .4, .25, .8);
   }
-  m.pond = { x: m.x, z: m.z, y: POND_Y + .06, r: POND_R };
+  // keep the lights nearest the pond (the shader handles up to 16)
+  const near = reflectLights.map(l => [Math.hypot(l[0] - m.x, l[2] - m.z), l]).filter(([d]) => d < POND_R + 4).sort((a, b) => a[0] - b[0]).slice(0, 16).map(([, l]) => l);
+  reflectLights = null;
+  m.pond = { x: m.x, z: m.z, y: POND_Y + .06, r: POND_R, lights: near };
   m.roofH = CURB + .1;
   m.top = 5;
 }
@@ -705,6 +713,7 @@ function buildTownSquare(m){
 // faint scanlines all the time. Everything snaps to whole sprite pixels so it stays pixel art.
 const KOI_FRAMES = 10, KOI_W = 100, KOI_H = 139;
 let koiTex = null;
+const _kd = new THREE.Vector3();
 const KOI_SHADER = {
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
@@ -752,17 +761,44 @@ function koiFx(m){
   plane.layers.set(1); plane.renderOrder = 3; scene.add(plane);
   // the water under the projection: deep blue, lighter toward the middle, with slow drifting shimmer bands and a
   // darker edge where it meets the stone, all in whole pond pixels
-  const wu = { time: u.time };
+  // The water reflects the hologram and the lights round it, all inside its own shader (no extra render pass):
+  // the koi's current frame is sampled a few times, blurred and rippled, so their colours spill into the water;
+  // each nearby light is mirrored through the water surface on the CPU (cheap: a few dozen numbers a frame) and
+  // drawn as a short wobbling streak of its own colour, stretched toward the viewer like a real reflection.
+  const NL = 16, lightPos = [], lightCol = [];
+  for (let k=0; k<NL; k++){ lightPos.push(new THREE.Vector3(0, 0, 0)); lightCol.push(new THREE.Vector3(0, 0, 0)); }
+  const wu = { time: u.time, map: u.map, frame: u.frame, glitch: u.glitch, lp: { value: lightPos }, lc: { value: lightCol },
+               streak: { value: new THREE.Vector2(0, 1) }, night: comp.uniforms.night,
+               koiBox: { value: new THREE.Vector4(pw, ph, (.608 - .5)*ph, 0) } };
   const wmat = new THREE.ShaderMaterial({ uniforms: wu,
     vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `uniform float time; varying vec2 vP;
+    fragmentShader: `uniform float time, frame, glitch, night; uniform sampler2D map; uniform vec3 lp[${NL}], lc[${NL}]; uniform vec2 streak; uniform vec4 koiBox;
+      varying vec2 vP;
+      const float NF = ${KOI_FRAMES}.0; const vec2 SZ = vec2(${KOI_W}.0, ${KOI_H}.0);
+      float koiA(vec2 uv){ if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return 0.0; return texture2D(map, vec2((frame + uv.x)/NF, uv.y)).a; }
+      vec3 koiC(vec2 uv){ uv = clamp(uv, 0.0, 1.0); vec4 t = texture2D(map, vec2((frame + uv.x)/NF, uv.y)); return t.rgb*t.a; }
       void main(){
         vec2 q = floor(vP*14.0)/14.0; float r = length(q)/${(POND_R + .05).toFixed(2)};
         vec3 deep = vec3(.05, .22, .40), mid = vec3(.10, .46, .68);
         vec3 col = mix(mid, deep, smoothstep(.15, 1.0, r));
         float s = sin(q.x*3.1 + time*.7) + sin(q.y*2.6 - time*.55) + sin((q.x + q.y)*2.2 + time*.4);
-        col += vec3(.05, .12, .15)*step(1.9, s);                    // shimmer
-        col *= 1.0 - .45*smoothstep(.86, 1.0, r);                     // dark edge under the rim
+        col += vec3(.05, .12, .15)*step(1.9, s);
+        // the hologram's light in the water: a soft, rippling halo of its colours
+        vec2 kuv = vec2(q.x/koiBox.x + .5, (q.y - koiBox.z)/koiBox.y + .5);
+        kuv.x += sin(q.y*9.0 + time*2.0)*.012;
+        vec3 halo = vec3(0.0); float tex = 2.5/SZ.x;
+        halo += koiC(kuv + vec2(tex, 0.0)) + koiC(kuv - vec2(tex, 0.0)) + koiC(kuv + vec2(0.0, tex)) + koiC(kuv - vec2(0.0, tex));
+        col += halo*.22*(1.0 + glitch);
+        // lights overhead, mirrored in the surface: short streaks stretched toward the viewer, wobbling with the ripples
+        vec2 side = vec2(-streak.y, streak.x);
+        for (int i=0; i<${NL}; i++){
+          vec2 d = q - lp[i].xy; d.x += sin(q.y*12.0 + time*3.0 + float(i))*.04;
+          float along = dot(d, streak), across = dot(d, side);
+          float g = exp(-across*across*45.0)*exp(-along*along*1.1)*lp[i].z;
+          g = floor(g*4.0 + .5)/4.0;                               // stepped, to stay pixel art
+          col += lc[i]*g*(.35 + .65*night)*1.3;
+        }
+        col *= 1.0 - .45*smoothstep(.86, 1.0, r);
         gl_FragColor = vec4(col, 1.0);
       }` });
   const water = new THREE.Mesh(new THREE.CircleGeometry(p.r + .05, 40), wmat);
@@ -772,6 +808,20 @@ function koiFx(m){
   return {
     update(dt, time){
       u.time.value = time;
+      // mirror each light through the water: the reflection of a light h above the surface sits where the view ray
+      // to the point h below it crosses the surface
+      cam.getWorldDirection(_kd);
+      const sy = Math.max(.05, -_kd.y);
+      const L = p.lights || [];
+      for (let k=0; k<16; k++){
+        const l = L[k];
+        if (!l){ wu.lp.value[k].set(0, 0, 0); continue; }
+        const h = l[1] - (p.y + .012), sc = h/sy;
+        const x = l[0] - _kd.x*sc - p.x, z = l[2] - _kd.z*sc - p.z;
+        wu.lp.value[k].set(x, -z, h > 0 ? 1 : 0); wu.lc.value[k].set(l[3], l[4], l[5]);
+      }
+      const hl = Math.hypot(_kd.x, _kd.z) || 1;
+      wu.streak.value.set(_kd.x/hl, -_kd.z/hl);
       hold -= dt; stray -= dt;
       if (hold <= 0){                                              // next frame, through a glitch
         u.prevFrame.value = u.frame.value;

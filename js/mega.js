@@ -841,12 +841,13 @@ function koiFx(m){
 }
 
 /* ---------- the foundry ---------- */
-// A tall, brooding steel works on a 6x4 block, after the reference: stacked slate-blue blocks clad in corrugated
+// A tall, brooding steel works on a 6x4 block, after the reference: stacked green-grey blocks clad in corrugated
 // panels and stained with rust, a rounded-roof hall, a fat smokestack wrapped in scaffolding, a taller chimney, a
 // tank tower ringed in light, and pipes looping over everything. The light is orange and comes from below the
 // ledges (glowing strips tucked under each overhang), a vertical strip up the tall block, the loading dock and a
 // few warm windows, with one cold blue tube for contrast. Steam rises off the stacks.
-M.fSteel = toon(0x2e3846); M.fSteel2 = toon(0x3b4757); M.fSteel3 = toon(0x252d38); M.fRust = toon(0x5c3a28); M.fRib = toon(0x1f2630);
+// the body uses the industrial district's own colours: green-grey painted metal, weathered concrete, darker trim
+M.fSteel = toon(0x6a7066); M.fSteel2 = toon(0x7d858e); M.fSteel3 = toon(0x4a524d); M.fRust = toon(0x8A4A2A); M.fRib = toon(0x555c57);
 M.fGlow = toon(0x5a2a10, { em:0xd84a08, kind:'neon' }); M.fGlow2 = toon(0x5a3410, { em:0xe0640e, kind:'neon' });   // deep orange: the emissive boost at night pushes paler oranges to yellow
 M.fBlue = toon(0x10283a, { em:0x7fd0ff, kind:'neon' });
 M.fWin = toon(0x4a2e18, { em:0xff7a2a, kind:'window' });

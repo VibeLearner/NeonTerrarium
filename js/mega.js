@@ -698,28 +698,74 @@ function buildTownSquare(m){
   m.roofH = CURB + .1;
   m.top = 5;
 }
-// The holographic koi: a hand-drawn 9-frame sprite sheet (assets/sprites/koi_pond.png, 96x96 per frame) laid
-// flat on the water and looped, so the koi chase each other round the pond. Drawn in the colour pass only, at
-// full brightness like a projection, with nearest-pixel sampling to stay crisp.
-const KOI_FRAMES = 9, KOI_FPS = 7;
+// The holographic koi: a 10-frame neon line-art sheet (assets/sprites/koi_neon.png, 100x139 per frame) projected
+// onto the pond. The frames don't flow smoothly into each other, so the projection is made to look faulty on purpose:
+// each frame holds for a beat, and every change comes through a glitch (rows tearing sideways, colour channels
+// splitting, half the image showing the previous frame, a flicker), with smaller stray glitches in between and
+// faint scanlines all the time. Everything snaps to whole sprite pixels so it stays pixel art.
+const KOI_FRAMES = 10, KOI_W = 100, KOI_H = 139;
 let koiTex = null;
+const KOI_SHADER = {
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D map; uniform float frame, prevFrame, glitch, seed, time;
+    varying vec2 vUv;
+    const float NF = ${KOI_FRAMES}.0; const vec2 SZ = vec2(${KOI_W}.0, ${KOI_H}.0);
+    float h(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y)*p3.z); }
+    vec4 tap(vec2 uv, float f){
+      if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return vec4(0.0);
+      uv = (floor(uv*SZ) + .5)/SZ;
+      return texture2D(map, vec2((f + uv.x)/NF, uv.y));
+    }
+    void main(){
+      vec2 uv = vUv;
+      float row = floor(uv.y*SZ.y), band = floor(uv.y*18.0), g = glitch;
+      float hb = h(vec2(band, seed));
+      // rows tearing sideways in bands, by whole pixels
+      if (hb < g*.6) uv.x += floor((h(vec2(band, seed + 7.0)) - .5)*g*22.0)/SZ.x;
+      // some bands still show the previous frame
+      float f = (h(vec2(band, seed + 3.0)) < g*.45) ? prevFrame : frame;
+      // colour channels split apart
+      float dx = floor(g*3.0 + .5)/SZ.x;
+      vec4 c = tap(uv, f), cr = tap(uv + vec2(dx, 0.0), f), cb = tap(uv - vec2(dx, 0.0), f);
+      float a = max(c.a, max(cr.a, cb.a));
+      if (a < .5) discard;
+      vec3 col = vec3(cr.a > .5 ? cr.r : c.r*.4, c.a > .5 ? c.g : .0, cb.a > .5 ? cb.b : c.b*.4);
+      if (c.a < .5) col *= .8;
+      col *= 1.0 - .22*mod(row, 2.0);                           // scanlines
+      col *= 1.0 - g*.55*step(.6, h(vec2(floor(time*40.0), seed)));   // flicker
+      gl_FragColor = vec4(col*1.15, 1.0);
+    }`,
+};
 function koiFx(m){
   if (!koiTex){
-    koiTex = new THREE.TextureLoader().load('assets/sprites/koi_pond.png');
+    koiTex = new THREE.TextureLoader().load('assets/sprites/koi_neon.png');
     koiTex.magFilter = koiTex.minFilter = THREE.NearestFilter; koiTex.generateMipmaps = false;
-    koiTex.repeat.set(1/KOI_FRAMES, 1);
   }
   const p = m.pond;
-  const mat = new THREE.MeshBasicMaterial({ map: koiTex, alphaTest: .5 });
-  const disc = new THREE.Mesh(new THREE.PlaneGeometry(2*(p.r + .1), 2*(p.r + .1)), mat);
-  disc.rotation.x = -PI/2; disc.position.set(p.x, p.y + .02, p.z);
-  disc.layers.set(1); scene.add(disc);
-  let frame = -1;
+  const u = { map: { value: koiTex }, frame: { value: 0 }, prevFrame: { value: 0 }, glitch: { value: 0 }, seed: { value: 0 }, time: { value: 0 } };
+  const mat = new THREE.ShaderMaterial({ uniforms: u, vertexShader: KOI_SHADER.vertexShader, fragmentShader: KOI_SHADER.fragmentShader });
+  // the ripples fill the pond; the leaping koi spill a little over the rim, like a projection that overshoots
+  const pw = 2*p.r + .3, ph = pw*KOI_H/KOI_W;
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), mat);
+  plane.rotation.x = -PI/2; plane.position.set(p.x, p.y + .03, p.z - (.608 - .5)*ph);
+  plane.layers.set(1); plane.renderOrder = 3; scene.add(plane);
+  let hold = 0, burst = 0, stray = 2 + Math.random()*3;
   return {
     update(dt, time){
-      const f = Math.floor(time*KOI_FPS) % KOI_FRAMES;
-      if (f !== frame){ frame = f; koiTex.offset.x = f/KOI_FRAMES; }
+      u.time.value = time;
+      hold -= dt; stray -= dt;
+      if (hold <= 0){                                              // next frame, through a glitch
+        u.prevFrame.value = u.frame.value;
+        u.frame.value = (u.frame.value + 1) % KOI_FRAMES;
+        hold = .28 + Math.random()*.32;
+        burst = .16 + Math.random()*.1;
+      }
+      if (stray <= 0){ burst = Math.max(burst, .1 + Math.random()*.15); stray = 2 + Math.random()*4; }   // the odd glitch between changes
+      burst = Math.max(0, burst - dt);
+      u.glitch.value = burst > 0 ? Math.min(1, burst*6)*(.6 + .4*Math.random()) : 0;
+      if (burst > 0 && Math.random() < .5) u.seed.value = Math.floor(Math.random()*997);   // the tear pattern jumps around while it glitches
     },
-    dispose(){ scene.remove(disc); disc.geometry.dispose(); mat.dispose(); }
+    dispose(){ scene.remove(plane); plane.geometry.dispose(); mat.dispose(); }
   };
 }

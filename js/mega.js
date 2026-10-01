@@ -277,8 +277,7 @@ if (location.hash.includes('dev')){
 // An octagonal glass mall in white and gold. It stands on white columns with gold collars above a marble court,
 // and each side is a single sheet of glass, framed only in gold at the corners and floor lines. Inside is an open
 // atrium: upper floors are walkway rings round a central core of boutiques (varied widths, neon signs over the
-// doors), with glass balustrades, so you see down through the void to every floor. Escalators and fountains sit
-// in the atrium; the walkways carry futuristic luxury furnishings. The roof is mostly pool, ringed by a white canopy
+// doors), with glass balustrades, so you see down through the void to every floor. Fountains sit in the atrium; the walkways carry futuristic luxury furnishings. The roof is mostly pool, ringed by a white canopy
 // on gold posts. Two floors per tier; warm lighting, with neon only on the shop signs.
 M.lux = toon(0xf4f1ea);               // white stone
 M.lux2 = toon(0xe7e0d2);              // warm off-white
@@ -362,7 +361,7 @@ function buildSkyMall(m){
   // ---- the glass mall, floor by floor
   const floors = m.levels*MALL_PER_TIER, base = deckY + deckT, CORE = .45;
   const outer = octEdges(SX, SZ), core = octEdges(SX*CORE, SZ*CORE), mid = octEdges(SX*.82, SZ*.82), voidMid = octEdges(SX*.84, SZ*.84);
-  const escSide = pick([0, 2, 4, 6]);   // escalators sit along one of the long straight sides
+  const escSide = pick([0, 2, 4, 6]);   // which straight sides the atrium fountains sit on
   const WALK = .68, walk = octEdges(SX*((CORE + WALK)/2), SZ*((CORE + WALK)/2)), rail = octEdges(SX*WALK, SZ*WALK);
   for (let f=0; f<floors; f++){
     const fy = base + f*MALL_FLOOR, tierStart = f % MALL_PER_TIER === 0;
@@ -397,7 +396,7 @@ function buildSkyMall(m){
       while (x < e.len/2 - .4){
         let w = Math.min(rnd(.6, 1.7), e.len/2 - .05 - x); if (e.len/2 - .05 - (x + w) < .45) w = e.len/2 - .05 - x;
         const cx = x + w/2, shop = pick([M.shop1, M.shop1, M.shop2, M.shop3]), tall = chance(.35);
-        const sh = tall ? 1.15 : .95;
+        const sh = tall ? 1.0 : .85;   // signs above must stay under the ceiling, or they poke up through the floor above (and the pool)
         box(shop, F, cx, fy + .08 + sh/2, -.08, w - .12, sh, .04);                              // the lit back wall
         box(M.lux, F, cx, fy + .1, .02, w - .1, .04, .2);                                       // threshold
         for (let s2 = cx - (w - .3)/2; s2 <= cx + (w - .3)/2 + .01; s2 += Math.max(.25, (w - .3)/Math.max(1, Math.round(w/.4)))){
@@ -410,12 +409,12 @@ function buildSkyMall(m){
         // the sign: a neon tube outline or a lit glyph sign above the door
         if (chance(.55)){
           const nm = pick([M.neonPink, M.neonCyan, M.neonAmber, M4.neonPurple]), nw = Math.min(w - .2, rnd(.35, .8));
-          box(nm, F, cx, fy + .26 + sh, .13, nw, .03, .03); box(nm, F, cx, fy + .44 + sh, .13, nw, .03, .03);
-          box(nm, F, cx - nw/2, fy + .35 + sh, .13, .03, .21, .03); box(nm, F, cx + nw/2, fy + .35 + sh, .13, .03, .21, .03);
-          for (let q = cx - nw/2 + .08; q < cx + nw/2 - .05; q += .09) box(nm, F, q, fy + .35 + sh + rnd(-.05, .05), .13, .025, rnd(.05, .12), .02);   // lettering, implied
-          glow(F, cx, fy + .35 + sh, .3, NEON_NAME.get(nm) || 'pink', .9);
+          box(nm, F, cx, fy + .18 + sh, .13, nw, .03, .03); box(nm, F, cx, fy + .34 + sh, .13, nw, .03, .03);
+          box(nm, F, cx - nw/2, fy + .26 + sh, .13, .03, .19, .03); box(nm, F, cx + nw/2, fy + .26 + sh, .13, .03, .19, .03);
+          for (let q = cx - nw/2 + .08; q < cx + nw/2 - .05; q += .09) box(nm, F, q, fy + .26 + sh + rnd(-.04, .04), .13, .025, rnd(.05, .1), .02);   // lettering, implied
+          glow(F, cx, fy + .26 + sh, .3, NEON_NAME.get(nm) || 'pink', .9);
         } else {
-          const kind = pick(GLYPH_H); plant(kind, F, cx, fy + .36 + sh, .13, .75, 'c', true); glow(F, cx, fy + .36 + sh, .3, GLYPH_GLOW[kind], .8);
+          const kind = pick(GLYPH_H); plant(kind, F, cx, fy + .26 + sh, .13, .7, 'c', true); glow(F, cx, fy + .26 + sh, .3, GLYPH_GLOW[kind], .8);
         }
         box(M.lux, F, x + w, fy + .7, .1, .08, 1.28, .14);                                      // white pilaster
         x += w;
@@ -444,12 +443,6 @@ function buildSkyMall(m){
         if (chance(.6)){ cyl(M.gold, F, t + .4, fy + MALL_FLOOR - .14, 0, .006, .2); put(U.sph, M.bulb, under(F, T(t + .4, fy + MALL_FLOOR - .27, 0, 0, .09, .09, .09))); glow(F, t + .4, fy + MALL_FLOOR - .27, 0, 'warm', .55); }   // pendant
       }
     }
-    // an escalator to the floor above, with gold handrails
-    if (f < floors - 1){
-      const e = voidMid[(escSide + 4*(f % 2)) % 8], F = under(P, T(e.mx, 0, e.mz, e.ry)), run = Math.min(2.2, e.len*.5);
-      strut(M.lux2, F, -run/2, fy + .1, .05, run/2, fy + MALL_FLOOR + .05, .05, .26);
-      for (const o of [-.15, .25]) strut(M.gold, F, -run/2, fy + .32, o - .05 + .05, run/2, fy + MALL_FLOOR + .27, o, .025);
-    }
     if (f === 0) for (const k of [(escSide + 2) % 8, (escSide + 6) % 8]){
       const e = voidMid[k], F = under(P, T(e.mx, 0, e.mz, e.ry));
       put(U.cyl16, M.lux, under(F, T(0, fy + .14, 0, 0, 1.2, .12, .7))); put(U.cyl16, M.mallPool, under(F, T(0, fy + .2, 0, 0, 1.05, .02, .58)));
@@ -470,9 +463,14 @@ function buildSkyMall(m){
   octSlab(M.lux, P, roof, SX*1.03, SZ*1.03, .14);
   for (const e of octEdges(SX*1.03, SZ*1.03)) box(M.goldLit, under(P, T(e.mx, 0, e.mz, e.ry)), 0, roof + .1, .01, e.len, .06, .04);
   octSlab(M.marbleOut, P, roof + .14, SX*.98, SZ*.98, .03);
-  octSlab(M.gold, P, roof + .14, SX*.75, SZ*.75, .06);                          // gold coping round the pool
-  octSlab(M.mallPool, P, roof + .15, SX*.72, SZ*.72, .07);
-  glow(P, 0, roof + .3, 0, 'warm', 1.2);
+  octSlab(M.gold, P, roof + .17, SX*.75, SZ*.75, .04, SX*.72, SZ*.72);          // gold coping round the pool (a ring, so nothing shows through the water)
+  // The water: a flat sheet level with the walk. Its normals lean slightly, so the wet-ground reflection pass
+  // (which only treats surfaces facing straight up) leaves it alone; otherwise the posts and bamboo round the
+  // pool smeared into it as dark streaks, like something under the water.
+  { const shape = new THREE.Shape(); octVerts(SX*.72, SZ*.72).forEach(([x, z], k) => k ? shape.lineTo(x, -z) : shape.moveTo(x, -z));
+    const g = new THREE.ShapeGeometry(shape); g.rotateX(-PI/2);
+    const n = g.attributes.normal; for (let k=0; k<n.count; k++) n.setXYZ(k, 0, .84, .54);
+    put(g, M.mallPool, under(P, T(0, roof + .19, 0))); g.dispose(); }
   for (const e of octEdges(SX*.87, SZ*.87)){
     const F = under(P, T(e.mx, 0, e.mz, e.ry));
     box(M.canvas, F, 0, roof + 1.0, .02, e.len*.95, .04, .46, 0, -.12);         // canopy, sloping out

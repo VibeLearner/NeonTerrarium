@@ -41,7 +41,7 @@ their angry animation). Emote bubbles also show up in the square: music notes an
 while waiting for a stall keeper, a bowl when sitting down with food. The eight bubbles are drawn in code in the
 people atlas (row 14) and always drawn bright.
 
-**Dark streets.** About one building in fifteen stands on a dark street (picked from its grid position, so it
+**Dark streets.** About one building in seventy stands on a dark street (picked from its grid position, so it
 never changes). While a dark plot is generated, about 80% of its windows, lamps, neon and trim are swapped for
 unlit look-alikes (picked by position, so the same ones stay off), most halos and lit signs are left out, and
 whatever still glows flickers hard and often. Every dark plot has one failing street lamp. (Code: `DARK` and
@@ -54,8 +54,7 @@ hurries on. The nearest officer on duty runs to the spot (keeping to the walkway
 scanner. A lurker lies low for a few minutes after each job. Muggings and police call-outs go into `cityLog`
 (hour, place, who), kept for the radio host.
 
-**Police drone.** The drone parked on the station's roof pad is live (in `policeFx`, mega.js): every minute or so
-it lifts off with its red and blue lights flashing, climbs high enough to clear the buildings, visits three
+**Police drone.** The drone parked on the station's roof pad is live (in `policeFx`, mega.js): every 25 to 55 seconds of real time, whatever the hour, it lifts off with its red and blue lights flashing, climbs high enough to clear the buildings, visits three
 street crossings nearby, hovers over each with a searchlight cone on the street, then flies home and lands.
 
 **What's in the way.** Every plot gets a 5 cm footprint map of everything in the walking band (ankle to head

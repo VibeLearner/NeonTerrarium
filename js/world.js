@@ -186,8 +186,8 @@ function buildStack(c){
   c.height = y;
 }
 
-// About one building in fifteen stands on a dark street: almost no light, and what's left flickers (see DARK in core.js)
-const isDarkPlot = c => !!c.sections.length && !c.mega && hash('dark', c.i, c.j) % 15 === 0;
+// About one building in seventy stands on a dark street: almost no light, and what's left flickers (see DARK in core.js)
+const isDarkPlot = c => !!c.sections.length && !c.mega && hash('dark', c.i, c.j) % 70 === 0;
 /* ---------- rebuilding ---------- */
 // Pieces are batched in regions of REG x REG grid cells; an edit only re-batches the regions it touched.
 const REG = 5, regions = new Map(), dirtyRegions = new Set();

@@ -1234,7 +1234,8 @@ function policeDrone(m){
   const spot = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xbfefff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); spot.scale.set(2.2, 2.2, 1); spot.layers.set(1); scene.add(spot);
   g.traverse(o => { if (o.isMesh && o.layers.mask === 1) o.layers.set(0); });
   g.position.copy(restPos); g.rotation.y = restYaw; scene.add(g);
-  const st = { mode: 'rest', timer: 20 + Math.random()*30, way: [], yaw: restYaw, spin: 0, hover: 0, k: 0 };
+  // its own clock (real seconds), so it keeps to its rounds whatever the hour, the day cycle or the frame rate
+  const st = { mode: 'rest', timer: 8 + Math.random()*10, way: [], yaw: restYaw, spin: 0, hover: 0, k: 0, last: performance.now() };
   const cruiseTo = (a, b) => Math.max(droneCruise(a, b) + 1.2, restPos.y + 1.5);
   const _to = new THREE.Vector3();
   function goToward(target, dt, speed){
@@ -1247,7 +1248,8 @@ function policeDrone(m){
   }
   return {
     g, st,
-    update(dt, time){
+    update(_dt, time){
+      const now = performance.now(), dt = Math.min(1, (now - st.last)/1000); st.last = now;
       const on = st.mode !== 'rest';
       st.spin = Math.max(0, Math.min(1, st.spin + (on ? dt : -dt*.5)));
       for (const h of blades) h.rotation.y += dt*40*st.spin;
@@ -1259,7 +1261,7 @@ function policeDrone(m){
         if (st.timer <= 0){
           const nodes = (typeof patrolNodes !== 'undefined' ? patrolNodes : []).filter(c => Math.hypot(c.x - restPos.x, c.z - restPos.z) < 22);
           if (nodes.length){ st.way = []; for (let k = 0; k < 3; k++) st.way.push(nodes[Math.floor(Math.random()*nodes.length)]); st.mode = 'up'; st.k = 0; }
-          else st.timer = 30;
+          else st.timer = 10;
         }
       } else if (st.mode === 'up'){
         st.k = Math.min(1, st.k + dt/2.2);
@@ -1287,7 +1289,7 @@ function policeDrone(m){
         st.k = Math.min(1, st.k + dt/2.8); const u = st.k*st.k*(3 - 2*st.k);
         g.position.lerpVectors(st.from, restPos, u);
         let dy = restYaw - st.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); st.yaw += dy*Math.min(1, dt*3);
-        if (st.k >= 1){ st.mode = 'rest'; st.timer = 35 + Math.random()*50; st.yaw = restYaw; g.position.copy(restPos); }
+        if (st.k >= 1){ st.mode = 'rest'; st.timer = 25 + Math.random()*30; st.yaw = restYaw; g.position.copy(restPos); }
       }
       g.rotation.y = st.yaw;
       // searchlight down to the street

@@ -754,10 +754,10 @@ function koiFx(m){
   const p = m.pond;
   const u = { map: { value: koiTex }, frame: { value: 0 }, prevFrame: { value: 0 }, glitch: { value: 0 }, seed: { value: 0 }, time: { value: 0 } };
   const mat = new THREE.ShaderMaterial({ uniforms: u, vertexShader: KOI_SHADER.vertexShader, fragmentShader: KOI_SHADER.fragmentShader });
-  // the ripples fill the pond; the leaping koi spill a little over the rim, like a projection that overshoots
-  const pw = 2*p.r + .3, ph = pw*KOI_H/KOI_W;
+  // sized so the whole frame, leaping koi included, sits inside the pond
+  const ph = 2*p.r*.88, pw = ph*KOI_W/KOI_H, koiOff = 0;
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), mat);
-  plane.rotation.x = -PI/2; plane.position.set(p.x, p.y + .03, p.z - (.608 - .5)*ph);
+  plane.rotation.x = -PI/2; plane.position.set(p.x, p.y + .03, p.z - koiOff);
   plane.layers.set(1); plane.renderOrder = 3; scene.add(plane);
   // the water under the projection: deep blue, lighter toward the middle, with slow drifting shimmer bands and a
   // darker edge where it meets the stone, all in whole pond pixels
@@ -769,7 +769,7 @@ function koiFx(m){
   for (let k=0; k<NL; k++){ lightPos.push(new THREE.Vector3(0, 0, 0)); lightCol.push(new THREE.Vector3(0, 0, 0)); }
   const wu = { time: u.time, map: u.map, frame: u.frame, glitch: u.glitch, lp: { value: lightPos }, lc: { value: lightCol },
                streak: { value: new THREE.Vector2(0, 1) }, night: comp.uniforms.night,
-               koiBox: { value: new THREE.Vector4(pw, ph, (.608 - .5)*ph, 0) } };
+               koiBox: { value: new THREE.Vector4(pw, ph, koiOff, 0) } };
   const wmat = new THREE.ShaderMaterial({ uniforms: wu,
     vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: `uniform float time, frame, glitch, night; uniform sampler2D map; uniform vec3 lp[${NL}], lc[${NL}]; uniform vec2 streak; uniform vec4 koiBox;

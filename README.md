@@ -77,8 +77,12 @@ Landmarks that take over a block of plots once the city is big enough. Each exis
 - **Foundry:** a 6x4 block (either way round). Unlocks at 60 industrial sections, then a 1 in 50 chance per build.
   A tall green-grey steel works with orange light tucked under every ledge, a scaffolded smokestack, a 22-unit
   chimney with a beacon, a tank tower ringed in light, looping pipes and a lit loading dock.
+- **Police station:** a 3x3 civic building. Unlocks at 15 residential and 15 commercial sections, then a 1 in 20
+  chance per build. A pale block over a lit glass lobby, a glass curtain wall, the neon badge and a POLICE fascia,
+  framed facade screens cycling the wanted posters (assets/sprites/wanted.png, with a projection glitch), a cyan
+  hologram ring round the building, a red/blue light bar flashing on the roof, patrol cars and officers out front.
 - New megastructures go in `MEGA_TYPES` at the top of `js/mega.js` (requirement, odds, footprint, max tiers).
-- For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall), **B** (town square) or **V** (foundry)
+- For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall), **B** (town square), **V** (foundry) or **C** (police station)
   to bring it in, or remove it, next to the plot under the pointer, skipping the requirement and the odds.
 
 ## Adding art and sound

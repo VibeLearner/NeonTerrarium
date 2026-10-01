@@ -13,6 +13,8 @@ const MEGA_TYPES = {
            colour: '#ffcf7a', build: buildSkyMall },
   square: { name: 'Town square', need: { low: 40, mid: 40 }, odds: 40, w: 5, h: 5, maxLevels: 1,
            colour: '#9dff6a', build: buildTownSquare, fx: koiFx },
+  police: { name: 'Police station', need: { low: 15, mid: 15 }, odds: 20, w: 3, h: 3, maxLevels: 1,
+           colour: '#4fb8ff', build: buildPoliceStation, fx: policeFx },
   foundry: { name: 'Foundry', need: { ind: 60 }, odds: 50, w: 6, h: 4, maxLevels: 1,
            colour: '#ff8a2a', build: buildFoundry },
 };
@@ -288,7 +290,7 @@ if (location.hash.includes('dev')){
   let lastPointer = null;
   addEventListener('pointermove', e => { lastPointer = { x: e.clientX, y: e.clientY }; });
   addEventListener('keydown', e => {
-    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry' }[e.key.toLowerCase()]; if (!kind) return;
+    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police' }[e.key.toLowerCase()]; if (!kind) return;
     const pk = lastPointer ? pickAt(lastPointer.x, lastPointer.y) : null;
     const c = pk && pk.c ? pk.c : pk && pk.kind === 'sky' ? { i: pk.i, j: pk.j } : cells.values().next().value;
     if (megas.has(kind)) removeMega(megas.get(kind));
@@ -993,4 +995,159 @@ function buildFoundry(m){
   for (let k=0; k<12; k++) plant(pick(['vines','h_ivy','l_mossroots','pothos','h_curtain3']), P, rnd(-6.5, 4), CURB + rnd(3.0, 4.3), 1.85, rnd(.9, 1.2), 't', true);   // growth over the front pipes
   m.roofH = CURB + 4.6;
   m.top = CURB + 23.5;
+}
+
+/* ---------- the police station ---------- */
+// A civic building on a 3x3 block, after the reference: a pale two-storey block over a recessed, brightly lit
+// glass lobby, a glass curtain wall in the middle of the front, big framed screens on the facade showing the
+// city's wanted posters (cycling, with a projection glitch, see policeFx), the neon badge and a POLICE fascia, and
+// a cyan holographic ring looping round the whole building. A light bar flashes red and blue on the roof; patrol
+// cars, officers, a crossing and a traffic light out front.
+M.polWall = toon(0xd2d5da); M.polWall2 = toon(0xb6bac2); M.polDark = toon(0x2a3140); M.polFrame = toon(0x8e949e);
+M.polLobby = toon(0x7fc8e0, { em:0x9ae6ff, kind:'lamp' }); M.polScreen = toon(0x0c1622, { em:0x06202c, kind:'trim' });
+M.polCar = toon(0xe8ebef); M.polCarDark = toon(0x1c2230);
+const WANTED_N = 9, WANTED_W = 64, WANTED_H = 68;
+function policeCar(P, x, z, ry){
+  const Q = under(P, T(x, 0, z, ry));
+  box(M.polCar, Q, 0, .32, 0, 1.3, .26, .6); box(M.polCarDark, Q, -.05, .52, 0, .7, .18, .54); box(M.glassDark, Q, .32, .52, 0, .04, .14, .5);
+  box(M.polCarDark, Q, 0, .28, .305, 1.28, .08, .01); box(M.polCarDark, Q, 0, .28, -.305, 1.28, .08, .01);   // stripe
+  box(M.neonCyan, Q, 0, .2, .31, 1.2, .02, .01);
+  box(M.blink, Q, -.08, .64, -.12, .12, .05, .16); box(M.neonCyan, Q, -.08, .64, .12, .12, .05, .16);       // light bar
+  for (const [wx, wz] of [[-.4,.3],[.4,.3],[-.4,-.3],[.4,-.3]]) put(U.cyl16, M.frame, under(Q, T(wx, .14, wz, 0, .24, .06, .24, PI/2)));
+}
+function buildPoliceStation(m){
+  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  const P = T(m.x, 0, m.z, pick([0, PI/2, PI, -PI/2])), H = 3*LOT/2;   // the front faces local +z
+  // ---- ground: a street along the front with a crossing, pale paving round the building
+  box(G.asph, P, 0, .012, 0, 2*H, .025, 2*H);
+  for (let a=0;a<14;a++) for (let b=0;b<10;b++) box(pick(TILES.high), P, -H + .41 + a*.81, .03, -H + .4 + b*.82, .77, .045, .78);
+  box(G.asph2, P, 0, .03, H - 1.1, 2*H, .05, 2.2);                                                     // the street
+  for (let t = -H + .6; t < H; t += 1.2) box(G.line, P, t, .058, H - 1.1, .6, .01, .06);
+  for (let k=0; k<7; k++) box(M.white2, P, -3.6 + k*.32, .058, H - 1.1, .18, .01, 1.8);              // crossing
+  // ---- the building
+  const bx = 0, bz = -.9, bw = 9.4, bd = 6.6, gf = 2.2, top = 6.3, front = bz + bd/2;
+  box(M.polDark, P, bx, CURB + gf/2, bz - .4, bw - 1.0, gf, bd - .8);                                  // recessed ground floor
+  for (let t = -bw/2 + 1.1; t < bw/2 - .9; t += .9){                                                  // lit glass lobby along the front
+    box(M.polLobby, P, t + .45, CURB + 1.05, front - .78, .84, 1.9, .04); box(M.polFrame, P, t, CURB + 1.05, front - .76, .05, 1.95, .06); }
+  box(M.glassDark, P, -1.2, CURB + .9, front - .74, 1.4, 1.6, .03); box(M.polFrame, P, -1.2, CURB + .9, front - .72, .04, 1.6, .03);   // doors
+  for (const t of [-3.4, -1.2, 1.0, 3.2]){ cyl(M.polWall, P, t, CURB + gf/2, front - .1, .1, gf); }   // columns under the overhang
+  box(M.polScreen, P, 2.6, CURB + .7, front - .55, 1.8, .9, .1);                                     // reception desk screen
+  box(M.polWall2, P, 2.6, CURB + .4, front - .45, 2.0, .7, .5);
+  for (let t = -bw/2 + .6; t < bw/2 - .4; t += .8){ box(M.bulb, P, t, CURB + gf - .05, front - .3, .3, .03, .1); glow(P, t, CURB + gf - .2, front - .2, 'cyan', .7); }   // downlights in the soffit
+  // upper storeys: a pale box, ledge lines, a glass curtain wall in the middle of the front
+  box(M.polWall, P, bx, CURB + gf + (top - gf)/2, bz, bw, top - gf, bd);
+  box(M.polWall2, P, bx, CURB + gf + .05, bz, bw + .1, .12, bd + .1);
+  box(M.polWall2, P, bx, CURB + top + .12, bz, bw + .2, .24, bd + .2);                                // parapet cap
+  box(M.polLobby, P, -.2, CURB + 4.2, front + .02, 3.0, 3.4, .04);                                     // the curtain wall, lit cool from inside
+  for (let t = -1.7; t <= 1.31; t += .5) box(M.polFrame, P, t, CURB + 4.2, front + .05, .04, 3.4, .04);
+  for (let y = 2.8; y <= 5.8; y += .85) box(M.polFrame, P, -.2, CURB + y, front + .05, 3.0, .04, .04);
+  for (let k=0; k<10; k++) box(pick([M.polDark, M.polFrame, M.polScreen]), P, rnd(-1.5, 1.1), CURB + rnd(2.6, 5.6), front - .25, rnd(.2, .5), rnd(.2, .5), .1);   // silhouettes of people and desks inside
+  // framed screens on the facade (the posters themselves are added live in policeFx)
+  const screens = [];
+  const screen = (F, x, y, w, h) => {
+    box(M.polFrame, F, x, y, .12, w + .34, h + .34, .24);                                                // chamfered-looking frame: frame plus corner blocks
+    for (const [cx, cy] of [[-1,-1],[1,-1],[-1,1],[1,1]]) box(M.polWall2, F, x + cx*(w/2 + .12), y + cy*(h/2 + .12), .26, .22, .22, .06, 0, 0, PI/4);
+    box(M.polScreen, F, x, y, .25, w, h, .02);
+    box(M.neonCyan, F, x, y - h/2 - .08, .26, w*.6, .03, .02);                                         // a cyan strip under each
+    glow(F, x, y - h/2 - .08, .4, 'cyan', .8);                                                           // the strip's glow, not over the poster
+    const mt = under(F, T(x, y, .31)); screens.push({ m: mt.elements.slice(), w, h });   // in front of the panel (boxes are at least MIN_T thick)
+  };
+  const Ff = under(P, T(0, 0, front, 0)), Fr = under(P, T(bw/2, 0, bz, PI/2)), Fl = under(P, T(-bw/2, 0, bz, -PI/2));
+  screen(Ff, -3.35, CURB + 4.15, 2.0, 2.12);
+  screen(Ff, 3.1, CURB + 4.15, 2.3, 2.44);
+  screen(Fr, .4, CURB + 4.2, 2.6, 2.76);
+  screen(Fr, -2.2, CURB + 1.2, 1.2, 1.28);
+  screen(Fl, -.6, CURB + 4.2, 2.3, 2.44);
+  m.screens = screens;
+  // the badge and the POLICE fascia over the entrance
+  box(M.polDark, Ff, -1.2, CURB + 6.0, .1, 3.0, .7, .12);
+  plant('sign_policetext', Ff, -1.85, CURB + 6.0, .18, 1.1, 'c', true); glow(Ff, -1.85, CURB + 6.0, .4, 'cyan', 1.4);
+  plant('sign_police', Ff, -.25, CURB + 6.0, .18, .55, 'c', true); glow(Ff, -.25, CURB + 6.0, .4, 'blue', 1.6);
+  plant('sign_police', Fr, 2.6, CURB + 5.6, .05, .8, 'c', true); glow(Fr, 2.6, CURB + 5.6, .3, 'blue', 1.8);
+  // vents and service doors on the side, like the reference
+  box(M.polDark, Fr, -3.2, CURB + 1.0, .02, .9, 1.9, .04); box(M.polFrame, Fr, -3.2, CURB + 2.1, .06, 1.0, .1, .1);
+  for (let k=0; k<3; k++) box(M.polDark, Ff, -3.8 + k*.35, CURB + 6.05, .04, .25, .12, .03);
+  // the holographic ring: a cyan loop round the building at mid height, with glows along it
+  { const n = 64, rx = 6.4, rz = 4.9, tilt = .35;                                                   // a thin, slightly tilted ellipse of light
+    const pt = a => [bx + Math.cos(a)*rx, CURB + 3.4 + Math.sin(a)*tilt, bz + Math.sin(a)*rz];
+    for (let k=0; k<n; k++){ const [x0, y0, z0] = pt(k*TAU/n), [x1, y1, z1] = pt((k + 1)*TAU/n); strut(M.neonCyan, P, x0, y0, z0, x1, y1, z1, .035); }
+    for (let k=0; k<16; k++){ const [x, y, z] = pt(k*TAU/16); glow(P, x, y, z, 'cyan', .8); } }
+  // the roof: plant, a mast, a drone pad, the light bar (flashing, in policeFx)
+  const ry = CURB + top + .24;
+  box(M.metal, P, -2.8, ry + .3, -2.5, 1.2, .6, .9); box(M.metal, P, -1.2, ry + .25, -2.8, .8, .5, .7);
+  cyl(M.frame, P, 3.6, ry + 1.4, -3.4, .04, 2.8); beaconLight(P, 3.6, ry + 2.85, -3.4, .08, .8);
+  box(M.concDD, P, 2.2, ry + .03, -.6, 2.0, .06, 2.0); box(M.neonCyan, P, 2.2, ry + .07, -.6, 1.6, .01, .06); box(M.neonCyan, P, 2.2, ry + .07, -.6, .06, .01, 1.6);
+  box(M.polCarDark, P, 2.2, ry + .2, -.6, .4, .12, .4); for (const [qx, qz] of [[-.3,-.3],[.3,-.3],[-.3,.3],[.3,.3]]) put(U.cyl16, M.metal, under(P, T(2.2 + qx, ry + .28, -.6 + qz, 0, .32, .02, .32)));   // a docked police drone
+  box(M.polDark, P, 0, ry + .2, front - .5, 1.6, .2, .3);
+  m.lightbar = { m: under(P, T(0, ry + .38, front - .5)).elements.slice() };
+  // out front: patrol cars, officers, a traffic light, bollards, trees in planters
+  policeCar(P, 2.4, front + 1.2, 0); policeCar(P, -4.0, front + 1.25, PI);
+  for (const [x, z] of [[-2.2, front + .9], [-.4, front + .6], [.2, front + .7], [3.9, front + .5], [-3.2, front + .5]]){
+    const Q = under(P, T(x, 0, z)); box(M.polCarDark, Q, 0, CURB + .12, 0, .09, .24, .07); box(M.polCarDark, Q, 0, CURB + .29, 0, .07, .07, .07); box(M.neonCyan, Q, 0, CURB + .2, .036, .02, .02, .01); }
+  { const Q = under(P, T(4.6, 0, H - 2.3)); cyl(M.metalDark, Q, 0, 1.0, 0, .04, 2.0); box(M.metalDark, Q, -.5, 1.9, 0, 1.0, .05, .05);
+    box(M.polCarDark, Q, -.9, 1.75, 0, .16, .4, .14); box(M.blink, Q, -.9, 1.86, .08, .08, .08, .02); glow(Q, -.9, 1.86, .15, 'red', .8); }
+  for (let t = -H + .6; t < H - .3; t += 1.0) cyl(M.polWall2, P, t, CURB + .2, front + .2 + 1.65, .05, .4);   // bollards
+  for (const [x, z] of [[-H + .7, -H + .7], [H - .7, -H + .7], [-H + .7, front - .2], [H - .7, front - .2]]){
+    box(M.polWall2, P, x, .25, z, .8, .4, .8); plant(pick(['bonsai','bush','bushFlower']), P, x, .45, z, 1.2); }
+  m.roofH = ry;
+  m.top = ry + 3;
+}
+// Live parts of the station: the wanted posters on the facade screens, each cycling through the nine posters with
+// a slight projection glitch (scanlines, the odd jittering row, a soft colour fringe) and a stronger burst as it
+// changes; and the roof light bar flashing red and blue.
+let wantedTex = null;
+const WANTED_FRAG = `
+  uniform sampler2D map; uniform float frame, prevFrame, glitch, seed, time;
+  varying vec2 vUv;
+  const float NF = ${WANTED_N}.0; const vec2 SZ = vec2(${WANTED_W}.0, ${WANTED_H}.0);
+  float h(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y)*p3.z); }
+  vec4 tap(vec2 uv, float f){ if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return vec4(0.0); uv = (floor(uv*SZ) + .5)/SZ; return texture2D(map, vec2((f + uv.x)/NF, uv.y)); }
+  void main(){
+    vec2 uv = vUv; float row = floor(uv.y*SZ.y), band = floor(uv.y*12.0);
+    float g = max(glitch, .08);                                          // never quite steady: a projection
+    if (h(vec2(band, seed)) < g*.5) uv.x += floor((h(vec2(band, seed + 7.0)) - .5)*g*12.0)/SZ.x;
+    if (h(vec2(row, floor(time*9.0))) > .985) uv.x += 1.0/SZ.x;          // the odd jittering row
+    float f = (h(vec2(band, seed + 3.0)) < glitch*.5) ? prevFrame : frame;
+    float dx = (glitch > .2 ? 2.0 : 1.0)/SZ.x;
+    vec4 c = tap(uv, f), cr = tap(uv + vec2(dx, 0.0), f), cb = tap(uv - vec2(dx, 0.0), f);
+    vec3 col = c.rgb*c.a; col.r = max(col.r, cr.r*cr.a*.6); col.b = max(col.b, cb.b*cb.a*.6);
+    col *= 1.0 - .25*mod(row, 2.0);
+    col *= 1.0 - glitch*.5*step(.6, h(vec2(floor(time*40.0), seed)));
+    vec3 bg = vec3(.02, .07, .11);                                       // the screen behind the projection
+    gl_FragColor = vec4(bg + col*1.2, 1.0);
+  }`;
+function policeFx(m){
+  if (!wantedTex){ wantedTex = new THREE.TextureLoader().load('assets/sprites/wanted.png'); wantedTex.magFilter = wantedTex.minFilter = THREE.NearestFilter; wantedTex.generateMipmaps = false; }
+  const parts = [], screens = [];
+  (m.screens || []).forEach((sc, k) => {
+    const u = { map: { value: wantedTex }, frame: { value: (k*2) % WANTED_N }, prevFrame: { value: 0 }, glitch: { value: 0 }, seed: { value: k*13 }, time: { value: 0 } };
+    const mat = new THREE.ShaderMaterial({ uniforms: u, vertexShader: KOI_SHADER.vertexShader, fragmentShader: WANTED_FRAG });
+    const sw = Math.min(sc.w, sc.h*WANTED_W/WANTED_H), sh = sw*WANTED_H/WANTED_W;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), mat);
+    mesh.matrixAutoUpdate = false; mesh.matrix.fromArray(sc.m); mesh.matrixWorldNeedsUpdate = true; mesh.layers.set(1); mesh.renderOrder = 3;
+    scene.add(mesh); parts.push(mesh);
+    screens.push({ u, hold: 2 + k*1.3 + Math.random()*2, burst: 0, stray: 1 + Math.random()*3 });
+  });
+  // the light bar: a red and a blue lamp that alternate, each with a halo
+  const bar = new THREE.Group(); bar.matrix.fromArray(m.lightbar.m); bar.matrix.decompose(bar.position, bar.quaternion, bar.scale);
+  const mk = (col, x) => { const lm = new THREE.MeshBasicMaterial({ color: col }); const b = new THREE.Mesh(new THREE.BoxGeometry(.5, .14, .24), lm); b.position.x = x;
+    const s2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); s2.scale.set(2.2, 2.2, 1); s2.position.x = x;
+    b.layers.set(1); s2.layers.set(1); bar.add(b, s2); return { b, s2, lm }; };
+  const red = mk(0xff2030, -.32), blue = mk(0x2a6cff, .32);
+  scene.add(bar); parts.push(bar);
+  return {
+    update(dt, time){
+      for (const s of screens){
+        s.u.time.value = time; s.hold -= dt; s.stray -= dt;
+        if (s.hold <= 0){ s.u.prevFrame.value = s.u.frame.value; s.u.frame.value = (s.u.frame.value + 1 + Math.floor(Math.random()*3)) % WANTED_N; s.hold = 4 + Math.random()*3; s.burst = .3; }
+        if (s.stray <= 0){ s.burst = Math.max(s.burst, .08 + Math.random()*.08); s.stray = 2 + Math.random()*4; }
+        s.burst = Math.max(0, s.burst - dt);
+        s.u.glitch.value = s.burst > 0 ? Math.min(1, s.burst*4)*(.5 + .5*Math.random()) : 0;
+        if (s.burst > 0 && Math.random() < .5) s.u.seed.value = Math.floor(Math.random()*997);
+      }
+      const ph = (time*2.2) % 2, a = ph < 1, flash = (time*14) % 1 < .6;   // alternate, with a quick double-flash
+      red.b.visible = red.s2.visible = a && flash; blue.b.visible = blue.s2.visible = !a && flash;
+    },
+    dispose(){ for (const p of parts){ scene.remove(p); p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material){ o.material.dispose(); } }); } }
+  };
 }

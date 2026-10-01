@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="css/style.css?v=2026-10-01pm">
+<link rel="stylesheet" href="css/style.css?v=2026-10-01pn">
 </head>
 <body>
 
@@ -18,6 +18,12 @@
   <div class="brand"><span class="n-neon">NEON</span> <span class="n-terra">TERRARIUM</span></div>
   <div class="readout" id="readout">15:30 · Day</div>
 </div>
+
+<!-- the radio: appears once the radio station stands; shows the song; click for the next tape -->
+<button id="tapedeck" class="tapedeck" aria-hidden="true" title="Radio: click for the next tape">
+  <span class="tape"><img src="assets/ui/cassette.png" alt="" width="118" height="88"><i class="reel l"></i><i class="reel r"></i></span>
+  <span class="tapeinfo"><small>On air</small><span class="tapeline" id="tapeLine"><b id="tapeTitle">Loading tapes...</b></span><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span></span>
+</button>
 
 <button id="deckToggle" class="deck-toggle" aria-expanded="false" aria-controls="deck">Settings</button>
 
@@ -70,6 +76,7 @@
 
   <section>
     <h2>Sound</h2>
+    <div class="slider stack"><label for="musicVol">Music <small>plays once the radio station is built</small></label><input type="range" id="musicVol" min="0" max="1" step="0.05" value="0.6"><output id="musicVolOut">60%</output></div>
     <div class="slider stack"><label for="sfxVol">Sound effects <small>building and removing</small></label><input type="range" id="sfxVol" min="0" max="1" step="0.05" value="0.8"><output id="sfxVolOut">80%</output></div>
   </section>
 
@@ -101,17 +108,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <!-- ?v= makes browsers fetch fresh copies after an update; change it with every release -->
-<script src="js/core.js?v=2026-10-01pm"></script>
-<script src="js/sprites.js?v=2026-10-01pm"></script>
-<script src="js/buildings.js?v=2026-10-01pm"></script>
-<script src="js/ground.js?v=2026-10-01pm"></script>
-<script src="js/vehicles.js?v=2026-10-01pm"></script>
-<script src="js/sky.js?v=2026-10-01pm"></script>
-<script src="js/audio.js?v=2026-10-01pm"></script>
-<script src="js/world.js?v=2026-10-01pm"></script>
-<script src="js/mega.js?v=2026-10-01pm"></script>
-<script src="js/people.js?v=2026-10-01pm"></script>
-<script src="js/input.js?v=2026-10-01pm"></script>
-<script src="js/main.js?v=2026-10-01pm"></script>
+<script src="js/core.js?v=2026-10-01pn"></script>
+<script src="js/sprites.js?v=2026-10-01pn"></script>
+<script src="js/buildings.js?v=2026-10-01pn"></script>
+<script src="js/ground.js?v=2026-10-01pn"></script>
+<script src="js/vehicles.js?v=2026-10-01pn"></script>
+<script src="js/sky.js?v=2026-10-01pn"></script>
+<script src="js/audio.js?v=2026-10-01pn"></script>
+<script src="js/world.js?v=2026-10-01pn"></script>
+<script src="js/mega.js?v=2026-10-01pn"></script>
+<script src="js/people.js?v=2026-10-01pn"></script>
+<script src="js/music.js?v=2026-10-01pn"></script>
+<script src="js/input.js?v=2026-10-01pn"></script>
+<script src="js/main.js?v=2026-10-01pn"></script>
 </body>
 </html>

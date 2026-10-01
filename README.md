@@ -54,7 +54,10 @@ js/main.js              start-up and the frame loop
 assets/sprites/         sprite PNGs at true pixel size (one file per sprite; the name is the sprite's id)
 assets/sprites/people.png  the people atlas: 12 characters, one 16 px row each, 6 walk + 4 idle frames of 12 px
 docs/people.md          the people system: how it works, plan and progress
-assets/audio/music/     music (coming next)
+assets/audio/music/     the music library the radio plays (see the README in that folder)
+assets/ui/cassette.png  the radio's cassette (from the neon sign sheet)
+js/music.js             the radio: music while the radio station stands, the cassette with the song name
+tools/make_playlist.py  optional: writes assets/audio/music/playlist.json (track order, nicer titles)
 assets/audio/sfx/       sound effects: place.wav (build pop), remove.wav (removal thud), radio-on.wav (radio station arrives)
 assets/audio/sfx/originals/  the untouched source recordings, for re-editing
 ```
@@ -72,6 +75,9 @@ koi, the drone, the screens) switch on at the end.
 - **Radio station:** arrives with the 20th building, of any zone (each built plot counts once; stacking doesn't
   add to it), on free ground near that build. Right-click removes it; with 20 or
   more buildings standing, the next build brings it back.
+  While it stands, the radio plays the music in assets/audio/music/, shuffled, fading in slowly once the station has
+  fully arrived. A neon cassette appears under the title showing the song; click it for the next tape. Removing
+  the station stops the music. Music volume is in Settings, Sound.
 - **Sky mall:** a 3x2 block (either way round). Unlocks at 50 luxury and 30 industrial sections, then a 1 in 50
   chance per build. An octagonal white-and-gold mall on white columns, each side one sheet of glass looking into
   an open atrium with walkways and boutiques round a central core; the roof is mostly pool under a white canopy.

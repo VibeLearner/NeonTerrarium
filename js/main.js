@@ -12,7 +12,8 @@ function frame(now){
   const dt = Math.min(.05, (now-last)/1000);
   // day and night cycle: 24 game hours per real hour. Real elapsed time (up to a second, so a slow frame rate
   // doesn't slow the day), and none while the tab is hidden.
-  if (S.cycle) S.hour = (S.hour + Math.min(1, (now-last)/1000)*24/3600) % 24;
+  const rdt = Math.min(1, (now-last)/1000);   // real time passed (fades and the day cycle shouldn't slow with the frame rate)
+  if (S.cycle) S.hour = (S.hour + rdt*24/3600) % 24;
   last = now;
   const night = applyTime();
   syncTimeUI();
@@ -23,6 +24,7 @@ function frame(now){
   updateAnims(dt);
   updateMegaFx(dt, now/1000);
   updatePeople(dt, now/1000);
+  music.update(rdt);
   updateSteam(dt, night);
   updateRain(dt);
   // wind pushes the clouds: they drift faster in a strong wind and nearly stop when it's calm

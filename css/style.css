@@ -79,3 +79,34 @@ input[type=range]{width:100%;accent-color:var(--cyan);margin:0}
   .zone .zin{min-width:0;padding:7px 10px}
   .zone b{font-size:12px}
 }
+
+/* the radio: a neon cassette with the song beside it, top left under the title; fades in with the radio station */
+.tapedeck{position:fixed;left:16px;top:calc(62px + env(safe-area-inset-top,0px));display:flex;align-items:center;gap:10px;padding:8px 12px 8px 8px;
+  background:rgba(14,10,24,.82);border:1px solid rgba(214,92,255,.55);border-radius:4px;color:var(--ink);font:inherit;text-align:left;cursor:pointer;
+  box-shadow:0 0 12px rgba(190,70,255,.25),inset 0 0 10px rgba(190,70,255,.12);
+  opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity 2.5s ease,transform 2.5s ease,border-color .2s}
+.tapedeck.live{opacity:1;transform:none;pointer-events:auto}
+.tapedeck:hover{border-color:#e78bff}
+.tapedeck:focus-visible{outline:1px solid var(--cyan);outline-offset:2px}
+.tape{position:relative;width:118px;height:88px;flex:none}
+.tape img{display:block;width:118px;height:88px;image-rendering:pixelated;filter:drop-shadow(0 0 3px rgba(222,100,255,.9)) drop-shadow(0 0 9px rgba(190,70,255,.55))}
+/* the reels' spokes turn while a song plays */
+.reel{position:absolute;top:35px;width:8px;height:8px;animation:reelspin 1.4s steps(8) infinite;animation-play-state:paused}
+.reel.l{left:30px}.reel.r{left:79px}
+.reel::before,.reel::after{content:"";position:absolute;left:3px;top:0;width:2px;height:8px;background:#f2a6ff;box-shadow:0 0 3px #d35cff}
+.reel::after{transform:rotate(90deg)}
+.tapedeck.playing .reel{animation-play-state:running}
+@keyframes reelspin{to{transform:rotate(360deg)}}
+.tapeinfo{display:grid;gap:4px;min-width:0}
+.tapeinfo small{font-family:var(--font-pixel);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#ff6fb8;text-shadow:0 0 6px rgba(255,79,163,.7)}
+.tapeline{display:block;width:170px;overflow:hidden;white-space:nowrap}
+.tapeline b{display:inline-block;font-family:var(--font-pixel);font-weight:400;font-size:12px;letter-spacing:.04em;color:#f6d6ff;text-shadow:0 0 6px rgba(214,92,255,.85)}
+.tapeline b.scroll{animation:tapescroll 14s ease-in-out infinite}
+@keyframes tapescroll{0%,15%{transform:translateX(0)}50%,65%{transform:translateX(var(--scroll))}100%{transform:translateX(0)}}
+.eq{display:flex;align-items:flex-end;gap:2px;height:10px}
+.eq i{width:3px;height:2px;background:#38E8E0;box-shadow:0 0 4px rgba(56,232,224,.7)}
+.tapedeck.playing .eq i{animation:eqbar .9s ease-in-out infinite alternate}
+.eq i:nth-child(2){animation-delay:-.3s}.eq i:nth-child(3){animation-delay:-.6s}.eq i:nth-child(4){animation-delay:-.15s}.eq i:nth-child(5){animation-delay:-.45s}
+@keyframes eqbar{from{height:2px}to{height:10px}}
+@media (max-width:560px){.tapedeck{transform-origin:top left;scale:.85}.tapeline{width:120px}}
+@media (prefers-reduced-motion:reduce){.reel,.tapeline b.scroll,.tapedeck.playing .eq i{animation:none}}

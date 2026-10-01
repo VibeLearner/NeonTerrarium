@@ -10,14 +10,17 @@ Code: `js/people.js`. Sprites: `assets/sprites/people.png`.
 | 1 | Sprite people, sidewalk network, walking door to door | Done |
 | 2 | Households, jobs, daily routines tied to the hour; fewer people out at night | Done |
 | 2b | Real doors that slide open and shut; walking that never clips buildings, furniture or plants | Done |
-| 3 | Eating at the carts, sitting on benches, stopping to talk | Not started |
+| 3 | Stall keepers, queueing and eating at the food stalls, sitting on benches and stools, stopping to chat | Done |
 | 4 | Delivery robots on the sidewalks, bumping into each other, reactions with emote icons | Not started |
 | 5 | Dark streets and muggings, police patrols, an event log for the radio RJ | Not started |
 
 ## How it works
 
-**Sprites.** One atlas, 12 characters (Craftpix townspeople and city men packs), one 16 px row each:
-6 walk frames then 4 idle frames, 12 px wide, facing right (mirrored for walking left). All visible people are
+**Sprites.** One atlas, 12 characters (Craftpix townspeople and city men packs), one 16 px row each, 20 cells
+of 12 px, facing right (mirrored for facing left): 6 walk, 4 idle, 6 gesture, 4 sitting. Gestures come from the
+pack's Special sheets (scaled to match the rest; the five characters that have one), used for chatting, ordering
+and serving; the others sway through their idle frames instead. Sitting frames are made from the idle frames:
+the body drops a pixel and the legs fold forward. All visible people are
 one instanced draw call. They stand upright to the screen and snap to whole render pixels, like the plants,
 and dissolve in a pixel dither when they step through a door.
 
@@ -45,8 +48,21 @@ Doors are drawn in three instanced batches (frame, lit hallway, sliding panel in
 slides open in a fifth of a second when someone is about to come out or go in, and closes behind them. People
 dissolve in the doorway as they cross the threshold.
 
-**Places.** Every building is a place. The town square is an open place with standing spots round the koi
-pond, one person per spot, picked on the side they arrive from.
+**Places.** Every building is a place. Open places have spots instead of doors, one person per spot:
+- **The town square.** The little box figures that used to stand in the square are gone; where they stood is
+  noted while the square is built (stall keepers behind the counters, queues in front, the crowd round the pond,
+  every cafe stool) and real people fill those spots. Each of the 14 food stalls has a keeper: the square's jobs
+  are its stalls, and if nobody in town is looking for work, people living nearest swap their job for one. Half
+  work the day market (10:00 to 17:30), half the night market (16:30 to midnight), so a stall is only open while
+  its keeper is at the counter.
+- **Benches.** Sidewalk benches and plaza benches have two seats each; every plot with one is a small place to
+  sit for a while.
+
+**What people do there.** A square visitor usually queues at an open stall (gesturing as they order while the
+keeper serves), then takes their food to a cafe stool or a spot to stand. Otherwise they stand somewhere, often
+right next to someone, and the two face each other and chat with gestures. Seats get the sitting frames. Each
+spot is reached from the nearest clear point of the walking map, and the last little step onto a seat or behind a
+counter is taken from there.
 
 **Residents.** Seeded from each building section, so the same people always live in the same building.
 Residential sections house 4 to 8, commercial 2 to 3, luxury 3 to 5, industrial none.
@@ -82,9 +98,9 @@ Rough numbers on a 7x7 test island (half plazas): 89 people; at 12:30 up to 57 w
 
 - Building the maps for a whole city at load takes about 2 ms a plot (more on a slow machine). Edits only
   redo the plots they touch.
-- The small box figures baked into the square's queues and the foundry are a smaller scale than the sprites.
-  Step 3 should replace them with sprite people queuing and eating.
-- Square visitors stand still (idle animation). Sitting on the ring bench and talking come in step 3.
+- The small box figures at the foundry's loading dock are still there, at a smaller scale than the sprites.
+- Chatting happens between people standing next to each other in the square; people passing on the street don't
+  stop to talk yet.
 - No collision between walkers yet: two people can pass through each other on a narrow path.
 - People walk on the street band more than the sidewalk: the sidewalk round most buildings is too narrow for a
   person with clearance.

@@ -178,3 +178,14 @@ function sph(mat,P,x,y,z,r,sy=1){ put(U.sph, mat, under(P, T(x,y,z,0,2*r,2*r*sy,
 function blob(mat,P,x,y,z,r,sy=1){ put(U.blob, mat, under(P, T(x,y,z,rnd(0,TAU),2*r,2*r*sy,2*r,rnd(0,1)))); }
 
 let city = null, glowGroup = null, emitters = [];
+// Places where people can stand or sit (bench seats, stall keepers' and customers' spots), noted while a piece is
+// generated: world position, which way they face, and what kind of spot it is. See people.js.
+let curSpots = null;
+const _sv = new THREE.Vector3(), _sd = new THREE.Vector3();
+function spotAt(P, x, y, z, kind, stall = null, face = [0, 1]){
+  if (!curSpots) return;
+  _sv.set(x, y, z).applyMatrix4(P);
+  const fl = face === 'origin' ? [-x, -z] : face;   // 'origin': facing the middle of P (a cart, a table)
+  _sd.set(fl[0], 0, fl[1]).transformDirection(P);
+  curSpots.push({ x: _sv.x, y: _sv.y, z: _sv.z, fx: _sd.x, fz: _sd.z, kind, stall });
+}

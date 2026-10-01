@@ -100,7 +100,7 @@ function groundLot(lot){
     if (!chance(.55*S.clutter+.1)) continue;
     const Pc = under(P, T(sx*(SIDE/2-.17), top+.02, sz*(SIDE/2-.17), pick([0, PI/2])));
     const r = R();
-    if (r < .2){ box(M.wood, Pc, 0, .14, 0, .4, .04, .14); box(M.frame, Pc, 0, .07, 0, .34, .14, .1); box(M.wood, Pc, 0, .24, -.06, .4, .12, .03); }   // bench
+    if (r < .2){ box(M.wood, Pc, 0, .14, 0, .4, .04, .14); box(M.frame, Pc, 0, .07, 0, .34, .14, .1); box(M.wood, Pc, 0, .24, -.06, .4, .12, .03); for (const sx of [-.1, .1]) spotAt(Pc, sx, .16, .01, 'seat', null, [0, 1]); }   // bench
     else if (r < .4){ box(M.concD, Pc, 0, .1, 0, .3, .2, .3); plant(pick(['bush','bushFlower','g_fern2','fern']), Pc, 0, .2, 0, rnd(.55,.75)); }  // planter
     else if (r < .55){ cyl(pick([M.corrBlue, M.teal2, M.frame]), Pc, 0, .13, 0, .08, .26); box(M.frame, Pc, 0, .27, 0, .18, .02, .18); }      // bin
     else if (r < .7){ for (const x of [-.12,0,.12]) box(M.metal, Pc, x, .1, 0, .03, .2, .2); }                                            // bike rack

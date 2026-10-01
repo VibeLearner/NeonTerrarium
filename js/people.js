@@ -14,9 +14,11 @@
 //   The hour is the one set in Settings, so a night city is quiet and a daytime one is busy.
 
 /* ---------- the sprite sheet ---------- */
-// assets/sprites/people.png: one character per 16 px row, 10 cells of 12 px each: 6 walk frames then 4 idle
-// frames, facing right (mirrored for walking left). Feet sit on the bottom row of the cell.
-const PPL = { rows: 12, cw: 12, ch: 16, walk: 6, idle: 4, W: 120, H: 192 };
+// assets/sprites/people.png: one character per 16 px row, 20 cells of 12 px each, facing right (mirrored for
+// facing left), feet on the bottom row: 6 walk frames, 4 idle, 6 gesture (talking, ordering, serving; characters
+// without their own gesture sheet sway through their idle frames) and 4 sitting.
+const PPL = { rows: 12, cw: 12, ch: 16, walk: 6, idle: 4, W: 240, H: 192 };
+const F_IDLE = 6, F_SPEC = 10, F_SIT = 16;
 const PPL_TEX = new THREE.TextureLoader().load('assets/sprites/people.png');
 PPL_TEX.magFilter = PPL_TEX.minFilter = THREE.NearestFilter; PPL_TEX.generateMipmaps = false;
 const PPL_MAX = 700;          // most people drawn at once (the nearest win if more are out)
@@ -322,7 +324,7 @@ const ZONE_LIFE = {
 const MEGA_LIFE = {
   radio:   { jobs: 6,  fun: 0,  night: .3 },
   mall:    { jobs: 8,  fun: 9 },              // per tier
-  square:  { jobs: 6,  fun: 12, open: true },
+  square:  { jobs: 0,  fun: 40, open: true },   // one stall keeper per food stall (see below)
   police:  { jobs: 8,  fun: 0,  night: .4 },
   foundry: { jobs: 14, fun: 0,  night: .35 },
 };
@@ -352,6 +354,34 @@ function plotDoor(c, sides, maxIn){
     c._pd = { src: G.src, sig, door: found };
   }
   return c._pd.door;
+}
+// Spots where people stand or sit. Each is reached from the nearest clear point of the walking map (its approach,
+// a network node); the last little step onto a seat or behind a counter is taken from there. Spots crowding an
+// earlier one are dropped, so two people never stand in each other.
+function approachFor(G, x, z, fx, fz){
+  if (freeAt(G, x, z)) return { x, z };
+  const cx = gIdx(x - G.x0, PN, PR), cz = gIdx(z - G.z0, PN, PR); let best = null, bd = Infinity;
+  for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++){
+    const X = cx + dx, Z = cz + dz; if (X < 0 || Z < 0 || X >= PN || Z >= PN || !G.free[Z*PN + X]) continue;
+    const wx = G.x0 + (X + .5)*PR, wz = G.z0 + (Z + .5)*PR, d2 = (wx - x)**2 + (wz - z)**2;
+    if (d2 > .64) continue;
+    const sc = d2 - .2*((wx - x)*fx + (wz - z)*fz);   // rather in front of a seat than behind it
+    if (sc < bd){ bd = sc; best = { x: wx, z: wz }; }
+  }
+  return best;
+}
+function makeSpots(pl, list, inside, oldSpots, addEnd){
+  list.forEach((r, n) => {
+    if (pl.spots.some(o => Math.hypot(o.x - r.x, o.z - r.z) < .34)) return;
+    const c = cells.get(ckey(Math.round(r.x/LOT), Math.round(r.z/LOT))); if (!inside(c)) return;
+    const ap = approachFor(cellGrid(c), r.x, r.z, r.fx, r.fz); if (!ap) return;
+    const key = 's:' + pl.id + ':' + n, old = oldSpots.get(key), nk = 'a:' + Math.round(ap.x*100) + ',' + Math.round(ap.z*100);
+    const sp = { key, x: r.x, y: r.y, z: r.z, ax: ap.x, az: ap.z, node: ngAdd(nk, ap.x, ap.z), kind: r.kind, stall: r.stall, face: [r.fx, r.fz],
+                 by: old ? old.by : null, place: pl.id, near: [] };
+    pl.spots.push(sp); spotByKey.set(key, sp); addEnd(c, { key: nk, x: ap.x, z: ap.z, kind: 's' });
+  });
+  // who could chat with whom: standing spots close together
+  for (const a of pl.spots) if (a.kind === 'stand') for (const b of pl.spots) if (b !== a && b.kind === 'stand' && Math.hypot(a.x - b.x, a.z - b.z) < .8) a.near.push(b);
 }
 // Rebuild the network, the places and their doors after an edit. Unchanged plots reuse their cached maps and paths.
 function buildNetwork(){
@@ -387,19 +417,27 @@ function buildNetwork(){
     if (d){ const key = 'd:' + c.i + ',' + c.j; doors.push(makeDoor(key, d, false, oldDoors.get(key))); addEnd(c, { key, x: d.stand.x, z: d.stand.z, kind: 'd' }); }
     fresh.set('c:' + c.i + ',' + c.j, { id: 'c:' + c.i + ',' + c.j, cell: c, x: c.x, z: c.z, jobs, fun, night, doors });
   }
+  // benches round the city: a little place to sit for a while
+  for (const c of cells.values()){
+    if (c.mega || !c.data || !c.data.spots || !c.data.spots.length) continue;
+    const pl = { id: 'b:' + c.i + ',' + c.j, bench: true, x: c.x, z: c.z, jobs: 0, fun: 0, night: 0, open: true, doors: [], spots: [] };
+    makeSpots(pl, c.data.spots, q => q === c, oldSpots, addEnd);
+    pl.fun = .25*pl.spots.length;
+    if (pl.spots.length) fresh.set(pl.id, pl);
+  }
   for (const m of megas.values()){
     const L = MEGA_LIFE[m.kind] || { jobs: 4, fun: 0 }, tiers = m.kind === 'mall' ? m.levels : 1;
     const pl = { id: 'm:' + m.kind, mega: m, x: m.x, z: m.z, jobs: L.jobs*tiers, fun: L.fun*tiers, night: L.night || 0, open: !!L.open, doors: [], spots: [] };
     if (L.open){
-      // standing spots round the koi pond, between the bench and the food carts, wherever there's room
-      for (const [ri, r] of [POND_R + 1.05, POND_R + 1.5].entries()) for (let k = 0; k < 40; k++){
-        const a = (k + ri*.5)/40*TAU, x = m.x + Math.cos(a)*r, z = m.z + Math.sin(a)*r;
-        const c = cells.get(ckey(Math.round(x/LOT), Math.round(z/LOT)));
-        if (!c || c.mega !== m.kind || !freeAt(cellGrid(c), x, z)) continue;
-        const key = 's:' + ri + ',' + k, old = oldSpots.get(key);
-        const sp = { key, x, z, node: ngAdd(key, x, z), by: old ? old.by : null, place: pl.id };
-        pl.spots.push(sp); spotByKey.set(key, sp); addEnd(c, { key, x, z, kind: 's' });
+      // the spots noted while the square was built: the crowd, cafe stools, queues and stall keepers' places
+      makeSpots(pl, m.data ? m.data.spots : [], c => c && c.mega === m.kind, oldSpots, addEnd);
+      pl.stalls = new Map();
+      for (const sp of pl.spots) if (sp.stall !== null && sp.stall !== undefined){
+        let st = pl.stalls.get(sp.stall); if (!st) pl.stalls.set(sp.stall, st = { id: sp.stall, keepers: [], queue: [] });
+        (sp.kind === 'vendor' ? st.keepers : st.queue).push(sp);
       }
+      for (const [k, st] of pl.stalls) if (!st.keepers.length || !st.queue.length) pl.stalls.delete(k);
+      pl.jobs = pl.stalls.size;
     } else {
       // doors on the walls that face the street, up to three, spread round the building
       const cand = [];
@@ -419,10 +457,10 @@ function buildNetwork(){
   for (const c of cells.values()){
     const ends = [];
     for (const [dx, dz] of SIDES4){ const p = cross.get(crossKey(c, dx, dz)); if (p) ends.push(p); }
-    for (const e of plotEnds.get(ckey(c.i, c.j)) || []) ends.push(e);
+    for (const e of plotEnds.get(ckey(c.i, c.j)) || []) if (!ends.some(o => o.key === e.key)) ends.push(e);
     if (ends.length < 2) continue;
     // a closed megastructure's plot only links its doors to the street, never street to street through the building
-    plotEdges(c, ends, closedMega(c) ? (a, b) => (a.kind === 'd') !== (b.kind === 'd') : (a, b) => !(a.kind === 's' && b.kind === 's'));
+    plotEdges(c, ends, closedMega(c) ? (a, b) => (a.kind === 'd') !== (b.kind === 'd') : () => true);
   }
   places.clear(); for (const [k, v] of fresh) places.set(k, v);
   rebuildDoorMeshes();
@@ -512,9 +550,8 @@ function syncJobs(){
     used.set(p.job, (used.get(p.job) || 0) + 1);
   }
   const open = [...places.values()].filter(pl => pl.jobs > (used.get(pl.id) || 0) && reachable(pl));
-  if (!open.length) return;
   const seekers = [...people.values()].filter(p => !p.job && p.wantsJob).sort((a, b) => a.id < b.id ? -1 : 1);
-  for (const p of seekers){
+  for (const p of open.length ? seekers : []){
     const home = places.get(p.home); if (!home) continue;
     const rr = mulberry32(hash(p.id, 'job', open.length));
     let tot = 0; const w = open.map(pl => { const free = pl.jobs - (used.get(pl.id) || 0); const v = free > 0 && pl.id !== p.home ? free/(1 + Math.hypot(pl.x - home.x, pl.z - home.z)/12) : 0; tot += v; return v; });
@@ -522,6 +559,25 @@ function syncJobs(){
     let r = rr()*tot, k = 0; while (k < w.length - 1 && (r -= w[k]) > 0) k++;
     p.job = open[k].id; used.set(p.job, (used.get(p.job) || 0) + 1);
   }
+  // the stalls are always staffed: if nobody's looking for work, people living nearby swap their job for one
+  const sq = places.get('m:square');
+  if (sq){
+    let need = sq.jobs - [...people.values()].filter(p => p.job === sq.id).length;
+    if (need > 0){
+      const near = [...people.values()].filter(p => p.job !== sq.id && p.wantsJob && places.get(p.home))
+        .sort((a, b) => { const ha = places.get(a.home), hb = places.get(b.home); return Math.hypot(ha.x - sq.x, ha.z - sq.z) - Math.hypot(hb.x - sq.x, hb.z - sq.z) || (a.id < b.id ? -1 : 1); });
+      for (const p of near){ if (need <= 0) break; p.job = sq.id; need--; }
+    }
+  }
+  assignStalls();
+}
+// each of the square's workers keeps one stall; half work the day market, half the night market
+function assignStalls(){
+  const sq = places.get('m:square');
+  const staff = [...people.values()].filter(p => sq && p.job === sq.id).sort((a, b) => a.id < b.id ? -1 : 1);
+  const ids = sq ? [...sq.stalls.keys()].sort((a, b) => a - b) : [];
+  staff.forEach((p, k) => { p.stall = ids[k % ids.length]; });
+  for (const p of people.values()) if (!sq || p.job !== sq.id) p.stall = null;
 }
 
 /* ---------- routines ---------- */
@@ -530,13 +586,16 @@ function asleep(p, h){
   if (p.job && p.nightWorker) return hrange(8.5, 15.5)(h);
   return !hrange(p.wake, p.bed)(h);
 }
-function working(p, h){ return !!p.job && hrange(p.ws, (p.ws + p.workLen) % 24)(h); }
+function working(p, h){ return !!p.job && hrange(p.ws, (p.ws + (p.wlen || p.workLen)) % 24)(h); }
 function desire(p, h){
   const job = p.job && places.get(p.job);
   p.nightWorker = !!(job && job.night && p.nightShift < job.night);
-  p.ws = p.nightWorker ? 21 + p.nightShift*4 : p.workS;
-  if (asleep(p, h)) return p.home;
+  p.ws = p.nightWorker ? 21 + p.nightShift*4 : p.workS; p.wlen = p.workLen;
+  if (job && job.stalls){ p.ws = p.nightShift < .5 ? 16.5 : 10; p.wlen = 7.5; }   // day market 10:00 to 17:30, night market 16:30 to midnight
+  if (p.chain && !asleep(p, h) && !working(p, h)) return p.at;   // finish what they started (ordered food: now eat it)
+  if (asleep(p, h) && !working(p, h)) return p.home;              // (a night-market shift runs past some keepers' usual bedtime)
   if (working(p, h)){
+    if (job && job.stalls) return p.job;   // stall keepers stay at their counter all shift
     if (h >= 12 && h < 13.5 && !p.nightWorker && pplRand() < .3) return leisure(p) || p.job;   // out for lunch
     return p.courier ? errand(p) : p.job;
   }
@@ -561,16 +620,38 @@ function errand(p){
 // how long they stay once they arrive (real seconds: the city's clock stands still, so this is pacing, not hours)
 function stayFor(p, pl){
   if (p.walkedFor === 'errand') return 3 + pplRand()*6;
+  if (p.spot && p.spot.kind === 'queue') return 6 + pplRand()*7;     // ordering
+  if (p.spot && p.spot.kind === 'seat') return 25 + pplRand()*45;
+  if (p.spot && pl.stalls && p.spot.kind === 'stand') return 30 + pplRand()*60;   // hanging out in the square
   if (pl.id === p.home) return 25 + pplRand()*60;
   if (pl.id === p.job) return 50 + pplRand()*100;
   return 15 + pplRand()*45;
 }
 const pplRand = Math.random;   // moment-to-moment choices; who people are is seeded above
-// a free standing spot, near the side they arrive from
-function pickSpot(to, from){
-  const free = to.spots.filter(sp => !sp.by); if (!free.length) return null;
-  free.sort((a, b) => Math.hypot(a.x - from.x, a.z - from.z) - Math.hypot(b.x - from.x, b.z - from.z));
-  return free[Math.floor(pplRand()*Math.min(6, free.length))];
+// stalls with their keeper standing at the counter right now
+const stallOpen = st => st.keepers.some(sp => { const q = sp.by && people.get(sp.by); return q && !q.walk && q.spot === sp; });
+const freeOf = list => list.filter(sp => !sp.by);
+const nearPick = (list, x, z, n = 6) => { if (!list.length) return null; list.sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z)); return list[Math.floor(pplRand()*Math.min(n, list.length))]; };
+// where in an open place this person goes: their own counter if they keep a stall, a queue at an open stall, a
+// seat or a spot to stand (often next to someone, to chat)
+function pickSpot(to, from, p){
+  if (to.bench) return nearPick(freeOf(to.spots), from.x, from.z, 3);
+  if (p && to.stalls){
+    if (p.job === to.id && p.stall !== null && working(p, S.hour)){ const st = to.stalls.get(p.stall); const k = st && freeOf(st.keepers)[0]; if (k) return k; }
+    if (p.chain === 'eat'){
+      const seat = pplRand() < .6 ? nearPick(freeOf(to.spots.filter(sp => sp.kind === 'seat')), p.x, p.z, 4) : null;
+      return seat || nearPick(freeOf(to.spots.filter(sp => sp.kind === 'stand')), p.x, p.z, 4);
+    }
+    if (pplRand() < .6){
+      const qs = []; for (const st of to.stalls.values()) if (stallOpen(st)) qs.push(...freeOf(st.queue));
+      const q = nearPick(qs, from.x, from.z, 5); if (q) return q;
+    }
+    const stands = freeOf(to.spots.filter(sp => sp.kind === 'stand'));
+    if (pplRand() < .5){ const social = stands.filter(sp => sp.near.some(o => o.by)); if (social.length) return nearPick(social, from.x, from.z, 8); }
+    if (pplRand() < .3){ const seat = nearPick(freeOf(to.spots.filter(sp => sp.kind === 'seat')), from.x, from.z, 8); if (seat) return seat; }
+    return nearPick(stands, from.x, from.z, 8);
+  }
+  return nearPick(freeOf(to.spots.filter(sp => sp.kind !== 'vendor' && sp.kind !== 'queue')), from.x, from.z, 6);
 }
 
 /* ---------- walking ---------- */
@@ -580,10 +661,10 @@ function startTrip(p, toId){
   const from = places.get(p.at), to = places.get(toId);
   if (!from || !to || !reachable(to)) return false;
   let a, head = [], dA = null;
-  if (p.spot) a = p.spot.node;
+  if (p.spot){ a = p.spot.node; head = [[p.spot.x, p.spot.z], [p.spot.ax, p.spot.az]]; }   // up off the seat, out from the counter
   else { if (!from.doors.length) return false; dA = nearestOf(from.doors, to.x, to.z); a = dA.node; head = [[dA.inside.x, dA.inside.z], [dA.wall.x, dA.wall.z]]; }
   let b, tail = [], dB = null, spot = null;
-  if (to.open){ spot = pickSpot(to, from); if (!spot) return false; b = spot.node; }
+  if (to.open){ spot = pickSpot(to, from, p); if (!spot || spot === p.spot) return false; b = spot.node; tail = [[spot.ax, spot.az], [spot.x, spot.z]]; }
   else { if (!to.doors.length) return false; dB = nearestOf(to.doors, from.x, from.z); b = dB.node; tail = [[dB.wall.x, dB.wall.z], [dB.inside.x, dB.inside.z]]; }
   const mid = route(a, b); if (!mid) return false;
   const pts = head.concat(mid, tail);
@@ -591,22 +672,27 @@ function startTrip(p, toId){
   for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
   if (p.spot){ p.spot.by = null; p.spot = null; }
   if (spot) spot.by = p.id;
-  p.walk = { pts, cum, len: cum[cum.length - 1], s: 0, to: toId, doorA: dA, doorB: dB, spot };
+  // safe0..safe1: the stretch on the walking network (before and after it: doorways, seats, counters)
+  p.walk = { pts, cum, len: cum[cum.length - 1], s: 0, to: toId, doorA: dA, doorB: dB, spot, safe0: cum[head.length], safe1: cum[pts.length - 1 - tail.length] };
   return true;
 }
 // decide what to do next once the current stay is over
 function decide(p){
   const want = desire(p, S.hour) || p.home;
   p.walkedFor = (want !== p.job && want !== p.home && working(p, S.hour)) ? 'errand' : null;
-  if (want === p.at || !places.has(want) || !startTrip(p, want)) p.until = pplNow + 15 + pplRand()*40;
+  const chained = p.chain && want === p.at;   // move within the place: from the queue to a seat to eat
+  const ok = !(want === p.at && !chained) && places.has(want) && startTrip(p, want);
+  p.chain = null;
+  if (!ok) p.until = pplNow + 15 + pplRand()*40;
 }
 function arrive(p){
   const w = p.walk; p.walk = null;
   p.at = w.to; p.spot = w.spot;
+  if (p.spot && p.spot.kind === 'queue') p.chain = 'eat';
   const pl = places.get(p.at);
   p.until = pplNow + (pl ? stayFor(p, pl) : 20);
 }
-const sendHome = p => { if (p.spot && p.spot.by === p.id) p.spot.by = null; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
+const sendHome = p => { if (p.spot && p.spot.by === p.id) p.spot.by = null; p.chain = null; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
 
 /* ---------- keeping up with the city ---------- */
 let pplReady = false, pplNow = 0, pplHour = S.hour, pplCursor = 0, pplList = [];
@@ -635,7 +721,7 @@ function syncPeople(){
     if (pplReady){ p.until = pplNow + 2 + Math.random()*20; continue; }
     const want = desire(p, S.hour), pl = places.get(want);
     p.at = reachable(pl) ? want : p.home;
-    if (pl && pl.open && p.at === want){ const sp = pickSpot(pl, pl); if (sp){ sp.by = p.id; p.spot = sp; } else p.at = p.home; }
+    if (pl && pl.open && p.at === want){ const sp = pickSpot(pl, pl, p); if (sp){ sp.by = p.id; p.spot = sp; } else p.at = p.home; }
     p.until = pplNow + Math.random()*40;
   }
   pplList = [...people.values()];
@@ -660,12 +746,15 @@ function updatePeople(dt, t){
   _camR.set(1, 0, 0).applyQuaternion(cam.quaternion);
   const pos = pplMesh.geometry.attributes.aPos, spr = pplMesh.geometry.attributes.aSpr, P = pos.array, Q = spr.array;
   const VP = comp.uniforms.VP.value;
+  // which stalls are being served, and who's queueing where
+  const served = new Set(), queued = new Set();
+  for (const p of pplList) if (!p.walk && p.spot){ if (p.spot.kind === 'vendor') served.add(p.spot.stall); else if (p.spot.kind === 'queue') queued.add(p.spot.stall); }
   let i = 0;
   for (const p of pplList){
-    let alpha = 1, walking = false;
+    let alpha = 1, walking = false, y = CURB, frame = 0;
     if (p.walk){
       const w = p.walk; w.s += dt*p.speed;
-      if (w.s >= w.len){ arrive(p); if (!p.spot) continue; p.x = p.spot.x; p.z = p.spot.z; }
+      if (w.s >= w.len){ arrive(p); if (!p.spot) continue; }
       else {
         walking = true;
         let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
@@ -677,14 +766,27 @@ function updatePeople(dt, t){
         if (w.doorA) alpha = Math.min(alpha, (w.s - .05)/.3);
         if (w.doorB) alpha = Math.min(alpha, (w.len - w.s - .05)/.3);
       }
-    } else if (p.spot){ p.x = p.spot.x; p.z = p.spot.z; }
-    else continue;
+    }
+    if (!walking){
+      const sp = p.spot; if (!sp) continue;
+      p.x = sp.x; p.z = sp.z; y = sp.y;
+      let face = sp.face, gest = false;
+      if (sp.kind === 'seat'){ y = sp.y - .09; frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4; }
+      else {
+        if (sp.kind === 'vendor') gest = queued.has(sp.stall) && Math.floor(t*.5 + p.phase) % 3 > 0;      // serving
+        else if (sp.kind === 'queue') gest = served.has(sp.stall) && Math.floor(t*.4 + p.phase) % 2 === 0;   // ordering
+        else { const mate = sp.near.find(o => o.by && people.get(o.by) && !people.get(o.by).walk);           // chatting
+          if (mate){ face = [mate.x - sp.x, mate.z - sp.z]; gest = Math.floor(t*.45 + p.phase) % 2 === 0; } else face = null; }
+        frame = gest ? F_SPEC + Math.floor(t*6 + p.phase) % 6 : F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
+      }
+      if (face){ const sd = face[0]*_camR.x + face[1]*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }
+    }
     if (i >= PPL_MAX) break;
     // skip anyone off screen
     _pv.set(p.x, CURB, p.z).applyMatrix4(VP);
     if (_pv.x < -1.1 || _pv.x > 1.1 || _pv.y < -1.15 || _pv.y > 1.1) continue;
-    const frame = walking ? Math.floor(t*9*p.speed/PPL_SPEED + p.phase) % PPL.walk : PPL.walk + Math.floor(t*2.5 + p.phase) % PPL.idle;
-    P[i*3] = p.x; P[i*3 + 1] = CURB; P[i*3 + 2] = p.z;
+    if (walking) frame = Math.floor(t*9*p.speed/PPL_SPEED + p.phase) % PPL.walk;
+    P[i*3] = p.x; P[i*3 + 1] = y; P[i*3 + 2] = p.z;
     Q[i*4] = p.row; Q[i*4 + 1] = frame; Q[i*4 + 2] = p.flip; Q[i*4 + 3] = Math.max(0, alpha);
     i++;
   }

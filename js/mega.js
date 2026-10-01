@@ -563,7 +563,12 @@ function lanternString(P, ax, ay, az, bx, by, bz, sag){
     px = x; py = y; pz = z;
   }
 }
-function person(P, x, y, z){ const c = pick([M.frame, M.metalDark, M.concDD, M.awn1, M.cloth3, M.white2, M.awn2, M.red2, M.cloth1, M.cloth4]); box(c, P, x, y + .11, z, .08, .22, .06); box(M.concDD, P, x, y + .26, z, .055, .06, .055); }
+// In the town square the little box figures are replaced by real people: there, person() only notes the spot
+// (still drawing the same random number, so the square's layout is unchanged) and the people system fills it.
+let PERSON_GHOST = null;   // while building the square: { kind, stall, face } for the spots being noted, or kind null to skip
+function ghostAs(kind, stall, face){ if (PERSON_GHOST) PERSON_GHOST = { kind, stall, face }; }
+function person(P, x, y, z){ const c = pick([M.frame, M.metalDark, M.concDD, M.awn1, M.cloth3, M.white2, M.awn2, M.red2, M.cloth1, M.cloth4]); if (PERSON_GHOST){ if (PERSON_GHOST.kind) spotAt(P, x, y, z, PERSON_GHOST.kind, PERSON_GHOST.stall, PERSON_GHOST.face); return; }
+  box(c, P, x, y + .11, z, .08, .22, .06); box(M.concDD, P, x, y + .26, z, .055, .06, .055); }
 // cart 1: a tall bike cart with a stack of glowing menu boards (menu-tower reference), its counter full of food
 function menuCart(P, neon){
   box(M.metalDark, P, 0, .42, 0, .9, .32, .45);
@@ -626,7 +631,10 @@ function marketStand(P){
   for (const x of [-L*.35, 0, L*.35]){ cyl(M.frame, P, x, 1.42, 0, .006, .2); put(U.cone, M.metalDark, under(P, T(x, 1.28, 0, 0, .2, .1, .2))); box(M.bulb, P, x, 1.22, 0, .06, .04, .06); glow(P, x, 1.2, .05, 'warm', 1.1); }
   for (let t = -L/2; t < L/2; t += .25){ box(M.bulb, P, t, 1.5, .55, .04, .04, .04); if (chance(.4)) glow(P, t, 1.48, .55, 'warm', .4); }   // a string of small bulbs
   hangingFood(P, -L*.2, 1.5, .4); hangingFood(P, L*.3, 1.45, .4);
+  const st = PERSON_GHOST && PERSON_GHOST.stall;
+  ghostAs('vendor', st, [0, 1]);
   for (let k=0; k<3; k++) person(P, rnd(-L/2 + .3, L/2 - .3), 0, -.75);                     // vendors behind
+  ghostAs('queue', st, [0, -1]);
   for (let k=0; k<5; k++) person(P, rnd(-L/2, L/2), 0, rnd(.6, 1.1));                       // shoppers in front
   for (let k=0; k<6; k++){ const x = rnd(-L/2 - .3, L/2 + .3); box(pick([M.crate, M.awn1, M.corrBlue, M.white2, M.red2]), P, x, .12, rnd(-1.0, -.8), .26, .24, .22); }   // crates and tubs
   for (let k=0; k<4; k++) put(U.cyl16, pick([M.awn1, M.corrBlue, M.white2]), under(P, T(rnd(-L/2, L/2), .1, .55, 0, .2, .2, .2)));
@@ -637,7 +645,9 @@ function cafeTable(P, x, z){
   const Q = under(P, T(x, 0, z, rnd(0, TAU)));
   put(U.cyl16, M.white2, under(Q, T(0, .3, 0, 0, .44, .03, .44))); cyl(M.frame, Q, 0, .15, 0, .02, .3);
   for (let k=0; k<2; k++) foodBowl(Q, rnd(-.1, .1), .31, rnd(-.1, .1), .05);
-  for (let k=0; k<3; k++){ const a = k*TAU/3; cyl(pick([M.red2, M.awn2, M.white2]), Q, Math.cos(a)*.34, .1, Math.sin(a)*.34, .06, .2); if (chance(.75)) person(Q, Math.cos(a)*.34, .06, Math.sin(a)*.34); }
+  ghostAs(null);
+  for (let k=0; k<3; k++){ const a = k*TAU/3; cyl(pick([M.red2, M.awn2, M.white2]), Q, Math.cos(a)*.34, .1, Math.sin(a)*.34, .06, .2); if (chance(.75)) person(Q, Math.cos(a)*.34, .06, Math.sin(a)*.34);
+    if (PERSON_GHOST) spotAt(Q, Math.cos(a)*.34, .2, Math.sin(a)*.34, 'seat', null, [-Math.cos(a), -Math.sin(a)]); }
   if (chance(.6)){ cyl(M.frame, Q, 0, .6, 0, .012, .6); put(U.cone, pick([M.awn1, M.awn2, M.awn3, M.tarp1]), under(Q, T(0, .98, 0, 0, .8, .2, .8))); }
   else { box(M.bulb, Q, 0, .34, 0, .05, .06, .05); glow(Q, 0, .38, 0, 'warm', .5); }
 }
@@ -652,6 +662,7 @@ function buildTownSquare(m){
   R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
   const P = T(m.x, 0, m.z, pick([0, PI/2, PI, -PI/2])), S5 = 5*LOT, H = S5/2;
   reflectLights = [];
+  PERSON_GHOST = { kind: null };
   box(G.asph, P, 0, .012, 0, S5, .025, S5);
   const n = 25, st = S5/n;
   for (let a=0;a<n;a++) for (let b=0;b<n;b++){
@@ -679,7 +690,7 @@ function buildTownSquare(m){
   for (let k=0; k<4; k++){ const [ax, az] = poles[k], [bx, bz] = poles[k + 4]; lanternString(P, ax, 3.1, az, bx, 3.1, bz, .9); }
   for (let k=0; k<8; k++){ const [ax, az] = poles[k], [bx, bz] = poles[(k+1)%8]; lanternString(P, ax, 3.0, az, bx, 3.0, bz, .4); }
   // ---- market stands along the four sides, between the poles, facing in
-  for (let k=0; k<4; k++){ const a = k*PI/2, r = 7.75; marketStand(under(P, T(Math.cos(a)*r, .05, Math.sin(a)*r, -a - PI/2))); }
+  for (let k=0; k<4; k++){ const a = k*PI/2, r = 7.75; ghostAs(null, 10 + k); marketStand(under(P, T(Math.cos(a)*r, .05, Math.sin(a)*r, -a - PI/2))); }
   // ---- carts in a ring round the pond, bigger than life so the food reads
   const carts = [], CS = 1.45;
   for (let k=0; k<10; k++){ const a = k*TAU/10 + PI/10 + rnd(-.08, .08), r = 5.0 + (k % 2)*.5; carts.push([Math.cos(a)*r, Math.sin(a)*r, a]); }
@@ -689,7 +700,11 @@ function buildTownSquare(m){
     if (r === 0) menuCart(Qs, pick([M.neonPink, M.neonCyan, M4.neonPurple]));
     else if (r === 1) hawkerStall(Qs);
     else foodTruck(Qs, pick([M.neonPink, M.neonCyan, M.neonAmber]));
+    ghostAs('queue', k, 'origin');
     for (let q=0; q<irand(2, 5); q++) person(Q, rnd(-.7, .7), 0, rnd(.9, 1.6));             // a queue
+    // where the stall keeper stands: behind the cart, or at the end of the food truck's counter
+    spotAt(Q, r === 2 ? -1.45 : 0, 0, r === 2 ? .62 : -.85, 'vendor', k, r === 2 ? [1, .4] : [0, 1]);
+    if (r !== 2) for (const x of [-.45, .45]) spotAt(Q, x, 0, 1.0, 'queue', k, 'origin');      // room to queue even where the dice gave few
   });
   for (let k=0; k<24; k++){
     const a = rnd(0, TAU), r = rnd(3.6, 7.0), x = Math.cos(a)*r, z = Math.sin(a)*r;
@@ -697,8 +712,10 @@ function buildTownSquare(m){
     if (Math.abs(Math.abs(x) - 7.75) < 1.4 && Math.abs(z) < 2) continue; if (Math.abs(Math.abs(z) - 7.75) < 1.4 && Math.abs(x) < 2) continue;
     cafeTable(P, x, z);
   }
+  ghostAs('stand', null, [0, 1]);
   for (let k=0; k<70; k++){ const a = rnd(0, TAU), r = rnd(POND_R + .9, 9); const x = Math.cos(a)*r, z = Math.sin(a)*r;   // the crowd, some in little groups
     person(P, x, .05, z); if (chance(.4)) person(P, x + rnd(-.15, .15), .05, z + rnd(.1, .18)); }
+  PERSON_GHOST = null;
   for (const [sx, sz] of [[1,1],[1,-1],[-1,1],[-1,-1]]){
     const Q = under(P, T(sx*(H - .7), 0, sz*(H - .7)));
     box(M.concM, Q, 0, .2, 0, .9, .4, .9); plant(pick(['bonsai','bamboo']), Q, 0, .4, 0, 1.2); plant('bushFlower', Q, .25, .4, .25, .8);

@@ -50,7 +50,7 @@ ATLAS.onBeforeCompile = sh => {
 };
 const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m !== ATLAS;
 function collect(fn){
-  buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {};
+  buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {}; curSpots = [];
   for (const k in SPR.size) FOL_LIST[k] = [];
   fn();
   const geo = new Map();
@@ -79,8 +79,8 @@ function collect(fn){
   }
   for (const g of geo.values()) g.computeBoundingSphere();
   const fol = {}; for (const k in FOL_LIST) if (FOL_LIST[k].length) fol[k] = FOL_LIST[k];
-  const out = { geo, fol, glows: glowList, emitters, pads: carPads, ports: curPorts };
-  glowList = null; buckets = new Map();
+  const out = { geo, fol, glows: glowList, emitters, pads: carPads, ports: curPorts, spots: curSpots };
+  glowList = null; buckets = new Map(); curSpots = null;
   return out;
 }
 function disposeData(d){ if (d) for (const g of d.geo.values()) g.dispose(); }
@@ -139,7 +139,8 @@ function buildPlatform(c){
     const n = 7, st = LOT/n;
     for (let i=0;i<n;i++) for (let j=0;j<n;j++) if (!chance(.04)) box(pick(TILES.mid), P, (i-(n-1)/2)*st, .03, (j-(n-1)/2)*st, st - .05, .045, st - .05);
     for (let k=0;k<irand(1,3);k++) plant(pick(['bush','bushFlower','g_spread1','g_fern3','bonsai']), P, rnd(-1.3,1.3), .05, rnd(-1.3,1.3), rnd(.7,.95));
-    if (chance(.4)){ const Pb = under(P, T(rnd(-.9,.9), .05, rnd(-.9,.9), pick([0, PI/2]))); box(M.wood, Pb, 0, .14, 0, .5, .04, .15); box(M.frame, Pb, 0, .07, 0, .42, .14, .1); }
+    if (chance(.4)){ const Pb = under(P, T(rnd(-.9,.9), .05, rnd(-.9,.9), pick([0, PI/2]))); box(M.wood, Pb, 0, .14, 0, .5, .04, .15); box(M.frame, Pb, 0, .07, 0, .42, .14, .1);
+      for (const sx of [-.13, .13]) spotAt(Pb, sx, .16, 0, 'seat', null, [0, 1]); }
   }
   if (chance(.45)){   // a street lamp on one corner
     const [sx,sz] = pick(CORNERS), Pl = T(x + sx*(LOT/2 - .25), 0, z + sz*(LOT/2 - .25));

@@ -1,13 +1,18 @@
 // Neon Terrarium: megastructures, landmarks that take over a 2x2 block of plots once the city is big enough.
 // All game scripts share one scope and load in order (see index.html).
 'use strict';
-// Each megastructure exists at most once. When its requirement is met (enough buildings of every zone), each new
-// build has a small chance of bringing it in: it takes over a 2x2 block of plots around that build, replacing what
-// stood there. Removing it (right-click) frees the plots, and it can come back once the requirement is met again.
+// Each megastructure exists at most once. When its requirement is met (enough buildings of the zones it names),
+// each new build has a small chance of bringing it in: it takes over a block of plots (w x h, either way round)
+// near that build, replacing what stood there. Some can be stacked: clicking the roof with a zone picked adds a
+// tier, up to maxLevels. Right-click takes the top tier off, or removes it when only one is left; it can come back
+// once the requirement is met again.
 const MEGA_TYPES = {
-  radio: { name: 'Radio station', need: 20, odds: 30, colour: '#ff5a4a', sound: 'radioOn', build: buildRadioStation },
+  radio: { name: 'Radio station', need: { low: 20, mid: 20, high: 20, ind: 20 }, odds: 30, w: 2, h: 2, maxLevels: 1,
+           colour: '#ff5a4a', sound: 'radioOn', build: buildRadioStation },
+  mall:  { name: 'Sky mall', need: { high: 50, ind: 30 }, odds: 50, w: 3, h: 2, maxLevels: 3,
+           colour: '#ffcf7a', build: buildSkyMall },
 };
-const megas = new Map();   // kind -> { kind, i, j, seed, x, z, data, view, roofH, top }
+const megas = new Map();   // kind -> { kind, i, j, w, h, levels, seed, x, z, data, view, roofH, top, cells }
 
 // how many building sections of each zone stand in the city
 function zoneCounts(){
@@ -16,8 +21,8 @@ function zoneCounts(){
   return n;
 }
 function megaUnlocked(kind){
-  const t = MEGA_TYPES[kind], n = zoneCounts();
-  return Object.values(n).every(v => v >= t.need);
+  const need = MEGA_TYPES[kind].need, n = zoneCounts();
+  return Object.keys(need).every(z => n[z] >= need[z]);
 }
 // called after every build: roll for each megastructure that isn't standing yet and whose requirement is met
 function maybeSpawnMegas(c){
@@ -26,38 +31,66 @@ function maybeSpawnMegas(c){
     if (Math.random() < 1/MEGA_TYPES[kind].odds) spawnMega(kind, c);
   }
 }
-// the 2x2 block nearest the build: every plot must exist and be free of other megastructures;
+const blockCells = (i, j, w, h) => { const out = []; for (let a=0;a<w;a++) for (let b=0;b<h;b++) out.push(cells.get(ckey(i+a, j+b))); return out; };
+// the block nearest the build, either way round: every plot must exist and be free of other megastructures;
 // among the nearest, the one with the fewest buildings on it wins
-function findMegaBlock(c){
+function findMegaBlock(kind, c){
+  const t = MEGA_TYPES[kind];
+  const shapes = t.w === t.h ? [[t.w, t.h]] : [[t.w, t.h], [t.h, t.w]];
   let best = null;
-  for (const a of cells.values()){
-    const blk = [[0,0],[1,0],[0,1],[1,1]].map(([di,dj]) => cells.get(ckey(a.i+di, a.j+dj)));
+  for (const a of cells.values()) for (const [w, h] of shapes){
+    const blk = blockCells(a.i, a.j, w, h);
     if (blk.some(b => !b || b.mega)) continue;
-    const d = Math.hypot(a.i + .5 - c.i, a.j + .5 - c.j), secs = blk.reduce((s, b) => s + b.sections.length, 0);
+    const d = Math.hypot(a.i + (w-1)/2 - c.i, a.j + (h-1)/2 - c.j), secs = blk.reduce((s, b) => s + b.sections.length, 0);
     const score = d*10 + secs + Math.random()*.5;
-    if (!best || score < best.score) best = { score, i: a.i, j: a.j };
+    if (!best || score < best.score) best = { score, i: a.i, j: a.j, w, h };
   }
   return best;
 }
-// put a megastructure's record in place on its four plots (no drawing)
-function placeMega(kind, i, j, seed){
-  if (!MEGA_TYPES[kind] || megas.has(kind)) return null;
-  const blk = [[0,0],[1,0],[0,1],[1,1]].map(([di,dj]) => cells.get(ckey(i+di, j+dj)));
+// put a megastructure's record in place on its plots (no drawing)
+function placeMega(kind, i, j, seed, w, h, levels = 1){
+  const t = MEGA_TYPES[kind];
+  if (!t || megas.has(kind)) return null;
+  w = w || t.w; h = h || t.h;
+  const blk = blockCells(i, j, w, h);
   if (blk.some(b => !b || b.mega)) return null;
-  const m = { kind, i, j, seed, x: (i + .5)*LOT, z: (j + .5)*LOT, data: null, view: null, roofH: CURB, top: CURB, cells: blk };
+  const m = { kind, i, j, w, h, levels: Math.max(1, Math.min(t.maxLevels, levels)), seed, x: (i + (w-1)/2)*LOT, z: (j + (h-1)/2)*LOT,
+              data: null, view: null, roofH: CURB, top: CURB, cells: blk };
   for (const b of blk){ b.mega = kind; b.sections = []; }
   megas.set(kind, m);
   return m;
 }
+const megaSize = m => [m.w*LOT, m.h*LOT];
 function spawnMega(kind, near){
-  const blk = findMegaBlock(near); if (!blk) return null;
-  const covered = [[0,0],[1,0],[0,1],[1,1]].map(([di,dj]) => cells.get(ckey(blk.i+di, blk.j+dj)));
+  const blk = findMegaBlock(kind, near); if (!blk) return null;
+  const covered = blockCells(blk.i, blk.j, blk.w, blk.h);
   for (const b of covered){ finishAnimsOn(b); if (b.view){ world.remove(b.view); b.view = null; } disposeData(b.data); b.data = null; }
-  const m = placeMega(kind, blk.i, blk.j, (Math.random()*1e9)|0); if (!m) return null;
+  const m = placeMega(kind, blk.i, blk.j, (Math.random()*1e9)|0, blk.w, blk.h); if (!m) return null;
   holdRegion(m);
   refresh(covered, [m]);
-  startAnim(m, 'build', CURB - .05, m.top + 1, MEGA_TYPES[kind].colour, 2*LOT, null, MEGA_TYPES[kind].sound);
+  startAnim(m, 'build', CURB - .05, m.top + 1, MEGA_TYPES[kind].colour, megaSize(m), null, MEGA_TYPES[kind].sound);
   return m;
+}
+// stacking: another tier on top
+function addMegaTier(m){
+  if (!m || m.levels >= MEGA_TYPES[m.kind].maxLevels) return;
+  finishAnimsOn(m);
+  holdRegion(m);
+  const y0 = m.roofH, old = { view: m.view, data: m.data }; m.view = null; m.data = null;
+  m.levels++;
+  refresh([], [m]);
+  dropView(old);
+  startAnim(m, 'build', y0 - .3, m.top + 1, MEGA_TYPES[m.kind].colour, megaSize(m), null);
+}
+// right-click: the top tier comes off, or the whole thing when it's down to one
+function removeMegaTier(m){
+  if (!m) return;
+  if (m.levels <= 1) return removeMega(m);
+  finishAnimsOn(m);
+  const top = m.top, old = { view: m.view, data: m.data }; m.view = null; m.data = null;
+  m.levels--;
+  refresh([], [m]);
+  startAnim(m, 'remove', m.roofH - .3, top + 1, MEGA_TYPES[m.kind].colour, megaSize(m), old);
 }
 function removeMega(m){
   if (!m) return;
@@ -67,7 +100,7 @@ function removeMega(m){
   for (const b of m.cells) b.mega = null;
   dirtyRegions.add(regKey(m.i, m.j));
   refresh(m.cells.filter(b => cells.get(ckey(b.i, b.j)) === b));
-  startAnim(m, 'remove', CURB - .05, m.top + 1, MEGA_TYPES[m.kind].colour, 2*LOT, old);
+  startAnim(m, 'remove', CURB - .05, m.top + 1, MEGA_TYPES[m.kind].colour, megaSize(m), old);
 }
 function rebuildMega(m){
   finishAnimsOn(m);
@@ -225,16 +258,125 @@ function buildRadioStation(m){
   m.top = top + 2.8;
 }
 
-// for trying things out: open the game with #dev in the address and press M to bring the radio station in
-// next to the plot under the pointer (ignores the requirement and the odds)
+// for trying things out: open the game with #dev in the address, point at a plot and press M for the radio
+// station or N for the sky mall (each key brings it in, or removes it if it's already there; ignores the
+// requirement and the odds)
 if (location.hash.includes('dev')){
   let lastPointer = null;
   addEventListener('pointermove', e => { lastPointer = { x: e.clientX, y: e.clientY }; });
   addEventListener('keydown', e => {
-    if (e.key !== 'm' && e.key !== 'M') return;
+    const kind = { m: 'radio', n: 'mall' }[e.key.toLowerCase()]; if (!kind) return;
     const pk = lastPointer ? pickAt(lastPointer.x, lastPointer.y) : null;
     const c = pk && pk.c ? pk.c : cells.values().next().value;
-    if (megas.has('radio')) removeMega(megas.get('radio'));
-    else if (c) spawnMega('radio', c);
+    if (megas.has(kind)) removeMega(megas.get(kind));
+    else if (c) spawnMega(kind, c);
   });
+}
+
+/* ---------- the sky mall ---------- */
+// A glass shopping block lifted on steel truss legs over a paved court: a heavy dark deck with a walkway, string
+// lights and planters round its edge, then the glass body, three floors per tier, every bay a warm-lit room seen
+// through floor-to-ceiling glass (furniture and plants in silhouette). The top tier carries a roof garden with a
+// pool, loungers, palms and a pergola strung with bulbs. Lighting is warm and yellow throughout, no neon.
+// rooms burn at a steady brightness day and night (kind 'lamp' isn't dimmed by daylight), so the glass always reads as lit from inside
+M.mallRoom = toon(0x5a4630, { em:0xf2c274, kind:'lamp' });
+M.mallRoom2 = toon(0x5a4a34, { em:0xf6d39c, kind:'lamp' });
+M.mallSteel = toon(0x2b2f37);
+M.mallPool = toon(0x1e4652, { em:0x6fb8c4, kind:'trim' });   // softer, paler water than the neon pools elsewhere
+const MALL_FLOOR = 1.0, MALL_PER_TIER = 3;
+function buildSkyMall(m){
+  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  const long = m.w >= m.h;
+  const P = T(m.x, 0, m.z, long ? pick([0, PI]) : pick([PI/2, -PI/2]));
+  const L = Math.max(m.w, m.h)*LOT, D = Math.min(m.w, m.h)*LOT;   // long side along the local x axis
+  // the court below
+  box(G.asph, P, 0, .012, 0, L, .025, D);
+  const nx = 21, nz = 14, sx = L/nx, sz = D/nz;
+  for (let a=0;a<nx;a++) for (let b=0;b<nz;b++) if (!chance(.03)) box(pick(TILES.high), P, (a-(nx-1)/2)*sx, .03, (b-(nz-1)/2)*sz, sx - .05, .045, sz - .05);
+  // truss legs: four posts with cross-bracing, footings, and a warm lamp on each
+  const legH = 2.4, deckT = .45, y0 = CURB, deckY = y0 + legH;
+  const lx = L/2 - 1.0, lz = D/2 - 1.0, lw = .32;
+  for (const x of [-lx, 0, lx]) for (const z of [-lz, lz]){
+    box(M.concDD, P, x, y0 + .1, z, 1.0, .2, 1.0);
+    for (const [px, pz] of [[1,1],[1,-1],[-1,-1],[-1,1]]) box(M.mallSteel, P, x + px*lw, y0 + legH/2, z + pz*lw, .11, legH, .11);
+    for (let y = .2; y < legH - .3; y += .7) for (const [ax, az, bx2, bz2] of [[1,1,1,-1],[1,-1,-1,-1],[-1,-1,-1,1],[-1,1,1,1]]){
+      strut(M.frame, P, x + ax*lw, y0 + y, z + az*lw, x + bx2*lw, y0 + y + .7, z + bz2*lw, .035);
+      strut(M.frame, P, x + bx2*lw, y0 + y, z + bz2*lw, x + ax*lw, y0 + y + .7, z + az*lw, .035);
+    }
+    box(M.bulb, P, x + lw + .07, y0 + legH*.55, z, .06, .1, .06); glow(P, x + lw + .1, y0 + legH*.55, z, 'warm', 1.3);
+  }
+  // the deck: a thick dark slab with beams beneath, a lit edge, a walkway railing and planters
+  box(M.mallSteel, P, 0, deckY + deckT/2, 0, L, deckT, D);
+  for (const z of [-lz, lz]) box(M.metalDark, P, 0, deckY - .12, z, L - .6, .24, .3);
+  for (const x of [-lx, 0, lx]) box(M.metalDark, P, x, deckY - .12, 0, .3, .24, D - .6);
+  const top0 = deckY + deckT;
+  box(M.concDD, P, 0, top0 + .01, 0, L - .05, .03, D - .05);
+  const edge = (fn) => { for (const [len, ox, oz, ry] of [[L, 0, D/2, 0], [L, 0, -D/2, PI], [D, L/2, 0, PI/2], [D, -L/2, 0, -PI/2]]) fn(under(P, T(ox, 0, oz, ry)), len); };
+  edge((F, len) => {
+    for (let t = -len/2 + .25; t < len/2 - .1; t += .5){
+      box(M.bulb, F, t, deckY + deckT*.55, .03, .07, .06, .04);              // bulbs along the deck's face
+      if (Math.round((t + len/2)/.5) % 2 === 0) glow(F, t, deckY + deckT*.5, .12, 'warm', .8);
+      cyl(M.frame, F, t, top0 + .2, -.08, .02, .4);                          // railing posts
+    }
+    box(M.frame, F, 0, top0 + .4, -.08, len - .1, .03, .03);                 // top rail
+    for (let t = -len/2 + .6; t < len/2 - .5; t += rnd(1.8, 3.2)) plant(hangKind(), F, t, top0 - .02, .04, rnd(.7, .9), 't', true);   // sparse, so the legs show
+  });
+  // the glass body, tier by tier
+  const inset = .5, BW = L - 2*inset, BD = D - 2*inset, floors = m.levels*MALL_PER_TIER;
+  let y = top0;
+  for (let f=0; f<floors; f++){
+    const fy = y + f*MALL_FLOOR, tierEdge = f % MALL_PER_TIER === 0;
+    box(M.concDD, P, 0, fy + .045, 0, BW + (tierEdge ? .3 : .14), tierEdge ? .12 : .09, BD + (tierEdge ? .3 : .14));   // floor slab
+    for (const [len, ox, oz, ry] of [[BW, 0, BD/2, 0], [BW, 0, -BD/2, PI], [BD, BW/2, 0, PI/2], [BD, -BW/2, 0, -PI/2]]){
+      const F = under(P, T(ox, 0, oz, ry)), nb = Math.max(2, Math.round(len/.9)), bw = len/nb;
+      for (let b=0; b<nb; b++){
+        const cx = -len/2 + (b + .5)*bw, lit = chance(.9);
+        box(lit ? (chance(.7) ? M.mallRoom : M.mallRoom2) : M.glassDark, F, cx, fy + .52, -.36, bw - .02, .86, .04);   // the lit room behind the glass
+        if (lit && chance(.75)) box(pick([M.frame, M.metalDark, M.wood, M.concDD]), F, cx + rnd(-.22, .22), fy + .09 + rnd(.1, .2), -.22, rnd(.18, .38), rnd(.2, .38), rnd(.14, .24));   // furniture in silhouette
+        if (lit && chance(.2)) plant(pick(['bonsai','bush','succulent']), F, cx + rnd(-.2, .2), fy + .09, -.18, .7);
+        box(M.mallSteel, F, -len/2 + b*bw, fy + .52, 0, .05, .9, .06);       // mullion
+      }
+      box(M.mallSteel, F, 0, fy + .97, 0, len, .04, .06);                     // transom at the ceiling
+      if (chance(.35)){                                                       // a planter ledge along the glass, greenery spilling over
+        box(M.concDD, F, 0, fy + .14, .1, len - .2, .1, .16);
+        for (let t = -len/2 + .4; t < len/2 - .3; t += rnd(.5, 1.1)) chance(.5) ? plant(hangKind(), F, t, fy + .16, .19, rnd(.7, .95), 't', true) : plant(pick(['bush','g_fern2','bushFlower']), F, t, fy + .19, .1, rnd(.55, .75));
+      }
+    }
+    for (const [cx, cz] of [[1,1],[1,-1],[-1,-1],[-1,1]]) box(M.mallSteel, P, cx*BW/2, fy + .5, cz*BD/2, .16, 1.0, .16);   // corner columns
+    // warm strip under each slab edge
+    for (let t = -BW/2 + .3; t < BW/2; t += 1.2){ glow(P, t, fy + .03, BD/2 + .12, 'warm', .55); glow(P, t, fy + .03, -BD/2 - .12, 'warm', .55); }
+  }
+  box(M.concD, P, 0, y + floors*MALL_FLOOR/2, 0, BW - .9, floors*MALL_FLOOR - .1, BD - .9);   // the core, so you never see through
+  const roof = y + floors*MALL_FLOOR;
+  // the tall MALL sign on the front, lit warm
+  const Fs = under(P, T(-BW/2 + .9, 0, BD/2 + .02, 0));
+  box(M.mallSteel, Fs, 0, roof - 1.45, .06, .7, 2.0, .06);
+  plant('sign_mall', Fs, 0, roof - 1.45, .1, 1.0, 'c', true); glow(Fs, 0, roof - 1.45, .35, 'amber', 2.2);
+  // roof garden
+  box(M.concDD, P, 0, roof + .06, 0, BW + .24, .12, BD + .24);
+  box(M3.deckTile, P, 0, roof + .13, 0, BW - .4, .03, BD - .4);
+  for (let t = -BW/2 + .5; t < BW/2 - .3; t += .6) box(M3.deckTile2, P, t, roof + .146, 0, .04, .005, BD - .5);   // deck tile seams
+  edge2();
+  function edge2(){
+    for (const [len, ox, oz, ry] of [[BW + .2, 0, BD/2 + .1, 0], [BW + .2, 0, -BD/2 - .1, PI], [BD + .2, BW/2 + .1, 0, PI/2], [BD + .2, -BW/2 - .1, 0, -PI/2]]){
+      const F = under(P, T(ox, 0, oz, ry));
+      box(M.glassTeal, F, 0, roof + .32, 0, len, .36, .03);                   // glass balustrade
+      box(M.mallSteel, F, 0, roof + .51, 0, len, .03, .05);
+      for (let t = -len/2 + .3; t < len/2; t += .6){ box(M.bulb, F, t, roof + .55, 0, .05, .05, .05); if (chance(.5)) glow(F, t, roof + .58, 0, 'warm', .6); }
+    }
+  }
+  const pw = Math.min(2.6, BW*.3), pd = Math.min(1.3, BD*.32), px0 = BW*.12;
+  box(M.wood, P, px0, roof + .15, 0, pw + 1.2, .04, pd + 1.0);                                          // timber deck round the pool
+  box(M.frame, P, px0, roof + .16, 0, pw + .1, .06, pd + .1); box(M.mallPool, P, px0, roof + .18, 0, pw, .04, pd); glow(P, px0, roof + .24, 0, 'warm', 1.2);
+  for (let k=0; k<4; k++){ const lz2 = (k < 2 ? -1 : 1)*(pd/2 + .32), lx2 = px0 + (k % 2 ? .5 : -.5); box(M.white2, P, lx2, roof + .2, lz2, .22, .06, .46); box(M.awn3, P, lx2, roof + .24, lz2 - .17, .22, .1, .06); }
+  for (let k=0; k<7; k++) plant(pick(['bamboo','bonsai','bush','bushFlower','g_spread2']), P, rnd(-BW/2 + .5, -BW*.18), roof + .15, rnd(-BD/2 + .5, BD/2 - .5), rnd(.8, 1.05));
+  for (let k=0; k<4; k++) plant(pick(['bamboo','bonsai']), P, rnd(px0 + pw/2 + .3, BW/2 - .4), roof + .15, (k % 2 ? 1 : -1)*rnd(.3, BD/2 - .4), rnd(.9, 1.1));
+  // pergola with string lights over a lounge corner
+  const gx = -BW/2 + 1.3, gz = 0;
+  for (const [cx, cz] of [[1,1],[1,-1],[-1,-1],[-1,1]]) box(M.wood, P, gx + cx*.7, roof + .62, gz + cz*.6, .07, .95, .07);
+  for (let t = -.6; t <= .6; t += .3) box(M.wood, P, gx, roof + 1.1, gz + t, 1.55, .05, .05);
+  for (let t = -.7; t <= .7; t += .35){ box(M.bulb, P, gx + t, roof + 1.03, gz, .05, .05, .05); glow(P, gx + t, roof + 1.0, gz, 'warm', .7); }
+  box(M.wood, P, gx, roof + .3, gz, 1.0, .2, .5); box(M.cloth2, P, gx, roof + .42, gz, .9, .06, .42);
+  m.roofH = roof + .12;
+  m.top = roof + 1.3;
 }

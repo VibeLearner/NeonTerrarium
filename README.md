@@ -60,14 +60,17 @@ The scripts are ordinary (non-module) scripts that share one scope, so the order
 
 ## Megastructures
 
-Landmarks that take over a 2x2 block of plots once the city is big enough. Each exists at most once.
+Landmarks that take over a block of plots once the city is big enough. Each exists at most once.
 
 - **Radio station:** unlocks when there are 20 building sections of every zone. From then on, each build has a
   1 in 30 chance of bringing it in, on the 2x2 block nearest that build (replacing what stood there). Right-click
   removes it; it can come back once the city meets the requirement again.
-- New megastructures go in `MEGA_TYPES` at the top of `js/mega.js`.
-- For testing, open the game with `#dev` at the end of the address and press **M** to bring in (or remove) the
-  radio station next to the plot under the pointer, skipping the requirement and the odds.
+- **Sky mall:** a 3x2 block (either way round). Unlocks at 50 luxury and 30 industrial sections, then a 1 in 50
+  chance per build. A glass mall on steel truss legs, every room lit warm from inside, with a roof garden and pool.
+  Click its roof with a zone picked to stack another tier (up to 3); right-click takes the top tier off.
+- New megastructures go in `MEGA_TYPES` at the top of `js/mega.js` (requirement, odds, footprint, max tiers).
+- For testing, open the game with `#dev` at the end of the address and press **M** (radio station) or **N** (sky mall)
+  to bring it in, or remove it, next to the plot under the pointer, skipping the requirement and the odds.
 
 ## Adding art and sound
 

@@ -364,8 +364,9 @@ function startAnim(c, kind, y0, y1, zone, w, old, sound){
   const lineMat = () => new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
   const box = new THREE.LineSegments(OUTLINE_GEO, lineMat()), scan = new THREE.LineSegments(OUTLINE_GEO, lineMat());
   const by0 = Math.max(y0, kind === 'build' && !zone && y0 < -1 ? -.7 : y0);   // a bare platform's outline hugs the slab, not the rock under it
-  box.position.set(c.x, (by0 + y1)/2, c.z); box.scale.set(w + .08, Math.max(.1, y1 - by0), w + .08);
-  scan.scale.set(w + .2, .001, w + .2);
+  const [wx, wz] = Array.isArray(w) ? w : [w, w];
+  box.position.set(c.x, (by0 + y1)/2, c.z); box.scale.set(wx + .08, Math.max(.1, y1 - by0), wz + .08);
+  scan.scale.set(wx + .2, .001, wz + .2);
   for (const l of [box, scan]){ l.layers.set(1); l.renderOrder = 998; scene.add(l); }
   if (sound) sfx.play(sound, { spread: 0 }); else sfx.play(kind === 'build' ? 'place' : 'remove');
   anims.push({ c, kind, view, old, u, mats, box, scan, x: c.x, z: c.z, y0, y1, t: 0, dur: kind === 'build' ? .15 : .12, reg: regKey(c.i, c.j), held });
@@ -419,7 +420,7 @@ const MEGA_SAVE_KEY = 'neonIsland.megas';
 function save(){
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE])));
-    localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ kind: m.kind, i: m.i, j: m.j, seed: m.seed }))));
+    localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed }))));
   } catch (e) {}
 }
 function load(){
@@ -427,7 +428,7 @@ function load(){
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!Array.isArray(d) || !d.length) return false;
     for (const [i,j,secs,st] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; cells.set(ckey(i,j), c); }
-    try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) placeMega(m.kind, m.i, m.j, m.seed); } catch (e) {}
+    try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels); } catch (e) {}
     return true;
   } catch (e) { return false; }
 }
@@ -463,7 +464,10 @@ function targetOf(pk){
   if (pk.kind === 'sky') return cells.has(ckey(pk.i, pk.j)) ? null : { type: 'empty', i: pk.i, j: pk.j };
   const c = pk.c, top = pk.kind === 'plat' ? CURB : c.height;
   if (Math.abs(pk.p.y - top) < .03){
-    if (c.mega) return null;   // nothing builds on a megastructure
+    if (c.mega){   // a megastructure's roof: another tier if it stacks, otherwise nothing builds there
+      const m = megas.get(c.mega);
+      return m && pk.kind === 'mega' && m.levels < MEGA_TYPES[m.kind].maxLevels ? { type: 'megaUp', m } : null;
+    }
     return pk.kind === 'bld' ? { type: 'up', c } : { type: 'onto', c };
   }
   // a side face: build next door in that direction
@@ -477,10 +481,11 @@ function applyTarget(t){
   if (!t) return null;
   const zone = S.zone;
   if (t.type === 'empty') return addPlatform(t.i, t.j, zone);
+  if (t.type === 'megaUp'){ if (zone) addMegaTier(t.m); return null; }
   if (!zone || t.c.mega) return null;
   addSection(t.c, zone); return t.c;
 }
-function removeAt(pk){ if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMega(megas.get(pk.c.mega)); removeSection(pk.c); }
+function removeAt(pk){ if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMegaTier(megas.get(pk.c.mega)); removeSection(pk.c); }
 
 /* ---------- hover outline showing where a click would build ---------- */
 const hoverMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85, depthTest: false });
@@ -489,7 +494,12 @@ hover.layers.set(1); hover.renderOrder = 999; hover.visible = false; scene.add(h
 function showHover(t){
   if (!t){ hover.visible = false; return; }
   hoverMat.color.set(S.zone ? ZONES[S.zone].col : '#e3d6bd');
-  let x, z, y0, h, w;
+  let x, z, y0, h, w, wz;
+  if (t.type === 'megaUp'){
+    if (!S.zone){ hover.visible = false; return; }
+    const [sx, sz] = megaSize(t.m);
+    hover.position.set(t.m.x, t.m.roofH + 1.6, t.m.z); hover.scale.set(sx - .6, 3.2, sz - .6); hover.visible = true; return;
+  }
   if (t.type === 'empty'){
     x = t.i*LOT; z = t.j*LOT;
     if (S.zone){ y0 = CURB; h = FH*3; w = SIDE; } else { y0 = -.6; h = .68; w = LOT; }

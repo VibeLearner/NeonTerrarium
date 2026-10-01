@@ -86,6 +86,17 @@ const GLYPH_V = [], GLYPH_H = [], GLYPH_GLOW = {};
   for (const ch of text){ const rows = F[ch]; rows.forEach((r, yy) => [...r].forEach((b, xx) => { if (b === '1') g.fillRect(x + xx, 2 + yy, 1, 1); })); x += rows[0].length + 1; }
   SPR.img.sign_onair = c.toDataURL(); SPR.size.sign_onair = [w, h]; SPR.anchor.sign_onair = .5;
 })();
+// The sky mall's tall sign: MALL stacked down a dark panel in warm amber, with a lit border
+(function mallSign(){
+  const F = { M:['10001','11011','10101','10001','10001'], A:['01110','10001','11111','10001','10001'], L:['10000','10000','10000','10000','11111'] };
+  const text = 'MALL', w = 11, h = 4 + text.length*6 - 1;
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  g.fillStyle = '#1c140c'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#ffb347'; g.fillRect(0,0,w,1); g.fillRect(0,h-1,w,1); g.fillRect(0,0,1,h); g.fillRect(w-1,0,1,h);
+  g.fillStyle = '#ffe2a8';
+  [...text].forEach((ch, k) => F[ch].forEach((r, yy) => [...r].forEach((b, xx) => { if (b === '1') g.fillRect(3 + xx, 2 + k*6 + yy, 1, 1); })));
+  SPR.img.sign_mall = c.toDataURL(); SPR.size.sign_mall = [w, h]; SPR.anchor.sign_mall = .5;
+})();
 // All sprites share one texture atlas and one material, so a whole region's plants, laundry and signs
 // are a single instanced draw call. The layout is computed from the known sizes right away; each image is
 // painted into its slot as soon as it has loaded.

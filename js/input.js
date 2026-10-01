@@ -42,7 +42,7 @@ const pdist = () => { const [a,b] = [...ptrs.values()]; return Math.hypot(a.x-b.
 const pmidX = () => { const [a,b] = [...ptrs.values()]; return (a.x + b.x)/2; };
 function paintAt(x, y){
   const t = targetOf(pickAt(x, y)); if (!t) return;
-  const k = t.type === 'empty' ? ckey(t.i, t.j) : ckey(t.c.i, t.c.j);
+  const k = t.type === 'empty' ? ckey(t.i, t.j) : t.type === 'megaUp' ? 'mega:' + t.m.kind : ckey(t.c.i, t.c.j);
   if (act.done.has(k)) return;               // each spot changes at most once per stroke
   act.done.add(k); applyTarget(t);
 }

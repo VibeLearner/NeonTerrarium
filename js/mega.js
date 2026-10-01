@@ -1065,12 +1065,12 @@ function buildPoliceStation(m){
   for (const [F, xs] of [[under(P, T(bw/2, 0, bz + RC/2, PI/2)), [-1.6, -.3]], [under(P, T(-bw/2, 0, bz + RC/2, -PI/2)), [1.1, 1.8]]])   // a column of sunken slots on each side
     for (const t of xs) for (const yy of [CURB + gf + .7, CURB + gf + 2.05, CURB + gf + 3.4]){ box(M.polDark, F, t, yy, .01, .4, .7, .04); box(chance(.5) ? M.polLobby : M.polScreen, F, t, yy, .015, .3, .6, .03); }
   // a deep recessed entrance portal round the curtain wall
-  box(M.polDark, P, -.2, CURB + 4.2, front + .005, 3.3, 3.7, .02);
-  for (const sx of [-1, 1]) box(M.polWall2, P, -.2 + sx*1.72, CURB + 4.2, front + .12, .14, 3.8, .26);
-  box(M.polWall2, P, -.2, CURB + 6.12, front + .12, 3.58, .14, .26);
-  box(M.polLobby, P, -.2, CURB + 4.2, front + .02, 3.0, 3.4, .04);                                     // the curtain wall, lit cool from inside
-  for (let t = -1.7; t <= 1.31; t += .5) box(M.polFrame, P, t, CURB + 4.2, front + .05, .04, 3.4, .04);
-  for (let y = 2.8; y <= 5.8; y += .85) box(M.polFrame, P, -.2, CURB + y, front + .05, 3.0, .04, .04);
+  box(M.polDark, P, -.2, CURB + 3.95, front + .005, 3.3, 3.2, .02);
+  for (const sx of [-1, 1]) box(M.polWall2, P, -.2 + sx*1.72, CURB + 3.92, front + .12, .14, 3.25, .26);   // the portal stops below the POLICE fascia
+  box(M.polWall2, P, -.2, CURB + 5.55, front + .12, 3.58, .12, .26);
+  box(M.polLobby, P, -.2, CURB + 3.95, front + .02, 3.0, 2.9, .04);                                     // the curtain wall, lit cool from inside
+  for (let t = -1.7; t <= 1.31; t += .5) box(M.polFrame, P, t, CURB + 3.95, front + .05, .04, 2.9, .04);
+  for (let y = 2.8; y <= 5.4; y += .85) box(M.polFrame, P, -.2, CURB + y, front + .05, 3.0, .04, .04);
   for (let k=0; k<10; k++) box(pick([M.polDark, M.polFrame, M.polScreen]), P, rnd(-1.5, 1.1), CURB + rnd(2.6, 5.6), front - .25, rnd(.2, .5), rnd(.2, .5), .1);   // silhouettes of people and desks inside
   // framed screens on the facade (the posters themselves are added live in policeFx)
   const screens = [];
@@ -1090,9 +1090,9 @@ function buildPoliceStation(m){
   screen(Fl, -.1, CURB + 4.2, 2.2, 2.34);
   m.screens = screens;
   // the badge and the POLICE fascia over the entrance
-  box(M.polDark, Ff, -1.2, CURB + 6.0, .1, 3.0, .7, .12);
-  plant('sign_policetext', Ff, -1.85, CURB + 6.0, .18, 1.1, 'c', true); glow(Ff, -1.85, CURB + 6.0, .4, 'cyan', 1.4);
-  plant('sign_police', Ff, -.25, CURB + 6.0, .18, .55, 'c', true); glow(Ff, -.25, CURB + 6.0, .4, 'blue', 1.6);
+  box(M.polDark, Ff, -1.2, CURB + 6.0, .14, 3.0, .6, .12);
+  plant('sign_policetext', Ff, -1.85, CURB + 6.0, .23, 1.1, 'c', true); glow(Ff, -1.85, CURB + 6.0, .4, 'cyan', 1.4);
+  plant('sign_police', Ff, -.25, CURB + 6.0, .23, .55, 'c', true); glow(Ff, -.25, CURB + 6.0, .4, 'blue', 1.6);
   plant('sign_police', Fr, -2.3, CURB + 4.7, .05, .7, 'c', true); glow(Fr, -2.3, CURB + 4.7, .3, 'blue', 1.6);
   // vents and service doors on the side, like the reference
   box(M.polDark, Fr, -3.2, CURB + 1.0, .02, .9, 1.9, .04); box(M.polFrame, Fr, -3.2, CURB + 2.1, .06, 1.0, .1, .1);

@@ -41,8 +41,11 @@ const gData = new Uint8Array([72,72,72,255, 150,150,150,255, 255,255,255,255]);
 const gradTex = new THREE.DataTexture(gData, 3, 1, THREE.RGBAFormat);
 gradTex.minFilter = gradTex.magFilter = THREE.NearestFilter; gradTex.generateMipmaps = false; gradTex.needsUpdate = true;
 const ALL_MATS = [];
-const EM_KIND = { window:1, bulb:2, neon:3, trim:4 };   // anything else that glows is kind 5 (fixed brightness)
-const EM_I = { value: [0, .22, .3, .6, .45, 1.3] };
+const EM_KIND = { window:1, bulb:2, neon:3, trim:4, blink:6 };   // anything else that glows is kind 5 (fixed brightness)
+const EM_I = { value: [0, .22, .3, .6, .45, 1.3, 1.7] };
+// Aircraft-warning lights: red lights that blink on and off together, with the blink travelling up the height of
+// a structure (a light's phase comes from its height), so a tower's lights chase upward.
+const BLINK_GLSL = `float blink(float y, float t){ return step(fract(t*0.7 - y*0.045), 0.34); }`;
 
 function toon(hex, o={}){
   const m = new THREE.MeshToonMaterial({ color:hex, gradientMap:gradTex });
@@ -92,7 +95,7 @@ const glowTex = (() => { const c=document.createElement('canvas'); c.width=c.hei
   const gr=g.createRadialGradient(16,16,0,16,16,16); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(.3,'rgba(255,255,255,.5)'); gr.addColorStop(1,'rgba(255,255,255,0)');
   g.fillStyle=gr; g.fillRect(0,0,32,32); return new THREE.CanvasTexture(c); })();
 const GLOW = {};
-[['pink',0xFF4FA3],['cyan',0x38E8E0],['amber',0xFFB347],['warm',0xFFCF7A],['blue',0x5ab8ff],['red',0xff2a2a]].forEach(([k,hex]) => {
+[['pink',0xFF4FA3],['cyan',0x38E8E0],['amber',0xFFB347],['warm',0xFFCF7A],['blue',0x5ab8ff],['red',0xff2a2a],['blink',0xff2a2a]].forEach(([k,hex]) => {
   GLOW[k] = new THREE.SpriteMaterial({ map:glowTex, color:hex, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true });
 });
 const NEON_GLOW = new Map([[M.neonPink,'pink'],[M.neonCyan,'cyan'],[M.neonAmber,'amber']]);

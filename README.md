@@ -46,6 +46,7 @@ js/ground.js            streets, sidewalks, bridges and cables between buildings
 js/vehicles.js          hover cars, delivery drones, their shadows, chimney steam
 js/sky.js               time of day, the pixel composite (outlines, sky, stars, rain, reflections, light shafts), clouds
 js/audio.js             sound effects (Web Audio), volume setting
+js/mega.js              megastructures: unlocking, placing, removing; the radio station
 js/world.js             the game world: cells, building stacks, batching, edits, build and remove animations, saving
 js/input.js             camera, mouse / touch / keyboard, settings panel
 js/main.js              start-up and the frame loop
@@ -56,6 +57,17 @@ assets/audio/sfx/originals/  the untouched source recordings, for re-editing
 ```
 
 The scripts are ordinary (non-module) scripts that share one scope, so the order in `index.html` matters.
+
+## Megastructures
+
+Landmarks that take over a 2x2 block of plots once the city is big enough. Each exists at most once.
+
+- **Radio station:** unlocks when there are 20 building sections of every zone. From then on, each build has a
+  1 in 30 chance of bringing it in, on the 2x2 block nearest that build (replacing what stood there). Right-click
+  removes it; it can come back once the city meets the requirement again.
+- New megastructures go in `MEGA_TYPES` at the top of `js/mega.js`.
+- For testing, open the game with `#dev` at the end of the address and press **M** to bring in (or remove) the
+  radio station next to the plot under the pointer, skipping the requirement and the odds.
 
 ## Adding art and sound
 

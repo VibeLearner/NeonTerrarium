@@ -52,7 +52,7 @@ function applyTime(){
     const g = m.userData.glow; if (!g) continue;
     m.emissiveIntensity = g==='window' ? .22+1.1*night : g==='bulb' ? .3+1.2*night : g==='neon' ? .6+1.0*night : g==='trim' ? .45+.9*night : 1.3;
   }
-  { const e = EM_I.value; e[1] = .22+1.1*night; e[2] = .3+1.2*night; e[3] = .6+1.0*night; e[4] = .45+.9*night; e[5] = 1.3; }
+  { const e = EM_I.value; e[1] = .22+1.1*night; e[2] = .3+1.2*night; e[3] = .6+1.0*night; e[4] = .45+.9*night; e[5] = 1.3; e[6] = 1.5+.4*night; }
   for (const k of ['pink','cyan','amber','warm']) GLOW[k].opacity = .1 + .8*night;
   GLOW.red.opacity = .95;
   GLOW_NIGHT.value = .1 + .8*night;

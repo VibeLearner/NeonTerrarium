@@ -75,6 +75,17 @@ const GLYPH_V = [], GLYPH_H = [], GLYPH_GLOW = {};
   for (let i=0;i<14;i++) make(true, i);
   for (let i=0;i<14;i++) make(false, i);
 })();
+// The radio station's red ON AIR sign, drawn in a 3x5 pixel font
+(function onAirSign(){
+  const F = { O:['111','101','101','101','111'], N:['1001','1101','1011','1001','1001'], A:['010','101','111','101','101'], I:['111','010','010','010','111'], R:['110','101','110','101','101'], ' ':['0','0','0','0','0'] };
+  const text = 'ON AIR', w = 4 + [...text].reduce((s, ch) => s + F[ch][0].length + 1, -1), h = 9;
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  g.fillStyle = '#1a0c12'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#ff3b3b'; g.fillRect(0,0,w,1); g.fillRect(0,h-1,w,1); g.fillRect(0,0,1,h); g.fillRect(w-1,0,1,h);
+  g.fillStyle = '#ff5a4a'; let x = 2;
+  for (const ch of text){ const rows = F[ch]; rows.forEach((r, yy) => [...r].forEach((b, xx) => { if (b === '1') g.fillRect(x + xx, 2 + yy, 1, 1); })); x += rows[0].length + 1; }
+  SPR.img.sign_onair = c.toDataURL(); SPR.size.sign_onair = [w, h]; SPR.anchor.sign_onair = .5;
+})();
 // All sprites share one texture atlas and one material, so a whole region's plants, laundry and signs
 // are a single instanced draw call. The layout is computed from the known sizes right away; each image is
 // painted into its slot as soon as it has loaded.
@@ -244,7 +255,7 @@ const GLOW_PTS_UNI = { scale:{ value: 20 } };
 const GLOW_NIGHT = { value: 1 };
 const GLOW_PTS = new THREE.ShaderMaterial({
   uniforms: { map:{ value: glowTex }, nightOp: GLOW_NIGHT, scale: GLOW_PTS_UNI.scale, time: FOL_UNI.time },
-  vertexShader: 'attribute float size; attribute vec4 aCol; attribute float aFlk; uniform float scale; uniform float nightOp; uniform float time; varying vec4 vCol;' + FLK_GLSL + ' void main(){ vCol = vec4(aCol.rgb, (aCol.a < 0.0 ? nightOp : aCol.a) * flicker(aFlk, time)); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale; }',
+  vertexShader: 'attribute float size; attribute vec4 aCol; attribute float aFlk; uniform float scale; uniform float nightOp; uniform float time; varying vec4 vCol;' + FLK_GLSL + BLINK_GLSL + ' void main(){ float op = aCol.a < -1.5 ? mix(0.04, 1.0, blink(position.y, time)) : (aCol.a < 0.0 ? nightOp : aCol.a); vCol = vec4(aCol.rgb, op * flicker(aFlk, time)); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale; }',
   fragmentShader: 'uniform sampler2D map; varying vec4 vCol; void main(){ float a = texture2D(map, gl_PointCoord).a; gl_FragColor = vec4(vCol.rgb, a * vCol.a); }',
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
 });
@@ -255,7 +266,7 @@ function glowPoints(gl){
   const pos = new Float32Array(n*3), size = new Float32Array(n), col = new Float32Array(n*4), flk = new Float32Array(n);
   let i = 0;
   for (const k in gl){
-    const arr = gl[k], c = GLOW[k].color, op = GLOW_FIXED[k] !== undefined ? GLOW_FIXED[k] : -1;
+    const arr = gl[k], c = GLOW[k].color, op = k === 'blink' ? -2 : GLOW_FIXED[k] !== undefined ? GLOW_FIXED[k] : -1;
     for (let q=0;q<arr.length;q+=4, i++){
       pos[i*3] = arr[q]; pos[i*3+1] = arr[q+1]; pos[i*3+2] = arr[q+2]; size[i] = arr[q+3];
       col[i*4] = c.r; col[i*4+1] = c.g; col[i*4+2] = c.b; col[i*4+3] = op;

@@ -330,6 +330,7 @@ const vShadow = (() => {
 function surfaceAt(x, z){
   const c = cells.get(ckey(Math.round(x/LOT), Math.round(z/LOT)));
   if (!c) return null;
+  if (c.mega) return c.height;
   if (c.sections.length && Math.abs(x - c.x) < SIDE/2 && Math.abs(z - c.z) < SIDE/2) return c.height;
   return CURB + .06;
 }

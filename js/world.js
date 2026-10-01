@@ -41,9 +41,9 @@ const ATLAS = new THREE.MeshToonMaterial({ color:0xffffff, gradientMap:gradTex, 
 ATLAS.onBeforeCompile = sh => {
   sh.uniforms.emI = EM_I; sh.uniforms.fTime = FOL_UNI.time; sh.uniforms.lodFine = LOD.fine;
   sh.vertexShader = sh.vertexShader
-    .replace('#include <common>', '#include <common>\nattribute vec4 aEm; attribute float aFlk; attribute float aFine; uniform float emI[6]; uniform float fTime; uniform float lodFine; varying vec3 vEmis;' + FLK_GLSL)
+    .replace('#include <common>', '#include <common>\nattribute vec4 aEm; attribute float aFlk; attribute float aFine; uniform float emI[7]; uniform float fTime; uniform float lodFine; varying vec3 vEmis;' + FLK_GLSL + BLINK_GLSL)
     .replace('#include <project_vertex>', '#include <project_vertex>\n' + LOD_CULL_GLSL)
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEmis = aEm.rgb * emI[int(aEm.a*255.0 + .5)] * flicker(aFlk, fTime);');
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nint ek = int(aEm.a*255.0 + .5); vEmis = aEm.rgb * emI[ek] * flicker(aFlk, fTime);\nif (ek == 6) vEmis *= mix(0.05, 1.0, blink((modelMatrix * vec4(transformed, 1.0)).y, fTime));');
   sh.fragmentShader = sh.fragmentShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vEmis;')
     .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = vEmis;');
@@ -131,6 +131,7 @@ function buildPlatform(c){
     }
     if (chance(.3)) cyl(M.rust, E, rnd(-1,1), -.4, .08, .08, rnd(1,2.2), 0, PI/2);
   }
+  if (c.mega) return;   // a megastructure lays its own ground across its plots
   // surface: sidewalk and street round a building, or a small paved plaza when the spot is empty
   if (c.sections.length) groundLot({ x, z, cls: c.sections[0].zone, elev: 0, base: CURB, deck: false });
   else {
@@ -201,6 +202,7 @@ function rebuildCell(c){
   disposeData(c.data);
   c.height = CURB;
   c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length) buildStack(c); });
+  if (c.mega){ const m = megas.get(c.mega); if (m && m.roofH) c.height = m.roofH; }
   cellView(c);
   c.emitters = c.data.emitters; c.pads = c.data.pads; c.ports = c.data.ports;
   dirtyRegions.add(regKey(c.i, c.j));
@@ -208,7 +210,7 @@ function rebuildCell(c){
 function rebuildRegion(key){
   const old = regions.get(key);
   if (old){ world.remove(old); disposeGroup(old); regions.delete(key); }
-  const datas = [...cells.values()].filter(c => c.data && regKey(c.i, c.j) === key).map(c => c.data);
+  const datas = [...cells.values(), ...megas.values()].filter(c => c.data && regKey(c.i, c.j) === key).map(c => c.data);
   if (!datas.length) return;
   const g = batchGroup(datas, false); world.add(g); regions.set(key, g);
 }
@@ -256,6 +258,7 @@ function syncAgents(){
   }
   for (const c of tripCars) if (c.pad && !carPads.includes(c.pad)){ c.pad = null; c.phase = 'away'; c.g.visible = false; c.timer = 2 + Math.random()*4; }
   let top = 6; for (const c of cells.values()) if (c.height > top) top = c.height;
+  for (const m of megas.values()) if (m.top > top) top = m.top;
   skyTop = top + 2.4;
   shadowDirty = true;
   save();
@@ -267,12 +270,13 @@ function centerView(now = false){
   if (n) camGoal.set(x/n, TARGET_Y, z/n); else camGoal.set(0, TARGET_Y, 0);
   if (now) camT.copy(camGoal);
 }
-function refresh(list){
+function refresh(list, megaList = []){
   for (const c of new Set(list)) if (c) rebuildCell(c);
+  for (const m of megaList) rebuildMega(m);
   for (const k of dirtyRegions){ if (heldRegions.has(k)) pendingRegions.add(k); else rebuildRegion(k); } dirtyRegions.clear();
   rebuildConnections(); syncAgents();
 }
-function rebuildAll(){ refresh([...cells.values()]); }
+function rebuildAll(){ refresh([...cells.values()], [...megas.values()]); }
 
 /* ---------- edits ---------- */
 const newCell = (i, j, sections = []) => ({ i, j, x: i*LOT, z: j*LOT, sections, sectionTops: [], firstFloors: 2, group: null, height: CURB, ports: [], pads: [], emitters: [] });
@@ -287,6 +291,7 @@ function addPlatform(i, j, zone = null){
   holdRegion(c);
   refresh([c, ...SIDES4.map(([a,b]) => cells.get(ckey(i+a, j+b)))]);
   startAnim(c, 'build', PLAT_BOTTOM, c.height + 1.2, zone, zone ? SIDE : LOT, null);
+  if (zone) maybeSpawnMegas(c);
   return c;
 }
 function removePlatform(c){
@@ -306,6 +311,7 @@ function addSection(c, zone){
   c.sections.push({ zone, seed: (Math.random()*1e9)|0, style: styleNow() }); refresh([c]);
   dropView(old);   // the new look already contains everything below the new section
   startAnim(c, 'build', y0 - .05, c.height + 1.2, zone, SIDE, null);
+  maybeSpawnMegas(c);
 }
 function removeSection(c){
   if (!c.sections.length) return removePlatform(c);
@@ -350,7 +356,7 @@ function startAnim(c, kind, y0, y1, zone, w, old){
   const view = kind === 'build' ? c.view : old.view;
   const held = kind === 'build';   // plants and glows arrive when a build finishes, but leave as soon as a removal starts
   if (!view){ if (old) dropView(old); if (held) releaseRegion(regKey(c.i, c.j)); return; }
-  const col = new THREE.Color(zone ? ZONES[zone].col : '#e3d6bd');
+  const col = new THREE.Color(zone ? (ZONES[zone] ? ZONES[zone].col : zone) : '#e3d6bd');
   const u = { plane: new THREE.Plane(new THREE.Vector3(0, -1, 0), kind === 'build' ? y0 : y1), h: { value: y0 }, col: { value: col.clone().multiplyScalar(1.6) }, on: { value: 1 } };
   const mats = animMaterials(u);
   view.traverse(o => { if (!o.isMesh) return; o.userData.baseMat = o.material; o.material = o.material === ATLAS ? mats.atlas : o.material; o.layers.set(3); });
@@ -399,6 +405,8 @@ function finishAnimsOn(c){ for (let i = anims.length - 1; i >= 0; i--) if (anims
 function clearIsland(){
   while (anims.length) endAnim(anims.length - 1);
   for (const c of cells.values()){ disposeData(c.data); c.data = null; cellView(c); }
+  for (const m of megas.values()){ disposeData(m.data); m.data = null; cellView(m); }
+  megas.clear();
   for (const k of [...regions.keys()]){ world.remove(regions.get(k)); disposeGroup(regions.get(k)); regions.delete(k); }
   cells.clear();
   for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) cells.set(ckey(i,j), newCell(i, j));
@@ -407,12 +415,19 @@ function clearIsland(){
 
 /* ---------- saving (this browser only) ---------- */
 const SAVE_KEY = 'neonIsland.v2';
-function save(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE]))); } catch (e) {} }
+const MEGA_SAVE_KEY = 'neonIsland.megas';
+function save(){
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE])));
+    localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ kind: m.kind, i: m.i, j: m.j, seed: m.seed }))));
+  } catch (e) {}
+}
 function load(){
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!Array.isArray(d) || !d.length) return false;
     for (const [i,j,secs,st] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; cells.set(ckey(i,j), c); }
+    try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) placeMega(m.kind, m.i, m.j, m.seed); } catch (e) {}
     return true;
   } catch (e) { return false; }
 }
@@ -430,7 +445,8 @@ function pickAt(cx, cy){
     if (!best || d < best.d) best = { d, c, kind, p: _hit.clone() };
   };
   for (const c of cells.values()){
-    if (c.sections.length){ _box3.min.set(c.x - SIDE/2, CURB, c.z - SIDE/2); _box3.max.set(c.x + SIDE/2, c.height, c.z + SIDE/2); test(c, 'bld'); }
+    if (c.mega){ _box3.min.set(c.x - LOT/2, CURB, c.z - LOT/2); _box3.max.set(c.x + LOT/2, c.height, c.z + LOT/2); test(c, 'mega'); }
+    else if (c.sections.length){ _box3.min.set(c.x - SIDE/2, CURB, c.z - SIDE/2); _box3.max.set(c.x + SIDE/2, c.height, c.z + SIDE/2); test(c, 'bld'); }
     _box3.min.set(c.x - LOT/2, -.8, c.z - LOT/2); _box3.max.set(c.x + LOT/2, CURB, c.z + LOT/2); test(c, 'plat');
   }
   if (best) return best;
@@ -445,22 +461,26 @@ function pickAt(cx, cy){
 function targetOf(pk){
   if (!pk) return null;
   if (pk.kind === 'sky') return cells.has(ckey(pk.i, pk.j)) ? null : { type: 'empty', i: pk.i, j: pk.j };
-  const c = pk.c, top = pk.kind === 'bld' ? c.height : CURB;
-  if (Math.abs(pk.p.y - top) < .03) return pk.kind === 'bld' ? { type: 'up', c } : { type: 'onto', c };
+  const c = pk.c, top = pk.kind === 'plat' ? CURB : c.height;
+  if (Math.abs(pk.p.y - top) < .03){
+    if (c.mega) return null;   // nothing builds on a megastructure
+    return pk.kind === 'bld' ? { type: 'up', c } : { type: 'onto', c };
+  }
   // a side face: build next door in that direction
   const dx = pk.p.x - c.x, dz = pk.p.z - c.z;
   const [a,b] = Math.abs(dx) > Math.abs(dz) ? [Math.sign(dx), 0] : [0, Math.sign(dz)];
   const n = cells.get(ckey(c.i + a, c.j + b));
+  if (n && n.mega) return null;
   return n ? { type: 'onto', c: n } : { type: 'empty', i: c.i + a, j: c.j + b };
 }
 function applyTarget(t){
   if (!t) return null;
   const zone = S.zone;
   if (t.type === 'empty') return addPlatform(t.i, t.j, zone);
-  if (!zone) return null;
+  if (!zone || t.c.mega) return null;
   addSection(t.c, zone); return t.c;
 }
-function removeAt(pk){ if (!pk || pk.kind === 'sky') return; removeSection(pk.c); }
+function removeAt(pk){ if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMega(megas.get(pk.c.mega)); removeSection(pk.c); }
 
 /* ---------- hover outline showing where a click would build ---------- */
 const hoverMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85, depthTest: false });

@@ -59,7 +59,6 @@ input[type=range]{width:100%;accent-color:var(--cyan);margin:0}
 /* zone bar: four cut-corner boxes with a neon border, Townscaper-minimal */
 .zonebar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));display:grid;justify-items:center;gap:8px;width:max-content;max-width:calc(100% - 32px)}
 .modehint{margin:0;font-size:11px;color:var(--ink);background:rgba(10,16,32,.72);padding:3px 10px;text-align:center}
-.modehint.hint{color:var(--muted)}
 .zones{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .zone{--cut:10px;padding:1.5px;border:0;border-radius:0;background:var(--z);cursor:pointer;
   clip-path:polygon(var(--cut) 0,100% 0,100% calc(100% - var(--cut)),calc(100% - var(--cut)) 100%,0 100%,0 var(--cut));

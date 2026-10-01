@@ -4,3 +4,5 @@ node_modules/
 *.log
 .artifact/
 assets/sprites/originals/people/
+assets/sprites/originals/police/
+assets/sprites/originals/robot/

@@ -16,9 +16,13 @@
 /* ---------- the sprite sheet ---------- */
 // assets/sprites/people.png: one character per 16 px row, 20 cells of 12 px each, facing right (mirrored for
 // facing left), feet on the bottom row: 6 walk frames, 4 idle, 6 gesture (talking, ordering, serving; characters
-// without their own gesture sheet sway through their idle frames) and 4 sitting.
-const PPL = { rows: 12, cw: 12, ch: 16, walk: 6, idle: 4, W: 240, H: 192 };
-const F_IDLE = 6, F_SPEC = 10, F_SIT = 16;
+// without their own gesture sheet sway through their idle frames) and 4 sitting; cells 20 to 31 are extra
+// animations (the police officer's scanner and angry reaction). Row 12 is the police officer, row 13 the delivery
+// robot (walk 0-3, alternate walk 4-7, parcel drop 8-13, the parcel capsule opening 14-19), row 14 the emote icons.
+const PPL = { rows: 15, cw: 12, ch: 16, walk: 6, idle: 4, W: 384, H: 240 };
+const F_IDLE = 6, F_SPEC = 10, F_SIT = 16, F_USE = 20, F_ANGRY = 26;
+const ROW_COP = 12, ROW_BOT = 13, ROW_EMO = 14, CITIZEN_ROWS = 12;
+const EMO = { bang: 0, quest: 1, heart: 2, anger: 3, sweat: 4, note: 5, dots: 6, bowl: 7 };
 const PPL_TEX = new THREE.TextureLoader().load('assets/sprites/people.png');
 PPL_TEX.magFilter = PPL_TEX.minFilter = THREE.NearestFilter; PPL_TEX.generateMipmaps = false;
 const PPL_MAX = 700;          // most people drawn at once (the nearest win if more are out)
@@ -53,8 +57,8 @@ const PPL_MAT = new THREE.ShaderMaterial({
       if (c.a < 0.5) discard;
       // stepping out of (or into) a doorway: the figure dissolves in a pixel dither
       if (vSpr.w < 0.999 && (bayer(gl_FragCoord.xy) + 0.5)/16.0 > vSpr.w) discard;
-      // people catch a little of the street light, so they still read at night
-      vec3 col = c.rgb * mix(tint, vec3(1.0), 0.3);
+      // people catch a little of the street light, so they still read at night; emote bubbles are always bright
+      vec3 col = vSpr.w > 1.5 ? c.rgb : c.rgb * mix(tint, vec3(1.0), 0.3);
       gl_FragColor = normalMode > 0.5 ? vec4(0.5, 0.5, 1.0, 1.0) : vec4(col, 1.0);
     }`,
 });
@@ -325,7 +329,7 @@ const MEGA_LIFE = {
   radio:   { jobs: 6,  fun: 0,  night: .3 },
   mall:    { jobs: 8,  fun: 9 },              // per tier
   square:  { jobs: 0,  fun: 40, open: true },   // one stall keeper per food stall (see below)
-  police:  { jobs: 8,  fun: 0,  night: .4 },
+  police:  { jobs: 8,  fun: 0,  night: .4, patrol: true },
   foundry: { jobs: 14, fun: 0,  night: .35 },
 };
 const places = new Map();   // id -> { id, x, z, doors: [{ node, out:{x,z}, in:{x,z}|null, dir:[dx,dz] }], jobs, fun, open, night, cell|mega }
@@ -337,7 +341,7 @@ function u01(...a){ return hash(...a) / 4294967296; }
 const reachable = pl => !!pl && (pl.doors.length > 0 || (pl.spots && pl.spots.length > 0));
 const crossKey = (c, dx, dz) => dx + dz > 0 ? c.i + ',' + c.j + '|' + dx + ',' + dz : (c.i + dx) + ',' + (c.j + dz) + '|' + (-dx) + ',' + (-dz);
 const DOOR_COLS = [0x4f7f86, 0x8A4A2A, 0x3a4252, 0xc95a7a, 0x6fa8dc, 0xd9b43a, 0x5f7d5b, 0xE3D6BD];
-let doorList = [], hiddenDoors = [], spotByKey = new Map(), doorByKey = new Map();
+let patrolNodes = [], doorList = [], hiddenDoors = [], spotByKey = new Map(), doorByKey = new Map();
 function makeDoor(key, d, mega, old){
   const door = { key, node: ngAdd(key, d.stand.x, d.stand.z), wall: d.wall, stand: d.stand, inside: d.inside, n: d.n, mega, noDraw: !!d.noDraw,
                  open: old ? old.open : 0, want: false, col: DOOR_COLS[hash(key) % DOOR_COLS.length] };
@@ -400,6 +404,7 @@ function buildNetwork(){
     cross.set(k, p ? { key: 'x:' + k, x: p.x, z: p.z, kind: 'x' } : null);
     if (p) ngAdd('x:' + k, p.x, p.z);
   }
+  patrolNodes = [...cross.values()].filter(Boolean).map(c => ({ key: c.key, node: NG.key.get(c.key), x: c.x, z: c.z }));
   const plotEnds = new Map();   // plot key -> extra endpoints (doors, standing spots)
   const addEnd = (c, e) => { const k = ckey(c.i, c.j); (plotEnds.get(k) || plotEnds.set(k, []).get(k)).push(e); };
   const fresh = new Map();
@@ -427,7 +432,7 @@ function buildNetwork(){
   }
   for (const m of megas.values()){
     const L = MEGA_LIFE[m.kind] || { jobs: 4, fun: 0 }, tiers = m.kind === 'mall' ? m.levels : 1;
-    const pl = { id: 'm:' + m.kind, mega: m, x: m.x, z: m.z, jobs: L.jobs*tiers, fun: L.fun*tiers, night: L.night || 0, open: !!L.open, doors: [], spots: [] };
+    const pl = { id: 'm:' + m.kind, mega: m, x: m.x, z: m.z, jobs: L.jobs*tiers, fun: L.fun*tiers, night: L.night || 0, open: !!L.open, patrol: !!L.patrol, doors: [], spots: [] };
     if (L.open){
       // the spots noted while the square was built: the crowd, cafe stools, queues and stall keepers' places
       makeSpots(pl, m.data ? m.data.spots : [], c => c && c.mega === m.kind, oldSpots, addEnd);
@@ -498,6 +503,9 @@ function updateDoors(dt){
   for (const p of pplList){ const w = p.walk; if (!w) continue;
     if (w.doorA && w.s < .55) w.doorA.want = true;
     if (w.doorB && w.len - w.s < .8) w.doorB.want = true; }
+  for (const b of bots){ const w = b.walk;
+    if (w){ if (w.doorA && w.s < .55) w.doorA.want = true; if (w.doorB && w.len - w.s < .8) w.doorB.want = true; }
+    if (b.state === 'drop' && pplNow - b.t0 > 1.6 && b.door) b.door.want = true; }   // someone opens up to take the parcel
   let moved = false;
   for (let i = 0; i < doorList.length && i < DOOR_MAX; i++){
     const d = doorList[i], o = Math.max(0, Math.min(1, d.open + (d.want ? 1 : -1)*dt/.2));
@@ -514,7 +522,7 @@ function updateDoors(dt){
 function makePerson(id, home){
   const u = k => u01(id, k);
   const wake = span(u('wake'), 6, 8.5);
-  return { id, home, job: null, wantsJob: u('emp') < .8, courier: u('courier') < .2, row: hash(id, 'look') % PPL.rows,
+  return { id, home, job: null, wantsJob: u('emp') < .8, courier: u('courier') < .2, row: hash(id, 'look') % CITIZEN_ROWS,
            speed: PPL_SPEED*span(u('speed'), .85, 1.15),
            wake, bed: (22 + 6*u('bed')**2) % 24, outgoing: span(u('out'), .25, .9), nightShift: u('night'),
            workS: span(u('ws'), 7.5, 9.5), workLen: span(u('wl'), 7.5, 9),
@@ -559,14 +567,15 @@ function syncJobs(){
     let r = rr()*tot, k = 0; while (k < w.length - 1 && (r -= w[k]) > 0) k++;
     p.job = open[k].id; used.set(p.job, (used.get(p.job) || 0) + 1);
   }
-  // the stalls are always staffed: if nobody's looking for work, people living nearby swap their job for one
-  const sq = places.get('m:square');
-  if (sq){
+  // the stalls and the police station are always staffed: if nobody's looking for work, people living nearby
+  // swap their job for one
+  for (const sq of [places.get('m:square'), places.get('m:police')]){
+    if (!sq) continue;
     let need = sq.jobs - [...people.values()].filter(p => p.job === sq.id).length;
     if (need > 0){
       const near = [...people.values()].filter(p => p.job !== sq.id && p.wantsJob && places.get(p.home))
         .sort((a, b) => { const ha = places.get(a.home), hb = places.get(b.home); return Math.hypot(ha.x - sq.x, ha.z - sq.z) - Math.hypot(hb.x - sq.x, hb.z - sq.z) || (a.id < b.id ? -1 : 1); });
-      for (const p of near){ if (need <= 0) break; p.job = sq.id; need--; }
+      for (const p of near){ if (need <= 0) break; if (p.job === 'm:square' || p.job === 'm:police') continue; p.job = sq.id; need--; }
     }
   }
   assignStalls();
@@ -578,6 +587,7 @@ function assignStalls(){
   const ids = sq ? [...sq.stalls.keys()].sort((a, b) => a - b) : [];
   staff.forEach((p, k) => { p.stall = ids[k % ids.length]; });
   for (const p of people.values()) if (!sq || p.job !== sq.id) p.stall = null;
+  for (const p of people.values()){ const j = p.job && places.get(p.job); p.cop = !!(j && j.patrol); }   // police staff wear the uniform
 }
 
 /* ---------- routines ---------- */
@@ -592,10 +602,11 @@ function desire(p, h){
   p.nightWorker = !!(job && job.night && p.nightShift < job.night);
   p.ws = p.nightWorker ? 21 + p.nightShift*4 : p.workS; p.wlen = p.workLen;
   if (job && job.stalls){ p.ws = p.nightShift < .5 ? 16.5 : 10; p.wlen = 7.5; }   // day market 10:00 to 17:30, night market 16:30 to midnight
+  if (job && job.patrol){ const k = Math.min(2, Math.floor(p.nightShift*3)); p.ws = [7, 15, 23][k]; p.wlen = 8; p.nightWorker = k === 2; }   // police: three shifts round the clock
   if (p.chain && !asleep(p, h) && !working(p, h)) return p.at;   // finish what they started (ordered food: now eat it)
   if (asleep(p, h) && !working(p, h)) return p.home;              // (a night-market shift runs past some keepers' usual bedtime)
   if (working(p, h)){
-    if (job && job.stalls) return p.job;   // stall keepers stay at their counter all shift
+    if (job && (job.stalls || job.patrol)) return p.job;   // stall keepers stay at their counter, officers on their beat
     if (h >= 12 && h < 13.5 && !p.nightWorker && pplRand() < .3) return leisure(p) || p.job;   // out for lunch
     return p.courier ? errand(p) : p.job;
   }
@@ -624,7 +635,7 @@ function stayFor(p, pl){
   if (p.spot && p.spot.kind === 'seat') return 25 + pplRand()*45;
   if (p.spot && pl.stalls && p.spot.kind === 'stand') return 30 + pplRand()*60;   // hanging out in the square
   if (pl.id === p.home) return 25 + pplRand()*60;
-  if (pl.id === p.job) return 50 + pplRand()*100;
+  if (pl.id === p.job) return p.cop ? 5 + pplRand()*12 : 50 + pplRand()*100;   // officers don't linger at the desk
   return 15 + pplRand()*45;
 }
 const pplRand = Math.random;   // moment-to-moment choices; who people are is seeded above
@@ -662,6 +673,7 @@ function startTrip(p, toId){
   if (!from || !to || !reachable(to)) return false;
   let a, head = [], dA = null;
   if (p.spot){ a = p.spot.node; head = [[p.spot.x, p.spot.z], [p.spot.ax, p.spot.az]]; }   // up off the seat, out from the counter
+  else if (p.patrol) a = p.patrol.node;                                                     // an officer out on the beat
   else { if (!from.doors.length) return false; dA = nearestOf(from.doors, to.x, to.z); a = dA.node; head = [[dA.inside.x, dA.inside.z], [dA.wall.x, dA.wall.z]]; }
   let b, tail = [], dB = null, spot = null;
   if (to.open){ spot = pickSpot(to, from, p); if (!spot || spot === p.spot) return false; b = spot.node; tail = [[spot.ax, spot.az], [spot.x, spot.z]]; }
@@ -671,28 +683,54 @@ function startTrip(p, toId){
   const cum = [0];
   for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
   if (p.spot){ p.spot.by = null; p.spot = null; }
+  p.patrol = null;
   if (spot) spot.by = p.id;
   // safe0..safe1: the stretch on the walking network (before and after it: doorways, seats, counters)
   p.walk = { pts, cum, len: cum[cum.length - 1], s: 0, to: toId, doorA: dA, doorB: dB, spot, safe0: cum[head.length], safe1: cum[pts.length - 1 - tail.length] };
   return true;
 }
+// Police officers on duty walk a beat: from the station (or where they stand) to a street crossing a few blocks
+// away, where they stop and scan for a while, then on to the next. Now and then they head back to the station.
+function startPatrol(p){
+  const st = places.get(p.job); if (!st || !patrolNodes.length) return false;
+  let a, head = [], dA = null;
+  if (p.patrol) a = p.patrol.node;
+  else { if (p.at !== p.job || !st.doors.length) return false; dA = st.doors[Math.floor(pplRand()*st.doors.length)]; a = dA.node; head = [[dA.inside.x, dA.inside.z], [dA.wall.x, dA.wall.z]]; }
+  const cand = patrolNodes.filter(c => c.node !== a && Math.hypot(c.x - st.x, c.z - st.z) < 26);
+  if (!cand.length) return false;
+  const tg = cand[Math.floor(pplRand()*cand.length)], mid = route(a, tg.node); if (!mid) return false;
+  const pts = head.concat(mid), cum = [0];
+  for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+  p.walk = { pts, cum, len: cum[cum.length - 1], s: 0, to: p.job, doorA: dA, doorB: null, spot: null, beat: tg, safe0: cum[head.length], safe1: cum[cum.length - 1] };
+  p.patrol = null;
+  return true;
+}
 // decide what to do next once the current stay is over
 function decide(p){
+  if (p.cop && working(p, S.hour) && desire(p, S.hour) === p.job && (p.patrol || p.at === p.job)){
+    const back = p.patrol && pplRand() < .15;   // back to the station for a bit
+    if (!back && (p.patrol || pplRand() < .85) && startPatrol(p)) return;
+    if (back && startTrip(p, p.job)) return;
+    p.until = pplNow + 10 + pplRand()*20; return;
+  }
   const want = desire(p, S.hour) || p.home;
   p.walkedFor = (want !== p.job && want !== p.home && working(p, S.hour)) ? 'errand' : null;
   const chained = p.chain && want === p.at;   // move within the place: from the queue to a seat to eat
+  if (chained && p.spot && p.spot.kind === 'queue') p.fed = true;   // walking off with their food
   const ok = !(want === p.at && !chained) && places.has(want) && startTrip(p, want);
   p.chain = null;
   if (!ok) p.until = pplNow + 15 + pplRand()*40;
 }
 function arrive(p){
   const w = p.walk; p.walk = null;
+  if (w.beat){ p.at = w.to; p.patrol = w.beat; p.until = pplNow + 4 + pplRand()*7; return; }
+  if (w.spot && w.spot.kind === 'seat' && p.fed){ p.fed = false; emote(p, 'bowl', 2.8); }
   p.at = w.to; p.spot = w.spot;
   if (p.spot && p.spot.kind === 'queue') p.chain = 'eat';
   const pl = places.get(p.at);
   p.until = pplNow + (pl ? stayFor(p, pl) : 20);
 }
-const sendHome = p => { if (p.spot && p.spot.by === p.id) p.spot.by = null; p.chain = null; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
+const sendHome = p => { if (p.spot && p.spot.by === p.id) p.spot.by = null; p.chain = null; p.patrol = null; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
 
 /* ---------- keeping up with the city ---------- */
 let pplReady = false, pplNow = 0, pplHour = S.hour, pplCursor = 0, pplList = [];
@@ -711,7 +749,9 @@ function syncPeople(){
       if (w.doorA) w.doorA = doorByKey.get(w.doorA.key) || null;
       if (w.doorB) w.doorB = doorByKey.get(w.doorB.key) || null;
       if (w.spot){ const sp = spotByKey.get(w.spot.key); if (sp && (!sp.by || sp.by === p.id)){ sp.by = p.id; w.spot = sp; } else { sendHome(p); continue; } }
+      if (w.beat){ const n = NG.key.get(w.beat.key); if (n === undefined){ sendHome(p); continue; } w.beat.node = n; }
     } else if (!places.has(p.at)) sendHome(p);
+    else if (p.patrol){ const n = NG.key.get(p.patrol.key); if (n === undefined) sendHome(p); else p.patrol.node = n; }
     else if (p.spot){ const sp = spotByKey.get(p.spot.key); if (sp && (!sp.by || sp.by === p.id)){ sp.by = p.id; p.spot = sp; } else sendHome(p); }
   }
   // newcomers: a fresh household is at home and comes out soon; on load, people are already wherever the hour says
@@ -726,6 +766,111 @@ function syncPeople(){
   }
   pplList = [...people.values()];
   pplReady = true;
+  syncBots();
+}
+
+/* ---------- delivery robots ---------- */
+// Little hover bots carry parcels from shops to homes along the same sidewalk network. Each one belongs to a shop:
+// it glides out of the shop's door, crosses town to a home, lowers a parcel capsule onto the step, the door
+// opens to take it in, and the bot heads back (or straight on to another drop). About one bot for every two shops.
+const bots = [];
+const BOT_SPEED = .75;
+function walkOf(pts, extra){ const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1])); return Object.assign({ pts, cum, len: cum[cum.length - 1], s: 0 }, extra); }
+function syncBots(){
+  const hubs = [...places.values()].filter(pl => pl.cell && pl.fun >= 2.5 && pl.doors.length);
+  const homes = new Set(); for (const p of people.values()) homes.add(p.home);
+  botHomes = [...homes].map(id => places.get(id)).filter(pl => pl && pl.doors.length);
+  const want = hubs.length ? Math.min(30, Math.ceil(hubs.length/2)) : 0;
+  while (bots.length > want) bots.pop();
+  while (bots.length < want) bots.push({ id: bots.length, state: 'in', until: pplNow + Math.random()*12, walk: null, x: 0, z: 0, flip: 1, phase: Math.random()*10, gait: Math.random() < .5 ? 0 : 4 });
+  hubs.sort((a, b) => a.id < b.id ? -1 : 1);
+  for (const b of bots){
+    if (!b.hub || !places.has(b.hub)) b.hub = hubs[hash('bot', b.id) % hubs.length].id;
+    if (b.walk){
+      const w = b.walk, gone = w.pts.some(([x, z]) => !cells.has(ckey(Math.round(x/LOT), Math.round(z/LOT))));
+      if (w.doorA) w.doorA = doorByKey.get(w.doorA.key) || null;
+      if (w.doorB) w.doorB = doorByKey.get(w.doorB.key) || null;
+      if (gone){ b.walk = null; b.state = 'in'; b.until = pplNow + 5; }
+    }
+    if (b.door) b.door = doorByKey.get(b.door.key) || null;
+    if (b.state === 'drop' && !b.door){ b.state = 'in'; b.until = pplNow + 5; }
+  }
+}
+let botHomes = [];
+function botNext(b){
+  const hub = places.get(b.hub); if (!hub || !hub.doors.length || !botHomes.length){ b.until = pplNow + 10; return; }
+  const from = b.state === 'drop' ? null : hub.doors[0];
+  const ox = from ? hub.x : b.x, oz = from ? hub.z : b.z;
+  const near = botHomes.filter(pl => pl !== hub && Math.hypot(pl.x - ox, pl.z - oz) < 30);
+  const back = b.state === 'drop' && (pplRand() < .45 || !near.length);
+  if (back){   // home to the shop, in through its door
+    const d = hub.doors[0], mid = route(b.door.node, d.node);
+    if (mid){ b.walk = walkOf(mid.concat([[d.wall.x, d.wall.z], [d.inside.x, d.inside.z]]), { doorA: null, doorB: d, home: true }); b.state = 'go'; b.door = null; return; }
+  }
+  if (!near.length){ b.until = pplNow + 15; return; }
+  const to = near[Math.floor(pplRand()*near.length)], dB = nearestOf(to.doors, ox, oz);
+  const a = from ? from.node : b.door.node, mid = route(a, dB.node);
+  if (!mid){ b.until = pplNow + 8; return; }
+  const head = from ? [[from.inside.x, from.inside.z], [from.wall.x, from.wall.z]] : [];
+  b.walk = walkOf(head.concat(mid), { doorA: from, doorB: null, target: dB }); b.state = 'go'; b.door = null;
+}
+function updateBots(dt, t){
+  // fewer deliveries in the small hours
+  const slow = S.hour < 6 || S.hour >= 23 ? 3 : 1;
+  for (const b of bots){
+    if (b.state === 'in'){ if (t >= b.until) botNext(b); continue; }
+    if (b.state === 'drop'){ if (t - b.t0 > 3.6){ b.cap = null; botNext(b); } continue; }
+    const w = b.walk; if (!w) { b.state = 'in'; continue; }
+    if (!(b.pause > t)) w.s += dt*BOT_SPEED;
+    if (w.s >= w.len){
+      b.walk = null;
+      if (w.home){ b.state = 'in'; b.until = t + (6 + pplRand()*14)*slow; continue; }
+      // at the door: lower the parcel just in front of it
+      const d = w.target; b.state = 'drop'; b.t0 = t; b.door = d;
+      b.x = d.stand.x; b.z = d.stand.z;
+      b.cap = { x: d.wall.x + d.n[0]*.14, z: d.wall.z + d.n[1]*.14 };
+      continue;
+    }
+    let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
+    const a = w.pts[k - 1], c = w.pts[k], seg = w.cum[k] - w.cum[k - 1] || 1, u = (w.s - w.cum[k - 1])/seg;
+    b.x = a[0] + (c[0] - a[0])*u; b.z = a[1] + (c[1] - a[1])*u; b.dx = c[0] - a[0]; b.dz = c[1] - a[1];
+    const sd = b.dx*_camR.x + b.dz*_camR.z; if (Math.abs(sd) > 1e-3) b.flip = sd < 0 ? -1 : 1;
+  }
+}
+
+/* ---------- bumping into each other, and emotes ---------- */
+function emote(p, kind, dur = 2.2){ p.emo = EMO[kind]; p.emoUntil = pplNow + dur; }
+// Walkers (and bots) coming at each other on a narrow path sometimes bump: both stop for a moment and react, with
+// a bubble over their heads (or, for a police officer, a proper scowl). A short cooldown stops the same pair
+// bumping again as they pass.
+const _bumpGrid = new Map();
+function checkBumps(t){
+  _bumpGrid.clear();
+  const movers = [];
+  for (const p of pplList){ const w = p.walk; if (!w || w.s < w.safe0 || w.s > w.safe1 || p.pause > t) continue; movers.push(p); }
+  for (const b of bots) if (b.walk && b.state === 'go' && !(b.pause > t) && b.walk.s > .6 && b.walk.len - b.walk.s > .6) movers.push(b);
+  for (const m of movers){ const k = Math.floor(m.x*2) + ',' + Math.floor(m.z*2); let l = _bumpGrid.get(k); if (!l) _bumpGrid.set(k, l = []); l.push(m); }
+  for (const m of movers){
+    if (m.bumpCD > t) continue;
+    const gx = Math.floor(m.x*2), gz = Math.floor(m.z*2);
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++){
+      const l = _bumpGrid.get((gx + dx) + ',' + (gz + dz)); if (!l) continue;
+      for (const o of l){
+        if (o === m || o.bumpCD > t || m.bumpCD > t) continue;
+        if ((m.x - o.x)**2 + (m.z - o.z)**2 > .27*.27) continue;
+        // only head-on or crossing paths, not someone walking the same way just behind
+        if (((m.dx || 0)*(o.dx || 0) + (m.dz || 0)*(o.dz || 0)) > 0) continue;
+        if (pplRand() > .55){ m.bumpCD = o.bumpCD = t + 3; continue; }   // most of the time they just squeeze past
+        m.pause = o.pause = t + .9; m.bumpCD = o.bumpCD = t + 6;
+        for (const [a, other] of [[m, o], [o, m]]){
+          if (a.gait !== undefined){ a.emo = EMO.quest; a.emoUntil = t + 1.6; continue; }   // a bot: puzzled beep
+          if (other.gait !== undefined){ emote(a, 'bang', 1.6); continue; }
+          if (a.cop){ emote(a, 'anger', 1.8); a.angry = t + .9; continue; }
+          const r = pplRand(); emote(a, r < .35 ? 'sweat' : r < .6 ? 'bang' : r < .8 ? 'anger' : 'quest', 1.8);
+        }
+      }
+    }
+  }
 }
 
 /* ---------- every frame ---------- */
@@ -742,25 +887,36 @@ function updatePeople(dt, t){
     if (!p.walk && pplNow >= p.until) decide(p);
   }
   pplCursor = n ? (pplCursor + slice) % n : 0;
-  // move walkers and fill the draw batch with everyone on show
   _camR.set(1, 0, 0).applyQuaternion(cam.quaternion);
+  updateBots(dt, t);
+  checkBumps(t);
+  // fill the draw batch with everyone on show
   const pos = pplMesh.geometry.attributes.aPos, spr = pplMesh.geometry.attributes.aSpr, P = pos.array, Q = spr.array;
   const VP = comp.uniforms.VP.value;
+  let i = 0;
+  const emit = (x, y, z, row, frame, flip, alpha) => {
+    if (i >= PPL_MAX) return false;
+    _pv.set(x, y, z).applyMatrix4(VP);
+    if (_pv.x < -1.1 || _pv.x > 1.1 || _pv.y < -1.15 || _pv.y > 1.1) return false;
+    P[i*3] = x; P[i*3 + 1] = y; P[i*3 + 2] = z;
+    Q[i*4] = row; Q[i*4 + 1] = frame; Q[i*4 + 2] = flip; Q[i*4 + 3] = alpha;
+    i++; return true;
+  };
   // which stalls are being served, and who's queueing where
   const served = new Set(), queued = new Set();
   for (const p of pplList) if (!p.walk && p.spot){ if (p.spot.kind === 'vendor') served.add(p.spot.stall); else if (p.spot.kind === 'queue') queued.add(p.spot.stall); }
-  let i = 0;
   for (const p of pplList){
     let alpha = 1, walking = false, y = CURB, frame = 0;
+    const paused = p.pause > t;
     if (p.walk){
-      const w = p.walk; w.s += dt*p.speed;
-      if (w.s >= w.len){ arrive(p); if (!p.spot) continue; }
+      const w = p.walk; if (!paused) w.s += dt*p.speed;
+      if (w.s >= w.len){ arrive(p); if (!p.spot && !p.patrol) continue; }
       else {
         walking = true;
         let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
         const a = w.pts[k - 1], b = w.pts[k], seg = w.cum[k] - w.cum[k - 1] || 1, u = (w.s - w.cum[k - 1])/seg;
-        p.x = a[0] + (b[0] - a[0])*u; p.z = a[1] + (b[1] - a[1])*u;
-        const sd = (b[0] - a[0])*_camR.x + (b[1] - a[1])*_camR.z;
+        p.x = a[0] + (b[0] - a[0])*u; p.z = a[1] + (b[1] - a[1])*u; p.dx = b[0] - a[0]; p.dz = b[1] - a[1];
+        const sd = p.dx*_camR.x + p.dz*_camR.z;
         if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
         // through the doorway: dissolving in from the hallway, or out as they step inside
         if (w.doorA) alpha = Math.min(alpha, (w.s - .05)/.3);
@@ -768,27 +924,43 @@ function updatePeople(dt, t){
       }
     }
     if (!walking){
-      const sp = p.spot; if (!sp) continue;
-      p.x = sp.x; p.z = sp.z; y = sp.y;
-      let face = sp.face, gest = false;
-      if (sp.kind === 'seat'){ y = sp.y - .09; frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4; }
-      else {
-        if (sp.kind === 'vendor') gest = queued.has(sp.stall) && Math.floor(t*.5 + p.phase) % 3 > 0;      // serving
-        else if (sp.kind === 'queue') gest = served.has(sp.stall) && Math.floor(t*.4 + p.phase) % 2 === 0;   // ordering
-        else { const mate = sp.near.find(o => o.by && people.get(o.by) && !people.get(o.by).walk);           // chatting
-          if (mate){ face = [mate.x - sp.x, mate.z - sp.z]; gest = Math.floor(t*.45 + p.phase) % 2 === 0; } else face = null; }
-        frame = gest ? F_SPEC + Math.floor(t*6 + p.phase) % 6 : F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
+      if (p.patrol){
+        // on the beat: standing at a crossing, now and then scanning with the handheld
+        p.x = p.patrol.x; p.z = p.patrol.z;
+        frame = Math.floor(t*.3 + p.phase) % 2 ? F_USE + Math.floor(t*6 + p.phase) % 6 : F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
+      } else {
+        const sp = p.spot; if (!sp) continue;
+        p.x = sp.x; p.z = sp.z; y = sp.y;
+        let face = sp.face, gest = false;
+        if (sp.kind === 'seat'){ y = sp.y - .09; frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4; }
+        else {
+          if (sp.kind === 'vendor') gest = queued.has(sp.stall) && Math.floor(t*.5 + p.phase) % 3 > 0;      // serving
+          else if (sp.kind === 'queue'){ gest = served.has(sp.stall) && Math.floor(t*.4 + p.phase) % 2 === 0;  // ordering
+            if (!served.has(sp.stall) && !(p.emoUntil > t) && pplRand() < dt*.06) emote(p, 'dots', 2); }   // waiting for the keeper
+          else { const mate = sp.near.find(o => o.by && people.get(o.by) && !people.get(o.by).walk);           // chatting
+            if (mate){ face = [mate.x - sp.x, mate.z - sp.z]; gest = Math.floor(t*.45 + p.phase) % 2 === 0;
+              if (!(p.emoUntil > t) && pplRand() < dt*.05) emote(p, pplRand() < .4 ? 'note' : pplRand() < .5 ? 'heart' : 'bang', 2.2); }
+            else face = null; }
+          frame = gest ? F_SPEC + Math.floor(t*6 + p.phase) % 6 : F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
+        }
+        if (face){ const sd = face[0]*_camR.x + face[1]*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }
       }
-      if (face){ const sd = face[0]*_camR.x + face[1]*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }
     }
-    if (i >= PPL_MAX) break;
-    // skip anyone off screen
-    _pv.set(p.x, CURB, p.z).applyMatrix4(VP);
-    if (_pv.x < -1.1 || _pv.x > 1.1 || _pv.y < -1.15 || _pv.y > 1.1) continue;
-    if (walking) frame = Math.floor(t*9*p.speed/PPL_SPEED + p.phase) % PPL.walk;
-    P[i*3] = p.x; P[i*3 + 1] = y; P[i*3 + 2] = p.z;
-    Q[i*4] = p.row; Q[i*4 + 1] = frame; Q[i*4 + 2] = p.flip; Q[i*4 + 3] = Math.max(0, alpha);
-    i++;
+    if (walking) frame = paused ? F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle : Math.floor(t*9*p.speed/PPL_SPEED + p.phase) % PPL.walk;
+    if (p.cop && p.angry > t) frame = F_ANGRY + Math.min(5, Math.floor((t - p.angry + .9)*7));
+    if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
+    if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
+  }
+  // delivery bots and their parcels
+  for (const b of bots){
+    if (b.state === 'in') continue;
+    let frame, alpha = 1;
+    if (b.state === 'drop') frame = 8 + Math.min(5, Math.floor((t - b.t0)/.22));
+    else { frame = b.gait + Math.floor(t*8 + b.phase) % 4; const w = b.walk;
+      if (w && w.doorA) alpha = Math.min(alpha, (w.s - .05)/.3); if (w && w.doorB) alpha = Math.min(alpha, (w.len - w.s - .05)/.3); }
+    const y = CURB + .02*Math.sin(t*3 + b.phase);
+    if (emit(b.x, y, b.z, ROW_BOT, frame, b.flip, Math.max(0, alpha)) && b.emoUntil > t) emit(b.x, y + .45, b.z, ROW_EMO, b.emo, 1, 2);
+    if (b.cap && t - b.t0 > 1.3) emit(b.cap.x, CURB, b.cap.z, ROW_BOT, 14 + Math.min(5, Math.floor((t - b.t0 - 1.3)/.38)), 1, 1);
   }
   pplMesh.geometry.instanceCount = i;
   pos.needsUpdate = spr.needsUpdate = true;
@@ -798,6 +970,7 @@ function updatePeople(dt, t){
 function peopleStats(){
   let walking = 0, home = 0, work = 0, out = 0;
   for (const p of people.values()){ if (p.walk) walking++; else if (p.at === p.home) home++; else if (p.at === p.job) work++; else out++; }
-  return { people: people.size, jobs: [...people.values()].filter(p => p.job).length, walking, home, work, out, drawn: pplMesh.geometry.instanceCount, nodes: NG.x.length, doors: doorList.length,
+  return { people: people.size, jobs: [...people.values()].filter(p => p.job).length, walking, home, work, out, drawn: pplMesh.geometry.instanceCount, nodes: NG.x.length, doors: doorList.length, bots: bots.length, botsOut: bots.filter(b => b.state !== 'in').length,
+    patrolling: [...people.values()].filter(p => p.cop && (p.patrol || (p.walk && p.walk.beat))).length, cops: [...people.values()].filter(p => p.cop).length,
     homeless: [...places.values()].filter(pl => pl.cell && !pl.doors.length).length };
 }

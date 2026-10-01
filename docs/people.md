@@ -11,18 +11,35 @@ Code: `js/people.js`. Sprites: `assets/sprites/people.png`.
 | 2 | Households, jobs, daily routines tied to the hour; fewer people out at night | Done |
 | 2b | Real doors that slide open and shut; walking that never clips buildings, furniture or plants | Done |
 | 3 | Stall keepers, queueing and eating at the food stalls, sitting on benches and stools, stopping to chat | Done |
-| 4 | Delivery robots on the sidewalks, bumping into each other, reactions with emote icons | Not started |
-| 5 | Dark streets and muggings, police patrols, an event log for the radio RJ | Not started |
+| 4 | Delivery robots on the sidewalks, bumping into each other, reactions with emote icons | Done |
+| 5 | Dark streets and muggings, police patrols, an event log for the radio RJ | Patrols done; the rest not started |
 
 ## How it works
 
-**Sprites.** One atlas, 12 characters (Craftpix townspeople and city men packs), one 16 px row each, 20 cells
+**Sprites.** One atlas (`assets/sprites/people.png`, 32 cells of 12x16 by 15 rows): 12 citizens, the police
+officer (row 12), the delivery robot (row 13) and emote bubbles (row 14). Citizens: 12 characters (Craftpix townspeople and city men packs), one 16 px row each, 20 cells
 of 12 px, facing right (mirrored for facing left): 6 walk, 4 idle, 6 gesture, 4 sitting. Gestures come from the
 pack's Special sheets (scaled to match the rest; the five characters that have one), used for chatting, ordering
 and serving; the others sway through their idle frames instead. Sitting frames are made from the idle frames:
 the body drops a pixel and the legs fold forward. All visible people are
 one instanced draw call. They stand upright to the screen and snap to whole render pixels, like the plants,
 and dissolve in a pixel dither when they step through a door.
+
+**Police.** The police station's staff wear the police officer sprite (its own sheet: walk, idle, talk, sitting,
+a handheld scanner and an angry reaction). Officers work three shifts round the clock (7:00, 15:00, 23:00). On
+duty they walk a beat: from the station to a street crossing a few blocks away, stop and scan for a while, then
+on to the next, and now and then back to the station. Like the stalls, the station is always staffed.
+
+**Delivery robots.** The small hover bot from the drones pack (the one with a parcel drop animation). About one
+for every two shops, each based at a shop: it glides out of the shop's door, crosses town on the sidewalk
+network to a home, lowers a parcel capsule onto the step, the door opens to take it in, and the bot heads back
+(or straight on to another drop). Fewer deliveries between 23:00 and 6:00.
+
+**Bumping and emotes.** Walkers (and bots) meeting head-on or crossing on a narrow path sometimes bump: both stop
+for a moment and react with a bubble over their head (!, ?, a sweat drop or an anger mark; officers scowl with
+their angry animation). Emote bubbles also show up in the square: music notes and hearts while chatting, dots
+while waiting for a stall keeper, a bowl when sitting down with food. The eight bubbles are drawn in code in the
+people atlas (row 14) and always drawn bright.
 
 **What's in the way.** Every plot gets a 5 cm footprint map of everything in the walking band (ankle to head
 height, 0.14 to 0.95 units): its triangles, clipped to the band and stamped from above, plus the solid middle

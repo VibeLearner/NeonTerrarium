@@ -1053,7 +1053,7 @@ function hall(lot, st, P0){
   const Pr = under(P0, T(0, c.h, 0));
   for (let i=0;i<3;i++){
     const z = -c.d/2 + c.d/6 + i*c.d/3;
-    put(U.prism, st.roof, under(Pr, T(0,0,z,PI/2,c.d/3,.45,c.w)));
+    put(U.prism, D[st.cls].roof, under(Pr, T(0,0,z,PI/2,c.d/3,.45,c.w)));
     box(pick([M.winLit,M.interiorCool]), Pr, 0, .2, z+c.d/12, c.w*.9, .03, c.d/7, 0, .95);
   }
   box(M.frame, Pr, 0, .5, 0, .06, .06, c.d);   // roof catwalk rail
@@ -1071,7 +1071,7 @@ function silos(lot, st, P0){
     put(U.cyl16, pick([st.walls[0],st.walls[1],M.metal]), under(P0, T(x,h/2,z,0,2*r,h,2*r)));
     put(U.cyl16, M.hazard, under(P0, T(x,h*.3,z,0,2*r+.04,.1,2*r+.04)));
     put(U.cyl16, pick(st.neonMats), under(P0, T(x,h*.62,z,0,2*r+.04,.03,2*r+.04)));
-    put(U.cone, st.roof, under(P0, T(x,h+.2,z,0,2*r+.04,.4,2*r+.04)));
+    put(U.cone, D[st.cls].roof, under(P0, T(x,h+.2,z,0,2*r+.04,.4,2*r+.04)));
     box(M.metalDark, P0, x+Math.cos(a)*(r+.03), h/2, z+Math.sin(a)*(r+.03), .08, h, .04, -a);
     minH = Math.min(minH, h);
   }

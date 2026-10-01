@@ -74,8 +74,11 @@ Landmarks that take over a block of plots once the city is big enough. Each exis
   through a glitching hologram shader; the full-size original is in assets/sprites/originals/), lantern strings crossing over
   it, and a night market: food carts piled with food (menu-tower bike carts, hawker stalls, little food trucks),
   long market stands with trays of food under tarps, tables and crowds.
+- **Foundry:** a 6x4 block (either way round). Unlocks at 60 industrial sections, then a 1 in 50 chance per build.
+  A tall slate-blue steel works with orange light tucked under every ledge, a scaffolded smokestack, a 22-unit
+  chimney with a beacon, a tank tower ringed in light, looping pipes and a lit loading dock.
 - New megastructures go in `MEGA_TYPES` at the top of `js/mega.js` (requirement, odds, footprint, max tiers).
-- For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall) or **B** (town square)
+- For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall), **B** (town square) or **V** (foundry)
   to bring it in, or remove it, next to the plot under the pointer, skipping the requirement and the odds.
 
 ## Adding art and sound

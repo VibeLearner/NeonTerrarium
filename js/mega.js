@@ -13,6 +13,8 @@ const MEGA_TYPES = {
            colour: '#ffcf7a', build: buildSkyMall },
   square: { name: 'Town square', need: { low: 40, mid: 40 }, odds: 40, w: 5, h: 5, maxLevels: 1,
            colour: '#9dff6a', build: buildTownSquare, fx: koiFx },
+  foundry: { name: 'Foundry', need: { ind: 60 }, odds: 50, w: 6, h: 4, maxLevels: 1,
+           colour: '#ff8a2a', build: buildFoundry },
 };
 const megas = new Map();   // kind -> { kind, i, j, w, h, levels, seed, x, z, data, view, roofH, top, cells }
 
@@ -286,7 +288,7 @@ if (location.hash.includes('dev')){
   let lastPointer = null;
   addEventListener('pointermove', e => { lastPointer = { x: e.clientX, y: e.clientY }; });
   addEventListener('keydown', e => {
-    const kind = { m: 'radio', n: 'mall', b: 'square' }[e.key.toLowerCase()]; if (!kind) return;
+    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry' }[e.key.toLowerCase()]; if (!kind) return;
     const pk = lastPointer ? pickAt(lastPointer.x, lastPointer.y) : null;
     const c = pk && pk.c ? pk.c : pk && pk.kind === 'sky' ? { i: pk.i, j: pk.j } : cells.values().next().value;
     if (megas.has(kind)) removeMega(megas.get(kind));
@@ -836,4 +838,138 @@ function koiFx(m){
     },
     dispose(){ scene.remove(plane, water); plane.geometry.dispose(); mat.dispose(); water.geometry.dispose(); wmat.dispose(); }
   };
+}
+
+/* ---------- the foundry ---------- */
+// A tall, brooding steel works on a 6x4 block, after the reference: stacked slate-blue blocks clad in corrugated
+// panels and stained with rust, a rounded-roof hall, a fat smokestack wrapped in scaffolding, a taller chimney, a
+// tank tower ringed in light, and pipes looping over everything. The light is orange and comes from below the
+// ledges (glowing strips tucked under each overhang), a vertical strip up the tall block, the loading dock and a
+// few warm windows, with one cold blue tube for contrast. Steam rises off the stacks.
+M.fSteel = toon(0x2e3846); M.fSteel2 = toon(0x3b4757); M.fSteel3 = toon(0x252d38); M.fRust = toon(0x5c3a28); M.fRib = toon(0x1f2630);
+M.fGlow = toon(0x5a2a10, { em:0xd84a08, kind:'neon' }); M.fGlow2 = toon(0x5a3410, { em:0xe0640e, kind:'neon' });   // deep orange: the emissive boost at night pushes paler oranges to yellow
+M.fBlue = toon(0x10283a, { em:0x7fd0ff, kind:'neon' });
+M.fWin = toon(0x4a2e18, { em:0xff7a2a, kind:'window' });
+// the four faces of a block centred at (cx, cz) of size w x d, each as a transform whose +z faces out
+function blockFaces(P, cx, cz, w, d){
+  return [[under(P, T(cx, 0, cz + d/2, 0)), w], [under(P, T(cx, 0, cz - d/2, PI)), w], [under(P, T(cx + w/2, 0, cz, PI/2)), d], [under(P, T(cx - w/2, 0, cz, -PI/2)), d]];
+}
+// a clad block: body, corrugated ribs, rust streaks, a ledge with a glowing strip tucked under it
+function fBlock(P, cx, cz, w, d, y0, h, mat, opts = {}){
+  box(mat, P, cx, y0 + h/2, cz, w, h, d);
+  for (const [F, len] of blockFaces(P, cx, cz, w, d)){
+    for (let t = -len/2 + .25; t < len/2 - .1; t += .32) box(M.fRib, F, t, y0 + h/2, .02, .05, h - .1, .04);    // corrugation
+    for (let k=0; k<Math.round(len/2.2); k++) box(M.fRust, F, rnd(-len/2 + .3, len/2 - .3), y0 + rnd(.3, h*.6), .035, rnd(.12, .3), rnd(.5, 1.6), .02);   // rust streaks
+    if (opts.windows) for (let y = y0 + .9; y < y0 + h - .5; y += 1.1) for (let t = -len/2 + .6; t < len/2 - .4; t += .9)
+      if (chance(.55)) box(chance(.25) ? M.fWin : M.glassDark, F, t, y, .04, .3, .4, .03);
+  }
+  // the ledge on top, and the orange strip under it: the signature light of the reference
+  box(M.fSteel3, P, cx, y0 + h + .08, cz, w + .5, .16, d + .5);
+  if (opts.glow !== false) for (const [F, len] of blockFaces(P, cx, cz, w + .5, d + .5)){
+    if (chance(opts.glowOdds ?? .75)){
+      box(M.fGlow, F, 0, y0 + h - .02, -.08, len - .4, .05, .06);
+      for (let t = -len/2 + .8; t < len/2 - .4; t += 1.6) glow(F, t, y0 + h - .2, .1, 'orange', 1.3);
+    }
+  }
+}
+function fPipe(P, ax, ay, az, bx, by, bz, r = .12, mat = M.fSteel2){ strut(mat, P, ax, ay, az, bx, by, bz, r*2); }
+// a big round stack: shaft, collars, cap, a ladder, and steam
+function fStack(P, x, z, r, h, opts = {}){
+  put(U.cyl16, M.fSteel, under(P, T(x, CURB + h/2, z, 0, 2*r, h, 2*r)));
+  for (let y = 1.2; y < h - .3; y += opts.collar || 2.4) put(U.cyl16, chance(.3) ? M.fRust : M.fSteel3, under(P, T(x, CURB + y, z, 0, 2*r + .2, .22, 2*r + .2)));
+  put(U.cyl16, M.fSteel3, under(P, T(x, CURB + h + .2, z, 0, 2*r + .35, .4, 2*r + .35)));            // the lipped top
+  put(U.cyl16, M.concDD, under(P, T(x, CURB + h + .3, z, 0, 2*r - .1, .22, 2*r - .1)));
+  for (const y of opts.lit || []){ put(U.cyl16, M.fGlow, under(P, T(x, CURB + y, z, 0, 2*r + .24, .08, 2*r + .24))); glow(P, x + r + .15, CURB + y, z, 'orange', 1.4); glow(P, x - r - .15, CURB + y, z, 'orange', 1.4); }
+  for (let y = .3; y < h - .4; y += .3) box(M.frame, P, x, CURB + y, z + r + .1, .3, .03, .03);       // ladder rungs
+  box(M.frame, P, x - .15, CURB + h/2, z + r + .1, .03, h, .03); box(M.frame, P, x + .15, CURB + h/2, z + r + .1, .03, h, .03);
+  emitters.push(new THREE.Vector3(x, CURB + h + .4, z).applyMatrix4(P));
+  if (opts.beacon){ beaconLight(P, x + r + .1, CURB + h + .45, z, .1, 1.1); beaconLight(P, x - r - .1, CURB + h + .45, z, .1, 1.1); }
+}
+function buildFoundry(m){
+  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  const long = m.w >= m.h, L = Math.max(m.w, m.h)*LOT, D = Math.min(m.w, m.h)*LOT;
+  const P = T(m.x, 0, m.z, long ? pick([0, PI]) : pick([PI/2, -PI/2]));   // the yard front faces local +z
+  // ---- the yard: dark wet concrete in slabs, puddles, hazard lines, a few drums and crates
+  box(G.asph, P, 0, .012, 0, L, .025, D);
+  const nx = 24, nz = 16, sx = L/nx, sz = D/nz;
+  for (let a=0;a<nx;a++) for (let b=0;b<nz;b++) if (!chance(.04)) box(pick(TILES.ind), P, (a-(nx-1)/2)*sx, .03, (b-(nz-1)/2)*sz, sx - .05, .045, sz - .05);
+  for (let k=0; k<10; k++) box(G.puddle, P, rnd(-L/2 + 1, L/2 - 1), .056, rnd(2, D/2 - .6), rnd(.6, 1.8), .01, rnd(.3, .8));
+  box(M.hazard, P, 0, .058, 4.0, L - 2, .012, .1);
+  for (let k=0; k<14; k++){ const x = rnd(-L/2 + .6, L/2 - .6), z = rnd(4.4, D/2 - .4);
+    chance(.6) ? put(U.cyl16, pick([M.fRust, M.awn3, M.corrBlue, M.fSteel2]), under(P, T(x, .28, z, 0, .4, .52, .4))) : box(pick([M.crate, M.fSteel2]), P, x, .22, z, .5, .44, .5); }
+
+  // ---- the main mass: a podium hall, two tall blocks over it, a rounded hall on top
+  fBlock(P, -1.2, -2.0, 11.5, 7.6, CURB, 4.4, M.fSteel, { windows: true });                         // podium
+  fBlock(P, -4.0, -3.4, 5.6, 4.8, CURB + 4.6, 4.6, M.fSteel2, { windows: true });                   // left block
+  fBlock(P, -4.0, -3.4, 4.6, 4.0, CURB + 9.4, 2.6, M.fSteel, { glowOdds: .5 });                    // its crown
+  fBlock(P, 2.0, -3.6, 3.6, 3.8, CURB + 4.6, 9.0, M.fSteel3, { windows: true, glowOdds: .5 });     // the tall block
+  // the rounded roof over the left crown (the curved top in the reference)
+  put(U.cyl16, M.fSteel2, under(P, T(-4.0, CURB + 12.2, -3.4, 0, 3.6, 4.0, 3.6, PI/2)));
+  for (let t = -1.8; t <= 1.8; t += .45) put(U.torus, M.fRib, under(P, T(-4.0 + t, CURB + 12.2, -3.4, PI/2, 3.7, 3.7, 3.7)));
+  // a vertical orange strip running up the tall block's front, like the one in the reference
+  box(M.fGlow, P, 3.5, CURB + 9.0, -1.68, .07, 8.2, .06);
+  for (let y = 5.5; y < 13; y += 1.4) glow(P, 3.5, CURB + y, -1.4, 'orange', 1.2);
+  box(M.fGlow2, P, .4, CURB + 9.0, -1.68, .05, 6.5, .05); for (let y = 6.5; y < 12; y += 2) glow(P, .4, CURB + y, -1.45, 'orange', .9);
+  // the one cold blue tube, low on the left
+  box(M.fBlue, P, -5.5, CURB + 2.6, 1.92, 2.6, .07, .06); glow(P, -5.5, CURB + 2.6, 2.2, 'cyan', 1.4); glow(P, -6.6, CURB + 2.6, 2.2, 'cyan', 1.0);
+
+  // ---- the loading dock along the podium's front: a deep canopy lit orange underneath, warm-lit bays
+  const dz = 1.8 + .02;
+  box(M.fSteel3, P, .8, CURB + 2.2, dz + .7, 7.5, .14, 1.5);
+  box(M.fGlow, P, .8, CURB + 2.11, dz + 1.4, 7.4, .05, .05);
+  for (let t = -2.6; t <= 4.2; t += 1.0){ box(M.fGlow2, P, t, CURB + 2.12, dz + .7, .5, .03, .2); glow(P, t, CURB + 1.95, dz + .8, 'orange', 1.5); }
+  for (const t of [-2.0, .1, 2.2, 3.9]){ box(M.fWin, P, t, CURB + .95, dz, 1.4, 1.6, .03); box(M.shutter, P, t, CURB + 1.55, dz + .02, 1.4, .4, .03); }   // open bays, lit inside
+  for (const t of [-2.9, 4.7]) cyl(M.frame, P, t, CURB + 1.1, dz + 1.35, .05, 2.2);
+  for (let k=0; k<6; k++) person(P, rnd(-2.5, 4.5), CURB, dz + rnd(.3, 1.4));
+  // a truck at the dock
+  { const Q = under(P, T(-1.1, 0, dz + 2.6, 0)); box(M.corrBlue, Q, 0, .75, 0, 2.6, 1.2, 1.0); box(M.fSteel2, Q, 1.7, .55, 0, .8, .8, .95); box(M.glassDark, Q, 2.08, .7, 0, .03, .3, .8);
+    for (const x of [-.8, .6, 1.6]) for (const s2 of [-1, 1]) put(U.cyl16, M.frame, under(Q, T(x, .2, s2*.5, 0, .38, .14, .38, PI/2))); box(M.bulb, Q, 2.1, .4, .35, .04, .08, .1); glow(Q, 2.2, .4, .35, 'warm', .9); }
+
+  // ---- the fat smokestack on the left, wrapped in scaffolding
+  const sx0 = -9.2, sz0 = -3.6;
+  fStack(P, sx0, sz0, 1.15, 16.5, { lit: [6.2, 11.8], collar: 2.0 });
+  for (let y = 0; y < 13; y += 1.3){                                                                 // scaffolding round it
+    for (const [ax, az, bx2, bz2] of [[-1.6,-1.6,1.6,-1.6],[1.6,-1.6,1.6,1.6],[1.6,1.6,-1.6,1.6],[-1.6,1.6,-1.6,-1.6]]){
+      strut(M.frame, P, sx0 + ax, CURB + y + 1.3, sz0 + az, sx0 + bx2, CURB + y + 1.3, sz0 + bz2, .04);
+      if (chance(.6)) strut(M.frame, P, sx0 + ax, CURB + y, sz0 + az, sx0 + bx2, CURB + y + 1.3, sz0 + bz2, .03);
+    }
+  }
+  for (const [ax, az] of [[-1.6,-1.6],[1.6,-1.6],[1.6,1.6],[-1.6,1.6]]) box(M.frame, P, sx0 + ax, CURB + 6.6, sz0 + az, .06, 13, .06);
+  for (const y of [4.0, 8.0, 11.9]) box(M.fSteel3, P, sx0, CURB + y, sz0 + 1.6, 3.3, .06, .5);       // landings
+  fPipe(P, sx0 + 1.3, CURB + 7.0, sz0, -6.8, CURB + 7.0, sz0, .22, M.fRust);                        // flue into the block
+  fPipe(P, sx0 + 1.3, CURB + 3.2, sz0 + .6, -7.0, CURB + 3.2, sz0 + .6, .18);
+
+  // ---- the tall chimney at the back right, with a beacon
+  fStack(P, 8.6, -5.2, .85, 22.5, { lit: [9, 17.5], collar: 3.0, beacon: true });
+  // ---- the tank tower, ringed in light, with catwalks and a ladder
+  const tx = 8.0, tz = 1.4, tr = 1.5, th = 10.5;
+  put(U.cyl16, M.fSteel2, under(P, T(tx, CURB + th/2, tz, 0, 2*tr, th, 2*tr)));
+  for (const y of [2.6, 5.4, 8.2]){ put(U.cyl16, M.fGlow, under(P, T(tx, CURB + y, tz, 0, 2*tr + .14, .07, 2*tr + .14))); for (let a = 0; a < TAU; a += PI/2) glow(P, tx + Math.cos(a)*(tr + .2), CURB + y, tz + Math.sin(a)*(tr + .2), 'orange', 1.0); }
+  for (const y of [4.0, 7.0]){ put(U.cyl16, M.fSteel3, under(P, T(tx, CURB + y, tz, 0, 2*tr + .9, .06, 2*tr + .9))); for (let a = 0; a < TAU; a += TAU/14) cyl(M.frame, P, tx + Math.cos(a)*(tr + .42), CURB + y + .2, tz + Math.sin(a)*(tr + .42), .015, .4); }
+  put(U.cone, M.fSteel3, under(P, T(tx, CURB + th + .5, tz, 0, 2*tr + .1, 1.0, 2*tr + .1)));
+  cyl(M.frame, P, tx, CURB + th + 1.4, tz, .03, 1.2); beaconLight(P, tx, CURB + th + 2.0, tz, .09, 1.0);
+  for (let y = .3; y < th - .2; y += .3) box(M.frame, P, tx - tr - .1, CURB + y, tz, .03, .03, .3);
+  // a stubby stack and a hopper on the right
+  fStack(P, 5.6, -5.6, .6, 13.5, { lit: [8.5] });
+  box(M.fSteel3, P, 9.4, CURB + 2.4, -1.8, 2.2, 4.8, 2.2); put(U.cone, M.fSteel2, under(P, T(9.4, CURB + 5.4, -1.8, 0, 2.6, 1.2, 2.6)));
+
+  // ---- pipes over and round everything
+  const loop = (ax, az, bx2, bz2, y0, up, r) => {                                                   // a raised loop between two points
+    fPipe(P, ax, y0, az, ax, y0 + up, az, r); fPipe(P, bx2, y0, bz2, bx2, y0 + up, bz2, r);
+    fPipe(P, ax, y0 + up, az, bx2, y0 + up, bz2, r);
+    put(U.sph, M.fSteel2, under(P, T(ax, y0 + up, az, 0, 3*r, 3*r, 3*r))); put(U.sph, M.fSteel2, under(P, T(bx2, y0 + up, bz2, 0, 3*r, 3*r, 3*r)));
+  };
+  loop(-2.6, -2.0, .6, -2.0, CURB + 9.2, 2.6, .2);                                                  // from the left block over to the tall one
+  loop(-1.5, -5.0, 1.0, -5.0, CURB + 9.2, 1.6, .14);
+  loop(3.6, -3.0, 7.2, -3.0, CURB + 7.0, 1.6, .18);                                                 // tall block to the chimney side
+  loop(4.4, -1.2, 6.6, 1.0, CURB + 4.4, 2.2, .16);                                                  // podium to the tank
+  for (const [y, r, z] of [[CURB + 3.8, .14, 1.95], [CURB + 3.4, .1, 1.95], [CURB + 1.0, .12, 1.95]]) fPipe(P, -6.9, y, z, 4.4, y, z, r, chance(.5) ? M.fRust : M.fSteel2);   // runs along the front
+  for (const x of [-6.6, -.2, 3.3]) fPipe(P, x, CURB + .2, 1.95, x, CURB + 4.3, 1.95, .12);
+  fPipe(P, 4.4, CURB + 3.0, -2.0, 7.0, CURB + 3.0, -2.0, .2, M.fRust); fPipe(P, 7.0, CURB + 3.0, -2.0, 7.0, CURB + 3.0, .4, .2, M.fRust);
+  // aerials, cables and a few warm work lights up top
+  for (const [x, z, h] of [[-5.2, -2.4, 2.4], [2.6, -2.6, 3.2], [1.0, -4.8, 1.8]]) cyl(M.frame, P, x, CURB + 13.6 + h/2 - (x < 0 ? 1.6 : 0), z, .03, h);
+  for (const [x, y, z] of [[-6.5, 9.3, 1.0], [3.7, 13.7, -1.9], [-1.3, 4.6, 1.9], [7.3, 4.6, 2.9]]){ box(M.bulb, P, x, CURB + y, z, .14, .08, .1); glow(P, x, CURB + y - .05, z + .1, 'warm', 1.4); }
+  for (let k=0; k<5; k++) plant(pick(['vines','h_ivy','l_mossroots']), P, rnd(-6.5, 3), CURB + rnd(3.0, 4.3), 1.85, rnd(.8, 1.1), 't', true);   // a little growth on the old steel
+  m.roofH = CURB + 4.6;
+  m.top = CURB + 23.5;
 }

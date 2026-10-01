@@ -272,7 +272,7 @@ const GLOW_PTS = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
 });
 const GLOW_FIXED = { red: .95, blue: .85 };
-const GLOW_FLK = { pink: 'neon', cyan: 'neon', amber: 'neon', warm: 'bulb' };   // halos flicker at the same odds as their kind of light
+const GLOW_FLK = { pink: 'neon', cyan: 'neon', amber: 'neon', warm: 'bulb', orange: 'neon' };   // halos flicker at the same odds as their kind of light
 function glowPoints(gl){
   let n = 0; for (const k in gl) n += gl[k].length/4;
   const pos = new Float32Array(n*3), size = new Float32Array(n), col = new Float32Array(n*4), flk = new Float32Array(n);

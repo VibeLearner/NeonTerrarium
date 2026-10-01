@@ -65,6 +65,9 @@ The scripts are ordinary (non-module) scripts that share one scope, so the order
 
 Landmarks that take a block of plots once the city is big enough. Each exists at most once. A megastructure never
 replaces buildings: it takes the nearest free block (open platform, or new platform grown onto the edge of the city).
+Each one arrives slowly (about four and a half seconds): its footprint is traced on the ground, a wireframe rises
+out of it, then the structure is revealed from the ground up behind a glowing scan line, and its live parts (the
+koi, the drone, the screens) switch on at the end.
 
 - **Radio station:** arrives with the 20th building, of any zone (each built plot counts once; stacking doesn't
   add to it), on free ground near that build. Right-click removes it; with 20 or

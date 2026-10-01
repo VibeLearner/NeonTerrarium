@@ -99,7 +99,11 @@ function spawnMega(kind, near){
   const m = placeMega(kind, blk.i, blk.j, (Math.random()*1e9)|0, blk.w, blk.h); if (!m) return null;
   holdRegion(m);
   refresh(covered.filter(b => !b.mega || b.mega === kind), [m]);
-  startAnim(m, 'build', CURB - .05, m.top + 1, MEGA_TYPES[kind].colour, megaSize(m), null, MEGA_TYPES[kind].sound);
+  // the slow arrival: the platform grown for it scans in alongside, and its live parts (koi, drone, screens) switch
+  // on once it's fully there
+  for (const c of grown){ holdRegion(c); startAnim(c, 'build', PLAT_BOTTOM, CURB + .3, MEGA_TYPES[kind].colour, LOT, null, null, { slow: true, quiet: true, bare: true }); }
+  if (m.fx){ m.fx.dispose(); m.fx = null; }
+  startAnim(m, 'build', CURB - .05, m.top + 1, MEGA_TYPES[kind].colour, megaSize(m), null, MEGA_TYPES[kind].sound, { slow: true, onEnd: () => { if (megas.get(kind) === m && !m.fx) megaFx(m); } });
   return m;
 }
 // stacking: another tier on top

@@ -363,7 +363,7 @@ function animMaterials(u){
   const nrm = normalMat.clone(); nrm.clippingPlanes = [u.plane]; nrm.onBeforeCompile = normalMat.onBeforeCompile;
   return { atlas, nrm };
 }
-function startAnim(c, kind, y0, y1, zone, w, old, sound){
+function startAnim(c, kind, y0, y1, zone, w, old, sound, opts = {}){
   const view = kind === 'build' ? c.view : old.view;
   const held = kind === 'build';   // plants and glows arrive when a build finishes, but leave as soon as a removal starts
   if (!view){ if (old) dropView(old); if (held) releaseRegion(regKey(c.i, c.j)); return; }
@@ -378,15 +378,44 @@ function startAnim(c, kind, y0, y1, zone, w, old, sound){
   const [wx, wz] = Array.isArray(w) ? w : [w, w];
   box.position.set(c.x, (by0 + y1)/2, c.z); box.scale.set(wx + .08, Math.max(.1, y1 - by0), wz + .08);
   scan.scale.set(wx + .2, .001, wz + .2);
-  for (const l of [box, scan]){ l.layers.set(1); l.renderOrder = 998; scene.add(l); }
-  if (sound) sfx.play(sound, { spread: 0 }); else sfx.play(kind === 'build' ? 'place' : 'remove');
-  anims.push({ c, kind, view, old, u, mats, box, scan, x: c.x, z: c.z, y0, y1, t: 0, dur: kind === 'build' ? .15 : .12, reg: regKey(c.i, c.j), held });
+  const lines = [box, scan];
+  // a slow arrival (megastructures) adds a footprint drawn on the ground and two fainter scan lines trailing the first
+  const foot = opts.slow && !opts.bare ? new THREE.LineSegments(OUTLINE_GEO, lineMat()) : null, trail = opts.slow ? [0, 1].map(() => new THREE.LineSegments(OUTLINE_GEO, lineMat())) : [];
+  if (foot){ foot.position.set(c.x, by0 + .02, c.z); foot.scale.set(wx + .3, .001, wz + .3); lines.push(foot); }
+  for (const l of trail){ l.scale.copy(scan.scale); lines.push(l); }
+  for (const l of lines){ l.layers.set(1); l.renderOrder = 998; scene.add(l); }
+  if (!opts.quiet){ if (sound) sfx.play(sound, { spread: 0 }); else sfx.play(kind === 'build' ? 'place' : 'remove'); }
+  const a = { c, kind, view, old, u, mats, box, scan, foot, trail, lines, x: c.x, z: c.z, y0, by0, y1, wx, wz, t: 0, dur: opts.slow ? 4.6 : kind === 'build' ? .15 : .12, slow: !!opts.slow, bare: !!opts.bare, onEnd: opts.onEnd, reg: regKey(c.i, c.j), held };
+  anims.push(a);
+  return a;
 }
 const easeOut = x => 1 - (1 - x)*(1 - x);
+const easeInOut = x => x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3)/2;
+// A megastructure's arrival, slow and deliberate (about four and a half seconds): its footprint is traced on the
+// ground and pulses; a wireframe of the whole structure rises out of it; then the structure is revealed from the
+// ground up behind a glowing scan line with two fainter ones trailing it, easing in and out; a last bright flash
+// of the outline, and the glow dies away.
+function slowAnim(a, p){
+  const grow = easeInOut(clamp(p/.2, 0, 1)), q = easeInOut(clamp((p - .2)/.64, 0, 1));
+  const h = a.y0 + (a.y1 - a.y0)*q;
+  a.u.plane.constant = h; a.u.h.value = h;
+  const pulse = .55 + .45*Math.sin(a.t*9);
+  if (a.foot) a.foot.material.opacity = (p < .9 ? Math.min(1, p/.06) : (1 - p)/.1)*pulse;
+  const top = a.by0 + (a.y1 - a.by0)*grow;
+  a.box.position.y = (a.by0 + top)/2; a.box.scale.y = Math.max(.02, top - a.by0);
+  const flash = p > .84 ? Math.sin(clamp((p - .84)/.16, 0, 1)*PI) : 0;
+  a.box.material.opacity = a.bare ? 0 : p < .84 ? .35 + .4*pulse*Math.min(1, p/.1) : Math.max(0, .75*(1 - (p - .84)/.16) + flash);
+  const on = h > a.y0 + .02 && h < a.y1 - .02;
+  a.scan.position.set(a.x, h, a.z); a.scan.material.opacity = on ? 1 : 0;
+  a.trail.forEach((l, k) => { const th = h - (k + 1)*.45; l.position.set(a.x, th, a.z); l.material.opacity = on && th > a.y0 ? .45/(k + 1) : 0; });
+  a.u.on.value = p < .92 ? 1 : 0;
+  a.u.col.value.copy(new THREE.Color(a.box.material.color)).multiplyScalar(1.6*(p < .84 ? 1 : 1 - (p - .84)/.16));
+}
 function updateAnims(dt){
   for (let i = anims.length - 1; i >= 0; i--){
     const a = anims[i]; a.t += dt;
     const p = Math.min(1, a.t/a.dur);
+    if (a.slow){ slowAnim(a, p); if (p >= 1) endAnim(i); continue; }
     let h, boxOp;
     if (a.kind === 'build'){
       const q = easeOut(clamp((p - .15)/.7, 0, 1));
@@ -406,12 +435,13 @@ function updateAnims(dt){
 }
 function endAnim(i){
   const a = anims[i]; anims.splice(i, 1);
-  for (const l of [a.box, a.scan]){ scene.remove(l); l.material.dispose(); }
+  for (const l of a.lines){ scene.remove(l); l.material.dispose(); }
   a.view.traverse(o => { if (o.isMesh){ o.material = o.userData.baseMat || o.material; if (o.userData.baseLayer !== undefined) o.layers.mask = o.userData.baseLayer; else o.layers.set(0); } });
   a.mats.atlas.dispose(); a.mats.nrm.dispose();
   if (a.kind === 'remove'){ dropView(a.old); if (a.c.view) a.c.view.visible = true; }
   if (a.held) releaseRegion(a.reg);
   shadowDirty = true;
+  if (a.onEnd) a.onEnd();
 }
 function finishAnimsOn(c){ for (let i = anims.length - 1; i >= 0; i--) if (anims[i].c === c) endAnim(i); }
 function clearIsland(){

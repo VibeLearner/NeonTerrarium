@@ -1406,7 +1406,7 @@ function pottedPlant(P, x, z, s = 1){ put(U.cyl16, pick([M.pot, M.inBrick2, M.in
 function crateAt(P, x, y, z, s = 1){ box(M.crate, P, x, y + .11*s, z, .24*s, .22*s, .24*s, rnd(-.3, .3)); box(M.inWood2, P, x, y + .11*s, z, .25*s, .03, .25*s); }
 function moss(P, x, y, z, n = 3){ for (let k=0; k<n; k++) blob(M.inMoss, P, x + rnd(-.2, .2), y, z + rnd(-.2, .2), rnd(.06, .12), .4); }
 // a neon word on a dark board, on a bracket or flat on the wall
-function wordSign(F, kind, x, y, z, k, col, halo){ box(M.frame, F, x, y, z - .03, SPR.size[kind][0]/PX*k + .06, SPR.size[kind][1]/PX*k + .06, MIN_T); plant(kind, F, x, y, z, k, 'c', true); glow(F, x, y, z + (halo ? .04 : .25), col, halo ?? 1.2 + k); }   // a small halo sits right on the board, so it never shows as a separate blob below it
+function wordSign(F, kind, x, y, z, k, col, halo){ box(M.frame, F, x, y, z - .03, SPR.size[kind][0]/PX*k + .06, SPR.size[kind][1]/PX*k + .06, MIN_T); plant(kind, F, x, y, z, k, 'c', true); glow(F, x, y, z + .04, col, halo ?? .9 + .6*k); }   // the halo sits right on the board (out in front, the high camera saw it as a blob below the sign)
 // a gabled roof along local x over a w x d box (ridge along x), with eaves; returns nothing
 function gable(P, y, w, d, rise, mat, over = .15){ put(U.prism, mat, under(P, T(0, y, 0, PI/2, d + 2*over, rise, w + 2*over))); }
 
@@ -1421,7 +1421,7 @@ function scrapShed(lot, st, P0){
   }
   const Ff = under(P, T(0, 0, d/2, 0));
   workDoor(Ff, .1, .75, 1.05, { frame: M.inRust2 });
-  wordSign(under(Ff, T(-.1, 0, .02, 0)), 'sign_w_scrap', 0, 1.5, .1, 1.0, 'cyan');
+  wordSign(under(Ff, T(-.1, 0, .02, 0)), 'sign_w_scrap', 0, 1.5, .1, 1.0, 'orange');
   box(M.inShop2, Ff, -.45, 1.75, .03, .3, .25, MIN_T); box(M.frame, Ff, -.45, 1.75, .06, .32, .03, MIN_T);   // a small lit window up high
   wallLamp(Ff, .55, 1.25);
   // the roof: corrugated, steep, overhanging, in one of three finishes: rust, weathered blue steel, or old
@@ -1467,7 +1467,7 @@ function gearWorkshop(lot, st, P0){
   put(U.prism, M.inTile, under(Q, T(0, 0, 0, 0, w + .36, .75, d + .3)));
   for (let t = -(d + .3)/2 + .06; t < (d + .3)/2; t += .12) for (const s of [-1, 1]) box(M.inTile2, Q, s*(w + .36)/4, .37, t, (w + .36)/2*1.12, .025, .04, 0, 0, s*-Math.atan2(.75, (w + .36)/2));   // tile courses
   box(M.inTile2, Q, 0, .76, 0, .1, .08, d + .32);   // ridge
-  wordSign(Ff, 'sign_w_gear', w*.12, h + .24, .1, 1.0, 'orange');
+  wordSign(Ff, 'sign_w_gear', w*.12, h + .24, .1, 1.0, 'orange');   // (halo colours match the letters, and aren't swapped by the district's palette)
   wallLamp(Ff, w*.2 + .58, .95); wallLamp(Ff, -w*.5 + .12, .95);
   pipeRun(M.inPipe, P, [[w/2 + .05, .08 + h, d/2 - .1], [w/2 + .05, .1, d/2 - .1]], .04, false);   // downpipe
   // out front: potted plants along the wall, gas bottles, crates, tools
@@ -1488,7 +1488,7 @@ function repairsBlock(lot, st, P0){
   }
   const Ff = under(P, T(0, 0, d/2, 0));
   workDoor(Ff, -.05, 1.2, 1.15, { frame: M.inConc2, shut: rnd(.1, .2) });
-  wordSign(Ff, 'sign_w_repairs', -.05, 1.42, .1, .9, 'cyan');
+  wordSign(Ff, 'sign_w_repairs', -.05, 1.42, .1, .9, 'sodium');
   wallLamp(Ff, w/2 - .2, 1.2);
   box(M.metalDark, Ff, -w/2 + .25, .9, .06, .25, .32, .1); box(M.inGas2, Ff, -w/2 + .25, .95, .12, .18, .06, MIN_T);   // a fuse box
   gasBottles(P, w/2 - .35, d/2 + .22, irand(2, 3)); drum(P, -w/2 + .3, d/2 + .3, M.inWood); if (chance(.7)) drum(P, -w/2 + .6, d/2 + .3);
@@ -1520,7 +1520,7 @@ function partsWarehouse(lot, st, P0){
   for (const y of [.25, .55, .82]){ box(M.inWood2, Ff, bx, y, .07, bw - .1, .03, MIN_T); for (let t = bx - bw/2 + .12; t < bx + bw/2 - .08; t += .15) if (chance(.75)) box(pick([M.crate, M.inBlue2, M.inGas2, M.hazard, M.inRust]), Ff, t, y + .07, .08, .1, rnd(.08, .13), MIN_T); }
   box(M.shutter, Ff, bx, 1.04, .06, bw, .12, MIN_T);
   glow(Ff, bx, .55, .3, 'warm', 1.2);
-  wordSign(Ff, 'sign_w_parts', bx, h - .14, .1, .95, 'blue');
+  wordSign(Ff, 'sign_w_parts', bx, h - .14, .1, .95, 'ember');
   wallLamp(Ff, -w/2 + .3, 1.1);
   // a conveyor hatch on one side (the belts between buildings come out of these)
   box(M.metalDark, P, w/2 + .03, 1.2, .3, MIN_T, .4, .5);
@@ -1575,7 +1575,7 @@ function lubeShed(lot, st, P0){
   for (let x = -w/2 + .1; x < w/2; x += .18){ const sag = .06*Math.sin(PI*(x + w/2)/w); box(M.bulb, P, x, h - .1 - sag, d/2 + .02, .04, .05, .04); if (chance(.4)) glow(P, x, h - .14 - sag, d/2 + .05, 'warm', .4); }
   const Fs = under(P, T(0, 0, d/2 + .02, 0));
   for (const s of [-1, 1]) box(M.frame, Fs, s*.4, h - .14, 0, .015, .14, .015);
-  wordSign(Fs, 'sign_w_lube', 0, h - .33, .04, .8, 'amber');
+  wordSign(Fs, 'sign_w_lube', 0, h - .33, .04, .8, 'hazard');
   if (!NO_ROOF){ cyl(M.inRust2, P, w/2 - .25, h + .5, -d/2 + .25, .06, 1.1); cyl(M.metalDark, P, w/2 - .25, h + 1.06, -d/2 + .25, .08, .05); emitters.push(new THREE.Vector3(w/2 - .25, h + 1.15, -d/2 + .25).applyMatrix4(P)); }
   for (let k=0; k<irand(2, 3); k++) pottedPlant(P, w/2 + .1, d/2 - .2 - k*.3, rnd(.8, 1.1));
   if (chance(.6*S.green)) plant(pick(['bushFlower','fern']), P, -w/2 - .1, 0, d/2 - .1, .9);

@@ -328,7 +328,7 @@ const comp = new THREE.ShaderMaterial({
       if (cloudOn > 0.5){
         // clouds come from their own lower-resolution pass (see cloudMat), upscaled with crisp pixels
         vec4 cl = texture2D(tCloud, vUv);
-        if (cl.a > 0.001){ float q = floor(cl.a*5.0 + dith)/5.0; col = mix(col, cl.rgb/cl.a, q); }   // dithered fade at the edges, like mist
+        if (cl.a > 0.001){ float q = clamp(floor(cl.a*3.0 + dith*.6)/2.0, 0.0, 1.0); col = mix(col, cl.rgb/cl.a, q); }   // crisp pixel edges, one dithered step between
       }
       // ---- steam from the vents, with light through it ----
       // Mist only gathers round the steam vents in the streets. Every vent is drawn once into a top-down steam map of
@@ -526,8 +526,18 @@ const cloudMat = new THREE.ShaderMaterial({
         if (t1 > t0){
           const int STEPS = 22;
           float dt = (t1 - t0)/float(STEPS);
-          vec3 shade = mix(skyBot, skyTop, 0.35)*0.55*(1.0 - 0.35*rainDark);
+          // A painted pastel ramp, like pixel-art cumulus: cream and peach where the sun hits, through pink and lavender,
+          // down to periwinkle and blue-violet in the shade. The ends come from the time of day (sun and sky colours),
+          // the tints in between fade out at night and in rain, so night clouds stay the moody blues they were.
+          float pastel = (1.0 - 0.85*night)*(1.0 - 0.6*rainDark);
+          vec3 shade = mix(mix(skyBot, skyTop, 0.35)*0.55, mix(skyTop, vec3(0.48, 0.52, 0.86), 0.6)*0.92, pastel)*(1.0 - 0.35*rainDark);
           vec3 litC = sunCol*1.05 + skyTop*0.25;
+          vec3 P0 = shade*(0.8 + 0.1*pastel),
+               P1 = shade + vec3(0.03, 0.02, 0.07)*pastel,
+               P2 = mix(shade, litC, 0.36) + vec3(0.07, 0.0, 0.07)*pastel,
+               P3 = mix(shade, litC, 0.58) + vec3(0.09, -0.01, 0.03)*pastel,
+               P4 = mix(shade, litC, 0.8) + vec3(0.06, 0.01, -0.03)*pastel,
+               P5 = litC*1.02 + vec3(0.02, 0.02, -0.01)*pastel;
           vec3 drift = vec3(cloudOff.x, 0.0, cloudOff.y);
           for (int i=0; i<STEPS; i++){
             vec3 p = ro + rdir*(t0 + (float(i) + dith)*dt), q = p + drift;
@@ -539,11 +549,18 @@ const cloudMat = new THREE.ShaderMaterial({
             float dens = mist;
             if (f > -0.15){ f += (vnoise(q*2.4) - 0.5)*0.18; dens = max(mist, smoothstep(0.0, 0.32, f)); }
             if (dens > 0.001){
-              float light = clamp(dot(normalize(n), sunDir)*0.45 + 0.5 - (1.0 - dens)*0.1, 0.0, 1.0);
-              light = floor(light*3.0 + dith*0.6)/3.0;                     // three crisp shading bands
-              vec3 cc = mix(shade, litC, light);
+              // light: how much each puff faces the sun, brighter toward the cloud tops, darker where another puff
+              // stands between this point and the sun (one look along the sun direction), so every puff gets its
+              // own rounded, lit cap and shadowed underside, the way the painted ones do
+              vec3 ps = q + sunDir*1.3; float fs = -1.0;
+              if (ps.y < -6.0 && p.y < -6.0) fs = atl(texSea, ps).r*2.0 - 1.0;
+              if (r > 14.0) fs = max(fs, atl(texRing, ps).r*2.0 - 1.0 - (1.0 - smoothstep(15.0, 19.0, length(ps.xz)))*2.0);
+              float light = dot(normalize(n), sunDir)*0.42 + 0.5 + 0.22*smoothstep(-15.0, -8.0, p.y) - 0.12
+                          - 0.32*smoothstep(-0.05, 0.3, fs) - (1.0 - dens)*0.06;
+              float band = clamp(floor(clamp(light, 0.0, 0.999)*6.0 + (dith - 0.5)*0.12), 0.0, 5.0);   // six crisp bands
+              vec3 cc = band < 0.5 ? P0 : band < 1.5 ? P1 : band < 2.5 ? P2 : band < 3.5 ? P3 : band < 4.5 ? P4 : P5;
               cc += cityGlow * night * 0.55 * exp(-length(p.xz - glowC)/9.0) * smoothstep(-11.0, -6.0, p.y);   // neon glow on the undersides
-              float a = clamp(dens*dt*0.8, 0.0, 1.0);
+              float a = clamp(dens*dt*1.9, 0.0, 1.0);   // nearly opaque at the surface, so each pixel shows one band, not a blend
               acc += T*a*cc; T *= 1.0 - a;
               if (T < 0.02) break;
             }

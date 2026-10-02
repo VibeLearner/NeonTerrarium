@@ -357,10 +357,12 @@ const comp = new THREE.ShaderMaterial({
           col = mix(col, mix(skyBot, skyTop, 0.5)*0.7, 0.35*pud*wet*2.0);   // puddles show the sky when nothing is above
         }
       }
-      if (cloudOn > 0.5){
-        // clouds come from their own lower-resolution pass (see cloudMat), upscaled with crisp pixels
+      if (cloudOn > 0.5 && rd >= 0.99999){
+        // clouds come from their own lower-resolution pass (see cloudMat), upscaled with crisp pixels. They're the
+        // background: drawn only where the sky shows, never over the island or anything on it (or hanging under it),
+        // and over the stars, which are further back still
         vec4 cl = texture2D(tCloud, sUv);
-        if (cl.a > 0.001){ float q = clamp(floor(cl.a*3.0 + dith*.6)/2.0, 0.0, 1.0); col = mix(col, cl.rgb/cl.a, q); }   // crisp pixel edges, one dithered step between
+        if (cl.a > 0.001){ float q = clamp(floor(cl.a*3.0 + dith*.6)/2.0, 0.0, 1.0); col = mix(col - c.rgb, cl.rgb/cl.a, q) + c.rgb; }   // glows over the sky (lamp haloes, the pads' glow) stay in front   // crisp pixel edges, one dithered step between
       }
       if (shim > .01) col += vec3(.3, .6, 1.0)*clamp(shim*7.0, 0.0, 1.0)*(.04 + .08*night)*(.75 + .25*sin(time*31.0 + vUv.x*res.x*.5));   // the faint flickering wash of the running pad
       // ---- steam from the vents, with light through it ----

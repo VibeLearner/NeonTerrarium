@@ -100,7 +100,7 @@ function applyTime(){
     const g = m.userData.glow; if (!g) continue;
     m.emissiveIntensity = g==='window' ? .22+1.1*night : g==='bulb' ? .3+1.2*night : g==='neon' ? .6+1.0*night : g==='trim' ? .45+.9*night : 1.3;
   }
-  LIGHTS_ON.value = night;   // the evening's progress: lights switch on one by one as it rises (see LIGHTS_ON)
+  LIGHTS_GOAL = night;   // where the evening is; LIGHTS_ON follows it at a walking pace (main.js), so the lights come on one by one
   { const e = EM_I.value; e[1] = .22+1.1*night; e[2] = .3+1.2*night; e[3] = .6+1.0*night; e[4] = .45+.9*night; e[5] = 1.3; e[6] = 1.5+.4*night; }
   for (const k of ['pink','cyan','amber','warm']) GLOW[k].opacity = .1 + .8*night;
   GLOW.red.opacity = .95;

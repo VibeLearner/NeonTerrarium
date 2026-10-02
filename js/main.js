@@ -16,6 +16,7 @@ function frame(now){
   if (S.cycle) S.hour = (S.hour + rdt*24/3600) % 24;
   last = now;
   const night = applyTime();
+  { const d = LIGHTS_GOAL - LIGHTS_ON.value, st = LIGHTS_RATE*rdt; LIGHTS_ON.value += Math.max(-st, Math.min(st, d)); }   // lights catch up with the hour one by one
   FLUID_NIGHT.value = night;   // the pipes' liquids glow after dark
   syncTimeUI();
   updateCars(now/1000);

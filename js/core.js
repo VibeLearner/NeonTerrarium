@@ -50,7 +50,9 @@ const ALL_MATS = [];
 // Lights come on one by one as evening falls (and go off one by one at dawn). Each light gets a switch-on point
 // from where it stands, hashed by a cell of about one room; it's lit once LIGHTS_ON (the evening, 0 by day to 1 at
 // night) passes it. A lamp, its halo and the light it throws share a cell, so they come on together.
-const LIGHTS_ON = { value: 1 };
+const LIGHTS_ON = { value: 0 };
+let LIGHTS_GOAL = 0;
+const LIGHTS_RATE = .11;   // how far through the switch-on order it gets per second: a jump straight to night still takes about seven seconds to light up
 const LIT_GLSL = `
   float litOn(float thr, float lv, float tm){
     float dv = lv - thr, on = clamp(dv*40.0, 0.0, 1.0);

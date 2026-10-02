@@ -214,10 +214,10 @@ let city = null, glowGroup = null, emitters = [];
 // generated: world position, which way they face, and what kind of spot it is. See people.js.
 let curSpots = null;
 const _sv = new THREE.Vector3(), _sd = new THREE.Vector3();
-function spotAt(P, x, y, z, kind, stall = null, face = [0, 1]){
+function spotAt(P, x, y, z, kind, stall = null, face = [0, 1], extra = null){
   if (!curSpots) return;
   _sv.set(x, y, z).applyMatrix4(P);
   const fl = face === 'origin' ? [-x, -z] : face;   // 'origin': facing the middle of P (a cart, a table)
   _sd.set(fl[0], 0, fl[1]).transformDirection(P);
-  curSpots.push({ x: _sv.x, y: _sv.y, z: _sv.z, fx: _sd.x, fz: _sd.z, kind, stall });
+  curSpots.push(Object.assign({ x: _sv.x, y: _sv.y, z: _sv.z, fx: _sd.x, fz: _sd.z, kind, stall }, extra));
 }

@@ -134,6 +134,34 @@ function lawn(P, n){
     for (const q of [0, 2, 1, 0, 3, 2]){ const [cx, cz, u, v] = C[q]; _gq.set(cx, .058, cz).applyMatrix4(P); b.p.push(_gq.x, _gq.y, _gq.z); b.n.push(0, 1, 0); b.u.push(u, v); b.d.push(0); }
   }
 }
+// Places to sit on a lawn: two of a picnic blanket (people eat there, facing each other), a pair of spots side by
+// side (friends chatting) and a little hologram projector (whoever sits there watches a show on it), in the
+// quarters of the plot (the middle stays clear for a park lamp). Sitting spots on the ground, so the sitting
+// people's legs-out pose sits on the grass.
+const PICNIC = [toon(0xb8433a), toon(0x3f6a9a), toon(0xd8b04a)];
+function lawnSpots(c, P){
+  const quads = [[-1, -1], [1, -1], [-1, 1], [1, 1]].sort(() => R() - .5), kinds = ['picnic', 'pair', 'holo'].sort(() => R() - .5);
+  const gy = CURB + .09, clear = [];   // sitting spots: drawn .09 lower, so on the ground
+  for (let g = 0; g < 2; g++){
+    const [qx, qz] = quads[g], ax = qx*rnd(.8, 1.05), az = qz*rnd(.8, 1.05), ry = rnd(0, PI), ca = Math.cos(ry), sa = Math.sin(ry);
+    const at = (u, v) => [ax + u*ca - v*sa, az + u*sa + v*ca];   // a frame turned to ry round the anchor
+    const kind = kinds[g];
+    if (kind === 'picnic'){
+      box(pick(PICNIC), P, ax, .075, az, .62, .015, .44, -ry); clear.push([ax, az, .34]);
+      for (let k = 0; k < 2; k++){ const [bx, bz] = at(rnd(-.12, .12), rnd(-.08, .08)); cyl(chance(.5) ? M.white2 : M.red2, P, bx, .09, bz, .045, .035); }
+      for (const s of [-1, 1]){ const [sx, sz] = at(s*.42, 0); clear.push([sx, sz, .14]); spotAt(P, sx, gy, sz, 'seat', null, [ax - sx, az - sz], { act: 'eat' }); }
+    } else if (kind === 'pair'){
+      for (const s of [-1, 1]){ const [sx, sz] = at(s*.2, 0); const [fx, fz] = at(0, .5); clear.push([sx, sz, .14]); spotAt(P, sx, gy, sz, 'seat', null, [fx - ax, fz - az], { act: 'pair' }); }
+    } else {
+      // the projector: a little dark puck with a lit lens; the show appears over it while someone watches (people.js)
+      cyl(M.metalDark, P, ax, .1, az, .09, .05); cyl(M.neonCyan, P, ax, .13, az, .04, .015); clear.push([ax, az, .16]);
+      const ad = hash('holo', c.i, c.j, g) % 9, n = chance(.5) ? 2 : 1;
+      for (let k = 0; k < n; k++){ const off = n === 2 ? (k ? .22 : -.22) : 0, [sx, sz] = at(off, .62); clear.push([sx, sz, .14]);
+        spotAt(P, sx, gy, sz, 'seat', null, [ax - sx, az - sz], { act: 'holo', hx: c.x + ax, hz: c.z + az, ad }); }
+    }
+  }
+  return clear;
+}
 function buildPlatform(c){
   NO_GREEN = c.green === 'none';
   try { buildPlatformBody(c); } finally { NO_GREEN = false; }
@@ -188,8 +216,11 @@ function buildPlatformBody(c){
       lawn(P, 4);
       // a garden lawn: one kind of short grass, packed in an even overlapping grid so it reads as a single carpet
       const n = 20, st = LOT/n;
-      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++)
-        plant('gt0', P, -LOT/2 + (i + .5 + rnd(-.2, .2))*st, .06, -LOT/2 + (j + .5 + rnd(-.2, .2))*st, rnd(.24, .28));
+      const clear = lawnSpots(c, P);   // the blankets, projectors and sitting places, kept clear of tall grass
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++){
+        const gx = -LOT/2 + (i + .5 + rnd(-.2, .2))*st, gz = -LOT/2 + (j + .5 + rnd(-.2, .2))*st;
+        if (clear.some(([x, z, r]) => (gx - x)**2 + (gz - z)**2 < r*r)) continue;
+        plant('gt0', P, gx, .06, gz, rnd(.24, .28)); }
     }
     else { const n = 7, st = LOT/n;
       for (let i=0;i<n;i++) for (let j=0;j<n;j++) if (!chance(.04)) box(pick(TILES.mid), P, (i-(n-1)/2)*st, .03, (j-(n-1)/2)*st, st - .05, .045, st - .05); }

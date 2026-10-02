@@ -130,12 +130,13 @@ function rasterize(data, x0, z0, nx, nz){
     }
   }
   // sprites: the solid middle of each plant, laundry or sign that reaches into the band
-  for (const k in data.fol) for (const f of data.fol[k]){
+  for (const k in data.fol){ if (/^gt\d$/.test(k)) continue;   // lawn grass: walked and sat on, not round
+    for (const f of data.fol[k]){
     const e = f.m.elements, oy = e[13], hy = e[5], yb = oy - f.an*hy, yt = oy + (1 - f.an)*hy;
     if (Math.max(yb, yt) < Y_LO || Math.min(yb, yt) > Y_HI) continue;
     const hx = e[0]*.35, hz = e[2]*.35;
     line(soft, e[12] - hx, e[14] - hz, e[12] + hx, e[14] + hz);
-  }
+  } }
   return { solid, soft, high, mid, nx, nz };
 }
 // a plot's maps: footprint (solid geometry, soft sprites) and the walking map, where free means a person fits
@@ -385,11 +386,13 @@ function makeSpots(pl, list, inside, oldSpots, addEnd){
     const ap = approachFor(cellGrid(c), r.x, r.z, r.fx, r.fz); if (!ap) return;
     const key = 's:' + pl.id + ':' + n, old = oldSpots.get(key), nk = 'a:' + Math.round(ap.x*100) + ',' + Math.round(ap.z*100);
     const sp = { key, x: r.x, y: r.y, z: r.z, ax: ap.x, az: ap.z, node: ngAdd(nk, ap.x, ap.z), kind: r.kind, stall: r.stall, face: [r.fx, r.fz],
-                 by: old ? old.by : null, place: pl.id, near: [] };
+                 by: old ? old.by : null, place: pl.id, near: [], act: r.act, hx: r.hx, hz: r.hz, ad: r.ad };
     pl.spots.push(sp); spotByKey.set(key, sp); addEnd(c, { key: nk, x: ap.x, z: ap.z, kind: 's' });
   });
   // who could chat with whom: standing spots close together
   for (const a of pl.spots) if (a.kind === 'stand') for (const b of pl.spots) if (b !== a && b.kind === 'stand' && Math.hypot(a.x - b.x, a.z - b.z) < .8) a.near.push(b);
+  // on a lawn: the other half of a picnic or a pair, and the other viewer of the same projector
+  for (const a of pl.spots) if (a.act) for (const b of pl.spots) if (b !== a && b.act === a.act && Math.hypot(a.x - b.x, a.z - b.z) < .9) a.near.push(b);
 }
 // Rebuild the network, the places and their doors after an edit. Unchanged plots reuse their cached maps and paths.
 function buildNetwork(){
@@ -651,7 +654,12 @@ const nearPick = (list, x, z, n = 6) => { if (!list.length) return null; list.so
 // where in an open place this person goes: their own counter if they keep a stall, a queue at an open stall, a
 // seat or a spot to stand (often next to someone, to chat)
 function pickSpot(to, from, p){
-  if (to.bench) return nearPick(freeOf(to.spots), from.x, from.z, 3);
+  if (to.bench){
+    // on a lawn, often join someone already sitting there (the other end of their blanket, beside them, at their show)
+    const free = freeOf(to.spots), social = free.filter(sp => sp.act && sp.near.some(o => o.by));
+    if (social.length && pplRand() < .6) return nearPick(social, from.x, from.z, 4);
+    return nearPick(free, from.x, from.z, 3);
+  }
   if (p && to.stalls){
     if (p.job === to.id && p.stall !== null && working(p, S.hour)){ const st = to.stalls.get(p.stall); const k = st && freeOf(st.keepers)[0]; if (k) return k; }
     if (p.chain === 'eat'){
@@ -1008,6 +1016,25 @@ function checkBumps(t){
   }
 }
 
+/* ---------- lawn hologram shows ---------- */
+// A small hologram plays over a lawn projector while someone sits watching it: a pool of little quads in the
+// hologram material, each given its ad through its uvs (see holoQuad in buildings.js), turned toward the viewer.
+const holoOn = [], holoPool = [];
+function lawnHolos(){
+  const used = new Set();
+  let n = 0;
+  for (const sp of holoOn){
+    const k = sp.hx.toFixed(2) + ',' + sp.hz.toFixed(2); if (used.has(k)) continue; used.add(k);
+    let m = holoPool[n];
+    if (!m){ m = new THREE.Mesh(new THREE.PlaneGeometry(.46, .34), HOLO_MAT); m.layers.set(1); m.renderOrder = 3; m.frustumCulled = false; scene.add(m); holoPool.push(m);
+      m.userData.u0 = Array.from(m.geometry.attributes.uv.array); }
+    if (m.userData.ad !== sp.ad){ const uv = m.geometry.attributes.uv, u0 = m.userData.u0, id = sp.ad + 9*(n + 3);
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, id + Math.min(u0[i*2], .999), Math.min(u0[i*2 + 1], .999));   // the picture (kind 0), this ad
+      uv.needsUpdate = true; m.userData.ad = sp.ad; }
+    m.position.set(sp.hx, CURB + .36, sp.hz); m.rotation.set(0, Math.atan2(sp.x - sp.hx, sp.z - sp.hz), 0); m.visible = true; n++;
+  }
+  for (let i = n; i < holoPool.length; i++) holoPool[i].visible = false;
+}
 /* ---------- every frame ---------- */
 const _pv = new THREE.Vector3(), _camR = new THREE.Vector3();
 function updatePeople(dt, t){
@@ -1042,7 +1069,7 @@ function updatePeople(dt, t){
     i++; return true;
   };
   // which stalls are being served, and who's queueing where
-  const served = new Set(), queued = new Set();
+  const served = new Set(), queued = new Set(); holoOn.length = 0;
   for (const p of pplList) if (!p.walk && p.spot){ if (p.spot.kind === 'vendor') served.add(p.spot.stall); else if (p.spot.kind === 'queue') queued.add(p.spot.stall); }
   for (const p of pplList){
     let alpha = 1, walking = false, y = CURB, frame = 0;
@@ -1074,7 +1101,14 @@ function updatePeople(dt, t){
         const sp = p.spot; if (!sp) continue;
         p.x = sp.x; p.z = sp.z; y = sp.y;
         let face = sp.face, gest = false;
-        if (sp.kind === 'seat'){ y = sp.y - .09; frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4; }
+        if (sp.kind === 'seat'){ y = sp.y - .09; frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4;
+          if (sp.act === 'holo'){ face = [sp.hx - sp.x, sp.hz - sp.z]; holoOn.push(sp);   // watching the show
+            if (!(p.emoUntil > t) && pplRand() < dt*.03) emote(p, pplRand() < .5 ? 'bang' : 'note', 2); }
+          else if (sp.act){ const mate = sp.near.find(o => o.by && people.get(o.by) && !people.get(o.by).walk);
+            if (mate) face = [mate.x - sp.x, mate.z - sp.z];
+            if (!(p.emoUntil > t)){
+              if (sp.act === 'eat' && pplRand() < dt*.09) emote(p, 'bowl', 2.4);                                 // a picnic
+              else if (mate && pplRand() < dt*.05) emote(p, pplRand() < .45 ? 'note' : pplRand() < .6 ? 'heart' : 'bang', 2.2); } } }
         else {
           if (sp.kind === 'vendor') gest = queued.has(sp.stall) && Math.floor(t*.5 + p.phase) % 3 > 0;      // serving
           else if (sp.kind === 'queue'){ gest = served.has(sp.stall) && Math.floor(t*.4 + p.phase) % 2 === 0;  // ordering
@@ -1093,6 +1127,7 @@ function updatePeople(dt, t){
     if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
   }
+  lawnHolos();
   // lurkers on the dark streets
   for (const L of lurkers.values()){
     if (L.fade <= 0) continue;

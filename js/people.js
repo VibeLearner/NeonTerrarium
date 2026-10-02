@@ -331,6 +331,7 @@ const MEGA_LIFE = {
   square:  { jobs: 0,  fun: 40, open: true },   // one stall keeper per food stall (see below)
   police:  { jobs: 8,  fun: 0,  night: .4, patrol: true },
   foundry: { jobs: 14, fun: 0,  night: .35 },
+  market:  { jobs: 10, fun: 14 },             // the market mall: shopkeepers inside, plenty of shoppers
 };
 const places = new Map();   // id -> { id, x, z, doors: [{ node, out:{x,z}, in:{x,z}|null, dir:[dx,dz] }], jobs, fun, open, night, cell|mega }
 const people = new Map();   // id -> person

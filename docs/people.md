@@ -101,7 +101,7 @@ counter is taken from there.
 Residential sections house 4 to 8, commercial 2 to 3, luxury 3 to 5, industrial none.
 
 **Jobs.** Commercial 3 to 5, luxury 2 to 4, industrial 4 to 6, and the megastructures (mall 8 per tier,
-foundry 14, police 8, radio 6, square 6). About 80% want work; jobs nearer home are more likely. Jobs are kept
+foundry 14, market mall 10, police 8, radio 6, square 6). About 80% want work; jobs nearer home are more likely. Jobs are kept
 across edits and only re-handed out when a workplace goes.
 
 **Routines.** The hour is the one set in Settings (the clock doesn't run). Each person has a wake time, a

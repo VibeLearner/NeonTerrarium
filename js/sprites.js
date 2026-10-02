@@ -29,7 +29,7 @@ const FLK_GLSL = `
 const texLoader = new THREE.TextureLoader();
 // how each sprite moves in the wind: 0 still, 1 laundry flapping from its line, 2 hanging greenery swinging from the top, 3 plants leaning at the tips
 function swayTypeFor(kind){
-  if (kind.startsWith('sign_') || kind.startsWith('glyph_') || kind === 'w_tangle') return 0;
+  if (kind.startsWith('sign_') || kind.startsWith('glyph_') || kind.startsWith('graf_') || kind === 'w_tangle') return 0;
   if (kind.startsWith('l_') && kind !== 'l_mossroots') return 1;
   if (kind === 'vines' || kind === 'pothos' || kind === 'l_mossroots' || kind.startsWith('h_')) return 2;
   return 3;
@@ -109,6 +109,99 @@ const GLYPH_V = [], GLYPH_H = [], GLYPH_GLOW = {};
   g.fillStyle = '#ffe2a8';
   [...text].forEach((ch, k) => F[ch].forEach((r, yy) => [...r].forEach((b, xx) => { if (b === '1') g.fillRect(3 + xx, 2 + k*6 + yy, 1, 1); })));
   SPR.img.sign_mall = c.toDataURL(); SPR.size.sign_mall = [w, h]; SPR.anchor.sign_mall = .5;
+})();
+// The market mall's signs. Shop boards: painted boards in bright market colours with chunky pseudo-characters (a
+// dot between words, now and then a price or 24H), some two lines deep. The rooftop sign: four big characters in
+// rainbow colours over MALL, outlined in dark, with no board behind. And graffiti for its walls: bubble-letter
+// tags with drips, in paint colours (these take the scene light: they're paint, not lights).
+const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
+(function marketSigns(){
+  const rr = mulberry32(6061), ri = n => Math.floor(rr()*n);
+  // a 7x7 pseudo-character, built like a real one: a radical beside a part, a roof over a part, or a frame round one
+  function hanzi(set){
+    const part = (x0, y0, w, h) => {
+      const k = ri(4), mid = y0 + (h >> 1);
+      if (k === 0){ for (let x=0;x<w;x++){ set(x0+x, y0); set(x0+x, y0+h-1); set(x0+x, mid); } for (let y=0;y<h;y++){ set(x0, y0+y); set(x0+w-1, y0+y); } }
+      else if (k === 1){ for (let x=0;x<w;x++){ set(x0+x, y0); set(x0+x, mid); } for (let y=0;y<h;y++) set(x0+(w>>1), y0+y); set(x0, y0+h-1); set(x0+w-1, y0+h-1); }
+      else if (k === 2){ for (let y=0;y<h;y++){ set(x0, y0+y); set(x0+w-1, y0+y); } for (let x=0;x<w;x++) set(x0+x, y0); for (let x=1;x<w-1;x++) set(x0+x, y0+h-2); }
+      else { for (let x=0;x<w;x++){ set(x0+x, y0+1); set(x0+x, y0+h-1); } const v = x0 + 1 + ri(Math.max(1, w-2)); for (let y=0;y<h;y++) set(v, y0+y); set(x0, y0); }
+    };
+    const k = ri(5);
+    if (k < 2){ for (let y=0;y<7;y++) set(1, y); set(0, 2); set(2, 2); rr() < .5 ? set(0, 5) : set(2, 4); part(3, 0, 4, 7); }   // radical and part
+    else if (k < 4){ set(3, 0); for (let x=0;x<7;x++) set(x, 1); set(0, 2); set(6, 2); part(1, 3, 5, 4); }                      // roof over a part
+    else { for (let q=0;q<7;q++){ set(0, q); set(6, q); set(q, 0); set(q, 6); } part(2, 2, 3, 3); }                             // a frame round a part
+  }
+  const DIG = { '2':['111','001','111','100','111'], '4':['101','101','111','001','001'], '5':['111','100','111','001','111'], '3':['111','001','111','001','111'], 'H':['101','101','111','101','101'] };
+  // a line: groups of characters with dots between, and maybe a number on the end
+  function lineSpec(){
+    const groups = 1 + ri(3), out = [];
+    for (let g = 0; g < groups; g++){ if (g) out.push('.'); for (let k = 0, n = groups > 1 ? 2 + ri(2) : 2 + ri(3); k < n; k++) out.push('c'); }
+    if (rr() < .25) out.push(...pick2(['24H', '5', '3', '2']).split(''));
+    return out;
+  }
+  const pick2 = a => a[ri(a.length)];
+  const itemW = it => it === 'c' ? 8 : it === '.' ? 3 : 4;
+  const BOARDS = [['#e0682c','#ffffff','orange'],['#2a9a86','#ffffff','cyan'],['#f2cf3a','#8a1a1a','amber'],['#d8407a','#ffffff','pink'],
+                  ['#3aa65a','#ffffff','cyan'],['#c83a2a','#fff2c8','pink'],['#34b8c8','#ffffff','cyan'],['#2a5aa8','#ffe680','cyan']];
+  function board(i, lines, spec, col){
+    const L = []; for (let k=0;k<lines;k++) L.push(spec ? [...spec] : lineSpec());
+    const lw = L.map(l => l.reduce((s, it) => s + itemW(it), -1));
+    const w = Math.max(...lw) + 6, h = 4 + lines*8 + 1;
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+    const [bg, fg, gn] = BOARDS[col ?? i % BOARDS.length];
+    g.fillStyle = '#1a1418'; g.fillRect(0, 0, w, h);
+    g.fillStyle = bg; g.fillRect(1, 1, w-2, h-2);
+    g.fillStyle = fg;
+    L.forEach((l, li) => {
+      let x = Math.floor((w - lw[li])/2); const y0 = 3 + li*8;
+      for (const it of l){
+        if (it === 'c') hanzi((px, py) => g.fillRect(x + px, y0 + py, 1, 1));
+        else if (it === '.') g.fillRect(x + 1, y0 + 3, 1, 1);
+        else DIG[it].forEach((r, yy) => [...r].forEach((b, xx) => { if (b === '1') g.fillRect(x + xx, y0 + 1 + yy, 1, 1); }));
+        x += itemW(it);
+      }
+    });
+    const kind = 'sign_mkt' + i;
+    SPR.img[kind] = c.toDataURL(); SPR.size[kind] = [w, h]; SPR.anchor[kind] = .5;
+    MKT_GLOW[kind] = gn; MKT_SIGNS.push(kind);
+  }
+  for (let i=0;i<16;i++) board(i, i % 5 === 3 ? 2 : 1);
+  board(16, 1, 'ccc', 0); board(17, 1, 'cccc', 0);   // the two big orange boards on the roof tower (小吃城, 手机维修)
+  MKT_SIGNS.length = 16;                             // kept for the tower only
+  // dark outline round whatever's painted, on a transparent canvas
+  function outline(g, w, h, col){
+    const d = g.getImageData(0, 0, w, h), a = d.data, o = new Uint8Array(w*h);
+    for (let y=0;y<h;y++) for (let x=0;x<w;x++) if (!a[(y*w + x)*4 + 3])
+      for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++){ const X = x+dx, Y = y+dy; if (X>=0 && Y>=0 && X<w && Y<h && a[(Y*w + X)*4 + 3] > 127) o[y*w + x] = 1; }
+    g.fillStyle = col; for (let q=0;q<w*h;q++) if (o[q]) g.fillRect(q % w, Math.floor(q/w), 1, 1);
+  }
+  // the rooftop sign: 彩虹广场 (as four rainbow pseudo-characters, two pixels to a stroke) over a smaller MALL
+  { const S = 2, w = 4*15 + 4, h = 15 + 2 + 11 + 2, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+    const cols = ['#ff5aa8', '#ff8a3a', '#5ae8c8', '#ffd23f'];
+    for (let k=0;k<4;k++){ g.fillStyle = cols[k]; hanzi((px, py) => g.fillRect(2 + k*15 + px*S, 1 + py*S, S, S)); }
+    const F = { M:['10001','11011','10101','10001','10001'], A:['01110','10001','11111','10001','10001'], L:['10000','10000','10000','10000','11111'] };
+    g.fillStyle = '#e070ff'; let x = w - 2 - (5+1+5+1+5+1+5)*S;
+    for (const ch of 'MALL'){ F[ch].forEach((r, yy) => [...r].forEach((b, xx) => { if (b === '1') g.fillRect(x + xx*S, 17 + yy*S, S, S); })); x += 6*S; }
+    outline(g, w, h, '#1a1026');
+    SPR.img.sign_mktroof = c.toDataURL(); SPR.size.sign_mktroof = [w, h]; SPR.anchor.sign_mktroof = .5; }
+  // graffiti: overlapping bubble letters, a highlight on each, a few drips, all outlined
+  const PAINT = [['#ff5aa8','#ffc0dc'],['#ff8a3a','#ffd8a0'],['#a070f0','#e0c8ff'],['#ffd23f','#fff2b0'],['#3ad0e0','#c0f4ff'],['#6ad06a','#d0ffc0']];
+  for (let i=0;i<8;i++){
+    const w = 30 + ri(14), h = 16, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+    const [fill, hi] = PAINT[i % PAINT.length], n = 3 + ri(3), step = (w - 8)/n;
+    g.fillStyle = fill;
+    for (let k=0;k<n;k++){
+      const cx = 4 + step*(k + .5) + rr()*2 - 1, cy = 7 + rr()*2 - 1, rx = step*.6 + 1, ry = 4 + rr()*2;
+      for (let y=0;y<h;y++) for (let x=0;x<w;x++) if (((x + .5 - cx)/rx)**2 + ((y + .5 - cy)/ry)**2 <= 1) g.fillRect(x, y, 1, 1);
+      if (rr() < .5) g.fillRect(Math.round(cx), Math.round(cy + ry - 1), 1, 2 + ri(3));   // a drip
+    }
+    g.fillStyle = hi;
+    for (let k=0;k<n;k++){ const cx = Math.round(4 + step*(k + .5)) - 1, cy = 5; g.fillRect(cx, cy, 2, 1); }
+    outline(g, w, h, '#1c1424');
+    const kind = 'graf_' + i;
+    SPR.img[kind] = c.toDataURL(); SPR.size[kind] = [w, h]; SPR.anchor[kind] = .5;
+    MKT_GRAF.push(kind);
+  }
 })();
 // All sprites share one texture atlas and one material, so a whole region's plants, laundry and signs
 // are a single instanced draw call. The layout is computed from the known sizes right away; each image is

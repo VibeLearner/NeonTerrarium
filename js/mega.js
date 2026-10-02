@@ -17,16 +17,20 @@ const MEGA_TYPES = {
            colour: '#4fb8ff', build: buildPoliceStation, fx: policeFx },
   foundry: { name: 'Foundry', need: { ind: 60 }, odds: 50, w: 6, h: 4, maxLevels: 1,
            colour: '#ff8a2a', build: buildFoundry },
+  market: { name: 'Rainbow Plaza market mall', need: { midPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives with the 30th commercial building
+           colour: '#ff7ab8', build: buildMarketMall },
 };
 const megas = new Map();   // kind -> { kind, i, j, w, h, levels, seed, x, z, data, view, roofH, top, cells }
 
 // how many building sections of each zone stand in the city
 function zoneCounts(){
-  // per zone: building sections; any: buildings of any zone; lowPlots: residential buildings (each built plot counts once)
-  const n = { low: 0, mid: 0, high: 0, ind: 0, any: 0, lowPlots: 0 };
+  // per zone: building sections; any: buildings of any zone; lowPlots, midPlots: residential and commercial
+  // buildings (each built plot counts once)
+  const n = { low: 0, mid: 0, high: 0, ind: 0, any: 0, lowPlots: 0, midPlots: 0 };
   for (const c of cells.values()){
     if (c.sections.length) n.any++;
     if (c.sections.some(s => s.zone === 'low')) n.lowPlots++;
+    if (c.sections.some(s => s.zone === 'mid')) n.midPlots++;
     for (const s of c.sections) if (n[s.zone] !== undefined) n[s.zone]++;
   }
   return n;
@@ -306,13 +310,13 @@ function buildRadioStation(m){
 }
 
 // for trying things out: open the game with #dev in the address, point at a plot and press M for the radio
-// station or N for the sky mall (each key brings it in, or removes it if it's already there; ignores the
-// requirement and the odds)
+// station, N the sky mall, B the town square, V the foundry, C the police station, X the market mall (each key
+// brings it in, or removes it if it's already there; ignores the requirement and the odds)
 if (location.hash.includes('dev')){
   let lastPointer = null;
   addEventListener('pointermove', e => { lastPointer = { x: e.clientX, y: e.clientY }; });
   addEventListener('keydown', e => {
-    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police' }[e.key.toLowerCase()]; if (!kind) return;
+    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police', x: 'market' }[e.key.toLowerCase()]; if (!kind) return;
     const pk = lastPointer ? pickAt(lastPointer.x, lastPointer.y) : null;
     const c = pk && pk.c ? pk.c : pk && pk.kind === 'sky' ? { i: pk.i, j: pk.j } : cells.values().next().value;
     if (megas.has(kind)) removeMega(megas.get(kind));
@@ -1355,4 +1359,306 @@ function policeFx(m){
     },
     dispose(){ for (const p of parts){ scene.remove(p); if (p !== radar && p !== drone.g) p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } scanMat.dispose(); drone.dispose(); }
   };
+}
+
+/* ---------- the market mall ---------- */
+// 彩虹广场 MALL, the Rainbow Plaza market, after the reference: a stacked, weathered market building on a 4x4 block,
+// a size up from the police station and taller. Teal concrete gone patchy with rust, paint and graffiti. A ground
+// floor of shops all the way round, with striped awnings and bright painted signboards; on its two street sides the
+// produce stalls spill out under the awnings, crates of fruit and veg out front, sausages and garlic hanging, strings
+// of bulbs. Above, a stepped floor of lit shops behind a terrace and a balcony (red lanterns, laundry, plants), then
+// three masses on the roof: a tower capped by a big glass barrel vault behind a painted concrete hood, a smaller
+// block with another vault and solar panels, and glass vaults over the front corners, lit warm from inside. A blue
+// tarp over a rooftop cafe at the back, bikes and crates on the terraces, cables slung everywhere, a dish; and on
+// top, the rainbow sign on its arch. The front is local +z and +x.
+M.mkTeal = toon(0x3f8a80); M.mkTeal2 = toon(0x347670); M.mkTeal3 = toon(0x24504e); M.mkRust = toon(0x9a5634); M.mkRust2 = toon(0x7a4430);
+const MK_PAINT = [0xd8508a, 0xe0803a, 0x8a5ac8, 0xe8c84a, 0x4ac0d0, 0xc84a4a, 0x6ac06a].map(h => toon(h));
+const MK_STRIPE = [[0xe0508a, 0xf4e8d0], [0x2a9a8a, 0xf4e8d0], [0xe8803a, 0xf2cf3a], [0xd04040, 0xf4ece0], [0x3a7ac0, 0x8ad8e0], [0x8a5ac8, 0xf08ab8]].map(p => p.map(h => toon(h)));
+const MK_RAINBOW = [0xe0508a, 0xe8803a, 0xf2cf3a, 0x2a9a8a, 0x3a7ac0].map(h => toon(h));
+M.mkGlass = new THREE.MeshBasicMaterial({ color: 0xc4ece6, transparent: true, opacity: .17, depthWrite: false }); M.mkGlass.userData.colorOnly = true;
+M.mkSolar = toon(0x24407a); M.mkSolarL = toon(0x6a8ac8); M.mkTarp = toon(0x3a78b8); M.mkTarp2 = toon(0x2e6298);
+M.mkLit1 = toon(0x5a3a20, { em:0xffb05a, kind:'lamp' }); M.mkLit2 = toon(0x5a4024, { em:0xffc878, kind:'lamp' }); M.mkLit3 = toon(0x5a3420, { em:0xff9a4a, kind:'lamp' });
+const MK_LIT = [M.mkLit1, M.mkLit2, M.mkLit3, M.mkLit1];   // warm market light, oranger than the sky mall's
+const mkGoods = () => chance(.6) ? food() : pick([M.cloth1, M.cloth3, M.cloth4, M.awn1, M.awn2, M.white2, M.corrBlue, M.red2]);
+// the vault: a glass half-cylinder along local x (open, radius 1, length 1), its half-disc ends, a half-ring rib
+U.vault = (() => { const g = new THREE.CylinderGeometry(1, 1, 1, 16, 1, true, 0, PI); g.rotateZ(PI/2); return g; })();
+U.vaultCap = new THREE.CircleGeometry(1, 16, 0, PI);
+U.halfRing = new THREE.TorusGeometry(1, .022, 4, 16, PI);
+// a glass barrel vault at (cx, y, cz), on a floor of lit market stalls
+function mkVault(P, cx, y, cz, len, r, alongX){
+  const Q = under(P, T(cx, y, cz, alongX ? 0 : PI/2));   // in Q the vault runs along x
+  box(M.mkTeal3, Q, 0, -.05, 0, len + .12, .1, 2*r + .12);
+  for (const s of [-1, 1]) for (let t = -len/2 + .35; t < len/2 - .25; t += rnd(.55, .8)){   // stalls along both sides, lit from behind
+    box(pick(MK_LIT), Q, t, .42, s*(r - .3), .5, .75, .04);
+    box(pick([M.wood, M.crate, M.metal, M.mkTeal2]), Q, t, .2, s*(r - .55), .44, .36, .34);
+    for (let k=0; k<3; k++) box(mkGoods(), Q, t - .14 + k*.14, .42, s*(r - .55), .1, .08, .1);
+  }
+  for (let t = -len/2 + .4; t < len/2; t += .9){ glow(Q, t, r*.6, 0, 'warm', 1.1); if (chance(.5)) plant(pick(['bonsai','fern','bush','bamboo']), Q, t + .3, 0, rnd(-.2, .2), rnd(.7, .9)); }
+  // the glass, its ribs and rails, a steel rim along the foot
+  put(U.vault, M.mkGlass, under(Q, T(0, 0, 0, 0, len, r, r)));
+  for (const s of [-1, 1]) put(U.vaultCap, M.mkGlass, under(Q, T(s*len/2, 0, 0, s*PI/2, r, r, 1)));
+  const n = Math.max(3, Math.round(len/.5));
+  for (let k=0; k<=n; k++) put(U.halfRing, M.mkTeal3, under(Q, T(-len/2 + k*len/n, 0, 0, PI/2, r, r, r)));
+  for (const a of [PI*.18, PI*.4, PI*.6, PI*.82]) strut(M.mkTeal3, Q, -len/2, Math.sin(a)*r, Math.cos(a)*r, len/2, Math.sin(a)*r, Math.cos(a)*r, .035);
+  strut(M.mkTeal3, Q, -len/2, r, 0, len/2, r, 0, .05);
+  for (const s of [-1, 1]) for (const a of [PI*.35, PI*.65]) strut(M.mkTeal3, Q, s*len/2, 0, Math.cos(a)*r*.98, s*len/2, Math.sin(a)*r*.98, Math.cos(a)*r*.98, .03);   // mullions on the ends
+  strut(M.mallGlint, Q, -len/2 + .1, Math.sin(PI*.3)*r + .01, Math.cos(PI*.3)*r, len/2 - .1, Math.sin(PI*.3)*r + .01, Math.cos(PI*.3)*r, .05);   // a glint
+  for (const s of [-1, 1]) box(M.mkTeal2, Q, 0, .06, s*r, len + .12, .14, .12);
+}
+// worn paint, rust and old posters, as flat patches on a wall face
+function mkPatches(F, len, y0, h, n, z = .015){
+  for (let k=0; k<n; k++){
+    const w = rnd(.25, .9), hh = Math.min(h - .1, rnd(.15, .6));
+    box(chance(.35) ? M.mkRust : chance(.2) ? M.mkTeal3 : pick(MK_PAINT), F, rnd(-len/2 + w/2, len/2 - w/2), rnd(y0 + hh/2 + .05, y0 + h - hh/2 - .05), z, w, hh, .02);
+  }
+  for (let k=0; k<Math.round(len/2.5); k++) box(M.mkRust2, F, rnd(-len/2 + .2, len/2 - .2), y0 + h - rnd(.3, .6), z + .004, rnd(.06, .14), rnd(.3, .7), .02);   // rust running down
+}
+// a striped awning at t on face F: from the wall at height y, out and down
+function mkAwning(F, t, y, w, out, drop, pal){
+  const n = Math.max(3, Math.round(w/.19)), sw = w/n, L = Math.hypot(out, drop), a = Math.atan2(drop, out);
+  for (let k=0; k<n; k++){
+    const x = t - w/2 + (k + .5)*sw, mat = pal[k % pal.length];
+    box(mat, F, x, y - drop/2, out/2, sw + .004, .03, L, 0, a);
+    box(mat, F, x, y - drop - (k % 2 ? .05 : .07), out, sw, k % 2 ? .1 : .14, .02);   // scalloped valance
+  }
+  for (const s of [-1, 1]) strut(M.frame, F, t + s*(w/2 - .04), y - drop, out, t + s*(w/2 - .04), y - drop - .05, out - .02, .02);
+}
+// a produce stall under an awning: a table of tilted crates heaped with fruit and veg, more crates on the ground
+function mkStall(F, t, w, y0){
+  const z0 = .95, d = .55;
+  box(M.wood, F, t, y0 + .46, z0, w, .05, d); box(M.crate, F, t, y0 + .22, z0 + d/2 - .03, w - .04, .4, .03);
+  for (const s of [-1, 1]) for (const zz of [z0 - d/2 + .04, z0 + d/2 - .04]) box(M.frame, F, t + s*(w/2 - .04), y0 + .22, zz, .04, .44, .04);
+  for (let x = t - w/2 + .16; x < t + w/2 - .1; x += .3) for (const [zz, tilt] of [[z0 - .12, 0], [z0 + .13, .3]]){
+    const Q = under(F, T(x, y0 + .5, zz, 0, 1, 1, 1, tilt));
+    box(chance(.6) ? M.crate : pick([M.awn2, M.corrBlue, M.red2]), Q, 0, .04, 0, .27, .08, .23);
+    const fm = chance(.5) ? pick(VEG) : food();
+    for (let q=0; q<4; q++) put(U.sph, chance(.85) ? fm : food(), under(Q, T(rnd(-.08, .08), .1, rnd(-.06, .06), 0, rnd(.08, .11), rnd(.06, .08), rnd(.08, .11))));
+  }
+  for (let k=0; k<Math.max(1, Math.round(w/.45)); k++){   // crates and tubs on the ground in front
+    const x = t + rnd(-w/2 + .15, w/2 - .15), z = z0 + d/2 + rnd(.12, .25);
+    if (chance(.7)){ box(chance(.6) ? M.crate : pick([M.awn2, M.corrBlue, M.red2]), F, x, y0 + .1, z, .26, .2, .2); for (let q=0; q<3; q++) put(U.sph, pick(VEG), under(F, T(x + rnd(-.07, .07), y0 + .21, z + rnd(-.05, .05), 0, .09, .07, .09))); }
+    else put(U.cyl16, pick([M.wood, M.white2, M.awn1]), under(F, T(x, y0 + .1, z, 0, .22, .2, .22)));
+  }
+}
+// a row of shopfronts along face F (+z out, the wall's face at z = 0), recessed under a fascia: lit interiors,
+// shelves of goods, signboards, awnings; and on the street sides, stalls out front. The shop the block's side
+// middle falls in is kept clear inside: that's the way in.
+function mkShopRow(F, len, y0, h, o){
+  const fy = y0 + h - .25;
+  box(M.mkTeal, F, 0, fy, -.22, len, .5, .46);                                                   // fascia
+  for (const s of [-1, 1]) box(M.mkTeal2, F, s*(len/2 - .22), y0 + h/2, -.22, .44, h, .46);      // corner piers
+  const cuts = []; let a = -len/2 + .44;
+  while (a < len/2 - .44 - .1){ let b = a + rnd(1.6, 2.5); if (len/2 - .44 - b < 1.2) b = len/2 - .44; cuts.push([a, b]); a = b; }
+  cuts.forEach(([a, b], k) => {
+    const tc = (a + b)/2, sw = b - a, entry = o.tmid >= a && o.tmid < b;
+    if (k < cuts.length - 1) box(M.mkTeal2, F, b, y0 + (h - .5)/2, -.22, .14, h - .5, .46);    // pier between shops
+    box(pick(MK_LIT), F, tc, y0 + (h - .5)/2, -.43, sw - .1, h - .52, .03);                     // the lit interior
+    if (!entry){
+      for (let s=0; s<3; s++){ const sy = y0 + .32 + s*.4; box(M.wood, F, tc, sy, -.35, sw - .22, .03, .14);
+        for (let x = tc - sw/2 + .18; x < tc + sw/2 - .15; x += .13) if (chance(.8)) box(mkGoods(), F, x, sy + .06, -.35, .09, rnd(.07, .13), .1); }
+      if (chance(.2)) box(M.shutter, F, tc, y0 + h - .75, -.06, sw - .1, .5, .03);               // a roll shutter half down
+    }
+    if (chance(o.signOdds ?? .85)){
+      const kind = pick(MKT_SIGNS), [pw, ph] = SPR.size[kind], k = Math.min(.95, (sw - .3)*PX/pw, .62*PX/ph);
+      plant(kind, F, tc + rnd(-.12, .12), fy, .035, k, 'c', true); glow(F, tc, fy, .3, MKT_GLOW[kind], .8 + k);
+    }
+    if (o.awning && chance(o.awnOdds ?? .9)) mkAwning(F, tc, y0 + h - .52, sw - .08, o.out || .95, o.drop || .32, chance(.3) ? MK_RAINBOW : pick(MK_STRIPE));
+    if (o.stall && !entry){
+      mkStall(F, tc, sw - .35, y0);
+      const ey = y0 + h - .52 - (o.drop || .32);
+      for (let x = tc - sw/2 + .15; x < tc + sw/2 - .1; x += .22){ box(M.bulb, F, x, ey - .1, (o.out || .95) - .06, .045, .05, .045); if (chance(.45)) glow(F, x, ey - .12, (o.out || .95), 'warm', .45); }
+      if (chance(.7)) hangingFood(F, tc + rnd(-sw/3, sw/3), ey + .02, (o.out || .95) - .2);
+    }
+    else if (!entry && o.back && chance(.3)){ const x = tc + rnd(-sw/3, sw/3); box(pick([M.crate, M.corrBlue, M.metal]), F, x, y0 + .15, .25, .34, .3, .26); }
+  });
+  mkPatches(F, len, fy - .25, .5, Math.round(len/1.2), .025);
+}
+// an upper-floor wall: windows into lit shops and homes (or dark glass), sills, little awnings, AC units, plants,
+// stretches of bare wall with graffiti
+function mkUpperFace(F, len, y0, h, o = {}){
+  const n = Math.max(1, Math.round(len/1.3)), seg = len/n;
+  for (let k=0; k<n; k++){
+    const t = -len/2 + (k + .5)*seg, ww = seg - .35, wh = h*.58, wy = y0 + h*.52;
+    if (chance(o.bare ?? .2)){ if (chance(.7)) plant(pick(MKT_GRAF), F, t, wy, .03, rnd(.8, 1.1), 'c', true); continue; }
+    box(chance(o.lit ?? .7) ? pick(MK_LIT) : M.glassDark, F, t, wy, .015, ww, wh, .03);
+    box(M.mkTeal3, F, t, wy - wh/2 - .03, .07, ww + .12, .05, .14);                         // sill
+    box(M.mkTeal3, F, t, wy + wh/2 + .02, .03, ww + .08, .05, .06);
+    for (const s of ww > 1 ? [-1, 0, 1] : [-1, 1]) box(M.mkTeal3, F, t + s*ww/2, wy, .035, .04, wh, .04);
+    if (chance(.3)) box(pick([M.tarp1, M.tarp2, M.tarp3, ...MK_STRIPE[k % MK_STRIPE.length]]), F, t, wy + wh/2 + .12, .2, ww + .1, .03, .42, 0, .35);
+    if (chance(.35)){ const ax = t + rnd(-ww/3, ww/3); box(M.white2, F, ax, wy - wh/2 - .22, .14, .32, .22, .22); put(U.cyl16, M.metalDark, under(F, T(ax, wy - wh/2 - .22, .25, 0, .16, .01, .16, PI/2))); }
+    if (chance(.4)) plant(pick(['bush','bushFlower','fern','succulent','bonsai']), F, t + rnd(-ww/3, ww/3), wy - wh/2, .1, rnd(.6, .85));
+  }
+  mkPatches(F, len, y0, h, Math.round(len*h/2.2));
+  if (o.vines) for (let t = -len/2 + .3; t < len/2 - .2; t += rnd(.8, 1.6)) if (chance(.5)) plant(pick(['vines','pothos','h_ivy','h_vine3']), F, t, y0 + h, .05, rnd(.8, 1.1), 't', true);
+}
+// the four faces of a box at (cx, cz), w x d: [transform, length, which side, where the block's side middle falls]
+function mkFaces(P, cx, cz, w, d){
+  return [[under(P, T(cx, 0, cz + d/2, 0)), w, 'f', -cx], [under(P, T(cx, 0, cz - d/2, PI)), w, 'b', cx],
+          [under(P, T(cx + w/2, 0, cz, PI/2)), d, 'r', cz], [under(P, T(cx - w/2, 0, cz, -PI/2)), d, 'l', -cz]];
+}
+// a parapet along a terrace edge (a to b, in P), with plants on it and now and then a glass rail
+function mkParapet(P, ax, az, bx, bz, y, glass){
+  const len = Math.hypot(bx - ax, bz - az), ry = Math.atan2(-(bz - az), bx - ax), F = under(P, T((ax + bx)/2, 0, (az + bz)/2, ry));
+  box(M.mkTeal2, F, 0, y + .2, 0, len, .4, .14); box(M.mkTeal3, F, 0, y + .41, 0, len + .04, .04, .18);
+  for (const s of [1, -1]){ const G2 = under(F, T(0, 0, s*.075, s > 0 ? 0 : PI)); mkPatches(G2, len, y, .4, Math.round(len/1.4), .01); }
+  if (glass){ box(M.mkGlass, F, 0, y + .7, 0, len, .5, .02); box(M.metalDark, F, 0, y + .96, 0, len, .03, .04); for (let t = -len/2; t <= len/2 + .01; t += 1.2) box(M.metalDark, F, t, y + .7, 0, .03, .55, .03); }
+  for (let t = -len/2 + .3; t < len/2 - .2; t += rnd(.5, 1.0)){
+    if (chance(.5)) plant(pick(['bush','bushFlower','fern','g_fern3','moss','bonsai']), F, t, y + .43, 0, rnd(.65, .9));
+    if (chance(.3)) plant(pick(['vines','pothos','h_ivy','h_curtain1']), under(F, T(0, 0, .08)), t, y + .4, 0, rnd(.7, 1.0), 't', true);
+  }
+}
+// a cable slung between two points (in P)
+function mkCable(P, ax, ay, az, bx, by, bz, sag, t = .025){
+  const n = 8; let px = ax, py = ay, pz = az;
+  for (let k=1; k<=n; k++){ const u = k/n, x = ax + (bx - ax)*u, z = az + (bz - az)*u, y = ay + (by - ay)*u - sag*Math.sin(PI*u); strut(M.frame, P, px, py, pz, x, y, z, t); px = x; py = y; pz = z; }
+}
+// a laundry line: a cord between two points with clothes pegged along it
+function mkLaundry(P, ax, ay, az, bx, by, bz){
+  mkCable(P, ax, ay, az, bx, by, bz, .08, .015);
+  const len = Math.hypot(bx - ax, bz - az), ry = Math.atan2(-(bz - az), bx - ax);
+  for (let u = .3/len; u < 1 - .2/len; u += rnd(.28, .42)/len){ const F = under(P, T(ax + (bx - ax)*u, 0, az + (bz - az)*u, ry)); if (chance(.85)) plant(laundryKind(), F, 0, ay + (by - ay)*u - .08*Math.sin(PI*u) - .01, 0, rnd(.9, 1.1), 't', true); }
+}
+function mkBike(P, x, y, z, ry){
+  const Q = under(P, T(x, y, z, ry)), c = pick([M.red2, M.awn2, M.cloth1, M.corrBlue, M.cloth4]);
+  for (const s of [-1, 1]) put(U.torus, M.frame, under(Q, T(s*.24, .17, 0, 0, .34, .34, .34)));
+  strut(c, Q, -.24, .17, 0, -.02, .17, 0, .03); strut(c, Q, -.02, .17, 0, .14, .38, 0, .03); strut(c, Q, -.24, .17, 0, -.06, .38, 0, .03);
+  strut(c, Q, -.06, .38, 0, .14, .38, 0, .03); strut(c, Q, .14, .38, 0, .24, .17, 0, .025); strut(M.frame, Q, .14, .38, 0, .17, .46, 0, .02);
+  box(M.frame, Q, .17, .46, 0, .03, .03, .2); box(M.frame, Q, -.08, .42, 0, .12, .03, .06);
+}
+function mkTable(P, x, y, z, umbrella){
+  put(U.cyl16, M.white2, under(P, T(x, y + .3, z, 0, .42, .03, .42))); cyl(M.frame, P, x, y + .15, z, .02, .3);
+  for (let k=0; k<3; k++){ const a = rnd(0, TAU); cyl(pick([M.red2, M.awn2, M.white2, M.awn3]), P, x + Math.cos(a)*.34, y + .1, z + Math.sin(a)*.34, .06, .2); }
+  foodBowl(P, x + rnd(-.08, .08), y + .31, z + rnd(-.08, .08), .05);
+  if (umbrella){ cyl(M.frame, P, x, y + .6, z, .012, .6); put(U.cone, pick([M.awn1, M.awn2, M.awn3, ...MK_PAINT]), under(P, T(x, y + .98, z, 0, .85, .2, .85))); }
+}
+function mkCrates(P, x, y, z, n = 3){
+  for (let k=0; k<n; k++){ const ry = rnd(0, PI); box(pick([M.crate, M.crate, M.wood, M.corrBlue, M.awn2]), under(P, T(x + rnd(-.25, .25), 0, z + rnd(-.25, .25), ry)), 0, y + .12 + (k > 1 && chance(.5) ? .24 : 0), 0, rnd(.24, .34), .24, rnd(.2, .3)); }
+}
+function mkPotted(P, x, y, z){ put(U.cyl16, pick([M.pot, M.mkTeal3, M.white2]), under(P, T(x, y + .1, z, 0, .26, .2, .26))); plant(pick(['bush','bushFlower','fern','bonsai','bamboo','g_fern3']), P, x, y + .2, z, rnd(.8, 1.05)); }
+function buildMarketMall(m){
+  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  const P = T(m.x, 0, m.z, pick([0, PI/2, PI, -PI/2])), H = 2*LOT, Y = CURB;   // the street fronts are local +z and +x
+  // ---- ground: worn paving, darker under the stalls
+  box(G.asph, P, 0, .012, 0, 2*H, .025, 2*H);
+  const nt = 19, st = 2*H/nt;
+  for (let a=0; a<nt; a++) for (let b=0; b<nt; b++) if (!chance(.04)) box(pick(TILES.mid), P, -H + (a + .5)*st, .03, -H + (b + .5)*st, st - .05, .045, st - .05);
+  // ---- tier 0: the ground floor of shops, stalls on the two street sides
+  const x0 = -6.6, x1 = 5.4, z0 = -6.6, z1 = 4.4, cx0 = (x0 + x1)/2, cz0 = (z0 + z1)/2, w0 = x1 - x0, d0 = z1 - z0, h0 = 2.0;
+  box(M.mkTeal, P, cx0, Y + h0/2, cz0, w0 - .9, h0, d0 - .9);
+  for (const [F, len, side, tmid] of mkFaces(P, cx0, cz0, w0, d0)){
+    const street = side === 'f' || side === 'r';
+    mkShopRow(F, len, Y, h0, { tmid, awning: true, stall: street, back: !street, out: street ? .95 : .6, drop: street ? .32 : .22, awnOdds: street ? .95 : .6, signOdds: street ? .9 : .6 });
+  }
+  const y1 = Y + h0 + .18;
+  box(M.mkTeal3, P, cx0, Y + h0 + .09, cz0, w0 + .2, .18, d0 + .2);                               // floor slab, a ledge all round
+  // a corner fruit stand where the two street sides meet
+  { const F = under(P, T(x1 + .55, 0, z1 + .55, PI/4));
+    for (let k=0; k<3; k++){ box(M.wood, F, 0, Y + .2 + k*.16, -k*.16, 1.0, .05, .3); for (let q=0; q<4; q++) put(U.sph, pick(VEG), under(F, T(-.36 + q*.24, Y + .27 + k*.16, -k*.16, 0, .14, .1, .14))); }
+    box(M.crate, F, 0, Y + .1, -.1, 1.0, .2, .6); }
+  // ---- tier 1: set back from the street sides, leaving a terrace along the front and a balcony on the side
+  const bx0 = -6.6, bx1 = 4.6, bz0 = -6.6, bz1 = 3.2, cx1 = (bx0 + bx1)/2, cz1 = (bz0 + bz1)/2, w1 = bx1 - bx0, d1 = bz1 - bz0, h1 = 1.75;
+  for (const [F, len, side, tmid] of mkFaces(P, cx1, cz1, w1, d1)){
+    if (side === 'f' || side === 'r') mkShopRow(F, len, y1, h1, { tmid: 99, awning: true, awnOdds: .5, out: .55, drop: .22, signOdds: .6 });
+    else mkUpperFace(F, len, y1, h1, { lit: .6 });
+  }
+  box(M.mkTeal, P, cx1 - .225, y1 + h1/2, cz1 - .225, w1 - .45, h1, d1 - .45);   // recessed only on the shop sides
+  const y2 = y1 + h1 + .18;
+  box(M.mkTeal3, P, cx1, y1 + h1 + .09, cz1, w1 + .2, .18, d1 + .2);
+  // the front terrace and side balcony (on the ground floor's roof)
+  mkParapet(P, x0 + .1, z1 - .05, x1 - .05, z1 - .05, y1, false);
+  mkParapet(P, x1 - .05, z1 - .05, x1 - .05, z0 + .1, y1, false);
+  mkLaundry(P, -5.8, y1 + 1.35, 3.85, -2.2, y1 + 1.35, 3.85); cyl(M.frame, P, -5.8, y1 + .7, 3.85, .02, 1.4); cyl(M.frame, P, -2.2, y1 + .7, 3.85, .02, 1.4);
+  mkLaundry(P, .2, y1 + 1.3, 3.9, 3.6, y1 + 1.25, 3.9); cyl(M.frame, P, .2, y1 + .67, 3.9, .02, 1.3); cyl(M.frame, P, 3.6, y1 + .65, 3.9, .02, 1.3);
+  for (let x = x0 + .4; x < x1 - .3; x += .25){ box(M.bulb, P, x, y1 + 1.55 - .1*Math.sin(PI*((x - x0)%3/3)), z1 - .2, .04, .05, .04); if (chance(.3)) glow(P, x, y1 + 1.5, z1 - .1, 'warm', .4); }
+  lanternString(P, x1 - .25, y1 + 1.5, z1 - .3, x1 - .25, y1 + 1.5, -1.2, .18);
+  lanternString(P, x1 - .25, y1 + 1.5, -1.6, x1 - .25, y1 + 1.5, z0 + .4, .18);
+  for (let k=0; k<3; k++) hangingFood(P, x1 - .25, y1 + 1.45, rnd(z0 + 1, z1 - 1));
+  for (let k=0; k<4; k++){ const x = rnd(x0 + .6, x1 - 1); if (chance(.5)) mkCrates(P, x, y1, 3.75, 2); else mkPotted(P, x, y1, 3.8); }
+  for (let k=0; k<5; k++) box(M.white2, P, bx1 + .2, y1 + .2, rnd(z0 + .5, z1 - .5), .26, .32, .4);   // AC units on the balcony
+  // ---- tier 2: the roof masses
+  // the tower: two more floors, the big signboard on its front
+  const tx0 = -3.0, tx1 = 1.8, tz0 = -6.2, tz1 = -.6, tcx = (tx0 + tx1)/2, tcz = (tz0 + tz1)/2, tw = tx1 - tx0, td = tz1 - tz0, th = 2.4;
+  box(M.mkTeal, P, tcx, y2 + th/2, tcz, tw, th, td);
+  for (const [F, len, side] of mkFaces(P, tcx, tcz, tw, td)){
+    mkUpperFace(F, len, y2, th/2, { lit: .8, bare: side === 'b' ? .4 : .15 }); mkUpperFace(F, len, y2 + th/2, th/2, { lit: .75, bare: .25, vines: true });
+    box(M.mkTeal3, F, 0, y2 + th/2, .05, len + .06, .06, .1);
+  }
+  { const F = under(P, T(tcx, 0, tz1, 0)); box(M.mkTeal3, F, -1.1, y2 + th - .38, .05, 1.65, .05, .1); plant('sign_mkt16', F, -1.1, y2 + th - .7, .1, 1.15, 'c', true); glow(F, -1.1, y2 + th - .7, .4, 'orange', 2.0);
+    const Fr = under(P, T(tx1, 0, tcz, PI/2)); plant('sign_mkt17', Fr, 1.4, y2 + th/2 + .05, .1, 1.0, 'c', true); glow(Fr, 1.4, y2 + th/2, .4, 'orange', 1.8); }
+  const yT = y2 + th + .18;
+  box(M.mkTeal3, P, tcx, y2 + th + .09, tcz, tw + .16, .18, td + .16);
+  // on the tower: the big glass vault behind a painted concrete hood, and the rainbow sign on its arch
+  const vx = tcx, vy = yT + .3;
+  box(M.mkTeal2, P, vx, yT + .15, tcz, 4.0, .3, td - .2);
+  mkVault(P, vx, vy, -3.85, 4.3, 1.8, false);
+  put(U.vault, M.mkTeal, under(P, T(vx, vy, -1.2, PI/2, 1.0, 1.95, 1.95)));
+  put(U.vaultCap, M.mkTeal, under(P, T(vx, vy, -.7, 0, 1.95, 1.95, 1))); put(U.vaultCap, M.mkTeal2, under(P, T(vx, vy, -1.7, PI, 1.95, 1.95, 1)));
+  for (const z of [-.72, -1.68]) put(U.halfRing, M.mkTeal3, under(P, T(vx, vy, z, 0, 1.97, 1.97, 1.97)));
+  for (let k=0; k<3; k++) put(U.vault, pick([...MK_PAINT, M.mkRust]), under(P, T(vx, vy, rnd(-1.6, -.85), PI/2, rnd(.12, .3), 1.965, 1.965)));   // paint bands over the hood
+  { const F = under(P, T(vx, 0, -.69, 0));   // the hood's face: a lit window, patches, graffiti
+    box(M.mkLit2, F, 0, vy + .6, .005, 2.2, .8, .02); for (let t = -1.1; t <= 1.11; t += .55) box(M.mkTeal3, F, t, vy + .6, .02, .04, .82, .03);
+    box(M.mkTeal3, F, 0, vy + .2, .025, 2.3, .05, .05); box(M.mkTeal3, F, 0, vy + 1.0, .02, 2.3, .04, .04);
+    for (let k=0; k<6; k++){ const a = rnd(.2, PI - .2), rr = rnd(1.15, 1.7), w = rnd(.2, .5); box(chance(.4) ? M.mkRust : pick(MK_PAINT), F, Math.cos(a)*rr, vy + Math.sin(a)*rr, .01, w, rnd(.15, .35), .02); }
+    plant(pick(MKT_GRAF), F, rnd(-.6, .6), vy + 1.45, .03, 1.0, 'c', true); }
+  const yA = yT + 2.3, ax = 2.15;
+  for (const s of [-1, 1]){ box(M.metalDark, P, vx + s*ax, (yT + yA)/2, -.66, .09, yA - yT, .09); box(M.metalDark, P, vx + s*(ax - .15), (yT + yA)/2, -.66, .06, yA - yT, .06); }
+  put(U.halfRing, M.metalDark, under(P, T(vx, yA, -.66, 0, ax, ax, ax*1.5))); put(U.halfRing, M.metalDark, under(P, T(vx, yA, -.66, 0, ax - .15, ax - .15, (ax - .15)*1.5)));
+  for (let k=1; k<12; k++){ const a = k*PI/12; strut(M.metalDark, P, vx + Math.cos(a)*ax, yA + Math.sin(a)*ax, -.66, vx + Math.cos(a)*(ax - .15), yA + Math.sin(a)*(ax - .15), -.66, .025); }
+  plant('sign_mktroof', P, vx, yA + 1.0, -.6, .75, 'c', true);
+  glow(P, vx - .8, yA + 1.2, -.4, 'pink', 1.6); glow(P, vx + .2, yA + 1.2, -.4, 'amber', 1.5); glow(P, vx + .9, yA + .7, -.4, 'pink', 1.3); glow(P, vx - .3, yA + .7, -.4, 'cyan', 1.2);
+  // the front-left corner: a glass vault on a lit plinth, over the terrace
+  box(M.mkTeal2, P, -4.8, y2 + .25, 1.7, 3.4, .5, 2.8);
+  { const F = under(P, T(-4.8, 0, 3.1, 0)); box(M.mkLit2, F, 0, y2 + .27, .01, 3.0, .3, .02); mkPatches(F, 3.4, y2, .5, 3, .02); }
+  mkVault(P, -4.8, y2 + .5, 1.7, 3.2, 1.3, true);
+  // the back-left: a rooftop cafe under a blue tarp
+  for (const [x, z] of [[-6.3, -5.9], [-3.3, -5.9], [-6.3, -2.6], [-3.3, -2.6]]) cyl(M.frame, P, x, y2 + .8, z, .03, 1.6);
+  put(U.vault, M.mkTarp, under(P, T(-4.8, y2 + 1.6, -4.25, 0, 3.3, .45, 1.85)));
+  for (const s of [-1, 1]) box(M.mkTarp2, P, -4.8, y2 + 1.58, -4.25 + s*1.82, 3.3, .1, .05);
+  for (const [x, z, u] of [[-5.6, -5.0, false], [-4.0, -4.6, false], [-5.2, -3.3, false], [-4.4, -1.4, true], [-5.8, -.8, true]]) mkTable(P, x, y2, z, u);
+  for (let x = -6.2; x < -3.3; x += .25){ box(M.bulb, P, x, y2 + 1.42, -2.55, .04, .05, .04); if (chance(.4)) glow(P, x, y2 + 1.4, -2.5, 'warm', .4); }
+  mkParapet(P, bx0 + .08, -6.5, bx0 + .08, .3, y2, true); mkParapet(P, bx0 + .08, bz0 + .08, tx0 - .1, bz0 + .08, y2, true);
+  for (let k=0; k<4; k++) mkPotted(P, rnd(-6.2, -3.4), y2, rnd(-2.2, -.1));
+  // the front terrace on the first floor's roof: bikes, crates, plants, a cable or two
+  mkParapet(P, tx0 - .2, bz1 - .08, bx1 - .05, bz1 - .08, y2, true);
+  mkBike(P, -1.6, y2, .6, .3); mkBike(P, .5, y2, 2.4, -.2);
+  mkCrates(P, -2.4, y2, 2.4, 3); mkCrates(P, 1.2, y2, .2, 2); mkTable(P, -.4, y2, 1.6, true);
+  for (let k=0; k<5; k++) mkPotted(P, rnd(-2.8, 1.6), y2, rnd(-.3, 2.8));
+  mkLaundry(P, -2.6, y2 + 1.2, -.3, 1.4, y2 + 1.2, -.3);
+  for (let x = tx0; x < tx1; x += .25){ box(M.bulb, P, x, y2 + 1.55 - .25*Math.sin(PI*(x - tx0)/tw), 2.9, .04, .05, .04); if (chance(.35)) glow(P, x, y2 + 1.5, 2.95, 'warm', .4); }
+  // the right: a block with a vault and solar panels behind, a smaller vault in front
+  const rx0 = 1.8, rx1 = 4.6, rz0 = -6.6, rz1 = -2.4, rcx = (rx0 + rx1)/2, rcz = (rz0 + rz1)/2, rw = rx1 - rx0, rd = rz1 - rz0, rh = 1.6;
+  box(M.mkTeal, P, rcx, y2 + rh/2, rcz - .225, rw, rh, rd - .45);
+  for (const [F, len, side] of mkFaces(P, rcx, rcz, rw, rd)){
+    if (side === 'f'){ mkShopRow(F, len, y2, rh, { tmid: 99, awning: true, awnOdds: 1, out: .4, drop: .2, signOdds: 1 }); mkLaundry(F, -len/2 + .2, y2 + 1.2, .3, len/2 - .2, y2 + 1.15, .3); }
+    else if (side !== 'l') mkUpperFace(F, len, y2, rh, { lit: .65, vines: true });
+  }
+  const yR = y2 + rh + .15;
+  box(M.mkTeal3, P, rcx, y2 + rh + .075, rcz, rw + .16, .15, rd + .16);
+  box(M.mkTeal2, P, rcx, yR + .1, -4.9, rw - .1, .2, 3.1);
+  mkVault(P, rcx, yR + .2, -4.9, 2.6, 1.5, true);
+  { const F = under(P, T(rcx, 0, -3.3, 0)); box(M.mkRust, F, 0, yR + .1, .01, 2.6, .18, .02); }
+  for (const x of [2.4, 3.5]){ const Q = under(P, T(x, yR, -2.95, 0, 1, 1, 1, -.5));   // solar panels, tilted to the sun
+    box(M.frame, P, x, yR + .15, -2.95, .9, .3, .1); box(M.mkSolar, Q, 0, .32, 0, 1.0, .03, .62);
+    for (let k=1; k<4; k++) box(M.mkSolarL, Q, -.5 + k*.25, .34, 0, .015, .01, .62); box(M.mkSolarL, Q, 0, .34, 0, 1.0, .01, .015); }
+  dish(P, 4.25, yR, -2.75, .4, -.6, -.5, true);
+  // the smaller vault on the front-right, on a plinth with a painted banner
+  box(M.mkTeal2, P, 3.2, y2 + .25, -.55, 2.8, .5, 2.6);
+  { const F = under(P, T(3.2, 0, .75, 0)); box(MK_PAINT[3], F, 0, y2 + .26, .01, 2.6, .42, .02); plant(pick(MKT_GRAF), F, 0, y2 + .27, .03, .85, 'c', true);
+    const Fr = under(P, T(4.6, 0, -.55, PI/2)); box(MK_PAINT[1], Fr, 0, y2 + .26, .01, 2.4, .42, .02); }
+  mkVault(P, 3.2, y2 + .5, -.55, 2.6, 1.2, false);
+  // cables everywhere: slung across the facades and between the roof masses
+  for (let k=0; k<3; k++){ const o = k*.08; mkCable(P, x0 + .3, y1 - .3 - o, z1 + .05 + o, -1.2, y1 - .15 - o, z1 + .05 + o, .5 + k*.12); mkCable(P, -1.2, y1 - .15 - o, z1 + .05 + o, x1 - .3, y1 - .3, z1 + .05 + o, .4 + k*.1); }
+  for (let k=0; k<3; k++) mkCable(P, x1 + .05 + k*.06, y1 - .2, z1 - .4, x1 + .05 + k*.06, y1 - .3, z0 + .5, .6 + k*.15);
+  for (let k=0; k<2; k++){ const o = k*.08; mkCable(P, x0 - .05, y2 - .1, -5.5 + o, x0 - .05 - o, Y + 1.5, .5, .3); }
+  mkCable(P, tx1, yT - .2, -1.0, rx1 - .3, y2 + .9, .3, .25); mkCable(P, tx0, yT - .3, -1.0, -4.8, y2 + 1.6, .2, .3);
+  for (let k=0; k<3; k++) mkCable(P, x0 - .04, y1 - .2, rnd(-5, 2), x0 - .04, Y + rnd(.6, 1.2), rnd(-5, 2), .1);   // drops down the side
+  // the back: bins and a fire escape ladder
+  for (let k=0; k<4; k++) put(U.cyl16, pick([M.awn2, M.corrBlue, M.metalDark]), under(P, T(rnd(-5, 4), Y + .25, z0 - .45, 0, .4, .5, .4)));
+  for (let y = Y + .3; y < y2; y += .3) box(M.frame, P, 2.6, y, z0 - .08, .4, .03, .03);
+  box(M.frame, P, 2.4, (Y + y2)/2, z0 - .08, .03, y2 - Y, .03); box(M.frame, P, 2.8, (Y + y2)/2, z0 - .08, .03, y2 - Y, .03);
+  // greenery taking over the ledges
+  for (const [F, len] of mkFaces(P, cx0, cz0, w0 + .2, d0 + .2)) for (let t = -len/2 + .4; t < len/2 - .3; t += rnd(.9, 1.8)) if (chance(.35)) plant(pick(['vines','pothos','h_ivy','h_vine3','h_curtain2']), F, t, Y + h0 + .12, .03, rnd(.7, 1.0), 't', true);
+  for (const [F, len] of mkFaces(P, cx1, cz1, w1 + .2, d1 + .2)) for (let t = -len/2 + .4; t < len/2 - .3; t += rnd(.8, 1.7)) if (chance(.3)) plant(pick(['vines','pothos','h_ivy','h_vine3','h_curtain1','h_heart']), F, t, y1 + h1 + .12, .03, rnd(.8, 1.1), 't', true);
+  m.roofH = yT;
+  m.top = yA + ax + .4;
 }

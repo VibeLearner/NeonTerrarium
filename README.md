@@ -95,8 +95,14 @@ koi, the drone, the screens) switch on at the end.
   chance per build. A pale block over a lit glass lobby, a glass curtain wall, the neon badge and a POLICE fascia,
   framed facade screens cycling the wanted posters (assets/sprites/wanted.png, with a projection glitch), a cyan
   hologram ring round the building, a red/blue light bar flashing on the roof, patrol cars and officers out front.
+- **Rainbow Plaza market mall (彩虹广场 MALL):** a 4x4 block, a size up from the police station and taller. Arrives
+  with the 30th commercial building (each plot with a commercial section counts once). A stacked, weathered market
+  building in teal concrete patched with paint, rust and graffiti: shops all round the ground floor under striped
+  awnings and bright painted signboards, produce stalls spilling onto the two street sides, a terraced upper floor
+  with lantern strings, laundry and plants, glass barrel vaults lit warm from inside, a blue tarp over a rooftop
+  cafe, solar panels and a dish, and the rainbow sign on an arch at the very top.
 - New megastructures go in `MEGA_TYPES` at the top of `js/mega.js` (requirement, odds, footprint, max tiers).
-- For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall), **B** (town square), **V** (foundry) or **C** (police station)
+- For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall), **B** (town square), **V** (foundry), **C** (police station) or **X** (market mall)
   to bring it in, or remove it, next to the plot under the pointer, skipping the requirement and the odds.
 
 ## People

@@ -161,6 +161,8 @@ document.querySelectorAll('#cloudChips button').forEach(b => b.addEventListener(
 $('vclouds').addEventListener('change', e => { S.vclouds = e.target.checked; });
 $('rays').addEventListener('change', e => { S.rays = e.target.checked; });
 $('bloom').addEventListener('change', e => { S.bloom = e.target.checked; });
+$('rim').addEventListener('change', e => { S.rim = e.target.checked; });
+$('grade').addEventListener('change', e => { S.grade = e.target.checked; });
 $('wet').addEventListener('change', e => { S.wetOn = e.target.checked; });
 $('spin').checked = S.spin; $('spin').addEventListener('change', e => { S.spin = e.target.checked; });
 $('musicVol').value = music.volume; $('musicVolOut').textContent = Math.round(music.volume*100) + '%';

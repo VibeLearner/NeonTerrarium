@@ -51,6 +51,31 @@ function placeSun(){
   sun.target.position.copy(_sunC); sun.target.updateMatrixWorld();
   sun.position.copy(_sunC).addScaledVector(SUN_DIR, SUN_BACK);
 }
+// Colour grades by time of day: lift tints the shadows, gain the highlights; sat and con are saturation and
+// contrast. Golden hour: warm highlights over violet-teal shadows. Blue hour: cool and soft. Night: deep blue-violet
+// shadows and a little extra saturation so neon pops. Rain mutes it all.
+const GRADES = {
+  day:    { lift: [.0, .006, .02], gain: [1.02, 1.0, .97], sat: 1.06, con: 1.03 },
+  golden: { lift: [.025, .0, .055], gain: [1.1, .99, .84], sat: 1.14, con: 1.07 },
+  blue:   { lift: [.0, .012, .05], gain: [.95, .98, 1.07], sat: 1.04, con: 1.02 },
+  night:  { lift: [.012, .0, .04], gain: [.97, .98, 1.04], sat: 1.16, con: 1.08 },
+  rain:   { lift: [.01, .015, .03], gain: [.95, .98, 1.0], sat: .86, con: .98 },
+};
+const _gr = { lift: [0, 0, 0], gain: [0, 0, 0], sat: 0, con: 0 };
+function gradeFor(h, rain){
+  // weights for each look across the day (golden hour round sunrise and sunset, blue hour just after dusk and before dawn)
+  const bump = (x, a, b, c, d) => x <= a || x >= d ? 0 : x < b ? (x - a)/(b - a) : x <= c ? 1 : (d - x)/(d - c);
+  const w = { golden: Math.max(bump(h, 15.4, 16.6, 18.2, 19.0), bump(h, 5.4, 6.0, 7.0, 8.0)), blue: Math.max(bump(h, 18.6, 19.3, 19.8, 20.6), bump(h, 4.4, 5.0, 5.4, 6.0)) };
+  w.night = (h >= 20.2 || h < 4.8) ? 1 : (h > 19.6 ? (h - 19.6)/.6 : h < 5.4 ? (5.4 - h)/.6 : 0);
+  w.night = Math.max(0, Math.min(1, w.night)) * (1 - w.blue*.6);
+  w.day = Math.max(0, 1 - w.golden - w.blue - w.night);
+  const tot = w.day + w.golden + w.blue + w.night;
+  _gr.lift = [0, 0, 0]; _gr.gain = [0, 0, 0]; _gr.sat = 0; _gr.con = 0;
+  for (const k of ['day', 'golden', 'blue', 'night']){ const g = GRADES[k], f = w[k]/tot;
+    for (let q=0; q<3; q++){ _gr.lift[q] += g.lift[q]*f; _gr.gain[q] += g.gain[q]*f; } _gr.sat += g.sat*f; _gr.con += g.con*f; }
+  if (rain){ const r = GRADES.rain, f = .65; for (let q=0; q<3; q++){ _gr.lift[q] += (r.lift[q] - _gr.lift[q])*f; _gr.gain[q] += (r.gain[q] - _gr.gain[q])*f; } _gr.sat += (r.sat - _gr.sat)*f; _gr.con += (r.con - _gr.con)*f; }
+  return w;
+}
 function applyTime(){
   const h = S.hour;
   let i = 0; while (i < KEYS.length-2 && KEYS[i+1].h <= h) i++;
@@ -78,6 +103,12 @@ function applyTime(){
   GLOW.blue.opacity = .85;
   comp.uniforms.skyTop.value.copy(cur.top); comp.uniforms.skyBot.value.copy(cur.bot);
   comp.uniforms.haze.value.copy(cur.bot); comp.uniforms.night.value = night;
+  const w = gradeFor(h, S.rain);
+  if (S.grade === false){ glowMix.uniforms.lift.value.set(0, 0, 0); glowMix.uniforms.gain.value.set(1, 1, 1); glowMix.uniforms.sat.value = 1; glowMix.uniforms.con.value = 1; }
+  else { glowMix.uniforms.lift.value.fromArray(_gr.lift); glowMix.uniforms.gain.value.fromArray(_gr.gain); glowMix.uniforms.sat.value = _gr.sat; glowMix.uniforms.con.value = _gr.con; }
+  // rim light: warm sunlight, strongest at golden hour, a little by day; cool moonlight at night; weak in the rain
+  comp.uniforms.rimI.value = S.rim === false ? 0 : (.25*w.day + 1.0*w.golden + .3*w.blue + .45*w.night)*(S.rain ? .35 : 1);
+  comp.uniforms.rimCol.value.setRGB(1.0, .7, .38).lerp(tmpC.setRGB(.42, .55, .9), Math.min(1, w.night + w.blue*.5));
   return night;
 }
 function phaseName(h){
@@ -105,6 +136,7 @@ const comp = new THREE.ShaderMaterial({
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
+    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()},
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
@@ -112,6 +144,7 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
+    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol;
     uniform float night; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
@@ -198,6 +231,21 @@ const comp = new THREE.ShaderMaterial({
         // zoomed out: crease lines inside shapes fade away and silhouettes soften, so the city doesn't turn to noise
         float k = dei > 0.0 ? 1.0 - 0.5*dei*(1.0 - 0.5*lodLines) : 1.0 + 0.4*nei*(1.0 - lodLines);
         col = c.rgb * mix(1.0, k, outlines);
+        // Rim light: where an edge faces the sun with open space (or something far behind) beyond it, the edge
+        // catches the light: a crisp warm line a pixel or two wide, and a soft warm wash on faces turned to the sun.
+        // Only where the shadow map says the sun really reaches. Strongest at golden hour; cool moonlight at night.
+        if (rimI > 0.01){
+          vec2 sd2 = sunV.xy; float sl = length(sd2);
+          if (sl > 0.05){
+            sd2 /= sl;
+            float gap = max(D(vUv + sd2*px*1.5) - d, D(vUv + sd2*px*2.5) - d);
+            float edge = step(0.8, gap)*step(-0.25, dot(n, sunV));
+            vec4 pw = invVP*vec4(vUv*2.0 - 1.0, rd*2.0 - 1.0, 1.0); pw /= pw.w;
+            float lit = litAt(pw.xyz);
+            float face = max(dot(n, sunV), 0.0);
+            col += rimCol*rimI*lit*(edge*1.1 + face*face*0.22);
+          }
+        }
         col = mix(col, haze, 0.35*smoothstep(camDist + 5.5, camDist + 53.0, d));   // the far side of the island fades into haze
       }
       // ---- rays through the scene for clouds and light shafts ----
@@ -497,9 +545,11 @@ const glowBlur = new THREE.ShaderMaterial({
 const glowCopy = new THREE.ShaderMaterial({ uniforms: { t: { value: null } }, vertexShader: fsVert,
   fragmentShader: 'uniform sampler2D t; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(t, vUv).rgb, 1.0); }', depthTest: false, depthWrite: false });
 const glowMix = new THREE.ShaderMaterial({
-  uniforms: { t: { value: null }, tB: { value: null }, tH: { value: null }, night: GLOW_FX.night, on: { value: 1 } },
+  uniforms: { t: { value: null }, tB: { value: null }, tH: { value: null }, night: GLOW_FX.night, on: { value: 1 },
+              lift: { value: new THREE.Vector3() }, gain: { value: new THREE.Vector3(1, 1, 1) }, sat: { value: 1 }, con: { value: 1 } },
   vertexShader: fsVert,
   fragmentShader: `uniform sampler2D t; uniform sampler2D tB; uniform sampler2D tH; uniform float night; uniform float on; varying vec2 vUv;
+    uniform vec3 lift; uniform vec3 gain; uniform float sat; uniform float con;
     float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y*0.75))); }
     float bayer(vec2 a){ return b2(0.5*a)*0.25 + b2(a); }
     void main(){
@@ -508,8 +558,13 @@ const glowMix = new THREE.ShaderMaterial({
       float k = mix(.6, 1.7, night);
       vec3 add = b*k + h*vec3(1.0, .42, .3)*mix(.3, 1.0, night);   // bloom, and a warm red halation round it
       add = floor(add*20.0 + bayer(gl_FragCoord.xy)*.99)/20.0;       // stepped and dithered: pixel art, not a smooth haze
-      c += add*on*(1.0 - .6*c);                                       // screen-like: light pixels don't blow out to white
-      gl_FragColor = vec4(c, 1.0);
+      c += add*on*(1.0 - .85*c);                                      // screen-like: bright pixels (a lit hotel facade) don't blow out to white
+      // colour grading for the time of day: tinted shadows (lift), tinted highlights (gain), saturation, contrast
+      c = c*gain + lift*(1.0 - c);
+      float l = dot(c, vec3(.299, .587, .114));
+      c = mix(vec3(l), c, sat);
+      c = (c - .5)*con + .5;
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
     }`,
   depthTest: false, depthWrite: false,
 });
@@ -526,7 +581,8 @@ function makeGlowTargets(){
 function glowPass(mat, target){ glowQuad.material = mat; renderer.setRenderTarget(target); renderer.render(glowScene, compCam); }
 // run after the composite has been drawn into rtOut; leaves the finished frame in rtFinal
 function renderGlow(){
-  if (!S.bloom){ glowCopy.uniforms.t.value = rtOut.texture; glowPass(glowCopy, rtFinal); return; }
+  glowMix.uniforms.on.value = S.bloom ? 1 : 0;
+  if (!S.bloom){ glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = rtB[0].texture; glowMix.uniforms.tH.value = rtHal[0].texture; glowPass(glowMix, rtFinal); return; }   // no bloom, but still graded
   const [b0, b1] = rtB, [h0, h1] = rtHal;
   glowPick.uniforms.t.value = rtOut.texture; glowPick.uniforms.texel.value.set(1/W, 1/H); glowPass(glowPick, b0);
   glowBlur.uniforms.t.value = b0.texture; glowBlur.uniforms.dir.value.set(1/b0.width, 0); glowPass(glowBlur, b1);

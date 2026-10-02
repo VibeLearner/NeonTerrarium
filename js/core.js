@@ -5,7 +5,7 @@ const PI = Math.PI, TAU = PI * 2;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const S = { seed: 20260930, district: 'mixed', clutter: 1, green: 1, neon: 1,
-  zone: null, hour: 15.5, wind: 1, cloudQ: 2, vclouds: true, rays: true, bloom: true, wetOn: true, rain: false, cycle: false, outlines: true, palette: false, spin: false, paint: false, res: 480 };
+  zone: null, hour: 15.5, wind: 1, cloudQ: 2, vclouds: true, rays: true, bloom: true, rim: true, grade: true, wetOn: true, rain: false, cycle: false, outlines: true, palette: false, spin: false, paint: false, res: 480 };
 
 /* ---------- seeded random ---------- */
 function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }

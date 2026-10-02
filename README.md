@@ -69,7 +69,10 @@ The scripts are ordinary (non-module) scripts that share one scope, so the order
 Besides the halls, silos and tank yards, the industrial zone builds five small workshops: a rusty corrugated
 scrap shed, a red brick gear workshop under a tiled roof, a mossy concrete repair shop with pipes over its roof, a
 blue parts warehouse with a sawtooth roof, and an open timber lube shed under a glass roof, each with a lit doorway
-and its own neon sign. Neighbouring buildings are joined by pipework (straight runs, loops and jogs with elbows,
+and its own neon sign. For height there are stacked yards (two or three of the workshops piled on concrete decks with
+an outside stair), an art-deco terraced foundry (stepped brick tiers with cyan neon edges, gold zigzag friezes, a
+gold-fanned central pier and smokestacks) and a brutalist works tower (mossy concrete blocks with lit window grids, a
+round silo with glowing portholes, rusty pipes wrapped round it). Neighbouring buildings are joined by pipework (straight runs, loops and jogs with elbows,
 flanges, valve wheels and the odd steam leak), and neighbouring industrial buildings often by a raised conveyor belt
 with crates riding along it (high enough for people to walk under). Code: `scrapShed` to `lubeShed` in
 `js/buildings.js`; `BRIDGE.pipework`, `BRIDGE.conveyor` and the moving crates in `js/ground.js`.

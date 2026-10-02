@@ -1463,7 +1463,8 @@ function partsWarehouse(lot, st, P0){
   // a conveyor hatch on one side (the belts between buildings come out of these)
   box(M.metalDark, P, w/2 + .03, 1.2, .3, MIN_T, .4, .5);
   // the sawtooth roof: three teeth, steep glazed faces lit from inside
-  if (!NO_ROOF || true){
+  if (NO_ROOF){ box(M.inBlue2, P, 0, h + .04, 0, w + .06, .08, d + .06); }   // another building stands on it: a flat roof
+  else {
     const n = 3, td = d/n, rise = .5;
     for (let k=0; k<n; k++){
       const z = -d/2 + td*(k + .5), Q = under(P, T(0, h, z));
@@ -1481,7 +1482,7 @@ function partsWarehouse(lot, st, P0){
   }
   for (let k=0; k<irand(1, 3); k++) crateAt(P, rnd(-w/2 + .2, -.1), 0, d/2 + .3);
   if (chance(.7)) pottedPlant(P, w/2 - .2, d/2 + .25); if (chance(.6*S.green)) plant('fern', P, w/2 + .1, 0, d/2 - .2, 1.0);
-  Object.assign(lot, { height: h + .5, floors: 2, occupied: true });
+  Object.assign(lot, { height: h + (NO_ROOF ? .08 : .5), floors: 2, occupied: true });
 }
 // Lube shed: an open-fronted timber shed under a glass roof, string lights, a workbench, drums of oil
 function lubeShed(lot, st, P0){
@@ -1519,6 +1520,145 @@ function lubeShed(lot, st, P0){
   Object.assign(lot, { height: h + rise + .1, floors: 1, occupied: true });
 }
 
+/* ---------- taller industry ---------- */
+Object.assign(M, {
+  idGold: toon(0xc49a48), idGoldLit: toon(0xb8903a, { em:0x6a4a10, kind:'trim' }), idBrass: toon(0xa8823a),
+  inNeon: toon(0x2a8a92, { em:0x52e6f2, kind:'lamp' }),   // steady cyan strip lighting, lit day and night
+  btConc: toon(0x8a8e88), btConc2: toon(0x70746e), btConc3: toon(0x5c605a),
+  btCyan: toon(0x5aa8b0, { em:0x5ad8e8, kind:'window' }), btWarm: toon(0xb8a070, { em:0xe8c070, kind:'window' }),
+});
+// Stacked yard: two or three of the yard's buildings piled up on concrete decks, an outside stair climbing them.
+// The lower ones are flat-roofed (NO_ROOF); the top one keeps its roof, chimneys and pipes.
+function stackedWorks(lot, st, P0){
+  const lowers = [repairsBlock, partsWarehouse, hall], uppers = [scrapShed, gearWorkshop, repairsBlock, partsWarehouse, lubeShed, silos];
+  const n = chance(.35) ? 3 : 2, stairSide = pick([0, PI/2, PI, -PI/2]);
+  let y = 0, floors = 0;
+  for (let k=0; k<n; k++){
+    const last = k === n - 1, f = last ? pick(uppers) : pick(lowers), sub = { ...lot, height: 0, floors: 0 }, keep = NO_ROOF;
+    if (!last) NO_ROOF = true;
+    f(sub, st, under(P0, T(0, y, 0)));
+    NO_ROOF = keep;
+    const h = Math.max(sub.height, FH);
+    if (!last){
+      // the deck: a concrete slab with a hazard edge and a rail, the next building stands on it
+      box(M.btConc2, P0, 0, y + h + .06, 0, 2.5, .12, 2.5); box(M.hazard, P0, 0, y + h + .01, 1.25, 2.5, .03, MIN_T);
+      for (const [a, b, c2, d2] of [[-1.22, -1.22, 1.22, -1.22], [1.22, -1.22, 1.22, 1.22]]) { const len = Math.hypot(c2 - a, d2 - b); box(M.frame, P0, (a + c2)/2, y + h + .4, (b + d2)/2, a === c2 ? .03 : len, .03, a === c2 ? len : .03); }
+      // an outside stair up to the deck
+      const Q = under(P0, T(0, y, 0, stairSide)), run = 1.6, n2 = 8;
+      for (let s = 0; s < n2; s++) box(M.metalDark, Q, -.8 + (s + .5)*run/n2, (s + 1)*(h + .1)/n2, 1.38, run/n2 + .01, .04, .32);
+      strut(M.frame, Q, -.8, .35, 1.54, -.8 + run, h + .45, 1.54, .03);
+      for (const x of [-.8, -.8 + run]) box(M.metalDark, Q, x, (x < 0 ? .1 : h)/2, 1.38, .05, x < 0 ? .1 : h, .05);
+      y += h + .12;
+    } else y += h;
+    floors += sub.floors || 1;
+  }
+  Object.assign(lot, { height: y, floors, occupied: true });
+}
+// Terraced foundry: an art-deco brick ziggurat. Stepped tiers with rows of tall lit windows, gold zigzag friezes,
+// cyan neon along every tier's edge, a tall central pier crowned with a gold fan, brass pipes, smokestacks.
+function decoWorks(lot, st, P0){
+  const P = under(P0, T(0, 0, 0, pick([0, PI/2, PI, -PI/2]))), tiers = irand(4, 5);
+  let y = 0, w = rnd(2.3, 2.45), d = rnd(2.2, 2.35), oz = 0;
+  const tops = [];
+  for (let k=0; k<tiers; k++){
+    const h = k === 0 ? rnd(1.15, 1.3) : rnd(.95, 1.15);
+    box(M.inBrick, P, 0, y + h/2, oz, w, h, d);
+    for (const f of faces(w, d)){
+      const F = under(P, T(f.nx*f.half, y, oz + f.nz*f.half, f.ry));
+      for (let yy = .2; yy < h - .25; yy += .2) box(M.inBrick2, F, 0, yy, .004, f.len - .04, .02, MIN_T*.5);   // brick courses
+      const nWin = Math.max(2, Math.floor((f.len - .3)/.26));
+      for (let i=0; i<nWin; i++){ const t = -f.len/2 + .15 + (i + .5)*(f.len - .3)/nWin; box(M.inBrick2, F, t, h*.42, .02, .14, h*.48, MIN_T); box(chance(.75) ? M.inShop : M.glassDark, F, t, h*.42, .03, .09, h*.42, MIN_T); }
+      // the frieze under the cap: a dark band with a gold zigzag
+      box(M.inBrick2, F, 0, h - .13, .035, f.len, .12, MIN_T);
+      for (let t = -f.len/2 + .07, q = 0; t < f.len/2 - .05; t += .12, q++) box(M.idGold, F, t, h - .13, .06, .14, .025, MIN_T, 0, 0, q % 2 ? .6 : -.6);
+      if (k === 0) for (let t = -f.len/2 + .55; t < f.len/2 - .4; t += 1.0){ strut(M.inNeon, F, t - .3, .62, .07, t, .2, .07, .04); strut(M.inNeon, F, t + .3, .62, .07, t, .2, .07, .04); glow(F, t, .4, .25, 'cyan', .7); }   // neon chevrons round the base
+    }
+    // the cap, with a cyan neon line along all four edges
+    box(M.inBrick2, P, 0, y + h + .05, oz, w + .1, .1, d + .1);
+    for (const [x, z, L, along] of [[0, d/2 + .06, w + .12, 1], [0, -d/2 - .06, w + .12, 1], [w/2 + .06, 0, d + .12, 0], [-w/2 - .06, 0, d + .12, 0]]) box(M.inNeon, P, x, y + h + .05, oz + z, along ? L : .04, .05, along ? .04 : L);
+    for (const [sx, sz] of CORNERS) glow(P, sx*w/2, y + h + .05, oz + sz*d/2, 'cyan', .9);
+    tops.push({ y: y + h + .1, w, d, oz });
+    y += h + .1; w -= rnd(.3, .38); d -= rnd(.26, .32); oz -= .06;
+  }
+  // the terraces left on each step: vents, pipes, little planters
+  for (let k=0; k<tops.length - 1; k++){ const t = tops[k], n = tops[k + 1];
+    for (let q=0; q<2; q++){ const side = pick([-1, 1]), x = side*(n.w/2 + (t.w - n.w)/4); if (chance(.5)) box(M.metalDark, P, x, t.y + .12, t.oz + rnd(-t.d/3, t.d/3), .16, .22, .2); else { box(M.inBrick2, P, x, t.y + .08, t.oz + rnd(-t.d/3, t.d/3), .16, .14, .3); plant(pick(['bush','bonsai','fern']), P, x, t.y + .15, t.oz, .7); } } }
+  // the central pier up the front, crowned with a gold fan
+  const top = tops[tops.length - 1], pz = tops[0].d/2 + .1, ph = top.y + .7;
+  box(M.inBrick2, P, 0, ph/2, pz - .1, .42, ph, .25);
+  for (const x of [-.12, 0, .12]) box(M.idGoldLit, P, x, ph/2, pz + .03, .025, ph - .3, MIN_T);
+  for (let a = -1.2; a <= 1.21; a += .4) strut(M.idGold, P, 0, ph - .1, pz + .05, Math.sin(a)*.32, ph - .1 + Math.cos(a)*.32, pz + .05, .035);
+  box(M.idGold, P, 0, ph - .1, pz + .05, .5, .04, MIN_T);
+  // the entrance at its foot: gold doors under a gold fan
+  box(M.idBrass, P, 0, .38, pz + .06, .36, .76, MIN_T); box(M.frame, P, 0, .38, pz + .08, .02, .7, MIN_T);
+  for (let a = -1.1; a <= 1.11; a += .37) strut(M.idGold, P, 0, .8, pz + .08, Math.sin(a)*.2, .8 + Math.cos(a)*.2, pz + .08, .025);
+  glow(P, 0, .5, pz + .3, 'warm', 1.0);
+  // brass pipes down the tiers, smokestacks on top
+  for (let q=0; q<irand(2, 3); q++){ const s = pick([-1, 1]), t = tops[irand(1, tops.length - 1)], x = s*(t.w/2 + .08); pipeRun(M.idBrass, P, [[x*.7, t.y + .3, t.oz + rnd(-.3, .3)], [x, t.y + .3, t.oz], [x, .25, t.oz], [x + s*.15, .25, t.oz]], .045, true); }
+  if (!NO_ROOF) for (let q=0; q<irand(2, 3); q++){
+    const x = rnd(-top.w/2 + .2, top.w/2 - .2), z = top.oz + rnd(-top.d/2 + .2, top.d/2 - .2), sh = rnd(1.4, 2.4), r = rnd(.09, .13);
+    put(U.cyl16, M.inBrick2, under(P, T(x, top.y + sh/2, z, 0, 2*r, sh, 2*r)));
+    for (const u of [.35, .7, 1]) put(U.cyl16, M.idGold, under(P, T(x, top.y + sh*u, z, 0, 2*r + .04, .05, 2*r + .04)));
+    emitters.push(new THREE.Vector3(x, top.y + sh + .1, z).applyMatrix4(P));
+  }
+  Object.assign(lot, { height: top.y, floors: tiers*2, occupied: true });
+}
+// Brutalist works tower: a mossy concrete block, offset in a few stacked chunks, grids of cyan and warm lit
+// windows; a round concrete silo beside it with glowing portholes; rusty pipes wrapped round both; moss dripping
+function brutalTower(lot, st, P0){
+  const P = under(P0, T(0, 0, 0, pick([0, PI/2, PI, -PI/2]))), chunks = irand(3, 5);
+  let y = 0; const bx = .3;
+  const blocks = [];
+  for (let k=0; k<chunks; k++){
+    const w = rnd(1.55, 1.8), d = rnd(1.5, 1.75), h = rnd(1.0, 1.35), ox = bx + rnd(-.08, .08), oz = rnd(-.1, .1);
+    box(M.btConc, P, ox, y + h/2, oz, w, h, d);
+    for (const f of faces(w, d)){
+      const F = under(P, T(ox + f.nx*f.half, y, oz + f.nz*f.half, f.ry));
+      if (chance(.8)){   // a grid of windows in a recessed concrete frame
+        const gw = f.len*.7, gh = h*.62, cols = Math.max(2, Math.round(gw/.22)), rows = 2, cw = gw/cols, rh = gh/rows;
+        box(M.btConc3, F, 0, h*.5, .01, gw + .08, gh + .08, MIN_T);
+        for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) box(chance(.6) ? M.btCyan : chance(.6) ? M.btWarm : M.glassDark, F, -gw/2 + (c + .5)*cw, h*.5 - gh/2 + (r + .5)*rh, .02, cw - .04, rh - .04, MIN_T);
+      }
+      for (let q=0; q<irand(2, 4); q++) box(chance(.5) ? M.inMoss : M.btConc2, F, rnd(-f.len/2 + .15, f.len/2 - .15), rnd(.1, h - .1), .006 + .002*q, rnd(.1, .35), rnd(.15, .5), MIN_T);   // stains and moss
+    }
+    box(M.btConc2, P, ox, y + h + .05, oz, w + .14, .1, d + .14);   // the ledge
+    for (let q=0; q<irand(3, 6); q++){ const a = rnd(0, TAU), ex = ox + Math.cos(a)*(w/2 + .05), ez = oz + Math.sin(a)*(d/2 + .05); blob(M.inMoss, P, Math.max(ox - w/2, Math.min(ox + w/2, ex)), y + h + .1, Math.max(oz - d/2, Math.min(oz + d/2, ez)), rnd(.07, .13), .4); }
+    for (const f of faces(w + .14, d + .14)) if (chance(.5*S.green)) plant(pick(['vines','l_mossroots','h_ivy','pothos']), under(P, T(ox + f.nx*f.half, 0, oz + f.nz*f.half, f.ry)), rnd(-f.len/3, f.len/3), y + h + .06, .02, rnd(.7, 1.0), 't', true);
+    blocks.push({ ox, oz, w, d, y, h });
+    y += h + .1;
+  }
+  const H = y;
+  // the silo beside it: banded concrete, portholes lit cyan, a capped top with a rail
+  const sx = bx - .95, sz = -.35, sr = rnd(.45, .52), sh = H + rnd(.4, .9);
+  put(U.cyl16, M.btConc, under(P, T(sx, sh/2, sz, 0, 2*sr, sh, 2*sr)));
+  for (let yy = 1.0; yy < sh - .3; yy += rnd(1.1, 1.5)) put(U.cyl16, M.btConc2, under(P, T(sx, yy, sz, 0, 2*sr + .06, .1, 2*sr + .06)));
+  for (let yy = .7; yy < sh - .4; yy += .85) for (const a of [PI*.25, PI*.75, PI*1.25]){
+    if (chance(.25)) continue;
+    const Q = under(P, T(sx + Math.sin(a)*(sr - .01), yy, sz + Math.cos(a)*(sr - .01), a));
+    put(U.cyl16, M.btConc3, under(Q, T(0, 0, .02, 0, .22, .06, .22, PI/2))); put(U.cyl16, M.btCyan, under(Q, T(0, 0, .04, 0, .15, .03, .15, PI/2))); glow(Q, 0, 0, .15, 'cyan', .5);
+  }
+  put(U.cyl16, M.btConc2, under(P, T(sx, sh + .05, sz, 0, 2*sr + .1, .1, 2*sr + .1)));
+  if (!NO_ROOF){ box(M.btConc2, P, sx, sh + .25, sz, .35, .3, .35); for (let a = 0; a < TAU; a += .5) box(M.frame, P, sx + Math.sin(a)*(sr - .03), sh + .25, sz + Math.cos(a)*(sr - .03), .03, .3, .03); }
+  moss(P, sx, sh + .12, sz, 3);
+  // rusty pipes: down the faces, across between silo and block, round the corners
+  for (let q=0; q<irand(4, 6); q++){
+    const b = pick(blocks), side = pick([-1, 1]), r = rnd(.035, .06), mat = pick([M.inPipe, M.inRust, M.inPipe2, M.inRust2]);
+    const x = b.ox + side*(b.w/2 + .07), z0 = b.oz + rnd(-b.d/3, b.d/3), y0 = b.y + b.h - .2, y1 = rnd(.2, Math.max(.3, b.y));
+    pipeRun(mat, P, [[x - side*.1, y0 + .25, z0], [x, y0 + .25, z0], [x, y1, z0], [x, y1, z0 + rnd(-.3, .3)], [x + side*.12, y1 - .15, z0]], r, true);
+  }
+  for (let q=0; q<irand(2, 3); q++){ const yy = rnd(.6, H - .4), mat = pick([M.inPipe, M.inRust]); pipeRun(mat, P, [[sx + sr, yy, sz + .1], [sx + sr + .3, yy, sz + .1], [sx + sr + .3, yy + rnd(-.3, .3), sz + .5], [bx - .5, yy, sz + .5]], rnd(.04, .06), true); }
+  // the top: a smaller plant room with grilles and vents
+  const tb = blocks[blocks.length - 1];
+  if (!NO_ROOF){
+    box(M.btConc2, P, tb.ox + rnd(-.2, .2), H + .25, tb.oz + rnd(-.2, .2), tb.w*.5, .5, tb.d*.5);
+    for (let q=0; q<2; q++){ const gx = tb.ox + rnd(-tb.w/3, tb.w/3), gz = tb.oz + rnd(-tb.d/3, tb.d/3); box(M.btConc3, P, gx, H + .04, gz, .4, .08, .3); for (let t = -.15; t <= .16; t += .06) box(M.frame, P, gx + t, H + .09, gz, .02, .02, .26); }
+    if (chance(.6)) emitters.push(new THREE.Vector3(tb.ox, H + .6, tb.oz).applyMatrix4(P));
+  }
+  // at the foot: puddles of runoff, rubble, ferns
+  for (let q=0; q<irand(2, 4); q++) plant(pick(['fern','g_fern2','moss','bush']), P, rnd(-1.1, 1.1), 0, rnd(.8, 1.1), rnd(.7, .95));
+  Object.assign(lot, { height: NO_ROOF ? H : Math.max(H, sh), floors: chunks*2, occupied: true });
+}
+
 function buildFactory(lot, st, P0){
   const v = R();
   if (v < .2) return buildTankYard(lot, P0);
@@ -1539,6 +1679,7 @@ function hall(lot, st, P0){
     F.push({F:Ff, len:f.len});
   });
   const Pr = under(P0, T(0, c.h, 0));
+  if (NO_ROOF){ box(D[st.cls].roof, P0, 0, c.h + .03, 0, c.w + .06, .06, c.d + .06); if (chance(.6*S.clutter)) annex(st, pick(F), c); Object.assign(lot, { height:c.h, floors:2, occupied:true }); return; }   // another building stands on it: a flat roof
   for (let i=0;i<3;i++){
     const z = -c.d/2 + c.d/6 + i*c.d/3;
     put(U.prism, D[st.cls].roof, under(Pr, T(0,0,z,PI/2,c.d/3,.45,c.w)));

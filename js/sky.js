@@ -113,6 +113,10 @@ function applyTime(){
   // rim light: warm sunlight, strongest at golden hour, a little by day; cool moonlight at night; weak in the rain
   comp.uniforms.rimI.value = S.rim === false ? 0 : (.25*w.day + 1.0*w.golden + .3*w.blue + .45*w.night)*(S.rain ? .35 : 1);
   comp.uniforms.rimCol.value.setRGB(1.0, .7, .38).lerp(tmpC.setRGB(.42, .55, .9), Math.min(1, w.night + w.blue*.5));
+  // ground mist: faint at midday, thicker round golden hour, dusk and night, thicker still in the rain
+  comp.uniforms.mistI.value = S.mist === false ? 0 : (.08*w.day + .7*w.golden + .6*w.blue + .6*w.night)*(S.rain ? 1.5 : 1);
+  comp.uniforms.mistSun.value = .5*w.day + 1.35*w.golden + .7*w.blue + .3*w.night;   // sunbeams in the mist: strongest with the sun low
+  comp.uniforms.mistNight.value = Math.min(1, w.night + w.blue*.5);
   return night;
 }
 function phaseName(h){
@@ -140,7 +144,7 @@ const comp = new THREE.ShaderMaterial({
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
-    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1},
+    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1},
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
@@ -148,7 +152,7 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI;
+    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun;
     uniform float night; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
@@ -325,6 +329,40 @@ const comp = new THREE.ShaderMaterial({
         // clouds come from their own lower-resolution pass (see cloudMat), upscaled with crisp pixels
         vec4 cl = texture2D(tCloud, vUv);
         if (cl.a > 0.001){ float q = floor(cl.a*5.0 + dith)/5.0; col = mix(col, cl.rgb/cl.a, q); }   // dithered fade at the edges, like mist
+      }
+      // ---- ground mist, with light through it ----
+      // A thin layer of mist lying in the streets (up to about a storey and a half), patchy and drifting slowly. Each
+      // pixel marches through the part of the layer in front of what it sees (8 dithered steps). By day the mist is lit
+      // by the sun wherever the shadow map says the sun reaches, and dim where buildings shade it, so sunbeams show as
+      // bright bands between the shadows: fake volumetric light. At night it's dark blue, lit from below by the light
+      // the lamps and neon throw on the streets (the night-light pass), so it glows their colours. Only over the city.
+      if (mistI > 0.0 && rd < 0.99999){
+        vec3 hit = ro + rdir*tEnd;
+        if (hit.y > -0.6){
+          float y0 = 2.6, y1 = -0.2;
+          float ta = max(0.0, (y0 - ro.y)/min(rdir.y, -0.001)), tb = min(tEnd, (y1 - ro.y)/min(rdir.y, -0.001));
+          if (tb > ta){
+            vec3 mid = ro + rdir*(.5*(ta + tb));
+            float pch = .45 + .55*fbm(vec3(mid.xz*.35 + vec2(time*.05, time*.02), time*.03));   // patchy, drifting
+            vec3 nl = (texture2D(tLight, vUv).rgb*.5 + texture2D(tLight, vUv + vec2(3.0, 0.0)*px).rgb*.25 + texture2D(tLight, vUv - vec2(3.0, 0.0)*px).rgb*.25);
+            vec3 amb = mix(mix(skyBot, skyTop, .4)*.55, vec3(.05, .07, .16), mistNight);
+            vec3 sunS = sunCol*mistSun*(1.0 - mistNight);
+            vec3 glowN = (nl*4.5 + cityGlow*.05)*mistNight;
+            const int MS = 8;
+            float dt = (tb - ta)/float(MS), T = 1.0; vec3 acc = vec3(0.0);
+            for (int i = 0; i < MS; i++){
+              vec3 p = ro + rdir*(ta + (float(i) + dith)*dt);
+              float h = clamp((p.y + .2)/2.8, 0.0, 1.0);
+              float dens = mistI*pch*(1.0 - h)*(1.0 - h)*3.2;
+              float a = 1.0 - exp(-dens*dt);
+              vec3 lc = amb + sunS*litAt(p) + glowN*(1.0 - h);
+              acc += T*a*lc; T *= 1.0 - a;
+            }
+            float m = 1.0 - T;
+            m = min(floor(m*10.0 + dith)/10.0, .75);   // stepped, to stay pixel art; never a wall of fog
+            col = col*(1.0 - m) + acc/max(1.0 - T, 1e-3)*m;
+          }
+        }
       }
       if (raysOn > 0.5 && rayI > 0.01){
         // light shafts: haze near the island lit wherever the shadow map says the sun gets through

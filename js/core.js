@@ -159,7 +159,7 @@ let LUX = null;   // while a luxury section is generated: { mats: Map(neon -> it
 const DARK_SUB = { window: toon(0x22303f), bulb: toon(0x3d3226), neon: toon(0x2a2230), trim: toon(0x2c3438) };
 const posHash = (x, y, z) => hash('lit', Math.round(x*20), Math.round(y*20), Math.round(z*20)) % 100;
 function put(geo, mat, m){
-  if (LUX){ const sub = LUX.mats.get(mat); if (sub) mat = sub; }
+  if (LUX){ const sub = LUX.mats.get(mat); if (sub){ mat = sub; if (LUX.halo) LUX.halo(sub, m); } }
   if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && posHash(m.elements[12], m.elements[13], m.elements[14]) < 82) mat = DARK_SUB[mat.userData.glow];
   let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null, o: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
   const fid = b.f ? (DARK && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow)) : 0;

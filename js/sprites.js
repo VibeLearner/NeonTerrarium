@@ -453,7 +453,7 @@ function buildFoliage(){
 let glowList = null;
 const _gv = new THREE.Vector3();
 function glow(P,x,y,z,kind,s=1){
-  if (LUX && LUX.glows[kind]) kind = LUX.glows[kind];
+  if (LUX && LUX.glows[kind]){ s *= LUX.haloK || 1; kind = LUX.glows[kind]; }
   if (DARK && !KEEP_LIGHT && GLOW_FLK[kind]){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 80) return; }
   if (DARK && GLOW_FLK[kind]) s = -s;   // marks a halo that flickers hard (see glowPoints)
   if (!glowList){ const sp = new THREE.Sprite(GLOW[kind]); sp.position.set(x,y,z).applyMatrix4(P); sp.scale.set(Math.abs(s),Math.abs(s),1); sp.layers.set(1); glowGroup.add(sp); return; }

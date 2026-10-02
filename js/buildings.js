@@ -1404,7 +1404,7 @@ function pottedPlant(P, x, z, s = 1){ put(U.cyl16, pick([M.pot, M.inBrick2, M.in
 function crateAt(P, x, y, z, s = 1){ box(M.crate, P, x, y + .11*s, z, .24*s, .22*s, .24*s, rnd(-.3, .3)); box(M.inWood2, P, x, y + .11*s, z, .25*s, .03, .25*s); }
 function moss(P, x, y, z, n = 3){ for (let k=0; k<n; k++) blob(M.inMoss, P, x + rnd(-.2, .2), y, z + rnd(-.2, .2), rnd(.06, .12), .4); }
 // a neon word on a dark board, on a bracket or flat on the wall
-function wordSign(F, kind, x, y, z, k, col){ box(M.frame, F, x, y, z - .03, SPR.size[kind][0]/PX*k + .06, SPR.size[kind][1]/PX*k + .06, MIN_T); plant(kind, F, x, y, z, k, 'c', true); glow(F, x, y, z + .25, col, 1.2 + k); }
+function wordSign(F, kind, x, y, z, k, col, halo){ box(M.frame, F, x, y, z - .03, SPR.size[kind][0]/PX*k + .06, SPR.size[kind][1]/PX*k + .06, MIN_T); plant(kind, F, x, y, z, k, 'c', true); glow(F, x, y, z + .25, col, halo ?? 1.2 + k); }
 // a gabled roof along local x over a w x d box (ridge along x), with eaves; returns nothing
 function gable(P, y, w, d, rise, mat, over = .15){ put(U.prism, mat, under(P, T(0, y, 0, PI/2, d + 2*over, rise, w + 2*over))); }
 
@@ -1796,9 +1796,10 @@ function containerStack(lot, st, P0){
           for (let k=0; k<irand(3, 5); k++) box(M.frame, F, rnd(-fc.len/2 + .2, fc.len/2 - .2), rnd(.15, .3), .05, rnd(.12, .25), rnd(.1, .3), MIN_T);   // counters, chairs, crates
           box(M.frame, F, 0, CH*.62, .05, fc.len - .3, .025, MIN_T);   // a shelf
           for (let t = -fc.len/2 + .25; t < fc.len/2 - .2; t += .14) if (chance(.6)) box(pick([M.frame, MC.paper, M.red2, M.green2]), F, t, CH*.62 + .05, .05, .06, .08, MIN_T);
-          glow(F, 0, CH*.45, .3, shop ? shop[1] === 'pink' ? 'pink' : 'warm' : 'warm', 1.0);
-          if (shop) wordSign(F, shop[0], rnd(-.25, .25), CH - .2, .1, 1, shop[1]);
-          else wordSign(F, 'sign_w_ramen', -.35, CH - .2, .1, 1, 'pink');
+          glow(F, 0, CH*.3, .3, 'warm', .55);
+          // the signs are stacked close together here, so each gets a small, faint halo (full-size ones bloomed into one blur)
+          if (shop) wordSign(F, shop[0], rnd(-.25, .25), CH - .2, .1, 1, shop[1], .7);
+          else wordSign(F, 'sign_w_ramen', -.35, CH - .2, .1, 1, 'pink', .7);
         } else {
           corrRibs(F, fc.len, .04, CH - .1, rib, .11);
           if (fc.nx !== 0){   // the container doors: locking bars on the ends
@@ -1857,7 +1858,7 @@ function containerStack(lot, st, P0){
     const tx = CL/2 - .35; put(U.cyl16, MC.white, under(R0, T(tx, .35, -CD + .35, 0, .4, .6, .4))); cyl(M.frame, R0, tx, .67, -CD + .35, .05, .05);
     cyl(M.metalDark, R0, -CL/2 + .2, .8, -CD + .2, .015, 1.5); for (const y of [1.2, 1.4]) box(M.metalDark, R0, -CL/2 + .2, y, -CD + .2, .4, .015, .015);
     sph(MC.white, R0, -CL/2 + .45, .35, -CD + .3, .14, .45);
-    wordSign(under(R0, T(.2, 0, CD - .02)), 'sign_w_tea', 0, 1.18, .06, 1, 'cyan');
+    wordSign(under(R0, T(.2, 0, CD - .02)), 'sign_w_tea', 0, 1.18, .06, 1, 'cyan', 1.0);
   }
   Object.assign(lot, { height: top + (NO_ROOF ? 0 : 1.0), floors: n + 1, occupied: true });
 }

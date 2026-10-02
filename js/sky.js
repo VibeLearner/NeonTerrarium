@@ -452,7 +452,89 @@ function makeTargets(){
   comp.uniforms.tCloud.value = rtCloud.texture; cloudMat.uniforms.tDepth.value = rtC.depthTexture;
   if (rtOut) rtOut.dispose();
   rtOut = new THREE.WebGLRenderTarget(W, H, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat });
-  upMat.uniforms.t.value = rtOut.texture; upMat.uniforms.srcRes.value.set(W, H); upMat.uniforms.dstRes.value.set(DW, DH);
+  makeGlowTargets();
+  upMat.uniforms.t.value = rtFinal.texture; upMat.uniforms.srcRes.value.set(W, H); upMat.uniforms.dstRes.value.set(DW, DH);
+}
+/* ---------- bloom and halation ---------- */
+// After the composite, the bright, saturated light in the frame (neon, lit windows, lamps, glints) is pulled out into
+// a quarter-size image and blurred: bloom. A further blur at an eighth of the size, tinted warm red, gives halation,
+// the soft fringe film shows round bright lights. Both are added back at the game's own resolution, stepped and
+// dithered so the glow stays pixel art, before the frame is scaled to the screen. White walls in the sun don't bloom:
+// the brightness that counts is weighted by colour. Stronger at night. Costs: a handful of passes over images of at
+// most a quarter of 480p.
+const GLOW_FX = { night: comp.uniforms.night };
+const fsVert = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+const glowPick = new THREE.ShaderMaterial({
+  uniforms: { t: { value: null }, texel: { value: new THREE.Vector2() }, night: GLOW_FX.night },
+  vertexShader: fsVert,
+  fragmentShader: `uniform sampler2D t; uniform vec2 texel; uniform float night; varying vec2 vUv;
+    vec3 pickC(vec2 uv){
+      vec3 c = texture2D(t, uv).rgb;
+      float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), sat = mx > 0.0 ? (mx - mn)/mx : 0.0;
+      float key = mx*(.45 + .55*sat);                                 // coloured light counts, white surfaces much less
+      float th = mix(.8, .5, night);                                // by day only the brightest lights bloom
+      return c*smoothstep(th, th + .25, key);
+    }
+    void main(){   // a 4x4 average with four bilinear taps
+      vec3 a = pickC(vUv + texel*vec2(-1.0, -1.0)) + pickC(vUv + texel*vec2(1.0, -1.0)) + pickC(vUv + texel*vec2(-1.0, 1.0)) + pickC(vUv + texel*vec2(1.0, 1.0));
+      gl_FragColor = vec4(a*.25, 1.0);
+    }`,
+  depthTest: false, depthWrite: false,
+});
+const glowBlur = new THREE.ShaderMaterial({
+  uniforms: { t: { value: null }, dir: { value: new THREE.Vector2() } },
+  vertexShader: fsVert,
+  fragmentShader: `uniform sampler2D t; uniform vec2 dir; varying vec2 vUv;
+    void main(){   // 9 taps folded into 5 bilinear reads
+      vec3 c = texture2D(t, vUv).rgb*.227;
+      c += (texture2D(t, vUv + dir*1.385).rgb + texture2D(t, vUv - dir*1.385).rgb)*.316;
+      c += (texture2D(t, vUv + dir*3.231).rgb + texture2D(t, vUv - dir*3.231).rgb)*.07;
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+  depthTest: false, depthWrite: false,
+});
+const glowCopy = new THREE.ShaderMaterial({ uniforms: { t: { value: null } }, vertexShader: fsVert,
+  fragmentShader: 'uniform sampler2D t; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(t, vUv).rgb, 1.0); }', depthTest: false, depthWrite: false });
+const glowMix = new THREE.ShaderMaterial({
+  uniforms: { t: { value: null }, tB: { value: null }, tH: { value: null }, night: GLOW_FX.night, on: { value: 1 } },
+  vertexShader: fsVert,
+  fragmentShader: `uniform sampler2D t; uniform sampler2D tB; uniform sampler2D tH; uniform float night; uniform float on; varying vec2 vUv;
+    float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y*0.75))); }
+    float bayer(vec2 a){ return b2(0.5*a)*0.25 + b2(a); }
+    void main(){
+      vec3 c = texture2D(t, vUv).rgb;
+      vec3 b = texture2D(tB, vUv).rgb, h = texture2D(tH, vUv).rgb;
+      float k = mix(.6, 1.7, night);
+      vec3 add = b*k + h*vec3(1.0, .42, .3)*mix(.3, 1.0, night);   // bloom, and a warm red halation round it
+      add = floor(add*20.0 + bayer(gl_FragCoord.xy)*.99)/20.0;       // stepped and dithered: pixel art, not a smooth haze
+      c += add*on*(1.0 - .6*c);                                       // screen-like: light pixels don't blow out to white
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+  depthTest: false, depthWrite: false,
+});
+const glowScene = new THREE.Scene(), glowQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), glowCopy); glowScene.add(glowQuad);
+let rtFinal = null, rtB = [], rtHal = [];
+function makeGlowTargets(){
+  for (const r of [rtFinal, ...rtB, ...rtHal]) if (r) r.dispose();
+  const lin = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, depthBuffer: false };
+  rtFinal = new THREE.WebGLRenderTarget(W, H, lin);
+  const qw = Math.max(1, Math.ceil(W/4)), qh = Math.max(1, Math.ceil(H/4)), ew = Math.max(1, Math.ceil(W/8)), eh = Math.max(1, Math.ceil(H/8));
+  rtB = [0, 1].map(() => new THREE.WebGLRenderTarget(qw, qh, lin));
+  rtHal = [0, 1].map(() => new THREE.WebGLRenderTarget(ew, eh, lin));
+}
+function glowPass(mat, target){ glowQuad.material = mat; renderer.setRenderTarget(target); renderer.render(glowScene, compCam); }
+// run after the composite has been drawn into rtOut; leaves the finished frame in rtFinal
+function renderGlow(){
+  if (!S.bloom){ glowCopy.uniforms.t.value = rtOut.texture; glowPass(glowCopy, rtFinal); return; }
+  const [b0, b1] = rtB, [h0, h1] = rtHal;
+  glowPick.uniforms.t.value = rtOut.texture; glowPick.uniforms.texel.value.set(1/W, 1/H); glowPass(glowPick, b0);
+  glowBlur.uniforms.t.value = b0.texture; glowBlur.uniforms.dir.value.set(1/b0.width, 0); glowPass(glowBlur, b1);
+  glowBlur.uniforms.t.value = b1.texture; glowBlur.uniforms.dir.value.set(0, 1/b0.height); glowPass(glowBlur, b0);
+  glowCopy.uniforms.t.value = b0.texture; glowPass(glowCopy, h0);   // halation: the bloom, smaller and blurred twice as wide
+  glowBlur.uniforms.t.value = h0.texture; glowBlur.uniforms.dir.value.set(2/h0.width, 0); glowPass(glowBlur, h1);
+  glowBlur.uniforms.t.value = h1.texture; glowBlur.uniforms.dir.value.set(0, 2/h0.height); glowPass(glowBlur, h0);
+  glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = b0.texture; glowMix.uniforms.tH.value = h0.texture;
+  glowPass(glowMix, rtFinal);
 }
 // The finished frame is scaled to the screen with "sharp bilinear" filtering: every render pixel stays a crisp
 // square, and where the scale isn't a whole number only the one-screen-pixel seam between two render pixels is

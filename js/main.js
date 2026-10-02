@@ -86,6 +86,7 @@ function frame(now){
   clouds.visible = !S.vclouds;
   if (S.vclouds){ renderer.setRenderTarget(rtCloud); renderer.render(cloudScene, compCam); }
   renderer.setRenderTarget(rtOut); renderer.render(compScene, compCam);
+  renderGlow();   // bloom and halation (sky.js)
   renderer.setRenderTarget(null); renderer.render(upScene, compCam);
   requestAnimationFrame(frame);
 }

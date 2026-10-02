@@ -1304,6 +1304,7 @@ Object.assign(M, {
   inPipe: toon(0x7a4a32), inPipe2: toon(0x5c5a58), inGas: toon(0x5a8aa8), inGas2: toon(0xb8bcb8),
 });
 const IN_SHOP = [M.inShop, M.inShop2];
+const SCRAP_ROOFS = [[M.inRust, M.inRust2], [toon(0x52677a), toon(0x3f5062)], [toon(0x6e7466), toon(0x565c50)]];   // rust, blue steel, galvanised
 // a right-angled triangle, extruded (for sawtooth roof ends): the tall side at local +x
 U.rtri = (() => { const s = new THREE.Shape(); s.moveTo(-.5, 0); s.lineTo(.5, 0); s.lineTo(.5, 1); s.lineTo(-.5, 0);
   const g = new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false }); g.translate(0, 0, -.5); return g; })();
@@ -1361,15 +1362,17 @@ function scrapShed(lot, st, P0){
   wordSign(under(Ff, T(-.1, 0, .02, 0)), 'sign_w_scrap', 0, 1.5, .1, 1.0, 'cyan');
   box(M.inShop2, Ff, -.45, 1.75, .03, .3, .25, MIN_T); box(M.frame, Ff, -.45, 1.75, .06, .32, .03, MIN_T);   // a small lit window up high
   wallLamp(Ff, .55, 1.25);
-  // the roof: rusty corrugated, steep, overhanging
-  gable(P, h, w, d, .85, M.inRust, .2);
+  // the roof: corrugated, steep, overhanging, in one of three finishes: rust, weathered blue steel, or old
+  // galvanised grey-green (sheet and rib colour), so whole yards of them aren't all orange
+  const [roof, rib] = SCRAP_ROOFS[Math.floor(R()*SCRAP_ROOFS.length)];
+  gable(P, h, w, d, .85, roof, .2);
   { const half = d/2 + .2, ang = Math.atan2(.85, half), L = Math.hypot(half, .85);   // ribs running down both slopes (the ridge runs along x)
-    for (let x = -w/2 - .15; x <= w/2 + .16; x += .16) for (const s of [-1, 1]) box(M.inRust2, P, x, h + .425 + Math.cos(ang)*.02, s*half/2, MIN_T, MIN_T, L, 0, s*ang); }
+    for (let x = -w/2 - .15; x <= w/2 + .16; x += .16) for (const s of [-1, 1]) box(rib, P, x, h + .425 + Math.cos(ang)*.02, s*half/2, MIN_T, MIN_T, L, 0, s*ang); }
   moss(P, -w/4, h + .5, rnd(-.5, .5), 4);
   if (!NO_ROOF){ for (const [x, z] of [[w*.2, -d*.25], [-w*.25, d*.15]]){ const ch = rnd(.6, 1.0); cyl(M.inRust2, P, x, h + .5 + ch/2, z, .07, ch); cyl(M.metalDark, P, x, h + .5 + ch, z, .09, .06); emitters.push(new THREE.Vector3(x, h + .6 + ch, z).applyMatrix4(P)); } }
   // a lean-to on the side, a ladder, a pipe down the wall, junk
   const lx = w/2 + .35;
-  box(M.inCorr2, P, lx, .45, .2, .7, .9, 1.1); box(M.inRust, P, lx, .98, .2, .82, .04, 1.2, 0, 0, -.3);
+  box(M.inCorr2, P, lx, .45, .2, .7, .9, 1.1); box(roof, P, lx, .98, .2, .82, .04, 1.2, 0, 0, -.3);
   box(pick(IN_SHOP), P, lx + .36, .4, .2, MIN_T, .45, .5);
   for (let y = .2; y < h - .1; y += .22) box(M.frame, P, -w/2 - .04, y, -d/2 + .35, MIN_T, .025, .3);
   for (const s of [-1, 1]) box(M.frame, P, -w/2 - .04, h/2, -d/2 + .35 + s*.15, MIN_T, h, .03);

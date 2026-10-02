@@ -22,7 +22,11 @@ const titleOf = file => decodeURIComponent(file.split('/').pop()).replace(MUSIC_
 // static, tuning in before and out after. What's been said is remembered (in this browser), so nothing repeats;
 // once the host has said everything, it's just the music.
 const RADIO_DIR = 'assets/audio/radio/';
-const RJ_INTROS = ['intro1', 'intro2', 'intro3', 'intro4', 'intro5', 'intro6', 'intro7', 'intro8', 'intro9'];
+const RJ_INTROS = ['intro1', 'intro2', 'intro3', 'intro4', 'intro5', 'intro6', 'intro7', 'intro8', 'intro9', 'intro10', 'intro11', 'intro12',
+  'longtalk1', 'longtalk2', 'longtalk3'];   // the long talks are longer intros, played over the start of a song the same way
+// Interrupts: partway through a song the host cuts in. The song stops, static, the interrupt, static, and the song
+// picks up where it left off. Each plays once, only after the first lore drop, and never on the song before lore 2.
+const RJ_INTERRUPTS = ['interrupt1', 'interrupt2'], RJ_INTERRUPT_ODDS = .3;
 const STATIC_IN = ['in1', 'in2'], STATIC_OUT = ['out1', 'out2', 'out3', 'out4', 'out5', 'out6', 'out7'];
 const RJ_KEY = 'neonIsland.radioHost', RJ_INTRO_ODDS = .45, DUCK = .22, STATIC_VOL = .7;
 const rj = (() => {
@@ -52,6 +56,14 @@ const rj = (() => {
       if (talk === 'lore1') st.after = 0; else if (st.lore1 && st.songs > 1) st.after++;
       save();
     },
+    // a song (with nothing said over its start) has begun: maybe an interrupt for partway through it
+    planInterrupt(talk){
+      if (talk || !st.lore1 || (!st.lore2 && st.after >= st.lore2At - 1)) return null;
+      const left = RJ_INTERRUPTS.filter(n => !st.used.includes(n));
+      if (!left.length || st.streak >= 2 || Math.random() > RJ_INTERRUPT_ODDS) return null;
+      return left[Math.floor(Math.random()*left.length)];
+    },
+    interrupted(name){ if (!st.used.includes(name)) st.used.push(name); st.streak++; save(); },
     loreDone(name){ st[name] = true; save(); },
     get state(){ return st; },
     reset(){ st = { songs: 0, lore1: false, lore2: false, after: 0, lore2At: Math.random() < .5 ? 3 : 4, used: [], streak: 0 }; save(); },
@@ -64,7 +76,7 @@ const music = (() => {
   el.addEventListener('ended', () => next());
   // the host: a second player for the static and the talk, played as a little queue of clips
   const vo = new Audio(); vo.preload = 'auto';
-  let voQ = [], voDone = null, voLore = null, talking = false, duck = 1, voBlocked = false;
+  let voQ = [], voDone = null, voLore = null, talking = false, duck = 1, voBlocked = false, cutIn = null, cutting = false;
   const pick = a => a[Math.floor(Math.random()*a.length)];
   function voPlay(){ const p = vo.play(); if (p && p.catch) p.then(() => { voBlocked = false; }).catch(() => { voBlocked = true; }); }
   function voNext(){
@@ -82,7 +94,7 @@ const music = (() => {
     voQ = [{ file: 'static/' + pick(STATIC_IN) + '.mp3', kind: 'static' }, { file: name + '.mp3', kind: name.startsWith('lore') ? 'lore' : 'intro' }, { file: 'static/' + pick(STATIC_OUT) + '.mp3', kind: 'static' }];
     voDone = done || null; voLore = name.startsWith('lore') ? name : null; talking = true; voNext();
   }
-  function hush(){ voQ = []; voDone = null; voLore = null; talking = false; vo.pause(); vo.removeAttribute('src'); }
+  function hush(){ voQ = []; voDone = null; voLore = null; talking = false; vo.pause(); vo.removeAttribute('src'); if (cutting){ cutting = false; duck = 1; } }
   el.addEventListener('error', () => { if (on) setTimeout(() => next(), 800); });
   // The music runs through Web Audio: an analyser (for the equalizer) and a gain for the volume and fades. Made on
   // the first play, which always follows a click (building the radio station, or a button).
@@ -130,12 +142,15 @@ const music = (() => {
   }
   function next(){
     if (!tracks || !tracks.length || !on) return;
+    cutIn = null;
     if (talking && !voLore) hush();   // skipping during an intro: straight to the song (a lore drop carries on over it)
     if (++idx >= order.length){ shuffle(); idx = 0; }
     const k = idx, plan = talking ? null : rj.plan();
     rj.started(plan);
     load(k);
     if (plan) talk(plan);   // the song starts underneath the talk, turned down, and comes back up after
+    const cut = rj.planInterrupt(plan);
+    cutIn = cut ? { name: cut, k, frac: .3 + Math.random()*.35 } : null;   // where in the song, once its length is known
   }
   // previous: back to the start of this song if it's been playing a while, otherwise the song before it
   function prev(){
@@ -162,7 +177,12 @@ const music = (() => {
     setOn(!!radio && !anims.some(a => a.c === radio));
     const playing = on && !paused && !blocked && !el.paused;
     // under the host's talk the song is turned down, and comes back up gently after
-    const dt2 = Math.min(dt, .1), dTarget = talking ? DUCK : 1;
+    // an interrupt due: stop the song, the host cuts in, then the song carries on from where it stopped
+    if (cutIn && !talking && !paused && on && cutIn.k === idx && el.duration > 20 && el.currentTime > el.duration*cutIn.frac){
+      const c = cutIn; cutIn = null; cutting = true; rj.interrupted(c.name); el.pause();
+      talk(c.name, () => { cutting = false; duck = 1; if (on && idx === c.k && !paused){ fadeIn = FADE_QUICK; tryPlay(); } });
+    }
+    const dt2 = Math.min(dt, .1), dTarget = talking && !cutting ? DUCK : 1;
     duck = dTarget < duck ? Math.max(dTarget, duck - dt2*1.5) : Math.min(dTarget, duck + dt2*.35);
     if (talking && !paused) vo.volume = Math.min(1, volume*(vo.dataset.kind === 'static' ? STATIC_VOL : 1));
     const target = playing ? 1 : 0;
@@ -224,5 +244,5 @@ const music = (() => {
       },
     };
   })();
-  return { update, setVolume, skip, back, togglePause, rj, get talking(){ return talking; }, vo, get volume(){ return volume; }, get tracks(){ return tracks; }, get on(){ return on; }, get paused(){ return paused; }, get level(){ return level; }, el };
+  return { update, setVolume, skip, back, togglePause, rj, get cutIn(){ return cutIn; }, get talking(){ return talking; }, vo, get volume(){ return volume; }, get tracks(){ return tracks; }, get on(){ return on; }, get paused(){ return paused; }, get level(){ return level; }, el };
 })();

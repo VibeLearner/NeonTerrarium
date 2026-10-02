@@ -868,6 +868,258 @@ function glassHotel(lot, st, P0, variant){
   Object.assign(lot, { height:y+.1, floors, occupied:true });
 }
 
+/* ---------- luxury curves: white organic towers of glass, garden terraces and domes ---------- */
+// After the garden-city reference: smooth white floor plates with rounded edges and a thin cyan light line, floors
+// of glass lit warm from inside behind slim white mullions, terraces planted with trees, ponds with lily pads, glass
+// railings, glass domes over gardens on the roofs, great white arches sweeping up and over, and sleek white hover
+// cars parked on cantilevered pads.
+Object.assign(M, {
+  lxWhite: toon(0xf1f3f0), lxWhite2: toon(0xdde3e2), lxLine: toon(0x1c5050, { em:0x6ff2ee, kind:'trim' }),
+  // warm rooms: golden by day; at night the glow is a deep orange, which the night boost lifts to a warm gold
+  lxRoom: toon(0xd6a868, { em:0xd8843a, kind:'window' }), lxRoom2: toon(0xc89a66, { em:0xe0985a, kind:'window' }), lxRoom3: toon(0xb8925e, { em:0xc8702a, kind:'window' }),
+  lxLeaf: toon(0x5a8a48, { flat:1 }), lxLeaf2: toon(0x7fa85a, { flat:1 }), lxBlossom: toon(0xe8eee4, { flat:1 }), lxBlossom2: toon(0xe0cce0, { flat:1 }),
+  lxWater: toon(0x3f8a92, { em:0x163c44, kind:'trim' }), lxPad: toon(0x5f9a4a, { flat:1 }),
+});
+M.lxGlass = new THREE.MeshBasicMaterial({ color: 0xd8f2f4, transparent: true, opacity: .2, depthWrite: false }); M.lxGlass.userData.colorOnly = true;
+const LX_ROOMS = [M.lxRoom, M.lxRoom, M.lxRoom2, M.lxRoom3];
+// a flat plate with rounded corners (a disc when r is half the width), extruded from y 0 to 1; cached by size
+const lxPlateCache = new Map();
+function lxPlate(mat, P, x, y, z, w, d, r, h, ry = 0){
+  r = Math.max(.01, Math.min(r, w/2, d/2));
+  const key = [w, d, r].map(v => v.toFixed(2)).join(',');
+  let g = lxPlateCache.get(key);
+  if (!g){
+    const s = new THREE.Shape(), hx = w/2 - r, hz = d/2 - r;
+    s.moveTo(-hx, -d/2); s.lineTo(hx, -d/2); s.absarc(hx, -hz, r, -PI/2, 0, false); s.lineTo(w/2, hz); s.absarc(hx, hz, r, 0, PI/2, false);
+    s.lineTo(-hx, d/2); s.absarc(-hx, hz, r, PI/2, PI, false); s.lineTo(-w/2, -hz); s.absarc(-hx, -hz, r, PI, 1.5*PI, false);
+    g = new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false, curveSegments: 7 }); g.rotateX(PI/2); g.translate(0, 1, 0); g = g.toNonIndexed();
+    lxPlateCache.set(key, g);
+  }
+  put(g, mat, under(P, T(x, y, z, ry, 1, h, 1)));
+}
+// points round a rounded rectangle, about `step` apart, each with the angle that turns local +z outward
+function lxRing(w, d, r, step){
+  r = Math.max(.01, Math.min(r, w/2, d/2));
+  const hx = w/2 - r, hz = d/2 - r, pcs = [];
+  const line = (x0, z0, x1, z1, nx, nz) => pcs.push({ len: Math.hypot(x1 - x0, z1 - z0), at: u => [x0 + (x1 - x0)*u, z0 + (z1 - z0)*u, nx, nz] });
+  const arc = (cx, cz, a0, a1) => pcs.push({ len: Math.abs(a1 - a0)*r, at: u => { const a = a0 + (a1 - a0)*u; return [cx + Math.cos(a)*r, cz + Math.sin(a)*r, Math.cos(a), Math.sin(a)]; } });
+  line(-hx, d/2, hx, d/2, 0, 1); arc(hx, hz, PI/2, 0); line(w/2, hz, w/2, -hz, 1, 0); arc(hx, -hz, 0, -PI/2);
+  line(hx, -d/2, -hx, -d/2, 0, -1); arc(-hx, -hz, -PI/2, -PI); line(-w/2, -hz, -w/2, hz, -1, 0); arc(-hx, hz, PI, PI/2);
+  const total = pcs.reduce((s, p) => s + p.len, 0), n = Math.max(6, Math.round(total/step)), out = [];
+  for (let k=0; k<n; k++){
+    let s = (k + .5)*total/n;
+    for (const p of pcs){ if (s <= p.len || p === pcs[pcs.length - 1]){ const [x, z, nx, nz] = p.at(p.len ? Math.min(1, s/p.len) : 0); out.push({ x, z, ry: Math.atan2(nx, nz), seg: total/n }); break; } s -= p.len; }
+  }
+  return out;
+}
+// a floor plate: white, a hair of cyan light round its rim
+function lxSlab(P, x, y, z, w, d, r, h = .12, line = true){
+  lxPlate(M.lxWhite, P, x, y - h, z, w, d, r, h);
+  if (line) lxPlate(M.lxLine, P, x, y - h*.62, z, w + .02, d + .02, r + .01, .03);
+}
+// a floor of glass: a warm lit room behind slim white mullions, a few things silhouetted against the light
+function lxGlassFloor(P, x, y, z, w, d, r, h, filter){
+  lxPlate(pick(LX_ROOMS), P, x, y, z, w - .06, d - .06, Math.max(.02, r - .03), h);
+  lxPlate(M.lxGlass, P, x, y + .01, z, w + .01, d + .01, r + .005, h - .02);   // the glass skin, a cool sheen over the warm rooms
+  for (const p of lxRing(w, d, r, .34)){
+    if (filter && !filter(p.x + x, p.z + z)) continue;
+    box(M.lxWhite2, P, x + p.x, y + h/2, z + p.z, .035, h, .035);
+    const F = under(P, T(x + p.x, y, z + p.z, p.ry)), q = R();
+    if (q < .12) box(pick([M.cream2, M.white2]), F, p.seg/2, h*.6, .005, p.seg*.8, h*.6, .015);          // curtains drawn
+    else if (q < .3) box(M.frame, F, p.seg/2, .16, .01, p.seg*.6, .14, .02);                             // a sofa against the light
+  }
+}
+// glass railing round (part of) a plate's edge
+function lxRail(P, x, y, z, w, d, r, keep){
+  for (const p of lxRing(w, d, r, .3)){
+    if (keep && !keep(p.x + x, p.z + z)) continue;
+    const F = under(P, T(x + p.x, y, z + p.z, p.ry));
+    box(M.lxGlass, F, 0, .13, 0, p.seg + .01, .24, .015); box(M.lxWhite, F, 0, .26, 0, p.seg + .02, .025, .03);
+  }
+}
+// a little tree: a thin trunk and a few rounded clumps of leaves (or blossom)
+function lxTree(P, x, y, z, s = 1){
+  const h = rnd(.35, .5)*s, mats = chance(.3) ? [M.lxBlossom, M.lxBlossom2, M.lxLeaf2] : [M.lxLeaf, M.lxLeaf2, M.lxLeaf];
+  cyl(M.trunk, P, x, y + h/2, z, .025*s, h);
+  for (let k=0; k<3 + (s > 1 ? 1 : 0); k++) blob(pick(mats), P, x + rnd(-.13, .13)*s, y + h + rnd(-.02, .14)*s, z + rnd(-.13, .13)*s, rnd(.13, .2)*s, .75);
+}
+// a pond with lily pads, set into a terrace
+function lxPond(P, x, y, z, w, d){
+  lxPlate(M.lxWhite2, P, x, y, z, w + .08, d + .08, Math.min(w, d)/2, .05);
+  lxPlate(M.lxWater, P, x, y + .05, z, w, d, Math.min(w, d)/2 - .02, .012);
+  for (let k=0; k<Math.round(w*d*14); k++){ const px = x + rnd(-w/2 + .06, w/2 - .06), pz = z + rnd(-d/2 + .06, d/2 - .06);
+    put(U.cyl16, M.lxPad, under(P, T(px, y + .066, pz, 0, .07, .008, .07))); if (chance(.25)) box(pick([M.lxBlossom, M.cloth1]), P, px, y + .075, pz, .025, .02, .025); }
+}
+// a terrace garden scattered over an area: shrubs, a tree or two, flowers; skip(x, z) keeps clear what must stay clear
+function lxGarden(P, y, pts, trees){
+  pts.forEach(([x, z], k) => { if (k < trees && chance(.85*S.green)) lxTree(P, x, y, z, rnd(.8, 1.1)); else if (chance(.85*S.green)) plant(pick(['bush','bushFlower','g_fern2','fern','g_spread1','bonsai']), P, x, y, z, rnd(.55, .8)); });
+}
+// a sleek white hover car
+function lxCar(P, x, y, z, ry){
+  const Q = under(P, T(x, y, z, ry));
+  put(U.sph, M.lxWhite, under(Q, T(0, .15, 0, 0, .34, .2, .78)));
+  put(U.sph, M.glassDark, under(Q, T(0, .22, -.04, 0, .24, .13, .38)));
+  box(M.lxLine, Q, 0, .1, 0, .3, .02, .62); glow(Q, 0, .05, 0, 'cyan', .7);
+  for (const s of [-1, 1]) put(U.sph, M.lxWhite2, under(Q, T(s*.16, .1, .22, 0, .08, .08, .16)));
+}
+// a pad cantilevered from a floor, with guide lights and a car on it; local +z points away from the building
+function lxCarPad(P, x, y, z, ry){
+  const Q = under(P, T(x, y, z, ry));
+  lxPlate(M.lxWhite2, Q, 0, -.07, .35, .62, .95, .12, .07);
+  box(M.lxLine, Q, 0, -.04, .83, .5, .025, .02); for (const s of [-1, 1]) box(M.lxLine, Q, s*.315, -.04, .35, .02, .025, .8);
+  box(M.frame, Q, 0, -.03, .35, .05, .01, .7);
+  strut(M.lxWhite2, Q, 0, -.07, .7, 0, -.55, -.05, .06);
+  lxCar(Q, 0, 0, .4, rnd(-.15, .15));
+}
+// a glass dome on a white ring, a garden under it
+U.lxDome = new THREE.SphereGeometry(1, 16, 7, 0, TAU, 0, PI/2);
+U.lxRib = new THREE.TorusGeometry(1, .02, 4, 18, PI);
+U.lxHoop = new THREE.TorusGeometry(1, .02, 4, 28);
+function lxDome(P, x, y, z, r){
+  lxPlate(M.lxWhite, P, x, y, z, 2*r + .16, 2*r + .16, r + .08, .1);
+  lxPlate(M.lxLine, P, x, y + .04, z, 2*r + .18, 2*r + .18, r + .09, .025);
+  lxPlate(M.grass, P, x, y + .1, z, 2*r - .04, 2*r - .04, r - .02, .03);
+  lxTree(P, x + rnd(-.1, .1), y + .12, z + rnd(-.1, .1), r*1.4);
+  for (let k=0; k<4; k++){ const a = rnd(0, TAU), rr = rnd(.35, .75)*r; plant(pick(['bush','bushFlower','fern','g_fern2']), P, x + Math.sin(a)*rr, y + .13, z + Math.cos(a)*rr, rnd(.45, .65)); }
+  glow(P, x, y + r*.5, z, 'warm', 1.0);
+  put(U.lxDome, M.lxGlass, under(P, T(x, y + .1, z, 0, r, r, r)));
+  for (let k=0; k<3; k++) put(U.lxRib, M.lxWhite, under(P, T(x, y + .1, z, k*PI/3, r, r, r)));
+  put(U.lxHoop, M.lxWhite, under(P, T(x, y + .1 + r*.55, z, 0, r*.84, r*.84, r*.84, PI/2)));
+}
+// a white band following a curve in P's x-y plane (pts: [[x, y], ...]); width runs along z
+const _lbx = new THREE.Vector3(), _lby = new THREE.Vector3(), _lbz = new THREE.Vector3(0, 0, 1), _lbs = new THREE.Vector3();
+function lxBand(mat, P, pts, width, thick, z = 0){
+  for (let k=0; k<pts.length - 1; k++){
+    const [x0, y0] = pts[k], [x1, y1] = pts[k + 1], len = Math.hypot(x1 - x0, y1 - y0); if (len < 1e-4) continue;
+    _lbx.set((x1 - x0)/len, (y1 - y0)/len, 0); _lby.crossVectors(_lbz, _lbx);
+    const m = new THREE.Matrix4().makeBasis(_lbx, _lby, _lbz).scale(_lbs.set(len + thick*.6, thick, width)).setPosition((x0 + x1)/2, (y0 + y1)/2, z);
+    put(U.box, mat, under(P, m));
+  }
+}
+// a curve offset outward from its own path (for the light line on the outside of a band)
+function lxOffset(pts, o){
+  return pts.map(([x, y], k) => { const [ax, ay] = pts[Math.max(0, k - 1)], [bx, by] = pts[Math.min(pts.length - 1, k + 1)], l = Math.hypot(bx - ax, by - ay) || 1; return [x + (by - ay)/l*o, y - (bx - ax)/l*o]; });
+}
+
+// Dome garden tower: round glass floors on white discs, planted terraces curving out from the front, a glass dome
+// garden on the roof, and a great white arch rising behind it from the ground and over the top
+function domeTower(lot, st, P0){
+  const r = rnd(.74, .84), floors = irand(4, 7), face = pick([0, PI/2, PI, -PI/2]), P = under(P0, T(0, 0, 0, face));
+  lxPlate(M.lxWhite2, P, 0, 0, 0, 2*r + .5, 2*r + .5, r + .25, .06);                                   // the forecourt
+  let y = .06, ang = rnd(-.6, .6);
+  const pad = irand(1, floors - 2), padSide = pick([-1, 1]);
+  for (let fl=0; fl<floors; fl++){
+    const h = FH - .12;
+    lxGlassFloor(P, 0, y, 0, 2*r, 2*r, r, h);
+    y += h + .12;
+    lxSlab(P, 0, y, 0, 2*r + .2, 2*r + .2, r + .1);
+    if (fl < floors - 1 && fl !== pad && chance(.75)){   // a terrace curving out of the front, planted, with a glass rail
+      const len = rnd(1.3, 2.2), th0 = ang - len/2, R2 = r + rnd(.42, .55);
+      put(wedgeGeo(R2, .12, th0, len), M.lxWhite, under(P, T(0, y - .06, 0)));
+      put(wedgeGeo(R2 + .01, .03, th0, len), M.lxLine, under(P, T(0, y - .07, 0)));
+      const pts = []; for (let a = th0 + .2; a < th0 + len - .1; a += rnd(.32, .45)){ const rr = rnd(r + .14, R2 - .14); pts.push([Math.sin(a)*rr, Math.cos(a)*rr]); }
+      lxGarden(P, y, pts, chance(.7) ? 1 : 0);
+      if (chance(.3)){ const a = th0 + len*.5; lxPond(P, Math.sin(a)*(r + .25), y, Math.cos(a)*(r + .25), .32, .22); }
+      for (let a = th0 + .08; a < th0 + len - .05; a += .3){ const F = under(P, T(Math.sin(a)*(R2 - .02), y, Math.cos(a)*(R2 - .02), a));
+        box(M.lxGlass, F, 0, .13, 0, .3*R2 + .01, .24, .015); box(M.lxWhite, F, 0, .26, 0, .3*R2 + .02, .025, .03);
+        if (chance(.35*S.green)) plant(hangKind(), under(F, T(0, 0, .02)), 0, -.12, 0, rnd(.45, .65), 't', true); }
+      ang += rnd(-.9, .9); ang = Math.max(-.9, Math.min(.9, ang));
+    }
+    if (fl === pad) lxCarPad(P, padSide*(r + .12), y, .15, padSide*PI/2);
+  }
+  if (NO_ROOF){ Object.assign(lot, { height: y, floors, occupied: true }); return; }   // another section stands on this one
+  // the dome garden on the roof
+  lxDome(P, 0, y, 0, r - .08);
+  const top = y + r;
+  // the arch: from the ground on one side, up over the dome, down to the ground on the other, behind the floors
+  const A = r + .42, B = top + .55, zb = -r - .12, pts = [];
+  for (let k=0; k<=24; k++){ const t = k*PI/24; pts.push([Math.cos(t)*A, Math.pow(Math.sin(t), .6)*B]); }
+  lxBand(M.lxWhite, P, pts, .28, .14, zb);
+  lxBand(M.lxLine, P, lxOffset(pts, .075), .05, .02, zb);
+  Object.assign(lot, { height: top, floors, occupied: true });
+}
+
+// Shell tower: stadium-shaped glass floors with balconies all round, wrapped by a white loop rising from the
+// ground on both sides and arching over the top, a little dome under the arch, cars parked on pads front and back
+function shellTower(lot, st, P0){
+  const w = rnd(1.4, 1.6), d = rnd(1.05, 1.25), floors = irand(6, 9), face = pick([0, PI/2, PI, -PI/2]), P = under(P0, T(0, 0, 0, face));
+  const r = d/2;
+  lxPlate(M.lxWhite2, P, 0, 0, 0, w + .45, d + .45, r + .2, .06);
+  let y = .06;
+  const pads = new Set([irand(2, floors - 2), irand(1, floors - 3)]);
+  for (let fl=0; fl<floors; fl++){
+    const h = FH - .12, inset = fl % 3 === 1 ? .18 : 0;   // every third floor steps in behind a wider balcony
+    lxGlassFloor(P, 0, y, 0, w - inset, d - inset, r - inset/2, h);
+    y += h + .12;
+    lxSlab(P, 0, y, 0, w + .3, d + .3, r + .15);
+    if (fl < floors - 1){
+      lxRail(P, 0, y, 0, w + .24, d + .24, r + .12);
+      if (chance(.55*S.green)) for (let k=0; k<3; k++){ const p = pick(lxRing(w + .12, d + .12, r + .06, .3)); plant(pick(['bush','bushFlower','fern','bonsai']), P, p.x, y, p.z, rnd(.5, .7)); }
+      if (chance(.3*S.green)) for (const p of lxRing(w + .3, d + .3, r + .15, .45)) if (chance(.3)) plant(hangKind(), under(P, T(p.x, 0, p.z, p.ry)), 0, y - .12, .01, rnd(.45, .65), 't', true);
+    }
+    if (pads.has(fl)) lxCarPad(P, rnd(-.25, .25), y, (fl % 2 ? 1 : -1)*(r + .12), fl % 2 ? 0 : PI);
+  }
+  const H = y, X = w/2 + .3;
+  if (NO_ROOF){   // another section stands on this one: the loop's two sides only
+    for (const s of [-1, 1]){ lxBand(M.lxWhite, P, [[s*X, 0], [s*X, H]], .3, .14, 0); lxBand(M.lxLine, P, [[s*(X + .075), 0], [s*(X + .075), H]], .05, .02, 0); }
+    Object.assign(lot, { height: H, floors, occupied: true }); return;
+  }
+  lxPlate(M.lxWhite, P, 0, H, 0, w + .1, d + .1, r + .05, .22);
+  lxDome(P, 0, H + .22, 0, Math.min(.42, d*.36));
+  // the loop: straight up both sides, a half circle over the top, through the middle of the floors
+  const pts = [[-X, 0]];
+  for (let k=0; k<=18; k++){ const t = PI - k*PI/18; pts.push([Math.cos(t)*X, H + .3 + Math.sin(t)*X*1.05]); }
+  pts.push([X, 0]);
+  lxBand(M.lxWhite, P, pts, .3, .14, 0);
+  lxBand(M.lxLine, P, lxOffset(pts, -.075), .05, .02, 0);
+  Object.assign(lot, { height: H + .3 + X*1.05, floors, occupied: true });
+}
+
+// Terrace cascade: wide rounded levels stepping back as they rise, each roof a garden of trees, ponds and flowers
+// behind a glass rail; glass floors beneath; a white ribbon sweeping up the side and out over the top; a glass
+// dome pavilion on the roof and a car parked on a pad
+function cascadeTerraces(lot, st, P0){
+  const levels = irand(3, 4), face = pick([0, PI/2, PI, -PI/2]), P = under(P0, T(0, 0, 0, face));
+  const W0 = rnd(2.3, 2.45), D0 = rnd(2.2, 2.35);
+  let y = 0, prev = null;
+  const L = [];
+  const step = rnd(.42, .48);   // each level steps back this far at the front; the backs stay flush
+  for (let k=0; k<levels; k++) L.push({ w: W0 - k*.2, d: D0 - k*step, oz: -k*step/2, ox: rnd(-.05, .05), r: rnd(.3, .5) });
+  lxPlate(M.lxWhite2, P, 0, 0, 0, W0, D0, L[0].r, .08); y = .08;
+  for (let k=0; k<levels; k++){
+    const lv = L[k], h = FH - .1, rw = lv.w - .3, rd = lv.d - .45, rz = lv.oz - .12;
+    lxGlassFloor(P, lv.ox, y, rz, rw, rd, Math.max(.1, lv.r - .15), h);
+    y += h + .14;
+    lxSlab(P, lv.ox, y, lv.oz, lv.w, lv.d, lv.r, .14);
+    // the terrace in front of the next level up: a garden, maybe a pond, a glass rail round the open edge
+    const nx = L[k + 1], frontZ = lv.oz + lv.d/2, backZ = nx ? nx.oz - .12 + (nx.d - .45)/2 : lv.oz - lv.d/2 + .3;
+    if (nx){
+      const pts = []; for (let x = -lv.w/2 + .3; x < lv.w/2 - .25; x += rnd(.32, .5)) pts.push([x, rnd(backZ + .12, frontZ - .14)]);
+      lxGarden(P, y, pts, irand(1, 2));
+      if (chance(.55)) lxPond(P, rnd(-lv.w*.25, lv.w*.25), y, (backZ + frontZ)/2, rnd(.4, .6), Math.max(.18, (frontZ - backZ)*.45));
+      lxRail(P, lv.ox, y, lv.oz, lv.w - .06, lv.d - .06, lv.r - .03, (x, z) => z > backZ + .05);
+      if (chance(.5*S.green)) for (const p of lxRing(lv.w, lv.d, lv.r, .4)) if (p.z > 0 && chance(.4)) plant(hangKind(), under(P, T(lv.ox + p.x, 0, lv.oz + p.z, p.ry)), 0, y - .14, .01, rnd(.5, .7), 't', true);
+    }
+    prev = lv;
+  }
+  if (NO_ROOF){ lxCarPad(P, -W0/2 + .02, FH*2 + .14 + .1, -.2, -PI/2); Object.assign(lot, { height: y, floors: levels, occupied: true }); return; }
+  // the roof: a dome pavilion, a garden, a rail
+  const top = L[levels - 1];
+  lxRail(P, top.ox, y, top.oz, top.w - .06, top.d - .06, top.r - .03);
+  const dr = Math.min(.45, top.d*.28);
+  lxDome(P, top.ox - top.w*.18, y, top.oz - .05, dr);
+  lxGarden(P, y, [[top.ox + top.w*.22, top.oz + .15], [top.ox + top.w*.3, top.oz - .3], [top.ox + .1, top.oz + top.d*.3]], 1);
+  // the ribbon: up the side from the first terrace, curling back and out over the top
+  const S2 = under(P, T(W0/2 + .1, 0, 0, -PI/2)), y1 = FH + .12, H = y;   // its curve runs along local z, front to back
+  const pts = []; for (let k=0; k<=20; k++){ const t = k/20, u = 1 - t;
+    const bx = u*u*u*(D0/2 - .2) + 3*u*u*t*(-.1) + 3*u*t*t*(.15) + t*t*t*(-D0/2 + .25), by = u*u*u*y1 + 3*u*u*t*(y1 + .1) + 3*u*t*t*(H + 1.15) + t*t*t*(H + .55);
+    pts.push([bx, by]); }
+  lxBand(M.lxWhite, S2, pts, .3, .12, 0);
+  lxBand(M.lxLine, S2, lxOffset(pts, .065), .045, .02, 0);
+  lxCarPad(P, -W0/2 + .02, FH*2 + .14 + .1, -.2, -PI/2);
+  Object.assign(lot, { height: H + .8, floors: levels, occupied: true });
+}
+
 /* ---------- district builders ---------- */
 // Low income: stacked boxes shifted and twisted, overhangs on stilts, bolted-on rooms, stairs, cables and signs everywhere
 function buildTenement(lot, st, P0){
@@ -930,13 +1182,16 @@ function buildShophouse(lot, st, P0){
 // High income: slab towers with neon edges, recessed glass floors and platforms; plus round and twisting towers
 function buildTower(lot, st, P0){
   const v = R();
-  if (v < .11) return roundTower(lot, st, P0);
-  if (v < .2) return twistTower(lot, st, P0);
-  if (v < .36) return gardenTower(lot, st, P0);
-  if (v < .48) return arcBuilding(lot, st, P0);
-  if (v < .62) return platformTower(lot, st, P0);
-  if (v < .86) return glassHotel(lot, st, P0);
-  return slabTower(lot, st, P0);
+  if (v < .08) return roundTower(lot, st, P0);
+  if (v < .15) return twistTower(lot, st, P0);
+  if (v < .26) return gardenTower(lot, st, P0);
+  if (v < .35) return arcBuilding(lot, st, P0);
+  if (v < .45) return platformTower(lot, st, P0);
+  if (v < .63) return glassHotel(lot, st, P0);
+  if (v < .73) return slabTower(lot, st, P0);
+  if (v < .83) return domeTower(lot, st, P0);       // the curved white garden-city buildings
+  if (v < .92) return shellTower(lot, st, P0);
+  return cascadeTerraces(lot, st, P0);
 }
 function slabTower(lot, st, P0){
   let w=rnd(1.9,2.3), d=rnd(1.9,2.3), y=0, fl=0, last=null;

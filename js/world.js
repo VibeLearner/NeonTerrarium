@@ -157,7 +157,7 @@ const glassHotelPodium = (lot, st, P0) => glassHotel(lot, st, P0, 'podium');
 const SECTION_TYPES = {
   low:  { ground: [[buildTenement,6],[podHouse,1.5],[octoHouse,1.2],[deckHouse,1.3]], upper: [[buildTenement,5],[podHouse,2],[octoHouse,1.2]] },
   mid:  { ground: [[buildShophouse,5],[podHouse,2],[octoHouse,1.5],[deckHouse,2],[platformTower,1.3]], upper: [[buildShophouse,4],[podHouse,2],[octoHouse,1],[platformTower,1]] },
-  high: { ground: [[buildTower,1]], upper: [[slabTower,2],[glassHotelTower,1.5],[glassHotelPodium,1],[roundTower,1],[twistTower,1],[gardenTower,1]] },
+  high: { ground: [[buildTower,1]], upper: [[slabTower,2],[glassHotelTower,1.5],[glassHotelPodium,1],[roundTower,1],[twistTower,1],[gardenTower,1],[domeTower,1],[shellTower,1],[cascadeTerraces,.8]] },
   ind:  { ground: [[buildFactory,1]], upper: [[hall,2],[silos,1]] },
 };
 function pickWeighted(list){ const tot = list.reduce((s,[,w]) => s + w, 0); let r = R()*tot; for (const [f,w] of list){ if ((r -= w) <= 0) return f; } return list[0][0]; }

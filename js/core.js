@@ -24,7 +24,11 @@ renderer.shadowMap.type = THREE.BasicShadowMap;
 renderer.shadowMap.autoUpdate = false;
 
 const scene = new THREE.Scene();
-const NEAR = 30, FAR = 125, CAM_DIST = 72, PITCH = 32 * PI/180, TARGET_Y = 2.4;
+// The view is orthographic, so the camera's distance changes nothing on screen; it only sets how deep the drawn
+// slab is. It reaches far in front of and behind the point looked at, so a tall building on the near side of a big
+// city is never clipped away while it's still in frame. (It used to reach 42 units in front and 53 behind, which cut
+// off tall buildings near the camera as the view turned or panned.) Depth stays precise to well under a millimetre.
+const NEAR = 10, FAR = 900, CAM_DIST = 400, PITCH = 32 * PI/180, TARGET_Y = 2.4;
 const cam = new THREE.OrthographicCamera(-1,1,1,-1,NEAR,FAR);
 
 const sun = new THREE.DirectionalLight(0xffffff, 1);

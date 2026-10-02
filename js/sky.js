@@ -79,7 +79,7 @@ const SKY_EL = .3, SKY_H = .5, SKY_TURN = .3;
 const comp = new THREE.ShaderMaterial({
   uniforms: {
     tColor:{value:null}, tDepth:{value:null}, tNormal:{value:null}, res:{value:new THREE.Vector2(1,1)},
-    near:{value:NEAR}, far:{value:FAR}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
+    near:{value:NEAR}, far:{value:FAR}, camDist:{value:CAM_DIST}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
     night:{value:0}, lodLines: LOD.lines, pxK:{value:1}, starOff:{value:new THREE.Vector2()}, skyYaw:{value:0}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
     pal:{value: PAL_HEX.map(h => { const c=new THREE.Color(h); return new THREE.Vector3(c.r,c.g,c.b); })},
     tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, rainOn:{value:0},
@@ -91,7 +91,7 @@ const comp = new THREE.ShaderMaterial({
   fragmentShader: `
     const float SKY_H = ${SKY_H.toFixed(3)}, SKY_EL = ${SKY_EL.toFixed(3)};
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
-    uniform vec2 res; uniform float near; uniform float far;
+    uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
     uniform float night; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
@@ -179,7 +179,7 @@ const comp = new THREE.ShaderMaterial({
         // zoomed out: crease lines inside shapes fade away and silhouettes soften, so the city doesn't turn to noise
         float k = dei > 0.0 ? 1.0 - 0.5*dei*(1.0 - 0.5*lodLines) : 1.0 + 0.4*nei*(1.0 - lodLines);
         col = c.rgb * mix(1.0, k, outlines);
-        col = mix(col, haze, 0.35*smoothstep(near+(far-near)*0.5, far, d));
+        col = mix(col, haze, 0.35*smoothstep(camDist + 5.5, camDist + 53.0, d));   // the far side of the island fades into haze
       }
       // ---- rays through the scene for clouds and light shafts ----
       vec2 ndc = vUv*2.0 - 1.0;
@@ -188,6 +188,7 @@ const comp = new THREE.ShaderMaterial({
       vec3 ro = pn.xyz, seg = pf.xyz - pn.xyz;
       float tEnd = length(seg); vec3 rdir = seg / tEnd;
       float dith = bayer(gl_FragCoord.xy);
+      float DK = 95.0/(far - near);   // depth tolerances below were set for a 95-unit depth range
       // ---- wet ground: bright lights (neon, windows, lamps) leave vertical streaks on wet pavement ----
       // Not a mirror: dull walls barely show, and only crisp puddle patches reflect clearly. No ripples or jitter.
       if (rd < 0.99999 && wet > 0.0 && dot(N(vUv), upView) > 0.93){
@@ -203,7 +204,7 @@ const comp = new THREE.ShaderMaterial({
           vec2 uv = cp.xy*0.5 + 0.5;
           if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
           float sd = texture2D(tDepth, uv).x, qd = cp.z*0.5 + 0.5;
-          if (qd > sd + 0.0003 && qd - sd < 0.015){ huv = uv; hit = 1.0; break; }
+          if (qd > sd + 0.0003*DK && qd - sd < 0.015*DK){ huv = uv; hit = 1.0; break; }
         }
         if (hit > 0.5){
           // smear the reflection downward a few pixels: the streaky look of lights on wet asphalt
@@ -247,8 +248,8 @@ const comp = new THREE.ShaderMaterial({
         vec3 rc = mix(vec3(0.72, 0.8, 0.92), vec3(0.45, 0.55, 0.78), night);
         for (int L=0; L<3; L++){
           float fl = float(L);
-          float layerD = 0.28 + fl*0.17;                                   // near, middle, far
-          if (rd < layerD) continue;                                       // something is in front of this layer
+          float layerD = camDist - 15.4 + fl*16.15;                        // near, middle, far (units from the camera)
+          if (near + rd*(far - near) < layerD) continue;                   // something is in front of this layer
           vec2 p = (gl_FragCoord.xy + rainOff*(1.25 - fl*0.25))*pxK + vec2(fl*311.0, fl*97.0);   // base pixels, like the stars
           p.x += p.y*(0.03 + windR*0.2);                                   // the slant: near straight down when calm, raking in a storm
           float colm = floor(p.x);

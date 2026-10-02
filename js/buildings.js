@@ -2237,8 +2237,8 @@ function luxPalette(h){   // from its own hash, so the towers' own layouts (draw
   // and every strip gets a soft halo of its own, sized to it (the old pink and cyan ones had few)
   const halo = (mat, m) => { const k = kOf.get(mat); if (!k || !glowList) return; const e = m.elements;
     const L = Math.max(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]), Math.hypot(e[8], e[9], e[10]));
-    if (L < .25) return; (glowList[k] || (glowList[k] = [])).push(e[12], e[13], e[14], Math.min(1.5, .4 + L*.4)); };
-  return { mats, glows: { cyan: a.k, pink: b.k, amber: a.k, blue: a.k, orange: b.k, green: a.k }, haloK: 1.6, halo };
+    if (L < .25) return; (glowList[k] || (glowList[k] = [])).push(e[12], e[13], e[14], Math.min(1.0, .3 + L*.25)); };
+  return { mats, glows: { cyan: a.k, pink: b.k, amber: a.k, blue: a.k, orange: b.k, green: a.k }, haloK: 1.2, halo };
 }
 
 /* ---------- industrial lighting ---------- */

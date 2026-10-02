@@ -110,16 +110,29 @@ function batchGroup(datas, withGeo = true){
 function buildPlatform(c){
   R = mulberry32(hash('plat', c.i, c.j));
   const x = c.x, z = c.z, P = T(x, 0, z);
-  box(M.rock, P, 0, -.35, 0, LOT + .02, .6, LOT + .02);
-  const depth = rnd(2.4, 4.6);
-  const g = jitter(new THREE.CylinderGeometry(LOT*.72, rnd(.3,.8), depth, 4, 3), .35, depth/2 - .05).toNonIndexed();
-  g.computeVertexNormals();
-  put(g, M.rock, T(x + rnd(-.25,.25), -.65 - depth/2, z + rnd(-.25,.25), PI/4)); g.dispose();
-  for (let k=0;k<irand(1,3);k++) blob(M.rockDark, P, rnd(-1.4,1.4), rnd(-1.6,-.8), rnd(-1.4,1.4), rnd(.35,.7));
-  if (R() < .35){   // a thruster under this piece
-    const ty = -.65 - depth;
-    cyl(M.metalDark, P, 0, ty - .1, 0, .38, .5); cyl(M.thruster, P, 0, ty - .38, 0, .3, .1);
-    glow(P, 0, ty - .7, 0, 'blue', 2.6);
+  // a flat slab: its underside is plain panelling with seams, and now and then a lift pad, a round thruster housing
+  // with a faint blue glow, so it reads as what holds the piece up
+  box(M.slabSide, P, 0, -.35, 0, LOT + .02, .6, LOT + .02);
+  for (const t of [-LOT/4, 0, LOT/4]){ box(M.slabSeam, P, t, -.655, 0, .04, .02, LOT - .1); box(M.slabSeam, P, 0, -.655, t, LOT - .1, .02, .04); }
+  for (const s2 of [-1, 1]) box(M.slabSeam, P, 0, -.12, s2*(LOT/2 + .012), LOT + .02, .05, .02);
+  for (const s2 of [-1, 1]) box(M.slabSeam, P, s2*(LOT/2 + .012), -.12, 0, .02, .05, LOT + .02);
+  // the lift pads hang near the open edges, where you can see them under the rim from the usual view
+  const open = SIDES4.filter(([a, b]) => !cells.has(ckey(c.i + a, c.j + b)));
+  const corners = CORNERS.filter(([sx, sz]) => open.some(([a, b]) => (a && a === sx) || (b && b === sz)));
+  const pads = corners.length ? (R() < .55 ? 1 : 0) + (corners.length > 2 && R() < .3 ? 1 : 0) : 0;
+  const used = [];
+  for (let k=0; k<pads; k++){
+    let cn; do cn = pick(corners); while (used.includes(cn) && used.length < corners.length); used.push(cn);
+    const px = cn[0]*(LOT/2 - rnd(.55, .65)), pz = cn[1]*(LOT/2 - rnd(.55, .65)), r = rnd(.34, .42);
+    cyl(M.metal, P, px, -.68, pz, r + .16, .06);                       // a collar where it meets the slab
+    cyl(M.metalDark, P, px, -1.05, pz, r, .72);                        // the column, hanging well below the slab
+    for (const y of [-.85, -1.15]) cyl(M.slabSeam, P, px, y, pz, r + .03, .05);   // bands round it
+    put(U.cone, M.metalDark, under(P, T(px, -1.52, pz, 0, 2*(r + .16), .3, 2*(r + .16))));   // the flared pad
+    cyl(M.slabSeam, P, px, -1.68, pz, r + .17, .05);                   // its lip
+    cyl(M.padGlow, P, px, -1.71, pz, r + .08, .03);                    // the emitter face
+    for (let a = 0; a < 4; a++){ const ca = Math.cos(a*PI/2 + PI/4), sa = Math.sin(a*PI/2 + PI/4);
+      strut(M.metalDark, P, px + ca*r, -1.25, pz + sa*r, px + ca*(r + .32), -.66, pz + sa*(r + .32), .05); }   // brackets
+    glow(P, px, -1.75, pz, 'blue', .55 + r*.6); glow(P, px, -2.1, pz, 'cyan', 1.6);   // a small glow on the face, a faint haze below (fainter by day)
   }
   // open edges: railing, vines over the drop, plants along the rim, the odd pipe
   for (const [a,b] of SIDES4){

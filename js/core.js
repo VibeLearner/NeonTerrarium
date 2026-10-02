@@ -72,6 +72,7 @@ const M = {
   neonPink: toon(0x5a1d3a,{em:0xFF4FA3, kind:'neon'}), neonCyan: toon(0x145452,{em:0x38E8E0, kind:'neon'}), neonAmber: toon(0x5a3e18,{em:0xFFB347, kind:'neon'}),
   trimCyan: toon(0x2a5452,{em:0x7FE8E0, kind:'trim'}),
   thruster: toon(0x1a3050,{em:0x5ab8ff, kind:'thruster'}),
+  padGlow: toon(0x16243a,{em:0x2f6aa8, kind:'thruster'}), slabSide: toon(0x4c505a), slabSeam: toon(0x353840),
   cloth1: toon(0xFF7FB0), cloth2: toon(0xEEF0EE), cloth3: toon(0x6fa8dc), cloth4: toon(0xF6B35C),
   awn1: toon(0xc95a7a), awn2: toon(0x3f8f8a), awn3: toon(0xd98b3a),
   crate: toon(0x9a7a52), veg1: toon(0x8FA04A,{flat:1}), veg2: toon(0xF6B35C,{flat:1}), veg3: toon(0xd9534f,{flat:1}),

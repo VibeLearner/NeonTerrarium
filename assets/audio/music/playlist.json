@@ -8,6 +8,10 @@
     "title": "ASCII Cyphers"
   },
   {
+    "file": "Clues.mp3",
+    "title": "Clues"
+  },
+  {
     "file": "Deck Check.mp3",
     "title": "Deck Check"
   },
@@ -56,11 +60,23 @@
     "title": "Sleeping Pods"
   },
   {
+    "file": "Stimshot.mp3",
+    "title": "Stimshot"
+  },
+  {
+    "file": "Supersonic.mp3",
+    "title": "Supersonic"
+  },
+  {
     "file": "The Great Filter.mp3",
     "title": "The Great Filter"
   },
   {
     "file": "Waveforms.mp3",
     "title": "Waveforms"
+  },
+  {
+    "file": "Yanbo Duzou.mp3",
+    "title": "烟波独奏"
   }
 ]

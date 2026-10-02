@@ -16,6 +16,7 @@ function frame(now){
   if (S.cycle) S.hour = (S.hour + rdt*24/3600) % 24;
   last = now;
   const night = applyTime();
+  FLUID_NIGHT.value = night;   // the pipes' liquids glow after dark
   syncTimeUI();
   updateCars(now/1000);
   updateDrones(dt, now/1000, night);

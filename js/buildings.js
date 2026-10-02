@@ -1321,34 +1321,51 @@ function pipeSeg(mat, P, ax, ay, az, bx, by, bz, r){
 // ripples and bubbles slide along it over time. The pattern comes from each pixel's world position (x + y + z grows
 // along any pipe, whichever way it runs), so nothing moves on the CPU and nothing is updated per frame; all the fluid
 // in a region is a single draw. Brightness is stepped, so it stays pixel art.
-M.fluid = new THREE.ShaderMaterial({
-  uniforms: { time: FOL_UNI.time },
-  vertexShader: 'varying vec3 vW; varying vec3 vN; void main(){ vec4 w = modelMatrix*vec4(position, 1.0); vW = w.xyz; vN = normalize(mat3(modelMatrix)*normal); gl_Position = projectionMatrix*viewMatrix*w; }',
-  fragmentShader: `uniform float time; varying vec3 vW; varying vec3 vN;
-    float h1(float n){ return fract(sin(n*12.9898)*43758.5453); }
-    void main(){
-      float s = vW.x + vW.y + vW.z, t = time;
-      float band = .5 + .5*sin(s*7.0 - t*4.2);                       // slow surges
-      float rip = .5 + .5*sin(s*19.0 - t*7.5 + sin(s*2.3 + t)*1.6);  // ripples riding on them
-      float cell = floor(s*11.0 - t*6.5), bub = step(.86, h1(cell))*step(.35, fract(s*11.0 - t*6.5));   // bubbles
-      float k = .12 + .42*band*band + .2*rip*band + .6*bub + .1*max(vN.y, 0.0);   // mostly deep blue, with bright surges
-      k = floor(k*5.0 + .5)/5.0;
-      vec3 deep = vec3(.02, .14, .48), mid = vec3(.06, .5, .92), hi = vec3(.62, .97, 1.0);
-      vec3 c = k < .5 ? mix(deep, mid, k*2.0) : mix(mid, hi, k*2.0 - 1.0);
-      gl_FragColor = vec4(c, 1.0);
-    }`,
-});
+// Three liquids: blue, dark green and brown. By day they're just coloured liquid; at night they glow softly, like
+// something bioluminescent, with a slow breathing pulse and brighter surges (FLUID_NIGHT follows the hour).
+const FLUID_NIGHT = { value: 0 };
+function fluidMat(deep, mid, hi, glowC){
+  return new THREE.ShaderMaterial({
+    uniforms: { time: FOL_UNI.time, night: FLUID_NIGHT },
+    vertexShader: 'varying vec3 vW; varying vec3 vN; void main(){ vec4 w = modelMatrix*vec4(position, 1.0); vW = w.xyz; vN = normalize(mat3(modelMatrix)*normal); gl_Position = projectionMatrix*viewMatrix*w; }',
+    fragmentShader: `uniform float time; uniform float night; varying vec3 vW; varying vec3 vN;
+      float h1(float n){ return fract(sin(n*12.9898)*43758.5453); }
+      void main(){
+        float s = vW.x + vW.y + vW.z, t = time;
+        float band = .5 + .5*sin(s*7.0 - t*4.2);                       // slow surges
+        float rip = .5 + .5*sin(s*19.0 - t*7.5 + sin(s*2.3 + t)*1.6);  // ripples riding on them
+        float cell = floor(s*11.0 - t*6.5), bub = step(.86, h1(cell))*step(.35, fract(s*11.0 - t*6.5));   // bubbles
+        float k = .12 + .42*band*band + .2*rip*band + .6*bub + .1*max(vN.y, 0.0);
+        k = floor(k*5.0 + .5)/5.0;
+        vec3 c = k < .5 ? mix(vec3${deep}, vec3${mid}, k*2.0) : mix(vec3${mid}, vec3${hi}, k*2.0 - 1.0);
+        // night: a soft glow from within, breathing slowly, the surges lit up most
+        float pulse = .85 + .15*sin(t*1.3 + s*.6);
+        vec3 lit = c*(.75 + .55*k)*pulse + vec3${glowC}*(.18 + .35*band*band)*pulse;
+        c = mix(c*.9, lit, night);
+        gl_FragColor = vec4(floor(c*24.0 + .5)/24.0, 1.0);
+      }`,
+  });
+}
+const FLUIDS = [
+  fluidMat('(.02, .14, .48)', '(.06, .5, .92)', '(.62, .97, 1.0)', '(.1, .5, .9)'),      // blue
+  fluidMat('(.02, .12, .06)', '(.06, .32, .14)', '(.42, .78, .4)', '(.12, .55, .25)'),   // dark green
+  fluidMat('(.12, .06, .02)', '(.34, .19, .07)', '(.74, .52, .26)', '(.5, .3, .1)'),     // brown
+];
+const FLUID_GLOW = ['cyan', 'green', 'amber'];
+M.fluid = FLUIDS[0];
 // a glass section of pipe: the glowing core, a glass sleeve, copper collars at the ends and along it
+let FLUID_PICK = 0;   // which liquid the current pipe run carries (set per run in pipeRun)
 function fluidSeg(mat, P, ax, ay, az, bx, by, bz, r){
   const len = Math.hypot(bx - ax, by - ay, bz - az), L = (u, q) => [ax + (bx - ax)*u, ay + (by - ay)*u, az + (bz - az)*u][q];
-  pipeSeg(M.fluid, P, ax, ay, az, bx, by, bz, r*.8);
+  pipeSeg(FLUIDS[FLUID_PICK], P, ax, ay, az, bx, by, bz, r*.8);
   pipeSeg(M.lxGlass, P, ax, ay, az, bx, by, bz, r*1.02);
   const n = Math.max(1, Math.round(len/1.0));
   for (let k=0; k<=n; k++){ const u = k/n, du = Math.min(.5, .05/len); const u0 = Math.max(0, u - du), u1 = Math.min(1, u + du);
     pipeSeg(k % n === 0 ? mat : M.inPipe2, P, L(u0, 0), L(u0, 1), L(u0, 2), L(u1, 0), L(u1, 1), L(u1, 2), r*1.32); }
-  for (let u = .5/n; u < 1; u += 1/n) glow(P, L(u, 0), L(u, 1), L(u, 2), 'cyan', .45 + r*2);
+  for (let u = .5/n; u < 1; u += 1/n) glow(P, L(u, 0), L(u, 1), L(u, 2), FLUID_GLOW[FLUID_PICK], .4 + r*2);
 }
 function pipeRun(mat, P, pts, r, flanges = true, glass = 0){
+  if (glass) FLUID_PICK = Math.floor(R()*FLUIDS.length);   // one liquid per run
   for (let k=0; k<pts.length - 1; k++){
     const [ax, ay, az] = pts[k], [bx, by, bz] = pts[k + 1];
     if (glass && Math.hypot(bx - ax, by - ay, bz - az) > .45 && chance(glass)){ fluidSeg(mat, P, ax, ay, az, bx, by, bz, r); if (k > 0) sph(mat, P, ax, ay, az, r*1.25); continue; }

@@ -262,11 +262,11 @@ const FOL_ATLAS = (() => {
   return { tex, size: new THREE.Vector2(AW, AH) };
 })();
 const FOL_SHADER = new THREE.ShaderMaterial({
-    uniforms: { lodPlants: LOD.plants, map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind },
-    vertexShader: `uniform vec2 res; uniform float time; uniform float lodPlants; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind;
-      varying vec2 vUv; varying float vShade; varying vec4 vRect; varying vec2 vKind; varying float vFlk;` + FLK_GLSL + `
+    uniforms: { lightsOn: LIGHTS_ON, lodPlants: LOD.plants, map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind },
+    vertexShader: `uniform vec2 res; uniform float time; uniform float lodPlants; uniform float lightsOn; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind; attribute float aOn;
+      varying vec2 vUv; varying float vShade; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn;` + FLK_GLSL + LIT_GLSL + `
       void main(){
-        vShade = aVar.z; vRect = aRect; vKind = aKind;
+        vShade = aVar.z; vRect = aRect; vKind = aKind; vOn = aKind.y > 0.5 ? litOn(aOn, lightsOn, time) : 1.0;
         // about one lit sign in ten flickers (picked from its random phase)
         vFlk = aVar.w > 99.0 ? flicker(200.0 + floor(fract(aVar.w*7.13)*54.0), time) : (aKind.y > 0.5 && fract(aVar.w*3.71) < 0.1) ? flicker(1.0 + floor(fract(aVar.w*7.13)*198.0), time) : 1.0;
         vec2 texSize = aRect.zw; float swayType = aKind.x;
@@ -296,7 +296,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
     side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
     fragmentShader: `uniform sampler2D map; uniform vec2 atlasSize; uniform vec3 tint; uniform float normalMode; uniform float neonI;
       uniform float time; uniform float wind;
-      varying vec2 vUv; varying float vShade; varying float vPhase; varying vec4 vRect; varying vec2 vKind; varying float vFlk;
+      varying vec2 vUv; varying float vShade; varying float vPhase; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn;
       void main(){
         vec2 texSize = floor(vRect.zw + 0.5); float swayType = vKind.x;
         vec2 tx = vUv * texSize;                 // position in texels
@@ -315,7 +315,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
         if (c.a < 0.5) discard;
         vec3 col = c.rgb*tint*vShade;
         // neon tubes light themselves; the dark backing board takes the scene light
-        if (vKind.y > 0.5 && dot(c.rgb, vec3(0.333)) > 0.35) col = c.rgb*neonI*max(vFlk, 0.3);
+        if (vKind.y > 0.5 && dot(c.rgb, vec3(0.333)) > 0.35) col = mix(c.rgb*tint*vShade*.55, c.rgb*neonI*max(vFlk, 0.3), vOn);   // switched off: just painted letters
         gl_FragColor = normalMode > 0.5 ? vec4(0.5,0.5,1.0,1.0) : vec4(col, 1.0);
       }`,
 });
@@ -428,7 +428,7 @@ const hangKind = () => pick(HANGING);
 function buildFoliage(){
   let n = 0; for (const kind in FOL_LIST) n += FOL_LIST[kind].length;
   if (!n) return;
-  const geo = new THREE.PlaneGeometry(1,1), attr = new Float32Array(n*4), fx = new Float32Array(n), rect = new Float32Array(n*4), kd = new Float32Array(n*2);
+  const geo = new THREE.PlaneGeometry(1,1), attr = new Float32Array(n*4), fx = new Float32Array(n), rect = new Float32Array(n*4), kd = new Float32Array(n*2), ons = new Float32Array(n);
   const mesh = new THREE.InstancedMesh(geo, FOL_SHADER, n);
   let i = 0;
   for (const kind in FOL_LIST){
@@ -437,13 +437,13 @@ function buildFoliage(){
     for (const p of L){
       mesh.setMatrixAt(i, p.m);
       attr[i*4] = p.an; attr[i*4+1] = p.flip; attr[i*4+2] = p.shade; attr[i*4+3] = p.phase; fx[i] = p.fixed;
-      rect.set(r, i*4); kd[i*2] = sw; kd[i*2+1] = em; i++;
+      rect.set(r, i*4); kd[i*2] = sw; kd[i*2+1] = em; ons[i] = em ? litOrder(p.m.elements[12], p.m.elements[13], p.m.elements[14])/255 : 0; i++;
     }
   }
   geo.setAttribute('aVar', new THREE.InstancedBufferAttribute(attr,4));
   geo.setAttribute('aFixed', new THREE.InstancedBufferAttribute(fx,1));
   geo.setAttribute('aRect', new THREE.InstancedBufferAttribute(rect,4));
-  geo.setAttribute('aKind', new THREE.InstancedBufferAttribute(kd,2));
+  geo.setAttribute('aKind', new THREE.InstancedBufferAttribute(kd,2)); geo.setAttribute('aOn', new THREE.InstancedBufferAttribute(ons,1));
   mesh.layers.set(2); mesh.frustumCulled = false;
   city.add(mesh);
 }
@@ -462,8 +462,8 @@ const GLOW_PTS_UNI = { scale:{ value: 20 } };
 // every glow colour in one batch: each point carries its colour, and whether it brightens at night
 const GLOW_NIGHT = { value: 1 };
 const GLOW_PTS = new THREE.ShaderMaterial({
-  uniforms: { map:{ value: glowTex }, nightOp: GLOW_NIGHT, scale: GLOW_PTS_UNI.scale, time: FOL_UNI.time },
-  vertexShader: 'attribute float size; attribute vec4 aCol; attribute float aFlk; uniform float scale; uniform float nightOp; uniform float time; varying vec4 vCol;' + FLK_GLSL + BLINK_GLSL + ' void main(){ float op = aCol.a < -1.5 ? mix(0.04, 1.0, blink(position.y, time)) : (aCol.a < 0.0 ? nightOp : aCol.a); vCol = vec4(aCol.rgb, op * flicker(aFlk, time)); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale; }',
+  uniforms: { map:{ value: glowTex }, nightOp: GLOW_NIGHT, scale: GLOW_PTS_UNI.scale, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
+  vertexShader: 'attribute float size; attribute vec4 aCol; attribute float aFlk; attribute float aOn; uniform float scale; uniform float nightOp; uniform float time; uniform float lightsOn; varying vec4 vCol;' + FLK_GLSL + BLINK_GLSL + LIT_GLSL + ' void main(){ float op = aCol.a < -1.5 ? mix(0.04, 1.0, blink(position.y, time)) : (aCol.a < 0.0 ? nightOp*litOn(aOn, lightsOn, time) : aCol.a); vCol = vec4(aCol.rgb, op * flicker(aFlk, time)); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale; }',
   fragmentShader: 'uniform sampler2D map; varying vec4 vCol; void main(){ float a = texture2D(map, gl_PointCoord).a; gl_FragColor = vec4(vCol.rgb, a * vCol.a); }',
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
 });
@@ -471,18 +471,18 @@ const GLOW_FIXED = { red: .95, blue: .85 };
 const GLOW_FLK = { pink: 'neon', cyan: 'neon', amber: 'neon', warm: 'bulb', orange: 'neon' };   // halos flicker at the same odds as their kind of light
 function glowPoints(gl){
   let n = 0; for (const k in gl) n += gl[k].length/4;
-  const pos = new Float32Array(n*3), size = new Float32Array(n), col = new Float32Array(n*4), flk = new Float32Array(n);
+  const pos = new Float32Array(n*3), size = new Float32Array(n), col = new Float32Array(n*4), flk = new Float32Array(n), ons = new Float32Array(n);
   let i = 0;
   for (const k in gl){
     const arr = gl[k], c = GLOW[k].color, op = k === 'blink' ? -2 : GLOW_FIXED[k] !== undefined ? GLOW_FIXED[k] : -1;
     for (let q=0;q<arr.length;q+=4, i++){
       pos[i*3] = arr[q]; pos[i*3+1] = arr[q+1]; pos[i*3+2] = arr[q+2]; size[i] = Math.abs(arr[q+3]);
       col[i*4] = c.r; col[i*4+1] = c.g; col[i*4+2] = c.b; col[i*4+3] = op;
-      flk[i] = arr[q+3] < 0 ? heavyFlickerId() : flickerId(GLOW_FLK[k]);
+      flk[i] = arr[q+3] < 0 ? heavyFlickerId() : flickerId(GLOW_FLK[k]); ons[i] = litOrder(arr[q], arr[q+1], arr[q+2])/255;
     }
   }
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('size', new THREE.BufferAttribute(size, 1)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 4)); g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1));
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('size', new THREE.BufferAttribute(size, 1)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 4)); g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1));
   g.computeBoundingSphere();
   const pts = new THREE.Points(g, GLOW_PTS); pts.layers.set(1); pts.layers.enable(4); pts.frustumCulled = false; return pts;   // layer 4: the night-light pass (sky.js)
 }

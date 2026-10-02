@@ -100,6 +100,7 @@ function applyTime(){
     const g = m.userData.glow; if (!g) continue;
     m.emissiveIntensity = g==='window' ? .22+1.1*night : g==='bulb' ? .3+1.2*night : g==='neon' ? .6+1.0*night : g==='trim' ? .45+.9*night : 1.3;
   }
+  LIGHTS_ON.value = night;   // the evening's progress: lights switch on one by one as it rises (see LIGHTS_ON)
   { const e = EM_I.value; e[1] = .22+1.1*night; e[2] = .3+1.2*night; e[3] = .6+1.0*night; e[4] = .45+.9*night; e[5] = 1.3; e[6] = 1.5+.4*night; }
   for (const k of ['pink','cyan','amber','warm']) GLOW[k].opacity = .1 + .8*night;
   GLOW.red.opacity = .95;
@@ -739,16 +740,16 @@ function renderGlow(){
 // how much of the screen the light pools cover, not on how many lights there are. A light just off screen still lights
 // what's on screen: its square is pulled to the screen's edge (never further from any lit pixel than its centre was).
 // Flicker, blinking beacons and dark streets come with the glow points. Only after dusk.
-const NL_UNI = { scale: { value: 10 }, time: FOL_UNI.time, res: { value: new THREE.Vector2(1, 1) }, invVP: comp.uniforms.invVP,
+const NL_UNI = { lightsOn: LIGHTS_ON, scale: { value: 10 }, time: FOL_UNI.time, res: { value: new THREE.Vector2(1, 1) }, invVP: comp.uniforms.invVP,
                  tDepth: { value: null }, tNormal: { value: null }, lightI: { value: 0 } };
 const nightLightMat = new THREE.ShaderMaterial({
   uniforms: NL_UNI,
-  vertexShader: `attribute float size; attribute vec4 aCol; attribute float aFlk; uniform float scale; uniform float time;
-    varying vec3 vL; varying vec3 vC; varying float vR;` + FLK_GLSL + BLINK_GLSL + `
+  vertexShader: `attribute float size; attribute vec4 aCol; attribute float aFlk; attribute float aOn; uniform float scale; uniform float time; uniform float lightsOn;
+    varying vec3 vL; varying vec3 vC; varying float vR;` + FLK_GLSL + BLINK_GLSL + LIT_GLSL + `
     void main(){
       vec4 w = modelMatrix*vec4(position, 1.0); vL = w.xyz;
       float R = clamp(size*2.4, 1.4, 5.0); vR = R;   // a wide reach, so the pools read
-      float op = aCol.a < -1.5 ? mix(.05, 1.0, blink(w.y, time)) : 1.0;
+      float op = aCol.a < -1.5 ? mix(.05, 1.0, blink(w.y, time)) : aCol.a < 0.0 ? litOn(aOn, lightsOn, time) : 1.0;
       vC = aCol.rgb*op*flicker(aFlk, time);
       vec4 cp = projectionMatrix*viewMatrix*w; cp.xyz /= cp.w;
       gl_Position = vec4(clamp(cp.xy, -1.0, 1.0), 0.0, 1.0);   // pulled onto the screen if it's just off it

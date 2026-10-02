@@ -47,6 +47,17 @@ const gData = new Uint8Array([72,72,72,255, 150,150,150,255, 255,255,255,255]);
 const gradTex = new THREE.DataTexture(gData, 3, 1, THREE.RGBAFormat);
 gradTex.minFilter = gradTex.magFilter = THREE.NearestFilter; gradTex.generateMipmaps = false; gradTex.needsUpdate = true;
 const ALL_MATS = [];
+// Lights come on one by one as evening falls (and go off one by one at dawn). Each light gets a switch-on point
+// from where it stands, hashed by a cell of about one room; it's lit once LIGHTS_ON (the evening, 0 by day to 1 at
+// night) passes it. A lamp, its halo and the light it throws share a cell, so they come on together.
+const LIGHTS_ON = { value: 1 };
+const LIT_GLSL = `
+  float litOn(float thr, float lv, float tm){
+    float dv = lv - thr, on = clamp(dv*40.0, 0.0, 1.0);
+    if (dv > 0.0 && dv < 0.04) on *= step(0.4, fract(sin(thr*917.3 + floor(tm*9.0))*43758.5453));   // a stutter as it catches
+    return on;
+  }`;
+function litOrder(x, y, z){ let h = Math.imul(Math.floor(x/.9), 73856093) ^ Math.imul(Math.floor(y/.95), 19349663) ^ Math.imul(Math.floor(z/.9), 83492791); h = Math.imul(h ^ (h >>> 15), 2246822519); h ^= h >>> 13; return 46 + ((h >>> 0) % 185); }   // a byte: .18 to .9 of the way into the evening
 const EM_KIND = { window:1, bulb:2, neon:3, trim:4, blink:6 };   // anything else that glows is kind 5 (fixed brightness)
 const EM_I = { value: [0, .22, .3, .6, .45, 1.3, 1.7] };
 // Aircraft-warning lights: red lights that blink on and off together, with the blink travelling up the height of
@@ -146,9 +157,9 @@ const DARK_SUB = { window: toon(0x22303f), bulb: toon(0x3d3226), neon: toon(0x2a
 const posHash = (x, y, z) => hash('lit', Math.round(x*20), Math.round(y*20), Math.round(z*20)) % 100;
 function put(geo, mat, m){
   if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && posHash(m.elements[12], m.elements[13], m.elements[14]) < 82) mat = DARK_SUB[mat.userData.glow];
-  let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
+  let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null, o: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
   const fid = b.f ? (DARK && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow)) : 0;
-  const did = b.f ? 0 : detailId(geo, m);   // lights are never dropped: they carry the look from far away
+  const did = b.f ? 0 : detailId(geo, m), ord = b.f ? litOrder(m.elements[12], m.elements[13], m.elements[14]) : 0;   // lights are never dropped: they carry the look from far away
   const P = geo.attributes.position.array, N = geo.attributes.normal ? geo.attributes.normal.array : null, idx = geo.index ? geo.index.array : null;
   const e = m.elements, ne = _nm.getNormalMatrix(m).elements, bp = b.p, bn = b.n;
   const cnt = idx ? idx.length : P.length/3;
@@ -159,7 +170,7 @@ function put(geo, mat, m){
       const nx = ne[0]*a + ne[3]*c + ne[6]*d, ny = ne[1]*a + ne[4]*c + ne[7]*d, nz = ne[2]*a + ne[5]*c + ne[8]*d, l = Math.hypot(nx, ny, nz) || 1;
       bn.push(nx/l, ny/l, nz/l); }
     else bn.push(0, 1, 0);
-    if (b.f) b.f.push(fid);
+    if (b.f){ b.f.push(fid); b.o.push(ord); }
     b.d.push(did);
   }
 }

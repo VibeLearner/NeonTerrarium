@@ -212,7 +212,8 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
               T:['111','010','010','010','010'], '2':['111','001','111','100','111'], '4':['101','101','111','001','001'], '.':['0','0','1','0','0'], ' ':['0','0','0','0','0'],
               N:['1001','1101','1011','1001','1001'], O:['111','101','101','101','111'], D:['110','101','101','101','110'], F:['111','100','110','100','100'],
               X:['101','101','010','101','101'], K:['101','101','110','101','101'], Y:['101','101','010','010','010'], '-':['000','000','111','000','000'],
-              M:['10001','11011','10101','10001','10001'] };
+              M:['10001','11011','10101','10001','10001'], W:['10001','10001','10101','11011','10001'], '1':['010','110','010','010','111'],
+              '5':['111','100','111','001','111'], Z:['111','001','010','100','111'] };
   const make = (kind, text, col, deco) => {
     const ws = [...text].map(ch => F[ch][0].length), tw = ws.reduce((a, b) => a + b + 1, -1), pad = deco ? 5 : 3, w = tw + 2*pad, h = 9;
     const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
@@ -230,6 +231,8 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
   make('sign_w_fixit', 'FIX-IT', '#ffe04a'); make('sign_w_stitch', 'STITCH', '#5ae8ff'); make('sign_w_tea', 'ROOF.TEA', '#5af0d0');
   make('sign_w_ramen', 'RAMEN', '#ff6a9a', true); make('sign_w_noodles', 'NOODLES', '#ffd060'); make('sign_w_noodlesP', 'NOODLES', '#ff7ab0');
   make('sign_w_hot', 'HOT.CHEAP', '#ffb04a'); make('sign_w_24h', '24H', '#ff5a8a', true);
+  // the radio station's relay: equipment plates
+  make('sign_w_satcom', 'SATCOM 12-A', '#ffd060'); make('sign_w_mlink', 'MLINK 5GHZ', '#5ae8ff'); make('sign_w_mw', 'MW 5GHZ', '#ff8a5a');
 })();
 // All sprites share one texture atlas and one material, so a whole region's plants, laundry and signs
 // are a single instanced draw call. The layout is computed from the known sizes right away; each image is

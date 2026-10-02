@@ -194,6 +194,193 @@ function dish(P, x, y, z, r, yaw, tilt, light){
 function beaconLight(P, x, y, z, s = .07, g = .8){ box(M.blink, P, x, y, z, s, s, s); glow(P, x, y, z, 'blink', g); }
 M.blink = toon(0x3a0c0c, { em:0xff2020, kind:'blink' });
 
+/* ---------- live screens: waveforms, oscilloscopes, spectra, scrolling data, a radar sweep, status LEDs ---------- */
+// Each screen is a quad in the ordinary geometry buckets carrying uvs: u's whole part picks the screen's program
+// (and a seed), the fraction is the position across it. One material animates every screen in the city from the
+// shared clock, drawn on a coarse pixel grid with scanlines so it reads as a little CRT.
+const SCREEN_MAT = new THREE.ShaderMaterial({
+  uniforms: { time: FOL_UNI.time },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform float time; varying vec2 vUv;
+    float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
+    void main(){
+      float id = floor(vUv.x + 1e-4), kind = mod(id, 6.0), seed = floor(id/6.0);
+      vec2 uv = vec2(vUv.x - id, vUv.y), res = vec2(30.0, 20.0), q = (floor(uv*res) + .5)/res;
+      float t = time + seed*7.31;
+      vec3 ink = mod(seed, 3.0) < 1.0 ? vec3(.35, 1.0, .55) : mod(seed, 3.0) < 2.0 ? vec3(.3, .9, 1.0) : vec3(1.0, .72, .3);
+      vec3 c = vec3(.015, .04, .03);
+      if (mod(floor(uv.x*res.x), 6.0) < 1.0 || mod(floor(uv.y*res.y), 5.0) < 1.0) c += ink*.06;   // graticule
+      if (kind < .5){          // incoming signal: a travelling wave that swells in bursts, with noise riding on it
+        float amp = .08 + .3*smoothstep(.2, .9, abs(sin(t*.45)))*(.6 + .4*sin(q.x*2.0 - t));
+        float y = .5 + amp*sin(q.x*19.0 - t*7.0)*sin(q.x*3.3 + t*1.4) + .09*(h21(vec2(floor(q.x*res.x - t*24.0), seed)) - .5)*amp*3.0;
+        if (abs(q.y - y) < 1.1/res.y) c = ink;
+      } else if (kind < 1.5){  // oscilloscope: a slowly turning Lissajous figure
+        float d = 9.0;
+        for (int i=0; i<48; i++){ float s = float(i)/48.0*6.2832; vec2 p = .5 + vec2(.4*sin(3.0*s + t*.9), .4*sin(2.0*s + t*.6 + seed));
+          d = min(d, length((q - p)*res)); }
+        if (d < 1.0) c = ink; else if (abs(q.x - .5) < .5/res.x || abs(q.y - .5) < .5/res.y) c += ink*.15;
+      } else if (kind < 2.5){  // spectrum bars bouncing
+        float bi = floor(q.x*10.0), hgt = .12 + .8*abs(sin(t*2.1 + bi*1.7 + seed))*(.45 + .55*h21(vec2(bi, floor(t*7.0))));
+        if (q.y < hgt && fract(q.x*10.0) < .7) c = q.y > .78 ? vec3(1.0, .35, .3) : ink;
+      } else if (kind < 3.5){  // packets arriving: rows of data scrolling up, the newest line flashing
+        float rows = 7.0, row = floor(q.y*rows + t*2.5), col = floor(q.x*12.0);
+        if (h21(vec2(col, row + seed*13.0)) > .42 && fract(q.x*12.0) > .25) c = ink*(row == floor(t*2.5) ? 1.0 : .7);
+      } else if (kind < 4.5){  // a radar sweep with blips that fade behind it
+        vec2 p = (q - .5)*vec2(res.x/res.y, 1.0); float r = length(p), a = atan(p.y, p.x) + 3.1416, sw = mod(t*1.8, 6.2832), da = mod(sw - a, 6.2832);
+        if (r < .46) c += ink*.7*exp(-da*2.2);
+        if (abs(r - .46) < .03 || abs(r - .25) < .02) c = max(c, ink*.45);
+        vec2 cell = floor(p*6.0); if (h21(cell + seed) > .93 && r < .45) c = max(c, ink*exp(-da*.8));
+      } else {                 // status panel: LEDs ticking over at their own rates
+        vec2 g = floor(uv*vec2(8.0, 4.0)), f = fract(uv*vec2(8.0, 4.0));
+        float on = step(.45, h21(g + floor(t*(1.5 + h21(g)*7.0))));
+        if (length(f - .5) < .3) c = on > .5 ? (h21(g + 3.0) < .2 ? vec3(1.0, .3, .2) : vec3(.3, 1.0, .45)) : vec3(.04, .1, .06);
+      }
+      c *= .82 + .18*step(.5, fract(uv.y*res.y*.5));   // scanlines
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+});
+let SCREEN_SEQ = 0;
+// a live screen on a face: F's local z points out of the face; kind 0-5 picks the program
+const _scA = new THREE.Vector3(), _scB = new THREE.Vector3(), _scN = new THREE.Vector3();
+function screenQuad(F, x, y, z, w, h, kind){
+  const id = (kind % 6) + 6*(SCREEN_SEQ++ % 97);
+  let b = buckets.get(SCREEN_MAT); if (!b){ b = { p: [], n: [], d: [], f: null, u: [] }; buckets.set(SCREEN_MAT, b); }
+  const C = [[-w/2, -h/2, 0, 0], [w/2, -h/2, 1, 0], [w/2, h/2, 1, 1], [-w/2, h/2, 0, 1]];
+  _scN.set(0, 0, 1).transformDirection(F);
+  for (const k of [0, 1, 2, 0, 2, 3]){
+    const [cx, cy, u, v] = C[k]; _scA.set(x + cx, y + cy, z).applyMatrix4(F);
+    b.p.push(_scA.x, _scA.y, _scA.z); b.n.push(_scN.x, _scN.y, _scN.z); b.u.push(id + Math.min(u, .999), v); b.d.push(0);
+  }
+}
+// a monitor: a dark bezel box with a live screen on its front (F: z out of the front)
+function monitor(F, x, y, z, w, h, kind, crt){
+  box(M.metalDark, F, x, y, z - (crt ? .12 : .03), w + .06, h + .06, crt ? .26 : .06);
+  if (crt) box(M.metalDark, F, x, y - .02, z - .26, w*.6, h*.6, .14);
+  screenQuad(F, x, y, z + .005, w, h, kind);
+}
+M.coax = toon(0x141519);
+// a bundle of thick black coax: a few cables side by side along the same path, offset sideways
+function coaxBundle(P, pts, n = 3, r = .03){
+  for (let k=0; k<n; k++){
+    const o = (k - (n - 1)/2)*r*2.3;
+    const shifted = pts.map(([x, y, z], i) => {
+      const [nx, , nz] = pts[Math.min(i + 1, pts.length - 1)], [px, , pz] = pts[Math.max(i - 1, 0)];
+      const dx = nx - px, dz = nz - pz, L = Math.hypot(dx, dz) || 1;
+      return [x - dz/L*o, y + (k % 2)*r*.6, z + dx/L*o];
+    });
+    pipeRun(M.coax, P, shifted, r, false);
+  }
+}
+// a rusted lattice comms tower: four tapering legs with X bracing and rings, a platform, Yagi-Uda arrays at the top,
+// cellular panels round the upper section and microwave horns lower down
+M.towerRust = toon(0x7a3e26); M.towerRust2 = toon(0x5a2e1e);
+function yagi(P, x, y, z, yaw, len = .9){
+  const Q = under(P, T(x, y, z, yaw));
+  box(M.metal, Q, 0, 0, len/2, .03, .03, len);
+  for (let k=0; k<7; k++){ const e = k === 1 ? .42 : .34 - k*.025; box(M.white2, Q, 0, 0, .08 + k*(len - .1)/6, e, .018, .018); }
+}
+function hornAntenna(P, x, y, z, yaw){
+  const Q = under(P, T(x, y, z, yaw));
+  put(U.cone, M.white2, under(Q, T(0, 0, .18, 0, .26, .32, .26, -PI/2)));   // the flared horn, mouth out
+  put(U.cyl16, M.metal, under(Q, T(0, 0, -.04, 0, .1, .18, .1, PI/2)));      // the feed
+  box(M.frame, Q, 0, -.13, .05, .04, .12, .3);
+}
+function latticeTower(P, x, y0, z, h, b0, b1){
+  const legs = [[1,1],[1,-1],[-1,-1],[-1,1]], half = y => b0 + (b1 - b0)*(y/h);
+  for (const [sx, sz] of legs) strut(M.towerRust, P, x + sx*b0, y0, z + sz*b0, x + sx*b1, y0 + h, z + sz*b1, .05);
+  for (let y = 0, lvl = 0; y < h - .01; y += .45, lvl++){
+    const y2 = Math.min(h, y + .45), w1 = half(y), w2 = half(y2);
+    for (let k=0; k<4; k++){
+      const [ax, az] = legs[k], [cx, cz] = legs[(k + 1)%4];
+      strut(M.towerRust2, P, x + ax*w2, y0 + y2, z + az*w2, x + cx*w2, y0 + y2, z + cz*w2, .025);
+      strut(M.towerRust2, P, x + ax*w1, y0 + y, z + az*w1, x + cx*w2, y0 + y2, z + cz*w2, .015);
+      strut(M.towerRust2, P, x + cx*w1, y0 + y, z + cz*w1, x + ax*w2, y0 + y2, z + az*w2, .015);
+    }
+  }
+  const pt = y0 + h*.62, pw = half(h*.62) + .18;   // a small platform with a rail
+  box(M.metalDark, P, x, pt, z, 2*pw, .04, 2*pw);
+  for (const [sx, sz] of legs) box(M.towerRust, P, x + sx*pw, pt + .14, z + sz*pw, .02, .28, .02);
+  for (let k=0; k<4; k++){ const [ax, az] = legs[k], [cx, cz] = legs[(k + 1)%4]; strut(M.towerRust, P, x + ax*pw, pt + .28, z + az*pw, x + cx*pw, pt + .28, z + cz*pw, .015); }
+  const top = y0 + h;
+  cyl(M.metal, P, x, top + .5, z, .025, 1.0);
+  for (let k=0; k<3; k++){ const a = rnd(0, TAU); yagi(P, x + Math.sin(a)*b1, top - .1 - k*.28, z + Math.cos(a)*b1, a, rnd(.7, 1.0)); }
+  for (let k=0; k<3; k++){ const a = k*TAU/3 + rnd(-.2, .2), r = half(h*.8) + .07, F = under(P, T(x + Math.sin(a)*r, y0 + h*.8, z + Math.cos(a)*r, a));
+    box(M.white2, F, 0, 0, .03, .14, .55, .05); box(M.frame, F, 0, 0, -.02, .04, .4, .05); }   // cellular panels
+  beaconLight(P, x, top + 1.02, z, .07, .8);
+  return { pt, pw };
+}
+
+M.solarCell = toon(0x1f3260); M.solarCell2 = toon(0x2a4278);
+// a row of solar panels tilted up toward +z on a low frame, centred at (x, z), len along x, depth front to back
+function solarRow(P, x, z, len, depth, y = 0){
+  const n = Math.max(1, Math.round(len/.48)), pw = len/n, tilt = .38, rise = Math.sin(tilt)*depth;
+  for (let k=0; k<n; k++){ const px = x - len/2 + (k + .5)*pw;
+    box(k % 2 ? M.solarCell : M.solarCell2, P, px, y + .25 + rise/2, z, pw - .04, .03, depth, 0, tilt);
+    box(M.metal, P, px, y + .25 + rise/2 + .02, z, .015, .015, depth, 0, tilt);   // the cell lines
+    for (const u of [-.25, .25]) box(M.metal, P, px, y + .25 + rise/2 - u*rise*2*.5 + .02, z + u*depth*Math.cos(tilt), pw - .06, .012, .012); }
+  for (const s of [-1, 1]){ box(M.frame, P, x + s*(len/2 - .05), y + .12 + rise*.0, z + depth*.42, .04, .24, .04); box(M.frame, P, x + s*(len/2 - .05), y + (.25 + rise)/2 + .05, z - depth*.42, .04, .25 + rise, .04); }
+}
+// The radio station's relay, filling the main roof (R0: the roof's centre, y = the roof deck): the SATCOM 12-A
+// dish on its plinth, a frame of three MLINK 5GHz dishes, two rusted lattice towers with Yagis, cellular panels and
+// MW 5GHz horns, and in the middle the server racks, their screens alive with incoming data, under a solar canopy;
+// thick black coax runs from the racks to everything
+function buildRelay(R0, bw, bd){
+  const y = .03;
+  // the big dish: a concrete plinth, a turntable, the dish pointed up toward the back-left sky
+  const sx = -1.2, sz = -1.05;
+  box(M.concD, R0, sx, y + .15, sz, .8, .3, .8); cyl(M.metalDark, R0, sx, y + .34, sz, .3, .08);
+  dish(R0, sx, y + .38, sz, 1.0, -2.4 + rnd(-.2, .2), .75, true);
+  { const F = under(R0, T(-bw/2 - .07, 0, sz, -PI/2)); for (const t of [-.8, .8]) box(M.frame, F, t, .35, -.02, .05, .7, .05); wordSign(F, 'sign_w_satcom', 0, .6, .05, .9, 'amber', .8); }
+  box(M.white2, R0, sx + .41, y + .17, sz, MIN_T, .14, .5); plant('sign_w_satcom', under(R0, T(sx + .43, y + .17, sz, PI/2)), 0, 0, 0, .45, 'c', true);   // its plate on the plinth
+  // the MLINK frame: two posts, three arms, three small dishes aimed out over the edge
+  const mx = 1.8, mz0 = -1.75, mz1 = -.45;
+  for (const z of [mz0, mz1]) box(M.metal, R0, mx, y + .85, z, .06, 1.7, .06);
+  box(M.metal, R0, mx, y + 1.68, (mz0 + mz1)/2, .05, .05, mz1 - mz0 + .06); box(M.metal, R0, mx, y + .2, (mz0 + mz1)/2, .05, .05, mz1 - mz0 + .06);
+  [[.55, -1.55], [.95, -1.1], [1.35, -.65]].forEach(([hy, z], k) => { box(M.metal, R0, mx - .02, y + hy, z, .05, .05, .05); dish(R0, mx + .02, y + hy - .2, z, .3, PI/2 + rnd(-.6, .6), rnd(1.1, 1.4), k === 2); });
+  { const F = under(R0, T(mx + .04, 0, (mz0 + mz1)/2, PI/2)); wordSign(F, 'sign_w_mlink', 0, .32, .02, .7, 'cyan', .6); }
+  // the two lattice towers, each with a pair of MW horns and their plate
+  for (const [tx, tz, h, b0] of [[.55, -1.6, rnd(3.0, 3.4), .32], [-1.75, 1.45, rnd(2.5, 2.8), .3]]){
+    const { pt, pw } = latticeTower(R0, tx, y, tz, h, b0, .1);
+    for (const a of [rnd(0, TAU), rnd(0, TAU)]) hornAntenna(R0, tx + Math.sin(a)*pw*.7, pt + .2, tz + Math.cos(a)*pw*.7, a);
+    const F = under(R0, T(tx, 0, tz + pw + .02, 0)); wordSign(F, 'sign_w_mw', 0, pt - .2, 0, .7, 'orange', .6);
+    coaxBundle(R0, [[tx + b0 - .05, y + .05, tz + b0 + .05], [tx + .2, pt - .05, tz + .2]], 2, .022);   // up a leg to the horns
+  }
+  // the server island: two rows of cabinets back to back, every face full of live screens and LEDs
+  const ix = .05, iz = .45, cw = .43, ch = 1.15;
+  for (const [face, zc] of [[0, iz + .24], [PI, iz - .24]]){
+    for (let k=0; k<3; k++){
+      const x = ix + (k - 1)*(cw + .02);
+      box(M.metalDark, R0, x, y + ch/2, zc, cw, ch, .46);
+      const F = under(R0, T(x, y, zc + (face ? -.23 : .23), face));
+      box(M.frame, F, 0, ch/2, .005, cw - .04, ch - .06, MIN_T);
+      screenQuad(F, 0, .92, .035, cw - .1, .22, irand(0, 4));
+      screenQuad(F, 0, .66, .035, cw - .1, .2, irand(0, 4));
+      screenQuad(F, 0, .41, .035, cw - .1, .16, 5);
+      for (let t = .1; t < .28; t += .05) box(M.metal, F, 0, t, .03, cw - .12, .015, MIN_T);   // vents
+    }
+    for (let k=0; k<(face ? 2 : 3); k++){ const Fm = under(R0, T(ix + (k - (face ? .5 : 1))*.42, y + ch, zc + (face ? -.08 : .08), face)); monitor(Fm, 0, .15, .15, .26, .2, k === 1 ? 1 : irand(0, 4), true); }
+  }
+  // a big waveform display on legs in front, and an oscilloscope bench to the side
+  { const Fb = under(R0, T(ix, y, iz + .95, 0)); for (const s of [-1, 1]) box(M.frame, Fb, s*.38, .3, -.02, .04, .6, .04); monitor(Fb, 0, .78, 0, .85, .45, 0, false); }
+  { const bx2 = -.95, bz2 = .95; box(M.inWood2, R0, bx2, y + .42, bz2, .7, .04, .4); for (const s of [-1, 1]) box(M.frame, R0, bx2 + s*.3, y + .2, bz2, .03, .4, .35);
+    for (const s of [-1, 1]) monitor(under(R0, T(bx2 + s*.17, y + .44, bz2 - .02, 0)), 0, .14, .1, .22, .17, 1, true);
+    box(M.metalDark, R0, bx2, y + .1, bz2, .5, .2, .3); }
+  // the solar canopy over the racks, with the charge controller and battery bank beside them
+  const cy = 1.85;
+  for (const [x, z] of [[ix - .78, iz - .6], [ix + .78, iz - .6], [ix - .78, iz + .62], [ix + .78, iz + .62]]) box(M.frame, R0, x, y + cy/2, z, .05, cy, .05);
+  box(M.frame, R0, ix, y + cy, iz, 1.65, .04, 1.3);
+  solarRow(R0, ix, iz, 1.6, 1.25, y + cy - .2);
+  box(M.white2, R0, ix + .98, y + .55, iz + .2, .3, .4, .2); box(M.neonAmber, R0, ix + .98, y + .65, iz + .31, .05, .05, MIN_T); screenQuad(under(R0, T(ix + .98, y, iz + .305, 0)), 0, .5, 0, .18, .08, 5);
+  for (let k=0; k<3; k++) box(M.metalDark, R0, ix + .98, y + .1 + k*.11, iz - .25, .32, .1, .3);   // the battery bank
+  coaxBundle(R0, [[ix + .98, y + cy - .1, iz + .55], [ix + .98, y + .8, iz + .55], [ix + .98, y + .76, iz + .3]], 2, .02);
+  // the coax: thick black bundles from the racks out across the roof to every dish and tower
+  coaxBundle(R0, [[ix - .3, y + .05, iz - .5], [ix - .3, y + .05, -.55], [sx + .55, y + .05, -.85], [sx + .45, y + .3, sz + .05]], 4);
+  coaxBundle(R0, [[ix + .3, y + .05, iz - .5], [ix + .3, y + .05, -1.05], [.55 - .35, y + .05, -1.3], [.55 - .3, y + .3, -1.55]], 3);
+  coaxBundle(R0, [[ix + .7, y + .05, iz - .1], [1.35, y + .05, iz - .1], [1.55, y + .05, -.6], [mx - .1, y + .25, -.75]], 3);
+  coaxBundle(R0, [[ix - .7, y + .05, iz + .55], [-1.2, y + .05, 1.05], [-1.5, y + .05, 1.35], [-1.6, y + .35, 1.4]], 3);
+  coaxBundle(R0, [[ix, y + .05, iz + .5], [ix, y + .05, iz + .9]], 2, .025);
+}
+
 /* ---------- the radio station ---------- */
 // A three-storey broadcast house with a dish farm on its roof, a lower wing carrying the two big dishes, and a
 // lattice radio mast at the far corner, linked by a catwalk. Red lights blink all over it, chasing up the mast.
@@ -231,18 +418,9 @@ function buildRadioStation(m){
   plant('sign_onair', under(P, T(bx - bw/2, 0, bz, -PI/2)), .5, roof - .45, .06, 1.0, 'c', true);
   // a vertical neon strip down one corner
   box(M.neonPink, P, bx + bw/2 + .05, y0 + h/2, bz + bd/2 + .05, .05, h - .2, .05);
-  // roof: equipment, then the dish farm, small dishes pointing every which way
-  box(M.metal, P, bx - 1.4, roof + .25, bz - 1.3, .9, .5, .7); box(M.metalDark, P, bx + 1.5, roof + .2, bz - 1.4, .6, .4, .6);
   for (const [cx, cz] of [[-1,-1],[1,-1],[-1,1],[1,1]]) beaconLight(P, bx + cx*(bw/2 - .06), roof + .33, bz + cz*(bd/2 - .06));
   for (let t = -bw/2 + 1.15; t < bw/2 - .8; t += 1.15){ beaconLight(P, bx + t, roof + .32, bz + bd/2, .06, .6); beaconLight(P, bx + t, roof + .32, bz - bd/2, .06, .6); }
-  const spots = [];
-  for (let k=0; k<120 && spots.length < 18; k++){
-    const x = bx + rnd(-bw/2 + .4, bw/2 - .4), z = bz + rnd(-bd/2 + .4, bd/2 - .4), r = rnd(.24, .55);
-    if (spots.some(s => Math.hypot(s.x - x, s.z - z) < s.r + r + .06)) continue;
-    if (Math.hypot(x - (bx - 1.4), z - (bz - 1.3)) < .9 || Math.hypot(x - (bx + 1.5), z - (bz - 1.4)) < .7) continue;
-    spots.push({ x, z, r });
-  }
-  for (const s of spots) dish(P, s.x, roof, s.z, s.r, rnd(0, TAU), rnd(.35, 1.15), chance(.7));
+  buildRelay(under(P, T(bx, roof, bz)), bw, bd);
 
   // ---- the wing: one storey, two big dishes on top
   const wx = 2.15, wz = -1.55, ww = 2.9, wd = 3.6, wh = FH + .35, wroof = y0 + wh;
@@ -252,8 +430,10 @@ function buildRadioStation(m){
   box(M.concDD, P, wx, wroof + .01, wz, ww - .08, .04, wd - .08);                                      // roof deck
   for (const [fx, fz, w, d] of [[0, wd/2, ww + .08, .05], [0, -wd/2, ww + .08, .05], [ww/2, 0, .05, wd + .08], [-ww/2, 0, .05, wd + .08]])
     box(M.trimCyan, P, wx + fx, wroof - .05, wz + fz, w, .05, d);                                       // cyan trim round the wing's roof
-  dish(P, wx - .55, wroof, wz - .75, rnd(.85, 1.0), rnd(0, TAU), rnd(.5, .9), true);
-  dish(P, wx + .55, wroof, wz + .95, rnd(.7, .85), rnd(0, TAU), rnd(.4, 1.0), true);
+  // the wing's roof: the relay's solar trickle-charge field, in two tilted rows, and the battery cabinets
+  { const W = under(P, T(wx, wroof, wz)); for (const z of [-1.05, .15]) solarRow(W, 0, z, ww - .5, 1.0);
+    for (let k=0; k<3; k++){ box(M.white2, W, -ww/2 + .45 + k*.42, .3, wd/2 - .45, .36, .6, .3); box(M.neonAmber, W, -ww/2 + .45 + k*.42, .5, wd/2 - .29, .05, .05, MIN_T); }
+    coaxBundle(W, [[-ww/2 + .9, .03, wd/2 - .45], [-ww/2 + .15, .03, wd/2 - .45], [-ww/2 + .15, .03, -wd/2 + .2], [-ww/2 - .02, .03, -wd/2 + .2]], 2, .025); }
   for (const [cx, cz] of [[-1,-1],[1,-1],[1,1]]) beaconLight(P, wx + cx*(ww/2 - .05), wroof + .06, wz + cz*(wd/2 - .05));
 
   // ---- the mast: a square lattice tower, tapering, with platforms, panel antennas and a whip on top

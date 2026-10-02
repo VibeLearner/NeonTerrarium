@@ -244,7 +244,11 @@ const comp = new THREE.ShaderMaterial({
         { vec3 lt = texture2D(tLight, vUv).rgb;
           lt = floor(lt*14.0 + bayer(gl_FragCoord.xy)*.99)/14.0;
           float lum = dot(c.rgb, vec3(.299, .587, .114));
-          col += lt*(c.rgb*1.1 + .16)*(1.0 - smoothstep(.35, .75, lum)); }   // strongest on dark walls and streets; bright surfaces (signs, windows) get none
+          // light lands on the surface: it scales the surface's own colour (the night-dimmed colour is about a third of
+          // the real one), so textures and dark details stay; capped below the bloom threshold so lit walls never glow;
+          // bright surfaces (signs, windows) get none
+          vec3 add = min(lt*c.rgb*2.6, vec3(.22));
+          col += add*(1.0 - smoothstep(.3, .6, lum)); }
         if (rimI > 0.01){
           vec2 sd2 = sunV.xy; float sl = length(sd2);
           if (sl > 0.05){
@@ -638,7 +642,7 @@ const nightLightMat = new THREE.ShaderMaterial({
       f *= smoothstep(.12*vR, .4*vR, dist);   // nothing on the light itself: it lights its surroundings, never washes out its own sign
       vec3 n = texture2D(tNormal, uv).rgb*2.0 - 1.0;
       vec3 lv = normalize(mat3(viewMatrix)*d + vec3(0.0, 0.0, 1e-4));
-      float ndl = .3 + .7*max(dot(n, lv), 0.0);
+      float ndl = max(dot(n, lv), 0.0);   // only faces turned to the light: thrown light with a lit side and a shaded side
       gl_FragColor = vec4(vC*f*ndl*lightI, 1.0);
     }`,
   transparent: true, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,
@@ -652,7 +656,7 @@ function makeLightTarget(){
 }
 // after the colour and normal passes; fills rtLight for the composite
 function renderNightLights(night){
-  const I = S.lights === false ? 0 : Math.max(0, Math.min(1, (night - .15)/.6))*.6;
+  const I = S.lights === false ? 0 : Math.max(0, Math.min(1, (night - .15)/.6))*.9;
   NL_UNI.lightI.value = I;
   renderer.setRenderTarget(rtLight); renderer.setClearColor(0x000000, 1); renderer.clear(true, false, false);
   if (I <= 0) return;

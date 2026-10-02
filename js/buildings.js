@@ -201,6 +201,7 @@ function faceCables(F,L,h){
 
 /* ---------- lit box signs with pixel lettering (drawn in code, see genGlyphSigns) ---------- */
 function glyphSign(F,x,y,vertical,projecting){
+  if (LUX) return;   // the luxury towers keep to their own gold and ivory lights
   const kind = pick(vertical ? GLYPH_V : GLYPH_H);
   const w = SPR.size[kind][0]/PX, h = SPR.size[kind][1]/PX, col = GLYPH_GLOW[kind];
   if (projecting){
@@ -2215,4 +2216,19 @@ function holoBoard(P, size, ad, seed){
     holoQuad(P, 0, lift + .12 + band/2, 0, w, band, ad, seed, 1);
   }
   holoQuad(P, 0, y0 + H/2, 0, w, H, ad, seed, 0);
+}
+
+/* ---------- luxury lighting ---------- */
+// The luxury towers have their own lights, in colours no other district uses: gold, ivory white, lemon yellow, rose
+// gold and a pale platinum lilac. Each section takes two of them (from its seed); while it's generated, every neon
+// strip and trim it lays down, and every halo, is swapped for its luxury twin (see LUX in put and glow).
+const LUX_COLS = [['gold', 0xffc24a, 0x5a4214], ['ivory', 0xfff3dc, 0x5a5448], ['lemon', 0xfff25a, 0x5a5418], ['rosegold', 0xffaa80, 0x5a3a2c], ['platinum', 0xe2d6ff, 0x4a4458]]
+  .map(([k, em, base]) => ({ k, neon: toon(base, { em, kind: 'neon' }), trim: toon(base, { em, kind: 'trim' }) }));
+// the cool blue and pink rooms of the other districts become warm champagne and rose-gold rooms here
+const LUX_ROOM = [toon(0x5a4c30, { em: 0xf2dca0, kind: 'window' }), toon(0x5a3a30, { em: 0xf0b08a, kind: 'window' })];
+function luxPalette(h){   // from its own hash, so the towers' own layouts (drawn from R) are untouched
+  const n = LUX_COLS.length, a = LUX_COLS[h % n], b = LUX_COLS[(h % n + 1 + (h >>> 8) % (n - 1)) % n];
+  const mats = new Map([[M.neonCyan, a.neon], [M.neonPink, b.neon], [M.neonAmber, a.neon], [M4.neonPurple, b.neon], [M4.neonBlue, a.neon], [M.holoBlue, a.neon],
+    [M.trimCyan, a.trim], [M.lxLine, a.trim], [M.interiorCool, LUX_ROOM[0]], [M.interiorPink, LUX_ROOM[1]], [M4.pool, LUX_ROOM[0]]].filter(([s2]) => s2));
+  return { mats, glows: { cyan: a.k, pink: b.k, amber: a.k, blue: a.k, orange: b.k, green: a.k } };
 }

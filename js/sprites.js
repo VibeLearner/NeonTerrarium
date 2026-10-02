@@ -409,7 +409,7 @@ const ICONS = {
 const NEON_NAME = new Map([[M.neonPink,'pink'],[M.neonCyan,'cyan'],[M.neonAmber,'amber']]);
 // flat: glued to the wall; projecting: a blade sign sticking out from the wall, readable from the side
 function iconSign(st, F, x, y, projecting, k=.62){
-  const color = NEON_NAME.get(pick(st.neonMats)), kind = `sign_${pick(ICONS[st.cls])}_${color}`;
+  const color = LUX ? 'amber' : NEON_NAME.get(pick(st.neonMats)), kind = `sign_${pick(ICONS[st.cls])}_${color}`;
   const w = SPR.size[kind][0]/PX*k;
   if (projecting){
     const Q = under(F, T(x, y, w/2+.08, PI/2));
@@ -453,6 +453,7 @@ function buildFoliage(){
 let glowList = null;
 const _gv = new THREE.Vector3();
 function glow(P,x,y,z,kind,s=1){
+  if (LUX && LUX.glows[kind]) kind = LUX.glows[kind];
   if (DARK && !KEEP_LIGHT && GLOW_FLK[kind]){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 80) return; }
   if (DARK && GLOW_FLK[kind]) s = -s;   // marks a halo that flickers hard (see glowPoints)
   if (!glowList){ const sp = new THREE.Sprite(GLOW[kind]); sp.position.set(x,y,z).applyMatrix4(P); sp.scale.set(Math.abs(s),Math.abs(s),1); sp.layers.set(1); glowGroup.add(sp); return; }
@@ -468,7 +469,7 @@ const GLOW_PTS = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
 });
 const GLOW_FIXED = { red: .95, blue: .85 };
-const GLOW_FLK = { pink: 'neon', cyan: 'neon', amber: 'neon', warm: 'bulb', orange: 'neon' };   // halos flicker at the same odds as their kind of light
+const GLOW_FLK = { pink: 'neon', cyan: 'neon', amber: 'neon', warm: 'bulb', orange: 'neon', gold: 'neon', ivory: 'neon', lemon: 'neon', rosegold: 'neon', platinum: 'neon' };   // halos flicker at the same odds as their kind of light
 function glowPoints(gl){
   let n = 0; for (const k in gl) n += gl[k].length/4;
   const pos = new Float32Array(n*3), size = new Float32Array(n), col = new Float32Array(n*4), flk = new Float32Array(n), ons = new Float32Array(n);

@@ -190,6 +190,7 @@ function buildStack(c){
   c.sections.forEach((sec, k) => {
     R = mulberry32(hash('sec', c.i, c.j, k, sec.zone, sec.seed));
     const st = STY[sec.zone], upper = k > 0, last = k === c.sections.length - 1;
+    LUX = sec.zone === 'high' ? luxPalette(hash('lux', c.i, c.j, k, sec.seed)) : null;
     const lot = { x: c.x, z: c.z, cls: sec.zone, elev: 0, base: y, signs: 0, occupied: true, height: 0, floors: 0 };
     lot.padOK = last && R() < .3;
     if (upper){   // a deck for the new section to stand on
@@ -201,7 +202,7 @@ function buildStack(c){
     if (upper && sec.zone === 'high') types = types.filter(([f]) => WHITE_TYPES.has(f) === prevWhite);
     const builder = pickWeighted(types);
     NO_ROOF = !last;
-    withStyle(sec.style, () => builder(lot, st, P0));
+    try { withStyle(sec.style, () => builder(lot, st, P0)); } finally { LUX = null; }
     NO_ROOF = false;
     prevWhite = !!lot.white;
     y += (upper ? .1 : 0) + Math.max(lot.height, FH);

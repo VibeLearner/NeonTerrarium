@@ -1289,6 +1289,233 @@ function twistTower(lot, st, P0){
 }
 
 // Industrial: shuttered halls with sawtooth roofs, silo clusters and tank yards
+/* ---------- the workshop yard: five small industrial buildings ---------- */
+// After the reference: a rusty corrugated scrap shed, a red brick gear workshop under a tiled roof, a mossy
+// concrete repair shop with pipes all over its roof, a blue corrugated parts warehouse with a sawtooth roof, and an
+// open timber lube shed under a glass roof. Each has a big lit doorway and its own neon sign; all of them leak
+// pipes, chimneys, crates, gas bottles, drums and potted plants.
+Object.assign(M, {
+  inRust: toon(0x8a4a2a), inRust2: toon(0x6a3a24), inCorr: toon(0x7a6656), inCorr2: toon(0x5e5046),
+  inBlue: toon(0x4a6a9a), inBlue2: toon(0x3a5680), inBlueRib: toon(0x34496e),
+  inBrick: toon(0x8e3a2e), inBrick2: toon(0x6e2e26), inMortar: toon(0xb09a88), inTile: toon(0xa4523a), inTile2: toon(0x84402c),
+  inConc: toon(0x8f928a), inConc2: toon(0x767a72), inMoss: toon(0x5f7a3a, { flat:1 }),
+  inWood: toon(0x7a5434), inWood2: toon(0x5e3f26),
+  inShop: toon(0xb08550, { em:0xc8803a, kind:'window' }), inShop2: toon(0xa08458, { em:0xd8984a, kind:'window' }),
+  inPipe: toon(0x7a4a32), inPipe2: toon(0x5c5a58), inGas: toon(0x5a8aa8), inGas2: toon(0xb8bcb8),
+});
+const IN_SHOP = [M.inShop, M.inShop2];
+// a right-angled triangle, extruded (for sawtooth roof ends): the tall side at local +x
+U.rtri = (() => { const s = new THREE.Shape(); s.moveTo(-.5, 0); s.lineTo(.5, 0); s.lineTo(.5, 1); s.lineTo(-.5, 0);
+  const g = new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false }); g.translate(0, 0, -.5); return g; })();
+const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pUp = new THREE.Vector3(0, 1, 0);
+// a round pipe from a to b (in P's space)
+function pipeSeg(mat, P, ax, ay, az, bx, by, bz, r){
+  _pa.set(ax, ay, az); _pb.set(bx - ax, by - ay, bz - az);
+  const len = _pb.length(); if (len < 1e-4) return;
+  _pq.setFromUnitVectors(_pUp, _pb.divideScalar(len));
+  put(U.cyl16, mat, under(P, new THREE.Matrix4().compose(_pa.addScaledVector(_pb, len/2), _pq, new THREE.Vector3(2*r, len, 2*r))));
+}
+// a pipe run through a list of points, with round elbows at the bends and flanges here and there
+function pipeRun(mat, P, pts, r, flanges = true){
+  for (let k=0; k<pts.length - 1; k++){
+    const [ax, ay, az] = pts[k], [bx, by, bz] = pts[k + 1];
+    pipeSeg(mat, P, ax, ay, az, bx, by, bz, r);
+    if (flanges && Math.hypot(bx - ax, by - ay, bz - az) > .6){ const u = .5; pipeSeg(M.inPipe2, P, ax + (bx - ax)*(u - .03), ay + (by - ay)*(u - .03), az + (bz - az)*(u - .03), ax + (bx - ax)*(u + .03), ay + (by - ay)*(u + .03), az + (bz - az)*(u + .03), r*1.35); }
+    if (k > 0) sph(mat, P, ax, ay, az, r*1.18);
+  }
+}
+// corrugation: vertical ribs over a wall face (F: local +z out, x along the face)
+function corrRibs(F, len, y0, h, mat, step = .13){ for (let t = -len/2 + step/2; t < len/2; t += step) box(mat, F, t, y0 + h/2, .012, .045, h - .02, MIN_T); }
+// a big doorway with a roll-up shutter partly up, a warm lit workshop inside (benches, tools, shelves of junk)
+function workDoor(F, x, w, h, opts = {}){
+  box(opts.frame || M.frame, F, x, h/2 + .02, .02, w + .12, h + .08, MIN_T);
+  box(pick(IN_SHOP), F, x, h*.45, .03, w, h*.9 - .02, MIN_T);
+  const shut = opts.shut ?? rnd(.15, .35);
+  box(M.shutter, F, x, h - shut*h/2, .05, w, shut*h, MIN_T);
+  for (let t = x - w/2 + .1; t < x + w/2; t += .2) box(M.frame, F, t, h*.3, .06, .08, rnd(.1, .3), MIN_T);   // benches and tools against the light
+  box(M.frame, F, x + rnd(-w*.25, w*.25), h*.55, .06, rnd(.15, .3), rnd(.08, .18), MIN_T);
+  glow(F, x, h*.45, .3, 'warm', .6 + w*.5);
+}
+function wallLamp(F, x, y){ box(M.frame, F, x, y, .06, .03, .03, .12); put(U.cone, M.metalDark, under(F, T(x, y - .02, .14, 0, .14, .07, .14))); box(M.bulb, F, x, y - .07, .14, .06, .03, .06); glow(F, x, y - .12, .2, 'warm', .8); }
+function gasBottles(P, x, z, n = 2){ for (let k=0; k<n; k++){ const gx = x + k*.13; cyl(pick([M.inGas, M.inGas2, M.red2]), P, gx, .22, z + rnd(-.03, .03), .055, .44); sph(M.metalDark, P, gx, .46, z, .04); } }
+function drum(P, x, z, mat){ put(U.cyl16, mat || pick([M.inRust, M.inBlue2, M.hazard, M.inPipe2]), under(P, T(x, .2, z, 0, .26, .4, .26))); put(U.cyl16, M.metalDark, under(P, T(x, .41, z, 0, .27, .02, .27))); }
+function pottedPlant(P, x, z, s = 1){ put(U.cyl16, pick([M.pot, M.inBrick2, M.inConc2]), under(P, T(x, .08*s, z, 0, .18*s, .16*s, .18*s))); plant(pick(['fern','bush','succulent','bushFlower','g_fern2']), P, x, .16*s, z, rnd(.55, .8)*s); }
+function crateAt(P, x, y, z, s = 1){ box(M.crate, P, x, y + .11*s, z, .24*s, .22*s, .24*s, rnd(-.3, .3)); box(M.inWood2, P, x, y + .11*s, z, .25*s, .03, .25*s); }
+function moss(P, x, y, z, n = 3){ for (let k=0; k<n; k++) blob(M.inMoss, P, x + rnd(-.2, .2), y, z + rnd(-.2, .2), rnd(.06, .12), .4); }
+// a neon word on a dark board, on a bracket or flat on the wall
+function wordSign(F, kind, x, y, z, k, col){ box(M.frame, F, x, y, z - .03, SPR.size[kind][0]/PX*k + .06, SPR.size[kind][1]/PX*k + .06, MIN_T); plant(kind, F, x, y, z, k, 'c', true); glow(F, x, y, z + .25, col, 1.2 + k); }
+// a gabled roof along local x over a w x d box (ridge along x), with eaves; returns nothing
+function gable(P, y, w, d, rise, mat, over = .15){ put(U.prism, mat, under(P, T(0, y, 0, PI/2, d + 2*over, rise, w + 2*over))); }
+
+// Scrap shed: a tall, narrow corrugated shed in rusty patchwork, a lean-to on its side, chimneys, a ladder
+function scrapShed(lot, st, P0){
+  const w = rnd(1.55, 1.75), d = rnd(1.8, 2.05), h = rnd(2.0, 2.3), P = under(P0, T(-.15, 0, 0, pick([0, PI/2, PI, -PI/2])));
+  box(M.inCorr, P, 0, h/2, 0, w, h, d);
+  for (const f of faces(w, d)){
+    const F = under(P, T(f.nx*f.half, 0, f.nz*f.half, f.ry));
+    corrRibs(F, f.len, 0, h, M.inCorr2);
+    for (let k=0; k<irand(3, 5); k++){ const pw = rnd(.35, .7), ph = rnd(.4, .9); box(pick([M.inRust, M.inRust2, M.corrBlue, M.inCorr2]), F, rnd(-f.len/2 + pw/2, f.len/2 - pw/2), rnd(ph/2, h - ph/2), .03, pw, ph, MIN_T); }   // patched panels
+  }
+  const Ff = under(P, T(0, 0, d/2, 0));
+  workDoor(Ff, .1, .75, 1.05, { frame: M.inRust2 });
+  wordSign(under(Ff, T(-.1, 0, .02, 0)), 'sign_w_scrap', 0, 1.5, .1, 1.0, 'cyan');
+  box(M.inShop2, Ff, -.45, 1.75, .03, .3, .25, MIN_T); box(M.frame, Ff, -.45, 1.75, .06, .32, .03, MIN_T);   // a small lit window up high
+  wallLamp(Ff, .55, 1.25);
+  // the roof: rusty corrugated, steep, overhanging
+  gable(P, h, w, d, .85, M.inRust, .2);
+  { const half = d/2 + .2, ang = Math.atan2(.85, half), L = Math.hypot(half, .85);   // ribs running down both slopes (the ridge runs along x)
+    for (let x = -w/2 - .15; x <= w/2 + .16; x += .16) for (const s of [-1, 1]) box(M.inRust2, P, x, h + .425 + Math.cos(ang)*.02, s*half/2, MIN_T, MIN_T, L, 0, s*ang); }
+  moss(P, -w/4, h + .5, rnd(-.5, .5), 4);
+  if (!NO_ROOF){ for (const [x, z] of [[w*.2, -d*.25], [-w*.25, d*.15]]){ const ch = rnd(.6, 1.0); cyl(M.inRust2, P, x, h + .5 + ch/2, z, .07, ch); cyl(M.metalDark, P, x, h + .5 + ch, z, .09, .06); emitters.push(new THREE.Vector3(x, h + .6 + ch, z).applyMatrix4(P)); } }
+  // a lean-to on the side, a ladder, a pipe down the wall, junk
+  const lx = w/2 + .35;
+  box(M.inCorr2, P, lx, .45, .2, .7, .9, 1.1); box(M.inRust, P, lx, .98, .2, .82, .04, 1.2, 0, 0, -.3);
+  box(pick(IN_SHOP), P, lx + .36, .4, .2, MIN_T, .45, .5);
+  for (let y = .2; y < h - .1; y += .22) box(M.frame, P, -w/2 - .04, y, -d/2 + .35, MIN_T, .025, .3);
+  for (const s of [-1, 1]) box(M.frame, P, -w/2 - .04, h/2, -d/2 + .35 + s*.15, MIN_T, h, .03);
+  pipeRun(M.inPipe, P, [[-w/2 - .1, h - .3, d/2 - .3], [-w/2 - .1, .3, d/2 - .3], [-w/2 - .4, .3, d/2 - .3]], .06, false);
+  for (let k=0; k<irand(3, 5); k++) blob(pick([M.inRust, M.metalDark, M.inPipe2, M.inRust2]), P, rnd(-w/2, w/2), .1, d/2 + rnd(.25, .5), rnd(.08, .16), .7);
+  if (chance(.7)) crateAt(P, w/2 - .1, 0, d/2 + .35);
+  for (let k=0; k<2; k++) if (chance(.6*S.green)) plant(pick(['vines','h_ivy','pothos']), under(P, T(-w/2, 0, rnd(-d/3, d/3), -PI/2)), 0, h - .1, .03, rnd(.8, 1.1), 't', true);
+  Object.assign(lot, { height: h + .85, floors: 2, occupied: true });
+}
+// Gear workshop: red brick under a terracotta tiled roof, a lit multi-paned window, a half-open roller door
+function gearWorkshop(lot, st, P0){
+  const w = rnd(2.0, 2.2), d = rnd(1.7, 1.9), h = rnd(1.35, 1.5), P = under(P0, T(0, 0, .1, pick([0, PI/2, PI, -PI/2])));
+  box(M.inConc2, P, 0, .08, 0, w + .1, .16, d + .1);   // a concrete plinth
+  box(M.inBrick, P, 0, h/2 + .08, 0, w, h, d);
+  for (const f of faces(w, d)){ const F = under(P, T(f.nx*f.half, .08, f.nz*f.half, f.ry));
+    for (let y = .1, row = 0; y < h - .05; y += .1, row++){ box(M.inMortar, F, 0, y, .004, f.len - .02, .015, MIN_T*.5);   // mortar courses, and joints staggered course by course
+      for (let t = -f.len/2 + (row % 2 ? .1 : .2); t < f.len/2 - .05; t += .2) box(M.inMortar, F, t, y + .05, .004, .015, .085, MIN_T*.5); }
+    for (let k=0; k<irand(4, 7); k++) box(chance(.5) ? M.inBrick2 : M.inRust, F, rnd(-f.len/2 + .1, f.len/2 - .1), rnd(.1, h - .1), .012, .14, .06, MIN_T*.6);   // odd bricks
+  }
+  const Ff = under(P, T(0, .08, d/2, 0));
+  workDoor(Ff, w*.2, .85, 1.0, { frame: M.inBrick2 });
+  // the lit window: a grid of small panes
+  const wx = -w*.27; box(M.inBrick2, Ff, wx, .62, .03, .72, .56, MIN_T); box(pick(IN_SHOP), Ff, wx, .62, .04, .62, .46, MIN_T);
+  for (let t = -.31; t <= .32; t += .155) box(M.frame, Ff, wx + t, .62, .07, .025, .48, MIN_T); for (const y of [.47, .62, .77]) box(M.frame, Ff, wx, y, .07, .64, .025, MIN_T);
+  box(M.inConc, Ff, wx, .33, .08, .8, .05, .12);   // sill
+  glow(Ff, wx, .62, .3, 'warm', 1.0);
+  // the gable end over the door, the sign and lamps
+  const Q = under(P, T(0, .08 + h, 0));
+  put(U.prism, M.inBrick, under(Q, T(0, 0, 0, 0, w, .7, d - .02)));   // gable wall infill (prism along z, matching the roof)
+  put(U.prism, M.inTile, under(Q, T(0, 0, 0, 0, w + .36, .75, d + .3)));
+  for (let t = -(d + .3)/2 + .06; t < (d + .3)/2; t += .12) for (const s of [-1, 1]) box(M.inTile2, Q, s*(w + .36)/4, .37, t, (w + .36)/2*1.12, .025, .04, 0, 0, s*-Math.atan2(.75, (w + .36)/2));   // tile courses
+  box(M.inTile2, Q, 0, .76, 0, .1, .08, d + .32);   // ridge
+  wordSign(Ff, 'sign_w_gear', w*.12, h + .24, .1, 1.0, 'orange');
+  wallLamp(Ff, w*.2 + .58, .95); wallLamp(Ff, -w*.5 + .12, .95);
+  pipeRun(M.inPipe, P, [[w/2 + .05, .08 + h, d/2 - .1], [w/2 + .05, .1, d/2 - .1]], .04, false);   // downpipe
+  // out front: potted plants along the wall, gas bottles, crates, tools
+  for (let k=0; k<irand(3, 5); k++) pottedPlant(P, wx + rnd(-.35, .35), d/2 + .2, rnd(.8, 1.1));
+  gasBottles(P, w/2 - .25, d/2 + .2, irand(1, 3)); if (chance(.7)) crateAt(P, -w/2 + .1, 0, d/2 + .35);
+  if (chance(.5)) box(M.metalDark, P, w*.2 + .45, .2, d/2 + .3, .2, .4, .2);   // a tool cabinet
+  if (!NO_ROOF && chance(.6)){ cyl(M.inBrick2, P, -w*.3, .08 + h + .6, -d*.2, .1, .9); emitters.push(new THREE.Vector3(-w*.3, h + 1.1, -d*.2).applyMatrix4(P)); }
+  Object.assign(lot, { height: .08 + h + .75, floors: 2, occupied: true });
+}
+// Repairs: a mossy concrete block, a wide lit roller door, a tangle of pipes and a machine on the flat roof
+function repairsBlock(lot, st, P0){
+  const w = rnd(2.0, 2.25), d = rnd(1.9, 2.15), h = rnd(1.6, 1.85), P = under(P0, T(0, 0, 0, pick([0, PI/2, PI, -PI/2])));
+  box(M.inConc, P, 0, h/2, 0, w, h, d);
+  box(M.inConc2, P, 0, h + .07, 0, w + .08, .14, d + .08);   // parapet cap
+  for (const f of faces(w, d)){ const F = under(P, T(f.nx*f.half, 0, f.nz*f.half, f.ry));
+    for (let k=0; k<irand(3, 6); k++){ const pw = rnd(.2, .6); box(chance(.5) ? M.inConc2 : M.inMoss, F, rnd(-f.len/2 + pw/2, f.len/2 - pw/2), rnd(.1, h - .1), .006 + .002*k, pw, rnd(.1, .4), MIN_T); }   // stains and moss
+    if (chance(.5*S.green)) plant(pick(['vines','h_ivy','l_mossroots']), F, rnd(-f.len/3, f.len/3), h + .1, .04, rnd(.8, 1.1), 't', true);
+  }
+  const Ff = under(P, T(0, 0, d/2, 0));
+  workDoor(Ff, -.05, 1.2, 1.15, { frame: M.inConc2, shut: rnd(.1, .2) });
+  wordSign(Ff, 'sign_w_repairs', -.05, 1.42, .1, .9, 'cyan');
+  wallLamp(Ff, w/2 - .2, 1.2);
+  box(M.metalDark, Ff, -w/2 + .25, .9, .06, .25, .32, .1); box(M.inGas2, Ff, -w/2 + .25, .95, .12, .18, .06, MIN_T);   // a fuse box
+  gasBottles(P, w/2 - .35, d/2 + .22, irand(2, 3)); drum(P, -w/2 + .3, d/2 + .3, M.inWood); if (chance(.7)) drum(P, -w/2 + .6, d/2 + .3);
+  for (let k=0; k<irand(2, 4); k++) pottedPlant(P, rnd(-w/2 + .2, w/2 - .2), d/2 + rnd(.45, .6), rnd(.8, 1.0));
+  if (!NO_ROOF){
+    const y = h + .14;
+    box(M.inConc2, P, rnd(-.2, .2), y + .2, rnd(-.3, .1), .6, .4, .5); box(M.metal, P, 0, y + .43, -.1, .3, .06, .3); put(U.cyl16, M.metalDark, under(P, T(0, y + .47, -.1, 0, .25, .02, .25)));   // the machine
+    const n = irand(3, 5);
+    for (let k=0; k<n; k++){   // pipes looping over the roof and down the walls
+      const z0 = -d/2 + .25 + k*(d - .5)/Math.max(1, n - 1), x0 = -w/2 + .2, x1 = w/2 - .2, up = rnd(.25, .55), r = rnd(.045, .07);
+      pipeRun(pick([M.inPipe, M.inRust, M.inPipe2]), P, [[x0, y + .05, z0], [x0, y + up, z0], [x1*rnd(.2, .7), y + up, z0], [x1*rnd(.2, .7), y + up, z0 + rnd(-.2, .2)], [x1, y + up*.5, z0], [x1 + .15, y + up*.5, z0], [x1 + .15, rnd(.3, h - .2), z0]], r, true);
+    }
+    moss(P, rnd(-w/3, w/3), h + .16, rnd(-d/3, d/3), 5);
+  }
+  Object.assign(lot, { height: h + .14, floors: 2, occupied: true });
+}
+// Parts warehouse: blue corrugated walls, a sawtooth roof with lit glazing, pipes looping over it, an open bay of shelves
+function partsWarehouse(lot, st, P0){
+  const w = rnd(2.2, 2.4), d = rnd(2.0, 2.25), h = rnd(1.45, 1.65), P = under(P0, T(0, 0, 0, pick([0, PI/2, PI, -PI/2])));
+  box(M.inBlue, P, 0, h/2, 0, w, h, d);
+  for (const f of faces(w, d)){ const F = under(P, T(f.nx*f.half, 0, f.nz*f.half, f.ry));
+    corrRibs(F, f.len, 0, h, M.inBlueRib, .12);
+    for (let k=0; k<irand(2, 4); k++) box(M.inRust, F, rnd(-f.len/2 + .2, f.len/2 - .2), rnd(.3, h - .2), .035 + .002*k, rnd(.08, .2), rnd(.2, .6), MIN_T);   // rust runs
+  }
+  const Ff = under(P, T(0, 0, d/2, 0));
+  // the open bay: shelving with boxes and crates inside, lit
+  const bw = 1.15, bx = w*.15;
+  box(M.frame, Ff, bx, .55, .02, bw + .1, 1.12, MIN_T); box(pick(IN_SHOP), Ff, bx, .5, .03, bw, 1.0, MIN_T);
+  for (const y of [.25, .55, .82]){ box(M.inWood2, Ff, bx, y, .07, bw - .1, .03, MIN_T); for (let t = bx - bw/2 + .12; t < bx + bw/2 - .08; t += .15) if (chance(.75)) box(pick([M.crate, M.inBlue2, M.inGas2, M.hazard, M.inRust]), Ff, t, y + .07, .08, .1, rnd(.08, .13), MIN_T); }
+  box(M.shutter, Ff, bx, 1.04, .06, bw, .12, MIN_T);
+  glow(Ff, bx, .55, .3, 'warm', 1.2);
+  wordSign(Ff, 'sign_w_parts', bx, h - .14, .1, .95, 'blue');
+  wallLamp(Ff, -w/2 + .3, 1.1);
+  // a conveyor hatch on one side (the belts between buildings come out of these)
+  box(M.metalDark, P, w/2 + .03, 1.2, .3, MIN_T, .4, .5);
+  // the sawtooth roof: three teeth, steep glazed faces lit from inside
+  if (!NO_ROOF || true){
+    const n = 3, td = d/n, rise = .5;
+    for (let k=0; k<n; k++){
+      const z = -d/2 + td*(k + .5), Q = under(P, T(0, h, z));
+      const slope = Math.atan2(rise, td);
+      box(M.inBlue2, Q, 0, rise/2, -.02, w + .1, MIN_T, Math.hypot(td, rise), 0, -slope);   // the long slope, rising to the front
+      box(M.frame, Q, 0, rise/2, td/2 - .02, w + .02, rise, MIN_T); box(pick(IN_SHOP), Q, 0, rise*.45, td/2 + .005, w - .2, rise*.7, MIN_T);   // the glazed face, lit
+      for (let t = -w/2 + .25; t < w/2; t += .3) box(M.frame, Q, t, rise*.45, td/2 + .03, .025, rise*.75, MIN_T);
+      for (const s of [-1, 1]) put(U.rtri, M.inBlue2, under(Q, T(s*(w/2 + .03), 0, 0, -PI/2, td, rise, MIN_T)));   // the tooth's end walls
+    }
+    if (!NO_ROOF) for (let k=0; k<irand(1, 3); k++){   // pipe loops over the teeth
+      const x = rnd(-w/2 + .3, w/2 - .3), up = rnd(.7, 1.0);
+      pipeRun(pick([M.inPipe, M.inRust]), P, [[x, h + .2, -d/2 + .2], [x, h + up, -d/2 + .2], [x, h + up, d*.1], [x + .3, h + up, d*.1], [x + .3, h + .4, d*.1]], rnd(.05, .08), true);
+      if (chance(.5)) emitters.push(new THREE.Vector3(x, h + up + .1, -d/2 + .2).applyMatrix4(P));
+    }
+  }
+  for (let k=0; k<irand(1, 3); k++) crateAt(P, rnd(-w/2 + .2, -.1), 0, d/2 + .3);
+  if (chance(.7)) pottedPlant(P, w/2 - .2, d/2 + .25); if (chance(.6*S.green)) plant('fern', P, w/2 + .1, 0, d/2 - .2, 1.0);
+  Object.assign(lot, { height: h + .5, floors: 2, occupied: true });
+}
+// Lube shed: an open-fronted timber shed under a glass roof, string lights, a workbench, drums of oil
+function lubeShed(lot, st, P0){
+  const w = rnd(1.9, 2.1), d = rnd(1.8, 2.0), h = rnd(1.3, 1.45), P = under(P0, T(0, 0, 0, pick([0, PI/2, PI, -PI/2])));
+  box(M.inConc2, P, 0, .04, 0, w + .1, .08, d + .1);
+  // back and side walls in planks, the front open
+  box(M.inWood2, P, 0, h/2, -d/2 + .04, w, h, .08);
+  for (const s of [-1, 1]) box(M.inWood2, P, s*(w/2 - .04), h/2, -.15, .08, h, d - .3);
+  for (const F of [under(P, T(0, 0, -d/2, PI)), under(P, T(w/2, 0, -.15, PI/2)), under(P, T(-w/2, 0, -.15, -PI/2))]) for (let y = .12; y < h; y += .14) box(M.inWood, F, 0, y, .01, w - .1, .02, MIN_T);
+  box(pick(IN_SHOP), P, 0, h*.5, -d/2 + .09, w - .3, h*.75, MIN_T);   // the lit back wall
+  // posts and beams
+  for (const [sx, sz] of CORNERS) box(M.inWood, P, sx*(w/2 - .05), h/2, sz*(d/2 - .05), .1, h, .1);
+  box(M.inWood, P, 0, h, d/2 - .05, w, .12, .12); box(M.inWood, P, 0, h, -d/2 + .05, w, .12, .12);
+  // the glass roof: two slopes of glass on timber rafters
+  const rise = .5, slope = Math.atan2(rise, d/2 + .15), L = Math.hypot(d/2 + .15, rise);
+  for (const s of [-1, 1]){
+    box(M.lxGlass, P, 0, h + .06 + rise/2, s*(d/4 + .05), w + .2, .02, L, 0, s*slope);
+    for (let x = -w/2 - .05; x <= w/2 + .06; x += .35) box(M.inWood, P, x, h + .08 + rise/2, s*(d/4 + .05), .05, .05, L, 0, s*slope);
+  }
+  box(M.inWood, P, 0, h + rise + .08, 0, w + .2, .07, .07);
+  // inside: a workbench, drums, crates, a hanging lamp
+  box(M.inWood, P, -.2, .42, -d/2 + .35, 1.0, .05, .4); for (const s of [-1, 1]) box(M.inWood2, P, -.2 + s*.45, .2, -d/2 + .35, .05, .4, .35);
+  for (let k=0; k<4; k++) box(pick([M.metalDark, M.inGas2, M.hazard, M.red2]), P, -.6 + k*.25, .5, -d/2 + .3, .08, rnd(.08, .15), .08);
+  drum(P, w/2 - .3, -d/2 + .35, M.hazard); drum(P, w/2 - .3, -d/2 + .65, M.inBlue2); if (chance(.6)) drum(P, w/2 - .6, -d/2 + .35, M.red2);
+  crateAt(P, -w/2 + .3, 0, .1); if (chance(.6)) crateAt(P, -w/2 + .3, .22, .1, .85);
+  cyl(M.frame, P, 0, h - .15, 0, .01, .3); box(M.bulb, P, 0, h - .32, 0, .1, .06, .1); glow(P, 0, h - .35, 0, 'warm', 1.2);
+  // string lights along the front eave, the sign hanging under the front beam
+  for (let x = -w/2 + .1; x < w/2; x += .18){ const sag = .06*Math.sin(PI*(x + w/2)/w); box(M.bulb, P, x, h - .1 - sag, d/2 + .02, .04, .05, .04); if (chance(.4)) glow(P, x, h - .14 - sag, d/2 + .05, 'warm', .4); }
+  const Fs = under(P, T(0, 0, d/2 + .02, 0));
+  for (const s of [-1, 1]) box(M.frame, Fs, s*.4, h - .14, 0, .015, .14, .015);
+  wordSign(Fs, 'sign_w_lube', 0, h - .33, .04, .8, 'amber');
+  if (!NO_ROOF){ cyl(M.inRust2, P, w/2 - .25, h + .5, -d/2 + .25, .06, 1.1); cyl(M.metalDark, P, w/2 - .25, h + 1.06, -d/2 + .25, .08, .05); emitters.push(new THREE.Vector3(w/2 - .25, h + 1.15, -d/2 + .25).applyMatrix4(P)); }
+  for (let k=0; k<irand(2, 3); k++) pottedPlant(P, w/2 + .1, d/2 - .2 - k*.3, rnd(.8, 1.1));
+  if (chance(.6*S.green)) plant(pick(['bushFlower','fern']), P, -w/2 - .1, 0, d/2 - .1, .9);
+  Object.assign(lot, { height: h + rise + .1, floors: 1, occupied: true });
+}
+
 function buildFactory(lot, st, P0){
   const v = R();
   if (v < .2) return buildTankYard(lot, P0);

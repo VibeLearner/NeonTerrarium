@@ -203,6 +203,26 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
     MKT_GRAF.push(kind);
   }
 })();
+// The workshop yard's neon words (industrial zone): bright letters in a 3x5 pixel font on a dark board with a
+// border in the same colour
+(function workshopSigns(){
+  const F = { S:['111','100','111','001','111'], C:['111','100','100','100','111'], R:['110','101','110','101','101'], A:['010','101','111','101','101'],
+              P:['110','101','110','100','100'], G:['111','100','101','101','111'], E:['111','100','110','100','111'], I:['111','010','010','010','111'],
+              L:['100','100','100','100','111'], U:['101','101','101','101','111'], B:['110','101','110','101','110'], H:['101','101','111','101','101'],
+              T:['111','010','010','010','010'], '2':['111','001','111','100','111'], '4':['101','101','111','001','001'], '.':['0','0','1','0','0'], ' ':['0','0','0','0','0'] };
+  const make = (kind, text, col, deco) => {
+    const ws = [...text].map(ch => F[ch][0].length), tw = ws.reduce((a, b) => a + b + 1, -1), pad = deco ? 5 : 3, w = tw + 2*pad, h = 9;
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+    g.fillStyle = '#12161c'; g.fillRect(0, 0, w, h);
+    g.fillStyle = col; g.fillRect(1, 1, w - 2, 1); g.fillRect(1, h - 2, w - 2, 1); g.fillRect(1, 1, 1, h - 2); g.fillRect(w - 2, 1, 1, h - 2);
+    if (deco){ g.fillRect(3, 4, 2, 1); g.fillRect(w - 5, 4, 2, 1); }   // little dashes either side, like the gear shop's sign
+    let x = pad;
+    [...text].forEach((ch, k) => { F[ch].forEach((r, yy) => [...r].forEach((b, xx) => { if (b === '1') g.fillRect(x + xx, 2 + yy, 1, 1); })); x += ws[k] + 1; });
+    SPR.img[kind] = c.toDataURL(); SPR.size[kind] = [w, h]; SPR.anchor[kind] = .5;
+  };
+  make('sign_w_scrap', 'SCRAP', '#6aff8a'); make('sign_w_gear', 'GEAR', '#ff8a3a', true); make('sign_w_repairs', 'REPAIRS', '#5af0d0');
+  make('sign_w_parts', 'PARTS', '#6ac8ff'); make('sign_w_lube', 'LUBE.24H', '#ffc060');
+})();
 // All sprites share one texture atlas and one material, so a whole region's plants, laundry and signs
 // are a single instanced draw call. The layout is computed from the known sizes right away; each image is
 // painted into its slot as soon as it has loaded.

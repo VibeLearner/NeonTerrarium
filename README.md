@@ -64,6 +64,16 @@ assets/audio/sfx/originals/  the untouched source recordings, for re-editing
 
 The scripts are ordinary (non-module) scripts that share one scope, so the order in `index.html` matters.
 
+## Industrial yards
+
+Besides the halls, silos and tank yards, the industrial zone builds five small workshops: a rusty corrugated
+scrap shed, a red brick gear workshop under a tiled roof, a mossy concrete repair shop with pipes over its roof, a
+blue parts warehouse with a sawtooth roof, and an open timber lube shed under a glass roof, each with a lit doorway
+and its own neon sign. Neighbouring buildings are joined by pipework (straight runs, loops and jogs with elbows,
+flanges, valve wheels and the odd steam leak), and neighbouring industrial buildings often by a raised conveyor belt
+with crates riding along it (high enough for people to walk under). Code: `scrapShed` to `lubeShed` in
+`js/buildings.js`; `BRIDGE.pipework`, `BRIDGE.conveyor` and the moving crates in `js/ground.js`.
+
 ## Megastructures
 
 Landmarks that take a block of plots once the city is big enough. Each exists at most once. A megastructure never

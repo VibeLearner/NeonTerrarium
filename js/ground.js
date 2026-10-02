@@ -205,6 +205,39 @@ const BRIDGE = {
     for (let i=0;i<irand(2,3);i++) cyl(pick([M.rust,D.ind.accent[0],M.metal]),Q,0,y+i*.19,rnd(-.14,.14),rnd(.07,.1),len,0,PI/2);
     box(M.neonAmber,Q,0,y-.17,0,.07,.07,.07); glow(Q,0,y-.2,0,'amber',.8);
   },
+  // Industrial pipework between two works: one to three round pipes, each running straight across, looping up and
+  // over, or jogging sideways, with elbows and flanges; a valve wheel on a loop now and then, the odd leak of steam
+  pipework(Q,len,y){
+    const zs = [-.28, 0, .28].sort(() => R() - .5), n = irand(1, 3);
+    for (let i=0;i<n;i++){
+      const z = zs[i], r = rnd(.055, .095), mat = pick([M.inPipe, M.inRust, M.inPipe2, M.rust]), yy = y + i*.06, shape = R(), a = rnd(.2, .45);
+      let pts, top = yy;
+      if (shape < .35) pts = [[-len/2, yy, z], [len/2, yy, z]];
+      else if (shape < .75){ const up = rnd(.35, .7); top = yy + up; pts = [[-len/2, yy, z], [-a, yy, z], [-a, top, z], [a, top, z], [a, yy, z], [len/2, yy, z]]; }
+      else { const z2 = Math.max(-.34, Math.min(.34, z + (z > 0 ? -1 : 1)*rnd(.18, .3))); pts = [[-len/2, yy, z], [-a, yy, z], [-a, yy, z2], [len/2, yy, z2]]; }
+      pipeRun(mat, Q, pts, r, true);
+      if (top > yy && chance(.4)){ put(U.torus, M.red2, under(Q, T(0, top + r + .06, z, 0, .22, .22, .22, PI/2))); cyl(M.metalDark, Q, 0, top + r*.5 + .03, z, .015, .07); }
+      if (chance(.15)) emitters.push(new THREE.Vector3(rnd(-a, a), top + r, z).applyMatrix4(Q));
+    }
+    for (const s of [-1, 1]) box(M.metalDark, Q, s*(len/2 - .3), y - .13, 0, .05, .04, .8);   // hanger straps where they leave the walls
+  },
+  // A conveyor belt between two works, high enough to walk under: a steel frame on a truss, the belt, side rails
+  // in hazard stripes, rollers, a beacon. The crates on it move (see conveyors below); they come out of one wall and
+  // go into the other.
+  conveyor(Q,len,y){
+    const W = .44;
+    box(M.metalDark, Q, 0, y - .08, 0, len, .1, W);
+    box(M.frame, Q, 0, y - .02, 0, len, .03, W - .1);
+    for (const s of [-1, 1]){
+      box(M.inRust2, Q, 0, y + .06, s*W/2, len, .06, .04);
+      for (let x = -len/2 + .1; x < len/2; x += .3) box(chance(.5) ? M.hazard : M.frame, Q, x, y + .06, s*(W/2 + .005), .14, .065, .04);
+    }
+    for (let x = -len/2 + .1; x < len/2; x += .2) cyl(M.metal, Q, x, y - .06, 0, .03, W - .02, PI/2);
+    for (let x = -len/2 + .15, k = 0; x < len/2 - .3; x += .32, k++) for (const s of [-1, 1]) strut(M.metalDark, Q, x, k % 2 ? y - .13 : y - .34, s*(W/2 - .02), x + .32, k % 2 ? y - .34 : y - .13, s*(W/2 - .02), .035);
+    for (const s of [-1, 1]) box(M.metalDark, Q, 0, y - .34, s*(W/2 - .02), len, .04, .04);
+    box(M.neonAmber, Q, 0, y + .12, W/2 + .02, .06, .06, .06); glow(Q, 0, y + .15, W/2 + .1, 'amber', .8);
+    if (CONV_SINK){ const a = new THREE.Vector3(-len/2, y + .11, 0).applyMatrix4(Q), b = new THREE.Vector3(len/2, y + .11, 0).applyMatrix4(Q); CONV_SINK.push({ a, b, dir: chance(.5) ? 1 : -1, speed: rnd(.22, .34), gap: rnd(.5, .8) }); }
+  },
   cables(Q,len,y,st){
     const n = irand(2,4);
     for (let i=0;i<n;i++){
@@ -216,6 +249,27 @@ const BRIDGE = {
     }
   },
 };
+// Crates riding the conveyor belts: one instanced batch, moved every frame. Conveyors are noted while a pair is
+// built (CONV_SINK); the list in use is rebuilt with the connections (see rebuildConnections in world.js).
+let CONV_SINK = null, conveyors = [];
+const CONV_MAX = 500, CONV_MESH = new THREE.InstancedMesh(U.box, M.crate, CONV_MAX);
+CONV_MESH.count = 0; CONV_MESH.frustumCulled = false; CONV_MESH.receiveShadow = true; CONV_MESH.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(CONV_MESH);
+const _cvM = new THREE.Matrix4(), _cvP = new THREE.Vector3(), _cvQ = new THREE.Quaternion(), _cvS = new THREE.Vector3(.22, .2, .24), _cvY = new THREE.Vector3(0, 1, 0);
+function setConveyors(list){
+  conveyors = list.map(c => { const len = c.a.distanceTo(c.b); return { ...c, len, n: Math.max(1, Math.floor(len/c.gap)), yaw: Math.atan2(-(c.b.z - c.a.z), c.b.x - c.a.x), ph: Math.random() }; });
+}
+function updateConveyors(t){
+  let i = 0;
+  for (const c of conveyors){
+    _cvQ.setFromAxisAngle(_cvY, c.yaw);
+    for (let k=0; k<c.n && i < CONV_MAX; k++){
+      let u = ((t*c.speed/c.len + c.ph + k/c.n) % 1 + 1) % 1; if (c.dir < 0) u = 1 - u;
+      _cvP.lerpVectors(c.a, c.b, u);
+      CONV_MESH.setMatrixAt(i++, _cvM.compose(_cvP, _cvQ, _cvS));
+    }
+  }
+  CONV_MESH.count = i; CONV_MESH.instanceMatrix.needsUpdate = true;
+}
 function buildConnections(lots){ for (const [a,b] of neighbors(lots)) connectPair(a, b); }
 function connectPair(a, b){
   {
@@ -231,7 +285,8 @@ function connectPair(a, b){
       if (used.some(u => Math.abs(u-y) < .8)) y = used[0] + (used[0]+.9 < top ? .9 : -.9);
       if (y < base+1) continue;
       used.push(y);
-      if (a.yard || b.yard || kinds.has('ind')) BRIDGE.pipes(Q,len,y);
+      if (kinds.size === 1 && kinds.has('ind') && t === 0 && chance(.5) && top + .5 - base >= 1.9){ BRIDGE.conveyor(Q, len, base + rnd(1.4, Math.min(1.6, top + .05))); used[used.length - 1] = base + 1.45; }
+      else if (a.yard || b.yard || kinds.has('ind')) BRIDGE.pipework(Q,len,y);
       else if (top < base+1.2) BRIDGE.cables(Q,len,y+.4,st);
       else if (kinds.has('high')) BRIDGE.tube(Q,len,y);
       else if (kinds.has('low')) (chance(.55) ? BRIDGE.catwalk : BRIDGE.cables)(Q,len,y,st);

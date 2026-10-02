@@ -26,6 +26,7 @@ function frame(now){
   updatePeople(dt, now/1000);
   music.update(rdt);
   updateSteam(dt, night);
+  updateConveyors(now/1000);
   updateRain(dt);
   // wind pushes the clouds: they drift faster in a strong wind and nearly stop when it's calm
   const windNow = S.wind * (S.rain ? 1.5 : 1), cDrift = .12 + windNow;

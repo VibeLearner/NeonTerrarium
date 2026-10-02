@@ -158,7 +158,7 @@ const SECTION_TYPES = {
   low:  { ground: [[buildTenement,6],[podHouse,1.5],[octoHouse,1.2],[deckHouse,1.3]], upper: [[buildTenement,5],[podHouse,2],[octoHouse,1.2]] },
   mid:  { ground: [[buildShophouse,5],[podHouse,2],[octoHouse,1.5],[deckHouse,2],[platformTower,1.3]], upper: [[buildShophouse,4],[podHouse,2],[octoHouse,1],[platformTower,1]] },
   high: { ground: [[buildTower,1]], upper: [[slabTower,2],[glassHotelTower,1.5],[glassHotelPodium,1],[roundTower,1],[twistTower,1],[gardenTower,1],[domeTower,1],[shellTower,1],[cascadeTerraces,.8]] },
-  ind:  { ground: [[buildFactory,1]], upper: [[hall,2],[silos,1]] },
+  ind:  { ground: [[buildFactory,2.2],[scrapShed,1],[gearWorkshop,1],[repairsBlock,1],[partsWarehouse,1],[lubeShed,.8]], upper: [[hall,2],[silos,1],[scrapShed,1],[repairsBlock,1],[partsWarehouse,1]] },
 };
 function pickWeighted(list){ const tot = list.reduce((s,[,w]) => s + w, 0); let r = R()*tot; for (const [f,w] of list){ if ((r -= w) <= 0) return f; } return list[0][0]; }
 // The white garden-city towers only stack with each other: on a white luxury section only another white one goes
@@ -242,7 +242,7 @@ function rebuildConnections(){
     const key = [a.x, a.z, b.x, b.z, a.height, b.height, a.cls, b.cls, a.firstFloors, b.firstFloors].map(v => typeof v === 'number' ? v.toFixed(2) : v).join('|') + '|' + JSON.stringify(a.style || DEFAULT_STYLE);
     used.add(key);
     let d = pairCache.get(key);
-    if (!d){ d = collect(() => withStyle(a.style, () => connectPair(a, b))); pairCache.set(key, d); }
+    if (!d){ CONV_SINK = []; d = collect(() => withStyle(a.style, () => connectPair(a, b))); d.conv = CONV_SINK; CONV_SINK = null; pairCache.set(key, d); }
     const rk = regKey(a.i, a.j);
     let r = byReg.get(rk); if (!r) byReg.set(rk, r = { keys: [], datas: [] });
     r.keys.push(key); r.datas.push(d);
@@ -255,6 +255,7 @@ function rebuildConnections(){
     const g = batchGroup(r.datas); world.add(g); connRegions.set(rk, { sig, group: g });
   }
   for (const [k, d] of pairCache) if (!used.has(k)){ disposeData(d); pairCache.delete(k); }
+  setConveyors([...pairCache.values()].flatMap(d => d.conv || []));
 }
 // a dock near the middle of the view, for drones that need a new home
 function nearPort(){
@@ -268,6 +269,7 @@ function syncAgents(){
   ports = []; carPads = []; emitters = [];
   for (const c of cells.values()){ ports.push(...c.ports); carPads.push(...c.pads); emitters.push(...c.emitters); }
   for (const m of megas.values()) if (m.data) emitters.push(...m.data.emitters);   // e.g. steam off the food carts
+  for (const d of pairCache.values()) if (d.emitters) emitters.push(...d.emitters);   // steam leaking from the pipework between buildings
   portLots = [...cells.values()].map(c => ({ x: c.x, z: c.z, height: c.height }));
   setupSteam();
   for (const d of drones) if (!ports.includes(d.at) || (d.phase !== 'inside' && !ports.includes(d.to))){

@@ -2235,16 +2235,19 @@ function luxPalette(h){   // from its own hash, so the towers' own layouts (draw
 }
 
 /* ---------- industrial lighting ---------- */
-// The industrial zone burns in the colours of a works at night: sodium orange, ember red, hazard yellow and a hot
-// orange. Each section takes two (from its own hash); its neon, trims, strip lamps and cool-lit rooms are swapped
+// The industrial zone burns in the colours of a works at night: sodium orange, ember red, hazard yellow, hot
+// orange, welding-arc white, safety green and toxic lime. Each section takes three (from its own hash); its neon, trims, strip lamps and cool-lit rooms are swapped
 // for these while it's generated, the same way the luxury towers get their gold (the glowing pipe liquids keep
 // their own colours).
-const IND_COLS = [['sodium', 0xffa23a, 0x5a3a18], ['ember', 0xff4a2a, 0x5a1e14], ['hazard', 0xffc21a, 0x5a4610], ['orange', 0xff6a14, 0x5a2a10]]
+const IND_COLS = [['sodium', 0xffa23a, 0x5a3a18], ['ember', 0xff4a2a, 0x5a1e14], ['hazard', 0xffc21a, 0x5a4610], ['orange', 0xff6a14, 0x5a2a10],
+  ['arc', 0xcfe6ff, 0x3a4250], ['green', 0x48ff7a, 0x14502a], ['toxic', 0xc6ff3a, 0x3a5010]]   // welding-arc white, safety green, toxic lime
   .map(([k, em, base]) => ({ k, neon: toon(base, { em, kind: 'neon' }), trim: toon(base, { em, kind: 'trim' }), lamp: toon(base, { em, kind: 'lamp' }) }));
 const IND_ROOM = [toon(0x5a3a20, { em: 0xffa050, kind: 'window' }), toon(0x5a2a1a, { em: 0xff7040, kind: 'window' })];
 function indPalette(h){
-  const n = IND_COLS.length, a = IND_COLS[h % n], b = IND_COLS[(h % n + 1 + (h >>> 8) % (n - 1)) % n];
-  const mats = new Map([[M.neonCyan, a.neon], [M.neonPink, b.neon], [M.neonAmber, a.neon], [M4.neonPurple, b.neon], [M4.neonBlue, a.neon], [M.holoBlue, a.neon],
-    [M.trimCyan, a.trim], [M.inNeon, a.lamp], [M.interiorCool, IND_ROOM[0]], [M.interiorPink, IND_ROOM[1]], [M.btCyan, IND_ROOM[1]]].filter(([s2]) => s2));
-  return { mats, glows: { cyan: a.k, pink: b.k, amber: a.k } };
+  // three different colours per section, so one building already mixes, say, orange trim, green strips and arc-white lamps
+  const n = IND_COLS.length, i0 = h % n, i1 = (i0 + 1 + (h >>> 8) % (n - 1)) % n; let i2 = (i0 + 1 + (h >>> 14) % (n - 1)) % n; if (i2 === i1) i2 = (i2 + 1) % n; if (i2 === i0) i2 = (i2 + 1) % n;
+  const a = IND_COLS[i0], b = IND_COLS[i1], c = IND_COLS[i2];
+  const mats = new Map([[M.neonCyan, a.neon], [M.neonPink, b.neon], [M.neonAmber, c.neon], [M4.neonPurple, b.neon], [M4.neonBlue, c.neon], [M.holoBlue, a.neon],
+    [M.trimCyan, c.trim], [M.inNeon, b.lamp], [M.interiorCool, IND_ROOM[0]], [M.interiorPink, IND_ROOM[1]], [M.btCyan, IND_ROOM[1]]].filter(([s2]) => s2));
+  return { mats, glows: { cyan: a.k, pink: b.k, amber: c.k } };
 }

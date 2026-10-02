@@ -148,6 +148,10 @@ for (const k of ['clutter','green','neon']){
 }
 $('reseed').addEventListener('click', () => { if ($('reseed').dataset.armed){ clearIsland(); delete $('reseed').dataset.armed; $('reseed').textContent = 'Clear island'; }
   else { $('reseed').dataset.armed = '1'; $('reseed').textContent = 'Click again to clear'; setTimeout(() => { delete $('reseed').dataset.armed; $('reseed').textContent = 'Clear island'; }, 2500); } });
+// the radio host forgets what it's said (two clicks, like clearing the island)
+$('resetRj').addEventListener('click', () => { const b = $('resetRj');
+  if (b.dataset.armed){ music.rj.reset(); delete b.dataset.armed; b.textContent = 'Radio host reset'; setTimeout(() => { b.textContent = 'Reset radio host'; }, 1800); }
+  else { b.dataset.armed = '1'; b.textContent = 'Click again to reset'; setTimeout(() => { if (b.dataset.armed){ delete b.dataset.armed; b.textContent = 'Reset radio host'; } }, 2500); } });
 function selectZone(z){
   S.zone = (z && S.zone !== z) ? z : null;
   document.querySelectorAll('.zone').forEach(b => { const on = b.dataset.zone === S.zone; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });

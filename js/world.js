@@ -120,7 +120,7 @@ function buildPlatform(c){
   const open = SIDES4.filter(([a, b]) => !cells.has(ckey(c.i + a, c.j + b)));
   const corners = CORNERS.filter(([sx, sz]) => open.some(([a, b]) => (a && a === sx) || (b && b === sz)));
   const pads = corners.length ? (R() < .55 ? 1 : 0) + (corners.length > 2 && R() < .3 ? 1 : 0) : 0;
-  const used = [];
+  const used = []; c.lifts = [];
   for (let k=0; k<pads; k++){
     let cn; do cn = pick(corners); while (used.includes(cn) && used.length < corners.length); used.push(cn);
     const px = cn[0]*(LOT/2 - rnd(.55, .65)), pz = cn[1]*(LOT/2 - rnd(.55, .65)), r = rnd(.34, .42);
@@ -132,6 +132,7 @@ function buildPlatform(c){
     cyl(M.padGlow, P, px, -1.71, pz, r + .08, .03);                    // the emitter face
     for (let a = 0; a < 4; a++){ const ca = Math.cos(a*PI/2 + PI/4), sa = Math.sin(a*PI/2 + PI/4);
       strut(M.metalDark, P, px + ca*r, -1.25, pz + sa*r, px + ca*(r + .32), -.66, pz + sa*(r + .32), .05); }   // brackets
+    c.lifts.push({ x: x + px, z: z + pz, r: r + .1 });
     glow(P, px, -1.75, pz, 'blue', .55 + r*.6); glow(P, px, -2.1, pz, 'cyan', 1.6);   // a small glow on the face, a faint haze below (fainter by day)
   }
   // open edges: railing, vines over the drop, plants along the rim, the odd pipe
@@ -310,7 +311,7 @@ function syncAgents(){
   for (const d of pairCache.values()) if (d.emitters) emitters.push(...d.emitters);   // steam leaking from the pipework between buildings
   portLots = [...cells.values()].map(c => ({ x: c.x, z: c.z, height: c.height }));
   VENTS = [...cells.values()].filter(c => c.vent).map(c => c.vent);   // steam vents, for the mist
-  makeSteamMap(VENTS);
+  makeSteamMap(VENTS, [...cells.values()].flatMap(c => c.lifts || []));   // steam vents for the mist, lift pads for their shimmer
   setupSteam();
   for (const d of drones) if (!ports.includes(d.at) || (d.phase !== 'inside' && !ports.includes(d.to))){
     d.phase = 'inside'; d.g.visible = false; d.at = nearPort(); d.timer = 1 + Math.random()*2;

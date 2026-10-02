@@ -144,7 +144,7 @@ const comp = new THREE.ShaderMaterial({
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
-    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, tSteam:{value:null}, steamExt:{value:1}, nVents:{value:0},
+    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, nLifts:{value:0}, tSteam:{value:null}, steamExt:{value:1}, nVents:{value:0},
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
@@ -152,7 +152,7 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform sampler2D tSteam; uniform float steamExt; uniform int nVents;
+    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform sampler2D tSteam; uniform float steamExt; uniform int nVents; uniform float nLifts;
     uniform float night; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
@@ -192,7 +192,33 @@ const comp = new THREE.ShaderMaterial({
     }
     void main(){
       vec2 px = 1.0/res;
-      vec4 c = texture2D(tColor, vUv);
+      // ---- heat shimmer under the lift pads: the air below each running pad wobbles what's behind it ----
+      // The pads are in the steam map's blue channel. The line of sight is sampled through the band of air under
+      // the pads (from their faces down about two units, strongest near the face); where it passes through a
+      // plume, the colour and clouds are read from a pixel or two to the side, rippling with time, in whole pixels.
+      vec2 sUv = vUv; float shim = 0.0;
+      if (nLifts > 0.5){
+        vec2 nd0 = vUv*2.0 - 1.0;
+        vec4 a0 = invVP*vec4(nd0, -1.0, 1.0); a0 /= a0.w; vec4 b0 = invVP*vec4(nd0, 1.0, 1.0); b0 /= b0.w;
+        vec3 o0 = a0.xyz, dr0 = normalize(b0.xyz - a0.xyz);
+        float rdS = rawD(vUv); vec4 f0 = invVP*vec4(nd0, rdS*2.0 - 1.0, 1.0); f0 /= f0.w; float tS = length(f0.xyz - o0);
+        if (dr0.y < -0.01){
+          float ta = (-1.72 - o0.y)/dr0.y, tb = min((-3.9 - o0.y)/dr0.y, tS);
+          if (tb > ta){
+            for (int i=0; i<8; i++){ vec3 p = o0 + dr0*(ta + (tb - ta)*(float(i) + .5)/8.0);
+              float w = texture2D(tSteam, p.xz/(2.0*steamExt) + .5).b, dep = clamp((-1.72 - p.y)/2.2, 0.0, 1.0);
+              shim += w*(1.0 - dep)*(1.0 - dep*.4); }
+            shim /= 8.0;
+          }
+        }
+        if (shim > .01){
+          float s1 = clamp(shim*7.0, 0.0, 1.0);
+          vec2 o = vec2(sin(vUv.y*res.y*.9 - time*15.0 + 2.0*sin(vUv.x*res.x*.35 + time*3.0)), .5*sin(vUv.x*res.x*.7 + time*11.0))*s1*2.2;
+          vec2 cand = vUv + floor(o + .5)*px;
+          if ((rawD(cand) >= 0.99999) == (rdS >= 0.99999)) sUv = cand;
+        }
+      }
+      vec4 c = texture2D(tColor, sUv);
       float rd = rawD(vUv);
       vec3 col;
       if (rd >= 0.99999){
@@ -333,9 +359,10 @@ const comp = new THREE.ShaderMaterial({
       }
       if (cloudOn > 0.5){
         // clouds come from their own lower-resolution pass (see cloudMat), upscaled with crisp pixels
-        vec4 cl = texture2D(tCloud, vUv);
+        vec4 cl = texture2D(tCloud, sUv);
         if (cl.a > 0.001){ float q = clamp(floor(cl.a*3.0 + dith*.6)/2.0, 0.0, 1.0); col = mix(col, cl.rgb/cl.a, q); }   // crisp pixel edges, one dithered step between
       }
+      if (shim > .01) col += vec3(.3, .6, 1.0)*clamp(shim*7.0, 0.0, 1.0)*(.04 + .08*night)*(.75 + .25*sin(time*31.0 + vUv.x*res.x*.5));   // the faint flickering wash of the running pad
       // ---- steam from the vents, with light through it ----
       // Mist only gathers round the steam vents in the streets. Every vent is drawn once into a top-down steam map of
       // the whole island (makeSteamMap, below): red a tight plume, green a wide one. Marching the line of sight
@@ -767,9 +794,9 @@ const STEAM_N = 512, STEAM_DATA = new Uint8Array(STEAM_N*STEAM_N*4);
 const steamTex = new THREE.DataTexture(STEAM_DATA, STEAM_N, STEAM_N, THREE.RGBAFormat);
 steamTex.minFilter = steamTex.magFilter = THREE.LinearFilter; steamTex.generateMipmaps = false;
 comp.uniforms.tSteam.value = steamTex;
-function makeSteamMap(vents){
+function makeSteamMap(vents, lifts = []){
   const ext = (GRID_MAX + 1)*LOT, k = STEAM_N/(2*ext);
-  comp.uniforms.steamExt.value = ext; comp.uniforms.nVents.value = vents.length;
+  comp.uniforms.steamExt.value = ext; comp.uniforms.nVents.value = vents.length; comp.uniforms.nLifts.value = lifts.length;
   STEAM_DATA.fill(0);
   const acc = new Float32Array(STEAM_N*STEAM_N*2);
   for (const v of vents){
@@ -781,6 +808,14 @@ function makeSteamMap(vents){
       }
   }
   for (let i = 0; i < STEAM_N*STEAM_N; i++){ STEAM_DATA[i*4] = Math.min(255, acc[i*2]*200); STEAM_DATA[i*4 + 1] = Math.min(255, acc[i*2 + 1]*200); }
+  // blue: the lift pads, a tight disc each (for the heat shimmer under them)
+  for (const v of lifts){
+    const cx = (v.x + ext)*k, cy = (v.z + ext)*k, R = .9*k;
+    for (let y = Math.max(0, Math.floor(cy - R)); y <= Math.min(STEAM_N - 1, Math.ceil(cy + R)); y++)
+      for (let x = Math.max(0, Math.floor(cx - R)); x <= Math.min(STEAM_N - 1, Math.ceil(cx + R)); x++){
+        const d = Math.hypot(x + .5 - cx, y + .5 - cy)/k, i = (y*STEAM_N + x)*4;
+        STEAM_DATA[i + 2] = Math.max(STEAM_DATA[i + 2], Math.round(255*Math.max(0, 1 - Math.pow(d/(v.r + .15), 2)))); }
+  }
   steamTex.needsUpdate = true;
 }
 // The finished frame is scaled to the screen with "sharp bilinear" filtering: every render pixel stays a crisp

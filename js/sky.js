@@ -561,17 +561,19 @@ const glowCopy = new THREE.ShaderMaterial({ uniforms: { t: { value: null } }, ve
   fragmentShader: 'uniform sampler2D t; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(t, vUv).rgb, 1.0); }', depthTest: false, depthWrite: false });
 const glowMix = new THREE.ShaderMaterial({
   uniforms: { t: { value: null }, tB: { value: null }, tH: { value: null }, night: GLOW_FX.night, on: { value: 1 },
-              lift: { value: new THREE.Vector3() }, gain: { value: new THREE.Vector3(1, 1, 1) }, sat: { value: 1 }, con: { value: 1 } },
+              lift: { value: new THREE.Vector3() }, gain: { value: new THREE.Vector3(1, 1, 1) }, sat: { value: 1 }, con: { value: 1 }, lit: { value: 0 } },
   vertexShader: fsVert,
   fragmentShader: `uniform sampler2D t; uniform sampler2D tB; uniform sampler2D tH; uniform float night; uniform float on; varying vec2 vUv;
-    uniform vec3 lift; uniform vec3 gain; uniform float sat; uniform float con;
+    uniform vec3 lift; uniform vec3 gain; uniform float sat; uniform float con; uniform float lit;
     float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y*0.75))); }
     float bayer(vec2 a){ return b2(0.5*a)*0.25 + b2(a); }
     void main(){
       vec3 c = texture2D(t, vUv).rgb;
       vec3 b = texture2D(tB, vUv).rgb, h = texture2D(tH, vUv).rgb;
-      float k = mix(.6, 1.7, night);
-      vec3 add = b*k + h*vec3(1.0, .42, .3)*mix(.3, 1.0, night);   // bloom, and a warm red halation round it
+      // with the night lights on, the thrown light already spreads each source's colour round it, so bloom pulls back
+      // (the wide halation most) and the two read as one lighting rather than stacking up
+      float k = mix(.6, 1.7, night)*mix(1.0, .62, lit);
+      vec3 add = b*k + h*vec3(1.0, .42, .3)*mix(.3, 1.0, night)*mix(1.0, .45, lit);   // bloom, and a warm red halation round it
       add = floor(add*20.0 + bayer(gl_FragCoord.xy)*.99)/20.0;       // stepped and dithered: pixel art, not a smooth haze
       c += add*on*(1.0 - .85*c);                                      // screen-like: bright pixels (a lit hotel facade) don't blow out to white
       // colour grading for the time of day: tinted shadows (lift), tinted highlights (gain), saturation, contrast
@@ -597,6 +599,7 @@ function glowPass(mat, target){ glowQuad.material = mat; renderer.setRenderTarge
 // run after the composite has been drawn into rtOut; leaves the finished frame in rtFinal
 function renderGlow(){
   glowMix.uniforms.on.value = S.bloom ? 1 : 0;
+  glowMix.uniforms.lit.value = NL_UNI.lightI.value > 0 ? Math.min(1, NL_UNI.lightI.value/.6) : 0;   // how much night light there is
   if (!S.bloom){ glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = rtB[0].texture; glowMix.uniforms.tH.value = rtHal[0].texture; glowPass(glowMix, rtFinal); return; }   // no bloom, but still graded
   const [b0, b1] = rtB, [h0, h1] = rtHal;
   glowPick.uniforms.t.value = rtOut.texture; glowPick.uniforms.texel.value.set(1/W, 1/H); glowPass(glowPick, b0);
@@ -656,7 +659,7 @@ function makeLightTarget(){
 }
 // after the colour and normal passes; fills rtLight for the composite
 function renderNightLights(night){
-  const I = S.lights === false ? 0 : Math.max(0, Math.min(1, (night - .15)/.6))*.9;
+  const I = S.lights === false ? 0 : Math.max(0, Math.min(1, (night - .15)/.6))*(S.bloom ? .72 : .9);   // a touch less when bloom is also on
   NL_UNI.lightI.value = I;
   renderer.setRenderTarget(rtLight); renderer.setClearColor(0x000000, 1); renderer.clear(true, false, false);
   if (I <= 0) return;

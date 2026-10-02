@@ -4,16 +4,16 @@
 /* ---------- time of day ---------- */
 const C = h => new THREE.Color(h);
 const KEYS = [
-  { h:0,    top:C(0x0b1226), bot:C(0x1B2A4A), sun:C(0x7086c9), si:.42, hs:C(0x34507a), hg:C(0x1a1f2e), hi:.55, night:1,   cloud:C(0x3a4766) },
-  { h:5,    top:C(0x0f1830), bot:C(0x2C3A52), sun:C(0x7086c9), si:.4,  hs:C(0x3a5480), hg:C(0x1f2233), hi:.55, night:.95, cloud:C(0x44506e) },
-  { h:6.6,  top:C(0x3a4f7e), bot:C(0xF2C9A5), sun:C(0xffb07a), si:.75, hs:C(0x8a9cc4), hg:C(0x5a4a4a), hi:.6,  night:.5,  cloud:C(0xe8b9a8) },
-  { h:9,    top:C(0x7fb2dc), bot:C(0xd4e6f0), sun:C(0xfff1dc), si:1.0, hs:C(0xbcd6ee), hg:C(0x8a7a66), hi:.6,  night:.04, cloud:C(0xf4f1ea) },
-  { h:12,   top:C(0x6aa6d6), bot:C(0xcfe4f2), sun:C(0xfff6e6), si:1.1, hs:C(0xc4dcf0), hg:C(0x8a7a66), hi:.62, night:0,   cloud:C(0xffffff) },
-  { h:15.5, top:C(0x78a8d2), bot:C(0xeed8bc), sun:C(0xffe6bc), si:1.0, hs:C(0xc8cfe0), hg:C(0x7a6a58), hi:.6,  night:.05, cloud:C(0xfbf0e2) },
-  { h:17.2, top:C(0x6f8fc0), bot:C(0xF6B35C), sun:C(0xffb35c), si:1.0, hs:C(0xc9a6a0), hg:C(0x6a4a3a), hi:.55, night:.35, cloud:C(0xF2C9A5) },
-  { h:18.9, top:C(0x2c3a6e), bot:C(0xc97a9a), sun:C(0xd77aa0), si:.5,  hs:C(0x6a6aa0), hg:C(0x3a2f44), hi:.5,  night:.8,  cloud:C(0x9a86b8) },
-  { h:20.5, top:C(0x0d1530), bot:C(0x1f2d52), sun:C(0x7086c9), si:.42, hs:C(0x34507a), hg:C(0x1a1f2e), hi:.55, night:1,   cloud:C(0x3a4766) },
-  { h:24,   top:C(0x0b1226), bot:C(0x1B2A4A), sun:C(0x7086c9), si:.42, hs:C(0x34507a), hg:C(0x1a1f2e), hi:.55, night:1,   cloud:C(0x3a4766) },
+  { h:0,    top:C(0x0c1230), bot:C(0x232a5a), sun:C(0x7086c9), si:.42, hs:C(0x34507a), hg:C(0x1a1f2e), hi:.55, night:1,   cloud:C(0x3a4766) },
+  { h:5,    top:C(0x111a3a), bot:C(0x323a66), sun:C(0x7086c9), si:.4,  hs:C(0x3a5480), hg:C(0x1f2233), hi:.55, night:.95, cloud:C(0x44506e) },
+  { h:6.6,  top:C(0x5a6cb8), bot:C(0xf4c4b0), sun:C(0xffb07a), si:.75, hs:C(0x8a9cc4), hg:C(0x5a4a4a), hi:.6,  night:.5,  cloud:C(0xe8b9a8) },
+  { h:9,    top:C(0x86a8f0), bot:C(0xcad8fa), sun:C(0xfff1dc), si:1.0, hs:C(0xbcd6ee), hg:C(0x8a7a66), hi:.6,  night:.04, cloud:C(0xf4f1ea) },
+  { h:12,   top:C(0x7fa4f2), bot:C(0xc0d2f8), sun:C(0xfff6e6), si:1.1, hs:C(0xc4dcf0), hg:C(0x8a7a66), hi:.62, night:0,   cloud:C(0xffffff) },
+  { h:15.5, top:C(0x86a6ee), bot:C(0xe2d6e8), sun:C(0xffe6bc), si:1.0, hs:C(0xc8cfe0), hg:C(0x7a6a58), hi:.6,  night:.05, cloud:C(0xfbf0e2) },
+  { h:17.2, top:C(0x7a8ede), bot:C(0xf8c4a0), sun:C(0xffb35c), si:1.0, hs:C(0xc9a6a0), hg:C(0x6a4a3a), hi:.55, night:.35, cloud:C(0xF2C9A5) },
+  { h:18.9, top:C(0x3e4592), bot:C(0xe49ab4), sun:C(0xd77aa0), si:.5,  hs:C(0x6a6aa0), hg:C(0x3a2f44), hi:.5,  night:.8,  cloud:C(0x9a86b8) },
+  { h:20.5, top:C(0x111a40), bot:C(0x2a3266), sun:C(0x7086c9), si:.42, hs:C(0x34507a), hg:C(0x1a1f2e), hi:.55, night:1,   cloud:C(0x3a4766) },
+  { h:24,   top:C(0x0c1230), bot:C(0x232a5a), sun:C(0x7086c9), si:.42, hs:C(0x34507a), hg:C(0x1a1f2e), hi:.55, night:1,   cloud:C(0x3a4766) },
 ];
 const cur = { top:new THREE.Color(), bot:new THREE.Color(), sun:new THREE.Color(), hs:new THREE.Color(), hg:new THREE.Color(), cloud:new THREE.Color(), si:1, hi:.6, night:0 };
 const RAIN_SKY = C(0x28324a), tmpC = new THREE.Color();
@@ -196,7 +196,10 @@ const comp = new THREE.ShaderMaterial({
       float rd = rawD(vUv);
       vec3 col;
       if (rd >= 0.99999){
-        vec3 sky = mix(skyBot, skyTop, smoothstep(0.05, 0.95, vUv.y));
+        // pastel pixel-art sky: the gradient in ten flat bands, with only a thin dithered seam where two meet
+        float tb = smoothstep(0.05, 0.95, vUv.y)*10.0, fb = fract(tb);
+        float tq = (floor(tb) + (fb > 0.82 ? step(bayer(gl_FragCoord.xy), (fb - 0.82)/0.18) : 0.0))/10.0;
+        vec3 sky = mix(skyBot, skyTop, tq);
         // The stars are a full 360-degree sky map. The view onto it is a flat strip: heading across, elevation up,
         // both in whole sky pixels, so turning the camera slides the stars straight sideways at an even pace (a
         // perspective view swung them through arcs, which felt wrong next to the flat, orthographic city). It turns
@@ -218,7 +221,10 @@ const comp = new THREE.ShaderMaterial({
           vec2 off = vec2(mix(m0, 1.0 - m0, hash(vec2(colI, row + 31.0))), mix(m0, 1.0 - m0, hash(vec2(row + 7.0, colI))));
           vec2 d = vec2((azw - (colI + off.x)*cw)/pix, (el - (row + off.y)*cellA)/pix);   // in pixels
           float r = length(d);
-          star = step(r, big > .5 ? 1.05 : .55)*(.45 + .55*bright)*(big > .5 && r > .55 ? .5 : 1.0);
+          if (big > .5){   // the bright ones twinkle as little four-point sparkles: a bright centre, arms fading out
+            float arm = abs(d.y) < .5 ? abs(d.x) : abs(d.x) < .5 ? abs(d.y) : 9.0, L = 1.6 + 1.2*bright;
+            star = arm < .5 ? 1.0 : arm < L ? (arm < 1.5 ? .6 : .32) : (r < 1.05 ? .25 : 0.0);
+          } else star = step(r, .55)*(.45 + .55*bright);
         }
         float above = smoothstep(-.02, .2, el);
         star *= night*above;

@@ -471,9 +471,10 @@ const glowPick = new THREE.ShaderMaterial({
     vec3 pickC(vec2 uv){
       vec3 c = texture2D(t, uv).rgb;
       float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), sat = mx > 0.0 ? (mx - mn)/mx : 0.0;
-      float key = mx*(.45 + .55*sat);                                 // coloured light counts, white surfaces much less
+      float yel = smoothstep(.2, .38, (min(c.r, c.g) - c.b)/max(mx, .001));   // warm yellow window light (not white, not beige walls)
+      float key = mx*(.45 + .55*max(sat, .95*yel));                  // coloured light counts, white surfaces much less
       float th = mix(.8, .5, night);                                // by day only the brightest lights bloom
-      return c*smoothstep(th, th + .25, key);
+      return c*smoothstep(th, th + .25, key)*(1.0 + .7*yel);         // and the windows glow a little stronger
     }
     void main(){   // a 4x4 average with four bilinear taps
       vec3 a = pickC(vUv + texel*vec2(-1.0, -1.0)) + pickC(vUv + texel*vec2(1.0, -1.0)) + pickC(vUv + texel*vec2(-1.0, 1.0)) + pickC(vUv + texel*vec2(1.0, 1.0));

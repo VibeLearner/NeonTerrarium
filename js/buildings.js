@@ -1374,7 +1374,8 @@ function fluidSeg(mat, P, ax, ay, az, bx, by, bz, r){
   const n = Math.max(1, Math.round(len/1.0));
   for (let k=0; k<=n; k++){ const u = k/n, du = Math.min(.5, .05/len); const u0 = Math.max(0, u - du), u1 = Math.min(1, u + du);
     pipeSeg(k % n === 0 ? mat : M.inPipe2, P, L(u0, 0), L(u0, 1), L(u0, 2), L(u1, 0), L(u1, 1), L(u1, 2), r*1.32); }
-  for (let u = .5/n; u < 1; u += 1/n) glow(P, L(u, 0), L(u, 1), L(u, 2), FLUID_GLOW[FLUID_PICK], .4 + r*2);
+  { const was = LUX; LUX = null;   // the liquids keep their own glow whatever the district's lights
+    for (let u = .5/n; u < 1; u += 1/n) glow(P, L(u, 0), L(u, 1), L(u, 2), FLUID_GLOW[FLUID_PICK], .4 + r*2); LUX = was; }
 }
 function pipeRun(mat, P, pts, r, flanges = true, glass = 0){
   if (glass) FLUID_PICK = Math.floor(R()*FLUIDS.length);   // one liquid per run
@@ -2231,4 +2232,19 @@ function luxPalette(h){   // from its own hash, so the towers' own layouts (draw
   const mats = new Map([[M.neonCyan, a.neon], [M.neonPink, b.neon], [M.neonAmber, a.neon], [M4.neonPurple, b.neon], [M4.neonBlue, a.neon], [M.holoBlue, a.neon],
     [M.trimCyan, a.trim], [M.lxLine, a.trim], [M.interiorCool, LUX_ROOM[0]], [M.interiorPink, LUX_ROOM[1]], [M4.pool, LUX_ROOM[0]]].filter(([s2]) => s2));
   return { mats, glows: { cyan: a.k, pink: b.k, amber: a.k, blue: a.k, orange: b.k, green: a.k } };
+}
+
+/* ---------- industrial lighting ---------- */
+// The industrial zone burns in the colours of a works at night: sodium orange, ember red, hazard yellow and a hot
+// orange. Each section takes two (from its own hash); its neon, trims, strip lamps and cool-lit rooms are swapped
+// for these while it's generated, the same way the luxury towers get their gold (the glowing pipe liquids keep
+// their own colours).
+const IND_COLS = [['sodium', 0xffa23a, 0x5a3a18], ['ember', 0xff4a2a, 0x5a1e14], ['hazard', 0xffc21a, 0x5a4610], ['orange', 0xff6a14, 0x5a2a10]]
+  .map(([k, em, base]) => ({ k, neon: toon(base, { em, kind: 'neon' }), trim: toon(base, { em, kind: 'trim' }), lamp: toon(base, { em, kind: 'lamp' }) }));
+const IND_ROOM = [toon(0x5a3a20, { em: 0xffa050, kind: 'window' }), toon(0x5a2a1a, { em: 0xff7040, kind: 'window' })];
+function indPalette(h){
+  const n = IND_COLS.length, a = IND_COLS[h % n], b = IND_COLS[(h % n + 1 + (h >>> 8) % (n - 1)) % n];
+  const mats = new Map([[M.neonCyan, a.neon], [M.neonPink, b.neon], [M.neonAmber, a.neon], [M4.neonPurple, b.neon], [M4.neonBlue, a.neon], [M.holoBlue, a.neon],
+    [M.trimCyan, a.trim], [M.inNeon, a.lamp], [M.interiorCool, IND_ROOM[0]], [M.interiorPink, IND_ROOM[1]], [M.btCyan, IND_ROOM[1]]].filter(([s2]) => s2));
+  return { mats, glows: { cyan: a.k, pink: b.k, amber: a.k } };
 }

@@ -190,7 +190,7 @@ function buildStack(c){
   c.sections.forEach((sec, k) => {
     R = mulberry32(hash('sec', c.i, c.j, k, sec.zone, sec.seed));
     const st = STY[sec.zone], upper = k > 0, last = k === c.sections.length - 1;
-    LUX = sec.zone === 'high' ? luxPalette(hash('lux', c.i, c.j, k, sec.seed)) : null;
+    LUX = sec.zone === 'high' ? luxPalette(hash('lux', c.i, c.j, k, sec.seed)) : sec.zone === 'ind' ? indPalette(hash('ind', c.i, c.j, k, sec.seed)) : null;   // each district's own light colours
     const lot = { x: c.x, z: c.z, cls: sec.zone, elev: 0, base: y, signs: 0, occupied: true, height: 0, floors: 0 };
     lot.padOK = last && R() < .3;
     if (upper){   // a deck for the new section to stand on

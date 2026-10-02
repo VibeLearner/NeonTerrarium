@@ -224,8 +224,8 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
     [...text].forEach((ch, k) => { F[ch].forEach((r, yy) => [...r].forEach((b, xx) => { if (b === '1') g.fillRect(x + xx, 2 + yy, 1, 1); })); x += ws[k] + 1; });
     SPR.img[kind] = c.toDataURL(); SPR.size[kind] = [w, h]; SPR.anchor[kind] = .5;
   };
-  make('sign_w_scrap', 'SCRAP', '#6aff8a'); make('sign_w_gear', 'GEAR', '#ff8a3a', true); make('sign_w_repairs', 'REPAIRS', '#5af0d0');
-  make('sign_w_parts', 'PARTS', '#6ac8ff'); make('sign_w_lube', 'LUBE.24H', '#ffc060');
+  make('sign_w_scrap', 'SCRAP', '#ff6a3a'); make('sign_w_gear', 'GEAR', '#ff8a3a', true); make('sign_w_repairs', 'REPAIRS', '#ffb03a');
+  make('sign_w_parts', 'PARTS', '#ff4a3a'); make('sign_w_lube', 'LUBE.24H', '#ffc060');
   // the commercial strip's shops: the container stack's floors, the spiral tower's ramen bar, the corner market
   make('sign_w_barber', 'BARBER', '#ff6ae0'); make('sign_w_meds', 'MEDS', '#7aff8a', true); make('sign_w_herbs', 'HERBS', '#9aff6a');
   make('sign_w_fixit', 'FIX-IT', '#ffe04a'); make('sign_w_stitch', 'STITCH', '#5ae8ff'); make('sign_w_tea', 'ROOF.TEA', '#5af0d0');
@@ -469,7 +469,7 @@ const GLOW_PTS = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
 });
 const GLOW_FIXED = { red: .95, blue: .85 };
-const GLOW_FLK = { pink: 'neon', cyan: 'neon', amber: 'neon', warm: 'bulb', orange: 'neon', gold: 'neon', ivory: 'neon', lemon: 'neon', rosegold: 'neon', platinum: 'neon' };   // halos flicker at the same odds as their kind of light
+const GLOW_FLK = { pink: 'neon', cyan: 'neon', amber: 'neon', warm: 'bulb', orange: 'neon', gold: 'neon', ivory: 'neon', lemon: 'neon', rosegold: 'neon', platinum: 'neon', ember: 'neon', sodium: 'neon', hazard: 'neon', orange: 'neon' };   // halos flicker at the same odds as their kind of light
 function glowPoints(gl){
   let n = 0; for (const k in gl) n += gl[k].length/4;
   const pos = new Float32Array(n*3), size = new Float32Array(n), col = new Float32Array(n*4), flk = new Float32Array(n), ons = new Float32Array(n);

@@ -1640,10 +1640,13 @@ function policeBikes(m, crew){
         b.spr.position.set(b.x, b.y + bob, b.z); b.spr.scale.set(w/PX*BIKE_K, h/PX*BIKE_K, 1);
         b.hum.position.set(b.x, b.y - .02, b.z); b.hum.material.opacity = (b.mode === 'park' ? .15 : .5)*(.85 + .15*Math.sin(time*20 + b.idx));
         b.ry = b.y + bob;
-        const call = b.mode === 'rush' || b.mode === 'pursue' || b.mode === 'search' || (b.passenger && b.mode === 'home');
-        const ph = (time*2.4 + b.idx*.37) % 1, flash = (time*15) % 1 < .6;
-        b.siren.material.color.setHex(ph < .5 ? 0xff2030 : 0x2a6cff); b.siren.material.opacity = call && flash ? .85*b.alpha : 0;
-        b.siren.position.set(b.x - b.hx*.15, b.ry + h/PX*BIKE_K*.8, b.z - b.hz*.15);
+        // the light bar flashes red and blue whenever the bike is on the move (faster and brighter on a call),
+        // the red lamp on one side and the blue on the other, each with a quick double flash
+        const moving = b.mode !== 'park' && b.mode !== 'enter', call = b.mode === 'rush' || b.mode === 'pursue' || b.mode === 'search' || (b.passenger && b.mode === 'home');
+        const ph = (time*(call ? 2.6 : 1.6) + b.idx*.37) % 1, red2 = ph < .5, f = (ph % .5)/.5, flash = f < .18 || (f > .3 && f < .48);
+        b.siren.material.color.setHex(red2 ? 0xff2030 : 0x2a6cff); b.siren.material.opacity = moving && flash ? (call ? .95 : .7)*b.alpha : 0;
+        const side = (red2 ? -1 : 1)*.13;
+        b.siren.position.set(b.x - b.hx*.15 + _bkR.x*side, b.ry + h/PX*BIKE_K*.8, b.z - b.hz*.15 + _bkR.z*side);
       }
     },
     dispose(){ for (const b of bikes){ scene.remove(b.spr, b.hum, b.siren); b.mat.dispose(); b.hum.material.dispose(); b.siren.material.dispose(); if (b.passenger){ b.passenger.state = 'away'; b.passenger = null; } } POLICE_BIKES = []; },

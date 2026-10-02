@@ -129,7 +129,7 @@ function lawn(P, n){
   let b = buckets.get(GRASS_MAT); if (!b){ b = { p: [], n: [], d: [], f: null, u: [] }; buckets.set(GRASS_MAT, b); }
   const s = LOT/n;
   for (let i=0;i<n;i++) for (let j=0;j<n;j++){
-    const r = R(), k = r < .7 ? 0 : r < .88 ? 1 : 2, u0 = k/3 + .001, u1 = (k + 1)/3 - .001, x0 = -LOT/2 + i*s, z0 = -LOT/2 + j*s;
+    const k = 0, u0 = k/3 + .001, u1 = (k + 1)/3 - .001, x0 = -LOT/2 + i*s, z0 = -LOT/2 + j*s;
     const C = [[x0, z0, u0, 1], [x0 + s, z0, u1, 1], [x0 + s, z0 + s, u1, 0], [x0, z0 + s, u0, 0]];
     for (const q of [0, 2, 1, 0, 3, 2]){ const [cx, cz, u, v] = C[q]; _gq.set(cx, .058, cz).applyMatrix4(P); b.p.push(_gq.x, _gq.y, _gq.z); b.n.push(0, 1, 0); b.u.push(u, v); b.d.push(0); }
   }
@@ -186,10 +186,10 @@ function buildPlatformBody(c){
     box(G.asph, P, 0, .012, 0, LOT, .025, LOT);
     if (c.green === 'grass'){   // laid to lawn, edge to edge, with grass growing up out of it
       lawn(P, 4);
-      // a dense even carpet of tiny tufts: a 13 x 13 grid, each nudged off its spot so no rows show
-      const n = 13, st = LOT/n;
-      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++){ const r = R(), kind = r < .7 ? 'gt' + irand(0, 4) : 'gt' + irand(6, 9);
-        plant(kind, P, -LOT/2 + (i + .5 + rnd(-.4, .4))*st, .06, -LOT/2 + (j + .5 + rnd(-.4, .4))*st, rnd(.2, .3)); }
+      // a garden lawn: one kind of short grass, packed in an even overlapping grid so it reads as a single carpet
+      const n = 20, st = LOT/n;
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++)
+        plant('gt0', P, -LOT/2 + (i + .5 + rnd(-.2, .2))*st, .06, -LOT/2 + (j + .5 + rnd(-.2, .2))*st, rnd(.24, .28));
     }
     else { const n = 7, st = LOT/n;
       for (let i=0;i<n;i++) for (let j=0;j<n;j++) if (!chance(.04)) box(pick(TILES.mid), P, (i-(n-1)/2)*st, .03, (j-(n-1)/2)*st, st - .05, .045, st - .05); }

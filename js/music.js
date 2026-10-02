@@ -91,6 +91,11 @@ const music = (() => {
   vo.addEventListener('error', () => voNext());
   // static in, the talk, static out; then done()
   function talk(name, done){
+    if (name.startsWith('interrupt')){   // a cut-in: two different bursts of static back to back, then the host, then straight back to the song
+      const all = STATIC_IN.concat(STATIC_OUT), a = pick(all); let b = pick(all); while (b === a) b = pick(all);
+      voQ = [{ file: 'static/' + a + '.mp3', kind: 'static' }, { file: 'static/' + b + '.mp3', kind: 'static' }, { file: name + '.mp3', kind: 'intro' }];
+      voDone = done || null; voLore = null; talking = true; voNext(); return;
+    }
     voQ = [{ file: 'static/' + pick(STATIC_IN) + '.mp3', kind: 'static' }, { file: name + '.mp3', kind: name.startsWith('lore') ? 'lore' : 'intro' }, { file: 'static/' + pick(STATIC_OUT) + '.mp3', kind: 'static' }];
     voDone = done || null; voLore = name.startsWith('lore') ? name : null; talking = true; voNext();
   }

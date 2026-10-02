@@ -1405,13 +1405,17 @@ function mkVault(P, cx, y, cz, len, r, alongX){
   strut(M.mallGlint, Q, -len/2 + .1, Math.sin(PI*.3)*r + .01, Math.cos(PI*.3)*r, len/2 - .1, Math.sin(PI*.3)*r + .01, Math.cos(PI*.3)*r, .05);   // a glint
   for (const s of [-1, 1]) box(M.mkTeal2, Q, 0, .06, s*r, len + .12, .14, .12);
 }
-// worn paint, rust and old posters, as flat patches on a wall face
+// worn paint, rust and old posters, as flat patches on a wall face. Every box is at least MIN_T thick (core.js), so
+// a patch is placed by its outer face. Patches overlap, so each sits at its own depth (a couple of millimetres
+// apart): two faces at the same depth fight over which is in front and flicker. With the default z they all stay
+// behind the window glass, whose face stands about .04 out from the wall.
 function mkPatches(F, len, y0, h, n, z = .015){
+  const at = front => front - MIN_T/2;
   for (let k=0; k<n; k++){
     const w = rnd(.25, .9), hh = Math.min(h - .1, rnd(.15, .6));
-    box(chance(.35) ? M.mkRust : chance(.2) ? M.mkTeal3 : pick(MK_PAINT), F, rnd(-len/2 + w/2, len/2 - w/2), rnd(y0 + hh/2 + .05, y0 + h - hh/2 - .05), z, w, hh, .02);
+    box(chance(.35) ? M.mkRust : chance(.2) ? M.mkTeal3 : pick(MK_PAINT), F, rnd(-len/2 + w/2, len/2 - w/2), rnd(y0 + hh/2 + .05, y0 + h - hh/2 - .05), at(z + .005 + .002*(k % 6)), w, hh, MIN_T);
   }
-  for (let k=0; k<Math.round(len/2.5); k++) box(M.mkRust2, F, rnd(-len/2 + .2, len/2 - .2), y0 + h - rnd(.3, .6), z + .004, rnd(.06, .14), rnd(.3, .7), .02);   // rust running down
+  for (let k=0; k<Math.round(len/2.5); k++) box(M.mkRust2, F, rnd(-len/2 + .2, len/2 - .2), y0 + h - rnd(.3, .6), at(z + .0175 + .001*(k % 2)), rnd(.06, .14), rnd(.3, .7), MIN_T);   // rust running down, over the paint
 }
 // a striped awning at t on face F: from the wall at height y, out and down
 function mkAwning(F, t, y, w, out, drop, pal){
@@ -1460,7 +1464,7 @@ function mkShopRow(F, len, y0, h, o){
     }
     if (chance(o.signOdds ?? .85)){
       const kind = pick(MKT_SIGNS), [pw, ph] = SPR.size[kind], k = Math.min(.95, (sw - .3)*PX/pw, .62*PX/ph);
-      plant(kind, F, tc + rnd(-.12, .12), fy, .035, k, 'c', true); glow(F, tc, fy, .3, MKT_GLOW[kind], .8 + k);
+      plant(kind, F, tc + rnd(-.12, .12), fy, .06, k, 'c', true); glow(F, tc, fy, .3, MKT_GLOW[kind], .8 + k);
     }
     if (o.awning && chance(o.awnOdds ?? .9)) mkAwning(F, tc, y0 + h - .52, sw - .08, o.out || .95, o.drop || .32, chance(.3) ? MK_RAINBOW : pick(MK_STRIPE));
     if (o.stall && !entry){
@@ -1479,7 +1483,7 @@ function mkUpperFace(F, len, y0, h, o = {}){
   const n = Math.max(1, Math.round(len/1.3)), seg = len/n;
   for (let k=0; k<n; k++){
     const t = -len/2 + (k + .5)*seg, ww = seg - .35, wh = h*.58, wy = y0 + h*.52;
-    if (chance(o.bare ?? .2)){ if (chance(.7)) plant(pick(MKT_GRAF), F, t, wy, .03, rnd(.8, 1.1), 'c', true); continue; }
+    if (chance(o.bare ?? .2)){ if (chance(.7)) plant(pick(MKT_GRAF), F, t, wy, .06, rnd(.8, 1.1), 'c', true); continue; }
     box(chance(o.lit ?? .7) ? pick(MK_LIT) : M.glassDark, F, t, wy, .015, ww, wh, .03);
     box(M.mkTeal3, F, t, wy - wh/2 - .03, .07, ww + .12, .05, .14);                         // sill
     box(M.mkTeal3, F, t, wy + wh/2 + .02, .03, ww + .08, .05, .06);
@@ -1598,8 +1602,8 @@ function buildMarketMall(m){
   { const F = under(P, T(vx, 0, -.69, 0));   // the hood's face: a lit window, patches, graffiti
     box(M.mkLit2, F, 0, vy + .6, .005, 2.2, .8, .02); for (let t = -1.1; t <= 1.11; t += .55) box(M.mkTeal3, F, t, vy + .6, .02, .04, .82, .03);
     box(M.mkTeal3, F, 0, vy + .2, .025, 2.3, .05, .05); box(M.mkTeal3, F, 0, vy + 1.0, .02, 2.3, .04, .04);
-    for (let k=0; k<6; k++){ const a = rnd(.2, PI - .2), rr = rnd(1.15, 1.7), w = rnd(.2, .5); box(chance(.4) ? M.mkRust : pick(MK_PAINT), F, Math.cos(a)*rr, vy + Math.sin(a)*rr, .01, w, rnd(.15, .35), .02); }
-    plant(pick(MKT_GRAF), F, rnd(-.6, .6), vy + 1.45, .03, 1.0, 'c', true); }
+    for (let k=0; k<6; k++){ const a = rnd(.2, PI - .2), rr = rnd(1.15, 1.7), w = rnd(.2, .5); box(chance(.4) ? M.mkRust : pick(MK_PAINT), F, Math.cos(a)*rr, vy + Math.sin(a)*rr, .034 + .002*k - MIN_T/2, w, rnd(.15, .35), MIN_T); }
+    plant(pick(MKT_GRAF), F, rnd(-.6, .6), vy + 1.45, .06, 1.0, 'c', true); }
   const yA = yT + 2.3, ax = 2.15;
   for (const s of [-1, 1]){ box(M.metalDark, P, vx + s*ax, (yT + yA)/2, -.66, .09, yA - yT, .09); box(M.metalDark, P, vx + s*(ax - .15), (yT + yA)/2, -.66, .06, yA - yT, .06); }
   put(U.halfRing, M.metalDark, under(P, T(vx, yA, -.66, 0, ax, ax, ax*1.5))); put(U.halfRing, M.metalDark, under(P, T(vx, yA, -.66, 0, ax - .15, ax - .15, (ax - .15)*1.5)));
@@ -1643,7 +1647,7 @@ function buildMarketMall(m){
   dish(P, 4.25, yR, -2.75, .4, -.6, -.5, true);
   // the smaller vault on the front-right, on a plinth with a painted banner
   box(M.mkTeal2, P, 3.2, y2 + .25, -.55, 2.8, .5, 2.6);
-  { const F = under(P, T(3.2, 0, .75, 0)); box(MK_PAINT[3], F, 0, y2 + .26, .01, 2.6, .42, .02); plant(pick(MKT_GRAF), F, 0, y2 + .27, .03, .85, 'c', true);
+  { const F = under(P, T(3.2, 0, .75, 0)); box(MK_PAINT[3], F, 0, y2 + .26, .01, 2.6, .42, .02); plant(pick(MKT_GRAF), F, 0, y2 + .27, .06, .85, 'c', true);
     const Fr = under(P, T(4.6, 0, -.55, PI/2)); box(MK_PAINT[1], Fr, 0, y2 + .26, .01, 2.4, .42, .02); }
   mkVault(P, 3.2, y2 + .5, -.55, 2.6, 1.2, false);
   // cables everywhere: slung across the facades and between the roof masses

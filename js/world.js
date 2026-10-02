@@ -184,7 +184,11 @@ function buildPlatformBody(c){
   if (c.sections.length) groundLot({ x, z, cls: c.sections[0].zone, elev: 0, base: CURB, deck: false, cross: cells.has(ckey(c.i, c.j + 1)) });
   else {
     box(G.asph, P, 0, .012, 0, LOT, .025, LOT);
-    if (c.green === 'grass') lawn(P, 4);   // laid to lawn, edge to edge
+    if (c.green === 'grass'){   // laid to lawn, edge to edge, with grass growing up out of it
+      lawn(P, 4);
+      for (let k = 0; k < irand(34, 44); k++){ const r = R(), kind = r < .75 ? 'gt' + irand(0, 4) : r < .96 ? 'gt' + irand(6, 9) : 'gt5';
+        plant(kind, P, rnd(-LOT/2 + .2, LOT/2 - .2), .06, rnd(-LOT/2 + .2, LOT/2 - .2), kind === 'gt5' ? rnd(.5, .6) : rnd(.38, .55)); }   // small, so it reads as grass, not shrubs
+    }
     else { const n = 7, st = LOT/n;
       for (let i=0;i<n;i++) for (let j=0;j<n;j++) if (!chance(.04)) box(pick(TILES.mid), P, (i-(n-1)/2)*st, .03, (j-(n-1)/2)*st, st - .05, .045, st - .05); }
     for (let k=0;k<(chance(.75) ? 1 : 0) + (chance(.2) ? 1 : 0);k++) plant(pick(['bush','bushFlower','g_fern3','bonsai']), P, rnd(-1.3,1.3), .05, rnd(-1.3,1.3), rnd(.7,.95));

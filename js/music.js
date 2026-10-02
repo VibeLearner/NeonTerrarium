@@ -35,6 +35,11 @@ const rj = (() => {
   if (!st || typeof st !== 'object') st = {};
   st = Object.assign({ songs: 0, lore1: false, lore2: false, after: 0, lore2At: Math.random() < .5 ? 3 : 4, used: [], streak: 0 }, st);
   const save = () => { try { localStorage.setItem(RJ_KEY, JSON.stringify(st)); } catch (e) {} };
+  if (st.lore2 && st.l2song === undefined) st.l2song = st.songs;   // saved before the love letter existed
+  // the love letter: two songs after the one lore 2 played over, on the third (the song before it stays clean)
+  // (songs counts the songs already started: while planning the next one it's one behind, once it's started it isn't)
+  const letterDue = () => st.lore2 && !st.loveletter && st.l2song !== undefined && st.songs - st.l2song >= 2;
+  const beforeLetter = (started = 0) => st.lore2 && !st.loveletter && st.l2song !== undefined && st.songs - started - st.l2song === 1;
   save();
   return {
     // what goes with the song that's about to start: 'lore1', 'lore2', an intro's name, or nothing
@@ -42,6 +47,8 @@ const rj = (() => {
       if (st.songs === 0) return null;                                   // the first song plays on its own
       if (!st.lore1) return 'lore1';
       if (!st.lore2 && st.after >= st.lore2At) return 'lore2';
+      if (letterDue()) return 'loveletter';
+      if (beforeLetter()) return null;
       const left = RJ_INTROS.filter(n => !st.used.includes(n));
       const beforeLore2 = !st.lore2 && st.after === st.lore2At - 1;     // the song just before lore 2 stays clean
       if (!left.length || st.streak >= 2 || beforeLore2 || Math.random() > RJ_INTRO_ODDS) return null;
@@ -50,7 +57,8 @@ const rj = (() => {
     // a song has started, with this talk (or none)
     started(talk){
       st.songs++;
-      if (talk === 'lore1' || talk === 'lore2') st.streak = 0;
+      if (talk === 'lore2') st.l2song = st.songs;
+      if (talk === 'lore1' || talk === 'lore2' || talk === 'loveletter') st.streak = 0;
       else if (talk){ st.streak++; if (!st.used.includes(talk)) st.used.push(talk); }
       else st.streak = 0;
       if (talk === 'lore1') st.after = 0; else if (st.lore1 && st.songs > 1) st.after++;
@@ -58,7 +66,7 @@ const rj = (() => {
     },
     // a song (with nothing said over its start) has begun: maybe an interrupt for partway through it
     planInterrupt(talk){
-      if (talk || !st.lore1 || (!st.lore2 && st.after >= st.lore2At - 1)) return null;
+      if (talk || !st.lore1 || (!st.lore2 && st.after >= st.lore2At - 1) || beforeLetter(1)) return null;
       const left = RJ_INTERRUPTS.filter(n => !st.used.includes(n));
       if (!left.length || st.streak >= 2 || Math.random() > RJ_INTERRUPT_ODDS) return null;
       return left[Math.floor(Math.random()*left.length)];
@@ -66,7 +74,7 @@ const rj = (() => {
     interrupted(name){ if (!st.used.includes(name)) st.used.push(name); st.streak++; save(); },
     loreDone(name){ st[name] = true; save(); },
     get state(){ return st; },
-    reset(){ st = { songs: 0, lore1: false, lore2: false, after: 0, lore2At: Math.random() < .5 ? 3 : 4, used: [], streak: 0 }; save(); },
+    reset(){ st = { songs: 0, lore1: false, lore2: false, loveletter: false, after: 0, lore2At: Math.random() < .5 ? 3 : 4, used: [], streak: 0 }; save(); },
   };
 })();
 const music = (() => {
@@ -96,8 +104,8 @@ const music = (() => {
       voQ = [{ file: 'static/' + a + '.mp3', kind: 'static' }, { file: 'static/' + b + '.mp3', kind: 'static' }, { file: name + '.mp3', kind: 'intro' }];
       voDone = done || null; voLore = null; talking = true; voNext(); return;
     }
-    voQ = [{ file: 'static/' + pick(STATIC_IN) + '.mp3', kind: 'static' }, { file: name + '.mp3', kind: name.startsWith('lore') ? 'lore' : 'intro' }, { file: 'static/' + pick(STATIC_OUT) + '.mp3', kind: 'static' }];
-    voDone = done || null; voLore = name.startsWith('lore') ? name : null; talking = true; voNext();
+    voQ = [{ file: 'static/' + pick(STATIC_IN) + '.mp3', kind: 'static' }, { file: name + '.mp3', kind: (name.startsWith('lore') || name === 'loveletter') ? 'lore' : 'intro' }, { file: 'static/' + pick(STATIC_OUT) + '.mp3', kind: 'static' }];
+    voDone = done || null; voLore = (name.startsWith('lore') || name === 'loveletter') ? name : null; talking = true; voNext();
   }
   function hush(){ voQ = []; voDone = null; voLore = null; talking = false; vo.pause(); vo.removeAttribute('src'); if (cutting){ cutting = false; duck = 1; } }
   el.addEventListener('error', () => { if (on) setTimeout(() => next(), 800); });

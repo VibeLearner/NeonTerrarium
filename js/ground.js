@@ -208,18 +208,30 @@ const BRIDGE = {
   // Industrial pipework between two works: one to three round pipes, each running straight across, looping up and
   // over, or jogging sideways, with elbows and flanges; a valve wheel on a loop now and then, the odd leak of steam
   pipework(Q,len,y){
-    const zs = [-.28, 0, .28].sort(() => R() - .5), n = irand(1, 3);
+    // Chunky industrial pipework between two works, after the overgrown-pipes reference: one to three pipes, each
+    // straight across, looping up and over, or jogging sideways; many have glass sections full of glowing fluid. Copper
+    // elbows and collars, valve wheels, a pressure gauge, steam leaks; moss on top, ferns sprouting, vines hanging.
+    const zs = [-.3, 0, .3].sort(() => R() - .5), n = irand(1, 3);
     for (let i=0;i<n;i++){
-      const z = zs[i], r = rnd(.055, .095), mat = pick([M.inPipe, M.inRust, M.inPipe2, M.rust]), yy = y + i*.06, shape = R(), a = rnd(.2, .45);
+      const z = zs[i], r = rnd(.1, .13), mat = pick([M.inPipe, M.inRust, M.inPipe2, M.rust]), yy = y + i*.08, shape = R(), a = rnd(.2, .42);
       let pts, top = yy;
       if (shape < .35) pts = [[-len/2, yy, z], [len/2, yy, z]];
-      else if (shape < .75){ const up = rnd(.35, .7); top = yy + up; pts = [[-len/2, yy, z], [-a, yy, z], [-a, top, z], [a, top, z], [a, yy, z], [len/2, yy, z]]; }
-      else { const z2 = Math.max(-.34, Math.min(.34, z + (z > 0 ? -1 : 1)*rnd(.18, .3))); pts = [[-len/2, yy, z], [-a, yy, z], [-a, yy, z2], [len/2, yy, z2]]; }
-      pipeRun(mat, Q, pts, r, true);
-      if (top > yy && chance(.4)){ put(U.torus, M.red2, under(Q, T(0, top + r + .06, z, 0, .22, .22, .22, PI/2))); cyl(M.metalDark, Q, 0, top + r*.5 + .03, z, .015, .07); }
-      if (chance(.15)) emitters.push(new THREE.Vector3(rnd(-a, a), top + r, z).applyMatrix4(Q));
+      else if (shape < .75){ const up = rnd(.4, .75); top = yy + up; pts = [[-len/2, yy, z], [-a, yy, z], [-a, top, z], [a, top, z], [a, yy, z], [len/2, yy, z]]; }
+      else { const z2 = Math.max(-.32, Math.min(.32, z + (z > 0 ? -1 : 1)*rnd(.2, .3))); pts = [[-len/2, yy, z], [-a, yy, z], [-a, yy, z2], [len/2, yy, z2]]; }
+      pipeRun(mat, Q, pts, r, true, i === 0 ? .85 : .45);
+      // a valve wheel on a stem, now and then a gauge
+      if (chance(.55)){ const vx = rnd(-len/2 + .3, len/2 - .3), vy = shape >= .35 && shape < .75 && Math.abs(vx) < a ? top : yy;
+        cyl(M.metalDark, Q, vx, vy + r + .07, z, .02, .14); put(U.torus, chance(.5) ? M.red2 : mat, under(Q, T(vx, vy + r + .15, z, 0, .26, .26, .26, PI/2)));
+        if (chance(.5)){ cyl(M.metalDark, Q, vx + .18, vy + r + .06, z, .015, .12); put(U.cyl16, M.white2, under(Q, T(vx + .18, vy + r + .16, z, 0, .1, .03, .1, PI/2))); } }
+      if (chance(.2)) emitters.push(new THREE.Vector3(rnd(-a, a), top + r, z).applyMatrix4(Q));
+      // overgrowth: moss along the top, ferns sprouting, vines hanging off the run
+      if (chance(.85*S.green)){
+        for (let k=0; k<irand(2, 4); k++){ const mx = rnd(-len/2 + .2, len/2 - .2); blob(M.inMoss, Q, mx, yy + r*.85, z, rnd(.07, .11), .45); }
+        if (chance(.6)) plant(pick(['fern','g_fern2','bush','succulent']), Q, rnd(-len/3, len/3), yy + r*.9, z, rnd(.5, .7));
+        for (let k=0; k<irand(1, 3); k++) plant(pick(['vines','h_ivy','pothos','l_mossroots','h_vine3']), Q, rnd(-len/2 + .2, len/2 - .2), yy - r*.7, z + (z >= 0 ? 1 : -1)*r*.9, rnd(.55, .8), 't', true);
+      }
     }
-    for (const s of [-1, 1]) box(M.metalDark, Q, s*(len/2 - .3), y - .13, 0, .05, .04, .8);   // hanger straps where they leave the walls
+    for (const s of [-1, 1]) box(M.metalDark, Q, s*(len/2 - .3), y - .17, 0, .06, .05, .9);   // hanger straps where they leave the walls
   },
   // A conveyor belt between two works, high enough to walk under: a steel frame on a truss, the belt, side rails
   // in hazard stripes, rollers, a beacon. The crates on it move (see conveyors below); they come out of one wall and

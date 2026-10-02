@@ -96,7 +96,9 @@ function batchGroup(datas, withGeo = true){
   for (const [m, geos] of byMat){
     const merged = geos.length === 1 ? geos[0].clone() : THREE.BufferGeometryUtils.mergeBufferGeometries(geos, false);
     merged.computeBoundingSphere();
-    const mesh = new THREE.Mesh(merged, m); mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh);
+    const mesh = new THREE.Mesh(merged, m);
+    if (m.userData.colorOnly){ mesh.layers.set(1); mesh.renderOrder = 2; } else { mesh.castShadow = true; mesh.receiveShadow = true; }   // see-through glass: colour pass only
+    g.add(mesh);
   }
   for (const k in SPR.size) FOL_LIST[k] = fol[k] || [];
   const saved = city; city = g; buildFoliage(); city = saved;

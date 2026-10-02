@@ -113,14 +113,17 @@ function batchGroup(datas, withGeo = true){
 const GREEN_MODES = ['some', 'none', 'grass'], GREEN_KEY = 'neonIsland.greenDefault';
 let GREEN_DEFAULT = (() => { try { const v = localStorage.getItem(GREEN_KEY); return GREEN_MODES.includes(v) ? v : 'some'; } catch (e) { return 'some'; } })();
 
+// A click on a plot that isn't on the current setting brings it to the current setting; a click on one that is
+// moves it (and the setting) on to the next.
 function cycleGreen(c){
-  c.green = GREEN_MODES[(GREEN_MODES.indexOf(c.green || 'some') + 1) % GREEN_MODES.length];
+  const cur = c.green || 'some';
+  c.green = cur !== GREEN_DEFAULT ? GREEN_DEFAULT : GREEN_MODES[(GREEN_MODES.indexOf(cur) + 1) % GREEN_MODES.length];
   GREEN_DEFAULT = c.green; try { localStorage.setItem(GREEN_KEY, GREEN_DEFAULT); } catch (e) {}
   refresh([c]); save(); sfx.play('place');
 }
 // the lawn: 16px grass tiles from the sheet (assets/floor/grass.png: fine grass, tufts, long blades)
 const GRASS_MAT = (() => { const t = new THREE.TextureLoader().load('assets/floor/grass.png'); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
-  const m = toon(0xc8d4b8); m.map = t; m.userData.noCast = true; return m; })();   // tinted down a little to sit with the city's palette
+  const m = toon(0xffffff); m.map = t; m.userData.noCast = true; return m; })();   // tinted down a little to sit with the city's palette
 const _gq = new THREE.Vector3();
 function lawn(P, n){
   let b = buckets.get(GRASS_MAT); if (!b){ b = { p: [], n: [], d: [], f: null, u: [] }; buckets.set(GRASS_MAT, b); }

@@ -201,7 +201,14 @@ function buildPlatformBody(c){
   const lamp = ([sx,sz]) => { const Pl = T(x + sx*(LOT/2 - .25), 0, z + sz*(LOT/2 - .25));
     cyl(M.metalDark, Pl, 0, .65, 0, .03, 1.3); box(M.metalDark, Pl, .12, 1.3, 0, .26, .03, .03);
     KEEP_LIGHT = true; box(M.bulb, Pl, .24, 1.26, 0, .12, .05, .1); glow(Pl, .24, 1.2, 0, 'warm', 1.4); KEEP_LIGHT = false; };
-  if (chance(.45)) lamp(pick(CORNERS));   // a street lamp on one corner
+  // part of a park (see parkCells): a tall garden lamp with a lantern globe, throwing a much wider pool of light,
+  // on every park tile, so the whole green is lit at night
+  const parkLamp = ([sx,sz]) => { const Pl = T(x + sx*(LOT/2 - .4), 0, z + sz*(LOT/2 - .4));
+    cyl(M.metalDark, Pl, 0, .08, 0, .12, .16); cyl(M.metalDark, Pl, 0, 1.0, 0, .035, 1.85); cyl(M.metalDark, Pl, 0, 1.25, 0, .05, .06);
+    for (const a of [0, PI/2, PI, -PI/2]) box(M.metalDark, Pl, Math.sin(a)*.07, 1.9, Math.cos(a)*.07, .02, .14, .02);
+    KEEP_LIGHT = true; sph(M.bulb, Pl, 0, 2.02, 0, .13); cyl(M.metalDark, Pl, 0, 2.17, 0, .1, .04); glow(Pl, 0, 2.02, 0, 'warm', 2.3); KEEP_LIGHT = false; };
+  if (!c.sections.length && c.park) parkLamp(CORNERS[hash('plamp', c.i, c.j) % 4]);
+  else if (chance(.45)) lamp(pick(CORNERS));   // a street lamp on one corner
   else if (DARK) lamp(CORNERS[hash('lamp', c.i, c.j) % 4]);   // a dark street always has its one failing lamp
 }
 
@@ -386,7 +393,24 @@ function centerView(now = false){
   if (n) camGoal.set(x/n, TARGET_Y, z/n); else camGoal.set(0, TARGET_Y, 0);
   if (now) camT.copy(camGoal);
 }
+// Parks: lawn plots that touch each other side to side form a green; a green of four or more is a park, and its
+// plots get the park lamps. Worked out over the whole island before every rebuild, and any plot whose status
+// changed is rebuilt too (so painting the fourth tile lights up the other three).
+function parkCells(){
+  const changed = [], seen = new Set();
+  for (const c of cells.values()){
+    if (seen.has(c)) continue;
+    const lawnish = q => q && !q.mega && !q.sections.length && q.green === 'grass';
+    if (!lawnish(c)){ seen.add(c); if (c.park){ c.park = false; changed.push(c); } continue; }
+    const group = [c], stack = [c]; seen.add(c);
+    while (stack.length){ const q = stack.pop(); for (const [a, b] of SIDES4){ const n = cells.get(ckey(q.i + a, q.j + b)); if (n && !seen.has(n) && lawnish(n)){ seen.add(n); group.push(n); stack.push(n); } } }
+    const park = group.length >= 4;
+    for (const q of group) if (!!q.park !== park){ q.park = park; changed.push(q); }
+  }
+  return changed;
+}
 function refresh(list, megaList = []){
+  list = list.concat(parkCells());
   for (const c of new Set(list)) if (c) rebuildCell(c);
   for (const m of megaList) rebuildMega(m);
   for (const k of dirtyRegions){ if (heldRegions.has(k)) pendingRegions.add(k); else rebuildRegion(k); } dirtyRegions.clear();

@@ -194,6 +194,26 @@ function buildStack(c){
     if (last && !lot.hasCarPad && R() < .7) addPerch({ x: c.x, z: c.z, height: y });
   });
   c.height = y;
+  steamVent(c);
+}
+// Steam vents: now and then a grate in the street beside a building breathes steam, and the mist (sky.js) gathers
+// round it. Common by industry (about 3 plots in 10), rare elsewhere (1 in 25); picked from the plot's position, so a
+// plot keeps its vent (or lack of one) through rebuilds.
+let VENTS = [];
+function steamVent(c){
+  c.vent = null;
+  const hv = hash('vent', c.i, c.j), ind = c.sections.some(s => s.zone === 'ind');
+  if (hv % 100 >= (ind ? 30 : 4)) return;
+  const side = [[1, 0], [-1, 0], [0, 1], [0, -1]][(hv >> 8) & 3], along = (((hv >> 12) & 255)/255 - .5)*1.4;
+  const off = SIDE/2 + .32, x = c.x + side[0]*off + side[1]*along, z = c.z + side[1]*off + side[0]*along;
+  const P = T(x, 0, z, side[0] ? PI/2 : 0);
+  box(M.concDD, P, 0, .03, 0, .62, .04, .44);                                         // the kerb round the grate
+  box(M.frame, P, 0, .045, 0, .52, .02, .34);
+  for (let k=0; k<6; k++) box(M.metalDark, P, -.22 + k*.088, .058, 0, .04, .012, .32);   // slats
+  box(M.neonAmber, P, .27, .06, .18, .04, .02, .04);                                   // a little warning light
+  emitters.push(new THREE.Vector3(x, .1, z));
+  emitters.push(new THREE.Vector3(x + .1, .1, z - .06));
+  c.vent = { x, z, s: .75 + ((hv >> 20) & 63)/63*.5 };                                // how strongly it breathes
 }
 
 // About one building in seventy stands on a dark street: almost no light, and what's left flickers (see DARK in core.js)
@@ -274,6 +294,7 @@ function syncAgents(){
   for (const m of megas.values()) if (m.data) emitters.push(...m.data.emitters);   // e.g. steam off the food carts
   for (const d of pairCache.values()) if (d.emitters) emitters.push(...d.emitters);   // steam leaking from the pipework between buildings
   portLots = [...cells.values()].map(c => ({ x: c.x, z: c.z, height: c.height }));
+  VENTS = [...cells.values()].filter(c => c.vent).map(c => c.vent);   // steam vents, for the mist
   setupSteam();
   for (const d of drones) if (!ports.includes(d.at) || (d.phase !== 'inside' && !ports.includes(d.to))){
     d.phase = 'inside'; d.g.visible = false; d.at = nearPort(); d.timer = 1 + Math.random()*2;

@@ -73,6 +73,12 @@ function frame(now){
   renderNightLights(comp.uniforms.night.value);   // lamps and neon lighting the surfaces round them (sky.js)
   comp.uniforms.upView.value.set(0,1,0).transformDirection(cam.matrixWorldInverse);
   comp.uniforms.sunV.value.copy(SUN_DIR).transformDirection(cam.matrixWorldInverse);   // for the rim light
+  { // the steam vents nearest the view, for the mist (sky.js)
+    const vs = VENTS;
+    vs.sort((a, b) => ((a.x - camT.x)**2 + (a.z - camT.z)**2) - ((b.x - camT.x)**2 + (b.z - camT.z)**2));
+    const U2 = comp.uniforms.vents.value, n = Math.min(12, vs.length);
+    for (let k=0; k<n; k++) U2[k].set(vs[k].x, vs[k].z, vs[k].s, 0);
+    comp.uniforms.nVents.value = n; }
   comp.uniforms.pxW.value = 2*zoom/H; comp.uniforms.aoI.value = S.ao === false ? 0 : 1;   // ambient occlusion (sky.js)
   comp.uniforms.skyYaw.value = -yaw*SKY_TURN;   // the star map turns with the camera (see sky.js)
   { const sy = Math.sin(yaw), cy = Math.cos(yaw);   // and drifts a hair as the view pans: sideways across, forward and back as a slight rise

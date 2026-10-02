@@ -114,7 +114,7 @@ function applyTime(){
   comp.uniforms.rimI.value = S.rim === false ? 0 : (.25*w.day + 1.0*w.golden + .3*w.blue + .45*w.night)*(S.rain ? .35 : 1);
   comp.uniforms.rimCol.value.setRGB(1.0, .7, .38).lerp(tmpC.setRGB(.42, .55, .9), Math.min(1, w.night + w.blue*.5));
   // ground mist: faint at midday, thicker round golden hour, dusk and night, thicker still in the rain
-  comp.uniforms.mistI.value = S.mist === false ? 0 : (.25*w.day + .8*w.golden + .6*w.blue + .55*w.night)*(S.rain ? 1.5 : 1);
+  comp.uniforms.mistI.value = S.mist === false ? 0 : (.55*w.day + .9*w.golden + .8*w.blue + .8*w.night)*(S.rain ? 1.4 : 1);
   comp.uniforms.mistSun.value = .5*w.day + 1.35*w.golden + .7*w.blue + .3*w.night;   // sunbeams in the mist: strongest with the sun low
   comp.uniforms.mistNight.value = Math.min(1, w.night + w.blue*.5);
   return night;
@@ -144,7 +144,7 @@ const comp = new THREE.ShaderMaterial({
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
-    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1},
+    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, vents:{value:Array.from({length:12}, () => new THREE.Vector4(0, 0, 0, 0))}, nVents:{value:0},
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
@@ -152,7 +152,7 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun;
+    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform vec4 vents[12]; uniform int nVents;
     uniform float night; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
@@ -330,37 +330,44 @@ const comp = new THREE.ShaderMaterial({
         vec4 cl = texture2D(tCloud, vUv);
         if (cl.a > 0.001){ float q = floor(cl.a*5.0 + dith)/5.0; col = mix(col, cl.rgb/cl.a, q); }   // dithered fade at the edges, like mist
       }
-      // ---- mist between the buildings, with light through it ----
-      // A thin band of mist hanging above head height (from about one unit up, thickest round 2.5 to 4.5, gone by 6.5),
-      // so the streets and the people in them stay clear. It mostly adds the light it scatters and hides very little:
-      // by day it's lit by the sun wherever the shadow map says the sun reaches and stays dark in buildings' shadows,
-      // so sunbeams between the towers show as bright shafts (fake volumetric light); at night it glows faintly with the
-      // colours the lamps and neon throw below. 8 dithered steps, stepped to stay pixel art. Only over the city.
-      if (mistI > 0.0 && rd < 0.99999){
+      // ---- steam from the vents, with light through it ----
+      // Mist only gathers round the steam vents in the streets (world.js; the 12 nearest the view are passed in as
+      // x, z, strength): low and thick at the grate, spreading wider and thinner as it rises, gone by about 4.5. Around
+      // the rest of the city the air is clear. It mostly adds the light it scatters and hides little, so people walking
+      // through stay visible: by day it's lit by the sun where the shadow map says the sun reaches (shafts through the
+      // steam), at night it glows with the colours the lamps and neon throw below. 8 dithered steps, only for pixels
+      // whose line of sight passes near a vent.
+      if (mistI > 0.0 && nVents > 0 && rd < 0.99999){
         vec3 hit = ro + rdir*tEnd;
-        if (hit.y > -0.6){
-          float y0 = 6.5, y1 = 1.0;
-          float ta = max(0.0, (y0 - ro.y)/min(rdir.y, -0.001)), tb = min(tEnd, (y1 - ro.y)/min(rdir.y, -0.001));
-          if (tb > ta){
-            vec3 mid = ro + rdir*(.5*(ta + tb));
-            float pch = .4 + .6*fbm(vec3(mid.xz*.3 + vec2(time*.05, time*.02), time*.03));   // patchy, drifting
-            vec3 nl = (texture2D(tLight, vUv).rgb*.5 + texture2D(tLight, vUv + vec2(4.0, 0.0)*px).rgb*.25 + texture2D(tLight, vUv - vec2(4.0, 0.0)*px).rgb*.25);
-            vec3 amb = mix(mix(skyBot, skyTop, .4)*.12, vec3(.015, .02, .05), mistNight);
-            vec3 sunS = sunCol*mistSun*(1.0 - mistNight);
-            vec3 glowN = (nl*2.2 + cityGlow*.025)*mistNight;
-            const int MS = 8;
-            float dt = (tb - ta)/float(MS), T = 1.0; vec3 acc = vec3(0.0);
-            for (int i = 0; i < MS; i++){
-              vec3 p = ro + rdir*(ta + (float(i) + dith)*dt);
-              float band = smoothstep(1.0, 2.4, p.y)*(1.0 - smoothstep(4.5, 6.5, p.y));
-              float dens = mistI*pch*band*.085;
-              acc += T*dens*dt*(amb + sunS*litAt(p) + glowN);
-              T *= exp(-dens*dt*.6);   // light extinction: it scatters light, hardly hides anything
-            }
-            acc = min(acc, vec3(.3));               // a veil of light, never a white-out
-            acc = floor(acc*20.0 + dith)/20.0;   // stepped, to stay pixel art
-            col = col*T + acc;
+        float y0 = 4.5, y1 = -0.1;
+        float ta = max(0.0, (y0 - ro.y)/min(rdir.y, -0.001)), tb = min(tEnd, (y1 - ro.y)/min(rdir.y, -0.001));
+        vec3 pA = ro + rdir*ta, pB = ro + rdir*tb;
+        // is any vent near this line of sight? (distance from each vent to the segment, in the ground plane)
+        float near = 0.0; vec2 sAB = pB.xz - pA.xz; float sl2 = max(dot(sAB, sAB), 1e-4);
+        for (int v = 0; v < 12; v++){ if (v >= nVents) break;
+          vec2 q = vents[v].xy - pA.xz; float u = clamp(dot(q, sAB)/sl2, 0.0, 1.0);
+          if (length(q - sAB*u) < 5.0) near = 1.0; }
+        if (hit.y > -0.6 && tb > ta && near > 0.5){
+          vec3 nl = (texture2D(tLight, vUv).rgb*.5 + texture2D(tLight, vUv + vec2(4.0, 0.0)*px).rgb*.25 + texture2D(tLight, vUv - vec2(4.0, 0.0)*px).rgb*.25);
+          vec3 amb = mix(mix(skyBot, skyTop, .4)*.35, vec3(.03, .04, .08), mistNight);
+          vec3 sunS = sunCol*mistSun*(1.0 - mistNight);
+          vec3 glowN = (nl*2.4 + cityGlow*.03)*mistNight;
+          const int MS = 8;
+          float dt = (tb - ta)/float(MS), T = 1.0; vec3 acc = vec3(0.0);
+          for (int i = 0; i < MS; i++){
+            vec3 p = ro + rdir*(ta + (float(i) + dith)*dt);
+            float hy = clamp(p.y/4.5, 0.0, 1.0);
+            float rr = 1.0 + 2.6*hy;                                         // the plume widens as it rises
+            float w = 0.0;
+            for (int v = 0; v < 12; v++){ if (v >= nVents) break;
+              vec2 dv = p.xz - vents[v].xy; w += vents[v].z*exp(-dot(dv, dv)/(rr*rr)); }
+            float dens = mistI*w*(1.0 - hy)*(1.0 - hy)*(.55 + .45*vnoise(vec3(p.xz*1.3, p.y*1.5 - time*.6)))*.9;
+            acc += T*dens*dt*(amb + sunS*litAt(p) + glowN);
+            T *= exp(-dens*dt*.35);   // light extinction: steam scatters light, hides little
           }
+          acc = min(acc, vec3(.4));
+          acc = floor(acc*20.0 + dith)/20.0;   // stepped, to stay pixel art
+          col = col*mix(1.0, T, .6) + acc;
         }
       }
       if (raysOn > 0.5 && rayI > 0.01){

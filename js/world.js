@@ -208,9 +208,25 @@ function buildStack(c){
     c.sectionTops.push(y);
     if (k === 0) c.firstFloors = lot.floors || 2;
     if (last && !lot.hasCarPad && R() < .7) addPerch({ x: c.x, z: c.z, height: y });
+    if (last) c._topLot = lot;
   });
   c.height = y;
+  rooftopBoard(c, y);
   steamVent(c);
+}
+// Hologram billboards on the roofs: a small one on about half the commercial roofs, and on tall buildings of the
+// commercial and residential zones now and then a big one on posts, with its slogan scrolling underneath. Picked from
+// the plot and its top section, so a roof keeps its billboard through rebuilds.
+function rooftopBoard(c, y){
+  const top = c.sections[c.sections.length - 1], lot = c._topLot; c._topLot = null;
+  if (!top || (lot && lot.hasCarPad) || c.dark) return;
+  const hv = hash('board', c.i, c.j, c.sections.length, top.seed), r = hv % 100;
+  let size = -1;
+  if ((top.zone === 'mid' || top.zone === 'low') && y > 4.5 && r < 28) size = y > 6.5 ? 2 : 1;
+  else if (top.zone === 'mid' && r < 55) size = 0;
+  if (size < 0) return;
+  const side = [[0, 1], [1, 0], [0, -1], [-1, 0]][(hv >>> 8) & 3], off = size ? .1 : .45;
+  holoBoard(T(c.x + side[0]*off, y, c.z + side[1]*off, Math.atan2(side[0], side[1])), size, (hv >>> 11) % 9, (hv >>> 15) % 211);
 }
 // Steam vents: now and then a grate in the street beside a building breathes steam, and the mist (sky.js) gathers
 // round it. Common by industry (about 3 plots in 10), rare elsewhere (1 in 25); picked from the plot's position, so a

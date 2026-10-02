@@ -243,7 +243,7 @@ const comp = new THREE.ShaderMaterial({
             vec4 pw = invVP*vec4(vUv*2.0 - 1.0, rd*2.0 - 1.0, 1.0); pw /= pw.w;
             float lit = litAt(pw.xyz);
             float face = max(dot(n, sunV), 0.0);
-            col += rimCol*rimI*lit*(edge*1.1 + face*face*0.22);
+            col += rimCol*rimI*lit*(edge*0.45 + face*face*0.22);   // a gentle edge line, not a glowing outline
           }
         }
         col = mix(col, haze, 0.35*smoothstep(camDist + 5.5, camDist + 53.0, d));   // the far side of the island fades into haze

@@ -418,5 +418,5 @@ function glowPoints(gl){
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('size', new THREE.BufferAttribute(size, 1)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 4)); g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1));
   g.computeBoundingSphere();
-  const pts = new THREE.Points(g, GLOW_PTS); pts.layers.set(1); return pts;
+  const pts = new THREE.Points(g, GLOW_PTS); pts.layers.set(1); pts.layers.enable(4); pts.frustumCulled = false; return pts;   // layer 4: the night-light pass (sky.js)
 }

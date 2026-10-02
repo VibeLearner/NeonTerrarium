@@ -140,7 +140,7 @@ const comp = new THREE.ShaderMaterial({
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
-    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()},
+    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null},
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
@@ -148,7 +148,7 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol;
+    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight;
     uniform float night; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
@@ -238,6 +238,12 @@ const comp = new THREE.ShaderMaterial({
         // Rim light: where an edge faces the sun with open space (or something far behind) beyond it, the edge
         // catches the light: a crisp warm line a pixel or two wide, and a soft warm wash on faces turned to the sun.
         // Only where the shadow map says the sun really reaches. Strongest at golden hour; cool moonlight at night.
+        // light from the city's own lamps, neon and windows falling on the surfaces round them (the night-light
+        // pass, below): tinted by each surface's colour, with a little added so dark walls still pick it up; stepped
+        // and dithered so it stays pixel art
+        { vec3 lt = texture2D(tLight, vUv).rgb;
+          lt = floor(lt*14.0 + bayer(gl_FragCoord.xy)*.99)/14.0;
+          col += lt*(c.rgb*1.25 + .05); }
         if (rimI > 0.01){
           vec2 sd2 = sunV.xy; float sl = length(sd2);
           if (sl > 0.05){
@@ -504,7 +510,7 @@ function makeTargets(){
   comp.uniforms.tCloud.value = rtCloud.texture; cloudMat.uniforms.tDepth.value = rtC.depthTexture;
   if (rtOut) rtOut.dispose();
   rtOut = new THREE.WebGLRenderTarget(W, H, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat });
-  makeGlowTargets();
+  makeGlowTargets(); makeLightTarget();
   upMat.uniforms.t.value = rtFinal.texture; upMat.uniforms.srcRes.value.set(W, H); upMat.uniforms.dstRes.value.set(DW, DH);
 }
 /* ---------- bloom and halation ---------- */
@@ -596,6 +602,63 @@ function renderGlow(){
   glowBlur.uniforms.t.value = h1.texture; glowBlur.uniforms.dir.value.set(0, 2/h0.height); glowPass(glowBlur, h0);
   glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = b0.texture; glowMix.uniforms.tH.value = h0.texture;
   glowPass(glowMix, rtFinal);
+}
+/* ---------- night lights: light from the city's lamps falling on the surfaces round them ---------- */
+// Every glow point (lamps, neon, windows, signs, beacons) is also a small light. In one pass at half the game's
+// resolution each is drawn as a square on screen big enough for its reach; for every pixel inside, the surface there
+// is rebuilt from the depth image, and if it's within reach it's lit with a soft falloff, more where it faces the
+// light (from the normal image). Lights accumulate additively and the composite adds the result. The cost depends on
+// how much of the screen the light pools cover, not on how many lights there are. A light just off screen still lights
+// what's on screen: its square is pulled to the screen's edge (never further from any lit pixel than its centre was).
+// Flicker, blinking beacons and dark streets come with the glow points. Only after dusk.
+const NL_UNI = { scale: { value: 10 }, time: FOL_UNI.time, res: { value: new THREE.Vector2(1, 1) }, invVP: comp.uniforms.invVP,
+                 tDepth: { value: null }, tNormal: { value: null }, lightI: { value: 0 } };
+const nightLightMat = new THREE.ShaderMaterial({
+  uniforms: NL_UNI,
+  vertexShader: `attribute float size; attribute vec4 aCol; attribute float aFlk; uniform float scale; uniform float time;
+    varying vec3 vL; varying vec3 vC; varying float vR;` + FLK_GLSL + BLINK_GLSL + `
+    void main(){
+      vec4 w = modelMatrix*vec4(position, 1.0); vL = w.xyz;
+      float R = clamp(size*1.25, .7, 3.4); vR = R;
+      float op = aCol.a < -1.5 ? mix(.05, 1.0, blink(w.y, time)) : 1.0;
+      vC = aCol.rgb*op*flicker(aFlk, time);
+      vec4 cp = projectionMatrix*viewMatrix*w; cp.xyz /= cp.w;
+      gl_Position = vec4(clamp(cp.xy, -1.0, 1.0), 0.0, 1.0);   // pulled onto the screen if it's just off it
+      gl_PointSize = 2.0*R*scale;
+    }`,
+  fragmentShader: `uniform sampler2D tDepth; uniform sampler2D tNormal; uniform vec2 res; uniform mat4 invVP; uniform float lightI;
+    varying vec3 vL; varying vec3 vC; varying float vR;
+    void main(){
+      vec2 uv = gl_FragCoord.xy/res;
+      float rd = texture2D(tDepth, uv).x; if (rd >= 0.99999) discard;   // sky
+      vec4 p = invVP*vec4(uv*2.0 - 1.0, rd*2.0 - 1.0, 1.0); p /= p.w;
+      vec3 d = vL - p.xyz; float dist = length(d); if (dist > vR) discard;
+      float f = 1.0 - dist/vR; f *= f;
+      vec3 n = texture2D(tNormal, uv).rgb*2.0 - 1.0;
+      vec3 lv = normalize(mat3(viewMatrix)*d + vec3(0.0, 0.0, 1e-4));
+      float ndl = .3 + .7*max(dot(n, lv), 0.0);
+      gl_FragColor = vec4(vC*f*ndl*lightI, 1.0);
+    }`,
+  transparent: true, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,
+});
+let rtLight = null;
+function makeLightTarget(){
+  if (rtLight) rtLight.dispose();
+  rtLight = new THREE.WebGLRenderTarget(Math.max(1, Math.ceil(W/2)), Math.max(1, Math.ceil(H/2)), { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, depthBuffer: false });
+  comp.uniforms.tLight.value = rtLight.texture;
+  NL_UNI.res.value.set(rtLight.width, rtLight.height);
+}
+// after the colour and normal passes; fills rtLight for the composite
+function renderNightLights(night){
+  const I = S.lights === false ? 0 : Math.max(0, Math.min(1, (night - .15)/.6))*.72;
+  NL_UNI.lightI.value = I;
+  renderer.setRenderTarget(rtLight); renderer.setClearColor(0x000000, 1); renderer.clear(true, false, false);
+  if (I <= 0) return;
+  NL_UNI.tDepth.value = rtC.depthTexture; NL_UNI.tNormal.value = rtN.texture;
+  NL_UNI.scale.value = rtLight.height/(2*zoom);
+  scene.overrideMaterial = nightLightMat; cam.layers.set(4);
+  renderer.render(scene, cam);
+  scene.overrideMaterial = null;
 }
 // The finished frame is scaled to the screen with "sharp bilinear" filtering: every render pixel stays a crisp
 // square, and where the scale isn't a whole number only the one-screen-pixel seam between two render pixels is

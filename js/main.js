@@ -70,6 +70,7 @@ function frame(now){
   renderer.autoClear = true;
   comp.uniforms.VP.value.copy(cam.projectionMatrix).multiply(cam.matrixWorldInverse);
   comp.uniforms.invVP.value.copy(comp.uniforms.VP.value).invert();
+  renderNightLights(comp.uniforms.night.value);   // lamps and neon lighting the surfaces round them (sky.js)
   comp.uniforms.upView.value.set(0,1,0).transformDirection(cam.matrixWorldInverse);
   comp.uniforms.sunV.value.copy(SUN_DIR).transformDirection(cam.matrixWorldInverse);   // for the rim light
   comp.uniforms.skyYaw.value = -yaw*SKY_TURN;   // the star map turns with the camera (see sky.js)

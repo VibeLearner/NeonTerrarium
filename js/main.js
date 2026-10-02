@@ -71,7 +71,9 @@ function frame(now){
   comp.uniforms.VP.value.copy(cam.projectionMatrix).multiply(cam.matrixWorldInverse);
   comp.uniforms.invVP.value.copy(comp.uniforms.VP.value).invert();
   comp.uniforms.upView.value.set(0,1,0).transformDirection(cam.matrixWorldInverse);
-  comp.uniforms.skyYaw.value = -yaw*SKY_TURN;   // the star map turns with the camera, at a gentler rate (see sky.js)
+  comp.uniforms.skyYaw.value = -yaw*SKY_TURN;   // the star map turns with the camera (see sky.js)
+  { const sy = Math.sin(yaw), cy = Math.cos(yaw);   // and drifts a hair as the view pans: sideways across, forward and back as a slight rise
+    comp.uniforms.starOff.value.set((camT.x*cy - camT.z*sy)*SKY_DRIFT, -(camT.x*sy + camT.z*cy)*SKY_DRIFT*.5); }
   comp.uniforms.rainOff.value.copy(camPix);
   comp.uniforms.wet.value = S.wetOn ? (S.rain ? .75 : .3) : 0; comp.uniforms.rainOn.value = S.rain ? 1 : 0;
   if (sun.shadow.map){ comp.uniforms.shadowMap.value = sun.shadow.map.texture; comp.uniforms.shadowMat.value.copy(sun.shadow.matrix); }

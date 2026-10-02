@@ -94,7 +94,7 @@ const PAL_HEX = ['#1B2A4A','#2C3A52','#4A5566','#C9B89A','#E3D6BD','#9EC4E0','#F
   '#5f9a94','#c98a8a','#c9a24a','#3f6fa8','#d9a55a','#c0674a','#9aa982','#9c5a44','#cfe8e0','#eadbd6','#5f7d5b','#3f5f58','#6b7280','#55585c','#7a7064','#b49a78'];
 // the star map view: SKY_EL is the elevation at the middle of the screen, SKY_H half the screen's height (radians),
 // SKY_TURN how far the sky turns for each turn of the camera
-const SKY_EL = .3, SKY_H = .5, SKY_TURN = .05;   // nearly still: a 45-degree turn slides the stars about ten pixels, onto a slightly different patch of sky
+const SKY_EL = .3, SKY_H = .5, SKY_TURN = 1, SKY_DRIFT = .0015;   // the sky turns with the camera, like a real one; panning drifts it only a hair (radians per unit)
 const comp = new THREE.ShaderMaterial({
   uniforms: {
     tColor:{value:null}, tDepth:{value:null}, tNormal:{value:null}, res:{value:new THREE.Vector2(1,1)},
@@ -159,10 +159,11 @@ const comp = new THREE.ShaderMaterial({
         // The stars are a full 360-degree sky map. The view onto it is a flat strip: heading across, elevation up,
         // both in whole sky pixels, so turning the camera slides the stars straight sideways at an even pace (a
         // perspective view swung them through arcs, which felt wrong next to the flat, orthographic city). It turns
-        // at SKY_TURN times the camera's rate, like something far away; panning and zooming don't move it.
+        // with the camera, so each turn looks at another part of the sky. Panning drifts it a hair (starOff), so it
+        // reads as very far away rather than painted on the screen; zooming doesn't move it.
         vec2 ndc2 = vUv*2.0 - 1.0;
         float pix = 2.0*SKY_H/(res.y*pxK);                       // one base pixel, as an angle
-        float az = skyYaw + ndc2.x*(res.x/res.y)*SKY_H, el = SKY_EL + ndc2.y*SKY_H;
+        float az = skyYaw + starOff.x + ndc2.x*(res.x/res.y)*SKY_H, el = SKY_EL + starOff.y + ndc2.y*SKY_H;
         az = floor(az/pix)*pix; el = floor(el/pix)*pix;          // whole pixels, so stars never shimmer while turning
         vec3 sd = vec3(cos(el)*cos(az), sin(el), cos(el)*sin(az));
         float cellA = pix*3.5, nAz = floor(6.2831853/cellA);

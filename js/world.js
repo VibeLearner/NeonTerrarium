@@ -203,11 +203,13 @@ function buildPlatformBody(c){
     KEEP_LIGHT = true; box(M.bulb, Pl, .24, 1.26, 0, .12, .05, .1); glow(Pl, .24, 1.2, 0, 'warm', 1.4); KEEP_LIGHT = false; };
   // part of a park (see parkCells): a tall garden lamp with a lantern globe, throwing a much wider pool of light,
   // on every park tile, so the whole green is lit at night
-  const parkLamp = ([sx,sz]) => { const Pl = T(x + sx*(LOT/2 - .4), 0, z + sz*(LOT/2 - .4));
+  const parkLamp = () => { const Pl = T(x, 0, z);
     cyl(M.metalDark, Pl, 0, .08, 0, .12, .16); cyl(M.metalDark, Pl, 0, 1.0, 0, .035, 1.85); cyl(M.metalDark, Pl, 0, 1.25, 0, .05, .06);
     for (const a of [0, PI/2, PI, -PI/2]) box(M.metalDark, Pl, Math.sin(a)*.07, 1.9, Math.cos(a)*.07, .02, .14, .02);
     KEEP_LIGHT = true; sph(M.bulb, Pl, 0, 2.02, 0, .13); cyl(M.metalDark, Pl, 0, 2.17, 0, .1, .04); glow(Pl, 0, 2.02, 0, 'warm', 2.3); KEEP_LIGHT = false; };
-  if (!c.sections.length && c.park) parkLamp(CORNERS[hash('plamp', c.i, c.j) % 4]);
+  // the park lamps stand in the middle of every other plot, on a checkerboard laid over the whole island, so
+  // however the green grows they keep an even spacing (and the plots between are lit from the four around them)
+  if (!c.sections.length && c.park){ if ((c.i + c.j) % 2 === 0) parkLamp(); }
   else if (chance(.45)) lamp(pick(CORNERS));   // a street lamp on one corner
   else if (DARK) lamp(CORNERS[hash('lamp', c.i, c.j) % 4]);   // a dark street always has its one failing lamp
 }

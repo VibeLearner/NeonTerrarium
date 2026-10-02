@@ -1719,6 +1719,295 @@ function brutalTower(lot, st, P0){
   Object.assign(lot, { height: NO_ROOF ? H : Math.max(H, sh), floors: chunks*2, occupied: true });
 }
 
+/* ---------- the commercial strip's ramshackle shops: a container stack, a spiral tower and a corner market ---------- */
+const MC = {
+  teal: toon(0x4d7a76), teal2: toon(0x5f8a80), tealDark: toon(0x3b605e), patch: toon(0x8a7a5a), patch2: toon(0x6f6a7a),
+  conRed: toon(0x8e3b30), conRed2: toon(0x6e2c24), conGreen: toon(0x3f6b4c), conGreen2: toon(0x2f5239),
+  conYellow: toon(0xb38a34), conYellow2: toon(0x8a6826), conBlue: toon(0x3f6488), conBlue2: toon(0x2f4c68),
+  conRust: toon(0x6e4a32), conRust2: toon(0x553826),
+  tarp: toon(0x3d5f86), tarp2: toon(0x2f4a6a), tarpGreen: toon(0x4a5a3a),
+  cabbage: toon(0x8fbf5a), daikon: toon(0xe8e6d6), tomato: toon(0xc8402e), lemon: toon(0xe8c840), chili: toon(0xb02a1e),
+  potato: toon(0x9a7a4a), garlic: toon(0xe6dcc8), bottle: toon(0x9fd0e0), sack: toon(0xb89a6e), card: toon(0xb08a5a), card2: toon(0x9a7448),
+  copper: toon(0x8a5a3a), paper: toon(0xe0d4b0), white: toon(0xe8e8e2), cross: toon(0xc0302a), board: toon(0x22262c), chalk: toon(0xd8d8cc),
+  cushion: toon(0xb05a4a), cushion2: toon(0x5a7a9a), soup: toon(0xd8a050),
+};
+const CONT = [[MC.conRed, MC.conRed2], [MC.conGreen, MC.conGreen2], [MC.conYellow, MC.conYellow2], [MC.conBlue, MC.conBlue2], [MC.conRust, MC.conRust2]];
+// a sagging wire with small warm bulbs
+function bulbString(P, ax, ay, az, bx, by, bz, sag){
+  const n = Math.max(3, Math.round(Math.hypot(bx - ax, by - ay, bz - az)/.22));
+  let px = ax, py = ay, pz = az;
+  for (let k=1; k<=n; k++){
+    const t = k/n, x = ax + (bx - ax)*t, y = ay + (by - ay)*t - sag*Math.sin(PI*t), z = az + (bz - az)*t;
+    strut(M.frame, P, px, py, pz, x, y, z, .01);
+    if (k < n){ box(M.bulb, P, x, y - .035, z, .045, .05, .045); if (k % 2) glow(P, x, y - .04, z, 'warm', .35); }
+    px = x; py = y; pz = z;
+  }
+}
+// a plain sagging cable
+function sagCable(P, ax, ay, az, bx, by, bz, sag){
+  const n = 6; let px = ax, py = ay, pz = az;
+  for (let k=1; k<=n; k++){ const t = k/n, x = ax + (bx - ax)*t, y = ay + (by - ay)*t - sag*Math.sin(PI*t), z = az + (bz - az)*t; strut(M.frame, P, px, py, pz, x, y, z, .012); px = x; py = y; pz = z; }
+}
+// a tarp sloping out from a wall (local z out), ragged strips hanging off its low edge
+function raggedTarp(F, x, y, w, depth, slope, mat){
+  box(mat, F, x, y - Math.sin(slope)*depth/2, depth/2*Math.cos(slope), w, .03, depth, 0, slope);
+  const ey = y - Math.sin(slope)*depth, ez = depth*Math.cos(slope);
+  for (let t = x - w/2 + .06; t < x + w/2 - .03; t += rnd(.09, .16)){ const l = rnd(.04, .2); box(mat, F, t, ey - l/2, ez, rnd(.05, .1), l, MIN_T); }
+}
+function birdCage(P, x, y, z){
+  box(M.frame, P, x, y + .14, z, .015, .1, .015);
+  cyl(M.inRust2, P, x, y - .08, z, .075, .02); cyl(M.inRust2, P, x, y + .06, z, .06, .02); sph(M.inRust2, P, x, y + .07, z, .06, .5);
+  for (let a = 0; a < 4; a++) box(M.inRust, P, x + Math.sin(a*PI/2)*.065, y - .01, z + Math.cos(a*PI/2)*.065, .012, .13, .012);
+}
+// produce in an open crate or a basket: a heap of round things on top
+function produceCrate(P, x, y, z, mat, ry = 0, basket = false){
+  if (basket) cyl(M.inWood, P, x, y + .06, z, .13, .12); else box(M.inWood, P, x, y + .07, z, .32, .14, .24, ry);
+  const n = basket ? 4 : 6;
+  for (let k=0; k<n; k++){ const a = k/n*TAU + rnd(0, .5), r = basket ? .06 : .08;
+    if (mat === MC.daikon) box(mat, P, x + Math.cos(a)*r, y + .16, z + Math.sin(a)*r*.6, .2, .04, .04, ry + rnd(-.3, .3));
+    else sph(mat, P, x + Math.cos(a)*r, y + .15 + rnd(0, .03), z + Math.sin(a)*r*.7, mat === MC.cabbage ? .06 : .04); }
+  if (mat === MC.daikon) for (let k=0; k<3; k++) box(M.green2, P, x + .1, y + .17, z + rnd(-.06, .06), .1, .03, .05, ry);   // the leafy tops
+}
+function cardboard(P, x, z, n){ let y = 0; for (let k=0; k<n; k++){ const s = rnd(.2, .3); box(chance(.5) ? MC.card : MC.card2, P, x + rnd(-.03, .03), y + s/2, z + rnd(-.03, .03), s, s*.85, s, rnd(-.2, .2)); box(MC.paper, P, x, y + s*.85 - .01, z, .04, .02, s + .01); y += s*.85; } }
+function stool(P, x, z){ cyl(chance(.5) ? M.red2 : MC.conBlue, P, x, .14, z, .08, .03); for (const s of [-1, 1]) box(M.frame, P, x + s*.05, .07, z, .02, .14, .02); }
+
+// Container stack: shipping containers piled two deep, every floor a little shop with its long side cut open on a lit
+// room and its neon name across the top; scaffolding and walkways up one side, awnings, sagging cables, a noodle bar
+// at the bottom and a tea lounge under a tarp and string lights on the roof
+function containerStack(lot, st, P0){
+  const P = under(P0, T(-.15, 0, -.1, pick([0, PI/2, PI, -PI/2])));
+  const CL = 2.0, CD = .86, CH = .95, n = irand(3, 4);
+  const shops = [['sign_w_barber','pink',M.interiorPink], ['sign_w_meds','green',M3.greenLit], ['sign_w_fixit','amber',M.inShop], ['sign_w_stitch','cyan',M.interiorCool], ['sign_w_herbs','green',M3.greenLit]].sort(() => R() - .5);
+  let prev = -1, crossed = false;
+  const zF = CD/2 + .015, zB = -CD/2 - .015;
+  for (let f=0; f<=n; f++){
+    const y = f*CH;
+    for (const z of [zB, zF]){
+      let ci; do ci = Math.floor(R()*CONT.length); while (ci === prev); prev = ci;
+      const [body, rib] = CONT[ci], ox = f ? rnd(-.1, .1) : 0, front = z === zF;
+      box(body, P, ox, y + CH/2, z, CL, CH - .01, CD);
+      for (const fc of faces(CL, CD)){
+        const F = under(P, T(ox + fc.nx*fc.half, y, z + fc.nz*fc.half, fc.ry));
+        if (front && fc.nz === 1){
+          // the open side: a lit room behind the frame, with the shop's things against the light
+          const shop = f ? shops[(f - 1) % shops.length] : null, room = shop ? shop[2] : M.inShop2;
+          box(rib, F, 0, CH - .05, .01, fc.len, .1, .04); box(rib, F, 0, .04, .01, fc.len, .08, .04);
+          box(room, F, 0, CH*.47, .02, fc.len - .16, CH - .2, MIN_T);
+          for (let k=0; k<irand(3, 5); k++) box(M.frame, F, rnd(-fc.len/2 + .2, fc.len/2 - .2), rnd(.15, .3), .05, rnd(.12, .25), rnd(.1, .3), MIN_T);   // counters, chairs, crates
+          box(M.frame, F, 0, CH*.62, .05, fc.len - .3, .025, MIN_T);   // a shelf
+          for (let t = -fc.len/2 + .25; t < fc.len/2 - .2; t += .14) if (chance(.6)) box(pick([M.frame, MC.paper, M.red2, M.green2]), F, t, CH*.62 + .05, .05, .06, .08, MIN_T);
+          glow(F, 0, CH*.45, .3, shop ? shop[1] === 'pink' ? 'pink' : 'warm' : 'warm', 1.0);
+          if (shop) wordSign(F, shop[0], rnd(-.25, .25), CH - .2, .1, 1, shop[1]);
+          else wordSign(F, 'sign_w_ramen', -.35, CH - .2, .1, 1, 'pink');
+        } else {
+          corrRibs(F, fc.len, .04, CH - .1, rib, .11);
+          if (fc.nx !== 0){   // the container doors: locking bars on the ends
+            for (const t of [-.25, -.1, .1, .25]) box(M.metalDark, F, t*CD/.86, CH/2, .035, .025, CH - .14, .025);
+            if (!crossed && f >= 1 && f <= 2 && fc.nx === -1 && !front){ crossed = true;   // a clinic's red cross
+              box(MC.white, F, 0, CH/2, .05, .32, .32, MIN_T); box(MC.cross, F, 0, CH/2, .06, .2, .07, MIN_T); box(MC.cross, F, 0, CH/2, .06, .07, .2, MIN_T); }
+          }
+          for (let k=0; k<irand(0, 2); k++) box(pick([MC.paper, MC.conRust2, M.inRust]), F, rnd(-fc.len/2 + .2, fc.len/2 - .2), rnd(.2, CH - .2), .04, rnd(.12, .3), rnd(.12, .3), MIN_T);   // notices, patches
+        }
+      }
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(M.frame, P, ox + sx*(CL/2 - .02), y + CH/2, z + sz*(CD/2 - .02), .05, CH, .05);   // corner posts
+    }
+    // a corrugated awning over the front on some floors
+    if (f && chance(.3)) box(chance(.5) ? M.inRust : MC.conBlue2, P, chance(.5) ? -.6 : .6, y + CH*.55, zF + CD/2 + .14, rnd(.5, .7), .03, .3, 0, .32);   // a little tin hood over one end of the opening
+  }
+  const top = (n + 1)*CH;
+  // the scaffold up the right side: posts, a plank walkway with a rail on every floor, a ladder
+  const sx = CL/2 + .28;
+  for (const z of [-CD - .1, 0, CD + .1]) box(M.inRust, P, sx + .15, top/2, z, .045, top, .045);
+  for (const z of [-CD - .1, CD + .1]) box(M.inRust, P, sx - .17, top/2, z, .045, top, .045);
+  for (let f=1; f<=n; f++){ const y = f*CH;
+    box(M.inWood2, P, sx, y + .02, 0, .36, .035, 2*CD + .25);
+    box(M.inRust, P, sx + .15, y + .3, 0, .03, .03, 2*CD + .25); box(M.inRust, P, sx + .15, y + .16, 0, .025, .025, 2*CD + .25);
+    for (const s of [-1, 1]) strut(M.inRust, P, sx + .15, y - CH, s*(CD + .1), sx + .15, y, 0, .012);   // cross bracing
+    const lz = (f % 2 ? -1 : 1)*(CD - .1);
+    for (let yy = y - CH + .15; yy < y; yy += .16) box(M.frame, P, sx - .05, yy, lz, .025, .025, .22);   // ladder rungs
+    for (const s of [-1, 1]) box(M.frame, P, sx - .05, y - CH/2, lz + s*.11, .025, CH, .025);
+  }
+  // cables sagging across the front and down the side
+  for (let k=0; k<irand(2, 4); k++){ const y = rnd(.9, top - .3); sagCable(P, -CL/2 - .05, y, zF + CD/2 + .03, CL/2 + .4, y + rnd(-.2, .2), zF + CD/2 + .03, rnd(.08, .2)); }
+  for (let k=0; k<2; k++) if (chance(.6*S.green)) plant(hangKind(), under(P, T(rnd(-CL/3, CL/3), 0, zF + CD/2 + .03)), 0, rnd(CH*2, top - .1), 0, rnd(.7, .95), 't', true);
+  // the noodle bar at the bottom: a counter, woks steaming, chillies hanging, stools, gas, crates and rubbish bags
+  const cz = zF + CD/2 + .32;
+  box(M.inWood, P, -.2, .3, cz, 1.3, .6, .22); box(M.inWood2, P, -.2, .62, cz, 1.38, .04, .3);
+  for (const x of [-.6, -.15]){ cyl(M.metalDark, P, x, .67, cz, .1, .04); cyl(MC.soup, P, x, .69, cz, .08, .015); emitters.push(new THREE.Vector3(x, .9, cz).applyMatrix4(P)); }
+  box(M.frame, P, -.2, .9, cz + .15, 1.2, .02, .02);
+  for (let t = -.75; t < .35; t += .09) box(MC.chili, P, t, .82 + rnd(-.02, .02), cz + .15, .03, rnd(.08, .14), .03);
+  box(M.inRust, P, -.2, CH + .02, cz + .05, 1.6, .03, .7, 0, .25);   // the stall's own tin awning
+  for (const x of [-.75, -.2, .35]) stool(P, x, cz + .32);
+  gasBottles(P, .55, cz, 1); crateAt(P, .75, 0, cz - .05); crateAt(P, -CL/2 - .1, 0, cz - .1);
+  for (let k=0; k<irand(2, 4); k++) blob(pick([M.frame, MC.white, M.metalDark]), P, -CL/2 + rnd(-.25, .1), .1, rnd(-.4, .6), rnd(.08, .13), .8);
+  cardboard(P, CL/2 + .1, zF + CD/2 + .25, irand(2, 3));
+  // the roof: a tea lounge on planks under a tarp and string lights, cushions round low tables, plants, a water tank and an antenna
+  if (!NO_ROOF){
+    const R0 = under(P, T(0, top, 0));
+    box(M.inWood2, R0, 0, .02, 0, CL - .1, .04, 2*CD - .1);
+    for (const [x, z] of [[-CL/2 + .1, -CD + .1], [CL/2 - .1, -CD + .1], [-CL/2 + .1, CD - .1], [CL/2 - .1, CD - .1]]) box(M.frame, R0, x, .45, z, .04, .9, .04);
+    box(MC.tarp, R0, -.1, .92, -.1, CL + .15, .03, 2*CD - .2, 0, .08, .05);
+    for (const t of [-CL/2 + .15, .05, CL/2 - .3]) box(MC.tarp, R0, t, .82, CD - .12, rnd(.15, .3), rnd(.1, .2), MIN_T);   // ragged edge
+    bulbString(R0, -CL/2 + .1, .85, CD - .1, CL/2 - .1, .85, CD - .1, .12);
+    bulbString(R0, CL/2 - .1, .85, CD - .1, CL/2 - .1, .85, -CD + .1, .1);
+    for (const x of [-.45, .35]){ box(M.inWood, R0, x, .14, .1, .4, .04, .3); for (const s of [-1, 1]) box(M.frame, R0, x, .07, .1 + s*.1, .36, .12, .03);
+      for (const s of [-1, 1]) box(chance(.5) ? MC.cushion : MC.cushion2, R0, x + s*.3, .06, .1, .16, .08, .26);
+      sph(MC.white, R0, x, .19, .1, .035); spotAt(R0, x + .3, .1, .1, 'seat', null, [-1, 0]); }
+    for (let k=0; k<irand(2, 4); k++) pottedPlant(under(R0, T(0, .04, 0)), rnd(-CL/2 + .2, CL/2 - .2), -CD + .25, rnd(.8, 1.0));
+    const tx = CL/2 - .35; put(U.cyl16, MC.white, under(R0, T(tx, .35, -CD + .35, 0, .4, .6, .4))); cyl(M.frame, R0, tx, .67, -CD + .35, .05, .05);
+    cyl(M.metalDark, R0, -CL/2 + .2, .8, -CD + .2, .015, 1.5); for (const y of [1.2, 1.4]) box(M.metalDark, R0, -CL/2 + .2, y, -CD + .2, .4, .015, .015);
+    sph(MC.white, R0, -CL/2 + .45, .35, -CD + .3, .14, .45);
+    wordSign(under(R0, T(.2, 0, CD - .02)), 'sign_w_tea', 0, 1.18, .06, 1, 'cyan');
+  }
+  Object.assign(lot, { height: top + (NO_ROOF ? 0 : 1.0), floors: n + 1, occupied: true });
+}
+
+// Spiral tower: a round patched tower ringed by balconies, a stair winding up the outside, lanterns, bird cages and
+// laundry on every ring; a ramen bar with red lanterns and a blue tarp at the foot
+function spiralTower(lot, st, P0){
+  const P = under(P0, T(0, 0, 0, rnd(0, TAU)));
+  const r = .7, n = irand(4, 6), H = n*FH, Rb = r + .4, Rs = Rb + .16;
+  put(wedgeGeo(r, H, 0, TAU), pick([MC.teal, MC.teal2]), under(P, T(0, H/2, 0)));
+  const atA = (a, rad, y) => under(P, T(Math.sin(a)*rad, y, Math.cos(a)*rad, a));   // a frame on the surface, z pointing out
+  for (let k=0; k<n*7; k++){ const F = atA(rnd(0, TAU), r - .005, 0); box(pick([MC.patch, MC.patch2, MC.tealDark, M.inRust, MC.paper]), F, 0, rnd(.2, H - .2), .02, rnd(.2, .45), rnd(.18, .5), MIN_T); }
+  for (let k=0; k<n*2; k++){ const F = atA(rnd(0, TAU), r - .005, 0); for (let t = -.12; t <= .12; t += .06) box(M.inCorr2, F, t, rnd(.6, H - .4), .03, .035, .4, MIN_T); }   // corrugated patches
+  const a0 = rnd(0, TAU);   // where the stair starts, at the ground
+  // the rings: a balcony slab, posts and rails, windows and doors behind, things on the walkway
+  for (let f=1; f<n; f++){
+    const y = f*FH;
+    put(arcGeo(r - .02, Rb, .06, 0, TAU), M.inConc2, under(P, T(0, y - .03, 0)));
+    const N = 16;
+    for (let k=0; k<N; k++){ const a = k/N*TAU, b = (k + 1)/N*TAU, pr = Rb - .03;
+      box(M.inRust, P, Math.sin(a)*pr, y + .17, Math.cos(a)*pr, .025, .3, .025);
+      strut(M.inRust, P, Math.sin(a)*pr, y + .32, Math.cos(a)*pr, Math.sin(b)*pr, y + .32, Math.cos(b)*pr, .014); }
+    for (let k=0; k<3; k++){ const F = atA(rnd(0, TAU), r, y);
+      if (k === 0){ box(M2.door, F, 0, .33, .02, .26, .58, MIN_T); box(M.frame, F, 0, .33, .01, .32, .62, MIN_T); }
+      else { box(M.frame, F, 0, .48, .01, .36, .34, MIN_T); box(pick(LIT_ROOMS), F, 0, .48, .025, .3, .28, MIN_T); glow(F, 0, .48, .2, 'warm', .5); } }
+    for (let k=0; k<irand(3, 5); k++){ const a = rnd(0, TAU), x = Math.sin(a)*(r + .2), z = Math.cos(a)*(r + .2), q = R();
+      if (q < .35) pottedPlant(under(P, T(0, y, 0)), x, z, rnd(.7, .9));
+      else if (q < .55) crateAt(P, x, y, z, .8);
+      else if (q < .75) birdCage(P, Math.sin(a)*(r + .3), y + FH - .3, Math.cos(a)*(r + .3));
+      else { box(M.lantern, P, Math.sin(a)*(r + .3), y + FH - .25, Math.cos(a)*(r + .3), .1, .14, .1); glow(P, Math.sin(a)*(r + .3), y + FH - .25, Math.cos(a)*(r + .3), 'orange', .6); } }
+    if (chance(.6*S.clutter)){ const a = rnd(0, TAU), F = atA(a, r + .3, y); box(M.frame, F, 0, .55, 0, .5, .012, .012); for (const t of [-.15, 0, .15]) if (chance(.8)) plant(laundryKind(), F, t, .54, 0, .8, 't', true); }
+    if (chance(.6)){ const a = rnd(0, TAU); for (let k=0; k<3; k++){ const b = a + k*.7; bulbString(P, Math.sin(b)*(Rb - .05), y + FH - .1, Math.cos(b)*(Rb - .05), Math.sin(b + .7)*(Rb - .05), y + FH - .1, Math.cos(b + .7)*(Rb - .05), .06); } }
+    if (chance(.5*S.green)) plant(hangKind(), atA(rnd(0, TAU), Rb, y), 0, -.02, .02, rnd(.7, .9), 't', true);
+  }
+  // the stair: treads on a helix outside the rings (once round every two floors), rails both sides, brackets back to the rings
+  const steps = Math.round(n/2*30), rise = H/steps, da = TAU/30;
+  let pi = null;
+  for (let k=0; k<steps; k++){
+    const a = a0 + k*da, y = (k + 1)*rise, F = atA(a, Rs, y);
+    box(M.inWood, F, 0, -.02, 0, .13, .035, .3);
+    const pts = [Math.sin(a), Math.cos(a)];
+    const cur = [[pts[0]*(Rs - .15), y + .32, pts[1]*(Rs - .15)], [pts[0]*(Rs + .15), y + .32, pts[1]*(Rs + .15)]];
+    if (pi){ for (const s of [0, 1]) strut(M.inRust, P, ...pi[s], ...cur[s], .014); }
+    if (k % 3 === 0) box(M.inRust, F, 0, .15, .14, .02, .32, .02);
+    if (k % 7 === 0){ strut(M.inRust, P, pts[0]*(Rs - .14), y - .03, pts[1]*(Rs - .14), pts[0]*(Rb - .05), Math.floor(y/FH)*FH - .03, pts[1]*(Rb - .05), .02); }   // bracket to the ring below
+    pi = cur;
+  }
+  // the ramen bar at the foot, facing away from where the stair begins
+  const as = a0 - PI*.62, Fs = atA(as, r, 0);
+  box(M.frame, Fs, 0, .45, .01, 1.0, .82, MIN_T); box(M.inShop2, Fs, -.1, .4, .03, .62, .66, MIN_T); glow(Fs, -.1, .4, .3, 'warm', 1.0);
+  box(M.inWood2, Fs, .35, .35, .03, .26, .62, MIN_T);   // a slatted side door
+  for (let t = .26; t < .47; t += .05) box(M.inWood, Fs, t, .35, .045, .02, .6, MIN_T);
+  box(M.inWood, Fs, -.1, .28, .2, .7, .05, .22); for (const x of [-.32, .12]) box(M.inWood2, Fs, x, .14, .2, .04, .28, .18);   // counter
+  for (const x of [-.3, -.05]){ cyl(MC.white, Fs, x, .33, .2, .06, .04); emitters.push(new THREE.Vector3(x, .5, .2).applyMatrix4(Fs)); }
+  box(MC.board, Fs, -.05, .98, .14, 2.0, .58, .05);
+  wordSign(Fs, 'sign_w_noodles', -.05, .98, .18, 1, 'amber');
+  for (const x of [-.75, .65]){ box(M.lantern, Fs, x, .75, .25, .14, .2, .14); box(M.frame, Fs, x, .88, .25, .03, .06, .03); glow(Fs, x, .75, .35, 'red', .9); noteLight(Fs, x, .75, .35, 0xff4030); }
+  raggedTarp(atA(as + .9, r, 0), 0, .95, .8, .55, .35, MC.tarp);
+  for (let k=0; k<3; k++){ const a = as + .9 + rnd(-.3, .3); produceCrate(P, Math.sin(a)*(r + .55), 0, Math.cos(a)*(r + .55), pick([MC.cabbage, MC.daikon, MC.potato]), a); }
+  for (const x of [-.6, -.15, .3]) stool(Fs, x, .45);
+  const Fb = atA(as - .1, r + .75, 0); box(MC.board, Fb, 0, .3, 0, .3, .42, .03, 0, -.15); for (let k=0; k<4; k++) box(MC.chalk, Fb, rnd(-.04, .02), .4 - k*.07, .02, rnd(.1, .2), .015, MIN_T, 0, -.15);   // the chalk menu
+  for (let k=0; k<irand(2, 3); k++){ const a = as + rnd(-1.4, -.9); blob(pick([MC.white, M.frame]), P, Math.sin(a)*(r + .5), .1, Math.cos(a)*(r + .5), rnd(.08, .12), .8); }
+  { const a = as + rnd(-1.2, -1.0); cyl(pick([MC.conBlue, M.green2, M.red2]), P, Math.sin(a)*(r + .35), .2, Math.cos(a)*(r + .35), .12, .4); }   // a bin
+  // the roof: a cap with water tanks, a dish, antennas and a little shed
+  put(wedgeGeo(r + .06, .08, 0, TAU), M.inConc2, under(P, T(0, H + .04, 0)));
+  if (!NO_ROOF){
+    put(U.cyl16, MC.white, under(P, T(.25, H + .35, -.15, 0, .32, .55, .32))); put(U.cyl16, M.inRust, under(P, T(-.2, H + .25, -.25, 0, .26, .35, .26)));
+    sph(MC.white, P, -.15, H + .3, .3, .14, .45); cyl(M.metalDark, P, -.3, H + .7, .1, .015, 1.3);
+    box(M.inCorr2, P, .2, H + .22, .3, .35, .36, .3);
+    for (let k=0; k<2; k++){ const a = rnd(0, TAU); sagCable(P, 0, H + .9, 0, Math.sin(a)*1.4, H - .3, Math.cos(a)*1.4, .15); }
+  }
+  Object.assign(lot, { height: H + .08, floors: n, occupied: true });
+}
+
+// Corner market: a two-storey corrugated corner shop, its ground floor open on a lit market of produce crates, sacks,
+// baskets and water; a wooden counter of bottles at the side under a ragged tarp, a neon sign on a plank above,
+// pipes up the walls, a roller shutter and a pile of boxes round the corner
+function cornerMarket(lot, st, P0){
+  const P = under(P0, T(0, 0, -.05, pick([0, PI/2, PI, -PI/2])));
+  const w = 2.0, d = 1.65, h1 = 1.0, h2 = .9, xr = .35, wall = pick([MC.tealDark, MC.conBlue2, M.inCorr]), rib = pick([M.inCorr2, MC.tealDark, MC.conBlue2]);
+  // the closed right-hand block and the back wall of the market
+  box(wall, P, (xr + w/2)/2, h1/2, 0, w/2 - xr, h1, d);
+  box(M.inShop, P, (-w/2 + xr)/2, h1/2, -d/2 + .05, xr + w/2, h1, .1);
+  box(M.inConc, P, (-w/2 + xr)/2, .02, 0, xr + w/2, .04, d);
+  box(wall, P, -w/2 + .03, h1/2, -d/4, .06, h1, d/2);   // a short side wall at the back left
+  for (const [x, z] of [[-w/2 + .05, d/2 - .05], [-w/2 + .05, 0], [xr - .05, d/2 - .05]]) cyl(M.inWood2, P, x, h1/2, z, .04, h1);
+  // the upper floor, corrugated all round, a lit window, a green tarp hung over the front
+  box(wall, P, 0, h1 + h2/2, 0, w, h2, d);
+  for (const fc of faces(w, d)){ const F = under(P, T(fc.nx*fc.half, 0, fc.nz*fc.half, fc.ry));
+    corrRibs(F, fc.len, h1, h2, rib, .12);
+    if (fc.nz !== 1) corrRibs(F, fc.len, 0, h1, rib, .12);
+    for (let k=0; k<irand(1, 3); k++) box(pick([MC.paper, M.inRust, MC.patch]), F, rnd(-fc.len/2 + .2, fc.len/2 - .2), rnd(.3, h1 + h2 - .2), .03, rnd(.12, .3), rnd(.15, .3), MIN_T); }
+  const Fu = under(P, T(0, h1, d/2, 0));
+  box(MC.tarpGreen, Fu, .35, h2*.55, .05, .7, h2*.8, .03, 0, -.08);
+  for (let t = .05; t < .68; t += .1) box(MC.tarpGreen, Fu, t, h2*.12 - rnd(0, .12), .07, .06, rnd(.08, .2), MIN_T);
+  { const Fx = under(P, T(w/2, h1, 0, PI/2)); box(M.frame, Fx, .2, .45, .01, .4, .34, MIN_T); box(pick(LIT_ROOMS), Fx, .2, .45, .025, .34, .28, MIN_T); glow(Fx, .2, .45, .2, 'warm', .5); }
+  // the market inside: shelves of tins and jars at the back, string bulbs, a hanging lantern
+  for (const y of [.45, .7]){ box(M.inWood2, P, (-w/2 + xr)/2, y, -d/2 + .16, xr + w/2 - .1, .03, .16);
+    for (let x = -w/2 + .12; x < xr - .1; x += .09) if (chance(.75)) cyl(pick([MC.tomato, MC.lemon, MC.bottle, M.green2, MC.paper]), P, x, y + .06, -d/2 + .16, .03, .09); }
+  bulbString(P, -w/2 + .08, h1 - .06, d/2 - .1, xr - .08, h1 - .06, d/2 - .1, .05);
+  bulbString(P, -w/2 + .08, h1 - .06, 0, xr - .08, h1 - .06, 0, .05);
+  box(M.lantern2, P, -.2, h1 - .2, .45, .1, .14, .1); glow(P, -.2, h1 - .2, .45, 'warm', .7); noteLight(P, -.2, h1 - .2, .45, 0xffc060);
+  // produce spilling out the front: crates, baskets, sacks, packs of water, a scale on a stand
+  const goods = [MC.cabbage, MC.daikon, MC.tomato, MC.lemon, MC.chili, MC.garlic, MC.potato];
+  for (let i=0; i<3; i++) for (let j=0; j<3; j++){ const x = -w/2 + .3 + i*.38 + rnd(-.04, .04), z = -.15 + j*.42 + rnd(-.04, .04);
+    if (j === 2 && i === 2) continue; produceCrate(P, x, 0, z, pick(goods), rnd(-.15, .15), chance(.3)); }
+  for (let k=0; k<irand(2, 3); k++){ const x = -w/2 + rnd(.2, 1.1), z = d/2 + rnd(.2, .4); chance(.5) ? produceCrate(P, x, 0, z, pick(goods), 0, true) : blob(MC.sack, P, x, .12, z, .13, 1.1); }
+  for (let i=0; i<3; i++) for (let j=0; j<2; j++) cyl(MC.bottle, P, xr - .3 + i*.08, .11, d/2 + .1 + j*.08, .035, .22);   // a pack of water
+  box(M.frame, P, xr - .15, .45, .1, .04, .9, .04); cyl(M.metal, P, xr - .15, .9, .1, .1, .02); cyl(MC.white, P, xr - .15, .8, .1, .06, .12);   // the scale
+  // the counter round the side: bottles, jars, folded cloths, a pot of chopsticks; a ragged tarp over it on a pole
+  const cx = -w/2 - .22;
+  box(M.inWood, P, cx, .32, .25, .3, .64, 1.2); box(M.inWood2, P, cx, .66, .25, .38, .04, 1.28);
+  for (let t = -.25; t < .8; t += .07) box(M.inWood2, P, cx - .155, .32, t, MIN_T, .6, .03);
+  for (let k=0; k<irand(5, 8); k++) cyl(pick([M.red2, MC.conRust, MC.lemon, MC.bottle, M.frame]), P, cx + rnd(-.08, .08), .76, rnd(-.3, .1), .025, rnd(.12, .22));
+  box(MC.white, P, cx, .71, .55, .2, .06, .16); cyl(M.metal, P, cx + .05, .73, .75, .04, .12);
+  { const Ft = under(P, T(-w/2, h1 + .05, .25, -PI/2)); raggedTarp(Ft, 0, 0, 1.5, .62, .32, MC.tarp); cyl(M.inWood2, P, -w/2 - .6, (h1 - .1)/2, .95, .03, h1 - .1); }
+  raggedTarp(under(P, T((-w/2 + xr)/2, h1 + .06, d/2, 0)), 0, 0, xr + w/2 + .25, .5, .28, MC.tarp2);
+  // the neon on a plank above the market, posters, lamps
+  box(M.inWood2, Fu, -.35, .58, .07, 2.05, .6, .04); for (const x of [-.8, .1]) box(M.frame, Fu, x, .58, .05, .03, .45, .05);
+  wordSign(Fu, 'sign_w_noodlesP', -.35, .58, .11, 1, 'pink');
+  wallLamp(under(P, T(xr - .1, 0, d/2 + .01, 0)), 0, h1 - .2);
+  // the right-hand block: a roller shutter on the front, a 'hot, cheap' sign and boxes stacked round the corner
+  const Ff = under(P, T((xr + w/2)/2, 0, d/2, 0));
+  box(M.frame, Ff, 0, .45, .015, w/2 - xr - .04, .9, MIN_T); box(M.shutter, Ff, 0, .42, .03, w/2 - xr - .14, .78, MIN_T);
+  for (let y = .08; y < .8; y += .06) box(M.metalDark, Ff, 0, y, .045, w/2 - xr - .16, .012, MIN_T);
+  if (chance(.5)) box(pick([M.red2, MC.conBlue, M.green2]), Ff, rnd(-.15, .15), .35, .05, .3, .18, MIN_T);   // graffiti tag
+  const Fx = under(P, T(w/2, 0, 0, PI/2));
+  wordSign(Fx, 'sign_w_hot', -.2, .72, .05, .85, 'amber'); box(MC.paper, Fx, .45, .5, .03, .22, .3, MIN_T);
+  for (const z of [.4, .75]) cardboard(P, w/2 + .2, z - .2, irand(2, 3));
+  cardboard(P, w/2 - .1, d/2 + .25, irand(1, 2));
+  for (let k=0; k<irand(4, 7); k++) cyl(pick([M.red2, MC.lemon, MC.conBlue, M.green2, MC.copper]), P, w/2 + rnd(.05, .45), .06, d/2 + rnd(.05, .4), .04, .12);   // tins
+  cyl(M.metal, P, w/2 + .4, .12, d/2 + .45, .1, .24);   // a bucket
+  // pipes climbing the front, wires, a lean-to awning over the shutter
+  pipeRun(MC.copper, P, [[w/2 - .08, .1, d/2 + .06], [w/2 - .08, h1 + h2 - .12, d/2 + .06], [.4, h1 + h2 - .12, d/2 + .06], [.4, h1 + h2 + .15, d/2 + .06]], .045, true);
+  pipeRun(MC.copper, P, [[xr + .05, .05, d/2 + .08], [xr + .05, h1 + .55, d/2 + .08], [xr + .3, h1 + .55, d/2 + .08]], .035, true);
+  box(M.inRust, P, (xr + w/2)/2 + .05, h1 + .03, d/2 + .2, w/2 - xr + .25, .03, .45, 0, .32);
+  for (let k=0; k<2; k++) sagCable(P, -w/2, h1 + h2 - .1 - k*.15, d/2 + .1, w/2 + .1, h1 + h2 - .25 - k*.1, d/2 + .1, .12);
+  if (chance(.6*S.green)) plant(hangKind(), Fu, rnd(-.8, -.2), h2 - .05, .04, rnd(.7, .9), 't', true);
+  // the roof: a shallow tin slope with a patch of tarp, a vent and a chimney pipe
+  if (!NO_ROOF){
+    const y = h1 + h2;
+    box(M.inRust2, P, 0, y + .1, 0, w + .2, .04, d + .2, 0, .1);
+    for (let t = -w/2 - .05; t < w/2 + .1; t += .14) box(M.inRust, P, t, y + .13, 0, .03, .03, d + .2, 0, .1);
+    box(MC.tarp2, P, rnd(-.4, .2), y + .16, rnd(-.3, .2), .7, .03, .6, rnd(-.3, .3), .1);
+    cyl(M.metalDark, P, .6, y + .45, -.4, .06, .7); emitters.push(new THREE.Vector3(.6, y + .85, -.4).applyMatrix4(P));
+    box(M.cream2, P, -.5, y + .3, -.3, .3, .26, .3);
+  }
+  Object.assign(lot, { height: h1 + h2 + (NO_ROOF ? 0 : .15), floors: 2, occupied: true });
+}
+
 function buildFactory(lot, st, P0){
   const v = R();
   if (v < .2) return buildTankYard(lot, P0);

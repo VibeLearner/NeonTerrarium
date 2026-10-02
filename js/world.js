@@ -161,7 +161,7 @@ const glassHotelTower = (lot, st, P0) => glassHotel(lot, st, P0, 'tower');
 const glassHotelPodium = (lot, st, P0) => glassHotel(lot, st, P0, 'podium');
 const SECTION_TYPES = {
   low:  { ground: [[buildTenement,6],[podHouse,1.5],[octoHouse,1.2],[deckHouse,1.3]], upper: [[buildTenement,5],[podHouse,2],[octoHouse,1.2]] },
-  mid:  { ground: [[buildShophouse,5],[podHouse,2],[octoHouse,1.5],[deckHouse,2],[platformTower,1.3]], upper: [[buildShophouse,4],[podHouse,2],[octoHouse,1],[platformTower,1]] },
+  mid:  { ground: [[buildShophouse,5],[podHouse,2],[octoHouse,1.5],[deckHouse,2],[platformTower,1.3],[containerStack,1.5],[spiralTower,1.2],[cornerMarket,1.5]], upper: [[buildShophouse,4],[podHouse,2],[octoHouse,1],[platformTower,1],[containerStack,1.2]] },
   high: { ground: [[buildTower,1]], upper: [[slabTower,2],[glassHotelTower,1.5],[glassHotelPodium,1],[roundTower,1],[twistTower,1],[gardenTower,1],[domeTower,1],[shellTower,1],[cascadeTerraces,.8]] },
   ind:  { ground: [[hall,1],[silos,1],[stiltFactory,1],[tankYard,1],[scrapShed,1],[gearWorkshop,1],[repairsBlock,1],[partsWarehouse,1],[lubeShed,.8],[stackedWorks,2.6],[decoWorks,1.1],[brutalTower,1.1]], upper: [[hall,2],[silos,1],[scrapShed,1],[repairsBlock,1],[partsWarehouse,1],[brutalTower,.6]] },
 };

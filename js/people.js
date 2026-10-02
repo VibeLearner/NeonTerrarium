@@ -383,8 +383,11 @@ function makeSpots(pl, list, inside, oldSpots, addEnd){
   list.forEach((r, n) => {
     if (pl.spots.some(o => Math.hypot(o.x - r.x, o.z - r.z) < .34)) return;
     const c = cells.get(ckey(Math.round(r.x/LOT), Math.round(r.z/LOT))); if (!inside(c)) return;
+    if (r.act && (c.green !== 'grass' || c.sections.length)) return;   // sitting on the ground: only on a plot laid fully to lawn
     const ap = approachFor(cellGrid(c), r.x, r.z, r.fx, r.fz); if (!ap) return;
-    const key = 's:' + pl.id + ':' + n, old = oldSpots.get(key), nk = 'a:' + Math.round(ap.x*100) + ',' + Math.round(ap.z*100);
+    // the key names the spot by what and where it is, so a plot rebuilt differently (a lawn paved over, say) never
+    // hands its old sitters a different seat in the wrong place
+    const key = 's:' + pl.id + ':' + n + ':' + (r.act || r.kind) + ':' + Math.round(r.x*20) + ',' + Math.round(r.z*20), old = oldSpots.get(key), nk = 'a:' + Math.round(ap.x*100) + ',' + Math.round(ap.z*100);
     const sp = { key, x: r.x, y: r.y, z: r.z, ax: ap.x, az: ap.z, node: ngAdd(nk, ap.x, ap.z), kind: r.kind, stall: r.stall, face: [r.fx, r.fz],
                  by: old ? old.by : null, place: pl.id, near: [], act: r.act, hx: r.hx, hz: r.hz, ad: r.ad, pic: r.pic };
     pl.spots.push(sp); spotByKey.set(key, sp); addEnd(c, { key: nk, x: ap.x, z: ap.z, kind: 's' });

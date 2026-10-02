@@ -34,6 +34,7 @@ const texLoader = new THREE.TextureLoader();
 function swayTypeFor(kind){
   if (kind.startsWith('sign_') || kind.startsWith('glyph_') || kind.startsWith('graf_') || kind === 'w_tangle') return 0;
   if (kind.startsWith('l_') && kind !== 'l_mossroots') return 1;
+  if (/^gt\d$/.test(kind)) return 4;   // lawn grass: bends as a whole, in waves rolling across the lawn
   if (kind === 'vines' || kind === 'pothos' || kind === 'l_mossroots' || kind.startsWith('h_')) return 2;
   return 3;
 }
@@ -266,7 +267,7 @@ const FOL_ATLAS = (() => {
 })();
 const FOL_SHADER = new THREE.ShaderMaterial({
     uniforms: { lightsOn: LIGHTS_ON, lodPlants: LOD.plants, map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind },
-    vertexShader: `uniform vec2 res; uniform float time; uniform float lodPlants; uniform float lightsOn; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind; attribute float aOn;
+    vertexShader: `uniform vec2 res; uniform float time; uniform float lodPlants; uniform float lightsOn; uniform float wind; varying float vPhase; attribute vec4 aVar; attribute float aFixed; attribute vec4 aRect; attribute vec2 aKind; attribute float aOn;
       varying vec2 vUv; varying float vShade; varying vec4 vRect; varying vec2 vKind; varying float vFlk; varying float vOn;` + FLK_GLSL + LIT_GLSL + `
       void main(){
         vShade = aVar.z; vRect = aRect; vKind = aKind; vOn = aKind.y > 0.5 ? litOn(aOn, lightsOn, time) : 1.0;
@@ -283,7 +284,14 @@ const FOL_SHADER = new THREE.ShaderMaterial({
         vec3 l3 = vec3(local, 0.0);
         if (aFixed > 0.5){
           // glued to a wall, edge or line: a flat plane in the surface's own orientation
-          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(l3, 1.0);
+          vec4 wp = modelMatrix * instanceMatrix * vec4(l3, 1.0);
+          if (swayType > 3.5){   // lawn grass: the blade tips lean with gusts that sweep across the lawn, so neighbours move together
+            vec3 base = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+            float tip = clamp(uv.y, 0.0, 1.0); tip *= tip;
+            float wave = sin(time*1.9 - dot(base.xz, vec2(.9, .55))*1.7) + .45*sin(time*3.7 - dot(base.xz, vec2(-.4, 1.1))*2.6 + aVar.w);
+            wp.xz += vec2(.75, .45)*wave*wind*.09*tip;
+          }
+          gl_Position = projectionMatrix * viewMatrix * wp;
         } else {
           // free-standing: faces the camera, with its anchor and corners snapped to whole render pixels
           vec4 a = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(0.0,0.0,0.0,1.0);
@@ -310,7 +318,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
           sh = wind*(1.3*sin(time*2.0 + ph - fromTop*1.4) + 0.45*sin(time*4.1 + ph*1.7))*fromTop;
         else if (swayType > 1.5 && swayType < 2.5)  // hanging vines: a slow wave travelling down to the tips
           sh = wind*(1.6*sin(time*1.3 + ph - fromTop*1.6) + 0.5*sin(time*2.9 + ph*2.0))*pow(fromTop, 1.4);
-        else if (swayType > 2.5)                    // standing plants: tips lean with the breeze
+        else if (swayType > 2.5 && swayType < 3.5)  // standing plants: tips lean with the breeze
           sh = wind*(1.0*sin(time*1.6 + ph) + 0.3*sin(time*3.3 + ph*1.3))*fromBottom*fromBottom;
         tx.x -= floor(sh + 0.5);                 // whole texels only, so pixels never break up
         if (tx.x < 0.0 || tx.x >= texSize.x || tx.y < 0.0 || tx.y >= texSize.y) discard;

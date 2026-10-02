@@ -28,16 +28,26 @@ const RAIN_SKY = C(0x28324a), tmpC = new THREE.Color();
 // shadows reach into view in the evening, are always in its view.
 const SUN_DIR = new THREE.Vector3(0, 1, 0), _sunC = new THREE.Vector3(), _sunCLast = new THREE.Vector3(1e9, 0, 0);
 const SUN_BACK = 260;
+// Stable shadows: the box only ever moves by whole shadow-map texels, measured along the sun's own view axes, so
+// when it moves and the shadows are redrawn they land on exactly the same grid as before and nothing changes on
+// screen (moving it any other amount made every shadow edge in the city re-pixelate at once, a visible pop).
+// The box also comes in a few fixed sizes, each a fifth bigger than the last, so zooming re-pixelates the shadows
+// only a handful of times instead of every few units.
+const _lx = new THREE.Vector3(), _ly = new THREE.Vector3(), _lz = new THREE.Vector3(), _lUp = new THREE.Vector3(0, 1, 0);
 let _shHalfLast = 0;
 function placeSun(){
-  const asp = Math.max(1, W/H), reach = Math.hypot(zoomT*asp, zoomT/Math.sin(PITCH)) + 30;   // +30: tall rooftops at the screen edge, and the box snapping
-  const half = Math.ceil(reach/6)*6, step = 6;
-  _sunC.set(Math.round(camGoal.x/step)*step, 0, Math.round(camGoal.z/step)*step);
+  const asp = Math.max(1, W/H), reach = Math.hypot(zoomT*asp, zoomT/Math.sin(PITCH)) + 30;   // +30: tall rooftops at the screen edge, and the box's steps
+  const half = 30*Math.pow(1.2, Math.max(0, Math.ceil(Math.log(reach/30)/Math.log(1.2))));
   if (half !== _shHalfLast){
     const sc = sun.shadow.camera; sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.updateProjectionMatrix();
-    _shHalfLast = half; shadowDirty = true;
+    _shHalfLast = half; shadowDirty = true; _sunCLast.set(1e9, 0, 0);
   }
-  if (!_sunC.equals(_sunCLast)){ _sunCLast.copy(_sunC); shadowDirty = true; }
+  // the sun camera's axes, as three.js's lookAt builds them: z toward the sun, x = up x z, y = z x x
+  _lz.copy(SUN_DIR); _lx.crossVectors(_lUp, _lz).normalize(); _ly.crossVectors(_lz, _lx);
+  const texel = 2*half/sun.shadow.mapSize.x, step = texel*Math.max(1, Math.round(6/texel));
+  const u = Math.round(camGoal.dot(_lx)/step)*step, v = Math.round(camGoal.dot(_ly)/step)*step, w = Math.round(camGoal.dot(_lz)/6)*6;   // along the sun it makes no difference to the grid
+  _sunC.copy(_lx).multiplyScalar(u).addScaledVector(_ly, v).addScaledVector(_lz, w);
+  if (_sunC.distanceToSquared(_sunCLast) > 1e-8){ _sunCLast.copy(_sunC); shadowDirty = true; }
   sun.target.position.copy(_sunC); sun.target.updateMatrixWorld();
   sun.position.copy(_sunC).addScaledVector(SUN_DIR, SUN_BACK);
 }

@@ -17,7 +17,7 @@
 // assets/sprites/people.png: one character per 16 px row, 20 cells of 12 px each, facing right (mirrored for
 // facing left), feet on the bottom row: 6 walk frames, 4 idle, 6 gesture (talking, ordering, serving; characters
 // without their own gesture sheet sway through their idle frames) and 4 sitting; cells 20 to 31 are extra
-// animations (the police officer's scanner and angry reaction). Row 12 is the police officer, row 13 the delivery
+// animations (the police officer's scanner and angry reaction). Row 12 is the police officer, row 13 the old delivery
 // robot (walk 0-3, alternate walk 4-7, parcel drop 8-13, the parcel capsule opening 14-19), row 14 the emote icons.
 const PPL = { rows: 15, cw: 12, ch: 16, walk: 6, idle: 4, W: 384, H: 240 };
 const F_IDLE = 6, F_SPEC = 10, F_SIT = 16, F_USE = 20, F_ANGRY = 26;
@@ -28,9 +28,10 @@ PPL_TEX.magFilter = PPL_TEX.minFilter = THREE.NearestFilter; PPL_TEX.generateMip
 const PPL_MAX = 700;          // most people drawn at once (the nearest win if more are out)
 const PPL_SPEED = .55;        // walking speed, world units a second (a block takes about 7 s)
 
-const PPL_MAT = new THREE.ShaderMaterial({
-  uniforms: { map: { value: PPL_TEX }, res: FOL_UNI.res, tint: FOL_UNI.tint, normalMode: FOL_UNI.normalMode,
-              sheet: { value: new THREE.Vector4(PPL.W, PPL.H, PPL.cw, PPL.ch) }, size: { value: new THREE.Vector2(PPL.cw/PX, PPL.ch/PX) } },
+// a batch of upright pixel sprites cut from one sheet (rows of equal cells): people, and the delivery drones
+function spriteMat(tex, W, H, cw, ch, rows){ return new THREE.ShaderMaterial({
+  uniforms: { map: { value: tex }, res: FOL_UNI.res, tint: FOL_UNI.tint, normalMode: FOL_UNI.normalMode,
+              sheet: { value: new THREE.Vector4(W, H, cw, ch) }, size: { value: new THREE.Vector2(cw/PX, ch/PX) } },
   vertexShader: `uniform vec2 res; uniform vec2 size; attribute vec3 aPos; attribute vec4 aSpr;
     varying vec2 vUv; varying vec4 vSpr;
     void main(){
@@ -52,7 +53,7 @@ const PPL_MAT = new THREE.ShaderMaterial({
     void main(){
       vec2 tx = floor(vUv * sheet.zw);
       if (tx.x < 0.0 || tx.y < 0.0 || tx.x >= sheet.z || tx.y >= sheet.w) discard;
-      vec2 st = vec2(vSpr.y*sheet.z + tx.x, (${PPL.rows - 1}.0 - vSpr.x)*sheet.w + tx.y);
+      vec2 st = vec2(vSpr.y*sheet.z + tx.x, (${rows - 1}.0 - vSpr.x)*sheet.w + tx.y);
       vec4 c = texture2D(map, (st + 0.5)/sheet.xy);
       if (c.a < 0.5) discard;
       // stepping out of (or into) a doorway: the figure dissolves in a pixel dither
@@ -61,18 +62,30 @@ const PPL_MAT = new THREE.ShaderMaterial({
       vec3 col = vSpr.w > 1.5 ? c.rgb : c.rgb * mix(tint, vec3(1.0), 0.3);
       gl_FragColor = normalMode > 0.5 ? vec4(0.5, 0.5, 1.0, 1.0) : vec4(col, 1.0);
     }`,
-});
-const pplMesh = (() => {
+}); }
+const PPL_MAT = spriteMat(PPL_TEX, PPL.W, PPL.H, PPL.cw, PPL.ch, PPL.rows);
+function spriteBatch(mat, max){
   const geo = new THREE.InstancedBufferGeometry();
   const q = new THREE.PlaneGeometry(1, 1);
   geo.index = q.index; geo.setAttribute('position', q.attributes.position); geo.setAttribute('uv', q.attributes.uv);
-  geo.setAttribute('aPos', new THREE.InstancedBufferAttribute(new Float32Array(PPL_MAX*3), 3).setUsage(THREE.DynamicDrawUsage));
-  geo.setAttribute('aSpr', new THREE.InstancedBufferAttribute(new Float32Array(PPL_MAX*4), 4).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('aPos', new THREE.InstancedBufferAttribute(new Float32Array(max*3), 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('aSpr', new THREE.InstancedBufferAttribute(new Float32Array(max*4), 4).setUsage(THREE.DynamicDrawUsage));
   geo.instanceCount = 0;
-  const m = new THREE.Mesh(geo, PPL_MAT);
+  const m = new THREE.Mesh(geo, mat);
   m.frustumCulled = false; m.layers.set(2);   // drawn with the plants: colour pass and the flat-normal outline pass
   scene.add(m); return m;
-})();
+}
+const pplMesh = spriteBatch(PPL_MAT, PPL_MAX);
+// The delivery drones: a little round hover drone with a parcel strapped on, drawn from eight views
+// (assets/sprites/ddrone.png: 22 x 19 px cells; 0 heading away from the camera, then clockwise round to 7, and
+// cell 8 the parcel set down on the doorstep).
+const DD = { W: 198, H: 19, cw: 22, ch: 19, parcel: 8 };
+const DD_TEX = new THREE.TextureLoader().load('assets/sprites/ddrone.png');
+DD_TEX.magFilter = DD_TEX.minFilter = THREE.NearestFilter; DD_TEX.generateMipmaps = false;
+const DD_MAX = 80, DD_MAT = spriteMat(DD_TEX, DD.W, DD.H, DD.cw, DD.ch, 1);
+DD_MAT.uniforms.size.value.multiplyScalar(.85);
+const ddMesh = spriteBatch(DD_MAT, DD_MAX);
+const _camFw = new THREE.Vector3();
 
 /* ---------- what's in the way: a footprint map of every plot ---------- */
 // Each plot gets a 5 cm map of everything standing in the walking band (ankle to head height): walls, benches,
@@ -882,7 +895,7 @@ function updateBots(dt, t){
       if (w.home){ b.state = 'in'; b.until = t + (6 + pplRand()*14)*slow; continue; }
       // at the door: lower the parcel just in front of it
       const d = w.target; b.state = 'drop'; b.t0 = t; b.door = d;
-      b.x = d.stand.x; b.z = d.stand.z;
+      b.x = d.stand.x; b.z = d.stand.z; b.dx = -d.n[0]; b.dz = -d.n[1];   // facing the door
       b.cap = { x: d.wall.x + d.n[0]*.14, z: d.wall.z + d.n[1]*.14 };
       continue;
     }
@@ -1197,17 +1210,34 @@ function updatePeople(dt, t){
       emit(b.x - b.hx*.24 - _bkF.x*.03, y + .03, b.z - b.hz*.24 - _bkF.z*.03, L.row, F_SIT, b.flip || 1, a); }
     emit(b.x + b.hx*.06 + ox, y, b.z + b.hz*.06 + oz, ROW_COP, F_SIT, b.flip || 1, a);
   }
-  // delivery bots and their parcels
+  // delivery drones and their parcels, in their own batch
+  _camFw.set(0, 0, -1).applyQuaternion(cam.quaternion); _camFw.y = 0; _camFw.normalize();
+  const dpos = ddMesh.geometry.attributes.aPos, dspr = ddMesh.geometry.attributes.aSpr, DP = dpos.array, DQ = dspr.array;
+  let di = 0;
+  const emitD = (x, y, z, frame, alpha) => {
+    if (di >= DD_MAX) return false;
+    _pv.set(x, y, z).applyMatrix4(VP);
+    if (_pv.x < -1.1 || _pv.x > 1.1 || _pv.y < -1.15 || _pv.y > 1.1) return false;
+    DP[di*3] = x; DP[di*3 + 1] = y; DP[di*3 + 2] = z; DQ[di*4] = 0; DQ[di*4 + 1] = frame; DQ[di*4 + 2] = 1; DQ[di*4 + 3] = alpha;
+    di++; return true;
+  };
   for (const b of bots){
     if (b.state === 'in') continue;
-    let frame, alpha = 1;
-    if (b.state === 'drop') frame = 8 + Math.min(5, Math.floor((t - b.t0)/.22));
-    else { frame = b.gait + Math.floor(t*8 + b.phase) % 4; const w = b.walk;
+    let alpha = 1, lift = .2;
+    if (b.state === 'drop'){   // dips down to set the parcel on the step, then rises again
+      const u = t - b.t0; lift = .2 - .12*(u < 1.3 ? Math.sin(Math.min(1, u/1.3)*PI/2) : Math.max(0, 1 - (u - 1.3)/.8)); }
+    else { const w = b.walk;
       if (w && w.doorA) alpha = Math.min(alpha, (w.s - .05)/.3); if (w && w.doorB) alpha = Math.min(alpha, (w.len - w.s - .05)/.3); }
-    const y = CURB + .02*Math.sin(t*3 + b.phase);
-    if (emit(b.x, y, b.z, ROW_BOT, frame, b.flip, Math.max(0, alpha)) && b.emoUntil > t) emit(b.x, y + .45, b.z, ROW_EMO, b.emo, 1, 2);
-    if (b.cap && t - b.t0 > 1.3) emit(b.cap.x, CURB, b.cap.z, ROW_BOT, 14 + Math.min(5, Math.floor((t - b.t0 - 1.3)/.38)), 1, 1);
+    // the view that matches its heading as the camera sees it
+    let view = b.view || 4;
+    if (b.dx !== undefined && (b.dx || b.dz)){ const ax = b.dx*_camR.x + b.dz*_camR.z, az = b.dx*_camFw.x + b.dz*_camFw.z;
+      view = b.view = ((Math.round(Math.atan2(ax, az)/(PI/4)) % 8) + 8) % 8; }
+    const y = CURB + lift + .03*Math.sin(t*3 + b.phase);
+    if (emitD(b.x, y, b.z, view, Math.max(0, alpha)) && b.emoUntil > t) emit(b.x, y + .75, b.z, ROW_EMO, b.emo, 1, 2);
+    // the parcel on the doorstep, until it's taken in
+    if (b.cap && t - b.t0 > 1.3){ const u = t - b.t0; emitD(b.cap.x, CURB, b.cap.z, DD.parcel, u > 3 ? Math.max(0, (3.6 - u)/.6) : 1); }
   }
+  ddMesh.geometry.instanceCount = di; dpos.needsUpdate = dspr.needsUpdate = true;
   pplMesh.geometry.instanceCount = i;
   pos.needsUpdate = spr.needsUpdate = true;
   updateDoors(dt);

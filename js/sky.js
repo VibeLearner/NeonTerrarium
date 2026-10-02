@@ -19,10 +19,19 @@ const cur = { top:new THREE.Color(), bot:new THREE.Color(), sun:new THREE.Color(
 const RAIN_SKY = C(0x28324a), tmpC = new THREE.Color();
 // The sun keeps a fixed direction but travels with the view, so its shadow box always covers what's on screen,
 // however far from the start the player has built. The box snaps in steps, and shadows redraw only when it moves.
+// Its size comes from the screen: the farthest ground point in view is a screen corner, the screen's half-width
+// sideways (zoom times the aspect) and its half-height deep (zoom over the sine of the pitch), plus room for
+// rooftops at the top of the screen, which stand on ground further back. A square that wide around the view's
+// middle covers every corner however the view is turned. (Casters outside it don't need covering: seen from the
+// sun, a shadow lands on the same spot of the shadow map as the thing that casts it.)
+// The sun stands far back (SUN_BACK) and sees deep (core.js), so tall buildings well toward the sun, whose long
+// shadows reach into view in the evening, are always in its view.
 const SUN_DIR = new THREE.Vector3(0, 1, 0), _sunC = new THREE.Vector3(), _sunCLast = new THREE.Vector3(1e9, 0, 0);
+const SUN_BACK = 260;
 let _shHalfLast = 0;
 function placeSun(){
-  const half = Math.ceil((zoomT*2.3 + 12)/6)*6, step = 6;
+  const asp = Math.max(1, W/H), reach = Math.hypot(zoomT*asp, zoomT/Math.sin(PITCH)) + 30;   // +30: tall rooftops at the screen edge, and the box snapping
+  const half = Math.ceil(reach/6)*6, step = 6;
   _sunC.set(Math.round(camGoal.x/step)*step, 0, Math.round(camGoal.z/step)*step);
   if (half !== _shHalfLast){
     const sc = sun.shadow.camera; sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.updateProjectionMatrix();
@@ -30,7 +39,7 @@ function placeSun(){
   }
   if (!_sunC.equals(_sunCLast)){ _sunCLast.copy(_sunC); shadowDirty = true; }
   sun.target.position.copy(_sunC); sun.target.updateMatrixWorld();
-  sun.position.copy(_sunC).addScaledVector(SUN_DIR, 40);
+  sun.position.copy(_sunC).addScaledVector(SUN_DIR, SUN_BACK);
 }
 function applyTime(){
   const h = S.hour;

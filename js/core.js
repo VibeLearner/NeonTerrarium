@@ -34,8 +34,10 @@ const cam = new THREE.OrthographicCamera(-1,1,1,-1,NEAR,FAR);
 const sun = new THREE.DirectionalLight(0xffffff, 1);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048,2048);
-Object.assign(sun.shadow.camera, { left:-17, right:17, top:17, bottom:-17, near:1, far:110 });
-sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
+// the sun's view reaches 260 units toward it (see SUN_BACK in sky.js) and 340 past the view's middle; the depth bias
+// is the old one scaled to this deeper range, so shadows sit as tightly to their casters as before
+Object.assign(sun.shadow.camera, { left:-17, right:17, top:17, bottom:-17, near:1, far:600 });
+sun.shadow.bias = -0.0008*110/600; sun.shadow.normalBias = 0.03;
 scene.add(sun, sun.target);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
 scene.add(hemi);

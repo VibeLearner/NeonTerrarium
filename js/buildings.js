@@ -1715,7 +1715,7 @@ function brutalTower(lot, st, P0){
     if (chance(.6)) emitters.push(new THREE.Vector3(tb.ox, H + .6, tb.oz).applyMatrix4(P));
   }
   // at the foot: puddles of runoff, rubble, ferns
-  for (let q=0; q<irand(2, 4); q++) plant(pick(['fern','g_fern2','moss','bush']), P, rnd(-1.1, 1.1), 0, rnd(.8, 1.1), rnd(.7, .95));
+  for (let q=0; q<irand(2, 4); q++){ const x = rnd(-1.1, 1.1), z = rnd(.8, 1.1), sc = rnd(.7, .95); chance(.5) ? plant(pick(['fern','g_fern2','bush']), P, x, 0, z, sc) : floorSmall(P, x, .046, z, sc + .1); }
   Object.assign(lot, { height: NO_ROOF ? H : Math.max(H, sh), floors: chunks*2, occupied: true });
 }
 

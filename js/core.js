@@ -180,6 +180,7 @@ const heavyFlickerId = () => 200 + Math.floor(Math.random()*55);
 function bucketGeometry(b){
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3));
+  if (b.u) g.setAttribute('uv', new THREE.Float32BufferAttribute(b.u, 2));   // floor decals
   return g;
 }
 const _p=new THREE.Vector3(), _q=new THREE.Quaternion(), _e=new THREE.Euler(), _s=new THREE.Vector3();

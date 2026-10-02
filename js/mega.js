@@ -962,7 +962,8 @@ function buildFoundry(m){
     chance(.6) ? put(U.cyl16, pick([M.fRust, M.awn3, M.corrBlue, M.fSteel2]), under(P, T(x, .28, z, 0, .4, .52, .4))) : box(pick([M.crate, M.fSteel2]), P, x, .22, z, .5, .44, .5); }
 
   // ---- greenery in the yard: weeds in the cracks, planters and a few small trees along the front
-  for (let k=0; k<26; k++) plant(pick(['g_clover','g_cover','g_moss2','moss','g_flowers','g_spread1']), P, rnd(-L/2 + .5, L/2 - .5), .06, rnd(2.4, D/2 - .3), rnd(.7, 1.0));
+  for (let k=0; k<26; k++){ const x = rnd(-L/2 + .5, L/2 - .5), z = rnd(2.4, D/2 - .3), sc = rnd(.7, 1.0);
+    chance(.15) ? plant('g_flowers', P, x, .06, z, sc) : floorBig(P, x, .066, z, sc + .2); }   // moss and weeds flat on the slabs, the odd flower clump
   for (let k=0; k<6; k++){ const x = -L/2 + 1.2 + k*(L - 2.4)/5, z = D/2 - .5;
     box(M.concM, P, x, .22, z, .9, .4, .5); plant(pick(['bamboo','bonsai','bushFlower','bush']), P, x, .42, z, rnd(.95, 1.25)); plant('h_ivy', under(P, T(x, 0, z + .25)), 0, .4, .01, .8, 't', true); }
   for (const x of [-L/2 + .5, L/2 - .5]) for (let z = -D/2 + 1; z < D/2 - 1; z += rnd(1.2, 2.0)) plant(pick(['bamboo','bush','g_fern3','bonsai']), P, x, .06, z, rnd(.9, 1.2));

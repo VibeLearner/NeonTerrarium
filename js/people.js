@@ -97,6 +97,7 @@ function rasterize(data, x0, z0, nx, nz){
   const line = (arr, ax, az, bx, bz) => { const n = Math.ceil(Math.hypot(bx - ax, bz - az)/(GR*.5)) + 1; for (let k = 0; k <= n; k++){ const u = k/n; mark(arr, ax + (bx - ax)*u, az + (bz - az)*u); } };
   const x1 = x0 + nx*GR, z1 = z0 + nz*GR;
   for (const geo of data.geo.values()){
+    if (geo.attributes.uv) continue;   // flat floor decals: nothing to walk round
     const P = geo.attributes.position.array;
     for (let t = 0; t + 8 < P.length; t += 9){
       const y0 = P[t + 1], y1 = P[t + 4], y2 = P[t + 7];

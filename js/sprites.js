@@ -328,6 +328,53 @@ function plant(kind,P,x,y,z,k=1,anchor,fixed=false){
     FOL_LIST[kind].push({ m: under(P, T(x,y,z,yaw+PI/2)).multiply(scale), an, flip:-flip, shade:shade*.88, phase, fixed:1 });
   }
 }
+/* ---------- floor overgrowth: flat moss, vines and weeds painted onto the ground ---------- */
+// Cut from the overgrown-tile sheets (stone keyed out, only the plant layer kept, shrunk to true pixel size).
+// Unlike the plant billboards these lie flat and take the scene's light and shadow like the paving under them,
+// so moss on the floor reads as moss, not as little shrubs. One small atlas, one material; they ride in the
+// ordinary geometry buckets (with uvs), so a cell's floor decals cost no extra draw call per patch.
+const FLOOR_SPR = { f_moss1:[15,15], f_moss2:[16,15], f_weeds:[21,20], f_crack:[22,22], f_vine:[24,23], f_mossmat:[22,22],
+  f_sprouts:[20,19], f_seam:[22,21], f_ivy:[24,24], f_leaves:[20,20], f_grass1:[30,9], f_grass2:[30,9] };
+const FLOOR_UV = {};
+const FLOOR_MAT = (() => {
+  const AW = 128; let x = 1, y = 1, rowH = 0; const slots = {};
+  for (const k in FLOOR_SPR){ const [w,h] = FLOOR_SPR[k];
+    if (x + w + 1 > AW){ x = 1; y += rowH + 1; rowH = 0; }
+    slots[k] = [x, y]; x += w + 1; rowH = Math.max(rowH, h); }
+  let AH = 16; while (AH < y + rowH + 1) AH *= 2;
+  const cv = document.createElement('canvas'); cv.width = AW; cv.height = AH;
+  const g = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv);
+  tex.magFilter = tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false;
+  for (const k in FLOOR_SPR){
+    const [w,h] = FLOOR_SPR[k], [cx,cy] = slots[k];
+    FLOOR_UV[k] = [cx/AW, 1 - (cy + h)/AH, (cx + w)/AW, 1 - cy/AH];
+    const img = new Image(); img.onload = () => { g.drawImage(img, cx, cy, w, h); tex.needsUpdate = true; }; img.src = 'assets/floor/' + k + '.png';
+  }
+  const m = toon(0xffffff); m.map = tex; m.alphaTest = .5; m.userData.noCast = true;
+  m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -2;
+  return m;
+})();
+// which patches go where
+const FLOOR_SMALL = ['f_moss1','f_moss2','f_crack','f_seam','f_sprouts','f_leaves'];             // tile gaps and sidewalk edges
+const FLOOR_BIG = ['f_vine','f_mossmat','f_ivy','f_weeds','f_seam','f_sprouts','f_moss2','f_leaves'];   // open ground: plazas and yards
+const FLOOR_FRINGE = ['f_grass1','f_grass2'];                                                         // grass along a kerb or wall foot
+// a patch lying flat at (x,y,z) in P's frame; turned a random quarter and mirrored, so repeats don't line up.
+// k scales it; ry turns it (strips use it to run along an edge)
+const _fv = new THREE.Vector3();
+function floorPatch(kind, P, x, y, z, k=1, ry){
+  if (!chance(Math.min(1, .25 + .75*S.green))) return;
+  const [w,h] = FLOOR_SPR[kind], hw = w/PX*k/2, hh = h/PX*k/2, uv = FLOOR_UV[kind];
+  const m = under(P, T(x, y, z, ry === undefined ? irand(0,3)*PI/2 : ry));
+  const flip = chance(.5), u0 = flip ? uv[2] : uv[0], u1 = flip ? uv[0] : uv[2];   // mirrored by the uvs, which keeps the winding facing up
+  let b = buckets.get(FLOOR_MAT); if (!b){ b = { p: [], n: [], d: [], f: null, u: [] }; buckets.set(FLOOR_MAT, b); }
+  const C = [[-hw,-hh,u0,uv[3]], [hw,-hh,u1,uv[3]], [hw,hh,u1,uv[1]], [-hw,hh,u0,uv[1]]];
+  for (const q of [0,2,1, 0,3,2]){
+    const [cx, cz, u, v] = C[q]; _fv.set(cx, 0, cz).applyMatrix4(m);
+    b.p.push(_fv.x, _fv.y, _fv.z); b.n.push(0, 1, 0); b.u.push(u, v); b.d.push(0);
+  }
+}
+const floorSmall = (P, x, y, z, k) => floorPatch(pick(FLOOR_SMALL), P, x, y, z, k);
+const floorBig = (P, x, y, z, k) => floorPatch(pick(FLOOR_BIG), P, x, y, z, k);
 // small plants for roofs, balconies and ledges; big spreading ones for open ground; hanging ones for walls and edges
 const SMALL_GROUND = ['bush','bush','bushFlower','moss','g_moss2','g_fern2'];
 const BIG_GROUND = ['g_clover','g_fern3','g_cover','g_flowers','g_spread1','g_spread2','g_fern2','g_moss2','bush','bushFlower'];

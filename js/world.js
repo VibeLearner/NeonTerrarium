@@ -97,7 +97,7 @@ function batchGroup(datas, withGeo = true){
     const merged = geos.length === 1 ? geos[0].clone() : THREE.BufferGeometryUtils.mergeBufferGeometries(geos, false);
     merged.computeBoundingSphere();
     const mesh = new THREE.Mesh(merged, m);
-    if (m.userData.colorOnly){ mesh.layers.set(1); mesh.renderOrder = 2; } else { mesh.castShadow = true; mesh.receiveShadow = true; }   // see-through glass: colour pass only
+    if (m.userData.colorOnly){ mesh.layers.set(1); mesh.renderOrder = 2; } else { mesh.castShadow = !m.userData.noCast; mesh.receiveShadow = true; }   // see-through glass: colour pass only
     g.add(mesh);
   }
   for (const k in SPR.size) FOL_LIST[k] = fol[k] || [];
@@ -140,7 +140,8 @@ function buildPlatform(c){
     box(G.asph, P, 0, .012, 0, LOT, .025, LOT);
     const n = 7, st = LOT/n;
     for (let i=0;i<n;i++) for (let j=0;j<n;j++) if (!chance(.04)) box(pick(TILES.mid), P, (i-(n-1)/2)*st, .03, (j-(n-1)/2)*st, st - .05, .045, st - .05);
-    for (let k=0;k<irand(1,3);k++) plant(pick(['bush','bushFlower','g_spread1','g_fern3','bonsai']), P, rnd(-1.3,1.3), .05, rnd(-1.3,1.3), rnd(.7,.95));
+    for (let k=0;k<irand(1,2);k++) plant(pick(['bush','bushFlower','g_fern3','bonsai']), P, rnd(-1.3,1.3), .05, rnd(-1.3,1.3), rnd(.7,.95));
+    for (let k=0;k<irand(2,4);k++) floorBig(P, rnd(-1.3,1.3), .056, rnd(-1.3,1.3), rnd(.8,1.15));   // moss and vines grown over the paving
     if (chance(.4)){ const Pb = under(P, T(rnd(-.9,.9), .05, rnd(-.9,.9), pick([0, PI/2]))); box(M.wood, Pb, 0, .14, 0, .5, .04, .15); box(M.frame, Pb, 0, .07, 0, .42, .14, .1);
       for (const sx of [-.13, .13]) spotAt(Pb, sx, .16, 0, 'seat', null, [0, 1]); }
   }
@@ -229,7 +230,7 @@ function cellView(c){
   const g = new THREE.Group();
   for (const [m, geo] of c.data.geo){
     const mesh = new THREE.Mesh(geo, m);
-    if (m.userData.colorOnly){ mesh.layers.set(1); mesh.renderOrder = 2; } else mesh.castShadow = mesh.receiveShadow = true;   // see-through glass: colour pass only
+    if (m.userData.colorOnly){ mesh.layers.set(1); mesh.renderOrder = 2; } else { mesh.castShadow = !m.userData.noCast; mesh.receiveShadow = true; }   // see-through glass: colour pass only
     g.add(mesh);
   }
   world.add(g); c.view = g;

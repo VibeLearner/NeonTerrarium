@@ -15,11 +15,74 @@ const MUSIC_VOL_KEY = 'neonIsland.musicVolume';
 const FADE_IN = 8, FADE_QUICK = .6, FADE_OUT = 1.5, EQ_BARS = 12;   // seconds; bars
 // "02 - Night Market (demo).mp3" -> "Night Market (demo)"
 const titleOf = file => decodeURIComponent(file.split('/').pop()).replace(MUSIC_EXT, '').replace(/^\d+\s*[-_.]\s*/, '').replace(/[_]+/g, ' ').trim();
+// The radio host (RJ). After the station opens: one song, then the first lore drop, spoken over the start of the
+// next song (turned down underneath); three or four songs after that, the second lore drop the same way. Now and
+// then a short intro from the host before a song: random, never more than two songs in a row, never on the song
+// right before the second lore drop, and each intro only once. Every bit of talk is wrapped in a burst of radio
+// static, tuning in before and out after. What's been said is remembered (in this browser), so nothing repeats;
+// once the host has said everything, it's just the music.
+const RADIO_DIR = 'assets/audio/radio/';
+const RJ_INTROS = ['intro1', 'intro2', 'intro3', 'intro4', 'intro5', 'intro6', 'intro7', 'intro8', 'intro9'];
+const STATIC_IN = ['in1', 'in2'], STATIC_OUT = ['out1', 'out2', 'out3', 'out4', 'out5', 'out6', 'out7'];
+const RJ_KEY = 'neonIsland.radioHost', RJ_INTRO_ODDS = .45, DUCK = .22, STATIC_VOL = .7;
+const rj = (() => {
+  let st = null;
+  try { st = JSON.parse(localStorage.getItem(RJ_KEY) || 'null'); } catch (e) {}
+  if (!st || typeof st !== 'object') st = {};
+  st = Object.assign({ songs: 0, lore1: false, lore2: false, after: 0, lore2At: Math.random() < .5 ? 3 : 4, used: [], streak: 0 }, st);
+  const save = () => { try { localStorage.setItem(RJ_KEY, JSON.stringify(st)); } catch (e) {} };
+  save();
+  return {
+    // what goes with the song that's about to start: 'lore1', 'lore2', an intro's name, or nothing
+    plan(){
+      if (st.songs === 0) return null;                                   // the first song plays on its own
+      if (!st.lore1) return 'lore1';
+      if (!st.lore2 && st.after >= st.lore2At) return 'lore2';
+      const left = RJ_INTROS.filter(n => !st.used.includes(n));
+      const beforeLore2 = !st.lore2 && st.after === st.lore2At - 1;     // the song just before lore 2 stays clean
+      if (!left.length || st.streak >= 2 || beforeLore2 || Math.random() > RJ_INTRO_ODDS) return null;
+      return left[Math.floor(Math.random()*left.length)];
+    },
+    // a song has started, with this talk (or none)
+    started(talk){
+      st.songs++;
+      if (talk === 'lore1' || talk === 'lore2') st.streak = 0;
+      else if (talk){ st.streak++; if (!st.used.includes(talk)) st.used.push(talk); }
+      else st.streak = 0;
+      if (talk === 'lore1') st.after = 0; else if (st.lore1 && st.songs > 1) st.after++;
+      save();
+    },
+    loreDone(name){ st[name] = true; save(); },
+    get state(){ return st; },
+    reset(){ st = { songs: 0, lore1: false, lore2: false, after: 0, lore2At: Math.random() < .5 ? 3 : 4, used: [], streak: 0 }; save(); },
+  };
+})();
 const music = (() => {
   let tracks = null, order = [], idx = -1, on = false, level = 0, volume = .6, blocked = false, lastFile = null, paused = false, fadeIn = FADE_IN;
   try { const v = parseFloat(localStorage.getItem(MUSIC_VOL_KEY)); if (!isNaN(v)) volume = Math.min(1, Math.max(0, v)); } catch (e) {}
   const el = new Audio(); el.preload = 'auto';
   el.addEventListener('ended', () => next());
+  // the host: a second player for the static and the talk, played as a little queue of clips
+  const vo = new Audio(); vo.preload = 'auto';
+  let voQ = [], voDone = null, voLore = null, talking = false, duck = 1, voBlocked = false;
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+  function voPlay(){ const p = vo.play(); if (p && p.catch) p.then(() => { voBlocked = false; }).catch(() => { voBlocked = true; }); }
+  function voNext(){
+    if (!voQ.length){ talking = false; vo.removeAttribute('src'); const f = voDone; voDone = null; if (f) f(); return; }
+    const c = voQ.shift(); vo.src = RADIO_DIR + c.file; vo.dataset.kind = c.kind; vo.volume = Math.min(1, volume*(c.kind === 'static' ? STATIC_VOL : 1));
+    if (!paused) voPlay();
+  }
+  vo.addEventListener('ended', () => {
+    if (vo.dataset.kind === 'lore' && voLore){ rj.loreDone(voLore); voLore = null; }
+    voNext();
+  });
+  vo.addEventListener('error', () => voNext());
+  // static in, the talk, static out; then done()
+  function talk(name, done){
+    voQ = [{ file: 'static/' + pick(STATIC_IN) + '.mp3', kind: 'static' }, { file: name + '.mp3', kind: name.startsWith('lore') ? 'lore' : 'intro' }, { file: 'static/' + pick(STATIC_OUT) + '.mp3', kind: 'static' }];
+    voDone = done || null; voLore = name.startsWith('lore') ? name : null; talking = true; voNext();
+  }
+  function hush(){ voQ = []; voDone = null; voLore = null; talking = false; vo.pause(); vo.removeAttribute('src'); }
   el.addEventListener('error', () => { if (on) setTimeout(() => next(), 800); });
   // The music runs through Web Audio: an analyser (for the equalizer) and a gain for the volume and fades. Made on
   // the first play, which always follows a click (building the radio station, or a button).
@@ -67,18 +130,24 @@ const music = (() => {
   }
   function next(){
     if (!tracks || !tracks.length || !on) return;
+    if (talking && !voLore) hush();   // skipping during an intro: straight to the song (a lore drop carries on over it)
     if (++idx >= order.length){ shuffle(); idx = 0; }
-    load(idx);
+    const k = idx, plan = talking ? null : rj.plan();
+    rj.started(plan);
+    if (plan === 'lore1' || plan === 'lore2'){ load(k); talk(plan); return; }   // the song starts underneath, turned down
+    if (plan){ el.pause(); ui.setTitle('On the mic: your host'); talk(plan, () => { if (on && idx === k) load(k); }); return; }
+    load(k);
   }
   // previous: back to the start of this song if it's been playing a while, otherwise the song before it
   function prev(){
     if (!tracks || !tracks.length || !on) return;
+    if (talking && !voLore){ hush(); load(idx); return; }
     if (el.currentTime > 3 || idx <= 0){ el.currentTime = 0; if (!paused) tryPlay(); return; }
     load(--idx);
   }
   function tryPlay(){ audioGraph(); if (actx && actx.state === 'suspended') actx.resume(); const p = el.play(); if (p && p.catch) p.then(() => { blocked = false; }).catch(() => { blocked = true; }); }
   // browsers only allow sound after the player has interacted with the page
-  for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, () => { if (blocked && on && !paused){ blocked = false; tryPlay(); } }, { capture: true, passive: true });
+  for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, () => { if (blocked && on && !paused){ blocked = false; tryPlay(); } if (voBlocked && talking && on && !paused){ voBlocked = false; voPlay(); } }, { capture: true, passive: true });
 
   // switched by the radio station being there or not (see update)
   function setOn(v){
@@ -86,27 +155,33 @@ const music = (() => {
     on = v; paused = false;
     ui.show(on); ui.setPaused(false);
     if (on){ fadeIn = FADE_IN; level = 0; ready.then(() => { if (!on) return; if (!order.length) shuffle(); next(); }); }
+    else hush();
   }
   function update(dt){
     const radio = typeof megas !== 'undefined' && megas.get('radio');
     // starts once the station has fully arrived (its arrival animation is over)
     setOn(!!radio && !anims.some(a => a.c === radio));
     const playing = on && !paused && !blocked && !el.paused;
+    // under a lore drop the song is turned down, and comes back up gently after
+    const dt2 = Math.min(dt, .1), dTarget = talking && voLore ? DUCK : 1;
+    duck = dTarget < duck ? Math.max(dTarget, duck - dt2*1.5) : Math.min(dTarget, duck + dt2*.35);
+    if (talking && !paused) vo.volume = Math.min(1, volume*(vo.dataset.kind === 'static' ? STATIC_VOL : 1));
     const target = playing ? 1 : 0;
     level = target > level ? Math.min(target, level + dt/fadeIn) : Math.max(target, level - dt/(on ? FADE_QUICK : FADE_OUT));
     if (level >= 1) fadeIn = FADE_QUICK;   // after the first slow fade-in, skips and resumes come up quickly
-    const v = Math.min(1, Math.max(0, level*level*volume));   // eased, so the fade feels even
+    const v = Math.min(1, Math.max(0, level*level*volume*duck));   // eased, so the fade feels even
     if (gain) gain.gain.value = v; else el.volume = v;
     // fully faded: stop (the station's gone) or hold where it is (paused)
     if (level <= 0 && !el.paused && (!on || paused)){ el.pause(); if (!on) el.currentTime = 0; }
-    ui.spin(playing);
+    ui.spin(playing || (talking && !paused));
     ui.eq(playing && analyser ? (analyser.getByteFrequencyData(bins), bins) : null, dt);
   }
   function setVolume(v){ volume = v; try { localStorage.setItem(MUSIC_VOL_KEY, String(v)); } catch (e) {} }
   function togglePause(){
     if (!on) return;
     paused = !paused; ui.setPaused(paused);
-    if (!paused){ fadeIn = FADE_QUICK; if (el.src) tryPlay(); else next(); }
+    if (paused){ if (talking) vo.pause(); }
+    else { fadeIn = FADE_QUICK; if (talking){ voPlay(); if (voLore && el.src) tryPlay(); } else if (el.src) tryPlay(); else next(); }
   }
   function skip(){ if (on){ level = 0; fadeIn = FADE_QUICK; next(); } }
   function back(){ if (on){ level = 0; fadeIn = FADE_QUICK; prev(); } }
@@ -150,5 +225,5 @@ const music = (() => {
       },
     };
   })();
-  return { update, setVolume, skip, back, togglePause, get volume(){ return volume; }, get tracks(){ return tracks; }, get on(){ return on; }, get paused(){ return paused; }, get level(){ return level; }, el };
+  return { update, setVolume, skip, back, togglePause, rj, get talking(){ return talking; }, vo, get volume(){ return volume; }, get tracks(){ return tracks; }, get on(){ return on; }, get paused(){ return paused; }, get level(){ return level; }, el };
 })();

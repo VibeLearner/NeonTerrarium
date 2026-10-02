@@ -4,6 +4,14 @@
     "title": "A Lonely Star"
   },
   {
+    "file": "ASCII Cyphers.mp3",
+    "title": "ASCII Cyphers"
+  },
+  {
+    "file": "Deck Check.mp3",
+    "title": "Deck Check"
+  },
+  {
     "file": "Digital Sheep.mp3",
     "title": "Digital Sheep"
   },
@@ -50,5 +58,9 @@
   {
     "file": "The Great Filter.mp3",
     "title": "The Great Filter"
+  },
+  {
+    "file": "Waveforms.mp3",
+    "title": "Waveforms"
   }
 ]

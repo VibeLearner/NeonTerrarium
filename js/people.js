@@ -271,7 +271,7 @@ function gridPaths(G, from, targets){
     return { pts, len };
   });
 }
-function ngLink(a, b, pts, len){ if (a === b) return; const e = { a, pts, len }; NG.adj[a].set(b, e); NG.adj[b].set(a, e); }
+function ngLink(a, b, pts, len, cost = len){ if (a === b) return; const e = { a, pts, len, cost }; NG.adj[a].set(b, e); NG.adj[b].set(a, e); }
 // one plot's paths, cached until the plot or its endpoints change
 function plotEdges(c, ends, pairOk){
   const G = cellGrid(c), sig = ends.map(e => e.key + '@' + e.x.toFixed(2) + ',' + e.z.toFixed(2)).join('|');
@@ -284,10 +284,13 @@ function plotEdges(c, ends, pairOk){
     }
     c._pe = { src: G.src, sig, edges };
   }
-  for (const e of c._pe.edges){ const a = NG.key.get(e.a), b = NG.key.get(e.b); if (a !== undefined && b !== undefined) ngLink(a, b, e.pts, e.len); }
+  // a lawn is somewhere to go and sit, not a short cut: walking over one costs several times the distance, so a route
+  // only crosses it when there's no reasonable way round (or when the lawn is where they're going)
+  const k = c.green === 'grass' && !c.sections.length && !c.mega ? LAWN_COST : 1;
+  for (const e of c._pe.edges){ const a = NG.key.get(e.a), b = NG.key.get(e.b); if (a !== undefined && b !== undefined) ngLink(a, b, e.pts, e.len, e.len*k); }
 }
 // shortest walk between two network points (A*), as one polyline
-const routeCache = new Map();
+const routeCache = new Map(), LAWN_COST = 5;
 function route(a, b){
   if (a === b) return [[NG.x[a], NG.z[a]]];
   const key = a + '>' + b;
@@ -303,7 +306,7 @@ function route(a, b){
   while (heap.length){
     const v = pop(); if (done[v]) continue; done[v] = 1;
     if (v === b){ found = true; break; }
-    for (const [w, e] of NG.adj[v]){ const d = g[v] + e.len; if (d < g[w]){ g[w] = d; from[w] = v; push(w, d + hz(w)); } }
+    for (const [w, e] of NG.adj[v]){ const d = g[v] + e.cost; if (d < g[w]){ g[w] = d; from[w] = v; push(w, d + hz(w)); } }
   }
   let out = null;
   if (found){

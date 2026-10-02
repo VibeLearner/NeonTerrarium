@@ -152,13 +152,14 @@ function buildPlatform(c){
 /* ---------- a building: a stack of sections, each a complete building from the zone's set of types ---------- */
 // A click builds a whole building. Clicking its roof stacks another complete section on top (any zone),
 // and removing takes the top section off. Each section keeps its own seed, so the rest never changes.
+const tankYard = (lot, st, P0) => buildTankYard(lot, P0);   // the round tanks on legs
 const glassHotelTower = (lot, st, P0) => glassHotel(lot, st, P0, 'tower');
 const glassHotelPodium = (lot, st, P0) => glassHotel(lot, st, P0, 'podium');
 const SECTION_TYPES = {
   low:  { ground: [[buildTenement,6],[podHouse,1.5],[octoHouse,1.2],[deckHouse,1.3]], upper: [[buildTenement,5],[podHouse,2],[octoHouse,1.2]] },
   mid:  { ground: [[buildShophouse,5],[podHouse,2],[octoHouse,1.5],[deckHouse,2],[platformTower,1.3]], upper: [[buildShophouse,4],[podHouse,2],[octoHouse,1],[platformTower,1]] },
   high: { ground: [[buildTower,1]], upper: [[slabTower,2],[glassHotelTower,1.5],[glassHotelPodium,1],[roundTower,1],[twistTower,1],[gardenTower,1],[domeTower,1],[shellTower,1],[cascadeTerraces,.8]] },
-  ind:  { ground: [[buildFactory,2.2],[scrapShed,1],[gearWorkshop,1],[repairsBlock,1],[partsWarehouse,1],[lubeShed,.8]], upper: [[hall,2],[silos,1],[scrapShed,1],[repairsBlock,1],[partsWarehouse,1]] },
+  ind:  { ground: [[hall,1],[silos,1],[stiltFactory,1],[tankYard,1],[scrapShed,1],[gearWorkshop,1],[repairsBlock,1],[partsWarehouse,1],[lubeShed,.8]], upper: [[hall,2],[silos,1],[scrapShed,1],[repairsBlock,1],[partsWarehouse,1]] },
 };
 function pickWeighted(list){ const tot = list.reduce((s,[,w]) => s + w, 0); let r = R()*tot; for (const [f,w] of list){ if ((r -= w) <= 0) return f; } return list[0][0]; }
 // The white garden-city towers only stack with each other: on a white luxury section only another white one goes

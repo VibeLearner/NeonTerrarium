@@ -528,7 +528,7 @@ function makePerson(id, home){
   const u = k => u01(id, k);
   const wake = span(u('wake'), 6, 8.5);
   return { id, home, job: null, wantsJob: u('emp') < .8, courier: u('courier') < .2, row: hash(id, 'look') % CITIZEN_ROWS,
-           speed: PPL_SPEED*span(u('speed'), .85, 1.15),
+           speed: PPL_SPEED*span(u('speed'), .85, 1.15), lane: span(u('lane'), -.08, .32),
            wake, bed: (22 + 6*u('bed')**2) % 24, outgoing: span(u('out'), .25, .9), nightShift: u('night'),
            workS: span(u('ws'), 7.5, 9.5), workLen: span(u('wl'), 7.5, 9),
            at: home, until: 0, walk: null, spot: null, x: 0, z: 0, flip: 1, phase: u('phase')*10 };
@@ -1027,6 +1027,18 @@ function updatePeople(dt, t){
         let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
         const a = w.pts[k - 1], b = w.pts[k], seg = w.cum[k] - w.cum[k - 1] || 1, u = (w.s - w.cum[k - 1])/seg;
         p.x = a[0] + (b[0] - a[0])*u; p.z = a[1] + (b[1] - a[1])*u; p.dx = b[0] - a[0]; p.dz = b[1] - a[1];
+        // Off the centre line: everyone keeps to their own lane, mostly to the right of the way they're going (so
+        // people coming the other way pass on the other side), drifting a little as they walk. It eases back to the
+        // line at doorways, seats and corners, and shrinks wherever the side step would bring them too near a wall.
+        if (w.s > w.safe0 && w.s < w.safe1){
+          const ease = Math.min(1, (w.s - w.safe0)/.6, (w.safe1 - w.s)/.6, (w.s - w.cum[k - 1])/.3 + .15, (w.cum[k] - w.s)/.3 + .15);
+          const L = Math.hypot(p.dx, p.dz) || 1, off = ((p.lane ?? .12) + .07*Math.sin(w.s*1.3 + p.phase))*Math.max(0, ease);
+          const nx = -p.dz/L, nz = p.dx/L;
+          for (const f of [1, .6, .3]){
+            const qx = p.x + nx*off*f, qz = p.z + nz*off*f, c = cells.get(ckey(Math.round(qx/LOT), Math.round(qz/LOT)));
+            if (c && freeAt(cellGrid(c), qx, qz)){ p.x = qx; p.z = qz; break; }
+          }
+        }
         const sd = p.dx*_camR.x + p.dz*_camR.z;
         if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
         // through the doorway: dissolving in from the hallway, or out as they step inside

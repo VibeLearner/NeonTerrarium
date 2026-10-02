@@ -114,7 +114,7 @@ function applyTime(){
   comp.uniforms.rimI.value = S.rim === false ? 0 : (.25*w.day + 1.0*w.golden + .3*w.blue + .45*w.night)*(S.rain ? .35 : 1);
   comp.uniforms.rimCol.value.setRGB(1.0, .7, .38).lerp(tmpC.setRGB(.42, .55, .9), Math.min(1, w.night + w.blue*.5));
   // ground mist: faint at midday, thicker round golden hour, dusk and night, thicker still in the rain
-  comp.uniforms.mistI.value = S.mist === false ? 0 : (.08*w.day + .7*w.golden + .6*w.blue + .6*w.night)*(S.rain ? 1.5 : 1);
+  comp.uniforms.mistI.value = S.mist === false ? 0 : (.25*w.day + .8*w.golden + .6*w.blue + .55*w.night)*(S.rain ? 1.5 : 1);
   comp.uniforms.mistSun.value = .5*w.day + 1.35*w.golden + .7*w.blue + .3*w.night;   // sunbeams in the mist: strongest with the sun low
   comp.uniforms.mistNight.value = Math.min(1, w.night + w.blue*.5);
   return night;
@@ -330,37 +330,36 @@ const comp = new THREE.ShaderMaterial({
         vec4 cl = texture2D(tCloud, vUv);
         if (cl.a > 0.001){ float q = floor(cl.a*5.0 + dith)/5.0; col = mix(col, cl.rgb/cl.a, q); }   // dithered fade at the edges, like mist
       }
-      // ---- ground mist, with light through it ----
-      // A thin layer of mist lying in the streets (up to about a storey and a half), patchy and drifting slowly. Each
-      // pixel marches through the part of the layer in front of what it sees (8 dithered steps). By day the mist is lit
-      // by the sun wherever the shadow map says the sun reaches, and dim where buildings shade it, so sunbeams show as
-      // bright bands between the shadows: fake volumetric light. At night it's dark blue, lit from below by the light
-      // the lamps and neon throw on the streets (the night-light pass), so it glows their colours. Only over the city.
+      // ---- mist between the buildings, with light through it ----
+      // A thin band of mist hanging above head height (from about one unit up, thickest round 2.5 to 4.5, gone by 6.5),
+      // so the streets and the people in them stay clear. It mostly adds the light it scatters and hides very little:
+      // by day it's lit by the sun wherever the shadow map says the sun reaches and stays dark in buildings' shadows,
+      // so sunbeams between the towers show as bright shafts (fake volumetric light); at night it glows faintly with the
+      // colours the lamps and neon throw below. 8 dithered steps, stepped to stay pixel art. Only over the city.
       if (mistI > 0.0 && rd < 0.99999){
         vec3 hit = ro + rdir*tEnd;
         if (hit.y > -0.6){
-          float y0 = 2.6, y1 = -0.2;
+          float y0 = 6.5, y1 = 1.0;
           float ta = max(0.0, (y0 - ro.y)/min(rdir.y, -0.001)), tb = min(tEnd, (y1 - ro.y)/min(rdir.y, -0.001));
           if (tb > ta){
             vec3 mid = ro + rdir*(.5*(ta + tb));
-            float pch = .45 + .55*fbm(vec3(mid.xz*.35 + vec2(time*.05, time*.02), time*.03));   // patchy, drifting
-            vec3 nl = (texture2D(tLight, vUv).rgb*.5 + texture2D(tLight, vUv + vec2(3.0, 0.0)*px).rgb*.25 + texture2D(tLight, vUv - vec2(3.0, 0.0)*px).rgb*.25);
-            vec3 amb = mix(mix(skyBot, skyTop, .4)*.55, vec3(.05, .07, .16), mistNight);
+            float pch = .4 + .6*fbm(vec3(mid.xz*.3 + vec2(time*.05, time*.02), time*.03));   // patchy, drifting
+            vec3 nl = (texture2D(tLight, vUv).rgb*.5 + texture2D(tLight, vUv + vec2(4.0, 0.0)*px).rgb*.25 + texture2D(tLight, vUv - vec2(4.0, 0.0)*px).rgb*.25);
+            vec3 amb = mix(mix(skyBot, skyTop, .4)*.12, vec3(.015, .02, .05), mistNight);
             vec3 sunS = sunCol*mistSun*(1.0 - mistNight);
-            vec3 glowN = (nl*4.5 + cityGlow*.05)*mistNight;
+            vec3 glowN = (nl*2.2 + cityGlow*.025)*mistNight;
             const int MS = 8;
             float dt = (tb - ta)/float(MS), T = 1.0; vec3 acc = vec3(0.0);
             for (int i = 0; i < MS; i++){
               vec3 p = ro + rdir*(ta + (float(i) + dith)*dt);
-              float h = clamp((p.y + .2)/2.8, 0.0, 1.0);
-              float dens = mistI*pch*(1.0 - h)*(1.0 - h)*3.2;
-              float a = 1.0 - exp(-dens*dt);
-              vec3 lc = amb + sunS*litAt(p) + glowN*(1.0 - h);
-              acc += T*a*lc; T *= 1.0 - a;
+              float band = smoothstep(1.0, 2.4, p.y)*(1.0 - smoothstep(4.5, 6.5, p.y));
+              float dens = mistI*pch*band*.085;
+              acc += T*dens*dt*(amb + sunS*litAt(p) + glowN);
+              T *= exp(-dens*dt*.6);   // light extinction: it scatters light, hardly hides anything
             }
-            float m = 1.0 - T;
-            m = min(floor(m*10.0 + dith)/10.0, .75);   // stepped, to stay pixel art; never a wall of fog
-            col = col*(1.0 - m) + acc/max(1.0 - T, 1e-3)*m;
+            acc = min(acc, vec3(.3));               // a veil of light, never a white-out
+            acc = floor(acc*20.0 + dith)/20.0;   // stepped, to stay pixel art
+            col = col*T + acc;
           }
         }
       }

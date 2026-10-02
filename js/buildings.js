@@ -1404,7 +1404,7 @@ function pottedPlant(P, x, z, s = 1){ put(U.cyl16, pick([M.pot, M.inBrick2, M.in
 function crateAt(P, x, y, z, s = 1){ box(M.crate, P, x, y + .11*s, z, .24*s, .22*s, .24*s, rnd(-.3, .3)); box(M.inWood2, P, x, y + .11*s, z, .25*s, .03, .25*s); }
 function moss(P, x, y, z, n = 3){ for (let k=0; k<n; k++) blob(M.inMoss, P, x + rnd(-.2, .2), y, z + rnd(-.2, .2), rnd(.06, .12), .4); }
 // a neon word on a dark board, on a bracket or flat on the wall
-function wordSign(F, kind, x, y, z, k, col, halo){ box(M.frame, F, x, y, z - .03, SPR.size[kind][0]/PX*k + .06, SPR.size[kind][1]/PX*k + .06, MIN_T); plant(kind, F, x, y, z, k, 'c', true); glow(F, x, y, z + .25, col, halo ?? 1.2 + k); }
+function wordSign(F, kind, x, y, z, k, col, halo){ box(M.frame, F, x, y, z - .03, SPR.size[kind][0]/PX*k + .06, SPR.size[kind][1]/PX*k + .06, MIN_T); plant(kind, F, x, y, z, k, 'c', true); glow(F, x, y, z + (halo ? .04 : .25), col, halo ?? 1.2 + k); }   // a small halo sits right on the board, so it never shows as a separate blob below it
 // a gabled roof along local x over a w x d box (ridge along x), with eaves; returns nothing
 function gable(P, y, w, d, rise, mat, over = .15){ put(U.prism, mat, under(P, T(0, y, 0, PI/2, d + 2*over, rise, w + 2*over))); }
 
@@ -1796,7 +1796,6 @@ function containerStack(lot, st, P0){
           for (let k=0; k<irand(3, 5); k++) box(M.frame, F, rnd(-fc.len/2 + .2, fc.len/2 - .2), rnd(.15, .3), .05, rnd(.12, .25), rnd(.1, .3), MIN_T);   // counters, chairs, crates
           box(M.frame, F, 0, CH*.62, .05, fc.len - .3, .025, MIN_T);   // a shelf
           for (let t = -fc.len/2 + .25; t < fc.len/2 - .2; t += .14) if (chance(.6)) box(pick([M.frame, MC.paper, M.red2, M.green2]), F, t, CH*.62 + .05, .05, .06, .08, MIN_T);
-          glow(F, 0, CH*.3, .3, 'warm', .55);
           // the signs are stacked close together here, so each gets a small, faint halo (full-size ones bloomed into one blur)
           if (shop) wordSign(F, shop[0], rnd(-.25, .25), CH - .2, .1, 1, shop[1], .7);
           else wordSign(F, 'sign_w_ramen', -.35, CH - .2, .1, 1, 'pink', .7);
@@ -1834,7 +1833,7 @@ function containerStack(lot, st, P0){
   // the noodle bar at the bottom: a counter, woks steaming, chillies hanging, stools, gas, crates and rubbish bags
   const cz = zF + CD/2 + .32;
   box(M.inWood, P, -.2, .3, cz, 1.3, .6, .22); box(M.inWood2, P, -.2, .62, cz, 1.38, .04, .3);
-  for (const x of [-.6, -.15]){ cyl(M.metalDark, P, x, .67, cz, .1, .04); cyl(MC.soup, P, x, .69, cz, .08, .015); emitters.push(new THREE.Vector3(x, .9, cz).applyMatrix4(P)); }
+  for (const x of [-.6, -.15]){ cyl(M.metalDark, P, x, .67, cz, .1, .04); cyl(MC.soup, P, x, .69, cz, .08, .015); }
   box(M.frame, P, -.2, .9, cz + .15, 1.2, .02, .02);
   for (let t = -.75; t < .35; t += .09) box(MC.chili, P, t, .82 + rnd(-.02, .02), cz + .15, .03, rnd(.08, .14), .03);
   box(M.inRust, P, -.2, CH + .02, cz + .05, 1.6, .03, .7, 0, .25);   // the stall's own tin awning

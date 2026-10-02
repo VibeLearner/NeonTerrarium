@@ -140,7 +140,7 @@ const comp = new THREE.ShaderMaterial({
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
-    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null},
+    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1},
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
@@ -148,7 +148,7 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight;
+    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI;
     uniform float night; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
@@ -235,6 +235,26 @@ const comp = new THREE.ShaderMaterial({
         // zoomed out: crease lines inside shapes fade away and silhouettes soften, so the city doesn't turn to noise
         float k = dei > 0.0 ? 1.0 - 0.5*dei*(1.0 - 0.5*lodLines) : 1.0 + 0.4*nei*(1.0 - lodLines);
         col = c.rgb * mix(1.0, k, outlines);
+        // Ambient occlusion: soft darkening in creases (the foot of a wall, under a ledge, inside a corner). For pairs
+        // of samples on opposite sides of the pixel, a crease is where this pixel lies further away than the average
+        // of the two (a flat or sloping surface gives none); pairs that jump to something far nearer (an edge in front)
+        // are skipped. Two radii, four directions; stepped and dithered to stay pixel art.
+        if (aoI > 0.0){
+          float occ = 0.0;
+          for (int r = 0; r < 2; r++){
+            float rp = r == 0 ? 2.0 : 5.0;
+            for (int q = 0; q < 4; q++){
+              vec2 dir = q == 0 ? vec2(1.0, 0.0) : q == 1 ? vec2(0.0, 1.0) : q == 2 ? vec2(.7071, .7071) : vec2(.7071, -.7071);
+              vec2 o = dir*rp*px;
+              float da = D(vUv + o), db = D(vUv - o), conc = d - .5*(da + db), s2 = rp*pxW;
+              float ok = step(d - min(da, db), 2.5*s2 + .6);
+              occ += ok*smoothstep(.12*s2, .9*s2, conc);
+            }
+          }
+          occ /= 8.0;
+          occ = floor(occ*6.0 + bayer(gl_FragCoord.xy)*.99)/6.0;
+          col *= 1.0 - occ*.42*aoI;
+        }
         // Rim light: where an edge faces the sun with open space (or something far behind) beyond it, the edge
         // catches the light: a crisp warm line a pixel or two wide, and a soft warm wash on faces turned to the sun.
         // Only where the shadow map says the sun really reaches. Strongest at golden hour; cool moonlight at night.

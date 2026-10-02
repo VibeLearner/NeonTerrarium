@@ -164,6 +164,7 @@ $('bloom').addEventListener('change', e => { S.bloom = e.target.checked; });
 $('rim').addEventListener('change', e => { S.rim = e.target.checked; });
 $('grade').addEventListener('change', e => { S.grade = e.target.checked; });
 $('lights').addEventListener('change', e => { S.lights = e.target.checked; });
+$('ao').addEventListener('change', e => { S.ao = e.target.checked; });
 $('wet').addEventListener('change', e => { S.wetOn = e.target.checked; });
 $('spin').checked = S.spin; $('spin').addEventListener('change', e => { S.spin = e.target.checked; });
 $('musicVol').value = music.volume; $('musicVolOut').textContent = Math.round(music.volume*100) + '%';

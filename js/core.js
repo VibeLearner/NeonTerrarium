@@ -115,7 +115,7 @@ const glowTex = (() => { const c=document.createElement('canvas'); c.width=c.hei
   const gr=g.createRadialGradient(16,16,0,16,16,16); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(.3,'rgba(255,255,255,.5)'); gr.addColorStop(1,'rgba(255,255,255,0)');
   g.fillStyle=gr; g.fillRect(0,0,32,32); return new THREE.CanvasTexture(c); })();
 const GLOW = {};
-[['pink',0xFF4FA3],['cyan',0x38E8E0],['amber',0xFFB347],['warm',0xFFCF7A],['blue',0x5ab8ff],['red',0xff2a2a],['blink',0xff2a2a],['orange',0xff6a14],['green',0x4aff7a],['gold',0xffc24a],['ivory',0xfff3dc],['lemon',0xfff25a],['rosegold',0xffaa80],['platinum',0xe2d6ff],['ember',0xff4a2a],['sodium',0xffa23a],['hazard',0xffc21a],['arc',0xcfe6ff],['toxic',0xc6ff3a]].forEach(([k,hex]) => {
+[['pink',0xFF4FA3],['cyan',0x38E8E0],['amber',0xFFB347],['warm',0xFFCF7A],['blue',0x5ab8ff],['red',0xff2a2a],['blink',0xff2a2a],['orange',0xff6a14],['green',0x4aff7a],['gold',0xffc24a],['ivory',0xfff3dc],['lemon',0xfff25a],['rosegold',0xffaa80],['platinum',0xe2d6ff],['ember',0xff4a2a],['sodium',0xffa23a],['hazard',0xffc21a],['arc',0xcfe6ff],['toxic',0xc6ff3a],['crimson',0xff1a3a]].forEach(([k,hex]) => {
   GLOW[k] = new THREE.SpriteMaterial({ map:glowTex, color:hex, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true });
 });
 const NEON_GLOW = new Map([[M.neonPink,'pink'],[M.neonCyan,'cyan'],[M.neonAmber,'amber']]);

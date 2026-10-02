@@ -84,8 +84,12 @@ function applyTime(){
   for (const k of ['si','hi','night']) cur[k] = a[k] + (b[k]-a[k])*t;
   if (S.rain){ cur.top.lerp(RAIN_SKY,.55); cur.bot.lerp(RAIN_SKY,.5); cur.cloud.lerp(RAIN_SKY,.5); cur.si *= .55; cur.night = Math.min(1, cur.night+.15); }
   const night = cur.night;
-  let ang = ((h-6)/12)*PI; if (Math.sin(ang) < .05) ang = (((h-18+24)%24)/12)*PI;
-  SUN_DIR.set(Math.cos(ang)*.9, .32+Math.max(Math.sin(ang),0)*.9, .5).normalize(); placeSun();
+  // One continuous path, so shadows never flip: by day the sun climbs from the east (6:00) and sets in the west
+  // (18:00); after that the same light rises as the moon over the west and travels back across the night sky to be
+  // the sunrise in the east. Its height follows |sin|, so it never dips below the horizon. (It used to jump straight
+  // from the setting sun to the moon on the other side, flipping every shadow at about 17:48 and 6:12.)
+  const ang = ((h - 6)/12)*PI;
+  SUN_DIR.set(Math.cos(ang)*.9, .32 + Math.abs(Math.sin(ang))*.9, .5).normalize(); placeSun();
   sun.color.copy(cur.sun); sun.intensity = cur.si;
   hemi.color.copy(cur.hs); hemi.groundColor.copy(cur.hg); hemi.intensity = cur.hi;
   M.cloud.color.copy(cur.cloud);

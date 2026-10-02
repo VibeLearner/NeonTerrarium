@@ -105,7 +105,8 @@ koi, the drone, the screens) switch on at the end.
   its chimney. Arrives with the 60th luxury building (each plot with a luxury section counts once). A white stepped
   palace: a podium with stairs between two wings, four rounded glass-walled terraces with cyan-lit slabs and
   swept-up corners, Japanese gardens on every terrace (bonsai pines, bamboo, mossy rocks, lily ponds, stone
-  lanterns) with glass domes, white piers with gold chevrons, hover cars on cantilevered pads, and on top a
+  lanterns) with glass domes, rounded glass bays bulging out of the floors, arched gold-framed entrances, blue
+  strip lighting along every edge, white piers with gold chevrons, hover cars on cantilevered pads, and on top a
   two-tier white pagoda roof with gold hips and a gold spire.
 - New megastructures go in `MEGA_TYPES` at the top of `js/mega.js` (requirement, odds, footprint, max tiers).
 - For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall), **B** (town square), **V** (foundry), **C** (police station), **X** (market mall) or **P** (cloud pagoda)

@@ -1681,6 +1681,43 @@ function buildMarketMall(m){
 // cantilevered off the podium. Its front is local +z; the long side runs along x.
 M.pgPine = toon(0x3c6638, { flat:1 }); M.pgPine2 = toon(0x557f48, { flat:1 }); M.pgRock = toon(0xbfc2bc, { flat:1 }); M.pgRock2 = toon(0x9ea29c, { flat:1 });
 M.pgMoss = toon(0x6f9a48, { flat:1 }); M.pgGoldLit = toon(0xb98a3a, { em:0x6a4a18, kind:'trim' });
+M.pgNeon = toon(0x2a8a92, { em:0x52e6f2, kind:'lamp' });   // the blue strip lighting: lit day and night, steady (no flicker)
+U.pgArchRing = new THREE.TorusGeometry(1, .09, 4, 14, PI);
+U.pgBay = new THREE.SphereGeometry(1, 16, 8, 0, PI, 0, PI/2);   // a quarter sphere bulging out along +z
+// a neon strip round a rounded plate's rim, with halos along it
+function pgNeonRing(P, x, y, z, w, d, r, t = .05){
+  lxPlate(M.pgNeon, P, x, y, z, w, d, r, t);
+  for (const p of lxRing(w, d, r, 2.2)) glow(P, x + p.x*1.01, y, z + p.z*1.01, 'cyan', .7);
+}
+// an arched entrance on face F (local +z out): a lit doorway with a round top in a white frame, a gold outline and
+// chevron, blue strips either side
+function pgArch(F, x, y, z, w, h){
+  const r = w/2, hs = Math.max(.1, h - r);
+  box(M.lxRoom, F, x, y + hs/2, z, w - .06, hs, MIN_T);
+  put(U.vaultCap, M.lxRoom, under(F, T(x, y + hs, z + .002, 0, r - .03, r - .03, 1)));
+  box(M.frame, F, x, y + hs*.45, z + .01, .03, hs*.9, MIN_T);                                        // the doors' meeting line
+  for (const s of [-1, 1]){ box(M.lxWhite, F, x + s*(r + .06), y + hs/2, z + .04, .12, hs, .12); box(M.gold, F, x + s*(r - .05), y + hs/2, z + .03, .04, hs, MIN_T);
+    box(M.pgNeon, F, x + s*(r + .18), y + hs/2, z + .04, .04, hs, .05); }
+  put(U.pgArchRing, M.lxWhite, under(F, T(x, y + hs, z + .04, 0, r + .06, r + .06, 1.3)));
+  strut(M.gold, F, x - r*.62, y + hs + r*.1, z + .07, x, y + hs + r*.62, z + .07, .04); strut(M.gold, F, x + r*.62, y + hs + r*.1, z + .07, x, y + hs + r*.62, z + .07, .04);
+  glow(F, x, y + hs*.6, z + .3, 'warm', .4 + w*.6);
+}
+// a rounded glass bay bulging out of a wall: a quarter dome over a lit half-round room, a white arched rim with a
+// blue strip, glass ribs; local +z points out of the wall
+function pgBay(P, x, y, z, r, ry){
+  const Q = under(P, T(x, y, z, ry));
+  put(wedgeGeo(r + .1, .12, -PI/2, PI), M.lxWhite, under(Q, T(0, .06, 0)));
+  put(wedgeGeo(r + .12, .04, -PI/2, PI), M.pgNeon, under(Q, T(0, .03, 0)));
+  put(U.vaultCap, M.lxRoom, under(Q, T(0, .12, .01, 0, r*.98, r*.98, 1)));                         // the lit room at the back
+  for (let k=0; k<2; k++) box(pick([M.cream2, M.white2, M.wood]), Q, rnd(-r*.4, r*.4), .27, rnd(.2, r*.5), .4, .2, .25);
+  pgPine(Q, r*.35, .12, r*.35, .55); plant(pick(['bush','fern','bonsai']), Q, -r*.4, .12, r*.3, .6);
+  glow(Q, 0, r*.45, r*.3, 'warm', 1.0);
+  put(U.pgBay, M.lxGlass, under(Q, T(0, .12, 0, 0, r, r, r)));
+  for (const a of [-.55, 0, .55]) put(U.lxRib, M.lxWhite, under(Q, T(0, .12, 0, PI/2 + a, r, r, r)));
+  put(U.lxHoop, M.lxWhite, under(Q, T(0, .12 + r*.5, 0, 0, r*.87, r*.87, r*.87, PI/2)));
+  put(U.pgArchRing, M.lxWhite, under(Q, T(0, .12, .02, 0, r + .06, r + .06, 1.4)));
+  put(U.pgArchRing, M.pgNeon, under(Q, T(0, .12, .1, 0, r + .14, r + .14, .5)));
+}
 // a bonsai pine: a leaning, bending trunk and flat pads of needles
 function pgPine(P, x, y, z, s = 1){
   const dir = rnd(0, TAU), lean = rnd(.15, .45)*s, h = rnd(.85, 1.2)*s;
@@ -1728,23 +1765,25 @@ function pgRoof(P, x, y, z, W, D, H){
 function pgPier(P, x, y, z, h, ry, w = 1.1){
   const Q = under(P, T(x, y, z, ry));
   box(M.lxWhite, Q, 0, h/2, 0, w, h, .5);
-  for (const s of [-1, 1]){ strut(M.gold, Q, s*(w/2 - .1), h - .12, .26, 0, h*.35, .26, .07); box(M.gold, Q, s*(w/2 - .1), h/2, .26, .07, h - .2, .05); }
+  for (const s of [-1, 1]){ strut(M.gold, Q, s*(w/2 - .1), h - .12, .26, 0, h*.68, .26, .07); box(M.gold, Q, s*(w/2 - .1), h/2, .26, .07, h - .2, .05); }
   box(M.gold, Q, 0, h - .1, .26, w - .12, .07, .05);
-  box(M.lxRoom, Q, 0, h*.2, .25, w*.45, h*.36, .02);
+  pgArch(Q, 0, 0, .26, Math.min(.9, w*.5), h*.55);
+  for (const s of [-1, 1]) box(M.pgNeon, Q, s*(w/2 + .02), h/2, .12, .05, h - .3, .1);
 }
 // a swept-up corner on a slab, like an eave; Q's local +x points out from the corner
 function pgFlare(P, x, y, z, ang){
   const Q = under(P, T(x, y, z, ang)), pts = [[-.25, -.1], [.15, -.08], [.45, -.02], [.7, .12], [.85, .3]];
-  lxBand(M.lxWhite, Q, pts, .55, .12, 0); lxBand(M.lxLine, Q, lxOffset(pts, -.065), .06, .02, 0);
+  lxBand(M.lxWhite, Q, pts, .55, .12, 0); lxBand(M.pgNeon, Q, lxOffset(pts, -.07), .08, .03, 0);
 }
 // a car pad cantilevered from the podium, two cars and a charging post on it; local +z points out
 function pgPad(P, x, y, z, ry){
   const Q = under(P, T(x, y, z, ry));
   lxPlate(M.lxWhite2, Q, 0, -.12, .8, 1.7, 2.0, .25, .12);
-  for (const s of [-1, 1]) box(M.lxLine, Q, s*.86, -.07, .8, .03, .03, 1.9); box(M.lxLine, Q, 0, -.07, 1.81, 1.6, .03, .03);
+  for (const s of [-1, 1]) box(M.pgNeon, Q, s*.86, -.07, .8, .05, .05, 1.9); box(M.pgNeon, Q, 0, -.07, 1.81, 1.6, .05, .05);
+  glow(Q, 0, -.07, 1.85, 'cyan', .8); for (const s of [-1, 1]) glow(Q, s*.88, -.07, .8, 'cyan', .7);
   box(M.frame, Q, 0, -.005, .9, .03, .01, 1.5);
   for (const s of [-1, 1]) lxCar(Q, s*.42, 0, 1.0, rnd(-.1, .1) + PI);
-  box(M.lxWhite, Q, .7, .25, .05, .14, .5, .14); box(M.lxLine, Q, .7, .4, .125, .08, .14, .02);
+  box(M.lxWhite, Q, .7, .25, .05, .14, .5, .14); box(M.pgNeon, Q, .7, .4, .125, .08, .14, MIN_T);
   strut(M.lxWhite2, Q, 0, -.12, 1.4, 0, -.6, .1, .12);
 }
 function buildCloudPagoda(m){
@@ -1758,21 +1797,24 @@ function buildCloudPagoda(m){
   // ---- the podium, with stairs up the front between two wings
   const pw = 17.6, pd = 12.4, pcz = -.6, ph = 1.2, pFront = pcz + pd/2, wing = .9, gap = 1.5;
   lxPlate(M.lxWhite2, P, 0, Y, pcz, pw, pd, 1.2, ph);
-  lxPlate(M.lxLine, P, 0, Y + ph - .09, pcz, pw + .03, pd + .03, 1.21, .03);
+  pgNeonRing(P, 0, Y + ph - .1, pcz, pw + .04, pd + .04, 1.22);
   for (const s of [-1, 1]){
     const ww = pw/2 - gap, wx = s*(gap + ww/2);
     lxPlate(M.lxWhite2, P, wx, Y, pFront + wing/2 - .3, ww, wing + .6, .45, ph);
-    lxPlate(M.lxLine, P, wx, Y + ph - .09, pFront + wing/2 - .3, ww + .03, wing + .63, .46, .03);
+    pgNeonRing(P, wx, Y + ph - .1, pFront + wing/2 - .3, ww + .04, wing + .64, .47);
+    // two arched entrances into the podium on each wing's face
+    const Fw = under(P, T(wx, 0, pFront + wing, 0));
+    for (const u of [-.25, .25]) pgArch(Fw, u*ww, Y, 0, .9, 1.0);
   }
   const front = pFront + wing;
   for (let k=0; k<8; k++){ const u = (k + .5)/8; box(M.lxWhite, P, 0, Y + ph*u/2, front - u*(wing + .3), 2*gap, ph*u, (wing + .3)/8 + .02); }   // stairs
-  for (const s of [-1, 1]){ box(M.lxWhite, P, s*(gap - .05), Y + ph/2 + .15, pFront + .1, .12, ph + .3, wing + .5); pgLantern(P, s*(gap + .35), Y + ph, front - .3, 1.1); }
+  for (const s of [-1, 1]){ box(M.lxWhite, P, s*(gap - .05), Y + ph/2 + .15, pFront + .1, .12, ph + .3, wing + .5); pgLantern(P, s*(gap + .35), Y + ph, front - .3, 1.1);
+    box(M.pgNeon, P, s*(gap - .05), Y + ph + .31, pFront + .1, .14, .03, wing + .5); }   // blue strips along the tops of the stair walls
   // lit arched openings round the podium's face, gold framed
   for (const [F, len, side] of mkFaces(P, 0, pcz, pw, pd)){
-    for (let t = -len/2 + 1.6; t < len/2 - 1.4; t += 1.7){
+    for (let t = -len/2 + 1.7; t < len/2 - 1.5; t += 2.0){
       if (side === 'f') continue;   // the front is the wings and the stairs
-      box(M.lxRoom, F, t, Y + .5, .01, .7, .75, MIN_T); put(U.cyl16, M.lxRoom, under(F, T(t, Y + .87, .01, 0, .7, MIN_T, .7, PI/2)));
-      box(M.gold, F, t - .38, Y + .5, .04, .05, .78, .05); box(M.gold, F, t + .38, Y + .5, .04, .05, .78, .05);
+      pgArch(F, t, Y, .01, .75, .95);
     }
   }
   // car pads off the sides and the front wings
@@ -1794,32 +1836,49 @@ function buildCloudPagoda(m){
     }
     lxRail(P, 0, yy, outer.cz, outer.w - .1, outer.d - .1, outer.r - .05);
   };
-  // the podium's own garden, clear of the stairs
   const floorOf = l => ({ w: l.w - 1.4, d: l.d - 1.2, cz: l.cz, r: Math.max(.3, l.r - .5) });
-  gardenRing({ w: pw, d: pd, cz: pcz, r: 1.2 }, floorOf(lv[0]), y, (x, z) => Math.abs(x) < gap + .9 && z > 0);
+  // rounded glass bays bulging out of the floors onto the terraces: two on the front of the first and third floors,
+  // one on each side of the second and fourth (the domes take the back of the sides)
+  const bays = [];
+  lv.forEach((l, k) => {
+    const f = floorOf(l), below = k ? lv[k - 1] : { w: pw, d: pd, cz: pcz };
+    if (k % 2 === 0){ const ring = below.cz + below.d/2 - (f.cz + f.d/2), r = Math.min(1.15, f.w*.1, ring - .12);
+      for (const s of [-1, 1]) bays.push({ k, x: s*f.w*.2, z: f.cz + f.d/2 - .05, r, ry: 0 }); }
+    else { const ring = below.w/2 - f.w/2, r = Math.min(1.05, ring - .25, LH*.55);
+      for (const s of [-1, 1]) bays.push({ k, x: s*(f.w/2 - .05), z: f.cz + f.d/2 - r - .35, r, ry: s*PI/2 }); }
+  });
+  const nearBay = (k, x, z, pad = .45) => bays.some(b => b.k === k && Math.hypot(x - b.x, z - b.z) < b.r + pad);
+  // the podium's own garden, clear of the stairs and the bays
+  gardenRing({ w: pw, d: pd, cz: pcz, r: 1.2 }, floorOf(lv[0]), y, (x, z) => (Math.abs(x) < gap + .9 && z > 0) || nearBay(0, x, z));
   const domes = [];
   lv.forEach((l, k) => {
     const f = floorOf(l), h = LH - .2;
     lxGlassFloor(P, 0, y, f.cz, f.w, f.d, f.r, h, null, .75);
     lxPlate(M.lxWhite2, P, 0, y + h*.52, f.cz, f.w + .04, f.d + .04, f.r + .02, .05);   // a transom between the upper and lower panes
     for (let x = -f.w/2 + .8; x < f.w/2 - .5; x += 1.6) glow(P, x, y + h*.6, f.cz + f.d/2 - .3, 'warm', .9);
-    // white piers with gold chevrons across the front (and one on each side)
+    // white piers with gold chevrons and arched doors across the front (and on the sides of the first floor), the bays
     pgPier(P, 0, y, f.cz + f.d/2 + .2, h, 0, 1.4 - k*.1);
-    if (k < 3) for (const s of [-1, 1]){ pgPier(P, s*f.w*.32, y, f.cz + f.d/2 + .2, h, 0, .9); pgPier(P, s*(f.w/2 + .2), y, f.cz, h, s*PI/2, 1.0); }
+    if (k < 3) for (const s of [-1, 1]) pgPier(P, s*f.w*.36, y, f.cz + f.d/2 + .2, h, 0, .9);
+    if (k === 0) for (const s of [-1, 1]) pgPier(P, s*(f.w/2 + .2), y, f.cz - 1.2, h, s*PI/2, 1.0);
+    for (const b of bays) if (b.k === k) pgBay(P, b.x, y, b.z, b.r, b.ry);
+    // a blue strip along the floor's foot, at the glass
+    pgNeonRing(P, 0, y + .02, f.cz, f.w + .06, f.d + .06, f.r + .03, .04);
     // curved white buttresses under the slab corners
     for (const [sxx, szz] of CORNERS){ const Q = under(P, T(sxx*(f.w/2 - .3), y, f.cz + szz*(f.d/2 - .3), Math.atan2(-szz, sxx)));
-      const pts = []; for (let q=0; q<=8; q++){ const u = q/8; pts.push([Math.sin(u*PI/2)*.9, u*h]); } lxBand(M.lxWhite, Q, pts, .22, .16, 0); }
+      const pts = []; for (let q=0; q<=8; q++){ const u = q/8; pts.push([Math.sin(u*PI/2)*.9, u*h]); } lxBand(M.lxWhite, Q, pts, .22, .16, 0); lxBand(M.pgNeon, Q, lxOffset(pts, -.09), .05, .03, 0); }
     y += LH;
-    lxSlab(P, 0, y, l.cz, l.w, l.d, l.r, .22);
+    lxSlab(P, 0, y, l.cz, l.w, l.d, l.r, .22, false);
+    pgNeonRing(P, 0, y - .16, l.cz, l.w + .04, l.d + .04, l.r + .02, .07);   // the slab's blue edge
     for (const [sxx, szz] of CORNERS) pgFlare(P, sxx*(l.w/2 - l.r*.3), y - .1, l.cz + szz*(l.d/2 - l.r*.3), Math.atan2(-szz, sxx));
     // the terrace on top of this level: a garden round the next floor, domes on its sides
     if (k < lv.length - 1){
       const nf = floorOf(lv[k + 1]);
       const dr = Math.min(1.3, (l.w - nf.w)/2 - .25);
-      if (k < 3 && dr > .5){ const side = k % 2 ? 1 : -1, dx = side*(nf.w/2 + dr + .05);
-        lxDome(P, dx, y, l.cz + rnd(-.6, .6), dr); domes.push([dx, l.cz]);
-        if (k === 0){ lxDome(P, -dx, y, l.cz - 1.2, dr*.8); domes.push([-dx, l.cz - 1.2]); } }
-      gardenRing(l, nf, y, (x, z) => domes.some(([dx, dz]) => Math.hypot(x - dx, z - dz) < dr + .5));
+      if (k < 2 && dr > .5){ const side = k % 2 ? 1 : -1, dx = side*(nf.w/2 + dr + .05), dz = nf.cz - nf.d*.22;
+        lxDome(P, dx, y, dz, dr); domes.push([dx, dz]);
+        pgNeonRing(P, dx, y + .02, dz, 2*dr + .22, 2*dr + .22, dr + .11, .03);
+        if (k === 0){ lxDome(P, -dx, y, dz, dr*.85); domes.push([-dx, dz]); pgNeonRing(P, -dx, y + .02, dz, 1.7*dr + .22, 1.7*dr + .22, .85*dr + .11, .03); } }
+      gardenRing(l, nf, y, (x, z) => domes.some(([dx, dz]) => Math.hypot(x - dx, z - dz) < dr + .5) || nearBay(k + 1, x, z));
     }
   });
   // ---- the pagoda on top: a lit hall, a wide roof, a smaller hall and roof, a gold spire
@@ -1830,7 +1889,7 @@ function buildCloudPagoda(m){
   for (const [sxx, szz] of CORNERS) box(M.lxWhite, P, sxx*hw/2, y + .75, top.cz + szz*hd/2, .3, 1.5, .3);
   pgPier(P, 0, y, top.cz + hd/2 + .1, 1.5, 0, 1.0);
   y += 1.5;
-  box(M.lxWhite, P, 0, y + .06, top.cz, hw + .3, .12, hd + .3); box(M.lxLine, P, 0, y + .02, top.cz + (hd + .3)/2 + .005, hw + .3, .03, MIN_T);
+  box(M.lxWhite, P, 0, y + .06, top.cz, hw + .3, .12, hd + .3); pgNeonRing(P, 0, y - .01, top.cz, hw + .34, hd + .34, .05, .04);
   pgRoof(P, 0, y + .12, top.cz, hw + 2.4, hd + 2.2, 1.6);
   const y2 = y + .9, h2w = hw*.55, h2d = hd*.6;
   lxGlassFloor(P, 0, y2, top.cz, h2w, h2d, .08, 1.2, null, .5);

@@ -17,7 +17,7 @@ const FADE_IN = 8, FADE_QUICK = .6, FADE_OUT = 1.5, EQ_BARS = 12;   // seconds; 
 const titleOf = file => decodeURIComponent(file.split('/').pop()).replace(MUSIC_EXT, '').replace(/^\d+\s*[-_.]\s*/, '').replace(/[_]+/g, ' ').trim();
 // The radio host (RJ). After the station opens: one song, then the first lore drop, spoken over the start of the
 // next song (turned down underneath); three or four songs after that, the second lore drop the same way. Now and
-// then a short intro from the host before a song: random, never more than two songs in a row, never on the song
+// then a short intro from the host over the start of a song (turned down the same way): random, never more than two songs in a row, never on the song
 // right before the second lore drop, and each intro only once. Every bit of talk is wrapped in a burst of radio
 // static, tuning in before and out after. What's been said is remembered (in this browser), so nothing repeats;
 // once the host has said everything, it's just the music.
@@ -134,9 +134,8 @@ const music = (() => {
     if (++idx >= order.length){ shuffle(); idx = 0; }
     const k = idx, plan = talking ? null : rj.plan();
     rj.started(plan);
-    if (plan === 'lore1' || plan === 'lore2'){ load(k); talk(plan); return; }   // the song starts underneath, turned down
-    if (plan){ el.pause(); ui.setTitle('On the mic: your host'); talk(plan, () => { if (on && idx === k) load(k); }); return; }
     load(k);
+    if (plan) talk(plan);   // the song starts underneath the talk, turned down, and comes back up after
   }
   // previous: back to the start of this song if it's been playing a while, otherwise the song before it
   function prev(){
@@ -162,8 +161,8 @@ const music = (() => {
     // starts once the station has fully arrived (its arrival animation is over)
     setOn(!!radio && !anims.some(a => a.c === radio));
     const playing = on && !paused && !blocked && !el.paused;
-    // under a lore drop the song is turned down, and comes back up gently after
-    const dt2 = Math.min(dt, .1), dTarget = talking && voLore ? DUCK : 1;
+    // under the host's talk the song is turned down, and comes back up gently after
+    const dt2 = Math.min(dt, .1), dTarget = talking ? DUCK : 1;
     duck = dTarget < duck ? Math.max(dTarget, duck - dt2*1.5) : Math.min(dTarget, duck + dt2*.35);
     if (talking && !paused) vo.volume = Math.min(1, volume*(vo.dataset.kind === 'static' ? STATIC_VOL : 1));
     const target = playing ? 1 : 0;

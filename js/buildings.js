@@ -708,9 +708,20 @@ function deckHouse(lot, st, P0){
   railingRun(P0, -(W+.3)/2+.05, (W+.3)/2-.6, (Dd+.3)/2-.05, tY+.12);
   railingRun(P0, -(W+.3)/2+.05, (W+.3)/2-.05, -(Dd+.3)/2+.05, tY+.12);
   railingRun(P0, -(Dd+.3)/2+.05, (Dd+.3)/2-.05, (W+.3)/2-.05, tY+.12, .3, PI/2);
-  const run = 1.3, ang = Math.atan2(lift, run);
-  box(M.concL, P0, W/2-.35, deckY+lift/2, (Dd+.3)/2+.25, .3, .06, Math.hypot(run, lift), ang);
-  box(M.frame, P0, W/2-.5, deckY+lift/2+.28, (Dd+.3)/2+.25, .03, .03, Math.hypot(run, lift), ang);
+  // the stair: a landing at the railing gap, then real steps running down along the front face to the ground,
+  // carried on two stringers with a handrail and a post under the landing (it used to be one bare slab poking out)
+  {
+    const Q = under(P0, T(0, 0, (Dd+.3)/2 + .17, 0)), y1 = tY + .12, xt = (W+.3)/2 - .3;
+    const n = 9, rise = y1/(n+1), run = .15, L = n*run, x0 = xt - .15, ang = Math.atan2(y1 - rise, L);
+    box(M.concL, Q, xt, y1 - .03, 0, .3, .06, .32);                                      // landing
+    box(M.frame, Q, xt, (y1 - .06)/2, .12, .05, y1 - .06, .05);                           // its post
+    for (let i=0;i<n;i++) box(M.concL, Q, x0 - (i+.5)*run, y1 - (i+1)*rise - .02, 0, run + .01, .04, .3);   // treads
+    const cx = x0 - L/2, cy = (y1 - rise)/2, len = Math.hypot(L, y1 - rise);
+    for (const s of [-1,1]) box(M.frame, Q, cx, cy - .04, s*.16, len, .07, .03, 0, 0, ang);   // stringers
+    box(M.frame, Q, cx, cy + .3, .16, len, .03, .03, 0, 0, ang);                             // handrail
+    for (const u of [.15, .85]) box(M.frame, Q, x0 - u*L, (y1 - rise)*(1 - u) + .15, .16, .03, .3, .03);
+    box(M.frame, Q, xt + .14, y1 + .15, .16, .03, .3, .03);
+  }
   // the block: square body with beveled top edges carrying slanted glowing windows
   const bw = W-.4, bd = Dd-.4, bh = rnd(.75,.95), by = tY+.12;
   box(pick([M.concM, M.concDD, M.frame, st.walls[0]]), P0, 0, by+bh/2, 0, bw, bh, bd);

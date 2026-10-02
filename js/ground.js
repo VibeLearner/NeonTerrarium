@@ -44,7 +44,7 @@ function groundLot(lot){
   const lineMat = lot.cls === 'ind' ? G.lineY : G.line;
   for (let t=-H2+.2; t<H2-.1; t+=.42){ box(lineMat, P, H2, .03, t, .045, .045, .2); box(lineMat, P, t, .03, H2, .2, .045, .045); }
   for (const s2 of [-1,1]){ box(lineMat, P, s2*(SIDE/2+.12), .03, 0, .045, .045, SIDE); box(lineMat, P, 0, .03, s2*(SIDE/2+.12), SIDE, .045, .045); }   // kerb-side lines
-  if (chance(.35)) for (let t=-.35; t<=.36; t+=.14) box(G.line, P, t, .037, H2, .08, .045, .5);          // crosswalk
+  if (chance(.35) && lot.cross !== false) for (let t=-.35; t<=.36; t+=.14) box(G.line, P, t, .037, H2, .08, .045, .5);   // crosswalk, only toward a neighbor (at an open edge it hung off the rim)
   if (chance(.6)) cyl(G.manhole, P, mid, .034, rnd(-1,1), .12, .045);
   for (let k=0;k<irand(1,3);k++){ const sx = pick([-1,1]), a = chance(.5); box(G.puddle, P, a?sx*rnd(SIDE/2+.2,H2):rnd(-1.4,1.4), .028, a?rnd(-1.4,1.4):sx*rnd(SIDE/2+.2,H2), rnd(.12,.3), .045, rnd(.1,.25), rnd(0,1)); }
   for (let k=0;k<irand(1,3);k++) box(G.crack, P, rnd(-H2,H2), .033, pick([-1,1])*rnd(SIDE/2+.15,H2), rnd(.2,.5), .045, .045, rnd(-.6,.6));

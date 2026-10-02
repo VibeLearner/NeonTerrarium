@@ -2113,7 +2113,8 @@ function buildLot(lot){
 // strip of scrolling text under the picture. Like the screens, every hologram in the city is one material: a quad's
 // uvs say which ad (and a seed), and whether it's the picture or the text strip. It comes on with the evening, as
 // the other lights do, and stays faintly on by day.
-const HOLO_INK = [[.25,.95,1], [1,.32,.95], [.3,.55,1], [.25,.95,1], [1,.32,.95], [.3,.55,1], [.25,.95,1], [.9,.38,1], [1,.35,.72]];
+// each board is tinted one of ten colours (from its seed), whatever colour the sheet drew the ad in
+const HOLO_INK = [[1,.55,.12], [.25,.95,1], [1,.3,.85], [.45,1,.35], [1,.85,.2], [.65,.4,1], [1,.25,.22], [.3,.55,1], [.2,1,.75], [1,.6,.75]];
 const HOLO_TEXT = ['ADVERTISING ROBOTS  *  THEY SMILE, THEY WAVE, THEY SELL  *  ', 'BOT SHOP  *  ROBOT REPAIR  *  FIXED WHILE YOU WAIT  *  ',
   'MEET YOUR NEW BEST FRIEND  *  ROBOTS FOR EVERY HOME  *  ', 'HOT RAMEN 24/7  *  EXTRA NOODLES, NO EXTRA CHARGE  *  ', 'LAUNDRY  *  SPIN CYCLE SPECIALS ALL NIGHT  *  ',
   'ARCADE  *  HIGH SCORES NIGHTLY  *  INSERT COIN  *  ', 'AIR FILTERS  *  BREATHE EASY ABOVE THE SMOG  *  ', 'MESSAGES TO GROUNDERS  *  BEAM ONE DOWN TONIGHT  *  ',
@@ -2136,17 +2137,18 @@ HOLO_MAT = new THREE.ShaderMaterial({
   uniforms: { tAds: { value: holoAds }, tText: { value: holoText }, time: FOL_UNI.time, lightsOn: LIGHTS_ON, textW: { value: HOLO_TW.slice() },
     ink: { value: HOLO_INK.map(c => new THREE.Vector3(...c)) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform sampler2D tAds; uniform sampler2D tText; uniform float time; uniform float lightsOn; uniform float textW[9]; uniform vec3 ink[9];
+  fragmentShader: `uniform sampler2D tAds; uniform sampler2D tText; uniform float time; uniform float lightsOn; uniform float textW[9]; uniform vec3 ink[10];
     varying vec2 vUv;` + LIT_GLSL + `
     float hh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
-    vec3 inkOf(float a){ vec3 c = ink[0]; for (int i = 1; i < 9; i++) if (float(i) == a) c = ink[i]; return c; }
+    vec3 inkOf(float a){ vec3 c = ink[0]; for (int i = 1; i < 10; i++) if (float(i) == a) c = ink[i]; return c; }
+    float palOf(float s){ return mod(s*7.0 + floor(s/10.0), 10.0); }
     float twOf(float a){ float w = textW[0]; for (int i = 1; i < 9; i++) if (float(i) == a) w = textW[i]; return w; }
     void main(){
       float id = floor(vUv.x + 1e-4), kind = floor(vUv.y + 1e-4), ad = mod(id, 9.0), seed = floor(id/9.0);
       float u = vUv.x - id, v = vUv.y - kind;
       if (!gl_FrontFacing) u = 1.0 - u;                          // from behind it reads the right way round too
       float t = time + seed*3.71;
-      vec3 c = inkOf(ad);
+      vec3 c = inkOf(palOf(seed));
       // a glitch burst every so often: rows torn sideways, the colour split, the frame jumping
       float gl = step(.9, hh(vec2(floor(t*2.5), seed)))*step(.35, hh(vec2(floor(t*14.0), seed + 1.0)));
       float band = floor(v*9.0);
@@ -2161,8 +2163,8 @@ HOLO_MAT = new THREE.ShaderMaterial({
         vec2 p = vec2(fr*64.0 + floor(u*cs.x), ad*48.0 + floor((1.0 - v)*cs.y));
         vec2 W = vec2(384.0, 432.0);
         vec3 s = texture2D(tAds, (p + .5)/W*vec2(1.0, -1.0) + vec2(0.0, 1.0)).rgb;
-        if (gl > .5){ s.r = texture2D(tAds, (p + vec2(2.0, 0.0) + .5)/W*vec2(1.0, -1.0) + vec2(0.0, 1.0)).r; }
-        col = s*1.7 + c*.07;                                      // the ad, on a faint sheet of light
+        if (gl > .5){ s.g = texture2D(tAds, (p + vec2(2.0, 0.0) + .5)/W*vec2(1.0, -1.0) + vec2(0.0, 1.0)).r; }
+        col = c*max(s.r, max(s.g, s.b))*1.9 + c*.07;               // the ad in the board's colour, on a faint sheet of light
         float lines = .72 + .28*step(.5, fract(v*cs.y*.5));        // scanlines
         col *= lines;
       } else {
@@ -2190,12 +2192,15 @@ function holoQuad(F, x, y, z, w, h, ad, seed, kind){
   for (const k of [0, 1, 2, 0, 2, 3]){ const [cx, cy, u, v] = C[k]; _hq.set(x + cx, y + cy, z).applyMatrix4(F); b.p.push(_hq.x, _hq.y, _hq.z); b.n.push(0, 1, 0); b.u.push(id + u, kind + v); b.d.push(0); }
 }
 M.holoBlue = toon(0x1a2a50, { em: 0x3a7aff, kind: 'neon' });
-const HOLO_EMIT = [[M.neonCyan, 'cyan'], [M.neonPink, 'pink'], [M.holoBlue, 'blue'], [M.neonCyan, 'cyan'], [M.neonPink, 'pink'], [M.holoBlue, 'blue'], [M.neonCyan, 'cyan'], [M.neonPink, 'pink'], [M.neonPink, 'pink']];
+const holoNeon = (c, k) => [toon(new THREE.Color(...c.map(v => v*.25)).getHex(), { em: new THREE.Color(...c).getHex(), kind: 'neon' }), k];
+const HOLO_EMIT = [holoNeon(HOLO_INK[0], 'orange'), [M.neonCyan, 'cyan'], [M.neonPink, 'pink'], holoNeon(HOLO_INK[3], 'green'), [M.neonAmber, 'amber'],
+  holoNeon(HOLO_INK[5], 'pink'), holoNeon(HOLO_INK[6], 'red'), [M.holoBlue, 'blue'], holoNeon(HOLO_INK[8], 'cyan'), holoNeon(HOLO_INK[9], 'pink')];
+const holoPal = seed => (seed*7 + Math.floor(seed/10)) % 10;   // same as palOf in the shader
 // A billboard standing at P (its base, facing +z). size 0 small (a rooftop stand), 1 medium, 2 large (on posts,
 // with the text strip).
 function holoBoard(P, size, ad, seed){
   const port = ad < 6, H = port ? [1.0, 1.6, 2.3][size] : [.85, 1.35, 1.95][size], w = port ? H*40/46 : H*64/44;
-  const band = size ? [0, .3, .4][size] : 0, lift = size ? .35 : .22, [emit, gk] = HOLO_EMIT[ad];
+  const band = size ? [0, .3, .4][size] : 0, lift = size ? .35 : .22, [emit, gk] = HOLO_EMIT[holoPal(seed)];
   const y0 = lift + .12 + (band ? band + .06 : 0);
   // the projector: a dark bar with the emitter strip along its top
   box(M.metalDark, P, 0, lift, 0, w + .16, .12, .2);

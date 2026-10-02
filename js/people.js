@@ -386,7 +386,7 @@ function makeSpots(pl, list, inside, oldSpots, addEnd){
     const ap = approachFor(cellGrid(c), r.x, r.z, r.fx, r.fz); if (!ap) return;
     const key = 's:' + pl.id + ':' + n, old = oldSpots.get(key), nk = 'a:' + Math.round(ap.x*100) + ',' + Math.round(ap.z*100);
     const sp = { key, x: r.x, y: r.y, z: r.z, ax: ap.x, az: ap.z, node: ngAdd(nk, ap.x, ap.z), kind: r.kind, stall: r.stall, face: [r.fx, r.fz],
-                 by: old ? old.by : null, place: pl.id, near: [], act: r.act, hx: r.hx, hz: r.hz, ad: r.ad };
+                 by: old ? old.by : null, place: pl.id, near: [], act: r.act, hx: r.hx, hz: r.hz, ad: r.ad, pic: r.pic };
     pl.spots.push(sp); spotByKey.set(key, sp); addEnd(c, { key: nk, x: ap.x, z: ap.z, kind: 's' });
   });
   // who could chat with whom: standing spots close together
@@ -1020,6 +1020,28 @@ function checkBumps(t){
 // A small hologram plays over a lawn projector while someone sits watching it: a pool of little quads in the
 // hologram material, each given its ad through its uvs (see holoQuad in buildings.js), turned toward the viewer.
 const holoOn = [], holoPool = [];
+// Picnic blankets: brought along by the first person to sit down at a picnic spot, spread out (unfolding from the
+// middle), and folded up and taken away when the last of them leaves. Each has a couple of bowls on it.
+const picOn = new Set(), picnics = new Map(), picPool = [];
+const PIC_MATS = [0xb8433a, 0x3f6a9a, 0xd8b04a].map(c => new THREE.MeshToonMaterial({ color: c, gradientMap: gradTex })), BOWL_MAT = new THREE.MeshToonMaterial({ color: 0xe6e6e2, gradientMap: gradTex });
+function lawnPicnics(dt){
+  for (const k of picOn) if (!picnics.has(k)){
+    let g = picPool.pop();
+    if (!g){ g = new THREE.Group(); const sheet = new THREE.Mesh(new THREE.BoxGeometry(.62, .015, .44), PIC_MATS[0]); g.add(sheet);
+      for (const [x, z] of [[-.1, .05], [.12, -.06]]){ const b = new THREE.Mesh(new THREE.CylinderGeometry(.045, .035, .035, 8), BOWL_MAT); b.position.set(x, .025, z); g.add(b); }
+      g.traverse(o => { if (o.isMesh){ o.castShadow = false; o.receiveShadow = true; } }); scene.add(g); }
+    const [xz, ry, col] = k.split('|'), [x, z] = xz.split(',').map(Number);
+    g.children[0].material = PIC_MATS[+col]; g.position.set(x, CURB - .002, z); g.rotation.y = -(+ry); g.visible = true; g.scale.set(.05, 1, .05);
+    picnics.set(k, { g, u: 0 });
+  }
+  for (const [k, p] of picnics){
+    const want = picOn.has(k) ? 1 : 0; p.u = want ? Math.min(1, p.u + dt*1.6) : Math.max(0, p.u - dt*1.6);
+    const e = p.u*p.u*(3 - 2*p.u); p.g.scale.set(.05 + .95*e, 1, .05 + .95*Math.min(1, e*1.3));   // unfolds lengthwise, then across
+    for (let i = 1; i < p.g.children.length; i++) p.g.children[i].visible = p.u > .9;   // the bowls come out once it's down
+    if (!want && p.u <= 0){ p.g.visible = false; picPool.push(p.g); picnics.delete(k); }
+  }
+  picOn.clear();
+}
 function lawnHolos(){
   const used = new Set();
   let n = 0;
@@ -1104,7 +1126,8 @@ function updatePeople(dt, t){
         if (sp.kind === 'seat'){ y = sp.y - .09; frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4;
           if (sp.act === 'holo'){ face = [sp.hx - sp.x, sp.hz - sp.z]; holoOn.push(sp);   // watching the show
             if (!(p.emoUntil > t) && pplRand() < dt*.03) emote(p, pplRand() < .5 ? 'bang' : 'note', 2); }
-          else if (sp.act){ const mate = sp.near.find(o => o.by && people.get(o.by) && !people.get(o.by).walk);
+          else if (sp.act){ if (sp.pic) picOn.add(sp.pic.x.toFixed(2) + ',' + sp.pic.z.toFixed(2) + '|' + sp.pic.ry.toFixed(3) + '|' + sp.pic.col);
+            const mate = sp.near.find(o => o.by && people.get(o.by) && !people.get(o.by).walk);
             if (mate) face = [mate.x - sp.x, mate.z - sp.z];
             if (!(p.emoUntil > t)){
               if (sp.act === 'eat' && pplRand() < dt*.09) emote(p, 'bowl', 2.4);                                 // a picnic
@@ -1127,7 +1150,7 @@ function updatePeople(dt, t){
     if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
   }
-  lawnHolos();
+  lawnHolos(); lawnPicnics(dt);
   // lurkers on the dark streets
   for (const L of lurkers.values()){
     if (L.fade <= 0) continue;

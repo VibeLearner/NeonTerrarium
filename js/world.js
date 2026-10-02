@@ -138,7 +138,7 @@ function lawn(P, n){
 // side (friends chatting) and a little hologram projector (whoever sits there watches a show on it), in the
 // quarters of the plot (the middle stays clear for a park lamp). Sitting spots on the ground, so the sitting
 // people's legs-out pose sits on the grass.
-const PICNIC = [toon(0xb8433a), toon(0x3f6a9a), toon(0xd8b04a)];
+const PICNIC = [0xb8433a, 0x3f6a9a, 0xd8b04a];
 function lawnSpots(c, P){
   const quads = [[-1, -1], [1, -1], [-1, 1], [1, 1]].sort(() => R() - .5), kinds = ['picnic', 'pair', 'holo'].sort(() => R() - .5);
   const gy = CURB + .09, clear = [];   // sitting spots: drawn .09 lower, so on the ground
@@ -147,9 +147,10 @@ function lawnSpots(c, P){
     const at = (u, v) => [ax + u*ca - v*sa, az + u*sa + v*ca];   // a frame turned to ry round the anchor
     const kind = kinds[g];
     if (kind === 'picnic'){
-      box(pick(PICNIC), P, ax, .075, az, .62, .015, .44, -ry); clear.push([ax, az, .34]);
-      for (let k = 0; k < 2; k++){ const [bx, bz] = at(rnd(-.12, .12), rnd(-.08, .08)); cyl(chance(.5) ? M.white2 : M.red2, P, bx, .09, bz, .045, .035); }
-      for (const s of [-1, 1]){ const [sx, sz] = at(s*.42, 0); clear.push([sx, sz, .14]); spotAt(P, sx, gy, sz, 'seat', null, [ax - sx, az - sz], { act: 'eat' }); }
+      // the blanket itself is brought by whoever comes to picnic, and goes home with them (people.js)
+      clear.push([ax, az, .34]);
+      const pic = { x: c.x + ax, z: c.z + az, ry, col: Math.floor(R()*3) };
+      for (const s of [-1, 1]){ const [sx, sz] = at(s*.42, 0); clear.push([sx, sz, .14]); spotAt(P, sx, gy, sz, 'seat', null, [ax - sx, az - sz], { act: 'eat', pic }); }
     } else if (kind === 'pair'){
       for (const s of [-1, 1]){ const [sx, sz] = at(s*.2, 0); const [fx, fz] = at(0, .5); clear.push([sx, sz, .14]); spotAt(P, sx, gy, sz, 'seat', null, [fx - ax, fz - az], { act: 'pair' }); }
     } else {

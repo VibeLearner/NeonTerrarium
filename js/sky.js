@@ -243,7 +243,8 @@ const comp = new THREE.ShaderMaterial({
         // and dithered so it stays pixel art
         { vec3 lt = texture2D(tLight, vUv).rgb;
           lt = floor(lt*14.0 + bayer(gl_FragCoord.xy)*.99)/14.0;
-          col += lt*(c.rgb*1.25 + .05); }
+          float lum = dot(c.rgb, vec3(.299, .587, .114));
+          col += lt*(c.rgb*1.1 + .16)*(1.0 - smoothstep(.35, .75, lum)); }   // strongest on dark walls and streets; bright surfaces (signs, windows) get none
         if (rimI > 0.01){
           vec2 sd2 = sunV.xy; float sl = length(sd2);
           if (sl > 0.05){
@@ -619,7 +620,7 @@ const nightLightMat = new THREE.ShaderMaterial({
     varying vec3 vL; varying vec3 vC; varying float vR;` + FLK_GLSL + BLINK_GLSL + `
     void main(){
       vec4 w = modelMatrix*vec4(position, 1.0); vL = w.xyz;
-      float R = clamp(size*1.25, .7, 3.4); vR = R;
+      float R = clamp(size*2.4, 1.4, 5.0); vR = R;   // a wide reach, so the pools read
       float op = aCol.a < -1.5 ? mix(.05, 1.0, blink(w.y, time)) : 1.0;
       vC = aCol.rgb*op*flicker(aFlk, time);
       vec4 cp = projectionMatrix*viewMatrix*w; cp.xyz /= cp.w;
@@ -634,6 +635,7 @@ const nightLightMat = new THREE.ShaderMaterial({
       vec4 p = invVP*vec4(uv*2.0 - 1.0, rd*2.0 - 1.0, 1.0); p /= p.w;
       vec3 d = vL - p.xyz; float dist = length(d); if (dist > vR) discard;
       float f = 1.0 - dist/vR; f *= f;
+      f *= smoothstep(.12*vR, .4*vR, dist);   // nothing on the light itself: it lights its surroundings, never washes out its own sign
       vec3 n = texture2D(tNormal, uv).rgb*2.0 - 1.0;
       vec3 lv = normalize(mat3(viewMatrix)*d + vec3(0.0, 0.0, 1e-4));
       float ndl = .3 + .7*max(dot(n, lv), 0.0);
@@ -650,7 +652,7 @@ function makeLightTarget(){
 }
 // after the colour and normal passes; fills rtLight for the composite
 function renderNightLights(night){
-  const I = S.lights === false ? 0 : Math.max(0, Math.min(1, (night - .15)/.6))*.72;
+  const I = S.lights === false ? 0 : Math.max(0, Math.min(1, (night - .15)/.6))*.6;
   NL_UNI.lightI.value = I;
   renderer.setRenderTarget(rtLight); renderer.setClearColor(0x000000, 1); renderer.clear(true, false, false);
   if (I <= 0) return;

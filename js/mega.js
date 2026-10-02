@@ -1842,9 +1842,9 @@ function buildCloudPagoda(m){
   const bays = [];
   lv.forEach((l, k) => {
     const f = floorOf(l), below = k ? lv[k - 1] : { w: pw, d: pd, cz: pcz };
-    if (k % 2 === 0){ const ring = below.cz + below.d/2 - (f.cz + f.d/2), r = Math.min(1.15, f.w*.1, ring - .12);
+    if (k % 2 === 0){ const ring = below.cz + below.d/2 - (f.cz + f.d/2), r = Math.min(1.15, f.w*.1, ring - .35);
       for (const s of [-1, 1]) bays.push({ k, x: s*f.w*.2, z: f.cz + f.d/2 - .05, r, ry: 0 }); }
-    else { const ring = below.w/2 - f.w/2, r = Math.min(1.05, ring - .25, LH*.55);
+    else { const ring = below.w/2 - f.w/2, r = Math.min(1.05, ring - .4, LH*.55);
       for (const s of [-1, 1]) bays.push({ k, x: s*(f.w/2 - .05), z: f.cz + f.d/2 - r - .35, r, ry: s*PI/2 }); }
   });
   const nearBay = (k, x, z, pad = .45) => bays.some(b => b.k === k && Math.hypot(x - b.x, z - b.z) < b.r + pad);
@@ -1873,8 +1873,8 @@ function buildCloudPagoda(m){
     // the terrace on top of this level: a garden round the next floor, domes on its sides
     if (k < lv.length - 1){
       const nf = floorOf(lv[k + 1]);
-      const dr = Math.min(1.3, (l.w - nf.w)/2 - .25);
-      if (k < 2 && dr > .5){ const side = k % 2 ? 1 : -1, dx = side*(nf.w/2 + dr + .05), dz = nf.cz - nf.d*.22;
+      const ringW = (l.w - nf.w)/2, dr = Math.min(1.3, (ringW - .55)/2);   // the dome and its base ring fit between the floor above and the rail
+      if (k < 2 && dr > .5){ const side = k % 2 ? 1 : -1, dx = side*(nf.w/2 + dr + .2), dz = nf.cz - nf.d*.22;
         lxDome(P, dx, y, dz, dr); domes.push([dx, dz]);
         pgNeonRing(P, dx, y + .02, dz, 2*dr + .22, 2*dr + .22, dr + .11, .03);
         if (k === 0){ lxDome(P, -dx, y, dz, dr*.85); domes.push([-dx, dz]); pgNeonRing(P, -dx, y + .02, dz, 1.7*dr + .22, 1.7*dr + .22, .85*dr + .11, .03); } }

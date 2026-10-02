@@ -1344,7 +1344,10 @@ function buildPoliceStation(m){
     for (const o of [0, .22]){ strut(M.neonAmber, F, -.25, py + .005, -o, 0, py + .005, -o - .2, .04); strut(M.neonAmber, F, .25, py + .005, -o, 0, py + .005, -o - .2, .04); } }
   for (let k=0; k<16; k++){ const t = -PS/2 + .15 + (k % 4)*(PS - .3)/3, side = Math.floor(k/4);   // edge lights
     const [lx, lz] = [[t, -PS/2], [PS/2, t], [-t, PS/2], [-PS/2, -t]][side]; box(M.bulb, P, px + lx, py + .02, pz + lz, .07, .04, .07); if (k % 2) glow(P, px + lx, py + .05, pz + lz, 'warm', .5); }
-  m.dronePad = under(P, T(px + .2, py, pz + .1, .4)).elements.slice();   // the police drone parks here (it's live: see policeFx)
+  m.dronePad = under(P, T(px + .2, py, pz + .1, .4)).elements.slice();
+  // the drones park in the pad's four quarters (they're live: see policeFx); three or four of them, by the station's seed
+  m.dronePads = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz], k) => under(P, T(px + sx*1.05, py, pz + sz*1.05, .4 + k*.9)).elements.slice());
+  m.droneN = 3 + (hash('drones', m.i, m.j, m.seed) % 2);
   // machinery and an antenna on the other side of the roof
   box(M.metal, P, 3.1, ry + .3, .9, 1.3, .6, 1.0); box(M.metal, P, 3.6, ry + .25, -.6, .8, .5, .7); box(M.metalDark, P, 1.7, ry + .2, 1.4, .7, .4, .6);
   for (let k=0; k<3; k++) put(U.cyl16, M.polWall2, under(P, T(2.9 + k*.4, ry + .78, .9, 0, .3, .1, .3)));   // fan housings
@@ -1396,8 +1399,8 @@ const WANTED_FRAG = `
 // The station's drone: parked on the roof pad, it now and then lifts off, flashing red and blue, and patrols the
 // streets nearby from the air: it flies from crossing to crossing high enough to clear the buildings, hovers over
 // each with its searchlight on the street, then comes home and lands. It doesn't do anything else.
-function policeDrone(m){
-  const g = new THREE.Group(), pad = new THREE.Matrix4().fromArray(m.dronePad);
+function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
+  const g = new THREE.Group(), pad = new THREE.Matrix4().fromArray(padM);
   const restPos = new THREE.Vector3(), restQ = new THREE.Quaternion(), _sc = new THREE.Vector3();
   pad.decompose(restPos, restQ, _sc);
   const restYaw = new THREE.Euler().setFromQuaternion(restQ, 'YXZ').y;
@@ -1418,14 +1421,16 @@ function policeDrone(m){
     return { b, sp, lm }; };
   const red = flash(0xff2030, -.16), blue = flash(0x2a6cff, .16);
   // the searchlight: a faint cone of light down to the street while it hovers
+  const SEARCH = new THREE.Color(0xbfefff), ALARM = new THREE.Color(0xff2a3a);
   const coneMat = new THREE.MeshBasicMaterial({ color: 0xbfefff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
   const cone = new THREE.Mesh(new THREE.ConeGeometry(.7, 1, 16, 1, true), coneMat); cone.layers.set(1); cone.renderOrder = 4; scene.add(cone);
   const spot = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xbfefff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); spot.scale.set(2.2, 2.2, 1); spot.layers.set(1); scene.add(spot);
   g.traverse(o => { if (o.isMesh && o.layers.mask === 1) o.layers.set(0); });
   g.position.copy(restPos); g.rotation.y = restYaw; scene.add(g);
   // its own clock (real seconds), so it keeps to its rounds whatever the hour, the day cycle or the frame rate
-  const st = { mode: 'rest', timer: 8 + Math.random()*10, way: [], yaw: restYaw, spin: 0, hover: 0, k: 0, last: performance.now() };
-  const cruiseTo = (a, b) => Math.max(droneCruise(a, b) + 1.2, restPos.y + 1.5);
+  // the crew take off at different times; each flies a little higher than the last, so their paths never meet
+  const st = { mode: 'rest', timer: 4 + idx*9 + Math.random()*5, way: [], yaw: restYaw, spin: 0, hover: 0, k: 0, last: performance.now(), chase: null };
+  const cruiseTo = (a, b) => Math.max(droneCruise(a, b) + 1.2 + idx*.45, restPos.y + 1.5 + idx*.45);
   const _to = new THREE.Vector3();
   function goToward(target, dt, speed){
     _to.subVectors(target, g.position); const d = _to.length();
@@ -1437,6 +1442,9 @@ function policeDrone(m){
   }
   return {
     g, st,
+    // sent to a mugging: true if it's free to go (not already on one)
+    scramble(L){ if (st.chase) return false; st.chase = { L, t: 25 }; if (st.mode === 'down' || st.mode === 'home'){ st.mode = 'fly'; st.target = null; st.climb = null; } return true; },
+    get busy(){ return !!st.chase; }, get pos(){ return g.position; },
     update(_dt, time){
       const now = performance.now(), dt = Math.min(1, (now - st.last)/1000); st.last = now;
       const on = st.mode !== 'rest';
@@ -1447,18 +1455,32 @@ function policeDrone(m){
       let light = 0;
       if (st.mode === 'rest'){
         st.timer -= dt;
-        if (st.timer <= 0){
-          const nodes = (typeof patrolNodes !== 'undefined' ? patrolNodes : []).filter(c => Math.hypot(c.x - restPos.x, c.z - restPos.z) < 22);
-          if (nodes.length){ st.way = []; for (let k = 0; k < 3; k++) st.way.push(nodes[Math.floor(Math.random()*nodes.length)]); st.mode = 'up'; st.k = 0; }
+        if (st.chase){ st.mode = 'up'; st.k = 0; st.way = []; }   // scrambled to a mugging
+        else if (st.timer <= 0){
+          const way = crew ? crew.plan(idx, restPos) : [];
+          if (way.length){ st.way = way; st.mode = 'up'; st.k = 0; }
           else st.timer = 10;
         }
       } else if (st.mode === 'up'){
         st.k = Math.min(1, st.k + dt/2.2);
         g.position.set(restPos.x, restPos.y + 1.2*st.k*st.k*(3 - 2*st.k), restPos.z);
-        if (st.k >= 1){ st.mode = 'fly'; st.target = null; }
+        if (st.k >= 1){ st.mode = st.chase ? 'chase' : 'fly'; st.target = null; }
+      } else if (st.mode === 'chase'){
+        // after a mugger: over the robbery, then tailing them as they run, the searchlight turned red on them
+        const L = st.chase.L, live = L && (L.state === 'rob' || L.state === 'strike' || L.state === 'flee') && L.fade > .05;
+        st.chase.t -= dt;
+        if (!live || st.chase.t <= 0){ st.chase = null; st.mode = st.way.length ? 'fly' : 'home'; st.target = null; st.climb = null; }
+        else {
+          _to.set(L.x, 0, L.z);
+          const alt = Math.max(cruiseTo(g.position, _to) - .6, restPos.y + 1.2);
+          const tgt = new THREE.Vector3(L.x, alt, L.z), far = Math.hypot(L.x - g.position.x, L.z - g.position.z);
+          goToward(tgt, dt, far > 3 ? 3.4 : 2.6);
+          if (far < 2.5){ light = 1; st.redOn = Math.min(1, (st.redOn || 0) + dt*3); st.aim = L; }
+        }
       } else if (st.mode === 'fly' || st.mode === 'home'){
+        if (st.chase && st.mode === 'fly'){ st.mode = 'chase'; st.target = null; st.climb = null; }
         if (!st.target){
-          const w = st.mode === 'fly' ? st.way.shift() : null;
+          const w = st.mode === 'fly' ? st.way.shift() : null; st.at = w;
           const tx = w ? w.x : restPos.x, tz = w ? w.z : restPos.z;
           _to.set(tx, 0, tz);
           st.target = new THREE.Vector3(tx, cruiseTo(g.position, _to), tz);
@@ -1468,27 +1490,39 @@ function policeDrone(m){
         else if (goToward(st.target, dt, 2.4)){
           st.target = null;
           if (st.mode === 'home'){ st.mode = 'down'; st.k = 0; st.from = g.position.clone(); }
-          else { st.mode = 'hover'; st.hover = 2.5 + Math.random()*2; }
+          else { st.mode = 'hover'; st.hover = 1.8 + Math.random()*1.4; if (crew && st.at) crew.visited(st.at); }
         }
       } else if (st.mode === 'hover'){
         st.hover -= dt; light = Math.min(1, st.hover*2, 1);
         g.position.y += Math.sin(time*2.3)*.002;
-        if (st.hover <= 0) st.mode = st.way.length ? 'fly' : 'home';
+        if (st.chase) st.mode = 'chase';
+        else if (st.hover <= 0) st.mode = st.way.length ? 'fly' : 'home';
       } else if (st.mode === 'down'){
         st.k = Math.min(1, st.k + dt/2.8); const u = st.k*st.k*(3 - 2*st.k);
         g.position.lerpVectors(st.from, restPos, u);
         let dy = restYaw - st.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); st.yaw += dy*Math.min(1, dt*3);
-        if (st.k >= 1){ st.mode = 'rest'; st.timer = 25 + Math.random()*30; st.yaw = restYaw; g.position.copy(restPos); }
+        if (st.k >= 1){ st.mode = 'rest'; st.timer = 8 + Math.random()*10; st.yaw = restYaw; g.position.copy(restPos); }
       }
       g.rotation.y = st.yaw;
       // searchlight down to the street
       const h = g.position.y - CURB;
-      cone.visible = spot.visible = light > 0;
-      if (light > 0){ cone.position.set(g.position.x, CURB + h/2, g.position.z); cone.scale.set(1, h, 1); coneMat.opacity = .14*light; spot.position.set(g.position.x, CURB + .05, g.position.z); spot.material.opacity = .55*light; }
+      if (st.mode !== 'chase') st.redOn = Math.max(0, (st.redOn || 0) - dt*2);
+      const redK = st.redOn || 0;
+      cone.visible = spot.visible = light > 0 || redK > 0;
+      if (cone.visible){
+        coneMat.color.copy(SEARCH).lerp(ALARM, redK); spot.material.color.copy(SEARCH).lerp(ALARM, redK);
+        // the light pours straight down from the drone; on a chase the pool sits on the mugger
+        const sx = redK > .5 && st.aim ? st.aim.x : g.position.x, sz = redK > .5 && st.aim ? st.aim.z : g.position.z;
+        cone.position.set((g.position.x + sx)/2, CURB + h/2, (g.position.z + sz)/2); cone.scale.set(1, Math.hypot(g.position.x - sx, h, g.position.z - sz), 1);
+        cone.rotation.set(0, 0, 0); cone.lookAt(sx, CURB, sz); cone.rotateX(-PI/2);
+        coneMat.opacity = (.14 + .1*redK)*Math.max(light, redK);
+        spot.position.set(sx, CURB + .05, sz); spot.material.opacity = (.55 + .3*redK)*Math.max(light, redK); spot.scale.setScalar(2.2 - .6*redK);
+      }
     },
     dispose(){ scene.remove(g, cone, spot); coneMat.dispose(); cone.geometry.dispose(); spot.material.dispose(); red.lm.dispose(); blue.lm.dispose(); red.sp.material.dispose(); blue.sp.material.dispose(); }
   };
 }
+let policeDroneAlert = null, policeCrew = null;   // set while the station stands (people.js calls the alert at a mugging)
 function policeFx(m){
   if (!wantedTex){ wantedTex = new THREE.TextureLoader().load('assets/sprites/wanted.png'); wantedTex.magFilter = wantedTex.minFilter = THREE.NearestFilter; wantedTex.generateMipmaps = false; }
   const parts = [], screens = [];
@@ -1524,9 +1558,46 @@ function policeFx(m){
   add(U.box, M.blink, -.5, .5, 0, .07, .07, .07);
   head.traverse(o => { if (o.isMesh) o.layers.set(0); });
   scene.add(radar); parts.push(radar);
-  const drone = policeDrone(m); parts.push(drone.g);
+  // The drone crew. The city's street crossings are shared out between the drones as sectors (slices round the
+  // middle of the city, so each drone has its own part); each sortie takes in the crossings of its sector that have
+  // gone longest without a visit, in a sensible order, so between them they sweep the whole city over and over.
+  const visits = new Map();   // crossing key -> when a drone last hovered over it
+  const crew = {
+    sectors: null, sig: '',
+    split(n){
+      const nodes = typeof patrolNodes !== 'undefined' ? patrolNodes : [];
+      const sig = nodes.length + ':' + n; if (this.sectors && sig === this.sig) return this.sectors;
+      let cx = 0, cz = 0; for (const c of nodes){ cx += c.x; cz += c.z; } cx /= nodes.length || 1; cz /= nodes.length || 1;
+      const sorted = nodes.slice().sort((a, b) => Math.atan2(a.z - cz, a.x - cx) - Math.atan2(b.z - cz, b.x - cx));
+      this.sectors = Array.from({ length: n }, (_, k) => sorted.slice(Math.floor(k*sorted.length/n), Math.floor((k + 1)*sorted.length/n)));
+      this.sig = sig; return this.sectors;
+    },
+    plan(idx, from){
+      const sec = this.split(drones.length)[idx] || []; if (!sec.length) return [];
+      const n = Math.max(5, Math.min(10, Math.ceil(sec.length/2.5)));
+      const pickd = sec.slice().sort((a, b) => ((visits.get(a.key) || 0) - (visits.get(b.key) || 0)) || (Math.random() - .5)).slice(0, n);
+      const way = []; let x = from.x, z = from.z;   // nearest first, from where it is
+      while (pickd.length){ let bi = 0, bd = Infinity; pickd.forEach((c, i) => { const d = (c.x - x)**2 + (c.z - z)**2; if (d < bd){ bd = d; bi = i; } }); const c = pickd.splice(bi, 1)[0]; way.push(c); x = c.x; z = c.z; }
+      return way;
+    },
+    visited(c){ visits.set(c.key, performance.now()); },
+    // the share of crossings a drone has hovered over in the last few minutes
+    coverage(win = 300000){ const nodes = typeof patrolNodes !== 'undefined' ? patrolNodes : [], now = performance.now(); if (!nodes.length) return 0; return nodes.filter(c => now - (visits.get(c.key) || -1e9) < win).length/nodes.length; },
+  };
+  const drones = [];
+  const pads = m.dronePads || [m.dronePad];
+  for (let k = 0; k < Math.min(m.droneN || 1, pads.length); k++){ const d = policeDrone(m, k, pads[k], crew); drones.push(d); parts.push(d.g); }
+  // now and then a drone is sent to a mugging: the nearest one that's free, unless they're all busy
+  policeDroneAlert = L => {
+    if (Math.random() > .7) return false;
+    const free = drones.filter(d => !d.busy); if (!free.length) return false;
+    free.sort((a, b) => Math.hypot(a.pos.x - L.x, a.pos.z - L.z) - Math.hypot(b.pos.x - L.x, b.pos.z - L.z));
+    return free[0].scramble(L);
+  };
+  policeCrew = crew;
+  const drone = drones[0];
   return {
-    drone,
+    drone, drones, crew,
     update(dt, time){
       for (const s of screens){
         s.u.time.value = time; s.hold -= dt; s.stray -= dt;
@@ -1539,10 +1610,10 @@ function policeFx(m){
       const ph = (time*2.2) % 2, a = ph < 1, flash = (time*14) % 1 < .6;   // alternate, with a quick double-flash
       red.b.visible = red.s2.visible = a && flash; blue.b.visible = blue.s2.visible = !a && flash;
       head.rotation.y = time*.55;
-      drone.update(dt, time);
+      for (const d of drones) d.update(dt, time);
       scanMat.color.setRGB(.22, .9, .88).multiplyScalar(.45 + .55*Math.abs(Math.sin(time*3)));
     },
-    dispose(){ for (const p of parts){ scene.remove(p); if (p !== radar && p !== drone.g) p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } scanMat.dispose(); drone.dispose(); }
+    dispose(){ for (const p of parts){ scene.remove(p); if (p !== radar && !drones.some(d => d.g === p)) p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } scanMat.dispose(); for (const d of drones) d.dispose(); policeDroneAlert = null; policeCrew = null; }
   };
 }
 

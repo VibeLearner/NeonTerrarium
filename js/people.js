@@ -942,6 +942,7 @@ function updateLurkers(dt, t){
         if (t - L.t0 > .8 && !(v.emoUntil > t)) emote(v, 'sweat', 2.5);
         if (t - L.t0 > 1.5){
           logEvent({ kind: 'mugging', x: L.x, z: L.z, plot: L.key, victim: v.id });
+          if (typeof policeDroneAlert === 'function' && policeDroneAlert) policeDroneAlert(L);   // sometimes a police drone comes over
           v.pause = 0; v.hurry = true;
           // the nearest officer on duty comes running
           let best = null, bd = 35*35;

@@ -1361,7 +1361,16 @@ function buildPoliceStation(m){
   box(M.polDark, P, 0, ry + .2, front - .5, 1.6, .2, .3);
   m.lightbar = { m: under(P, T(0, ry + .38, front - .5)).elements.slice() };
   // out front: patrol cars, officers, a traffic light, bollards, trees in planters
-  policeCar(P, 2.4, front + 1.2, 0); policeCar(P, -4.0, front + 1.25, PI);
+  // four bays for the hoverbikes (live: see policeBikes), painted on the forecourt, each with a charging post
+  m.bikePads = [];
+  for (const bx2 of [-4.9, -3.6, 2.0, 3.3]){
+    const Q = under(P, T(bx2, 0, front + 1.25));
+    for (const s of [-1, 1]) box(M.neonCyan, Q, s*.42, .058, 0, .03, .01, 1.0); box(M.neonCyan, Q, 0, .058, -.5, .87, .01, .03);
+    box(M.polCarDark, Q, -.5, .3, -.45, .08, .55, .08); box(M.neonCyan, Q, -.5, .5, -.4, .05, .1, .02);
+    const w = new THREE.Vector3(0, 0, 0).applyMatrix4(Q), f = new THREE.Vector3(0, 0, 1).transformDirection(Q);
+    m.bikePads.push({ x: w.x, z: w.z, fx: f.x, fz: f.z });
+  }
+  { const d = new THREE.Vector3(-1.2, 0, front + .1).applyMatrix4(P); m.stationDoor = { x: d.x, z: d.z }; }
   for (const [x, z] of [[-2.2, front + .9], [-.4, front + .6], [.2, front + .7], [3.9, front + .5], [-3.2, front + .5]]){
     const Q = under(P, T(x, 0, z)); box(M.polCarDark, Q, 0, CURB + .12, 0, .09, .24, .07); box(M.polCarDark, Q, 0, CURB + .29, 0, .07, .07, .07); box(M.neonCyan, Q, 0, CURB + .2, .036, .02, .02, .01); }
   { const Q = under(P, T(4.6, 0, H - 2.3)); cyl(M.metalDark, Q, 0, 1.0, 0, .04, 2.0); box(M.metalDark, Q, -.5, 1.9, 0, 1.0, .05, .05);
@@ -1467,15 +1476,18 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
         if (st.k >= 1){ st.mode = st.chase ? 'chase' : 'fly'; st.target = null; }
       } else if (st.mode === 'chase'){
         // after a mugger: over the robbery, then tailing them as they run, the searchlight turned red on them
-        const L = st.chase.L, live = L && (L.state === 'rob' || L.state === 'strike' || L.state === 'flee') && L.fade > .05;
-        st.chase.t -= dt;
+        const L = st.chase.L, live = L && (L.state === 'rob' || L.state === 'strike' || L.state === 'flee' || L.state === 'hide') && L.fade > .05;
+        st.chase.t -= dt; if (L && L.tagged) st.chase.t = Math.max(st.chase.t, 2);   // a tagged mugger is followed until the bikes have them
         if (!live || st.chase.t <= 0){ st.chase = null; st.mode = st.way.length ? 'fly' : 'home'; st.target = null; st.climb = null; }
         else {
           _to.set(L.x, 0, L.z);
           const alt = Math.max(cruiseTo(g.position, _to) - .6, restPos.y + 1.2);
           const tgt = new THREE.Vector3(L.x, alt, L.z), far = Math.hypot(L.x - g.position.x, L.z - g.position.z);
           goToward(tgt, dt, far > 3 ? 3.4 : 2.6);
-          if (far < 2.5){ light = 1; st.redOn = Math.min(1, (st.redOn || 0) + dt*3); st.aim = L; }
+          if (far < 2.5){ light = 1; st.redOn = Math.min(1, (st.redOn || 0) + dt*3); st.aim = L;
+            // held in the red light for five seconds, the mugger is tagged: the bikes know who they're after
+            if (st.redOn > .5 && !L.tagged){ st.chase.lock = (st.chase.lock || 0) + dt; if (st.chase.lock >= 5){ L.tagged = true; if (crew && crew.onTag) crew.onTag(L); } } }
+          else st.chase.lock = 0;
         }
       } else if (st.mode === 'fly' || st.mode === 'home'){
         if (st.chase && st.mode === 'fly'){ st.mode = 'chase'; st.target = null; st.climb = null; }
@@ -1522,6 +1534,123 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
     dispose(){ scene.remove(g, cone, spot); coneMat.dispose(); cone.geometry.dispose(); spot.material.dispose(); red.lm.dispose(); blue.lm.dispose(); red.sp.material.dispose(); blue.sp.material.dispose(); }
   };
 }
+/* ---------- the police hoverbikes ---------- */
+// One per drone, parked in the bays in front of the station. Now and then an officer takes one out on a patrol of
+// the streets. When a drone is sent to a mugging, two bikes rush to the spot and search round it; if the drone holds
+// the mugger in its red light for five seconds they're tagged, and the bikes run them down. The one that gets there
+// first takes the mugger back to the station on its pillion and they go in; the other patrols the area a while.
+// The bike is a billboard picked from eight drawn views by its heading; the officer (and passenger) are drawn by
+// people.js from POLICE_BIKES.
+const PBIKE_VIEWS = ['r2c1', 'r1c4', 'r2c3', 'r2c4', 'r1c1', 'r1c2', 'r1c3', 'r2c2'];   // nose away, away-right, right, ... going clockwise
+const PBIKE_TEX = PBIKE_VIEWS.map(n => { const t = new THREE.TextureLoader().load('assets/sprites/pbike_' + n + '.png'); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; });
+const PBIKE_SIZE = { r1c1: [14, 17], r1c2: [24, 17], r1c3: [26, 16], r1c4: [23, 18], r2c1: [14, 18], r2c2: [19, 18], r2c3: [26, 16], r2c4: [24, 18] };
+let POLICE_BIKES = [];
+const BIKE_Y = CURB + .28, BIKE_K = .8, BIKE_SEAT = .26;   // hover height; the rider's seat above the bike's base
+function policeBike(m, idx, pad){
+  const mat = new THREE.SpriteMaterial({ map: PBIKE_TEX[0], alphaTest: .5, transparent: false });
+  const spr = new THREE.Sprite(mat); spr.center.set(.5, 0); spr.layers.set(1); spr.renderOrder = 2; scene.add(spr);
+  const hum = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0x4aa8ff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: .55 }));
+  hum.layers.set(1); hum.scale.set(.9, .45, 1); scene.add(hum);
+  // the siren: a red and blue glow that swaps over while they're on a call
+  const siren = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff2030, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
+  siren.layers.set(1); siren.scale.set(.7, .7, 1); scene.add(siren);
+  const b = { idx, pad, x: pad.x, z: pad.z, y: CURB + .08, hx: pad.fx, hz: pad.fz, mode: 'park', timer: 40 + idx*25 + Math.random()*60,
+              path: null, s: 0, speed: 1.6, rider: false, passenger: null, alpha: 1, target: null, until: 0, spr, hum, siren, mat };
+  // follow a path of [x, z] points
+  b.go = (pts, speed) => { const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1])); b.path = { pts, cum, len: cum[cum.length - 1] }; b.s = 0; b.speed = speed; };
+  return b;
+}
+const nearNode = (x, z) => { let best = null, bd = Infinity; for (const c of (typeof patrolNodes !== 'undefined' ? patrolNodes : [])){ const d = (c.x - x)**2 + (c.z - z)**2; if (d < bd){ bd = d; best = c; } } return best; };
+function bikeRoute(b, tx, tz, speed, direct){
+  const a = nearNode(b.x, b.z), c = nearNode(tx, tz);
+  let mid = a && c && typeof route === 'function' ? route(a.node, c.node) : null;
+  if (!mid) mid = [];
+  b.go([[b.x, b.z]].concat(mid, direct ? [[tx, tz]] : []), speed);
+}
+function policeBikes(m, crew){
+  const pads = m.bikePads || [], n = Math.min(pads.length, crew.size);
+  const bikes = []; for (let k = 0; k < n; k++) bikes.push(policeBike(m, k, pads[k]));
+  POLICE_BIKES = bikes;
+  const home = b => { bikeRoute(b, b.pad.x + b.pad.fx*1.2, b.pad.z + b.pad.fz*1.2, b.passenger ? 2.4 : 1.8, true); b.path.pts.push([b.pad.x, b.pad.z]); b.go(b.path.pts, b.speed); b.mode = 'home'; };
+  const sweep = (b, cx, cz, r, speed) => { const near = (typeof patrolNodes !== 'undefined' ? patrolNodes : []).filter(c => Math.hypot(c.x - cx, c.z - cz) < r);
+    if (!near.length) return false; const t = near[Math.floor(Math.random()*near.length)]; bikeRoute(b, t.x, t.z, speed); return true; };
+  let caseL = null;
+  const api = {
+    bikes,
+    // a drone has gone to a mugging: two bikes come to the spot
+    alert(L){ const free = bikes.filter(b => !b.case).sort((p, q) => Math.hypot(p.x - L.x, p.z - L.z) - Math.hypot(q.x - L.x, q.z - L.z)).slice(0, 2);
+      if (!free.length) return; caseL = L;
+      for (const b of free){ b.case = L; b.rider = true; b.mode = 'rush'; bikeRoute(b, L.x, L.z, 3.2); b.until = performance.now() + 50000; } },
+    // the drone has tagged them: the case bikes run them down
+    onTag(L){ for (const b of bikes) if (b.case === L){ b.mode = 'pursue'; b.repath = 0; } },
+    update(dt, time){
+      const now = performance.now();
+      for (const b of bikes){
+        const L = b.case;
+        if (b.mode === 'park'){
+          b.rider = false; b.timer -= dt;
+          if (b.timer <= 0){ b.timer = 70 + Math.random()*90;   // out on patrol: a few crossings somewhere in the city, then back
+            const nodes = typeof patrolNodes !== 'undefined' ? patrolNodes : [];
+            if (nodes.length && bikes.filter(q => q.mode !== 'park').length < 2){ b.rider = true; b.mode = 'patrol'; b.legs = 3 + Math.floor(Math.random()*3); const t = nodes[Math.floor(Math.random()*nodes.length)]; bikeRoute(b, t.x, t.z, 1.7); } }
+        }
+        // moving along the path
+        if (b.path && b.mode !== 'park' && b.mode !== 'enter'){
+          b.s = Math.min(b.path.len, b.s + dt*b.speed);
+          const P = b.path; let k = 1; while (k < P.cum.length - 1 && P.cum[k] < b.s) k++;
+          const a = P.pts[k - 1], c = P.pts[k] || a, seg = P.cum[k] - P.cum[k - 1] || 1, u = Math.min(1, (b.s - P.cum[k - 1])/seg);
+          b.x = a[0] + (c[0] - a[0])*u; b.z = a[1] + (c[1] - a[1])*u;
+          const dx = c[0] - a[0], dz = c[1] - a[1], l = Math.hypot(dx, dz); if (l > 1e-3){ const tx = dx/l, tz = dz/l; b.hx += (tx - b.hx)*Math.min(1, dt*6); b.hz += (tz - b.hz)*Math.min(1, dt*6); }
+          b.y += (BIKE_Y - b.y)*Math.min(1, dt*3);
+        }
+        const done = !b.path || b.s >= b.path.len - 1e-3;
+        if (b.mode === 'patrol' && done){ if (--b.legs > 0) sweep(b, b.x, b.z, 14, 1.7) || home(b); else home(b); }
+        else if (b.mode === 'rush' && done){ b.mode = 'search'; sweep(b, L ? L.x : b.x, L ? L.z : b.z, 6, 2.0); }
+        else if (b.mode === 'search'){
+          if (done) sweep(b, L ? L.x : b.x, L ? L.z : b.z, 6, 2.0);
+          if (now > b.until || !L || L.state === 'away'){ b.case = null; home(b); }
+        }
+        else if (b.mode === 'pursue'){
+          if (!L || L.state === 'away' || L.state === 'caught'){ if (L && L.state === 'caught' && L.bike !== b){ b.mode = 'guard'; b.until = now + 45000; sweep(b, b.x, b.z, 6, 1.6); } else { b.case = null; home(b); } }
+          else {
+            const d = Math.hypot(L.x - b.x, L.z - b.z);
+            if (d < .45){ L.state = 'caught'; L.bike = b; b.passenger = L; b.case = null; home(b); }   // got them: onto the pillion
+            else if (d < 1.4){ b.go([[b.x, b.z], [L.x, L.z]], 3.4); }   // close: straight at them
+            else if ((b.repath -= dt) <= 0){ b.repath = 1.2; bikeRoute(b, L.x, L.z, 3.4, true); }
+          }
+        }
+        else if (b.mode === 'guard'){ if (done) sweep(b, b.x, b.z, 7, 1.5); if (now > b.until){ b.case = null; home(b); } }
+        else if (b.mode === 'home' && done){
+          b.x = b.pad.x; b.z = b.pad.z; b.hx = b.pad.fx; b.hz = b.pad.fz;
+          if (b.passenger){ b.mode = 'enter'; b.t = 0; } else { b.mode = 'park'; b.rider = false; }
+        }
+        else if (b.mode === 'enter'){   // the officer takes the mugger in: both fade through the station doors
+          // they get off and walk to the door together (people.js draws the walk from b.walkIn), fading in the doorway
+          const door = m.stationDoor || b.pad, dist = Math.hypot(door.x - b.pad.x, door.z - b.pad.z), dur = dist/.9;
+          b.t += dt; b.walkIn = { x0: b.pad.x, z0: b.pad.z, x1: door.x, z1: door.z, u: Math.min(1, b.t/dur) };
+          b.alpha = Math.max(0, Math.min(1, 1 - (b.t - dur + .5)/.6));
+          if (b.t > dur + .15){ b.walkIn = null; const Lp = b.passenger; if (Lp){ Lp.state = 'away'; Lp.tagged = false; Lp.bike = null; Lp.until = (typeof pplNow !== 'undefined' ? pplNow : 0) + 400 + Math.random()*400; Lp.x = Lp.home.x; Lp.z = Lp.home.z; }
+            b.passenger = null; b.rider = false; b.alpha = 1; b.mode = 'park'; }
+        }
+        if (b.mode === 'park') b.y += (CURB + .08 - b.y)*Math.min(1, dt*2);
+        // the sprite: the view that matches the heading as the camera sees it
+        const ax = b.hx*_bkR.x + b.hz*_bkR.z, az = -(b.hx*_bkF.x + b.hz*_bkF.z);
+        const oct = ((Math.round(Math.atan2(ax, az)/(Math.PI/4)) % 8) + 8) % 8, view = PBIKE_VIEWS[oct], [w, h] = PBIKE_SIZE[view];
+        b.mat.map = PBIKE_TEX[oct]; b.mat.color.copy(FOL_UNI.tint.value);
+        const bob = b.mode === 'park' ? 0 : Math.sin(time*3 + b.idx)*.02;
+        b.spr.position.set(b.x, b.y + bob, b.z); b.spr.scale.set(w/PX*BIKE_K, h/PX*BIKE_K, 1);
+        b.hum.position.set(b.x, b.y - .02, b.z); b.hum.material.opacity = (b.mode === 'park' ? .15 : .5)*(.85 + .15*Math.sin(time*20 + b.idx));
+        b.ry = b.y + bob;
+        const call = b.mode === 'rush' || b.mode === 'pursue' || b.mode === 'search' || (b.passenger && b.mode === 'home');
+        const ph = (time*2.4 + b.idx*.37) % 1, flash = (time*15) % 1 < .6;
+        b.siren.material.color.setHex(ph < .5 ? 0xff2030 : 0x2a6cff); b.siren.material.opacity = call && flash ? .85*b.alpha : 0;
+        b.siren.position.set(b.x - b.hx*.15, b.ry + h/PX*BIKE_K*.8, b.z - b.hz*.15);
+      }
+    },
+    dispose(){ for (const b of bikes){ scene.remove(b.spr, b.hum, b.siren); b.mat.dispose(); b.hum.material.dispose(); b.siren.material.dispose(); if (b.passenger){ b.passenger.state = 'away'; b.passenger = null; } } POLICE_BIKES = []; },
+  };
+  return api;
+}
+const _bkR = new THREE.Vector3(), _bkF = new THREE.Vector3();
 let policeDroneAlert = null, policeCrew = null;   // set while the station stands (people.js calls the alert at a mugging)
 function policeFx(m){
   if (!wantedTex){ wantedTex = new THREE.TextureLoader().load('assets/sprites/wanted.png'); wantedTex.magFilter = wantedTex.minFilter = THREE.NearestFilter; wantedTex.generateMipmaps = false; }
@@ -1588,11 +1717,16 @@ function policeFx(m){
   const pads = m.dronePads || [m.dronePad];
   for (let k = 0; k < Math.min(m.droneN || 1, pads.length); k++){ const d = policeDrone(m, k, pads[k], crew); drones.push(d); parts.push(d.g); }
   // now and then a drone is sent to a mugging: the nearest one that's free, unless they're all busy
+  crew.size = drones.length;
+  const bikes = policeBikes(m, crew);
+  crew.onTag = L => bikes.onTag(L);
   policeDroneAlert = L => {
     if (Math.random() > .7) return false;
     const free = drones.filter(d => !d.busy); if (!free.length) return false;
     free.sort((a, b) => Math.hypot(a.pos.x - L.x, a.pos.z - L.z) - Math.hypot(b.pos.x - L.x, b.pos.z - L.z));
-    return free[0].scramble(L);
+    const sent = free[0].scramble(L);
+    if (sent) bikes.alert(L);   // and two bikes come to the spot
+    return sent;
   };
   policeCrew = crew;
   const drone = drones[0];
@@ -1611,9 +1745,11 @@ function policeFx(m){
       red.b.visible = red.s2.visible = a && flash; blue.b.visible = blue.s2.visible = !a && flash;
       head.rotation.y = time*.55;
       for (const d of drones) d.update(dt, time);
+      _bkR.set(1, 0, 0).applyQuaternion(cam.quaternion); _bkF.set(0, 0, -1).applyQuaternion(cam.quaternion); _bkF.y = 0; _bkF.normalize();
+      bikes.update(dt, time);
       scanMat.color.setRGB(.22, .9, .88).multiplyScalar(.45 + .55*Math.abs(Math.sin(time*3)));
     },
-    dispose(){ for (const p of parts){ scene.remove(p); if (p !== radar && !drones.some(d => d.g === p)) p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } scanMat.dispose(); for (const d of drones) d.dispose(); policeDroneAlert = null; policeCrew = null; }
+    dispose(){ for (const p of parts){ scene.remove(p); if (p !== radar && !drones.some(d => d.g === p)) p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } scanMat.dispose(); for (const d of drones) d.dispose(); bikes.dispose(); policeDroneAlert = null; policeCrew = null; }
   };
 }
 

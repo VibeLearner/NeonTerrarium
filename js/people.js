@@ -899,7 +899,10 @@ const isNight = h => h >= 20 || h < 5;
 function syncLurkers(){
   const keep = new Set();
   for (const c of cells.values()){
-    if (!c.dark) continue;
+    // the dark streets always have one; now and then an ordinary, well-lit street gets one too (rarely out, and
+    // quick to give up)
+    const rare = !c.dark && !!c.sections.length && !c.mega && hash('lurk2', c.i, c.j) % 12 === 0;
+    if (!c.dark && !rare) continue;
     const k = ckey(c.i, c.j); keep.add(k);
     const G = cellGrid(c);
     // a corner of the plot's street that's clear (and stays the same every time)
@@ -907,8 +910,9 @@ function syncLurkers(){
     for (let q = 0; q < 4 && !spot; q++){ const [sx, sz] = CORNERS[(h + q) % 4]; spot = approachFor(G, c.x + sx*1.55, c.z + sz*1.55, -sx, -sz); }
     const old = lurkers.get(k);
     if (!spot){ lurkers.delete(k); continue; }
-    if (old){ old.home = spot; continue; }
-    lurkers.set(k, { key: k, cell: c, home: spot, x: spot.x, z: spot.z, state: 'away', until: pplNow + 10 + Math.random()*40, row: 9 + h % 3, flip: 1, phase: Math.random()*10, fade: 0 });
+    if (old){ old.home = spot; old.rare = rare; continue; }
+    lurkers.set(k, { key: k, cell: c, home: spot, x: spot.x, z: spot.z, state: 'away', rare,
+                     until: pplNow + (rare ? 200 + Math.random()*700 : 10 + Math.random()*40), row: 9 + h % 3, flip: 1, phase: Math.random()*10, fade: 0 });
   }
   for (const k of [...lurkers.keys()]) if (!keep.has(k)) lurkers.delete(k);
 }
@@ -919,11 +923,12 @@ function updateLurkers(dt, t){
     switch (L.state){
       case 'away':      // not out (daytime, or lying low after a job)
         L.fade = Math.max(0, L.fade - dt*2);
-        if (night && t >= L.until){ L.state = 'lurk'; L.x = L.home.x; L.z = L.home.z; L.until = t + 4; }
+        if (night && t >= L.until){ L.state = 'lurk'; L.x = L.home.x; L.z = L.home.z; L.until = t + 4; L.out = t; }
         break;
       case 'lurk': {    // loitering on the corner, waiting for someone alone
         L.fade = Math.min(1, L.fade + dt*1.5);
         if (!night){ L.state = 'away'; L.until = t + 5; break; }
+        if (L.rare && t - L.out > 60){ L.state = 'away'; L.until = t + 300 + pplRand()*600; break; }   // a lit street: gives up soon
         if (t < L.until) break;
         L.until = t + .5;
         let victim = null;
@@ -934,7 +939,7 @@ function updateLurkers(dt, t){
           if (pplList.some(o => o.cop && (o.x - p.x)**2 + (o.z - p.z)**2 < 64)) continue;                      // police nearby
           victim = p; break;
         }
-        if (victim && pplRand() < .5){ L.state = 'strike'; L.victim = victim; victim.pause = t + 4; emote(victim, 'bang', 1.6); L.t0 = t; }
+        if (victim && pplRand() < (L.rare ? .3 : .5)){ L.state = 'strike'; L.victim = victim; victim.pause = t + 4; emote(victim, 'bang', 1.6); L.t0 = t; }
         else if (victim) L.until = t + 20;   // thought better of it
         break;
       }
@@ -964,19 +969,28 @@ function updateLurkers(dt, t){
           const near = patrolNodes.length ? patrolNodes.reduce((b, c) => (c.x - L.x)**2 + (c.z - L.z)**2 < (b.x - L.x)**2 + (b.z - L.z)**2 ? c : b) : null;
           const to = far.length ? far[Math.floor(pplRand()*far.length)] : null, mid = near && to ? route(near.node, to.node) : null;
           L.walk = mid ? walkOf([[L.x, L.z]].concat(mid), {}) : null;
-          L.victim = null; L.state = L.walk ? 'flee' : 'away'; L.until = t + 90 + pplRand()*120;
+          L.victim = null; L.state = L.walk ? 'flee' : L.tagged ? 'hide' : 'away'; L.until = t + (L.rare ? 400 + pplRand()*500 : 90 + pplRand()*120);
         }
         break;
       }
       case 'flee': {
         const w = L.walk; w.s += dt*2.0;
-        if (w.s >= w.len){ L.state = 'away'; L.walk = null; break; }
+        if (w.s >= w.len){ L.walk = null;
+          // tagged by a drone: no melting away now, they crouch in a doorway and wait for it to blow over
+          if (L.tagged){ L.state = 'hide'; L.fade = 1; L.hideUntil = t + 60; } else L.state = 'away';
+          break; }
         let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
         const a = w.pts[k - 1], c = w.pts[k], seg = w.cum[k] - w.cum[k - 1] || 1, u = (w.s - w.cum[k - 1])/seg;
         L.x = a[0] + (c[0] - a[0])*u; L.z = a[1] + (c[1] - a[1])*u; L.dx = c[0] - a[0]; L.dz = c[1] - a[1];
-        L.fade = Math.min(1, (w.len - w.s)/.8);   // melts into the dark at the end
+        L.fade = L.tagged ? 1 : Math.min(1, (w.len - w.s)/.8);   // melts into the dark at the end
         break;
       }
+      case 'hide':      // tagged and lying low; if the bikes don't find them in time, they slip away
+        if (t > L.hideUntil){ L.tagged = false; L.state = 'away'; }
+        break;
+      case 'caught':    // riding to the station on the back of a police bike (moved and drawn with the bike)
+        if (L.bike){ L.x = L.bike.x; L.z = L.bike.z; }
+        break;
     }
   }
 }
@@ -1153,11 +1167,29 @@ function updatePeople(dt, t){
   lawnHolos(); lawnPicnics(dt);
   // lurkers on the dark streets
   for (const L of lurkers.values()){
-    if (L.fade <= 0) continue;
+    if (L.fade <= 0 || L.state === 'caught') continue;
     if (L.dx !== undefined){ const sd = L.dx*_camR.x + L.dz*_camR.z; if (Math.abs(sd) > 1e-3) L.flip = sd < 0 ? -1 : 1; }
     const fr = L.state === 'strike' || L.state === 'flee' ? Math.floor(t*16 + L.phase) % PPL.walk
              : L.state === 'rob' ? F_SPEC + Math.floor(t*7) % 6 : F_IDLE + Math.floor(t*2 + L.phase) % PPL.idle;
     emit(L.x, CURB, L.z, L.row, fr, L.flip, L.fade >= 1 ? 1 : L.fade*.98);
+  }
+  // the police hoverbikes: the officer astride, and anyone they've picked up on the pillion behind
+  if (typeof POLICE_BIKES !== 'undefined') for (const b of POLICE_BIKES){
+    if (!b.rider || b.alpha <= 0) continue;
+    const a0 = b.alpha >= 1 ? 1 : b.alpha*.98;
+    if (b.walkIn){   // off the bike and walking into the station, the officer leading the mugger by the arm
+      const W = b.walkIn, dx = W.x1 - W.x0, dz = W.z1 - W.z0, l = Math.hypot(dx, dz) || 1, x = W.x0 + dx*W.u, z = W.z0 + dz*W.u;
+      const sd = dx*_camR.x + dz*_camR.z, fl = Math.abs(sd) > 1e-3 ? (sd < 0 ? -1 : 1) : 1, fr = Math.floor(t*9) % PPL.walk;
+      emit(x, CURB, z, ROW_COP, fr, fl, a0);
+      if (b.passenger) emit(x - dx/l*.32, CURB, z - dz/l*.32, b.passenger.row, (fr + 3) % PPL.walk, fl, a0);
+      continue;
+    }
+    const sd = b.hx*_camR.x + b.hz*_camR.z; if (Math.abs(sd) > .15) b.flip = sd < 0 ? -1 : 1;
+    const ox = -_bkF.x*.06, oz = -_bkF.z*.06;   // a touch nearer the camera than the bike sprite
+    const y = b.ry + BIKE_SEAT, a = a0;
+    if (b.passenger){ const L = b.passenger;
+      emit(b.x - b.hx*.24 - _bkF.x*.03, y + .03, b.z - b.hz*.24 - _bkF.z*.03, L.row, F_SIT, b.flip || 1, a); }
+    emit(b.x + b.hx*.06 + ox, y, b.z + b.hz*.06 + oz, ROW_COP, F_SIT, b.flip || 1, a);
   }
   // delivery bots and their parcels
   for (const b of bots){

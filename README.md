@@ -101,8 +101,14 @@ koi, the drone, the screens) switch on at the end.
   awnings and bright painted signboards, produce stalls spilling onto the two street sides, a terraced upper floor
   with lantern strings, laundry and plants, glass barrel vaults lit warm from inside, a blue tarp over a rooftop
   cafe, solar panels and a dish, and the rainbow sign on an arch at the very top.
+- **Cloud Pagoda:** a 5x4 block (either way round), a size down from the foundry and the tallest building after
+  its chimney. Arrives with the 60th luxury building (each plot with a luxury section counts once). A white stepped
+  palace: a podium with stairs between two wings, four rounded glass-walled terraces with cyan-lit slabs and
+  swept-up corners, Japanese gardens on every terrace (bonsai pines, bamboo, mossy rocks, lily ponds, stone
+  lanterns) with glass domes, white piers with gold chevrons, hover cars on cantilevered pads, and on top a
+  two-tier white pagoda roof with gold hips and a gold spire.
 - New megastructures go in `MEGA_TYPES` at the top of `js/mega.js` (requirement, odds, footprint, max tiers).
-- For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall), **B** (town square), **V** (foundry), **C** (police station) or **X** (market mall)
+- For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall), **B** (town square), **V** (foundry), **C** (police station), **X** (market mall) or **P** (cloud pagoda)
   to bring it in, or remove it, next to the plot under the pointer, skipping the requirement and the odds.
 
 ## People

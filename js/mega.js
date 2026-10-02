@@ -19,18 +19,21 @@ const MEGA_TYPES = {
            colour: '#ff8a2a', build: buildFoundry },
   market: { name: 'Rainbow Plaza market mall', need: { midPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives with the 30th commercial building
            colour: '#ff7ab8', build: buildMarketMall },
+  pagoda: { name: 'Cloud Pagoda', need: { highPlots: 60 }, odds: 1, w: 5, h: 4, maxLevels: 1,   // arrives with the 60th luxury building
+           colour: '#8ff0ff', build: buildCloudPagoda },
 };
 const megas = new Map();   // kind -> { kind, i, j, w, h, levels, seed, x, z, data, view, roofH, top, cells }
 
 // how many building sections of each zone stand in the city
 function zoneCounts(){
-  // per zone: building sections; any: buildings of any zone; lowPlots, midPlots: residential and commercial
-  // buildings (each built plot counts once)
-  const n = { low: 0, mid: 0, high: 0, ind: 0, any: 0, lowPlots: 0, midPlots: 0 };
+  // per zone: building sections; any: buildings of any zone; lowPlots, midPlots, highPlots: residential, commercial
+  // and luxury buildings (each built plot counts once)
+  const n = { low: 0, mid: 0, high: 0, ind: 0, any: 0, lowPlots: 0, midPlots: 0, highPlots: 0 };
   for (const c of cells.values()){
     if (c.sections.length) n.any++;
     if (c.sections.some(s => s.zone === 'low')) n.lowPlots++;
     if (c.sections.some(s => s.zone === 'mid')) n.midPlots++;
+    if (c.sections.some(s => s.zone === 'high')) n.highPlots++;
     for (const s of c.sections) if (n[s.zone] !== undefined) n[s.zone]++;
   }
   return n;
@@ -310,13 +313,14 @@ function buildRadioStation(m){
 }
 
 // for trying things out: open the game with #dev in the address, point at a plot and press M for the radio
-// station, N the sky mall, B the town square, V the foundry, C the police station, X the market mall (each key
+// station, N the sky mall, B the town square, V the foundry, C the police station, X the market mall, P the cloud
+// pagoda (each key
 // brings it in, or removes it if it's already there; ignores the requirement and the odds)
 if (location.hash.includes('dev')){
   let lastPointer = null;
   addEventListener('pointermove', e => { lastPointer = { x: e.clientX, y: e.clientY }; });
   addEventListener('keydown', e => {
-    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police', x: 'market' }[e.key.toLowerCase()]; if (!kind) return;
+    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police', x: 'market', p: 'pagoda' }[e.key.toLowerCase()]; if (!kind) return;
     const pk = lastPointer ? pickAt(lastPointer.x, lastPointer.y) : null;
     const c = pk && pk.c ? pk.c : pk && pk.kind === 'sky' ? { i: pk.i, j: pk.j } : cells.values().next().value;
     if (megas.has(kind)) removeMega(megas.get(kind));
@@ -1665,4 +1669,178 @@ function buildMarketMall(m){
   for (const [F, len] of mkFaces(P, cx1, cz1, w1 + .2, d1 + .2)) for (let t = -len/2 + .4; t < len/2 - .3; t += rnd(.8, 1.7)) if (chance(.3)) plant(pick(['vines','pothos','h_ivy','h_vine3','h_curtain1','h_heart']), F, t, y1 + h1 + .12, .03, rnd(.8, 1.1), 't', true);
   m.roofH = yT;
   m.top = yA + ax + .4;
+}
+
+/* ---------- the cloud pagoda ---------- */
+// A luxury megastructure on a 5x4 block, after the reference: a white stepped palace climbing to a two-tier pagoda.
+// A raised podium with stairs up the front between two wings, then four rounded terraced levels, each a floor of
+// glass lit warm under a white slab with a thin cyan light line and corners swept up like eaves. Every terrace is a
+// Japanese garden: bonsai pines, bamboo, mossy rocks, lily ponds and stone lanterns behind a glass rail, with glass
+// domes on the terraces. White piers carry gold chevron frames; on top, a lit hall under a white pagoda roof with
+// upturned corners and gold hips, a smaller hall and roof above it, and a gold spire. Hover cars are parked on pads
+// cantilevered off the podium. Its front is local +z; the long side runs along x.
+M.pgPine = toon(0x3c6638, { flat:1 }); M.pgPine2 = toon(0x557f48, { flat:1 }); M.pgRock = toon(0xbfc2bc, { flat:1 }); M.pgRock2 = toon(0x9ea29c, { flat:1 });
+M.pgMoss = toon(0x6f9a48, { flat:1 }); M.pgGoldLit = toon(0xb98a3a, { em:0x6a4a18, kind:'trim' });
+// a bonsai pine: a leaning, bending trunk and flat pads of needles
+function pgPine(P, x, y, z, s = 1){
+  const dir = rnd(0, TAU), lean = rnd(.15, .45)*s, h = rnd(.85, 1.2)*s;
+  let px = x, py = y, pz = z;
+  for (let k=1; k<=3; k++){
+    const u = k/3, bend = Math.sin(u*PI*.8)*lean, nx = x + Math.cos(dir)*bend + Math.cos(dir + 1.6)*(k === 2 ? .08*s : 0), nz = z + Math.sin(dir)*bend, ny = y + h*u;
+    strut(M.trunk, P, px, py, pz, nx, ny, nz, .07*s*(1.15 - u*.4));
+    if (k > 1) for (let q=0; q<2; q++) blob(chance(.5) ? M.pgPine : M.pgPine2, P, nx + rnd(-.22, .22)*s, ny + rnd(-.02, .08)*s, nz + rnd(-.22, .22)*s, rnd(.2, .3)*s, .38);
+    px = nx; py = ny; pz = nz;
+  }
+  blob(M.pgPine2, P, px, py + .1*s, pz, .2*s, .45);
+}
+function pgRocks(P, x, y, z){
+  for (let k=0; k<irand(2, 3); k++){ const rx = x + rnd(-.18, .18), rz = z + rnd(-.18, .18); blob(chance(.6) ? M.pgRock : M.pgRock2, P, rx, y + .07, rz, rnd(.1, .2), .7); if (chance(.6)) blob(M.pgMoss, P, rx, y + .15, rz, rnd(.07, .11), .4); }
+  for (let k=0; k<3; k++) blob(M.pgMoss, P, x + rnd(-.3, .3), y + .02, z + rnd(-.3, .3), rnd(.08, .14), .35);
+}
+function pgLantern(P, x, y, z, s = 1){
+  box(M.pgRock, P, x, y + .04*s, z, .22*s, .08*s, .22*s); cyl(M.pgRock, P, x, y + .22*s, z, .04*s, .3*s);
+  box(M.pgRock, P, x, y + .4*s, z, .2*s, .04*s, .2*s); box(M.bulb, P, x, y + .5*s, z, .13*s, .14*s, .13*s); glow(P, x, y + .5*s, z, 'warm', .6*s);
+  put(U.cone, M.pgRock, under(P, T(x, y + .64*s, z, PI/4, .36*s, .14*s, .36*s))); sph(M.pgRock, P, x, y + .74*s, z, .035*s);
+}
+function pgBamboo(P, x, y, z){ for (let k=0; k<irand(3, 5); k++) plant('bamboo', P, x + rnd(-.2, .2), y, z + rnd(-.2, .2), rnd(.8, 1.15)); blob(M.pgMoss, P, x, y + .02, z, .2, .3); }
+// a pagoda roof: a square hip roof with concave slopes and corners that sweep up, white, scaled to W x D x H
+U.pgRoof = (() => {
+  const g = new THREE.CylinderGeometry(.12, 1, 1, 32, 8, true), p = g.attributes.position;
+  for (let k=0; k<p.count; k++){
+    const x = p.getX(k), z = p.getZ(k), t = p.getY(k) + .5, a = Math.atan2(z, x), c = Math.cos(a), s = Math.sin(a), m = Math.max(Math.abs(c), Math.abs(s));
+    const r = (.1 + .9*Math.pow(1 - t, 1.6))/m, corner = 1 - (m - Math.SQRT1_2)/(1 - Math.SQRT1_2);
+    p.setXYZ(k, c*r, t + Math.pow(corner, 2.5)*.32*Math.pow(1 - t, 3), s*r);
+  }
+  g.computeVertexNormals(); return g.toNonIndexed();
+})();
+function pgRoof(P, x, y, z, W, D, H){
+  lxPlate(M.lxWhite2, P, x, y - .06, z, W*.9, D*.9, .1, .08);                                    // the soffit
+  put(U.pgRoof, M.lxWhite, under(P, T(x, y, z, 0, W/2, H, D/2)));
+  for (const [sx, sz] of CORNERS){                                                                // gold hips and eaves
+    const cx = sx*W/2, cz = sz*D/2;
+    strut(M.gold, P, x + cx, y + H*.33, z + cz, x + cx*.62, y + H*.12, z + cz*.62, .06);
+    strut(M.gold, P, x + cx*.62, y + H*.12, z + cz*.62, x + cx*.12, y + H*.97, z + cz*.12, .06);
+    box(M.gold, P, x + cx, y + H*.33 + .05, z + cz, .1, .1, .1);
+  }
+  for (const s of [-1, 1]){ box(M.pgGoldLit, P, x, y + .03, z + s*(D/2 - .02), W*.72, .05, .05); box(M.pgGoldLit, P, x + s*(W/2 - .02), y + .03, z, .05, .05, D*.72); }
+}
+// a white pier with a gold chevron frame (the reference's big gold M and V shapes); local +z faces out
+function pgPier(P, x, y, z, h, ry, w = 1.1){
+  const Q = under(P, T(x, y, z, ry));
+  box(M.lxWhite, Q, 0, h/2, 0, w, h, .5);
+  for (const s of [-1, 1]){ strut(M.gold, Q, s*(w/2 - .1), h - .12, .26, 0, h*.35, .26, .07); box(M.gold, Q, s*(w/2 - .1), h/2, .26, .07, h - .2, .05); }
+  box(M.gold, Q, 0, h - .1, .26, w - .12, .07, .05);
+  box(M.lxRoom, Q, 0, h*.2, .25, w*.45, h*.36, .02);
+}
+// a swept-up corner on a slab, like an eave; Q's local +x points out from the corner
+function pgFlare(P, x, y, z, ang){
+  const Q = under(P, T(x, y, z, ang)), pts = [[-.25, -.1], [.15, -.08], [.45, -.02], [.7, .12], [.85, .3]];
+  lxBand(M.lxWhite, Q, pts, .55, .12, 0); lxBand(M.lxLine, Q, lxOffset(pts, -.065), .06, .02, 0);
+}
+// a car pad cantilevered from the podium, two cars and a charging post on it; local +z points out
+function pgPad(P, x, y, z, ry){
+  const Q = under(P, T(x, y, z, ry));
+  lxPlate(M.lxWhite2, Q, 0, -.12, .8, 1.7, 2.0, .25, .12);
+  for (const s of [-1, 1]) box(M.lxLine, Q, s*.86, -.07, .8, .03, .03, 1.9); box(M.lxLine, Q, 0, -.07, 1.81, 1.6, .03, .03);
+  box(M.frame, Q, 0, -.005, .9, .03, .01, 1.5);
+  for (const s of [-1, 1]) lxCar(Q, s*.42, 0, 1.0, rnd(-.1, .1) + PI);
+  box(M.lxWhite, Q, .7, .25, .05, .14, .5, .14); box(M.lxLine, Q, .7, .4, .125, .08, .14, .02);
+  strut(M.lxWhite2, Q, 0, -.12, 1.4, 0, -.6, .1, .12);
+}
+function buildCloudPagoda(m){
+  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  const long = m.w >= m.h, L = Math.max(m.w, m.h)*LOT, D = Math.min(m.w, m.h)*LOT;
+  const P = T(m.x, 0, m.z, long ? pick([0, PI]) : pick([PI/2, -PI/2])), Y = CURB;
+  // ---- ground: pale paving
+  box(G.asph, P, 0, .012, 0, L, .025, D);
+  const nx = 25, nz = 20, sx = L/nx, sz = D/nz;
+  for (let a=0; a<nx; a++) for (let b=0; b<nz; b++) if (!chance(.03)) box(pick(TILES.high), P, -L/2 + (a + .5)*sx, .03, -D/2 + (b + .5)*sz, sx - .05, .045, sz - .05);
+  // ---- the podium, with stairs up the front between two wings
+  const pw = 17.6, pd = 12.4, pcz = -.6, ph = 1.2, pFront = pcz + pd/2, wing = .9, gap = 1.5;
+  lxPlate(M.lxWhite2, P, 0, Y, pcz, pw, pd, 1.2, ph);
+  lxPlate(M.lxLine, P, 0, Y + ph - .09, pcz, pw + .03, pd + .03, 1.21, .03);
+  for (const s of [-1, 1]){
+    const ww = pw/2 - gap, wx = s*(gap + ww/2);
+    lxPlate(M.lxWhite2, P, wx, Y, pFront + wing/2 - .3, ww, wing + .6, .45, ph);
+    lxPlate(M.lxLine, P, wx, Y + ph - .09, pFront + wing/2 - .3, ww + .03, wing + .63, .46, .03);
+  }
+  const front = pFront + wing;
+  for (let k=0; k<8; k++){ const u = (k + .5)/8; box(M.lxWhite, P, 0, Y + ph*u/2, front - u*(wing + .3), 2*gap, ph*u, (wing + .3)/8 + .02); }   // stairs
+  for (const s of [-1, 1]){ box(M.lxWhite, P, s*(gap - .05), Y + ph/2 + .15, pFront + .1, .12, ph + .3, wing + .5); pgLantern(P, s*(gap + .35), Y + ph, front - .3, 1.1); }
+  // lit arched openings round the podium's face, gold framed
+  for (const [F, len, side] of mkFaces(P, 0, pcz, pw, pd)){
+    for (let t = -len/2 + 1.6; t < len/2 - 1.4; t += 1.7){
+      if (side === 'f') continue;   // the front is the wings and the stairs
+      box(M.lxRoom, F, t, Y + .5, .01, .7, .75, MIN_T); put(U.cyl16, M.lxRoom, under(F, T(t, Y + .87, .01, 0, .7, MIN_T, .7, PI/2)));
+      box(M.gold, F, t - .38, Y + .5, .04, .05, .78, .05); box(M.gold, F, t + .38, Y + .5, .04, .05, .78, .05);
+    }
+  }
+  // car pads off the sides and the front wings
+  pgPad(P, -pw/2 + .2, Y + ph, -2.6, -PI/2); pgPad(P, pw/2 - .2, Y + ph, 1.4, PI/2); pgPad(P, pw/2 - .2, Y + ph, -3.6, PI/2);
+  pgPad(P, -5.8, Y + ph, front - .2, 0); pgPad(P, 6.0, Y + ph, front - .2, 0);
+  // ---- the terraced levels
+  const lv = [];
+  for (let k=1; k<=4; k++) lv.push({ w: pw - k*2.7, d: pd - k*2.0, cz: pcz - k*.15, r: Math.max(.6, 1.3 - k*.15) });
+  const LH = 2.0;
+  let y = Y + ph;
+  const gardenRing = (outer, inner, yy, skip) => {   // a Japanese garden round a terrace, between its rim and the floor above
+    const mw = (outer.w + inner.w)/2, md = (outer.d + inner.d)/2, mz = (outer.cz + inner.cz)/2;
+    for (const p of lxRing(mw, md, (outer.r + inner.r)/2, .8)){
+      const x = p.x, z = mz + p.z; if (skip && skip(x, z)) continue;
+      const q = R();
+      if (q < .26) pgPine(P, x, yy, z, rnd(.8, 1.15)); else if (q < .42) pgBamboo(P, x, yy, z); else if (q < .62) pgRocks(P, x, yy, z);
+      else if (q < .72) lxPond(P, x, yy, z, rnd(.6, .9), rnd(.4, .55)); else if (q < .8) pgLantern(P, x, yy, z, .9);
+      else plant(pick(['bush','bushFlower','fern','g_fern2','bonsai']), P, x, yy, z, rnd(.6, .85));
+    }
+    lxRail(P, 0, yy, outer.cz, outer.w - .1, outer.d - .1, outer.r - .05);
+  };
+  // the podium's own garden, clear of the stairs
+  const floorOf = l => ({ w: l.w - 1.4, d: l.d - 1.2, cz: l.cz, r: Math.max(.3, l.r - .5) });
+  gardenRing({ w: pw, d: pd, cz: pcz, r: 1.2 }, floorOf(lv[0]), y, (x, z) => Math.abs(x) < gap + .9 && z > 0);
+  const domes = [];
+  lv.forEach((l, k) => {
+    const f = floorOf(l), h = LH - .2;
+    lxGlassFloor(P, 0, y, f.cz, f.w, f.d, f.r, h, null, .75);
+    lxPlate(M.lxWhite2, P, 0, y + h*.52, f.cz, f.w + .04, f.d + .04, f.r + .02, .05);   // a transom between the upper and lower panes
+    for (let x = -f.w/2 + .8; x < f.w/2 - .5; x += 1.6) glow(P, x, y + h*.6, f.cz + f.d/2 - .3, 'warm', .9);
+    // white piers with gold chevrons across the front (and one on each side)
+    pgPier(P, 0, y, f.cz + f.d/2 + .2, h, 0, 1.4 - k*.1);
+    if (k < 3) for (const s of [-1, 1]){ pgPier(P, s*f.w*.32, y, f.cz + f.d/2 + .2, h, 0, .9); pgPier(P, s*(f.w/2 + .2), y, f.cz, h, s*PI/2, 1.0); }
+    // curved white buttresses under the slab corners
+    for (const [sxx, szz] of CORNERS){ const Q = under(P, T(sxx*(f.w/2 - .3), y, f.cz + szz*(f.d/2 - .3), Math.atan2(-szz, sxx)));
+      const pts = []; for (let q=0; q<=8; q++){ const u = q/8; pts.push([Math.sin(u*PI/2)*.9, u*h]); } lxBand(M.lxWhite, Q, pts, .22, .16, 0); }
+    y += LH;
+    lxSlab(P, 0, y, l.cz, l.w, l.d, l.r, .22);
+    for (const [sxx, szz] of CORNERS) pgFlare(P, sxx*(l.w/2 - l.r*.3), y - .1, l.cz + szz*(l.d/2 - l.r*.3), Math.atan2(-szz, sxx));
+    // the terrace on top of this level: a garden round the next floor, domes on its sides
+    if (k < lv.length - 1){
+      const nf = floorOf(lv[k + 1]);
+      const dr = Math.min(1.3, (l.w - nf.w)/2 - .25);
+      if (k < 3 && dr > .5){ const side = k % 2 ? 1 : -1, dx = side*(nf.w/2 + dr + .05);
+        lxDome(P, dx, y, l.cz + rnd(-.6, .6), dr); domes.push([dx, l.cz]);
+        if (k === 0){ lxDome(P, -dx, y, l.cz - 1.2, dr*.8); domes.push([-dx, l.cz - 1.2]); } }
+      gardenRing(l, nf, y, (x, z) => domes.some(([dx, dz]) => Math.hypot(x - dx, z - dz) < dr + .5));
+    }
+  });
+  // ---- the pagoda on top: a lit hall, a wide roof, a smaller hall and roof, a gold spire
+  const top = lv[lv.length - 1], hw = top.w - 1.6, hd = top.d - 1.0;
+  lxRail(P, 0, y, top.cz, top.w - .1, top.d - .1, top.r - .05);
+  for (const [sxx, szz] of CORNERS) pgPine(P, sxx*(top.w/2 - .45), y, top.cz + szz*(top.d/2 - .4), .8);
+  lxGlassFloor(P, 0, y, top.cz, hw, hd, .1, 1.5, null, .6);
+  for (const [sxx, szz] of CORNERS) box(M.lxWhite, P, sxx*hw/2, y + .75, top.cz + szz*hd/2, .3, 1.5, .3);
+  pgPier(P, 0, y, top.cz + hd/2 + .1, 1.5, 0, 1.0);
+  y += 1.5;
+  box(M.lxWhite, P, 0, y + .06, top.cz, hw + .3, .12, hd + .3); box(M.lxLine, P, 0, y + .02, top.cz + (hd + .3)/2 + .005, hw + .3, .03, MIN_T);
+  pgRoof(P, 0, y + .12, top.cz, hw + 2.4, hd + 2.2, 1.6);
+  const y2 = y + .9, h2w = hw*.55, h2d = hd*.6;
+  lxGlassFloor(P, 0, y2, top.cz, h2w, h2d, .08, 1.2, null, .5);
+  for (const [sxx, szz] of CORNERS) box(M.lxWhite, P, sxx*h2w/2, y2 + .6, top.cz + szz*h2d/2, .22, 1.2, .22);
+  y = y2 + 1.2;
+  box(M.lxWhite, P, 0, y + .05, top.cz, h2w + .25, .1, h2d + .25);
+  pgRoof(P, 0, y + .1, top.cz, h2w + 2.0, h2d + 1.9, 1.9);
+  const sp = y + .1 + 1.9;
+  cyl(M.gold, P, 0, sp + .5, top.cz, .05, 1.1); for (let k=0; k<4; k++) put(U.torus, M.gold, under(P, T(0, sp + .25 + k*.2, top.cz, 0, .3 - k*.04, .3 - k*.04, .3 - k*.04, PI/2)));
+  sph(M.gold, P, 0, sp + 1.1, top.cz, .09); beaconLight(P, 0, sp + 1.25, top.cz, .06, .7);
+  m.roofH = Y + ph + LH;
+  m.top = sp + 1.6;
 }

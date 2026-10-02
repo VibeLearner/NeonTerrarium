@@ -892,7 +892,7 @@ function lxPlate(mat, P, x, y, z, w, d, r, h, ry = 0){
     const s = new THREE.Shape(), hx = w/2 - r, hz = d/2 - r;
     s.moveTo(-hx, -d/2); s.lineTo(hx, -d/2); s.absarc(hx, -hz, r, -PI/2, 0, false); s.lineTo(w/2, hz); s.absarc(hx, hz, r, 0, PI/2, false);
     s.lineTo(-hx, d/2); s.absarc(-hx, hz, r, PI/2, PI, false); s.lineTo(-w/2, -hz); s.absarc(-hx, -hz, r, PI, 1.5*PI, false);
-    g = new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false, curveSegments: 7 }); g.rotateX(PI/2); g.translate(0, 1, 0); g = g.toNonIndexed();
+    g = new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false, curveSegments: 7 }); g.rotateX(PI/2); g.translate(0, 1, 0); if (g.index) g = g.toNonIndexed();
     lxPlateCache.set(key, g);
   }
   put(g, mat, under(P, T(x, y, z, ry, 1, h, 1)));
@@ -918,10 +918,10 @@ function lxSlab(P, x, y, z, w, d, r, h = .12, line = true){
   if (line) lxPlate(M.lxLine, P, x, y - h*.62, z, w + .02, d + .02, r + .01, .03);
 }
 // a floor of glass: a warm lit room behind slim white mullions, a few things silhouetted against the light
-function lxGlassFloor(P, x, y, z, w, d, r, h, filter){
+function lxGlassFloor(P, x, y, z, w, d, r, h, filter, step = .34){
   lxPlate(pick(LX_ROOMS), P, x, y, z, w - .06, d - .06, Math.max(.02, r - .03), h);
   lxPlate(M.lxGlass, P, x, y + .01, z, w + .01, d + .01, r + .005, h - .02);   // the glass skin, a cool sheen over the warm rooms
-  for (const p of lxRing(w, d, r, .34)){
+  for (const p of lxRing(w, d, r, step)){
     if (filter && !filter(p.x + x, p.z + z)) continue;
     box(M.lxWhite2, P, x + p.x, y + h/2, z + p.z, .035, h, .035);
     const F = under(P, T(x + p.x, y, z + p.z, p.ry)), q = R();
@@ -1004,6 +1004,7 @@ function lxOffset(pts, o){
 // Dome garden tower: round glass floors on white discs, planted terraces curving out from the front, a glass dome
 // garden on the roof, and a great white arch rising behind it from the ground and over the top
 function domeTower(lot, st, P0){
+  lot.white = true;
   const r = rnd(.74, .84), floors = irand(4, 7), face = pick([0, PI/2, PI, -PI/2]), P = under(P0, T(0, 0, 0, face));
   lxPlate(M.lxWhite2, P, 0, 0, 0, 2*r + .5, 2*r + .5, r + .25, .06);                                   // the forecourt
   let y = .06, ang = rnd(-.6, .6);
@@ -1042,6 +1043,7 @@ function domeTower(lot, st, P0){
 // Shell tower: stadium-shaped glass floors with balconies all round, wrapped by a white loop rising from the
 // ground on both sides and arching over the top, a little dome under the arch, cars parked on pads front and back
 function shellTower(lot, st, P0){
+  lot.white = true;
   const w = rnd(1.4, 1.6), d = rnd(1.05, 1.25), floors = irand(6, 9), face = pick([0, PI/2, PI, -PI/2]), P = under(P0, T(0, 0, 0, face));
   const r = d/2;
   lxPlate(M.lxWhite2, P, 0, 0, 0, w + .45, d + .45, r + .2, .06);
@@ -1079,6 +1081,7 @@ function shellTower(lot, st, P0){
 // behind a glass rail; glass floors beneath; a white ribbon sweeping up the side and out over the top; a glass
 // dome pavilion on the roof and a car parked on a pad
 function cascadeTerraces(lot, st, P0){
+  lot.white = true;
   const levels = irand(3, 4), face = pick([0, PI/2, PI, -PI/2]), P = under(P0, T(0, 0, 0, face));
   const W0 = rnd(2.3, 2.45), D0 = rnd(2.2, 2.35);
   let y = 0, prev = null;

@@ -161,8 +161,12 @@ const SECTION_TYPES = {
   ind:  { ground: [[buildFactory,1]], upper: [[hall,2],[silos,1]] },
 };
 function pickWeighted(list){ const tot = list.reduce((s,[,w]) => s + w, 0); let r = R()*tot; for (const [f,w] of list){ if ((r -= w) <= 0) return f; } return list[0][0]; }
+// The white garden-city towers only stack with each other: on a white luxury section only another white one goes
+// up, and a white one only goes up on ground or on another white section (the other luxury types look jarring
+// against them). Sections of other zones are left as they are.
+const WHITE_TYPES = new Set([domeTower, shellTower, cascadeTerraces]);
 function buildStack(c){
-  let y = CURB;
+  let y = CURB, prevWhite = false;
   c.sectionTops = [];
   c.sections.forEach((sec, k) => {
     R = mulberry32(hash('sec', c.i, c.j, k, sec.zone, sec.seed));
@@ -174,10 +178,13 @@ function buildStack(c){
       box(pick(st.neonMats), T(c.x, y, c.z), 0, .02, (SIDE - .1)/2 + .015, SIDE - .1, .03, .03);
     }
     const P0 = T(c.x + rnd(-.1,.1), y + (upper ? .1 : 0), c.z + rnd(-.1,.1), rnd(-st.yaw, st.yaw));
-    const builder = pickWeighted(SECTION_TYPES[sec.zone][upper ? 'upper' : 'ground']);
+    let types = SECTION_TYPES[sec.zone][upper ? 'upper' : 'ground'];
+    if (upper && sec.zone === 'high') types = types.filter(([f]) => WHITE_TYPES.has(f) === prevWhite);
+    const builder = pickWeighted(types);
     NO_ROOF = !last;
     withStyle(sec.style, () => builder(lot, st, P0));
     NO_ROOF = false;
+    prevWhite = !!lot.white;
     y += (upper ? .1 : 0) + Math.max(lot.height, FH);
     c.sectionTops.push(y);
     if (k === 0) c.firstFloors = lot.floors || 2;

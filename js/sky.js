@@ -94,7 +94,7 @@ const PAL_HEX = ['#1B2A4A','#2C3A52','#4A5566','#C9B89A','#E3D6BD','#9EC4E0','#F
   '#5f9a94','#c98a8a','#c9a24a','#3f6fa8','#d9a55a','#c0674a','#9aa982','#9c5a44','#cfe8e0','#eadbd6','#5f7d5b','#3f5f58','#6b7280','#55585c','#7a7064','#b49a78'];
 // the star map view: SKY_EL is the elevation at the middle of the screen, SKY_H half the screen's height (radians),
 // SKY_TURN how far the sky turns for each turn of the camera
-const SKY_EL = .3, SKY_H = .5, SKY_TURN = 1, SKY_DRIFT = .00015;   // the sky turns with the camera, like a real one; panning barely drifts it (radians per unit: about a pixel per 15 units)
+const SKY_EL = .3, SKY_H = .5, SKY_TURN = 0, SKY_DRIFT = 0;   // the star map stays fixed on screen: turning and panning the camera never move it
 const comp = new THREE.ShaderMaterial({
   uniforms: {
     tColor:{value:null}, tDepth:{value:null}, tNormal:{value:null}, res:{value:new THREE.Vector2(1,1)},

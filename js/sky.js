@@ -115,7 +115,7 @@ function applyTime(){
   comp.uniforms.rimCol.value.setRGB(1.0, .7, .38).lerp(tmpC.setRGB(.42, .55, .9), Math.min(1, w.night + w.blue*.5));
   // ground mist: faint at midday, thicker round golden hour, dusk and night, thicker still in the rain
   comp.uniforms.mistI.value = S.mist === false ? 0 : (.55*w.day + .9*w.golden + .8*w.blue + .8*w.night)*(S.rain ? 1.4 : 1);
-  comp.uniforms.mistSun.value = .5*w.day + 1.35*w.golden + .7*w.blue + .3*w.night;   // sunbeams in the mist: strongest with the sun low
+  comp.uniforms.mistSun.value = .5*w.day + 1.0*w.golden + .7*w.blue + .3*w.night;   // sunbeams in the mist: strongest with the sun low
   comp.uniforms.mistNight.value = Math.min(1, w.night + w.blue*.5);
   return night;
 }
@@ -144,7 +144,7 @@ const comp = new THREE.ShaderMaterial({
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
-    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, vents:{value:Array.from({length:12}, () => new THREE.Vector4(0, 0, 0, 0))}, nVents:{value:0},
+    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, tSteam:{value:null}, steamExt:{value:1}, nVents:{value:0},
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
@@ -152,7 +152,7 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform vec4 vents[12]; uniform int nVents;
+    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform sampler2D tSteam; uniform float steamExt; uniform int nVents;
     uniform float night; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
@@ -331,23 +331,19 @@ const comp = new THREE.ShaderMaterial({
         if (cl.a > 0.001){ float q = floor(cl.a*5.0 + dith)/5.0; col = mix(col, cl.rgb/cl.a, q); }   // dithered fade at the edges, like mist
       }
       // ---- steam from the vents, with light through it ----
-      // Mist only gathers round the steam vents in the streets (world.js; the 12 nearest the view are passed in as
-      // x, z, strength): low and thick at the grate, spreading wider and thinner as it rises, gone by about 4.5. Around
-      // the rest of the city the air is clear. It mostly adds the light it scatters and hides little, so people walking
-      // through stay visible: by day it's lit by the sun where the shadow map says the sun reaches (shafts through the
-      // steam), at night it glows with the colours the lamps and neon throw below. 8 dithered steps, only for pixels
-      // whose line of sight passes near a vent.
+      // Mist only gathers round the steam vents in the streets. Every vent is drawn once into a top-down steam map of
+      // the whole island (makeSteamMap, below): red a tight plume, green a wide one. Marching the line of sight
+      // (8 dithered steps), each step reads the map once and blends tight to wide by height: low and thick at the
+      // grate, spreading and thinning as it rises, gone by about 4.5. So there's no limit on vents and the cost doesn't
+      // grow with them. It mostly adds the light it scatters and hides little, so people stay visible: by day it's lit
+      // by the sun where the shadow map says the sun reaches, at night it takes the colours the lamps and neon throw.
       if (mistI > 0.0 && nVents > 0 && rd < 0.99999){
         vec3 hit = ro + rdir*tEnd;
         float y0 = 4.5, y1 = -0.1;
         float ta = max(0.0, (y0 - ro.y)/min(rdir.y, -0.001)), tb = min(tEnd, (y1 - ro.y)/min(rdir.y, -0.001));
-        vec3 pA = ro + rdir*ta, pB = ro + rdir*tb;
-        // is any vent near this line of sight? (distance from each vent to the segment, in the ground plane)
-        float near = 0.0; vec2 sAB = pB.xz - pA.xz; float sl2 = max(dot(sAB, sAB), 1e-4);
-        for (int v = 0; v < 12; v++){ if (v >= nVents) break;
-          vec2 q = vents[v].xy - pA.xz; float u = clamp(dot(q, sAB)/sl2, 0.0, 1.0);
-          if (length(q - sAB*u) < 5.0) near = 1.0; }
-        if (hit.y > -0.6 && tb > ta && near > 0.5){
+        vec2 mA = (ro + rdir*ta).xz, mB = (ro + rdir*tb).xz;
+        vec2 sA = texture2D(tSteam, mA/(2.0*steamExt) + .5).rg, sB = texture2D(tSteam, mB/(2.0*steamExt) + .5).rg, sM = texture2D(tSteam, (mA + mB)/(4.0*steamExt) + .5).rg;
+        if (hit.y > -0.6 && tb > ta && max(max(sA.g, sB.g), sM.g) > .004){   // skip lines of sight with no steam near them
           vec3 nl = (texture2D(tLight, vUv).rgb*.5 + texture2D(tLight, vUv + vec2(4.0, 0.0)*px).rgb*.25 + texture2D(tLight, vUv - vec2(4.0, 0.0)*px).rgb*.25);
           vec3 amb = mix(mix(skyBot, skyTop, .4)*.35, vec3(.03, .04, .08), mistNight);
           vec3 sunS = sunCol*mistSun*(1.0 - mistNight);
@@ -357,10 +353,8 @@ const comp = new THREE.ShaderMaterial({
           for (int i = 0; i < MS; i++){
             vec3 p = ro + rdir*(ta + (float(i) + dith)*dt);
             float hy = clamp(p.y/4.5, 0.0, 1.0);
-            float rr = 1.0 + 2.6*hy;                                         // the plume widens as it rises
-            float w = 0.0;
-            for (int v = 0; v < 12; v++){ if (v >= nVents) break;
-              vec2 dv = p.xz - vents[v].xy; w += vents[v].z*exp(-dot(dv, dv)/(rr*rr)); }
+            vec2 sm = texture2D(tSteam, p.xz/(2.0*steamExt) + .5).rg;
+            float w = mix(sm.r*1.6, sm.g, smoothstep(.0, .55, hy))*.95;
             float dens = mistI*w*(1.0 - hy)*(1.0 - hy)*(.55 + .45*vnoise(vec3(p.xz*1.3, p.y*1.5 - time*.6)))*.9;
             acc += T*dens*dt*(amb + sunS*litAt(p) + glowN);
             T *= exp(-dens*dt*.35);   // light extinction: steam scatters light, hides little
@@ -742,6 +736,29 @@ function renderNightLights(night){
   scene.overrideMaterial = nightLightMat; cam.layers.set(4);
   renderer.render(scene, cam);
   scene.overrideMaterial = null;
+}
+/* ---------- the steam map ---------- */
+// A top-down map of the whole island (512 x 512, about 1.5 units a texel) with every steam vent stamped in: red a tight
+// plume (radius about 1.1), green a wide one (about 3). Redrawn only when the city changes; the mist reads it.
+const STEAM_N = 512, STEAM_DATA = new Uint8Array(STEAM_N*STEAM_N*4);
+const steamTex = new THREE.DataTexture(STEAM_DATA, STEAM_N, STEAM_N, THREE.RGBAFormat);
+steamTex.minFilter = steamTex.magFilter = THREE.LinearFilter; steamTex.generateMipmaps = false;
+comp.uniforms.tSteam.value = steamTex;
+function makeSteamMap(vents){
+  const ext = (GRID_MAX + 1)*LOT, k = STEAM_N/(2*ext);
+  comp.uniforms.steamExt.value = ext; comp.uniforms.nVents.value = vents.length;
+  STEAM_DATA.fill(0);
+  const acc = new Float32Array(STEAM_N*STEAM_N*2);
+  for (const v of vents){
+    const cx = (v.x + ext)*k, cy = (v.z + ext)*k, R = 3.0*k*2.2;
+    for (let y = Math.max(0, Math.floor(cy - R)); y <= Math.min(STEAM_N - 1, Math.ceil(cy + R)); y++)
+      for (let x = Math.max(0, Math.floor(cx - R)); x <= Math.min(STEAM_N - 1, Math.ceil(cx + R)); x++){
+        const d2 = ((x + .5 - cx)**2 + (y + .5 - cy)**2)/(k*k), i = (y*STEAM_N + x)*2;
+        acc[i] += v.s*Math.exp(-d2/(1.1*1.1)); acc[i + 1] += v.s*Math.exp(-d2/(3.0*3.0));
+      }
+  }
+  for (let i = 0; i < STEAM_N*STEAM_N; i++){ STEAM_DATA[i*4] = Math.min(255, acc[i*2]*200); STEAM_DATA[i*4 + 1] = Math.min(255, acc[i*2 + 1]*200); }
+  steamTex.needsUpdate = true;
 }
 // The finished frame is scaled to the screen with "sharp bilinear" filtering: every render pixel stays a crisp
 // square, and where the scale isn't a whole number only the one-screen-pixel seam between two render pixels is

@@ -295,6 +295,7 @@ function syncAgents(){
   for (const d of pairCache.values()) if (d.emitters) emitters.push(...d.emitters);   // steam leaking from the pipework between buildings
   portLots = [...cells.values()].map(c => ({ x: c.x, z: c.z, height: c.height }));
   VENTS = [...cells.values()].filter(c => c.vent).map(c => c.vent);   // steam vents, for the mist
+  makeSteamMap(VENTS);
   setupSteam();
   for (const d of drones) if (!ports.includes(d.at) || (d.phase !== 'inside' && !ports.includes(d.to))){
     d.phase = 'inside'; d.g.visible = false; d.at = nearPort(); d.timer = 1 + Math.random()*2;

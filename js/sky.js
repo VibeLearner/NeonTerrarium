@@ -537,11 +537,21 @@ const glowPick = new THREE.ShaderMaterial({
       float yel = smoothstep(.2, .38, (min(c.r, c.g) - c.b)/max(mx, .001));   // warm yellow window light (not white, not beige walls)
       float key = mx*(.45 + .55*max(sat, .95*yel));                  // coloured light counts, white surfaces much less
       float th = mix(.8, .5, night);                                // by day only the brightest lights bloom
-      return c*smoothstep(th, th + .25, key)*(1.0 + .7*yel);         // and the windows glow a little stronger
+      // sunlit pale surfaces (the white luxury towers, cream walls) turn warm and bright at golden hour and would
+      // otherwise bloom like lights: anything near-white (all channels close together) is kept out of the bloom by
+      // day, fading back in after dusk. Lights are far more saturated, so they're unaffected.
+      float pale = smoothstep(.42, .6, mn/max(mx, .001))*(1.0 - night);
+      return c*smoothstep(th, th + .25, key)*(1.0 + .7*yel)*(1.0 - pale);   // and the windows glow a little stronger
     }
     void main(){   // a 4x4 average with four bilinear taps
       vec3 a = pickC(vUv + texel*vec2(-1.0, -1.0)) + pickC(vUv + texel*vec2(1.0, -1.0)) + pickC(vUv + texel*vec2(-1.0, 1.0)) + pickC(vUv + texel*vec2(1.0, 1.0));
-      gl_FragColor = vec4(a*.25, 1.0);
+      a *= .25;
+      // big bright areas (a whole lit facade of the white towers) shouldn't glow like a lamp: what blooms is light
+      // brighter than its surroundings, so the neighbourhood's level is taken off. Strongest by day and at golden
+      // hour; at night small lights against the dark are untouched anyway.
+      vec3 ring = pickC(vUv + texel*vec2(-7.0, 0.0)) + pickC(vUv + texel*vec2(7.0, 0.0)) + pickC(vUv + texel*vec2(0.0, -7.0)) + pickC(vUv + texel*vec2(0.0, 7.0));
+      a = max(a - ring*.25*mix(.85, .45, night), 0.0);
+      gl_FragColor = vec4(a, 1.0);
     }`,
   depthTest: false, depthWrite: false,
 });

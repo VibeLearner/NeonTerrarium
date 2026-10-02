@@ -186,8 +186,10 @@ function buildPlatformBody(c){
     box(G.asph, P, 0, .012, 0, LOT, .025, LOT);
     if (c.green === 'grass'){   // laid to lawn, edge to edge, with grass growing up out of it
       lawn(P, 4);
-      for (let k = 0; k < irand(34, 44); k++){ const r = R(), kind = r < .75 ? 'gt' + irand(0, 4) : r < .96 ? 'gt' + irand(6, 9) : 'gt5';
-        plant(kind, P, rnd(-LOT/2 + .2, LOT/2 - .2), .06, rnd(-LOT/2 + .2, LOT/2 - .2), kind === 'gt5' ? rnd(.5, .6) : rnd(.38, .55)); }   // small, so it reads as grass, not shrubs
+      // a dense even carpet of tiny tufts: a 13 x 13 grid, each nudged off its spot so no rows show
+      const n = 13, st = LOT/n;
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++){ const r = R(), kind = r < .7 ? 'gt' + irand(0, 4) : 'gt' + irand(6, 9);
+        plant(kind, P, -LOT/2 + (i + .5 + rnd(-.4, .4))*st, .06, -LOT/2 + (j + .5 + rnd(-.4, .4))*st, rnd(.2, .3)); }
     }
     else { const n = 7, st = LOT/n;
       for (let i=0;i<n;i++) for (let j=0;j<n;j++) if (!chance(.04)) box(pick(TILES.mid), P, (i-(n-1)/2)*st, .03, (j-(n-1)/2)*st, st - .05, .045, st - .05); }

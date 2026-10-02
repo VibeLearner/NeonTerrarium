@@ -528,7 +528,7 @@ function makePerson(id, home){
   const u = k => u01(id, k);
   const wake = span(u('wake'), 6, 8.5);
   return { id, home, job: null, wantsJob: u('emp') < .8, courier: u('courier') < .2, row: hash(id, 'look') % CITIZEN_ROWS,
-           speed: PPL_SPEED*span(u('speed'), .85, 1.15), lane: span(u('lane'), -.08, .32),
+           speed: PPL_SPEED*span(u('speed'), .85, 1.15), lane: span(u('lane'), -.08, .32), wide: span(u('wide'), -.75, 1.05),
            wake, bed: (22 + 6*u('bed')**2) % 24, outgoing: span(u('out'), .25, .9), nightShift: u('night'),
            workS: span(u('ws'), 7.5, 9.5), workLen: span(u('wl'), 7.5, 9),
            at: home, until: 0, walk: null, spot: null, x: 0, z: 0, flip: 1, phase: u('phase')*10 };
@@ -673,6 +673,32 @@ function pickSpot(to, from, p){
 /* ---------- walking ---------- */
 const nearestOf = (doors, x, z) => { let best = null, bd = Infinity; for (const d of doors){ const v = (d.stand.x - x)**2 + (d.stand.z - z)**2; if (v < bd){ bd = v; best = d; } } return best; };
 // a trip: from just inside one door, out through it, along the network, in through another (or to a standing spot)
+// Everyone has a line of their own across the walking paths, instead of all treading the centre: a narrow lane
+// (mostly to the right of the way they're going, so people coming the other way pass on the other side) and, on
+// open paving with room to spare, a wide one. For each bend of the route the widest of these that's clear, and
+// clear all the way from the last bend, is taken; the bends are mitred, so the line stays parallel round corners.
+// The ends of the network stretch stay on the centre, where the route meets doorways, seats and counters.
+const freePt = (x, z) => { const c = cells.get(ckey(Math.round(x/LOT), Math.round(z/LOT))); return !!c && freeAt(cellGrid(c), x, z); };
+function clearSeg(ax, az, bx, bz){ const n = Math.ceil(Math.hypot(bx - ax, bz - az)/.08) + 1; for (let k = 0; k <= n; k++){ const u = k/n; if (!freePt(ax + (bx - ax)*u, az + (bz - az)*u)) return false; } return true; }
+function spreadPath(p, pts, i0, i1){
+  if (i1 - i0 < 1) return pts;
+  const lane = p.lane ?? .12, wide = p.wide ?? lane*3, tries = [wide, wide*.65, lane, lane*.5, 0];
+  const out = pts.map(q => q.slice());
+  let prev = out[i0];
+  for (let k = i0 + 1; k < i1; k++){
+    const [ax, az] = pts[k - 1], [bx, bz] = pts[k], [cx, cz] = pts[k + 1];
+    let n1x = -(bz - az), n1z = bx - ax, l1 = Math.hypot(n1x, n1z) || 1, n2x = -(cz - bz), n2z = cx - bx, l2 = Math.hypot(n2x, n2z) || 1;
+    n1x /= l1; n1z /= l1; n2x /= l2; n2z /= l2;
+    let mx = n1x + n2x, mz = n1z + n2z; const ml = Math.hypot(mx, mz);
+    if (ml < .3){ out[k] = [bx, bz]; prev = out[k]; continue; }   // a hairpin: stay on the line
+    mx /= ml; mz /= ml; const sc = 1/Math.max(.55, mx*n1x + mz*n1z);
+    for (const o of tries){ const x = bx + mx*o*sc, z = bz + mz*o*sc;
+      if (o === 0 || (freePt(x, z) && clearSeg(prev[0], prev[1], x, z))){ out[k] = [x, z]; break; } }
+    prev = out[k];
+  }
+  if (!clearSeg(prev[0], prev[1], out[i1][0], out[i1][1])) return pts;   // can't rejoin cleanly: keep the centre line
+  return out;
+}
 function startTrip(p, toId){
   const from = places.get(p.at), to = places.get(toId);
   if (!from || !to || !reachable(to)) return false;
@@ -684,14 +710,14 @@ function startTrip(p, toId){
   if (to.open){ spot = pickSpot(to, from, p); if (!spot || spot === p.spot) return false; b = spot.node; tail = [[spot.ax, spot.az], [spot.x, spot.z]]; }
   else { if (!to.doors.length) return false; dB = nearestOf(to.doors, from.x, from.z); b = dB.node; tail = [[dB.wall.x, dB.wall.z], [dB.inside.x, dB.inside.z]]; }
   const mid = route(a, b); if (!mid) return false;
-  const pts = head.concat(mid, tail);
+  const base = head.concat(mid, tail), pts = p.cop ? base : spreadPath(p, base, head.length, base.length - 1 - tail.length);
   const cum = [0];
   for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
   if (p.spot){ p.spot.by = null; p.spot = null; }
   p.patrol = null;
   if (spot) spot.by = p.id;
   // safe0..safe1: the stretch on the walking network (before and after it: doorways, seats, counters)
-  p.walk = { pts, cum, len: cum[cum.length - 1], s: 0, to: toId, doorA: dA, doorB: dB, spot, safe0: cum[head.length], safe1: cum[pts.length - 1 - tail.length] };
+  p.walk = { pts, base, cum, len: cum[cum.length - 1], s: 0, to: toId, doorA: dA, doorB: dB, spot, safe0: cum[head.length], safe1: cum[pts.length - 1 - tail.length] };
   return true;
 }
 // Police officers on duty walk a beat: from the station (or where they stand) to a street crossing a few blocks
@@ -701,9 +727,10 @@ function startPatrol(p, forced){
   let a, head = [], dA = null;
   if (p.walk && forced){   // called away mid-walk: keep to the current path as far as its next street crossing, then turn
     const w = p.walk; let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
-    let j = k; while (j < w.pts.length && !crossAt.has(posKey(w.pts[j][0], w.pts[j][1]))) j++;
-    if (j >= w.pts.length) return false;
-    a = crossAt.get(posKey(w.pts[j][0], w.pts[j][1])).node; head = [[p.x, p.z]].concat(w.pts.slice(k, j)); dA = null;
+    const bp = w.base || w.pts;   // the route's own points (the walked line may be set off to one side)
+    let j = k; while (j < bp.length && !crossAt.has(posKey(bp[j][0], bp[j][1]))) j++;
+    if (j >= bp.length) return false;
+    a = crossAt.get(posKey(bp[j][0], bp[j][1])).node; head = [[p.x, p.z]].concat(w.pts.slice(k, j)); dA = null;
   }
   else if (p.patrol) a = p.patrol.node;
   else { if (p.at !== p.job || !st.doors.length) return false; dA = st.doors[Math.floor(pplRand()*st.doors.length)]; a = dA.node; head = [[dA.inside.x, dA.inside.z], [dA.wall.x, dA.wall.z]]; }
@@ -1027,18 +1054,9 @@ function updatePeople(dt, t){
         let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
         const a = w.pts[k - 1], b = w.pts[k], seg = w.cum[k] - w.cum[k - 1] || 1, u = (w.s - w.cum[k - 1])/seg;
         p.x = a[0] + (b[0] - a[0])*u; p.z = a[1] + (b[1] - a[1])*u; p.dx = b[0] - a[0]; p.dz = b[1] - a[1];
-        // Off the centre line: everyone keeps to their own lane, mostly to the right of the way they're going (so
-        // people coming the other way pass on the other side), drifting a little as they walk. It eases back to the
-        // line at doorways, seats and corners, and shrinks wherever the side step would bring them too near a wall.
-        if (w.s > w.safe0 && w.s < w.safe1){
-          const ease = Math.min(1, (w.s - w.safe0)/.6, (w.safe1 - w.s)/.6, (w.s - w.cum[k - 1])/.3 + .15, (w.cum[k] - w.s)/.3 + .15);
-          const L = Math.hypot(p.dx, p.dz) || 1, off = ((p.lane ?? .12) + .07*Math.sin(w.s*1.3 + p.phase))*Math.max(0, ease);
-          const nx = -p.dz/L, nz = p.dx/L;
-          for (const f of [1, .6, .3]){
-            const qx = p.x + nx*off*f, qz = p.z + nz*off*f, c = cells.get(ckey(Math.round(qx/LOT), Math.round(qz/LOT)));
-            if (c && freeAt(cellGrid(c), qx, qz)){ p.x = qx; p.z = qz; break; }
-          }
-        }
+        // a gentle sway across their own line as they walk (the line itself is set per trip: see spreadPath)
+        if (w.s > w.safe0 && w.s < w.safe1){ const L = Math.hypot(p.dx, p.dz) || 1, e = Math.min(1, (w.s - w.safe0)/.5, (w.safe1 - w.s)/.5), o = .045*e*Math.sin(w.s*1.3 + p.phase);
+          p.x += -p.dz/L*o; p.z += p.dx/L*o; }
         const sd = p.dx*_camR.x + p.dz*_camR.z;
         if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
         // through the doorway: dissolving in from the hallway, or out as they step inside

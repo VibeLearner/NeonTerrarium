@@ -373,8 +373,16 @@ function floorPatch(kind, P, x, y, z, k=1, ry){
     b.p.push(_fv.x, _fv.y, _fv.z); b.n.push(0, 1, 0); b.u.push(u, v); b.d.push(0);
   }
 }
-const floorSmall = (P, x, y, z, k) => floorPatch(pick(FLOOR_SMALL), P, x, y, z, k);
-const floorBig = (P, x, y, z, k) => floorPatch(pick(FLOOR_BIG), P, x, y, z, k);
+// a patch now and then grows into a cluster: several overlapping pieces of the same family around the spot,
+// so the floor has proper mossy stretches as well as single tufts
+function floorGrow(list, P, x, y, z, k, spread){
+  if (!chance(.3)){ floorPatch(pick(list), P, x, y, z, k); return; }
+  const n = irand(3, 5);
+  for (let i=0;i<n;i++){ const a = rnd(0, TAU), d = i ? rnd(.3, 1)*spread : 0;
+    floorPatch(pick(list), P, x + Math.cos(a)*d, y + i*.0008, z + Math.sin(a)*d, k*rnd(.75, 1)); }   // tiny lifts stop overlaps fighting
+}
+const floorSmall = (P, x, y, z, k) => floorGrow(FLOOR_SMALL, P, x, y, z, k, .3);
+const floorBig = (P, x, y, z, k) => floorGrow(FLOOR_BIG, P, x, y, z, k, .5);
 // small plants for roofs, balconies and ledges; big spreading ones for open ground; hanging ones for walls and edges
 const SMALL_GROUND = ['bush','bush','bushFlower','moss','g_moss2','g_fern2'];
 const BIG_GROUND = ['g_clover','g_fern3','g_cover','g_flowers','g_spread1','g_spread2','g_fern2','g_moss2','bush','bushFlower'];

@@ -963,7 +963,7 @@ function buildFoundry(m){
 
   // ---- greenery in the yard: weeds in the cracks, planters and a few small trees along the front
   for (let k=0; k<26; k++){ const x = rnd(-L/2 + .5, L/2 - .5), z = rnd(2.4, D/2 - .3), sc = rnd(.7, 1.0);
-    chance(.15) ? plant('g_flowers', P, x, .06, z, sc) : floorBig(P, x, .066, z, sc + .2); }   // moss and weeds flat on the slabs, the odd flower clump
+    chance(.1) ? plant('g_flowers', P, x, .06, z, sc) : floorBig(P, x, .066, z, sc + .2); }   // moss and weeds flat on the slabs, the odd flower clump
   for (let k=0; k<6; k++){ const x = -L/2 + 1.2 + k*(L - 2.4)/5, z = D/2 - .5;
     box(M.concM, P, x, .22, z, .9, .4, .5); plant(pick(['bamboo','bonsai','bushFlower','bush']), P, x, .42, z, rnd(.95, 1.25)); plant('h_ivy', under(P, T(x, 0, z + .25)), 0, .4, .01, .8, 't', true); }
   for (const x of [-L/2 + .5, L/2 - .5]) for (let z = -D/2 + 1; z < D/2 - 1; z += rnd(1.2, 2.0)) plant(pick(['bamboo','bush','g_fern3','bonsai']), P, x, .06, z, rnd(.9, 1.2));

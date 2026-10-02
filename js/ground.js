@@ -95,7 +95,7 @@ function groundLot(lot){
   // wet stains and moss in the tile gaps
   for (let k=0;k<irand(1,3);k++) box(pick([G.puddle, G.crack]), P, rnd(-1.2,1.2), top+.037, pick([-1,1])*rnd(1.1,1.25), rnd(.1,.25), .045, rnd(.06,.14), rnd(0,PI));
   // moss and weeds lying flat in the tile gaps, mostly toward the sidewalk edges, and now and then a strip of grass along a kerb
-  for (let k=0;k<irand(1,3);k++){ const e = pick([-1,1])*rnd(.85,1.15), t = rnd(-1.1,1.1); chance(.5) ? floorSmall(P, e, top+.046, t, rnd(.6,.9)) : floorSmall(P, t, top+.046, e, rnd(.6,.9)); }
+  for (let k=0;k<irand(2,4);k++){ const e = pick([-1,1])*rnd(.85,1.15), t = rnd(-1.1,1.1); chance(.5) ? floorSmall(P, e, top+.046, t, rnd(.6,.9)) : floorSmall(P, t, top+.046, e, rnd(.6,.9)); }
   if (chance(.35*S.green)){ const sd = pick(SIDES4); floorPatch(pick(FLOOR_FRINGE), under(P, T(sd[0]*(SIDE/2-.2), 0, sd[1]*(SIDE/2-.2), Math.atan2(sd[0], sd[1]))), rnd(-.6,.6), top+.047, 0, rnd(.75,.95), 0); }
   // street furniture on the sidewalk corners, which the buildings leave free
   for (const [sx,sz] of CORNERS){
@@ -107,7 +107,7 @@ function groundLot(lot){
     else if (r < .55){ cyl(pick([M.corrBlue, M.teal2, M.frame]), Pc, 0, .13, 0, .08, .26); box(M.frame, Pc, 0, .27, 0, .18, .02, .18); }      // bin
     else if (r < .7){ for (const x of [-.12,0,.12]) box(M.metal, Pc, x, .1, 0, .03, .2, .2); }                                            // bike rack
     else if (r < .85){ for (const x of [-.15,.15]) cyl(M.hazard, Pc, x, .1, 0, .04, .2); }                                               // bollards
-    else { box(G.grout, Pc, 0, .01, 0, .3, .045, .3); plant(pick(['bonsai','bamboo','bush']), Pc, 0, .02, 0, rnd(.75,.95)); }           // tree pit
+    else { box(G.grout, Pc, 0, .01, 0, .3, .045, .3); chance(.55) ? plant(pick(['bonsai','bamboo','bush']), Pc, 0, .02, 0, rnd(.75,.95)) : floorSmall(Pc, 0, .036, 0, .8); }   // tree pit, or one gone to moss
   }
   if (e > 0 && chance(.6*S.green)) for (const [sx,sz] of CORNERS) if (chance(.4)) plant(bigKind(), P, sx*(SIDE/2-.2), top+.03, sz*(SIDE/2-.2), rnd(.6,.8));
 }

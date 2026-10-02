@@ -107,7 +107,35 @@ function batchGroup(datas, withGeo = true){
 }
 
 /* ---------- a platform piece: slab, rock root, railings and greenery on the open edges ---------- */
+// Each plot's greenery: 'some' (the usual plants, moss and vines), 'none' (bare: nothing growing, nothing hanging
+// over the edges) or 'grass' (an empty plot laid to lawn). Clicking an empty plot with no zone picked cycles it,
+// and whatever it's left on becomes the setting for the next plots you add.
+const GREEN_MODES = ['some', 'none', 'grass'], GREEN_KEY = 'neonIsland.greenDefault';
+let GREEN_DEFAULT = (() => { try { const v = localStorage.getItem(GREEN_KEY); return GREEN_MODES.includes(v) ? v : 'some'; } catch (e) { return 'some'; } })();
+
+function cycleGreen(c){
+  c.green = GREEN_MODES[(GREEN_MODES.indexOf(c.green || 'some') + 1) % GREEN_MODES.length];
+  GREEN_DEFAULT = c.green; try { localStorage.setItem(GREEN_KEY, GREEN_DEFAULT); } catch (e) {}
+  refresh([c]); save(); sfx.play('place');
+}
+// the lawn: 16px grass tiles from the sheet (assets/floor/grass.png: fine grass, tufts, long blades)
+const GRASS_MAT = (() => { const t = new THREE.TextureLoader().load('assets/floor/grass.png'); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
+  const m = toon(0xc8d4b8); m.map = t; m.userData.noCast = true; return m; })();   // tinted down a little to sit with the city's palette
+const _gq = new THREE.Vector3();
+function lawn(P, n){
+  let b = buckets.get(GRASS_MAT); if (!b){ b = { p: [], n: [], d: [], f: null, u: [] }; buckets.set(GRASS_MAT, b); }
+  const s = LOT/n;
+  for (let i=0;i<n;i++) for (let j=0;j<n;j++){
+    const r = R(), k = r < .7 ? 0 : r < .88 ? 1 : 2, u0 = k/3 + .001, u1 = (k + 1)/3 - .001, x0 = -LOT/2 + i*s, z0 = -LOT/2 + j*s;
+    const C = [[x0, z0, u0, 1], [x0 + s, z0, u1, 1], [x0 + s, z0 + s, u1, 0], [x0, z0 + s, u0, 0]];
+    for (const q of [0, 2, 1, 0, 3, 2]){ const [cx, cz, u, v] = C[q]; _gq.set(cx, .058, cz).applyMatrix4(P); b.p.push(_gq.x, _gq.y, _gq.z); b.n.push(0, 1, 0); b.u.push(u, v); b.d.push(0); }
+  }
+}
 function buildPlatform(c){
+  NO_GREEN = c.green === 'none';
+  try { buildPlatformBody(c); } finally { NO_GREEN = false; }
+}
+function buildPlatformBody(c){
   R = mulberry32(hash('plat', c.i, c.j));
   const x = c.x, z = c.z, P = T(x, 0, z);
   // a flat slab: its underside is plain panelling with seams, and now and then a lift pad, a round thruster housing
@@ -153,10 +181,11 @@ function buildPlatform(c){
   if (c.sections.length) groundLot({ x, z, cls: c.sections[0].zone, elev: 0, base: CURB, deck: false, cross: cells.has(ckey(c.i, c.j + 1)) });
   else {
     box(G.asph, P, 0, .012, 0, LOT, .025, LOT);
-    const n = 7, st = LOT/n;
-    for (let i=0;i<n;i++) for (let j=0;j<n;j++) if (!chance(.04)) box(pick(TILES.mid), P, (i-(n-1)/2)*st, .03, (j-(n-1)/2)*st, st - .05, .045, st - .05);
+    if (c.green === 'grass') lawn(P, 4);   // laid to lawn, edge to edge
+    else { const n = 7, st = LOT/n;
+      for (let i=0;i<n;i++) for (let j=0;j<n;j++) if (!chance(.04)) box(pick(TILES.mid), P, (i-(n-1)/2)*st, .03, (j-(n-1)/2)*st, st - .05, .045, st - .05); }
     for (let k=0;k<(chance(.75) ? 1 : 0) + (chance(.2) ? 1 : 0);k++) plant(pick(['bush','bushFlower','g_fern3','bonsai']), P, rnd(-1.3,1.3), .05, rnd(-1.3,1.3), rnd(.7,.95));
-    for (let k=0;k<irand(3,5);k++) floorBig(P, rnd(-1.3,1.3), .056, rnd(-1.3,1.3), rnd(.8,1.15));   // moss and vines grown over the paving
+    if (c.green !== 'grass') for (let k=0;k<irand(3,5);k++) floorBig(P, rnd(-1.3,1.3), .056, rnd(-1.3,1.3), rnd(.8,1.15));   // moss and vines grown over the paving
     if (chance(.4)){ const Pb = under(P, T(rnd(-.9,.9), .05, rnd(-.9,.9), pick([0, PI/2]))); box(M.wood, Pb, 0, .14, 0, .5, .04, .15); box(M.frame, Pb, 0, .07, 0, .42, .14, .1);
       for (const sx of [-.13, .13]) spotAt(Pb, sx, .16, 0, 'seat', null, [0, 1]); }
   }
@@ -357,7 +386,7 @@ function refresh(list, megaList = []){
 function rebuildAll(){ refresh([...cells.values()], [...megas.values()]); }
 
 /* ---------- edits ---------- */
-const newCell = (i, j, sections = []) => ({ i, j, x: i*LOT, z: j*LOT, sections, sectionTops: [], firstFloors: 2, group: null, height: CURB, ports: [], pads: [], emitters: [] });
+const newCell = (i, j, sections = []) => ({ i, j, x: i*LOT, z: j*LOT, green: GREEN_DEFAULT, sections, sectionTops: [], firstFloors: 2, group: null, height: CURB, ports: [], pads: [], emitters: [] });
 // Every edit plays out as a short animation (see "build and remove animations" below): the old look of the
 // cell is kept aside, the new one is built, and a glowing outline and scan line sweep between them.
 const PLAT_BOTTOM = -5.6;
@@ -531,7 +560,7 @@ const SAVE_KEY = 'neonIsland.v2';
 const MEGA_SAVE_KEY = 'neonIsland.megas';
 function save(){
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE])));
+    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some'])));
     localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed }))));
   } catch (e) {}
 }
@@ -539,7 +568,7 @@ function load(){
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!Array.isArray(d) || !d.length) return false;
-    for (const [i,j,secs,st] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; cells.set(ckey(i,j), c); }
+    for (const [i,j,secs,st,gr] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; cells.set(ckey(i,j), c); }
     try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels); } catch (e) {}
     return true;
   } catch (e) { return false; }
@@ -594,6 +623,7 @@ function applyTarget(t){
   const zone = S.zone;
   if (t.type === 'empty') return addPlatform(t.i, t.j, zone);
   if (t.type === 'megaUp'){ if (zone) addMegaTier(t.m); return null; }
+  if (!zone && t.type === 'onto' && !t.c.mega && !t.c.sections.length){ cycleGreen(t.c); return t.c; }   // no zone picked: an empty plot's greenery cycles
   if (!zone || t.c.mega) return null;
   addSection(t.c, zone); return t.c;
 }

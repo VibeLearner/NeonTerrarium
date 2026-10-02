@@ -324,6 +324,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
 // Otherwise the plant stands free: two copies crossed in an X, locked to the world at a random angle,
 // so it never turns or slides as the camera moves and never shows up edge-on and paper-thin.
 function plant(kind,P,x,y,z,k=1,anchor,fixed=false){
+  if (NO_GREEN && (kind === 'l_mossroots' || !/^(sign_|glyph_|l_|graf_)/.test(kind))) return;   // a bare plot: nothing growing
   const s = SPR.size[kind];
   const an = anchor===undefined ? SPR.anchor[kind] : anchor==='b' ? 0 : anchor==='t' ? 1 : anchor==='c' ? .5 : anchor;
   const scale = new THREE.Matrix4().makeScale(s[0]/PX*k, s[1]/PX*k, 1);
@@ -373,6 +374,7 @@ const FLOOR_FRINGE = ['f_grass1','f_grass2'];                                   
 // k scales it; ry turns it (strips use it to run along an edge)
 const _fv = new THREE.Vector3();
 function floorPatch(kind, P, x, y, z, k=1, ry){
+  if (NO_GREEN) return;
   if (!chance(Math.min(1, .25 + .75*S.green))) return;
   const [w,h] = FLOOR_SPR[kind], hw = w/PX*k/2, hh = h/PX*k/2, uv = FLOOR_UV[kind];
   const m = under(P, T(x, y, z, ry === undefined ? irand(0,3)*PI/2 : ry));

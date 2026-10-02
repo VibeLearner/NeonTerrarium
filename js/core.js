@@ -155,7 +155,7 @@ const _nm = new THREE.Matrix3();
 // neon and trim are swapped for unlit look-alikes (picked by position, so the same ones stay off), and whatever
 // still glows flickers badly. KEEP_LIGHT protects a light from going out (the street lamp: it flickers instead).
 let DARK = false, KEEP_LIGHT = false;
-let LUX = null;   // while a luxury section is generated: { mats: Map(neon -> its gold/ivory/... stand-in), glows: { kind: kind } }
+let LUX = null, NO_GREEN = false;   // NO_GREEN: while a bare plot (no greenery) is generated, see world.js   // while a luxury section is generated: { mats: Map(neon -> its gold/ivory/... stand-in), glows: { kind: kind } }
 const DARK_SUB = { window: toon(0x22303f), bulb: toon(0x3d3226), neon: toon(0x2a2230), trim: toon(0x2c3438) };
 const posHash = (x, y, z) => hash('lit', Math.round(x*20), Math.round(y*20), Math.round(z*20)) % 100;
 function put(geo, mat, m){

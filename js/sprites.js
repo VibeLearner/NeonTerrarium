@@ -288,8 +288,10 @@ const FOL_SHADER = new THREE.ShaderMaterial({
           if (swayType > 3.5){   // lawn grass: the blade tips lean with gusts that sweep across the lawn, so neighbours move together
             vec3 base = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
             float tip = clamp(uv.y, 0.0, 1.0); tip *= tip;
-            float wave = sin(time*1.9 - dot(base.xz, vec2(.9, .55))*1.7) + .45*sin(time*3.7 - dot(base.xz, vec2(-.4, 1.1))*2.6 + aVar.w);
-            wp.xz += vec2(.75, .45)*wave*wind*.09*tip;
+            // a gentle back-and-forth lean, nearly in step across the lawn (only a slow drift in timing over distance),
+            // with a little flutter of each blade's own
+            float lean = sin(time*1.4 - dot(base.xz, vec2(.12, .08))) + .3*sin(time*2.3 + aVar.w*6.0);
+            wp.xz += vec2(.75, .45)*(.35 + .65*lean)*wind*.05*tip;
           }
           gl_Position = projectionMatrix * viewMatrix * wp;
         } else {

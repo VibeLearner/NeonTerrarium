@@ -1913,7 +1913,19 @@ function policeBikes(m, crew){
         if (b.mode === 'park') b.y += (CURB + .08 - b.y)*Math.min(1, dt*2);
         // the sprite: the view that matches the heading as the camera sees it
         const ax = b.hx*_bkR.x + b.hz*_bkR.z, az = b.hx*_bkF.x + b.hz*_bkF.z;   // heading against the view: + away from the camera (view 0, nose away), - toward it
-        const oct = ((Math.round(Math.atan2(ax, az)/(Math.PI/4)) % 8) + 8) % 8, view = PBIKE_VIEWS[oct], [w, h] = PBIKE_SIZE[view];
+        // which of the eight views: with a little slack past each boundary, so it doesn't flick back and forth on the edge
+        const a8 = Math.atan2(ax, az)/(Math.PI/4);
+        if (b.oct === undefined) b.oct = ((Math.round(a8) % 8) + 8) % 8;
+        else { let dv = a8 - b.oct; dv -= 8*Math.round(dv/8); if (Math.abs(dv) > .62){ b.octFrom = b.oct; b.oct = ((Math.round(a8) % 8) + 8) % 8; b.turnT = 0; } }
+        // a quick turn between views: it narrows a touch, swaps halfway, and eases out to the new view's width
+        const TURN = .16; let oct = b.oct, sq = 1, [w, h] = PBIKE_SIZE[PBIKE_VIEWS[b.oct]];
+        if (b.turnT !== undefined && b.turnT < TURN){
+          const k = b.turnT/TURN, e = k*k*(3 - 2*k), [w0, h0] = PBIKE_SIZE[PBIKE_VIEWS[b.octFrom]];
+          if (k < .5) oct = b.octFrom;
+          w = w0 + (w - w0)*e; h = h0 + (h - h0)*e; sq = 1 - .3*Math.sin(PI*k);
+          b.turnT += dt;
+        }
+        w *= sq;
         b.mat.map = PBIKE_TEX[oct]; b.mat.color.copy(FOL_UNI.tint.value);
         const bob = b.mode === 'park' ? 0 : Math.sin(time*3 + b.idx)*.02;
         b.spr.position.set(b.x, b.y + bob, b.z); b.spr.scale.set(w/PX*BIKE_K, h/PX*BIKE_K, 1);

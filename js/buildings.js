@@ -2734,7 +2734,7 @@ const AIR_A = new THREE.TextureLoader().load('assets/sprites/holo_pureair.png'),
 const AIR_A2 = new THREE.TextureLoader().load('assets/sprites/holo_aether.png'), AIR_B2 = new THREE.TextureLoader().load('assets/sprites/holo_sky.png');
 const AIR_A3 = new THREE.TextureLoader().load('assets/sprites/holo_synth.png'), AIR_B3 = new THREE.TextureLoader().load('assets/sprites/holo_watch.png');   // and Synth Corp's security, hacked by "Big Brother is watching"
 // and two plain ads (no hack) for the wall holograms: Robo-Repair and PureFlow air filters. Each is an atlas of five
-// portrait versions of the ad (see tools/make_tall_holo_ads.sh), so a hologram can run the height of a building without
+// portrait versions of the ad (see tools/make_tall_holo_ads.py), so a hologram can run the height of a building without
 // stretching the picture: WALL_ASPECT is each version's height over width, WALL_CELLS where it sits in the atlas.
 const AIR_W1 = new THREE.TextureLoader().load('assets/sprites/holo_robo_tall.png'), AIR_W2 = new THREE.TextureLoader().load('assets/sprites/holo_pureflow_tall.png');
 const WALL_ASPECT = [1.05, 1.5, 2.1, 3.0, 4.2];
@@ -2810,7 +2810,8 @@ function uvBucket(mat){ let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d
 // A wall hologram: pictures as wide as the building's face, floating just off it (inside the plot), with a thin
 // emitter bar on the wall under them. P is at the bottom (the top of the ground floor) and H is the height up to
 // the roofline. The ad is never stretched to fit: a tall wall takes a stack of N pictures, each cut from the atlas
-// version whose proportions are closest to H/N (the nearest is at most about 20% off). ad 0 Robo-Repair, 1 PureFlow.
+// version whose proportions are closest to H/N (the nearest is at most about 20% off, and the pictures in it keep their
+// true shape). ad 0 Robo-Repair, 1 PureFlow.
 function wallHologram(P, W, H, id, ad){
   box(M.metalDark, P, 0, -.05, -.02, W*.92, .07, .1); box(M.neonCyan, P, 0, -.015, .035, W*.86, .015, .015);
   for (const sx of [-1, 1]) glow(P, sx*W*.3, 0, .06, 'cyan', .3);

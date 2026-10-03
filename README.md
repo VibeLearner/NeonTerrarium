@@ -164,8 +164,8 @@ brutalist arcologies and dome market halls (`js/buildings.js`: `signShop`, `tile
 `arcologyTower`, `glassTower`, `brutalTower`). The streets are lit warm from the shopfronts, with lantern strings
 between buildings and no street lamps. About one commercial building in six that is mid-size or taller wears a
 hologram ad down one face, from just under the roofline to the top of the ground floor. The ad is never stretched:
-tall walls get a stack of portrait versions of it, made from the original pictures by seam carving
-(`tools/make_tall_holo_ads.sh`, needs ImageMagick). About one tall tower in thirty throws a huge air-filter hologram out over the
+tall walls get portrait versions of it (the lettering and picture keep their true size and only the plain
+gaps between them grow; `tools/make_tall_holo_ads.py`, needs Pillow), stacked when the wall is very tall. About one tall tower in thirty throws a huge air-filter hologram out over the
 street. That one plays a cycle of ads (an air-filter ad, Aether-Vane recruitment, Synth Corp security) that
 protest groups hack in turn. Code: `wallHologram` and `airHologram`; ad art in `assets/sprites/holo_*.png`, built by
 `tools/make_holo_ads.py`.

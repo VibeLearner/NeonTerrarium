@@ -11,13 +11,18 @@ Code: `js/people.js`. Sprites: `assets/sprites/people.png`.
 | 2 | Households, jobs, daily routines tied to the hour; fewer people out at night | Done |
 | 2b | Real doors that slide open and shut; walking that never clips buildings, furniture or plants | Done |
 | 3 | Stall keepers, queueing and eating at the food stalls, sitting on benches and stools, stopping to chat | Done |
-| 4 | Delivery robots on the sidewalks, bumping into each other, reactions with emote icons | Done |
-| 5 | Dark streets and muggings, police patrols, an event log for the radio RJ | Done (the log is kept; the radio host that reads it is still to come) |
+| 4 | Delivery drones on the sidewalks, bumping into each other, reactions with emote icons | Done (the first delivery robots were replaced by a hovering parcel drone) |
+| 5 | Dark streets and muggings, police patrols, an event log | Done (`cityLog` is kept, but the radio host is scripted and does not read it yet) |
+| 6 | Lawn sitting: picnic blankets, pairs of friends, hologram projector shows | Done |
+| 7 | Police hoverbikes that patrol, rush to muggings and bring muggers in | Done |
+| 8 | The Neon Dome's nights: queue, bouncers, dancing, going home | Done |
 
 ## How it works
 
-**Sprites.** One atlas (`assets/sprites/people.png`, 32 cells of 12x16 by 15 rows): 12 citizens, the police
-officer (row 12), the delivery robot (row 13) and emote bubbles (row 14). Citizens: 12 characters (Craftpix townspeople and city men packs), one 16 px row each, 20 cells
+**Sprites.** One atlas (`assets/sprites/people.png`, 32 cells of 12x16 by 16 rows): 12 citizens, the police
+officer (row 12), the old delivery robot (row 13, no longer drawn), emote bubbles (row 14) and the club's
+bouncers (row 15, the officer redrawn in red). The delivery drones have their own sheet, `assets/sprites/ddrone.png`.
+Citizens: 12 characters (Craftpix townspeople and city men packs), one 16 px row each, 20 cells
 of 12 px, facing right (mirrored for facing left): 6 walk, 4 idle, 6 gesture, 4 sitting. Gestures come from the
 pack's Special sheets (scaled to match the rest; the five characters that have one), used for chatting, ordering
 and serving; the others sway through their idle frames instead. Sitting frames are made from the idle frames:
@@ -30,10 +35,12 @@ a handheld scanner and an angry reaction). Officers work three shifts round the 
 duty they walk a beat: from the station to a street crossing a few blocks away, stop and scan for a while, then
 on to the next, and now and then back to the station. Like the stalls, the station is always staffed.
 
-**Delivery robots.** The small hover bot from the drones pack (the one with a parcel drop animation). About one
-for every two shops, each based at a shop: it glides out of the shop's door, crosses town on the sidewalk
-network to a home, lowers a parcel capsule onto the step, the door opens to take it in, and the bot heads back
-(or straight on to another drop). Fewer deliveries between 23:00 and 6:00.
+**Delivery drones.** A little round hover drone with a parcel strapped on, drawn from eight views by its heading
+(`ddrone.png`, one cell per view, plus the parcel set down on the doorstep). About one for every two shops (at most
+30), each based at a shop: it glides out of the shop's door at 1.4 units a second, crosses town on the sidewalk
+network to a home, dips to set the parcel on the step, the door opens to take it in, and the drone heads back
+(or straight on to another drop). Fewer deliveries between 23:00 and 6:00. (Code: `syncBots`, `BOT_SPEED` and
+`DD` in `people.js`. The ambient sky drones in `vehicles.js` are a separate, purely decorative thing.)
 
 **Bumping and emotes.** Walkers (and bots) meeting head-on or crossing on a narrow path sometimes bump: both stop
 for a moment and react with a bubble over their head (!, ?, a sweat drop or an anger mark; officers scowl with
@@ -52,7 +59,20 @@ past alone, with no officer within 8 units, the lurker sometimes darts over and 
 ('!', then a sweat drop), the mugger runs off to a crossing well away and melts into the dark, and the victim
 hurries on. The nearest officer on duty runs to the spot (keeping to the walkways) and looks around with the
 scanner. A lurker lies low for a few minutes after each job. Muggings and police call-outs go into `cityLog`
-(hour, place, who), kept for the radio host.
+(hour, place, who). Nothing reads it yet: the radio host plays fixed recordings (`js/music.js`) rather than
+commenting on the city, so feeding `cityLog` to the host is still an idea.
+
+Lit streets get rare muggers too: about one occupied, non-megastructure plot in twelve has a lurker who strikes
+less often (30% against 50% on a dark plot), gives up sooner and then stays away much longer.
+
+**Police hoverbikes.** Each station parks black hoverbikes in the bays out front, one per patrol drone (up to the
+size of the crew). Now and then an officer takes one out on a patrol of a few street crossings somewhere in the
+city, never more than two out at once, and brings it home. When a drone is sent to a mugging, two bikes rush to the
+spot and search round it. If the drone holds the mugger in its red light for five seconds, the mugger is tagged and
+the bikes run them down. The bike that gets there first takes them back to the station on its pillion and they go
+in; the other patrols the area for a while. A red and blue light bar flashes whenever a bike is moving. The bike is
+a billboard picked from eight drawn views by its heading (`assets/sprites/pbike_*.png`); the rider and passenger are
+drawn by `people.js` from `POLICE_BIKES`. (Code: `policeBikes` in `mega.js`.)
 
 **Police drone.** The drone parked on the station's roof pad is live (in `policeFx`, mega.js): every 25 to 55 seconds of real time, whatever the hour, it lifts off with its red and blue lights flashing, climbs high enough to clear the buildings, visits three
 street crossings nearby, hovers over each with a searchlight cone on the street, then flies home and lands.
@@ -91,6 +111,24 @@ dissolve in the doorway as they cross the threshold.
 - **Benches.** Sidewalk benches and plaza benches have two seats each; every plot with one is a small place to
   sit for a while.
 
+- **Lawns.** A plot laid fully to lawn gets four places to sit on the ground, two groups in two of its quarters
+  (the middle stays clear for a park lamp): a picnic blanket (two seats facing each other, where people eat), a
+  pair of seats side by side (friends chatting), or a hologram projector with one or two seats facing it (the
+  sitters watch a show that plays over it). The blanket is brought by the first person to sit and folded away when
+  they leave. Walkers avoid lawns as short cuts: a lawn path costs five times its length in routing. (Code:
+  `lawnSpots` in `world.js`; blankets and shows in `people.js`.)
+- **The Neon Dome.** See below.
+
+**The Neon Dome's nights.** The club opens at 19:00 and closes at 4:00 (`clubOpenAt` in `mega.js`). Each time it
+opens it picks a mood (`CLUB_MODES` in `people.js`): packed (target 55 inside, someone arriving about every 0.7 s),
+decent (24, every 1.6 s) or nearly empty (4, every 7 s). Residents who are home and free come out, even the ones
+who would normally be asleep. Some stop at the bar kiosk or the snack stand first (more on a busy night), then join
+the queue along the rope, which has 11 places. Two bouncers on the door check each person's ID: most go in, now
+and then one is turned away and shoved off. Inside they dance, on the floor or up on the gallery, for 30 to 200
+seconds depending on the night, then walk out and home; a few stop by the path to throw up first (a puddle is left
+on the paving). Now and then a bouncer goes in and walks someone out, and at closing time everyone still inside
+drifts out. The bouncers use the red-clad officer sprite on row 15 of the atlas.
+
 **What people do there.** A square visitor usually queues at an open stall (gesturing as they order while the
 keeper serves), then takes their food to a cafe stool or a spot to stand. Otherwise they stand somewhere, often
 right next to someone, and the two face each other and chat with gestures. Seats get the sitting frames. Each
@@ -101,7 +139,8 @@ counter is taken from there.
 Residential sections house 4 to 8, commercial 2 to 3, luxury 3 to 5, industrial none.
 
 **Jobs.** Commercial 3 to 5, luxury 2 to 4, industrial 4 to 6, and the megastructures (mall 8 per tier,
-foundry 14, cloud pagoda 12, market mall 10, police 8, radio 6, square 6). About 80% want work; jobs nearer home are more likely. Jobs are kept
+foundry 14, cloud pagoda 12, market mall 10, Neon Dome 10, police 8, radio 6; the square's jobs are its stall
+keepers, one per stall). About 80% want work; jobs nearer home are more likely. Jobs are kept
 across edits and only re-handed out when a workplace goes.
 
 **Routines.** The hour is the one set in Settings (the clock doesn't run). Each person has a wake time, a
@@ -137,6 +176,10 @@ Rough numbers on a 7x7 test island (half plazas): 89 people; at 12:30 up to 57 w
 - No collision between walkers yet: two people can pass through each other on a narrow path.
 - People walk on the street band more than the sidewalk: the sidewalk round most buildings is too narrow for a
   person with clearance.
+- The radio host does not react to the city yet (see Muggings above).
+- There is no automated test: the clipping check and `peopleStats()` below are run by hand.
+- The music and radio recordings in `assets/audio/` ship in the repo but their licensing is not documented
+  anywhere.
 
 ## Licensing
 

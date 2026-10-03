@@ -13,7 +13,7 @@ or Cmd+Shift+R on a Mac).
 
 ## Playing it locally
 
-The game is plain HTML and JavaScript with no build step, but it has to be served over http (browsers block loading the sprite images straight from disk). From this folder:
+The game is plain HTML and JavaScript with no build step, but it has to be served over http (browsers block loading the sprite images straight from disk). Three.js and the fonts load from CDNs, so you also need a network connection. From this folder:
 
 ```
 python3 -m http.server 8000
@@ -27,12 +27,15 @@ then open http://localhost:8000.
 |---|---|---|
 | Pick a zone | Zone A to D buttons, or 1 to 4 (Esc or 0 to deselect) | Zone buttons |
 | Build | Click the sky to grow the platform; with a zone picked, click to build, click a roof to stack a section | Tap |
+| Change a plot's greenery | With no zone picked, click an empty plot: cycles some plants, bare, lawn (the choice becomes the default for new plots) | Tap |
 | Remove the top section | Right-click | Press and hold |
-| Move around | W A S D (Shift for faster), H to jump back to the middle | |
-| Rotate | Drag, or Q / E | Two-finger twist |
-| Zoom | Scroll wheel | Pinch |
+| Delete mode | X, or the delete button by the zones: drag to select a block of plots, click inside it to delete everything there (buildings, platform and any megastructure reaching into it), click outside to drop the selection. X or Esc to leave | Delete button |
+| Place a megastructure | Pick it in the Buildings menu, click to put it down, R turns it, right-click or Esc cancels | Tap |
+| Move around | W A S D or the arrow keys (Shift for faster), H or Home to jump back to the middle | |
+| Rotate | Drag, or Q / E (45 degree steps) | Two-finger twist |
+| Zoom | Scroll wheel, or + / - | Pinch |
 
-Your city saves automatically in the browser.
+Your city saves automatically in the browser (plots, megastructures and the style sliders). The time of day, weather, wind, render options and camera are not saved and reset on reload.
 
 ## Project layout
 
@@ -46,8 +49,8 @@ js/ground.js            streets, sidewalks, bridges and cables between buildings
 js/vehicles.js          hover cars, delivery drones, their shadows, chimney steam
 js/sky.js               time of day, the pixel composite (outlines, sky, stars, rain, reflections, light shafts), clouds
 js/audio.js             sound effects (Web Audio), volume setting
-js/mega.js              megastructures: unlocking, placing, removing; the radio station
-js/people.js            people: residents, jobs, daily routines, the sidewalk network, walking door to door
+js/mega.js              megastructures: unlocking, placing, removing, their live parts (koi, police drone and hoverbikes, club lights)
+js/people.js            people: residents, jobs, daily routines, the sidewalk network, walking door to door, delivery drones, muggings and police, the Neon Dome's nights
 js/world.js             the game world: cells, building stacks, batching, edits, build and remove animations, saving
 js/input.js             camera, mouse / touch / keyboard, settings panel
 js/main.js              start-up and the frame loop
@@ -56,8 +59,10 @@ assets/sprites/people.png  the people atlas: 12 characters, one 16 px row each, 
 docs/people.md          the people system: how it works, plan and progress
 assets/audio/music/     the music library the radio plays (see the README in that folder)
 assets/ui/cassette.png  the radio's cassette (from the neon sign sheet)
-js/music.js             the radio: music while the radio station stands, the cassette with the song name
+js/music.js             the radio: music while the radio station stands, the cassette with the song name, the radio host (RJ)
+assets/audio/radio/     the radio host's recordings (intros, long talks, lore drops, interrupts, the love letter) and the static bursts
 tools/make_playlist.py  optional: writes assets/audio/music/playlist.json (track order, nicer titles)
+tools/make_floor_decals.py, tools/make_holo_ads.py  asset generators for the floor decals and the hologram ad sheets
 assets/audio/sfx/       sound effects: place.wav (build pop), remove.wav (removal thud), radio-on.wav (radio station arrives), mega-arrive.wav (any other megastructure arrives; 4.6 s, the length of its arrival animation)
 assets/audio/sfx/originals/  the untouched source recordings, for re-editing
 ```
@@ -82,7 +87,10 @@ with crates riding along it (high enough for people to walk under). Code: `scrap
 
 ## Megastructures
 
-Landmarks that take a block of plots once the city is big enough. Each exists at most once. A megastructure never
+Landmarks that take a block of plots once the city is big enough. Each kind first arrives on its own, when its
+requirement is met (and, for some, on a random roll with each build). From then on it stays unlocked: the Buildings
+menu (it appears when the first one arrives) lists every kind that has arrived and places as many more as you like,
+each with its own variant. A megastructure never
 replaces buildings: it takes the nearest free block (open platform, or new platform grown onto the edge of the city).
 Each one arrives slowly (about four and a half seconds): its footprint is traced on the ground, a wireframe rises
 out of it, then the structure is revealed from the ground up behind a glowing scan line, and its live parts (the
@@ -95,6 +103,12 @@ koi, the drone, the screens) switch on at the end.
   fully arrived. A neon cassette appears under the title showing the song, with previous, play/pause and next
   buttons and an equalizer that follows the music. Removing
   the station stops the music. Music volume is in Settings, Sound.
+  The station also has a radio host, RJ. After the first song he drops the first piece of lore over the start of
+  the next one (the music turns down underneath), and a second one a few songs later. Now and then he adds a short
+  intro, a long talk, or cuts in partway through a song (the song stops, static, the interrupt, static, the song
+  picks up where it left off). Every bit of talk is wrapped in a burst of radio static. What he has said is
+  remembered in this browser, so nothing repeats; once he has said it all it's just the music. Settings, Render has
+  a Reset radio host button. Code: `js/music.js`; recordings in `assets/audio/radio/`.
 - **Sky mall:** a 3x2 block (either way round). Unlocks at 50 luxury and 30 industrial sections, then a 1 in 50
   chance per build. An octagonal white-and-gold mall on white columns, each side one sheet of glass looking into
   an open atrium with walkways and boutiques round a central core; the roof is mostly pool under a white canopy.
@@ -111,6 +125,8 @@ koi, the drone, the screens) switch on at the end.
   chance per build. A pale block over a lit glass lobby, a glass curtain wall, the neon badge and a POLICE fascia,
   framed facade screens cycling the wanted posters (assets/sprites/wanted.png, with a projection glitch), a cyan
   hologram ring round the building, a red/blue light bar flashing on the roof, patrol cars and officers out front.
+  A police drone on the roof pad and a row of black hoverbikes in the bays out front are live: the drone patrols
+  the nearby crossings, and the bikes patrol and rush to muggings (see `docs/people.md`).
 - **Rainbow Plaza market mall (彩虹广场 MALL):** a 4x4 block, a size up from the police station and taller. Arrives
   with the 30th commercial building (each plot with a commercial section counts once). A stacked, weathered market
   building in teal concrete patched with paint, rust and graffiti: shops all round the ground floor under striped
@@ -124,9 +140,33 @@ koi, the drone, the screens) switch on at the end.
   lanterns) with glass domes, rounded glass bays bulging out of the floors, arched gold-framed entrances, blue
   strip lighting along every edge, white piers with gold chevrons, hover cars on cantilevered pads, and on top a
   two-tier white pagoda roof with gold hips and a gold spire.
+- **Neon Dome:** a 4x4 nightclub under a geodesic glass dome. Arrives once there are 30 residential, 30 commercial
+  and 30 luxury buildings (each plot counts once). The dome's struts are lit in cyan and pink in one of three
+  patterns, picked per dome. It opens at 19:00 and closes at 4:00. Each night is packed, decent or nearly empty;
+  residents who are home and free come out, queue along the rope, get their ID checked by two bouncers, and dance
+  on the floor or the gallery. Details in `docs/people.md`.
 - New megastructures go in `MEGA_TYPES` at the top of `js/mega.js` (requirement, odds, footprint, max tiers).
-- For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall), **B** (town square), **V** (foundry), **C** (police station), **X** (market mall) or **P** (cloud pagoda)
+- For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall), **B** (town square), **V** (foundry), **C** (police station), **K** (market mall), **P** (cloud pagoda) or **J** (Neon Dome)
   to bring it in, or remove it, next to the plot under the pointer, skipping the requirement and the odds.
+
+## Lawns and parks
+
+Clicking an empty plot with no zone picked cycles its greenery: some plants, bare, or a lawn of tiny grass tufts
+that sways with the wind setting. Four or more connected lawn plots become a park, with tall garden lamps throwing
+wide pools of light. Every lawn has places to sit: a picnic blanket for two (brought by whoever comes to picnic and
+folded away when they leave), a pair of spots for friends, and a small hologram projector whose show plays while
+someone sits watching it. Code: `lawn` and `lawnSpots` in `js/world.js`, the shows and blankets in `js/people.js`.
+
+## Commercial streets and holograms
+
+The commercial zone builds neon-named shops, tiled-roof shops, market stalls, food plazas, glass towers, pagodas,
+brutalist arcologies and dome market halls (`js/buildings.js`: `signShop`, `tiledShop`, `foodPlaza`,
+`arcologyTower`, `glassTower`, `brutalTower`). The streets are lit warm from the shopfronts, with lantern strings
+between buildings and no street lamps. About one commercial building in six that is mid-size or taller wears a
+hologram ad across one face, and about one tall tower in thirty throws a huge air-filter hologram out over the
+street. That one plays a cycle of ads (an air-filter ad, Aether-Vane recruitment, Synth Corp security) that
+protest groups hack in turn. Code: `wallHologram` and `airHologram`; ad art in `assets/sprites/holo_*.png`, built by
+`tools/make_holo_ads.py`.
 
 ## People
 

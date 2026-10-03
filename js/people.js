@@ -1096,7 +1096,7 @@ function clubArrive(p, pl){
   return true;
 }
 // the queue's places: from the door along the rope
-const queueSlot = (m, k) => [.45 + k*.38, m.club.DR + 1.42];
+const queueSlot = (m, k) => [1.5 + k*.34, m.club.DR + 1.6];
 function clubDancePos(m){
   const c = m.club;
   for (let tries = 0; tries < 20; tries++){
@@ -1134,7 +1134,7 @@ function updateClubs(dt, t){
     const [bR, bL] = [s.bouncers[1], s.bouncers[0]];
     const front = s.queue[0];
     if (front && s.open && front.club.stage === 'queue' && bR.state === 'post' && t >= s.checkAt){
-      front.club.stage = 'check'; front.club.t0 = t; front.club.face = [1, -.4]; bR.state = 'check'; bR.t0 = t;
+      front.club.stage = 'check'; front.club.t0 = t; front.club.face = [-1, -.25]; bR.state = 'check'; bR.t0 = t;
     }
     if (bR.state === 'check' && t - bR.t0 > 2.2){
       const q = front && front.club && front.club.stage === 'check' ? front : null;
@@ -1208,9 +1208,9 @@ function drawBouncers(emit, t, dt){
     const pl = s.pl, m = pl && pl.mega; if (!m || !m.club || !places.has(pl.id)) continue;
     const c = m.club, door = c.door;
     for (const b of s.bouncers){
-      const post = [b.side*.95, c.DR + 1.15];
+      const post = [b.side*1.05, c.DR + 1.5];   // out in front of the doorway, clear of its walls
       let lx = post[0], lz = post[1], frame = F_IDLE + Math.floor(t*2 + (b.side > 0 ? 1.3 : 0)) % PPL.idle, alpha = 1, face = [0, 1];
-      if (b.state === 'check'){ frame = F_USE + Math.floor((t - b.t0)*6) % 6; face = [1, .3]; }
+      if (b.state === 'check'){ frame = F_USE + Math.floor((t - b.t0)*6) % 6; face = [1, .25]; }
       else if (b.state === 'shove'){ frame = F_ANGRY + Math.min(5, Math.floor((t - b.t0)*7)); face = [1, .3]; }
       else if (b.state === 'goIn'){ const u = Math.min(1, (t - b.t0)/1.6); lx = post[0] + (door[0] - post[0])*u; lz = post[1] + (door[1] - post[1])*u; frame = Math.floor(t*8) % PPL.walk; alpha = 1 - Math.max(0, (u - .6)/.4); face = [door[0] - post[0], door[1] - post[1]]; }
       else if (b.state === 'in') alpha = 0;

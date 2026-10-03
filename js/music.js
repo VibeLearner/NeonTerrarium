@@ -195,8 +195,13 @@ const music = (() => {
     else hush();
   }
   function update(dt){
-    const radio = typeof megas !== 'undefined' && [...megas.values()].find(m => m.kind === 'radio' && !anims.some(a => a.c === m));
-    // starts once the station has fully arrived (its arrival animation is over)
+    // starts once the station has fully arrived (its arrival animation is over), and carries on if the station is
+    // rebuilt in place (turned with R), which runs the build animation again
+    let radio = null;
+    if (typeof megas !== 'undefined') for (const m of megas.values()) if (m.kind === 'radio'){
+      if (!m.arrived && !anims.some(a => a.c === m)) m.arrived = true;
+      if (m.arrived) radio = m;
+    }
     setOn(!!radio);
     const playing = on && !paused && !blocked && !el.paused;
     // under the host's talk the song is turned down, and comes back up gently after

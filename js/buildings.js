@@ -2811,14 +2811,15 @@ function uvBucket(mat){ let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d
 // the projector on a wall at P (local +z out of the wall, origin at the lens height), throwing the picture D out
 // A wall hologram: tall signs floating just off a building's face (inside the plot), with a thin emitter bar on the wall
 // under them. P is at the bottom (the top of the ground floor) and H is the height up to the roofline. A sign is never
-// stretched: N copies are stacked (as few as fit under the face width W), each scaled to H/N tall and as wide as its
-// shape says, centered. ad 0 is the sushi sign, 1 the repair sign.
+// stretched: N signs are stacked (as few as fit under the face width W, the squarer sign deciding), each H/N tall, as
+// wide as its shape says and centered. The stack alternates between the two signs, starting with ad (0 sushi, 1 repair).
 function wallHologram(P, W, H, id, ad){
-  const A = WALL_ASPECT[ad], n = Math.max(1, Math.ceil(H/(W*A))), h = H/n, w = h/A, pair = 3 + ad + 2*Math.max(1, Math.round(h));
-  box(M.metalDark, P, 0, -.05, -.02, Math.max(w, .8)*.92, .07, .1); box(M.neonCyan, P, 0, -.015, .035, Math.max(w, .8)*.86, .015, .015);
-  for (const sx of [-1, 1]) glow(P, sx*Math.max(w, .8)*.3, 0, .06, 'cyan', .3);
+  const n = Math.max(1, Math.ceil(H/(W*Math.min(...WALL_ASPECT)))), h = H/n, wide = h/Math.min(...WALL_ASPECT), rows = Math.max(1, Math.round(h));
+  box(M.metalDark, P, 0, -.05, -.02, Math.max(wide, .8)*.92, .07, .1); box(M.neonCyan, P, 0, -.015, .035, Math.max(wide, .8)*.86, .015, .015);
+  for (const sx of [-1, 1]) glow(P, sx*Math.max(wide, .8)*.3, 0, .06, 'cyan', .3);
   const b = uvBucket(AIR_HOLO_MAT);
   for (let t = 0; t < n; t++){
+    const a = (ad + t) & 1, w = h/WALL_ASPECT[a], pair = 3 + a + 2*rows;
     const y0 = t*h + .02, C = [[-w/2, y0, 0, 0], [w/2, y0, .999, 0], [w/2, y0 + h - .02, .999, .999], [-w/2, y0 + h - .02, 0, .999]];
     for (const k of [0, 1, 2, 0, 2, 3]){ const [cx, cy, u, v] = C[k]; _aq.set(cx, cy, .08).applyMatrix4(P); b.p.push(_aq.x, _aq.y, _aq.z); b.n.push(0, 1, 0); b.u.push(id + t*7 + u, pair + v); b.d.push(0); }
   }

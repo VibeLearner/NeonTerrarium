@@ -2877,7 +2877,8 @@ const IND_ROOM = [toon(0x5a2420, { em: 0xb83a2c, kind: 'window' }), toon(0x5a1a1
 // the works' lit shopfronts and windows: red, and a step dimmer than elsewhere (their big lit panels bloomed)
 const IND_DIM_HEX = [0xb83a2c, 0xa82434, 0xc04a30, 0x9a1c24];
 const IND_DIM = [M.inShop, M.inShop2, M.winLit, M.bulb].filter(Boolean).map((m, i) => [m, toon(m.color.getHex(), { em: IND_DIM_HEX[i % 4], kind: m.userData.glow })]);
-// any other light on the works (a warm window, a gold trim, glowing fluid) turns to one of the reds, about as bright as it was
+// any other light on the works (a warm window, a gold trim) turns to one of the reds, about as bright as it was; the
+// liquid in the glass pipes is its own shader and keeps its blue, green and brown (see fluidSeg)
 const IND_AUTO = new Map();
 function indRed(mat){
   if (mat.userData.glow === 'blink') return null;

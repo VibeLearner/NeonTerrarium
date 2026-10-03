@@ -494,6 +494,37 @@ function removeSection(c){
   c.sections.pop(); refresh([c]);
   startAnim(c, 'remove', (c.sections.length ? c.height : CURB) - .05, top + 1.2, zone, SIDE, old);
 }
+// Delete mode: everything in a block of plots goes at once: megastructures that reach into it (whole), and every
+// plot in it, buildings and platform alike, each with the removal sweep. One rebuild for the lot at the end.
+function removeArea(r){
+  const inR = (i, j) => i >= r.i0 && i <= r.i1 && j >= r.j0 && j <= r.j1;
+  for (const m of [...megas.values()]) if (m.i <= r.i1 && m.i + m.w - 1 >= r.i0 && m.j <= r.j1 && m.j + m.h - 1 >= r.j0) removeMega(m);
+  const gone = [], touched = new Set();
+  for (const c of [...cells.values()]){
+    if (!inR(c.i, c.j) || c.mega) continue;
+    finishAnimsOn(c);
+    const top = c.sections.length ? c.height : CURB, zone = c.sections.length ? c.sections[0].zone : null;
+    const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
+    cells.delete(ckey(c.i, c.j)); dirtyRegions.add(regKey(c.i, c.j)); gone.push(c);
+    startAnim(c, 'remove', PLAT_BOTTOM, top + 1.4, zone, LOT, old);
+  }
+  for (const c of gone) for (const [a, b] of SIDES4){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n) touched.add(n); }
+  if (gone.length){ refresh([...touched]); save(); sfx.play('remove'); }
+  return gone.length;
+}
+// the selection in delete mode: a red patch over the plots, with an outline
+const selFill = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-PI/2), new THREE.MeshBasicMaterial({ color: 0xff3a4a, transparent: true, opacity: .26, depthTest: false, depthWrite: false }));
+const selEdge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: 0xff4a5a, transparent: true, opacity: .95, depthTest: false }));
+for (const o of [selFill, selEdge]){ o.layers.set(1); o.renderOrder = 999; o.visible = false; scene.add(o); }
+function showAreaSel(r){
+  if (!r){ selFill.visible = selEdge.visible = false; return; }
+  const x = (r.i0 + r.i1)/2*LOT, z = (r.j0 + r.j1)/2*LOT, sx = (r.i1 - r.i0 + 1)*LOT - .2, sz = (r.j1 - r.j0 + 1)*LOT - .2;
+  let top = CURB; for (const c of cells.values()) if (c.i >= r.i0 && c.i <= r.i1 && c.j >= r.j0 && c.j <= r.j1) top = Math.max(top, c.height);
+  selFill.position.set(x, CURB + .09, z); selFill.scale.set(sx, 1, sz);
+  const h = Math.min(top + .6, 30) + .7;
+  selEdge.position.set(x, -.6 + h/2, z); selEdge.scale.set(sx, h, sz);
+  selFill.visible = selEdge.visible = true;
+}
 function dropView(old){ if (old.view) world.remove(old.view); disposeData(old.data); }
 
 /* ---------- build and remove animations ---------- */

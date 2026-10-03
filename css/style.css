@@ -146,3 +146,10 @@ input[type=range]{width:100%;accent-color:var(--cyan);margin:0}
 .bitem.locked small{font-size:9.5px}
 .bitem:focus-visible{outline:1px solid #fff;outline-offset:2px}
 @media (max-width:700px){.bmenu{top:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px));width:190px}}
+
+/* delete mode: the button by the zones turns red, and so does the hint */
+.rot.del{font-size:15px}
+.rot.del:hover{border-color:#ff4a5a;color:#ff4a5a}
+.rot.del.on{border-color:#ff4a5a;color:#fff;background:rgba(255,58,74,.35);box-shadow:0 0 10px rgba(255,58,74,.6)}
+body.deleting #modeHint{color:#ffd0d4;background:rgba(80,10,20,.82)}
+body.deleting #view{cursor:crosshair}

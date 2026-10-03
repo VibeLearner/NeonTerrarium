@@ -857,7 +857,7 @@ function syncPeople(){
 // it glides out of the shop's door, crosses town to a home, lowers a parcel capsule onto the step, the door
 // opens to take it in, and the bot heads back (or straight on to another drop). About one bot for every two shops.
 const bots = [];
-const BOT_SPEED = .75;
+const BOT_SPEED = 1.4;   // a brisk glide, well past walking pace
 function walkOf(pts, extra){ const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1])); return Object.assign({ pts, cum, len: cum[cum.length - 1], s: 0 }, extra); }
 function syncBots(){
   const hubs = [...places.values()].filter(pl => pl.cell && pl.fun >= 2.5 && pl.doors.length);

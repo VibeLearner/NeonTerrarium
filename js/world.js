@@ -326,7 +326,7 @@ function rooftopBoard(c, y){
   if (c.sections.some(s => s.zone === 'mid') && (c.sections.length >= 3 || y >= 6) && y >= 5 && (window.AIR_FORCE === c.i + ',' + c.j || hash('airholo', c.i, c.j) % 30 === 0)){
     // facing the lowest neighbour (open sky, a park, the shortest roof), so the picture isn't buried in a tower
     const ha = hash('airside', c.i, c.j), nb = ([a, b]) => { const n = cells.get(ckey(c.i + a, c.j + b)); return n ? n.sections.length : -1; };
-    const sd = SIDES4.map((d, k) => [d, nb(d)*4 + ((ha >>> k*2) & 3)]).sort((p, q) => p[1] - q[1])[0][0], yp = y - .6, W = 3*LOT - .8, pair = (ha >>> 10) & 1, H = W*AIR_ASPECT[pair];
+    const sd = SIDES4.map((d, k) => [d, nb(d)*4 + ((ha >>> k*2) & 3)]).sort((p, q) => p[1] - q[1])[0][0], yp = y - .6, W = 3*LOT - .8, pair = (ha >>> 10) % 3, H = W*AIR_ASPECT[pair];
     airHologram(T(c.x + sd[0]*1.12, yp, c.z + sd[1]*1.12, Math.atan2(sd[0], sd[1])), W, H, 3.2, (ha >>> 4) % 50, window.AIR_PAIR !== undefined ? window.AIR_PAIR : pair);
   }
   if (size < 0) return;

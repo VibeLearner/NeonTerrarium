@@ -2732,16 +2732,17 @@ function holoQuad(F, x, y, z, w, h, ad, seed, kind){
 // two pairs: Caelum-Sol's pure air hacked by "breathe for free", Aether-Vane's Platform 9 recruitment hacked by "the sky belongs to no one"
 const AIR_A = new THREE.TextureLoader().load('assets/sprites/holo_pureair.png'), AIR_B = new THREE.TextureLoader().load('assets/sprites/holo_freeair.png');
 const AIR_A2 = new THREE.TextureLoader().load('assets/sprites/holo_aether.png'), AIR_B2 = new THREE.TextureLoader().load('assets/sprites/holo_sky.png');
-const AIR_ASPECT = [.75, 440/512];   // height over width of each pair's pictures
-for (const t of [AIR_A, AIR_B, AIR_A2, AIR_B2]){ t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }
+const AIR_A3 = new THREE.TextureLoader().load('assets/sprites/holo_synth.png'), AIR_B3 = new THREE.TextureLoader().load('assets/sprites/holo_watch.png');   // and Synth Corp's security, hacked by "Big Brother is watching"
+const AIR_ASPECT = [.75, 440/512, .75];   // height over width of each pair's pictures
+for (const t of [AIR_A, AIR_B, AIR_A2, AIR_B2, AIR_A3, AIR_B3]){ t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }
 const AIR_CYCLE = [60, 2.4, 30, 2.4];   // ad, glitch, hacked, glitch back (seconds)
 const AIR_HOLO_MAT = new THREE.ShaderMaterial({
-  uniforms: { tA: { value: AIR_A }, tB: { value: AIR_B }, tA2: { value: AIR_A2 }, tB2: { value: AIR_B2 }, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
+  uniforms: { tA: { value: AIR_A }, tB: { value: AIR_B }, tA2: { value: AIR_A2 }, tB2: { value: AIR_B2 }, tA3: { value: AIR_A3 }, tB3: { value: AIR_B3 }, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform sampler2D tA; uniform sampler2D tB; uniform sampler2D tA2; uniform sampler2D tB2; uniform float time; uniform float lightsOn; varying vec2 vUv;` + LIT_GLSL + `
+  fragmentShader: `uniform sampler2D tA; uniform sampler2D tB; uniform sampler2D tA2; uniform sampler2D tB2; uniform sampler2D tA3; uniform sampler2D tB3; uniform float time; uniform float lightsOn; varying vec2 vUv;` + LIT_GLSL + `
     float hh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
     float pr = 0.0;
-    vec3 smp(float b, vec2 q){ q = clamp(q, 0.0, 1.0); if (pr > .5) return b > .5 ? texture2D(tB2, q).rgb : texture2D(tA2, q).rgb; return b > .5 ? texture2D(tB, q).rgb : texture2D(tA, q).rgb; }
+    vec3 smp(float b, vec2 q){ q = clamp(q, 0.0, 1.0); if (pr > 1.5) return b > .5 ? texture2D(tB3, q).rgb : texture2D(tA3, q).rgb; if (pr > .5) return b > .5 ? texture2D(tB2, q).rgb : texture2D(tA2, q).rgb; return b > .5 ? texture2D(tB, q).rgb : texture2D(tA, q).rgb; }
     void main(){
       pr = floor(vUv.y + 1e-4);
       float id = floor(vUv.x + 1e-4), u = vUv.x - id, v = vUv.y - pr;

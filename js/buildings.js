@@ -2729,17 +2729,22 @@ function holoQuad(F, x, y, z, w, h, ad, seed, kind){
 // Caelum-Sol's pure-air ad for a minute, then it glitches, gets "hacked" and the free-air protest sign takes over for
 // half a minute, then glitches back, and round again. Additive, so the dark of the sign is see-through; scanlines, a
 // rolling band, flicker; torn rows, split colour and static in the glitches. A faint beam fans out from the lens.
+// two pairs: Caelum-Sol's pure air hacked by "breathe for free", Aether-Vane's Platform 9 recruitment hacked by "the sky belongs to no one"
 const AIR_A = new THREE.TextureLoader().load('assets/sprites/holo_pureair.png'), AIR_B = new THREE.TextureLoader().load('assets/sprites/holo_freeair.png');
-for (const t of [AIR_A, AIR_B]){ t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }
+const AIR_A2 = new THREE.TextureLoader().load('assets/sprites/holo_aether.png'), AIR_B2 = new THREE.TextureLoader().load('assets/sprites/holo_sky.png');
+const AIR_ASPECT = [.75, 440/512];   // height over width of each pair's pictures
+for (const t of [AIR_A, AIR_B, AIR_A2, AIR_B2]){ t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }
 const AIR_CYCLE = [60, 2.4, 30, 2.4];   // ad, glitch, hacked, glitch back (seconds)
 const AIR_HOLO_MAT = new THREE.ShaderMaterial({
-  uniforms: { tA: { value: AIR_A }, tB: { value: AIR_B }, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
+  uniforms: { tA: { value: AIR_A }, tB: { value: AIR_B }, tA2: { value: AIR_A2 }, tB2: { value: AIR_B2 }, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform sampler2D tA; uniform sampler2D tB; uniform float time; uniform float lightsOn; varying vec2 vUv;` + LIT_GLSL + `
+  fragmentShader: `uniform sampler2D tA; uniform sampler2D tB; uniform sampler2D tA2; uniform sampler2D tB2; uniform float time; uniform float lightsOn; varying vec2 vUv;` + LIT_GLSL + `
     float hh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
-    vec3 smp(float b, vec2 q){ q = clamp(q, 0.0, 1.0); return b > .5 ? texture2D(tB, q).rgb : texture2D(tA, q).rgb; }
+    float pr = 0.0;
+    vec3 smp(float b, vec2 q){ q = clamp(q, 0.0, 1.0); if (pr > .5) return b > .5 ? texture2D(tB2, q).rgb : texture2D(tA2, q).rgb; return b > .5 ? texture2D(tB, q).rgb : texture2D(tA, q).rgb; }
     void main(){
-      float id = floor(vUv.x + 1e-4), u = vUv.x - id, v = vUv.y;
+      pr = floor(vUv.y + 1e-4);
+      float id = floor(vUv.x + 1e-4), u = vUv.x - id, v = vUv.y - pr;
       if (!gl_FrontFacing) u = 1.0 - u;
       float t = time + id*23.7, cyc = mod(t, ${AIR_CYCLE.reduce((a, b) => a + b).toFixed(1)});
       float e1 = ${AIR_CYCLE[0].toFixed(1)}, e2 = e1 + ${AIR_CYCLE[1].toFixed(1)}, e3 = e2 + ${AIR_CYCLE[2].toFixed(1)};
@@ -2792,7 +2797,7 @@ AIR_BEAM_MAT.userData.colorOnly = true; AIR_BEAM_MAT.userData.noCast = true;
 const _aq = new THREE.Vector3();
 function uvBucket(mat){ let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: null, u: [] }; buckets.set(mat, b); } return b; }
 // the projector on a wall at P (local +z out of the wall, origin at the lens height), throwing the picture D out
-function airHologram(P, W, H, D, id){
+function airHologram(P, W, H, D, id, pair = 0){
   // the projector: a housing on brackets, a lens ring, a lit lens
   box(M.metalDark, P, 0, 0, .22, .7, .36, .44); box(M.frame, P, 0, .2, .22, .74, .04, .48);
   for (const sx of [-.25, .25]) box(M.metalDark, P, sx, -.24, .12, .06, .2, .24);
@@ -2800,7 +2805,7 @@ function airHologram(P, W, H, D, id){
   box(M.neonCyan, P, -.24, .1, .445, .1, .03, .01); box(M.neonPink, P, .22, .1, .445, .06, .03, .01);
   // the picture
   const b = uvBucket(AIR_HOLO_MAT), C = [[-W/2, -H/2, 0, 0], [W/2, -H/2, .999, 0], [W/2, H/2, .999, .999], [-W/2, H/2, 0, .999]];
-  for (const k of [0, 1, 2, 0, 2, 3]){ const [cx, cy, u, v] = C[k]; _aq.set(cx, cy, D).applyMatrix4(P); b.p.push(_aq.x, _aq.y, _aq.z); b.n.push(0, 1, 0); b.u.push(id + u, v); b.d.push(0); }
+  for (const k of [0, 1, 2, 0, 2, 3]){ const [cx, cy, u, v] = C[k]; _aq.set(cx, cy, D).applyMatrix4(P); b.p.push(_aq.x, _aq.y, _aq.z); b.n.push(0, 1, 0); b.u.push(id + u, pair + v); b.d.push(0); }
   // the beam: four faces from the lens to the picture's edges
   const bb = uvBucket(AIR_BEAM_MAT), L = [0, 0, .5], E = [[-W/2, -H/2], [W/2, -H/2], [W/2, H/2], [-W/2, H/2]];
   for (let k=0; k<4; k++){

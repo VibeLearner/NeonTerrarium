@@ -937,7 +937,8 @@ function squareVariant(m){
   return Object.assign(v, SQ_FORCE || {});
 }
 M.fountainWater = toon(0x6fcfe6, { em:0x1e6a86, kind:'trim' });
-M.sakura = toon(0xf2a2c4, { em:0x4a1830, kind:'window' }); M.sakura2 = toon(0xffc8dc, { em:0x5a2840, kind:'window' }); M.sakura3 = toon(0xd87aa6, { flat:1 });
+M.sakura = toon(0xf2a2c4, { em:0x4a1830, kind:'window' }); M.sakura2 = toon(0xffc8dc, { em:0x5a2840, kind:'window' }); M.sakura3 = toon(0xd87aa6, { flat:1 }); M.sakura4 = toon(0xfbe4ee, { flat:1 });
+M.sakuraBark = toon(0x4a3430, { flat:1 });
 M.shrineRed = toon(0xc8402e); M.shrineRed2 = toon(0x9a2e22); M.shrineDark = toon(0x2e2826); M.shrineRope = toon(0xe8dcb8);
 M.clockFace = toon(0xe8e0c8, { em:0x8a7a50, kind:'window' }); M.bandRoof = toon(0x5a4a82); M.bandRoof2 = toon(0x7a3a4a);
 // a figure drawn as boxes (performers on the bandstand: always drawn, never real people)
@@ -978,25 +979,61 @@ function centreFountain(P){
   emitters.push(new THREE.Vector3(0, 2.9, 0).applyMatrix4(P));
   return { mast: 3.15, cross: false };
 }
-// a sakura tree in a raised planter, its canopy lit soft pink, paper lanterns in the branches, petals underfoot
+// a sakura tree in a raised planter of grass: a gnarled trunk that splits into crooked limbs, each forking again
+// out and a little down, so the crown spreads wide and flat; the blossom sits in loose clumps of small irregular
+// puffs at the twig ends (with gaps you can see branches through), in three pinks, lit soft at night. Paper
+// lanterns hang from the lower limbs, and petals drift across the grass and the paving.
+function sakuraLimb(P, x, y, z, dx, dy, dz, len, th, depth, tips){
+  const ex = x + dx*len, ey = y + dy*len, ez = z + dz*len;
+  // a slight kink halfway, so no limb is ruler-straight
+  const mx = (x + ex)/2 + rnd(-.08, .08)*len, my = (y + ey)/2 + rnd(-.05, .08)*len, mz = (z + ez)/2 + rnd(-.08, .08)*len;
+  strut(M.sakuraBark, P, x, y, z, mx, my, mz, th); strut(M.sakuraBark, P, mx, my, mz, ex, ey, ez, th*.85);
+  if (depth <= 0){ tips.push([ex, ey, ez, len]); return; }
+  const n = depth >= 2 ? irand(2, 3) : irand(2, 4), h = Math.atan2(dz, dx);
+  for (let k=0; k<n; k++){
+    const a = h + (k - (n - 1)/2)*rnd(.5, .8) + rnd(-.25, .25);
+    const up = depth >= 2 ? rnd(.25, .6) : rnd(-.15, .25);                 // the crown flattens out, the twigs droop a touch
+    const hl = Math.sqrt(1 - up*up);
+    sakuraLimb(P, ex, ey, ez, Math.cos(a)*hl, up, Math.sin(a)*hl, len*rnd(.62, .78), th*.62, depth - 1, tips);
+  }
+}
 function centreSakura(P){
   centreBase(P);
   put(U.cyl16, M.concM, under(P, T(0, .3, 0, 0, 5.6, .5, 5.6)));
   put(U.cyl16, M.neonPink, under(P, T(0, .42, 0, 0, 5.66, .03, 5.66)));
   put(U.cyl16, M.pgMoss, under(P, T(0, .56, 0, 0, 5.3, .04, 5.3)));
-  for (let k=0; k<9; k++){ const a = rnd(0, TAU), r = rnd(1.0, 2.4); plant(pick(['g_fern2', 'bush', 'bushFlower', 'g_fern3']), P, Math.cos(a)*r, .58, Math.sin(a)*r, rnd(.6, .85)); }
-  strut(M.trunk, P, 0, .55, 0, .15, 1.6, .1, .42); strut(M.trunk, P, .15, 1.6, .1, -.08, 2.5, 0, .32);
-  const ends = [];
-  for (let k=0; k<6; k++){
-    const a = k*TAU/6 + rnd(-.3, .3), rr = rnd(1.5, 2.3), y = rnd(2.9, 3.6), sy = rnd(1.9, 2.4), mx = Math.cos(a)*rr*.55, mz = Math.sin(a)*rr*.55;
-    strut(M.trunk, P, 0, sy, 0, mx, y - .45, mz, .17); strut(M.trunk, P, mx, y - .45, mz, Math.cos(a)*rr, y, Math.sin(a)*rr, .1);
-    ends.push([Math.cos(a)*rr, y, Math.sin(a)*rr]);
+  // the planter laid to grass: the same short tufts as a lawn, packed edge to edge (clear round the trunk)
+  const gs = .19;
+  for (let gx = -2.6; gx <= 2.6; gx += gs) for (let gz = -2.6; gz <= 2.6; gz += gs){
+    const x = gx + rnd(-.05, .05), z = gz + rnd(-.05, .05), r = Math.hypot(x, z);
+    if (r > 2.58 || r < .38) continue;
+    plant('gt0', P, x, .58, z, rnd(.24, .28));
   }
-  for (const [ex, ey, ez] of ends) for (let q=0; q<5; q++) sph(pick([M.sakura, M.sakura2, M.sakura3]), P, ex + rnd(-.6, .6), ey + rnd(-.15, .5), ez + rnd(-.6, .6), rnd(.45, .72), .75);
-  for (let q=0; q<7; q++) sph(pick([M.sakura, M.sakura2]), P, rnd(-.9, .9), rnd(3.6, 4.3), rnd(-.9, .9), rnd(.6, .85), .75);
-  ends.forEach(([ex, ey, ez], k) => { glow(P, ex, ey + .2, ez, 'pink', 1.3);
-    if (k % 2){ cyl(M.frame, P, ex, ey - .45, ez, .006, .5); box(M.lantern, P, ex, ey - .78, ez, .16, .22, .16); glow(P, ex, ey - .78, ez, 'amber', .8); noteLight(P, ex, ey - .78, ez, 0xff8a3a); } });
-  for (let k=0; k<46; k++){ const a = rnd(0, TAU), r = rnd(.6, 5.6), x = Math.cos(a)*r, z = Math.sin(a)*r; box(pick([M.sakura2, M.sakura3]), P, x, r < 2.7 ? .6 : .065, z, .06, .012, .05, rnd(0, PI)); }
+  for (let k=0; k<6; k++){ const a = rnd(0, TAU), r = rnd(1.4, 2.4); plant(pick(['bushFlower', 'g_fern3', 'g_flowers']), P, Math.cos(a)*r, .58, Math.sin(a)*r, rnd(.55, .8)); }
+  for (let k=0; k<5; k++){ const a = k*TAU/5 + rnd(-.3, .3), r = rnd(.32, .5); strut(M.sakuraBark, P, 0, .9, 0, Math.cos(a)*(r + .25), .56, Math.sin(a)*(r + .25), .12); }   // roots over the soil
+  // the trunk: leaning, twisting a little as it rises, then splitting into three or four limbs
+  const lean = rnd(0, TAU), tips = [];
+  let px = 0, py = .56, pz = 0;
+  for (let k=1; k<=3; k++){ const nx = Math.cos(lean)*.12*k + rnd(-.06, .06), nz = Math.sin(lean)*.12*k + rnd(-.06, .06), ny = .56 + k*.5;
+    strut(M.sakuraBark, P, px, py, pz, nx, ny, nz, .42 - k*.05); px = nx; py = ny; pz = nz; }
+  const limbs = irand(3, 4), a0 = rnd(0, TAU);
+  for (let k=0; k<limbs; k++){
+    const a = a0 + k*TAU/limbs + rnd(-.35, .35), up = rnd(.45, .7), hl = Math.sqrt(1 - up*up);
+    sakuraLimb(P, px, py, pz, Math.cos(a)*hl, up, Math.sin(a)*hl, rnd(1.0, 1.25), .2, 2, tips);
+  }
+  // blossom: a loose clump of small puffs round each twig end, a few strays hanging below
+  const shades = [M.sakura, M.sakura2, M.sakura3, M.sakura4];
+  for (const [ex, ey, ez] of tips){
+    const n = irand(8, 12), base = pick(shades);
+    for (let q=0; q<n; q++) blob(chance(.6) ? base : pick(shades), P, ex + rnd(-.42, .42), ey + rnd(-.18, .22), ez + rnd(-.42, .42), rnd(.13, .24), .7);
+    if (chance(.5)) blob(pick(shades), P, ex + rnd(-.3, .3), ey - rnd(.25, .45), ez + rnd(-.3, .3), rnd(.08, .13), 1.1);
+  }
+  tips.forEach(([ex, ey, ez], k) => { if (k % 4 === 0) glow(P, ex, ey + .1, ez, 'pink', 1.1); });
+  // lanterns from the lower twigs
+  tips.slice().sort((a, b) => a[1] - b[1]).slice(0, 4).forEach(([ex, ey, ez]) => {
+    cyl(M.frame, P, ex, ey - .3, ez, .006, .5); box(M.lantern, P, ex, ey - .62, ez, .15, .2, .15); glow(P, ex, ey - .62, ez, 'amber', .8); noteLight(P, ex, ey - .62, ez, 0xff8a3a); });
+  // petals, on the grass and blown out across the paving
+  for (let k=0; k<56; k++){ const a = rnd(0, TAU), r = rnd(.6, 6.0), x = Math.cos(a)*r, z = Math.sin(a)*r; box(pick([M.sakura2, M.sakura3]), P, x, r < 2.6 ? .62 : .065, z, .06, .012, .05, rnd(0, PI)); }
   return { mast: null, cross: false };
 }
 // a round bandstand: a stage under a conical roof on slim posts, a band playing, a big screen behind them

@@ -316,6 +316,7 @@ function buildStack(c){
 // down a face, the air-filter picture) don't depend on the roof or the top section at all, so a building that has one
 // keeps it as you stack more onto it (the roof billboards and the side board do change with the top section).
 const airCells = new Set();   // the towers that may throw an air-filter hologram (whether or not there's room for it right now)
+const AIR_HOLO_ODDS = 20;     // one commercial building in this many that hasn't got the wall hologram throws the big air-filter picture, which makes one in 30 overall
 const WALL_HOLO_ODDS = 3;     // one commercial building in this many, once it's tall enough, wears a wall hologram
 const WALL_HOLO_MIN_Y = 2.4;  // 'tall enough': stacking a section can make a building shorter (the whole stack is built afresh), but never
                               // below this for two or more sections, so a building that has a hologram keeps it as it grows
@@ -324,9 +325,14 @@ function rooftopBoard(c, y){
   airCells.delete(c);
   if (!top || c.dark) return;
   const mid = c.sections.some(s => s.zone === 'mid');
-  // one commercial building in WALL_HOLO_ODDS, tall enough, wears a hologram ad down one face, as wide as the
-  // building, never out past its plot, from just under the roofline to the top of the ground floor
-  const hw = hash('wallside', c.i, c.j), wsd = SIDES4[hw & 3], wallOn = mid && y >= WALL_HOLO_MIN_Y && (window.WALL_FORCE === c.i + ',' + c.j || hash('wallholo', c.i, c.j) % WALL_HOLO_ODDS === 0);
+  // A building has the wall hologram or the air-filter one, never both: the plots that get the wall hologram are
+  // picked first, and the air-filter tower is picked from the others. Both picks come from the plot alone, so
+  // stacking never swaps one for the other.
+  const key = c.i + ',' + c.j, wallPick = window.WALL_FORCE === key || hash('wallholo', c.i, c.j) % WALL_HOLO_ODDS === 0;
+  const airPick = window.AIR_FORCE === key || (!wallPick && hash('airholo', c.i, c.j) % AIR_HOLO_ODDS === 0);
+  const hw = hash('wallside', c.i, c.j), wsd = SIDES4[hw & 3], wallOn = mid && y >= WALL_HOLO_MIN_Y && wallPick && !airPick;
+  // one commercial building in WALL_HOLO_ODDS (and not an air-filter tower), tall enough, wears a hologram ad down one
+  // face, as wide as the building, never out past its plot, from just under the roofline to the top of the ground floor
   if (wallOn){
     const Wd = 2.2, yb = CURB + FH + .1;   // the ground floor is left clear for the shopfront
     wallHologram(T(c.x + wsd[0]*1.18, yb, c.z + wsd[1]*1.18, Math.atan2(wsd[0], wsd[1])), Wd, y - .08 - yb, (hw >>> 4) % 50, (hw >>> 10) % WALL_CELLS.length);
@@ -335,7 +341,7 @@ function rooftopBoard(c, y){
   // The picture (three plots wide) hangs over the three plots in front of the tower, so it's thrown from the face whose
   // three front plots are the lowest, and only if they're all lower than the picture's bottom edge (else it would be
   // inside a building). When a neighbour changes, the tower is rebuilt (see refresh) and picks again.
-  if (mid && (c.sections.length >= 3 || y >= 6) && y >= 5 && (window.AIR_FORCE === c.i + ',' + c.j || hash('airholo', c.i, c.j) % 30 === 0)){
+  if (mid && (c.sections.length >= 3 || y >= 6) && y >= 5 && airPick){
     airCells.add(c);
     const ha = hash('airside', c.i, c.j), W = 3*LOT - .8, pair = (ha >>> 10) % 3, H = W*AIR_ASPECT[pair], yp = y - .6;
     const front = ([a, b]) => { let m = 0; for (let l = -1; l <= 1; l++){ const n = cells.get(ckey(c.i + a + (a ? 0 : l), c.j + b + (b ? 0 : l))); if (n) m = Math.max(m, n.height); } return m; };

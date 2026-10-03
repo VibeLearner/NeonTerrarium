@@ -168,7 +168,7 @@ hologram ad down one face, from just under the roofline to the top of the ground
 Very tall walls get a stack that runs through the signs in turn. The signs are packed into one atlas, `assets/sprites/holo_walls.png`,
 from `assets/sprites/originals/holo_*.webp` by `tools/make_wall_holo_signs.py` (needs Pillow; it prints the `WALL_CELLS`
 line to paste into `js/buildings.js`).
-About one tall tower in thirty throws a huge air-filter hologram out over the
+A building never has both: about one tall tower in thirty (picked from the buildings without a wall sign) throws a huge air-filter hologram out over the
 street. That one plays a cycle of ads (an air-filter ad, Aether-Vane recruitment, Synth Corp security) that
 protest groups hack in turn. It hangs over the three plots in front of the tower, so it only appears where those
 plots are lower than its bottom edge (the tower picks the clearest face, and rebuilds when a neighbor changes). Code: `wallHologram` and `airHologram`; ad art in `assets/sprites/holo_*.png`, built by

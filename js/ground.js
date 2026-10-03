@@ -91,7 +91,7 @@ function groundLot(lot){
   }
   if (chance(.4)) box(G.grout, P, pick([-1,1])*(SIDE/2-.15), top+.03, rnd(-1,1), .12, .045, .2);   // drain grate
   // the commercial streets are the lit ones: a soft warm wash over the street on every side (light only, no halo)
-  if (lot.cls === 'mid') for (const [sx, sz] of SIDES4) if (chance(.5)){ const t = rnd(-.9, .9); glow(P, sx*mid + sz*t, rnd(.8, 1.0), sz*mid + sx*t, chance(.6) ? 'spill' : 'spill2', rnd(.75, 1.05)); }   // a pool here and there, not an even wash
+  if (lot.cls === 'mid') for (const [sx, sz] of SIDES4) if (chance(.45)){ const t = rnd(-.8, .8), o = SIDE/2 - .1; glow(P, sx*o + sz*t, rnd(.35, .55), sz*o + sx*t, chance(.6) ? 'spill' : 'spill2', rnd(1.3, 1.6)); }   // light spilling out of a shopfront at counter height, here and there
   // tactile strip where the crosswalk meets the curb
   box(M.hazard, P, 0, top+.035, SIDE/2-.14, .55, .045, .12);
   // wet stains and moss in the tile gaps
@@ -318,8 +318,7 @@ function connectPair(a, b){
           if (used.some(u => Math.abs(u-y) < .3)) continue;
           used.push(y);
           const za = rnd(-.55, .55), zb = chance(.5) ? za : rnd(-.55, .55);
-          lanternString(Q, -len/2 - .1, y, za, len/2 + .1, y + rnd(-.15, .15), zb, rnd(.15, .32));
-          if (t === 0 && chance(.5)) glow(Q, rnd(-.6, .6), y - .5, (za + zb)/2, 'spill', rnd(.9, 1.2));
+          lanternString(Q, -len/2 - .1, y, za, len/2 + .1, y + rnd(-.15, .15), zb, rnd(.15, .32), .45);   // small halos: decoration, not the street's light
           break;
         }
       }

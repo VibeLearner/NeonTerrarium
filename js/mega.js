@@ -819,13 +819,13 @@ function hangingFood(P, x, y, z){ for (let k=0; k<4; k++){ const hx = x + (k - 1
 let reflectLights = null;
 const _rl = new THREE.Vector3();
 function noteLight(P, x, y, z, hex){ if (!reflectLights) return; _rl.set(x, y, z).applyMatrix4(P); const c = new THREE.Color(hex); reflectLights.push([_rl.x, _rl.y, _rl.z, c.r, c.g, c.b]); }
-function lanternString(P, ax, ay, az, bx, by, bz, sag){
+function lanternString(P, ax, ay, az, bx, by, bz, sag, hk = 1){
   const n = Math.max(4, Math.round(Math.hypot(bx - ax, bz - az)/.55));
   let px = ax, py = ay, pz = az;
   for (let k=1; k<=n; k++){
     const t = k/n, x = ax + (bx - ax)*t, z = az + (bz - az)*t, y = ay + (by - ay)*t - sag*Math.sin(PI*t);
     strut(M.frame, P, px, py, pz, x, y, z, .012);
-    if (k < n){ box(chance(.5) ? M.lantern : M.lantern2, P, x, y - .1, z, .1, .14, .1); if (k % 2) glow(P, x, y - .1, z, chance(.6) ? 'amber' : 'warm', .55); if (k % 2) noteLight(P, x, y - .1, z, 0xffa040); }
+    if (k < n){ box(chance(.5) ? M.lantern : M.lantern2, P, x, y - .1, z, .1, .14, .1); if (k % 2) glow(P, x, y - .1, z, chance(.6) ? 'amber' : 'warm', .55*hk); if (k % 2) noteLight(P, x, y - .1, z, 0xffa040); }
     px = x; py = y; pz = z;
   }
 }

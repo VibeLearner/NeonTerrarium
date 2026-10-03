@@ -242,7 +242,6 @@ function buildPlatformBody(c){
   // the park lamps stand in the middle of every other plot, on a checkerboard laid over the whole island, so
   // however the green grows they keep an even spacing (and the plots between are lit from the four around them)
   if (!c.sections.length && c.park){ if ((c.i + c.j) % 2 === 0) parkLamp(); }
-  else if (c.sections[0] && c.sections[0].zone === 'mid'){ const k = hash('mlamp', c.i, c.j) % 4; lamp(CORNERS[k]); lamp(CORNERS[(k + 2) % 4]); }   // the commercial streets: lamps on two corners
   else if (chance(.45)) lamp(pick(CORNERS));   // a street lamp on one corner
   else if (DARK) lamp(CORNERS[hash('lamp', c.i, c.j) % 4]);   // a dark street always has its one failing lamp
 }

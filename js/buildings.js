@@ -2518,7 +2518,7 @@ function stallBase(lot, st, P0){
       if (chance(.7)) figureAt(F, cx + rnd(-.15, .15), 0, zf - .36);
       if (chance(.6*S.neon)){ const [sn, sc] = pick(BASE_SIGNS); fitSign(under(F, T(0, 0, zf + .07, 0)), sn, cx, h - .05, 0, sw - .12, .5, sc); }
       // the warm spill: out over the street in front of the stall, lighting the road (no halo of its own)
-      if (chance(.6)) glow(F, cx + rnd(-.2, .2), rnd(1.0, 1.2), zf + rnd(.45, .65), chance(.65) ? 'spill' : 'spill2', rnd(1.0, 1.35));
+      if (chance(.7)) glow(F, cx + rnd(-.2, .2), rnd(.45, .6), zf + rnd(.05, .2), chance(.65) ? 'spill' : 'spill2', rnd(1.4, 1.75));   // out of the stall at counter height, across the street
     }
     if (chance(.35)){ const x = rnd(x0 + .2, x1 - .2); stool(F, x, zf + .14); spotAt(F, x, .16, zf + .14, 'seat', null, [0, -1]); }
   }

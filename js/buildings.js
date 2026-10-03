@@ -2733,16 +2733,18 @@ function holoQuad(F, x, y, z, w, h, ad, seed, kind){
 const AIR_A = new THREE.TextureLoader().load('assets/sprites/holo_pureair.png'), AIR_B = new THREE.TextureLoader().load('assets/sprites/holo_freeair.png');
 const AIR_A2 = new THREE.TextureLoader().load('assets/sprites/holo_aether.png'), AIR_B2 = new THREE.TextureLoader().load('assets/sprites/holo_sky.png');
 const AIR_A3 = new THREE.TextureLoader().load('assets/sprites/holo_synth.png'), AIR_B3 = new THREE.TextureLoader().load('assets/sprites/holo_watch.png');   // and Synth Corp's security, hacked by "Big Brother is watching"
-const AIR_ASPECT = [.75, 440/512, .75];   // height over width of each pair's pictures
-for (const t of [AIR_A, AIR_B, AIR_A2, AIR_B2, AIR_A3, AIR_B3]){ t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }
+// and two plain ads (no hack) for the wall holograms: Robo-Repair and PureFlow air filters
+const AIR_W1 = new THREE.TextureLoader().load('assets/sprites/holo_robo.png'), AIR_W2 = new THREE.TextureLoader().load('assets/sprites/holo_pureflow.png');
+const AIR_ASPECT = [.75, 440/512, .75, .75, .75];   // height over width of each pair's pictures
+for (const t of [AIR_A, AIR_B, AIR_A2, AIR_B2, AIR_A3, AIR_B3, AIR_W1, AIR_W2]){ t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }
 const AIR_CYCLE = [60, 2.4, 30, 2.4];   // ad, glitch, hacked, glitch back (seconds)
 const AIR_HOLO_MAT = new THREE.ShaderMaterial({
-  uniforms: { tA: { value: AIR_A }, tB: { value: AIR_B }, tA2: { value: AIR_A2 }, tB2: { value: AIR_B2 }, tA3: { value: AIR_A3 }, tB3: { value: AIR_B3 }, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
+  uniforms: { tA: { value: AIR_A }, tB: { value: AIR_B }, tA2: { value: AIR_A2 }, tB2: { value: AIR_B2 }, tA3: { value: AIR_A3 }, tB3: { value: AIR_B3 }, tW1: { value: AIR_W1 }, tW2: { value: AIR_W2 }, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform sampler2D tA; uniform sampler2D tB; uniform sampler2D tA2; uniform sampler2D tB2; uniform sampler2D tA3; uniform sampler2D tB3; uniform float time; uniform float lightsOn; varying vec2 vUv;` + LIT_GLSL + `
+  fragmentShader: `uniform sampler2D tA; uniform sampler2D tB; uniform sampler2D tA2; uniform sampler2D tB2; uniform sampler2D tA3; uniform sampler2D tB3; uniform sampler2D tW1; uniform sampler2D tW2; uniform float time; uniform float lightsOn; varying vec2 vUv;` + LIT_GLSL + `
     float hh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
     float pr = 0.0;
-    vec3 smp(float b, vec2 q){ q = clamp(q, 0.0, 1.0); if (pr > 1.5) return b > .5 ? texture2D(tB3, q).rgb : texture2D(tA3, q).rgb; if (pr > .5) return b > .5 ? texture2D(tB2, q).rgb : texture2D(tA2, q).rgb; return b > .5 ? texture2D(tB, q).rgb : texture2D(tA, q).rgb; }
+    vec3 smp(float b, vec2 q){ q = clamp(q, 0.0, 1.0); if (pr > 3.5) return texture2D(tW2, q).rgb; if (pr > 2.5) return texture2D(tW1, q).rgb; if (pr > 1.5) return b > .5 ? texture2D(tB3, q).rgb : texture2D(tA3, q).rgb; if (pr > .5) return b > .5 ? texture2D(tB2, q).rgb : texture2D(tA2, q).rgb; return b > .5 ? texture2D(tB, q).rgb : texture2D(tA, q).rgb; }
     void main(){
       pr = floor(vUv.y + 1e-4);
       float id = floor(vUv.x + 1e-4), u = vUv.x - id, v = vUv.y - pr;
@@ -2754,6 +2756,7 @@ const AIR_HOLO_MAT = new THREE.ShaderMaterial({
       else if (cyc < e2){ float k = (cyc - e1)/(e2 - e1); g = 1.0; useB = step(hh(vec2(band, floor(t*9.0))), k*k*1.15); }       // hacked: rows flip over to the protest
       else if (cyc < e3) useB = 1.0;
       else { float k = (cyc - e3)/(${AIR_CYCLE[3].toFixed(1)}); g = 1.0; useB = 1.0 - step(hh(vec2(band, floor(t*9.0) + 3.0)), k*k*1.15); }   // and taken back
+      if (pr > 2.5){ g = 0.0; useB = 0.0; }   // the wall ads: never hacked, only the odd small glitch
       // the odd small glitch while it plays (more often on the hacked sign)
       float small = step(useB > .5 ? .86 : .95, hh(vec2(floor(t*3.0), id)))*step(.5, hh(vec2(floor(t*16.0), id + 2.0)));
       g = max(g, small*.45);
@@ -2798,6 +2801,14 @@ AIR_BEAM_MAT.userData.colorOnly = true; AIR_BEAM_MAT.userData.noCast = true;
 const _aq = new THREE.Vector3();
 function uvBucket(mat){ let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: null, u: [] }; buckets.set(mat, b); } return b; }
 // the projector on a wall at P (local +z out of the wall, origin at the lens height), throwing the picture D out
+// A wall hologram: a picture as wide as the building's face, floating just off it (inside the plot), with a thin
+// emitter bar on the wall under it. pair 3 Robo-Repair, 4 PureFlow.
+function wallHologram(P, W, H, id, pair){
+  box(M.metalDark, P, 0, -.05, -.02, W*.92, .07, .1); box(M.neonCyan, P, 0, -.015, .035, W*.86, .015, .015);
+  for (const sx of [-1, 1]) glow(P, sx*W*.3, 0, .06, 'cyan', .3);
+  const b = uvBucket(AIR_HOLO_MAT), C = [[-W/2, 0, 0, 0], [W/2, 0, .999, 0], [W/2, H, .999, .999], [-W/2, H, 0, .999]];
+  for (const k of [0, 1, 2, 0, 2, 3]){ const [cx, cy, u, v] = C[k]; _aq.set(cx, cy + .02, .08).applyMatrix4(P); b.p.push(_aq.x, _aq.y, _aq.z); b.n.push(0, 1, 0); b.u.push(id + u, pair + v); b.d.push(0); }
+}
 function airHologram(P, W, H, D, id, pair = 0){
   // the projector: a housing on brackets, a lens ring, a lit lens
   box(M.metalDark, P, 0, 0, .22, .7, .36, .44); box(M.frame, P, 0, .2, .22, .74, .04, .48);

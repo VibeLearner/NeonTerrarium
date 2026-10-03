@@ -321,13 +321,20 @@ function rooftopBoard(c, y){
   if ((top.zone === 'mid' || top.zone === 'low') && y > 4.5 && r < (top.zone === 'mid' ? 45 : 28)) size = y > 6.5 ? 2 : 1;
   else if (top.zone === 'mid' && r < 72) size = 0;
   // and on the commercial streets, often a board hung off the side of the building too, part way up
-  if (c.sections.some(s => s.zone === 'mid') && y > 2.4 && (hv >>> 20) % 100 < 40) sideBoard(c, y, hv);
+  const sideB = c.sections.some(s => s.zone === 'mid') && y > 2.4 && (hv >>> 20) % 100 < 40;
+  if (sideB) sideBoard(c, y, hv);
   // one tall commercial tower in thirty throws the huge air-filter hologram out over the street from its top floor
   if (c.sections.some(s => s.zone === 'mid') && (c.sections.length >= 3 || y >= 6) && y >= 5 && (window.AIR_FORCE === c.i + ',' + c.j || hash('airholo', c.i, c.j) % 30 === 0)){
     // facing the lowest neighbour (open sky, a park, the shortest roof), so the picture isn't buried in a tower
     const ha = hash('airside', c.i, c.j), nb = ([a, b]) => { const n = cells.get(ckey(c.i + a, c.j + b)); return n ? n.sections.length : -1; };
     const sd = SIDES4.map((d, k) => [d, nb(d)*4 + ((ha >>> k*2) & 3)]).sort((p, q) => p[1] - q[1])[0][0], yp = y - .6, W = 3*LOT - .8, pair = (ha >>> 10) % 3, H = W*AIR_ASPECT[pair];
     airHologram(T(c.x + sd[0]*1.12, yp, c.z + sd[1]*1.12, Math.atan2(sd[0], sd[1])), W, H, 3.2, (ha >>> 4) % 50, window.AIR_PAIR !== undefined ? window.AIR_PAIR : pair);
+  }
+  // one commercial building in six, mid-sized or taller, wears a hologram ad across the upper part of one face,
+  // as wide as the building and never out past its plot
+  if (c.sections.some(s => s.zone === 'mid') && y >= 3.5 && (window.WALL_FORCE === c.i + ',' + c.j || hash('wallholo', c.i, c.j) % 6 === 0)){
+    const hw = hash('wallside', c.i, c.j), si = sideB && (hw & 3) === ((hv >>> 4) & 3) ? (hw + 1) & 3 : hw & 3, sd = SIDES4[si], Wd = 2.2, Hd = Wd*.75, yb = Math.max(1.5, y - .08 - Hd);   // up under the roofline, clear of the shop awnings
+    wallHologram(T(c.x + sd[0]*1.18, yb, c.z + sd[1]*1.18, Math.atan2(sd[0], sd[1])), Wd, Hd, (hw >>> 4) % 50, 3 + ((hw >>> 10) & 1));
   }
   if (size < 0) return;
   const side = [[0, 1], [1, 0], [0, -1], [-1, 0]][(hv >>> 8) & 3], off = size ? .1 : .45;

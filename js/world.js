@@ -257,9 +257,9 @@ const SECTION_TYPES = {
   // the commercial quarter: shops under neon names, tiled-roof shops, stall streets, pagodas, glass and brutalist
   // towers, glass-dome markets, food plazas, and the market-street types; no longer the pod, octagon and deck
   // houses, which the residential blocks share
-  mid:  { ground: [[signShop,3.6],[tiledShop,2],[stallMarket,1.6],[pagodaHall,1],[glassTower,1.1],[arcologyTower,.8],[domeMarket,.8],[foodPlaza,1],
-                   [buildShophouse,1.1],[platformTower,.8],[containerStack,1],[spiralTower,.8],[cornerMarket,1.1]],
-          upper: [[signShop,3],[tiledShop,1.6],[buildShophouse,1],[platformTower,.6],[containerStack,.8]] },
+  mid:  { ground: [[signShop,3.4],[tiledShop,1.8],[foodDeck,1.8],[stallMarket,1.4],[pagodaHall,1],[glassTower,.75],[arcologyTower,.8],[domeMarket,.8],[foodPlaza,.8],
+                   [billboardLot,.7],[buildShophouse,1],[platformTower,.7],[containerStack,.9],[spiralTower,.8],[cornerMarket,1]],
+          upper: [[signShop,2.6],[foodDeck,2.4],[tiledShop,1.4],[buildShophouse,.9],[platformTower,.5],[containerStack,.7]] },
   high: { ground: [[buildTower,1]], upper: [[slabTower,2],[glassHotelTower,1.5],[glassHotelPodium,1],[roundTower,1],[twistTower,1],[gardenTower,1],[domeTower,1],[shellTower,1],[cascadeTerraces,.8]] },
   ind:  { ground: [[hall,1],[silos,1],[stiltFactory,1],[tankYard,1],[scrapShed,1],[gearWorkshop,1],[repairsBlock,1],[partsWarehouse,1],[lubeShed,.8],[stackedWorks,2.6],[decoWorks,1.1],[brutalTower,1.1]], upper: [[hall,2],[silos,1],[scrapShed,1],[repairsBlock,1],[partsWarehouse,1],[brutalTower,.6]] },
 };
@@ -269,7 +269,7 @@ function pickWeighted(list){ const tot = list.reduce((s,[,w]) => s + w, 0); let 
 // against them). Sections of other zones are left as they are.
 const WHITE_TYPES = new Set([domeTower, shellTower, cascadeTerraces]);
 function buildStack(c){
-  let y = CURB, prevWhite = false;
+  let y = CURB, prevWhite = false, prevDeck = false;
   c.sectionTops = [];
   c.sections.forEach((sec, k) => {
     R = mulberry32(hash('sec', c.i, c.j, k, sec.zone, sec.seed));
@@ -284,11 +284,12 @@ function buildStack(c){
     const P0 = T(c.x + rnd(-.1,.1), y + (upper ? .1 : 0), c.z + rnd(-.1,.1), rnd(-st.yaw, st.yaw));
     let types = SECTION_TYPES[sec.zone][upper ? 'upper' : 'ground'];
     if (upper && sec.zone === 'high') types = types.filter(([f]) => WHITE_TYPES.has(f) === prevWhite);
+    if (upper && sec.zone === 'mid' && prevDeck) types = [[foodDeck, 5]].concat(types);   // decks of stalls like to pile up
     const builder = pickWeighted(types);
     NO_ROOF = !last;
     try { withStyle(sec.style, () => builder(lot, st, P0)); } finally { LUX = null; }
     NO_ROOF = false;
-    prevWhite = !!lot.white;
+    prevWhite = !!lot.white; prevDeck = builder === foodDeck;
     y += (upper ? .1 : 0) + Math.max(lot.height, FH);
     c.sectionTops.push(y);
     if (k === 0) c.firstFloors = lot.floors || 2;
@@ -307,11 +308,21 @@ function rooftopBoard(c, y){
   if (!top || (lot && lot.hasCarPad) || c.dark) return;
   const hv = hash('board', c.i, c.j, c.sections.length, top.seed), r = hv % 100;
   let size = -1;
-  if ((top.zone === 'mid' || top.zone === 'low') && y > 4.5 && r < 28) size = y > 6.5 ? 2 : 1;
-  else if (top.zone === 'mid' && r < 55) size = 0;
+  if ((top.zone === 'mid' || top.zone === 'low') && y > 4.5 && r < (top.zone === 'mid' ? 45 : 28)) size = y > 6.5 ? 2 : 1;
+  else if (top.zone === 'mid' && r < 72) size = 0;
+  // and on the commercial streets, often a board hung off the side of the building too, part way up
+  if (c.sections.some(s => s.zone === 'mid') && y > 2.4 && (hv >>> 20) % 100 < 40) sideBoard(c, y, hv);
   if (size < 0) return;
   const side = [[0, 1], [1, 0], [0, -1], [-1, 0]][(hv >>> 8) & 3], off = size ? .1 : .45;
   holoBoard(T(c.x + side[0]*off, y, c.z + side[1]*off, Math.atan2(side[0], side[1])), size, (hv >>> 11) % 9, (hv >>> 15) % 211);
+}
+// a billboard bracketed off a building's side wall, facing out over the street
+function sideBoard(c, y, hv){
+  const side = [[1, 0], [-1, 0], [0, 1], [0, -1]][(hv >>> 4) & 3], h = Math.max(1.4, y*(.45 + ((hv >>> 9) & 7)*.04));
+  const off = 1.12, x = c.x + side[0]*off, z = c.z + side[1]*off, ry = Math.atan2(side[0], side[1]);
+  const P = T(x, h, z, ry);
+  for (const s of [-1, 1]){ box(M.metalDark, P, s*.45, .3, -.12, .06, .06, .3); box(M.metalDark, P, s*.45, .05, -.05, .05, .5, .05); }   // the brackets into the wall
+  holoBoard(under(P, T(0, -.2, .05, 0)), 0, (hv >>> 13) % 9, (hv >>> 2) % 211);
 }
 // Steam vents: now and then a grate in the street beside a building breathes steam, and the mist (sky.js) gathers
 // round it. Common by industry (about 3 plots in 10), rare elsewhere (1 in 25); picked from the plot's position, so a

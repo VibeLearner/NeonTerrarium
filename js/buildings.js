@@ -110,7 +110,7 @@ function planLots(){
 
 
 /* ---------- facade decoration ---------- */
-const litRoom = st => chance(st.lit) ? pick(LIT_ROOMS) : M.glassDark;
+const litRoom = st => chance(st.lit) ? pick(st.rooms || LIT_ROOMS) : M.glassDark;   // (the commercial quarter has its own, warmer rooms)
 
 function decorateFloor(st,F,L,y0,floorIdx,lot){
   const ground = floorIdx === 0;
@@ -164,7 +164,7 @@ function shopfront(st,F,L,y0){
   if (chance(.7)) box(pick(st.awn||AWN), F, 0, y0+.9, .2, L*.8, .05, .42, 0, .3);
   if (chance(.85*S.neon)){
     if (chance(.5)) glyphSign(F, rnd(-L/5,L/5), y0+1.08, false, false);
-    else { const m=pick(st.neonMats); box(m,F,0,y0+1.06,.05,L*rnd(.35,.6),.14,.05); glow(F,0,y0+1.06,.2,NEON_GLOW.get(m),1.3); }
+    else { const m=pick(st.neonMats); box(m,F,0,y0+1.06,.05,L*rnd(.35,.6),.14,.05); glow(F,0,y0+1.06,.08,NEON_GLOW.get(m),.8); }   // halos sit on what's lit (out in front they read as dots)
   }
   if (chance(.6*S.clutter)) for (let k=0;k<irand(1,3);k++){
     const x=rnd(-L/2+.2,L/2-.2), z=rnd(.35,.55);
@@ -178,7 +178,7 @@ function garage(st,F,L,y0){
   box(pick([M.hazard,st.trim,M.frame]), F, 0, y0+.46, 0, wdt+.1, .84, .05);
   box(pick([M.interiorCool,M.interiorCool,M.winLit]), F, 0, y0+.34, .015, wdt, .6, .07);
   box(M.shutter, F, 0, y0+.74, .045, wdt, .18, .06);
-  box(M.neonAmber, F, 0, y0+.92, .07, .06, .06, .06); glow(F, 0, y0+.92, .17, 'amber', .8);
+  box(M.neonAmber, F, 0, y0+.92, .07, .06, .06, .06); glow(F, 0, y0+.92, .08, 'amber', .6);
   if (chance(.5*S.clutter)) for (const s of [-1,1]) box(pick([M.hazard,M.cloth2]), F, s*(wdt/2+.12), .12, .3, .08, .24, .08);   // bollards
 }
 function vending(F,x,z){
@@ -211,7 +211,7 @@ function glyphSign(F,x,y,vertical,projecting){
     glow(F, x, y, w/2+.1, col, .8+h*.8);
   } else {
     plant(kind, F, x, y, .07, 1, 'c', true);
-    glow(F, x, y, .3, col, .8+Math.max(w,h)*.7);
+    glow(F, x, y, .09, col, .5+Math.max(w,h)*.45);
   }
 }
 
@@ -1887,7 +1887,7 @@ function spiralTower(lot, st, P0){
       strut(M.inRust, P, Math.sin(a)*pr, y + .32, Math.cos(a)*pr, Math.sin(b)*pr, y + .32, Math.cos(b)*pr, .014); }
     for (let k=0; k<3; k++){ const F = atA(rnd(0, TAU), r, y);
       if (k === 0){ box(M2.door, F, 0, .33, .02, .26, .58, MIN_T); box(M.frame, F, 0, .33, .01, .32, .62, MIN_T); }
-      else { box(M.frame, F, 0, .48, .01, .36, .34, MIN_T); box(pick(LIT_ROOMS), F, 0, .48, .025, .3, .28, MIN_T); glow(F, 0, .48, .2, 'warm', .5); } }
+      else { box(M.frame, F, 0, .48, .01, .36, .34, MIN_T); box(pick(LIT_ROOMS), F, 0, .48, .025, .3, .28, MIN_T); glow(F, 0, .48, .05, 'warm', .4); } }
     for (let k=0; k<irand(3, 5); k++){ const a = rnd(0, TAU), x = Math.sin(a)*(r + .2), z = Math.cos(a)*(r + .2), q = R();
       if (q < .35) pottedPlant(under(P, T(0, y, 0)), x, z, rnd(.7, .9));
       else if (q < .55) crateAt(P, x, y, z, .8);
@@ -1912,14 +1912,14 @@ function spiralTower(lot, st, P0){
   }
   // the ramen bar at the foot, facing away from where the stair begins
   const as = a0 - PI*.62, Fs = atA(as, r, 0);
-  box(M.frame, Fs, 0, .45, .01, 1.0, .82, MIN_T); box(M.inShop2, Fs, -.1, .4, .03, .62, .66, MIN_T); glow(Fs, -.1, .4, .3, 'warm', 1.0);
+  box(M.frame, Fs, 0, .45, .01, 1.0, .82, MIN_T); box(M.inShop2, Fs, -.1, .4, .03, .62, .66, MIN_T); glow(Fs, -.1, .4, .06, 'warm', .7);
   box(M.inWood2, Fs, .35, .35, .03, .26, .62, MIN_T);   // a slatted side door
   for (let t = .26; t < .47; t += .05) box(M.inWood, Fs, t, .35, .045, .02, .6, MIN_T);
   box(M.inWood, Fs, -.1, .28, .2, .7, .05, .22); for (const x of [-.32, .12]) box(M.inWood2, Fs, x, .14, .2, .04, .28, .18);   // counter
   for (const x of [-.3, -.05]){ cyl(MC.white, Fs, x, .33, .2, .06, .04); emitters.push(new THREE.Vector3(x, .5, .2).applyMatrix4(Fs)); }
   box(MC.board, Fs, -.05, .98, .14, 2.0, .58, .05);
   wordSign(Fs, 'sign_w_noodles', -.05, .98, .18, 1, 'amber');
-  for (const x of [-.75, .65]){ box(M.lantern, Fs, x, .75, .25, .14, .2, .14); box(M.frame, Fs, x, .88, .25, .03, .06, .03); glow(Fs, x, .75, .35, 'red', .9); noteLight(Fs, x, .75, .35, 0xff4030); }
+  for (const x of [-.75, .65]){ box(M.lantern, Fs, x, .75, .25, .14, .2, .14); box(M.frame, Fs, x, .88, .25, .03, .06, .03); glow(Fs, x, .75, .25, 'red', .5); noteLight(Fs, x, .75, .25, 0xff4030); }
   raggedTarp(atA(as + .9, r, 0), 0, .95, .8, .55, .35, MC.tarp);
   for (let k=0; k<3; k++){ const a = as + .9 + rnd(-.3, .3); produceCrate(P, Math.sin(a)*(r + .55), 0, Math.cos(a)*(r + .55), pick([MC.cabbage, MC.daikon, MC.potato]), a); }
   for (const x of [-.6, -.15, .3]) stool(Fs, x, .45);
@@ -1958,7 +1958,7 @@ function cornerMarket(lot, st, P0){
   const Fu = under(P, T(0, h1, d/2, 0));
   box(MC.tarpGreen, Fu, .35, h2*.55, .05, .7, h2*.8, .03, 0, -.08);
   for (let t = .05; t < .68; t += .1) box(MC.tarpGreen, Fu, t, h2*.12 - rnd(0, .12), .07, .06, rnd(.08, .2), MIN_T);
-  { const Fx = under(P, T(w/2, h1, 0, PI/2)); box(M.frame, Fx, .2, .45, .01, .4, .34, MIN_T); box(pick(LIT_ROOMS), Fx, .2, .45, .025, .34, .28, MIN_T); glow(Fx, .2, .45, .2, 'warm', .5); }
+  { const Fx = under(P, T(w/2, h1, 0, PI/2)); box(M.frame, Fx, .2, .45, .01, .4, .34, MIN_T); box(pick(LIT_ROOMS), Fx, .2, .45, .025, .34, .28, MIN_T); glow(Fx, .2, .45, .05, 'warm', .4); }
   // the market inside: shelves of tins and jars at the back, string bulbs, a hanging lantern
   for (const y of [.45, .7]){ box(M.inWood2, P, (-w/2 + xr)/2, y, -d/2 + .16, xr + w/2 - .1, .03, .16);
     for (let x = -w/2 + .12; x < xr - .1; x += .09) if (chance(.75)) cyl(pick([MC.tomato, MC.lemon, MC.bottle, M.green2, MC.paper]), P, x, y + .06, -d/2 + .16, .03, .09); }
@@ -2028,12 +2028,15 @@ const COM = {
   walls: [toon(0x4a3a30), toon(0x3a3846), toon(0x5a3e52), toon(0xb8a888), toon(0x2e4a52), toon(0x7a4a3a)],
   wood: toon(0x5a3a28), wood2: toon(0x3e281c), stone: toon(0xc8b48e), stone2: toon(0xa8946e), stoneD: toon(0x7a6a50),
   tile: toon(0x2e3a52), tile2: toon(0x3a4a66), plaster: toon(0xe0d4b8), bronze: toon(0x8a6a3a),
-  warm: toon(0x5a3a1c, { em:0xd8903a, kind:'window' }), warm2: toon(0x5a3018, { em:0xc8702a, kind:'window' }), shopLit: toon(0x6a4a2a, { em:0xffd08a, kind:'window' }),
+  warm: toon(0x5a3a1c, { em:0xd8903a, kind:'window' }), warm2: toon(0x5a3018, { em:0xc8702a, kind:'window' }), shopLit: toon(0x6a3a1a, { em:0xff9a48, kind:'window' }),
   lanRed: toon(0x7a1e14, { em:0xff5a3a, kind:'bulb' }), lanTeal: toon(0x145a52, { em:0x3ae8c8, kind:'bulb' }), lanPurple: toon(0x3a1e5a, { em:0xb070ff, kind:'bulb' }), lanGold: toon(0x6a4a14, { em:0xffc04a, kind:'bulb' }),
   noren: toon(0x8a2a24), noren2: toon(0x2a3a5a), glass: null,
   stripes: [[0xc84a5a, 0xf0e4d0], [0x3a6a9a, 0xe8e0cc], [0x7a4aa0, 0xf0d8f0], [0x2a8a7a, 0xf0e8d8], [0xd0803a, 0x3a2a24]].map(p => p.map(h => toon(h))),
 };
 COM.glass = new THREE.MeshBasicMaterial({ color: 0xffe0b0, transparent: true, opacity: .16, depthWrite: false, side: THREE.DoubleSide }); COM.glass.userData.colorOnly = true;
+// the commercial quarter's light: warm rooms, and neon mostly pink and amber with purple (the references' contrast)
+STY.mid.rooms = [COM.warm, COM.warm2, COM.shopLit, M.winLit, M.interiorPink, COM.warm];   // amber and orange rooms, the odd pink one STY.mid.lit = .72;
+STY.mid.neonMats = [M.neonPink, M.neonPink, M4.neonPurple, M.neonAmber, M.neonAmber, M.neonCyan];
 const LAN_GLOW = new Map([[COM.lanRed, 'orange'], [COM.lanTeal, 'cyan'], [COM.lanPurple, 'pink'], [COM.lanGold, 'warm']]);
 const SHOP_SIGNS = [['sign_c_pawn', 'gold'], ['sign_c_noodles', 'amber'], ['sign_c_drones', 'cyan'], ['sign_c_prints', 'pink'], ['sign_c_tea', 'green'],
                     ['sign_c_records', 'platinum'], ['sign_c_cramen', 'pink'], ['sign_c_baropen', 'cyan'], ['sign_c_hotel', 'cyan'], ['sign_c_dataloan', 'pink'], ['sign_c_techparts', 'cyan']];
@@ -2281,7 +2284,7 @@ function neonTag(F, L, h, n = 1){
 }
 // concrete, weathered: the brutalist towers of the commercial quarter (their own greys, not the factories')
 COM.conc = toon(0x8e8c84); COM.conc2 = toon(0x74726a); COM.conc3 = toon(0x5a5852); COM.stain = toon(0x4a4a44); COM.moss = toon(0x5a7034, { flat:1 });
-COM.glassT = toon(0x1c2a44); COM.glassLit = toon(0x2a4060, { em:0x3a6a9a, kind:'window' }); COM.glassWarm = toon(0x4a3a2a, { em:0xffc078, kind:'window' }); COM.mullion = toon(0x2a3242);
+COM.glassT = toon(0x1c2a44); COM.glassLit = toon(0x2a4060, { em:0x3a6a9a, kind:'window' }); COM.glassWarm = toon(0x4a2e1a, { em:0xffa050, kind:'window' }); COM.mullion = toon(0x2a3242);
 COM.pagodaRed = toon(0x8a2a22); COM.pagodaRoof = toon(0x7a2a1e); COM.pagodaRoof2 = toon(0x2a3448); COM.gold = toon(0xc49a3a, { em:0x5a3a10, kind:'trim' }); COM.pillar = toon(0x9a2a1e);
 COM.corr = [toon(0x8a5a3a), toon(0x3e6a6a), toon(0x4a5a7a), toon(0xb07a3a), toon(0x6a6a6a), toon(0x5a3e5a)];
 // ARCOLOGY-07: a brutalist tower of weathered concrete: two tall piers, blocks cantilevered off them at odd heights
@@ -2347,7 +2350,7 @@ function glassTower(lot, st, P0){
     for (let k=0; k<floors; k++){ const fy = y + k*fh;
       box(COM.mullion, F, 0, fy + .02, .012, f.len, .04, .01);   // the floor line
       const run = chance(.35);   // a whole floor lit, or scattered offices
-      for (let c=0; c<cols; c++){ if (!run && chance(.55)) continue; box(chance(.82) ? COM.glassLit : COM.glassWarm, F, -f.len/2 + (c + .5)*f.len/cols, fy + fh*.55, .01, f.len/cols - .03, fh*.6, .005); } }
+      for (let c=0; c<cols; c++){ if (!run && chance(.55)) continue; box(chance(.3) ? COM.glassLit : COM.glassWarm, F, -f.len/2 + (c + .5)*f.len/cols, fy + fh*.55, .01, f.len/cols - .03, fh*.6, .005); } }
     for (let c=0; c<=cols; c++) box(COM.mullion, F, -f.len/2 + c*f.len/cols, y + floors*fh/2, .015, .015, floors*fh, .01); }
   // the name up one corner, sideways, and neon edges
   const Fn = under(P, T(w/2 - .1, 0, d/2 + .02, 0)), [nm, nc] = pick([['sign_c_nexus', 'platinum'], ['sign_c_arakawa', 'cyan']]);
@@ -2422,6 +2425,68 @@ function stallMarket(lot, st, P0){
   for (let k=0; k<2; k++) box(G.puddle, P, rnd(-.8, .8), .035, rnd(-.2, .2), rnd(.3, .6), .01, rnd(.15, .3));
   bulbString(P, -S2/2, 1.35, 0, S2/2, 1.35, 0, .1);
   Object.assign(lot, { height: 1.4, floors: 1, occupied: true });
+}
+// The food deck (the noodle-tower reference): a floor of food stalls open to the street on a concrete deck between
+// steel posts, and stackable, so decks pile up into a tower of noodle bars with a stair zigzagging up the side. Each
+// deck has two or three stalls (noren curtains, steaming pots and bowls, chillies drying, a neon name over each),
+// stools along the counters, a rail round the open edges and paper lanterns strung along the front; the top deck
+// gets a tarp canopy hung with lanterns. Lit warm all through, with the neon pink and purple over it.
+const DECK_SIGNS = [['sign_c_noodles', 'amber'], ['sign_c_ramen', 'amber'], ['sign_c_cramen', 'pink'], ['sign_c_noodlebar', 'pink'], ['sign_c_sushi', 'amber'], ['sign_w_24h', 'pink'], ['sign_c_open', 'pink']];
+function foodDeck(lot, st, P0){
+  const P = under(P0, T(0, 0, 0, pick([0, PI/2, PI, -PI/2]))), W = 2.35, D = 2.25, h = 1.2, upper = lot.base > CURB + .05;
+  box(COM.conc3, P, 0, .05, 0, W, .1, D);                                     // the deck
+  box(M4.neonPurple, P, 0, .03, D/2 + .005, W, .03, .02);
+  for (const [sx, sz] of CORNERS) box(M.metalDark, P, sx*(W/2 - .06), h/2, sz*(D/2 - .06), .1, h, .1);
+  box(M.metalDark, P, -W/2 + .06, h/2, 0, .08, h, .08);
+  // the stalls: along the back, and down the left side
+  const stall = (F, len) => {
+    box(COM.wood, F, 0, .1 + .25, 0, len - .1, .5, .32); box(COM.wood2, F, 0, .61, .02, len, .03, .38);   // the counter
+    box(COM.wood2, F, 0, .62, -.31, len - .1, .9, .02); box(COM.warm2, F, 0, .78, -.29, len - .3, .4, .01);   // the kitchen wall behind, a warm hatch in it
+    for (let x = -len/2 + .2; x < len/2 - .1; x += .32){ if (typeof steamPot === 'function' && chance(.45)) steamPot(F, x, .62, -.05); else if (typeof foodBowl === 'function') foodBowl(F, x, .62, .06, .065); }
+    const nm = pick([COM.noren, COM.noren2, toon(0x2a6a5a), toon(0xb0803a)]);
+    for (let x = -len/2 + .08; x < len/2 - .05; x += .11) box(nm, F, x, h - .2, .14, .1, .22, .012);       // the noren
+    if (chance(.6)) for (let q=0; q<5; q++){ const hx = -len/2 + .2 + q*.12; cyl(M.frame, F, hx, h - .1, .2, .004, .1); box(MC.chili, F, hx, h - .2, .2, .03, .12, .03); }
+    const [sn, sc] = pick(DECK_SIGNS); box(M.frame, F, 0, h - .02, .2, Math.min(len - .1, 1.2), .2, .03); fitSign(under(F, T(0, 0, .22, 0)), sn, 0, h - .02, 0, Math.min(len - .2, 1.1), .6, sc);
+    for (let x = -len/2 + .25; x < len/2 - .15; x += .4){ stool(F, x, .5); spotAt(F, x, .16, .5, 'seat', null, [0, -1]); }
+    figureAt(F, rnd(-len/3, len/3), 0, -.18);
+  };
+  stall(under(P, T(.1, .1, -D/2 + .36, 0)), W - .4);
+  if (chance(.75)) stall(under(P, T(-W/2 + .36, .1, .25, PI/2)), D - .9);
+  // the rail round the open front and right side, lanterns strung along the front
+  for (let x = -W/2 + .1; x <= W/2 - .1; x += .15) cyl(M.frame, P, x, .25, D/2 - .04, .008, .3);
+  box(M.frame, P, 0, .4, D/2 - .04, W - .1, .02, .02);
+  for (let k=0; k<6; k++){ const x = -W/2 + .2 + k*(W - .4)/5; paperLantern(P, x, h - .14 - .05*Math.sin(PI*k/5), D/2 - .02, k % 3 === 1 ? COM.lanGold : null, 1.05); }
+  box(M.frame, P, 0, h - .05, D/2 - .04, W - .1, .02, .02);
+  // the stair up the right side, deck to deck: two short flights with a landing
+  const sx = W/2 - .2, steps = 7;
+  for (let k=0; k<steps; k++){ const t = (k + .5)/steps; box(COM.conc2, P, sx, .1 + t*(h - .1), D/2 - .25 - t*(D - .7), .3, .04, .16); }
+  strut(M.frame, P, sx + .16, .55, D/2 - .2, sx + .16, h + .4, -D/2 + .45, .015);
+  // a bulb or two under the deck above (the light falls on the counters), halos tight on the bulbs
+  for (const x of [-.5, .4]){ box(M.bulb, P, x, h - .06, -.2, .06, .05, .06); glow(P, x, h - .1, -.2, 'warm', .45); }
+  if (!NO_ROOF){
+    // the top deck's roof: a tarp canopy on the posts, lanterns along its edge
+    box(pick([MC.tarp, MC.tarp2, M.tarp1 || MC.tarp]), P, 0, h + .1, 0, W + .1, .03, D + .1, 0, .08);
+    for (const [cx, cz] of CORNERS) cyl(M.metalDark, P, cx*(W/2 - .06), h + .05, cz*(D/2 - .06), .03, .1);
+    for (let k=0; k<4; k++) paperLantern(P, -W/2 + .35 + k*(W - .7)/3, h + .02, D/2 + .02, null, 1.0);
+  } else box(COM.conc3, P, 0, h + .02, 0, W, .06, D);   // the floor of the deck above
+  Object.assign(lot, { height: h + (NO_ROOF ? .05 : .15), floors: 1, occupied: true });
+}
+// A billboard on a plot of its own: a big holographic board (or two, back to back) on a steel frame high above the
+// street, a catwalk under it, and at its feet a kiosk with its shutter lit and a vending machine
+function billboardLot(lot, st, P0){
+  const P = under(P0, T(0, 0, 0, pick([0, PI/2, PI, -PI/2]))), lift = rnd(1.4, 2.4), twin = chance(.5);
+  const hv = hash('lotboard', P0.elements[12].toFixed(2), P0.elements[14].toFixed(2), lot.base);
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(M.metalDark, P, sx*.8, lift/2, sz*.35, .1, lift, .1);
+  for (const sz of [-.35, .35]) for (let y = .4; y < lift; y += .5){ strut(M.frame, P, -.8, y, sz, .8, y + .45, sz, .025); }   // bracing
+  box(M.metalDark, P, 0, lift, 0, 2.0, .08, .9); for (let x = -.95; x <= .95; x += .19) cyl(M.frame, P, x, lift + .18, .44, .008, .3);   // the catwalk
+  holoBoard(under(P, T(0, lift, .1, 0)), 2, hv % 9, (hv >>> 6) % 211);
+  if (twin) holoBoard(under(P, T(0, lift, -.1, PI)), 2, (hv >>> 3) % 9, (hv >>> 12) % 211);
+  // the kiosk at its foot
+  const Fk = under(P, T(.55, 0, .75, 0)); box(COM.wood, Fk, 0, .35, 0, .7, .7, .5); box(COM.shopLit, Fk, 0, .38, .26, .5, .4, .01);
+  stripedAwning(under(Fk, T(0, 0, .25, 0)), .72, .8, .3, .4, pick(COM.stripes)); paperLantern(Fk, -.3, .62, .4, null, .9);
+  if (typeof vending === 'function') vending(under(P, T(-.6, 0, .75, 0)), 0, 0);
+  neonTag(under(P, T(.55, 0, .5, PI)), .7, .7);
+  Object.assign(lot, { height: lift + (twin ? 2.6 : 2.6), floors: 1, occupied: true });
 }
 function buildFactory(lot, st, P0){
   const v = R();

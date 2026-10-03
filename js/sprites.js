@@ -481,10 +481,10 @@ function iconSign(st, F, x, y, projecting, k=.62){
     const Q = under(F, T(x, y, w/2+.08, PI/2));
     box(M.metalDark, F, x, y+SPR.size[kind][1]/PX*k/2+.03, w/2+.05, .04, .04, w+.12);
     plant(kind, Q, 0, 0, 0, k, 'c', true);
-    glow(F, x, y, w/2+.08, color, 1.3+w);
+    glow(F, x, y, w/2+.08, color, .9+w*.6);
   } else {
     plant(kind, F, x, y, .065, k, 'c', true);
-    glow(F, x, y, .3, color, 1.2+w);
+    glow(F, x, y, .08, color, .7+w*.6);
   }
 }
 const bigKind = () => pick(BIG_GROUND);

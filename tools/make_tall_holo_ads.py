@@ -1,7 +1,8 @@
-# Builds assets/sprites/holo_robo_tall.png and holo_pureflow_tall.png from the 512x384 originals (holo_robo.png,
-# holo_pureflow.png in the same folder). Each output is an atlas of five portrait versions of the ad, 512 px wide,
-# so a wall hologram can run the height of a building without stretching the picture (see wallHologram in
-# js/buildings.js, which must agree with the layout below).
+# Builds the wall-hologram pictures in assets/sprites (see wallHologram in js/buildings.js, which must agree with this):
+#  - holo_pureflow_tall.png from the 512x384 original holo_pureflow.png: an atlas of five portrait versions of the ad,
+#    512 px wide, so the hologram can run the height of a building without stretching the picture.
+#  - holo_sushi.png from originals/holo_sushi.webp: the tall Sushi sign, cropped to the sign on black with a small
+#    margin (it is already tall, so it needs no versions: the hologram just scales it).
 # Nothing is scaled. Each ad is cut into the parts that matter (frame, lettering, picture), kept at their true
 # size, and the extra height is filled by repeating the plain rows in the gaps between them.
 # Atlas layout: two columns of 512 px,
@@ -14,7 +15,6 @@ W = 512
 CELLS = [(0, 0, 2150), (0, 2150, 1075), (512, 0, 1536), (512, 1536, 768), (512, 2304, 538)]   # x, y, height
 # Gaps that can grow: (first row, last row, share of the extra height), rows counted in the 512x384 original
 GAPS = {
-    'robo':     [(81, 86, .40), (229, 236, .25), (292, 299, .10), (321, 327, .25)],
     'pureflow': [(95, 115, .40), (255, 274, .40), (321, 331, .20)],
 }
 
@@ -39,3 +39,9 @@ for ad, gaps in GAPS.items():
     for (x, y, h) in CELLS:
         atlas.paste(tall(src, gaps, h), (x, y))
     atlas.save(f'holo_{ad}_tall.png'); print(f'holo_{ad}_tall.png', atlas.size)
+
+# the Sushi sign: transparent background -> black (the hologram is additive, so black is see-through), 12 px margin
+sush = Image.open('originals/holo_sushi.webp').convert('RGBA')
+box = sush.getchannel('A').getbbox(); sush = sush.crop(box)
+out = Image.new('RGB', (sush.width + 24, sush.height + 24), (0, 0, 0)); out.paste(sush, (12, 12), sush)
+out.save('holo_sushi.png'); print('holo_sushi.png', out.size)

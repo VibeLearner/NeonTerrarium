@@ -2733,10 +2733,12 @@ function holoQuad(F, x, y, z, w, h, ad, seed, kind){
 const AIR_A = new THREE.TextureLoader().load('assets/sprites/holo_pureair.png'), AIR_B = new THREE.TextureLoader().load('assets/sprites/holo_freeair.png');
 const AIR_A2 = new THREE.TextureLoader().load('assets/sprites/holo_aether.png'), AIR_B2 = new THREE.TextureLoader().load('assets/sprites/holo_sky.png');
 const AIR_A3 = new THREE.TextureLoader().load('assets/sprites/holo_synth.png'), AIR_B3 = new THREE.TextureLoader().load('assets/sprites/holo_watch.png');   // and Synth Corp's security, hacked by "Big Brother is watching"
-// and two plain ads (no hack) for the wall holograms: Robo-Repair and PureFlow air filters. Each is an atlas of five
-// portrait versions of the ad (see tools/make_tall_holo_ads.py), so a hologram can run the height of a building without
-// stretching the picture: WALL_ASPECT is each version's height over width, WALL_CELLS where it sits in the atlas.
-const AIR_W1 = new THREE.TextureLoader().load('assets/sprites/holo_robo_tall.png'), AIR_W2 = new THREE.TextureLoader().load('assets/sprites/holo_pureflow_tall.png');
+// and two plain ads (no hack) for the wall holograms: the Sushi sign (tall, used as it is, SUSHI_ASPECT high over wide)
+// and PureFlow air filters (an atlas of five portrait versions of the ad, see tools/make_tall_holo_ads.py, so a
+// hologram can run the height of a building without stretching the picture: WALL_ASPECT is each version's height over
+// width, WALL_CELLS where it sits in the atlas).
+const AIR_W1 = new THREE.TextureLoader().load('assets/sprites/holo_sushi.png'), AIR_W2 = new THREE.TextureLoader().load('assets/sprites/holo_pureflow_tall.png');
+const SUSHI_ASPECT = 999/431;
 const WALL_ASPECT = [1.05, 1.5, 2.1, 3.0, 4.2];
 const WALL_ATLAS = [1024, 3225], WALL_CELLS = [[512, 2304, 538], [512, 1536, 768], [0, 2150, 1075], [512, 0, 1536], [0, 0, 2150]];   // x, y from the top, height (all 512 wide)
 const AIR_ASPECT = [.75, 440/512, .75, .75, .75];   // height over width of each pair's pictures
@@ -2749,13 +2751,15 @@ const AIR_HOLO_MAT = new THREE.ShaderMaterial({
     float hh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
     float pr = 0.0;
     vec3 wall(vec2 q){ float w = pr - 3.0, ad = mod(w, 2.0), vr = floor(w*.5 + .01); vec3 c = ${WALL_CELLS.map((c, k) => `vr < ${k}.5 ? vec3(${c[0]}.0, ${c[1]}.0, ${c[2]}.0)`).join(' : ')} : vec3(0.0);
-      vec2 a = vec2(${WALL_ATLAS[0]}.0, ${WALL_ATLAS[1]}.0), uv = vec2((c.x + .5 + q.x*511.0)/a.x, 1.0 - (c.y + .5 + (1.0 - q.y)*(c.z - 1.0))/a.y); return ad > .5 ? texture2D(tW2, uv).rgb : texture2D(tW1, uv).rgb; }
+      vec2 a = vec2(${WALL_ATLAS[0]}.0, ${WALL_ATLAS[1]}.0), uv = vec2((c.x + .5 + q.x*511.0)/a.x, 1.0 - (c.y + .5 + (1.0 - q.y)*(c.z - 1.0))/a.y); return ad > .5 ? texture2D(tW2, uv).rgb : texture2D(tW1, q).rgb; }
     vec3 smp(float b, vec2 q){ q = clamp(q, 0.0, 1.0); if (pr > 2.5) return wall(q); if (pr > 1.5) return b > .5 ? texture2D(tB3, q).rgb : texture2D(tA3, q).rgb; if (pr > .5) return b > .5 ? texture2D(tB2, q).rgb : texture2D(tA2, q).rgb; return b > .5 ? texture2D(tB, q).rgb : texture2D(tA, q).rgb; }
     void main(){
       pr = floor(vUv.y + 1e-4);
       float wl = pr > 2.5 ? 1.0 : 0.0, vr = floor((pr - 3.0)*.5 + .01), lines = 170.0;
-      // wall ads: one scanline every ~0.1 world units whatever the height of the version (its width is 2.2)
-      if (wl > .5) lines = 22.0*(${WALL_ASPECT.map((a, k) => `vr < ${k}.5 ? ${a.toFixed(2)}`).join(' : ')} : ${WALL_ASPECT[WALL_ASPECT.length - 1].toFixed(2)});
+      // wall ads: one scanline every ~0.1 world units whatever the height of the version (PureFlow's width is 2.2; the
+      // sushi sign's pair carries its height in world units, rounded, as vr)
+      if (wl > .5 && mod(pr - 3.0, 2.0) < .5) lines = 10.0*max(vr, 1.0);
+      else if (wl > .5) lines = 22.0*(${WALL_ASPECT.map((a, k) => `vr < ${k}.5 ? ${a.toFixed(2)}`).join(' : ')} : ${WALL_ASPECT[WALL_ASPECT.length - 1].toFixed(2)});
       float id = floor(vUv.x + 1e-4), u = vUv.x - id, v = vUv.y - pr;
       if (!gl_FrontFacing) u = 1.0 - u;
       float t = time + id*23.7, cyc = mod(t, ${AIR_CYCLE.reduce((a, b) => a + b).toFixed(1)});
@@ -2811,19 +2815,25 @@ AIR_BEAM_MAT.userData.colorOnly = true; AIR_BEAM_MAT.userData.noCast = true;
 const _aq = new THREE.Vector3();
 function uvBucket(mat){ let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: null, u: [] }; buckets.set(mat, b); } return b; }
 // the projector on a wall at P (local +z out of the wall, origin at the lens height), throwing the picture D out
-// A wall hologram: pictures as wide as the building's face, floating just off it (inside the plot), with a thin
-// emitter bar on the wall under them. P is at the bottom (the top of the ground floor) and H is the height up to
-// the roofline. The ad is never stretched to fit: a tall wall takes a stack of N pictures, each cut from the atlas
-// version whose proportions are closest to H/N (the nearest is at most about 20% off, and the pictures in it keep their
-// true shape). ad 0 Robo-Repair, 1 PureFlow.
+// A wall hologram: pictures floating just off a building's face (inside the plot), with a thin emitter bar on the wall
+// under them. P is at the bottom (the top of the ground floor) and H is the height up to the roofline. Nothing is
+// stretched to fit. ad 0 is the tall Sushi sign: N copies stacked (as few as fit under the face width W), each scaled
+// to H/N tall and as wide as its shape says, centered. ad 1 is PureFlow: pictures as wide as the face, stacked when the
+// wall is very tall, each cut from the atlas version whose proportions are closest to H/N (the nearest is at most about
+// 20% off, and the pictures in it keep their true shape).
 function wallHologram(P, W, H, id, ad){
-  box(M.metalDark, P, 0, -.05, -.02, W*.92, .07, .1); box(M.neonCyan, P, 0, -.015, .035, W*.86, .015, .015);
-  for (const sx of [-1, 1]) glow(P, sx*W*.3, 0, .06, 'cyan', .3);
-  const n = Math.max(1, Math.round(H/W/3)), h = H/n, a = h/W;
-  let vr = 0; for (let k = 1; k < WALL_ASPECT.length; k++) if (Math.abs(Math.log(WALL_ASPECT[k]/a)) < Math.abs(Math.log(WALL_ASPECT[vr]/a))) vr = k;
-  const b = uvBucket(AIR_HOLO_MAT), pair = 3 + ad + 2*vr;
+  let n, h, w, pair;
+  if (ad === 0){ n = Math.max(1, Math.ceil(H/(W*SUSHI_ASPECT))); h = H/n; w = h/SUSHI_ASPECT; pair = 3 + 2*Math.max(1, Math.round(h)); }
+  else {
+    n = Math.max(1, Math.round(H/W/3)); h = H/n; w = W;
+    const a = h/W; let vr = 0; for (let k = 1; k < WALL_ASPECT.length; k++) if (Math.abs(Math.log(WALL_ASPECT[k]/a)) < Math.abs(Math.log(WALL_ASPECT[vr]/a))) vr = k;
+    pair = 3 + 1 + 2*vr;
+  }
+  box(M.metalDark, P, 0, -.05, -.02, Math.max(w, .8)*.92, .07, .1); box(M.neonCyan, P, 0, -.015, .035, Math.max(w, .8)*.86, .015, .015);
+  for (const sx of [-1, 1]) glow(P, sx*Math.max(w, .8)*.3, 0, .06, 'cyan', .3);
+  const b = uvBucket(AIR_HOLO_MAT);
   for (let t = 0; t < n; t++){
-    const y0 = t*h + .02, C = [[-W/2, y0, 0, 0], [W/2, y0, .999, 0], [W/2, y0 + h - .02, .999, .999], [-W/2, y0 + h - .02, 0, .999]];
+    const y0 = t*h + .02, C = [[-w/2, y0, 0, 0], [w/2, y0, .999, 0], [w/2, y0 + h - .02, .999, .999], [-w/2, y0 + h - .02, 0, .999]];
     for (const k of [0, 1, 2, 0, 2, 3]){ const [cx, cy, u, v] = C[k]; _aq.set(cx, cy, .08).applyMatrix4(P); b.p.push(_aq.x, _aq.y, _aq.z); b.n.push(0, 1, 0); b.u.push(id + t*7 + u, pair + v); b.d.push(0); }
   }
 }

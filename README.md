@@ -36,8 +36,10 @@ then open http://localhost:8000.
 | Rotate | Drag, or Q / E (45 degree steps) | Two-finger twist |
 | Zoom | Scroll wheel, or + / - | Pinch |
 
-Settings, Render has a **Pixels** choice of 240p, 480p (the default) or 720p: how many lines the picture is drawn at, so
-how chunky the pixels are (240p is the lightest on the graphics card, 720p the finest and heaviest). It is remembered in
+Settings, Render has a **Pixels** choice of 240p, 480p (the default), 720p or Smooth: how many lines the picture is drawn at, so
+how chunky the pixels are (240p is the lightest on the graphics card, 720p finer and heavier). Smooth drops the pixel look: it
+is drawn at your screen's own resolution (up to 1440 lines), and the shading is not stepped or dithered, so the sky, clouds and
+glows are smooth gradients. It is the heaviest. The plants, signs, people and drones are pixel-art sprites and stay that way. It is remembered in
 the browser. The picture is drawn at whole screen pixels where it can be, so on some screens two choices land close
 together (on a 1080 screen 480p is 540 lines).
 

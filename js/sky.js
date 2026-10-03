@@ -840,17 +840,29 @@ const upMat = new THREE.ShaderMaterial({
   depthTest:false, depthWrite:false,
 });
 const upScene = new THREE.Scene(); upScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), upMat));
-// Render resolution. At the default zoom and closer the game is drawn at about 480 lines, each render pixel a
+// Render resolution. At the default zoom and closer the game is drawn at about 480 lines (or 240 or 720: see below), each render pixel a
 // whole number of screen pixels. Zooming out, it is drawn at more lines in step with the zoom, so every building
 // keeps the same pixels and the pixels themselves get smaller on screen, up to the screen's own resolution.
 // (Past that, the detail levels in main.js take over.) Stars and rain are measured in base pixels (pxK) so they
 // keep their size.
 const ZOOM_REF = 13.2;
+// How many lines the game is drawn at (Settings, Render: 240p, 480p or 720p). The choice is remembered in this browser.
+const RES_KEY = 'neonIsland.renderLines', RES_CHOICES = [240, 480, 720];
+let RENDER_LINES = (() => { try { const v = +localStorage.getItem(RES_KEY); return RES_CHOICES.includes(v) ? v : 480; } catch (e) { return 480; } })();
+function setRenderLines(n){
+  if (!RES_CHOICES.includes(n) || n === RENDER_LINES) return;
+  RENDER_LINES = n; try { localStorage.setItem(RES_KEY, String(n)); } catch (e) {}
+  resize();
+}
 let DW = 1, DH = 1, BASE_H = 270, pxK = 1;
 function resize(){
   const dpr = devicePixelRatio || 1;
   DW = Math.max(1, Math.round(innerWidth*dpr)); DH = Math.max(1, Math.round(innerHeight*dpr));
-  BASE_H = Math.ceil(DH / Math.max(1, Math.round(DH / 480)));
+  // about RENDER_LINES lines, each a whole number of screen pixels. Where whole pixels can't tell 720 from 480 (a 1080 screen
+  // makes both 540 lines), 720 is drawn at exactly 720 lines instead, a little under two screen pixels each
+  const whole = t => Math.ceil(DH / Math.max(1, Math.round(DH / t)));
+  BASE_H = whole(RENDER_LINES);
+  if (RENDER_LINES === 720 && BASE_H <= whole(480)) BASE_H = Math.min(DH, 720);
   renderer.setSize(DW, DH, false);
   canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
   H = 0; applyRenderRes(zoom);

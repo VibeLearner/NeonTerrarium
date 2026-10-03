@@ -36,6 +36,11 @@ then open http://localhost:8000.
 | Rotate | Drag, or Q / E (45 degree steps) | Two-finger twist |
 | Zoom | Scroll wheel, or + / - | Pinch |
 
+Settings, Render has a **Pixels** choice of 240p, 480p (the default) or 720p: how many lines the picture is drawn at, so
+how chunky the pixels are (240p is the lightest on the graphics card, 720p the finest and heaviest). It is remembered in
+the browser. The picture is drawn at whole screen pixels where it can be, so on some screens two choices land close
+together (on a 1080 screen 480p is 540 lines).
+
 Your city saves automatically in the browser (plots, megastructures and the style sliders). The time of day, weather, wind, render options and camera are not saved and reset on reload.
 
 ## Project layout

@@ -184,6 +184,11 @@ function selectZone(z){
 }
 document.querySelectorAll('.zone').forEach(b => b.addEventListener('click', () => selectZone(b.dataset.zone)));
 $('outlines').addEventListener('change', e => { S.outlines = e.target.checked; });
+// the render resolution: 240p, 480p or 720p (see setRenderLines in sky.js)
+document.querySelectorAll('#resChips button').forEach(b => {
+  b.classList.toggle('on', +b.dataset.lines === RENDER_LINES);
+  b.addEventListener('click', () => { setRenderLines(+b.dataset.lines); document.querySelectorAll('#resChips button').forEach(x => x.classList.toggle('on', x === b)); });
+});
 document.querySelectorAll('#cloudChips button').forEach(b => b.addEventListener('click', () => {
   S.cloudQ = +b.dataset.q; document.querySelectorAll('#cloudChips button').forEach(x => x.classList.toggle('on', x === b)); makeTargets();
 }));

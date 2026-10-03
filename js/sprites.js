@@ -236,6 +236,10 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
   make('sign_w_ramen', 'RAMEN', '#ff6a9a', true); make('sign_w_noodles', 'NOODLES', '#ffd060'); make('sign_w_noodlesP', 'NOODLES', '#ff7ab0');
   make('sign_w_hot', 'HOT.CHEAP', '#ffb04a'); make('sign_w_24h', '24H', '#ff5a8a', true);
   // the radio station's relay: equipment plates
+  // the Neon Dome club: its name over the door, and the little signs round it
+  make('sign_w_neondome', 'NEON DOME', '#ff5ad0', true); make('sign_w_nightclub', 'NIGHTCLUB.OPEN 24H', '#5ae8ff');
+  make('sign_w_club', 'CLUB', '#b07aff'); make('sign_w_drinks', 'DRINKS', '#b07aff'); make('sign_w_music', 'MUSIC', '#b07aff');
+  make('sign_w_enter', 'ENTER', '#5af0e0'); make('sign_w_bar', 'BAR', '#7ab0ff', true); make('sign_w_snacks', 'SNACKS', '#ff6aa8');
   make('sign_w_satcom', 'SATCOM 12-A', '#ffd060'); make('sign_w_mlink', 'MLINK 5GHZ', '#5ae8ff'); make('sign_w_mw', 'MW 5GHZ', '#ff8a5a');
 })();
 // All sprites share one texture atlas and one material, so a whole region's plants, laundry and signs

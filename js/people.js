@@ -351,6 +351,7 @@ const MEGA_LIFE = {
   foundry: { jobs: 14, fun: 0,  night: .35 },
   market:  { jobs: 10, fun: 14 },             // the market mall: shopkeepers inside, plenty of shoppers
   pagoda:  { jobs: 12, fun: 10, night: .2 },  // the cloud pagoda: a luxury hotel and spa
+  club:    { jobs: 10, fun: 24, night: .6 },  // the Neon Dome: bar staff, DJs and door staff, mostly at night; a big draw
 };
 const places = new Map();   // id -> { id, x, z, doors: [{ node, out:{x,z}, in:{x,z}|null, dir:[dx,dz] }], jobs, fun, open, night, cell|mega }
 const people = new Map();   // id -> person

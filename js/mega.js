@@ -23,6 +23,8 @@ const MEGA_TYPES = {
            colour: '#ff7ab8', build: buildMarketMall },
   pagoda: { name: 'Cloud Pagoda', need: { highPlots: 60 }, odds: 1, w: 5, h: 4, maxLevels: 1,   // arrives with the 60th luxury building
            colour: '#8ff0ff', build: buildCloudPagoda },
+  club: { name: 'Neon Dome', need: { highPlots: 30, midPlots: 30, lowPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives once there are 30 each of luxury, commercial and residential buildings
+           colour: '#c070ff', build: buildNeonDome, fx: clubFx },
 };
 const megas = new Map();   // id -> { id, kind, i, j, w, h, levels, seed, x, z, data, view, roofH, top, cells }; a plot's .mega is the id
 const megaOf = c => c && c.mega ? megas.get(c.mega) || null : null;
@@ -548,13 +550,13 @@ function buildRadioStation(m){
 
 // for trying things out: open the game with #dev in the address, point at a plot and press M for the radio
 // station, N the sky mall, B the town square, V the foundry, C the police station, K the market mall, P the cloud
-// pagoda (each key
+// pagoda, J the Neon Dome club (each key
 // brings one in, with Shift it takes one away; ignores the requirement and the odds)
 if (location.hash.includes('dev')){
   let lastPointer = null;
   addEventListener('pointermove', e => { lastPointer = { x: e.clientX, y: e.clientY }; });
   addEventListener('keydown', e => {
-    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police', k: 'market', p: 'pagoda' }[e.key.toLowerCase()]; if (!kind) return;
+    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police', k: 'market', p: 'pagoda', j: 'club' }[e.key.toLowerCase()]; if (!kind) return;
     const pk = lastPointer ? pickAt(lastPointer.x, lastPointer.y) : null;
     const c = pk && pk.c ? pk.c : pk && pk.kind === 'sky' ? { i: pk.i, j: pk.j } : cells.values().next().value;
     if (e.shiftKey && megasOfKind(kind).length) removeMega(megasOfKind(kind)[0]);
@@ -2586,6 +2588,220 @@ function buildCloudPagoda(m){
   m.top = sp + 1.6;
 }
 
+/* ---------- the Neon Dome ---------- */
+// A nightclub under a geodesic glass dome (the Neon Dome reference): a dark metal drum with a band of lit windows
+// carries a dome of triangular glass panes on a dark frame, with runs of its struts in cyan and pink neon. Through
+// the glass you see the club inside: a gallery ring round the top of the drum with a neon rail and a bar, and down
+// in the middle the dance floor (its tiles pulse to the music), the DJ on a stage, the crowd, a mirror ball and
+// coloured beams sweeping round (see clubFx). Outside: an arched entrance glowing warm under a big NEON DOME sign,
+// NIGHTCLUB OPEN 24H under it, a CLUB / DRINKS / MUSIC pylon, an ENTER arrow, a queue snaking between barriers,
+// and a bar kiosk and a snack stand either side. Each one picks from its seed which runs of struts are lit.
+M.domeFrame = toon(0x2a2e3c); M.domeNode = toon(0x4a5060); M.domeDrum = toon(0x30323e); M.domeDrum2 = toon(0x3e4252); M.domeFloor = toon(0x1c1a26);
+M.domeNeonA = toon(0x145452, { em:0x38e8e0, kind:'neon' }); M.domeNeonB = toon(0x5a1d4a, { em:0xff4fc8, kind:'neon' });
+M.domeGlass = new THREE.MeshBasicMaterial({ color: 0xb8b0ff, transparent: true, opacity: .13, depthWrite: false, side: THREE.DoubleSide }); M.domeGlass.userData.colorOnly = true;
+M.clubWin = toon(0x40204a, { em:0xc060ff, kind:'window' }); M.clubWin2 = toon(0x1a3a50, { em:0x4ad8ff, kind:'window' });
+NEON_GLOW.set(M.domeNeonA, 'cyan'); NEON_GLOW.set(M.domeNeonB, 'pink');
+const DOME_R = 5.45, DOME_H = 4.4, DRUM_H = 1.5;
+// the dome's points, rings of them from the drum up to the top, and its triangles (each ring zipped to the next)
+function domeMesh(){
+  const rings = [[20, 0], [20, .32], [15, .64], [10, .96], [5, 1.27]], pts = [], ringIdx = [];
+  rings.forEach(([n, e], k) => { const off = (k % 2)*PI/n, idx = [];
+    for (let q=0; q<n; q++){ const a = off + q*TAU/n; idx.push(pts.length); pts.push([DOME_R*Math.cos(e)*Math.cos(a), DOME_H*Math.sin(e), DOME_R*Math.cos(e)*Math.sin(a), k, a]); }
+    ringIdx.push({ idx, off, n }); });
+  const apex = pts.length; pts.push([0, DOME_H, 0, rings.length, 0]);
+  const tris = [];
+  for (let k=0; k<ringIdx.length - 1; k++){
+    const A = ringIdx[k], B = ringIdx[k + 1];
+    // walk round both rings together by angle, starting B at its point at or just before A's first
+    const sb = Math.ceil((B.off - A.off)/(TAU/B.n) - 1e-9), bi = q => B.idx[(((q - sb) % B.n) + B.n) % B.n];
+    const angA = q => A.off + q*TAU/A.n, angB = q => B.off + (q - sb)*TAU/B.n;
+    let i = 0, j = 0;
+    while (i < A.n || j < B.n){
+      const goA = j >= B.n || (i < A.n && angA(i + 1) < angB(j + 1));
+      if (goA){ tris.push([A.idx[i % A.n], bi(j), A.idx[(i + 1) % A.n]]); i++; }
+      else { tris.push([A.idx[i % A.n], bi(j), bi(j + 1)]); j++; }
+    }
+  }
+  const top = ringIdx[ringIdx.length - 1];
+  for (let q=0; q<top.n; q++) tris.push([top.idx[q], top.idx[(q + 1) % top.n], apex]);
+  const edges = new Map();
+  for (const t of tris) for (let e=0; e<3; e++){ const a = t[e], b = t[(e + 1) % 3], key = Math.min(a, b) + ':' + Math.max(a, b); if (!edges.has(key)) edges.set(key, [Math.min(a, b), Math.max(a, b)]); }
+  return { pts, tris, edges: [...edges.values()] };
+}
+// which struts are neon, and in which colour: 0 none, 1 cyan, 2 pink
+function domeNeonOf(style, a, b){
+  const ka = a[3], kb = b[3], ang = Math.atan2((a[2] + b[2])/2, (a[0] + b[0])/2), side = Math.cos(ang - .6) > 0 ? 2 : 1;
+  if (style === 0){ if (ka === kb && (ka === 1 || ka === 3)) return side; if (Math.abs(ka - kb) === 1 && Math.min(ka, kb) === 2) return 3 - side; return 0; }   // two rings and a zigzag, split cyan / pink by side
+  if (style === 1){ if (ka !== kb){ const q = Math.round((ang + PI)/(TAU/10)); return q % 2 ? 1 : 0; } return ka === 2 ? 2 : 0; }           // ribs up the dome in cyan, one pink ring
+  if (ka === kb) return ka % 2 ? 2 : 1; return 0;                                                                                        // every ring lit, alternating
+}
+function buildNeonDome(m){
+  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  const P = T(m.x, 0, m.z, pick([0, PI/2, PI, -PI/2])), L = m.w*LOT, H = L/2, y0 = CURB;
+  // ---- the plaza: dark wet paving
+  box(G.asph, P, 0, .012, 0, L, .025, L);
+  const n = 20, st = L/n;
+  for (let a=0;a<n;a++) for (let b=0;b<n;b++) if (!chance(.03)) box(pick([TILES.ind[0], TILES.ind[1], TILES.low[2], TILES.ind[2]]), P, (a-(n-1)/2)*st, .03, (b-(n-1)/2)*st, st - .04, .045, st - .04);
+  for (let k=0; k<8; k++) box(G.puddle, P, rnd(-H + 1, H - 1), .056, rnd(4.5, H - .5), rnd(.5, 1.4), .01, rnd(.3, .7));
+  // ---- the drum: dark metal with a band of lit windows, pipes and AC boxes clinging to it
+  const DR = DOME_R + .3;
+  // a hollow ring of wall (so the dance floor inside shows through the glass), a ledge on top, a neon band
+  const ring = (mat, r, y, h, t, n = 40) => { for (let k=0; k<n; k++){ const a = (k + .5)*TAU/n; box(mat, under(P, T(Math.cos(a)*r, 0, Math.sin(a)*r, PI/2 - a)), 0, y, 0, r*TAU/n + .02, h, t); } };
+  ring(M.domeDrum, DR - .15, y0 + DRUM_H/2, DRUM_H, .3);
+  ring(M.domeDrum2, DR - .05, y0 + DRUM_H + .06, .12, .55);
+  ring(M.domeNeonB, DR + .01, y0 + DRUM_H - .03, .04, .04);
+  for (let k=0; k<24; k++){ const a = k*TAU/24; if (Math.abs(((a - PI/2) + TAU) % TAU - 0) < .5 || Math.abs(((a - PI/2) + TAU) % TAU - TAU) < .5) continue;   // not over the entrance
+    const F = under(P, T(Math.cos(a)*(DR + .01), 0, Math.sin(a)*(DR + .01), PI/2 - a));
+    box(k % 3 ? M.clubWin : M.clubWin2, F, 0, y0 + .9, .01, .9, .32, .02);
+    if (k % 5 === 2){ box(M.metal, F, 0, y0 + .35, .2, .55, .45, .35); box(M.metalDark, F, 0, y0 + .35, .38, .4, .35, .01); }   // an AC unit
+    if (k % 7 === 3) cyl(M.inPipe2 || M.metalDark, F, .35, y0 + .75, .12, .05, 1.5); }
+  // ---- the dome: glass panes on a dark frame, lit struts
+  const D = domeMesh(), yb = y0 + DRUM_H + .12, style = hash('dome-neon', m.seed) % 3;
+  const pos = [];
+  for (const t of D.tris) for (const q of t){ const p = D.pts[q]; pos.push(p[0], p[1] + yb, p[2]); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  put(g, M.domeGlass, P); g.dispose();
+  for (const [a, b] of D.edges){
+    const pa = D.pts[a], pb = D.pts[b], lit = domeNeonOf(style, pa, pb);
+    strut(M.domeFrame, P, pa[0], pa[1] + yb, pa[2], pb[0], pb[1] + yb, pb[2], .07);
+    if (lit){ const s = 1.012; strut(lit === 1 ? M.domeNeonA : M.domeNeonB, P, pa[0]*s, pa[1]*s + yb, pa[2]*s, pb[0]*s, pb[1]*s + yb, pb[2]*s, .045);
+      if (chance(.35)) glow(P, (pa[0] + pb[0])/2*1.03, (pa[1] + pb[1])/2 + yb, (pa[2] + pb[2])/2*1.03, lit === 1 ? 'cyan' : 'pink', 1.1); }
+  }
+  for (const p of D.pts) sph(M.domeNode, P, p[0], p[1] + yb, p[2], .09);
+  cyl(M.domeFrame, P, 0, yb + DOME_H + .2, 0, .05, .4); beaconLight(P, 0, yb + DOME_H + .45, 0, .09, 1.0);
+  // ---- inside: the gallery ring on top of the drum, its neon rail, a bar along it
+  const GI = 3.5, gy = y0 + DRUM_H + .1;
+  for (let k=0; k<32; k++){ const a = k*TAU/32, a2 = (k + 1)*TAU/32, rm = (GI + DOME_R)/2, F = under(P, T(Math.cos(a + PI/32)*rm, 0, Math.sin(a + PI/32)*rm, PI/2 - a - PI/32));
+    box(M.domeFloor, F, 0, gy, 0, rm*TAU/32 + .05, .1, (DOME_R - GI) + .1);
+    strut(k % 2 ? M.domeNeonA : M.domeNeonB, P, Math.cos(a)*GI, gy + .42, Math.sin(a)*GI, Math.cos(a2)*GI, gy + .42, Math.sin(a2)*GI, .035); }
+  for (let k=0; k<10; k++){ const a = k*TAU/10; cyl(M.domeFrame, P, Math.cos(a)*GI, gy + .22, Math.sin(a)*GI, .025, .42); }
+  { const F = under(P, T(0, 0, -(GI + DOME_R)/2 - .1)); box(M.wood, F, 0, gy + .32, 0, 2.6, .5, .4); box(M.clubWin2, F, 0, gy + .58, .2, 2.5, .03, .02);
+    for (let k=0; k<9; k++) box(pick([M.cloth1, M.cloth3, M.cloth4, M.white2]), F, -1.1 + k*.27, gy + .64, -.1, .05, .14, .05); glow(F, 0, gy + .7, .3, 'cyan', 1.2); }
+  for (let k=0; k<22; k++){ const a = rnd(0, TAU), r = rnd(GI + .35, DOME_R - .5); if (Math.sin(a) < -.6 && Math.abs(Math.cos(a)) < .5) continue;
+    figure(P, Math.cos(a)*r, gy + .05, Math.sin(a)*r, pick([M.cloth1, M.cloth3, M.cloth4, M.awn1, M.awn2, M.white2, M.red2])); }
+  // ---- inside, down below: the dance floor (drawn live by clubFx), the stage and the DJ, the crowd
+  put(U.cyl16, M.domeFloor, under(P, T(0, y0 + .03, 0, 0, 2*GI, .04, 2*GI)));
+  { const F = under(P, T(0, 0, -2.6)); box(M.domeDrum2, F, 0, y0 + .25, 0, 2.2, .45, 1.0); box(M.domeNeonA, F, 0, y0 + .2, .51, 2.2, .04, .02);
+    box(M.metalDark, F, 0, y0 + .72, .1, 1.1, .45, .4); box(M.screen2, F, 0, y0 + .88, .31, 1.0, .1, .01);
+    figure(F, 0, y0 + .48, -.2, M.frame);
+    for (const s of [-1, 1]){ box(M.frame, F, s*1.25, y0 + .75, 0, .45, 1.3, .45); put(U.cyl16, M.metalDark, under(F, T(s*1.25, y0 + .95, .23, 0, .3, .02, .3, PI/2))); }
+    box(M.domeFrame, F, 0, y0 + 2.2, -.35, 3.4, 1.6, .08); box(M.screen, F, 0, y0 + 2.2, -.3, 3.2, 1.4, .02); glow(F, 0, y0 + 2.2, 0, 'platinum', 1.8); }
+  for (let k=0; k<26; k++){ const a = rnd(0, TAU), r = rnd(.2, 2.9), x = Math.cos(a)*r, z = Math.sin(a)*r; if (z < -1.8) continue;
+    figure(P, x, y0 + .05, z, pick([M.cloth1, M.cloth3, M.cloth4, M.awn1, M.awn2, M.white2, M.red2, M.awn3])); }
+  // ---- outside: the entrance, an arch through the drum on the front, glowing warm inside
+  const E = under(P, T(0, 0, DR - .1));
+  box(M.domeDrum2, E, 0, y0 + 1.15, .45, 3.0, 2.3, 1.1);
+  box(M.winLit, E, 0, y0 + .75, 1.0, 1.5, 1.4, .02); put(U.cyl16, M.winLit, under(E, T(0, y0 + 1.45, 1.0, 0, 1.5, .02, 1.5, PI/2)));
+  box(M.domeFrame, E, 0, y0 + .05, 1.3, 1.9, .1, .6);
+  for (const s of [-1, 1]){ box(M.domeNeonA, E, s*.82, y0 + .8, 1.02, .04, 1.5, .03); }
+  glow(E, 0, y0 + .9, 1.4, 'warm', 2.0);
+  // the big sign over it, and NIGHTCLUB OPEN 24H under
+  box(M.metalDark, E, 0, y0 + 2.72, 1.05, 4.3, 1.15, .14);
+  plant('sign_w_neondome', under(E, T(0, 0, 1.13)), 0, y0 + 2.9, 0, 1.5, 'c', true); glow(E, 0, y0 + 2.85, 1.6, 'pink', 2.6);
+  plant('sign_w_nightclub', under(E, T(0, 0, 1.13)), 0, y0 + 2.4, 0, .65, 'c', true); glow(E, 0, y0 + 2.38, 1.5, 'cyan', 1.2);
+  // the pylon: CLUB, DRINKS, MUSIC
+  { const Q = under(P, T(-2.95, 0, DR + 1.0)); box(M.metalDark, Q, 0, y0 + 1.5, 0, 1.05, 3.0, .2); box(M4.neonPurple, Q, 0, y0 + 1.5, .11, 1.07, 3.0, .01);
+    box(M.domeFrame, Q, 0, y0 + 1.5, .12, .97, 2.9, .01);
+    ['sign_w_club', 'sign_w_drinks', 'sign_w_music'].forEach((k, q) => plant(k, under(Q, T(0, 0, .14)), 0, y0 + 2.5 - q*.8, 0, .55, 'c', true));
+    glow(Q, 0, y0 + 1.8, .4, 'platinum', 1.6); }
+  // ENTER, with an arrow pointing in
+  { const Q = under(P, T(2.95, 0, DR + .9)); cyl(M.metalDark, Q, 0, y0 + .6, 0, .04, 1.2); box(M.metalDark, Q, 0, y0 + 1.35, 0, 1.3, .5, .08);
+    plant('sign_w_enter', under(Q, T(0, 0, .05)), -.15, y0 + 1.35, 0, .75, 'c', true);
+    box(M.neonCyan, Q, .45, y0 + 1.35, .05, .25, .03, .02); box(M.neonCyan, Q, .52, y0 + 1.41, .05, .12, .03, .02, 0, 0, -.8); box(M.neonCyan, Q, .52, y0 + 1.29, .05, .12, .03, .02, 0, 0, .8);
+    glow(Q, 0, y0 + 1.35, .3, 'cyan', 1.2); }
+  // the queue: barriers on posts in a zigzag out front, and people waiting (umbrellas up, it's always about to rain)
+  const posts = [[-1.4, DR + 1.0], [-1.4, DR + 1.6], [1.4, DR + 1.6], [1.4, DR + 2.2], [-1.4, DR + 2.2]];
+  for (const [x, z] of posts){ cyl(M.metal, P, x, y0 + .25, z, .03, .5); sph(M.metal, P, x, y0 + .52, z, .045); }
+  for (let k=0; k<posts.length - 1; k++){ const [ax, az] = posts[k], [bx, bz] = posts[k + 1]; if (ax !== bx && az !== bz) continue; strut(M.red2, P, ax, y0 + .45, az, bx, y0 + .45, bz, .025); }
+  for (let k=0; k<14; k++){ const t = k/13, row = Math.floor(t*3), x = (row % 2 ? 1 : -1)*(-1.1 + 2.2*((t*3) % 1)), z = DR + 1.3 + row*.6 + rnd(-.08, .08);
+    figure(P, x, y0, z, pick([M.cloth1, M.cloth3, M.cloth4, M.awn1, M.awn2, M.white2]));
+    if (chance(.55)){ cyl(M.frame, P, x, y0 + .38, z, .006, .2); put(U.cone, pick([M.awn1, M.cloth3, M4.neonPurple, M.awn2, M.cloth1]), under(P, T(x, y0 + .5, z, 0, .36, .08, .36))); } }
+  // a bar kiosk and a snack stand either side of the front
+  for (const s of [-1, 1]){
+    const Q = under(P, T(s*5.3, 0, 5.3, s > 0 ? -PI/4 : PI/4));
+    box(M.domeDrum2, Q, 0, y0 + .75, 0, 1.8, 1.5, 1.2); box(M.winLit, Q, 0, y0 + .7, .61, 1.4, .6, .01);
+    box(M.metal, Q, 0, y0 + .42, .7, 1.6, .05, .25);
+    box(s > 0 ? M.awn2 : M.awn1, Q, 0, y0 + 1.15, .85, 1.9, .05, .6, 0, -.35);
+    box(M.metalDark, Q, 0, y0 + 1.75, .55, 1.5, .4, .06);
+    plant(s > 0 ? 'sign_w_bar' : 'sign_w_snacks', under(Q, T(0, 0, .6)), 0, y0 + 1.75, 0, .72, 'c', true);
+    glow(Q, 0, y0 + 1.75, .9, s > 0 ? 'blue' : 'pink', 1.3); glow(Q, 0, y0 + .7, 1.0, 'warm', 1.2);
+    for (let k=0; k<3; k++) figure(Q, rnd(-.6, .6), y0, rnd(1.0, 1.5), pick([M.cloth1, M.cloth3, M.cloth4, M.awn3]));
+    emitters.push(new THREE.Vector3(.4, y0 + 1.6, 0).applyMatrix4(Q));
+  }
+  // planters by the door, and the odd bush round the drum
+  for (const s of [-1, 1]){ const Q = under(P, T(s*1.75, 0, DR + .55)); box(M.concM, Q, 0, y0 + .2, 0, .7, .4, .5); plant(pick(['bush', 'bushFlower', 'g_fern3']), Q, 0, y0 + .4, 0, .9); }
+  for (let k=0; k<8; k++){ const a = rnd(PI*.75, PI*2.25), r = DR + .45; plant(pick(['bush', 'g_fern2', 'bamboo']), P, Math.cos(a)*r, y0, Math.sin(a)*r, rnd(.7, .95)); }
+  for (const [sx, sz] of [[-1, -1], [1, -1]]) { const Q = under(P, T(sx*(H - .8), 0, sz*(H - .8))); box(M.concM, Q, 0, y0 + .2, 0, .9, .4, .9); plant(pick(['bonsai', 'bamboo']), Q, 0, y0 + .4, 0, 1.1); }
+  // where clubFx draws: the dance floor, the light rig at the top
+  m.club = { m: P.elements.slice(), floorR: GI - .15, floorY: y0 + .07, rigY: yb + DOME_H - .7 };
+  m.roofH = yb + DOME_H;
+  m.top = yb + DOME_H + 1.2;
+}
+// The club's moving lights: the dance floor's tiles light up in patterns to a 124 bpm beat, a mirror ball turns
+// under the rig throwing glints, and four coloured beams sweep round the floor.
+function clubFx(m){
+  const c = m.club; if (!c) return null;
+  const root = new THREE.Group(); root.matrixAutoUpdate = false; root.matrix.fromArray(c.m); root.matrixWorldNeedsUpdate = true; scene.add(root);
+  const u = { time: { value: 0 } };
+  const floorMat = new THREE.ShaderMaterial({ uniforms: u, transparent: false,
+    vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform float time; varying vec2 vP;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)))*43758.5453); }
+      void main(){
+        vec2 cell = floor(vP/.42), f = fract(vP/.42);
+        float beat = floor(time*124.0/60.0), bar = floor(beat/8.0), mode = mod(bar, 3.0);
+        float r = length(cell + .5), a = atan(cell.y + .5, cell.x + .5);
+        float on = mode < .5 ? step(.5, h(cell + beat))                                  // scattered tiles, a new lot each beat
+                 : mode < 1.5 ? step(.5, fract(r*.25 - beat*.25))                       // rings rippling out
+                 : step(.5, fract(a/6.2832*4.0 + beat*.125));                           // a spinning pinwheel
+        vec3 c1 = vec3(1.0, .3, .8), c2 = vec3(.25, .9, 1.0), c3 = vec3(.65, .4, 1.0);
+        float k = mod(cell.x + cell.y + bar, 3.0);
+        vec3 col = k < .5 ? c1 : k < 1.5 ? c2 : c3;
+        float edge = step(.08, f.x)*step(.08, f.y)*step(f.x, .92)*step(f.y, .92);
+        float pulse = 1.0 - fract(time*124.0/60.0)*.45;
+        gl_FragColor = vec4(mix(vec3(.05, .04, .08), col*pulse, on*edge), 1.0);
+      }` });
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(c.floorR, 40), floorMat);
+  floor.rotation.x = -PI/2; floor.position.set(0, c.floorY, 0); floor.layers.set(1); floor.renderOrder = 2; root.add(floor);
+  // the mirror ball and its glints
+  const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(.32, 1), new THREE.MeshBasicMaterial({ color: 0xdfe6f4 }));
+  ball.position.set(0, c.rigY - .5, 0); ball.layers.set(1); root.add(ball);
+  const rod = new THREE.Mesh(new THREE.CylinderGeometry(.02, .02, .5, 6), new THREE.MeshBasicMaterial({ color: 0x2a2e3c })); rod.position.set(0, c.rigY - .1, 0); rod.layers.set(1); root.add(rod);
+  const glints = [];
+  for (let k=0; k<10; k++){ const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: [0xffffff, 0xff7ad8, 0x7af0ff][k % 3], blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
+    s.layers.set(1); s.scale.set(.5, .5, 1); root.add(s); glints.push({ s, a: k*TAU/10, r: 1.2 + (k % 4)*.5, ph: k*.7 }); }
+  // the beams: long thin cones from the rig down to the floor, swinging round
+  const beams = [];
+  const beamGeo = new THREE.ConeGeometry(.35, 1, 10, 1, true); beamGeo.translate(0, -.5, 0);
+  [0xff4fc8, 0x38e8e0, 0x9b6bff, 0xffb347].forEach((col, k) => {
+    const mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const b = new THREE.Mesh(beamGeo, mat); b.position.set(Math.cos(k*PI/2)*.6, c.rigY, Math.sin(k*PI/2)*.6); b.layers.set(1); b.renderOrder = 4; root.add(b);
+    const spot = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: .6 }));
+    spot.layers.set(1); spot.scale.set(1.2, 1.2, 1); root.add(spot);
+    beams.push({ b, mat, spot, k }); });
+  const _v = new THREE.Vector3();
+  return {
+    update(dt, time){
+      u.time.value = time;
+      ball.rotation.y = time*.8;
+      const night = 1;   // the club runs day and night
+      for (const g of glints){ const a = g.a + time*.8, f = .5 + .5*Math.sin(time*6 + g.ph);
+        g.s.position.set(Math.cos(a)*g.r, c.floorY + .05 + (g.r - 1.2)*.6, Math.sin(a)*g.r); g.s.material.opacity = f*.8*night; }
+      for (const B of beams){
+        const a = time*(.6 + B.k*.13) + B.k*PI/2, rr = 1.2 + 1.3*(.5 + .5*Math.sin(time*.9 + B.k));
+        const tx = Math.cos(a)*rr, tz = Math.sin(a)*rr;
+        _v.set(tx - B.b.position.x, c.floorY - c.rigY, tz - B.b.position.z);
+        const len = _v.length(); B.b.scale.set(1, len, 1);
+        B.b.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), _v.normalize());
+        B.spot.position.set(tx, c.floorY + .04, tz);
+        B.mat.opacity = .12 + .08*(.5 + .5*Math.sin(time*124/60*PI));
+      }
+    },
+    dispose(){ scene.remove(root); floor.geometry.dispose(); floorMat.dispose(); ball.geometry.dispose(); ball.material.dispose(); rod.geometry.dispose(); rod.material.dispose();
+      for (const g of glints) g.s.material.dispose(); beamGeo.dispose(); for (const B of beams){ B.mat.dispose(); B.spot.material.dispose(); } }
+  };
+}
+
 /* ---------- variants: each megastructure's own colour scheme ---------- */
 // Besides what its seed already shuffles (dish farms, mast height, shop signs...), every megastructure picks a colour
 // scheme from its seed. The first scheme of each kind is the original look; the others swap its main materials (and
@@ -2618,6 +2834,10 @@ function megaSkins(){
       { mats: [[M.mkTeal, t(0xb86a4a)], [M.mkTeal2, t(0x9a5640)], [M.mkTeal3, t(0x6a3a2c)], [M.mkTarp, t(0x3f8a80)], [M.mkTarp2, t(0x347670)]] },   // terracotta
       { mats: [[M.mkTeal, t(0x7a5aa0)], [M.mkTeal2, t(0x664a8a)], [M.mkTeal3, t(0x3e2c58)], [M.mkTarp, t(0xd8508a)], [M.mkTarp2, t(0xb8406e)]] },   // violet
       { mats: [[M.mkTeal, t(0xc8b47a)], [M.mkTeal2, t(0xa8946a)], [M.mkTeal3, t(0x6a5a40)], [M.mkTarp, t(0xc84a4a)], [M.mkTarp2, t(0xa83a3a)]] } ],  // sand
+    club: [null,
+      { mats: [[M.domeNeonA, neon(0x3a2a10, 0xffb347)], [M.domeNeonB, neon(0x3a1a5a, 0x9b6bff)]], glows: { cyan: 'amber', pink: 'platinum' } },   // amber and violet
+      { mats: [[M.domeNeonA, neon(0x1a4010, 0x7aff6a)], [M.domeNeonB, neon(0x5a1a3a, 0xff4fa3)]], glows: { cyan: 'green' } },                    // acid green and pink
+      { mats: [[M.domeNeonA, neon(0x1a2a60, 0x4f7bff)], [M.domeNeonB, neon(0x5a1010, 0xff2a4a)], [M.domeDrum, t(0x24262e)]], glows: { cyan: 'blue', pink: 'crimson' } } ],   // blue and red
     pagoda: [null,
       { mats: [[M.lxWhite, t(0xb8402e)], [M.lxWhite2, t(0x2e2826)], [M.pgNeon, lamp(0xffb347)]], glows: { cyan: 'amber' } },          // temple red
       { mats: [[M.lxWhite, t(0x5a9a80)], [M.lxWhite2, t(0x3e6e5a)], [M.gold, t(0xb88a4a)], [M.pgNeon, lamp(0xff6fb8)]], glows: { cyan: 'pink' } },   // jade and bronze

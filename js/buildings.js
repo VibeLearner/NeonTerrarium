@@ -305,7 +305,10 @@ function buildCarPad(P, w, d){
   // across (the render is 480 lines, so a pixel is about .052 units at the usual zoom: MIN_T). Anything thinner than a
   // pixel pops in and out of the picture as the camera turns, which is what made the pad shimmer; a raised bar adds
   // outline pixels along its sides, so the paint is thin (box() would round its height up to a pixel, so put() is used).
-  const pw = Math.min(w, d) - .12, top = .1, bw = .12;
+  // The slab stands a little proud of the roof cap under it (a box .1 thick on most of these roofs): with its top at the
+  // same height, the two faces fought for the pixels and the pad flickered between its grey and the roof's colour as the
+  // camera turned.
+  const pw = Math.min(w, d) - .12, top = .13, bw = .12;
   const paint = (mat, x, z, sx, sz) => put(U.box, mat, under(P, T(x, top + .004, z, 0, sx, .016, sz)));
   box(M.concDD, P, 0, top/2, 0, pw, top, pw);
   // the H: two bars and the crossbar
@@ -315,7 +318,7 @@ function buildCarPad(P, w, d){
   const n = Math.max(2, Math.floor((pw - .5)/.36));
   for (let k = 0; k < n; k++){ const t = -((n - 1)*.36)/2 + k*.36; paint(M.neonAmber, t, pw/2-.1, .1, .1); paint(M.neonAmber, t, -pw/2+.1, .1, .1); }
   cyl(M.frame, P, pw/2-.12, .45, -pw/2+.12, .04, .7); box(CARM.tail, P, pw/2-.12, .82, -pw/2+.12, .08, .08, .08);
-  carPads.push({ pos: new THREE.Vector3(0, .12, 0).applyMatrix4(P), busy:false });
+  carPads.push({ pos: new THREE.Vector3(0, top + .02, 0).applyMatrix4(P), busy:false });
 }
 let NO_ROOF = false;
 function roofItems(st,P,w,d,lot){

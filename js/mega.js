@@ -1912,7 +1912,7 @@ function policeBikes(m, crew){
         }
         if (b.mode === 'park') b.y += (CURB + .08 - b.y)*Math.min(1, dt*2);
         // the sprite: the view that matches the heading as the camera sees it
-        const ax = b.hx*_bkR.x + b.hz*_bkR.z, az = -(b.hx*_bkF.x + b.hz*_bkF.z);
+        const ax = b.hx*_bkR.x + b.hz*_bkR.z, az = b.hx*_bkF.x + b.hz*_bkF.z;   // heading against the view: + away from the camera (view 0, nose away), - toward it
         const oct = ((Math.round(Math.atan2(ax, az)/(Math.PI/4)) % 8) + 8) % 8, view = PBIKE_VIEWS[oct], [w, h] = PBIKE_SIZE[view];
         b.mat.map = PBIKE_TEX[oct]; b.mat.color.copy(FOL_UNI.tint.value);
         const bob = b.mode === 'park' ? 0 : Math.sin(time*3 + b.idx)*.02;

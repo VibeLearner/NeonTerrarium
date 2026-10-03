@@ -155,6 +155,7 @@ function spawnMegaAt(kind, blk){
   for (const c of grown) for (const [a, b] of SIDES4){ const nb = cells.get(ckey(c.i + a, c.j + b)); if (nb && !nb.mega && !covered.includes(nb)) covered.push(nb); }
   for (const b of covered){ finishAnimsOn(b); if (b.view){ world.remove(b.view); b.view = null; } disposeData(b.data); b.data = null; }
   const m = placeMega(kind, blk.i, blk.j, (Math.random()*1e9)|0, blk.w, blk.h); if (!m) return null;
+  if (kind === 'square') m.centre = nextSquareCentre(m);
   holdRegion(m);
   refresh(covered.filter(b => !b.mega || b.mega === m.id), [m]);
   // the slow arrival: the platform grown for it scans in alongside, and its live parts (koi, drone, screens) switch
@@ -927,12 +928,21 @@ const POND_R = 2.5, POND_Y = .2;
 // the paving pattern and what stands in each corner. SQ_FORCE (for testing) overrides any of these.
 const SQ_CENTRES = ['pond', 'fountain', 'sakura', 'bandstand', 'shrine', 'clock'];
 let SQ_FORCE = null;
+// A new square takes whichever centrepiece the city has fewest of (a random one among those tied), so they come
+// round evenly rather than by the luck of the dice; the choice is saved with the square.
+function nextSquareCentre(m){
+  const n = Object.fromEntries(SQ_CENTRES.map(c => [c, 0]));
+  for (const o of megas.values()) if (o !== m && o.kind === 'square'){ const c = o.centre || (o.variant && o.variant.centre); if (c in n) n[c]++; }
+  const low = Math.min(...Object.values(n)), pool = SQ_CENTRES.filter(c => n[c] === low);
+  return pool[Math.floor(Math.random()*pool.length)];
+}
 function squareVariant(m){
   const r = mulberry32(hash('square-variant', m.seed)), one = a => a[Math.floor(r()*a.length)];
   const v = { centre: one(SQ_CENTRES), carts: one(['ring', 'horseshoe', 'corners', 'streets', 'scatter']),
     mix: one([[0, 1, 2], [0, 0, 1, 2], [1, 1, 2], [2, 2, 0, 1], [0, 1], [1, 2]]), stands: one(['four', 'four', 'pair', 'three']),
     poles: one(['octagon', 'square']), floor: one(['rings', 'checker', 'spokes', 'diagonal']), tiles: Math.floor(r()*4),
     corners: [0, 1, 2, 3].map(() => one(['planter', 'planter', 'vending', 'tree', 'kiosk'])), open: Math.floor(r()*4)*PI/2, skip: Math.floor(r()*4) };
+  if (m.centre && SQ_CENTRES.includes(m.centre)) v.centre = m.centre;   // chosen when it was placed (see nextSquareCentre)
   if (v.carts === 'streets') v.stands = 'pair';   // the food streets run between the stands, not into them
   return Object.assign(v, SQ_FORCE || {});
 }

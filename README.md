@@ -99,7 +99,7 @@ koi, the drone, the screens) switch on at the end.
 - **Radio station:** arrives with the 20th building, of any zone (each built plot counts once; stacking doesn't
   add to it), on free ground near that build. Right-click removes it; with 20 or
   more buildings standing, the next build brings it back.
-  While it stands, the radio plays the music in assets/audio/music/, shuffled, fading in slowly once the station has
+  While it stands, the radio plays the music in assets/audio/music/, shuffled so every song plays once before any plays again (what has played this round is remembered in this browser), fading in slowly once the station has
   fully arrived. A neon cassette appears under the title showing the song, with previous, play/pause and next
   buttons and an equalizer that follows the music. Removing
   the station stops the music. Music volume is in Settings, Sound.

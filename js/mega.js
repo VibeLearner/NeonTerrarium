@@ -2665,7 +2665,7 @@ function buildNeonDome(m){
     const pa = D.pts[a], pb = D.pts[b], lit = domeNeonOf(style, pa, pb);
     strut(M.domeFrame, P, pa[0], pa[1] + yb, pa[2], pb[0], pb[1] + yb, pb[2], .07);
     if (lit){ const s = 1.012; strut(lit === 1 ? M.domeNeonA : M.domeNeonB, P, pa[0]*s, pa[1]*s + yb, pa[2]*s, pb[0]*s, pb[1]*s + yb, pb[2]*s, .045);
-      if (chance(.35)) glow(P, (pa[0] + pb[0])/2*1.03, (pa[1] + pb[1])/2 + yb, (pa[2] + pb[2])/2*1.03, lit === 1 ? 'cyan' : 'pink', 1.1); }
+      if (chance(.35)) glow(P, (pa[0] + pb[0])/2*1.03, (pa[1] + pb[1])/2 + yb, (pa[2] + pb[2])/2*1.03, lit === 1 ? 'cyan' : 'pink', .75); }
   }
   for (const p of D.pts) sph(M.domeNode, P, p[0], p[1] + yb, p[2], .09);
   cyl(M.domeFrame, P, 0, yb + DOME_H + .2, 0, .05, .4); beaconLight(P, 0, yb + DOME_H + .45, 0, .09, 1.0);
@@ -2676,14 +2676,14 @@ function buildNeonDome(m){
     strut(k % 2 ? M.domeNeonA : M.domeNeonB, P, Math.cos(a)*GI, gy + .42, Math.sin(a)*GI, Math.cos(a2)*GI, gy + .42, Math.sin(a2)*GI, .035); }
   for (let k=0; k<10; k++){ const a = k*TAU/10; cyl(M.domeFrame, P, Math.cos(a)*GI, gy + .22, Math.sin(a)*GI, .025, .42); }
   { const F = under(P, T(0, 0, -(GI + DOME_R)/2 - .1)); box(M.wood, F, 0, gy + .32, 0, 2.6, .5, .4); box(M.clubWin2, F, 0, gy + .58, .2, 2.5, .03, .02);
-    for (let k=0; k<9; k++) box(pick([M.cloth1, M.cloth3, M.cloth4, M.white2]), F, -1.1 + k*.27, gy + .64, -.1, .05, .14, .05); glow(F, 0, gy + .7, .3, 'cyan', 1.2); }
+    for (let k=0; k<9; k++) box(pick([M.cloth1, M.cloth3, M.cloth4, M.white2]), F, -1.1 + k*.27, gy + .64, -.1, .05, .14, .05); glow(F, 0, gy + .62, .22, 'cyan', .7); }
   // ---- inside, down below: the dance floor (drawn live by clubFx), the stage and the DJ, the crowd
   put(U.cyl16, M.domeFloor, under(P, T(0, y0 + .03, 0, 0, 2*GI, .04, 2*GI)));
   { const F = under(P, T(0, 0, -2.6)); box(M.domeDrum2, F, 0, y0 + .25, 0, 2.2, .45, 1.0); box(M.domeNeonA, F, 0, y0 + .2, .51, 2.2, .04, .02);
     box(M.metalDark, F, 0, y0 + .72, .1, 1.1, .45, .4); box(M.screen2, F, 0, y0 + .88, .31, 1.0, .1, .01);
     figure(F, 0, y0 + .48, -.2, M.frame);
     for (const s of [-1, 1]){ box(M.frame, F, s*1.25, y0 + .75, 0, .45, 1.3, .45); put(U.cyl16, M.metalDark, under(F, T(s*1.25, y0 + .95, .23, 0, .3, .02, .3, PI/2))); }
-    box(M.domeFrame, F, 0, y0 + 2.2, -.35, 3.4, 1.6, .08); box(M.screen, F, 0, y0 + 2.2, -.3, 3.2, 1.4, .02); glow(F, 0, y0 + 2.2, 0, 'platinum', 1.8); }
+    box(M.domeFrame, F, 0, y0 + 2.2, -.35, 3.4, 1.6, .08); box(M.screen, F, 0, y0 + 2.2, -.3, 3.2, 1.4, .02); glow(F, 0, y0 + 2.2, -.27, 'platinum', 1.0); }
   // ---- outside: the entrance, an arch through the drum on the front, glowing warm inside
   const E = under(P, T(0, 0, DR - .1));
   box(M.domeDrum2, E, 0, y0 + 1.15, .45, 3.0, 2.3, 1.1);
@@ -2693,18 +2693,18 @@ function buildNeonDome(m){
   for (const s of [-1, 1]){ box(M.domeNeonB, E, s*.82, y0 + .8, 1.02, .04, 1.5, .03); }
   // the big sign over it, and NIGHTCLUB OPEN 24H under
   box(M.metalDark, E, 0, y0 + 2.72, 1.05, 4.3, 1.15, .14);
-  plant('sign_w_neondome', under(E, T(0, 0, 1.13)), 0, y0 + 2.9, 0, 1.5, 'c', true); glow(E, 0, y0 + 2.9, 1.18, 'pink', 1.6);   /* the halo sits on the board, not out in front where it read as a dot over the door */
-  plant('sign_w_nightclub', under(E, T(0, 0, 1.13)), 0, y0 + 2.4, 0, .65, 'c', true); glow(E, 0, y0 + 2.4, 1.18, 'cyan', .9);
+  plant('sign_w_neondome', under(E, T(0, 0, 1.13)), 0, y0 + 2.9, 0, 1.5, 'c', true); glow(E, 0, y0 + 2.9, 1.15, 'pink', 1.0);   /* every halo here sits right on its board: out in front, the high camera saw them as dots */
+  plant('sign_w_nightclub', under(E, T(0, 0, 1.13)), 0, y0 + 2.4, 0, .65, 'c', true); glow(E, 0, y0 + 2.4, 1.15, 'cyan', .6);
   // the pylon: CLUB, DRINKS, MUSIC
   { const Q = under(P, T(-2.95, 0, DR + 1.0)); box(M.metalDark, Q, 0, y0 + 1.5, 0, 1.05, 3.0, .2); box(M4.neonPurple, Q, 0, y0 + 1.5, .11, 1.07, 3.0, .01);
     box(M.domeFrame, Q, 0, y0 + 1.5, .12, .97, 2.9, .01);
     ['sign_w_club', 'sign_w_drinks', 'sign_w_music'].forEach((k, q) => plant(k, under(Q, T(0, 0, .14)), 0, y0 + 2.5 - q*.8, 0, .55, 'c', true));
-    glow(Q, 0, y0 + 1.8, .4, 'platinum', 1.6); }
+    glow(Q, 0, y0 + 1.8, .14, 'platinum', .8); }
   // ENTER, with an arrow pointing in
   { const Q = under(P, T(2.95, 0, DR + .9)); cyl(M.metalDark, Q, 0, y0 + .6, 0, .04, 1.2); box(M.metalDark, Q, 0, y0 + 1.35, 0, 1.3, .5, .08);
     plant('sign_w_enter', under(Q, T(0, 0, .05)), -.15, y0 + 1.35, 0, .75, 'c', true);
     box(M.neonCyan, Q, .45, y0 + 1.35, .05, .25, .03, .02); box(M.neonCyan, Q, .52, y0 + 1.41, .05, .12, .03, .02, 0, 0, -.8); box(M.neonCyan, Q, .52, y0 + 1.29, .05, .12, .03, .02, 0, 0, .8);
-    glow(Q, 0, y0 + 1.35, .3, 'cyan', 1.2); }
+    glow(Q, 0, y0 + 1.35, .06, 'cyan', .7); }
   // the queue line: a velvet rope on posts along the front, the queue forming inside it (residents: see people.js)
   const posts = []; for (let x = 1.05; x <= 4.7; x += .73) posts.push([x, DR + 1.78]);   // (clear of the door, where people come and go)
   for (const [x, z] of posts){ cyl(M.metal, P, x, y0 + .25, z, .03, .5); sph(M.metal, P, x, y0 + .52, z, .045); }
@@ -2717,7 +2717,7 @@ function buildNeonDome(m){
     box(s > 0 ? M.awn2 : M.awn1, Q, 0, y0 + 1.15, .85, 1.9, .05, .6, 0, -.35);
     box(M.metalDark, Q, 0, y0 + 1.75, .55, 1.5, .4, .06);
     plant(s > 0 ? 'sign_w_bar' : 'sign_w_snacks', under(Q, T(0, 0, .6)), 0, y0 + 1.75, 0, .72, 'c', true);
-    glow(Q, 0, y0 + 1.75, .9, s > 0 ? 'blue' : 'pink', 1.3); glow(Q, 0, y0 + .7, 1.0, 'warm', 1.2);
+    glow(Q, 0, y0 + 1.75, .6, s > 0 ? 'blue' : 'pink', .7); glow(Q, 0, y0 + .7, .63, 'warm', .7);
     emitters.push(new THREE.Vector3(.4, y0 + 1.6, 0).applyMatrix4(Q));
   }
   // planters by the door, and the odd bush round the drum

@@ -217,7 +217,7 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
               N:['1001','1101','1011','1001','1001'], O:['111','101','101','101','111'], D:['110','101','101','101','110'], F:['111','100','110','100','100'],
               X:['101','101','010','101','101'], K:['101','101','110','101','101'], Y:['101','101','010','010','010'], '-':['000','000','111','000','000'],
               M:['10001','11011','10101','10001','10001'], W:['10001','10001','10101','11011','10001'], '1':['010','110','010','010','111'],
-              '5':['111','100','111','001','111'], Z:['111','001','010','100','111'] };
+              '5':['111','100','111','001','111'], Z:['111','001','010','100','111'], '3':['111','001','011','001','111'], V:['101','101','101','101','010'] };
   const make = (kind, text, col, deco) => {
     const ws = [...text].map(ch => F[ch][0].length), tw = ws.reduce((a, b) => a + b + 1, -1), pad = deco ? 5 : 3, w = tw + 2*pad, h = 9;
     const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
@@ -237,6 +237,12 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
   make('sign_w_hot', 'HOT.CHEAP', '#ffb04a'); make('sign_w_24h', '24H', '#ff5a8a', true);
   // the radio station's relay: equipment plates
   // the Neon Dome club: its name over the door, and the little signs round it
+  // the commercial quarter's shops (see signShop, tiledShop, domeMarket, foodPlaza)
+  make('sign_c_pawn', 'PAWN', '#ffcf5a', true); make('sign_c_noodles', 'NOODLES', '#ffc860', true); make('sign_c_drones', 'DRONES.REPAIR', '#5ae8ff');
+  make('sign_c_prints', 'TECH.PRINTS.3D', '#ff7ad0'); make('sign_c_tea', 'TEA.MATCHA', '#8aff7a'); make('sign_c_records', 'RECORDS', '#c08aff', true);
+  make('sign_c_cramen', 'CYBER RAMEN', '#ff6ad8'); make('sign_c_baropen', 'BAR OPEN', '#5af0ff'); make('sign_c_hotel', 'HOTEL', '#5ae8ff', true);
+  make('sign_c_dataloan', 'DATA.LOAN', '#ff5aa8'); make('sign_c_techparts', 'TECH.PARTS', '#5ae8ff'); make('sign_c_dome', 'DOME MARKET', '#ffc04a', true);
+  make('sign_c_sushi', 'SUSHI.RAMEN.24H', '#ffb04a');
   make('sign_w_neondome', 'NEON DOME', '#ff5ad0', true); make('sign_w_nightclub', 'NIGHTCLUB.OPEN 24H', '#5ae8ff');
   make('sign_w_club', 'CLUB', '#b07aff'); make('sign_w_drinks', 'DRINKS', '#b07aff'); make('sign_w_music', 'MUSIC', '#b07aff');
   make('sign_w_enter', 'ENTER', '#5af0e0'); make('sign_w_bar', 'BAR', '#7ab0ff', true); make('sign_w_snacks', 'SNACKS', '#ff6aa8');

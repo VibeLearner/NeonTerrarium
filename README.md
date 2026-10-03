@@ -163,9 +163,9 @@ The commercial zone builds neon-named shops, tiled-roof shops, market stalls, fo
 brutalist arcologies and dome market halls (`js/buildings.js`: `signShop`, `tiledShop`, `foodPlaza`,
 `arcologyTower`, `glassTower`, `brutalTower`). The streets are lit warm from the shopfronts, with lantern strings
 between buildings and no street lamps. About one commercial building in six that is mid-size or taller wears a
-hologram ad down one face, from just under the roofline to the top of the ground floor: one of four tall neon signs
-(a sushi bar, a repair shop, an air-filter shop and a satellite shop), scaled to fit without stretching. Very tall walls
-get a stack that runs through the signs in turn. The signs are packed into one atlas, `assets/sprites/holo_walls.png`,
+hologram ad down one face, from just under the roofline to the top of the ground floor: one of five tall neon signs
+(a sushi bar, a repair shop, an air-filter shop, a satellite shop and a loan shop), scaled to fit without stretching.
+Very tall walls get a stack that runs through the signs in turn. The signs are packed into one atlas, `assets/sprites/holo_walls.png`,
 from `assets/sprites/originals/holo_*.webp` by `tools/make_wall_holo_signs.py` (needs Pillow; it prints the `WALL_CELLS`
 line to paste into `js/buildings.js`).
 About one tall tower in thirty throws a huge air-filter hologram out over the

@@ -334,7 +334,7 @@ function rooftopBoard(c, y){
   // never out past its plot, from just under the roofline to the top of the ground floor
   if (c.sections.some(s => s.zone === 'mid') && y >= 3.5 && (window.WALL_FORCE === c.i + ',' + c.j || hash('wallholo', c.i, c.j) % 6 === 0)){
     const hw = hash('wallside', c.i, c.j), si = sideB && (hw & 3) === ((hv >>> 4) & 3) ? (hw + 1) & 3 : hw & 3, sd = SIDES4[si], Wd = 2.2, yb = CURB + FH + .1;   // the ground floor is left clear for the shopfront
-    wallHologram(T(c.x + sd[0]*1.18, yb, c.z + sd[1]*1.18, Math.atan2(sd[0], sd[1])), Wd, y - .08 - yb, (hw >>> 4) % 50, (hw >>> 10) & 3);
+    wallHologram(T(c.x + sd[0]*1.18, yb, c.z + sd[1]*1.18, Math.atan2(sd[0], sd[1])), Wd, y - .08 - yb, (hw >>> 4) % 50, (hw >>> 10) % WALL_CELLS.length);
   }
   if (size < 0) return;
   const side = [[0, 1], [1, 0], [0, -1], [-1, 0]][(hv >>> 8) & 3], off = size ? .1 : .45;

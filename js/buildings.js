@@ -2733,12 +2733,12 @@ function holoQuad(F, x, y, z, w, h, ad, seed, kind){
 const AIR_A = new THREE.TextureLoader().load('assets/sprites/holo_pureair.png'), AIR_B = new THREE.TextureLoader().load('assets/sprites/holo_freeair.png');
 const AIR_A2 = new THREE.TextureLoader().load('assets/sprites/holo_aether.png'), AIR_B2 = new THREE.TextureLoader().load('assets/sprites/holo_sky.png');
 const AIR_A3 = new THREE.TextureLoader().load('assets/sprites/holo_synth.png'), AIR_B3 = new THREE.TextureLoader().load('assets/sprites/holo_watch.png');   // and Synth Corp's security, hacked by "Big Brother is watching"
-// and four plain ads (no hack) for the wall holograms: tall neon signs for a sushi bar, a repair shop, an air-filter shop
-// (PureFlow) and a satellite shop, used as they are. They share one atlas (assets/sprites/holo_walls.png, built by
+// and plain ads (no hack) for the wall holograms: tall neon signs for a sushi bar, a repair shop, an air-filter shop
+// (PureFlow), a satellite shop and a loan shop, used as they are. They share one atlas (assets/sprites/holo_walls.png, built by
 // tools/make_wall_holo_signs.py, which prints the WALL_CELLS line below), side by side; WALL_ASPECT is each sign's height
 // over width.
 const AIR_W1 = new THREE.TextureLoader().load('assets/sprites/holo_walls.png');
-const WALL_ATLAS = [2147, 1467], WALL_CELLS = [[0, 0, 431, 999], [433, 0, 351, 1254], [786, 0, 656, 1388], [1444, 0, 703, 1467]];   // x, y from the top, width, height of each sign
+const WALL_ATLAS = [2147, 2618], WALL_CELLS = [[0, 0, 431, 999], [433, 0, 351, 1254], [786, 0, 656, 1388], [1444, 0, 703, 1467], [0, 1469, 795, 1149]];   // x, y from the top, width, height of each sign
 const WALL_ASPECT = WALL_CELLS.map(c => c[3]/c[2]);
 const AIR_ASPECT = [.75, 440/512, .75, .75, .75];   // height over width of each pair's pictures
 for (const t of [AIR_A, AIR_B, AIR_A2, AIR_B2, AIR_A3, AIR_B3, AIR_W1]){ t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }
@@ -2814,16 +2814,17 @@ function uvBucket(mat){ let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d
 // the projector on a wall at P (local +z out of the wall, origin at the lens height), throwing the picture D out
 // A wall hologram: tall signs floating just off a building's face (inside the plot), with a thin emitter bar on the wall
 // under them. P is at the bottom (the top of the ground floor) and H is the height up to the roofline. A sign is never
-// stretched: N signs are stacked (as few as fit under the face width W, the squarest sign deciding), each H/N tall, as
-// wide as its shape says and centered. The stack runs through the signs in order, starting with ad (0 to 3).
+// stretched: N signs are stacked (about WALL_SLOT tall at most, each slot H/N), each as tall as its shape allows in the
+// slot (and no wider than the face W), centered in it. The stack runs through the signs in order, starting with ad.
+const WALL_SLOT = 2.3;   // a slot is at most W*WALL_SLOT tall: roughly the shape of the signs
 function wallHologram(P, W, H, id, ad){
-  const K = WALL_ASPECT.length, amin = Math.min(...WALL_ASPECT), n = Math.max(1, Math.ceil(H/(W*amin))), h = H/n, wide = h/amin, rows = Math.max(1, Math.round(h));
+  const K = WALL_ASPECT.length, n = Math.max(1, Math.ceil(H/(W*WALL_SLOT))), h = H/n, wide = Math.min(W, h/WALL_SLOT);
   box(M.metalDark, P, 0, -.05, -.02, Math.max(wide, .8)*.92, .07, .1); box(M.neonCyan, P, 0, -.015, .035, Math.max(wide, .8)*.86, .015, .015);
   for (const sx of [-1, 1]) glow(P, sx*Math.max(wide, .8)*.3, 0, .06, 'cyan', .3);
   const b = uvBucket(AIR_HOLO_MAT);
   for (let t = 0; t < n; t++){
-    const a = (ad + t) % K, w = h/WALL_ASPECT[a], pair = 3 + a + K*rows;
-    const y0 = t*h + .02, C = [[-w/2, y0, 0, 0], [w/2, y0, .999, 0], [w/2, y0 + h - .02, .999, .999], [-w/2, y0 + h - .02, 0, .999]];
+    const a = (ad + t) % K, w = Math.min(W, h/WALL_ASPECT[a]), sh = w*WALL_ASPECT[a], pair = 3 + a + K*Math.max(1, Math.round(sh));
+    const y0 = t*h + (h - sh)/2 + .02, y1 = y0 + sh - .02, C = [[-w/2, y0, 0, 0], [w/2, y0, .999, 0], [w/2, y1, .999, .999], [-w/2, y1, 0, .999]];
     for (const k of [0, 1, 2, 0, 2, 3]){ const [cx, cy, u, v] = C[k]; _aq.set(cx, cy, .08).applyMatrix4(P); b.p.push(_aq.x, _aq.y, _aq.z); b.n.push(0, 1, 0); b.u.push(id + t*7 + u, pair + v); b.d.push(0); }
   }
 }

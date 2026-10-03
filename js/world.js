@@ -312,30 +312,39 @@ function buildStack(c){
 }
 // Hologram billboards on the roofs: a small one on about half the commercial roofs, and on tall buildings of the
 // commercial and residential zones now and then a big one on posts, with its slogan scrolling underneath. Picked from
-// the plot and its top section, so a roof keeps its billboard through rebuilds.
+// the plot and its top section, so a roof keeps its billboard through rebuilds. The two big wall holograms (the sign
+// down a face, the air-filter picture) don't depend on the roof or the top section at all, so a building that has one
+// keeps it as you stack more onto it (the roof billboards and the side board do change with the top section).
+const WALL_HOLO_ODDS = 3;     // one commercial building in this many, once it's tall enough, wears a wall hologram
+const WALL_HOLO_MIN_Y = 2.4;  // 'tall enough': stacking a section can make a building shorter (the whole stack is built afresh), but never
+                              // below this for two or more sections, so a building that has a hologram keeps it as it grows
 function rooftopBoard(c, y){
   const top = c.sections[c.sections.length - 1], lot = c._topLot; c._topLot = null;
-  if (!top || (lot && lot.hasCarPad) || c.dark) return;
-  const hv = hash('board', c.i, c.j, c.sections.length, top.seed), r = hv % 100;
-  let size = -1;
-  if ((top.zone === 'mid' || top.zone === 'low') && y > 4.5 && r < (top.zone === 'mid' ? 45 : 28)) size = y > 6.5 ? 2 : 1;
-  else if (top.zone === 'mid' && r < 72) size = 0;
-  // and on the commercial streets, often a board hung off the side of the building too, part way up
-  const sideB = c.sections.some(s => s.zone === 'mid') && y > 2.4 && (hv >>> 20) % 100 < 40;
-  if (sideB) sideBoard(c, y, hv);
+  if (!top || c.dark) return;
+  const mid = c.sections.some(s => s.zone === 'mid');
+  // one commercial building in WALL_HOLO_ODDS, tall enough, wears a hologram ad down one face, as wide as the
+  // building, never out past its plot, from just under the roofline to the top of the ground floor
+  const hw = hash('wallside', c.i, c.j), wsd = SIDES4[hw & 3], wallOn = mid && y >= WALL_HOLO_MIN_Y && (window.WALL_FORCE === c.i + ',' + c.j || hash('wallholo', c.i, c.j) % WALL_HOLO_ODDS === 0);
+  if (wallOn){
+    const Wd = 2.2, yb = CURB + FH + .1;   // the ground floor is left clear for the shopfront
+    wallHologram(T(c.x + wsd[0]*1.18, yb, c.z + wsd[1]*1.18, Math.atan2(wsd[0], wsd[1])), Wd, y - .08 - yb, (hw >>> 4) % 50, (hw >>> 10) % WALL_CELLS.length);
+  }
   // one tall commercial tower in thirty throws the huge air-filter hologram out over the street from its top floor
-  if (c.sections.some(s => s.zone === 'mid') && (c.sections.length >= 3 || y >= 6) && y >= 5 && (window.AIR_FORCE === c.i + ',' + c.j || hash('airholo', c.i, c.j) % 30 === 0)){
+  if (mid && (c.sections.length >= 3 || y >= 6) && y >= 5 && (window.AIR_FORCE === c.i + ',' + c.j || hash('airholo', c.i, c.j) % 30 === 0)){
     // facing the lowest neighbour (open sky, a park, the shortest roof), so the picture isn't buried in a tower
     const ha = hash('airside', c.i, c.j), nb = ([a, b]) => { const n = cells.get(ckey(c.i + a, c.j + b)); return n ? n.sections.length : -1; };
     const sd = SIDES4.map((d, k) => [d, nb(d)*4 + ((ha >>> k*2) & 3)]).sort((p, q) => p[1] - q[1])[0][0], yp = y - .6, W = 3*LOT - .8, pair = (ha >>> 10) % 3, H = W*AIR_ASPECT[pair];
     airHologram(T(c.x + sd[0]*1.12, yp, c.z + sd[1]*1.12, Math.atan2(sd[0], sd[1])), W, H, 3.2, (ha >>> 4) % 50, window.AIR_PAIR !== undefined ? window.AIR_PAIR : pair);
   }
-  // one commercial building in six, mid-sized or taller, wears a hologram ad down one face, as wide as the building,
-  // never out past its plot, from just under the roofline to the top of the ground floor
-  if (c.sections.some(s => s.zone === 'mid') && y >= 3.5 && (window.WALL_FORCE === c.i + ',' + c.j || hash('wallholo', c.i, c.j) % 6 === 0)){
-    const hw = hash('wallside', c.i, c.j), si = sideB && (hw & 3) === ((hv >>> 4) & 3) ? (hw + 1) & 3 : hw & 3, sd = SIDES4[si], Wd = 2.2, yb = CURB + FH + .1;   // the ground floor is left clear for the shopfront
-    wallHologram(T(c.x + sd[0]*1.18, yb, c.z + sd[1]*1.18, Math.atan2(sd[0], sd[1])), Wd, y - .08 - yb, (hw >>> 4) % 50, (hw >>> 10) % WALL_CELLS.length);
-  }
+  if (lot && lot.hasCarPad) return;   // a car pad on the roof: no roof billboard or side board
+  const hv = hash('board', c.i, c.j, c.sections.length, top.seed), r = hv % 100;
+  let size = -1;
+  if ((top.zone === 'mid' || top.zone === 'low') && y > 4.5 && r < (top.zone === 'mid' ? 45 : 28)) size = y > 6.5 ? 2 : 1;
+  else if (top.zone === 'mid' && r < 72) size = 0;
+  // and on the commercial streets, often a board hung off the side of the building too, part way up (never on the
+  // face that has the wall hologram)
+  const sbs = SIDES4[(hv >>> 4) & 3];
+  if (mid && y > 2.4 && (hv >>> 20) % 100 < 40 && !(wallOn && sbs === wsd)) sideBoard(c, y, hv);
   if (size < 0) return;
   const side = [[0, 1], [1, 0], [0, -1], [-1, 0]][(hv >>> 8) & 3], off = size ? .1 : .45;
   holoBoard(T(c.x + side[0]*off, y, c.z + side[1]*off, Math.atan2(side[0], side[1])), size, (hv >>> 11) % 9, (hv >>> 15) % 211);

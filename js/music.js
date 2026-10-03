@@ -185,9 +185,9 @@ const music = (() => {
     else hush();
   }
   function update(dt){
-    const radio = typeof megas !== 'undefined' && megas.get('radio');
+    const radio = typeof megas !== 'undefined' && [...megas.values()].find(m => m.kind === 'radio' && !anims.some(a => a.c === m));
     // starts once the station has fully arrived (its arrival animation is over)
-    setOn(!!radio && !anims.some(a => a.c === radio));
+    setOn(!!radio);
     const playing = on && !paused && !blocked && !el.paused;
     // under the host's talk the song is turned down, and comes back up gently after
     // an interrupt due: stop the song, the host cuts in, then the song carries on from where it stopped

@@ -42,7 +42,7 @@ const pdist = () => { const [a,b] = [...ptrs.values()]; return Math.hypot(a.x-b.
 const pmidX = () => { const [a,b] = [...ptrs.values()]; return (a.x + b.x)/2; };
 function paintAt(x, y){
   const t = targetOf(pickAt(x, y)); if (!t) return;
-  const k = t.type === 'empty' ? ckey(t.i, t.j) : t.type === 'megaUp' ? 'mega:' + t.m.kind : ckey(t.c.i, t.c.j);
+  const k = t.type === 'empty' ? ckey(t.i, t.j) : t.type === 'megaUp' ? 'mega:' + t.m.id : ckey(t.c.i, t.c.j);
   if (act.done.has(k)) return;               // each spot changes at most once per stroke
   act.done.add(k); applyTarget(t);
 }
@@ -59,7 +59,7 @@ canvas.addEventListener('pointerdown', e => {
   if (e.button === 0){
     const pk = pickAt(e.clientX, e.clientY);
     // a click (no drag) builds; a drag rotates the view. With "Drag to paint" on, a drag that starts on the city paints instead.
-    if (!pk || pk.kind === 'sky' || !S.paint) act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false };
+    if (!pk || pk.kind === 'sky' || !S.paint || megaPick) act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false };
     else { act = { kind: 'paint', done: new Set() }; paintAt(e.clientX, e.clientY); }
   }
   else if (e.button === 2) act = { kind: 'right', x: e.clientX, y: e.clientY, moved: false };
@@ -67,13 +67,14 @@ canvas.addEventListener('pointerdown', e => {
 });
 canvas.addEventListener('pointermove', e => {
   const p = ptrs.get(e.pointerId);
-  if (!p){ showHover(targetOf(pickAt(e.clientX, e.clientY))); return; }   // just hovering
+  if (!p){ ptrLast = { x: e.clientX, y: e.clientY };   // just hovering
+    if (megaPick) showMegaGhost(megaPick, groundCellAt(e.clientX, e.clientY), megaTurn); else showHover(targetOf(pickAt(e.clientX, e.clientY))); return; }
   const dx = e.clientX - p.x;
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!act) return;
   if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), 5, 30); const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } return; }
   if (act.kind === 'rotate'){ yawT -= dx*.008; return; }
-  if (act.kind === 'sky'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; hover.visible = false; } return; }
+  if (act.kind === 'sky'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; hover.visible = false; if (megaPick) showMegaGhost(null); } return; }
   if (act.kind === 'right'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved) yawT -= dx*.008; return; }
   if (act.kind === 'touch'){
     if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) > 10){ act.moved = true; clearTimeout(act.timer); const pk = pickAt(act.x, act.y); act.spin = !pk || pk.kind === 'sky' || !S.paint; if (!act.spin) paintAt(act.x, act.y); }
@@ -84,15 +85,15 @@ canvas.addEventListener('pointermove', e => {
 });
 const endPtr = e => {
   if (act && ptrs.has(e.pointerId)){
-    if (act.kind === 'right' && !act.moved) removeAt(pickAt(e.clientX, e.clientY));
-    if (act.kind === 'sky' && !act.moved){ act.done = new Set(); paintAt(e.clientX, e.clientY); }
-    if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); act.done = new Set(); paintAt(e.clientX, e.clientY); }
+    if (act.kind === 'right' && !act.moved){ if (megaPick) selectMega(null); else removeAt(pickAt(e.clientX, e.clientY)); }   // right-click while placing: put it down
+    if (act.kind === 'sky' && !act.moved){ if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
+    if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
   }
   ptrs.delete(e.pointerId);
   if (!ptrs.size){ dragging = false; act = null; }
 };
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
-canvas.addEventListener('pointerleave', () => { if (!ptrs.size) hover.visible = false; });
+canvas.addEventListener('pointerleave', () => { if (!ptrs.size){ hover.visible = false; showMegaGhost(null); } });
 canvas.addEventListener('wheel', e => { e.preventDefault(); zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 30); }, { passive:false });
 const PAN_KEYS = ['w','a','s','d','arrowup','arrowdown'];
 addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === 'shift') keys.delete('shift'); });
@@ -103,12 +104,13 @@ addEventListener('keydown', e => {
   if (k === 'shift') keys.add('shift');
   if (PAN_KEYS.includes(k)){ keys.add(k); e.preventDefault(); return; }
   if (k === 'h' || e.key === 'Home'){ centerView(); return; }
+  if (k === 'r' && megaPick){ megaTurn = !megaTurn; if (ptrLast) showMegaGhost(megaPick, groundCellAt(ptrLast.x, ptrLast.y), megaTurn); return; }
   if (e.key === 'ArrowLeft' || e.key === 'q' || e.key === 'Q') yawT += PI/4;
   else if (e.key === 'ArrowRight' || e.key === 'e' || e.key === 'E') yawT -= PI/4;
   else if (e.key === '+' || e.key === '=') zoomT = clamp(zoomT*.9,5,30);
   else if (e.key === '-') zoomT = clamp(zoomT*1.1,5,30);
   else if ('1234'.includes(e.key) && e.key.length === 1) selectZone(['low','mid','high','ind'][+e.key - 1]);
-  else if (e.key === 'Escape' || e.key === '0') selectZone(null);
+  else if (e.key === 'Escape' || e.key === '0'){ if (megaPick) selectMega(null); else selectZone(null); }
 });
 
 /* ---------- UI ---------- */
@@ -154,7 +156,9 @@ $('resetRj').addEventListener('click', () => { const b = $('resetRj');
   else { b.dataset.armed = '1'; b.textContent = 'Click again to reset'; setTimeout(() => { if (b.dataset.armed){ delete b.dataset.armed; b.textContent = 'Reset radio host'; } }, 2500); } });
 function selectZone(z){
   S.zone = (z && S.zone !== z) ? z : null;
+  if (S.zone && megaPick) selectMega(null, true);
   document.querySelectorAll('.zone').forEach(b => { const on = b.dataset.zone === S.zone; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  if (megaPick) return;
   $('modeHint').textContent = S.zone ? `Zone ${ZONES[S.zone].key}: click to build · click a roof to stack a section` + (S.paint ? ' · drag to paint' : '') : 'Click the sky to grow the platform · pick a zone to build';
 }
 document.querySelectorAll('.zone').forEach(b => b.addEventListener('click', () => selectZone(b.dataset.zone)));
@@ -182,3 +186,52 @@ $('rotBR').addEventListener('click', () => { yawT -= PI/4; });
 $('deckToggle').addEventListener('click', () => {
   const open = $('deck').classList.toggle('open'); $('deckToggle').setAttribute('aria-expanded', open); $('deckToggle').textContent = open ? 'Close' : 'Settings';
 });
+
+/* ---------- the Buildings menu ---------- */
+// Shows up once the first megastructure has arrived. Every kind that has arrived is listed and can be placed again,
+// as many times as you like; kinds still to come are shown greyed with what they need. Pick one, and its footprint
+// follows the pointer (green-lit in its colour where it fits, red where it doesn't): click to put one down, R turns
+// it, right-click or Esc stops placing.
+let megaPick = null, megaTurn = false, ptrLast = null;
+const BMENU_OPEN_KEY = 'neonIsland.bmenuOpen';
+function selectMega(kind, quiet){
+  megaPick = kind && megaPick !== kind ? kind : null;
+  if (megaPick && S.zone) selectZone(null);
+  document.querySelectorAll('.bitem').forEach(b => { const on = b.dataset.kind === megaPick; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  hover.visible = false;
+  if (megaPick){ const t = MEGA_TYPES[megaPick];
+    $('modeHint').textContent = `Placing: ${t.name} · click to build` + (t.w !== t.h ? ' · R turns it' : '') + ' · right-click or Esc to stop';
+    if (ptrLast) showMegaGhost(megaPick, groundCellAt(ptrLast.x, ptrLast.y), megaTurn); }
+  else { showMegaGhost(null); if (!quiet) selectZone(S.zone); }
+}
+function placeMegaHere(x, y){
+  const c = groundCellAt(x, y); if (!c) return;
+  const m = placeFromMenu(megaPick, c.i, c.j, megaTurn);
+  if (!m) return;   // doesn't fit there (the footprint shows red)
+  showMegaGhost(megaPick, c, megaTurn);
+}
+function setBmenuOpen(open){
+  $('bmenuHead').setAttribute('aria-expanded', open); $('bmenuList').hidden = !open;
+  try { localStorage.setItem(BMENU_OPEN_KEY, open ? '1' : '0'); } catch (e) {}
+}
+function renderBmenu(){
+  const any = megaUnlockedKinds.size > 0;
+  $('bmenu').hidden = !any; if (!any) return;
+  const list = $('bmenuList'); list.textContent = '';
+  const kinds = Object.keys(MEGA_TYPES); kinds.sort((a, b) => (megaUnlockedKinds.has(b) ? 1 : 0) - (megaUnlockedKinds.has(a) ? 1 : 0));   // what you can place first
+  for (const kind of kinds){
+    const t = MEGA_TYPES[kind], open = megaUnlockedKinds.has(kind);
+    const b = document.createElement('button'); b.className = 'bitem' + (open ? '' : ' locked'); b.dataset.kind = kind; b.style.setProperty('--m', t.colour);
+    b.setAttribute('aria-pressed', megaPick === kind); if (megaPick === kind) b.classList.add('on');
+    const n = megasOfKind(kind).length;
+    b.innerHTML = `<i class="sw"></i><b></b><small></small>`;
+    b.querySelector('b').textContent = open ? t.name : 'Locked';
+    b.querySelector('small').textContent = open ? `${t.w} × ${t.h} plots` + (n ? ` · ${n} built` : '') : 'Arrives with ' + megaNeedText(kind);
+    if (open) b.addEventListener('click', () => selectMega(kind)); else { b.disabled = true; b.title = 'Arrives on its own with ' + megaNeedText(kind); }
+    list.appendChild(b);
+  }
+}
+$('bmenuHead').addEventListener('click', () => { setBmenuOpen($('bmenuList').hidden); $('bmenuHead').classList.remove('fresh'); });
+// a kind arriving for the first time: open the menu and make the header pulse so it gets noticed
+function onMegaUnlock(){ renderBmenu(); if (!document.getElementById('bmenuList')) return; setBmenuOpen(true); $('bmenuHead').classList.add('fresh'); }
+{ let open = false; try { open = localStorage.getItem(BMENU_OPEN_KEY) === '1'; } catch (e) {} setBmenuOpen(open); renderBmenu(); }

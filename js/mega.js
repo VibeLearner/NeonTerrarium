@@ -1,9 +1,11 @@
 // Neon Terrarium: megastructures, landmarks that take over a 2x2 block of plots once the city is big enough.
 // All game scripts share one scope and load in order (see index.html).
 'use strict';
-// Each megastructure exists at most once. When its requirement is met (enough buildings of the zones it names),
-// each new build has a small chance of bringing it in: it takes a block of free plots (w x h, either way round)
-// near that build, growing the platform where needed; it never replaces a building. Some can be stacked: clicking the roof with a zone picked adds a
+// Each kind first arrives on its own: when its requirement is met (enough buildings of the zones it names), each new
+// build has a chance of bringing it in. It takes a block of free plots (w x h, either way round) near that build,
+// growing the platform where needed; it never replaces a building. Once a kind has arrived it's unlocked for good:
+// the Buildings menu then places as many more as you like (see placeFromMenu). Every one is built from its own seed,
+// which also picks its variant (layout, centrepiece, colours), so a row of them doesn't repeat. Some can be stacked: clicking the roof with a zone picked adds a
 // tier, up to maxLevels. Right-click takes the top tier off, or removes it when only one is left; it can come back
 // once the requirement is met again.
 const MEGA_TYPES = {
@@ -22,7 +24,21 @@ const MEGA_TYPES = {
   pagoda: { name: 'Cloud Pagoda', need: { highPlots: 60 }, odds: 1, w: 5, h: 4, maxLevels: 1,   // arrives with the 60th luxury building
            colour: '#8ff0ff', build: buildCloudPagoda },
 };
-const megas = new Map();   // kind -> { kind, i, j, w, h, levels, seed, x, z, data, view, roofH, top, cells }
+const megas = new Map();   // id -> { id, kind, i, j, w, h, levels, seed, x, z, data, view, roofH, top, cells }; a plot's .mega is the id
+const megaOf = c => c && c.mega ? megas.get(c.mega) || null : null;
+const megaKindOf = c => { const m = megaOf(c); return m ? m.kind : null; };
+const megasOfKind = kind => [...megas.values()].filter(m => m.kind === kind);
+let megaIdN = 0;
+const newMegaId = kind => { let id; do id = kind + '#' + (++megaIdN); while (megas.has(id)); return id; };
+// which kinds have arrived at least once (they stay in the Buildings menu even if every copy is taken down)
+const MEGA_UNLOCK_KEY = 'neonIsland.megaUnlocked';
+const megaUnlockedKinds = new Set((() => { try { return JSON.parse(localStorage.getItem(MEGA_UNLOCK_KEY) || '[]'); } catch (e) { return []; } })().filter(k => MEGA_TYPES[k]));
+function unlockMegaKind(kind){
+  if (megaUnlockedKinds.has(kind)) return;
+  megaUnlockedKinds.add(kind);
+  try { localStorage.setItem(MEGA_UNLOCK_KEY, JSON.stringify([...megaUnlockedKinds])); } catch (e) {}
+  if (typeof onMegaUnlock === 'function') onMegaUnlock(kind);
+}
 
 // how many building sections of each zone stand in the city
 function zoneCounts(){
@@ -45,10 +61,39 @@ function megaUnlocked(kind){
 // called after every build: roll for each megastructure that isn't standing yet and whose requirement is met
 function maybeSpawnMegas(c){
   for (const kind in MEGA_TYPES){
-    if (megas.has(kind) || !megaUnlocked(kind)) continue;
+    if (megaUnlockedKinds.has(kind) || megasOfKind(kind).length || !megaUnlocked(kind)) continue;   // each kind arrives on its own only once
     if (Math.random() < 1/MEGA_TYPES[kind].odds) spawnMega(kind, c);
   }
 }
+// can a w x h block go at (i, j)? Every plot free ground or open sky, inside the world, touching the platform
+function megaBlockOk(i, j, w, h){
+  if (Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX || Math.abs(i + w - 1) > GRID_MAX || Math.abs(j + h - 1) > GRID_MAX) return false;
+  let missing = 0;
+  for (let a = 0; a < w; a++) for (let b = 0; b < h; b++){ const c = cells.get(ckey(i + a, j + b)); if (!c){ missing++; continue; } if (c.mega || c.sections.length) return false; }
+  if (missing < w*h) return true;
+  for (let a = -1; a <= w; a++) for (let q = -1; q <= h; q++){
+    if (a >= 0 && a < w && q >= 0 && q < h) continue;
+    if ((a === -1 || a === w) && (q === -1 || q === h)) continue;
+    if (cells.has(ckey(i + a, j + q))) return true;
+  }
+  return false;
+}
+// the Buildings menu: the block for a kind centred on plot (ci, cj), turned if asked
+function megaBlockAt(kind, ci, cj, turned){
+  const t = MEGA_TYPES[kind]; const [w, h] = turned ? [t.h, t.w] : [t.w, t.h];
+  const i = ci - Math.floor((w - 1)/2), j = cj - Math.floor((h - 1)/2);
+  return { i, j, w, h, ok: megaBlockOk(i, j, w, h) };
+}
+function placeFromMenu(kind, ci, cj, turned){
+  const blk = megaBlockAt(kind, ci, cj, turned); if (!blk.ok) return null;
+  const m = spawnMegaAt(kind, blk); if (m){ save(); }
+  return m;
+}
+// what a kind needs before it first arrives, in words (for the menu)
+const NEED_WORDS = { any: ['building', 'buildings'], low: ['residential floor', 'residential floors'], mid: ['commercial floor', 'commercial floors'],
+  high: ['luxury floor', 'luxury floors'], ind: ['industrial floor', 'industrial floors'], lowPlots: ['residential building', 'residential buildings'],
+  midPlots: ['commercial building', 'commercial buildings'], highPlots: ['luxury building', 'luxury buildings'] };
+const megaNeedText = kind => Object.entries(MEGA_TYPES[kind].need).map(([z, n]) => n + ' ' + NEED_WORDS[z][n === 1 ? 0 : 1]).join(' and ');
 const blockCells = (i, j, w, h) => { const out = []; for (let a=0;a<w;a++) for (let b=0;b<h;b++) out.push(cells.get(ckey(i+a, j+b))); return out; };
 // The block for a megastructure: free ground near the build that brought it in, either way round. It never
 // replaces anything: every plot in the block is either open platform with nothing built on it, or not there yet
@@ -79,21 +124,27 @@ function findMegaBlock(kind, c){
   return best;
 }
 // put a megastructure's record in place on its plots (no drawing)
-function placeMega(kind, i, j, seed, w, h, levels = 1){
+function placeMega(kind, i, j, seed, w, h, levels = 1, id = null){
   const t = MEGA_TYPES[kind];
-  if (!t || megas.has(kind)) return null;
+  if (!t || (id && megas.has(id))) return null;
   w = w || t.w; h = h || t.h;
   const blk = blockCells(i, j, w, h);
   if (blk.some(b => !b || b.mega)) return null;
-  const m = { kind, i, j, w, h, levels: Math.max(1, Math.min(t.maxLevels, levels)), seed, x: (i + (w-1)/2)*LOT, z: (j + (h-1)/2)*LOT,
+  id = id || newMegaId(kind);
+  const m = { id, kind, i, j, w, h, levels: Math.max(1, Math.min(t.maxLevels, levels)), seed, x: (i + (w-1)/2)*LOT, z: (j + (h-1)/2)*LOT,
               data: null, view: null, roofH: CURB, top: CURB, cells: blk };
-  for (const b of blk){ b.mega = kind; b.sections = []; }
-  megas.set(kind, m);
+  for (const b of blk){ b.mega = id; b.sections = []; }
+  megas.set(id, m);
+  unlockMegaKind(kind);
   return m;
 }
 const megaSize = m => [m.w*LOT, m.h*LOT];
 function spawnMega(kind, near){
   const blk = findMegaBlock(kind, near); if (!blk) return null;
+  return spawnMegaAt(kind, blk);
+}
+// bring one in on a given block { i, j, w, h } (free ground or open sky, touching the platform)
+function spawnMegaAt(kind, blk){
   const grown = [];
   for (let a=0; a<blk.w; a++) for (let b=0; b<blk.h; b++){   // grow any missing platform under the block
     const i = blk.i + a, j = blk.j + b;
@@ -105,7 +156,7 @@ function spawnMega(kind, near){
   for (const b of covered){ finishAnimsOn(b); if (b.view){ world.remove(b.view); b.view = null; } disposeData(b.data); b.data = null; }
   const m = placeMega(kind, blk.i, blk.j, (Math.random()*1e9)|0, blk.w, blk.h); if (!m) return null;
   holdRegion(m);
-  refresh(covered.filter(b => !b.mega || b.mega === kind), [m]);
+  refresh(covered.filter(b => !b.mega || b.mega === m.id), [m]);
   // the slow arrival: the platform grown for it scans in alongside, and its live parts (koi, drone, screens) switch
   // on once it's fully there
   for (const c of grown){ holdRegion(c); startAnim(c, 'build', PLAT_BOTTOM, CURB + .3, MEGA_TYPES[kind].colour, LOT, null, null, { slow: true, quiet: true, bare: true }); }
@@ -114,7 +165,8 @@ function spawnMega(kind, near){
   // run the length of the animation, starting with it.
   const t = MEGA_TYPES[kind];
   startAnim(m, 'build', CURB - .05, m.top + 1, t.colour, megaSize(m), null, t.sound || 'megaArrive', { slow: true,
-    onEnd: () => { if (megas.get(kind) === m && !m.fx) megaFx(m); } });
+    onEnd: () => { if (megas.get(m.id) === m && !m.fx) megaFx(m); } });
+  if (typeof renderBmenu === 'function') renderBmenu();
   return m;
 }
 // stacking: another tier on top
@@ -143,22 +195,23 @@ function removeMega(m){
   finishAnimsOn(m);
   if (m.fx){ m.fx.dispose(); m.fx = null; }
   const old = { view: m.view, data: m.data }; m.view = null; m.data = null;
-  megas.delete(m.kind);
+  megas.delete(m.id);
   for (const b of m.cells) b.mega = null;
   dirtyRegions.add(regKey(m.i, m.j));
   refresh(m.cells.filter(b => cells.get(ckey(b.i, b.j)) === b));
   startAnim(m, 'remove', CURB - .05, m.top + 1, MEGA_TYPES[m.kind].colour, megaSize(m), old);
+  if (typeof renderBmenu === 'function') renderBmenu();
 }
 // moving parts (like the square's holographic koi) live outside the batched geometry and are updated every frame
 function megaFx(m){
   if (m.fx){ m.fx.dispose(); m.fx = null; }
-  const t = MEGA_TYPES[m.kind]; if (t.fx) m.fx = t.fx(m);
+  const t = MEGA_TYPES[m.kind]; if (t.fx) m.fx = t.fx(m) || null;
 }
 function updateMegaFx(dt, time){ for (const m of megas.values()) if (m.fx) m.fx.update(dt, time); }
 function rebuildMega(m){
   finishAnimsOn(m);
   disposeData(m.data);
-  m.data = collect(() => MEGA_TYPES[m.kind].build(m));
+  m.data = collect(() => withSkin(megaSkinOf(m), () => MEGA_TYPES[m.kind].build(m)));
   cellView(m);
   megaFx(m);
   for (const b of m.cells) b.height = m.roofH;
@@ -394,7 +447,7 @@ function buildRadioStation(m){
   box(M.hazard, P, 2.2, .058, 2.2, 2.9, .012, 2.9); box(M.concDD, P, 2.2, .062, 2.2, 2.7, .014, 2.7);
 
   // ---- main building
-  const bx = -1.05, bz = -.55, bw = 4.6, bd = 4.2, floors = 4, h = floors*FH + .25, y0 = CURB, roof = y0 + h;
+  const bx = -1.05, bz = -.55, bw = 4.6, bd = 4.2, floors = 3 + hash('floors', m.seed) % 3, h = floors*FH + .25, y0 = CURB, roof = y0 + h;   // three to five storeys
   box(M.concM, P, bx, y0 + h/2, bz, bw, h, bd);
   for (let f=0; f<=floors; f++) box(M.concD, P, bx, y0 + f*FH + .02, bz, bw + .1, .09, bd + .1);          // floor ledges
   for (let f=0; f<floors; f++){
@@ -495,7 +548,7 @@ function buildRadioStation(m){
 // for trying things out: open the game with #dev in the address, point at a plot and press M for the radio
 // station, N the sky mall, B the town square, V the foundry, C the police station, X the market mall, P the cloud
 // pagoda (each key
-// brings it in, or removes it if it's already there; ignores the requirement and the odds)
+// brings one in, with Shift it takes one away; ignores the requirement and the odds)
 if (location.hash.includes('dev')){
   let lastPointer = null;
   addEventListener('pointermove', e => { lastPointer = { x: e.clientX, y: e.clientY }; });
@@ -503,7 +556,7 @@ if (location.hash.includes('dev')){
     const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police', x: 'market', p: 'pagoda' }[e.key.toLowerCase()]; if (!kind) return;
     const pk = lastPointer ? pickAt(lastPointer.x, lastPointer.y) : null;
     const c = pk && pk.c ? pk.c : pk && pk.kind === 'sky' ? { i: pk.i, j: pk.j } : cells.values().next().value;
-    if (megas.has(kind)) removeMega(megas.get(kind));
+    if (e.shiftKey && megasOfKind(kind).length) removeMega(megasOfKind(kind)[0]);
     else if (c) spawnMega(kind, c);
   });
 }
@@ -731,7 +784,7 @@ function buildSkyMall(m){
 }
 
 /* ---------- the town square ---------- */
-// A 5x5 open plaza for the neighbourhoods. In the middle, a holographic koi pond: a round, dark pool ringed in
+// A 5x5 open plaza for the neighbourhoods (each one varies: see squareVariant). In the middle, say, a holographic koi pond: a round, dark pool ringed in
 // stone and cyan neon, with lily pads and lotus lights, where koi made of light circle and flicker. Lantern strings
 // cross over it between poles round the square. Round the pond, a busy night market: food carts of three kinds
 // (menu-tower bike carts, hawker stalls, little food trucks), all piled with food; long market stands with trays
@@ -868,21 +921,31 @@ function flatWater(mat, P, y, r){
   put(g, mat, under(P, T(0, y, 0))); g.dispose();
 }
 const POND_R = 2.5, POND_Y = .2;
-function buildTownSquare(m){
-  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
-  const P = T(m.x, 0, m.z, pick([0, PI/2, PI, -PI/2])), S5 = 5*LOT, H = S5/2;
-  reflectLights = [];
-  PERSON_GHOST = { kind: null };
-  box(G.asph, P, 0, .012, 0, S5, .025, S5);
-  const n = 25, st = S5/n;
-  for (let a=0;a<n;a++) for (let b=0;b<n;b++){
-    const x = (a-(n-1)/2)*st, z = (b-(n-1)/2)*st, r = Math.hypot(x, z);
-    if (r < POND_R + .5) continue;
-    const ring = Math.floor(r/1.5) % 2, mat = ring ? TILES.mid[(a + b) % 2] : TILES.low[(a*3 + b) % 4];
-    if (!chance(.02)) box(mat, P, x, .03, z, st - .04, .045, st - .04);
-  }
-  for (const r of [POND_R + 1.4, 6.6]) for (let k=0; k<48; k++){ const a = k*TAU/48; box(M.concL, P, Math.cos(a)*r, .058, Math.sin(a)*r, .5, .012, .08, -a + PI/2); }
-  // ---- the koi pond
+// Every town square is its own: from its seed it picks a centrepiece (the koi pond, a tiered fountain, a sakura
+// tree, a bandstand, a little shrine or a clock tower), how its food carts are laid out (a ring, a horseshoe, four
+// corner food courts, two food streets or scattered), which sides get the long market stands, the lantern poles,
+// the paving pattern and what stands in each corner. SQ_FORCE (for testing) overrides any of these.
+const SQ_CENTRES = ['pond', 'fountain', 'sakura', 'bandstand', 'shrine', 'clock'];
+let SQ_FORCE = null;
+function squareVariant(m){
+  const r = mulberry32(hash('square-variant', m.seed)), one = a => a[Math.floor(r()*a.length)];
+  const v = { centre: one(SQ_CENTRES), carts: one(['ring', 'horseshoe', 'corners', 'streets', 'scatter']),
+    mix: one([[0, 1, 2], [0, 0, 1, 2], [1, 1, 2], [2, 2, 0, 1], [0, 1], [1, 2]]), stands: one(['four', 'four', 'pair', 'three']),
+    poles: one(['octagon', 'square']), floor: one(['rings', 'checker', 'spokes', 'diagonal']), tiles: Math.floor(r()*4),
+    corners: [0, 1, 2, 3].map(() => one(['planter', 'planter', 'vending', 'tree', 'kiosk'])), open: Math.floor(r()*4)*PI/2, skip: Math.floor(r()*4) };
+  if (v.carts === 'streets') v.stands = 'pair';   // the food streets run between the stands, not into them
+  return Object.assign(v, SQ_FORCE || {});
+}
+M.fountainWater = toon(0x6fcfe6, { em:0x1e6a86, kind:'trim' });
+M.sakura = toon(0xf2a2c4, { em:0x4a1830, kind:'window' }); M.sakura2 = toon(0xffc8dc, { em:0x5a2840, kind:'window' }); M.sakura3 = toon(0xd87aa6, { flat:1 });
+M.shrineRed = toon(0xc8402e); M.shrineRed2 = toon(0x9a2e22); M.shrineDark = toon(0x2e2826); M.shrineRope = toon(0xe8dcb8);
+M.clockFace = toon(0xe8e0c8, { em:0x8a7a50, kind:'window' }); M.bandRoof = toon(0x5a4a82); M.bandRoof2 = toon(0x7a3a4a);
+// a figure drawn as boxes (performers on the bandstand: always drawn, never real people)
+function figure(P, x, y, z, c){ box(c, P, x, y + .11, z, .08, .22, .06); box(M.concDD, P, x, y + .26, z, .055, .06, .055); }
+// the round stone base every centrepiece stands on, wide enough to cover the paving it replaces
+function centreBase(P){ put(U.cyl16, M.concD, under(P, T(0, .06, 0, 0, 2*(POND_R + .75), .1, 2*(POND_R + .75)))); }
+// ---- centrepieces: each returns { mast } (the height lantern strings can run from, or null) and { cross } (strings may cross over it)
+function centrePond(P){
   put(U.cyl16, M.concM, under(P, T(0, .12, 0, 0, 2*POND_R + .7, .2, 2*POND_R + .7)));        // stone rim
   put(U.cyl16, M.concD, under(P, T(0, .225, 0, 0, 2*POND_R + .8, .04, 2*POND_R + .8)));
   put(U.cyl16, M.neonCyan, under(P, T(0, .16, 0, 0, 2*POND_R + .74, .03, 2*POND_R + .74)));  // neon band round the rim
@@ -893,20 +956,187 @@ function buildTownSquare(m){
     const Q = under(P, T(Math.cos(a)*r, .25, Math.sin(a)*r, -a));
     box(M.metalDark, Q, 0, .15, 0, .18, .3, .18); box(M.screen, Q, 0, .32, 0, .12, .04, .12); glow(Q, 0, .34, 0, 'cyan', .7); noteLight(Q, 0, .34, 0, 0x4fd8ff); }
   for (let k=0; k<6; k++){ const a = rnd(0, TAU), r = POND_R + .55; plant(pick(['bush','bushFlower','g_fern2']), P, Math.cos(a)*r, .25, Math.sin(a)*r, .7); }
-  // ---- lantern poles round the square, strung across the pond and between each other
+  return { mast: null, cross: true };
+}
+// a three-tier fountain: water spilling from bowl to bowl into a wide basin, jets arcing in from the rim
+function centreFountain(P){
+  centreBase(P);
+  put(U.cyl16, M.concM, under(P, T(0, .2, 0, 0, 5.8, .3, 5.8)));
+  put(U.cyl16, M.concL, under(P, T(0, .36, 0, 0, 6.0, .04, 6.0)));
+  put(U.cyl16, M.neonCyan, under(P, T(0, .27, 0, 0, 5.86, .03, 5.86)));
+  flatWater(M.koiWater, P, .33, 2.78);
+  cyl(M.concM, P, 0, .95, 0, .38, 1.2);
+  put(U.cyl16, M.concL, under(P, T(0, 1.5, 0, 0, 2.6, .18, 2.6))); flatWater(M.fountainWater, P, 1.6, 1.18);
+  cyl(M.concM, P, 0, 2.05, 0, .2, 1.0);
+  put(U.cyl16, M.concL, under(P, T(0, 2.55, 0, 0, 1.3, .14, 1.3))); flatWater(M.fountainWater, P, 2.63, .56);
+  cyl(M.concL, P, 0, 2.8, 0, .05, .3); sph(M.neonCyan, P, 0, 3.02, 0, .15); glow(P, 0, 3.02, 0, 'cyan', 1.4); noteLight(P, 0, 3.02, 0, 0x38e8e0);
+  for (let k=0; k<14; k++){ const a = k*TAU/14; strut(M.fountainWater, P, Math.cos(a)*.64, 2.6, Math.sin(a)*.64, Math.cos(a)*.78, 1.62, Math.sin(a)*.78, .035); }
+  for (let k=0; k<22; k++){ const a = k*TAU/22; strut(M.fountainWater, P, Math.cos(a)*1.28, 1.56, Math.sin(a)*1.28, Math.cos(a)*1.5, .36, Math.sin(a)*1.5, .04); }
+  for (let k=0; k<8; k++){ const a = k*TAU/8 + PI/8; let px = Math.cos(a)*2.72, pz = Math.sin(a)*2.72, py = .4;   // jets
+    for (let q=1; q<=7; q++){ const u = q/7, r = 2.72 - 1.0*u, y = .4 + 1.25*Math.sin(u*PI)*(1 - .25*u), x = Math.cos(a)*r, z = Math.sin(a)*r; strut(M.fountainWater, P, px, py, pz, x, y, z, .03); px = x; py = y; pz = z; } }
+  for (let k=0; k<6; k++){ const a = k*TAU/6; glow(P, Math.cos(a)*2.1, .36, Math.sin(a)*2.1, 'cyan', .8); }
+  emitters.push(new THREE.Vector3(0, 2.9, 0).applyMatrix4(P));
+  return { mast: 3.15, cross: false };
+}
+// a sakura tree in a raised planter, its canopy lit soft pink, paper lanterns in the branches, petals underfoot
+function centreSakura(P){
+  centreBase(P);
+  put(U.cyl16, M.concM, under(P, T(0, .3, 0, 0, 5.6, .5, 5.6)));
+  put(U.cyl16, M.neonPink, under(P, T(0, .42, 0, 0, 5.66, .03, 5.66)));
+  put(U.cyl16, M.pgMoss, under(P, T(0, .56, 0, 0, 5.3, .04, 5.3)));
+  for (let k=0; k<9; k++){ const a = rnd(0, TAU), r = rnd(1.0, 2.4); plant(pick(['g_fern2', 'bush', 'bushFlower', 'g_fern3']), P, Math.cos(a)*r, .58, Math.sin(a)*r, rnd(.6, .85)); }
+  strut(M.trunk, P, 0, .55, 0, .15, 1.6, .1, .42); strut(M.trunk, P, .15, 1.6, .1, -.08, 2.5, 0, .32);
+  const ends = [];
+  for (let k=0; k<6; k++){
+    const a = k*TAU/6 + rnd(-.3, .3), rr = rnd(1.5, 2.3), y = rnd(2.9, 3.6), sy = rnd(1.9, 2.4), mx = Math.cos(a)*rr*.55, mz = Math.sin(a)*rr*.55;
+    strut(M.trunk, P, 0, sy, 0, mx, y - .45, mz, .17); strut(M.trunk, P, mx, y - .45, mz, Math.cos(a)*rr, y, Math.sin(a)*rr, .1);
+    ends.push([Math.cos(a)*rr, y, Math.sin(a)*rr]);
+  }
+  for (const [ex, ey, ez] of ends) for (let q=0; q<5; q++) sph(pick([M.sakura, M.sakura2, M.sakura3]), P, ex + rnd(-.6, .6), ey + rnd(-.15, .5), ez + rnd(-.6, .6), rnd(.45, .72), .75);
+  for (let q=0; q<7; q++) sph(pick([M.sakura, M.sakura2]), P, rnd(-.9, .9), rnd(3.6, 4.3), rnd(-.9, .9), rnd(.6, .85), .75);
+  ends.forEach(([ex, ey, ez], k) => { glow(P, ex, ey + .2, ez, 'pink', 1.3);
+    if (k % 2){ cyl(M.frame, P, ex, ey - .45, ez, .006, .5); box(M.lantern, P, ex, ey - .78, ez, .16, .22, .16); glow(P, ex, ey - .78, ez, 'amber', .8); noteLight(P, ex, ey - .78, ez, 0xff8a3a); } });
+  for (let k=0; k<46; k++){ const a = rnd(0, TAU), r = rnd(.6, 5.6), x = Math.cos(a)*r, z = Math.sin(a)*r; box(pick([M.sakura2, M.sakura3]), P, x, r < 2.7 ? .6 : .065, z, .06, .012, .05, rnd(0, PI)); }
+  return { mast: null, cross: false };
+}
+// a round bandstand: a stage under a conical roof on slim posts, a band playing, a big screen behind them
+function centreBandstand(P){
+  centreBase(P);
+  put(U.cyl16, M.concM, under(P, T(0, .32, 0, 0, 5.6, .5, 5.6)));
+  put(U.cyl16, M.wood, under(P, T(0, .58, 0, 0, 5.4, .03, 5.4)));
+  put(U.cyl16, M4.neonPurple, under(P, T(0, .45, 0, 0, 5.66, .04, 5.66)));
+  for (let k=0; k<3; k++) box(M.concL, P, 0, (k + 1)*.095, 2.85 + (2 - k)*.26, 1.8, (k + 1)*.19, .28);   // steps up at the front
+  const top = 3.4;
+  for (let k=0; k<8; k++){ const a = k*TAU/8 + PI/8, x = Math.cos(a)*2.55, z = Math.sin(a)*2.55;
+    cyl(M.metalDark, P, x, .57 + (top - .57)/2, z, .06, top - .57);
+    box(M.bulb, P, x*.92, top - .15, z*.92, .1, .1, .1); glow(P, x*.9, top - .2, z*.9, pick(['pink', 'cyan', 'amber']), 1.0); }
+  put(U.cone, pick([M.bandRoof, M.bandRoof2, M.metalDark]), under(P, T(0, top + .5, 0, PI/8, 6.5, 1.0, 6.5)));
+  for (let k=0; k<32; k++){ const a = k*TAU/32; box(M.neonPink, P, Math.cos(a)*3.22, top + .02, Math.sin(a)*3.22, .64, .05, .05, -a + PI/2); }
+  glow(P, 0, top, 3.2, 'pink', 1.6); glow(P, 0, top, -3.2, 'pink', 1.6);
+  cyl(M.metal, P, 0, top + 1.15, 0, .04, .4); sph(M.neonCyan, P, 0, top + 1.38, 0, .1); glow(P, 0, top + 1.38, 0, 'cyan', 1.0);
+  // the band, the gear and a screen at the back
+  for (const s of [-1, 1]){ box(M.frame, P, s*1.9, 1.05, -1.1, .5, .95, .45); for (const y of [.8, 1.25]) put(U.cyl16, M.metalDark, under(P, T(s*1.9, y, -.87, 0, .3, .02, .3, PI/2))); }
+  box(M.metalDark, P, 0, .97, -1.55, 1.3, .8, .55); box(M.screen, P, 0, 1.2, -1.27, 1.1, .2, .01); box(M.neonCyan, P, 0, .65, -1.27, 1.2, .03, .01);
+  box(M.metalDark, P, 0, 2.3, -2.45, 2.6, 1.5, .08); box(pick([M.screen, M.screen2]), P, 0, 2.3, -2.4, 2.4, 1.3, .02); glow(P, 0, 2.3, -2.2, 'platinum', 1.6);
+  cyl(M.frame, P, 0, .85, .55, .012, .55); figure(P, 0, .57, .4, M.awn1);
+  figure(P, -.85, .57, -.25, M.cloth3); box(M.wood, P, -.82, .82, -.15, .25, .07, .05, 0, 0, .6);
+  figure(P, .9, .57, -.3, M.cloth4); box(M.metalDark, P, .9, .78, -.1, .45, .05, .18);
+  return { mast: top + 1.2, cross: false };
+}
+// a little shrine: a hall with a dark gabled roof on a stone platform, a red torii in front, stone lanterns and pines
+function centreShrine(P){
+  centreBase(P);
+  box(M.pgRock, P, 0, .2, -.3, 4.0, .3, 3.4); box(M.pgRock2, P, 0, .37, -.75, 3.0, .04, 2.0);
+  const fy = .39, hz = -1.1;
+  box(M.shrineDark, P, 0, fy + .06, hz, 2.2, .12, 1.6);
+  for (const [sx, sz] of CORNERS) cyl(M.shrineRed, P, sx*.95, fy + .65, hz + sz*.65, .06, 1.2);
+  box(M.wood, P, 0, fy + .62, hz - .7, 1.9, 1.1, .06); for (const s of [-1, 1]) box(M.wood, P, s*.97, fy + .62, hz, .06, 1.1, 1.3);
+  box(M.shrineRed2, P, 0, fy + 1.27, hz, 2.15, .12, 1.5);
+  for (const s of [-1, 1]) box(M.shrineDark, P, 0, fy + 1.62, hz + s*.48, 2.9, .09, 1.25, 0, s*.5);
+  box(M.shrineDark, P, 0, fy + 1.9, hz, 3.0, .12, .14);
+  box(M.wood, P, 0, fy + .3, hz - .35, .9, .5, .4); box(M.bulb, P, 0, fy + .65, hz - .35, .14, .18, .14); glow(P, 0, fy + .7, hz - .3, 'warm', 1.0);
+  box(M.shrineRope, P, 0, fy + 1.15, hz + .78, 1.8, .06, .06);
+  for (const s of [-1, 1]){ box(M.lantern, P, s*.8, fy + .95, hz + .82, .16, .24, .16); glow(P, s*.8, fy + .95, hz + .9, 'amber', .8); noteLight(P, s*.8, fy + .95, hz + .82, 0xff8a3a); }
+  for (const [z, k] of [[1.95, 1], [2.85, .78]]){   // two torii, the far one smaller
+    for (const s of [-1, 1]) cyl(M.shrineRed, P, s*1.0*k, .9*k, z, .09*k, 1.8*k);
+    box(M.shrineRed, P, 0, 1.45*k, z, 2.4*k, .12*k, .14*k); box(M.shrineRed, P, 0, 1.72*k, z, 2.7*k, .1*k, .16*k);
+    box(M.shrineDark, P, 0, 1.83*k, z, 3.0*k, .1*k, .2*k); box(M.shrineRed, P, 0, 1.58*k, z, .14*k, .26*k, .1*k);
+    box(M.neonAmber, P, 0, 1.9*k, z + .1*k, 2.8*k, .03, .02); glow(P, 0, 1.9*k, z + .3, 'amber', 1.0*k);
+  }
+  for (let k=0; k<5; k++) box(M.pgRock2, P, rnd(-.06, .06), .37, 1.3 - k*.38, .5, .03, .3);   // stepping stones to the hall
+  for (const s of [-1, 1]){ pgLantern(P, s*1.45, .35, .5, 1.1); pgLantern(P, s*1.45, .35, -.6, 1.1); pgPine(P, s*1.6, .35, -1.75, 1.0); }
+  cyl(M.metalDark, P, 0, .5, .55, .16, .3); emitters.push(new THREE.Vector3(0, .75, .55).applyMatrix4(P));   // incense burner
+  return { mast: null, cross: false };
+}
+// a clock tower: a slim stone shaft with neon corners, four lit clock faces at the top, a beacon on the spire
+function centreClock(P){
+  centreBase(P);
+  put(U.cyl16, M.concM, under(P, T(0, .18, 0, 0, 5.0, .24, 5.0))); put(U.cyl16, M.concL, under(P, T(0, .4, 0, 0, 3.6, .2, 3.6)));
+  for (let k=0; k<8; k++){ const a = k*TAU/8; box(M.wood, P, Math.cos(a)*2.15, .38, Math.sin(a)*2.15, .7, .06, .26, -a + PI/2); }
+  const neon = pick([[M.neonCyan, 'cyan'], [M.neonPink, 'pink'], [M.neonAmber, 'amber']]);
+  box(M.concL, P, 0, 3.1, 0, 1.3, 5.2, 1.3);
+  for (const [sx, sz] of CORNERS){ box(M.metalDark, P, sx*.62, 3.1, sz*.62, .16, 5.2, .16); box(neon[0], P, sx*.71, 3.1, sz*.71, .03, 5.0, .03); }
+  for (const y of [1.6, 3.2]) box(M.metalDark, P, 0, y, 0, 1.42, .1, 1.42);
+  box(M.concM, P, 0, 6.3, 0, 1.7, 1.2, 1.7);
+  for (let f=0; f<4; f++){ const Q = under(P, T(0, 6.3, 0, f*PI/2));
+    put(U.cyl16, M.clockFace, under(Q, T(0, 0, .86, 0, .95, .04, .95, PI/2)));
+    box(M.frame, Q, 0, .12, .89, .05, .3, .02); box(M.frame, Q, .1, -.03, .89, .24, .05, .02, 0, 0, .5); glow(Q, 0, 0, 1.0, 'warm', 1.1); }
+  for (const s of [-1, 1]){ box(neon[0], P, 0, 4.4, s*.67, .9, .22, .02); glow(P, 0, 4.4, s*.85, neon[1], 1.2); }
+  put(U.cone, M.metalDark, under(P, T(0, 7.35, 0, PI/4, 2.3, .9, 2.3)));
+  cyl(M.metal, P, 0, 8.05, 0, .04, .6); beaconLight(P, 0, 8.4, 0);
+  for (const [sx, sz] of CORNERS) glow(P, sx*.75, 1.0, sz*.75, neon[1], .9);
+  return { mast: 6.9, cross: false };
+}
+const SQ_CENTRE_FN = { pond: centrePond, fountain: centreFountain, sakura: centreSakura, bandstand: centreBandstand, shrine: centreShrine, clock: centreClock };
+// ---- where the food carts go: [x, z, fx, fz] (position, and the way the counter faces)
+function squareCarts(v){
+  const out = [], toCentre = (x, z) => { const l = Math.hypot(x, z) || 1; return [-x/l, -z/l]; };
+  if (v.carts === 'ring') for (let k=0; k<10; k++){ const a = k*TAU/10 + PI/10 + rnd(-.08, .08), r = 5.0 + (k % 2)*.5, x = Math.cos(a)*r, z = Math.sin(a)*r; out.push([x, z, ...toCentre(x, z)]); }
+  else if (v.carts === 'horseshoe') for (let k=0; k<9; k++){ const a = v.open + .75 + k*(TAU - 1.5)/8, x = Math.cos(a)*5.35, z = Math.sin(a)*5.35; out.push([x, z, ...toCentre(x, z)]); }
+  else if (v.carts === 'corners') for (let q=0; q<4; q++){ const a = PI/4 + q*PI/2, bx = Math.cos(a)*6.0, bz = Math.sin(a)*6.0, tx = -Math.sin(a), tz = Math.cos(a);
+    for (const o of [-1.75, 0, 1.75]){ const x = bx + tx*o, z = bz + tz*o; out.push([x, z, ...toCentre(x, z)]); } }
+  else if (v.carts === 'streets') for (const s of [-1, 1]) for (const x of [-6, -3, 0, 3, 6]) out.push([x + rnd(-.15, .15), s*5.35, 0, -s]);
+  else { for (let tries = 0; tries < 300 && out.length < 10; tries++){
+      const a = rnd(0, TAU), r = rnd(4.7, 6.4), x = Math.cos(a)*r, z = Math.sin(a)*r;
+      if (out.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 2.2)) continue;
+      if (standNear(v, x, z, 2.4)) continue;
+      const [fx, fz] = toCentre(x, z), j = rnd(-.5, .5); out.push([x, z, fx*Math.cos(j) - fz*Math.sin(j), fx*Math.sin(j) + fz*Math.cos(j)]); } }
+  return out;
+}
+// the sides that get a long market stand (angles round the square)
+function squareStandSides(v){
+  const all = [0, PI/2, PI, -PI/2];
+  if (v.stands === 'pair') return v.carts === 'streets' ? [0, PI] : [all[v.skip % 2], all[v.skip % 2 + 2]];
+  if (v.stands === 'three') return all.filter((_, k) => k !== v.skip);
+  return all;
+}
+function standNear(v, x, z, pad){ return squareStandSides(v).some(a => { const sx = Math.cos(a)*7.75, sz = Math.sin(a)*7.75; return Math.abs(a % PI) < .1 ? Math.abs(x - sx) < pad && Math.abs(z) < 1.6 + pad*.4 : Math.abs(z - sz) < pad && Math.abs(x) < 1.6 + pad*.4; }); }
+// what stands in each corner
+function squareCorner(Q, kind){
+  if (kind === 'vending'){ box(M.concM, Q, 0, .05, 0, 1.0, .1, .8);
+    for (const s of [-1, 1]){ box(pick([M.corrBlue, M.red2, M.white2, M.awn2]), Q, s*.24, .62, 0, .44, 1.15, .5); box(pick([M.screen, M.screen2]), Q, s*.24, .75, .26, .34, .55, .01); box(M.bulb, Q, s*.24, .3, .26, .3, .08, .01); }
+    glow(Q, 0, .8, .5, pick(['cyan', 'pink']), 1.1); return; }
+  if (kind === 'tree'){ put(U.cyl16, M.concM, under(Q, T(0, .25, 0, 0, 1.3, .5, 1.3))); put(U.cyl16, M.pgMoss, under(Q, T(0, .51, 0, 0, 1.2, .03, 1.2))); pgPine(Q, 0, .5, 0, 1.6); return; }
+  if (kind === 'kiosk'){ box(M.concM, Q, 0, .05, 0, .8, .1, .8); cyl(M.metalDark, Q, 0, .6, 0, .06, 1.1); box(M.metalDark, Q, 0, 1.25, 0, .7, .5, .08);
+    box(M.screen, Q, 0, 1.25, .05, .62, .42, .01); box(M.screen2, Q, 0, 1.25, -.05, .62, .42, .01); glow(Q, 0, 1.25, .2, 'cyan', 1.0); return; }
+  box(M.concM, Q, 0, .2, 0, .9, .4, .9); plant(pick(['bonsai','bamboo']), Q, 0, .4, 0, 1.2); plant('bushFlower', Q, .25, .4, .25, .8);
+}
+function buildTownSquare(m){
+  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  const v = squareVariant(m); m.variant = v;
+  const P = T(m.x, 0, m.z, pick([0, PI/2, PI, -PI/2])), S5 = 5*LOT, H = S5/2;
+  reflectLights = [];
+  PERSON_GHOST = { kind: null };
+  box(G.asph, P, 0, .012, 0, S5, .025, S5);
+  // the paving: rings, a checkerboard, spokes or diagonal bands, in one of four pairings of tile colours
+  const n = 25, st = S5/n, tl = TILES.low, tm = TILES.mid, tv = v.tiles;
+  for (let a=0;a<n;a++) for (let b=0;b<n;b++){
+    const x = (a-(n-1)/2)*st, z = (b-(n-1)/2)*st, r = Math.hypot(x, z);
+    if (r < POND_R + .5) continue;
+    const band = v.floor === 'rings' ? Math.floor(r/1.5) % 2 : v.floor === 'checker' ? (Math.floor(a/2) + Math.floor(b/2)) % 2
+               : v.floor === 'spokes' ? Math.floor((Math.atan2(z, x) + PI)/(TAU/16)) % 2 : ((Math.floor((x + z)/1.6) % 2) + 2) % 2;
+    const mat = band ? tm[(tv + (a + b) % 2) % tm.length] : tl[(tv + a*3 + b) % tl.length];
+    if (!chance(.02)) box(mat, P, x, .03, z, st - .04, .045, st - .04);
+  }
+  if (v.floor === 'rings' || v.floor === 'spokes') for (const r of [POND_R + 1.4, 6.6]) for (let k=0; k<48; k++){ const a = k*TAU/48; box(M.concL, P, Math.cos(a)*r, .058, Math.sin(a)*r, .5, .012, .08, -a + PI/2); }
+  // ---- the centrepiece
+  const cen = SQ_CENTRE_FN[v.centre](P);
+  // ---- lantern poles round the square, strung between each other (across the middle over a pond, or down from a tall centrepiece)
   const poles = [];
-  for (let k=0; k<8; k++){ const a = k*TAU/8 + PI/8, r = 7.9; poles.push([Math.cos(a)*r, Math.sin(a)*r]); }
+  if (v.poles === 'octagon') for (let k=0; k<8; k++){ const a = k*TAU/8 + PI/8, r = 7.9; poles.push([Math.cos(a)*r, Math.sin(a)*r]); }
+  else for (const [x, z] of [[7.4, 7.4], [7.4, 3.8], [7.4, -3.8], [7.4, -7.4], [3.8, -7.4], [-3.8, -7.4], [-7.4, -7.4], [-7.4, -3.8], [-7.4, 3.8], [-7.4, 7.4], [-3.8, 7.4], [3.8, 7.4]]) poles.push([x, z]);
   for (const [x, z] of poles){ cyl(M.metalDark, P, x, 1.6, z, .05, 3.2); box(M.lantern2, P, x, 3.26, z, .14, .14, .14); glow(P, x, 3.26, z, 'warm', 1.0); noteLight(P, x, 3.26, z, 0xffcf7a); }
-  for (let k=0; k<4; k++){ const [ax, az] = poles[k], [bx, bz] = poles[k + 4]; lanternString(P, ax, 3.1, az, bx, 3.1, bz, .9); }
-  for (let k=0; k<8; k++){ const [ax, az] = poles[k], [bx, bz] = poles[(k+1)%8]; lanternString(P, ax, 3.0, az, bx, 3.0, bz, .4); }
-  // ---- market stands along the four sides, between the poles, facing in
-  for (let k=0; k<4; k++){ const a = k*PI/2, r = 7.75; ghostAs(null, 10 + k); marketStand(under(P, T(Math.cos(a)*r, .05, Math.sin(a)*r, -a - PI/2))); }
-  // ---- carts in a ring round the pond, bigger than life so the food reads
-  const carts = [], CS = 1.45;
-  for (let k=0; k<10; k++){ const a = k*TAU/10 + PI/10 + rnd(-.08, .08), r = 5.0 + (k % 2)*.5; carts.push([Math.cos(a)*r, Math.sin(a)*r, a]); }
-  carts.forEach(([x, z, a], k) => {
-    const Q = under(P, T(x, .05, z, -a - PI/2 + rnd(-.15, .15))), Qs = under(Q, T(0, 0, 0, 0, CS, CS, CS));
-    const r = k % 3;
+  const np = poles.length;
+  if (cen.cross) for (let k=0; k<np/2; k++){ const [ax, az] = poles[k], [bx, bz] = poles[k + np/2]; lanternString(P, ax, 3.1, az, bx, 3.1, bz, .9); }
+  else if (cen.mast) for (let k=0; k<np; k += np > 8 ? 3 : 2){ const [bx, bz] = poles[k]; lanternString(P, 0, cen.mast, 0, bx, 3.1, bz, .35); }
+  for (let k=0; k<np; k++){ const [ax, az] = poles[k], [bx, bz] = poles[(k+1)%np]; lanternString(P, ax, 3.0, az, bx, 3.0, bz, .4); }
+  // ---- market stands along some of the sides, between the poles, facing in
+  squareStandSides(v).forEach((a, k) => { const r = 7.75; ghostAs(null, 100 + k); marketStand(under(P, T(Math.cos(a)*r, .05, Math.sin(a)*r, -a - PI/2))); });
+  // ---- the food carts, bigger than life so the food reads
+  const carts = squareCarts(v), CS = 1.45;
+  carts.forEach(([x, z, fx, fz], k) => {
+    const Q = under(P, T(x, .05, z, Math.atan2(fx, fz) + rnd(-.12, .12))), Qs = under(Q, T(0, 0, 0, 0, CS, CS, CS));
+    const r = v.mix[k % v.mix.length];
     if (r === 0) menuCart(Qs, pick([M.neonPink, M.neonCyan, M4.neonPurple]));
     else if (r === 1) hawkerStall(Qs);
     else foodTruck(Qs, pick([M.neonPink, M.neonCyan, M.neonAmber]));
@@ -914,28 +1144,28 @@ function buildTownSquare(m){
     for (let q=0; q<irand(2, 5); q++) person(Q, rnd(-.7, .7), 0, rnd(.9, 1.6));             // a queue
     // where the stall keeper stands: behind the cart, or at the end of the food truck's counter
     spotAt(Q, r === 2 ? -1.45 : 0, 0, r === 2 ? .62 : -.85, 'vendor', k, r === 2 ? [1, .4] : [0, 1]);
-    if (r !== 2) for (const x of [-.45, .45]) spotAt(Q, x, 0, 1.0, 'queue', k, 'origin');      // room to queue even where the dice gave few
+    if (r !== 2) for (const x2 of [-.45, .45]) spotAt(Q, x2, 0, 1.0, 'queue', k, 'origin');      // room to queue even where the dice gave few
   });
-  for (let k=0; k<24; k++){
-    const a = rnd(0, TAU), r = rnd(3.6, 7.0), x = Math.cos(a)*r, z = Math.sin(a)*r;
-    if (carts.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 1.6)) continue;
-    if (Math.abs(Math.abs(x) - 7.75) < 1.4 && Math.abs(z) < 2) continue; if (Math.abs(Math.abs(z) - 7.75) < 1.4 && Math.abs(x) < 2) continue;
+  for (let k=0; k<26; k++){
+    const a = rnd(0, TAU), r = rnd(3.8, 7.0), x = Math.cos(a)*r, z = Math.sin(a)*r;
+    if (carts.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 1.7)) continue;
+    if (standNear(v, x, z, 1.4)) continue;
+    if (poles.some(([px, pz]) => Math.hypot(px - x, pz - z) < .6)) continue;
     cafeTable(P, x, z);
   }
   ghostAs('stand', null, [0, 1]);
   for (let k=0; k<70; k++){ const a = rnd(0, TAU), r = rnd(POND_R + .9, 9); const x = Math.cos(a)*r, z = Math.sin(a)*r;   // the crowd, some in little groups
     person(P, x, .05, z); if (chance(.4)) person(P, x + rnd(-.15, .15), .05, z + rnd(.1, .18)); }
   PERSON_GHOST = null;
-  for (const [sx, sz] of [[1,1],[1,-1],[-1,1],[-1,-1]]){
-    const Q = under(P, T(sx*(H - .7), 0, sz*(H - .7)));
-    box(M.concM, Q, 0, .2, 0, .9, .4, .9); plant(pick(['bonsai','bamboo']), Q, 0, .4, 0, 1.2); plant('bushFlower', Q, .25, .4, .25, .8);
-  }
-  // keep the lights nearest the pond (the shader handles up to 16)
-  const near = reflectLights.map(l => [Math.hypot(l[0] - m.x, l[2] - m.z), l]).filter(([d]) => d < POND_R + 4).sort((a, b) => a[0] - b[0]).slice(0, 16).map(([, l]) => l);
+  CORNERS.forEach(([sx, sz], k) => squareCorner(under(P, T(sx*(H - .7), 0, sz*(H - .7), Math.atan2(-sx, -sz))), v.corners[k]));
+  // the koi pond reflects the lights nearest it (the shader handles up to 16)
+  if (v.centre === 'pond'){
+    const near = reflectLights.map(l => [Math.hypot(l[0] - m.x, l[2] - m.z), l]).filter(([d]) => d < POND_R + 4).sort((a, b) => a[0] - b[0]).slice(0, 16).map(([, l]) => l);
+    m.pond = { x: m.x, z: m.z, y: POND_Y + .06, r: POND_R, lights: near };
+  } else m.pond = null;
   reflectLights = null;
-  m.pond = { x: m.x, z: m.z, y: POND_Y + .06, r: POND_R, lights: near };
   m.roofH = CURB + .1;
-  m.top = 5;
+  m.top = v.centre === 'clock' ? 9 : 5;
 }
 // The holographic koi: a 10-frame neon line-art sheet (assets/sprites/koi_neon.png, 100x139 per frame) projected
 // onto the pond. The frames don't flow smoothly into each other, so the projection is made to look faulty on purpose:
@@ -982,7 +1212,7 @@ function koiFx(m){
     koiTex = new THREE.TextureLoader().load('assets/sprites/koi_neon.png');
     koiTex.magFilter = koiTex.minFilter = THREE.NearestFilter; koiTex.generateMipmaps = false;
   }
-  const p = m.pond;
+  const p = m.pond; if (!p) return null;   // only the squares with the koi pond
   const u = { map: { value: koiTex }, frame: { value: 0 }, prevFrame: { value: 0 }, glitch: { value: 0 }, seed: { value: 0 }, time: { value: 0 } };
   const mat = new THREE.ShaderMaterial({ uniforms: u, vertexShader: KOI_SHADER.vertexShader, fragmentShader: KOI_SHADER.fragmentShader });
   // sized so the whole frame, leaping koi included, sits inside the pond
@@ -1570,7 +1800,7 @@ function bikeRoute(b, tx, tz, speed, direct){
 function policeBikes(m, crew){
   const pads = m.bikePads || [], n = Math.min(pads.length, crew.size);
   const bikes = []; for (let k = 0; k < n; k++) bikes.push(policeBike(m, k, pads[k]));
-  POLICE_BIKES = bikes;
+  POLICE_BIKES = POLICE_BIKES.concat(bikes);   // every station's bikes (people.js draws their riders)
   const home = b => { bikeRoute(b, b.pad.x + b.pad.fx*1.2, b.pad.z + b.pad.fz*1.2, b.passenger ? 2.4 : 1.8, true); b.path.pts.push([b.pad.x, b.pad.z]); b.go(b.path.pts, b.speed); b.mode = 'home'; };
   const sweep = (b, cx, cz, r, speed) => { const near = (typeof patrolNodes !== 'undefined' ? patrolNodes : []).filter(c => Math.hypot(c.x - cx, c.z - cz) < r);
     if (!near.length) return false; const t = near[Math.floor(Math.random()*near.length)]; bikeRoute(b, t.x, t.z, speed); return true; };
@@ -1649,12 +1879,22 @@ function policeBikes(m, crew){
         b.siren.position.set(b.x - b.hx*.15 + _bkR.x*side, b.ry + h/PX*BIKE_K*.8, b.z - b.hz*.15 + _bkR.z*side);
       }
     },
-    dispose(){ for (const b of bikes){ scene.remove(b.spr, b.hum, b.siren); b.mat.dispose(); b.hum.material.dispose(); b.siren.material.dispose(); if (b.passenger){ b.passenger.state = 'away'; b.passenger = null; } } POLICE_BIKES = []; },
+    dispose(){ for (const b of bikes){ scene.remove(b.spr, b.hum, b.siren); b.mat.dispose(); b.hum.material.dispose(); b.siren.material.dispose(); if (b.passenger){ b.passenger.state = 'away'; b.passenger = null; } } POLICE_BIKES = POLICE_BIKES.filter(b => !bikes.includes(b)); },
   };
   return api;
 }
 const _bkR = new THREE.Vector3(), _bkF = new THREE.Vector3();
-let policeDroneAlert = null, policeCrew = null;   // set while the station stands (people.js calls the alert at a mugging)
+// Every police station standing: people.js calls policeDroneAlert at a mugging, and the nearest station answers.
+// Each station's drones patrol the crossings nearer to it than to any other station.
+const POLICE_STATIONS = [];
+let policeDroneAlert = null, policeCrew = null;
+function policeWire(){
+  policeCrew = POLICE_STATIONS.length ? POLICE_STATIONS[0].crew : null;
+  policeDroneAlert = POLICE_STATIONS.length ? (L => {
+    const by = POLICE_STATIONS.slice().sort((a, b) => Math.hypot(a.m.x - L.x, a.m.z - L.z) - Math.hypot(b.m.x - L.x, b.m.z - L.z));
+    return by[0].alert(L);
+  }) : null;
+}
 function policeFx(m){
   if (!wantedTex){ wantedTex = new THREE.TextureLoader().load('assets/sprites/wanted.png'); wantedTex.magFilter = wantedTex.minFilter = THREE.NearestFilter; wantedTex.generateMipmaps = false; }
   const parts = [], screens = [];
@@ -1697,8 +1937,11 @@ function policeFx(m){
   const crew = {
     sectors: null, sig: '',
     split(n){
-      const nodes = typeof patrolNodes !== 'undefined' ? patrolNodes : [];
-      const sig = nodes.length + ':' + n; if (this.sectors && sig === this.sig) return this.sectors;
+      const all = typeof patrolNodes !== 'undefined' ? patrolNodes : [];
+      const sig = all.length + ':' + n + ':' + POLICE_STATIONS.length; if (this.sectors && sig === this.sig) return this.sectors;
+      // this station's own beat: the crossings nearest to it
+      const near = (c, st) => Math.hypot(c.x - st.m.x, c.z - st.m.z);
+      const nodes = POLICE_STATIONS.length > 1 ? all.filter(c => POLICE_STATIONS.every(st => st.m === m || near(c, st) >= near(c, { m }))) : all;
       let cx = 0, cz = 0; for (const c of nodes){ cx += c.x; cz += c.z; } cx /= nodes.length || 1; cz /= nodes.length || 1;
       const sorted = nodes.slice().sort((a, b) => Math.atan2(a.z - cz, a.x - cx) - Math.atan2(b.z - cz, b.x - cx));
       this.sectors = Array.from({ length: n }, (_, k) => sorted.slice(Math.floor(k*sorted.length/n), Math.floor((k + 1)*sorted.length/n)));
@@ -1723,7 +1966,7 @@ function policeFx(m){
   crew.size = drones.length;
   const bikes = policeBikes(m, crew);
   crew.onTag = L => bikes.onTag(L);
-  policeDroneAlert = L => {
+  const alert = L => {
     if (Math.random() > .7) return false;
     const free = drones.filter(d => !d.busy); if (!free.length) return false;
     free.sort((a, b) => Math.hypot(a.pos.x - L.x, a.pos.z - L.z) - Math.hypot(b.pos.x - L.x, b.pos.z - L.z));
@@ -1731,7 +1974,8 @@ function policeFx(m){
     if (sent) bikes.alert(L);   // and two bikes come to the spot
     return sent;
   };
-  policeCrew = crew;
+  const station = { m, crew, alert };
+  POLICE_STATIONS.push(station); policeWire();
   const drone = drones[0];
   return {
     drone, drones, crew,
@@ -1752,7 +1996,7 @@ function policeFx(m){
       bikes.update(dt, time);
       scanMat.color.setRGB(.22, .9, .88).multiplyScalar(.45 + .55*Math.abs(Math.sin(time*3)));
     },
-    dispose(){ for (const p of parts){ scene.remove(p); if (p !== radar && !drones.some(d => d.g === p)) p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } scanMat.dispose(); for (const d of drones) d.dispose(); bikes.dispose(); policeDroneAlert = null; policeCrew = null; }
+    dispose(){ for (const p of parts){ scene.remove(p); if (p !== radar && !drones.some(d => d.g === p)) p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } scanMat.dispose(); for (const d of drones) d.dispose(); bikes.dispose(); const k = POLICE_STATIONS.indexOf(station); if (k >= 0) POLICE_STATIONS.splice(k, 1); policeWire(); }
   };
 }
 
@@ -2294,3 +2538,51 @@ function buildCloudPagoda(m){
   m.roofH = Y + ph + LH;
   m.top = sp + 1.6;
 }
+
+/* ---------- variants: each megastructure's own colour scheme ---------- */
+// Besides what its seed already shuffles (dish farms, mast height, shop signs...), every megastructure picks a colour
+// scheme from its seed. The first scheme of each kind is the original look; the others swap its main materials (and
+// the glows that go with them) while it's built, through the same hook the districts use for their palettes (LUX,
+// see core.js). The town square varies in its own way instead (see squareVariant).
+let MEGA_SKINS = null;
+function megaSkins(){
+  if (MEGA_SKINS) return MEGA_SKINS;
+  const t = (hex, o) => toon(hex, o);
+  const trimAmber = t(0x5a3e18, { em:0xffb347, kind:'trim' }), trimPink = t(0x5a1d3a, { em:0xff4fa3, kind:'trim' });
+  const lamp = em => t(0x2a3a4a, { em, kind:'lamp' }), neon = (hex, em) => t(hex, { em, kind:'neon' });
+  MEGA_SKINS = {
+    radio: [null,
+      { mats: [[M.concM, t(0x8e4a3a)], [M.concD, t(0x5e3a30)], [M.concL, t(0xb08870)], [M.trimCyan, trimAmber], [M.neonPink, M.neonCyan], [M.red2, M.hazard]] },          // brick, yellow and white mast
+      { mats: [[M.concM, t(0x3f6f6a)], [M.concD, t(0x2c4c4a)], [M.concL, t(0x7aa49c)], [M.trimCyan, trimPink], [M.neonPink, M.neonAmber], [M.red2, t(0xd06a2a)]] },      // teal, orange mast
+      { mats: [[M.concM, t(0xd6dad6)], [M.concD, t(0x8a9096)], [M.concL, t(0xeef0ee)], [M.neonPink, M4.neonPurple], [M.red2, t(0x2a2f38)]] } ],                           // white, black and white mast
+    mall: [null,
+      { mats: [[M.lux, t(0x2a2c32)], [M.lux2, t(0x3a3c44)], [M.marbleOut, t(0x34363e)]] },                                                                                  // noir and gold
+      { mats: [[M.gold, t(0xd89a80)], [M.goldLit, t(0xc8806a, { em:0xffaa80, kind:'trim' })], [M.lux, t(0xf6ece8)], [M.lux2, t(0xead8d2)]], glows: { warm: 'rosegold' } },   // rose gold
+      { mats: [[M.gold, t(0xc8ccd8)], [M.goldLit, t(0xb8c0d0, { em:0xe2d6ff, kind:'trim' })], [M.lux, t(0xeef2f6)]], glows: { warm: 'platinum' } } ],                      // platinum
+    police: [null,
+      { mats: [[M.polWall, t(0x2e3442)], [M.polWall2, t(0x3a4252)], [M.polDark, t(0x161a22)], [M.polFrame, t(0x5a6270)], [M.neonCyan, M4.neonBlue]], glows: { cyan: 'blue' } },   // midnight
+      { mats: [[M.polWall, t(0x9ab4d4)], [M.polWall2, t(0x7a94b8)], [M.polDark, t(0x1e2a48)], [M.neonCyan, M.neonAmber]], glows: { cyan: 'amber' } },                              // blue and amber
+      { mats: [[M.polWall, t(0xd8ccb4)], [M.polWall2, t(0xb8a88e)], [M.polDark, t(0x3a3028)], [M.polFrame, t(0x8a7a64)]] } ],                                                  // sandstone
+    foundry: [null,
+      { mats: [[M.fSteel, t(0x7a5a46)], [M.fSteel2, t(0x8a6a54)], [M.fSteel3, t(0x5a4032)], [M.fGlow, neon(0x5a1010, 0xff1a3a)], [M.fGlow2, neon(0x5a1418, 0xff3a4a)]], glows: { orange: 'crimson' } },   // rust and crimson
+      { mats: [[M.fSteel, t(0x4e5a6e)], [M.fSteel2, t(0x66728a)], [M.fSteel3, t(0x3a4456)], [M.fGlow, neon(0x10283a, 0x38e8e0)], [M.fGlow2, neon(0x10303a, 0x5ad8ff)], [M.fWin, t(0x1a3040, { em:0x7fd0ff, kind:'window' })]], glows: { orange: 'cyan' } },   // cobalt
+      { mats: [[M.fSteel, t(0x4a5a3a)], [M.fSteel2, t(0x5e6e4a)], [M.fSteel3, t(0x36422c)], [M.fGlow, neon(0x2a4010, 0xc6ff3a)], [M.fGlow2, neon(0x30400e, 0xd8ff5a)]], glows: { orange: 'toxic' } } ],     // chemical green
+    market: [null,
+      { mats: [[M.mkTeal, t(0xb86a4a)], [M.mkTeal2, t(0x9a5640)], [M.mkTeal3, t(0x6a3a2c)], [M.mkTarp, t(0x3f8a80)], [M.mkTarp2, t(0x347670)]] },   // terracotta
+      { mats: [[M.mkTeal, t(0x7a5aa0)], [M.mkTeal2, t(0x664a8a)], [M.mkTeal3, t(0x3e2c58)], [M.mkTarp, t(0xd8508a)], [M.mkTarp2, t(0xb8406e)]] },   // violet
+      { mats: [[M.mkTeal, t(0xc8b47a)], [M.mkTeal2, t(0xa8946a)], [M.mkTeal3, t(0x6a5a40)], [M.mkTarp, t(0xc84a4a)], [M.mkTarp2, t(0xa83a3a)]] } ],  // sand
+    pagoda: [null,
+      { mats: [[M.lxWhite, t(0xb8402e)], [M.lxWhite2, t(0x2e2826)], [M.pgNeon, lamp(0xffb347)]], glows: { cyan: 'amber' } },          // temple red
+      { mats: [[M.lxWhite, t(0x5a9a80)], [M.lxWhite2, t(0x3e6e5a)], [M.gold, t(0xb88a4a)], [M.pgNeon, lamp(0xff6fb8)]], glows: { cyan: 'pink' } },   // jade and bronze
+      { mats: [[M.lxWhite, t(0x2e3448)], [M.lxWhite2, t(0x22283a)], [M.pgNeon, lamp(0x9b6bff)]], glows: { cyan: 'platinum' } } ],      // midnight
+  };
+  return MEGA_SKINS;
+}
+// the scheme this one wears (null: the original look)
+function megaSkinOf(m){
+  const list = megaSkins()[m.kind]; if (!list) return null;
+  const k = hash('skin', m.kind, m.seed) % list.length, s = list[k];
+  m.skin = k;
+  return s ? { mats: new Map(s.mats), glows: s.glows || {} } : null;
+}
+function withSkin(skin, fn){ if (!skin) return fn(); const was = LUX; LUX = skin; try { return fn(); } finally { LUX = was; } }

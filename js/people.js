@@ -194,7 +194,7 @@ function clearLine(G, ax, az, bx, bz){
 // onto the street. The town square is open ground, walked across like a plaza.
 let NG = { x: [], z: [], adj: [], key: new Map() };
 const ngAdd = (k, x, z) => { let n = NG.key.get(k); if (n !== undefined) return n; n = NG.x.length; NG.x.push(x); NG.z.push(z); NG.adj.push(new Map()); NG.key.set(k, n); return n; };
-const openMega = c => { const t = c && c.mega && MEGA_LIFE[c.mega]; return !!(t && t.open); };
+const openMega = c => { const t = c && c.mega && MEGA_LIFE[megaKindOf(c)]; return !!(t && t.open); };
 const pathable = c => !!c && (!c.mega || openMega(c));
 const closedMega = c => !!c && !!c.mega && !openMega(c);
 // where to cross between two neighbouring plots: as near the middle of the side as is clear on both sides
@@ -459,10 +459,10 @@ function buildNetwork(){
   }
   for (const m of megas.values()){
     const L = MEGA_LIFE[m.kind] || { jobs: 4, fun: 0 }, tiers = m.kind === 'mall' ? m.levels : 1;
-    const pl = { id: 'm:' + m.kind, mega: m, x: m.x, z: m.z, jobs: L.jobs*tiers, fun: L.fun*tiers, night: L.night || 0, open: !!L.open, patrol: !!L.patrol, doors: [], spots: [] };
+    const pl = { id: 'm:' + m.id, mega: m, x: m.x, z: m.z, jobs: L.jobs*tiers, fun: L.fun*tiers, night: L.night || 0, open: !!L.open, patrol: !!L.patrol, doors: [], spots: [] };
     if (L.open){
       // the spots noted while the square was built: the crowd, cafe stools, queues and stall keepers' places
-      makeSpots(pl, m.data ? m.data.spots : [], c => c && c.mega === m.kind, oldSpots, addEnd);
+      makeSpots(pl, m.data ? m.data.spots : [], c => c && c.mega === m.id, oldSpots, addEnd);
       pl.stalls = new Map();
       for (const sp of pl.spots) if (sp.stall !== null && sp.stall !== undefined){
         let st = pl.stalls.get(sp.stall); if (!st) pl.stalls.set(sp.stall, st = { id: sp.stall, keepers: [], queue: [] });
@@ -596,24 +596,28 @@ function syncJobs(){
   }
   // the stalls and the police station are always staffed: if nobody's looking for work, people living nearby
   // swap their job for one
-  for (const sq of [places.get('m:square'), places.get('m:police')]){
+  const staffed = [...places.values()].filter(pl => pl.mega && (pl.mega.kind === 'square' || pl.mega.kind === 'police'));
+  const isStaffed = id => staffed.some(pl => pl.id === id);
+  for (const sq of staffed){
     if (!sq) continue;
     let need = sq.jobs - [...people.values()].filter(p => p.job === sq.id).length;
     if (need > 0){
       const near = [...people.values()].filter(p => p.job !== sq.id && p.wantsJob && places.get(p.home))
         .sort((a, b) => { const ha = places.get(a.home), hb = places.get(b.home); return Math.hypot(ha.x - sq.x, ha.z - sq.z) - Math.hypot(hb.x - sq.x, hb.z - sq.z) || (a.id < b.id ? -1 : 1); });
-      for (const p of near){ if (need <= 0) break; if (p.job === 'm:square' || p.job === 'm:police') continue; p.job = sq.id; need--; }
+      for (const p of near){ if (need <= 0) break; if (isStaffed(p.job)) continue; p.job = sq.id; need--; }
     }
   }
   assignStalls();
 }
 // each of the square's workers keeps one stall; half work the day market, half the night market
 function assignStalls(){
-  const sq = places.get('m:square');
-  const staff = [...people.values()].filter(p => sq && p.job === sq.id).sort((a, b) => a.id < b.id ? -1 : 1);
-  const ids = sq ? [...sq.stalls.keys()].sort((a, b) => a - b) : [];
-  staff.forEach((p, k) => { p.stall = ids[k % ids.length]; });
-  for (const p of people.values()) if (!sq || p.job !== sq.id) p.stall = null;
+  for (const p of people.values()) p.stall = null;
+  for (const sq of places.values()){
+    if (!sq.mega || sq.mega.kind !== 'square' || !sq.stalls) continue;
+    const staff = [...people.values()].filter(p => p.job === sq.id).sort((a, b) => a.id < b.id ? -1 : 1);
+    const ids = [...sq.stalls.keys()].sort((a, b) => a - b);
+    if (ids.length) staff.forEach((p, k) => { p.stall = ids[k % ids.length]; });
+  }
   for (const p of people.values()){ const j = p.job && places.get(p.job); p.cop = !!(j && j.patrol); }   // police staff wear the uniform
 }
 
@@ -1125,7 +1129,8 @@ function updatePeople(dt, t){
   };
   // which stalls are being served, and who's queueing where
   const served = new Set(), queued = new Set(); holoOn.length = 0;
-  for (const p of pplList) if (!p.walk && p.spot){ if (p.spot.kind === 'vendor') served.add(p.spot.stall); else if (p.spot.kind === 'queue') queued.add(p.spot.stall); }
+  const stallKey = sp => sp.place + ':' + sp.stall;   // stall numbers repeat between squares
+  for (const p of pplList) if (!p.walk && p.spot){ if (p.spot.kind === 'vendor') served.add(stallKey(p.spot)); else if (p.spot.kind === 'queue') queued.add(stallKey(p.spot)); }
   for (const p of pplList){
     let alpha = 1, walking = false, y = CURB, frame = 0;
     const paused = p.pause > t;
@@ -1166,9 +1171,9 @@ function updatePeople(dt, t){
               if (sp.act === 'eat' && pplRand() < dt*.09) emote(p, 'bowl', 2.4);                                 // a picnic
               else if (mate && pplRand() < dt*.05) emote(p, pplRand() < .45 ? 'note' : pplRand() < .6 ? 'heart' : 'bang', 2.2); } } }
         else {
-          if (sp.kind === 'vendor') gest = queued.has(sp.stall) && Math.floor(t*.5 + p.phase) % 3 > 0;      // serving
-          else if (sp.kind === 'queue'){ gest = served.has(sp.stall) && Math.floor(t*.4 + p.phase) % 2 === 0;  // ordering
-            if (!served.has(sp.stall) && !(p.emoUntil > t) && pplRand() < dt*.06) emote(p, 'dots', 2); }   // waiting for the keeper
+          if (sp.kind === 'vendor') gest = queued.has(stallKey(sp)) && Math.floor(t*.5 + p.phase) % 3 > 0;      // serving
+          else if (sp.kind === 'queue'){ gest = served.has(stallKey(sp)) && Math.floor(t*.4 + p.phase) % 2 === 0;  // ordering
+            if (!served.has(stallKey(sp)) && !(p.emoUntil > t) && pplRand() < dt*.06) emote(p, 'dots', 2); }   // waiting for the keeper
           else { const mate = sp.near.find(o => o.by && people.get(o.by) && !people.get(o.by).walk);           // chatting
             if (mate){ face = [mate.x - sp.x, mate.z - sp.z]; gest = Math.floor(t*.45 + p.phase) % 2 === 0;
               if (!(p.emoUntil > t) && pplRand() < dt*.05) emote(p, pplRand() < .4 ? 'note' : pplRand() < .5 ? 'heart' : 'bang', 2.2); }

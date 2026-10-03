@@ -119,3 +119,30 @@ input[type=range]{width:100%;accent-color:var(--cyan);margin:0}
 .eq i{width:3px;height:2px;background:#38E8E0;box-shadow:0 0 4px rgba(56,232,224,.7)}
 @media (max-width:560px){.tapedeck{transform-origin:top left;scale:.85}.tapeline{width:150px}}
 @media (prefers-reduced-motion:reduce){.reel,.tapeline b.scroll{animation:none}}
+
+/* the Buildings menu, down the left under the radio */
+.bmenu{position:fixed;left:16px;top:calc(182px + env(safe-area-inset-top,0px));width:220px;z-index:2;display:grid;gap:6px}
+.bmenu[hidden]{display:none}
+.bmenu-head{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:8px 12px;background:var(--deck);border:1px solid var(--cyan);border-radius:0;color:var(--cyan);
+  font-family:var(--font-pixel);font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+.bmenu-head i::after{content:'+';font-style:normal}
+.bmenu-head[aria-expanded="true"] i::after{content:'\2212'}
+.bmenu-head:hover{color:#fff;border-color:#fff}
+.bmenu-head.fresh{animation:bpulse 1.1s ease-in-out 4}
+@keyframes bpulse{50%{box-shadow:0 0 12px var(--cyan);color:#fff}}
+.bmenu-list{display:grid;gap:6px;max-height:calc(100vh - 182px - 200px - env(safe-area-inset-top,0px));overflow:auto;padding:2px;scrollbar-width:thin}
+.bmenu-list[hidden]{display:none}
+.bitem{--m:#38E8E0;display:grid;grid-template-columns:14px 1fr;align-items:center;gap:4px 10px;width:100%;text-align:left;padding:8px 10px;
+  background:rgba(10,16,32,.9);border:1px solid color-mix(in srgb, var(--m) 45%, transparent);border-radius:0;color:var(--ink);cursor:pointer}
+.bitem .sw{grid-row:span 2;width:14px;height:14px;background:var(--m);box-shadow:0 0 6px var(--m)}
+.bitem b{font-family:var(--font-pixel);font-weight:400;font-size:11px;letter-spacing:.06em;color:var(--m)}
+.bitem small{font-size:10px;color:var(--muted)}
+.bitem:hover{border-color:var(--m)}
+.bitem.on{background:linear-gradient(90deg, color-mix(in srgb, var(--m) 25%, #0a1020), rgba(10,16,32,.92));border-color:var(--m);box-shadow:0 0 8px color-mix(in srgb, var(--m) 60%, transparent)}
+.bitem.locked{cursor:default;border-style:dashed;border-color:var(--line);padding:6px 10px}
+.bitem.locked .sw{background:transparent;border:1px dashed var(--muted);box-shadow:none;width:12px;height:12px}
+.bitem.locked b{color:var(--muted)}
+.bitem.locked small{font-size:9.5px}
+.bitem:focus-visible{outline:1px solid #fff;outline-offset:2px}
+@media (max-width:700px){.bmenu{top:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px));width:190px}}

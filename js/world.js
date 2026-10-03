@@ -628,7 +628,7 @@ const MEGA_SAVE_KEY = 'neonIsland.megas';
 function save(){
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some'])));
-    localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed }))));
+    localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ id: m.id, kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed }))));
   } catch (e) {}
 }
 function load(){
@@ -636,7 +636,7 @@ function load(){
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!Array.isArray(d) || !d.length) return false;
     for (const [i,j,secs,st,gr] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; cells.set(ckey(i,j), c); }
-    try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels); } catch (e) {}
+    try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels, m.id || null); } catch (e) {}
     return true;
   } catch (e) { return false; }
 }
@@ -716,6 +716,32 @@ function showHover(t){
   else { x = t.c.x; z = t.c.z; y0 = t.c.height; h = FH*2; w = SIDE; }
   if (t.type !== 'empty' && !S.zone){ hover.visible = false; return; }
   hover.position.set(x, y0 + h/2, z); hover.scale.set(w, h, w); hover.visible = true;
+}
+
+/* ---------- placing a megastructure from the Buildings menu: its footprint follows the pointer ---------- */
+// the plot under the pointer at street level (ignores what stands there, so tall buildings don't get in the way)
+function groundCellAt(cx, cy){
+  const r = canvas.getBoundingClientRect();
+  _ndc.set(((cx - r.left)/r.width)*2 - 1, -((cy - r.top)/r.height)*2 + 1);
+  ray.setFromCamera(_ndc, cam);
+  const o = ray.ray.origin, dir = ray.ray.direction; if (Math.abs(dir.y) < 1e-4) return null;
+  const t = (CURB - o.y)/dir.y; if (t < 0) return null;
+  const p = o.clone().addScaledVector(dir, t);
+  return { i: Math.round(p.x/LOT), j: Math.round(p.z/LOT) };
+}
+const ghostFill = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-PI/2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .22, depthTest: false, depthWrite: false }));
+const ghostEdge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .9, depthTest: false }));
+for (const o of [ghostFill, ghostEdge]){ o.layers.set(1); o.renderOrder = 999; o.visible = false; scene.add(o); }
+let megaGhost = null;   // { kind, i, j, w, h, ok } while placing
+function showMegaGhost(kind, cell, turned){
+  if (!kind || !cell){ ghostFill.visible = ghostEdge.visible = false; megaGhost = null; return; }
+  const b = megaBlockAt(kind, cell.i, cell.j, turned); megaGhost = Object.assign({ kind }, b);
+  const col = b.ok ? MEGA_TYPES[kind].colour : '#ff3040';
+  const x = (b.i + (b.w - 1)/2)*LOT, z = (b.j + (b.h - 1)/2)*LOT, sx = b.w*LOT - .3, sz = b.h*LOT - .3, h = 2.4;
+  ghostFill.material.color.set(col); ghostEdge.material.color.set(col);
+  ghostFill.position.set(x, CURB + .08, z); ghostFill.scale.set(sx, 1, sz);
+  ghostEdge.position.set(x, CURB + h/2, z); ghostEdge.scale.set(sx, h, sz);
+  ghostFill.visible = ghostEdge.visible = true;
 }
 
 function generate(){ rebuildAll(); }

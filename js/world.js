@@ -242,6 +242,7 @@ function buildPlatformBody(c){
   // the park lamps stand in the middle of every other plot, on a checkerboard laid over the whole island, so
   // however the green grows they keep an even spacing (and the plots between are lit from the four around them)
   if (!c.sections.length && c.park){ if ((c.i + c.j) % 2 === 0) parkLamp(); }
+  else if (c.sections[0] && c.sections[0].zone === 'mid'){ const k = hash('mlamp', c.i, c.j) % 4; lamp(CORNERS[k]); lamp(CORNERS[(k + 2) % 4]); }   // the commercial streets: lamps on two corners
   else if (chance(.45)) lamp(pick(CORNERS));   // a street lamp on one corner
   else if (DARK) lamp(CORNERS[hash('lamp', c.i, c.j) % 4]);   // a dark street always has its one failing lamp
 }
@@ -257,7 +258,7 @@ const SECTION_TYPES = {
   // the commercial quarter: shops under neon names, tiled-roof shops, stall streets, pagodas, glass and brutalist
   // towers, glass-dome markets, food plazas, and the market-street types; no longer the pod, octagon and deck
   // houses, which the residential blocks share
-  mid:  { ground: [[signShop,3.4],[tiledShop,1.8],[foodDeck,1.8],[stallMarket,1.4],[pagodaHall,1],[glassTower,.75],[arcologyTower,.8],[domeMarket,.8],[foodPlaza,.8],
+  mid:  { ground: [[signShop,3.4],[tiledShop,1.8],[foodDeck,1.2],[foodTower,1.4],[stallMarket,1.4],[pagodaHall,1],[glassTower,.75],[arcologyTower,.8],[domeMarket,.8],[foodPlaza,.8],
                    [billboardLot,.7],[buildShophouse,1],[platformTower,.7],[containerStack,.9],[spiralTower,.8],[cornerMarket,1]],
           upper: [[signShop,2.6],[foodDeck,2.4],[tiledShop,1.4],[buildShophouse,.9],[platformTower,.5],[containerStack,.7]] },
   high: { ground: [[buildTower,1]], upper: [[slabTower,2],[glassHotelTower,1.5],[glassHotelPodium,1],[roundTower,1],[twistTower,1],[gardenTower,1],[domeTower,1],[shellTower,1],[cascadeTerraces,.8]] },
@@ -268,6 +269,7 @@ function pickWeighted(list){ const tot = list.reduce((s,[,w]) => s + w, 0); let 
 // up, and a white one only goes up on ground or on another white section (the other luxury types look jarring
 // against them). Sections of other zones are left as they are.
 const WHITE_TYPES = new Set([domeTower, shellTower, cascadeTerraces]);
+const STALL_TYPES = new Set([stallMarket, foodDeck, foodTower, foodPlaza, billboardLot, domeMarket, cornerMarket]);
 function buildStack(c){
   let y = CURB, prevWhite = false, prevDeck = false;
   c.sectionTops = [];
@@ -286,10 +288,18 @@ function buildStack(c){
     if (upper && sec.zone === 'high') types = types.filter(([f]) => WHITE_TYPES.has(f) === prevWhite);
     if (upper && sec.zone === 'mid' && prevDeck) types = [[foodDeck, 5]].concat(types);   // decks of stalls like to pile up
     const builder = pickWeighted(types);
+    // most commercial buildings stand on a ring of market stalls opening onto the street (the stall streets, decks
+    // and plazas are stalls already, so they stand on the ground)
+    const onStalls = !upper && sec.zone === 'mid' && !STALL_TYPES.has(builder) && hash('stallbase', c.i, c.j, sec.seed) % 100 < 60;
+    let P1 = P0, hb = 0;
     NO_ROOF = !last;
-    try { withStyle(sec.style, () => builder(lot, st, P0)); } finally { LUX = null; }
+    try { withStyle(sec.style, () => {
+      if (onStalls){ stallBase(lot, st, P0); hb = lot.height; P1 = under(P0, T(0, hb, 0)); lot.base += hb; lot.height = 0; }
+      builder(lot, st, P1);
+    }); } finally { LUX = null; }
     NO_ROOF = false;
-    prevWhite = !!lot.white; prevDeck = builder === foodDeck;
+    if (onStalls){ lot.base -= hb; lot.height += hb; }
+    prevWhite = !!lot.white; prevDeck = builder === foodDeck || builder === foodTower;
     y += (upper ? .1 : 0) + Math.max(lot.height, FH);
     c.sectionTops.push(y);
     if (k === 0) c.firstFloors = lot.floors || 2;

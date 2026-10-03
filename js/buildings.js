@@ -2432,8 +2432,8 @@ function stallMarket(lot, st, P0){
 // stools along the counters, a rail round the open edges and paper lanterns strung along the front; the top deck
 // gets a tarp canopy hung with lanterns. Lit warm all through, with the neon pink and purple over it.
 const DECK_SIGNS = [['sign_c_noodles', 'amber'], ['sign_c_ramen', 'amber'], ['sign_c_cramen', 'pink'], ['sign_c_noodlebar', 'pink'], ['sign_c_sushi', 'amber'], ['sign_w_24h', 'pink'], ['sign_c_open', 'pink']];
-function foodDeck(lot, st, P0){
-  const P = under(P0, T(0, 0, 0, pick([0, PI/2, PI, -PI/2]))), W = 2.35, D = 2.25, h = 1.2, upper = lot.base > CURB + .05;
+function foodDeck(lot, st, P0, rot){
+  const P = under(P0, T(0, 0, 0, rot !== undefined ? rot : pick([0, PI/2, PI, -PI/2]))), W = 2.35, D = 2.25, h = 1.2, upper = lot.base > CURB + .05;
   box(COM.conc3, P, 0, .05, 0, W, .1, D);                                     // the deck
   box(M4.neonPurple, P, 0, .03, D/2 + .005, W, .03, .02);
   for (const [sx, sz] of CORNERS) box(M.metalDark, P, sx*(W/2 - .06), h/2, sz*(D/2 - .06), .1, h, .1);
@@ -2470,6 +2470,59 @@ function foodDeck(lot, st, P0){
     for (let k=0; k<4; k++) paperLantern(P, -W/2 + .35 + k*(W - .7)/3, h + .02, D/2 + .02, null, 1.0);
   } else box(COM.conc3, P, 0, h + .02, 0, W, .06, D);   // the floor of the deck above
   Object.assign(lot, { height: h + (NO_ROOF ? .05 : .15), floors: 1, occupied: true });
+}
+// A tower of food decks in one go: two or three decks stacked, all turned the same way so the stairs line up
+function foodTower(lot, st, P0){
+  const rot = pick([0, PI/2, PI, -PI/2]), n = irand(2, 3), keep = NO_ROOF;
+  let y = 0;
+  try {
+    for (let k=0; k<n; k++){
+      NO_ROOF = keep || k < n - 1;
+      const L = { ...lot, base: lot.base + y };
+      foodDeck(L, st, under(P0, T(0, y, 0)), rot);
+      y += L.height;
+    }
+  } finally { NO_ROOF = keep; }
+  Object.assign(lot, { height: y, floors: n, occupied: true });
+}
+// The market-stall base most commercial buildings stand on: a ring of little stalls round a podium, every one opening
+// onto the street (a pinwheel, so each side of the plot has its own row), counters piled with goods, a lit hatch at the
+// back, a striped awning or a corrugated roof out over the sidewalk, lanterns, a neon name on the fascia. Each stall
+// throws a warm spill of light out across the street (a light-only glow: it lights the road, it draws no halo).
+const STALL_BASE_H = 1.32;
+const BASE_SIGNS = [['sign_c_noodles', 'amber'], ['sign_c_ramen', 'amber'], ['sign_c_open', 'pink'], ['sign_c_tea', 'green'], ['sign_c_pawn', 'gold'],
+                    ['sign_c_mods', 'cyan'], ['sign_c_sushi', 'amber'], ['sign_c_techparts', 'cyan'], ['sign_c_gear', 'cyan'], ['sign_c_prints', 'pink']];
+function stallBase(lot, st, P0){
+  const B = 2.2, h = STALL_BASE_H, dep = .5;
+  // the podium: a dark core (the stalls' back walls) under a slab with a lit fascia
+  box(COM.wood2 || M.concDD, P0, 0, (h - .12)/2, 0, B - 2*dep + .04, h - .12, B - 2*dep + .04);
+  box(M.concDD, P0, 0, h - .06, 0, B + .06, .12, B + .06);
+  for (const [sx, sz] of CORNERS) box(M.metalDark, P0, sx*(B/2 - .04), (h - .12)/2, sz*(B/2 - .04), .08, h - .12, .08);
+  for (let side = 0; side < 4; side++){
+    const F = under(P0, T(0, 0, 0, side*PI/2));   // local +z faces this side's street
+    const x0 = -B/2, x1 = B/2 - dep, n = 2, sw = (x1 - x0)/n, zf = B/2;
+    box(M4.neonPurple, F, 0, h - .125, zf + .035, B, .025, .02);   // a thin neon line under the slab's edge
+    for (let k=0; k<n; k++){
+      const cx = x0 + sw*(k + .5), goods = pick(['food', 'food', 'food', 'tech', 'curio']);
+      if (k) box(M.metalDark, F, x0 + sw*k, (h - .12)/2, zf - .04, .05, h - .12, .05);   // the post between stalls
+      box(COM.shopLit, F, cx, .72, zf - dep + .025, sw - .2, .42, .01);               // the lit hatch at the back
+      glow(F, cx, .74, zf - dep + .12, 'warm', .35);
+      box(COM.wood, F, cx, .24, zf - .14, sw - .1, .48, .22); box(COM.wood2, F, cx, .49, zf - .12, sw - .04, .03, .28);   // the counter
+      counterGoods(F, cx - sw/2 + .1, cx + sw/2 - .1, .5, zf - .14, goods);
+      // the roof out over the sidewalk: a striped awning, or a corrugated sheet
+      if (chance(.55)) stripedAwning(under(F, T(cx, 0, zf, 0)), 1.12, sw - .02, .34, .42, pick(COM.stripes));
+      else { const rm = pick(COM.corr); box(rm, F, cx, 1.06, zf + .14, sw - .02, .025, .36, -.3); for (let t = cx - sw/2 + .05; t < cx + sw/2; t += .09) box(rm, F, t, 1.075, zf + .14, .02, .02, .36, -.3); }
+      if (chance(.75)) paperLantern(F, cx + rnd(-.2, .2), .86, zf + .2, chance(.4) ? COM.lanGold : null, .9);
+      if (goods === 'food' && chance(.45)) for (let q=0; q<4; q++){ const hx = cx - sw/2 + .14 + q*.15; cyl(M.frame, F, hx, .98, zf - .05, .004, .08); box(pick([MC.chili, MC.tomato, M.awn3]), F, hx, .88, zf - .05, .035, .12, .035); }
+      if (goods === 'food' && chance(.35)){ cyl(M.metalDark, F, cx + sw/2 - .17, .55, zf - .2, .06, .06); emitters.push(new THREE.Vector3(cx + sw/2 - .17, .66, zf - .2).applyMatrix4(F)); }
+      if (chance(.7)) figureAt(F, cx + rnd(-.15, .15), 0, zf - .36);
+      if (chance(.6*S.neon)){ const [sn, sc] = pick(BASE_SIGNS); fitSign(under(F, T(0, 0, zf + .07, 0)), sn, cx, h - .05, 0, sw - .12, .5, sc); }
+      // the warm spill: out over the street in front of the stall, lighting the road (no halo of its own)
+      glow(F, cx, 1.15, zf + .6, 'spill', 1.45);
+    }
+    if (chance(.35)){ const x = rnd(x0 + .2, x1 - .2); stool(F, x, zf + .14); spotAt(F, x, .16, zf + .14, 'seat', null, [0, -1]); }
+  }
+  Object.assign(lot, { height: h, floors: 1, occupied: true });
 }
 // A billboard on a plot of its own: a big holographic board (or two, back to back) on a steel frame high above the
 // street, a catwalk under it, and at its feet a kiosk with its shutter lit and a vending machine

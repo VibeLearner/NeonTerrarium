@@ -522,7 +522,7 @@ function glow(P,x,y,z,kind,s=1){
   if (LUX && LUX.glows[kind]){ s *= LUX.haloK || 1; kind = LUX.glows[kind]; }
   if (DARK && !KEEP_LIGHT && GLOW_FLK[kind]){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 80) return; }
   if (DARK && GLOW_FLK[kind]) s = -s;   // marks a halo that flickers hard (see glowPoints)
-  if (!glowList){ const sp = new THREE.Sprite(GLOW[kind]); sp.position.set(x,y,z).applyMatrix4(P); sp.scale.set(Math.abs(s),Math.abs(s),1); sp.layers.set(1); glowGroup.add(sp); return; }
+  if (!glowList){ if (LIGHT_ONLY[kind]) return; const sp = new THREE.Sprite(GLOW[kind]); sp.position.set(x,y,z).applyMatrix4(P); sp.scale.set(Math.abs(s),Math.abs(s),1); sp.layers.set(1); glowGroup.add(sp); return; }
   _gv.set(x,y,z).applyMatrix4(P); (glowList[kind] || (glowList[kind] = [])).push(_gv.x, _gv.y, _gv.z, s);
 }
 const GLOW_PTS_UNI = { scale:{ value: 20 } };
@@ -536,7 +536,19 @@ const GLOW_PTS = new THREE.ShaderMaterial({
 });
 const GLOW_FIXED = { red: .95, blue: .85 };
 const GLOW_FLK = { pink: 'neon', cyan: 'neon', amber: 'neon', warm: 'bulb', orange: 'neon', gold: 'neon', ivory: 'neon', lemon: 'neon', rosegold: 'neon', platinum: 'neon', ember: 'neon', sodium: 'neon', hazard: 'neon', orange: 'neon', arc: 'neon', toxic: 'neon', crimson: 'neon', green: 'neon' };   // halos flicker at the same odds as their kind of light
+// light-only kinds: no halo of their own, they only throw light on what's round them (the night-light pass), like
+// the warm spill from the market stalls and lamps across the commercial streets
+const LIGHT_ONLY = { spill: true };
 function glowPoints(gl){
+  const lo = {}, vis = {};
+  for (const k in gl) (LIGHT_ONLY[k] ? lo : vis)[k] = gl[k];
+  if (!Object.keys(lo).length) return glowPointsOf(gl);
+  const g = new THREE.Group();
+  if (Object.keys(vis).length) g.add(glowPointsOf(vis));
+  const p = glowPointsOf(lo); p.layers.set(4); g.add(p);
+  return g;
+}
+function glowPointsOf(gl){
   let n = 0; for (const k in gl) n += gl[k].length/4;
   const pos = new Float32Array(n*3), size = new Float32Array(n), col = new Float32Array(n*4), flk = new Float32Array(n), ons = new Float32Array(n);
   let i = 0;

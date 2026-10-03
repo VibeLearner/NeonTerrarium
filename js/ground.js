@@ -90,6 +90,8 @@ function groundLot(lot){
     if (chance(.08)) box(G.crack, P, tx, top+.04, tz, .3, .045, .045, rnd(0,PI));
   }
   if (chance(.4)) box(G.grout, P, pick([-1,1])*(SIDE/2-.15), top+.03, rnd(-1,1), .12, .045, .2);   // drain grate
+  // the commercial streets are the lit ones: a soft warm wash over the street on every side (light only, no halo)
+  if (lot.cls === 'mid') for (const [sx, sz] of SIDES4) for (const t of [-.7, .7]) glow(P, sx*mid + sz*t, .9, sz*mid + sx*t, 'spill', 1.0);
   // tactile strip where the crosswalk meets the curb
   box(M.hazard, P, 0, top+.035, SIDE/2-.14, .55, .045, .12);
   // wet stains and moss in the tile gaps
@@ -306,9 +308,25 @@ function connectPair(a, b){
       else if (kinds.has('low')) (chance(.55) ? BRIDGE.catwalk : BRIDGE.cables)(Q,len,y,st);
       else (chance(.5) ? BRIDGE.covered : BRIDGE.cables)(Q,len,y,st);
     }
+    // strings of lanterns across the commercial streets, like the ones round the town square: one to three between
+    // two shops, at different heights, some running on a slant; the street under them gets a warm spill of light
+    if (kinds.has('mid') && !kinds.has('high') && !kinds.has('ind') && !a.yard && !b.yard && typeof lanternString === 'function'){
+      const hiY = Math.max(base + 1.7, Math.min(top + .3, base + 2.9)), n = irand(2, 3);
+      for (let t=0; t<n; t++){
+        for (let tries=0; tries<5; tries++){
+          const y = rnd(base + 1.55, hiY);
+          if (used.some(u => Math.abs(u-y) < .3)) continue;
+          used.push(y);
+          const za = rnd(-.55, .55), zb = chance(.5) ? za : rnd(-.55, .55);
+          lanternString(Q, -len/2 - .1, y, za, len/2 + .1, y + rnd(-.15, .15), zb, rnd(.15, .32));
+          if (t === 0) glow(Q, 0, y - .5, (za + zb)/2, 'spill', 1.3);
+          break;
+        }
+      }
+    }
     // washing lines strung between homes: most tenement pairs, some market pairs
     const lines = kinds.has('high') || kinds.has('ind') || a.yard || b.yard ? 0
-      : (kinds.has('low') ? irand(1,3) : chance(.5) ? 1 : 0);
+      : (kinds.has('low') ? irand(1,3) : chance(.3) ? 1 : 0);
     for (let t=0; t<lines; t++){
       if (!chance(.9*S.clutter)) continue;
       for (let tries=0; tries<5; tries++){

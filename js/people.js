@@ -396,6 +396,11 @@ function approachFor(G, x, z, fx, fz){
   }
   return best;
 }
+// a world point in a megastructure's own frame (the way it was built: its middle, turned to its facing)
+function megaLocal(m, x, z){
+  const a = (m.facing || 0)*PI/2, c = Math.cos(a), s = Math.sin(a), dx = x - m.x, dz = z - m.z;
+  return [c*dx - s*dz, s*dx + c*dz];
+}
 function makeSpots(pl, list, inside, oldSpots, addEnd){
   list.forEach((r, n) => {
     if (pl.spots.some(o => Math.hypot(o.x - r.x, o.z - r.z) < .34)) return;
@@ -404,7 +409,10 @@ function makeSpots(pl, list, inside, oldSpots, addEnd){
     const ap = approachFor(cellGrid(c), r.x, r.z, r.fx, r.fz); if (!ap) return;
     // the key names the spot by what and where it is, so a plot rebuilt differently (a lawn paved over, say) never
     // hands its old sitters a different seat in the wrong place
-    const key = 's:' + pl.id + ':' + n + ':' + (r.act || r.kind) + ':' + Math.round(r.x*20) + ',' + Math.round(r.z*20), old = oldSpots.get(key), nk = 'a:' + Math.round(ap.x*100) + ',' + Math.round(ap.z*100);
+    // (a megastructure's spots are named by where they are in its own frame, not the world's, so that turning it, which
+    // moves every spot, leaves everyone with the spot they had: its keepers, queues and sitters)
+    const lc = pl.mega ? megaLocal(pl.mega, r.x, r.z) : [r.x, r.z];
+    const key = 's:' + pl.id + ':' + n + ':' + (r.act || r.kind) + ':' + Math.round(lc[0]*20) + ',' + Math.round(lc[1]*20), old = oldSpots.get(key), nk = 'a:' + Math.round(ap.x*100) + ',' + Math.round(ap.z*100);
     const sp = { key, x: r.x, y: r.y, z: r.z, ax: ap.x, az: ap.z, node: ngAdd(nk, ap.x, ap.z), kind: r.kind, stall: r.stall, face: [r.fx, r.fz],
                  by: old ? old.by : null, place: pl.id, near: [], act: r.act, hx: r.hx, hz: r.hz, ad: r.ad, pic: r.pic };
     pl.spots.push(sp); spotByKey.set(key, sp); addEnd(c, { key: nk, x: ap.x, z: ap.z, kind: 's' });

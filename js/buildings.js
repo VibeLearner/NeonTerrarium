@@ -301,14 +301,24 @@ function chimneyAt(P,x,y,z){
 }
 let carPads = [];
 function buildCarPad(P, w, d){
-  const pw = Math.min(w, d) - .12;
-  box(M.concDD, P, 0, .05, 0, pw, .1, pw);
-  box(M.hazard, P, 0, .11, 0, .05, .045, pw*.45); box(M.hazard, P, -pw*.14, .11, 0, .045, .045, pw*.45); box(M.hazard, P, pw*.14, .11, 0, .045, .045, pw*.45);   // H marking
-  box(M.hazard, P, 0, .11, 0, pw*.28, .045, .045);
-  for (const [sx,sz] of CORNERS){ box(M.neonCyan, P, sx*(pw/2-.06), .12, sz*(pw/2-.06), .06, .05, .06); glow(P, sx*(pw/2-.06), .16, sz*(pw/2-.06), 'cyan', .5); }
-  for (let t=-pw/2+.25; t<pw/2-.15; t+=.3){ box(M.neonAmber, P, t, .115, pw/2-.05, .04, .03, .04); box(M.neonAmber, P, t, .115, -pw/2+.05, .04, .03, .04); }
-  cyl(M.frame, P, pw/2-.08, .45, -pw/2+.08, .02, .7); box(CARM.tail, P, pw/2-.08, .82, -pw/2+.08, .05, .05, .05);
-  carPads.push({ pos: new THREE.Vector3(0, .12, 0).applyMatrix4(P), busy:false });
+  // The markings are paint laid almost flush on the slab, and every line and dot is at least about two render pixels
+  // across (the render is 480 lines, so a pixel is about .052 units at the usual zoom: MIN_T). Anything thinner than a
+  // pixel pops in and out of the picture as the camera turns, which is what made the pad shimmer; a raised bar adds
+  // outline pixels along its sides, so the paint is thin (box() would round its height up to a pixel, so put() is used).
+  // The slab stands a little proud of the roof cap under it (a box .1 thick on most of these roofs): with its top at the
+  // same height, the two faces fought for the pixels and the pad flickered between its grey and the roof's colour as the
+  // camera turned.
+  const pw = Math.min(w, d) - .12, top = .13, bw = .12;
+  const paint = (mat, x, z, sx, sz) => put(U.box, mat, under(P, T(x, top + .004, z, 0, sx, .016, sz)));
+  box(M.concDD, P, 0, top/2, 0, pw, top, pw);
+  // the H: two bars and the crossbar
+  paint(M.hazard, -pw*.2, 0, bw, pw*.5); paint(M.hazard, pw*.2, 0, bw, pw*.5); paint(M.hazard, 0, 0, pw*.4 - bw, bw);
+  // corner lights, and a row of amber guide dots along the front and back edges
+  for (const [sx,sz] of CORNERS){ box(M.neonCyan, P, sx*(pw/2-.1), top + .02, sz*(pw/2-.1), .12, .04, .12); glow(P, sx*(pw/2-.1), top + .07, sz*(pw/2-.1), 'cyan', .5); }
+  const n = Math.max(2, Math.floor((pw - .5)/.36));
+  for (let k = 0; k < n; k++){ const t = -((n - 1)*.36)/2 + k*.36; paint(M.neonAmber, t, pw/2-.1, .1, .1); paint(M.neonAmber, t, -pw/2+.1, .1, .1); }
+  cyl(M.frame, P, pw/2-.12, .45, -pw/2+.12, .04, .7); box(CARM.tail, P, pw/2-.12, .82, -pw/2+.12, .08, .08, .08);
+  carPads.push({ pos: new THREE.Vector3(0, top + .02, 0).applyMatrix4(P), busy:false });
 }
 let NO_ROOF = false;
 function roofItems(st,P,w,d,lot){
@@ -2733,20 +2743,30 @@ function holoQuad(F, x, y, z, w, h, ad, seed, kind){
 const AIR_A = new THREE.TextureLoader().load('assets/sprites/holo_pureair.png'), AIR_B = new THREE.TextureLoader().load('assets/sprites/holo_freeair.png');
 const AIR_A2 = new THREE.TextureLoader().load('assets/sprites/holo_aether.png'), AIR_B2 = new THREE.TextureLoader().load('assets/sprites/holo_sky.png');
 const AIR_A3 = new THREE.TextureLoader().load('assets/sprites/holo_synth.png'), AIR_B3 = new THREE.TextureLoader().load('assets/sprites/holo_watch.png');   // and Synth Corp's security, hacked by "Big Brother is watching"
-// and two plain ads (no hack) for the wall holograms: Robo-Repair and PureFlow air filters
-const AIR_W1 = new THREE.TextureLoader().load('assets/sprites/holo_robo.png'), AIR_W2 = new THREE.TextureLoader().load('assets/sprites/holo_pureflow.png');
+// and plain ads (no hack) for the wall holograms: tall neon signs for a sushi bar, a repair shop, an air-filter shop
+// (PureFlow), a satellite shop and a loan shop, used as they are. They share one atlas (assets/sprites/holo_walls.png, built by
+// tools/make_wall_holo_signs.py, which prints the WALL_CELLS line below), side by side; WALL_ASPECT is each sign's height
+// over width.
+const AIR_W1 = new THREE.TextureLoader().load('assets/sprites/holo_walls.png');
+const WALL_ATLAS = [2147, 2618], WALL_CELLS = [[0, 0, 431, 999], [433, 0, 351, 1254], [786, 0, 656, 1388], [1444, 0, 703, 1467], [0, 1469, 795, 1149]];   // x, y from the top, width, height of each sign
+const WALL_ASPECT = WALL_CELLS.map(c => c[3]/c[2]);
 const AIR_ASPECT = [.75, 440/512, .75, .75, .75];   // height over width of each pair's pictures
-for (const t of [AIR_A, AIR_B, AIR_A2, AIR_B2, AIR_A3, AIR_B3, AIR_W1, AIR_W2]){ t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }
+for (const t of [AIR_A, AIR_B, AIR_A2, AIR_B2, AIR_A3, AIR_B3, AIR_W1]){ t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }
 const AIR_CYCLE = [60, 2.4, 30, 2.4];   // ad, glitch, hacked, glitch back (seconds)
 const AIR_HOLO_MAT = new THREE.ShaderMaterial({
-  uniforms: { tA: { value: AIR_A }, tB: { value: AIR_B }, tA2: { value: AIR_A2 }, tB2: { value: AIR_B2 }, tA3: { value: AIR_A3 }, tB3: { value: AIR_B3 }, tW1: { value: AIR_W1 }, tW2: { value: AIR_W2 }, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
+  uniforms: { tA: { value: AIR_A }, tB: { value: AIR_B }, tA2: { value: AIR_A2 }, tB2: { value: AIR_B2 }, tA3: { value: AIR_A3 }, tB3: { value: AIR_B3 }, tW1: { value: AIR_W1 }, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform sampler2D tA; uniform sampler2D tB; uniform sampler2D tA2; uniform sampler2D tB2; uniform sampler2D tA3; uniform sampler2D tB3; uniform sampler2D tW1; uniform sampler2D tW2; uniform float time; uniform float lightsOn; varying vec2 vUv;` + LIT_GLSL + `
+  fragmentShader: `uniform sampler2D tA; uniform sampler2D tB; uniform sampler2D tA2; uniform sampler2D tB2; uniform sampler2D tA3; uniform sampler2D tB3; uniform sampler2D tW1; uniform float time; uniform float lightsOn; varying vec2 vUv;` + LIT_GLSL + `
     float hh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
     float pr = 0.0;
-    vec3 smp(float b, vec2 q){ q = clamp(q, 0.0, 1.0); if (pr > 3.5) return texture2D(tW2, q).rgb; if (pr > 2.5) return texture2D(tW1, q).rgb; if (pr > 1.5) return b > .5 ? texture2D(tB3, q).rgb : texture2D(tA3, q).rgb; if (pr > .5) return b > .5 ? texture2D(tB2, q).rgb : texture2D(tA2, q).rgb; return b > .5 ? texture2D(tB, q).rgb : texture2D(tA, q).rgb; }
+    vec3 wall(vec2 q){ float ad = mod(pr - 3.0, ${WALL_CELLS.length}.0); vec4 c = ${WALL_CELLS.map((c, k) => `ad < ${k}.5 ? vec4(${c.map(v => v + '.0').join(', ')})`).join(' : ')} : vec4(0.0);
+      return texture2D(tW1, vec2((c.x + .5 + q.x*(c.z - 1.0))/${WALL_ATLAS[0]}.0, 1.0 - (c.y + .5 + (1.0 - q.y)*(c.w - 1.0))/${WALL_ATLAS[1]}.0)).rgb; }
+    vec3 smp(float b, vec2 q){ q = clamp(q, 0.0, 1.0); if (pr > 2.5) return wall(q); if (pr > 1.5) return b > .5 ? texture2D(tB3, q).rgb : texture2D(tA3, q).rgb; if (pr > .5) return b > .5 ? texture2D(tB2, q).rgb : texture2D(tA2, q).rgb; return b > .5 ? texture2D(tB, q).rgb : texture2D(tA, q).rgb; }
     void main(){
       pr = floor(vUv.y + 1e-4);
+      float wl = pr > 2.5 ? 1.0 : 0.0, vr = floor((pr - 3.0)/${WALL_CELLS.length}.0 + .01), lines = 170.0;
+      // wall ads: one scanline every ~0.1 world units; their pair is 3 + the ad number + ads*(the sign's height in world units, rounded)
+      if (wl > .5) lines = 10.0*max(vr, 1.0);
       float id = floor(vUv.x + 1e-4), u = vUv.x - id, v = vUv.y - pr;
       if (!gl_FrontFacing) u = 1.0 - u;
       float t = time + id*23.7, cyc = mod(t, ${AIR_CYCLE.reduce((a, b) => a + b).toFixed(1)});
@@ -2758,13 +2778,14 @@ const AIR_HOLO_MAT = new THREE.ShaderMaterial({
       else { float k = (cyc - e3)/(${AIR_CYCLE[3].toFixed(1)}); g = 1.0; useB = 1.0 - step(hh(vec2(band, floor(t*9.0) + 3.0)), k*k*1.15); }   // and taken back
       if (pr > 2.5){ g = 0.0; useB = 0.0; }   // the wall ads: never hacked, only the odd small glitch
       // the odd small glitch while it plays (more often on the hacked sign)
-      float small = step(useB > .5 ? .86 : .95, hh(vec2(floor(t*3.0), id)))*step(.5, hh(vec2(floor(t*16.0), id + 2.0)));
+      float small = step(useB > .5 ? .86 : mix(.95, .88, wl), hh(vec2(floor(t*3.0), id)))*step(.5, hh(vec2(floor(t*16.0), id + 2.0)));
       g = max(g, small*.45);
       if (g > 0.0){
         u += (hh(vec2(band, floor(t*24.0))) - .5)*.18*g;
         u += (hh(vec2(slab, floor(t*7.0) + 9.0)) - .5)*.06*g;
       }
       u += (hh(vec2(floor(v*90.0), floor(t*5.0))) > .992 ? .012 : 0.0);   // a line jittering now and then
+      u += wl*(hh(vec2(floor(v*lines*.5), floor(t*10.0) + id)) - .5)*.007;   // wall ads: a faint wobble along the rows
       if (u < 0.0 || u > 1.0) discard;
       vec2 q = vec2(u, v);
       vec3 col = smp(useB, q);
@@ -2774,13 +2795,13 @@ const AIR_HOLO_MAT = new THREE.ShaderMaterial({
       if (g > .9 && hh(vec2(slab, floor(t*12.0))) > .8) col *= .15;           // whole slabs dropping out
       vec3 tint = useB > .5 ? vec3(.3, .9, 1.0) : vec3(.35, .75, 1.0);
       col = col*1.05 + tint*.035;                                              // the sign on a faint sheet of light
-      col *= .74 + .26*step(.5, fract(v*170.0));                              // scanlines
+      col *= mix(.74 + .26*step(.5, fract(v*170.0)), .55 + .45*step(.5, fract(v*lines)), wl);   // scanlines (deeper on the wall ads)
       col += tint*.12*exp(-pow((fract(v*.5 - t*.22) - .5)*10.0, 2.0));       // a band rolling up
       float edge = smoothstep(0.0, .03, u)*smoothstep(1.0, .97, u)*smoothstep(0.0, .03, v)*smoothstep(1.0, .97, v);
       float fl = .9 + .1*sin(t*37.0)*sin(t*11.0);
       if (hh(vec2(floor(t*9.0), id + 5.0)) > .985) fl *= .35;
       float on = litOn(.3, lightsOn, time);
-      gl_FragColor = vec4(col*edge*fl*mix(.4, .8, on), 1.0);
+      gl_FragColor = vec4(col*edge*fl*mix(.4, .8, on)*mix(1.0, 1.4, wl), 1.0);   // the wall ads a little brighter
     }`,
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
 });
@@ -2801,13 +2822,21 @@ AIR_BEAM_MAT.userData.colorOnly = true; AIR_BEAM_MAT.userData.noCast = true;
 const _aq = new THREE.Vector3();
 function uvBucket(mat){ let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: null, u: [] }; buckets.set(mat, b); } return b; }
 // the projector on a wall at P (local +z out of the wall, origin at the lens height), throwing the picture D out
-// A wall hologram: a picture as wide as the building's face, floating just off it (inside the plot), with a thin
-// emitter bar on the wall under it. pair 3 Robo-Repair, 4 PureFlow.
-function wallHologram(P, W, H, id, pair){
-  box(M.metalDark, P, 0, -.05, -.02, W*.92, .07, .1); box(M.neonCyan, P, 0, -.015, .035, W*.86, .015, .015);
-  for (const sx of [-1, 1]) glow(P, sx*W*.3, 0, .06, 'cyan', .3);
-  const b = uvBucket(AIR_HOLO_MAT), C = [[-W/2, 0, 0, 0], [W/2, 0, .999, 0], [W/2, H, .999, .999], [-W/2, H, 0, .999]];
-  for (const k of [0, 1, 2, 0, 2, 3]){ const [cx, cy, u, v] = C[k]; _aq.set(cx, cy + .02, .08).applyMatrix4(P); b.p.push(_aq.x, _aq.y, _aq.z); b.n.push(0, 1, 0); b.u.push(id + u, pair + v); b.d.push(0); }
+// A wall hologram: tall signs floating just off a building's face (inside the plot), with a thin emitter bar on the wall
+// under them. P is at the bottom (the top of the ground floor) and H is the height up to the roofline. A sign is never
+// stretched: N signs are stacked (about WALL_SLOT tall at most, each slot H/N), each as tall as its shape allows in the
+// slot (and no wider than the face W), centered in it. The stack runs through the signs in order, starting with ad.
+const WALL_SLOT = 2.3;   // a slot is at most W*WALL_SLOT tall: roughly the shape of the signs
+function wallHologram(P, W, H, id, ad){
+  const K = WALL_ASPECT.length, n = Math.max(1, Math.ceil(H/(W*WALL_SLOT))), h = H/n, wide = Math.min(W, h/WALL_SLOT);
+  box(M.metalDark, P, 0, -.05, -.02, Math.max(wide, .8)*.92, .07, .1); box(M.neonCyan, P, 0, -.015, .035, Math.max(wide, .8)*.86, .015, .015);
+  for (const sx of [-1, 1]) glow(P, sx*Math.max(wide, .8)*.3, 0, .06, 'cyan', .3);
+  const b = uvBucket(AIR_HOLO_MAT);
+  for (let t = 0; t < n; t++){
+    const a = (ad + t) % K, w = Math.min(W, h/WALL_ASPECT[a]), sh = w*WALL_ASPECT[a], pair = 3 + a + K*Math.max(1, Math.round(sh));
+    const y0 = t*h + (h - sh)/2 + .02, y1 = y0 + sh - .02, C = [[-w/2, y0, 0, 0], [w/2, y0, .999, 0], [w/2, y1, .999, .999], [-w/2, y1, 0, .999]];
+    for (const k of [0, 1, 2, 0, 2, 3]){ const [cx, cy, u, v] = C[k]; _aq.set(cx, cy, .08).applyMatrix4(P); b.p.push(_aq.x, _aq.y, _aq.z); b.n.push(0, 1, 0); b.u.push(id + t*7 + u, pair + v); b.d.push(0); }
+  }
 }
 function airHologram(P, W, H, D, id, pair = 0){
   // the projector: a housing on brackets, a lens ring, a lit lens

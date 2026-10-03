@@ -139,7 +139,7 @@ const comp = new THREE.ShaderMaterial({
   uniforms: {
     tColor:{value:null}, tDepth:{value:null}, tNormal:{value:null}, res:{value:new THREE.Vector2(1,1)},
     near:{value:NEAR}, far:{value:FAR}, camDist:{value:CAM_DIST}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
-    night:{value:0}, lodLines: LOD.lines, pxK:{value:1}, starOff:{value:new THREE.Vector2()}, skyYaw:{value:0}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
+    night:{value:0}, smoothLook: SMOOTH_LOOK, lodLines: LOD.lines, pxK:{value:1}, starOff:{value:new THREE.Vector2()}, skyYaw:{value:0}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
     pal:{value: PAL_HEX.map(h => { const c=new THREE.Color(h); return new THREE.Vector3(c.r,c.g,c.b); })},
     tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, rainOn:{value:0},
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
@@ -154,7 +154,7 @@ const comp = new THREE.ShaderMaterial({
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
     uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform sampler2D tSteam; uniform float steamExt; uniform int nVents; uniform float nLifts;
-    uniform float night; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
+    uniform float night; uniform float smoothLook; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
     uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float rainOn; uniform sampler2D tCloud;
@@ -225,7 +225,7 @@ const comp = new THREE.ShaderMaterial({
       if (rd >= 0.99999){
         // pastel pixel-art sky: the gradient in ten flat bands, with only a thin dithered seam where two meet
         float tb = smoothstep(0.05, 0.95, vUv.y)*10.0, fb = fract(tb);
-        float tq = (floor(tb) + (fb > 0.82 ? step(bayer(gl_FragCoord.xy), (fb - 0.82)/0.18) : 0.0))/10.0;
+        float tq = smoothLook > .5 ? tb/10.0 : (floor(tb) + (fb > 0.82 ? step(bayer(gl_FragCoord.xy), (fb - 0.82)/0.18) : 0.0))/10.0;   // (Smooth: no bands)
         vec3 sky = mix(skyBot, skyTop, tq);
         // The stars are a full 360-degree sky map. The view onto it is a flat strip: heading across, elevation up,
         // both in whole sky pixels, so turning the camera slides the stars straight sideways at an even pace (a
@@ -256,7 +256,7 @@ const comp = new THREE.ShaderMaterial({
         float above = smoothstep(-.02, .2, el);
         star *= night*above;
         float haze = band*above*night*.05*(.6 + .4*hash(floor(vec2(az, el)/(pix*2.0))));
-        sky += vec3(.55, .5, .8)*floor(haze*40.0 + bayer(gl_FragCoord.xy)*.99)/40.0;   // dithered, so it stays pixel art
+        sky += vec3(.55, .5, .8)*(smoothLook > .5 ? haze : floor(haze*40.0 + bayer(gl_FragCoord.xy)*.99)/40.0);   // dithered, so it stays pixel art
         col = sky + vec3(star) + c.rgb;
       } else {
         float d = near + rd*(far-near);
@@ -289,7 +289,7 @@ const comp = new THREE.ShaderMaterial({
             }
           }
           occ /= 8.0;
-          occ = floor(occ*6.0 + bayer(gl_FragCoord.xy)*.99)/6.0;
+          occ = smoothLook > .5 ? occ : floor(occ*6.0 + bayer(gl_FragCoord.xy)*.99)/6.0;
           col *= 1.0 - occ*.42*aoI;
         }
         // Rim light: where an edge faces the sun with open space (or something far behind) beyond it, the edge
@@ -299,7 +299,7 @@ const comp = new THREE.ShaderMaterial({
         // pass, below): tinted by each surface's colour, with a little added so dark walls still pick it up; stepped
         // and dithered so it stays pixel art
         { vec3 lt = texture2D(tLight, vUv).rgb;
-          lt = floor(lt*14.0 + bayer(gl_FragCoord.xy)*.99)/14.0;
+          lt = smoothLook > .5 ? lt : floor(lt*14.0 + bayer(gl_FragCoord.xy)*.99)/14.0;
           float lum = dot(c.rgb, vec3(.299, .587, .114));
           // light lands on the surface: it scales the surface's own colour (the night-dimmed colour is about a third of
           // the real one), so textures and dark details stay; capped below the bloom threshold so lit walls never glow;
@@ -363,7 +363,7 @@ const comp = new THREE.ShaderMaterial({
         // background: drawn only where the sky shows, never over the island or anything on it (or hanging under it),
         // and over the stars, which are further back still
         vec4 cl = texture2D(tCloud, sUv);
-        if (cl.a > 0.001){ float q = clamp(floor(cl.a*3.0 + dith*.6)/2.0, 0.0, 1.0); col = mix(col - c.rgb, cl.rgb/cl.a, q) + c.rgb; }   // glows over the sky (lamp haloes, the pads' glow) stay in front   // crisp pixel edges, one dithered step between
+        if (cl.a > 0.001){ float q = smoothLook > .5 ? clamp(cl.a, 0.0, 1.0) : clamp(floor(cl.a*3.0 + dith*.6)/2.0, 0.0, 1.0); col = mix(col - c.rgb, cl.rgb/cl.a, q) + c.rgb; }   // glows over the sky (lamp haloes, the pads' glow) stay in front   // crisp pixel edges, one dithered step between
       }
       if (shim > .01) col += vec3(.3, .6, 1.0)*clamp(shim*7.0, 0.0, 1.0)*(.04 + .08*night)*(.75 + .25*sin(time*31.0 + vUv.x*res.x*.5));   // the faint flickering wash of the running pad
       // ---- steam from the vents, with light through it ----
@@ -396,7 +396,7 @@ const comp = new THREE.ShaderMaterial({
             T *= exp(-dens*dt*.35);   // light extinction: steam scatters light, hides little
           }
           acc = min(acc, vec3(.4));
-          acc = floor(acc*20.0 + dith)/20.0;   // stepped, to stay pixel art
+          acc = smoothLook > .5 ? acc : floor(acc*20.0 + dith)/20.0;   // stepped, to stay pixel art
           col = col*mix(1.0, T, .6) + acc;
         }
       }
@@ -412,7 +412,7 @@ const comp = new THREE.ShaderMaterial({
             acc += litAt(p) * hz * dt;
           }
           float shafts = acc * 0.016 * rayI;   // (12 dithered steps look the same as 20 at this resolution)
-          shafts = floor(shafts*10.0 + dith)/10.0;                  // stepped, so the beams read as pixel art
+          shafts = smoothLook > .5 ? shafts : floor(shafts*10.0 + dith)/10.0;                  // stepped, so the beams read as pixel art
           col += sunCol * shafts;
         }
       }
@@ -534,14 +534,14 @@ const cloudMat = new THREE.ShaderMaterial({
   uniforms: {
     tDepth:{value:null}, invVP:comp.uniforms.invVP, time:comp.uniforms.time, cloudOff:{value:new THREE.Vector2()}, texSea:{value:cloudAtlas[0].texture}, texRing:{value:cloudAtlas[1].texture},
     sunDir:comp.uniforms.sunDir, sunCol:comp.uniforms.sunCol, skyTop:comp.uniforms.skyTop, skyBot:comp.uniforms.skyBot,
-    night:comp.uniforms.night, cityGlow:comp.uniforms.cityGlow, glowC:comp.uniforms.glowC, rainDark:comp.uniforms.rainDark,
+    night:comp.uniforms.night, smoothLook: SMOOTH_LOOK, cityGlow:comp.uniforms.cityGlow, glowC:comp.uniforms.glowC, rainDark:comp.uniforms.rainDark,
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: CLOUD_NOISE + `
     uniform sampler2D tDepth; uniform mat4 invVP; uniform float time; uniform vec2 cloudOff;
     uniform sampler2D texSea; uniform sampler2D texRing;
     uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 cityGlow; uniform vec2 glowC;
-    uniform float night; uniform float rainDark;
+    uniform float night; uniform float smoothLook; uniform float rainDark;
     varying vec2 vUv;
     vec2 tileUV(float s, vec2 xz){ vec2 inner = clamp(xz, 0.5/128.0, 1.0 - 0.5/128.0); return (vec2(mod(s, 8.0), floor(s/8.0)) + inner)/vec2(8.0, 4.0); }
     vec4 atl(sampler2D t, vec3 q){
@@ -595,6 +595,8 @@ const cloudMat = new THREE.ShaderMaterial({
                           - 0.32*smoothstep(-0.05, 0.3, fs) - (1.0 - dens)*0.06;
               float band = clamp(floor(clamp(light, 0.0, 0.999)*6.0 + (dith - 0.5)*0.12), 0.0, 5.0);   // six crisp bands
               vec3 cc = band < 0.5 ? P0 : band < 1.5 ? P1 : band < 2.5 ? P2 : band < 3.5 ? P3 : band < 4.5 ? P4 : P5;
+              if (smoothLook > .5){ float bf = clamp(light, 0.0, 0.999)*5.0;   // Smooth: the six colours blend instead of banding
+                cc = bf < 1.0 ? mix(P0, P1, bf) : bf < 2.0 ? mix(P1, P2, bf - 1.0) : bf < 3.0 ? mix(P2, P3, bf - 2.0) : bf < 4.0 ? mix(P3, P4, bf - 3.0) : mix(P4, P5, bf - 4.0); }
               cc += cityGlow * night * 0.55 * exp(-length(p.xz - glowC)/9.0) * smoothstep(-11.0, -6.0, p.y);   // neon glow on the undersides
               float a = clamp(dens*dt*1.9, 0.0, 1.0);   // nearly opaque at the surface, so each pixel shows one band, not a blend
               acc += T*a*cc; T *= 1.0 - a;
@@ -622,7 +624,8 @@ function makeTargets(){
   comp.uniforms.res.value.set(W,H);
   if (rtCloud) rtCloud.dispose();
   const q = S.cloudQ || 2;
-  rtCloud = new THREE.WebGLRenderTarget(Math.ceil(W/q), Math.ceil(H/q), opt);
+  // (Smooth: the clouds are drawn smaller than the frame and stretched with a blend, so their edges aren't stair-steps)
+  rtCloud = new THREE.WebGLRenderTarget(Math.ceil(W/q), Math.ceil(H/q), SMOOTH_LOOK.value ? Object.assign({}, opt, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }) : opt);
   comp.uniforms.tCloud.value = rtCloud.texture; cloudMat.uniforms.tDepth.value = rtC.depthTexture;
   if (rtOut) rtOut.dispose();
   rtOut = new THREE.WebGLRenderTarget(W, H, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat });
@@ -681,10 +684,10 @@ const glowBlur = new THREE.ShaderMaterial({
 const glowCopy = new THREE.ShaderMaterial({ uniforms: { t: { value: null } }, vertexShader: fsVert,
   fragmentShader: 'uniform sampler2D t; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(t, vUv).rgb, 1.0); }', depthTest: false, depthWrite: false });
 const glowMix = new THREE.ShaderMaterial({
-  uniforms: { t: { value: null }, tB: { value: null }, tH: { value: null }, night: GLOW_FX.night, on: { value: 1 },
+  uniforms: { t: { value: null }, tB: { value: null }, tH: { value: null }, night: GLOW_FX.night, smoothLook: SMOOTH_LOOK, on: { value: 1 },
               lift: { value: new THREE.Vector3() }, gain: { value: new THREE.Vector3(1, 1, 1) }, sat: { value: 1 }, con: { value: 1 }, lit: { value: 0 } },
   vertexShader: fsVert,
-  fragmentShader: `uniform sampler2D t; uniform sampler2D tB; uniform sampler2D tH; uniform float night; uniform float on; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D t; uniform sampler2D tB; uniform sampler2D tH; uniform float night; uniform float smoothLook; uniform float on; varying vec2 vUv;
     uniform vec3 lift; uniform vec3 gain; uniform float sat; uniform float con; uniform float lit;
     float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y*0.75))); }
     float bayer(vec2 a){ return b2(0.5*a)*0.25 + b2(a); }
@@ -695,7 +698,7 @@ const glowMix = new THREE.ShaderMaterial({
       // (the wide halation most) and the two read as one lighting rather than stacking up
       float k = mix(.6, 1.7, night)*mix(1.0, .62, lit);
       vec3 add = b*k + h*vec3(1.0, .42, .3)*mix(.3, 1.0, night)*mix(1.0, .45, lit);   // bloom, and a warm red halation round it
-      add = floor(add*20.0 + bayer(gl_FragCoord.xy)*.99)/20.0;       // stepped and dithered: pixel art, not a smooth haze
+      add = smoothLook > .5 ? add : floor(add*20.0 + bayer(gl_FragCoord.xy)*.99)/20.0;       // stepped and dithered: pixel art, not a smooth haze
       c += add*on*(1.0 - .85*c);                                      // screen-like: bright pixels (a lit hotel facade) don't blow out to white
       // colour grading for the time of day: tinted shadows (lift), tinted highlights (gain), saturation, contrast
       c = c*gain + lift*(1.0 - c);
@@ -840,17 +843,31 @@ const upMat = new THREE.ShaderMaterial({
   depthTest:false, depthWrite:false,
 });
 const upScene = new THREE.Scene(); upScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), upMat));
-// Render resolution. At the default zoom and closer the game is drawn at about 480 lines, each render pixel a
+// Render resolution. At the default zoom and closer the game is drawn at about 480 lines (or 240 or 720: see below), each render pixel a
 // whole number of screen pixels. Zooming out, it is drawn at more lines in step with the zoom, so every building
 // keeps the same pixels and the pixels themselves get smaller on screen, up to the screen's own resolution.
 // (Past that, the detail levels in main.js take over.) Stars and rain are measured in base pixels (pxK) so they
 // keep their size.
 const ZOOM_REF = 13.2;
+// How many lines the game is drawn at (Settings, Render: 240p, 480p or 720p). The choice is remembered in this browser.
+// 0 is Smooth: no pixel look, drawn at the screen's own resolution (up to SMOOTH_MAX lines).
+const RES_KEY = 'neonIsland.renderLines', RES_CHOICES = [240, 480, 720, 0], SMOOTH_MAX = 1440;
+let RENDER_LINES = (() => { try { const raw = localStorage.getItem(RES_KEY), v = raw === null ? NaN : +raw; return RES_CHOICES.includes(v) ? v : 480; } catch (e) { return 480; } })();
+SMOOTH_LOOK.value = RENDER_LINES === 0 ? 1 : 0;
+function setRenderLines(n){
+  if (!RES_CHOICES.includes(n) || n === RENDER_LINES) return;   // (0 is Smooth)
+  RENDER_LINES = n; SMOOTH_LOOK.value = n === 0 ? 1 : 0; try { localStorage.setItem(RES_KEY, String(n)); } catch (e) {}
+  resize();
+}
 let DW = 1, DH = 1, BASE_H = 270, pxK = 1;
 function resize(){
   const dpr = devicePixelRatio || 1;
   DW = Math.max(1, Math.round(innerWidth*dpr)); DH = Math.max(1, Math.round(innerHeight*dpr));
-  BASE_H = Math.ceil(DH / Math.max(1, Math.round(DH / 480)));
+  // about RENDER_LINES lines, each a whole number of screen pixels. Where whole pixels can't tell 720 from 480 (a 1080 screen
+  // makes both 540 lines), 720 is drawn at exactly 720 lines instead, a little under two screen pixels each
+  const whole = t => Math.ceil(DH / Math.max(1, Math.round(DH / t)));
+  BASE_H = RENDER_LINES === 0 ? Math.min(DH, SMOOTH_MAX) : whole(RENDER_LINES);
+  if (RENDER_LINES === 720 && BASE_H <= whole(480)) BASE_H = Math.min(DH, 720);
   renderer.setSize(DW, DH, false);
   canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
   H = 0; applyRenderRes(zoom);

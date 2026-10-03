@@ -312,30 +312,54 @@ function buildStack(c){
 }
 // Hologram billboards on the roofs: a small one on about half the commercial roofs, and on tall buildings of the
 // commercial and residential zones now and then a big one on posts, with its slogan scrolling underneath. Picked from
-// the plot and its top section, so a roof keeps its billboard through rebuilds.
+// the plot and its top section, so a roof keeps its billboard through rebuilds. The two big wall holograms (the sign
+// down a face, the air-filter picture) don't depend on the roof or the top section at all, so a building that has one
+// keeps it as you stack more onto it (the roof billboards and the side board do change with the top section).
+const airCells = new Set();   // the towers that may throw an air-filter hologram (whether or not there's room for it right now)
+const AIR_HOLO_ODDS = 20;     // one commercial building in this many that hasn't got the wall hologram throws the big air-filter picture, which makes one in 30 overall
+const WALL_HOLO_ODDS = 3;     // one commercial building in this many, once it's tall enough, wears a wall hologram
+const WALL_HOLO_MIN_Y = 2.4;  // 'tall enough': stacking a section can make a building shorter (the whole stack is built afresh), but never
+                              // below this for two or more sections, so a building that has a hologram keeps it as it grows
 function rooftopBoard(c, y){
   const top = c.sections[c.sections.length - 1], lot = c._topLot; c._topLot = null;
-  if (!top || (lot && lot.hasCarPad) || c.dark) return;
+  airCells.delete(c);
+  if (!top || c.dark) return;
+  const mid = c.sections.some(s => s.zone === 'mid');
+  // A building has the wall hologram or the air-filter one, never both: the plots that get the wall hologram are
+  // picked first, and the air-filter tower is picked from the others. Both picks come from the plot alone, so
+  // stacking never swaps one for the other.
+  const key = c.i + ',' + c.j, wallPick = window.WALL_FORCE === key || hash('wallholo', c.i, c.j) % WALL_HOLO_ODDS === 0;
+  const airPick = window.AIR_FORCE === key || (!wallPick && hash('airholo', c.i, c.j) % AIR_HOLO_ODDS === 0);
+  const hw = hash('wallside', c.i, c.j), wsd = SIDES4[hw & 3], wallOn = mid && y >= WALL_HOLO_MIN_Y && wallPick && !airPick;
+  // one commercial building in WALL_HOLO_ODDS (and not an air-filter tower), tall enough, wears a hologram ad down one
+  // face, as wide as the building, never out past its plot, from just under the roofline to the top of the ground floor
+  if (wallOn){
+    const Wd = 2.2, yb = CURB + FH + .1;   // the ground floor is left clear for the shopfront
+    wallHologram(T(c.x + wsd[0]*1.18, yb, c.z + wsd[1]*1.18, Math.atan2(wsd[0], wsd[1])), Wd, y - .08 - yb, (hw >>> 4) % 50, (hw >>> 10) % WALL_CELLS.length);
+  }
+  // one tall commercial tower in thirty throws the huge air-filter hologram out over the street from its top floor.
+  // The picture (three plots wide) hangs over the three plots in front of the tower, so it's thrown from the face whose
+  // three front plots are the lowest, and only if they're all lower than the picture's bottom edge (else it would be
+  // inside a building). When a neighbour changes, the tower is rebuilt (see refresh) and picks again.
+  if (mid && (c.sections.length >= 3 || y >= 6) && y >= 5 && airPick){
+    airCells.add(c);
+    const ha = hash('airside', c.i, c.j), W = 3*LOT - .8, pair = (ha >>> 10) % 3, H = W*AIR_ASPECT[pair], yp = y - .6;
+    const front = ([a, b]) => { let m = 0; for (let l = -1; l <= 1; l++){ const n = cells.get(ckey(c.i + a + (a ? 0 : l), c.j + b + (b ? 0 : l))); if (n) m = Math.max(m, n.height); } return m; };
+    const sd = SIDES4.map((d, k) => [d, front(d) + ((ha >>> k*2) & 3)*.01]).sort((p, q) => p[1] - q[1])[0];
+    if (sd[1] <= yp - H/2 - .3 || window.AIR_FORCE === c.i + ',' + c.j){
+      const d = sd[0];
+      airHologram(T(c.x + d[0]*1.12, yp, c.z + d[1]*1.12, Math.atan2(d[0], d[1])), W, H, 3.2, (ha >>> 4) % 50, window.AIR_PAIR !== undefined ? window.AIR_PAIR : pair);
+    }
+  }
+  if (lot && lot.hasCarPad) return;   // a car pad on the roof: no roof billboard or side board
   const hv = hash('board', c.i, c.j, c.sections.length, top.seed), r = hv % 100;
   let size = -1;
   if ((top.zone === 'mid' || top.zone === 'low') && y > 4.5 && r < (top.zone === 'mid' ? 45 : 28)) size = y > 6.5 ? 2 : 1;
   else if (top.zone === 'mid' && r < 72) size = 0;
-  // and on the commercial streets, often a board hung off the side of the building too, part way up
-  const sideB = c.sections.some(s => s.zone === 'mid') && y > 2.4 && (hv >>> 20) % 100 < 40;
-  if (sideB) sideBoard(c, y, hv);
-  // one tall commercial tower in thirty throws the huge air-filter hologram out over the street from its top floor
-  if (c.sections.some(s => s.zone === 'mid') && (c.sections.length >= 3 || y >= 6) && y >= 5 && (window.AIR_FORCE === c.i + ',' + c.j || hash('airholo', c.i, c.j) % 30 === 0)){
-    // facing the lowest neighbour (open sky, a park, the shortest roof), so the picture isn't buried in a tower
-    const ha = hash('airside', c.i, c.j), nb = ([a, b]) => { const n = cells.get(ckey(c.i + a, c.j + b)); return n ? n.sections.length : -1; };
-    const sd = SIDES4.map((d, k) => [d, nb(d)*4 + ((ha >>> k*2) & 3)]).sort((p, q) => p[1] - q[1])[0][0], yp = y - .6, W = 3*LOT - .8, pair = (ha >>> 10) % 3, H = W*AIR_ASPECT[pair];
-    airHologram(T(c.x + sd[0]*1.12, yp, c.z + sd[1]*1.12, Math.atan2(sd[0], sd[1])), W, H, 3.2, (ha >>> 4) % 50, window.AIR_PAIR !== undefined ? window.AIR_PAIR : pair);
-  }
-  // one commercial building in six, mid-sized or taller, wears a hologram ad across the upper part of one face,
-  // as wide as the building and never out past its plot
-  if (c.sections.some(s => s.zone === 'mid') && y >= 3.5 && (window.WALL_FORCE === c.i + ',' + c.j || hash('wallholo', c.i, c.j) % 6 === 0)){
-    const hw = hash('wallside', c.i, c.j), si = sideB && (hw & 3) === ((hv >>> 4) & 3) ? (hw + 1) & 3 : hw & 3, sd = SIDES4[si], Wd = 2.2, Hd = Wd*.75, yb = Math.max(1.5, y - .08 - Hd);   // up under the roofline, clear of the shop awnings
-    wallHologram(T(c.x + sd[0]*1.18, yb, c.z + sd[1]*1.18, Math.atan2(sd[0], sd[1])), Wd, Hd, (hw >>> 4) % 50, 3 + ((hw >>> 10) & 1));
-  }
+  // and on the commercial streets, often a board hung off the side of the building too, part way up (never on the
+  // face that has the wall hologram)
+  const sbs = SIDES4[(hv >>> 4) & 3];
+  if (mid && y > 2.4 && (hv >>> 20) % 100 < 40 && !(wallOn && sbs === wsd)) sideBoard(c, y, hv);
   if (size < 0) return;
   const side = [[0, 1], [1, 0], [0, -1], [-1, 0]][(hv >>> 8) & 3], off = size ? .1 : .45;
   holoBoard(T(c.x + side[0]*off, y, c.z + side[1]*off, Math.atan2(side[0], side[1])), size, (hv >>> 11) % 9, (hv >>> 15) % 211);
@@ -485,6 +509,12 @@ function parkCells(){
 }
 function refresh(list, megaList = []){
   list = list.concat(parkCells());
+  // an air-filter hologram hangs over the plots in front of its tower, so a change next door rebuilds the tower too
+  for (const a of airCells){
+    if (cells.get(ckey(a.i, a.j)) !== a){ airCells.delete(a); continue; }
+    const near = c => c && c !== a && Math.abs(c.i - a.i) <= 1 && Math.abs(c.j - a.j) <= 1;
+    if (list.some(near) || megaList.some(m => (m.cells || []).some(near))) list.push(a);
+  }
   for (const c of new Set(list)) if (c) rebuildCell(c);
   for (const m of megaList) rebuildMega(m);
   for (const k of dirtyRegions){ if (heldRegions.has(k)) pendingRegions.add(k); else rebuildRegion(k); } dirtyRegions.clear();
@@ -699,7 +729,7 @@ const MEGA_SAVE_KEY = 'neonIsland.megas';
 function save(){
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some'])));
-    localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ id: m.id, kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed, centre: m.centre || undefined }))));
+    localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ id: m.id, kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed, centre: m.centre || undefined, rot: m.rot, si: m.si, sj: m.sj }))));
   } catch (e) {}
 }
 function load(){
@@ -707,7 +737,7 @@ function load(){
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!Array.isArray(d) || !d.length) return false;
     for (const [i,j,secs,st,gr] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; cells.set(ckey(i,j), c); }
-    try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) { const mm = placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels, m.id || null); if (mm && m.centre) mm.centre = m.centre; } } catch (e) {}
+    try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) { const mm = placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels, m.id || null); if (mm && m.centre) mm.centre = m.centre; if (mm && Number.isInteger(m.rot)) mm.rot = ((m.rot % 4) + 4) % 4; if (mm && Number.isInteger(m.si) && Number.isInteger(m.sj)){ mm.si = m.si; mm.sj = m.sj; } } } catch (e) {}
     return true;
   } catch (e) { return false; }
 }

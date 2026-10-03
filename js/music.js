@@ -5,13 +5,14 @@
 // there is one (see tools/make_playlist.py); otherwise, on GitHub Pages, the folder is listed through GitHub's API,
 // so dropping files into the folder and pushing is enough.
 //
-// When the radio station has fully arrived, a shuffled track starts and fades in slowly. Tracks follow one
+// When the radio station has fully arrived, a shuffled track starts and fades in slowly. Every song plays once before
+// any repeats (see shuffle). Tracks follow one
 // another (never the same one twice in a row). Removing the station stops the music (a quick fade so it doesn't
 // click). The cassette in the corner shows what's playing, with previous, play/pause and next buttons and a live
 // equalizer drawn from the music itself.
 const MUSIC_DIR = 'assets/audio/music/';
 const MUSIC_EXT = /\.(mp3|ogg|oga|m4a|aac|wav|flac|webm|opus)$/i;
-const MUSIC_VOL_KEY = 'neonIsland.musicVolume';
+const MUSIC_VOL_KEY = 'neonIsland.musicVolume', BAG_KEY = 'neonIsland.musicPlayed';
 const FADE_IN = 8, FADE_QUICK = .6, FADE_OUT = 1.5, EQ_BARS = 12;   // seconds; bars
 // "02 - Night Market (demo).mp3" -> "Night Market (demo)"
 const titleOf = file => decodeURIComponent(file.split('/').pop()).replace(MUSIC_EXT, '').replace(/^\d+\s*[-_.]\s*/, '').replace(/[_]+/g, ' ').trim();
@@ -145,10 +146,19 @@ const music = (() => {
   }
   const ready = loadList().then(l => { tracks = l; ui.setTitle(); });
 
-  function shuffle(){ order = tracks.map((_, k) => k); for (let k = order.length - 1; k > 0; k--){ const j = Math.floor(Math.random()*(k + 1)); [order[k], order[j]] = [order[j], order[k]]; }
+  // Every song plays once before any plays again. The songs played so far in this round are remembered in this browser
+  // (so a reload, or taking the station down and building it again, carries on with the songs not yet heard); a round
+  // ends when they've all played, and the next one starts with a fresh shuffle that doesn't open with the last song.
+  let played = new Set();
+  try { const b = JSON.parse(localStorage.getItem(BAG_KEY) || '{}'); if (Array.isArray(b.played)) played = new Set(b.played); if (typeof b.last === 'string') lastFile = b.last; } catch (e) {}
+  function saveBag(){ try { localStorage.setItem(BAG_KEY, JSON.stringify({ played: [...played], last: lastFile })); } catch (e) {} }
+  function shuffle(){
+    order = tracks.map((_, k) => k).filter(k => !played.has(tracks[k].file));   // the songs not yet heard this round
+    if (!order.length){ played.clear(); order = tracks.map((_, k) => k); }      // all heard: a new round
+    for (let k = order.length - 1; k > 0; k--){ const j = Math.floor(Math.random()*(k + 1)); [order[k], order[j]] = [order[j], order[k]]; }
     if (order.length > 1 && tracks[order[0]].file === lastFile) [order[0], order[1]] = [order[1], order[0]]; idx = -1; }
   function load(k){
-    const t = tracks[order[k]]; lastFile = t.file;
+    const t = tracks[order[k]]; lastFile = t.file; played.add(t.file); saveBag();
     el.src = MUSIC_DIR + t.file.split('/').map(encodeURIComponent).join('/');
     ui.setTitle(t.title);
     if (!paused) tryPlay();
@@ -185,8 +195,13 @@ const music = (() => {
     else hush();
   }
   function update(dt){
-    const radio = typeof megas !== 'undefined' && [...megas.values()].find(m => m.kind === 'radio' && !anims.some(a => a.c === m));
-    // starts once the station has fully arrived (its arrival animation is over)
+    // starts once the station has fully arrived (its arrival animation is over), and carries on if the station is
+    // rebuilt in place (turned with R), which runs the build animation again
+    let radio = null;
+    if (typeof megas !== 'undefined') for (const m of megas.values()) if (m.kind === 'radio'){
+      if (!m.arrived && !anims.some(a => a.c === m)) m.arrived = true;
+      if (m.arrived) radio = m;
+    }
     setOn(!!radio);
     const playing = on && !paused && !blocked && !el.paused;
     // under the host's talk the song is turned down, and comes back up gently after

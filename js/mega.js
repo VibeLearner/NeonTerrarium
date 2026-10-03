@@ -2691,11 +2691,10 @@ function buildNeonDome(m){
   box(M.clubDoor, E, 0, y0 + .75, 1.0, 1.5, 1.4, .02); put(U.cyl16, M.clubDoor, under(E, T(0, y0 + 1.45, 1.0, 0, 1.5, .02, 1.5, PI/2)));
   box(M.domeFrame, E, 0, y0 - .005, 1.3, 1.9, .03, .6);   // a dark mat at the door, flush with the paving
   for (const s of [-1, 1]){ box(M.domeNeonB, E, s*.82, y0 + .8, 1.02, .04, 1.5, .03); }
-  glow(E, 0, y0 + .8, 1.3, 'pink', .3);
   // the big sign over it, and NIGHTCLUB OPEN 24H under
   box(M.metalDark, E, 0, y0 + 2.72, 1.05, 4.3, 1.15, .14);
-  plant('sign_w_neondome', under(E, T(0, 0, 1.13)), 0, y0 + 2.9, 0, 1.5, 'c', true); glow(E, 0, y0 + 2.85, 1.6, 'pink', 2.6);
-  plant('sign_w_nightclub', under(E, T(0, 0, 1.13)), 0, y0 + 2.4, 0, .65, 'c', true); glow(E, 0, y0 + 2.38, 1.5, 'cyan', 1.2);
+  plant('sign_w_neondome', under(E, T(0, 0, 1.13)), 0, y0 + 2.9, 0, 1.5, 'c', true); glow(E, 0, y0 + 2.9, 1.18, 'pink', 1.6);   /* the halo sits on the board, not out in front where it read as a dot over the door */
+  plant('sign_w_nightclub', under(E, T(0, 0, 1.13)), 0, y0 + 2.4, 0, .65, 'c', true); glow(E, 0, y0 + 2.4, 1.18, 'cyan', .9);
   // the pylon: CLUB, DRINKS, MUSIC
   { const Q = under(P, T(-2.95, 0, DR + 1.0)); box(M.metalDark, Q, 0, y0 + 1.5, 0, 1.05, 3.0, .2); box(M4.neonPurple, Q, 0, y0 + 1.5, .11, 1.07, 3.0, .01);
     box(M.domeFrame, Q, 0, y0 + 1.5, .12, .97, 2.9, .01);

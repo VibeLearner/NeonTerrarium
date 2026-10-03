@@ -21,7 +21,7 @@
 // robot (walk 0-3, alternate walk 4-7, parcel drop 8-13, the parcel capsule opening 14-19), row 14 the emote icons.
 const PPL = { rows: 16, cw: 12, ch: 16, walk: 6, idle: 4, W: 384, H: 256 };
 const F_IDLE = 6, F_SPEC = 10, F_SIT = 16, F_USE = 20, F_ANGRY = 26;
-const ROW_COP = 12, ROW_BOT = 13, ROW_EMO = 14, ROW_BOUNCER = 15, CITIZEN_ROWS = 12;   // row 15: the officer redrawn in black, the club's bouncers
+const ROW_COP = 12, ROW_BOT = 13, ROW_EMO = 14, ROW_BOUNCER = 15, CITIZEN_ROWS = 12;   // row 15: the officer redrawn in red, the club's bouncers
 const EMO = { bang: 0, quest: 1, heart: 2, anger: 3, sweat: 4, note: 5, dots: 6, bowl: 7 };
 const PPL_TEX = new THREE.TextureLoader().load('assets/sprites/people.png');
 PPL_TEX.magFilter = PPL_TEX.minFilter = THREE.NearestFilter; PPL_TEX.generateMipmaps = false;

@@ -330,11 +330,11 @@ function rooftopBoard(c, y){
     const sd = SIDES4.map((d, k) => [d, nb(d)*4 + ((ha >>> k*2) & 3)]).sort((p, q) => p[1] - q[1])[0][0], yp = y - .6, W = 3*LOT - .8, pair = (ha >>> 10) % 3, H = W*AIR_ASPECT[pair];
     airHologram(T(c.x + sd[0]*1.12, yp, c.z + sd[1]*1.12, Math.atan2(sd[0], sd[1])), W, H, 3.2, (ha >>> 4) % 50, window.AIR_PAIR !== undefined ? window.AIR_PAIR : pair);
   }
-  // one commercial building in six, mid-sized or taller, wears a hologram ad across the upper part of one face,
-  // as wide as the building and never out past its plot
+  // one commercial building in six, mid-sized or taller, wears a hologram ad down one face, as wide as the building,
+  // never out past its plot, from just under the roofline to the top of the ground floor
   if (c.sections.some(s => s.zone === 'mid') && y >= 3.5 && (window.WALL_FORCE === c.i + ',' + c.j || hash('wallholo', c.i, c.j) % 6 === 0)){
-    const hw = hash('wallside', c.i, c.j), si = sideB && (hw & 3) === ((hv >>> 4) & 3) ? (hw + 1) & 3 : hw & 3, sd = SIDES4[si], Wd = 2.2, Hd = Wd*.75, yb = Math.max(1.5, y - .08 - Hd);   // up under the roofline, clear of the shop awnings
-    wallHologram(T(c.x + sd[0]*1.18, yb, c.z + sd[1]*1.18, Math.atan2(sd[0], sd[1])), Wd, Hd, (hw >>> 4) % 50, 3 + ((hw >>> 10) & 1));
+    const hw = hash('wallside', c.i, c.j), si = sideB && (hw & 3) === ((hv >>> 4) & 3) ? (hw + 1) & 3 : hw & 3, sd = SIDES4[si], Wd = 2.2, yb = CURB + FH + .1;   // the ground floor is left clear for the shopfront
+    wallHologram(T(c.x + sd[0]*1.18, yb, c.z + sd[1]*1.18, Math.atan2(sd[0], sd[1])), Wd, y - .08 - yb, (hw >>> 4) % 50, (hw >>> 10) & 1);
   }
   if (size < 0) return;
   const side = [[0, 1], [1, 0], [0, -1], [-1, 0]][(hv >>> 8) & 3], off = size ? .1 : .45;

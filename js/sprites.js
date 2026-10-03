@@ -81,6 +81,41 @@ const GLYPH_V = [], GLYPH_H = [], GLYPH_GLOW = {};
   for (let i=0;i<14;i++) make(true, i);
   for (let i=0;i<14;i++) make(false, i);
 })();
+// Neon graffiti for the commercial quarter's side walls: tags and doodles in neon paint, a bright core with a halo
+// one pixel round it, on no background (the wall shows through). Named sign_ng_* so they glow like the signs.
+const NEON_GRAF = [];
+(function neonGraffiti(){
+  const rr = mulberry32(90210), ri = n => Math.floor(rr()*n);
+  const COLS = [['#ff4fd8', '#ffc4f2'], ['#3af0ff', '#c8fbff'], ['#a8ff3a', '#e8ffc4'], ['#b070ff', '#e4d0ff'], ['#ff8a3a', '#ffd8b8'], ['#ffe14a', '#fff6c0']];
+  for (let i=0; i<18; i++){
+    const shape = i % 9, w = shape === 0 || shape === 8 ? 26 + ri(14) : 15 + ri(6), h = shape === 0 ? 13 + ri(4) : 13 + ri(4);
+    const on = new Uint8Array(w*h), set = (x, y) => { x = Math.round(x); y = Math.round(y); if (x >= 1 && y >= 1 && x < w - 1 && y < h - 1) on[y*w + x] = 1; };
+    const line = (x0, y0, x1, y1) => { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1); for (let k=0; k<=n; k++) set(x0 + (x1 - x0)*k/n, y0 + (y1 - y0)*k/n); };
+    const ring = (cx, cy, rx, ry, a0 = 0, a1 = TAU) => { const n = Math.ceil((rx + ry)*3); for (let k=0; k<=n; k++){ const a = a0 + (a1 - a0)*k/n; set(cx + Math.cos(a)*rx, cy + Math.sin(a)*ry); } };
+    const cx = w/2, cy = h/2;
+    if (shape === 0){   // a tag: loopy letters joined up, swashed underneath
+      let x = 3, y = cy;
+      while (x < w - 6){ const t = ri(3);
+        if (t === 0) ring(x + 2, y - 1, 2, 3); else if (t === 1){ line(x, y + 3, x + 1, y - 4); line(x + 1, y - 4, x + 4, y + 3); } else { line(x, y - 4, x, y + 3); line(x, y, x + 3, y - 2); }
+        x += 4 + ri(2); y = cy + ri(3) - 1; }
+      line(2, h - 3, w - 3, h - 4 - ri(2)); set(w - 3, h - 6); }
+    else if (shape === 1){ line(2, cy, w - 3, cy); line(w - 3, cy, w - 7, cy - 4); line(w - 3, cy, w - 7, cy + 4); line(2, cy - 2, 2, cy + 2); }   // an arrow
+    else if (shape === 2){ ring(cx - 3, cy - 2, 3, 3, PI, TAU); ring(cx + 3, cy - 2, 3, 3, PI, TAU); line(cx - 6, cy - 2, cx, cy + 5); line(cx + 6, cy - 2, cx, cy + 5); }   // a heart
+    else if (shape === 3){ ring(cx, cy, 5, 5); set(cx - 2, cy - 2); set(cx + 2, cy - 2); ring(cx, cy + 1, 3, 2, .3, PI - .3); }   // a smiley
+    else if (shape === 4){ line(cx - 6, cy + 4, cx + 6, cy + 4); line(cx - 6, cy + 4, cx - 6, cy - 3); line(cx - 6, cy - 3, cx - 3, cy); line(cx - 3, cy, cx, cy - 5); line(cx, cy - 5, cx + 3, cy); line(cx + 3, cy, cx + 6, cy - 3); line(cx + 6, cy - 3, cx + 6, cy + 4); }   // a crown
+    else if (shape === 5){ line(cx + 2, 2, cx - 3, cy); line(cx - 3, cy, cx + 3, cy); line(cx + 3, cy, cx - 2, h - 3); }   // a bolt
+    else if (shape === 6){ ring(cx, cy, 6, 3); ring(cx, cy, 2, 2); set(cx, cy); }   // an eye
+    else if (shape === 7){ for (let k=0; k<8; k++){ const a = k*TAU/8; line(cx + Math.cos(a)*2, cy + Math.sin(a)*2, cx + Math.cos(a)*6, cy + Math.sin(a)*5); } }   // a burst
+    else { ring(5, cy, 3, 4); line(10, cy - 4, 10, cy + 4); line(10, cy, 14, cy - 4); line(10, cy, 14, cy + 4); for (let x = 17; x < w - 3; x += 4){ line(x, cy + 4, x + 2, cy - 4); } }   // letters and slashes
+    const [col, core] = COLS[(i*5 + ri(6)) % COLS.length];
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+    g.globalAlpha = .4; g.fillStyle = col;
+    for (let y=0; y<h; y++) for (let x=0; x<w; x++){ if (on[y*w + x]) continue; let n = 0; for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) if (on[(y + dy)*w + x + dx]) n++; if (n) g.fillRect(x, y, 1, 1); }
+    g.globalAlpha = 1;
+    for (let y=0; y<h; y++) for (let x=0; x<w; x++) if (on[y*w + x]){ g.fillStyle = (x + y) % 3 ? col : core; g.fillRect(x, y, 1, 1); }
+    const kind = 'sign_ng_' + i; SPR.img[kind] = c.toDataURL(); SPR.size[kind] = [w, h]; SPR.anchor[kind] = .5; NEON_GRAF.push(kind);
+  }
+})();
 // The radio station's red ON AIR sign, drawn in a 3x5 pixel font
 (function onAirSign(){
   const F = { O:['111','101','101','101','111'], N:['1001','1101','1011','1001','1001'], A:['010','101','111','101','101'], I:['111','010','010','010','111'], R:['110','101','110','101','101'], ' ':['0','0','0','0','0'] };
@@ -217,7 +252,8 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
               N:['1001','1101','1011','1001','1001'], O:['111','101','101','101','111'], D:['110','101','101','101','110'], F:['111','100','110','100','100'],
               X:['101','101','010','101','101'], K:['101','101','110','101','101'], Y:['101','101','010','010','010'], '-':['000','000','111','000','000'],
               M:['10001','11011','10101','10001','10001'], W:['10001','10001','10101','11011','10001'], '1':['010','110','010','010','111'],
-              '5':['111','100','111','001','111'], Z:['111','001','010','100','111'], '3':['111','001','011','001','111'], V:['101','101','101','101','010'] };
+              '5':['111','100','111','001','111'], Z:['111','001','010','100','111'], '3':['111','001','011','001','111'], V:['101','101','101','101','010'],
+              '0':['111','101','101','101','111'], '6':['111','100','111','101','111'], '7':['111','001','010','010','010'], '8':['111','101','111','101','111'], '9':['111','101','111','001','111'], '/':['001','001','010','100','100'] };
   const make = (kind, text, col, deco) => {
     const ws = [...text].map(ch => F[ch][0].length), tw = ws.reduce((a, b) => a + b + 1, -1), pad = deco ? 5 : 3, w = tw + 2*pad, h = 9;
     const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
@@ -243,6 +279,11 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
   make('sign_c_cramen', 'CYBER RAMEN', '#ff6ad8'); make('sign_c_baropen', 'BAR OPEN', '#5af0ff'); make('sign_c_hotel', 'HOTEL', '#5ae8ff', true);
   make('sign_c_dataloan', 'DATA.LOAN', '#ff5aa8'); make('sign_c_techparts', 'TECH.PARTS', '#5ae8ff'); make('sign_c_dome', 'DOME MARKET', '#ffc04a', true);
   make('sign_c_sushi', 'SUSHI.RAMEN.24H', '#ffb04a');
+  make('sign_c_geomarket', 'GEODESIC MARKET', '#e0d0b0'); make('sign_c_bios', 'BIOS DOME', '#7ae8d0'); make('sign_c_arcology', 'ARCOLOGY-07', '#d070ff', true);
+  make('sign_c_block', 'BLOCK 09', '#ff8a5a'); make('sign_c_hab', 'HAB BLOC 09', '#ffb04a'); make('sign_c_nexus', 'NEXUS GLASS', '#9ab8ff'); make('sign_c_arakawa', 'ARAKAWA TOWER', '#7ad8ff');
+  make('sign_c_robot', 'ROBOT REPAIR', '#ff6a9a'); make('sign_c_mods', 'CYBER MODS', '#5af0e0', true); make('sign_c_open', 'OPEN 24H', '#ff5ad0');
+  make('sign_c_pawntech', 'PAWN.TECH', '#ffcf5a', true); make('sign_c_techmods', 'TECH REPAIR/MODS', '#5ae8ff'); make('sign_c_noodlebar', 'NOODLE BAR', '#ff7ad0', true);
+  make('sign_c_ramen', 'RAMEN', '#ffb04a', true); make('sign_c_gear', 'GEAR.SCRAP', '#7ae8ff');
   make('sign_w_neondome', 'NEON DOME', '#ff5ad0', true); make('sign_w_nightclub', 'NIGHTCLUB.OPEN 24H', '#5ae8ff');
   make('sign_w_club', 'CLUB', '#b07aff'); make('sign_w_drinks', 'DRINKS', '#b07aff'); make('sign_w_music', 'MUSIC', '#b07aff');
   make('sign_w_enter', 'ENTER', '#5af0e0'); make('sign_w_bar', 'BAR', '#7ab0ff', true); make('sign_w_snacks', 'SNACKS', '#ff6aa8');

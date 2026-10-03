@@ -254,10 +254,12 @@ const glassHotelTower = (lot, st, P0) => glassHotel(lot, st, P0, 'tower');
 const glassHotelPodium = (lot, st, P0) => glassHotel(lot, st, P0, 'podium');
 const SECTION_TYPES = {
   low:  { ground: [[buildTenement,6],[podHouse,1.5],[octoHouse,1.2],[deckHouse,1.3]], upper: [[buildTenement,5],[podHouse,2],[octoHouse,1.2]] },
-  // the commercial quarter: shops under neon names, tiled-roof shops, the dome market hall, food plazas, and the
-  // market-street types; no longer the pod, octagon and deck houses, which the residential blocks share
-  mid:  { ground: [[signShop,4],[tiledShop,2.5],[domeMarket,1.1],[foodPlaza,1.4],[buildShophouse,1.5],[platformTower,1],[containerStack,1.2],[spiralTower,1],[cornerMarket,1.4]],
-          upper: [[signShop,3],[tiledShop,2],[buildShophouse,1.2],[platformTower,.8],[containerStack,1]] },
+  // the commercial quarter: shops under neon names, tiled-roof shops, stall streets, pagodas, glass and brutalist
+  // towers, glass-dome markets, food plazas, and the market-street types; no longer the pod, octagon and deck
+  // houses, which the residential blocks share
+  mid:  { ground: [[signShop,3.6],[tiledShop,2],[stallMarket,1.6],[pagodaHall,1],[glassTower,1.1],[arcologyTower,.8],[domeMarket,.8],[foodPlaza,1],
+                   [buildShophouse,1.1],[platformTower,.8],[containerStack,1],[spiralTower,.8],[cornerMarket,1.1]],
+          upper: [[signShop,3],[tiledShop,1.6],[buildShophouse,1],[platformTower,.6],[containerStack,.8]] },
   high: { ground: [[buildTower,1]], upper: [[slabTower,2],[glassHotelTower,1.5],[glassHotelPodium,1],[roundTower,1],[twistTower,1],[gardenTower,1],[domeTower,1],[shellTower,1],[cascadeTerraces,.8]] },
   ind:  { ground: [[hall,1],[silos,1],[stiltFactory,1],[tankYard,1],[scrapShed,1],[gearWorkshop,1],[repairsBlock,1],[partsWarehouse,1],[lubeShed,.8],[stackedWorks,2.6],[decoWorks,1.1],[brutalTower,1.1]], upper: [[hall,2],[silos,1],[scrapShed,1],[repairsBlock,1],[partsWarehouse,1],[brutalTower,.6]] },
 };

@@ -31,6 +31,7 @@ then open http://localhost:8000.
 | Remove the top section | Right-click | Press and hold |
 | Delete mode | X, or the delete button by the zones: drag to select a block of plots, click inside it to delete everything there (buildings, platform and any megastructure reaching into it), click outside to drop the selection. X or Esc to leave | Delete button |
 | Place a megastructure | Pick it in the Buildings menu, click to put it down, R turns it, right-click or Esc cancels | Tap |
+| Turn a megastructure | With the pointer over a standing megastructure, press R: it turns a quarter, or the next facing that fits (a 3 x 2 swaps to 2 x 3 if the plots beside it are free), flashing red if none does | |
 | Move around | W A S D or the arrow keys (Shift for faster), H or Home to jump back to the middle | |
 | Rotate | Drag, or Q / E (45 degree steps) | Two-finger twist |
 | Zoom | Scroll wheel, or + / - | Pinch |

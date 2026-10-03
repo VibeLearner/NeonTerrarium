@@ -119,6 +119,11 @@ addEventListener('keydown', e => {
   if (PAN_KEYS.includes(k)){ keys.add(k); e.preventDefault(); return; }
   if (k === 'h' || e.key === 'Home'){ centerView(); return; }
   if (k === 'x' && !e.repeat){ setDelMode(!delMode); return; }
+  if (k === 'r' && !megaPick && !delMode && !e.repeat){   // turn the megastructure under the pointer
+    const pk = ptrLast ? pickAt(ptrLast.x, ptrLast.y) : null;
+    if (pk && pk.kind === 'mega' && pk.c.mega){ const m = megas.get(pk.c.mega); if (m) turnMega(m); }
+    return;
+  }
   if (k === 'r' && megaPick){ megaTurn = !megaTurn; if (ptrLast) showMegaGhost(megaPick, groundCellAt(ptrLast.x, ptrLast.y), megaTurn); return; }
   if (e.key === 'ArrowLeft' || e.key === 'q' || e.key === 'Q') yawT += PI/4;
   else if (e.key === 'ArrowRight' || e.key === 'e' || e.key === 'E') yawT -= PI/4;

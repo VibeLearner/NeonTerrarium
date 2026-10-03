@@ -122,7 +122,10 @@ function turnMega(m){
     showAreaSel({ i0: m.i, i1: m.i + m.w - 1, j0: m.j, j1: m.j + m.h - 1 }); setTimeout(() => showAreaSel(null), 450);
     return false;
   }
-  if (m.fx){ m.fx.dispose(); m.fx = null; }
+  // its live parts (the police station's drones and bikes, say) carry on through the turn if they can be moved over to
+  // the new layout (fx.rebase); the others are made again once it has been rebuilt
+  if (m.fx && m.fx.rebase){ m.carryFx = m.fx; m.fx = null; } else if (m.fx){ m.fx.dispose(); m.fx = null; }
+  if (m.si === undefined){ m.si = m.i; m.sj = m.j; }   // the seed of what it looks like was made from where it first stood
   const oldCells = m.cells, old = { view: m.view, data: m.data }; m.view = null; m.data = null;
   for (const b of oldCells) b.mega = null;
   const grown = [];   // platform for any plots of the new block that aren't there yet
@@ -140,7 +143,8 @@ function turnMega(m){
   holdRegion(m);
   refresh(covered.filter(b => !b.mega || b.mega === m.id), [m]);
   dropView(old);
-  if (m.fx){ m.fx.dispose(); m.fx = null; }
+  if (m.fx && m.fx !== m.keptFx){ m.fx.dispose(); m.fx = null; }   // made again when the build animation ends
+  m.keptFx = null;
   for (const c of grown){ holdRegion(c); startAnim(c, 'build', PLAT_BOTTOM, CURB + .3, t.colour, LOT, null, null, { quiet: true, bare: true }); }
   startAnim(m, 'build', CURB - .05, m.top + 1, t.colour, megaSize(m), null, undefined, { onEnd: () => { if (megas.get(m.id) === m && !m.fx) megaFx(m); } });
   save();
@@ -257,6 +261,7 @@ function removeMega(m){
 // moving parts (like the square's holographic koi) live outside the batched geometry and are updated every frame
 function megaFx(m){
   if (m.fx){ m.fx.dispose(); m.fx = null; }
+  if (m.carryFx){ const fx = m.carryFx; m.carryFx = null; fx.rebase(m); m.fx = m.keptFx = fx; return; }   // turned: the same live parts, set down in the new layout
   const t = MEGA_TYPES[m.kind]; if (t.fx) m.fx = t.fx(m) || null;
 }
 function updateMegaFx(dt, time){ for (const m of megas.values()) if (m.fx) m.fx.update(dt, time); }
@@ -490,7 +495,7 @@ function buildRelay(R0, bw, bd){
 // A three-storey broadcast house with a dish farm on its roof, a lower wing carrying the two big dishes, and a
 // lattice radio mast at the far corner, linked by a catwalk. Red lights blink all over it, chasing up the mast.
 function buildRadioStation(m){
-  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
   const P = T(m.x, 0, m.z, megaAngle(m, pick([0, PI/2, PI, -PI/2]))), S2 = 2*LOT;
   // ground: one paved compound across all four plots, with a darker service apron round the mast
   box(G.asph, P, 0, .012, 0, S2, .025, S2);
@@ -665,7 +670,7 @@ function octSlab(mat, P, y, sx, sz, h, hx = 0, hz = 0){
   put(g, mat, under(P, T(0, y, 0, 0, 1, h, 1)));
 }
 function buildSkyMall(m){
-  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
   const long = m.w >= m.h, L = Math.max(m.w, m.h)*LOT, D = Math.min(m.w, m.h)*LOT;
   const Pc = T(m.x, 0, m.z, megaAngle(m, long ? pick([0, PI]) : pick([PI/2, -PI/2])));   // the block, long side on local x
   const SX = MALL_HX, SZ = MALL_HZ, P = Pc;
@@ -1200,7 +1205,7 @@ function squareCorner(Q, kind){
   box(M.concM, Q, 0, .2, 0, .9, .4, .9); plant(pick(['bonsai','bamboo']), Q, 0, .4, 0, 1.2); plant('bushFlower', Q, .25, .4, .25, .8);
 }
 function buildTownSquare(m){
-  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
   const v = squareVariant(m); m.variant = v;
   const P = T(m.x, 0, m.z, megaAngle(m, pick([0, PI/2, PI, -PI/2]))), S5 = 5*LOT, H = S5/2;
   reflectLights = [];
@@ -1310,7 +1315,7 @@ function koiFx(m){
     koiTex = new THREE.TextureLoader().load('assets/sprites/koi_neon.png');
     koiTex.magFilter = koiTex.minFilter = THREE.NearestFilter; koiTex.generateMipmaps = false;
   }
-  const p = m.pond; if (!p) return null;   // only the squares with the koi pond
+  let p = m.pond; if (!p) return null;   // only the squares with the koi pond
   const u = { map: { value: koiTex }, frame: { value: 0 }, prevFrame: { value: 0 }, glitch: { value: 0 }, seed: { value: 0 }, time: { value: 0 } };
   const mat = new THREE.ShaderMaterial({ uniforms: u, vertexShader: KOI_SHADER.vertexShader, fragmentShader: KOI_SHADER.fragmentShader });
   // sized so the whole frame, leaping koi included, sits inside the pond
@@ -1365,6 +1370,8 @@ function koiFx(m){
   water.layers.set(1); water.renderOrder = 2; scene.add(water);
   let hold = 0, burst = 0, stray = 2 + Math.random()*3;
   return {
+    // the square was turned: the pond is where its new layout puts it (the koi carry on from the frame they were on)
+    rebase(m2){ p = m2.pond || p; plane.position.set(p.x, p.y + .03, p.z - koiOff); water.position.set(p.x, p.y + .012, p.z); },
     update(dt, time){
       u.time.value = time;
       // mirror each light through the water: the reflection of a light h above the surface sits where the view ray
@@ -1457,7 +1464,7 @@ function fStack(P, x, z, r, h, opts = {}){
   if (opts.beacon){ beaconLight(P, x + r + .1, CURB + h + .45, z, .1, 1.1); beaconLight(P, x - r - .1, CURB + h + .45, z, .1, 1.1); }
 }
 function buildFoundry(m){
-  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
   const long = m.w >= m.h, L = Math.max(m.w, m.h)*LOT, D = Math.min(m.w, m.h)*LOT;
   const P = T(m.x, 0, m.z, megaAngle(m, long ? pick([0, PI]) : pick([PI/2, -PI/2])));   // the yard front faces local +z
   // ---- the yard: dark wet concrete in slabs, puddles, hazard lines, a few drums and crates
@@ -1572,7 +1579,7 @@ function policeCar(P, x, z, ry){
   for (const [wx, wz] of [[-.4,.3],[.4,.3],[-.4,-.3],[.4,-.3]]) put(U.cyl16, M.frame, under(Q, T(wx, .14, wz, 0, .24, .06, .24, PI/2)));
 }
 function buildPoliceStation(m){
-  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
   const P = T(m.x, 0, m.z, megaAngle(m, pick([0, PI/2, PI, -PI/2]))), H = 3*LOT/2;   // the front faces local +z
   // ---- ground: a street along the front with a crossing, pale paving round the building
   box(G.asph, P, 0, .012, 0, 2*H, .025, 2*H);
@@ -1675,7 +1682,7 @@ function buildPoliceStation(m){
   m.dronePad = under(P, T(px + .2, py, pz + .1, .4)).elements.slice();
   // the drones park in the pad's four quarters (they're live: see policeFx); three or four of them, by the station's seed
   m.dronePads = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz], k) => under(P, T(px + sx*1.05, py, pz + sz*1.05, .4 + k*.9)).elements.slice());
-  m.droneN = 3 + (hash('drones', m.i, m.j, m.seed) % 2);
+  m.droneN = 3 + (hash('drones', m.si ?? m.i, m.sj ?? m.j, m.seed) % 2);
   // machinery and an antenna on the other side of the roof
   box(M.metal, P, 3.1, ry + .3, .9, 1.3, .6, 1.0); box(M.metal, P, 3.6, ry + .25, -.6, .8, .5, .7); box(M.metalDark, P, 1.7, ry + .2, 1.4, .7, .4, .6);
   for (let k=0; k<3; k++) put(U.cyl16, M.polWall2, under(P, T(2.9 + k*.4, ry + .78, .9, 0, .3, .1, .3)));   // fan housings
@@ -1740,7 +1747,7 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
   const g = new THREE.Group(), pad = new THREE.Matrix4().fromArray(padM);
   const restPos = new THREE.Vector3(), restQ = new THREE.Quaternion(), _sc = new THREE.Vector3();
   pad.decompose(restPos, restQ, _sc);
-  const restYaw = new THREE.Euler().setFromQuaternion(restQ, 'YXZ').y;
+  let restYaw = new THREE.Euler().setFromQuaternion(restQ, 'YXZ').y;
   const part = (geo, mat, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0, to = g) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.set(rx, ry, rz); to.add(o); return o; };
   part(U.box, M.polCar, 0, .2, 0, .9, .18, .55); part(U.box, M.polCarDark, 0, .32, 0, .6, .1, .36); part(U.box, M.neonCyan, .46, .2, 0, .02, .05, .3);
   const blades = [];
@@ -1779,6 +1786,12 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
   }
   return {
     g, st,
+    // the station was turned: the pad is somewhere else now. A drone on its rounds just comes home to the new pad.
+    rebase(padM){
+      pad.fromArray(padM); pad.decompose(restPos, restQ, _sc); restYaw = new THREE.Euler().setFromQuaternion(restQ, 'YXZ').y;
+      if (st.mode === 'rest'){ g.position.copy(restPos); st.yaw = restYaw; g.rotation.y = restYaw; }
+      else if (st.mode === 'home'){ st.target = null; st.climb = null; }   // flying home: aim for the new pad
+    },
     // sent to a mugging: true if it's free to go (not already on one)
     scramble(L){ if (st.chase) return false; st.chase = { L, t: 25 }; if (st.mode === 'down' || st.mode === 'home'){ st.mode = 'fly'; st.target = null; st.climb = null; } return true; },
     get busy(){ return !!st.chase; }, get pos(){ return g.position; },
@@ -1909,6 +1922,14 @@ function policeBikes(m, crew){
     alert(L){ const free = bikes.filter(b => !b.case).sort((p, q) => Math.hypot(p.x - L.x, p.z - L.z) - Math.hypot(q.x - L.x, q.z - L.z)).slice(0, 2);
       if (!free.length) return; caseL = L;
       for (const b of free){ b.case = L; b.rider = true; b.mode = 'rush'; bikeRoute(b, L.x, L.z, 3.2); b.until = performance.now() + 50000; } },
+    // the station was turned: the bays are somewhere else now. Parked bikes go to the new bays; bikes on the way home
+    // head for them
+    rebase(){
+      const np = m.bikePads || [];
+      bikes.forEach((b, k) => { const pd = np[k]; if (!pd) return; b.pad = pd;
+        if (b.mode === 'park'){ b.x = pd.x; b.z = pd.z; b.hx = pd.fx; b.hz = pd.fz; }
+        else if (b.mode === 'home') home(b); });
+    },
     // the drone has tagged them: the case bikes run them down
     onTag(L){ for (const b of bikes) if (b.case === L){ b.mode = 'pursue'; b.repath = 0; } },
     update(dt, time){
@@ -2007,14 +2028,14 @@ function policeWire(){
 }
 function policeFx(m){
   if (!wantedTex){ wantedTex = new THREE.TextureLoader().load('assets/sprites/wanted.png'); wantedTex.magFilter = wantedTex.minFilter = THREE.NearestFilter; wantedTex.generateMipmaps = false; }
-  const parts = [], screens = [];
+  const parts = [], screens = [], screenMeshes = [];
   (m.screens || []).forEach((sc, k) => {
     const u = { map: { value: wantedTex }, frame: { value: (k*2) % WANTED_N }, prevFrame: { value: 0 }, glitch: { value: 0 }, seed: { value: k*13 }, time: { value: 0 } };
     const mat = new THREE.ShaderMaterial({ uniforms: u, vertexShader: KOI_SHADER.vertexShader, fragmentShader: WANTED_FRAG });
     const sw = Math.min(sc.w, sc.h*WANTED_W/WANTED_H), sh = sw*WANTED_H/WANTED_W;
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), mat);
     mesh.matrixAutoUpdate = false; mesh.matrix.fromArray(sc.m); mesh.matrixWorldNeedsUpdate = true; mesh.layers.set(1); mesh.renderOrder = 3;
-    scene.add(mesh); parts.push(mesh);
+    scene.add(mesh); parts.push(mesh); screenMeshes.push(mesh);
     screens.push({ u, hold: 2 + k*1.3 + Math.random()*2, burst: 0, stray: 1 + Math.random()*3 });
   });
   // the light bar: a red and a blue lamp that alternate, each with a halo
@@ -2089,6 +2110,15 @@ function policeFx(m){
   const drone = drones[0];
   return {
     drone, drones, crew,
+    // the station was turned: the screens, light bar, radar, pads and bays are where its new layout puts them, and the
+    // drones, bikes and rounds carry on
+    rebase(m2){
+      (m2.screens || []).forEach((sc, k) => { const me = screenMeshes[k]; if (me){ me.matrix.fromArray(sc.m); me.matrixWorldNeedsUpdate = true; } });
+      bar.matrix.fromArray(m2.lightbar.m); bar.matrix.decompose(bar.position, bar.quaternion, bar.scale);
+      radar.matrix.fromArray(m2.radar.m); radar.matrix.decompose(radar.position, radar.quaternion, radar.scale);
+      const np = m2.dronePads || [m2.dronePad]; drones.forEach((d, k) => { if (np[k]) d.rebase(np[k]); });
+      bikes.rebase();
+    },
     update(dt, time){
       for (const s of screens){
         s.u.time.value = time; s.hold -= dt; s.stray -= dt;
@@ -2289,7 +2319,7 @@ function mkCrates(P, x, y, z, n = 3){
 }
 function mkPotted(P, x, y, z){ put(U.cyl16, pick([M.pot, M.mkTeal3, M.white2]), under(P, T(x, y + .1, z, 0, .26, .2, .26))); plant(pick(['bush','bushFlower','fern','bonsai','bamboo','g_fern3']), P, x, y + .2, z, rnd(.8, 1.05)); }
 function buildMarketMall(m){
-  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
   const P = T(m.x, 0, m.z, megaAngle(m, pick([0, PI/2, PI, -PI/2]))), H = 2*LOT, Y = CURB;   // the street fronts are local +z and +x
   // ---- ground: worn paving, darker under the stalls
   box(G.asph, P, 0, .012, 0, 2*H, .025, 2*H);
@@ -2532,7 +2562,7 @@ function pgPad(P, x, y, z, ry){
   strut(M.lxWhite2, Q, 0, -.12, 1.4, 0, -.6, .1, .12);
 }
 function buildCloudPagoda(m){
-  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
   const long = m.w >= m.h, L = Math.max(m.w, m.h)*LOT, D = Math.min(m.w, m.h)*LOT;
   const P = T(m.x, 0, m.z, megaAngle(m, long ? pick([0, PI]) : pick([PI/2, -PI/2]))), Y = CURB;
   // ---- ground: pale paving
@@ -2697,7 +2727,7 @@ function domeNeonOf(style, a, b){
   if (ka === kb) return ka % 2 ? 2 : 1; return 0;                                                                                        // every ring lit, alternating
 }
 function buildNeonDome(m){
-  R = mulberry32(hash('mega', m.kind, m.i, m.j, m.seed));
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
   const P = T(m.x, 0, m.z, megaAngle(m, pick([0, PI/2, PI, -PI/2]))), L = m.w*LOT, H = L/2, y0 = CURB;
   // ---- the plaza: dark wet paving
   box(G.asph, P, 0, .012, 0, L, .025, L);

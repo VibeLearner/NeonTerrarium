@@ -170,7 +170,8 @@ from `assets/sprites/originals/holo_*.webp` by `tools/make_wall_holo_signs.py` (
 line to paste into `js/buildings.js`).
 About one tall tower in thirty throws a huge air-filter hologram out over the
 street. That one plays a cycle of ads (an air-filter ad, Aether-Vane recruitment, Synth Corp security) that
-protest groups hack in turn. Code: `wallHologram` and `airHologram`; ad art in `assets/sprites/holo_*.png`, built by
+protest groups hack in turn. It hangs over the three plots in front of the tower, so it only appears where those
+plots are lower than its bottom edge (the tower picks the clearest face, and rebuilds when a neighbor changes). Code: `wallHologram` and `airHologram`; ad art in `assets/sprites/holo_*.png`, built by
 `tools/make_holo_ads.py`.
 
 ## People

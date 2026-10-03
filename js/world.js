@@ -315,11 +315,13 @@ function buildStack(c){
 // the plot and its top section, so a roof keeps its billboard through rebuilds. The two big wall holograms (the sign
 // down a face, the air-filter picture) don't depend on the roof or the top section at all, so a building that has one
 // keeps it as you stack more onto it (the roof billboards and the side board do change with the top section).
+const airCells = new Set();   // the towers that may throw an air-filter hologram (whether or not there's room for it right now)
 const WALL_HOLO_ODDS = 3;     // one commercial building in this many, once it's tall enough, wears a wall hologram
 const WALL_HOLO_MIN_Y = 2.4;  // 'tall enough': stacking a section can make a building shorter (the whole stack is built afresh), but never
                               // below this for two or more sections, so a building that has a hologram keeps it as it grows
 function rooftopBoard(c, y){
   const top = c.sections[c.sections.length - 1], lot = c._topLot; c._topLot = null;
+  airCells.delete(c);
   if (!top || c.dark) return;
   const mid = c.sections.some(s => s.zone === 'mid');
   // one commercial building in WALL_HOLO_ODDS, tall enough, wears a hologram ad down one face, as wide as the
@@ -329,12 +331,19 @@ function rooftopBoard(c, y){
     const Wd = 2.2, yb = CURB + FH + .1;   // the ground floor is left clear for the shopfront
     wallHologram(T(c.x + wsd[0]*1.18, yb, c.z + wsd[1]*1.18, Math.atan2(wsd[0], wsd[1])), Wd, y - .08 - yb, (hw >>> 4) % 50, (hw >>> 10) % WALL_CELLS.length);
   }
-  // one tall commercial tower in thirty throws the huge air-filter hologram out over the street from its top floor
+  // one tall commercial tower in thirty throws the huge air-filter hologram out over the street from its top floor.
+  // The picture (three plots wide) hangs over the three plots in front of the tower, so it's thrown from the face whose
+  // three front plots are the lowest, and only if they're all lower than the picture's bottom edge (else it would be
+  // inside a building). When a neighbour changes, the tower is rebuilt (see refresh) and picks again.
   if (mid && (c.sections.length >= 3 || y >= 6) && y >= 5 && (window.AIR_FORCE === c.i + ',' + c.j || hash('airholo', c.i, c.j) % 30 === 0)){
-    // facing the lowest neighbour (open sky, a park, the shortest roof), so the picture isn't buried in a tower
-    const ha = hash('airside', c.i, c.j), nb = ([a, b]) => { const n = cells.get(ckey(c.i + a, c.j + b)); return n ? n.sections.length : -1; };
-    const sd = SIDES4.map((d, k) => [d, nb(d)*4 + ((ha >>> k*2) & 3)]).sort((p, q) => p[1] - q[1])[0][0], yp = y - .6, W = 3*LOT - .8, pair = (ha >>> 10) % 3, H = W*AIR_ASPECT[pair];
-    airHologram(T(c.x + sd[0]*1.12, yp, c.z + sd[1]*1.12, Math.atan2(sd[0], sd[1])), W, H, 3.2, (ha >>> 4) % 50, window.AIR_PAIR !== undefined ? window.AIR_PAIR : pair);
+    airCells.add(c);
+    const ha = hash('airside', c.i, c.j), W = 3*LOT - .8, pair = (ha >>> 10) % 3, H = W*AIR_ASPECT[pair], yp = y - .6;
+    const front = ([a, b]) => { let m = 0; for (let l = -1; l <= 1; l++){ const n = cells.get(ckey(c.i + a + (a ? 0 : l), c.j + b + (b ? 0 : l))); if (n) m = Math.max(m, n.height); } return m; };
+    const sd = SIDES4.map((d, k) => [d, front(d) + ((ha >>> k*2) & 3)*.01]).sort((p, q) => p[1] - q[1])[0];
+    if (sd[1] <= yp - H/2 - .3 || window.AIR_FORCE === c.i + ',' + c.j){
+      const d = sd[0];
+      airHologram(T(c.x + d[0]*1.12, yp, c.z + d[1]*1.12, Math.atan2(d[0], d[1])), W, H, 3.2, (ha >>> 4) % 50, window.AIR_PAIR !== undefined ? window.AIR_PAIR : pair);
+    }
   }
   if (lot && lot.hasCarPad) return;   // a car pad on the roof: no roof billboard or side board
   const hv = hash('board', c.i, c.j, c.sections.length, top.seed), r = hv % 100;
@@ -494,6 +503,12 @@ function parkCells(){
 }
 function refresh(list, megaList = []){
   list = list.concat(parkCells());
+  // an air-filter hologram hangs over the plots in front of its tower, so a change next door rebuilds the tower too
+  for (const a of airCells){
+    if (cells.get(ckey(a.i, a.j)) !== a){ airCells.delete(a); continue; }
+    const near = c => c && c !== a && Math.abs(c.i - a.i) <= 1 && Math.abs(c.j - a.j) <= 1;
+    if (list.some(near) || megaList.some(m => (m.cells || []).some(near))) list.push(a);
+  }
   for (const c of new Set(list)) if (c) rebuildCell(c);
   for (const m of megaList) rebuildMega(m);
   for (const k of dirtyRegions){ if (heldRegions.has(k)) pendingRegions.add(k); else rebuildRegion(k); } dirtyRegions.clear();

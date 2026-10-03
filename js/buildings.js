@@ -2753,6 +2753,9 @@ const AIR_HOLO_MAT = new THREE.ShaderMaterial({
     vec3 smp(float b, vec2 q){ q = clamp(q, 0.0, 1.0); if (pr > 2.5) return wall(q); if (pr > 1.5) return b > .5 ? texture2D(tB3, q).rgb : texture2D(tA3, q).rgb; if (pr > .5) return b > .5 ? texture2D(tB2, q).rgb : texture2D(tA2, q).rgb; return b > .5 ? texture2D(tB, q).rgb : texture2D(tA, q).rgb; }
     void main(){
       pr = floor(vUv.y + 1e-4);
+      float wl = pr > 2.5 ? 1.0 : 0.0, vr = floor((pr - 3.0)*.5 + .01), lines = 170.0;
+      // wall ads: one scanline every ~0.1 world units whatever the height of the version (its width is 2.2)
+      if (wl > .5) lines = 22.0*(${WALL_ASPECT.map((a, k) => `vr < ${k}.5 ? ${a.toFixed(2)}`).join(' : ')} : ${WALL_ASPECT[WALL_ASPECT.length - 1].toFixed(2)});
       float id = floor(vUv.x + 1e-4), u = vUv.x - id, v = vUv.y - pr;
       if (!gl_FrontFacing) u = 1.0 - u;
       float t = time + id*23.7, cyc = mod(t, ${AIR_CYCLE.reduce((a, b) => a + b).toFixed(1)});
@@ -2764,13 +2767,14 @@ const AIR_HOLO_MAT = new THREE.ShaderMaterial({
       else { float k = (cyc - e3)/(${AIR_CYCLE[3].toFixed(1)}); g = 1.0; useB = 1.0 - step(hh(vec2(band, floor(t*9.0) + 3.0)), k*k*1.15); }   // and taken back
       if (pr > 2.5){ g = 0.0; useB = 0.0; }   // the wall ads: never hacked, only the odd small glitch
       // the odd small glitch while it plays (more often on the hacked sign)
-      float small = step(useB > .5 ? .86 : .95, hh(vec2(floor(t*3.0), id)))*step(.5, hh(vec2(floor(t*16.0), id + 2.0)));
+      float small = step(useB > .5 ? .86 : mix(.95, .88, wl), hh(vec2(floor(t*3.0), id)))*step(.5, hh(vec2(floor(t*16.0), id + 2.0)));
       g = max(g, small*.45);
       if (g > 0.0){
         u += (hh(vec2(band, floor(t*24.0))) - .5)*.18*g;
         u += (hh(vec2(slab, floor(t*7.0) + 9.0)) - .5)*.06*g;
       }
       u += (hh(vec2(floor(v*90.0), floor(t*5.0))) > .992 ? .012 : 0.0);   // a line jittering now and then
+      u += wl*(hh(vec2(floor(v*lines*.5), floor(t*10.0) + id)) - .5)*.007;   // wall ads: a faint wobble along the rows
       if (u < 0.0 || u > 1.0) discard;
       vec2 q = vec2(u, v);
       vec3 col = smp(useB, q);
@@ -2780,13 +2784,13 @@ const AIR_HOLO_MAT = new THREE.ShaderMaterial({
       if (g > .9 && hh(vec2(slab, floor(t*12.0))) > .8) col *= .15;           // whole slabs dropping out
       vec3 tint = useB > .5 ? vec3(.3, .9, 1.0) : vec3(.35, .75, 1.0);
       col = col*1.05 + tint*.035;                                              // the sign on a faint sheet of light
-      col *= .74 + .26*step(.5, fract(v*170.0));                              // scanlines
+      col *= mix(.74 + .26*step(.5, fract(v*170.0)), .55 + .45*step(.5, fract(v*lines)), wl);   // scanlines (deeper on the wall ads)
       col += tint*.12*exp(-pow((fract(v*.5 - t*.22) - .5)*10.0, 2.0));       // a band rolling up
       float edge = smoothstep(0.0, .03, u)*smoothstep(1.0, .97, u)*smoothstep(0.0, .03, v)*smoothstep(1.0, .97, v);
       float fl = .9 + .1*sin(t*37.0)*sin(t*11.0);
       if (hh(vec2(floor(t*9.0), id + 5.0)) > .985) fl *= .35;
       float on = litOn(.3, lightsOn, time);
-      gl_FragColor = vec4(col*edge*fl*mix(.4, .8, on), 1.0);
+      gl_FragColor = vec4(col*edge*fl*mix(.4, .8, on)*mix(1.0, 1.4, wl), 1.0);   // the wall ads a little brighter
     }`,
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
 });

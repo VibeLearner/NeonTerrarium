@@ -536,7 +536,7 @@ const GLOW_PTS = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
 });
 const GLOW_FIXED = { red: .95, blue: .85 };
-const GLOW_FLK = { pink: 'neon', cyan: 'neon', amber: 'neon', warm: 'bulb', orange: 'neon', gold: 'neon', ivory: 'neon', lemon: 'neon', rosegold: 'neon', platinum: 'neon', ember: 'neon', sodium: 'neon', hazard: 'neon', orange: 'neon', arc: 'neon', toxic: 'neon', crimson: 'neon', green: 'neon' };   // halos flicker at the same odds as their kind of light
+const GLOW_FLK = { pink: 'neon', cyan: 'neon', amber: 'neon', warm: 'bulb', orange: 'neon', gold: 'neon', ivory: 'neon', lemon: 'neon', rosegold: 'neon', platinum: 'neon', ember: 'neon', sodium: 'neon', hazard: 'neon', orange: 'neon', arc: 'neon', toxic: 'neon', crimson: 'neon', green: 'neon', scarlet: 'neon', rosered: 'neon', blood: 'neon', redorange: 'neon' };   // halos flicker at the same odds as their kind of light
 // light-only kinds: no halo of their own, they only throw light on what's round them (the night-light pass), like
 // the warm spill from the market stalls and lamps across the commercial streets
 const LIGHT_ONLY = { spill: true, spill2: true };

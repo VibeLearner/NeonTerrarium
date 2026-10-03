@@ -115,7 +115,7 @@ const glowTex = (() => { const c=document.createElement('canvas'); c.width=c.hei
   const gr=g.createRadialGradient(16,16,0,16,16,16); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(.3,'rgba(255,255,255,.5)'); gr.addColorStop(1,'rgba(255,255,255,0)');
   g.fillStyle=gr; g.fillRect(0,0,32,32); return new THREE.CanvasTexture(c); })();
 const GLOW = {};
-[['pink',0xFF4FA3],['cyan',0x38E8E0],['amber',0xFFB347],['warm',0xFFCF7A],['blue',0x5ab8ff],['red',0xff2a2a],['blink',0xff2a2a],['orange',0xff6a14],['green',0x4aff7a],['gold',0xffc24a],['ivory',0xfff3dc],['lemon',0xfff25a],['rosegold',0xffaa80],['platinum',0xe2d6ff],['ember',0xff4a2a],['sodium',0xffa23a],['hazard',0xffc21a],['arc',0xcfe6ff],['toxic',0xc6ff3a],['crimson',0xff1a3a],['spill',0x8a5826],['spill2',0x7e4020]].forEach(([k,hex]) => {
+[['pink',0xFF4FA3],['cyan',0x38E8E0],['amber',0xFFB347],['warm',0xFFCF7A],['blue',0x5ab8ff],['red',0xff2a2a],['blink',0xff2a2a],['orange',0xff6a14],['green',0x4aff7a],['gold',0xffc24a],['ivory',0xfff3dc],['lemon',0xfff25a],['rosegold',0xffaa80],['platinum',0xe2d6ff],['ember',0xff4a2a],['sodium',0xffa23a],['hazard',0xffc21a],['arc',0xcfe6ff],['toxic',0xc6ff3a],['crimson',0xff1a3a],['spill',0x8a5826],['spill2',0x7e4020],['scarlet',0xff2a1a],['rosered',0xff3a5a],['blood',0xc8101c],['redorange',0xff5230]].forEach(([k,hex]) => {
   GLOW[k] = new THREE.SpriteMaterial({ map:glowTex, color:hex, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true });
 });
 const NEON_GLOW = new Map([[M.neonPink,'pink'],[M.neonCyan,'cyan'],[M.neonAmber,'amber']]);
@@ -159,7 +159,7 @@ let LUX = null, NO_GREEN = false;   // NO_GREEN: while a bare plot (no greenery)
 const DARK_SUB = { window: toon(0x22303f), bulb: toon(0x3d3226), neon: toon(0x2a2230), trim: toon(0x2c3438) };
 const posHash = (x, y, z) => hash('lit', Math.round(x*20), Math.round(y*20), Math.round(z*20)) % 100;
 function put(geo, mat, m){
-  if (LUX){ const sub = LUX.mats.get(mat); if (sub){ mat = sub; if (LUX.halo) LUX.halo(sub, m); } }
+  if (LUX){ let sub = LUX.mats.get(mat); if (!sub && LUX.auto && mat.userData && mat.userData.glow) sub = LUX.auto(mat); if (sub){ mat = sub; if (LUX.halo) LUX.halo(sub, m); } }
   if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && posHash(m.elements[12], m.elements[13], m.elements[14]) < 82) mat = DARK_SUB[mat.userData.glow];
   let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null, o: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
   const fid = b.f ? (DARK && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow)) : 0;

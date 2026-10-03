@@ -2599,7 +2599,7 @@ function buildCloudPagoda(m){
 M.domeFrame = toon(0x2a2e3c); M.domeNode = toon(0x4a5060); M.domeDrum = toon(0x30323e); M.domeDrum2 = toon(0x3e4252); M.domeFloor = toon(0x1c1a26);
 M.domeNeonA = toon(0x145452, { em:0x38e8e0, kind:'neon' }); M.domeNeonB = toon(0x5a1d4a, { em:0xff4fc8, kind:'neon' });
 M.domeGlass = new THREE.MeshBasicMaterial({ color: 0xb8b0ff, transparent: true, opacity: .13, depthWrite: false, side: THREE.DoubleSide }); M.domeGlass.userData.colorOnly = true;
-M.clubWin = toon(0x40204a, { em:0xc060ff, kind:'window' }); M.clubWin2 = toon(0x1a3a50, { em:0x4ad8ff, kind:'window' });
+M.clubWin = toon(0x40204a, { em:0xc060ff, kind:'window' }); M.clubDoor = toon(0x1c0c16, { em:0x1e0a18, kind:'window' }); /* a dim pink doorway */ M.clubWin2 = toon(0x1a3a50, { em:0x4ad8ff, kind:'window' });
 NEON_GLOW.set(M.domeNeonA, 'cyan'); NEON_GLOW.set(M.domeNeonB, 'pink');
 const DOME_R = 5.45, DOME_H = 4.4, DRUM_H = 1.5;
 // the dome's points, rings of them from the drum up to the top, and its triangles (each ring zipped to the next)
@@ -2677,8 +2677,6 @@ function buildNeonDome(m){
   for (let k=0; k<10; k++){ const a = k*TAU/10; cyl(M.domeFrame, P, Math.cos(a)*GI, gy + .22, Math.sin(a)*GI, .025, .42); }
   { const F = under(P, T(0, 0, -(GI + DOME_R)/2 - .1)); box(M.wood, F, 0, gy + .32, 0, 2.6, .5, .4); box(M.clubWin2, F, 0, gy + .58, .2, 2.5, .03, .02);
     for (let k=0; k<9; k++) box(pick([M.cloth1, M.cloth3, M.cloth4, M.white2]), F, -1.1 + k*.27, gy + .64, -.1, .05, .14, .05); glow(F, 0, gy + .7, .3, 'cyan', 1.2); }
-  for (let k=0; k<22; k++){ const a = rnd(0, TAU), r = rnd(GI + .35, DOME_R - .5); if (Math.sin(a) < -.6 && Math.abs(Math.cos(a)) < .5) continue;
-    figure(P, Math.cos(a)*r, gy + .05, Math.sin(a)*r, pick([M.cloth1, M.cloth3, M.cloth4, M.awn1, M.awn2, M.white2, M.red2])); }
   // ---- inside, down below: the dance floor (drawn live by clubFx), the stage and the DJ, the crowd
   put(U.cyl16, M.domeFloor, under(P, T(0, y0 + .03, 0, 0, 2*GI, .04, 2*GI)));
   { const F = under(P, T(0, 0, -2.6)); box(M.domeDrum2, F, 0, y0 + .25, 0, 2.2, .45, 1.0); box(M.domeNeonA, F, 0, y0 + .2, .51, 2.2, .04, .02);
@@ -2686,15 +2684,14 @@ function buildNeonDome(m){
     figure(F, 0, y0 + .48, -.2, M.frame);
     for (const s of [-1, 1]){ box(M.frame, F, s*1.25, y0 + .75, 0, .45, 1.3, .45); put(U.cyl16, M.metalDark, under(F, T(s*1.25, y0 + .95, .23, 0, .3, .02, .3, PI/2))); }
     box(M.domeFrame, F, 0, y0 + 2.2, -.35, 3.4, 1.6, .08); box(M.screen, F, 0, y0 + 2.2, -.3, 3.2, 1.4, .02); glow(F, 0, y0 + 2.2, 0, 'platinum', 1.8); }
-  for (let k=0; k<26; k++){ const a = rnd(0, TAU), r = rnd(.2, 2.9), x = Math.cos(a)*r, z = Math.sin(a)*r; if (z < -1.8) continue;
-    figure(P, x, y0 + .05, z, pick([M.cloth1, M.cloth3, M.cloth4, M.awn1, M.awn2, M.white2, M.red2, M.awn3])); }
   // ---- outside: the entrance, an arch through the drum on the front, glowing warm inside
   const E = under(P, T(0, 0, DR - .1));
   box(M.domeDrum2, E, 0, y0 + 1.15, .45, 3.0, 2.3, 1.1);
-  box(M.winLit, E, 0, y0 + .75, 1.0, 1.5, 1.4, .02); put(U.cyl16, M.winLit, under(E, T(0, y0 + 1.45, 1.0, 0, 1.5, .02, 1.5, PI/2)));
-  box(M.domeFrame, E, 0, y0 + .05, 1.3, 1.9, .1, .6);
-  for (const s of [-1, 1]){ box(M.domeNeonA, E, s*.82, y0 + .8, 1.02, .04, 1.5, .03); }
-  glow(E, 0, y0 + .9, 1.4, 'warm', 2.0);
+  // the doorway: a dim pink glow from inside (a shutter rolls down over it while the club's shut: see clubFx)
+  box(M.clubDoor, E, 0, y0 + .75, 1.0, 1.5, 1.4, .02); put(U.cyl16, M.clubDoor, under(E, T(0, y0 + 1.45, 1.0, 0, 1.5, .02, 1.5, PI/2)));
+  box(M.domeFrame, E, 0, y0 - .005, 1.3, 1.9, .03, .6);   // a dark mat at the door, flush with the paving
+  for (const s of [-1, 1]){ box(M.domeNeonB, E, s*.82, y0 + .8, 1.02, .04, 1.5, .03); }
+  glow(E, 0, y0 + .8, 1.3, 'pink', .3);
   // the big sign over it, and NIGHTCLUB OPEN 24H under
   box(M.metalDark, E, 0, y0 + 2.72, 1.05, 4.3, 1.15, .14);
   plant('sign_w_neondome', under(E, T(0, 0, 1.13)), 0, y0 + 2.9, 0, 1.5, 'c', true); glow(E, 0, y0 + 2.85, 1.6, 'pink', 2.6);
@@ -2709,13 +2706,10 @@ function buildNeonDome(m){
     plant('sign_w_enter', under(Q, T(0, 0, .05)), -.15, y0 + 1.35, 0, .75, 'c', true);
     box(M.neonCyan, Q, .45, y0 + 1.35, .05, .25, .03, .02); box(M.neonCyan, Q, .52, y0 + 1.41, .05, .12, .03, .02, 0, 0, -.8); box(M.neonCyan, Q, .52, y0 + 1.29, .05, .12, .03, .02, 0, 0, .8);
     glow(Q, 0, y0 + 1.35, .3, 'cyan', 1.2); }
-  // the queue: barriers on posts in a zigzag out front, and people waiting (umbrellas up, it's always about to rain)
-  const posts = [[-1.4, DR + 1.0], [-1.4, DR + 1.6], [1.4, DR + 1.6], [1.4, DR + 2.2], [-1.4, DR + 2.2]];
+  // the queue line: a velvet rope on posts along the front, the queue forming inside it (residents: see people.js)
+  const posts = []; for (let x = 1.05; x <= 4.7; x += .73) posts.push([x, DR + 1.78]);   // (clear of the door, where people come and go)
   for (const [x, z] of posts){ cyl(M.metal, P, x, y0 + .25, z, .03, .5); sph(M.metal, P, x, y0 + .52, z, .045); }
-  for (let k=0; k<posts.length - 1; k++){ const [ax, az] = posts[k], [bx, bz] = posts[k + 1]; if (ax !== bx && az !== bz) continue; strut(M.red2, P, ax, y0 + .45, az, bx, y0 + .45, bz, .025); }
-  for (let k=0; k<14; k++){ const t = k/13, row = Math.floor(t*3), x = (row % 2 ? 1 : -1)*(-1.1 + 2.2*((t*3) % 1)), z = DR + 1.3 + row*.6 + rnd(-.08, .08);
-    figure(P, x, y0, z, pick([M.cloth1, M.cloth3, M.cloth4, M.awn1, M.awn2, M.white2]));
-    if (chance(.55)){ cyl(M.frame, P, x, y0 + .38, z, .006, .2); put(U.cone, pick([M.awn1, M.cloth3, M4.neonPurple, M.awn2, M.cloth1]), under(P, T(x, y0 + .5, z, 0, .36, .08, .36))); } }
+  for (let k=0; k<posts.length - 1; k++){ const [ax, az] = posts[k], [bx, bz] = posts[k + 1]; strut(M.red2, P, ax, y0 + .45, az, bx, y0 + .45, bz, .025); }
   // a bar kiosk and a snack stand either side of the front
   for (const s of [-1, 1]){
     const Q = under(P, T(s*5.3, 0, 5.3, s > 0 ? -PI/4 : PI/4));
@@ -2725,7 +2719,6 @@ function buildNeonDome(m){
     box(M.metalDark, Q, 0, y0 + 1.75, .55, 1.5, .4, .06);
     plant(s > 0 ? 'sign_w_bar' : 'sign_w_snacks', under(Q, T(0, 0, .6)), 0, y0 + 1.75, 0, .72, 'c', true);
     glow(Q, 0, y0 + 1.75, .9, s > 0 ? 'blue' : 'pink', 1.3); glow(Q, 0, y0 + .7, 1.0, 'warm', 1.2);
-    for (let k=0; k<3; k++) figure(Q, rnd(-.6, .6), y0, rnd(1.0, 1.5), pick([M.cloth1, M.cloth3, M.cloth4, M.awn3]));
     emitters.push(new THREE.Vector3(.4, y0 + 1.6, 0).applyMatrix4(Q));
   }
   // planters by the door, and the odd bush round the drum
@@ -2733,19 +2726,27 @@ function buildNeonDome(m){
   for (let k=0; k<8; k++){ const a = rnd(PI*.75, PI*2.25), r = DR + .45; plant(pick(['bush', 'g_fern2', 'bamboo']), P, Math.cos(a)*r, y0, Math.sin(a)*r, rnd(.7, .95)); }
   for (const [sx, sz] of [[-1, -1], [1, -1]]) { const Q = under(P, T(sx*(H - .8), 0, sz*(H - .8))); box(M.concM, Q, 0, y0 + .2, 0, .9, .4, .9); plant(pick(['bonsai', 'bamboo']), Q, 0, y0 + .4, 0, 1.1); }
   // where clubFx draws: the dance floor, the light rig at the top
-  m.club = { m: P.elements.slice(), floorR: GI - .15, floorY: y0 + .07, rigY: yb + DOME_H - .7 };
+  m.club = { m: P.elements.slice(), floorR: GI - .15, floorY: y0 + .07, rigY: yb + DOME_H - .7, GI, gy: gy + .05, DR, outer: DOME_R, door: [0, DR + 1.0],
+             kiosks: [-1, 1].map(s => ({ x: s*5.3, z: 5.3, ry: s > 0 ? -PI/4 : PI/4 })) };
   m.roofH = yb + DOME_H;
   m.top = yb + DOME_H + 1.2;
 }
 // The club's moving lights: the dance floor's tiles light up in patterns to a 124 bpm beat, a mirror ball turns
 // under the rig throwing glints, and four coloured beams sweep round the floor.
+// open from seven in the evening until four in the morning
+const clubOpenAt = h => h >= 19 || h < 4;
 function clubFx(m){
   const c = m.club; if (!c) return null;
   const root = new THREE.Group(); root.matrixAutoUpdate = false; root.matrix.fromArray(c.m); root.matrixWorldNeedsUpdate = true; scene.add(root);
-  const u = { time: { value: 0 } };
+  // the shutter over the doorway while it's shut: dark slats, rolled down
+  const shutMat = new THREE.MeshLambertMaterial({ color: 0x2a2c34 });
+  const shutter = new THREE.Group(); root.add(shutter);
+  for (let k=0; k<8; k++){ const sl = new THREE.Mesh(new THREE.BoxGeometry(1.56, .17, .04), shutMat); sl.position.set(0, CURB + .1 + k*.18, c.door[1] + .07); shutter.add(sl); }
+  shutter.traverse(o => { if (o.isMesh) o.layers.set(0); });
+  const u = { time: { value: 0 } }, floorOn = { value: 1 }; u.lit = floorOn;
   const floorMat = new THREE.ShaderMaterial({ uniforms: u, transparent: false,
     vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `uniform float time; varying vec2 vP;
+    fragmentShader: `uniform float time, lit; varying vec2 vP;
       float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)))*43758.5453); }
       void main(){
         vec2 cell = floor(vP/.42), f = fract(vP/.42);
@@ -2759,7 +2760,7 @@ function clubFx(m){
         vec3 col = k < .5 ? c1 : k < 1.5 ? c2 : c3;
         float edge = step(.08, f.x)*step(.08, f.y)*step(f.x, .92)*step(f.y, .92);
         float pulse = 1.0 - fract(time*124.0/60.0)*.45;
-        gl_FragColor = vec4(mix(vec3(.05, .04, .08), col*pulse, on*edge), 1.0);
+        gl_FragColor = vec4(mix(vec3(.05, .04, .08), col*pulse, on*edge*lit), 1.0);
       }` });
   const floor = new THREE.Mesh(new THREE.CircleGeometry(c.floorR, 40), floorMat);
   floor.rotation.x = -PI/2; floor.position.set(0, c.floorY, 0); floor.layers.set(1); floor.renderOrder = 2; root.add(floor);
@@ -2784,7 +2785,9 @@ function clubFx(m){
     update(dt, time){
       u.time.value = time;
       ball.rotation.y = time*.8;
-      const night = 1;   // the club runs day and night
+      const open = clubOpenAt(S.hour), night = open ? 1 : 0;
+      shutter.visible = !open; floorOn.value = open ? 1 : 0;
+      for (const B of beams){ B.b.visible = B.spot.visible = open; }
       for (const g of glints){ const a = g.a + time*.8, f = .5 + .5*Math.sin(time*6 + g.ph);
         g.s.position.set(Math.cos(a)*g.r, c.floorY + .05 + (g.r - 1.2)*.6, Math.sin(a)*g.r); g.s.material.opacity = f*.8*night; }
       for (const B of beams){
@@ -2798,7 +2801,7 @@ function clubFx(m){
       }
     },
     dispose(){ scene.remove(root); floor.geometry.dispose(); floorMat.dispose(); ball.geometry.dispose(); ball.material.dispose(); rod.geometry.dispose(); rod.material.dispose();
-      for (const g of glints) g.s.material.dispose(); beamGeo.dispose(); for (const B of beams){ B.mat.dispose(); B.spot.material.dispose(); } }
+      for (const g of glints) g.s.material.dispose(); beamGeo.dispose(); shutMat.dispose(); shutter.traverse(o => { if (o.geometry) o.geometry.dispose(); }); for (const B of beams){ B.mat.dispose(); B.spot.material.dispose(); } }
   };
 }
 

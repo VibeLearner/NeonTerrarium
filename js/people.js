@@ -19,9 +19,9 @@
 // without their own gesture sheet sway through their idle frames) and 4 sitting; cells 20 to 31 are extra
 // animations (the police officer's scanner and angry reaction). Row 12 is the police officer, row 13 the old delivery
 // robot (walk 0-3, alternate walk 4-7, parcel drop 8-13, the parcel capsule opening 14-19), row 14 the emote icons.
-const PPL = { rows: 15, cw: 12, ch: 16, walk: 6, idle: 4, W: 384, H: 240 };
+const PPL = { rows: 16, cw: 12, ch: 16, walk: 6, idle: 4, W: 384, H: 256 };
 const F_IDLE = 6, F_SPEC = 10, F_SIT = 16, F_USE = 20, F_ANGRY = 26;
-const ROW_COP = 12, ROW_BOT = 13, ROW_EMO = 14, CITIZEN_ROWS = 12;
+const ROW_COP = 12, ROW_BOT = 13, ROW_EMO = 14, ROW_BOUNCER = 15, CITIZEN_ROWS = 12;   // row 15: the officer redrawn in black, the club's bouncers
 const EMO = { bang: 0, quest: 1, heart: 2, anger: 3, sweat: 4, note: 5, dots: 6, bowl: 7 };
 const PPL_TEX = new THREE.TextureLoader().load('assets/sprites/people.png');
 PPL_TEX.magFilter = PPL_TEX.minFilter = THREE.NearestFilter; PPL_TEX.generateMipmaps = false;
@@ -79,7 +79,7 @@ const pplMesh = spriteBatch(PPL_MAT, PPL_MAX);
 // The delivery drones: a little round hover drone with a parcel strapped on, drawn from eight views
 // (assets/sprites/ddrone.png: 22 x 19 px cells; 0 heading away from the camera, then clockwise round to 7, and
 // cell 8 the parcel set down on the doorstep).
-const DD = { W: 198, H: 19, cw: 22, ch: 19, parcel: 8 };
+const DD = { W: 242, H: 19, cw: 22, ch: 19, parcel: 8, puke: 9, puddle: 10 };   // 9, 10: the club's leftovers (see pukes)
 const DD_TEX = new THREE.TextureLoader().load('assets/sprites/ddrone.png');
 DD_TEX.magFilter = DD_TEX.minFilter = THREE.NearestFilter; DD_TEX.generateMipmaps = false;
 const DD_MAX = 80, DD_MAT = spriteMat(DD_TEX, DD.W, DD.H, DD.cw, DD.ch, 1);
@@ -351,7 +351,7 @@ const MEGA_LIFE = {
   foundry: { jobs: 14, fun: 0,  night: .35 },
   market:  { jobs: 10, fun: 14 },             // the market mall: shopkeepers inside, plenty of shoppers
   pagoda:  { jobs: 12, fun: 10, night: .2 },  // the cloud pagoda: a luxury hotel and spa
-  club:    { jobs: 10, fun: 24, night: .6 },  // the Neon Dome: bar staff, DJs and door staff, mostly at night; a big draw
+  club:    { jobs: 10, fun: 0, night: .6 },   // the Neon Dome: bar staff and DJs, mostly at night (its crowd is brought out by the night: see updateClubs)
 };
 const places = new Map();   // id -> { id, x, z, doors: [{ node, out:{x,z}, in:{x,z}|null, dir:[dx,dz] }], jobs, fun, open, night, cell|mega }
 const people = new Map();   // id -> person
@@ -471,6 +471,12 @@ function buildNetwork(){
       }
       for (const [k, st] of pl.stalls) if (!st.keepers.length || !st.queue.length) pl.stalls.delete(k);
       pl.jobs = pl.stalls.size;
+    } else if (m.kind === 'club' && m.club){
+      // the club has the one way in: its arched entrance (drawn with the building, so no door panel)
+      const e = m.club.m, W = (x, z) => ({ x: e[0]*x + e[8]*z + e[12], z: e[2]*x + e[10]*z + e[14] }), fx = e[8], fz = e[10], fl = Math.hypot(fx, fz) || 1;
+      const DRc = m.club.DR, d = { wall: W(-.2, DRc + 1.0), stand: W(-.4, DRc + 1.45), inside: W(-.2, DRc + .7), n: [fx/fl, fz/fl], noDraw: true };
+      const b = m.cells.find(q => q.i === Math.round(d.stand.x/LOT) && q.j === Math.round(d.stand.z/LOT)) || m.cells[0], key = 'd:' + m.id + ':entrance';
+      pl.doors.push(makeDoor(key, d, true, oldDoors.get(key))); addEnd(b, { key, x: d.stand.x, z: d.stand.z, kind: 'd' });
     } else {
       // doors on the walls that face the street, up to three, spread round the building
       const cand = [];
@@ -740,7 +746,8 @@ function startTrip(p, toId){
   else { if (!from.doors.length) return false; dA = nearestOf(from.doors, to.x, to.z); a = dA.node; head = [[dA.inside.x, dA.inside.z], [dA.wall.x, dA.wall.z]]; }
   let b, tail = [], dB = null, spot = null;
   if (to.open){ spot = pickSpot(to, from, p); if (!spot || spot === p.spot) return false; b = spot.node; tail = [[spot.ax, spot.az], [spot.x, spot.z]]; }
-  else { if (!to.doors.length) return false; dB = nearestOf(to.doors, from.x, from.z); b = dB.node; tail = [[dB.wall.x, dB.wall.z], [dB.inside.x, dB.inside.z]]; }
+  else { if (!to.doors.length) return false; dB = nearestOf(to.doors, from.x, from.z); b = dB.node; tail = [[dB.wall.x, dB.wall.z], [dB.inside.x, dB.inside.z]];
+    if (to.mega && to.mega.kind === 'club' && p.clubbing){ tail = []; dB = null; } }   // club-goers stop outside: the queue's next (see clubArrive)
   const mid = route(a, b); if (!mid) return false;
   const base = head.concat(mid, tail), pts = p.cop ? base : spreadPath(p, base, head.length, base.length - 1 - tail.length);
   const cum = [0];
@@ -777,6 +784,7 @@ function startPatrol(p, forced){
 }
 // decide what to do next once the current stay is over
 function decide(p){
+  if (p.club) return;   // out at the club: the night decides (see updateClubs)
   if (p.cop && working(p, S.hour) && desire(p, S.hour) === p.job && (p.patrol || p.at === p.job)){
     const back = p.patrol && pplRand() < .15;   // back to the station for a bit
     if (!back && (p.patrol || pplRand() < .85) && startPatrol(p)) return;
@@ -800,9 +808,10 @@ function arrive(p){
   p.at = w.to; p.spot = w.spot;
   if (p.spot && p.spot.kind === 'queue') p.chain = 'eat';
   const pl = places.get(p.at);
+  if (p.clubbing && pl && pl.mega && pl.mega.kind === 'club' && clubArrive(p, pl)) return;
   p.until = pplNow + (pl ? stayFor(p, pl) : 20);
 }
-const sendHome = p => { if (p.spot && p.spot.by === p.id) p.spot.by = null; p.chain = null; p.patrol = null; p.rush = false; p.hurry = false; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
+const sendHome = p => { p.club = null; p.clubbing = false; if (p.spot && p.spot.by === p.id) p.spot.by = null; p.chain = null; p.patrol = null; p.rush = false; p.hurry = false; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
 
 /* ---------- keeping up with the city ---------- */
 let pplReady = false, pplNow = 0, pplHour = S.hour, pplCursor = 0, pplList = [];
@@ -823,6 +832,7 @@ function syncPeople(){
       if (w.spot){ const sp = spotByKey.get(w.spot.key); if (sp && (!sp.by || sp.by === p.id)){ sp.by = p.id; w.spot = sp; } else { sendHome(p); continue; } }
       if (w.beat){ const n = NG.key.get(w.beat.key); if (n === undefined){ sendHome(p); continue; } w.beat.node = n; }
     } else if (!places.has(p.at)) sendHome(p);
+    else if (p.club){ const pl = places.get(p.club.id); if (!pl || !pl.mega || !pl.mega.club) sendHome(p); }
     else if (p.patrol){ const n = NG.key.get(p.patrol.key); if (n === undefined) sendHome(p); else p.patrol.node = n; }
     else if (p.spot){ const sp = spotByKey.get(p.spot.key); if (sp && (!sp.by || sp.by === p.id)){ sp.by = p.id; p.spot = sp; } else sendHome(p); }
   }
@@ -1019,6 +1029,201 @@ function updateLurkers(dt, t){
   }
 }
 
+/* ---------- the Neon Dome's nights ---------- */
+// The club opens at seven in the evening (see clubOpenAt in mega.js). Each time it opens it decides what sort of
+// night it'll be: packed, a decent crowd, or near empty, and residents who are home and free come out for it.
+// Arriving, some stop at the bar kiosk or the snack stand first (more of them on a busy night); then they join the
+// queue along the rope. Two bouncers on the door check each one's ID: most go in, now and then one is turned away
+// and shoved off. Inside they dance, on the floor or up on the gallery, until they've had enough; then they walk
+// out the door and home, and a few stop by the side of the path to throw up first. Now and then a bouncer goes in
+// and walks someone out. At closing time (four in the morning) everyone still inside drifts out.
+const CLUB_MODES = { packed: { target: 55, every: .7, kiosk: .45, stay: [90, 200], sick: .22 },
+                     decent: { target: 24, every: 1.6, kiosk: .3, stay: [60, 140], sick: .12 },
+                     empty:  { target: 4,  every: 7, kiosk: .15, stay: [30, 80], sick: .05 } };
+const clubs = new Map();   // club place id -> its night
+const pukes = [];          // { x, z, t0 } puddles on the paving
+const CLUB_Q = 11;         // places in the queue
+function clubW(m, x, z){ const e = m.club.m; return [e[0]*x + e[8]*z + e[12], e[2]*x + e[10]*z + e[14]]; }
+function clubDir(m, x, z){ const e = m.club.m; return [e[0]*x + e[8]*z, e[2]*x + e[10]*z]; }
+function clubOf(pl){
+  let s = clubs.get(pl.id);
+  if (!s){ s = { pl, open: false, mode: null, next: 0, queue: [], checkAt: 0, escortAt: 0, bouncers: [-1, 1].map(side => ({ side, state: 'post', t0: 0, x: 0, z: 0, flip: 1 })) }; clubs.set(pl.id, s); }
+  s.pl = pl; return s;
+}
+const clubMembers = s => pplList.filter(p => p.club && p.club.id === s.pl.id);
+// someone free to come out: home, awake or not (it's a night out), not working, not police
+const clubCandidate = p => !p.walk && !p.club && !p.cop && !p.chain && p.at === p.home && !working(p, S.hour) && places.has(p.home);
+// a trip that starts where they stand, joining the network at a door (out of the queue, shoved away, escorted)
+function startTripAt(p, x, z, fromDoor, toId){
+  const to = places.get(toId); if (!to || !reachable(to) || !fromDoor) return false;
+  let b, tail = [], dB = null, spot = null;
+  if (to.open){ spot = pickSpot(to, { x, z }, p); if (!spot) return false; b = spot.node; tail = [[spot.ax, spot.az], [spot.x, spot.z]]; }
+  else { if (!to.doors.length) return false; dB = nearestOf(to.doors, x, z); b = dB.node; tail = [[dB.wall.x, dB.wall.z], [dB.inside.x, dB.inside.z]]; }
+  const mid = route(fromDoor.node, b); if (!mid) return false;
+  const head = [[x, z]], base = head.concat(mid, tail), pts = spreadPath(p, base, head.length, base.length - 1 - tail.length), cum = [0];
+  for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+  if (spot) spot.by = p.id;
+  p.walk = { pts, base, cum, len: cum[cum.length - 1], s: 0, to: toId, doorA: null, doorB: dB, spot, safe0: cum[head.length], safe1: cum[pts.length - 1 - tail.length] };
+  return true;
+}
+function clubRelease(p, how){
+  const c = p.club; if (!c) return;
+  const s = clubs.get(c.id), pl = places.get(c.id), m = pl && pl.mega;
+  if (s){ const k = s.queue.indexOf(p); if (k >= 0) s.queue.splice(k, 1); }
+  p.club = null; p.clubbing = false; p.at = c.id; p.until = pplNow + 5;
+  if (!pl || !m){ sendHome(p); return; }
+  const door = pl.doors[0];
+  if (how === 'inside'){   // out through the door and home, maybe feeling it
+    if (startTrip(p, p.home)){ const sick = CLUB_MODES[(s && s.mode) || 'decent'].sick; if (pplRand() < sick) p.walk.puke = { at: 1.4 + pplRand()*1.6 }; }
+    else sendHome(p);
+    return;
+  }
+  if (!startTripAt(p, p.x, p.z, door, p.home)) sendHome(p);
+  else if (how === 'shoved' || how === 'escorted'){ p.hurry = true; emote(p, 'anger', 2.4); }
+}
+// a resident has walked up to the club
+function clubArrive(p, pl){
+  const s = clubOf(pl), m = pl.mega, mode = CLUB_MODES[s.mode || 'decent'];
+  if (!s.open || !m || !m.club){ p.clubbing = false; p.until = pplNow; return false; }
+  p.club = { id: pl.id, stage: 'toQueue', t0: pplNow, style: Math.floor(pplRand()*3), ph: pplRand()*10 };
+  p.until = Infinity;
+  if (pplRand() < mode.kiosk){
+    const k = m.club.kiosks[Math.floor(pplRand()*m.club.kiosks.length)];
+    const a = k.ry, fx = Math.sin(a), fz = Math.cos(a), sx = Math.cos(a), sz = -Math.sin(a), d = 1.15 + pplRand()*.8, o = (pplRand() - .5)*1.6;
+    p.club.stage = 'kiosk'; p.club.lx = k.x + fx*d + sx*o; p.club.lz = k.z + fz*d + sz*o; p.club.face = [-fx, -fz];
+    p.club.until = pplNow + 12 + pplRand()*25;
+  } else s.queue.push(p);
+  return true;
+}
+// the queue's places: from the door along the rope
+const queueSlot = (m, k) => [.45 + k*.38, m.club.DR + 1.42];
+function clubDancePos(m){
+  const c = m.club;
+  for (let tries = 0; tries < 20; tries++){
+    if (pplRand() < .6){ const a = pplRand()*TAU, r = Math.sqrt(pplRand())*(c.floorR - .35), x = Math.cos(a)*r, z = Math.sin(a)*r; if (z < -1.7) continue; return [x, z, c.floorY]; }
+    const a = pplRand()*TAU, r = c.GI + .35 + pplRand()*(c.outer - c.GI - .85), x = Math.cos(a)*r, z = Math.sin(a)*r;
+    if (z < -c.GI && Math.abs(x) < 1.6) continue;   // the bar
+    return [x, z, c.gy];
+  }
+  return [0, 0, c.floorY];
+}
+function updateClubs(dt, t){
+  const open = clubOpenAt(S.hour);
+  for (const id of [...clubs.keys()]) if (!places.has(id)) clubs.delete(id);   // taken down
+  for (const pl of places.values()){
+    if (!pl.mega || pl.mega.kind !== 'club' || !pl.mega.club || !pl.doors.length) continue;
+    const s = clubOf(pl), m = pl.mega, c = m.club;
+    // opening time: what sort of night is it?
+    if (open && !s.open){ s.open = true; s.mode = ['packed', 'decent', 'empty'][Math.floor(pplRand()*3)]; s.next = t + 2; s.escortAt = t + 40 + pplRand()*60;
+      logEvent({ kind: 'club', night: s.mode, x: m.x, z: m.z }); }
+    if (!open && s.open){ s.open = false;   // closing: out they go, the ones inside a few at a time
+      for (const p of clubMembers(s)){ if (p.club.stage === 'inside') p.club.until = t + pplRand()*25; else clubRelease(p, 'queue'); } }
+    const mode = CLUB_MODES[s.mode || 'decent'], members = clubMembers(s);
+    // bring people out until the night's crowd is reached
+    if (s.open && t >= s.next){
+      s.next = t + mode.every*(.6 + pplRand()*.8);
+      const coming = pplList.filter(p => p.clubbing && !p.club && p.walk && p.walk.to === pl.id).length;
+      if (members.length + coming < mode.target){
+        const cand = pplList.filter(clubCandidate);
+        if (cand.length){ const p = cand[Math.floor(pplRand()*cand.length)]; p.clubbing = true; if (!startTrip(p, pl.id)) p.clubbing = false; }
+      }
+    }
+    // the queue: everyone steps up to their place; the one at the front is checked
+    s.queue = s.queue.filter(p => p.club && p.club.id === pl.id && (p.club.stage === 'toQueue' || p.club.stage === 'queue' || p.club.stage === 'check'));
+    s.queue.forEach((p, k) => { const [qx, qz] = queueSlot(m, Math.min(k, CLUB_Q - 1)); p.club.lx = qx; p.club.lz = qz + (k >= CLUB_Q ? (k - CLUB_Q + 1)*.25 : 0); p.club.face = [-1, 0]; });
+    const [bR, bL] = [s.bouncers[1], s.bouncers[0]];
+    const front = s.queue[0];
+    if (front && s.open && front.club.stage === 'queue' && bR.state === 'post' && t >= s.checkAt){
+      front.club.stage = 'check'; front.club.t0 = t; front.club.face = [1, -.4]; bR.state = 'check'; bR.t0 = t;
+    }
+    if (bR.state === 'check' && t - bR.t0 > 2.2){
+      const q = front && front.club && front.club.stage === 'check' ? front : null;
+      if (q && pplRand() < .88){ q.club.stage = 'enter'; q.club.t0 = t; s.queue.shift(); bR.state = 'post'; s.checkAt = t + .6 + pplRand()*1.2; }
+      else { bR.state = 'shove'; bR.t0 = t; if (q){ q.club.stage = 'shoved'; q.club.t0 = t; s.queue.shift(); emote(q, 'bang', 1.2); } s.checkAt = t + 2.5; }
+    }
+    if (bR.state === 'shove' && t - bR.t0 > 1.4) bR.state = 'post';
+    // now and then a bouncer goes in and walks someone out
+    const inside = members.filter(p => p.club.stage === 'inside');
+    if (s.open && bL.state === 'post' && inside.length >= 6 && t >= s.escortAt){ bL.state = 'goIn'; bL.t0 = t; }
+    if (bL.state === 'goIn' && t - bL.t0 > 1.6){ bL.state = 'in'; bL.t0 = t; }
+    if (bL.state === 'in' && t - bL.t0 > 3.5){
+      const v = inside[Math.floor(pplRand()*inside.length)];
+      if (v){ v.club.stage = 'escorted'; v.club.t0 = t; bL.state = 'escort'; bL.t0 = t; bL.victim = v; } else bL.state = 'back';
+    }
+    if (bL.state === 'escort' && t - bL.t0 > 3.0){ bL.state = 'eject'; bL.t0 = t; }
+    if (bL.state === 'eject' && t - bL.t0 > 1.3){ const v = bL.victim; bL.victim = null; if (v && v.club) clubRelease(v, 'escorted'); bL.state = 'back'; bL.t0 = t; s.escortAt = t + 70 + pplRand()*90; }
+    if (bL.state === 'back' && t - bL.t0 > 2.6) bL.state = 'post';
+    // everyone else
+    for (const p of members){
+      const k = p.club; if (!k) continue;   // (walked out by a bouncer just now)
+      if (k.stage === 'kiosk' && t > k.until){ k.stage = 'toQueue'; s.queue.push(p); }
+      else if (k.stage === 'toQueue'){ const qi = s.queue.indexOf(p); if (qi >= 0 && Math.hypot((k.x ?? 0) - k.lx, (k.z ?? 0) - k.lz) < .05) k.stage = 'queue'; }
+      else if (k.stage === 'enter' && t - k.t0 > 1.4){ const [x, z, y] = clubDancePos(m); k.stage = 'inside'; k.lx = x; k.lz = z; k.ly = y; k.until = t + mode.stay[0] + pplRand()*(mode.stay[1] - mode.stay[0]); }
+      else if (k.stage === 'inside' && t > k.until) clubRelease(p, 'inside');
+      else if (k.stage === 'shoved' && t - k.t0 > 1.0) clubRelease(p, 'shoved');
+      else if ((k.stage === 'queue' || k.stage === 'toQueue' || k.stage === 'kiosk') && !s.open) clubRelease(p, 'queue');
+    }
+  }
+  for (let k = pukes.length - 1; k >= 0; k--) if (t - pukes[k].t0 > 40) pukes.splice(k, 1);
+}
+// where a club-goer is and how they look right now: { x, y, z, frame, flip, alpha } or null (out of sight)
+function clubPose(p, t, dt){
+  const k = p.club, pl = places.get(k.id), m = pl && pl.mega; if (!m || !m.club) return null;
+  const c = m.club, beat = t*124/60;
+  const facing = (fx, fz) => { const [wx, wz] = clubDir(m, fx, fz), sd = wx*_camR.x + wz*_camR.z; return Math.abs(sd) > 1e-3 ? (sd < 0 ? -1 : 1) : p.flip; };
+  if (k.x === undefined){ const e = c.m, ix = e[0]*(p.x - e[12]) + e[2]*(p.z - e[14]), iz = e[8]*(p.x - e[12]) + e[10]*(p.z - e[14]); k.x = ix; k.z = iz; }   // where they walked up, in the club's own frame
+  const stepTo = (tx, tz, speed) => { const dx = tx - k.x, dz = tz - k.z, d = Math.hypot(dx, dz); if (d < 1e-3) return false; const st = Math.min(d, speed*dt); k.x += dx/d*st; k.z += dz/d*st; k.dx = dx; k.dz = dz; return true; };
+  let y = CURB, frame = F_IDLE + Math.floor(t*2.5 + k.ph) % PPL.idle, flip = p.flip, alpha = 1;
+  if (k.stage === 'inside'){
+    k.x = k.lx; k.z = k.lz; y = k.ly;
+    if (k.style === 0){ frame = F_IDLE + Math.floor(beat*2 + k.ph) % PPL.idle; y += .045*Math.abs(Math.sin(beat*PI)); flip = Math.floor(beat/2 + k.ph) % 2 ? 1 : -1; }
+    else if (k.style === 1){ frame = F_SPEC + Math.floor(beat*2 + k.ph) % 6; flip = Math.floor(beat + k.ph) % 2 ? 1 : -1; y += .02*Math.abs(Math.sin(beat*PI)); }
+    else { frame = Math.floor(beat*4 + k.ph) % PPL.walk; const sw = Math.sin(beat*PI*.5 + k.ph); k.x = k.lx + _camR.x*.06*sw; k.z = k.lz + _camR.z*.06*sw; flip = Math.cos(beat*PI*.5 + k.ph) > 0 ? 1 : -1; }
+    if (!(p.emoUntil > t) && pplRand() < dt*.02) emote(p, pplRand() < .6 ? 'note' : 'heart', 1.8);
+  }
+  else if (k.stage === 'escorted'){   // walked out beside the bouncer, then stood there being told
+    const b = clubs.get(k.id).bouncers[0];
+    k.x = b.x + .35; k.z = b.z + .1; frame = b.state === 'escort' ? Math.floor(t*8) % PPL.walk : F_IDLE + Math.floor(t*2) % PPL.idle; flip = b.flip;
+    alpha = b.state === 'escort' ? Math.min(1, (t - b.t0)/.5) : 1;
+    if (b.state === 'eject' && !(p.emoUntil > t)) emote(p, 'sweat', 1.5);
+  }
+  else if (k.stage === 'enter'){ const [dx, dz] = c.door; const moving = stepTo(dx, dz, .6); frame = moving ? Math.floor(t*9 + k.ph) % PPL.walk : frame; flip = facing(k.dx || 0, k.dz || -1); alpha = Math.max(0, 1 - (t - k.t0)/1.3); }
+  else if (k.stage === 'shoved'){   // stumbling back from the door
+    if (k.sx === undefined){ k.sx = k.x + .8; k.sz = k.z + .45; }
+    stepTo(k.sx, k.sz, 2.4); frame = F_IDLE; flip = facing(-1, -.4); }
+  else {   // walking up to the queue or the kiosk, or waiting there
+    const moving = stepTo(k.lx, k.lz, .55);
+    if (moving){ frame = Math.floor(t*9 + k.ph) % PPL.walk; flip = facing(k.dx, k.dz); }
+    else { flip = facing(k.face[0], k.face[1]);
+      if (k.stage === 'check') frame = F_SPEC + Math.floor(t*5) % 6;   // handing over the ID
+      else if (k.stage === 'kiosk') frame = Math.floor(t*.4 + k.ph) % 3 === 0 ? F_SPEC + Math.floor(t*6 + k.ph) % 6 : frame;
+      if (k.stage === 'queue' && !(p.emoUntil > t) && pplRand() < dt*.015) emote(p, 'dots', 1.8); }
+  }
+  const [wx, wz] = clubW(m, k.x, k.z);
+  return { x: wx, y, z: wz, frame, flip, alpha };
+}
+// the two bouncers, drawn by the door
+function drawBouncers(emit, t, dt){
+  for (const s of clubs.values()){
+    const pl = s.pl, m = pl && pl.mega; if (!m || !m.club || !places.has(pl.id)) continue;
+    const c = m.club, door = c.door;
+    for (const b of s.bouncers){
+      const post = [b.side*.95, c.DR + 1.15];
+      let lx = post[0], lz = post[1], frame = F_IDLE + Math.floor(t*2 + (b.side > 0 ? 1.3 : 0)) % PPL.idle, alpha = 1, face = [0, 1];
+      if (b.state === 'check'){ frame = F_USE + Math.floor((t - b.t0)*6) % 6; face = [1, .3]; }
+      else if (b.state === 'shove'){ frame = F_ANGRY + Math.min(5, Math.floor((t - b.t0)*7)); face = [1, .3]; }
+      else if (b.state === 'goIn'){ const u = Math.min(1, (t - b.t0)/1.6); lx = post[0] + (door[0] - post[0])*u; lz = post[1] + (door[1] - post[1])*u; frame = Math.floor(t*8) % PPL.walk; alpha = 1 - Math.max(0, (u - .6)/.4); face = [door[0] - post[0], door[1] - post[1]]; }
+      else if (b.state === 'in') alpha = 0;
+      else if (b.state === 'escort'){ const u = Math.min(1, (t - b.t0)/3.0), tx = -2.4, tz = c.DR + 2.1; lx = door[0] + (tx - door[0])*u; lz = door[1] + (tz - door[1])*u; frame = Math.floor(t*8) % PPL.walk; alpha = Math.min(1, (t - b.t0)/.5); face = [tx - door[0], tz - door[1]]; }
+      else if (b.state === 'eject'){ lx = -2.4; lz = c.DR + 2.1; frame = F_ANGRY + Math.min(5, Math.floor((t - b.t0)*7)); face = [1, 0]; }
+      else if (b.state === 'back'){ const u = Math.min(1, (t - b.t0)/2.6), fx0 = -2.4, fz0 = c.DR + 2.1; lx = fx0 + (post[0] - fx0)*u; lz = fz0 + (post[1] - fz0)*u; frame = u < 1 ? Math.floor(t*8) % PPL.walk : frame; face = [post[0] - fx0, post[1] - fz0]; }
+      b.x = lx; b.z = lz;
+      const [wx, wz] = clubW(m, lx, lz), [fx, fz] = clubDir(m, face[0], face[1]), sd = fx*_camR.x + fz*_camR.z; if (Math.abs(sd) > 1e-3) b.flip = sd < 0 ? -1 : 1;
+      if (alpha > 0) emit(wx, CURB, wz, ROW_BOUNCER, frame, b.flip, alpha >= 1 ? 1 : alpha*.98);
+    }
+  }
+}
+
 /* ---------- bumping into each other, and emotes ---------- */
 function emote(p, kind, dur = 2.2){ p.emo = EMO[kind]; p.emoUntil = pplNow + dur; }
 // Walkers (and bots) coming at each other on a narrow path sometimes bump: both stop for a moment and react, with
@@ -1115,6 +1320,7 @@ function updatePeople(dt, t){
   _camR.set(1, 0, 0).applyQuaternion(cam.quaternion);
   updateBots(dt, t);
   updateLurkers(dt, t);
+  updateClubs(dt, t);
   checkBumps(t);
   // fill the draw batch with everyone on show
   const pos = pplMesh.geometry.attributes.aPos, spr = pplMesh.geometry.attributes.aSpr, P = pos.array, Q = spr.array;
@@ -1137,6 +1343,9 @@ function updatePeople(dt, t){
     const paused = p.pause > t;
     if (p.walk){
       const w = p.walk; if (!paused) w.s += dt*p.speed*(p.rush ? 2.3 : p.hurry ? 1.6 : 1);
+      if (w.puke && !w.puke.t0 && w.s >= w.puke.at){   // stops by the side of the path and throws up
+        w.puke.t0 = t; p.pause = t + 3.6; const L = Math.hypot(p.dx || 0, p.dz || 0) || 1, sx = -(p.dz || 0)/L, sz = (p.dx || 0)/L;
+        w.puke.x = p.x + sx*.22; w.puke.z = p.z + sz*.22; emote(p, 'sweat', 1.6); }
       if (w.s >= w.len){ arrive(p); if (!p.spot && !p.patrol) continue; }
       else {
         walking = true;
@@ -1154,7 +1363,10 @@ function updatePeople(dt, t){
       }
     }
     if (!walking){
-      if (p.patrol){
+      if (p.club){
+        const r = clubPose(p, t, dt); if (!r) continue;
+        p.x = r.x; p.z = r.z; y = r.y; frame = r.frame; p.flip = r.flip; alpha = r.alpha;
+      } else if (p.patrol){
         // on the beat: standing at a crossing, now and then scanning with the handheld
         p.x = p.patrol.x; p.z = p.patrol.z;
         frame = Math.floor(t*.3 + p.phase) % 2 ? F_USE + Math.floor(t*6 + p.phase) % 6 : F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
@@ -1185,10 +1397,15 @@ function updatePeople(dt, t){
       }
     }
     if (walking) frame = paused ? F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle : Math.floor(t*9*p.speed/PPL_SPEED*(p.rush ? 2 : p.hurry ? 1.5 : 1) + p.phase) % PPL.walk;
+    if (walking && paused && p.walk.puke && p.walk.puke.t0 && t - p.walk.puke.t0 < 3.6){
+      const u = t - p.walk.puke.t0; frame = F_SPEC + Math.floor(u*5) % 6;   // doubled over, heaving
+      const sd = (p.walk.puke.x - p.x)*_camR.x + (p.walk.puke.z - p.z)*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
+      if (u > .8 && !p.walk.puke.left){ p.walk.puke.left = true; pukes.push({ x: p.walk.puke.x, z: p.walk.puke.z, t0: t, sx: p.x, sz: p.z }); } }
     if (p.cop && p.angry > t) frame = F_ANGRY + Math.min(5, Math.floor((t - p.angry + .9)*7));
     if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
   }
+  drawBouncers(emit, t, dt);
   lawnHolos(); lawnPicnics(dt);
   // lurkers on the dark streets
   for (const L of lurkers.values()){
@@ -1243,6 +1460,10 @@ function updatePeople(dt, t){
     // the parcel on the doorstep, until it's taken in
     if (b.cap && t - b.t0 > 1.3){ const u = t - b.t0; emitD(b.cap.x, CURB, b.cap.z, DD.parcel, u > 3 ? Math.max(0, (3.6 - u)/.6) : 1); }
   }
+  // sick on the paving outside the club: the stream while it's happening, then the puddle, fading after a while
+  for (const k of pukes){ const u = t - k.t0;
+    if (u < 2.2) emitD(k.x + (k.sx - k.x)*.35, CURB, k.z + (k.sz - k.z)*.35, DD.puke, 1);
+    emitD(k.x, CURB - .02, k.z, DD.puddle, u > 32 ? Math.max(0, 1 - (u - 32)/8) : Math.min(1, u/1.2)); }
   ddMesh.geometry.instanceCount = di; dpos.needsUpdate = dspr.needsUpdate = true;
   pplMesh.geometry.instanceCount = i;
   pos.needsUpdate = spr.needsUpdate = true;

@@ -189,7 +189,7 @@ $('deckToggle').addEventListener('click', () => {
 
 /* ---------- the Buildings menu ---------- */
 // Shows up once the first megastructure has arrived. Every kind that has arrived is listed and can be placed again,
-// as many times as you like; kinds still to come are shown greyed with what they need. Pick one, and its footprint
+// as many times as you like; kinds still to come aren't shown until they arrive. Pick one, and its footprint
 // follows the pointer (green-lit in its colour where it fits, red where it doesn't): click to put one down, R turns
 // it, right-click or Esc stops placing.
 let megaPick = null, megaTurn = false, ptrLast = null;
@@ -218,8 +218,7 @@ function renderBmenu(){
   const any = megaUnlockedKinds.size > 0;
   $('bmenu').hidden = !any; if (!any) return;
   const list = $('bmenuList'); list.textContent = '';
-  const kinds = Object.keys(MEGA_TYPES); kinds.sort((a, b) => (megaUnlockedKinds.has(b) ? 1 : 0) - (megaUnlockedKinds.has(a) ? 1 : 0));   // what you can place first
-  for (const kind of kinds){
+  for (const kind of Object.keys(MEGA_TYPES).filter(k => megaUnlockedKinds.has(k))){   // only what has arrived: the rest stay a surprise
     const t = MEGA_TYPES[kind], open = megaUnlockedKinds.has(kind);
     const b = document.createElement('button'); b.className = 'bitem' + (open ? '' : ' locked'); b.dataset.kind = kind; b.style.setProperty('--m', t.colour);
     b.setAttribute('aria-pressed', megaPick === kind); if (megaPick === kind) b.classList.add('on');

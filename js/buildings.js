@@ -301,13 +301,20 @@ function chimneyAt(P,x,y,z){
 }
 let carPads = [];
 function buildCarPad(P, w, d){
-  const pw = Math.min(w, d) - .12;
-  box(M.concDD, P, 0, .05, 0, pw, .1, pw);
-  box(M.hazard, P, 0, .11, 0, .05, .045, pw*.45); box(M.hazard, P, -pw*.14, .11, 0, .045, .045, pw*.45); box(M.hazard, P, pw*.14, .11, 0, .045, .045, pw*.45);   // H marking
-  box(M.hazard, P, 0, .11, 0, pw*.28, .045, .045);
-  for (const [sx,sz] of CORNERS){ box(M.neonCyan, P, sx*(pw/2-.06), .12, sz*(pw/2-.06), .06, .05, .06); glow(P, sx*(pw/2-.06), .16, sz*(pw/2-.06), 'cyan', .5); }
-  for (let t=-pw/2+.25; t<pw/2-.15; t+=.3){ box(M.neonAmber, P, t, .115, pw/2-.05, .04, .03, .04); box(M.neonAmber, P, t, .115, -pw/2+.05, .04, .03, .04); }
-  cyl(M.frame, P, pw/2-.08, .45, -pw/2+.08, .02, .7); box(CARM.tail, P, pw/2-.08, .82, -pw/2+.08, .05, .05, .05);
+  // The markings are paint laid almost flush on the slab, and every line and dot is at least about two render pixels
+  // across (the render is 480 lines, so a pixel is about .052 units at the usual zoom: MIN_T). Anything thinner than a
+  // pixel pops in and out of the picture as the camera turns, which is what made the pad shimmer; a raised bar adds
+  // outline pixels along its sides, so the paint is thin (box() would round its height up to a pixel, so put() is used).
+  const pw = Math.min(w, d) - .12, top = .1, bw = .12;
+  const paint = (mat, x, z, sx, sz) => put(U.box, mat, under(P, T(x, top + .004, z, 0, sx, .016, sz)));
+  box(M.concDD, P, 0, top/2, 0, pw, top, pw);
+  // the H: two bars and the crossbar
+  paint(M.hazard, -pw*.2, 0, bw, pw*.5); paint(M.hazard, pw*.2, 0, bw, pw*.5); paint(M.hazard, 0, 0, pw*.4 - bw, bw);
+  // corner lights, and a row of amber guide dots along the front and back edges
+  for (const [sx,sz] of CORNERS){ box(M.neonCyan, P, sx*(pw/2-.1), top + .02, sz*(pw/2-.1), .12, .04, .12); glow(P, sx*(pw/2-.1), top + .07, sz*(pw/2-.1), 'cyan', .5); }
+  const n = Math.max(2, Math.floor((pw - .5)/.36));
+  for (let k = 0; k < n; k++){ const t = -((n - 1)*.36)/2 + k*.36; paint(M.neonAmber, t, pw/2-.1, .1, .1); paint(M.neonAmber, t, -pw/2+.1, .1, .1); }
+  cyl(M.frame, P, pw/2-.12, .45, -pw/2+.12, .04, .7); box(CARM.tail, P, pw/2-.12, .82, -pw/2+.12, .08, .08, .08);
   carPads.push({ pos: new THREE.Vector3(0, .12, 0).applyMatrix4(P), busy:false });
 }
 let NO_ROOF = false;

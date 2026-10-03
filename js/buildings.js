@@ -2867,10 +2867,13 @@ function luxPalette(h){   // from its own hash, so the towers' own layouts (draw
 // orange, welding-arc white, safety green and toxic lime. Each section takes three (from its own hash); its neon, trims, strip lamps and cool-lit rooms are swapped
 // for these while it's generated, the same way the luxury towers get their gold (the glowing pipe liquids keep
 // their own colours).
+function dimHex(hex, k){ return new THREE.Color(hex).multiplyScalar(k).getHex(); }
 const IND_COLS = [['sodium', 0xffa23a, 0x5a3a18], ['ember', 0xff4a2a, 0x5a1e14], ['hazard', 0xffc21a, 0x5a4610], ['orange', 0xff6a14, 0x5a2a10],
   ['arc', 0xcfe6ff, 0x3a4250], ['green', 0x48ff7a, 0x14502a], ['toxic', 0xc6ff3a, 0x3a5010], ['crimson', 0xff1a3a, 0x5a0c16]]   // welding-arc white, safety green, toxic lime
-  .map(([k, em, base]) => ({ k, neon: toon(base, { em, kind: 'neon' }), trim: toon(base, { em, kind: 'trim' }), lamp: toon(base, { em, kind: 'lamp' }) }));
-const IND_ROOM = [toon(0x5a3a20, { em: 0xffa050, kind: 'window' }), toon(0x5a2a1a, { em: 0xff7040, kind: 'window' })];
+  .map(([k, em, base]) => ({ k, neon: toon(base, { em, kind: 'neon' }), trim: toon(base, { em, kind: 'trim' }), lamp: toon(base, { em: dimHex(em, .55), kind: 'lamp' }) }));   // the strip lamps burn at full strength: kept dim so the works don't bloom
+const IND_ROOM = [toon(0x5a3a20, { em: 0xb87038, kind: 'window' }), toon(0x5a2a1a, { em: 0xb0502e, kind: 'window' })];
+// the works' lit shopfronts and windows, a step dimmer than elsewhere (their big lit panels bloomed)
+const IND_DIM = [M.inShop, M.inShop2, M.winLit, M.bulb, M.inNeon].filter(Boolean).map(m => [m, toon(m.color.getHex(), { em: dimHex(m.emissive.getHex(), .62), kind: m.userData.glow })]);
 function indPalette(h){
   // three different colours per section, so one building already mixes, say, orange trim, green strips and arc-white lamps
   // and one of the three is always a red (ember or crimson), so red runs all through the works
@@ -2880,5 +2883,6 @@ function indPalette(h){
   const a = trio[o], b = trio[(o + 1) % 3], c = trio[(o + 2) % 3];
   const mats = new Map([[M.neonCyan, a.neon], [M.neonPink, b.neon], [M.neonAmber, c.neon], [M4.neonPurple, b.neon], [M4.neonBlue, c.neon], [M.holoBlue, a.neon],
     [M.trimCyan, c.trim], [M.inNeon, b.lamp], [M.interiorCool, IND_ROOM[0]], [M.interiorPink, IND_ROOM[1]], [M.btCyan, IND_ROOM[1]]].filter(([s2]) => s2));
-  return { mats, glows: { cyan: a.k, pink: b.k, amber: c.k } };
+  for (const [m, d] of IND_DIM) if (!mats.has(m)) mats.set(m, d);
+  return { mats, glows: { cyan: a.k, pink: b.k, amber: c.k }, haloAll: .6 };
 }

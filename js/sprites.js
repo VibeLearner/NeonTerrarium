@@ -519,6 +519,7 @@ function buildFoliage(){
 let glowList = null;
 const _gv = new THREE.Vector3();
 function glow(P,x,y,z,kind,s=1){
+  if (LUX && LUX.haloAll) s *= LUX.haloAll;   // a district whose halos run smaller (the works)
   if (LUX && LUX.glows[kind]){ s *= LUX.haloK || 1; kind = LUX.glows[kind]; }
   if (DARK && !KEEP_LIGHT && GLOW_FLK[kind]){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 80) return; }
   if (DARK && GLOW_FLK[kind]) s = -s;   // marks a halo that flickers hard (see glowPoints)

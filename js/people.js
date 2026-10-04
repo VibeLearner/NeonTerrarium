@@ -1343,17 +1343,19 @@ function liftRide(p, dt, t){
   return { x, y: y + .02, z, frame, alpha: alpha >= 1 ? 1 : Math.max(0, alpha*.98) };
 }
 // the cab: a little cage with a floor, corner posts, a roof, mesh on two sides and a lamp
+const CAB_H = .95;
 const CAB_MATS = { frame: toon(0x2e3036), iron: toon(0x5a3a2a), mesh: toon(0x6a6e74), lamp: toon(0x5a4630, { em: 0xffcf7a, kind: 'bulb' }) };
 function liftCab(c){
   const k = ckey(c.i, c.j); let e = liftCabs.get(k);
   if (!e){
     const g = new THREE.Group(), add = (mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); g.add(m); };
-    add(CAB_MATS.frame, 0, .02, 0, .4, .04, .4); add(CAB_MATS.frame, 0, .7, 0, .42, .05, .42);
-    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(CAB_MATS.iron, sx*.19, .36, sz*.19, .03, .68, .03);
-    for (let y = .15; y < .65; y += .1) add(CAB_MATS.mesh, 0, y, -.19, .38, .012, .012);
-    for (let y = .15; y < .65; y += .1) add(CAB_MATS.mesh, -.19, y, 0, .012, .012, .38);
+    // CAB_H: clear of the tallest person (15 sprite pixels, 15/PX = .83, standing .02 up) with a little headroom
+    add(CAB_MATS.frame, 0, .02, 0, .4, .04, .4); add(CAB_MATS.frame, 0, CAB_H, 0, .42, .05, .42);
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(CAB_MATS.iron, sx*.19, CAB_H/2, sz*.19, .03, CAB_H, .03);
+    for (let y = .15; y < CAB_H - .05; y += .1) add(CAB_MATS.mesh, 0, y, -.19, .38, .012, .012);
+    for (let y = .15; y < CAB_H - .05; y += .1) add(CAB_MATS.mesh, -.19, y, 0, .012, .012, .38);
     add(CAB_MATS.iron, 0, .3, .19, .4, .03, .02);
-    add(CAB_MATS.lamp, 0, .66, 0, .07, .04, .07);
+    add(CAB_MATS.lamp, 0, CAB_H - .04, 0, .07, .04, .07);
     scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0 }; liftCabs.set(k, e);
   }
   return e;

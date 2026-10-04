@@ -533,7 +533,7 @@ function liftScaffoldInd(c, y0){
 // a motor housing with a big gear and a cyan status light, and a striped gate. F: local +z out from the deck's side.
 const LIFT_IRON = toon(0x5a3a2a), LIFT_DARK = toon(0x2e3036);
 function liftShaft(F, x, z, base, y0){
-  const h = .22, top = y0 + .78;
+  const h = .22, top = y0 + 1.08;   // (the head clears the cab, which is .95 tall, at the top)
   for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) box(LIFT_IRON, F, x + sx*h, (base + top)/2, z + sz*h, .04, top - base, .04);
   for (let y = base + .9; y < top - .2; y += .9){
     for (const [ax, az, bx, bz] of [[-h, -h, h, -h], [h, -h, h, h], [-h, -h, -h, h]]) box(LIFT_DARK, F, x + (ax + bx)/2, y, z + (az + bz)/2, Math.abs(bx - ax) + .05, .035, Math.abs(bz - az) + .05);
@@ -551,8 +551,8 @@ function liftShaft(F, x, z, base, y0){
   box(LIFT_DARK, F, x - .42, base + .2, z, .28, .4, .34);
   put(U.cyl16, LIFT_IRON, under(F, T(x - .42, base + .28, z + .19, 0, .34, .05, .34, PI/2)));
   box(M.neonCyan, F, x - .29, base + .38, z - .1, .01, .03, .08);
-  for (const s of [-1, 1]) box(M.hazard, F, x + h + .01, base + .5, z + s*h, .02, .9, .05);
-  box(M.hazard, F, x + h + .01, base + .96, z, .02, .05, .5);
+  for (const s of [-1, 1]) box(M.hazard, F, x + h + .01, base + .53, z + s*h, .02, 1.0, .05);
+  box(M.hazard, F, x + h + .01, base + 1.04, z, .02, .05, .5);
 }
 function liftScaffold(c, y0){
   if (c.sections[0] && c.sections[0].zone === 'mid') return liftScaffoldCom(c, y0);   // a commercial pod: the heavy steel rig

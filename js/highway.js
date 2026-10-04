@@ -79,7 +79,7 @@ function hwTileWhy(i, j, L, skip){
   if (!c) return 'needs the platform under it';
   if (c.mega) return 'not over a megastructure';
   if (hwY(L) - HW_CLEAR < hwSurface(c)) return 'a building is in the way: go higher';
-  for (const { h, k } of hwAt(i, j)) if (h !== skip && Math.abs(h.tiles[k].L - L) < 2) return 'another highway is there: go 2 floors higher or lower';
+  for (const { h, k } of hwAt(i, j)) if (Math.abs(h.tiles[k].L - L) < 2) return 'another highway is there: go 2 floors higher or lower';
   return null;
 }
 // the open sky a ramp needs, just past the line's end (from the plot at (i, j) going out along d)
@@ -120,7 +120,8 @@ function hwTargetAt(pk){
   for (const h of highways){
     if (h.done) continue;
     const n = h.tiles.length, e = h.tiles[n - 1];
-    if (Math.abs(e.i - i) + Math.abs(e.j - j) !== 1 || h.tiles.some(t => t.i === i && t.j === j)) continue;
+    if (Math.abs(e.i - i) + Math.abs(e.j - j) !== 1) continue;
+    const pv = h.tiles[n - 2]; if (pv && pv.i === i && pv.j === j) continue;   // (not back onto itself: but over or under its own road is an overpass)
     const Lc = Math.max(e.L - HW_STEP_L, Math.min(e.L + HW_STEP_L, L));   // next to the end, the piece simply joins it: as high or low as one plot may step toward the chosen height
     let why = hwTileWhy(i, j, Lc, h);
     if (!why && n === 1) why = hwRampWhy(e.i, e.j, e.L, [e.i - i, e.j - j], h);   // the entry ramp's sky, behind the first plot
@@ -366,7 +367,7 @@ function hwBuildView(h){
 function hwFeet(c){
   for (const { h, k } of hwAt(c.i, c.j)){
     const t = h.tiles[k];
-    if (hwAt(c.i, c.j).some(o => o.h !== h && o.h.tiles[o.k].L < t.L)) continue;   // another highway under this one: it spans over
+    if (hwAt(c.i, c.j).some(o => !(o.h === h && o.k === k) && o.h.tiles[o.k].L < t.L)) continue;   // another highway under this one: it spans over
     const m = hwCenter(h, k, .5), top = hwHeight(h, k, .5) - HW_THICK - HW_GIRDER + .04, bot = c.mega ? hwSurface(c) : c.sections.length ? c.height : CURB;   // (it stands on the roof itself)
     if (top - bot < .2) continue;
     const F = T(m.x, 0, m.z, Math.atan2(m.tx, m.tz));
@@ -569,7 +570,7 @@ function hwPick(cx, cy){
     if (h.done) continue;
     const e = h.tiles[h.tiles.length - 1];
     for (const [a, b] of SIDES4){
-      const i = e.i + a, j = e.j + b; if (h.tiles.some(t => t.i === i && t.j === j)) continue;
+      const i = e.i + a, j = e.j + b, pv = h.tiles[h.tiles.length - 2]; if (pv && pv.i === i && pv.j === j) continue;
       _hbox.min.set(i*LOT - LOT/2, hwY(Math.min(hwLevel, e.L)) - .8, j*LOT - LOT/2); _hbox.max.set(i*LOT + LOT/2, hwY(Math.max(hwLevel, e.L)) + .4, j*LOT + LOT/2);   // (a slab round the heights in question)
       if (!_hray.ray.intersectBox(_hbox, _hhit)) continue;
       const d = _hhit.distanceTo(_hray.ray.origin);

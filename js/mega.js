@@ -27,6 +27,8 @@ const MEGA_TYPES = {
            colour: '#7affa0', build: buildGreenhouse, fx: greenhouseFx },
   spire: { name: 'Data Spire', need: { high: 75 }, after: ['foundry'], odds: 1, w: 3, h: 3, maxLevels: 1,   // arrives with the 75th luxury floor, once the Foundry has come
            colour: '#5ae8ff', build: buildDataSpire, fx: spireFx },
+  bathhouse: { name: 'Geothermal Bathhouse', need: { lowPlots: 65, midPlots: 50 }, odds: 40, w: 3, h: 3, maxLevels: 1,   // 65 residential and 50 commercial buildings, then a 1 in 40 chance with each build
+           colour: '#7ad8ff', build: buildBathhouse },
   club: { name: 'Neon Dome', need: { highPlots: 30, midPlots: 30, lowPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives once there are 30 each of luxury, commercial and residential buildings
            colour: '#c070ff', build: buildNeonDome, fx: clubFx },
 };
@@ -1911,6 +1913,181 @@ function spireFx(m){
     },
     dispose(){ scene.remove(root); mesh.geometry.dispose(); mesh.material.dispose(); for (const h of halos) h.material.dispose(); }
   };
+}
+
+/* ---------- the geothermal bathhouse ---------- */
+// A steaming onsen on a 3x3 block, after the reference: a courtyard of round stone-rimmed hot pools on wet paving,
+// steps and little waterfalls between them, bamboo and autumn maples, stone lanterns; round it, old timber bath halls
+// under dark tiled roofs with turned-up eaves: the main hall at the back (two storeys, its big ONSEN board over the
+// entrance, noren curtains, paper lanterns, a balcony), a pavilion and a bath hut on the left, a concrete block with a
+// rooftop pool on the right; and the geothermal plant threaded through all of it: fat pipes with valves and elbows,
+// a steam tank, gauges and screens, a scaffold tower with tanks behind the hall, cables strung with lanterns, and purple
+// and cyan neon along the railings. Steam rises off every pool. Visitors come to soak (they sit in the pools) and the
+// front desk and the tea counter are staffed (see MEGA_LIFE in people.js).
+M.bhStone = toon(0x8a8478); M.bhStone2 = toon(0x6e6a62); M.bhStoneD = toon(0x4e4c48); M.bhPave = toon(0x7a7670); M.bhPave2 = toon(0x6a665e);
+M.bhWater = toon(0x3a86a8, { em:0x3a8ab8, kind:'window' }); M.bhWater2 = toon(0x6ab8d0, { em:0x7ad0e8, kind:'window' });
+M.bhNoren = toon(0x3e3270); M.bhNoren2 = toon(0x2e4a7a); M.bhMaple = toon(0xc8602a, { flat: 1 }); M.bhMaple2 = toon(0xd8903a, { flat: 1 });
+M.bhPipe = toon(0x5a6068); M.bhPipe2 = toon(0x7a8088); M.bhValve = toon(0xa83a2a);
+function bhRoof(P, x, y, z, w, d, rise){   // a dark tiled hip roof with turned-up eaves (see tileRoof), placed at (x, y, z)
+  const Q = under(P, T(x, 0, z));
+  box(COM.wood2, Q, 0, y - .04, 0, w - .2, .08, d - .2);
+  tileRoof(Q, y, w, d, rise, COM.tile);
+  for (const s of [-1, 1]) box(COM.tile2, Q, 0, y + rise*.55, s*.001, w*.3, rise*.5, d*.06);   // the ridge's raised ends
+}
+function bhLantern(P, x, y, z, col = 'red'){   // a red and white paper lantern on a cord
+  box(M.frame, P, x, y + .16, z, .015, .14, .015);
+  box(col === 'red' ? M.lantern : M.lantern2, P, x, y, z, .14, .2, .14); box(M.frame, P, x, y + .1, z, .1, .02, .1); box(M.frame, P, x, y - .1, z, .1, .02, .1);
+  glow(P, x, y, z + .08, col === 'red' ? 'red' : 'warm', .55); noteLight(P, x, y, z, col === 'red' ? 0xff4030 : 0xffc060);
+}
+function bhNoren(F, x, y, w, mat){   // a split curtain over a doorway (F faces out)
+  const n = Math.max(2, Math.round(w/.3));
+  for (let k = 0; k < n; k++) box(mat, F, x - w/2 + (k + .5)*w/n, y, .03, w/n - .03, .42, .02);
+  box(COM.wood2, F, x, y + .23, .03, w + .08, .04, .04);
+}
+function bhPool(P, x, z, r, y0 = CURB){   // a round stone-rimmed hot pool, steam off it, people soaking in it
+  const n = Math.max(12, Math.round(r*14));
+  for (let k = 0; k < n; k++){ const a = k/n*TAU, rr = r + .06; box(chance(.5) ? M.bhStone : M.bhStone2, P, x + Math.cos(a)*rr, y0 + .14, z + Math.sin(a)*rr, .26 + rnd(0, .08), .28 + rnd(0, .08), .2, -a + PI/2); }
+  put(U.cyl16, M.bhStoneD, under(P, T(x, y0 + .02, z, 0, 2*r, .04, 2*r)));
+  flatWater(M.bhWater, under(P, T(x, 0, z)), y0 + .2, r - .02);
+  for (let k = 0; k < 3; k++){ const a = rnd(0, TAU), q = rnd(0, r*.6); flatWater(M.bhWater2, under(P, T(x + Math.cos(a)*q, 0, z + Math.sin(a)*q)), y0 + .205, rnd(.12, .25)); }   // glints
+  for (let k = 0; k < Math.max(2, Math.round(r*2.5)); k++){ const a = rnd(0, TAU), q = rnd(0, r*.5); emitters.push(new THREE.Vector3(x + Math.cos(a)*q, y0 + .25, z + Math.sin(a)*q).applyMatrix4(P)); }
+  // where people sit and soak: round the inside of the rim, facing the middle (their lower half under the water)
+  for (let k = 0; k < Math.max(3, Math.round(r*4)); k++){ const a = (k + .5)/Math.max(3, Math.round(r*4))*TAU + rnd(-.15, .15), q = r - .22;
+    spotAt(P, x + Math.cos(a)*q, y0 + .02, z + Math.sin(a)*q, 'seat', null, [-Math.cos(a), -Math.sin(a)]); }
+}
+function bhPipe(P, pts, r = .12, mat = M.bhPipe){   // a run of pipe through points [x, y, z], an elbow at each bend
+  for (let k = 1; k < pts.length; k++){ const [ax, ay, az] = pts[k - 1], [bx, by, bz] = pts[k]; strut(mat, P, ax, ay, az, bx, by, bz, 2*r); }
+  for (let k = 1; k < pts.length - 1; k++){ const [x, y, z] = pts[k]; put(U.sph, M.bhPipe2, under(P, T(x, y, z, 0, 2.6*r, 2.6*r, 2.6*r))); }
+  for (let k = 0; k < pts.length - 1; k++){ const [ax, ay, az] = pts[k], [bx, by, bz] = pts[k + 1], L = Math.hypot(bx - ax, by - ay, bz - az);
+    for (let t = .8; t < L - .3; t += 1.4){ const u = t/L; put(U.cyl16, M.frame, under(P, T(ax + (bx - ax)*u, ay + (by - ay)*u, az + (bz - az)*u, Math.atan2(bx - ax, bz - az), 2*r + .06, .06, 2*r + .06, Math.abs(by - ay) > .01 ? 0 : PI/2))); } }   // flanges
+}
+function bhValve(P, x, y, z){ put(U.torus, M.bhValve, under(P, T(x, y, z, 0, .3, .3, .6, PI/2))); box(M.bhValve, P, x, y, z, .04, .04, .2); }
+function bhStoneLantern(P, x, z){   // a stone toro, lit
+  box(M.bhStone2, P, x, CURB + .08, z, .3, .16, .3); box(M.bhStone, P, x, CURB + .38, z, .1, .44, .1);
+  box(M.bhStone2, P, x, CURB + .64, z, .26, .08, .26); box(COM.warm, P, x, CURB + .78, z, .16, .18, .16); glow(P, x, CURB + .78, z, 'warm', .7);
+  put(U.hip4, M.bhStoneD, under(P, T(x, CURB + .98, z, 0, .4, .2, .4))); box(M.bhStone2, P, x, CURB + 1.1, z, .06, .08, .06);
+}
+function bhHall(P, x, z, w, d, floors, opts = {}){   // a timber bath hall: lit lattice windows, noren at the door, a tiled roof
+  const fh = .95; let y = CURB;
+  for (let f = 0; f < floors; f++){
+    box(f === 0 ? COM.wood : COM.wood2, P, x, y + fh/2, z, w, fh, d);
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) box(COM.wood2, P, x + sx*(w/2 + .02), y + fh/2, z + sz*(d/2 + .02), .1, fh, .1);
+    for (const [F, len, k] of blockFaces(P, x, z, w, d).map((q, k) => [...q, k])){
+      const n = Math.max(1, Math.floor(len/.8));
+      for (let q = 0; q < n; q++){ const t = -len/2 + (q + .5)*len/n; if (f === 0 && k === (opts.door ?? 0) && Math.abs(t) < .5) continue;
+        box(chance(.75) ? COM.warm : COM.warm2, F, t, y + fh*.55, .02, len/n - .25, fh*.5, .02);
+        for (let l = -2; l <= 2; l++) box(COM.wood2, F, t + l*(len/n - .25)/5, y + fh*.55, .035, .015, fh*.5, .01); }
+      if (f === 0 && k === (opts.door ?? 0)){ box(COM.shopLit, F, 0, y + .45, .02, .8, .85, .02); bhNoren(F, 0, y + .72, .9, opts.noren || M.bhNoren); }
+    }
+    box(COM.wood2, P, x, y + fh + .03, z, w + .14, .06, d + .14);
+    if (f < floors - 1){ bhRoof(P, x, y + fh + .05, z, w + .5, d + .5, .18); }   // a little skirt roof between storeys
+    y += fh + .08;
+  }
+  bhRoof(P, x, y, z, w + .6, d + .6, opts.rise || .7);
+  return y;
+}
+function buildBathhouse(m){
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
+  const S_ = m.w*LOT, H = S_/2, P = T(m.x, 0, m.z, megaAngle(m, pick([0, PI/2, PI, -PI/2])));   // the entrance faces local +z
+  // ---- the ground: wet stone paving, the odd puddle and moss
+  box(G.asph, P, 0, .012, 0, S_, .025, S_);
+  const n = 22, st = S_/n;
+  for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) box(chance(.5) ? M.bhPave : M.bhPave2, P, (a - (n - 1)/2)*st, .03, (b - (n - 1)/2)*st, st - .05, .045, st - .05);
+  for (let k = 0; k < 8; k++) box(G.puddle, P, rnd(-H + .8, H - .8), .056, rnd(-1, H - .6), rnd(.4, 1.0), .01, rnd(.3, .6));
+  for (let k = 0; k < 16; k++) floorBig(P, rnd(-H + .5, H - .5), .066, rnd(-H + .5, H - .5), rnd(.7, 1));
+  // ---- the edge: a low stone wall, a railing with neon along it, gaps to come in by (front middle, and each side)
+  const wallRun = (ax, az, bx, bz, neon) => {
+    const L = Math.hypot(bx - ax, bz - az), mx = (ax + bx)/2, mz = (az + bz)/2, ry = Math.atan2(-(bz - az), bx - ax);   // (its local x along the wall)
+    box(M.bhStone2, P, mx, CURB + .18, mz, L, .36, .3, ry); box(M.bhStone, P, mx, CURB + .38, mz, L + .04, .06, .34, ry);
+    const F = under(P, T(mx, 0, mz, ry));
+    for (let t = -L/2 + .2; t <= L/2; t += .5) box(M.frame, F, t, CURB + .62, 0, .04, .44, .04);
+    box(M.frame, F, 0, CURB + .84, 0, L, .04, .05); box(neon, F, 0, CURB + .78, .03, L - .1, .03, .02);
+    for (let t = -L/2 + .8; t < L/2 - .4; t += 1.8) glow(F, t, CURB + .8, .1, neon === M4.neonPurple ? 'pink' : 'cyan', .5);
+  };
+  wallRun(-H + .2, H - .2, -1.1, H - .2, M4.neonPurple); wallRun(1.1, H - .2, H - .2, H - .2, M.neonCyan);
+  wallRun(-H + .2, -H + .2, -H + .2, -1.6, M.neonCyan); wallRun(-H + .2, .6, -H + .2, 1.6, M4.neonPurple);
+  wallRun(H - .2, -H + .2, H - .2, -1.3, M4.neonPurple); wallRun(H - .2, 1.0, H - .2, H - .2, M.neonCyan);
+  // ---- the hot pools, with steps and little waterfalls between them
+  for (const [x, z, r] of [[-2.2, -.85, .9], [2.1, -.85, .9], [-2.4, 2.3, .95], [2.4, 2.4, .95]]) bhPool(P, x, z, r);   // round a clear path up the middle, from the gate to the front desk
+  for (const [x, z] of [[-2.3, .75], [2.3, .75], [0, 1.4], [0, -.3]]) for (let k = 0; k < 3; k++) box(M.bhStone2, P, x + (k - 1)*.32, .052, z + (k % 2)*.05, .26, .012, .2);   // stepping stones, set flush in the paving
+  for (const [x, z] of [[-2.2, -2.0], [2.1, -2.0]]){   // spouts out of the hall's wall pouring into the back pools
+    bhPipe(P, [[x, CURB + 1.1, z - .3], [x, CURB + 1.1, z + .05]], .07); box(M.bhWater2, P, x, CURB + .65, z + .1, .12, .9, .05); emitters.push(new THREE.Vector3(x, CURB + .3, z + .25).applyMatrix4(P)); }
+  { const x = 3.85, z = .75; box(M.bhStone, P, x, CURB + .45, z, .7, .9, .5); box(M.bhWater2, P, x - .3, CURB + .5, z + .2, .08, .7, .2); plant('bamboo', P, x + .2, CURB + .9, z, 1.0); }   // a rock with a little cascade
+  // ---- the main hall at the back: two storeys, the ONSEN board, a balcony, lanterns
+  const hx = -.6, hz = -3.6, hw = 4.6, hd = 2.6;
+  const top = bhHall(P, hx, hz, hw, hd, 2, { rise: .85, noren: M.bhNoren });
+  { const F = under(P, T(hx, 0, hz + hd/2 + .06, 0));
+    box(COM.wood2, F, 0, CURB + 1.55, .06, 3.4, .95, .1); box(COM.plaster, F, 0, CURB + 1.55, .1, 3.2, .8, .04);
+    fitSign(under(F, T(0, 0, .14, 0)), 'sign_w_onsen', 0, CURB + 1.72, 0, 2.6, 1.6, 'pink');
+    fitSign(under(F, T(0, 0, .14, 0)), 'sign_w_geobath', 0, CURB + 1.33, 0, 2.9, .7, 'cyan');
+    for (const t of [-1.9, -.9, .9, 1.9]) bhLantern(F, t, CURB + .78, .25, t > 0 ? 'red' : 'white');
+    // the front desk under the eaves: a counter, its keeper behind it, a queue in front
+    box(COM.wood2, F, 1.2, CURB + .3, .55, .9, .55, .3); box(COM.shopLit, F, 1.2, CURB + .6, .55, .8, .04, .25); box(M.screen || COM.warm, F, 1.45, CURB + .7, .55, .2, .14, .03);
+    spotAt(F, 1.2, CURB, .2, 'vendor', 0, [0, 1]); for (let k = 0; k < 3; k++) spotAt(F, 1.2, CURB, .95 + k*.36, 'queue', 0, [0, -1]); }
+  // the balcony on the upper floor, and a temperature board on the hall's side
+  box(COM.wood2, P, hx, CURB + 1.03, hz + hd/2 + .35, hw - .4, .06, .6);
+  for (let t = -hw/2 + .3; t <= hw/2 - .3; t += .3) box(COM.wood2, P, hx + t, CURB + 1.28, hz + hd/2 + .63, .03, .45, .03);
+  box(COM.wood2, P, hx, CURB + 1.48, hz + hd/2 + .63, hw - .4, .05, .05);
+  { const F = under(P, T(hx + hw/2 + .06, 0, hz, PI/2)); box(M.frame, F, 0, CURB + 1.5, .03, 1.4, .7, .05); fitSign(under(F, T(0, 0, .07, 0)), 'sign_w_temp', 0, CURB + 1.5, 0, 1.3, .6, 'cyan'); }
+  // the scaffold tower behind it: tanks, a gantry, pipes down into the hall, a solar panel
+  { const x0 = hx - .8, z0 = hz - .6, tw = 1.6, ty = 5.2;
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(M.frame, P, x0 + sx*tw/2, (top + ty)/2, z0 + sz*tw/2*.8, .07, ty - top, .07);
+    for (let y = top + .9; y < ty; y += 1.1){ for (const [ax, az, bx, bz] of [[-1, -1, 1, -1], [1, -1, 1, 1], [1, 1, -1, 1], [-1, 1, -1, -1]]) strut(M.frame, P, x0 + ax*tw/2, y, z0 + az*tw/2*.8, x0 + bx*tw/2, y, z0 + bz*tw/2*.8, .04);
+      strut(M.frame, P, x0 - tw/2, y - 1.1, z0 + tw/2*.8, x0 + tw/2, y, z0 + tw/2*.8, .03); }
+    box(M.bhStoneD, P, x0, ty + .02, z0, tw + .3, .08, tw*.8 + .3);
+    for (const sx of [-.4, .4]){ put(U.cyl16, M.bhPipe2, under(P, T(x0 + sx, ty + .55, z0, 0, .62, 1.0, .62))); put(U.cyl16, M.bhPipe, under(P, T(x0 + sx, ty + 1.08, z0, 0, .66, .08, .66))); emitters.push(new THREE.Vector3(x0 + sx, ty + 1.2, z0).applyMatrix4(P)); }
+    for (let t = -tw/2; t <= tw/2 + .01; t += .2) box(M.frame, P, x0 + t, ty + .32, z0 + tw*.4 + .15, .02, .5, .02);
+    box(M.corrBlue, P, hx + 1.4, top + .95, hz - .3, 1.1, .04, .7, 0, -.4); box(M.frame, P, hx + 1.4, top + .7, hz - .3, .06, .5, .06);   // the solar panel
+    bhPipe(P, [[x0 + .4, ty, z0], [x0 + .4, top + .5, z0], [hx + 1.8, top + .5, z0], [hx + 1.8, CURB + .4, hz + hd/2 + .1]], .13);
+    bhPipe(P, [[x0 - .4, ty, z0], [x0 - .4, top + .3, z0], [hx - hw/2 - .2, top + .3, z0], [hx - hw/2 - .2, CURB + 1.0, z0]], .1, M.bhPipe2);
+    beaconLight(P, x0, ty + 1.3, z0, .08, .8); }
+  // ---- the left: a small pavilion (its ONSEN sign on the pipes), and the bath hut at the front with the BATHS noren
+  { const px = -4.35, pz = -1.6, top2 = bhHall(P, px, pz, 1.7, 1.7, 1, { rise: .55, door: 3, noren: M.bhNoren2 });
+    bhPipe(P, [[px - .5, CURB, pz - 1.1], [px - .5, top2 + 1.1, pz - 1.1]], .16); bhPipe(P, [[px + .1, CURB, pz - 1.15], [px + .1, top2 + .8, pz - 1.15]], .12, M.bhPipe2);
+    for (const x of [px - .5, px + .1]){ emitters.push(new THREE.Vector3(x, top2 + 1.2, pz - 1.1).applyMatrix4(P)); }
+    const F = under(P, T(px + .9, 0, pz - .3, PI/2)); box(M.frame, F, 0, top2 + .45, .05, 1.3, .55, .06);
+    fitSign(under(F, T(0, 0, .09, 0)), 'sign_w_onsen', 0, top2 + .45, 0, 1.2, .9, 'cyan'); bhLantern(P, px + .95, CURB + .8, pz + .7, 'red'); }
+  { const px = -3.9, pz = 3.85, top3 = bhHall(P, px, pz, 2.4, 1.6, 1, { rise: .5, door: 3, noren: M.bhNoren });
+    const F = under(P, T(px + 1.25, 0, pz, PI/2)); box(M.bhNoren, F, 0, CURB + 1.15, .04, 1.2, .3, .02); fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_baths', 0, CURB + 1.15, 0, 1.1, .7, 'pink');
+    // the tea counter on its side: its keeper and a queue
+    box(COM.wood2, F, -.4, CURB + .3, .45, .7, .5, .3); box(COM.shopLit, F, -.4, CURB + .57, .45, .6, .04, .25);
+    spotAt(F, -.4, CURB, .15, 'vendor', 1, [0, 1]); for (let k = 0; k < 2; k++) spotAt(F, -.4, CURB, .85 + k*.36, 'queue', 1, [0, -1]);
+    for (const t of [-.6, .6]) bhLantern(F, t, CURB + 1.0, .3, 'red'); }
+  // ---- the right: a concrete block with a rooftop pool, its windows lit, the STEAM board on it
+  { const bx = 4.1, bz = -3.6, bw = 2.2, bd = 2.6, bh = 2.1;
+    box(M.bhStone2, P, bx, CURB + bh/2, bz, bw, bh, bd);
+    for (const [F, len] of blockFaces(P, bx, bz, bw, bd)) for (let t = -len/2 + .45; t < len/2 - .3; t += .65) for (const y of [.6, 1.5]) box(chance(.6) ? COM.warm : M.glassDark, F, t, CURB + y, .02, .4, .45, .02);
+    box(M.bhStoneD, P, bx, CURB + bh + .05, bz, bw + .15, .1, bd + .15);
+    box(M.bhStone, P, bx, CURB + bh + .25, bz, bw - .1, .3, bd - .1); flatWater(M.bhWater, under(P, T(bx, 0, bz)), CURB + bh + .36, Math.min(bw, bd)/2 - .2);
+    for (let k = 0; k < 3; k++) emitters.push(new THREE.Vector3(bx + rnd(-.5, .5), CURB + bh + .45, bz + rnd(-.6, .6)).applyMatrix4(P));
+    for (const [x, z] of [[bx - .4, bz + .4], [bx + .3, bz - .3]]) figure(P, x, CURB + bh + .2, z, pick([M.cloth1, M.cloth3, M.awn2]));
+    for (let t = -bw/2; t <= bw/2; t += .3) box(M.frame, P, bx + t, CURB + bh + .55, bz + bd/2, .03, .4, .03); box(M4.neonPurple, P, bx, CURB + bh + .72, bz + bd/2 + .02, bw, .03, .03);
+    const F = under(P, T(bx - bw/2 - .04, 0, bz + .3, -PI/2)); box(M.frame, F, 0, CURB + 1.05, .03, 1.5, .55, .05); fitSign(under(F, T(0, 0, .07, 0)), 'sign_w_steam', 0, CURB + 1.05, 0, 1.4, .9, 'cyan');
+    box(M.corrBlue, P, bx + .5, CURB + bh + .9, bz - .9, .6, .04, .45, 0, -.4); }   // its solar panel
+  // ---- the front right: the geothermal plant: a steam tank, gauges and screens, pipes, a valve wheel
+  { const tx = 3.7, tz = 3.5;
+    put(U.cyl16, M.bhPipe, under(P, T(tx, CURB + .7, tz, 0, 1.2, 1.4, 1.2))); put(U.sph, M.bhPipe2, under(P, T(tx, CURB + 1.4, tz, 0, 1.2, .5, 1.2)));
+    for (const y of [.3, 1.0]) put(U.cyl16, M.rust, under(P, T(tx, CURB + y, tz, 0, 1.24, .08, 1.24)));
+    { const F = under(P, T(tx, 0, tz + .61, 0)); fitSign(under(F, T(0, 0, .02, 0)), 'sign_w_steam', 0, CURB + .7, 0, .9, .55, 'pink'); }
+    emitters.push(new THREE.Vector3(tx, CURB + 1.7, tz).applyMatrix4(P));
+    bhPipe(P, [[tx - .6, CURB + .5, tz], [2.0, CURB + .5, tz], [2.0, CURB + 2.3, tz], [2.0, CURB + 2.3, H - .45], [-H + .5, CURB + 2.3, H - .45], [-H + .5, CURB + .3, H - .45]], .14);   // (up and over the way in)
+    bhPipe(P, [[tx, CURB + 1.6, tz], [tx, CURB + 2.2, tz], [tx, CURB + 2.2, -1.0], [H - .4, CURB + 2.2, -1.0]], .12, M.bhPipe2);
+    bhValve(P, 2.0, CURB + 1.2, tz + .2); bhValve(P, -H + .5, CURB + 1.2, H - .25);
+    for (const [x, z] of [[4.8, 2.0], [4.8, 2.6]]){ box(M.fSteel3 || M.frame, P, x, CURB + .45, z, .4, .8, .4); box(M.screen || M.neonCyan, P, x - .21, CURB + .55, z, .02, .25, .3); }
+    bhStoneLantern(P, 4.9, 4.9); bhStoneLantern(P, -4.9, 2.1); bhStoneLantern(P, -1.3, 4.9); }
+  // ---- greenery: bamboo, autumn maples, ferns by the pools
+  for (const [x, z] of [[-3.4, .5], [1.2, .7], [-1.2, .7], [3.6, 3.7], [1.6, 4.7], [-4.8, -4.8]]) plant(pick(['bamboo', 'g_fern3', 'bush']), P, x, CURB + .05, z, rnd(.9, 1.2));
+  for (const [x, z] of [[4.9, -.3], [-4.9, -3.4], [-2.0, 4.9]]){ cyl(M.wood, P, x, CURB + .5, z, .05, 1.0);
+    for (let k = 0; k < 6; k++) put(U.sph, chance(.5) ? M.bhMaple : M.bhMaple2, under(P, T(x + rnd(-.35, .35), CURB + 1.0 + rnd(0, .45), z + rnd(-.35, .35), 0, rnd(.35, .55), rnd(.3, .45), rnd(.35, .55)))); }
+  // ---- cables strung across the courtyard with lanterns on them
+  lanternString(P, hx - 2.0, CURB + 2.1, hz + hd/2 + .3, -4.3, CURB + 1.6, -.6, .3);
+  lanternString(P, hx + 2.0, CURB + 2.1, hz + hd/2 + .3, 3.1, CURB + 2.15, -2.3, .25);
+  lanternString(P, -3.0, CURB + 1.2, 3.1, 2.0, CURB + 1.2, 2.6, .35);
+  for (let k = 0; k < 5; k++){ const ax = rnd(-H + 1, H - 1); strut(M.frame, P, ax, top + .2, hz, ax + rnd(-2, 2), CURB + 2.4, H - .3, .015); }   // stray cables down to the front
+  // standing about between the pools: chatting, waiting their turn
+  for (const [x, z] of [[-.45, .3], [.45, .6], [-.4, 2.4], [.5, 2.9], [-.5, 4.2], [.55, 3.9], [-.6, 1.4]]) spotAt(P, x, CURB, z, 'stand', null, [0, 1]);
+  m.roofH = top + .9;
+  m.top = 6.8;
 }
 
 /* ---------- the police station ---------- */

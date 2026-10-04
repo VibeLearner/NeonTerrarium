@@ -356,7 +356,8 @@ const MEGA_LIFE = {
   market:  { jobs: 10, fun: 14 },             // the market mall: shopkeepers inside, plenty of shoppers
   pagoda:  { jobs: 12, fun: 10, night: .2 },  // the cloud pagoda: a luxury hotel and spa
   club:    { jobs: 10, fun: 0, night: .6 },
-  spire:   { jobs: 0, fun: 0 },   // the Data Spire: no ordinary jobs; its archivist and guards are their own people (see syncSpireStaff)
+  spire:   { jobs: 0, fun: 0 },
+  bathhouse: { jobs: 0, fun: 18, open: true },   // the onsen: people come to soak (its seats are in the pools); the front desk and tea counter are its stalls, always kept   // the Data Spire: no ordinary jobs; its archivist and guards are their own people (see syncSpireStaff)
   greenhouse: { jobs: 12, fun: 1.5, night: .35 },   // the hydroponic farm: growers round the clock, and people dropping by for fresh greens   // the Neon Dome: bar staff and DJs, mostly at night (its crowd is brought out by the night: see updateClubs)
 };
 const places = new Map();   // id -> { id, x, z, doors: [{ node, out:{x,z}, in:{x,z}|null, dir:[dx,dz] }], jobs, fun, open, night, cell|mega }
@@ -673,7 +674,7 @@ function syncJobs(){
   }
   // the stalls and the police station are always staffed: if nobody's looking for work, people living nearby
   // swap their job for one
-  const staffed = [...places.values()].filter(pl => pl.mega && (pl.mega.kind === 'square' || pl.mega.kind === 'police' || pl.mega.kind === 'greenhouse'));   // (the farm too: someone's always tending it)
+  const staffed = [...places.values()].filter(pl => pl.mega && (pl.mega.kind === 'square' || pl.mega.kind === 'police' || pl.mega.kind === 'greenhouse' || pl.mega.kind === 'bathhouse'));   // (the farm too: someone's always tending it)
   const isStaffed = id => staffed.some(pl => pl.id === id);
   for (const sq of staffed){
     if (!sq) continue;
@@ -690,7 +691,7 @@ function syncJobs(){
 function assignStalls(){
   for (const p of people.values()) p.stall = null;
   for (const sq of places.values()){
-    if (!sq.mega || sq.mega.kind !== 'square' || !sq.stalls) continue;
+    if (!sq.mega || !sq.stalls) continue;   // (the square's stalls, the bathhouse's desk and tea counter)
     const staff = [...people.values()].filter(p => p.job === sq.id).sort((a, b) => a.id < b.id ? -1 : 1);
     const ids = [...sq.stalls.keys()].sort((a, b) => a - b);
     if (ids.length) staff.forEach((p, k) => { p.stall = ids[k % ids.length]; });
@@ -752,7 +753,7 @@ function stayFor(p, pl){
 const pplRand = Math.random;   // moment-to-moment choices; who people are is seeded above
 // stalls with their keeper standing at the counter right now
 const stallOpen = st => st.keepers.some(sp => { const q = sp.by && people.get(sp.by); return q && !q.walk && q.spot === sp; });
-const freeOf = list => list.filter(sp => !sp.by);
+const freeOf = list => list.filter(sp => !sp.by && !(sp.bad > pplNow));   // (bad: no way to it from where this person is: see startTrip)
 const nearPick = (list, x, z, n = 6) => { if (!list.length) return null; list.sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z)); return list[Math.floor(pplRand()*Math.min(n, list.length))]; };
 // where in an open place this person goes: their own counter if they keep a stall, a queue at an open stall, a
 // seat or a spot to stand (often next to someone, to chat)
@@ -769,6 +770,8 @@ function pickSpot(to, from, p){
       const seat = pplRand() < .6 ? nearPick(freeOf(to.spots.filter(sp => sp.kind === 'seat')), p.x, p.z, 4) : null;
       return seat || nearPick(freeOf(to.spots.filter(sp => sp.kind === 'stand')), p.x, p.z, 4);
     }
+    if (to.mega && to.mega.kind === 'bathhouse' && pplRand() < .75){   // at the onsen most come to soak
+      const seat = nearPick(freeOf(to.spots.filter(sp => sp.kind === 'seat')), from.x, from.z, 12); if (seat) return seat; }
     if (pplRand() < .6){
       const qs = []; for (const st of to.stalls.values()) if (stallOpen(st)) qs.push(...freeOf(st.queue));
       const q = nearPick(qs, from.x, from.z, 5); if (q) return q;
@@ -818,10 +821,14 @@ function startTrip(p, toId){
   else if (p.patrol) a = p.patrol.node;                                                     // an officer out on the beat
   else { if (!from.doors.length) return false; dA = nearestOf(from.doors, to.x, to.z); a = dA.node; head = [[dA.inside.x, dA.inside.z], [dA.wall.x, dA.wall.z]]; }
   let b, tail = [], dB = null, spot = null;
-  if (to.open){ spot = pickSpot(to, from, p); if (!spot || spot === p.spot) return false; b = spot.node; tail = [[spot.ax, spot.az], [spot.x, spot.z]]; }
+  let mid = null;
+  if (to.open){   // a spot it can actually get to: if there's no way to the one picked, another
+    for (let tries = 0; tries < 5 && !mid; tries++){ spot = pickSpot(to, from, p); if (!spot || spot === p.spot) return false;
+      b = spot.node; mid = route(a, b); if (!mid) spot.bad = pplNow + 1e-6; }   // (passed over for this trip only)
+    if (!mid) return false; tail = [[spot.ax, spot.az], [spot.x, spot.z]]; }
   else { if (!to.doors.length) return false; dB = nearestOf(to.doors, from.x, from.z); b = dB.node; tail = [[dB.wall.x, dB.wall.z], [dB.inside.x, dB.inside.z]];
     if (to.mega && to.mega.kind === 'club' && p.clubbing){ tail = []; dB = null; } }   // club-goers stop outside: the queue's next (see clubArrive)
-  const mid = route(a, b); if (!mid) return false;
+  if (!mid) mid = route(a, b); if (!mid) return false;
   const base = head.concat(mid, tail), pts = p.cop ? base : spreadPath(p, base, head.length, base.length - 1 - tail.length);
   const cum = [0];
   for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));

@@ -673,7 +673,7 @@ function syncJobs(){
   }
   // the stalls and the police station are always staffed: if nobody's looking for work, people living nearby
   // swap their job for one
-  const staffed = [...places.values()].filter(pl => pl.mega && (pl.mega.kind === 'square' || pl.mega.kind === 'police'));
+  const staffed = [...places.values()].filter(pl => pl.mega && (pl.mega.kind === 'square' || pl.mega.kind === 'police' || pl.mega.kind === 'greenhouse'));   // (the farm too: someone's always tending it)
   const isStaffed = id => staffed.some(pl => pl.id === id);
   for (const sq of staffed){
     if (!sq) continue;
@@ -1600,6 +1600,26 @@ function lawnHolos(){
 }
 /* ---------- every frame ---------- */
 const _pv = new THREE.Vector3(), _camR = new THREE.Vector3();
+// Inside the hydroponic farm: everyone there (its growers, and anyone who's dropped by) walks the aisles between the
+// racks and tables, stopping now and then to tend the greens, seen through the glass. Each keeps an aisle of their own.
+function ghPose(p, t, dt){
+  const pl = places.get(p.at), m = pl && pl.mega; if (!m || m.kind !== 'greenhouse' || !m.gh || !m.gh.aisles) return false;
+  const A = m.gh.aisles;
+  if (!p.gh || p.gh.m !== m.id){ const k = hash(p.id, 'aisle') % A.length, a = A[k]; p.gh = { m: m.id, a: k, u: (hash(p.id, 'u') % 1000)/1000, dir: hash(p.id, 'd') % 2 ? 1 : -1, pause: 0 }; }
+  // the aisles along the wall nearest the camera are hidden behind that wall's racks: whoever keeps one works its twin
+  // on the far side for now, where they can be seen through the glass roof
+  const e0 = m.gh.m, cdx = cam.position.x - e0[12], cdz = cam.position.z - e0[14], camSide = Math.sign(e0[8]*cdx + e0[10]*cdz) || 1;
+  const g = p.gh; let ai = g.a; const az = A[ai].z - A[0].z - .82;   // (relative to the middle of the house)
+  if (ai >= 2 && Math.sign(A[ai].z - (A[0].z + A[1].z)/2) === camSide) ai = ai % 2 ? ai - 1 : ai + 1;
+  const a = A[ai], len = a.x1 - a.x0;
+  if (g.pause > 0){ g.pause -= dt; p.ghWalk = false; }
+  else { g.u += g.dir*p.speed*.7*dt/len; if (g.u > 1 || g.u < 0){ g.dir = -g.dir; g.u = Math.max(0, Math.min(1, g.u)); }
+    if (Math.random() < dt*.3) g.pause = 1.5 + Math.random()*4; p.ghWalk = true; }   // stop to tend the trays
+  const e = m.gh.m, lx = a.x0 + len*g.u, lz = a.z;
+  p.x = e[0]*lx + e[8]*lz + e[12]; p.z = e[2]*lx + e[10]*lz + e[14]; p.gy = a.y + .03;
+  const dx = e[0]*g.dir, dz = e[2]*g.dir, sd = dx*_camR.x + dz*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
+  return true;
+}
 function updatePeople(dt, t){
   pplNow = t;
   if (!pplReady) return;
@@ -1678,6 +1698,8 @@ function updatePeople(dt, t){
         // on the beat: standing at a crossing, now and then scanning with the handheld
         p.x = p.patrol.x; p.z = p.patrol.z;
         frame = Math.floor(t*.3 + p.phase) % 2 ? F_USE + Math.floor(t*6 + p.phase) % 6 : F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
+      } else if (!p.spot && ghPose(p, t, dt)){
+        y = p.gy; frame = p.ghWalk ? Math.floor(t*9*p.speed/PPL_SPEED + p.phase) % PPL.walk : F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
       } else {
         const sp = p.spot; if (!sp) continue;
         p.x = sp.x; p.z = sp.z; y = sp.y;

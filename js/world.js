@@ -271,7 +271,7 @@ function pickWeighted(list){ const tot = list.reduce((s,[,w]) => s + w, 0); let 
 const WHITE_TYPES = new Set([domeTower, shellTower, cascadeTerraces]);
 const STALL_TYPES = new Set([stallMarket, foodDeck, foodTower, foodPlaza, billboardLot, domeMarket, cornerMarket]);
 function buildStack(c){
-  let y = CURB, prevWhite = false, prevDeck = false;
+  let y = c.lift ? c.lift.y : CURB, prevWhite = false, prevDeck = false;   // a side pod's stack starts up in the air, on its scaffold
   c.sectionTops = [];
   c.sections.forEach((sec, k) => {
     R = mulberry32(hash('sec', c.i, c.j, k, sec.zone, sec.seed));
@@ -307,8 +307,114 @@ function buildStack(c){
     if (last) c._topLot = lot;
   });
   c.height = y;
+  c.walks = null;
+  if (c.lift) liftScaffold(c, c.lift.y);
   rooftopBoard(c, y);
   steamVent(c);
+}
+/* ---------- side pods: a building hung off the side of a taller one ---------- */
+// Clicking the side of a building high up (residential only, for now) hangs a one-section home in the air over the
+// empty plot next to it: the pod stands on a plank deck on a DIY scaffold of pipes and posts down to the street, and
+// a plank walkway with rails runs from it to a door in every neighbour tall enough to reach (one, or two either side,
+// or more). A stair hut at the foot of the scaffold, with a ladder up, is the pod's front door for people on the
+// street; the walkways' ends are noted (c.walks) so people can be seen crossing them (see people.js).
+const LIFT_MIN = 1.75;   // the lowest a pod hangs (deck height above the street): room for people to walk under
+// the deck height for a click at height y on the side of building c: snapped to a floor, with the pod's top no higher than c's roof
+function liftSnap(c, y){
+  let ly = CURB + Math.round((y - CURB)/FH)*FH;
+  ly = Math.min(ly, c.height - 1.1);
+  if (ly < CURB + LIFT_MIN) ly = CURB + Math.ceil(LIFT_MIN/FH)*FH;
+  return ly + 1.1 <= c.height + .01 ? ly : null;
+}
+// neighbours a pod at deck height y0 can tie into: a building that rises past the deck (a pod too, if it hangs lower)
+function liftSupports(c, y0){
+  const out = [];
+  for (const d of SIDES4){
+    const n = cells.get(ckey(c.i + d[0], c.j + d[1]));
+    if (n && !n.mega && n.sections.length && n.height >= y0 + 1.0 && (!n.lift || n.lift.y <= y0 - .5)) out.push(d);
+  }
+  return out;
+}
+function liftScaffold(c, y0){
+  R = mulberry32(hash('lift', c.i, c.j, Math.round(y0*100)));
+  const P = T(c.x, 0, c.z), E = .98, base = CURB;   // poles just inside the deck's corners, clear of the sidewalk's corners
+  const sup = liftSupports(c, y0), supKey = new Set(sup.map(d => d.join()));
+  const tube = () => pick([M.metal, M.metal, M.rust, M.frame]);
+  const wobble = () => rnd(-.03, .03);
+  // the deck: planks on bearers, a little bigger than the pod
+  box(M.frame, P, 0, y0 - .1, 0, 2.36, .08, 2.36);
+  for (let x = -1.12; x <= 1.13; x += .16) box(pick([M.wood, M.wood, M.crate]), P, x, y0 - .03, 0, .14, .05, 2.3);
+  // the uprights: four corners and a middle post or two, crooked, some steel, some timber
+  const posts = [[-E, -E], [E, -E], [-E, E], [E, E]];
+  if (chance(.7)) posts.push([0, chance(.5) ? E : -E]);
+  if (chance(.5)) posts.push([chance(.5) ? E : -E, 0]);
+  for (const [x, z] of posts){
+    const wx = wobble(), wz = wobble();
+    if (chance(.25)) box(M.wood, P, x, (base + y0 - .1)/2, z, .07, y0 - .1 - base, .07);
+    else strut(tube(), P, x + wx, base, z + wz, x, y0 - .1, z, .03);
+    box(M.concDD, P, x + wx, base + .02, z + wz, .14, .04, .14);   // a base plate
+  }
+  // ledgers round the frame every metre or so, and cross braces on a couple of faces
+  for (let y = base + 1.0; y < y0 - .3; y += rnd(.85, 1.1)){
+    for (const [ax, az, bx, bz] of [[-E, -E, E, -E], [E, -E, E, E], [E, E, -E, E], [-E, E, -E, -E]]) if (chance(.85)) strut(tube(), P, ax, y, az, bx, y + rnd(-.04, .04), bz, .02);
+  }
+  for (const [ax, az, bx, bz] of [[-E, -E, E, -E], [E, -E, E, E], [E, E, -E, E], [-E, E, -E, -E]]){
+    if (!chance(.55)) continue;
+    const yl = base + .25, yh = y0 - .15;
+    strut(tube(), P, ax, yl, az, bx, yh, bz, .018); if (chance(.6)) strut(tube(), P, bx, yl, bz, ax, yh, az, .018);
+  }
+  // the stair hut and ladder: on a side with no walkway, the pod's front door at street level
+  const free = SIDES4.filter(d => !supKey.has(d.join()));
+  const hs = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0];
+  { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));   // local +z out to that side
+    const wall = pick([M.concW, M.concL, M.corrBlue, M.metal]), hz = .76;
+    box(wall, F, 0, base + .52, hz, .8, 1.04, .42);                         // the hut: a little stair shed
+    box(pick([M.rust, M.metalDark, M.corrBlue]), F, 0, base + 1.07, hz, .88, .05, .5, .12);   // a sloping tin roof
+    box(M.bulb, F, .3, base + .95, hz + .22, .06, .05, .04); glow(F, .3, base + .92, hz + .25, 'warm', .35);   // a bare bulb by the door
+    box(M.frame, F, 0, base + .5, hz + .215, .46, .02, .01);                 // a lintel strip over where the door goes
+    if (chance(.6)) plant(pick(['bush', 'fern', 'bonsai']), F, .62, base, hz + .25, rnd(.55, .7));
+    // the ladder from the hut's roof up through a gap in the deck
+    for (const s of [-1, 1]) strut(M.metal, F, s*.17, base + 1.08, hz - .05, s*.17, y0 + .55, hz - .05, .018);
+    for (let y = base + 1.2; y < y0 + .5; y += .2) box(M.metal, F, 0, y, hz - .05, .34, .025, .025);
+  }
+  // rails round the deck's open edges (a gap where a walkway leaves), with the odd plant pot and washing
+  for (const d of SIDES4){
+    const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))), bridge = supKey.has(d.join());
+    for (let x = -1.1; x <= 1.11; x += .55){ if (bridge && Math.abs(x) < .45) continue; cyl(tube(), F, x, y0 + .23, 1.15, .015, .46); }
+    if (bridge){ strut(tube(), F, -1.1, y0 + .45, 1.15, -.42, y0 + .45, 1.15, .015); strut(tube(), F, .42, y0 + .45, 1.15, 1.1, y0 + .45, 1.15, .015); }
+    else { strut(tube(), F, -1.1, y0 + .45, 1.15, 1.1, y0 + .45, 1.15, .015); if (chance(.35*S.clutter)) for (let x = -.8; x < .9; x += .4) if (chance(.6)) plant(laundryKind(), F, x, y0 + .45, 1.16, .8, 't', true); }
+    if (chance(.4*S.green)) plant(pick(['bush', 'fern', 'succulent', 'bushFlower']), F, rnd(-.9, .9), y0, 1.02, rnd(.5, .65));
+    if (chance(.35*S.green)) plant(hangKind(), F, rnd(-.9, .9), y0 - .12, 1.18, rnd(.6, .8), 't', true);
+  }
+  // the walkways: planks over the street to a door in each neighbour that reaches the deck
+  c.walks = [];
+  for (const d of sup){
+    const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))), z0 = 1.1, z1 = LOT - 1.05, L = z1 - z0, zm = (z0 + z1)/2, w = .74;
+    box(M.frame, F, 0, y0 - .09, zm, w + .08, .06, L);
+    for (let z = z0 + .05; z < z1; z += .17) box(pick([M.wood, M.wood, M.crate]), F, 0, y0 - .035, z, w, .045, .14);
+    for (const s of [-1, 1]){
+      for (let z = z0 + .1; z < z1; z += .5) cyl(tube(), F, s*w/2, y0 + .23, z, .015, .46);
+      strut(tube(), F, s*w/2, y0 + .45, z0, s*w/2, y0 + .45, z1 - .05, .015);
+      strut(tube(), F, s*w/2, y0 - .1, zm, s*(w/2 + .05), y0 - .9, z0 + .1, .02);   // braces down to the scaffold
+      strut(tube(), F, s*w/2, y0 - .1, zm + .3, s*w/2, y0 - .75, z1 - .05, .02);    // and back to the wall
+    }
+    // overhead: two tall poles at the ends, a bar across them, a string of bulbs or a line of washing
+    const top = y0 + rnd(1.5, 1.9);
+    for (const z of [z0 + .08, z1 - .08]) for (const s of [-1, 1]) strut(tube(), F, s*(w/2 + .02), y0, z, s*(w/2 + .02), top, z, .016);
+    for (const s of [-1, 1]) strut(tube(), F, s*(w/2 + .02), top, z0 + .08, s*(w/2 + .02), top + rnd(-.06, .06), z1 - .08, .016);
+    if (chance(.55)) bulbString(F, -w/2, top - .05, z0 + .1, w/2, top - .05, z1 - .1, .12);
+    else if (chance(.7*S.clutter)) for (let z = z0 + .3; z < z1 - .2; z += .3) if (chance(.7)) plant(laundryKind(), F, 0, top - .02, z, .8, 't', true);
+    // the door in the neighbour's wall: a frame, a lit door, a little step, set into the wall so no gap shows
+    box(M.concDD, F, 0, y0 + .5, z1 + .18, .7, 1.02, .4);
+    box(M.frame, F, 0, y0 + .5, z1 - .03, .62, 1.02, .04);
+    box(pick([M.winLit, M.winLit, M.interiorPink || M.winLit]), F, 0, y0 + .46, z1 - .055, .44, .86, .02);
+    box(M.metalDark, F, 0, y0 + 1.03, z1 - .1, .7, .04, .16);
+    glow(F, 0, y0 + .7, z1 - .08, 'warm', .4);
+    // and one on the pod's own side
+    box(M.frame, F, 0, y0 + .5, z0 + .03, .6, 1.0, .05); box(M.winLit, F, 0, y0 + .46, z0 + .06, .42, .84, .02);
+    const a = new THREE.Vector3(0, y0, z0 + .2).applyMatrix4(F), b = new THREE.Vector3(0, y0, z1 - .2).applyMatrix4(F);
+    c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01 });
+  }
 }
 // Hologram billboards on the roofs: a small one on about half the commercial roofs, and on tall buildings of the
 // commercial and residential zones now and then a big one on posts, with its slogan scrolling underneath. Picked from
@@ -434,7 +540,7 @@ const pairCache = new Map();
 // pairs are batched by region too, and a region's batch is only redone when its set of pairs changed
 const connRegions = new Map();
 function rebuildConnections(){
-  const lots = [...cells.values()].filter(c => c.sections.length)
+  const lots = [...cells.values()].filter(c => c.sections.length && !c.lift)
     .map(c => ({ i: c.i, j: c.j, style: c.sections[0].style, x: c.x, z: c.z, cls: c.sections[0].zone, height: c.sectionTops[0], base: CURB, firstFloors: c.firstFloors, floors: c.firstFloors }));
   const used = new Set(), byReg = new Map();
   for (const [a,b] of neighbors(lots)){
@@ -515,7 +621,9 @@ function refresh(list, megaList = []){
     const near = c => c && c !== a && Math.abs(c.i - a.i) <= 1 && Math.abs(c.j - a.j) <= 1;
     if (list.some(near) || megaList.some(m => (m.cells || []).some(near))) list.push(a);
   }
-  const todo = [...new Set(list)].filter(Boolean);
+  // a side pod's walkways go to the neighbours tall enough to reach: a change next door rebuilds the pod, after the neighbour
+  for (const c of [...list]) if (c) for (const [a, b] of SIDES4){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n && n.lift) list.push(n); }
+  const todo = [...new Set(list)].filter(Boolean).sort((p, q) => (p.lift ? 1 : 0) - (q.lift ? 1 : 0));
   for (const c of todo) rebuildCell(c);
   // an air-filter tower picks its face from its neighbours' heights, so if one of them was only built after it in this
   // pass (loading a saved city builds every plot in one go), build the tower again now that they all stand
@@ -561,11 +669,25 @@ function addSection(c, zone){
   startAnim(c, 'build', y0 - .05, c.height + 1.2, zone, SIDE, null);
   maybeSpawnMegas(c);
 }
+// hang a pod off the side of a taller building, over the empty plot c, its deck at height y
+function addLift(c, y, zone){
+  if (!c || c.mega || c.sections.length) return null;
+  finishAnimsOn(c);
+  holdRegion(c);
+  const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
+  c.lift = { y };
+  c.sections.push({ zone, seed: (Math.random()*1e9)|0, style: styleNow() }); refresh([c]);
+  dropView(old);
+  startAnim(c, 'build', CURB - .05, c.height + 1.2, zone, SIDE, null);
+  maybeSpawnMegas(c);
+  return c;
+}
 function removeSection(c){
   if (!c.sections.length) return removePlatform(c);
   finishAnimsOn(c);
   const top = c.height, zone = c.sections[c.sections.length - 1].zone, old = { view: c.view, data: c.data }; c.view = null; c.data = null;
-  c.sections.pop(); refresh([c]);
+  c.sections.pop(); if (!c.sections.length) c.lift = null;   // the last of a pod takes its scaffold with it
+  refresh([c]);
   startAnim(c, 'remove', (c.sections.length ? c.height : CURB) - .05, top + 1.2, zone, SIDE, old);
 }
 // Delete mode: everything in a block of plots goes at once: megastructures that reach into it (whole), and every
@@ -732,7 +854,7 @@ const SAVE_KEY = 'neonIsland.v2';
 const MEGA_SAVE_KEY = 'neonIsland.megas';
 function save(){
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some'])));
+    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some', c.lift ? c.lift.y : 0])));
     localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ id: m.id, kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed, centre: m.centre || undefined, rot: m.rot, si: m.si, sj: m.sj }))));
   } catch (e) {}
 }
@@ -740,7 +862,7 @@ function load(){
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!Array.isArray(d) || !d.length) return false;
-    for (const [i,j,secs,st,gr] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; cells.set(ckey(i,j), c); }
+    for (const [i,j,secs,st,gr,lf] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; if (lf > 0 && c.sections.length) c.lift = { y: lf }; cells.set(ckey(i,j), c); }
     try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) { const mm = placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels, m.id || null); if (mm && m.centre) mm.centre = m.centre; if (mm && Number.isInteger(m.rot)) mm.rot = ((m.rot % 4) + 4) % 4; if (mm && Number.isInteger(m.si) && Number.isInteger(m.sj)){ mm.si = m.si; mm.sj = m.sj; } } } catch (e) {}
     return true;
   } catch (e) { return false; }
@@ -760,7 +882,7 @@ function pickAt(cx, cy){
   };
   for (const c of cells.values()){
     if (c.mega){ _box3.min.set(c.x - LOT/2, CURB, c.z - LOT/2); _box3.max.set(c.x + LOT/2, c.height, c.z + LOT/2); test(c, 'mega'); }
-    else if (c.sections.length){ _box3.min.set(c.x - SIDE/2, CURB, c.z - SIDE/2); _box3.max.set(c.x + SIDE/2, c.height, c.z + SIDE/2); test(c, 'bld'); }
+    else if (c.sections.length){ _box3.min.set(c.x - SIDE/2, c.lift ? c.lift.y - .15 : CURB, c.z - SIDE/2); _box3.max.set(c.x + SIDE/2, c.height, c.z + SIDE/2); test(c, 'bld'); }
     _box3.min.set(c.x - LOT/2, -.8, c.z - LOT/2); _box3.max.set(c.x + LOT/2, CURB, c.z + LOT/2); test(c, 'plat');
   }
   if (best) return best;
@@ -788,6 +910,11 @@ function targetOf(pk){
   const [a,b] = Math.abs(dx) > Math.abs(dz) ? [Math.sign(dx), 0] : [0, Math.sign(dz)];
   const n = cells.get(ckey(c.i + a, c.j + b));
   if (n && n.mega) return null;
+  // high up the side of a building, with residential picked and an empty plot next to it: hang a pod there
+  if (S.zone === 'low' && pk.kind === 'bld' && n && !n.sections.length && pk.p.y > CURB + LIFT_MIN){
+    const ly = liftSnap(c, pk.p.y);
+    if (ly !== null) return { type: 'side', c: n, y: ly, from: c };
+  }
   return n ? { type: 'onto', c: n } : { type: 'empty', i: c.i + a, j: c.j + b };
 }
 function applyTarget(t){
@@ -795,6 +922,7 @@ function applyTarget(t){
   const zone = S.zone;
   if (t.type === 'empty') return addPlatform(t.i, t.j, zone);
   if (t.type === 'megaUp'){ if (zone) addMegaTier(t.m); return null; }
+  if (t.type === 'side') return zone ? addLift(t.c, t.y, zone) : null;
   if (!zone && t.type === 'onto' && !t.c.mega && !t.c.sections.length){ cycleGreen(t.c); return t.c; }   // no zone picked: an empty plot's greenery cycles
   if (!zone || t.c.mega) return null;
   addSection(t.c, zone); return t.c;
@@ -817,7 +945,8 @@ function showHover(t){
   if (t.type === 'empty'){
     x = t.i*LOT; z = t.j*LOT;
     if (S.zone){ y0 = CURB; h = FH*3; w = SIDE; } else { y0 = -.6; h = .68; w = LOT; }
-  } else if (t.type === 'onto'){ x = t.c.x; z = t.c.z; y0 = t.c.sections.length ? t.c.height : CURB; h = FH*3; w = SIDE; }
+  } else if (t.type === 'side'){ x = t.c.x; z = t.c.z; y0 = t.y; h = FH*2; w = SIDE; }
+  else if (t.type === 'onto'){ x = t.c.x; z = t.c.z; y0 = t.c.sections.length ? t.c.height : CURB; h = FH*3; w = SIDE; }
   else { x = t.c.x; z = t.c.z; y0 = t.c.height; h = FH*2; w = SIDE; }
   if (t.type !== 'empty' && !S.zone){ hover.visible = false; return; }
   hover.position.set(x, y0 + h/2, z); hover.scale.set(w, h, w); hover.visible = true;

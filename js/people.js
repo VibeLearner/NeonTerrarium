@@ -1242,6 +1242,34 @@ function drawBouncers(emit, t, dt){
   }
 }
 
+/* ---------- the side pods' walkways ---------- */
+// Each walkway between a pod and the building it hangs off has a neighbour or two using it: out of one door, across
+// the planks, in at the other, a pause inside, and back. They fade in and out at the doors like everyone else.
+const deckWalkers = new Map();
+function drawDeckWalkers(emit, t, dt){
+  const seen = new Set();
+  for (const c of cells.values()){
+    if (!c.walks || !c.walks.length) continue;
+    c.walks.forEach((w, k) => {
+      const n = 1 + (hash('deckn', c.i, c.j, k) % 3 === 0 ? 1 : 0);
+      for (let q = 0; q < n; q++){
+        const key = c.i + ',' + c.j + ':' + k + ':' + q; seen.add(key);
+        let d = deckWalkers.get(key);
+        const len = Math.hypot(w.bx - w.ax, w.bz - w.az);
+        if (!d || d.len !== len){ d = { len, u: Math.random(), dir: Math.random() < .5 ? 1 : -1, wait: q ? 4 + Math.random()*10 : Math.random()*3, row: hash('deckrow', c.i, c.j, k, q) % CITIZEN_ROWS, ph: Math.random()*10, flip: 1 }; deckWalkers.set(key, d); }
+        if (d.wait > 0){ d.wait -= dt; continue; }   // indoors for a while
+        d.u += d.dir*dt*PPL_SPEED*.8/len;
+        if (d.u >= 1 || d.u <= 0){ d.u = Math.min(1, Math.max(0, d.u)); d.dir = -d.dir; d.wait = 3 + Math.random()*9; continue; }
+        const x = w.ax + (w.bx - w.ax)*d.u, z = w.az + (w.bz - w.az)*d.u;
+        const sd = ((w.bx - w.ax)*_camR.x + (w.bz - w.az)*_camR.z)*d.dir; if (Math.abs(sd) > 1e-3) d.flip = sd < 0 ? -1 : 1;
+        const edge = Math.min(d.u, 1 - d.u)*len, alpha = Math.min(1, edge/.25);   // through the doorways
+        emit(x, w.y, z, d.row, Math.floor(t*9 + d.ph) % PPL.walk, d.flip, alpha >= 1 ? 1 : alpha*.98);
+      }
+    });
+  }
+  for (const k of deckWalkers.keys()) if (!seen.has(k)) deckWalkers.delete(k);
+}
+
 /* ---------- bumping into each other, and emotes ---------- */
 function emote(p, kind, dur = 2.2){ p.emo = EMO[kind]; p.emoUntil = pplNow + dur; }
 // Walkers (and bots) coming at each other on a narrow path sometimes bump: both stop for a moment and react, with
@@ -1424,6 +1452,7 @@ function updatePeople(dt, t){
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
   }
   drawBouncers(emit, t, dt);
+  drawDeckWalkers(emit, t, dt);
   lawnHolos(); lawnPicnics(dt);
   // lurkers on the dark streets
   for (const L of lurkers.values()){

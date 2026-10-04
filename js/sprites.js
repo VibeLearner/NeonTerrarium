@@ -283,6 +283,7 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
   make('sign_c_block', 'BLOCK 09', '#ff8a5a'); make('sign_c_hab', 'HAB BLOC 09', '#ffb04a'); make('sign_c_nexus', 'NEXUS GLASS', '#9ab8ff'); make('sign_c_arakawa', 'ARAKAWA TOWER', '#7ad8ff');
   make('sign_c_robot', 'ROBOT REPAIR', '#ff6a9a'); make('sign_c_mods', 'CYBER MODS', '#5af0e0', true); make('sign_c_open', 'OPEN 24H', '#ff5ad0');
   make('sign_c_pawntech', 'PAWN.TECH', '#ffcf5a', true); make('sign_c_techmods', 'TECH REPAIR/MODS', '#5ae8ff'); make('sign_c_noodlebar', 'NOODLE BAR', '#ff7ad0', true);
+  make('sign_c_lift', 'LIFT UP-DOWN', '#ff5ad0', true);
   make('sign_c_ramen', 'RAMEN', '#ffb04a', true); make('sign_c_gear', 'GEAR.SCRAP', '#7ae8ff');
   make('sign_w_neondome', 'NEON DOME', '#ff5ad0', true); make('sign_w_nightclub', 'NIGHTCLUB.OPEN 24H', '#5ae8ff');
   make('sign_w_club', 'CLUB', '#b07aff'); make('sign_w_drinks', 'DRINKS', '#b07aff'); make('sign_w_music', 'MUSIC', '#b07aff');

@@ -2130,6 +2130,7 @@ function signShop(lot, st, P0){
   if (floors > 2 && chance(.7)){ const g = pick(GLYPH_V), Fg = under(P, T(w/2 - .14, 0, d/2 + .02, 0)); plant(g, Fg, 0, h0 + .95, .03, 1, 'c', true); glow(Fg, 0, h0 + .95, .05, GLYPH_GLOW[g], .5); }   // a vertical glyph sign up the corner
   bulbString(P, -w/2, h0 + .08, d/2 + .45, w/2, h0 + .08, d/2 + .45, .06);
   if (!NO_ROOF){ const Pr = under(P, T(last.ox, y, last.oz, 0)); box(COM.wood2, Pr, 0, .05, 0, last.w + .08, .1, last.d + .08); roofItems(st, Pr, last.w, last.d, lot); }
+  lot.roof = roofCorners(under(P, T(last.ox, y, last.oz, 0)), last.w, last.d);   // for a side pod's rig to stand on
   Object.assign(lot, { height: y + (NO_ROOF ? 0 : .1), floors, occupied: true });
 }
 // a person drawn as boxes (shopkeepers behind counters)

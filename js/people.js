@@ -1370,9 +1370,25 @@ function liftRide(p, dt, t){
 // the cab: a little cage with a floor, corner posts, a roof, mesh on two sides and a lamp
 const CAB_H = .95;
 const CAB_MATS = { frame: toon(0x2e3036), iron: toon(0x5a3a2a), mesh: toon(0x6a6e74), lamp: toon(0x5a4630, { em: 0xffcf7a, kind: 'bulb' }) };
+// the commercial cab (after the neon glass lift): dark corner posts, glass all round, a cyan neon floor edge, a magenta
+// one at the roof, a warm lamp
+const CAB_GLASS = new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: .22, depthWrite: false });
+const CAB_NEON = { cyan: toon(0x145452, { em: 0x38e8e0, kind: 'neon' }), pink: toon(0x5a1d3a, { em: 0xff4fa3, kind: 'neon' }) };
 function liftCab(c){
-  const k = ckey(c.i, c.j); let e = liftCabs.get(k);
-  if (!e){
+  const k = ckey(c.i, c.j), style = (c.liftCab && c.liftCab.style) || 'low'; let e = liftCabs.get(k);
+  if (e && e.style !== style){ scene.remove(e.g); liftCabs.delete(k); e = null; }   // the pod changed zone: a new cab
+  if (e) return e;
+  if (style === 'com'){
+    const g = new THREE.Group(), add = (mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); g.add(m); return m; };
+    add(CAB_MATS.frame, 0, .02, 0, .42, .04, .42); add(CAB_MATS.frame, 0, CAB_H, 0, .44, .05, .44);
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(CAB_MATS.frame, sx*.2, CAB_H/2, sz*.2, .035, CAB_H, .035);
+    for (const [x, z, sx, sz] of [[0, -.2, .38, .01], [.2, 0, .01, .38], [-.2, 0, .01, .38]]){ const m = add(CAB_GLASS, x, CAB_H/2, z, sx, CAB_H - .08, sz); m.renderOrder = 2; }
+    add(CAB_NEON.cyan, 0, .05, .215, .42, .02, .015); add(CAB_NEON.cyan, -.215, .05, 0, .015, .02, .42);
+    add(CAB_NEON.pink, 0, CAB_H - .04, .225, .44, .02, .015); add(CAB_NEON.pink, -.225, CAB_H - .04, 0, .015, .02, .44);
+    add(CAB_MATS.lamp, 0, CAB_H - .05, 0, .08, .03, .08);
+    scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0, style }; liftCabs.set(k, e); return e;
+  }
+  {
     const g = new THREE.Group(), add = (mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); g.add(m); };
     // CAB_H: clear of the tallest person (15 sprite pixels, 15/PX = .83, standing .02 up) with a little headroom
     add(CAB_MATS.frame, 0, .02, 0, .4, .04, .4); add(CAB_MATS.frame, 0, CAB_H, 0, .42, .05, .42);
@@ -1381,7 +1397,7 @@ function liftCab(c){
     for (let y = .15; y < CAB_H - .05; y += .1) add(CAB_MATS.mesh, -.19, y, 0, .012, .012, .38);
     add(CAB_MATS.iron, 0, .3, .19, .4, .03, .02);
     add(CAB_MATS.lamp, 0, CAB_H - .04, 0, .07, .04, .07);
-    scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0 }; liftCabs.set(k, e);
+    scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0, style }; liftCabs.set(k, e);
   }
   return e;
 }

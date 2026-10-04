@@ -1390,6 +1390,7 @@ const CAB_MATS = { frame: toon(0x2e3036), iron: toon(0x5a3a2a), mesh: toon(0x6a6
 const CAB_GLASS = new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: .22, depthWrite: false });
 const CAB_NEON = { cyan: toon(0x145452, { em: 0x38e8e0, kind: 'neon' }), pink: toon(0x5a1d3a, { em: 0xff4fa3, kind: 'neon' }) };
 const CAB_IND = { steel: toon(0x34363a), rust: toon(0x4a3026), neon: toon(0x5a1010, { em: 0xff3a24, kind: 'neon' }), inside: toon(0x4a2412, { em: 0xff7a30, kind: 'window' }) };
+const CAB_LUX = { gold: toon(0xc49a48), glass: new THREE.MeshBasicMaterial({ color: 0xbfe0e8, transparent: true, opacity: .18, depthWrite: false }) };
 function liftCab(c){
   const k = ckey(c.i, c.j), style = (c.liftCab && c.liftCab.style) || 'low'; let e = liftCabs.get(k);
   if (e && e.style !== style){ scene.remove(e.g); liftCabs.delete(k); e = null; }   // the pod changed zone: a new cab
@@ -1402,6 +1403,16 @@ function liftCab(c){
     add(CAB_NEON.cyan, 0, .05, .215, .42, .02, .015); add(CAB_NEON.cyan, -.215, .05, 0, .015, .02, .42);
     add(CAB_NEON.pink, 0, CAB_H - .04, .225, .44, .02, .015); add(CAB_NEON.pink, -.225, CAB_H - .04, 0, .015, .02, .44);
     add(CAB_MATS.lamp, 0, CAB_H - .05, 0, .08, .03, .08);
+    scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0, style }; liftCabs.set(k, e); return e;
+  }
+  if (style === 'lux'){   // the luxury cab: a glass capsule between gold caps, gold ribs, a little gold dome, a warm lamp
+    const g = new THREE.Group(), addG = (geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); g.add(m); return m; };
+    addG(U.cyl16, CAB_LUX.gold, 0, .03, 0, .46, .06, .46); addG(U.cyl16, CAB_LUX.gold, 0, CAB_H + .01, 0, .48, .07, .48);
+    const gl = addG(U.cyl16, CAB_LUX.glass, 0, CAB_H/2, 0, .44, CAB_H - .06, .44); gl.renderOrder = 2;
+    for (let k = 0; k < 6; k++){ const a = k*TAU/6; addG(U.box, CAB_LUX.gold, Math.sin(a)*.22, CAB_H/2, Math.cos(a)*.22, .02, CAB_H, .02); }
+    addG(U.cyl16, CAB_LUX.gold, 0, .32, 0, .45, .02, .45);
+    addG(U.lxDome, CAB_LUX.gold, 0, CAB_H + .04, 0, .16, .1, .16);
+    addG(U.box, CAB_MATS.lamp, 0, CAB_H - .04, 0, .07, .03, .07);
     scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0, style }; liftCabs.set(k, e); return e;
   }
   if (style === 'ind'){   // the industrial cab (after the works tower): a heavy steel box open at the front, red neon round

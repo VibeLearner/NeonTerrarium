@@ -1237,7 +1237,7 @@ function buildTower(lot, st, P0){
 }
 function slabTower(lot, st, P0){
   let w=rnd(1.9,2.3), d=rnd(1.9,2.3), y=0, fl=0, last=null;
-  const floors = irand(7,11), mat = pick(st.walls);
+  const floors = lot.mf ? Math.max(1, Math.min(irand(7,11), lot.mf)) : irand(7,11), mat = pick(st.walls);   // (built into a gap under a side pod: low enough to fit)
   // lobby: recessed glass floor under the first slab, on columns
   const lobby = { w:w-.5, d:d-.5, h:FH, y:0, ox:0, oz:0, ry:0 };
   glassRoom(P0, lobby, pick([M.interiorCool,M.winLit]));
@@ -1256,7 +1256,7 @@ function slabTower(lot, st, P0){
     } else {
       const P = chunkBox(P0, c, chance(.3)?pick(st.walls):mat, .04);
       const F = decorateChunk(st, P, c, fl, lot, fl===1);
-      if (fl > 2 && chance(.3)){   // a rounded pod cantilevered off the side
+      if (fl > 2 && !lot.mf && chance(.3)){   // a rounded pod cantilevered off the side
         const side = pick([0, PI/2, PI, -PI/2]), pw = rnd(1.3,1.7), pd = rnd(1.1,1.4);
         const out = (side===0||side===PI ? d : w)/2 + pd/2 - .35;
         pod(st, P0, { w:pw, d:pd, h:FH*1.1, y:y+.02, ox:Math.sin(side)*out, oz:Math.cos(side)*out, ry:0 }, { face: side, R: rnd(.4,.6) });
@@ -1273,6 +1273,8 @@ function slabTower(lot, st, P0){
   }
   Object.assign(lot, { height:y, floors, occupied:true });
   const Pr = under(P0, T(0,y,0));
+  lot.roof = roofCorners(Pr, w, d);   // for a side pod's platform to stand on
+  if (NO_ROOF) return;                 // (another building stands on it)
   roofItems(st, Pr, w, d, lot);
   if (chance(.6)){ cyl(M.frame,P0,w/2-.2,y+.9,d/2-.2,.03,1.8); box(M.neonPink,P0,w/2-.2,y+1.82,d/2-.2,.06,.06,.06); glow(P0,w/2-.2,y+1.84,d/2-.2,'pink',.7); }
 }

@@ -308,8 +308,9 @@ function stackRun(c, secs, y, tag, first){
     if (upper && sec.zone === 'mid' && prevDeck) types = [[foodDeck, 5]].concat(types);   // decks of stalls like to pile up
     let builder = pickWeighted(types);
     if (lot.aloft && sec.zone === 'mid' && ![signShop, tiledShop, glassTower].includes(builder)) builder = pickWeighted([[signShop, 3], [tiledShop, 2], [glassTower, 1]]);   // on a pod's deck: a building that keeps to it
+    if (lot.aloft && sec.zone === 'high' && ![slabTower, roundTower, twistTower, gardenTower, domeTower, shellTower].includes(builder)) builder = pickWeighted([[slabTower, 3], [roundTower, 2], [twistTower, 1], [gardenTower, 1], [domeTower, 1], [shellTower, 1]]);   // (a tower that keeps to the platform)
     if (lot.aloft && sec.zone === 'ind' && ![hall, partsWarehouse].includes(builder)) builder = pickWeighted([[hall, 3], [partsWarehouse, 2]]);   // (a works that keeps to the deck)
-    if (sec.mf){ lot.mf = sec.mf; if (sec.zone === 'low') builder = buildTenement; else if (sec.zone === 'mid') builder = signShop; else if (sec.zone === 'ind') builder = hall; }   // built into a gap: a tenement (or shop) short enough to fit
+    if (sec.mf){ lot.mf = sec.mf; if (sec.zone === 'low') builder = buildTenement; else if (sec.zone === 'mid') builder = signShop; else if (sec.zone === 'ind') builder = hall; else if (sec.zone === 'high') builder = slabTower; }   // built into a gap: a tenement (or shop) short enough to fit
     // most commercial buildings stand on a ring of market stalls opening onto the street (the stall streets, decks
     // and plazas are stalls already, so they stand on the ground)
     const onStalls = !upper && !sec.mf && !lot.aloft && sec.zone === 'mid' && !STALL_TYPES.has(builder) && hash('stallbase', c.i, c.j, sec.seed) % 100 < 60;
@@ -625,9 +626,118 @@ function liftShaft(F, x, z, base, y0){
   for (const s of [-1, 1]) box(M.hazard, F, x + h + .01, base + .53, z + s*h, .02, 1.0, .05);
   box(M.hazard, F, x + h + .01, base + 1.04, z, .02, .05, .5);
 }
+// The luxury pod's platform, after the garden-tower references: no scaffold at all, but a finished podium the tower
+// stands on. A cream stone deck with a gold edge, a glass storey under it lit from inside behind gold mullions, a stone
+// soffit, and slim round stone columns with gold collars standing on anchor points (the roof's corners below, or plinths
+// on the street). Glass balustrades with a gold handrail, round planters with bonsai at the corners. The lift is a glass
+// tube ringed in gold with a gold dome, its cab a glass capsule; the walkways are glass skybridges between gold lattice
+// trusses, a gold arch beneath.
+const LUX_STONE = toon(0xe6dccb), LUX_STONE2 = toon(0xcfc3ad);
+const LUX_GLASS = new THREE.MeshBasicMaterial({ color: 0x8a8068, transparent: true, opacity: .16, depthWrite: false, side: THREE.DoubleSide }); LUX_GLASS.userData.colorOnly = true;
+function luxCol(P, x, z, y0, y1, r = .08){   // a round stone column, gold collars at the foot, head and every couple of metres
+  put(U.cyl16, LUX_STONE, under(P, T(x, (y0 + y1)/2, z, 0, 2*r, y1 - y0, 2*r)));
+  for (const y of [y0 + .05, y1 - .05]) put(U.cyl16, M.idGold, under(P, T(x, y, z, 0, 2*r + .06, .07, 2*r + .06)));
+  for (let y = y0 + 2; y < y1 - 1; y += 2) put(U.cyl16, M.idGold, under(P, T(x, y, z, 0, 2*r + .03, .04, 2*r + .03)));
+}
+function luxTube(F, x, z, base, y0){
+  const r = .27, top = y0 + 1.12;
+  put(U.cyl16, LUX_GLASS, under(F, T(x, (base + top)/2, z, 0, 2*r, top - base, 2*r)));
+  for (let k = 0; k < 8; k++){ const a = k*TAU/8 + TAU/16; box(M.idGold, F, x + Math.sin(a)*r, (base + top)/2, z + Math.cos(a)*r, .025, top - base, .025); }
+  for (let y = base + .9; y < top - .2; y += .9) put(U.torus, M.idGold, under(F, T(x, y, z, 0, 2*r + .02, 2*r + .02, .5, PI/2)));
+  // the foot: a round stone plinth with a gold band; the head: a stone drum, a gold dome and finial
+  put(U.cyl16, LUX_STONE, under(F, T(x, base + .05, z, 0, 2*r + .16, .1, 2*r + .16))); put(U.cyl16, M.idGold, under(F, T(x, base + .11, z, 0, 2*r + .1, .03, 2*r + .1)));
+  put(U.cyl16, LUX_STONE, under(F, T(x, top + .07, z, 0, 2*r + .12, .14, 2*r + .12))); put(U.cyl16, M.idGold, under(F, T(x, top + .15, z, 0, 2*r + .14, .03, 2*r + .14)));
+  put(U.lxDome, M.idGold, under(F, T(x, top + .16, z, 0, r*.9, r*.75, r*.9)));
+  cyl(M.idGold, F, x, top + .16 + r*.75 + .06, z, .012, .14); sph(M.idGoldLit, F, x, top + .16 + r*.75 + .14, z, .025);
+  // a gold call panel by the gate, and the gate itself: two slim gold posts and a lintel on the street side
+  box(LUX_STONE2, F, x + r + .1, base + .45, z - r - .02, .08, .5, .1); box(M.screen || M.idGoldLit, F, x + r + .145, base + .52, z - r - .02, .01, .1, .06);
+  for (const s of [-1, 1]) box(M.idGold, F, x + r + .01, base + .55, z + s*.2, .035, 1.0, .035);
+  box(M.idGold, F, x + r + .01, base + 1.07, z, .035, .05, .44);
+}
+function liftPlatformLux(c, y0){
+  R = mulberry32(hash('liftl', c.i, c.j, Math.round(y0*100)));
+  const P = T(c.x, 0, c.z), H = 1.22, base = c.belowTop ?? CURB, onRoof = c.belowTop != null;
+  const sup = liftSupports(c, y0), supKey = new Set(sup.map(d => d.join()));
+  const pH = .5, yb = y0 - .14 - pH;   // the glass storey's height, the soffit's underside
+  // the deck: a stone slab with a gold band round its edge
+  box(LUX_STONE, P, 0, y0 - .07, 0, 2*H, .14, 2*H);
+  for (const d of SIDES4){ const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))); box(M.idGold, F, 0, y0 - .07, H + .005, 2*H + .02, .04, .012); }
+  // the glass storey under it: a lit room behind gold mullions, then the stone soffit
+  const gw = 2*H - .24, lit = pick(LIT_ROOMS);
+  box(LUX_STONE2, P, 0, y0 - .14 - pH/2, 0, gw - .12, pH, gw - .12);
+  for (const d of SIDES4){ const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1])));
+    box(lit, F, 0, y0 - .14 - pH/2, gw/2 - .055, gw - .16, pH - .1, .01);
+    box(LUX_GLASS, F, 0, y0 - .14 - pH/2, gw/2, gw, pH, .01);
+    for (let x = -gw/2; x <= gw/2 + .01; x += gw/6) box(M.idGold, F, x, y0 - .14 - pH/2, gw/2 + .01, .03, pH, .03); }
+  box(LUX_STONE, P, 0, yb - .05, 0, 2*H - .1, .1, 2*H - .1);
+  for (const d of SIDES4){ const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))); box(M.idGold, F, 0, yb - .05, H - .045, 2*H - .08, .03, .012); }
+  // the columns: on the roof's corners below (taken in), or on plinths on the street under the platform's corners
+  const QS = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  let feet = QS.map(([sx, sz]) => [sx*.92, sz*.92]);
+  if (onRoof){
+    const rc = c.liftRoof || QS.map(([sx, sz]) => [c.x + sx*.75, base, c.z + sz*.75]);
+    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
+    feet = QS.map(([sx, sz]) => { let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
+      const k = .2, dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1;
+      return [clamp(best[0] - c.x + dx/l*k, -H + .2, H - .2), clamp(best[2] - c.z + dz/l*k, -H + .2, H - .2)]; });
+  }
+  for (const [x, z] of feet){
+    box(LUX_STONE2, P, x, base + .08, z, .3, .16, .3); box(M.idGold, P, x, base + .165, z, .26, .02, .26);
+    luxCol(P, x, z, base + .16, yb - .1);
+  }
+  // round planters on the deck's corners, a bonsai in each, hanging green off the soffit here and there
+  for (const [sx, sz] of QS){ const x = sx*(H - .02), z = sz*(H - .02);
+    put(U.cyl16, LUX_STONE, under(P, T(x, y0 + .06, z, 0, .36, .12, .36))); put(U.cyl16, M.idGold, under(P, T(x, y0 + .125, z, 0, .37, .02, .37)));
+    if (chance(.8*S.green)) plant('bonsai', P, x, y0 + .13, z, rnd(.8, 1.0)); }
+  for (let k = 0; k < 4; k++) if (chance(.5*S.green)){ const d = SIDES4[k], F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))); plant(hangKind(), F, rnd(-.8, .8), yb - .1, H - .05, rnd(.55, .75), 't', true); }
+  // the lift: a gold-ringed glass tube on a side with no walkway
+  const free = SIDES4.filter(d => !supKey.has(d.join()));
+  const hs = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0];
+  const LX = .5, LZ = 1.5;
+  { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));
+    luxTube(F, LX, LZ, CURB, y0);
+    const Wp = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
+    const cc = Wp(LX, LZ), fr = Wp(LX + .29, LZ), ix = Wp(LX, .9), g = Wp(1, 0), o = Wp(0, 0), gx = g.x - o.x, gz = g.z - o.z;
+    c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz), style: 'lux' };
+  }
+  // glass balustrades with a gold handrail (gaps for the walkways and the lift)
+  for (const d of SIDES4){
+    const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))), bridge = supKey.has(d.join()), lift = d === hs;
+    const runs = lift ? [[-H + .2, LX - .32], [LX + .32, H - .2]] : bridge ? [[-H + .2, -.5], [.5, H - .2]] : [[-H + .2, H - .2]];
+    for (const [a, b] of runs){ if (b - a < .05) continue;
+      box(LUX_GLASS, F, (a + b)/2, y0 + .22, H - .04, b - a, .4, .01);
+      box(M.idGold, F, (a + b)/2, y0 + .43, H - .04, b - a + .02, .025, .035);
+      for (const x of [a, b]) box(M.idGold, F, x, y0 + .22, H - .04, .03, .44, .03); }
+  }
+  // the walkways: glass skybridges between gold lattice trusses, a gold arch under each, to a doorway in each neighbour
+  c.walks = [];
+  for (const d of sup){
+    const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))), z0 = 1.2, z1 = LOT - 1.05, L = z1 - z0, zm = (z0 + z1)/2, w = .8, ht = .62;
+    box(LUX_STONE, F, 0, y0 - .05, zm, w + .06, .1, L);
+    for (const s of [-1, 1]){
+      trussBeam(F, s*w/2, z0, s*w/2, z1, y0, ht, M.idGold, .014);
+      box(LUX_GLASS, F, s*(w/2 - .02), y0 + ht/2, zm, .01, ht - .04, L);
+      // the arch: a curve of gold from the platform to the wall, its spandrel braced up to the deck
+      const n = 8, rise = .45;
+      for (let k = 0; k < n; k++){ const u0 = k/n, u1 = (k + 1)/n, ya = y0 - .1 - rise*4*u0*(1 - u0), yc = y0 - .1 - rise*4*u1*(1 - u1);
+        strut(M.idGold, F, s*w/2, ya - .12, z0 + L*u0, s*w/2, yc - .12, z0 + L*u1, .03);
+        if (k) strut(M.idGold, F, s*w/2, ya - .12, z0 + L*u0, s*w/2, y0 - .1, z0 + L*u0, .015); }
+    }
+    box(LUX_GLASS, F, 0, y0 + ht, zm, w, .01, L); box(M.idGold, F, 0, y0 + ht, zm, .03, .02, L);   // the glass roof, a gold ridge
+    // the doorways: a stone surround with a gold frame in the neighbour's wall, a gold frame on the platform's side
+    box(LUX_STONE, F, 0, y0 + .52, z1 + .16, .84, 1.08, .36);
+    box(M.idGold, F, 0, y0 + .5, z1 - .03, .64, 1.02, .05);
+    box(LUX_STONE2, F, 0, y0 + 1.06, z1 - .05, .76, .06, .1);
+    box(M.idGold, F, 0, y0 + .5, z0 + .02, .62, 1.0, .05);
+    const a = new THREE.Vector3(0, y0, z0 + .2).applyMatrix4(F), b = new THREE.Vector3(0, y0, z1 - .2).applyMatrix4(F);
+    const dA = new THREE.Vector3(0, 0, z0 + .05).applyMatrix4(F), dB = new THREE.Vector3(0, 0, z1 - .06).applyMatrix4(F), o0 = new THREE.Vector3(0, 0, 0).applyMatrix4(F), fz = new THREE.Vector3(0, 0, 1).applyMatrix4(F), nx = fz.x - o0.x, nz = fz.z - o0.z;
+    c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01, doors: [{ x: dA.x, z: dA.z, n: [nx, nz] }, { x: dB.x, z: dB.z, n: [-nx, -nz] }], col: 0xd8c8a0 });
+  }
+}
 function liftScaffold(c, y0){
   if (c.sections[0] && c.sections[0].zone === 'mid') return liftScaffoldCom(c, y0);   // a commercial pod: the heavy steel rig
-  if (c.sections[0] && c.sections[0].zone === 'ind') return liftScaffoldInd(c, y0);   // an industrial pod: the trestle   // a commercial pod: the heavy steel rig
+  if (c.sections[0] && c.sections[0].zone === 'ind') return liftScaffoldInd(c, y0);
+  if (c.sections[0] && c.sections[0].zone === 'high') return liftPlatformLux(c, y0);   // a luxury pod: a finished platform, no scaffold   // an industrial pod: the trestle   // a commercial pod: the heavy steel rig
   R = mulberry32(hash('lift', c.i, c.j, Math.round(y0*100)));
   const P = T(c.x, 0, c.z), E = .98, base = c.belowTop ?? CURB, onRoof = c.belowTop != null;   // on the roof of the building below, if there is one   // poles just inside the deck's corners, clear of the sidewalk's corners
   const sup = liftSupports(c, y0), supKey = new Set(sup.map(d => d.join()));

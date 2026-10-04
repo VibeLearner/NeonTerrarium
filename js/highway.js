@@ -454,7 +454,7 @@ function hwPulseRebuild(){
 }
 const hwFlares = (() => { const m = new THREE.InstancedMesh(U.box, HWM.flare, HW_CAR_MAX); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
 let hwCars = [];
-function hwClearCars(h){ hwPulseDirty = true; if (!h){ return; } hwCars = hwCars.filter(c => c.h !== h); h.spawnAt = null; }
+function hwClearCars(h){ hwPulseDirty = true; if (!h){ return; } hwCars = hwCars.filter(c => c.h !== h); h.queue = null; }
 const _hbz = new THREE.Vector3();
 // each lane's whole course: down from the sky, the ramp, the deck, through the terminal, up the ramp out and away
 function hwLanePaths(h){
@@ -499,30 +499,35 @@ function hwTraffic(t){
   hwBusyAt = t; let built = 0, secs = 0;
   for (const c of cells.values()){ if (c.sections.length){ built++; secs += c.sections.length; } }
   const m = built + secs*.4 + cells.size*.15 + megas.size*6;
-  return (hwBusy = Math.max(0, Math.min(1, m/160)));
+  return (hwBusy = Math.max(0, Math.min(1, m/220)));
 }
-// the wait before a lane's next car: bursts of two or three close together, then a lull, rather than a metronome. The
-// busier the city, the shorter the waits.
-function hwNextGap(busy, lane){
-  const mean = (8 - 6.4*busy)*lane;
-  if (Math.random() < .28) return 1.0 + Math.random()*.7;                 // right behind the last
-  return Math.min(mean*1.8, .8 + (-Math.log(1 - Math.random()*.97))*mean);   // otherwise anything from soon to a long gap
-}
+// Traffic comes in waves. A young city sends two or three cars together every 30 to 40 seconds; as the city grows the waves
+// come more often and carry more cars, up to a steady stream (about a car a second on a two-lane road) in a big one.
+const HW_RATE_MIN = 2.5/35, HW_RATE_MAX = 1.05;   // cars a second, a two-lane highway
 function updateHighways(dt, t){
-  // traffic: each finished highway sends cars down each lane, uneven and more of them as the city grows; none catches another
   const busy = hwTraffic(t);
   for (const h of highways){
     if (!h.done || !h.view) continue;
     const LP = hwLanePaths(h);
-    if (!h.spawnAt){ h.spawnAt = LP.map(() => t + Math.random()*5); h.laneMul = LP.map(() => .8 + Math.random()*.5); }
-    LP.forEach((P, l) => {
-      if (t < h.spawnAt[l]) return;
-      h.spawnAt[l] = t + hwNextGap(busy, h.laneMul[l]);
-      if (hwCars.length >= HW_CAR_MAX) return;
-      let lastS = Infinity; for (const c of hwCars) if (c.h === h && c.lane === l) lastS = Math.min(lastS, c.s);
-      if (lastS < 2.4) return;
+    if (!h.queue){ h.queue = []; h.waveAt = t + 2 + Math.random()*8; }
+    if (t >= h.waveAt){
+      const rate = HW_RATE_MIN*Math.pow(HW_RATE_MAX/HW_RATE_MIN, Math.pow(busy, 1.25))*(h.lanes/2);
+      const n = Math.max(2, Math.round(2 + 3*busy + Math.random()*1.4 - .2));
+      let at = t; for (let k = 0; k < n; k++){ if (k) at += .9 + Math.random()*1.4; h.queue.push({ at, lane: Math.floor(Math.random()*h.lanes) }); }
+      h.waveAt = t + (n/rate)*(.75 + Math.random()*.5);
+    }
+    h.queue = h.queue.filter(q => {
+      if (t < q.at) return true;
+      if (hwCars.length >= HW_CAR_MAX) return false;
+      let lane = q.lane, lastS = Infinity;
+      for (let tries = 0; tries < h.lanes; tries++){
+        lastS = Infinity; for (const c of hwCars) if (c.h === h && c.lane === lane) lastS = Math.min(lastS, c.s);
+        if (lastS >= 2.4) break; lane = (lane + 1)%h.lanes;
+      }
+      if (lastS < 2.4){ q.at = t + .6; return true; }   // every lane has one just entering: a moment later
       const r = Math.random(), kind = r < .45 ? 0 : r < .7 ? 1 : r < .9 ? 2 : 3;
-      hwCars.push({ h, lane: l, s: 0, k: 0, kind });
+      hwCars.push({ h, lane, s: 0, k: 0, kind });
+      return false;
     });
   }
   // move and draw the cars

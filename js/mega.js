@@ -2254,11 +2254,62 @@ function policeBike(m, idx, pad){
   return b;
 }
 const nearNode = (x, z) => { let best = null, bd = Infinity; for (const c of (typeof patrolNodes !== 'undefined' ? patrolNodes : [])){ const d = (c.x - x)**2 + (c.z - z)**2; if (d < bd){ bd = d; best = c; } } return best; };
+// Bikes keep to the streets and never pass through anything: see bikeStreetRoute.
+const BIKE_R = .32;   // half a bike's width, and some
+function bikeClear(ax, az, bx, bz, r = BIKE_R){
+  if (typeof freePt !== 'function') return true;
+  const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L/.12)), px = L ? -(bz - az)/L*r : 0, pz = L ? (bx - ax)/L*r : 0;
+  for (let k = 0; k <= n; k++){ const u = k/n, x = ax + (bx - ax)*u, z = az + (bz - az)*u;
+    if (!freePt(x, z) || !freePt(x + px, z + pz) || !freePt(x - px, z - pz)) return false; }
+  return true;
+}
+// the way between two points for a bike: a search over a fine grid of the ground (every cell where a bike fits, its
+// width clear of buildings, pillars, street furniture and the platform's edge), the street's asphalt cheaper than the
+// sidewalks, so it keeps to the road; then pulled tight into straight runs wherever those are clear
+function bikeStreetRoute(sx, sz, tx, tz, rk = .8){
+  const S = .2, pad = 5, x0 = Math.min(sx, tx) - pad, z0 = Math.min(sz, tz) - pad, nx = Math.ceil((Math.abs(tx - sx) + 2*pad)/S) + 1, nz = Math.ceil((Math.abs(tz - sz) + 2*pad)/S) + 1;
+  if (nx*nz > 160000) return null;
+  const okC = new Int8Array(nx*nz).fill(-1), r = BIKE_R*rk;
+  const free = (i, j) => { const k = j*nx + i; if (okC[k] < 0){ const x = x0 + i*S, z = z0 + j*S;
+      okC[k] = freePt(x, z) && freePt(x + r, z) && freePt(x - r, z) && freePt(x, z + r) && freePt(x, z - r) && freePt(x + r*.7, z + r*.7) && freePt(x - r*.7, z - r*.7) && freePt(x + r*.7, z - r*.7) && freePt(x - r*.7, z + r*.7) ? 1 : 0; }
+    return okC[k] === 1; };
+  const street = (i, j) => { const x = x0 + i*S, z = z0 + j*S, dx = Math.abs(x - Math.round(x/LOT)*LOT), dz = Math.abs(z - Math.round(z/LOT)*LOT); return dx > SIDE/2 + .05 || dz > SIDE/2 + .05; };
+  const at = (x, z) => [Math.round((x - x0)/S), Math.round((z - z0)/S)];
+  const near = (x, z) => { const [ci, cj] = at(x, z); let best = null, bd = 1e9; for (let dj = -4; dj <= 4; dj++) for (let di = -4; di <= 4; di++){ const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= nx || j >= nz || !free(i, j)) continue; const d = di*di + dj*dj; if (d < bd){ bd = d; best = [i, j]; } } return best; };
+  const A = near(sx, sz), B = near(tx, tz); if (!A || !B) return null;
+  const N = nx*nz, g = new Float32Array(N).fill(1e9), from = new Int32Array(N).fill(-1), heap = [];
+  const push = (k, f) => { heap.push([f, k]); let c = heap.length - 1; while (c > 0){ const p = (c - 1) >> 1; if (heap[p][0] <= heap[c][0]) break; [heap[p], heap[c]] = [heap[c], heap[p]]; c = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length){ heap[0] = last; let c = 0; for (;;){ const l = 2*c + 1, rr = l + 1; let m = c; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (rr < heap.length && heap[rr][0] < heap[m][0]) m = rr; if (m === c) break; [heap[m], heap[c]] = [heap[c], heap[m]]; c = m; } } return top; };
+  const hgt = (i, j) => Math.hypot(i - B[0], j - B[1]);
+  const ka = A[1]*nx + A[0], kb = B[1]*nx + B[0]; g[ka] = 0; push(ka, hgt(A[0], A[1]));
+  let it = 0;
+  while (heap.length && it++ < 60000){
+    const [, k] = pop(); if (k === kb) break;
+    const i = k % nx, j = (k / nx) | 0;
+    for (const [di, dj, c] of [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.414],[1,-1,1.414],[-1,1,1.414],[-1,-1,1.414]]){
+      const ni = i + di, nj = j + dj; if (ni < 0 || nj < 0 || ni >= nx || nj >= nz || !free(ni, nj)) continue;
+      const nk = nj*nx + ni, v = g[k] + c*(street(ni, nj) ? 1 : 2.5);
+      if (v < g[nk]){ g[nk] = v; from[nk] = k; push(nk, v + hgt(ni, nj)); }
+    }
+  }
+  if (from[kb] < 0 && kb !== ka) return null;
+  const raw = []; for (let k = kb; k >= 0; k = from[k]){ raw.unshift([x0 + (k % nx)*S, z0 + ((k / nx) | 0)*S]); if (k === ka) break; }
+  // pull it tight: from each point, straight on to the furthest one it can see
+  const out = [raw[0]]; let c = 0;
+  while (c < raw.length - 1){ let f = raw.length - 1; while (f > c + 1 && !bikeClear(raw[c][0], raw[c][1], raw[f][0], raw[f][1], r)) f--; out.push(raw[f]); c = f; }
+  return out;
+}
+// from where it is (out of its bay first, straight ahead), along the streets, and the last stretch to the target only
+// if that's clear; if the streets don't connect, the old way along the walking network
 function bikeRoute(b, tx, tz, speed, direct){
-  const a = nearNode(b.x, b.z), c = nearNode(tx, tz);
-  let mid = a && c && typeof route === 'function' ? route(a.node, c.node) : null;
-  if (!mid) mid = [];
-  b.go([[b.x, b.z]].concat(mid, direct ? [[tx, tz]] : []), speed);
+  const head = [[b.x, b.z]];
+  if (b.mode === 'park' || (b.pad && Math.hypot(b.x - b.pad.x, b.z - b.pad.z) < .3)) head.push([b.pad.x + b.pad.fx*1.2, b.pad.z + b.pad.fz*1.2]);   // out of the bay
+  const [sx, sz] = head[head.length - 1];
+  let mid = bikeStreetRoute(sx, sz, tx, tz) || bikeStreetRoute(sx, sz, tx, tz, .45);   // (a tight squeeze if that's the only way)
+  if (!mid){ const nn = (x, z) => { let best = null, bd = Infinity; for (const c of (typeof patrolNodes !== 'undefined' ? patrolNodes : [])){ const d = (c.x - x)**2 + (c.z - z)**2; if (d < bd){ bd = d; best = c; } } return best; };
+    const a = nn(sx, sz), c = nn(tx, tz); mid = (a && c && typeof route === 'function' ? route(a.node, c.node) : null) || []; }
+  const last = mid.length ? mid[mid.length - 1] : [sx, sz];
+  b.go(head.concat(mid, direct && bikeClear(last[0], last[1], tx, tz, .2) ? [[tx, tz]] : []), speed);
 }
 function policeBikes(m, crew){
   const pads = m.bikePads || [], n = Math.min(pads.length, crew.size);
@@ -2315,7 +2366,7 @@ function policeBikes(m, crew){
           else {
             const d = Math.hypot(L.x - b.x, L.z - b.z);
             if (d < .45){ L.state = 'caught'; L.bike = b; b.passenger = L; b.case = null; home(b); }   // got them: onto the pillion
-            else if (d < 1.4){ b.go([[b.x, b.z], [L.x, L.z]], 3.4); }   // close: straight at them
+            else if (d < 1.4 && bikeClear(b.x, b.z, L.x, L.z)){ b.go([[b.x, b.z], [L.x, L.z]], 3.4); }   // close, nothing between: straight at them
             else if ((b.repath -= dt) <= 0){ b.repath = 1.2; bikeRoute(b, L.x, L.z, 3.4, true); }
           }
         }

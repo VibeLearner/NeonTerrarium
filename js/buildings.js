@@ -1569,8 +1569,9 @@ function partsWarehouse(lot, st, P0){
       if (chance(.5)) emitters.push(new THREE.Vector3(x, h + up + .1, -d/2 + .2).applyMatrix4(P));
     }
   }
-  for (let k=0; k<irand(1, 3); k++) crateAt(P, rnd(-w/2 + .2, -.1), 0, d/2 + .3);
-  if (chance(.7)) pottedPlant(P, w/2 - .2, d/2 + .25); if (chance(.6*S.green)) plant('fern', P, w/2 + .1, 0, d/2 - .2, 1.0);
+  if (!lot.aloft){ for (let k=0; k<irand(1, 3); k++) crateAt(P, rnd(-w/2 + .2, -.1), 0, d/2 + .3);
+    if (chance(.7)) pottedPlant(P, w/2 - .2, d/2 + .25); if (chance(.6*S.green)) plant('fern', P, w/2 + .1, 0, d/2 - .2, 1.0); }   // (on a pod's deck: nothing out front past its edge)
+  lot.roof = roofCorners(under(P, T(0, h, 0)), w, d);
   Object.assign(lot, { height: h + (NO_ROOF ? .08 : .5), floors: 2, occupied: true });
 }
 // Lube shed: an open-fronted timber shed under a glass roof, string lights, a workbench, drums of oil
@@ -2588,6 +2589,7 @@ function hall(lot, st, P0){
     F.push({F:Ff, len:f.len});
   });
   const Pr = under(P0, T(0, c.h, 0));
+  lot.roof = roofCorners(Pr, c.w, c.d);   // for a side pod's rig to stand on
   if (NO_ROOF){ box(D[st.cls].roof, P0, 0, c.h + .03, 0, c.w + .06, .06, c.d + .06); if (chance(.6*S.clutter)) annex(st, pick(F), c); Object.assign(lot, { height:c.h, floors:2, occupied:true }); return; }   // another building stands on it: a flat roof
   for (let i=0;i<3;i++){
     const z = -c.d/2 + c.d/6 + i*c.d/3;
@@ -2597,8 +2599,8 @@ function hall(lot, st, P0){
   box(M.frame, Pr, 0, .5, 0, .06, .06, c.d);   // roof catwalk rail
   chimneyAt(P0, c.w/2-.3, c.h, -c.d/2+.3);
   if (chance(.5)) chimneyAt(P0, -c.w/2+.3, c.h, c.d/2-.3);
-  if (chance(.6*S.clutter)) annex(st, pick(F), c);
-  if (chance(.5)) stairs(st, pick(F), 2);
+  if (!lot.aloft && chance(.6*S.clutter)) annex(st, pick(F), c);   // (up on a pod's deck: no shed or stairs off the edge)
+  if (!lot.aloft && chance(.5)) stairs(st, pick(F), 2);
   Object.assign(lot, { height:c.h, floors:2, occupied:true });
 }
 function silos(lot, st, P0){

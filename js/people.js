@@ -1374,6 +1374,7 @@ const CAB_MATS = { frame: toon(0x2e3036), iron: toon(0x5a3a2a), mesh: toon(0x6a6
 // one at the roof, a warm lamp
 const CAB_GLASS = new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: .22, depthWrite: false });
 const CAB_NEON = { cyan: toon(0x145452, { em: 0x38e8e0, kind: 'neon' }), pink: toon(0x5a1d3a, { em: 0xff4fa3, kind: 'neon' }) };
+const CAB_IND = { steel: toon(0x34363a), rust: toon(0x4a3026), neon: toon(0x5a1010, { em: 0xff3a24, kind: 'neon' }), inside: toon(0x4a2412, { em: 0xff7a30, kind: 'window' }) };
 function liftCab(c){
   const k = ckey(c.i, c.j), style = (c.liftCab && c.liftCab.style) || 'low'; let e = liftCabs.get(k);
   if (e && e.style !== style){ scene.remove(e.g); liftCabs.delete(k); e = null; }   // the pod changed zone: a new cab
@@ -1386,6 +1387,20 @@ function liftCab(c){
     add(CAB_NEON.cyan, 0, .05, .215, .42, .02, .015); add(CAB_NEON.cyan, -.215, .05, 0, .015, .02, .42);
     add(CAB_NEON.pink, 0, CAB_H - .04, .225, .44, .02, .015); add(CAB_NEON.pink, -.225, CAB_H - .04, 0, .015, .02, .44);
     add(CAB_MATS.lamp, 0, CAB_H - .05, 0, .08, .03, .08);
+    scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0, style }; liftCabs.set(k, e); return e;
+  }
+  if (style === 'ind'){   // the industrial cab (after the works tower): a heavy steel box open at the front, red neon round
+    // its front and top, lit orange inside from a panel on the back wall
+    const g = new THREE.Group(), add = (mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); g.add(m); return m; };
+    add(CAB_IND.steel, 0, .03, 0, .44, .06, .44); add(CAB_IND.steel, 0, CAB_H + .01, 0, .46, .08, .46);
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(CAB_IND.rust, sx*.205, CAB_H/2, sz*.205, .045, CAB_H, .045);
+    add(CAB_IND.steel, 0, CAB_H/2, -.2, .4, CAB_H - .06, .02);                                // the back wall
+    add(CAB_IND.inside, 0, CAB_H*.55, -.188, .3, CAB_H*.5, .01);                               // its lit panel
+    for (const s of [-1, 1]){ add(CAB_IND.steel, s*.2, .2, 0, .02, .3, .38);                  // the sides: a kick plate and bars
+      for (let y = .45; y < CAB_H - .05; y += .14) add(CAB_IND.rust, s*.2, y, 0, .015, .02, .38); }
+    add(CAB_IND.neon, 0, .07, .23, .44, .025, .015); add(CAB_IND.neon, 0, CAB_H - .05, .235, .46, .025, .015);   // round the open front
+    for (const s of [-1, 1]){ add(CAB_IND.neon, s*.23, CAB_H/2, .23, .015, CAB_H - .1, .015); add(CAB_IND.neon, s*.235, CAB_H - .05, 0, .015, .025, .46); }
+    add(CAB_MATS.lamp, 0, CAB_H - .05, 0, .07, .03, .07);
     scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0, style }; liftCabs.set(k, e); return e;
   }
   {

@@ -308,6 +308,7 @@ function stackRun(c, secs, y, tag, first){
     if (upper && sec.zone === 'mid' && prevDeck) types = [[foodDeck, 5]].concat(types);   // decks of stalls like to pile up
     let builder = pickWeighted(types);
     if (lot.aloft && sec.zone === 'mid' && ![signShop, tiledShop, glassTower].includes(builder)) builder = pickWeighted([[signShop, 3], [tiledShop, 2], [glassTower, 1]]);   // on a pod's deck: a building that keeps to it
+    if (lot.aloft && sec.zone === 'ind' && ![hall, partsWarehouse].includes(builder)) builder = pickWeighted([[hall, 3], [partsWarehouse, 2]]);   // (a works that keeps to the deck)
     if (sec.mf){ lot.mf = sec.mf; if (sec.zone === 'low') builder = buildTenement; else if (sec.zone === 'mid') builder = signShop; else if (sec.zone === 'ind') builder = hall; }   // built into a gap: a tenement (or shop) short enough to fit
     // most commercial buildings stand on a ring of market stalls opening onto the street (the stall streets, decks
     // and plazas are stalls already, so they stand on the ground)
@@ -479,6 +480,41 @@ function liftScaffoldCom(c, y0){
 const IND_RUST = toon(0x4a3026), IND_RUST2 = toon(0x5e3a28), IND_STEEL = toon(0x34363a), IND_RED = toon(0x5a1010, { em: 0xff3a24, kind: 'bulb' });
 function iBeam(mat, P, x, z, y0, y1, w = .16){ box(mat, P, x, (y0 + y1)/2, z, w, y1 - y0, .05); for (const s of [-1, 1]) box(mat, P, x, (y0 + y1)/2, z + s*w/2, w, y1 - y0, .04); }
 function indLight(P, x, y, z){ box(M.metalDark, P, x, y, z, .1, .08, .1); box(IND_RED, P, x, y - .05, z, .08, .02, .08); glow(P, x, y - .07, z, 'ember', .4); }
+// The industrial lift (after the works tower reference): a heavy lattice tower of rusted angle posts, zigzag bracing
+// on three faces, a head housing with a big pulley, cables and a counterweight, and at the foot the winding motor with
+// its flywheel, a red warning lamp and a hazard gate. The light is the cab's own: red neon round it, orange inside.
+// F: local +z out from the deck's side; the gate is on the +x face, along the street.
+const IND_LIFT_NEON = toon(0x5a1010, { em: 0xff3a24, kind: 'neon' });
+function liftShaftInd(F, x, z, base, y0){
+  const h = .24, top = y0 + 1.12;
+  for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]){ box(IND_RUST, F, x + sx*h, (base + top)/2, z + sz*h, .06, top - base, .06); }
+  // zigzag lattice on the back and both sides (the gate face stays open), a ring every bay
+  const bay = .7;
+  for (let y = base + .1, k = 0; y < top - .2; y += bay, k++){
+    const y1 = Math.min(top - .1, y + bay), fl = k % 2 ? 1 : -1;
+    for (const [ax, az, bx, bz] of [[-h, -h, h, -h], [-h, h, h, h], [-h, -h, -h, h]]){
+      box(IND_STEEL, F, x + (ax + bx)/2, y1, z + (az + bz)/2, Math.abs(bx - ax) + .07, .045, Math.abs(bz - az) + .07);
+      const [p0, p1] = fl > 0 ? [[ax, az], [bx, bz]] : [[bx, bz], [ax, az]];
+      strut(IND_RUST2, F, x + p0[0], y + .03, z + p0[1], x + p1[0], y1 - .03, z + p1[1], .016);
+    }
+  }
+  for (let y = base + 2.2; y < top - .6; y += 2.2) for (const s of [-1, 1]) box(IND_RED, F, x + h + .035, y, z + s*h, .012, .05, .025);   // red marker lamps up the front posts
+  // the head: a heavy housing over the tower, the pulley on top, a red lamp
+  box(IND_STEEL, F, x, top + .1, z, .68, .2, .68); box(IND_RUST, F, x, top + .22, z, .5, .06, .5);
+  put(U.torus, IND_RUST2, under(F, T(x, top + .42, z, 0, .4, .4, .4, 0, PI/2)));
+  indLight(F, x + .3, top - .02, z + .3);
+  // cables down the back, and a big counterweight riding on them
+  for (const s of [-1, 1]) strut(M.metalDark, F, x + s*.08, base + .5, z - .19, x + s*.08, top, z - .19, .007);
+  box(IND_STEEL, F, x, (base + top)*.6, z - .19, .26, .5, .07); box(M.hazard, F, x, (base + top)*.6 - .2, z - .15, .26, .06, .01);
+  // at the foot: the winding motor and its flywheel, a red lamp over the gate, a hazard-striped gate across the front
+  box(IND_STEEL, F, x - .5, base + .24, z, .34, .48, .44); box(IND_RUST, F, x - .5, base + .5, z, .26, .06, .3);
+  put(U.cyl16, IND_RUST2, under(F, T(x - .5, base + .32, z + .25, 0, .4, .06, .4, PI/2)));
+  box(IND_RED, F, x - .33, base + .4, z - .12, .01, .04, .1);
+  for (const s of [-1, 1]) box(M.hazard, F, x + h + .02, base + .53, z + s*h, .03, 1.0, .06);
+  box(M.hazard, F, x + h + .02, base + 1.05, z, .03, .06, .54);
+  box(IND_LIFT_NEON, F, x + h + .045, base + 1.1, z, .01, .02, .5);
+  glow(F, x + h + .1, base + 1.05, z, 'ember', .3);
+}
 function liftScaffoldInd(c, y0){
   R = mulberry32(hash('lifti', c.i, c.j, Math.round(y0*100)));
   const P = T(c.x, 0, c.z), E = .92, base = c.belowTop ?? CURB, onRoof = c.belowTop != null;
@@ -490,45 +526,52 @@ function liftScaffoldInd(c, y0){
     box(IND_RUST, F, 0, y0 - .2, 1.15, 2.42, .34, .1);
     for (let x = -1.1; x <= 1.11; x += .22) box(M.metalDark, F, x, y0 - .2, 1.205, .03, .03, .01); }   // rivets
   // the columns: concrete piers, I-beams, deep girders between them, X braces in each bay
+  // the columns stand on anchor points: the roof's corners (taken in so the beam and its plate sit wholly on it) when
+  // there's a building below, else the deck's corners on the street; the girders run between them
   const cols = [[-E, -E], [E, -E], [E, E], [-E, E]];
-  for (const [x, z] of cols){ if (!onRoof) box(M.concM, P, x, base + .3, z, .5, .6, .5); iBeam(rust(), P, x, z, base + (onRoof ? 0 : .6), y0 - .37); }
-  const edges = [[-E, -E, E, -E], [E, -E, E, E], [E, E, -E, E], [-E, E, -E, -E]];
+  let feet = cols.map(([x, z]) => [x, z]);
+  if (onRoof){
+    const rc = c.liftRoof || cols.map(([sx, sz]) => [c.x + Math.sign(sx)*.75, base, c.z + Math.sign(sz)*.75]);
+    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
+    feet = cols.map(([sx, sz]) => { let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
+      const k = .22 + rnd(0, .08), dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1; return [best[0] - c.x + dx/l*k, best[2] - c.z + dz/l*k]; });
+  }
+  for (const [x, z] of feet){ if (!onRoof) box(M.concM, P, x, base + .3, z, .5, .6, .5); else box(M.concDD, P, x, base + .03, z, .34, .06, .34); iBeam(rust(), P, x, z, base + (onRoof ? .06 : .6), y0 - .37); }
+  const edges = feet.map((f, k) => [f[0], f[1], feet[(k + 1) % 4][0], feet[(k + 1) % 4][1]]);
+  const fx0 = Math.min(...feet.map(f => f[0])) + .15, fx1 = Math.max(...feet.map(f => f[0])) - .15, fz0 = Math.min(...feet.map(f => f[1])) + .15, fz1 = Math.max(...feet.map(f => f[1])) - .15;
   const lv = [base + (onRoof ? .1 : .6)]; for (let y = lv[0] + rnd(1.5, 1.9); y < y0 - .9; y += rnd(1.5, 1.9)) lv.push(y); lv.push(y0 - .37);
   for (let k = 1; k < lv.length; k++) for (const [ax, az, bx, bz] of edges){
     if (k < lv.length - 1) box(rust(), P, (ax + bx)/2, lv[k], (az + bz)/2, Math.abs(bx - ax) + .14, .14, Math.abs(bz - az) + .14);   // girder
     if (chance(.8)){ strut(rust(), P, ax, lv[k - 1] + .08, az, bx, lv[k] - .08, bz, .035); strut(rust(), P, bx, lv[k - 1] + .08, bz, ax, lv[k] - .08, az, .035); }   // X brace
   }
-  // pipes: a bundle under the deck along one axis, one of them dropping down a column to the ground
+  // pipes: a bundle under the deck along one axis, one of them dropping down a column to the ground (or onto the roof below)
   const ax = chance(.5);
   for (let q = 0; q < irand(2, 3); q++){
     const o = -.45 + q*.32, yy = y0 - .55 - q*.05, mat = pick([M.inRust, M.inPipe, M.inRust2, M.inPipe2]), r = rnd(.07, .1);
     const pts = ax ? [[-1.3, yy, o], [1.3, yy, o]] : [[o, yy, -1.3], [o, yy, 1.3]];
-    if (q === 0){ const end = ax ? [E - .2, yy, o] : [o, yy, E - .2]; pipeRun(mat, P, [pts[0], end, [end[0], base + .25, end[2]], [end[0] + (ax ? .4 : 0), base + .25, end[2] + (ax ? 0 : .4)]], r, true); }
+    if (q === 0){ const end = ax ? [Math.min(E - .2, fx1), yy, clamp(o, fz0, fz1)] : [clamp(o, fx0, fx1), yy, Math.min(E - .2, fz1)]; pipeRun(mat, P, [pts[0], end, [end[0], base + .25, end[2]], [end[0] + (ax ? .4 : 0), base + .25, end[2] + (ax ? 0 : .4)]], r, true); }
     else pipeRun(mat, P, pts, r, true);
   }
   if (chance(.5)) emitters.push(new THREE.Vector3(rnd(-.8, .8), y0 - .5, rnd(-.8, .8)).applyMatrix4(P));   // a leaky joint
   // red lights on the deck frame, a beacon on a corner post
   for (const [sx, sz] of cols) if (chance(.7)) indLight(P, sx*1.2, y0 - .4, sz*1.2);
   { const [sx, sz] = pick(cols); cyl(IND_STEEL, P, sx*1.1, y0 + .45, sz*1.1, .025, .9); beaconLight(P, sx*1.1, y0 + .93, sz*1.1, .07, .8); }
-  // the street entrance: a concrete guard hut with a roller shutter and a caged ladder (or a ladder from the roof below)
+  // the lift: a heavy lattice tower beside the deck on a side with no walkway, from the street up past the deck, its
+  // steel cab lined in red neon carrying people between the street and the deck
   const free = SIDES4.filter(d => !supKey.has(d.join()));
   const hs = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0];
+  const LX = .5, LZ = 1.44;
   { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));
-    if (!onRoof){
-      box(M.concM, F, 0, base + .55, .78, .9, 1.1, .5); box(M.shutter, F, 0, base + .42, 1.035, .55, .76, .01);
-      for (let y = base + .1; y < base + .8; y += .08) box(M.metalDark, F, 0, y, 1.04, .55, .01, .01);
-      box(M.concDD, F, 0, base + 1.13, .78, 1.0, .06, .6); indLight(F, .33, base + .98, 1.07);
-    }
-    const lz = onRoof ? .78 : .5, ly0 = onRoof ? base : base + 1.15;
-    for (const s of [-1, 1]) box(IND_STEEL, F, s*.17, (ly0 + y0)/2, lz, .035, y0 - ly0, .035);
-    for (let y = ly0 + .15; y < y0 - .1; y += .2) box(IND_STEEL, F, 0, y, lz, .34, .025, .025);
-    for (let y = ly0 + .6; y < y0 - .3; y += .5) put(U.torus, IND_RUST, under(F, T(0, y, lz + .1, 0, .5, .5, .3, PI/2)));
+    liftShaftInd(F, LX, LZ, CURB, y0);
+    const Wp = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
+    const cc = Wp(LX, LZ), fr = Wp(LX + .26, LZ), ix = Wp(LX, .85), g = Wp(1, 0), o = Wp(0, 0), gx = g.x - o.x, gz = g.z - o.z;
+    c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz), style: 'ind' };
   }
   // pipe rails round the deck (gaps for the walkways)
   for (const d of SIDES4){
-    const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))), bridge = supKey.has(d.join());
-    for (let x = -1.15; x <= 1.16; x += .46){ if (bridge && Math.abs(x) < .5) continue; cyl(IND_STEEL, F, x, y0 + .24, 1.15, .02, .48); }
-    for (const yy of [.48, .26]){ if (bridge){ strut(IND_RUST2, F, -1.15, y0 + yy, 1.15, -.5, y0 + yy, 1.15, .018); strut(IND_RUST2, F, .5, y0 + yy, 1.15, 1.15, y0 + yy, 1.15, .018); } else strut(IND_RUST2, F, -1.15, y0 + yy, 1.15, 1.15, y0 + yy, 1.15, .018); }
+    const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))), bridge = supKey.has(d.join()), lift = d === hs;
+    for (let x = -1.15; x <= 1.16; x += .46){ if ((bridge && Math.abs(x) < .5) || (lift && Math.abs(x - LX) < .32)) continue; cyl(IND_STEEL, F, x, y0 + .24, 1.15, .02, .48); }
+    for (const yy of [.48, .26]){ if (lift){ strut(IND_RUST2, F, -1.15, y0 + yy, 1.15, LX - .3, y0 + yy, 1.15, .018); strut(IND_RUST2, F, LX + .3, y0 + yy, 1.15, 1.15, y0 + yy, 1.15, .018); } else if (bridge){ strut(IND_RUST2, F, -1.15, y0 + yy, 1.15, -.5, y0 + yy, 1.15, .018); strut(IND_RUST2, F, .5, y0 + yy, 1.15, 1.15, y0 + yy, 1.15, .018); } else strut(IND_RUST2, F, -1.15, y0 + yy, 1.15, 1.15, y0 + yy, 1.15, .018); }
   }
   // the walkways: box trusses over the street, pipes running through them, a railed catwalk on top
   c.walks = [];

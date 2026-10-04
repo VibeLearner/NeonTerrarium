@@ -632,6 +632,7 @@ function liftShaft(F, x, z, base, y0){
 // on the street). Glass balustrades with a gold handrail, round planters with bonsai at the corners. The lift is a glass
 // tube ringed in gold with a gold dome, its cab a glass capsule; the walkways are glass skybridges between gold lattice
 // trusses, a gold arch beneath.
+U.luxVault = new THREE.CylinderGeometry(1, 1, 1, 12, 1, true, -PI/2, PI).rotateX(-PI/2).toNonIndexed();   // a half tube along z, open below
 const LUX_STONE = toon(0xe6dccb), LUX_STONE2 = toon(0xcfc3ad);
 const LUX_GLASS = new THREE.MeshBasicMaterial({ color: 0x8a8068, transparent: true, opacity: .16, depthWrite: false, side: THREE.DoubleSide }); LUX_GLASS.userData.colorOnly = true;
 function luxCol(P, x, z, y0, y1, r = .08){   // a round stone column, gold collars at the foot, head and every couple of metres
@@ -724,13 +725,24 @@ function liftPlatformLux(c, y0){
         if (k) strut(M.idGold, F, s*w/2, ya - .12, z0 + L*u0, s*w/2, y0 - .1, z0 + L*u0, .015); }
     }
     box(LUX_GLASS, F, 0, y0 + ht, zm, w, .01, L); box(M.idGold, F, 0, y0 + ht, zm, .03, .02, L);   // the glass roof, a gold ridge
+    // where the neighbour stands back from the plot's edge (a round tower, a set-back lobby), a glass vestibule under a
+    // barrel vault ribbed in gold carries the walkway on to its wall, and the door goes there
+    const gap = wallGap(cells.get(ckey(c.i + d[0], c.j + d[1])), F, y0, z1), ze = z1 + (gap > .04 ? gap + .04 : 0);
+    if (ze > z1){ const vm = (z1 + ze)/2, vl = ze - z1 + .02;
+      box(LUX_STONE, F, 0, y0 - .05, vm, w + .06, .1, vl);
+      for (const s of [-1, 1]){ box(LUX_GLASS, F, s*w/2, y0 + .4, vm, .01, .8, vl); box(M.idGold, F, s*w/2, y0 + .01, vm, .03, .03, vl); box(M.idGold, F, s*w/2, y0 + .8, vm, .03, .03, vl); }
+      put(U.luxVault, LUX_GLASS, under(F, T(0, y0 + .8, vm, 0, w/2, w/2, vl)));
+      for (let z = z1; z <= ze + .001; z += Math.max(.2, (ze - z1)/Math.ceil((ze - z1)/.3))){
+        put(U.halfRing, M.idGold, under(F, T(0, y0 + .8, z, 0, w/2, w/2, 1)));
+        for (const s of [-1, 1]) box(M.idGold, F, s*w/2, y0 + .4, z, .03, .8, .03); }
+    }
     // the doorways: a stone surround with a gold frame in the neighbour's wall, a gold frame on the platform's side
-    box(LUX_STONE, F, 0, y0 + .52, z1 + .16, .84, 1.08, .36);
-    box(M.idGold, F, 0, y0 + .5, z1 - .03, .64, 1.02, .05);
-    box(LUX_STONE2, F, 0, y0 + 1.06, z1 - .05, .76, .06, .1);
+    box(LUX_STONE, F, 0, y0 + .52, ze + .16, .84, 1.08, .36);
+    box(M.idGold, F, 0, y0 + .5, ze - .03, .64, 1.02, .05);
+    box(LUX_STONE2, F, 0, y0 + 1.06, ze - .05, .76, .06, .1);
     box(M.idGold, F, 0, y0 + .5, z0 + .02, .62, 1.0, .05);
-    const a = new THREE.Vector3(0, y0, z0 + .2).applyMatrix4(F), b = new THREE.Vector3(0, y0, z1 - .2).applyMatrix4(F);
-    const dA = new THREE.Vector3(0, 0, z0 + .05).applyMatrix4(F), dB = new THREE.Vector3(0, 0, z1 - .06).applyMatrix4(F), o0 = new THREE.Vector3(0, 0, 0).applyMatrix4(F), fz = new THREE.Vector3(0, 0, 1).applyMatrix4(F), nx = fz.x - o0.x, nz = fz.z - o0.z;
+    const a = new THREE.Vector3(0, y0, z0 + .2).applyMatrix4(F), b = new THREE.Vector3(0, y0, ze - .2).applyMatrix4(F);
+    const dA = new THREE.Vector3(0, 0, z0 + .05).applyMatrix4(F), dB = new THREE.Vector3(0, 0, ze - .06).applyMatrix4(F), o0 = new THREE.Vector3(0, 0, 0).applyMatrix4(F), fz = new THREE.Vector3(0, 0, 1).applyMatrix4(F), nx = fz.x - o0.x, nz = fz.z - o0.z;
     c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01, doors: [{ x: dA.x, z: dA.z, n: [nx, nz] }, { x: dB.x, z: dB.z, n: [-nx, -nz] }], col: 0xd8c8a0 });
   }
 }
@@ -937,15 +949,10 @@ function cellView(c){
 // Where the pod's building meets the deck on the lift's side: a ray from the deck's edge in toward the building finds
 // its wall, and the door (opening as people and bots come and go: see the doors in people.js) goes there. The riders
 // walk to it and in.
-function podDoorSpot(c){
-  const L = c.liftCab, dx = L.ix - L.x, dz = L.iz - L.z, l = Math.hypot(dx, dz) || 1, ux = dx/l, uz = dz/l;
-  // the rays start inside the building and run out toward the lift: the first thing each meets is the inside of the
-  // front wall (or a counter or shelf short of it), and they stop at the deck's edge
-  const S0 = 1.0, far = .7, sx = L.x + ux*S0, sz = L.z + uz*S0, ex = L.x + ux*(S0 - far), ez = L.z + uz*(S0 - far), pad = .2;
-  // one pass over the cell's triangles keeps those in the corridor the rays run through (so this stays cheap)
-  const bx0 = Math.min(sx, ex) - pad, bx1 = Math.max(sx, ex) + pad, bz0 = Math.min(sz, ez) - pad, bz1 = Math.max(sz, ez) + pad, by0 = L.y0 + .2, by1 = L.y0 + .9;
-  const tris = [];
-  for (const [, g] of c.data.geo){   // (shop glass counts: the door goes in the shopfront)
+// one pass over a cell's triangles keeps those in the corridor some rays run through (so a ray test stays cheap)
+function corridorTris(geoMap, sx, sz, ex, ez, by0, by1, pad = .25){
+  const bx0 = Math.min(sx, ex) - pad, bx1 = Math.max(sx, ex) + pad, bz0 = Math.min(sz, ez) - pad, bz1 = Math.max(sz, ez) + pad, tris = [];
+  for (const [, g] of geoMap){   // (glass counts: a door can go in a shopfront)
     const P = g.attributes.position.array, I = g.index ? g.index.array : null, n = I ? I.length : P.length/3;
     for (let k = 0; k < n; k += 3){
       const a = (I ? I[k] : k)*3, b = (I ? I[k + 1] : k + 1)*3, q = (I ? I[k + 2] : k + 2)*3;
@@ -954,12 +961,30 @@ function podDoorSpot(c){
       if (Math.max(P[a + 1], P[b + 1], P[q + 1]) < by0 || Math.min(P[a + 1], P[b + 1], P[q + 1]) > by1) continue;
       tris.push(new THREE.Vector3(P[a], P[a + 1], P[a + 2]), new THREE.Vector3(P[b], P[b + 1], P[b + 2]), new THREE.Vector3(P[q], P[q + 1], P[q + 2]));
     } }
+  return tris;
+}
+function rayTris(tris, ray, far, hit){ let best = far; for (let k = 0; k < tris.length; k += 3) if (ray.intersectTriangle(tris[k], tris[k + 1], tris[k + 2], false, hit)){ const dd = hit.distanceTo(ray.origin); if (dd < best) best = dd; } return best; }
+// how far past a walkway's end the neighbour's wall really is (a round or set-back tower stands short of the plot's edge)
+function wallGap(n, F, y0, z1, far = 1.6){
+  if (!n || !n.data || !n.data.geo) return 0;
+  const W = (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix4(F), a = W(0, 0, z1), b = W(0, 0, z1 + far), ux = (b.x - a.x)/far, uz = (b.z - a.z)/far;
+  const tris = corridorTris(n.data.geo, a.x, a.z, b.x, b.z, y0 + .2, y0 + .9), ray = new THREE.Ray(), hit = new THREE.Vector3(), ds = [];
+  for (const h of [.3, .55, .8]) for (const o of [-.2, 0, .2]){ ray.origin.set(a.x + uz*o, y0 + h, a.z - ux*o); ray.direction.set(ux, 0, uz); ds.push(rayTris(tris, ray, far, hit)); }
+  ds.sort((p, q) => p - q);
+  const d = ds[ds.length - 2];   // the second furthest: a rail or a plant stops some rays short
+  return d >= far - 1e-6 ? 0 : d;
+}
+function podDoorSpot(c){
+  const L = c.liftCab, dx = L.ix - L.x, dz = L.iz - L.z, l = Math.hypot(dx, dz) || 1, ux = dx/l, uz = dz/l;
+  // the rays start inside the building and run out toward the lift: the first thing each meets is the inside of the
+  // front wall (or a counter or shelf short of it), and they stop at the deck's edge
+  const S0 = 1.0, far = .7, sx = L.x + ux*S0, sz = L.z + uz*S0, ex = L.x + ux*(S0 - far), ez = L.z + uz*(S0 - far), pad = .2;
+  const tris = corridorTris(c.data.geo, sx, sz, ex, ez, L.y0 + .2, L.y0 + .9);
   // three heights and three offsets; clutter inside stops some short, so the wall is the second furthest out
   const ds = [], ray = new THREE.Ray(), hit = new THREE.Vector3();
   for (const h of [.3, .55, .8]) for (const o of [-.12, 0, .12]){
     ray.origin.set(sx - uz*o, L.y0 + h, sz + ux*o); ray.direction.set(-ux, 0, -uz);
-    let best = far; for (let k = 0; k < tris.length; k += 3) if (ray.intersectTriangle(tris[k], tris[k + 1], tris[k + 2], false, hit)){ const dd = hit.distanceTo(ray.origin); if (dd < best) best = dd; }
-    ds.push(best); }
+    ds.push(rayTris(tris, ray, far, hit)); }
   ds.sort((a, b) => b - a);
   const d = S0 - Math.min(far, ds[1] + .01);                                 // from the cab to the wall's face
   L.door = { x: L.x + ux*d, z: L.z + uz*d, n: [-ux, -uz] };                  // the wall point, facing out to the lift

@@ -467,6 +467,11 @@ function buildNetwork(){
       for (let k = 0; k < 8 && !freeAt(G, sx, sz); k++){ sx += L.nx*.1; sz += L.nz*.1; }
       if (freeAt(G, sx, sz)){ const key = 'l:' + c.i + ',' + c.j, ld = { wall: { x: L.fx, z: L.fz }, stand: { x: sx, z: sz }, inside: { x: L.x, z: L.z }, n: [L.nx, L.nz], noDraw: true, lift: c };
         doors.push(makeDoor(key, ld, false, oldDoors.get(key))); addEnd(c, { key, x: sx, z: sz, kind: 'd' }); }
+      // and the home's own door up on the deck, where the riders step in and out (drawn, opening; not on the walking map)
+      if (L.door){ const pk = 'pd:' + c.i + ',' + c.j, od = oldDoors.get(pk);
+        const pd = { key: pk, wall: { x: L.door.x, z: L.door.z }, y: L.y0, n: L.door.n, mega: false, noDraw: false, open: od ? od.open : 0, want: false, col: DOOR_COLS[hash(pk) % DOOR_COLS.length] };
+        doorList.push(pd); doorByKey.set(pk, pd); c._podDoor = pd; }
+      else c._podDoor = null;
     }
     const d = !c.liftCab || c.below ? plotDoor(c, sides, 1.75) : null;
     if (d){ const key = 'd:' + c.i + ',' + c.j; doors.push(makeDoor(key, d, false, oldDoors.get(key))); addEnd(c, { key, x: d.stand.x, z: d.stand.z, kind: 'd' }); }
@@ -537,7 +542,7 @@ const doorPanel = new THREE.InstancedMesh(U.box, DOOR_PANEL, DOOR_MAX);
 doorPanel.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(DOOR_MAX*3), 3);   // made up front: three sizes it to the count at first use
 for (const m of [doorFrame, doorLight, doorPanel]){ m.count = 0; m.frustumCulled = false; m.receiveShadow = true; m.raycast = () => {}; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); }
 const _dm = new THREE.Matrix4(), _dl = new THREE.Matrix4(), _dc = new THREE.Color();
-function doorBasis(d){ const k = d.mega ? 1.35 : 1; return _dm.makeRotationY(Math.atan2(d.n[0], d.n[1])).setPosition(d.wall.x, CURB, d.wall.z).multiply(_dl.makeScale(k, k, k)); }
+function doorBasis(d){ const k = d.mega ? 1.35 : 1; return _dm.makeRotationY(Math.atan2(d.n[0], d.n[1])).setPosition(d.wall.x, d.y ?? CURB, d.wall.z).multiply(_dl.makeScale(k, k, k)); }
 const doorPart = (B, x, y, z, w, h, dd) => B.clone().multiply(_dl.compose(_p.set(x, y, z), _q.identity(), _s.set(w, h, dd)));
 function setPanel(i, d){ doorPanel.setMatrixAt(i, doorPart(doorBasis(d), d.open*.37, .34, .045, .35, .66, .03)); }
 function rebuildDoorMeshes(){
@@ -561,7 +566,11 @@ function updateDoors(dt){
     if (w.doorB && w.len - w.s < .8) w.doorB.want = true; }
   for (const b of bots){ const w = b.walk;
     if (w){ if (w.doorA && w.s < .55) w.doorA.want = true; if (w.doorB && w.len - w.s < .8) w.doorB.want = true; }
-    if (b.state === 'drop' && pplNow - b.t0 > 1.6 && b.door) b.door.want = true; }   // someone opens up to take the parcel
+    if (b.state === 'drop' && pplNow - b.t0 > 1.6 && b.door) b.door.want = true;   // someone opens up to take the parcel
+    const r = b.ride, pd = r && r.c._podDoor; if (pd && r.dropT && pplNow - r.dropT > 1.2 && pplNow - r.dropT < 3.2) pd.want = true; }   // (up on a pod: its deck door)
+  // up on a pod, the deck door opens for whoever steps out of it to the lift, or off the lift and in through it
+  for (const p of pplList){ const r = p.ride, pd = r && r.c._podDoor; if (!pd) continue;
+    if ((r.ph === 'in' && r.t < LIFT_STEP*.6) || (r.ph === 'out' && r.t > LIFT_STEP*.35)) pd.want = true; }
   let moved = false;
   for (let i = 0; i < doorList.length && i < DOOR_MAX; i++){
     const d = doorList[i], o = Math.max(0, Math.min(1, d.open + (d.want ? 1 : -1)*dt/.2));
@@ -1350,7 +1359,7 @@ function liftRide(p, dt, t){
   const e = liftCab(c), deckWait = [L.ix + (L.x - L.ix)*.55, L.iz + (L.z - L.iz)*.55], gate = [L.fx + L.nx*.12, L.fz + L.nz*.12];
   let x, z, y, alpha = 1, frame = F_IDLE + Math.floor(t*2 + p.phase) % PPL.idle, dir = null;
   if (r.ph === 'in'){   // out of the door, across the deck to wait by the lift
-    const u = Math.min(1, r.t/LIFT_STEP); x = L.ix + (deckWait[0] - L.ix)*u; z = L.iz + (deckWait[1] - L.iz)*u; y = L.y0; alpha = u;
+    const u = Math.min(1, r.t/LIFT_STEP); x = L.ix + (deckWait[0] - L.ix)*u; z = L.iz + (deckWait[1] - L.iz)*u; y = L.y0; alpha = Math.min(1, u/.35);   // (out through the door as it opens)
     frame = Math.floor(t*9 + p.phase) % PPL.walk; dir = [deckWait[0] - L.ix, deckWait[1] - L.iz];
     if (u >= 1){ r.ph = 'wait'; r.t = 0; }
   } else if (r.ph === 'wait'){
@@ -1359,7 +1368,7 @@ function liftRide(p, dt, t){
     if (r.t > 6 && !(p.emoUntil > t) && pplRand() < dt*.05) emote(p, 'dots', 1.8);   // still waiting
   } else if (r.ph === 'cab'){ x = L.x; z = L.z; y = e.y; }
   else if (r.ph === 'out'){   // off the deck and in at the door
-    const u = Math.min(1, r.t/LIFT_STEP); x = L.x + (L.ix - L.x)*u; z = L.z + (L.iz - L.z)*u; y = L.y0; alpha = 1 - u;
+    const u = Math.min(1, r.t/LIFT_STEP); x = L.x + (L.ix - L.x)*u; z = L.z + (L.iz - L.z)*u; y = L.y0; alpha = Math.min(1, (1 - u)/.35);   // (in through the open door)
     frame = Math.floor(t*9 + p.phase) % PPL.walk; dir = [L.ix - L.x, L.iz - L.z];
     if (u >= 1){ p.ride = null; arrive(p); return null; }
   } else { p.ride = null; p.x = L.x; p.z = L.z; return null; }   // 'done': at the street, off along the walk

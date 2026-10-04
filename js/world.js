@@ -824,6 +824,37 @@ function cellView(c){
   }
   world.add(g); c.view = g;
 }
+// Where the pod's building meets the deck on the lift's side: a ray from the deck's edge in toward the building finds
+// its wall, and the door (opening as people and bots come and go: see the doors in people.js) goes there. The riders
+// walk to it and in.
+function podDoorSpot(c){
+  const L = c.liftCab, dx = L.ix - L.x, dz = L.iz - L.z, l = Math.hypot(dx, dz) || 1, ux = dx/l, uz = dz/l;
+  // the rays start inside the building and run out toward the lift: the first thing each meets is the inside of the
+  // front wall (or a counter or shelf short of it), and they stop at the deck's edge
+  const S0 = 1.0, far = .7, sx = L.x + ux*S0, sz = L.z + uz*S0, ex = L.x + ux*(S0 - far), ez = L.z + uz*(S0 - far), pad = .2;
+  // one pass over the cell's triangles keeps those in the corridor the rays run through (so this stays cheap)
+  const bx0 = Math.min(sx, ex) - pad, bx1 = Math.max(sx, ex) + pad, bz0 = Math.min(sz, ez) - pad, bz1 = Math.max(sz, ez) + pad, by0 = L.y0 + .2, by1 = L.y0 + .9;
+  const tris = [];
+  for (const [, g] of c.data.geo){   // (shop glass counts: the door goes in the shopfront)
+    const P = g.attributes.position.array, I = g.index ? g.index.array : null, n = I ? I.length : P.length/3;
+    for (let k = 0; k < n; k += 3){
+      const a = (I ? I[k] : k)*3, b = (I ? I[k + 1] : k + 1)*3, q = (I ? I[k + 2] : k + 2)*3;
+      if (Math.max(P[a], P[b], P[q]) < bx0 || Math.min(P[a], P[b], P[q]) > bx1) continue;
+      if (Math.max(P[a + 2], P[b + 2], P[q + 2]) < bz0 || Math.min(P[a + 2], P[b + 2], P[q + 2]) > bz1) continue;
+      if (Math.max(P[a + 1], P[b + 1], P[q + 1]) < by0 || Math.min(P[a + 1], P[b + 1], P[q + 1]) > by1) continue;
+      tris.push(new THREE.Vector3(P[a], P[a + 1], P[a + 2]), new THREE.Vector3(P[b], P[b + 1], P[b + 2]), new THREE.Vector3(P[q], P[q + 1], P[q + 2]));
+    } }
+  // three heights and three offsets; clutter inside stops some short, so the wall is the second furthest out
+  const ds = [], ray = new THREE.Ray(), hit = new THREE.Vector3();
+  for (const h of [.3, .55, .8]) for (const o of [-.12, 0, .12]){
+    ray.origin.set(sx - uz*o, L.y0 + h, sz + ux*o); ray.direction.set(-ux, 0, -uz);
+    let best = far; for (let k = 0; k < tris.length; k += 3) if (ray.intersectTriangle(tris[k], tris[k + 1], tris[k + 2], false, hit)){ const dd = hit.distanceTo(ray.origin); if (dd < best) best = dd; }
+    ds.push(best); }
+  ds.sort((a, b) => b - a);
+  const d = S0 - Math.min(far, ds[1] + .01);                                 // from the cab to the wall's face
+  L.door = { x: L.x + ux*d, z: L.z + uz*d, n: [-ux, -uz] };                  // the wall point, facing out to the lift
+  L.ix = L.door.x - ux*.12; L.iz = L.door.z - uz*.12;                       // where the riders step through
+}
 function rebuildCell(c){
   finishAnimsOn(c);   // a neighbour's edit can rebuild a cell that is still animating
   disposeData(c.data);
@@ -831,6 +862,7 @@ function rebuildCell(c){
   c.dark = isDarkPlot(c);
   DARK = c.dark;
   try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length) buildStack(c); }); } finally { DARK = false; }
+  if (c.liftCab) podDoorSpot(c);
   if (c.mega){ const m = megas.get(c.mega); if (m && m.roofH) c.height = m.roofH; }
   cellView(c);
   c.emitters = c.data.emitters; c.pads = c.data.pads; c.ports = c.data.ports;

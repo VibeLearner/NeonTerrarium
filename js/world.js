@@ -379,12 +379,14 @@ function workLight(P, x, y, z){ box(M.metalDark, P, x, y, z, .09, .07, .09); box
 // The commercial lift (after the neon glass lift reference): a steel frame glazed on three sides, cyan neon up the
 // front corners and magenta up the back, two big gears on its side, a head with a neon ring over the pulley, and at
 // the foot a control console with a lit screen and a LIFT sign. F: local +z out from the deck's side; the gate is on +x.
+// the lift shaft's glass: a dim warm tint (unlit, so a bright colour would glow at night)
+const LIFT_GLASS = new THREE.MeshBasicMaterial({ color: 0x4a3c30, transparent: true, opacity: .14, depthWrite: false, side: THREE.DoubleSide }); LIFT_GLASS.userData.colorOnly = true;
 function liftShaftCom(F, x, z, base, y0){
   const h = .24, top = y0 + 1.1;
   for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) box(TRUSS, F, x + sx*h, (base + top)/2, z + sz*h, .05, top - base, .05);
   for (const [sx, sz, m] of [[1, -1, M.neonCyan], [1, 1, M.neonCyan], [-1, -1, M.neonPink], [-1, 1, M.neonPink]]) box(m, F, x + sx*(h + .03), (base + top)/2, z + sz*(h + .03), .015, top - base - .2, .015);
   // glass on the back and the two sides (the gate side stays open)
-  box(COM.glass, F, x - h, (base + top)/2, z, .01, top - base, 2*h); box(COM.glass, F, x, (base + top)/2, z - h, 2*h, top - base, .01); box(COM.glass, F, x, (base + top)/2, z + h, 2*h, top - base, .01);
+  box(LIFT_GLASS, F, x - h, (base + top)/2, z, .01, top - base, 2*h); box(LIFT_GLASS, F, x, (base + top)/2, z - h, 2*h, top - base, .01); box(LIFT_GLASS, F, x, (base + top)/2, z + h, 2*h, top - base, .01);
   for (let y = base + 1.0; y < top - .2; y += 1.0) for (const [ax, az, bx, bz] of [[-h, -h, h, -h], [-h, h, h, h], [-h, -h, -h, h]]) box(TRUSS, F, x + (ax + bx)/2, y, z + (az + bz)/2, Math.abs(bx - ax) + .06, .04, Math.abs(bz - az) + .06);
   // the gears on the side, part way up
   const gy = base + Math.min(2.2, (y0 - base)*.5);

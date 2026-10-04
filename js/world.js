@@ -288,11 +288,11 @@ function stackRun(c, secs, y, tag, first){
   let prevWhite = false, prevDeck = false;
   c.sectionTops = [];
   secs.forEach((sec, k) => {
-    R = mulberry32(hash('sec' + tag, c.i, c.j, sec.kh ?? k, sec.zone, sec.seed));
+    R = mulberry32(hash('sec', c.i, c.j, sec.kh ?? k, sec.zone, sec.seed));   // (the same whether a building stands under a pod or not, so it keeps its look)
     const st = STY[sec.zone], upper = k > 0, last = k === secs.length - 1;
     LUX = sec.zone === 'high' ? luxPalette(hash('lux', c.i, c.j, k, sec.seed)) : sec.zone === 'ind' ? indPalette(hash('ind', c.i, c.j, k, sec.seed)) : null;   // each district's own light colours
     const lot = { x: c.x, z: c.z, cls: sec.zone, elev: 0, base: y, signs: 0, occupied: true, height: 0, floors: 0 };
-    lot.padOK = last && R() < .3;
+    lot.padOK = tag === 'b' ? (R(), false) : last && R() < .3;   // (under a pod: the same draw whatever's on top, so adding a section never re-rolls the one below it)
     if (upper){   // a deck for the new section to stand on
       box(M.concDD, T(c.x, y, c.z), 0, .05, 0, SIDE - .1, .1, SIDE - .1);
       box(pick(st.neonMats), T(c.x, y, c.z), 0, .02, (SIDE - .1)/2 + .015, SIDE - .1, .03, .03);
@@ -307,7 +307,7 @@ function stackRun(c, secs, y, tag, first){
     // and plazas are stalls already, so they stand on the ground)
     const onStalls = !upper && sec.zone === 'mid' && !STALL_TYPES.has(builder) && hash('stallbase', c.i, c.j, sec.seed) % 100 < 60;
     let P1 = P0, hb = 0;
-    NO_ROOF = !last;
+    NO_ROOF = !last || tag === 'b';   // (the building under a side pod: a flat roof for the scaffold to stand on)
     try { withStyle(sec.style, () => {
       if (onStalls){ stallBase(lot, st, P0); hb = lot.height; P1 = under(P0, T(0, hb, 0)); lot.base += hb; lot.height = 0; }
       builder(lot, st, P1);
@@ -689,19 +689,23 @@ function addSection(c, zone){
 }
 // hang a pod off the side of a taller building, over the empty plot c, its deck at height y
 function addLift(c, y, zone){
-  if (!c || c.mega || c.sections.length) return null;
+  if (!c || c.mega || c.lift) return null;
+  if (c.sections.length && y < c.height + FH - .05) return null;   // over a shorter building: a floor's gap at least
   finishAnimsOn(c);
   holdRegion(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
+  if (c.sections.length){ c.below = c.sections; c.sections = []; }   // the building already there stays, under the pod
   c.lift = { y };
-  c.sections.push({ zone, seed: (Math.random()*1e9)|0, style: styleNow() }); refresh([c]);
+  c.sections.push({ zone, seed: (Math.random()*1e9)|0, style: styleNow() });
+  if (c.below){ rebuildCell(c); disposeData(c.data); c.data = null; if (c.belowTop > c.lift.y - GAP_MERGE) c.lift.y = c.belowTop + FH; }   // its roof flattened for the scaffold may sit a touch differently
+  refresh([c]);
   dropView(old);
-  startAnim(c, 'build', CURB - .05, c.height + 1.2, zone, SIDE, null);
+  startAnim(c, 'build', c.below ? (c.belowTop ?? CURB) - .05 : CURB - .05, c.height + 1.2, zone, SIDE, null);
   maybeSpawnMegas(c);
   return c;
 }
 // the gap a pod needs under it; less than this and the pod and the building under it become one building
-const GAP_MERGE = .9;
+const GAP_MERGE = .85;
 const groundTop = c => c.below && c.below.length ? (c.belowTop ?? CURB) : CURB;
 function mergePod(c){ c.sections = (c.below || []).concat(c.sections); c.sections.forEach(s => { delete s.kh; }); c.below = null; c.lift = null; }
 // a pod grows a section downward: the new section hangs under it, and the pod's deck drops by its height
@@ -710,11 +714,18 @@ function addPodDown(c, zone){
   finishAnimsOn(c); holdRegion(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   c.sections.forEach((s, k) => { if (s.kh === undefined) s.kh = k; });
-  const y0 = c.lift.y, gapF = Math.floor((y0 - groundTop(c) + .05)/FH);
+  const y0 = c.lift.y, gapF = Math.floor((y0 - groundTop(c) - (c.below && c.below.length ? .1 : 0) + .02)/FH);
   const sec = { zone, seed: (Math.random()*1e9)|0, style: styleNow(), kh: -1 - c.sections.length, mf: Math.max(1, gapF >= 2 ? gapF - 1 : gapF) };   // leaves a floor's gap, or fills the last one
   c.sections.unshift(sec);
-  rebuildCell(c); disposeData(c.data); c.data = null;          // a first build to measure the new section
-  const h = c.sectionTops[0] - y0, ny = y0 - h;
+  let h = 0;
+  for (let tries = 0; tries < 4; tries++){
+    rebuildCell(c); disposeData(c.data); c.data = null;          // a build to measure the new section
+    h = c.sectionTops[0] - y0;
+    const over = groundTop(c) + GAP_MERGE - (y0 - h);
+    if (gapF < 2 || over <= 0 || sec.mf <= 1) break;
+    sec.mf = Math.max(1, sec.mf - Math.ceil(over/FH));
+  }
+  const ny = y0 - h;
   if (gapF < 2 || ny - groundTop(c) < GAP_MERGE) mergePod(c); else c.lift.y = ny;
   refresh([c]); dropView(old);
   startAnim(c, 'build', CURB - .05, c.height + 1.2, zone, SIDE, null);
@@ -726,9 +737,16 @@ function addBelowUp(c, zone){
   if ((c.below || []).length >= MAX_SECTIONS) return null;
   finishAnimsOn(c); holdRegion(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
-  const y0 = groundTop(c), gapF = Math.floor((c.lift.y - y0 + .05)/FH);
-  (c.below = c.below || []).push({ zone, seed: (Math.random()*1e9)|0, style: styleNow(), mf: Math.max(1, gapF >= 2 ? gapF - 1 : gapF) });
-  rebuildCell(c); disposeData(c.data); c.data = null;
+  const y0 = groundTop(c), deck = c.below && c.below.length ? .1 : 0, gapF = Math.floor((c.lift.y - y0 - deck + .02)/FH);   // whole floors of room (a section on another stands on a thin deck)
+  const sec = { zone, seed: (Math.random()*1e9)|0, style: styleNow(), mf: Math.max(1, gapF >= 2 ? gapF - 1 : gapF) };
+  (c.below = c.below || []).push(sec);
+  // build it; if it still reaches into the gap (a section under it can be re-rolled taller), try it a floor or two shorter
+  for (let tries = 0; tries < 4; tries++){
+    rebuildCell(c); disposeData(c.data); c.data = null;
+    const over = c.belowTop - (c.lift.y - GAP_MERGE);
+    if (gapF < 2 || over <= 0 || sec.mf <= 1) break;
+    sec.mf = Math.max(1, sec.mf - Math.ceil(over/FH));
+  }
   if (gapF < 2 || c.belowTop > c.lift.y - GAP_MERGE) mergePod(c);
   refresh([c]); dropView(old);
   startAnim(c, 'build', y0 - .05, c.height + 1.2, zone, SIDE, null);
@@ -984,8 +1002,15 @@ function targetOf(pk){
   // high up the side of a building, with residential picked and an empty plot next to it: hang a pod there
   // (open sky next door too: the platform grows under it)
   const inGrid = Math.abs(c.i + a) <= GRID_MAX && Math.abs(c.j + b) <= GRID_MAX;
-  if (S.zone === 'low' && (pk.kind === 'bld' || pk.kind === 'low') && !c.mega && (n ? !n.sections.length : inGrid) && pk.p.y > CURB + FH){
-    const ly = liftSnap(pk.kind === 'low' ? { sectionTops: c.belowTops, height: groundTop(c) } : c, pk.p.y);
+  // (or over a shorter building next door, if there's a floor's gap between its roof and the pod)
+  const shorter = n && n.sections.length && !n.lift && !n.mega;
+  if (S.zone === 'low' && (pk.kind === 'bld' || pk.kind === 'low') && !c.mega && (n ? !n.sections.length || shorter : inGrid) && pk.p.y > CURB + FH){
+    const host = pk.kind === 'low' ? { sectionTops: c.belowTops, height: groundTop(c) } : c;
+    let ly = liftSnap(host, pk.p.y);
+    if (ly !== null && shorter && ly < n.height + FH - .05){   // too low over the shorter building: the first floor of the tall one that clears it
+      const need = n.height + FH - .05, cand = (host.sectionTops || []).concat([...Array(40)].map((_, q) => CURB + (q + 1)*FH)).filter(v => v >= need && v <= host.height - .5).sort((a, b) => a - b);
+      ly = cand.length ? cand[0] : null;
+    }
     if (ly !== null) return { type: 'side', c: n || null, i: c.i + a, j: c.j + b, y: ly, from: c };
   }
   return n ? { type: 'onto', c: n } : { type: 'empty', i: c.i + a, j: c.j + b };

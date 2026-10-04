@@ -1170,7 +1170,7 @@ function buildTenement(lot, st, P0){
     if (!stairsDone && fl===0 && floors>=4 && chance(.5)){ stairs(st, pick(F), Math.min(floors,4)); stairsDone=true; }
     prev = c; y += c.h; fl += nn;
   }
-  if (chance(.3)){
+  if (chance(.3) && !lot.mf){   // (not when it must fit a gap under a side pod: the pod on top is another floor)
     y = pod(st, P0, { w:clamp(prev.w+rnd(.1,.4),1.4,2.3), d:clamp(prev.d+rnd(.1,.4),1.4,2.3), h:rnd(1,1.15), y, ox:prev.ox+rnd(-.2,.2), oz:prev.oz+rnd(-.2,.2), ry:prev.ry+rnd(-.2,.2) }, { face: pick([0, PI/2, PI, -PI/2]) });
     Object.assign(lot, { height:y, floors, occupied:true });
     return;

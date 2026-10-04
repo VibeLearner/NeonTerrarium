@@ -525,10 +525,7 @@ function updateHighways(dt, t){
     if (t >= h.waveAt){
       const rate = HW_RATE_MIN*Math.pow(HW_RATE_MAX/HW_RATE_MIN, Math.pow(busy, 1.25))*(h.lanes/2);
       const n = Math.max(2, Math.round(2 + 3*busy + Math.random()*1.4 - .2));
-      // a wave comes from one part of the sky and goes off toward another: any bearing round the road's end, far or near
-      const place = () => { const a = Math.random()*TAU, d = 40 + Math.random()*40; return { a, d }; };
-      const wave = { from: place(), to: place() };
-      let at = t; for (let k = 0; k < n; k++){ if (k) at += .9 + Math.random()*1.4; h.queue.push({ at, lane: Math.floor(Math.random()*h.lanes), wave }); }
+      let at = t; for (let k = 0; k < n; k++){ if (k) at += .9 + Math.random()*5.5; h.queue.push({ at, lane: Math.floor(Math.random()*h.lanes) }); }
       h.waveAt = t + (n/rate)*(.75 + Math.random()*.5);
     }
     h.queue = h.queue.filter(q => {
@@ -540,10 +537,11 @@ function updateHighways(dt, t){
         if (lastS >= 2.4) break; lane = (lane + 1)%h.lanes;
       }
       if (lastS < 2.4){ q.at = t + .6; return true; }   // every lane has one just entering: a moment later
-      // the car's own offsets: its wave's place in the sky, scattered a little (the road's approach starts 38 units out, so the
+      // the car's own offsets: a place in the sky of its own, scattered a little (the road's approach starts 38 units out, so the
       // offset is from there; it fades out by the ramp, and a second one fades in after the terminal)
+      const place = () => ({ a: Math.random()*TAU, d: 40 + Math.random()*40 });   // (any bearing round the road's end, far or near: each car its own)
       const spot = w => ({ lat: Math.cos(w.a)*w.d + (Math.random() - .5)*10, back: Math.sin(w.a)*w.d - 38 + (Math.random() - .5)*10, up: Math.random()*5 - 1, k: Math.max(0, (w.d - 45)/45) });
-      hwCars.push({ h, lane, s: 0, k: 0, kind: hwPickKind(), inO: spot(q.wave.from), outO: spot(q.wave.to) });
+      hwCars.push({ h, lane, s: 0, k: 0, kind: hwPickKind(), inO: spot(place()), outO: spot(place()) });
       return false;
     });
   }

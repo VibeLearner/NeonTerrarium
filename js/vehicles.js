@@ -166,8 +166,8 @@ let skyTop = 13;
 /* ---------- delivery drones flying between rooftop docks ---------- */
 const drones = [];
 const redLight = toon(0x401010, { em:0xff2a2a, kind:'thruster' });
-const DRONES_PER_SECTION = 3;   // the test island counts as one section for now
-for (let i=0;i<DRONES_PER_SECTION;i++){
+const DRONES_MAX = 14, DRONES_MIN = 3;   // built up front; how many are out working depends on the size of the city (see droneActive)
+for (let i=0;i<DRONES_MAX;i++){
   const g = new THREE.Group();
   const b = new THREE.Mesh(U.box, M.metalDark); b.scale.set(.3,.09,.3); g.add(b);
   const rotors = [];
@@ -180,7 +180,7 @@ for (let i=0;i<DRONES_PER_SECTION;i++){
   const red = new THREE.Mesh(U.box, redLight); red.scale.set(.06,.06,.06); red.position.set(0,.09,-.15); g.add(red);
   const redGlow = new THREE.Sprite(GLOW.red); redGlow.scale.set(.55,.55,1); redGlow.position.set(0,.1,-.16); redGlow.layers.set(1); g.add(redGlow);
   g.visible = false; scene.add(g);
-  drones.push({ g, red, redGlow, phase:'inside', timer:0, at:0, to:0, k:0, cruise:0, blink: Math.random()*2 });
+  drones.push({ idx: i, g, red, redGlow, phase:'inside', timer:0, at:0, to:0, k:0, cruise:0, blink: Math.random()*2 });
 }
 let ports = [], portLots = [];
 // Almost every building gets a compact drone perch: a slim mast on the roof topped by a small deck with a hangar pod.
@@ -227,7 +227,10 @@ function droneCruise(a, b){
   return y;
 }
 const _dp = new THREE.Vector3(), DRONE_SPEED = 1.7;
+// how many drones are out on deliveries: three on a young island, up to all of them in a large city (the scale is highway.js's hwTraffic)
+const droneActive = () => DRONES_MIN + Math.round((DRONES_MAX - DRONES_MIN)*Math.pow(typeof hwTraffic === 'function' ? hwTraffic(performance.now()/1000) : 0, .85));
 function updateDrones(dt, t, night){
+  const active = droneActive();
   for (const d of drones){
     if (ports.length < 2){ d.g.visible = false; continue; }
     const pos = d.g.position;
@@ -235,6 +238,7 @@ function updateDrones(dt, t, night){
     switch (d.phase){
       case 'inside':
         d.timer -= dt;
+        if (d.idx >= active){ d.timer = Math.max(d.timer, .5); break; }   // (the city is too small to keep this one busy yet)
         if (d.timer <= 0){
           const from = d.at;
           const cand = ports.filter(p => p !== d.at && !p.busy);

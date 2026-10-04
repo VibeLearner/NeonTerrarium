@@ -1151,7 +1151,7 @@ function cascadeTerraces(lot, st, P0){
 /* ---------- district builders ---------- */
 // Low income: stacked boxes shifted and twisted, overhangs on stilts, bolted-on rooms, stairs, cables and signs everywhere
 function buildTenement(lot, st, P0){
-  const floors = irand(st.floors[0], st.floors[1]);
+  const floors = Math.max(1, Math.min(irand(st.floors[0], st.floors[1]), lot.mf || 99));   // (lot.mf: built into a gap under a side pod, it must leave room)
   const w0=rnd(1.5,2.0), d0=rnd(1.5,2.0);
   let y=0, fl=0, ox=0, oz=0, prev=null, stairsDone=false;
   while (fl < floors){

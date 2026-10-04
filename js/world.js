@@ -1275,7 +1275,6 @@ function removeArea(r){
   const inR = (i, j) => i >= r.i0 && i <= r.i1 && j >= r.j0 && j <= r.j1;
   for (const m of [...megas.values()]) if (m.i <= r.i1 && m.i + m.w - 1 >= r.i0 && m.j <= r.j1 && m.j + m.h - 1 >= r.j0) removeMega(m);
   const gone = [], touched = new Set();
-  for (const [i, j] of hwRemoveArea(r)){ const c = cells.get(ckey(i, j)); if (c && !inR(i, j)) touched.add(c); }   // highways reaching into it go too
   for (const c of [...cells.values()]){
     if (!inR(c.i, c.j) || c.mega) continue;
     finishAnimsOn(c);

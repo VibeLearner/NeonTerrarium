@@ -751,14 +751,11 @@ function hwShowGhost(t){
   hwGhost.pole.position.set(x, (top + by)/2, z); hwGhost.pole.scale.set(.06, Math.max(.01, top - by), .06);
   hwGhost.g.visible = true;
 }
-function hwHintText(why){
-  const base = `Highway · height ${hwLevel} floors ([ and ] to change) · ${hwLanesPick} lanes (L) · click a plot to start · click next to its end to extend · click the end again for the drop-off · right-click a piece to cut it back`;
-  return why ? base.replace(' · click a plot to start', '') + ' · ' + why : base;
-}
+// highway mode's line under the bar: only what's wrong, when something is (the Instructions panel has the rest)
+function hwHintText(why){ return why || ''; }
 let hwLastPt = null;
 function hwHover(cx, cy){ hwLastPt = { x: cx, y: cy }; const t = hwTargetAt(hwPick(cx, cy)); hwShowGhost(t);
-  const del = t && t.type === 'none' && t.h ? (t.k === 0 ? 'right-click: remove this whole highway' : 'right-click: remove this piece and the road beyond it') : '';
-  $('modeHint').textContent = hwHintText(del || (t && !t.ok ? t.why : t && t.type === 'finish' ? 'click to finish it with a drop-off' : t && t.type === 'extend' ? 'click to join a piece on to the highlighted end' : '')); }
+  const el = $('modeHint'), why = hwHintText(t && !t.ok && t.type !== 'none' ? t.why : ''); el.textContent = why; el.hidden = !why; }
 function hwClick(cx, cy){ const t = hwTargetAt(hwPick(cx, cy)); if (hwApply(t)) hwHover(cx, cy); }
 function hwRightClick(cx, cy){ const pk = hwPick(cx, cy); if (pk && pk.kind === 'hwTile'){ hwCutAt(pk.h, pk.k); hwHover(cx, cy); } }
 function hwSetLevel(L){ hwLevel = Math.max(HW_MIN_L, Math.min(HW_MAX_L, L)); const el = document.getElementById('hwLevel'); if (el) el.textContent = hwLevel; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y); }
@@ -769,6 +766,6 @@ function setHwMode(on, quiet){
   else { hwGhost.g.visible = false; hwHighlight(null); }
   const b = document.getElementById('hwBtn'); if (b){ b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
   const bar = document.getElementById('hwbar'); if (bar) bar.hidden = !on;
-  if (on) $('modeHint').textContent = hwHintText('');
+  $('modeHint').hidden = on; if (on) $('modeHint').textContent = '';
   else if (!quiet) selectZone(S.zone);
 }

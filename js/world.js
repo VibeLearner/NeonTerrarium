@@ -281,7 +281,7 @@ function buildStack(c){
   }
   const y = stackRun(c, c.sections, c.lift ? c.lift.y : CURB, '', !c.belowTop);   // a side pod's stack starts up in the air, on its scaffold
   c.height = y;
-  c.walks = null;
+  c.walks = null; c.liftCab = null;
   if (c.lift) liftScaffold(c, c.lift.y);
   rooftopBoard(c, y);
   steamVent(c);
@@ -528,6 +528,32 @@ function liftScaffoldInd(c, y0){
     c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01 });
   }
 }
+// The lift's shaft (after the pod-on-a-tower reference, made slim): four rusty posts with rings and braces from the
+// street to just over the deck, a head with a pulley wheel and a lamp, two cables and a counterweight, and at the foot
+// a motor housing with a big gear and a cyan status light, and a striped gate. F: local +z out from the deck's side.
+const LIFT_IRON = toon(0x5a3a2a), LIFT_DARK = toon(0x2e3036);
+function liftShaft(F, x, z, base, y0){
+  const h = .22, top = y0 + .78;
+  for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) box(LIFT_IRON, F, x + sx*h, (base + top)/2, z + sz*h, .04, top - base, .04);
+  for (let y = base + .9; y < top - .2; y += .9){
+    for (const [ax, az, bx, bz] of [[-h, -h, h, -h], [h, -h, h, h], [-h, -h, -h, h]]) box(LIFT_DARK, F, x + (ax + bx)/2, y, z + (az + bz)/2, Math.abs(bx - ax) + .05, .035, Math.abs(bz - az) + .05);
+    strut(LIFT_IRON, F, x - h, y - .85, z - h, x + h, y, z - h, .012);   // a brace on the back
+  }
+  // the head: a housing over the shaft, a pulley wheel, a lamp
+  box(LIFT_DARK, F, x, top + .08, z, .56, .16, .56);
+  put(U.torus, LIFT_IRON, under(F, T(x, top + .26, z, 0, .3, .3, .3, 0, PI/2)));
+  box(M.bulb, F, x + .2, top - .04, z + .27, .06, .05, .05); glow(F, x + .2, top - .08, z + .3, 'warm', .3);
+  // cables, and a counterweight on one
+  for (const s of [-1, 1]) strut(M.metalDark, F, x + s*.06, base + .5, z - .17, x + s*.06, top, z - .17, .006);
+  box(LIFT_DARK, F, x - .06, (base + top)*.55, z - .17, .1, .32, .06);
+  // at the foot: the motor and its gear, a status light, a striped gate across the front
+  // (the gate is on the shaft's +x face, along the street, so the way in stays on the plot's own sidewalk)
+  box(LIFT_DARK, F, x - .42, base + .2, z, .28, .4, .34);
+  put(U.cyl16, LIFT_IRON, under(F, T(x - .42, base + .28, z + .19, 0, .34, .05, .34, PI/2)));
+  box(M.neonCyan, F, x - .29, base + .38, z - .1, .01, .03, .08);
+  for (const s of [-1, 1]) box(M.hazard, F, x + h + .01, base + .5, z + s*h, .02, .9, .05);
+  box(M.hazard, F, x + h + .01, base + .96, z, .02, .05, .5);
+}
 function liftScaffold(c, y0){
   if (c.sections[0] && c.sections[0].zone === 'mid') return liftScaffoldCom(c, y0);   // a commercial pod: the heavy steel rig
   if (c.sections[0] && c.sections[0].zone === 'ind') return liftScaffoldInd(c, y0);   // an industrial pod: the trestle   // a commercial pod: the heavy steel rig
@@ -577,32 +603,23 @@ function liftScaffold(c, y0){
   // the stair hut and ladder: on a side with no walkway, the pod's front door at street level
   const free = SIDES4.filter(d => !supKey.has(d.join()));
   const hs = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0];
-  if (onRoof){ const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));   // a building below: just a ladder up from what's under it
-    // leaning from the roof, between the two feet on this side, up to the deck's edge
-    const q = QS.map((s, k) => k).filter(k => QS[k][0]*hs[0] + QS[k][1]*hs[1] > 0);
-    const bx = (feet[q[0]][0] + feet[q[1]][0])/2*.85, bz = (feet[q[0]][2] + feet[q[1]][2])/2*.85, ex = hs[0]*.8, ez = hs[1]*.8;
-    const sx = -hs[1]*.17, sz = hs[0]*.17;   // across the ladder
-    for (const s of [-1, 1]) strut(M.metal, P, bx + s*sx, base, bz + s*sz, ex + s*sx, y0 + .55, ez + s*sz, .018);
-    const n = Math.floor((y0 + .5 - base)/.2);
-    for (let k = 1; k < n; k++){ const u = k/n, x = bx + (ex - bx)*u, z = bz + (ez - bz)*u; strut(M.metal, P, x - sx, base + (y0 + .55 - base)*u, z - sz, x + sx, base + (y0 + .55 - base)*u, z + sz, .012); }
-  } else { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));   // local +z out to that side
-    const wall = pick([M.concW, M.concL, M.corrBlue, M.metal]), hz = .76;
-    box(wall, F, 0, base + .52, hz, .8, 1.04, .42);                         // the hut: a little stair shed
-    box(pick([M.rust, M.metalDark, M.corrBlue]), F, 0, base + 1.07, hz, .88, .05, .5, .12);   // a sloping tin roof
-    box(M.bulb, F, .3, base + .95, hz + .22, .06, .05, .04); glow(F, .3, base + .92, hz + .25, 'warm', .35);   // a bare bulb by the door
-    box(M.frame, F, 0, base + .5, hz + .215, .46, .02, .01);                 // a lintel strip over where the door goes
-    if (chance(.6)) plant(pick(['bush', 'fern', 'bonsai']), F, .62, base, hz + .25, rnd(.55, .7));
-    // the ladder from the hut's roof up through a gap in the deck
-    for (const s of [-1, 1]) strut(M.metal, F, s*.17, base + 1.08, hz - .05, s*.17, y0 + .55, hz - .05, .018);
-    for (let y = base + 1.2; y < y0 + .5; y += .2) box(M.metal, F, 0, y, hz - .05, .34, .025, .025);
+  // the lift: a slim shaft beside the deck on that side, from the street up past the deck, its cab carrying people
+  // between the street and the deck (the cab itself moves: see the lifts in people.js)
+  const LX = .5, LZ = 1.42;
+  { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));   // local +z out to that side
+    liftShaft(F, LX, LZ, CURB, y0);
+    const W = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(F);
+    const cc = W(LX, LZ), fr = W(LX + .26, LZ), ix = W(LX, .85), g = W(1, 0), o = W(0, 0), gx = g.x - o.x, gz = g.z - o.z;
+    c.liftCab = { x: cc.x, z: cc.z, fx: fr.x, fz: fr.z, nx: gx, nz: gz, ix: ix.x, iz: ix.z, y0, ry: Math.atan2(gx, gz) };
   }
   // rails round the deck's open edges (a gap where a walkway leaves), with the odd plant pot and washing
   for (const d of SIDES4){
-    const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))), bridge = supKey.has(d.join());
-    for (let x = -1.1; x <= 1.11; x += .55){ if (bridge && Math.abs(x) < .45) continue; cyl(tube(), F, x, y0 + .23, 1.15, .015, .46); }
-    if (bridge){ strut(tube(), F, -1.1, y0 + .45, 1.15, -.42, y0 + .45, 1.15, .015); strut(tube(), F, .42, y0 + .45, 1.15, 1.1, y0 + .45, 1.15, .015); }
+    const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))), bridge = supKey.has(d.join()), lift = d === hs;
+    for (let x = -1.1; x <= 1.11; x += .55){ if ((bridge && Math.abs(x) < .45) || (lift && Math.abs(x - LX) < .32)) continue; cyl(tube(), F, x, y0 + .23, 1.15, .015, .46); }
+    if (lift){ strut(tube(), F, -1.1, y0 + .45, 1.15, LX - .28, y0 + .45, 1.15, .015); if (LX + .28 < 1.1) strut(tube(), F, LX + .28, y0 + .45, 1.15, 1.1, y0 + .45, 1.15, .015); }
+    else if (bridge){ strut(tube(), F, -1.1, y0 + .45, 1.15, -.42, y0 + .45, 1.15, .015); strut(tube(), F, .42, y0 + .45, 1.15, 1.1, y0 + .45, 1.15, .015); }
     else { strut(tube(), F, -1.1, y0 + .45, 1.15, 1.1, y0 + .45, 1.15, .015); if (chance(.35*S.clutter)) for (let x = -.8; x < .9; x += .4) if (chance(.6)) plant(laundryKind(), F, x, y0 + .45, 1.16, .8, 't', true); }
-    if (chance(.4*S.green)) plant(pick(['bush', 'fern', 'succulent', 'bushFlower']), F, rnd(-.9, .9), y0, 1.02, rnd(.5, .65));
+    if (chance(.4*S.green)) plant(pick(['bush', 'fern', 'succulent', 'bushFlower']), F, lift ? rnd(-.9, LX - .4) : rnd(-.9, .9), y0, 1.02, rnd(.5, .65));
     if (chance(.35*S.green)) plant(hangKind(), F, rnd(-.9, .9), y0 - .12, 1.18, rnd(.6, .8), 't', true);
   }
   // the walkways: planks over the street to a door in each neighbour that reaches the deck

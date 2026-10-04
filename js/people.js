@@ -369,7 +369,7 @@ const DOOR_COLS = [0x4f7f86, 0x8A4A2A, 0x3a4252, 0xc95a7a, 0x6fa8dc, 0xd9b43a, 0
 const posKey = (x, z) => Math.round(x*1000) + ',' + Math.round(z*1000);
 let crossAt = new Map(), patrolNodes = [], doorList = [], hiddenDoors = [], spotByKey = new Map(), doorByKey = new Map();
 function makeDoor(key, d, mega, old){
-  const door = { key, node: ngAdd(key, d.stand.x, d.stand.z), wall: d.wall, stand: d.stand, inside: d.inside, n: d.n, mega, noDraw: !!d.noDraw,
+  const door = { key, node: ngAdd(key, d.stand.x, d.stand.z), wall: d.wall, stand: d.stand, inside: d.inside, n: d.n, mega, noDraw: !!d.noDraw, lift: d.lift || null,
                  open: old ? old.open : 0, want: false, col: DOOR_COLS[hash(key) % DOOR_COLS.length] };
   (door.noDraw ? hiddenDoors : doorList).push(door); doorByKey.set(key, door); return door;
 }
@@ -458,7 +458,17 @@ function buildNetwork(){
       if (s.zone === 'ind') night = .3; });
     const h = hash('door', c.i, c.j, c.sections[0].seed), order = [0, 1, 2, 3].map(k => SIDES4[(h + k) % 4]);
     const sides = order.filter(([dx, dz]) => cross.get(crossKey(c, dx, dz))).concat(order.filter(([dx, dz]) => !cross.get(crossKey(c, dx, dz))));
-    const d = plotDoor(c, sides, 1.75), doors = [];
+    const doors = [];
+    // a home up on a side pod: its way in is the lift at the foot of the scaffold (and the building under it, if there's
+    // one, keeps its own door too)
+    if (c.liftCab){
+      const L = c.liftCab, G = cellGrid(c);
+      let sx = L.fx + L.nx*.3, sz = L.fz + L.nz*.3;
+      for (let k = 0; k < 8 && !freeAt(G, sx, sz); k++){ sx += L.nx*.1; sz += L.nz*.1; }
+      if (freeAt(G, sx, sz)){ const key = 'l:' + c.i + ',' + c.j, ld = { wall: { x: L.fx, z: L.fz }, stand: { x: sx, z: sz }, inside: { x: L.x, z: L.z }, n: [L.nx, L.nz], noDraw: true, lift: c };
+        doors.push(makeDoor(key, ld, false, oldDoors.get(key))); addEnd(c, { key, x: sx, z: sz, kind: 'd' }); }
+    }
+    const d = !c.liftCab || c.below ? plotDoor(c, sides, 1.75) : null;
     if (d){ const key = 'd:' + c.i + ',' + c.j; doors.push(makeDoor(key, d, false, oldDoors.get(key))); addEnd(c, { key, x: d.stand.x, z: d.stand.z, kind: 'd' }); }
     fresh.set('c:' + c.i + ',' + c.j, { id: 'c:' + c.i + ',' + c.j, cell: c, x: c.x, z: c.z, jobs, fun, night, doors });
   }
@@ -769,6 +779,7 @@ function startTrip(p, toId){
   if (spot) spot.by = p.id;
   // safe0..safe1: the stretch on the walking network (before and after it: doorways, seats, counters)
   p.walk = { pts, base, cum, len: cum[cum.length - 1], s: 0, to: toId, doorA: dA, doorB: dB, spot, safe0: cum[head.length], safe1: cum[pts.length - 1 - tail.length] };
+  if (dA && dA.lift) p.ride = { c: dA.lift, dir: 'down', t: 0 };   // out of a pod home: down in the lift first
   return true;
 }
 // Police officers on duty walk a beat: from the station (or where they stand) to a street crossing a few blocks
@@ -1270,6 +1281,63 @@ function drawDeckWalkers(emit, t, dt){
   for (const k of deckWalkers.keys()) if (!seen.has(k)) deckWalkers.delete(k);
 }
 
+/* ---------- the side pods' lifts ---------- */
+// Someone coming home to a pod walks into the cab at the foot of the lift and rides up with it; at the deck they step
+// off toward the home and fade in through its door. Going out it runs the other way: out of the door, into the cab,
+// down, and off along the street. The cab (one small group of boxes per lift) follows whoever's riding, and waits where
+// it last stopped.
+const liftCabs = new Map();   // cell key -> { g, y }
+const LIFT_SPEED = 1.3, LIFT_STEP = .9;
+const ease = u => u*u*(3 - 2*u);
+function liftRide(p, dt, t){
+  const r = p.ride, c = r.c, L = c && cells.get(ckey(c.i, c.j)) === c ? c.liftCab : null;
+  if (!L){ p.ride = null; if (r.dir === 'up' && p.walk) arrive(p); return null; }
+  r.t += dt;
+  const dur = Math.max(.6, (L.y0 - CURB)/LIFT_SPEED), cab = liftCab(c);
+  let x = L.x, z = L.z, y, alpha = 1, frame = F_IDLE + Math.floor(t*2 + p.phase) % PPL.idle, step = -1;
+  if (r.dir === 'up'){
+    if (r.t < dur){ y = CURB + (L.y0 - CURB)*ease(r.t/dur); cab.y = y; }
+    else { const u = (r.t - dur)/LIFT_STEP; if (u >= 1){ p.ride = null; arrive(p); return null; } step = u; alpha = 1 - u; y = L.y0; cab.y = y; }
+  } else {
+    if (r.t < LIFT_STEP){ step = 1 - r.t/LIFT_STEP; alpha = r.t/LIFT_STEP; y = L.y0; cab.y = y; }
+    else if (r.t < LIFT_STEP + dur){ y = L.y0 - (L.y0 - CURB)*ease((r.t - LIFT_STEP)/dur); cab.y = y; }
+    else { p.ride = null; cab.y = CURB; return null; }   // at the street: off along the walk
+  }
+  if (step >= 0){   // stepping between the cab and the deck, toward the home's door
+    x = L.x + (L.ix - L.x)*step; z = L.z + (L.iz - L.z)*step; frame = Math.floor(t*9 + p.phase) % PPL.walk;
+    const dx = (L.ix - L.x)*(r.dir === 'up' ? 1 : -1), dz = (L.iz - L.z)*(r.dir === 'up' ? 1 : -1), sd = dx*_camR.x + dz*_camR.z;
+    if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
+  }
+  p.x = x; p.z = z;
+  return { x, y: y + .02, z, frame, alpha: alpha >= 1 ? 1 : Math.max(0, alpha*.98) };
+}
+// the cab: a little cage with a floor, corner posts, a roof, mesh on two sides and a lamp
+const CAB_MATS = { frame: toon(0x2e3036), iron: toon(0x5a3a2a), mesh: toon(0x6a6e74), lamp: toon(0x5a4630, { em: 0xffcf7a, kind: 'bulb' }) };
+function liftCab(c){
+  const k = ckey(c.i, c.j); let e = liftCabs.get(k);
+  if (!e){
+    const g = new THREE.Group(), add = (mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); g.add(m); };
+    add(CAB_MATS.frame, 0, .02, 0, .4, .04, .4); add(CAB_MATS.frame, 0, .7, 0, .42, .05, .42);
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(CAB_MATS.iron, sx*.19, .36, sz*.19, .03, .68, .03);
+    for (let y = .15; y < .65; y += .1) add(CAB_MATS.mesh, 0, y, -.19, .38, .012, .012);
+    for (let y = .15; y < .65; y += .1) add(CAB_MATS.mesh, -.19, y, 0, .012, .012, .38);
+    add(CAB_MATS.iron, 0, .3, .19, .4, .03, .02);
+    add(CAB_MATS.lamp, 0, .66, 0, .07, .04, .07);
+    scene.add(g); e = { g, y: CURB }; liftCabs.set(k, e);
+  }
+  return e;
+}
+function drawLiftCabs(){
+  const live = new Set();
+  for (const c of cells.values()){
+    const L = c.liftCab; if (!L) continue;
+    const k = ckey(c.i, c.j), e = liftCab(c); live.add(k);
+    e.y = Math.min(Math.max(e.y, CURB), L.y0);
+    e.g.position.set(L.x, e.y, L.z); e.g.rotation.y = L.ry;
+  }
+  for (const [k, e] of liftCabs) if (!live.has(k)){ scene.remove(e.g); liftCabs.delete(k); }
+}
+
 /* ---------- bumping into each other, and emotes ---------- */
 function emote(p, kind, dur = 2.2){ p.emo = EMO[kind]; p.emoUntil = pplNow + dur; }
 // Walkers (and bots) coming at each other on a narrow path sometimes bump: both stop for a moment and react, with
@@ -1391,12 +1459,15 @@ function updatePeople(dt, t){
   for (const p of pplList){
     let alpha = 1, walking = false, y = CURB, frame = 0;
     const paused = p.pause > t;
+    if (p.ride){ const r = liftRide(p, dt, t); if (r){ emit(r.x, r.y, r.z, p.row, r.frame, p.flip, r.alpha); continue; } }
     if (p.walk){
       const w = p.walk; if (!paused) w.s += dt*p.speed*(p.rush ? 2.3 : p.hurry ? 1.6 : 1);
       if (w.puke && !w.puke.t0 && w.s >= w.puke.at){   // stops by the side of the path and throws up
         w.puke.t0 = t; p.pause = t + 3.6; const L = Math.hypot(p.dx || 0, p.dz || 0) || 1, sx = -(p.dz || 0)/L, sz = (p.dx || 0)/L;
         w.puke.x = p.x + sx*.22; w.puke.z = p.z + sz*.22; emote(p, 'sweat', 1.6); }
-      if (w.s >= w.len){ arrive(p); if (!p.spot && !p.patrol) continue; }
+      if (w.s >= w.len && w.doorB && w.doorB.lift && !w.rode){ w.rode = true; w.s = w.len; p.ride = { c: w.doorB.lift, dir: 'up', t: 0 }; }
+      if (p.ride){}
+      else if (w.s >= w.len){ arrive(p); if (!p.spot && !p.patrol) continue; }
       else {
         walking = true;
         let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
@@ -1408,8 +1479,8 @@ function updatePeople(dt, t){
         const sd = p.dx*_camR.x + p.dz*_camR.z;
         if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
         // through the doorway: dissolving in from the hallway, or out as they step inside
-        if (w.doorA) alpha = Math.min(alpha, (w.s - .05)/.3);
-        if (w.doorB) alpha = Math.min(alpha, (w.len - w.s - .05)/.3);
+        if (w.doorA && !w.doorA.lift) alpha = Math.min(alpha, (w.s - .05)/.3);
+        if (w.doorB && !w.doorB.lift) alpha = Math.min(alpha, (w.len - w.s - .05)/.3);
       }
     }
     if (!walking){
@@ -1457,6 +1528,7 @@ function updatePeople(dt, t){
   }
   drawBouncers(emit, t, dt);
   drawDeckWalkers(emit, t, dt);
+  drawLiftCabs();
   lawnHolos(); lawnPicnics(dt);
   // lurkers on the dark streets
   for (const L of lurkers.values()){

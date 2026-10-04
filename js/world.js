@@ -1005,6 +1005,19 @@ function bucketTopIn(x0, x1, z0, z1){
       const y = Math.max(p[q + 1], p[q + 4], p[q + 7]); if (y > m) m = y; } }
   return m;
 }
+// the height of the highest surface built so far right over the point (x, z) (each triangle's own height there)
+function bucketHeightAt(x, z){
+  let m = -1e9;
+  for (const b of buckets.values()){ const p = b.p;
+    for (let q = 0; q + 8 < p.length; q += 9){
+      const ax = p[q], az = p[q + 2], bx = p[q + 3], bz = p[q + 5], cx = p[q + 6], cz = p[q + 8];
+      if (x < Math.min(ax, bx, cx) || x > Math.max(ax, bx, cx) || z < Math.min(az, bz, cz) || z > Math.max(az, bz, cz)) continue;
+      const d = (bz - cz)*(ax - cx) + (cx - bx)*(az - cz); if (Math.abs(d) < 1e-9) continue;   // (seen edge-on from above: a wall)
+      const u = ((bz - cz)*(x - cx) + (cx - bx)*(z - cz))/d, v = ((cz - az)*(x - cx) + (ax - cx)*(z - cz))/d, w = 1 - u - v;
+      if (u < -1e-4 || v < -1e-4 || w < -1e-4) continue;
+      const y = u*p[q + 1] + v*p[q + 4] + w*p[q + 7]; if (y > m) m = y; } }
+  return m;
+}
 function bucketTop(){ let m = CURB; for (const b of buckets.values()){ const p = b.p; for (let q = 1; q < p.length; q += 3) if (p[q] > m) m = p[q]; } return m; }
 function rebuildCell(c){
   finishAnimsOn(c);   // a neighbour's edit can rebuild a cell that is still animating

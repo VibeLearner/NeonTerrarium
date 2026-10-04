@@ -376,6 +376,10 @@ function hwFeet(c){
     if (hwAt(c.i, c.j).some(o => !(o.h === h && o.k === k) && o.h.tiles[o.k].L < t.L)) continue;   // another highway under this one: it spans over
     const m = hwCenter(h, k, .5), top = hwHeight(h, k, .5) - HW_THICK - HW_GIRDER + .04, roof = c.sections.length && !c.mega ? bucketTopIn(m.x - .2, m.x + .2, m.z - .2, m.z + .2) : -1e9, bot = c.mega ? hwSurface(c) : roof > CURB ? roof - .6 : CURB;   // (it goes down into the roof right under it, the clutter there having been left out: see hwKeepOut)
     if (top - bot < .2) continue;
+    if (roof > CURB){   // only onto a flat roof: over a sawtooth, a pitched roof or a dome the deck simply spans across
+      const hs = [[-.4, -.4], [.4, -.4], [-.4, .4], [.4, .4], [0, 0], [-.4, 0], [.4, 0], [0, -.4], [0, .4]].map(([dx, dz]) => bucketHeightAt(m.x + dx, m.z + dz));
+      if (Math.max(...hs) - Math.min(...hs) > .2) continue;
+    }
     const F = T(m.x, 0, m.z, Math.atan2(m.tx, m.tz));
     box(HWM.pillar, F, 0, (bot + top)/2, 0, .4, top - bot, .4);
     box(HWM.pillar2, F, 0, top - .12, 0, .62, .24, .5);                  // the head under the girder

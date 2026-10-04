@@ -2177,6 +2177,7 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
           _to.set(L.x, 0, L.z);
           const alt = Math.max(cruiseTo(g.position, _to) - .6, restPos.y + 1.2);
           const tgt = new THREE.Vector3(L.x, alt, L.z), far = Math.hypot(L.x - g.position.x, L.z - g.position.z);
+          if (g.position.y < alt - .3) tgt.set(g.position.x, alt, g.position.z);   // up to its height first (over a highway, say), then across
           const via = droneDetour(g.position, tgt); goToward(via || tgt, dt, far > 3 ? 3.4 : 2.6); solidPush(g.position);
           if (far < 2.5){ light = 1; st.redOn = Math.min(1, (st.redOn || 0) + dt*3); st.aim = L;
             // held in the red light for five seconds, the mugger is tagged: the bikes know who they're after

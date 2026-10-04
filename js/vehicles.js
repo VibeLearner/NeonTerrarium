@@ -220,9 +220,12 @@ function resetDrones(){
 // cruising height: high enough to clear every building the straight line between the two perches passes over
 function droneCruise(a, b){
   let y = Math.max(a.y, b.y) + 1 + Math.random()*1.4;
-  for (let i=1;i<12;i++){
-    const x = a.x + (b.x-a.x)*i/12, z = a.z + (b.z-a.z)*i/12;
+  for (let i=0;i<=24;i++){
+    const x = a.x + (b.x-a.x)*i/24, z = a.z + (b.z-a.z)*i/24;
     for (const l of portLots) if (Math.abs(x-l.x) < 1.6 && Math.abs(z-l.z) < 1.6) y = Math.max(y, l.height + 1.3);
+    if (typeof hwAt === 'function') for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++){   // and over any sky highway in the way (its ramps rise above the deck)
+      const ti = Math.round(x/LOT) + di, tj = Math.round(z/LOT) + dj; if (Math.abs(x - ti*LOT) > LOT*.75 || Math.abs(z - tj*LOT) > LOT*.75) continue;
+      for (const { h, k } of hwAt(ti, tj)){ const n = h.tiles.length, end = k === 0 || k === n - 1; y = Math.max(y, hwY(h.tiles[k].L) + (end ? HW_RAMP + .5 : .4) + 1.1); } }
   }
   return y;
 }

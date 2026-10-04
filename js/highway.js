@@ -484,7 +484,7 @@ function hwLanePaths(h){
     for (let q = 1; q <= 28; q++){ bez(_hbz, E, D1, D2, D3, q/28); push(_hbz.x, _hbz.y, _hbz.z); }
     const cum = new Float32Array(X.length); for (let q = 1; q < X.length; q++) cum[q] = cum[q - 1] + Math.hypot(X[q] - X[q - 1], Y[q] - Y[q - 1], Z[q] - Z[q - 1]);
     out.push({ X: Float32Array.from(X), Y: Float32Array.from(Y), Z: Float32Array.from(Z), cum, len: cum[cum.length - 1],
-      sGate: cum[q0 + qGate], sDeck0: cum[q0 + qDeck0], sIn: cum[q0 + qIn], sMid: cum[q0 + qMid], sOut: cum[q0 + qOut] });
+      sRamp: cum[q0], sEnd: cum[q0 + deck.length - 1], hx: a.tx, hz: a.tz, ex: e.tx, ez: e.tz, sGate: cum[q0 + qGate], sDeck0: cum[q0 + qDeck0], sIn: cum[q0 + qIn], sMid: cum[q0 + qMid], sOut: cum[q0 + qOut] });
   }
   return (h.lanePaths = out);
 }
@@ -498,7 +498,7 @@ function hwAlong(P, s, k, o){
   o.yaw = Math.atan2(dx, dz); o.pitch = -Math.atan2(dy, Math.hypot(dx, dz) || 1e-4);
   return k;
 }
-const _hdm = new THREE.Object3D(), _hpos = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 };
+const _hdm = new THREE.Object3D(), _hpos = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, _hpos2 = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 };
 // How busy the sky is: from a young little island (0) to a big, built-up city (1), by its buildings, megastructures and size.
 // Scale: a MEDIUM city is the one that has just unlocked every megastructure and raised them all: the buildings that takes
 // (about 50 residential, 30 commercial, 60 luxury and 30 industrial plots, some 240 sections between them) plus the 8
@@ -537,7 +537,12 @@ function updateHighways(dt, t){
         if (lastS >= 2.4) break; lane = (lane + 1)%h.lanes;
       }
       if (lastS < 2.4){ q.at = t + .6; return true; }   // every lane has one just entering: a moment later
-      hwCars.push({ h, lane, s: 0, k: 0, kind: hwPickKind() });
+      // each car comes in from somewhere of its own (to one side or the other, nearer or farther, higher or lower) and leaves
+      // toward somewhere else: offsets that fade out by the time it reaches the ramp, and fade in again after the terminal
+      const side = Math.random() < .5 ? -1 : 1, sideO = Math.random() < .5 ? -1 : 1;
+      hwCars.push({ h, lane, s: 0, k: 0, kind: hwPickKind(),
+        inO: { lat: side*(2 + Math.random()*16), back: -4 + Math.random()*14, up: Math.random()*3.4 },
+        outO: { lat: sideO*(2 + Math.random()*16), back: -4 + Math.random()*14, up: Math.random()*3.4 } });
       return false;
     });
   }
@@ -551,6 +556,18 @@ function updateHighways(dt, t){
     if (s0 < P.sMid && c.s >= P.sMid && Math.random() < .55) hwDropVisitor(c.h);   // through the terminal: someone gets out
     if (c.s > P.sIn + .05 && c.s < P.sOut - .05) return true;   // inside the terminal: out of sight
     c.k = hwAlong(P, c.s, c.k, _hpos);
+    if (c.inO){   // wander in from its own direction, and out toward its own
+      const wi = c.s < P.sRamp ? 1 - smooth01(c.s/P.sRamp) : 0, wo = c.s > P.sEnd ? smooth01((c.s - P.sEnd)/(P.len - P.sEnd)) : 0;
+      if (wi > 0 || wo > 0){
+        const A = c.inO, B = c.outO, ax = -P.hz, az = P.hx, bx = -P.ez, bz = P.ex;   // (to the side of the way it's heading)
+        const move = (px, py, pz) => [px + wi*(A.lat*ax - A.back*P.hx) + wo*(B.lat*bx + B.back*P.ex), py + wi*A.up + wo*B.up, pz + wi*(A.lat*az - A.back*P.hz) + wo*(B.lat*bz + B.back*P.ez)];
+        const q0 = move(_hpos.x, _hpos.y, _hpos.z), s2 = Math.min(P.len, c.s + .3), wi2 = s2 < P.sRamp ? 1 - smooth01(s2/P.sRamp) : 0, wo2 = s2 > P.sEnd ? smooth01((s2 - P.sEnd)/(P.len - P.sEnd)) : 0;
+        hwAlong(P, s2, c.k, _hpos2);
+        const q1 = [_hpos2.x + wi2*(A.lat*ax - A.back*P.hx) + wo2*(B.lat*bx + B.back*P.ex), _hpos2.y + wi2*A.up + wo2*B.up, _hpos2.z + wi2*(A.lat*az - A.back*P.hz) + wo2*(B.lat*bz + B.back*P.ez)];
+        const dx = q1[0] - q0[0], dy = q1[1] - q0[1], dz = q1[2] - q0[2];
+        _hpos.x = q0[0]; _hpos.y = q0[1]; _hpos.z = q0[2]; _hpos.yaw = Math.atan2(dx, dz); _hpos.pitch = -Math.atan2(dy, Math.hypot(dx, dz) || 1e-4);
+      }
+    }
     // locked onto the lanes at the toll gate: it settles a little lower, and the lane flares under it
     const g = (c.s - P.sGate)/.9, hover = c.s < P.sGate ? .3 : c.s < P.sGate + .9 ? .3 - .1*smooth01(g) : c.s > P.sOut ? .2 + .1*smooth01((c.s - P.sOut)/1.5) : .2;
     const sc = Math.min(1, c.s/4, (P.len - c.s)/4);

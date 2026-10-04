@@ -14,8 +14,9 @@ function frame(now){
   // resolution steps down, quick again and it steps back up (a hidden tab's long gap is ignored)
   { const ms = now - last; if (ms < 250){ PERF.ema += (ms - PERF.ema)*.05; PERF.t += ms; }
     if (PERF.t > 2000){ PERF.t = 0;
-      if (PERF.ema > 26 && PERF.grow > 1) PERF.grow = Math.max(1, PERF.grow - .2);
-      else if (PERF.ema < 15 && PERF.grow < PERF.max) PERF.grow = Math.min(PERF.max, PERF.grow + .1); } }
+      if (S.autoPerf === false) PERF.grow = Infinity;
+      else if (PERF.ema > 26 && PERF.f > 1) PERF.grow = Math.max(1, Math.min(PERF.grow, PERF.f) - .2);   // slow: a step under what's drawn now
+      else if (PERF.ema < 15 && PERF.grow < Infinity){ PERF.grow += .1; if (PERF.grow > 6) PERF.grow = Infinity; } } }   // quick again: back up, and off once it's well clear
   // day and night cycle: 24 game hours per real hour. Real elapsed time (up to a second, so a slow frame rate
   // doesn't slow the day), and none while the tab is hidden.
   const rdt = Math.min(1, (now-last)/1000);   // real time passed (fades and the day cycle shouldn't slow with the frame rate)

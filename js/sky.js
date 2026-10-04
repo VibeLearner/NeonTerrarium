@@ -875,9 +875,14 @@ function resize(){
 // Zooming out draws at more lines, but no more than PERF.grow times the base (it used to climb all the way to the screen's
 // own resolution: on a sharp laptop screen, zoomed out over a big city, four to nine times the pixels for every
 // post effect). PERF.grow is also lowered on its own while frames run slow, and raised again once they're quick (main.js).
-const PERF = { grow: 1.6, max: 1.6, ema: 16, t: 0 };
+// Both are Settings, Render, "Optimize framerate": the cap (S.capRes) and the automatic lowering (S.autoPerf).
+const PERF = { grow: Infinity, max: 1.6, ema: 16, t: 0, f: 1 };
 function applyRenderRes(z){
-  const f = Math.min(Math.max(1, z/ZOOM_REF), PERF.grow), step = Math.round(Math.log(f)/Math.log(1.04));   // 4% steps, so targets aren't remade every frame
+  let f = Math.max(1, z/ZOOM_REF);
+  if (S.capRes !== false) f = Math.min(f, PERF.max);
+  if (S.autoPerf !== false) f = Math.min(f, PERF.grow);
+  PERF.f = f;
+  const step = Math.round(Math.log(f)/Math.log(1.04));   // 4% steps, so targets aren't remade every frame
   const h = Math.min(DH, Math.round(BASE_H*Math.pow(1.04, step)));
   if (h === H) return;
   H = h; W = Math.max(1, Math.round(h*DW/DH)); pxK = BASE_H/H;

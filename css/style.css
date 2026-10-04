@@ -153,3 +153,4 @@ input[type=range]{width:100%;accent-color:var(--cyan);margin:0}
 .rot.del.on{border-color:#ff4a5a;color:#fff;background:rgba(255,58,74,.35);box-shadow:0 0 10px rgba(255,58,74,.6)}
 body.deleting #modeHint{color:#ffd0d4;background:rgba(80,10,20,.82)}
 body.deleting #view{cursor:crosshair}
+.deck h3.subhead{margin:14px 0 6px;font-family:var(--font-pixel);font-weight:400;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan);opacity:.8}

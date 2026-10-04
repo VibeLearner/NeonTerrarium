@@ -184,6 +184,11 @@ function selectZone(z){
 }
 document.querySelectorAll('.zone').forEach(b => b.addEventListener('click', () => selectZone(b.dataset.zone)));
 $('outlines').addEventListener('change', e => { S.outlines = e.target.checked; });
+// Optimize framerate (see applyRenderRes in sky.js): remembered in this browser
+for (const id of ['capRes', 'autoPerf']){
+  try { const v = localStorage.getItem('neonIsland.' + id); if (v !== null){ S[id] = v === '1'; $(id).checked = S[id]; } } catch (e) {}
+  $(id).addEventListener('change', e => { S[id] = e.target.checked; try { localStorage.setItem('neonIsland.' + id, S[id] ? '1' : '0'); } catch (e2) {} if (id === 'autoPerf') PERF.grow = Infinity; });
+}
 // the render resolution: 240p, 480p or 720p (see setRenderLines in sky.js)
 document.querySelectorAll('#resChips button').forEach(b => {
   b.classList.toggle('on', +b.dataset.lines === RENDER_LINES);

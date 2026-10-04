@@ -641,11 +641,12 @@ function luxCol(P, x, z, y0, y1, r = .08){   // a round stone column, gold colla
   for (const y of [y0 + .05, y1 - .05]) put(U.cyl16, M.idGold, under(P, T(x, y, z, 0, 2*r + .06, .07, 2*r + .06)));
   for (let y = y0 + 2; y < y1 - 1; y += 2) put(U.cyl16, M.idGold, under(P, T(x, y, z, 0, 2*r + .03, .04, 2*r + .03)));
 }
+const LUX_TUBE_GLASS = new THREE.MeshBasicMaterial({ color: 0x4a2c10, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });   // (added light: it glows warm against the dark) LUX_TUBE_GLASS.userData.colorOnly = true;
 function luxTube(F, x, z, base, y0){
   const r = .27, top = y0 + 1.12;
-  put(U.cyl16, LUX_GLASS, under(F, T(x, (base + top)/2, z, 0, 2*r, top - base, 2*r)));
+  put(U.cyl16, LUX_TUBE_GLASS, under(F, T(x, (base + top)/2, z, 0, 2*r, top - base, 2*r)));   // (a warm amber glass, lit from within)
   for (let k = 0; k < 8; k++){ const a = k*TAU/8 + TAU/16; box(M.idGold, F, x + Math.sin(a)*r, (base + top)/2, z + Math.cos(a)*r, .025, top - base, .025); }
-  for (let y = base + .9; y < top - .2; y += .9) put(U.torus, M.idGold, under(F, T(x, y, z, 0, 2*r + .02, 2*r + .02, .5, PI/2)));
+  for (let y = base + .9; y < top - .2; y += .9) put(U.torus, LUX_TRIM, under(F, T(x, y, z, 0, 2*r + .02, 2*r + .02, .5, PI/2)));   // gold rings that glow after dark
   // the foot: a round stone plinth with a gold band; the head: a stone drum, a gold dome and finial
   put(U.cyl16, LUX_STONE, under(F, T(x, base + .05, z, 0, 2*r + .16, .1, 2*r + .16))); put(U.cyl16, M.idGold, under(F, T(x, base + .11, z, 0, 2*r + .1, .03, 2*r + .1)));
   put(U.cyl16, LUX_STONE, under(F, T(x, top + .07, z, 0, 2*r + .12, .14, 2*r + .12))); put(U.cyl16, M.idGold, under(F, T(x, top + .15, z, 0, 2*r + .14, .03, 2*r + .14)));

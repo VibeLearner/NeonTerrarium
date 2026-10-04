@@ -318,13 +318,17 @@ function buildStack(c){
 // a plank walkway with rails runs from it to a door in every neighbour tall enough to reach (one, or two either side,
 // or more). A stair hut at the foot of the scaffold, with a ladder up, is the pod's front door for people on the
 // street; the walkways' ends are noted (c.walks) so people can be seen crossing them (see people.js).
-const LIFT_MIN = 1.35;   // the lowest a pod hangs (deck height above the street): room for people to walk under
+const LIFT_MIN = .9;   // the lowest a pod hangs (deck height above the street): room for people to walk under
 // the deck height for a click at height y on the side of building c: snapped to a floor, with the pod's top no higher than c's roof
 function liftSnap(c, y){
-  let ly = CURB + Math.round((y - CURB)/FH)*FH;
-  ly = Math.min(ly, c.height - .7);   // the deck at least a little below the roof (the pod itself may rise past it)
-  if (ly < CURB + LIFT_MIN) ly = CURB + Math.ceil(LIFT_MIN/FH)*FH;
-  return ly <= c.height - .7 + .01 ? ly : null;
+  // the section the pointer is on: a pod lines up with that section's floor (its deck on the top of the one below);
+  // on the bottom section, with the floor the pointer is on, as long as it's above the ground floor
+  const tops = c.sectionTops || [];
+  let k = tops.findIndex(t => y < t); if (k < 0) k = tops.length - 1;
+  let ly = k >= 1 ? tops[k - 1] : CURB + Math.max(1, Math.floor((y - CURB)/FH))*FH;
+  if (ly < CURB + LIFT_MIN) return null;
+  if (ly > c.height - .5) ly = c.height - .5;
+  return ly;
 }
 // neighbours a pod at deck height y0 can tie into: a building that rises past the deck (a pod too, if it hangs lower)
 function liftSupports(c, y0){
@@ -913,7 +917,7 @@ function targetOf(pk){
   // high up the side of a building, with residential picked and an empty plot next to it: hang a pod there
   // (open sky next door too: the platform grows under it)
   const inGrid = Math.abs(c.i + a) <= GRID_MAX && Math.abs(c.j + b) <= GRID_MAX;
-  if (S.zone === 'low' && pk.kind === 'bld' && !c.mega && (n ? !n.sections.length : inGrid) && pk.p.y > CURB + .9){
+  if (S.zone === 'low' && pk.kind === 'bld' && !c.mega && (n ? !n.sections.length : inGrid) && pk.p.y > CURB + FH){
     const ly = liftSnap(c, pk.p.y);
     if (ly !== null) return { type: 'side', c: n || null, i: c.i + a, j: c.j + b, y: ly, from: c };
   }
@@ -935,9 +939,13 @@ function removeAt(pk){ if (!pk || pk.kind === 'sky') return; if (pk.c.mega) retu
 const hoverMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85, depthTest: false });
 const hover = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1)), hoverMat);
 hover.layers.set(1); hover.renderOrder = 999; hover.visible = false; scene.add(hover);
+// a side pod's outline is filled too (in its own pink), so it stands out against the wall it hangs from
+const hoverFill = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff5ad8, transparent: true, opacity: .22, depthTest: false, depthWrite: false }));
+hoverFill.layers.set(1); hoverFill.renderOrder = 998; hoverFill.visible = false; scene.add(hoverFill);
 function showHover(t){
+  hoverFill.visible = false;
   if (!t){ hover.visible = false; return; }
-  hoverMat.color.set(S.zone ? ZONES[S.zone].col : '#e3d6bd');
+  hoverMat.color.set(t && t.type === 'side' ? '#ff5ad8' : S.zone ? ZONES[S.zone].col : '#e3d6bd');   // a side pod: its own colour
   let x, z, y0, h, w, wz;
   if (t.type === 'megaUp'){
     if (!S.zone){ hover.visible = false; return; }
@@ -952,6 +960,7 @@ function showHover(t){
   else { x = t.c.x; z = t.c.z; y0 = t.c.height; h = FH*2; w = SIDE; }
   if (t.type !== 'empty' && !S.zone){ hover.visible = false; return; }
   hover.position.set(x, y0 + h/2, z); hover.scale.set(w, h, w); hover.visible = true;
+  if (t.type === 'side'){ hoverFill.position.copy(hover.position); hoverFill.scale.copy(hover.scale); hoverFill.visible = true; }
 }
 
 /* ---------- placing a megastructure from the Buildings menu: its footprint follows the pointer ---------- */

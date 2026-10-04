@@ -49,7 +49,7 @@ function paintAt(x, y){
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
   canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); dragging = true;
-  if (ptrs.size === 2){ if (act && act.timer) clearTimeout(act.timer); act = { kind: 'pinch' }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); hover.visible = false; return; }
+  if (ptrs.size === 2){ if (act && act.timer) clearTimeout(act.timer); act = { kind: 'pinch' }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); hover.visible = hoverFill.visible = false; return; }
   if (delMode && e.button === 0){ act = { kind: 'del', x: e.clientX, y: e.clientY, moved: false, from: groundCellAt(e.clientX, e.clientY) }; return; }   // delete mode: drag selects
   if (e.pointerType === 'touch'){
     // tap builds, drag paints, press and hold removes
@@ -69,7 +69,7 @@ canvas.addEventListener('pointerdown', e => {
 canvas.addEventListener('pointermove', e => {
   const p = ptrs.get(e.pointerId);
   if (!p){ ptrLast = { x: e.clientX, y: e.clientY };   // just hovering
-    if (delMode){ hover.visible = false; return; }
+    if (delMode){ hover.visible = hoverFill.visible = false; return; }
     if (megaPick) showMegaGhost(megaPick, groundCellAt(e.clientX, e.clientY), megaTurn); else showHover(targetOf(pickAt(e.clientX, e.clientY))); return; }
   const dx = e.clientX - p.x;
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -82,7 +82,7 @@ canvas.addEventListener('pointermove', e => {
     if (act.moved && act.from && to){ delSel = { i0: Math.min(act.from.i, to.i), i1: Math.max(act.from.i, to.i), j0: Math.min(act.from.j, to.j), j1: Math.max(act.from.j, to.j) }; showAreaSel(delSel); }
     return;
   }
-  if (act.kind === 'sky'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; hover.visible = false; if (megaPick) showMegaGhost(null); } return; }
+  if (act.kind === 'sky'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; hover.visible = hoverFill.visible = false; if (megaPick) showMegaGhost(null); } return; }
   if (act.kind === 'right'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved) yawT -= dx*.008; return; }
   if (act.kind === 'touch'){
     if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) > 10){ act.moved = true; clearTimeout(act.timer); const pk = pickAt(act.x, act.y); act.spin = !pk || pk.kind === 'sky' || !S.paint; if (!act.spin) paintAt(act.x, act.y); }
@@ -107,7 +107,7 @@ const endPtr = e => {
   if (!ptrs.size){ dragging = false; act = null; }
 };
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
-canvas.addEventListener('pointerleave', () => { if (!ptrs.size){ hover.visible = false; showMegaGhost(null); } });
+canvas.addEventListener('pointerleave', () => { if (!ptrs.size){ hover.visible = hoverFill.visible = false; showMegaGhost(null); } });
 canvas.addEventListener('wheel', e => { e.preventDefault(); zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 30); }, { passive:false });
 const PAN_KEYS = ['w','a','s','d','arrowup','arrowdown'];
 addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === 'shift') keys.delete('shift'); });
@@ -225,7 +225,7 @@ function selectMega(kind, quiet){
   if (megaPick && delMode) setDelMode(false, true);
   if (megaPick && S.zone) selectZone(null);
   document.querySelectorAll('.bitem').forEach(b => { const on = b.dataset.kind === megaPick; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-  hover.visible = false;
+  hover.visible = hoverFill.visible = false;
   if (megaPick){ const t = MEGA_TYPES[megaPick];
     $('modeHint').textContent = `Placing: ${t.name} · click to build` + (t.w !== t.h ? ' · R turns it' : '') + ' · right-click or Esc to stop';
     if (ptrLast) showMegaGhost(megaPick, groundCellAt(ptrLast.x, ptrLast.y), megaTurn); }
@@ -269,7 +269,7 @@ function onMegaUnlock(){ renderBmenu(); if (!document.getElementById('bmenuList'
 let delMode = false, delSel = null;
 function setDelMode(on, quiet){
   delMode = on; delSel = null; showAreaSel(null);
-  if (on){ if (S.zone) selectZone(null); if (megaPick) selectMega(null, true); hover.visible = false; showMegaGhost(null); }
+  if (on){ if (S.zone) selectZone(null); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = false; showMegaGhost(null); }
   document.body.classList.toggle('deleting', on);
   $('delBtn').classList.toggle('on', on); $('delBtn').setAttribute('aria-pressed', on);
   if (on) $('modeHint').textContent = 'Delete mode: drag to select an area · click inside it to delete · click outside to clear · X to go back to building';

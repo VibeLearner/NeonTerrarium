@@ -633,6 +633,7 @@ function liftShaft(F, x, z, base, y0){
 // tube ringed in gold with a gold dome, its cab a glass capsule; the walkways are glass skybridges between gold lattice
 // trusses, a gold arch beneath.
 U.luxVault = new THREE.CylinderGeometry(1, 1, 1, 12, 1, true, -PI/2, PI).rotateX(-PI/2).toNonIndexed();   // a half tube along z, open below
+const LUX_TRIM = toon(0x8a6a2a, { em: 0xd8a850, kind: 'trim' });   // gold that glows softly after dark (the vestibules)
 const LUX_STONE = toon(0xe6dccb), LUX_STONE2 = toon(0xcfc3ad);
 const LUX_GLASS = new THREE.MeshBasicMaterial({ color: 0x8a8068, transparent: true, opacity: .16, depthWrite: false, side: THREE.DoubleSide }); LUX_GLASS.userData.colorOnly = true;
 function luxCol(P, x, z, y0, y1, r = .08){   // a round stone column, gold collars at the foot, head and every couple of metres
@@ -730,16 +731,17 @@ function liftPlatformLux(c, y0){
     const gap = wallGap(cells.get(ckey(c.i + d[0], c.j + d[1])), F, y0, z1), ze = z1 + (gap > .04 ? gap + .04 : 0);
     if (ze > z1){ const vm = (z1 + ze)/2, vl = ze - z1 + .02;
       box(LUX_STONE, F, 0, y0 - .05, vm, w + .06, .1, vl);
-      for (const s of [-1, 1]){ box(LUX_GLASS, F, s*w/2, y0 + .4, vm, .01, .8, vl); box(M.idGold, F, s*w/2, y0 + .01, vm, .03, .03, vl); box(M.idGold, F, s*w/2, y0 + .8, vm, .03, .03, vl); }
+      for (const s of [-1, 1]){ box(LUX_GLASS, F, s*w/2, y0 + .4, vm, .01, .8, vl); box(LUX_TRIM, F, s*w/2, y0 + .01, vm, .03, .03, vl); box(LUX_TRIM, F, s*w/2, y0 + .8, vm, .03, .03, vl); }
       put(U.luxVault, LUX_GLASS, under(F, T(0, y0 + .8, vm, 0, w/2, w/2, vl)));
       for (let z = z1; z <= ze + .001; z += Math.max(.2, (ze - z1)/Math.ceil((ze - z1)/.3))){
-        put(U.halfRing, M.idGold, under(F, T(0, y0 + .8, z, 0, w/2, w/2, 1)));
+        put(U.halfRing, LUX_TRIM, under(F, T(0, y0 + .8, z, 0, w/2, w/2, 1.6)));
         for (const s of [-1, 1]) box(M.idGold, F, s*w/2, y0 + .4, z, .03, .8, .03); }
     }
     // the doorways: a stone surround with a gold frame in the neighbour's wall, a gold frame on the platform's side
     box(LUX_STONE, F, 0, y0 + .52, ze + .16, .84, 1.08, .36);
     box(M.idGold, F, 0, y0 + .5, ze - .03, .64, 1.02, .05);
     box(LUX_STONE2, F, 0, y0 + 1.06, ze - .05, .76, .06, .1);
+    if (ze > z1){ box(M.idGold, F, 0, y0 + 1.0, ze - .12, .1, .03, .06); box(LUX_TRIM, F, 0, y0 + .97, ze - .12, .07, .03, .05); glow(F, 0, y0 + .94, ze - .14, 'gold', .28); }   // a lamp over the door
     box(M.idGold, F, 0, y0 + .5, z0 + .02, .62, 1.0, .05);
     const a = new THREE.Vector3(0, y0, z0 + .2).applyMatrix4(F), b = new THREE.Vector3(0, y0, ze - .2).applyMatrix4(F);
     const dA = new THREE.Vector3(0, 0, z0 + .05).applyMatrix4(F), dB = new THREE.Vector3(0, 0, ze - .06).applyMatrix4(F), o0 = new THREE.Vector3(0, 0, 0).applyMatrix4(F), fz = new THREE.Vector3(0, 0, 1).applyMatrix4(F), nx = fz.x - o0.x, nz = fz.z - o0.z;

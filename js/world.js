@@ -515,7 +515,11 @@ function refresh(list, megaList = []){
     const near = c => c && c !== a && Math.abs(c.i - a.i) <= 1 && Math.abs(c.j - a.j) <= 1;
     if (list.some(near) || megaList.some(m => (m.cells || []).some(near))) list.push(a);
   }
-  for (const c of new Set(list)) if (c) rebuildCell(c);
+  const todo = [...new Set(list)].filter(Boolean);
+  for (const c of todo) rebuildCell(c);
+  // an air-filter tower picks its face from its neighbours' heights, so if one of them was only built after it in this
+  // pass (loading a saved city builds every plot in one go), build the tower again now that they all stand
+  for (const c of todo) if (airCells.has(c) && !anims.some(a => a.c === c)) rebuildCell(c);
   for (const m of megaList) rebuildMega(m);
   for (const k of dirtyRegions){ if (heldRegions.has(k)) pendingRegions.add(k); else rebuildRegion(k); } dirtyRegions.clear();
   rebuildConnections(); syncAgents();

@@ -629,21 +629,9 @@ function buildRadioStation(m){
   m.top = top + 2.8;
 }
 
-// for trying things out: open the game with #dev in the address, point at a plot and press M for the radio
-// station, N the sky mall, B the town square, V the foundry, C the police station, K the market mall, P the cloud
-// pagoda, J the Neon Dome club, G the hydroponic farm, Y the data spire (each key
-// brings one in, with Shift it takes one away; ignores the requirement and the odds)
-if (location.hash.includes('dev')){
-  let lastPointer = null;
-  addEventListener('pointermove', e => { lastPointer = { x: e.clientX, y: e.clientY }; });
-  addEventListener('keydown', e => {
-    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police', k: 'market', p: 'pagoda', j: 'club', g: 'greenhouse', y: 'spire' }[e.key.toLowerCase()]; if (!kind) return;
-    const pk = lastPointer ? pickAt(lastPointer.x, lastPointer.y) : null;
-    const c = pk && pk.c ? pk.c : pk && pk.kind === 'sky' ? { i: pk.i, j: pk.j } : cells.values().next().value;
-    if (e.shiftKey && megasOfKind(kind).length) removeMega(megasOfKind(kind)[0]);
-    else if (c) spawnMega(kind, c);
-  });
-}
+// for trying things out: open the game with #dev in the address and every megastructure is already in the Buildings
+// menu (and the sky highways in Transport), ready to place. Only for this visit: nothing is saved as unlocked.
+if (location.hash.includes('dev')) for (const kind in MEGA_TYPES) megaUnlockedKinds.add(kind);
 
 /* ---------- the sky mall ---------- */
 // An octagonal glass mall in white and gold. It stands on white columns with gold collars above a marble court,

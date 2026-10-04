@@ -26,11 +26,11 @@ const CARM = {
   head:  toon(0x707070, { em:0xfff4dc, kind:'thruster' }),
   tail:  toon(0x401010, { em:0xff3030, kind:'thruster' }),
   taxiSign: toon(0x5a3e18, { em:0xffd060, kind:'thruster' }),
-  std:  [toon(0x24272e), toon(0x33373f), toon(0x8a1c22), toon(0xd8dade), toon(0x1c2a3a)],
+  std:  [toon(0x24272e), toon(0x9a1f26), toon(0xd8dade), toon(0x1f4a7a), toon(0x3a7a5a), toon(0xd8782a)],   // the first few are the ones the highway traffic uses
   taxi: [toon(0xe8b830)],
-  lux:  [toon(0x16171c), toon(0x121318), toon(0x2a1a2e)],
+  lux:  [toon(0x16171c), toon(0x4a1626), toon(0x1a2448), toon(0xe8e6e0)],
   beat: [toon(0x8A4A2A), toon(0x7d8b8c), toon(0x6b6048), toon(0x5a6a58)],
-  van:  [toon(0x2e3d55), toon(0x8a9098), toon(0xd9d2c0), toon(0x3f6a6a)],
+  van:  [toon(0x2e3d55), toon(0xd9d2c0), toon(0x3f6a6a), toon(0xb8503a), toon(0x8a9098)],
   chrome: toon(0xb8c0c8), gold: toon(0xc9a24a), black: toon(0x15161a), under: toon(0x22252c), grille: toon(0x0e0f12),
   check: toon(0x17181c), seat: toon(0x8a7a62),
 };
@@ -71,10 +71,10 @@ const CAR_SHAPES = {
     body: [[-.5,-.06],[.49,-.06],[.51,0],[.5,.09],[.2,.12],[-.45,.13],[-.51,.1],[-.51,0]],
     cab:  [[.2,.115],[.09,.26],[-.3,.26],[-.43,.125]], roof: [-.29, .08], roofY: .26, seams: [.05, -.15], belt: .12 },
 };
-function buildCar(kind){
+function buildCar(kind, forcedBody){
   const g = new THREE.Group(), rr = Math.random, pk = a => a[Math.floor(rr()*a.length)];
   const S_ = CAR_SHAPES[kind] || CAR_SHAPES.std, L = S_.L, W = S_.W, out = { g, flick:[], wobble: kind === 'beat' ? 1 : 0, len0: L + .05 };
-  const body = pk(CARM[kind]), trim = kind === 'lux' ? CARM.gold : kind === 'std' ? CARM.black : CARM.chrome;
+  const body = forcedBody || pk(CARM[kind]), trim = kind === 'lux' ? CARM.gold : kind === 'std' ? CARM.black : CARM.chrome;
   const nose = Math.max(...S_.body.map(p => p[0])), tailZ = Math.min(...S_.body.map(p => p[0]));
   // body, cabin glass, roof panel, pillars
   carPart(g, carProfile(S_.body, W), body, 0, 0, 0, 1, 1, 1);

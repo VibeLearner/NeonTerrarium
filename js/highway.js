@@ -412,17 +412,24 @@ function hwFold(g){
   const merge = list => { const m = list.length ? THREE.BufferGeometryUtils.mergeBufferGeometries(list, false) : null; list.forEach(x => x.dispose()); return m; };
   return { plain: merge(plain), lit: merge(lit) };
 }
+// every kind in several paint jobs: each is its own folded model (a handful of them are on the road at any time)
+const HW_VARIANTS = { std: 4, taxi: 1, lux: 3, van: 3, beat: 2 };
 const HW_KINDS = (() => {
-  const out = [];
-  ['std', 'taxi', 'lux', 'van'].forEach((kind, q) => {
-    const c = buildCar(kind), g = c.g;
+  const out = [], byBase = {};
+  for (const kind in HW_VARIANTS) CARM[kind].slice(0, HW_VARIANTS[kind]).forEach(body => {
+    const c = buildCar(kind, body), g = c.g;
     for (const pv of c.pods) pv.rotation.x = .95;   // thrusters tilted back: cruising
     const f = hwFold(g), meshes = [];
     for (const [geo, mat] of [[f.plain, HW_CAR_PLAIN], [f.lit, HW_CAR_GLOW]]){ if (!geo) continue; const m = new THREE.InstancedMesh(geo, mat, HW_CAR_MAX); m.count = 0; m.frustumCulled = false; m.visible = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); meshes.push(m); }
-    out.push({ kind, meshes, n: 0 });
+    out.push({ kind, meshes, n: 0 }); (byBase[kind] = byBase[kind] || []).push(out.length - 1);
   });
-  return out;
+  out.byBase = byBase; return out;
 })();
+// a car for the road: a kind by how common it is, then one of its paint jobs
+function hwPickKind(){
+  const r = Math.random(), base = r < .4 ? 'std' : r < .65 ? 'taxi' : r < .82 ? 'lux' : r < .95 ? 'van' : 'beat', list = HW_KINDS.byBase[base];
+  return list[Math.floor(Math.random()*list.length)];
+}
 // The pulse: a row of small light segments down each side of the deck, dark until a soft pulse of light runs along
 // them in the direction of travel, every few seconds. One batch for every highway; only the segments' colours change
 // from frame to frame (their places are set when a highway is built).
@@ -530,8 +537,7 @@ function updateHighways(dt, t){
         if (lastS >= 2.4) break; lane = (lane + 1)%h.lanes;
       }
       if (lastS < 2.4){ q.at = t + .6; return true; }   // every lane has one just entering: a moment later
-      const r = Math.random(), kind = r < .45 ? 0 : r < .7 ? 1 : r < .9 ? 2 : 3;
-      hwCars.push({ h, lane, s: 0, k: 0, kind });
+      hwCars.push({ h, lane, s: 0, k: 0, kind: hwPickKind() });
       return false;
     });
   }

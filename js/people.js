@@ -1357,12 +1357,16 @@ function updatePeople(dt, t){
     if (S.cycle && dh < .5) pplHour = S.hour;
     else if (dh > .2){ pplHour = S.hour; for (const p of pplList) if (!p.walk) p.until = Math.min(p.until, pplNow + Math.random()*8); } }
   // decisions are spread over frames: a slice of the population each time
-  const n = pplList.length, slice = Math.min(n, 60);
-  for (let k = 0; k < slice; k++){
+  // (and a time budget: a decision can mean finding a new route across town, and a burst of them on one frame is a
+  // visible stutter; whoever isn't reached this frame is reached on the next)
+  const n = pplList.length, slice = Math.min(n, 60), tb = performance.now();
+  let k = 0;
+  for (; k < slice; k++){
     const p = pplList[(pplCursor + k) % n];
     if (!p.walk && pplNow >= p.until) decide(p);
+    if (performance.now() - tb > 2.5){ k++; break; }
   }
-  pplCursor = n ? (pplCursor + slice) % n : 0;
+  pplCursor = n ? (pplCursor + k) % n : 0;
   _camR.set(1, 0, 0).applyQuaternion(cam.quaternion);
   updateBots(dt, t);
   updateLurkers(dt, t);

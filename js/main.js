@@ -10,6 +10,12 @@ selectZone(null);
 let last = performance.now();
 function frame(now){
   const dt = Math.min(.05, (now-last)/1000);
+  // auto performance: a running average of the frame time; slow for a couple of seconds and the zoomed-out render
+  // resolution steps down, quick again and it steps back up (a hidden tab's long gap is ignored)
+  { const ms = now - last; if (ms < 250){ PERF.ema += (ms - PERF.ema)*.05; PERF.t += ms; }
+    if (PERF.t > 2000){ PERF.t = 0;
+      if (PERF.ema > 26 && PERF.grow > 1) PERF.grow = Math.max(1, PERF.grow - .2);
+      else if (PERF.ema < 15 && PERF.grow < PERF.max) PERF.grow = Math.min(PERF.max, PERF.grow + .1); } }
   // day and night cycle: 24 game hours per real hour. Real elapsed time (up to a second, so a slow frame rate
   // doesn't slow the day), and none while the tab is hidden.
   const rdt = Math.min(1, (now-last)/1000);   // real time passed (fades and the day cycle shouldn't slow with the frame rate)

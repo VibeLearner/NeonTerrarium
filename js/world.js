@@ -274,11 +274,10 @@ const STALL_TYPES = new Set([stallMarket, foodDeck, foodTower, foodPlaza, billbo
 // ground, and c.sections, the pod hanging over it on its scaffold (from c.lift.y), with a gap between them.
 function buildStack(c){
   c.belowTop = null; c.belowTops = [];
-  c.liftHF = null;
+  c.liftRoof = null;
   if (c.lift && c.below && c.below.length){
-    const mark = new Map([...buckets.values()].map(b => [b, b.p.length]));
-    c.belowTop = stackRun(c, c.below, CURB, 'b', true); c.belowTops = c.sectionTops; c._topLot = null;
-    c.liftHF = liftHeights(c, mark);
+    c.belowTop = stackRun(c, c.below, CURB, 'b', true); c.belowTops = c.sectionTops;
+    c.liftRoof = c._topLot && c._topLot.roof ? c._topLot.roof : null; c._topLot = null;   // the roof's corners, for the scaffold's legs
   }
   const y = stackRun(c, c.sections, c.lift ? c.lift.y : CURB, '', !c.belowTop);   // a side pod's stack starts up in the air, on its scaffold
   c.height = y;
@@ -329,39 +328,6 @@ function stackRun(c, secs, y, tag, first){
   return y;
 }
 /* ---------- side pods: a building hung off the side of a taller one ---------- */
-// What's under a pod, as a height map: once, right after the building under it is generated, its new triangles (the
-// part of each bucket added since 'mark') are stamped onto a 28 x 28 grid over the plot, each cell keeping the highest
-// point that covers it. The scaffold's legs then reach down to whatever is under each of them: the roof of the
-// building below, or past its edge to the street. No cost per frame; only when the plot is rebuilt.
-const HF_N = 28, HF_S = 2.8/HF_N;
-function liftHeights(c, mark){
-  const hf = new Float32Array(HF_N*HF_N).fill(CURB), x0 = c.x - 1.4, z0 = c.z - 1.4, lim = c.lift.y - .2;
-  for (const b of buckets.values()){
-    const P = b.p, from = mark.get(b) || 0;
-    for (let t = from; t + 8 < P.length; t += 9){
-      const ya = P[t + 1], yb = P[t + 4], yc = P[t + 7], ymax = Math.max(ya, yb, yc);
-      if (ymax <= CURB + .02 || ymax > lim) continue;
-      const mnx = Math.min(P[t], P[t + 3], P[t + 6]), mxx = Math.max(P[t], P[t + 3], P[t + 6]), mnz = Math.min(P[t + 2], P[t + 5], P[t + 8]), mxz = Math.max(P[t + 2], P[t + 5], P[t + 8]);
-      const i0 = Math.max(0, Math.floor((mnx - x0)/HF_S)), i1 = Math.min(HF_N - 1, Math.floor((mxx - x0)/HF_S)), j0 = Math.max(0, Math.floor((mnz - z0)/HF_S)), j1 = Math.min(HF_N - 1, Math.floor((mxz - z0)/HF_S));
-      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){ const q = j*HF_N + i; if (ymax > hf[q]) hf[q] = ymax; }
-    }
-  }
-  return hf;
-}
-// the height of what's under a point of the plot (world x, z): the highest cell within a leg's width of it
-function liftFloor(c, x, z){
-  if (!c.liftHF) return CURB;
-  const x0 = c.x - 1.4, z0 = c.z - 1.4, i = Math.floor((x - x0)/HF_S), j = Math.floor((z - z0)/HF_S);
-  let h = CURB;
-  for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++){ const a = i + di, b = j + dj; if (a >= 0 && b >= 0 && a < HF_N && b < HF_N) h = Math.max(h, c.liftHF[b*HF_N + a]); }
-  return h;
-}
-
-// Clicking the side of a building high up (residential only, for now) hangs a one-section home in the air over the
-// empty plot next to it: the pod stands on a plank deck on a DIY scaffold of pipes and posts down to the street, and
-// a plank walkway with rails runs from it to a door in every neighbour tall enough to reach (one, or two either side,
-// or more). A stair hut at the foot of the scaffold, with a ladder up, is the pod's front door for people on the
-// street; the walkways' ends are noted (c.walks) so people can be seen crossing them (see people.js).
 const LIFT_MIN = .9;   // the lowest a pod hangs (deck height above the street): room for people to walk under
 // the deck height for a click at height y on the side of building c: snapped to a floor, with the pod's top no higher than c's roof
 function liftSnap(c, y){
@@ -572,37 +538,52 @@ function liftScaffold(c, y0){
   // the deck: planks on bearers, a little bigger than the pod
   box(M.frame, P, 0, y0 - .1, 0, 2.36, .08, 2.36);
   for (let x = -1.12; x <= 1.13; x += .16) box(pick([M.wood, M.wood, M.crate]), P, x, y0 - .03, 0, .14, .05, 2.3);
-  // the uprights: four corners and a middle post or two, crooked, some steel, some timber
-  const posts = [[-E, -E], [E, -E], [-E, E], [E, E]];
-  if (chance(.7)) posts.push([0, chance(.5) ? E : -E]);
-  if (chance(.5)) posts.push([chance(.5) ? E : -E, 0]);
-  // each leg goes down to what's under it: the roof of the building below, or the street beside it
-  const foot = (x, z) => liftFloor(c, c.x + x, c.z + z), cf = {};
-  for (const [x, z] of [[-E, -E], [E, -E], [E, E], [-E, E]]) cf[x + ',' + z] = foot(x, z);
-  for (const [x, z] of posts){
-    const wx = wobble(), wz = wobble(), fy = foot(x + wx, z + wz);
-    if (chance(.25)) box(M.wood, P, x, (fy + y0 - .1)/2, z, .07, y0 - .1 - fy, .07);
-    else strut(tube(), P, x + wx, fy, z + wz, x, y0 - .1, z, .03);
-    box(M.concDD, P, x + wx, fy + .02, z + wz, .14, .04, .14);   // a base plate
+  // Anchor points: the four corners under the deck, and four feet. With a building below, each foot is a corner of its
+  // roof (taken inward a little, at random, so no two rigs stand alike); with nothing below, the street under the deck.
+  // Each leg runs from its deck corner to its foot, leaning in or splaying out as the roof is narrower or turned, so it
+  // always lands on the roof. Ledgers and braces join the legs along their actual lines.
+  const QS = [[-1, -1], [1, -1], [1, 1], [-1, 1]], top = QS.map(([sx, sz]) => [sx*E, y0 - .1, sz*E]);
+  let feet;
+  if (onRoof){
+    const rc = c.liftRoof || QS.map(([sx, sz]) => [c.x + sx*.6, base, c.z + sz*.6]);   // (no corners recorded: a safe square well inside)
+    const cx = rc.reduce((a, p) => a + p[0], 0)/4, cz = rc.reduce((a, p) => a + p[2], 0)/4;
+    feet = QS.map(([sx, sz]) => {   // the roof corner lying furthest toward this deck corner
+      let best = rc[0], bd = -Infinity; for (const p of rc){ const d = sx*(p[0] - cx) + sz*(p[2] - cz); if (d > bd){ bd = d; best = p; } }
+      const k = rnd(.08, .2), dx = cx - best[0], dz = cz - best[2], l = Math.hypot(dx, dz) || 1;
+      return [best[0] - c.x + dx/l*k, base, best[2] - c.z + dz/l*k];
+    });
+  } else feet = top.map(([x, , z]) => [x + wobble(), base, z + wobble()]);
+  const legAt = (k, y) => { const a = feet[k], b = top[k], u = Math.max(0, Math.min(1, (y - a[1])/(b[1] - a[1]))); return [a[0] + (b[0] - a[0])*u, a[2] + (b[2] - a[2])*u]; };
+  for (let k = 0; k < 4; k++){
+    const [fx, fy, fz] = feet[k], [tx, ty, tz] = top[k];
+    strut(chance(.25) ? M.wood : tube(), P, fx, fy, fz, tx, ty, tz, .03);
+    box(M.concDD, P, fx, fy + .02, fz, .14, .04, .14);   // a base plate
   }
-  // ledgers round the frame every metre or so (only where both legs reach), and cross braces on a couple of faces
-  const EDGES = [[-E, -E, E, -E], [E, -E, E, E], [E, E, -E, E], [-E, E, -E, -E]];
-  for (let y = Math.min(...Object.values(cf)) + 1.0; y < y0 - .3; y += rnd(.85, 1.1)){
-    for (const [ax, az, bx, bz] of EDGES) if (y > Math.max(cf[ax + ',' + az], cf[bx + ',' + bz]) + .3 && chance(.85)) strut(tube(), P, ax, y, az, bx, y + rnd(-.04, .04), bz, .02);
+  // a prop or two from mid-roof up to the middle of a deck edge, so a wide deck on a small roof reads as braced
+  for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 0]]) if (chance(.4)){
+    const fx = (feet[a][0] + feet[b][0])/2, fz = (feet[a][2] + feet[b][2])/2, tx = (top[a][0] + top[b][0])/2, tz = (top[a][2] + top[b][2])/2;
+    strut(tube(), P, fx, base, fz, tx, y0 - .1, tz, .025); box(M.concDD, P, fx, base + .02, fz, .12, .04, .12);
   }
-  for (const [ax, az, bx, bz] of EDGES){
+  // ledgers between neighbouring legs every metre or so, and cross braces on a couple of faces, all along the legs' lines
+  for (let y = base + 1.0; y < y0 - .3; y += rnd(.85, 1.1)) for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 0]]) if (chance(.85)){
+    const [ax, az] = legAt(a, y), [bx, bz] = legAt(b, y); strut(tube(), P, ax, y, az, bx, y + rnd(-.04, .04), bz, .02); }
+  for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 0]]){
     if (!chance(.55)) continue;
-    const yl = Math.max(cf[ax + ',' + az], cf[bx + ',' + bz]) + .25, yh = y0 - .15;
-    if (yh - yl < .6) continue;
-    strut(tube(), P, ax, yl, az, bx, yh, bz, .018); if (chance(.6)) strut(tube(), P, bx, yl, bz, ax, yh, az, .018);
+    const yl = base + .25, yh = y0 - .15; if (yh - yl < .6) continue;
+    const [ax, az] = legAt(a, yl), [bx, bz] = legAt(b, yh), [cx2, cz2] = legAt(b, yl), [dx2, dz2] = legAt(a, yh);
+    strut(tube(), P, ax, yl, az, bx, yh, bz, .018); if (chance(.6)) strut(tube(), P, cx2, yl, cz2, dx2, yh, dz2, .018);
   }
   // the stair hut and ladder: on a side with no walkway, the pod's front door at street level
   const free = SIDES4.filter(d => !supKey.has(d.join()));
   const hs = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0];
   if (onRoof){ const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));   // a building below: just a ladder up from what's under it
-    const lw = new THREE.Vector3(0, 0, .8).applyMatrix4(F), lf = liftFloor(c, lw.x, lw.z);
-    for (const s of [-1, 1]) strut(M.metal, F, s*.17, lf, .8, s*.17, y0 + .55, .8, .018);
-    for (let y = lf + .15; y < y0 + .5; y += .2) box(M.metal, F, 0, y, .8, .34, .025, .025);
+    // leaning from the roof, between the two feet on this side, up to the deck's edge
+    const q = QS.map((s, k) => k).filter(k => QS[k][0]*hs[0] + QS[k][1]*hs[1] > 0);
+    const bx = (feet[q[0]][0] + feet[q[1]][0])/2*.85, bz = (feet[q[0]][2] + feet[q[1]][2])/2*.85, ex = hs[0]*.8, ez = hs[1]*.8;
+    const sx = -hs[1]*.17, sz = hs[0]*.17;   // across the ladder
+    for (const s of [-1, 1]) strut(M.metal, P, bx + s*sx, base, bz + s*sz, ex + s*sx, y0 + .55, ez + s*sz, .018);
+    const n = Math.floor((y0 + .5 - base)/.2);
+    for (let k = 1; k < n; k++){ const u = k/n, x = bx + (ex - bx)*u, z = bz + (ez - bz)*u; strut(M.metal, P, x - sx, base + (y0 + .55 - base)*u, z - sz, x + sx, base + (y0 + .55 - base)*u, z + sz, .012); }
   } else { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));   // local +z out to that side
     const wall = pick([M.concW, M.concL, M.corrBlue, M.metal]), hz = .76;
     box(wall, F, 0, base + .52, hz, .8, 1.04, .42);                         // the hut: a little stair shed

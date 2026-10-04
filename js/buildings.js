@@ -1150,6 +1150,7 @@ function cascadeTerraces(lot, st, P0){
 
 /* ---------- district builders ---------- */
 // Low income: stacked boxes shifted and twisted, overhangs on stilts, bolted-on rooms, stairs, cables and signs everywhere
+function roofCorners(F, w, d){ return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => { const v = new THREE.Vector3(sx*w/2, 0, sz*d/2).applyMatrix4(F); return [v.x, v.y, v.z]; }); }
 function buildTenement(lot, st, P0){
   const floors = Math.max(1, Math.min(irand(st.floors[0], st.floors[1]), lot.mf || 99));   // (lot.mf: built into a gap under a side pod, it must leave room)
   const w0=rnd(1.5,2.0), d0=rnd(1.5,2.0);
@@ -1170,6 +1171,8 @@ function buildTenement(lot, st, P0){
     if (!stairsDone && fl===0 && floors>=4 && chance(.5)){ stairs(st, pick(F), Math.min(floors,4)); stairsDone=true; }
     prev = c; y += c.h; fl += nn;
   }
+  // the top roof's corners (world), for a side pod's scaffold to stand on (see liftScaffold in world.js)
+  lot.roof = roofCorners(under(P0, T(prev.ox, y, prev.oz, prev.ry)), prev.w, prev.d);
   if (chance(.3) && !lot.mf){   // (not when it must fit a gap under a side pod: the pod on top is another floor)
     y = pod(st, P0, { w:clamp(prev.w+rnd(.1,.4),1.4,2.3), d:clamp(prev.d+rnd(.1,.4),1.4,2.3), h:rnd(1,1.15), y, ox:prev.ox+rnd(-.2,.2), oz:prev.oz+rnd(-.2,.2), ry:prev.ry+rnd(-.2,.2) }, { face: pick([0, PI/2, PI, -PI/2]) });
     Object.assign(lot, { height:y, floors, occupied:true });

@@ -65,7 +65,7 @@ canvas.addEventListener('pointerdown', e => {
   if (e.pointerType === 'touch'){
     // tap builds, drag paints, press and hold removes
     act = { kind: 'touch', x: e.clientX, y: e.clientY, moved: false, done: new Set() };
-    act.timer = setTimeout(() => { if (act && act.kind === 'touch' && !act.moved){ if (hwMode) hwRightClick(act.x, act.y); else removeAt(pickAt(act.x, act.y)); act.kind = 'none'; } }, 550);
+    act.timer = setTimeout(() => { if (act && act.kind === 'touch' && !act.moved){ if (hwMode) hwRightClick(act.x, act.y); else { const hp = hwPick(act.x, act.y); if (hp && hp.kind === 'hwTile') hwRightClick(act.x, act.y); else removeAt(pickAt(act.x, act.y)); } act.kind = 'none'; } }, 550);
     return;
   }
   if (e.button === 0 && hwMode){ act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false }; return; }   // highway mode: a click builds, a drag turns the view
@@ -112,7 +112,7 @@ const endPtr = e => {
       delSel = null; showAreaSel(null);
     }
     if (act.kind === 'right' && !act.moved && delMode){ delSel = null; showAreaSel(null); }
-    else if (act.kind === 'right' && !act.moved){ if (hwMode) hwRightClick(e.clientX, e.clientY); else if (megaPick) selectMega(null); else removeAt(pickAt(e.clientX, e.clientY)); }   // right-click while placing: put it down
+    else if (act.kind === 'right' && !act.moved){ if (hwMode) hwRightClick(e.clientX, e.clientY); else if (megaPick) selectMega(null); else { const hp = hwPick(e.clientX, e.clientY); if (hp && hp.kind === 'hwTile') hwRightClick(e.clientX, e.clientY); else removeAt(pickAt(e.clientX, e.clientY)); } }   // right-click while placing: put it down; on a highway piece: cut the road there
     if (act.kind === 'sky' && !act.moved){ if (hwMode) hwClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
     if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (hwMode) hwClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
   }

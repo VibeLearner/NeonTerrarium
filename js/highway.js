@@ -156,12 +156,15 @@ function hwApply(t){
 }
 // right-click a highway plot: the drop-off goes first (the line stays, open again); anywhere else it's cut back to
 // before that plot (the whole thing, from its entry)
-function hwCutAt(h, k){
-  const n = h.tiles.length, touched = h.tiles.slice(Math.max(0, k - 1)).map(t => [t.i, t.j]);
-  if (h.done && k === n - 1){ const L = hwLiftSpot(h, h.side); touched.push([Math.round(L.sx/LOT), Math.round(L.sz/LOT)]); h.done = false; hwCommit(h, touched); }
-  else if (k === 0){ hwRemove(h); return; }
-  else { if (h.done){ const L = hwLiftSpot(h, h.side); touched.push([Math.round(L.sx/LOT), Math.round(L.sz/LOT)]); } h.tiles = h.tiles.slice(0, k); h.done = false; hwCommit(h, touched); }
-  sfx.play('remove');
+// cut a highway at plot k: from its entry (k = 0) the whole thing goes; from anywhere further on, that plot and the rest
+// of the road beyond it (the drop-off included) go, and what's left is open again to be extended. Returns the plots touched.
+function hwCutAt(h, k, quiet){
+  if (k === 0) return hwRemove(h, quiet);
+  const touched = h.tiles.slice(Math.max(0, k - 1)).map(t => [t.i, t.j]);
+  if (h.done){ const L = hwLiftSpot(h, h.side); touched.push([Math.round(L.sx/LOT), Math.round(L.sz/LOT)]); }
+  h.tiles = h.tiles.slice(0, k); h.done = false; hwActive = h;
+  if (quiet){ hwReindex(); hwBuildView(h); hwClearCars(h); } else { hwCommit(h, touched); sfx.play('remove'); }
+  return touched;
 }
 function hwRemove(h, quiet){
   const touched = h.tiles.map(t => [t.i, t.j]);
@@ -171,10 +174,10 @@ function hwRemove(h, quiet){
   if (!quiet){ hwCommit(null, touched); sfx.play('remove'); } else hwReindex();
   return touched;
 }
-// delete mode: every highway reaching into the block goes; the plots they stood on are returned for the rebuild
+// delete mode: every highway reaching into the block is cut there (see hwCutAt); the plots it stood on are returned for the rebuild
 function hwRemoveArea(r){
   const out = [];
-  for (const h of [...highways]) if (h.tiles.some(t => t.i >= r.i0 && t.i <= r.i1 && t.j >= r.j0 && t.j <= r.j1)) out.push(...hwRemove(h, true));
+  for (const h of [...highways]){ const k = h.tiles.findIndex(t => t.i >= r.i0 && t.i <= r.i1 && t.j >= r.j0 && t.j <= r.j1); if (k >= 0) out.push(...hwCutAt(h, k, true)); }   // (cut from the first of its plots in the block)
   return out;
 }
 function hwClearAll(){ for (const h of highways){ hwDropView(h); hwClearCars(h); } highways = []; hwActive = null; hwReindex(); }

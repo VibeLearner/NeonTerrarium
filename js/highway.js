@@ -21,11 +21,20 @@ let hwMode = false, hwLevel = 4, hwLanesPick = 2, hwActive = null;
 const hwKey = (i, j) => i + ',' + j;
 function hwReindex(){ hwIndex = new Map(); for (const h of highways) h.tiles.forEach((t, k) => { const q = hwKey(t.i, t.j); (hwIndex.get(q) || hwIndex.set(q, []).get(q)).push({ h, k }); }); }
 const hwAt = (i, j) => hwIndex.get(hwKey(i, j)) || [];
-// the underside of the lowest highway over a plot (buildings there stay under it), or null
-function hwCap(c){ let cap = null; for (const { h, k } of hwAt(c.i, c.j)){ const v = hwY(h.tiles[k].L) - HW_CLEAR - .05; if (cap === null || v < cap) cap = v; } return cap; }
-// the top of whatever stands on a plot
-function hwSurface(c){ if (c.mega){ const m = megas.get(c.mega); return m && m.roofH ? m.roofH : c.height; } return c.sections.length ? c.height : CURB; }
-
+// the underside of the lowest highway over a plot (buildings there stay under it), or null. The deck eases between plots of
+// different heights, so the lowest point of the plot's stretch counts; so does the room the sky ramps need just past a line's ends.
+function hwCap(c){
+  let cap = null; const take = v => { if (cap === null || v < cap) cap = v; };
+  for (const { h, k } of hwAt(c.i, c.j)){ let lo = 1e9; for (let u = 0; u <= 1.001; u += .1) lo = Math.min(lo, hwHeight(h, k, u)); take(lo - HW_CLEAR - .05); }
+  for (const h of highways){
+    const n = h.tiles.length, t0 = h.tiles[0], e = h.tiles[n - 1];
+    const a = hwDirs(h, 0).din; if (t0.i - a[0] === c.i && t0.j - a[1] === c.j) take(hwY(t0.L) + HW_RAMP + .1);
+    if (h.done && n > 1){ const o = hwDirs(h, n - 1).dout; if (e.i + o[0] === c.i && e.j + o[1] === c.j) take(hwY(e.L) + HW_RAMP + .1); }
+  }
+  return cap;
+}
+// the top of whatever stands on a plot (the tallest of its geometry, rooftop props and all: see rebuildCell)
+function hwSurface(c){ if (c.mega){ const m = megas.get(c.mega); return m && m.roofH ? m.roofH : c.height; } return c.sections.length ? Math.max(c.height, c.topY || 0) : CURB; }
 /* ---------- the line: its plots, turns and heights ---------- */
 function hwDirs(h, k){
   const T = h.tiles, n = T.length, t = T[k];
@@ -112,10 +121,10 @@ function hwTargetAt(pk){
     if (h.done) continue;
     const n = h.tiles.length, e = h.tiles[n - 1];
     if (Math.abs(e.i - i) + Math.abs(e.j - j) !== 1 || h.tiles.some(t => t.i === i && t.j === j)) continue;
-    let why = hwTileWhy(i, j, L, h);
-    if (!why && Math.abs(L - e.L) > HW_STEP_L) why = 'too steep: at most ' + HW_STEP_L + ' floors up or down per plot';
+    const Lc = Math.max(e.L - HW_STEP_L, Math.min(e.L + HW_STEP_L, L));   // next to the end, the piece simply joins it: as high or low as one plot may step toward the chosen height
+    let why = hwTileWhy(i, j, Lc, h);
     if (!why && n === 1) why = hwRampWhy(e.i, e.j, e.L, [e.i - i, e.j - j], h);   // the entry ramp's sky, behind the first plot
-    return { type: 'extend', h, i, j, L, ok: !why, why };
+    return { type: 'extend', h, i, j, L: Lc, ok: !why, why };
   }
   const why = hwTileWhy(i, j, L, null);
   return { type: 'start', i, j, L, ok: !why, why };
@@ -358,7 +367,7 @@ function hwFeet(c){
   for (const { h, k } of hwAt(c.i, c.j)){
     const t = h.tiles[k];
     if (hwAt(c.i, c.j).some(o => o.h !== h && o.h.tiles[o.k].L < t.L)) continue;   // another highway under this one: it spans over
-    const m = hwCenter(h, k, .5), top = hwHeight(h, k, .5) - HW_THICK - HW_GIRDER + .04, bot = hwSurface(c);
+    const m = hwCenter(h, k, .5), top = hwHeight(h, k, .5) - HW_THICK - HW_GIRDER + .04, bot = c.mega ? hwSurface(c) : c.sections.length ? c.height : CURB;   // (it stands on the roof itself)
     if (top - bot < .2) continue;
     const F = T(m.x, 0, m.z, Math.atan2(m.tx, m.tz));
     box(HWM.pillar, F, 0, (bot + top)/2, 0, .4, top - bot, .4);
@@ -554,11 +563,25 @@ function hwPick(cx, cy){
     if (!_hray.ray.intersectBox(_hbox, _hhit)) return;
     const d = _hhit.distanceTo(_hray.ray.origin); if (!best || d < best.d) best = { kind: 'hwTile', h, k, d };
   });
-  // the plot at the chosen height under the pointer (unless a highway piece is nearer)
+  // next to the open end of an unfinished line, the pointer is taken to mean the plot that would extend it, at whatever height it
+  // is looking at: the column above that plot (not just the plane at the chosen height) counts, so changing the height keeps the pick
+  for (const h of highways){
+    if (h.done) continue;
+    const e = h.tiles[h.tiles.length - 1];
+    for (const [a, b] of SIDES4){
+      const i = e.i + a, j = e.j + b; if (h.tiles.some(t => t.i === i && t.j === j)) continue;
+      _hbox.min.set(i*LOT - LOT/2, hwY(Math.min(hwLevel, e.L)) - .8, j*LOT - LOT/2); _hbox.max.set(i*LOT + LOT/2, hwY(Math.max(hwLevel, e.L)) + .4, j*LOT + LOT/2);   // (a slab round the heights in question)
+      if (!_hray.ray.intersectBox(_hbox, _hhit)) continue;
+      const d = _hhit.distanceTo(_hray.ray.origin);
+      if (best && best.kind === 'hwTile' && best.d < d + 1) continue;   // (the end piece itself, or another, in front)
+      if (!best || best.kind === 'hwTile' || d < best.d) best = { kind: 'hwGround', i, j, d, near: true };
+    }
+  }
+  // the plot at the chosen height under the pointer (unless a highway piece or such a column is nearer)
   const o = _hray.ray.origin, dir = _hray.ray.direction, y = hwY(hwLevel);
   if (Math.abs(dir.y) > 1e-4){ const tt = (y - o.y)/dir.y; if (tt > 0){ const p = o.clone().addScaledVector(dir, tt), d = tt*dir.length();
     const i = Math.round(p.x/LOT), j = Math.round(p.z/LOT);
-    if (!best || d < best.d - .5) best = { kind: 'hwGround', i, j, d }; } }
+    if (!best || (!best.near && d < best.d - .5)) best = { kind: 'hwGround', i, j, d }; } }
   return best;
 }
 const hwGhostMat = new THREE.MeshBasicMaterial({ color: 0x38e8e0, transparent: true, opacity: .32, depthTest: false, depthWrite: false });

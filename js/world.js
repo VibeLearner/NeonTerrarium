@@ -993,13 +993,15 @@ function podDoorSpot(c){
   L.door = { x: L.x + ux*d, z: L.z + uz*d, n: [-ux, -uz] };                  // the wall point, facing out to the lift
   L.ix = L.door.x - ux*.12; L.iz = L.door.z - uz*.12;                       // where the riders step through
 }
+// the highest point of everything built so far in this collect (rooftop antennas and tanks included)
+function bucketTop(){ let m = CURB; for (const b of buckets.values()){ const p = b.p; for (let q = 1; q < p.length; q += 3) if (p[q] > m) m = p[q]; } return m; }
 function rebuildCell(c){
   finishAnimsOn(c);   // a neighbour's edit can rebuild a cell that is still animating
   disposeData(c.data);
   c.height = CURB;
   c.dark = isDarkPlot(c);
   DARK = c.dark;
-  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length) buildStack(c); hwFeet(c); }); } finally { DARK = false; }   // (and the feet of any highway over it)
+  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length) buildStack(c); c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); }); } finally { DARK = false; }   // (and the feet of any highway over it)
   if (c.liftCab) podDoorSpot(c);
   if (c.mega){ const m = megas.get(c.mega); if (m && m.roofH) c.height = m.roofH; }
   cellView(c);
@@ -1147,11 +1149,14 @@ function addSection(c, zone){
   holdRegion(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   c.sections.push(sec);
-  if (cap !== null) for (let tries = 0; tries < 4; tries++){
-    rebuildCell(c); disposeData(c.data); c.data = null;
-    if (c.height <= cap) break;
-    if (sec.mf <= 1){ c.sections.pop(); break; }
-    sec.mf = Math.max(1, sec.mf - Math.ceil((c.height - cap)/FH));
+  if (cap !== null){
+    for (let tries = 0; tries < 8; tries++){
+      rebuildCell(c); disposeData(c.data); c.data = null;
+      if (c.topY <= cap) break;                                  // (measured on the real geometry: antennas, tanks and signs count)
+      if (sec.mf <= 1) break;
+      sec.mf = Math.max(1, sec.mf - Math.max(1, Math.ceil((c.topY - cap)/FH)));
+    }
+    if (c.topY > cap) c.sections.pop();
   }
   refresh([c]);
   dropView(old);   // the new look already contains everything below the new section

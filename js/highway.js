@@ -474,6 +474,10 @@ function hwPulseRebuild(){
   hwPulseMesh.count = q; hwPulseMesh.visible = q > 0; hwPulseMesh.instanceMatrix.needsUpdate = true; hwPulseDirty = false;
 }
 const hwFlares = (() => { const m = new THREE.InstancedMesh(U.box, HWM.flare, HW_CAR_MAX); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
+// a soft pool of light on the deck under every car riding the lanes (one additive batch)
+const hwCarGlow = (() => { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-PI/2);
+  const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: glowTex, color: 0x5ae8ff, transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false }), HW_CAR_MAX);
+  m.count = 0; m.frustumCulled = false; m.layers.set(1); m.renderOrder = 3; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
 let hwCars = [];
 function hwClearCars(h){ hwPulseDirty = true; if (!h){ return; } hwCars = hwCars.filter(c => c.h !== h); h.queue = null; }
 const _hbz = new THREE.Vector3();
@@ -609,7 +613,7 @@ function updateHighways(dt, t){
   }
   // move and draw the cars
   for (const K of HW_KINDS) K.n = 0;
-  let nf = 0;
+  let nf = 0, ng = 0;
   hwCars = hwCars.filter(c => {
     const LP = c.h.lanePaths; if (!LP) return false;
     const P = LP[c.lane], s0 = c.s;
@@ -627,11 +631,15 @@ function updateHighways(dt, t){
     const sc = Math.min(1, c.s/4, (P.len - c.s)/4);
     _hdm.position.set(_hpos.x, _hpos.y + hover, _hpos.z); _hdm.rotation.set(_hpos.pitch, _hpos.yaw, 0, 'YXZ'); _hdm.scale.setScalar(Math.max(.01, sc)); _hdm.updateMatrix();
     const K = HW_KINDS[c.kind]; if (K.n < HW_CAR_MAX){ for (const m of K.meshes) m.setMatrixAt(K.n, _hdm.matrix); K.n++; }
+    if (c.s > P.sGate && c.s < P.sOut + 1.2 && ng < HW_CAR_MAX){   // its glow on the deck, coming up as it locks on at the gate and fading as it lifts off
+      const f = Math.min(1, (c.s - P.sGate)/1.2, (P.sOut + 1.2 - c.s)/1.4);
+      _hdm.position.set(_hpos.x, _hpos.y + .035, _hpos.z); _hdm.rotation.set(_hpos.pitch, _hpos.yaw, 0, 'YXZ'); _hdm.scale.set(1.5*f, 1, 2.4*f); _hdm.updateMatrix(); hwCarGlow.setMatrixAt(ng++, _hdm.matrix); }
     if (c.s >= P.sGate && c.s < P.sGate + .9 && nf < HW_CAR_MAX){ const f = 1 - g; _hdm.position.set(_hpos.x, _hpos.y + .02, _hpos.z); _hdm.rotation.set(_hpos.pitch, _hpos.yaw, 0, 'YXZ'); _hdm.scale.set(.75*f + .2, .02, 1.1); _hdm.updateMatrix(); hwFlares.setMatrixAt(nf++, _hdm.matrix); }
     return true;
   });
   for (const K of HW_KINDS) for (const m of K.meshes){ m.count = K.n; m.visible = K.n > 0; if (K.n) m.instanceMatrix.needsUpdate = true; }
   hwFlares.count = nf; hwFlares.visible = nf > 0; if (nf) hwFlares.instanceMatrix.needsUpdate = true;
+  hwCarGlow.count = ng; hwCarGlow.visible = ng > 0; if (ng) hwCarGlow.instanceMatrix.needsUpdate = true;
   // the pulse: each segment lights as the head of a pulse passes it and fades behind (a pulse every 11 units, moving
   // at 3 units a second), stepped so it reads as segments switching on rather than a smooth glow
   if (hwPulseDirty) hwPulseRebuild();

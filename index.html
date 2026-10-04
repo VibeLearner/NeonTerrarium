@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="css/style.css?v=2026-10-04zi">
+<link rel="stylesheet" href="css/style.css?v=2026-10-04zj">
 </head>
 <body>
 
@@ -36,6 +36,27 @@
 <aside id="bmenu" class="bmenu" hidden aria-label="Buildings">
   <button id="bmenuHead" class="bmenu-head" aria-expanded="false" aria-controls="bmenuList"><span>Buildings</span><i aria-hidden="true"></i></button>
   <div id="bmenuList" class="bmenu-list" hidden></div>
+  <!-- Transport: arrives with the fourth megastructure -->
+  <div id="tmenu" class="tmenu" hidden>
+    <button id="tmenuHead" class="bmenu-head" aria-expanded="false" aria-controls="tmenuList"><span>Transport</span><i aria-hidden="true"></i></button>
+    <div id="tmenuList" class="bmenu-list" hidden>
+      <button class="bitem" id="hwBtn" style="--m:#a77bff" aria-pressed="false" title="Sky highways (5)"><i class="sw"></i><b>Sky highway</b><small>Flying cars · drop-off lifts</small></button>
+      <button class="thelp" id="hwHelpBtn" aria-expanded="false" aria-controls="hwHelp">How it works</button>
+    </div>
+  </div>
+</aside>
+
+<!-- the Sky highway instructions: a square panel at the side -->
+<aside id="hwHelp" class="hwhelp" hidden role="dialog" aria-label="Sky highway instructions">
+  <header><b>Sky highway</b><button id="hwHelpClose" aria-label="Close instructions">✕</button></header>
+  <ol>
+    <li><span class="n">1</span><p><strong>Start.</strong> Pick <em>Sky highway</em> (or press <kbd>5</kbd>), then click any plot. That plot becomes the entry: a sky ramp and a toll gate.</p></li>
+    <li><span class="n">2</span><p><strong>Height and lanes.</strong> <kbd>[</kbd> <kbd>]</kbd> or the − + buttons set the height in floors. <kbd>L</kbd> switches between 2 and 3 lanes.</p></li>
+    <li><span class="n">3</span><p><strong>Extend.</strong> Click the plot next to the open end. Turns curve on their own. A plot can step 2 floors up or down.</p></li>
+    <li><span class="n">4</span><p><strong>Cross over.</strong> Go 2 floors above or below any road, including your own, to pass over it.</p></li>
+    <li><span class="n">5</span><p><strong>Finish.</strong> Click the last piece again to add the drop-off: a lift down for visitors and a sky ramp out.</p></li>
+    <li><span class="n">6</span><p><strong>Undo.</strong> Right-click a piece to cut the road back to it. <kbd>Esc</kbd> leaves the mode.</p></li>
+  </ol>
 </aside>
 
 <button id="deckToggle" class="deck-toggle" aria-expanded="false" aria-controls="deck">Settings</button>
@@ -46,14 +67,13 @@
     <button id="hwLanes" class="hwlanes" title="Lanes for the highway you're building (L)">2 lanes</button>
   </div>
   <p class="modehint" id="modeHint">Click the sky to grow the platform · pick a zone to build</p>
-  <p class="modehint hint controls">WASD moves · Drag the sky or Q/E to rotate · Right-click removes a section · X for delete mode: drag to select, click inside to delete · 5 or Roads for sky highways · H centers view · Check Settings for more</p>
+  <p class="modehint hint controls">WASD moves · Drag the sky or Q/E to rotate · Right-click removes a section · X for delete mode: drag to select, click inside to delete · H centers view · Check Settings for more</p>
   <div class="zones">
     <button class="rot" id="rotBL" aria-label="Rotate view left">⟲</button>
     <button class="zone" data-zone="low"  style="--z:#38E8E0" aria-pressed="false"><span class="zin"><b>ZONE A</b><small>Residential</small></span></button>
     <button class="zone" data-zone="mid"  style="--z:#FFB347" aria-pressed="false"><span class="zin"><b>ZONE B</b><small>Commercial</small></span></button>
     <button class="zone" data-zone="high" style="--z:#FF4FA3" aria-pressed="false"><span class="zin"><b>ZONE C</b><small>Luxury</small></span></button>
     <button class="zone" data-zone="ind"  style="--z:#E8E03A" aria-pressed="false"><span class="zin"><b>ZONE D</b><small>Industrial</small></span></button>
-    <button class="zone" id="hwBtn" style="--z:#a77bff" aria-pressed="false" title="Sky highways (5)"><span class="zin"><b>ROADS</b><small>Sky highway</small></span></button>
     <button class="rot" id="rotBR" aria-label="Rotate view right">⟳</button>
     <button class="rot del" id="delBtn" aria-label="Delete mode" aria-pressed="false" title="Delete mode (X)">✕</button>
   </div>
@@ -147,19 +167,19 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <!-- ?v= makes browsers fetch fresh copies after an update; change it with every release -->
-<script src="js/core.js?v=2026-10-04zi"></script>
-<script src="js/sprites.js?v=2026-10-04zi"></script>
-<script src="js/buildings.js?v=2026-10-04zi"></script>
-<script src="js/ground.js?v=2026-10-04zi"></script>
-<script src="js/vehicles.js?v=2026-10-04zi"></script>
-<script src="js/sky.js?v=2026-10-04zi"></script>
-<script src="js/audio.js?v=2026-10-04zi"></script>
-<script src="js/world.js?v=2026-10-04zi"></script>
-<script src="js/mega.js?v=2026-10-04zi"></script>
-<script src="js/people.js?v=2026-10-04zi"></script>
-<script src="js/highway.js?v=2026-10-04zi"></script>
-<script src="js/music.js?v=2026-10-04zi"></script>
-<script src="js/input.js?v=2026-10-04zi"></script>
-<script src="js/main.js?v=2026-10-04zi"></script>
+<script src="js/core.js?v=2026-10-04zj"></script>
+<script src="js/sprites.js?v=2026-10-04zj"></script>
+<script src="js/buildings.js?v=2026-10-04zj"></script>
+<script src="js/ground.js?v=2026-10-04zj"></script>
+<script src="js/vehicles.js?v=2026-10-04zj"></script>
+<script src="js/sky.js?v=2026-10-04zj"></script>
+<script src="js/audio.js?v=2026-10-04zj"></script>
+<script src="js/world.js?v=2026-10-04zj"></script>
+<script src="js/mega.js?v=2026-10-04zj"></script>
+<script src="js/people.js?v=2026-10-04zj"></script>
+<script src="js/highway.js?v=2026-10-04zj"></script>
+<script src="js/music.js?v=2026-10-04zj"></script>
+<script src="js/input.js?v=2026-10-04zj"></script>
+<script src="js/main.js?v=2026-10-04zj"></script>
 </body>
 </html>

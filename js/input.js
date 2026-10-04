@@ -121,7 +121,7 @@ addEventListener('keydown', e => {
   if (PAN_KEYS.includes(k)){ keys.add(k); e.preventDefault(); return; }
   if (k === 'h' || e.key === 'Home'){ centerView(); return; }
   if (k === 'x' && !e.repeat){ setDelMode(!delMode); return; }
-  if (e.key === '5' && !e.repeat){ setHwMode(!hwMode); return; }
+  if (e.key === '5' && !e.repeat){ if (hwUnlocked()) setHwMode(!hwMode); return; }
   if (hwMode && (e.key === '[' || e.key === 'PageDown')){ hwSetLevel(hwLevel - 1); return; }
   if (hwMode && (e.key === ']' || e.key === 'PageUp')){ hwSetLevel(hwLevel + 1); return; }
   if (hwMode && k === 'l' && !e.repeat){ hwSetLanesUI(hwLanesPick === 2 ? 3 : 2); return; }
@@ -136,6 +136,7 @@ addEventListener('keydown', e => {
   else if (e.key === '+' || e.key === '=') zoomT = clamp(zoomT*.9,5,30);
   else if (e.key === '-') zoomT = clamp(zoomT*1.1,5,30);
   else if ('1234'.includes(e.key) && e.key.length === 1) selectZone(['low','mid','high','ind'][+e.key - 1]);
+  else if (e.key === 'Escape' && !$('hwHelp').hidden) setHwHelp(false);
   else if ((e.key === 'Escape' || e.key === '0') && hwMode) setHwMode(false);
   else if (e.key === 'Escape' || e.key === '0'){ if (delMode){ if (delSel){ delSel = null; showAreaSel(null); } else setDelMode(false); } else if (megaPick) selectMega(null); else selectZone(null); }
 });
@@ -262,7 +263,7 @@ function setBmenuOpen(open){
 }
 function renderBmenu(){
   const any = megaUnlockedKinds.size > 0;
-  $('bmenu').hidden = !any; if (!any) return;
+  $('bmenu').hidden = !any; $('tmenu').hidden = !hwUnlocked(); if (!any) return;
   const list = $('bmenuList'); list.textContent = '';
   for (const kind of Object.keys(MEGA_TYPES).filter(k => megaUnlockedKinds.has(k))){   // only what has arrived: the rest stay a surprise
     const t = MEGA_TYPES[kind], open = megaUnlockedKinds.has(kind);
@@ -278,7 +279,22 @@ function renderBmenu(){
 }
 $('bmenuHead').addEventListener('click', () => { setBmenuOpen($('bmenuList').hidden); $('bmenuHead').classList.remove('fresh'); });
 // a kind arriving for the first time: open the menu and make the header pulse so it gets noticed
-function onMegaUnlock(){ renderBmenu(); if (!document.getElementById('bmenuList')) return; setBmenuOpen(true); $('bmenuHead').classList.add('fresh'); }
+function onMegaUnlock(){
+  renderBmenu(); if (!document.getElementById('bmenuList')) return; setBmenuOpen(true); $('bmenuHead').classList.add('fresh');
+  if (megaUnlockedKinds.size === 4){ setTmenuOpen(true); $('tmenuHead').classList.add('fresh'); }   // the fourth: sky highways arrive
+}
+// Transport (under Buildings): arrives with the fourth megastructure, or at once in a city that already has highways
+const hwUnlocked = () => megaUnlockedKinds.size >= 4 || highways.length > 0;
+const TMENU_OPEN_KEY = 'neonIsland.tmenuOpen';
+function setTmenuOpen(open){
+  $('tmenuHead').setAttribute('aria-expanded', open); $('tmenuList').hidden = !open;
+  try { localStorage.setItem(TMENU_OPEN_KEY, open ? '1' : '0'); } catch (e) {}
+}
+$('tmenuHead').addEventListener('click', () => { setTmenuOpen($('tmenuList').hidden); $('tmenuHead').classList.remove('fresh'); });
+{ let open = false; try { open = localStorage.getItem(TMENU_OPEN_KEY) === '1'; } catch (e) {} setTmenuOpen(open); }
+function setHwHelp(on){ $('hwHelp').hidden = !on; $('hwHelpBtn').setAttribute('aria-expanded', on); }
+$('hwHelpBtn').addEventListener('click', () => setHwHelp($('hwHelp').hidden));
+$('hwHelpClose').addEventListener('click', () => setHwHelp(false));
 { let open = false; try { open = localStorage.getItem(BMENU_OPEN_KEY) === '1'; } catch (e) {} setBmenuOpen(open); renderBmenu(); }
 
 /* ---------- delete mode ---------- */

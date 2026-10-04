@@ -537,12 +537,11 @@ function updateHighways(dt, t){
         if (lastS >= 2.4) break; lane = (lane + 1)%h.lanes;
       }
       if (lastS < 2.4){ q.at = t + .6; return true; }   // every lane has one just entering: a moment later
-      // each car comes in from somewhere of its own (to one side or the other, nearer or farther, higher or lower) and leaves
-      // toward somewhere else: offsets that fade out by the time it reaches the ramp, and fade in again after the terminal
-      const side = Math.random() < .5 ? -1 : 1, sideO = Math.random() < .5 ? -1 : 1;
-      hwCars.push({ h, lane, s: 0, k: 0, kind: hwPickKind(),
-        inO: { lat: side*(2 + Math.random()*16), back: -4 + Math.random()*14, up: Math.random()*3.4 },
-        outO: { lat: sideO*(2 + Math.random()*16), back: -4 + Math.random()*14, up: Math.random()*3.4 } });
+      // each car comes in from somewhere of its own and leaves toward somewhere else: a spot anywhere in a wide disc of sky
+      // round where the road's approach starts (or ends), an offset that fades out by the time it reaches the ramp (and in
+      // again after the terminal)
+      const spot = () => { const a = Math.random()*TAU, r = 5 + 34*Math.sqrt(Math.random()); return { lat: Math.cos(a)*r, back: Math.sin(a)*r, up: -1 + Math.random()*5 }; };
+      hwCars.push({ h, lane, s: 0, k: 0, kind: hwPickKind(), inO: spot(), outO: spot() });
       return false;
     });
   }

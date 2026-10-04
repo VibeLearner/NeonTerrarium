@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="css/style.css?v=2026-10-05g">
+<link rel="stylesheet" href="css/style.css?v=2026-10-05h">
 </head>
 <body>
 
@@ -70,7 +70,23 @@
   </div>
   <p class="tiltchip" id="tiltChip" hidden>Camera tilt · drag up or down (or W / S) to tilt · drag sideways (or A / D) to turn · Space to go back</p>
   <p class="modehint" id="modeHint">Click the sky to grow the platform · pick a zone to build</p>
-  <p class="modehint hint controls">WASD moves · Drag the sky or Q/E to rotate · Right-click removes a section · X for delete mode: drag to select, click inside to delete · Space tilts the camera · H centers view · Check Settings for more</p>
+  <div class="ctlwrap hint">
+    <p class="modehint ctlhover" tabindex="0">Hover for controls</p>
+    <div class="ctlpanel" role="tooltip">
+      <dl>
+        <dt>WASD</dt><dd>Move</dd>
+        <dt>Drag the sky · Q / E</dt><dd>Rotate</dd>
+        <dt>Scroll</dt><dd>Zoom</dd>
+        <dt>Space</dt><dd>Tilt the camera</dd>
+        <dt>1 – 4</dt><dd>Pick a zone</dd>
+        <dt>Click</dt><dd>Build</dd>
+        <dt>Right-click</dt><dd>Remove a section</dd>
+        <dt>X</dt><dd>Delete mode</dd>
+        <dt>H</dt><dd>Center the view</dd>
+        <dt>Esc</dt><dd>Stop what you're doing</dd>
+      </dl>
+    </div>
+  </div>
   <div class="zones">
     <button class="rot" id="rotBL" aria-label="Rotate view left">⟲</button>
     <button class="zone" data-zone="low"  style="--z:#38E8E0" aria-pressed="false"><span class="zin"><b>ZONE A</b><small>Residential</small></span></button>
@@ -170,19 +186,19 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <!-- ?v= makes browsers fetch fresh copies after an update; change it with every release -->
-<script src="js/core.js?v=2026-10-05g"></script>
-<script src="js/sprites.js?v=2026-10-05g"></script>
-<script src="js/buildings.js?v=2026-10-05g"></script>
-<script src="js/ground.js?v=2026-10-05g"></script>
-<script src="js/vehicles.js?v=2026-10-05g"></script>
-<script src="js/sky.js?v=2026-10-05g"></script>
-<script src="js/audio.js?v=2026-10-05g"></script>
-<script src="js/world.js?v=2026-10-05g"></script>
-<script src="js/mega.js?v=2026-10-05g"></script>
-<script src="js/people.js?v=2026-10-05g"></script>
-<script src="js/highway.js?v=2026-10-05g"></script>
-<script src="js/music.js?v=2026-10-05g"></script>
-<script src="js/input.js?v=2026-10-05g"></script>
-<script src="js/main.js?v=2026-10-05g"></script>
+<script src="js/core.js?v=2026-10-05h"></script>
+<script src="js/sprites.js?v=2026-10-05h"></script>
+<script src="js/buildings.js?v=2026-10-05h"></script>
+<script src="js/ground.js?v=2026-10-05h"></script>
+<script src="js/vehicles.js?v=2026-10-05h"></script>
+<script src="js/sky.js?v=2026-10-05h"></script>
+<script src="js/audio.js?v=2026-10-05h"></script>
+<script src="js/world.js?v=2026-10-05h"></script>
+<script src="js/mega.js?v=2026-10-05h"></script>
+<script src="js/people.js?v=2026-10-05h"></script>
+<script src="js/highway.js?v=2026-10-05h"></script>
+<script src="js/music.js?v=2026-10-05h"></script>
+<script src="js/input.js?v=2026-10-05h"></script>
+<script src="js/main.js?v=2026-10-05h"></script>
 </body>
 </html>

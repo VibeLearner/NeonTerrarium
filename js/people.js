@@ -1286,28 +1286,59 @@ function drawDeckWalkers(emit, t, dt){
 // off toward the home and fade in through its door. Going out it runs the other way: out of the door, into the cab,
 // down, and off along the street. The cab (one small group of boxes per lift) follows whoever's riding, and waits where
 // it last stopped.
-const liftCabs = new Map();   // cell key -> { g, y }
+const liftCabs = new Map();   // cell key -> { g, y, state, target, at, hold }
 const LIFT_SPEED = 1.3, LIFT_STEP = .9;
 const ease = u => u*u*(3 - 2*u);
+// The lift's controller, once a frame for every lift: it carries whoever is in the cab to the other end, then waits a
+// moment with its doors open. Idle, it takes everyone waiting at the end it's at, or, if they're all at the other end,
+// goes there empty to fetch them (they've called it). Riders: p.ride = { c, dir: 'up'|'down', ph, t }, ph one of
+// 'in' (stepping out of the door onto the deck), 'wait' (at an end, for the cab), 'cab', 'out' (stepping off the deck
+// in through the door), 'done'.
+function updateLifts(dt){
+  const by = new Map();
+  for (const p of pplList) if (p.ride){ const k = ckey(p.ride.c.i, p.ride.c.j); (by.get(k) || by.set(k, []).get(k)).push(p); }
+  for (const [k, e] of liftCabs){
+    const c = cells.get(k), L = c && c.liftCab; if (!L) continue;
+    const riders = by.get(k) || [], top = L.y0, end = y => y >= top - .01 ? 'top' : y <= CURB + .01 ? 'bot' : null;
+    if (e.state === 'moving'){
+      const goal = e.target === 'top' ? top : CURB, d = goal - e.y, st = Math.max(LIFT_SPEED, (top - CURB)/5)*dt;   // (a tall run goes faster: about five seconds end to end at most)
+      e.y += Math.abs(d) <= st ? d : Math.sign(d)*st;
+      if (Math.abs(goal - e.y) < 1e-4){ e.y = goal; e.state = 'idle'; e.at = e.target; e.hold = .6;
+        for (const p of riders) if (p.ride.ph === 'cab'){ if (e.at === 'top' && p.ride.dir === 'up'){ p.ride.ph = 'out'; p.ride.t = 0; } else if (e.at === 'bot' && p.ride.dir === 'down') p.ride.ph = 'done'; } }
+      continue;
+    }
+    e.at = end(e.y);
+    if (!e.at){ e.state = 'moving'; e.target = 'bot'; continue; }   // left between floors (a rebuild): back to the street
+    if ((e.hold -= dt) > 0) continue;
+    const waitAt = w => riders.filter(p => p.ride.ph === 'wait' && (p.ride.dir === 'up' ? 'bot' : 'top') === w);
+    const here = waitAt(e.at);
+    if (here.length){ for (const p of here) p.ride.ph = 'cab'; e.state = 'moving'; e.target = e.at === 'top' ? 'bot' : 'top'; }
+    else if (waitAt(e.at === 'top' ? 'bot' : 'top').length){ e.state = 'moving'; e.target = e.at === 'top' ? 'bot' : 'top'; }   // called: going to fetch them
+  }
+}
+// where a rider is and how they look
 function liftRide(p, dt, t){
   const r = p.ride, c = r.c, L = c && cells.get(ckey(c.i, c.j)) === c ? c.liftCab : null;
   if (!L){ p.ride = null; if (r.dir === 'up' && p.walk) arrive(p); return null; }
-  r.t += dt;
-  const dur = Math.max(.6, (L.y0 - CURB)/LIFT_SPEED), cab = liftCab(c);
-  let x = L.x, z = L.z, y, alpha = 1, frame = F_IDLE + Math.floor(t*2 + p.phase) % PPL.idle, step = -1;
-  if (r.dir === 'up'){
-    if (r.t < dur){ y = CURB + (L.y0 - CURB)*ease(r.t/dur); cab.y = y; }
-    else { const u = (r.t - dur)/LIFT_STEP; if (u >= 1){ p.ride = null; arrive(p); return null; } step = u; alpha = 1 - u; y = L.y0; cab.y = y; }
-  } else {
-    if (r.t < LIFT_STEP){ step = 1 - r.t/LIFT_STEP; alpha = r.t/LIFT_STEP; y = L.y0; cab.y = y; }
-    else if (r.t < LIFT_STEP + dur){ y = L.y0 - (L.y0 - CURB)*ease((r.t - LIFT_STEP)/dur); cab.y = y; }
-    else { p.ride = null; cab.y = CURB; return null; }   // at the street: off along the walk
-  }
-  if (step >= 0){   // stepping between the cab and the deck, toward the home's door
-    x = L.x + (L.ix - L.x)*step; z = L.z + (L.iz - L.z)*step; frame = Math.floor(t*9 + p.phase) % PPL.walk;
-    const dx = (L.ix - L.x)*(r.dir === 'up' ? 1 : -1), dz = (L.iz - L.z)*(r.dir === 'up' ? 1 : -1), sd = dx*_camR.x + dz*_camR.z;
-    if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
-  }
+  if (!r.ph) r.ph = r.dir === 'up' ? 'wait' : 'in';
+  r.t = (r.t || 0) + dt;
+  const e = liftCab(c), deckWait = [L.ix + (L.x - L.ix)*.55, L.iz + (L.z - L.iz)*.55], gate = [L.fx + L.nx*.12, L.fz + L.nz*.12];
+  let x, z, y, alpha = 1, frame = F_IDLE + Math.floor(t*2 + p.phase) % PPL.idle, dir = null;
+  if (r.ph === 'in'){   // out of the door, across the deck to wait by the lift
+    const u = Math.min(1, r.t/LIFT_STEP); x = L.ix + (deckWait[0] - L.ix)*u; z = L.iz + (deckWait[1] - L.iz)*u; y = L.y0; alpha = u;
+    frame = Math.floor(t*9 + p.phase) % PPL.walk; dir = [deckWait[0] - L.ix, deckWait[1] - L.iz];
+    if (u >= 1){ r.ph = 'wait'; r.t = 0; }
+  } else if (r.ph === 'wait'){
+    if (r.dir === 'up'){ x = gate[0]; z = gate[1]; y = CURB; dir = [-L.nx, -L.nz]; }
+    else { x = deckWait[0]; z = deckWait[1]; y = L.y0; dir = [L.x - L.ix, L.z - L.iz]; }
+    if (r.t > 6 && !(p.emoUntil > t) && pplRand() < dt*.05) emote(p, 'dots', 1.8);   // still waiting
+  } else if (r.ph === 'cab'){ x = L.x; z = L.z; y = e.y; }
+  else if (r.ph === 'out'){   // off the deck and in at the door
+    const u = Math.min(1, r.t/LIFT_STEP); x = L.x + (L.ix - L.x)*u; z = L.z + (L.iz - L.z)*u; y = L.y0; alpha = 1 - u;
+    frame = Math.floor(t*9 + p.phase) % PPL.walk; dir = [L.ix - L.x, L.iz - L.z];
+    if (u >= 1){ p.ride = null; arrive(p); return null; }
+  } else { p.ride = null; p.x = L.x; p.z = L.z; return null; }   // 'done': at the street, off along the walk
+  if (dir){ const sd = dir[0]*_camR.x + dir[1]*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }
   p.x = x; p.z = z;
   return { x, y: y + .02, z, frame, alpha: alpha >= 1 ? 1 : Math.max(0, alpha*.98) };
 }
@@ -1323,7 +1354,7 @@ function liftCab(c){
     for (let y = .15; y < .65; y += .1) add(CAB_MATS.mesh, -.19, y, 0, .012, .012, .38);
     add(CAB_MATS.iron, 0, .3, .19, .4, .03, .02);
     add(CAB_MATS.lamp, 0, .66, 0, .07, .04, .07);
-    scene.add(g); e = { g, y: CURB }; liftCabs.set(k, e);
+    scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0 }; liftCabs.set(k, e);
   }
   return e;
 }
@@ -1332,7 +1363,7 @@ function drawLiftCabs(){
   for (const c of cells.values()){
     const L = c.liftCab; if (!L) continue;
     const k = ckey(c.i, c.j), e = liftCab(c); live.add(k);
-    e.y = Math.min(Math.max(e.y, CURB), L.y0);
+    if (e.y > L.y0){ e.y = L.y0; }   // (the deck was lowered: the cab with it)
     e.g.position.set(L.x, e.y, L.z); e.g.rotation.y = L.ry;
   }
   for (const [k, e] of liftCabs) if (!live.has(k)){ scene.remove(e.g); liftCabs.delete(k); }
@@ -1456,6 +1487,8 @@ function updatePeople(dt, t){
   const served = new Set(), queued = new Set(); holoOn.length = 0;
   const stallKey = sp => sp.place + ':' + sp.stall;   // stall numbers repeat between squares
   for (const p of pplList) if (!p.walk && p.spot){ if (p.spot.kind === 'vendor') served.add(stallKey(p.spot)); else if (p.spot.kind === 'queue') queued.add(stallKey(p.spot)); }
+  for (const c of cells.values()) if (c.liftCab) liftCab(c);   // (every lift has its cab, so its controller runs)
+  updateLifts(dt);
   for (const p of pplList){
     let alpha = 1, walking = false, y = CURB, frame = 0;
     const paused = p.pause > t;

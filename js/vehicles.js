@@ -124,16 +124,24 @@ let ports = [], portLots = [];
 // Masts keep the perch clear of whatever else is on the roof.
 function addPerch(l){
   const sx = pick([-1,1]), sz = pick([-1,1]);
-  const base = new THREE.Vector3(l.x + sx*rnd(.25,.55), l.height, l.z + sz*rnd(.25,.55));
+  // sized for the drone: about .6 across its rotors and .35 tall with its parcel slung under it, so the landing square is
+  // .72 across and the hangar .72 deep and wide and .46 tall inside, with a doorway it fits through
+  const base = new THREE.Vector3(l.x + sx*rnd(.12,.3), l.height, l.z + sz*rnd(.12,.3));
   const mast = rnd(.45,.8), P = T(base.x, base.y + mast, base.z, pick([0, PI/2, PI, -PI/2]));
-  cyl(M.frame, I4, base.x, base.y + mast/2, base.z, .03, mast);
-  box(M.concDD, P, 0, 0, 0, .62, .05, .38);
-  box(M.hazard, P, .12, .03, 0, .26, .045, .045);
-  for (const z of [-.16,.16]){ box(M.neonCyan, P, .28, .035, z, .04, .03, .04); glow(P, .28, .07, z, 'cyan', .35); }
-  box(M.shutter, P, -.19, .14, 0, .24, .24, .32);
-  box(M.interiorCool, P, -.065, .12, 0, .02, .16, .22); glow(P, -.03, .12, 0, 'cyan', .45);
-  box(M.neonAmber, P, -.19, .28, .12, .04, .04, .04);
-  (curPorts || ports).push({ pad: new THREE.Vector3(.14, .1, 0).applyMatrix4(P), inside: new THREE.Vector3(-.19, .1, 0).applyMatrix4(P), busy: false });
+  cyl(M.frame, I4, base.x, base.y + mast/2, base.z, .045, mast);
+  for (const s of [-1, 1]) strut(M.frame, I4, base.x, base.y + mast*.35, base.z, base.x + s*.3, base.y + mast - .02, base.z, .02);   // braces under the deck
+  box(M.concDD, P, 0, 0, 0, 1.56, .06, .82);                                     // the deck
+  box(M.hazard, P, .38, .035, 0, .5, .02, .06); box(M.hazard, P, .38, .035, 0, .06, .02, .5);   // a cross on the landing square
+  for (const [x, z] of [[.72, -.35], [.72, .35], [.06, -.35], [.06, .35]]){ box(M.neonCyan, P, x, .045, z, .05, .03, .05); glow(P, x, .08, z, 'cyan', .3); }
+  // the hangar: walls, a roof, a lit inside, the shutter rolled up over the doorway
+  const hx = -.4, hw = .8, hd = .78, hh = .52;
+  box(M.shutter, P, hx, .03 + hh/2, -hd/2, hw, hh, .04); box(M.shutter, P, hx, .03 + hh/2, hd/2, hw, hh, .04);
+  box(M.shutter, P, hx - hw/2, .03 + hh/2, 0, .04, hh, hd);
+  box(M.metalDark, P, hx, .05 + hh, 0, hw + .06, .05, hd + .06);
+  box(M.interiorCool, P, hx - hw/2 + .03, .03 + hh/2, 0, .01, hh - .1, hd - .12); glow(P, hx, .3, 0, 'cyan', .45);
+  box(M.metalDark, P, hx + hw/2, .03 + hh - .05, 0, .05, .1, hd);               // the shutter, rolled up
+  box(M.neonAmber, P, hx + hw/2, .03 + hh - .1, hd/2 - .04, .03, .04, .04);
+  (curPorts || ports).push({ pad: new THREE.Vector3(.38, .27, 0).applyMatrix4(P), inside: new THREE.Vector3(hx, .27, 0).applyMatrix4(P), busy: false });
 }
 function buildDronePorts(lots){
   ports = []; portLots = lots;

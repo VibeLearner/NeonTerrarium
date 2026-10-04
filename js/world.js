@@ -326,7 +326,7 @@ function stackRun(c, secs, y, tag, first){
     y += (upper ? .1 : 0) + Math.max(lot.height, FH);
     c.sectionTops.push(y);
     if (k === 0 && first) c.firstFloors = lot.floors || 2;
-    if (last && !lot.hasCarPad && R() < .7) addPerch({ x: c.x, z: c.z, height: y });
+    if (last && !lot.hasCarPad && R() < .7 && !hwAt(c.i, c.j).length) addPerch({ x: c.x, z: c.z, height: y });   // (no drone perch under a highway: its pillar stands there)
     if (last) c._topLot = lot;
   });
   return y;
@@ -994,6 +994,17 @@ function podDoorSpot(c){
   L.ix = L.door.x - ux*.12; L.iz = L.door.z - uz*.12;                       // where the riders step through
 }
 // the highest point of everything built so far in this collect (rooftop antennas and tanks included)
+// the highest point of what's been built so far over a small square (x0..x1, z0..z1): any triangle reaching over it counts,
+// so a wide roof box or a rooftop tank whose corners lie outside the square still does
+function bucketTopIn(x0, x1, z0, z1){
+  let m = -1e9;
+  for (const b of buckets.values()){ const p = b.p;
+    for (let q = 0; q + 8 < p.length; q += 9){
+      const ax = p[q], bx = p[q + 3], cx = p[q + 6]; if (Math.max(ax, bx, cx) < x0 || Math.min(ax, bx, cx) > x1) continue;
+      const az = p[q + 2], bz = p[q + 5], cz = p[q + 8]; if (Math.max(az, bz, cz) < z0 || Math.min(az, bz, cz) > z1) continue;
+      const y = Math.max(p[q + 1], p[q + 4], p[q + 7]); if (y > m) m = y; } }
+  return m;
+}
 function bucketTop(){ let m = CURB; for (const b of buckets.values()){ const p = b.p; for (let q = 1; q < p.length; q += 3) if (p[q] > m) m = p[q]; } return m; }
 function rebuildCell(c){
   finishAnimsOn(c);   // a neighbour's edit can rebuild a cell that is still animating

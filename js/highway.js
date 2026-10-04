@@ -368,7 +368,7 @@ function hwFeet(c){
   for (const { h, k } of hwAt(c.i, c.j)){
     const t = h.tiles[k];
     if (hwAt(c.i, c.j).some(o => !(o.h === h && o.k === k) && o.h.tiles[o.k].L < t.L)) continue;   // another highway under this one: it spans over
-    const m = hwCenter(h, k, .5), top = hwHeight(h, k, .5) - HW_THICK - HW_GIRDER + .04, bot = c.mega ? hwSurface(c) : c.sections.length ? c.height : CURB;   // (it stands on the roof itself)
+    const m = hwCenter(h, k, .5), top = hwHeight(h, k, .5) - HW_THICK - HW_GIRDER + .04, bot = c.mega ? hwSurface(c) : c.sections.length ? Math.max(c.height, bucketTopIn(m.x - .4, m.x + .4, m.z - .4, m.z + .4)) : CURB;   // (it stands on whatever is right under it: the roof, or a tank or plant room on it)
     if (top - bot < .2) continue;
     const F = T(m.x, 0, m.z, Math.atan2(m.tx, m.tz));
     box(HWM.pillar, F, 0, (bot + top)/2, 0, .4, top - bot, .4);

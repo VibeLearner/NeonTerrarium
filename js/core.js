@@ -28,7 +28,8 @@ const scene = new THREE.Scene();
 // slab is. It reaches far in front of and behind the point looked at, so a tall building on the near side of a big
 // city is never clipped away while it's still in frame. (It used to reach 42 units in front and 53 behind, which cut
 // off tall buildings near the camera as the view turned or panned.) Depth stays precise to well under a millimetre.
-const NEAR = 10, FAR = 900, CAM_DIST = 400, PITCH = 32 * PI/180, TARGET_Y = 2.4;
+const NEAR = 10, FAR = 900, CAM_DIST = 400, PITCH0 = 32 * PI/180, TARGET_Y = 2.4;
+let PITCH = PITCH0;   // the camera's tilt: the isometric view's, unless tilt mode (Space) has it raised or lowered
 const cam = new THREE.OrthographicCamera(-1,1,1,-1,NEAR,FAR);
 
 const sun = new THREE.DirectionalLight(0xffffff, 1);

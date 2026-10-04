@@ -4,11 +4,21 @@
 /* ---------- camera ---------- */
 let shadowDirty = true; const _sunLast = new THREE.Vector3();
 let spinT = 0, yaw = .7, yawT = .7, zoom = 13.2, zoomT = 13.2;
+// Tilt mode (Space): the camera stays where it is, and dragging up and down (or W and S) tilts it, from a low angle up to
+// nearly straight down, for placing things the isometric view hides; dragging sideways (or A and D) still turns it.
+// Space again goes back to the isometric view.
+let tiltMode = false, pitchT = PITCH0;
+const PITCH_MIN = 12*PI/180, PITCH_MAX = 82*PI/180;
+function setTiltMode(on){
+  tiltMode = on; if (!on) pitchT = PITCH0;
+  const el = document.getElementById('tiltChip'); if (el) el.hidden = !on;
+}
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const camPix = new THREE.Vector2(), keys = new Set(), _cr = new THREE.Vector3(), _cu = new THREE.Vector3(), _cv = new THREE.Vector3(), _cs = new THREE.Vector3();
 function updateCamera(dt){
   if (S.spin && !dragging){ spinT += dt; if (spinT > 6){ spinT = 0; yawT += PI/4; } }
   yaw += (yawT-yaw)*Math.min(1, dt*3.5);
+  PITCH += (pitchT - PITCH)*Math.min(1, dt*6); if (Math.abs(pitchT - PITCH) < 1e-4) PITCH = pitchT;
   zoom += (zoomT-zoom)*Math.min(1, dt*8);
   // easing never quite arrives, so a "still" camera kept drifting by fractions of a pixel; snap once close
   if (Math.abs(yawT-yaw) < 1e-3) yaw = yawT;
@@ -16,7 +26,8 @@ function updateCamera(dt){
   // WASD / arrow keys: pan across the ground, relative to the way the camera faces; Shift goes faster
   const fw = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0);
   const rt = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
-  const panning = fw !== 0 || rt !== 0;
+  if (tiltMode && (fw || rt)){ pitchT = clamp(pitchT + fw*dt*.9, PITCH_MIN, PITCH_MAX); yawT -= rt*dt*1.4; }   // (locked in place: the keys tilt and turn it instead)
+  const panning = !tiltMode && (fw !== 0 || rt !== 0);
   if (panning){
     const sp = zoom*1.5*(keys.has('shift') ? 2.5 : 1)*dt/Math.hypot(fw, rt);
     const sy = Math.sin(yaw), cy = Math.cos(yaw);
@@ -73,22 +84,22 @@ canvas.addEventListener('pointermove', e => {
     if (delMode){ hover.visible = hoverFill.visible = false; return; }
     if (hwMode){ hwHover(e.clientX, e.clientY); return; }
     if (megaPick) showMegaGhost(megaPick, groundCellAt(e.clientX, e.clientY), megaTurn); else showHover(targetOf(pickAt(e.clientX, e.clientY))); return; }
-  const dx = e.clientX - p.x;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y, tilt = () => { if (tiltMode) pitchT = clamp(pitchT + dy*.006, PITCH_MIN, PITCH_MAX); };
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!act) return;
   if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), 5, 30); const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } return; }
-  if (act.kind === 'rotate'){ yawT -= dx*.008; return; }
+  if (act.kind === 'rotate'){ yawT -= dx*.008; tilt(); return; }
   if (act.kind === 'del'){
     if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true;
     const to = groundCellAt(e.clientX, e.clientY);
     if (act.moved && act.from && to){ delSel = { i0: Math.min(act.from.i, to.i), i1: Math.max(act.from.i, to.i), j0: Math.min(act.from.j, to.j), j1: Math.max(act.from.j, to.j) }; showAreaSel(delSel); }
     return;
   }
-  if (act.kind === 'sky'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; hover.visible = hoverFill.visible = false; if (megaPick) showMegaGhost(null); } return; }
-  if (act.kind === 'right'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved) yawT -= dx*.008; return; }
+  if (act.kind === 'sky'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); hover.visible = hoverFill.visible = false; if (megaPick) showMegaGhost(null); } return; }
+  if (act.kind === 'right'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); } return; }
   if (act.kind === 'touch'){
     if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) > 10){ act.moved = true; clearTimeout(act.timer); const pk = pickAt(act.x, act.y); act.spin = !pk || pk.kind === 'sky' || !S.paint; if (!act.spin) paintAt(act.x, act.y); }
-    if (act.moved){ if (act.spin) yawT -= dx*.008; else paintAt(e.clientX, e.clientY); }
+    if (act.moved){ if (act.spin){ yawT -= dx*.008; tilt(); } else paintAt(e.clientX, e.clientY); }
     return;
   }
   if (act.kind === 'paint'){ paintAt(e.clientX, e.clientY); showHover(targetOf(pickAt(e.clientX, e.clientY))); }
@@ -120,6 +131,7 @@ addEventListener('keydown', e => {
   if (k === 'shift') keys.add('shift');
   if (PAN_KEYS.includes(k)){ keys.add(k); e.preventDefault(); return; }
   if (k === 'h' || e.key === 'Home'){ centerView(); return; }
+  if (e.key === ' '){ e.preventDefault(); if (!e.repeat) setTiltMode(!tiltMode); return; }
   if (k === 'x' && !e.repeat){ setDelMode(!delMode); return; }
   if (e.key === '5' && !e.repeat){ if (hwUnlocked()) setHwMode(!hwMode); return; }
   if (hwMode && (e.key === '[' || e.key === 'PageDown')){ hwSetLevel(hwLevel - 1); return; }

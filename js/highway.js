@@ -476,7 +476,7 @@ function hwPulseRebuild(){
 const hwFlares = (() => { const m = new THREE.InstancedMesh(U.box, HWM.flare, HW_CAR_MAX); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
 // a soft pool of light on the deck under every car riding the lanes, the pale aqua of the flash at the toll gate (one additive batch)
 const hwCarGlow = (() => { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-PI/2);
-  const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: glowTex, color: 0x8afff4, transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false }), HW_CAR_MAX);
+  const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: glowTex, color: new THREE.Color(0x5af0e4).multiplyScalar(1.25), transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }), HW_CAR_MAX);
   m.count = 0; m.frustumCulled = false; m.layers.set(1); m.renderOrder = 3; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
 let hwCars = [];
 function hwClearCars(h){ hwPulseDirty = true; if (!h){ return; } hwCars = hwCars.filter(c => c.h !== h); h.queue = null; }
@@ -654,7 +654,8 @@ function updateHighways(dt, t){
     const K = HW_KINDS[c.kind]; if (K.n < HW_CAR_MAX){ for (const m of K.meshes) m.setMatrixAt(K.n, _hdm.matrix); K.n++; }
     if (c.s > P.sGate && c.s < P.sOut + 1.2 && ng < HW_CAR_MAX){   // its glow on the deck, coming up as it locks on at the gate and fading as it lifts off
       const f = Math.min(1, (c.s - P.sGate)/1.2, (P.sOut + 1.2 - c.s)/1.4);
-      _hdm.position.set(_hpos.x, _hpos.y + .035, _hpos.z); _hdm.rotation.set(_hpos.pitch, _hpos.yaw, 0, 'YXZ'); _hdm.scale.set(1.5*f, 1, 2.4*f); _hdm.updateMatrix(); hwCarGlow.setMatrixAt(ng++, _hdm.matrix); }
+      _hdm.position.set(_hpos.x, _hpos.y + .035, _hpos.z); _hdm.rotation.set(_hpos.pitch, _hpos.yaw, 0, 'YXZ'); const lat = Math.abs(c.lane - (c.h.lanes - 1)/2)*HW_LANE, wMax = 2*(c.h.lanes*HW_LANE/2 + HW_EDGE*.35 - lat);   // (as wide as fits between the car's lane and the deck's edge: none spills over the side)
+      _hdm.scale.set(Math.min(1.5, wMax)*f, 1, 2.6*f); _hdm.updateMatrix(); hwCarGlow.setMatrixAt(ng++, _hdm.matrix); }
     if (c.s >= P.sGate && c.s < P.sGate + .9 && nf < HW_CAR_MAX){ const f = 1 - g; _hdm.position.set(_hpos.x, _hpos.y + .02, _hpos.z); _hdm.rotation.set(_hpos.pitch, _hpos.yaw, 0, 'YXZ'); _hdm.scale.set(.75*f + .2, .02, 1.1); _hdm.updateMatrix(); hwFlares.setMatrixAt(nf++, _hdm.matrix); }
     return true;
   });

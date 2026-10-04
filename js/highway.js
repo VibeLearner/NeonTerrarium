@@ -525,7 +525,10 @@ function updateHighways(dt, t){
     if (t >= h.waveAt){
       const rate = HW_RATE_MIN*Math.pow(HW_RATE_MAX/HW_RATE_MIN, Math.pow(busy, 1.25))*(h.lanes/2);
       const n = Math.max(2, Math.round(2 + 3*busy + Math.random()*1.4 - .2));
-      let at = t; for (let k = 0; k < n; k++){ if (k) at += .9 + Math.random()*1.4; h.queue.push({ at, lane: Math.floor(Math.random()*h.lanes) }); }
+      // a wave comes from one part of the sky and goes off toward another: any bearing round the road's end, far or near
+      const place = () => { const a = Math.random()*TAU, d = 40 + Math.random()*40; return { a, d }; };
+      const wave = { from: place(), to: place() };
+      let at = t; for (let k = 0; k < n; k++){ if (k) at += .9 + Math.random()*1.4; h.queue.push({ at, lane: Math.floor(Math.random()*h.lanes), wave }); }
       h.waveAt = t + (n/rate)*(.75 + Math.random()*.5);
     }
     h.queue = h.queue.filter(q => {
@@ -537,11 +540,10 @@ function updateHighways(dt, t){
         if (lastS >= 2.4) break; lane = (lane + 1)%h.lanes;
       }
       if (lastS < 2.4){ q.at = t + .6; return true; }   // every lane has one just entering: a moment later
-      // each car comes in from somewhere of its own and leaves toward somewhere else: a spot anywhere in a wide disc of sky
-      // round where the road's approach starts (or ends), an offset that fades out by the time it reaches the ramp (and in
-      // again after the terminal)
-      const spot = () => { const a = Math.random()*TAU, r = 5 + 34*Math.sqrt(Math.random()); return { lat: Math.cos(a)*r, back: Math.sin(a)*r, up: -1 + Math.random()*5 }; };
-      hwCars.push({ h, lane, s: 0, k: 0, kind: hwPickKind(), inO: spot(), outO: spot() });
+      // the car's own offsets: its wave's place in the sky, scattered a little (the road's approach starts 38 units out, so the
+      // offset is from there; it fades out by the ramp, and a second one fades in after the terminal)
+      const spot = w => ({ lat: Math.cos(w.a)*w.d + (Math.random() - .5)*10, back: Math.sin(w.a)*w.d - 38 + (Math.random() - .5)*10, up: Math.random()*5 - 1, k: Math.max(0, (w.d - 45)/45) });
+      hwCars.push({ h, lane, s: 0, k: 0, kind: hwPickKind(), inO: spot(q.wave.from), outO: spot(q.wave.to) });
       return false;
     });
   }
@@ -550,7 +552,9 @@ function updateHighways(dt, t){
   let nf = 0;
   hwCars = hwCars.filter(c => {
     const LP = c.h.lanePaths; if (!LP) return false;
-    const P = LP[c.lane], s0 = c.s; c.s += dt*HW_SPEED;
+    const P = LP[c.lane], s0 = c.s;
+    const f0 = c.inO ? 1 + (s0 < P.sRamp ? (1 - smooth01(s0/P.sRamp))*c.inO.k : 0) + (s0 > P.sEnd ? smooth01((s0 - P.sEnd)/(P.len - P.sEnd))*c.outO.k : 0) : 1;   // (from far out it flies a little faster, so it isn't slow to arrive)
+    c.s += dt*HW_SPEED*f0;
     if (c.s >= P.len) return false;
     if (s0 < P.sMid && c.s >= P.sMid && Math.random() < .55) hwDropVisitor(c.h);   // through the terminal: someone gets out
     if (c.s > P.sIn + .05 && c.s < P.sOut - .05) return true;   // inside the terminal: out of sight

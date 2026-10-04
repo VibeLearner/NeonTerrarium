@@ -40,7 +40,11 @@ function spriteMat(tex, W, H, cw, ch, rows){ return new THREE.ShaderMaterial({
       vec2 local = vec2(position.x, position.y + 0.5) * size;
       vec2 ap = floor((a.xy*0.5 + 0.5)*res + 0.5);
       vec2 off = floor(vec2(projectionMatrix[0][0], projectionMatrix[1][1]) * local * 0.5 * res + 0.5);
-      gl_Position = vec4((ap + off)/res*2.0 - 1.0, a.z, 1.0);
+      // depth as an upright figure: each row of the sprite takes the depth of that height above the feet. (With the
+      // feet's depth for the whole sprite it lay flat in depth, so a wall just behind or beside someone, nearer the
+      // camera higher up, cut through their upper body: people seemed to walk into buildings at the corners.)
+      vec4 up = projectionMatrix * modelViewMatrix * vec4(aPos + vec3(0.0, local.y, 0.0), 1.0);
+      gl_Position = vec4((ap + off)/res*2.0 - 1.0, up.z, 1.0);
       vUv = vec2(aSpr.z < 0.0 ? 1.0 - uv.x : uv.x, uv.y);
       vSpr = aSpr;
     }`,
@@ -1099,10 +1103,14 @@ function clubArrive(p, pl){
     const k = m.club.kiosks[Math.floor(pplRand()*m.club.kiosks.length)];
     const a = k.ry, fx = Math.sin(a), fz = Math.cos(a), sx = Math.cos(a), sz = -Math.sin(a), d = 1.15 + pplRand()*.8, o = (pplRand() - .5)*1.6;
     p.club.stage = 'kiosk'; p.club.lx = k.x + fx*d + sx*o; p.club.lz = k.z + fz*d + sz*o; p.club.face = [-fx, -fz];
+    p.club.ks = Math.sign(k.x); p.club.via = [clubKioskVia(m, p.club.ks)];   // round the front of the pylon or the ENTER sign, not behind them
     p.club.until = pplNow + 12 + pplRand()*25;
   } else s.queue.push(p);
   return true;
 }
+// the way to and from a kiosk: out along the front of the plaza, in front of the CLUB pylon (left) or the ENTER sign
+// (right), so nobody walks behind them
+const clubKioskVia = (m, s) => [s*4.25, m.club.DR + (s < 0 ? 1.5 : 1.3)];
 // the queue's places: from the door along the rope
 const queueSlot = (m, k) => [1.5 + k*.34, m.club.DR + 1.6];
 function clubDancePos(m){
@@ -1164,8 +1172,8 @@ function updateClubs(dt, t){
     // everyone else
     for (const p of members){
       const k = p.club; if (!k) continue;   // (walked out by a bouncer just now)
-      if (k.stage === 'kiosk' && t > k.until){ k.stage = 'toQueue'; s.queue.push(p); }
-      else if (k.stage === 'toQueue'){ const qi = s.queue.indexOf(p); if (qi >= 0 && Math.hypot((k.x ?? 0) - k.lx, (k.z ?? 0) - k.lz) < .05) k.stage = 'queue'; }
+      if (k.stage === 'kiosk' && t > k.until){ k.stage = 'toQueue'; k.via = [clubKioskVia(m, k.ks || 1)]; s.queue.push(p); }
+      else if (k.stage === 'toQueue'){ const qi = s.queue.indexOf(p); if (qi >= 0 && !(k.via && k.via.length) && Math.hypot((k.x ?? 0) - k.lx, (k.z ?? 0) - k.lz) < .05) k.stage = 'queue'; }
       else if (k.stage === 'enter' && t - k.t0 > 1.4){ const [x, z, y] = clubDancePos(m); k.stage = 'inside'; k.lx = x; k.lz = z; k.ly = y; k.until = t + mode.stay[0] + pplRand()*(mode.stay[1] - mode.stay[0]); }
       else if (k.stage === 'inside' && t > k.until) clubRelease(p, 'inside');
       else if (k.stage === 'shoved' && t - k.t0 > 1.0) clubRelease(p, 'shoved');
@@ -1200,7 +1208,9 @@ function clubPose(p, t, dt){
     if (k.sx === undefined){ k.sx = k.x + .8; k.sz = k.z + .45; }
     stepTo(k.sx, k.sz, 2.4); frame = F_IDLE; flip = facing(-1, -.4); }
   else {   // walking up to the queue or the kiosk, or waiting there
-    const moving = stepTo(k.lx, k.lz, .55);
+    let moving = false;
+    if (k.via && k.via.length){ moving = stepTo(k.via[0][0], k.via[0][1], .55); if (!moving){ k.via.shift(); moving = true; } }   // a waypoint first
+    else moving = stepTo(k.lx, k.lz, .55);
     if (moving){ frame = Math.floor(t*9 + k.ph) % PPL.walk; flip = facing(k.dx, k.dz); }
     else { flip = facing(k.face[0], k.face[1]);
       if (k.stage === 'check') frame = F_SPEC + Math.floor(t*5) % 6;   // handing over the ID

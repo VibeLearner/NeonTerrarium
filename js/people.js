@@ -410,19 +410,22 @@ function megaLocal(m, x, z){
 }
 function makeSpots(pl, list, inside, oldSpots, addEnd){
   list.forEach((r, n) => {
-    if (pl.spots.some(o => Math.hypot(o.x - r.x, o.z - r.z) < .34)) return;
+    if (pl.spots.some(o => Math.hypot(o.x - r.x, o.z - r.z) < .34 && Math.abs((o.y ?? 0) - (r.y ?? 0)) < .5)) return;
     const c = cells.get(ckey(Math.round(r.x/LOT), Math.round(r.z/LOT))); if (!inside(c)) return;
     if (r.act && (c.green !== 'grass' || c.sections.length)) return;   // sitting on the ground: only on a plot laid fully to lawn
-    const ap = approachFor(cellGrid(c), r.x, r.z, r.fx, r.fz); if (!ap) return;
+    // a spot up off the street (the bathhouse's terrace) is reached from its way in below: people go out of sight there
+    // and come out at the spot (see startTrip)
+    const ce = r.ex !== undefined ? cells.get(ckey(Math.round(r.ex/LOT), Math.round(r.ez/LOT))) : c; if (!ce) return;
+    const ap = r.ex !== undefined ? approachFor(cellGrid(ce), r.ex, r.ez, 0, 1) : approachFor(cellGrid(c), r.x, r.z, r.fx, r.fz); if (!ap) return;
     // the key names the spot by what and where it is, so a plot rebuilt differently (a lawn paved over, say) never
     // hands its old sitters a different seat in the wrong place
     // (a megastructure's spots are named by where they are in its own frame, not the world's, so that turning it, which
     // moves every spot, leaves everyone with the spot they had: its keepers, queues and sitters)
     const lc = pl.mega ? megaLocal(pl.mega, r.x, r.z) : [r.x, r.z];
     const key = 's:' + pl.id + ':' + n + ':' + (r.act || r.kind) + ':' + Math.round(lc[0]*20) + ',' + Math.round(lc[1]*20), old = oldSpots.get(key), nk = 'a:' + Math.round(ap.x*100) + ',' + Math.round(ap.z*100);
-    const sp = { key, x: r.x, y: r.y, z: r.z, ax: ap.x, az: ap.z, node: ngAdd(nk, ap.x, ap.z), kind: r.kind, stall: r.stall, face: [r.fx, r.fz],
+    const sp = { key, x: r.x, y: r.y, z: r.z, ax: ap.x, az: ap.z, up: r.ex !== undefined, node: ngAdd(nk, ap.x, ap.z), kind: r.kind, stall: r.stall, face: [r.fx, r.fz],
                  by: old ? old.by : null, place: pl.id, near: [], act: r.act, hx: r.hx, hz: r.hz, ad: r.ad, pic: r.pic };
-    pl.spots.push(sp); spotByKey.set(key, sp); addEnd(c, { key: nk, x: ap.x, z: ap.z, kind: 's' });
+    pl.spots.push(sp); spotByKey.set(key, sp); addEnd(ce, { key: nk, x: ap.x, z: ap.z, kind: 's' });
   });
   // who could chat with whom: standing spots close together
   for (const a of pl.spots) if (a.kind === 'stand') for (const b of pl.spots) if (b !== a && b.kind === 'stand' && Math.hypot(a.x - b.x, a.z - b.z) < .8) a.near.push(b);
@@ -813,11 +816,13 @@ function spreadPath(p, pts, i0, i1){
   if (!clearSeg(prev[0], prev[1], out[i1][0], out[i1][1])) return pts;   // can't rejoin cleanly: keep the centre line
   return out;
 }
+const UP_WAY = { key: 'up-way', noDraw: true };   // the bathhouse's way up to its terrace: people fade out (and in) there, like at a door
 function startTrip(p, toId){
   const from = places.get(p.at), to = places.get(toId);
   if (!from || !to || !reachable(to)) return false;
   let a, head = [], dA = null;
-  if (p.spot){ a = p.spot.node; head = [[p.spot.x, p.spot.z], [p.spot.ax, p.spot.az]]; }   // up off the seat, out from the counter
+  if (p.spot && p.spot.up){ a = p.spot.node; head = [[p.spot.ax, p.spot.az]]; dA = UP_WAY; }   // down from the terrace: out of its way in
+  else if (p.spot){ a = p.spot.node; head = [[p.spot.x, p.spot.z], [p.spot.ax, p.spot.az]]; }   // up off the seat, out from the counter
   else if (p.patrol) a = p.patrol.node;                                                     // an officer out on the beat
   else { if (!from.doors.length) return false; dA = nearestOf(from.doors, to.x, to.z); a = dA.node; head = [[dA.inside.x, dA.inside.z], [dA.wall.x, dA.wall.z]]; }
   let b, tail = [], dB = null, spot = null;
@@ -825,7 +830,7 @@ function startTrip(p, toId){
   if (to.open){   // a spot it can actually get to: if there's no way to the one picked, another
     for (let tries = 0; tries < 5 && !mid; tries++){ spot = pickSpot(to, from, p); if (!spot || spot === p.spot) return false;
       b = spot.node; mid = route(a, b); if (!mid) spot.bad = pplNow + 1e-6; }   // (passed over for this trip only)
-    if (!mid) return false; tail = [[spot.ax, spot.az], [spot.x, spot.z]]; }
+    if (!mid) return false; if (spot.up){ tail = []; dB = UP_WAY; } else tail = [[spot.ax, spot.az], [spot.x, spot.z]]; }
   else { if (!to.doors.length) return false; dB = nearestOf(to.doors, from.x, from.z); b = dB.node; tail = [[dB.wall.x, dB.wall.z], [dB.inside.x, dB.inside.z]];
     if (to.mega && to.mega.kind === 'club' && p.clubbing){ tail = []; dB = null; } }   // club-goers stop outside: the queue's next (see clubArrive)
   if (!mid) mid = route(a, b); if (!mid) return false;
@@ -938,8 +943,8 @@ function syncPeople(){
       const w = p.walk;
       const gone = !places.has(w.to) || w.pts.some(([x, z]) => !cells.has(ckey(Math.round(x/LOT), Math.round(z/LOT))));
       if (gone){ sendHome(p); continue; }
-      if (w.doorA) w.doorA = doorByKey.get(w.doorA.key) || null;
-      if (w.doorB) w.doorB = doorByKey.get(w.doorB.key) || null;
+      if (w.doorA && w.doorA !== UP_WAY) w.doorA = doorByKey.get(w.doorA.key) || null;
+      if (w.doorB && w.doorB !== UP_WAY) w.doorB = doorByKey.get(w.doorB.key) || null;
       if (w.spot){ const sp = spotByKey.get(w.spot.key); if (sp && (!sp.by || sp.by === p.id)){ sp.by = p.id; w.spot = sp; } else { sendHome(p); continue; } }
       if (w.beat){ const n = NG.key.get(w.beat.key); if (n === undefined){ sendHome(p); continue; } w.beat.node = n; }
     } else if (!places.has(p.at)) sendHome(p);
@@ -982,8 +987,8 @@ function syncBots(){
     if (!b.hub || !places.has(b.hub)) b.hub = hubs[hash('bot', b.id) % hubs.length].id;
     if (b.walk){
       const w = b.walk, gone = w.pts.some(([x, z]) => !cells.has(ckey(Math.round(x/LOT), Math.round(z/LOT))));
-      if (w.doorA) w.doorA = doorByKey.get(w.doorA.key) || null;
-      if (w.doorB) w.doorB = doorByKey.get(w.doorB.key) || null;
+      if (w.doorA && w.doorA !== UP_WAY) w.doorA = doorByKey.get(w.doorA.key) || null;
+      if (w.doorB && w.doorB !== UP_WAY) w.doorB = doorByKey.get(w.doorB.key) || null;
       if (gone){ b.walk = null; b.state = 'in'; b.until = pplNow + 5; }
     }
     if (b.door) b.door = doorByKey.get(b.door.key) || null;

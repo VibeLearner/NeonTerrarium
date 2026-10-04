@@ -120,7 +120,7 @@ const endPtr = e => {
   if (!ptrs.size){ dragging = false; act = null; }
 };
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
-canvas.addEventListener('pointerleave', () => { if (!ptrs.size){ hover.visible = hoverFill.visible = false; showMegaGhost(null); hwGhost.g.visible = false; } });
+canvas.addEventListener('pointerleave', () => { if (!ptrs.size){ hover.visible = hoverFill.visible = false; showMegaGhost(null); hwGhost.g.visible = false; hwHighlight(null); } });
 canvas.addEventListener('wheel', e => { e.preventDefault(); zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 30); }, { passive:false });
 const PAN_KEYS = ['w','a','s','d','arrowup','arrowdown'];
 addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === 'shift') keys.delete('shift'); });

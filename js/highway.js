@@ -695,8 +695,47 @@ const hwGhost = (() => {
   for (const o of [deck, edge, pole]){ o.layers.set(1); o.renderOrder = 999; g.add(o); }
   g.visible = false; scene.add(g); return { g, deck, edge, pole };
 })();
+// Highlights on the road itself: the piece under the pointer (and, faint, the rest of the road a right-click there would
+// take with it), or the end piece the next one is built from. Each is a see-through band over the deck and its outline.
+const hwHiMake = (col, op) => {
+  const fill = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
+  const line = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: Math.min(1, op*3), depthTest: false }));
+  for (const o of [fill, line]){ o.layers.set(1); o.renderOrder = 998; o.frustumCulled = false; o.visible = false; scene.add(o); }
+  return { fill, line, key: '' };
+};
+const hwHiA = hwHiMake(0x38e8e0, .3), hwHiB = hwHiMake(0xff3a4a, .14);
+// show plots k0..k1 of h in highlight H (colour col), or hide it (h null)
+function hwHiShow(H, h, k0, k1, col){
+  if (!h || k1 < k0){ H.fill.visible = H.line.visible = false; H.key = ''; return; }
+  H.fill.material.color.setHex(col); H.line.material.color.setHex(col);
+  const key = h.id + ':' + k0 + ':' + k1 + ':' + h.tiles.length + ':' + h.lanes;
+  if (H.key !== key){
+    H.key = key;
+    const W = hwWidth(h)/2 + .08, tri = [], seg = [], lift = .06;
+    const edge = (k, u) => { const c = hwCenter(h, k, u), y = hwHeight(h, k, u) + lift; return [[c.x - c.tz*W, y, c.z + c.tx*W], [c.x + c.tz*W, y, c.z - c.tx*W]]; };
+    for (let k = k0; k <= k1; k++){
+      const N = 8; let prev = edge(k, 0);
+      seg.push(...prev[0], ...prev[1]);
+      for (let q = 1; q <= N; q++){ const cur = edge(k, q/N);
+        tri.push(...prev[0], ...prev[1], ...cur[1], ...prev[0], ...cur[1], ...cur[0]);
+        seg.push(...prev[0], ...cur[0], ...prev[1], ...cur[1]); prev = cur; }
+      seg.push(...prev[0], ...prev[1]);
+    }
+    H.fill.geometry.setAttribute('position', new THREE.Float32BufferAttribute(tri, 3)); H.fill.geometry.computeBoundingSphere();
+    H.line.geometry.setAttribute('position', new THREE.Float32BufferAttribute(seg, 3)); H.line.geometry.computeBoundingSphere();
+  }
+  H.fill.visible = H.line.visible = true;
+}
+function hwHighlight(t){
+  if (t && t.type === 'none' && t.h){ const n = t.h.tiles.length;   // a built piece: it, and what a right-click would take with it
+    hwHiShow(hwHiA, t.h, t.k, t.k, 0xff6a7a); hwHiShow(hwHiB, t.h, t.k + 1, n - 1, 0xff3a4a); return; }
+  if (t && t.type === 'finish'){ const n = t.h.tiles.length; hwHiShow(hwHiA, t.h, n - 1, n - 1, t.ok ? 0xff5ad8 : 0xff3a4a); hwHiShow(hwHiB, null); return; }
+  if (t && t.type === 'extend'){ const n = t.h.tiles.length; hwHiShow(hwHiA, t.h, n - 1, n - 1, 0x38e8e0); hwHiShow(hwHiB, null); return; }   // the piece the next one joins on to
+  hwHiShow(hwHiA, null); hwHiShow(hwHiB, null);
+}
 function hwShowGhost(t){
-  if (!t || t.type === 'none' && !t.why){ hwGhost.g.visible = false; return; }
+  hwHighlight(t);
+  if (!t || t.type === 'none'){ hwGhost.g.visible = false; return; }
   const col = t.ok ? (t.type === 'finish' ? 0xff5ad8 : 0x38e8e0) : 0xff3a4a;
   hwGhostMat.color.setHex(col); hwGhostLine.color.setHex(col);
   let x, z, y, len, ry, w, th = .3, by;
@@ -717,7 +756,9 @@ function hwHintText(why){
   return why ? base.replace(' · click a plot to start', '') + ' · ' + why : base;
 }
 let hwLastPt = null;
-function hwHover(cx, cy){ hwLastPt = { x: cx, y: cy }; const t = hwTargetAt(hwPick(cx, cy)); hwShowGhost(t); $('modeHint').textContent = hwHintText(t && !t.ok ? t.why : t && t.type === 'finish' ? 'click to finish it with a drop-off' : ''); }
+function hwHover(cx, cy){ hwLastPt = { x: cx, y: cy }; const t = hwTargetAt(hwPick(cx, cy)); hwShowGhost(t);
+  const del = t && t.type === 'none' && t.h ? (t.k === 0 ? 'right-click: remove this whole highway' : 'right-click: remove this piece and the road beyond it') : '';
+  $('modeHint').textContent = hwHintText(del || (t && !t.ok ? t.why : t && t.type === 'finish' ? 'click to finish it with a drop-off' : t && t.type === 'extend' ? 'click to join a piece on to the highlighted end' : '')); }
 function hwClick(cx, cy){ const t = hwTargetAt(hwPick(cx, cy)); if (hwApply(t)) hwHover(cx, cy); }
 function hwRightClick(cx, cy){ const pk = hwPick(cx, cy); if (pk && pk.kind === 'hwTile'){ hwCutAt(pk.h, pk.k); hwHover(cx, cy); } }
 function hwSetLevel(L){ hwLevel = Math.max(HW_MIN_L, Math.min(HW_MAX_L, L)); const el = document.getElementById('hwLevel'); if (el) el.textContent = hwLevel; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y); }
@@ -725,7 +766,7 @@ function hwSetLanesUI(n){ hwSetLanes(n); const el = document.getElementById('hwL
 function setHwMode(on, quiet){
   hwMode = on;
   if (on){ if (S.zone) selectZone(null); if (delMode) setDelMode(false, true); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = false; showMegaGhost(null); }
-  else hwGhost.g.visible = false;
+  else { hwGhost.g.visible = false; hwHighlight(null); }
   const b = document.getElementById('hwBtn'); if (b){ b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
   const bar = document.getElementById('hwbar'); if (bar) bar.hidden = !on;
   if (on) $('modeHint').textContent = hwHintText('');

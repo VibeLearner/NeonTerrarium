@@ -274,7 +274,12 @@ const STALL_TYPES = new Set([stallMarket, foodDeck, foodTower, foodPlaza, billbo
 // ground, and c.sections, the pod hanging over it on its scaffold (from c.lift.y), with a gap between them.
 function buildStack(c){
   c.belowTop = null; c.belowTops = [];
-  if (c.lift && c.below && c.below.length){ c.belowTop = stackRun(c, c.below, CURB, 'b', true); c.belowTops = c.sectionTops; c._topLot = null; }
+  c.liftHF = null;
+  if (c.lift && c.below && c.below.length){
+    const mark = new Map([...buckets.values()].map(b => [b, b.p.length]));
+    c.belowTop = stackRun(c, c.below, CURB, 'b', true); c.belowTops = c.sectionTops; c._topLot = null;
+    c.liftHF = liftHeights(c, mark);
+  }
   const y = stackRun(c, c.sections, c.lift ? c.lift.y : CURB, '', !c.belowTop);   // a side pod's stack starts up in the air, on its scaffold
   c.height = y;
   c.walks = null;
@@ -324,6 +329,34 @@ function stackRun(c, secs, y, tag, first){
   return y;
 }
 /* ---------- side pods: a building hung off the side of a taller one ---------- */
+// What's under a pod, as a height map: once, right after the building under it is generated, its new triangles (the
+// part of each bucket added since 'mark') are stamped onto a 28 x 28 grid over the plot, each cell keeping the highest
+// point that covers it. The scaffold's legs then reach down to whatever is under each of them: the roof of the
+// building below, or past its edge to the street. No cost per frame; only when the plot is rebuilt.
+const HF_N = 28, HF_S = 2.8/HF_N;
+function liftHeights(c, mark){
+  const hf = new Float32Array(HF_N*HF_N).fill(CURB), x0 = c.x - 1.4, z0 = c.z - 1.4, lim = c.lift.y - .2;
+  for (const b of buckets.values()){
+    const P = b.p, from = mark.get(b) || 0;
+    for (let t = from; t + 8 < P.length; t += 9){
+      const ya = P[t + 1], yb = P[t + 4], yc = P[t + 7], ymax = Math.max(ya, yb, yc);
+      if (ymax <= CURB + .02 || ymax > lim) continue;
+      const mnx = Math.min(P[t], P[t + 3], P[t + 6]), mxx = Math.max(P[t], P[t + 3], P[t + 6]), mnz = Math.min(P[t + 2], P[t + 5], P[t + 8]), mxz = Math.max(P[t + 2], P[t + 5], P[t + 8]);
+      const i0 = Math.max(0, Math.floor((mnx - x0)/HF_S)), i1 = Math.min(HF_N - 1, Math.floor((mxx - x0)/HF_S)), j0 = Math.max(0, Math.floor((mnz - z0)/HF_S)), j1 = Math.min(HF_N - 1, Math.floor((mxz - z0)/HF_S));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){ const q = j*HF_N + i; if (ymax > hf[q]) hf[q] = ymax; }
+    }
+  }
+  return hf;
+}
+// the height of what's under a point of the plot (world x, z): the highest cell within a leg's width of it
+function liftFloor(c, x, z){
+  if (!c.liftHF) return CURB;
+  const x0 = c.x - 1.4, z0 = c.z - 1.4, i = Math.floor((x - x0)/HF_S), j = Math.floor((z - z0)/HF_S);
+  let h = CURB;
+  for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++){ const a = i + di, b = j + dj; if (a >= 0 && b >= 0 && a < HF_N && b < HF_N) h = Math.max(h, c.liftHF[b*HF_N + a]); }
+  return h;
+}
+
 // Clicking the side of a building high up (residential only, for now) hangs a one-section home in the air over the
 // empty plot next to it: the pod stands on a plank deck on a DIY scaffold of pipes and posts down to the street, and
 // a plank walkway with rails runs from it to a door in every neighbour tall enough to reach (one, or two either side,
@@ -543,27 +576,33 @@ function liftScaffold(c, y0){
   const posts = [[-E, -E], [E, -E], [-E, E], [E, E]];
   if (chance(.7)) posts.push([0, chance(.5) ? E : -E]);
   if (chance(.5)) posts.push([chance(.5) ? E : -E, 0]);
+  // each leg goes down to what's under it: the roof of the building below, or the street beside it
+  const foot = (x, z) => liftFloor(c, c.x + x, c.z + z), cf = {};
+  for (const [x, z] of [[-E, -E], [E, -E], [E, E], [-E, E]]) cf[x + ',' + z] = foot(x, z);
   for (const [x, z] of posts){
-    const wx = wobble(), wz = wobble();
-    if (chance(.25)) box(M.wood, P, x, (base + y0 - .1)/2, z, .07, y0 - .1 - base, .07);
-    else strut(tube(), P, x + wx, base, z + wz, x, y0 - .1, z, .03);
-    box(M.concDD, P, x + wx, base + .02, z + wz, .14, .04, .14);   // a base plate
+    const wx = wobble(), wz = wobble(), fy = foot(x + wx, z + wz);
+    if (chance(.25)) box(M.wood, P, x, (fy + y0 - .1)/2, z, .07, y0 - .1 - fy, .07);
+    else strut(tube(), P, x + wx, fy, z + wz, x, y0 - .1, z, .03);
+    box(M.concDD, P, x + wx, fy + .02, z + wz, .14, .04, .14);   // a base plate
   }
-  // ledgers round the frame every metre or so, and cross braces on a couple of faces
-  for (let y = base + 1.0; y < y0 - .3; y += rnd(.85, 1.1)){
-    for (const [ax, az, bx, bz] of [[-E, -E, E, -E], [E, -E, E, E], [E, E, -E, E], [-E, E, -E, -E]]) if (chance(.85)) strut(tube(), P, ax, y, az, bx, y + rnd(-.04, .04), bz, .02);
+  // ledgers round the frame every metre or so (only where both legs reach), and cross braces on a couple of faces
+  const EDGES = [[-E, -E, E, -E], [E, -E, E, E], [E, E, -E, E], [-E, E, -E, -E]];
+  for (let y = Math.min(...Object.values(cf)) + 1.0; y < y0 - .3; y += rnd(.85, 1.1)){
+    for (const [ax, az, bx, bz] of EDGES) if (y > Math.max(cf[ax + ',' + az], cf[bx + ',' + bz]) + .3 && chance(.85)) strut(tube(), P, ax, y, az, bx, y + rnd(-.04, .04), bz, .02);
   }
-  for (const [ax, az, bx, bz] of [[-E, -E, E, -E], [E, -E, E, E], [E, E, -E, E], [-E, E, -E, -E]]){
+  for (const [ax, az, bx, bz] of EDGES){
     if (!chance(.55)) continue;
-    const yl = base + .25, yh = y0 - .15;
+    const yl = Math.max(cf[ax + ',' + az], cf[bx + ',' + bz]) + .25, yh = y0 - .15;
+    if (yh - yl < .6) continue;
     strut(tube(), P, ax, yl, az, bx, yh, bz, .018); if (chance(.6)) strut(tube(), P, bx, yl, bz, ax, yh, az, .018);
   }
   // the stair hut and ladder: on a side with no walkway, the pod's front door at street level
   const free = SIDES4.filter(d => !supKey.has(d.join()));
   const hs = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0];
-  if (onRoof){ const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));   // a building below: just a ladder up from its roof
-    for (const s of [-1, 1]) strut(M.metal, F, s*.17, base, .8, s*.17, y0 + .55, .8, .018);
-    for (let y = base + .15; y < y0 + .5; y += .2) box(M.metal, F, 0, y, .8, .34, .025, .025);
+  if (onRoof){ const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));   // a building below: just a ladder up from what's under it
+    const lw = new THREE.Vector3(0, 0, .8).applyMatrix4(F), lf = liftFloor(c, lw.x, lw.z);
+    for (const s of [-1, 1]) strut(M.metal, F, s*.17, lf, .8, s*.17, y0 + .55, .8, .018);
+    for (let y = lf + .15; y < y0 + .5; y += .2) box(M.metal, F, 0, y, .8, .34, .025, .025);
   } else { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));   // local +z out to that side
     const wall = pick([M.concW, M.concL, M.corrBlue, M.metal]), hz = .76;
     box(wall, F, 0, base + .52, hz, .8, 1.04, .42);                         // the hut: a little stair shed

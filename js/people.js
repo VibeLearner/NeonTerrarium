@@ -473,6 +473,10 @@ function buildNetwork(){
         doorList.push(pd); doorByKey.set(pk, pd); c._podDoor = pd; }
       else c._podDoor = null;
     }
+    // the doors at each end of the pod's walkways, a little bigger to fill their frames
+    c._walkDoors = (c.walks || []).map((w, k) => (w.doors || []).map((wd, e) => { const key = 'w:' + c.i + ',' + c.j + ':' + k + ':' + e, od = oldDoors.get(key);
+      const dd = { key, wall: { x: wd.x, z: wd.z }, y: w.y - .01, n: wd.n, k: 1.3, mega: false, noDraw: false, open: od ? od.open : 0, want: false, col: w.col ?? DOOR_COLS[hash(key) % DOOR_COLS.length] };
+      doorList.push(dd); doorByKey.set(key, dd); return dd; }));
     const d = !c.liftCab || c.below ? plotDoor(c, sides, 1.75) : null;
     if (d){ const key = 'd:' + c.i + ',' + c.j; doors.push(makeDoor(key, d, false, oldDoors.get(key))); addEnd(c, { key, x: d.stand.x, z: d.stand.z, kind: 'd' }); }
     fresh.set('c:' + c.i + ',' + c.j, { id: 'c:' + c.i + ',' + c.j, cell: c, x: c.x, z: c.z, jobs, fun, night, doors });
@@ -542,7 +546,7 @@ const doorPanel = new THREE.InstancedMesh(U.box, DOOR_PANEL, DOOR_MAX);
 doorPanel.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(DOOR_MAX*3), 3);   // made up front: three sizes it to the count at first use
 for (const m of [doorFrame, doorLight, doorPanel]){ m.count = 0; m.frustumCulled = false; m.receiveShadow = true; m.raycast = () => {}; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); }
 const _dm = new THREE.Matrix4(), _dl = new THREE.Matrix4(), _dc = new THREE.Color();
-function doorBasis(d){ const k = d.mega ? 1.35 : 1; return _dm.makeRotationY(Math.atan2(d.n[0], d.n[1])).setPosition(d.wall.x, d.y ?? CURB, d.wall.z).multiply(_dl.makeScale(k, k, k)); }
+function doorBasis(d){ const k = d.k || (d.mega ? 1.35 : 1); return _dm.makeRotationY(Math.atan2(d.n[0], d.n[1])).setPosition(d.wall.x, d.y ?? CURB, d.wall.z).multiply(_dl.makeScale(k, k, k)); }
 const doorPart = (B, x, y, z, w, h, dd) => B.clone().multiply(_dl.compose(_p.set(x, y, z), _q.identity(), _s.set(w, h, dd)));
 function setPanel(i, d){ doorPanel.setMatrixAt(i, doorPart(doorBasis(d), d.open*.37, .34, .045, .35, .66, .03)); }
 function rebuildDoorMeshes(){
@@ -1301,7 +1305,9 @@ function drawDeckWalkers(emit, t, dt){
         let d = deckWalkers.get(key);
         const len = Math.hypot(w.bx - w.ax, w.bz - w.az);
         if (!d || d.len !== len){ d = { len, u: Math.random(), dir: Math.random() < .5 ? 1 : -1, wait: q ? 4 + Math.random()*10 : Math.random()*3, row: hash('deckrow', c.i, c.j, k, q) % CITIZEN_ROWS, ph: Math.random()*10, flip: 1 }; deckWalkers.set(key, d); }
-        if (d.wait > 0){ d.wait -= dt; continue; }   // indoors for a while
+        const wd = c._walkDoors && c._walkDoors[k], end = d.u < .5 ? 0 : 1;
+        if (d.wait > 0){ d.wait -= dt; if (d.wait < .25 && wd && wd[end]) wd[end].want = true; continue; }   // indoors for a while (the door opens as they come out)
+        if (wd){ const e0 = d.u*len, e1 = (1 - d.u)*len; if (e0 < .5 && wd[0]) wd[0].want = true; if (e1 < .5 && wd[1]) wd[1].want = true; }
         d.u += d.dir*dt*PPL_SPEED*.8/len;
         if (d.u >= 1 || d.u <= 0){ d.u = Math.min(1, Math.max(0, d.u)); d.dir = -d.dir; d.wait = 3 + Math.random()*9; continue; }
         const x = w.ax + (w.bx - w.ax)*d.u, z = w.az + (w.bz - w.az)*d.u;

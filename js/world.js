@@ -464,13 +464,13 @@ function liftScaffoldCom(c, y0){
     // the door in the neighbour: a heavy steel frame round a lit door, a neon name over it now and then
     box(TRUSS, F, 0, y0 + .52, z1 + .16, .82, 1.1, .36);
     box(M.metalDark, F, 0, y0 + .5, z1 - .03, .7, 1.04, .05);
-    box(COM.shopLit, F, 0, y0 + .46, z1 - .06, .46, .86, .02);
     box(M.hazard, F, 0, y0 + 1.04, z1 - .06, .7, .05, .03);
     if (chance(.5*S.neon)){ const [sn, sc] = pick(COM_POD_SIGNS); fitSign(under(F, T(0, 0, z1 - .08, PI)), sn, 0, y0 + 1.3, 0, .9, .5, sc); }
     glow(F, 0, y0 + .7, z1 - .1, 'warm', .4);
-    box(M.metalDark, F, 0, y0 + .5, z0 + .02, .62, 1.0, .05); box(COM.shopLit, F, 0, y0 + .46, z0 + .05, .42, .84, .02);
+    box(M.metalDark, F, 0, y0 + .5, z0 + .02, .62, 1.0, .05);
     const a = new THREE.Vector3(0, y0, z0 + .2).applyMatrix4(F), b = new THREE.Vector3(0, y0, z1 - .2).applyMatrix4(F);
-    c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01 });
+    const dA = new THREE.Vector3(0, 0, z0 + .05).applyMatrix4(F), dB = new THREE.Vector3(0, 0, z1 - .06).applyMatrix4(F), o0 = new THREE.Vector3(0, 0, 0).applyMatrix4(F), fz = new THREE.Vector3(0, 0, 1).applyMatrix4(F), nx = fz.x - o0.x, nz = fz.z - o0.z;
+    c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01, doors: [{ x: dA.x, z: dA.z, n: [nx, nz] }, { x: dB.x, z: dB.z, n: [-nx, -nz] }], col: 0x3c4450 });
   }
 }
 // The industrial pod's trestle, after the works reference: concrete piers, heavy rusted I-beam columns X-braced
@@ -589,15 +589,14 @@ function liftScaffoldInd(c, y0){
     box(IND_STEEL, F, 0, y0 - th, zm, w, .05, L);                          // the bottom of the box
     for (let q = 0; q < irand(2, 3); q++){ const x = -.25 + q*.25, yy = y0 - th + .14 + (q % 2)*.18; pipeRun(pick([M.inRust, M.inPipe, M.inRust2]), F, [[x, yy, z0 - .1], [x, yy, z1 + .15]], rnd(.06, .09), true); }
     indLight(F, 0, y0 - th - .08, zm);
-    // the door in the neighbour: a steel frame round a roller shutter, half up and lit behind, a red light over it
+    // the door in the neighbour: a steel frame round a sliding steel door, a red light over it
     box(IND_STEEL, F, 0, y0 + .5, z1 + .14, .84, 1.06, .32);
     box(M.metalDark, F, 0, y0 + .5, z1 - .03, .72, 1.0, .05);
-    box(COM.shopLit, F, 0, y0 + .22, z1 - .055, .5, .4, .01); box(M.shutter, F, 0, y0 + .66, z1 - .06, .54, .5, .02);
-    for (let y = y0 + .45; y < y0 + .92; y += .07) box(M.metalDark, F, 0, y, z1 - .075, .54, .01, .01);
     indLight(F, 0, y0 + 1.08, z1 - .12);
-    box(M.metalDark, F, 0, y0 + .5, z0 + .02, .62, 1.0, .05); box(M.shutter, F, 0, y0 + .46, z0 + .05, .44, .84, .02);
+    box(M.metalDark, F, 0, y0 + .5, z0 + .02, .62, 1.0, .05);
     const a = new THREE.Vector3(0, y0, z0 + .2).applyMatrix4(F), b = new THREE.Vector3(0, y0, z1 - .2).applyMatrix4(F);
-    c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01 });
+    const dA = new THREE.Vector3(0, 0, z0 + .05).applyMatrix4(F), dB = new THREE.Vector3(0, 0, z1 - .06).applyMatrix4(F), o0 = new THREE.Vector3(0, 0, 0).applyMatrix4(F), fz = new THREE.Vector3(0, 0, 1).applyMatrix4(F), nx = fz.x - o0.x, nz = fz.z - o0.z;
+    c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01, doors: [{ x: dA.x, z: dA.z, n: [nx, nz] }, { x: dB.x, z: dB.z, n: [-nx, -nz] }], col: 0x5a5e64 });
   }
 }
 // The lift's shaft (after the pod-on-a-tower reference, made slim): four rusty posts with rings and braces from the
@@ -715,13 +714,14 @@ function liftScaffold(c, y0){
     // the door in the neighbour's wall: a frame, a lit door, a little step, set into the wall so no gap shows
     box(M.concDD, F, 0, y0 + .5, z1 + .18, .7, 1.02, .4);
     box(M.frame, F, 0, y0 + .5, z1 - .03, .62, 1.02, .04);
-    box(pick([M.winLit, M.winLit, M.interiorPink || M.winLit]), F, 0, y0 + .46, z1 - .055, .44, .86, .02);
     box(M.metalDark, F, 0, y0 + 1.03, z1 - .1, .7, .04, .16);
     glow(F, 0, y0 + .7, z1 - .08, 'warm', .4);
     // and one on the pod's own side
-    box(M.frame, F, 0, y0 + .5, z0 + .03, .6, 1.0, .05); box(M.winLit, F, 0, y0 + .46, z0 + .06, .42, .84, .02);
+    box(M.frame, F, 0, y0 + .5, z0 + .03, .6, 1.0, .05);
+    // (the doors themselves slide open for the people crossing: see the doors in people.js)
     const a = new THREE.Vector3(0, y0, z0 + .2).applyMatrix4(F), b = new THREE.Vector3(0, y0, z1 - .2).applyMatrix4(F);
-    c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01 });
+    const dA = new THREE.Vector3(0, 0, z0 + .065).applyMatrix4(F), dB = new THREE.Vector3(0, 0, z1 - .06).applyMatrix4(F), o0 = new THREE.Vector3(0, 0, 0).applyMatrix4(F), fz = new THREE.Vector3(0, 0, 1).applyMatrix4(F), nx = fz.x - o0.x, nz = fz.z - o0.z;
+    c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01, doors: [{ x: dA.x, z: dA.z, n: [nx, nz] }, { x: dB.x, z: dB.z, n: [-nx, -nz] }], col: null });
   }
 }
 // Hologram billboards on the roofs: a small one on about half the commercial roofs, and on tall buildings of the

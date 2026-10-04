@@ -2077,7 +2077,8 @@ function counterGoods(F, x0, x1, y, z, kind){
 }
 function signShop(lot, st, P0){
   const P = under(P0, T(0, 0, 0, pick([0, PI/2, PI, -PI/2])));
-  const w = rnd(1.95, 2.25), d = rnd(1.8, 2.1), floors = irand(2, 4), wall = pick(COM.walls), h0 = 1.2;
+  const w = rnd(1.95, 2.25), d = rnd(1.8, 2.1), wall = pick(COM.walls), h0 = lot.mf ? FH : 1.2;   // (in a gap: a standard-height shop floor)
+  let floors = irand(2, 4); if (lot.mf) floors = Math.max(1, Math.min(floors, lot.mf));   // (built into a gap under a side pod: short enough to fit)   // (built into a gap under a side pod: short enough to fit)
   const [sign, col] = pick(SHOP_SIGNS), goods = /noodle|ramen|tea|bar/.test(sign) ? 'food' : /drones|prints|tech|data/.test(sign) ? 'tech' : 'curio';
   // the shop floor: side and back walls, the front open onto a warm-lit room
   box(wall, P, 0, h0/2, -d/2 + .05, w, h0, .1); for (const s of [-1, 1]) box(wall, P, s*(w/2 - .05), h0/2, 0, .1, h0, d);

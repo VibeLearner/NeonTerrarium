@@ -23,7 +23,7 @@ const MEGA_TYPES = {
            colour: '#ff7ab8', build: buildMarketMall },
   pagoda: { name: 'Cloud Pagoda', need: { highPlots: 60 }, odds: 1, w: 5, h: 4, maxLevels: 1,   // arrives with the 60th luxury building
            colour: '#8ff0ff', build: buildCloudPagoda },
-  greenhouse: { name: 'Hydroponic Farm', need: { ind: 40 }, odds: 1, w: 5, h: 4, maxLevels: 1,   // arrives with the 40th industrial floor
+  greenhouse: { name: 'Hydroponic Farm', need: { ind: 100 }, odds: 60, w: 5, h: 4, maxLevels: 1,   // once there are 100 industrial floors, a 1 in 60 chance with each build
            colour: '#7affa0', build: buildGreenhouse, fx: greenhouseFx },
   club: { name: 'Neon Dome', need: { highPlots: 30, midPlots: 30, lowPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives once there are 30 each of luxury, commercial and residential buildings
            colour: '#c070ff', build: buildNeonDome, fx: clubFx },

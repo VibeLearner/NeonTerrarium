@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="css/style.css?v=2026-10-04zj">
+<link rel="stylesheet" href="css/style.css?v=2026-10-04zk">
 </head>
 <body>
 
@@ -40,8 +40,8 @@
   <div id="tmenu" class="tmenu" hidden>
     <button id="tmenuHead" class="bmenu-head" aria-expanded="false" aria-controls="tmenuList"><span>Transport</span><i aria-hidden="true"></i></button>
     <div id="tmenuList" class="bmenu-list" hidden>
-      <button class="bitem" id="hwBtn" style="--m:#a77bff" aria-pressed="false" title="Sky highways (5)"><i class="sw"></i><b>Sky highway</b><small>Flying cars · drop-off lifts</small></button>
-      <button class="thelp" id="hwHelpBtn" aria-expanded="false" aria-controls="hwHelp">How it works</button>
+      <button class="bitem" id="hwBtn" style="--m:#a77bff" aria-pressed="false" title="Sky highways (5)"><i class="sw"></i><b>Sky highway</b></button>
+      <button class="thelp" id="hwHelpBtn" aria-expanded="false" aria-controls="hwHelp">Instructions</button>
     </div>
   </div>
 </aside>
@@ -49,14 +49,16 @@
 <!-- the Sky highway instructions: a square panel at the side -->
 <aside id="hwHelp" class="hwhelp" hidden role="dialog" aria-label="Sky highway instructions">
   <header><b>Sky highway</b><button id="hwHelpClose" aria-label="Close instructions">✕</button></header>
-  <ol>
-    <li><span class="n">1</span><p><strong>Start.</strong> Pick <em>Sky highway</em> (or press <kbd>5</kbd>), then click any plot. That plot becomes the entry: a sky ramp and a toll gate.</p></li>
-    <li><span class="n">2</span><p><strong>Height and lanes.</strong> <kbd>[</kbd> <kbd>]</kbd> or the − + buttons set the height in floors. <kbd>L</kbd> switches between 2 and 3 lanes.</p></li>
-    <li><span class="n">3</span><p><strong>Extend.</strong> Click the plot next to the open end. Turns curve on their own. A plot can step 2 floors up or down.</p></li>
-    <li><span class="n">4</span><p><strong>Cross over.</strong> Go 2 floors above or below any road, including your own, to pass over it.</p></li>
-    <li><span class="n">5</span><p><strong>Finish.</strong> Click the last piece again to add the drop-off: a lift down for visitors and a sky ramp out.</p></li>
-    <li><span class="n">6</span><p><strong>Undo.</strong> Right-click a piece to cut the road back to it. <kbd>Esc</kbd> leaves the mode.</p></li>
-  </ol>
+  <dl>
+    <dt>Click a plot</dt><dd>Start a highway</dd>
+    <dt>Click next to the end</dt><dd>Extend it</dd>
+    <dt>Click the last piece</dt><dd>Add the drop-off</dd>
+    <dt>Right-click a piece</dt><dd>Cut the road back</dd>
+    <dt><kbd>[</kbd> <kbd>]</kbd> or <kbd>−</kbd> <kbd>+</kbd></dt><dd>Lower or raise the height</dd>
+    <dt><kbd>L</kbd></dt><dd>2 or 3 lanes</dd>
+    <dt><kbd>5</kbd></dt><dd>Highway mode on or off</dd>
+    <dt><kbd>Esc</kbd></dt><dd>Leave highway mode</dd>
+  </dl>
 </aside>
 
 <button id="deckToggle" class="deck-toggle" aria-expanded="false" aria-controls="deck">Settings</button>
@@ -167,19 +169,19 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <!-- ?v= makes browsers fetch fresh copies after an update; change it with every release -->
-<script src="js/core.js?v=2026-10-04zj"></script>
-<script src="js/sprites.js?v=2026-10-04zj"></script>
-<script src="js/buildings.js?v=2026-10-04zj"></script>
-<script src="js/ground.js?v=2026-10-04zj"></script>
-<script src="js/vehicles.js?v=2026-10-04zj"></script>
-<script src="js/sky.js?v=2026-10-04zj"></script>
-<script src="js/audio.js?v=2026-10-04zj"></script>
-<script src="js/world.js?v=2026-10-04zj"></script>
-<script src="js/mega.js?v=2026-10-04zj"></script>
-<script src="js/people.js?v=2026-10-04zj"></script>
-<script src="js/highway.js?v=2026-10-04zj"></script>
-<script src="js/music.js?v=2026-10-04zj"></script>
-<script src="js/input.js?v=2026-10-04zj"></script>
-<script src="js/main.js?v=2026-10-04zj"></script>
+<script src="js/core.js?v=2026-10-04zk"></script>
+<script src="js/sprites.js?v=2026-10-04zk"></script>
+<script src="js/buildings.js?v=2026-10-04zk"></script>
+<script src="js/ground.js?v=2026-10-04zk"></script>
+<script src="js/vehicles.js?v=2026-10-04zk"></script>
+<script src="js/sky.js?v=2026-10-04zk"></script>
+<script src="js/audio.js?v=2026-10-04zk"></script>
+<script src="js/world.js?v=2026-10-04zk"></script>
+<script src="js/mega.js?v=2026-10-04zk"></script>
+<script src="js/people.js?v=2026-10-04zk"></script>
+<script src="js/highway.js?v=2026-10-04zk"></script>
+<script src="js/music.js?v=2026-10-04zk"></script>
+<script src="js/input.js?v=2026-10-04zk"></script>
+<script src="js/main.js?v=2026-10-04zk"></script>
 </body>
 </html>

@@ -29,6 +29,7 @@ function frame(now){
   updateCars(now/1000);
   updateDrones(dt, now/1000, night);
   updateTrips(dt, now/1000);
+  updateHighways(dt, now/1000);
   updateVehicleShadows();
   updateAnims(dt);
   updateMegaFx(dt, now/1000);

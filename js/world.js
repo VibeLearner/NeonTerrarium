@@ -999,7 +999,7 @@ function rebuildCell(c){
   c.height = CURB;
   c.dark = isDarkPlot(c);
   DARK = c.dark;
-  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length) buildStack(c); }); } finally { DARK = false; }
+  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length) buildStack(c); hwFeet(c); }); } finally { DARK = false; }   // (and the feet of any highway over it)
   if (c.liftCab) podDoorSpot(c);
   if (c.mega){ const m = megas.get(c.mega); if (m && m.roofH) c.height = m.roofH; }
   cellView(c);
@@ -1129,7 +1129,7 @@ function addPlatform(i, j, zone = null){
   return c;
 }
 function removePlatform(c){
-  if (c.sections.length) return;
+  if (c.sections.length || hwAt(c.i, c.j).length) return;   // (a highway's pillar stands on it)
   finishAnimsOn(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   cells.delete(ckey(c.i, c.j)); dirtyRegions.add(regKey(c.i, c.j));
@@ -1140,16 +1140,28 @@ const MAX_SECTIONS = 4, MAX_HEIGHT = 24;
 function addSection(c, zone){
   if (c.sections.length >= MAX_SECTIONS || c.height > MAX_HEIGHT) return;
   finishAnimsOn(c);
+  const y0 = c.sections.length ? c.height : CURB;
+  // under a highway: only as many floors as fit beneath it (a section that still reaches it is built a floor or two shorter)
+  const cap = hwCap(c), sec = { zone, seed: (Math.random()*1e9)|0, style: styleNow() };
+  if (cap !== null){ const f = Math.floor((cap - y0 - (c.sections.length ? .1 : 0) + .02)/FH); if (f < 1) return; sec.mf = f; }
   holdRegion(c);
-  const y0 = c.sections.length ? c.height : CURB, old = { view: c.view, data: c.data }; c.view = null; c.data = null;
-  c.sections.push({ zone, seed: (Math.random()*1e9)|0, style: styleNow() }); refresh([c]);
+  const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
+  c.sections.push(sec);
+  if (cap !== null) for (let tries = 0; tries < 4; tries++){
+    rebuildCell(c); disposeData(c.data); c.data = null;
+    if (c.height <= cap) break;
+    if (sec.mf <= 1){ c.sections.pop(); break; }
+    sec.mf = Math.max(1, sec.mf - Math.ceil((c.height - cap)/FH));
+  }
+  refresh([c]);
   dropView(old);   // the new look already contains everything below the new section
+  if (!c.sections.includes(sec)){ releaseRegion(regKey(c.i, c.j)); return; }   // (it wouldn't fit under the highway)
   startAnim(c, 'build', y0 - .05, c.height + 1.2, zone, SIDE, null);
   maybeSpawnMegas(c);
 }
 // hang a pod off the side of a taller building, over the empty plot c, its deck at height y
 function addLift(c, y, zone){
-  if (!c || c.mega || c.lift) return null;
+  if (!c || c.mega || c.lift || hwAt(c.i, c.j).length) return null;   // (not under a highway)
   if (c.sections.length && y < c.height + FH - .05) return null;   // over a shorter building: a floor's gap at least
   finishAnimsOn(c);
   holdRegion(c);
@@ -1234,6 +1246,7 @@ function removeArea(r){
   const inR = (i, j) => i >= r.i0 && i <= r.i1 && j >= r.j0 && j <= r.j1;
   for (const m of [...megas.values()]) if (m.i <= r.i1 && m.i + m.w - 1 >= r.i0 && m.j <= r.j1 && m.j + m.h - 1 >= r.j0) removeMega(m);
   const gone = [], touched = new Set();
+  for (const [i, j] of hwRemoveArea(r)){ const c = cells.get(ckey(i, j)); if (c && !inR(i, j)) touched.add(c); }   // highways reaching into it go too
   for (const c of [...cells.values()]){
     if (!inR(c.i, c.j) || c.mega) continue;
     finishAnimsOn(c);
@@ -1382,7 +1395,7 @@ function clearIsland(){
   for (const m of megas.values()){ disposeData(m.data); m.data = null; cellView(m); if (m.fx){ m.fx.dispose(); m.fx = null; } }
   megas.clear();
   for (const k of [...regions.keys()]){ world.remove(regions.get(k)); disposeGroup(regions.get(k)); regions.delete(k); }
-  cells.clear();
+  cells.clear(); hwClearAll();
   for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) cells.set(ckey(i,j), newCell(i, j));
   rebuildAll(); centerView();
 }
@@ -1395,12 +1408,14 @@ function save(){
     localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some', c.lift ? c.lift.y : 0, c.lift && c.below ? c.below : 0])));
     localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ id: m.id, kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed, centre: m.centre || undefined, rot: m.rot, si: m.si, sj: m.sj }))));
   } catch (e) {}
+  hwSave();
 }
 function load(){
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!Array.isArray(d) || !d.length) return false;
     for (const [i,j,secs,st,gr,lf,bl] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; if (lf > 0 && c.sections.length){ c.lift = { y: lf }; if (Array.isArray(bl)){ const b2 = bl.filter(s => s && ZONES[s.zone]); if (b2.length) c.below = b2; } } cells.set(ckey(i,j), c); }
+    hwLoad();   // (before the plots are built: the highways' pillars stand on them)
     try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) { const mm = placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels, m.id || null); if (mm && m.centre) mm.centre = m.centre; if (mm && Number.isInteger(m.rot)) mm.rot = ((m.rot % 4) + 4) % 4; if (mm && Number.isInteger(m.si) && Number.isInteger(m.sj)){ mm.si = m.si; mm.sj = m.sj; } } } catch (e) {}
     return true;
   } catch (e) { return false; }

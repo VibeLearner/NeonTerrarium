@@ -54,9 +54,10 @@ canvas.addEventListener('pointerdown', e => {
   if (e.pointerType === 'touch'){
     // tap builds, drag paints, press and hold removes
     act = { kind: 'touch', x: e.clientX, y: e.clientY, moved: false, done: new Set() };
-    act.timer = setTimeout(() => { if (act && act.kind === 'touch' && !act.moved){ removeAt(pickAt(act.x, act.y)); act.kind = 'none'; } }, 550);
+    act.timer = setTimeout(() => { if (act && act.kind === 'touch' && !act.moved){ if (hwMode) hwRightClick(act.x, act.y); else removeAt(pickAt(act.x, act.y)); act.kind = 'none'; } }, 550);
     return;
   }
+  if (e.button === 0 && hwMode){ act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false }; return; }   // highway mode: a click builds, a drag turns the view
   if (e.button === 0){
     const pk = pickAt(e.clientX, e.clientY);
     // a click (no drag) builds; a drag rotates the view. With "Drag to paint" on, a drag that starts on the city paints instead.
@@ -70,6 +71,7 @@ canvas.addEventListener('pointermove', e => {
   const p = ptrs.get(e.pointerId);
   if (!p){ ptrLast = { x: e.clientX, y: e.clientY };   // just hovering
     if (delMode){ hover.visible = hoverFill.visible = false; return; }
+    if (hwMode){ hwHover(e.clientX, e.clientY); return; }
     if (megaPick) showMegaGhost(megaPick, groundCellAt(e.clientX, e.clientY), megaTurn); else showHover(targetOf(pickAt(e.clientX, e.clientY))); return; }
   const dx = e.clientX - p.x;
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -99,15 +101,15 @@ const endPtr = e => {
       delSel = null; showAreaSel(null);
     }
     if (act.kind === 'right' && !act.moved && delMode){ delSel = null; showAreaSel(null); }
-    else if (act.kind === 'right' && !act.moved){ if (megaPick) selectMega(null); else removeAt(pickAt(e.clientX, e.clientY)); }   // right-click while placing: put it down
-    if (act.kind === 'sky' && !act.moved){ if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
-    if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
+    else if (act.kind === 'right' && !act.moved){ if (hwMode) hwRightClick(e.clientX, e.clientY); else if (megaPick) selectMega(null); else removeAt(pickAt(e.clientX, e.clientY)); }   // right-click while placing: put it down
+    if (act.kind === 'sky' && !act.moved){ if (hwMode) hwClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
+    if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (hwMode) hwClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
   }
   ptrs.delete(e.pointerId);
   if (!ptrs.size){ dragging = false; act = null; }
 };
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
-canvas.addEventListener('pointerleave', () => { if (!ptrs.size){ hover.visible = hoverFill.visible = false; showMegaGhost(null); } });
+canvas.addEventListener('pointerleave', () => { if (!ptrs.size){ hover.visible = hoverFill.visible = false; showMegaGhost(null); hwGhost.g.visible = false; } });
 canvas.addEventListener('wheel', e => { e.preventDefault(); zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 30); }, { passive:false });
 const PAN_KEYS = ['w','a','s','d','arrowup','arrowdown'];
 addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === 'shift') keys.delete('shift'); });
@@ -119,6 +121,10 @@ addEventListener('keydown', e => {
   if (PAN_KEYS.includes(k)){ keys.add(k); e.preventDefault(); return; }
   if (k === 'h' || e.key === 'Home'){ centerView(); return; }
   if (k === 'x' && !e.repeat){ setDelMode(!delMode); return; }
+  if (e.key === '5' && !e.repeat){ setHwMode(!hwMode); return; }
+  if (hwMode && (e.key === '[' || e.key === 'PageDown')){ hwSetLevel(hwLevel - 1); return; }
+  if (hwMode && (e.key === ']' || e.key === 'PageUp')){ hwSetLevel(hwLevel + 1); return; }
+  if (hwMode && k === 'l' && !e.repeat){ hwSetLanesUI(hwLanesPick === 2 ? 3 : 2); return; }
   if (k === 'r' && !megaPick && !delMode && !e.repeat){   // turn the megastructure under the pointer
     const pk = ptrLast ? pickAt(ptrLast.x, ptrLast.y) : null;
     if (pk && pk.kind === 'mega' && pk.c.mega){ const m = megas.get(pk.c.mega); if (m) turnMega(m); }
@@ -130,6 +136,7 @@ addEventListener('keydown', e => {
   else if (e.key === '+' || e.key === '=') zoomT = clamp(zoomT*.9,5,30);
   else if (e.key === '-') zoomT = clamp(zoomT*1.1,5,30);
   else if ('1234'.includes(e.key) && e.key.length === 1) selectZone(['low','mid','high','ind'][+e.key - 1]);
+  else if ((e.key === 'Escape' || e.key === '0') && hwMode) setHwMode(false);
   else if (e.key === 'Escape' || e.key === '0'){ if (delMode){ if (delSel){ delSel = null; showAreaSel(null); } else setDelMode(false); } else if (megaPick) selectMega(null); else selectZone(null); }
 });
 
@@ -178,11 +185,17 @@ function selectZone(z){
   S.zone = (z && S.zone !== z) ? z : null;
   if (S.zone && delMode) setDelMode(false, true);
   if (S.zone && megaPick) selectMega(null, true);
-  document.querySelectorAll('.zone').forEach(b => { const on = b.dataset.zone === S.zone; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-  if (megaPick || delMode) return;
+  if (S.zone && hwMode) setHwMode(false, true);
+  document.querySelectorAll('.zone[data-zone]').forEach(b => { const on = b.dataset.zone === S.zone; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  if (megaPick || delMode || hwMode) return;
   $('modeHint').textContent = S.zone ? `Zone ${ZONES[S.zone].key}: click to build · click a roof to stack a section` + ' · click high on a wall to hang a pod' + (S.paint ? ' · drag to paint' : '') : 'Click the sky to grow the platform · pick a zone to build';
 }
-document.querySelectorAll('.zone').forEach(b => b.addEventListener('click', () => selectZone(b.dataset.zone)));
+document.querySelectorAll('.zone[data-zone]').forEach(b => b.addEventListener('click', () => selectZone(b.dataset.zone)));
+// the sky highways (highway.js): the Highway button, and its height and lanes controls
+$('hwBtn').addEventListener('click', () => setHwMode(!hwMode));
+$('hwDown').addEventListener('click', () => hwSetLevel(hwLevel - 1));
+$('hwUp').addEventListener('click', () => hwSetLevel(hwLevel + 1));
+$('hwLanes').addEventListener('click', () => hwSetLanesUI(hwLanesPick === 2 ? 3 : 2));
 $('outlines').addEventListener('change', e => { S.outlines = e.target.checked; });
 // Optimize framerate (see applyRenderRes in sky.js): remembered in this browser
 for (const id of ['capRes', 'autoPerf']){
@@ -229,6 +242,7 @@ function selectMega(kind, quiet){
   megaPick = kind && megaPick !== kind ? kind : null;
   if (megaPick && delMode) setDelMode(false, true);
   if (megaPick && S.zone) selectZone(null);
+  if (megaPick && hwMode) setHwMode(false, true);
   document.querySelectorAll('.bitem').forEach(b => { const on = b.dataset.kind === megaPick; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   hover.visible = hoverFill.visible = false;
   if (megaPick){ const t = MEGA_TYPES[megaPick];
@@ -274,7 +288,7 @@ function onMegaUnlock(){ renderBmenu(); if (!document.getElementById('bmenuList'
 let delMode = false, delSel = null;
 function setDelMode(on, quiet){
   delMode = on; delSel = null; showAreaSel(null);
-  if (on){ if (S.zone) selectZone(null); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = false; showMegaGhost(null); }
+  if (on){ if (S.zone) selectZone(null); if (megaPick) selectMega(null, true); if (hwMode) setHwMode(false, true); hover.visible = hoverFill.visible = false; showMegaGhost(null); }
   document.body.classList.toggle('deleting', on);
   $('delBtn').classList.toggle('on', on); $('delBtn').setAttribute('aria-pressed', on);
   if (on) $('modeHint').textContent = 'Delete mode: drag to select an area · click inside it to delete · click outside to clear · X to go back to building';

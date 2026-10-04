@@ -65,6 +65,13 @@ input[type=range]{width:100%;accent-color:var(--cyan);margin:0}
 .deck-toggle{display:block;position:fixed;right:16px;top:calc(16px + env(safe-area-inset-top,0px));background:var(--deck);border-color:var(--pink);color:var(--pink);font-family:var(--font-pixel);letter-spacing:.08em;padding:8px 12px;z-index:2}
 /* zone bar: four cut-corner boxes with a neon border, Townscaper-minimal */
 .zonebar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));display:grid;justify-items:center;gap:8px;width:max-content;max-width:calc(100% - 32px)}
+.hwbar{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink);background:rgba(10,16,32,.85);padding:4px 10px;border:1px solid #a77bff}
+.hwbar[hidden]{display:none}
+.hwbar button{min-width:24px;height:22px;padding:0 6px;color:var(--ink);background:rgba(167,123,255,.18);border:1px solid #a77bff;border-radius:0;cursor:pointer;font:inherit}
+.hwbar button:hover{background:rgba(167,123,255,.4)}
+.hwbar b{font-family:var(--font-pixel);font-weight:400;font-size:13px;color:#c9b0ff;min-width:18px;text-align:center}
+.hwbar small{color:var(--muted)}
+.hwbar .hwlanes{margin-left:8px}
 .modehint{margin:0;font-size:11px;color:var(--ink);background:rgba(10,16,32,.72);padding:3px 10px;text-align:center}
 .zones{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .zone{--cut:10px;padding:1.5px;border:0;border-radius:0;background:var(--z);cursor:pointer;

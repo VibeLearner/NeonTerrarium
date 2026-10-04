@@ -284,6 +284,7 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
   make('sign_c_robot', 'ROBOT REPAIR', '#ff6a9a'); make('sign_c_mods', 'CYBER MODS', '#5af0e0', true); make('sign_c_open', 'OPEN 24H', '#ff5ad0');
   make('sign_c_pawntech', 'PAWN.TECH', '#ffcf5a', true); make('sign_c_techmods', 'TECH REPAIR/MODS', '#5ae8ff'); make('sign_c_noodlebar', 'NOODLE BAR', '#ff7ad0', true);
   make('sign_c_lift', 'LIFT UP-DOWN', '#ff5ad0', true);
+  make('sign_hw_toll', 'TOLL GATE 07', '#5ae8ff'); make('sign_hw_entry', 'HIGHWAY ENTRY', '#ff5ad0'); make('sign_hw_arrivals', 'ARRIVALS', '#5ae8ff');   // the sky highways (highway.js)
   make('sign_c_ramen', 'RAMEN', '#ffb04a', true); make('sign_c_gear', 'GEAR.SCRAP', '#7ae8ff');
   make('sign_w_neondome', 'NEON DOME', '#ff5ad0', true); make('sign_w_nightclub', 'NIGHTCLUB.OPEN 24H', '#5ae8ff');
   make('sign_w_club', 'CLUB', '#b07aff'); make('sign_w_drinks', 'DRINKS', '#b07aff'); make('sign_w_music', 'MUSIC', '#b07aff');

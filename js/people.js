@@ -523,6 +523,7 @@ function buildNetwork(){
     }
     fresh.set(pl.id, pl);
   }
+  hwPlaces(fresh, oldDoors, addEnd);   // the highways' drop-offs: visitors come down their lifts (highway.js)
   // paths across each plot between its crossings, door and spots
   for (const c of cells.values()){
     const ends = [];
@@ -616,7 +617,7 @@ function syncResidents(){
       }
     });
   }
-  for (const id of [...people.keys()]) if (!keep.has(id)) people.delete(id);
+  for (const [id, p] of [...people]) if (!keep.has(id) && !(p.visitor && places.has(p.home))) people.delete(id);   // (visitors stay while their drop-off does)
 }
 // jobs: keep the ones people have, hand free ones to those who want work (nearer jobs more likely)
 function syncJobs(){
@@ -676,6 +677,7 @@ function desire(p, h){
   p.ws = p.nightWorker ? 21 + p.nightShift*4 : p.workS; p.wlen = p.workLen;
   if (job && job.stalls){ p.ws = p.nightShift < .5 ? 16.5 : 10; p.wlen = 7.5; }   // day market 10:00 to 17:30, night market 16:30 to midnight
   if (job && job.patrol){ const k = Math.min(2, Math.floor(p.nightShift*3)); p.ws = [7, 15, 23][k]; p.wlen = 8; p.nightWorker = k === 2; }   // police: three shifts round the clock
+  if (p.visitor) return pplNow > p.leaveAt ? p.home : (leisure(p) || p.home);   // a visitor: out seeing the town until it's time to go
   if (p.chain && !asleep(p, h) && !working(p, h)) return p.at;   // finish what they started (ordered food: now eat it)
   if (asleep(p, h) && !working(p, h)) return p.home;              // (a night-market shift runs past some keepers' usual bedtime)
   if (working(p, h)){
@@ -827,6 +829,7 @@ function decide(p){
     if (back && startTrip(p, p.job)) return;
     p.until = pplNow + 10 + pplRand()*20; return;
   }
+  if (p.visitor && p.at === p.home && !p.walk && (pplNow > p.leaveAt || (p.tries = (p.tries || 0) + 1) > 4)){ p.gone = true; return; }   // back at the drop-off (or nowhere to go): off home
   const want = desire(p, S.hour) || p.home;
   p.walkedFor = (want !== p.job && want !== p.home && working(p, S.hour)) ? 'errand' : null;
   const chained = p.chain && want === p.at;   // move within the place: from the queue to a seat to eat
@@ -842,12 +845,39 @@ function arrive(p){
   if (w.beat){ p.at = w.to; p.patrol = w.beat; p.until = pplNow + 4 + pplRand()*7; return; }
   if (w.spot && w.spot.kind === 'seat' && p.fed){ p.fed = false; emote(p, 'bowl', 2.8); }
   p.at = w.to; p.spot = w.spot;
+  if (p.visitor && p.at === p.home){ p.gone = true; return; }   // up the lift and away
   if (p.spot && p.spot.kind === 'queue') p.chain = 'eat';
   const pl = places.get(p.at);
   if (p.clubbing && pl && pl.mega && pl.mega.kind === 'club' && clubArrive(p, pl)) return;
   p.until = pplNow + (pl ? stayFor(p, pl) : 20);
 }
 const sendHome = p => { p.club = null; p.clubbing = false; if (p.spot && p.spot.by === p.id) p.spot.by = null; p.chain = null; p.patrol = null; p.rush = false; p.hurry = false; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
+
+/* ---------- visitors from the sky highways ---------- */
+// A car passing through a drop-off lets someone out: they come down its lift to the street, go round the shops, stalls
+// and squares for a few minutes, then walk back, ride up and are picked up by another car. Twenty at most at once.
+let visitorSeq = 0;
+function spawnVisitor(placeId){
+  const pl = places.get(placeId); if (!pl || !pl.doors.length || !pplReady) return false;
+  let n = 0; for (const q of pplList) if (q.visitor) n++;
+  if (n >= HW_VISITORS) return false;
+  const id = 'vis:' + (++visitorSeq) + ':' + placeId, p = makePerson(id, placeId);
+  Object.assign(p, { visitor: true, wantsJob: false, courier: false, leaveAt: pplNow + 120 + Math.random()*200, at: placeId, until: pplNow + .3 + Math.random()*1.2 });
+  people.set(id, p); pplList.push(p); return true;
+}
+// each finished highway's drop-off as a place: its one door is the lift's, at the foot of the shaft in the street
+function hwPlaces(fresh, oldDoors, addEnd){
+  for (const h of highways){
+    if (!h.done || h.tiles.length < 2) continue;
+    const Ls = hwLiftSpot(h, h.side), c = cells.get(ckey(Math.round(Ls.stand.x/LOT), Math.round(Ls.stand.z/LOT))); if (!c) continue;
+    const G = cellGrid(c), st = { x: Ls.stand.x, z: Ls.stand.z };
+    for (let k = 0; k < 8 && !freeAt(G, st.x, st.z); k++){ st.x += Ls.dx*.08; st.z += Ls.dz*.08; }
+    if (!freeAt(G, st.x, st.z)) continue;
+    const key = 'hw:' + h.id, d = makeDoor(key, { wall: Ls.wall, stand: st, inside: { x: Ls.sx, z: Ls.sz }, n: [Ls.dx, Ls.dz] }, false, oldDoors.get(key));
+    addEnd(c, { key, x: st.x, z: st.z, kind: 'd' });
+    fresh.set('v:' + h.id, { id: 'v:' + h.id, hub: true, x: Ls.sx, z: Ls.sz, jobs: 0, fun: 0, night: 0, doors: [d] });
+  }
+}
 
 /* ---------- keeping up with the city ---------- */
 let pplReady = false, pplNow = 0, pplHour = S.hour, pplCursor = 0, pplList = [];
@@ -897,7 +927,7 @@ const BOT_SPEED = 1.4;   // a brisk glide, well past walking pace
 function walkOf(pts, extra){ const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1])); return Object.assign({ pts, cum, len: cum[cum.length - 1], s: 0 }, extra); }
 function syncBots(){
   const hubs = [...places.values()].filter(pl => pl.cell && pl.fun >= 2.5 && pl.doors.length);
-  const homes = new Set(); for (const p of people.values()) homes.add(p.home);
+  const homes = new Set(); for (const p of people.values()) if (!p.visitor) homes.add(p.home);
   botHomes = [...homes].map(id => places.get(id)).filter(pl => pl && pl.doors.length);
   const want = hubs.length ? Math.min(30, Math.ceil(hubs.length/2)) : 0;
   while (bots.length > want) bots.pop();
@@ -1551,6 +1581,7 @@ function updatePeople(dt, t){
     if (performance.now() - tb > 2.5){ k++; break; }
   }
   pplCursor = n ? (pplCursor + k) % n : 0;
+  if (pplList.some(p => p.gone)){ for (const p of pplList) if (p.gone){ if (p.spot && p.spot.by === p.id) p.spot.by = null; people.delete(p.id); } pplList = pplList.filter(p => !p.gone); }
   _camR.set(1, 0, 0).applyQuaternion(cam.quaternion);
   updateBots(dt, t);
   updateLurkers(dt, t);

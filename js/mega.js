@@ -71,7 +71,7 @@ function maybeSpawnMegas(c){
 function megaBlockOk(i, j, w, h, own = null){   // own: the plots of a megastructure that's being turned (they count as free)
   if (Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX || Math.abs(i + w - 1) > GRID_MAX || Math.abs(j + h - 1) > GRID_MAX) return false;
   let missing = 0;
-  for (let a = 0; a < w; a++) for (let b = 0; b < h; b++){ const c = cells.get(ckey(i + a, j + b)); if (!c){ missing++; continue; } if ((c.mega && !(own && own.has(c))) || c.sections.length) return false; }
+  for (let a = 0; a < w; a++) for (let b = 0; b < h; b++){ if (hwAt(i + a, j + b).length) return false; const c = cells.get(ckey(i + a, j + b)); if (!c){ missing++; continue; } if ((c.mega && !(own && own.has(c))) || c.sections.length) return false; }
   if (missing < w*h) return true;
   for (let a = -1; a <= w; a++) for (let q = -1; q <= h; q++){
     if (a >= 0 && a < w && q >= 0 && q < h) continue;

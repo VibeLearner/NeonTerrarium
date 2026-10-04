@@ -13,7 +13,7 @@ const HW_LANE = .62, HW_EDGE = .22, HW_THICK = .3, HW_GIRDER = .28;   // lane wi
 const HW_CLEAR = HW_THICK + HW_GIRDER + .08;          // from the deck's surface down to the clear space under it
 const HW_RAMP = 1.0;                                 // how far the sky ramps rise above the deck
 const HW_SPEED = 2.5;                                // cars, world units a second (one speed for all, so nobody catches up)
-const HW_CAR_MAX = 48, HW_PULSE_MAX = 2400, HW_VISITORS = 20;
+const HW_CAR_MAX = 160, HW_PULSE_MAX = 2400, HW_VISITORS = 20;
 const hwY = L => CURB + L*FH;
 const hwWidth = h => h.lanes*HW_LANE + 2*HW_EDGE;
 let highways = [], hwNext = 1, hwIndex = new Map();   // hwIndex: 'i,j' -> [{ h, k }]
@@ -492,15 +492,32 @@ function hwAlong(P, s, k, o){
   return k;
 }
 const _hdm = new THREE.Object3D(), _hpos = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 };
+// How busy the sky is: from a young little island (0) to a big, built-up city (1), by its buildings, megastructures and size
+let hwBusy = 0, hwBusyAt = -9;
+function hwTraffic(t){
+  if (t - hwBusyAt < 2) return hwBusy;
+  hwBusyAt = t; let built = 0, secs = 0;
+  for (const c of cells.values()){ if (c.sections.length){ built++; secs += c.sections.length; } }
+  const m = built + secs*.4 + cells.size*.15 + megas.size*6;
+  return (hwBusy = Math.max(0, Math.min(1, m/160)));
+}
+// the wait before a lane's next car: bursts of two or three close together, then a lull, rather than a metronome. The
+// busier the city, the shorter the waits.
+function hwNextGap(busy, lane){
+  const mean = (8 - 6.4*busy)*lane;
+  if (Math.random() < .28) return 1.0 + Math.random()*.7;                 // right behind the last
+  return Math.min(mean*1.8, .8 + (-Math.log(1 - Math.random()*.97))*mean);   // otherwise anything from soon to a long gap
+}
 function updateHighways(dt, t){
-  // traffic: each finished highway sends cars down each lane every few seconds, spaced so none catches another
+  // traffic: each finished highway sends cars down each lane, uneven and more of them as the city grows; none catches another
+  const busy = hwTraffic(t);
   for (const h of highways){
     if (!h.done || !h.view) continue;
     const LP = hwLanePaths(h);
-    if (!h.spawnAt) h.spawnAt = LP.map(() => t + Math.random()*3);
+    if (!h.spawnAt){ h.spawnAt = LP.map(() => t + Math.random()*5); h.laneMul = LP.map(() => .8 + Math.random()*.5); }
     LP.forEach((P, l) => {
       if (t < h.spawnAt[l]) return;
-      h.spawnAt[l] = t + 2.2 + Math.random()*4.5;
+      h.spawnAt[l] = t + hwNextGap(busy, h.laneMul[l]);
       if (hwCars.length >= HW_CAR_MAX) return;
       let lastS = Infinity; for (const c of hwCars) if (c.h === h && c.lane === l) lastS = Math.min(lastS, c.s);
       if (lastS < 2.4) return;

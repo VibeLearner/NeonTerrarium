@@ -474,9 +474,9 @@ function hwPulseRebuild(){
   hwPulseMesh.count = q; hwPulseMesh.visible = q > 0; hwPulseMesh.instanceMatrix.needsUpdate = true; hwPulseDirty = false;
 }
 const hwFlares = (() => { const m = new THREE.InstancedMesh(U.box, HWM.flare, HW_CAR_MAX); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
-// a soft pool of light on the deck under every car riding the lanes, the blue of its hover pads (one additive batch)
+// a soft pool of light on the deck under every car riding the lanes, the pale aqua of the flash at the toll gate (one additive batch)
 const hwCarGlow = (() => { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-PI/2);
-  const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: glowTex, color: 0x5ab8ff, transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false }), HW_CAR_MAX);
+  const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: glowTex, color: 0x8afff4, transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false }), HW_CAR_MAX);
   m.count = 0; m.frustumCulled = false; m.layers.set(1); m.renderOrder = 3; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
 let hwCars = [];
 function hwClearCars(h){ hwPulseDirty = true; if (!h){ return; } hwCars = hwCars.filter(c => c.h !== h); h.queue = null; }

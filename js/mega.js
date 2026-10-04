@@ -1676,20 +1676,30 @@ function buildGreenhouse(m){
     for (let q = 0; q <= n; q++) box(q === 0 || q === n ? M.ghFrame2 : M.ghFrame, F, -len/2 + q*len/n, yG + Hg/2, .02, q === 0 || q === n ? .14 : .06, Hg, .08);
     for (const [y, t] of [[yG + .05, .12], [yG + 1.2, .05], [yG + 2.4, .12], [yG + 3.6, .05], [yE, .16]]) box(t > .1 ? M.ghFrame2 : M.ghFrame, F, 0, y, .02, len, t, .08);
   }
-  // the barrel vault: glass panels between arched ribs, purlins along it, glass gables at the ends
-  const NS = 12, arc = q => { const a = q/NS*PI; return [Math.cos(a)*Dg/2, yE + Math.sin(a)*hv]; };
-  for (let q = 0; q < NS; q++){
-    const [za, ya] = arc(q), [zb, yb] = arc(q + 1), mz = (za + zb)/2, my = (ya + yb)/2, len = Math.hypot(zb - za, yb - ya), rx = -Math.atan2(yb - ya, zb - za);
-    put(U.box, M.ghGlass, under(P, T(0, my, cz + mz, 0, Wg, MIN_T, len, rx)));
-    box(M.ghFrame, P, 0, ya, cz + za, Wg, .06, .06);                                           // purlin
-    for (const side of [-1, 1]){                                                               // the gable ends: glass strips up to the arc
-      const hh = my - yE; if (hh > .05) box(M.ghGlass, P, side*gx, yE + hh/2, cz + mz, .02, hh, Math.abs(zb - za) + .01);
-      box(M.ghFrame, P, side*gx, yE + Math.max(.03, ya - yE)/2, cz + za, .06, Math.max(.06, ya - yE), .06);
+  // the roof, by variant: a barrel vault (the first look), a pitched glass gable, or two smaller vaults side by side. Each
+  // is a run of profile points across the depth; glass panels between them, purlins at them, ribs over them every so
+  // often along the length, glass gables filling the ends, and a vent along every ridge
+  const NS = 12, variant = m.skin || 0, profiles = [], ridges = [];
+  if (variant === 1){ const hg = hv*.95; profiles.push(Array.from({ length: NS + 1 }, (_, q) => { const z = Dg/2 - q/NS*Dg; return [z, yE + hg*(1 - Math.abs(z)/(Dg/2))]; })); ridges.push([0, yE + hg]); }
+  else if (variant === 2){ const r = Dg/4, hr = hv*.72; for (const c0 of [Dg/4, -Dg/4]){ profiles.push(Array.from({ length: NS + 1 }, (_, q) => { const a = q/NS*PI; return [c0 + Math.cos(a)*r, yE + Math.sin(a)*hr]; })); ridges.push([c0, yE + hr]); }
+    box(M.ghFrame2, P, 0, yE + .04, cz, Wg + .1, .1, .3); }                                    // the valley gutter between them
+  else { profiles.push(Array.from({ length: NS + 1 }, (_, q) => { const a = q/NS*PI; return [Math.cos(a)*Dg/2, yE + Math.sin(a)*hv]; })); ridges.push([0, yE + hv]); }
+  for (const pr of profiles){
+    for (let q = 0; q < pr.length - 1; q++){
+      const [za, ya] = pr[q], [zb, yb] = pr[q + 1], mz = (za + zb)/2, my = (ya + yb)/2, len = Math.hypot(zb - za, yb - ya), rx = -Math.atan2(yb - ya, zb - za);
+      put(U.box, M.ghGlass, under(P, T(0, my, cz + mz, 0, Wg, MIN_T, len, rx)));
+      box(M.ghFrame, P, 0, ya, cz + za, Wg, .06, .06);                                         // purlin
+      for (const side of [-1, 1]){                                                             // the gable ends: glass strips up to the roof
+        const hh = my - yE; if (hh > .05) box(M.ghGlass, P, side*gx, yE + hh/2, cz + mz, .02, hh, Math.abs(zb - za) + .01);
+        box(M.ghFrame, P, side*gx, yE + Math.max(.03, ya - yE)/2, cz + za, .06, Math.max(.06, ya - yE), .06);
+      }
     }
+    for (let x = -gx; x <= gx + .01; x += Wg/12) for (let q = 0; q < pr.length - 1; q++){ const [za, ya] = pr[q], [zb, yb] = pr[q + 1]; strut(Math.abs(x) > gx - .1 ? M.ghFrame2 : M.ghFrame, P, x, ya, cz + za, x, yb, cz + zb, Math.abs(x) > gx - .1 ? .1 : .06); }
   }
-  for (let x = -gx; x <= gx + .01; x += Wg/12) for (let q = 0; q < NS; q++){ const [za, ya] = arc(q), [zb, yb] = arc(q + 1); strut(Math.abs(x) > gx - .1 ? M.ghFrame2 : M.ghFrame, P, x, ya, cz + za, x, yb, cz + zb, Math.abs(x) > gx - .1 ? .1 : .06); }
-  box(M.ghFrame2, P, 0, yE + hv + .08, cz, Wg + .2, .16, .4);                                 // the ridge vent
-  for (let x = -gx + 1.5; x < gx - 1; x += 3.0){ box(M.fSteel3, P, x, yE + hv + .3, cz, .7, .3, .55); emitters.push(new THREE.Vector3(x, yE + hv + .5, cz).applyMatrix4(P)); }
+  for (const [rz, ry] of ridges){
+    box(M.ghFrame2, P, 0, ry + .08, cz + rz, Wg + .2, .16, .4);                               // the ridge vent
+    for (let x = -gx + 1.5; x < gx - 1; x += 3.0){ box(M.fSteel3, P, x, ry + .3, cz + rz, .7, .3, .55); emitters.push(new THREE.Vector3(x, ry + .5, cz + rz).applyMatrix4(P)); }
+  }
   beaconLight(P, -gx, yE + .3, gz1, .08, .8); beaconLight(P, gx, yE + .3, gz0, .08, .8);
   // vines escaping over the eaves
   for (let k=0; k<10; k++){ const side = chance(.5) ? 1 : -1; plant(pick(['vines','pothos','h_ivy']), under(P, T(rnd(-gx + .5, gx - .5), 0, cz + side*(Dg/2 + .04), side > 0 ? 0 : PI)), 0, yE + .05, 0, rnd(.8, 1.1), 't', true); }
@@ -1732,22 +1742,20 @@ function buildGreenhouse(m){
   }
   // the conveyor down the middle with crates of greens riding it, and the nutrient tanks at one end
   box(M.ghFrame2, P, 0, yG + .5, cz, Wg - 2.4, .1, .55); box(M.concDD, P, 0, yG + .57, cz, Wg - 2.5, .03, .48);
-  for (let x = -gx + 1.3; x < gx - 1.2; x += .35) box(M.ghFrame, P, x, yG + .59, cz, .03, .02, .5);
   for (let x = -gx + 1.3; x < gx - 1.2; x += 1.6) for (const o of [-.22, .22]) box(M.ghFrame, P, x, yG + .25, cz + o, .05, .5, .05);
-  for (let x = -gx + 1.8; x < gx - 1.6; x += rnd(1.0, 1.8)){ box(M.crate, P, x, yG + .74, cz, .42, .3, .36); for (let q = 0; q < 4; q++) box(pick([M.ghLeaf1, M.ghLeaf2]), P, x - .1 + (q%2)*.2, yG + .93, cz - .08 + (q > 1 ? .16 : 0), .14, .09, .12); }
   for (const [x, zo] of [[-gx + .6, -.5], [-gx + .6, .5], [gx - .6, 0]]){ put(U.cyl16, M.fSteel2, under(P, T(x, yG + .9, cz + zo, 0, .7, 1.8, .7))); put(U.cyl16, M.fRust, under(P, T(x, yG + 1.2, cz + zo, 0, .74, .1, .74))); box(M.ghNeonT, P, x + .36*Math.sign(-x), yG + 1.4, cz + zo, .02, .3, .08); }
   // pipes under the roof, hung with vines, and a sign over the floor
   for (const z of [gz0 + 1.25, gz1 - 1.25]){ strut(M.fRust, P, -gx + .2, yE - .25, z, gx - .2, yE - .25, z, .14);
     for (let x = -gx + .5; x < gx - .4; x += rnd(.5, 1.0)) if (chance(.6)) plant(pick(['vines','pothos','h_vine3','h_curtain1']), P, x, yE - .3, z, rnd(.7, 1.0), 't', true); }
   wordSign(under(P, T(gx - 3.2, 0, cz, PI/2)), 'sign_w_bay', 0, yG + 2.9, 0, .7, 'pink', .6);
-  m.gh = { m: P.toArray(), rails };
+  m.gh = { m: P.toArray(), rails, belt: { y: yG + .59, z: cz, x0: -gx + 1.35, x1: gx - 1.35 } };   // (the belt's slats and the crates on it move: see greenhouseFx)
   m.roofH = CURB + H0 + .1;
-  m.top = yE + hv + .8;
+  m.top = Math.max(...ridges.map(r => r[1])) + .8;
 }
 // the robot arms: a trolley on each gantry rail with a jointed arm under it, sliding along over the tables, stopping
 // now and then to reach down and tend the greens
 function greenhouseFx(m){
-  const g = m.gh; if (!g || !g.rails.length) return null;
+  const g = m.gh; if (!g || !g.belt) return null;
   const root = new THREE.Group(); root.matrixAutoUpdate = false; root.matrix.fromArray(g.m); root.matrixWorldNeedsUpdate = true; scene.add(root);
   const armMat = new THREE.MeshLambertMaterial({ color: 0xc0702a }), darkMat = new THREE.MeshLambertMaterial({ color: 0x2c3236 }), geo = new THREE.BoxGeometry(1, 1, 1);
   const mk = (par, mat, x, y, z, sx, sy, sz) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); par.add(o); return o; };
@@ -1759,6 +1767,21 @@ function greenhouseFx(m){
     const hand = new THREE.Group(); hand.position.y = -.42; el.add(hand); mk(hand, darkMat, 0, 0, 0, .14, .05, .1); mk(hand, darkMat, -.05, -.06, 0, .02, .08, .02); mk(hand, darkMat, .05, -.06, 0, .02, .08, .02);
     return { r, car, sh, el, ph: k*1.7 + (m.seed % 7), sp: .18 + (k%3)*.05 };
   });
+  // the conveyor: its slats and the crates of greens riding on it, carried along and round again (three batches)
+  const B = g.belt, BL = B.x1 - B.x0, nSl = Math.floor(BL/.35), crates = [];
+  for (let x = .4; x < BL - .3; x += 1.0 + ((x*7.3 + m.seed) % 1)*.9) crates.push(x);
+  const inst = (n, mat) => { const im = new THREE.InstancedMesh(geo, mat, n); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; root.add(im); return im; };
+  const slatMat = new THREE.MeshLambertMaterial({ color: 0x30363a }), crateMat = new THREE.MeshLambertMaterial({ color: 0x9a7a52 }), leafMat = new THREE.MeshLambertMaterial({ color: 0x6ab840 });
+  const slats = inst(nSl, slatMat), boxes = inst(crates.length, crateMat), leaves = inst(crates.length*4, leafMat), o3 = new THREE.Object3D(), BELT_V = .32;
+  const place = (im, k, x, y, z, sx, sy, sz) => { o3.position.set(x, y, z); o3.scale.set(sx, sy, sz); o3.updateMatrix(); im.setMatrixAt(k, o3.matrix); };
+  const belt = t => {
+    const off = (t*BELT_V) % BL;
+    for (let k = 0; k < nSl; k++) place(slats, k, B.x0 + ((k*.35 + off) % BL), B.y, B.z, .03, .02, .5);
+    crates.forEach((c, k) => { const x = B.x0 + ((c + off) % BL), e = Math.min(1, (x - B.x0)/.3, (B.x1 - x)/.3);   // (shrinking into the ends, where the tanks take them)
+      place(boxes, k, x, B.y + .15*e, B.z, .42*e, .3*e, .36*e);
+      for (let q = 0; q < 4; q++) place(leaves, k*4 + q, x - .1*e + (q%2)*.2*e, B.y + .34*e, B.z - .08*e + (q > 1 ? .16*e : 0), .14*e, .09*e, .12*e); });
+    for (const im of [slats, boxes, leaves]) im.instanceMatrix.needsUpdate = true;
+  };
   return {
     update(dt, t){
       for (const a of arms){
@@ -1766,8 +1789,9 @@ function greenhouseFx(m){
         a.car.position.x = a.r.x0 + (a.r.x1 - a.r.x0)*glide;
         a.sh.rotation.z = .35*Math.sin(u*1.7) - .2*dwell; a.el.rotation.z = .7*dwell + .25*Math.sin(u*2.3);
       }
+      belt(t);
     },
-    dispose(){ scene.remove(root); geo.dispose(); armMat.dispose(); darkMat.dispose(); }
+    dispose(){ scene.remove(root); geo.dispose(); for (const mt of [armMat, darkMat, slatMat, crateMat, leafMat]) mt.dispose(); }
   };
 }
 
@@ -3253,6 +3277,9 @@ function megaSkins(){
       { mats: [[M.mkTeal, t(0xb86a4a)], [M.mkTeal2, t(0x9a5640)], [M.mkTeal3, t(0x6a3a2c)], [M.mkTarp, t(0x3f8a80)], [M.mkTarp2, t(0x347670)]] },   // terracotta
       { mats: [[M.mkTeal, t(0x7a5aa0)], [M.mkTeal2, t(0x664a8a)], [M.mkTeal3, t(0x3e2c58)], [M.mkTarp, t(0xd8508a)], [M.mkTarp2, t(0xb8406e)]] },   // violet
       { mats: [[M.mkTeal, t(0xc8b47a)], [M.mkTeal2, t(0xa8946a)], [M.mkTeal3, t(0x6a5a40)], [M.mkTarp, t(0xc84a4a)], [M.mkTarp2, t(0xa83a3a)]] } ],  // sand
+    greenhouse: [null,
+      { mats: [[M.ghFrame, t(0x2e5a56)], [M.ghFrame2, t(0x3e706a)], [M.ghConc, t(0x7a5a48)], [M.ghConc2, t(0x5e4436)], [M.ghConc3, t(0x8a6a56)], [M.ghGrowP, neon(0x5a3e10, 0xffb347)], [M.ghGrowW, neon(0x5a5a50, 0xfff3dc)], [M.ghNeonP, neon(0x10383a, 0x38e8e0)]], glows: { pink: 'amber', platinum: 'ivory' } },   // teal frame on brick, amber and warm white light, a pitched glass roof
+      { mats: [[M.ghFrame, t(0x5a2a26)], [M.ghFrame2, t(0x7a3a30)], [M.ghConc, t(0x3e4450)], [M.ghConc2, t(0x2e3440)], [M.ghConc3, t(0x4e5462)], [M.ghGrowP, neon(0x5a1028, 0xff3a6a)], [M.ghGrowW, neon(0x10285a, 0x4a8aff)], [M.ghNeonP, neon(0x5a1028, 0xff4fa3)]], glows: { pink: 'crimson', platinum: 'blue' } } ],   // rust-red frame on slate, magenta and blue light, twin vaults
     club: [null,
       { mats: [[M.domeNeonA, neon(0x3a2a10, 0xffb347)], [M.domeNeonB, neon(0x3a1a5a, 0x9b6bff)]], glows: { cyan: 'amber', pink: 'platinum' } },   // amber and violet
       { mats: [[M.domeNeonA, neon(0x1a4010, 0x7aff6a)], [M.domeNeonB, neon(0x5a1a3a, 0xff4fa3)]], glows: { cyan: 'green' } },                    // acid green and pink

@@ -25,6 +25,8 @@ const MEGA_TYPES = {
            colour: '#8ff0ff', build: buildCloudPagoda },
   greenhouse: { name: 'Hydroponic Farm', need: { ind: 100 }, odds: 60, w: 5, h: 4, maxLevels: 1,   // once there are 100 industrial floors, a 1 in 60 chance with each build
            colour: '#7affa0', build: buildGreenhouse, fx: greenhouseFx },
+  spire: { name: 'Data Spire', need: { high: 75 }, after: ['foundry'], odds: 1, w: 3, h: 3, maxLevels: 1,   // arrives with the 75th luxury floor, once the Foundry has come
+           colour: '#5ae8ff', build: buildDataSpire, fx: spireFx },
   club: { name: 'Neon Dome', need: { highPlots: 30, midPlots: 30, lowPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives once there are 30 each of luxury, commercial and residential buildings
            colour: '#c070ff', build: buildNeonDome, fx: clubFx },
 };
@@ -59,8 +61,8 @@ function zoneCounts(){
   return n;
 }
 function megaUnlocked(kind){
-  const need = MEGA_TYPES[kind].need, n = zoneCounts();
-  return Object.keys(need).every(z => n[z] >= need[z]);
+  const t = MEGA_TYPES[kind], need = t.need, n = zoneCounts();
+  return Object.keys(need).every(z => n[z] >= need[z]) && (t.after || []).every(k => megaUnlockedKinds.has(k));   // (after: other megastructures that must have arrived first)
 }
 // called after every build: roll for each megastructure that isn't standing yet and whose requirement is met
 function maybeSpawnMegas(c){
@@ -71,7 +73,7 @@ function maybeSpawnMegas(c){
 }
 // can a w x h block go at (i, j)? Every plot free ground or open sky, inside the world, touching the platform
 // how far some megastructures hang out past their block (measured), so a highway beside one keeps its distance
-const MEGA_OVER = { square: .4, police: .8, foundry: .3, pagoda: 1.0, greenhouse: .35 };
+const MEGA_OVER = { square: .4, police: .8, foundry: .3, pagoda: 1.0, greenhouse: .35, spire: .35 };
 // would a highway over or beside the block at (i, j) meet it? (kind: what overhang to allow for)
 function megaHwNear(i, j, w, h, kind){
   const over = (MEGA_OVER[kind] || 0) + .05, x0 = i*LOT - LOT/2 - over, x1 = (i + w - 1)*LOT + LOT/2 + over, z0 = j*LOT - LOT/2 - over, z1 = (j + h - 1)*LOT + LOT/2 + over;
@@ -119,7 +121,7 @@ function placeFromMenu(kind, ci, cj, turned){
 const NEED_WORDS = { any: ['building', 'buildings'], low: ['residential floor', 'residential floors'], mid: ['commercial floor', 'commercial floors'],
   high: ['luxury floor', 'luxury floors'], ind: ['industrial floor', 'industrial floors'], lowPlots: ['residential building', 'residential buildings'],
   midPlots: ['commercial building', 'commercial buildings'], highPlots: ['luxury building', 'luxury buildings'] };
-const megaNeedText = kind => Object.entries(MEGA_TYPES[kind].need).map(([z, n]) => n + ' ' + NEED_WORDS[z][n === 1 ? 0 : 1]).join(' and ');
+const megaNeedText = kind => Object.entries(MEGA_TYPES[kind].need).map(([z, n]) => n + ' ' + NEED_WORDS[z][n === 1 ? 0 : 1]).concat((MEGA_TYPES[kind].after || []).map(k => 'the ' + MEGA_TYPES[k].name)).join(' and ');
 const blockCells = (i, j, w, h) => { const out = []; for (let a=0;a<w;a++) for (let b=0;b<h;b++) out.push(cells.get(ckey(i+a, j+b))); return out; };
 // A megastructure's facing: the quarter turns it was last turned to (m.rot, 0 to 3, saved), or else the seeded pick its
 // builder makes (so structures nobody has turned look as they always did). The builders always make their pick, so the
@@ -629,13 +631,13 @@ function buildRadioStation(m){
 
 // for trying things out: open the game with #dev in the address, point at a plot and press M for the radio
 // station, N the sky mall, B the town square, V the foundry, C the police station, K the market mall, P the cloud
-// pagoda, J the Neon Dome club, G the hydroponic farm (each key
+// pagoda, J the Neon Dome club, G the hydroponic farm, Y the data spire (each key
 // brings one in, with Shift it takes one away; ignores the requirement and the odds)
 if (location.hash.includes('dev')){
   let lastPointer = null;
   addEventListener('pointermove', e => { lastPointer = { x: e.clientX, y: e.clientY }; });
   addEventListener('keydown', e => {
-    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police', k: 'market', p: 'pagoda', j: 'club', g: 'greenhouse' }[e.key.toLowerCase()]; if (!kind) return;
+    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police', k: 'market', p: 'pagoda', j: 'club', g: 'greenhouse', y: 'spire' }[e.key.toLowerCase()]; if (!kind) return;
     const pk = lastPointer ? pickAt(lastPointer.x, lastPointer.y) : null;
     const c = pk && pk.c ? pk.c : pk && pk.kind === 'sky' ? { i: pk.i, j: pk.j } : cells.values().next().value;
     if (e.shiftKey && megasOfKind(kind).length) removeMega(megasOfKind(kind)[0]);
@@ -1778,6 +1780,121 @@ function greenhouseFx(m){
       }
     },
     dispose(){ scene.remove(root); geo.dispose(); armMat.dispose(); darkMat.dispose(); }
+  };
+}
+
+/* ---------- the data spire ---------- */
+// A black monolith on a 3x3 block, after the reference: a cluster of tall dark prisms (the middle one tallest) rising
+// out of a sloped plinth, every edge traced in cold cyan neon, with triple bands round it a third of the way up and
+// near each top. The neon pulses in a slow heartbeat, each beat sending a wave of light up the tower (live: see
+// spireFx). At its foot: the DATA SPIRE board and a lit doorway, a chain-link fence with a biohazard plate, concrete
+// barriers stencilled ARCHIVE MODULE 7712, frosted storage crates, and cold mist rolling out of the vents.
+M.dsBlack = toon(0x1a1d22); M.dsBlack2 = toon(0x22262d); M.dsSeam = toon(0x0e1013); M.dsConc = toon(0x7a7e80); M.dsFrost = toon(0xc8dce4);
+M.dsCrate = toon(0x4a5866); M.dsCrate2 = toon(0x3a4450); M.dsDoor = toon(0x0e2a30, { em:0x3ab8c8, kind:'window' }); M.dsNeon = toon(0x103038, { em:0x5ae8ff, kind:'neon' });
+const dsFrustCache = new Map();
+// a square-sectioned frustum, flat-shaded (bottom half-width b, top half-width t, height 1)
+function dsFrustum(b, t){
+  const k = b.toFixed(2) + '/' + t.toFixed(2); let g = dsFrustCache.get(k);
+  if (!g){ g = new THREE.CylinderGeometry(t*Math.SQRT2, b*Math.SQRT2, 1, 4, 1, false, PI/4).toNonIndexed(); g.computeVertexNormals(); dsFrustCache.set(k, g); }
+  return g;
+}
+function buildDataSpire(m){
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
+  const S_ = m.w*LOT, P = T(m.x, 0, m.z, megaAngle(m, pick([0, PI/2, PI, -PI/2])));
+  const lines = [];   // neon runs for the pulse: [ax, ay, az, bx, by, bz]
+  const line = (ax, ay, az, bx, by, bz) => lines.push([ax, ay, az, bx, by, bz]);
+  // ---- the ground: dark wet slabs, puddles, frost
+  box(G.asph, P, 0, .012, 0, S_, .025, S_);
+  const n = 14, st = S_/n;
+  for (let a=0;a<n;a++) for (let b=0;b<n;b++) if (!chance(.04)) box(pick(TILES.ind), P, (a-(n-1)/2)*st, .03, (b-(n-1)/2)*st, st - .05, .045, st - .05);
+  for (let k=0; k<8; k++) box(G.puddle, P, rnd(-S_/2 + .6, S_/2 - .6), .056, rnd(1, S_/2 - .4), rnd(.6, 1.6), .01, rnd(.3, .7));
+  for (let k=0; k<10; k++) box(M.dsFrost, P, rnd(-S_/2 + .5, S_/2 - .5), .058, rnd(-S_/2 + .5, S_/2 - .5), rnd(.3, .9), .01, rnd(.2, .6));
+  // ---- the plinth: sloped shoulders
+  const pb = 3.7, pt = 2.7, ph = 3.0;
+  put(dsFrustum(pb, pt), M.dsBlack2, under(P, T(0, CURB + ph/2, 0, 0, 1, ph, 1)));
+  for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) line(sx*pb, CURB + .05, sz*pb, sx*pt, CURB + ph, sz*pt);   // its corners
+  for (let k=0; k<4; k++){ const F = under(P, T(0, 0, 0, k*PI/2)); for (let t = -2.4; t <= 2.4; t += 1.2) box(M.dsSeam, F, t, CURB + ph/2, (pb + pt)/2 + .01, .03, ph*1.02, .03, 0, -Math.atan2(pb - pt, ph)); }
+  // ---- the prisms: [cx, cz, half-width x, half-depth z, top]
+  const prisms = [[0, -.2, 1.5, 1.5, 33], [-1.7, .25, .95, 1.25, 26.5], [1.75, -.35, 1.0, 1.15, 23.5], [.3, -1.75, 1.3, .8, 29.5]];
+  for (const [cx, cz, hx, hz, top] of prisms){
+    box(M.dsBlack, P, cx, (CURB + top)/2, cz, 2*hx, top - CURB, 2*hz);
+    put(dsFrustum(Math.min(hx, hz), Math.min(hx, hz)*.8), M.dsBlack2, under(P, T(cx, top + .2, cz, 0, hx/Math.min(hx, hz), .4, hz/Math.min(hx, hz))));   // a chamfered cap
+    for (const [F, len] of blockFaces(P, cx, cz, 2*hx, 2*hz)){
+      for (let y = CURB + ph + 1.6; y < top - .3; y += 2.1) box(M.dsSeam, F, 0, y, .01, len - .1, .04, .03);          // panel seams
+      for (let t = -len/2 + len/3; t < len/2 - .1; t += len/3) box(M.dsSeam, F, t, (CURB + ph + top)/2, .01, .03, top - CURB - ph, .03);
+      for (let k = 0; k < Math.round((top - 8)/7); k++) if (chance(.6)){ const vy = rnd(CURB + ph + 2, top - 2), vt = rnd(-len/2 + .4, len/2 - .4);   // louvred vents
+        box(M.dsSeam, F, vt, vy, .03, .5, .3, .03); for (let q = 0; q < 3; q++) box(M.dsBlack2, F, vt, vy - .1 + q*.1, .05, .46, .03, .03); }
+    }
+    // neon: the four vertical edges, and triple bands a third of the way up and near the top
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) line(cx + sx*(hx + .02), CURB + ph, cz + sz*(hz + .02), cx + sx*(hx + .02), top, cz + sz*(hz + .02));
+    for (const yb of [CURB + 11.5, top - 3.2]) if (yb < top - 1) for (let q = 0; q < 3; q++){ const y = yb + q*.32, ex = hx + .03, ez = hz + .03;
+      line(cx - ex, y, cz + ez, cx + ex, y, cz + ez); line(cx + ex, y, cz + ez, cx + ex, y, cz - ez); line(cx + ex, y, cz - ez, cx - ex, y, cz - ez); line(cx - ex, y, cz - ez, cx - ex, y, cz + ez); }
+  }
+  for (const [x, y, z] of [[0, 33.5, -.2], [.3, 30, -1.75]]){ cyl(M.frame, P, x, y + .6, z, .03, 1.2); beaconLight(P, x, y + 1.25, z, .09, 1.0); }
+  // ---- the entrance: a lit doorway in a porch, the DATA SPIRE board beside it
+  const ez = pt + .2;
+  box(M.dsBlack2, P, .6, CURB + 1.2, ez + .2, 2.4, 2.4, 1.6);
+  put(dsFrustum(1.4, 1.1), M.dsBlack, under(P, T(.6, CURB + 2.6, ez + .2, 0, 1.0, .4, .7)));
+  box(M.dsDoor, P, .6, CURB + .8, ez + 1.01, 1.0, 1.5, .03); glow(P, .6, CURB + .9, ez + 1.2, 'cyan', 1.2);
+  box(M.dsNeon, P, .6, CURB + 1.62, ez + 1.03, 1.1, .04, .03);
+  for (const t of [-.2, 1.4]) box(M.dsNeon, P, t, CURB + .8, ez + 1.03, .04, 1.6, .03);
+  const F = under(P, T(-1.7, 0, ez + .55, 0));
+  box(M.dsSeam, F, 0, CURB + 1.5, 0, 1.9, 1.7, .08);
+  fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_dataspire', 0, CURB + 2.0, 0, 1.7, 1.0, 'cyan');
+  fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_coldstore', 0, CURB + 1.5, 0, 1.7, .55, 'cyan');
+  fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_level7', 0, CURB + 1.05, 0, 1.6, .5, 'cyan');
+  for (const [x, z] of [[-3.0, 2.0], [3.1, 1.6], [2.6, -2.9]]){ box(M.dsSeam, P, x, CURB + .35, z, .6, .5, .4); emitters.push(new THREE.Vector3(x, CURB + .6, z).applyMatrix4(P)); }   // cold vents
+  // ---- the fence: chain-link on posts, barbed wire, a biohazard plate, a chained gate
+  const fz0 = S_/2 - .6, fx0 = -S_/2 + .4, fx1 = -1.0;
+  for (let x = fx0; x <= fx1 + .01; x += 1.2){ cyl(M.frame, P, x, .9, fz0, .035, 1.8); strut(M.frame, P, x, 1.8, fz0, x, 2.05, fz0 + .18, .03); }
+  for (let x = fx0; x < fx1; x += .14) box(M.metal, P, x + .07, .9, fz0, .012, 1.7, .012);
+  for (let y = .15; y < 1.8; y += .14) box(M.metal, P, (fx0 + fx1)/2, y, fz0, fx1 - fx0, .012, .012);
+  for (const yy of [1.9, 2.0]) box(M.frame, P, (fx0 + fx1)/2, yy, fz0 + (yy - 1.8)*.7, fx1 - fx0, .02, .02);
+  box(M.hazard, P, (fx0 + fx1)/2, 1.1, fz0 + .03, .5, .5, .02); box(M.frame, P, (fx0 + fx1)/2, 1.1, fz0 + .045, .2, .2, .01);
+  // concrete barriers along the front, one stencilled
+  for (let x = -S_/2 + .7; x < -.8; x += 1.35){ put(dsFrustum(.32, .12), M.dsConc, under(P, T(x, .35, fz0 + .6, 0, 2.0, .6, 1.0))); box(M.dsConc, P, x, .07, fz0 + .6, 1.25, .1, .62); }
+  { const Fb = under(P, T(-S_/2 + 2.05, 0, fz0 + .86, 0)); plant('sign_w_archive', Fb, 0, .38, 0, .5, 'c', true); }
+  // frosted storage crates stacked on the right, status lights on them
+  for (const [x, z, y, w] of [[2.6, 4.2, 0, 1.4], [4.1, 4.0, 0, 1.2], [3.3, 4.1, .7, 1.2], [4.4, 2.6, 0, 1.0], [-3.6, -3.8, 0, 1.3], [-4.3, -2.6, 0, 1.0]]){
+    box(chance(.5) ? M.dsCrate : M.dsCrate2, P, x, .38 + y, z, w, .66, .8); box(M.dsFrost, P, x, .73 + y, z, w + .02, .04, .82);
+    box(M.dsSeam, P, x, .38 + y, z + .41, w - .2, .04, .02); box(M.dsNeon, P, x + w/2 - .15, .5 + y, z + .41, .06, .06, .02);
+  }
+  m.ds = { m: P.toArray(), lines, top: 33 };
+  m.roofH = CURB + ph;
+  m.top = 35;
+}
+// The pulse: every neon run is cut into short pieces (one instanced batch), dim between beats. A beat is a double
+// thump (lub-dub) that lifts every piece at once, and a wave of light that climbs from the plinth to the top after it.
+function spireFx(m){
+  const d = m.ds; if (!d || !d.lines.length) return null;
+  const root = new THREE.Group(); root.matrixAutoUpdate = false; root.matrix.fromArray(d.m); root.matrixWorldNeedsUpdate = true; scene.add(root);
+  const segs = [];
+  for (const [ax, ay, az, bx, by, bz] of d.lines){ const len = Math.hypot(bx - ax, by - ay, bz - az), k = Math.max(1, Math.round(len/.55));
+    for (let q = 0; q < k; q++){ const u0 = q/k, u1 = (q + 1)/k; segs.push({ a: [ax + (bx - ax)*u0, ay + (by - ay)*u0, az + (bz - az)*u0], b: [ax + (bx - ax)*u1, ay + (by - ay)*u1, az + (bz - az)*u1] }); } }
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff }), segs.length);
+  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(segs.length*3), 3); mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+  const o = new THREE.Object3D(), A = new THREE.Vector3(), B = new THREE.Vector3(), Z = new THREE.Vector3(0, 0, 1);
+  segs.forEach((g, k) => { A.fromArray(g.a); B.fromArray(g.b); o.position.copy(A).add(B).multiplyScalar(.5); o.quaternion.setFromUnitVectors(Z, B.clone().sub(A).normalize()); o.scale.set(.07, .07, A.distanceTo(B) + .02); o.updateMatrix(); mesh.setMatrixAt(k, o.matrix); g.y = o.position.y; });
+  mesh.frustumCulled = false; root.add(mesh);
+  // halos on the bands, pulsing with them
+  const halos = [];
+  for (const [x, y, z] of [[1.55, 12, 1.35], [-1.55, 12, 1.35], [0, 30, 1.4], [-2.7, 23.5, 1.5], [2.8, 20.5, .9], [2.75, 1.6, 2.75], [-2.75, 1.6, 2.75]]){
+    const sp = new THREE.Sprite(GLOW.cyan.clone()); sp.position.set(x, y, z); sp.scale.set(1.6, 1.6, 1); sp.layers.set(1); root.add(sp); halos.push(sp); }
+  const C = new THREE.Color(0x5ae8ff), W_ = new THREE.Color(0xe8ffff), c = new THREE.Color(), PER = 2.8, H = d.top;
+  return {
+    update(dt, t){
+      const ph = (t + (m.seed % 13)) % PER;
+      const thump = Math.exp(-(((ph - .05)/.09)**2)) + .75*Math.exp(-(((ph - .38)/.09)**2));   // lub-dub
+      const wy = (ph - .3)/1.7*(H + 4) - 2;                                               // the wave climbing after it
+      for (let k = 0; k < segs.length; k++){
+        const wv = ph > .3 ? Math.exp(-(((segs[k].y - wy)/2.2)**2)) : 0, v = .22 + .5*thump + .95*wv;
+        c.copy(C).lerp(W_, Math.min(1, Math.max(0, v - .8))).multiplyScalar(Math.min(1.6, v + .15));
+        mesh.instanceColor.setXYZ(k, c.r, c.g, c.b);
+      }
+      mesh.instanceColor.needsUpdate = true;
+      for (const h of halos){ const wv = ph > .3 ? Math.exp(-(((h.position.y - wy)/2.6)**2)) : 0; h.material.opacity = Math.min(1, .25 + .55*thump + .8*wv); }
+    },
+    dispose(){ scene.remove(root); mesh.geometry.dispose(); mesh.material.dispose(); for (const h of halos) h.material.dispose(); }
   };
 }
 

@@ -920,19 +920,43 @@ function botNext(b){
   const head = from ? [[from.inside.x, from.inside.z], [from.wall.x, from.wall.z]] : [];
   b.walk = walkOf(head.concat(mid), { doorA: from, doorB: null, target: dB }); b.state = 'go'; b.door = null;
 }
+// A delivery bot taking a parcel up to a pod home: it waits at the lift's gate (calling the cab), rides up, crosses
+// the deck to the home's door and sets the parcel down there, then waits by the lift, rides down and goes on its way.
+// The lift's controller (updateLifts) moves the cab and the riders' stages between 'wait', 'cab', 'out' and 'done'.
+function botLift(b, dt, t){
+  const r = b.ride, c = r.c, L = c && cells.get(ckey(c.i, c.j)) === c ? c.liftCab : null;
+  const leave = () => { b.ride = null; b.cap = null; b.state = 'drop'; b.t0 = t - 10; b.by = CURB; if (b.door){ b.x = b.door.stand.x; b.z = b.door.stand.z; } };
+  if (!L){ leave(); return; }
+  r.t += dt;
+  const e = liftCab(c), deckWait = [L.ix + (L.x - L.ix)*.55, L.iz + (L.z - L.iz)*.55], dropAt = [L.ix + (L.x - L.ix)*.15, L.iz + (L.z - L.iz)*.15];
+  const face = (dx, dz) => { b.dx = dx; b.dz = dz; const sd = dx*_camR.x + dz*_camR.z; if (Math.abs(sd) > 1e-3) b.flip = sd < 0 ? -1 : 1; };
+  if (r.ph === 'wait'){
+    if (r.dir === 'up'){ b.x = L.fx + L.nx*.14; b.z = L.fz + L.nz*.14; b.by = CURB; face(-L.nx, -L.nz); }
+    else { b.x = deckWait[0]; b.z = deckWait[1]; b.by = L.y0; face(L.x - L.ix, L.z - L.iz); }
+  } else if (r.ph === 'cab'){ b.x = L.x; b.z = L.z; b.by = e.y; }
+  else if (r.ph === 'out'){   // off the cab, across the deck to the door
+    if (r.dir === 'up' && !r.dropT){ const u = Math.min(1, r.t/LIFT_STEP); b.x = L.x + (dropAt[0] - L.x)*u; b.z = L.z + (dropAt[1] - L.z)*u; b.by = L.y0; face(L.ix - L.x, L.iz - L.z);
+      if (u >= 1){ r.dropT = t; b.cap = { x: L.ix, z: L.iz, y: L.y0 }; b.t0 = t; } }
+    else if (r.dropT){   // lowering the parcel by the door, then back to wait for the lift down
+      if (t - r.dropT > 3.6){ b.cap = null; r.dropT = 0; r.dir = 'down'; r.ph = 'wait'; r.t = 0; b.x = deckWait[0]; b.z = deckWait[1]; } }
+  } else if (r.ph === 'done') leave();
+}
 function updateBots(dt, t){
   // fewer deliveries in the small hours
   const slow = S.hour < 6 || S.hour >= 23 ? 3 : 1;
   for (const b of bots){
     if (b.state === 'in'){ if (t >= b.until) botNext(b); continue; }
     if (b.state === 'drop'){ if (t - b.t0 > 3.6){ b.cap = null; botNext(b); } continue; }
+    if (b.state === 'lift'){ botLift(b, dt, t); continue; }
     const w = b.walk; if (!w) { b.state = 'in'; continue; }
     if (!(b.pause > t)) w.s += dt*BOT_SPEED;
     if (w.s >= w.len){
       b.walk = null;
       if (w.home){ b.state = 'in'; b.until = t + (6 + pplRand()*14)*slow; continue; }
-      // at the door: lower the parcel just in front of it
-      const d = w.target; b.state = 'drop'; b.t0 = t; b.door = d;
+      // at the door: lower the parcel just in front of it (a home up on a pod: up in the lift first, to its door)
+      const d = w.target;
+      if (d.lift && d.lift.liftCab){ b.state = 'lift'; b.door = d; b.ride = { c: d.lift, dir: 'up', ph: 'wait', t: 0 }; b.by = CURB; continue; }
+      b.state = 'drop'; b.t0 = t; b.door = d; b.by = CURB;
       b.x = d.stand.x; b.z = d.stand.z; b.dx = -d.n[0]; b.dz = -d.n[1];   // facing the door
       b.cap = { x: d.wall.x + d.n[0]*.14, z: d.wall.z + d.n[1]*.14 };
       continue;
@@ -1297,6 +1321,7 @@ const ease = u => u*u*(3 - 2*u);
 function updateLifts(dt){
   const by = new Map();
   for (const p of pplList) if (p.ride){ const k = ckey(p.ride.c.i, p.ride.c.j); (by.get(k) || by.set(k, []).get(k)).push(p); }
+  for (const p of bots) if (p.ride){ const k = ckey(p.ride.c.i, p.ride.c.j); (by.get(k) || by.set(k, []).get(k)).push(p); }   // delivery bots ride too
   for (const [k, e] of liftCabs){
     const c = cells.get(k), L = c && c.liftCab; if (!L) continue;
     const riders = by.get(k) || [], top = L.y0, end = y => y >= top - .01 ? 'top' : y <= CURB + .01 ? 'bot' : null;
@@ -1605,18 +1630,20 @@ function updatePeople(dt, t){
   for (const b of bots){
     if (b.state === 'in') continue;
     let alpha = 1, lift = .2;
-    if (b.state === 'drop'){   // dips down to set the parcel on the step, then rises again
+    const dropping = b.state === 'drop' || (b.state === 'lift' && b.ride && b.ride.dropT);
+    if (dropping){   // dips down to set the parcel on the step, then rises again
       const u = t - b.t0; lift = .2 - .12*(u < 1.3 ? Math.sin(Math.min(1, u/1.3)*PI/2) : Math.max(0, 1 - (u - 1.3)/.8)); }
+    else if (b.state === 'lift'){}
     else { const w = b.walk;
       if (w && w.doorA) alpha = Math.min(alpha, (w.s - .05)/.3); if (w && w.doorB) alpha = Math.min(alpha, (w.len - w.s - .05)/.3); }
     // the view that matches its heading as the camera sees it
     let view = b.view || 4;
     if (b.dx !== undefined && (b.dx || b.dz)){ const ax = b.dx*_camR.x + b.dz*_camR.z, az = b.dx*_camFw.x + b.dz*_camFw.z;
       view = b.view = ((Math.round(Math.atan2(ax, az)/(PI/4)) % 8) + 8) % 8; }
-    const y = CURB + lift + .03*Math.sin(t*3 + b.phase);
+    const y = (b.state === 'lift' || b.state === 'drop' ? b.by ?? CURB : CURB) + lift + .03*Math.sin(t*3 + b.phase);
     if (emitD(b.x, y, b.z, view, Math.max(0, alpha)) && b.emoUntil > t) emit(b.x, y + .75, b.z, ROW_EMO, b.emo, 1, 2);
     // the parcel on the doorstep, until it's taken in
-    if (b.cap && t - b.t0 > 1.3){ const u = t - b.t0; emitD(b.cap.x, CURB, b.cap.z, DD.parcel, u > 3 ? Math.max(0, (3.6 - u)/.6) : 1); }
+    if (b.cap && t - b.t0 > 1.3){ const u = t - b.t0; emitD(b.cap.x, b.cap.y ?? CURB, b.cap.z, DD.parcel, u > 3 ? Math.max(0, (3.6 - u)/.6) : 1); }
   }
   // sick on the paving outside the club: the stream while it's happening, then the puddle, fading after a while
   for (const k of pukes){ const u = t - k.t0;

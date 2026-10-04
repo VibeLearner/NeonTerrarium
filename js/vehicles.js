@@ -300,7 +300,9 @@ function updateDrones(dt, t, night){
   }
 }
 // a point well outside the camera's view, where cars appear from and vanish to
-function viewRadius(){ return zoomT*(W/H)*1.2 + 18; }
+// how far out from the middle of the view is out of sight: the screen's half-width, or its depth on the ground (which
+// grows as the camera tilts down: see tilt mode), whichever is more, plus room for flying high
+function viewRadius(){ return Math.hypot(zoomT*(W/H), zoomT/Math.sin(Math.max(.15, PITCH)))*1.1 + 18 + .5*skyTop; }
 function offscreen(y){ const a = Math.random()*TAU, r = viewRadius() + 12 + Math.random()*8; return new THREE.Vector3(camGoal.x + Math.cos(a)*r, y, camGoal.z + Math.sin(a)*r); }
 function flyTo(c, target, speed){ c.from.copy(c.g.position); c.to.copy(target); c.k = 0; c.len = Math.max(.01, c.from.distanceTo(c.to)/speed); }
 // Trips follow smooth cubic curves: arrivals stay high until they're over the pad, then ease down onto it;

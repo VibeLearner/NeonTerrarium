@@ -581,6 +581,9 @@ function hwLiftFor(c, P){
   for (let pass = 0; pass < 4; pass++) for (let q = 1; q < n - 1; q++) L[q] = Math.max(need[q], (L[q - 1] + L[q] + L[q + 1])/3);
   return L;
 }
+// is a point in view (with a margin past the screen's edges)?
+const _hos = new THREE.Vector3();
+function hwOnScreen(x, y, z){ _hos.set(x, y, z).project(cam); return Math.abs(_hos.x) < 1.2 && Math.abs(_hos.y) < 1.25; }
 function updateHighways(dt, t){
   const busy = hwTraffic(t);
   for (const h of highways){
@@ -598,7 +601,7 @@ function updateHighways(dt, t){
       if (hwCars.length >= HW_CAR_MAX) return false;
       let lane = q.lane, lastS = Infinity;
       for (let tries = 0; tries < h.lanes; tries++){
-        lastS = Infinity; for (const c of hwCars) if (c.h === h && c.lane === lane) lastS = Math.min(lastS, c.s);
+        lastS = Infinity; for (const c of hwCars) if (c.h === h && c.lane === lane && c.s >= 0) lastS = Math.min(lastS, c.s);   // (one still coming in from out of sight is on a way of its own)
         if (lastS >= 2.4) break; lane = (lane + 1)%h.lanes;
       }
       if (lastS < 2.4){ q.at = t + .6; return true; }   // every lane has one just entering: a moment later
@@ -607,6 +610,11 @@ function updateHighways(dt, t){
       const place = () => ({ a: Math.random()*TAU, d: 40 + Math.random()*40 });   // (any bearing round the road's end, far or near: each car its own)
       const spot = w => ({ lat: Math.cos(w.a)*w.d + (Math.random() - .5)*10, back: Math.sin(w.a)*w.d - 38 + (Math.random() - .5)*10, up: Math.random()*5 - 1, k: Math.max(0, (w.d - 45)/45) });
       const car = { h, lane, s: 0, k: 0, kind: hwPickKind(), inO: spot(place()), outO: spot(place()) };
+      // it comes in from out of sight: if the start of its way in is on screen, it starts that much further back
+      { const P = LP[lane], a = {}, b = {}; hwCarPos(car, P, 0, 0, a, false); hwCarPos(car, P, .5, 0, b, false);
+        const L = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) || 1, bx = (a.x - b.x)/L, by = (a.y - b.y)/L, bz = (a.z - b.z)/L;
+        let d = 0; while (d < 240 && hwOnScreen(a.x + bx*d, a.y + by*d, a.z + bz*d)) d += 4;
+        if (d > 0){ car.s = -(d + 6); car.pre = { x: a.x, y: a.y, z: a.z, bx, by, bz }; } }
       car.lift = hwLiftFor(car, LP[lane]);   // (rising over anything in its way)
       hwCars.push(car);
       return false;
@@ -621,7 +629,7 @@ function updateHighways(dt, t){
       const P = LP[c.lane], s0 = c.s;
       const f0 = c.inO ? 1 + (s0 < P.sRamp ? (1 - smooth01(s0/P.sRamp))*c.inO.k : 0) + (s0 > P.sEnd ? smooth01((s0 - P.sEnd)/(P.len - P.sEnd))*c.outO.k : 0) : 1;   // (from far out it flies a little faster, so it isn't slow to arrive)
       let ns = s0 + dt*HW_SPEED*f0;
-      const key = c.h.id + ':' + c.lane, L = lead.get(key); if (L !== undefined) ns = Math.min(ns, L - HW_GAP);
+      const key = c.h.id + ':' + c.lane, L = s0 >= 0 ? lead.get(key) : undefined; if (L !== undefined) ns = Math.min(ns, L - HW_GAP);
       const off = s0 < P.sRamp + 1 || s0 > P.sEnd - 1;   // (off the deck: each on its own way through the sky, so the lanes don't keep them apart)
       let clash = false;
       if (off && c.pos) for (const o of near){ if (o.h !== c.h) continue;
@@ -629,7 +637,7 @@ function updateHighways(dt, t){
         if (dh < 1.6 && Math.abs(dv) < 1.0){ clash = true; ns = Math.min(ns, s0 + dt*HW_SPEED*.5); c.dyT = Math.min(2.6, Math.max(c.dyT || 0, (o.dy || 0) + 1.15)); } }   // (it eases off and climbs over)
       if (!clash) c.dyT = Math.max(0, (c.dyT || 0) - dt*.35);
       c.dy = (c.dy || 0) + ((c.dyT || 0) - (c.dy || 0))*Math.min(1, dt*3);
-      c.ns = Math.max(s0, ns); lead.set(key, c.ns);
+      c.ns = Math.max(s0, ns); if (s0 >= 0) lead.set(key, c.ns);
       if (off && c.pos) near.push(c);
     } }
   for (const K of HW_KINDS) K.n = 0;
@@ -638,7 +646,20 @@ function updateHighways(dt, t){
     const LP = c.h.lanePaths; if (!LP) return false;
     const P = LP[c.lane], s0 = c.s;
     c.s = c.ns ?? c.s + dt*HW_SPEED;
-    if (c.s >= P.len) return false;
+    if (c.s < 0 && c.pre){   // still on its way in from out of sight: a straight line to where its way in starts
+      const q = c.pre, d = -c.s; _hdm.position.set(q.x + q.bx*d, q.y + q.by*d + .3, q.z + q.bz*d); _hdm.rotation.set(Math.atan2(q.by, Math.hypot(q.bx, q.bz)), Math.atan2(-q.bx, -q.bz), 0, 'YXZ'); _hdm.scale.setScalar(1); _hdm.updateMatrix();
+      c.pos = [_hdm.position.x, _hdm.position.y, _hdm.position.z];
+      const K = HW_KINDS[c.kind]; if (K.n < HW_CAR_MAX){ for (const m of K.meshes) m.setMatrixAt(K.n, _hdm.matrix); K.n++; }
+      return true; }
+    if (c.s >= P.len){   // its way out is over: it flies straight on until it's out of sight
+      if (!c.coast){ const a = {}, b = {}; hwCarPos(c, P, P.len - .5, 0, a); hwCarPos(c, P, P.len, 0, b); const L = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) || 1;
+        c.coast = { x: b.x, y: b.y, z: b.z, dx: (b.x - a.x)/L, dy: Math.max(0, (b.y - a.y)/L), dz: (b.z - a.z)/L, t: 0 }; }
+      const q = c.coast, v = HW_SPEED*(1 + (c.outO ? c.outO.k : 0))*dt; q.t += dt; q.x += q.dx*v; q.y += q.dy*v; q.z += q.dz*v;
+      if (q.t > 60 || (q.t > .2 && !hwOnScreen(q.x, q.y, q.z))) return false;
+      _hdm.position.set(q.x, q.y + .3, q.z); _hdm.rotation.set(-Math.atan2(q.dy, Math.hypot(q.dx, q.dz)), Math.atan2(q.dx, q.dz), 0, 'YXZ'); _hdm.scale.setScalar(1); _hdm.updateMatrix();
+      c.pos = [q.x, q.y, q.z];
+      const K = HW_KINDS[c.kind]; if (K.n < HW_CAR_MAX){ for (const m of K.meshes) m.setMatrixAt(K.n, _hdm.matrix); K.n++; }
+      return true; }
     if (s0 < P.sMid && c.s >= P.sMid && Math.random() < .55) hwDropVisitor(c.h);   // through the terminal: someone gets out
     if (c.s > P.sIn + .05 && c.s < P.sOut - .05) return true;   // inside the terminal: out of sight
     // its position, and its heading from a step further on (off the deck it follows its own way in or out, and its lift)
@@ -649,7 +670,7 @@ function updateHighways(dt, t){
     if (c.inO && (c.s < P.sRamp || c.s > P.sEnd)){ const dx = _hpos2.x - _hpos.x, dy = _hpos2.y - _hpos.y, dz = _hpos2.z - _hpos.z; _hpos.yaw = Math.atan2(dx, dz); _hpos.pitch = -Math.atan2(dy, Math.hypot(dx, dz) || 1e-4); }
     // locked onto the lanes at the toll gate: it settles a little lower, and the lane flares under it
     const g = (c.s - P.sGate)/.9, hover = c.s < P.sGate ? .3 : c.s < P.sGate + .9 ? .3 - .1*smooth01(g) : c.s > P.sOut ? .2 + .1*smooth01((c.s - P.sOut)/1.5) : .2;
-    const sc = Math.min(1, c.s/4, (P.len - c.s)/4);
+    const sc = 1;   // (it comes and goes out of sight: see the way in and the coast out)
     _hdm.position.set(_hpos.x, _hpos.y + hover, _hpos.z); _hdm.rotation.set(_hpos.pitch, _hpos.yaw, 0, 'YXZ'); _hdm.scale.setScalar(Math.max(.01, sc)); _hdm.updateMatrix();
     const K = HW_KINDS[c.kind]; if (K.n < HW_CAR_MAX){ for (const m of K.meshes) m.setMatrixAt(K.n, _hdm.matrix); K.n++; }
     if (c.s > P.sGate && c.s < P.sOut + 1.2 && ng < HW_CAR_MAX){   // its glow on the deck, coming up as it locks on at the gate and fading as it lifts off

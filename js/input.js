@@ -42,7 +42,7 @@ const pdist = () => { const [a,b] = [...ptrs.values()]; return Math.hypot(a.x-b.
 const pmidX = () => { const [a,b] = [...ptrs.values()]; return (a.x + b.x)/2; };
 function paintAt(x, y){
   const t = targetOf(pickAt(x, y)); if (!t) return;
-  const k = t.type === 'empty' ? ckey(t.i, t.j) : t.type === 'megaUp' ? 'mega:' + t.m.id : ckey(t.c.i, t.c.j);
+  const k = t.type === 'empty' || t.type === 'side' ? ckey(t.i, t.j) : t.type === 'megaUp' ? 'mega:' + t.m.id : ckey(t.c.i, t.c.j);
   if (act.done.has(k)) return;               // each spot changes at most once per stroke
   act.done.add(k); applyTarget(t);
 }
@@ -180,7 +180,7 @@ function selectZone(z){
   if (S.zone && megaPick) selectMega(null, true);
   document.querySelectorAll('.zone').forEach(b => { const on = b.dataset.zone === S.zone; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   if (megaPick || delMode) return;
-  $('modeHint').textContent = S.zone ? `Zone ${ZONES[S.zone].key}: click to build · click a roof to stack a section` + (S.paint ? ' · drag to paint' : '') : 'Click the sky to grow the platform · pick a zone to build';
+  $('modeHint').textContent = S.zone ? `Zone ${ZONES[S.zone].key}: click to build · click a roof to stack a section` + (S.zone === 'low' ? ' · click high on a wall to hang a pod' : '') + (S.paint ? ' · drag to paint' : '') : 'Click the sky to grow the platform · pick a zone to build';
 }
 document.querySelectorAll('.zone').forEach(b => b.addEventListener('click', () => selectZone(b.dataset.zone)));
 $('outlines').addEventListener('change', e => { S.outlines = e.target.checked; });

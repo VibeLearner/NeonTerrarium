@@ -318,13 +318,13 @@ function buildStack(c){
 // a plank walkway with rails runs from it to a door in every neighbour tall enough to reach (one, or two either side,
 // or more). A stair hut at the foot of the scaffold, with a ladder up, is the pod's front door for people on the
 // street; the walkways' ends are noted (c.walks) so people can be seen crossing them (see people.js).
-const LIFT_MIN = 1.75;   // the lowest a pod hangs (deck height above the street): room for people to walk under
+const LIFT_MIN = 1.35;   // the lowest a pod hangs (deck height above the street): room for people to walk under
 // the deck height for a click at height y on the side of building c: snapped to a floor, with the pod's top no higher than c's roof
 function liftSnap(c, y){
   let ly = CURB + Math.round((y - CURB)/FH)*FH;
-  ly = Math.min(ly, c.height - 1.1);
+  ly = Math.min(ly, c.height - .7);   // the deck at least a little below the roof (the pod itself may rise past it)
   if (ly < CURB + LIFT_MIN) ly = CURB + Math.ceil(LIFT_MIN/FH)*FH;
-  return ly + 1.1 <= c.height + .01 ? ly : null;
+  return ly <= c.height - .7 + .01 ? ly : null;
 }
 // neighbours a pod at deck height y0 can tie into: a building that rises past the deck (a pod too, if it hangs lower)
 function liftSupports(c, y0){
@@ -911,9 +911,11 @@ function targetOf(pk){
   const n = cells.get(ckey(c.i + a, c.j + b));
   if (n && n.mega) return null;
   // high up the side of a building, with residential picked and an empty plot next to it: hang a pod there
-  if (S.zone === 'low' && pk.kind === 'bld' && n && !n.sections.length && pk.p.y > CURB + LIFT_MIN){
+  // (open sky next door too: the platform grows under it)
+  const inGrid = Math.abs(c.i + a) <= GRID_MAX && Math.abs(c.j + b) <= GRID_MAX;
+  if (S.zone === 'low' && pk.kind === 'bld' && !c.mega && (n ? !n.sections.length : inGrid) && pk.p.y > CURB + .9){
     const ly = liftSnap(c, pk.p.y);
-    if (ly !== null) return { type: 'side', c: n, y: ly, from: c };
+    if (ly !== null) return { type: 'side', c: n || null, i: c.i + a, j: c.j + b, y: ly, from: c };
   }
   return n ? { type: 'onto', c: n } : { type: 'empty', i: c.i + a, j: c.j + b };
 }
@@ -922,7 +924,7 @@ function applyTarget(t){
   const zone = S.zone;
   if (t.type === 'empty') return addPlatform(t.i, t.j, zone);
   if (t.type === 'megaUp'){ if (zone) addMegaTier(t.m); return null; }
-  if (t.type === 'side') return zone ? addLift(t.c, t.y, zone) : null;
+  if (t.type === 'side'){ if (!zone) return null; const c = t.c || addPlatform(t.i, t.j, null); if (c) finishAnimsOn(c); return c ? addLift(c, t.y, zone) : null; }
   if (!zone && t.type === 'onto' && !t.c.mega && !t.c.sections.length){ cycleGreen(t.c); return t.c; }   // no zone picked: an empty plot's greenery cycles
   if (!zone || t.c.mega) return null;
   addSection(t.c, zone); return t.c;
@@ -945,7 +947,7 @@ function showHover(t){
   if (t.type === 'empty'){
     x = t.i*LOT; z = t.j*LOT;
     if (S.zone){ y0 = CURB; h = FH*3; w = SIDE; } else { y0 = -.6; h = .68; w = LOT; }
-  } else if (t.type === 'side'){ x = t.c.x; z = t.c.z; y0 = t.y; h = FH*2; w = SIDE; }
+  } else if (t.type === 'side'){ x = t.i*LOT; z = t.j*LOT; y0 = t.y; h = FH*2; w = SIDE; }
   else if (t.type === 'onto'){ x = t.c.x; z = t.c.z; y0 = t.c.sections.length ? t.c.height : CURB; h = FH*3; w = SIDE; }
   else { x = t.c.x; z = t.c.z; y0 = t.c.height; h = FH*2; w = SIDE; }
   if (t.type !== 'empty' && !S.zone){ hover.visible = false; return; }

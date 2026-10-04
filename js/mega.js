@@ -28,7 +28,7 @@ const MEGA_TYPES = {
   spire: { name: 'Data Spire', need: { high: 75 }, after: ['foundry'], odds: 1, w: 3, h: 3, maxLevels: 1,   // arrives with the 75th luxury floor, once the Foundry has come
            colour: '#5ae8ff', build: buildDataSpire, fx: spireFx },
   bathhouse: { name: 'Geothermal Bathhouse', need: { lowPlots: 65, midPlots: 50 }, odds: 40, w: 3, h: 3, maxLevels: 1,   // 65 residential and 50 commercial buildings, then a 1 in 40 chance with each build
-           colour: '#7ad8ff', build: buildBathhouse },
+           colour: '#7ad8ff', build: buildBathhouse, fx: bathFx },
   club: { name: 'Neon Dome', need: { highPlots: 30, midPlots: 30, lowPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives once there are 30 each of luxury, commercial and residential buildings
            colour: '#c070ff', build: buildNeonDome, fx: clubFx },
 };
@@ -1925,7 +1925,7 @@ function spireFx(m){
 // and cyan neon along the railings. Steam rises off every pool. Visitors come to soak (they sit in the pools) and the
 // front desk and the tea counter are staffed (see MEGA_LIFE in people.js).
 M.bhStone = toon(0x8a8478); M.bhStone2 = toon(0x6e6a62); M.bhStoneD = toon(0x4e4c48); M.bhPave = toon(0x7a7670); M.bhPave2 = toon(0x6a665e);
-M.bhWater = toon(0x3a86a8, { em:0x3a8ab8, kind:'window' }); M.bhWater2 = toon(0x6ab8d0, { em:0x7ad0e8, kind:'window' });
+M.bhWater = toon(0x1a6a78, { em:0x22d8c8, kind:'neon' }); M.bhWater2 = toon(0x4ad8d0, { em:0x8afff0, kind:'neon' });   // bioluminescent: lit from within, brightest at night
 M.bhNoren = toon(0x3e3270); M.bhNoren2 = toon(0x2e4a7a); M.bhMaple = toon(0xc8602a, { flat: 1 }); M.bhMaple2 = toon(0xd8903a, { flat: 1 });
 M.bhPipe = toon(0x5a6068); M.bhPipe2 = toon(0x7a8088); M.bhValve = toon(0xa83a2a);
 function bhRoof(P, x, y, z, w, d, rise){   // a dark tiled hip roof with turned-up eaves (see tileRoof), placed at (x, y, z)
@@ -1944,12 +1944,14 @@ function bhNoren(F, x, y, w, mat){   // a split curtain over a doorway (F faces 
   for (let k = 0; k < n; k++) box(mat, F, x - w/2 + (k + .5)*w/n, y, .03, w/n - .03, .42, .02);
   box(COM.wood2, F, x, y + .23, .03, w + .08, .04, .04);
 }
-let BH_ENTRY = null;   // while the bathhouse is built: where people step in and out of sight on their way up to the pools ({ ex, ez }, world)
+let BH_ENTRY = null, BH_POOLS = null;   // while the bathhouse is built: where people step in and out of sight on their way up to the pools ({ ex, ez }, world)
 function bhPool(P, x, z, r, y0 = CURB){   // a round stone-rimmed hot pool, steam off it, people soaking in it
   const n = Math.max(12, Math.round(r*14));
   for (let k = 0; k < n; k++){ const a = k/n*TAU, rr = r + .06; box(chance(.5) ? M.bhStone : M.bhStone2, P, x + Math.cos(a)*rr, y0 + .14, z + Math.sin(a)*rr, .26 + rnd(0, .08), .28 + rnd(0, .08), .2, -a + PI/2); }
   put(U.cyl16, M.bhStoneD, under(P, T(x, y0 + .02, z, 0, 2*r, .04, 2*r)));
   flatWater(M.bhWater, under(P, T(x, 0, z)), y0 + .2, r - .02);
+  if (BH_POOLS) BH_POOLS.push([...new THREE.Vector3(x, y0 + .21, z).applyMatrix4(P).toArray(), r - .05]);   // (for the glow: see bathFx)
+  glow(P, x, y0 + .3, z, 'cyan', 1.2*r);
   for (let k = 0; k < 3; k++){ const a = rnd(0, TAU), q = rnd(0, r*.6); flatWater(M.bhWater2, under(P, T(x + Math.cos(a)*q, 0, z + Math.sin(a)*q)), y0 + .205, rnd(.12, .25)); }   // glints
   for (let k = 0; k < Math.max(2, Math.round(r*2.5)); k++){ const a = rnd(0, TAU), q = rnd(0, r*.5); emitters.push(new THREE.Vector3(x + Math.cos(a)*q, y0 + .25, z + Math.sin(a)*q).applyMatrix4(P)); }
   // where people sit and soak: round the inside of the rim, facing the middle (their lower half under the water)
@@ -2014,6 +2016,7 @@ function buildBathhouse(m){
   // Two levels, as in the reference: the street level along the front, with the way in, the front desk, the tea booth
   // and the steam plant, and the bath terrace on a stone podium over it, where the pools and the halls are.
   const DH = 1.35, D = CURB + DH, PZ = 3.7;   // the terrace's height, and where its front wall stands
+  BH_POOLS = [];
   // ---- the ground: wet stone paving, puddles and moss
   box(G.asph, P, 0, .012, 0, S_, .025, S_);
   const n = 22, st = S_/n;
@@ -2132,10 +2135,43 @@ function buildBathhouse(m){
   // standing about on the terrace, chatting between soaks
   for (const [x, z] of [[-.45, .3], [.45, .6], [-.4, 2.0], [.4, 3.1], [-.6, 3.3], [3.3, -.6], [-.5, -1.4]]) spotAt(P, x, D, z, 'stand', null, [0, 1], BH_ENTRY);
   BH_ENTRY = null;
+  m.bhPools = BH_POOLS; BH_POOLS = null;
   m.roofH = D;
   m.top = ty_top(top);
 }
 const ty_top = top => top + 2.6 + 1.4;
+
+// The pools' living light: each glows from within in a slow breathing pulse of its own, a brighter swirl drifts round
+// it, and tiny motes of light rise and sink in the water, like plankton stirred by the bathers.
+function bathFx(m){
+  const pools = m.bhPools; if (!pools || !pools.length) return null;
+  const root = new THREE.Group(); scene.add(root);
+  const disc = new THREE.CircleGeometry(1, 32); disc.rotateX(-PI/2);
+  const mk = (col, op) => new THREE.MeshBasicMaterial({ map: glowTex, color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false });
+  const parts = pools.map(([x, y, z, r], k) => {
+    const glowM = mk(0x2af0d8, .5), swirlM = mk(0x9afff4, .4);
+    const g = new THREE.Mesh(disc, glowM); g.position.set(x, y + .005, z); g.scale.setScalar(r*1.15); g.layers.set(1); g.renderOrder = 4; root.add(g);
+    const sw = new THREE.Mesh(disc, swirlM); sw.position.set(x, y + .01, z); sw.scale.setScalar(r*.45); sw.layers.set(1); sw.renderOrder = 4; root.add(sw);
+    const motes = [];
+    for (let q = 0; q < 10; q++){ const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: q % 3 ? 0x7affe8 : 0xc8fff0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: .8 }));
+      sp.layers.set(1); sp.scale.set(.09, .09, 1); root.add(sp); motes.push({ sp, a: Math.random()*TAU, rr: Math.random()*r*.85, sp0: .2 + Math.random()*.5, ph: Math.random()*TAU }); }
+    return { x, y, z, r, g, sw, glowM, swirlM, motes, ph: k*1.9 };
+  });
+  return {
+    update(dt, t){
+      const night = typeof isNight === 'function' && isNight(S.hour) ? 1 : .55;
+      for (const p of parts){
+        const b = .5 + .5*Math.sin(t*.9 + p.ph);
+        p.glowM.opacity = (.35 + .35*b)*night; p.g.scale.setScalar(p.r*(1.1 + .06*b));
+        const a = t*.35 + p.ph; p.sw.position.set(p.x + Math.cos(a)*p.r*.42, p.y + .01, p.z + Math.sin(a)*p.r*.42); p.swirlM.opacity = (.25 + .3*(1 - b))*night;
+        for (const o of p.motes){ o.a += dt*o.sp0*.4; const rr = o.rr + Math.sin(t*o.sp0 + o.ph)*.08;
+          o.sp.position.set(p.x + Math.cos(o.a)*rr, p.y + .02 + .05*(.5 + .5*Math.sin(t*1.7*o.sp0 + o.ph)), p.z + Math.sin(o.a)*rr);
+          o.sp.material.opacity = (.35 + .65*Math.max(0, Math.sin(t*2.1*o.sp0 + o.ph)))*night; }
+      }
+    },
+    dispose(){ scene.remove(root); disc.dispose(); for (const p of parts){ p.glowM.dispose(); p.swirlM.dispose(); for (const o of p.motes) o.sp.material.dispose(); } }
+  };
+}
 
 /* ---------- the police station ---------- */
 // A civic building on a 3x3 block, after the reference: a pale two-storey block over a recessed, brightly lit

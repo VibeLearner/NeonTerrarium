@@ -1431,12 +1431,12 @@ function targetOf(pk){
   const [a,b] = Math.abs(dx) > Math.abs(dz) ? [Math.sign(dx), 0] : [0, Math.sign(dz)];
   const n = cells.get(ckey(c.i + a, c.j + b));
   if (n && n.mega) return null;
-  // high up the side of a building, with residential picked and an empty plot next to it: hang a pod there
+  // high up the side of a building, with any zone picked and an empty plot next to it: hang a pod there
   // (open sky next door too: the platform grows under it)
   const inGrid = Math.abs(c.i + a) <= GRID_MAX && Math.abs(c.j + b) <= GRID_MAX;
   // (or over a shorter building next door, if there's a floor's gap between its roof and the pod)
   const shorter = n && n.sections.length && !n.lift && !n.mega;
-  if ((S.zone === 'low' || S.zone === 'mid' || S.zone === 'ind') && (pk.kind === 'bld' || pk.kind === 'low') && !c.mega && (n ? !n.sections.length || shorter : inGrid) && pk.p.y > CURB + FH){
+  if ((S.zone === 'low' || S.zone === 'mid' || S.zone === 'ind' || S.zone === 'high') && (pk.kind === 'bld' || pk.kind === 'low') && !c.mega && (n ? !n.sections.length || shorter : inGrid) && pk.p.y > CURB + FH){
     const host = pk.kind === 'low' ? { sectionTops: c.belowTops, height: groundTop(c) } : c;
     let ly = liftSnap(host, pk.p.y);
     if (ly !== null && shorter && ly < n.height + FH - .05){   // too low over the shorter building: the first floor of the tall one that clears it

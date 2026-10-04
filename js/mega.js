@@ -1892,7 +1892,7 @@ function buildDataSpire(m){
     box(chance(.5) ? M.dsCrate : M.dsCrate2, P, x, .38 + y, z, w, .66, .8); box(M.dsFrost, P, x, .73 + y, z, w + .02, .04, .82);
     box(M.dsSeam, P, x, .38 + y, z + .41, w - .2, .04, .02); box(M.dsNeon, P, x + w/2 - .15, .5 + y, z + .41, .06, .06, .02);
   }
-  m.ds = { m: P.toArray(), lines, top: 33 };
+  m.ds = { m: P.toArray(), lines, top: 33, door: [.6, ez + 1.01] };   // (door: the lit doorway in the porch, where the archivist and the guards come and go: see people.js)
   m.roofH = CURB + ph;
   m.top = 35;
 }

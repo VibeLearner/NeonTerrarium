@@ -17,13 +17,13 @@
 // assets/sprites/people.png: one character per 16 px row, 20 cells of 12 px each, facing right (mirrored for
 // facing left), feet on the bottom row: 6 walk frames, 4 idle, 6 gesture (talking, ordering, serving; characters
 // without their own gesture sheet sway through their idle frames) and 4 sitting; cells 20 to 31 are extra
-// animations (the police officer's scanner and angry reaction). Row 12 is the police officer, row 13 the old delivery
+// animations (the police officer's scanner and angry reaction). Row 16 is the hooded archivist (walk and idle only). Row 12 is the police officer, row 13 the old delivery
 // robot (walk 0-3, alternate walk 4-7, parcel drop 8-13, the parcel capsule opening 14-19), row 14 the emote icons.
-const PPL = { rows: 16, cw: 12, ch: 16, walk: 6, idle: 4, W: 384, H: 256 };
+const PPL = { rows: 17, cw: 12, ch: 16, walk: 6, idle: 4, W: 384, H: 272 };
 const F_IDLE = 6, F_SPEC = 10, F_SIT = 16, F_USE = 20, F_ANGRY = 26;
-const ROW_COP = 12, ROW_BOT = 13, ROW_EMO = 14, ROW_BOUNCER = 15, CITIZEN_ROWS = 12;   // row 15: the officer redrawn in red, the club's bouncers
+const ROW_COP = 12, ROW_BOT = 13, ROW_EMO = 14, ROW_BOUNCER = 15, ROW_HOOD = 16, CITIZEN_ROWS = 12;   // row 16: the Data Spire's hooded archivist   // row 15: the officer redrawn in red, the club's bouncers
 const EMO = { bang: 0, quest: 1, heart: 2, anger: 3, sweat: 4, note: 5, dots: 6, bowl: 7 };
-const PPL_TEX = new THREE.TextureLoader().load('assets/sprites/people.png');
+const PPL_TEX = new THREE.TextureLoader().load('assets/sprites/people_v2.png');
 PPL_TEX.magFilter = PPL_TEX.minFilter = THREE.NearestFilter; PPL_TEX.generateMipmaps = false;
 const PPL_MAX = 700;          // most people drawn at once (the nearest win if more are out)
 const PPL_SPEED = .55;        // walking speed, world units a second (a block takes about 7 s)
@@ -356,6 +356,7 @@ const MEGA_LIFE = {
   market:  { jobs: 10, fun: 14 },             // the market mall: shopkeepers inside, plenty of shoppers
   pagoda:  { jobs: 12, fun: 10, night: .2 },  // the cloud pagoda: a luxury hotel and spa
   club:    { jobs: 10, fun: 0, night: .6 },
+  spire:   { jobs: 0, fun: 0 },   // the Data Spire: no ordinary jobs; its archivist and guards are their own people (see syncSpireStaff)
   greenhouse: { jobs: 12, fun: 1.5, night: .35 },   // the hydroponic farm: growers round the clock, and people dropping by for fresh greens   // the Neon Dome: bar staff and DJs, mostly at night (its crowd is brought out by the night: see updateClubs)
 };
 const places = new Map();   // id -> { id, x, z, doors: [{ node, out:{x,z}, in:{x,z}|null, dir:[dx,dz] }], jobs, fun, open, night, cell|mega }
@@ -503,6 +504,13 @@ function buildNetwork(){
       }
       for (const [k, st] of pl.stalls) if (!st.keepers.length || !st.queue.length) pl.stalls.delete(k);
       pl.jobs = pl.stalls.size;
+    } else if (m.kind === 'spire' && m.ds && m.ds.door){
+      // the one way in: the lit doorway in its porch (drawn with the building)
+      const e = m.ds.m, W = (x, z) => ({ x: e[0]*x + e[8]*z + e[12], z: e[2]*x + e[10]*z + e[14] }), fx = e[8], fz = e[10], fl = Math.hypot(fx, fz) || 1, [x, z] = m.ds.door;
+      const d = { wall: W(x, z + .02), stand: W(x, z + .55), inside: W(x, z - .35), n: [fx/fl, fz/fl], noDraw: true };
+      const b = m.cells.find(c => c.i === Math.round(d.stand.x/LOT) && c.j === Math.round(d.stand.z/LOT)) || m.cells[0], key = 'd:' + m.id + ':door';
+      pl.doors.push(makeDoor(key, d, true, oldDoors.get(key))); addEnd(b, { key, x: d.stand.x, z: d.stand.z, kind: 'd' });
+      pl.guarded = true;
     } else if (m.kind === 'greenhouse' && m.gh){
       // the farm's ways in: the office door and the open bay on its front (drawn with the building, so no door panels)
       const e = m.gh.m, W = (x, z) => ({ x: e[0]*x + e[8]*z + e[12], z: e[2]*x + e[10]*z + e[14] }), fx = e[8], fz = e[10], fl = Math.hypot(fx, fz) || 1;
@@ -626,13 +634,30 @@ function syncResidents(){
       }
     });
   }
+  syncSpireStaff(keep);
   for (const [id, p] of [...people]) if (!keep.has(id) && !(p.visitor && places.has(p.home))) people.delete(id);   // (visitors stay while their drop-off does)
+}
+// The Data Spire's own people: the hooded archivist, who lives at the police station (or, without one, at the spire)
+// and works at the spire from before dawn to late at night, and six officers who guard it, three on the day watch and
+// three on the night watch, walking the streets right round it. Their homes and jobs are fixed (see syncJobs).
+function syncSpireStaff(keep){
+  const police = [...places.values()].find(pl => pl.mega && pl.mega.kind === 'police');
+  for (const pl of places.values()){
+    if (!pl.guarded) continue;
+    const home = police ? police.id : pl.id, base = 'spire:' + pl.mega.id;
+    const add = (id, init) => { keep.add(id); let p = people.get(id);
+      if (!p){ p = makePerson(id, home); p.fresh = true; people.set(id, p); }
+      Object.assign(p, { home, job: pl.id, fixedJob: true, wantsJob: false, courier: false }, init); };
+    add(base + ':archivist', { row: ROW_HOOD, archivist: true, wake: 4, bed: 23.75, workS: 4.5, workLen: 18.5, outgoing: 0 });   // in at half past four, out at eleven
+    for (let k = 0; k < 6; k++) add(base + ':guard' + k, { guard: true, guardShift: k < 3 ? 0 : 1, outgoing: .3 });
+  }
 }
 // jobs: keep the ones people have, hand free ones to those who want work (nearer jobs more likely)
 function syncJobs(){
   const used = new Map();
   for (const p of people.values()){
     const pl = p.job && places.get(p.job);
+    if (p.fixedJob && pl) continue;   // (the spire's staff: theirs is set)
     if (!pl || (used.get(p.job) || 0) >= pl.jobs){ p.job = null; continue; }
     used.set(p.job, (used.get(p.job) || 0) + 1);
   }
@@ -670,7 +695,7 @@ function assignStalls(){
     const ids = [...sq.stalls.keys()].sort((a, b) => a - b);
     if (ids.length) staff.forEach((p, k) => { p.stall = ids[k % ids.length]; });
   }
-  for (const p of people.values()){ const j = p.job && places.get(p.job); p.cop = !!(j && j.patrol); }   // police staff wear the uniform
+  for (const p of people.values()){ const j = p.job && places.get(p.job); p.cop = !!(j && j.patrol) || !!p.guard; }   // police staff (and the spire's guards) wear the uniform
 }
 
 /* ---------- routines ---------- */
@@ -686,11 +711,13 @@ function desire(p, h){
   p.ws = p.nightWorker ? 21 + p.nightShift*4 : p.workS; p.wlen = p.workLen;
   if (job && job.stalls){ p.ws = p.nightShift < .5 ? 16.5 : 10; p.wlen = 7.5; }   // day market 10:00 to 17:30, night market 16:30 to midnight
   if (job && job.patrol){ const k = Math.min(2, Math.floor(p.nightShift*3)); p.ws = [7, 15, 23][k]; p.wlen = 8; p.nightWorker = k === 2; }   // police: three shifts round the clock
+  if (p.guard){ p.ws = p.guardShift ? 18 : 6; p.wlen = 12; p.nightWorker = !!p.guardShift; }   // the spire's watch: six to six, day and night
+  if (p.archivist){ p.ws = p.workS; p.wlen = p.workLen; p.nightWorker = false; if (working(p, h)) return p.job; return p.home; }   // straight from home to the spire and back, nothing else
   if (p.visitor) return pplNow > p.leaveAt ? p.home : (leisure(p) || p.home);   // a visitor: out seeing the town until it's time to go
   if (p.chain && !asleep(p, h) && !working(p, h)) return p.at;   // finish what they started (ordered food: now eat it)
   if (asleep(p, h) && !working(p, h)) return p.home;              // (a night-market shift runs past some keepers' usual bedtime)
   if (working(p, h)){
-    if (job && (job.stalls || job.patrol)) return p.job;   // stall keepers stay at their counter, officers on their beat
+    if (job && (job.stalls || job.patrol || p.guard)) return p.job;   // stall keepers stay at their counter, officers on their beat
     if (h >= 12 && h < 13.5 && !p.nightWorker && pplRand() < .3) return leisure(p) || p.job;   // out for lunch
     return p.courier ? errand(p) : p.job;
   }
@@ -820,7 +847,9 @@ function startPatrol(p, forced){
   }
   else if (p.patrol) a = p.patrol.node;
   else { if (p.at !== p.job || !st.doors.length) return false; dA = st.doors[Math.floor(pplRand()*st.doors.length)]; a = dA.node; head = [[dA.inside.x, dA.inside.z], [dA.wall.x, dA.wall.z]]; }
-  const cand = patrolNodes.filter(c => c.node !== a && Math.hypot(c.x - st.x, c.z - st.z) < 26);
+  const R = st.guarded ? 7.5 : 26;   // (the spire's guards keep to the streets right round it)
+  let cand = patrolNodes.filter(c => c.node !== a && Math.hypot(c.x - st.x, c.z - st.z) < R);
+  if (!cand.length && st.guarded) cand = patrolNodes.filter(c => c.node !== a && Math.hypot(c.x - st.x, c.z - st.z) < 12);
   if (!cand.length) return false;
   const tg = forced || cand[Math.floor(pplRand()*cand.length)], mid = route(a, tg.node); if (!mid) return false;
   const pts = head.concat(mid), cum = [0];
@@ -833,7 +862,7 @@ function startPatrol(p, forced){
 function decide(p){
   if (p.club) return;   // out at the club: the night decides (see updateClubs)
   if (p.cop && working(p, S.hour) && desire(p, S.hour) === p.job && (p.patrol || p.at === p.job)){
-    const back = p.patrol && pplRand() < .15;   // back to the station for a bit
+    const back = p.patrol && pplRand() < (p.guard ? .05 : .15);   // back to the station for a bit (guards rarely step inside)
     if (!back && (p.patrol || pplRand() < .85) && startPatrol(p)) return;
     if (back && startTrip(p, p.job)) return;
     p.until = pplNow + 10 + pplRand()*20; return;
@@ -1092,7 +1121,7 @@ function updateLurkers(dt, t){
           v.pause = 0; v.hurry = true;
           // the nearest officer on duty comes running
           let best = null, bd = 35*35;
-          for (const q of onDutyCops()){ const d2 = (q.x - L.x)**2 + (q.z - L.z)**2; if (d2 < bd){ bd = d2; best = q; } }
+          for (const q of onDutyCops()){ if (q.guard) continue; const d2 = (q.x - L.x)**2 + (q.z - L.z)**2; if (d2 < bd){ bd = d2; best = q; } }
           if (best && patrolNodes.length){
             const node = patrolNodes.reduce((b, c) => (c.x - L.x)**2 + (c.z - L.z)**2 < (b.x - L.x)**2 + (b.z - L.z)**2 ? c : b);
             if (startPatrol(best, node) || (best.callout = node, false)){ best.rush = true; emote(best, 'bang', 2); logEvent({ kind: 'police', x: node.x, z: node.z, plot: L.key, officer: best.id }); }
@@ -1681,6 +1710,7 @@ function updatePeople(dt, t){
       const sd = (p.walk.puke.x - p.x)*_camR.x + (p.walk.puke.z - p.z)*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
       if (u > .8 && !p.walk.puke.left){ p.walk.puke.left = true; pukes.push({ x: p.walk.puke.x, z: p.walk.puke.z, t0: t, sx: p.x, sz: p.z }); } }
     if (p.cop && p.angry > t) frame = F_ANGRY + Math.min(5, Math.floor((t - p.angry + .9)*7));
+    if (p.row === ROW_HOOD && frame >= F_SPEC) frame = F_IDLE + (frame % 4);   // (the archivist has walk and idle frames only)
     if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
   }

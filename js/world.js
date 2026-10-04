@@ -302,7 +302,7 @@ function stackRun(c, secs, y, tag, first){
     if (upper && sec.zone === 'high') types = types.filter(([f]) => WHITE_TYPES.has(f) === prevWhite);
     if (upper && sec.zone === 'mid' && prevDeck) types = [[foodDeck, 5]].concat(types);   // decks of stalls like to pile up
     let builder = pickWeighted(types);
-    if (sec.mf){ lot.mf = sec.mf; if (sec.zone === 'low') builder = buildTenement; else if (sec.zone === 'mid') builder = signShop; }   // built into a gap: a tenement (or shop) short enough to fit
+    if (sec.mf){ lot.mf = sec.mf; if (sec.zone === 'low') builder = buildTenement; else if (sec.zone === 'mid') builder = signShop; else if (sec.zone === 'ind') builder = hall; }   // built into a gap: a tenement (or shop) short enough to fit
     // most commercial buildings stand on a ring of market stalls opening onto the street (the stall streets, decks
     // and plazas are stalls already, so they stand on the ground)
     const onStalls = !upper && !sec.mf && sec.zone === 'mid' && !STALL_TYPES.has(builder) && hash('stallbase', c.i, c.j, sec.seed) % 100 < 60;
@@ -443,8 +443,94 @@ function liftScaffoldCom(c, y0){
     c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01 });
   }
 }
+// The industrial pod's trestle, after the works reference: concrete piers, heavy rusted I-beam columns X-braced
+// between deep girders, a riveted girder frame round a steel-plate deck, and bundles of rusty pipe running under the deck
+// and down to the ground. The walkways are box trusses with pipes running through them and a railed catwalk on top, to
+// a shuttered steel door in each neighbour. Red lights, as the works have.
+const IND_RUST = toon(0x4a3026), IND_RUST2 = toon(0x5e3a28), IND_STEEL = toon(0x34363a), IND_RED = toon(0x5a1010, { em: 0xff3a24, kind: 'bulb' });
+function iBeam(mat, P, x, z, y0, y1, w = .16){ box(mat, P, x, (y0 + y1)/2, z, w, y1 - y0, .05); for (const s of [-1, 1]) box(mat, P, x, (y0 + y1)/2, z + s*w/2, w, y1 - y0, .04); }
+function indLight(P, x, y, z){ box(M.metalDark, P, x, y, z, .1, .08, .1); box(IND_RED, P, x, y - .05, z, .08, .02, .08); glow(P, x, y - .07, z, 'ember', .4); }
+function liftScaffoldInd(c, y0){
+  R = mulberry32(hash('lifti', c.i, c.j, Math.round(y0*100)));
+  const P = T(c.x, 0, c.z), E = .92, base = c.belowTop ?? CURB, onRoof = c.belowTop != null;
+  const sup = liftSupports(c, y0), supKey = new Set(sup.map(d => d.join()));
+  const rust = () => pick([IND_RUST, IND_RUST, IND_RUST2, IND_STEEL]);
+  // the deck: a steel plate inside a deep riveted girder frame
+  box(IND_STEEL, P, 0, y0 - .05, 0, 2.3, .06, 2.3);
+  for (const d of SIDES4){ const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1])));
+    box(IND_RUST, F, 0, y0 - .2, 1.15, 2.42, .34, .1);
+    for (let x = -1.1; x <= 1.11; x += .22) box(M.metalDark, F, x, y0 - .2, 1.205, .03, .03, .01); }   // rivets
+  // the columns: concrete piers, I-beams, deep girders between them, X braces in each bay
+  const cols = [[-E, -E], [E, -E], [E, E], [-E, E]];
+  for (const [x, z] of cols){ if (!onRoof) box(M.concM, P, x, base + .3, z, .5, .6, .5); iBeam(rust(), P, x, z, base + (onRoof ? 0 : .6), y0 - .37); }
+  const edges = [[-E, -E, E, -E], [E, -E, E, E], [E, E, -E, E], [-E, E, -E, -E]];
+  const lv = [base + (onRoof ? .1 : .6)]; for (let y = lv[0] + rnd(1.5, 1.9); y < y0 - .9; y += rnd(1.5, 1.9)) lv.push(y); lv.push(y0 - .37);
+  for (let k = 1; k < lv.length; k++) for (const [ax, az, bx, bz] of edges){
+    if (k < lv.length - 1) box(rust(), P, (ax + bx)/2, lv[k], (az + bz)/2, Math.abs(bx - ax) + .14, .14, Math.abs(bz - az) + .14);   // girder
+    if (chance(.8)){ strut(rust(), P, ax, lv[k - 1] + .08, az, bx, lv[k] - .08, bz, .035); strut(rust(), P, bx, lv[k - 1] + .08, bz, ax, lv[k] - .08, az, .035); }   // X brace
+  }
+  // pipes: a bundle under the deck along one axis, one of them dropping down a column to the ground
+  const ax = chance(.5);
+  for (let q = 0; q < irand(2, 3); q++){
+    const o = -.45 + q*.32, yy = y0 - .55 - q*.05, mat = pick([M.inRust, M.inPipe, M.inRust2, M.inPipe2]), r = rnd(.07, .1);
+    const pts = ax ? [[-1.3, yy, o], [1.3, yy, o]] : [[o, yy, -1.3], [o, yy, 1.3]];
+    if (q === 0){ const end = ax ? [E - .2, yy, o] : [o, yy, E - .2]; pipeRun(mat, P, [pts[0], end, [end[0], base + .25, end[2]], [end[0] + (ax ? .4 : 0), base + .25, end[2] + (ax ? 0 : .4)]], r, true); }
+    else pipeRun(mat, P, pts, r, true);
+  }
+  if (chance(.5)) emitters.push(new THREE.Vector3(rnd(-.8, .8), y0 - .5, rnd(-.8, .8)).applyMatrix4(P));   // a leaky joint
+  // red lights on the deck frame, a beacon on a corner post
+  for (const [sx, sz] of cols) if (chance(.7)) indLight(P, sx*1.2, y0 - .4, sz*1.2);
+  { const [sx, sz] = pick(cols); cyl(IND_STEEL, P, sx*1.1, y0 + .45, sz*1.1, .025, .9); beaconLight(P, sx*1.1, y0 + .93, sz*1.1, .07, .8); }
+  // the street entrance: a concrete guard hut with a roller shutter and a caged ladder (or a ladder from the roof below)
+  const free = SIDES4.filter(d => !supKey.has(d.join()));
+  const hs = free.length ? free[hash('liftdoor', c.i, c.j) % free.length] : SIDES4[0];
+  { const F = under(P, T(0, 0, 0, Math.atan2(hs[0], hs[1])));
+    if (!onRoof){
+      box(M.concM, F, 0, base + .55, .78, .9, 1.1, .5); box(M.shutter, F, 0, base + .42, 1.035, .55, .76, .01);
+      for (let y = base + .1; y < base + .8; y += .08) box(M.metalDark, F, 0, y, 1.04, .55, .01, .01);
+      box(M.concDD, F, 0, base + 1.13, .78, 1.0, .06, .6); indLight(F, .33, base + .98, 1.07);
+    }
+    const lz = onRoof ? .78 : .5, ly0 = onRoof ? base : base + 1.15;
+    for (const s of [-1, 1]) box(IND_STEEL, F, s*.17, (ly0 + y0)/2, lz, .035, y0 - ly0, .035);
+    for (let y = ly0 + .15; y < y0 - .1; y += .2) box(IND_STEEL, F, 0, y, lz, .34, .025, .025);
+    for (let y = ly0 + .6; y < y0 - .3; y += .5) put(U.torus, IND_RUST, under(F, T(0, y, lz + .1, 0, .5, .5, .3, PI/2)));
+  }
+  // pipe rails round the deck (gaps for the walkways)
+  for (const d of SIDES4){
+    const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))), bridge = supKey.has(d.join());
+    for (let x = -1.15; x <= 1.16; x += .46){ if (bridge && Math.abs(x) < .5) continue; cyl(IND_STEEL, F, x, y0 + .24, 1.15, .02, .48); }
+    for (const yy of [.48, .26]){ if (bridge){ strut(IND_RUST2, F, -1.15, y0 + yy, 1.15, -.5, y0 + yy, 1.15, .018); strut(IND_RUST2, F, .5, y0 + yy, 1.15, 1.15, y0 + yy, 1.15, .018); } else strut(IND_RUST2, F, -1.15, y0 + yy, 1.15, 1.15, y0 + yy, 1.15, .018); }
+  }
+  // the walkways: box trusses over the street, pipes running through them, a railed catwalk on top
+  c.walks = [];
+  for (const d of sup){
+    const F = under(P, T(0, 0, 0, Math.atan2(d[0], d[1]))), z0 = 1.2, z1 = LOT - 1.05, L = z1 - z0, zm = (z0 + z1)/2, w = .9, th = .75;
+    box(IND_STEEL, F, 0, y0 - .04, zm, w, .06, L);                       // the catwalk plate
+    for (const s of [-1, 1]){
+      box(IND_RUST, F, s*w/2, y0 - .09, zm, .12, .12, L); box(IND_RUST, F, s*w/2, y0 - th, zm, .12, .12, L);   // top and bottom chords
+      const n = Math.max(2, Math.round(L/.62));
+      for (let k = 0; k <= n; k++){ const z = z0 + k*L/n; box(IND_RUST, F, s*w/2, y0 - th/2 - .05, z, .1, th - .1, .1); }   // verticals
+      for (let k = 0; k < n; k++){ const za = z0 + k*L/n, zb = z0 + (k + 1)*L/n; strut(IND_RUST2, F, s*w/2, y0 - th + .05, za, s*w/2, y0 - .14, zb, .025); strut(IND_RUST2, F, s*w/2, y0 - .14, za, s*w/2, y0 - th + .05, zb, .025); }
+      for (let z = z0 + .15; z < z1; z += .55) cyl(IND_STEEL, F, s*(w/2 - .05), y0 + .25, z, .018, .5);
+      strut(IND_STEEL, F, s*(w/2 - .05), y0 + .5, z0, s*(w/2 - .05), y0 + .5, z1, .02);
+    }
+    box(IND_STEEL, F, 0, y0 - th, zm, w, .05, L);                          // the bottom of the box
+    for (let q = 0; q < irand(2, 3); q++){ const x = -.25 + q*.25, yy = y0 - th + .14 + (q % 2)*.18; pipeRun(pick([M.inRust, M.inPipe, M.inRust2]), F, [[x, yy, z0 - .1], [x, yy, z1 + .15]], rnd(.06, .09), true); }
+    indLight(F, 0, y0 - th - .08, zm);
+    // the door in the neighbour: a steel frame round a roller shutter, half up and lit behind, a red light over it
+    box(IND_STEEL, F, 0, y0 + .5, z1 + .14, .84, 1.06, .32);
+    box(M.metalDark, F, 0, y0 + .5, z1 - .03, .72, 1.0, .05);
+    box(COM.shopLit, F, 0, y0 + .22, z1 - .055, .5, .4, .01); box(M.shutter, F, 0, y0 + .66, z1 - .06, .54, .5, .02);
+    for (let y = y0 + .45; y < y0 + .92; y += .07) box(M.metalDark, F, 0, y, z1 - .075, .54, .01, .01);
+    indLight(F, 0, y0 + 1.08, z1 - .12);
+    box(M.metalDark, F, 0, y0 + .5, z0 + .02, .62, 1.0, .05); box(M.shutter, F, 0, y0 + .46, z0 + .05, .44, .84, .02);
+    const a = new THREE.Vector3(0, y0, z0 + .2).applyMatrix4(F), b = new THREE.Vector3(0, y0, z1 - .2).applyMatrix4(F);
+    c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01 });
+  }
+}
 function liftScaffold(c, y0){
   if (c.sections[0] && c.sections[0].zone === 'mid') return liftScaffoldCom(c, y0);   // a commercial pod: the heavy steel rig
+  if (c.sections[0] && c.sections[0].zone === 'ind') return liftScaffoldInd(c, y0);   // an industrial pod: the trestle   // a commercial pod: the heavy steel rig
   R = mulberry32(hash('lift', c.i, c.j, Math.round(y0*100)));
   const P = T(c.x, 0, c.z), E = .98, base = c.belowTop ?? CURB, onRoof = c.belowTop != null;   // on the roof of the building below, if there is one   // poles just inside the deck's corners, clear of the sidewalk's corners
   const sup = liftSupports(c, y0), supKey = new Set(sup.map(d => d.join()));
@@ -1098,7 +1184,7 @@ function targetOf(pk){
   const inGrid = Math.abs(c.i + a) <= GRID_MAX && Math.abs(c.j + b) <= GRID_MAX;
   // (or over a shorter building next door, if there's a floor's gap between its roof and the pod)
   const shorter = n && n.sections.length && !n.lift && !n.mega;
-  if ((S.zone === 'low' || S.zone === 'mid') && (pk.kind === 'bld' || pk.kind === 'low') && !c.mega && (n ? !n.sections.length || shorter : inGrid) && pk.p.y > CURB + FH){
+  if ((S.zone === 'low' || S.zone === 'mid' || S.zone === 'ind') && (pk.kind === 'bld' || pk.kind === 'low') && !c.mega && (n ? !n.sections.length || shorter : inGrid) && pk.p.y > CURB + FH){
     const host = pk.kind === 'low' ? { sectionTops: c.belowTops, height: groundTop(c) } : c;
     let ly = liftSnap(host, pk.p.y);
     if (ly !== null && shorter && ly < n.height + FH - .05){   // too low over the shorter building: the first floor of the tall one that clears it

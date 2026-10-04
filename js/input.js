@@ -180,7 +180,7 @@ function selectZone(z){
   if (S.zone && megaPick) selectMega(null, true);
   document.querySelectorAll('.zone').forEach(b => { const on = b.dataset.zone === S.zone; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   if (megaPick || delMode) return;
-  $('modeHint').textContent = S.zone ? `Zone ${ZONES[S.zone].key}: click to build · click a roof to stack a section` + (S.zone === 'low' || S.zone === 'mid' ? ' · click high on a wall to hang a pod' : '') + (S.paint ? ' · drag to paint' : '') : 'Click the sky to grow the platform · pick a zone to build';
+  $('modeHint').textContent = S.zone ? `Zone ${ZONES[S.zone].key}: click to build · click a roof to stack a section` + (S.zone === 'low' || S.zone === 'mid' || S.zone === 'ind' ? ' · click high on a wall to hang a pod' : '') + (S.paint ? ' · drag to paint' : '') : 'Click the sky to grow the platform · pick a zone to build';
 }
 document.querySelectorAll('.zone').forEach(b => b.addEventListener('click', () => selectZone(b.dataset.zone)));
 $('outlines').addEventListener('change', e => { S.outlines = e.target.checked; });

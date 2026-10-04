@@ -2561,6 +2561,7 @@ function buildFactory(lot, st, P0){
 }
 function hall(lot, st, P0){
   const c = { w:rnd(2.2,2.45), d:rnd(2,2.35), h:rnd(1.6,2), y:0, ox:0, oz:0, ry:0 };
+  if (lot.mf) c.h = Math.max(FH, Math.min(c.h, lot.mf*FH));   // (built into a gap under a side pod: low enough to fit)
   const P = chunkBox(P0, c, pick(st.walls), .03);
   const fs = faces(c.w,c.d), F = [];
   fs.forEach((f,i) => {

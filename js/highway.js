@@ -492,14 +492,19 @@ function hwAlong(P, s, k, o){
   return k;
 }
 const _hdm = new THREE.Object3D(), _hpos = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 };
-// How busy the sky is: from a young little island (0) to a big, built-up city (1), by its buildings, megastructures and size
+// How busy the sky is: from a young little island (0) to a big, built-up city (1), by its buildings, megastructures and size.
+// Scale: a MEDIUM city is the one that has just unlocked every megastructure and raised them all: the buildings that takes
+// (about 50 residential, 30 commercial, 60 luxury and 30 industrial plots, some 240 sections between them) plus the 8
+// megastructures and the ground they stand on (about 370 plots of platform). In these terms that comes to about 370,
+// which is half way (busy .5); a LARGE city is twice that.
+const HW_CITY_LARGE = 740;
 let hwBusy = 0, hwBusyAt = -9;
 function hwTraffic(t){
   if (t - hwBusyAt < 2) return hwBusy;
   hwBusyAt = t; let built = 0, secs = 0;
   for (const c of cells.values()){ if (c.sections.length){ built++; secs += c.sections.length; } }
   const m = built + secs*.4 + cells.size*.15 + megas.size*6;
-  return (hwBusy = Math.max(0, Math.min(1, m/220)));
+  return (hwBusy = Math.max(0, Math.min(1, m/HW_CITY_LARGE)));
 }
 // Traffic comes in waves. A young city sends two or three cars together every 30 to 40 seconds; as the city grows the waves
 // come more often and carry more cars, up to a steady stream (about a car a second on a two-lane road) in a big one.

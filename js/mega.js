@@ -1927,6 +1927,7 @@ function spireFx(m){
 M.bhStone = toon(0x8a8478); M.bhStone2 = toon(0x6e6a62); M.bhStoneD = toon(0x4e4c48); M.bhPave = toon(0x7a7670); M.bhPave2 = toon(0x6a665e);
 M.bhWater = toon(0x1a6a78, { em:0x22d8c8, kind:'neon' }); M.bhWater2 = toon(0x4ad8d0, { em:0x8afff0, kind:'neon' });   // bioluminescent: lit from within, brightest at night
 M.bhNoren = toon(0x3e3270); M.bhNoren2 = toon(0x2e4a7a); M.bhMaple = toon(0xc8602a, { flat: 1 }); M.bhMaple2 = toon(0xd8903a, { flat: 1 });
+M.bhDeck = toon(0x7a5a40); M.bhDeck2 = toon(0x5a4030); M.bhDeck3 = toon(0x8a6a4c);
 M.bhPipe = toon(0x5a6068); M.bhPipe2 = toon(0x7a8088); M.bhValve = toon(0xa83a2a);
 function bhRoof(P, x, y, z, w, d, rise){   // a dark tiled hip roof with turned-up eaves (see tileRoof), placed at (x, y, z)
   const Q = under(P, T(x, 0, z));
@@ -2031,8 +2032,13 @@ function buildBathhouse(m){
     for (let k = 0; k < Math.round(len/1.5); k++) plant(pick(['vines', 'h_ivy', 'l_mossroots']), F, rnd(-len/2 + .3, len/2 - .3), D + .02, .05, rnd(.7, 1), 't', true);
   }
   box(M.bhStoneD, P, 0, D - .04, (pz0 + PZ)/2, px1 - px0 + .12, .1, PZ - pz0 + .12);                    // the lip
-  const dn = 18, dsx = (px1 - px0)/dn, dsz = (PZ - pz0)/14;
-  for (let a = 0; a < dn; a++) for (let b = 0; b < 14; b++) box(chance(.5) ? M.bhPave : M.bhPave2, P, px0 + (a + .5)*dsx, D + .02, pz0 + (b + .5)*dsz, dsx - .05, .04, dsz - .05);   // the terrace paving
+  // the terrace floor: weathered timber decking, long boards running side to side in staggered lengths, the odd darker board
+  { const bw = .19, nb = Math.round((PZ - pz0)/bw);
+    box(COM.wood2, P, 0, D + .005, (pz0 + PZ)/2, px1 - px0, .01, PZ - pz0);                         // (the gaps between the boards)
+    for (let b = 0; b < nb; b++){ const z = pz0 + (b + .5)*(PZ - pz0)/nb; let x = px0 - rnd(0, 1.2);
+      while (x < px1){ const L = rnd(1.0, 2.2), xa = Math.max(px0, x), xb = Math.min(px1, x + L);
+        if (xb - xa > .1) box(chance(.15) ? M.bhDeck2 : chance(.5) ? M.bhDeck : M.bhDeck3, P, (xa + xb)/2, D + .025, z, xb - xa - .02, .03, bw - .025);
+        x += L; } } }
   // ---- street level, along the front
   const F0 = under(P, T(0, 0, PZ + .01, 0));
   // the way in: a lit doorway in the podium, its own little tiled roof, noren, lanterns, the BATHS sign

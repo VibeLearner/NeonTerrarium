@@ -23,6 +23,8 @@ const MEGA_TYPES = {
            colour: '#ff7ab8', build: buildMarketMall },
   pagoda: { name: 'Cloud Pagoda', need: { highPlots: 60 }, odds: 1, w: 5, h: 4, maxLevels: 1,   // arrives with the 60th luxury building
            colour: '#8ff0ff', build: buildCloudPagoda },
+  greenhouse: { name: 'Hydroponic Farm', need: { ind: 40 }, odds: 1, w: 5, h: 4, maxLevels: 1,   // arrives with the 40th industrial floor
+           colour: '#7affa0', build: buildGreenhouse, fx: greenhouseFx },
   club: { name: 'Neon Dome', need: { highPlots: 30, midPlots: 30, lowPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives once there are 30 each of luxury, commercial and residential buildings
            colour: '#c070ff', build: buildNeonDome, fx: clubFx },
 };
@@ -69,7 +71,7 @@ function maybeSpawnMegas(c){
 }
 // can a w x h block go at (i, j)? Every plot free ground or open sky, inside the world, touching the platform
 // how far some megastructures hang out past their block (measured), so a highway beside one keeps its distance
-const MEGA_OVER = { square: .4, police: .8, foundry: .3, pagoda: 1.0 };
+const MEGA_OVER = { square: .4, police: .8, foundry: .3, pagoda: 1.0, greenhouse: .35 };
 // would a highway over or beside the block at (i, j) meet it? (kind: what overhang to allow for)
 function megaHwNear(i, j, w, h, kind){
   const over = (MEGA_OVER[kind] || 0) + .05, x0 = i*LOT - LOT/2 - over, x1 = (i + w - 1)*LOT + LOT/2 + over, z0 = j*LOT - LOT/2 - over, z1 = (j + h - 1)*LOT + LOT/2 + over;
@@ -627,13 +629,13 @@ function buildRadioStation(m){
 
 // for trying things out: open the game with #dev in the address, point at a plot and press M for the radio
 // station, N the sky mall, B the town square, V the foundry, C the police station, K the market mall, P the cloud
-// pagoda, J the Neon Dome club (each key
+// pagoda, J the Neon Dome club, G the hydroponic farm (each key
 // brings one in, with Shift it takes one away; ignores the requirement and the odds)
 if (location.hash.includes('dev')){
   let lastPointer = null;
   addEventListener('pointermove', e => { lastPointer = { x: e.clientX, y: e.clientY }; });
   addEventListener('keydown', e => {
-    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police', k: 'market', p: 'pagoda', j: 'club' }[e.key.toLowerCase()]; if (!kind) return;
+    const kind = { m: 'radio', n: 'mall', b: 'square', v: 'foundry', c: 'police', k: 'market', p: 'pagoda', j: 'club', g: 'greenhouse' }[e.key.toLowerCase()]; if (!kind) return;
     const pk = lastPointer ? pickAt(lastPointer.x, lastPointer.y) : null;
     const c = pk && pk.c ? pk.c : pk && pk.kind === 'sky' ? { i: pk.i, j: pk.j } : cells.values().next().value;
     if (e.shiftKey && megasOfKind(kind).length) removeMega(megasOfKind(kind)[0]);
@@ -1581,6 +1583,202 @@ function buildFoundry(m){
   for (let k=0; k<12; k++) plant(pick(['vines','h_ivy','l_mossroots','pothos','h_curtain3']), P, rnd(-6.5, 4), CURB + rnd(3.0, 4.3), 1.85, rnd(.9, 1.2), 't', true);   // growth over the front pipes
   m.roofH = CURB + 4.6;
   m.top = CURB + 23.5;
+}
+
+/* ---------- the hydroponic farm ---------- */
+// An industrial greenhouse on a 5x4 block, after the reference: a weathered, rust-streaked concrete podium wrapped in
+// pipes, its big painted HYDROPONIC FARM board over a purple neon OPEN 24HR FARMS canopy, roller shutters and a
+// green-lit bay; on top, a two-storey glass house in a dark steel grid under a barrel-vaulted glass roof. Through the
+// glass: tiers of grow racks lit purple and white along the walls, a mezzanine, rows of hydroponic tables thick with
+// greens, a conveyor carrying crates, nutrient tanks, rusty pipes hung with vines, and robot arms riding gantry rails
+// over the tables (live: see greenhouseFx). Steam leaks from the roof vents.
+M.ghConc = toon(0x5c605e); M.ghConc2 = toon(0x4a4f4f); M.ghConc3 = toon(0x6f726c); M.ghFrame = toon(0x30363a); M.ghFrame2 = toon(0x4c5458);
+M.ghTray = toon(0xd2d6d0); M.ghLeaf1 = toon(0x5aa83a); M.ghLeaf2 = toon(0x7ec64c); M.ghLeaf3 = toon(0x3e8a30); M.ghGrate = toon(0x2c3032); M.ghBoard = toon(0xcfc6ac);
+M.ghGrowP = toon(0x4a1a5a, { em:0xc86aff, kind:'neon' }); M.ghGrowW = toon(0x5a5a64, { em:0xeef0ff, kind:'neon' });
+M.ghNeonP = toon(0x3a1a5a, { em:0xb06aff, kind:'neon' }); M.ghNeonT = toon(0x10383a, { em:0x5ae8e0, kind:'neon' });
+M.ghWin = toon(0x2a4030, { em:0x5ab87a, kind:'window' }); M.ghBay = toon(0x2a4434, { em:0xc8ffd8, kind:'window' });
+M.ghGlass = new THREE.MeshBasicMaterial({ color: 0xd8f4ee, transparent: true, opacity: .1, depthWrite: false, side: THREE.DoubleSide }); M.ghGlass.userData.colorOnly = true;
+function buildGreenhouse(m){
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
+  const long = m.w >= m.h, L = Math.max(m.w, m.h)*LOT, D = Math.min(m.w, m.h)*LOT;
+  const P = T(m.x, 0, m.z, megaAngle(m, long ? pick([0, PI]) : pick([PI/2, -PI/2])));   // the front faces local +z
+  const cz = -1.0, W0 = L - 3.0, D0 = D - 4.6, H0 = 4.2;                 // the podium
+  const z0 = cz - D0/2, z1 = cz + D0/2;
+  const Wg = W0 - 1.0, Dg = D0 - .8, yG = CURB + H0 + .1, Hg = 4.8, yE = yG + Hg, hv = 2.3;   // the glass house and its vault
+  const gz0 = cz - Dg/2, gz1 = cz + Dg/2, gx = Wg/2;
+  // ---- the yard: wet slabs, puddles, a hazard line, bollards, drums and crates of produce
+  box(G.asph, P, 0, .012, 0, L, .025, D);
+  const nx = 24, nz = 18, sx = L/nx, sz = D/nz;
+  for (let a=0;a<nx;a++) for (let b=0;b<nz;b++) if (!chance(.05)) box(pick(TILES.ind), P, (a-(nx-1)/2)*sx, .03, (b-(nz-1)/2)*sz, sx - .05, .045, sz - .05);
+  for (let k=0; k<9; k++) box(G.puddle, P, rnd(-L/2 + 1, L/2 - 1), .056, rnd(z1 + .4, D/2 - .3), rnd(.6, 1.8), .01, rnd(.3, .7));
+  box(M.hazard, P, 0, .058, z1 + 1.9, L - 2.4, .012, .1);
+  for (let x = -L/2 + 1.6; x < L/2 - 1; x += 2.4) put(U.cyl16, M.hazard, under(P, T(x, .3, D/2 - .4, 0, .14, .5, .14)));
+  for (let k=0; k<10; k++){ const x = rnd(-L/2 + .6, L/2 - .6), z = rnd(z1 + .4, D/2 - .8);
+    if (chance(.5)) put(U.cyl16, pick([M.fRust, M.corrBlue, M.fSteel2]), under(P, T(x, .28, z, 0, .4, .52, .4)));
+    else { box(M.crate, P, x, .2, z, .5, .38, .4); for (let q = 0; q < 4; q++) box(pick([M.ghLeaf1, M.ghLeaf2]), P, x - .15 + (q%2)*.3, .42, z - .1 + (q > 1 ? .2 : 0), .16, .1, .14); } }
+  for (let k=0; k<18; k++) floorBig(P, rnd(-L/2 + .5, L/2 - .5), .066, rnd(z1 + .3, D/2 - .3), rnd(.8, 1.1));
+  for (const x of [-L/2 + .5, L/2 - .5]) for (let z = -D/2 + .8; z < z1; z += rnd(1.2, 2.0)) plant(pick(['bamboo','bush','g_fern3','bushFlower']), P, x, .06, z, rnd(.9, 1.2));
+
+  // ---- the podium: two storeys of weathered concrete, grime and rust, a ledge, windows along the sides and back
+  box(M.ghConc, P, 0, CURB + H0/2, cz, W0, H0, D0);
+  box(M.ghConc2, P, 0, CURB + 2.1, cz, W0 + .12, .16, D0 + .12);                          // the floor band
+  box(M.ghConc3, P, 0, CURB + H0 + .05, cz, W0 + .3, .14, D0 + .3);                        // the ledge the glass house stands on
+  for (const [F, len, fk] of blockFaces(P, 0, cz, W0, D0).map((f, k) => [...f, k])){
+    for (let k=0; k<Math.round(len/1.6); k++) box(pick([M.fRust, M.ghConc2]), F, rnd(-len/2 + .3, len/2 - .3), CURB + rnd(.6, H0 - .8), .035, rnd(.12, .35), rnd(.6, 2.0), .02);   // streaks
+    for (let k=0; k<Math.round(len/2); k++) if (fk || chance(.3)) plant(pick(['vines','h_ivy','pothos','l_mossroots']), F, fk ? rnd(-len/2 + .3, len/2 - .3) : rnd(4, len/2 - .3), CURB + H0 + .05, .05, rnd(.8, 1.15), 't', true);   // (not over the sign)
+  }
+  for (const [F, len, k] of blockFaces(P, 0, cz, W0, D0).map((f, k) => [...f, k])){
+    if (k === 0) continue;                                                                    // (the front has its sign and doors)
+    for (const y of [CURB + 1.15, CURB + 3.2]) for (let t = -len/2 + .8; t < len/2 - .6; t += 1.1){
+      box(chance(.45) ? M.ghWin : M.glassDark, F, t, y, .04, .62, .55, .03); box(M.ghConc2, F, t, y - .32, .06, .72, .06, .06); }
+  }
+  // ---- the front: the painted board, the neon canopy, shutters and a lit bay
+  const fz = z1 + .02, F0 = under(P, T(0, 0, fz, 0));
+  box(M.ghBoard, F0, -1.2, CURB + 3.1, .06, 8.6, 1.8, .08);
+  box(M.ghConc2, F0, -1.2, CURB + 3.1, .03, 8.9, 2.0, .04);
+  for (let k=0; k<9; k++) box(pick([M.fRust, M.ghConc3]), F0, -1.2 + rnd(-4, 4), CURB + rnd(2.4, 3.6), .105, rnd(.1, .3), rnd(.3, 1.0), .01);   // rust bleeding down the board
+  fitSign(under(F0, T(0, 0, .11, 0)), 'sign_w_hydro', -1.2, CURB + 3.4, 0, 7.8, 2.4, 'green');
+  fitSign(under(F0, T(0, 0, .11, 0)), 'sign_w_agri', -1.2, CURB + 2.55, 0, 6.2, .9, 'cyan');
+  // the canopy, purple neon along its edge, the sign on its front
+  box(M.ghConc2, F0, -1.6, CURB + 1.95, .6, 7.2, .16, 1.2);
+  box(M.ghNeonP, F0, -1.6, CURB + 1.86, 1.2, 7.1, .05, .05);
+  for (let t = -4.8; t <= 1.6; t += 1.6) glow(F0, t, CURB + 1.75, 1.0, 'platinum', 1.2);
+  wordSign(under(F0, T(0, 0, 1.22, 0)), 'sign_w_farm24', -1.6, CURB + 2.2, 0, .9, 'platinum', .8);
+  for (const t of [-4.8, 1.6]) cyl(M.frame, F0, t, CURB + .95, 1.1, .05, 1.9);
+  for (const t of [-3.5, -1.2]){ box(M.shutter, F0, t, CURB + .9, .04, 1.9, 1.7, .05); for (let y = .2; y < 1.7; y += .17) box(M.ghFrame2, F0, t, CURB + y, .07, 1.9, .02, .02); }
+  // the open bay on the right: lit green-white, racks of greens inside
+  box(M.ghBay, F0, .6, CURB + .95, .03, 1.5, 1.6, .03);
+  for (const t of [.15, 1.05]){ box(M.ghFrame, F0, t, CURB + .9, .1, .05, 1.6, .2);
+    for (const y of [.45, .9, 1.35]){ box(M.ghTray, F0, t + .22, CURB + y, .12, .4, .04, .2); for (let q = 0; q < 3; q++) box(pick([M.ghLeaf1, M.ghLeaf2]), F0, t + .1 + q*.12, CURB + y + .06, .12, .09, .07, .09); } }
+  box(M.ghNeonT, F0, .6, CURB + 1.8, .08, 1.5, .05, .04); glow(F0, .6, CURB + 1.0, .3, 'green', 1.4);
+  // warm lit windows and a small office door on the right of the front
+  for (const t of [3.8, 5.2, 6.4]) box(M.ghWin, F0, t, CURB + 3.1, .04, .8, .6, .03);
+  box(M.glassDark, F0, 4.6, CURB + .7, .04, .9, 1.3, .03); box(M.bulb, F0, 4.6, CURB + 1.5, .1, .2, .08, .1); glow(F0, 4.6, CURB + 1.45, .25, 'warm', 1.0);
+  box(M.fSteel3, F0, 6.0, CURB + .6, .2, .6, .9, .35); box(M.ghNeonT, F0, 6.0, CURB + .9, .38, .3, .05, .02);           // a control box
+  for (const [x, col] of [[3.0, 'red'], [6.9, 'cyan']]){ box(col === 'red' ? M.blink || M.bulb : M.ghNeonT, F0, x, CURB + 1.4, .08, .08, .12, .06); glow(F0, x, CURB + 1.4, .15, col, .7); }
+  for (let k=0; k<5; k++) person(P, rnd(-4.5, 4), CURB, z1 + rnd(.4, 1.6));
+
+  // ---- pipes: risers up the corners into the glass house, runs along the front and sides, a tank in the yard
+  const pipe = (ax, ay, az, bx, by, bz, r = .14, mat = M.fSteel2) => strut(mat, P, ax, ay, az, bx, by, bz, r*2);
+  const elbow = (x, y, z, r) => put(U.sph, M.fSteel2, under(P, T(x, y, z, 0, 3*r, 3*r, 3*r)));
+  for (const [x, z, r] of [[-W0/2 - .25, z1 - .4, .22], [-W0/2 - .25, z1 - 1.1, .15], [W0/2 + .25, z1 - .5, .2], [W0/2 + .25, z0 + .6, .18], [-W0/2 - .25, z0 + .8, .16]]){
+    pipe(x, CURB, z, x, yG + .6, z, r, chance(.4) ? M.fRust : M.fSteel2); elbow(x, yG + .6, z, r);
+    const ix = x + Math.sign(-x)*.75; pipe(x, yG + .6, z, ix, yG + .6, z, r); elbow(ix, yG + .6, z, r);
+    for (let y = CURB + .8; y < yG; y += 1.3) put(U.cyl16, M.ghFrame, under(P, T(x, y, z, 0, 2*r + .08, .08, 2*r + .08)));   // clamps
+  }
+  for (const [y, r, mat] of [[CURB + 4.05, .16, M.fSteel2], [CURB + 1.95 + .3, .1, M.fRust], [CURB + .35, .13, M.fSteel2]]) pipe(-W0/2 - .2, y, z1 + .2, W0/2 + .2, y, z1 + .2, r, mat);
+  for (const x of [-W0/2 + .3, W0/2 - .3]) pipe(x, CURB + .35, z1 + .2, x, CURB + 4.05, z1 + .2, .12);
+  for (const side of [-1, 1]) for (const [y, r] of [[CURB + 3.7, .14], [CURB + 2.6, .1]]) pipe(side*(W0/2 + .2), y, z0 - .1, side*(W0/2 + .2), y, z1 + .2, r, chance(.5) ? M.fRust : M.fSteel2);
+  const tx = -L/2 + 1.3, tz = D/2 - 1.4;                                                      // the nutrient tank in the yard
+  put(U.cyl16, M.fSteel2, under(P, T(tx, CURB + 1.6, tz, 0, 1.6, 3.2, 1.6))); put(U.cone, M.ghFrame2, under(P, T(tx, CURB + 3.45, tz, 0, 1.7, .5, 1.7)));
+  for (const y of [.9, 2.3]) put(U.cyl16, M.fRust, under(P, T(tx, CURB + y, tz, 0, 1.68, .12, 1.68)));
+  box(M.ghNeonT, P, tx, CURB + 2.9, tz + .82, .5, .05, .03); glow(P, tx, CURB + 2.9, tz + 1.0, 'cyan', .8);
+  for (let y = .3; y < 3.1; y += .3) box(M.frame, P, tx + .82, CURB + y, tz, .03, .03, .3);
+  pipe(tx, CURB + 2.2, tz - .8, tx, CURB + 2.2, z1 + .2, .14); elbow(tx, CURB + 2.2, z1 + .2, .14);
+  // steam vents on the ledge
+  for (const [x, z] of [[-W0/2 + .5, z0 + .4], [W0/2 - .5, z0 + .4], [W0/2 - .5, z1 - .3]]){ box(M.fSteel3, P, x, CURB + H0 + .35, z, .5, .5, .5); emitters.push(new THREE.Vector3(x, CURB + H0 + .7, z).applyMatrix4(P)); }
+
+  // ---- the glass house: floor, glass, the steel grid
+  box(M.ghGrate, P, 0, yG + .02, cz, Wg, .04, Dg);
+  for (const [F, len] of blockFaces(P, 0, cz, Wg, Dg)){
+    box(M.ghGlass, F, 0, yG + Hg/2, 0, len, Hg, .02);
+    const n = Math.round(len/1.25);
+    for (let q = 0; q <= n; q++) box(q === 0 || q === n ? M.ghFrame2 : M.ghFrame, F, -len/2 + q*len/n, yG + Hg/2, .02, q === 0 || q === n ? .14 : .06, Hg, .08);
+    for (const [y, t] of [[yG + .05, .12], [yG + 1.2, .05], [yG + 2.4, .12], [yG + 3.6, .05], [yE, .16]]) box(t > .1 ? M.ghFrame2 : M.ghFrame, F, 0, y, .02, len, t, .08);
+  }
+  // the barrel vault: glass panels between arched ribs, purlins along it, glass gables at the ends
+  const NS = 12, arc = q => { const a = q/NS*PI; return [Math.cos(a)*Dg/2, yE + Math.sin(a)*hv]; };
+  for (let q = 0; q < NS; q++){
+    const [za, ya] = arc(q), [zb, yb] = arc(q + 1), mz = (za + zb)/2, my = (ya + yb)/2, len = Math.hypot(zb - za, yb - ya), rx = -Math.atan2(yb - ya, zb - za);
+    put(U.box, M.ghGlass, under(P, T(0, my, cz + mz, 0, Wg, MIN_T, len, rx)));
+    box(M.ghFrame, P, 0, ya, cz + za, Wg, .06, .06);                                           // purlin
+    for (const side of [-1, 1]){                                                               // the gable ends: glass strips up to the arc
+      const hh = my - yE; if (hh > .05) box(M.ghGlass, P, side*gx, yE + hh/2, cz + mz, .02, hh, Math.abs(zb - za) + .01);
+      box(M.ghFrame, P, side*gx, yE + Math.max(.03, ya - yE)/2, cz + za, .06, Math.max(.06, ya - yE), .06);
+    }
+  }
+  for (let x = -gx; x <= gx + .01; x += Wg/12) for (let q = 0; q < NS; q++){ const [za, ya] = arc(q), [zb, yb] = arc(q + 1); strut(Math.abs(x) > gx - .1 ? M.ghFrame2 : M.ghFrame, P, x, ya, cz + za, x, yb, cz + zb, Math.abs(x) > gx - .1 ? .1 : .06); }
+  box(M.ghFrame2, P, 0, yE + hv + .08, cz, Wg + .2, .16, .4);                                 // the ridge vent
+  for (let x = -gx + 1.5; x < gx - 1; x += 3.0){ box(M.fSteel3, P, x, yE + hv + .3, cz, .7, .3, .55); emitters.push(new THREE.Vector3(x, yE + hv + .5, cz).applyMatrix4(P)); }
+  beaconLight(P, -gx, yE + .3, gz1, .08, .8); beaconLight(P, gx, yE + .3, gz0, .08, .8);
+  // vines escaping over the eaves
+  for (let k=0; k<10; k++){ const side = chance(.5) ? 1 : -1; plant(pick(['vines','pothos','h_ivy']), under(P, T(rnd(-gx + .5, gx - .5), 0, cz + side*(Dg/2 + .04), side > 0 ? 0 : PI)), 0, yE + .05, 0, rnd(.8, 1.1), 't', true); }
+
+  // ---- inside: racks along the long walls, two storeys, lit purple and white
+  const greens = (F, x0, x1, y, z, dz = .32) => { for (let x = x0; x < x1; x += .22) for (const o of [-dz/4, dz/4]) box(chance(.5) ? M.ghLeaf1 : chance(.5) ? M.ghLeaf2 : M.ghLeaf3, F, x, y + .05, z + o, .14, .1 + rnd(0, .05), .12); };
+  const rack = (zc, face, yBase, tiers, gap) => {
+    for (let x = -gx + .4; x < gx - .5; x += 1.4){
+      for (const xx of [x, x + 1.3]) box(M.ghFrame, P, xx, yBase + tiers*gap/2, zc, .04, tiers*gap, .04);
+      for (let t = 0; t < tiers; t++){ const y = yBase + .3 + t*gap;
+        box(M.ghTray, P, x + .65, y, zc, 1.3, .05, .42); greens(P, x + .1, x + 1.25, y, zc, .34);
+        box(t%2 ? M.ghGrowW : M.ghGrowP, P, x + .65, y + gap - .1, zc, 1.2, .03, .06); }
+    }
+    for (let x = -gx + 1.2; x < gx; x += 2.8) glow(P, x, yBase + gap*tiers*.5, zc + face*.3, chance(.6) ? 'platinum' : 'pink', 1.5);
+  };
+  rack(gz0 + .4, 1, yG, 4, .56); rack(gz1 - .4, -1, yG, 4, .56);
+  // the mezzanine along both long walls, with racks of its own
+  const yM = yG + 2.4;
+  for (const [zc, face] of [[gz0 + .55, 1], [gz1 - .55, -1]]){
+    box(M.ghGrate, P, 0, yM, zc, Wg - .2, .06, 1.1);
+    box(M.ghFrame2, P, 0, yM + .5, zc + face*.55, Wg - .2, .04, .04); for (let x = -gx + .3; x < gx; x += 1.0) box(M.ghFrame, P, x, yM + .25, zc + face*.55, .03, .5, .03);
+    for (let x = -gx + .5; x < gx; x += 2.5) box(M.ghFrame, P, x, (yG + yM)/2, zc + face*.55, .06, yM - yG, .06);   // posts under it
+  }
+  rack(gz0 + .3, 1, yM, 3, .62); rack(gz1 - .3, -1, yM, 3, .62);
+  // the hydroponic tables down the middle, a grow light over each, two gantry rails for the robot arms
+  const rows = [cz - 2.85, cz - 1.75, cz + 1.75, cz + 2.85].filter(z => z > gz0 + 1.3 && z < gz1 - 1.3);
+  for (const z of rows) for (const side of [-1, 1]){
+    const xc = side*(gx/2 + .25), len = gx - 1.4;
+    for (const xx of [xc - len/2 + .2, xc, xc + len/2 - .2]) for (const o of [-.3, .3]) box(M.ghFrame, P, xx, yG + .38, z + o, .05, .72, .05);
+    box(M.ghTray, P, xc, yG + .78, z, len, .08, .8); greens(P, xc - len/2 + .15, xc + len/2 - .1, yG + .8, z, .62); greens(P, xc - len/2 + .25, xc + len/2 - .1, yG + .8, z, .2);
+    box(rows.indexOf(z)%2 ? M.ghGrowW : M.ghGrowP, P, xc, yG + 1.75, z, len - .3, .04, .1);
+    for (const xx of [xc - len/3, xc + len/3]) box(M.ghFrame, P, xx, (yG + 1.75 + yE)/2, z, .015, yE - yG - 1.75, .015);   // hung from the roof
+    glow(P, xc, yG + 1.5, z, rows.indexOf(z)%2 ? 'platinum' : 'pink', 1.8);
+  }
+  const rails = [];
+  for (const z of [cz - 2.3, cz + 2.3]) if (z > gz0 + 1.2 && z < gz1 - 1.2){
+    box(M.ghFrame2, P, 0, yG + 2.2, z, Wg - .4, .1, .12);
+    for (const x of [-gx + .3, 0, gx - .3]) box(M.ghFrame, P, x, yG + 1.1, z, .1, 2.2, .1);
+    rails.push({ z, y: yG + 2.15, x0: -gx + .8, x1: -.6 }, { z, y: yG + 2.15, x0: .6, x1: gx - .8 });
+  }
+  // the conveyor down the middle with crates of greens riding it, and the nutrient tanks at one end
+  box(M.ghFrame2, P, 0, yG + .5, cz, Wg - 2.4, .1, .55); box(M.concDD, P, 0, yG + .57, cz, Wg - 2.5, .03, .48);
+  for (let x = -gx + 1.3; x < gx - 1.2; x += .35) box(M.ghFrame, P, x, yG + .59, cz, .03, .02, .5);
+  for (let x = -gx + 1.3; x < gx - 1.2; x += 1.6) for (const o of [-.22, .22]) box(M.ghFrame, P, x, yG + .25, cz + o, .05, .5, .05);
+  for (let x = -gx + 1.8; x < gx - 1.6; x += rnd(1.0, 1.8)){ box(M.crate, P, x, yG + .74, cz, .42, .3, .36); for (let q = 0; q < 4; q++) box(pick([M.ghLeaf1, M.ghLeaf2]), P, x - .1 + (q%2)*.2, yG + .93, cz - .08 + (q > 1 ? .16 : 0), .14, .09, .12); }
+  for (const [x, zo] of [[-gx + .6, -.5], [-gx + .6, .5], [gx - .6, 0]]){ put(U.cyl16, M.fSteel2, under(P, T(x, yG + .9, cz + zo, 0, .7, 1.8, .7))); put(U.cyl16, M.fRust, under(P, T(x, yG + 1.2, cz + zo, 0, .74, .1, .74))); box(M.ghNeonT, P, x + .36*Math.sign(-x), yG + 1.4, cz + zo, .02, .3, .08); }
+  // pipes under the roof, hung with vines, and a sign over the floor
+  for (const z of [gz0 + 1.25, gz1 - 1.25]){ strut(M.fRust, P, -gx + .2, yE - .25, z, gx - .2, yE - .25, z, .14);
+    for (let x = -gx + .5; x < gx - .4; x += rnd(.5, 1.0)) if (chance(.6)) plant(pick(['vines','pothos','h_vine3','h_curtain1']), P, x, yE - .3, z, rnd(.7, 1.0), 't', true); }
+  wordSign(under(P, T(gx - 3.2, 0, cz, PI/2)), 'sign_w_bay', 0, yG + 2.9, 0, .7, 'pink', .6);
+  m.gh = { m: P.toArray(), rails };
+  m.roofH = CURB + H0 + .1;
+  m.top = yE + hv + .8;
+}
+// the robot arms: a trolley on each gantry rail with a jointed arm under it, sliding along over the tables, stopping
+// now and then to reach down and tend the greens
+function greenhouseFx(m){
+  const g = m.gh; if (!g || !g.rails.length) return null;
+  const root = new THREE.Group(); root.matrixAutoUpdate = false; root.matrix.fromArray(g.m); root.matrixWorldNeedsUpdate = true; scene.add(root);
+  const armMat = new THREE.MeshLambertMaterial({ color: 0xc0702a }), darkMat = new THREE.MeshLambertMaterial({ color: 0x2c3236 }), geo = new THREE.BoxGeometry(1, 1, 1);
+  const mk = (par, mat, x, y, z, sx, sy, sz) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); par.add(o); return o; };
+  const arms = g.rails.map((r, k) => {
+    const car = new THREE.Group(); car.position.set((r.x0 + r.x1)/2, r.y, r.z); root.add(car);
+    mk(car, darkMat, 0, 0, 0, .34, .14, .26);
+    const sh = new THREE.Group(); sh.position.y = -.08; car.add(sh); mk(sh, armMat, 0, -.25, 0, .09, .5, .09);
+    const el = new THREE.Group(); el.position.y = -.5; sh.add(el); mk(el, darkMat, 0, 0, 0, .12, .12, .12); mk(el, armMat, 0, -.2, 0, .07, .4, .07);
+    const hand = new THREE.Group(); hand.position.y = -.42; el.add(hand); mk(hand, darkMat, 0, 0, 0, .14, .05, .1); mk(hand, darkMat, -.05, -.06, 0, .02, .08, .02); mk(hand, darkMat, .05, -.06, 0, .02, .08, .02);
+    return { r, car, sh, el, ph: k*1.7 + (m.seed % 7), sp: .18 + (k%3)*.05 };
+  });
+  return {
+    update(dt, t){
+      for (const a of arms){
+        const u = t*a.sp + a.ph, glide = (Math.sin(u) + 1)/2, dwell = Math.max(0, Math.sin(u*3.1 + 1.3));   // slide, and reach down now and then
+        a.car.position.x = a.r.x0 + (a.r.x1 - a.r.x0)*glide;
+        a.sh.rotation.z = .35*Math.sin(u*1.7) - .2*dwell; a.el.rotation.z = .7*dwell + .25*Math.sin(u*2.3);
+      }
+    },
+    dispose(){ scene.remove(root); geo.dispose(); armMat.dispose(); darkMat.dispose(); }
+  };
 }
 
 /* ---------- the police station ---------- */

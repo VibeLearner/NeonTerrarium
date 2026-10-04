@@ -286,6 +286,7 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
   make('sign_c_lift', 'LIFT UP-DOWN', '#ff5ad0', true);
   make('sign_hw_toll', 'TOLL GATE 07', '#5ae8ff'); make('sign_hw_entry', 'HIGHWAY ENTRY', '#ff5ad0'); make('sign_hw_arrivals', 'ARRIVALS', '#5ae8ff');   // the sky highways (highway.js)
   make('sign_c_ramen', 'RAMEN', '#ffb04a', true); make('sign_c_gear', 'GEAR.SCRAP', '#7ae8ff');
+  make('sign_w_hydro', 'HYDROPONIC FARM', '#8aff9a', true); make('sign_w_farm24', 'OPEN 24HR FARMS', '#c88aff'); make('sign_w_agri', 'AGRI-TECH.HYDROPONICS', '#5ae8ff'); make('sign_w_bay', 'BAY 12', '#ff7ad8');   // the hydroponic farm
   make('sign_w_neondome', 'NEON DOME', '#ff5ad0', true); make('sign_w_nightclub', 'NIGHTCLUB.OPEN 24H', '#5ae8ff');
   make('sign_w_club', 'CLUB', '#b07aff'); make('sign_w_drinks', 'DRINKS', '#b07aff'); make('sign_w_music', 'MUSIC', '#b07aff');
   make('sign_w_enter', 'ENTER', '#5af0e0'); make('sign_w_bar', 'BAR', '#7ab0ff', true); make('sign_w_snacks', 'SNACKS', '#ff6aa8');

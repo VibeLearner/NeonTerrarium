@@ -364,16 +364,23 @@ function hwBuildView(h){
 // the parts that stand on the plots under a highway: a pillar from the roof or the ground up to each plot's deck, and
 // the drop-off's lift shaft down to the street. Drawn with the plot (called while it's built), so the walking paths
 // go round them.
+// where this plot's highway pillars come down (for put's keep-out: no rooftop clutter there), or null
+function hwKeepOut(c){
+  const spots = [];
+  for (const { h, k } of hwAt(c.i, c.j)){ if (hwAt(c.i, c.j).some(o => !(o.h === h && o.k === k) && o.h.tiles[o.k].L < h.tiles[k].L)) continue; const m = hwCenter(h, k, .5); spots.push({ x: m.x, z: m.z }); }
+  return spots.length ? { y: CURB + 1.2, spots } : null;
+}
 function hwFeet(c){
   for (const { h, k } of hwAt(c.i, c.j)){
     const t = h.tiles[k];
     if (hwAt(c.i, c.j).some(o => !(o.h === h && o.k === k) && o.h.tiles[o.k].L < t.L)) continue;   // another highway under this one: it spans over
-    const m = hwCenter(h, k, .5), top = hwHeight(h, k, .5) - HW_THICK - HW_GIRDER + .04, bot = c.mega ? hwSurface(c) : c.sections.length ? Math.max(c.height, bucketTopIn(m.x - .4, m.x + .4, m.z - .4, m.z + .4)) : CURB;   // (it stands on whatever is right under it: the roof, or a tank or plant room on it)
+    const m = hwCenter(h, k, .5), top = hwHeight(h, k, .5) - HW_THICK - HW_GIRDER + .04, roof = c.sections.length && !c.mega ? bucketTopIn(m.x - .2, m.x + .2, m.z - .2, m.z + .2) : -1e9, bot = c.mega ? hwSurface(c) : roof > CURB ? roof - .6 : CURB;   // (it goes down into the roof right under it, the clutter there having been left out: see hwKeepOut)
     if (top - bot < .2) continue;
     const F = T(m.x, 0, m.z, Math.atan2(m.tx, m.tz));
     box(HWM.pillar, F, 0, (bot + top)/2, 0, .4, top - bot, .4);
     box(HWM.pillar2, F, 0, top - .12, 0, .62, .24, .5);                  // the head under the girder
-    box(HWM.pillar2, F, 0, bot + .05, 0, .54, .1, .54);                  // the foot
+    if (roof > CURB){ box(HWM.pillar2, F, 0, roof + .06, 0, .6, .14, .6); box(HWM.pillar2, F, 0, roof + .01, 0, .72, .05, .72); }   // the collar where it meets the roof
+    else box(HWM.pillar2, F, 0, bot + .05, 0, .54, .1, .54);                  // the foot
     for (const s of [-1, 1]) box(s < 0 ? HWM.cyan : HWM.pink, F, s*.205, (bot + top)/2, 0, .012, Math.max(.1, top - bot - .5), .04);
     box(HWM.cyan, F, 0, top - .3, .205, .3, .03, .012); box(HWM.pink, F, 0, top - .3, -.205, .3, .03, .012);
   }

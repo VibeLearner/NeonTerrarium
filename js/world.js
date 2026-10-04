@@ -1012,7 +1012,7 @@ function rebuildCell(c){
   c.height = CURB;
   c.dark = isDarkPlot(c);
   DARK = c.dark;
-  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length) buildStack(c); c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); }); } finally { DARK = false; }   // (and the feet of any highway over it)
+  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length){ PUT_KEEPOUT = hwKeepOut(c); try { buildStack(c); } finally { PUT_KEEPOUT = null; } } c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); }); } finally { DARK = false; }   // (and the feet of any highway over it)
   if (c.liftCab) podDoorSpot(c);
   if (c.mega){ const m = megas.get(c.mega); if (m && m.roofH) c.height = m.roofH; }
   cellView(c);

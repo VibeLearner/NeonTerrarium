@@ -400,6 +400,7 @@ function plant(kind,P,x,y,z,k=1,anchor,fixed=false){
   const flip = (kind.startsWith('sign_') || kind.startsWith('glyph_')) ? 1 : toss;   // lettering must read the right way round
   if (DARK && flip === 1 && kind.startsWith('sign_')){ _gv.set(x,y,z).applyMatrix4(P); if (posHash(_gv.x, _gv.y, _gv.z) < 70) return; }
   const ph = DARK && kind.startsWith('sign_') ? phase + 100 : phase;   // a sign on a dark street flickers hard
+  if (PUT_KEEPOUT){ _gv.set(x,y,z).applyMatrix4(P); if (inKeepOut(_gv.x, _gv.y, _gv.z, .2)){ if (!fixed) rnd(0,PI); return; } }   // (not where a highway pillar meets the roof: see put)
   if (fixed){
     FOL_LIST[kind].push({ m: under(P, T(x,y,z)).multiply(scale), an, flip, shade, phase: ph, fixed:1 });
   } else {

@@ -160,7 +160,24 @@ let DARK = false, KEEP_LIGHT = false;
 let LUX = null, NO_GREEN = false;   // NO_GREEN: while a bare plot (no greenery) is generated, see world.js   // while a luxury section is generated: { mats: Map(neon -> its gold/ivory/... stand-in), glows: { kind: kind } }
 const DARK_SUB = { window: toon(0x22303f), bulb: toon(0x3d3226), neon: toon(0x2a2230), trim: toon(0x2c3438) };
 const posHash = (x, y, z) => hash('lit', Math.round(x*20), Math.round(y*20), Math.round(z*20)) % 100;
+// Where a highway's pillar comes down onto a roof (see hwFeet), the rooftop clutter there (tanks, boxes, chimneys,
+// plants) is left out, so the pillar meets the roof itself: { y, spots: [{ x, z }] } while such a plot is built, else null.
+// Only small pieces above the ground floor count; walls, roof slabs and big roof forms stay.
+let PUT_KEEPOUT = null;
+const KEEP_R = .45;
+function inKeepOut(x, y, z, r){ if (y < PUT_KEEPOUT.y) return false; for (const s of PUT_KEEPOUT.spots) if (Math.abs(x - s.x) < r + KEEP_R && Math.abs(z - s.z) < r + KEEP_R) return true; return false; }
+function keptOut(geo, m){
+  if (!geo.boundingBox) geo.computeBoundingBox();
+  const bb = geo.boundingBox, e = m.elements, cx0 = (bb.min.x + bb.max.x)/2, cy0 = (bb.min.y + bb.max.y)/2, cz0 = (bb.min.z + bb.max.z)/2;
+  const hx0 = (bb.max.x - bb.min.x)/2, hy0 = (bb.max.y - bb.min.y)/2, hz0 = (bb.max.z - bb.min.z)/2;
+  const hx = Math.abs(e[0])*hx0 + Math.abs(e[4])*hy0 + Math.abs(e[8])*hz0, hz = Math.abs(e[2])*hx0 + Math.abs(e[6])*hy0 + Math.abs(e[10])*hz0;
+  if (hx > .85 || hz > .85) return false;                                                    // (a big piece: part of the building)
+  const hy = Math.abs(e[1])*hx0 + Math.abs(e[5])*hy0 + Math.abs(e[9])*hz0;
+  const x = e[0]*cx0 + e[4]*cy0 + e[8]*cz0 + e[12], y = e[1]*cx0 + e[5]*cy0 + e[9]*cz0 + e[13], z = e[2]*cx0 + e[6]*cy0 + e[10]*cz0 + e[14];
+  return inKeepOut(x, y - hy, z, Math.max(hx, hz));
+}
 function put(geo, mat, m){
+  if (PUT_KEEPOUT && keptOut(geo, m)) return;
   if (LUX){ let sub = LUX.mats.get(mat); if (!sub && LUX.auto && mat.userData && mat.userData.glow) sub = LUX.auto(mat); if (sub){ mat = sub; if (LUX.halo) LUX.halo(sub, m); } }
   if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && posHash(m.elements[12], m.elements[13], m.elements[14]) < 82) mat = DARK_SUB[mat.userData.glow];
   let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null, o: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }

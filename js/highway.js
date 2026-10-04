@@ -516,6 +516,52 @@ function hwTraffic(t){
 // Traffic comes in waves. A young city sends two or three cars together every 30 to 40 seconds; as the city grows the waves
 // come more often and carry more cars, up to a steady stream (about a car a second on a two-lane road) in a big one.
 const HW_RATE_MIN = 2.5/35, HW_RATE_MAX = 1.05;   // cars a second, a two-lane highway
+// where a car is along its course: the lane's path, its own offsets in and out (see the spawn), and the lift that keeps it
+// over the buildings (see hwLiftFor); into o ({ x, y, z }), and the path cursor back
+function hwCarPos(c, P, s, k, o, lift = true){
+  k = hwAlong(P, s, k, o);
+  if (c.inO){
+    const wi = s < P.sRamp ? 1 - smooth01(s/P.sRamp) : 0, wo = s > P.sEnd ? smooth01((s - P.sEnd)/(P.len - P.sEnd)) : 0;
+    if (wi > 0 || wo > 0){ const A = c.inO, B = c.outO, ax = -P.hz, az = P.hx, bx = -P.ez, bz = P.ex;   // (to the side of the way it's heading)
+      o.x += wi*(A.lat*ax - A.back*P.hx) + wo*(B.lat*bx + B.back*P.ex); o.y += wi*A.up + wo*B.up; o.z += wi*(A.lat*az - A.back*P.hz) + wo*(B.lat*bz + B.back*P.ez); }
+  }
+  if (lift && c.lift){ const f = s/HW_LIFT_STEP, q = Math.floor(f), L = c.lift; if (q >= 0 && q < L.length - 1) o.y += L[q] + (L[q + 1] - L[q])*(f - q); }
+  return k;
+}
+// the tallest thing under a point of sky: buildings (rooftop props and all), megastructures, other highways' decks and this
+// one's own (but for the ends the cars come down onto and leave from)
+function hwSkyAt(x, z, own){
+  let top = -1;
+  const i0 = Math.round(x/LOT), j0 = Math.round(z/LOT);
+  for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++){
+    const dx = Math.abs(x - i*LOT), dz = Math.abs(z - j*LOT);
+    if (dx > LOT/2 + .5 || dz > LOT/2 + .5) continue;
+    const c = cells.get(ckey(i, j));
+    if (c){ if (c.mega){ const m = megas.get(c.mega); if (m) top = Math.max(top, m.top || m.roofH || 0); }
+      else if (c.sections.length && dx < SIDE/2 + .6 && dz < SIDE/2 + .6) top = Math.max(top, c.height, c.topY || 0); }
+    for (const { h, k } of hwAt(i, j)){ const n = h.tiles.length, end = k === 0 || k === n - 1;
+      if (h === own && (k <= 1 || k >= n - 2)) continue;
+      top = Math.max(top, hwY(h.tiles[k].L) + (end ? 1.8 : .7)); }
+  }
+  return top;
+}
+// a car's lift along its course, worked out once when it sets off: wherever its way in or out passes over something
+// taller, it rises to clear it (in good time before, easing down after), and it comes down onto the ramp as before
+const HW_LIFT_STEP = .35, HW_CLEARANCE = .8;   // (fine steps: far out, a step along the course can be a long way through the sky)
+function hwLiftFor(c, P){
+  const n = Math.ceil(P.len/HW_LIFT_STEP) + 2, need = new Float32Array(n), o = { x: 0, y: 0, z: 0 };
+  let k = 0, any = false;
+  for (let q = 0; q < n; q++){
+    const s = Math.min(P.len, q*HW_LIFT_STEP); if (s >= P.sRamp - .5 && s <= P.sEnd + .5) continue;   // (on the deck: nothing to do)
+    k = hwCarPos(c, P, s, k, o, false);
+    const v = hwSkyAt(o.x, o.z, c.h) + HW_CLEARANCE - o.y; if (v > 0){ need[q] = v; any = true; }
+  }
+  if (!any) return null;
+  const L = new Float32Array(n);
+  for (let q = 0; q < n; q++){ let m = 0; for (let j = Math.max(0, q - 8); j <= Math.min(n - 1, q + 17); j++) m = Math.max(m, need[j]); L[q] = m; }   // up well before, down a little after
+  for (let pass = 0; pass < 4; pass++) for (let q = 1; q < n - 1; q++) L[q] = Math.max(need[q], (L[q - 1] + L[q] + L[q + 1])/3);
+  return L;
+}
 function updateHighways(dt, t){
   const busy = hwTraffic(t);
   for (const h of highways){
@@ -541,7 +587,9 @@ function updateHighways(dt, t){
       // offset is from there; it fades out by the ramp, and a second one fades in after the terminal)
       const place = () => ({ a: Math.random()*TAU, d: 40 + Math.random()*40 });   // (any bearing round the road's end, far or near: each car its own)
       const spot = w => ({ lat: Math.cos(w.a)*w.d + (Math.random() - .5)*10, back: Math.sin(w.a)*w.d - 38 + (Math.random() - .5)*10, up: Math.random()*5 - 1, k: Math.max(0, (w.d - 45)/45) });
-      hwCars.push({ h, lane, s: 0, k: 0, kind: hwPickKind(), inO: spot(place()), outO: spot(place()) });
+      const car = { h, lane, s: 0, k: 0, kind: hwPickKind(), inO: spot(place()), outO: spot(place()) };
+      car.lift = hwLiftFor(car, LP[lane]);   // (rising over anything in its way)
+      hwCars.push(car);
       return false;
     });
   }
@@ -556,19 +604,10 @@ function updateHighways(dt, t){
     if (c.s >= P.len) return false;
     if (s0 < P.sMid && c.s >= P.sMid && Math.random() < .55) hwDropVisitor(c.h);   // through the terminal: someone gets out
     if (c.s > P.sIn + .05 && c.s < P.sOut - .05) return true;   // inside the terminal: out of sight
-    c.k = hwAlong(P, c.s, c.k, _hpos);
-    if (c.inO){   // wander in from its own direction, and out toward its own
-      const wi = c.s < P.sRamp ? 1 - smooth01(c.s/P.sRamp) : 0, wo = c.s > P.sEnd ? smooth01((c.s - P.sEnd)/(P.len - P.sEnd)) : 0;
-      if (wi > 0 || wo > 0){
-        const A = c.inO, B = c.outO, ax = -P.hz, az = P.hx, bx = -P.ez, bz = P.ex;   // (to the side of the way it's heading)
-        const move = (px, py, pz) => [px + wi*(A.lat*ax - A.back*P.hx) + wo*(B.lat*bx + B.back*P.ex), py + wi*A.up + wo*B.up, pz + wi*(A.lat*az - A.back*P.hz) + wo*(B.lat*bz + B.back*P.ez)];
-        const q0 = move(_hpos.x, _hpos.y, _hpos.z), s2 = Math.min(P.len, c.s + .3), wi2 = s2 < P.sRamp ? 1 - smooth01(s2/P.sRamp) : 0, wo2 = s2 > P.sEnd ? smooth01((s2 - P.sEnd)/(P.len - P.sEnd)) : 0;
-        hwAlong(P, s2, c.k, _hpos2);
-        const q1 = [_hpos2.x + wi2*(A.lat*ax - A.back*P.hx) + wo2*(B.lat*bx + B.back*P.ex), _hpos2.y + wi2*A.up + wo2*B.up, _hpos2.z + wi2*(A.lat*az - A.back*P.hz) + wo2*(B.lat*bz + B.back*P.ez)];
-        const dx = q1[0] - q0[0], dy = q1[1] - q0[1], dz = q1[2] - q0[2];
-        _hpos.x = q0[0]; _hpos.y = q0[1]; _hpos.z = q0[2]; _hpos.yaw = Math.atan2(dx, dz); _hpos.pitch = -Math.atan2(dy, Math.hypot(dx, dz) || 1e-4);
-      }
-    }
+    // its position, and its heading from a step further on (off the deck it follows its own way in or out, and its lift)
+    const s2 = Math.min(P.len, c.s + .3);
+    c.k = hwCarPos(c, P, c.s, c.k, _hpos); hwCarPos(c, P, s2, c.k, _hpos2);
+    if (c.inO && (c.s < P.sRamp || c.s > P.sEnd)){ const dx = _hpos2.x - _hpos.x, dy = _hpos2.y - _hpos.y, dz = _hpos2.z - _hpos.z; _hpos.yaw = Math.atan2(dx, dz); _hpos.pitch = -Math.atan2(dy, Math.hypot(dx, dz) || 1e-4); }
     // locked onto the lanes at the toll gate: it settles a little lower, and the lane flares under it
     const g = (c.s - P.sGate)/.9, hover = c.s < P.sGate ? .3 : c.s < P.sGate + .9 ? .3 - .1*smooth01(g) : c.s > P.sOut ? .2 + .1*smooth01((c.s - P.sOut)/1.5) : .2;
     const sc = Math.min(1, c.s/4, (P.len - c.s)/4);

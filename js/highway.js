@@ -413,11 +413,10 @@ function hwFold(g){
   return { plain: merge(plain), lit: merge(lit) };
 }
 const HW_KINDS = (() => {
-  const out = [], under = [HWM.pink, HWM.cyan, M.neonAmber || HWM.pink, null];
+  const out = [];
   ['std', 'taxi', 'lux', 'van'].forEach((kind, q) => {
     const c = buildCar(kind), g = c.g;
     for (const pv of c.pods) pv.rotation.x = .95;   // thrusters tilted back: cruising
-    if (under[q]) carPart(g, U.box, under[q], 0, -.09, 0, .16, .015, .7);   // a strip of underglow
     const f = hwFold(g), meshes = [];
     for (const [geo, mat] of [[f.plain, HW_CAR_PLAIN], [f.lit, HW_CAR_GLOW]]){ if (!geo) continue; const m = new THREE.InstancedMesh(geo, mat, HW_CAR_MAX); m.count = 0; m.frustumCulled = false; m.visible = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); meshes.push(m); }
     out.push({ kind, meshes, n: 0 });

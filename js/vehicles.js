@@ -14,76 +14,139 @@ const clouds = (() => {
 })();
 
 const cars = [];
-/* ---------- hover cars: low angular bodies on four drum hover pods, in several kinds ---------- */
-// Original design: wedge hull, glass cabin, drum-shaped hover pods in dark hoops, vertical light strips on the
-// front pods, blue thrusters underneath. Kinds: standard, taxi, luxury, beat-up and cargo van.
+/* ---------- hover cars: real car bodies on hover pads, in several kinds ---------- */
+// Each body is a side silhouette pushed out to the car's width (a painted lower body, a glass cabin set a touch in from
+// the sides, a roof panel and pillars over it), riding on hover pads underneath instead of wheels. Kinds: a low wedge
+// sports car (std), a checkered yellow taxi with a roof sign and ducted fans, a long black limousine with gold trim
+// (lux), a tall rounded family minivan (van) and a beat-up old sedan (beat). The pads are pivot groups the flight code
+// tilts (back while cruising, straight down to land, park and take off).
 U.taper = new THREE.CylinderGeometry(.18, .5, 1, 16).toNonIndexed();
 const CARM = {
   strip: toon(0x606060, { em:0xfff0d8, kind:'thruster' }),
+  head:  toon(0x707070, { em:0xfff4dc, kind:'thruster' }),
   tail:  toon(0x401010, { em:0xff3030, kind:'thruster' }),
-  taxiSign: toon(0x5a3e18, { em:0xffc040, kind:'thruster' }),
-  std:  [toon(0x2a2e36), toon(0x3a3f48), toon(0x3a3036), toon(0x40464e)],
-  taxi: [toon(0xe0b43a)],
-  lux:  [toon(0xe8e8e4), toon(0x2a2050), toon(0x15161c), toon(0x6a1f3a)],
+  taxiSign: toon(0x5a3e18, { em:0xffd060, kind:'thruster' }),
+  std:  [toon(0x24272e), toon(0x33373f), toon(0x8a1c22), toon(0xd8dade), toon(0x1c2a3a)],
+  taxi: [toon(0xe8b830)],
+  lux:  [toon(0x16171c), toon(0x121318), toon(0x2a1a2e)],
   beat: [toon(0x8A4A2A), toon(0x7d8b8c), toon(0x6b6048), toon(0x5a6a58)],
-  van:  [toon(0x8a9098), toon(0x4f7fa3), toon(0xd9d2c0)],
-  chrome: toon(0xb8c0c8),
+  van:  [toon(0x2e3d55), toon(0x8a9098), toon(0xd9d2c0), toon(0x3f6a6a)],
+  chrome: toon(0xb8c0c8), gold: toon(0xc9a24a), black: toon(0x15161a), under: toon(0x22252c), grille: toon(0x0e0f12),
+  check: toon(0x17181c), seat: toon(0x8a7a62),
 };
 function carPart(g, geo, mat, x, y, z, sx, sy, sz, rx=0, ry=0, rz=0){
   const m = new THREE.Mesh(geo, mat); m.position.set(x,y,z); m.scale.set(sx,sy,sz); m.rotation.set(rx,ry,rz); g.add(m); return m;
 }
 function carSprite(g, mat, x, y, z, sc){ const sp = new THREE.Sprite(mat); sp.position.set(x,y,z); sp.scale.set(sc,sc,1); sp.layers.set(1); g.add(sp); return sp; }
+// a side silhouette ([z, y] points, nose toward +z) pushed out to width w, centred on x = 0 (cached by its shape)
+const carProfileCache = new Map();
+function carProfile(pts, w, bev = .012){
+  const key = JSON.stringify(pts) + w + bev;
+  let geo = carProfileCache.get(key);
+  if (!geo){
+    const sh = new THREE.Shape(); pts.forEach(([z, y], k) => k ? sh.lineTo(z, y) : sh.moveTo(z, y));
+    const d = Math.max(.01, w - 2*bev);
+    geo = new THREE.ExtrudeGeometry(sh, { depth: d, bevelEnabled: bev > 0, bevelThickness: bev, bevelSize: bev*.8, bevelSegments: 1, curveSegments: 4 });
+    if (geo.index) geo = geo.toNonIndexed();
+    geo.applyMatrix4(new THREE.Matrix4().makeRotationY(-PI/2)); geo.translate(d/2, 0, 0);
+    geo.computeVertexNormals(); carProfileCache.set(key, geo);
+  }
+  return geo;
+}
+// the shapes, per kind: the painted body up to the waist, the glass cabin over it, the roof panel's span, door seams
+const CAR_SHAPES = {
+  std: { L: 1.04, W: .46, pads: 2,
+    body: [[-.52,-.05],[.5,-.06],[.54,-.01],[.52,.04],[.3,.08],[.12,.11],[-.4,.13],[-.53,.12],[-.54,.03]],
+    cab:  [[.16,.105],[-.02,.215],[-.22,.21],[-.42,.125]], roof: [-.2, -.02], roofY: .212, seams: [.02, -.2], belt: .1 },
+  taxi: { L: 1.0, W: .44, pads: 2,
+    body: [[-.5,-.06],[.48,-.06],[.52,-.01],[.51,.06],[.42,.11],[.18,.14],[-.42,.15],[-.5,.12],[-.52,.02]],
+    cab:  [[.2,.135],[.04,.29],[-.3,.29],[-.42,.14]], roof: [-.29, .03], roofY: .29, seams: [.05, -.17], belt: .13 },
+  lux: { L: 1.3, W: .43, pads: 3,
+    body: [[-.65,-.05],[.63,-.05],[.66,0],[.65,.08],[.58,.115],[.3,.13],[-.6,.135],[-.66,.11],[-.67,.02]],
+    cab:  [[.3,.125],[.17,.245],[-.5,.245],[-.6,.13]], roof: [-.49, .16], roofY: .245, seams: [.12, -.08, -.28], belt: .12 },
+  van: { L: 1.06, W: .5, pads: 3,
+    body: [[-.52,-.06],[.48,-.06],[.53,-.01],[.545,.06],[.52,.13],[.42,.18],[-.5,.18],[-.535,.1],[-.53,0]],
+    cab:  [[.43,.17],[.22,.37],[-.46,.375],[-.51,.17]], roof: [-.45, .2], roofY: .372, seams: [.1, -.14], belt: .16 },
+  beat: { L: 1.0, W: .44, pads: 2,
+    body: [[-.5,-.06],[.49,-.06],[.51,0],[.5,.09],[.2,.12],[-.45,.13],[-.51,.1],[-.51,0]],
+    cab:  [[.2,.115],[.09,.26],[-.3,.26],[-.43,.125]], roof: [-.29, .08], roofY: .26, seams: [.05, -.15], belt: .12 },
+};
 function buildCar(kind){
   const g = new THREE.Group(), rr = Math.random, pk = a => a[Math.floor(rr()*a.length)];
-  const L = kind === 'lux' ? 1.15 : kind === 'van' ? 1.2 : 1.0, W = kind === 'van' ? .5 : .44;
-  const body = pk(CARM[kind]);
-  const out = { g, flick:[], wobble: kind === 'beat' ? 1 : 0 };
-  // a sleek, slightly flattened tube: tapered tail, body section, glass cabin, long pointed glass nose
-  const R_ = kind === 'van' ? .19 : kind === 'lux' ? .13 : .14, cy = .04, FL = .8;   // FL flattens the height
-  const glassF = kind === 'van' ? .22 : kind === 'lux' ? .42 : .36;
-  const tailLen = R_*1.6, bodyLen = L*(1-glassF) - tailLen*.8, glassLen = L*glassF;
-  const zb = -L/2 + tailLen + bodyLen/2 - .05, zg = zb + bodyLen/2 + glassLen/2;
-  carPart(g, U.cyl16, body, 0, cy, zb, 2*R_, bodyLen, 2*R_*FL, PI/2);
-  carPart(g, U.cyl16, M.glassDark, 0, cy, zg, 2*R_*.97, glassLen, 2*R_*.97*FL, PI/2);
-  carPart(g, U.sph, M.glassDark, 0, cy, zg + glassLen/2, 2*R_*.97, 2*R_*.97*FL, R_*2.6);       // long pointed glass nose
-  carPart(g, U.taper, body, 0, cy, zb - bodyLen/2 - tailLen/2, 2*R_, tailLen, 2*R_*FL, -PI/2); // tail narrowing to a point
-  carPart(g, U.cyl16, M.frame, 0, cy, zb + bodyLen/2, 2*R_+.015, .03, 2*R_*FL+.015, PI/2);       // seam between body and glass
-  carPart(g, U.box, CARM.strip, 0, cy + R_*FL + .004, zb, .025, .015, bodyLen*.7);               // light strip along the top
-  carPart(g, U.box, body, 0, cy + R_*FL + .06, zb - bodyLen/2 - tailLen*.2, .025, .11, tailLen*.9, .5);   // small tail fin
-  for (const sx of [-1,1]) carPart(g, U.box, M.frame, sx*(R_+.003), cy, zb + bodyLen*.15, .01, R_*.8, .02);   // door line
-  if (kind === 'van') for (const zz of [-.15, .05]) carPart(g, U.cyl16, M.hazard, 0, cy, zb + zz, 2*R_+.01, .05, 2*R_*FL+.01, PI/2);   // cargo bands
-  // four slim hover pods on swivels: each pod is a pivot group the flight code turns
-  // (thrusters tilt back while cruising, and swing to point straight down to land, park and take off)
-  const px = R_ + .1, pz = L*.28;
-  out.pods = [];
-  for (const sx of [-1,1]) for (const sz of [-1,1]){
-    carPart(g, U.box, M.frame, sx*(px-.06), cy-.02, sz*pz, .07, .03, .07);                // strut to the body
-    const pv = new THREE.Group(); pv.position.set(sx*px, -.02, sz*pz); g.add(pv); out.pods.push(pv);
-    carPart(pv, U.cyl16, kind === 'beat' && rr() < .3 ? pk(CARM.beat) : M.frame, 0, 0, 0, .24, .1, .24, 0, 0, PI/2);   // drum
-    carPart(pv, U.cyl16, M.concDD, sx*.06, 0, 0, .27, .02, .27, 0, 0, PI/2);            // thin outer hoop
-    const lit = sz > 0 || kind === 'lux';
-    if (lit && !(kind === 'beat' && sx < 0 && sz > 0)) carPart(pv, U.box, CARM.strip, 0, 0, sz*.125, .025, .16, .015);   // vertical light strip
-    carPart(pv, U.cyl16, M.thruster, 0, -.13, 0, .1, .03, .1);                              // nozzle
-    const tg = carSprite(pv, GLOW.blue, 0, -.2, 0, .45);
-    if (kind === 'beat' && sx > 0 && sz < 0) out.flick.push(tg);                          // one sputtering thruster
+  const S_ = CAR_SHAPES[kind] || CAR_SHAPES.std, L = S_.L, W = S_.W, out = { g, flick:[], wobble: kind === 'beat' ? 1 : 0, len0: L + .05 };
+  const body = pk(CARM[kind]), trim = kind === 'lux' ? CARM.gold : kind === 'std' ? CARM.black : CARM.chrome;
+  const nose = Math.max(...S_.body.map(p => p[0])), tailZ = Math.min(...S_.body.map(p => p[0]));
+  // body, cabin glass, roof panel, pillars
+  carPart(g, carProfile(S_.body, W), body, 0, 0, 0, 1, 1, 1);
+  carPart(g, carProfile(S_.cab, W*.9, .008), M.glassDark, 0, 0, 0, 1, 1, 1);
+  const [r0, r1] = S_.roof; carPart(g, U.box, body, 0, S_.roofY + .012, (r0 + r1)/2, W*.9 + .01, .03, r1 - r0);
+  for (const z of S_.seams){   // door pillars up through the glass, and the seam down the door
+    const yTop = S_.roofY, yb = S_.belt;
+    for (const sx of [-1, 1]){ carPart(g, U.box, body, sx*W*.45, (yb + yTop)/2, z, .03, yTop - yb, .035); carPart(g, U.box, CARM.grille, sx*(W/2 + .002), .03, z, .006, S_.belt - .02, .012); }
   }
-  // tail lights and headlight glow
-  for (const sx of [-1,1]) carPart(g, U.box, CARM.tail, sx*R_*.3, cy, zb - bodyLen/2 - tailLen + .03, .05, .03, .02);
-  carSprite(g, GLOW.warm, 0, cy, zg + glassLen/2 + R_*1.2, .6);
+  carPart(g, U.box, CARM.under, 0, -.07, (nose + tailZ)/2 - .01, W*.82, .035, L*.86);     // the dark underside the pads hang from
+  // lights
+  for (const sx of [-1, 1]){
+    carPart(g, U.box, CARM.head, sx*W*.33, .04, nose - .005, W*.22, .03, .02);
+    carPart(g, U.box, CARM.tail, sx*W*.34, .07, tailZ + .01, W*.2, .03, .02);
+  }
+  carSprite(g, GLOW.warm, 0, .03, nose + .12, .55);
+  // hover pads underneath, in pairs along the car
+  out.pods = [];
+  const n = S_.pads, px = W*.27;
+  for (let q = 0; q < n; q++){
+    const pz = (n === 1 ? 0 : (q/(n - 1) - .5)*L*.62);
+    for (const sx of [-1, 1]){
+      const pv = new THREE.Group(); pv.position.set(sx*px, -.1, pz); g.add(pv); out.pods.push(pv);
+      carPart(pv, U.cyl16, kind === 'beat' && rr() < .3 ? pk(CARM.beat) : M.frame, 0, 0, 0, .14, .035, .14);   // the pad
+      carPart(pv, U.cyl16, trim === CARM.gold ? CARM.gold : M.concDD, 0, .01, 0, .155, .012, .155);           // its rim
+      carPart(pv, U.cyl16, M.thruster, 0, -.02, 0, .11, .012, .11);                                            // the glowing face
+      const tg = carSprite(pv, GLOW.blue, 0, -.08, 0, .38);
+      if (kind === 'beat' && sx > 0 && q === 0) out.flick.push(tg);                                           // one sputtering pad
+    }
+  }
+  // what makes each kind
   if (kind === 'taxi'){
-    carPart(g, U.box, CARM.taxiSign, 0, cy + R_ + .05, zb + .05, .16, .07, .09);
-    carSprite(g, GLOW.amber, 0, cy + R_ + .07, zb + .05, .5);
-    for (let i=0;i<5;i++) for (const sx of [-1,1]) if (i%2===0) carPart(g, U.box, M.frame, sx*(R_+.004), cy, zb - bodyLen/2 + .08 + i*.09, .01, .05, .05);   // checker band
+    carPart(g, U.box, CARM.black, 0, S_.roofY + .04, -.12, .18, .025, .11);                                  // the sign's base
+    carPart(g, U.box, CARM.taxiSign, 0, S_.roofY + .075, -.12, .2, .055, .1);                                // the lit TAXI sign
+    carSprite(g, GLOW.amber, 0, S_.roofY + .09, -.12, .45);
+    for (let i = 0; i < 9; i++) for (const sx of [-1, 1]) for (const row of [0, 1])                          // checker band down the sides
+      if ((i + row)%2 === 0) carPart(g, U.box, CARM.check, sx*(W/2 + .003), .045 + row*.035, -.36 + i*.09, .006, .035, .09);
+    for (const sx of [-1, 1]) carPart(g, U.box, CARM.check, sx*(W/2 + .003), -.025, 0, .006, .025, L*.88);   // dark skirt stripe
+    for (const sx of [-1, 1]){   // ducted fans in the front wings, and a pair high at the back
+      const F = (x, y, z, r) => { carPart(g, U.torus, CARM.black, x, y, z, r, r, 1.4); carPart(g, U.cyl16, CARM.grille, x, y, z, r*.85, .02, r*.85, PI/2);
+        carPart(g, U.box, M.frame, x, y, z + .006, r*.8, .012, .012); carPart(g, U.box, M.frame, x, y, z + .006, .012, r*.8, .012); };
+      F(sx*W*.3, .045, nose - .03, .11); F(sx*W*.22, .16, tailZ - .01, .09);
+    }
   }
   if (kind === 'lux'){
-    const neon = pk([M.neonCyan, M.neonPink, M4.neonPurple]);
-    for (const sx of [-1,1]){ carPart(g, U.box, CARM.chrome, sx*(R_+.004), cy+.02, 0, .01, .015, L*.75); carPart(g, U.box, neon, sx*R_*.5, cy - R_ - .005, 0, .02, .02, L*.7); }
-    carSprite(g, NEON_GLOW.get(neon) === 'cyan' ? GLOW.cyan : GLOW.pink, 0, cy - R_ - .06, 0, .8);
+    for (const sx of [-1, 1]){
+      carPart(g, U.box, CARM.gold, sx*(W/2 + .003), S_.belt - .005, -.02, .006, .012, L*.92);               // gold line along the waist
+      carPart(g, U.box, CARM.gold, sx*(W/2 + .003), -.03, -.02, .006, .012, L*.9);                         // and along the sill
+    }
+    carPart(g, U.box, CARM.grille, 0, .045, nose + .002, W*.42, .07, .02);                                   // the tall grille
+    for (let k = -2; k <= 2; k++) carPart(g, U.box, CARM.gold, k*W*.08, .045, nose + .012, .012, .07, .012);
+    carPart(g, U.box, CARM.gold, 0, .085, nose + .01, W*.44, .012, .02);
+    carPart(g, U.box, CARM.gold, 0, S_.roofY + .03, (r0 + r1)/2, .02, .012, r1 - r0 - .04);                 // a fine line along the roof
+  }
+  if (kind === 'std'){
+    carPart(g, U.box, body, 0, .19, tailZ + .04, W*.95, .015, .08);                                        // rear wing
+    for (const sx of [-1, 1]){
+      carPart(g, U.box, CARM.black, sx*W*.36, .165, tailZ + .05, .02, .05, .03);                           // its struts
+      carPart(g, U.box, CARM.grille, sx*(W/2 + .003), .035, -.16, .006, .05, .16);                         // side intakes
+    }
+    carPart(g, U.box, CARM.grille, 0, -.015, nose - .005, W*.6, .03, .02);                                   // a low front intake
+    for (const sx of [-1, 1]){ carPart(g, U.cyl16, CARM.black, sx*W*.2, .03, tailZ - .01, .08, .03, .08, PI/2); carPart(g, U.cyl16, M.thruster, sx*W*.2, .03, tailZ - .027, .055, .01, .055, PI/2); }   // twin thrusters out the back
+  }
+  if (kind === 'van'){
+    for (const sx of [-1, 1]) carPart(g, U.box, CARM.chrome, sx*(W/2 + .003), .02, -.02, .006, .012, L*.82);   // a rubbing strip
+    carPart(g, U.box, CARM.black, 0, S_.roofY + .035, -.1, W*.55, .015, .03); carPart(g, U.box, CARM.black, 0, S_.roofY + .035, -.3, W*.55, .015, .03);   // roof bars
+    for (const z of [-.3, -.05]) carPart(g, U.box, CARM.seat, 0, .21, z, W*.7, .08, .06);                   // seats seen through the glass
   }
   if (kind === 'beat'){
-    carPart(g, U.box, pk([M.corrBlue, M.hazard, M.rustRed, M.cream2]), R_+.005, cy, zb + rr()*.2-.1, .01, R_*1.1, .2);   // mismatched door panel
-    carPart(g, U.box, M.cream2, -R_-.005, cy+.03, zb + .1, .01, .03, .12, .3);           // tape patch
-    carPart(g, U.box, M.rust, 0, cy + R_ + .003, zb - bodyLen*.3, .12, .01, .14);       // rust patch on top
+    carPart(g, U.box, pk([M.corrBlue, M.hazard, M.rustRed, M.cream2]), W/2 + .004, .03, rr()*.2 - .1, .006, .09, .22);   // mismatched door panel
+    carPart(g, U.box, M.cream2, -W/2 - .004, .06, .1, .006, .03, .12, .3);                                  // tape patch
+    carPart(g, U.box, M.rust, 0, S_.roofY + .03, -.1, .14, .008, .14);                                       // rust on the roof
   }
   return out;
 }

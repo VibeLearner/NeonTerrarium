@@ -1131,7 +1131,7 @@ function addPlatform(i, j, zone = null){
   return c;
 }
 function removePlatform(c){
-  if (c.sections.length || hwAt(c.i, c.j).length) return;   // (a highway's pillar stands on it)
+  if (c.sections.length) return;
   finishAnimsOn(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   cells.delete(ckey(c.i, c.j)); dirtyRegions.add(regKey(c.i, c.j));

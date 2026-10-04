@@ -76,9 +76,8 @@ function hwTileWhy(i, j, L, skip){
   if (L < HW_MIN_L || L > HW_MAX_L) return 'out of range';
   if (Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX) return 'off the map';
   const c = cells.get(ckey(i, j));
-  if (!c) return 'needs the platform under it';
-  if (c.mega) return 'not over a megastructure';
-  if (hwY(L) - HW_CLEAR < hwSurface(c)) return 'a building is in the way: go higher';
+  if (c && c.mega) return 'not over a megastructure';   // (open sky is fine: the deck just has no pillar there)
+  if (c && hwY(L) - HW_CLEAR < hwSurface(c)) return 'a building is in the way: go higher';
   for (const { h, k } of hwAt(i, j)) if (Math.abs(h.tiles[k].L - L) < 2) return 'another highway is there: go 2 floors higher or lower';
   return null;
 }
@@ -604,7 +603,7 @@ function hwShowGhost(t){
   hwGhost.deck.position.set(x, y - th/2 + (t.type === 'finish' ? th/2 : 0), z); hwGhost.deck.rotation.y = ry; hwGhost.deck.scale.set(w, th, len);
   hwGhost.edge.position.copy(hwGhost.deck.position); hwGhost.edge.rotation.y = ry; hwGhost.edge.scale.copy(hwGhost.deck.scale);
   // a line down to whatever's below, to judge the height by
-  const c = cells.get(ckey(Math.round(x/LOT), Math.round(z/LOT))); by = c ? hwSurface(c) : CURB;
+  const c = cells.get(ckey(Math.round(x/LOT), Math.round(z/LOT))); by = c ? hwSurface(c) : y;
   const top = y - th; hwGhost.pole.visible = top - by > .1 && t.type !== 'finish';
   hwGhost.pole.position.set(x, (top + by)/2, z); hwGhost.pole.scale.set(.06, Math.max(.01, top - by), .06);
   hwGhost.g.visible = true;

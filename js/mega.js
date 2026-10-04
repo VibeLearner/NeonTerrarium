@@ -1748,7 +1748,9 @@ function buildGreenhouse(m){
   for (const z of [gz0 + 1.25, gz1 - 1.25]){ strut(M.fRust, P, -gx + .2, yE - .25, z, gx - .2, yE - .25, z, .14);
     for (let x = -gx + .5; x < gx - .4; x += rnd(.5, 1.0)) if (chance(.6)) plant(pick(['vines','pothos','h_vine3','h_curtain1']), P, x, yE - .3, z, rnd(.7, 1.0), 't', true); }
   wordSign(under(P, T(gx - 3.2, 0, cz, PI/2)), 'sign_w_bay', 0, yG + 2.9, 0, .7, 'pink', .6);
-  m.gh = { m: P.toArray(), rails, belt: { y: yG + .59, z: cz, x0: -gx + 1.35, x1: gx - 1.35 } };   // (the belt's slats and the crates on it move: see greenhouseFx)
+  // where people come and go (the office door and the open bay, see people.js), and the aisles the workers walk inside
+  const aisles = [[yG, cz - .82], [yG, cz + .82], [yG, gz0 + 1.1], [yG, gz1 - 1.1], [yM, gz0 + .78], [yM, gz1 - .78]].map(([y, z]) => ({ y, z, x0: -gx + 1.4, x1: gx - 1.4 }));
+  m.gh = { m: P.toArray(), rails, aisles, doors: [[4.6, z1], [.6, z1]], belt: { y: yG + .59, z: cz, x0: -gx + 1.35, x1: gx - 1.35 } };   // (the belt's slats and the crates on it move: see greenhouseFx)
   m.roofH = CURB + H0 + .1;
   m.top = Math.max(...ridges.map(r => r[1])) + .8;
 }
@@ -1782,8 +1784,27 @@ function greenhouseFx(m){
       for (let q = 0; q < 4; q++) place(leaves, k*4 + q, x - .1*e + (q%2)*.2*e, B.y + .34*e, B.z - .08*e + (q > 1 ? .16*e : 0), .14*e, .09*e, .12*e); });
     for (const im of [slats, boxes, leaves]) im.instanceMatrix.needsUpdate = true;
   };
+  // the workers inside, walking the aisles between the racks and tables and stopping to tend the greens: as many as the
+  // farm's people currently at work there (see people.js), up to a dozen
+  const WCOL = [0x4a7a5a, 0xd9b43a, 0xd8dcd8, 0x3a6a8a, 0xc0702a, 0x6a5a8a], bodyMat = WCOL.map(c => new THREE.MeshLambertMaterial({ color: c })), skin = new THREE.MeshLambertMaterial({ color: 0xc89a78 });
+  const workers = [];
+  for (let k = 0; k < 12; k++){
+    const a = g.aisles[k % g.aisles.length], w = new THREE.Group(); w.visible = false; w.scale.setScalar(1.7); root.add(w);   // (to the scale of the racks and tables in here)
+    mk(w, bodyMat[k % bodyMat.length], 0, .2, 0, .11, .3, .08); mk(w, skin, 0, .41, 0, .08, .08, .08); mk(w, darkMat, 0, .03, 0, .1, .06, .07);
+    workers.push({ w, a, x: a.x0 + (a.x1 - a.x0)*((k*.37 + m.seed*.001) % 1), dir: k % 2 ? 1 : -1, pause: 0, sp: .28 + (k % 4)*.05 });
+  }
+  let nWork = 0, countAt = 0;
+  const atWork = () => { let n = 0; if (typeof people !== 'undefined') for (const p of people.values()) if (p.at === 'm:' + m.id && !p.walk) n++; return n; };
   return {
     update(dt, t){
+      if (t - countAt > 1){ countAt = t; nWork = Math.min(workers.length, atWork()); }
+      workers.forEach((o, k) => {
+        o.w.visible = k < nWork; if (!o.w.visible) return;
+        if (o.pause > 0){ o.pause -= dt; o.w.position.y = o.a.y + .01 - .04*Math.max(0, Math.sin(t*3 + k)); }   // bent over the trays
+        else { o.x += o.dir*o.sp*dt; if (o.x > o.a.x1 || o.x < o.a.x0){ o.dir = -o.dir; o.x = Math.max(o.a.x0, Math.min(o.a.x1, o.x)); }
+          if (Math.random() < dt*.25) o.pause = 1.5 + Math.random()*3; o.w.position.y = o.a.y + .01 + .015*Math.abs(Math.sin(t*8 + k)); }
+        o.w.position.x = o.x; o.w.position.z = o.a.z; o.w.rotation.y = o.pause > 0 ? (o.a.z > 0 ? PI : 0) : (o.dir > 0 ? PI/2 : -PI/2);
+      });
       for (const a of arms){
         const u = t*a.sp + a.ph, glide = (Math.sin(u) + 1)/2, dwell = Math.max(0, Math.sin(u*3.1 + 1.3));   // slide, and reach down now and then
         a.car.position.x = a.r.x0 + (a.r.x1 - a.r.x0)*glide;
@@ -1791,7 +1812,7 @@ function greenhouseFx(m){
       }
       belt(t);
     },
-    dispose(){ scene.remove(root); geo.dispose(); for (const mt of [armMat, darkMat, slatMat, crateMat, leafMat]) mt.dispose(); }
+    dispose(){ scene.remove(root); geo.dispose(); for (const mt of [armMat, darkMat, slatMat, crateMat, leafMat, skin, ...bodyMat]) mt.dispose(); }
   };
 }
 

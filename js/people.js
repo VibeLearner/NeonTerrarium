@@ -355,7 +355,8 @@ const MEGA_LIFE = {
   foundry: { jobs: 14, fun: 0,  night: .35 },
   market:  { jobs: 10, fun: 14 },             // the market mall: shopkeepers inside, plenty of shoppers
   pagoda:  { jobs: 12, fun: 10, night: .2 },  // the cloud pagoda: a luxury hotel and spa
-  club:    { jobs: 10, fun: 0, night: .6 },   // the Neon Dome: bar staff and DJs, mostly at night (its crowd is brought out by the night: see updateClubs)
+  club:    { jobs: 10, fun: 0, night: .6 },
+  greenhouse: { jobs: 12, fun: 1.5, night: .35 },   // the hydroponic farm: growers round the clock, and people dropping by for fresh greens   // the Neon Dome: bar staff and DJs, mostly at night (its crowd is brought out by the night: see updateClubs)
 };
 const places = new Map();   // id -> { id, x, z, doors: [{ node, out:{x,z}, in:{x,z}|null, dir:[dx,dz] }], jobs, fun, open, night, cell|mega }
 const people = new Map();   // id -> person
@@ -502,6 +503,14 @@ function buildNetwork(){
       }
       for (const [k, st] of pl.stalls) if (!st.keepers.length || !st.queue.length) pl.stalls.delete(k);
       pl.jobs = pl.stalls.size;
+    } else if (m.kind === 'greenhouse' && m.gh){
+      // the farm's ways in: the office door and the open bay on its front (drawn with the building, so no door panels)
+      const e = m.gh.m, W = (x, z) => ({ x: e[0]*x + e[8]*z + e[12], z: e[2]*x + e[10]*z + e[14] }), fx = e[8], fz = e[10], fl = Math.hypot(fx, fz) || 1;
+      m.gh.doors.forEach(([x, z], q) => {
+        const d = { wall: W(x, z + .02), stand: W(x, z + .5), inside: W(x, z - .35), n: [fx/fl, fz/fl], noDraw: true };
+        const b = m.cells.find(c => c.i === Math.round(d.stand.x/LOT) && c.j === Math.round(d.stand.z/LOT)) || m.cells[0], key = 'd:' + m.id + ':door' + q;
+        pl.doors.push(makeDoor(key, d, true, oldDoors.get(key))); addEnd(b, { key, x: d.stand.x, z: d.stand.z, kind: 'd' });
+      });
     } else if (m.kind === 'club' && m.club){
       // the club has the one way in: its arched entrance (drawn with the building, so no door panel)
       const e = m.club.m, W = (x, z) => ({ x: e[0]*x + e[8]*z + e[12], z: e[2]*x + e[10]*z + e[14] }), fx = e[8], fz = e[10], fl = Math.hypot(fx, fz) || 1;

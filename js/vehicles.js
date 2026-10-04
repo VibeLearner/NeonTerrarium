@@ -458,9 +458,17 @@ const steamMat = new THREE.ShaderMaterial({
   fragmentShader: 'uniform sampler2D map; uniform vec3 color; varying float vA; void main(){ float a = texture2D(map, gl_PointCoord).a * vA; if (a < .01) discard; gl_FragColor = vec4(color, a); }',
   transparent: true, depthWrite: false,
 });
+let steamCeil = null;
 function setupSteam(){
   if (steamPts){ scene.remove(steamPts); steamPts.geometry.dispose(); steamPts = null; }
   steamSrc = emitters.slice();
+  // under a sky highway the steam can't rise through the deck: each source's ceiling (the deck's underside over it, or
+  // none), where its puffs flatten out, spread along under the deck and fade
+  steamCeil = new Float32Array(steamSrc.length).fill(1e9);
+  if (typeof hwAt === 'function' && highways.length) steamSrc.forEach((e, k) => {
+    for (const x of [e.x, e.x + .7]){ const i = Math.round(x/LOT), j = Math.round(e.z/LOT);
+      for (const { h, k: t } of hwAt(i, j)){ const under = hwY(h.tiles[t].L) - HW_THICK - HW_GIRDER; if (under > e.y - .2) steamCeil[k] = Math.min(steamCeil[k], under); } }
+  });
   const n = steamSrc.length*STEAM_PER; if (!n) return;
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n*3), 3));
@@ -478,8 +486,9 @@ function updateSteam(dt, night){
   for (let i=0;i<steamLife.length;i++){
     let L = steamLife[i] + dt*.32; if (L > 1) L -= 1; steamLife[i] = L;
     const e = steamSrc[(i/STEAM_PER)|0];
-    P[i*3] = e.x + L*.7 + Math.sin(steamWob[i] + L*4)*.08; P[i*3+1] = e.y + L*2.3; P[i*3+2] = e.z + L*.2;
-    Sz[i] = .45 + L*1.5; A[i] = Math.min(1, L*6)*(1 - L)*.75;
+    const k = (i/STEAM_PER)|0, top = steamCeil ? steamCeil[k] - .45 : 1e9, up = e.y + L*2.3, over = Math.max(0, up - top);   // (over: how far past the deck above it)
+    P[i*3] = e.x + L*.7 + Math.sin(steamWob[i] + L*4)*.08 + Math.cos(steamWob[i])*over*.9; P[i*3+1] = Math.min(up, top); P[i*3+2] = e.z + L*.2 + Math.sin(steamWob[i])*over*.9;
+    Sz[i] = (.45 + L*1.5)*Math.max(.45, 1 - over*.5); A[i] = Math.min(1, L*6)*(1 - L)*.75*Math.max(0, 1 - over/1.3);
   }
   steamPts.geometry.attributes.position.needsUpdate = true; steamPts.geometry.attributes.size.needsUpdate = true; steamPts.geometry.attributes.alpha.needsUpdate = true;
 }

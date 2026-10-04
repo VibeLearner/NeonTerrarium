@@ -565,6 +565,7 @@ function hwSkyAt(x, z, own){
 }
 // a car's lift along its course, worked out once when it sets off: wherever its way in or out passes over something
 // taller, it rises to clear it (in good time before, easing down after), and it comes down onto the ramp as before
+const HW_GAP = 1.6;   // the least room between two cars in a lane (a long limousine is about 1.35)
 const HW_LIFT_STEP = .35, HW_CLEARANCE = .8;   // (fine steps: far out, a step along the course can be a long way through the sky)
 function hwLiftFor(c, P){
   const n = Math.ceil(P.len/HW_LIFT_STEP) + 2, need = new Float32Array(n), o = { x: 0, y: 0, z: 0 };
@@ -612,19 +613,39 @@ function updateHighways(dt, t){
     });
   }
   // move and draw the cars
+  // how far each car may go this frame: never closer than HW_GAP behind the car ahead in its lane, and on the way in, a
+  // car about to fly into another anywhere off the deck (their ways in and out cross) eases off and climbs over it
+  { const lead = new Map(), order = hwCars.slice().sort((a, b) => b.s - a.s), near = [];
+    for (const c of order){
+      const LP = c.h.lanePaths; if (!LP){ c.ns = c.s; continue; }
+      const P = LP[c.lane], s0 = c.s;
+      const f0 = c.inO ? 1 + (s0 < P.sRamp ? (1 - smooth01(s0/P.sRamp))*c.inO.k : 0) + (s0 > P.sEnd ? smooth01((s0 - P.sEnd)/(P.len - P.sEnd))*c.outO.k : 0) : 1;   // (from far out it flies a little faster, so it isn't slow to arrive)
+      let ns = s0 + dt*HW_SPEED*f0;
+      const key = c.h.id + ':' + c.lane, L = lead.get(key); if (L !== undefined) ns = Math.min(ns, L - HW_GAP);
+      const off = s0 < P.sRamp + 1 || s0 > P.sEnd - 1;   // (off the deck: each on its own way through the sky, so the lanes don't keep them apart)
+      let clash = false;
+      if (off && c.pos) for (const o of near){ if (o.h !== c.h) continue;
+        const dh = Math.hypot(o.pos[0] - c.pos[0], o.pos[2] - c.pos[2]), dv = c.pos[1] - o.pos[1];
+        if (dh < 1.6 && Math.abs(dv) < 1.0){ clash = true; ns = Math.min(ns, s0 + dt*HW_SPEED*.5); c.dyT = Math.min(2.6, Math.max(c.dyT || 0, (o.dy || 0) + 1.15)); } }   // (it eases off and climbs over)
+      if (!clash) c.dyT = Math.max(0, (c.dyT || 0) - dt*.35);
+      c.dy = (c.dy || 0) + ((c.dyT || 0) - (c.dy || 0))*Math.min(1, dt*3);
+      c.ns = Math.max(s0, ns); lead.set(key, c.ns);
+      if (off && c.pos) near.push(c);
+    } }
   for (const K of HW_KINDS) K.n = 0;
   let nf = 0, ng = 0;
   hwCars = hwCars.filter(c => {
     const LP = c.h.lanePaths; if (!LP) return false;
     const P = LP[c.lane], s0 = c.s;
-    const f0 = c.inO ? 1 + (s0 < P.sRamp ? (1 - smooth01(s0/P.sRamp))*c.inO.k : 0) + (s0 > P.sEnd ? smooth01((s0 - P.sEnd)/(P.len - P.sEnd))*c.outO.k : 0) : 1;   // (from far out it flies a little faster, so it isn't slow to arrive)
-    c.s += dt*HW_SPEED*f0;
+    c.s = c.ns ?? c.s + dt*HW_SPEED;
     if (c.s >= P.len) return false;
     if (s0 < P.sMid && c.s >= P.sMid && Math.random() < .55) hwDropVisitor(c.h);   // through the terminal: someone gets out
     if (c.s > P.sIn + .05 && c.s < P.sOut - .05) return true;   // inside the terminal: out of sight
     // its position, and its heading from a step further on (off the deck it follows its own way in or out, and its lift)
     const s2 = Math.min(P.len, c.s + .3);
     c.k = hwCarPos(c, P, c.s, c.k, _hpos); hwCarPos(c, P, s2, c.k, _hpos2);
+    if (c.dy){ const w = c.s < P.sRamp ? 1 - smooth01((c.s - (P.sRamp - 5))/5) : c.s > P.sEnd ? smooth01((c.s - P.sEnd)/5) : 0; _hpos.y += c.dy*w; _hpos2.y += c.dy*w; }   // (climbing over another car, settling back before the ramp)
+    c.pos = [_hpos.x, _hpos.y, _hpos.z];
     if (c.inO && (c.s < P.sRamp || c.s > P.sEnd)){ const dx = _hpos2.x - _hpos.x, dy = _hpos2.y - _hpos.y, dz = _hpos2.z - _hpos.z; _hpos.yaw = Math.atan2(dx, dz); _hpos.pitch = -Math.atan2(dy, Math.hypot(dx, dz) || 1e-4); }
     // locked onto the lanes at the toll gate: it settles a little lower, and the lane flares under it
     const g = (c.s - P.sGate)/.9, hover = c.s < P.sGate ? .3 : c.s < P.sGate + .9 ? .3 - .1*smooth01(g) : c.s > P.sOut ? .2 + .1*smooth01((c.s - P.sOut)/1.5) : .2;

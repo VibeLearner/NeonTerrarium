@@ -1873,7 +1873,8 @@ function buildDataSpire(m){
     box(chance(.5) ? M.dsCrate : M.dsCrate2, P, x, .38 + y, z, w, .66, .8); box(M.dsFrost, P, x, .73 + y, z, w + .02, .04, .82);
     box(M.dsSeam, P, x, .38 + y, z + .41, w - .2, .04, .02); box(M.dsNeon, P, x + w/2 - .15, .5 + y, z + .41, .06, .06, .02);
   }
-  m.ds = { m: P.toArray(), lines, top: 33, door: [.6, ez + 1.01] };   // (door: the lit doorway in the porch, where the archivist and the guards come and go: see people.js)
+  m.ds = { m: P.toArray(), lines, top: 33, door: [.6, ez + 1.01] };
+  m.solid = { m: P.toArray(), x0: -3.95, x1: 3.95, z0: -3.95, z1: 3.95, y1: 35 };   // (what flying things keep out of: see droneDetour)   // (door: the lit doorway in the porch, where the archivist and the guards come and go: see people.js)
   m.roofH = CURB + ph;
   m.top = 35;
 }
@@ -2142,10 +2143,10 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
     rebase(padM){
       pad.fromArray(padM); pad.decompose(restPos, restQ, _sc); restYaw = new THREE.Euler().setFromQuaternion(restQ, 'YXZ').y;
       if (st.mode === 'rest'){ g.position.copy(restPos); st.yaw = restYaw; g.rotation.y = restYaw; }
-      else if (st.mode === 'home'){ st.target = null; st.climb = null; }   // flying home: aim for the new pad
+      else if (st.mode === 'home'){ st.target = null; st.climb = null; st.via = null; }   // flying home: aim for the new pad
     },
     // sent to a mugging: true if it's free to go (not already on one)
-    scramble(L){ if (st.chase) return false; st.chase = { L, t: 25 }; if (st.mode === 'down' || st.mode === 'home'){ st.mode = 'fly'; st.target = null; st.climb = null; } return true; },
+    scramble(L){ if (st.chase) return false; st.chase = { L, t: 25 }; if (st.mode === 'down' || st.mode === 'home'){ st.mode = 'fly'; st.target = null; st.climb = null; st.via = null; } return true; },
     get busy(){ return !!st.chase; }, get pos(){ return g.position; },
     update(_dt, time){
       const now = performance.now(), dt = Math.min(1, (now - st.last)/1000); st.last = now;
@@ -2171,19 +2172,19 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
         // after a mugger: over the robbery, then tailing them as they run, the searchlight turned red on them
         const L = st.chase.L, live = L && (L.state === 'rob' || L.state === 'strike' || L.state === 'flee' || L.state === 'hide') && L.fade > .05;
         st.chase.t -= dt; if (L && L.tagged) st.chase.t = Math.max(st.chase.t, 2);   // a tagged mugger is followed until the bikes have them
-        if (!live || st.chase.t <= 0){ st.chase = null; st.mode = st.way.length ? 'fly' : 'home'; st.target = null; st.climb = null; }
+        if (!live || st.chase.t <= 0){ st.chase = null; st.mode = st.way.length ? 'fly' : 'home'; st.target = null; st.climb = null; st.via = null; }
         else {
           _to.set(L.x, 0, L.z);
           const alt = Math.max(cruiseTo(g.position, _to) - .6, restPos.y + 1.2);
           const tgt = new THREE.Vector3(L.x, alt, L.z), far = Math.hypot(L.x - g.position.x, L.z - g.position.z);
-          goToward(tgt, dt, far > 3 ? 3.4 : 2.6);
+          const via = droneDetour(g.position, tgt); goToward(via || tgt, dt, far > 3 ? 3.4 : 2.6); solidPush(g.position);
           if (far < 2.5){ light = 1; st.redOn = Math.min(1, (st.redOn || 0) + dt*3); st.aim = L;
             // held in the red light for five seconds, the mugger is tagged: the bikes know who they're after
             if (st.redOn > .5 && !L.tagged){ st.chase.lock = (st.chase.lock || 0) + dt; if (st.chase.lock >= 5){ L.tagged = true; if (crew && crew.onTag) crew.onTag(L); } } }
           else st.chase.lock = 0;
         }
       } else if (st.mode === 'fly' || st.mode === 'home'){
-        if (st.chase && st.mode === 'fly'){ st.mode = 'chase'; st.target = null; st.climb = null; }
+        if (st.chase && st.mode === 'fly'){ st.mode = 'chase'; st.target = null; st.climb = null; st.via = null; }
         if (!st.target){
           const w = st.mode === 'fly' ? st.way.shift() : null; st.at = w;
           const tx = w ? w.x : restPos.x, tz = w ? w.z : restPos.z;
@@ -2191,7 +2192,10 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
           st.target = new THREE.Vector3(tx, cruiseTo(g.position, _to), tz);
           st.climb = new THREE.Vector3(g.position.x, st.target.y, g.position.z);   // climb first, then cross
         }
-        if (st.climb){ if (goToward(st.climb, dt, 1.6)) st.climb = null; }
+        if (!st.climb && !st.via){ const v = droneDetour(g.position, st.target); if (v) st.via = v; }   // round the Data Spire, not through it
+        if (st.via && !st.climb){ if (goToward(st.via, dt, 2.4)) st.via = null; solidPush(g.position); }
+        if (st.via && !st.climb){}
+        else if (st.climb){ if (goToward(st.climb, dt, 1.6)) st.climb = null; }
         else if (goToward(st.target, dt, 2.4)){
           st.target = null;
           if (st.mode === 'home'){ st.mode = 'down'; st.k = 0; st.from = g.position.clone(); }
@@ -2227,6 +2231,49 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
     dispose(){ scene.remove(g, cone, spot); coneMat.dispose(); cone.geometry.dispose(); spot.material.dispose(); red.lm.dispose(); blue.lm.dispose(); red.sp.material.dispose(); blue.sp.material.dispose(); }
   };
 }
+/* ---------- keeping flyers out of the tallest megastructures ---------- */
+// A megastructure taller than anything flies (the Data Spire) carries m.solid: a box in its own frame, from the ground
+// to its top. A flyer's straight leg that would cross it goes round a corner of it instead, and anything that still
+// strays inside is pushed back out to the nearest face.
+const _sdA = new THREE.Vector3(), _sdB = new THREE.Vector3(), _sdM = new THREE.Matrix4();
+const SOLID_PAD = .9;
+function solidLocal(S, p, out){ _sdM.fromArray(S.m).invert(); return out.copy(p).applyMatrix4(_sdM); }
+function segHitsBox(ax, az, bx, bz, x0, x1, z0, z1){
+  let t0 = 0, t1 = 1; const dx = bx - ax, dz = bz - az;
+  for (const [p, q] of [[-dx, ax - x0], [dx, x1 - ax], [-dz, az - z0], [dz, z1 - az]]){
+    if (Math.abs(p) < 1e-9){ if (q < 0) return false; continue; }
+    const r = q/p; if (p < 0){ if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; } }
+  return true;
+}
+// the first corner to fly round on the way from a to b (world points), or null if the way is clear
+function droneDetour(a, b){
+  for (const m of megas.values()){
+    const S = m.solid; if (!S || Math.min(a.y, b.y) > S.y1 + .5) continue;
+    solidLocal(S, a, _sdA); solidLocal(S, b, _sdB);
+    const x0 = S.x0 - SOLID_PAD, x1 = S.x1 + SOLID_PAD, z0 = S.z0 - SOLID_PAD, z1 = S.z1 + SOLID_PAD;
+    if (!segHitsBox(_sdA.x, _sdA.z, _sdB.x, _sdB.z, x0, x1, z0, z1)) continue;
+    const e = .02, C = [[x0 - e, z0 - e], [x1 + e, z0 - e], [x1 + e, z1 + e], [x0 - e, z1 + e]];
+    let best = null, bd = Infinity;
+    for (const [cx, cz] of C){
+      if (segHitsBox(_sdA.x, _sdA.z, cx, cz, x0 + .05, x1 - .05, z0 + .05, z1 - .05)) continue;
+      const d = Math.hypot(cx - _sdA.x, cz - _sdA.z) + Math.hypot(_sdB.x - cx, _sdB.z - cz); if (d < bd){ bd = d; best = [cx, cz]; } }
+    if (!best) continue;
+    return new THREE.Vector3(best[0], a.y, best[1]).applyMatrix4(_sdM.fromArray(S.m)).setY(Math.max(a.y, b.y));
+  }
+  return null;
+}
+// a flyer inside one: out through the nearest face
+function solidPush(p){
+  for (const m of megas.values()){
+    const S = m.solid; if (!S || p.y > S.y1 + .5) continue;
+    solidLocal(S, p, _sdA);
+    const x0 = S.x0 - .3, x1 = S.x1 + .3, z0 = S.z0 - .3, z1 = S.z1 + .3;
+    if (_sdA.x <= x0 || _sdA.x >= x1 || _sdA.z <= z0 || _sdA.z >= z1) continue;
+    const d = [[_sdA.x - x0, 'x', x0], [x1 - _sdA.x, 'x', x1], [_sdA.z - z0, 'z', z0], [z1 - _sdA.z, 'z', z1]].sort((u, v) => u[0] - v[0])[0];
+    _sdA[d[1]] = d[2]; p.copy(_sdA.applyMatrix4(_sdM.fromArray(S.m)));
+  }
+}
+
 /* ---------- the police hoverbikes ---------- */
 // One per drone, parked in the bays in front of the station. Now and then an officer takes one out on a patrol of
 // the streets. When a drone is sent to a mugging, two bikes rush to the spot and search round it; if the drone holds

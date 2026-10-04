@@ -456,14 +456,15 @@ function podHouse(lot, st, P0){
   faces(bw,bd).forEach((f,i) => { const F = under(P, T(f.nx*f.half, -base.h/2, f.nz*f.half, f.ry));
     if (i === 0) shopfront(st, F, f.len, 0); else decorateFloor({...st, shop:0, garage:0}, F, f.len, 0, 1, lot);
     if (i === 1 && chance(.6)) glyphSign(F, 0, .8, true, true); });
-  // side shed with a tiled pitched roof and a warm window
-  if (chance(.6)){
+  // side shed with a tiled pitched roof and a warm window (not up on a scaffold deck, where it would hang past the edge)
+  if (chance(.6) && !lot.aloft){
     const sx = base.ox + bw/2 + .35, P2 = T(sx, 0, base.oz+rnd(-.2,.2));
     box(pick([M.wood, M.concW, M.cream2]), under(P0,P2), 0, .38, 0, .7, .76, .8);
     put(U.prism, D.low.roof, under(P0, under(P2, T(0,.76,0,PI/2,.95,.32,.8))));
     box(M.winLit, under(P0,P2), .36, .42, 0, .03, .28, .32);
   }
-  for (const [sx,sz] of CORNERS) if (chance(.5)) box(M.frame, P0, base.ox+sx*(bw/2+.25), .6, base.oz+sz*(bd/2+.2), .07, 1.2, .07);   // posts under the overhang
+  const pin = v => lot.aloft ? clamp(v, -1.05, 1.05) : v;   // (on a scaffold deck: posts stay on the planks)
+  for (const [sx,sz] of CORNERS) if (chance(.5)) box(M.frame, P0, pin(base.ox+sx*(bw/2+.25)), .6, pin(base.oz+sz*(bd/2+.2)), .07, 1.2, .07);   // posts under the overhang
   const pc = { w:rnd(2.0,2.35), d:rnd(1.9,2.3), h:rnd(1.05,1.25), y:1.12, ox:base.ox+rnd(-.2,.2), oz:base.oz+rnd(-.2,.2), ry:rnd(-.15,.15) };
   let y = pod(st, P0, pc, { face: pick([0, PI/2, PI, -PI/2]) });
   if (chance(.3)){ y = pod(st, P0, { ...pc, w:pc.w*.8, d:pc.d*.8, y, ry:pc.ry+rnd(-.4,.4), ox:pc.ox+rnd(-.2,.2) }, { face: pick([0, PI/2, PI, -PI/2]) }); }
@@ -568,11 +569,17 @@ function octoHouse(lot, st, P0){
   box(M.cream2, top[2].F, -.1, .6, .03, .18, .28, .04);   // small keypad and signs
   for (const s of [-1,1]) box(pick(LIT_ROOMS), top[3].F, s*.13, .6, .02, .14, .3, .05);
   roundVent(top[3].F, -.1, .22, .09); roundVent(top[3].F, .12, .22, .09);
-  // landing slab and stairs down
+  // landing slab and stairs down (up on a scaffold deck there's no room for them: a small step and a ladder down the wall)
+  if (lot.aloft){
+    box(M.metalDark, df, 0, -.03, .16, .5, .05, .3);
+    for (const s of [-1, 1]) box(M.metal, df, s*.15, -hb/2, .1, .03, hb, .03);
+    for (let y = -hb + .15; y < -.05; y += .2) box(M.metal, df, 0, y, .1, .3, .025, .025);
+  } else {
   const L = under(P, T(Math.sin(PI/4)*(rt+.25), hb+.02, Math.cos(PI/4)*(rt+.25), PI/4));
   box(M.concL, L, 0, 0, 0, 1.1, .1, .6); box(M.frame, L, 0, .22, .3, 1.1, .03, .03);
   box(M.concL, L, .95, -hb/2, .1, 1.35, .08, .4, 0, 0, -Math.atan2(hb, 1.2));
   box(M.frame, L, .95, -hb/2+.25, .3, 1.35, .03, .03, 0, 0, -Math.atan2(hb, 1.2));
+  }
   // blade sign stack of icons
   const bs = top[6].F;
   iconSign(st, bs, 0, .75, true, .55);
@@ -722,7 +729,11 @@ function deckHouse(lot, st, P0){
   railingRun(P0, -(Dd+.3)/2+.05, (Dd+.3)/2-.05, (W+.3)/2-.05, tY+.12, .3, PI/2);
   // the stair: a landing at the railing gap, then real steps running down along the front face to the ground,
   // carried on two stringers with a handrail and a post under the landing (it used to be one bare slab poking out)
-  {
+  if (lot.aloft){   // up on a scaffold deck the run of steps would hang past its edge: a ladder up through the terrace instead
+    const y1 = tY + .12, xt = (W+.3)/2 - .3, z = Math.min((Dd+.3)/2 - .12, 1.05);
+    for (const s of [-1, 1]) box(M.metal, P0, xt + s*.14, y1/2, z, .03, y1 + .3, .03);
+    for (let y = .15; y < y1 + .1; y += .2) box(M.metal, P0, xt, y, z, .28, .025, .025);
+  } else {
     const Q = under(P0, T(0, 0, (Dd+.3)/2 + .17, 0)), y1 = tY + .12, xt = (W+.3)/2 - .3;
     const n = 9, rise = y1/(n+1), run = .15, L = n*run, x0 = xt - .15, ang = Math.atan2(y1 - rise, L);
     box(M.concL, Q, xt, y1 - .03, 0, .3, .06, .32);                                      // landing
@@ -1168,7 +1179,7 @@ function buildTenement(lot, st, P0){
     const F = decorateChunk(st,P,c,fl,lot,fl===0);
     for (const f of F) if (chance(.45)) box(pick(st.accent.concat(st.walls)), f.F, rnd(-f.len/3,f.len/3), rnd(.15,c.h-.2), .015, rnd(.25,.55), rnd(.2,.45), .03);
     if (fl>0 && chance(.5*S.clutter)) annex(st, pick(F), c);
-    if (!stairsDone && fl===0 && floors>=4 && chance(.5)){ stairs(st, pick(F), Math.min(floors,4)); stairsDone=true; }
+    if (!stairsDone && fl===0 && floors>=4 && !lot.aloft && chance(.5)){ stairs(st, pick(F), Math.min(floors,4)); stairsDone=true; }
     prev = c; y += c.h; fl += nn;
   }
   // the top roof's corners (world), for a side pod's scaffold to stand on (see liftScaffold in world.js)

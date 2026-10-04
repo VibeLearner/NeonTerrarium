@@ -296,6 +296,7 @@ function stackRun(c, secs, y, tag, first){
     const st = STY[sec.zone], upper = k > 0, last = k === secs.length - 1;
     LUX = sec.zone === 'high' ? luxPalette(hash('lux', c.i, c.j, k, sec.seed)) : sec.zone === 'ind' ? indPalette(hash('ind', c.i, c.j, k, sec.seed)) : null;   // each district's own light colours
     const lot = { x: c.x, z: c.z, cls: sec.zone, elev: 0, base: y, signs: 0, occupied: true, height: 0, floors: 0 };
+    lot.aloft = !upper && tag === '' && !!c.lift;   // the bottom of a side pod: it stands on a scaffold deck, not the street
     lot.padOK = tag === 'b' ? (R(), false) : last && R() < .3;   // (under a pod: the same draw whatever's on top, so adding a section never re-rolls the one below it)
     if (upper){   // a deck for the new section to stand on
       box(M.concDD, T(c.x, y, c.z), 0, .05, 0, SIDE - .1, .1, SIDE - .1);

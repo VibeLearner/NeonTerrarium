@@ -76,7 +76,7 @@ function hwTileWhy(i, j, L, skip){
   if (L < HW_MIN_L || L > HW_MAX_L) return 'out of range';
   if (Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX) return 'off the map';
   const c = cells.get(ckey(i, j));
-  if (c && c.mega) return 'not over a megastructure';   // (open sky is fine: the deck just has no pillar there)
+  if ((c && c.mega) || hwMegaNear(i, j)) return 'not over or right beside a megastructure';   // (open sky is fine: the deck just has no pillar there)
   if (c && hwY(L) - HW_CLEAR < hwSurface(c)) return 'a building is in the way: go higher';
   for (const { h, k } of hwAt(i, j)) if (Math.abs(h.tiles[k].L - L) < 2) return 'another highway is there: go 2 floors higher or lower';
   return null;
@@ -84,6 +84,7 @@ function hwTileWhy(i, j, L, skip){
 // the open sky a ramp needs, just past the line's end (from the plot at (i, j) going out along d)
 function hwRampWhy(i, j, L, d, skip){
   const ni = i + d[0], nj = j + d[1], c = cells.get(ckey(ni, nj)), top = hwY(L) + HW_RAMP + .5;
+  if (hwMegaNear(ni, nj)) return 'the sky ramp would hit a megastructure';
   if (c && hwSurface(c) > top - .4) return 'the sky ramp would hit a building';
   for (const { h, k } of hwAt(ni, nj)) if (h !== skip && Math.abs(hwY(h.tiles[k].L) - (top - .5)) < 1.4) return 'the sky ramp would hit a highway';
   return null;

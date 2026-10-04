@@ -68,10 +68,32 @@ function maybeSpawnMegas(c){
   }
 }
 // can a w x h block go at (i, j)? Every plot free ground or open sky, inside the world, touching the platform
-function megaBlockOk(i, j, w, h, own = null){   // own: the plots of a megastructure that's being turned (they count as free)
+// how far some megastructures hang out past their block (measured), so a highway beside one keeps its distance
+const MEGA_OVER = { square: .4, police: .8, foundry: .3, pagoda: 1.0 };
+// would a highway over or beside the block at (i, j) meet it? (kind: what overhang to allow for)
+function megaHwNear(i, j, w, h, kind){
+  const over = (MEGA_OVER[kind] || 0) + .05, x0 = i*LOT - LOT/2 - over, x1 = (i + w - 1)*LOT + LOT/2 + over, z0 = j*LOT - LOT/2 - over, z1 = (j + h - 1)*LOT + LOT/2 + over;
+  for (let a = -1; a <= w; a++) for (let q = -1; q <= h; q++){
+    if (!hwAt(i + a, j + q).length) continue;
+    if (a >= 0 && a < w && q >= 0 && q < h) return true;
+    const cx = (i + a)*LOT, cz = (j + q)*LOT, r = 1.25;   // (the deck's reach round a plot's middle)
+    if (cx + r > x0 && cx - r < x1 && cz + r > z0 && cz - r < z1) return true;
+  }
+  return false;
+}
+// the reverse: is a plot's deck reach inside a standing megastructure's footprint (and its overhang)?
+function hwMegaNear(i, j){
+  for (const m of megas.values()){
+    const over = (MEGA_OVER[m.kind] || 0) + .05, cx = i*LOT, cz = j*LOT, r = 1.25;
+    if (cx + r > m.i*LOT - LOT/2 - over && cx - r < (m.i + m.w - 1)*LOT + LOT/2 + over && cz + r > m.j*LOT - LOT/2 - over && cz - r < (m.j + m.h - 1)*LOT + LOT/2 + over) return true;
+  }
+  return false;
+}
+function megaBlockOk(i, j, w, h, own = null, kind = null){   // own: the plots of a megastructure that's being turned (they count as free)
   if (Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX || Math.abs(i + w - 1) > GRID_MAX || Math.abs(j + h - 1) > GRID_MAX) return false;
+  if (megaHwNear(i, j, w, h, kind)) return false;
   let missing = 0;
-  for (let a = 0; a < w; a++) for (let b = 0; b < h; b++){ if (hwAt(i + a, j + b).length) return false; const c = cells.get(ckey(i + a, j + b)); if (!c){ missing++; continue; } if ((c.mega && !(own && own.has(c))) || c.sections.length) return false; }
+  for (let a = 0; a < w; a++) for (let b = 0; b < h; b++){ const c = cells.get(ckey(i + a, j + b)); if (!c){ missing++; continue; } if ((c.mega && !(own && own.has(c))) || c.sections.length) return false; }
   if (missing < w*h) return true;
   for (let a = -1; a <= w; a++) for (let q = -1; q <= h; q++){
     if (a >= 0 && a < w && q >= 0 && q < h) continue;
@@ -84,7 +106,7 @@ function megaBlockOk(i, j, w, h, own = null){   // own: the plots of a megastruc
 function megaBlockAt(kind, ci, cj, turned){
   const t = MEGA_TYPES[kind]; const [w, h] = turned ? [t.h, t.w] : [t.w, t.h];
   const i = ci - Math.floor((w - 1)/2), j = cj - Math.floor((h - 1)/2);
-  return { i, j, w, h, ok: megaBlockOk(i, j, w, h) };
+  return { i, j, w, h, ok: megaBlockOk(i, j, w, h, null, kind) };
 }
 function placeFromMenu(kind, ci, cj, turned){
   const blk = megaBlockAt(kind, ci, cj, turned); if (!blk.ok) return null;
@@ -116,7 +138,7 @@ function turnMega(m){
   for (let q = 1; q <= 3 && !pick; q++){
     const rot = (f0 + q) % 4, [w, h] = t.w === t.h || rot % 2 === 0 ? [t.w, t.h] : [t.h, t.w];
     const x0 = m.i + (m.w - 1)/2 - (w - 1)/2, z0 = m.j + (m.h - 1)/2 - (h - 1)/2;   // keep the middle where it was, as near as the grid allows
-    for (const i of new Set([Math.floor(x0), Math.ceil(x0)])) for (const j of new Set([Math.floor(z0), Math.ceil(z0)])) if (!pick && megaBlockOk(i, j, w, h, own)) pick = { rot, i, j, w, h };
+    for (const i of new Set([Math.floor(x0), Math.ceil(x0)])) for (const j of new Set([Math.floor(z0), Math.ceil(z0)])) if (!pick && megaBlockOk(i, j, w, h, own, m.kind)) pick = { rot, i, j, w, h };
   }
   if (!pick){
     showAreaSel({ i0: m.i, i1: m.i + m.w - 1, j0: m.j, j1: m.j + m.h - 1 }); setTimeout(() => showAreaSel(null), 450);
@@ -163,6 +185,7 @@ function findMegaBlock(kind, c){
     if (Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX || Math.abs(i + w - 1) > GRID_MAX || Math.abs(j + h - 1) > GRID_MAX) continue;
     const d = Math.hypot(i + (w-1)/2 - c.i, j + (h-1)/2 - c.j);
     if (best && d*4 > best.score) continue;   // can't beat what we have
+    if (megaHwNear(i, j, w, h, kind)) continue;   // (a highway over or beside it)
     const blk = blockCells(i, j, w, h);
     if (blk.some(b => b && (b.mega || b.sections.length))) continue;   // something stands there
     const missing = blk.filter(b => !b).length;

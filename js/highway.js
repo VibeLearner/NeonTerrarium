@@ -81,6 +81,8 @@ function hwTileWhy(i, j, L, skip){
   if (c && hwY(L) - HW_CLEAR < hwSurface(c)) return 'a building is in the way: go higher';
   for (const { h, k } of hwAt(i, j)) if (Math.abs(h.tiles[k].L - L) < 2) return 'another highway is there: go 2 floors higher or lower';
   if (mtAt(i, j).length && !mtHwClear(hwY(L))) return 'the metro is in the way at this height: go higher or lower';
+  if (hwY(L) - HW_CLEAR < MT_SHAFT_TOP + .2) for (const [x, z, r] of mtShafts())   // a metro station's lift shaft beside the plot, reaching up past the deck
+    if (Math.abs(x - i*LOT) < LOT/2 + r + .25 && Math.abs(z - j*LOT) < LOT/2 + r + .25) return 'a metro station\'s lift is in the way: go higher';
   return null;
 }
 // the open sky a ramp needs, just past the line's end (from the plot at (i, j) going out along d)
@@ -102,6 +104,8 @@ function hwLiftOK(h, side){
   const S_ = hwLiftSpot(h, side), c = cells.get(ckey(Math.round(S_.stand.x/LOT), Math.round(S_.stand.z/LOT))), c2 = cells.get(ckey(Math.round(S_.sx/LOT), Math.round(S_.sz/LOT)));
   if (!c || !c2 || c.mega || c2.mega) return false;
   const G = cellGrid(c2); if (!freeAt(G, S_.sx, S_.sz)) return false;
+  if (hwY(h.tiles[h.tiles.length - 1].L) + 1.3 > MT_Y - MT_CLEAR) for (const l of metros) for (const p of mtSamples(l, .4)) if (Math.hypot(p.x - S_.sx, p.z - S_.sz) < .95) return false;   // (no metro line through the shaft)
+  for (const [x, z] of mtShafts()) if (Math.hypot(x - S_.sx, z - S_.sz) < .8) return false;   // (nor a station's lift where it stands)
   return freeAt(cellGrid(c), S_.stand.x, S_.stand.z);
 }
 // what a click at a plot would do in highway mode: { type: 'start'|'extend'|'finish'|'none', ok, why, ... }

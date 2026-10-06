@@ -71,8 +71,20 @@ function mtLiftOK(l, k, side){
   if (!c || !c2 || c.mega || c2.mega) return false;
   if (!freeAt(cellGrid(c2), S_.sx, S_.sz)) return false;
   for (const l2 of metros) for (const k2 of mtStops(l2)){ if (l2 === l && k2 === k) continue; const s2 = l2.sides && l2.sides[k2]; if (!s2) continue; const o = mtLiftSpot(l2, k2, s2); if (Math.hypot(o.sx - S_.sx, o.sz - S_.sz) < .8) return false; }
+  if (mtShaftHitsHw(S_.sx, S_.sz, S_.r)) return false;   // (no sky highway's deck through the shaft)
   return freeAt(cellGrid(c), S_.stand.x, S_.stand.z);
 }
+const MT_SHAFT_TOP = MT_Y + 1.4;   // the top of a station's lift shaft, its cap and all
+// does any sky highway's deck (or its ramps) pass through a lift shaft at (x, z), below the shaft's top?
+function mtShaftHitsHw(x, z, r){
+  for (const h of highways){
+    const reach = hwWidth(h)/2 + r + .15;
+    for (const p of hwSamples(h, .4)) if (Math.abs(p.x - x) < reach && Math.abs(p.z - z) < reach && Math.hypot(p.x - x, p.z - z) < reach && p.y - HW_CLEAR < MT_SHAFT_TOP + .2) return true;
+  }
+  return false;
+}
+// every station lift shaft standing, as [x, z, r]
+function mtShafts(){ const out = []; for (const l of metros) for (const k of mtStops(l)){ const s = l.sides && l.sides[k]; if (!s) continue; const L = mtLiftSpot(l, k, s); out.push([L.sx, L.sz, L.r]); } return out; }
 // would a line starting at (i, j) have room for its first station's lift (on either side, whichever way it then goes)?
 function mtEndLiftOK(i, j){
   for (const d of SIDES4){ const l = { tiles: [{ i, j }], dir0: d, sides: {}, st: [] }; for (const sd of [1, -1]) if (mtLiftOK(l, 0, sd)) return true; }

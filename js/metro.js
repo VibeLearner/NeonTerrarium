@@ -342,7 +342,7 @@ function mtCarModel(cab, nose = 1){
   const add = (mat, x, y, z, sx, sy, sz, rx = 0, rz = 0, ry = 0) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z*nose); m.scale.set(sx, sy, sz); m.rotation.set(rx*nose, ry*nose, rz); g.add(m); return m; };
   const R_ = mulberry32(cab ? 77 : 41);
   // the body: from the back end to where the cab's nose starts (all of it, on a middle car)
-  const zb0 = -L/2 + .04, zb1 = cab ? L/2 - .3 : L/2 - .04, bl = zb1 - zb0, bz = (zb0 + zb1)/2;
+  const zb0 = -L/2 + .04, zb1 = cab ? L/2 - .38 : L/2 - .04, bl = zb1 - zb0, bz = (zb0 + zb1)/2;
   add(MTM.body, 0, y0 + .3, bz, Wb, .6, bl);                                      // the lower body
   add(MTM.body, 0, y0 + .6 + (H - .6 - rr)/2, bz, Wb - .03, H - .6 - rr, bl);      // the upper body, a little in at the windows
   add(MTM.body, 0, y0 + H - rr/2, bz, Wb - 2*rr, rr, bl);                          // the roof, its edges rounded down
@@ -393,24 +393,42 @@ function mtCarModel(cab, nose = 1){
     for (const o of [-.15, .15]) add(MTM.dark, bx, by + .07, L*.02 + o, .12, .05, .07);   // its wheels on the rail
     add(MTM.belt, bx + .1, by + .02, L*.02, .01, .02, .4); }
   if (cab){
-    // the nose: a rounded dome on the end of the body, mostly glass (a dark frame round it, a centre post), the body
-    // only in a band at the bottom with the headlights and the green strip
-    const rx = Wb/2 + .01, ry = H/2 + .03, rz = .3, cy = y0 + H/2, cz = zb1;
-    const part = (mat, t0, t1, p0, p1, sc = 1) => {   // a patch of the half-ellipsoid facing +z: theta t0..t1 from the top, phi p0..p1 round it
-      const geo = new THREE.SphereGeometry(1, 18, 12, p0, p1 - p0, t0, t1 - t0).toNonIndexed(); geo.computeVertexNormals();
-      const m = new THREE.Mesh(geo, mat); m.position.set(0, cy, cz*nose); m.scale.set(rx*sc, ry*sc, rz*sc); m.rotation.y = nose < 0 ? PI : 0; g.add(m); return m; };   // (turned, not mirrored, for a cab facing back)
-    const tG = PI*.64;   // where the glass ends and the body begins
-    part(MTM.glass, 0, tG, 0, PI);                                                // the glass dome
-    part(MTM.body, tG, PI, 0, PI);                                                // the body band below it
-    part(MTM.dark, tG - .05, tG + .02, 0, PI, 1.012);                             // the frame round the glass's lower edge
-    part(MTM.dark, .02, tG, PI/2 - .035, PI/2 + .035, 1.012);                     // the centre post
-    for (const ph of [PI*.2, PI*.8]) part(MTM.dark, .25, tG, ph - .03, ph + .03, 1.01);   // two more posts where the glass turns the corner
-    part(MTM.belt, tG + .1, tG + .14, .25, PI - .25, 1.01);                       // the green strip across the front
-    part(MTM.belt, .3, .34, 0, PI, 1.008);                                        // and one high round the glass
-    for (const ph of [PI/2 - .55, PI/2 + .55]) part(MTM.head, tG + .2, tG + .3, ph - .16, ph + .16, 1.01);   // the headlights
-    part(MTM.dark, PI*.92, PI, .5, PI - .5, 1.01);                                // the coupler's shroud underneath
-    part(MTM.glassHi, .12, .32, PI*.28, PI*.5, 1.006);                            // a sheen where the light catches the glass
-    for (const ph of [PI/2 - .32, PI/2 + .32]) part(MTM.sil, .55, 1.25, ph - .12, ph + .12, 1.004);   // the drivers, dark against the lit glass
+    // the nose, after the reference: the body carried on and gently rounded off. Its roof curves down in a long arc into
+    // a low, upright front, and its corners round in seen from above; the curved upper part is a wraparound windscreen
+    // (green-tinted, lit), the lower part body with the headlights and a green strip. Lofted from sections along it.
+    const Ln = .36, N = 12, rt = .3, rp = .14, yb = y0 - .02;
+    const sec = t => {   // the section at t (0 where it leaves the body, 1 at the tip): its outline, left side up, over the top, right side down
+      const w = Wb/2 - rp*(1 - Math.sqrt(Math.max(0, 1 - t*t))), yt = y0 + H - rt*(1 - Math.sqrt(Math.max(0, 1 - t*t))), r = .1 - .04*t;
+      const pts = [[-w, yb], [-w, y0 + .16], [-w, y0 + .19], [-w, y0 + .36], [-w, y0 + .4]];
+      for (let q = 0; q <= 4; q++){ const a = PI - q*PI/8; pts.push([-w + r + r*Math.cos(a), yt - r + r*Math.sin(a)]); }
+      for (let q = 0; q <= 4; q++){ const a = PI/2 - q*PI/8; pts.push([w - r + r*Math.cos(a), yt - r + r*Math.sin(a)]); }
+      pts.push([w, y0 + .4], [w, y0 + .36], [w, y0 + .19], [w, y0 + .16], [w, yb]);
+      return pts.map(([x, y]) => [x, y, zb1 + t*Ln]);
+    };
+    const S = []; for (let q = 0; q <= N; q++) S.push(sec(q/N));
+    const M = S[0].length, buf = { body: [], glass: [], dark: [], belt: [] };
+    const kindOf = (y, t) => y < y0 + .16 ? 'body' : y < y0 + .19 ? 'belt' : y < y0 + .36 ? 'body' : y < y0 + .4 ? 'dark' : t > .2 ? 'glass' : 'body';
+    const quad = (k, A, B, C, D) => buf[k].push(...A, ...B, ...C, ...A, ...C, ...D);
+    for (let q = 0; q < N; q++) for (let j = 0; j < M - 1; j++){
+      const A = S[q][j], B = S[q + 1][j], C = S[q + 1][j + 1], D = S[q][j + 1];
+      quad(kindOf((A[1] + B[1] + C[1] + D[1])/4, (q + .5)/N), A, B, C, D);
+    }
+    { const F = S[N]; for (let j = 0; j < (M >> 1) - 1; j++){ const a = F[j], b = F[j + 1], c = F[M - 2 - j], d = F[M - 1 - j];   // the front face, in bands across
+        quad(kindOf((a[1] + b[1])/2, 1), a, b, c, d); } }
+    const mat = { body: MTM.body, glass: MTM.glass, dark: MTM.dark, belt: MTM.belt };
+    for (const k in buf){ if (!buf[k].length) continue;
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(buf[k], 3)); geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, mat[k]); if (nose < 0) m.rotation.y = PI; g.add(m); }
+    // the windscreen's frame: a post down the middle and one at each corner, a sheen across the glass
+    const zt = zb1 + Ln, ytop = t => y0 + H - rt*(1 - Math.sqrt(Math.max(0, 1 - t*t)));
+    for (let q = 1; q < N; q++){ const t0 = q/N, t1 = (q + 1)/N; const st = (x, a, b) => { const m = new THREE.Mesh(U.box, MTM.dark); const ya = ytop(a) + .006, yb2 = ytop(b) + .006, za = zb1 + a*Ln, zb2 = zb1 + b*Ln;
+        m.position.set(x, (ya + yb2)/2, ((za + zb2)/2)*nose); m.scale.set(.025, .012, Math.hypot(zb2 - za, yb2 - ya) + .005); m.rotation.x = Math.atan2(ya - yb2, zb2 - za)*nose; g.add(m); };
+      if (t0 >= .2) st(0, t0, t1); }
+    add(MTM.dark, 0, (y0 + .4 + ytop(1))/2, zt + .004, .025, ytop(1) - y0 - .4, .01);
+    add(MTM.glassHi, -.18, ytop(.6) + .004, zb1 + .6*Ln, .12, .01, .08, -.6);   // a glint of light on the glass
+    // the headlights and the green strip across the front
+    for (const sx of [-1, 1]){ add(MTM.dark, sx*.2, y0 + .27, zt + .004, .17, .06, .01); add(MTM.head, sx*.17, y0 + .27, zt + .008, .08, .035, .006); add(MTM.head, sx*.25, y0 + .27, zt + .008, .04, .035, .006); }
+    add(MTM.dark, 0, y0 - .03, zt - .06, Wb - .34, .08, .12);   // the coupler's shroud
   }
   return g;
 }

@@ -2540,6 +2540,36 @@ function buildLogisticsHub(m){
     for (const [ox, oz] of [[-.6, .6], [-.6, -.3], [.3, .6]]) strut(M.frame, P, ax, yr + 2.2, az, ax + ox, yr, az + oz, .02);
     beaconLight(P, ax, yr + 3.25, az, .08, .9); yagi(P, ax, yr + 2.9, az, .8, .6); }
   for (const [x, z] of [[rg.x0 + .2, rg.z1 - .2], [rg.x1 - .2, rg.z1 - .2], [rg.x0 + .2, rg.z0 + .2]]) beaconLight(P, x, yr + .1, z, .07, .7);
+  // ---- what sets the variants apart (the colours come from megaSkins)
+  const V = m.skin || 0;
+  if (V === 1){   // a gantry crane riding rails along the crown either side of the open middle, a container slung from its hook
+    const cz = -2.6, xl = wl - .25, xr = wr + .25, yb = yR + 2.4;
+    for (const x of [xl, xr]){ box(M.lgConc4, P, x, yR + .08, (rb + rg.z1 - 1)/2, .22, .12, rg.z1 - 1 - rb); for (let z = rb + .3; z < rg.z1 - 1; z += .8) box(M.frame, P, x, yR + .03, z, .5, .04, .1); }
+    for (const x of [xl, xr]) for (const s2 of [-1, 1]){ strut(M.lgFork, P, x, yR + .2, cz + s2*.8, x, yb, cz + s2*.25, .14); box(M.lgConc4, P, x, yR + .2, cz + s2*.8, .5, .2, .5); }
+    for (const x of [xl, xr]){ box(M.lgFork, P, x, yR + 1.2, cz, .12, .12, 1.4); box(M.frame, P, x, yR + .3, cz, .3, .25, 1.9); }
+    box(M.lgFork, P, (xl + xr)/2, yb, cz, xr - xl + .5, .35, .7); for (let x = xl + .4; x < xr; x += .8) strut(M.frame, P, x, yb - .17, cz - .3, x + .4, yb + .17, cz - .3, .04);
+    lgHaz(under(P, T((xl + xr)/2, 0, cz + .36, 0)), xr - xl, yb, .2);
+    const tx = rcx + .6; box(M.lgConc4, P, tx, yb - .3, cz, .9, .3, .8); box(M.blink, P, tx, yb - .05, cz + .42, .06, .06, .06);
+    const hy = y2 + 2.65; for (const s2 of [-1, 1]) cyl(M.frame, P, tx + s2*.2, (yb - .45 + hy + 1.25)/2, cz, .015, yb - .45 - hy - 1.25);
+    box(M.lgConc4, P, tx, hy + 1.25, cz, 1.2, .1, .5); lgCtr(P, tx, hy, cz, 0, 5, 'sign_w_kib', 2.4);
+    beaconLight(P, xl, yb + .25, cz, .08, .8); beaconLight(P, xr, yb + .25, cz, .08, .8);
+  } else if (V === 2){   // a tower of containers stacked four high off the right side, and a billboard on the roof
+    let yy = .06; for (let k = 0; k < 4; k++) yy += lgCtr(P, a0.x1 + 1.4, yy, 8.0, PI/2 + (k % 2 ? .04 : -.03), [1, 4, 6, 2][k], k === 1 ? 'sign_w_import' : k === 3 ? 'sign_w_kib' : null, 2.6);
+    for (const s2 of [-1, 1]) cyl(M.frame, P, a0.x1 + 1.4 + s2*.62, yy/2, 6.6, .03, yy);
+    beaconLight(P, a0.x1 + 1.4, yy + .1, 8.0, .08, .9);
+    const bx = rg.x0 + 2.4, bz = -2.6, F = under(P, T(bx, 0, bz, 0));
+    for (const s2 of [-1.5, 1.5]){ box(M.frame, F, s2, yr + 1.3, -.1, .1, 2.6, .1); strut(M.frame, F, s2, yr, -.9, s2, yr + 2.0, -.1, .06); }
+    box(M.lgConc4, F, 0, yr + 2.1, 0, 3.8, 1.5, .12); box(M.lgNeonO, F, 0, yr + 1.32, .07, 3.8, .05, .04); box(M.lgNeonO, F, 0, yr + 2.88, .07, 3.8, .05, .04);
+    for (const r of [0, PI]) fitSign(under(F, T(0, 0, r ? -.08 : .08, r)), 'sign_c_open', 0, yr + 2.1, 0, 3.5, 2.0, 'pink');   // (both faces)
+    box(M.lgNeonO, F, 0, yr + 1.32, -.07, 3.8, .05, .04); box(M.lgNeonO, F, 0, yr + 2.88, -.07, 3.8, .05, .04);
+  } else if (V === 3){   // cooling towers and more solar on the roof
+    for (const x of [wr + 1.6, rg.x1 - 1.8]){ const z = -3.6;
+      put(U.cyl16, M.lgConc2, under(P, T(x, yr + .9, z, 0, 1.7, 1.8, 1.7))); put(U.cyl16, M.lgConc, under(P, T(x, yr + 2.0, z, 0, 1.4, .5, 1.4))); put(U.cyl16, M.lgConc2, under(P, T(x, yr + 2.45, z, 0, 1.55, .4, 1.55)));
+      put(U.cyl16, M.lgNeonO, under(P, T(x, yr + 1.5, z, 0, 1.74, .06, 1.74))); put(U.cyl16, M.lgConc4, under(P, T(x, yr + 2.66, z, 0, 1.3, .04, 1.3)));
+      for (let k = 0; k < 3; k++) emitters.push(new THREE.Vector3(x + rnd(-.3, .3), yr + 2.8, z + rnd(-.3, .3)).applyMatrix4(P)); }
+    for (const z of [-6.0, .6]) solarRow(P, (wr + rg.x1)/2 - .2, z, 5.0, .9, yr - .2);
+    for (const z of [-4.6, -3.2]) solarRow(P, (rg.x0 + wl)/2, z, 3.6, .9, yr - .2);
+  }
   // greenery: vines off the deck's and the platform's edges, weeds at grade
   for (let x = a0.x0 + 1; x < a0.x1; x += rnd(1.8, 3.2)) if (chance(.45)) plant(pick(['vines', 'h_ivy', 'l_mossroots']), under(P, T(x, 0, a0.z1 + .02, 0)), 0, yG - .02, .04, rnd(.7, .9), 't', true);
   for (let k = 0; k < 10; k++) floorBig(P, rnd(a0.x1 + .3, HX - .3), .066, rnd(-HZ + .5, HZ - .5), rnd(.7, 1));
@@ -4135,6 +4165,10 @@ function megaSkins(){
       { mats: [[M.domeNeonA, neon(0x3a2a10, 0xffb347)], [M.domeNeonB, neon(0x3a1a5a, 0x9b6bff)]], glows: { cyan: 'amber', pink: 'platinum' } },   // amber and violet
       { mats: [[M.domeNeonA, neon(0x1a4010, 0x7aff6a)], [M.domeNeonB, neon(0x5a1a3a, 0xff4fa3)]], glows: { cyan: 'green' } },                    // acid green and pink
       { mats: [[M.domeNeonA, neon(0x1a2a60, 0x4f7bff)], [M.domeNeonB, neon(0x5a1010, 0xff2a4a)], [M.domeDrum, t(0x24262e)]], glows: { cyan: 'blue', pink: 'crimson' } } ],   // blue and red
+    logistics: [null,
+      { mats: [[M.lgConc, t(0x7a5a48)], [M.lgConc2, t(0x664a3c)], [M.lgConc3, t(0x523a30)], [M.lgFloor, t(0x5a4c44)], [M.lgFloor2, t(0x4a3e38)], [M.lgNeonO, neon(0x10383a, 0x38e8e0)]] },   // rust and teal, a gantry crane over the middle
+      { mats: [[M.lgConc, t(0x3e424e)], [M.lgConc2, t(0x343842)], [M.lgConc3, t(0x2a2e36)], [M.lgConc4, t(0x1e2128)], [M.lgFloor, t(0x383a42)], [M.lgFloor2, t(0x2e3038)], [M.lgNeonO, neon(0x3a1a5a, 0xc070ff)], [M.hazard, t(0xd0508a)]] },   // midnight and violet, a container tower and a billboard
+      { mats: [[M.lgConc, t(0xb8ab92)], [M.lgConc2, t(0xa09480)], [M.lgConc3, t(0x847a68)], [M.lgFloor, t(0x8a8478)], [M.lgFloor2, t(0x76706a)], [M.lgNeonO, neon(0x10285a, 0x4f9bff)]] } ],   // sandstone and blue, cooling towers and solar
     pagoda: [null,
       { mats: [[M.lxWhite, t(0xb8402e)], [M.lxWhite2, t(0x2e2826)], [M.pgNeon, lamp(0xffb347)]], glows: { cyan: 'amber' } },          // temple red
       { mats: [[M.lxWhite, t(0x5a9a80)], [M.lxWhite2, t(0x3e6e5a)], [M.gold, t(0xb88a4a)], [M.pgNeon, lamp(0xff6fb8)]], glows: { cyan: 'pink' } },   // jade and bronze

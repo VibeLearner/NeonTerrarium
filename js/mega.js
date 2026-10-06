@@ -2388,10 +2388,9 @@ function buildLogisticsHub(m){
   // ---- the ground hall, under the deck: walls with big openings at the sides and back, the dock bays on the right
   { const o = { x0: a0.x0, x1: a0.x1, z0: a0.z0, z1: a1.z1 }, h = y1 - yG - .32, zc = (o.z0 + o.z1)/2;
     const [Fb, lb] = face(o, 1); lgWallOpen(Fb, lb, yG, h, [[-6.5, 2.2, 1.9], [-.5, 2.2, 1.9], [5.5, 2.2, 1.9]]);
-    const [Fl, ll] = face(o, 3); lgWallOpen(Fl, ll, yG, h, [[-8 - zc, 2.0, 1.8], [-3 - zc, 2.4, 1.9], [1.2 - zc, 2.0, 1.8]]);
-    const docks = [-6.5, -1.5];                                                                    // (z of the dock bays on the right)
-    const [Fr, lr] = face(o, 2); lgWallOpen(Fr, lr, yG, h, docks.map(z => [zc - z, 2.4, 2.1]).concat([[zc - (-9.2), 1.4, 1.6]]));
-    box(M.frame, Fr, zc - (-4.0), yG + 2.0, .04, 3.0, .42, .04); fitSign(under(Fr, T(0, 0, .07, 0)), 'sign_w_export', zc - (-4.0), yG + 2.0, 0, 2.9, .9, 'amber');
+    // (its sides are open: only the back is walled)
+    const [Fr] = face(a1, 2); box(M.frame, Fr, a1.z1 - zc - 7.9, y1 - .62, .06, 3.0, .42, .04); for (const s2 of [-1, 1]) box(M.frame, Fr, a1.z1 - zc - 7.9 + s2*1.3, y1 - .35, .06, .03, .2, .03);
+    fitSign(under(Fr, T(0, 0, .09, 0)), 'sign_w_export', a1.z1 - zc - 7.9, y1 - .62, 0, 2.9, .9, 'amber');
     ceiling(y1 - .32, o); }
   // the ramps down from the dock bays (and the yard's corner) to containers waiting at grade
   for (const [z, c, lab, trailer] of [[-6.5, 4, 'sign_w_import', true], [-1.5, 3, 'sign_w_import', false], [4.6, 0, 'sign_w_cargo', false]]){
@@ -2458,8 +2457,7 @@ function buildLogisticsHub(m){
   // ---- the deck hall, under the ring: open in front, racks; walls with openings at the sides and back
   { const h = y2 - y1 - .32, zc = (rg.z0 + rg.z1)/2;
     const [Fb, lb] = face(rg, 1); lgWallOpen(Fb, lb, y1, h, [[-5, 1.8, 1.7], [0, 1.8, 1.7], [5, 1.8, 1.7]]);
-    const [Fl, ll] = face(rg, 3); lgWallOpen(Fl, ll, y1, h, [[-6.8 - zc, 1.6, 1.7], [-3.6 - zc, 1.6, 1.7]]);
-    const [Fr, lr] = face(rg, 2); lgWallOpen(Fr, lr, y1, h, [[zc + 6.8, 1.6, 1.7], [zc + 2.6, 1.6, 1.7]]);
+    // (open at the sides too)
     for (const z of [rg.z1 - 1.4, rg.z1 - 3.4, rg.z1 - 5.4]) for (const x of [-6.6, -1.9, 2.8]) lgRack(P, x, y1, z, 4.2, 4, .55);
     ceiling(y2 - .32, rg);
     for (let x = rg.x0 + 1.2; x < rg.x1; x += 3.0){ box(M.lgConc4, P, x, y2 - .42, rg.z1 + .12, .3, .1, .2); box(M.lgLit, P, x, y2 - .48, rg.z1 + .16, .26, .03, .16); glow(P, x, y2 - .7, rg.z1 + .3, 'ivory', .6); } }
@@ -2493,12 +2491,12 @@ function buildLogisticsHub(m){
     fitSign(under(F, T(0, 0, .1, 0)), 'sign_w_fragile', 0, yB - .35, 0, 3.3, .9, 'amber');
     lgCtr(P, cx, y2, rg.z1 - 1.0, 0, 0, 'sign_w_kib', 2.6); lgCtr(P, cx, y2 + 1.1, rg.z1 - 1.0, 0, 4, null, 2.4);
     for (const z of [rg.z1 - 3.0, rg.z1 - 5.0]) lgRack(P, cx, y2, z, 3.6, 4, .62);
-    box(M.lgConc, P, wr + .1, y2 + bayH/2, (rg.z0 + rg.z1)/2 - .5, .2, bayH, rg.z1 - rg.z0 - 1.0);
+    box(M.lgConc, P, wr + .1, y2 + .75, (rg.z0 + rg.z1)/2 - .5, .2, 1.5, rg.z1 - rg.z0 - 1.0);   // (a low counter, open above)
     const Fi = under(P, T(wr, 0, (rg.z0 + rg.z1)/2, -PI/2));
     for (const t of [-2.0, -.4, 1.2]){ box(M.lgBay, Fi, t, y2 + .8, .01, 1.1, 1.0, .02); box(M.lgConc4, Fi, t, y2 + .26, .2, 1.0, .06, .4);
       box(M.lgNeonC, Fi, t, y2 + 1.35, .03, 1.1, .04, .03); glow(Fi, t, y2 + .9, .25, 'cyan', .8);
       if (t !== -.4){ const Q = under(Fi, T(t, y2 + .45, .25)); box(M.lgConc4, Q, 0, 0, 0, .3, .08, .3); for (const a of [PI/4, 3*PI/4, 5*PI/4, 7*PI/4]) box(M.lgConc4, Q, Math.cos(a)*.22, .03, Math.sin(a)*.22, .22, .03, .04, -a); } }
-    box(M.frame, Fi, -.4, yB - .5, .03, 3.0, .42, .04); fitSign(under(Fi, T(0, 0, .06, 0)), 'sign_w_dronecharge', -.4, yB - .5, 0, 2.9, .9, 'green'); }
+    box(M.frame, Fi, -.4, yB - .35, .03, 3.0, .42, .04); for (const s2 of [-1, 1]) box(M.frame, Fi, -.4 + s2*1.3, yB - .07, .03, .03, .14, .03); fitSign(under(Fi, T(0, 0, .06, 0)), 'sign_w_dronecharge', -.4, yB - .35, 0, 2.9, .9, 'green'); }
   // the back wing: a lit drone bay where the delivery drones go in, shelves of parked drones, DRONE STORAGE over them
   { const F = under(P, T(rcx, 0, rb, 0));
     box(M.lgConc, P, rcx, y2 + bayH/2, (rb + rg.z0)/2, wr - wl, bayH, rb - rg.z0);

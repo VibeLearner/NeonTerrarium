@@ -171,7 +171,7 @@ const MTM = {
   green: toon(0x184010, { em: 0x5aff2a, kind: 'neon' }), green2: toon(0x284010, { em: 0xb0ff3a, kind: 'neon' }), board: toon(0x0c1a10, { em: 0x0e2a14, kind: 'trim' }),
   lit: toon(0x3a4a3a, { em: 0xd8ffe0, kind: 'lamp' }), tactile: toon(0xd9b43a),
   // the train
-  body: toon(0x7a828c), body2: toon(0x4c525a), dark: toon(0x1c1f24), win: toon(0x1a3a12, { em: 0x9aff6a, kind: 'window' }), glass: toon(0x163010, { em: 0x3a8a28, kind: 'window' }),
+  body: toon(0x7a828c), body2: toon(0x4c525a), dark: toon(0x1c1f24), win: toon(0x1a3a12, { em: 0x9aff6a, kind: 'window' }), glass: toon(0x183a22, { em: 0x2e7a3a, kind: 'window' }), glassHi: toon(0x6aa880),
   head: toon(0x5a5a50, { em: 0xf0fff0, kind: 'lamp' }), sil: toon(0x0a1a0a), belt: toon(0x184010, { em: 0x5aff2a, kind: 'neon' }),
 };
 const MT_GLASS = new THREE.MeshBasicMaterial({ color: 0x9aff7a, transparent: true, opacity: .12, depthWrite: false, side: THREE.DoubleSide }); MT_GLASS.userData.colorOnly = true;
@@ -342,7 +342,7 @@ function mtCarModel(cab, nose = 1){
   const add = (mat, x, y, z, sx, sy, sz, rx = 0, rz = 0, ry = 0) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z*nose); m.scale.set(sx, sy, sz); m.rotation.set(rx*nose, ry*nose, rz); g.add(m); return m; };
   const R_ = mulberry32(cab ? 77 : 41);
   // the body: from the back end to where the cab's nose starts (all of it, on a middle car)
-  const zb0 = -L/2 + .04, zb1 = cab ? L/2 - .36 : L/2 - .04, bl = zb1 - zb0, bz = (zb0 + zb1)/2;
+  const zb0 = -L/2 + .04, zb1 = cab ? L/2 - .3 : L/2 - .04, bl = zb1 - zb0, bz = (zb0 + zb1)/2;
   add(MTM.body, 0, y0 + .3, bz, Wb, .6, bl);                                      // the lower body
   add(MTM.body, 0, y0 + .6 + (H - .6 - rr)/2, bz, Wb - .03, H - .6 - rr, bl);      // the upper body, a little in at the windows
   add(MTM.body, 0, y0 + H - rr/2, bz, Wb - 2*rr, rr, bl);                          // the roof, its edges rounded down
@@ -393,22 +393,24 @@ function mtCarModel(cab, nose = 1){
     for (const o of [-.15, .15]) add(MTM.dark, bx, by + .07, L*.02 + o, .12, .05, .07);   // its wheels on the rail
     add(MTM.belt, bx + .1, by + .02, L*.02, .01, .02, .4); }
   if (cab){
-    // the nose: a short lower front, the big sloped windscreen in a dark frame, the cap over it, rounded corners
-    const zn = L/2 - .36, yf = .48, ang = Math.atan2(H - .02 - yf, .3), cz = zn + .19, cy = y0 + (yf + H - .02)/2, nY = Math.cos(ang), nZ = Math.sin(ang);
-    add(MTM.body, 0, y0 + yf/2, zn + .17, Wb - .02, yf, .34);                          // the lower front
-    for (const s of [-1, 1]) add(MTM.body, s*(Wb/2 - .09), y0 + yf/2, zn + .3, .2, yf, .1, 0, 0, s*.55);   // its rounded corners
-    add(MTM.body, 0, cy - nY*.11, cz - nZ*.11, Wb - .02, .22, .4, ang);                 // the sloped wedge the windscreen sits in
-    add(MTM.dark, 0, cy + nY*.004, cz + nZ*.004, Wb - .06, .012, .38, ang);              // the windscreen's frame
-    add(MTM.glass, 0, cy + nY*.01, cz + nZ*.01, Wb - .18, .012, .32, ang);               // the windscreen, lit
-    add(MTM.dark, 0, cy + nY*.016, cz + nZ*.016, .02, .012, .32, ang);                  // its centre post
-    for (const x of [-.15, .17]) add(MTM.sil, x, cy + nY*.017 - .02, cz + nZ*.017 - .03, .1, .006, .1, ang);   // the drivers, dark against the lit cab
-    for (const s of [-1, 1]) add(MTM.belt, s*(Wb/2 - .005), cy - nY*.05, cz - nZ*.05, .008, .02, .4, ang);
-    add(MTM.body, 0, y0 + H - .07, zn + .02, Wb - .06, .14, .1);                          // the cap
-    add(MTM.dark, 0, y0 + H - .07, zn + .075, .36, .07, .012); add(MTM.glass, 0, y0 + H - .07, zn + .082, .32, .045, .006);   // the destination board
-    for (const s of [-1, 1]){ add(MTM.dark, s*.26, y0 + .3, zn + .362, .16, .07, .01); add(MTM.head, s*.24, y0 + .3, zn + .368, .07, .04, .006); add(MTM.head, s*.31, y0 + .3, zn + .368, .04, .04, .006); }   // the headlights
-    add(MTM.belt, 0, y0 + .16, zn + .365, Wb - .2, .025, .008);                           // the green strip across the front
-    add(MTM.dark, 0, y0 - .02, zn + .32, Wb - .2, .1, .14);                               // the coupler skirt
-    add(MTM.body2, 0, y0 + .04, zn + .385, .14, .06, .04);
+    // the nose: a rounded dome on the end of the body, mostly glass (a dark frame round it, a centre post), the body
+    // only in a band at the bottom with the headlights and the green strip
+    const rx = Wb/2 + .01, ry = H/2 + .03, rz = .3, cy = y0 + H/2, cz = zb1;
+    const part = (mat, t0, t1, p0, p1, sc = 1) => {   // a patch of the half-ellipsoid facing +z: theta t0..t1 from the top, phi p0..p1 round it
+      const geo = new THREE.SphereGeometry(1, 18, 12, p0, p1 - p0, t0, t1 - t0).toNonIndexed(); geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, mat); m.position.set(0, cy, cz*nose); m.scale.set(rx*sc, ry*sc, rz*sc); m.rotation.y = nose < 0 ? PI : 0; g.add(m); return m; };   // (turned, not mirrored, for a cab facing back)
+    const tG = PI*.64;   // where the glass ends and the body begins
+    part(MTM.glass, 0, tG, 0, PI);                                                // the glass dome
+    part(MTM.body, tG, PI, 0, PI);                                                // the body band below it
+    part(MTM.dark, tG - .05, tG + .02, 0, PI, 1.012);                             // the frame round the glass's lower edge
+    part(MTM.dark, .02, tG, PI/2 - .035, PI/2 + .035, 1.012);                     // the centre post
+    for (const ph of [PI*.2, PI*.8]) part(MTM.dark, .25, tG, ph - .03, ph + .03, 1.01);   // two more posts where the glass turns the corner
+    part(MTM.belt, tG + .1, tG + .14, .25, PI - .25, 1.01);                       // the green strip across the front
+    part(MTM.belt, .3, .34, 0, PI, 1.008);                                        // and one high round the glass
+    for (const ph of [PI/2 - .55, PI/2 + .55]) part(MTM.head, tG + .2, tG + .3, ph - .16, ph + .16, 1.01);   // the headlights
+    part(MTM.dark, PI*.92, PI, .5, PI - .5, 1.01);                                // the coupler's shroud underneath
+    part(MTM.glassHi, .12, .32, PI*.28, PI*.5, 1.006);                            // a sheen where the light catches the glass
+    for (const ph of [PI/2 - .32, PI/2 + .32]) part(MTM.sil, .55, 1.25, ph - .12, ph + .12, 1.004);   // the drivers, dark against the lit glass
   }
   return g;
 }

@@ -73,6 +73,11 @@ function mtLiftOK(l, k, side){
   for (const l2 of metros) for (const k2 of mtStops(l2)){ if (l2 === l && k2 === k) continue; const s2 = l2.sides && l2.sides[k2]; if (!s2) continue; const o = mtLiftSpot(l2, k2, s2); if (Math.hypot(o.sx - S_.sx, o.sz - S_.sz) < .8) return false; }
   return freeAt(cellGrid(c), S_.stand.x, S_.stand.z);
 }
+// would a line starting at (i, j) have room for its first station's lift (on either side, whichever way it then goes)?
+function mtEndLiftOK(i, j){
+  for (const d of SIDES4){ const l = { tiles: [{ i, j }], dir0: d, sides: {}, st: [] }; for (const sd of [1, -1]) if (mtLiftOK(l, 0, sd)) return true; }
+  return false;
+}
 // each stop's lift side: kept if it still fits, else whichever side fits (or none: a stop without a lift lets nobody off)
 function mtSides(l){
   const old = l.sides || {}; l.sides = {};
@@ -86,7 +91,8 @@ function mtTargetAt(pk){
     const l = pk.l, k = pk.k, n = l.tiles.length;
     if (!l.done && k === n - 1){
       if (n < 2) return { type: 'none', l, k, ok: false, why: 'extend it to the next plot first' };
-      return { type: 'finish', l, k, ok: true, why: '' };
+      const why = [1, -1].some(sd => mtLiftOK(l, k, sd)) ? '' : 'no room here for the station\'s lift down to the street';   // (and ends at one)
+      return { type: 'finish', l, k, ok: !why, why };
     }
     if (k > 0 && k < n - 1){
       if (l.st.includes(k)) return { type: 'unstop', l, k, ok: true, why: '' };
@@ -101,10 +107,15 @@ function mtTargetAt(pk){
     const n = l.tiles.length, e = l.tiles[n - 1];
     if (Math.abs(e.i - i) + Math.abs(e.j - j) !== 1) continue;
     const pv = l.tiles[n - 2]; if (pv && pv.i === i && pv.j === j) continue;
-    const why = mtTileWhy(i, j);
+    let why = mtTileWhy(i, j);
+    if (!why && n === 1){   // the first station's lift has to fit beside the track running this way
+      l.tiles.push({ i, j }); const fits = [1, -1].some(sd => mtLiftOK(l, 0, sd)); l.tiles.pop();   // (tried with the plot added, then put back)
+      if (!fits) why = 'the first station\'s lift has no room if the line goes this way';
+    }
     return { type: 'extend', l, i, j, ok: !why, why };
   }
-  const why = mtTileWhy(i, j);
+  let why = mtTileWhy(i, j);
+  if (!why && !mtEndLiftOK(i, j)) why = 'no room here for the station\'s lift down to the street';   // (a line starts at a station people can get off at)
   return { type: 'start', i, j, ok: !why, why };
 }
 
@@ -192,7 +203,13 @@ function mtBuildView(l){
   // where the platforms are, the overhead girder runs through the canopy; elsewhere the C-frames carry it
   l.data = collect(() => {
     // (no rail under the train: it hangs from the girder overhead, held up by its magnets alone)
-    // the overhead girder: a dark box beam over the train, green circuit traces along both its faces
+    // the overhead girder: a dark box beam over the train, green circuit traces along both its faces. At a finished line's
+    // ends it reaches a little past the station, over the end cars of a train standing there
+    if (l.done && n > 1) for (const [k, u, d] of [[0, 0, -1], [n - 1, 1, 1]]){
+      const c = hwCenter(l, k, u), F = T(c.x + c.tx*d*.4, MT_Y, c.z + c.tz*d*.4, Math.atan2(c.tx, c.tz));
+      box(MTM.beam, F, 0, MT_OH + MT_OHT/2, 0, .46, MT_OHT, .8); box(MTM.beam2, F, 0, MT_OH + MT_OHT/2, d*.41, .5, MT_OHT + .04, .04);
+      box(MTM.blue, F, 0, MT_OH - .004, 0, .14, .008, .8); box(MTM.green, F, 0, MT_OH + MT_OHT/2, d*.44, .3, .03, .012);
+    }
     hwSweep(MTM.beam, pts, MT_OL, MT_OH + MT_OHT/2, .46, MT_OHT);
     for (const s of [-1, 1]) hwSweep(MTM.beam2, pts, s*.13, MT_OH - .015, .07, .05);   // the magnet rails under it
     hwSweep(MTM.blue, pts, 0, MT_OH - .004, .14, .008);                       // and the glowing strip between them, the train's magnets hanging just under it
@@ -343,9 +360,8 @@ function mtCarModel(cab, nose = 1){
   for (const s of [-1, 1]) add(MTM.body, s*(Wb/2 - rr*.62), y0 + H - rr*.62, bz, rr*1.15, rr*.55, bl, 0, s*.7);
   add(MTM.body2, 0, y0 + H + .005, bz, Wb - .34, .015, bl - .1);                     // the roof's centre panel
   // the skirt underneath: dark, vented, the green underglow along it
-  add(MTM.dark, 0, y0 - .04, 0, Wb - .1, .1, L - .08);
-  for (let z = -L/2 + .2; z < L/2 - .15; z += .18) for (const s of [-1, 1]) add(MTM.body2, s*(Wb/2 - .05), y0 - .04, z, .01, .06, .1);
-  add(MTM.belt, 0, y0 - .095, 0, Wb - .3, .015, L - .3);
+  add(MTM.dark, 0, y0 - .045, 0, Wb - .04, .1, L - .06);                             // (one clean piece: little vents and a thin strip under it flickered as it moved)
+  add(MTM.belt, 0, y0 - .1, 0, Wb - .3, .02, L - .3);
   for (const s of [-1, 1]){
     const sx = s*(Wb/2), sxu = s*((Wb - .03)/2);
     // panel seams, and the three green lines: under the roof, over the windows' sills, along the belt
@@ -389,7 +405,7 @@ function mtCarModel(cab, nose = 1){
     // the nose, after the reference: the body carried on and gently rounded off. Its roof curves down in a long arc into
     // a low, upright front, and its corners round in seen from above; the curved upper part is a wraparound windscreen
     // (green-tinted, lit), the lower part body with the headlights and a green strip. Lofted from sections along it.
-    const Ln = .36, N = 18, rt = .3, rp = .14, yb = y0 - .02, AR = 6;
+    const Ln = .36, N = 18, rt = .3, rp = .14, yb = y0 - .095, AR = 6;   // (its underside level with the skirt's)
     const sec = t => {   // the section at t (0 where it leaves the body, 1 at the tip): its outline, left side up, over the top, right side down
       const w = Wb/2 - rp*(1 - Math.sqrt(Math.max(0, 1 - t*t))), yt = y0 + H - rt*(1 - Math.sqrt(Math.max(0, 1 - t*t))), r = .1 - .04*t;
       const pts = [[-w, yb], [-w, y0 + .16], [-w, y0 + .19], [-w, y0 + .36], [-w, y0 + .4]];
@@ -430,7 +446,6 @@ function mtCarModel(cab, nose = 1){
     // the headlights and the green strip across the front
     for (const sx of [-1, 1]){ add(MTM.dark, sx*.2, y0 + .27, zt + .004, .19, .075, .012); add(MTM.head, sx*.165, y0 + .27, zt + .01, .08, .04, .006); add(MTM.head, sx*.25, y0 + .27, zt + .01, .04, .04, .006); add(MTM.belt, sx*.2, y0 + .227, zt + .009, .19, .01, .006); }
     add(MTM.dark, 0, y0 + .27, zt + .004, .1, .06, .01); add(MTM.glass, 0, y0 + .27, zt + .009, .08, .035, .006);   // the line number between them
-    add(MTM.dark, 0, y0 - .03, zt - .06, Wb - .34, .08, .12);   // the coupler's shroud
   }
   return g;
 }
@@ -465,8 +480,7 @@ function mtPath(l){
   for (const p of S){ X.push(p.x); Y.push(p.y); Z.push(p.z); }
   for (let q = 1; q < S.length; q++) cum.push(cum[q - 1] + Math.hypot(X[q] - X[q - 1], Z[q] - Z[q - 1]));
   const sAt = (k, u) => { for (let q = 0; q < S.length; q++) if (S[q].k > k || (S[q].k === k && S[q].u >= u - 1e-6)) return cum[q]; return cum[cum.length - 1]; };
-  const len = cum[cum.length - 1], half = (MT_CARS*MT_CL + (MT_CARS - 1)*MT_GAP)/2 + .12;   // (at the ends, the train stops short enough to stay on the track)
-  const stops = mtStops(l).map(k => ({ k, s: Math.max(half, Math.min(len - half, sAt(k, .5))) }));
+  const stops = mtStops(l).map(k => ({ k, s: sAt(k, .5) }));   // (every stop, the ends too, right at its station: the girder reaches out past the ends for the cars there)
   return (l.path = { X: Float32Array.from(X), Y: Float32Array.from(Y), Z: Float32Array.from(Z), cum: Float32Array.from(cum), len: cum[cum.length - 1], stops });
 }
 function mtResetTrain(l){

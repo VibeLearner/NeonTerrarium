@@ -410,9 +410,9 @@ function mtCarModel(cab, nose = 1){
       if (y > y0 + .5 && y < y0 + .62 && t > .72 && t < .9 && Math.abs(Math.abs(x) - .17) < .05) return 'sil';   // the drivers' heads and shoulders, dark against the lit cab
       return 'glass';
     };
-    const quad = (k, A, B, C, D) => buf[k].push(...A, ...B, ...C, ...A, ...C, ...D);
-    for (let q = 0; q < N; q++) for (let j = 0; j < M - 1; j++){
-      const A = S[q][j], B = S[q + 1][j], C = S[q + 1][j + 1], D = S[q][j + 1];
+    const quad = (k, A, B, C, D) => buf[k].push(...A, ...B, ...C, ...A, ...C, ...D, ...A, ...C, ...B, ...A, ...D, ...C);   // (both ways round: seen from any side, nothing goes see-through)
+    for (let q = 0; q < N; q++) for (let j = 0; j < M; j++){   // (j = M - 1: the underside, back across from the last point to the first)
+      const A = S[q][j], B = S[q + 1][j], C = S[q + 1][(j + 1) % M], D = S[q][(j + 1) % M];
       quad(kindOf((A[1] + B[1] + C[1] + D[1])/4, (q + .5)/N, (A[0] + B[0] + C[0] + D[0])/4), A, B, C, D);
     }
     { const F = S[N]; for (let j = 0; j < (M >> 1) - 1; j++){ const a = F[j], b = F[j + 1], c = F[M - 2 - j], d = F[M - 1 - j];   // the front face, in bands across

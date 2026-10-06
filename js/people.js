@@ -358,7 +358,8 @@ const MEGA_LIFE = {
   club:    { jobs: 10, fun: 0, night: .6 },
   spire:   { jobs: 0, fun: 0 },
   bathhouse: { jobs: 0, fun: 18, open: true },   // the onsen: people come to soak (its seats are in the pools); the front desk and tea counter are its stalls, always kept   // the Data Spire: no ordinary jobs; its archivist and guards are their own people (see syncSpireStaff)
-  greenhouse: { jobs: 12, fun: 1.5, night: .35 },   // the hydroponic farm: growers round the clock, and people dropping by for fresh greens   // the Neon Dome: bar staff and DJs, mostly at night (its crowd is brought out by the night: see updateClubs)
+  greenhouse: { jobs: 12, fun: 1.5, night: .35 },
+  logistics: { jobs: 14, fun: 0, night: .5 },   // the logistics hub: dock hands, pickers and forklift drivers, round the clock (OPEN 24H)   // the hydroponic farm: growers round the clock, and people dropping by for fresh greens   // the Neon Dome: bar staff and DJs, mostly at night (its crowd is brought out by the night: see updateClubs)
 };
 const places = new Map();   // id -> { id, x, z, doors: [{ node, out:{x,z}, in:{x,z}|null, dir:[dx,dz] }], jobs, fun, open, night, cell|mega }
 const people = new Map();   // id -> person
@@ -515,10 +516,10 @@ function buildNetwork(){
       const b = m.cells.find(c => c.i === Math.round(d.stand.x/LOT) && c.j === Math.round(d.stand.z/LOT)) || m.cells[0], key = 'd:' + m.id + ':door';
       pl.doors.push(makeDoor(key, d, true, oldDoors.get(key))); addEnd(b, { key, x: d.stand.x, z: d.stand.z, kind: 'd' });
       pl.guarded = true;
-    } else if (m.kind === 'greenhouse' && m.gh){
-      // the farm's ways in: the office door and the open bay on its front (drawn with the building, so no door panels)
-      const e = m.gh.m, W = (x, z) => ({ x: e[0]*x + e[8]*z + e[12], z: e[2]*x + e[10]*z + e[14] }), fx = e[8], fz = e[10], fl = Math.hypot(fx, fz) || 1;
-      m.gh.doors.forEach(([x, z], q) => {
+    } else if ((m.kind === 'greenhouse' && m.gh) || (m.kind === 'logistics' && m.lg)){
+      // the farm's ways in: the office door and the open bay on its front; the hub's: two of its loading bays (drawn with the building, so no door panels)
+      const gd = m.gh || m.lg, e = gd.m, W = (x, z) => ({ x: e[0]*x + e[8]*z + e[12], z: e[2]*x + e[10]*z + e[14] }), fx = e[8], fz = e[10], fl = Math.hypot(fx, fz) || 1;
+      gd.doors.forEach(([x, z], q) => {
         const d = { wall: W(x, z + .02), stand: W(x, z + .5), inside: W(x, z - .35), n: [fx/fl, fz/fl], noDraw: true };
         const b = m.cells.find(c => c.i === Math.round(d.stand.x/LOT) && c.j === Math.round(d.stand.z/LOT)) || m.cells[0], key = 'd:' + m.id + ':door' + q;
         pl.doors.push(makeDoor(key, d, true, oldDoors.get(key))); addEnd(b, { key, x: d.stand.x, z: d.stand.z, kind: 'd' });
@@ -677,7 +678,7 @@ function syncJobs(){
   }
   // the stalls and the police station are always staffed: if nobody's looking for work, people living nearby
   // swap their job for one
-  const staffed = [...places.values()].filter(pl => pl.mega && (pl.mega.kind === 'square' || pl.mega.kind === 'police' || pl.mega.kind === 'greenhouse' || pl.mega.kind === 'bathhouse'));   // (the farm too: someone's always tending it)
+  const staffed = [...places.values()].filter(pl => pl.mega && (pl.mega.kind === 'square' || pl.mega.kind === 'police' || pl.mega.kind === 'greenhouse' || pl.mega.kind === 'logistics' || pl.mega.kind === 'bathhouse'));   // (the farm too: someone's always tending it)
   const isStaffed = id => staffed.some(pl => pl.id === id);
   for (const sq of staffed){
     if (!sq) continue;
@@ -1615,19 +1616,20 @@ const _pv = new THREE.Vector3(), _camR = new THREE.Vector3();
 // Inside the hydroponic farm: everyone there (its growers, and anyone who's dropped by) walks the aisles between the
 // racks and tables, stopping now and then to tend the greens, seen through the glass. Each keeps an aisle of their own.
 function ghPose(p, t, dt){
-  const pl = places.get(p.at), m = pl && pl.mega; if (!m || m.kind !== 'greenhouse' || !m.gh || !m.gh.aisles) return false;
-  const A = m.gh.aisles;
+  const pl = places.get(p.at), m = pl && pl.mega; if (!m) return false;
+  const gd = m.kind === 'greenhouse' ? m.gh : m.kind === 'logistics' ? m.lg : null; if (!gd || !gd.aisles) return false;   // (the hub's workers walk its dock, deck and atrium the same way)
+  const A = gd.aisles;
   if (!p.gh || p.gh.m !== m.id){ const k = hash(p.id, 'aisle') % A.length, a = A[k]; p.gh = { m: m.id, a: k, u: (hash(p.id, 'u') % 1000)/1000, dir: hash(p.id, 'd') % 2 ? 1 : -1, pause: 0 }; }
   // the aisles along the wall nearest the camera are hidden behind that wall's racks: whoever keeps one works its twin
   // on the far side for now, where they can be seen through the glass roof
-  const e0 = m.gh.m, cdx = cam.position.x - e0[12], cdz = cam.position.z - e0[14], camSide = Math.sign(e0[8]*cdx + e0[10]*cdz) || 1;
+  const e0 = gd.m, cdx = cam.position.x - e0[12], cdz = cam.position.z - e0[14], camSide = Math.sign(e0[8]*cdx + e0[10]*cdz) || 1;
   const g = p.gh; let ai = g.a; const az = A[ai].z - A[0].z - .82;   // (relative to the middle of the house)
-  if (ai >= 2 && Math.sign(A[ai].z - (A[0].z + A[1].z)/2) === camSide) ai = ai % 2 ? ai - 1 : ai + 1;
+  if (m.kind === 'greenhouse' && ai >= 2 && Math.sign(A[ai].z - (A[0].z + A[1].z)/2) === camSide) ai = ai % 2 ? ai - 1 : ai + 1;
   const a = A[ai], len = a.x1 - a.x0;
   if (g.pause > 0){ g.pause -= dt; p.ghWalk = false; }
   else { g.u += g.dir*p.speed*.7*dt/len; if (g.u > 1 || g.u < 0){ g.dir = -g.dir; g.u = Math.max(0, Math.min(1, g.u)); }
     if (Math.random() < dt*.3) g.pause = 1.5 + Math.random()*4; p.ghWalk = true; }   // stop to tend the trays
-  const e = m.gh.m, lx = a.x0 + len*g.u, lz = a.z;
+  const e = gd.m, lx = a.x0 + len*g.u, lz = a.z;
   p.x = e[0]*lx + e[8]*lz + e[12]; p.z = e[2]*lx + e[10]*lz + e[14]; p.gy = a.y + .03;
   const dx = e[0]*g.dir, dz = e[2]*g.dir, sd = dx*_camR.x + dz*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
   return true;

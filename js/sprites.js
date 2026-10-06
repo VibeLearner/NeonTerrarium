@@ -289,6 +289,11 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
   make('sign_w_hydro', 'HYDROPONIC FARM', '#8aff9a', true); make('sign_w_farm24', 'OPEN 24HR FARMS', '#c88aff'); make('sign_w_agri', 'AGRI-TECH.HYDROPONICS', '#5ae8ff'); make('sign_w_bay', 'BAY 12', '#ff7ad8');   // the hydroponic farm
   make('sign_w_dataspire', 'DATA SPIRE', '#bff8ff', true); make('sign_w_coldstore', 'COLD STORAGE ARCHIVE', '#5ae8ff'); make('sign_w_level7', 'LEVEL 7.RESTRICTED', '#5ae8ff'); make('sign_w_archive', 'ARCHIVE MODULE 7712', '#e8e8e0');   // the data spire
   make('sign_w_onsen', 'ONSEN', '#ff8ae8'); make('sign_w_geobath', 'GEOTHERMAL BATHS NO.3', '#5ae8ff'); make('sign_w_temp', '42C.STEAM OK', '#5ae8ff'); make('sign_w_baths', 'BATHS', '#ff7ad8'); make('sign_w_steam', 'STEAM', '#7ae8ff', true);   // the bathhouse
+  make('sign_w_kibou', 'KIBOU LOGISTICS', '#8af0ff', true); make('sign_w_distro', 'DISTRO-7.MEGA HUB', '#d0a0ff'); make('sign_w_megahub', 'MEGA HUB', '#8af0ff', true);   // the logistics hub
+  make('sign_w_nofly', 'AIRSPACE.NO FLY ZONE', '#ff5ad0'); make('sign_w_fragile', 'FRAGILE.ELECTRONICS', '#ffd060'); make('sign_w_export', 'EXPORT.SECTOR 07', '#ffb04a');
+  make('sign_w_grid', 'POWER.GRID 03', '#c07aff'); make('sign_w_sortout', 'SORT.OUTBOUND', '#5ae8ff'); make('sign_w_sortin', 'SORT.INBOUND', '#5ae8ff');
+  make('sign_w_dronestore', 'DRONE STORAGE.LEVEL 2', '#5ae8ff'); make('sign_w_dronecharge', 'DRONE CHARGING', '#7affa0');
+  make('sign_w_import', 'IMPORT', '#f0e8d8'); make('sign_w_kib', 'KIBOU', '#f0e8d8'); make('sign_w_frag', 'FRAG.DELICATE', '#f0e8d8'); make('sign_w_cargo', 'CARGO NB-88', '#f0e8d8'); make('sign_w_heavy', 'HEAVY 12T', '#f0e8d8');
   make('sign_w_neondome', 'NEON DOME', '#ff5ad0', true); make('sign_w_nightclub', 'NIGHTCLUB.OPEN 24H', '#5ae8ff');
   make('sign_w_club', 'CLUB', '#b07aff'); make('sign_w_drinks', 'DRINKS', '#b07aff'); make('sign_w_music', 'MUSIC', '#b07aff');
   make('sign_w_enter', 'ENTER', '#5af0e0'); make('sign_w_bar', 'BAR', '#7ab0ff', true); make('sign_w_snacks', 'SNACKS', '#ff6aa8');

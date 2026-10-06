@@ -1077,7 +1077,8 @@ function nearPort(){
 function syncAgents(){
   ports = []; carPads = []; emitters = [];
   for (const c of cells.values()){ ports.push(...c.ports); carPads.push(...c.pads); emitters.push(...c.emitters); }
-  for (const m of megas.values()) if (m.data) emitters.push(...m.data.emitters);   // e.g. steam off the food carts
+  for (const m of megas.values()) if (m.data) emitters.push(...m.data.emitters);
+  for (const m of megas.values()) if (m.data && m.data.ports) ports.push(...m.data.ports);   // e.g. the logistics hub's drone bays   // e.g. steam off the food carts
   for (const d of pairCache.values()) if (d.emitters) emitters.push(...d.emitters);   // steam leaking from the pipework between buildings
   portLots = [...cells.values()].map(c => ({ x: c.x, z: c.z, height: c.height }));
   VENTS = [...cells.values()].filter(c => c.vent).map(c => c.vent);   // steam vents, for the mist

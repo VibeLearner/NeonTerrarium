@@ -31,6 +31,7 @@ function hwCap(c){
     const a = hwDirs(h, 0).din; if (t0.i - a[0] === c.i && t0.j - a[1] === c.j) take(hwY(t0.L) + HW_RAMP + .1);
     if (h.done && n > 1){ const o = hwDirs(h, n - 1).dout; if (e.i + o[0] === c.i && e.j + o[1] === c.j) take(hwY(e.L) + HW_RAMP + .1); }
   }
+  if (typeof mtAt === 'function' && mtAt(c.i, c.j).length) take(MT_Y - MT_CLEAR - .05);   // and the metro's guideway (metro.js)
   return cap;
 }
 // the top of whatever stands on a plot (the tallest of its geometry, rooftop props and all: see rebuildCell)
@@ -79,6 +80,7 @@ function hwTileWhy(i, j, L, skip){
   if ((c && c.mega) || hwMegaNear(i, j)) return 'not over or right beside a megastructure';   // (open sky is fine: the deck just has no pillar there)
   if (c && hwY(L) - HW_CLEAR < hwSurface(c)) return 'a building is in the way: go higher';
   for (const { h, k } of hwAt(i, j)) if (Math.abs(h.tiles[k].L - L) < 2) return 'another highway is there: go 2 floors higher or lower';
+  if (mtAt(i, j).length && !mtHwClear(hwY(L))) return 'the metro is in the way at this height: go higher or lower';
   return null;
 }
 // the open sky a ramp needs, just past the line's end (from the plot at (i, j) going out along d)
@@ -87,6 +89,7 @@ function hwRampWhy(i, j, L, d, skip){
   if (hwMegaNear(ni, nj)) return 'the sky ramp would hit a megastructure';
   if (c && hwSurface(c) > top - .4) return 'the sky ramp would hit a building';
   for (const { h, k } of hwAt(ni, nj)) if (h !== skip && Math.abs(hwY(h.tiles[k].L) - (top - .5)) < 1.4) return 'the sky ramp would hit a highway';
+  if (mtAt(ni, nj).length && top + 2 > MT_Y - MT_CLEAR && hwY(L) - HW_CLEAR < MT_TOP + .3) return 'the sky ramp would hit the metro';
   return null;
 }
 // the drop-off's lift down to the street: a glass shaft beside the plot, in the street band on one side
@@ -370,13 +373,14 @@ function hwBuildView(h){
 // where this plot's highway pillars come down (for put's keep-out: no rooftop clutter there), or null
 function hwKeepOut(c){
   const spots = [];
-  for (const { h, k } of hwAt(c.i, c.j)){ if (hwAt(c.i, c.j).some(o => !(o.h === h && o.k === k) && o.h.tiles[o.k].L < h.tiles[k].L)) continue; const m = hwCenter(h, k, .5); spots.push({ x: m.x, z: m.z }); }
+  for (const { h, k } of hwAt(c.i, c.j)){ if (hwAt(c.i, c.j).some(o => !(o.h === h && o.k === k) && o.h.tiles[o.k].L < h.tiles[k].L) || (mtAt(c.i, c.j).length && hwY(h.tiles[k].L) > MT_Y)) continue; const m = hwCenter(h, k, .5); spots.push({ x: m.x, z: m.z }); }
   return spots.length ? { y: CURB + 1.2, spots } : null;
 }
 function hwFeet(c){
   for (const { h, k } of hwAt(c.i, c.j)){
     const t = h.tiles[k];
     if (hwAt(c.i, c.j).some(o => !(o.h === h && o.k === k) && o.h.tiles[o.k].L < t.L)) continue;   // another highway under this one: it spans over
+    if (mtAt(c.i, c.j).length && hwY(t.L) > MT_Y) continue;   // (and over the metro)
     const m = hwCenter(h, k, .5), top = hwHeight(h, k, .5) - HW_THICK - HW_GIRDER + .04, roof = c.sections.length && !c.mega ? bucketTopIn(m.x - .2, m.x + .2, m.z - .2, m.z + .2) : -1e9, bot = c.mega ? hwSurface(c) : roof > CURB ? roof - .6 : CURB;   // (it goes down into the roof right under it, the clutter there having been left out: see hwKeepOut)
     if (top - bot < .2) continue;
     if (roof > CURB){   // only onto a flat roof: over a sawtooth, a pitched roof or a dome the deck simply spans across
@@ -560,6 +564,7 @@ function hwSkyAt(x, z, own){
     for (const { h, k } of hwAt(i, j)){ const n = h.tiles.length, end = k === 0 || k === n - 1;
       if (h === own && (k <= 1 || k >= n - 2)) continue;
       top = Math.max(top, hwY(h.tiles[k].L) + (end ? 1.8 : .7)); }
+    if (mtAt(i, j).length) top = Math.max(top, MT_TOP + .3);   // over the metro too
   }
   return top;
 }
@@ -813,7 +818,7 @@ function hwSetLevel(L){ hwLevel = Math.max(HW_MIN_L, Math.min(HW_MAX_L, L)); con
 function hwSetLanesUI(n){ hwSetLanes(n); const el = document.getElementById('hwLanes'); if (el) el.textContent = n + ' lanes'; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y); }
 function setHwMode(on, quiet){
   hwMode = on;
-  if (on){ if (S.zone) selectZone(null); if (delMode) setDelMode(false, true); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = false; showMegaGhost(null); }
+  if (on){ if (mtMode) setMtMode(false, true); if (S.zone) selectZone(null); if (delMode) setDelMode(false, true); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = false; showMegaGhost(null); }
   else { hwGhost.g.visible = false; hwHighlight(null); }
   const b = document.getElementById('hwBtn'); if (b){ b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
   const bar = document.getElementById('hwbar'); if (bar) bar.hidden = !on;

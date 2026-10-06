@@ -65,10 +65,10 @@ canvas.addEventListener('pointerdown', e => {
   if (e.pointerType === 'touch'){
     // tap builds, drag paints, press and hold removes
     act = { kind: 'touch', x: e.clientX, y: e.clientY, moved: false, done: new Set() };
-    act.timer = setTimeout(() => { if (act && act.kind === 'touch' && !act.moved){ if (hwMode) hwRightClick(act.x, act.y); else removeAt(pickAt(act.x, act.y)); act.kind = 'none'; } }, 550);
+    act.timer = setTimeout(() => { if (act && act.kind === 'touch' && !act.moved){ if (hwMode) hwRightClick(act.x, act.y); else if (mtMode) mtRightClick(act.x, act.y); else removeAt(pickAt(act.x, act.y)); act.kind = 'none'; } }, 550);
     return;
   }
-  if (e.button === 0 && hwMode){ act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false }; return; }   // highway mode: a click builds, a drag turns the view
+  if (e.button === 0 && (hwMode || mtMode)){ act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false }; return; }   // highway or metro mode: a click builds, a drag turns the view
   if (e.button === 0){
     const pk = pickAt(e.clientX, e.clientY);
     // a click (no drag) builds; a drag rotates the view. With "Drag to paint" on, a drag that starts on the city paints instead.
@@ -83,6 +83,7 @@ canvas.addEventListener('pointermove', e => {
   if (!p){ ptrLast = { x: e.clientX, y: e.clientY };   // just hovering
     if (delMode){ hover.visible = hoverFill.visible = false; return; }
     if (hwMode){ hwHover(e.clientX, e.clientY); return; }
+    if (mtMode){ mtHover(e.clientX, e.clientY); return; }
     if (megaPick) showMegaGhost(megaPick, groundCellAt(e.clientX, e.clientY), megaTurn); else showHover(targetOf(pickAt(e.clientX, e.clientY))); return; }
   const dx = e.clientX - p.x, dy = e.clientY - p.y, tilt = () => { if (tiltMode) pitchT = clamp(pitchT + dy*.006, PITCH_MIN, PITCH_MAX); };
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -112,9 +113,9 @@ const endPtr = e => {
       delSel = null; showAreaSel(null);
     }
     if (act.kind === 'right' && !act.moved && delMode){ delSel = null; showAreaSel(null); }
-    else if (act.kind === 'right' && !act.moved){ if (hwMode) hwRightClick(e.clientX, e.clientY); else if (megaPick) selectMega(null); else removeAt(pickAt(e.clientX, e.clientY)); }   // right-click while placing: put it down (highways are only cut in highway mode)
-    if (act.kind === 'sky' && !act.moved){ if (hwMode) hwClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
-    if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (hwMode) hwClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
+    else if (act.kind === 'right' && !act.moved){ if (hwMode) hwRightClick(e.clientX, e.clientY); else if (mtMode) mtRightClick(e.clientX, e.clientY); else if (megaPick) selectMega(null); else removeAt(pickAt(e.clientX, e.clientY)); }   // right-click while placing: put it down (highways are only cut in highway mode)
+    if (act.kind === 'sky' && !act.moved){ if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
+    if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
   }
   ptrs.delete(e.pointerId);
   if (!ptrs.size){ dragging = false; act = null; }
@@ -134,6 +135,7 @@ addEventListener('keydown', e => {
   if (e.key === ' '){ e.preventDefault(); if (!e.repeat) setTiltMode(!tiltMode); return; }
   if (k === 'x' && !e.repeat){ setDelMode(!delMode); return; }
   if (e.key === '5' && !e.repeat){ if (hwUnlocked()) setHwMode(!hwMode); return; }
+  if (e.key === '6' && !e.repeat){ if (hwUnlocked()) setMtMode(!mtMode); return; }
   if (hwMode && (e.key === '[' || e.key === 'PageDown')){ hwSetLevel(hwLevel - 1); return; }
   if (hwMode && (e.key === ']' || e.key === 'PageUp')){ hwSetLevel(hwLevel + 1); return; }
   if (hwMode && k === 'l' && !e.repeat){ hwSetLanesUI(hwLanesPick === 2 ? 3 : 2); return; }
@@ -149,7 +151,9 @@ addEventListener('keydown', e => {
   else if (e.key === '-') zoomT = clamp(zoomT*1.1,5,30);
   else if ('1234'.includes(e.key) && e.key.length === 1) selectZone(['low','mid','high','ind'][+e.key - 1]);
   else if (e.key === 'Escape' && !$('hwHelp').hidden) setHwHelp(false);
+  else if (e.key === 'Escape' && !$('mtHelp').hidden) setMtHelp(false);
   else if ((e.key === 'Escape' || e.key === '0') && hwMode) setHwMode(false);
+  else if ((e.key === 'Escape' || e.key === '0') && mtMode) setMtMode(false);
   else if (e.key === 'Escape' || e.key === '0'){ if (delMode){ if (delSel){ delSel = null; showAreaSel(null); } else setDelMode(false); } else if (megaPick) selectMega(null); else selectZone(null); }
 });
 
@@ -199,8 +203,9 @@ function selectZone(z){
   if (S.zone && delMode) setDelMode(false, true);
   if (S.zone && megaPick) selectMega(null, true);
   if (S.zone && hwMode) setHwMode(false, true);
+  if (S.zone && mtMode) setMtMode(false, true);
   document.querySelectorAll('.zone[data-zone]').forEach(b => { const on = b.dataset.zone === S.zone; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-  if (megaPick || delMode || hwMode) return;
+  if (megaPick || delMode || hwMode || mtMode) return;
   $('modeHint').textContent = S.zone ? `Zone ${ZONES[S.zone].key}: click to build · click a roof to stack a section` + ' · click high on a wall to hang a pod' + (S.paint ? ' · drag to paint' : '') : 'Click the sky to grow the platform · pick a zone to build';
 }
 document.querySelectorAll('.zone[data-zone]').forEach(b => b.addEventListener('click', () => selectZone(b.dataset.zone)));
@@ -209,6 +214,8 @@ $('hwBtn').addEventListener('click', () => setHwMode(!hwMode));
 $('hwDown').addEventListener('click', () => hwSetLevel(hwLevel - 1));
 $('hwUp').addEventListener('click', () => hwSetLevel(hwLevel + 1));
 $('hwLanes').addEventListener('click', () => hwSetLanesUI(hwLanesPick === 2 ? 3 : 2));
+// the metro (metro.js): its button in Transport
+$('mtBtn').addEventListener('click', () => setMtMode(!mtMode));
 $('outlines').addEventListener('change', e => { S.outlines = e.target.checked; });
 // Optimize framerate (see applyRenderRes in sky.js): remembered in this browser
 for (const id of ['capRes', 'autoPerf']){
@@ -256,6 +263,7 @@ function selectMega(kind, quiet){
   if (megaPick && delMode) setDelMode(false, true);
   if (megaPick && S.zone) selectZone(null);
   if (megaPick && hwMode) setHwMode(false, true);
+  if (megaPick && mtMode) setMtMode(false, true);
   document.querySelectorAll('.bitem').forEach(b => { const on = b.dataset.kind === megaPick; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   hover.visible = hoverFill.visible = false;
   if (megaPick){ const t = MEGA_TYPES[megaPick];
@@ -296,7 +304,7 @@ function onMegaUnlock(){
   if (megaUnlockedKinds.size === 4){ setTmenuOpen(true); $('tmenuHead').classList.add('fresh'); }   // the fourth: sky highways arrive
 }
 // Transport (under Buildings): arrives with the fourth megastructure, or at once in a city that already has highways
-const hwUnlocked = () => megaUnlockedKinds.size >= 4 || highways.length > 0;
+const hwUnlocked = () => megaUnlockedKinds.size >= 4 || highways.length > 0 || metros.length > 0;
 const TMENU_OPEN_KEY = 'neonIsland.tmenuOpen';
 function setTmenuOpen(open){
   $('tmenuHead').setAttribute('aria-expanded', open); $('tmenuList').hidden = !open;
@@ -304,9 +312,12 @@ function setTmenuOpen(open){
 }
 $('tmenuHead').addEventListener('click', () => { setTmenuOpen($('tmenuList').hidden); $('tmenuHead').classList.remove('fresh'); });
 { let open = false; try { open = localStorage.getItem(TMENU_OPEN_KEY) === '1'; } catch (e) {} setTmenuOpen(open); }
-function setHwHelp(on){ $('hwHelp').hidden = !on; $('hwHelpBtn').setAttribute('aria-expanded', on); }
+function setHwHelp(on){ $('hwHelp').hidden = !on; $('hwHelpBtn').setAttribute('aria-expanded', on); if (on && $('mtHelp')) $('mtHelp').hidden = true, $('mtHelpBtn').setAttribute('aria-expanded', false); }
 $('hwHelpBtn').addEventListener('click', () => setHwHelp($('hwHelp').hidden));
 $('hwHelpClose').addEventListener('click', () => setHwHelp(false));
+function setMtHelp(on){ $('mtHelp').hidden = !on; $('mtHelpBtn').setAttribute('aria-expanded', on); if (on) setHwHelp(false); }
+$('mtHelpBtn').addEventListener('click', () => setMtHelp($('mtHelp').hidden));
+$('mtHelpClose').addEventListener('click', () => setMtHelp(false));
 { let open = false; try { open = localStorage.getItem(BMENU_OPEN_KEY) === '1'; } catch (e) {} setBmenuOpen(open); renderBmenu(); }
 
 /* ---------- delete mode ---------- */
@@ -316,7 +327,7 @@ $('hwHelpClose').addEventListener('click', () => setHwHelp(false));
 let delMode = false, delSel = null;
 function setDelMode(on, quiet){
   delMode = on; delSel = null; showAreaSel(null);
-  if (on){ if (S.zone) selectZone(null); if (megaPick) selectMega(null, true); if (hwMode) setHwMode(false, true); hover.visible = hoverFill.visible = false; showMegaGhost(null); }
+  if (on){ if (S.zone) selectZone(null); if (megaPick) selectMega(null, true); if (hwMode) setHwMode(false, true); if (mtMode) setMtMode(false, true); hover.visible = hoverFill.visible = false; showMegaGhost(null); }
   document.body.classList.toggle('deleting', on);
   $('delBtn').classList.toggle('on', on); $('delBtn').setAttribute('aria-pressed', on);
   if (on) $('modeHint').textContent = 'Delete mode: drag to select an area · click inside it to delete · click outside to clear · X to go back to building';

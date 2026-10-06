@@ -546,6 +546,7 @@ function buildNetwork(){
     fresh.set(pl.id, pl);
   }
   hwPlaces(fresh, oldDoors, addEnd);   // the highways' drop-offs: visitors come down their lifts (highway.js)
+  mtPlaces(fresh, oldDoors, addEnd);   // and the metro's stations (metro.js)
   // paths across each plot between its crossings, door and spots
   for (const c of cells.values()){
     const ends = [];
@@ -927,6 +928,21 @@ function hwPlaces(fresh, oldDoors, addEnd){
     const key = 'hw:' + h.id, d = makeDoor(key, { wall: Ls.wall, stand: st, inside: { x: Ls.sx, z: Ls.sz }, n: [Ls.dx, Ls.dz] }, false, oldDoors.get(key));
     addEnd(c, { key, x: st.x, z: st.z, kind: 'd' });
     fresh.set('v:' + h.id, { id: 'v:' + h.id, hub: true, x: Ls.sx, z: Ls.sz, jobs: 0, fun: 0, night: 0, doors: [d] });
+  }
+}
+
+// each metro station with a lift as a place: its door is the lift's, at the foot of the shaft in the street (the train
+// lets visitors off there: see updateMetros)
+function mtPlaces(fresh, oldDoors, addEnd){
+  for (const l of metros) for (const k of mtStops(l)){
+    const side = l.sides && l.sides[k]; if (!side) continue;
+    const Ls = mtLiftSpot(l, k, side), c = cells.get(ckey(Math.round(Ls.stand.x/LOT), Math.round(Ls.stand.z/LOT))); if (!c) continue;
+    const G = cellGrid(c), st = { x: Ls.stand.x, z: Ls.stand.z };
+    for (let q = 0; q < 8 && !freeAt(G, st.x, st.z); q++){ st.x += Ls.dx*.08; st.z += Ls.dz*.08; }
+    if (!freeAt(G, st.x, st.z)) continue;
+    const id = 'mt:' + l.id + ':' + k, key = 'mtd:' + l.id + ':' + k, d = makeDoor(key, { wall: Ls.wall, stand: st, inside: { x: Ls.sx, z: Ls.sz }, n: [Ls.dx, Ls.dz] }, false, oldDoors.get(key));
+    addEnd(c, { key, x: st.x, z: st.z, kind: 'd' });
+    fresh.set(id, { id, hub: true, x: Ls.sx, z: Ls.sz, jobs: 0, fun: 0, night: 0, doors: [d] });
   }
 }
 

@@ -326,7 +326,7 @@ function stackRun(c, secs, y, tag, first){
     y += (upper ? .1 : 0) + Math.max(lot.height, FH);
     c.sectionTops.push(y);
     if (k === 0 && first) c.firstFloors = lot.floors || 2;
-    if (last && !lot.hasCarPad && R() < .7 && !hwAt(c.i, c.j).length) addPerch({ x: c.x, z: c.z, height: y });   // (no drone perch under a highway: its pillar stands there)
+    if (last && !lot.hasCarPad && R() < .7 && !hwAt(c.i, c.j).length && !mtAt(c.i, c.j).length) addPerch({ x: c.x, z: c.z, height: y });   // (no drone perch under a highway: its pillar stands there)
     if (last) c._topLot = lot;
   });
   return y;
@@ -1025,7 +1025,7 @@ function rebuildCell(c){
   c.height = CURB;
   c.dark = isDarkPlot(c);
   DARK = c.dark;
-  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length){ PUT_KEEPOUT = hwKeepOut(c); try { buildStack(c); } finally { PUT_KEEPOUT = null; } } c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); }); } finally { DARK = false; }   // (and the feet of any highway over it)
+  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length){ PUT_KEEPOUT = lineKeepOut(c); try { buildStack(c); } finally { PUT_KEEPOUT = null; } } c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); mtFeet(c); }); } finally { DARK = false; }   // (and the feet of any highway over it)
   if (c.liftCab) podDoorSpot(c);
   if (c.mega){ const m = megas.get(c.mega); if (m && m.roofH) c.height = m.roofH; }
   cellView(c);
@@ -1191,7 +1191,7 @@ function addSection(c, zone){
 }
 // hang a pod off the side of a taller building, over the empty plot c, its deck at height y
 function addLift(c, y, zone){
-  if (!c || c.mega || c.lift || hwAt(c.i, c.j).length) return null;   // (not under a highway)
+  if (!c || c.mega || c.lift || hwAt(c.i, c.j).length || mtAt(c.i, c.j).length) return null;   // (not under a highway or the metro)
   if (c.sections.length && y < c.height + FH - .05) return null;   // over a shorter building: a floor's gap at least
   finishAnimsOn(c);
   holdRegion(c);
@@ -1424,7 +1424,7 @@ function clearIsland(){
   for (const m of megas.values()){ disposeData(m.data); m.data = null; cellView(m); if (m.fx){ m.fx.dispose(); m.fx = null; } }
   megas.clear();
   for (const k of [...regions.keys()]){ world.remove(regions.get(k)); disposeGroup(regions.get(k)); regions.delete(k); }
-  cells.clear(); hwClearAll();
+  cells.clear(); hwClearAll(); mtClearAll();
   for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) cells.set(ckey(i,j), newCell(i, j));
   rebuildAll(); centerView();
 }
@@ -1437,14 +1437,14 @@ function save(){
     localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some', c.lift ? c.lift.y : 0, c.lift && c.below ? c.below : 0])));
     localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ id: m.id, kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed, centre: m.centre || undefined, rot: m.rot, si: m.si, sj: m.sj }))));
   } catch (e) {}
-  hwSave();
+  hwSave(); mtSave();
 }
 function load(){
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!Array.isArray(d) || !d.length) return false;
     for (const [i,j,secs,st,gr,lf,bl] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; if (lf > 0 && c.sections.length){ c.lift = { y: lf }; if (Array.isArray(bl)){ const b2 = bl.filter(s => s && ZONES[s.zone]); if (b2.length) c.below = b2; } } cells.set(ckey(i,j), c); }
-    hwLoad();   // (before the plots are built: the highways' pillars stand on them)
+    hwLoad(); mtLoad();   // (before the plots are built: the highways' and the metro's pillars stand on them)
     try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) { const mm = placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels, m.id || null); if (mm && m.centre) mm.centre = m.centre; if (mm && Number.isInteger(m.rot)) mm.rot = ((m.rot % 4) + 4) % 4; if (mm && Number.isInteger(m.si) && Number.isInteger(m.sj)){ mm.si = m.si; mm.sj = m.sj; } } } catch (e) {}
     return true;
   } catch (e) { return false; }

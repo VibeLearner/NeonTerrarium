@@ -82,7 +82,7 @@ const MEGA_OVER = { logistics: .3, square: .4, police: .8, foundry: .3, pagoda: 
 function megaHwNear(i, j, w, h, kind){
   const over = (MEGA_OVER[kind] || 0) + .05, x0 = i*LOT - LOT/2 - over, x1 = (i + w - 1)*LOT + LOT/2 + over, z0 = j*LOT - LOT/2 - over, z1 = (j + h - 1)*LOT + LOT/2 + over;
   for (let a = -1; a <= w; a++) for (let q = -1; q <= h; q++){
-    if (!hwAt(i + a, j + q).length) continue;
+    if (!hwAt(i + a, j + q).length && !mtAt(i + a, j + q).length) continue;   // (a highway or the metro)
     if (a >= 0 && a < w && q >= 0 && q < h) return true;
     const cx = (i + a)*LOT, cz = (j + q)*LOT, r = 1.25;   // (the deck's reach round a plot's middle)
     if (cx + r > x0 && cx - r < x1 && cz + r > z0 && cz - r < z1) return true;

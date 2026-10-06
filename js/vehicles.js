@@ -225,7 +225,8 @@ function droneCruise(a, b){
     for (const l of portLots) if (Math.abs(x-l.x) < 1.6 && Math.abs(z-l.z) < 1.6) y = Math.max(y, l.height + 1.3);
     if (typeof hwAt === 'function') for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++){   // and over any sky highway in the way (its ramps rise above the deck)
       const ti = Math.round(x/LOT) + di, tj = Math.round(z/LOT) + dj; if (Math.abs(x - ti*LOT) > LOT*.75 || Math.abs(z - tj*LOT) > LOT*.75) continue;
-      for (const { h, k } of hwAt(ti, tj)){ const n = h.tiles.length, end = k === 0 || k === n - 1; y = Math.max(y, hwY(h.tiles[k].L) + (end ? HW_RAMP + .5 : .4) + 1.1); } }
+      for (const { h, k } of hwAt(ti, tj)){ const n = h.tiles.length, end = k === 0 || k === n - 1; y = Math.max(y, hwY(h.tiles[k].L) + (end ? HW_RAMP + .5 : .4) + 1.1); }
+      if (typeof mtAt === 'function' && mtAt(ti, tj).length) y = Math.max(y, MT_TOP + 1.1); }   // (and the metro)
   }
   return y;
 }
@@ -470,9 +471,10 @@ function setupSteam(){
   // under a sky highway the steam can't rise through the deck: each source's ceiling (the deck's underside over it, or
   // none), where its puffs flatten out, spread along under the deck and fade
   steamCeil = new Float32Array(steamSrc.length).fill(1e9);
-  if (typeof hwAt === 'function' && highways.length) steamSrc.forEach((e, k) => {
+  if (typeof hwAt === 'function' && (highways.length || metros.length)) steamSrc.forEach((e, k) => {
     for (const x of [e.x, e.x + .7]){ const i = Math.round(x/LOT), j = Math.round(e.z/LOT);
-      for (const { h, k: t } of hwAt(i, j)){ const under = hwY(h.tiles[t].L) - HW_THICK - HW_GIRDER; if (under > e.y - .2) steamCeil[k] = Math.min(steamCeil[k], under); } }
+      for (const { h, k: t } of hwAt(i, j)){ const under = hwY(h.tiles[t].L) - HW_THICK - HW_GIRDER; if (under > e.y - .2) steamCeil[k] = Math.min(steamCeil[k], under); }
+      if (mtAt(i, j).length){ const under = MT_Y - MT_DECK - MT_GIRD; if (under > e.y - .2) steamCeil[k] = Math.min(steamCeil[k], under); } }
   });
   const n = steamSrc.length*STEAM_PER; if (!n) return;
   const g = new THREE.BufferGeometry();

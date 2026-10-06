@@ -2337,9 +2337,7 @@ function buildLogisticsHub(m){
   };
   for (const [y0, h] of [[yD, y1 - yD - .32], [y1, y2 - y1 - .32]]){
     wallLow(under(P, T(0, 0, bz0, PI)), 2*bx, y0, h);
-    wallLow(under(P, T(-bx, 0, (bz0 + bz1)/2, -PI/2)), bz1 - bz0, y0, h, y0 === yD ? 2.4 : null);
-    wallLow(under(P, T(bx, 0, (bz0 + bz1)/2, PI/2)), bz1 - bz0, y0, h);
-  }
+  }   // (the ends are left open, as in the reference: columns and slab edges only)
   // the deck storey's front, behind the open deck: open at the middle, glass at the ends, lit inside
   for (const sx of [-1, 1]){ const F = under(P, T(sx*(bx - 2.2), 0, rz1 - .02, 0)); box(M.ghGlass, F, 0, (y1 + y2 - .32)/2, 0, 4.2, y2 - y1 - .32, .02);
     for (let t = -2.1; t <= 2.11; t += 1.05) box(M.lgConc4, F, t, (y1 + y2 - .32)/2, .02, .07, y2 - y1 - .32, .07); box(M.lgConc4, F, 0, y1 + 1.2, .02, 4.2, .07, .07); }
@@ -2416,6 +2414,9 @@ function buildLogisticsHub(m){
     for (let x = a; x <= b + .01; x += .6) box(M.frame, P, x, y1 + .32, bz1 - .05, .04, .64, .04);
     box(M.frame, P, cx, y1 + .64, bz1 - .05, len, .05, .05); box(M.lgNeonO, P, cx, y1 + .5, bz1 - .02, len, .04, .03);
     for (let x = a + 1; x < b; x += 3.2) glow(P, x, y1 + .5, bz1 + .1, 'orange', .5); }
+  for (const sx of [-1, 1]){ const a = rz1 + .1, b = bz1 - .05, cz = (a + b)/2;
+    for (let z = a; z <= b + .01; z += .6) box(M.frame, P, sx*(bx - .05), y1 + .32, z, .04, .64, .04);
+    box(M.frame, P, sx*(bx - .05), y1 + .64, cz, .05, .05, b - a); box(M.lgNeonO, P, sx*(bx - .02), y1 + .5, cz, .03, .04, b - a); }
   // the inbound belt, climbing from a hopper on the apron up onto the deck
   { const x = -6.0, za = HZ - .9, ya = .95, zb = 2.2, yb = y1 + 1.1;
     box(M.lgConc3, P, x, .45, za + .2, 1.0, .9, 1.0); box(M.lgConc4, P, x, .95, za + .2, 1.1, .1, 1.1);
@@ -2479,8 +2480,12 @@ function buildLogisticsHub(m){
     box(M.frame, F, 0, yB - .45, .04, 4.4, .42, .04); fitSign(under(F, T(0, 0, .07, 0)), 'sign_w_dronestore', 0, yB - .45, 0, 4.3, .9, 'cyan'); }
   // the left and back walls of the wings, outside: concrete with window bands
   wallLow(under(P, T(0, 0, bz0, PI)), 2*bx, y2, bayH);
-  wallLow(under(P, T(-bx, 0, (bz0 + rz1)/2, -PI/2)), rz1 - bz0, y2, bayH);
-  wallLow(under(P, T(bx, 0, (bz0 + rz1)/2, PI/2)), rz1 - bz0, y2, bayH);
+  // the wings' ends are open too: posts carrying the band, hazard stripes on the slab edge, a railing
+  for (const sx of [-1, 1]){
+    for (const z of [rz1 - .2, rz1 - 3.5, rz1 - 6.8, bz0 + .3]) box(M.lgConc2, P, sx*(bx - .17), y2 + bayH/2, z, .34, bayH, .34);
+    lgHaz(under(P, T(sx*(bx + .1), 0, (bz0 + rz1)/2, sx*PI/2)), rz1 - bz0 + .1, y2 - .16, .28);
+    for (let z = bz0 + .5; z < rz1 - .3; z += .6) box(M.frame, P, sx*(bx - .05), y2 + .32, z, .04, .64, .04);
+    box(M.frame, P, sx*(bx - .05), y2 + .64, (bz0 + rz1)/2, .05, .05, rz1 - bz0 - .6); }
 
   // ---- the band: a deep concrete crown all round the atrium, signs on its front, orange neon round its rim
   const bandH = yR - yB;
@@ -2513,9 +2518,9 @@ function buildLogisticsHub(m){
   // pilasters up the back and the ends, a ledge at every floor, downpipes and a tall orange strip on the back
   for (const [F, len, fk] of blockFaces(P, 0, (bz0 + rz1)/2, 2*bx, rz1 - bz0).map((f, k) => [...f, k])){
     if (fk === 0) continue;
-    const yb0 = fk === 1 ? yD : yD, n = Math.max(2, Math.round(len/2.65));
+    const yb0 = fk === 1 ? yD : yB, n = Math.max(2, Math.round(len/2.65));   // (the ends are open below the band)
     for (let q = 0; q <= n; q++) box(M.lgConc2, F, -len/2 + .15 + q*(len - .3)/n, (yb0 + yR)/2, .07, .32, yR - yb0, .14);
-    for (const y of [y1 - .1, y2 - .1]) box(M.lgConc3, F, 0, y, .1, len, .18, .2);
+    if (fk === 1) for (const y of [y1 - .1, y2 - .1]) box(M.lgConc3, F, 0, y, .1, len, .18, .2);
     if (fk === 1){ for (const t of [-6.5, 2.0]){ cyl(M.fSteel2, F, t, (yD + yR)/2, .25, .1, yR - yD); for (let y = yD + 1; y < yR; y += 1.6) box(M.lgConc4, F, t, y, .25, .26, .06, .26); }
       box(M.lgNeonO, F, 4.6, (y2 + yR)/2, .17, .07, yR - y2 - .4, .05); for (let y = y2 + .6; y < yR - .2; y += 1.5) glow(F, 4.6, y, .3, 'orange', .9); }
   }

@@ -145,7 +145,7 @@ const comp = new THREE.ShaderMaterial({
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
-    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, nLifts:{value:0}, tSteam:{value:null}, steamExt:{value:1}, nVents:{value:0},
+    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, nLifts:{value:0}, mtGap:{value:Array.from({ length: 16 }, () => new THREE.Vector4())}, mtN:{value:0}, mtGapY:{value:new THREE.Vector2()}, tSteam:{value:null}, steamExt:{value:1}, nVents:{value:0},
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
@@ -153,7 +153,7 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform sampler2D tSteam; uniform float steamExt; uniform int nVents; uniform float nLifts;
+    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform sampler2D tSteam; uniform float steamExt; uniform int nVents; uniform float nLifts; uniform vec4 mtGap[16]; uniform int mtN; uniform vec2 mtGapY;
     uniform float night; uniform float smoothLook; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
@@ -217,6 +217,35 @@ const comp = new THREE.ShaderMaterial({
           vec2 o = vec2(sin(vUv.y*res.y*.9 - time*15.0 + 2.0*sin(vUv.x*res.x*.35 + time*3.0)), .5*sin(vUv.x*res.x*.7 + time*11.0))*s1*2.2;
           vec2 cand = vUv + floor(o + .5)*px;
           if ((rawD(cand) >= 0.99999) == (rdS >= 0.99999)) sUv = cand;
+        }
+      }
+      // ---- the metro's magnetic field: the air in the gap over each car (between its magnet shoe and the girder's
+      // rail) crackles: what's behind it shivers in fast electric ripples, and it glows electric blue with sparks.
+      // Each car's gap is a box (mtGap: x, z, and the way it faces); the line of sight is sampled through the slab of
+      // air at the gap's height, and wherever it passes through a box, that counts.
+      float mtSh = 0.0;
+      if (mtN > 0){
+        vec2 nd1 = vUv*2.0 - 1.0;
+        vec4 a1 = invVP*vec4(nd1, -1.0, 1.0); a1 /= a1.w; vec4 b1 = invVP*vec4(nd1, 1.0, 1.0); b1 /= b1.w;
+        vec3 o1 = a1.xyz, d1 = normalize(b1.xyz - a1.xyz);
+        float rd1 = rawD(vUv); vec4 f1 = invVP*vec4(nd1, rd1*2.0 - 1.0, 1.0); f1 /= f1.w; float tS1 = length(f1.xyz - o1);
+        if (abs(d1.y) > 0.001){
+          float ta = (mtGapY.y - o1.y)/d1.y, tb = (mtGapY.x - o1.y)/d1.y;
+          if (ta > tb){ float tt = ta; ta = tb; tb = tt; }
+          tb = min(tb, tS1 + 0.04);
+          if (tb > ta){
+            for (int i=0; i<6; i++){ vec3 p = o1 + d1*(ta + (tb - ta)*(float(i) + .5)/6.0);
+              for (int k=0; k<16; k++){ if (k >= mtN) break;
+                vec4 g = mtGap[k]; vec2 q = p.xz - g.xy; float al = abs(q.x*g.z + q.y*g.w), ac = abs(q.x*g.w - q.y*g.z);
+                mtSh += (1.0 - smoothstep(.3, .46, ac))*(1.0 - smoothstep(.5, .68, al)); } }
+            mtSh /= 6.0;
+          }
+        }
+        if (mtSh > .01){
+          float s2 = clamp(mtSh*4.0, 0.0, 1.0);
+          vec2 o = vec2(sin(vUv.y*res.y*1.6 + time*31.0) + .6*sin(vUv.x*res.x*.5 - time*9.0), .7*sin(vUv.x*res.x*1.1 - time*23.0))*s2*1.8;   // a fast, tight crackle (the lift pads' heat haze is slow and lazy)
+          vec2 cand = sUv + floor(o + .5)*px;
+          if ((rawD(cand) >= 0.99999) == (rawD(sUv) >= 0.99999)) sUv = cand;
         }
       }
       vec4 c = texture2D(tColor, sUv);
@@ -443,6 +472,11 @@ const comp = new THREE.ShaderMaterial({
           float sp = step(hash(sc + 19.0), 0.22) * step(ph, 0.07) * step(0.5, hash(floor(wp.xz*14.0)));
           col = mix(col, rc*1.15, sp*0.6);
         }
+      }
+      if (mtSh > .01){   // the field's own light: an electric blue glow, pulsing, with sparks jumping across it
+        float s3 = clamp(mtSh*4.0, 0.0, 1.0), cell = hash(floor(gl_FragCoord.xy/2.0) + floor(time*18.0));
+        float pulse = .55 + .3*sin(time*12.0 + vUv.x*res.x*.15) + .15*sin(time*37.0);
+        col += vec3(.18, .55, 1.0)*s3*pulse*.55 + vec3(.6, .9, 1.0)*s3*step(.94, cell)*.8;
       }
       if (palOn > 0.5){
         vec3 best = pal[0]; float bd = 1e9;

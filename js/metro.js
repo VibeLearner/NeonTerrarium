@@ -456,7 +456,7 @@ const MT_FIELD_TEX = (() => {
   const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.repeat.set(3, 1); return t;
 })();
 const mtField = (() => { const g = new THREE.PlaneGeometry(1, 1); g.rotateY(PI/2);
-  const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: MT_FIELD_TEX, color: new THREE.Color(0x6ad0ff), transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), MT_CAR_MAX*3);
+  const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: MT_FIELD_TEX, color: new THREE.Color(0x6ad0ff).multiplyScalar(1.6), transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), MT_CAR_MAX*3);
   m.count = 0; m.frustumCulled = false; m.layers.set(1); m.renderOrder = 3; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
 // the line's centre as a path the train follows ({ X, Y, Z, cum, len }), and where along it each stop's middle is
 function mtPath(l){
@@ -475,10 +475,10 @@ function mtResetTrain(l){
   const P = mtPath(l); if (P.stops.length < 2) return;
   l.train = { s: P.stops[0].s, v: 0, dir: 1, at: 0, dwell: 2 + (l.id % 3) };
 }
-const _mpos = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, _mdm = new THREE.Object3D();
+const _mpos = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, _mdm = new THREE.Object3D(), _mgap = [];   // _mgap: each car's gap this frame, for the shimmer (see the comp shader in sky.js)
 function updateMetros(dt, t){
   for (const M_ of MT_MODELS) M_.n = 0;
-  let ng = 0, nf = 0;
+  let ng = 0, nf = 0; _mgap.length = 0;
   const night = typeof isNight === 'function' && isNight(S.hour);
   for (const l of metros){
     const tr = l.train; if (!tr || !l.view) continue;
@@ -512,6 +512,7 @@ function updateMetros(dt, t){
       _mdm.rotation.set(0, yaw, 0, 'YXZ'); _mdm.scale.setScalar(1); _mdm.updateMatrix();
       const M_ = MT_MODELS[!cab ? 0 : q === 0 ? 2 : 1]; if (M_.n < MT_CAR_MAX){ for (const m of M_.meshes) m.setMatrixAt(M_.n, _mdm.matrix); M_.n++; }
       if (ng < MT_CAR_MAX){ const bob = .008*Math.sin(t*2.2 + l.id + q), top = .12 + .78 + .065 + MT_LEV + bob, gap = MT_OH - top;   // the field in the gap over it, flickering a little
+        _mgap.push([_mpos.x, _mpos.z, Math.sin(yaw), Math.cos(yaw)]);
         for (const sx of [-1, 1]){ const ox = sx*.2*Math.cos(yaw), oz = -sx*.2*Math.sin(yaw);   // a sheet each side of the shoe, wavering in height
           _mdm.position.set(_mpos.x + ox, _mpos.y + top + gap/2, _mpos.z + oz); _mdm.rotation.set(0, yaw, 0); _mdm.scale.set(1, gap*(1.3 + .25*Math.sin(t*11 + q*2.1 + sx)), MT_CL - .25); _mdm.updateMatrix(); mtField.setMatrixAt(nf++, _mdm.matrix); }
         _mdm.position.set(_mpos.x, _mpos.y + top + .01, _mpos.z); _mdm.rotation.set(0, yaw, PI/2); _mdm.scale.set(1, .5, MT_CL - .25); _mdm.updateMatrix(); mtField.setMatrixAt(nf++, _mdm.matrix); }   // and one lying on the roof
@@ -519,7 +520,11 @@ function updateMetros(dt, t){
     }
   }
   for (const M_ of MT_MODELS) for (const m of M_.meshes){ m.count = M_.n; m.visible = M_.n > 0; if (M_.n) m.instanceMatrix.needsUpdate = true; }
-  mtField.count = nf; mtField.visible = nf > 0; mtField.material.opacity = night ? 1 : .75; if (nf) mtField.instanceMatrix.needsUpdate = true;
+  mtField.count = nf; mtField.visible = nf > 0; mtField.material.opacity = 1; if (nf) mtField.instanceMatrix.needsUpdate = true;
+  { const U_ = comp.uniforms, cx = camT.x, cz = camT.z;   // the 16 cars nearest the view get the shimmer
+    _mgap.sort((a, b) => (a[0] - cx)**2 + (a[1] - cz)**2 - (b[0] - cx)**2 - (b[1] - cz)**2);
+    const n = Math.min(16, _mgap.length); for (let k = 0; k < n; k++) U_.mtGap.value[k].set(..._mgap[k]);
+    U_.mtN.value = n; U_.mtGapY.value.set(MT_Y + .12 + .78 + .04 + MT_LEV, MT_Y + MT_OH + .02); }
   MT_FIELD_TEX.offset.x = (t*.9) % 1; MT_FIELD_TEX.offset.y = .04*Math.sin(t*13);   // the shimmer runs and flickers
   mtGlow.count = 0; mtGlow.visible = false;   // (no deck under the train to light any more) mtGlow.material.opacity = night ? .85 : .3; if (ng) mtGlow.instanceMatrix.needsUpdate = true;
   // the stations' lift cabs go up and down

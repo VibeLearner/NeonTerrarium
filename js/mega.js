@@ -19,7 +19,7 @@ const MEGA_TYPES = {
            colour: '#4fb8ff', build: buildPoliceStation, fx: policeFx },
   foundry: { name: 'Foundry', need: { ind: 60 }, odds: 50, w: 6, h: 4, maxLevels: 1,
            colour: '#ff8a2a', build: buildFoundry },
-  market: { name: 'Rainbow Plaza market mall', need: { midPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives with the 30th commercial building
+  market: { name: 'Market Plaza', need: { midPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives with the 30th commercial building
            colour: '#ff7ab8', build: buildMarketMall },
   pagoda: { name: 'Cloud Pagoda', need: { highPlots: 60 }, odds: 1, w: 5, h: 4, maxLevels: 1,   // arrives with the 60th luxury building
            colour: '#8ff0ff', build: buildCloudPagoda },
@@ -27,9 +27,9 @@ const MEGA_TYPES = {
            colour: '#7affa0', build: buildGreenhouse, fx: greenhouseFx },
   spire: { name: 'Data Spire', need: { high: 75 }, after: ['foundry'], odds: 1, w: 3, h: 3, maxLevels: 1,   // arrives with the 75th luxury floor, once the Foundry has come
            colour: '#5ae8ff', build: buildDataSpire, fx: spireFx },
-  bathhouse: { name: 'Geothermal Bathhouse', need: { lowPlots: 65, midPlots: 50 }, odds: 40, w: 3, h: 3, maxLevels: 1,   // 65 residential and 50 commercial buildings, then a 1 in 40 chance with each build
+  bathhouse: { name: 'Bath House', need: { lowPlots: 65, midPlots: 50 }, odds: 40, w: 3, h: 3, maxLevels: 1,   // 65 residential and 50 commercial buildings, then a 1 in 40 chance with each build
            colour: '#7ad8ff', build: buildBathhouse, fx: bathFx },
-  logistics: { name: 'Kibou Logistics Mega Hub', need: { ind: 80 }, after: ['foundry'], odds: 40, w: 6, h: 6, maxLevels: 1,   // 80 industrial floors and the Foundry, then a 1 in 40 chance with each build
+  logistics: { name: 'Logistics Hub', need: { ind: 80 }, after: ['foundry'], odds: 40, w: 6, h: 6, maxLevels: 1,   // 80 industrial floors and the Foundry, then a 1 in 40 chance with each build
            colour: '#5ae8ff', build: buildLogisticsHub, fx: logisticsFx },
   club: { name: 'Neon Dome', need: { highPlots: 30, midPlots: 30, lowPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives once there are 30 each of luxury, commercial and residential buildings
            colour: '#c070ff', build: buildNeonDome, fx: clubFx },

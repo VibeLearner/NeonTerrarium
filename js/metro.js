@@ -1,7 +1,7 @@
 // Neon Terrarium: the Magrail metro. An elevated maglev line at one fixed height (level with the hydroponic farm's
 // glass roof), after the reference: a guideway on pillars, an overhead box girder carried on C-frames, green circuit
-// traces along it and MAGRAIL GREEN LINE boards; a three-car train, its windows and belt lines lit green, its bogies
-// riding the girder overhead. Stations: platforms either side under a canopy, screen doors, a lift down to the street.
+// traces along it and MAGRAIL GREEN LINE boards; a three-car train, its windows and belt lines lit green, hanging from
+// the girder overhead on its magnets, floating clear of the deck (an upside-down maglev). Stations: platforms either side under a canopy, screen doors, a lift down to the street.
 // The train shuttles from end to end, stopping at every station, and lets visitors out at the ones with a lift.
 // All game scripts share one scope and load in order (see index.html); this one after highway.js, whose line geometry
 // (hwDirs, hwCenter, hwSweep, hwSeg, hwFold, hwAlong) it shares.
@@ -13,7 +13,8 @@ const MT_SAVE_KEY = 'neonIsland.metros';
 const MT_Y = hwY(12);                            // the rail's height: level with the hydroponic farm's glass ridge (12 floors)
 const MT_W = 1.0, MT_DECK = .26, MT_GIRD = .32;  // the guideway: width, deck depth, the girder under it
 const MT_CLEAR = MT_DECK + MT_GIRD + .08;        // from the rail down to the clear space under it
-const MT_OH = 1.3, MT_OHT = .36, MT_OL = .74;    // the overhead girder: its underside above the rail, its depth, how far it sits to one side
+const MT_OH = 1.3, MT_OHT = .36, MT_OL = 0;     // the overhead girder: its underside above the rail, its depth, how far it sits to one side (none: right over the train)
+const MT_LEV = .16;                              // how high the train floats: it hangs from the girder on its magnets, clear of the deck
 const MT_TOP = MT_Y + 2.1;                       // the top of it all (the stations' canopies)
 const MT_CL = 1.45, MT_GAP = .06, MT_CARS = 3;    // a car's length, the gap between cars, cars to a train
 const MT_PLAT = .75;                             // a platform's width, each side
@@ -200,7 +201,8 @@ function mtBuildView(l){
     }
     // the overhead girder: a dark box beam over the train, green circuit traces along both its faces
     hwSweep(MTM.beam, pts, MT_OL, MT_OH + MT_OHT/2, .46, MT_OHT);
-    hwSweep(MTM.beam2, pts, MT_OL - .06, MT_OH + .02, .2, .04);              // the bogie rail under it
+    for (const s of [-1, 1]) hwSweep(MTM.beam2, pts, s*.13, MT_OH - .015, .07, .05);   // the magnet rails under it
+    hwSweep(MTM.green, pts, 0, MT_OH - .004, .14, .008);                      // and the glowing strip between them, the train's magnets hanging just under it
     for (const s of [-1, 1]){ hwSweep(MTM.green, pts, MT_OL + s*.235, MT_OH + MT_OHT*.62, .012, .025); hwSweep(MTM.frame, pts, MT_OL + s*.235, MT_OH + MT_OHT + .01, .03, .03); }
     for (let q = 0; q + 1 < pts.length; q++){
       const a = pts[q], b = pts[q + 1];
@@ -212,9 +214,10 @@ function mtBuildView(l){
     for (let k = 0; k < n; k++){
       const stop = stops.includes(k);
       if (!stop){   // a post up the girder's side of the deck, a bracket under the girder (local -x is the line's +lat side)
-        const F = mtFrame(l, k, .5), px = -(MT_OL + .25);
-        box(MTM.pillar, F, px, (MT_OH - MT_DECK)/2, 0, .16, MT_OH + MT_DECK, .22);
-        box(MTM.pillar, F, -(MT_OL + .05), MT_OH - .06, 0, .5, .12, .24);
+        const F = mtFrame(l, k, .5), px = -(W/2 + .12), ya = MT_OH + MT_OHT + .06;   // a post beside the deck, its arm over the top of the girder
+        box(MTM.pillar, F, px, (ya - MT_DECK)/2, 0, .16, ya + MT_DECK + .06, .22);
+        box(MTM.pillar, F, px/2 + .05, ya, 0, Math.abs(px) + .3, .12, .24);
+        for (const s of [-1, 1]) box(MTM.pillar2, F, s*.27, MT_OH + MT_OHT/2, 0, .06, MT_OHT + .1, .2);   // the clamp round it
         box(MTM.pillar2, F, -(W/2 + .06), -MT_DECK*.5, 0, .5, .18, .3);                                // its knee on the deck's edge
         box(MTM.green, F, px - .081, MT_OH*.45, 0, .012, MT_OH - .4, .03);
       }
@@ -384,14 +387,13 @@ function mtCarModel(cab, nose = 1){
   }
   // the gangway bellows at the inner ends
   for (const e of cab ? [-1] : [-1, 1]){ add(MTM.dark, 0, y0 + .42, e*(L/2 - .005), .58, .66, .06); for (const yy of [.2, .42, .64]) add(MTM.body2, 0, y0 + yy, e*(L/2 + .012), .6, .02, .02); }
-  // the roof: equipment boxes with grilles, and the hanger: a forked arm up to the bogie riding the girder at the side
-  for (const zc of [-L*.26, L*.18]){ add(MTM.body2, 0, y0 + H + .05, zc, .36, .09, .28); for (let x = -.12; x <= .13; x += .06) add(MTM.dark, x, y0 + H + .1, zc, .025, .012, .22); }
-  { const bx = -MT_OL + .06, by = MT_OH - .07, base = y0 + H + .06;
-    add(MTM.dark, -.12, base, L*.02, .16, .06, .24);
-    for (const o of [-.08, .08]){ const ax = -.12, ay = base + .02, len = Math.hypot(bx - ax, by - ay); add(MTM.dark, (ax + bx)/2, (ay + by)/2, L*.02 + o, len, .04, .04, 0, Math.atan2(by - ay, bx - ax)); }
-    add(MTM.body2, bx, by + .02, L*.02, .2, .08, .46);                                  // the bogie
-    for (const o of [-.15, .15]) add(MTM.dark, bx, by + .07, L*.02 + o, .12, .05, .07);   // its wheels on the rail
-    add(MTM.belt, bx + .1, by + .02, L*.02, .01, .02, .4); }
+  // the roof: low equipment boxes either side, and down the middle the magnet shoe the car hangs by: no arm, no
+  // wheels, just a gap to the girder's rail, lit green
+  for (const zc of [-L*.26, L*.18]) for (const sx of [-1, 1]){ add(MTM.body2, sx*.27, y0 + H + .03, zc, .16, .06, .28); for (let z = -.1; z <= .11; z += .05) add(MTM.dark, sx*.27, y0 + H + .065, zc + z, .12, .01, .02); }
+  { const zs = cab ? -.12 : 0, ls = cab ? L - .5 : L - .16;
+    add(MTM.dark, 0, y0 + H + .025, zs, .3, .05, ls);                                  // the shoe
+    add(MTM.body2, 0, y0 + H + .055, zs, .22, .02, ls - .06);                          // its magnet face
+    for (const sx of [-1, 1]) add(MTM.belt, sx*.155, y0 + H + .03, zs, .012, .025, ls); }   // lit along its edges
   if (cab){
     // the nose, after the reference: the body carried on and gently rounded off. Its roof curves down in a long arc into
     // a low, upright front, and its corners round in seen from above; the curved upper part is a wraparound windscreen
@@ -451,6 +453,10 @@ const MT_MODELS = [[false, 1], [true, 1], [true, -1]].map(([cab, nose]) => {   /
 const mtGlow = (() => { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-PI/2);
   const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: glowTex, color: new THREE.Color(0x5aff2a), transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false }), MT_CAR_MAX);
   m.count = 0; m.frustumCulled = false; m.layers.set(1); m.renderOrder = 3; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
+// the magnetic field holding each car up: a glowing sheet in the gap between its shoe and the girder's rail, seen side-on
+const mtField = (() => { const g = new THREE.PlaneGeometry(1, 1); g.rotateY(PI/2);
+  const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: glowTex, color: new THREE.Color(0x7aff4a), transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), MT_CAR_MAX);
+  m.count = 0; m.frustumCulled = false; m.layers.set(1); m.renderOrder = 3; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
 // the line's centre as a path the train follows ({ X, Y, Z, cum, len }), and where along it each stop's middle is
 function mtPath(l){
   if (l.path) return l.path;
@@ -501,13 +507,16 @@ function updateMetros(dt, t){
       const a = Math.max(0, s - .25), b = Math.min(P.len, s + .25);
       cur = hwAlong(P, s, cur, _mpos); const p0 = {}, p1 = {}; hwAlong(P, a, 0, p0); hwAlong(P, b, 0, p1);
       const yaw = Math.atan2(p1.x - p0.x, p1.z - p0.z), cab = q === 0 || q === MT_CARS - 1;
-      _mdm.position.set(_mpos.x, _mpos.y + .02 + .015*Math.sin(t*2.2 + l.id + q), _mpos.z);
+      _mdm.position.set(_mpos.x, _mpos.y + MT_LEV + .008*Math.sin(t*2.2 + l.id + q), _mpos.z);   // (floating: a slow bob on its magnets)
       _mdm.rotation.set(0, yaw, 0, 'YXZ'); _mdm.scale.setScalar(1); _mdm.updateMatrix();
       const M_ = MT_MODELS[!cab ? 0 : q === 0 ? 2 : 1]; if (M_.n < MT_CAR_MAX){ for (const m of M_.meshes) m.setMatrixAt(M_.n, _mdm.matrix); M_.n++; }
+      if (ng < MT_CAR_MAX){ const bob = .008*Math.sin(t*2.2 + l.id + q), top = .12 + .78 + .065 + MT_LEV + bob, gap = MT_OH - top;   // the field in the gap over it, flickering a little
+        _mdm.position.set(_mpos.x, _mpos.y + top + gap/2, _mpos.z); _mdm.rotation.set(0, yaw, 0); _mdm.scale.set(1, gap*2.2*(.85 + .15*Math.sin(t*9 + q*2.1)), MT_CL - .2); _mdm.updateMatrix(); mtField.setMatrixAt(ng, _mdm.matrix); }
       if (ng < MT_CAR_MAX){ _mdm.position.set(_mpos.x, _mpos.y + .012, _mpos.z); _mdm.rotation.set(0, yaw, 0); _mdm.scale.set(.85, 1, MT_CL*1.2); _mdm.updateMatrix(); mtGlow.setMatrixAt(ng++, _mdm.matrix); }
     }
   }
   for (const M_ of MT_MODELS) for (const m of M_.meshes){ m.count = M_.n; m.visible = M_.n > 0; if (M_.n) m.instanceMatrix.needsUpdate = true; }
+  mtField.count = ng; mtField.visible = ng > 0; mtField.material.opacity = night ? .9 : .55; if (ng) mtField.instanceMatrix.needsUpdate = true;
   mtGlow.count = ng; mtGlow.visible = ng > 0; mtGlow.material.opacity = night ? .85 : .3; if (ng) mtGlow.instanceMatrix.needsUpdate = true;
   // the stations' lift cabs go up and down
   for (const l of metros) if (l.cabs) for (const c of l.cabs){

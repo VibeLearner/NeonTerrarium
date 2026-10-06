@@ -2498,7 +2498,9 @@ function buildLogisticsHub(m){
     lgHaz(F, len, yB + .08, .16); box(M.lgConc4, F, 0, yR + .06, 0, len + .1, .12, .16);
     box(M.lgNeonO, F, 0, yR - .06, .02, len, .05, .04);
     for (let q = 0; q < Math.round(len/2.4); q++) box(pick([M.fRust, M.lgConc2]), F, rnd(-len/2 + .4, len/2 - .4), yB + rnd(.4, bandH - .3), .015, rnd(.12, .3), rnd(.2, .5), .02);
-    if (k) for (let q = 0; q < Math.round(len/3); q++) if (chance(.6)) plant(pick(['vines', 'h_ivy', 'pothos', 'l_mossroots']), F, rnd(-len/2 + .4, len/2 - .4), yR + .1, .04, rnd(.9, 1.2), 't', true); }
+    const zc = (rg.z0 + rg.z1)/2, sign = k === 2 ? [8.0 + zc, 2.5] : k === 3 ? [-5.0 - zc, 3.4] : null;   // (where the side signs hang: no vines over them)
+    if (k) for (let q = 0; q < Math.round(len/3); q++) if (chance(.6)){ const t = rnd(-len/2 + .4, len/2 - .4); if (sign && Math.abs(t - sign[0]) < sign[1]) continue;
+      plant(pick(['vines', 'h_ivy', 'pothos', 'l_mossroots']), F, t, yR + .1, .04, rnd(.9, 1.2), 't', true); } }
   { const ia = { x0: wl, x1: wr, z0: rb, z1: rg.z1 - 1.0 };
     for (let k = 0; k < 4; k++){ const [F0, len] = face(ia, k), F = under(F0, T(0, 0, 0, PI));
       box(M.lgNeonO, F, 0, yR - .12, .02, len, .06, .05);

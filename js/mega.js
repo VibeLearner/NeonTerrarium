@@ -2267,7 +2267,6 @@ function lgPad(P, x, y, z, r){
   put(U.cyl16, M.lgPad, under(P, T(x, y + .03, z, 0, 2*r + .25, .06, 2*r + .25)));
   put(U.torus, M.lgNeonC, under(P, T(x, y + .07, z, 0, 2*r, 2*r, .7, PI/2)));
   for (const s of [-1, 1]) box(M.hazard, P, x + s*r*.32, y + .065, z, .07, .01, r*.9); box(M.hazard, P, x, y + .065, z, r*.64, .01, .07);
-  for (let a = 0; a < TAU; a += PI/2) glow(P, x + Math.cos(a)*r, y + .12, z + Math.sin(a)*r, 'cyan', .7);
 }
 // a heavy cable lying along the ground through points [x, z], with a little wander
 function lgCable(P, pts, y, t = .06){
@@ -2299,7 +2298,6 @@ function lgPylon(P, x0, y0, x1, y1, z, side, w0, w1, depth, bulge = 1.2){
     for (const s of [-1, 1]) box(M.lgConc4, P, mx, my, z + s*(depth/2 + .01), len*.78, w*.62, .03, 0, 0, ang);   // recessed panels on its faces
     box(M.lgConc3, P, ax, ay, z, .16, w + .14, depth + .14, 0, 0, ang);                                       // a rib at each joint
     box(M.lgNeonC, P, mx + nx*(w/2 + .02), my + ny*(w/2 + .02), z, len, .05, .12, 0, 0, ang);
-    if (k % 2 === 0) glow(P, mx + nx*(w/2 + .25), my + ny*(w/2 + .25), z, 'cyan', .8);
     pipeA.push([mx - nx*(w/2 + .14), my - ny*(w/2 + .14)]); pipeB.push([mx - nx*(w/2 + .14), my - ny*(w/2 + .14)]);
     if (k === 3){ box(M.blink, P, mx + nx*(w/2 + .06), my + ny*(w/2 + .06), z + depth/2 - .2, .07, .07, .07); }
   }
@@ -2340,11 +2338,11 @@ function buildLogisticsHub(m){
   const mid = (o) => [(o.x0 + o.x1)/2, (o.z0 + o.z1)/2, o.x1 - o.x0, o.z1 - o.z0];
   const face = (o, k) => k === 0 ? [under(P, T((o.x0 + o.x1)/2, 0, o.z1, 0)), o.x1 - o.x0] : k === 1 ? [under(P, T((o.x0 + o.x1)/2, 0, o.z0, PI)), o.x1 - o.x0]
                        : k === 2 ? [under(P, T(o.x1, 0, (o.z0 + o.z1)/2, PI/2)), o.z1 - o.z0] : [under(P, T(o.x0, 0, (o.z0 + o.z1)/2, -PI/2)), o.z1 - o.z0];
-  const belts = [], lanes = [];
+  const belts = [], lanes = [], pools = [];   // pools: where the floodlights' light falls, drawn soft (see logisticsFx)
   const rail = (ax, az, bx, bz, y, neon = true) => { const len = Math.hypot(bx - ax, bz - az), ry = Math.atan2(-(bz - az), bx - ax), F = under(P, T((ax + bx)/2, 0, (az + bz)/2, ry));
     for (let t = -len/2; t <= len/2 + .01; t += .6) box(M.frame, F, t, y + .32, 0, .04, .64, .04);
-    box(M.frame, F, 0, y + .64, 0, len, .05, .05); if (neon){ box(M.lgNeonO, F, 0, y + .5, .03, len, .04, .03); for (let t = -len/2 + 1; t < len/2; t += 3.2) glow(F, t, y + .5, .15, 'orange', .5); } };
-  const ceiling = (y, o) => { for (let z = o.z0 + .9; z < o.z1 - .3; z += 2.1) for (let x = o.x0 + 1.3; x < o.x1 - .5; x += 2.7){ box(M.lgLit, P, x, y - .02, z, 1.3, .03, .22); glow(P, x, y - .3, z, 'ivory', .9); } };
+    box(M.frame, F, 0, y + .64, 0, len, .05, .05); if (neon) box(M.lgNeonO, F, 0, y + .5, .03, len, .04, .03); };
+  const ceiling = (y, o) => { for (let z = o.z0 + .9; z < o.z1 - .3; z += 2.1) box(M.lgLit, P, (o.x0 + o.x1)/2, y - .02, z, o.x1 - o.x0 - 1.0, .03, .12); };   // long light bars, not points
   const slab = (o, y, edges = [0, 1, 2, 3]) => { const [cx, cz, w, d] = mid(o);
     box(M.lgConc2, P, cx, y - .16, cz, w, .32, d); box(M.lgFloor2, P, cx, y + .005, cz, w - .1, .01, d - .1);
     for (const k of edges){ const [F, len] = face(o, k); lgHaz(F, len, y - .16, .26); } };
@@ -2368,13 +2366,13 @@ function buildLogisticsHub(m){
     for (const [y, r, mat] of [[yG*.3, .12, M.fSteel2], [yG*.62, .09, M.fRust]]) strut(mat, F, -9.6, y, .18, 7.0, y, .18, 2*r);
     for (const t of [-8.0, -2.4, 3.6]) bhValve(F, t, yG*.62, .32);
     put(U.cyl16, M.lgGen, under(F, T(-4.6, yG*.5, .1, 0, .9, 2.4, .9, 0, PI/2))); for (const t of [-5.6, -4.6, -3.6]) put(U.cyl16, M.lgConc4, under(F, T(t, yG*.5, .1, 0, 1.0, .08, 1.0, 0, PI/2)));
-    box(M.lgNeonC, F, -4.6, yG*.5, .56, 2.0, .04, .02); glow(F, -4.6, yG*.5, .7, 'cyan', .7); box(M.blink, F, -3.2, yG*.8, .4, .06, .06, .06);
+    box(M.lgNeonC, F, -4.6, yG*.5, .56, 2.0, .04, .02); box(M.blink, F, -3.2, yG*.8, .4, .06, .06, .06);
     for (let k = 0; k < 6; k++){ const t = -9 + k*1.4 + rnd(-.3, .3), pts = [[t, .15]]; let z = .3; for (let q = 0; q < 3; q++){ z += rnd(.2, .35); pts.push([t + rnd(-.3, .3), z]); }   // cables trailing off the front
       mkCable(F, t, yG - .05, .05, t + rnd(-.2, .2), .08, .3, .1, .035); lgCable(F, pts.map(([a, b]) => [a, b]), .07, .05); }
     for (const t of [-.2, 7.2]){ for (let k = 0; k < 4; k++) box(M.lgConc3, F, t, (k + .5)*yG/4, .2 + (3 - k)*.17, 1.3, yG/4 + .01, .2); }   // steps up to the yard
   }
   { const [F] = face(a0, 3); box(M.frame, F, 7.6, yG*.55, .02, 2.6, .5, .04);                     // POWER GRID 03
-    fitSign(under(F, T(0, 0, .04, 0)), 'sign_w_grid', 7.6, yG*.55, 0, 2.5, .9, 'pink'); box(M.lgNeonP, F, 7.6, yG*.18, .04, 2.8, .04, .03); glow(F, 7.6, yG*.2, .15, 'pink', .9);
+    fitSign(under(F, T(0, 0, .04, 0)), 'sign_w_grid', 7.6, yG*.55, 0, 2.5, .9, 'pink'); box(M.lgNeonP, F, 7.6, yG*.18, .04, 2.8, .04, .03);
     for (const t of [5.8, 9.4]) bhPipe(F, [[t, yG*.4, .05], [t, yG*.4, .22], [t, .1, .22]], .1, M.fRust); }
   // transformers in the yard's front left corner, cables off them
   for (const [x, z] of [[a0.x0 + 1.0, a0.z1 - 1.3], [a0.x0 + 2.4, a0.z1 - 1.3]]){
@@ -2416,7 +2414,7 @@ function buildLogisticsHub(m){
   for (let k = 0; k < 5; k++) put(U.cyl16, pick([M.fRust, M.corrBlue, M.fSteel2, M.lgBinT]), under(P, T(7.8 + (k%2)*.45, yG + .28, 5.6 + (k > 1 ? .45 : 0) + (k > 3 ? .45 : 0), 0, .4, .52, .4)));
   lgForklift(P, -5.6, yG, 9.7, PI*.1); lgForklift(P, -5.6, yG, 4.6, .4);
   // the yard's floodlights on poles
-  for (const [x, z] of [[a0.x1 - .4, a0.z1 - .4], [-6.0, a0.z1 - .4]]){ cyl(M.frame, P, x, yG + 1.6, z, .05, 3.2); box(M.lgConc4, P, x, yG + 3.2, z - .15, .3, .14, .3); box(M.lgLit, P, x, yG + 3.12, z - .15, .24, .02, .24); glow(P, x, yG + 2.9, z - .4, 'ivory', .8); }
+  for (const [x, z] of [[a0.x1 - .4, a0.z1 - .4], [-6.0, a0.z1 - .4]]){ cyl(M.frame, P, x, yG + 1.6, z, .05, 3.2); box(M.lgConc4, P, x, yG + 3.2, z - .15, .3, .14, .3); box(M.lgLit, P, x, yG + 3.12, z - .15, .24, .02, .24); pools.push([x - .4, yG + .03, z - 1.0, 1.5]); }
 
   // ---- level 1: the deck, and the conveyor platform reaching forward down the left
   slab(a1, y1, [0, 1, 2]); slab(ext, y1, [0, 2, 3]);
@@ -2424,7 +2422,7 @@ function buildLogisticsHub(m){
   rail(-6.4 + .05, a1.z1 - .05, a1.x1 - .05, a1.z1 - .05, y1); rail(ext.x1 - .05, ext.z0, ext.x1 - .05, ext.z1 - .05, y1); rail(ext.x0 + .05, ext.z1 - .05, ext.x1 - .05, ext.z1 - .05, y1);
   rail(ext.x0 + .05, ext.z0, ext.x0 + .05, ext.z1 - .05, y1);
   rail(a1.x0 + .05, a1.z0 + .05, a1.x1 - .05, a1.z0 + .05, y1, false); rail(a1.x1 - .05, a1.z0 + .05, a1.x1 - .05, a1.z1 - .05, y1, false); rail(a1.x0 + .05, a1.z0 + .05, a1.x0 + .05, a1.z1, y1, false);
-  for (let x = -5.6; x < a1.x1; x += 3.0){ box(M.lgConc4, P, x, y1 - .42, a1.z1 - .2, .3, .1, .2); box(M.lgLit, P, x, y1 - .48, a1.z1 - .16, .26, .03, .16); glow(P, x, y1 - .7, a1.z1 + .1, 'ivory', .6); }
+  for (let x = -5.6; x < a1.x1; x += 3.0){ box(M.lgConc4, P, x, y1 - .42, a1.z1 - .2, .3, .1, .2); box(M.lgLit, P, x, y1 - .48, a1.z1 - .16, .26, .03, .16); pools.push([x, yG + .03, a1.z1 + 1.1, 1.3]); }
   const beltRun = (ax, az, bx, bz, y, sign) => {
     const len = Math.hypot(bx - ax, bz - az), ry = Math.atan2(-(bz - az), bx - ax), F = under(P, T((ax + bx)/2, 0, (az + bz)/2, ry));
     box(M.lgConc4, F, 0, y + .5, 0, len, .1, .62); box(M.lgFloor2, F, 0, y + .57, 0, len - .05, .02, .52);
@@ -2472,7 +2470,7 @@ function buildLogisticsHub(m){
   rail(rg.x0 + .1, rg.z1 - .05, wl - .1, rg.z1 - .05, y2); rail(wr + .1, rg.z1 - .05, rg.x1 - .1, rg.z1 - .05, y2);
   for (const x of [rg.x0 + .05, rg.x1 - .05]) rail(x, rg.z0 + .1, x, rg.z1 - .1, y2, false);
   // floodlights under the wings' fronts, over the yard
-  for (const o of [lw, rw]) for (let x = o.x0 + .8; x < o.x1 - .3; x += 2.4){ box(M.lgConc4, P, x, y2 - .42, rg.z1 - .2, .3, .1, .2); box(M.lgLit, P, x, y2 - .48, rg.z1 - .16, .26, .03, .16); glow(P, x, y2 - .7, rg.z1 + .1, 'ivory', .6); }
+  for (const o of [lw, rw]) for (let x = o.x0 + .8; x < o.x1 - .3; x += 2.4){ box(M.lgConc4, P, x, y2 - .42, rg.z1 - .2, .3, .1, .2); box(M.lgLit, P, x, y2 - .48, rg.z1 - .16, .26, .03, .16); pools.push([x, yG + .03, rg.z1 + .8, 1.2]); }
   ceiling(yB, lw); ceiling(yB, rw);
   // the left wing: rows of tall racks, an aisle across the middle
   for (const z of [2.4, .5, -1.4, -3.2, -5.1, -7.0, -8.9, -10.6]) lgRack(P, (rg.x0 + wl)/2, y2, z, 3.8, 4, .62);
@@ -2488,7 +2486,7 @@ function buildLogisticsHub(m){
   { const F = under(P, T(rcx, 0, rb, 0));
     box(M.lgConc, P, rcx, y2 + bayH/2, (rb + rg.z0)/2, wr - wl, bayH, rb - rg.z0);
     for (const t of [-1.2, 1.2]){ box(M.lgBay, F, t, y2 + .5, .01, 1.1, .9, .02); box(M.lgConc4, F, t, y2 + 1.0, .1, 1.3, .12, .25);
-      box(M.lgNeonC, F, t, y2 + .95, .14, 1.1, .04, .03); for (const s of [-1, 1]) box(M.hazard, F, t + s*.6, y2 + .5, .04, .08, .95, .05); glow(F, t, y2 + .6, .25, 'cyan', .9); }
+      box(M.lgNeonC, F, t, y2 + .95, .14, 1.1, .04, .03); for (const s of [-1, 1]) box(M.hazard, F, t + s*.6, y2 + .5, .04, .08, .95, .05); }
     for (const t of [-4.6, -3.6, 3.6, 4.6]) for (const y of [y2 + .5, y2 + 1.2, y2 + 1.9]){ box(M.lgConc4, F, t, y - .08, .15, .85, .05, .3); box(M.lgConc2, F, t, y, .15, .3, .08, .2); for (const s of [-1, 1]) box(M.lgConc4, F, t + s*.24, y + .03, .15, .22, .02, .03); }
     box(M.frame, F, 0, yB - .45, .04, 4.4, .42, .04); fitSign(under(F, T(0, 0, .07, 0)), 'sign_w_dronestore', 0, yB - .45, 0, 4.3, .9, 'cyan');
     const [Fo, lo] = face(bw, 1); for (let t = -lo/2 + .7; t < lo/2 - .4; t += 1.2) box(chance(.5) ? M.lgWin : M.glassDark, Fo, t, y2 + 1.6, .01, .7, .45, .02); }
@@ -2498,12 +2496,12 @@ function buildLogisticsHub(m){
   for (const o of [lw, rw, bw, { x0: wl, x1: wr, z0: rg.z1 - 1.0, z1: rg.z1 }]){ const [cx, cz, w, d] = mid(o); box(M.lgConc, P, cx, yB + bandH/2, cz, w, bandH, d); }
   for (let k = 0; k < 4; k++){ const [F, len] = face(rg, k);
     lgHaz(F, len, yB + .08, .16); box(M.lgConc4, F, 0, yR + .06, 0, len + .1, .12, .16);
-    box(M.lgNeonO, F, 0, yR - .06, .02, len, .05, .04); for (let t = -len/2 + 1.2; t < len/2; t += 3.2) glow(F, t, yR - .2, .15, 'orange', .9);
+    box(M.lgNeonO, F, 0, yR - .06, .02, len, .05, .04);
     for (let q = 0; q < Math.round(len/2.4); q++) box(pick([M.fRust, M.lgConc2]), F, rnd(-len/2 + .4, len/2 - .4), yB + rnd(.4, bandH - .3), .015, rnd(.12, .3), rnd(.2, .5), .02);
     if (k) for (let q = 0; q < Math.round(len/3); q++) if (chance(.6)) plant(pick(['vines', 'h_ivy', 'pothos', 'l_mossroots']), F, rnd(-len/2 + .4, len/2 - .4), yR + .1, .04, rnd(.9, 1.2), 't', true); }
   { const ia = { x0: wl, x1: wr, z0: rb, z1: rg.z1 - 1.0 };
     for (let k = 0; k < 4; k++){ const [F0, len] = face(ia, k), F = under(F0, T(0, 0, 0, PI));
-      box(M.lgNeonO, F, 0, yR - .12, .02, len, .06, .05); for (let t = -len/2 + .8; t < len/2; t += 2.0) glow(F, t, yR - .3, .15, 'orange', 1.0);
+      box(M.lgNeonO, F, 0, yR - .12, .02, len, .06, .05);
       lgHaz(F, len, yB + .08, .16); for (let t = -len/2 + .8; t < len/2 - .5; t += 1.3) box(chance(.5) ? M.lgWin : M.glassDark, F, t, yB + .62, .01, .7, .32, .02); } }
   { const F = under(P, T(rcx, 0, rg.z1, 0));                                                       // the gate beam: KIBOU LOGISTICS, DISTRO-7 MEGA HUB hung under it
     box(M.lgConc4, F, 0, yB + .63, .02, wr - wl - .2, .86, .05); fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_kibou', 0, yB + .63, 0, wr - wl - .6, 1.6, 'cyan');
@@ -2512,7 +2510,7 @@ function buildLogisticsHub(m){
     box(M.lgNeonO, F, 0, yB + .02, .05, wr - wl, .05, .05); }
   { const F = under(P, T((wr + rg.x1)/2, 0, rg.z1, 0));
     box(M.lgConc4, F, 0, yB + .63, .02, rg.x1 - wr - .2, .86, .05); fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_megahub', 0, yB + .63, 0, rg.x1 - wr - .5, 1.6, 'cyan');
-    box(M.lgNeonP, F, 0, yB + .2, .06, rg.x1 - wr - .2, .04, .04); glow(F, 0, yB + .2, .2, 'pink', .9); }
+    box(M.lgNeonP, F, 0, yB + .2, .06, rg.x1 - wr - .2, .04, .04); }
   { const F = under(P, T((rg.x0 + wl)/2, 0, rg.z1, 0));
     box(M.lgConc4, F, 0, yB + .63, .02, wl - rg.x0 - .2, .7, .05); fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_nofly', 0, yB + .63, 0, wl - rg.x0 - .4, 1.2, 'pink');
     box(M.frame, F, .8, yB - .4, .02, 1.9, .5, .04); for (const s2 of [-1, 1]) box(M.frame, F, .8 + s2*.8, yB - .1, .02, .03, .2, .03);
@@ -2552,7 +2550,7 @@ function buildLogisticsHub(m){
   const aisles = [[yG, 3.95, -4.8, 7.4], [yG, 9.9, -4.4, 6.0], [yG, .55, -9.0, 7.0], [y1, .55, -6.0, 1.2], [y1, -5.7, -6.0, 3.0], [y2, -2.3, -10.8, -7.0], [y2, -2.3, 5.0, 10.0]].map(([y, z, x0, x1]) => ({ y, z, x0, x1 }));
   const stations = pads.concat([[-4.8, y1 + 2.2, -8.0], [-1.6, y1 + 1.1, -8.0], [3.9, y1 + 1.1, a1.z1 - .6], [-3.0, yG + 1.1, 8.6], [1.6, yG + 1.1, 8.6], [-1.6, yG + 2.2, 5.4], [4.2, yG + 1.1, 5.4],
     [-5.9, y1 + .62, -2.4], [3.8, y1 + .62, -7.9], [1.3, y1 + .62, a1.z1 - 1.1]]);
-  m.lg = { m: P.toArray(), aisles, doors: [[-1.2, a0.z1 + .2], [6.2, a0.z1 + .2]], belts, lanes, stations, cruise: y2 + .4, nDrones: 11, top: yR + 3.6 };
+  m.lg = { m: P.toArray(), pools, aisles, doors: [[-1.2, a0.z1 + .2], [6.2, a0.z1 + .2]], belts, lanes, stations, cruise: y2 + .4, nDrones: 11, top: yR + 3.6 };
   m.solid = { m: P.toArray(), x0: -HX, x1: HX, z0: -HZ, z1: HZ, y1: yR + 3.4 };   // (what the police drones keep out of: see droneDetour)
   m.roofH = yR;
   m.top = yR + 3.5;
@@ -2599,6 +2597,10 @@ function logisticsFx(m){
     car.position.y = .12; f.position.set(L.x0, L.y, L.z);
     return { L, f, car, load, ph: k*1.7 + (m.seed % 5)*.3, sp: .07 + k*.015, last: 0 };
   });
+  // the floodlights' pools of light on the floor: soft discs that glow at night
+  const disc = new THREE.CircleGeometry(1, 24); disc.rotateX(-PI/2);
+  const poolMat = new THREE.MeshBasicMaterial({ map: glowTex, color: 0xfff0d0, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false });
+  for (const [x, y, z, r] of g.pools || []){ const d = new THREE.Mesh(disc, poolMat); d.position.set(x, y, z); d.scale.setScalar(r); d.layers.set(1); d.renderOrder = 4; root.add(d); }
   const sstep = (a, b, x) => { const u = Math.max(0, Math.min(1, (x - a)/(b - a))); return u*u*(3 - 2*u); };
   // the drones: little quadcopters hopping between stops inside the hub (pads, container tops, belt ends), picking a
   // parcel up at one and setting it down at the next. Each keeps a cruising height of its own so they don't collide.
@@ -2632,7 +2634,7 @@ function logisticsFx(m){
   const _v = new THREE.Vector3();
   return {
     update(dt, t){
-      beltTick(t);
+      beltTick(t); poolMat.opacity = typeof isNight === 'function' && isNight(S.hour) ? .45 : .06;
       for (const F of lifts){
         const u = (t*F.sp + F.ph) % 2, s = u < 1 ? sstep(.12, .88, u) : 1 - sstep(1.12, 1.88, u), L = F.L;
         F.f.position.x = L.x0 + (L.x1 - L.x0)*s;
@@ -2657,7 +2659,7 @@ function logisticsFx(m){
         for (const r of d.rotors) r.rotation.y += d.spin*dt;
       }
     },
-    dispose(){ scene.remove(root); scene.remove(sky); geo.dispose(); cylG.dispose(); for (const k in mats) mats[k].dispose(); for (const B of belts){ B.slats.dispose(); B.boxes.dispose(); } }
+    dispose(){ scene.remove(root); scene.remove(sky); geo.dispose(); cylG.dispose(); disc.dispose(); poolMat.dispose(); for (const k in mats) mats[k].dispose(); for (const B of belts){ B.slats.dispose(); B.boxes.dispose(); } }
   };
 }
 

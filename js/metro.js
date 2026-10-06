@@ -473,17 +473,14 @@ const mtGlow = (() => { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-PI/2
   m.count = 0; m.frustumCulled = false; m.layers.set(1); m.renderOrder = 3; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
 // the magnetic field holding each car up: an electric blue shimmer in the gap between its shoe and the girder's rail,
 // in sheets along both sides of the shoe and one lying over the roof; a scrolling texture of wavering lines
-const MT_FIELD_TEX = (() => {
-  const c = document.createElement('canvas'); c.width = 64; c.height = 32; const g = c.getContext('2d');
-  for (let k = 0; k < 7; k++){ const y0 = 3 + k*4 + (k % 2)*1.5, a = .35 + (k % 3)*.25;
-    g.strokeStyle = `rgba(${k % 2 ? 140 : 90},${k % 2 ? 230 : 200},255,${a})`; g.lineWidth = k % 3 ? 1 : 1.6; g.beginPath();
-    for (let x = 0; x <= 64; x += 2){ const y = y0 + Math.sin(x/64*TAU*(1 + k % 3) + k)*1.6; x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
-  const fade = g.createLinearGradient(0, 0, 0, 32); fade.addColorStop(0, 'rgba(0,0,0,1)'); fade.addColorStop(.2, 'rgba(0,0,0,0)'); fade.addColorStop(.8, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,1)');
-  g.globalCompositeOperation = 'destination-out'; g.fillStyle = fade; g.fillRect(0, 0, 64, 32);
-  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.repeat.set(3, 1); return t;
+const MT_FIELD_TEX = (() => {   // a soft glow: brightest in the middle of the gap, fading out to nothing above and below and at the ends
+  const c = document.createElement('canvas'); c.width = 64; c.height = 32; const g = c.getContext('2d'), im = g.createImageData(64, 32);
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 64; x++){ const v = Math.sin(PI*(y + .5)/32)**2, u = Math.sin(PI*(x + .5)/64)**.6, a = v*u, i = (y*64 + x)*4;
+    im.data[i] = 120; im.data[i + 1] = 210; im.data[i + 2] = 255; im.data[i + 3] = Math.round(255*a); }
+  g.putImageData(im, 0, 0); const t = new THREE.CanvasTexture(c); t.minFilter = t.magFilter = THREE.LinearFilter; return t;
 })();
 const mtField = (() => { const g = new THREE.PlaneGeometry(1, 1); g.rotateY(PI/2);
-  const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: MT_FIELD_TEX, color: new THREE.Color(0x6ad0ff).multiplyScalar(1.6), transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), MT_CAR_MAX*3);
+  const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: MT_FIELD_TEX, color: new THREE.Color(0x6ad0ff), transparent: true, opacity: .55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), MT_CAR_MAX*3);
   m.count = 0; m.frustumCulled = false; m.layers.set(1); m.renderOrder = 3; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
 // the line's centre as a path the train follows ({ X, Y, Z, cum, len }), and where along it each stop's middle is
 function mtPath(l){
@@ -540,18 +537,17 @@ function updateMetros(dt, t){
       if (ng < MT_CAR_MAX){ const bob = .008*Math.sin(t*2.2 + l.id + q), top = .12 + .78 + .065 + MT_LEV + bob, gap = MT_OH - top;   // the field in the gap over it, flickering a little
         _mgap.push([_mpos.x, _mpos.z, Math.sin(yaw), Math.cos(yaw)]);
         for (const sx of [-1, 1]){ const ox = sx*.2*Math.cos(yaw), oz = -sx*.2*Math.sin(yaw);   // a sheet each side of the shoe, wavering in height
-          _mdm.position.set(_mpos.x + ox, _mpos.y + top + gap/2, _mpos.z + oz); _mdm.rotation.set(0, yaw, 0); _mdm.scale.set(1, gap*(1.3 + .25*Math.sin(t*11 + q*2.1 + sx)), MT_CL - .25); _mdm.updateMatrix(); mtField.setMatrixAt(nf++, _mdm.matrix); }
-        _mdm.position.set(_mpos.x, _mpos.y + top + .01, _mpos.z); _mdm.rotation.set(0, yaw, PI/2); _mdm.scale.set(1, .5, MT_CL - .25); _mdm.updateMatrix(); mtField.setMatrixAt(nf++, _mdm.matrix); }   // and one lying on the roof
+          _mdm.position.set(_mpos.x + ox, _mpos.y + top + gap/2, _mpos.z + oz); _mdm.rotation.set(0, yaw, 0); _mdm.scale.set(1, gap*(1.8 + .15*Math.sin(t*3 + q*2.1 + sx)), MT_CL); _mdm.updateMatrix(); mtField.setMatrixAt(nf++, _mdm.matrix); }
+        _mdm.position.set(_mpos.x, _mpos.y + top + .01, _mpos.z); _mdm.rotation.set(0, yaw, PI/2); _mdm.scale.set(1, .7, MT_CL); _mdm.updateMatrix(); mtField.setMatrixAt(nf++, _mdm.matrix); }   // and one lying on the roof
       if (ng < MT_CAR_MAX){ _mdm.position.set(_mpos.x, _mpos.y + .012, _mpos.z); _mdm.rotation.set(0, yaw, 0); _mdm.scale.set(.85, 1, MT_CL*1.2); _mdm.updateMatrix(); mtGlow.setMatrixAt(ng++, _mdm.matrix); }
     }
   }
   for (const M_ of MT_MODELS) for (const m of M_.meshes){ m.count = M_.n; m.visible = M_.n > 0; if (M_.n) m.instanceMatrix.needsUpdate = true; }
-  mtField.count = nf; mtField.visible = nf > 0; mtField.material.opacity = 1; if (nf) mtField.instanceMatrix.needsUpdate = true;
+  mtField.count = nf; mtField.visible = nf > 0; mtField.material.opacity = .45 + .1*Math.sin(t*3.5); if (nf) mtField.instanceMatrix.needsUpdate = true;
   { const U_ = comp.uniforms, cx = camT.x, cz = camT.z;   // the 16 cars nearest the view get the shimmer
     _mgap.sort((a, b) => (a[0] - cx)**2 + (a[1] - cz)**2 - (b[0] - cx)**2 - (b[1] - cz)**2);
     const n = Math.min(16, _mgap.length); for (let k = 0; k < n; k++) U_.mtGap.value[k].set(..._mgap[k]);
     U_.mtN.value = n; U_.mtGapY.value.set(MT_Y + .12 + .78 + .04 + MT_LEV, MT_Y + MT_OH + .02); }
-  MT_FIELD_TEX.offset.x = (t*.9) % 1; MT_FIELD_TEX.offset.y = .04*Math.sin(t*13);   // the shimmer runs and flickers
   mtGlow.count = 0; mtGlow.visible = false;   // (no deck under the train to light any more) mtGlow.material.opacity = night ? .85 : .3; if (ng) mtGlow.instanceMatrix.needsUpdate = true;
   // the stations' lift cabs go up and down
   for (const l of metros) if (l.cabs) for (const c of l.cabs){

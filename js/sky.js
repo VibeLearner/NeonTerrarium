@@ -237,13 +237,13 @@ const comp = new THREE.ShaderMaterial({
             for (int i=0; i<6; i++){ vec3 p = o1 + d1*(ta + (tb - ta)*(float(i) + .5)/6.0);
               for (int k=0; k<16; k++){ if (k >= mtN) break;
                 vec4 g = mtGap[k]; vec2 q = p.xz - g.xy; float al = abs(q.x*g.z + q.y*g.w), ac = abs(q.x*g.w - q.y*g.z);
-                mtSh += (1.0 - smoothstep(.3, .46, ac))*(1.0 - smoothstep(.5, .68, al)); } }
+                mtSh += (1.0 - smoothstep(.05, .62, ac))*(1.0 - smoothstep(.2, .95, al)); } }   // (soft all the way out: a haze, no edge)
             mtSh /= 6.0;
           }
         }
         if (mtSh > .01){
-          float s2 = clamp(mtSh*4.0, 0.0, 1.0);
-          vec2 o = vec2(sin(vUv.y*res.y*1.6 + time*31.0) + .6*sin(vUv.x*res.x*.5 - time*9.0), .7*sin(vUv.x*res.x*1.1 - time*23.0))*s2*1.8;   // a fast, tight crackle (the lift pads' heat haze is slow and lazy)
+          float s2 = clamp(mtSh*2.5, 0.0, 1.0);
+          vec2 o = vec2(sin(vUv.y*res.y*.8 + time*14.0 + 1.5*sin(vUv.x*res.x*.2 + time*5.0)), .5*sin(vUv.x*res.x*.5 - time*10.0))*s2*1.4;   // a quick, rolling waver (the lift pads' heat haze is slower and lazier)
           vec2 cand = sUv + floor(o + .5)*px;
           if ((rawD(cand) >= 0.99999) == (rawD(sUv) >= 0.99999)) sUv = cand;
         }
@@ -473,10 +473,10 @@ const comp = new THREE.ShaderMaterial({
           col = mix(col, rc*1.15, sp*0.6);
         }
       }
-      if (mtSh > .01){   // the field's own light: an electric blue glow, pulsing, with sparks jumping across it
-        float s3 = clamp(mtSh*4.0, 0.0, 1.0), cell = hash(floor(gl_FragCoord.xy/2.0) + floor(time*18.0));
-        float pulse = .55 + .3*sin(time*12.0 + vUv.x*res.x*.15) + .15*sin(time*37.0);
-        col += vec3(.18, .55, 1.0)*s3*pulse*.55 + vec3(.6, .9, 1.0)*s3*step(.94, cell)*.8;
+      if (mtSh > .002){   // the field's own light: a soft electric blue haze, breathing
+        float s3 = mtSh*mtSh*(3.0 - 2.0*mtSh);   // eased in from nothing at its edges
+        float pulse = .7 + .2*sin(time*3.5 + vUv.x*res.x*.02) + .1*sin(time*7.0 + vUv.y*res.y*.03);   // a slow breathing, drifting across it
+        col += vec3(.2, .55, 1.0)*s3*pulse*.6;
       }
       if (palOn > 0.5){
         vec3 best = pal[0]; float bd = 1e9;

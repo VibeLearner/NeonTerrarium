@@ -2293,7 +2293,7 @@ function buildLogisticsHub(m){
   const long = m.w >= m.h, L = Math.max(m.w, m.h)*LOT, D = Math.min(m.w, m.h)*LOT;
   const P = T(m.x, 0, m.z, megaAngle(m, L === D ? pick([0, PI/2, PI, -PI/2]) : long ? pick([0, PI]) : pick([PI/2, -PI/2])));   // the dock faces local +z
   const HX = L/2, HZ = D/2, bx = HX - .6, bz0 = -HZ + .4, bz1 = HZ - 4.2;   // the building's footprint; the apron is in front
-  const yD = CURB + .32, y1 = yD + 2.8, y2 = y1 + 2.6, yB = y2 + 2.8, yR = yB + 2.3;   // dock floor, deck, atrium, the band, the roof
+  const yD = CURB + .32, y1 = yD + 2.8, y2 = y1 + 2.6, yB = y2 + 2.8, yR = yB + 1.2;   // dock floor, deck, atrium, the band (a thin crown), the roof
   const wx = 5.4, rz1 = bz1 - 8.2, rz0 = bz0 + 2.2;                       // the atrium: x within +-wx, z from rz0 to rz1; the open deck in front of it
   const zC = [bz1 - .25, 3.6, 0, -3.6, -7.2, bz0 + .25].filter(z => z <= bz1 - .25 && z >= bz0 + .25), zU = [rz1 - .1, -4.6, -8.0, bz0 + .25];   // column lines
   const colX = Array.from({ length: 9 }, (_, k) => -bx + .2 + k*(2*bx - .4)/8);
@@ -2317,7 +2317,7 @@ function buildLogisticsHub(m){
   // ---- columns through the dock storey and the deck storey, banded in hazard stripes at their feet
   const column = (x, z, ya, yb) => { box(M.lgConc2, P, x, (ya + yb)/2, z, .38, yb - ya, .38);
     for (const yy of [ya + .1, ya + .3]) box(M.frame, P, x, yy, z, .4, .08, .4); box(M.hazard, P, x, ya + .2, z, .4, .12, .4); };
-  for (const x of colX){ for (const z of zC) column(x, z, yD, y1 - .32); for (const z of zU) column(x, z, y1, y2 - .32); }
+  // (no columns: the floors are open slabs, as in the reference)
   // ---- the slabs: the deck over the dock, the ring and atrium floor over the deck's back. Hazard stripes along every front edge
   box(M.lgConc2, P, 0, y1 - .16, (bz0 + bz1)/2, 2*bx + .2, .32, bz1 - bz0 + .2);
   box(M.lgFloor2, P, 0, y1 + .005, (bz0 + bz1)/2, 2*bx, .01, bz1 - bz0);
@@ -2339,8 +2339,7 @@ function buildLogisticsHub(m){
     wallLow(under(P, T(0, 0, bz0, PI)), 2*bx, y0, h);
   }   // (the ends are left open, as in the reference: columns and slab edges only)
   // the deck storey's front, behind the open deck: open at the middle, glass at the ends, lit inside
-  for (const sx of [-1, 1]){ const F = under(P, T(sx*(bx - 2.2), 0, rz1 - .02, 0)); box(M.ghGlass, F, 0, (y1 + y2 - .32)/2, 0, 4.2, y2 - y1 - .32, .02);
-    for (let t = -2.1; t <= 2.11; t += 1.05) box(M.lgConc4, F, t, (y1 + y2 - .32)/2, .02, .07, y2 - y1 - .32, .07); box(M.lgConc4, F, 0, y1 + 1.2, .02, 4.2, .07, .07); }
+  // (the deck storey's front stays open from end to end)
 
   // ---- inside the deck storey, under the ring: racks along the back, containers, pallets
   for (const x of [-7.6, -2.6, 2.4, 7.4]) lgRack(P, x, y1, bz0 + .75, 4.6, 4, .55);
@@ -2452,16 +2451,11 @@ function buildLogisticsHub(m){
   // ---- the ring's lower storey: the left wing open, racks inside; the right wing glass-fronted; the back wing's drone bays
   const bayH = yB - y2;
   ceiling(yB, bz0, rz1, -bx, -wx); ceiling(yB, bz0, rz1, wx, bx);
-  for (const z of [rz1 - .2, rz1 - 3.5, rz1 - 6.8, bz0 + .3]) box(M.lgConc2, P, -wx + .15, y2 + bayH/2, z, .3, bayH, .3);   // the left wing's open corner posts
-  for (const x of [-bx + .3, -8.1]) box(M.lgConc2, P, x, y2 + bayH/2, rz1 - .2, .34, bayH, .34);
   for (const z of [rz1 - 1.3, rz1 - 3.2, rz1 - 5.1, rz1 - 7.0]) lgRack(P, (-bx - wx)/2, y2, z, 4.8, 4, .62);
   lgRack(P, (-bx - wx)/2, y2, bz0 + .45, 4.8, 4, .62);
   // the right wing: a glass front in a dark grid, containers and racks inside, FRAGILE ELECTRONICS over it
   { const cx = (bx + wx)/2, w = bx - wx, F = under(P, T(cx, 0, rz1 - .05, 0));
-    box(M.ghGlass, F, 0, y2 + bayH/2, 0, w, bayH, .02);
-    for (let t = -w/2; t <= w/2 + .01; t += w/5) box(M.lgConc4, F, t, y2 + bayH/2, .02, .09, bayH, .09);
-    for (const y of [y2 + .05, y2 + 1.4, yB - .05]) box(M.lgConc4, F, 0, y, .02, w, .08, .09);
-    box(M.frame, F, 0, yB - .35, .07, 3.4, .42, .04); fitSign(under(F, T(0, 0, .1, 0)), 'sign_w_fragile', 0, yB - .35, 0, 3.3, .9, 'amber');
+    box(M.frame, F, 0, yB - .35, .07, 3.4, .42, .04); for (const s2 of [-1, 1]) box(M.frame, F, s2*1.5, yB - .07, .07, .03, .14, .03); fitSign(under(F, T(0, 0, .1, 0)), 'sign_w_fragile', 0, yB - .35, 0, 3.3, .9, 'amber');
     lgCtr(P, cx - 1.3, y2, rz1 - 1.1, 0, 0, null, 2.4); lgCtr(P, cx + 1.3, y2, rz1 - 1.1, 0, 4, null, 2.4); lgCtr(P, cx - 1.3, y2 + 1.1, rz1 - 1.1, 0, 2, null, 2.4);
     for (const z of [rz1 - 3.0, rz1 - 5.0, rz1 - 7.0]) lgRack(P, cx, y2, z, 4.8, 4, .62); lgRack(P, cx, y2, bz0 + .45, 4.8, 4, .62);
     box(M.lgConc, P, wx + .1, y2 + bayH/2, (bz0 + rz1)/2, .2, bayH, rz1 - bz0);                    // its atrium side: a wall of charging docks
@@ -2482,7 +2476,6 @@ function buildLogisticsHub(m){
   wallLow(under(P, T(0, 0, bz0, PI)), 2*bx, y2, bayH);
   // the wings' ends are open too: posts carrying the band, hazard stripes on the slab edge, a railing
   for (const sx of [-1, 1]){
-    for (const z of [rz1 - .2, rz1 - 3.5, rz1 - 6.8, bz0 + .3]) box(M.lgConc2, P, sx*(bx - .17), y2 + bayH/2, z, .34, bayH, .34);
     lgHaz(under(P, T(sx*(bx + .1), 0, (bz0 + rz1)/2, sx*PI/2)), rz1 - bz0 + .1, y2 - .16, .28);
     for (let z = bz0 + .5; z < rz1 - .3; z += .6) box(M.frame, P, sx*(bx - .05), y2 + .32, z, .04, .64, .04);
     box(M.frame, P, sx*(bx - .05), y2 + .64, (bz0 + rz1)/2, .05, .05, rz1 - bz0 - .6); }
@@ -2494,27 +2487,29 @@ function buildLogisticsHub(m){
   box(M.lgConc, P, 0, yB + bandH/2, (bz0 + rz0)/2, 2*wx, bandH, rz0 - bz0);                    // over the back
   box(M.lgConc, P, 0, yB + bandH/2, rz1 - .5, 2*wx, bandH, 1.0);                                // the gate beam over the front
   for (const [F, len] of blockFaces(P, 0, (bz0 + rz1)/2, 2*bx, rz1 - bz0)){
-    lgHaz(F, len, yB + .15, .3); box(M.lgConc4, F, 0, yR + .1, 0, len + .1, .2, .2);
-    for (let k = 0; k < Math.round(len/2.4); k++) box(pick([M.fRust, M.lgConc2]), F, rnd(-len/2 + .4, len/2 - .4), yB + rnd(.6, bandH - .4), .015, rnd(.12, .3), rnd(.4, 1.2), .02);
+    lgHaz(F, len, yB + .08, .16); box(M.lgConc4, F, 0, yR + .06, 0, len + .1, .12, .16);
+    for (let k = 0; k < Math.round(len/2.4); k++) box(pick([M.fRust, M.lgConc2]), F, rnd(-len/2 + .4, len/2 - .4), yB + rnd(.4, bandH - .3), .015, rnd(.12, .3), rnd(.2, .5), .02);
   }
   for (const [F0, len] of blockFaces(P, 0, (rz0 + rz1 - 1.0)/2, 2*wx, rz1 - 1.0 - rz0)){            // the rim of the atrium, inside (turned to face in)
     const F = under(F0, T(0, 0, 0, PI));
     box(M.lgNeonO, F, 0, yR - .12, .02, len, .06, .05); for (let t = -len/2 + .8; t < len/2; t += 2.0) glow(F, t, yR - .3, .15, 'orange', 1.0);
-    lgHaz(F, len, yB + .15, .3);
-    for (let t = -len/2 + .8; t < len/2 - .5; t += 1.3) box(chance(.5) ? M.lgWin : M.glassDark, F, t, yB + 1.2, .01, .7, .45, .02); }
+    lgHaz(F, len, yB + .08, .16);
+    for (let t = -len/2 + .8; t < len/2 - .5; t += 1.3) box(chance(.5) ? M.lgWin : M.glassDark, F, t, yB + .62, .01, .7, .32, .02); }
   { const F = under(P, T(0, 0, rz1, 0));                                                         // the gate beam's front: KIBOU LOGISTICS, DISTRO-7 MEGA HUB
-    box(M.lgConc4, F, 0, yB + 1.25, .02, 9.8, 1.65, .05);
-    fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_kibou', 0, yB + 1.5, 0, 9.4, 2.2, 'cyan');
-    fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_distro', 0, yB + .72, 0, 5.4, 1.0, 'platinum');
+    box(M.lgConc4, F, 0, yB + .63, .02, 9.8, .86, .05);
+    fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_kibou', 0, yB + .63, 0, 9.4, 1.55, 'cyan');
+    box(M.lgConc4, F, 0, yB - .48, .02, 4.6, .46, .04); for (const s2 of [-1, 1]) box(M.frame, F, s2*2.0, yB - .13, .02, .03, .24, .03);   // DISTRO-7 MEGA HUB, hung under the beam
+    fitSign(under(F, T(0, 0, .05, 0)), 'sign_w_distro', 0, yB - .48, 0, 4.4, .9, 'platinum');
     box(M.lgNeonO, F, 0, yB + .02, .05, 2*wx, .05, .05); for (let t = -4.5; t <= 4.5; t += 2.25) glow(F, t, yB - .1, .2, 'orange', 1.0); }
   { const F = under(P, T((bx + wx)/2, 0, rz1, 0));                                               // the right wing: MEGA HUB
-    box(M.lgConc4, F, 0, yB + 1.3, .02, 4.9, 1.4, .05); fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_megahub', 0, yB + 1.3, 0, 4.6, 2.6, 'cyan');
-    box(M.lgNeonP, F, 0, yB + .55, .06, 4.9, .04, .04); glow(F, 0, yB + .55, .2, 'pink', .9); }
+    box(M.lgConc4, F, 0, yB + .63, .02, 4.9, .86, .05); fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_megahub', 0, yB + .63, 0, 4.6, 1.6, 'cyan');
+    box(M.lgNeonP, F, 0, yB + .2, .06, 4.9, .04, .04); glow(F, 0, yB + .2, .2, 'pink', .9); }
   { const F = under(P, T((-bx - wx)/2, 0, rz1, 0));                                              // the left: AIRSPACE NO FLY ZONE, OPEN 24H
-    box(M.lgConc4, F, 0, yB + 1.55, .02, 4.9, .7, .05); fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_nofly', 0, yB + 1.55, 0, 4.7, 1.2, 'pink');
-    fitSign(under(F, T(0, 0, .06, 0)), 'sign_c_open', 1.2, yB + .75, 0, 2.0, 1.0, 'pink'); }
-  { const F = under(P, T(bx, 0, (bz0 + rz1)/2, PI/2)); fitSign(under(F, T(0, 0, .04, 0)), 'sign_w_megahub', 0, yB + 1.2, 0, 4.0, 1.8, 'cyan'); }
-  { const F = under(P, T(-bx, 0, (bz0 + rz1)/2, -PI/2)); fitSign(under(F, T(0, 0, .04, 0)), 'sign_w_kibou', 0, yB + 1.2, 0, 5.6, 1.4, 'cyan'); }
+    box(M.lgConc4, F, 0, yB + .63, .02, 4.9, .7, .05); fitSign(under(F, T(0, 0, .06, 0)), 'sign_w_nofly', 0, yB + .63, 0, 4.7, 1.2, 'pink');
+    box(M.frame, F, 1.2, yB - .4, .02, 1.9, .5, .04); for (const s2 of [-1, 1]) box(M.frame, F, 1.2 + s2*.8, yB - .1, .02, .03, .2, .03);
+    fitSign(under(F, T(0, 0, .05, 0)), 'sign_c_open', 1.2, yB - .4, 0, 1.8, .9, 'pink'); }
+  { const F = under(P, T(bx, 0, (bz0 + rz1)/2, PI/2)); fitSign(under(F, T(0, 0, .04, 0)), 'sign_w_megahub', 0, yB + .62, 0, 4.0, 1.4, 'cyan'); }
+  { const F = under(P, T(-bx, 0, (bz0 + rz1)/2, -PI/2)); fitSign(under(F, T(0, 0, .04, 0)), 'sign_w_kibou', 0, yB + .62, 0, 5.6, 1.4, 'cyan'); }
   // pilasters up the back and the ends, a ledge at every floor, downpipes and a tall orange strip on the back
   for (const [F, len, fk] of blockFaces(P, 0, (bz0 + rz1)/2, 2*bx, rz1 - bz0).map((f, k) => [...f, k])){
     if (fk === 0) continue;

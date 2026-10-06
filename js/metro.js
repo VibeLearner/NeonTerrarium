@@ -15,7 +15,7 @@ const MT_W = 1.0, MT_DECK = .26, MT_GIRD = .32;  // the guideway: width, deck de
 const MT_CLEAR = MT_DECK + MT_GIRD + .08;        // from the rail down to the clear space under it
 const MT_OH = 1.3, MT_OHT = .36, MT_OL = .74;    // the overhead girder: its underside above the rail, its depth, how far it sits to one side
 const MT_TOP = MT_Y + 2.1;                       // the top of it all (the stations' canopies)
-const MT_CL = 1.3, MT_GAP = .08, MT_CARS = 3;    // a car's length, the gap between cars, cars to a train
+const MT_CL = 1.45, MT_GAP = .06, MT_CARS = 3;    // a car's length, the gap between cars, cars to a train
 const MT_PLAT = .75;                             // a platform's width, each side
 const MT_VMAX = 2.8, MT_ACC = .9, MT_DWELL = 5;  // the train: top speed, acceleration, seconds at a stop
 let metros = [], mtNext = 1, mtIndex = new Map();
@@ -171,8 +171,8 @@ const MTM = {
   green: toon(0x184010, { em: 0x5aff2a, kind: 'neon' }), green2: toon(0x284010, { em: 0xb0ff3a, kind: 'neon' }), board: toon(0x0c1a10, { em: 0x0e2a14, kind: 'trim' }),
   lit: toon(0x3a4a3a, { em: 0xd8ffe0, kind: 'lamp' }), tactile: toon(0xd9b43a),
   // the train
-  body: toon(0x7a828c), body2: toon(0x4c525a), dark: toon(0x1c1f24), win: toon(0x1a3a12, { em: 0x9aff6a, kind: 'window' }), glass: toon(0x163010, { em: 0x6ae040, kind: 'window' }),
-  head: toon(0x5a5a50, { em: 0xf0fff0, kind: 'lamp' }), belt: toon(0x184010, { em: 0x5aff2a, kind: 'neon' }),
+  body: toon(0x7a828c), body2: toon(0x4c525a), dark: toon(0x1c1f24), win: toon(0x1a3a12, { em: 0x9aff6a, kind: 'window' }), glass: toon(0x163010, { em: 0x3a8a28, kind: 'window' }),
+  head: toon(0x5a5a50, { em: 0xf0fff0, kind: 'lamp' }), sil: toon(0x0a1a0a), belt: toon(0x184010, { em: 0x5aff2a, kind: 'neon' }),
 };
 const MT_GLASS = new THREE.MeshBasicMaterial({ color: 0x9aff7a, transparent: true, opacity: .12, depthWrite: false, side: THREE.DoubleSide }); MT_GLASS.userData.colorOnly = true;
 
@@ -338,28 +338,77 @@ function mtFeet(c){
 // a car, built part by part and folded (see hwFold): its body, the green-lit windows and belt lines, doors, the bogie
 // arm up to the girder overhead; a cab car has a sloped nose with a lit windscreen and headlights at its +z end
 function mtCarModel(cab, nose = 1){
-  const g = new THREE.Group(), L = MT_CL, Wb = .78, y0 = .1, H = .78;
-  const add = (mat, x, y, z, sx, sy, sz, rx = 0, rz = 0) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z*nose); m.scale.set(sx, sy, sz); m.rotation.set(rx*nose, 0, rz); g.add(m); };
-  const bl = cab ? L - .3 : L, bz = cab ? -.15 : 0;
-  add(MTM.body, 0, y0 + H/2, bz, Wb, H, bl);
-  add(MTM.dark, 0, y0 + .07, 0, Wb - .08, .14, L - .1);
-  add(MTM.body2, 0, y0 + H + .03, bz, Wb - .16, .06, bl - .2);
+  const g = new THREE.Group(), L = MT_CL, Wb = .8, y0 = .12, H = .78, rr = .1;   // length, width, floor, body height, the roof's rounding
+  const add = (mat, x, y, z, sx, sy, sz, rx = 0, rz = 0, ry = 0) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z*nose); m.scale.set(sx, sy, sz); m.rotation.set(rx*nose, ry*nose, rz); g.add(m); return m; };
+  const R_ = mulberry32(cab ? 77 : 41);
+  // the body: from the back end to where the cab's nose starts (all of it, on a middle car)
+  const zb0 = -L/2 + .04, zb1 = cab ? L/2 - .36 : L/2 - .04, bl = zb1 - zb0, bz = (zb0 + zb1)/2;
+  add(MTM.body, 0, y0 + .3, bz, Wb, .6, bl);                                      // the lower body
+  add(MTM.body, 0, y0 + .6 + (H - .6 - rr)/2, bz, Wb - .03, H - .6 - rr, bl);      // the upper body, a little in at the windows
+  add(MTM.body, 0, y0 + H - rr/2, bz, Wb - 2*rr, rr, bl);                          // the roof, its edges rounded down
+  for (const s of [-1, 1]) add(MTM.body, s*(Wb/2 - rr*.62), y0 + H - rr*.62, bz, rr*1.15, rr*.55, bl, 0, s*.7);
+  add(MTM.body2, 0, y0 + H + .005, bz, Wb - .34, .015, bl - .1);                     // the roof's centre panel
+  // the skirt underneath: dark, vented, the green underglow along it
+  add(MTM.dark, 0, y0 - .04, 0, Wb - .1, .1, L - .08);
+  for (let z = -L/2 + .2; z < L/2 - .15; z += .18) for (const s of [-1, 1]) add(MTM.body2, s*(Wb/2 - .05), y0 - .04, z, .01, .06, .1);
+  add(MTM.belt, 0, y0 - .095, 0, Wb - .3, .015, L - .3);
   for (const s of [-1, 1]){
-    add(MTM.win, s*(Wb/2 + .004), y0 + .5, bz, .01, .24, bl - .22);
-    for (let z = bz - bl/2 + .2; z < bz + bl/2 - .1; z += .3) add(MTM.body2, s*(Wb/2 + .008), y0 + .5, z, .012, .26, .035);   // mullions
-    for (const z of [bz - bl*.27, bz + bl*.27]){ add(MTM.dark, s*(Wb/2 + .009), y0 + .36, z, .01, .58, .2); add(MTM.belt, s*(Wb/2 + .012), y0 + .36, z, .006, .6, .012); }
-    add(MTM.belt, s*(Wb/2 + .012), y0 + .22, 0, .008, .03, L - .06);           // the belt line
-    add(MTM.belt, s*(Wb/2 + .012), y0 + H - .07, bz, .008, .025, bl - .06);    // and under the roof
+    const sx = s*(Wb/2), sxu = s*((Wb - .03)/2);
+    // panel seams, and the three green lines: under the roof, over the windows' sills, along the belt
+    add(MTM.body2, sx + s*.003, y0 + .6, bz, .006, .012, bl);
+    add(MTM.belt, sxu + s*.006, y0 + H - rr - .02, bz, .008, .022, bl - .04);
+    add(MTM.belt, sx + s*.006, y0 + .4, bz, .008, .02, bl - .04);
+    add(MTM.belt, sx + s*.006, y0 + .13, bz, .008, .03, bl - .04);
+    // the doors, a pair to a side: dark leaves with a lit window each, outlined in green
+    const doors = cab ? [zb0 + .26, zb1 - .3] : [-L*.3, L*.3];
+    for (const zd of doors){
+      add(MTM.dark, sx + s*.004, y0 + .36, zd, .008, .62, .27);
+      for (const o of [-.066, .066]){ add(MTM.win, sx + s*.008, y0 + .5, zd + o, .006, .2, .09); add(MTM.body2, sx + s*.007, y0 + .26, zd + o, .006, .26, .1); }
+      add(MTM.belt, sx + s*.01, y0 + .36, zd, .006, .62, .008);                       // the seam between the leaves
+      for (const e of [-.137, .137]) add(MTM.belt, sx + s*.01, y0 + .36, zd + e, .006, .64, .012);
+      add(MTM.belt, sx + s*.01, y0 + .675, zd, .006, .012, .29);
+    }
+    // the windows between the doors (and beyond them): green-lit panes with people in them
+    const spans = [[zb0 + .08, doors[0] - .17], [doors[0] + .17, doors[1] - .17], [doors[1] + .17, zb1 - .08]];
+    for (const [za, zz] of spans){
+      const n = Math.max(1, Math.round((zz - za)/.24)), w = (zz - za)/n;
+      for (let q = 0; q < n; q++){
+        const zc = za + (q + .5)*w;
+        add(MTM.win, sxu + s*.004, y0 + .72, zc, .006, .22, w - .04);
+        add(MTM.body2, sxu + s*.006, y0 + .72, za + q*w, .008, .24, .025);                // the mullion
+        if (R_() < .75){ const px = zc + (R_() - .5)*w*.4, tall = .03 + R_()*.03;      // a passenger: head and shoulders against the light
+          add(MTM.sil, sxu + s*.006, y0 + .66 + tall, px, .006, .07, .055); add(MTM.sil, sxu + s*.006, y0 + .63 + tall*.5, px, .006, .06, .11); }
+      }
+      add(MTM.body2, sxu + s*.006, y0 + .72, zz, .008, .24, .025);
+    }
   }
-  add(MTM.belt, 0, y0 - .015, 0, Wb - .24, .02, L - .3);                       // the glow under it
-  { const ax = -MT_OL + .08, ay = MT_OH - .09, by = y0 + H + .1, len = Math.hypot(ax, ay - by);   // the bogie arm, cranked up and over to the girder at the side
-    add(MTM.dark, 0, y0 + H + .05, 0, .16, .08, .3); add(MTM.dark, ax/2, (ay + by)/2, 0, len, .06, .07, 0, Math.atan2(ay - by, ax)); add(MTM.body2, -MT_OL + .06, MT_OH - .06, 0, .26, .1, .44); }
+  // the gangway bellows at the inner ends
+  for (const e of cab ? [-1] : [-1, 1]){ add(MTM.dark, 0, y0 + .42, e*(L/2 - .005), .58, .66, .06); for (const yy of [.2, .42, .64]) add(MTM.body2, 0, y0 + yy, e*(L/2 + .012), .6, .02, .02); }
+  // the roof: equipment boxes with grilles, and the hanger: a forked arm up to the bogie riding the girder at the side
+  for (const zc of [-L*.26, L*.18]){ add(MTM.body2, 0, y0 + H + .05, zc, .36, .09, .28); for (let x = -.12; x <= .13; x += .06) add(MTM.dark, x, y0 + H + .1, zc, .025, .012, .22); }
+  { const bx = -MT_OL + .06, by = MT_OH - .07, base = y0 + H + .06;
+    add(MTM.dark, -.12, base, L*.02, .16, .06, .24);
+    for (const o of [-.08, .08]){ const ax = -.12, ay = base + .02, len = Math.hypot(bx - ax, by - ay); add(MTM.dark, (ax + bx)/2, (ay + by)/2, L*.02 + o, len, .04, .04, 0, Math.atan2(by - ay, bx - ax)); }
+    add(MTM.body2, bx, by + .02, L*.02, .2, .08, .46);                                  // the bogie
+    for (const o of [-.15, .15]) add(MTM.dark, bx, by + .07, L*.02 + o, .12, .05, .07);   // its wheels on the rail
+    add(MTM.belt, bx + .1, by + .02, L*.02, .01, .02, .4); }
   if (cab){
-    add(MTM.body, 0, y0 + .26, L/2 - .15, Wb, .52, .3);                          // the nose
-    add(MTM.glass, 0, y0 + .64, L/2 - .2, Wb - .1, .025, .38, .95);              // the sloped windscreen
-    add(MTM.body, 0, y0 + H - .05, L/2 - .33, Wb, .1, .12);
-    for (const s of [-1, 1]) add(MTM.head, s*.25, y0 + .3, L/2 - .002, .16, .05, .01);
-    add(MTM.belt, 0, y0 + .16, L/2 - .002, Wb - .08, .03, .012);
+    // the nose: a short lower front, the big sloped windscreen in a dark frame, the cap over it, rounded corners
+    const zn = L/2 - .36, yf = .48, ang = Math.atan2(H - .02 - yf, .3), cz = zn + .19, cy = y0 + (yf + H - .02)/2, nY = Math.cos(ang), nZ = Math.sin(ang);
+    add(MTM.body, 0, y0 + yf/2, zn + .17, Wb - .02, yf, .34);                          // the lower front
+    for (const s of [-1, 1]) add(MTM.body, s*(Wb/2 - .09), y0 + yf/2, zn + .3, .2, yf, .1, 0, 0, s*.55);   // its rounded corners
+    add(MTM.body, 0, cy - nY*.11, cz - nZ*.11, Wb - .02, .22, .4, ang);                 // the sloped wedge the windscreen sits in
+    add(MTM.dark, 0, cy + nY*.004, cz + nZ*.004, Wb - .06, .012, .38, ang);              // the windscreen's frame
+    add(MTM.glass, 0, cy + nY*.01, cz + nZ*.01, Wb - .18, .012, .32, ang);               // the windscreen, lit
+    add(MTM.dark, 0, cy + nY*.016, cz + nZ*.016, .02, .012, .32, ang);                  // its centre post
+    for (const x of [-.15, .17]) add(MTM.sil, x, cy + nY*.017 - .02, cz + nZ*.017 - .03, .1, .006, .1, ang);   // the drivers, dark against the lit cab
+    for (const s of [-1, 1]) add(MTM.belt, s*(Wb/2 - .005), cy - nY*.05, cz - nZ*.05, .008, .02, .4, ang);
+    add(MTM.body, 0, y0 + H - .07, zn + .02, Wb - .06, .14, .1);                          // the cap
+    add(MTM.dark, 0, y0 + H - .07, zn + .075, .36, .07, .012); add(MTM.glass, 0, y0 + H - .07, zn + .082, .32, .045, .006);   // the destination board
+    for (const s of [-1, 1]){ add(MTM.dark, s*.26, y0 + .3, zn + .362, .16, .07, .01); add(MTM.head, s*.24, y0 + .3, zn + .368, .07, .04, .006); add(MTM.head, s*.31, y0 + .3, zn + .368, .04, .04, .006); }   // the headlights
+    add(MTM.belt, 0, y0 + .16, zn + .365, Wb - .2, .025, .008);                           // the green strip across the front
+    add(MTM.dark, 0, y0 - .02, zn + .32, Wb - .2, .1, .14);                               // the coupler skirt
+    add(MTM.body2, 0, y0 + .04, zn + .385, .14, .06, .04);
   }
   return g;
 }
@@ -380,7 +429,8 @@ function mtPath(l){
   for (const p of S){ X.push(p.x); Y.push(p.y); Z.push(p.z); }
   for (let q = 1; q < S.length; q++) cum.push(cum[q - 1] + Math.hypot(X[q] - X[q - 1], Z[q] - Z[q - 1]));
   const sAt = (k, u) => { for (let q = 0; q < S.length; q++) if (S[q].k > k || (S[q].k === k && S[q].u >= u - 1e-6)) return cum[q]; return cum[cum.length - 1]; };
-  const stops = mtStops(l).map(k => ({ k, s: sAt(k, .5) }));
+  const len = cum[cum.length - 1], half = (MT_CARS*MT_CL + (MT_CARS - 1)*MT_GAP)/2 + .12;   // (at the ends, the train stops short enough to stay on the track)
+  const stops = mtStops(l).map(k => ({ k, s: Math.max(half, Math.min(len - half, sAt(k, .5))) }));
   return (l.path = { X: Float32Array.from(X), Y: Float32Array.from(Y), Z: Float32Array.from(Z), cum: Float32Array.from(cum), len: cum[cum.length - 1], stops });
 }
 function mtResetTrain(l){

@@ -171,8 +171,8 @@ const MTM = {
   green: toon(0x184010, { em: 0x5aff2a, kind: 'neon' }), green2: toon(0x284010, { em: 0xb0ff3a, kind: 'neon' }), board: toon(0x0c1a10, { em: 0x0e2a14, kind: 'trim' }),
   lit: toon(0x3a4a3a, { em: 0xd8ffe0, kind: 'lamp' }), tactile: toon(0xd9b43a),
   // the train
-  body: toon(0x7a828c), body2: toon(0x4c525a), dark: toon(0x1c1f24), win: toon(0x1a3a12, { em: 0x9aff6a, kind: 'window' }), glass: toon(0x183a22, { em: 0x2e7a3a, kind: 'window' }), glassHi: toon(0x6aa880),
-  head: toon(0x5a5a50, { em: 0xf0fff0, kind: 'lamp' }), sil: toon(0x0a1a0a), belt: toon(0x184010, { em: 0x5aff2a, kind: 'neon' }),
+  body: toon(0x7a828c), body2: toon(0x4c525a), dark: toon(0x1c1f24), win: toon(0x1a3a12, { em: 0x9aff6a, kind: 'window' }), glass: toon(0x183a22, { em: 0x267030, kind: 'window' }), glassHi: toon(0x2a5a34, { em: 0x9ae8a8, kind: 'window' }),
+  head: toon(0x5a5a50, { em: 0xf0fff0, kind: 'lamp' }), sil: toon(0x0a1a0a, { em: 0x0c2410, kind: 'window' }), belt: toon(0x184010, { em: 0x5aff2a, kind: 'neon' }),
 };
 const MT_GLASS = new THREE.MeshBasicMaterial({ color: 0x9aff7a, transparent: true, opacity: .12, depthWrite: false, side: THREE.DoubleSide }); MT_GLASS.userData.colorOnly = true;
 
@@ -396,26 +396,35 @@ function mtCarModel(cab, nose = 1){
     // the nose, after the reference: the body carried on and gently rounded off. Its roof curves down in a long arc into
     // a low, upright front, and its corners round in seen from above; the curved upper part is a wraparound windscreen
     // (green-tinted, lit), the lower part body with the headlights and a green strip. Lofted from sections along it.
-    const Ln = .36, N = 12, rt = .3, rp = .14, yb = y0 - .02;
+    const Ln = .36, N = 18, rt = .3, rp = .14, yb = y0 - .02, AR = 6;
     const sec = t => {   // the section at t (0 where it leaves the body, 1 at the tip): its outline, left side up, over the top, right side down
       const w = Wb/2 - rp*(1 - Math.sqrt(Math.max(0, 1 - t*t))), yt = y0 + H - rt*(1 - Math.sqrt(Math.max(0, 1 - t*t))), r = .1 - .04*t;
       const pts = [[-w, yb], [-w, y0 + .16], [-w, y0 + .19], [-w, y0 + .36], [-w, y0 + .4]];
-      for (let q = 0; q <= 4; q++){ const a = PI - q*PI/8; pts.push([-w + r + r*Math.cos(a), yt - r + r*Math.sin(a)]); }
-      for (let q = 0; q <= 4; q++){ const a = PI/2 - q*PI/8; pts.push([w - r + r*Math.cos(a), yt - r + r*Math.sin(a)]); }
+      for (let q = 0; q <= AR; q++){ const a = PI - q*PI/(2*AR); pts.push([-w + r + r*Math.cos(a), yt - r + r*Math.sin(a)]); }
+      pts.push([-.22, yt], [-.12, yt], [-.015, yt], [.015, yt], [.12, yt], [.22, yt]);   // (breaks across the top, for the frame and the glints)
+      for (let q = 0; q <= AR; q++){ const a = PI/2 - q*PI/(2*AR); pts.push([w - r + r*Math.cos(a), yt - r + r*Math.sin(a)]); }
       pts.push([w, y0 + .4], [w, y0 + .36], [w, y0 + .19], [w, y0 + .16], [w, yb]);
       return pts.map(([x, y]) => [x, y, zb1 + t*Ln]);
     };
     const S = []; for (let q = 0; q <= N; q++) S.push(sec(q/N));
-    const M = S[0].length, buf = { body: [], glass: [], dark: [], belt: [] };
-    const kindOf = (y, t) => y < y0 + .16 ? 'body' : y < y0 + .19 ? 'belt' : y < y0 + .36 ? 'body' : y < y0 + .4 ? 'dark' : t > .2 ? 'glass' : 'body';
+    const M = S[0].length, buf = { body: [], glass: [], dark: [], belt: [], hi: [], sil: [] }, G0 = .22, G1 = G0 + 1/N;
+    // what each patch is: the body, its green lines, the windscreen's dark frame, the glass, a glint across it, the drivers behind it
+    const kindOf = (y, t, x) => {
+      if (y < y0 + .16) return 'body'; if (y < y0 + .19) return 'belt'; if (y < y0 + .36) return 'body'; if (y < y0 + .4) return 'dark';
+      if (t < G0) return 'body'; if (t < G1) return y > y0 + .6 ? 'belt' : 'dark';               // the frame's top edge: a green line over the roof, dark down the sides
+      if (Math.abs(x) < .02 && y > y0 + .45) return 'dark';                                      // (the centre post, see below)
+      if (y > y0 + .6 && x < -.12 && x > -.22 && t > .4 && t < .7) return 'hi';                 // a glint
+      if (y > y0 + .5 && y < y0 + .62 && t > .72 && t < .9 && Math.abs(Math.abs(x) - .17) < .05) return 'sil';   // the drivers' heads and shoulders, dark against the lit cab
+      return 'glass';
+    };
     const quad = (k, A, B, C, D) => buf[k].push(...A, ...B, ...C, ...A, ...C, ...D);
     for (let q = 0; q < N; q++) for (let j = 0; j < M - 1; j++){
       const A = S[q][j], B = S[q + 1][j], C = S[q + 1][j + 1], D = S[q][j + 1];
-      quad(kindOf((A[1] + B[1] + C[1] + D[1])/4, (q + .5)/N), A, B, C, D);
+      quad(kindOf((A[1] + B[1] + C[1] + D[1])/4, (q + .5)/N, (A[0] + B[0] + C[0] + D[0])/4), A, B, C, D);
     }
     { const F = S[N]; for (let j = 0; j < (M >> 1) - 1; j++){ const a = F[j], b = F[j + 1], c = F[M - 2 - j], d = F[M - 1 - j];   // the front face, in bands across
-        quad(kindOf((a[1] + b[1])/2, 1), a, b, c, d); } }
-    const mat = { body: MTM.body, glass: MTM.glass, dark: MTM.dark, belt: MTM.belt };
+        quad(kindOf((a[1] + b[1])/2, 1, 1), a, b, c, d); } }
+    const mat = { body: MTM.body, glass: MTM.glass, dark: MTM.dark, belt: MTM.belt, hi: MTM.glassHi, sil: MTM.sil };
     for (const k in buf){ if (!buf[k].length) continue;
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(buf[k], 3)); geo.computeVertexNormals();
       const m = new THREE.Mesh(geo, mat[k]); if (nose < 0) m.rotation.y = PI; g.add(m); }
@@ -423,11 +432,11 @@ function mtCarModel(cab, nose = 1){
     const zt = zb1 + Ln, ytop = t => y0 + H - rt*(1 - Math.sqrt(Math.max(0, 1 - t*t)));
     for (let q = 1; q < N; q++){ const t0 = q/N, t1 = (q + 1)/N; const st = (x, a, b) => { const m = new THREE.Mesh(U.box, MTM.dark); const ya = ytop(a) + .006, yb2 = ytop(b) + .006, za = zb1 + a*Ln, zb2 = zb1 + b*Ln;
         m.position.set(x, (ya + yb2)/2, ((za + zb2)/2)*nose); m.scale.set(.025, .012, Math.hypot(zb2 - za, yb2 - ya) + .005); m.rotation.x = Math.atan2(ya - yb2, zb2 - za)*nose; g.add(m); };
-      if (t0 >= .2) st(0, t0, t1); }
+      }
     add(MTM.dark, 0, (y0 + .4 + ytop(1))/2, zt + .004, .025, ytop(1) - y0 - .4, .01);
-    add(MTM.glassHi, -.18, ytop(.6) + .004, zb1 + .6*Ln, .12, .01, .08, -.6);   // a glint of light on the glass
     // the headlights and the green strip across the front
-    for (const sx of [-1, 1]){ add(MTM.dark, sx*.2, y0 + .27, zt + .004, .17, .06, .01); add(MTM.head, sx*.17, y0 + .27, zt + .008, .08, .035, .006); add(MTM.head, sx*.25, y0 + .27, zt + .008, .04, .035, .006); }
+    for (const sx of [-1, 1]){ add(MTM.dark, sx*.2, y0 + .27, zt + .004, .19, .075, .012); add(MTM.head, sx*.165, y0 + .27, zt + .01, .08, .04, .006); add(MTM.head, sx*.25, y0 + .27, zt + .01, .04, .04, .006); add(MTM.belt, sx*.2, y0 + .227, zt + .009, .19, .01, .006); }
+    add(MTM.dark, 0, y0 + .27, zt + .004, .1, .06, .01); add(MTM.glass, 0, y0 + .27, zt + .009, .08, .035, .006);   // the line number between them
     add(MTM.dark, 0, y0 - .03, zt - .06, Wb - .34, .08, .12);   // the coupler's shroud
   }
   return g;

@@ -154,6 +154,7 @@ function roundedBox(w,h,d,r){
 }
 
 let buckets = new Map();
+let curCover = null;   // while a piece is collected: the solid blocks in it, as matrices (see hideCovered in world.js)
 // Each primitive is transformed straight into its material's vertex list (no per-primitive geometry objects),
 // which keeps generating a building quick enough to do mid-click.
 const _nm = new THREE.Matrix3();
@@ -187,6 +188,7 @@ function put(geo, mat, m){
   let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null, o: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
   const fid = b.f ? (DARK && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow)) : 0;
   const did = b.f ? 0 : detailId(geo, m), ord = b.f ? litOrder(m.elements[12], m.elements[13], m.elements[14]) : 0;   // lights are never dropped: they carry the look from far away
+  if (curCover && geo === U.box && did === 0 && atlasable(mat) && !mat.userData.colorOnly) curCover.push(m.elements.slice());   // a solid block: may hide what's inside it (see hideCovered)
   const P = geo.attributes.position.array, N = geo.attributes.normal ? geo.attributes.normal.array : null;
   const e = m.elements, ne = _nm.getNormalMatrix(m).elements, bp = b.p, bn = b.n;
   // each corner once (the shape's welded corners), and its triangles as indices into them: the same triangles in the same

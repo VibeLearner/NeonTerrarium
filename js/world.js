@@ -18,6 +18,13 @@ const SIDES4 = [[1,0],[-1,0],[0,1],[0,-1]];
 const world = new THREE.Group(); world.matrixAutoUpdate = false; scene.add(world); city = world;
 // Static pieces (plots, regions, their plants and glows) never move once built: their matrices are set once and left
 // alone, so the frame's world-matrix update skips them
+// A piece's hidden faces (see hideCovered) are left out of the views drawn from the camera, but the sun's shadow map still
+// draws them all (it draws shapes' far sides, and those faces have always darkened the sides of their block turned from the
+// sun a little): three calls onBeforeRender only for camera views, so the range is cut there and restored straight after.
+function hideBefore(r, s, c, g){ if (!g.userData.full) g.drawRange.count = g.userData.shown; }
+function hideAfter(r, s, c, g){ g.drawRange.count = Infinity; }
+// while a piece is swept in or out (sliced open), its hidden faces are drawn too
+function showHidden(view, on){ view.traverse(o => { const g = o.isMesh && o.geometry; if (g && g.userData.shown !== undefined) g.userData.full = on; }); }
 function freezeTree(g){ g.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; }); return g; }
 let connGroup = null, curPorts = null, EXT = 12;
 const camT = new THREE.Vector3(0, TARGET_Y, 0), camGoal = new THREE.Vector3(0, TARGET_Y, 0);
@@ -52,10 +59,69 @@ ATLAS.onBeforeCompile = sh => {
     .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = vEmis;');
 };
 const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m !== ATLAS;
+// Faces nobody can ever see: wholly and well inside one of the piece's solid blocks (a box's end sunk into a wall, a post
+// buried in a slab). From any angle the block is in front of them. A block only counts if it's always drawn (never thinned
+// out when zoomed out), opaque and a true box. (Faces pressed flat against a block's face are kept: in testing they still
+// changed a few pixels.)
+// The hidden triangles go to the end of the bucket's list (hid: how many); they're left out of drawing but kept, so a
+// building's sweep in or out (which slices it open) can draw them, and the walking maps still see every triangle.
+const HIDE_DEEP = .01;   // how far inside a block a face must be to count as hidden (world units)
+// the piece's blocks, ready for testing (once per piece): their inverse matrices, bounds and a grid to find them by
+function prepCovers(covers){
+  if (!covers || !covers.length) return null;
+  const G = 1.0, grid = new Map(), key = (x, y, z) => ((x + 2048)*4096 + (y + 2048))*4096 + (z + 2048);
+  // (only true boxes: square corners, not mirrored; a slanted or flipped one is left out rather than reasoned about)
+  covers = covers.filter(e => { const d01 = e[0]*e[4] + e[1]*e[5] + e[2]*e[6], d02 = e[0]*e[8] + e[1]*e[9] + e[2]*e[10], d12 = e[4]*e[8] + e[5]*e[9] + e[6]*e[10];
+    const s0 = Math.hypot(e[0], e[1], e[2]), s1 = Math.hypot(e[4], e[5], e[6]), s2 = Math.hypot(e[8], e[9], e[10]);
+    const det = e[0]*(e[5]*e[10] - e[6]*e[9]) - e[4]*(e[1]*e[10] - e[2]*e[9]) + e[8]*(e[1]*e[6] - e[2]*e[5]);
+    return s0 > 0 && s1 > 0 && s2 > 0 && det > 0 && Math.abs(d01) < 1e-6*s0*s1 && Math.abs(d02) < 1e-6*s0*s2 && Math.abs(d12) < 1e-6*s1*s2; });
+  if (!covers.length) return null;
+  const cv = covers.map(e => {
+    const inv = new THREE.Matrix4().fromArray(e).invert().elements, sx = Math.hypot(e[0], e[1], e[2]), sy = Math.hypot(e[4], e[5], e[6]), sz = Math.hypot(e[8], e[9], e[10]);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (let q = 0; q < 8; q++){ const a = q & 1 ? .5 : -.5, c = q & 2 ? .5 : -.5, d = q & 4 ? .5 : -.5;
+      const x = e[0]*a + e[4]*c + e[8]*d + e[12], y = e[1]*a + e[5]*c + e[9]*d + e[13], z = e[2]*a + e[6]*c + e[10]*d + e[14];
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    return { inv, lim: [.5 - HIDE_DEEP/(sx || 1), .5 - HIDE_DEEP/(sy || 1), .5 - HIDE_DEEP/(sz || 1)], box: [x0, x1, y0, y1, z0, z1] };
+  });
+  cv.forEach((c, k) => { const [x0, x1, y0, y1, z0, z1] = c.box;
+    for (let x = Math.floor(x0/G); x <= Math.floor(x1/G); x++) for (let y = Math.floor(y0/G); y <= Math.floor(y1/G); y++) for (let z = Math.floor(z0/G); z <= Math.floor(z1/G); z++){
+      const h = key(x, y, z); let l = grid.get(h); if (!l) grid.set(h, l = []); l.push(k); } });
+  return { cv, grid, key, G };
+}
+function hideCovered(b, C){
+  b.hid = 0;
+  if (!C || !b.i.length) return;
+  const { cv, grid, key, G } = C;
+  const P = b.p, I = b.i, n = I.length, out = new Array(n), hid = [];
+  let nv = 0;
+  for (let t = 0; t + 2 < n; t += 3){
+    const a3 = I[t]*3, b3 = I[t + 1]*3, c3 = I[t + 2]*3;
+    let hidden = false;
+    const l = grid.get(key(Math.floor((P[a3] + P[b3] + P[c3])/3/G), Math.floor((P[a3 + 1] + P[b3 + 1] + P[c3 + 1])/3/G), Math.floor((P[a3 + 2] + P[b3 + 2] + P[c3 + 2])/3/G)));
+    if (l){
+      const tx0 = Math.min(P[a3], P[b3], P[c3]), tx1 = Math.max(P[a3], P[b3], P[c3]), ty0 = Math.min(P[a3 + 1], P[b3 + 1], P[c3 + 1]), ty1 = Math.max(P[a3 + 1], P[b3 + 1], P[c3 + 1]), tz0 = Math.min(P[a3 + 2], P[b3 + 2], P[c3 + 2]), tz1 = Math.max(P[a3 + 2], P[b3 + 2], P[c3 + 2]);
+      for (let li = 0; li < l.length && !hidden; li++){
+        const c = cv[l[li]], bx = c.box;
+        if (tx0 < bx[0] || tx1 > bx[1] || ty0 < bx[2] || ty1 > bx[3] || tz0 < bx[4] || tz1 > bx[5]) continue;   // (not even within its bounds)
+        // every corner well inside (something just under a block's skin can still show through it, so that's kept)
+        const m = c.inv, lim = c.lim; let ok = true;
+        for (let q = 0; q < 3 && ok; q++){ const o = q === 0 ? a3 : q === 1 ? b3 : c3, x = P[o], y = P[o + 1], z = P[o + 2];
+          for (let a = 0; a < 3; a++) if (Math.abs(m[a]*x + m[4 + a]*y + m[8 + a]*z + m[12 + a]) > lim[a]){ ok = false; break; } }
+        hidden = ok;
+      }
+    }
+    if (hidden) hid.push(I[t], I[t + 1], I[t + 2]); else { out[nv++] = I[t]; out[nv++] = I[t + 1]; out[nv++] = I[t + 2]; }
+  }
+  if (!hid.length) return;
+  for (let q = 0; q < hid.length; q++) out[nv + q] = hid[q];
+  b.i = out; b.hid = hid.length;
+}
 function collect(fn){
-  buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {}; curSpots = [];
+  buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {}; curSpots = []; curCover = [];
   for (const k in SPR.size) FOL_LIST[k] = [];
   fn();
+  const covers = curCover; curCover = null;
   const geo = new Map();
   let nAt = 0;
   for (const [mat, b] of buckets){ if (atlasable(mat)) nAt += b.p.length/3; else geo.set(mat, bucketGeometry(b)); }
@@ -74,14 +140,20 @@ function collect(fn){
       fine.set(b.d, o);
       o += n;
     }
-    // the triangles: each bucket's indices, moved along by where its corners landed
-    let ni = 0; for (const [mat, b] of buckets) if (atlasable(mat)){ bucketIndexUpTo(b); ni += b.i.length; }
+    // the triangles: each bucket's indices, moved along by where its corners landed; first every bucket's visible ones (in
+    // their order), then the hidden ones (drawn only while the piece is being swept in or out: see hideCovered)
+    let ni = 0, nh = 0; const C = prepCovers(covers); for (const [mat, b] of buckets) if (atlasable(mat)){ bucketIndexUpTo(b); hideCovered(b, C); ni += b.i.length; nh += b.hid; }
     const ix = nAt > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
-    { let o2 = 0, k = 0; for (const [mat, b] of buckets){ if (!atlasable(mat)) continue; const I = b.i; for (let q = 0; q < I.length; q++) ix[k++] = I[q] + o2; o2 += b.p.length/3; } }
+    { let k = 0, kh = ni - nh;
+      let o2 = 0; for (const [mat, b] of buckets){ if (!atlasable(mat)) continue; const I = b.i, nv = I.length - b.hid;
+        for (let q = 0; q < nv; q++) ix[k++] = I[q] + o2;
+        for (let q = nv; q < I.length; q++) ix[kh++] = I[q] + o2;
+        o2 += b.p.length/3; } }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3)); g.setIndex(new THREE.BufferAttribute(ix, 1));
     g.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); g.setAttribute('aEm', new THREE.BufferAttribute(em, 4, true));
     g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aFine', new THREE.BufferAttribute(fine, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1, true));
+    if (nh) g.userData.shown = ni - nh;   // (the hidden triangles come after this many indices: see hideBefore)
     geo.set(ATLAS, g);
   }
   for (const g of geo.values()) g.computeBoundingSphere();
@@ -952,6 +1024,7 @@ function cellView(c){
   for (const [m, geo] of c.data.geo){
     const mesh = new THREE.Mesh(geo, m);
     if (m.userData.colorOnly){ mesh.layers.set(1); mesh.renderOrder = 2; } else { mesh.castShadow = !m.userData.noCast; mesh.receiveShadow = true; }   // see-through glass: colour pass only
+    if (geo.userData.shown !== undefined){ mesh.onBeforeRender = hideBefore; mesh.onAfterRender = hideAfter; }
     g.add(mesh);
   }
   world.add(freezeTree(g)); c.view = g;
@@ -1348,6 +1421,7 @@ function startAnim(c, kind, y0, y1, zone, w, old, sound, opts = {}){
   const u = { plane: new THREE.Plane(new THREE.Vector3(0, -1, 0), kind === 'build' ? y0 : y1), h: { value: y0 }, col: { value: col.clone().multiplyScalar(1.6) }, on: { value: 1 } };
   const mats = animMaterials(u);
   view.traverse(o => { if (!o.isMesh) return; o.userData.baseMat = o.material; o.userData.baseLayer = o.layers.mask; o.material = o.material === ATLAS ? mats.atlas : o.material; if (!o.material.userData.colorOnly) o.layers.set(3); });
+  showHidden(view, true);   // (sliced open by the sweep: the faces normally hidden inside can show)
   if (kind === 'remove' && c.view) c.view.visible = false;   // what's left appears when the sweep is done
   const lineMat = () => new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
   const box = new THREE.LineSegments(OUTLINE_GEO, lineMat()), scan = new THREE.LineSegments(OUTLINE_GEO, lineMat());
@@ -1418,6 +1492,7 @@ function endAnim(i){
   const a = anims[i]; anims.splice(i, 1);
   for (const l of a.lines){ scene.remove(l); l.material.dispose(); }
   a.view.traverse(o => { if (o.isMesh){ o.material = o.userData.baseMat || o.material; if (o.userData.baseLayer !== undefined) o.layers.mask = o.userData.baseLayer; else o.layers.set(0); } });
+  showHidden(a.view, false);
   a.mats.atlas.dispose(); a.mats.nrm.dispose();
   if (a.kind === 'remove'){ dropView(a.old); if (a.c.view) a.c.view.visible = true; }
   if (a.held) releaseRegion(a.reg);

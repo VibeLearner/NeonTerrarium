@@ -150,6 +150,23 @@ function buildCar(kind, forcedBody){
   }
   return out;
 }
+// A car's fixed parts (everything but its tilting pads and its glows) joined into one mesh per material, so a car is a
+// handful of draws instead of forty or more. Same materials, same shapes: each part's own placement is baked into its copy.
+function foldParts(g){
+  g.updateMatrixWorld(true);
+  const byMat = new Map();
+  for (const o of g.children) if (o.isMesh && !o.isInstancedMesh && !o.material.map){ const k = o.material; let l = byMat.get(k); if (!l) byMat.set(k, l = []); l.push(o); }
+  for (const [mat, list] of byMat){
+    if (list.length < 2 || list.some(o => o.layers.mask !== list[0].layers.mask || o.castShadow !== list[0].castShadow || o.receiveShadow !== list[0].receiveShadow || o.renderOrder !== list[0].renderOrder)) continue;
+    const geos = list.map(o => { let q = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+      for (const n of Object.keys(q.attributes)) if (n !== 'position' && n !== 'normal') q.deleteAttribute(n);
+      q.applyMatrix4(o.matrix); return q; });
+    const merged = THREE.BufferGeometryUtils.mergeBufferGeometries(geos, false); geos.forEach(q => q.dispose());
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.layers.mask = list[0].layers.mask;
+    g.add(mesh); for (const o of list) g.remove(o);
+  }
+}
 const tripCars = [];
 let skyTop = 13;
 (function buildCars(){
@@ -160,7 +177,7 @@ let skyTop = 13;
   ];
   const kinds = ['std','taxi','lux','beat','van','taxi','std','beat','lux','taxi','std','van'];
   // six cars keep circling the island; the rest make trips
-  for (let i=0;i<5;i++){ const c = buildCar(kinds[(i+6)%kinds.length]); c.g.visible = false; scene.add(c.g); tripCars.push({ ...c, phase:'away', timer: 2 + i*3.5, pad:null, from:new THREE.Vector3(), to:new THREE.Vector3(), k:0, len:1, bank:0 }); }
+  for (let i=0;i<5;i++){ const c = buildCar(kinds[(i+6)%kinds.length]); foldParts(c.g); c.g.visible = false; scene.add(c.g); tripCars.push({ ...c, phase:'away', timer: 2 + i*3.5, pad:null, from:new THREE.Vector3(), to:new THREE.Vector3(), k:0, len:1, bank:0 }); }
 })();
 
 /* ---------- delivery drones flying between rooftop docks ---------- */
@@ -179,6 +196,7 @@ for (let i=0;i<DRONES_MAX;i++){
   const amber = new THREE.Mesh(U.box, M.neonAmber); amber.scale.set(.05,.05,.05); amber.position.set(0,.08,.15); g.add(amber);
   const red = new THREE.Mesh(U.box, redLight); red.scale.set(.06,.06,.06); red.position.set(0,.09,-.15); g.add(red);
   const redGlow = new THREE.Sprite(GLOW.red); redGlow.scale.set(.55,.55,1); redGlow.position.set(0,.1,-.16); redGlow.layers.set(1); g.add(redGlow);
+  foldParts(g);   // (its arms and rotors: one mesh each set; the blinking light keeps its own)
   g.visible = false; scene.add(g);
   drones.push({ idx: i, g, red, redGlow, phase:'inside', timer:0, at:0, to:0, k:0, cruise:0, blink: Math.random()*2 });
 }

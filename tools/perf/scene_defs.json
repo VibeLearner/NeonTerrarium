@@ -37,5 +37,15 @@
   "edits": [
    "const m = spawnMega('market', cells.get(ckey(0, 0))); return !!m;"
   ]
+ },
+ {
+  "name": "dense",
+  "cam": {
+   "x": 0,
+   "z": 0,
+   "zoom": 26,
+   "yaw": 0.7
+  },
+  "build": "maybeSpawnMegas = () => {}; const Z = ['low','mid','ind','high','low','mid','ind']; let n = 0; for (let i=-9;i<=9;i++) for (let j=-9;j<=9;j++) if (!cells.has(ckey(i,j))) addPlatform(i, j, null); for (const a of [...anims]) finishAnimsOn(a.c); const c0 = cells.get(ckey(0,0)); const megs = []; for (const k of ['logistics','greenhouse','market','spire','bathhouse']){ const m = spawnMega(k, c0); for (const a of [...anims]) finishAnimsOn(a.c); megs.push(k + (m ? '@' + m.i + ',' + m.j : ' FAILED')); } for (let i=-9;i<=9;i++) for (let j=-9;j<=9;j++){ if (i % 4 === 0 || j % 5 === 0) continue; const c = cells.get(ckey(i,j)); if (!c || c.mega) continue; const z = Z[(((i*7 + j*13) % Z.length) + Z.length) % Z.length], h = 1 + ((((i*i + j*3) % 3) + 3) % 3); for (let q = 0; q < h; q++) addSection(c, q && z === 'high' ? 'high' : z); n++; } for (const a of [...anims]) finishAnimsOn(a.c); return [n + ' built plots', cells.size + ' plots', megs.join(' ')];"
  }
 ]

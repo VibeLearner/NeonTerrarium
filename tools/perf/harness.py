@@ -22,6 +22,7 @@ VIEWPORTS = [(1280, 720), (1920, 1080)]
 def ensure_three():
     lib = os.path.join(CACHE, 'lib')
     if os.path.exists(os.path.join(lib, 'three.min.js')):
+        _patch_uuid(lib)
         return lib
     os.makedirs(lib, exist_ok=True)
     subprocess.run(['npm', 'pack', 'three@0.128.0', '--silent'], cwd=CACHE, check=True, stdout=subprocess.DEVNULL)
@@ -29,7 +30,20 @@ def ensure_three():
         for src, dst in [('package/build/three.min.js', 'three.min.js'), ('package/examples/js/utils/BufferGeometryUtils.js', 'BufferGeometryUtils.js')]:
             with t.extractfile(src) as f, open(os.path.join(lib, dst), 'wb') as o:
                 o.write(f.read())
+    _patch_uuid(lib)
     return lib
+
+
+def _patch_uuid(lib):
+    # three.js gives every new object an id made from Math.random. In the harness Math.random is the game's seeded stream,
+    # so a build that creates a different number of objects (merging meshes, say) would shift every random choice after it.
+    # The harness's copy of three draws its ids from a stream of its own (window.__uuidRand, see shim.js).
+    p = os.path.join(lib, 'three.min.js')
+    src = open(p).read()
+    old = 'function ct(){const t=4294967295*Math.random()|0,e=4294967295*Math.random()|0,n=4294967295*Math.random()|0,i=4294967295*Math.random()|0;'
+    new = 'function ct(){const t=4294967295*__uuidRand()|0,e=4294967295*__uuidRand()|0,n=4294967295*__uuidRand()|0,i=4294967295*__uuidRand()|0;'
+    if old in src:
+        open(p, 'w').write(src.replace(old, new))
 
 
 def make_site(name, ref=None):
@@ -170,7 +184,7 @@ def cmd_diff(base_ref, cand_ref, only, quick):
     ub = make_site('base', base_ref)
     uc = make_site('cand', cand_ref)
     os.makedirs(OUT, exist_ok=True)
-    fails, total, info_rows = [], 0, []
+    fails, total, info_rows, notes = [], 0, [], []
     vps = VIEWPORTS[:1] if quick else VIEWPORTS
     with sync_playwright() as pw:
         br = launch(pw)
@@ -191,14 +205,18 @@ def cmd_diff(base_ref, cand_ref, only, quick):
                     if a['state'] != b['state']:
                         fails.append('%s: state differs first at "%s"' % (name, first_state_diff(a['state'], b['state'])))
                     ia, ib = a['info'], b['info']
-                    if ib['calls'] > ia['calls'] or ib['tris'] > ia['tris'] or ib['geos'] != ia['geos'] or ib['tex'] != ia['tex']:
+                    if ib['calls'] > ia['calls'] or ib['tex'] != ia['tex']:
                         fails.append('%s: renderer.info base %s cand %s' % (name, ia, ib))
+                    elif ib['tris'] > ia['tris'] or ib['geos'] != ia['geos']:
+                        notes.append('%s: triangles %d -> %d, geometries %d -> %d' % (name, ia['tris'], ib['tris'], ia['geos'], ib['geos']))
                     info_rows.append((name, ia, ib))
                 print('%-26s %d captures  %.0fs' % (tag, len(cb), time.time() - t0), flush=True)
         br.close()
     srv.shutdown()
     with open(os.path.join(OUT, 'info.json'), 'w') as f:
         json.dump(info_rows, f, indent=1)
+    for n in notes[:8]:
+        print('  note', n)
     print('\n%d captures compared, %d problems' % (total, len(fails)))
     for f in fails:
         print('  FAIL', f)

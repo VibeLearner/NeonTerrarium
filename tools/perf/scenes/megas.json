@@ -18,5 +18,6 @@
  },
  "edits": [
   "const m = spawnMega('market', cells.get(ckey(0, 0))); return !!m;"
- ]
+ ],
+ "rush": null
 }

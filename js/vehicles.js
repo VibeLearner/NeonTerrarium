@@ -163,6 +163,7 @@ function foldParts(g){
       q.applyMatrix4(o.matrix); return q; });
     const merged = THREE.BufferGeometryUtils.mergeBufferGeometries(geos, false); geos.forEach(q => q.dispose());
     if (!merged) continue;
+    merged.userData.folded = true;
     const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.layers.mask = list[0].layers.mask;
     g.add(mesh); for (const o of list) g.remove(o);
   }

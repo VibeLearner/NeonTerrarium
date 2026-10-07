@@ -620,7 +620,14 @@ function makePerson(id, home){
            speed: PPL_SPEED*span(u('speed'), .85, 1.15), lane: span(u('lane'), -.08, .32), wide: span(u('wide'), -.75, 1.05),
            wake, bed: (22 + 6*u('bed')**2) % 24, outgoing: span(u('out'), .25, .9), nightShift: u('night'),
            workS: span(u('ws'), 7.5, 9.5), workLen: span(u('wl'), 7.5, 9),
-           at: home, until: 0, walk: null, spot: null, x: 0, z: 0, flip: 1, phase: u('phase')*10 };
+           at: home, until: 0, walk: null, spot: null, x: 0, z: 0, flip: 1, phase: u('phase')*10,
+           // Everything a person can pick up later, declared up front (not set yet: undefined, read the same as absent), so
+           // every person has the same shape and the per-frame loops over thousands of them don't slow down on mixed shapes.
+           fresh: undefined, visitor: undefined, stall: undefined, fixedJob: undefined, leaveAt: undefined, cop: undefined, archivist: undefined,
+           guard: undefined, guardShift: undefined, nightWorker: undefined, ws: undefined, wlen: undefined, walkedFor: undefined, chain: undefined,
+           patrol: undefined, metro: undefined, metroPlan: undefined, ride: undefined, club: undefined, clubbing: undefined, rush: undefined,
+           hurry: undefined, callout: undefined, gh: undefined, ghWalk: undefined, gy: undefined, dx: undefined, dz: undefined, pause: undefined,
+           bumpCD: undefined, emo: undefined, emoUntil: undefined, angry: undefined, fed: undefined, tries: undefined, gone: undefined };
 }
 function syncResidents(){
   const keep = new Set();
@@ -852,11 +859,20 @@ function startTrip(p, toId){
 }
 // Police officers on duty walk a beat: from the station (or where they stand) to a street crossing a few blocks
 // away, where they stop and scan for a while, then on to the next. Now and then they head back to the station.
+// Which segment of its path a walk is on: the first k >= 1 whose distance along reaches w.s (or the last). Walks only go
+// forward, so the search carries on from where it last stopped (any segment before that one can't be it), instead of
+// starting from the beginning of a long trip every frame; if w.s ever went back, it starts over.
+function walkSeg(w){
+  const C = w.cum, n = C.length - 1; let k = w._k || 1;
+  if (k > n || (k > 1 && C[k - 1] >= w.s)) k = 1;
+  while (k < n && C[k] < w.s) k++;
+  w._k = k; return k;
+}
 function startPatrol(p, forced){
   const st = places.get(p.job); if (!st || !patrolNodes.length) return false;
   let a, head = [], dA = null;
   if (p.walk && forced){   // called away mid-walk: keep to the current path as far as its next street crossing, then turn
-    const w = p.walk; let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
+    const w = p.walk; let k = walkSeg(w);
     const bp = w.base || w.pts;   // the route's own points (the walked line may be set off to one side)
     let j = k; while (j < bp.length && !crossAt.has(posKey(bp[j][0], bp[j][1]))) j++;
     if (j >= bp.length) return false;
@@ -1081,7 +1097,7 @@ function updateBots(dt, t){
       b.cap = { x: d.wall.x + d.n[0]*.14, z: d.wall.z + d.n[1]*.14 };
       continue;
     }
-    let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
+    let k = walkSeg(w);
     const a = w.pts[k - 1], c = w.pts[k], seg = w.cum[k] - w.cum[k - 1] || 1, u = (w.s - w.cum[k - 1])/seg;
     b.x = a[0] + (c[0] - a[0])*u; b.z = a[1] + (c[1] - a[1])*u; b.dx = c[0] - a[0]; b.dz = c[1] - a[1];
     const sd = b.dx*_camR.x + b.dz*_camR.z; if (Math.abs(sd) > 1e-3) b.flip = sd < 0 ? -1 : 1;
@@ -1180,7 +1196,7 @@ function updateLurkers(dt, t){
           // tagged by a drone: no melting away now, they crouch in a doorway and wait for it to blow over
           if (L.tagged){ L.state = 'hide'; L.fade = 1; L.hideUntil = t + 60; } else L.state = 'away';
           break; }
-        let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
+        let k = walkSeg(w);
         const a = w.pts[k - 1], c = w.pts[k], seg = w.cum[k] - w.cum[k - 1] || 1, u = (w.s - w.cum[k - 1])/seg;
         L.x = a[0] + (c[0] - a[0])*u; L.z = a[1] + (c[1] - a[1])*u; L.dx = c[0] - a[0]; L.dz = c[1] - a[1];
         L.fade = L.tagged ? 1 : Math.min(1, (w.len - w.s)/.8);   // melts into the dark at the end
@@ -1573,11 +1589,57 @@ function emote(p, kind, dur = 2.2){ p.emo = EMO[kind]; p.emoUntil = pplNow + dur
 // bumping again as they pass.
 const _bumpGrid = new Map(), _bumpMovers = [];
 const bumpKey = (gx, gz) => (gx + 8192)*16384 + (gz + 8192);   // (a number per half-unit square: no strings to build every frame)
+// Who bumps into whom, found with a flat grid of half-unit squares over the walkers' bounds: each square's walkers are
+// listed in walker order (a counting sort), so every walker meets its neighbours in exactly the order the square-by-square
+// lists below would give, without a lookup per square. (A very spread-out or broken position falls back to those lists.)
+let _bOrd = new Int32Array(64), _bGX = new Int32Array(64), _bGZ = new Int32Array(64), _bStart = new Int32Array(64), _bFill = new Int32Array(64);
 function checkBumps(t){
-  for (const l of _bumpGrid.values()) l.length = 0;   // (the squares' lists are kept and emptied, not remade)
   const movers = _bumpMovers; movers.length = 0;
   for (const p of pplList){ const w = p.walk; if (!w || w.s < w.safe0 || w.s > w.safe1 || p.pause > t) continue; movers.push(p); }
   for (const b of bots) if (b.walk && b.state === 'go' && !(b.pause > t) && b.walk.s > .6 && b.walk.len - b.walk.s > .6) movers.push(b);
+  const n = movers.length; if (!n) return;
+  if (_bGX.length < n){ _bGX = new Int32Array(n*2); _bGZ = new Int32Array(n*2); _bOrd = new Int32Array(n*2); }
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (let i = 0; i < n; i++){ const m = movers[i], gx = Math.floor(m.x*2), gz = Math.floor(m.z*2);
+    if (!Number.isFinite(gx) || !Number.isFinite(gz)) return checkBumpsLists(t, movers);
+    _bGX[i] = gx; _bGZ[i] = gz; if (gx < x0) x0 = gx; if (gx > x1) x1 = gx; if (gz < z0) z0 = gz; if (gz > z1) z1 = gz; }
+  const GW = x1 - x0 + 1, GH = z1 - z0 + 1, NC = GW*GH;
+  if (NC > 4e6) return checkBumpsLists(t, movers);
+  if (_bStart.length < NC + 1){ _bStart = new Int32Array((NC + 1)*2); _bFill = new Int32Array((NC + 1)*2); }
+  const st = _bStart, fill = _bFill, ord = _bOrd; st.fill(0, 0, NC + 1);
+  for (let i = 0; i < n; i++) st[(_bGZ[i] - z0)*GW + (_bGX[i] - x0) + 1]++;
+  for (let c = 0; c < NC; c++) st[c + 1] += st[c];
+  fill.set(st.subarray(0, NC), 0);
+  for (let i = 0; i < n; i++) ord[fill[(_bGZ[i] - z0)*GW + (_bGX[i] - x0)]++] = i;
+  for (let i = 0; i < n; i++){
+    const m = movers[i];
+    if (m.bumpCD > t) continue;
+    const gx = _bGX[i], gz = _bGZ[i];
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++){
+      const cx = gx + dx - x0, cz = gz + dz - z0; if (cx < 0 || cz < 0 || cx >= GW || cz >= GH) continue;
+      const c = cz*GW + cx, e = st[c + 1];
+      for (let q = st[c]; q < e; q++) bumpPair(t, m, movers[ord[q]]);
+    }
+  }
+}
+// the two walkers meet: most squeeze past; some stop, startled
+function bumpPair(t, m, o){
+  if (o === m || o.bumpCD > t || m.bumpCD > t) return;
+  if ((m.x - o.x)**2 + (m.z - o.z)**2 > .27*.27) return;
+  // only head-on or crossing paths, not someone walking the same way just behind
+  if (((m.dx || 0)*(o.dx || 0) + (m.dz || 0)*(o.dz || 0)) > 0) return;
+  if (pplRand() > .55){ m.bumpCD = o.bumpCD = t + 3; return; }   // most of the time they just squeeze past
+  m.pause = o.pause = t + .9; m.bumpCD = o.bumpCD = t + 6;
+  for (const [a, other] of [[m, o], [o, m]]){
+    if (a.gait !== undefined){ a.emo = EMO.quest; a.emoUntil = t + 1.6; continue; }   // a bot: puzzled beep
+    if (other.gait !== undefined){ emote(a, 'bang', 1.6); continue; }
+    if (a.cop){ emote(a, 'anger', 1.8); a.angry = t + .9; continue; }
+    const r = pplRand(); emote(a, r < .35 ? 'sweat' : r < .6 ? 'bang' : r < .8 ? 'anger' : 'quest', 1.8);
+  }
+}
+// the same, square by square through lists (the fallback)
+function checkBumpsLists(t, movers){
+  for (const l of _bumpGrid.values()) l.length = 0;   // (the squares' lists are kept and emptied, not remade)
   if (_bumpGrid.size > 4096) _bumpGrid.clear();
   for (const m of movers){ const k = bumpKey(Math.floor(m.x*2), Math.floor(m.z*2)); let l = _bumpGrid.get(k); if (!l) _bumpGrid.set(k, l = []); l.push(m); }
   for (const m of movers){
@@ -1585,20 +1647,7 @@ function checkBumps(t){
     const gx = Math.floor(m.x*2), gz = Math.floor(m.z*2);
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++){
       const l = _bumpGrid.get(bumpKey(gx + dx, gz + dz)); if (!l || !l.length) continue;
-      for (const o of l){
-        if (o === m || o.bumpCD > t || m.bumpCD > t) continue;
-        if ((m.x - o.x)**2 + (m.z - o.z)**2 > .27*.27) continue;
-        // only head-on or crossing paths, not someone walking the same way just behind
-        if (((m.dx || 0)*(o.dx || 0) + (m.dz || 0)*(o.dz || 0)) > 0) continue;
-        if (pplRand() > .55){ m.bumpCD = o.bumpCD = t + 3; continue; }   // most of the time they just squeeze past
-        m.pause = o.pause = t + .9; m.bumpCD = o.bumpCD = t + 6;
-        for (const [a, other] of [[m, o], [o, m]]){
-          if (a.gait !== undefined){ a.emo = EMO.quest; a.emoUntil = t + 1.6; continue; }   // a bot: puzzled beep
-          if (other.gait !== undefined){ emote(a, 'bang', 1.6); continue; }
-          if (a.cop){ emote(a, 'anger', 1.8); a.angry = t + .9; continue; }
-          const r = pplRand(); emote(a, r < .35 ? 'sweat' : r < .6 ? 'bang' : r < .8 ? 'anger' : 'quest', 1.8);
-        }
-      }
+      for (const o of l) bumpPair(t, m, o);
     }
   }
 }
@@ -1724,7 +1773,7 @@ function updatePeople(dt, t){
       else if (w.s >= w.len){ arrive(p); if (!p.spot && !p.patrol) continue; }
       else {
         walking = true;
-        let k = 1; while (k < w.cum.length - 1 && w.cum[k] < w.s) k++;
+        let k = walkSeg(w);
         const a = w.pts[k - 1], b = w.pts[k], seg = w.cum[k] - w.cum[k - 1] || 1, u = (w.s - w.cum[k - 1])/seg;
         p.x = a[0] + (b[0] - a[0])*u; p.z = a[1] + (b[1] - a[1])*u; p.dx = b[0] - a[0]; p.dz = b[1] - a[1];
         // a gentle sway across their own line as they walk (the line itself is set per trip: see spreadPath)

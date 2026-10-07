@@ -6,9 +6,16 @@ Proves a performance change leaves every pixel and every simulation decision exa
 python3 tools/perf/harness.py self                # the working tree against itself: must report 0 problems
 python3 tools/perf/harness.py diff --base HEAD    # HEAD vs the working tree
 python3 tools/perf/harness.py diff --quick --only city   # one viewport, one scene (about 3 minutes)
+python3 tools/perf/harness.py diff --base A --ref B      # two commits (no working tree)
+PERF_STEPS=noon_f1,night_zoom_out python3 tools/perf/harness.py diff --quick --only maxcity   # only these steps
 python3 tools/perf/harness.py time --ref HEAD --frames 120
 python3 tools/perf/harness.py scenes              # rebuild scenes/*.json from scene_defs.json
+python3 tools/perf/maxcity_gen.py                 # rebuild scenes/maxcity.json (the biggest city: see below)
 ```
+
+`maxcity` is the stress scene: the whole view at the furthest zoom filled with buildings of all four zones, two of each
+megastructure, two metros and three highways (about 10,000 people). Its full script takes over an hour here, so run it
+with `PERF_STEPS`.
 
 Needs Python Playwright with Chromium and PIL. three.js r128 is fetched once with `npm pack` into `.cache/` (gitignored).
 

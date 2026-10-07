@@ -56,3 +56,39 @@ pass. Differences under about 15% are within run-to-run noise.
   locals into module state, for no measurable gain.
 - **Pod lift `Map` and `ckey` strings** (`updateLifts`): only riders in pods are grouped, a handful per frame.
 - **Metro door matrix** (metro.js, `mtDrawDoors`): this code sits after an early `return` and never runs.
+
+# Round 2: the biggest city (2026-10-08)
+
+Scene `maxcity`: the view at the furthest zoom filled with buildings of all four zones, two of each megastructure, two
+metros and three highways, about 10,200 people. Numbers are from the same SwiftShader setup as above. Draw calls and
+triangles are exact counts; times are medians.
+
+| Measure | Before | After | Change |
+| --- | ---: | ---: | ---: |
+| Draws, colour pass, furthest zoom | 1931 | 1352 | -30% |
+| Draws, normal pass, furthest zoom | 845 | 690 | -18% |
+| Draws, foliage pass | 204 | 36 | -82% |
+| Draws, colour pass, close up (zoom 6) | 724 | 326 | -55% |
+| Triangles, colour pass, furthest zoom | 16.52M | 16.52M | 0% |
+| Triangles, colour pass, close up | 3.264M | 3.271M | +0.2% |
+| People update, real clock (ms) | 8.4 | 5.9 | -30% |
+| Whole simulation step, real clock (ms) | 13.3 | 10.3 | -23% |
+
+"Real clock": the harness freezes the clock inside a frame, so the 2.5 ms decision budget in `updatePeople` never
+trips there and every frame makes 60 decisions (routing then dominates the profile). With the real clock the budget
+works as in the game.
+
+| Item | What |
+| --- | --- |
+| people | Walkers carry on from the path segment they were on instead of scanning their path from the start (4 places). The bump check sorts movers into a flat grid of typed arrays (counting sort), visiting neighbours in the same order as before. Every person is created with all its fields, so they share one hidden class. Police bikes keep their path segment too. |
+| batching | Plants and glows (and those of the bridges and walkways) are still built per region at the same moments, but drawn 4 x 4 regions at a time (they are never culled, so this draws nothing more). Bridges and walkways themselves stay one mesh per region, so close-up views draw no extra geometry. Merged batches keep their first piece's place in the draw order, for see-through things too. |
+| megastructures | Logistics hub forklifts, drone rotor discs and floor light pools are drawn as one batch per material and shape. Police drones and the radar head draw one mesh per material. |
+| harness | `--ref` picks the candidate for `diff`; `PERF_STEPS` runs a subset of steps; each build gets a fresh browser (two max cities in one browser lost the page). |
+
+Check: city, megastructures and dense scenes (53 captures) plus 5 max-city captures. Simulation dumps and saves are
+identical everywhere. Pixels: at most 57 differ per capture, and 631 (mean 1.7 levels out of 255) on the city's day
+cycle after its edits. These are halos crossing a sprite or steam: after an edit, a merged batch can be drawn on the
+other side of them than the rebuilt region was, the same kind of order the game already varies with build history.
+Close up, the logistics hubs can cost up to 15 more draws when only part of a hub is in view.
+
+Not done: walkers off screen already stop being tested once the 700 drawn people are full (`emit` returns first).

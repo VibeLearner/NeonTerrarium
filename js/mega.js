@@ -2602,6 +2602,47 @@ function buildLogisticsHub(m){
 // The live parts: the belts and the boxes riding them, forklifts shuttling up and down their lanes, raising and lowering
 // their loads, and the hub's cargo drones: each lifts off its pad, climbs out over the city in a wide loop, and comes
 // back down onto another pad, a parcel slung underneath.
+// Moving parts drawn as one batch per material (a copy of each part) instead of one mesh each. units: the moving
+// groups, children of `host`; every solid mesh under a unit (for which want() holds) is taken out of its group and drawn
+// in its batch where it was: through the unit and any groups in between, which go on moving and hiding as before
+// (a hidden one hides its parts). `sphere` (in host space) is the batches' bounds: where all the units can go.
+// Returns draw(), to call after the units have moved.
+function batchParts(units, host, sphere, want = () => true){
+  const byMat = new Map();
+  for (const u of units){
+    const walk = (o, chain) => { for (const c of [...o.children]){
+      if (c.isMesh && !c.isInstancedMesh && want(c)){ let l = byMat.get(c.material); if (!l) byMat.set(c.material, l = { parts: [] }); l.parts.push({ u, chain, o: c }); }
+      else if (!c.isMesh && !c.isSprite && !c.isPoints) walk(c, chain.concat(c)); } };
+    walk(u, []);
+  }
+  const _m = new THREE.Matrix4(), _z = new THREE.Matrix4().makeScale(0, 0, 0), batches = [];
+  for (const [mat, l] of byMat){
+    // (parts of one material that differ in shape are batched per shape)
+    const byGeo = new Map(); for (const p of l.parts){ let q = byGeo.get(p.o.geometry); if (!q) byGeo.set(p.o.geometry, q = []); q.push(p); }
+    for (const [geo, parts] of byGeo){
+      if (parts.length < 2) continue;
+      const g2 = new THREE.BufferGeometry(); for (const k in geo.attributes) g2.setAttribute(k, geo.attributes[k]); if (geo.index) g2.setIndex(geo.index);
+      g2.boundingSphere = sphere.clone(); g2.boundingBox = new THREE.Box3().setFromCenterAndSize(sphere.center, new THREE.Vector3(1, 1, 1).multiplyScalar(sphere.radius*2));
+      const p0 = parts[0].o, im = new THREE.InstancedMesh(g2, mat, parts.length); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      im.layers.mask = p0.layers.mask; im.renderOrder = p0.renderOrder; im.castShadow = p0.castShadow; im.receiveShadow = p0.receiveShadow;
+      for (const p of parts) p.o.parent.remove(p.o);
+      host.add(im); batches.push({ im, parts });
+    }
+  }
+  const draw = m => {
+    for (const u of units) if (u.matrixAutoUpdate) u.updateMatrix();
+    for (const { im, parts } of batches){
+      parts.forEach((p, k) => {
+        let vis = p.u.visible && p.o.visible; for (const c of p.chain) if (!c.visible){ vis = false; break; }
+        if (!vis){ im.setMatrixAt(k, _z); return; }
+        _m.copy(p.u.matrix); for (const c of p.chain){ if (c.matrixAutoUpdate) c.updateMatrix(); _m.multiply(c.matrix); }
+        if (p.o.matrixAutoUpdate) p.o.updateMatrix(); _m.multiply(p.o.matrix); im.setMatrixAt(k, _m); });
+      if (m) megaFxDirty(im.instanceMatrix, m); else im.instanceMatrix.needsUpdate = true; }
+  };
+  draw.batches = batches;
+  draw.dispose = () => { for (const { im } of batches){ im.geometry.dispose(); im.dispose(); } };
+  return draw;
+}
 function logisticsFx(m){
   const g = m.lg; if (!g) return null;
   const root = new THREE.Group(); root.matrixAutoUpdate = false; root.matrix.fromArray(g.m); root.matrixWorldNeedsUpdate = true; scene.add(root);
@@ -2641,10 +2682,16 @@ function logisticsFx(m){
     car.position.y = .12; f.position.set(L.x0, L.y, L.z);
     return { L, f, car, load, ph: k*1.7 + (m.seed % 5)*.3, sp: .07 + k*.015, last: 0 };
   });
+  // (the forklifts' parts: a batch per material for all of them, bounded by their lanes)
+  const liftSphere = (() => { const P = []; for (const L of g.lanes) P.push(new THREE.Vector3(L.x0, L.y, L.z), new THREE.Vector3(L.x1, L.y, L.z)); const S = new THREE.Sphere().setFromPoints(P.length ? P : [new THREE.Vector3()]); S.radius += 2; return S; })();
+  const liftsDraw = batchParts(lifts.map(F => F.f), root, liftSphere);
   // the floodlights' pools of light on the floor: soft discs that glow at night
   const disc = new THREE.CircleGeometry(1, 24); disc.rotateX(-PI/2);
   const poolMat = new THREE.MeshBasicMaterial({ map: glowTex, color: 0xfff0d0, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false });
-  for (const [x, y, z, r] of g.pools || []){ const d = new THREE.Mesh(disc, poolMat); d.position.set(x, y, z); d.scale.setScalar(r); d.layers.set(1); d.renderOrder = 4; root.add(d); }
+  const poolG = new THREE.Group(); root.add(poolG);
+  for (const [x, y, z, r] of g.pools || []){ const d = new THREE.Mesh(disc, poolMat); d.position.set(x, y, z); d.scale.setScalar(r); d.layers.set(1); d.renderOrder = 4; poolG.add(d); }
+  const poolsDraw = batchParts([poolG], root, (() => { const S = new THREE.Sphere(); const P = (g.pools || []).map(([x, y, z]) => new THREE.Vector3(x, y, z)); if (P.length) S.setFromPoints(P); S.radius += Math.max(0, ...(g.pools || []).map(q => q[3])) + .5; return S; })());
+  poolsDraw();   // (they don't move)
   const sstep = (a, b, x) => { const u = Math.max(0, Math.min(1, (x - a)/(b - a))); return u*u*(3 - 2*u); };
   // the drones: little quadcopters hopping between stops inside the hub (pads, container tops, belt ends), picking a
   // parcel up at one and setting it down at the next. Each keeps a cruising height of its own so they don't collide.
@@ -2681,8 +2728,11 @@ function logisticsFx(m){
   const dGeo = new THREE.BufferGeometry(); for (const k in geo.attributes) dGeo.setAttribute(k, geo.attributes[k]); if (geo.index) dGeo.setIndex(geo.index); dGeo.boundingSphere = dSphere; dGeo.boundingBox = new THREE.Box3().setFromCenterAndSize(dSphere.center, new THREE.Vector3(1, 1, 1).multiplyScalar(dSphere.radius*2));
   const dInst = [...dParts].map(([mt, list]) => { const im = new THREE.InstancedMesh(dGeo, mt, list.length); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); sky.add(im); return { im, list }; });
   const _dm = new THREE.Matrix4(), _d0 = new THREE.Matrix4().makeScale(0, 0, 0);
+  // (and the see-through rotor discs, all alike, a batch of their own)
+  const rotorsDraw = batchParts(drones.map(d => d.grp), sky, dSphere, o => o.material === mats.rotor);
   const dronesDraw = () => {
     for (const d of drones) d.grp.updateMatrix();
+    rotorsDraw(m);
     for (const { im, list } of dInst){ list.forEach((p, k) => im.setMatrixAt(k, p.parcel && !p.d.parcel.visible ? _d0 : _dm.multiplyMatrices(p.d.grp.matrix, p.m))); megaFxDirty(im.instanceMatrix, m); }
   };
   dronesDraw();
@@ -2706,6 +2756,7 @@ function logisticsFx(m){
         F.car.position.y = .12 + (dd < .12 ? .45*Math.sin((1 - dd/.12)*PI/2) : 0);
         F.load.visible = u < 1;                                                                         // loaded one way, empty on the way back
       }
+      liftsDraw(m);
       for (const d of drones){
         if (d.state === 'sit'){
           d.spin = Math.max(8, d.spin - dt*40); d.timer -= dt;                                            // (idling, rotors ticking over)
@@ -2724,7 +2775,7 @@ function logisticsFx(m){
       }
       dronesDraw();
     },
-    dispose(){ scene.remove(root); scene.remove(sky); for (const { im } of dInst) im.dispose(); dGeo.dispose(); geo.dispose(); cylG.dispose(); disc.dispose(); poolMat.dispose(); for (const k in mats) mats[k].dispose(); for (const B of belts){ B.slats.dispose(); B.boxes.dispose(); } }
+    dispose(){ scene.remove(root); scene.remove(sky); liftsDraw.dispose(); rotorsDraw.dispose(); poolsDraw.dispose(); for (const { im } of dInst) im.dispose(); dGeo.dispose(); geo.dispose(); cylG.dispose(); disc.dispose(); poolMat.dispose(); for (const k in mats) mats[k].dispose(); for (const B of belts){ B.slats.dispose(); B.boxes.dispose(); } }
   };
 }
 
@@ -2938,6 +2989,7 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
   const cone = new THREE.Mesh(new THREE.ConeGeometry(.7, 1, 16, 1, true), coneMat); cone.layers.set(1); cone.renderOrder = 4; scene.add(cone);
   const spot = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xbfefff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); spot.scale.set(2.2, 2.2, 1); spot.layers.set(1); scene.add(spot);
   g.traverse(o => { if (o.isMesh && o.layers.mask === 1) o.layers.set(0); });
+  foldParts(g); for (const h of blades) foldParts(h);   // (its body, arms and rotor guards: a mesh per material; each rotor's blades one mesh)
   g.position.copy(restPos); g.rotation.y = restYaw; scene.add(g);
   // its own clock (real seconds), so it keeps to its rounds whatever the hour, the day cycle or the frame rate
   // the crew take off at different times; each flies a little higher than the last, so their paths never meet
@@ -3044,7 +3096,7 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
         spot.position.set(sx, CURB + .05, sz); spot.material.opacity = (.55 + .3*redK)*Math.max(light, redK); spot.scale.setScalar(2.2 - .6*redK);
       }
     },
-    dispose(){ scene.remove(g, cone, spot); coneMat.dispose(); cone.geometry.dispose(); spot.material.dispose(); red.lm.dispose(); blue.lm.dispose(); red.sp.material.dispose(); blue.sp.material.dispose(); }
+    dispose(){ scene.remove(g, cone, spot); g.traverse(o => { if (o.geometry && o.geometry.userData.folded) o.geometry.dispose(); }); coneMat.dispose(); cone.geometry.dispose(); spot.material.dispose(); red.lm.dispose(); blue.lm.dispose(); red.sp.material.dispose(); blue.sp.material.dispose(); }
   };
 }
 /* ---------- keeping flyers out of the tallest megastructures ---------- */
@@ -3211,7 +3263,7 @@ function policeBikes(m, crew){
         // moving along the path
         if (b.path && b.mode !== 'park' && b.mode !== 'enter'){
           b.s = Math.min(b.path.len, b.s + dt*b.speed);
-          const P = b.path; let k = 1; while (k < P.cum.length - 1 && P.cum[k] < b.s) k++;
+          const P = b.path; let k = b._k && b._kp === P && b._k < P.cum.length && !(b._k > 1 && P.cum[b._k - 1] >= b.s) ? b._k : 1; while (k < P.cum.length - 1 && P.cum[k] < b.s) k++; b._k = k; b._kp = P;   // (carrying on from the last segment: see walkSeg in people.js)
           const a = P.pts[k - 1], c = P.pts[k] || a, seg = P.cum[k] - P.cum[k - 1] || 1, u = Math.min(1, (b.s - P.cum[k - 1])/seg);
           b.x = a[0] + (c[0] - a[0])*u; b.z = a[1] + (c[1] - a[1])*u;
           const dx = c[0] - a[0], dz = c[1] - a[1], l = Math.hypot(dx, dz); if (l > 1e-3){ const tx = dx/l, tz = dz/l; b.hx += (tx - b.hx)*Math.min(1, dt*6); b.hz += (tz - b.hz)*Math.min(1, dt*6); }
@@ -3326,6 +3378,7 @@ function policeFx(m){
   add(U.sph, M.polWall, .55, .45, 0, .32, .32, .32);                              // sensor dome
   add(U.box, M.blink, -.5, .5, 0, .07, .07, .07);
   head.traverse(o => { if (o.isMesh) o.layers.set(0); });
+  foldParts(head);   // (a mesh per material)
   scene.add(radar); parts.push(radar);
   // The drone crew. The city's street crossings are shared out between the drones as sectors (slices round the
   // middle of the city, so each drone has its own part); each sortie takes in the crossings of its sector that have
@@ -3402,7 +3455,7 @@ function policeFx(m){
       bikes.update(dt, time);
       scanMat.color.setRGB(.22, .9, .88).multiplyScalar(.45 + .55*Math.abs(Math.sin(time*3)));
     },
-    dispose(){ for (const p of parts){ scene.remove(p); if (p !== radar && !drones.some(d => d.g === p)) p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } scanMat.dispose(); for (const d of drones) d.dispose(); bikes.dispose(); const k = POLICE_STATIONS.indexOf(station); if (k >= 0) POLICE_STATIONS.splice(k, 1); policeWire(); }
+    dispose(){ for (const p of parts){ scene.remove(p); if (p !== radar && !drones.some(d => d.g === p)) p.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } radar.traverse(o => { if (o.geometry && o.geometry.userData.folded) o.geometry.dispose(); }); scanMat.dispose(); for (const d of drones) d.dispose(); bikes.dispose(); const k = POLICE_STATIONS.indexOf(station); if (k >= 0) POLICE_STATIONS.splice(k, 1); policeWire(); }
   };
 }
 

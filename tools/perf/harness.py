@@ -140,6 +140,9 @@ def steps(scene):
     if scene.get('rush'):   # a crowd at the stations: boarding, a full train, the lifts, impatience
         s += [('rush_a', 400, scene['rush'])] + [('rush_' + c, 400, None) for c in 'bcdef']
     s.append(('evening_cycle', 120, 'S.hour = 17.8; S.cycle = true; S.vclouds = true'))
+    keep = os.environ.get('PERF_STEPS')   # a shorter run for heavy scenes: only these labels (the same on both builds)
+    if keep:
+        s = [x for x in s if x[0] in keep.split(',')]
     return s
 
 
@@ -192,8 +195,9 @@ def cmd_diff(base_ref, cand_ref, only, quick):
             for vp in vps:
                 tag = '%s_%dx%d' % (sc['name'], vp[0], vp[1])
                 t0 = time.time()
-                cb, eb = run_scene(br, ub, sc, vp)
-                cc, ec = run_scene(br, uc, sc, vp)
+                # (a fresh browser for each build: two heavy scenes one after the other in one browser can lose its page)
+                br.close(); br = launch(pw); cb, eb = run_scene(br, ub, sc, vp)
+                br.close(); br = launch(pw); cc, ec = run_scene(br, uc, sc, vp)
                 if eb or ec:
                     fails.append('%s page errors: base %s cand %s' % (tag, eb[:2], ec[:2]))
                 for (lb, a), (lc, b) in zip(cb, cc):
@@ -287,7 +291,7 @@ if __name__ == '__main__':
     if a.cmd == 'scenes':
         cmd_scenes()
     elif a.cmd == 'diff':
-        sys.exit(cmd_diff(a.base, None, a.only, a.quick))
+        sys.exit(cmd_diff(a.base, a.ref, a.only, a.quick))   # (--ref: the candidate; the working tree if not given)
     elif a.cmd == 'self':
         sys.exit(cmd_diff(None, None, a.only, a.quick))
     else:

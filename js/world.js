@@ -1127,7 +1127,7 @@ const markSolid = c => { if (c) solidDirty.add(mergeKey(c.i, c.j)); };
 // every merge block that overlaps a region (REG x REG plots)
 function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
   for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++) solidDirty.add(i + ',' + j); }
-function flushSolid(){ if (!solidDirty.size) return; for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); }
+function flushSolid(){ flushSuper(); if (!solidDirty.size) return; for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); }
 const mergeable = o => o.isMesh && !o.isInstancedMesh && o.layers.mask === 1 && !o.material.transparent && o.geometry.index && !o.userData.noMerge;
 function rebuildSolid(key){
   const old = solidRegions.get(key);
@@ -1179,12 +1179,84 @@ function mergeIndexed(geos){
 renderer.setOpaqueSort((a, b) => a.groupOrder !== b.groupOrder ? a.groupOrder - b.groupOrder : a.renderOrder !== b.renderOrder ? a.renderOrder - b.renderOrder
   : a.program !== b.program ? a.program.id - b.program.id : a.material.id !== b.material.id ? a.material.id - b.material.id : a.z !== b.z ? a.z - b.z
   : (a.object.userData.sortId ?? a.id) - (b.object.userData.sortId ?? b.id));
+// and likewise for see-through things (three's order: layer group, render order, distance back to front, creation)
+renderer.setTransparentSort((a, b) => a.groupOrder !== b.groupOrder ? a.groupOrder - b.groupOrder : a.renderOrder !== b.renderOrder ? a.renderOrder - b.renderOrder
+  : a.z !== b.z ? b.z - a.z : (a.object.userData.sortId ?? a.id) - (b.object.userData.sortId ?? b.id));
 function rebuildRegion(key){
   const old = regions.get(key);
-  if (old){ world.remove(old); disposeGroup(old); regions.delete(key); }
+  superDirty.add('r' + superKey(key));
+  if (old){ disposeGroup(old); regions.delete(key); }
   const datas = [...cells.values(), ...megas.values()].filter(c => c.data && regKey(c.i, c.j) === key).map(c => c.data);
   if (!datas.length) return;
-  const g = batchGroup(datas, false); world.add(g); regions.set(key, g);
+  regions.set(key, batchGroup(datas, false));   // (not drawn itself: see the super-regions below)
+}
+// Super-regions. Each region's plants and glows (and those of each region's bridges and walkways, below) are still
+// worked out on their own, at the same moments as before (so the flicker each light is given, and when a new piece's
+// plants appear, are unchanged), but they are drawn SREG x SREG regions at a time: one batch per kind of thing instead
+// of one per region. Plants and glows are drawn whole wherever the view is (they aren't culled), so a bigger batch draws
+// nothing more; it only costs fewer draw calls.
+const SREG = 4, superRegions = new Map(), superDirty = new Set();
+const superKey = rk => { const c = rk.indexOf(','); return Math.floor(+rk.slice(0, c)/SREG) + ',' + Math.floor(+rk.slice(c + 1)/SREG); };
+function flushSuper(){
+  if (!superDirty.size) return;
+  for (const sk of superDirty){
+    const old = superRegions.get(sk);
+    if (old){ world.remove(old); disposeMerged(old); superRegions.delete(sk); }
+    const src = sk[0] === 'r' ? [...regions].map(([k, g]) => [k, g]) : [...connRegions].map(([k, r]) => [k, r.group]), key = sk.slice(1);
+    const groups = src.filter(([k]) => superKey(k) === key).map(([, g]) => g);
+    if (!groups.length) continue;
+    const g = mergeLeaves(groups); world.add(freezeTree(g)); superRegions.set(sk, g);
+  }
+  superDirty.clear();
+}
+// geometry a merged batch made itself is freed with it; geometry it shares with a region's own batch is not
+function disposeMerged(g){ g.traverse(o => { if ((o.isMesh || o.isPoints) && o.userData.own) o.geometry.dispose(); }); }
+// Everything drawn in some region batches, joined: one object per kind (plain mesh per material and settings, plant
+// instances, glow points per layer), in the regions' order.
+function mergeLeaves(groups){
+  const cls = new Map();
+  groups.forEach((grp, gi) => grp.traverse(o => {
+    if (!(o.isMesh || o.isPoints)) return;
+    // (what is culled to the view, the bridges and walkways themselves, stays a mesh per region: a bigger one would be
+    // drawn whenever any of it is on screen, all of it, and close up that is a lot of geometry out of sight)
+    const k = (o.isInstancedMesh ? 'I' : o.isPoints ? 'P' : 'M') + o.material.id + '|' + o.layers.mask + '|' + o.renderOrder + '|' + o.castShadow + '|' + o.receiveShadow + '|' + (o.frustumCulled ? 'cull' + gi : '');
+    let l = cls.get(k); if (!l) cls.set(k, l = []); l.push(o);
+  }));
+  const out = new THREE.Group();
+  for (const list of cls.values()){
+    const o0 = list[0]; let obj;
+    if (list.length === 1){
+      obj = o0.isInstancedMesh ? new THREE.InstancedMesh(o0.geometry, o0.material, o0.count) : o0.isPoints ? new THREE.Points(o0.geometry, o0.material) : new THREE.Mesh(o0.geometry, o0.material);
+      if (o0.isInstancedMesh) obj.instanceMatrix = o0.instanceMatrix;
+    } else if (o0.isInstancedMesh){
+      const geo = new THREE.BufferGeometry(), g0 = o0.geometry;
+      for (const n in g0.attributes){ const a = g0.attributes[n]; if (!a.isInstancedBufferAttribute) geo.setAttribute(n, a); }
+      if (g0.index) geo.setIndex(g0.index);
+      let n = 0; for (const o of list) n += o.count;
+      for (const nm in g0.attributes){ const a0 = g0.attributes[nm]; if (!a0.isInstancedBufferAttribute) continue;
+        const arr = new a0.array.constructor(n*a0.itemSize); let q = 0; for (const o of list){ const a = o.geometry.attributes[nm]; arr.set(a.array.subarray(0, o.count*a0.itemSize), q); q += o.count*a0.itemSize; }
+        geo.setAttribute(nm, new THREE.InstancedBufferAttribute(arr, a0.itemSize, a0.normalized)); }
+      obj = new THREE.InstancedMesh(geo, o0.material, n); let q = 0;
+      for (const o of list){ obj.instanceMatrix.array.set(o.instanceMatrix.array.subarray(0, o.count*16), q); q += o.count*16; }
+      obj.userData.own = true;
+    } else {
+      const geos = list.map(o => o.geometry), names = Object.keys(geos[0].attributes), geo = new THREE.BufferGeometry();
+      const idx = !!geos[0].index;
+      let nv = 0, ni = 0; for (const g of geos){ nv += g.attributes.position.count; if (idx) ni += g.index.count; }
+      for (const nm of names){ const a0 = geos[0].attributes[nm], arr = new a0.array.constructor(nv*a0.itemSize); let q = 0;
+        for (const g of geos){ arr.set(g.attributes[nm].array, q); q += g.attributes[nm].array.length; }
+        geo.setAttribute(nm, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); }
+      if (idx){ const ix = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let k = 0, base = 0;
+        for (const g of geos){ const I = g.index.array; for (let q = 0; q < I.length; q++) ix[k++] = I[q] + base; base += g.attributes.position.count; }
+        geo.setIndex(new THREE.BufferAttribute(ix, 1)); }
+      geo.computeBoundingSphere();
+      obj = o0.isPoints ? new THREE.Points(geo, o0.material) : new THREE.Mesh(geo, o0.material); obj.userData.own = true;
+    }
+    obj.userData.sortId = Math.min(...list.map(o => o.userData.sortId ?? o.id));   // (drawn in the order its first piece would have been: see the sorts below)
+    obj.layers.mask = o0.layers.mask; obj.renderOrder = o0.renderOrder; obj.castShadow = o0.castShadow; obj.receiveShadow = o0.receiveShadow; obj.frustumCulled = o0.frustumCulled;
+    out.add(obj);
+  }
+  return out;
 }
 // Bridges and lines between neighbours: each pair is generated once and cached until either side changes
 const pairCache = new Map();
@@ -1203,12 +1275,12 @@ function rebuildConnections(){
     let r = byReg.get(rk); if (!r) byReg.set(rk, r = { keys: [], datas: [] });
     r.keys.push(key); r.datas.push(d);
   }
-  for (const [rk, cr] of connRegions) if (!byReg.has(rk)){ world.remove(cr.group); disposeGroup(cr.group); connRegions.delete(rk); }
+  for (const [rk, cr] of connRegions) if (!byReg.has(rk)){ disposeGroup(cr.group); connRegions.delete(rk); superDirty.add('c' + superKey(rk)); }
   for (const [rk, r] of byReg){
     const sig = r.keys.join('#'), cr = connRegions.get(rk);
     if (cr && cr.sig === sig) continue;
-    if (cr){ world.remove(cr.group); disposeGroup(cr.group); }
-    const g = batchGroup(r.datas); world.add(g); connRegions.set(rk, { sig, group: g });
+    if (cr) disposeGroup(cr.group);
+    connRegions.set(rk, { sig, group: batchGroup(r.datas) }); superDirty.add('c' + superKey(rk));   // (drawn in its super-region)
   }
   for (const [k, d] of pairCache) if (!used.has(k)){ disposeData(d); pairCache.delete(k); }
   setConveyors([...pairCache.values()].flatMap(d => d.conv || []));
@@ -1574,7 +1646,7 @@ function clearIsland(){
   for (const c of cells.values()){ disposeData(c.data); c.data = null; cellView(c); }
   for (const m of megas.values()){ disposeData(m.data); m.data = null; cellView(m); if (m.fx){ m.fx.dispose(); m.fx = null; } }
   megas.clear();
-  for (const k of [...regions.keys()]){ world.remove(regions.get(k)); disposeGroup(regions.get(k)); regions.delete(k); }
+  for (const k of [...regions.keys()]){ disposeGroup(regions.get(k)); regions.delete(k); superDirty.add('r' + superKey(k)); }
   for (const k of [...solidRegions.keys()]){ const r = solidRegions.get(k); world.remove(r.group); disposeGroup(r.group); solidRegions.delete(k); } solidDirty.clear(); animCells.clear();
   cells.clear(); hwClearAll(); mtClearAll();
   for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) cells.set(ckey(i,j), newCell(i, j));

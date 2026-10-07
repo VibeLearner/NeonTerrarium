@@ -81,6 +81,7 @@ function frame(now){
   renderer.autoClear = true;
   comp.uniforms.VP.value.copy(cam.projectionMatrix).multiply(cam.matrixWorldInverse);
   comp.uniforms.invVP.value.copy(comp.uniforms.VP.value).invert();
+  liftShimmerCull(comp.uniforms.VP.value); mtShimmerCull(comp.uniforms.VP.value);   // the air shimmers only where they can show
   renderNightLights(comp.uniforms.night.value);   // lamps and neon lighting the surfaces round them (sky.js)
   comp.uniforms.upView.value.set(0,1,0).transformDirection(cam.matrixWorldInverse);
   comp.uniforms.sunV.value.copy(SUN_DIR).transformDirection(cam.matrixWorldInverse);   // for the rim light

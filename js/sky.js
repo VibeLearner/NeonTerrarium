@@ -838,9 +838,26 @@ const STEAM_N = 512, STEAM_DATA = new Uint8Array(STEAM_N*STEAM_N*4);
 const steamTex = new THREE.DataTexture(STEAM_DATA, STEAM_N, STEAM_N, THREE.RGBAFormat);
 steamTex.minFilter = steamTex.magFilter = THREE.LinearFilter; steamTex.generateMipmaps = false;
 comp.uniforms.tSteam.value = steamTex;
+// Does a box in the world show anywhere on screen? (the view is orthographic: its corners, projected, bound it)
+const _sbc = new THREE.Vector3();
+function boxOnScreen(VP, x0, x1, y0, y1, z0, z1){
+  let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity;
+  for (let q = 0; q < 8; q++){ _sbc.set(q & 1 ? x1 : x0, q & 2 ? y1 : y0, q & 4 ? z1 : z0).applyMatrix4(VP);
+    a = Math.min(a, _sbc.x); b = Math.max(b, _sbc.x); c = Math.min(c, _sbc.y); d = Math.max(d, _sbc.y); }
+  return b > -1.05 && a < 1.05 && d > -1.05 && c < 1.05;
+}
+// The lift pads' shimmer only runs while a pad's patch of the steam map (its disc, plus the texels the filtering reaches)
+// could be under some pixel's line of sight through the air below the pads; otherwise every pixel would sample nothing.
+let STEAM_LIFTS = [];
+function liftShimmerCull(VP){
+  let on = false;
+  for (const [x, z, r] of STEAM_LIFTS) if (boxOnScreen(VP, x - r, x + r, -3.95, -1.67, z - r, z + r)){ on = true; break; }
+  comp.uniforms.nLifts.value = on ? STEAM_LIFTS.length : 0;
+}
 function makeSteamMap(vents, lifts = []){
   const ext = (GRID_MAX + 1)*LOT, k = STEAM_N/(2*ext);
   comp.uniforms.steamExt.value = ext; comp.uniforms.nVents.value = vents.length; comp.uniforms.nLifts.value = lifts.length;
+  STEAM_LIFTS = lifts.map(v => [v.x, v.z, v.r + .15 + 1.5/k]);
   STEAM_DATA.fill(0);
   const acc = new Float32Array(STEAM_N*STEAM_N*2);
   for (const v of vents){

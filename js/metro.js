@@ -526,7 +526,15 @@ function mtResetTrain(l){
   P.stops.forEach((st, i) => { const sd = l.sides && l.sides[st.k]; if (!sd) return;
     l.stn.set(st.k, { i, k: st.k, s: st.s, side: -sd, e: mtFrame(l, st.k, .5).elements.slice(), id: 'mt:' + l.id + ':' + st.k }); });
 }
-const _mpos = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, _mdm = new THREE.Object3D(), _mgap = [];   // _mgap: each car's gap this frame, for the shimmer (see the comp shader in sky.js)
+const _mpos = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, _mdm = new THREE.Object3D(), _mgap = [], _mtop = [];   // _mgap: each car's gap this frame, for the shimmer (see the comp shader in sky.js)
+// The shimmer's cars go to the composite shader, less any whose field can't reach the screen: a car's haze is exactly
+// nothing more than .95 along or .62 across from its middle (see the comp shader), so off screen it only costs every
+// pixel six samples of nothing. Called once the frame's view matrix is set (main.js).
+function mtShimmerCull(VP){
+  const U_ = comp.uniforms, y0 = U_.mtGapY.value.x - .05, y1 = U_.mtGapY.value.y + .05; let n = 0;
+  for (const g of _mtop) if (boxOnScreen(VP, g[0] - 1.2, g[0] + 1.2, y0, y1, g[1] - 1.2, g[1] + 1.2)) U_.mtGap.value[n++].set(...g);
+  U_.mtN.value = n;
+}
 function updateMetros(dt, t){
   for (const M_ of MT_MODELS) M_.n = 0;
   MT_LEAF.n = 0;
@@ -582,8 +590,8 @@ function updateMetros(dt, t){
   mtField.count = nf; mtField.visible = nf > 0; mtField.material.opacity = .45 + .1*Math.sin(t*3.5); if (nf) mtField.instanceMatrix.needsUpdate = true;
   { const U_ = comp.uniforms, cx = camT.x, cz = camT.z;   // the 16 cars nearest the view get the shimmer
     _mgap.sort((a, b) => (a[0] - cx)**2 + (a[1] - cz)**2 - (b[0] - cx)**2 - (b[1] - cz)**2);
-    const n = Math.min(16, _mgap.length); for (let k = 0; k < n; k++) U_.mtGap.value[k].set(..._mgap[k]);
-    U_.mtN.value = n; U_.mtGapY.value.set(MT_Y + (.12 + .78 + .04)*MT_SY + MT_LEV, MT_Y + MT_OH + .02); }
+    _mtop.length = 0; for (let k = 0; k < Math.min(16, _mgap.length); k++) _mtop.push(_mgap[k]);   // (handed to the shader once the frame's view is known: mtShimmerCull)
+    U_.mtGapY.value.set(MT_Y + (.12 + .78 + .04)*MT_SY + MT_LEV, MT_Y + MT_OH + .02); }
   mtGlow.count = 0; mtGlow.visible = false;   // (no deck under the train to light any more) mtGlow.material.opacity = night ? .85 : .3; if (ng) mtGlow.instanceMatrix.needsUpdate = true;
   // the stations' lift cabs go up and down
   for (const l of metros) if (l.cabs) for (const c of l.cabs) c.g.position.y = c.y;   // (moved by the lift controller: see mtLifts)

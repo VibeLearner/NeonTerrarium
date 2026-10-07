@@ -496,7 +496,11 @@ function mtResetTrain(l){
   l.path = null; l.train = null;
   if (!l.done || l.tiles.length < 2) return;
   const P = mtPath(l); if (P.stops.length < 2) return;
-  l.train = { s: P.stops[0].s, v: 0, dir: 1, at: 0, dwell: 2 + (l.id % 3) };
+  l.train = { s: P.stops[0].s, v: 0, dir: 1, at: 0, dwell: 2 + (l.id % 3), stopT: 0, doors: 0, load: [], fresh: true };
+  // the stations people can use (those with a lift): where each is, and which side of the track its platform's way out is
+  l.stn = new Map();
+  P.stops.forEach((st, i) => { const sd = l.sides && l.sides[st.k]; if (!sd) return;
+    l.stn.set(st.k, { i, k: st.k, s: st.s, side: -sd, e: mtFrame(l, st.k, .5).elements.slice(), id: 'mt:' + l.id + ':' + st.k }); });
 }
 const _mpos = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, _mdm = new THREE.Object3D(), _mgap = [];   // _mgap: each car's gap this frame, for the shimmer (see the comp shader in sky.js)
 function updateMetros(dt, t){
@@ -508,8 +512,13 @@ function updateMetros(dt, t){
     const P = mtPath(l), stops = P.stops;
     // the run: dwell at a stop, then on to the next one along (turning back at the ends), easing in and out
     if (tr.dwell > 0){
-      tr.dwell -= dt; tr.v = 0;
-      if (tr.dwell <= 0){
+      tr.v = 0; tr.stopT += dt;
+      if (tr.fresh){ tr.fresh = false; mtArrive(l, tr, stops[tr.at].k); }   // (where it starts out: the doors open there too)
+      else if (tr.doors > .9 && tr.dwell > 1.6 && (tr.late = (tr.late || 0) + dt) > .5){ tr.late = 0; mtBoard(l, tr, stops[tr.at].k, false); }   // whoever's just come up onto the platform gets on too
+      const busy = mtBusy(l, tr);   // (people still getting on and off: the doors stay open)
+      if (!busy || tr.dwell > .75) tr.dwell -= dt;
+      tr.doors = Math.max(0, Math.min(1, tr.stopT/.7, tr.dwell/.7));
+      if (tr.dwell <= 0){ tr.doors = 0;
         if (tr.at + tr.dir < 0 || tr.at + tr.dir >= stops.length) tr.dir = -tr.dir;
         tr.next = tr.at + tr.dir;
       }
@@ -519,9 +528,8 @@ function updateMetros(dt, t){
       tr.v = Math.min(MT_VMAX, tr.v + MT_ACC*dt, vCap + .05);
       const step = Math.min(dist, tr.v*dt); tr.s += Math.sign(d)*step;
       if (dist - step < .005){
-        tr.s = goal; tr.at = tr.next; tr.v = 0; tr.dwell = MT_DWELL + Math.random()*2;
-        const k = stops[tr.at].k, side = l.sides && l.sides[k];
-        if (side && typeof spawnVisitor === 'function') for (let q = 0; q < 2; q++) if (Math.random() < .5) spawnVisitor('mt:' + l.id + ':' + k);   // someone gets off
+        tr.s = goal; tr.at = tr.next; tr.v = 0; tr.dwell = MT_DWELL + Math.random()*2; tr.stopT = 0;
+        mtArrive(l, tr, stops[tr.at].k);   // the doors open: off, then on
       }
     }
     // the cars: one ahead of the middle of the train, one behind, a cab at each end facing out
@@ -542,6 +550,8 @@ function updateMetros(dt, t){
       if (ng < MT_CAR_MAX){ _mdm.position.set(_mpos.x, _mpos.y + .012, _mpos.z); _mdm.rotation.set(0, yaw, 0); _mdm.scale.set(.85, 1, MT_CL*1.2); _mdm.updateMatrix(); mtGlow.setMatrixAt(ng++, _mdm.matrix); }
     }
   }
+  mtRiders(dt, t);
+  mtDrawDoors();
   for (const M_ of MT_MODELS) for (const m of M_.meshes){ m.count = M_.n; m.visible = M_.n > 0; if (M_.n) m.instanceMatrix.needsUpdate = true; }
   mtField.count = nf; mtField.visible = nf > 0; mtField.material.opacity = .45 + .1*Math.sin(t*3.5); if (nf) mtField.instanceMatrix.needsUpdate = true;
   { const U_ = comp.uniforms, cx = camT.x, cz = camT.z;   // the 16 cars nearest the view get the shimmer
@@ -640,4 +650,189 @@ function setMtMode(on, quiet){
   const b = document.getElementById('mtBtn'); if (b){ b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
   $('modeHint').hidden = on; if (on) $('modeHint').textContent = '';
   else if (!quiet) selectZone(S.zone);
+}
+
+/* ---------- riding the metro ---------- */
+// People take the metro when it saves them a long walk: to the station nearest them, up its lift, a wait on the
+// platform, on through the train's doors, off at the station nearest where they're going, down its lift and on. How
+// busy a station gets comes from that: from how many people it saves a walk (see mtPlanTrip, and mtReachFrom, which
+// lets the metro bring far places within reach when people pick where to go out). The train holds MT_CAP; whoever it
+// leaves behind is cross about it, all the more with only the one line in the city, and those kept waiting long enough
+// give up and walk. A rider: p.metro = { l, k (the station they're at), to (the one they're going to), final (where
+// they're headed after), st (what they're doing), t, x, z (where on the platform, in its frame), door }.
+const MT_CAP = 12;                                // people to a train
+const MT_DOORS = [-1.085, -1.555, -.435, .435, 1.085, 1.555];   // the doors of a train standing at a station, along the platform from its middle
+const MT_MIN_RIDERS = 2;                          // there's always someone riding (see mtAmbient)
+const MT_PLAT_Y = .12;                            // the platform's surface, over the rail
+const mtLines = () => metros.filter(l => l.train && l.stn && l.stn.size >= 2);
+const mtW = (st, x, z) => { const e = st.e; return [e[0]*x + e[8]*z + e[12], e[2]*x + e[8 + 2]*z + e[14]]; };
+const MT_WALK = d => d*1.3;                       // a walk through the streets, a little longer than the crow flies
+// what a ride from one station to another costs, as the walk it's worth: a little for the ride itself, more for the lifts and the wait
+const mtRideCost = (a, b) => Math.abs(a.s - b.s)*.25 + 8;
+// the cheapest way from (ax, az) to (bx, bz) by metro, or null: { l, a, b, cost }
+function mtBestRide(ax, az, bx, bz){
+  let best = null;
+  for (const l of mtLines()){ const S = [...l.stn.values()];
+    for (const A of S){ const pa = mtW(A, 0, 0), wa = MT_WALK(Math.hypot(pa[0] - ax, pa[1] - az));
+      for (const B of S){ if (B === A) continue; const pb = mtW(B, 0, 0), c = wa + mtRideCost(A, B) + MT_WALK(Math.hypot(pb[0] - bx, pb[1] - bz));
+        if (!best || c < best.cost) best = { l, a: A, b: B, cost: c }; } } }
+  return best;
+}
+// how far a place is from (ax, az), the metro taken into account: a function of the place's (x, z)
+function mtReachFrom(ax, az){
+  const lines = mtLines(); if (!lines.length) return null;
+  const arr = [];   // each station, and the least it costs to be standing there having come from (ax, az)
+  for (const l of lines){ const S = [...l.stn.values()];
+    for (const B of S){ let c = Infinity; const pb = mtW(B, 0, 0);
+      for (const A of S){ if (A === B) continue; const pa = mtW(A, 0, 0); c = Math.min(c, MT_WALK(Math.hypot(pa[0] - ax, pa[1] - az)) + mtRideCost(A, B)); }
+      arr.push([pb[0], pb[1], c]); } }
+  return (x, z) => { let d = Math.hypot(x - ax, z - az); for (const [sx, sz, c] of arr) d = Math.min(d, (c + MT_WALK(Math.hypot(x - sx, z - sz)))/1.3); return d; };
+}
+// should this person go to `want` by metro? { station (the place to walk to), l, from, to, final } or null
+function mtPlanTrip(p, want){
+  if (!pplReady || want.startsWith('mt:') || want.startsWith('v:') || (p.at && p.at.startsWith('mt:'))) return null;
+  const from = places.get(p.at), to = places.get(want); if (!from || !to) return null;
+  const walk = MT_WALK(Math.hypot(to.x - from.x, to.z - from.z)); if (walk < 11) return null;
+  const r = mtBestRide(from.x, from.z, to.x, to.z); if (!r || r.cost > walk*.85 || !places.has(r.a.id)) return null;
+  if (pplRand() > .85) return null;   // (a few walk anyway)
+  return { station: r.a.id, l: r.l, from: r.a.k, to: r.b.k, final: want };
+}
+function mtNearestStation(x, z){ let best = null, bd = Infinity; for (const l of mtLines()) for (const st of l.stn.values()){ const [sx, sz] = mtW(st, 0, 0), d = Math.hypot(sx - x, sz - z); if (d < bd){ bd = d; best = st.id; } } return best; }
+// at the foot of the station's lift: becomes a rider (up the lift first)
+function mtEnter(p){
+  const v = p.metroPlan; p.metroPlan = null;
+  const l = v && metros.includes(v.l) ? v.l : null, st = l && l.stn && l.stn.get(v.from);
+  if (!st || !l.stn.has(v.to) || !l.train){ return false; }
+  p.metro = { l, k: v.from, to: v.to, final: v.final, st: 'up', t: -(1.5 + Math.random()*2.5), x: st.side*1.3, z: 0, waited: 0, missed: 0 };
+  p.until = Infinity; p.spot = null; return true;
+}
+const mtRidersOf = l => pplList.filter(p => p.metro && p.metro.l === l);
+// still getting on or off this train?
+function mtBusy(l, tr){ for (const p of pplList){ const m = p.metro; if (m && m.l === l && (m.st === 'board' || (m.st === 'alight' && m.t < 1.2))) return true; } return false; }
+// which way the train goes from stop i next (it turns back at the ends)
+const mtNextDir = (l, tr) => { const n = mtPath(l).stops.length; return tr.at + tr.dir < 0 || tr.at + tr.dir >= n ? -tr.dir : tr.dir; };
+// the train has stopped at station k: those for here get off, then those waiting get on, as many as it has room for
+function mtArrive(l, tr, k){
+  const st = l.stn && l.stn.get(k); if (!st) return;
+  let q = 0;
+  for (const p of tr.load.slice()) if (p.metro && p.metro.to === k){ tr.load.splice(tr.load.indexOf(p), 1);
+    Object.assign(p.metro, { k, st: 'alight', t: -.5 - q*.35, door: MT_DOORS[q % MT_DOORS.length] }); q++; }
+  mtBoard(l, tr, k, true, q);
+}
+// those waiting at station k for the way it's going next get on, as many as there's room for; on the first call at a stop
+// (first), the rest are told the train's full
+function mtBoard(l, tr, k, first, q = 0){
+  const st = l.stn && l.stn.get(k); if (!st) return;
+  const dir = mtNextDir(l, tr), waiting = pplList.filter(p => p.metro && p.metro.l === l && p.metro.k === k && (p.metro.st === 'wait' || p.metro.st === 'toSpot'))
+    .filter(p => { const to = l.stn.get(p.metro.to); return to && Math.sign(to.i - st.i) === dir; }).sort((a, b) => b.metro.waited - a.metro.waited);
+  const single = mtLines().length <= 1;
+  let room = MT_CAP - tr.load.length, b = 0;
+  for (const p of waiting){
+    if (room > 0){ room--; Object.assign(p.metro, { st: 'board', t: -.6 - q*.2 - b*.35, door: MT_DOORS[(b + 3) % MT_DOORS.length] }); tr.load.push(p); b++; }
+    else if (first){ p.metro.missed++; if (single || p.metro.missed > 1){ emote(p, 'anger', 2.6); p.metro.fume = pplNow + 1.2; } else emote(p, 'sweat', 2); }   // left behind: full
+  }
+}
+// a rider's next step, every frame
+function mtRiders(dt, t){
+  for (const l of metros) if (l.train) l.train.load = l.train.load.filter(p => people.has(p.id) && p.metro && p.metro.l === l && (p.metro.st === 'ride' || p.metro.st === 'board'));   // (anyone gone from the city is gone from the train)
+  for (const p of pplList){
+    const m = p.metro; if (!m) continue;
+    const l = m.l, st = l && l.stn && l.stn.get(m.k);
+    if (!metros.includes(l) || !st || !places.has(st.id)){ p.metro = null; if (places.has(p.at)) p.until = pplNow; else sendHome(p); continue; }   // the line or the station is gone
+    const tr = l.train;
+    if (m.st === 'ride'){ if (!tr || !tr.load.includes(p)){ const to = l.stn.get(m.to); if (to){ m.k = m.to; p.at = to.id; m.st = 'down'; m.t = 0; } else { p.metro = null; sendHome(p); } } continue; }   // (the line was rebuilt under them: off at their stop)
+    m.t += dt;
+    const move = (tx, tz, sp) => { const dx = tx - m.x, dz = tz - m.z, d = Math.hypot(dx, dz), step = sp*dt; if (d <= step){ m.x = tx; m.z = tz; return true; } m.x += dx/d*step; m.z += dz/d*step; m.dx = dx; m.dz = dz; return false; };
+    const sp = p.speed*.9;
+    if (m.st === 'up'){ if (m.t >= 0){ m.st = 'toSpot'; m.t = 0; m.x = st.side*1.3; m.z = (Math.random() - .5)*.3; m.spot = mtSpotFor(l, st, p); } }
+    else if (m.st === 'toSpot'){ if (move(m.spot[0], m.spot[1], sp)){ m.st = 'wait'; m.t = 0; } m.waited += dt; }
+    else if (m.st === 'wait'){
+      m.waited += dt;
+      const crowd = pplList.filter(q => q.metro && q.metro.l === l && q.metro.k === m.k && q.metro.st === 'wait').length;
+      const single = mtLines().length <= 1, patience = (single ? 28 : 60)*(1 - Math.min(.5, crowd/MT_CAP*.4));
+      if (!(p.emoUntil > pplNow)){
+        if (m.waited > patience && Math.random() < dt*(.12 + .1*m.missed)){ emote(p, 'anger', 2.4); m.fume = pplNow + 1.1; }
+        else if (m.waited > 12 && Math.random() < dt*.04) emote(p, 'dots', 2); }
+      if (!m.ambient && m.waited > patience*3){ m.st = 'leave'; m.t = 0; emote(p, 'anger', 2.2); }   // that's it: they'll walk
+    }
+    else if (m.st === 'board'){
+      if (m.t < 0) continue;   // (their turn at the door)
+      const ex = st.side*.52;
+      if (!m.atDoor){ if (move(ex, m.door, sp*1.2)) m.atDoor = true; }
+      else if (move(st.side*.25, m.door, sp)){ m.st = 'ride'; m.atDoor = false; }
+    }
+    else if (m.st === 'alight'){
+      if (m.t < 0){ m.x = st.side*.25; m.z = m.door; continue; }
+      if (!m.out){ if (move(st.side*.6, m.door, sp)) m.out = true; }
+      else if (move(st.side*1.3, (Math.random() - .5)*.2, sp)){ m.st = 'down'; m.t = 0; m.out = false; }
+    }
+    else if (m.st === 'leave'){ if (move(st.side*1.3, 0, sp)){ m.st = 'down'; m.t = 0; m.giveUp = true; } }
+    else if (m.st === 'down'){
+      if (m.t > 1.5 + Math.random()*.02){   // at the foot of the lift: on their way
+        const fin = m.final, amb = m.ambient; p.metro = null; p.at = st.id; if (amb) p.home = st.id;   // (an outsider: they'll look round here)
+        if (fin && places.has(fin) && startTrip(p, fin)){} else p.until = pplNow + (amb ? .5 : 2);
+      }
+    }
+  }
+  mtAmbient(t);
+}
+// a place to stand on the platform: in rows along the way-out side, the nearest free one; once they're all taken, in among the crowd
+function mtSpotFor(l, st, p){
+  const taken = new Set(); for (const q of pplList){ const m = q.metro; if (q !== p && m && m.l === l && m.k === st.k && m.spot && (m.st === 'wait' || m.st === 'toSpot')) taken.add(m.spot[0].toFixed(2) + ',' + m.spot[1].toFixed(2)); }
+  const spots = [];
+  for (const x of [.72, .98]) for (let z = -1.5; z <= 1.51; z += .375) spots.push([st.side*(x + (Math.random() - .5)*.06), z + (Math.random() - .5)*.08]);
+  spots.sort((a, b) => Math.abs(a[1]) - Math.abs(b[1]) + (Math.random() - .5)*.6);
+  for (const s of spots) if (!taken.has(s[0].toFixed(2) + ',' + s[1].toFixed(2)) && ![...taken].some(k => { const [x, z] = k.split(',').map(Number); return Math.hypot(x - s[0], z - s[1]) < .2; })) return s;
+  return [st.side*(.7 + Math.random()*.4), (Math.random() - .5)*3.0];
+}
+// where a rider is drawn, and how (null: out of sight, in the lift or on the train)
+function mtPose(p, t, dt){
+  const m = p.metro, st = m.l && m.l.stn && m.l.stn.get(m.k); if (!st) return null;
+  if (m.st === 'up' || m.st === 'ride' || m.st === 'down' && m.t > .4) return null;
+  if (m.st === 'board' && m.t < 0) { /* waiting their turn: where they stood */ }
+  if (m.st === 'alight' && m.t < 0) return null;
+  let alpha = 1;
+  if (m.st === 'toSpot') alpha = Math.min(1, m.t/.4);                               // out of the lift
+  if (m.st === 'down') alpha = Math.max(0, 1 - m.t/.4);                              // into it
+  if (m.st === 'board' && m.atDoor) alpha = Math.max(0, Math.min(1, (Math.abs(m.x) - .25)/.27));   // through the doors
+  if (m.st === 'alight' && !m.out) alpha = Math.max(0, Math.min(1, (Math.abs(m.x) - .25)/.27));
+  const [x, z] = mtW(st, m.x, m.z), walking = m.st === 'toSpot' || (m.st === 'board' && m.t >= 0) || (m.st === 'alight' && m.t >= 0) || m.st === 'leave' || m.st === 'down';
+  let frame;
+  if (walking) frame = Math.floor(t*9*p.speed/PPL_SPEED + p.phase) % PPL.walk;
+  else if (m.fume > pplNow) frame = F_ANGRY + Math.min(5, Math.floor((1.2 - (m.fume - pplNow))*6));   // stamping and shaking a fist
+  else frame = F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
+  if (walking && m.dx !== undefined){ const e = st.e, wx = e[0]*m.dx + e[8]*m.dz, wz = e[2]*m.dx + e[10]*m.dz, sd = wx*_camR.x + wz*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }
+  else if (!walking){ const e = st.e, wx = -e[0]*st.side, wz = -e[2]*st.side, sd = wx*_camR.x + wz*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }   // waiting: facing the track
+  return { x, y: MT_Y + MT_PLAT_Y, z, frame, alpha };
+}
+// There's always someone riding: a line with fewer than MT_MIN_RIDERS on it gets an outsider at one of its stations,
+// going to another. Off the train they look round the town for a while (like the highways' visitors), then leave by
+// the nearest station.
+let mtAmbSeq = 0;
+function mtAmbient(t){
+  if (!pplReady) return;
+  for (const l of mtLines()){
+    if ((l.ambAt || 0) > t) continue;
+    const n = mtRidersOf(l).length; if (n >= MT_MIN_RIDERS){ l.ambAt = t + 2; continue; }
+    l.ambAt = t + 3 + Math.random()*4;
+    const S = [...l.stn.values()].filter(st => places.has(st.id)); if (S.length < 2) continue;
+    const a = S[Math.floor(Math.random()*S.length)]; let b = a; while (b === a) b = S[Math.floor(Math.random()*S.length)];
+    const id = 'mtr:' + (++mtAmbSeq) + ':' + l.id, p = makePerson(id, a.id);
+    Object.assign(p, { visitor: true, wantsJob: false, courier: false, leaveAt: pplNow + 90 + Math.random()*150, at: a.id, until: Infinity });
+    p.metro = { l, k: a.k, to: b.k, final: null, ambient: true, st: 'up', t: 0, x: a.side*1.3, z: 0, waited: 0, missed: 0 };
+    people.set(id, p); pplList.push(p);
+  }
+}
+// the doors standing open on the platform side while the train's at a station: a lit gap in each, sliding wide
+const mtDoorMesh = (() => { const m = new THREE.InstancedMesh(U.box, new THREE.MeshBasicMaterial({ color: 0xf0ffe8 }), 192); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
+const _mdM = new THREE.Matrix4(), _mdL = new THREE.Matrix4();
+function mtDrawDoors(){
+  let n = 0;
+  for (const l of metros){ const tr = l.train; if (!tr || !l.stn || tr.dwell <= 0 || tr.doors <= .01) continue;
+    const st = l.stn.get(mtPath(l).stops[tr.at].k); if (!st) continue;
+    _mdM.fromArray(st.e);
+    for (const dz of MT_DOORS) for (const [x, y, h] of [[.413, MT_LEV + .12 + .36, .58], [.55, MT_PLAT_Y + .36, .66]]){ if (n >= 192) break;   // the train's doors, and the platform's screen doors in line with them
+      _mdL.makeTranslation(st.side*x, y, dz).multiply(new THREE.Matrix4().makeScale(.012, h, .28*tr.doors));
+      mtDoorMesh.setMatrixAt(n++, _mdM.clone().multiply(_mdL)); } }
+  mtDoorMesh.count = n; mtDoorMesh.visible = n > 0; if (n) mtDoorMesh.instanceMatrix.needsUpdate = true;
 }

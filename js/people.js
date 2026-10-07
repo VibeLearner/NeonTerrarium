@@ -735,8 +735,10 @@ function desire(p, h){
 function leisure(p){
   const home = places.get(p.home); if (!home) return null;
   let tot = 0; const list = [];
+  const reach = typeof mtReachFrom === 'function' ? mtReachFrom(home.x, home.z) : null;   // (how far a place is, the metro taken into account: see metro.js)
   for (const pl of places.values()){ if (pl.fun <= 0 || pl.id === p.home || !reachable(pl)) continue;
-    const v = pl.fun/(1 + (Math.hypot(pl.x - home.x, pl.z - home.z)/14)**2); tot += v; list.push([pl.id, v]); }
+    const d = reach ? reach(pl.x, pl.z) : Math.hypot(pl.x - home.x, pl.z - home.z);
+    const v = pl.fun/(1 + (d/14)**2); tot += v; list.push([pl.id, v]); }
   let r = pplRand()*tot; for (const [id, v] of list) if ((r -= v) <= 0) return id;
   return list.length ? list[list.length - 1][0] : null;
 }
@@ -875,6 +877,7 @@ function startPatrol(p, forced){
 // decide what to do next once the current stay is over
 function decide(p){
   if (p.club) return;   // out at the club: the night decides (see updateClubs)
+  if (p.metro){ p.until = Infinity; return; }   // on the platform or on the train: the metro decides (see metro.js)
   if (p.cop && working(p, S.hour) && desire(p, S.hour) === p.job && (p.patrol || p.at === p.job)){
     const back = p.patrol && pplRand() < (p.guard ? .05 : .15);   // back to the station for a bit (guards rarely step inside)
     if (!back && (p.patrol || pplRand() < .85) && startPatrol(p)) return;
@@ -886,6 +889,10 @@ function decide(p){
   p.walkedFor = (want !== p.job && want !== p.home && working(p, S.hour)) ? 'errand' : null;
   const chained = p.chain && want === p.at;   // move within the place: from the queue to a seat to eat
   if (chained && p.spot && p.spot.kind === 'queue') p.fed = true;   // walking off with their food
+  if (p.visitor && want === p.home && p.home.startsWith('mt:') && typeof mtNearestStation === 'function'){ const st = mtNearestStation(p.x, p.z); if (st && places.has(st)) p.home = st; }   // came by metro: leaves from the nearest station
+  if (!chained && want !== p.at && !p.cop && !p.archivist && typeof mtPlanTrip === 'function'){   // far, and the metro would save the walk: off to the station
+    const via = mtPlanTrip(p, want);
+    if (via && startTrip(p, via.station)){ p.metroPlan = via; p.chain = null; return; } }
   const ok = !(want === p.at && !chained) && places.has(want) && startTrip(p, want);
   p.chain = null;
   if (!ok) p.until = pplNow + 15 + pplRand()*40;
@@ -897,13 +904,15 @@ function arrive(p){
   if (w.beat){ p.at = w.to; p.patrol = w.beat; p.until = pplNow + 4 + pplRand()*7; return; }
   if (w.spot && w.spot.kind === 'seat' && p.fed){ p.fed = false; emote(p, 'bowl', 2.8); }
   p.at = w.to; p.spot = w.spot;
+  if (p.metroPlan && w.to === p.metroPlan.station && typeof mtEnter === 'function' && mtEnter(p)) return;   // at the station: up the lift to the platform (see metro.js)
+  p.metroPlan = null;
   if (p.visitor && p.at === p.home){ p.gone = true; return; }   // up the lift and away
   if (p.spot && p.spot.kind === 'queue') p.chain = 'eat';
   const pl = places.get(p.at);
   if (p.clubbing && pl && pl.mega && pl.mega.kind === 'club' && clubArrive(p, pl)) return;
   p.until = pplNow + (pl ? stayFor(p, pl) : 20);
 }
-const sendHome = p => { p.club = null; p.clubbing = false; if (p.spot && p.spot.by === p.id) p.spot.by = null; p.chain = null; p.patrol = null; p.rush = false; p.hurry = false; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
+const sendHome = p => { p.metro = null; p.metroPlan = null; p.club = null; p.clubbing = false; if (p.spot && p.spot.by === p.id) p.spot.by = null; p.chain = null; p.patrol = null; p.rush = false; p.hurry = false; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
 
 /* ---------- visitors from the sky highways ---------- */
 // A car passing through a drop-off lets someone out: they come down its lift to the street, go round the shops, stalls
@@ -1728,6 +1737,9 @@ function updatePeople(dt, t){
         // on the beat: standing at a crossing, now and then scanning with the handheld
         p.x = p.patrol.x; p.z = p.patrol.z;
         frame = Math.floor(t*.3 + p.phase) % 2 ? F_USE + Math.floor(t*6 + p.phase) % 6 : F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
+      } else if (p.metro){
+        const r = typeof mtPose === 'function' ? mtPose(p, t, dt) : null; if (!r) continue;   // up on the platform, boarding, getting off (hidden on the train)
+        p.x = r.x; p.z = r.z; y = r.y; frame = r.frame; alpha = r.alpha;
       } else if (!p.spot && ghPose(p, t, dt)){
         y = p.gy; frame = p.ghWalk ? Math.floor(t*9*p.speed/PPL_SPEED + p.phase) % PPL.walk : F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
       } else {

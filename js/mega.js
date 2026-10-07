@@ -4115,7 +4115,7 @@ function clubFx(m){
     const spot = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: .6 }));
     spot.layers.set(1); spot.scale.set(1.2, 1.2, 1); root.add(spot);
     beams.push({ b, mat, spot, k }); });
-  const _v = new THREE.Vector3();
+  const _v = new THREE.Vector3(), _down = new THREE.Vector3(0, -1, 0);
   return {
     update(dt, time){
       u.time.value = time;
@@ -4130,7 +4130,7 @@ function clubFx(m){
         const tx = Math.cos(a)*rr, tz = Math.sin(a)*rr;
         _v.set(tx - B.b.position.x, c.floorY - c.rigY, tz - B.b.position.z);
         const len = _v.length(); B.b.scale.set(1, len, 1);
-        B.b.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), _v.normalize());
+        B.b.quaternion.setFromUnitVectors(_down, _v.normalize());
         B.spot.position.set(tx, c.floorY + .04, tz);
         B.mat.opacity = .12 + .08*(.5 + .5*Math.sin(time*124/60*PI));
       }

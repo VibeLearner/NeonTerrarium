@@ -18,7 +18,8 @@
  },
  "edits": [
   "const c = cells.get(ckey(-1, 3)); if (c && !c.mega) addSection(c, 'mid');",
-  "const c = cells.get(ckey(2, -3)); if (c && c.sections.length) removeAt({ kind: 'bld', c });"
+  "const c = cells.get(ckey(2, -3)); if (c && c.sections.length) removeAt({ kind: 'bld', c });",
+  "const out = []; for (const [i, j, z] of [[-1, 2, 'low'], [1, 2, 'mid'], [3, -2, 'low'], [-3, -2, 'com'], [1, -4, 'mid'], [-2, 3, 'low'], [2, 3, 'high']]){ const c = cells.get(ckey(i, j)); out.push(!!addLift(c, c && c.sections.length ? c.height + 1.6 : 2.6, ZONES[z] ? z : 'low')); } return out;"
  ],
  "rush": "const l = metros[0], S_ = [...l.stn.values()]; const add = (st, to, n, tag) => { for (let q = 0; q < n; q++){ const id = 'rush' + tag + q, p = makePerson(id, st.id); Object.assign(p, { visitor: true, at: st.id, until: Infinity, leaveAt: 1e9 }); p.metro = { l, k: st.k, to: to.k, final: null, ambient: true, st: 'up', t: -q*.3, x: st.side*1.3, z: 0, waited: 40, missed: 1, slot: q % 3 }; if (q % 3){ Object.assign(p.metro, { st: 'toSpot', t: 1, x: st.side*(MT_LIFT_OFF - .1), z: (q % 5 - 2)*.1 }); p.metro.spot = mtSpotFor(l, st, p); } people.set(id, p); pplList.push(p); } }; add(S_[0], S_[S_.length - 1], 16, 'a'); add(S_[S_.length - 1], S_[0], 9, 'b'); if (S_.length > 2) add(S_[1], S_[0], 5, 'c'); return S_.length;"
 }

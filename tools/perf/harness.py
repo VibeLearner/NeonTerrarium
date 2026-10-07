@@ -208,24 +208,26 @@ def cmd_diff(base_ref, cand_ref, only, quick):
 def cmd_time(ref, only, frames):
     from playwright.sync_api import sync_playwright
     srv = serve()
-    url = make_site('time', ref)
+    url = make_site('time_' + (ref or 'working').replace('/', '_'), ref)
     res = {}
+    views = [('noon', 'S.hour = 12; S.rain = false'), ('night rain', 'S.hour = 23; S.rain = true'),
+             ('night zoomed out', 'S.hour = 23; S.rain = true; zoom = zoomT = 30'), ('night close', 'S.hour = 23; S.rain = true; zoom = zoomT = 4.5')]
     with sync_playwright() as pw:
         br = launch(pw)
         for sc in load_scenes(only):
-            for hour, rain in [(12, False), (23, True)]:
-                ctx, pg, errs = open_game(br, url, sc, VIEWPORTS[0])
-                pg.evaluate('h => { S.hour = h[0]; S.rain = h[1]; }', [hour, rain])
-                pg.evaluate('() => { __step(60); __perf.timeSetup(); }')
-                pg.evaluate('n => __perf.timeFrame(n)', frames)
-                res['%s @%dh' % (sc['name'], hour)] = pg.evaluate('() => __perf.timeReport()')
-                ctx.close()
+            ctx, pg, errs = open_game(br, url, sc, VIEWPORTS[0])
+            pg.evaluate('() => { __perf.skip = true; __step(120); __perf.skip = false; }')
+            res['%s: CPU, %d frames simulated' % (sc['name'], frames)] = pg.evaluate('n => __perf.cpuTime(n)', frames)
+            for name, js in views:
+                pg.evaluate('() => { ' + js + '; __perf.skip = true; __step(30); __perf.skip = false; }')
+                res['%s: GPU, %s' % (sc['name'], name)] = pg.evaluate('n => __perf.gpuTime(n)', 6)
+            ctx.close()
         br.close()
     srv.shutdown()
     for k, rep in res.items():
-        print('\n== %s (ms, mean / p95)' % k)
+        print('\n== %s (ms: mean, p95)' % k)
         for name, v in sorted(rep.items(), key=lambda kv: -kv[1]['mean']):
-            print('  %-28s %7.2f %7.2f' % (name, v['mean'], v['p95']))
+            print('  %-24s %8.3f %8.3f' % (name, v['mean'], v['p95']))
     os.makedirs(OUT, exist_ok=True)
     with open(os.path.join(OUT, 'timing_%s.json' % (ref or 'working').replace('/', '_')), 'w') as f:
         json.dump(res, f, indent=1)
@@ -261,7 +263,7 @@ if __name__ == '__main__':
     ap.add_argument('--ref', default=None)
     ap.add_argument('--only', nargs='*')
     ap.add_argument('--quick', action='store_true', help='one viewport only')
-    ap.add_argument('--frames', type=int, default=300)
+    ap.add_argument('--frames', type=int, default=600)
     a = ap.parse_args()
     os.makedirs(CACHE, exist_ok=True)
     if a.cmd == 'scenes':

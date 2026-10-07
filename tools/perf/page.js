@@ -52,29 +52,37 @@ window.__perf = (() => {
     const info = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, points: renderer.info.render.points, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures };
     return { png, info, state: P.state() };
   };
-  // timing: wall-clock per update function and per render pass (gl.finish after each pass so GPU work is charged to it)
-  P.timeSetup = () => {
-    const now = __realNow, acc = P.acc = {}, add = (k, v) => { const a = acc[k] || (acc[k] = []); a.push(v); };
-    P.frameAcc = {};
-    const gl = renderer.getContext();
-    const names = ['updateCars', 'updateDrones', 'updateTrips', 'updateHighways', 'updateMetros', 'updateVehicleShadows', 'updateAnims', 'updateMegaFx', 'updatePeople', 'updateSteam', 'updateConveyors', 'updateCamera', 'renderNightLights', 'renderGlow'];
-    const cur = {};
-    for (const nm of names){ const f = window[nm]; if (typeof f !== 'function') continue;
-      window[nm] = function(...a){ const t0 = now(); const res = f.apply(this, a); if (nm.startsWith('render')) gl.finish(); cur[nm] = (cur[nm] || 0) + now() - t0; return res; }; }
-    const rr = renderer.render.bind(renderer);
-    let depth = 0;
-    renderer.render = (sc, c) => {
-      const lbl = sc === scene ? 'scene L' + c.layers.mask + (sc.overrideMaterial ? ' ovr' : '') : sc === compScene ? 'composite' : (typeof cloudScene !== 'undefined' && sc === cloudScene) ? 'clouds' : (typeof glowScene !== 'undefined' && sc === glowScene) ? 'glow pass' : (typeof upScene !== 'undefined' && sc === upScene) ? 'upscale' : 'other';
-      const t0 = now(); rr(sc, c); gl.finish(); cur['pass: ' + lbl] = (cur['pass: ' + lbl] || 0) + now() - t0;
-    };
-    P.timeFrame = n => {
-      for (let i = 0; i < n; i++){
-        for (const k in cur) delete cur[k];
-        const t0 = now(); __step(1); gl.finish(); cur.frame = now() - t0;
-        for (const k in cur) add(k, cur[k]);
-      }
-    };
-    P.timeReport = () => { const out = {}; for (const k in acc){ const a = acc[k].slice().sort((x, y) => x - y); out[k] = { mean: a.reduce((s, v) => s + v, 0)/a.length, p95: a[Math.min(a.length - 1, Math.floor(a.length*.95))], n: a.length }; } return out; };
+  // Timing. CPU: frames simulated without drawing (as between captures), each update function and the whole frame timed;
+  // the skipped draws still do their world-matrix updates, so that cost is in "frame". GPU: one view drawn, then single
+  // passes redrawn several times each, synchronised with a 1-pixel read, so a pass's own cost is measured on its own.
+  P.cpuTime = n => {
+    const now = __realNow, acc = {}, cur = {};
+    const names = ['updateCars', 'updateDrones', 'updateTrips', 'updateHighways', 'updateMetros', 'updateVehicleShadows', 'updateAnims', 'updateMegaFx', 'updatePeople', 'updateSteam', 'updateConveyors', 'updateCamera'];
+    const orig = {};
+    for (const nm of names){ const f = window[nm]; if (typeof f !== 'function') continue; orig[nm] = f;
+      window[nm] = function(...a){ const t0 = now(); const r_ = f.apply(this, a); cur[nm] = (cur[nm] || 0) + now() - t0; return r_; }; }
+    P.skip = true;
+    for (let i = 0; i < n; i++){
+      for (const k in cur) delete cur[k];
+      const t0 = now(); __step(1); cur.frame = now() - t0;
+      for (const k in cur) (acc[k] || (acc[k] = [])).push(cur[k]);
+    }
+    P.skip = false;
+    for (const nm in orig) window[nm] = orig[nm];
+    return P.report(acc);
+  };
+  P.report = acc => { const out = {}; for (const k in acc){ const a = acc[k].slice().sort((x, y) => x - y); out[k] = { mean: a.reduce((s_, v) => s_ + v, 0)/a.length, p95: a[Math.min(a.length - 1, Math.floor(a.length*.95))], n: a.length }; } return out; };
+  P.gpuTime = reps => {
+    const now = __realNow, gl = renderer.getContext(), px = new Uint8Array(4);
+    const sync = () => { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
+    __step(1); sync();   // one whole frame first: every target filled for this view
+    const acc = {};
+    const time = (k, fn) => { const a = acc[k] = []; for (let i = 0; i < reps; i++){ sync(); const t0 = now(); fn(); sync(); a.push(now() - t0); } };
+    time('composite', () => { renderer.setRenderTarget(rtOut); renderer.render(compScene, compCam); renderer.setRenderTarget(null); });
+    time('night lights', () => { renderNightLights(comp.uniforms.night.value); renderer.setRenderTarget(null); });
+    time('matrix update x1', () => { scene.updateMatrixWorld(); });
+    time('whole frame', () => { __step(1); });
+    return P.report(acc);
   };
   return P;
 })();

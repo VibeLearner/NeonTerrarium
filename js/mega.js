@@ -2666,6 +2666,26 @@ function logisticsFx(m){
     const carry = k % 2 === 0; parcel.visible = carry;
     drones.push({ grp, rotors, parcel, st, carry, state: 'sit', timer: .5 + k*.7 + Math.random()*1.5, curve: null, s: 0, len: 0, spin: 0, to: null, yaw: Math.random()*TAU, cy: toW(0, (g.cruise || 0) + (k % 11)*.17, 0).y });
   }
+  // The drones' solid parts (body, arms, lights, skids, parcel) are drawn as one batch per material for all of them,
+  // a copy each, instead of a mesh each (fourteen a drone); the see-through rotor discs stay meshes of their own.
+  const dParts = new Map();   // material -> [{ d, m: the part's matrix in its drone, parcel: is it part of the parcel }]
+  for (const d of drones){ d.grp.updateMatrix(); d.parcel.updateMatrix();
+    for (const o of [...d.grp.children, ...d.parcel.children]){
+      if (!o.isMesh || d.rotors.includes(o)) continue;
+      o.updateMatrix(); const inParcel = o.parent === d.parcel;
+      let l = dParts.get(o.material); if (!l) dParts.set(o.material, l = []);
+      l.push({ d, m: inParcel ? d.parcel.matrix.clone().multiply(o.matrix) : o.matrix.clone(), parcel: inParcel });
+      o.parent.remove(o); } }
+  // (each batch is skipped when its hub is off screen: its bounds are a sphere round every stop, with room for the flights between)
+  const dSphere = (() => { const c = new THREE.Vector3(); for (const s of stops) c.add(s.p); c.divideScalar(Math.max(1, stops.length)); let r = 0; for (const s of stops) r = Math.max(r, s.p.distanceTo(c)); for (const d of drones) r = Math.max(r, d.cy - c.y); return new THREE.Sphere(c, r + 2.5); })();
+  const dGeo = new THREE.BufferGeometry(); for (const k in geo.attributes) dGeo.setAttribute(k, geo.attributes[k]); if (geo.index) dGeo.setIndex(geo.index); dGeo.boundingSphere = dSphere; dGeo.boundingBox = new THREE.Box3().setFromCenterAndSize(dSphere.center, new THREE.Vector3(1, 1, 1).multiplyScalar(dSphere.radius*2));
+  const dInst = [...dParts].map(([mt, list]) => { const im = new THREE.InstancedMesh(dGeo, mt, list.length); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); sky.add(im); return { im, list }; });
+  const _dm = new THREE.Matrix4(), _d0 = new THREE.Matrix4().makeScale(0, 0, 0);
+  const dronesDraw = () => {
+    for (const d of drones) d.grp.updateMatrix();
+    for (const { im, list } of dInst){ list.forEach((p, k) => im.setMatrixAt(k, p.parcel && !p.d.parcel.visible ? _d0 : _dm.multiplyMatrices(p.d.grp.matrix, p.m))); megaFxDirty(im.instanceMatrix, m); }
+  };
+  dronesDraw();
   const trip = d => {
     const free = stops.filter(p => !p.busy && p !== d.st); if (!free.length){ d.timer = 1; return; }
     const near = free.sort((p, q) => p.p.distanceToSquared(d.st.p) - q.p.distanceToSquared(d.st.p)).slice(0, 6), to = near[Math.floor(Math.random()*near.length)];
@@ -2702,8 +2722,9 @@ function logisticsFx(m){
         }
         for (const r of d.rotors) r.rotation.y += d.spin*dt;
       }
+      dronesDraw();
     },
-    dispose(){ scene.remove(root); scene.remove(sky); geo.dispose(); cylG.dispose(); disc.dispose(); poolMat.dispose(); for (const k in mats) mats[k].dispose(); for (const B of belts){ B.slats.dispose(); B.boxes.dispose(); } }
+    dispose(){ scene.remove(root); scene.remove(sky); for (const { im } of dInst) im.dispose(); dGeo.dispose(); geo.dispose(); cylG.dispose(); disc.dispose(); poolMat.dispose(); for (const k in mats) mats[k].dispose(); for (const B of belts){ B.slats.dispose(); B.boxes.dispose(); } }
   };
 }
 

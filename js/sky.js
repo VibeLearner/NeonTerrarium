@@ -432,7 +432,11 @@ const comp = new THREE.ShaderMaterial({
       if (raysOn > 0.5 && rayI > 0.01){
         // light shafts: haze near the island lit wherever the shadow map says the sun gets through
         float t0 = max(0.0, (12.0 - ro.y)/min(rdir.y, -0.001)), t1 = min(tEnd, (-0.5 - ro.y)/min(rdir.y, -0.001));
-        if (t1 > t0){
+        // (the haze is only within 13 units of glowC: a line of sight that never comes that close adds exactly nothing,
+        // so its shadow-map lookups are skipped; half a unit to spare)
+        vec2 rsa = ro.xz + rdir.xz*t0, rsb = ro.xz + rdir.xz*t1 - rsa;
+        float rsk = clamp(dot(glowC - rsa, rsb)/max(dot(rsb, rsb), 1e-6), 0.0, 1.0);
+        if (t1 > t0 && length(rsa + rsb*rsk - glowC) < 13.5){
           const int RSTEPS = 12;
           float dt = (t1 - t0)/float(RSTEPS), acc = 0.0;
           for (int i=0; i<RSTEPS; i++){

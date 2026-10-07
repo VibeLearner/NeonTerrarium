@@ -121,7 +121,8 @@ def steps(scene):
         ('morning_rays', 40, 'S.hour = 8.5; S.vclouds = false'),
     ]
     for k, e in enumerate(scene.get('edits', [])):
-        s.append(('edit%d' % k, 45, e))
+        s.append(('edit%d_mid' % k, 4, e))      # mid-animation: the build sweep and its outline pass
+        s.append(('edit%d' % k, 41, None))
     s.append(('evening_cycle', 120, 'S.hour = 17.8; S.cycle = true; S.vclouds = true'))
     return s
 

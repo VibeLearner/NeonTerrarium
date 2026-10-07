@@ -31,6 +31,9 @@
    "zoom": 24,
    "yaw": 0.7
   },
-  "build": "maybeSpawnMegas = () => {}; for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++) if (!cells.has(ckey(i,j))) addPlatform(i, j, null); const c0 = cells.get(ckey(0,0)); const log = []; for (const k of Object.keys(MEGA_TYPES)) { const m = spawnMega(k, c0); for (const a of [...anims]) finishAnimsOn(a.c); log.push(k + (m ? '@' + m.i + ',' + m.j + ' skin ' + (m.skin||0) : ' FAILED')); } for (let q = 0; q < 2; q++){ const m = spawnMega('logistics', c0); for (const a of [...anims]) finishAnimsOn(a.c); log.push('logistics extra ' + (m ? m.skin : 'FAILED')); } return log;"
+  "build": "maybeSpawnMegas = () => {}; for (let i=-2;i<=2;i++) for (let j=-2;j<=2;j++) if (!cells.has(ckey(i,j))) addPlatform(i, j, null); const c0 = cells.get(ckey(0,0)); const log = []; for (const k of Object.keys(MEGA_TYPES)) { const m = spawnMega(k, c0); for (const a of [...anims]) finishAnimsOn(a.c); log.push(k + (m ? '@' + m.i + ',' + m.j + ' skin ' + (m.skin||0) : ' FAILED')); } for (let q = 0; q < 2; q++){ const m = spawnMega('logistics', c0); for (const a of [...anims]) finishAnimsOn(a.c); log.push('logistics extra ' + (m ? m.skin : 'FAILED')); } return log;",
+  "edits": [
+   "const m = spawnMega('market', cells.get(ckey(0, 0))); return !!m;"
+  ]
  }
 ]

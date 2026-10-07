@@ -16,5 +16,7 @@
   "neonIsland.highways": "[]",
   "neonIsland.tmenuOpen": "1"
  },
- "edits": []
+ "edits": [
+  "const m = spawnMega('market', cells.get(ckey(0, 0))); return !!m;"
+ ]
 }

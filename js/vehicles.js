@@ -415,7 +415,7 @@ function surfaceAt(x, z){
   if (c.sections.length && Math.abs(x - c.x) < SIDE/2 && Math.abs(z - c.z) < SIDE/2) return c.height;
   return CURB + .06;
 }
-const _vs = new THREE.Vector3(), _vf = new THREE.Vector3(), _vm = new THREE.Matrix4(), _vq = new THREE.Quaternion(), _vsc = new THREE.Vector3(), _vup = new THREE.Vector3(0,1,0);
+const _vs = new THREE.Vector3(), _vf = new THREE.Vector3(), _vm = new THREE.Matrix4(), _vq = new THREE.Quaternion(), _vsc = new THREE.Vector3(), _vup = new THREE.Vector3(0,1,0), _vsz = new THREE.Vector3();
 function updateVehicleShadows(){
   const sd = _vs.copy(SUN_DIR);
   vShadow.material.uniforms.strength.value = .8 * Math.min(1, sun.intensity/1.1);
@@ -433,7 +433,7 @@ function updateVehicleShadows(){
     const lift = p.y - h, fade = Math.max(.45, 1 - lift/14);
     _vf.set(0, 0, 1).applyQuaternion(g.quaternion);
     _vq.setFromAxisAngle(_vup, Math.atan2(_vf.x, _vf.z));
-    _vm.compose(_vsc.set(x, h + .015, z), _vq, new THREE.Vector3(wid*fade, 1, len*fade));
+    _vm.compose(_vsc.set(x, h + .015, z), _vq, _vsz.set(wid*fade, 1, len*fade));
     vShadow.setMatrixAt(n++, _vm);
   };
   for (const c of tripCars) cast(c.g, c.len0 || 1.05, .5);

@@ -296,6 +296,18 @@ function megaFx(m){
   const t = MEGA_TYPES[m.kind]; if (t.fx) m.fx = t.fx(m) || null;
 }
 function updateMegaFx(dt, time){ for (const m of megas.values()) if (m.fx) m.fx.update(dt, time); }
+// The effects' instance buffers (belts, crates, the spire's light) change every frame, but only go up to the graphics card
+// while their megastructure is on screen (none of them casts a shadow, so off screen they show nowhere); a change made off
+// screen waits and goes up the frame it comes into view. megaFxFlush runs once the frame's view is known (main.js).
+const megaFxPending = new Map();   // buffer attribute -> its megastructure
+function megaFxDirty(attr, m){ megaFxPending.set(attr, m); }
+function megaFxFlush(VP){
+  for (const [attr, m] of megaFxPending){
+    if (megas.get(m.id) !== m){ megaFxPending.delete(attr); continue; }   // (gone, or rebuilt as a new one)
+    const pad = 2.5, x0 = m.i*LOT - LOT/2 - pad, x1 = (m.i + m.w - 1)*LOT + LOT/2 + pad, z0 = m.j*LOT - LOT/2 - pad, z1 = (m.j + m.h - 1)*LOT + LOT/2 + pad;
+    if (boxOnScreen(VP, x0, x1, -8, Math.max(m.top || 0, m.roofH || 0, CURB) + 8, z0, z1)){ attr.needsUpdate = true; megaFxPending.delete(attr); }
+  }
+}
 function rebuildMega(m){
   finishAnimsOn(m);
   disposeData(m.data);
@@ -1786,7 +1798,7 @@ function greenhouseFx(m){
     crates.forEach((c, k) => { const x = B.x0 + ((c + off) % BL), e = Math.min(1, (x - B.x0)/.3, (B.x1 - x)/.3);   // (shrinking into the ends, where the tanks take them)
       place(boxes, k, x, B.y + .15*e, B.z, .42*e, .3*e, .36*e);
       for (let q = 0; q < 4; q++) place(leaves, k*4 + q, x - .1*e + (q%2)*.2*e, B.y + .34*e, B.z - .08*e + (q > 1 ? .16*e : 0), .14*e, .09*e, .12*e); });
-    for (const im of [slats, boxes, leaves]) im.instanceMatrix.needsUpdate = true;
+    for (const im of [slats, boxes, leaves]) megaFxDirty(im.instanceMatrix, m);
   };
   return {
     update(dt, t){
@@ -1910,7 +1922,7 @@ function spireFx(m){
         c.copy(C).lerp(W_, Math.min(1, Math.max(0, v - .8))).multiplyScalar(Math.min(1.6, v + .15));
         mesh.instanceColor.setXYZ(k, c.r, c.g, c.b);
       }
-      mesh.instanceColor.needsUpdate = true;
+      megaFxDirty(mesh.instanceColor, m);
       for (const h of halos){ const wv = ph > .3 ? Math.exp(-(((h.position.y - wy)/2.6)**2)) : 0; h.material.opacity = Math.min(1, .25 + .55*thump + .8*wv); }
     },
     dispose(){ scene.remove(root); mesh.geometry.dispose(); mesh.material.dispose(); for (const h of halos) h.material.dispose(); }
@@ -2615,7 +2627,7 @@ function logisticsFx(m){
     for (let k = 0; k < B.nSl; k++){ o3.position.copy(B.a).addScaledVector(B.dir, (k*.3 + off) % B.len); o3.quaternion.copy(B.q); o3.scale.set(.05, .025, B.w - .04); o3.updateMatrix(); B.slats.setMatrixAt(k, o3.matrix); }
     B.crates.forEach((c, k) => { const s = (c + off) % B.len, e = Math.max(.001, Math.min(1, s/.35, (B.len - s)/.35));
       o3.position.copy(B.a).addScaledVector(B.dir, s).addScaledVector(B.yA, .02 + .14*e); o3.quaternion.copy(B.q); o3.scale.set(.36*e, .26*e, .34*e); o3.updateMatrix(); B.boxes.setMatrixAt(k, o3.matrix); });
-    B.slats.instanceMatrix.needsUpdate = B.boxes.instanceMatrix.needsUpdate = true; } };
+    megaFxDirty(B.slats.instanceMatrix, m); megaFxDirty(B.boxes.instanceMatrix, m); } };
   // the forklifts
   const lifts = g.lanes.map((L, k) => {
     const f = new THREE.Group(); root.add(f);

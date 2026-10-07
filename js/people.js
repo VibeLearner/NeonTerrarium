@@ -1400,17 +1400,22 @@ function drawBouncers(emit, t, dt){
 // Each walkway between a pod and the building it hangs off has a neighbour or two using it: out of one door, across
 // the planks, in at the other, a pause inside, and back. They fade in and out at the doors like everyone else.
 const deckWalkers = new Map();
+let deckFrame = 0;
 function drawDeckWalkers(emit, t, dt){
-  const seen = new Set();
+  deckFrame++;   // (each walker's record is stamped as it's seen; the unseen are dropped after)
   for (const c of cells.values()){
     if (!c.walks || !c.walks.length) continue;
     c.walks.forEach((w, k) => {
-      const n = 1 + (hash('deckn', c.i, c.j, k) % 3 === 0 ? 1 : 0);
+      // how many use it, their keys and its length: fixed for this walkway, worked out once (a rebuilt plot makes new ones)
+      let wc = w._deck; if (!wc || wc.i !== c.i || wc.j !== c.j || wc.k !== k){ const n = 1 + (hash('deckn', c.i, c.j, k) % 3 === 0 ? 1 : 0);
+        wc = w._deck = { i: c.i, j: c.j, k, keys: Array.from({ length: n }, (_, q) => c.i + ',' + c.j + ':' + k + ':' + q), len: Math.hypot(w.bx - w.ax, w.bz - w.az) }; }
+      const n = wc.keys.length;
       for (let q = 0; q < n; q++){
-        const key = c.i + ',' + c.j + ':' + k + ':' + q; seen.add(key);
+        const key = wc.keys[q];
         let d = deckWalkers.get(key);
-        const len = Math.hypot(w.bx - w.ax, w.bz - w.az);
+        const len = wc.len;
         if (!d || d.len !== len){ d = { len, u: Math.random(), dir: Math.random() < .5 ? 1 : -1, wait: q ? 4 + Math.random()*10 : Math.random()*3, row: hash('deckrow', c.i, c.j, k, q) % CITIZEN_ROWS, ph: Math.random()*10, flip: 1 }; deckWalkers.set(key, d); }
+        d.seen = deckFrame;
         const wd = c._walkDoors && c._walkDoors[k], end = d.u < .5 ? 0 : 1;
         if (d.wait > 0){ d.wait -= dt; if (d.wait < .25 && wd && wd[end]) wd[end].want = true; continue; }   // indoors for a while (the door opens as they come out)
         if (wd){ const e0 = d.u*len, e1 = (1 - d.u)*len; if (e0 < .5 && wd[0]) wd[0].want = true; if (e1 < .5 && wd[1]) wd[1].want = true; }
@@ -1423,7 +1428,7 @@ function drawDeckWalkers(emit, t, dt){
       }
     });
   }
-  for (const k of deckWalkers.keys()) if (!seen.has(k)) deckWalkers.delete(k);
+  for (const [k, d] of deckWalkers) if (d.seen !== deckFrame) deckWalkers.delete(k);
 }
 
 /* ---------- the side pods' lifts ---------- */
@@ -1565,18 +1570,20 @@ function emote(p, kind, dur = 2.2){ p.emo = EMO[kind]; p.emoUntil = pplNow + dur
 // Walkers (and bots) coming at each other on a narrow path sometimes bump: both stop for a moment and react, with
 // a bubble over their heads (or, for a police officer, a proper scowl). A short cooldown stops the same pair
 // bumping again as they pass.
-const _bumpGrid = new Map();
+const _bumpGrid = new Map(), _bumpMovers = [];
+const bumpKey = (gx, gz) => (gx + 8192)*16384 + (gz + 8192);   // (a number per half-unit square: no strings to build every frame)
 function checkBumps(t){
-  _bumpGrid.clear();
-  const movers = [];
+  for (const l of _bumpGrid.values()) l.length = 0;   // (the squares' lists are kept and emptied, not remade)
+  const movers = _bumpMovers; movers.length = 0;
   for (const p of pplList){ const w = p.walk; if (!w || w.s < w.safe0 || w.s > w.safe1 || p.pause > t) continue; movers.push(p); }
   for (const b of bots) if (b.walk && b.state === 'go' && !(b.pause > t) && b.walk.s > .6 && b.walk.len - b.walk.s > .6) movers.push(b);
-  for (const m of movers){ const k = Math.floor(m.x*2) + ',' + Math.floor(m.z*2); let l = _bumpGrid.get(k); if (!l) _bumpGrid.set(k, l = []); l.push(m); }
+  if (_bumpGrid.size > 4096) _bumpGrid.clear();
+  for (const m of movers){ const k = bumpKey(Math.floor(m.x*2), Math.floor(m.z*2)); let l = _bumpGrid.get(k); if (!l) _bumpGrid.set(k, l = []); l.push(m); }
   for (const m of movers){
     if (m.bumpCD > t) continue;
     const gx = Math.floor(m.x*2), gz = Math.floor(m.z*2);
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++){
-      const l = _bumpGrid.get((gx + dx) + ',' + (gz + dz)); if (!l) continue;
+      const l = _bumpGrid.get(bumpKey(gx + dx, gz + dz)); if (!l || !l.length) continue;
       for (const o of l){
         if (o === m || o.bumpCD > t || m.bumpCD > t) continue;
         if ((m.x - o.x)**2 + (m.z - o.z)**2 > .27*.27) continue;

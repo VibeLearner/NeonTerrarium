@@ -198,11 +198,16 @@ const comp = new THREE.ShaderMaterial({
       // the pads (from their faces down about two units, strongest near the face); where it passes through a
       // plume, the colour and clouds are read from a pixel or two to the side, rippling with time, in whole pixels.
       vec2 sUv = vUv; float shim = 0.0;
-      if (nLifts > 0.5){
+      float rd = rawD(vUv);
+      // the pixel's line of sight (both shimmers march along it): from the near plane, and how far to what's drawn there
+      vec3 o0 = vec3(0.0), dr0 = vec3(0.0, -1.0, 0.0); float tS = 0.0;
+      if (nLifts > 0.5 || mtN > 0){
         vec2 nd0 = vUv*2.0 - 1.0;
         vec4 a0 = invVP*vec4(nd0, -1.0, 1.0); a0 /= a0.w; vec4 b0 = invVP*vec4(nd0, 1.0, 1.0); b0 /= b0.w;
-        vec3 o0 = a0.xyz, dr0 = normalize(b0.xyz - a0.xyz);
-        float rdS = rawD(vUv); vec4 f0 = invVP*vec4(nd0, rdS*2.0 - 1.0, 1.0); f0 /= f0.w; float tS = length(f0.xyz - o0);
+        o0 = a0.xyz; dr0 = normalize(b0.xyz - a0.xyz);
+        vec4 f0 = invVP*vec4(nd0, rd*2.0 - 1.0, 1.0); f0 /= f0.w; tS = length(f0.xyz - o0);
+      }
+      if (nLifts > 0.5){
         if (dr0.y < -0.01){
           float ta = (-1.72 - o0.y)/dr0.y, tb = min((-3.9 - o0.y)/dr0.y, tS);
           if (tb > ta){
@@ -216,7 +221,7 @@ const comp = new THREE.ShaderMaterial({
           float s1 = clamp(shim*7.0, 0.0, 1.0);
           vec2 o = vec2(sin(vUv.y*res.y*.9 - time*15.0 + 2.0*sin(vUv.x*res.x*.35 + time*3.0)), .5*sin(vUv.x*res.x*.7 + time*11.0))*s1*2.2;
           vec2 cand = vUv + floor(o + .5)*px;
-          if ((rawD(cand) >= 0.99999) == (rdS >= 0.99999)) sUv = cand;
+          if ((rawD(cand) >= 0.99999) == (rd >= 0.99999)) sUv = cand;
         }
       }
       // ---- the metro's magnetic field: the air in the gap over each car (between its magnet shoe and the girder's
@@ -225,10 +230,7 @@ const comp = new THREE.ShaderMaterial({
       // air at the gap's height, and wherever it passes through a box, that counts.
       float mtSh = 0.0;
       if (mtN > 0){
-        vec2 nd1 = vUv*2.0 - 1.0;
-        vec4 a1 = invVP*vec4(nd1, -1.0, 1.0); a1 /= a1.w; vec4 b1 = invVP*vec4(nd1, 1.0, 1.0); b1 /= b1.w;
-        vec3 o1 = a1.xyz, d1 = normalize(b1.xyz - a1.xyz);
-        float rd1 = rawD(vUv); vec4 f1 = invVP*vec4(nd1, rd1*2.0 - 1.0, 1.0); f1 /= f1.w; float tS1 = length(f1.xyz - o1);
+        vec3 o1 = o0, d1 = dr0; float tS1 = tS;
         if (abs(d1.y) > 0.001){
           float ta = (mtGapY.y - o1.y)/d1.y, tb = (mtGapY.x - o1.y)/d1.y;
           if (ta > tb){ float tt = ta; ta = tb; tb = tt; }
@@ -249,7 +251,6 @@ const comp = new THREE.ShaderMaterial({
         }
       }
       vec4 c = texture2D(tColor, sUv);
-      float rd = rawD(vUv);
       vec3 col;
       if (rd >= 0.99999){
         // pastel pixel-art sky: the gradient in ten flat bands, with only a thin dithered seam where two meet

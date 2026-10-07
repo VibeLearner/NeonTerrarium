@@ -786,7 +786,7 @@ const NL_UNI = { lightsOn: LIGHTS_ON, scale: { value: 10 }, time: FOL_UNI.time, 
                  tDepth: { value: null }, tNormal: { value: null }, lightI: { value: 0 } };
 const nightLightMat = new THREE.ShaderMaterial({
   uniforms: NL_UNI,
-  vertexShader: `attribute float size; attribute vec4 aCol; attribute float aFlk; attribute float aOn; uniform float scale; uniform float time; uniform float lightsOn;
+  vertexShader: `attribute float size; attribute vec4 aCol; attribute float aFlk; attribute float aOn; uniform float scale; uniform float time; uniform float lightsOn; uniform vec2 res;
     varying vec3 vL; varying vec3 vC; varying float vR;` + FLK_GLSL + BLINK_GLSL + LIT_GLSL + `
     void main(){
       vec4 w = modelMatrix*vec4(position, 1.0); vL = w.xyz;
@@ -796,6 +796,10 @@ const nightLightMat = new THREE.ShaderMaterial({
       vec4 cp = projectionMatrix*viewMatrix*w; cp.xyz /= cp.w;
       gl_Position = vec4(clamp(cp.xy, -1.0, 1.0), 0.0, 1.0);   // pulled onto the screen if it's just off it
       gl_PointSize = 2.0*R*scale;
+      // further off the screen than its reach, it can't light anything shown (the view is orthographic: a surface on
+      // screen is at least as far from the light in the world as it is on screen): dropped, so its square isn't drawn
+      vec2 off = (abs(cp.xy) - 1.0)*.5*res;
+      if (max(off.x, off.y) > R*scale + 4.0) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     }`,
   fragmentShader: `uniform sampler2D tDepth; uniform sampler2D tNormal; uniform vec2 res; uniform mat4 invVP; uniform float lightI;
     varying vec3 vL; varying vec3 vC; varying float vR;

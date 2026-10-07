@@ -1,7 +1,7 @@
 # Frame-rate work: results (2026-10-07)
 
 Every change below was checked with `harness.py diff`. The final check compares the build before any of this work
-(tag `perf-base`) with the finished build: 106 captures (3 scenes, 2 screen sizes, noon to night, rain, zoom, pan,
+(local tag `perf-base`, commit 87f3f6e) with the finished build: 106 captures (3 scenes, 2 screen sizes, noon to night, rain, zoom, pan,
 effects off and on, edits mid-animation, a station rush, a running day cycle). Every PNG, simulation dump, save and
 `renderer.info` count was identical.
 

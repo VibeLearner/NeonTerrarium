@@ -390,13 +390,12 @@ function mtCarModel(cab, nose = 1){
   for (const s of [-1, 1]) add(MTM.body, s*(Wb/2 - rr*.62), y0 + H - rr*.62, bz, rr*1.15, rr*.55, bl, 0, s*.7);
   add(MTM.body2, 0, y0 + H + .005, bz, Wb - .34, .015, bl - .1);                     // the roof's centre panel
   // the inside, seen through the doors: a lit ceiling strip, grab poles and a rail, benches against the core either side
-  // of the door, an ad on the core's wall, now and then a rider holding on
+  // of the door, now and then a rider holding on
   for (const s of [-1, 1]){
     const xi = s*(ci/2 + .003);
     add(MTM.lit, s*(Wb/2 - .17), y0 + H - rr - .015, dz, .06, .015, DW + .3);
     for (const o of [-.2, .2]) add(MTM.pole, s*(Wb/2 - .15), (yd0 + yd1)/2, dz + o, .018, DH, .018);
     add(MTM.pole, s*(Wb/2 - .15), yd1 - .06, dz, .014, .014, .44);
-    add(MTM.ad, xi, y0 + .45, dz, .004, .22, .3); add(MTM.green, xi + s*.002, y0 + .58, dz, .004, .015, .32);
     for (const o of [-.27, .27]){ add(MTM.seat, s*(ci/2 + .045), y0 + .18, dz + o, .09, .035, .16); add(MTM.seat, s*(ci/2 + .012), y0 + .28, dz + o, .025, .18, .16); }
     if (R_() < .6){ const o = (R_() - .5)*.2; add(MTM.sil, s*(Wb/2 - .22), y0 + .3, dz + o, .06, .4, .1); add(MTM.sil, s*(Wb/2 - .22), y0 + .56, dz + o, .055, .1, .07); add(MTM.sil, s*(Wb/2 - .18), y0 + .58, dz + o + .05, .02, .14, .02); }
   }

@@ -73,9 +73,10 @@ function frame(now){
   if (anims.length){
     cam.layers.set(3);
     for (const a of anims){
-      a.view.traverse(o => { if (o.isMesh){ o.userData.colMat = o.material; o.material = a.mats.nrm; } });
+      if (!a.meshes){ a.meshes = []; a.view.traverse(o => { if (o.isMesh) a.meshes.push(o); }); }   // (found once: a piece's meshes don't change while it animates)
+      for (const o of a.meshes){ o.userData.colMat = o.material; o.material = a.mats.nrm; }
       renderer.render(a.view, cam);
-      a.view.traverse(o => { if (o.isMesh) o.material = o.userData.colMat; });
+      for (const o of a.meshes) o.material = o.userData.colMat;
     }
   }
   renderer.autoClear = true;

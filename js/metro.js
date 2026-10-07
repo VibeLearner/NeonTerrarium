@@ -581,7 +581,7 @@ function updateMetros(dt, t){
         for (const sx of [-1, 1]){ const ox = sx*.2*Math.cos(yaw), oz = -sx*.2*Math.sin(yaw);   // a sheet each side of the shoe, wavering in height
           _mdm.position.set(_mpos.x + ox, _mpos.y + top + gap/2, _mpos.z + oz); _mdm.rotation.set(0, yaw, 0); _mdm.scale.set(1, gap*(1.8 + .15*Math.sin(t*3 + q*2.1 + sx)), MT_CL); _mdm.updateMatrix(); mtField.setMatrixAt(nf++, _mdm.matrix); }
         _mdm.position.set(_mpos.x, _mpos.y + top + .01, _mpos.z); _mdm.rotation.set(0, yaw, PI/2); _mdm.scale.set(1, .7, MT_CL); _mdm.updateMatrix(); mtField.setMatrixAt(nf++, _mdm.matrix); }   // and one lying on the roof
-      if (ng < MT_CAR_MAX){ _mdm.position.set(_mpos.x, _mpos.y + .012, _mpos.z); _mdm.rotation.set(0, yaw, 0); _mdm.scale.set(.85, 1, MT_CL*1.2); _mdm.updateMatrix(); mtGlow.setMatrixAt(ng++, _mdm.matrix); }
+      if (ng < MT_CAR_MAX) ng++;   // (the count still caps the field sheets above; the deck glow itself is no longer drawn: see below)
     }
   }
   mtRiders(dt, t);

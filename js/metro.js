@@ -854,7 +854,7 @@ function mtAmbient(t){
     people.set(id, p); pplList.push(p);
   }
 }
-// the door leaves: two to a door each side, sliding apart over the car's wall at a station (on the side its platform's
+// the door leaves: two to a door each side, sliding apart into the car's walls at a station (on the side its platform's
 // way out is), shut the rest of the time
 const MT_LEAF = (() => { const g = new THREE.Group(), mk = (mat, y, z, sy, sz, x = 0) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z); m.scale.set(.02, sy, sz); g.add(m); };
   const w = MT_DOOR_W/2, h = MT_DOOR_H;
@@ -862,13 +862,13 @@ const MT_LEAF = (() => { const g = new THREE.Group(), mk = (mat, y, z, sy, sz, x
   const f = hwFold(g), meshes = [];
   for (const [geo, mat] of [[f.plain, HW_CAR_PLAIN], [f.lit, HW_CAR_GLOW]]){ if (!geo) continue; const m = new THREE.InstancedMesh(geo, mat, MT_CAR_MAX*4); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); meshes.push(m); }
   return { meshes, n: 0 }; })();
-const _mlv = new THREE.Matrix4(), _mlw = new THREE.Matrix4();
+const _mlv = new THREE.Matrix4(), _mlw = new THREE.Matrix4(), _mls = new THREE.Matrix4();
 // the leaves of car q (its matrix M) of a train: open, how far its doors on side `side` are open
 function mtLeaves(M, q, side, open){
   const dz = q === 1 ? 0 : q === 0 ? -MT_CAB_DOOR : MT_CAB_DOOR, w = MT_DOOR_W/2, y = (.13)*MT_SY + MT_DOOR_H/2;
   for (const s of [-1, 1]){ const o = s === side ? open : 0;
     for (const e of [-1, 1]){ if (MT_LEAF.n >= MT_CAR_MAX*4) return;
-      _mlv.makeTranslation(s*.413, y, dz + e*(w/2 + o*(w - .02)));
+      _mlv.makeTranslation(s*.396, y, dz + e*(w/2 + o*w/2)).multiply(_mls.makeScale(1, 1, Math.max(.001, 1 - o)));   // (slid away into the wall either side: a cab car has no room to slide them over its wall, it would reach past its end)
       _mlw.multiplyMatrices(M, _mlv); for (const m of MT_LEAF.meshes) m.setMatrixAt(MT_LEAF.n, _mlw); MT_LEAF.n++; } }
 }
 // (the old lit door gaps: gone, the doors are real now)

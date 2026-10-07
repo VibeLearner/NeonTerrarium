@@ -187,11 +187,14 @@ function put(geo, mat, m){
   let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null, o: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
   const fid = b.f ? (DARK && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow)) : 0;
   const did = b.f ? 0 : detailId(geo, m), ord = b.f ? litOrder(m.elements[12], m.elements[13], m.elements[14]) : 0;   // lights are never dropped: they carry the look from far away
-  const P = geo.attributes.position.array, N = geo.attributes.normal ? geo.attributes.normal.array : null, idx = geo.index ? geo.index.array : null;
+  const P = geo.attributes.position.array, N = geo.attributes.normal ? geo.attributes.normal.array : null;
   const e = m.elements, ne = _nm.getNormalMatrix(m).elements, bp = b.p, bn = b.n;
-  const cnt = idx ? idx.length : P.length/3;
-  for (let q=0;q<cnt;q++){
-    const v = (idx ? idx[q] : q)*3, x = P[v], y = P[v+1], z = P[v+2];
+  // each corner once (the shape's welded corners), and its triangles as indices into them: the same triangles in the same
+  // order as before, but a corner shared by two triangles of a face is stored, and transformed on the card, only once
+  bucketIndexUpTo(b);
+  const w = weldOf(geo), src = w.src, base = bp.length/3;
+  for (let q=0;q<src.length;q++){
+    const v = src[q]*3, x = P[v], y = P[v+1], z = P[v+2];
     bp.push(e[0]*x + e[4]*y + e[8]*z + e[12], e[1]*x + e[5]*y + e[9]*z + e[13], e[2]*x + e[6]*y + e[10]*z + e[14]);
     if (N){ const a = N[v], c = N[v+1], d = N[v+2];
       const nx = ne[0]*a + ne[3]*c + ne[6]*d, ny = ne[1]*a + ne[4]*c + ne[7]*d, nz = ne[2]*a + ne[5]*c + ne[8]*d, l = Math.hypot(nx, ny, nz) || 1;
@@ -200,6 +203,33 @@ function put(geo, mat, m){
     if (b.f){ b.f.push(fid); b.o.push(ord); }
     b.d.push(did);
   }
+  const bi = b.i, tri = w.tri; for (let q = 0; q < tri.length; q++) bi.push(base + tri[q]);
+  b.ni = bp.length/3;
+}
+// A shape's corners with duplicates merged (same position and normal, bit for bit) and its triangles as indices into them.
+// Kept on the shape, and remade if its positions change.
+const _wf = new Float64Array(1), _wu = new Uint32Array(_wf.buffer);
+const _wk = x => { _wf[0] = x; return _wu[0].toString(36) + ':' + _wu[1].toString(36); };   // (exact: tells -0 from 0)
+function weldOf(geo){
+  const pa = geo.attributes.position, na = geo.attributes.normal, idx = geo.index ? geo.index.array : null;
+  let w = geo.userData._weld;
+  if (w && w.pa === pa.array && w.pv === pa.version && w.na === (na && na.array) && w.nv === (na ? na.version : 0) && w.idx === idx) return w;
+  const P = pa.array, N = na ? na.array : null, cnt = idx ? idx.length : P.length/3, map = new Map(), src = [], tri = new Uint32Array(cnt);
+  for (let q = 0; q < cnt; q++){
+    const v = idx ? idx[q] : q, o = v*3;
+    let key = _wk(P[o]) + ',' + _wk(P[o + 1]) + ',' + _wk(P[o + 2]);
+    if (N) key += '|' + _wk(N[o]) + ',' + _wk(N[o + 1]) + ',' + _wk(N[o + 2]);
+    let k = map.get(key); if (k === undefined){ k = src.length; map.set(key, k); src.push(v); }
+    tri[q] = k;
+  }
+  w = geo.userData._weld = { pa: P, pv: pa.version, na: N, nv: na ? na.version : 0, idx, src: Uint32Array.from(src), tri };
+  return w;
+}
+// Corners written straight into a bucket (floor decals, hologram quads: three per triangle) get plain indices of their own,
+// in order, so every bucket ends up indexed.
+function bucketIndexUpTo(b){
+  if (!b.i){ b.i = []; b.ni = 0; }
+  const n = b.p.length/3; for (let v = b.ni; v < n; v++) b.i.push(v); b.ni = n;
 }
 // Is this piece a fine detail? Sticks (two thin sides: posts, rails, cables, frames, pipes) and tiny bits
 // (small in every direction). Flat panels, with only one thin side, are kept: they read even when small.
@@ -220,6 +250,7 @@ function bucketGeometry(b){
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3));
   if (b.u) g.setAttribute('uv', new THREE.Float32BufferAttribute(b.u, 2));   // floor decals
+  bucketIndexUpTo(b); g.setIndex(new THREE.BufferAttribute(b.p.length/3 > 65535 ? new Uint32Array(b.i) : new Uint16Array(b.i), 1));
   return g;
 }
 const _p=new THREE.Vector3(), _q=new THREE.Quaternion(), _e=new THREE.Euler(), _s=new THREE.Vector3();

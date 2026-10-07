@@ -115,11 +115,12 @@ function rasterize(data, x0, z0, nx, nz){
   const x1 = x0 + nx*GR, z1 = z0 + nz*GR;
   for (const geo of data.geo.values()){
     if (geo.attributes.uv) continue;   // flat floor decals: nothing to walk round
-    const P = geo.attributes.position.array;
-    for (let t = 0; t + 8 < P.length; t += 9){
-      const y0 = P[t + 1], y1 = P[t + 4], y2 = P[t + 7];
+    const P = geo.attributes.position.array, I = geo.index ? geo.index.array : null, nT = I ? I.length : P.length/3;
+    for (let t = 0; t + 2 < nT; t += 3){
+      const a3 = (I ? I[t] : t)*3, b3 = (I ? I[t + 1] : t + 1)*3, c3 = (I ? I[t + 2] : t + 2)*3;   // (a triangle's three corners)
+      const y0 = P[a3 + 1], y1 = P[b3 + 1], y2 = P[c3 + 1];
       if ((y0 < Y_LO && y1 < Y_LO && y2 < Y_LO) || (y0 > Y_HI && y1 > Y_HI && y2 > Y_HI)) continue;
-      const ax = P[t], az = P[t + 2], bx = P[t + 3], bz = P[t + 5], cx = P[t + 6], cz = P[t + 8];
+      const ax = P[a3], az = P[a3 + 2], bx = P[b3], bz = P[b3 + 2], cx = P[c3], cz = P[c3 + 2];
       if (Math.max(ax, bx, cx) < x0 || Math.min(ax, bx, cx) > x1 || Math.max(az, bz, cz) < z0 || Math.min(az, bz, cz) > z1) continue;
       const tri = [[ax, y0, az], [bx, y1, bz], [cx, y2, cz]];
       // door height: what reaches the top of a doorway (so a door goes on a wall, never on a planter or a bench);

@@ -74,8 +74,12 @@ function collect(fn){
       fine.set(b.d, o);
       o += n;
     }
+    // the triangles: each bucket's indices, moved along by where its corners landed
+    let ni = 0; for (const [mat, b] of buckets) if (atlasable(mat)){ bucketIndexUpTo(b); ni += b.i.length; }
+    const ix = nAt > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+    { let o2 = 0, k = 0; for (const [mat, b] of buckets){ if (!atlasable(mat)) continue; const I = b.i; for (let q = 0; q < I.length; q++) ix[k++] = I[q] + o2; o2 += b.p.length/3; } }
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3)); g.setIndex(new THREE.BufferAttribute(ix, 1));
     g.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); g.setAttribute('aEm', new THREE.BufferAttribute(em, 4, true));
     g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aFine', new THREE.BufferAttribute(fine, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1, true));
     geo.set(ATLAS, g);

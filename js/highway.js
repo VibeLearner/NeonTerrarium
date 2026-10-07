@@ -458,7 +458,7 @@ function hwPickKind(){
 const hwPulseMesh = (() => { const m = new THREE.InstancedMesh(U.box, new THREE.MeshBasicMaterial({ color: 0xffffff }), HW_PULSE_MAX);
   m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(HW_PULSE_MAX*3), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage);
   m.count = 0; m.frustumCulled = false; scene.add(m); return m; })();
-let hwPulseDirty = true, hwPulseSegs = [];   // [{ s, side, ph }] in the batch's order
+let hwPulseDirty = true, hwPulseSegs = [], hwPulseFresh = true;   // [{ s, side, ph }] in the batch's order
 const HW_PULSE_COL = { '-1': new THREE.Color(0xff4fa3), '1': new THREE.Color(0x38e8e0) };
 // a highway's segments: along both edges of the deck (they make the lanes' edge lines), from the foot of the entry ramp to the terminal (or the open end)
 function hwPulsePlaces(h){
@@ -474,6 +474,7 @@ function hwPulsePlaces(h){
   return out;
 }
 function hwPulseRebuild(){
+  hwPulseFresh = true;   // (a new batch: its colours go up whatever they are)
   hwPulseSegs = []; let q = 0;
   for (const h of highways){ if (!h.view) continue; h.pulse = h.pulse || hwPulsePlaces(h);
     for (const g of h.pulse){ if (q >= HW_PULSE_MAX) break;
@@ -487,6 +488,7 @@ const hwCarGlow = (() => { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-P
   const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: glowTex, color: new THREE.Color(0x5af0e4).multiplyScalar(1.25), transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }), HW_CAR_MAX);
   m.count = 0; m.frustumCulled = false; m.layers.set(1); m.renderOrder = 3; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
 let hwCars = [];
+const _hwLead = new Map(), _hwOrder = [], _hwNear = [];   // (updateHighways' scratch, reused every frame)
 function hwClearCars(h){ hwPulseDirty = true; if (!h){ return; } hwCars = hwCars.filter(c => c.h !== h); h.queue = null; }
 const _hbz = new THREE.Vector3();
 // each lane's whole course: down from the sky, the ramp, the deck, through the terminal, up the ramp out and away
@@ -632,7 +634,8 @@ function updateHighways(dt, t){
   // move and draw the cars
   // how far each car may go this frame: never closer than HW_GAP behind the car ahead in its lane, and on the way in, a
   // car about to fly into another anywhere off the deck (their ways in and out cross) eases off and climbs over it
-  { const lead = new Map(), order = hwCars.slice().sort((a, b) => b.s - a.s), near = [];
+  { const lead = _hwLead, order = _hwOrder, near = _hwNear; lead.clear(); near.length = 0; order.length = 0;
+    for (const c of hwCars) order.push(c); order.sort((a, b) => b.s - a.s);
     for (const c of order){
       const LP = c.h.lanePaths; if (!LP){ c.ns = c.s; continue; }
       const P = LP[c.lane], s0 = c.s;
@@ -651,7 +654,10 @@ function updateHighways(dt, t){
     } }
   for (const K of HW_KINDS) K.n = 0;
   let nf = 0, ng = 0;
-  hwCars = hwCars.filter(c => {
+  let _hw = 0;   // (kept in place: the cars still flying are moved to the front, in order, and the rest dropped)
+  for (let _hi = 0; _hi < hwCars.length; _hi++){ const c = hwCars[_hi]; if (hwCarStep(c)) hwCars[_hw++] = c; }
+  hwCars.length = _hw;
+  function hwCarStep(c){
     const LP = c.h.lanePaths; if (!LP) return false;
     const P = LP[c.lane], s0 = c.s;
     c.s = c.ns ?? c.s + dt*HW_SPEED;
@@ -688,7 +694,7 @@ function updateHighways(dt, t){
       _hdm.scale.set(Math.min(1.5, wMax)*f, 1, 2.6*f); _hdm.updateMatrix(); hwCarGlow.setMatrixAt(ng++, _hdm.matrix); }
     if (c.s >= P.sGate && c.s < P.sGate + .9 && nf < HW_CAR_MAX){ const f = 1 - g; _hdm.position.set(_hpos.x, _hpos.y + .02, _hpos.z); _hdm.rotation.set(_hpos.pitch, _hpos.yaw, 0, 'YXZ'); _hdm.scale.set(.75*f + .2, .02, 1.1); _hdm.updateMatrix(); hwFlares.setMatrixAt(nf++, _hdm.matrix); }
     return true;
-  });
+  }
   for (const K of HW_KINDS) for (const m of K.meshes){ m.count = K.n; m.visible = K.n > 0; if (K.n) m.instanceMatrix.needsUpdate = true; }
   hwFlares.count = nf; hwFlares.visible = nf > 0; if (nf) hwFlares.instanceMatrix.needsUpdate = true;
   hwCarGlow.count = ng; hwCarGlow.visible = ng > 0; if (ng) hwCarGlow.instanceMatrix.needsUpdate = true;
@@ -697,12 +703,14 @@ function updateHighways(dt, t){
   if (hwPulseDirty) hwPulseRebuild();
   if (hwPulseSegs.length){
     const C = hwPulseMesh.instanceColor.array, PER = 11, TAIL = 1.8, v = 3;
+    let changed = hwPulseFresh; hwPulseFresh = false;
     for (let q = 0; q < hwPulseSegs.length; q++){
       const g = hwPulseSegs[q], d = (((t*v + g.ph - g.s) % PER) + PER) % PER;   // how far behind the pulse's head this segment is
       let k = d < TAIL ? 1 - d/TAIL : 0; k = Math.ceil(k*4)/4; k = .22 + .6*k*k;    // a dim edge line, stepping up softly as the pulse passes
-      const c = HW_PULSE_COL[g.side]; C[q*3] = c.r*k; C[q*3 + 1] = c.g*k; C[q*3 + 2] = c.b*k;
+      const c = HW_PULSE_COL[g.side], r = c.r*k, gg = c.g*k, b = c.b*k, o = q*3;
+      if (C[o] !== Math.fround(r) || C[o + 1] !== Math.fround(gg) || C[o + 2] !== Math.fround(b)){ C[o] = r; C[o + 1] = gg; C[o + 2] = b; changed = true; }
     }
-    hwPulseMesh.instanceColor.needsUpdate = true;
+    if (changed) hwPulseMesh.instanceColor.needsUpdate = true;   // (the steps mean most frames change only a few segments, often none: uploaded only then)
   }
   // the hexagon barriers shimmer, and the drop-offs' lift cabs go up and down
   HW_HEX_TEX.offset.y = (t*.12) % 1;

@@ -14,6 +14,7 @@ const MT_Y = hwY(12);                            // the rail's height: level wit
 const MT_W = 1.0, MT_DECK = .26, MT_GIRD = .32;  // the guideway: width, deck depth, the girder under it
 const MT_CLEAR = MT_DECK + MT_GIRD + .08;        // from the rail down to the clear space under it
 const MT_OH = 1.46, MT_OHT = .36, MT_OL = 0;     // the overhead girder: its underside above the rail, its depth, how far it sits to one side (none: right over the train)
+const MT_LIFT_R = .42, MT_LIFT_OFF = SIDE/2 + .47;   // a station lift's shaft: wide enough for two or three people at once (a sprite cell is .67 across), out in the street beside the station
 const MT_SY = 1.35;                               // the cars are built short and stretched up by this (tall enough inside for anyone)
 const MT_DOOR_W = .64, MT_DOOR_H = .95;           // a door: wider and taller than the biggest person (a sprite cell is .67 by .89)
 const MT_CAB_DOOR = -.265;                        // where a cab car's door is, along it
@@ -65,7 +66,7 @@ function mtHwRampHere(i, j){
 }
 // a station's lift down to the street: a glass shaft beside its plot, in the street band on one side
 function mtLiftSpot(l, k, side){
-  const t = l.tiles[k], { dout } = hwDirs(l, k), rx = -dout[1]*side, rz = dout[0]*side, off = SIDE/2 + .25, r = .24;
+  const t = l.tiles[k], { dout } = hwDirs(l, k), rx = -dout[1]*side, rz = dout[0]*side, off = MT_LIFT_OFF, r = MT_LIFT_R;
   const sx = t.i*LOT + rx*off, sz = t.j*LOT + rz*off;
   return { sx, sz, r, dx: dout[0], dz: dout[1], rx, rz, wall: { x: sx + dout[0]*(r + .02), z: sz + dout[1]*(r + .02) }, stand: { x: sx + dout[0]*(r + .34), z: sz + dout[1]*(r + .34) } };
 }
@@ -77,7 +78,7 @@ function mtLiftOK(l, k, side){
   if (mtShaftHitsHw(S_.sx, S_.sz, S_.r)) return false;   // (no sky highway's deck through the shaft)
   return freeAt(cellGrid(c), S_.stand.x, S_.stand.z);
 }
-const MT_SHAFT_TOP = MT_Y + 1.4;   // the top of a station's lift shaft, its cap and all
+const MT_SHAFT_TOP = MT_Y + 1.6;   // the top of a station's lift shaft, its cap and all
 // does any sky highway's deck (or its ramps) pass through a lift shaft at (x, z), below the shaft's top?
 function mtShaftHitsHw(x, z, r){
   for (const h of highways){
@@ -271,12 +272,13 @@ function mtBuildView(l){
     const s = l.sides[k]; if (!s) continue;
     const Ls = mtLiftSpot(l, k, s), cab = new THREE.Group();
     const add = (geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); cab.add(m); return m; };
-    add(U.cyl16, MTM.canopy, 0, .03, 0, .4, .06, .4); add(U.cyl16, MTM.canopy, 0, .93, 0, .42, .07, .42);
-    for (const y of [.08, .88]) add(U.torus, MTM.green, 0, y, 0, .44, .44, .3).rotation.x = PI/2;
-    for (let q = 0; q < 4; q++){ const a = q*PI/2 + PI/4; add(U.box, MTM.green2, Math.sin(a)*.19, .48, Math.cos(a)*.19, .018, .8, .018); }
+    const cr = MT_LIFT_R - .04, ch = 1.08;   // (taller than anyone, as wide as the shaft)
+    add(U.cyl16, MTM.canopy, 0, .03, 0, 2*cr, .06, 2*cr); add(U.cyl16, MTM.canopy, 0, ch, 0, 2*cr + .02, .07, 2*cr + .02);
+    for (const y of [.08, ch - .05]) add(U.torus, MTM.green, 0, y, 0, 2*cr + .04, 2*cr + .04, .3).rotation.x = PI/2;
+    for (let q = 0; q < 4; q++){ const a = q*PI/2 + PI/4; add(U.box, MTM.green2, Math.sin(a)*cr*.95, ch/2, Math.cos(a)*cr*.95, .018, ch - .1, .018); }
     const f = hwFold(cab), folded = new THREE.Group();
     for (const [geo, mat] of [[f.plain, HW_CAR_PLAIN], [f.lit, HW_CAR_GLOW]]) if (geo){ const m = new THREE.Mesh(geo, mat); m.userData.own = true; folded.add(m); }
-    folded.position.set(Ls.sx, CURB, Ls.sz); l.fx.add(folded); l.cabs.push({ g: folded, y0: CURB + .02, y1: MT_Y + .14, ph: (l.id*.37 + k*.21) % 1 });
+    folded.position.set(Ls.sx, CURB, Ls.sz); l.fx.add(folded); l.cabs.push({ k, g: folded, y0: CURB + .02, y1: MT_Y + MT_PLAT_Y + .01, y: CURB + .02, state: 'idle', hold: 0, x: Ls.sx, z: Ls.sz });
   }
   shadowDirty = true;
 }
@@ -319,7 +321,7 @@ function mtStation(l, k){
   for (const s of [-1, 1]){ const G = under(F, T(s*(cw/2 + .01), 0, 0, s*PI/2)); box(MTM.board, G, 0, cy + .08, .005, 2.2, .12, .01); fitSign(under(G, T(0, 0, .015, 0)), 'sign_mt_line', 0, cy + .08, 0, 2.1, .4, 'green'); }
   // the bridge to the lift
   if (side){
-    const x0 = side*(W/2 + MT_PLAT), x1 = side*(SIDE/2 + .25 - .22);
+    const x0 = side*(W/2 + MT_PLAT), x1 = side*(MT_LIFT_OFF - MT_LIFT_R + .04);
     box(MTM.plat2, F, (x0 + x1)/2, -.12, 0, Math.abs(x1 - x0) + .02, .28, .55); box(MTM.plat, F, (x0 + x1)/2, ph - .01, 0, Math.abs(x1 - x0), .02, .53);
     for (const z of [-.27, .27]){ box(MTM.frame, F, (x0 + x1)/2, ph + .3, z, Math.abs(x1 - x0), .03, .03); box(MTM.green, F, (x0 + x1)/2, ph + .2, z, Math.abs(x1 - x0), .02, .012); }
     box(MTM.lit, F, side*(W/2 + MT_PLAT - .05), ph + .62, 0, .02, .22, .4);   // the EXIT light over the way out
@@ -355,9 +357,10 @@ function mtFeet(c){
   for (const l of metros) for (const k of mtStops(l)){
     const s = l.sides && l.sides[k]; if (!s) continue;
     const Ls = mtLiftSpot(l, k, s); if (Math.round(Ls.sx/LOT) !== c.i || Math.round(Ls.sz/LOT) !== c.j) continue;
-    const top = MT_Y + 1.15, P = T(Ls.sx, 0, Ls.sz, Math.atan2(Ls.dx, Ls.dz)), r = Ls.r;
+    const top = MT_SHAFT_TOP - .2, P = T(Ls.sx, 0, Ls.sz, Math.atan2(Ls.dx, Ls.dz)), r = Ls.r;
     put(U.cyl16, MT_GLASS, under(P, T(0, (CURB + top)/2, 0, 0, 2*r, top - CURB, 2*r)));
     for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) box(MTM.frame, P, sx*r*.72, (CURB + top)/2, sz*r*.72, .045, top - CURB, .045);
+    box(MTM.lit, P, 0, CURB + 1.08, r + .02, .5, .03, .02);   // over the way in at the foot
     for (let yy = CURB + 1.0; yy < top - .3; yy += 1.0) put(U.torus, MTM.green, under(P, T(0, yy, 0, 0, 2*r + .03, 2*r + .03, .45, PI/2)));
     box(MTM.canopy, P, 0, CURB + .04, 0, 2*r + .16, .08, 2*r + .16);
     box(MTM.canopy, P, 0, top + .08, 0, 2*r + .14, .16, 2*r + .14); box(MTM.green, P, 0, top + .17, 0, 2*r + .1, .02, 2*r + .1);
@@ -583,10 +586,7 @@ function updateMetros(dt, t){
     U_.mtN.value = n; U_.mtGapY.value.set(MT_Y + (.12 + .78 + .04)*MT_SY + MT_LEV, MT_Y + MT_OH + .02); }
   mtGlow.count = 0; mtGlow.visible = false;   // (no deck under the train to light any more) mtGlow.material.opacity = night ? .85 : .3; if (ng) mtGlow.instanceMatrix.needsUpdate = true;
   // the stations' lift cabs go up and down
-  for (const l of metros) if (l.cabs) for (const c of l.cabs){
-    const ph = (t*.1 + c.ph) % 1, u = ph < .3 ? 0 : ph < .5 ? smooth01((ph - .3)/.2) : ph < .8 ? 1 : 1 - smooth01((ph - .8)/.2);
-    c.g.position.y = c.y0 + (c.y1 - c.y0)*u;
-  }
+  for (const l of metros) if (l.cabs) for (const c of l.cabs) c.g.position.y = c.y;   // (moved by the lift controller: see mtLifts)
 }
 
 /* ---------- metro mode: picking, the ghost, the highlights ---------- */
@@ -726,7 +726,7 @@ function mtEnter(p){
   const v = p.metroPlan; p.metroPlan = null;
   const l = v && metros.includes(v.l) ? v.l : null, st = l && l.stn && l.stn.get(v.from);
   if (!st || !l.stn.has(v.to) || !l.train){ return false; }
-  p.metro = { l, k: v.from, to: v.to, final: v.final, st: 'up', t: -(1.5 + Math.random()*2.5), x: st.side*1.3, z: 0, waited: 0, missed: 0 };
+  p.metro = { l, k: v.from, to: v.to, final: v.final, st: 'up', t: 0, x: st.side*MT_LIFT_OFF, z: 0, waited: 0, missed: 0, slot: Math.floor(Math.random()*3) };
   p.until = Infinity; p.spot = null; return true;
 }
 const mtRidersOf = l => pplList.filter(p => p.metro && p.metro.l === l);
@@ -767,7 +767,7 @@ function mtRiders(dt, t){
     m.t += dt;
     const move = (tx, tz, sp) => { const dx = tx - m.x, dz = tz - m.z, d = Math.hypot(dx, dz), step = sp*dt; if (d <= step){ m.x = tx; m.z = tz; return true; } m.x += dx/d*step; m.z += dz/d*step; m.dx = dx; m.dz = dz; return false; };
     const sp = p.speed*.9;
-    if (m.st === 'up'){ if (m.t >= 0){ m.st = 'toSpot'; m.t = 0; m.x = st.side*1.3; m.z = (Math.random() - .5)*.3; m.spot = mtSpotFor(l, st, p); } }
+    if (m.st === 'up' || m.st === 'cabUp' || m.st === 'cabDown' || m.st === 'liftTop') continue;   // (at the lift: see mtLifts)
     else if (m.st === 'toSpot'){ if (move(m.spot[0], m.spot[1], sp)){ m.st = 'wait'; m.t = 0; } m.waited += dt; }
     else if (m.st === 'wait'){
       m.waited += dt;
@@ -788,16 +788,17 @@ function mtRiders(dt, t){
     else if (m.st === 'alight'){
       if (m.t < 0){ m.x = st.side*.22; m.z = m.door + (Math.random() - .5)*.3; continue; }
       if (!m.out){ if (move(st.side*.66, m.z, sp)) m.out = true; }
-      else if (move(st.side*1.3, (Math.random() - .5)*.2, sp)){ m.st = 'down'; m.t = 0; m.out = false; }
+      else if (move(st.side*(MT_LIFT_OFF - .1), m.lz ?? (m.lz = (Math.random() - .5)*.3), sp)){ m.st = 'liftTop'; m.t = 0; m.out = false; m.lz = undefined; }   // into the lift, to wait for the cab
     }
-    else if (m.st === 'leave'){ if (move(st.side*1.3, 0, sp)){ m.st = 'down'; m.t = 0; m.giveUp = true; } }
+    else if (m.st === 'leave'){ if (move(st.side*(MT_LIFT_OFF - .1), 0, sp)){ m.st = 'liftTop'; m.t = 0; m.giveUp = true; } }
     else if (m.st === 'down'){
-      if (m.t > 1.5 + Math.random()*.02){   // at the foot of the lift: on their way
+      {   // out of the cab at the foot of the lift: on their way
         const fin = m.final, amb = m.ambient; p.metro = null; p.at = st.id; if (amb) p.home = st.id;   // (an outsider: they'll look round here)
         if (fin && places.has(fin) && startTrip(p, fin)){} else p.until = pplNow + (amb ? .5 : 2);
       }
     }
   }
+  mtLifts(dt, t);
   mtAmbient(t);
 }
 // a place to stand on the platform: in rows along the way-out side, the nearest free one; once they're all taken, in among the crowd
@@ -818,15 +819,19 @@ function mtSpotFor(l, st, p){
 // where a rider is drawn, and how (null: out of sight, in the lift or on the train)
 function mtPose(p, t, dt){
   const m = p.metro, st = m.l && m.l.stn && m.l.stn.get(m.k); if (!st) return null;
-  if (m.st === 'up' || m.st === 'ride' || m.st === 'down' && m.t > .4) return null;
+  if (m.st === 'ride' || m.st === 'down') return null;
+  const lc = (m.st === 'up' || m.st === 'cabUp' || m.st === 'cabDown') && m.l.cabs && m.l.cabs.find(c => c.k === m.k);
+  if (lc){   // at the foot waiting, or in the cab going up or down: inside the shaft, a little apart from the others in it
+    const a = m.slot*2.1 + .4, r = m.slot ? .2 : .05, y = m.st === 'up' ? CURB : lc.y + .02;
+    const sd = Math.cos(a)*_camR.x + Math.sin(a)*_camR.z; p.flip = sd < 0 ? -1 : 1;
+    return { x: lc.x + Math.cos(a)*r, y, z: lc.z + Math.sin(a)*r, frame: F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle, alpha: 1 }; }
   if (m.st === 'board' && m.t < 0) { /* waiting their turn: where they stood */ }
   if (m.st === 'alight' && m.t < 0) return null;
   let alpha = 1;
-  if (m.st === 'toSpot') alpha = Math.min(1, m.t/.4);                               // out of the lift
-  if (m.st === 'down') alpha = Math.max(0, 1 - m.t/.4);                              // into it
+
   if (m.st === 'board' && m.atDoor) alpha = Math.max(0, Math.min(1, (Math.abs(m.x) - .22)/.3));   // through the doors
   if (m.st === 'alight' && !m.out) alpha = Math.max(0, Math.min(1, (Math.abs(m.x) - .22)/.3));
-  const [x, z] = mtW(st, m.x, m.z), walking = m.st === 'toSpot' || (m.st === 'board' && m.t >= 0) || (m.st === 'alight' && m.t >= 0) || m.st === 'leave' || m.st === 'down';
+  const [x, z] = mtW(st, m.x, m.z), walking = m.st === 'toSpot' || (m.st === 'board' && m.t >= 0) || (m.st === 'alight' && m.t >= 0) || m.st === 'leave';
   let frame;
   if (walking) frame = Math.floor(t*9*p.speed/PPL_SPEED + p.phase) % PPL.walk;
   else if (m.fume > pplNow) frame = F_ANGRY + Math.min(5, Math.floor((1.2 - (m.fume - pplNow))*6));   // stamping and shaking a fist
@@ -850,7 +855,7 @@ function mtAmbient(t){
     const a = S[Math.floor(Math.random()*S.length)]; let b = a; while (b === a) b = S[Math.floor(Math.random()*S.length)];
     const id = 'mtr:' + (++mtAmbSeq) + ':' + l.id, p = makePerson(id, a.id);
     Object.assign(p, { visitor: true, wantsJob: false, courier: false, leaveAt: pplNow + 90 + Math.random()*150, at: a.id, until: Infinity });
-    p.metro = { l, k: a.k, to: b.k, final: null, ambient: true, st: 'up', t: 0, x: a.side*1.3, z: 0, waited: 0, missed: 0 };
+    p.metro = { l, k: a.k, to: b.k, final: null, ambient: true, st: 'up', t: 0, x: a.side*MT_LIFT_OFF, z: 0, waited: 0, missed: 0, slot: Math.floor(Math.random()*3) };
     people.set(id, p); pplList.push(p);
   }
 }
@@ -885,4 +890,34 @@ function mtDrawDoors(){
       _mdL.makeTranslation(st.side*x, y, dz).multiply(new THREE.Matrix4().makeScale(.012, h, .28*tr.doors));
       mtDoorMesh.setMatrixAt(n++, _mdM.clone().multiply(_mdL)); } }
   mtDoorMesh.count = n; mtDoorMesh.visible = n > 0; if (n) mtDoorMesh.instanceMatrix.needsUpdate = true;
+}
+
+// The station lifts: each cab carries riders between the street and the platform, three at a time. Idle at an end, it
+// takes whoever is waiting there; if nobody is but someone waits at the other end, it goes to fetch them. It stops a
+// moment at each end for people to get in and out.
+const MT_LIFT_CAP = 3, MT_LIFT_V = 1.5;
+function mtLifts(dt, t){
+  for (const l of metros){ if (!l.cabs || !l.stn) continue;
+    for (const c of l.cabs){
+      const st = l.stn.get(c.k); if (!st) continue;
+      const here = q => q.metro && q.metro.l === l && q.metro.k === c.k;
+      const atBot = pplList.filter(q => here(q) && q.metro.st === 'up'), atTop = pplList.filter(q => here(q) && q.metro.st === 'liftTop');
+      if (c.state === 'move'){
+        const d = c.target - c.y, step = MT_LIFT_V*dt*Math.min(1, .35 + Math.abs(d));   // (easing in at the end)
+        if (Math.abs(d) <= step){ c.y = c.target; c.state = 'idle'; c.hold = .8;
+          for (const q of pplList){ const m = q.metro; if (!here(q)) continue;
+            if (m.st === 'cabUp'){ m.st = 'toSpot'; m.t = 1; m.x = st.side*(MT_LIFT_OFF - .1); m.z = (m.slot - 1)*.18; m.spot = mtSpotFor(l, st, q); }   // out onto the platform
+            else if (m.st === 'cabDown'){ m.st = 'down'; m.t = 0; } } }   // out at the street
+        else c.y += Math.sign(d)*step;
+        continue;
+      }
+      if ((c.hold -= dt) > 0) continue;
+      const bot = c.y <= c.y0 + .01, top = c.y >= c.y1 - .01;
+      const go = (to, who, as) => { who.slice(0, MT_LIFT_CAP).forEach((q, i) => { q.metro.st = as; q.metro.slot = i; }); c.target = to; c.state = 'move'; };
+      if (bot && atBot.length) go(c.y1, atBot, 'cabUp');
+      else if (top && atTop.length) go(c.y0, atTop, 'cabDown');
+      else if (bot && atTop.length){ c.target = c.y1; c.state = 'move'; }
+      else if (top && atBot.length){ c.target = c.y0; c.state = 'move'; }
+    }
+  }
 }

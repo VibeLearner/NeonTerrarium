@@ -373,7 +373,7 @@ const DOOR_COLS = [0x4f7f86, 0x8A4A2A, 0x3a4252, 0xc95a7a, 0x6fa8dc, 0xd9b43a, 0
 const posKey = (x, z) => Math.round(x*1000) + ',' + Math.round(z*1000);
 let crossAt = new Map(), patrolNodes = [], doorList = [], hiddenDoors = [], spotByKey = new Map(), doorByKey = new Map();
 function makeDoor(key, d, mega, old){
-  const door = { key, node: ngAdd(key, d.stand.x, d.stand.z), wall: d.wall, stand: d.stand, inside: d.inside, n: d.n, mega, noDraw: !!d.noDraw, lift: d.lift || null,
+  const door = { key, node: ngAdd(key, d.stand.x, d.stand.z), wall: d.wall, stand: d.stand, inside: d.inside, n: d.n, mega, noDraw: !!d.noDraw, lift: d.lift || null, open3d: !!d.open3d,
                  open: old ? old.open : 0, want: false, col: DOOR_COLS[hash(key) % DOOR_COLS.length] };
   (door.noDraw ? hiddenDoors : doorList).push(door); doorByKey.set(key, door); return door;
 }
@@ -949,7 +949,7 @@ function mtPlaces(fresh, oldDoors, addEnd){
     const G = cellGrid(c), st = { x: Ls.stand.x, z: Ls.stand.z };
     for (let q = 0; q < 8 && !freeAt(G, st.x, st.z); q++){ st.x += Ls.dx*.08; st.z += Ls.dz*.08; }
     if (!freeAt(G, st.x, st.z)) continue;
-    const id = 'mt:' + l.id + ':' + k, key = 'mtd:' + l.id + ':' + k, d = makeDoor(key, { wall: Ls.wall, stand: st, inside: { x: Ls.sx, z: Ls.sz }, n: [Ls.dx, Ls.dz] }, false, oldDoors.get(key));
+    const id = 'mt:' + l.id + ':' + k, key = 'mtd:' + l.id + ':' + k, d = makeDoor(key, { wall: Ls.wall, stand: st, inside: { x: Ls.sx, z: Ls.sz }, n: [Ls.dx, Ls.dz], open3d: true, noDraw: true }, false, oldDoors.get(key));
     addEnd(c, { key, x: st.x, z: st.z, kind: 'd' });
     fresh.set(id, { id, hub: true, x: Ls.sx, z: Ls.sz, jobs: 0, fun: 0, night: 0, doors: [d] });
   }
@@ -1725,8 +1725,8 @@ function updatePeople(dt, t){
         const sd = p.dx*_camR.x + p.dz*_camR.z;
         if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
         // through the doorway: dissolving in from the hallway, or out as they step inside
-        if (w.doorA && !w.doorA.lift) alpha = Math.min(alpha, (w.s - .05)/.3);
-        if (w.doorB && !w.doorB.lift) alpha = Math.min(alpha, (w.len - w.s - .05)/.3);
+        if (w.doorA && !w.doorA.lift && !w.doorA.open3d) alpha = Math.min(alpha, (w.s - .05)/.3);   // (open3d: a way in you can see into, like a metro station's lift: no fading there)
+        if (w.doorB && !w.doorB.lift && !w.doorB.open3d) alpha = Math.min(alpha, (w.len - w.s - .05)/.3);
       }
     }
     if (!walking){

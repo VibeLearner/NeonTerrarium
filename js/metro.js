@@ -535,7 +535,16 @@ function mtShimmerCull(VP){
   for (const g of _mtop) if (boxOnScreen(VP, g[0] - 1.2, g[0] + 1.2, y0, y1, g[1] - 1.2, g[1] + 1.2)) U_.mtGap.value[n++].set(...g);
   U_.mtN.value = n;
 }
+// Each line's riders, in the city's order, gathered once a frame (instead of every check scanning the whole city):
+// l._riders. A removed line's list goes stale, but nobody reads it (its riders are sent home in mtRiders).
+let _mtFrame = 0;
+function mtIndexRiders(){
+  _mtFrame++;
+  for (const l of metros){ l._rf = _mtFrame; (l._riders || (l._riders = [])).length = 0; }
+  for (const p of pplList){ const m = p.metro; if (m && m.l && m.l._rf === _mtFrame) m.l._riders.push(p); }
+}
 function updateMetros(dt, t){
+  mtIndexRiders();
   for (const M_ of MT_MODELS) M_.n = 0;
   MT_LEAF.n = 0;
   let ng = 0, nf = 0; _mgap.length = 0;
@@ -739,7 +748,7 @@ function mtEnter(p){
 }
 const mtRidersOf = l => pplList.filter(p => p.metro && p.metro.l === l);
 // still getting on or off this train?
-function mtBusy(l, tr){ for (const p of pplList){ const m = p.metro; if (m && m.l === l && (m.st === 'board' || (m.st === 'alight' && m.t < 1.2))) return true; } return false; }
+function mtBusy(l, tr){ for (const p of l._riders){ const m = p.metro; if (m && m.l === l && (m.st === 'board' || (m.st === 'alight' && m.t < 1.2))) return true; } return false; }
 // which way the train goes from stop i next (it turns back at the ends)
 const mtNextDir = (l, tr) => { const n = mtPath(l).stops.length; return tr.at + tr.dir < 0 || tr.at + tr.dir >= n ? -tr.dir : tr.dir; };
 // the train has stopped at station k: those for here get off, then those waiting get on, as many as it has room for
@@ -766,26 +775,32 @@ function mtBoard(l, tr, k, first, q = 0){
 // a rider's next step, every frame
 function mtRiders(dt, t){
   for (const l of metros) if (l.train) l.train.load = l.train.load.filter(p => people.has(p.id) && p.metro && p.metro.l === l && (p.metro.st === 'ride' || p.metro.st === 'board'));   // (anyone gone from the city is gone from the train)
+  // how many are waiting at each station, kept up to date as riders start and stop waiting below (it's what makes a
+  // crowd impatient: the same count a scan of the whole city would give at that moment)
+  for (const l of metros) (l._wait || (l._wait = new Map())).clear();
+  for (const p of pplList){ const m = p.metro; if (m && m.st === 'wait' && m.l && m.l._wait) m.l._wait.set(m.k, (m.l._wait.get(m.k) || 0) + 1); }
+  const waitAdd = (m, d) => { const W = m.l && m.l._wait; if (W) W.set(m.k, (W.get(m.k) || 0) + d); };
   for (const p of pplList){
     const m = p.metro; if (!m) continue;
     const l = m.l, st = l && l.stn && l.stn.get(m.k);
-    if (!metros.includes(l) || !st || !places.has(st.id)){ p.metro = null; if (places.has(p.at)) p.until = pplNow; else sendHome(p); continue; }   // the line or the station is gone
+    if (!metros.includes(l) || !st || !places.has(st.id)){ if (m.st === 'wait') waitAdd(m, -1); p.metro = null; if (places.has(p.at)) p.until = pplNow; else sendHome(p); continue; }   // the line or the station is gone
     const tr = l.train;
     if (m.st === 'ride'){ if (!tr || !tr.load.includes(p)){ const to = l.stn.get(m.to); if (to){ m.k = m.to; p.at = to.id; m.st = 'down'; m.t = 0; } else { p.metro = null; sendHome(p); } } continue; }   // (the line was rebuilt under them: off at their stop)
     m.t += dt;
     const move = (tx, tz, sp) => { const dx = tx - m.x, dz = tz - m.z, d = Math.hypot(dx, dz), step = sp*dt; if (d <= step){ m.x = tx; m.z = tz; return true; } m.x += dx/d*step; m.z += dz/d*step; m.dx = dx; m.dz = dz; return false; };
     const sp = p.speed*.9;
     if (m.st === 'up' || m.st === 'cabUp' || m.st === 'cabDown' || m.st === 'liftTop') continue;   // (at the lift: see mtLifts)
-    else if (m.st === 'toSpot'){ if (move(m.spot[0], m.spot[1], sp)){ m.st = 'wait'; m.t = 0; } m.waited += dt; }
+    else if (m.st === 'toSpot'){ if (move(m.spot[0], m.spot[1], sp)){ m.st = 'wait'; m.t = 0; waitAdd(m, 1); } m.waited += dt; }
     else if (m.st === 'wait'){
       m.waited += dt;
-      const crowd = pplList.filter(q => q.metro && q.metro.l === l && q.metro.k === m.k && q.metro.st === 'wait').length;
+      const crowd = l._wait.get(m.k) || 0;
       const single = mtLines().length <= 1, patience = (single ? 28 : 60)*(1 - Math.min(.5, crowd/MT_CAP*.4));
       if (!(p.emoUntil > pplNow)){
         if (m.waited > patience && Math.random() < dt*(.12 + .1*m.missed)){ emote(p, 'anger', 2.4); m.fume = pplNow + 1.1; }
         else if (m.waited > 12 && Math.random() < dt*.04) emote(p, 'dots', 2); }
       if (Math.random() < dt*.02 && m.spot && m.spot[2] !== 'seat'){ const n = mtSpotFor(l, st, p); if (Math.hypot(n[0] - m.x, n[1] - m.z) < 1.2){ m.spot = n; m.st = 'toSpot'; m.t = 1; } }   // shifting about
       if (!m.ambient && m.waited > patience*3){ m.st = 'leave'; m.t = 0; emote(p, 'anger', 2.2); }   // that's it: they'll walk
+      if (m.st !== 'wait') waitAdd(m, -1);
     }
     else if (m.st === 'board'){
       if (m.t < 0) continue;   // (their turn at the door)
@@ -905,15 +920,18 @@ function mtDrawDoors(){
 // moment at each end for people to get in and out.
 const MT_LIFT_CAP = 3, MT_LIFT_V = 1.5;
 function mtLifts(dt, t){
+  // everyone at each station, in the city's order, found once (a cab only ever changes its own station's riders)
+  for (const l of metros) (l._here || (l._here = new Map())).clear();
+  for (const p of pplList){ const m = p.metro; if (m && m.l && m.l._here && metros.includes(m.l)){ const H_ = m.l._here; let a = H_.get(m.k); if (!a) H_.set(m.k, a = []); a.push(p); } }
   for (const l of metros){ if (!l.cabs || !l.stn) continue;
     for (const c of l.cabs){
       const st = l.stn.get(c.k); if (!st) continue;
-      const here = q => q.metro && q.metro.l === l && q.metro.k === c.k;
-      const atBot = pplList.filter(q => here(q) && q.metro.st === 'up'), atTop = pplList.filter(q => here(q) && q.metro.st === 'liftTop');
+      const hereL = l._here.get(c.k) || [];
+      const atBot = hereL.filter(q => q.metro.st === 'up'), atTop = hereL.filter(q => q.metro.st === 'liftTop');
       if (c.state === 'move'){
         const d = c.target - c.y, step = MT_LIFT_V*dt*Math.min(1, .35 + Math.abs(d));   // (easing in at the end)
         if (Math.abs(d) <= step){ c.y = c.target; c.state = 'idle'; c.hold = .8;
-          for (const q of pplList){ const m = q.metro; if (!here(q)) continue;
+          for (const q of hereL){ const m = q.metro;
             if (m.st === 'cabUp'){ m.st = 'toSpot'; m.t = 1; m.x = st.side*(MT_LIFT_OFF - .1); m.z = (m.slot - 1)*.18; m.spot = mtSpotFor(l, st, q); }   // out onto the platform
             else if (m.st === 'cabDown'){ m.st = 'down'; m.t = 0; } } }   // out at the street
         else c.y += Math.sign(d)*step;

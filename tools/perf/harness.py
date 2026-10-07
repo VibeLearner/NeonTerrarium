@@ -123,6 +123,8 @@ def steps(scene):
     for k, e in enumerate(scene.get('edits', [])):
         s.append(('edit%d_mid' % k, 4, e))      # mid-animation: the build sweep and its outline pass
         s.append(('edit%d' % k, 41, None))
+    if scene.get('rush'):   # a crowd at the stations: boarding, a full train, the lifts, impatience
+        s += [('rush_a', 400, scene['rush'])] + [('rush_' + c, 400, None) for c in 'bcdef']
     s.append(('evening_cycle', 120, 'S.hour = 17.8; S.cycle = true; S.vclouds = true'))
     return s
 
@@ -243,7 +245,7 @@ def cmd_scenes():
             log = pg.evaluate('() => { ' + d['build'] + ' }')
             pg.evaluate('() => { for (const a of [...anims]) finishAnimsOn(a.c); save(); }')
             storage = pg.evaluate('() => { const o = {}; for (let i = 0; i < localStorage.length; i++){ const k = localStorage.key(i); if (k !== "neonIsland.autoPerf") o[k] = localStorage.getItem(k); } return o; }')
-            sc = {'name': d['name'], 'cam': d['cam'], 'storage': storage, 'edits': d.get('edits', [])}
+            sc = {'name': d['name'], 'cam': d['cam'], 'storage': storage, 'edits': d.get('edits', []), 'rush': d.get('rush')}
             json.dump(sc, open(os.path.join(SCENES, d['name'] + '.json'), 'w'), indent=1)
             print(d['name'], log, errs[:3])
             pg.screenshot(path=os.path.join(OUT, 'scene_' + d['name'] + '.png')) if os.makedirs(OUT, exist_ok=True) is None else None

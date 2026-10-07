@@ -1018,7 +1018,7 @@ const REG = 5, regions = new Map(), dirtyRegions = new Set();
 const regKey = (i, j) => Math.floor(i/REG) + ',' + Math.floor(j/REG);
 // a cell's solid geometry is drawn as its own mesh (usually one draw call); plants and glows are batched per region
 function cellView(c){
-  if (c.view){ world.remove(c.view); c.view = null; }
+  if (c.view){ world.remove(c.view); c.view = null; markSolid(c); }
   if (!c.data) return;
   const g = new THREE.Group();
   for (const [m, geo] of c.data.geo){
@@ -1028,6 +1028,7 @@ function cellView(c){
     g.add(mesh);
   }
   world.add(freezeTree(g)); c.view = g;
+  markSolid(c);
 }
 // Where the pod's building meets the deck on the lift's side: a ray from the deck's edge in toward the building finds
 // its wall, and the door (opening as people and bots come and go: see the doors in people.js) goes there. The riders
@@ -1112,6 +1113,72 @@ function rebuildCell(c){
   c.emitters = c.data.emitters; c.pads = c.data.pads; c.ports = c.data.ports;
   dirtyRegions.add(regKey(c.i, c.j));
 }
+/* ---------- solid geometry merged by region ---------- */
+// Every plot and megastructure keeps its own view (one mesh per material), but drawing a big city one building at a
+// time costs the processor more than the drawing itself: a few thousand separate draws a frame. So the settled pieces of
+// each block (MREG x MREG plots) are merged, per material, into one mesh, and their own meshes are hidden. Only solid,
+// opaque pieces drawn in the main layer are merged (see-through ones keep their own order of drawing). A piece being
+// swept in or out is left out of its region's merge while it animates, so the sweep draws it as before; regions are
+// remade (at the start of the next frame) whenever one of their pieces changes.
+const solidRegions = new Map(), solidDirty = new Set(), animCells = new Set();
+// (merged in blocks of MREG x MREG plots, smaller than the regions: a block is drawn whole whenever any of it is on screen)
+const MREG = 3, mergeKey = (i, j) => Math.floor(i/MREG) + ',' + Math.floor(j/MREG);
+const markSolid = c => { if (c) solidDirty.add(mergeKey(c.i, c.j)); };
+// every merge block that overlaps a region (REG x REG plots)
+function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
+  for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++) solidDirty.add(i + ',' + j); }
+function flushSolid(){ if (!solidDirty.size) return; for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); }
+const mergeable = o => o.isMesh && !o.isInstancedMesh && o.layers.mask === 1 && !o.material.transparent && o.geometry.index && !o.userData.noMerge;
+function rebuildSolid(key){
+  const old = solidRegions.get(key);
+  if (old){ for (const m of old.members) m.visible = true; world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); }
+  const byMat = new Map(), members = [];
+  for (const c of [...cells.values(), ...megas.values()]){
+    if (!c.view || c.view.parent !== world || !c.view.visible || mergeKey(c.i, c.j) !== key || animCells.has(c)) continue;   // (only views actually on show)
+    for (const o of c.view.children) if (mergeable(o)){ let l = byMat.get(o.material); if (!l) byMat.set(o.material, l = []); l.push(o); }
+  }
+  if (!byMat.size) return;
+  const g = new THREE.Group();
+  for (const [mat, list] of byMat){
+    if (list.length < 2) continue;   // (nothing to gain)
+    list.sort((a, b) => a.id - b.id);   // (in the order three would have drawn them one by one: where two pieces meet at exactly the same depth, the same one wins)
+    const merged = mergeIndexed(list.map(o => o.geometry)); if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow;
+    mesh.userData.sortId = list[0].id;   // (drawn where its first piece would have been: see the opaque sort below)
+    if (merged.userData.shown !== undefined){ mesh.onBeforeRender = hideBefore; mesh.onAfterRender = hideAfter; }
+    g.add(mesh);
+    for (const o of list){ o.visible = false; members.push(o); }
+  }
+  if (!g.children.length) return;
+  world.add(freezeTree(g)); solidRegions.set(key, { group: g, members });
+}
+// Indexed geometries joined into one: corners one after another, and the triangles of all of them, the ones shown first
+// (each piece's in order), then the hidden ones (see hideCovered). Null if they don't share the same attributes.
+function mergeIndexed(geos){
+  const names = Object.keys(geos[0].attributes);
+  for (const g of geos) if (Object.keys(g.attributes).length !== names.length || names.some(n => !g.attributes[n] || g.attributes[n].itemSize !== geos[0].attributes[n].itemSize || g.attributes[n].normalized !== geos[0].attributes[n].normalized || g.attributes[n].array.constructor !== geos[0].attributes[n].array.constructor)) return null;
+  let nv = 0, ni = 0, nh = 0;
+  for (const g of geos){ nv += g.attributes.position.count; ni += g.index.count; nh += g.index.count - (g.userData.shown ?? g.index.count); }
+  const out = new THREE.BufferGeometry();
+  for (const n of names){ const a0 = geos[0].attributes[n], arr = new a0.array.constructor(nv*a0.itemSize); let o = 0;
+    for (const g of geos){ const a = g.attributes[n].array; arr.set(a, o); o += a.length; }
+    out.setAttribute(n, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); }
+  const ix = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+  let k = 0, kh = ni - nh, base = 0;
+  for (const g of geos){ const I = g.index.array, sh = g.userData.shown ?? I.length;
+    for (let q = 0; q < sh; q++) ix[k++] = I[q] + base;
+    for (let q = sh; q < I.length; q++) ix[kh++] = I[q] + base;
+    base += g.attributes.position.count; }
+  out.setIndex(new THREE.BufferAttribute(ix, 1));
+  if (nh) out.userData.shown = ni - nh;
+  out.computeBoundingSphere();
+  return out;
+}
+// three's own order for solid things (by layer group, render order, shader, material, distance, then creation), except that
+// a region's merged mesh takes the place of the first of its pieces
+renderer.setOpaqueSort((a, b) => a.groupOrder !== b.groupOrder ? a.groupOrder - b.groupOrder : a.renderOrder !== b.renderOrder ? a.renderOrder - b.renderOrder
+  : a.program !== b.program ? a.program.id - b.program.id : a.material.id !== b.material.id ? a.material.id - b.material.id : a.z !== b.z ? a.z - b.z
+  : (a.object.userData.sortId ?? a.id) - (b.object.userData.sortId ?? b.id));
 function rebuildRegion(key){
   const old = regions.get(key);
   if (old){ world.remove(old); disposeGroup(old); regions.delete(key); }
@@ -1214,7 +1281,7 @@ function refresh(list, megaList = []){
   // pass (loading a saved city builds every plot in one go), build the tower again now that they all stand
   for (const c of todo) if (airCells.has(c) && !anims.some(a => a.c === c)) rebuildCell(c);
   for (const m of megaList) rebuildMega(m);
-  for (const k of dirtyRegions){ if (heldRegions.has(k)) pendingRegions.add(k); else rebuildRegion(k); } dirtyRegions.clear();
+  for (const k of dirtyRegions){ markSolidRegion(k); if (heldRegions.has(k)) pendingRegions.add(k); else rebuildRegion(k); } dirtyRegions.clear();
   rebuildConnections(); syncAgents();
 }
 function rebuildAll(){ refresh([...cells.values()], [...megas.values()]); }
@@ -1437,6 +1504,7 @@ function startAnim(c, kind, y0, y1, zone, w, old, sound, opts = {}){
   for (const l of lines){ l.layers.set(1); l.renderOrder = 998; scene.add(l); }
   if (!opts.quiet){ if (sound) sfx.play(sound, { spread: 0 }); else sfx.play(kind === 'build' ? 'place' : 'remove'); }
   const a = { c, kind, view, old, u, mats, box, scan, foot, trail, lines, x: c.x, z: c.z, y0, by0, y1, wx, wz, t: 0, dur: opts.slow ? 4.6 : kind === 'build' ? .15 : .12, slow: !!opts.slow, bare: !!opts.bare, onEnd: opts.onEnd, cue: opts.cue, reg: regKey(c.i, c.j), held };
+  animCells.add(c); rebuildSolid(mergeKey(c.i, c.j)); solidDirty.delete(mergeKey(c.i, c.j));   // (out of its region's merge while it animates: its own meshes show)
   anims.push(a);
   return a;
 }
@@ -1490,6 +1558,7 @@ function updateAnims(dt){
 }
 function endAnim(i){
   const a = anims[i]; anims.splice(i, 1);
+  if (!anims.some(b => b.c === a.c)){ animCells.delete(a.c); markSolid(a.c); }   // (back into its region's merge)
   for (const l of a.lines){ scene.remove(l); l.material.dispose(); }
   a.view.traverse(o => { if (o.isMesh){ o.material = o.userData.baseMat || o.material; if (o.userData.baseLayer !== undefined) o.layers.mask = o.userData.baseLayer; else o.layers.set(0); } });
   showHidden(a.view, false);
@@ -1506,6 +1575,7 @@ function clearIsland(){
   for (const m of megas.values()){ disposeData(m.data); m.data = null; cellView(m); if (m.fx){ m.fx.dispose(); m.fx = null; } }
   megas.clear();
   for (const k of [...regions.keys()]){ world.remove(regions.get(k)); disposeGroup(regions.get(k)); regions.delete(k); }
+  for (const k of [...solidRegions.keys()]){ const r = solidRegions.get(k); world.remove(r.group); disposeGroup(r.group); solidRegions.delete(k); } solidDirty.clear(); animCells.clear();
   cells.clear(); hwClearAll(); mtClearAll();
   for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) cells.set(ckey(i,j), newCell(i, j));
   rebuildAll(); centerView();

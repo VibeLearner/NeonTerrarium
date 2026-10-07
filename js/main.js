@@ -61,6 +61,7 @@ function frame(now){
     const loss = (zoom/ZOOM_REF)*(BASE_H/H);   // 1 = every building keeps all its pixels
     const t = clamp((loss - 1.15)/1.0, 0, 1), e = t*t*(3 - 2*t);
     LOD.fine.value = e; LOD.plants.value = e; LOD.lines.value = e; }
+  flushSolid();   // regions whose pieces changed are merged again (world.js)
   scene.updateMatrixWorld();   // once for every pass below (see core.js): nothing moves between them
   renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
   cam.layers.enableAll(); renderer.render(scene, cam);

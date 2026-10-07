@@ -15,7 +15,10 @@ const GRID_MAX = 100, MAX_LEVELS = 12;   // about 760 units in every direction f
 const cells = new Map();
 const ckey = (i,j) => i + ',' + j;
 const SIDES4 = [[1,0],[-1,0],[0,1],[0,-1]];
-const world = new THREE.Group(); scene.add(world); city = world;
+const world = new THREE.Group(); world.matrixAutoUpdate = false; scene.add(world); city = world;
+// Static pieces (plots, regions, their plants and glows) never move once built: their matrices are set once and left
+// alone, so the frame's world-matrix update skips them
+function freezeTree(g){ g.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; }); return g; }
 let connGroup = null, curPorts = null, EXT = 12;
 const camT = new THREE.Vector3(0, TARGET_Y, 0), camGoal = new THREE.Vector3(0, TARGET_Y, 0);
 // The style (clutter, greenery, neon) of every piece is stored with it when it is built. Generation reads S.clutter,
@@ -103,7 +106,7 @@ function batchGroup(datas, withGeo = true){
   for (const k in SPR.size) FOL_LIST[k] = fol[k] || [];
   const saved = city; city = g; buildFoliage(); city = saved;
   if (Object.keys(gl).length) g.add(glowPoints(gl));
-  return g;
+  return freezeTree(g);
 }
 
 /* ---------- a platform piece: slab, rock root, railings and greenery on the open edges ---------- */
@@ -947,7 +950,7 @@ function cellView(c){
     if (m.userData.colorOnly){ mesh.layers.set(1); mesh.renderOrder = 2; } else { mesh.castShadow = !m.userData.noCast; mesh.receiveShadow = true; }   // see-through glass: colour pass only
     g.add(mesh);
   }
-  world.add(g); c.view = g;
+  world.add(freezeTree(g)); c.view = g;
 }
 // Where the pod's building meets the deck on the lift's side: a ray from the deck's edge in toward the building finds
 // its wall, and the door (opening as people and bots come and go: see the doors in people.js) goes there. The riders

@@ -24,6 +24,9 @@ renderer.shadowMap.type = THREE.BasicShadowMap;
 renderer.shadowMap.autoUpdate = false;
 
 const scene = new THREE.Scene();
+// World matrices are brought up to date once a frame (main.js), not by every one of the frame's passes; the scene
+// itself never moves, so it doesn't force its whole tree to recompute either (see freezeTree in world.js)
+scene.autoUpdate = false; scene.matrixAutoUpdate = false;
 // The view is orthographic, so the camera's distance changes nothing on screen; it only sets how deep the drawn
 // slab is. It reaches far in front of and behind the point looked at, so a tall building on the near side of a big
 // city is never clipped away while it's still in frame. (It used to reach 42 units in front and 53 behind, which cut

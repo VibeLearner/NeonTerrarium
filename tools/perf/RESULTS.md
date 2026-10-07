@@ -65,12 +65,12 @@ triangles are exact counts; times are medians.
 
 | Measure | Before | After | Change |
 | --- | ---: | ---: | ---: |
-| Draws, colour pass, furthest zoom | 1931 | 1352 | -30% |
+| Draws, color pass, furthest zoom | 1931 | 1352 | -30% |
 | Draws, normal pass, furthest zoom | 845 | 690 | -18% |
 | Draws, foliage pass | 204 | 36 | -82% |
-| Draws, colour pass, close up (zoom 6) | 724 | 326 | -55% |
-| Triangles, colour pass, furthest zoom | 16.52M | 16.52M | 0% |
-| Triangles, colour pass, close up | 3.264M | 3.271M | +0.2% |
+| Draws, color pass, close up (zoom 6) | 724 | 326 | -55% |
+| Triangles, color pass, furthest zoom | 16.52M | 16.52M | 0% |
+| Triangles, color pass, close up | 3.264M | 3.271M | +0.2% |
 | People update, real clock (ms) | 8.4 | 5.9 | -30% |
 | Whole simulation step, real clock (ms) | 13.3 | 10.3 | -23% |
 

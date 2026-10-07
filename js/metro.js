@@ -526,7 +526,7 @@ function mtResetTrain(l){
   P.stops.forEach((st, i) => { const sd = l.sides && l.sides[st.k]; if (!sd) return;
     l.stn.set(st.k, { i, k: st.k, s: st.s, side: -sd, e: mtFrame(l, st.k, .5).elements.slice(), id: 'mt:' + l.id + ':' + st.k }); });
 }
-const _mpos = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, _mdm = new THREE.Object3D(), _mgap = [], _mtop = [];   // _mgap: each car's gap this frame, for the shimmer (see the comp shader in sky.js)
+const _mpos = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, _mdm = new THREE.Object3D(), _mgap = [], _mtop = [], _mgapPool = [], _mp0 = {}, _mp1 = {};   // _mgap: each car's gap this frame, for the shimmer (see the comp shader in sky.js)
 // The shimmer's cars go to the composite shader, less any whose field can't reach the screen: a car's haze is exactly
 // nothing more than .95 along or .62 across from its middle (see the comp shader), so off screen it only costs every
 // pixel six samples of nothing. Called once the frame's view matrix is set (main.js).
@@ -579,14 +579,14 @@ function updateMetros(dt, t){
     for (let q = 0; q < MT_CARS; q++){
       const off = (q - (MT_CARS - 1)/2)*(MT_CL + MT_GAP), s = Math.max(0, Math.min(P.len, tr.s + off));
       const a = Math.max(0, s - .25), b = Math.min(P.len, s + .25);
-      cur = hwAlong(P, s, cur, _mpos); const p0 = {}, p1 = {}; hwAlong(P, a, 0, p0); hwAlong(P, b, 0, p1);
+      cur = hwAlong(P, s, cur, _mpos); const p0 = _mp0, p1 = _mp1; hwAlong(P, a, 0, p0); hwAlong(P, b, 0, p1);
       const yaw = Math.atan2(p1.x - p0.x, p1.z - p0.z), cab = q === 0 || q === MT_CARS - 1;
       _mdm.position.set(_mpos.x, _mpos.y + MT_LEV + .008*Math.sin(t*2.2 + l.id + q), _mpos.z);   // (floating: a slow bob on its magnets)
       _mdm.rotation.set(0, yaw, 0, 'YXZ'); _mdm.scale.setScalar(1); _mdm.updateMatrix();
       const M_ = MT_MODELS[!cab ? 0 : q === 0 ? 2 : 1]; if (M_.n < MT_CAR_MAX){ for (const m of M_.meshes) m.setMatrixAt(M_.n, _mdm.matrix); M_.n++; }
       { const stn = tr.dwell > 0 && l.stn && l.stn.get(stops[tr.at].k); mtLeaves(_mdm.matrix, q, stn ? stn.side : 0, stn ? tr.doors : 0); }
       if (ng < MT_CAR_MAX){ const bob = .008*Math.sin(t*2.2 + l.id + q), top = (.12 + .78 + .065)*MT_SY + MT_LEV + bob, gap = MT_OH - top;   // the field in the gap over it, flickering a little
-        _mgap.push([_mpos.x, _mpos.z, Math.sin(yaw), Math.cos(yaw)]);
+        { const g = _mgapPool[_mgap.length] || (_mgapPool[_mgap.length] = [0, 0, 0, 0]); g[0] = _mpos.x; g[1] = _mpos.z; g[2] = Math.sin(yaw); g[3] = Math.cos(yaw); _mgap.push(g); }   // (reused arrays)
         for (const sx of [-1, 1]){ const ox = sx*.2*Math.cos(yaw), oz = -sx*.2*Math.sin(yaw);   // a sheet each side of the shoe, wavering in height
           _mdm.position.set(_mpos.x + ox, _mpos.y + top + gap/2, _mpos.z + oz); _mdm.rotation.set(0, yaw, 0); _mdm.scale.set(1, gap*(1.8 + .15*Math.sin(t*3 + q*2.1 + sx)), MT_CL); _mdm.updateMatrix(); mtField.setMatrixAt(nf++, _mdm.matrix); }
         _mdm.position.set(_mpos.x, _mpos.y + top + .01, _mpos.z); _mdm.rotation.set(0, yaw, PI/2); _mdm.scale.set(1, .7, MT_CL); _mdm.updateMatrix(); mtField.setMatrixAt(nf++, _mdm.matrix); }   // and one lying on the roof

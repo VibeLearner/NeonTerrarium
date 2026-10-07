@@ -13,9 +13,12 @@ const MT_SAVE_KEY = 'neonIsland.metros';
 const MT_Y = hwY(12);                            // the rail's height: level with the hydroponic farm's glass ridge (12 floors)
 const MT_W = 1.0, MT_DECK = .26, MT_GIRD = .32;  // the guideway: width, deck depth, the girder under it
 const MT_CLEAR = MT_DECK + MT_GIRD + .08;        // from the rail down to the clear space under it
-const MT_OH = 1.3, MT_OHT = .36, MT_OL = 0;     // the overhead girder: its underside above the rail, its depth, how far it sits to one side (none: right over the train)
-const MT_LEV = .16;                              // how high the train floats: it hangs from the girder on its magnets, clear of the deck
-const MT_TOP = MT_Y + 2.1;                       // the top of it all (the stations' canopies)
+const MT_OH = 1.46, MT_OHT = .36, MT_OL = 0;     // the overhead girder: its underside above the rail, its depth, how far it sits to one side (none: right over the train)
+const MT_SY = 1.35;                               // the cars are built short and stretched up by this (tall enough inside for anyone)
+const MT_DOOR_W = .64, MT_DOOR_H = .95;           // a door: wider and taller than the biggest person (a sprite cell is .67 by .89)
+const MT_CAB_DOOR = -.265;                        // where a cab car's door is, along it
+const MT_LEV = .12 - .12*MT_SY;                   // (the cars' floors level with the platforms)                              // how high the train floats: it hangs from the girder on its magnets, clear of the deck
+const MT_TOP = MT_Y + 2.3;                       // the top of it all (the stations' canopies)
 const MT_CL = 1.45, MT_GAP = .06, MT_CARS = 3;    // a car's length, the gap between cars, cars to a train
 const MT_PLAT = .75;                             // a platform's width, each side
 const MT_VMAX = 2.8, MT_ACC = .9, MT_DWELL = 5;  // the train: top speed, acceleration, seconds at a stop
@@ -193,7 +196,7 @@ const MTM = {
   deck: toon(0x343a42), deck2: toon(0x40464e), girder: toon(0x2a2f36), rail: toon(0x7a828c), beam: toon(0x3a4048), beam2: toon(0x4a5058),
   pillar: toon(0x2c3138), pillar2: toon(0x3a4048), plat: toon(0x4a5058), plat2: toon(0x3a3f46), canopy: toon(0x22262c), frame: toon(0x1a1d22),
   green: toon(0x184010, { em: 0x5aff2a, kind: 'neon' }), green2: toon(0x284010, { em: 0xb0ff3a, kind: 'neon' }), board: toon(0x0c1a10, { em: 0x0e2a14, kind: 'trim' }),
-  lit: toon(0x3a4a3a, { em: 0xd8ffe0, kind: 'lamp' }), blue: toon(0x103050, { em: 0x4ac8ff, kind: 'neon' }), tactile: toon(0xd9b43a),
+  lit: toon(0x3a4a3a, { em: 0xd8ffe0, kind: 'lamp' }), inner: toon(0x8c968c, { em: 0x1c241c, kind: 'window' }), pole: toon(0xc8ccc8), seat: toon(0x2c5a3a), ad: toon(0x5a2a48, { em: 0xd060a8, kind: 'window' }), blue: toon(0x103050, { em: 0x4ac8ff, kind: 'neon' }), tactile: toon(0xd9b43a),
   // the train
   body: toon(0x7a828c), body2: toon(0x4c525a), dark: toon(0x1c1f24), win: toon(0x1a3a12, { em: 0x9aff6a, kind: 'window' }), glass: toon(0x183a22, { em: 0x267030, kind: 'window' }), glassHi: toon(0x2a5a34, { em: 0x9ae8a8, kind: 'window' }),
   head: toon(0x5a5a50, { em: 0xf0fff0, kind: 'lamp' }), sil: toon(0x0a1a0a, { em: 0x0c2410, kind: 'window' }), belt: toon(0x184010, { em: 0x5aff2a, kind: 'neon' }),
@@ -288,10 +291,14 @@ function mtStation(l, k){
     box(MTM.tactile, F, s*(W/2 + .1), ph + .002, 0, .06, .01, Lp - .1);         // the yellow line along its edge
     box(MTM.green, F, s*(W/2 + .005), ph - .06, 0, .012, .04, Lp);
     // the screen doors: glass panels in green-lit frames, a gap where each car's doors stop
-    for (let z = -Lp/2 + .1; z < Lp/2 - .05; z += .48) box(MTM.frame, F, s*(W/2 + .03), ph + .38, z, .04, .76, .04);
-    box(MTM.lit, F, s*(W/2 + .03), ph + .74, 0, .02, .03, Lp - .2);
-    put(U.box, MT_GLASS, under(F, T(s*(W/2 + .03), ph + .38, 0, 0, .02, .7, Lp - .1)));
-    box(MTM.green, F, s*(W/2 + .035), ph + .78, 0, .012, .025, Lp - .1);
+    { const gaps = s === side ? MT_DOORS.map(z => [z - MT_DOOR_W/2 - .04, z + MT_DOOR_W/2 + .04]) : [];   // (openings where the train's doors stop, on the side people use)
+      let z0 = -Lp/2 + .05; const runs = [];
+      for (const [a, b] of gaps.concat([[Lp/2 - .05, Lp/2]])){ if (a > z0 + .02) runs.push([z0, a]); z0 = b; }
+      for (const [a, b] of runs){ const zc = (a + b)/2, ln = b - a;
+        put(U.box, MT_GLASS, under(F, T(s*(W/2 + .03), ph + .38, zc, 0, .02, .7, ln)));
+        for (let z = a; z <= b + .01; z += Math.max(.2, ln/Math.max(1, Math.round(ln/.48)))) box(MTM.frame, F, s*(W/2 + .03), ph + .38, Math.min(z, b), .04, .76, .04);
+        box(MTM.lit, F, s*(W/2 + .03), ph + .74, zc, .02, .03, ln); box(MTM.green, F, s*(W/2 + .035), ph + .78, zc, .012, .025, ln); }
+      for (const [a, b] of gaps) for (const z of [a, b]) box(MTM.green, F, s*(W/2 + .03), ph + .38, z, .045, .76, .02); }   // the openings' edges, lit
     // the outer rail, benches, a vending machine, a lamp post
     if (s !== side){ box(MTM.frame, F, s*(W/2 + MT_PLAT - .03), ph + .3, 0, .03, .03, Lp); for (let z = -Lp/2; z <= Lp/2 + .01; z += .6) box(MTM.frame, F, s*(W/2 + MT_PLAT - .03), ph + .15, z, .03, .3, .03); }
     for (const z of [-.9, .9]){ box(MTM.frame, F, s*(px + .18), ph + .12, z, .14, .04, .5); box(MTM.frame, F, s*(px + .25), ph + .2, z, .03, .16, .5); }
@@ -366,39 +373,53 @@ function mtCarModel(cab, nose = 1){
   const R_ = mulberry32(cab ? 77 : 41);
   // the body: from the back end to where the cab's nose starts (all of it, on a middle car)
   const zb0 = -L/2 + .04, zb1 = cab ? L/2 - .38 : L/2 - .04, bl = zb1 - zb0, bz = (zb0 + zb1)/2;
-  add(MTM.body, 0, y0 + .3, bz, Wb, .6, bl);                                      // the lower body
-  add(MTM.body, 0, y0 + .6 + (H - .6 - rr)/2, bz, Wb - .03, H - .6 - rr, bl);      // the upper body, a little in at the windows
+  // the body: hollow at the doors. A core down the middle (the inside's back wall), the side walls round a big door each
+  // side (wider and taller than anyone who has to get through it), the roof over it all. The door leaves are drawn
+  // apart (see mtLeaves), so they can slide open at the stations.
+  const DW = MT_DOOR_W, DH = MT_DOOR_H/MT_SY, dz = cab ? MT_CAB_DOOR : 0, yd0 = y0 + .01, yd1 = yd0 + DH, ci = Wb - .36;
+  add(MTM.inner, 0, y0 + (H - rr)/2, bz, ci, H - rr, bl);                          // the core: the inside's back wall
+  add(MTM.dark, 0, y0 + .004, bz, Wb - .06, .008, bl);                             // the floor
+  const segs = [[zb0, dz - DW/2], [dz + DW/2, zb1]];
+  for (const s of [-1, 1]){
+    for (const [za, zz] of segs){ if (zz - za < .01) continue; const zc = (za + zz)/2, ln = zz - za;
+      add(MTM.body, s*(Wb/2 - .05), y0 + .3, zc, .1, .6, ln);                                          // the wall below the windows
+      add(MTM.body, s*((Wb - .03)/2 - .05), y0 + .6 + (H - .6 - rr)/2, zc, .1, H - .6 - rr, ln); }     // and beside them
+    add(MTM.body, s*((Wb - .03)/2 - .05), (yd1 + y0 + H - rr)/2, dz, .1, Math.max(.01, y0 + H - rr - yd1), DW + .02);   // over the door
+  }
   add(MTM.body, 0, y0 + H - rr/2, bz, Wb - 2*rr, rr, bl);                          // the roof, its edges rounded down
   for (const s of [-1, 1]) add(MTM.body, s*(Wb/2 - rr*.62), y0 + H - rr*.62, bz, rr*1.15, rr*.55, bl, 0, s*.7);
   add(MTM.body2, 0, y0 + H + .005, bz, Wb - .34, .015, bl - .1);                     // the roof's centre panel
-  // the skirt underneath: dark, vented, the green underglow along it
-  add(MTM.dark, 0, y0 - .045, 0, Wb - .04, .1, L - .06);                             // (one clean piece: little vents and a thin strip under it flickered as it moved)
+  // the inside, seen through the doors: a lit ceiling strip, grab poles and a rail, benches against the core either side
+  // of the door, an ad on the core's wall, now and then a rider holding on
+  for (const s of [-1, 1]){
+    const xi = s*(ci/2 + .003);
+    add(MTM.lit, s*(Wb/2 - .17), y0 + H - rr - .015, dz, .06, .015, DW + .3);
+    for (const o of [-.2, .2]) add(MTM.pole, s*(Wb/2 - .15), (yd0 + yd1)/2, dz + o, .018, DH, .018);
+    add(MTM.pole, s*(Wb/2 - .15), yd1 - .06, dz, .014, .014, .44);
+    add(MTM.ad, xi, y0 + .45, dz, .004, .22, .3); add(MTM.green, xi + s*.002, y0 + .58, dz, .004, .015, .32);
+    for (const o of [-.27, .27]){ add(MTM.seat, s*(ci/2 + .045), y0 + .18, dz + o, .09, .035, .16); add(MTM.seat, s*(ci/2 + .012), y0 + .28, dz + o, .025, .18, .16); }
+    if (R_() < .6){ const o = (R_() - .5)*.2; add(MTM.sil, s*(Wb/2 - .22), y0 + .3, dz + o, .06, .4, .1); add(MTM.sil, s*(Wb/2 - .22), y0 + .56, dz + o, .055, .1, .07); add(MTM.sil, s*(Wb/2 - .18), y0 + .58, dz + o + .05, .02, .14, .02); }
+  }
+  // the skirt underneath, the green underglow along it
+  add(MTM.dark, 0, y0 - .045, 0, Wb - .04, .1, L - .06);
   add(MTM.belt, 0, y0 - .1, 0, Wb - .3, .02, L - .3);
   for (const s of [-1, 1]){
     const sx = s*(Wb/2), sxu = s*((Wb - .03)/2);
-    // panel seams, and the three green lines: under the roof, over the windows' sills, along the belt
-    add(MTM.body2, sx + s*.003, y0 + .6, bz, .006, .012, bl);
+    // panel seams, and the three green lines (broken by the door): under the roof, over the windows' sills, along the belt
+    for (const [za, zz] of segs){ if (zz - za < .02) continue; const zc = (za + zz)/2, ln = zz - za - .02;
+      add(MTM.body2, sx + s*.003, y0 + .6, zc, .006, .012, ln);
+      add(MTM.belt, sx + s*.006, y0 + .4, zc, .008, .02, ln);
+      add(MTM.belt, sx + s*.006, y0 + .13, zc, .008, .03, ln); }
     add(MTM.belt, sxu + s*.006, y0 + H - rr - .02, bz, .008, .022, bl - .04);
-    add(MTM.belt, sx + s*.006, y0 + .4, bz, .008, .02, bl - .04);
-    add(MTM.belt, sx + s*.006, y0 + .13, bz, .008, .03, bl - .04);
-    // the doors, a pair to a side: dark leaves with a lit window each, outlined in green
-    const doors = cab ? [zb0 + .26, zb1 - .3] : [-L*.3, L*.3];
-    for (const zd of doors){
-      add(MTM.dark, sx + s*.004, y0 + .36, zd, .008, .62, .27);
-      for (const o of [-.066, .066]){ add(MTM.win, sx + s*.008, y0 + .5, zd + o, .006, .2, .09); add(MTM.body2, sx + s*.007, y0 + .26, zd + o, .006, .26, .1); }
-      add(MTM.belt, sx + s*.01, y0 + .36, zd, .006, .62, .008);                       // the seam between the leaves
-      for (const e of [-.137, .137]) add(MTM.belt, sx + s*.01, y0 + .36, zd + e, .006, .64, .012);
-      add(MTM.belt, sx + s*.01, y0 + .675, zd, .006, .012, .29);
-    }
-    // the windows between the doors (and beyond them): green-lit panes with people in them
-    const spans = [[zb0 + .08, doors[0] - .17], [doors[0] + .17, doors[1] - .17], [doors[1] + .17, zb1 - .08]];
-    for (const [za, zz] of spans){
+    for (const e of [-1, 1]) add(MTM.belt, sx + s*.008, (yd0 + yd1)/2, dz + e*(DW/2 + .01), .008, DH + .02, .014);   // the door's frame, lit
+    // the windows: green-lit panes with people in them
+    for (const [za0, zz0] of segs){ const za = za0 + .06, zz = zz0 - .06; if (zz - za < .12) continue;
       const n = Math.max(1, Math.round((zz - za)/.24)), w = (zz - za)/n;
       for (let q = 0; q < n; q++){
         const zc = za + (q + .5)*w;
         add(MTM.win, sxu + s*.004, y0 + .72, zc, .006, .22, w - .04);
-        add(MTM.body2, sxu + s*.006, y0 + .72, za + q*w, .008, .24, .025);                // the mullion
-        if (R_() < .75){ const px = zc + (R_() - .5)*w*.4, tall = .03 + R_()*.03;      // a passenger: head and shoulders against the light
+        add(MTM.body2, sxu + s*.006, y0 + .72, za + q*w, .008, .24, .025);
+        if (R_() < .75){ const px = zc + (R_() - .5)*w*.4, tall = .03 + R_()*.03;
           add(MTM.sil, sxu + s*.006, y0 + .66 + tall, px, .006, .07, .055); add(MTM.sil, sxu + s*.006, y0 + .63 + tall*.5, px, .006, .06, .11); }
       }
       add(MTM.body2, sxu + s*.006, y0 + .72, zz, .008, .24, .025);
@@ -459,6 +480,7 @@ function mtCarModel(cab, nose = 1){
     for (const sx of [-1, 1]){ add(MTM.dark, sx*.2, y0 + .27, zt + .004, .19, .075, .012); add(MTM.head, sx*.165, y0 + .27, zt + .01, .08, .04, .006); add(MTM.head, sx*.25, y0 + .27, zt + .01, .04, .04, .006); add(MTM.belt, sx*.2, y0 + .227, zt + .009, .19, .01, .006); }
     add(MTM.dark, 0, y0 + .27, zt + .004, .1, .06, .01); add(MTM.glass, 0, y0 + .27, zt + .009, .08, .035, .006);   // the line number between them
   }
+  g.scale.y = MT_SY;   // (stretched up: see MT_SY)
   return g;
 }
 const MT_CAR_MAX = 90;
@@ -505,6 +527,7 @@ function mtResetTrain(l){
 const _mpos = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, _mdm = new THREE.Object3D(), _mgap = [];   // _mgap: each car's gap this frame, for the shimmer (see the comp shader in sky.js)
 function updateMetros(dt, t){
   for (const M_ of MT_MODELS) M_.n = 0;
+  MT_LEAF.n = 0;
   let ng = 0, nf = 0; _mgap.length = 0;
   const night = typeof isNight === 'function' && isNight(S.hour);
   for (const l of metros){
@@ -542,7 +565,8 @@ function updateMetros(dt, t){
       _mdm.position.set(_mpos.x, _mpos.y + MT_LEV + .008*Math.sin(t*2.2 + l.id + q), _mpos.z);   // (floating: a slow bob on its magnets)
       _mdm.rotation.set(0, yaw, 0, 'YXZ'); _mdm.scale.setScalar(1); _mdm.updateMatrix();
       const M_ = MT_MODELS[!cab ? 0 : q === 0 ? 2 : 1]; if (M_.n < MT_CAR_MAX){ for (const m of M_.meshes) m.setMatrixAt(M_.n, _mdm.matrix); M_.n++; }
-      if (ng < MT_CAR_MAX){ const bob = .008*Math.sin(t*2.2 + l.id + q), top = .12 + .78 + .065 + MT_LEV + bob, gap = MT_OH - top;   // the field in the gap over it, flickering a little
+      { const stn = tr.dwell > 0 && l.stn && l.stn.get(stops[tr.at].k); mtLeaves(_mdm.matrix, q, stn ? stn.side : 0, stn ? tr.doors : 0); }
+      if (ng < MT_CAR_MAX){ const bob = .008*Math.sin(t*2.2 + l.id + q), top = (.12 + .78 + .065)*MT_SY + MT_LEV + bob, gap = MT_OH - top;   // the field in the gap over it, flickering a little
         _mgap.push([_mpos.x, _mpos.z, Math.sin(yaw), Math.cos(yaw)]);
         for (const sx of [-1, 1]){ const ox = sx*.2*Math.cos(yaw), oz = -sx*.2*Math.sin(yaw);   // a sheet each side of the shoe, wavering in height
           _mdm.position.set(_mpos.x + ox, _mpos.y + top + gap/2, _mpos.z + oz); _mdm.rotation.set(0, yaw, 0); _mdm.scale.set(1, gap*(1.8 + .15*Math.sin(t*3 + q*2.1 + sx)), MT_CL); _mdm.updateMatrix(); mtField.setMatrixAt(nf++, _mdm.matrix); }
@@ -557,7 +581,7 @@ function updateMetros(dt, t){
   { const U_ = comp.uniforms, cx = camT.x, cz = camT.z;   // the 16 cars nearest the view get the shimmer
     _mgap.sort((a, b) => (a[0] - cx)**2 + (a[1] - cz)**2 - (b[0] - cx)**2 - (b[1] - cz)**2);
     const n = Math.min(16, _mgap.length); for (let k = 0; k < n; k++) U_.mtGap.value[k].set(..._mgap[k]);
-    U_.mtN.value = n; U_.mtGapY.value.set(MT_Y + .12 + .78 + .04 + MT_LEV, MT_Y + MT_OH + .02); }
+    U_.mtN.value = n; U_.mtGapY.value.set(MT_Y + (.12 + .78 + .04)*MT_SY + MT_LEV, MT_Y + MT_OH + .02); }
   mtGlow.count = 0; mtGlow.visible = false;   // (no deck under the train to light any more) mtGlow.material.opacity = night ? .85 : .3; if (ng) mtGlow.instanceMatrix.needsUpdate = true;
   // the stations' lift cabs go up and down
   for (const l of metros) if (l.cabs) for (const c of l.cabs){
@@ -661,7 +685,7 @@ function setMtMode(on, quiet){
 // give up and walk. A rider: p.metro = { l, k (the station they're at), to (the one they're going to), final (where
 // they're headed after), st (what they're doing), t, x, z (where on the platform, in its frame), door }.
 const MT_CAP = 12;                                // people to a train
-const MT_DOORS = [-1.085, -1.555, -.435, .435, 1.085, 1.555];   // the doors of a train standing at a station, along the platform from its middle
+const MT_DOORS = [-(MT_CL + MT_GAP) - MT_CAB_DOOR, 0, (MT_CL + MT_GAP) + MT_CAB_DOOR];   // the doors of a train standing at a station, along the platform from its middle
 const MT_MIN_RIDERS = 2;                          // there's always someone riding (see mtAmbient)
 const MT_PLAT_Y = .12;                            // the platform's surface, over the rail
 const mtLines = () => metros.filter(l => l.train && l.stn && l.stn.size >= 2);
@@ -753,17 +777,18 @@ function mtRiders(dt, t){
       if (!(p.emoUntil > pplNow)){
         if (m.waited > patience && Math.random() < dt*(.12 + .1*m.missed)){ emote(p, 'anger', 2.4); m.fume = pplNow + 1.1; }
         else if (m.waited > 12 && Math.random() < dt*.04) emote(p, 'dots', 2); }
+      if (Math.random() < dt*.02 && m.spot && m.spot[2] !== 'seat'){ const n = mtSpotFor(l, st, p); if (Math.hypot(n[0] - m.x, n[1] - m.z) < 1.2){ m.spot = n; m.st = 'toSpot'; m.t = 1; } }   // shifting about
       if (!m.ambient && m.waited > patience*3){ m.st = 'leave'; m.t = 0; emote(p, 'anger', 2.2); }   // that's it: they'll walk
     }
     else if (m.st === 'board'){
       if (m.t < 0) continue;   // (their turn at the door)
-      const ex = st.side*.52;
-      if (!m.atDoor){ if (move(ex, m.door, sp*1.2)) m.atDoor = true; }
-      else if (move(st.side*.25, m.door, sp)){ m.st = 'ride'; m.atDoor = false; }
+      const ex = st.side*.62, dzj = m.door + (m.dj ?? (m.dj = (Math.random() - .5)*.3));   // (through any part of the doorway)
+      if (!m.atDoor){ if (move(ex, dzj, sp*1.2)) m.atDoor = true; }
+      else if (move(st.side*.22, dzj, sp)){ m.st = 'ride'; m.atDoor = false; m.dj = undefined; }
     }
     else if (m.st === 'alight'){
-      if (m.t < 0){ m.x = st.side*.25; m.z = m.door; continue; }
-      if (!m.out){ if (move(st.side*.6, m.door, sp)) m.out = true; }
+      if (m.t < 0){ m.x = st.side*.22; m.z = m.door + (Math.random() - .5)*.3; continue; }
+      if (!m.out){ if (move(st.side*.66, m.z, sp)) m.out = true; }
       else if (move(st.side*1.3, (Math.random() - .5)*.2, sp)){ m.st = 'down'; m.t = 0; m.out = false; }
     }
     else if (m.st === 'leave'){ if (move(st.side*1.3, 0, sp)){ m.st = 'down'; m.t = 0; m.giveUp = true; } }
@@ -778,12 +803,18 @@ function mtRiders(dt, t){
 }
 // a place to stand on the platform: in rows along the way-out side, the nearest free one; once they're all taken, in among the crowd
 function mtSpotFor(l, st, p){
-  const taken = new Set(); for (const q of pplList){ const m = q.metro; if (q !== p && m && m.l === l && m.k === st.k && m.spot && (m.st === 'wait' || m.st === 'toSpot')) taken.add(m.spot[0].toFixed(2) + ',' + m.spot[1].toFixed(2)); }
-  const spots = [];
-  for (const x of [.72, .98]) for (let z = -1.5; z <= 1.51; z += .375) spots.push([st.side*(x + (Math.random() - .5)*.06), z + (Math.random() - .5)*.08]);
-  spots.sort((a, b) => Math.abs(a[1]) - Math.abs(b[1]) + (Math.random() - .5)*.6);
-  for (const s of spots) if (!taken.has(s[0].toFixed(2) + ',' + s[1].toFixed(2)) && ![...taken].some(k => { const [x, z] = k.split(',').map(Number); return Math.hypot(x - s[0], z - s[1]) < .2; })) return s;
-  return [st.side*(.7 + Math.random()*.4), (Math.random() - .5)*3.0];
+  // all over the platform: three rows of standing room along it and the benches' seats, a free place picked at random
+  // (a little likelier nearer the lift), never right on top of someone else
+  const others = []; for (const q of pplList){ const m = q.metro; if (q !== p && m && m.l === l && m.k === st.k && m.spot && (m.st === 'wait' || m.st === 'toSpot')) others.push(m.spot); }
+  const free = ([x, z]) => others.every(o => Math.hypot(o[0] - x, o[1] - z) > .24);
+  const cand = [];
+  for (const sz of [-1.05, -.75, .75, 1.05]) cand.push([st.side*1.06, sz, 'seat']);   // the benches
+  for (let i = 0; i < 40; i++){ const x = .66 + Math.random()*.36, z = (Math.random()*2 - 1)*1.62;
+    if (x > .95 && ((Math.abs(z) > .6 && Math.abs(z) < 1.2) || z < -1.35)) continue;   // (not on the benches or the vending machine)
+    cand.push([st.side*x, z]); }
+  const ok = cand.filter(free); if (!ok.length) return [st.side*(.66 + Math.random()*.36), (Math.random()*2 - 1)*1.5];
+  ok.sort((a, b) => Math.abs(a[1])*.4 + Math.random() - (Math.abs(b[1])*.4 + Math.random()));
+  return ok[0];
 }
 // where a rider is drawn, and how (null: out of sight, in the lift or on the train)
 function mtPose(p, t, dt){
@@ -794,12 +825,13 @@ function mtPose(p, t, dt){
   let alpha = 1;
   if (m.st === 'toSpot') alpha = Math.min(1, m.t/.4);                               // out of the lift
   if (m.st === 'down') alpha = Math.max(0, 1 - m.t/.4);                              // into it
-  if (m.st === 'board' && m.atDoor) alpha = Math.max(0, Math.min(1, (Math.abs(m.x) - .25)/.27));   // through the doors
-  if (m.st === 'alight' && !m.out) alpha = Math.max(0, Math.min(1, (Math.abs(m.x) - .25)/.27));
+  if (m.st === 'board' && m.atDoor) alpha = Math.max(0, Math.min(1, (Math.abs(m.x) - .22)/.3));   // through the doors
+  if (m.st === 'alight' && !m.out) alpha = Math.max(0, Math.min(1, (Math.abs(m.x) - .22)/.3));
   const [x, z] = mtW(st, m.x, m.z), walking = m.st === 'toSpot' || (m.st === 'board' && m.t >= 0) || (m.st === 'alight' && m.t >= 0) || m.st === 'leave' || m.st === 'down';
   let frame;
   if (walking) frame = Math.floor(t*9*p.speed/PPL_SPEED + p.phase) % PPL.walk;
   else if (m.fume > pplNow) frame = F_ANGRY + Math.min(5, Math.floor((1.2 - (m.fume - pplNow))*6));   // stamping and shaking a fist
+  else if (m.st === 'wait' && m.spot && m.spot[2] === 'seat'){ frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4; return { x, y: MT_Y + MT_PLAT_Y + .06, z, frame, alpha }; }   // on a bench
   else frame = F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
   if (walking && m.dx !== undefined){ const e = st.e, wx = e[0]*m.dx + e[8]*m.dz, wz = e[2]*m.dx + e[10]*m.dz, sd = wx*_camR.x + wz*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }
   else if (!walking){ const e = st.e, wx = -e[0]*st.side, wz = -e[2]*st.side, sd = wx*_camR.x + wz*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }   // waiting: facing the track
@@ -823,10 +855,29 @@ function mtAmbient(t){
     people.set(id, p); pplList.push(p);
   }
 }
-// the doors standing open on the platform side while the train's at a station: a lit gap in each, sliding wide
+// the door leaves: two to a door each side, sliding apart over the car's wall at a station (on the side its platform's
+// way out is), shut the rest of the time
+const MT_LEAF = (() => { const g = new THREE.Group(), mk = (mat, y, z, sy, sz, x = 0) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z); m.scale.set(.02, sy, sz); g.add(m); };
+  const w = MT_DOOR_W/2, h = MT_DOOR_H;
+  mk(MTM.body2, 0, 0, h, w - .01); mk(MTM.win, 0, h*.18, h*.42, w - .1, .006); mk(MTM.body, 0, -h*.3, h*.3, w - .1, .004);
+  const f = hwFold(g), meshes = [];
+  for (const [geo, mat] of [[f.plain, HW_CAR_PLAIN], [f.lit, HW_CAR_GLOW]]){ if (!geo) continue; const m = new THREE.InstancedMesh(geo, mat, MT_CAR_MAX*4); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); meshes.push(m); }
+  return { meshes, n: 0 }; })();
+const _mlv = new THREE.Matrix4(), _mlw = new THREE.Matrix4();
+// the leaves of car q (its matrix M) of a train: open, how far its doors on side `side` are open
+function mtLeaves(M, q, side, open){
+  const dz = q === 1 ? 0 : q === 0 ? -MT_CAB_DOOR : MT_CAB_DOOR, w = MT_DOOR_W/2, y = (.13)*MT_SY + MT_DOOR_H/2;
+  for (const s of [-1, 1]){ const o = s === side ? open : 0;
+    for (const e of [-1, 1]){ if (MT_LEAF.n >= MT_CAR_MAX*4) return;
+      _mlv.makeTranslation(s*.413, y, dz + e*(w/2 + o*(w - .02)));
+      _mlw.multiplyMatrices(M, _mlv); for (const m of MT_LEAF.meshes) m.setMatrixAt(MT_LEAF.n, _mlw); MT_LEAF.n++; } }
+}
+// (the old lit door gaps: gone, the doors are real now)
 const mtDoorMesh = (() => { const m = new THREE.InstancedMesh(U.box, new THREE.MeshBasicMaterial({ color: 0xf0ffe8 }), 192); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); return m; })();
 const _mdM = new THREE.Matrix4(), _mdL = new THREE.Matrix4();
 function mtDrawDoors(){
+  for (const m of MT_LEAF.meshes){ m.count = MT_LEAF.n; m.visible = MT_LEAF.n > 0; if (MT_LEAF.n) m.instanceMatrix.needsUpdate = true; }
+  return;
   let n = 0;
   for (const l of metros){ const tr = l.train; if (!tr || !l.stn || tr.dwell <= 0 || tr.doors <= .01) continue;
     const st = l.stn.get(mtPath(l).stops[tr.at].k); if (!st) continue;

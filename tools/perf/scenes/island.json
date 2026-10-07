@@ -1,0 +1,19 @@
+{
+ "name": "island",
+ "cam": {
+  "x": 0,
+  "z": 0,
+  "zoom": 13.2,
+  "yaw": 0.7
+ },
+ "storage": {
+  "neonIsland.metros": "[]",
+  "neonIsland.megas": "[]",
+  "neonIsland.radioHost": "{\"songs\":0,\"lore1\":false,\"lore2\":false,\"after\":0,\"lore2At\":4,\"used\":[],\"streak\":0}",
+  "neonIsland.v2": "[[-1,-1,[],{\"clutter\":1,\"green\":1,\"neon\":1},\"some\",0,0],[-1,0,[],{\"clutter\":1,\"green\":1,\"neon\":1},\"some\",0,0],[-1,1,[],{\"clutter\":1,\"green\":1,\"neon\":1},\"some\",0,0],[0,-1,[],{\"clutter\":1,\"green\":1,\"neon\":1},\"some\",0,0],[0,0,[],{\"clutter\":1,\"green\":1,\"neon\":1},\"some\",0,0],[0,1,[],{\"clutter\":1,\"green\":1,\"neon\":1},\"some\",0,0],[1,-1,[],{\"clutter\":1,\"green\":1,\"neon\":1},\"some\",0,0],[1,0,[],{\"clutter\":1,\"green\":1,\"neon\":1},\"some\",0,0],[1,1,[],{\"clutter\":1,\"green\":1,\"neon\":1},\"some\",0,0]]",
+  "neonIsland.bmenuOpen": "0",
+  "neonIsland.highways": "[]",
+  "neonIsland.tmenuOpen": "0"
+ },
+ "edits": []
+}

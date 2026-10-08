@@ -58,9 +58,9 @@ const cutRest = u => u.A + u.H + u.S;
 // frame the pieces whose boxes miss the view are left out of the draw: the same triangles are drawn where they can show, in
 // the same order, so the picture doesn't change. Several ranges go up in one call where the browser has WEBGL_multi_draw,
 // else as one draw each (see renderBufferDirect below).
-const CULL = { minPx: 1, lvl: -1, stamp: 0, pl: new Float64Array(24), pad: 0, total: 0, drawn: 0, tris: 0 }, _cullM = new THREE.Matrix4(), _cullF = new THREE.Frustum();
-function cullFrame(){
-  cam.updateMatrixWorld(); _cullM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _cullF.setFromProjectionMatrix(_cullM);
+const CULL = { cam: null, minPx: 1, lvl: -1, stamp: 0, pl: new Float64Array(24), pad: 0, total: 0, drawn: 0, tris: 0 }, _cullM = new THREE.Matrix4(), _cullF = new THREE.Frustum();
+function cullFrame(camera = cam){   // (for the camera about to draw: the view's, or the static cache's)
+  CULL.cam = camera; camera.updateMatrixWorld(); _cullM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); _cullF.setFromProjectionMatrix(_cullM);
   for (let i = 0; i < 6; i++){ const p = _cullF.planes[i]; CULL.pl.set([p.normal.x, p.normal.y, p.normal.z, p.constant], i*4); }
   CULL.pad = 4*(2*zoom/H);   // (a few screen pixels of room, in world units)
   { const lim = (2*zoom/H)*CULL.minPx; let lv = -1; for (let k = 0; k < SMALL_N; k++) if (SMALL_E[k] <= lim) lv = k; CULL.lvl = PH.tests.noSmall ? -1 : lv; }   // (triangles with no edge as long as a pixel's worth are left out)
@@ -98,15 +98,15 @@ function multiRows(o, P, r0, r1){
 }
 function cutBefore(r, s, c, g){
   const u = g.userData.cut, P = g.userData.pcs; g.drawRange.start = 0; g.drawRange.count = g.userData.full ? cutRest(u) : u.A;
-  if (P && !g.userData.full && c === cam){ const t = multiRows(this, P, 0, 0); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } }
+  if (P && !g.userData.full && c === CULL.cam){ const t = multiRows(this, P, 0, 0); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } }
 }
 function cutAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = cutRest(g.userData.cut); this.userData.md = null; }
 function sideBefore(r, s, c, g){
   const u = g.userData.cut, b = u.A + u.H, o = u.off, P = g.userData.pcs;
-  if (SIDE_ARC.all){ g.drawRange.start = b; g.drawRange.count = u.S; if (P && c === cam){ const t = multiRows(this, P, 1, SIDE_K); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } } return; }
+  if (SIDE_ARC.all){ g.drawRange.start = b; g.drawRange.count = u.S; if (P && c === CULL.cam){ const t = multiRows(this, P, 1, SIDE_K); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } } return; }
   const s0 = SIDE_ARC.s, e = s0 + SIDE_ARC.L, end = e <= SIDE_K ? b + o[e] : b + u.S + o[e - SIDE_K];
   g.drawRange.start = b + o[s0]; g.drawRange.count = end - (b + o[s0]);
-  if (P && c === cam){ const t = multiRows(this, P, 1 + s0, e); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } }
+  if (P && c === CULL.cam){ const t = multiRows(this, P, 1 + s0, e); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } }
 }
 { // (several ranges in one draw: three itself only draws one, so while a mesh with ranges is drawn the context's drawElements is swapped)
   const gl = renderer.getContext(), ext = window.NO_MULTI_DRAW ? null : gl.getExtension('WEBGL_multi_draw'), rbd = renderer.renderBufferDirect;
@@ -123,7 +123,14 @@ function sideBefore(r, s, c, g){
 }
 // how many of a geometry's indices are its own triangles (the copied wall slices left out)
 const triIndexCount = g => g.userData.cut ? cutRest(g.userData.cut) : (g.index ? g.index.count : g.attributes.position.count);
-function freezeTree(g){ g.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; }); return g; }
+// Static and live (the static cache: see staticcache.js). A mesh that is built once and only changes with the camera, the sun and
+// the time-of-day uniforms is moved to layer 5 (STATIC_BIT) when it joins the world; the live set (people, plants, vehicles,
+// anything with a time uniform or a clipping plane, anything see-through) stays where it was. The camera draws both
+// (layers.enableAll) until the cache is on, then the live set on top of the cache's picture. Anything unknown stays live.
+const STATIC_BIT = 32;
+const isStaticMat = m => !!m && (m.isMeshToonMaterial || m.isMeshLambertMaterial || m.isMeshBasicMaterial) && !m.transparent && !m.userData.colorOnly && !m.userData.live && !m.clippingPlanes;
+const markStatic = o => { if (o.isMesh && !o.isInstancedMesh && o.layers.mask === 1 && !o.userData.noStatic && isStaticMat(o.material)) o.layers.mask = STATIC_BIT; };
+function freezeTree(g){ g.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; markStatic(o); }); return g; }
 let connGroup = null, curPorts = null, EXT = 12;
 const camT = new THREE.Vector3(0, TARGET_Y, 0), camGoal = new THREE.Vector3(0, TARGET_Y, 0);
 // The style (clutter, greenery, neon) of every piece is stored with it when it is built. Generation reads S.clutter,
@@ -1314,7 +1321,7 @@ const markSolid = c => { if (c) solidDirty.add(mergeKey(c.i, c.j)); };
 function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
   for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++) solidDirty.add(i + ',' + j); }
 function flushSolid(){ flushSuper(); if (!solidDirty.size) return; for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); }
-const mergeable = o => o.isMesh && !o.isInstancedMesh && o.layers.mask === 1 && !o.material.transparent && o.geometry.index && !o.userData.noMerge;
+const mergeable = o => o.isMesh && !o.isInstancedMesh && (o.layers.mask === 1 || o.layers.mask === STATIC_BIT) && !o.material.transparent && o.geometry.index && !o.userData.noMerge;
 function rebuildSolid(key){
   const old = solidRegions.get(key);
   if (old){ for (const m of old.members) m.visible = !(m.userData.sideOf && m.geometry.userData.full); world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); }   // (a walls' mesh stays hidden while its piece is swept: see showHidden)

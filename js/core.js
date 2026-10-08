@@ -67,7 +67,7 @@ function mrtShader(mat, flat = null, cutout = false){
 // Does this draw write the normal image? Only what the normal pass drew (layer 0, plants and people on layer 2, pieces
 // mid-sweep on layer 3), with a material that knows how. A see-through one only if it blends normally: it writes the
 // normal at full opacity, which with normal blending replaces what's under it, as the normal pass did.
-const mrtWants = (o, m) => (o.layers.mask & 13) !== 0 && (m.userData.mrt === true || m.isMeshToonMaterial || m.isMeshBasicMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshStandardMaterial || m.isMeshNormalMaterial)
+const mrtWants = (o, m) => (o.layers.mask & 45) !== 0 && (m.userData.mrt === true || m.isMeshToonMaterial || m.isMeshBasicMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshStandardMaterial || m.isMeshNormalMaterial)
   && !(m.transparent && m.blending !== THREE.NormalBlending);
 
 const scene = new THREE.Scene();

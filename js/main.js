@@ -84,7 +84,7 @@ function frame(now){
   if (!MRT){   // (without WebGL 2: the normal image in a pass of its own)
     PH.begin('normals');
     renderer.setRenderTarget(rtN); renderer.setClearColor(0x8080ff, 1);
-    scene.overrideMaterial = normalMat; cam.layers.set(0); renderer.render(scene, cam); scene.overrideMaterial = null;
+    scene.overrideMaterial = normalMat; cam.layers.mask = 1 | STATIC_BIT; renderer.render(scene, cam); scene.overrideMaterial = null;
     renderer.autoClear = false; FOL_UNI.normalMode.value = 1; cam.layers.set(2); renderer.render(scene, cam);
     FOL_UNI.normalMode.value = 0;
     // pieces mid-animation are drawn with their clipping in the normal pass too, so outlines match what's shown

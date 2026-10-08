@@ -779,30 +779,30 @@ let rtC = null, rtN = null, W = 480, H = 270;
 // either writes it or leaves it alone (mrtWants), switched only when that changes. The normal pass's own depth never saw
 // glass, glows and the like, so whatever it left out mustn't hide the normals behind it: those draws come after the
 // rest among the solid ones (the opaque sort in world.js) and don't write the second image.
-let MRT_ON = false, mrtCur = 0, mrtWarned = new Set();
+let MRT_ON = false, mrtCur = 0, MRT_RT = null, mrtWarned = new Set();   // (MRT_RT: the target being drawn with both images; the color target, or the static cache's)
 if (MRT){
   const gl = renderer.getContext(), B2 = [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1], B1 = [gl.COLOR_ATTACHMENT0, gl.NONE];
   const rbd = renderer.renderBufferDirect;
   renderer.renderBufferDirect = function(camera, sc, geo, mat, obj, grp){
-    if (MRT_ON && renderer.getRenderTarget() === rtC){
+    if (MRT_ON && renderer.getRenderTarget() === MRT_RT){
       if (PH.tests.plain && obj.isMesh && !obj.isInstancedMesh && !geo.isInstancedBufferGeometry && !mat.transparent && geo.attributes.normal && !mat.isShaderMaterial) mat = PH.plainMat;   // (the overlay's plain-shading test)
       const w = mrtWants(obj, mat) ? 2 : 1;
       if (w !== mrtCur){ gl.drawBuffers(w === 2 ? B2 : B1); mrtCur = w; }
-      if (w === 1 && (obj.layers.mask & 13) && !mrtWarned.has(mat)){ mrtWarned.add(mat); console.warn('Neon Terrarium: no normals from', mat.type, mat.name || '', obj); }
+      if (w === 1 && (obj.layers.mask & 45) && !mrtWarned.has(mat)){ mrtWarned.add(mat); console.warn('Neon Terrarium: no normals from', mat.type, mat.name || '', obj); }
     }
     return rbd.call(this, camera, sc, geo, mat, obj, grp);
   };
 }
 // before the color pass: both images cleared (the normal image to "facing the camera", as the normal pass cleared it)
-function mrtBegin(){
+function mrtBegin(rt = rtC, rn = rtN, keep = false){   // (keep: don't clear: the picture is copied in from the static cache instead)
   const gl = renderer.getContext();
-  if (rtC._mrtN !== rtN){
-    renderer.setRenderTarget(rtN); renderer.setRenderTarget(rtC);   // (three makes both targets' buffers now)
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, renderer.properties.get(rtN.texture).__webglTexture, 0);
-    rtC._mrtN = rtN;
-  }
-  gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]); mrtCur = 2;
-  renderer.clear(); gl.clearBufferfv(gl.COLOR, 1, [128/255, 128/255, 1, 1]);
+  if (rt._mrtN !== rn){
+    renderer.setRenderTarget(rn); renderer.setRenderTarget(rt);   // (three makes both targets' buffers now)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, renderer.properties.get(rn.texture).__webglTexture, 0);
+    rt._mrtN = rn;
+  } else renderer.setRenderTarget(rt);
+  gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]); mrtCur = 2; MRT_RT = rt;
+  if (!keep){ renderer.clear(); gl.clearBufferfv(gl.COLOR, 1, [128/255, 128/255, 1, 1]); }
   renderer.autoClear = false; MRT_ON = true;
 }
 function mrtEnd(){ MRT_ON = false; renderer.autoClear = true; }

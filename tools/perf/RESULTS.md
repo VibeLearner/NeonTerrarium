@@ -187,3 +187,27 @@ and move 3 pixels by one level in one channel (megas edit0). Kept at 8 slices so
 Harness: thousands of pixels differ per capture (megas: 3,800 to 8,700) because slanted faces' toon bands and the normal
 image flip on knife-edge values. Not "the same picture", so the vertex stays at float normals. Positions as 16-bit were not
 tried: they move edges, which is the same kind of change.
+
+# Round 4, second pass: the cheats, built on request (each its own commit, revert any one)
+
+Order of commits after W1a: (1) 16 wall slices (W1b) and byte normals (W3a); (2) size-sorted triangle order (W2a);
+(3) off-screen people at quarter rate (W5.1). Checked with the harness against the commit before each one (SwiftShader).
+
+| Change | Harness vs the commit before | Triangles (city, dense, megas, all steps) |
+| --- | --- | --- |
+| 16 slices + byte normals | thousands of pixels differ by a level (earlier trial of byte normals: 3,800 to 8,700 a capture) | n/a |
+| W2a: triangles under a pixel not sent | median 2,223 pixels of 921,600 differ (0.24%), worst 16,505 (1.8%, night zoomed out, looks identical by eye); no state differences, no page errors | 51.0M to 31.9M (36% fewer); zoom-in steps about 50% fewer |
+| W5.1: people off screen every 4th frame | state differs (expected: the simulation changed); no page errors | n/a |
+
+W2a: a first version drew only a third of each list (counts in triangles, ranges in indices); caught by looking at the
+capture, fixed. Threshold: longest edge under one render pixel at the current zoom, in doubling classes (SMALL_E in world.js).
+Overlay tests (exact mode, Shift+F3): "draw sub-pixel triangles too", "people off screen at full rate",
+"no per-plot culling".
+
+Not built, with reasons:
+- W3a positions as 16-bit: needs per-batch origins; every reader of merged geometry (walking maps, ray tests) would change.
+- W4a half-resolution composite effects: the wet-ground search, mist and rays are interleaved with the pixel stepping in one
+  shader (sky.js); splitting them out blind, with no real graphics card here to time it, risked a broken composite.
+- W6 cached static city: a large new render path (margin target, strip refresh, live/static split). Better started once
+  the numbers from the owner's M2 show how much of the frame is left after these changes.
+- W3b, W5.2, W2b, W2c: small, unmeasured gains; left until the M2 timing says which one is worth it.

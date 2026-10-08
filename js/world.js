@@ -23,8 +23,46 @@ const world = new THREE.Group(); world.matrixAutoUpdate = false; scene.add(world
 // sun a little): three calls onBeforeRender only for camera views, so the range is cut there and restored straight after.
 function hideBefore(r, s, c, g){ if (!g.userData.full) g.drawRange.count = g.userData.shown; }
 function hideAfter(r, s, c, g){ g.drawRange.count = Infinity; }
-// while a piece is swept in or out (sliced open), its hidden faces are drawn too
-function showHidden(view, on){ view.traverse(o => { const g = o.isMesh && o.geometry; if (g && g.userData.shown !== undefined) g.userData.full = on; }); }
+// while a piece is swept in or out (sliced open), its hidden faces are drawn too (and its walls all at once: see below)
+function showHidden(view, on){ view.traverse(o => { const g = o.isMesh && o.geometry; if (!g) return;
+  if (g.userData.shown !== undefined || g.userData.cut) g.userData.full = on;
+  if (o.userData.sideOf) o.visible = !on; }); }
+// Walls facing away. The graphics card throws away every triangle turned away from the camera, but only after it has
+// done all the work for its corners; in a city of boxes that's half the walls, and every underside. So the buildings'
+// triangles are kept in this order (see collect): A, the ones that may face the camera from anywhere (roofs, slopes);
+// H, the ones never drawn by the camera (inside solid blocks: see hideCovered; and undersides, which the camera, always
+// looking down, can never see); S, the walls, sorted by which way they face into SIDE_K slices of the compass; then D,
+// the first half of S again, so that any run of slices going round the compass is one unbroken stretch. Each piece is
+// drawn as two meshes over the same triangles: one draws A (or, for its shadow, A + H + S), the other only the slices
+// of walls that can face the camera this frame (SIDE_ARC). A wall is only ever left out when it faces away by a margin,
+// so nothing that would have been drawn is missing; the picture doesn't change. Shadows still draw every face.
+const SIDE_K = 8, SIDE_ARC = { all: true, s: 0, L: SIDE_K };
+function sideArc(){
+  cam.updateMatrixWorld(); const e = cam.matrixWorld.elements, tx = e[8], tz = e[10];   // toward the camera (it's orthographic: the same for every pixel)
+  if (Math.hypot(tx, tz) < 1e-3){ SIDE_ARC.all = true; return; }
+  const a = Math.atan2(tz, tx), w = TAU/SIDE_K, hid = [];
+  for (let k = 0; k < SIDE_K; k++){
+    const p0 = k*w, p1 = p0 + w, da = ((a - p0)%TAU + TAU)%TAU;   // (is the camera's own direction inside the slice?)
+    const best = da <= w ? 1 : Math.max(Math.cos(p0 - a), Math.cos(p1 - a));
+    hid.push(best < -.002);
+  }
+  let s = -1; for (let k = 0; k < SIDE_K; k++) if (!hid[k] && hid[(k + SIDE_K - 1)%SIDE_K]){ s = k; break; }
+  if (s < 0){ SIDE_ARC.all = true; return; }
+  let L = 0; while (L < SIDE_K && !hid[(s + L)%SIDE_K]) L++;
+  if (s + L > SIDE_K + SIDE_K/2){ SIDE_ARC.all = true; return; }   // (can't happen with 8 slices; just in case)
+  SIDE_ARC.all = false; SIDE_ARC.s = s; SIDE_ARC.L = L;
+}
+const cutRest = u => u.A + u.H + u.S;
+function cutBefore(r, s, c, g){ const u = g.userData.cut; g.drawRange.start = 0; g.drawRange.count = g.userData.full ? cutRest(u) : u.A; }
+function cutAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = cutRest(g.userData.cut); }
+function sideBefore(r, s, c, g){
+  const u = g.userData.cut, b = u.A + u.H, o = u.off;
+  if (SIDE_ARC.all){ g.drawRange.start = b; g.drawRange.count = u.S; return; }
+  const s0 = SIDE_ARC.s, e = s0 + SIDE_ARC.L, end = e <= SIDE_K ? b + o[e] : b + u.S + o[e - SIDE_K];
+  g.drawRange.start = b + o[s0]; g.drawRange.count = end - (b + o[s0]);
+}
+// how many of a geometry's indices are its own triangles (the copied wall slices left out)
+const triIndexCount = g => g.userData.cut ? cutRest(g.userData.cut) : (g.index ? g.index.count : g.attributes.position.count);
 function freezeTree(g){ g.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; }); return g; }
 let connGroup = null, curPorts = null, EXT = 12;
 const camT = new THREE.Vector3(0, TARGET_Y, 0), camGoal = new THREE.Vector3(0, TARGET_Y, 0);
@@ -67,7 +105,10 @@ ATLAS.onBeforeCompile = sh => {
   if (ATLAS_TEST.noGlow) sh.vertexShader = sh.vertexShader.replace(/int ek = int\(aEm\.a\*255\.0 \+ \.5\);[^\n]*\n[^\n]*\n/, 'vEmis = aEm.rgb;\n');   // (picture changes: lights don't switch, flicker or blink)
   if (ATLAS_TEST.noData) sh.vertexShader = sh.vertexShader.replace(/int ek = int\(aEm\.a\*255\.0 \+ \.5\);[^\n]*\n[^\n]*\n/, 'vEmis = vec3(0.0);\n').replace('#include <color_vertex>', 'vColor = vec3(0.8);');   // (picture changes: no colors, no glow)
 };
-const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m !== ATLAS;
+// the same material for the walls' mesh (see sideArc), so its draws merge apart from the rest; the same shader
+const ATLAS_SIDE = ATLAS.clone(); ATLAS_SIDE.onBeforeCompile = ATLAS.onBeforeCompile; ATLAS_SIDE.customProgramCacheKey = ATLAS.customProgramCacheKey;
+let SIDE_SPLIT = false;   // (set while a plot or a megastructure is collected: see collect)
+const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m !== ATLAS && m !== ATLAS_SIDE;
 // Faces nobody can ever see: wholly and well inside one of the piece's solid blocks (a box's end sunk into a wall, a post
 // buried in a slab). From any angle the block is in front of them. A block only counts if it's always drawn (never thinned
 // out when zoomed out), opaque and a true box. (Faces pressed flat against a block's face are kept: in testing they still
@@ -126,6 +167,37 @@ function hideCovered(b, C){
   for (let q = 0; q < hid.length; q++) out[nv + q] = hid[q];
   b.i = out; b.hid = hid.length;
 }
+// The buildings' triangles in the order sideArc wants: A, H, the walls slice by slice (S), then slices 0 to 3 again (D).
+// A wall slice only takes triangles turned no higher than level (whatever faces at all upward may face the camera from
+// anywhere); an underside is one the camera can't see at its lowest tilt, nor any higher.
+function sideLayout(buckets, nAt){
+  const A = [], H = [], S = Array.from({ length: SIDE_K }, () => []), w = TAU/SIDE_K, low = Math.sin(PITCH_MIN), lowC = Math.cos(PITCH_MIN);
+  let o2 = 0;
+  for (const [mat, b] of buckets){
+    if (!atlasable(mat)) continue;
+    const I = b.i, nv = I.length - b.hid, P = b.p;
+    for (let q = 0; q < nv; q += 3){
+      const a3 = I[q]*3, b3 = I[q + 1]*3, c3 = I[q + 2]*3;
+      const ux = P[b3] - P[a3], uy = P[b3 + 1] - P[a3 + 1], uz = P[b3 + 2] - P[a3 + 2], vx = P[c3] - P[a3], vy = P[c3 + 1] - P[a3 + 1], vz = P[c3 + 2] - P[a3 + 2];
+      const nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx, l = Math.hypot(nx, ny, nz);
+      let dst = A;
+      if (l > 0){
+        const y = ny/l, h = Math.hypot(nx, nz)/l;
+        if (y*low + h*lowC < -.002) dst = H;   // an underside: away from the camera at every tilt and turn
+        else if (y <= 0 && h > 0){ let ph = Math.atan2(nz, nx); if (ph < 0) ph += TAU; dst = S[Math.min(SIDE_K - 1, Math.floor(ph/w))]; }
+      }
+      dst.push(I[q] + o2, I[q + 1] + o2, I[q + 2] + o2);
+    }
+    for (let q = nv; q < I.length; q++) H.push(I[q] + o2);
+    o2 += P.length/3;
+  }
+  const off = [0]; for (const s of S) off.push(off[off.length - 1] + s.length);
+  const nS = off[SIDE_K], nD = off[SIDE_K/2], n = A.length + H.length + nS + nD;
+  const ix = nAt > 65535 ? new Uint32Array(n) : new Uint16Array(n);
+  let k = 0; for (const v of A) ix[k++] = v; for (const v of H) ix[k++] = v; for (const s of S) for (const v of s) ix[k++] = v;
+  for (let j = 0; j < SIDE_K/2; j++) for (const v of S[j]) ix[k++] = v;
+  return { ix, cut: { A: A.length, H: H.length, S: nS, off } };
+}
 function collect(fn){
   buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {}; curSpots = []; curCover = [];
   for (const k in SPR.size) FOL_LIST[k] = [];
@@ -152,17 +224,22 @@ function collect(fn){
     // the triangles: each bucket's indices, moved along by where its corners landed; first every bucket's visible ones (in
     // their order), then the hidden ones (drawn only while the piece is being swept in or out: see hideCovered)
     let ni = 0, nh = 0; const C = prepCovers(covers); for (const [mat, b] of buckets) if (atlasable(mat)){ bucketIndexUpTo(b); hideCovered(b, C); ni += b.i.length; nh += b.hid; }
-    const ix = nAt > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
-    { let k = 0, kh = ni - nh;
+    let ix, cut = null;
+    if (SIDE_SPLIT){ ({ ix, cut } = sideLayout(buckets, nAt)); }
+    else {
+      ix = nAt > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+      let k = 0, kh = ni - nh;
       let o2 = 0; for (const [mat, b] of buckets){ if (!atlasable(mat)) continue; const I = b.i, nv = I.length - b.hid;
         for (let q = 0; q < nv; q++) ix[k++] = I[q] + o2;
         for (let q = nv; q < I.length; q++) ix[kh++] = I[q] + o2;
-        o2 += b.p.length/3; } }
+        o2 += b.p.length/3; }
+    }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3)); g.setIndex(new THREE.BufferAttribute(ix, 1));
     g.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); g.setAttribute('aEm', new THREE.BufferAttribute(em, 4, true));
     g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aFine', new THREE.BufferAttribute(fine, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1, true));
-    if (nh) g.userData.shown = ni - nh;   // (the hidden triangles come after this many indices: see hideBefore)
+    if (cut){ g.userData.cut = cut; g.setDrawRange(0, cutRest(cut)); }   // (A, H, S and D: see sideArc)
+    else if (nh) g.userData.shown = ni - nh;   // (the hidden triangles come after this many indices: see hideBefore)
     geo.set(ATLAS, g);
   }
   for (const g of geo.values()) g.computeBoundingSphere();
@@ -1026,6 +1103,12 @@ const isDarkPlot = c => !!c.sections.length && !c.mega && hash('dark', c.i, c.j)
 const REG = 5, regions = new Map(), dirtyRegions = new Set();
 const regKey = (i, j) => Math.floor(i/REG) + ',' + Math.floor(j/REG);
 // a cell's solid geometry is drawn as its own mesh (usually one draw call); plants and glows are batched per region
+// the walls' mesh of a building mesh in the A/H/S/D order (sideArc): the same triangles, no shadow of its own
+function sideMesh(mesh){
+  const sm = new THREE.Mesh(mesh.geometry, ATLAS_SIDE); sm.receiveShadow = mesh.receiveShadow; sm.castShadow = false; sm.layers.mask = mesh.layers.mask;
+  sm.onBeforeRender = sideBefore; sm.onAfterRender = cutAfter; sm.userData.sideOf = mesh; mesh.userData.side = sm;
+  return sm;
+}
 function cellView(c){
   if (c.view){ world.remove(c.view); c.view = null; markSolid(c); }
   if (!c.data) return;
@@ -1035,6 +1118,7 @@ function cellView(c){
     if (m.userData.colorOnly){ mesh.layers.set(1); mesh.renderOrder = 2; } else { mesh.castShadow = !m.userData.noCast; mesh.receiveShadow = true; }   // see-through glass: colour pass only
     if (geo.userData.shown !== undefined){ mesh.onBeforeRender = hideBefore; mesh.onAfterRender = hideAfter; }
     g.add(mesh);
+    if (geo.userData.cut){ mesh.onBeforeRender = cutBefore; mesh.onAfterRender = cutAfter; g.add(sideMesh(mesh)); }   // (and its walls: see sideArc)
   }
   world.add(freezeTree(g)); c.view = g;
   markSolid(c);
@@ -1046,7 +1130,7 @@ function cellView(c){
 function corridorTris(geoMap, sx, sz, ex, ez, by0, by1, pad = .25){
   const bx0 = Math.min(sx, ex) - pad, bx1 = Math.max(sx, ex) + pad, bz0 = Math.min(sz, ez) - pad, bz1 = Math.max(sz, ez) + pad, tris = [];
   for (const [, g] of geoMap){   // (glass counts: a door can go in a shopfront)
-    const P = g.attributes.position.array, I = g.index ? g.index.array : null, n = I ? I.length : P.length/3;
+    const P = g.attributes.position.array, I = g.index ? g.index.array : null, n = I ? triIndexCount(g) : P.length/3;   // (not the copied wall slices: see sideArc)
     for (let k = 0; k < n; k += 3){
       const a = (I ? I[k] : k)*3, b = (I ? I[k + 1] : k + 1)*3, q = (I ? I[k + 2] : k + 2)*3;
       if (Math.max(P[a], P[b], P[q]) < bx0 || Math.min(P[a], P[b], P[q]) > bx1) continue;
@@ -1115,7 +1199,8 @@ function rebuildCell(c){
   c.height = CURB;
   c.dark = isDarkPlot(c);
   DARK = c.dark;
-  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length){ PUT_KEEPOUT = lineKeepOut(c); try { buildStack(c); } finally { PUT_KEEPOUT = null; } } c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); mtFeet(c); }); } finally { DARK = false; }   // (and the feet of any highway over it)
+  SIDE_SPLIT = true;
+  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length){ PUT_KEEPOUT = lineKeepOut(c); try { buildStack(c); } finally { PUT_KEEPOUT = null; } } c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); mtFeet(c); }); } finally { DARK = false; SIDE_SPLIT = false; }   // (and the feet of any highway over it)
   if (c.liftCab) podDoorSpot(c);
   if (c.mega){ const m = megas.get(c.mega); if (m && m.roofH) c.height = m.roofH; }
   cellView(c);
@@ -1140,23 +1225,25 @@ function flushSolid(){ flushSuper(); if (!solidDirty.size) return; for (const k 
 const mergeable = o => o.isMesh && !o.isInstancedMesh && o.layers.mask === 1 && !o.material.transparent && o.geometry.index && !o.userData.noMerge;
 function rebuildSolid(key){
   const old = solidRegions.get(key);
-  if (old){ for (const m of old.members) m.visible = true; world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); }
+  if (old){ for (const m of old.members) m.visible = !(m.userData.sideOf && m.geometry.userData.full); world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); }   // (a walls' mesh stays hidden while its piece is swept: see showHidden)
   const byMat = new Map(), members = [];
   for (const c of [...cells.values(), ...megas.values()]){
     if (!c.view || c.view.parent !== world || !c.view.visible || mergeKey(c.i, c.j) !== key || animCells.has(c)) continue;   // (only views actually on show)
-    for (const o of c.view.children) if (mergeable(o)){ let l = byMat.get(o.material); if (!l) byMat.set(o.material, l = []); l.push(o); }
+    for (const o of c.view.children) if (mergeable(o) && !o.userData.sideOf){ let l = byMat.get(o.material); if (!l) byMat.set(o.material, l = []); l.push(o); }   // (a walls' mesh goes with its building's)
   }
   if (!byMat.size) return;
   const g = new THREE.Group();
   for (const [mat, list] of byMat){
     if (list.length < 2) continue;   // (nothing to gain)
     list.sort((a, b) => a.id - b.id);   // (in the order three would have drawn them one by one: where two pieces meet at exactly the same depth, the same one wins)
-    const merged = mergeIndexed(list.map(o => o.geometry)); if (!merged) continue;
+    const cutting = list.some(o => o.geometry.userData.cut);
+    const merged = cutting ? mergeCut(list.map(o => o.geometry)) : mergeIndexed(list.map(o => o.geometry)); if (!merged) continue;
     const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow;
     mesh.userData.sortId = list[0].id;   // (drawn where its first piece would have been: see the opaque sort below)
     if (merged.userData.shown !== undefined){ mesh.onBeforeRender = hideBefore; mesh.onAfterRender = hideAfter; }
     g.add(mesh);
-    for (const o of list){ o.visible = false; members.push(o); }
+    if (cutting){ mesh.onBeforeRender = cutBefore; mesh.onAfterRender = cutAfter; const sm = sideMesh(mesh); sm.userData.sortId = list[0].userData.side ? list[0].userData.side.id : list[0].id; g.add(sm); }
+    for (const o of list){ o.visible = false; members.push(o); if (o.userData.side){ o.userData.side.visible = false; members.push(o.userData.side); } }
   }
   if (!g.children.length) return;
   world.add(freezeTree(g)); solidRegions.set(key, { group: g, members });
@@ -1180,6 +1267,34 @@ function mergeIndexed(geos){
     base += g.attributes.position.count; }
   out.setIndex(new THREE.BufferAttribute(ix, 1));
   if (nh) out.userData.shown = ni - nh;
+  out.computeBoundingSphere();
+  return out;
+}
+// Building geometries joined in the A/H/S/D order (sideArc): every piece's A, every piece's H, then each wall slice of
+// every piece in turn, then slices 0 to 3 again. (A piece without the order counts as all A, and its hidden ones as H.)
+function mergeCut(geos){
+  const names = Object.keys(geos[0].attributes);
+  for (const g of geos) if (Object.keys(g.attributes).length !== names.length || names.some(n => !g.attributes[n] || g.attributes[n].itemSize !== geos[0].attributes[n].itemSize || g.attributes[n].normalized !== geos[0].attributes[n].normalized || g.attributes[n].array.constructor !== geos[0].attributes[n].array.constructor)) return null;
+  let nv = 0; for (const g of geos) nv += g.attributes.position.count;
+  const out = new THREE.BufferGeometry();
+  for (const n of names){ const a0 = geos[0].attributes[n], arr = new a0.array.constructor(nv*a0.itemSize); let o = 0;
+    for (const g of geos){ const a = g.attributes[n].array; arr.set(a, o); o += a.length; }
+    out.setAttribute(n, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); }
+  const seg = g => { const I = g.index.array, u = g.userData.cut;
+    if (u) return { I, a: [0, u.A], h: [u.A, u.A + u.H], s: u.off.map(x => u.A + u.H + x) };
+    const sh = g.userData.shown ?? I.length; return { I, a: [0, sh], h: [sh, I.length], s: new Array(SIDE_K + 1).fill(I.length) }; };
+  const parts = geos.map(seg);
+  let nA = 0, nH = 0; const nB = new Array(SIDE_K).fill(0);
+  for (const p of parts){ nA += p.a[1] - p.a[0]; nH += p.h[1] - p.h[0]; for (let k = 0; k < SIDE_K; k++) nB[k] += p.s[k + 1] - p.s[k]; }
+  const off = [0]; for (let k = 0; k < SIDE_K; k++) off.push(off[k] + nB[k]);
+  const n = nA + nH + off[SIDE_K] + off[SIDE_K/2], ix = nv > 65535 ? new Uint32Array(n) : new Uint16Array(n);
+  let k = 0;
+  const put = (lo, hi) => { let base = 0; parts.forEach((p, gi) => { const I = p.I, r = typeof lo === 'function' ? lo(p) : null; const [x, y] = r || [p[lo][0], p[lo][1]]; for (let q = x; q < y; q++) ix[k++] = I[q] + base; base += geos[gi].attributes.position.count; }); };
+  put('a'); put('h');
+  for (let j = 0; j < SIDE_K; j++) put(p => [p.s[j], p.s[j + 1]]);
+  for (let j = 0; j < SIDE_K/2; j++) put(p => [p.s[j], p.s[j + 1]]);
+  out.setIndex(new THREE.BufferAttribute(ix, 1));
+  out.userData.cut = { A: nA, H: nH, S: off[SIDE_K], off }; out.setDrawRange(0, nA + nH + off[SIDE_K]);
   out.computeBoundingSphere();
   return out;
 }

@@ -311,7 +311,7 @@ function megaFxFlush(VP){
 function rebuildMega(m){
   finishAnimsOn(m);
   disposeData(m.data);
-  m.data = collect(() => withSkin(megaSkinOf(m), () => MEGA_TYPES[m.kind].build(m)));
+  SIDE_SPLIT = true; try { m.data = collect(() => withSkin(megaSkinOf(m), () => MEGA_TYPES[m.kind].build(m))); } finally { SIDE_SPLIT = false; }   // (buildings' walls in facing order: see sideArc in world.js)
   cellView(m);
   megaFx(m);
   for (const b of m.cells) b.height = m.roofH;

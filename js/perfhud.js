@@ -161,8 +161,8 @@ const PH = (() => {
   function setExact(v){ exact = !!v; if (!exact) for (const k in tests) setTest(k, false); if (testBar){ testBar.hidden = !exact; for (const b of testBar.querySelectorAll('button')) b._lab(); } clearAll(); label(); }
   function setTest(k, v){
     if (tests[k] === v) return; tests[k] = v;
-    if (k in ATLAS_TEST){ ATLAS_TEST[k] = v; ATLAS.needsUpdate = true; }
-    if (k === 'shadows'){ renderer.shadowMap.enabled = !v; for (const m of ALL_MATS.concat([ATLAS])) m.needsUpdate = true; if (!v) shadowDirty = true; }   // (shaders are rebuilt either way)
+    if (k in ATLAS_TEST){ ATLAS_TEST[k] = v; ATLAS.needsUpdate = true; ATLAS_SIDE.needsUpdate = true; }
+    if (k === 'shadows'){ renderer.shadowMap.enabled = !v; for (const m of ALL_MATS.concat([ATLAS, ATLAS_SIDE])) m.needsUpdate = true; if (!v) shadowDirty = true; }   // (shaders are rebuilt either way)
   }
   function toggle(){
     on = !on;

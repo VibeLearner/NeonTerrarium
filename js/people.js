@@ -115,7 +115,7 @@ function rasterize(data, x0, z0, nx, nz){
   const x1 = x0 + nx*GR, z1 = z0 + nz*GR;
   for (const geo of data.geo.values()){
     if (geo.attributes.uv) continue;   // flat floor decals: nothing to walk round
-    const P = geo.attributes.position.array, I = geo.index ? geo.index.array : null, nT = I ? I.length : P.length/3;
+    const P = geo.attributes.position.array, I = geo.index ? geo.index.array : null, nT = I ? triIndexCount(geo) : P.length/3;   // (not the copied wall slices: world.js)
     for (let t = 0; t + 2 < nT; t += 3){
       const a3 = (I ? I[t] : t)*3, b3 = (I ? I[t + 1] : t + 1)*3, c3 = (I ? I[t + 2] : t + 2)*3;   // (a triangle's three corners)
       const y0 = P[a3 + 1], y1 = P[b3 + 1], y2 = P[c3 + 1];

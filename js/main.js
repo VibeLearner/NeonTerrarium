@@ -68,6 +68,7 @@ function frame(now){
   flushSolid();   // regions whose pieces changed are merged again (world.js)
   scene.updateMatrixWorld();   // once for every pass below (see core.js): nothing moves between them
   PH.lap('scene upkeep');
+  sideArc();   // which way the buildings' walls can face the camera this frame (world.js)
   cam.layers.enableAll(); shadowFrame();   // shadows: redrawn at once, a strip in the background, or not at all (sky.js)
   PH.shadow(); PH.begin(renderer.shadowMap.needsUpdate ? 'color + shadow redraw' : 'color');
   const pt = PH.tests;   // (the overlay's tests: perfhud.js)

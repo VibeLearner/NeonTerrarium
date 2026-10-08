@@ -117,7 +117,15 @@ function scBlit(colL, rowB){
 // texels (twice or four times where it wraps round an edge), a scissor to the rectangle, culled to the rectangle's own frustum. The same
 // widened projection as every other draw of the cache, so the pixels match.
 const _rectCam = new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR);
+// the lights as they are now, and a way to put others in place for a draw (a strip or rectangle of the cache is drawn with the lights the rest of the
+// picture was drawn with, whatever the day cycle has done since)
+function scLightSnap(){ return { sc: sun.color.clone(), si: sun.intensity, hc: hemi.color.clone(), hg: hemi.groundColor.clone(), hi: hemi.intensity, em: EM_I.value.slice(), m1: sun.matrixWorld.clone(), m2: sun.target.matrixWorld.clone() }; }
+function scLightPut(L){ sun.color.copy(L.sc); sun.intensity = L.si; hemi.color.copy(L.hc); hemi.groundColor.copy(L.hg); hemi.intensity = L.hi; sun.matrixWorld.copy(L.m1); sun.target.matrixWorld.copy(L.m2); for (let i = 0; i < 7; i++) EM_I.value[i] = L.em[i]; }
 function scDrawRect(c0, c1, r0, r1, px, py){
+  const held = SC.lt && !PH.tests.noHold ? scLightSnap() : null; if (held) scLightPut(SC.lt);
+  try { scDrawRect0(c0, c1, r0, r1, px, py); } finally { if (held) scLightPut(held); }
+}
+function scDrawRect0(c0, c1, r0, r1, px, py){
   scCamera();
   const M = SC.Muse, cam_ = SC.camS, pxl = 2*zoom/H, baseC = scCol(px) - M, baseR = scRow(py) - M, rt = SC.rtS;
   for (const [tx, ax, wx] of scPieces(c0, c1 - c0, SC.ox, SC.w)) for (const [ty, ay, wy] of scPieces(r0, r1 - r0, SC.oy, SC.h)){
@@ -151,6 +159,47 @@ function scExtend(px, py){
   SC.R = o; SC.strips++; SC.stripAt = SC.rebuilds;
   return true;
 }
+// An edit (a piece placed, taken away, sweeping in or out, a region's pieces merged): instead of the whole picture, redraw the screen rectangle
+// it can have changed, with the lights the picture was drawn with. The rectangle is the union of the boxes of what changed (SC_DIRTY, world.js)
+// and everything their shadows can fall on: each box widened by a little for the shadow's soft edge, then swept down to the ground along the
+// sun's direction (a point is in a new shadow if the ray from it to the sun meets the box), projected into the cache's pixels, with a few
+// pixels' room. False (the caller draws the whole picture) when it can't be done safely: something changed that has no box, the shadow
+// map or the sun's light isn't what the picture was drawn with, the sun is too low (the shadows reach too far), the rectangle is more than
+// SC_RECT_MAX of the picture, or the overlay test "redraw the cache whole on edits" is on.
+const SC_RECT_MAX = .55, SC_SWEEP_PAD = 1.2, SC_GROUND = -3, SC_RECT_EPS = 2e-4;
+const scNoRect = () => PH.tests.noRect || window.__NO_RECT;
+const _rp = new THREE.Vector3(), _rd = new THREE.Vector3();
+function scEditRect(px, py, shk, soft){
+  const D = SC_DIRTY;
+  if (scNoRect()) return SC.rectWhy = 'rectangles switched off', false;
+  if (D.unknown || D.boxes.length > 24) return SC.rectWhy = D.unknown ? 'something changed that has no box' : 'too many boxes', false;
+  if (!scSame(shk, SC.shk)) return SC.rectWhy = 'the shadow map changed', false;
+  if (scDelta(soft, SC.soft) > SC_RECT_EPS) return SC.rectWhy = 'the light moved', false;   // (the cache tolerates a drift up to SC_EPS; a rectangle redrawn beside older light would show it, so it asks for less)
+  if (!D.boxes.length){ SC.editsSeen = SC_EDITS; return true; }   // (only merges, which change nothing on screen)
+  _rd.copy(sun.position).sub(sun.target.position).normalize();   // toward the sun
+  if (_rd.y < .12) return SC.rectWhy = 'the sun is low', false;
+  scCamera();
+  const cam_ = SC.camS, pxl = 2*zoom/H, M = SC.Muse, baseC = scCol(px) - M, baseR = scRow(py) - M;
+  let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
+  const take = (x, y, z) => { _rp.set(x, y, z).applyMatrix4(cam_.matrixWorldInverse);
+    const c = baseC + (_rp.x - cam_.left)/pxl, r = baseR + (_rp.y - cam_.bottom)/pxl;
+    if (c < c0) c0 = c; if (c > c1) c1 = c; if (r < r0) r0 = r; if (r > r1) r1 = r; };
+  for (const b of D.boxes){
+    for (let q = 0; q < 8; q++){
+      const x = (q & 1 ? b.max.x : b.min.x) + (q & 1 ? SC_SWEEP_PAD : -SC_SWEEP_PAD), y = (q & 2 ? b.max.y : b.min.y) + (q & 2 ? SC_SWEEP_PAD : -SC_SWEEP_PAD), z = (q & 4 ? b.max.z : b.min.z) + (q & 4 ? SC_SWEEP_PAD : -SC_SWEEP_PAD);
+      take(x, y, z);
+      const t = (y - SC_GROUND)/_rd.y; take(x - _rd.x*t, SC_GROUND, z - _rd.z*t);   // (down along the sun's rays to the ground)
+    }
+  }
+  const pad = 4; c0 = Math.floor(c0) - pad; c1 = Math.ceil(c1) + pad; r0 = Math.floor(r0) - pad; r1 = Math.ceil(r1) + pad;
+  const R = SC.R; c0 = Math.max(c0, R.x0); c1 = Math.min(c1, R.x1); r0 = Math.max(r0, R.y0); r1 = Math.min(r1, R.y1);
+  if (c1 > c0 && r1 > r0){
+    if ((c1 - c0)*(r1 - r0) > SC_RECT_MAX*SC.w*SC.h) return SC.rectWhy = 'the rectangle is most of the picture', false;
+    scDrawRect(c0, c1, r0, r1, px, py); SC.rects++; SC.rectLast = [c0 - scCol(px), c1 - scCol(px), r0 - scRow(py), r1 - scRow(py)];
+  }
+  D.boxes.length = 0; SC.editsSeen = SC_EDITS;
+  return true;
+}
 // What the static pieces' pictures depend on, in two parts.
 // HARD: what makes the cache wrong the moment it changes (the view's orientation and zoom, the render size and mode, the detail
 // levels, the lights switching on and off, any static piece coming, going or changing, the pinned place along the view, the
@@ -163,7 +212,7 @@ function scHard(out){
   let k = 0; const put = v => { out[k++] = v; };
   put(yaw); put(PITCH); put(zoom); put(W); put(H); put(SMOOTH_LOOK.value); put(LOD.fine.value); put(CULL.lvl); put(CULL.minPx);
   put(LIGHTS_ON.value < .17 ? 0 : LIGHTS_ON.value);   // (no window switches on below about .18: a drift under that, as the day cycle gives by day, changes nothing)
-  put(sun.castShadow ? 1 : 0); put(renderer.shadowMap.enabled ? 1 : 0); put(SC_EDITS); put(SC.c0);
+  put(sun.castShadow ? 1 : 0); put(renderer.shadowMap.enabled ? 1 : 0); put(SC.c0);   // (an edit, SC_EDITS, is dealt with apart: see scEditRect)
   let t = 0, b = 1; for (const key in PH.tests){ if (PH.tests[key]) t |= b; b <<= 1; } put(t);
   out.length = k; return out;
 }
@@ -180,6 +229,7 @@ function scSoft(out){
 function scShadowKey(out){ let k = 0; for (const v of sun.shadow.matrix.elements) out[k++] = v; out[k++] = sun.shadow.map ? sun.shadow.map.texture.id : -1; out.length = k; return out; }
 function scSame(a, b){ if (!a || !b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
 function scDelta(a, b){ let m = 0; for (let i = 0; i < a.length; i++){ const d = Math.abs(a[i] - b[i]); if (d > m) m = d; } return m; }
+SC.editsSeen = 0; SC.rects = 0; SC.lt = null;   // (rects: edits drawn as a rectangle; lt: the lights the picture was drawn with)
 SC.prev = null; SC.hard = null; SC.soft = null; SC.shk = null; SC.ok = false; SC.ox = 0; SC.oy = 0; SC.R = { x0: 0, x1: 0, y0: 0, y1: 0 }; SC.strips = 0; SC.age = 0; SC.rebuilds = 0; SC.next = null; SC.job = null; SC.K = 8; SC.flash = 0;
 
 // one background strip of the next cache: the job's own camera (where the view was when it began), the strip's rows only, the
@@ -205,7 +255,7 @@ function scBand(job){
 }
 function scJobStart(px, py, hard, soft, shk, why){
   if (!SC.next){ if (!scMargin()) return; SC.next = scMake(SC.w, SC.h); }
-  const job = { k: 0, K: SC.K, ox: scCol(px) - SC.Muse, oy: scRow(py) - SC.Muse, hard: hard.slice(), soft: soft.slice(), shk: shk.slice(), map: sun.shadow.map, why,
+  const job = { edits: SC_EDITS, k: 0, K: SC.K, ox: scCol(px) - SC.Muse, oy: scRow(py) - SC.Muse, hard: hard.slice(), soft: soft.slice(), shk: shk.slice(), map: sun.shadow.map, why,
     rt: SC.next.rt, rn: SC.next.rn, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR),
     sc: sun.color.clone(), si: sun.intensity, hc: hemi.color.clone(), hg: hemi.groundColor.clone(), hi: hemi.intensity, em: EM_I.value.slice(), m1: sun.matrixWorld.clone(), m2: sun.target.matrixWorld.clone() };
   scCamera(); job.cam.left = SC.camS.left; job.cam.right = SC.camS.right; job.cam.top = SC.camS.top; job.cam.bottom = SC.camS.bottom; job.cam.updateProjectionMatrix();
@@ -214,6 +264,7 @@ function scJobStart(px, py, hard, soft, shk, why){
 }
 function scJobSwap(job){   // the finished strips become the cache
   const rt = SC.rtS, rn = SC.rtSN; SC.rtS = job.rt; SC.rtSN = job.rn; SC.next = { rt, rn };
+  SC.lt = job; SC.editsSeen = job.edits;   // (a job's own fields are the lights it was drawn with)
   SC.hard = job.hard; SC.soft = job.soft; SC.shk = job.shk; SC.ox = job.ox; SC.oy = job.oy; SC.R = { x0: job.ox, x1: job.ox + SC.w, y0: job.oy, y1: job.oy + SC.h }; SC.age = 0; SC.rebuilds++; SC.job = null;
 }
 // the static set into the cache in one go, at the view's own place
@@ -224,6 +275,7 @@ function scFull(px, py, hard, soft, shk, why){
   SC.camS.layers.mask = STATIC_BIT; cullFrame(SC.camS);
   renderer.render(scene, SC.camS);
   mrtEnd();
+  SC.lt = scLightSnap(); SC.editsSeen = SC_EDITS; SC_DIRTY.boxes.length = 0; SC_DIRTY.unknown = false;
   SC.hard = hard.slice(); SC.soft = soft.slice(); SC.shk = shk.slice(); SC.ok = true; SC.ox = scCol(px) - SC.Muse; SC.oy = scRow(py) - SC.Muse; SC.R = { x0: SC.ox, x1: SC.ox + SC.w, y0: SC.oy, y1: SC.oy + SC.h }; SC.age = 0; SC.rebuilds++; SC.job = null; SC.flash = 6;
   SC.state = 'redrawn'; SC.why = why;
 }
@@ -232,7 +284,10 @@ const _hA = [], _sA = [], _kA = [];
 SC.frame = function(){
   if (window.__perf && window.__perf.skip) return false;   // (the harness skips this frame's drawing: the old path's render call, which it intercepts, does what a skipped frame owes; the cache's state stays as it was)
   if (SC.mode === 'off' || SC.mode === 'oldview' || PH.tests.noStatic || !MRT){ SC.state = 'off'; SC.why = SC.mode === 'off' || SC.mode === 'oldview' || PH.tests.noStatic ? 'switched off' : 'no WebGL 2'; SC.ok = false; SC.job = null; return false; }
-  if (renderer.shadowMap.needsUpdate){ SC.state = 'off'; SC.why = 'shadows redrawn this frame'; SC.ok = false; SC.job = null; return false; }
+  if (renderer.shadowMap.needsUpdate){   // (the shadows are redrawn at once: for an edit whose boxes are known the picture stays, and the next frame redraws just the edit's rectangle)
+    SC.state = 'off'; SC.why = 'shadows redrawn this frame'; SC.job = null;
+    if (!(SC.ok && SC_EDITS !== SC.editsSeen && !SC_DIRTY.unknown && !scNoRect() && scSame(scHard(_hA), SC.hard))) SC.ok = false;   // (anything else changing too: the whole picture goes, as it always did)
+    return false; }
   if (SC.mode === 'split'){   // (a check: static then live on the main camera, no cache, to tell order effects from projection effects)
     const lm0 = cam.layers.mask;
     renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1); mrtBegin();
@@ -250,6 +305,7 @@ SC.frame = function(){
   else if (!scSame(hard, SC.hard)) now = 'something it depends on changed';
   else if (scCol(px) < SC.R.x0 || scCol(px) + W > SC.R.x1 || scRow(py) < SC.R.y0 || scRow(py) + H > SC.R.y1) now = 'view left the cache';
   else if (scDelta(soft, SC.soft) > SC_BIG) now = 'the light jumped';
+  else if (SC_EDITS !== SC.editsSeen && !scEditRect(px, py, shk, soft)) now = 'an edit: ' + SC.rectWhy;
   // Still changing from frame to frame (a turn or zoom easing in, the lights switching at dusk): the cache would be drawn again every
   // frame, which costs more than the old way. Draw the old way until the inputs hold still for a frame, then draw the cache once.
   const stable = scSame(hard, SC.prev); SC.prev = hard.slice();
@@ -259,7 +315,7 @@ SC.frame = function(){
   else {
     SC.age++; SC.state = 'in use'; SC.why = '';
     // a newer cache in the background when the light has drifted, the shadow map has been swapped, or the view has used half the room
-    if (SC.job && (!scSame(hard, SC.job.hard) || sun.shadow.map !== SC.job.map)){ SC.job = null; }   // (it was for something that's gone)
+    if (SC.job && (!scSame(hard, SC.job.hard) || sun.shadow.map !== SC.job.map || SC.job.edits !== SC_EDITS)){ SC.job = null; }   // (it was for something that's gone)
     if (!SC.job){
       let why = '';
       if (scDelta(soft, SC.soft) > SC_EPS) why = 'light drifted';
@@ -303,5 +359,5 @@ function scFlash(px, py){
 // the overlay's line
 SC.line = function(){
   if (SC.mode === 'off' || PH.tests.noStatic) return 'static cache: off (switched off)';
-  return 'static cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + (SC.ok ? '   frames since redrawn ' + SC.age + '   redrawn ' + SC.rebuilds + ' times   ring strips ' + SC.strips : '');
+  return 'static cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + (SC.ok ? '   frames since redrawn ' + SC.age + '   redrawn ' + SC.rebuilds + ' times   ring strips ' + SC.strips + '   edit rectangles ' + SC.rects + (SC.rectLast ? ' (last: x ' + SC.rectLast[0] + ' to ' + SC.rectLast[1] + ', y from bottom ' + SC.rectLast[2] + ' to ' + SC.rectLast[3] + ')' : '') : '');
 };

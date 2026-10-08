@@ -19,7 +19,24 @@ const world = new THREE.Group(); world.matrixAutoUpdate = false; scene.add(world
 // The static cache (staticcache.js) is out of date whenever a static piece comes, goes, shows, hides or changes layer: every
 // such place bumps this count (the world's add and remove here; showHidden and the sweeps below).
 let SC_EDITS = 0;
-{ const add = world.add, remove = world.remove; world.add = function(){ SC_EDITS++; return add.apply(this, arguments); }; world.remove = function(){ SC_EDITS++; return remove.apply(this, arguments); }; }
+// And where: the world boxes of what came, went, showed or hid, so the cache can redraw just that part of its picture (staticcache.js, scEditRect).
+// `unknown`: something changed that has no box (the highway and metro builders say so): the whole picture is drawn again. `quiet`: a merge of a
+// region's pieces into one mesh (rebuildSolid): the same triangles in the same order, so the picture doesn't change and no box is noted.
+const SC_DIRTY = { boxes: [], unknown: false, quiet: 0 }, _dbx = new THREE.Box3();
+// (only what the static picture can hold or its lighting can feel: a mesh on the static layer, or any that casts a shadow; plants, glows and the like
+// that are drawn live and cast none change nothing in it)
+function scRelevant(o){ let r = false; o.traverse(m => { if (!r && (m.isMesh || m.isPoints) && ((m.layers.mask & STATIC_BIT) || m.castShadow)) r = true; }); return r; }
+function scNote(o){
+  if (SC_DIRTY.quiet || SC_DIRTY.unknown || !o || !scRelevant(o)) return;
+  _dbx.makeEmpty(); _dbx.setFromObject(o);
+  if (_dbx.isEmpty()){ return; }
+  const last = SC_DIRTY.boxes[SC_DIRTY.boxes.length - 1]; if (last && last.equals(_dbx)) return;   // (the same piece noted again)
+  if (SC_DIRTY.boxes.length >= 40){ SC_DIRTY.unknown = true; return; }
+  SC_DIRTY.boxes.push(_dbx.clone());
+}
+{ const add = world.add, remove = world.remove;
+  world.add = function(){ SC_EDITS++; const r = add.apply(this, arguments); for (let i = 0; i < arguments.length; i++) scNote(arguments[i]); return r; };
+  world.remove = function(){ SC_EDITS++; for (let i = 0; i < arguments.length; i++) scNote(arguments[i]); return remove.apply(this, arguments); }; }
 // Static pieces (plots, regions, their plants and glows) never move once built: their matrices are set once and left
 // alone, so the frame's world-matrix update skips them
 // A piece's hidden faces (see hideCovered) are left out of the views drawn from the camera, but the sun's shadow map still
@@ -28,7 +45,7 @@ let SC_EDITS = 0;
 function hideBefore(r, s, c, g){ if (!g.userData.full) g.drawRange.count = g.userData.shown; }
 function hideAfter(r, s, c, g){ g.drawRange.count = Infinity; }
 // while a piece is swept in or out (sliced open), its hidden faces are drawn too (and its walls all at once: see below)
-function showHidden(view, on){ SC_EDITS++; view.traverse(o => { const g = o.isMesh && o.geometry; if (!g) return;
+function showHidden(view, on){ SC_EDITS++; scNote(view); view.traverse(o => { const g = o.isMesh && o.geometry; if (!g) return;
   if (g.userData.shown !== undefined || g.userData.cut) g.userData.full = on;
   if (o.userData.sideOf) o.visible = !on; }); }
 // Walls facing away. The graphics card throws away every triangle turned away from the camera, but only after it has
@@ -1428,7 +1445,8 @@ function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
   for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++) solidDirty.add(i + ',' + j); }
 function flushSolid(){ flushSuper(); if (!solidDirty.size) return; for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); }
 const mergeable = o => o.isMesh && !o.isInstancedMesh && (o.layers.mask === 1 || o.layers.mask === STATIC_BIT) && !o.material.transparent && o.geometry.index && !o.userData.noMerge;
-function rebuildSolid(key){
+function rebuildSolid(key){ SC_DIRTY.quiet++; try { rebuildSolid0(key); } finally { SC_DIRTY.quiet--; } }
+function rebuildSolid0(key){
   const old = solidRegions.get(key);
   if (old){ for (const m of old.members) m.visible = !(m.userData.sideOf && m.geometry.userData.full); world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); }   // (a walls' mesh stays hidden while its piece is swept: see showHidden)
   const byMat = new Map(), members = [];
@@ -1900,6 +1918,7 @@ function animMaterials(u){
 function startAnim(c, kind, y0, y1, zone, w, old, sound, opts = {}){
   SC_EDITS++;
   const view = kind === 'build' ? c.view : old.view;
+  scNote(view);   // (the cache's rectangle redraw: this piece's box)
   const held = kind === 'build';   // plants and glows arrive when a build finishes, but leave as soon as a removal starts
   if (!view){ if (old) dropView(old); if (held) releaseRegion(regKey(c.i, c.j)); return; }
   const col = new THREE.Color(zone ? (ZONES[zone] ? ZONES[zone].col : zone) : '#e3d6bd');
@@ -1977,7 +1996,7 @@ function updateAnims(dt){
 }
 function endAnim(i){
   SC_EDITS++;
-  const a = anims[i]; anims.splice(i, 1);
+  const a = anims[i]; anims.splice(i, 1); scNote(a.view);
   if (!anims.some(b => b.c === a.c)){ animCells.delete(a.c); markSolid(a.c); }   // (back into its region's merge)
   for (const l of a.lines){ scene.remove(l); l.material.dispose(); }
   a.view.traverse(o => { if (o.isMesh && o.userData.isOv){ o.visible = true; return; } if (o.isMesh){ o.material = o.userData.baseMat || o.material; if (o.userData.baseLayer !== undefined) o.layers.mask = o.userData.baseLayer; else o.layers.set(0); } });

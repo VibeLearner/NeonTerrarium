@@ -187,6 +187,27 @@ def steps(scene):
             ('c_edit_off2', 60, None, 4),
             ('c_edit_in', 6, near, 3),
             ('c_edit_in2', 60, None, 4),
+            # edits drawn frame by frame (the edit's own frame included): the cache's rectangle redraw (staticcache.js scEditRect); compare with PERF_BASE_INIT='window.__NO_RECT = true;'
+            ('r_sun', 6, 'S.cycle = false; S.rain = false; S.hour = 14', 6),
+            ('r_sun2', 60, None, 4),
+            ('r_place', 4, "const c = cells.get(ckey(-1, 3)); if (c && !c.mega) addSection(c, 'mid');", 3),
+            ('r_place_mid', 40, None, 8),
+            ('r_place_end', 130, None, 6),
+            ('r_place_end2', 40, None, 4),
+            ('r_demo', 4, "const c = cells.get(ckey(2, -3)); if (c && c.sections.length) removeAt({ kind: 'bld', c });", 3),
+            ('r_demo_mid', 40, None, 8),
+            ('r_demo_end', 130, None, 6),
+            ('r_demo_end2', 40, None, 4),
+            ('r_tower', 4, "const c = cells.get(ckey(2, 3)); if (c && !c.mega) { addSection(c, 'high'); addSection(c, 'high'); }", 3),
+            ('r_tower_mid', 60, None, 8),
+            ('r_tower_end', 200, None, 6),
+            ('r_tower_end2', 40, None, 4),
+            ('r_pan', 50, 'camGoal.x += 30', 40),   # the ring has wrapped by now: an edit whose rectangle straddles its edge
+            ('r_pan2', 40, None, 4),
+            ('r_wrap', 4, near, 3),
+            ('r_wrap_mid', 40, None, 8),
+            ('r_wrap_end', 130, None, 6),
+            ('r_wrap_end2', 40, None, 4),
             ('c_dusk', 40, 'S.hour = 19', 8),
             ('c_dusk2', 600, None, 6),
             ('c_night', 30, 'S.hour = 23', 6),
@@ -272,7 +293,7 @@ def cmd_diff(base_ref, cand_ref, only, quick):
                 tag = '%s_%dx%d' % (sc['name'], vp[0], vp[1])
                 t0 = time.time()
                 # (a fresh browser for each build: two heavy scenes one after the other in one browser can lose its page)
-                br.close(); br = launch(pw); cb, eb = run_scene(br, ub, sc, vp, sc_mode=os.environ.get('PERF_SC_BASE_MODE'))
+                br.close(); br = launch(pw); cb, eb = run_scene(br, ub, sc, vp, sc_mode=os.environ.get('PERF_SC_BASE_MODE'), extra_init=os.environ.get('PERF_BASE_INIT'))
                 br.close(); br = launch(pw); cc, ec = run_scene(br, uc, sc, vp, sc_mode=os.environ.get('PERF_SC_MODE'), extra_init=os.environ.get('PERF_CAND_INIT'))   # (PERF_CAND_INIT: JS run before the candidate's scripts, e.g. window.__FULL_RATE = true;)
                 if eb or ec:
                     fails.append('%s page errors: base %s cand %s' % (tag, eb[:2], ec[:2]))

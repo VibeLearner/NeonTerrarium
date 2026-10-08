@@ -83,3 +83,27 @@ from the API calls: textures, buffers and renderbuffers asked for, minus those d
   are hidden account for 1.9 GB of a (double-counted) 4.2 GB. Dropping the CPU copies of merged meshes after upload would save a large part of it; I did not do it
   (picking, edits and re-merging read those arrays; it needs a careful pass). Suggested as its own item.
 - The sampling heap profiler (tools/perf/heapsites.py) sees only 153 MB of ordinary JS objects (the building scan, roundedBox geometry, collect lists, plants).
+
+**7. Building without redrawing the whole cache: done.**
+- What it does: an edit (a piece placed, removed, sweeping in or out, a neighbor's bridge or walkway rebuilt) no longer throws the whole cache away. The world notes
+  the box of every static piece that came, went, showed or hid (`SC_DIRTY`, world.js; region and super-region merges, which change nothing on screen, and
+  plants or glows that are drawn live and cast no shadow, are left out). The next frame draws just the rectangle those boxes can change: each box widened by 1.2
+  units, swept down to the ground along the sun's rays (a point is in a new shadow if its ray to the sun meets the box), projected into the cache's pixels with
+  4 px to spare, drawn with the strip camera and scissor of item 2 (so it wraps round the ring's edge correctly), with the lights the cache was drawn with (new:
+  held lights for every strip and rectangle, which also makes ring strips exact under a running day cycle). Test "redraw the cache whole on edits" and
+  `window.__NO_RECT = true` keep the old way; "strips drawn with the current lights" switches the held lights off.
+- The whole picture is still drawn (as before) when: something changed that has no box (the highway and metro builders say so), the shadow map or the sun's light
+  isn't what the cache was drawn with (light drift over 2e-4, tighter than the cache's own tolerance so a rectangle never sits beside visibly older light),
+  the sun is below about 7 degrees, the rectangle is more than 55% of the cache, more than 24 boxes, or anything else the cache depends on changed in the same
+  frames (turning, zooming, lights switching).
+- The shadow gate your advisor-style trap: every edit also redraws the shadows in one frame, which used to drop the cache. Now that frame is drawn the old way,
+  as it always was, and the cache stays; the next frame draws the rectangle. `redrawn N times` in the overlay no longer counts up on edits; `edit rectangles N`
+  (and the last rectangle) is on the cache line. tools/perf/edit_frames.py shows it frame by frame: place, tall tower, demolish: one old-way frame (the shadow
+  frame), then the rectangle, and the sweep end the same way; zero whole redraws.
+- Checks: cache steps with edits drawn frame by frame (r_place, r_demo, r_tower, an edit after a pan that wrapped the ring, each with its sweep end): rectangles
+  against whole redraws in this build, 70 captures, 0 problems; against the previous commit (whole redraws), 70 captures, 0 problems; standard script against
+  the previous commit: city 25, megas 15, dense 13 captures, 0 problems. tools/perf/cache_compare.py (reads the cache, draws it whole, compares) shows what
+  any two draws of the same cache differ by when nothing was edited: 19 to 134 px (tie pixels where merging changed draw order), so numbers near that are noise.
+- Decision: the first version used the cache's own light tolerance and kept the cache across the shadow frame even while other things were changing; the standard
+  script then showed two frames (city edit1_mid 1,809 px, megas edit0 835 px) drawn the old way instead of from a fresh cache. Fixed by keeping the cache only
+  when nothing else changed, and by the tighter light tolerance; the standard script is back to 0.

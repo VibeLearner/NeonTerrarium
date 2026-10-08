@@ -87,8 +87,8 @@ function hash(...a){ let h = 2166136261; for (const v of a){ const s = String(v)
 // so a whole building is a single draw call no matter how many materials it was modelled with.
 const ATLAS = new THREE.MeshToonMaterial({ color:0xffffff, gradientMap:gradTex, vertexColors:true });
 // (performance overlay tests, exact mode only: variants of this shader, to find what its corners cost; see perfhud.js)
-const ATLAS_TEST = { lean: false, noGlow: false, noData: false };
-ATLAS.customProgramCacheKey = () => 'atlas' + (ATLAS_TEST.lean ? 'L' : '') + (ATLAS_TEST.noGlow ? 'G' : '') + (ATLAS_TEST.noData ? 'D' : '');
+const ATLAS_TEST = { lean: false, noGlow: false, noData: false, gbuf: false };
+ATLAS.customProgramCacheKey = () => 'atlas' + (ATLAS_TEST.lean ? 'L' : '') + (ATLAS_TEST.noGlow ? 'G' : '') + (ATLAS_TEST.noData ? 'D' : '') + (ATLAS_TEST.gbuf ? 'B' : '');
 ATLAS.onBeforeCompile = sh => {
   sh.uniforms.emI = EM_I; sh.uniforms.fTime = FOL_UNI.time; sh.uniforms.lodFine = LOD.fine; sh.uniforms.lightsOn = LIGHTS_ON;
   sh.vertexShader = sh.vertexShader
@@ -110,6 +110,15 @@ vec3 getGradientIrradiance( vec3 normal, vec3 lightDirection ){
   if (ATLAS_TEST.lean){   // the view position isn't used by these lights with this camera: not passed at all (same picture)
     sh.vertexShader = sh.vertexShader.replace('varying vec3 vViewPosition;', '').replace('vViewPosition = - mvPosition.xyz;', '');
     sh.fragmentShader = sh.fragmentShader.replace('#include <lights_toon_pars_fragment>', THREE.ShaderChunk.lights_toon_pars_fragment.replace('varying vec3 vViewPosition;', 'const vec3 vViewPosition = vec3( 0.0, 0.0, 1.0 );'));
+  }
+  // colors only: no sunlight, sky light or shadow lookup, and the vertex shader no longer passes the shadow map's
+  // coordinates or the view position: what drawing the buildings would cost if the lighting were worked out afterwards,
+  // once per pixel (picture changes: flat, unlit colors)
+  if (ATLAS_TEST.gbuf){
+    sh.vertexShader = sh.vertexShader.replace('#include <shadowmap_vertex>', '').replace('varying vec3 vViewPosition;', '').replace('vViewPosition = - mvPosition.xyz;', '');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_toon_pars_fragment>', 'varying vec3 vNormal;').replace('#include <shadowmap_pars_fragment>', '')
+      .replace('#include <lights_toon_fragment>', '').replace('#include <lights_fragment_begin>', '').replace('#include <lights_fragment_maps>', '').replace('#include <lights_fragment_end>', '')
+      .replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;', 'vec3 outgoingLight = diffuseColor.rgb*0.6 + totalEmissiveRadiance;');
   }
   if (ATLAS_TEST.noGlow) sh.vertexShader = sh.vertexShader.replace(/int ek = int\(aEm\.a\*255\.0 \+ \.5\);[^\n]*\n[^\n]*\n/, 'vEmis = aEm.rgb;\n');   // (picture changes: lights don't switch, flicker or blink)
   if (ATLAS_TEST.noData) sh.vertexShader = sh.vertexShader.replace(/int ek = int\(aEm\.a\*255\.0 \+ \.5\);[^\n]*\n[^\n]*\n/, 'vEmis = vec3(0.0);\n').replace('#include <color_vertex>', 'vColor = vec3(0.8);');   // (picture changes: no colors, no glow)

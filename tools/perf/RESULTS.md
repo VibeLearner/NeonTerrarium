@@ -181,3 +181,9 @@ Probe (maxcity, zoom 30, after plot culling): 6.4M building triangles submitted,
 (only 83k of those tilt under 8 degrees, so a tilt-aware order is not worth it) and 828k of 3.65M wall triangles (8 slices
 let in walls near the edges). 16 or 32 slices would cut about 9% of triangles, but both change the order triangles tie in
 and move 3 pixels by one level in one channel (megas edit0). Kept at 8 slices so the harness stays at exactly 0.
+
+## W3a: normals as signed bytes (tried, not kept)
+
+Harness: thousands of pixels differ per capture (megas: 3,800 to 8,700) because slanted faces' toon bands and the normal
+image flip on knife-edge values. Not "the same picture", so the vertex stays at float normals. Positions as 16-bit were not
+tried: they move edges, which is the same kind of change.

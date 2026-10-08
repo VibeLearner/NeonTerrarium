@@ -139,3 +139,27 @@ from the API calls: textures, buffers and renderbuffers asked for, minus those d
 - Decisions: three single-output passes (r128 has no multiple render targets) rather than one with three outputs; RGBA8 with scaled values (no float targets needed); the texel's
   stand-in is the block's lower-left pixel; depth agreement weight 1/(1 + (dz/s)^4) with s = 6 pixels' worth of world units (.02 at least); the light shafts and mist read the
   block's own texel first and skip the other fetches where it says nothing is there (so an effect's faint outer edge can lose up to a texel).
+
+**9. Custom shapes and round parts: measured and reported; nothing changed (as asked: report first).** tools/perf/shapes_report.py counts every primitive put into a piece while
+the max city is generated (1,269,884 primitives, 24.0 million triangles before any hiding or culling; the visible share can only be sampled, see item 5).
+- The kit: boxes 56.1% (12 triangles each, 1.12 million uses), `U.cyl16` 11.8% (64 each, 44,376 uses), `U.sph` 7.3% (80 each), `U.cyl` (8 sides) 5.8%, `U.blob` 1.0%.
+  Everything else: 29.8% (`U.cyl16` is outside the four named shapes of the plan, so it counts here).
+- Custom shapes by builder: `roundedBox` (core.js; an ExtrudeGeometry with a 1-step bevel and rounded plan corners) about 15% in all, in many sizes: 156 triangles (8,647 uses,
+  5.6%), 242 (2.8%), 236 (1.9%), 292 (1.1%), 184 (.9%) and ten more under .5%. Its users: the building masses (buildings.js 344, 424, 598, 2122), floor slabs and trims
+  (360, 420, 421, 526, 725, 794, 1322: slabs .07 to .13 high with corner radius .03 to .05), awnings (379), planters (1300), road furniture (ground.js 184). `U.torus` (6 x 20 sides,
+  240 triangles) 1.9%, the luxury ribs and hoops (`lxRib`, `lxHoop`, `lxDome`) .4%, `U.cone` .1%, plus a few lathes and 4,000-triangle one-offs (.7%).
+- Round parts all together (cylinders of both kinds, spheres, blobs, tori, domes, cones): 26.4%.
+- Waste that is exact: none found. A rounded box's bottom cap and bottom bevel (about 40% of its triangles) face down and are already in the hidden segment, so they cost nothing to the
+  camera; its plan corners use 4 segments each (three's arcs double `curveSegments`), which at radius .03 to .05 is far below a pixel.
+- What would pay (cheats, need a flip test and per-zoom shape variants, so not done tonight): (1) rounded boxes with radius at most .06 drawn with one segment per corner when small on screen:
+  a slab goes from 156 to about 60 triangles, the outline moves by under .3 of a pixel at zoom 30 on 1640 lines (r (1 - cos 22.5 degrees) at .05 is .004 units); the rounded boxes are
+  about 15% of the triangles put, so something like 9% of all triangles. (2) `cyl16` drawn as 8 sides when its diameter is under about 6 pixels (the 8-gon is inside a quarter pixel
+  of the circle up to a radius of 3.3 px) and as 4 sides under about 1.7 pixels: `cyl16` is 11.8% of the triangles put, 8 sides is half the cost. Both would be chosen per piece range like the
+  size classes of W2a, so they need the shapes generated in two or three variants and one more row per piece in the layout. Say if you want it.
+
+**10. Painted wall detail at far zoom: measured, under the threshold, so no prototype.** tools/perf/paint_probe.py (boxes only; a box counts when all of it lies within the depth of the
+plane of a larger box's face, parallel to it, its footprint inside that face's rectangle: sills, frames, panels, panes, window bars, rails laid on a wall; counted with its 12 triangles):
+- Depth .06 (the plan's number): city 7.7% of all triangles put (11.3% of the boxes; of that 1.0% glowing, 6.7% plain), dense 7.0% (11.6% of boxes). The plan's threshold is 20%: not reached.
+- Depth .12 (twice the plan's, about 3 pixels at zoom 30, so no longer "under a pixel"): city 18.5% (27.1% of the boxes).
+- The visible share can't be read from this probe (the owner's measurement: thin plates 14%, panes 8%); boxes lying on a wall show about half of their 12 triangles at most, so counting by pieces
+  overstates the saving. By the plan's rule (over 20% of building triangles within about .06 of a larger parallel wall face) I did not build the prototype.

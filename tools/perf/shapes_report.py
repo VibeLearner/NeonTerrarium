@@ -10,10 +10,10 @@ window.__PS_STATS = { n: {}, tris: {}, verts: {}, lab: new Map() };
 window.__PS = function(geo, mat, m){
   const st = window.__PS_STATS; let lab = st.lab.get(geo);
   if (!lab){
-    const kit = ['box', 'cyl', 'sph', 'blob'].find(k => window.U && U[k] === geo);
+    const KU = typeof U !== 'undefined' ? U : {}; const kit = ['box', 'cyl', 'sph', 'blob'].find(k => KU[k] === geo);
     const p = geo.parameters || {};
     lab = kit ? 'kit ' + kit : (geo.type && geo.type !== 'BufferGeometry' ? geo.type : 'custom') + ' ' + (p.radialSegments || p.radius || p.curveSegments || '') + '/' + (geo.index ? geo.index.count : geo.attributes.position.count)/3;
-    for (const k of Object.keys(window.U || {})) if (U[k] === geo){ lab = 'U.' + k + ' (' + geo.type + ')'; break; }
+    if (!kit) for (const k of Object.keys(KU)) if (KU[k] === geo){ lab = 'U.' + k + ' (' + geo.type + ')'; break; }
     st.lab.set(geo, lab);
   }
   const t = (geo.index ? geo.index.count : geo.attributes.position.count)/3;

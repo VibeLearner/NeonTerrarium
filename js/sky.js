@@ -218,7 +218,7 @@ const comp = new THREE.ShaderMaterial({
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
-    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, nLifts:{value:0}, mtGap:{value:Array.from({ length: 16 }, () => new THREE.Vector4())}, mtN:{value:0}, mtGapY:{value:new THREE.Vector2()}, tSteam:{value:null}, steamExt:{value:1}, nVents:{value:0},
+    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, nLifts:{value:0}, mtGap:{value:Array.from({ length: 16 }, () => new THREE.Vector4())}, mtN:{value:0}, mtGapY:{value:new THREE.Vector2()}, tSteam:{value:null}, tLiftMask:{value:null}, steamExt:{value:1}, nVents:{value:0},
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
@@ -226,7 +226,7 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform sampler2D tSteam; uniform float steamExt; uniform int nVents; uniform float nLifts; uniform vec4 mtGap[16]; uniform int mtN; uniform vec2 mtGapY;
+    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform sampler2D tSteam; uniform sampler2D tLiftMask; uniform float steamExt; uniform int nVents; uniform float nLifts; uniform vec4 mtGap[16]; uniform int mtN; uniform vec2 mtGapY;
     uniform float night; uniform float smoothLook; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
@@ -290,8 +290,9 @@ const comp = new THREE.ShaderMaterial({
       }
       if (FX_SHIM > 0 && nLifts > 0.5){
         if (dr0.y < -0.01){
-          float ta = (-1.72 - o0.y)/dr0.y, tb = min((-3.9 - o0.y)/dr0.y, tS);
-          if (tb > ta){
+          float ta = (-1.72 - o0.y)/dr0.y, tf = (-3.9 - o0.y)/dr0.y, tb = min(tf, tS);
+          // (could any pad be under this line at all? see liftMaskFor)
+          if (tb > ta && texture2D(tLiftMask, (o0.xz + dr0.xz*(.5*(ta + tf)))/(2.0*steamExt) + .5).r > .5){
             for (int i=0; i<8; i++){ vec3 p = o0 + dr0*(ta + (tb - ta)*(float(i) + .5)/8.0);
               float w = texture2D(tSteam, p.xz/(2.0*steamExt) + .5).b, dep = clamp((-1.72 - p.y)/2.2, 0.0, 1.0);
               shim += w*(1.0 - dep)*(1.0 - dep*.4); }
@@ -604,6 +605,7 @@ function compVariant(){
     on.RIM = u.rimI.value > .01; on.WET = u.wet.value > 0; on.CLOUDS = u.cloudOn.value > .5; on.MIST = u.mistI.value > 0 && u.nVents.value > 0;
     on.RAYS = u.raysOn.value > .5 && u.rayI.value > .01; on.RAIN = u.rainOn.value > .5; on.PAL = u.palOn.value > .5;
   }
+  if (T.compNoShim) on.SHIM = false;
   const key = COMP_FX.map(f => on[f] === false ? 0 : 1).join('');
   if (key !== compKey){ compKey = key; for (const f of COMP_FX) comp.defines['FX_' + f] = on[f] === false ? 0 : 1; comp.needsUpdate = true; }
 }
@@ -1005,6 +1007,39 @@ function liftShimmerCull(VP){
   let on = false;
   for (const [x, z, r] of STEAM_LIFTS) if (boxOnScreen(VP, x - r, x + r, -3.95, -1.67, z - r, z + r)){ on = true; break; }
   comp.uniforms.nLifts.value = on ? STEAM_LIFTS.length : 0;
+  if (on) liftMaskFor(comp.uniforms.invVP.value);
+}
+// Which pixels could see a pad's shimmer at all. The view is orthographic, so every pixel's line of sight runs the same
+// way, and its stretch through the air under the pads (y -1.72 down to -3.9) is the same length across the ground for
+// every pixel: within LIFT_H of that stretch's middle. A coarse top-down map (3 units a cell) marks the cells whose
+// middle point could be that close to a pad's patch of the steam map (its disc, the texels the filtering reaches, a
+// little to spare). A pixel whose middle point lands in an unmarked cell would only read zeros all along its line, so
+// it skips the eight reads (same picture). Rebuilt when the pads change or the view tilts further than it was built for.
+const LIFT_MN = 256, LIFT_MDATA = new Uint8Array(LIFT_MN*LIFT_MN*4);
+const liftMaskTex = new THREE.DataTexture(LIFT_MDATA, LIFT_MN, LIFT_MN, THREE.RGBAFormat);
+liftMaskTex.minFilter = liftMaskTex.magFilter = THREE.NearestFilter; liftMaskTex.generateMipmaps = false;
+comp.uniforms.tLiftMask.value = liftMaskTex;
+let liftMaskR = -1, liftMaskOf = null;
+const _lmA = new THREE.Vector3(), _lmB = new THREE.Vector3();
+function liftMaskFor(invVP){
+  _lmA.set(0, 0, -1).applyMatrix4(invVP); _lmB.set(0, 0, 1).applyMatrix4(invVP); _lmB.sub(_lmA).normalize();
+  const half = _lmB.y < -.01 ? (3.9 - 1.72)*.5*Math.hypot(_lmB.x, _lmB.z)/-_lmB.y : 0;
+  if (liftMaskOf === STEAM_LIFTS && half <= liftMaskR) return;
+  const R = Math.ceil(Math.max(half, liftMaskOf === STEAM_LIFTS ? liftMaskR : 0)*4 + 1)/4;   // a bit more than needed, so small tilts don't rebuild it
+  liftMaskOf = STEAM_LIFTS; liftMaskR = R;
+  const ext = comp.uniforms.steamExt.value, cell = 2*ext/LIFT_MN;
+  LIFT_MDATA.fill(0);
+  for (const [x, z, r] of STEAM_LIFTS){
+    const reach = r + R + .25;
+    const i0 = Math.max(0, Math.floor((x - reach + ext)/cell)), i1 = Math.min(LIFT_MN - 1, Math.floor((x + reach + ext)/cell));
+    const j0 = Math.max(0, Math.floor((z - reach + ext)/cell)), j1 = Math.min(LIFT_MN - 1, Math.floor((z + reach + ext)/cell));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){
+      const cx0 = -ext + i*cell, cz0 = -ext + j*cell;
+      const dx = Math.max(cx0 - x, 0, x - (cx0 + cell)), dz = Math.max(cz0 - z, 0, z - (cz0 + cell));
+      if (dx*dx + dz*dz <= reach*reach) LIFT_MDATA[(j*LIFT_MN + i)*4] = 255;
+    }
+  }
+  liftMaskTex.needsUpdate = true;
 }
 function makeSteamMap(vents, lifts = []){
   const ext = (GRID_MAX + 1)*LOT, k = STEAM_N/(2*ext);

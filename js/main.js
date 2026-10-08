@@ -59,8 +59,6 @@ function frame(now){
   FOL_UNI.wind.value = S.wind * (S.rain ? 1.5 : 1);
 
   // shadows are redrawn only after an edit or once the sun has visibly moved
-  if (_sunLast.distanceToSquared(SUN_DIR) > .12/1600){ _sunLast.copy(SUN_DIR); shadowDirty = true; }
-  renderer.shadowMap.needsUpdate = shadowDirty; shadowDirty = false;
   GLOW_PTS_UNI.scale.value = H/(2*zoom);
   { // detail levels: only needed once zooming out outruns the screen's resolution (see applyRenderRes)
     const loss = (zoom/ZOOM_REF)*(BASE_H/H);   // 1 = every building keeps all its pixels
@@ -70,6 +68,7 @@ function frame(now){
   flushSolid();   // regions whose pieces changed are merged again (world.js)
   scene.updateMatrixWorld();   // once for every pass below (see core.js): nothing moves between them
   PH.lap('scene upkeep');
+  cam.layers.enableAll(); shadowFrame();   // shadows: redrawn at once, a strip in the background, or not at all (sky.js)
   PH.shadow(); PH.begin(renderer.shadowMap.needsUpdate ? 'color + shadow redraw' : 'color');
   renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
   cam.layers.enableAll(); renderer.render(scene, cam);

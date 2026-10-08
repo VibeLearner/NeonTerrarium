@@ -26,7 +26,7 @@ const RAIN_SKY = C(0x28324a), tmpC = new THREE.Color();
 // sun, a shadow lands on the same spot of the shadow map as the thing that casts it.)
 // The sun stands far back (SUN_BACK) and sees deep (core.js), so tall buildings well toward the sun, whose long
 // shadows reach into view in the evening, are always in its view.
-const SUN_DIR = new THREE.Vector3(0, 1, 0), _sunC = new THREE.Vector3(), _sunCLast = new THREE.Vector3(1e9, 0, 0);
+const SUN_DIR = new THREE.Vector3(0, 1, 0), _sunC = new THREE.Vector3();
 const SUN_BACK = 260;
 // Stable shadows: the box only ever moves by whole shadow-map texels, measured along the sun's own view axes, so
 // when it moves and the shadows are redrawn they land on exactly the same grid as before and nothing changes on
@@ -34,22 +34,78 @@ const SUN_BACK = 260;
 // The box also comes in a few fixed sizes, each a fifth bigger than the last, so zooming re-pixelates the shadows
 // only a handful of times instead of every few units.
 const _lx = new THREE.Vector3(), _ly = new THREE.Vector3(), _lz = new THREE.Vector3(), _lUp = new THREE.Vector3(0, 1, 0);
-let _shHalfLast = 0;
+// What the view needs shadowed: the box's size and where its middle is (worked out as above), for shadowFrame below
+const shNeed = { half: 0, c: new THREE.Vector3(), dir: new THREE.Vector3(0, 1, 0) };
 function placeSun(){
   const asp = Math.max(1, W/H), reach = Math.hypot(zoomT*asp, zoomT/Math.sin(PITCH)) + 30;   // +30: tall rooftops at the screen edge, and the box's steps
   const half = 30*Math.pow(1.2, Math.max(0, Math.ceil(Math.log(reach/30)/Math.log(1.2))));
-  if (half !== _shHalfLast){
-    const sc = sun.shadow.camera; sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.updateProjectionMatrix();
-    _shHalfLast = half; shadowDirty = true; _sunCLast.set(1e9, 0, 0);
-  }
   // the sun camera's axes, as three.js's lookAt builds them: z toward the sun, x = up x z, y = z x x
   _lz.copy(SUN_DIR); _lx.crossVectors(_lUp, _lz).normalize(); _ly.crossVectors(_lz, _lx);
-  const texel = 2*half/sun.shadow.mapSize.x, step = texel*Math.max(1, Math.round(6/texel));
+  const texel = 2*half/2048, step = texel*Math.max(1, Math.round(6/texel));
   const u = Math.round(camGoal.dot(_lx)/step)*step, v = Math.round(camGoal.dot(_ly)/step)*step, w = Math.round(camGoal.dot(_lz)/6)*6;   // along the sun it makes no difference to the grid
   _sunC.copy(_lx).multiplyScalar(u).addScaledVector(_ly, v).addScaledVector(_lz, w);
-  if (_sunC.distanceToSquared(_sunCLast) > 1e-8){ _sunCLast.copy(_sunC); shadowDirty = true; }
+  shNeed.half = half; shNeed.c.copy(_sunC); shNeed.dir.copy(SUN_DIR);
   sun.target.position.copy(_sunC); sun.target.updateMatrixWorld();
   sun.position.copy(_sunC).addScaledVector(SUN_DIR, SUN_BACK);
+}
+// Shadow redraws without the spikes. The shadow map is drawn half as wide again as the view needs, on the same grid
+// and at the same texel size (3072 texels for what used to be 2048), so panning stays inside it for a while with
+// nothing to redraw. Before the view gets near its edge, whenever the sun has moved (with the day cycle running the
+// old code redrew the whole map every frame; now the next one is always on its way, SH_K frames apart), or once the
+// zoom has stepped to another box size, the next map is drawn in the background a strip at a time (SH_K frames, one strip each, into a
+// second map) and the two are swapped when it's done; what's on screen never sees a half-drawn map. An edit, or a view
+// that outruns the map (a jump across the city), still redraws it at once, as before. While a building's sweep is
+// playing the background strips wait (its clipped shadow is only drawn right by the full redraw).
+const SH_F = 1.5, SH_K = 8, SH_SUN = .12/1600;
+sun.shadow.mapSize.set(2048*SH_F, 2048*SH_F);
+let shFront = null, shJob = null, shSpare = null;
+const shTarget = () => new THREE.WebGLRenderTarget(2048*SH_F, 2048*SH_F, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat });
+// (three draws a shadow map only from inside a render call: a scene holding one empty mesh is rendered, and the mesh,
+// as it comes up, draws the strip)
+const shHost = new THREE.Scene(), shHostRT = new THREE.WebGLRenderTarget(1, 1), shHook = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial());
+shHook.frustumCulled = false; shHost.add(shHook); shHost.autoUpdate = false; shHost.userData.always = true;   // (always: see tools/perf/page.js)
+shHook.onBeforeRender = () => { renderer.shadowMap.needsUpdate = true; renderer.shadowMap.render([sun], scene, cam); renderer.shadowMap.needsUpdate = false; };
+const shSnap = rt => { const lx = new THREE.Vector3().crossVectors(_lUp, shNeed.dir).normalize();
+  return { rt, half: shNeed.half, c: shNeed.c.clone(), dir: shNeed.dir.clone(), lx, ly: new THREE.Vector3().crossVectors(shNeed.dir, lx), matrix: new THREE.Matrix4(), k: 0 }; };
+// does map m (in its own axes) hold all the view needs?
+const _shd = new THREE.Vector3();
+function shSlack(m){ _shd.subVectors(shNeed.c, m.c); return m.half*SH_F - shNeed.half*1.02 - Math.max(Math.abs(_shd.dot(m.lx)), Math.abs(_shd.dot(m.ly))); }
+// point the sun and its shadow camera at map m (strip k of SH_K, or the whole of it)
+function shAim(m, k = -1){
+  const sh = sun.shadow, c = sh.camera, HF = m.half*SH_F;
+  sun.target.position.copy(m.c); sun.position.copy(m.c).addScaledVector(m.dir, SUN_BACK); sun.updateMatrixWorld(); sun.target.updateMatrixWorld();
+  c.left = -HF; c.right = HF;
+  if (k < 0){ c.bottom = -HF; c.top = HF; sh._viewports[0].set(0, 0, 1, 1); }
+  else { c.bottom = -HF + 2*HF*k/SH_K; c.top = -HF + 2*HF*(k + 1)/SH_K; sh._viewports[0].set(0, k/SH_K, 1, 1/SH_K); }
+  c.updateProjectionMatrix(); sh.map = m.rt;
+}
+function shadowFrame(){
+  const sh = sun.shadow;
+  let now = shadowDirty || !shFront || shSlack(shFront) < 0; shadowDirty = false;
+  if (!now){
+    // time to start the next map? (the sun moved, the box size changed, or the view has used up 40% of the room; a map
+    // under way is only started again if the sun has jumped, the box size changed or the view would leave it)
+    const due = shFront.dir.distanceToSquared(shNeed.dir) > 1e-12 || shFront.half !== shNeed.half || shSlack(shFront) < .6*(SH_F - 1)*shNeed.half;
+    if (shJob && (shJob.half !== shNeed.half || shJob.dir.distanceToSquared(shNeed.dir) > SH_SUN || shSlack(shJob) < 0)){ shSpare = shJob.rt; shJob = null; }   // aimed at a view that's gone: start again
+    if (due && !shJob){ shJob = shSnap(shSpare || shTarget()); shSpare = null; shAim(shJob); sh.updateMatrices(sun); shJob.matrix.copy(sh.matrix); }
+    if (shJob && !anims.length){
+      PH.begin('shadow strip (background)');
+      shAim(shJob, shJob.k); shJob.rt.scissor.set(0, sh.mapSize.y*shJob.k/SH_K, sh.mapSize.x, sh.mapSize.y/SH_K); shJob.rt.scissorTest = true;
+      const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(shHostRT); renderer.render(shHost, cam); renderer.autoClear = ac;
+      shJob.rt.scissorTest = false;
+      PH.end();
+      if (++shJob.k === SH_K){ shSpare = shFront.rt; shFront = shJob; shJob = null; }
+    }
+    shAim(shFront); sh.matrix.copy(shFront.matrix);
+    renderer.shadowMap.needsUpdate = false;
+  } else {
+    // at once, in the colour pass, as before
+    if (shJob){ shSpare = shJob.rt; shJob = null; }
+    shFront = shSnap(shFront ? shFront.rt : shTarget()); shAim(shFront); sh.updateMatrices(sun); shFront.matrix.copy(sh.matrix);
+    renderer.shadowMap.needsUpdate = true;
+  }
+  // and the sun back where the view's lighting wants it
+  sun.target.position.copy(shNeed.c); sun.position.copy(shNeed.c).addScaledVector(SUN_DIR, SUN_BACK); sun.updateMatrixWorld(); sun.target.updateMatrixWorld();
 }
 // Colour grades by time of day: lift tints the shadows, gain the highlights; sat and con are saturation and
 // contrast. Golden hour: warm highlights over violet-teal shadows. Blue hour: cool and soft. Night: deep blue-violet

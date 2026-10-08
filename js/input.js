@@ -2,7 +2,7 @@
 // All game scripts share one scope and load in order (see index.html).
 'use strict';
 /* ---------- camera ---------- */
-let shadowDirty = true; const _sunLast = new THREE.Vector3();
+let shadowDirty = true;
 let spinT = 0, yaw = .7, yawT = .7, zoom = 13.2, zoomT = 13.2;
 // Tilt mode (Space): the camera stays where it is, and dragging up and down (or W and S) tilts it, from a low angle up to
 // nearly straight down, for placing things the isometric view hides; dragging sideways (or A and D) still turns it.

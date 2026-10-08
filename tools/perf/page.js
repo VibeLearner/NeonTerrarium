@@ -15,7 +15,7 @@ window.__perf = (() => {
     const rr = renderer.render.bind(renderer);
     P.skip = false; P.shadowOwed = false;
     renderer.render = (sc, c) => {
-      if (!P.skip) return rr(sc, c);
+      if (!P.skip || sc.userData.always) return rr(sc, c);   // (always: work a skipped frame still has to do, like a background shadow strip)
       if (sc.autoUpdate === true) sc.updateMatrixWorld();
       if (c.parent === null) c.updateMatrixWorld();
       if (sc === scene && renderer.shadowMap.needsUpdate) P.shadowOwed = true;

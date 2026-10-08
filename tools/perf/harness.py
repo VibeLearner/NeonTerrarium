@@ -176,6 +176,20 @@ def steps(scene):
             ('c_rain2', 90, None, 6),
             ('c_cycle', 30, 'S.rain = false; S.hour = 17.8; S.cycle = true', 10),
             ('c_cycle2', 200, None, 12),
+            ('c_day9', 20, 'S.cycle = false; S.rain = false; S.hour = 9', 8),
+            ('c_day9b', 900, 'S.cycle = true', 6),   # the day cycle running at mid-morning: the cache serves lighting up to a drift threshold (and a strip job) old
+            ('c_day9c', 900, None, 6),
+            ('c_day9d', 900, None, 6),
+            # the day cycle at 27 times its real speed with every frame drawn (an upper bound on how far the cache's lighting lags the sun)
+            ('c_fast0', 20, 'S.cycle = false; S.rain = false; S.hour = 9; window.__at0 = window.__at0 || applyTime', 6),
+            ('c_fast1', 40, 'applyTime = function(){ S.hour = (S.hour + .003) % 24; return window.__at0(); }', 40),
+            ('c_fast2', 24, None, 24),
+            ('c_fast3', 24, None, 24),
+            ('c_fast4', 8, 'applyTime = window.__at0', 6),
+            ('c_opt', 12, 'S.cycle = false; S.hour = 12; S.capRes = false; zoomT = 30', 8),   # Settings, Render, Optimize framerate: the render size changes
+            ('c_opt2', 80, None, 4),
+            ('c_opt_off', 12, 'S.capRes = true', 8),
+            ('c_opt_off2', 80, None, 4),
         ]
         keep = os.environ.get('PERF_STEPS')
         return [x for x in lst if x[0] in keep.split(',')] if keep else lst

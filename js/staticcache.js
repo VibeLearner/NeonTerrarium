@@ -64,7 +64,8 @@ SC.drawView = function(fn){
   scCamera();
   const keep = cam.projectionMatrix.clone(), M = SC.Muse;
   cam.projectionMatrix.copy(SC.camS.projectionMatrix); rtC.viewport.set(-M, -M, W + 2*M, H + 2*M); renderer.setRenderTarget(rtC);   // (three reads a target's viewport when the target is set)
-  try { fn(); } finally { cam.projectionMatrix.copy(keep); rtC.viewport.set(0, 0, W, H); }
+  FOL_UNI.res.value.set(W + 2*M, H + 2*M);   // (the plants' and people's shaders snap to whole pixels of 'res' and emit clip coordinates: they need the size of what is being drawn into)
+  try { fn(); } finally { cam.projectionMatrix.copy(keep); rtC.viewport.set(0, 0, W, H); FOL_UNI.res.value.set(W, H); }
 };
 // copy the window of the cache that is the view (color, depth and normals) into the color target
 function scBlit(dx, dy){
@@ -90,7 +91,8 @@ const SC_EPS = .003, SC_BIG = .03;   // (a change in the soft part under EPS isn
 function scHard(out){
   let k = 0; const put = v => { out[k++] = v; };
   put(yaw); put(PITCH); put(zoom); put(W); put(H); put(SMOOTH_LOOK.value); put(LOD.fine.value); put(CULL.lvl); put(CULL.minPx);
-  put(LIGHTS_ON.value); put(sun.castShadow ? 1 : 0); put(renderer.shadowMap.enabled ? 1 : 0); put(SC_EDITS); put(SC.c0);
+  put(LIGHTS_ON.value < .17 ? 0 : LIGHTS_ON.value);   // (no window switches on below about .18: a drift under that, as the day cycle gives by day, changes nothing)
+  put(sun.castShadow ? 1 : 0); put(renderer.shadowMap.enabled ? 1 : 0); put(SC_EDITS); put(SC.c0);
   let t = 0, b = 1; for (const key in PH.tests){ if (PH.tests[key]) t |= b; b <<= 1; } put(t);
   out.length = k; return out;
 }
@@ -107,7 +109,7 @@ function scSoft(out){
 function scShadowKey(out){ let k = 0; for (const v of sun.shadow.matrix.elements) out[k++] = v; out[k++] = sun.shadow.map ? sun.shadow.map.texture.id : -1; out.length = k; return out; }
 function scSame(a, b){ if (!a || !b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
 function scDelta(a, b){ let m = 0; for (let i = 0; i < a.length; i++){ const d = Math.abs(a[i] - b[i]); if (d > m) m = d; } return m; }
-SC.hard = null; SC.soft = null; SC.shk = null; SC.ok = false; SC.ax = 0; SC.ay = 0; SC.age = 0; SC.rebuilds = 0; SC.next = null; SC.job = null; SC.K = 8; SC.flash = 0;
+SC.prev = null; SC.hard = null; SC.soft = null; SC.shk = null; SC.ok = false; SC.ax = 0; SC.ay = 0; SC.age = 0; SC.rebuilds = 0; SC.next = null; SC.job = null; SC.K = 8; SC.flash = 0;
 
 // one background strip of the next cache: the job's own camera (where the view was when it began), the strip's rows only, the
 // lights as they were when it began
@@ -177,6 +179,10 @@ SC.frame = function(){
   else if (!scSame(hard, SC.hard)) now = 'something it depends on changed';
   else if (Math.abs(px - SC.ax) > M || Math.abs(py - SC.ay) > M) now = 'view left the cache';
   else if (scDelta(soft, SC.soft) > SC_BIG) now = 'the light jumped';
+  // Still changing from frame to frame (a turn or zoom easing in, the lights switching at dusk): the cache would be drawn again every
+  // frame, which costs more than the old way. Draw the old way until the inputs hold still for a frame, then draw the cache once.
+  const stable = scSame(hard, SC.prev); SC.prev = hard.slice();
+  if (now === 'something it depends on changed' && SC.ok && !stable){ SC.state = 'off'; SC.why = 'changing: drawn the old way'; SC.job = null; return false; }
   const lm = cam.layers.mask;
   if (now){ scFull(px, py, hard, soft, shk, now); }
   else {

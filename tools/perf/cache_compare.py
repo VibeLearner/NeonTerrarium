@@ -18,14 +18,14 @@ JS = r"""() => {
   renderer.readRenderTargetPixels(SC.rtS, 0, 0, w, h, B); renderer.readRenderTargetPixels(SC.rtSN, 0, 0, w, h, Bn);
   const R1 = SC.R, ox1 = SC.ox, oy1 = SC.oy, c0 = Math.max(R0.x0, R1.x0), c1 = Math.min(R0.x1, R1.x1), r0 = Math.max(R0.y0, R1.y0), r1 = Math.min(R0.y1, R1.y1);
   const base = scCol(px), baseR = scRow(py);
-  let cnt = 0, nd = 0, bx0 = 1e9, bx1 = -1e9, by0 = 1e9, by1 = -1e9, inRect = 0, maxd = 0; const pts = [];
+  let near = 0, cnt = 0, nd = 0, bx0 = 1e9, bx1 = -1e9, by0 = 1e9, by1 = -1e9, inRect = 0, maxd = 0; const pts = [];
   for (let r = r0; r < r1; r++) for (let c = c0; c < c1; c++){
     const ia = (mod(r - oy0, h)*w + mod(c - ox0, w))*4, ib = (mod(r - oy1, h)*w + mod(c - ox1, w))*4; cnt++;
     let d = 0, dn = 0; for (let k = 0; k < 4; k++){ d = Math.max(d, Math.abs(A[ia + k] - B[ib + k])); dn = Math.max(dn, Math.abs(An[ia + k] - Bn[ib + k])); }
     if (d || dn){ nd++; maxd = Math.max(maxd, d, dn); const x = c - base, y = r - baseR; bx0 = Math.min(bx0, x); bx1 = Math.max(bx1, x); by0 = Math.min(by0, y); by1 = Math.max(by1, y);
-      if (rl && x >= rl[0] && x < rl[1] && y >= rl[2] && y < rl[3]) inRect++; if (pts.length < 12) pts.push([x, y, d, dn]); }
+      if (rl && x >= rl[0] && x < rl[1] && y >= rl[2] && y < rl[3]) inRect++; else if (rl && x >= rl[0] - 40 && x < rl[1] + 40 && y >= rl[2] - 40 && y < rl[3] + 40) near++; if (pts.length < 12) pts.push([x, y, d, dn]); }
   }
-  return { compared: cnt, differ: nd, maxDiff: maxd, box: nd ? [bx0, bx1, by0, by1] : null, inLastRect: inRect, lastRect: rl, sample: pts };
+  return { compared: cnt, differ: nd, maxDiff: maxd, box: nd ? [bx0, bx1, by0, by1] : null, inLastRect: inRect, outsideWithin40px: near, lastRect: rl, sample: pts };
 }"""
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('scene'); ap.add_argument('--at', nargs='+', required=True); ap.add_argument('--size', type=int, default=0)

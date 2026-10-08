@@ -57,9 +57,9 @@ is not the blit's state; then the pinned camera's depth (wet-ground search, shim
   a radian a second) never reaches it. Tune by eye: raise `SD.v0` if you ever see detail drop, lower it for more speed.
 - Check: standard script against the previous commit (still and eased frames must be identical): city 25, megas 15, dense 13 captures, 0 problems.
   Cache steps: a slow turn (+.12 rad, peaking at about .007 rad/frame) captured mid-turn: identical; a fast spin (+3 rad) and a quick zoom out
-  captured while moving: 50,000 to 53,000 px differ (5% of 921,600; mostly fine detail: window bars, rails, small pieces; crop:
-  tools/perf/overnight/item6_fast_spin_before_after.png, base left, new right). Those numbers are with v0 = 6; the speeds in those two captures were far above
-  either threshold, so v0 = 10 changes them little (re-checked in the final run, see the table).
+  captured while moving: 47,817 px (fast spin) and 29,214 px (quick zoom out) differ, 5% and 3% of 921,600, mostly fine detail: window bars, rails, small pieces
+  (crop: tools/perf/overnight/item6_fast_spin_before_after.png, base left, new right; the crop was taken at v0 = 6, the numbers are with the final v0 = 10); the slow
+  turn, and every capture at rest, are identical.
 - Triangles drawn by the color pass during a fast spin (+3 rad, city, 1280x720): zoom 30: 35 to 49% fewer; zoom 15: 39 to 54% fewer (with v0 = 6).
   GPU time can only be read on the owner's machine: record a fast spin and a Q/E turn at zoom 30 with the test on and off.
 
@@ -71,7 +71,7 @@ from the API calls: textures, buffers and renderbuffers asked for, minus those d
 |---|---|---|---|---|---|
 | a7b4449 (before the cache) | 2,889 MB | 2,925 MB | 1,495 MB | 1,595 MB | 1,520 / 2,023 |
 | round 6 at item 3 (d44c52e, cache with ring) | 3,008 MB | 3,045 MB | 1,555 MB | 1,651 MB | 2,366 / 2,645 |
-| same build, no building in the cycle, 400 s | 3,008 MB | 3,045 MB (flat from 50 s: 3,036, 3,039, 3,038, 3,048, 3,050, 3,046, 3,046, 3,045) | 1,555 MB | 1,648 MB | 2,366 / 2,642 (2,574 at 50 s, then +60 in the next 100 s, +5 after) |
+| 6297025 (item 6), no building in the cycle, 400 s | 3,008 MB | 3,045 MB (flat from 50 s: 3,036, 3,039, 3,038, 3,048, 3,050, 3,046, 3,046, 3,045) | 1,555 MB | 1,648 MB | 2,366 / 2,642 (2,574 at 50 s, then +60 in the next 100 s, +5 after) |
 
 - Both builds grow the same: +36 MB of JS heap and about +100 MB of graphics in 10 minutes, then flat. Without building, the geometry count rises for the first
   two minutes (plots and plants are built as the camera reaches them) and stops. No leak in either build.
@@ -96,7 +96,7 @@ from the API calls: textures, buffers and renderbuffers asked for, minus those d
   isn't what the cache was drawn with (light drift over 2e-4, tighter than the cache's own tolerance so a rectangle never sits beside visibly older light),
   the sun is below about 7 degrees, the rectangle is more than 55% of the cache, more than 24 boxes, or anything else the cache depends on changed in the same
   frames (turning, zooming, lights switching).
-- The shadow gate your advisor-style trap: every edit also redraws the shadows in one frame, which used to drop the cache. Now that frame is drawn the old way,
+- The shadow gate: every edit also redraws the shadows in one frame, which used to drop the cache. Now that frame is drawn the old way,
   as it always was, and the cache stays; the next frame draws the rectangle. `redrawn N times` in the overlay no longer counts up on edits; `edit rectangles N`
   (and the last rectangle) is on the cache line. tools/perf/edit_frames.py shows it frame by frame: place, tall tower, demolish: one old-way frame (the shadow
   frame), then the rectangle, and the sweep end the same way; zero whole redraws.
@@ -104,6 +104,12 @@ from the API calls: textures, buffers and renderbuffers asked for, minus those d
   against whole redraws in this build, 70 captures, 0 problems; against the previous commit (whole redraws), 70 captures, 0 problems; standard script against
   the previous commit: city 25, megas 15, dense 13 captures, 0 problems. tools/perf/cache_compare.py (reads the cache, draws it whole, compares) shows what
   any two draws of the same cache differ by when nothing was edited: 19 to 134 px (tie pixels where merging changed draw order), so numbers near that are noise.
+- Re-verified on the final commit (305d348) after the guard went in: edit_frames.py (above) and the cache-step lines show `edit rectangles` counting up on every
+  place, tall tower, demolish and sweep end while `redrawn N times` stays put; the edit after the ring-wrapping pan (r_wrap) also took the rectangle path (x 322 to 544,
+  y 157 to 358); the rectangle code is item 2's wrap-aware piece drawing, so it wraps when it has to (a rectangle that happens to straddle the ring's edge was not forced
+  in a test). On the filtered step list rectangles against whole redraws in the same build differ by 45 px at r_wrap (clusters at (169,124), (210,669), (488,581),
+  (496,415), (545,540)); tools/perf/cache_compare.py shows why: against a fresh whole redraw the cache differs by 22 to 153 px after every edit, and by 141 with no edit at
+  all (c_still), and only 0 to 3 of those pixels lie within 40 px outside the rectangle: the rectangle's borders are fine, the rest is the same tie-pixel floor.
 - Decision: the first version used the cache's own light tolerance and kept the cache across the shadow frame even while other things were changing; the standard
   script then showed two frames (city edit1_mid 1,809 px, megas edit0 835 px) drawn the old way instead of from a fresh cache. Fixed by keeping the cache only
   when nothing else changed, and by the tighter light tolerance; the standard script is back to 0.

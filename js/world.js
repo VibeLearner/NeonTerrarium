@@ -36,7 +36,7 @@ function showHidden(view, on){ view.traverse(o => { const g = o.isMesh && o.geom
 // drawn as two meshes over the same triangles: one draws A (or, for its shadow, A + H + S), the other only the slices
 // of walls that can face the camera this frame (SIDE_ARC). A wall is only ever left out when it faces away by a margin,
 // so nothing that would have been drawn is missing; the picture doesn't change. Shadows still draw every face.
-const SIDE_K = 8, SIDE_ARC = { all: true, s: 0, L: SIDE_K };
+const SIDE_K = 16, SIDE_ARC = { all: true, s: 0, L: SIDE_K };
 function sideArc(){
   cam.updateMatrixWorld(); const e = cam.matrixWorld.elements, tx = e[8], tz = e[10];   // toward the camera (it's orthographic: the same for every pixel)
   if (Math.hypot(tx, tz) < 1e-3){ SIDE_ARC.all = true; return; }
@@ -284,11 +284,11 @@ function collect(fn){
   let nAt = 0;
   for (const [mat, b] of buckets){ if (atlasable(mat)) nAt += b.p.length/3; else geo.set(mat, bucketGeometry(b)); }
   if (nAt){
-    const pos = new Float32Array(nAt*3), nrm = new Float32Array(nAt*3), col = new Uint8Array(nAt*3), em = new Uint8Array(nAt*4), flk = new Uint8Array(nAt), fine = new Uint8Array(nAt), ons = new Uint8Array(nAt);
+    const pos = new Float32Array(nAt*3), nrm = new Int8Array(nAt*4), col = new Uint8Array(nAt*3), em = new Uint8Array(nAt*4), flk = new Uint8Array(nAt), fine = new Uint8Array(nAt), ons = new Uint8Array(nAt);
     let o = 0;
     for (const [mat, b] of buckets){
       if (!atlasable(mat)) continue;
-      const n = b.p.length/3; pos.set(b.p, o*3); nrm.set(b.n, o*3);
+      const n = b.p.length/3; pos.set(b.p, o*3); { const bn = b.n; for (let q = 0, w = o*4; q < n; q++, w += 4){ nrm[w] = Math.round(bn[q*3]*127); nrm[w + 1] = Math.round(bn[q*3 + 1]*127); nrm[w + 2] = Math.round(bn[q*3 + 2]*127); } }   // (normals as bytes: exact on axis-aligned faces, under half a degree off otherwise)
       const r = Math.round(mat.color.r*255), gg = Math.round(mat.color.g*255), bl = Math.round(mat.color.b*255);
       for (let i=o;i<o+n;i++){ col[i*3] = r; col[i*3+1] = gg; col[i*3+2] = bl; }
       const k = mat.userData.glow;
@@ -312,7 +312,7 @@ function collect(fn){
         o2 += b.p.length/3; }
     }
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3)); g.setIndex(new THREE.BufferAttribute(ix, 1));
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 4, true)); g.setIndex(new THREE.BufferAttribute(ix, 1));
     g.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); g.setAttribute('aEm', new THREE.BufferAttribute(em, 4, true));
     g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aFine', new THREE.BufferAttribute(fine, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1, true));
     if (cut){ g.userData.cut = cut; g.setDrawRange(0, cutRest(cut)); }   // (A, H, S and D: see sideArc)

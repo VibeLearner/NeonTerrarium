@@ -113,3 +113,29 @@ from the API calls: textures, buffers and renderbuffers asked for, minus those d
 - Decision: the first version used the cache's own light tolerance and kept the cache across the shadow frame even while other things were changing; the standard
   script then showed two frames (city edit1_mid 1,809 px, megas edit0 835 px) drawn the old way instead of from a fresh cache. Fixed by keeping the cache only
   when nothing else changed, and by the tighter light tolerance; the standard script is back to 0.
+
+**8. Soft effects at half resolution: done, a cheat (flip test).**
+- What: the composite's wet-ground reflection search (22 steps), the steam mist (8) and the light shafts (12) are now worked out once per 2 x 2 block of pixels into three
+  small RGBA8 targets (pass "soft effects (half resolution)", sky.js `softEffects`); the composite reads them where its own cheap tests say the effect applies (wet:
+  up-facing opaque pixel in the wet; mist and shafts: the block's own result says something is there), as the four nearest texels weighted by how well each one's depth
+  agrees with the pixel's (nothing bleeds across an edge, including at the foot of a wall: texels from a wall are not used for the ground). The pixel-art stepping and
+  dither (reflection in five levels, mist in twenty, shafts in ten) is applied at full resolution to the result, with the full-resolution Bayer value. Outlines, ambient
+  occlusion, rain, shimmer, night lights, rim light are untouched. The 2 x 2 grid is fixed to the world's pixel parity (the camera's corner, mod 2), so a pan of
+  one pixel moves it by one pixel (checked by reading the code; not measured, so look for crawl on shafts and reflections while panning slowly).
+- Test "soft effects at full resolution" (and `window.__SOFT_FULL = true`) restores the old composite: the shader program with `SOFT_HALF` off is the old text, and the
+  pass is skipped. Exact half of the check: with the test on, the standard script against the previous commit (9e06e75), city 25, megas 15, dense 13 captures: 0 problems,
+  including the rain night and the morning rays.
+- Flip numbers (same build, half against full resolution, the standard script's captures; of 921,600 pixels): city 50,000 to 160,000 differ (5 to 17%), of which over 8 levels
+  9,000 to 45,000 (1 to 5%) and over 32 levels 76 to 3,900 (up to 0.4%, the worst in the night pan); megas 43,000 to 76,000 (over 8: 4,500 to 6,800; over 32: 62 to 280);
+  dense 48,000 to 82,000 (over 8: 6,100 to 11,200; over 32: 140 to 360). Most of it is the dither and stepping landing on neighboring levels, as the crops show. Same-frame
+  crops (full resolution left, half right; tools/perf/soft_compare.py): tools/perf/overnight/item8_soft_rain_night.png (and _rain_night_far), _mist_vent_night, _mist_vent_day,
+  _rays_morning, _rays_evening. Same-frame differences (soft_compare): night rain 29,775 px (over 8: 5,848; over 32: 103), rain far 24,433 (4,842; 163), mist at a vent at night
+  27,553 (2,842; 9), mist by day 41,343 (12,821; 364), morning rays 36,483 (10,679; 503), evening rays 37,215 (16,121; 891).
+- Cost: the GPU saving can't be measured here (SwiftShader). Exact timing (Shift+F3) lists "soft effects (half resolution)" beside "composite": read both with the test on and
+  off, in rain at night (wet), at a steam vent, and at golden hour (shafts). What changes: the reflection search, mist march and shaft march run for a quarter of the pixels;
+  the composite adds 1 fetch (mist, shafts) or 4 depth fetches plus 4 result fetches (only where they apply) per pixel.
+- Bloom check: its first downsample already reads the composite's target directly into a target a quarter of the size (`glowPick`, W/4 x H/4, eight taps); no full-size pass in
+  between. Nothing to change.
+- Decisions: three single-output passes (r128 has no multiple render targets) rather than one with three outputs; RGBA8 with scaled values (no float targets needed); the texel's
+  stand-in is the block's lower-left pixel; depth agreement weight 1/(1 + (dz/s)^4) with s = 6 pixels' worth of world units (.02 at least); the light shafts and mist read the
+  block's own texel first and skip the other fetches where it says nothing is there (so an effect's faint outer edge can lose up to a texel).

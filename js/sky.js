@@ -208,8 +208,9 @@ const SKY_EL = .3, SKY_H = .5, SKY_TURN = 1, SKY_DRIFT = 0;   // a real sky: fix
 // (FX_*: each effect can be compiled out of the shader altogether when it's off: see compVariant)
 const COMP_FX = ['SHIM', 'OUTLINE', 'AO', 'NL', 'RIM', 'WET', 'CLOUDS', 'MIST', 'RAYS', 'RAIN', 'PAL'];
 const comp = new THREE.ShaderMaterial({
-  defines: Object.fromEntries(COMP_FX.map(f => ['FX_' + f, 1])),
+  defines: Object.assign({ SOFT_HALF: 0 }, Object.fromEntries(COMP_FX.map(f => ['FX_' + f, 1]))),   // (SOFT_HALF: the wet-ground reflections, the mist and the light shafts are worked out at half resolution: see softEffects)
   uniforms: {
+    tSoftW:{value:null}, tSoftM:{value:null}, tSoftR:{value:null}, softPar:{value:new THREE.Vector2()}, softDim:{value:new THREE.Vector2(1,1)}, softSig:{value:.5},
     tColor:{value:null}, tDepth:{value:null}, tNormal:{value:null}, res:{value:new THREE.Vector2(1,1)},
     near:{value:NEAR}, far:{value:FAR}, camDist:{value:CAM_DIST}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
     night:{value:0}, smoothLook: SMOOTH_LOOK, lodLines: LOD.lines, pxK:{value:1}, starOff:{value:new THREE.Vector2()}, skyYaw:{value:0}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
@@ -233,6 +234,7 @@ const comp = new THREE.ShaderMaterial({
     uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float rainOn; uniform sampler2D tCloud;
     uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 cityGlow;
     uniform float cloudOn; uniform float raysOn; uniform float rayI; uniform float rainDark;
+    uniform sampler2D tSoftW; uniform sampler2D tSoftM; uniform sampler2D tSoftR; uniform vec2 softPar; uniform vec2 softDim; uniform float softSig;
     varying vec2 vUv;
     #include <packing>
     // ---- 3D value noise for the cloud volumes ----
@@ -261,6 +263,23 @@ const comp = new THREE.ShaderMaterial({
       return vec2(max(min(t1, t2), 0.0), min(max(t1, t2), 1.0));
     }
     float D(vec2 uv){ return near + rawD(uv)*(far-near); }
+    #if SOFT_HALF
+    // The half-resolution results (softEffects): one texel stands for a 2 x 2 block of pixels, the block's lower left pixel, on a grid fixed to the
+    // world's pixels (softPar: the parity of the view's corner), so a pan of one pixel moves them by one pixel. For the pixel at fc: the four texels
+    // round it (bilinear), each weighted by how well the depth at its own pixel agrees with this one's, so nothing bleeds across an edge.
+    vec4 softTaps(vec2 fc, float dF, out ivec4 tx, out ivec4 ty){
+      vec2 t = (floor(fc) + softPar + 0.5)*0.5 - 0.5, i0 = floor(t), f = t - i0;
+      tx = clamp(ivec4(i0.x, i0.x + 1.0, i0.x, i0.x + 1.0), ivec4(0), ivec4(int(softDim.x) - 1));
+      ty = clamp(ivec4(i0.y, i0.y, i0.y + 1.0, i0.y + 1.0), ivec4(0), ivec4(int(softDim.y) - 1));
+      vec4 wb = vec4((1.0 - f.x)*(1.0 - f.y), f.x*(1.0 - f.y), (1.0 - f.x)*f.y, f.x*f.y), w;
+      for (int k = 0; k < 4; k++){
+        ivec2 rp = clamp(ivec2(2*tx[k], 2*ty[k]) - ivec2(softPar), ivec2(0), ivec2(res) - 1);
+        float z = (near + texelFetch(tDepth, rp, 0).x*(far - near) - dF)/softSig; z *= z;
+        w[k] = wb[k]/(1.0 + z*z);
+      }
+      return w;
+    }
+    #endif
     vec3 N(vec2 uv){ return texture2D(tNormal, uv).rgb*2.0-1.0; }
     // arithmetic hash (no sin): the sin trick loses precision on some GPUs and lines the stars up in streaks
     float hash(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -465,6 +484,26 @@ const comp = new THREE.ShaderMaterial({
       float DK = 95.0/(far - near);   // depth tolerances below were set for a 95-unit depth range
       // ---- wet ground: bright lights (neon, windows, lamps) leave vertical streaks on wet pavement ----
       // Not a mirror: dull walls barely show, and only crisp puddle patches reflect clearly. No ripples or jitter.
+#if SOFT_HALF
+      #define SOFT_TAPS if (!haveTaps){ sw = softTaps(gl_FragCoord.xy, near + rd*(far - near), sx, sy); haveTaps = true; }
+      ivec4 sx, sy; vec4 sw = vec4(0.0); bool haveTaps = false;
+      if (FX_WET > 0 && rd < 0.99999 && wet > 0.0 && dot(n, upView) > 0.93){
+        SOFT_TAPS
+        float Wt = 0.0, Kh = 0.0, Cs = 0.0; vec3 Ch = vec3(0.0);
+        for (int k = 0; k < 4; k++){
+          vec4 s4 = texelFetch(tSoftW, ivec2(sx[k], sy[k]), 0); float a4 = s4.a;
+          if (a4 < 0.01) continue;
+          Wt += sw[k];
+          if (a4 < 0.51){ float kh = (a4 - 0.02)/0.48; Kh += sw[k]*kh; Ch += sw[k]*kh*s4.rgb; }
+          else Cs += sw[k]*(a4 - 0.52)/0.48*0.7;
+        }
+        if (Wt > 1e-4){
+          float kk = floor(Kh/Wt*5.0 + 0.5)/5.0;                                        // stepped, to stay pixel art
+          col = mix(col, max(col, Ch/max(Kh, 1e-5)*0.9), clamp(kk, 0.0, 0.8));
+          col = mix(col, mix(skyBot, skyTop, 0.5)*0.7, Cs/Wt);
+        }
+      }
+#else
       if (FX_WET > 0 && rd < 0.99999 && wet > 0.0 && dot(n, upView) > 0.93){
         vec3 wp = ro + rdir*tEnd;
         float pud = step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
@@ -493,6 +532,7 @@ const comp = new THREE.ShaderMaterial({
           col = mix(col, mix(skyBot, skyTop, 0.5)*0.7, 0.35*pud*wet*2.0);   // puddles show the sky when nothing is above
         }
       }
+#endif
       if (FX_CLOUDS > 0 && cloudOn > 0.5 && rd >= 0.99999){
         // clouds come from their own lower-resolution pass (see cloudMat), upscaled with crisp pixels. They're the
         // background: drawn only where the sky shows, never over the island or anything on it (or hanging under it),
@@ -508,6 +548,22 @@ const comp = new THREE.ShaderMaterial({
       // grate, spreading and thinning as it rises, gone by about 4.5. So there's no limit on vents and the cost doesn't
       // grow with them. It mostly adds the light it scatters and hides little, so people stay visible: by day it's lit
       // by the sun where the shadow map says the sun reaches, at night it takes the colours the lamps and neon throw.
+#if SOFT_HALF
+      if (FX_MIST > 0 && mistI > 0.0 && nVents > 0 && rd < 0.99999){
+        ivec2 nb = ivec2((floor(gl_FragCoord.xy) + softPar)*0.5);
+        vec4 m0 = texelFetch(tSoftM, min(nb, ivec2(softDim) - 1), 0);
+        if (m0.a < 0.999 || m0.r + m0.g + m0.b > 0.0){   // (the block's own texel says whether any steam is near: elsewhere nothing is read)
+          SOFT_TAPS
+          vec3 acc = vec3(0.0); float Tm = 0.0, Ws = 0.0;
+          for (int k = 0; k < 4; k++){ vec4 s4 = texelFetch(tSoftM, ivec2(sx[k], sy[k]), 0); acc += sw[k]*s4.rgb; Tm += sw[k]*s4.a; Ws += sw[k]; }
+          if (Ws > 1e-4){
+            acc = acc/Ws*0.4; Tm /= Ws;
+            acc = smoothLook > .5 ? acc : floor(acc*20.0 + dith)/20.0;   // stepped, to stay pixel art
+            col = col*mix(1.0, Tm, .6) + acc;
+          }
+        }
+      }
+#else
       if (FX_MIST > 0 && mistI > 0.0 && nVents > 0 && rd < 0.99999){
         vec3 hit = ro + rdir*tEnd;
         float y0 = 4.5, y1 = -0.1;
@@ -535,6 +591,23 @@ const comp = new THREE.ShaderMaterial({
           col = col*mix(1.0, T, .6) + acc;
         }
       }
+#endif
+#if SOFT_HALF
+      if (FX_RAYS > 0 && raysOn > 0.5 && rayI > 0.01){
+        ivec2 nb = ivec2((floor(gl_FragCoord.xy) + softPar)*0.5);
+        float r0 = texelFetch(tSoftR, min(nb, ivec2(softDim) - 1), 0).r;
+        if (r0 > 0.0){
+          SOFT_TAPS
+          float shafts = 0.0, Ws = 0.0;
+          for (int k = 0; k < 4; k++){ shafts += sw[k]*texelFetch(tSoftR, ivec2(sx[k], sy[k]), 0).r; Ws += sw[k]; }
+          if (Ws > 1e-4){
+            shafts = shafts/Ws*2.0;
+            shafts = smoothLook > .5 ? shafts : floor(shafts*10.0 + dith)/10.0;   // stepped, so the beams read as pixel art
+            col += sunCol * shafts;
+          }
+        }
+      }
+#else
       if (FX_RAYS > 0 && raysOn > 0.5 && rayI > 0.01){
         // light shafts: haze near the island lit wherever the shadow map says the sun gets through
         float t0 = max(0.0, (12.0 - ro.y)/min(rdir.y, -0.001)), t1 = min(tEnd, (-0.5 - ro.y)/min(rdir.y, -0.001));
@@ -555,6 +628,7 @@ const comp = new THREE.ShaderMaterial({
           col += sunCol * shafts;
         }
       }
+#endif
       // ---- rain: pixel streaks in three depth layers ----
       // Each layer sits at a depth: buildings in front of it hide its drops, so rain falls between and behind
       // things instead of lying on the screen. Layers are tied to the world (they slide with the view when it pans
@@ -612,8 +686,134 @@ function compVariant(){
     on.RAYS = u.raysOn.value > .5 && u.rayI.value > .01; on.RAIN = u.rainOn.value > .5; on.PAL = u.palOn.value > .5;
   }
   if (T.compNoShim) on.SHIM = false;
-  const key = COMP_FX.map(f => on[f] === false ? 0 : 1).join('');
-  if (key !== compKey){ compKey = key; for (const f of COMP_FX) comp.defines['FX_' + f] = on[f] === false ? 0 : 1; comp.needsUpdate = true; }
+  // the wet-ground reflections, the mist and the light shafts at half resolution (softEffects): off in the test "soft effects at full resolution"
+  // (and window.__SOFT_FULL), when none of them is on, and without WebGL 2 (texelFetch)
+  const soft = !(T.softFull || window.__SOFT_FULL) && renderer.capabilities.isWebGL2 && !T.compFloor && (on.WET !== false || on.MIST !== false || on.RAYS !== false) ? 1 : 0;
+  const key = COMP_FX.map(f => on[f] === false ? 0 : 1).join('') + soft;
+  if (key !== compKey){ compKey = key; for (const f of COMP_FX) comp.defines['FX_' + f] = on[f] === false ? 0 : 1; comp.defines.SOFT_HALF = soft;
+    for (const m of softMats){ for (const f of COMP_FX) m.defines['FX_' + f] = comp.defines['FX_' + f]; m.needsUpdate = true; }
+    comp.needsUpdate = true; }
+  SOFT_ON = soft === 1;
+}
+let SOFT_ON = false;
+// ---- soft effects at half resolution ----
+// The composite works out three soft effects for every pixel: the reflection search on wet ground (22 steps), the steam's mist (8) and the light
+// shafts (12). Each is smooth over a few pixels, so here each is worked out once for a block of 2 x 2 pixels (the block's lower left one) into a
+// target of its own, and the composite, where its cheap tests say the effect applies, reads the four nearest results weighted by depth (softTaps).
+// The pixel-art stepping and dithering (the reflection's five levels, the mist's twenty, the shafts' ten) are applied at full resolution to the
+// result, so they stay crisp. Outlines, ambient occlusion, rain, shimmer, night lights stay as they were. The test "soft effects at full resolution" gives the
+// composite exactly as it was. Each target is RGBA8: wet: the reflected color and a code (0 none; .02 to .5 a reflection of that strength; .52 to 1 a
+// sky puddle), mist: the light scattered (x 2.5) and what gets through, shafts: their strength (x .5).
+const SOFT_HEAD = `
+  vec2 ij = floor(gl_FragCoord.xy);
+  vec2 rep = clamp(2.0*ij - softPar, vec2(0.0), res - 1.0);        // the block's pixel
+  vec2 uvR = (rep + 0.5)/res;
+  float rd = rawD(uvR);
+  float dith = bayer(rep);
+  vec2 ndc = uvR*2.0 - 1.0;
+  vec4 pn = invVP * vec4(ndc, -1.0, 1.0); pn /= pn.w;
+  vec4 pf = invVP * vec4(ndc, rd*2.0 - 1.0, 1.0); pf /= pf.w;
+  vec3 ro = pn.xyz, seg = pf.xyz - pn.xyz;
+  float tEnd = length(seg); vec3 rdir = seg / tEnd;
+  float DK = 95.0/(far - near);
+  vec4 outv = vec4(0.0);
+`;
+const SOFT_WET = SOFT_HEAD + `
+  if (FX_WET > 0 && rd < 0.99999 && wet > 0.0){
+    vec3 n = N(uvR);
+    if (dot(n, upView) > 0.93){
+      vec3 wp = ro + rdir*tEnd;
+      float pud = step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
+      pud *= 0.35 + 0.65*rainOn;
+      vec3 rr = reflect(rdir, vec3(0.0, 1.0, 0.0));
+      vec3 hitCol = vec3(0.0); float hit = 0.0, t = 0.03; vec2 huv = vec2(0.0);
+      for (int i=0; i<22; i++){
+        t += 0.05 + t*0.14;
+        vec3 q = wp + rr*t;
+        vec4 cp = VP * vec4(q, 1.0); cp.xyz /= cp.w;
+        vec2 uv = cp.xy*0.5 + 0.5;
+        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
+        float sd = texture2D(tDepth, uv).x, qd = cp.z*0.5 + 0.5;
+        if (qd > sd + 0.0003*DK && qd - sd < 0.015*DK){ huv = uv; hit = 1.0; break; }
+      }
+      if (hit > 0.5){
+        vec2 st = vec2(0.0, -1.0/res.y);
+        hitCol = texture2D(tColor, huv).rgb*0.4 + texture2D(tColor, huv+st*2.0).rgb*0.3 + texture2D(tColor, huv+st*4.0).rgb*0.2 + texture2D(tColor, huv+st*6.0).rgb*0.1;
+        float lum = dot(hitCol, vec3(0.3, 0.59, 0.11));
+        float bright = smoothstep(0.35, 0.95, lum);
+        float k = wet * mix(bright*0.9, 0.7, pud);
+        outv = vec4(hitCol, 0.02 + clamp(k, 0.0, 1.0)*0.48);
+      } else if (pud > 0.0) outv = vec4(0.0, 0.0, 0.0, 0.52 + clamp(0.35*pud*wet*2.0/0.7, 0.0, 1.0)*0.48);
+      else outv = vec4(0.0, 0.0, 0.0, 0.02);
+    }
+  }
+  gl_FragColor = outv;`;
+const SOFT_MIST = SOFT_HEAD + `
+  outv = vec4(0.0, 0.0, 0.0, 1.0);
+  if (FX_MIST > 0 && mistI > 0.0 && nVents > 0 && rd < 0.99999){
+    vec3 hit = ro + rdir*tEnd;
+    float y0 = 4.5, y1 = -0.1;
+    float ta = max(0.0, (y0 - ro.y)/min(rdir.y, -0.001)), tb = min(tEnd, (y1 - ro.y)/min(rdir.y, -0.001));
+    vec2 mA = (ro + rdir*ta).xz, mB = (ro + rdir*tb).xz;
+    vec2 sA = texture2D(tSteam, mA/(2.0*steamExt) + .5).rg, sB = texture2D(tSteam, mB/(2.0*steamExt) + .5).rg, sM = texture2D(tSteam, (mA + mB)/(4.0*steamExt) + .5).rg;
+    if (hit.y > -0.6 && tb > ta && max(max(sA.g, sB.g), sM.g) > .004){
+      vec2 px = 1.0/res;
+      vec3 nl = (texture2D(tLight, uvR).rgb*.5 + texture2D(tLight, uvR + vec2(4.0, 0.0)*px).rgb*.25 + texture2D(tLight, uvR - vec2(4.0, 0.0)*px).rgb*.25);
+      vec3 amb = mix(mix(skyBot, skyTop, .4)*.35, vec3(.03, .04, .08), mistNight);
+      vec3 sunS = sunCol*mistSun*(1.0 - mistNight);
+      vec3 glowN = (nl*2.4 + cityGlow*.03)*mistNight;
+      const int MS = 8;
+      float dt = (tb - ta)/float(MS), T = 1.0; vec3 acc = vec3(0.0);
+      for (int i = 0; i < MS; i++){
+        vec3 p = ro + rdir*(ta + (float(i) + dith)*dt);
+        float hy = clamp(p.y/4.5, 0.0, 1.0);
+        vec2 sm = texture2D(tSteam, p.xz/(2.0*steamExt) + .5).rg;
+        float w = mix(sm.r*1.6, sm.g, smoothstep(.0, .55, hy))*.95;
+        float dens = mistI*w*(1.0 - hy)*(1.0 - hy)*(.55 + .45*vnoise(vec3(p.xz*1.3, p.y*1.5 - time*.6)))*.9;
+        acc += T*dens*dt*(amb + sunS*litAt(p) + glowN);
+        T *= exp(-dens*dt*.35);
+      }
+      acc = min(acc, vec3(.4));
+      outv = vec4(acc*2.5, T);
+    }
+  }
+  gl_FragColor = outv;`;
+const SOFT_RAYS = SOFT_HEAD + `
+  if (FX_RAYS > 0 && raysOn > 0.5 && rayI > 0.01){
+    float t0 = max(0.0, (12.0 - ro.y)/min(rdir.y, -0.001)), t1 = min(tEnd, (-0.5 - ro.y)/min(rdir.y, -0.001));
+    vec2 rsa = ro.xz + rdir.xz*t0, rsb = ro.xz + rdir.xz*t1 - rsa;
+    float rsk = clamp(dot(glowC - rsa, rsb)/max(dot(rsb, rsb), 1e-6), 0.0, 1.0);
+    if (t1 > t0 && length(rsa + rsb*rsk - glowC) < 13.5){
+      const int RSTEPS = 12;
+      float dt = (t1 - t0)/float(RSTEPS), acc = 0.0;
+      for (int i=0; i<RSTEPS; i++){
+        vec3 p = ro + rdir*(t0 + (float(i) + dith)*dt);
+        float hz = smoothstep(-0.5, 1.0, p.y) * exp(-p.y/4.0) * smoothstep(13.0, 7.0, length(p.xz - glowC));
+        acc += litAt(p) * hz * dt;
+      }
+      outv = vec4(clamp(acc * 0.016 * rayI * 0.5, 0.0, 1.0), 0.0, 0.0, 1.0);
+    }
+  }
+  gl_FragColor = outv;`;
+const COMP_PRELUDE = comp.fragmentShader.slice(0, comp.fragmentShader.indexOf('void main(){'));
+const softMats = [SOFT_WET, SOFT_MIST, SOFT_RAYS].map(body => new THREE.ShaderMaterial({
+  defines: Object.assign({ SOFT_HALF: 0 }, Object.fromEntries(COMP_FX.map(f => ['FX_' + f, 1]))), uniforms: comp.uniforms, vertexShader: comp.vertexShader,
+  fragmentShader: COMP_PRELUDE + 'void main(){' + body + '}', depthTest: false, depthWrite: false }));
+const softScene = new THREE.Scene(), softQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), softMats[0]); softScene.add(softQuad);
+let rtSoft = [];
+function makeSoftTargets(){
+  for (const r of rtSoft) r.dispose();
+  const w = Math.ceil(W/2) + 1, h = Math.ceil(H/2) + 1, o = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat, depthBuffer: false };
+  rtSoft = [0, 1, 2].map(() => new THREE.WebGLRenderTarget(w, h, o));
+  comp.uniforms.softDim.value.set(w, h); comp.uniforms.tSoftW.value = rtSoft[0].texture; comp.uniforms.tSoftM.value = rtSoft[1].texture; comp.uniforms.tSoftR.value = rtSoft[2].texture;
+}
+// before the composite: the soft effects that are on, into their targets (compVariant has just said whether they're used)
+function softEffects(px, py){
+  if (!SOFT_ON) return;
+  const u = comp.uniforms, par = v => ((v % 2) + 2) % 2;
+  u.softPar.value.set(par(px - (W >> 1)), par(py - (H >> 1))); u.softSig.value = Math.max(6*2*zoom/H, .02);
+  const on = [comp.defines.FX_WET, comp.defines.FX_MIST, comp.defines.FX_RAYS];
+  for (let i = 0; i < 3; i++){ if (!on[i]) continue; softQuad.material = softMats[i]; renderer.setRenderTarget(rtSoft[i]); renderer.render(softScene, compCam); }
 }
 const compScene = new THREE.Scene(), compCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
 compScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), comp));
@@ -822,7 +1022,7 @@ function makeTargets(){
   comp.uniforms.tCloud.value = rtCloud.texture; cloudMat.uniforms.tDepth.value = rtC.depthTexture;
   if (rtOut) rtOut.dispose();
   rtOut = new THREE.WebGLRenderTarget(W, H, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat });
-  makeGlowTargets(); makeLightTarget();
+  makeGlowTargets(); makeLightTarget(); makeSoftTargets();
   upMat.uniforms.t.value = rtFinal.texture; upMat.uniforms.srcRes.value.set(W, H); upMat.uniforms.dstRes.value.set(DW, DH);
 }
 /* ---------- bloom and halation ---------- */

@@ -43,8 +43,11 @@ window.__perf = (() => {
     return JSON.stringify(o);
   };
   // run n frames, then one more with renderer.info counted, and grab that frame's pixels (same task: the buffer is still there)
-  P.cap = n => {
-    if (n > 1){ P.skip = true; __step(n - 1); P.skip = false; }
+  // (draw: how many of the last frames before the captured one are drawn too, so that a cache carried from frame to frame is exercised)
+  P.cap = (n, draw = 0) => {
+    const skipN = Math.max(0, n - 1 - draw);
+    if (skipN > 0){ P.skip = true; __step(skipN); P.skip = false; }
+    if (draw > 0 && n > 1){ if (P.shadowOwed){ shadowDirty = true; P.shadowOwed = false; } __step(Math.min(draw, n - 1)); }
     if (P.shadowOwed){ shadowDirty = true; P.shadowOwed = false; }
     renderer.info.reset();
     __step(1);

@@ -146,6 +146,27 @@ def steps(scene):
     if scene.get('rush'):   # a crowd at the stations: boarding, a full train, the lifts, impatience
         s += [('rush_a', 400, scene['rush'])] + [('rush_' + c, 400, None) for c in 'bcdef']
     s.append(('evening_cycle', 120, 'S.hour = 17.8; S.cycle = true; S.vclouds = true'))
+    if os.environ.get('PERF_SC_STEPS'):   # the static cache's steps (js/staticcache.js): frames before a capture are drawn, so the cache is carried along
+        far = "const f = [...cells.values()].filter(c => c.sections.length && !c.mega).sort((a, b) => Math.hypot(b.x - camT.x, b.z - camT.z) - Math.hypot(a.x - camT.x, a.z - camT.z))[0]; if (f) addSection(f, 'mid');"
+        near = "const f = [...cells.values()].filter(c => c.sections.length && !c.mega).sort((a, b) => Math.hypot(a.x - camT.x, a.z - camT.z) - Math.hypot(b.x - camT.x, b.z - camT.z))[0]; if (f) addSection(f, 'mid');"
+        return [
+            ('c_settle', 4, 'S.hour = 12; S.rain = false', 3),
+            ('c_still', 60, None, 4),
+            ('c_pan_slow', 12, 'camGoal.x += 1.5; camGoal.z -= 1', 10),
+            ('c_pan_fast', 20, 'camGoal.x += 25; camGoal.z += 20', 12),
+            ('c_turn', 14, 'yawT += .5', 10),
+            ('c_zoom', 14, 'zoomT = zoomT*1.4', 10),
+            ('c_edit_off', 8, far, 6),
+            ('c_edit_off2', 6, None, 4),
+            ('c_edit_in', 6, near, 3),
+            ('c_edit_in2', 44, None, 4),
+            ('c_dusk', 40, 'S.hour = 19', 8),
+            ('c_dusk2', 80, None, 6),
+            ('c_night', 30, 'S.hour = 23', 6),
+            ('c_night_still', 30, None, 5),
+            ('c_rain', 30, 'S.rain = true', 6),
+            ('c_cycle', 30, 'S.rain = false; S.hour = 17.8; S.cycle = true', 10),
+        ]
     keep = os.environ.get('PERF_STEPS')   # a shorter run for heavy scenes: only these labels (the same on both builds)
     if keep:
         s = [x for x in s if x[0] in keep.split(',')]
@@ -155,10 +176,11 @@ def steps(scene):
 def run_scene(browser, url, scene, vp, keep_png=True, sc_mode=None):
     ctx, pg, errs = open_game(browser, url, scene, vp, sc_mode)
     caps = []
-    for label, n, js in steps(scene):
+    for st in steps(scene):
+        label, n, js = st[:3]; draw = st[3] if len(st) > 3 else 0
         if js:
             pg.evaluate('() => { ' + js + ' }')
-        c = pg.evaluate('n => __perf.cap(n)', n)
+        c = pg.evaluate('([n, d]) => __perf.cap(n, d)', [n, draw])
         caps.append((label, c))
     ctx.close()
     return caps, errs

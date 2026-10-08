@@ -16,6 +16,10 @@ const cells = new Map();
 const ckey = (i,j) => i + ',' + j;
 const SIDES4 = [[1,0],[-1,0],[0,1],[0,-1]];
 const world = new THREE.Group(); world.matrixAutoUpdate = false; scene.add(world); city = world;
+// The static cache (staticcache.js) is out of date whenever a static piece comes, goes, shows, hides or changes layer: every
+// such place bumps this count (the world's add and remove here; showHidden and the sweeps below).
+let SC_EDITS = 0;
+{ const add = world.add, remove = world.remove; world.add = function(){ SC_EDITS++; return add.apply(this, arguments); }; world.remove = function(){ SC_EDITS++; return remove.apply(this, arguments); }; }
 // Static pieces (plots, regions, their plants and glows) never move once built: their matrices are set once and left
 // alone, so the frame's world-matrix update skips them
 // A piece's hidden faces (see hideCovered) are left out of the views drawn from the camera, but the sun's shadow map still
@@ -24,7 +28,7 @@ const world = new THREE.Group(); world.matrixAutoUpdate = false; scene.add(world
 function hideBefore(r, s, c, g){ if (!g.userData.full) g.drawRange.count = g.userData.shown; }
 function hideAfter(r, s, c, g){ g.drawRange.count = Infinity; }
 // while a piece is swept in or out (sliced open), its hidden faces are drawn too (and its walls all at once: see below)
-function showHidden(view, on){ view.traverse(o => { const g = o.isMesh && o.geometry; if (!g) return;
+function showHidden(view, on){ SC_EDITS++; view.traverse(o => { const g = o.isMesh && o.geometry; if (!g) return;
   if (g.userData.shown !== undefined || g.userData.cut) g.userData.full = on;
   if (o.userData.sideOf) o.visible = !on; }); }
 // Walls facing away. The graphics card throws away every triangle turned away from the camera, but only after it has
@@ -1792,6 +1796,7 @@ function animMaterials(u){
   return { atlas, nrm };
 }
 function startAnim(c, kind, y0, y1, zone, w, old, sound, opts = {}){
+  SC_EDITS++;
   const view = kind === 'build' ? c.view : old.view;
   const held = kind === 'build';   // plants and glows arrive when a build finishes, but leave as soon as a removal starts
   if (!view){ if (old) dropView(old); if (held) releaseRegion(regKey(c.i, c.j)); return; }
@@ -1868,6 +1873,7 @@ function updateAnims(dt){
   }
 }
 function endAnim(i){
+  SC_EDITS++;
   const a = anims[i]; anims.splice(i, 1);
   if (!anims.some(b => b.c === a.c)){ animCells.delete(a.c); markSolid(a.c); }   // (back into its region's merge)
   for (const l of a.lines){ scene.remove(l); l.material.dispose(); }

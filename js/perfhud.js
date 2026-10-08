@@ -105,6 +105,7 @@ const PH = (() => {
     } else L.push(`main thread ${avg(jsMs).toFixed(1)} ms   graphics card ${!ext ? 'n/a (this browser has no GPU timers)' : gpuMs.n ? avg(gpuMs).toFixed(1) + ' ms' : 'measuring'}`);
     L.push(`render ${W}x${H} of ${DW}x${DH}   zoom ${zoom.toFixed(1)}   people ${typeof pplList !== 'undefined' ? pplList.length : '-'}   plots ${cells.size}`);
     L.push(`building pieces drawn ${CULL.drawn} of ${CULL.total} (the rest are off screen)`);
+    if (typeof SC !== 'undefined') L.push(SC.line());
     const now = performance.now(); shadowTimes = shadowTimes.filter(t => now - t < 10000);
     L.push(`shadow redraws in the last 10 s: ${shadowTimes.length}` + (shadowMs.n ? `   (graphics card ${avg(shadowMs).toFixed(1)} ms each)` : ''));
     L.push('');

@@ -35,7 +35,7 @@ JS = r"""async ([zoomV, R, nyaw, pitches]) => {
   }
   function piece(m){ return m.parent && m.parent.userData && m.parent.userData.plot ? 1 : 0; }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(P3, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  const mat = new THREE.ShaderMaterial({ vertexShader: 'attribute vec3 color; varying vec3 vc; void main(){ vc = color; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }', fragmentShader: 'precision highp float; varying vec3 vc; void main(){ gl_FragColor = vec4(vc, 1.0); }', side: THREE.DoubleSide });
+  const mat = new THREE.ShaderMaterial({ vertexShader: 'attribute vec3 color; varying vec3 vc; void main(){ vc = color; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }', fragmentShader: 'precision highp float; varying vec3 vc; void main(){ gl_FragColor = vec4(vc, 1.0); }', side: THREE.FrontSide });
   const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; S.add(mesh);
   const w = renderer.domElement.width, h = renderer.domElement.height, rt = new THREE.WebGLRenderTarget(w, h, { depthBuffer: true }); rt.texture.minFilter = rt.texture.magFilter = THREE.NearestFilter;
   const seen = new Uint8Array(info.length), buf = new Uint8Array(w*h*4);

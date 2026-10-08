@@ -78,7 +78,7 @@ function cullFrame(camera = cam, area = camera){   // (for the camera about to d
 // Tune from the console (they take effect on the next frame): SD.v0 (px/frame where the first class goes), SD.step (each next class at this multiple),
 // SD.max (classes at most), SD.fast (px/frame where a fast spin may drop fastMax more classes), SD.cursorPx (full detail within this many px of the
 // cursor), SD.hys (margin round a threshold), SD.on = false.
-const SD = { on: true, v0: 6, step: 2, max: 2, fast: 40, fastMax: 1, cursorPx: 200, hys: .25, hist: [0, 0, 0, 0, 0, 0], top: 0, pieces: 0, moving: false,
+const SD = { on: true, v0: 10, step: 2, max: 2, fast: 40, fastMax: 1, cursorPx: 200, hys: .25, hist: [0, 0, 0, 0, 0, 0], top: 0, pieces: 0, moving: false,
   dYaw: 0, dZoom: 0, dPitch: 0, pY: null, pZ: 0, pP: 0, list: [], stamp: -1 };
 function sdTrack(){   // every frame: how far the view turned, tilted and zoomed since the last one
   SD.dYaw = SD.pY === null ? 0 : yaw - SD.pY; SD.dZoom = SD.pY === null ? 0 : (zoom - SD.pZ)/zoom; SD.dPitch = SD.pY === null ? 0 : PITCH - SD.pP;

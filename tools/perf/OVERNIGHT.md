@@ -163,3 +163,44 @@ plane of a larger box's face, parallel to it, its footprint inside that face's r
 - Depth .12 (twice the plan's, about 3 pixels at zoom 30, so no longer "under a pixel"): city 18.5% (27.1% of the boxes).
 - The visible share can't be read from this probe (the owner's measurement: thin plates 14%, panes 8%); boxes lying on a wall show about half of their 12 triangles at most, so counting by pieces
   overstates the saving. By the plan's rule (over 20% of building triangles within about .06 of a larger parallel wall face) I did not build the prototype.
+
+**11. Steady frame pacing: measured, one cause found and not fixable cheaply, the rest explained.** tools/perf/spikes.py (main thread without drawing: the real clock, per frame, with
+the function that took the time; and drawn frames counted: whole redraws, strips, rectangles, programs compiled, draw calls). Max city, zoom 30, this machine (about twice the M2's time):
+- Main thread, 400 frames each after 1,200 warm-up frames. Still: median 9.5 ms, 95% 18.9, 99% 33.3, max 52.0. Slow pan: median 9.6, 95% 14.9, 99% 27.9, max 31.7. Slow turn: median 9.1,
+  95% 15.5, 99% 34.6, max 50.5 (95% over median 1.5 to 2.0).
+- What the standing-out frames are: (1) `decide` in bursts of 14 to 18 ms in single frames, and the first frames after the harness has drawn: the harness freezes the clock inside a frame, so the
+  game's 2.5 ms a frame decision budget never stops them; in the game that cap holds and the steady cost is about 1.5 ms. An artifact, not a spike you will see. (2) `checkBumps`: 2.5 to 4 ms on
+  every N-th frame (N = 2 to 4 by zoom: item 1 runs the whole pass every N-th frame). That is a real, regular spike: 9, 9, 12 ms at N = 3. I tried spreading it (each frame only the walkers whose
+  place in the list plus the frame number is a multiple of N look for someone near them, so each looks once in N frames): the list and the grid have to be built every frame then, and that is most of
+  the pass (about 2 ms), so the mean went from about 1 ms a frame to 3 ms. Reverted. The fix is a grid kept between frames and updated as walkers step (each walker is stepped once in N frames anyway):
+  a design, not tonight's job. (3) `updateSteam` (2 to 6 ms) and `updateMegaFx` (2 to 8 ms) vary from frame to frame with no budget on them; no single cause.
+  (4) Garbage collection can't be seen from the page; nothing in the table ("other") was left over after the timed functions in the frames that stood out.
+- Drawn frames (counted; the harness's renderer can't time the card): slow pan, 60 frames: 0 whole redraws, 0 strips, all frames from the cache, 2,089 to 2,119 draw calls. Fast pan: 2 strips in 60
+  frames, each frame with a strip submits about 350 to 480 more draw calls (1,950 to 2,420). Slow turn: every frame drawn the old way (the cache waits for the view to hold still), 1,403 to 1,418 calls.
+  Day cycle running: a whole redraw twice in 60 frames (the cache redraws when the lights switch, 8 background strips each time, one draw-call bump of about 750 on the frames with a strip).
+  No shader program was compiled in any of these scenarios once warm (the first time a weather or time-of-day combination appears it compiles; not measurable here).
+  An edit: see item 7 (edit_frames.py: one old-way frame, the one that redraws the shadows, then one rectangle).
+- Found while counting calls: a cached frame has MORE draw calls (about 2,100) than an old-way frame (about 1,400) at zoom 30 in the max city, because the live pass of the cache also draws the glow
+  overlay (one small draw per piece with flickering or stuttering windows) and the live set. See item 12 for what the live pass holds: 1.16 million triangles in 886 objects at zoom 30, the largest part
+  glass.
+- Done about it: nothing shipped. The one regular spike (`checkBumps` every N-th frame) has a design but not a quick fix; everything else is either an artifact of the harness's clock or
+  already smooth. If you see stutter on the M2 that is not this, the likely suspects are the glass and plants live set (item 12) and shader compiles on weather changes.
+
+**12. Zoom 60 (measure only; the cap stays at 30).** tools/perf/zoom60.py sets `zoom = zoomT = 60` in code; max city, harness render size 1024 x 576, cache on, other changes in. Draw calls and
+triangles are as submitted; GPU time can't be read here, the owner's script below has the readings.
+| | zoom 30 | zoom 60 |
+|---|---|---|
+| world units a render pixel covers | .104 | .208 |
+| people on screen of 10,203 / step rate N | 7,304 / 4 | 10,118 / 4 |
+| size class cutoff (CULL.lvl) | 3 | 4 |
+| cached still frame: draw calls / triangles submitted | 2,098 / 1.70 M | 2,447 / 1.90 M |
+| main thread, no drawing: median / 95% / max | 8.85 / 17.5 / 24.9 ms | 9.80 / 17.4 / 24.5 ms |
+| slow pan, 40 frames: whole redraws / strips / old-way frames / draw calls | 0 / 0 / 0 / 2,089 to 2,119 | 0 / 0 / 0 / 2,424 to 2,448 |
+| slow turn, 40 frames: old-way frames / draw calls | 40 / 1,564 to 1,595 | 40 / 2,556 to 2,637 |
+- At zoom 60 the whole city (everyone) is on screen, so per-plot culling removes nothing: the frames drawn the old way (turning, zooming, lights changing) submit 65% more draw calls than at
+  zoom 30, and those are the frames that will hurt. Still and panning keep the cache's benefit (draw calls +17%), and the cache's margin (256 px) then covers 53 units instead of 27, so
+  pans need strips about half as often.
+- The live pass (what a cached frame still draws; tools/perf/live_tris.py), max city, zoom 30: 1.16 million triangles in 886 objects that pass the frustum test: see-through glass of the
+  buildings (177 objects, 457k, `colorOnly` materials: transparent, drawn after the people so they tint what is behind them, which is why they can't live in the cache), building meshes that
+  write their normals themselves (219 objects, 205k), plants (34 instanced objects, 95,550 instances, 191k), glow points (98k), instanced street furniture and vehicles (155k). This is what the
+  color pass still costs with the cache on; trimming it (glass quads merged where they share an edge, plants culled by super-region) is the largest lever left on the card side.

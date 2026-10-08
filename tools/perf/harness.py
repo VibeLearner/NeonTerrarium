@@ -127,6 +127,14 @@ def load_scenes(only=None):
 
 # The script every scene runs, step by step: (label, frames to run, JS to run first). The same on both builds.
 def steps(scene):
+    if os.environ.get('PERF_SWEEP'):   # every angle the game allows: 12 turns x 3 tilts (lowest, middle, highest) x 3 zooms; PERF_SWEEP=quick for a third of them
+        quick = os.environ['PERF_SWEEP'] == 'quick'
+        out = [('sw_start', 3, 'S.cycle = false; S.hour = 12; S.rain = false')]
+        for z in (30, 15, 6):
+            for pi, pd in enumerate((12, 45, 82)):
+                for k in range(0, 12, 3 if quick else 1):
+                    out.append(('sw_z%d_p%d_y%02d' % (z, pd, k), 3, 'zoom = zoomT = %s; PITCH = pitchT = %s*Math.PI/180; yaw = yawT = %s*Math.PI/6 + .07' % (z, pd, k)))
+        return out
     s = [
         ('noon_f1', 1, None),
         ('noon_f30', 29, None),

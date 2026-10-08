@@ -63,8 +63,8 @@ const cutRest = u => u.A + u.H + u.S;
 // the same order, so the picture doesn't change. Several ranges go up in one call where the browser has WEBGL_multi_draw,
 // else as one draw each (see renderBufferDirect below).
 const CULL = { cam: null, minPx: 1, lvl: -1, stamp: 0, pl: new Float64Array(24), pad: 0, total: 0, drawn: 0, tris: 0 }, _cullM = new THREE.Matrix4(), _cullF = new THREE.Frustum();
-function cullFrame(camera = cam){   // (for the camera about to draw: the view's, or the static cache's)
-  CULL.cam = camera; camera.updateMatrixWorld(); _cullM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); _cullF.setFromProjectionMatrix(_cullM);
+function cullFrame(camera = cam, area = camera){   // (for the camera about to draw: the view's, or the static cache's; area: the camera whose frustum is what's wanted, a strip of the cache)
+  CULL.cam = camera; area.updateMatrixWorld(); _cullM.multiplyMatrices(area.projectionMatrix, area.matrixWorldInverse); _cullF.setFromProjectionMatrix(_cullM);
   for (let i = 0; i < 6; i++){ const p = _cullF.planes[i]; CULL.pl.set([p.normal.x, p.normal.y, p.normal.z, p.constant], i*4); }
   CULL.pad = 4*(2*zoom/H);   // (a few screen pixels of room, in world units)
   { const lim = (2*zoom/H)*CULL.minPx; let lv = -1; for (let k = 0; k < SMALL_N; k++) if (SMALL_E[k] <= lim) lv = k; CULL.lvl = PH.tests.noSmall ? -1 : lv; }   // (triangles with no edge as long as a pixel's worth are left out)
@@ -204,19 +204,37 @@ const ATLAS_SIDE = ATLAS.clone(); ATLAS_SIDE.onBeforeCompile = ATLAS.onBeforeCom
 const OV_BIT = 64;
 const ATLAS_OV = ATLAS.clone(); ATLAS_OV.onBeforeCompile = ATLAS.onBeforeCompile; ATLAS_OV.customProgramCacheKey = ATLAS.customProgramCacheKey; ATLAS_OV.depthWrite = false;
 function glowOverlay(mesh){
-  const g = mesh.geometry, fl = g.attributes.aFlk, em = g.attributes.aEm, I = g.index && g.index.array; if (!fl || !em || !I) return;
-  const F = fl.array, E = em.array, u = g.userData.cut, out = [];
-  const scan = (a, b) => { for (let q = a; q < b; q += 3){ const i0 = I[q], i1 = I[q + 1], i2 = I[q + 2];
-    if (F[i0] || F[i1] || F[i2] || E[i0*4 + 3] === 6 || E[i1*4 + 3] === 6 || E[i2*4 + 3] === 6) out.push(i0, i1, i2); } };
+  const g = mesh.geometry, fl = g.attributes.aFlk, em = g.attributes.aEm, on = g.attributes.aOn, I = g.index && g.index.array; if (!fl || !em || !on || !I) return;
+  const F = fl.array, E = em.array, ON = on.array, u = g.userData.cut, fb = [], win = [];
+  // flickering lights and aircraft lights (always), and the windows that switch (their threshold, aOn, against LIGHTS_ON): a window
+  // stutters with the clock while LIGHTS_ON is within 0.04 above its threshold (litOn, core.js), so those are drawn every frame too
+  const scan = (a, b) => { for (let q = a; q < b; q += 3){ const i0 = I[q], i1 = I[q + 1], i2 = I[q + 2], k0 = E[i0*4 + 3];
+    if (F[i0] || F[i1] || F[i2] || k0 === 6 || E[i1*4 + 3] === 6 || E[i2*4 + 3] === 6) fb.push(i0, i1, i2);
+    else if (k0 >= 1 && k0 <= 4) win.push(i0, i1, i2); } };
   if (u){ scan(0, u.A); scan(u.A + u.H, u.A + u.H + u.S); } else scan(0, g.userData.shown ?? I.length);   // (the walls once: not the copied slices; not the faces nobody sees)
-  if (!out.length) return;
+  if (!fb.length && !win.length) return;
+  const off = new Int32Array(257); for (let q = 0; q < win.length; q += 3) off[ON[win[q]] + 1]++;
+  for (let b = 0; b < 256; b++) off[b + 1] += off[b];
+  const cur = off.slice(0, 256), sorted = new Array(win.length);   // (windows by threshold, so the band of them to draw is one run)
+  for (let q = 0; q < win.length; q += 3){ const p = cur[ON[win[q]]]++*3; sorted[p] = win[q]; sorted[p + 1] = win[q + 1]; sorted[p + 2] = win[q + 2]; }
+  const out = fb.concat(sorted);
   const og = new THREE.BufferGeometry(); for (const k in g.attributes) og.setAttribute(k, g.attributes[k]);
   og.setIndex(new THREE.BufferAttribute(g.attributes.position.count > 65535 ? new Uint32Array(out) : new Uint16Array(out), 1));
   if (!g.boundingSphere) g.computeBoundingSphere(); og.boundingSphere = g.boundingSphere.clone();
   g.addEventListener('dispose', () => og.dispose());
   const ov = new THREE.Mesh(og, ATLAS_OV); ov.layers.mask = OV_BIT; ov.receiveShadow = mesh.receiveShadow; ov.castShadow = false; ov.userData.isOv = true;
+  ov.userData.ovInfo = { nFB: fb.length, off }; ov.onBeforeRender = ovBefore; ov.onAfterRender = ovAfter;
   mesh.add(ov);
 }
+// what the overlay draws this frame: the flickering and blinking triangles, and the windows in the stutter band of LIGHTS_ON
+function ovBefore(r, s, c, g){
+  const u = this.userData.ovInfo, lv = LIGHTS_ON.value, lo = Math.max(0, Math.floor((lv - .04)*255) - 1), hi = Math.min(255, Math.ceil(lv*255) + 1);
+  const a = u.nFB, o0 = u.off[lo]*3, b = hi >= lo ? (u.off[hi + 1] - u.off[lo])*3 : 0;   // (offsets are in triangles, ranges in indices)
+  if (!b){ g.drawRange.start = 0; g.drawRange.count = a; }
+  else if (!a){ g.drawRange.start = o0; g.drawRange.count = b; }
+  else { g.drawRange.start = 0; g.drawRange.count = a + b; this.userData.md = { s: new Int32Array([0, a + o0]), n: new Int32Array([a, b]) }; }
+}
+function ovAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = Infinity; this.userData.md = null; }
 let SIDE_SPLIT = false;   // (set while a plot or a megastructure is collected: see collect)
 const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m !== ATLAS && m !== ATLAS_SIDE;
 // Faces nobody can ever see: wholly and well inside one of the piece's solid blocks (a box's end sunk into a wall, a post

@@ -149,24 +149,36 @@ def steps(scene):
     if os.environ.get('PERF_SC_STEPS'):   # the static cache's steps (js/staticcache.js): frames before a capture are drawn, so the cache is carried along
         far = "const f = [...cells.values()].filter(c => c.sections.length && !c.mega).sort((a, b) => Math.hypot(b.x - camT.x, b.z - camT.z) - Math.hypot(a.x - camT.x, a.z - camT.z))[0]; if (f) addSection(f, 'mid');"
         near = "const f = [...cells.values()].filter(c => c.sections.length && !c.mega).sort((a, b) => Math.hypot(a.x - camT.x, a.z - camT.z) - Math.hypot(b.x - camT.x, b.z - camT.z))[0]; if (f) addSection(f, 'mid');"
-        return [
+        lst = [
             ('c_settle', 4, 'S.hour = 12; S.rain = false', 3),
             ('c_still', 60, None, 4),
             ('c_pan_slow', 12, 'camGoal.x += 1.5; camGoal.z -= 1', 10),
             ('c_pan_fast', 20, 'camGoal.x += 25; camGoal.z += 20', 12),
+            ('c_pan_fast2', 40, None, 6),
+            ('c_pan_edge', 26, 'camGoal.x += 11; camGoal.z += 2', 22),
+            ('c_pan_edge2', 14, None, 12),
+            ('c_soft', 16, 'S.hour += .15', 14),
+            ('c_soft2', 40, None, 10),
             ('c_turn', 14, 'yawT += .5', 10),
+            ('c_turn2', 150, None, 4),
             ('c_zoom', 14, 'zoomT = zoomT*1.4', 10),
+            ('c_zoom2', 150, None, 4),
             ('c_edit_off', 8, far, 6),
-            ('c_edit_off2', 6, None, 4),
+            ('c_edit_off2', 60, None, 4),
             ('c_edit_in', 6, near, 3),
-            ('c_edit_in2', 44, None, 4),
+            ('c_edit_in2', 60, None, 4),
             ('c_dusk', 40, 'S.hour = 19', 8),
-            ('c_dusk2', 80, None, 6),
+            ('c_dusk2', 600, None, 6),
             ('c_night', 30, 'S.hour = 23', 6),
+            ('c_night2', 600, None, 6),
             ('c_night_still', 30, None, 5),
             ('c_rain', 30, 'S.rain = true', 6),
+            ('c_rain2', 90, None, 6),
             ('c_cycle', 30, 'S.rain = false; S.hour = 17.8; S.cycle = true', 10),
+            ('c_cycle2', 200, None, 12),
         ]
+        keep = os.environ.get('PERF_STEPS')
+        return [x for x in lst if x[0] in keep.split(',')] if keep else lst
     keep = os.environ.get('PERF_STEPS')   # a shorter run for heavy scenes: only these labels (the same on both builds)
     if keep:
         s = [x for x in s if x[0] in keep.split(',')]
@@ -232,13 +244,15 @@ def cmd_diff(base_ref, cand_ref, only, quick):
                 for (lb, a), (lc, b) in zip(cb, cc):
                     total += 1
                     name = tag + '_' + lb
+                    if os.environ.get('PERF_SC_STEPS') and b.get('sc'):
+                        print('   %-34s %s' % (name, b['sc']))
                     pa, pb = png_bytes(a['png']), png_bytes(b['png'])
                     if pa != pb:
                         fails.append('%s: pixels: %s' % (name, pixel_diff(pa, pb, os.path.join(OUT, name))))
                     if a['state'] != b['state']:
                         fails.append('%s: state differs first at "%s"' % (name, first_state_diff(a['state'], b['state'])))
                     ia, ib = a['info'], b['info']
-                    if sc_build and ib['tex'] in (ia['tex'], ia['tex'] + 3):   # (the static cache: its color, normal and depth targets, and its own pass: more draws and three more textures are by design)
+                    if sc_build and ib['tex'] - ia['tex'] in (0, 3, 6):   # (the static cache: two sets of color, normal and depth targets, and its own pass: more draws and three or six more textures are by design)
                         if ib['geos'] != ia['geos']:
                             notes.append('%s: geometries %d -> %d' % (name, ia['geos'], ib['geos']))
                     elif ib['calls'] > ia['calls'] or ib['tex'] != ia['tex']:

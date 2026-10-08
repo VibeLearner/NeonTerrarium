@@ -131,3 +131,29 @@ panning, 17 FPS, frame 60.2 ms (95% under 83.5), main thread 24.0 ms, and about 
   triangles at this zoom).
 - Panning redraws the shadow map on most frames, adding about 12 to 17 ms to the color pass each time (the work on
   `wip/shadow-strips` is aimed at this).
+
+# Round 3: shadows without spikes, the city drawn once (2026-10-08)
+
+Measured live in Chrome on the owner's M2 (max city, zoom 30, rendering 2560x1440), before and after:
+
+| Reading | Before | After |
+| --- | ---: | ---: |
+| FPS, standing still | 20 | 26 |
+| Frame time, standing still | 51.0 ms | 39.0 ms |
+| FPS, panning | 19 | 28 |
+| Worst frame, panning | 67.6 ms | 50.9 ms |
+| Shadow redraws in 10 s, panning | 82 | 0 |
+| FPS, day cycle on | 17 | 29 |
+| Shadow redraws in 10 s, day cycle on | 169 | 0 |
+| Triangles per frame (harness) | 32.6M | 16.5M |
+| Exact time, color + normals | 56.2 ms | 39.6 ms |
+
+| Item | What |
+| --- | --- |
+| shadows | The shadow map is drawn twice as wide as the view needs (4096 texels, same texel size and grid), so panning stays inside it. A new map (when the view nears its edge, the sun moves, or the zoom steps) is drawn in the background a strip per frame into a second map and swapped in when done. The two maps share one depth buffer. Edits still redraw at once. With the day cycle on, the old code redrew the whole map every frame. |
+| draw once | The color pass also writes the normal image (a second render target): every material writes the normal the old normal pass drew there. Draws the normal pass never made don't touch it, and among solid draws come last. The separate normal, plant-normal and sweep-normal passes are gone (kept as a fallback without WebGL 2). |
+
+Check: no simulation differences anywhere (57 captures, live and in the harness). Pixels: 2 to 4% of pixels differ as thin
+speckle along edges, where the old normal pass and the color pass disagreed about which surface is in front (now both
+come from one drawing); with the day cycle running, shadows catch up with the sun every half second instead of every
+frame. Shadow maps take about 160 MB of graphics memory instead of 24 MB.

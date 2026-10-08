@@ -70,6 +70,61 @@ function cullFrame(camera = cam, area = camera){   // (for the camera about to d
   { const lim = (2*zoom/H)*CULL.minPx; let lv = -1; for (let k = 0; k < SMALL_N; k++) if (SMALL_E[k] <= lim) lv = k; CULL.lvl = PH.tests.noSmall ? -1 : lv; }   // (triangles with no edge as long as a pixel's worth are left out)
   CULL.stamp++; CULL.total = CULL.drawn = CULL.tris = 0;
 }
+// (6) Speed-based detail while the view turns, tilts or zooms (a cheat: the overlay test "no speed-based detail" turns it off). Frames drawn the
+// old way while the view changes leave out, per plot, triangles up to one or two size classes (SMALL_E) bigger than the usual cutoff, by how fast
+// that plot moves on screen (render pixels a frame, around the pivot at the middle of the screen). Motion hides what the cache would show at rest:
+// a still camera never reduces anything and the cache is always drawn at full detail. Plots near the cursor keep full detail whatever the speed.
+// A plot drops a class only when clearly faster than the class's threshold (SD.hys) and gets it back only when clearly slower, one class a frame.
+// Tune from the console (they take effect on the next frame): SD.v0 (px/frame where the first class goes), SD.step (each next class at this multiple),
+// SD.max (classes at most), SD.fast (px/frame where a fast spin may drop fastMax more classes), SD.cursorPx (full detail within this many px of the
+// cursor), SD.hys (margin round a threshold), SD.on = false.
+const SD = { on: true, v0: 6, step: 2, max: 2, fast: 40, fastMax: 1, cursorPx: 200, hys: .25, hist: [0, 0, 0, 0, 0, 0], top: 0, pieces: 0, moving: false,
+  dYaw: 0, dZoom: 0, dPitch: 0, pY: null, pZ: 0, pP: 0, list: [], stamp: -1 };
+function sdTrack(){   // every frame: how far the view turned, tilted and zoomed since the last one
+  SD.dYaw = SD.pY === null ? 0 : yaw - SD.pY; SD.dZoom = SD.pY === null ? 0 : (zoom - SD.pZ)/zoom; SD.dPitch = SD.pY === null ? 0 : PITCH - SD.pP;
+  SD.pY = yaw; SD.pZ = zoom; SD.pP = PITCH;
+}
+const _sdVec = new THREE.Vector3(), _sdMat = new THREE.Matrix4();
+function sdApply(){   // for a frame drawn the old way: each plot's extra size classes, from how fast it moves
+  CULL.sd = false;
+  if (!SD.on || PH.tests.noSpeed || PH.tests.noSmall) return;
+  if (SD.stamp !== SC_EDITS){ SD.list = []; const seen = new Set(); world.traverse(o => { const g = o.isMesh && o.geometry, P = g && g.userData.pcs; if (P && !seen.has(P)){ seen.add(P); SD.list.push(P); } }); SD.stamp = SC_EDITS; }
+  const w = Math.abs(SD.dYaw), tz = Math.abs(SD.dZoom), tp = Math.abs(SD.dPitch);
+  SD.moving = w + tz + tp > 1e-6; SD.hist.fill(0); SD.top = 0; SD.pieces = 0;
+  const lv = CULL.lvl, nT = SD.max + SD.fastMax, thr = [];
+  for (let k = 0; k < nT; k++) thr.push(k < SD.max ? SD.v0*SD.step**k : SD.fast*SD.step**(k - SD.max));
+  if (!SD.moving){ for (const P of SD.list) if (P.xlOn){ P.xl.fill(0); P.xlOn = 0; } return; }   // (a still view is never reduced)
+  cam.updateMatrixWorld(); const e = cam.matrixWorld.elements, upp = H/(2*zoom), sp = Math.sin(PITCH), cp = Math.cos(PITCH);
+  const rx = e[0], rz = e[2], hr = Math.hypot(e[8], e[10]) || 1, fx = -e[8]/hr, fz = -e[10]/hr;
+  const rr = renderer.domElement.getBoundingClientRect(), cur = typeof ptrLast !== 'undefined' && ptrLast ? [((ptrLast.x - rr.left)/rr.width)*2 - 1, -(((ptrLast.y - rr.top)/rr.height)*2 - 1)] : null;
+  const VPm = _sdMat.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+  for (const P of SD.list){
+    if (!P.xl) P.xl = new Int8Array(P.n);
+    let any = 0;
+    for (let i = 0; i < P.n; i++){
+      const o = i*6, b = P.box, cx = (b[o] + b[o + 1])/2, cz = (b[o + 4] + b[o + 5])/2, cy = (b[o + 2] + b[o + 3])/2, hx = (b[o + 1] - b[o])/2, hz = (b[o + 5] - b[o + 4])/2;
+      const dx = cx - camT.x, dz = cz - camT.z;
+      // the part of the piece nearest the pivot (a big piece is as slow as its slowest part)
+      const a = Math.max(0, Math.abs(dx*rx + dz*rz) - (Math.abs(rx)*hx + Math.abs(rz)*hz)), bb = Math.max(0, Math.abs(dx*fx + dz*fz) - (Math.abs(fx)*hx + Math.abs(fz)*hz));
+      let s = upp*(Math.hypot(w*bb, w*a*sp) + tp*Math.hypot(a, bb, 0));
+      if (tz) s += upp*tz*Math.hypot(a*upp, bb*sp*upp);
+      let L = P.xl[i], t = L;
+      // plots near the cursor keep everything
+      let keep = false;
+      if (cur){ _sdVec.set(cx, cy, cz).applyMatrix4(VPm); keep = Math.hypot((_sdVec.x - cur[0])*W/2, (_sdVec.y - cur[1])*H/2) - upp*Math.max(hx, hz) < SD.cursorPx; }
+      if (keep) t = 0;
+      else {
+        while (t < nT && s > thr[t]*(1 + SD.hys)) t++;                       // faster: drop a class (at once, as far as the speed says)
+        if (t === L && L > 0 && s < thr[L - 1]*(1 - SD.hys)) t = L - 1;     // clearly slower: one class back a frame
+      }
+      if (keep && L > 0) t = L - 1;   // (and back from the cursor's side the same way)
+      P.xl[i] = t; if (t) any = 1; SD.hist[t]++; SD.pieces++; if (s > SD.top) SD.top = s;
+    }
+    P.xlOn = any;
+  }
+  CULL.sd = true;
+}
+SD.line = () => 'speed-based detail: ' + (!SD.on || PH.tests.noSpeed ? 'off' : !SD.moving ? 'view still, full detail' : 'plots by extra classes ' + SD.hist.slice(0, SD.max + SD.fastMax + 1).map((n, k) => '+' + k + ': ' + n).join('  ') + '   fastest ' + SD.top.toFixed(0) + ' px/frame');
 // which of a merged mesh's pieces touch the view (worked out once a frame per mesh); returns how many do
 function pieceVis(P){
   if (P.stamp === CULL.stamp) return P.seen;
@@ -88,10 +143,10 @@ function pieceVis(P){
 const MD = { s: new Int32Array(64), n: new Int32Array(64) };
 function multiRows(o, P, r0, r1){
   if (PH.tests.noCull) return false;
-  const seen = pieceVis(P), lv = CULL.lvl; if (seen === P.n && lv < 0) return false;
+  const seen = pieceVis(P), lv = CULL.lvl, xl = CULL.sd && P.xlOn ? P.xl : null; if (seen === P.n && lv < 0 && !xl) return false;
   const v = P.vis, n = P.n; let m = 0, tot = 0;
   for (let r = r0; r <= r1; r++) for (let i = 0; i < n; i++){
-    if (!v[i]) continue; const c = lv < 0 ? P.rowN[r*n + i] : P.rowC[(r*n + i)*SMALL_N + lv]; if (!c) continue;
+    if (!v[i]) continue; const x = xl ? xl[i] : 0, c = lv < 0 && !x ? P.rowN[r*n + i] : P.rowC[(r*n + i)*SMALL_N + Math.min(SMALL_N - 1, Math.max(lv, 0) + x)]; if (!c) continue;
     const st = P.rowS[r*n + i];
     if (m && MD.s[m - 1] + MD.n[m - 1] === st) MD.n[m - 1] += c;
     else { if (m === MD.s.length){ const s2 = new Int32Array(m*2), n2 = new Int32Array(m*2); s2.set(MD.s); n2.set(MD.n); MD.s = s2; MD.n = n2; } MD.s[m] = st; MD.n[m++] = c; }

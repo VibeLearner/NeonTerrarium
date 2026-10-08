@@ -71,6 +71,7 @@ function frame(now){
   PH.lap('scene upkeep');
   sideArc();   // which way the buildings' walls can face the camera this frame (world.js)
   cullFrame();   // and which merged pieces are in view
+  sdTrack();   // how fast the view is turning and zooming (world.js)
   cam.layers.enableAll(); shadowFrame();   // shadows: redrawn at once, a strip in the background, or not at all (sky.js)
   PH.shadow(); PH.begin(renderer.shadowMap.needsUpdate ? 'color + shadow redraw' : 'color');
   const pt = PH.tests;   // (the overlay's tests: perfhud.js)
@@ -78,8 +79,9 @@ function frame(now){
   if (pt.quarter || !SC.frame()){   // (the static cache draws the frame when it can: staticcache.js)
     renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
     if (MRT) mrtBegin();   // the normal image is drawn along with the colors (core.js, sky.js)
+    sdApply();   // the old way's frames: plots that move fast on screen lose their smallest triangles (world.js, speed-based detail)
     cam.layers.enableAll(); cam.layers.disable(6); SC.drawView(() => renderer.render(scene, cam), SC.mode === 'oldview');   // (layer 6: the glow overlay, for the cache's frames only)
-    cam.layers.enableAll();
+    cam.layers.enableAll(); CULL.sd = false;
     if (MRT) mrtEnd();
   }
   if (pt.quarter) rtC.viewport.set(0, 0, W, H);

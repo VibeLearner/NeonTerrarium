@@ -177,6 +177,12 @@ def steps(scene):
             ('c_turn2', 150, None, 4),
             ('c_zoom', 14, 'zoomT = zoomT*1.4', 10),
             ('c_zoom2', 150, None, 4),
+            ('sd_slow', 6, 'yawT += .12', 6),   # speed-based detail (world.js SD): a slow turn (nothing should drop), then at rest
+            ('sd_slow_end', 80, None, 4),
+            ('sd_fast', 6, 'yawT += 3', 6),     # a fast spin, captured while it runs
+            ('sd_fast_end', 120, None, 4),
+            ('sd_zoomf', 6, 'zoomT = Math.max(6, zoomT/1.7)', 6),   # a quick zoom out
+            ('sd_zoomf_end', 150, None, 4),
             ('c_edit_off', 8, far, 6),
             ('c_edit_off2', 60, None, 4),
             ('c_edit_in', 6, near, 3),

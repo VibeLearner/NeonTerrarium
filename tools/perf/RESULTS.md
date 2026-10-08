@@ -157,3 +157,20 @@ Check: no simulation differences anywhere (57 captures, live and in the harness)
 speckle along edges, where the old normal pass and the color pass disagreed about which surface is in front (now both
 come from one drawing); with the day cycle running, shadows catch up with the sun every half second instead of every
 frame. Shadow maps take about 160 MB of graphics memory instead of 24 MB.
+
+# Round 4, W1a: per-plot culling inside merged blocks (2026-10-08)
+
+Each 3 x 3 block's merged building mesh now remembers every plot's box and index ranges; each frame only the plots in view
+are drawn (one WEBGL_multi_draw call, or one draw per range without it). Overlay test "no per-plot culling" switches it off.
+
+Harness (SwiftShader, 1280x720): city, dense, megas 53 captures and maxcity (noon_f1, night_zoom_in, night_pan) 3 captures,
+0 problems; city and dense again with the multi-draw extension forced off (the per-range fallback), 38 captures, 0 problems.
+
+| Scene, step | Triangles before | After |
+| --- | ---: | ---: |
+| maxcity noon (furthest zoom) | 34.5M | 32.5M (5.7%) |
+| maxcity zoom 4.5 | 2.05M | 1.29M (37%) |
+| maxcity pan | 2.04M | 1.24M (39%) |
+| city zoom 4.5 / pan | 391k / 345k | 233k / 185k |
+
+Timing on the real card is not measured yet (needs the owner's M2: see the plan's protocol).

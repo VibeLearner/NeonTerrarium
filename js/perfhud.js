@@ -13,8 +13,8 @@ const PH = (() => {
   // in one plain material (the same triangles, almost no shading), shadows: surfaces don't look up the shadow map.
   // lean: the buildings' shader without the view position it passes but never uses (same picture); no glow math: lights
   // don't switch on, flicker or blink; no color data: the buildings' colors and glow aren't read at all.
-  const tests = { quarter: false, plain: false, shadows: false, lean: false, noGlow: false, noData: false, cutoutsLast: false, compAll: false, compFloor: false, compNoShim: false, gbuf: false }, plainMat = new THREE.MeshBasicMaterial({ color: 0x8a8f99 });
-  const TEST_NAMES = { quarter: 'quarter of the pixels', plain: 'plain shading', shadows: 'no surface shadows', lean: 'lean buildings (same picture)', noGlow: 'no glow math', noData: 'no color data', cutoutsLast: 'cut-outs drawn last (same picture)', compAll: 'composite: every effect compiled in (same picture)', compFloor: 'composite: no effects', compNoShim: 'composite: no air shimmer (pads, metro)', gbuf: 'buildings: colors only, no lighting' };
+  const tests = { quarter: false, plain: false, shadows: false, lean: false, noGlow: false, noData: false, cutoutsLast: false, compAll: false, compFloor: false, compNoShim: false, gbuf: false, noCull: false }, plainMat = new THREE.MeshBasicMaterial({ color: 0x8a8f99 });
+  const TEST_NAMES = { quarter: 'quarter of the pixels', plain: 'plain shading', shadows: 'no surface shadows', lean: 'lean buildings (same picture)', noGlow: 'no glow math', noData: 'no color data', cutoutsLast: 'cut-outs drawn last (same picture)', compAll: 'composite: every effect compiled in (same picture)', compFloor: 'composite: no effects', compNoShim: 'composite: no air shimmer (pads, metro)', gbuf: 'buildings: colors only, no lighting', noCull: 'no per-plot culling (same picture)' };
   const gl = renderer.getContext(), info = renderer.info;
   const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
   const N = 180;   // frames of history
@@ -104,6 +104,7 @@ const PH = (() => {
       L.push(`main thread ${avg(jsMs).toFixed(1)} ms (includes the waiting)   all passes, exact ${exMs.n ? avg(exMs).toFixed(1) + ' ms' : 'measuring'}`);
     } else L.push(`main thread ${avg(jsMs).toFixed(1)} ms   graphics card ${!ext ? 'n/a (this browser has no GPU timers)' : gpuMs.n ? avg(gpuMs).toFixed(1) + ' ms' : 'measuring'}`);
     L.push(`render ${W}x${H} of ${DW}x${DH}   zoom ${zoom.toFixed(1)}   people ${typeof pplList !== 'undefined' ? pplList.length : '-'}   plots ${cells.size}`);
+    L.push(`building pieces drawn ${CULL.drawn} of ${CULL.total} (the rest are off screen)`);
     const now = performance.now(); shadowTimes = shadowTimes.filter(t => now - t < 10000);
     L.push(`shadow redraws in the last 10 s: ${shadowTimes.length}` + (shadowMs.n ? `   (graphics card ${avg(shadowMs).toFixed(1)} ms each)` : ''));
     L.push('');

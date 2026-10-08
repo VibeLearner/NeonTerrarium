@@ -53,13 +53,72 @@ function sideArc(){
   SIDE_ARC.all = false; SIDE_ARC.s = s; SIDE_ARC.L = L;
 }
 const cutRest = u => u.A + u.H + u.S;
-function cutBefore(r, s, c, g){ const u = g.userData.cut; g.drawRange.start = 0; g.drawRange.count = g.userData.full ? cutRest(u) : u.A; }
-function cutAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = cutRest(g.userData.cut); }
+// Pieces off screen. A merged block is drawn whole whenever any of it shows, and a tall tower's box can be the only
+// part of a 3 x 3 block in view. mergeCut notes where each piece's triangles went (rows: A, then the wall slices), and each
+// frame the pieces whose boxes miss the view are left out of the draw: the same triangles are drawn where they can show, in
+// the same order, so the picture doesn't change. Several ranges go up in one call where the browser has WEBGL_multi_draw,
+// else as one draw each (see renderBufferDirect below).
+const CULL = { stamp: 0, pl: new Float64Array(24), pad: 0, total: 0, drawn: 0, tris: 0 }, _cullM = new THREE.Matrix4(), _cullF = new THREE.Frustum();
+function cullFrame(){
+  cam.updateMatrixWorld(); _cullM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _cullF.setFromProjectionMatrix(_cullM);
+  for (let i = 0; i < 6; i++){ const p = _cullF.planes[i]; CULL.pl.set([p.normal.x, p.normal.y, p.normal.z, p.constant], i*4); }
+  CULL.pad = 4*(2*zoom/H);   // (a few screen pixels of room, in world units)
+  CULL.stamp++; CULL.total = CULL.drawn = CULL.tris = 0;
+}
+// which of a merged mesh's pieces touch the view (worked out once a frame per mesh); returns how many do
+function pieceVis(P){
+  if (P.stamp === CULL.stamp) return P.seen;
+  const pl = CULL.pl, pad = CULL.pad, b = P.box, v = P.vis; let seen = 0;
+  for (let i = 0; i < P.n; i++){
+    const o = i*6; let ok = 1;
+    for (let q = 0; q < 24; q += 4){ const nx = pl[q], ny = pl[q + 1], nz = pl[q + 2];   // (the corner furthest along the plane's normal)
+      if (nx*(nx > 0 ? b[o + 1] : b[o]) + ny*(ny > 0 ? b[o + 3] : b[o + 2]) + nz*(nz > 0 ? b[o + 5] : b[o + 4]) + pl[q + 3] < -pad){ ok = 0; break; } }
+    v[i] = ok; seen += ok;
+  }
+  P.stamp = CULL.stamp; P.seen = seen; CULL.total += P.n; CULL.drawn += seen;
+  return seen;
+}
+// the ranges of rows r0 to r1 (inclusive) for the pieces on show, runs that sit next to each other joined; sets the mesh up to
+// draw them. Returns false when everything shows (the plain draw range does it).
+const MD = { s: new Int32Array(64), n: new Int32Array(64) };
+function multiRows(o, P, r0, r1){
+  if (PH.tests.noCull) return false;
+  const seen = pieceVis(P); if (seen === P.n) return false;
+  const v = P.vis, n = P.n; let m = 0, tot = 0;
+  for (let r = r0; r <= r1; r++) for (let i = 0; i < n; i++){
+    const c = P.rowN[r*n + i]; if (!v[i] || !c) continue;
+    const st = P.rowS[r*n + i];
+    if (m && MD.s[m - 1] + MD.n[m - 1] === st) MD.n[m - 1] += c;
+    else { if (m === MD.s.length){ const s2 = new Int32Array(m*2), n2 = new Int32Array(m*2); s2.set(MD.s); n2.set(MD.n); MD.s = s2; MD.n = n2; } MD.s[m] = st; MD.n[m++] = c; }
+    tot += c;
+  }
+  o.userData.md = m ? { s: MD.s.slice(0, m), n: MD.n.slice(0, m) } : null;
+  CULL.tris += tot; return tot;
+}
+function cutBefore(r, s, c, g){
+  const u = g.userData.cut, P = g.userData.pcs; g.drawRange.start = 0; g.drawRange.count = g.userData.full ? cutRest(u) : u.A;
+  if (P && !g.userData.full && c === cam){ const t = multiRows(this, P, 0, 0); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } }
+}
+function cutAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = cutRest(g.userData.cut); this.userData.md = null; }
 function sideBefore(r, s, c, g){
-  const u = g.userData.cut, b = u.A + u.H, o = u.off;
-  if (SIDE_ARC.all){ g.drawRange.start = b; g.drawRange.count = u.S; return; }
+  const u = g.userData.cut, b = u.A + u.H, o = u.off, P = g.userData.pcs;
+  if (SIDE_ARC.all){ g.drawRange.start = b; g.drawRange.count = u.S; if (P && c === cam){ const t = multiRows(this, P, 1, SIDE_K); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } } return; }
   const s0 = SIDE_ARC.s, e = s0 + SIDE_ARC.L, end = e <= SIDE_K ? b + o[e] : b + u.S + o[e - SIDE_K];
   g.drawRange.start = b + o[s0]; g.drawRange.count = end - (b + o[s0]);
+  if (P && c === cam){ const t = multiRows(this, P, 1 + s0, e); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } }
+}
+{ // (several ranges in one draw: three itself only draws one, so while a mesh with ranges is drawn the context's drawElements is swapped)
+  const gl = renderer.getContext(), ext = window.NO_MULTI_DRAW ? null : gl.getExtension('WEBGL_multi_draw'), rbd = renderer.renderBufferDirect;
+  renderer.renderBufferDirect = function(camera, sc, geo, mat, obj, grp){
+    const md = obj.userData.md; if (!md) return rbd.call(this, camera, sc, geo, mat, obj, grp);
+    const bpe = geo.index.array.BYTES_PER_ELEMENT, n = md.s.length;
+    if (ext){ if (!md.o){ md.o = new Int32Array(n); for (let i = 0; i < n; i++) md.o[i] = md.s[i]*bpe; } }
+    gl.drawElements = function(mode, count, type){
+      if (ext) ext.multiDrawElementsWEBGL(mode, md.n, 0, type, md.o, 0, n);
+      else { const f = Object.getPrototypeOf(gl).drawElements; for (let i = 0; i < n; i++) f.call(gl, mode, md.n[i], type, md.s[i]*bpe); }
+    };
+    try { return rbd.call(this, camera, sc, geo, mat, obj, grp); } finally { delete gl.drawElements; }
+  };
 }
 // how many of a geometry's indices are its own triangles (the copied wall slices left out)
 const triIndexCount = g => g.userData.cut ? cutRest(g.userData.cut) : (g.index ? g.index.count : g.attributes.position.count);
@@ -1307,12 +1366,21 @@ function mergeCut(geos){
   const off = [0]; for (let k = 0; k < SIDE_K; k++) off.push(off[k] + nB[k]);
   const n = nA + nH + off[SIDE_K] + off[SIDE_K/2], ix = nv > 65535 ? new Uint32Array(n) : new Uint16Array(n);
   let k = 0;
-  const put = (lo, hi) => { let base = 0; parts.forEach((p, gi) => { const I = p.I, r = typeof lo === 'function' ? lo(p) : null; const [x, y] = r || [p[lo][0], p[lo][1]]; for (let q = x; q < y; q++) ix[k++] = I[q] + base; base += geos[gi].attributes.position.count; }); };
-  put('a'); put('h');
-  for (let j = 0; j < SIDE_K; j++) put(p => [p.s[j], p.s[j + 1]]);
-  for (let j = 0; j < SIDE_K/2; j++) put(p => [p.s[j], p.s[j + 1]]);
+  // where each piece's own triangles landed, row by row (row 0: A; rows 1 to 8: the wall slices; rows 9 to 12: slices 0 to 3
+  // again), and its box: what lets a frame draw only the pieces that are on screen (see cullPieces)
+  const nP = geos.length, rows = 1 + SIDE_K + SIDE_K/2, rowS = new Int32Array(rows*nP), rowN = new Int32Array(rows*nP), box = new Float32Array(nP*6);
+  const put = (lo, row) => { let base = 0; parts.forEach((p, gi) => { const I = p.I, r = typeof lo === 'function' ? lo(p) : null; const [x, y] = r || [p[lo][0], p[lo][1]];
+    if (row >= 0){ rowS[row*nP + gi] = k; rowN[row*nP + gi] = y - x; }
+    for (let q = x; q < y; q++) ix[k++] = I[q] + base; base += geos[gi].attributes.position.count; }); };
+  put('a', 0); put('h', -1);
+  for (let j = 0; j < SIDE_K; j++) put(p => [p.s[j], p.s[j + 1]], 1 + j);
+  for (let j = 0; j < SIDE_K/2; j++) put(p => [p.s[j], p.s[j + 1]], 1 + SIDE_K + j);
+  geos.forEach((g, gi) => { const P = g.attributes.position.array; let x0 = 1e30, x1 = -1e30, y0 = 1e30, y1 = -1e30, z0 = 1e30, z1 = -1e30;
+    for (let q = 0; q < P.length; q += 3){ const x = P[q], y = P[q + 1], z = P[q + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+    box.set([x0, x1, y0, y1, z0, z1], gi*6); });
   out.setIndex(new THREE.BufferAttribute(ix, 1));
   out.userData.cut = { A: nA, H: nH, S: off[SIDE_K], off }; out.setDrawRange(0, nA + nH + off[SIDE_K]);
+  if (nP > 1) out.userData.pcs = { n: nP, rowS, rowN, box, stamp: -1, vis: new Uint8Array(nP), seen: 0 };
   out.computeBoundingSphere();
   return out;
 }

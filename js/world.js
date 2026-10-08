@@ -133,7 +133,7 @@ const triIndexCount = g => g.userData.cut ? cutRest(g.userData.cut) : (g.index ?
 // (layers.enableAll) until the cache is on, then the live set on top of the cache's picture. Anything unknown stays live.
 const STATIC_BIT = 32;
 const isStaticMat = m => !!m && (m.isMeshToonMaterial || m.isMeshLambertMaterial || m.isMeshBasicMaterial) && !m.transparent && !m.userData.colorOnly && !m.userData.live && !m.clippingPlanes;
-const markStatic = o => { if (o.isMesh && !o.isInstancedMesh && o.layers.mask === 1 && !o.userData.noStatic && isStaticMat(o.material)) o.layers.mask = STATIC_BIT; };
+const markStatic = o => { if (o.isMesh && !o.isInstancedMesh && o.layers.mask === 1 && !o.userData.noStatic && isStaticMat(o.material)){ o.layers.mask = STATIC_BIT; if (o.material === ATLAS) glowOverlay(o); } };
 function freezeTree(g){ g.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; markStatic(o); }); return g; }
 let connGroup = null, curPorts = null, EXT = 12;
 const camT = new THREE.Vector3(0, TARGET_Y, 0), camGoal = new THREE.Vector3(0, TARGET_Y, 0);
@@ -196,6 +196,27 @@ vec3 getGradientIrradiance( vec3 normal, vec3 lightDirection ){
 };
 // the same material for the walls' mesh (see sideArc), so its draws merge apart from the rest; the same shader
 const ATLAS_SIDE = ATLAS.clone(); ATLAS_SIDE.onBeforeCompile = ATLAS.onBeforeCompile; ATLAS_SIDE.customProgramCacheKey = ATLAS.customProgramCacheKey;
+// The glow overlay (static cache, staticcache.js). The cache holds the buildings as they were drawn; the lights that flicker
+// (aFlk) and the aircraft lights that blink (glow kind 6) change every frame. Each static building mesh carries a child mesh
+// over just those triangles, drawn after the cache is copied in, with the same shader (so the same corner positions and
+// depth), depth test "equal or nearer", no depth write, color image only: it repaints them where they're the visible surface.
+// It sits on layer 6 (OV_BIT): the live pass draws it, the old path (which draws the buildings themselves) doesn't.
+const OV_BIT = 64;
+const ATLAS_OV = ATLAS.clone(); ATLAS_OV.onBeforeCompile = ATLAS.onBeforeCompile; ATLAS_OV.customProgramCacheKey = ATLAS.customProgramCacheKey; ATLAS_OV.depthWrite = false;
+function glowOverlay(mesh){
+  const g = mesh.geometry, fl = g.attributes.aFlk, em = g.attributes.aEm, I = g.index && g.index.array; if (!fl || !em || !I) return;
+  const F = fl.array, E = em.array, u = g.userData.cut, out = [];
+  const scan = (a, b) => { for (let q = a; q < b; q += 3){ const i0 = I[q], i1 = I[q + 1], i2 = I[q + 2];
+    if (F[i0] || F[i1] || F[i2] || E[i0*4 + 3] === 6 || E[i1*4 + 3] === 6 || E[i2*4 + 3] === 6) out.push(i0, i1, i2); } };
+  if (u){ scan(0, u.A); scan(u.A + u.H, u.A + u.H + u.S); } else scan(0, g.userData.shown ?? I.length);   // (the walls once: not the copied slices; not the faces nobody sees)
+  if (!out.length) return;
+  const og = new THREE.BufferGeometry(); for (const k in g.attributes) og.setAttribute(k, g.attributes[k]);
+  og.setIndex(new THREE.BufferAttribute(g.attributes.position.count > 65535 ? new Uint32Array(out) : new Uint16Array(out), 1));
+  if (!g.boundingSphere) g.computeBoundingSphere(); og.boundingSphere = g.boundingSphere.clone();
+  g.addEventListener('dispose', () => og.dispose());
+  const ov = new THREE.Mesh(og, ATLAS_OV); ov.layers.mask = OV_BIT; ov.receiveShadow = mesh.receiveShadow; ov.castShadow = false; ov.userData.isOv = true;
+  mesh.add(ov);
+}
 let SIDE_SPLIT = false;   // (set while a plot or a megastructure is collected: see collect)
 const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m !== ATLAS && m !== ATLAS_SIDE;
 // Faces nobody can ever see: wholly and well inside one of the piece's solid blocks (a box's end sunk into a wall, a post
@@ -1803,7 +1824,8 @@ function startAnim(c, kind, y0, y1, zone, w, old, sound, opts = {}){
   const col = new THREE.Color(zone ? (ZONES[zone] ? ZONES[zone].col : zone) : '#e3d6bd');
   const u = { plane: new THREE.Plane(new THREE.Vector3(0, -1, 0), kind === 'build' ? y0 : y1), h: { value: y0 }, col: { value: col.clone().multiplyScalar(1.6) }, on: { value: 1 } };
   const mats = animMaterials(u);
-  view.traverse(o => { if (!o.isMesh) return; o.userData.baseMat = o.material; o.userData.baseLayer = o.layers.mask; o.material = o.material === ATLAS ? mats.atlas : o.material; if (!o.material.userData.colorOnly) o.layers.set(3); });
+  view.traverse(o => { if (!o.isMesh) return; if (o.userData.isOv){ o.visible = false; return; }   // (the glow overlay waits: the sweep draws the piece itself)
+    o.userData.baseMat = o.material; o.userData.baseLayer = o.layers.mask; o.material = o.material === ATLAS ? mats.atlas : o.material; if (!o.material.userData.colorOnly) o.layers.set(3); });
   showHidden(view, true);   // (sliced open by the sweep: the faces normally hidden inside can show)
   if (kind === 'remove' && c.view) c.view.visible = false;   // what's left appears when the sweep is done
   const lineMat = () => new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
@@ -1877,7 +1899,7 @@ function endAnim(i){
   const a = anims[i]; anims.splice(i, 1);
   if (!anims.some(b => b.c === a.c)){ animCells.delete(a.c); markSolid(a.c); }   // (back into its region's merge)
   for (const l of a.lines){ scene.remove(l); l.material.dispose(); }
-  a.view.traverse(o => { if (o.isMesh){ o.material = o.userData.baseMat || o.material; if (o.userData.baseLayer !== undefined) o.layers.mask = o.userData.baseLayer; else o.layers.set(0); } });
+  a.view.traverse(o => { if (o.isMesh && o.userData.isOv){ o.visible = true; return; } if (o.isMesh){ o.material = o.userData.baseMat || o.material; if (o.userData.baseLayer !== undefined) o.layers.mask = o.userData.baseLayer; else o.layers.set(0); } });
   showHidden(a.view, false);
   a.mats.atlas.dispose(); a.mats.nrm.dispose();
   if (a.kind === 'remove'){ dropView(a.old); if (a.c.view) a.c.view.visible = true; }

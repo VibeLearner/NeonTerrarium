@@ -78,7 +78,8 @@ function frame(now){
   if (pt.quarter || !SC.frame()){   // (the static cache draws the frame when it can: staticcache.js)
     renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
     if (MRT) mrtBegin();   // the normal image is drawn along with the colors (core.js, sky.js)
-    cam.layers.enableAll(); SC.drawView(() => renderer.render(scene, cam));
+    cam.layers.enableAll(); cam.layers.disable(6); SC.drawView(() => renderer.render(scene, cam));   // (layer 6: the glow overlay, for the cache's frames only)
+    cam.layers.enableAll();
     if (MRT) mrtEnd();
   }
   if (pt.quarter) rtC.viewport.set(0, 0, W, H);

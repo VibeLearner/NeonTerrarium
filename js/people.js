@@ -309,22 +309,25 @@ function plotEdges(c, ends, pairOk){
 }
 // shortest walk between two network points (A*), as one polyline
 const routeCache = new Map(), LAWN_COST = 5;
+let _rtG = new Float32Array(0), _rtFrom = new Int32Array(0), _rtSeen = new Int32Array(0), _rtDone = new Int32Array(0), _rtEp = 0;
 function route(a, b){
   if (a === b) return [[NG.x[a], NG.z[a]]];
   const key = a + '>' + b;
   if (routeCache.has(key)) return routeCache.get(key);
-  const n = NG.x.length, g = new Float32Array(n).fill(Infinity), from = new Int32Array(n).fill(-1), done = new Uint8Array(n);
+  const n = NG.x.length;
+  if (_rtG.length < n){ _rtG = new Float32Array(n*2); _rtFrom = new Int32Array(n*2); _rtSeen = new Int32Array(n*2); _rtDone = new Int32Array(n*2); _rtEp = 0; }
+  const ep = ++_rtEp, g = _rtG, from = _rtFrom, seen = _rtSeen, done = _rtDone;   // (g, from: valid where seen[v] === ep; done: where it is ep; the same search as filling fresh arrays with Infinity, -1 and 0)
   const heap = [], hf = [];
   const push = (v, f) => { heap.push(v); hf.push(f); let i = heap.length - 1; while (i > 0){ const p = (i - 1) >> 1; if (hf[p] <= hf[i]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; [hf[p], hf[i]] = [hf[i], hf[p]]; i = p; } };
   const pop = () => { const top = heap[0], lv = heap.pop(), lf = hf.pop(); if (heap.length){ heap[0] = lv; hf[0] = lf; let i = 0;
     for (;;){ const l = 2*i + 1, r = l + 1; let m = i; if (l < heap.length && hf[l] < hf[m]) m = l; if (r < heap.length && hf[r] < hf[m]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; [hf[m], hf[i]] = [hf[i], hf[m]]; i = m; } } return top; };
   const hz = v => Math.hypot(NG.x[v] - NG.x[b], NG.z[v] - NG.z[b]);
-  g[a] = 0; push(a, hz(a));
+  seen[a] = ep; g[a] = 0; from[a] = -1; push(a, hz(a));
   let found = false;
   while (heap.length){
-    const v = pop(); if (done[v]) continue; done[v] = 1;
+    const v = pop(); if (done[v] === ep) continue; done[v] = ep;
     if (v === b){ found = true; break; }
-    for (const [w, e] of NG.adj[v]){ const d = g[v] + e.cost; if (d < g[w]){ g[w] = d; from[w] = v; push(w, d + hz(w)); } }
+    for (const [w, e] of NG.adj[v]){ const d = g[v] + e.cost; if (seen[w] !== ep || d < g[w]){ seen[w] = ep; g[w] = d; from[w] = v; push(w, d + hz(w)); } }
   }
   let out = null;
   if (found){
@@ -362,6 +365,7 @@ const MEGA_LIFE = {
   greenhouse: { jobs: 12, fun: 1.5, night: .35 },
   logistics: { jobs: 24, fun: 0, night: .5 },   // the logistics hub: dock hands, pickers and forklift drivers, round the clock (OPEN 24H)   // the hydroponic farm: growers round the clock, and people dropping by for fresh greens   // the Neon Dome: bar staff and DJs, mostly at night (its crowd is brought out by the night: see updateClubs)
 };
+let placesEpoch = 0;   // (counts the rebuilds of the places)
 const places = new Map();   // id -> { id, x, z, doors: [{ node, out:{x,z}, in:{x,z}|null, dir:[dx,dz] }], jobs, fun, open, night, cell|mega }
 const people = new Map();   // id -> person
 const hrange = (lo, hi) => (h => lo <= hi ? (h >= lo && h < hi) : (h >= lo || h < hi));
@@ -557,7 +561,7 @@ function buildNetwork(){
     // a closed megastructure's plot only links its doors to the street, never street to street through the building
     plotEdges(c, ends, closedMega(c) ? (a, b) => (a.kind === 'd') !== (b.kind === 'd') : () => true);
   }
-  places.clear(); for (const [k, v] of fresh) places.set(k, v);
+  places.clear(); for (const [k, v] of fresh) places.set(k, v); placesEpoch++;
   rebuildDoorMeshes();
 }
 
@@ -739,12 +743,19 @@ function desire(p, h){
   const out = p.outgoing * (h >= 10 && h < 21 ? 1 : h >= 21 || h < 1 ? .5 : .25);
   return pplRand() < out ? leisure(p) || p.home : p.home;
 }
+// the places that draw anyone out in free time (fun above 0, somewhere to go), in the order of places, listed once for each rebuild of
+// the places (every door, spot and fun they have is set during that rebuild)
+let _lpEpoch = -1, _lpList = [];
+function leisurePlaces(){
+  if (_lpEpoch !== placesEpoch){ _lpEpoch = placesEpoch; _lpList = []; for (const pl of places.values()) if (!(pl.fun <= 0) && reachable(pl)) _lpList.push(pl); }
+  return _lpList;
+}
 // somewhere to spend free time: shops, bars, the mall, the square. Nearer places are more likely.
 function leisure(p){
   const home = places.get(p.home); if (!home) return null;
   let tot = 0; const list = [];
   const reach = typeof mtReachFrom === 'function' ? mtReachFrom(home.x, home.z) : null;   // (how far a place is, the metro taken into account: see metro.js)
-  for (const pl of places.values()){ if (pl.fun <= 0 || pl.id === p.home || !reachable(pl)) continue;
+  for (const pl of leisurePlaces()){ if (pl.id === p.home) continue;
     const d = reach ? reach(pl.x, pl.z) : Math.hypot(pl.x - home.x, pl.z - home.z);
     const v = pl.fun/(1 + (d/14)**2); tot += v; list.push([pl.id, v]); }
   let r = pplRand()*tot; for (const [id, v] of list) if ((r -= v) <= 0) return id;
@@ -901,7 +912,7 @@ function decide(p){
     if (back && startTrip(p, p.job)) return;
     p.until = pplNow + 10 + pplRand()*20; return;
   }
-  if (p.visitor && p.at === p.home && !p.walk && (pplNow > p.leaveAt || (p.tries = (p.tries || 0) + 1) > 4)){ p.gone = true; return; }   // back at the drop-off (or nowhere to go): off home
+  if (p.visitor && p.at === p.home && !p.walk && (pplNow > p.leaveAt || (p.tries = (p.tries || 0) + 1) > 4)){ p.gone = true; pplGoneN++; return; }   // back at the drop-off (or nowhere to go): off home
   const want = desire(p, S.hour) || p.home;
   p.walkedFor = (want !== p.job && want !== p.home && working(p, S.hour)) ? 'errand' : null;
   const chained = p.chain && want === p.at;   // move within the place: from the queue to a seat to eat
@@ -923,7 +934,7 @@ function arrive(p){
   p.at = w.to; p.spot = w.spot;
   if (p.metroPlan && w.to === p.metroPlan.station && typeof mtEnter === 'function' && mtEnter(p)) return;   // at the station: up the lift to the platform (see metro.js)
   p.metroPlan = null;
-  if (p.visitor && p.at === p.home){ p.gone = true; return; }   // up the lift and away
+  if (p.visitor && p.at === p.home){ p.gone = true; pplGoneN++; return; }   // up the lift and away
   if (p.spot && p.spot.kind === 'queue') p.chain = 'eat';
   const pl = places.get(p.at);
   if (p.clubbing && pl && pl.mega && pl.mega.kind === 'club' && clubArrive(p, pl)) return;
@@ -973,14 +984,19 @@ function mtPlaces(fresh, oldDoors, addEnd){
 }
 
 /* ---------- keeping up with the city ---------- */
-let pplFrame = 0;
+let pplFrame = 0, pplGoneN = 0;   // (pplGoneN: people marked gone and not yet removed)
 const _op = new THREE.Vector3();
 // is a ground point well off the screen from any height people can be at (screen x doesn't depend on height; y does)
 function offScreen(x, z){
-  const VP = comp.uniforms.VP.value;
-  _op.set(x, 0, z).applyMatrix4(VP); if (_op.x < -1.3 || _op.x > 1.3) return true;
-  const y0 = _op.y; _op.set(x, 40, z).applyMatrix4(VP);
-  return (y0 > 1.3 && _op.y > 1.3) || (y0 < -1.4 && _op.y < -1.4);
+  const e = comp.uniforms.VP.value.elements;
+  // (the same arithmetic as Vector3.applyMatrix4, written out: this runs for every person every frame)
+  let w = 1/(e[3]*x + e[7]*0 + e[11]*z + e[15]);
+  const nx = (e[0]*x + e[4]*0 + e[8]*z + e[12])*w;
+  if (nx < -1.3 || nx > 1.3) return true;
+  const y0 = (e[1]*x + e[5]*0 + e[9]*z + e[13])*w;
+  w = 1/(e[3]*x + e[7]*40 + e[11]*z + e[15]);
+  const y1 = (e[1]*x + e[5]*40 + e[9]*z + e[13])*w;
+  return (y0 > 1.3 && y1 > 1.3) || (y0 < -1.4 && y1 < -1.4);
 }
 let pplReady = false, pplNow = 0, pplHour = S.hour, pplCursor = 0, pplList = [];
 // called after every edit (from syncAgents): rebuild the network, places and doors, then the residents and their jobs
@@ -1627,7 +1643,9 @@ function checkBumps(t){
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++){
       const cx = gx + dx - x0, cz = gz + dz - z0; if (cx < 0 || cz < 0 || cx >= GW || cz >= GH) continue;
       const c = cz*GW + cx, e = st[c + 1];
-      for (let q = st[c]; q < e; q++) bumpPair(t, m, movers[ord[q]]);
+      for (let q = st[c]; q < e; q++){ const o = movers[ord[q]];
+        if (o === m || o.bumpCD > t || m.bumpCD > t || (m.x - o.x)**2 + (m.z - o.z)**2 > .27*.27) continue;   // (bumpPair's own first tests, ahead of the call)
+        bumpPair(t, m, o); }
     }
   }
 }
@@ -1726,6 +1744,7 @@ function ghPose(p, t, dt){
   return true;
 }
 function updatePeople(dt, t){
+  PH.subBegin();
   pplNow = t;
   if (!pplReady) return;
   // the hour was changed in Settings: everyone reconsiders over the next few seconds
@@ -1743,33 +1762,42 @@ function updatePeople(dt, t){
     if (!p.walk && pplNow >= p.until) decide(p);
     if (performance.now() - tb > 2.5){ k++; break; }
   }
+  PH.sub('people: decisions');
   pplCursor = n ? (pplCursor + k) % n : 0;
-  if (pplList.some(p => p.gone)){ for (const p of pplList) if (p.gone){ if (p.spot && p.spot.by === p.id) p.spot.by = null; people.delete(p.id); } pplList = pplList.filter(p => !p.gone); }
+  if (pplGoneN > 0 && pplList.some(p => p.gone)){ for (const p of pplList) if (p.gone){ if (p.spot && p.spot.by === p.id) p.spot.by = null; people.delete(p.id); } pplList = pplList.filter(p => !p.gone); }
+  pplGoneN = 0;
   _camR.set(1, 0, 0).applyQuaternion(cam.quaternion);
+  PH.sub('people: removing the gone');
   updateBots(dt, t);
   updateLurkers(dt, t);
   updateClubs(dt, t);
+  PH.sub('people: bots, lurkers, clubs');
   checkBumps(t);
+  PH.sub('people: bumps');
   // fill the draw batch with everyone on show
   const pos = pplMesh.geometry.attributes.aPos, spr = pplMesh.geometry.attributes.aSpr, P = pos.array, Q = spr.array;
   const VP = comp.uniforms.VP.value;
   let i = 0;
+  const ve = VP.elements;
   const emit = (x, y, z, row, frame, flip, alpha) => {
     if (i >= PPL_MAX) return false;
-    _pv.set(x, y, z).applyMatrix4(VP);
-    if (_pv.x < -1.1 || _pv.x > 1.1 || _pv.y < -1.15 || _pv.y > 1.1) return false;
+    // (Vector3.applyMatrix4's arithmetic, written out; only the screen position is needed)
+    const w = 1/(ve[3]*x + ve[7]*y + ve[11]*z + ve[15]), sx = (ve[0]*x + ve[4]*y + ve[8]*z + ve[12])*w, sy = (ve[1]*x + ve[5]*y + ve[9]*z + ve[13])*w;
+    if (sx < -1.1 || sx > 1.1 || sy < -1.15 || sy > 1.1) return false;
     P[i*3] = x; P[i*3 + 1] = y; P[i*3 + 2] = z;
     Q[i*4] = row; Q[i*4 + 1] = frame; Q[i*4 + 2] = flip; Q[i*4 + 3] = alpha;
     i++; return true;
   };
   // which stalls are being served, and who's queueing where
   const served = new Set(), queued = new Set(); holoOn.length = 0;
-  const stallKey = sp => sp.place + ':' + sp.stall;   // stall numbers repeat between squares
+  const stallKey = sp => sp._key || (sp._key = sp.place + ':' + sp.stall);   // stall numbers repeat between squares (the string is made once per spot)
   for (const p of pplList) if (!p.walk && p.spot){ if (p.spot.kind === 'vendor') served.add(stallKey(p.spot)); else if (p.spot.kind === 'queue') queued.add(stallKey(p.spot)); }
+  PH.sub('people: stall scan');
   for (const c of cells.values()) if (c.liftCab) liftCab(c);   // (every lift has its cab, so its controller runs)
   updateLifts(dt);
   // (W5.1) Anyone well off screen is worked on every fourth frame, with the time of the frames skipped (their walks go on at
   // the same speed; they arrive, and pick what's next, a few frames later). Lifts, clubs and the metro always run.
+  PH.sub('people: lifts');
   const dt0 = dt; let pi = 0; pplFrame++;
   for (const p of pplList){
     if (!PH.tests.noSlowFar && !p.ride && !p.club && !p.metro && p.x !== undefined && ((pplFrame + pi++) & 3) && offScreen(p.x, p.z)){ p.acc = (p.acc || 0) + dt0; continue; }
@@ -1849,6 +1877,7 @@ function updatePeople(dt, t){
     if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
   }
+  PH.sub('people: the loop over everyone');
   drawBouncers(emit, t, dt);
   drawDeckWalkers(emit, t, dt);
   drawLiftCabs();

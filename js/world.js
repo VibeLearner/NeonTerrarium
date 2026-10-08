@@ -134,7 +134,15 @@ const triIndexCount = g => g.userData.cut ? cutRest(g.userData.cut) : (g.index ?
 const STATIC_BIT = 32;
 const isStaticMat = m => !!m && (m.isMeshToonMaterial || m.isMeshLambertMaterial || m.isMeshBasicMaterial) && !m.transparent && !m.userData.colorOnly && !m.userData.live && !m.clippingPlanes;
 const markStatic = o => { if (o.isMesh && !o.isInstancedMesh && o.layers.mask === 1 && !o.userData.noStatic && isStaticMat(o.material)){ o.layers.mask = STATIC_BIT; if (o.material === ATLAS) glowOverlay(o); } };
-function freezeTree(g){ g.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; markStatic(o); }); return g; }
+// A frozen tree's matrices are set once and never change (nothing writes to them), so after the first pass over it the world-matrix
+// update (every frame, main.js) doesn't walk it again: it was visiting some 12,000 objects a frame to find nothing to do.
+// (Overlay test "walk every matrix" switches this off.)
+const _omw = THREE.Object3D.prototype.updateMatrixWorld;
+function frozenUpdate(force){
+  if (this._mwDone && !this.matrixWorldNeedsUpdate && !force && !PH.tests.walkAll) return;
+  _omw.call(this, force); this._mwDone = true;
+}
+function freezeTree(g){ g.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; markStatic(o); }); g.updateMatrixWorld = frozenUpdate; return g; }
 let connGroup = null, curPorts = null, EXT = 12;
 const camT = new THREE.Vector3(0, TARGET_Y, 0), camGoal = new THREE.Vector3(0, TARGET_Y, 0);
 // The style (clutter, greenery, neon) of every piece is stored with it when it is built. Generation reads S.clutter,

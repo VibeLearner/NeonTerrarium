@@ -58,9 +58,9 @@ window.__perf = (() => {
   // Timing. CPU: frames simulated without drawing (as between captures), each update function and the whole frame timed;
   // the skipped draws still do their world-matrix updates, so that cost is in "frame". GPU: one view drawn, then single
   // passes redrawn several times each, synchronised with a 1-pixel read, so a pass's own cost is measured on its own.
-  P.cpuTime = n => {
+  P.cpuTime = (n, extra = []) => {
     const now = __realNow, acc = {}, cur = {};
-    const names = ['updateCars', 'updateDrones', 'updateTrips', 'updateHighways', 'updateMetros', 'updateVehicleShadows', 'updateAnims', 'updateMegaFx', 'updatePeople', 'updateSteam', 'updateConveyors', 'updateCamera'];
+    const names = extra.concat(['checkBumps', 'updateBots', 'updateLurkers', 'updateClubs', 'decide', 'arrive', 'updateLifts', 'liftCab', 'liftRide', 'drawBouncers', 'drawDeckWalkers', 'drawLiftCabs', 'lawnHolos', 'lawnPicnics', 'updateCars', 'updateDrones', 'updateTrips', 'updateHighways', 'updateMetros', 'updateVehicleShadows', 'updateAnims', 'updateMegaFx', 'updatePeople', 'updateSteam', 'updateConveyors', 'updateCamera']);
     const orig = {};
     for (const nm of names){ const f = window[nm]; if (typeof f !== 'function') continue; orig[nm] = f;
       window[nm] = function(...a){ const t0 = now(); const r_ = f.apply(this, a); cur[nm] = (cur[nm] || 0) + now() - t0; return r_; }; }

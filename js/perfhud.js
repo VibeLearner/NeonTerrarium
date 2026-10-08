@@ -13,8 +13,8 @@ const PH = (() => {
   // in one plain material (the same triangles, almost no shading), shadows: surfaces don't look up the shadow map.
   // lean: the buildings' shader without the view position it passes but never uses (same picture); no glow math: lights
   // don't switch on, flicker or blink; no color data: the buildings' colors and glow aren't read at all.
-  const tests = { quarter: false, plain: false, shadows: false, lean: false, noGlow: false, noData: false, cutoutsLast: false, compAll: false, compFloor: false, compNoShim: false, gbuf: false, noCull: false, noSmall: false, noSlowFar: false, noStatic: false, showRebuilds: false }, plainMat = new THREE.MeshBasicMaterial({ color: 0x8a8f99 });
-  const TEST_NAMES = { quarter: 'quarter of the pixels', plain: 'plain shading', shadows: 'no surface shadows', lean: 'lean buildings (same picture)', noGlow: 'no glow math', noData: 'no color data', cutoutsLast: 'cut-outs drawn last (same picture)', compAll: 'composite: every effect compiled in (same picture)', compFloor: 'composite: no effects', compNoShim: 'composite: no air shimmer (pads, metro)', gbuf: 'buildings: colors only, no lighting', noCull: 'no per-plot culling (same picture)', noSmall: 'draw sub-pixel triangles too', noSlowFar: 'people off screen at full rate', noStatic: 'no static cache', showRebuilds: 'show cache redraws (red)' };
+  const tests = { quarter: false, plain: false, shadows: false, lean: false, noGlow: false, noData: false, cutoutsLast: false, compAll: false, compFloor: false, compNoShim: false, gbuf: false, noCull: false, noSmall: false, noSlowFar: false, noStatic: false, showRebuilds: false, walkAll: false }, plainMat = new THREE.MeshBasicMaterial({ color: 0x8a8f99 });
+  const TEST_NAMES = { quarter: 'quarter of the pixels', plain: 'plain shading', shadows: 'no surface shadows', lean: 'lean buildings (same picture)', noGlow: 'no glow math', noData: 'no color data', cutoutsLast: 'cut-outs drawn last (same picture)', compAll: 'composite: every effect compiled in (same picture)', compFloor: 'composite: no effects', compNoShim: 'composite: no air shimmer (pads, metro)', gbuf: 'buildings: colors only, no lighting', noCull: 'no per-plot culling (same picture)', noSmall: 'draw sub-pixel triangles too', noSlowFar: 'people off screen at full rate', noStatic: 'no static cache', showRebuilds: 'show cache redraws (red)', walkAll: 'walk every matrix (same picture)' };
   const gl = renderer.getContext(), info = renderer.info;
   const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
   const N = 180;   // frames of history
@@ -69,6 +69,13 @@ const PH = (() => {
     if (exact){ sync(); t = performance.now(); put(s.ex, t - c.t); if (!c.sub){ exFrame += t - c.t; if (c.name === 'color + shadow redraw') put(shadowMs, t - c.t); } }
     mark = t;
   }
+  // sections inside a lap (the people lap, say): their times are listed apart, not added into the laps' sum. The real clock where the
+  // harness scripts performance.now (tools/perf).
+  const rnow = () => typeof __realNow === 'function' ? __realNow() : performance.now();
+  let subMark = 0;
+  function subBegin(){ if (on) subMark = rnow(); }
+  function sub(name){ if (!on) return; const t = rnow(); put(stat(name, 'subsim').cpu, t - subMark); subMark = t; }
+  function laps(){ const o = {}; for (const [k, s] of stats) if (s.kind === 'sim' || s.kind === 'subsim') o[k] = avg(s.cpu); return o; }
   function shadow(){ if (on && renderer.shadowMap.needsUpdate){ shadowFrame = true; shadowTimes.push(performance.now()); } }
   function frameEnd(){
     if (!on) return;
@@ -114,6 +121,7 @@ const PH = (() => {
     for (const [k, s] of stats) if (s.kind === 'sim') simSum += avg(s.cpu);
     L.push(`simulation and upkeep          ${f1(simSum)}`);
     for (const [k, s] of stats) if (s.kind === 'sim') L.push(`  ${k.padEnd(28)}${f1(avg(s.cpu))}`);
+    { const subs = [...stats].filter(([k, s]) => s.kind === 'subsim'); if (subs.length){ L.push('detail inside the laps above:'); for (const [k, s] of subs) L.push(`  ${k.padEnd(28)}${f1(avg(s.cpu))}`); } }
     // passes in the order they ran, each followed by the passes timed inside it
     const row = (label, s) => `${label.padEnd(30)}${f1(avg(s.cpu))}   ${f1(avg(exact ? s.ex : s.gpu))}  ${big(avg(s.calls)).padStart(6)}  ${big(avg(s.tris)).padStart(9)}`;
     for (const [k, s] of stats) L.push(...(s.kind === 'pass' ? [row(k, s)] : s.kind === 'sub' ? [row('  ' + k, s)] : []));
@@ -173,5 +181,5 @@ const PH = (() => {
   }
   addEventListener('keydown', e => { if ((e.key === 'F3' || e.key === '`') && !e.repeat && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName)){ e.preventDefault();
     if (e.shiftKey){ if (!on) toggle(); setExact(!exact); } else toggle(); } });
-  return { frameStart, lap, begin, end, shadow, frameEnd, toggle, setExact, text, tests, plainMat, get on(){ return on; }, get exact(){ return exact; } };
+  return { frameStart, lap, sub, subBegin, laps, begin, end, shadow, frameEnd, toggle, setExact, text, tests, plainMat, get on(){ return on; }, get exact(){ return exact; } };
 })();

@@ -333,3 +333,50 @@ Memory: two sets of cache targets of (W + 512) x (H + 512) pixels, 12 bytes a pi
 - Turn, zoom and the lights switching draw the old way; so the turning numbers should match the old build's.
 - tools/perf: PERF_SC_STEPS=1 (the cache script), PERF_SC_MODE and PERF_SC_BASE_MODE (reuse, every, off, oldview, split), PERF_SC_DRAW
   (cap on drawn frames), PERF_STEPS (also picks cache steps), crops.py, diffstats.py, overlay_probe.py.
+
+# Round 6 (branch wip/round6, from wip/static-cache 1bc4451)
+
+Plan: the owner's `perf-round6-plan.md`. Harness numbers are SwiftShader on a shared machine and noisy (the same build varied by 20% from
+run to run); speed claims below use alternating A/B runs (tools/perf/ab_cpu.py) and say so.
+
+## Item 1: main thread
+
+**1a. People off screen, lazily: not possible as described. Reported, not built.**
+- The test that decides who is "off screen" (W5.1's `offScreen`) has to be conservative about height (people ride lifts and walk decks up to
+  40 units up), so it only calls a person off screen when they are off to the side. In the max city that is 165 of 10,201 people at zoom 30,
+  560 at zoom 15 and 977 at zoom 8. At the owner's views nearly everyone counts as on screen; there is almost nothing to skip. A tighter test
+  would change who is stepped on which frame, and so when walks end and decisions are made: not exact against the previous commit.
+- `checkBumps` runs over every walker in its safe stretch, seen or not, from the positions of the walkers and with the random stream
+  (`pplRand`) for the outcome. Making unseen walkers lazy would change which pairs meet and in what order they draw random numbers. The plan
+  names this case ("collision avoidance between unseen people") and says to keep that part as it is; it is the largest piece after the
+  loop itself (2.5 to 2.8 ms of 10.8 here).
+- Where the time goes in the max city at steady state (1,500 warm-up frames; this machine, about twice the M2's time; people 10,203,
+  decisions already subtracted unless noted): the loop over everyone 5.3 ms, collision checks 2.5 to 2.8, decisions 1.5 (in the harness the
+  clock is frozen inside a frame, so the 2.5 ms decision budget never trips; in the first minute everyone's wait has run out and 60 decisions
+  a frame show up as 10 to 19 ms, which is a start-up burst, not steady state), bots, lurkers and clubs 0.3, the stall scan 0.3, lifts 0.2,
+  removing the gone 0.2. (Timers are now in the overlay: "detail inside the laps above", people: ...)
+- Done instead, all exact (arithmetic and order unchanged): the per-frame `pplList.some(p => p.gone)` scan became a counter; `offScreen` and
+  `emit` evaluate the projection inline (the same arithmetic as Vector3.applyMatrix4, no vector per person); the stall key string is made
+  once per spot; the collision pair loop does `bumpPair`'s first tests before the call; `route` (A*) keeps its working arrays between calls
+  with a stamp instead of allocating and filling four network-sized arrays every call; `leisure` walks a list of the places that can draw
+  anyone (rebuilt only when the places are) instead of every place. Measured with alternating runs, four rounds, steady state: people
+  without decisions 9.76 against 9.71 ms (medians), minimum 8.20 against 8.41: no measurable change. The saving is real in the decision path
+  (route and desire were 4.7 and 3.2 ms of the 9.6 start-up burst) but decisions are a small part of steady state.
+- Verification: harness diff against 1bc4451, standard script, city, megas and dense, 53 captures, 0 pixel and 0 state differences; max city,
+  noon, noon at 120 frames, night zoom in, night pan and the evening cycle (people's states after about 1,000 simulated frames), 5 captures,
+  0 problems.
+
+**1b. Vehicles, highways, metros, drones: not changed.** Measured (harness, steady state): metros 0.6 to 0.7 ms, highways 0.3 to 0.7,
+conveyors 0.2 to 0.3, drones 0.1, steam 1.8 to 2.2, megastructure effects 1.4 to 1.7. The highway cars read each other every frame (gap to the
+car ahead, clashes between cars off the deck) and spawn with random numbers; the metros run four passes over all people each frame for riders
+and waiters; neither can be put on a "position is a function of time" footing without changing what the cars and trains do. The pieces that
+could be trimmed exactly are each a few tenths of a millisecond; I left them. (The 3.6 ms on the M2 is more than this scene's 1.3 ms: the
+owner's save has more highways or riders than the harness scene.)
+
+**1c. Scene upkeep: what it is, and an exact fix.** `flushSolid` costs nothing when nothing changed; the cost is `scene.updateMatrixWorld()`,
+which visits every object in the scene every frame: 13,312 objects (12,324 under the world group, 969 with matrixAutoUpdate on), 1.5 ms here
+(about 2 ms on the M2). Everything under the world group is frozen (matrices set once) and walked for nothing. Frozen trees now compute their
+matrices once and are skipped afterwards (`frozenUpdate`, world.js; overlay test "walk every matrix" restores the old walk). Measured with the
+alternating A/B: the whole simulated frame is 1.8 to 2.1 ms shorter (medians 19.49 against 17.35, minimums 16.72 against 14.94). Same
+verification as above, plus the cache script on the city (edits on and off screen, dusk, night, rain, day cycle) against 1bc4451 with the
+cache on both sides.

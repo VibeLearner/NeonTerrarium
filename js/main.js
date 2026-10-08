@@ -9,6 +9,7 @@ centerView(true);
 selectZone(null);
 let last = performance.now();
 function frame(now){
+  PH.frameStart(now);   // (the performance overlay, F3: perfhud.js)
   const dt = Math.min(.05, (now-last)/1000);
   // auto performance: a running average of the frame time; slow for a couple of seconds and the zoomed-out render
   // resolution steps down, quick again and it steps back up (a hidden tab's long gap is ignored)
@@ -26,15 +27,19 @@ function frame(now){
   { const d = LIGHTS_GOAL - LIGHTS_ON.value, st = LIGHTS_RATE*rdt; LIGHTS_ON.value += Math.max(-st, Math.min(st, d)); }   // lights catch up with the hour one by one
   FLUID_NIGHT.value = night;   // the pipes' liquids glow after dark
   syncTimeUI();
+  PH.lap('time of day, interface');
   updateCars(now/1000);
   updateDrones(dt, now/1000, night);
   updateTrips(dt, now/1000);
   updateHighways(dt, now/1000);
   updateMetros(dt, now/1000);
+  PH.lap('vehicles, highways, metros');
   updateVehicleShadows();
   updateAnims(dt);
   updateMegaFx(dt, now/1000);
+  PH.lap('megastructures, animations');
   updatePeople(dt, now/1000);
+  PH.lap('people');
   music.update(rdt);
   updateSteam(dt, night);
   updateConveyors(now/1000);
@@ -61,11 +66,16 @@ function frame(now){
     const loss = (zoom/ZOOM_REF)*(BASE_H/H);   // 1 = every building keeps all its pixels
     const t = clamp((loss - 1.15)/1.0, 0, 1), e = t*t*(3 - 2*t);
     LOD.fine.value = e; LOD.plants.value = e; LOD.lines.value = e; }
+  PH.lap('steam, rain, camera');
   flushSolid();   // regions whose pieces changed are merged again (world.js)
   scene.updateMatrixWorld();   // once for every pass below (see core.js): nothing moves between them
+  PH.lap('scene upkeep');
+  PH.shadow(); PH.begin(renderer.shadowMap.needsUpdate ? 'color + shadow redraw' : 'color');
   renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
   cam.layers.enableAll(); renderer.render(scene, cam);
+  PH.end();
   renderer.shadowMap.needsUpdate = false;
+  PH.begin('normals');
   renderer.setRenderTarget(rtN); renderer.setClearColor(0x8080ff, 1);
   scene.overrideMaterial = normalMat; cam.layers.set(0); renderer.render(scene, cam); scene.overrideMaterial = null;
   renderer.autoClear = false; FOL_UNI.normalMode.value = 1; cam.layers.set(2); renderer.render(scene, cam);
@@ -81,11 +91,13 @@ function frame(now){
     }
   }
   renderer.autoClear = true;
+  PH.end();
   comp.uniforms.VP.value.copy(cam.projectionMatrix).multiply(cam.matrixWorldInverse);
   comp.uniforms.invVP.value.copy(comp.uniforms.VP.value).invert();
   liftShimmerCull(comp.uniforms.VP.value); mtShimmerCull(comp.uniforms.VP.value);   // the air shimmers only where they can show
   megaFxFlush(comp.uniforms.VP.value);   // and the megastructures' moving parts go up to the card only while they're on screen
-  renderNightLights(comp.uniforms.night.value);   // lamps and neon lighting the surfaces round them (sky.js)
+  PH.lap('pass setup');
+  PH.begin('night lights'); renderNightLights(comp.uniforms.night.value); PH.end();   // lamps and neon lighting the surfaces round them (sky.js)
   comp.uniforms.upView.value.set(0,1,0).transformDirection(cam.matrixWorldInverse);
   comp.uniforms.sunV.value.copy(SUN_DIR).transformDirection(cam.matrixWorldInverse);   // for the rim light
   comp.uniforms.pxW.value = 2*zoom/H; comp.uniforms.aoI.value = S.ao === false ? 0 : 1;   // ambient occlusion (sky.js)
@@ -102,10 +114,12 @@ function frame(now){
   { const el = SUN_DIR.y, nt = comp.uniforms.night.value;
     comp.uniforms.rayI.value = (1-nt)*(0.45 + 1.1*(1-el)) + nt*.12; }
   clouds.visible = !S.vclouds;
-  if (S.vclouds){ renderer.setRenderTarget(rtCloud); renderer.render(cloudScene, compCam); }
-  renderer.setRenderTarget(rtOut); renderer.render(compScene, compCam);
-  renderGlow();   // bloom and halation (sky.js)
-  renderer.setRenderTarget(null); renderer.render(upScene, compCam);
+  PH.lap('pass setup');
+  if (S.vclouds){ PH.begin('clouds'); renderer.setRenderTarget(rtCloud); renderer.render(cloudScene, compCam); PH.end(); }
+  PH.begin('composite'); renderer.setRenderTarget(rtOut); renderer.render(compScene, compCam); PH.end();
+  PH.begin('bloom and grade'); renderGlow(); PH.end();   // bloom and halation (sky.js)
+  PH.begin('to screen'); renderer.setRenderTarget(null); renderer.render(upScene, compCam); PH.end();
+  PH.frameEnd();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

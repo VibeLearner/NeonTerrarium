@@ -94,13 +94,15 @@ def launch(pw):
     return pw.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-vsync', '--autoplay-policy=user-gesture-required'])
 
 
-def open_game(browser, url, scene, vp):
+def open_game(browser, url, scene, vp, sc_mode=None):
     ctx = browser.new_context(viewport={'width': vp[0], 'height': vp[1]}, device_scale_factor=1)
     pg = ctx.new_page()
     pg.set_default_timeout(1800000)
     errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.add_init_script('window.__PERF_SCENE = ' + json.dumps({'storage': scene.get('storage', {})}) + ';')
+    if sc_mode:   # the static cache's mode (see js/staticcache.js); PERF_SC_BASE_MODE for the baseline, PERF_SC_MODE for the candidate
+        pg.add_init_script('window.__SC_MODE = ' + json.dumps(sc_mode) + ';')
     pg.add_init_script(path=os.path.join(HERE, 'shim.js'))
     pg.goto('http://127.0.0.1:%d%s' % (PORT, url))
     pg.wait_for_function('() => document.readyState === "complete" && typeof frame === "function"')
@@ -150,8 +152,8 @@ def steps(scene):
     return s
 
 
-def run_scene(browser, url, scene, vp, keep_png=True):
-    ctx, pg, errs = open_game(browser, url, scene, vp)
+def run_scene(browser, url, scene, vp, keep_png=True, sc_mode=None):
+    ctx, pg, errs = open_game(browser, url, scene, vp, sc_mode)
     caps = []
     for label, n, js in steps(scene):
         if js:
@@ -192,6 +194,7 @@ def cmd_diff(base_ref, cand_ref, only, quick):
     uc = make_site('cand', cand_ref)
     os.makedirs(OUT, exist_ok=True)
     fails, total, info_rows, notes = [], 0, [], []
+    sc_build = os.path.exists(os.path.join(CACHE, 'sites', 'cand', 'js', 'staticcache.js'))
     vps = VIEWPORTS[:1] if quick else VIEWPORTS
     with sync_playwright() as pw:
         br = launch(pw)
@@ -200,8 +203,8 @@ def cmd_diff(base_ref, cand_ref, only, quick):
                 tag = '%s_%dx%d' % (sc['name'], vp[0], vp[1])
                 t0 = time.time()
                 # (a fresh browser for each build: two heavy scenes one after the other in one browser can lose its page)
-                br.close(); br = launch(pw); cb, eb = run_scene(br, ub, sc, vp)
-                br.close(); br = launch(pw); cc, ec = run_scene(br, uc, sc, vp)
+                br.close(); br = launch(pw); cb, eb = run_scene(br, ub, sc, vp, sc_mode=os.environ.get('PERF_SC_BASE_MODE'))
+                br.close(); br = launch(pw); cc, ec = run_scene(br, uc, sc, vp, sc_mode=os.environ.get('PERF_SC_MODE'))
                 if eb or ec:
                     fails.append('%s page errors: base %s cand %s' % (tag, eb[:2], ec[:2]))
                 for (lb, a), (lc, b) in zip(cb, cc):
@@ -213,7 +216,10 @@ def cmd_diff(base_ref, cand_ref, only, quick):
                     if a['state'] != b['state']:
                         fails.append('%s: state differs first at "%s"' % (name, first_state_diff(a['state'], b['state'])))
                     ia, ib = a['info'], b['info']
-                    if ib['calls'] > ia['calls'] or ib['tex'] != ia['tex']:
+                    if sc_build and ib['tex'] in (ia['tex'], ia['tex'] + 3):   # (the static cache: its color, normal and depth targets, and its own pass: more draws and three more textures are by design)
+                        if ib['geos'] != ia['geos']:
+                            notes.append('%s: geometries %d -> %d' % (name, ia['geos'], ib['geos']))
+                    elif ib['calls'] > ia['calls'] or ib['tex'] != ia['tex']:
                         fails.append('%s: renderer.info base %s cand %s' % (name, ia, ib))
                     elif ib['tris'] > ia['tris'] or ib['geos'] != ia['geos']:
                         notes.append('%s: triangles %d -> %d, geometries %d -> %d' % (name, ia['tris'], ib['tris'], ia['geos'], ib['geos']))

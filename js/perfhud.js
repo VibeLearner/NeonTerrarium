@@ -11,8 +11,10 @@ const PH = (() => {
   // Tests (exact mode only, to find out what the color pass is spending its time on; they change the picture while on):
   // quarter: the color pass draws into a quarter of the pixels (the triangles are the same), plain: every surface drawn
   // in one plain material (the same triangles, almost no shading), shadows: surfaces don't look up the shadow map.
-  const tests = { quarter: false, plain: false, shadows: false }, plainMat = new THREE.MeshBasicMaterial({ color: 0x8a8f99 });
-  const TEST_NAMES = { quarter: 'quarter of the pixels', plain: 'plain shading', shadows: 'no surface shadows' };
+  // lean: the buildings' shader without the view position it passes but never uses (same picture); no glow math: lights
+  // don't switch on, flicker or blink; no color data: the buildings' colors and glow aren't read at all.
+  const tests = { quarter: false, plain: false, shadows: false, lean: false, noGlow: false, noData: false }, plainMat = new THREE.MeshBasicMaterial({ color: 0x8a8f99 });
+  const TEST_NAMES = { quarter: 'quarter of the pixels', plain: 'plain shading', shadows: 'no surface shadows', lean: 'lean buildings (same picture)', noGlow: 'no glow math', noData: 'no color data' };
   const gl = renderer.getContext(), info = renderer.info;
   const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
   const N = 180;   // frames of history
@@ -159,6 +161,7 @@ const PH = (() => {
   function setExact(v){ exact = !!v; if (!exact) for (const k in tests) setTest(k, false); if (testBar){ testBar.hidden = !exact; for (const b of testBar.querySelectorAll('button')) b._lab(); } clearAll(); label(); }
   function setTest(k, v){
     if (tests[k] === v) return; tests[k] = v;
+    if (k in ATLAS_TEST){ ATLAS_TEST[k] = v; ATLAS.needsUpdate = true; }
     if (k === 'shadows'){ renderer.shadowMap.enabled = !v; for (const m of ALL_MATS.concat([ATLAS])) m.needsUpdate = true; if (!v) shadowDirty = true; }   // (shaders are rebuilt either way)
   }
   function toggle(){

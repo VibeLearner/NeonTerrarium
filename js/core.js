@@ -54,7 +54,8 @@ if (MRT){
 }
 // A shader material of the game's own that the normal pass drew with MeshNormalMaterial gets the same normal here:
 // flat = the normal it wrote itself in the normal pass (plants and people: a flat one facing the camera).
-function mrtShader(mat, flat = null){
+function mrtShader(mat, flat = null, cutout = false){
+  if (cutout) mat.userData.cutout = true;   // (it throws pixels away: see the opaque sort in world.js)
   if (!MRT) return mat;
   if (!flat) mat.vertexShader = mat.vertexShader.replace(/void main\(\)\s*\{/, 'varying vec3 vMrtN;\nvoid main(){ vMrtN = normalize( normalMatrix * normal );');
   const out = flat ? `pc_fragNormal = ${flat};` : 'pc_fragNormal = vec4( normalize( normalize( vMrtN ) ) * 0.5 + 0.5, 1.0 );';

@@ -394,7 +394,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
         gl_FragColor = normalMode > 0.5 ? vec4(0.5,0.5,1.0,1.0) : vec4(col, 1.0);
       }`,
 });
-mrtShader(FOL_SHADER, 'vec4(0.5, 0.5, 1.0, 1.0)');   // (its normal-pass output, written alongside the color: core.js)
+mrtShader(FOL_SHADER, 'vec4(0.5, 0.5, 1.0, 1.0)'); FOL_SHADER.userData.cutout = true;   // (its normal-pass output, written alongside the color: core.js)
 // anchor: 'b' bottom sits on the point, 't' top hangs from it, 'c' centered
 // fixed: lie flat in P's orientation (P's local z is the surface's outward direction).
 // Otherwise the plant stands free: two copies crossed in an X, locked to the world at a random angle,

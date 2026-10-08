@@ -1302,7 +1302,9 @@ function mergeCut(geos){
 // a region's merged mesh takes the place of the first of its pieces
 // (and whatever doesn't write the normal image after everything that does: see mrtBegin in sky.js)
 const mrtLast = r => mrtWants(r.object, r.material) ? 0 : 1;
-renderer.setOpaqueSort((a, b) => a.groupOrder !== b.groupOrder ? a.groupOrder - b.groupOrder : MRT && mrtLast(a) !== mrtLast(b) ? mrtLast(a) - mrtLast(b) : a.renderOrder !== b.renderOrder ? a.renderOrder - b.renderOrder
+// (the overlay's test: cut-out sprites, which throw pixels away, after every plain solid draw; see perfhud.js)
+const cutLast = r => PH.tests.cutoutsLast && r.material.userData.cutout ? 1 : 0;
+renderer.setOpaqueSort((a, b) => a.groupOrder !== b.groupOrder ? a.groupOrder - b.groupOrder : MRT && mrtLast(a) !== mrtLast(b) ? mrtLast(a) - mrtLast(b) : cutLast(a) !== cutLast(b) ? cutLast(a) - cutLast(b) : a.renderOrder !== b.renderOrder ? a.renderOrder - b.renderOrder
   : a.program !== b.program ? a.program.id - b.program.id : a.material.id !== b.material.id ? a.material.id - b.material.id : a.z !== b.z ? a.z - b.z
   : (a.object.userData.sortId ?? a.id) - (b.object.userData.sortId ?? b.id));
 // and likewise for see-through things (three's order: layer group, render order, distance back to front, creation)

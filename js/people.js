@@ -66,7 +66,7 @@ function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMa
       vec3 col = vSpr.w > 1.5 ? c.rgb : c.rgb * mix(tint, vec3(1.0), 0.3);
       gl_FragColor = normalMode > 0.5 ? vec4(0.5, 0.5, 1.0, 1.0) : vec4(col, 1.0);
     }`,
-}), 'vec4(0.5, 0.5, 1.0, 1.0)'); }
+}), 'vec4(0.5, 0.5, 1.0, 1.0)', true); }
 const PPL_MAT = spriteMat(PPL_TEX, PPL.W, PPL.H, PPL.cw, PPL.ch, PPL.rows);
 function spriteBatch(mat, max){
   const geo = new THREE.InstancedBufferGeometry();

@@ -190,6 +190,7 @@ def run_scene(browser, url, scene, vp, keep_png=True, sc_mode=None):
     caps = []
     for st in steps(scene):
         label, n, js = st[:3]; draw = st[3] if len(st) > 3 else 0
+        if os.environ.get('PERF_SC_DRAW'): draw = min(draw, int(os.environ['PERF_SC_DRAW']))   # (fewer drawn frames for the heaviest scenes)
         if js:
             pg.evaluate('() => { ' + js + ' }')
         c = pg.evaluate('([n, d]) => __perf.cap(n, d)', [n, draw])

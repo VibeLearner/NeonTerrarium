@@ -157,7 +157,7 @@ function scFull(px, py, hard, soft, shk, why){
 const _hA = [], _sA = [], _kA = [];
 // The color pass, drawn from the cache. False (nothing drawn) when the old path has to do it.
 SC.frame = function(){
-  if (window.__perf && window.__perf.skip) return true;   // (the harness skips this frame's drawing: nothing here may change the cache's state either)
+  if (window.__perf && window.__perf.skip) return false;   // (the harness skips this frame's drawing: the old path's render call, which it intercepts, does what a skipped frame owes; the cache's state stays as it was)
   if (SC.mode === 'off' || SC.mode === 'oldview' || PH.tests.noStatic || !MRT){ SC.state = 'off'; SC.why = SC.mode === 'off' || SC.mode === 'oldview' || PH.tests.noStatic ? 'switched off' : 'no WebGL 2'; SC.ok = false; SC.job = null; return false; }
   if (renderer.shadowMap.needsUpdate){ SC.state = 'off'; SC.why = 'shadows redrawn this frame'; SC.ok = false; SC.job = null; return false; }
   if (SC.mode === 'split'){   // (a check: static then live on the main camera, no cache, to tell order effects from projection effects)

@@ -211,3 +211,93 @@ Not built, with reasons:
 - W6 cached static city: a large new render path (margin target, strip refresh, live/static split). Better started once
   the numbers from the owner's M2 show how much of the frame is left after these changes.
 - W3b, W5.2, W2b, W2c: small, unmeasured gains; left until the M2 timing says which one is worth it.
+
+# Round 5: the cached static city (branch wip/static-cache, from a7b4449)
+
+Plan: the owner's `cached-static-city-plan.md`. Measured so far only in the harness (SwiftShader); the owner's M2 numbers are
+still to come (script: tools/perf/MEASURE_STATIC_CACHE.md). Nothing here is merged or published.
+
+What it is: opaque toon, lambert and basic meshes built once (buildings and walls, ground, bridges: everything that joins the
+world through freezeTree) move to layer 5 ("static"); everything else stays live (people, plants, vehicles, glow points,
+see-through things, anything with a time uniform or a clipping plane, pieces mid-sweep). The static set is drawn into a target
+a margin of 256 render pixels wider than the view on every side (color, normals and depth, the color target's formats); each
+frame the window the view needs is blitted into the color target at a whole-pixel offset and only the live set is drawn on top,
+with a small overlay for the lights that flicker or blink and the windows that stutter. Code: js/staticcache.js, hooks in
+world.js, sky.js, input.js, main.js, people.js, perfhud.js.
+
+| Step | Commit | Check |
+| --- | --- | --- |
+| 1 static and live flags, layer split | a63f7aa | harness diff against a7b4449: city, megas, dense, 53 captures, 0 problems |
+| 2 cache target and camera, redrawn every frame, copied | 42d0d64 | see "exactness" below |
+| 3 camera pinned along the view | 602b615 | no haze or rain shift; noise as below |
+| 4 reuse: signature, coverage, fallback | 0b73c2f | 530 to 1,670 pixels (flicker frozen at that step) |
+| 5 glow overlay | 53c1cba | first captures 562 and 637 to 62 and 63 pixels |
+| 6 strips into a second target, day-cycle schedule, window stutter | 8b33406 | 26 steps on the city, below |
+| 7 overlay line and tests, measurement script, this record | (this commit) | |
+
+## Exactness: where "diff 0" was not met literally
+
+- Cache off ('off' mode, or the overlay test "no static cache"): exactly a7b4449's frames. Harness against a7b4449, city, megas
+  and dense, standard script, 53 captures, 0 problems (and the build against itself, 25 captures, 0 problems).
+- Static then live drawn on the main camera, no cache (mode 'split'): 0 pixels differ from a7b4449 on the two city captures tried
+  (night zoom-in and pan); on the max city's pan, 20 pixels differ from the all-in-one draw: the draw order of a live and a static
+  surface at one depth.
+- The cache camera's projection is wider than the view's, and an edge that falls exactly on a pixel centre can land either side of
+  it. Drawing the view itself with that same widened projection and a viewport offset by the margin (SC.drawView) makes the
+  cache and the frame rasterize alike. The price: while the cache is enabled even the frames drawn the old way come out of that
+  view, and against a7b4449 they differ by 1,000 to 4,500 of 921,600 pixels, isolated edge pixels. With the overlay test
+  "no static cache" (or SC.mode 'off') the frame is a7b4449's, exactly.
+- Pinning the camera along the view moves every depth value; effects that compare depths (outlines, dither steps) flip by one
+  level at some pixels. Against the same build's unpinned old path (mode 'oldview'), that is 600 to 2,300 pixels a capture,
+  most by one level.
+- Isolated single pixels (tens a capture) at foliage and sprite edges where a live and a static surface meet at one depth: their
+  draw order is the one place the split cannot keep (static first, live after).
+
+So the cache frames match the old way to within about 0.25% of pixels, nearly all one level, and no difference lines up on a
+row or a column; but they do not match bit for bit. Judged by the plan's own allowance ("a handful of tie pixels, explained"),
+stretched to a few thousand single-level pixels.
+
+A harness slip worth knowing: for a while the cache code's early exit on the harness's skipped frames also skipped the harness's
+record of an owed shadow redraw, so captures after edits had stale shadows in every mode, including 'off' (656,022 pixels at
+edit0_mid against a7b4449). Found by checking 'off' against a7b4449, fixed (a skipped frame now takes the old path's intercepted
+render call); the cache figures below are from after the fix.
+
+## Results (SwiftShader, 1280x720, cache against the old path of the same build through the same view, 'oldview')
+
+City, 26 steps with drawn frames (still hold, slow pan, fast pan past the margin, a pan that starts a strip job, a small hour
+change, turn, zoom, edits on and off screen, dusk, night, rain on, the day cycle): 0 state differences, 0 page errors.
+Pixels per capture (of 921,600): 62 and 63 (first draws), 813 (slow pan), 538 (fast pan), 992 and 1,492 (edge pan), 1,385 and
+1,720 (soft change), 1,218 to 2,197 (turn, zoom, edits), 1,576 and 1,774 (dusk), 1,311 to 1,494 (night), 1,310 and 1,000
+(rain), 2,158 and 2,162 (day cycle); at most 53 by more than 32 levels. The cache line reads as it should: in use when still
+and while panning slowly, redrawing "n of 8" for a view nearing the edge or a light that drifted, redrawn at once for turns,
+zooms, edits, the lights switching and light jumps. No differences line up on rows (no strip seams).
+
+Max city, still frames (script cut to 6 captures, 2 drawn frames each): 625 to 958 pixels differ, at most 84 by more than 32.
+
+Triangles submitted in a cache frame against the old way (counted by renderer.info at the capture frame):
+
+| Scene | Old path | Cache frame | Draw calls old / cache |
+| --- | ---: | ---: | ---: |
+| city, still | 502,784 | 44,614 | 254 / 180 |
+| city, night, settled | 408,955 | 61,184 | 390 / 330 |
+| maxcity (1280x720 render), still | 7.93M | 1.66M | 2,264 / 1,974 |
+
+What is left in the max city's cache frame is mostly the live set: the plants (wind-driven, instanced), glow points, people and
+vehicles. Frames that redraw the whole cache cost about one old-path frame plus the extra margin (turn: 527,883 triangles
+against 295,282 on the city); a redraw from a turn or zoom is a single-frame spike while the view eases, and a strip job costs
+an eighth of a full draw for eight frames.
+
+Memory: two sets of cache targets of (W + 512) x (H + 512) pixels, 12 bytes a pixel (color 4, normals 4, depth 4): at 3420 x 1640
+about 101 MB each, 203 MB together (the second set is made on the first background redraw). The 8 GB M2 question from the
+earlier plan stands.
+
+## Known behavior to look at on the M2
+
+- Shadows and lighting in the cache lag by up to a strip job (8 frames) after a shadow-map swap or a slow light drift; a jump
+  (rain on, the hour set by hand) redraws at once. With the day cycle on, watch for a faint seam or a late shadow.
+- Held evening hours (19:00 to 21:00 and 5:00 to 7:00) have windows that stutter with the clock; the overlay draws them each
+  frame, so check windows at those hours.
+- Frames where the shadow map is redrawn at once, and the lights switching on and off at dusk and dawn, draw the old way
+  (the cache is off or redrawn every frame for those frames).
+- tools/perf: PERF_SC_STEPS=1 (the cache script), PERF_SC_MODE and PERF_SC_BASE_MODE (modes: reuse, every, off, oldview, split),
+  PERF_SC_DRAW (cap on drawn frames), crops.py and diffstats.py for the differing pixels.

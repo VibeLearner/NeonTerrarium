@@ -53,7 +53,7 @@ window.__perf = (() => {
     __step(1);
     const png = canvas.toDataURL('image/png');
     const info = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, points: renderer.info.render.points, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures };
-    return { png, info, state: P.state(), sc: typeof SC !== 'undefined' ? SC.line() : '' };
+    return { png, info, state: P.state(), sc: typeof SC !== 'undefined' && SC.line ? SC.line() : '' };
   };
   // Timing. CPU: frames simulated without drawing (as between captures), each update function and the whole frame timed;
   // the skipped draws still do their world-matrix updates, so that cost is in "frame". GPU: one view drawn, then single

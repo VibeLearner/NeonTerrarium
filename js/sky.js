@@ -218,7 +218,7 @@ const comp = new THREE.ShaderMaterial({
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
-    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, nLifts:{value:0}, mtGap:{value:Array.from({ length: 16 }, () => new THREE.Vector4())}, mtN:{value:0}, mtGapY:{value:new THREE.Vector2()}, tSteam:{value:null}, tLiftMask:{value:null}, steamExt:{value:1}, nVents:{value:0},
+    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, nLifts:{value:0}, mtGap:{value:Array.from({ length: 16 }, () => new THREE.Vector4())}, mtN:{value:0}, mtGapY:{value:new THREE.Vector2()}, tSteam:{value:null}, tLiftMask:{value:null}, tShimTile:{value:null}, steamExt:{value:1}, nVents:{value:0},
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
@@ -226,7 +226,7 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform sampler2D tSteam; uniform sampler2D tLiftMask; uniform float steamExt; uniform int nVents; uniform float nLifts; uniform vec4 mtGap[16]; uniform int mtN; uniform vec2 mtGapY;
+    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform sampler2D tSteam; uniform sampler2D tLiftMask; uniform sampler2D tShimTile; uniform float steamExt; uniform int nVents; uniform float nLifts; uniform vec4 mtGap[16]; uniform int mtN; uniform vec2 mtGapY;
     uniform float night; uniform float smoothLook; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
@@ -282,13 +282,19 @@ const comp = new THREE.ShaderMaterial({
       float rd = rawD(vUv);
       // the pixel's line of sight (both shimmers march along it): from the near plane, and how far to what's drawn there
       vec3 o0 = vec3(0.0), dr0 = vec3(0.0, -1.0, 0.0); float tS = 0.0;
-      if (FX_SHIM > 0 && (nLifts > 0.5 || mtN > 0)){
+      // (which shimmers could reach this pixel at all: a coarse map of the screen, red the pads, green the metro cars,
+      // worked out each frame from where their boxes of air land on screen: see shimTiles. Elsewhere both add nothing)
+      bool shL = false, shM = false;
+      #if FX_SHIM
+      { vec4 shT = texture2D(tShimTile, vUv); shL = nLifts > 0.5 && shT.r > .5; shM = mtN > 0 && shT.g > .5; }
+      #endif
+      if (FX_SHIM > 0 && (shL || shM)){
         vec2 nd0 = vUv*2.0 - 1.0;
         vec4 a0 = invVP*vec4(nd0, -1.0, 1.0); a0 /= a0.w; vec4 b0 = invVP*vec4(nd0, 1.0, 1.0); b0 /= b0.w;
         o0 = a0.xyz; dr0 = normalize(b0.xyz - a0.xyz);
         vec4 f0 = invVP*vec4(nd0, rd*2.0 - 1.0, 1.0); f0 /= f0.w; tS = length(f0.xyz - o0);
       }
-      if (FX_SHIM > 0 && nLifts > 0.5){
+      if (FX_SHIM > 0 && shL){
         if (dr0.y < -0.01){
           float ta = (-1.72 - o0.y)/dr0.y, tf = (-3.9 - o0.y)/dr0.y, tb = min(tf, tS);
           // (could any pad be under this line at all? see liftMaskFor)
@@ -311,7 +317,7 @@ const comp = new THREE.ShaderMaterial({
       // Each car's gap is a box (mtGap: x, z, and the way it faces); the line of sight is sampled through the slab of
       // air at the gap's height, and wherever it passes through a box, that counts.
       float mtSh = 0.0;
-      if (FX_SHIM > 0 && mtN > 0){
+      if (FX_SHIM > 0 && shM){
         vec3 o1 = o0, d1 = dr0; float tS1 = tS;
         if (abs(d1.y) > 0.001){
           float ta = (mtGapY.y - o1.y)/d1.y, tb = (mtGapY.x - o1.y)/d1.y;
@@ -1015,6 +1021,38 @@ function liftShimmerCull(VP){
 // middle point could be that close to a pad's patch of the steam map (its disc, the texels the filtering reaches, a
 // little to spare). A pixel whose middle point lands in an unmarked cell would only read zeros all along its line, so
 // it skips the eight reads (same picture). Rebuilt when the pads change or the view tilts further than it was built for.
+// Where on screen the shimmers could show. Each pad's air (its disc, from y -3.95 to -1.67) and each metro car's gap
+// (a square round it, at the gap's height) is a box; the view is orthographic, so a pixel's line of sight passes through
+// a box only if the pixel lies inside the box's outline on screen, and so inside the rectangle round its eight corners.
+// The screen is cut into SHT_W x SHT_H tiles; a tile is marked (red: a pad, green: a car) if any such rectangle reaches
+// it. A pixel in an unmarked tile would only add zeros, so the composite skips that shimmer there (same picture).
+const SHT_W = 128, SHT_H = 64, SHT_DATA = new Uint8Array(SHT_W*SHT_H*4);
+const shimTileTex = new THREE.DataTexture(SHT_DATA, SHT_W, SHT_H, THREE.RGBAFormat);
+shimTileTex.minFilter = shimTileTex.magFilter = THREE.NearestFilter; shimTileTex.generateMipmaps = false;
+comp.uniforms.tShimTile.value = shimTileTex;
+const _shtR = [0, 0, 0, 0];
+function boxRect(VP, x0, x1, y0, y1, z0, z1){
+  let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity;
+  for (let q = 0; q < 8; q++){ _sbc.set(q & 1 ? x1 : x0, q & 2 ? y1 : y0, q & 4 ? z1 : z0).applyMatrix4(VP);
+    a = Math.min(a, _sbc.x); b = Math.max(b, _sbc.x); c = Math.min(c, _sbc.y); d = Math.max(d, _sbc.y); }
+  _shtR[0] = a; _shtR[1] = b; _shtR[2] = c; _shtR[3] = d; return _shtR;
+}
+function shtMark(r, ch){
+  // tiles whose span (in -1..1) meets the rectangle, with a little to spare for rounding
+  const e = .002, i0 = Math.max(0, Math.floor((r[0] - e + 1)*.5*SHT_W)), i1 = Math.min(SHT_W - 1, Math.floor((r[1] + e + 1)*.5*SHT_W));
+  const j0 = Math.max(0, Math.floor((r[2] - e + 1)*.5*SHT_H)), j1 = Math.min(SHT_H - 1, Math.floor((r[3] + e + 1)*.5*SHT_H));
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) SHT_DATA[(j*SHT_W + i)*4 + ch] = 255;
+}
+let shtAny = true;
+function shimTiles(VP){
+  const U_ = comp.uniforms;
+  if (!shtAny && U_.nLifts.value < .5 && U_.mtN.value <= 0) return;   // (nothing marked last time, nothing to mark now)
+  SHT_DATA.fill(0); shtAny = false;
+  if (U_.nLifts.value > .5) for (const [x, z, r] of STEAM_LIFTS){ shtMark(boxRect(VP, x - r, x + r, -3.95, -1.67, z - r, z + r), 0); shtAny = true; }
+  const y0 = U_.mtGapY.value.x - .05, y1 = U_.mtGapY.value.y + .05;
+  for (let k = 0; k < U_.mtN.value; k++){ const g = U_.mtGap.value[k]; shtMark(boxRect(VP, g.x - 1.2, g.x + 1.2, y0, y1, g.y - 1.2, g.y + 1.2), 1); shtAny = true; }
+  shimTileTex.needsUpdate = true;
+}
 const LIFT_MN = 256, LIFT_MDATA = new Uint8Array(LIFT_MN*LIFT_MN*4);
 const liftMaskTex = new THREE.DataTexture(LIFT_MDATA, LIFT_MN, LIFT_MN, THREE.RGBAFormat);
 liftMaskTex.minFilter = liftMaskTex.magFilter = THREE.NearestFilter; liftMaskTex.generateMipmaps = false;

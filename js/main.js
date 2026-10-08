@@ -101,7 +101,7 @@ function frame(now){
   }
   comp.uniforms.VP.value.copy(cam.projectionMatrix).multiply(cam.matrixWorldInverse);
   comp.uniforms.invVP.value.copy(comp.uniforms.VP.value).invert();
-  liftShimmerCull(comp.uniforms.VP.value); mtShimmerCull(comp.uniforms.VP.value);   // the air shimmers only where they can show
+  liftShimmerCull(comp.uniforms.VP.value); mtShimmerCull(comp.uniforms.VP.value); shimTiles(comp.uniforms.VP.value);   // the air shimmers only where they can show
   megaFxFlush(comp.uniforms.VP.value);   // and the megastructures' moving parts go up to the card only while they're on screen
   PH.lap('pass setup');
   PH.begin('night lights'); renderNightLights(comp.uniforms.night.value); PH.end();   // lamps and neon lighting the surfaces round them (sky.js)

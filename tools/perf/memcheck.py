@@ -42,13 +42,14 @@ def fmt(tag, r):
     return '%-10s JS heap %7.1f MB (total %7.1f)   graphics est %7.1f MB (textures %6.1f, buffers %6.1f, renderbuffers %5.1f)   three: %d geometries %d textures' % (tag, r['js'], r['jsTotal'], r['gfx'], r['tex'], r['buf'], r['rb'], r['geoms'], r['textures'])
 
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser(); ap.add_argument('scene'); ap.add_argument('--ref', default=None); ap.add_argument('--rounds', type=int, default=30); ap.add_argument('--zoom', type=float, default=30)
+    ap = argparse.ArgumentParser(); ap.add_argument('scene'); ap.add_argument('--ref', default=None); ap.add_argument('--rounds', type=int, default=30); ap.add_argument('--zoom', type=float, default=30); ap.add_argument('--no-edits', action='store_true', help='leave the building action out of the cycle')
     ap.add_argument('--sim', type=int, default=1200, help='frames simulated per round (60 a second)'); ap.add_argument('--draw', type=int, default=6, help='of those, frames drawn')
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
     srv = H.serve(); url = H.make_site('mem', a.ref); sc = H.load_scenes([a.scene])[0]
     ACTS = ['camGoal.x += 25', 'camGoal.z -= 25', 'yawT += 1.2', 'zoomT = 12', 'zoomT = %s' % a.zoom, 'camGoal.x -= 25; camGoal.z += 20', 'yawT -= 1.5', 'S.hour = (S.hour + 3) % 24',
             "const f = [...cells.values()].filter(c => c.sections.length && !c.mega).sort((x, y) => Math.hypot(x.x - camT.x, x.z - camT.z) - Math.hypot(y.x - camT.x, y.z - camT.z))[0]; if (f) addSection(f, 'mid');"]
+    if a.no_edits: ACTS = ACTS[:-1]
     with sync_playwright() as pw:
         br = pw.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-vsync', '--enable-precise-memory-info', '--js-flags=--expose-gc'])
         ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init=GL)

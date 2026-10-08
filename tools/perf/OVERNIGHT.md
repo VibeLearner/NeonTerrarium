@@ -62,3 +62,24 @@ is not the blit's state; then the pinned camera's depth (wet-ground search, shim
   either threshold, so v0 = 10 changes them little (re-checked in the final run, see the table).
 - Triangles drawn by the color pass during a fast spin (+3 rad, city, 1280x720): zoom 30: 35 to 49% fewer; zoom 15: 39 to 54% fewer (with v0 = 6).
   GPU time can only be read on the owner's machine: record a fast spin and a Q/E turn at zoom 30 with the test on and off.
+
+**4. Memory: measured; nothing grows, the 3 GB is the city's geometry.** (tools/perf/memcheck.py: max city, harness Chrome with SwiftShader at 1280x720,
+10 minutes of simulated play: a pan, turn, zoom, hour change or one build every 20 simulated seconds; JS heap after a forced collection; graphics bytes counted
+from the API calls: textures, buffers and renderbuffers asked for, minus those deleted, no mips or driver padding. Same script on both builds.)
+
+| | JS heap at load | after 10 min | graphics at load | after 10 min | three geometries at load / after |
+|---|---|---|---|---|---|
+| a7b4449 (before the cache) | 2,889 MB | 2,925 MB | 1,495 MB | 1,595 MB | 1,520 / 2,023 |
+| round 6 at item 3 (d44c52e, cache with ring) | 3,008 MB | 3,045 MB | 1,555 MB | 1,651 MB | 2,366 / 2,645 |
+| same build, no building in the cycle, 400 s | 3,008 MB | 3,045 MB (flat from 50 s: 3,036, 3,039, 3,038, 3,048, 3,050, 3,046, 3,046, 3,045) | 1,555 MB | 1,648 MB | 2,366 / 2,642 (2,574 at 50 s, then +60 in the next 100 s, +5 after) |
+
+- Both builds grow the same: +36 MB of JS heap and about +100 MB of graphics in 10 minutes, then flat. Without building, the geometry count rises for the first
+  two minutes (plots and plants are built as the camera reaches them) and stops. No leak in either build.
+- The cache build costs about +120 MB of JS heap and +60 MB of graphics at load (the second set of cache targets, +86 MB of textures, comes at the first
+  background redraw). Your 3.2 GB reading was mostly the max city itself: a7b4449 already shows 2.9 GB right after load.
+- Where the 3 GB is (tools/perf/heapsplit.py): Chrome's `performance.memory` counts the backing stores of typed arrays. Each geometry keeps its CPU copy of its
+  vertex data after upload: 2.4 GB in 7,970 geometries (positions 870 MB, indices 505, normals 303, window emissive data 283, colors 214, three flicker/on/fine
+  attributes 71 each). A plot's own meshes stay (hidden) next to the merged mesh of their region, so much of it is held twice; summing by owner, meshes that
+  are hidden account for 1.9 GB of a (double-counted) 4.2 GB. Dropping the CPU copies of merged meshes after upload would save a large part of it; I did not do it
+  (picking, edits and re-merging read those arrays; it needs a careful pass). Suggested as its own item.
+- The sampling heap profiler (tools/perf/heapsites.py) sees only 153 MB of ordinary JS objects (the building scan, roundedBox geometry, collect lists, plants).

@@ -25,7 +25,7 @@ if __name__ == '__main__':
         pg.wait_for_function('() => [...document.images].every(i => i.complete)'); pg.wait_for_timeout(2500)
         pg.add_script_tag(path=os.path.join(H.HERE, 'page.js')); pg.evaluate('sc => __perf.setup(sc)', sc)
         cdp.send('HeapProfiler.collectGarbage')
-        prof = cdp.send('HeapProfiler.getSamplingHeapProfile')['profile']
+        prof = cdp.send('HeapProfiler.getSamplingProfile')['profile']
         tot = collections.Counter(); cnt = 0
         def walk(n, stack):
             global cnt

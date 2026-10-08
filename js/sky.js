@@ -205,7 +205,10 @@ const PAL_HEX = ['#1B2A4A','#2C3A52','#4A5566','#C9B89A','#E3D6BD','#9EC4E0','#F
 // the star map view: SKY_EL is the elevation at the middle of the screen, SKY_H half the screen's height (radians),
 // SKY_TURN how far the sky turns for each turn of the camera
 const SKY_EL = .3, SKY_H = .5, SKY_TURN = 1, SKY_DRIFT = 0;   // a real sky: fixed around the world, so turning the camera looks at another part of it; panning never moves it (it's infinitely far away)
+// (FX_*: each effect can be compiled out of the shader altogether when it's off: see compVariant)
+const COMP_FX = ['SHIM', 'OUTLINE', 'AO', 'NL', 'RIM', 'WET', 'CLOUDS', 'MIST', 'RAYS', 'RAIN', 'PAL'];
 const comp = new THREE.ShaderMaterial({
+  defines: Object.fromEntries(COMP_FX.map(f => ['FX_' + f, 1])),
   uniforms: {
     tColor:{value:null}, tDepth:{value:null}, tNormal:{value:null}, res:{value:new THREE.Vector2(1,1)},
     near:{value:NEAR}, far:{value:FAR}, camDist:{value:CAM_DIST}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
@@ -272,13 +275,13 @@ const comp = new THREE.ShaderMaterial({
       float rd = rawD(vUv);
       // the pixel's line of sight (both shimmers march along it): from the near plane, and how far to what's drawn there
       vec3 o0 = vec3(0.0), dr0 = vec3(0.0, -1.0, 0.0); float tS = 0.0;
-      if (nLifts > 0.5 || mtN > 0){
+      if (FX_SHIM > 0 && (nLifts > 0.5 || mtN > 0)){
         vec2 nd0 = vUv*2.0 - 1.0;
         vec4 a0 = invVP*vec4(nd0, -1.0, 1.0); a0 /= a0.w; vec4 b0 = invVP*vec4(nd0, 1.0, 1.0); b0 /= b0.w;
         o0 = a0.xyz; dr0 = normalize(b0.xyz - a0.xyz);
         vec4 f0 = invVP*vec4(nd0, rd*2.0 - 1.0, 1.0); f0 /= f0.w; tS = length(f0.xyz - o0);
       }
-      if (nLifts > 0.5){
+      if (FX_SHIM > 0 && nLifts > 0.5){
         if (dr0.y < -0.01){
           float ta = (-1.72 - o0.y)/dr0.y, tb = min((-3.9 - o0.y)/dr0.y, tS);
           if (tb > ta){
@@ -300,7 +303,7 @@ const comp = new THREE.ShaderMaterial({
       // Each car's gap is a box (mtGap: x, z, and the way it faces); the line of sight is sampled through the slab of
       // air at the gap's height, and wherever it passes through a box, that counts.
       float mtSh = 0.0;
-      if (mtN > 0){
+      if (FX_SHIM > 0 && mtN > 0){
         vec3 o1 = o0, d1 = dr0; float tS1 = tS;
         if (abs(d1.y) > 0.001){
           float ta = (mtGapY.y - o1.y)/d1.y, tb = (mtGapY.x - o1.y)/d1.y;
@@ -362,6 +365,7 @@ const comp = new THREE.ShaderMaterial({
       } else {
         float d = near + rd*(far-near);
         n = N(vUv);
+        #if FX_OUTLINE
         // the four neighbours' depths, read once for both outline tests
         float dR = D(vUv+vec2(px.x,0.0)), dL = D(vUv-vec2(px.x,0.0)), dU = D(vUv+vec2(0.0,px.y)), dB = D(vUv-vec2(0.0,px.y));
         float dd = 0.0;
@@ -375,11 +379,14 @@ const comp = new THREE.ShaderMaterial({
         // zoomed out: crease lines inside shapes fade away and silhouettes soften, so the city doesn't turn to noise
         float k = dei > 0.0 ? 1.0 - 0.5*dei*(1.0 - 0.5*lodLines) : 1.0 + 0.4*nei*(1.0 - lodLines);
         col = c.rgb * mix(1.0, k, outlines);
+        #else
+        col = c.rgb;
+        #endif
         // Ambient occlusion: soft darkening in creases (the foot of a wall, under a ledge, inside a corner). For pairs
         // of samples on opposite sides of the pixel, a crease is where this pixel lies further away than the average
         // of the two (a flat or sloping surface gives none); pairs that jump to something far nearer (an edge in front)
         // are skipped. Two radii, four directions; stepped and dithered to stay pixel art.
-        if (aoI > 0.0){
+        if (FX_AO > 0 && aoI > 0.0){
           float occ = 0.0;
           for (int r = 0; r < 2; r++){
             float rp = r == 0 ? 2.0 : 5.0;
@@ -401,6 +408,7 @@ const comp = new THREE.ShaderMaterial({
         // light from the city's own lamps, neon and windows falling on the surfaces round them (the night-light
         // pass, below): tinted by each surface's colour, with a little added so dark walls still pick it up; stepped
         // and dithered so it stays pixel art
+        #if FX_NL
         { vec3 lt = texture2D(tLight, vUv).rgb;
           lt = smoothLook > .5 ? lt : floor(lt*14.0 + bayer(gl_FragCoord.xy)*.99)/14.0;
           float lum = dot(c.rgb, vec3(.299, .587, .114));
@@ -409,7 +417,8 @@ const comp = new THREE.ShaderMaterial({
           // bright surfaces (signs, windows) get none
           vec3 add = min(lt*c.rgb*2.6, vec3(.22));
           col += add*(1.0 - smoothstep(.3, .6, lum)); }
-        if (rimI > 0.01){
+        #endif
+        if (FX_RIM > 0 && rimI > 0.01){
           vec2 sd2 = sunV.xy; float sl = length(sd2);
           if (sl > 0.05){
             sd2 /= sl;
@@ -433,7 +442,7 @@ const comp = new THREE.ShaderMaterial({
       float DK = 95.0/(far - near);   // depth tolerances below were set for a 95-unit depth range
       // ---- wet ground: bright lights (neon, windows, lamps) leave vertical streaks on wet pavement ----
       // Not a mirror: dull walls barely show, and only crisp puddle patches reflect clearly. No ripples or jitter.
-      if (rd < 0.99999 && wet > 0.0 && dot(n, upView) > 0.93){
+      if (FX_WET > 0 && rd < 0.99999 && wet > 0.0 && dot(n, upView) > 0.93){
         vec3 wp = ro + rdir*tEnd;
         float pud = step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
         pud *= 0.35 + 0.65*rainOn;
@@ -461,7 +470,7 @@ const comp = new THREE.ShaderMaterial({
           col = mix(col, mix(skyBot, skyTop, 0.5)*0.7, 0.35*pud*wet*2.0);   // puddles show the sky when nothing is above
         }
       }
-      if (cloudOn > 0.5 && rd >= 0.99999){
+      if (FX_CLOUDS > 0 && cloudOn > 0.5 && rd >= 0.99999){
         // clouds come from their own lower-resolution pass (see cloudMat), upscaled with crisp pixels. They're the
         // background: drawn only where the sky shows, never over the island or anything on it (or hanging under it),
         // and over the stars, which are further back still
@@ -476,7 +485,7 @@ const comp = new THREE.ShaderMaterial({
       // grate, spreading and thinning as it rises, gone by about 4.5. So there's no limit on vents and the cost doesn't
       // grow with them. It mostly adds the light it scatters and hides little, so people stay visible: by day it's lit
       // by the sun where the shadow map says the sun reaches, at night it takes the colours the lamps and neon throw.
-      if (mistI > 0.0 && nVents > 0 && rd < 0.99999){
+      if (FX_MIST > 0 && mistI > 0.0 && nVents > 0 && rd < 0.99999){
         vec3 hit = ro + rdir*tEnd;
         float y0 = 4.5, y1 = -0.1;
         float ta = max(0.0, (y0 - ro.y)/min(rdir.y, -0.001)), tb = min(tEnd, (y1 - ro.y)/min(rdir.y, -0.001));
@@ -503,7 +512,7 @@ const comp = new THREE.ShaderMaterial({
           col = col*mix(1.0, T, .6) + acc;
         }
       }
-      if (raysOn > 0.5 && rayI > 0.01){
+      if (FX_RAYS > 0 && raysOn > 0.5 && rayI > 0.01){
         // light shafts: haze near the island lit wherever the shadow map says the sun gets through
         float t0 = max(0.0, (12.0 - ro.y)/min(rdir.y, -0.001)), t1 = min(tEnd, (-0.5 - ro.y)/min(rdir.y, -0.001));
         // (the haze is only within 13 units of glowC: a line of sight that never comes that close adds exactly nothing,
@@ -527,7 +536,7 @@ const comp = new THREE.ShaderMaterial({
       // Each layer sits at a depth: buildings in front of it hide its drops, so rain falls between and behind
       // things instead of lying on the screen. Layers are tied to the world (they slide with the view when it pans
       // or turns, nearer layers more), fall along one slant, and splash on wet ground.
-      if (rainOn > 0.5){
+      if (FX_RAIN > 0 && rainOn > 0.5){
         vec3 rc = mix(vec3(0.72, 0.8, 0.92), vec3(0.45, 0.55, 0.78), night);
         for (int L=0; L<3; L++){
           float fl = float(L);
@@ -556,7 +565,7 @@ const comp = new THREE.ShaderMaterial({
         float pulse = .7 + .2*sin(time*3.5 + vUv.x*res.x*.02) + .1*sin(time*7.0 + vUv.y*res.y*.03);   // a slow breathing, drifting across it
         col += vec3(.2, .55, 1.0)*s3*pulse*.6;
       }
-      if (palOn > 0.5){
+      if (FX_PAL > 0 && palOn > 0.5){
         vec3 best = pal[0]; float bd = 1e9;
         for (int i=0; i<${PAL_HEX.length}; i++){ vec3 df = col - pal[i]; float dist = dot(df*df, vec3(0.3,0.59,0.11)); if (dist < bd){ bd = dist; best = pal[i]; } }
         col = best;
@@ -565,6 +574,22 @@ const comp = new THREE.ShaderMaterial({
     }`,
   depthTest:false, depthWrite:false,
 });
+// The composite as one shader holding every effect is big, and the graphics card sets aside room for all of it even for
+// the effects that are off and skipped. Test (the overlay, exact mode): compiled with only the effects that are on this
+// frame, the rest left out of the program entirely (each left out only when it would have done nothing: same picture);
+// or with none at all, to see the floor. Programs are kept, so switching back and forth costs nothing after the first.
+let compKey = '';
+function compVariant(){
+  const T = PH.tests, u = comp.uniforms, on = {};
+  if (T.compFloor) for (const f of COMP_FX) on[f] = false;
+  else if (T.compMatch){
+    on.SHIM = u.nLifts.value > .5 || u.mtN.value > 0; on.OUTLINE = u.outlines.value > 0; on.AO = u.aoI.value > 0; on.NL = NL_UNI.lightI.value > 0;
+    on.RIM = u.rimI.value > .01; on.WET = u.wet.value > 0; on.CLOUDS = u.cloudOn.value > .5; on.MIST = u.mistI.value > 0 && u.nVents.value > 0;
+    on.RAYS = u.raysOn.value > .5 && u.rayI.value > .01; on.RAIN = u.rainOn.value > .5; on.PAL = u.palOn.value > .5;
+  }
+  const key = COMP_FX.map(f => on[f] === false ? 0 : 1).join('');
+  if (key !== compKey){ compKey = key; for (const f of COMP_FX) comp.defines['FX_' + f] = on[f] === false ? 0 : 1; comp.needsUpdate = true; }
+}
 const compScene = new THREE.Scene(), compCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
 compScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), comp));
 

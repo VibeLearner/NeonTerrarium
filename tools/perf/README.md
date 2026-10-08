@@ -17,6 +17,16 @@ python3 tools/perf/maxcity_gen.py                 # rebuild scenes/maxcity.json 
 megastructure, two metros and three highways (about 10,000 people). Its full script takes over an hour here, so run it
 with `PERF_STEPS`.
 
+On a machine with a real graphics card, `PERF_GPU=1` runs it in that machine's own Google Chrome (`pip install
+playwright pillow numpy`; no browser download needed), in visible windows, many times quicker:
+
+```
+PERF_GPU=1 python3 tools/perf/harness.py diff --base main --ref wip/shadow-strips --quick --only city megas dense
+PERF_GPU=1 PERF_STEPS=noon_f1,noon_f120,night_23h_rain,night_zoom_out python3 tools/perf/harness.py diff --base main --ref wip/shadow-strips --quick --only maxcity
+```
+
+Compare two builds on the same machine: a different graphics card can round a few pixels differently.
+
 Needs Python Playwright with Chromium and PIL. three.js r128 is fetched once with `npm pack` into `.cache/` (gitignored).
 
 ## How it stays deterministic

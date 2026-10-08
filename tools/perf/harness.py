@@ -87,6 +87,10 @@ def serve():
 
 
 def launch(pw):
+    # PERF_GPU=1: the machine's own Google Chrome on its real graphics card, in a visible window (much quicker than
+    # SwiftShader; compare two builds on the same machine, since another card may round a few pixels differently)
+    if os.environ.get('PERF_GPU'):
+        return pw.chromium.launch(channel='chrome', headless=False, args=['--disable-gpu-vsync', '--disable-frame-rate-limit', '--autoplay-policy=user-gesture-required'])
     return pw.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-vsync', '--autoplay-policy=user-gesture-required'])
 
 

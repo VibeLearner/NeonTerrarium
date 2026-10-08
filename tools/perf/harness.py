@@ -94,7 +94,7 @@ def launch(pw):
     return pw.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-vsync', '--autoplay-policy=user-gesture-required'])
 
 
-def open_game(browser, url, scene, vp, sc_mode=None):
+def open_game(browser, url, scene, vp, sc_mode=None, extra_init=None):
     ctx = browser.new_context(viewport={'width': vp[0], 'height': vp[1]}, device_scale_factor=1)
     pg = ctx.new_page()
     pg.set_default_timeout(1800000)
@@ -103,6 +103,7 @@ def open_game(browser, url, scene, vp, sc_mode=None):
     pg.add_init_script('window.__PERF_SCENE = ' + json.dumps({'storage': scene.get('storage', {})}) + ';')
     if sc_mode:   # the static cache's mode (see js/staticcache.js); PERF_SC_BASE_MODE for the baseline, PERF_SC_MODE for the candidate
         pg.add_init_script('window.__SC_MODE = ' + json.dumps(sc_mode) + ';')
+    if extra_init: pg.add_init_script(extra_init)
     pg.add_init_script(path=os.path.join(HERE, 'shim.js'))
     pg.goto('http://127.0.0.1:%d%s' % (PORT, url))
     pg.wait_for_function('() => document.readyState === "complete" && typeof frame === "function"')
@@ -199,8 +200,8 @@ def steps(scene):
     return s
 
 
-def run_scene(browser, url, scene, vp, keep_png=True, sc_mode=None):
-    ctx, pg, errs = open_game(browser, url, scene, vp, sc_mode)
+def run_scene(browser, url, scene, vp, keep_png=True, sc_mode=None, extra_init=None):
+    ctx, pg, errs = open_game(browser, url, scene, vp, sc_mode, extra_init)
     caps = []
     for st in steps(scene):
         label, n, js = st[:3]; draw = st[3] if len(st) > 3 else 0
@@ -253,7 +254,7 @@ def cmd_diff(base_ref, cand_ref, only, quick):
                 t0 = time.time()
                 # (a fresh browser for each build: two heavy scenes one after the other in one browser can lose its page)
                 br.close(); br = launch(pw); cb, eb = run_scene(br, ub, sc, vp, sc_mode=os.environ.get('PERF_SC_BASE_MODE'))
-                br.close(); br = launch(pw); cc, ec = run_scene(br, uc, sc, vp, sc_mode=os.environ.get('PERF_SC_MODE'))
+                br.close(); br = launch(pw); cc, ec = run_scene(br, uc, sc, vp, sc_mode=os.environ.get('PERF_SC_MODE'), extra_init=os.environ.get('PERF_CAND_INIT'))   # (PERF_CAND_INIT: JS run before the candidate's scripts, e.g. window.__FULL_RATE = true;)
                 if eb or ec:
                     fails.append('%s page errors: base %s cand %s' % (tag, eb[:2], ec[:2]))
                 for (lb, a), (lc, b) in zip(cb, cc):

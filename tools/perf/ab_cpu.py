@@ -7,7 +7,7 @@ import argparse, json, os, statistics, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import harness as H
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser(); ap.add_argument('scene'); ap.add_argument('--a', required=True); ap.add_argument('--zoom', type=float, default=30); ap.add_argument('--rounds', type=int, default=3); ap.add_argument('--frames', type=int, default=60)
+    ap = argparse.ArgumentParser(); ap.add_argument('scene'); ap.add_argument('--a', default=None, help='a git ref (default: the working tree)'); ap.add_argument('--a-init', default=None); ap.add_argument('--b-init', default=None); ap.add_argument('--zoom', type=float, default=30); ap.add_argument('--rounds', type=int, default=3); ap.add_argument('--frames', type=int, default=60)
     ap.add_argument('--b', default=None, help='a git ref instead of the working tree'); ap.add_argument('--warm', type=int, default=40)
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
@@ -16,7 +16,7 @@ if __name__ == '__main__':
     with sync_playwright() as pw:
         for r in range(a.rounds):
             for tag, url in ((('A', ua), ('B', ub)) if r % 2 == 0 else (('B', ub), ('A', ua))):   # (the order alternates)
-                br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[1])
+                br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[1], extra_init=(a.a_init if tag == 'A' else a.b_init))
                 pg.evaluate('z => { zoom = zoomT = z; }', a.zoom); pg.evaluate('n => __perf.cap(n)', a.warm)
                 out = pg.evaluate('n => __perf.cpuTime(n)', a.frames)
                 res[tag].append({k: v['mean'] for k, v in out.items()}); br.close()

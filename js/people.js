@@ -984,6 +984,8 @@ function mtPlaces(fresh, oldDoors, addEnd){
 }
 
 /* ---------- keeping up with the city ---------- */
+const PPL_NMAX = 4, PPL_CURSOR_PX = 90;
+const PPLRATE = { n: 1, hist: [0, 0, 0, 0, 0] };   // (n: how often a typical walker is stepped now, and the collision check runs; hist: people at each rate)
 let pplFrame = 0, pplGoneN = 0;   // (pplGoneN: people marked gone and not yet removed)
 const _op = new THREE.Vector3();
 // is a ground point well off the screen from any height people can be at (screen x doesn't depend on height; y does)
@@ -1772,7 +1774,7 @@ function updatePeople(dt, t){
   updateLurkers(dt, t);
   updateClubs(dt, t);
   PH.sub('people: bots, lurkers, clubs');
-  checkBumps(t);
+  if (PH.tests.fullRate || window.__FULL_RATE || PPLRATE.n <= 1 || pplFrame % PPLRATE.n === 0) checkBumps(t);   // (every PPLRATE.n-th frame (last frame's typical rate) when people are small: the pass looks at everyone, and a meeting lasts many frames)
   PH.sub('people: bumps');
   // fill the draw batch with everyone on show
   const pos = pplMesh.geometry.attributes.aPos, spr = pplMesh.geometry.attributes.aSpr, P = pos.array, Q = spr.array;
@@ -1798,10 +1800,44 @@ function updatePeople(dt, t){
   // (W5.1) Anyone well off screen is worked on every fourth frame, with the time of the frames skipped (their walks go on at
   // the same speed; they arrive, and pick what's next, a few frames later). Lifts, clubs and the metro always run.
   PH.sub('people: lifts');
-  const dt0 = dt; let pi = 0; pplFrame++;
+  const dt0 = dt; let pi = 0, idx = -1; pplFrame++;
+  // (round 6) How often a person is stepped depends on how big they are on screen: one step may move them about .75 of a render
+  // pixel at most (their speed, times the frame time, over the size of a render pixel at this zoom), so up close it is every
+  // frame and zoomed out every second to fourth. The steps are spread evenly (person i on the frames where (frame + i) % N is 0),
+  // the time of the frames between goes to the next step, the sprites are drawn every frame from what the last step left, and the
+  // collision check runs at the same rate. Lifts, clubs, the metro and anyone riding, and anyone near the cursor, stay every frame.
+  // (Overlay test "people at full rate": the way it was, W5.1 only.)
+  const full = PH.tests.fullRate || window.__FULL_RATE;
+  const rpx = 2*zoom/H, dtq = Math.max(1/240, Math.round(dt0*240)/240), reach = .75*rpx/dtq;   // (world units one step may move a person)
+  const nTyp = full ? 1 : Math.max(1, Math.min(PPL_NMAX, Math.floor(reach/PPL_SPEED)));
+  PPLRATE.n = nTyp; PPLRATE.hist.fill(0);
+  let cux = NaN, cuy = NaN;
+  if (!full && nTyp > 1 && ptrLast){ const r = canvas.getBoundingClientRect(); cux = ((ptrLast.x - r.left)/r.width)*2 - 1; cuy = -((ptrLast.y - r.top)/r.height)*2 + 1; }
+  const ve2 = comp.uniforms.VP.value.elements, curR2 = (PPL_CURSOR_PX/(H/2))**2;   // (the cursor's radius in clip units of the height)
+  const aspect = W/H;
   for (const p of pplList){
-    if (!PH.tests.noSlowFar && !p.ride && !p.club && !p.metro && p.x !== undefined && ((pplFrame + pi++) & 3) && offScreen(p.x, p.z)){ p.acc = (p.acc || 0) + dt0; continue; }
+    idx++;
+    if (full){
+      if (!PH.tests.noSlowFar && !p.ride && !p.club && !p.metro && p.x !== undefined && ((pplFrame + pi++) & 3) && offScreen(p.x, p.z)){ p.acc = (p.acc || 0) + dt0; continue; }
+    } else if (!p.ride && !p.club && !p.metro && p.x !== undefined){
+      const fac = p.rush ? 2.3 : p.hurry ? 1.6 : 1;
+      let Nn = Math.max(1, Math.min(PPL_NMAX, Math.floor(reach/(p.speed*fac))));
+      if (!PH.tests.noSlowFar && Nn < 4 && offScreen(p.x, p.z)) Nn = 4;   // (W5.1)
+      if (Nn > 1 && cux === cux){   // near the cursor: where the player is looking
+        const x = p.x, z = p.z, sx = ve2[0]*x + ve2[8]*z + ve2[12], sy = ve2[1]*x + ve2[9]*z + ve2[13];
+        if (((sx - cux)*aspect)**2 + (sy - cuy)**2 < curR2) Nn = 1; }
+      PPLRATE.hist[Nn]++;
+      if (Nn > 1 && (pplFrame + idx) % Nn){
+        p.acc = (p.acc || 0) + dt0;
+        if (p._ec){   // drawn every frame from what the last step left
+          emit(p.x, p._ey, p.z, p._er, p._ef, p.flip, p._ea);
+          if (p._eoOn && p.emoUntil > t) emit(p.x, p._ey + p._eo, p.z, ROW_EMO, p.emo, 1, 2); }
+        if (p._holo) holoOn.push(p._holo);
+        if (p._pic) picOn.add(p._pic);
+        continue; }
+    }
     const dt = dt0 + (p.acc || 0); p.acc = 0;
+    p._ec = 0; p._holo = null; p._pic = null;
     let alpha = 1, walking = false, y = CURB, frame = 0;
     const paused = p.pause > t;
     if (p.ride){ const r = liftRide(p, dt, t); if (r){ emit(r.x, r.y, r.z, p.row, r.frame, p.flip, r.alpha); continue; } }
@@ -1846,9 +1882,9 @@ function updatePeople(dt, t){
         p.x = sp.x; p.z = sp.z; y = sp.y;
         let face = sp.face, gest = false;
         if (sp.kind === 'seat'){ y = sp.y - .09; frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4;
-          if (sp.act === 'holo'){ face = [sp.hx - sp.x, sp.hz - sp.z]; holoOn.push(sp);   // watching the show
+          if (sp.act === 'holo'){ face = [sp.hx - sp.x, sp.hz - sp.z]; holoOn.push(p._holo = sp);   // watching the show
             if (!(p.emoUntil > t) && pplRand() < dt*.03) emote(p, pplRand() < .5 ? 'bang' : 'note', 2); }
-          else if (sp.act){ if (sp.pic) picOn.add(sp.pic.x.toFixed(2) + ',' + sp.pic.z.toFixed(2) + '|' + sp.pic.ry.toFixed(3) + '|' + sp.pic.col);
+          else if (sp.act){ if (sp.pic){ const pk = sp.pic.x.toFixed(2) + ',' + sp.pic.z.toFixed(2) + '|' + sp.pic.ry.toFixed(3) + '|' + sp.pic.col; picOn.add(pk); p._pic = pk; }
             const mate = sp.near.find(o => o.by && people.get(o.by) && !people.get(o.by).walk);
             if (mate) face = [mate.x - sp.x, mate.z - sp.z];
             if (!(p.emoUntil > t)){
@@ -1874,6 +1910,7 @@ function updatePeople(dt, t){
       if (u > .8 && !p.walk.puke.left){ p.walk.puke.left = true; pukes.push({ x: p.walk.puke.x, z: p.walk.puke.z, t0: t, sx: p.x, sz: p.z }); } }
     if (p.cop && p.angry > t) frame = F_ANGRY + Math.min(5, Math.floor((t - p.angry + .9)*7));
     if (p.row === ROW_HOOD && frame >= F_SPEC) frame = F_IDLE + (frame % 4);   // (the archivist has walk and idle frames only)
+    p._ec = 1; p._ey = y; p._er = p.cop ? ROW_COP : p.row; p._ef = frame; p._ea = Math.max(0, alpha); p._eo = frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8; p._eoOn = alpha > .9;   // (what a frame between steps draws again)
     if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
   }

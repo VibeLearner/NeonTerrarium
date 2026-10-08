@@ -254,8 +254,9 @@ const comp = new THREE.ShaderMaterial({
     vec3 N(vec2 uv){ return texture2D(tNormal, uv).rgb*2.0-1.0; }
     // arithmetic hash (no sin): the sin trick loses precision on some GPUs and lines the stars up in streaks
     float hash(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
-    float ne(vec2 o, float d, vec3 n){
-      float dd = D(vUv+o) - d; vec3 nn = N(vUv+o);
+    // (dn: the neighbour's depth, already read for the silhouette test)
+    float ne(vec2 o, float dn, float d, vec3 n){
+      float dd = dn - d; vec3 nn = N(vUv+o);
       float nd = dot(n-nn, vec3(1.0,1.0,1.0));
       float ni = clamp(smoothstep(-0.01, 0.01, nd), 0.0, 1.0);
       float di = clamp(sign(dd*0.25 + 0.01), 0.0, 1.0);
@@ -321,7 +322,7 @@ const comp = new THREE.ShaderMaterial({
         }
       }
       vec4 c = texture2D(tColor, sUv);
-      vec3 col;
+      vec3 col; vec3 n = vec3(0.0, 0.0, 1.0);   // (the normal: read once, used by the outlines, the wet streaks and the splashes)
       if (rd >= 0.99999){
         // pastel pixel-art sky: the gradient in ten flat bands, with only a thin dithered seam where two meet
         float tb = smoothstep(0.05, 0.95, vUv.y)*10.0, fb = fract(tb);
@@ -360,14 +361,16 @@ const comp = new THREE.ShaderMaterial({
         col = sky + vec3(star) + c.rgb;
       } else {
         float d = near + rd*(far-near);
-        vec3 n = N(vUv);
+        n = N(vUv);
+        // the four neighbours' depths, read once for both outline tests
+        float dR = D(vUv+vec2(px.x,0.0)), dL = D(vUv-vec2(px.x,0.0)), dU = D(vUv+vec2(0.0,px.y)), dB = D(vUv-vec2(0.0,px.y));
         float dd = 0.0;
-        dd += clamp(D(vUv+vec2(px.x,0.0)) - d, 0.0, 1.0);
-        dd += clamp(D(vUv-vec2(px.x,0.0)) - d, 0.0, 1.0);
-        dd += clamp(D(vUv+vec2(0.0,px.y)) - d, 0.0, 1.0);
-        dd += clamp(D(vUv-vec2(0.0,px.y)) - d, 0.0, 1.0);
+        dd += clamp(dR - d, 0.0, 1.0);
+        dd += clamp(dL - d, 0.0, 1.0);
+        dd += clamp(dU - d, 0.0, 1.0);
+        dd += clamp(dB - d, 0.0, 1.0);
         float dei = floor(smoothstep(0.25, 0.55, dd)*2.0)/2.0;
-        float nei = ne(vec2(px.x,0.0), d, n) + ne(vec2(-px.x,0.0), d, n) + ne(vec2(0.0,px.y), d, n) + ne(vec2(0.0,-px.y), d, n);
+        float nei = ne(vec2(px.x,0.0), dR, d, n) + ne(vec2(-px.x,0.0), dL, d, n) + ne(vec2(0.0,px.y), dU, d, n) + ne(vec2(0.0,-px.y), dB, d, n);
         nei = step(0.1, nei);
         // zoomed out: crease lines inside shapes fade away and silhouettes soften, so the city doesn't turn to noise
         float k = dei > 0.0 ? 1.0 - 0.5*dei*(1.0 - 0.5*lodLines) : 1.0 + 0.4*nei*(1.0 - lodLines);
@@ -430,7 +433,7 @@ const comp = new THREE.ShaderMaterial({
       float DK = 95.0/(far - near);   // depth tolerances below were set for a 95-unit depth range
       // ---- wet ground: bright lights (neon, windows, lamps) leave vertical streaks on wet pavement ----
       // Not a mirror: dull walls barely show, and only crisp puddle patches reflect clearly. No ripples or jitter.
-      if (rd < 0.99999 && wet > 0.0 && dot(N(vUv), upView) > 0.93){
+      if (rd < 0.99999 && wet > 0.0 && dot(n, upView) > 0.93){
         vec3 wp = ro + rdir*tEnd;
         float pud = step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
         pud *= 0.35 + 0.65*rainOn;
@@ -540,7 +543,7 @@ const comp = new THREE.ShaderMaterial({
           col = mix(col, rc, on*(0.42 - fl*0.1));
         }
         // splashes: single pixels that flash on up-facing surfaces, fixed to the ground so they don't swim
-        if (rd < 0.99999 && dot(N(vUv), upView) > 0.9){
+        if (rd < 0.99999 && dot(n, upView) > 0.9){
           vec3 wp = ro + rdir*tEnd;
           vec2 sc = floor(wp.xz*7.0);
           float ph = fract(time*1.7 + hash(sc)*7.0);

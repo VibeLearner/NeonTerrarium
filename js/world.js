@@ -97,7 +97,16 @@ ATLAS.onBeforeCompile = sh => {
     .replace('#include <begin_vertex>', '#include <begin_vertex>\nint ek = int(aEm.a*255.0 + .5); if (ek == 0) vEmis = vec3(0.0); else { float lon = ek >= 1 && ek <= 4 ? litOn(aOn, lightsOn, fTime) : 1.0; vEmis = aEm.rgb * mix(ek == 1 ? .22*(1.0 - .6*lightsOn) : 0.0, emI[ek], lon) * flicker(aFlk, fTime);   // a switched-off window is just a dim room (and most corners don\'t glow at all: nothing to work out)\nif (ek == 6) vEmis *= mix(0.05, 1.0, blink((modelMatrix * vec4(transformed, 1.0)).y, fTime)); }');
   sh.fragmentShader = sh.fragmentShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vEmis;')
-    .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = vEmis;');
+    .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = vEmis;')
+    // The light's three bands worked out instead of looked up: the gradient texture (core.js) is three texels, read
+    // nearest, so the band is which third of 0..1 the light falls in, and its brightness the texel's value. The same
+    // numbers, one texture read less for every pixel of every building (and at this size, many pixels are shaded
+    // several times over: a triangle smaller than a pixel still costs a few).
+    .replace('#include <gradientmap_pars_fragment>', `uniform sampler2D gradientMap;
+vec3 getGradientIrradiance( vec3 normal, vec3 lightDirection ){
+  float u = dot( normal, lightDirection )*0.5 + 0.5, i = clamp( floor( u*3.0 ), 0.0, 2.0 );
+  return vec3( i < 0.5 ? ${gData[0]}.0/255.0 : i < 1.5 ? ${gData[4]}.0/255.0 : ${gData[8]}.0/255.0 );
+}`);
   if (ATLAS_TEST.lean){   // the view position isn't used by these lights with this camera: not passed at all (same picture)
     sh.vertexShader = sh.vertexShader.replace('varying vec3 vViewPosition;', '').replace('vViewPosition = - mvPosition.xyz;', '');
     sh.fragmentShader = sh.fragmentShader.replace('#include <lights_toon_pars_fragment>', THREE.ShaderChunk.lights_toon_pars_fragment.replace('varying vec3 vViewPosition;', 'const vec3 vViewPosition = vec3( 0.0, 0.0, 1.0 );'));

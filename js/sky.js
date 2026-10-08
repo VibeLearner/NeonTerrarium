@@ -758,21 +758,22 @@ function makeGlowTargets(){
   rtB = [0, 1].map(() => new THREE.WebGLRenderTarget(qw, qh, lin));
   rtHal = [0, 1].map(() => new THREE.WebGLRenderTarget(ew, eh, lin));
 }
-function glowPass(mat, target){ glowQuad.material = mat; renderer.setRenderTarget(target); renderer.render(glowScene, compCam); }
+// (name: how the performance overlay's exact timing lists this pass, perfhud.js)
+function glowPass(mat, target, name){ PH.begin(name, true); glowQuad.material = mat; renderer.setRenderTarget(target); renderer.render(glowScene, compCam); PH.end(); }
 // run after the composite has been drawn into rtOut; leaves the finished frame in rtFinal
 function renderGlow(){
   glowMix.uniforms.on.value = S.bloom ? 1 : 0;
   glowMix.uniforms.lit.value = NL_UNI.lightI.value > 0 ? Math.min(1, NL_UNI.lightI.value/.6) : 0;   // how much night light there is
-  if (!S.bloom){ glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = rtB[0].texture; glowMix.uniforms.tH.value = rtHal[0].texture; glowPass(glowMix, rtFinal); return; }   // no bloom, but still graded
+  if (!S.bloom){ glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = rtB[0].texture; glowMix.uniforms.tH.value = rtHal[0].texture; glowPass(glowMix, rtFinal, 'grade (no bloom)'); return; }   // no bloom, but still graded
   const [b0, b1] = rtB, [h0, h1] = rtHal;
-  glowPick.uniforms.t.value = rtOut.texture; glowPick.uniforms.texel.value.set(1/W, 1/H); glowPass(glowPick, b0);
-  glowBlur.uniforms.t.value = b0.texture; glowBlur.uniforms.dir.value.set(1/b0.width, 0); glowPass(glowBlur, b1);
-  glowBlur.uniforms.t.value = b1.texture; glowBlur.uniforms.dir.value.set(0, 1/b0.height); glowPass(glowBlur, b0);
-  glowCopy.uniforms.t.value = b0.texture; glowPass(glowCopy, h0);   // halation: the bloom, smaller and blurred twice as wide
-  glowBlur.uniforms.t.value = h0.texture; glowBlur.uniforms.dir.value.set(2/h0.width, 0); glowPass(glowBlur, h1);
-  glowBlur.uniforms.t.value = h1.texture; glowBlur.uniforms.dir.value.set(0, 2/h0.height); glowPass(glowBlur, h0);
+  glowPick.uniforms.t.value = rtOut.texture; glowPick.uniforms.texel.value.set(1/W, 1/H); glowPass(glowPick, b0, 'bloom: pick bright');
+  glowBlur.uniforms.t.value = b0.texture; glowBlur.uniforms.dir.value.set(1/b0.width, 0); glowPass(glowBlur, b1, 'bloom: blur across');
+  glowBlur.uniforms.t.value = b1.texture; glowBlur.uniforms.dir.value.set(0, 1/b0.height); glowPass(glowBlur, b0, 'bloom: blur down');
+  glowCopy.uniforms.t.value = b0.texture; glowPass(glowCopy, h0, 'halation: shrink');   // halation: the bloom, smaller and blurred twice as wide
+  glowBlur.uniforms.t.value = h0.texture; glowBlur.uniforms.dir.value.set(2/h0.width, 0); glowPass(glowBlur, h1, 'halation: blur across');
+  glowBlur.uniforms.t.value = h1.texture; glowBlur.uniforms.dir.value.set(0, 2/h0.height); glowPass(glowBlur, h0, 'halation: blur down');
   glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = b0.texture; glowMix.uniforms.tH.value = h0.texture;
-  glowPass(glowMix, rtFinal);
+  glowPass(glowMix, rtFinal, 'bloom: mix and grade');
 }
 /* ---------- night lights: light from the city's lamps falling on the surfaces round them ---------- */
 // Every glow point (lamps, neon, windows, signs, beacons) is also a small light. In one pass at half the game's

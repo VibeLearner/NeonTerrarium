@@ -2,8 +2,12 @@
 // processor's time per part of the simulation and per render pass, the graphics card's time per pass (timer queries,
 // where the browser offers them), the draw calls and triangles of each pass, and a graph of the last frames with the
 // shadow redraws marked. "Copy numbers" puts a plain-text summary on the clipboard. Costs nothing while it's hidden.
+// "Exact timing" (the button, or Shift+F3) is for browsers whose timer queries can't be trusted: before and after each
+// pass it waits until the graphics card has finished everything queued so far, so the time between is what that pass
+// alone costs it. The waiting stops the processor and the card working side by side, so the frame rate drops while it's
+// on; the per-pass times are what count. In this mode the glow passes are also timed one by one (sky.js).
 const PH = (() => {
-  let on = false, el = null, graph = null, body = null, lastShow = 0;
+  let on = false, exact = false, el = null, graph = null, body = null, lastShow = 0, exBtn = null;
   const gl = renderer.getContext(), info = renderer.info;
   const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
   const N = 180;   // frames of history
@@ -12,8 +16,9 @@ const PH = (() => {
   const put = (r, v) => { r.a[r.i] = v; r.i = (r.i + 1) % N; if (r.n < N) r.n++; };
   const avg = r => { if (!r.n) return NaN; let s = 0; for (let k = 0; k < r.n; k++) s += r.a[k]; return s/r.n; };
   const pct = (r, p) => { if (!r.n) return NaN; const b = Array.from(r.a.subarray(0, r.n)).sort((x, y) => x - y); return b[Math.min(r.n - 1, Math.floor(p*r.n))]; };
-  const stat = (name, kind) => { let s = stats.get(name); if (!s) stats.set(name, s = { kind, cpu: ring(), gpu: ring(), calls: ring(), tris: ring() }); return s; };
-  const frameMs = ring(), jsMs = ring(), gpuMs = ring(), shadowMs = ring();
+  const stat = (name, kind) => { let s = stats.get(name); if (!s) stats.set(name, s = { kind, cpu: ring(), gpu: ring(), ex: ring(), calls: ring(), tris: ring() }); return s; };
+  const frameMs = ring(), jsMs = ring(), gpuMs = ring(), shadowMs = ring(), exMs = ring();
+  let exFrame = 0;   // this frame's exact pass times added up
   const hist = [];   // per frame, for the graph: [frame ms, shadow redrawn?]
   let lastRaf = 0, t0 = 0, mark = 0, cur = null, gpuFrame = 0, shadowFrame = false, frameNo = 0, shadowTimes = [];
   const free = [], pending = [];
@@ -23,28 +28,45 @@ const PH = (() => {
     lastRaf = now; frameNo++; shadowFrame = false;
     t0 = mark = performance.now();
     info.autoReset = false; info.reset();
-    collect();
+    if (exact) exFrame = 0; else collect();
   }
+  // Exact timing: wait until the graphics card has finished what's been queued. finish() alone isn't trusted (some
+  // browsers return before the card is done), so one pixel is also read back from the target the last pass drew into:
+  // nothing can be read before the drawing that writes it is done, and a pass draws only after the passes it reads from.
+  // (A pixel read from anything else may not wait: the browser can tell it has nothing pending.)
+  const px = new Uint8Array(4);
+  function sync(){ gl.finish(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); }
   // simulation time since the last mark, under a name
   function lap(name){ if (!on) return; const t = performance.now(); put(stat(name, 'sim').cpu, t - mark); mark = t; }
-  // a render pass: processor time to issue it, graphics card time to draw it, its draws and triangles
-  function begin(name){
+  // a render pass: processor time to issue it, graphics card time to draw it, its draws and triangles. A pass inside
+  // another (sub = true: the glow passes) is timed only in exact mode, since timer queries can't be nested.
+  const stack = [];
+  function begin(name, sub){
     if (!on) return;
+    if (sub && !exact){ stack.push(null); return; }
+    stat(name, sub ? 'sub' : 'pass');   // (listed in the order the passes start, so a pass comes before those inside it)
+    if (exact) sync();   // everything before this pass is done
     const t = performance.now(); mark = t;
-    cur = { name, t, c: info.render.calls, tr: info.render.triangles + info.render.points + info.render.lines, q: null };
-    if (ext){ const q = free.pop() || gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); cur.q = q; }
+    cur = { name, sub: !!sub, t, c: info.render.calls, tr: info.render.triangles + info.render.points + info.render.lines, q: null };
+    if (ext && !exact){ const q = free.pop() || gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); cur.q = q; }
+    stack.push(cur);
   }
   function end(){
-    if (!on || !cur) return;
-    if (cur.q){ gl.endQuery(ext.TIME_ELAPSED_EXT); pending.push({ q: cur.q, name: cur.name, frame: frameNo }); }
-    const t = performance.now(), s = stat(cur.name, 'pass');
-    put(s.cpu, t - cur.t); put(s.calls, info.render.calls - cur.c); put(s.tris, info.render.triangles + info.render.points + info.render.lines - cur.tr);
-    mark = t; cur = null;
+    if (!on || !stack.length) return;
+    const c = stack.pop(); cur = stack.length ? stack[stack.length - 1] : null;
+    if (!c) return;
+    if (c.q){ gl.endQuery(ext.TIME_ELAPSED_EXT); pending.push({ q: c.q, name: c.name, frame: frameNo }); }
+    const s = stat(c.name, c.sub ? 'sub' : 'pass');
+    let t = performance.now();
+    put(s.cpu, t - c.t); put(s.calls, info.render.calls - c.c); put(s.tris, info.render.triangles + info.render.points + info.render.lines - c.tr);
+    if (exact){ sync(); t = performance.now(); put(s.ex, t - c.t); if (!c.sub){ exFrame += t - c.t; if (c.name === 'color + shadow redraw') put(shadowMs, t - c.t); } }
+    mark = t;
   }
   function shadow(){ if (on && renderer.shadowMap.needsUpdate){ shadowFrame = true; shadowTimes.push(performance.now()); } }
   function frameEnd(){
     if (!on) return;
     put(jsMs, performance.now() - t0);
+    if (exact) put(exMs, exFrame);
     if (performance.now() - lastShow > 250){ lastShow = performance.now(); show(); }
   }
   // graphics card timings arrive a few frames late
@@ -68,17 +90,32 @@ const PH = (() => {
     const fps = 1000/avg(frameMs), L = [];
     L.push(`Neon Terrarium performance   ${new Date().toISOString().slice(0, 16)}`);
     L.push(`FPS ${fps.toFixed(0)}   frame ${avg(frameMs).toFixed(1)} ms (95% under ${pct(frameMs, .95).toFixed(1)}, worst ${pct(frameMs, 1).toFixed(1)})`);
-    L.push(`main thread ${avg(jsMs).toFixed(1)} ms   graphics card ${!ext ? 'n/a (this browser has no GPU timers)' : gpuMs.n ? avg(gpuMs).toFixed(1) + ' ms' : 'measuring'}`);
+    if (exact){
+      L.push(`EXACT TIMING: each pass waits for the graphics card, so FPS is lower than in play; the pass times are what count`);
+      L.push(`main thread ${avg(jsMs).toFixed(1)} ms (includes the waiting)   all passes, exact ${exMs.n ? avg(exMs).toFixed(1) + ' ms' : 'measuring'}`);
+    } else L.push(`main thread ${avg(jsMs).toFixed(1)} ms   graphics card ${!ext ? 'n/a (this browser has no GPU timers)' : gpuMs.n ? avg(gpuMs).toFixed(1) + ' ms' : 'measuring'}`);
     L.push(`render ${W}x${H} of ${DW}x${DH}   zoom ${zoom.toFixed(1)}   people ${typeof pplList !== 'undefined' ? pplList.length : '-'}   plots ${cells.size}`);
     const now = performance.now(); shadowTimes = shadowTimes.filter(t => now - t < 10000);
     L.push(`shadow redraws in the last 10 s: ${shadowTimes.length}` + (shadowMs.n ? `   (graphics card ${avg(shadowMs).toFixed(1)} ms each)` : ''));
     L.push('');
-    L.push('                              cpu ms  gpu ms   draws  triangles');
+    L.push(exact ? '                              cpu ms exact ms  draws  triangles' : '                              cpu ms  gpu ms   draws  triangles');
     let simSum = 0;
     for (const [k, s] of stats) if (s.kind === 'sim') simSum += avg(s.cpu);
     L.push(`simulation and upkeep          ${f1(simSum)}`);
     for (const [k, s] of stats) if (s.kind === 'sim') L.push(`  ${k.padEnd(28)}${f1(avg(s.cpu))}`);
-    for (const [k, s] of stats) if (s.kind === 'pass') L.push(`${k.padEnd(30)}${f1(avg(s.cpu))}   ${f1(avg(s.gpu))}  ${big(avg(s.calls)).padStart(6)}  ${big(avg(s.tris)).padStart(9)}`);
+    // passes in the order they ran, each followed by the passes timed inside it
+    const row = (label, s) => `${label.padEnd(30)}${f1(avg(s.cpu))}   ${f1(avg(exact ? s.ex : s.gpu))}  ${big(avg(s.calls)).padStart(6)}  ${big(avg(s.tris)).padStart(9)}`;
+    for (const [k, s] of stats) L.push(...(s.kind === 'pass' ? [row(k, s)] : s.kind === 'sub' ? [row('  ' + k, s)] : []));
+    if (exact){
+      // the costliest single passes (a pass that has passes timed inside it is counted through those instead)
+      const leaf = [], parents = new Set();
+      let prev = null;
+      for (const [k, s] of stats){ if (s.kind === 'sub' && prev) parents.add(prev); if (s.kind === 'pass') prev = k; }
+      for (const [k, s] of stats) if ((s.kind === 'pass' && !parents.has(k)) || s.kind === 'sub') if (s.ex.n) leaf.push([k, avg(s.ex), pct(s.ex, .95)]);
+      leaf.sort((a, b) => b[1] - a[1]);
+      if (leaf.length){ L.push(''); L.push('costliest passes, exact (mean, 95% under):');
+        leaf.slice(0, 5).forEach(([k, m, p], i) => L.push(`  ${i + 1}. ${k.padEnd(26)}${f1(m)}  ${f1(p)} ms`)); }
+    }
     return L.join('\n');
   }
   function show(){
@@ -99,14 +136,21 @@ const PH = (() => {
     const bar = document.createElement('div'); bar.style.cssText = 'margin-top:6px;display:flex;gap:8px;align-items:center';
     const copy = document.createElement('button'); copy.textContent = 'Copy numbers'; copy.style.cssText = 'font:inherit;padding:2px 8px;cursor:pointer';
     const note = document.createElement('span'); note.style.opacity = '.7'; note.textContent = 'F3 or ` hides';
+    exBtn = document.createElement('button'); exBtn.style.cssText = copy.style.cssText; exBtn.onclick = () => setExact(!exact); label();
     copy.onclick = () => { const t = text(); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { note.textContent = 'copied'; }, () => { note.textContent = 'select the text and copy it'; }); };
-    bar.append(copy, note); el.append(graph, body, bar); document.body.appendChild(el);
+    bar.append(copy, exBtn, note); el.append(graph, body, bar); document.body.appendChild(el);
   }
+  function label(){ if (exBtn) exBtn.textContent = 'Exact timing: ' + (exact ? 'on' : 'off'); }
+  function clearAll(){ stats.clear(); hist.length = 0; lastRaf = 0; shadowTimes = []; gpuOf.clear(); for (const r of [frameMs, jsMs, gpuMs, shadowMs, exMs]){ r.n = 0; r.i = 0; }
+    for (const p of pending) gl.deleteQuery(p.q); pending.length = 0; }
+  // (switched between frames, from a key or the button, so no pass is half timed)
+  function setExact(v){ exact = !!v; clearAll(); label(); }
   function toggle(){
     on = !on;
-    if (on){ if (!el) build(); el.hidden = false; stats.clear(); hist.length = 0; lastRaf = 0; for (const r of [frameMs, jsMs, gpuMs, shadowMs]){ r.n = 0; r.i = 0; } }
+    if (on){ if (!el) build(); el.hidden = false; clearAll(); }
     else { if (el) el.hidden = true; info.autoReset = true; for (const p of pending) gl.deleteQuery(p.q); pending.length = 0; }
   }
-  addEventListener('keydown', e => { if ((e.key === 'F3' || e.key === '`') && !e.repeat && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName)){ e.preventDefault(); toggle(); } });
-  return { frameStart, lap, begin, end, shadow, frameEnd, toggle, get on(){ return on; } };
+  addEventListener('keydown', e => { if ((e.key === 'F3' || e.key === '`') && !e.repeat && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName)){ e.preventDefault();
+    if (e.shiftKey){ if (!on) toggle(); setExact(!exact); } else toggle(); } });
+  return { frameStart, lap, begin, end, shadow, frameEnd, toggle, setExact, text, get on(){ return on; }, get exact(){ return exact; } };
 })();

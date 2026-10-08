@@ -92,3 +92,42 @@ other side of them than the rebuilt region was, the same kind of order the game 
 Close up, the logistics hubs can cost up to 15 more draws when only part of a hub is in view.
 
 Not done: walkers off screen already stop being tested once the 700 drawn people are full (`emit` returns first).
+
+# Round 3: exact pass timing on a real graphics card (2026-10-08)
+
+The overlay's "gpu ms" column comes from WebGL timer queries. In Chrome on an Apple M2 (ANGLE on Metal) they are not
+usable: for the `maxcity` scene they added up to 146 ms a frame while frames took 64 ms, and the bloom chain (seven small
+passes at a quarter and an eighth of the size) and the plain upscale to the screen each read about 25 ms, the same as the
+composite. So the overlay now has **Exact timing** (its button, or Shift+F3): before and after each pass it waits until
+the card has finished (`gl.finish` plus a one-pixel read from the target the pass drew into) and times the gap with the
+clock. The glow passes are also listed one by one in this mode. Reading back from a separate 1 x 1 target was tried first
+and does not wait on Metal (the composite then read 0.4 ms), so the read has to come from the pass's own target.
+
+The waiting stops the processor and the card overlapping, so in this mode a frame takes longer (about 100 ms here) and
+the passes add up to more than the real frame. Read the shares, not the total. With exact timing off the overlay
+works as before, and while it's hidden it costs nothing. Frames are drawn the same either way (harness: 0 problems).
+
+Measured in the live game, `maxcity` (2025 plots, about 10,200 people), zoom 30, render 3420 x 1640 (720p, "Optimize
+framerate" off), 15:30, no rain. Standing still, then panning round the middle of the city with the keys.
+
+| Pass | Normal overlay, gpu ms (still) | Exact, still | Exact, panning | Exact, night (22:00) |
+| --- | ---: | ---: | ---: | ---: |
+| color (with a shadow redraw) | | | 52.9 | |
+| color | 49.0 | 41.3 | 36.2 | 41.1 |
+| normals | 19.7 | 23.3 | 20.2 | 23.0 |
+| night lights | 1.2 | 0.4 | 0.4 | 3.8 |
+| clouds | 1.5 | 0.7 | 1.3 | 0.7 |
+| **composite** | 24.2 | **20.0** | **18.6** | **17.8** |
+| bloom and grade (7 passes) | 25.2 | 3.9 | 3.8 | 3.9 |
+| to screen | 25.7 | 1.0 | 1.0 | 1.0 |
+
+The normal overlay itself, for reference: still, 15 to 16 FPS, frame 64.5 ms, main thread 22.7 ms (people 6.3 ms);
+panning, 17 FPS, frame 60.2 ms (95% under 83.5), main thread 24.0 ms, and about 8 shadow redraws a second.
+
+- The **composite** is the costliest full-screen pass by a wide margin, about 18 to 20 ms. Every other full-screen pass
+  is under 4 ms: the whole bloom and halation chain about 4 ms (its biggest step, the final mix, 1 ms), the night lights
+  4 ms after dark, the upscale 1 ms.
+- The two scene passes cost more than any full-screen pass: color about 41 ms and normals about 23 ms (each about 18M
+  triangles at this zoom).
+- Panning redraws the shadow map on most frames, adding about 12 to 17 ms to the color pass each time (the work on
+  `wip/shadow-strips` is aimed at this).

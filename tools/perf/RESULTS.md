@@ -174,3 +174,10 @@ Harness (SwiftShader, 1280x720): city, dense, megas 53 captures and maxcity (noo
 | city zoom 4.5 / pan | 391k / 345k | 233k / 185k |
 
 Timing on the real card is not measured yet (needs the owner's M2: see the plan's protocol).
+
+## W1b: finer wall slices (tried, not kept)
+
+Probe (maxcity, zoom 30, after plot culling): 6.4M building triangles submitted, 1.23M (19%) face away: 401k of 2.77M in A
+(only 83k of those tilt under 8 degrees, so a tilt-aware order is not worth it) and 828k of 3.65M wall triangles (8 slices
+let in walls near the edges). 16 or 32 slices would cut about 9% of triangles, but both change the order triangles tie in
+and move 3 pixels by one level in one channel (megas edit0). Kept at 8 slices so the harness stays at exactly 0.

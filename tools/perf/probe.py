@@ -43,7 +43,7 @@ PROBE = r"""
         for (let r = 1 + s0; r <= s0 + L; r++) range(pc.rowS[r*n + i], pc.rowS[r*n + i] + pc.rowN[r*n + i], false); }
     }
   });
-  out.zoom = zoom; out.yaw = yaw; out.pitch = pitch;
+  out.zoom = zoom; out.yaw = yaw; out.pitch = PITCH;
   return out;
 }
 """
@@ -61,7 +61,7 @@ if __name__ == '__main__':
         ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0])
         js = 'zoomT = %s;' % a.zoom
         if a.yaw is not None: js += ' yawT = %s;' % a.yaw
-        if a.pitch is not None: js += ' pitchT = %s;' % a.pitch
+        if a.pitch is not None: js += ' pitchT = %s; PITCH = pitchT;' % a.pitch
         pg.evaluate('() => { ' + js + ' }')
         pg.evaluate('n => __perf.cap(n)', a.frames)
         print(json.dumps(pg.evaluate(PROBE), indent=1)); print(errs[:2])

@@ -732,6 +732,7 @@ if (MRT){
   const rbd = renderer.renderBufferDirect;
   renderer.renderBufferDirect = function(camera, sc, geo, mat, obj, grp){
     if (MRT_ON && renderer.getRenderTarget() === rtC){
+      if (PH.tests.plain && obj.isMesh && !obj.isInstancedMesh && !geo.isInstancedBufferGeometry && !mat.transparent && geo.attributes.normal && !mat.isShaderMaterial) mat = PH.plainMat;   // (the overlay's plain-shading test)
       const w = mrtWants(obj, mat) ? 2 : 1;
       if (w !== mrtCur){ gl.drawBuffers(w === 2 ? B2 : B1); mrtCur = w; }
       if (w === 1 && (obj.layers.mask & 13) && !mrtWarned.has(mat)){ mrtWarned.add(mat); console.warn('Neon Terrarium: no normals from', mat.type, mat.name || '', obj); }

@@ -37,16 +37,20 @@ if (MRT){
   gl.shaderSource = (sh, s) => src(sh, s.replace('out highp vec4 pc_fragColor;', 'layout(location = 0) out highp vec4 pc_fragColor;\nlayout(location = 1) out highp vec4 pc_fragNormal;'));
   // every built-in material: the normal as MeshNormalMaterial computes it (normal_vert, defaultnormal_vertex), written
   // as it packs it (packNormalToRGB), at full opacity
-  THREE.ShaderChunk.common += '\nvarying vec3 vMrtN;';
+  // (toon materials, nearly everything, already carry exactly this normal as vNormal: they reuse it rather than pass the
+  // same three numbers a second time for every corner of every triangle)
+  THREE.ShaderChunk.common += '\n#ifndef TOON\nvarying vec3 vMrtN;\n#endif';
   THREE.ShaderChunk.project_vertex += `
+#ifndef TOON
 { vec3 mrtN = normal;
 #ifdef USE_INSTANCING
   mat3 mrtM = mat3( instanceMatrix );
   mrtN /= vec3( dot( mrtM[ 0 ], mrtM[ 0 ] ), dot( mrtM[ 1 ], mrtM[ 1 ] ), dot( mrtM[ 2 ], mrtM[ 2 ] ) );
   mrtN = mrtM * mrtN;
 #endif
-  vMrtN = normalize( normalMatrix * mrtN ); }`;
-  THREE.ShaderChunk.dithering_fragment += '\npc_fragNormal = vec4( normalize( normalize( vMrtN ) ) * 0.5 + 0.5, 1.0 );';
+  vMrtN = normalize( normalMatrix * mrtN ); }
+#endif`;
+  THREE.ShaderChunk.dithering_fragment += '\n#ifdef TOON\npc_fragNormal = vec4( normalize( normalize( vNormal ) ) * 0.5 + 0.5, 1.0 );\n#else\npc_fragNormal = vec4( normalize( normalize( vMrtN ) ) * 0.5 + 0.5, 1.0 );\n#endif';
 }
 // A shader material of the game's own that the normal pass drew with MeshNormalMaterial gets the same normal here:
 // flat = the normal it wrote itself in the normal pass (plants and people: a flat one facing the camera).

@@ -70,10 +70,13 @@ function frame(now){
   PH.lap('scene upkeep');
   cam.layers.enableAll(); shadowFrame();   // shadows: redrawn at once, a strip in the background, or not at all (sky.js)
   PH.shadow(); PH.begin(renderer.shadowMap.needsUpdate ? 'color + shadow redraw' : 'color');
+  const pt = PH.tests;   // (the overlay's tests: perfhud.js)
+  if (pt.quarter) rtC.viewport.set(0, 0, W >> 1, H >> 1);   // (plain shading: see renderBufferDirect in sky.js)
   renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
   if (MRT) mrtBegin();   // the normal image is drawn along with the colors (core.js, sky.js)
   cam.layers.enableAll(); renderer.render(scene, cam);
   if (MRT) mrtEnd();
+  if (pt.quarter) rtC.viewport.set(0, 0, W, H);
   PH.end();
   renderer.shadowMap.needsUpdate = false;
   if (!MRT){   // (without WebGL 2: the normal image in a pass of its own)

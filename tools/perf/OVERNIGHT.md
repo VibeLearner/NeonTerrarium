@@ -180,9 +180,10 @@ the function that took the time; and drawn frames counted: whole redraws, strips
   Day cycle running: a whole redraw twice in 60 frames (the cache redraws when the lights switch, 8 background strips each time, one draw-call bump of about 750 on the frames with a strip).
   No shader program was compiled in any of these scenarios once warm (the first time a weather or time-of-day combination appears it compiles; not measurable here).
   An edit: see item 7 (edit_frames.py: one old-way frame, the one that redraws the shadows, then one rectangle).
-- Found while counting calls: a cached frame has MORE draw calls (about 2,100) than an old-way frame (about 1,400) at zoom 30 in the max city, because the live pass of the cache also draws the glow
-  overlay (one small draw per piece with flickering or stuttering windows) and the live set. See item 12 for what the live pass holds: 1.16 million triangles in 886 objects at zoom 30, the largest part
-  glass.
+- Found while counting calls, not explained: a frame drawn from the cache submits about 2,100 draw calls where a frame drawn the old way submits about 1,400 (zoom 30, max city), although the
+  old way draws everything the cache frame does and more. The glow overlay accounts for about 165 of them (1,858 overlay meshes exist, 165 are in view, all with something to draw) plus 99 other
+  layer-6 meshes; the rest I could not attribute tonight (the background shadow strips and the composite passes are in both kinds of frame). Worth a look with the browser's profiler on the
+  M2: if cached frames cost more main-thread time than they should, this is where. See item 12 for what the live pass holds (1.16 million triangles in 886 objects at zoom 30).
 - Done about it: nothing shipped. The one regular spike (`checkBumps` every N-th frame) has a design but not a quick fix; everything else is either an artifact of the harness's clock or
   already smooth. If you see stutter on the M2 that is not this, the likely suspects are the glass and plants live set (item 12) and shader compiles on weather changes.
 

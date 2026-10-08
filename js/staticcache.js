@@ -14,6 +14,17 @@ const SC = {
 };
 const SC_LIVE_MASK = -1 & ~STATIC_BIT;
 sun.layers.enable(5); hemi.layers.enable(5);   // (three only collects the lights the camera's layers can see: the static pass needs them)
+// Pinning the camera along the view. In an orthographic view, moving the camera along its own direction changes nothing on
+// screen, only every depth value (by the same amount). The cache is drawn with the camera at one place along the view (c0),
+// so while it's in use the camera stays there however the player pans: depth then matches the cache's exactly. Everything
+// that measures depth as a distance from the camera target is told the difference, dc (camDist in the composite). When
+// the true place drifts 50 units from c0 the pin moves to it (and the cache, drawn at the old place, is out of date).
+SC.c0 = null; SC.dc = 0;
+SC.pin = function(cTrue){
+  if (SC.mode === 'off' || SC.mode === 'oldview' || PH.tests.noStatic || !MRT){ SC.c0 = null; SC.dc = 0; return cTrue; }
+  if (SC.c0 === null || Math.abs(cTrue - SC.c0) > 50) SC.c0 = cTrue;
+  SC.dc = cTrue - SC.c0; return SC.c0;
+};
 // the margin the card allows (the view plus the margin must fit a texture)
 function scMargin(){
   const gl = renderer.getContext(), max = Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));

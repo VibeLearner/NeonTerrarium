@@ -52,6 +52,7 @@ function frame(now){
   comp.uniforms.glowC.value.set(camT.x, camT.z);
   applyRenderRes(zoom);
   updateCamera(dt);
+  comp.uniforms.camDist.value = CAM_DIST + SC.dc;   // (depth is measured from the pinned camera: see staticcache.js)
   comp.uniforms.outlines.value = S.outlines ? 1 : 0;
   comp.uniforms.palOn.value = S.palette ? 1 : 0;
   comp.uniforms.time.value = now/1000;

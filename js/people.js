@@ -1713,7 +1713,7 @@ function ghPose(p, t, dt){
   if (!p.gh || p.gh.m !== m.id){ const k = hash(p.id, 'aisle') % A.length, a = A[k]; p.gh = { m: m.id, a: k, u: (hash(p.id, 'u') % 1000)/1000, dir: hash(p.id, 'd') % 2 ? 1 : -1, pause: 0 }; }
   // the aisles along the wall nearest the camera are hidden behind that wall's racks: whoever keeps one works its twin
   // on the far side for now, where they can be seen through the glass roof
-  const e0 = gd.m, cdx = cam.position.x - e0[12], cdz = cam.position.z - e0[14], camSide = Math.sign(e0[8]*cdx + e0[10]*cdz) || 1;
+  const e0 = gd.m, cdx = camPosTrue.x - e0[12], cdz = camPosTrue.z - e0[14], camSide = Math.sign(e0[8]*cdx + e0[10]*cdz) || 1;
   const g = p.gh; let ai = g.a; const az = A[ai].z - A[0].z - .82;   // (relative to the middle of the house)
   if (m.kind === 'greenhouse' && ai >= 2 && Math.sign(A[ai].z - (A[0].z + A[1].z)/2) === camSide) ai = ai % 2 ? ai - 1 : ai + 1;
   const a = A[ai], len = a.x1 - a.x0;

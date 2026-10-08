@@ -59,8 +59,8 @@ function scCamera(){
 // starts M pixels left of and below the color target. Every vertex then comes out exactly where it does in the cache (just M
 // pixels over), so the two rasterize alike pixel for pixel; with the view's own projection an edge that falls on a pixel
 // centre can land either side of it. (Depth is the same either way: the near and far planes are the same.)
-SC.drawView = function(fn){
-  if (SC.mode === 'off' || PH.tests.noStatic || !MRT || !scMargin()){ fn(); return; }
+SC.drawView = function(fn, widen = true){   // (widen false: the frame is drawn the old way, with the view's own projection: the margin costs vertices and pixels and buys nothing)
+  if (!widen || SC.mode === 'off' || PH.tests.noStatic || !MRT || !scMargin()){ fn(); return; }
   scCamera();
   const keep = cam.projectionMatrix.clone(), M = SC.Muse;
   cam.projectionMatrix.copy(SC.camS.projectionMatrix); rtC.viewport.set(-M, -M, W + 2*M, H + 2*M); renderer.setRenderTarget(rtC);   // (three reads a target's viewport when the target is set)
@@ -76,6 +76,27 @@ const scCol = px => px - (W >> 1), scRow = py => py - (H >> 1);   // (absolute c
 function scPieces(a, len, o, n){
   const t = scMod(a - o, n), w1 = Math.min(len, n - t);
   return w1 < len ? [[t, 0, w1], [0, w1, len - w1]] : [[t, 0, len]];
+}
+// The same copy by drawing a full-screen triangle that reads the three cache textures with texelFetch (ring addressing in the shader) and writes
+// color, normals and depth (gl_FragDepth). Slower in principle than blitFramebuffer; here so the owner can tell whether the copy leaves the
+// targets in a state that makes the composite slower (overlay test "copy by drawing").
+let _cdMat = null, _cdScene = null;
+function scCopyDraw(colL, rowB){
+  if (!_cdMat){
+    _cdMat = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, depthTest: true, depthWrite: true, depthFunc: THREE.AlwaysDepth, blending: THREE.NoBlending,
+      uniforms: { tC: { value: null }, tN: { value: null }, tD: { value: null }, off: { value: new THREE.Vector2() }, size: { value: new THREE.Vector2() } },
+      vertexShader: 'in vec3 position; void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: `precision highp float; precision highp int; precision highp sampler2D;
+        uniform sampler2D tC; uniform sampler2D tN; uniform sampler2D tD; uniform vec2 off; uniform vec2 size;
+        layout(location = 0) out highp vec4 oC; layout(location = 1) out highp vec4 oN;
+        void main(){ ivec2 sz = ivec2(size), q = ivec2(gl_FragCoord.xy) + ivec2(off); q = ((q % sz) + sz) % sz;
+          oC = texelFetch(tC, q, 0); oN = texelFetch(tN, q, 0); gl_FragDepth = texelFetch(tD, q, 0).r; }` });
+    _cdMat.userData.mrt = true;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), _cdMat); m.frustumCulled = false; _cdScene = new THREE.Scene(); _cdScene.add(m);
+  }
+  const u = _cdMat.uniforms; u.tC.value = SC.rtS.texture; u.tN.value = SC.rtSN.texture; u.tD.value = SC.rtS.depthTexture;
+  u.off.value.set(scMod(colL - SC.ox, SC.w), scMod(rowB - SC.oy, SC.h)); u.size.value.set(SC.w, SC.h);
+  renderer.render(_cdScene, compCam);
 }
 // copy the window of the cache that is the view (color, depth and normals) into the color target: up to four rectangles
 function scBlit(colL, rowB){
@@ -259,7 +280,7 @@ SC.frame = function(){
   // the window of it into the frame, then the live set on top
   renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
   mrtBegin(rtC, rtN, true);
-  scBlit(scCol(px), scRow(py));
+  if (PH.tests.copyByDraw || window.__COPY_DRAW) scCopyDraw(scCol(px), scRow(py)); else scBlit(scCol(px), scRow(py));
   cam.layers.mask = SC_LIVE_MASK; cullFrame(cam);
   SC.drawView(() => renderer.render(scene, cam));
   if (PH.tests.showRebuilds) scFlash(px, py);

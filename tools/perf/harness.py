@@ -160,6 +160,11 @@ def steps(scene):
             ('c_pan_edge2', 14, None, 12),
             ('c_soft', 16, 'S.hour += .15', 14),
             ('c_soft2', 40, None, 10),
+            ('c_ring1', 50, 'camGoal.x += 30', 40),   # long pans one way and back and on another axis: the ring wraps round its edges
+            ('c_ring2', 60, 'camGoal.x -= 60; camGoal.z += 20', 50),
+            ('c_ring3', 60, 'camGoal.z -= 40', 50),
+            ('c_ring4', 40, 'camGoal.x += 30; camGoal.z += 20', 30),
+            ('c_ring5', 60, None, 4),
             ('c_turn', 14, 'yawT += .5', 10),
             ('c_turn2', 150, None, 4),
             ('c_zoom', 14, 'zoomT = zoomT*1.4', 10),

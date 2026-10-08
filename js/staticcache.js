@@ -67,18 +67,68 @@ SC.drawView = function(fn){
   FOL_UNI.res.value.set(W + 2*M, H + 2*M);   // (the plants' and people's shaders snap to whole pixels of 'res' and emit clip coordinates: they need the size of what is being drawn into)
   try { fn(); } finally { cam.projectionMatrix.copy(keep); rtC.viewport.set(0, 0, W, H); FOL_UNI.res.value.set(W, H); }
 };
-// copy the window of the cache that is the view (color, depth and normals) into the color target
-function scBlit(dx, dy){
-  const gl = renderer.getContext(), M = SC.Muse, x0 = M + dx, y0 = M + dy;
+// The cache picture is a ring: absolute pixel column c (the camera's whole-pixel position, plus the pixel's place in the view) lives at
+// texel (c - SC.ox) mod width, rows likewise, so a pan only needs the strip that comes into view drawn over the strip that has left.
+// SC.R is the stretch of absolute columns and rows the picture holds right now; the view must lie inside it.
+const scMod = (a, n) => ((a % n) + n) % n;
+const scCol = px => px - (W >> 1), scRow = py => py - (H >> 1);   // (absolute column and row of the view's left and bottom edge for a camera at whole-pixel place px, py)
+// pieces [source start, destination start, length] of a run of `len` absolute pixels starting at `a`, in a ring of size n with origin o
+function scPieces(a, len, o, n){
+  const t = scMod(a - o, n), w1 = Math.min(len, n - t);
+  return w1 < len ? [[t, 0, w1], [0, w1, len - w1]] : [[t, 0, len]];
+}
+// copy the window of the cache that is the view (color, depth and normals) into the color target: up to four rectangles
+function scBlit(colL, rowB){
+  const gl = renderer.getContext();
   const fs = renderer.properties.get(SC.rtS).__webglFramebuffer, fc = renderer.properties.get(rtC).__webglFramebuffer;
+  const xs = scPieces(colL, W, SC.ox, SC.w), ys = scPieces(rowB, H, SC.oy, SC.h);
   gl.bindFramebuffer(gl.READ_FRAMEBUFFER, fs); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, fc);
   gl.readBuffer(gl.COLOR_ATTACHMENT0); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE]);
-  gl.blitFramebuffer(x0, y0, x0 + W, y0 + H, 0, 0, W, H, gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT, gl.NEAREST);
+  for (const [sx, dx, w] of xs) for (const [sy, dy, h] of ys) gl.blitFramebuffer(sx, sy, sx + w, sy + h, dx, dy, dx + w, dy + h, gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT, gl.NEAREST);
   gl.readBuffer(gl.COLOR_ATTACHMENT1); gl.drawBuffers([gl.NONE, gl.COLOR_ATTACHMENT1]);
-  gl.blitFramebuffer(x0, y0, x0 + W, y0 + H, 0, 0, W, H, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+  for (const [sx, dx, w] of xs) for (const [sy, dy, h] of ys) gl.blitFramebuffer(sx, sy, sx + w, sy + h, dx, dy, dx + w, dy + h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
   gl.readBuffer(gl.COLOR_ATTACHMENT0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, fc);   // (both bindings back to the color target, as three believes them to be)
   gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+}
+// Draw a rectangle of absolute columns and rows [c0, c1) x [r0, r1) into the ring: the cache camera at the view's place now (its
+// frustum covers the view and the margin, so the rectangle is inside it), the viewport shifted so the rectangle lands on its own
+// texels (twice or four times where it wraps round an edge), a scissor to the rectangle, culled to the rectangle's own frustum. The same
+// widened projection as every other draw of the cache, so the pixels match.
+const _rectCam = new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR);
+function scDrawRect(c0, c1, r0, r1, px, py){
+  scCamera();
+  const M = SC.Muse, cam_ = SC.camS, pxl = 2*zoom/H, baseC = scCol(px) - M, baseR = scRow(py) - M, rt = SC.rtS;
+  for (const [tx, ax, wx] of scPieces(c0, c1 - c0, SC.ox, SC.w)) for (const [ty, ay, wy] of scPieces(r0, r1 - r0, SC.oy, SC.h)){
+    const pc0 = c0 + ax, pr0 = r0 + ay;   // (this piece's absolute start)
+    rt.viewport.set(tx - (pc0 - baseC), ty - (pr0 - baseR), SC.w, SC.h); rt.scissor.set(tx, ty, wx, wy); rt.scissorTest = true;
+    _rectCam.left = cam_.left + (pc0 - baseC)*pxl; _rectCam.right = cam_.left + (pc0 + wx - baseC)*pxl;
+    _rectCam.bottom = cam_.bottom + (pr0 - baseR)*pxl; _rectCam.top = cam_.bottom + (pr0 + wy - baseR)*pxl; _rectCam.updateProjectionMatrix();
+    _rectCam.position.copy(cam_.position); _rectCam.quaternion.copy(cam_.quaternion); _rectCam.updateMatrixWorld();
+    renderer.setClearColor(0x000000, 1);
+    mrtBegin(rt, SC.rtSN);
+    cam_.layers.mask = STATIC_BIT; cullFrame(cam_, _rectCam);
+    try { renderer.render(scene, cam_); } finally { mrtEnd(); }
+  }
+  rt.viewport.set(0, 0, SC.w, SC.h); rt.scissorTest = false;
+}
+// Keep the view inside the ring with room to spare: when the room on a side falls under half the margin, draw the strip that brings
+// it back to the whole margin (the ring's width is the view plus two margins, so the opposite strip is overwritten). False when the
+// view has left the ring, or the strip would be more than a margin wide (a pan too fast for it): the caller draws the cache whole.
+function scExtend(px, py){
+  const R = SC.R, M = SC.Muse, half = M >> 1, colL = scCol(px), rowB = scRow(py);
+  if (colL < R.x0 || colL + W > R.x1 || rowB < R.y0 || rowB + H > R.y1) return false;
+  const strips = [], o = { x0: R.x0, x1: R.x1, y0: R.y0, y1: R.y1 };
+  if (o.x1 - (colL + W) < half){ const n1 = colL + W + M; strips.push([o.x1, n1, null, null]); o.x1 = n1; o.x0 = n1 - SC.w; }
+  else if (colL - o.x0 < half){ const n0 = colL - M; strips.push([n0, o.x0, null, null]); o.x0 = n0; o.x1 = n0 + SC.w; }
+  if (o.y1 - (rowB + H) < half){ const n1 = rowB + H + M; strips.push([null, null, o.y1, n1]); o.y1 = n1; o.y0 = n1 - SC.h; }
+  else if (rowB - o.y0 < half){ const n0 = rowB - M; strips.push([null, null, n0, o.y0]); o.y0 = n0; o.y1 = n0 + SC.h; }
+  if (!strips.length) return true;
+  for (const st of strips){   // (a column strip spans the new rows, a row strip the new columns)
+    if (st[0] !== null){ if (st[1] - st[0] > M) return false; scDrawRect(st[0], st[1], o.y0, o.y1, px, py); }
+    else { if (st[3] - st[2] > M) return false; scDrawRect(o.x0, o.x1, st[2], st[3], px, py); } }
+  SC.R = o; SC.strips++; SC.stripAt = SC.rebuilds;
+  return true;
 }
 // What the static pieces' pictures depend on, in two parts.
 // HARD: what makes the cache wrong the moment it changes (the view's orientation and zoom, the render size and mode, the detail
@@ -109,7 +159,7 @@ function scSoft(out){
 function scShadowKey(out){ let k = 0; for (const v of sun.shadow.matrix.elements) out[k++] = v; out[k++] = sun.shadow.map ? sun.shadow.map.texture.id : -1; out.length = k; return out; }
 function scSame(a, b){ if (!a || !b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
 function scDelta(a, b){ let m = 0; for (let i = 0; i < a.length; i++){ const d = Math.abs(a[i] - b[i]); if (d > m) m = d; } return m; }
-SC.prev = null; SC.hard = null; SC.soft = null; SC.shk = null; SC.ok = false; SC.ax = 0; SC.ay = 0; SC.age = 0; SC.rebuilds = 0; SC.next = null; SC.job = null; SC.K = 8; SC.flash = 0;
+SC.prev = null; SC.hard = null; SC.soft = null; SC.shk = null; SC.ok = false; SC.ox = 0; SC.oy = 0; SC.R = { x0: 0, x1: 0, y0: 0, y1: 0 }; SC.strips = 0; SC.age = 0; SC.rebuilds = 0; SC.next = null; SC.job = null; SC.K = 8; SC.flash = 0;
 
 // one background strip of the next cache: the job's own camera (where the view was when it began), the strip's rows only, the
 // lights as they were when it began
@@ -134,7 +184,7 @@ function scBand(job){
 }
 function scJobStart(px, py, hard, soft, shk, why){
   if (!SC.next){ if (!scMargin()) return; SC.next = scMake(SC.w, SC.h); }
-  const job = { k: 0, K: SC.K, ax: px, ay: py, hard: hard.slice(), soft: soft.slice(), shk: shk.slice(), map: sun.shadow.map, why,
+  const job = { k: 0, K: SC.K, ox: scCol(px) - SC.Muse, oy: scRow(py) - SC.Muse, hard: hard.slice(), soft: soft.slice(), shk: shk.slice(), map: sun.shadow.map, why,
     rt: SC.next.rt, rn: SC.next.rn, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR),
     sc: sun.color.clone(), si: sun.intensity, hc: hemi.color.clone(), hg: hemi.groundColor.clone(), hi: hemi.intensity, em: EM_I.value.slice(), m1: sun.matrixWorld.clone(), m2: sun.target.matrixWorld.clone() };
   scCamera(); job.cam.left = SC.camS.left; job.cam.right = SC.camS.right; job.cam.top = SC.camS.top; job.cam.bottom = SC.camS.bottom; job.cam.updateProjectionMatrix();
@@ -143,7 +193,7 @@ function scJobStart(px, py, hard, soft, shk, why){
 }
 function scJobSwap(job){   // the finished strips become the cache
   const rt = SC.rtS, rn = SC.rtSN; SC.rtS = job.rt; SC.rtSN = job.rn; SC.next = { rt, rn };
-  SC.hard = job.hard; SC.soft = job.soft; SC.shk = job.shk; SC.ax = job.ax; SC.ay = job.ay; SC.age = 0; SC.rebuilds++; SC.job = null;
+  SC.hard = job.hard; SC.soft = job.soft; SC.shk = job.shk; SC.ox = job.ox; SC.oy = job.oy; SC.R = { x0: job.ox, x1: job.ox + SC.w, y0: job.oy, y1: job.oy + SC.h }; SC.age = 0; SC.rebuilds++; SC.job = null;
 }
 // the static set into the cache in one go, at the view's own place
 function scFull(px, py, hard, soft, shk, why){
@@ -153,7 +203,7 @@ function scFull(px, py, hard, soft, shk, why){
   SC.camS.layers.mask = STATIC_BIT; cullFrame(SC.camS);
   renderer.render(scene, SC.camS);
   mrtEnd();
-  SC.hard = hard.slice(); SC.soft = soft.slice(); SC.shk = shk.slice(); SC.ok = true; SC.ax = px; SC.ay = py; SC.age = 0; SC.rebuilds++; SC.job = null; SC.flash = 6;
+  SC.hard = hard.slice(); SC.soft = soft.slice(); SC.shk = shk.slice(); SC.ok = true; SC.ox = scCol(px) - SC.Muse; SC.oy = scRow(py) - SC.Muse; SC.R = { x0: SC.ox, x1: SC.ox + SC.w, y0: SC.oy, y1: SC.oy + SC.h }; SC.age = 0; SC.rebuilds++; SC.job = null; SC.flash = 6;
   SC.state = 'redrawn'; SC.why = why;
 }
 const _hA = [], _sA = [], _kA = [];
@@ -177,7 +227,7 @@ SC.frame = function(){
   if (SC.mode === 'every') now = 'redrawn every frame';
   else if (!SC.ok) now = 'first draw';
   else if (!scSame(hard, SC.hard)) now = 'something it depends on changed';
-  else if (Math.abs(px - SC.ax) > M || Math.abs(py - SC.ay) > M) now = 'view left the cache';
+  else if (scCol(px) < SC.R.x0 || scCol(px) + W > SC.R.x1 || scRow(py) < SC.R.y0 || scRow(py) + H > SC.R.y1) now = 'view left the cache';
   else if (scDelta(soft, SC.soft) > SC_BIG) now = 'the light jumped';
   // Still changing from frame to frame (a turn or zoom easing in, the lights switching at dusk): the cache would be drawn again every
   // frame, which costs more than the old way. Draw the old way until the inputs hold still for a frame, then draw the cache once.
@@ -193,20 +243,23 @@ SC.frame = function(){
       let why = '';
       if (scDelta(soft, SC.soft) > SC_EPS) why = 'light drifted';
       else if (!scSame(shk, SC.shk)) why = 'shadow map swapped';
-      else if (Math.abs(px - SC.ax) > M/2 || Math.abs(py - SC.ay) > M/2) why = 'view nearing the edge';
+      else if (PH.tests.noRing && (scCol(px) - SC.R.x0 < M/2 || SC.R.x1 - scCol(px) - W < M/2 || scRow(py) - SC.R.y0 < M/2 || SC.R.y1 - scRow(py) - H < M/2)) why = 'view nearing the edge';   // (without the ring: a whole new picture)
       if (why) scJobStart(px, py, hard, soft, shk, why);
     }
     if (SC.job){
       scBand(SC.job); SC.job.k++; SC.state = 'redrawing ' + SC.job.k + ' of ' + SC.job.K; SC.why = SC.job.why; SC.band = SC.job.k - 1;
       if (SC.job.k === SC.job.K){
-        if (Math.abs(px - SC.job.ax) <= M && Math.abs(py - SC.job.ay) <= M) scJobSwap(SC.job); else SC.job = null;
+        if (scCol(px) >= SC.job.ox && scCol(px) + W <= SC.job.ox + SC.w && scRow(py) >= SC.job.oy && scRow(py) + H <= SC.job.oy + SC.h) scJobSwap(SC.job); else SC.job = null;
       }
     }
+  }
+  if (!now && !PH.tests.noRing && !scExtend(px, py)){   // the strip that keeps the view inside the ring; a pan too fast for it: the whole picture
+    scFull(px, py, hard, soft, shk, 'pan too fast for the ring');
   }
   // the window of it into the frame, then the live set on top
   renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
   mrtBegin(rtC, rtN, true);
-  scBlit(px - SC.ax, py - SC.ay);
+  scBlit(scCol(px), scRow(py));
   cam.layers.mask = SC_LIVE_MASK; cullFrame(cam);
   SC.drawView(() => renderer.render(scene, cam));
   if (PH.tests.showRebuilds) scFlash(px, py);
@@ -221,7 +274,7 @@ function scFlash(px, py){
     gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE]); renderer.clear(true, false, false); gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]); rtC.scissorTest = false; renderer.setRenderTarget(rtC); };
   if (SC.state === 'redrawn' && SC.flash > 0){ paint(0, 0, W, e); paint(0, H - e, W, e); paint(0, 0, e, H); paint(W - e, 0, e, H); }
   else if (SC.job && SC.band !== undefined){
-    const h = SC.h, y0 = Math.floor(h*SC.band/SC.job.K) - SC.Muse - (py - SC.ay), y1 = Math.floor(h*(SC.band + 1)/SC.job.K) - SC.Muse - (py - SC.ay);
+    const h = SC.h, y0 = Math.floor(h*SC.band/SC.job.K) + SC.job.oy - scRow(py), y1 = Math.floor(h*(SC.band + 1)/SC.job.K) + SC.job.oy - scRow(py);
     const a = Math.max(0, y0), b = Math.min(H, y1); if (b > a) paint(0, a, e, b - a), paint(W - e, a, e, b - a);
   }
   if (SC.flash > 0) SC.flash--;
@@ -229,5 +282,5 @@ function scFlash(px, py){
 // the overlay's line
 SC.line = function(){
   if (SC.mode === 'off' || PH.tests.noStatic) return 'static cache: off (switched off)';
-  return 'static cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + (SC.ok ? '   frames since redrawn ' + SC.age + '   redrawn ' + SC.rebuilds + ' times' : '');
+  return 'static cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + (SC.ok ? '   frames since redrawn ' + SC.age + '   redrawn ' + SC.rebuilds + ' times   ring strips ' + SC.strips : '');
 };

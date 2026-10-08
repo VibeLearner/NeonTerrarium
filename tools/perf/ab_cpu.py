@@ -29,5 +29,9 @@ if __name__ == '__main__':
     for k in keys:
         x, y = med('A', k), med('B', k)
         if max(x, y) >= .05: print('%-24s %9.2f %9.2f   %9.2f %9.2f' % (k, x, y, low('A', k), low('B', k)))
+    # the machine's speed drifts a lot from run to run: also the people time as a share of functions neither build changed
+    def ref(d): return sum(d.get(k, 0) for k in ('updateSteam', 'updateMegaFx', 'updateConveyors', 'updateHighways', 'updateMetros')) or 1
+    ra = [(d['updatePeople'] - d.get('decide', 0))/ref(d) for d in res['A']]; rb = [(d['updatePeople'] - d.get('decide', 0))/ref(d) for d in res['B']]
+    print('people (no decisions) over the unchanged functions: A median %.2f (%s)   B median %.2f (%s)   B/A %.2f' % (statistics.median(ra), ' '.join('%.2f' % v for v in ra), statistics.median(rb), ' '.join('%.2f' % v for v in rb), statistics.median(rb)/statistics.median(ra)))
     pa = [d['updatePeople'] - d.get('decide', 0) for d in res['A']]; pb = [d['updatePeople'] - d.get('decide', 0) for d in res['B']]
     print('people without decisions: A median %.2f min %.2f (%s)   B median %.2f min %.2f (%s)' % (statistics.median(pa), min(pa), ' '.join('%.2f' % v for v in pa), statistics.median(pb), min(pb), ' '.join('%.2f' % v for v in pb)))

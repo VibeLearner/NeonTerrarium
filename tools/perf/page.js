@@ -58,21 +58,24 @@ window.__perf = (() => {
   // Timing. CPU: frames simulated without drawing (as between captures), each update function and the whole frame timed;
   // the skipped draws still do their world-matrix updates, so that cost is in "frame". GPU: one view drawn, then single
   // passes redrawn several times each, synchronised with a 1-pixel read, so a pass's own cost is measured on its own.
-  P.cpuTime = (n, extra = []) => {
-    const now = __realNow, acc = {}, cur = {};
+  P.cpuTime = (n, extra = []) => P.report(P.cpuFrames(n, extra).acc);
+  P.cpuFrames = (n, extra = [], perFrame = null) => {   // the raw per-frame times of each timed function (and 'frame': the whole step), in order
+    const now = __realNow, acc = {}, cur = {}, rows = [];
     const names = extra.concat(['checkBumps', 'updateBots', 'updateLurkers', 'updateClubs', 'decide', 'arrive', 'updateLifts', 'liftCab', 'liftRide', 'drawBouncers', 'drawDeckWalkers', 'drawLiftCabs', 'lawnHolos', 'lawnPicnics', 'updateCars', 'updateDrones', 'updateTrips', 'updateHighways', 'updateMetros', 'updateVehicleShadows', 'updateAnims', 'updateMegaFx', 'updatePeople', 'updateSteam', 'updateConveyors', 'updateCamera']);
     const orig = {};
     for (const nm of names){ const f = window[nm]; if (typeof f !== 'function') continue; orig[nm] = f;
       window[nm] = function(...a){ const t0 = now(); const r_ = f.apply(this, a); cur[nm] = (cur[nm] || 0) + now() - t0; return r_; }; }
     P.skip = true;
     for (let i = 0; i < n; i++){
+      if (perFrame) eval(perFrame);
       for (const k in cur) delete cur[k];
       const t0 = now(); __step(1); cur.frame = now() - t0;
       for (const k in cur) (acc[k] || (acc[k] = [])).push(cur[k]);
+      rows.push(Object.assign({}, cur));
     }
     P.skip = false;
     for (const nm in orig) window[nm] = orig[nm];
-    return P.report(acc);
+    return { acc, rows };
   };
   P.report = acc => { const out = {}; for (const k in acc){ const a = acc[k].slice().sort((x, y) => x - y); out[k] = { mean: a.reduce((s_, v) => s_ + v, 0)/a.length, p95: a[Math.min(a.length - 1, Math.floor(a.length*.95))], n: a.length }; } return out; };
   P.gpuTime = reps => {

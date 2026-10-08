@@ -58,11 +58,12 @@ const cutRest = u => u.A + u.H + u.S;
 // frame the pieces whose boxes miss the view are left out of the draw: the same triangles are drawn where they can show, in
 // the same order, so the picture doesn't change. Several ranges go up in one call where the browser has WEBGL_multi_draw,
 // else as one draw each (see renderBufferDirect below).
-const CULL = { stamp: 0, pl: new Float64Array(24), pad: 0, total: 0, drawn: 0, tris: 0 }, _cullM = new THREE.Matrix4(), _cullF = new THREE.Frustum();
+const CULL = { minPx: 1, lvl: -1, stamp: 0, pl: new Float64Array(24), pad: 0, total: 0, drawn: 0, tris: 0 }, _cullM = new THREE.Matrix4(), _cullF = new THREE.Frustum();
 function cullFrame(){
   cam.updateMatrixWorld(); _cullM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _cullF.setFromProjectionMatrix(_cullM);
   for (let i = 0; i < 6; i++){ const p = _cullF.planes[i]; CULL.pl.set([p.normal.x, p.normal.y, p.normal.z, p.constant], i*4); }
   CULL.pad = 4*(2*zoom/H);   // (a few screen pixels of room, in world units)
+  { const lim = (2*zoom/H)*CULL.minPx; let lv = -1; for (let k = 0; k < SMALL_N; k++) if (SMALL_E[k] <= lim) lv = k; CULL.lvl = PH.tests.noSmall ? -1 : lv; }   // (triangles with no edge as long as a pixel's worth are left out)
   CULL.stamp++; CULL.total = CULL.drawn = CULL.tris = 0;
 }
 // which of a merged mesh's pieces touch the view (worked out once a frame per mesh); returns how many do
@@ -83,10 +84,10 @@ function pieceVis(P){
 const MD = { s: new Int32Array(64), n: new Int32Array(64) };
 function multiRows(o, P, r0, r1){
   if (PH.tests.noCull) return false;
-  const seen = pieceVis(P); if (seen === P.n) return false;
+  const seen = pieceVis(P), lv = CULL.lvl; if (seen === P.n && lv < 0) return false;
   const v = P.vis, n = P.n; let m = 0, tot = 0;
   for (let r = r0; r <= r1; r++) for (let i = 0; i < n; i++){
-    const c = P.rowN[r*n + i]; if (!v[i] || !c) continue;
+    if (!v[i]) continue; const c = lv < 0 ? P.rowN[r*n + i] : P.rowC[(r*n + i)*SMALL_N + lv]; if (!c) continue;
     const st = P.rowS[r*n + i];
     if (m && MD.s[m - 1] + MD.n[m - 1] === st) MD.n[m - 1] += c;
     else { if (m === MD.s.length){ const s2 = new Int32Array(m*2), n2 = new Int32Array(m*2); s2.set(MD.s); n2.set(MD.n); MD.s = s2; MD.n = n2; } MD.s[m] = st; MD.n[m++] = c; }
@@ -247,8 +248,12 @@ function hideCovered(b, C){
 // The buildings' triangles in the order sideArc wants: A, H, the walls slice by slice (S), then slices 0 to 3 again (D).
 // A wall slice only takes triangles turned no higher than level (whatever faces at all upward may face the camera from
 // anywhere); an underside is one the camera can't see at its lowest tilt, nor any higher.
+// (W2a) Inside each list the triangles go largest first (by longest edge), and the layout notes how many have an edge of at
+// least each size in SMALL_E: a frame draws only the front of each list, leaving out what is too small to paint more than a speck.
+const SMALL_E = [0, 1, 2, 3, 4, 5].map(k => .0125*2**k), SMALL_N = SMALL_E.length;
 function sideLayout(buckets, nAt){
   const A = [], H = [], S = Array.from({ length: SIDE_K }, () => []), w = TAU/SIDE_K, low = Math.sin(PITCH_MIN), lowC = Math.cos(PITCH_MIN);
+  const Ae = [], Se = Array.from({ length: SIDE_K }, () => []);   // longest edge of each triangle in A and in the slices
   let o2 = 0;
   for (const [mat, b] of buckets){
     if (!atlasable(mat)) continue;
@@ -257,23 +262,33 @@ function sideLayout(buckets, nAt){
       const a3 = I[q]*3, b3 = I[q + 1]*3, c3 = I[q + 2]*3;
       const ux = P[b3] - P[a3], uy = P[b3 + 1] - P[a3 + 1], uz = P[b3 + 2] - P[a3 + 2], vx = P[c3] - P[a3], vy = P[c3 + 1] - P[a3 + 1], vz = P[c3 + 2] - P[a3 + 2];
       const nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx, l = Math.hypot(nx, ny, nz);
-      let dst = A;
+      let dst = A, de = Ae;
       if (l > 0){
         const y = ny/l, h = Math.hypot(nx, nz)/l;
-        if (y*low + h*lowC < -.002) dst = H;   // an underside: away from the camera at every tilt and turn
-        else if (y <= 0 && h > 0){ let ph = Math.atan2(nz, nx); if (ph < 0) ph += TAU; dst = S[Math.min(SIDE_K - 1, Math.floor(ph/w))]; }
+        if (y*low + h*lowC < -.002){ dst = H; de = null; }   // an underside: away from the camera at every tilt and turn
+        else if (y <= 0 && h > 0){ let ph = Math.atan2(nz, nx); if (ph < 0) ph += TAU; const sl = Math.min(SIDE_K - 1, Math.floor(ph/w)); dst = S[sl]; de = Se[sl]; }
       }
       dst.push(I[q] + o2, I[q + 1] + o2, I[q + 2] + o2);
+      if (de) de.push(Math.max(Math.hypot(ux, uy, uz), Math.hypot(vx, vy, vz), Math.hypot(P[c3] - P[b3], P[c3 + 1] - P[b3 + 1], P[c3 + 2] - P[b3 + 2])));
     }
     for (let q = nv; q < I.length; q++) H.push(I[q] + o2);
     o2 += P.length/3;
   }
-  const off = [0]; for (const s of S) off.push(off[off.length - 1] + s.length);
-  const nS = off[SIDE_K], nD = off[SIDE_K/2], n = A.length + H.length + nS + nD;
+  const cls = new Int32Array((1 + SIDE_K)*SMALL_N);
+  const bySize = (T, E, row) => {   // largest first (ties keep their order); counts of those at least each size
+    const n = E.length, ord = new Array(n); for (let i = 0; i < n; i++) ord[i] = i;
+    ord.sort((p, q) => E[q] - E[p]);
+    const out = new Array(n*3); for (let i = 0; i < n; i++){ const t = ord[i]*3; out[i*3] = T[t]; out[i*3 + 1] = T[t + 1]; out[i*3 + 2] = T[t + 2]; }
+    for (let k = 0; k < SMALL_N; k++){ let c = 0; while (c < n && E[ord[c]] >= SMALL_E[k]) c++; cls[row*SMALL_N + k] = c*3; }   // (in indices, as the ranges are)
+    return out;
+  };
+  const As = bySize(A, Ae, 0), Ss = S.map((T, j) => bySize(T, Se[j], 1 + j));
+  const off = [0]; for (const t of Ss) off.push(off[off.length - 1] + t.length);
+  const nS = off[SIDE_K], nD = off[SIDE_K/2], n = As.length + H.length + nS + nD;
   const ix = nAt > 65535 ? new Uint32Array(n) : new Uint16Array(n);
-  let k = 0; for (const v of A) ix[k++] = v; for (const v of H) ix[k++] = v; for (const s of S) for (const v of s) ix[k++] = v;
-  for (let j = 0; j < SIDE_K/2; j++) for (const v of S[j]) ix[k++] = v;
-  return { ix, cut: { A: A.length, H: H.length, S: nS, off } };
+  let k = 0; for (const v of As) ix[k++] = v; for (const v of H) ix[k++] = v; for (const t of Ss) for (const v of t) ix[k++] = v;
+  for (let j = 0; j < SIDE_K/2; j++) for (const v of Ss[j]) ix[k++] = v;
+  return { ix, cut: { A: As.length, H: H.length, S: nS, off, cls } };
 }
 function collect(fn){
   buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {}; curSpots = []; curCover = [];
@@ -1369,8 +1384,11 @@ function mergeCut(geos){
   // where each piece's own triangles landed, row by row (row 0: A; rows 1 to 8: the wall slices; rows 9 to 12: slices 0 to 3
   // again), and its box: what lets a frame draw only the pieces that are on screen (see cullPieces)
   const nP = geos.length, rows = 1 + SIDE_K + SIDE_K/2, rowS = new Int32Array(rows*nP), rowN = new Int32Array(rows*nP), box = new Float32Array(nP*6);
+  const rowC = new Int32Array(rows*nP*SMALL_N);   // (per piece and row: how many triangles are at least each size)
   const put = (lo, row) => { let base = 0; parts.forEach((p, gi) => { const I = p.I, r = typeof lo === 'function' ? lo(p) : null; const [x, y] = r || [p[lo][0], p[lo][1]];
-    if (row >= 0){ rowS[row*nP + gi] = k; rowN[row*nP + gi] = y - x; }
+    if (row >= 0){ rowS[row*nP + gi] = k; rowN[row*nP + gi] = y - x;
+      const src = row <= SIDE_K ? row : row - SIDE_K, cu = geos[gi].userData.cut, o = (row*nP + gi)*SMALL_N;
+      for (let l = 0; l < SMALL_N; l++) rowC[o + l] = cu && cu.cls ? cu.cls[src*SMALL_N + l] : y - x; }
     for (let q = x; q < y; q++) ix[k++] = I[q] + base; base += geos[gi].attributes.position.count; }); };
   put('a', 0); put('h', -1);
   for (let j = 0; j < SIDE_K; j++) put(p => [p.s[j], p.s[j + 1]], 1 + j);
@@ -1380,7 +1398,7 @@ function mergeCut(geos){
     box.set([x0, x1, y0, y1, z0, z1], gi*6); });
   out.setIndex(new THREE.BufferAttribute(ix, 1));
   out.userData.cut = { A: nA, H: nH, S: off[SIDE_K], off }; out.setDrawRange(0, nA + nH + off[SIDE_K]);
-  if (nP > 1) out.userData.pcs = { n: nP, rowS, rowN, box, stamp: -1, vis: new Uint8Array(nP), seen: 0 };
+  if (nP > 1) out.userData.pcs = { n: nP, rowS, rowN, rowC, box, stamp: -1, vis: new Uint8Array(nP), seen: 0 };
   out.computeBoundingSphere();
   return out;
 }

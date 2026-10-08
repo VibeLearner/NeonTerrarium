@@ -392,6 +392,7 @@ const SCREEN_MAT = new THREE.ShaderMaterial({
       gl_FragColor = vec4(c, 1.0);
     }`,
 });
+mrtShader(SCREEN_MAT);   // (it writes the normal image too: core.js)
 let SCREEN_SEQ = 0;
 // a live screen on a face: F's local z points out of the face; kind 0-5 picks the program
 const _scA = new THREE.Vector3(), _scB = new THREE.Vector3(), _scN = new THREE.Vector3();

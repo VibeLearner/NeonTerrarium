@@ -29,7 +29,7 @@ const PPL_MAX = 700;          // most people drawn at once (the nearest win if m
 const PPL_SPEED = .55;        // walking speed, world units a second (a block takes about 7 s)
 
 // a batch of upright pixel sprites cut from one sheet (rows of equal cells): people, and the delivery drones
-function spriteMat(tex, W, H, cw, ch, rows){ return new THREE.ShaderMaterial({
+function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMaterial({   // (mrtShader: writes its flat normal too, core.js)
   uniforms: { map: { value: tex }, res: FOL_UNI.res, tint: FOL_UNI.tint, normalMode: FOL_UNI.normalMode,
               sheet: { value: new THREE.Vector4(W, H, cw, ch) }, size: { value: new THREE.Vector2(cw/PX, ch/PX) } },
   vertexShader: `uniform vec2 res; uniform vec2 size; attribute vec3 aPos; attribute vec4 aSpr;
@@ -66,7 +66,7 @@ function spriteMat(tex, W, H, cw, ch, rows){ return new THREE.ShaderMaterial({
       vec3 col = vSpr.w > 1.5 ? c.rgb : c.rgb * mix(tint, vec3(1.0), 0.3);
       gl_FragColor = normalMode > 0.5 ? vec4(0.5, 0.5, 1.0, 1.0) : vec4(col, 1.0);
     }`,
-}); }
+}), 'vec4(0.5, 0.5, 1.0, 1.0)'); }
 const PPL_MAT = spriteMat(PPL_TEX, PPL.W, PPL.H, PPL.cw, PPL.ch, PPL.rows);
 function spriteBatch(mat, max){
   const geo = new THREE.InstancedBufferGeometry();

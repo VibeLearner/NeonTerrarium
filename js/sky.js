@@ -48,35 +48,45 @@ function placeSun(){
   sun.target.position.copy(_sunC); sun.target.updateMatrixWorld();
   sun.position.copy(_sunC).addScaledVector(SUN_DIR, SUN_BACK);
 }
-// Shadow redraws without the spikes. The shadow map is drawn half as wide again as the view needs, on the same grid
-// and at the same texel size (3072 texels for what used to be 2048), so panning stays inside it for a while with
-// nothing to redraw. Before the view gets near its edge, whenever the sun has moved (with the day cycle running the
-// old code redrew the whole map every frame; now the next one is always on its way, SH_K frames apart), or once the
-// zoom has stepped to another box size, the next map is drawn in the background a strip at a time (SH_K frames, one strip each, into a
-// second map) and the two are swapped when it's done; what's on screen never sees a half-drawn map. An edit, or a view
-// that outruns the map (a jump across the city), still redraws it at once, as before. While a building's sweep is
-// playing the background strips wait (its clipped shadow is only drawn right by the full redraw).
-const SH_F = 1.5, SH_K = 8, SH_SUN = .12/1600;
+// Shadow redraws without the spikes. The shadow map is drawn twice as wide as the view needs, on the same grid and at
+// the same texel size (4096 texels where it used to be 2048; exactly twice, so the map's scale is exactly half the old
+// one and shadows land on the same screen pixels as before, which one and a half times didn't quite manage). Panning
+// stays inside it for a while with nothing to redraw. Before the view gets near its edge, whenever the sun has moved
+// (with the day cycle running the old code redrew the whole map every frame), or once the zoom has stepped to another
+// box size, the next map is drawn in the background a strip at a time (one strip a frame, SH_K strips, or SH_K_SUN
+// when only the sun has crept on, into a second map) and the two are swapped when it's done; what's on screen never sees a half-drawn map. An edit, or a view that
+// outruns the map (a jump across the city), still redraws it at once, as before.
+const SH_F = 2, SH_K = 8, SH_K_SUN = 32, SH_SUN = .12/1600;   // (a map that only follows the sun is spread thinner: it has no view to keep up with)
 sun.shadow.mapSize.set(2048*SH_F, 2048*SH_F);
 let shFront = null, shJob = null, shSpare = null;
-const shTarget = () => new THREE.WebGLRenderTarget(2048*SH_F, 2048*SH_F, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat });
+// (the two maps are never drawn into at the same time, so the second borrows the first one's depth buffer: 32 MB saved)
+let shDepth = null;
+function shTarget(){
+  const rt = new THREE.WebGLRenderTarget(2048*SH_F, 2048*SH_F, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat });
+  const prev = renderer.getRenderTarget(); renderer.setRenderTarget(rt);   // (three sets its buffers up now)
+  const gl = renderer.getContext(), p = renderer.properties.get(rt);
+  if (!shDepth) shDepth = p.__webglDepthbuffer;
+  else if (p.__webglDepthbuffer && p.__webglDepthbuffer !== shDepth){ gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, shDepth); gl.deleteRenderbuffer(p.__webglDepthbuffer); p.__webglDepthbuffer = shDepth; }
+  renderer.setRenderTarget(prev);
+  return rt;
+}
 // (three draws a shadow map only from inside a render call: a scene holding one empty mesh is rendered, and the mesh,
 // as it comes up, draws the strip)
 const shHost = new THREE.Scene(), shHostRT = new THREE.WebGLRenderTarget(1, 1), shHook = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial());
 shHook.frustumCulled = false; shHost.add(shHook); shHost.autoUpdate = false; shHost.userData.always = true;   // (always: see tools/perf/page.js)
 shHook.onBeforeRender = () => { renderer.shadowMap.needsUpdate = true; renderer.shadowMap.render([sun], scene, cam); renderer.shadowMap.needsUpdate = false; };
-const shSnap = rt => { const lx = new THREE.Vector3().crossVectors(_lUp, shNeed.dir).normalize();
-  return { rt, half: shNeed.half, c: shNeed.c.clone(), dir: shNeed.dir.clone(), lx, ly: new THREE.Vector3().crossVectors(shNeed.dir, lx), matrix: new THREE.Matrix4(), k: 0 }; };
+const shSnap = (rt, K = SH_K) => { const lx = new THREE.Vector3().crossVectors(_lUp, shNeed.dir).normalize();
+  return { rt, half: shNeed.half, c: shNeed.c.clone(), dir: shNeed.dir.clone(), lx, ly: new THREE.Vector3().crossVectors(shNeed.dir, lx), matrix: new THREE.Matrix4(), k: 0, K }; };
 // does map m (in its own axes) hold all the view needs?
 const _shd = new THREE.Vector3();
 function shSlack(m){ _shd.subVectors(shNeed.c, m.c); return m.half*SH_F - shNeed.half*1.02 - Math.max(Math.abs(_shd.dot(m.lx)), Math.abs(_shd.dot(m.ly))); }
-// point the sun and its shadow camera at map m (strip k of SH_K, or the whole of it)
+// point the sun and its shadow camera at map m (strip k of its m.K, or the whole of it)
 function shAim(m, k = -1){
   const sh = sun.shadow, c = sh.camera, HF = m.half*SH_F;
   sun.target.position.copy(m.c); sun.position.copy(m.c).addScaledVector(m.dir, SUN_BACK); sun.updateMatrixWorld(); sun.target.updateMatrixWorld();
   c.left = -HF; c.right = HF;
   if (k < 0){ c.bottom = -HF; c.top = HF; sh._viewports[0].set(0, 0, 1, 1); }
-  else { c.bottom = -HF + 2*HF*k/SH_K; c.top = -HF + 2*HF*(k + 1)/SH_K; sh._viewports[0].set(0, k/SH_K, 1, 1/SH_K); }
+  else { const K = m.K; c.bottom = -HF + 2*HF*k/K; c.top = -HF + 2*HF*(k + 1)/K; sh._viewports[0].set(0, k/K, 1, 1/K); }
   c.updateProjectionMatrix(); sh.map = m.rt;
 }
 function shadowFrame(){
@@ -85,16 +95,20 @@ function shadowFrame(){
   if (!now){
     // time to start the next map? (the sun moved, the box size changed, or the view has used up 40% of the room; a map
     // under way is only started again if the sun has jumped, the box size changed or the view would leave it)
-    const due = shFront.dir.distanceToSquared(shNeed.dir) > 1e-12 || shFront.half !== shNeed.half || shSlack(shFront) < .6*(SH_F - 1)*shNeed.half;
-    if (shJob && (shJob.half !== shNeed.half || shJob.dir.distanceToSquared(shNeed.dir) > SH_SUN || shSlack(shJob) < 0)){ shSpare = shJob.rt; shJob = null; }   // aimed at a view that's gone: start again
-    if (due && !shJob){ shJob = shSnap(shSpare || shTarget()); shSpare = null; shAim(shJob); sh.updateMatrices(sun); shJob.matrix.copy(sh.matrix); }
-    if (shJob && !anims.length){
+    const sunD = shFront.dir.distanceToSquared(shNeed.dir), viewDue = shFront.half !== shNeed.half || shSlack(shFront) < .6*(SH_F - 1)*shNeed.half;
+    const due = viewDue || sunD > 1e-12, slow = !viewDue && sunD <= SH_SUN;   // (only the sun creeping on: spread it thin)
+    if (shJob && (shJob.half !== shNeed.half || shJob.dir.distanceToSquared(shNeed.dir) > SH_SUN || shSlack(shJob) < 0 || (viewDue && shJob.K !== SH_K))){ shSpare = shJob.rt; shJob = null; }   // aimed at a view that's gone, or too slow for it: start again
+    if (due && !shJob){ shJob = shSnap(shSpare || shTarget(), slow ? SH_K_SUN : SH_K); shSpare = null; shAim(shJob); sh.updateMatrices(sun); shJob.matrix.copy(sh.matrix); }
+    if (shJob){
       PH.begin('shadow strip (background)');
-      shAim(shJob, shJob.k); shJob.rt.scissor.set(0, sh.mapSize.y*shJob.k/SH_K, sh.mapSize.x, sh.mapSize.y/SH_K); shJob.rt.scissorTest = true;
+      shAim(shJob, shJob.k); shJob.rt.scissor.set(0, sh.mapSize.y*shJob.k/shJob.K, sh.mapSize.x, sh.mapSize.y/shJob.K); shJob.rt.scissorTest = true;
+      // (a building mid-sweep: three's own shadow pass ignores its clipping, so the strip does too)
+      for (const a of anims) a.mats.atlas.clippingPlanes = [];
       const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(shHostRT); renderer.render(shHost, cam); renderer.autoClear = ac;
+      for (const a of anims) a.mats.atlas.clippingPlanes = [a.u.plane];
       shJob.rt.scissorTest = false;
       PH.end();
-      if (++shJob.k === SH_K){ shSpare = shFront.rt; shFront = shJob; shJob = null; }
+      if (++shJob.k === shJob.K){ shSpare = shFront.rt; shFront = shJob; shJob = null; }
     }
     shAim(shFront); sh.matrix.copy(shFront.matrix);
     renderer.shadowMap.needsUpdate = false;
@@ -708,13 +722,43 @@ const cloudScene = new THREE.Scene(); cloudScene.add(new THREE.Mesh(new THREE.Pl
 let rtCloud = null;
 
 let rtC = null, rtN = null, W = 480, H = 270;
+// Drawing the city once (core.js): the normal image (rtN's texture) is the color target's second image, and each draw
+// either writes it or leaves it alone (mrtWants), switched only when that changes. The normal pass's own depth never saw
+// glass, glows and the like, so whatever it left out mustn't hide the normals behind it: those draws come after the
+// rest among the solid ones (the opaque sort in world.js) and don't write the second image.
+let MRT_ON = false, mrtCur = 0, mrtWarned = new Set();
+if (MRT){
+  const gl = renderer.getContext(), B2 = [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1], B1 = [gl.COLOR_ATTACHMENT0, gl.NONE];
+  const rbd = renderer.renderBufferDirect;
+  renderer.renderBufferDirect = function(camera, sc, geo, mat, obj, grp){
+    if (MRT_ON && renderer.getRenderTarget() === rtC){
+      const w = mrtWants(obj, mat) ? 2 : 1;
+      if (w !== mrtCur){ gl.drawBuffers(w === 2 ? B2 : B1); mrtCur = w; }
+      if (w === 1 && (obj.layers.mask & 13) && !mrtWarned.has(mat)){ mrtWarned.add(mat); console.warn('Neon Terrarium: no normals from', mat.type, mat.name || '', obj); }
+    }
+    return rbd.call(this, camera, sc, geo, mat, obj, grp);
+  };
+}
+// before the color pass: both images cleared (the normal image to "facing the camera", as the normal pass cleared it)
+function mrtBegin(){
+  const gl = renderer.getContext();
+  if (rtC._mrtN !== rtN){
+    renderer.setRenderTarget(rtN); renderer.setRenderTarget(rtC);   // (three makes both targets' buffers now)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, renderer.properties.get(rtN.texture).__webglTexture, 0);
+    rtC._mrtN = rtN;
+  }
+  gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]); mrtCur = 2;
+  renderer.clear(); gl.clearBufferfv(gl.COLOR, 1, [128/255, 128/255, 1, 1]);
+  renderer.autoClear = false; MRT_ON = true;
+}
+function mrtEnd(){ MRT_ON = false; renderer.autoClear = true; }
 function makeTargets(){
   if (rtC){ rtC.depthTexture.dispose(); rtC.dispose(); rtN.dispose(); }
   const opt = { minFilter:THREE.NearestFilter, magFilter:THREE.NearestFilter, format:THREE.RGBAFormat };
   rtC = new THREE.WebGLRenderTarget(W,H,opt);
   rtC.depthTexture = new THREE.DepthTexture(W,H); rtC.depthTexture.type = THREE.UnsignedIntType;
   rtC.depthTexture.minFilter = rtC.depthTexture.magFilter = THREE.NearestFilter;
-  rtN = new THREE.WebGLRenderTarget(W,H,opt);
+  rtN = new THREE.WebGLRenderTarget(W,H, MRT ? Object.assign({ depthBuffer: false }, opt) : opt);   // (drawn by the color pass, core.js: no depth of its own)
   comp.uniforms.tColor.value = rtC.texture; comp.uniforms.tDepth.value = rtC.depthTexture; comp.uniforms.tNormal.value = rtN.texture;
   comp.uniforms.res.value.set(W,H);
   if (rtCloud) rtCloud.dispose();

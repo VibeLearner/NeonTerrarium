@@ -1366,7 +1366,7 @@ function pipeSeg(mat, P, ax, ay, az, bx, by, bz, r){
 // something bioluminescent, with a slow breathing pulse and brighter surges (FLUID_NIGHT follows the hour).
 const FLUID_NIGHT = { value: 0 };
 function fluidMat(deep, mid, hi, glowC){
-  return new THREE.ShaderMaterial({
+  return mrtShader(new THREE.ShaderMaterial({   // (mrtShader: it writes the normal image too, core.js)
     uniforms: { time: FOL_UNI.time, night: FLUID_NIGHT },
     vertexShader: 'varying vec3 vW; varying vec3 vN; void main(){ vec4 w = modelMatrix*vec4(position, 1.0); vW = w.xyz; vN = normalize(mat3(modelMatrix)*normal); gl_Position = projectionMatrix*viewMatrix*w; }',
     fragmentShader: `uniform float time; uniform float night; varying vec3 vW; varying vec3 vN;
@@ -1385,7 +1385,7 @@ function fluidMat(deep, mid, hi, glowC){
         c = mix(c*.9, lit, night);
         gl_FragColor = vec4(floor(c*24.0 + .5)/24.0, 1.0);
       }`,
-  });
+  }));
 }
 const FLUIDS = [
   fluidMat('(.02, .14, .48)', '(.06, .5, .92)', '(.62, .97, 1.0)', '(.1, .5, .9)'),      // blue

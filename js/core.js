@@ -23,6 +23,48 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.BasicShadowMap;
 renderer.shadowMap.autoUpdate = false;
 
+/* ---------- drawing the city once: color and normals in one pass ---------- */
+// The city used to be drawn twice a frame: once for its colors, and again for the normal image (which way every
+// surface faces, for the outlines, ambient occlusion and night lights), every triangle a second time. Now the color pass
+// writes both at once: each material also writes, to a second image, exactly what the normal pass drew there (the
+// surface's own normal, as MeshNormalMaterial worked it out; flat "facing the camera" for plants and people). Things the
+// normal pass never drew (glass, glows, sprites, light beams) leave the second image alone: see mrtWants and main.js.
+// WebGL 2 only; without it the old second pass runs.
+const MRT = renderer.capabilities.isWebGL2;
+if (MRT){
+  // a second output for every fragment shader (three declares the first without a location, which two outputs need)
+  const gl = renderer.getContext(), src = gl.shaderSource.bind(gl);
+  gl.shaderSource = (sh, s) => src(sh, s.replace('out highp vec4 pc_fragColor;', 'layout(location = 0) out highp vec4 pc_fragColor;\nlayout(location = 1) out highp vec4 pc_fragNormal;'));
+  // every built-in material: the normal as MeshNormalMaterial computes it (normal_vert, defaultnormal_vertex), written
+  // as it packs it (packNormalToRGB), at full opacity
+  THREE.ShaderChunk.common += '\nvarying vec3 vMrtN;';
+  THREE.ShaderChunk.project_vertex += `
+{ vec3 mrtN = normal;
+#ifdef USE_INSTANCING
+  mat3 mrtM = mat3( instanceMatrix );
+  mrtN /= vec3( dot( mrtM[ 0 ], mrtM[ 0 ] ), dot( mrtM[ 1 ], mrtM[ 1 ] ), dot( mrtM[ 2 ], mrtM[ 2 ] ) );
+  mrtN = mrtM * mrtN;
+#endif
+  vMrtN = normalize( normalMatrix * mrtN ); }`;
+  THREE.ShaderChunk.dithering_fragment += '\npc_fragNormal = vec4( normalize( normalize( vMrtN ) ) * 0.5 + 0.5, 1.0 );';
+}
+// A shader material of the game's own that the normal pass drew with MeshNormalMaterial gets the same normal here:
+// flat = the normal it wrote itself in the normal pass (plants and people: a flat one facing the camera).
+function mrtShader(mat, flat = null){
+  if (!MRT) return mat;
+  if (!flat) mat.vertexShader = mat.vertexShader.replace(/void main\(\)\s*\{/, 'varying vec3 vMrtN;\nvoid main(){ vMrtN = normalize( normalMatrix * normal );');
+  const out = flat ? `pc_fragNormal = ${flat};` : 'pc_fragNormal = vec4( normalize( normalize( vMrtN ) ) * 0.5 + 0.5, 1.0 );';
+  const f = mat.fragmentShader, k = f.lastIndexOf('}');
+  mat.fragmentShader = (flat ? '' : 'varying vec3 vMrtN;\n') + f.slice(0, k) + out + '\n' + f.slice(k);
+  mat.userData.mrt = true;
+  return mat;
+}
+// Does this draw write the normal image? Only what the normal pass drew (layer 0, plants and people on layer 2, pieces
+// mid-sweep on layer 3), with a material that knows how. A see-through one only if it blends normally: it writes the
+// normal at full opacity, which with normal blending replaces what's under it, as the normal pass did.
+const mrtWants = (o, m) => (o.layers.mask & 13) !== 0 && (m.userData.mrt === true || m.isMeshToonMaterial || m.isMeshBasicMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshStandardMaterial || m.isMeshNormalMaterial)
+  && !(m.transparent && m.blending !== THREE.NormalBlending);
+
 const scene = new THREE.Scene();
 // World matrices are brought up to date once a frame (main.js), not by every one of the frame's passes; the scene
 // itself never moves, so it doesn't force its whole tree to recompute either (see freezeTree in world.js)

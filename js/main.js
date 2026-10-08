@@ -71,9 +71,12 @@ function frame(now){
   cam.layers.enableAll(); shadowFrame();   // shadows: redrawn at once, a strip in the background, or not at all (sky.js)
   PH.shadow(); PH.begin(renderer.shadowMap.needsUpdate ? 'color + shadow redraw' : 'color');
   renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
+  if (MRT) mrtBegin();   // the normal image is drawn along with the colors (core.js, sky.js)
   cam.layers.enableAll(); renderer.render(scene, cam);
+  if (MRT) mrtEnd();
   PH.end();
   renderer.shadowMap.needsUpdate = false;
+  if (!MRT){   // (without WebGL 2: the normal image in a pass of its own)
   PH.begin('normals');
   renderer.setRenderTarget(rtN); renderer.setClearColor(0x8080ff, 1);
   scene.overrideMaterial = normalMat; cam.layers.set(0); renderer.render(scene, cam); scene.overrideMaterial = null;
@@ -91,6 +94,7 @@ function frame(now){
   }
   renderer.autoClear = true;
   PH.end();
+  }
   comp.uniforms.VP.value.copy(cam.projectionMatrix).multiply(cam.matrixWorldInverse);
   comp.uniforms.invVP.value.copy(comp.uniforms.VP.value).invert();
   liftShimmerCull(comp.uniforms.VP.value); mtShimmerCull(comp.uniforms.VP.value);   // the air shimmers only where they can show

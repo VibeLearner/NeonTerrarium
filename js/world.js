@@ -1176,7 +1176,9 @@ function mergeIndexed(geos){
 }
 // three's own order for solid things (by layer group, render order, shader, material, distance, then creation), except that
 // a region's merged mesh takes the place of the first of its pieces
-renderer.setOpaqueSort((a, b) => a.groupOrder !== b.groupOrder ? a.groupOrder - b.groupOrder : a.renderOrder !== b.renderOrder ? a.renderOrder - b.renderOrder
+// (and whatever doesn't write the normal image after everything that does: see mrtBegin in sky.js)
+const mrtLast = r => mrtWants(r.object, r.material) ? 0 : 1;
+renderer.setOpaqueSort((a, b) => a.groupOrder !== b.groupOrder ? a.groupOrder - b.groupOrder : MRT && mrtLast(a) !== mrtLast(b) ? mrtLast(a) - mrtLast(b) : a.renderOrder !== b.renderOrder ? a.renderOrder - b.renderOrder
   : a.program !== b.program ? a.program.id - b.program.id : a.material.id !== b.material.id ? a.material.id - b.material.id : a.z !== b.z ? a.z - b.z
   : (a.object.userData.sortId ?? a.id) - (b.object.userData.sortId ?? b.id));
 // and likewise for see-through things (three's order: layer group, render order, distance back to front, creation)

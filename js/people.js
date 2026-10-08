@@ -973,6 +973,15 @@ function mtPlaces(fresh, oldDoors, addEnd){
 }
 
 /* ---------- keeping up with the city ---------- */
+let pplFrame = 0;
+const _op = new THREE.Vector3();
+// is a ground point well off the screen from any height people can be at (screen x doesn't depend on height; y does)
+function offScreen(x, z){
+  const VP = comp.uniforms.VP.value;
+  _op.set(x, 0, z).applyMatrix4(VP); if (_op.x < -1.3 || _op.x > 1.3) return true;
+  const y0 = _op.y; _op.set(x, 40, z).applyMatrix4(VP);
+  return (y0 > 1.3 && _op.y > 1.3) || (y0 < -1.4 && _op.y < -1.4);
+}
 let pplReady = false, pplNow = 0, pplHour = S.hour, pplCursor = 0, pplList = [];
 // called after every edit (from syncAgents): rebuild the network, places and doors, then the residents and their jobs
 function syncPeople(){
@@ -1759,7 +1768,12 @@ function updatePeople(dt, t){
   for (const p of pplList) if (!p.walk && p.spot){ if (p.spot.kind === 'vendor') served.add(stallKey(p.spot)); else if (p.spot.kind === 'queue') queued.add(stallKey(p.spot)); }
   for (const c of cells.values()) if (c.liftCab) liftCab(c);   // (every lift has its cab, so its controller runs)
   updateLifts(dt);
+  // (W5.1) Anyone well off screen is worked on every fourth frame, with the time of the frames skipped (their walks go on at
+  // the same speed; they arrive, and pick what's next, a few frames later). Lifts, clubs and the metro always run.
+  const dt0 = dt; let pi = 0; pplFrame++;
   for (const p of pplList){
+    if (!PH.tests.noSlowFar && !p.ride && !p.club && !p.metro && p.x !== undefined && ((pplFrame + pi++) & 3) && offScreen(p.x, p.z)){ p.acc = (p.acc || 0) + dt0; continue; }
+    const dt = dt0 + (p.acc || 0); p.acc = 0;
     let alpha = 1, walking = false, y = CURB, frame = 0;
     const paused = p.pause > t;
     if (p.ride){ const r = liftRide(p, dt, t); if (r){ emit(r.x, r.y, r.z, p.row, r.frame, p.flip, r.alpha); continue; } }

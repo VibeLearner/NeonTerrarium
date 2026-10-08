@@ -253,6 +253,13 @@ const comp = new THREE.ShaderMaterial({
       return step(sc.z - 0.003, unpackRGBAToDepth(texture2D(shadowMap, sc.xy)));
     }
     float rawD(vec2 uv){ return texture2D(tDepth, uv).x; }
+    // the part of 0..1 where v0 + t*(v1 - v0) lies within -h..h (empty: x > y)
+    vec2 mtSpan(float v0, float v1, float h){
+      float dv = v1 - v0;
+      if (abs(dv) < 1e-6) return abs(v0) < h ? vec2(0.0, 1.0) : vec2(1.0, 0.0);
+      float t1 = (-h - v0)/dv, t2 = (h - v0)/dv;
+      return vec2(max(min(t1, t2), 0.0), min(max(t1, t2), 1.0));
+    }
     float D(vec2 uv){ return near + rawD(uv)*(far-near); }
     vec3 N(vec2 uv){ return texture2D(tNormal, uv).rgb*2.0-1.0; }
     // arithmetic hash (no sin): the sin trick loses precision on some GPUs and lines the stars up in streaks
@@ -310,8 +317,17 @@ const comp = new THREE.ShaderMaterial({
           if (ta > tb){ float tt = ta; ta = tb; tb = tt; }
           tb = min(tb, tS1 + 0.04);
           if (tb > ta){
+            // which cars' boxes the six samples can reach at all (the samples lie along one straight line): a car whose
+            // box the line misses (with room to spare) would only add zeros, so it's left out of the loop below
+            int near = 0;
+            { vec3 pS = o1 + d1*(ta + (tb - ta)*.5/6.0), pE = o1 + d1*(ta + (tb - ta)*5.5/6.0);
+              for (int k=0; k<16; k++){ if (k >= mtN) break;
+                vec4 g = mtGap[k]; vec2 q0 = pS.xz - g.xy, q1 = pE.xz - g.xy;
+                vec2 ra = mtSpan(q0.x*g.z + q0.y*g.w, q1.x*g.z + q1.y*g.w, .96), rc = mtSpan(q0.x*g.w - q0.y*g.z, q1.x*g.w - q1.y*g.z, .63);
+                if (max(ra.x, rc.x) <= min(ra.y, rc.y)) near |= 1 << k; } }
             for (int i=0; i<6; i++){ vec3 p = o1 + d1*(ta + (tb - ta)*(float(i) + .5)/6.0);
               for (int k=0; k<16; k++){ if (k >= mtN) break;
+                if ((near & (1 << k)) == 0) continue;
                 vec4 g = mtGap[k]; vec2 q = p.xz - g.xy; float al = abs(q.x*g.z + q.y*g.w), ac = abs(q.x*g.w - q.y*g.z);
                 mtSh += (1.0 - smoothstep(.05, .62, ac))*(1.0 - smoothstep(.2, .95, al)); } }   // (soft all the way out: a haze, no edge)
             mtSh /= 6.0;
@@ -575,14 +591,15 @@ const comp = new THREE.ShaderMaterial({
   depthTest:false, depthWrite:false,
 });
 // The composite as one shader holding every effect is big, and the graphics card sets aside room for all of it even for
-// the effects that are off and skipped. Test (the overlay, exact mode): compiled with only the effects that are on this
-// frame, the rest left out of the program entirely (each left out only when it would have done nothing: same picture);
-// or with none at all, to see the floor. Programs are kept, so switching back and forth costs nothing after the first.
+// the effects that are off and skipped (measured: about 3 ms of its 19). So it's compiled with only the effects that are
+// on this frame, the rest left out of the program entirely (each only when it would have done nothing: same picture).
+// Programs are kept, so switching back and forth costs nothing after the first time. (The overlay's tests, exact mode:
+// everything compiled in as before, or no effects at all, to see the floor.)
 let compKey = '';
 function compVariant(){
   const T = PH.tests, u = comp.uniforms, on = {};
   if (T.compFloor) for (const f of COMP_FX) on[f] = false;
-  else if (T.compMatch){
+  else if (!T.compAll){
     on.SHIM = u.nLifts.value > .5 || u.mtN.value > 0; on.OUTLINE = u.outlines.value > 0; on.AO = u.aoI.value > 0; on.NL = NL_UNI.lightI.value > 0;
     on.RIM = u.rimI.value > .01; on.WET = u.wet.value > 0; on.CLOUDS = u.cloudOn.value > .5; on.MIST = u.mistI.value > 0 && u.nVents.value > 0;
     on.RAYS = u.raysOn.value > .5 && u.rayI.value > .01; on.RAIN = u.rainOn.value > .5; on.PAL = u.palOn.value > .5;

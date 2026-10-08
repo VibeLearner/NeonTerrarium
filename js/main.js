@@ -77,23 +77,23 @@ function frame(now){
   PH.end();
   renderer.shadowMap.needsUpdate = false;
   if (!MRT){   // (without WebGL 2: the normal image in a pass of its own)
-  PH.begin('normals');
-  renderer.setRenderTarget(rtN); renderer.setClearColor(0x8080ff, 1);
-  scene.overrideMaterial = normalMat; cam.layers.set(0); renderer.render(scene, cam); scene.overrideMaterial = null;
-  renderer.autoClear = false; FOL_UNI.normalMode.value = 1; cam.layers.set(2); renderer.render(scene, cam);
-  FOL_UNI.normalMode.value = 0;
-  // pieces mid-animation are drawn with their clipping in the normal pass too, so outlines match what's shown
-  if (anims.length){
-    cam.layers.set(3);
-    for (const a of anims){
-      if (!a.meshes){ a.meshes = []; a.view.traverse(o => { if (o.isMesh) a.meshes.push(o); }); }   // (found once: a piece's meshes don't change while it animates)
-      for (const o of a.meshes){ o.userData.colMat = o.material; o.material = a.mats.nrm; }
-      renderer.render(a.view, cam);
-      for (const o of a.meshes) o.material = o.userData.colMat;
+    PH.begin('normals');
+    renderer.setRenderTarget(rtN); renderer.setClearColor(0x8080ff, 1);
+    scene.overrideMaterial = normalMat; cam.layers.set(0); renderer.render(scene, cam); scene.overrideMaterial = null;
+    renderer.autoClear = false; FOL_UNI.normalMode.value = 1; cam.layers.set(2); renderer.render(scene, cam);
+    FOL_UNI.normalMode.value = 0;
+    // pieces mid-animation are drawn with their clipping in the normal pass too, so outlines match what's shown
+    if (anims.length){
+      cam.layers.set(3);
+      for (const a of anims){
+        if (!a.meshes){ a.meshes = []; a.view.traverse(o => { if (o.isMesh) a.meshes.push(o); }); }   // (found once: a piece's meshes don't change while it animates)
+        for (const o of a.meshes){ o.userData.colMat = o.material; o.material = a.mats.nrm; }
+        renderer.render(a.view, cam);
+        for (const o of a.meshes) o.material = o.userData.colMat;
+      }
     }
-  }
-  renderer.autoClear = true;
-  PH.end();
+    renderer.autoClear = true;
+    PH.end();
   }
   comp.uniforms.VP.value.copy(cam.projectionMatrix).multiply(cam.matrixWorldInverse);
   comp.uniforms.invVP.value.copy(comp.uniforms.VP.value).invert();

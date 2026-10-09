@@ -240,7 +240,9 @@
     const a = document.createElement('a'); const d = new Date(); const pad = n => String(n).padStart(2, '0');
     a.href = URL.createObjectURL(blob); a.download = 'jam-ratings-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.json';
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
-    $('#rateMsg').textContent = 'Exported ' + S.ratings.length + ' ratings. Look for the file in your Downloads folder.';
+    // Some hosts (including the hosted artifact view) block downloads, so the text is also shown to select and copy.
+    const box = $('#exportBox'); box.hidden = false; box.value = JSON.stringify(exportObject(), null, 2); box.focus(); box.select();
+    $('#rateMsg').textContent = 'Exported ' + S.ratings.length + ' ratings. If no file appeared in Downloads, copy the text in the box below and send that.';
   });
   $('#copyjson').addEventListener('click', async () => {
     const text = JSON.stringify(exportObject(), null, 2);
@@ -253,7 +255,12 @@
   });
   $('#clearr').addEventListener('click', () => {
     if (!S.ratings.length) return;
-    if (!window.confirm('Remove all ' + S.ratings.length + ' ratings from this list? Export first if you want to keep them.')) return;
+    const b = $('#clearr');
+    if (!b.dataset.armed) { // two clicks instead of a confirm dialog (dialogs are blocked in some hosts)
+      b.dataset.armed = '1'; b.textContent = 'Click again to clear'; $('#rateMsg').textContent = 'This removes all ' + S.ratings.length + ' ratings. Export first if you want to keep them.';
+      setTimeout(() => { delete b.dataset.armed; b.textContent = 'Clear list'; }, 4000); return;
+    }
+    delete b.dataset.armed; b.textContent = 'Clear list';
     S.ratings = []; persist(); renderRatings(); $('#rateMsg').textContent = 'List cleared.';
   });
 

@@ -43,9 +43,9 @@ def play(mode, scene, edits, srv):
     url = HH.make_site('wedit' + mode, None); sc = HH.load_scenes([scene])[0]
     with sync_playwright() as pw:
         br = HH.launch(pw)
-        init = 'window.__NV_OFF = true; ' + ('window.__GEN_WORKER = true;' if mode == 'worker' else 'window.__GEN_MAIN = true;')
+        init = 'window.__NV_OFF = true; ' + ('window.__GEN_WORKER = true; window.__LOAD_MAIN = true;' if mode == 'worker' else 'window.__GEN_MAIN = true;')
         ctx, pg, errs = HH.open_game(br, url, sc, HH.VIEWPORTS[0], extra_init=init)
-        if mode == 'worker': pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=120000)
+        if mode == 'worker': pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=120000, polling=200)
         pg.evaluate('() => { __perf.skip = true; }')
         r = pg.evaluate(RUN, [mode, edits])
         br.close()

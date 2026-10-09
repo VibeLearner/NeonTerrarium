@@ -23,6 +23,7 @@ I developed there in a side worktree and copied each finished item over). Every 
 | 10 painted wall detail | measured, under the 20% threshold, no prototype | fdeb3ee | 7.7% (city), 7.0% (dense) |
 | 11 steady frame pacing | measured; one regular spike (collision pass) found, a spreading attempt reverted | 9c970b8, 8678f35 | spread and spike causes listed |
 | 12 zoom 60 | measured | 9c970b8 | table in item 12 |
+| 13 (extra) live pass drawn only for objects the view can show | done, exact | (next commit) | cache steps city 70/70 and megas 12/12, standard city 25, megas 15, dense 13: 0 problems; draw calls 1,990 to 1,363, triangles 1.67 M to 1.28 M |
 
 ## What I skipped or didn't finish, and why
 - 1a: can't be exact and nearly nobody is off screen; replaced by your size-based rate.
@@ -30,7 +31,7 @@ I developed there in a side worktree and copied each finished item over). Every 
 - 3(b): the composite's extra cost is a GPU matter; the harness can't time the card. The switch to find it ("copy the cache by drawing") is built.
 - 5a flat-face rule: shipped only as a patch file; 0.3 to 0.5% of triangles for a few tie pixels. 5b: nothing to remove.
 - 9: you asked for a report first: the numbers and two candidates are in item 9. 10: under the plan's threshold. 11: the collision pass's regular spike has a design, no quick fix.
-- Not done at all: dropping the CPU copies of merged geometry (item 4's finding, about 1 to 2 GB), trimming the live pass (item 12's finding), a grid for the collision pass kept between frames.
+- Not done at all: trimming the live pass further, dropping the CPU copies of merged geometry (item 4's finding, about 1 to 2 GB), a grid for the collision pass kept between frames.
 
 ## Decisions I made on my own (one line of why each)
 - People rate: N from each person's own speed (rush and hurry included), frame time quantized to 1/240 s so N doesn't flap with jitter, N capped at 4, cursor radius 90 px: conservative, and each step stays under about .75 px.
@@ -53,14 +54,14 @@ I developed there in a side worktree and copied each finished item over). Every 
 4. **5a flat-face patch**: recommend leaving it out; tools/perf/patches/hide_flat_faces.patch if you disagree.
 5. **Round parts and rounded boxes by zoom band** (item 9): about 9% and 6% of the triangles put; both need shape variants and a flip test. Go or no go?
 6. **Freeing the CPU copies of merged geometry** (item 4): about 1 to 2 GB of the 3 GB heap. Needs a careful pass over picking, edits and re-merging. Go or no go?
-7. **Live pass** (item 12): 1.16 million triangles in 886 objects at zoom 30 in a cached frame, 457k of them see-through glass. The largest lever left on the card side. And the unexplained draw calls (a cached frame submits about 700 more than an old-way frame): worth the browser's profiler on the M2.
+7. **Live pass** (item 12): 1.16 million triangles in 886 objects at zoom 30 in a cached frame, 457k of them see-through glass: the largest lever left on the card side (merging the glass quads where they share an edge, or culling plants by super-region). The extra item 13 already removed the margin band's objects from it.
 8. **The collision pass spike** every N-th frame (item 11): +3 ms on a 9 ms frame at N = 3; the fix is a grid kept between frames.
 9. **Zoom 60** (item 12): the frames drawn the old way (turning, zooming) submit 65% more draw calls than at zoom 30; still and pan keep the cache's benefit. Your call whether the cap should move.
 
 ## One measurement script (old build against new, everything that changed)
 Builds: OLD = `a7b4449` (before the cache) or `1bc4451` (round 5, accepted); NEW = `wip/round6`. Laptop on power and rested 5 minutes, Chrome in front, max city, Render 720p, "Optimize framerate" off, day cycle off, 22:00 in rain. Wait 20 s after any change; 3 readings 5 s apart; report the middle one; alternate old and new.
 - **A. Readings** (overlay F3, exact timing off: FPS and main thread ms), zoom 30 and zoom 15, each: still, slow pan (hold W), slow turn (Q or E), for OLD and for NEW.
-- **B. NEW with one thing switched back, same readings at zoom 30 and 15** (console, takes effect next frame; set back to undo): people `__FULL_RATE = true`; cache `SC.mode = 'off'`; speed detail `SD.on = false`; ring `PH.tests.noRing = true`; soft effects `__SOFT_FULL = true`; edits `__NO_RECT = true`. For the cache, `SC.mode = 'off'` also leaves speed-based detail on: use `SD.on = false` with it for the old picture. Building: place a house and a tall tower with `__NO_RECT` on and off and watch the overlay's `redrawn N times` and `edit rectangles N`; note any hitch.
+- **B. NEW with one thing switched back, same readings at zoom 30 and 15** (console, takes effect next frame; set back to undo): people `__FULL_RATE = true`; cache `SC.mode = 'off'`; speed detail `SD.on = false`; ring `PH.tests.noRing = true`; soft effects `__SOFT_FULL = true`; edits `__NO_RECT = true`; live pass `PH.tests.noLiveCull = true`. For the cache, `SC.mode = 'off'` also leaves speed-based detail on: use `SD.on = false` with it for the old picture. Building: place a house and a tall tower with `__NO_RECT` on and off and watch the overlay's `redrawn N times` and `edit rectangles N`; note any hitch.
 - **C. Exact timing** (Shift+F3), zoom 30 still, rain at night: `color`, `soft effects (half resolution)`, `composite`, `night lights`, `bloom and grade`, `all passes, exact`, `main thread`, for NEW, NEW with `__SOFT_FULL = true`, and NEW with `__COPY_DRAW = true` (item 3b).
 - **D. Recordings**, 10 seconds each: a busy street at zoom 15 and at zoom 30 with `__FULL_RATE = true` and with it false; a slow turn and a fast spin with `SD.on` true and false.
 - **E. Zoom 60** (NEW only): `zoom = zoomT = 60`: still, slow pan, slow turn: FPS and main thread ms.
@@ -259,11 +260,10 @@ the function that took the time; and drawn frames counted: whole redraws, strips
   Day cycle running: a whole redraw twice in 60 frames (the cache redraws when the lights switch, 8 background strips each time, one draw-call bump of about 750 on the frames with a strip).
   No shader program was compiled in any of these scenarios once warm (the first time a weather or time-of-day combination appears it compiles; not measurable here).
   An edit: see item 7 (edit_frames.py: one old-way frame, the one that redraws the shadows, then one rectangle).
-- Found while counting calls, not explained: a frame drawn from the cache submits about 2,100 draw calls where a frame drawn the old way submits about 1,400 (zoom 30, max city), although the
-  old way draws everything the cache frame does and more. The glow overlay accounts for about 165 of them (1,858 overlay meshes exist, 165 are in view, all with something to draw) plus 99 other
-  layer-6 meshes; the rest I could not attribute tonight (the background shadow strips and the composite passes are in both kinds of frame). Worth a look with the browser's profiler on the
-  M2: if cached frames cost more main-thread time than they should, this is where. See item 12 for what the live pass holds (1.16 million triangles in 886 objects at zoom 30).
-- Done about it: nothing shipped. The one regular spike (`checkBumps` every N-th frame) has a design but not a quick fix; everything else is either an artifact of the harness's clock or
+- Found while counting calls: a frame drawn from the cache submitted about 2,000 draw calls where a frame drawn the old way submits about 1,500 (max city, zoom 30, 1024 x 576), although the old way
+  draws everything the cache frame does and more. Cause: the cache frame's live pass is drawn with the cache's widened projection (so its pixels fall exactly on the cache's) and three culls by that
+  projection, so every live object in the margin band (up to 256 px round the view) was drawn too. Fixed as the extra item 13 below.
+- Done about it: the live pass cull (item 13). The one regular spike (`checkBumps` every N-th frame) has a design but not a quick fix; everything else is either an artifact of the harness's clock or
   already smooth. If you see stutter on the M2 that is not this, the likely suspects are the glass and plants live set (item 12) and shader compiles on weather changes.
 
 **12. Zoom 60 (measure only; the cap stays at 30).** tools/perf/zoom60.py sets `zoom = zoomT = 60` in code; max city, harness render size 1024 x 576, cache on, other changes in. Draw calls and
@@ -284,3 +284,11 @@ triangles are as submitted; GPU time can't be read here, the owner's script belo
   buildings (177 objects, 457k, `colorOnly` materials: transparent, drawn after the people so they tint what is behind them, which is why they can't live in the cache), building meshes that
   write their normals themselves (219 objects, 205k), plants (34 instanced objects, 95,550 instances, 191k), glow points (98k), instanced street furniture and vehicles (155k). This is what the
   color pass still costs with the cache on; trimming it (glass quads merged where they share an edge, plants culled by super-region) is the largest lever left on the card side.
+
+**13. (Extra, found by item 11) The cache frame's live pass is drawn for what the view can show, not for the margin too: done, exact.** In a frame drawn from the cache the live set (people, plants,
+glass, glow, vehicles) is drawn with the cache's widened projection, which three culls by, so everything in the 256 px margin band round the view was submitted as well. Now the objects that never move
+and are culled by three itself (a plot's glass, its glow overlay and similar: found once for each change to the world) are left out when their bounding sphere is outside the view's own frustum (the
+planes `cullFrame` has just made for it, 4 px of room): they could not have put a pixel into the view. Test "live pass: everything in the widened view (as before)" (`PH.tests.noLiveCull`).
+- Measured (max city, zoom 30, 1024 x 576 render, a cached frame): draw calls 1,990 to 1,363 (31% fewer), triangles submitted 1.67 M to 1.28 M (23% fewer), 1,474 objects left out. The margin band is a
+  smaller share at larger render sizes (256 px on 3420 x 1640 is 1.5 times the view's area, on 1024 x 576 it is 3.3 times), so on the M2 expect roughly a quarter of those savings.
+- Check: cache steps against the previous commit, city 70 captures, megas 12: 0 problems (identical pictures); standard script city 25, megas 15, dense 13: 0 problems.

@@ -338,12 +338,37 @@ SC.frame = function(){
   mrtBegin(rtC, rtN, true);
   if (PH.tests.copyByDraw || window.__COPY_DRAW) scCopyDraw(scCol(px), scRow(py)); else scBlit(scCol(px), scRow(py));
   cam.layers.mask = SC_LIVE_MASK; cullFrame(cam);
-  SC.drawView(() => renderer.render(scene, cam));
+  if (!PH.tests.noLiveCull) scLiveCull();
+  try { SC.drawView(() => renderer.render(scene, cam)); } finally { scLiveRestore(); }
   if (PH.tests.showRebuilds) scFlash(px, py);
   mrtEnd();
   cam.layers.mask = lm;
   return true;
 };
+// The live pass is drawn with the cache's widened projection (its pixels then fall exactly where the cache's do), which lets in every object of the margin too, a band
+// round the view up to 256 px wide. What no pixel of the view can show is left out here, by the view's own frustum (the planes cullFrame has just made for it): only objects
+// that never move and are culled by three itself (a plot's glass, its overlay and the like), found once for each change to the world. The picture doesn't change.
+let _lcList = [], _lcStamp = -1; const _lcHid = [], _lcS = new THREE.Sphere();
+function scLiveList(){
+  if (_lcStamp === SC_EDITS) return; _lcStamp = SC_EDITS; _lcList = [];
+  world.traverse(o => {
+    if (!(o.isMesh || o.isPoints) || !o.frustumCulled || o.isInstancedMesh || o.matrixAutoUpdate !== false || !(o.layers.mask & SC_LIVE_MASK)) return;
+    const g = o.geometry; if (!g || !g.attributes || !g.attributes.position) return;
+    if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingSphere) return;
+    _lcS.copy(g.boundingSphere).applyMatrix4(o.matrixWorld);
+    _lcList.push(o, _lcS.center.x, _lcS.center.y, _lcS.center.z, _lcS.radius);
+  });
+}
+function scLiveCull(){
+  scLiveList(); const pl = CULL.pl, pad = CULL.pad; _lcHid.length = 0;
+  for (let i = 0; i < _lcList.length; i += 5){
+    const o = _lcList[i]; if (!o.visible) continue;
+    const cx = _lcList[i + 1], cy = _lcList[i + 2], cz = _lcList[i + 3], r = _lcList[i + 4] + pad;
+    for (let q = 0; q < 24; q += 4) if (pl[q]*cx + pl[q + 1]*cy + pl[q + 2]*cz + pl[q + 3] < -r){ o.visible = false; _lcHid.push(o); break; }
+  }
+  SC.liveCulled = _lcHid.length;
+}
+function scLiveRestore(){ for (let i = 0; i < _lcHid.length; i++) _lcHid[i].visible = true; _lcHid.length = 0; }
 // (the overlay's test: a red frame the frame a whole cache is drawn again, and a red band where a background strip is being drawn)
 function scFlash(px, py){
   const gl = renderer.getContext(), e = 6;

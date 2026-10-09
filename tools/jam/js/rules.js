@@ -114,4 +114,88 @@
     if (q && step(dQ) && q.ct && !p) return 'appoggiatura';
     return 'bad';
   };
+
+  // ------------------------------------------------------------------------------------------
+  // the checks themselves (shared by lint.js and the composer's own validator)
+  // notes: [{ layer, m (midi), s, e (sounding span in steps), held (steps held as a chord tone, 0 if not held),
+  //           strong, hv, strum, pluck }]
+  // tl: sorted [{ s0, s1, seg: { root, base, pcs } }], the chord at every step
+  // Each check returns the list of offending notes (or pairs) so the composer can regenerate them.
+  // ------------------------------------------------------------------------------------------
+  const check = J.check = {};
+  check.segIndex = function (tl, t) {
+    let lo = 0, hi = tl.length - 1;
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (tl[mid].s0 <= t) lo = mid; else hi = mid - 1; }
+    return lo;
+  };
+  check.segAt = (tl, t) => tl[check.segIndex(tl, t)];
+  // minor 9th (13 semitones) and minor 2nd (1) between two sounding notes that overlap by an eighth or more,
+  // unless both pitch classes belong to the chord that is sounding (a b9 inside an altered dominant is allowed)
+  check.clashes = function (notes, tl) {
+    const out = [];
+    const sorted = notes.filter(n => n.e - n.s >= 2).sort((a, b) => a.s - b.s);
+    let active = [];
+    for (const a of sorted) {
+      active = active.filter(x => x.e > a.s + 2);
+      for (const b of active) {
+        const d = Math.abs(a.m - b.m);
+        if (d !== 1 && d !== 13) continue;
+        const lo = Math.max(a.s, b.s), hi = Math.min(a.e, b.e);
+        if (hi - lo < 2) continue;
+        let bad = 0;
+        for (let t = Math.ceil(lo); t < hi; t++) { const sg = check.segAt(tl, t).seg; if (!(sg.pcs.includes(a.m % 12) && sg.pcs.includes(b.m % 12))) bad++; }
+        if (bad >= 2) out.push([a, b]);
+      }
+      active.push(a);
+    }
+    return out;
+  };
+  // melody notes (one layer, in time order): returns { bad: [notes], avoid: [notes] }
+  check.melody = function (seq, tl, tonic, scaleName) {
+    const bad = [], avoid = [];
+    const items = seq.map(n => {
+      const si = check.segIndex(tl, n.s), cur = tl[si].seg, nxt = tl[si + 1];
+      return { m: n.m, strong: !!n.strong, ct: cur.pcs.includes(n.m % 12), nextCt: nxt ? nxt.seg.pcs.includes(n.m % 12) : false, seg: cur, n };
+    });
+    items.forEach((it, i) => {
+      const prevGap = i > 0 && it.n.s - items[i - 1].n.s > 8, nextGap = i + 1 < items.length && items[i + 1].n.s - it.n.s > 8;
+      const local = []; if (i > 0 && !prevGap) local.push(items[i - 1]);
+      const idx = local.length; local.push(it);
+      if (i + 1 < items.length && !nextGap) local.push(items[i + 1]);
+      if (J.nctFigure(local, idx) === 'bad' && it.strong) bad.push(it.n);
+      if (it.strong && !it.ct) { const sc = J.chordScale({ root: it.seg.root, base: it.seg.base, pcs: it.seg.pcs }, tonic, scaleName); if (sc.avoid.has(it.m % 12)) avoid.push(it.n); }
+    });
+    return { bad, avoid };
+  };
+  // pad, key and pluck notes still sounding (beyond tolerance seconds) after a chord change they do not belong to
+  check.stale = function (notes, tl, spsAt, tol) {
+    tol = tol || 0.22;
+    const out = [];
+    for (let k = 1; k < tl.length; k++) {
+      const prev = tl[k - 1].seg, cur = tl[k].seg, b = tl[k].s0;
+      if (prev.root === cur.root && prev.pcs.join() === cur.pcs.join()) continue;
+      const sps = spsAt(b);
+      for (const n of notes) {
+        if (n.layer !== 'pads' && n.layer !== 'keys' && n.layer !== 'twinkle') continue;
+        if (n.s >= b - 0.01 || n.e <= b + tol / sps) continue;
+        if (cur.pcs.includes(n.m % 12)) continue;
+        out.push(n);
+      }
+    }
+    return out;
+  };
+  // number of steps in [from, to) where more than two layers hold chords (2 or more notes, each held two beats or longer)
+  check.holderSteps = function (notes, from, to) {
+    const bad = [];
+    for (let t = from; t < to; t += 2) {
+      let holders = 0;
+      ['pads', 'keys', 'twinkle'].forEach(L => {
+        let c = 0;
+        for (const n of notes) if (n.layer === L && n.held >= 8 && (L !== 'twinkle' || n.strum) && n.s <= t && n.s + n.held > t) c++;
+        if (c >= 2) holders++;
+      });
+      if (holders > 2) bad.push(t);
+    }
+    return bad;
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -19,7 +19,7 @@ const load = f => (0, eval)(fs.readFileSync(base + f, 'utf8'));
 ['js/rng.js', 'js/theory.js', 'js/rules.js'].forEach(load);
 (0, eval)('globalThis.JAM_STYLE=' + fs.readFileSync(base + 'style_defaults.js', 'utf8').split('=').slice(1).join('=').replace(/;\s*$/, ''));
 load('js/composer.js');
-try { load('js/composer2.js'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+load('js/motif.js'); try { load('js/composer2.js'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
 const J = globalThis.Jam;
 
 // ---------------------------------------------------------------- settings to test
@@ -66,7 +66,8 @@ function buildNotes(bars, kind) {
     b.segs.forEach(sg => timeline.push({ s0: base + sg.s0, s1: base + sg.s1, seg: sg, bar: bi }));
     b.ev.forEach(ev => {
       const s = base + ev.s;
-      const add = (layer, m, e, extra) => notes.push(Object.assign({ layer, m, s, e, bar: bi, ev, held: 0 }, extra || {}));
+      const strong = b.meter.starts.includes(ev.s);
+      const add = (layer, m, e, extra) => notes.push(Object.assign({ layer, m, s, e, bar: bi, ev, held: 0, strong }, extra || {}));
       switch (ev.l) {
         case 'bass': add('bass', ev.n, s + ev.d + 0.15 / sps); break;
         case 'keys': ev.notes.forEach(m => add('keys', m, s + ev.d + 0.18 / sps, { held: ev.d })); break;
@@ -103,60 +104,22 @@ function lintRun(run, kind) {
   const tonic = run.song.tonic, scaleName = run.song.scaleName;
   const scaleOf = seg => J.chordScale({ root: seg.root, base: seg.base, pcs: seg.pcs }, tonic, scaleName);
 
-  // 1. minor 9th and minor 2nd clashes between sounding notes (not between two tones of the same chord, not under an eighth)
-  const sorted = notes.filter(n => n.e - n.s >= 2).sort((a, b) => a.s - b.s);
-  let active = [];
-  for (const a of sorted) {
-    active = active.filter(x => x.e > a.s + 2);
-    for (const b of active) {
-      const d = Math.abs(a.m - b.m);
-      if (d !== 1 && d !== 13) continue;
-      const lo = Math.max(a.s, b.s), hi = Math.min(a.e, b.e);
-      if (hi - lo < 2) continue;
-      let bad = 0;
-      for (let t = Math.ceil(lo); t < hi; t++) { const sg = segAt(tl, t).seg; if (!(sg.pcs.includes(a.m % 12) && sg.pcs.includes(b.m % 12))) bad++; }
-      if (bad >= 2) { out.clash++; const kk = [a.layer, b.layer].sort().join('+'); out.clashPairs = out.clashPairs || {}; out.clashPairs[kk] = (out.clashPairs[kk] || 0) + 1; }
-    }
-    active.push(a);
-  }
+  // 1. minor 9th and minor 2nd clashes between sounding notes
+  const cl = J.check.clashes(notes, tl);
+  out.clash = cl.length; out.clashPairs = {};
+  cl.forEach(([a, b]) => { const kk = [a.layer, b.layer].sort().join('+'); out.clashPairs[kk] = (out.clashPairs[kk] || 0) + 1; });
 
   // 2. non-chord tones on strong beats without an allowed figure, and avoid notes on strong beats (lead and twinkle plucks)
   ['lead', 'twinkle'].forEach(layer => {
     const seq = notes.filter(n => n.layer === layer && !n.hv && !n.strum).sort((a, b) => a.s - b.s);
-    const items = seq.map(n => {
-      const b = bars[n.bar], t = n.s - N.barStarts[n.bar];
-      const si = segAt(tl, n.s), cur = si.seg;
-      const nxt = tl[tl.indexOf(si) + 1];
-      return { m: n.m, strong: b.meter.starts.includes(Math.round(t)) && Math.abs(t - Math.round(t)) < 0.01, ct: cur.pcs.includes(n.m % 12), nextCt: nxt ? nxt.seg.pcs.includes(n.m % 12) : false, seg: cur, n };
-    });
-    items.forEach((it, i) => {
-      // a long gap (a rest) cuts the figure: treat the note as unattached
-      const prevGap = i > 0 && it.n.s - items[i - 1].n.s > 8, nextGap = i + 1 < items.length && items[i + 1].n.s - it.n.s > 8;
-      const view = items.slice(Math.max(0, i - 1), i + 2).map((x, k, arr) => x);
-      let local = [], idx = 0;
-      if (i > 0 && !prevGap) { local.push(items[i - 1]); } idx = local.length; local.push(it);
-      if (i + 1 < items.length && !nextGap) local.push(items[i + 1]);
-      const f = J.nctFigure(local, idx);
-      if (f === 'bad') out.nct_strong += it.strong ? 1 : 0;
-      if (layer === 'lead' && it.strong) { const sc = scaleOf(it.seg); if (sc.avoid.has(it.m % 12) && !it.ct) out.avoid_strong++; }
-    });
+    const r = J.check.melody(seq, tl, tonic, scaleName);
+    out.nct_strong += r.bad.length;
+    if (layer === 'lead') out.avoid_strong += r.avoid.length;
   });
 
   // 3. notes still sounding after a chord change that do not belong to the new chord
-  const TOL = 0.22; // seconds
-  for (let k = 1; k < tl.length; k++) {
-    const prev = tl[k - 1].seg, cur = tl[k].seg, b = tl[k].s0;
-    if (prev.pcs.join() === cur.pcs.join() && prev.root === cur.root) continue;
-    const sps = 60 / bars[tl[k].bar].bpm / 4 / bars[tl[k].bar].clock;
-    for (const n of notes) {
-      if (n.layer !== 'pads' && n.layer !== 'keys' && n.layer !== 'twinkle') continue;
-      if (n.s >= b - 0.01 || n.e <= b + TOL / sps) continue;
-      if (cur.pcs.includes(n.m % 12)) continue;
-      out.stale++;
-    }
-  }
+  out.stale = J.check.stale(notes, tl, t => 60 / bars[tl[J.check.segIndex(tl, t)].bar].bpm / 4 / bars[tl[J.check.segIndex(tl, t)].bar].clock).length;
 
-  // 4. parallel fifths and octaves between the lead and the bass
   const lead = notes.filter(n => n.layer === 'lead' && !n.hv).sort((a, b) => a.s - b.s);
   const bass = notes.filter(n => n.layer === 'bass').sort((a, b) => a.s - b.s);
   const bassAt = t => { let r = null; for (const b of bass) { if (b.s <= t + 0.01) r = b; else break; } return r; };
@@ -174,19 +137,10 @@ function lintRun(run, kind) {
   // 5. lead notes outside its band
   lead.forEach(n => { if (n.m < J.BANDS.lead[0] || n.m > J.BANDS.lead[1]) out.lead_band++; });
 
-  // 6. bars where more than two layers hold chords at once (>= 2 notes, each held two beats or longer)
-  const holdLayers = ['pads', 'keys', 'twinkle'];
+  // 6. bars where more than two layers hold chords at once
   const barsBad = new Set();
   for (let bi = 0; bi < bars.length; bi++) {
-    const b0 = N.barStarts[bi], b1 = b0 + bars[bi].steps;
-    for (let t = b0; t < b1; t += 2) {
-      let holders = 0;
-      holdLayers.forEach(L => {
-        const c = notes.filter(n => n.layer === L && n.held >= 8 && n.s <= t && n.s + n.held > t && (L !== 'twinkle' || n.strum));
-        if (c.length >= 2) holders++;
-      });
-      if (holders > 2) { barsBad.add(bi); break; }
-    }
+    if (J.check.holderSteps(notes, N.barStarts[bi], N.barStarts[bi] + bars[bi].steps).length) barsBad.add(bi);
   }
   out.holders = barsBad.size;
 
@@ -309,7 +263,7 @@ function runSet(kind, jobs, nbars) {
   }
   return results;
 }
-module.exports = { compose, lintRun, runSet, sum, summarize, RULES, FIVE, PRESETS };
+module.exports = { buildNotes, compose, lintRun, runSet, sum, summarize, RULES, FIVE, PRESETS };
 
 if (require.main === module) {
   const args = parseArgs(process.argv);

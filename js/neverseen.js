@@ -187,6 +187,7 @@ function nvTick(){
     while (NV.queue.length){ const c = NV.queue.shift(), g = nvNeeds(c); if (!g) continue;
       const tri = nvTriangles(g), sig = nvSig(g, tri), bits = NV.store.get(sig);
       if (bits){ nvApply(c, g, tri, nvFromBits(bits, tri.length)); NV.stats.fromStore++; break; }   // (one plot a frame)
+      if (!c._nvFresh && !(PH.tests.nvBackfill || window.__NV_BACKFILL)){ c._nvGeo = g; continue; }   // (plots that were there at load are not worked out unless the test "never-seen backfill" is on; a stored result above still applies)
       if (!idle || window.__NV_NO_COMPUTE) { NV.queue.unshift(c); break; }
       NV.job = nvStart(c); break; }
   }

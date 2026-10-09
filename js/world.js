@@ -1542,6 +1542,7 @@ function rebuildCell(c){
   rebuildCellPost(c);
 }
 function rebuildCellPost(c){
+  if (pplReady && pplFrame >= 60) c._nvFresh = true;   // (built or changed during play: the never-seen job works these out)
   if (c.liftCab) podDoorSpot(c);
   if (c.mega){ const m = megas.get(c.mega); if (m && m.roofH) c.height = m.roofH; }
   cellView(c);

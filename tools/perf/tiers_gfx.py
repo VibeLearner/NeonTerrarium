@@ -22,7 +22,7 @@ if __name__ == '__main__':
     with sync_playwright() as pw:
         br = pw.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-vsync', '--enable-precise-memory-info', '--js-flags=--expose-gc'])
         ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init='window.__NV_OFF = true; window.__GEN_WORKER = true;' + (' window.__TIER_OFF = true;' if a.off else '') + M.GL)
-        cdp = ctx.new_cdp_session(pg); pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=900000)
+        cdp = ctx.new_cdp_session(pg); pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=900000, polling=500)
         r0 = M.read(pg, cdp)
         r = pg.evaluate(RUN, [a.frames, a.zoom, a.max_min*60000]); r1 = M.read(pg, cdp)
         print('%s zoom %g tiers %s: %d frames; %s | %s | %s' % (a.scene, a.zoom, 'OFF' if a.off else 'on', r['frames'], r['tier'], r['pm'], r['rw']))

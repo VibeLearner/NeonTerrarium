@@ -27,7 +27,7 @@ if __name__ == '__main__':
         br = H.launch(pw)
         init = 'window.__NV_OFF = true;' + ('' if a.noworker else ' window.__GEN_WORKER = true;') + (' window.__TIER_OFF = true;' if a.keep else '')
         ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init=init)
-        if not a.noworker: pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=900000)
+        if not a.noworker: pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=900000, polling=500)
         pg.evaluate('() => { __perf.skip = true; PM.trace = true; }')
         for r in pg.evaluate(RUN, [steps]): print('%-20s %5d frames  %s | made again %d, tier changes %d, slow restores %d | %d draws %d triangles | %s' % (r['label'], r['frames'], r['tier'], r['async'], r['changes'], r['sync'], r['calls'], r['tris'], r['rw']))
         print(pg.evaluate("() => JSON.stringify([...(PM.stacks || [])].sort((a, b) => b[1] - a[1]).slice(0, 4))"))

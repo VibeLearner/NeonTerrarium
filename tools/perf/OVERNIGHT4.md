@@ -9,10 +9,10 @@ Base: main at 6da3dbf. Work branch locally `wip/recipes`, pushed with `git push 
 | 0 Baseline | done (numbers below) | this file | memcheck, counts only |
 | 1 Recipe and proof | done | see git log ("Round 9 item 1") | `tools/perf/recipe_proof.py`: 0 plots differ on maxcity (2025), city (227), dense (361), megas (267), 30 pods each on city and maxcity; harness quick check city 25 captures 0 problems |
 | 2 Generation in a Web Worker | done | see git log ("Round 9 item 2") | `recipe_proof.py <scene> --worker` 0 differ on maxcity 2025, dense 361, megas 267, city 227, 30 pods; `worker_edit.py city --edits 12` 0 differ (8 by the worker, 4 taken back to the page); `diff --base 6da3dbf --quick --only city` 25 captures 0 problems |
-| 3 Walking network off the main thread | partly (see below) | see git log ("Round 9 item 3") | `worker_edit.py city --edits 12`: network hash after all edits identical, 8 walking maps taken from the worker; `recipe_proof.py --worker`: walking maps byte-identical (city, dense); `diff --base 6da3dbf --quick --only city` 0 problems |
+| 3 Walking network off the main thread | partly; the helper moved the door search to the worker and put door meshes and spots in steps (OVERNIGHT4B.md item 3b, merged); path searches stay on the page | see git log ("Round 9 item 3") | `worker_edit.py city --edits 12`: network hash after all edits identical, 8 walking maps taken from the worker; `recipe_proof.py --worker`: walking maps byte-identical (city, dense); `diff --base 6da3dbf --quick --only city` 0 problems |
 | 4 Drop the plots' own geometry | done (one named stall left) | see git log ("Round 9 item 4") | `diff --base 6da3dbf --quick` city 25, dense 13, megas 15 captures 0 problems; `plotmem_check.py <scene> --same` (the same edits with and without letting go of the arrays: every plot and every merged block hashed) 0 differ on city (231 plots, 33 blocks), dense (399, 54), megas (267, 40); maxcity JS heap after play 2,519 MB kept, 1,847 MB let go (-672 MB) |
 | 5 Detail tiers (cheat) | built, default on; owner to approve | commits "item 5, part 1" and "stand-in tier policy" | `PERF_CAND_INIT="window.__TIER_OFF = true;"` against 6da3dbf: city 25, dense 13, megas 15 captures 0 problems; the tier machinery alone (stand-in laid out from the same buckets, nothing left out, all blocks on it, `__TIER_ALL` with `__TIER_KEEPALL`) 0 pixel differences on dense; static cache `tiers_cache_check.py dense` reuse against every 0 pixels differ in 6 legs |
-| 6 Never-seen job | first part only (helper agent continues on wip/recipes-b) | "stand-in tier policy ..." commit | `nv_compare.py dense --plots 1 --yaws 12 --np 4`: removed sets identical on 4 plots, pixels made 92 to 100% of the old way |
+| 6 Never-seen job | partly (helper, wip/recipes-b merged); tiles off, backfill stays off | merge of wip/recipes-b | 20 plots at 48 views identical (see item 6; my first check was empty and is withdrawn) |
 | 7 Load from recipes | built, default on with a worker | same commit | `load_check.py city --old-order`: every plot, region, megastructure, network node, place and network hash identical to the old load |
 
 ## Item 0: baseline (main 6da3dbf, software renderer, counts only)
@@ -113,14 +113,59 @@ Crops (tools/perf/overnight4/tiers_dense_z*_h*_still|turn.png, each: tiers off |
 What to look for. At night the window grids read brighter at the farthest zoom (the thin dark fittings in front of the panes are gone), railings and cables thin out, small rooftop fittings are missing, and at zoom 22 and farther the whole view is stand-in. Popping: after zooming in past 24 or panning, a block nearer than the margin is made again by the worker (a plot takes a worker generation, about the time of a placement's generation, some 50 ms on a laptop core, nine plots a block), merged in steps, and swapped in while the view moves; in a still view the change shows up within 2 seconds of the view stopping. The margin (12 units, about three plots) covers a slow pan; a fast pan will show stand-ins at the edge of the view for a second or two.
 What I would check first: the farthest zoom at night. `TIER.small`, `TIER.zs`, `TIER.margin` and `TIER.maxFull` are the knobs.
 
-## Item 6: never-seen job (first part)
+## Item 6: never-seen job (my first part, then the helper's; details in OVERNIGHT4B.md)
 
-Built in js/neverseen.js: each view draws and scatters only the pixels that can hold a triangle not seen yet (a sphere round each undecided triangle, the same camera shifted by whole pixels with the viewport so the picture is the same one), the map is read back every 24 views and then at growing intervals to update what is decided, and the job stops early when nothing is left. Removed sets identical on the 4 plots checked (one a zone, 12 turns by 4 tilts, 48 views): 23,348 of 23,973 triangles on a low plot, 10,962 of 11,346 mid, 2,421 of 2,432 high, 5,204 of 5,260 industrial, 0 differ; pixels made 96, 100, 92, 96% of the old way; no early stop (every plot has triangles that are never seen). So this is a few percent, not the large factor the plan hoped for: the cost is the pixels of the views and the views are fixed. A helper agent (wip/recipes-b, OVERNIGHT4B.md) takes the rest of item 6.
+My first part (views limited to what can hold an unseen triangle, same pixel grid by a viewport shift, readback now and then, early stop) was checked with `nv_compare.py`, and the helper found that check was empty: the tool set the harness's `__perf.skip`, which turns every `renderer.render` into nothing, so every id picture was blank, every triangle counted as never seen, and "identical removed sets, 4 to 8% fewer pixels" proved nothing. I withdraw those numbers. The helper fixed the tool and redid it (branch wip/recipes-b, merged here): 20 plots (5 per zone) at 48 views each instead of the 1,344: old and new removed sets identical triangle for triangle; scatter vertices 93.5% of the old job's on the 20 plots (83% on one plot at 1,344 views), drawn pixels 96%; the early stop never fires (a plot always keeps never-seen triangles); results are now kept by recipe as well as by geometry, so a plot whose arrays were let go is not made again to be looked up (76 city plots made again with other random draws gave the same positions, indexes and cut sizes); several views in one target ("tiles") are built but off: they differ on 2 of 7,000 triangles on one of four plots (a tile away from the corner adds a whole number to the window coordinates, which rounds coarsely), and they only save draw calls. Estimate for the whole maxcity from counts (`nv_estimate.py`; 1,637 plots, 1,344 views each, 5,305 Gpx drawn): the cap of 8 views a frame at 60 FPS alone gives 76 minutes, pixel work at an assumed 2 Gpx/s about 80 minutes, against the plan's limit of about 15 minutes: backfill stays off by default. Not done: old against new at the full 1,344 views (over 10 minutes a plot here).
 
 ## Item 7: loading a saved city from recipes (js/loadcity.js)
 
 When the worker is there, a saved city is made from recipes: the worker starts as soon as recipe.js is read; plots are asked for nearest the camera first, put in the world a few milliseconds a frame as they come; the order of the old load (plain plots, pods, air-filter towers, megastructures, then the whole-city work: a region's plants and lights as soon as its plots are in, the walking network and people at the end); a click edits nothing until it is done; the old load is behind "load on the main thread (as before)" and runs when there is no worker, it does not come up in 20 s, or it fails. Check (`load_check.py city --old-order`): every plot's arrays (all but the random detail and flicker ids), the regions, megastructures, walking network nodes, places and network hash are identical to the old load. In the nearest-first order 4 of 227 plots differ in the shape of a rounded box by a few thousandths: `roundedBox` takes the shape of the first plot that asked for a size to two decimals (a first-asker rule that is in the old code too), so the shape depends on the order plots are made in. The first plot is in the world 0.8 s after the page starts in the software renderer; timing of the first frame and of a settled city is for your machine (the measurement script). The harness keeps the old load (no worker there).
 
-## Not yet done
+## Skipped or partial, one sentence each
+
+- Item 3: the path searches and crossings stay on the page (after one edit only a handful are redone, each well under a millisecond); everything per plot that is big is in the worker or in steps.
+- Item 6: no large speed-up found that keeps the removed set identical; tiles are off because they are not exact; backfill stays off (76 minutes at the very least for maxcity).
+- Item 5: the maxcity figures for graphics are from one run (tiers_gfx.py, 22,800 frames of settling); the crops are of the dense scene only (the maxcity picture at zoom 30 is the same kind of difference).
+- Item 7: first-frame and settled-city times are for your machine (below); harness runs keep the old load.
+- The never-seen job's recipe-signature store and the tier policy have no run on the harness's `maxcity` beyond the figures above and the steps listed in the final check.
+
+## Final check (against 6da3dbf, every new way that can be switched off, switched off: `window.__TIER_OFF = true`; the worker is off in the harness, so the old generation, old load and old network run)
+
+`harness.py diff --base 6da3dbf --quick --only X` with `window.__TIER_OFF = true;` (the worker and the new load are off in the harness anyway):
+- city, also with `__NV_OLD` and `__NET_OLD`: 25 captures, 0 problems. With only `__TIER_OFF` the same run reports 3 problems that are all `renderer.info` counters in the rush steps (scatter points of the never-seen job and 2 more textures from its decided-ids map); the pictures and the people's state are identical.
+- dense: 13 captures, 0 problems. megas: 15 captures, 0 problems.
+- maxcity, steps noon_f1 and night_zoom_out only (software renderer, a full set is over 10 minutes): 2 captures, 0 problems.
+Worker and load checks: `recipe_proof.py <scene> --worker` 0 differ on maxcity (2,025), dense, megas, city; `worker_edit.py city --edits 12` 0 differ; `plotmem_check.py <scene> --same` 0 differ on city, dense, megas; `load_check.py city --old-order` identical; `tiers_cache_check.py dense` 0 pixels differ in 6 legs.
+
+## My decisions (each with one line why)
+
+- Recipe holds only own fields plus a neighbor-existence mask, extra neighbor facts only for pods and air towers: those are the only plots that read more, found by the stand-in throwing on any other read.
+- One shared rounded-box cache between page and worker, page's shapes win: the cache makes a plot's shape depend on who asked first, so two caches would make worker plots differ.
+- Materials named by place in the load-time list, not by three's id: ids differ between the threads (the renderer takes two).
+- The plot worker starts as soon as recipe.js is read: it loads the game's scripts while the page does, so a load from recipes need not wait for it.
+- Arrays of a plot are let go through accessors that make the plot again on the page when read: any reader I missed works, slowly, and shows in a counter instead of breaking.
+- Stand-in cut from the buckets just made, not from a second generation: costs no random draws and cannot differ from the full plot.
+- Tier swaps held until the view moves (or 120 frames): the plan says never in the middle of a still frame; the wait is the price.
+- A tier change notes the block's box as a static cache edit rectangle: a merge is quiet because it changes no picture, a tier swap does.
+- Hoisting the two `toon()` calls of the night-market stalls was left alone: it would shift material ids, and industrial window colors are picked by `mat.id`.
+- The recipe-signature idea for the never-seen store was done by the helper only as a lookup key kept beside the geometry key, never applied to a geometry it did not match.
+
+## For you to judge
+
+- Item 5, the cheat: tools/perf/overnight4/tiers_dense_z*_h*_still|turn.png (off | on | difference x4) and tiers_dense_show.png; start with zoom 30 at night. The knobs `TIER.small`, `TIER.zs`, `TIER.margin`, `TIER.maxFull`, `TIER.hold`, `TIER.stillWait`.
+- Whether 4 of 227 plots differing in rounded-box shapes by a few thousandths after a nearest-first load matters (it is the old cache's first-asker rule showing).
+- The looks round (separate branch wip/looks, tools/looks/REVIEW.md) is not part of this report.
+
+## Measurement script for your machine (about 5 minutes, main 6da3dbf against this branch)
+
+Chrome, max city, 1280 by 720, optimize framerate off. Restart Chrome between builds. Do the first build (main at 6da3dbf, served as you usually do), then the new branch, then the new branch again with the test "full detail everywhere (as before)" switched on (F3, then Shift+F3, Tests row). Each time:
+1. Load time: reload with DevTools Performance open (or `performance.now()` at the first `requestAnimationFrame` after `loadTick`/first drawn frame); write down the time to the first drawn frame, and (new build) `LOADP.line()` in the console when done: it says "loaded from recipes in N s (first plot after M s)". Main thread build for the old: the time until the first frame.
+2. Memory: after the city has settled (2 minutes, zoom 30 still), Shift+Esc (Chrome task manager): the page's memory footprint (the worker is its own row: write both); in the console `PM.line()`, `TIER.line()`, `RW.line()`.
+3. Zoom 30, still, wait 30 s after the zoom change: FPS (F3), color pass triangles; then a slow turn for 10 s: FPS. Zoom 15: wait 30 s, a slow turn: FPS.
+4. Placing: console `window.__w = 0; (function f(){ const t = performance.now(); requestAnimationFrame(() => { __w = Math.max(__w, performance.now() - t); f(); }); })()`; place a house, wait 5 s, read `__w`, set it to 0, place a tower (a 'high' section on a tall building), wait, read.
+5. With the tests "generation on the main thread (as before)", "keep the plots' own geometry (as before)" and "load on the main thread (as before)" on, step 4 gives the old placement numbers.
+Write down: first-frame time, settled-city time, memory, FPS at zoom 30 still, zoom 30 turn, zoom 15 turn, worst frame for a house and for a tower.
+
+## Not yet done (nothing planned; kept for the next round)
 
 Items 2 to 7 and the final measurement script. Items listed as skipped will each get a sentence here.

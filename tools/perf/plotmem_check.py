@@ -65,7 +65,7 @@ def same(scene, port):
         for mode, init in (('keep', 'window.__NV_OFF = true; window.__KEEP_GEO = true; window.__KEEP_CPU = true;'), ('drop+worker', 'window.__NV_OFF = true; window.__KEEP_CPU = true; window.__GEN_WORKER = true;')):
             url = H.make_site('pms' + mode[:2], None)
             ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init=init)
-            if 'worker' in mode: pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=900000)
+            if 'worker' in mode: pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=900000, polling=500)
             pg.evaluate('() => { __perf.skip = true; PM.trace = true; }')
             res[mode] = pg.evaluate(SAME, [mode]); res[mode]['errs'] = errs[:2]; ctx.close()
         br.close()
@@ -88,7 +88,7 @@ if __name__ == '__main__':
         br = H.launch(pw)
         init = 'window.__NV_OFF = true;' + (' window.__KEEP_GEO = true;' if a.keep else '') + ('' if a.noworker else ' window.__GEN_WORKER = true;')
         ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init='--js-flags=--expose-gc' and init)
-        if not a.noworker: pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=900000)
+        if not a.noworker: pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=900000, polling=500)
         pg.evaluate('() => { __perf.skip = true; }')
         r = pg.evaluate(RUN, [a.frames, a.keep])
         print(json.dumps(r, indent=1)); print('page errors', errs[:3])

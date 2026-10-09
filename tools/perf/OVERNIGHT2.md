@@ -65,6 +65,12 @@ What I checked, exactly:
   Structure after settling is otherwise the same (tools/perf/placement_check.py: cells, bridges, regions, ports, walking network).
 - It is behind the overlay test "edit upkeep spread over frames (people differ)" and `window.__SYNC_LATER = true`. Owner decision: turn it on by default if a different people sequence after an edit is fine.
 - Check with it off (the default): harness quick city, 25 captures, 0 problems against the previous commit.
+- Also built for item 3, exact and on by default (each behind the test "edit upkeep: a key string per path point (same picture)" / `__SLOW_SYNC`, and "steam map: rebuilt at every edit (same picture)" / `__STEAM_ALWAYS`):
+  the walkers' "is my path still over existing plots" check uses one set of numbers instead of a key string per point of every walk (syncPeopleRest 79 to 45 ms); `neighbors` finds pairs through a map by grid position instead of every plot against every plot (2,618 pairs, same list and order, 25.4 to 4.3 ms);
+  `plotEdges` compares endpoints number by number instead of building a string for each (the walking network, 20 ms less); the steam map is kept when an edit leaves the vents and lifts as they were (35 ms saved on most edits).
+  The network after a rebuild is the same: cells, graph edges, lengths, doors, patrol nodes hashed in both modes (before and after an edit): identical. The whole upkeep (bridges and agents, steady state, maxcity): 150 to 190 ms before, 113 to 131 ms after (-25%).
+  Placing calls (house, tower, same random seed, alternated in one page): house 205 to 220 ms either way (noise is about 30 ms), tower 380 to 394 before, 329 to 344 after.
+  Check: harness city, dense, megas, both sizes, full script (106 captures): 0 problems.
 
 **4. Stalls and memory: done (memory), stall cause found and two causes fixed exactly.**
 - Memory (tools/perf/heapkind.py, memcheck.py): the CPU copies of the merged region geometry (999 meshes, 1,186 MB of typed arrays in the biggest city) were read by nothing after the card had them. They are now let go right after their upload

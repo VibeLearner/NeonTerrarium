@@ -1,11 +1,90 @@
-# Overnight report (round 6 and after)
+# Overnight report (round 6 and the extra)
 
-(Being written as the work goes; the final version is at the end of the run.)
+Branch `wip/round6` (from `wip/static-cache` 1bc4451), every commit pushed. Nothing merged into main, nothing published, no branch deleted (a scratch branch `scratch/5a` exists in the clone, not pushed;
+I developed there in a side worktree and copied each finished item over). Every commit's own check is in the table; numbers and crops are in the item sections below.
 
-## Decisions made on my own
-- Item 1 people rate: N from each person's own speed (rush, hurry included) with the frame time quantized to 1/240 s so N doesn't flap with jitter; N capped at 4; the cursor radius is 90 render pixels. Why: the plan leaves them open; these are conservative and keep a step under about .75 of a render pixel.
-- Sprites of people skipped on a frame are drawn from what their last step left (including the emote bubble, hologram and picnic upkeep). Why: "drawn every frame", and holograms/picnics are fed by the people loop.
-- The collision check runs every N-th frame for everyone (N = the typical walker's rate from the previous frame), not per subset. Why: pairs are only found when both walkers are in the pass, so a subset would find far fewer meetings; a meeting lasts many frames, so a whole pass every N frames finds them.
+## The table
+
+| Item | Result | Commit | Check |
+|---|---|---|---|
+| 1a people off screen, lazily | not possible as described | (RESULTS.md) | reported |
+| 1 people stepped by on-screen size (your replacement for 1a) | done | 8d5d783 | with "people at full rate" forced on: equal to the previous commit (city, megas, dense 53 captures, max city 4: 0 problems); flow checked; people lap 7.16 to 5.32 ms at zoom 30, 6.42 to 4.80 at zoom 15 |
+| 1b vehicles by on-screen size | not done: N would be 1 (a step is already about a pixel) | (this file) | measured speeds |
+| 1c scene upkeep | done | 9009db6 | standard script 0; 1.8 to 2.1 ms a frame |
+| 2 ring cache | done | 40cc6b7 | cache steps incl. five long pans vs the build before, drawn the old way: 0 state differences, 0 errors, residue as before, no seams |
+| 3 turn/zoom slowdown, composite cost | (a) done; (b) switch built, needs your GPU | d44c52e | cache steps: only the 7 changing-frame captures differ (46 to 807 px); copy by drawing equals the blit |
+| 4 memory | measured, no growth | 4946276 | both builds, 10 minutes of play; the 3 GB is the city's geometry |
+| 5a never-visible faces to H | measured; rule built, not shipped | 20a5f09 (+ patch file) | moves 0.3 to 0.5% of triangles; 6 of 36 sweep captures differ by 4 to 77 px (ties) |
+| 5b leaner sticks | not applicable (every non-bottom face shows from some angle) | 20a5f09 | probe |
+| 6 speed-based detail while turning | done, a cheat | 78966fe, 6297025 | standard script 0 (city 25, megas 15, dense 13); fast spin 47,817 px differ, slow turn identical |
+| 7 building without a whole redraw | done | 305d348, 9e06e75 | rectangles vs whole redraws in one build 70/70 identical; vs previous commit 70/70; standard script 0 |
+| 8 soft effects at half resolution | done, a cheat | b94b439 | with the test on: equal to the previous commit (city, megas, dense: 0 problems); flip numbers and crops |
+| 9 custom shapes and round parts | reported, nothing changed | fdeb3ee | census |
+| 10 painted wall detail | measured, under the 20% threshold, no prototype | fdeb3ee | 7.7% (city), 7.0% (dense) |
+| 11 steady frame pacing | measured; one regular spike (collision pass) found, a spreading attempt reverted | 9c970b8, 8678f35 | spread and spike causes listed |
+| 12 zoom 60 | measured | 9c970b8 | table in item 12 |
+
+## What I skipped or didn't finish, and why
+- 1a: can't be exact and nearly nobody is off screen; replaced by your size-based rate.
+- 1b: the vehicles' step is already about one pixel, so nothing to spread.
+- 3(b): the composite's extra cost is a GPU matter; the harness can't time the card. The switch to find it ("copy the cache by drawing") is built.
+- 5a flat-face rule: shipped only as a patch file; 0.3 to 0.5% of triangles for a few tie pixels. 5b: nothing to remove.
+- 9: you asked for a report first: the numbers and two candidates are in item 9. 10: under the plan's threshold. 11: the collision pass's regular spike has a design, no quick fix.
+- Not done at all: dropping the CPU copies of merged geometry (item 4's finding, about 1 to 2 GB), trimming the live pass (item 12's finding), a grid for the collision pass kept between frames.
+
+## Decisions I made on my own (one line of why each)
+- People rate: N from each person's own speed (rush and hurry included), frame time quantized to 1/240 s so N doesn't flap with jitter, N capped at 4, cursor radius 90 px: conservative, and each step stays under about .75 px.
+- Skipped people's sprites are drawn from their last step (emote bubble, hologram and picnic upkeep included): "sprites drawn every frame", and those are fed by the people loop.
+- The collision check runs the whole pass every N-th frame (N from the previous frame), not per subset: a pair is only found when both walkers are in the pass. (Spreading it across the N frames was tried and made the mean cost worse.)
+- Vehicles left alone (N would be 1).
+- Ring: extend a strip to the full margin once less than half is left (fewer, wider strips); a strip wider than the margin falls back to a whole redraw.
+- Turn and zoom: old-way frames use the view's own projection (same as `SC.mode = 'off'`, removes the margin cost) rather than scissor plus real-frustum culling.
+- 5a: the flat-face rule not shipped (ties, tiny gain); the probe counts front faces only, as the game draws them.
+- Speed-based detail: first threshold 10 px/frame (a keyboard turn at the M2's frame rate would trip 6 on a quarter of the screen), 2 classes, one more for a fast spin (40 px/frame), cursor radius 200 px, hysteresis 25%, one class back a frame; the finest `aFine` pieces and pans left out: `lodFine` is one value for every plot (it would drop them at the cursor too).
+- Edits: rectangle widened by 1.2 units and swept to the ground along the sun's rays, 4 px of room; whole redraw if the sun is under about 7 degrees, the rectangle is over 55% of the cache, the light moved more than 2e-4, something changed without a box (highway and metro builders), or anything else changed in the same frames; region merges and live shadowless pieces ignored (they change nothing in the picture); held lights for every strip and rectangle.
+- Soft effects: three single-output passes (r128 has no multiple render targets), RGBA8 with scaled values, the block's lower-left pixel stands for it, depth weights 1/(1 + (dz/s)^4) with s = 6 pixels' worth, mist and shafts skipped where the block's own texel says nothing is there.
+- Items 9 and 10: reported, not built, as the plan says (report first; threshold 20%).
+- Measurements are from the harness's software renderer: draw calls, triangles and main-thread time are real, card times are not; every GPU question is in the script below.
+
+## For you to decide or look at
+1. **Speed-based detail** (item 6, a cheat): crop tools/perf/overnight/item6_fast_spin_before_after.png (base left, new right). Fast spin: 47,817 px differ (5%), slow turn identical; triangles in the color pass during a fast spin 35 to 54% fewer. Tune live with `SD.v0` (10), `SD.fast` (40), `SD.max`, `SD.cursorPx`; turn it off with `SD.on = false`.
+2. **Soft effects at half resolution** (item 8, a cheat): six same-frame crops in tools/perf/overnight (item8_soft_*.png: full resolution left, half right): rain at night, mist at a vent (night and day), shafts at morning and evening. 4 to 17% of pixels differ, nearly all by a level of dither; over 32 levels 0.01 to 0.4%. Look for crawl on the shafts and reflections while panning slowly (the 2 x 2 grid is fixed to the world's pixels, but I could not measure it).
+3. **People at full rate** (item 1): flip "people at full rate" live on a busy street at zoom 15 and 30 and look for anyone stepping, jumping or sliding.
+4. **5a flat-face patch**: recommend leaving it out; tools/perf/patches/hide_flat_faces.patch if you disagree.
+5. **Round parts and rounded boxes by zoom band** (item 9): about 9% and 6% of the triangles put; both need shape variants and a flip test. Go or no go?
+6. **Freeing the CPU copies of merged geometry** (item 4): about 1 to 2 GB of the 3 GB heap. Needs a careful pass over picking, edits and re-merging. Go or no go?
+7. **Live pass** (item 12): 1.16 million triangles in 886 objects at zoom 30 in a cached frame, 457k of them see-through glass. The largest lever left on the card side. And the unexplained draw calls (a cached frame submits about 700 more than an old-way frame): worth the browser's profiler on the M2.
+8. **The collision pass spike** every N-th frame (item 11): +3 ms on a 9 ms frame at N = 3; the fix is a grid kept between frames.
+9. **Zoom 60** (item 12): the frames drawn the old way (turning, zooming) submit 65% more draw calls than at zoom 30; still and pan keep the cache's benefit. Your call whether the cap should move.
+
+## One measurement script (old build against new, everything that changed)
+Builds: OLD = `a7b4449` (before the cache) or `1bc4451` (round 5, accepted); NEW = `wip/round6`. Laptop on power and rested 5 minutes, Chrome in front, max city, Render 720p, "Optimize framerate" off, day cycle off, 22:00 in rain. Wait 20 s after any change; 3 readings 5 s apart; report the middle one; alternate old and new.
+- **A. Readings** (overlay F3, exact timing off: FPS and main thread ms), zoom 30 and zoom 15, each: still, slow pan (hold W), slow turn (Q or E), for OLD and for NEW.
+- **B. NEW with one thing switched back, same readings at zoom 30 and 15** (console, takes effect next frame; set back to undo): people `__FULL_RATE = true`; cache `SC.mode = 'off'`; speed detail `SD.on = false`; ring `PH.tests.noRing = true`; soft effects `__SOFT_FULL = true`; edits `__NO_RECT = true`. For the cache, `SC.mode = 'off'` also leaves speed-based detail on: use `SD.on = false` with it for the old picture. Building: place a house and a tall tower with `__NO_RECT` on and off and watch the overlay's `redrawn N times` and `edit rectangles N`; note any hitch.
+- **C. Exact timing** (Shift+F3), zoom 30 still, rain at night: `color`, `soft effects (half resolution)`, `composite`, `night lights`, `bloom and grade`, `all passes, exact`, `main thread`, for NEW, NEW with `__SOFT_FULL = true`, and NEW with `__COPY_DRAW = true` (item 3b).
+- **D. Recordings**, 10 seconds each: a busy street at zoom 15 and at zoom 30 with `__FULL_RATE = true` and with it false; a slow turn and a fast spin with `SD.on` true and false.
+- **E. Zoom 60** (NEW only): `zoom = zoomT = 60`: still, slow pan, slow turn: FPS and main thread ms.
+
+# Details by item
+
+**1. Main thread: people and vehicles (item 1, with the extra's replacement of 1a).**
+- 1a (people off screen, worked out lazily): not possible as described, reported earlier (tools/perf/RESULTS.md, round 6 item 1: at zoom 30 only 165 of 10,201 people are off screen, and exact
+  state can't survive any change of update rate). Replaced, as you asked, by:
+- People stepped by their on-screen size (8d5d783): each person is updated every N-th frame, N from their own walk speed and the pixel size so one update moves them at most about .75 render pixels
+  (cap 4; person i on frames where (frame + i) % N == 0; the accumulated time is passed; lifts, clubs, metro, riders, anyone within 90 px of the cursor, and people off to the side keep their old
+  rate; sprites are drawn every frame from the last step's result; the collision check and the emote work run on the same rhythm: the whole pass every N-th frame). Overlay test "people at full rate"
+  (and `window.__FULL_RATE = true`), overlay line with N and its spread. In the max city N is 4 for nearly everyone at zoom 30 and zoom 15.
+- Check: with the test forced on the build equals the previous commit exactly (city, megas, dense 53 captures; max city 4 captures; 0 problems). Flow, max city 1920x1080 zoom 30, 30 s, 10,112 people at
+  N = 4 against full rate: walking 5,171 against 5,211, standing 5,032 against 4,992, mean move a frame .054 against .055 px, largest move 2.95 against 1.92 px, decisions a minute 5,170 against 4,962,
+  emotes 10,222 against 10,052, arrivals 906 against 834: the same density and flow, nobody jumps (the largest single move is 3 px, a person stepping once in four frames).
+- People lap before and after (alternating A/B, 4 rounds each, 1,500 warm-up frames, decisions taken out, max city, this machine; A = full rate, B = new): zoom 30: 7.16 against 5.32 ms (medians; minimums
+  6.76 against 4.74), 26% less, 1.8 ms; as a share of functions neither build changed 1.98 against 1.30 (34% less); the whole simulated frame 12.98 against 11.82 ms. Zoom 15: 6.42 against 4.80 ms
+  (25% less, 1.6 ms), share 1.70 against 1.29 (24% less), whole frame 12.49 against 10.79 ms. (On the M2 the people lap was 7.5 ms: expect about 5.5.)
+- 1b (vehicles, highways, drones): not changed. Their speeds are 1.7 to 2.5 units a second, .77 to 1.1 px a frame at zoom 30 on 1640 lines, so a step already moves them about a pixel and N would be 1: the
+  same idea has nothing to give them. Highway cars read each other every frame, metros run four passes over the people; neither can be made lazy without changing what they do (RESULTS.md). The test
+  "vehicles at full rate" would switch nothing, so it isn't there.
+- 1c scene upkeep (9009db6): accepted earlier. Frozen trees skip the matrix walk (13,312 objects, 1.5 ms here, about 2 ms on the M2); the whole simulated frame is 1.8 to 2.1 ms shorter; overlay test "walk every
+  matrix"; standard script 0 problems.
 
 **2. Ring (wrap-around) cache: done.** The cache picture is addressed modulo its size; the copy to the frame is up to four blits; when the view
 moves, only the strip that became needed is drawn (strip camera, viewport offset beyond the attachment, scissor), up to the margin's width.
@@ -26,6 +105,27 @@ widened projection. Residue against the widened reference on the 7 changing-fram
 as a full-screen pass instead of blitting ("copy the cache by drawing, not blitting"; also `window.__COPY_DRAW = true`): same pictures as the
 blit (checked on the cache steps; same 7 changing-frame captures differ, none new). If the composite is the same with it on and off, the cause
 is not the blit's state; then the pinned camera's depth (wet-ground search, shimmer tiles) or `pxK` is next, which need the owner's GPU to measure.
+
+**4. Memory: measured; nothing grows, the 3 GB is the city's geometry.** (tools/perf/memcheck.py: max city, harness Chrome with SwiftShader at 1280x720,
+10 minutes of simulated play: a pan, turn, zoom, hour change or one build every 20 simulated seconds; JS heap after a forced collection; graphics bytes counted
+from the API calls: textures, buffers and renderbuffers asked for, minus those deleted, no mips or driver padding. Same script on both builds.)
+
+| | JS heap at load | after 10 min | graphics at load | after 10 min | three geometries at load / after |
+|---|---|---|---|---|---|
+| a7b4449 (before the cache) | 2,889 MB | 2,925 MB | 1,495 MB | 1,595 MB | 1,520 / 2,023 |
+| round 6 at item 3 (d44c52e, cache with ring) | 3,008 MB | 3,045 MB | 1,555 MB | 1,651 MB | 2,366 / 2,645 |
+| 6297025 (item 6), no building in the cycle, 400 s | 3,008 MB | 3,045 MB (flat from 50 s: 3,036, 3,039, 3,038, 3,048, 3,050, 3,046, 3,046, 3,045) | 1,555 MB | 1,648 MB | 2,366 / 2,642 (2,574 at 50 s, then +60 in the next 100 s, +5 after) |
+
+- Both builds grow the same: +36 MB of JS heap and about +100 MB of graphics in 10 minutes, then flat. Without building, the geometry count rises for the first
+  two minutes (plots and plants are built as the camera reaches them) and stops. No leak in either build.
+- The cache build costs about +120 MB of JS heap and +60 MB of graphics at load (the second set of cache targets, +86 MB of textures, comes at the first
+  background redraw). Your 3.2 GB reading was mostly the max city itself: a7b4449 already shows 2.9 GB right after load.
+- Where the 3 GB is (tools/perf/heapsplit.py): Chrome's `performance.memory` counts the backing stores of typed arrays. Each geometry keeps its CPU copy of its
+  vertex data after upload: 2.4 GB in 7,970 geometries (positions 870 MB, indices 505, normals 303, window emissive data 283, colors 214, three flicker/on/fine
+  attributes 71 each). A plot's own meshes stay (hidden) next to the merged mesh of their region, so much of it is held twice; summing by owner, meshes that
+  are hidden account for 1.9 GB of a (double-counted) 4.2 GB. Dropping the CPU copies of merged meshes after upload would save a large part of it; I did not do it
+  (picking, edits and re-merging read those arrays; it needs a careful pass). Suggested as its own item.
+- The sampling heap profiler (tools/perf/heapsites.py) sees only 153 MB of ordinary JS objects (the building scan, roundedBox geometry, collect lists, plants).
 
 **5. Fewer triangles: investigated; nothing shipped (details below).**
 - Headroom (tools/perf/visprobe.py: triangle ids rendered from 12 turns x 3 tilts at zoom 30 around a mid-city point, ~6,800 triangles): of the
@@ -62,27 +162,6 @@ is not the blit's state; then the pinned camera's depth (wet-ground search, shim
   turn, and every capture at rest, are identical.
 - Triangles drawn by the color pass during a fast spin (+3 rad, city, 1280x720): zoom 30: 35 to 49% fewer; zoom 15: 39 to 54% fewer (with v0 = 6).
   GPU time can only be read on the owner's machine: record a fast spin and a Q/E turn at zoom 30 with the test on and off.
-
-**4. Memory: measured; nothing grows, the 3 GB is the city's geometry.** (tools/perf/memcheck.py: max city, harness Chrome with SwiftShader at 1280x720,
-10 minutes of simulated play: a pan, turn, zoom, hour change or one build every 20 simulated seconds; JS heap after a forced collection; graphics bytes counted
-from the API calls: textures, buffers and renderbuffers asked for, minus those deleted, no mips or driver padding. Same script on both builds.)
-
-| | JS heap at load | after 10 min | graphics at load | after 10 min | three geometries at load / after |
-|---|---|---|---|---|---|
-| a7b4449 (before the cache) | 2,889 MB | 2,925 MB | 1,495 MB | 1,595 MB | 1,520 / 2,023 |
-| round 6 at item 3 (d44c52e, cache with ring) | 3,008 MB | 3,045 MB | 1,555 MB | 1,651 MB | 2,366 / 2,645 |
-| 6297025 (item 6), no building in the cycle, 400 s | 3,008 MB | 3,045 MB (flat from 50 s: 3,036, 3,039, 3,038, 3,048, 3,050, 3,046, 3,046, 3,045) | 1,555 MB | 1,648 MB | 2,366 / 2,642 (2,574 at 50 s, then +60 in the next 100 s, +5 after) |
-
-- Both builds grow the same: +36 MB of JS heap and about +100 MB of graphics in 10 minutes, then flat. Without building, the geometry count rises for the first
-  two minutes (plots and plants are built as the camera reaches them) and stops. No leak in either build.
-- The cache build costs about +120 MB of JS heap and +60 MB of graphics at load (the second set of cache targets, +86 MB of textures, comes at the first
-  background redraw). Your 3.2 GB reading was mostly the max city itself: a7b4449 already shows 2.9 GB right after load.
-- Where the 3 GB is (tools/perf/heapsplit.py): Chrome's `performance.memory` counts the backing stores of typed arrays. Each geometry keeps its CPU copy of its
-  vertex data after upload: 2.4 GB in 7,970 geometries (positions 870 MB, indices 505, normals 303, window emissive data 283, colors 214, three flicker/on/fine
-  attributes 71 each). A plot's own meshes stay (hidden) next to the merged mesh of their region, so much of it is held twice; summing by owner, meshes that
-  are hidden account for 1.9 GB of a (double-counted) 4.2 GB. Dropping the CPU copies of merged meshes after upload would save a large part of it; I did not do it
-  (picking, edits and re-merging read those arrays; it needs a careful pass). Suggested as its own item.
-- The sampling heap profiler (tools/perf/heapsites.py) sees only 153 MB of ordinary JS objects (the building scan, roundedBox geometry, collect lists, plants).
 
 **7. Building without redrawing the whole cache: done.**
 - What it does: an edit (a piece placed, removed, sweeping in or out, a neighbor's bridge or walkway rebuilt) no longer throws the whole cache away. The world notes

@@ -149,7 +149,9 @@ function gradeFor(h, rain){
   if (rain){ const r = GRADES.rain, f = .65; for (let q=0; q<3; q++){ _gr.lift[q] += (r.lift[q] - _gr.lift[q])*f; _gr.gain[q] += (r.gain[q] - _gr.gain[q])*f; } _gr.sat += (r.sat - _gr.sat)*f; _gr.con += (r.con - _gr.con)*f; }
   return w;
 }
-function applyTime(){
+// The time of day as it was before the looks system (js/looks.js): the keyframes above, the four grades. Kept: the overlay test
+// "old grades (as before)" (LK.old, or window.__OLD_GRADES) draws with this, and the new knobs are set to what leaves it unchanged (lkNeutral).
+function applyTimeOld(){
   const h = S.hour;
   let i = 0; while (i < KEYS.length-2 && KEYS[i+1].h <= h) i++;
   const a = KEYS[i], b = KEYS[i+1], t = Math.min(1, Math.max(0, (h-a.h)/(b.h-a.h)));
@@ -191,7 +193,17 @@ function applyTime(){
   comp.uniforms.mistI.value = S.mist === false ? 0 : (.55*w.day + .9*w.golden + .8*w.blue + .8*w.night)*(S.rain ? 1.4 : 1);
   comp.uniforms.mistSun.value = .5*w.day + 1.0*w.golden + .7*w.blue + .3*w.night;   // sunbeams in the mist: strongest with the sun low
   comp.uniforms.mistNight.value = Math.min(1, w.night + w.blue*.5);
+  lkNeutral(night);
   return night;
+}
+// the looks system's own path (looks.js) unless the old way is asked for
+function applyTime(){ return (typeof LK !== 'undefined' && !LK.old && !window.__OLD_GRADES) ? lkApply() : applyTimeOld(); }
+// every knob the looks added, at the value that leaves the old picture as it was
+function lkNeutral(night){
+  const u = comp.uniforms, g = glowMix.uniforms;
+  u.starVis.value = night; u.skyMidOn.value = 0; u.hazeK.value = .35; u.mistTint.value.setRGB(1, 1, 1); u.sparkle.value = 0; u.rainAmt.value = S.rain ? 1 : 0;
+  cloudMat.uniforms.cover.value = .5; cloudMat.uniforms.cloudAmt.value = 0;
+  g.midA.value = 0; g.palBlend.value = 0; g.grain.value = 0; g.fringe.value = 0; g.flare.value = 0; g.vig.value = 0; g.bloomK.value = 1; g.halK.value = 1; glowPick.uniforms.thK.value = 1;
 }
 function phaseName(h){
   if (h >= 5 && h < 8) return 'Dawn';
@@ -209,7 +221,7 @@ const PAL_HEX = ['#1B2A4A','#2C3A52','#4A5566','#C9B89A','#E3D6BD','#9EC4E0','#F
 // SKY_TURN how far the sky turns for each turn of the camera
 const SKY_EL = .3, SKY_H = .5, SKY_TURN = 1, SKY_DRIFT = 0;   // a real sky: fixed around the world, so turning the camera looks at another part of it; panning never moves it (it's infinitely far away)
 // (FX_*: each effect can be compiled out of the shader altogether when it's off: see compVariant)
-const COMP_FX = ['SHIM', 'OUTLINE', 'AO', 'NL', 'RIM', 'WET', 'CLOUDS', 'MIST', 'RAYS', 'RAIN', 'PAL'];
+const COMP_FX = ['SHIM', 'OUTLINE', 'AO', 'NL', 'RIM', 'WET', 'CLOUDS', 'MIST', 'RAYS', 'RAIN', 'PAL', 'SPARK'];
 const comp = new THREE.ShaderMaterial({
   defines: Object.assign({ SOFT_HALF: 0 }, Object.fromEntries(COMP_FX.map(f => ['FX_' + f, 1]))),   // (SOFT_HALF: the wet-ground reflections, the mist and the light shafts are worked out at half resolution: see softEffects)
   uniforms: {
@@ -218,7 +230,7 @@ const comp = new THREE.ShaderMaterial({
     near:{value:NEAR}, far:{value:FAR}, camDist:{value:CAM_DIST}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
     night:{value:0}, smoothLook: SMOOTH_LOOK, lodLines: LOD.lines, pxK:{value:1}, starOff:{value:new THREE.Vector2()}, skyYaw:{value:0}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
     pal:{value: PAL_HEX.map(h => { const c=new THREE.Color(h); return new THREE.Vector3(c.r,c.g,c.b); })},
-    tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, rainOn:{value:0},
+    tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, rainOn:{value:0}, rainAmt:{value:0}, starVis:{value:0}, skyMid:{value:new THREE.Color()}, skyMidOn:{value:0}, hazeK:{value:.35}, mistTint:{value:new THREE.Color(1,1,1)}, sparkle:{value:0},
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
@@ -235,6 +247,7 @@ const comp = new THREE.ShaderMaterial({
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
     uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float rainOn; uniform sampler2D tCloud;
+    uniform float rainAmt; uniform float starVis; uniform vec3 skyMid; uniform float skyMidOn; uniform float hazeK; uniform vec3 mistTint; uniform float sparkle;   // (the looks: js/looks.js)
     uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 cityGlow;
     uniform float cloudOn; uniform float raysOn; uniform float rayI; uniform float rainDark;
     uniform sampler2D tSoftW; uniform sampler2D tSoftM; uniform sampler2D tSoftR; uniform vec2 softPar; uniform vec2 softDim; uniform float softSig;
@@ -375,7 +388,7 @@ const comp = new THREE.ShaderMaterial({
         // pastel pixel-art sky: the gradient in ten flat bands, with only a thin dithered seam where two meet
         float tb = smoothstep(0.05, 0.95, vUv.y)*10.0, fb = fract(tb);
         float tq = smoothLook > .5 ? tb/10.0 : (floor(tb) + (fb > 0.82 ? step(bayer(gl_FragCoord.xy), (fb - 0.82)/0.18) : 0.0))/10.0;   // (Smooth: no bands)
-        vec3 sky = mix(skyBot, skyTop, tq);
+        vec3 sky = skyMidOn > .5 ? (tq < .5 ? mix(skyBot, skyMid, tq*2.0) : mix(skyMid, skyTop, tq*2.0 - 1.0)) : mix(skyBot, skyTop, tq);   // (a horizon colour between, when a look gives one)
         // The stars are a full 360-degree sky map. The view onto it is a flat strip: heading across, elevation up,
         // both in whole sky pixels, so turning the camera slides the stars straight sideways at an even pace (a
         // perspective view swung them through arcs, which felt wrong next to the flat, orthographic city). It turns
@@ -403,8 +416,8 @@ const comp = new THREE.ShaderMaterial({
           } else star = step(r, .55)*(.45 + .55*bright);
         }
         float above = smoothstep(-.02, .2, el);
-        star *= night*above;
-        float haze = band*above*night*.05*(.6 + .4*hash(floor(vec2(az, el)/(pix*2.0))));
+        star *= starVis*above;
+        float haze = band*above*starVis*.05*(.6 + .4*hash(floor(vec2(az, el)/(pix*2.0))));
         sky += vec3(.55, .5, .8)*(smoothLook > .5 ? haze : floor(haze*40.0 + bayer(gl_FragCoord.xy)*.99)/40.0);   // dithered, so it stays pixel art
         col = sky + vec3(star) + c.rgb;
       } else {
@@ -475,7 +488,7 @@ const comp = new THREE.ShaderMaterial({
             col += rimCol*rimI*lit*(edge*0.45 + face*face*0.22);   // a gentle edge line, not a glowing outline
           }
         }
-        col = mix(col, haze, 0.35*smoothstep(camDist + 5.5, camDist + 53.0, d));   // the far side of the island fades into haze
+        col = mix(col, haze, hazeK*smoothstep(camDist + 5.5, camDist + 53.0, d));   // the far side of the island fades into haze
       }
       // ---- rays through the scene for clouds and light shafts ----
       vec2 ndc = vUv*2.0 - 1.0;
@@ -510,7 +523,7 @@ const comp = new THREE.ShaderMaterial({
       if (FX_WET > 0 && rd < 0.99999 && wet > 0.0 && dot(n, upView) > 0.93){
         vec3 wp = ro + rdir*tEnd;
         float pud = step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
-        pud *= 0.35 + 0.65*rainOn;
+        pud *= 0.35 + 0.65*rainAmt;
         vec3 rr = reflect(rdir, vec3(0.0, 1.0, 0.0));
         vec3 hitCol = vec3(0.0); float hit = 0.0, t = 0.03; vec2 huv = vec2(0.0);
         for (int i=0; i<22; i++){
@@ -534,6 +547,20 @@ const comp = new THREE.ShaderMaterial({
         } else if (pud > 0.0){
           col = mix(col, mix(skyBot, skyTop, 0.5)*0.7, 0.35*pud*wet*2.0);   // puddles show the sky when nothing is above
         }
+      }
+#endif
+#if FX_SPARK
+      // ---- sparkle: tiny glints on wet ground and roofs, where the light on them is strong (the rainy morning's signature) ----
+      // One cell per pixel or so, fixed to the world so a pan doesn't make them swim. A cell glints when its own hash is high enough
+      // for the light there (the picture's own brightness, and the sun where the shadow map says it reaches), and twinkles on its own clock.
+      if (sparkle > 0.0 && wet > 0.0 && rd < 0.99999 && dot(n, upView) > 0.93){
+        vec3 wps = ro + rdir*tEnd;
+        vec2 gc = floor(wps.xz*9.0);
+        float hs0 = hash(gc + 11.3), hs1 = hash(gc*1.7 + 3.1);
+        float lightK = clamp(dot(col, vec3(.3, .59, .11))*1.6 + litAt(wps)*dot(sunCol, vec3(.3, .59, .11))*.35, 0.0, 1.0);
+        float tw = smoothstep(.5, .95, sin(time*(2.5 + 3.5*hs1) + hs1*60.0)*.5 + .5);
+        float gl = step(1.0 - .1*lightK*min(1.0, wet*1.4), hs0)*tw*min(1.0, sparkle);
+        col += mix(vec3(1.0), sunCol/max(max(sunCol.r, max(sunCol.g, sunCol.b)), .001), .35)*gl*(.55 + .45*min(sparkle, 2.0)*.5);
       }
 #endif
       if (FX_CLOUDS > 0 && cloudOn > 0.5 && rd >= 0.99999){
@@ -562,7 +589,7 @@ const comp = new THREE.ShaderMaterial({
           if (Ws > 1e-4){
             acc = acc/Ws*0.4; Tm /= Ws;
             acc = smoothLook > .5 ? acc : floor(acc*20.0 + dith)/20.0;   // stepped, to stay pixel art
-            col = col*mix(1.0, Tm, .6) + acc;
+            col = col*mix(1.0, Tm, .6) + acc*mistTint;
           }
         }
       }
@@ -591,7 +618,7 @@ const comp = new THREE.ShaderMaterial({
           }
           acc = min(acc, vec3(.4));
           acc = smoothLook > .5 ? acc : floor(acc*20.0 + dith)/20.0;   // stepped, to stay pixel art
-          col = col*mix(1.0, T, .6) + acc;
+          col = col*mix(1.0, T, .6) + acc*mistTint;
         }
       }
 #endif
@@ -649,7 +676,7 @@ const comp = new THREE.ShaderMaterial({
           float y = p.y + time*speed + hash(vec2(colm, fl*13.0))*500.0;
           float seg = floor(y/spacing), pos = mod(y, spacing);
           float on = step(hash(vec2(colm, seg + fl*71.0)), 0.16 - fl*0.03) * step(pos, len);
-          col = mix(col, rc, on*(0.42 - fl*0.1));
+          col = mix(col, rc, on*(0.42 - fl*0.1)*rainAmt);
         }
         // splashes: single pixels that flash on up-facing surfaces, fixed to the ground so they don't swim
         if (rd < 0.99999 && dot(n, upView) > 0.9){
@@ -657,7 +684,7 @@ const comp = new THREE.ShaderMaterial({
           vec2 sc = floor(wp.xz*7.0);
           float ph = fract(time*1.7 + hash(sc)*7.0);
           float sp = step(hash(sc + 19.0), 0.22) * step(ph, 0.07) * step(0.5, hash(floor(wp.xz*14.0)));
-          col = mix(col, rc*1.15, sp*0.6);
+          col = mix(col, rc*1.15, sp*0.6*rainAmt);
         }
       }
       if (mtSh > .002){   // the field's own light: a soft electric blue haze, breathing
@@ -681,12 +708,13 @@ const comp = new THREE.ShaderMaterial({
 // everything compiled in as before, or no effects at all, to see the floor.)
 let compKey = '';
 function compVariant(){
+  if (typeof LK !== 'undefined' && !LK.old && !window.__OLD_GRADES) lkFrame();   // (the looks' wetness, rain and shafts, over what main.js has just set: looks.js)
   const T = PH.tests, u = comp.uniforms, on = {};
   if (T.compFloor) for (const f of COMP_FX) on[f] = false;
   else if (!T.compAll){
     on.SHIM = u.nLifts.value > .5 || u.mtN.value > 0; on.OUTLINE = u.outlines.value > 0; on.AO = u.aoI.value > 0; on.NL = NL_UNI.lightI.value > 0;
     on.RIM = u.rimI.value > .01; on.WET = u.wet.value > 0; on.CLOUDS = u.cloudOn.value > .5; on.MIST = u.mistI.value > 0 && u.nVents.value > 0;
-    on.RAYS = u.raysOn.value > .5 && u.rayI.value > .01; on.RAIN = u.rainOn.value > .5; on.PAL = u.palOn.value > .5;
+    on.RAYS = u.raysOn.value > .5 && u.rayI.value > .01; on.RAIN = u.rainOn.value > .5; on.PAL = u.palOn.value > .5; on.SPARK = u.sparkle.value > 0 && u.wet.value > 0;
   }
   if (T.compNoShim) on.SHIM = false;
   // the wet-ground reflections, the mist and the light shafts at half resolution (softEffects): off in the test "soft effects at full resolution"
@@ -727,7 +755,7 @@ const SOFT_WET = SOFT_HEAD + `
     if (dot(n, upView) > 0.93){
       vec3 wp = ro + rdir*tEnd;
       float pud = step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
-      pud *= 0.35 + 0.65*rainOn;
+      pud *= 0.35 + 0.65*rainAmt;
       vec3 rr = reflect(rdir, vec3(0.0, 1.0, 0.0));
       vec3 hitCol = vec3(0.0); float hit = 0.0, t = 0.03; vec2 huv = vec2(0.0);
       for (int i=0; i<22; i++){
@@ -900,13 +928,14 @@ const cloudMat = new THREE.ShaderMaterial({
     tDepth:{value:null}, invVP:comp.uniforms.invVP, time:comp.uniforms.time, cloudOff:{value:new THREE.Vector2()}, texSea:{value:cloudAtlas[0].texture}, texRing:{value:cloudAtlas[1].texture},
     sunDir:comp.uniforms.sunDir, sunCol:comp.uniforms.sunCol, skyTop:comp.uniforms.skyTop, skyBot:comp.uniforms.skyBot,
     night:comp.uniforms.night, smoothLook: SMOOTH_LOOK, cityGlow:comp.uniforms.cityGlow, glowC:comp.uniforms.glowC, rainDark:comp.uniforms.rainDark,
+    cover:{value:.5}, cloudAmt:{value:0}, cloudCol:{value:new THREE.Color(1, 1, 1)},   // (the looks: how much sky the clouds fill, and the colour they lean toward)
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: CLOUD_NOISE + `
     uniform sampler2D tDepth; uniform mat4 invVP; uniform float time; uniform vec2 cloudOff;
     uniform sampler2D texSea; uniform sampler2D texRing;
     uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 cityGlow; uniform vec2 glowC;
-    uniform float night; uniform float smoothLook; uniform float rainDark;
+    uniform float night; uniform float smoothLook; uniform float rainDark; uniform float cover; uniform float cloudAmt; uniform vec3 cloudCol;
     varying vec2 vUv;
     vec2 tileUV(float s, vec2 xz){ vec2 inner = clamp(xz, 0.5/128.0, 1.0 - 0.5/128.0); return (vec2(mod(s, 8.0), floor(s/8.0)) + inner)/vec2(8.0, 4.0); }
     vec4 atl(sampler2D t, vec3 q){
@@ -933,6 +962,7 @@ const cloudMat = new THREE.ShaderMaterial({
           float pastel = (1.0 - 0.85*night)*(1.0 - 0.6*rainDark);
           vec3 shade = mix(mix(skyBot, skyTop, 0.35)*0.55, mix(skyTop, vec3(0.48, 0.52, 0.86), 0.6)*0.92, pastel)*(1.0 - 0.35*rainDark);
           vec3 litC = sunCol*1.05 + skyTop*0.25;
+          litC = mix(litC, cloudCol, cloudAmt); shade = mix(shade, cloudCol*0.62, cloudAmt);
           vec3 P0 = shade*(0.8 + 0.1*pastel),
                P1 = shade + vec3(0.03, 0.02, 0.07)*pastel,
                P2 = mix(shade, litC, 0.36) + vec3(0.07, 0.0, 0.07)*pastel,
@@ -948,6 +978,7 @@ const cloudMat = new THREE.ShaderMaterial({
             if (r > 14.0){ vec4 sb = atl(texRing, q); float f2 = sb.r*2.0 - 1.0 - (1.0 - smoothstep(15.0, 19.0, r))*2.0; if (f2 > f){ f = f2; n = sb.gba*2.0 - 1.0; } }
             float mist = p.y < -10.0 ? clamp((vnoise(q*0.07) - 0.55)*2.2, 0.0, 1.0) * smoothstep(-16.0, -13.5, p.y) * smoothstep(-10.0, -12.0, p.y) * 0.25 : 0.0;
             float dens = mist;
+            f += (cover - .5)*.9;   // (the looks' cloud cover: .5 is the picture as it was)
             if (f > -0.15){ f += (vnoise(q*2.4) - 0.5)*0.18; dens = max(mist, smoothstep(0.0, 0.32, f)); }
             if (dens > 0.001){
               // light: how much each puff faces the sun, brighter toward the cloud tops, darker where another puff
@@ -1038,15 +1069,15 @@ function makeTargets(){
 const GLOW_FX = { night: comp.uniforms.night };
 const fsVert = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
 const glowPick = new THREE.ShaderMaterial({
-  uniforms: { t: { value: null }, texel: { value: new THREE.Vector2() }, night: GLOW_FX.night },
+  uniforms: { t: { value: null }, texel: { value: new THREE.Vector2() }, night: GLOW_FX.night, thK: { value: 1 } },
   vertexShader: fsVert,
-  fragmentShader: `uniform sampler2D t; uniform vec2 texel; uniform float night; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D t; uniform vec2 texel; uniform float night; uniform float thK; varying vec2 vUv;
     vec3 pickC(vec2 uv){
       vec3 c = texture2D(t, uv).rgb;
       float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), sat = mx > 0.0 ? (mx - mn)/mx : 0.0;
       float yel = smoothstep(.2, .38, (min(c.r, c.g) - c.b)/max(mx, .001));   // warm yellow window light (not white, not beige walls)
       float key = mx*(.45 + .55*max(sat, .95*yel));                  // coloured light counts, white surfaces much less
-      float th = mix(.8, .5, night);                                // by day only the brightest lights bloom
+      float th = mix(.8, .5, night)*thK;   // (thK: a look's bloom threshold, 1 as it was)                                // by day only the brightest lights bloom
       // sunlit pale surfaces (the white luxury towers, cream walls) turn warm and bright at golden hour and would
       // otherwise bloom like lights: anything near-white (all channels close together) is kept out of the bloom by
       // day, fading back in after dusk. Lights are far more saturated, so they're unaffected.
@@ -1081,19 +1112,39 @@ const glowCopy = new THREE.ShaderMaterial({ uniforms: { t: { value: null } }, ve
   fragmentShader: 'uniform sampler2D t; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(t, vUv).rgb, 1.0); }', depthTest: false, depthWrite: false });
 const glowMix = new THREE.ShaderMaterial({
   uniforms: { t: { value: null }, tB: { value: null }, tH: { value: null }, night: GLOW_FX.night, smoothLook: SMOOTH_LOOK, on: { value: 1 },
-              lift: { value: new THREE.Vector3() }, gain: { value: new THREE.Vector3(1, 1, 1) }, sat: { value: 1 }, con: { value: 1 }, lit: { value: 0 } },
+              lift: { value: new THREE.Vector3() }, gain: { value: new THREE.Vector3(1, 1, 1) }, sat: { value: 1 }, con: { value: 1 }, lit: { value: 0 },
+              // the looks (js/looks.js): midtone tint, the palette as a gradient map, grain, colour fringing, lens flare and sun glare, vignette, bloom and halation strength
+              midG: { value: new THREE.Vector3(1, 1, 1) }, midA: { value: 0 }, pal8: { value: Array.from({ length: 8 }, () => new THREE.Vector3()) }, palBlend: { value: 0 },
+              grain: { value: 0 }, grainSize: { value: 1 }, fringe: { value: 0 }, flare: { value: 0 }, flareVis: { value: 0 }, sunUv: { value: new THREE.Vector2(.5, .5) }, flareCol: { value: new THREE.Color(1, 1, 1) },
+              vig: { value: 0 }, bloomK: { value: 1 }, halK: { value: 1 }, time: comp.uniforms.time, res: { value: new THREE.Vector2(1, 1) } },
   vertexShader: fsVert,
   fragmentShader: `uniform sampler2D t; uniform sampler2D tB; uniform sampler2D tH; uniform float night; uniform float smoothLook; uniform float on; varying vec2 vUv;
     uniform vec3 lift; uniform vec3 gain; uniform float sat; uniform float con; uniform float lit;
+    uniform vec3 midG; uniform float midA; uniform vec3 pal8[8]; uniform float palBlend; uniform float grain; uniform float grainSize; uniform float fringe;
+    uniform float flare; uniform float flareVis; uniform vec2 sunUv; uniform vec3 flareCol; uniform float vig; uniform float bloomK; uniform float halK; uniform float time; uniform vec2 res;
     float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y*0.75))); }
     float bayer(vec2 a){ return b2(0.5*a)*0.25 + b2(a); }
+    float hash21(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+    // the palette as a gradient map: dark pixels toward the first colours, bright toward the last (js/looks.js sorts them by brightness)
+    vec3 palMap(float l){
+      float x = clamp(l, 0.0, 1.0)*7.0; vec3 a = pal8[0], b = pal8[1]; float f = fract(x);
+      for (int k = 0; k < 7; k++){ if (float(k) <= x && x < float(k) + 1.0){ a = pal8[k]; b = pal8[k + 1]; } }
+      if (x >= 7.0){ a = pal8[6]; b = pal8[7]; f = 1.0; }
+      return mix(a, b, f);
+    }
     void main(){
       vec3 c = texture2D(t, vUv).rgb;
+      // colour fringing: the red and blue pictures slide a whole pixel or more apart toward the edges (whole pixels, so it stays crisp)
+      if (fringe > 0.0){
+        vec2 cc = (vUv - .5)*2.0; float rr = length(cc);
+        float px = floor(fringe*rr*rr + .5);
+        if (px > 0.0){ vec2 d = (rr > 1e-4 ? cc/rr : vec2(0.0))*px/res; c.r = texture2D(t, vUv + d).r; c.b = texture2D(t, vUv - d).b; }
+      }
       vec3 b = texture2D(tB, vUv).rgb, h = texture2D(tH, vUv).rgb;
       // with the night lights on, the thrown light already spreads each source's colour round it, so bloom pulls back
       // (the wide halation most) and the two read as one lighting rather than stacking up
-      float k = mix(.6, 1.7, night)*mix(1.0, .62, lit);
-      vec3 add = b*k + h*vec3(1.0, .42, .3)*mix(.3, 1.0, night)*mix(1.0, .45, lit);   // bloom, and a warm red halation round it
+      float k = mix(.6, 1.7, night)*mix(1.0, .62, lit)*bloomK;
+      vec3 add = b*k + h*vec3(1.0, .42, .3)*mix(.3, 1.0, night)*mix(1.0, .45, lit)*halK;   // bloom, and a warm red halation round it
       add = smoothLook > .5 ? add : floor(add*20.0 + bayer(gl_FragCoord.xy)*.99)/20.0;       // stepped and dithered: pixel art, not a smooth haze
       c += add*on*(1.0 - .85*c);                                      // screen-like: bright pixels (a lit hotel facade) don't blow out to white
       // colour grading for the time of day: tinted shadows (lift), tinted highlights (gain), saturation, contrast
@@ -1101,6 +1152,28 @@ const glowMix = new THREE.ShaderMaterial({
       float l = dot(c, vec3(.299, .587, .114));
       c = mix(vec3(l), c, sat);
       c = (c - .5)*con + .5;
+      if (midA > 0.0){ float l2 = clamp(dot(c, vec3(.299, .587, .114)), 0.0, 1.0); c *= mix(vec3(1.0), midG, 4.0*l2*(1.0 - l2)); }   // the midtones' tint: strongest in the middle of the range
+      if (palBlend > 0.0){ float l3 = dot(clamp(c, 0.0, 1.0), vec3(.299, .587, .114)); c = mix(c, palMap(l3), palBlend); }   // the look's palette showing through
+      if (flare > 0.0){
+        // soft lens flare and sun glare along the line from the sun through the middle of the picture; with the sun well off screen, only a faint glare on its side
+        vec2 asp = vec2(res.x/res.y, 1.0);
+        vec2 sc = clamp(sunUv, vec2(-.02), vec2(1.02));
+        float gl = exp(-pow(length((vUv - sc)*asp), 2.0)*14.0)*.5 + exp(-length((vUv - sc)*asp)*2.6)*.22;
+        float gh = 0.0;
+        for (int q = 0; q < 4; q++){
+          float kq = q == 0 ? .45 : q == 1 ? .8 : q == 2 ? 1.35 : 1.9, rq = q == 0 ? .05 : q == 1 ? .09 : q == 2 ? .035 : .13;
+          vec2 gp = sunUv + (vec2(.5) - sunUv)*kq;
+          float dq = length((vUv - gp)*asp);
+          gh += (smoothstep(rq, rq*.4, dq)*.22 + smoothstep(rq*1.5, rq, dq)*smoothstep(rq*.7, rq*1.5, dq)*.1)*(q == 3 ? .6 : 1.0);
+        }
+        c += flareCol*flare*(gl*(.3 + .7*flareVis) + gh*flareVis);
+      }
+      if (vig > 0.0){ vec2 vv = (vUv - .5)*vec2(1.15, 1.0)*2.0; c *= 1.0 - vig*smoothstep(.55, 1.5, length(vv)); }
+      if (grain > 0.0){   // film grain, after the grade: re-rolled 24 times a second, in blocks of grainSize pixels, a little stronger in the shadows
+        float gn = hash21(floor(gl_FragCoord.xy/grainSize) + floor(time*24.0)*37.0) - .5;
+        float lg = dot(clamp(c, 0.0, 1.0), vec3(.299, .587, .114));
+        c += gn*grain*.5*(1.15 - .6*lg);
+      }
       gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
     }`,
   depthTest: false, depthWrite: false,
@@ -1119,6 +1192,8 @@ function makeGlowTargets(){
 function glowPass(mat, target, name){ PH.begin(name, true); glowQuad.material = mat; renderer.setRenderTarget(target); renderer.render(glowScene, compCam); PH.end(); }
 // run after the composite has been drawn into rtOut; leaves the finished frame in rtFinal
 function renderGlow(){
+  glowMix.uniforms.res.value.set(W, H);
+  if (typeof LK !== 'undefined' && !LK.old && !window.__OLD_GRADES) lkGlow();   // (the looks' lens and film values: looks.js)
   glowMix.uniforms.on.value = S.bloom ? 1 : 0;
   glowMix.uniforms.lit.value = NL_UNI.lightI.value > 0 ? Math.min(1, NL_UNI.lightI.value/.6) : 0;   // how much night light there is
   if (!S.bloom){ glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = rtB[0].texture; glowMix.uniforms.tH.value = rtHal[0].texture; glowPass(glowMix, rtFinal, 'grade (no bloom)'); return; }   // no bloom, but still graded

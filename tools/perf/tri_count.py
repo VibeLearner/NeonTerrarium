@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Triangles the color pass draws in a frame (the cache off, a turned view), for combinations of the round 8 cheats, at the zooms that give the pixel size of the owner's 1640-line render at zoom 30 and 15
 (the harness renders 720 lines: the same pixel size in world units is zoom * 720/1640).
-   python3 tools/perf/tri_count.py dense --configs 'all' 'window.__FULL_ROUND=true;' 'window.__FULL_STICKS=true;' 'window.__FULL_ROUND=true;window.__FULL_STICKS=true;'"""
+   python3 tools/perf/tri_count.py dense --configs 'all' 'window.__LEAN_ROUND=true;' 'window.__THIN_STICKS=true;' 'window.__LEAN_ROUND=true;window.__THIN_STICKS=true;'"""
 import argparse, os, sys, json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import harness as H

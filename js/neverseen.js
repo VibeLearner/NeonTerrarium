@@ -1,12 +1,12 @@
 // Neon Terrarium: faces that no allowed camera ever sees (round 8, item 1: a cheat, the overlay test "draw never-seen faces too" turns it off).
 // Inside a plot's own geometry many faces are covered by other faces of the same plot from every view the game allows (every turn, every tilt from PITCH_MIN to PITCH_MAX):
 // interiors, the backs of fittings, the far sides of things. For each plot, in idle frames, the triangles of its own geometry are drawn into an id picture from a fixed set of views
-// (NV.yaws turns x NV.np tilts x NV.jits sub-pixel offsets, at a pixel finer than the closest zoom's), the ids that show up in any view are marked on the card (a second pass
+// (NV.yaws turns x NV.np tilts, offset by half a turn step, at a pixel of .0045 against the closest zoom's .0061: the dense reference set), the ids that show up in any view are marked on the card (a second pass
 // scatters every pixel's id into a small map, so only that map is read back, once). The drawn triangles that never showed (and that are not depth ties with a same-facing
 // triangle in the same plane) move to H: still drawn in the shadow map and while the piece is swept in or out, left out of the camera's pictures. Neighbors never count (the
 // plot is drawn alone). The result is kept by the plot's geometry signature in IndexedDB, so a plot is worked out once, ever.
 // A sampled set can miss a face that shows through a narrow gap or at a grazing angle in a few views: the rare missing speck of wall is the cost (see OVERNIGHT3.md).
-const NV = { yaws: 48, np: 8, jits: [[0, 0], [.5, .5], [.25, .75], [.75, .25]], px: .006, maxPx: 4000, ver: 'v1-48x8x4-p006',
+const NV = { yaws: 96, np: 14, yawOff: .5, jits: [[0, 0]], px: .0045, maxPx: 4000, ver: 'v2-96x14-p0045',   // (the dense reference set of round 7: nothing it sees is removed)
   views: 1, queue: [], job: null, store: new Map(), db: null, dbReady: false, still: 0, last: '', modeOn: true, stats: { plots: 0, removed: 0, drawn: 0, fromStore: 0, views: 0 },
   acc: null, rtId: null, scn: null, scatterScn: null };
 NV.off = () => !!window.__NV_OFF;

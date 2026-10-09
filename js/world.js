@@ -523,7 +523,7 @@ function drain(g){ let r; while (!(r = g.next()).done); return r.value; }
 function collect(fn){ return drain(collectGen((function*(){ fn(); })())); }
 // the same, a step at a time (body: a generator that yields between its steps): see stageStart
 function* collectGen(body){
-  FAR_CFG.lean = !(PH.tests.fullRound || window.__FULL_ROUND); FAR_CFG.sticks = !(PH.tests.fullSticks || window.__FULL_STICKS);
+  FAR_CFG.lean = !!(PH.tests.leanRound || window.__LEAN_ROUND); FAR_CFG.sticks = !!(PH.tests.thinSticks || window.__THIN_STICKS);   // (both off unless the tests are on)
   buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {}; curSpots = []; curCover = [];
   for (const k in SPR.size) FOL_LIST[k] = [];
   yield* body; yield;

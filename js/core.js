@@ -269,7 +269,7 @@ function pushCorners(b, geo, w, m, fid, ord, did){
 }
 // Round parts with a lean twin (round 8 item 3, a cheat: the overlay test "full round parts"): the 16-sided cylinder has an 8-sided one (the same circle, every second corner), a rounded plate a coarser corner.
 // A twin is made only for a part small enough that the two outlines are within a quarter of a pixel of each other at the zoom where the lean ones start to be drawn (LEAN_LIM, in world units a pixel).
-const FAR_CFG = { lean: true, sticks: true }, LEAN_OF = new Map(), LEAN_LIM = .0227, STICK_LIM = .035;
+const FAR_CFG = { lean: false, sticks: false }, LEAN_OF = new Map(), LEAN_LIM = .0227, STICK_LIM = .035;
 const LEAN_R = { cyl16: .098 };   // (a 16-gon against its 8-gon: the gap is .0576 of the radius, so up to 4.3 pixels of radius at LEAN_LIM)
 function leanOk(geo, m){ const e = m.elements; return .5*Math.max(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[8], e[9], e[10])) <= LEAN_R.cyl16; }
 // A shape's corners with duplicates merged (same position and normal, bit for bit) and its triangles as indices into them.

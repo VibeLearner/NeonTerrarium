@@ -99,12 +99,12 @@ def unb(b64, T):
     raw = base64.b64decode(b64); return [1 if raw[t >> 3] & (1 << (t & 7)) else 0 for t in range(T)]
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('scene'); ap.add_argument('--mode', choices=['prod', 'ref', 'crops', 'list'], default='list'); ap.add_argument('--plot', type=int, default=0); ap.add_argument('--crops', type=int, default=6)
-    ap.add_argument('--prod', default='yaws=48,np=8,px=.006'); ap.add_argument('--ref', default='yaws=96,np=14,px=.0045,yawOff=.5'); ap.add_argument('--out', default='nv_report')
+    ap.add_argument('--prod', default='yaws=96,np=14,px=.0045,yawOff=.5'); ap.add_argument('--ref', default='yaws=96,np=14,px=.0045,yawOff=.5'); ap.add_argument('--out', default='nv_report')
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
     from PIL import Image, ImageDraw
     srv = H.serve(); url = H.make_site('nvr' + a.mode + str(a.plot), None); sc = H.load_scenes([a.scene])[0]
-    prod = parse(a.prod); prod['jits'] = [[0, 0], [.5, .5], [.25, .75], [.75, .25]]
+    prod = parse(a.prod); prod['jits'] = [[0, 0]] if prod.get('px') == .0045 else [[0, 0], [.5, .5], [.25, .75], [.75, .25]]
     ref = parse(a.ref); ref['jits'] = [[0, 0]]
     base = os.path.join(OUT, 'nv_%s_%d_' % (a.scene, a.plot))
     os.makedirs(OUT, exist_ok=True)

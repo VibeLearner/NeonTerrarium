@@ -14,10 +14,10 @@ if __name__ == '__main__':
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
     srv = H.serve(); url = H.make_site('fc', None); sc = H.load_scenes([a.scene])[0]; z = a.owner_zoom*H.VIEWPORTS[0][1]/a.owner_h
-    off = {'round': 'window.__FULL_ROUND=true;', 'sticks': 'window.__FULL_STICKS=true;', 'both': 'window.__FULL_ROUND=true;window.__FULL_STICKS=true;'}[a.which]
+    off = {'round': 'window.__LEAN_ROUND=true;', 'sticks': 'window.__THIN_STICKS=true;', 'both': 'window.__LEAN_ROUND=true;window.__THIN_STICKS=true;'}[a.which]
     shots = {}
     with sync_playwright() as pw:
-        for name, init in (('off', 'window.__NV_OFF=true;' + off), ('on', 'window.__NV_OFF=true;')):
+        for name, init in (('off', 'window.__NV_OFF=true;'), ('on', 'window.__NV_OFF=true;' + off)):
             br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init=init)
             pg.evaluate('(z) => { S.cycle = false; S.hour = 12; S.rain = false; zoom = zoomT = z; }', z); r = pg.evaluate('() => __perf.cap(90, 3)'); shots[name] = img(r['png']); br.close()
     srv.shutdown()
@@ -34,6 +34,6 @@ if __name__ == '__main__':
         row = Image.new('RGB', (3*(bw*S + 4), bh*S), (30, 30, 30))
         for i, t in enumerate(tiles): row.paste(t.resize((bw*S, bh*S), Image.NEAREST), (i*(bw*S + 4), 0))
         rows.append(row)
-    m = Image.new('RGB', (rows[0].width, len(rows)*(bh*S + 4) + 18), (30, 30, 30)); dr = ImageDraw.Draw(m); dr.text((3, 3), 'before (%s) | after (default) | difference x4   %s, owner zoom %g (harness zoom %.1f)' % ('full ' + a.which, a.scene, a.owner_zoom, z), fill=(255, 255, 255))
+    m = Image.new('RGB', (rows[0].width, len(rows)*(bh*S + 4) + 18), (30, 30, 30)); dr = ImageDraw.Draw(m); dr.text((3, 3), 'before (default) | after (%s on) | difference x4   %s, owner zoom %g (harness zoom %.1f)' % (a.which, a.scene, a.owner_zoom, z), fill=(255, 255, 255))
     for i, r in enumerate(rows): m.paste(r, (0, 18 + i*(bh*S + 4)))
     p = os.path.join(OUT, a.out or 'item3_%s_%s_z%g.png' % (a.which, a.scene, a.owner_zoom)); m.save(p); print(p)

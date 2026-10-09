@@ -437,9 +437,62 @@
   }
 
   // ------------------------------------------------------------------------------------------
+  // tapped riffs: a fast two-hand figure (an anchor note, a hammered note, a tapped high note) in syncopated sixteenths.
+  // Everything below is written by hand from how tapping works on a guitar: it is not taken from any recording.
+  // ------------------------------------------------------------------------------------------
+  // rhythm templates for a 16-step bar: a = accent, x = note, . = rest. The groups run 3+3+3+3+2+2 unless the template syncopates.
+  const RIFF_RHYTHMS = [
+    'axxaxxaxxaxxaxax',   // a full stream, 3+3+3+3+2+2
+    'axxaxxaxx.a.axax',   // the same with a gap after the third group
+    'a.xa.xaxxa.xa.xx',   // syncopated, two eighth-note feels leaning on the offbeats
+    'axx.xxaxxa.xaxx.',   // a breath on beats 2 and 4
+    'a.xxa.xxa.xxa.xx',   // 4+4+4+4 with the accent on each downbeat
+  ];
+  // which three chord tones (offsets in the chord pool) one group plays, and how its base moves group to group
+  const RIFF_OFFSETS = [[0, 2, 4], [2, 0, 3], [0, 3, 5], [1, 0, 3]];
+  const RIFF_BASES = [[0, 1, 2, 1, 0, 1], [0, 0, 1, 1, 2, 1], [2, 1, 0, 1, 2, 3]];
+  function riffPlan(song, sec, p, eff) {
+    const r = eff.riff || 0;
+    if (r <= 0.02) return null;
+    const kind = sec.kind;
+    if (kind === 'intro' || kind === 'outro' || kind === 'build' || kind === 'swell' || kind === 'breakdown') return null;
+    const hookSection = kind === 'drop' || kind === 'chorus';
+    const nPh = Math.floor(sec.bars / 4);
+    if (p < (hookSection ? 2 : 1) || nPh < 3 || p > nPh - 1) return null;        // the hook is stated first; the riff comes after it
+    for (let q = 0; q < 4; q++) if (eAt(sec, 4 * p + q, eff) < 0.35) return null;
+    const prob = clamp(r * (0.6 + 0.5 * eff.math + 0.3 * eff.synth) * (kind === 'bridge' ? 1.3 : 1), 0, 0.95);
+    if (u(sec.rngSeed, 'riff', p) >= prob) return null;
+    const rs = J.rng(sec.rngSeed, 'riffshape');
+    return { rhythm: rs.int(0, RIFF_RHYTHMS.length - 1), offs: rs.pick(RIFF_OFFSETS), bases: rs.pick(RIFF_BASES) };
+  }
+  function riffCell(rp, meter, q) {
+    const cell = [];
+    let gi = 0;
+    if (meter.steps === 16) {
+      const tpl = RIFF_RHYTHMS[(rp.rhythm + (q === 3 ? 1 : 0)) % RIFF_RHYTHMS.length];
+      let g = -1;
+      for (let s = 0; s < 16; s++) {
+        const ch = tpl[s];
+        if (ch === '.') continue;
+        if (ch === 'a') g++;
+        cell.push({ s, acc: ch === 'a', riff: true, g: Math.max(g, 0), k: 0 });
+      }
+      // position inside each group decides the chord tone: anchor, hammer, tap
+      const byG = {}; cell.forEach(c => { (byG[c.g] = byG[c.g] || []).push(c); });
+      Object.keys(byG).forEach(gk => byG[gk].forEach((c, i) => { c.k = Math.min(i, 2); c.idx = rp.bases[(+gk) % rp.bases.length] + rp.offs[Math.min(i, 2)]; }));
+    } else {
+      meter.groups.forEach((len, g) => {
+        const s0 = meter.starts[g];
+        for (let i = 0; i < len; i++) cell.push({ s: s0 + i, acc: i === 0, riff: true, g, k: Math.min(i, 2), idx: rp.bases[g % rp.bases.length] + rp.offs[Math.min(i, 2)] });
+      });
+    }
+    return cell;
+  }
+
+  // ------------------------------------------------------------------------------------------
   // twinkle for a phrase: open arpeggios with a pedal tone, thinned around the lead
   // ------------------------------------------------------------------------------------------
-  function twinkleFor(song, sec, p, eff, leadOnsetsByBar, e0) {
+  function twinkleFor(song, sec, p, eff, leadOnsetsByBar, e0, rp) {
     const out = [];
     const b0 = 4 * p;
     const kind = sec.kind;
@@ -458,12 +511,14 @@
       const ckey = tmeter.id + ':' + style;
       sec.tw = sec.tw || {};
       if (!sec.tw[ckey]) sec.tw[ckey] = C.makeTwinkleCell(J.rng(sec.rngSeed, 'twc', ckey), tmeter, style);
-      const cell = sec.tw[ckey];
+      let cell = sec.tw[ckey];
+      if (rp) cell = riffCell(rp, meter, q);
       const crescendo = (kind === 'build' || kind === 'swell') ? 0.45 + 0.6 * (b / Math.max(1, sec.bars - 1)) : (kind === 'outro' ? 1 - 0.7 * (b / Math.max(1, sec.bars - 1)) : 1);
       const lead = leadOnsetsByBar[q] || [];
       const rrb = J.rng(sec.rngSeed, 'twb', b);
       const segs = sec.segs[b];
       const dn = clamp(eff.density * sec.paceM, 0, 1);
+      let lastRiffM = -1;
       cell.forEach((c, k) => {
         if (c.s >= steps) return;
         const beat = Math.floor(c.s / 4);
@@ -471,10 +526,12 @@
         // density budget: a busy lead thins the twinkle to downbeats, a resting lead lets it fill
         if (nLead >= 3 && c.s % 4 !== 0) return;
         if (nLead >= 1 && !c.acc && c.s % 4 !== 0) return;
-        if (style === 'sparse' && !c.acc && rrb.next() > 0.3 + 0.35 * dn) return;
-        if (c.pick && rrb.next() > dn * 0.9) return;
-        if (style === 'arp' && !c.acc && !c.pick && rrb.next() > 0.55 + 0.5 * dn) return;
-        if ((kind === 'build' || kind === 'swell') && !c.acc && c.s % 4 !== 2 && b < sec.bars / 2) return;
+        if (!c.riff) {
+          if (style === 'sparse' && !c.acc && rrb.next() > 0.3 + 0.35 * dn) return;
+          if (c.pick && rrb.next() > dn * 0.9) return;
+          if (style === 'arp' && !c.acc && !c.pick && rrb.next() > 0.55 + 0.5 * dn) return;
+          if ((kind === 'build' || kind === 'swell') && !c.acc && c.s % 4 !== 2 && b < sec.bars / 2) return;
+        }
         let sg = segs[0]; segs.forEach(x => { if (c.s >= x.s0) sg = x; });
         const band = J.BANDS.twinkle;
         // open pool: chord tones spread at least a third apart
@@ -482,15 +539,18 @@
         if (pool.length < 3) pool = J.chordMidis(sg.chord, band[0], band[1]);
         if (!pool.length) return;
         let m;
-        const pedalOk = sg.scale.chord.has(pedalPc) && c.acc;
+        const pedalOk = !c.riff && sg.scale.chord.has(pedalPc) && c.acc;
         if (pedalOk && (c.group === 0 || c.group % 2 === 0)) m = pedalM;
         else {
           const base = pool.findIndex(x => x >= 64 - Math.round(2 * eff.dark));
           let idx = (base < 0 ? 0 : base) + c.idx;
           const n_ = pool.length; if (idx >= n_) idx = Math.max(0, 2 * (n_ - 1) - idx); if (idx < 0) idx = Math.min(n_ - 1, -idx);
           m = pool[idx];
+          // a tapped figure never repeats the note it just played: step to the neighboring chord tone
+          if (c.riff && m === lastRiffM) m = pool[idx > 0 ? idx - 1 : Math.min(n_ - 1, idx + 1)];
         }
-        const v = clamp((c.acc ? 0.62 : c.pick ? 0.4 : 0.46) * (0.55 + 0.6 * e) * crescendo, 0.1, 0.95);
+        if (c.riff) lastRiffM = m;
+        const v = clamp((c.riff ? (c.acc ? 0.6 : c.k === 2 ? 0.44 : 0.38) : c.acc ? 0.62 : c.pick ? 0.4 : 0.46) * (0.55 + 0.6 * e) * crescendo, 0.1, 0.95);
         out.push({ l: 'twinkle', k: 'pluck', bar: q, s: c.s, n: Math.min(m, band[1]), v, variant: (k + b) % 2, pan: ((k * 37 + b * 11) % 7 - 3) / 7, cap: true });
       });
       // emo strum on the first beat of a new chord (never while keys or pads are sustaining)
@@ -615,9 +675,16 @@
     stat('phrases');
     const plan = planPhrase(song, sec, p, eff, st);
     const hook = song.hook, tonicMidi = hook.tonicMidi, band = J.BANDS.lead;
+    // a riff phrase: the tapped figure carries bars 1 to 3 and the lead answers in the cadence bar
+    const rp = riffPlan(song, sec, p, eff);
+    if (rp) {
+      plan.onsets = plan.onsets.filter(o => o.q === 3);
+      plan.riff = rp;
+      stat('riffPhrases');
+    }
     const anyLead = plan.onsets.length > 0;
     const leadByBar = q => plan.onsets.filter(o => o.q === q).map(o => o.s);
-    const mkTwinkle = () => twinkleFor(song, sec, p, eff, [0, 1, 2, 3].map(leadByBar), 0);
+    const mkTwinkle = () => twinkleFor(song, sec, p, eff, [0, 1, 2, 3].map(leadByBar), 0, rp);
     let notes = [], leadEv = [], twEv = [], result = null;
     const tryOnce = (variant, width, simple) => {
       let nts;
@@ -664,6 +731,7 @@
       if (ev.k === 'pluck') st.twRing.push({ sec: sec.id, layer: 'twinkle', m: ev.n, s, e: s + ring(ev.n), held: 0, pluck: true, strong: false });
       else ev.notes.forEach(m => st.twRing.push({ sec: sec.id, layer: 'twinkle', m, s, e: s + ring(m), held: ring(m), pluck: true, strum: true, strong: false }));
     });
+    if (rp) for (let q = 0; q < 3; q++) plan.info[q] = 'tapped riff, the lead waits for the cadence';
     plan.leadEv = r.le; plan.twEv = r.tw;
     return plan;
   }

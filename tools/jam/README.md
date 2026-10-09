@@ -30,6 +30,7 @@ The game's own files are untouched. Everything lives in `tools/jam/`.
 - **Darkness / mood**: minor and phrygian color against major and lydian. Chosen when a piece starts.
 - **Density**: how many optional notes happen (ghost notes, hat sixteenths, pickups).
 - **Tempo feel**: full time on the left, half-time (about 85) on the right.
+- **Tapping riffs**: new composer only. Some phrases hand the tune to a fast, syncopated tapping figure in the twinkle, and the lead answers on the cadence bar. See `NOTES4.md`.
 - **Tempo (BPM)**: far left is Auto (the Drum and bass slider picks it). Otherwise 60 to 200. Optional notes, strums, slow attacks, swing and half-time all follow the tempo you set. See `NOTES3.md`.
 
 Most sliders take effect smoothly while music plays and add or remove features instead of reshuffling the piece. Key and the home chord progression are fixed when a seed starts (the tempo is too while on Auto; the Tempo slider changes it live), so after big moves to Darkness or Drum and bass, press **Restart** to hear them fully.

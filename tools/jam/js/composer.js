@@ -15,7 +15,7 @@
   J.PARAM_KEYS = ['energy', 'jazz', 'math', 'emo', 'punk', 'dnb', 'synth', 'dark', 'tempoFeel', 'density'];
   J.defaultParams = function () {
     const st = G.JAM_STYLE || null;
-    const p = { energy: 0.65, jazz: 0.40, math: 0.35, emo: 0.45, punk: 0.35, dnb: 0.65, synth: 0.60, dark: 0.55, tempoFeel: 0.30, density: 0.60, bpm: 0 };
+    const p = { energy: 0.65, jazz: 0.40, math: 0.35, emo: 0.45, punk: 0.35, dnb: 0.65, synth: 0.60, dark: 0.55, tempoFeel: 0.30, density: 0.60, bpm: 0, riff: 0.5 };
     if (st) {
       const cc = st.chord_color || {};
       // ninth + eleventh shares are the most trustworthy "jazz color" figures in the profile

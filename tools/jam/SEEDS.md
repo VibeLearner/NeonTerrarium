@@ -55,3 +55,7 @@ Use headphones, set Master so a chorus is comfortable, and leave the page at day
 3. **Twinkle thinned.** The new composer plays about 6.4 twinkle notes per bar against 8.8 in the old one, because clashing notes are dropped. If it feels sparse, change the pedal and density gates in `twinkleFor` (`js/composer2.js`).
 4. **Tempo range, jazz amount, odd meters, mix.** Same advice as round 1: the tempo range in `makeSong`, the jazz slider default in `style_defaults.js`, the odd-meter share, and the mix balance, none of which were set by ear.
 5. **The "doesn't work" notes.** Short phrases like "bass too busy" or "bridge felt lost" are the most useful input. Group them by section, layer and slider position.
+
+## Tapping riffs (round 4)
+
+For the tapped, syncopated riff feel, take seeds 3, 4 or 7 and set **Tapping riffs** to 90 and **Math** to 70 or more (the tempo slider at 130 to 174 works well). Rows 3, 4 and 7 plus those two changes, and `ember-ja` with Math 60, were checked: 33 to 36 tapped bars in 180 and zero rule violations. See `NOTES4.md`.

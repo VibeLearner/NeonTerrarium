@@ -88,6 +88,7 @@
     ['math', 'Math rock', 'Odd-meter bridges (7/8, 5/4, 9/8), 3+3+2 twinkle patterns, tight accents.'],
     ['emo', 'Midwest emo', 'Open add9 and sus chords, strummed chords, long crescendo builds.'],
     ['punk', 'Pop punk', 'Driving eighths, big major-key choruses, power-bass.'],
+    ['riff', 'Tapping riffs', 'New composer only. Some phrases hand the tune to a fast, syncopated two-hand tapping figure (anchor, hammer, tap) in the twinkle, and the lead answers on the cadence bar. More math and synth makes them likelier.'],
     ['synth', 'Synth flavor', 'Reese basses, detuned saw shimmer, arpeggiated leads.'],
   ];
   const FEEL = [
@@ -207,7 +208,7 @@
   function mixerSync() { J.LAYERS.forEach(n => { const st = strips[n]; if (st.mute) synth.setMute(n, true); if (st.solo) synth.setSolo(n, true); }); }
 
   // ---------------------------------------------------------------- ratings
-  function fmtParams(p) { return J.PARAM_KEYS.map(k => k + ' ' + Math.round(p[k] * 100)).join(', ') + (p.bpm > 0 ? ', bpm ' + Math.round(p.bpm) : ''); }
+  function fmtParams(p) { return J.PARAM_KEYS.map(k => k + ' ' + Math.round(p[k] * 100)).join(', ') + (p.bpm > 0 ? ', bpm ' + Math.round(p.bpm) : '') + (p.riff > 0 ? ', riff ' + Math.round(p.riff * 100) : ''); }
   function renderRatings() {
     const ul = $('#ratings'); ul.innerHTML = '';
     S.ratings.slice().reverse().forEach(r => {
@@ -231,7 +232,8 @@
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   function loadRating(r) {
     const p = r.startParams || r.params;
-    Object.assign(S.params, p); S.params.bpm = (p && p.bpm > 0) ? p.bpm : 0;
+    Object.assign(S.params, p); S.params.bpm = (p && p.bpm > 0) ? p.bpm : 0; S.params.riff = (p && p.riff > 0) ? p.riff : 0;
+    sliderEls.riff.inp.value = Math.round(S.params.riff * 100); sliderEls.riff.val.textContent = sliderEls.riff.inp.value; sliderEls.riff.inp.style.setProperty('--fill', sliderEls.riff.inp.value + '%');
     sliderEls.bpm.inp.value = S.params.bpm > 0 ? Math.round(S.params.bpm) : 59; sliderEls.bpm.paint();
     J.PARAM_KEYS.forEach(k => { const e = sliderEls[k]; e.inp.value = Math.round(S.params[k] * 100); e.val.textContent = e.inp.value; e.inp.style.setProperty('--fill', e.inp.value + '%'); });
     if (r.game) { Object.assign(S.game, r.game); refreshSegs(); if (engine) engine.setGame(S.game); updateGameNote(); }

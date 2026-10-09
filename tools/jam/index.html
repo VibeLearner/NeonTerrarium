@@ -34,6 +34,9 @@
       <button id="next" title="Next seed in your history, or a fresh one" aria-label="Next seed">&#9654;</button>
       <button id="restart" title="Play this seed again from the top with the current settings">Restart</button>
     </div>
+    <div class="seg-group composerbox"><span class="lbl">Composer</span>
+      <div class="seg" id="segComposer" role="group" aria-label="Composer: old or new"></div>
+      <p class="hint" id="composerNote"></p></div>
     <p id="seedhelp" class="hint">A seed always plays the same piece for the same settings. Any text works as a seed. Big slider moves are best heard after Restart, because key and tempo are chosen when a piece starts.</p>
   </section>
 
@@ -59,6 +62,7 @@
         <div id="nowRules" class="rules">-</div>
       </div>
     </div>
+    <div class="leadline" aria-live="off"><span class="lbl">Lead is doing</span> <span id="nowLead">-</span></div>
     <canvas id="beats" width="900" height="34" aria-label="Beat grid"></canvas>
     <canvas id="timeline" width="900" height="54" aria-label="Song form timeline"></canvas>
     <canvas id="spectrum" width="900" height="90" aria-label="Spectrum"></canvas>
@@ -132,8 +136,11 @@
 <script src="style_defaults.js" onerror="void 0"></script>
 <script src="js/rng.js"></script>
 <script src="js/theory.js"></script>
+<script src="js/rules.js"></script>
 <script src="js/synth.js"></script>
+<script src="js/motif.js"></script>
 <script src="js/composer.js"></script>
+<script src="js/composer2.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/ui.js"></script>
 </body>

@@ -7,7 +7,7 @@
   J.LAYERS = LAYERS;
 
   // voice caps per layer (polyphony budget). Drums are capped by dropping the quietest extras.
-  const CAPS = { drums: 28, bass: 3, keys: 14, twinkle: 14, pads: 26, lead: 3, texture: 12 };
+  const CAPS = { drums: 28, bass: 3, keys: 14, twinkle: 14, pads: 26, lead: 5, texture: 12 };
   // per-layer defaults: fader, reverb send, delay send
   const LAYER_CFG = {
     drums:   { fader: 0.88, rev: 0.07, dly: 0.00 },
@@ -436,17 +436,35 @@
       }
       return ksCache.get(key);
     };
+    // plucks that are still ringing, so a chord change can damp the ones that do not belong to the new chord
+    let plucks = [];
     this.pluck = function (t, midi, vel, o) {
       o = o || {};
       const g = ctx.createGain();
       const buf = this.prepare(midi, o.variant || 0);
-      const end = t + buf.duration;
-      if (!alloc('twinkle', t, end, g, vel > 0.35)) return;
+      const capped = !!o.cap;                                    // the second composer: no string rings longer than J.RING.newMax
+      const ringEnd = t + (capped ? Math.min(buf.duration, J.RING.newMax) : buf.duration);
+      if (!alloc('twinkle', t, ringEnd, g, vel > 0.35)) return;
       const src = ctx.createBufferSource(); src.buffer = buf;
       g.gain.value = vel * 0.8;
+      if (capped && buf.duration > J.RING.newMax) { g.gain.setValueAtTime(vel * 0.8, ringEnd - 0.14); g.gain.linearRampToValueAtTime(0, ringEnd); }
+      const damper = ctx.createGain();                           // nothing else touches this gain, so damping needs no cancel
       const pan = ctx.createStereoPanner(); pan.pan.value = o.pan || 0;
-      src.connect(g); g.connect(pan); pan.connect(this.layers.twinkle.input);
-      src.start(t); dropOnEnd(src, pan);
+      src.connect(g); g.connect(damper); damper.connect(pan); pan.connect(this.layers.twinkle.input);
+      src.start(t); if (capped) src.stop(ringEnd + 0.02);
+      dropOnEnd(src, pan);
+      plucks = plucks.filter(x => x.end > t - 0.5);
+      plucks.push({ pc: ((midi % 12) + 12) % 12, t0: t, end: ringEnd, damper });
+    };
+    // chord change at time t: plucks whose pitch class is not in pcs fade out over `rel` seconds
+    this.damp = function (t, pcs, rel) {
+      rel = rel || J.RING.dampRel;
+      plucks.forEach(x => {
+        if (x.t0 < t - 0.03 && x.end > t + 0.02 && pcs.indexOf(x.pc) < 0 && !x.damped) {
+          x.damped = true;
+          try { x.damper.gain.setValueAtTime(1, t); x.damper.gain.linearRampToValueAtTime(0, t + rel); } catch (e) { }
+        }
+      });
     };
 
     // ================================================================ PADS (detuned saws)
@@ -480,9 +498,9 @@
       const h = alloc('lead', t, end + 0.12, g, true);
       if (!h) return;
       let startF = f, gliding = false;
-      if (lastLead && lastLead.end > t - 0.04 && o.glide) { startF = lastLead.f; gliding = true; }
-      if (lastLead && lastLead.end > t) { try { lastLead.gain.gain.cancelScheduledValues(t); lastLead.gain.gain.setTargetAtTime(0, t, 0.006); } catch (e) { } }
-      lastLead = { end: end + 0.1, gain: g, f };
+      if (!o.hv && lastLead && lastLead.end > t - 0.04 && o.glide) { startF = lastLead.f; gliding = true; }
+      if (!o.hv && lastLead && lastLead.end > t) { try { lastLead.gain.gain.cancelScheduledValues(t); lastLead.gain.gain.setTargetAtTime(0, t, 0.006); } catch (e) { } }
+      if (!o.hv) lastLead = { end: end + 0.1, gain: g, f };
       const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 3.5;
       const peakC = (o.bright || 1) * 4200;
       lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(peakC, t + 0.03); lp.frequency.exponentialRampToValueAtTime(1500 * (o.bright || 1), t + 0.35);

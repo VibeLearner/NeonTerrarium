@@ -132,3 +132,8 @@ footer { padding-bottom: 36px; color: var(--dim); font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
 .exportbox { width: 100%; box-sizing: border-box; margin-top: 8px; font: 12px/1.4 ui-monospace, Menlo, monospace; background: var(--bg); color: inherit; border: 1px solid currentColor; border-radius: 6px; padding: 8px; }
+
+.composerbox { margin-top: 12px; max-width: 360px; }
+.leadline { margin: 6px 0 10px; font-size: 14px; color: var(--text); }
+.leadline .lbl { margin-right: 8px; }
+#nowLead { color: var(--cyan); }

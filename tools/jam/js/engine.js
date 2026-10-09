@@ -15,6 +15,8 @@
     this.lookahead = opts.lookahead || 0.35;
     this.running = false;
     this.seed = '1';
+    this.composerKind = 'new';      // 'new' (second composer) or 'old' (the first one)
+    this.startComposer = 'new';
     this.startParams = null;
     this.current = null;            // what is audible right now (for the display)
     this.stats = { bars: 0, late: 0, maxLate: 0 };
@@ -56,7 +58,8 @@
       synth.releaseAll(ctx.currentTime, 0.04);
       this.startParams = Object.assign({}, this.P);
       this.startGame = Object.assign({}, this.G);
-      comp = new J.Composer(this.seed, this.mods.eff);
+      this.startComposer = (this.composerKind === 'old' || !J.Composer2) ? 'old' : 'new';
+      comp = this.startComposer === 'old' ? new J.Composer(this.seed, this.mods.eff) : new J.Composer2(this.seed, this.mods.eff);
       this.song = comp.song;
       queue = []; cur = null; stepIdx = 0; ui = [];
       this.running = true;
@@ -88,7 +91,7 @@
         case 'keys': synth.keys(t, ev.notes, dur, ev.v, ev); break;
         case 'twinkle':
           if (ev.k === 'pluck') synth.pluck(t, ev.n, ev.v, ev);
-          else ev.notes.forEach((n, i) => synth.pluck(t + i * 0.014, n, ev.v * (0.85 + 0.05 * i), { variant: 0, pan: (i - 1.5) * 0.25 }));
+          else ev.notes.forEach((n, i) => synth.pluck(t + i * 0.014, n, ev.v * (0.85 + 0.05 * i), { variant: 0, pan: (i - 1.5) * 0.25, cap: ev.cap }));
           break;
         case 'pads': synth.pad(t, ev.notes, dur, ev.v, ev); break;
         case 'lead': synth.lead(t, ev.n, dur, ev.v, ev); break;
@@ -100,6 +103,7 @@
         case 'fx':
           if (ev.k === 'duck') synth.duck(t, ev.depth, ev.rel);
           else if (ev.k === 'padcut') synth.setPadCutoff(ev.hz, t, 0.6);
+          else if (ev.k === 'damp') synth.damp(t, ev.pcs, J.RING.dampRel);
           break;
       }
     }
@@ -187,7 +191,7 @@
     // ---------------------------------------------------------------- NPC motif test
     this.playMotif = function (npcSeed) {
       const song = (comp && comp.song) || J.makeSong('npc-preview', this.mods.eff);
-      const m = J.npcMotif(npcSeed, song, this.mods.eff);
+      const m = (this.startComposer === 'new' && J.npcMotif2) ? J.npcMotif2(npcSeed, song, this.mods.eff) : J.npcMotif(npcSeed, song, this.mods.eff);
       const unit = 60 / song.bpm;                 // an eighth of the motif grid = one beat of the base tempo
       const t0 = ctx.currentTime + 0.06;
       m.notes.forEach(n => synth.bell(t0 + n.t * unit * 0.5, n.midi, 0.7, n.d * unit * 0.5));
@@ -198,7 +202,7 @@
     this.snapshot = function () {
       const c = this.current;
       return {
-        seed: this.seed, params: Object.assign({}, this.P), startParams: this.startParams, game: Object.assign({}, this.G),
+        composer: this.startComposer, seed: this.seed, params: Object.assign({}, this.P), startParams: this.startParams, game: Object.assign({}, this.G),
         song: this.song ? { key: J.NOTE_NAMES[this.song.tonic] + ' ' + this.song.mode, bpm: this.song.bpm, home: this.song.home.id, alt: this.song.alt.id, alt2: this.song.alt2.id, scale: this.song.scaleName } : null,
         at: c ? { section: c.bar.kind + ' ' + (c.bar.barNo + 1) + '/' + c.bar.bars, meter: c.bar.meter.id, bar: c.bar.barCount } : null,
       };

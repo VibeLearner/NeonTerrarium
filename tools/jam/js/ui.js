@@ -21,6 +21,7 @@
     history: saved.history && saved.history.length ? saved.history : [String(100000 + Math.floor(Math.random() * 900000))],
     hIdx: saved.hIdx === undefined ? 0 : saved.hIdx,
     ratings: saved.ratings || [],
+    composer: saved.composer === 'old' ? 'old' : 'new',
   };
   if (S.hIdx >= S.history.length) S.hIdx = S.history.length - 1;
   let saveT = null;
@@ -35,7 +36,7 @@
     synth = new J.Synth(ctx);
     engine = new J.Engine(ctx, synth);
     window.__jam = { ctx, synth, engine };            // handy for debugging in the console
-    engine.setParams(S.params); engine.setGame(S.game);
+    engine.setParams(S.params); engine.setGame(S.game); engine.composerKind = S.composer;
     engine.setTexture({ vinyl: S.tex.vinyl, hum: S.tex.hum, radio: S.tex.radio });
     engine.setGated(S.tex.gate);
     J.LAYERS.forEach(n => { if (S.faders[n] !== undefined) synth.setFader(n, S.faders[n]); });
@@ -56,7 +57,7 @@
   async function startPlay() {
     ensureAudio();
     try { await ctx.resume(); } catch (e) { }
-    engine.setParams(S.params);
+    engine.setParams(S.params); engine.composerKind = S.composer;
     engine.start(curSeed());
     sections = []; lastSecId = null;
     playBtn.textContent = 'Stop'; playBtn.setAttribute('aria-pressed', 'true');
@@ -131,6 +132,14 @@
   const GN = {
     tod: { day: 'Day: a little brighter and more energetic, less jazz.', dusk: 'Dusk: more emo open chords, a hint of radio.', night: 'Night: jazzier, leaning to half-time, less dense, more space.' },
   };
+  const CN = { new: 'New composer: harmony planned per phrase, cadences, a returning hook, plucks damped at chord changes.', old: 'Old composer: the first version, kept for comparing. Same seed, same sliders.' };
+  buildSeg($('#segComposer'), [['old', 'Old composer'], ['new', 'New composer']], () => S.composer, v => {
+    if (S.composer === v) return;
+    S.composer = v; persist(); $('#composerNote').textContent = CN[v];
+    if (engine) engine.composerKind = v;
+    if (isPlaying()) startPlay();
+  });
+  $('#composerNote').textContent = CN[S.composer];
   function updateGameNote() {
     const g = S.game, bits = [GN.tod[g.tod]];
     if (g.rain) bits.push('Rain: music filtered and spacious, softer hats, rain on the mix.');
@@ -189,7 +198,7 @@
       const li = document.createElement('li');
       const meta = document.createElement('div'); meta.className = 'meta';
       const g = r.game || {};
-      meta.innerHTML = '<b>seed ' + escapeHtml(r.seed) + '</b> ' + escapeHtml((r.song && r.song.key) || '') + (r.song ? ' ' + r.song.bpm + ' BPM' : '') +
+      meta.innerHTML = '<b>seed ' + escapeHtml(r.seed) + '</b> ' + escapeHtml((r.song && r.song.key) || '') + (r.song ? ' ' + r.song.bpm + ' BPM' : '') + ' &middot; ' + escapeHtml((r.composer || 'old') + ' composer') +
         ' &middot; ' + escapeHtml([g.tod, g.rain ? 'rain' : null, g.view !== 'street' ? g.view : null].filter(Boolean).join(', ')) +
         (r.at ? '<br>at ' + escapeHtml(r.at.section + ' ' + r.at.meter) : '') + (r.note ? '<br>&ldquo;' + escapeHtml(r.note) + '&rdquo;' : '');
       const tag = document.createElement('span'); tag.className = 'tag ' + r.verdict; tag.textContent = r.verdict === 'keep' ? 'KEEP' : 'NO';
@@ -356,13 +365,23 @@
     $('#nowTempo').textContent = (engine.song.bpm * b.clock).toFixed(1) + ' BPM' + (b.clock === 0.5 ? ' (half of ' + engine.song.bpm + ')' : '');
     $('#nowRules').textContent = describeRules(b);
   }
+  function updateLead() {
+    const cur = engine && engine.current; if (!cur) return;
+    const b = cur.bar; let sg = b.segs[0]; for (const x of b.segs) if (cur.step >= x.s0 && cur.step < x.s1) sg = x;
+    let txt;
+    if (b.composer === 'new') {
+      txt = (b.leadInfo || '-') + (sg.scale ? '   |   scale over ' + sg.name + ': ' + sg.scale : '');
+      if (b.phrase && b.layers && b.layers.lead) txt += '   |   phrase bar ' + (b.phrase.pos + 1) + ' of 4, ' + b.phrase.type;
+    } else txt = 'old composer: its own motif, no chord scales';
+    if ($('#nowLead').textContent !== txt) $('#nowLead').textContent = txt;
+  }
   let lastHealth = 0;
   function frame() {
     requestAnimationFrame(frame);
     if (engine) {
       const lat = ctx.outputLatency || ctx.baseLatency || 0;
       engine.poll(ctx.currentTime - lat);
-      updateNow(); drawBeats(); drawTimeline(); drawSpectrum();
+      updateNow(); updateLead(); drawBeats(); drawTimeline(); drawSpectrum();
       const lv = synth.levels();
       J.LAYERS.forEach(n => { const st = strips[n]; st.level = Math.max(lv[n], st.level * 0.9); st.meter.style.width = Math.min(100, Math.pow(st.level, 0.6) * 100) + '%'; });
       const now = performance.now();

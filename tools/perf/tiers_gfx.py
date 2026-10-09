@@ -8,10 +8,10 @@ import harness as H
 import memcheck as M
 RUN = r"""
 async ([frames, zoom, maxMs]) => {
-  S.cycle = false; S.hour = 12; PH.tests.noStatic = true; zoomT = zoom; zoom = zoom; __perf.skip = true;
+  PM.trace = true; S.cycle = false; S.hour = 12; PH.tests.noStatic = true; zoomT = zoom; zoom = zoom; __perf.skip = true;
   const t0 = Date.now(); let f = 0; for (; f < frames && Date.now() - t0 < maxMs; f++){ __step(1); if (f % 10 === 9) await new Promise(r => setTimeout(r, 20)); if (f > 600 && !solidDirty.size && !SOLID_JOB && !STAGE_Q.length && !RW.jobs.size && f % 200 === 0){ if (window.__tl === TIER.line() + PM.line()) break; window.__tl = TIER.line() + PM.line(); } }
   __perf.skip = false; renderer.info.reset(); __step(2); const tris = renderer.info.render.triangles, calls = renderer.info.render.calls; __perf.skip = true;
-  return { frames: f, tier: TIER.line(), pm: PM.line(), rw: RW.line(), tris, calls, dirty: solidDirty.size };
+  return { dbg: PM.dbg, why: PM.why, stacks: [...(PM.stacks || [])].sort((a, b) => b[1] - a[1]).slice(0, 4), frames: f, tier: TIER.line(), pm: PM.line(), rw: RW.line(), tris, calls, dirty: solidDirty.size };
 }
 """
 if __name__ == '__main__':
@@ -22,10 +22,10 @@ if __name__ == '__main__':
     with sync_playwright() as pw:
         br = pw.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-vsync', '--enable-precise-memory-info', '--js-flags=--expose-gc'])
         ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init='window.__NV_OFF = true; window.__GEN_WORKER = true;' + (' window.__TIER_OFF = true;' if a.off else '') + M.GL)
-        cdp = ctx.new_cdp_session(pg); pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=120000)
+        cdp = ctx.new_cdp_session(pg); pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=900000)
         r0 = M.read(pg, cdp)
         r = pg.evaluate(RUN, [a.frames, a.zoom, a.max_min*60000]); r1 = M.read(pg, cdp)
         print('%s zoom %g tiers %s: %d frames; %s | %s | %s' % (a.scene, a.zoom, 'OFF' if a.off else 'on', r['frames'], r['tier'], r['pm'], r['rw']))
         print('   JS heap %.0f -> %.0f MB; graphics %.0f -> %.0f MB (buffers %.0f -> %.0f); %d draws, %d triangles; blocks still to merge %d' % (r0['js'], r1['js'], r0['gfx'], r1['gfx'], r0['buf'], r1['buf'], r['calls'], r['tris'], r['dirty']))
-        print('page errors', errs[:3]); br.close()
+        print('slow restores:', r['why'], r['stacks'], r['dbg']); print('page errors', errs[:3]); br.close()
     srv.shutdown()

@@ -1834,6 +1834,7 @@ function tierMark(key){ solidAbort(key); solidDirty.add(key); TIER.changes++; if
 // each frame (main.js): which blocks are full, from where the view is; blocks that change are merged again
 function tierTick(){
   tierTrack();
+  if (SYNC_NOW() || (typeof LOADP !== 'undefined' && LOADP.on)) return;   // (not while a city is loading, nor in the first second of play, when merges are made at once: a tier change waits for the worker)
   if (!TIER.on() || TIER.all()){ if (TIER.of.size){ const ks = [...TIER.of.keys()]; TIER.of.clear(); for (const k of ks) tierMark(k); } TIER.sig = ''; return; }
   const sig = (zoomT <= TIER.zs ? 'n' : 'f') + (camGoal.x/LOT).toFixed(0) + ',' + (camGoal.z/LOT).toFixed(0) + ',' + zoomT.toFixed(1) + ',' + yawT.toFixed(1) + ',' + cells.size + ',' + PM.frame % 30;
   if (sig === TIER.sig) return; TIER.sig = sig;
@@ -2101,7 +2102,7 @@ function syncAgentsEnd(){
 // once). A new edit restarts the stages (each one rebuilds from the cities' cells, so a repeat is safe). Loading, and the overlay test "edit upkeep in the same frame", do it all at once.
 let SYNC_Q = null;
 const SYNC_STAGES = [() => rebuildConnections(), () => syncAgentsA(), ms => syncSteamStep(ms), ms => syncPeopleNetStep(ms), ms => syncPeopleRestStep(ms), () => syncAgentsEnd()];
-const SYNC_NOW = () => !!(PH.tests.syncNow || window.__SYNC_NOW) || ((!pplReady || pplFrame < 60) && !(typeof LOADP !== 'undefined' && LOADP.on));   // (the first second of a session is loading)
+const SYNC_NOW = () => !!(PH.tests.syncNow || window.__SYNC_NOW) || ((!pplReady || pplFrame < 60) && !(typeof LOADP !== 'undefined' && (LOADP.on || LOADP.cool > 0)));   // (the first second of a session is loading)
 function queueSync(){ SYNC_Q = 0; syncPeopleAbort(); STEAM_JOB = null; }
 function stepSync(ms = 3){ if (SYNC_Q === null) return; const q = SYNC_Q, t0 = stageNow();
   const r = SYNC_STAGES[q](Math.max(1, ms - FRAME_WORK)); FRAME_WORK += stageNow() - t0; if (r === false) return; SYNC_Q = q + 1 >= SYNC_STAGES.length ? null : q + 1; }   // (a stage is a frame's work, or several frames' for the walking network and the residents: those answer false until they are done)

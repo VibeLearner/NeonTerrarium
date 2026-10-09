@@ -6,7 +6,7 @@
 // soon as its plots are in; the walking network and the people at the end). Until it is done a click edits nothing. The old load stays behind the test "load on the main thread (as before)",
 // and is what runs when there is no worker, or it does not come up in 20 seconds, or it fails. The plots made this way are the same plots (recipe_proof.py), but their random detail and
 // flicker ids are the worker's own draws, so a loaded city differs from an old load in which small pieces and lights flicker.
-const LOADP = { on: false, phase: 0, q: [], inflight: new Map(), wait: 0, placed: 0, total: 0, rem: new Map(), ready: [], megaQ: [], t0: 0, firstAt: null, doneAt: null, maxIn: 16, fell: 0 };
+const LOADP = { on: false, phase: 0, q: [], inflight: new Map(), wait: 0, placed: 0, total: 0, rem: new Map(), ready: [], megaQ: [], t0: 0, firstAt: null, doneAt: null, maxIn: 16, fell: 0, cool: 0 };
 const loadWanted = () => typeof Worker !== 'undefined' && !(PH.tests.loadMain || window.__LOAD_MAIN) && !genMain() && !(window.__realNow && !window.__GEN_WORKER) && RW.state !== 'failed';
 LOADP.line = () => LOADP.on ? 'loading from recipes: phase ' + (LOADP.phase + 1) + ' of 4, ' + LOADP.placed + ' of ' + LOADP.total + ' plots' : LOADP.doneAt ? 'loaded from recipes in ' + ((LOADP.doneAt - LOADP.t0)/1000).toFixed(1) + ' s' + (LOADP.firstAt ? ' (first plot after ' + ((LOADP.firstAt - LOADP.t0)/1000).toFixed(1) + ' s)' : '') : 'load: the old way';
 function loadStart(){
@@ -33,7 +33,7 @@ function loadPlace(c, job){
   const k = regKey(c.i, c.j), n = LOADP.rem.get(k) - 1; LOADP.rem.set(k, n); if (n === 0) LOADP.ready.push(k);
 }
 function loadTick(){
-  if (!LOADP.on) return;
+  if (!LOADP.on){ if (LOADP.cool > 0) LOADP.cool--; return; }   // (cool: for a while after the load the blocks still to merge are merged in steps, not at once as in the first second of the old load)
   if (RW.state !== 'ready'){ if (RW.state === 'failed' || ++LOADP.wait > 60*20) loadFallback(); return; }   // (the worker is still loading the game's scripts: the page waits for it, up to 20 s)
   if (LOADP.phase === 0 && !LOADP.sent){ RW.sendWorld(); LOADP.sent = true; }
   const t0 = stageNow();
@@ -44,7 +44,7 @@ function loadTick(){
     if (stageNow() - t0 >= 5) break;
   }
   // a region whose plots are all in gets its plants and lights now (one a frame)
-  if (LOADP.ready.length && stageNow() - t0 < 5){ const k = LOADP.ready.shift(); markSolidRegion(k); rebuildRegion(k); dirtyRegions.delete(k); }
+  if (LOADP.ready.length && stageNow() - t0 < 5){ const k = LOADP.ready.shift(); rebuildRegion(k); dirtyRegions.delete(k); }   // (no markSolidRegion: each plot marked its own block as it came)
   // more to ask for
   while (LOADP.inflight.size < LOADP.maxIn && LOADP.q.length){ const c = LOADP.q.shift(), job = { c, r: null }; RW.request(job, true); LOADP.inflight.set(c, job); }
   if (LOADP.q.length || LOADP.inflight.size) return;
@@ -52,7 +52,7 @@ function loadTick(){
   if (LOADP.phase < 2){ LOADP.phase++; LOADP.q = LOADP.phases[LOADP.phase].slice(); return; }
   if (LOADP.ready.length) return;
   if (LOADP.megaQ.length){ rebuildMega(LOADP.megaQ.shift()); return; }   // (a megastructure a frame)
-  for (const k of dirtyRegions){ markSolidRegion(k); rebuildRegion(k); } dirtyRegions.clear();
+  for (const k of dirtyRegions) rebuildRegion(k); dirtyRegions.clear();
   rebuildConnections(); syncAgents();
-  LOADP.on = false; LOADP.doneAt = performance.now(); LOADP.phase = 3;
+  LOADP.on = false; LOADP.doneAt = performance.now(); LOADP.phase = 3; LOADP.cool = 240;
 }

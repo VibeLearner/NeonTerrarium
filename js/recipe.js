@@ -292,6 +292,7 @@ function pmFill(h, nd){
 function pmRestoreSync(h, why){
   if (!h.out && !pmNeeds(h, 'stand')) return;
   PM.sync++; PM.why[why] = (PM.why[why] || 0) + 1;
+  if (PM.trace && (PM.dbg = PM.dbg || []).length < 6) PM.dbg.push([h.c.i, h.c.j, h.out, h.sout, h.queued, h.due, PM.frame, tierOfKey(mergeKey(h.c.i, h.c.j)), SOLID_JOB ? SOLID_JOB.key : null, mergeKey(h.c.i, h.c.j)]);
   if (PM.trace){ const st = new Error().stack.split('\n').slice(2, 7).map(x => x.replace(/.*\//, '').replace(/\)$/, '')).join(' < '); PM.stacks = PM.stacks || new Map(); PM.stacks.set(st, (PM.stacks.get(st) || 0) + 1); }
   const rec = h.d.rec, prev = stageCap();   // (a reader can be a builder in the middle of making another plot: its globals are put back, as between the steps of a staged plot)
   let nd; try { nd = recipeGen(Object.assign({}, rec.r, { draws: rec.draws }), recipeWorld()).data; } finally { stageApply(prev); }

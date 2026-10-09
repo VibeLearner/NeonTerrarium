@@ -20,7 +20,7 @@ const PARAMS = [
   ['skyTop', 'Sky', 'Sky, top', 'c', 0, 0, 0, 'the top of the screen'],
   ['skyHor', 'Sky', 'Sky, horizon', 'c', 0, 0, 0, 'the middle band: where the sky meets the city'],
   ['skyBot', 'Sky', 'Sky, bottom', 'c', 0, 0, 0, 'the lowest band, behind the island'],
-  ['cloud', 'Sky', 'Cloud color', 'c', 0, 0, 0, 'the colour the clouds lean toward'],
+  ['cloud', 'Sky', 'Cloud color', 'c', 0, 0, 0, 'the color the clouds lean toward'],
   ['cover', 'Sky', 'Cloud cover', 'n', 0, 1, .01, '.5 is the way it always was'],
   ['stars', 'Sky', 'Stars', 'n', 0, 1, .01, 'how many show'],
   ['sun', 'Light', 'Sun color', 'c', 0, 0, 0, ''],
@@ -282,6 +282,8 @@ function weatherWeights(w, r, c, out){
   return out;
 }
 // lookAt(time, weather): the weights of the looks at that hour and weather (at most a handful, usually two or three)
+// (A hand-off in mixed weather can hold four or five looks for a moment: each time of day brings its rainy and overcast variants. Cutting it back to
+// three was tried and gave jumps where weights tie, so the blend is left whole; it is two or three looks nearly all of the time.)
 function lookAt(h, r, c){ return weatherWeights(autoWeights(h, {}), smooth(r), smooth(c), {}); }
 LK.lookAt = lookAt;
 

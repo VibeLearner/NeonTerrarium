@@ -388,7 +388,7 @@ const comp = new THREE.ShaderMaterial({
         // pastel pixel-art sky: the gradient in ten flat bands, with only a thin dithered seam where two meet
         float tb = smoothstep(0.05, 0.95, vUv.y)*10.0, fb = fract(tb);
         float tq = smoothLook > .5 ? tb/10.0 : (floor(tb) + (fb > 0.82 ? step(bayer(gl_FragCoord.xy), (fb - 0.82)/0.18) : 0.0))/10.0;   // (Smooth: no bands)
-        vec3 sky = skyMidOn > .5 ? (tq < .5 ? mix(skyBot, skyMid, tq*2.0) : mix(skyMid, skyTop, tq*2.0 - 1.0)) : mix(skyBot, skyTop, tq);   // (a horizon colour between, when a look gives one)
+        vec3 sky = skyMidOn > .5 ? (tq < .5 ? mix(skyBot, skyMid, tq*2.0) : mix(skyMid, skyTop, tq*2.0 - 1.0)) : mix(skyBot, skyTop, tq);   // (a horizon color between, when a look gives one)
         // The stars are a full 360-degree sky map. The view onto it is a flat strip: heading across, elevation up,
         // both in whole sky pixels, so turning the camera slides the stars straight sideways at an even pace (a
         // perspective view swung them through arcs, which felt wrong next to the flat, orthographic city). It turns
@@ -928,7 +928,7 @@ const cloudMat = new THREE.ShaderMaterial({
     tDepth:{value:null}, invVP:comp.uniforms.invVP, time:comp.uniforms.time, cloudOff:{value:new THREE.Vector2()}, texSea:{value:cloudAtlas[0].texture}, texRing:{value:cloudAtlas[1].texture},
     sunDir:comp.uniforms.sunDir, sunCol:comp.uniforms.sunCol, skyTop:comp.uniforms.skyTop, skyBot:comp.uniforms.skyBot,
     night:comp.uniforms.night, smoothLook: SMOOTH_LOOK, cityGlow:comp.uniforms.cityGlow, glowC:comp.uniforms.glowC, rainDark:comp.uniforms.rainDark,
-    cover:{value:.5}, cloudAmt:{value:0}, cloudCol:{value:new THREE.Color(1, 1, 1)},   // (the looks: how much sky the clouds fill, and the colour they lean toward)
+    cover:{value:.5}, cloudAmt:{value:0}, cloudCol:{value:new THREE.Color(1, 1, 1)},   // (the looks: how much sky the clouds fill, and the color they lean toward)
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: CLOUD_NOISE + `
@@ -1113,7 +1113,7 @@ const glowCopy = new THREE.ShaderMaterial({ uniforms: { t: { value: null } }, ve
 const glowMix = new THREE.ShaderMaterial({
   uniforms: { t: { value: null }, tB: { value: null }, tH: { value: null }, night: GLOW_FX.night, smoothLook: SMOOTH_LOOK, on: { value: 1 },
               lift: { value: new THREE.Vector3() }, gain: { value: new THREE.Vector3(1, 1, 1) }, sat: { value: 1 }, con: { value: 1 }, lit: { value: 0 },
-              // the looks (js/looks.js): midtone tint, the palette as a gradient map, grain, colour fringing, lens flare and sun glare, vignette, bloom and halation strength
+              // the looks (js/looks.js): midtone tint, the palette as a gradient map, grain, color fringing, lens flare and sun glare, vignette, bloom and halation strength
               midG: { value: new THREE.Vector3(1, 1, 1) }, midA: { value: 0 }, pal8: { value: Array.from({ length: 8 }, () => new THREE.Vector3()) }, palBlend: { value: 0 },
               grain: { value: 0 }, grainSize: { value: 1 }, fringe: { value: 0 }, flare: { value: 0 }, flareVis: { value: 0 }, sunUv: { value: new THREE.Vector2(.5, .5) }, flareCol: { value: new THREE.Color(1, 1, 1) },
               vig: { value: 0 }, bloomK: { value: 1 }, halK: { value: 1 }, time: comp.uniforms.time, res: { value: new THREE.Vector2(1, 1) } },
@@ -1125,7 +1125,7 @@ const glowMix = new THREE.ShaderMaterial({
     float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y*0.75))); }
     float bayer(vec2 a){ return b2(0.5*a)*0.25 + b2(a); }
     float hash21(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
-    // the palette as a gradient map: dark pixels toward the first colours, bright toward the last (js/looks.js sorts them by brightness)
+    // the palette as a gradient map: dark pixels toward the first colors, bright toward the last (js/looks.js sorts them by brightness)
     vec3 palMap(float l){
       float x = clamp(l, 0.0, 1.0)*7.0; vec3 a = pal8[0], b = pal8[1]; float f = fract(x);
       for (int k = 0; k < 7; k++){ if (float(k) <= x && x < float(k) + 1.0){ a = pal8[k]; b = pal8[k + 1]; } }
@@ -1134,7 +1134,7 @@ const glowMix = new THREE.ShaderMaterial({
     }
     void main(){
       vec3 c = texture2D(t, vUv).rgb;
-      // colour fringing: the red and blue pictures slide a whole pixel or more apart toward the edges (whole pixels, so it stays crisp)
+      // color fringing: the red and blue pictures slide a whole pixel or more apart toward the edges (whole pixels, so it stays crisp)
       if (fringe > 0.0){
         vec2 cc = (vUv - .5)*2.0; float rr = length(cc);
         float px = floor(fringe*rr*rr*rr*.8 + .5);

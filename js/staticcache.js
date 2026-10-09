@@ -283,6 +283,9 @@ const _hA = [], _sA = [], _kA = [];
 // The color pass, drawn from the cache. False (nothing drawn) when the old path has to do it.
 SC.frame = function(){
   if (window.__perf && window.__perf.skip) return false;   // (the harness skips this frame's drawing: the old path's render call, which it intercepts, does what a skipped frame owes; the cache's state stays as it was)
+  // a look picked by hand crossfades over three seconds (looks.js): the light moves too fast for the cache (it would be drawn whole again and again as the
+  // drift passes SC_BIG), so for those seconds the old way draws and the cache is built once more when the fade is done
+  if (typeof LK !== 'undefined' && LK.fade && !LK.old && !window.__NO_FADE_HOLD){ SC.state = 'off'; SC.why = 'a look crossfade: drawn the old way'; SC.ok = false; SC.job = null; return false; }
   if (SC.mode === 'off' || SC.mode === 'oldview' || PH.tests.noStatic || !MRT){ SC.state = 'off'; SC.why = SC.mode === 'off' || SC.mode === 'oldview' || PH.tests.noStatic ? 'switched off' : 'no WebGL 2'; SC.ok = false; SC.job = null; return false; }
   if (renderer.shadowMap.needsUpdate){   // (the shadows are redrawn at once: for an edit whose boxes are known the picture stays, and the next frame redraws just the edit's rectangle)
     SC.state = 'off'; SC.why = 'shadows redrawn this frame'; SC.job = null;

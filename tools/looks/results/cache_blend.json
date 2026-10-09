@@ -1,0 +1,207 @@
+{
+ "final (with the crossfade hold in staticcache.js)": {
+  "crossfade": {
+   "frames": 330,
+   "states": {
+    "in use": 30,
+    "off": 299,
+    "redrawn": 1
+   },
+   "reasons": {
+    "a look crossfade": 180,
+    "first draw": 1,
+    "changing": 119
+   },
+   "whole_cache_replacements": 1,
+   "sun_jump_frames": 0,
+   "what": "Mid afternoon to Night by hand: the 3 s crossfade starts at frame 30",
+   "errors": []
+  },
+  "crossfade2": {
+   "frames": 330,
+   "states": {
+    "in use": 111,
+    "off": 218,
+    "redrawn": 1
+   },
+   "reasons": {
+    "a look crossfade": 180,
+    "first draw": 1,
+    "changing": 31,
+    "redrawing after a turn": 7
+   },
+   "whole_cache_replacements": 2,
+   "sun_jump_frames": 0,
+   "what": "Mid afternoon to Overcast by hand",
+   "errors": []
+  },
+  "weather30": {
+   "frames": 1950,
+   "states": {
+    "in use": 278,
+    "redrawing": 645,
+    "off": 1027
+   },
+   "reasons": {
+    "light drifted": 645,
+    "changing": 1020,
+    "redrawing after a turn": 7
+   },
+   "whole_cache_replacements": 81,
+   "sun_jump_frames": 0,
+   "what": "Auto at 14:00, clear to rain over the real 30 s (1800 frames)",
+   "errors": []
+  },
+  "weather30_overcast": {
+   "frames": 1950,
+   "states": {
+    "in use": 335,
+    "redrawing": 684,
+    "off": 931
+   },
+   "reasons": {
+    "light drifted": 684,
+    "changing": 924,
+    "redrawing after a turn": 7
+   },
+   "whole_cache_replacements": 86,
+   "sun_jump_frames": 0,
+   "what": "Auto at 14:00, clear to overcast over the real 30 s",
+   "errors": []
+  }
+ },
+ "first version, without the hold": {
+  "crossfade": {
+   "frames": 330,
+   "states": {
+    "in use": 35,
+    "redrawing": 74,
+    "redrawn": 18,
+    "off": 203
+   },
+   "reasons": {
+    "light drifted": 74,
+    "the light jumped": 18,
+    "changing": 203
+   },
+   "whole_cache_replacements": 19,
+   "sun_jump_frames": 0,
+   "what": "Mid afternoon to Night by hand: the 3 s crossfade starts at frame 30",
+   "errors": []
+  },
+  "crossfade2": {
+   "frames": 330,
+   "states": {
+    "in use": 117,
+    "redrawing": 89,
+    "redrawn": 13,
+    "off": 111
+   },
+   "reasons": {
+    "light drifted": 89,
+    "the light jumped": 13,
+    "changing": 104,
+    "redrawing after a turn": 7
+   },
+   "whole_cache_replacements": 17,
+   "sun_jump_frames": 0,
+   "what": "Mid afternoon to Overcast by hand",
+   "errors": []
+  },
+  "weather": {
+   "frames": 480,
+   "states": {
+    "in use": 131,
+    "redrawing": 133,
+    "redrawn": 5,
+    "off": 211
+   },
+   "reasons": {
+    "light drifted": 133,
+    "the light jumped": 5,
+    "changing": 204,
+    "redrawing after a turn": 7
+   },
+   "whole_cache_replacements": 18,
+   "sun_jump_frames": 0,
+   "what": "Auto at 14:00, clear to rain in 6 s (5 times faster than the real 30 s)",
+   "errors": []
+  }
+ },
+ "day at 60 times the normal speed, old path against looks": {
+  "dusk_looks": {
+   "frames": 450,
+   "states": {
+    "in use": 2,
+    "redrawing": 50,
+    "off": 398
+   },
+   "reasons": {
+    "light drifted": 50,
+    "changing": 391,
+    "redrawing after a turn": 7
+   },
+   "whole_cache_replacements": 6,
+   "sun_jump_frames": 0,
+   "what": "Auto through the evening, 17:48 to 20:48 in 7.5 s (golden, dusk, night hand-offs)",
+   "errors": []
+  },
+  "dusk_old": {
+   "frames": 450,
+   "states": {
+    "off": 412,
+    "redrawing": 38
+   },
+   "reasons": {
+    "changing": 405,
+    "redrawing after a turn": 7,
+    "light drifted": 38
+   },
+   "whole_cache_replacements": 5,
+   "sun_jump_frames": 0,
+   "what": "the same evening on the old path",
+   "errors": []
+  },
+  "dawn_looks": {
+   "frames": 450,
+   "states": {
+    "in use": 2,
+    "redrawing": 188,
+    "off": 260
+   },
+   "reasons": {
+    "light drifted": 188,
+    "changing": 253,
+    "redrawing after a turn": 7
+   },
+   "whole_cache_replacements": 24,
+   "sun_jump_frames": 0,
+   "what": "Auto through the dawn, 04:48 to 07:48 in 7.5 s (late night, morning hand-offs)",
+   "errors": []
+  },
+  "dawn_old": {
+   "frames": 450,
+   "states": {
+    "off": 450
+   },
+   "reasons": {
+    "changing": 450
+   },
+   "whole_cache_replacements": 0,
+   "sun_jump_frames": 0,
+   "what": "the same dawn on the old path",
+   "errors": []
+  }
+ },
+ "nothing changing": {
+  "frames": 150,
+  "states": {
+   "in use": 150
+  },
+  "reasons": {},
+  "whole_cache_replacements": 0,
+  "sun_jump_frames": 0,
+  "what": "Mid afternoon held, nothing changing",
+  "errors": []
+ }
+}

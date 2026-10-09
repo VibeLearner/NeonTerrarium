@@ -299,13 +299,25 @@ function glowOverlay(mesh){
   const cur = off.slice(0, 256), sorted = new Array(win.length);   // (windows by threshold, so the band of them to draw is one run)
   for (let q = 0; q < win.length; q += 3){ const p = cur[ON[win[q]]]++*3; sorted[p] = win[q]; sorted[p + 1] = win[q + 1]; sorted[p + 2] = win[q + 2]; }
   const out = fb.concat(sorted);
-  const og = new THREE.BufferGeometry(); for (const k in g.attributes) og.setAttribute(k, g.attributes[k]);
-  og.setIndex(new THREE.BufferAttribute(g.attributes.position.count > 65535 ? new Uint32Array(out) : new Uint16Array(out), 1));
+  const og = new THREE.BufferGeometry(), blockKey = mesh.userData.blockKey;
+  if (blockKey !== undefined){
+    // a region's merged mesh: the overlay gets vertex data of its own (just the corners its triangles use), so that a whole region of them can be joined into one draw (ovBatch below)
+    const nv0 = g.attributes.position.count, map = new Int32Array(nv0).fill(-1), src = [], idx = new Array(out.length);
+    for (let q = 0; q < out.length; q++){ const v = out[q]; let r = map[v]; if (r < 0){ r = map[v] = src.length; src.push(v); } idx[q] = r; }
+    for (const k in g.attributes){ const a = g.attributes[k], n = a.itemSize, arr = new a.array.constructor(src.length*n);
+      for (let v = 0; v < src.length; v++) for (let c = 0; c < n; c++) arr[v*n + c] = a.array[src[v]*n + c];
+      og.setAttribute(k, new THREE.BufferAttribute(arr, n, a.normalized)); }
+    og.setIndex(new THREE.BufferAttribute(src.length > 65535 ? new Uint32Array(idx) : new Uint16Array(idx), 1));
+  } else {
+    for (const k in g.attributes) og.setAttribute(k, g.attributes[k]);
+    og.setIndex(new THREE.BufferAttribute(g.attributes.position.count > 65535 ? new Uint32Array(out) : new Uint16Array(out), 1));
+  }
   if (!g.boundingSphere) g.computeBoundingSphere(); og.boundingSphere = g.boundingSphere.clone();
   g.addEventListener('dispose', () => og.dispose());
-  const ov = new THREE.Mesh(og, ATLAS_OV); ov.layers.mask = OV_BIT; ov.receiveShadow = mesh.receiveShadow; ov.castShadow = false; ov.userData.isOv = true;
+  const ov = new THREE.Mesh(og, ATLAS_OV); ov.layers.mask = blockKey !== undefined && !ovPerBlock() ? 0 : OV_BIT; ov.receiveShadow = mesh.receiveShadow; ov.castShadow = false; ov.userData.isOv = true;
   ov.userData.ovInfo = { nFB: fb.length, off }; ov.onBeforeRender = ovBefore; ov.onAfterRender = ovAfter;
   mesh.add(ov);
+  if (blockKey !== undefined) ovRegister(blockKey, ov, mesh.receiveShadow);
 }
 // what the overlay draws this frame: the flickering and blinking triangles, and the windows in the stutter band of LIGHTS_ON
 function ovBefore(r, s, c, g){
@@ -316,6 +328,52 @@ function ovBefore(r, s, c, g){
   else { g.drawRange.start = 0; g.drawRange.count = a + b; this.userData.md = { s: new Int32Array([0, a + o0]), n: new Int32Array([a, b]) }; }
 }
 function ovAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = Infinity; this.userData.md = null; }
+// The overlays of the merged regions (one each, 226 draw calls in a view at zoom 30) joined, a batch for every OVB x OVB block of regions: one mesh whose index holds each member's triangles one after another, and each frame
+// the ranges of the members in view (what each member's own overlay would draw) go up in one multi-range draw. Opaque, no depth write, depth equal or nearer: only exactly coplanar duplicates could tell the
+// order apart. The members' own overlays stay (layer 0, not drawn) for the overlay test "glow overlay: one draw per region (as before)".
+const OVB = 4, ovBlocks = new Map(), ovBatches = new Map(), ovDirty = new Set(); let ovModeNow = null;
+const ovPerBlock = () => !!(PH.tests.ovPerBlock || window.__OV_PER_BLOCK);
+const ovSuperKey = k => { const c = k.indexOf(','); return Math.floor(+k.slice(0, c)/OVB) + ',' + Math.floor(+k.slice(c + 1)/OVB); };
+function ovRegister(key, ov, rs){ let l = ovBlocks.get(key); if (!l) ovBlocks.set(key, l = []); l.push({ ov, rs }); ovDirty.add(ovSuperKey(key)); }
+function ovForget(key){ if (ovBlocks.delete(key)) ovDirty.add(ovSuperKey(key)); }
+function ovFlush(){
+  const per = ovPerBlock();
+  if (per !== ovModeNow){ ovModeNow = per; for (const l of ovBlocks.values()) for (const m of l) m.ov.layers.mask = per ? OV_BIT : 0; for (const b of ovBatches.values()) b.layers.mask = per ? 0 : OV_BIT; }
+  if (!ovDirty.size) return;
+  for (const sk of ovDirty){
+    for (const sfx of ['r', 'p']){ const old = ovBatches.get(sk + sfx); if (old){ world.remove(old); old.geometry.dispose(); ovBatches.delete(sk + sfx); } }
+    for (const rs of [true, false]){
+      const mem = []; for (const [k, l] of ovBlocks) if (ovSuperKey(k) === sk) for (const m of l) if (m.rs === rs && m.ov.parent) mem.push(m);
+      if (!mem.length) continue;
+      let nv = 0, ni = 0; for (const m of mem){ nv += m.ov.geometry.attributes.position.count; ni += m.ov.geometry.index.count; }
+      const names = Object.keys(mem[0].ov.geometry.attributes), geo = new THREE.BufferGeometry();
+      if (mem.some(m => Object.keys(m.ov.geometry.attributes).length !== names.length || names.some(n => !m.ov.geometry.attributes[n]))) continue;
+      for (const n of names){ const a0 = mem[0].ov.geometry.attributes[n], arr = new a0.array.constructor(nv*a0.itemSize); let q = 0; for (const m of mem){ const a = m.ov.geometry.attributes[n].array; arr.set(a, q); q += a.length; }
+        geo.setAttribute(n, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); }
+      const ix = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni), rec = []; let k = 0, base = 0;
+      for (const m of mem){ const g = m.ov.geometry, I = g.index.array; rec.push({ at: k, info: m.ov.userData.ovInfo, c: g.boundingSphere.center, r: g.boundingSphere.radius }); for (let q = 0; q < I.length; q++) ix[k++] = I[q] + base; base += g.attributes.position.count; }
+      geo.setIndex(new THREE.BufferAttribute(ix, 1)); geo.computeBoundingSphere();
+      const b = new THREE.Mesh(geo, ATLAS_OV); b.layers.mask = per ? 0 : OV_BIT; b.receiveShadow = rs; b.castShadow = false; b.frustumCulled = false; b.matrixAutoUpdate = false; b.updateMatrix(); b.matrixWorldNeedsUpdate = true;
+      b.userData.ovb = rec; b.onBeforeRender = ovbBefore; b.onAfterRender = ovAfter; world.add(b); ovBatches.set(sk + (rs ? 'r' : 'p'), b);
+    }
+  }
+  ovDirty.clear();
+}
+let _ovS = new Int32Array(256), _ovN = new Int32Array(256);
+function ovbBefore(r, s, c, g){
+  const rec = this.userData.ovb, lv = LIGHTS_ON.value, lo = Math.max(0, Math.floor((lv - .04)*255) - 1), hi = Math.min(255, Math.ceil(lv*255) + 1), pl = CULL.pl, pad = CULL.pad, cull = c === CULL.cam;
+  let m = 0, tot = 0;
+  for (let i = 0; i < rec.length; i++){
+    const e = rec[i];
+    if (cull){ const rr = e.r + pad; let out = false; for (let q = 0; q < 24; q += 4) if (pl[q]*e.c.x + pl[q + 1]*e.c.y + pl[q + 2]*e.c.z + pl[q + 3] < -rr){ out = true; break; } if (out) continue; }
+    const u = e.info, a = u.nFB, o0 = u.off[lo]*3, b = hi >= lo ? (u.off[hi + 1] - u.off[lo])*3 : 0;
+    if (m + 2 > _ovS.length){ const s2 = new Int32Array(_ovS.length*2), n2 = new Int32Array(_ovS.length*2); s2.set(_ovS); n2.set(_ovN); _ovS = s2; _ovN = n2; }
+    if (a){ _ovS[m] = e.at; _ovN[m++] = a; tot += a; }
+    if (b){ _ovS[m] = e.at + a + o0; _ovN[m++] = b; tot += b; }
+  }
+  if (!m){ g.drawRange.start = 0; g.drawRange.count = 0; this.userData.md = null; return; }
+  g.drawRange.start = 0; g.drawRange.count = tot; this.userData.md = { s: _ovS.slice(0, m), n: _ovN.slice(0, m) };
+}
 let SIDE_SPLIT = false;   // (set while a plot or a megastructure is collected: see collect)
 const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m !== ATLAS && m !== ATLAS_SIDE;
 // Faces nobody can ever see: wholly and well inside one of the piece's solid blocks (a box's end sunk into a wall, a post
@@ -1445,15 +1503,19 @@ const markSolid = c => { if (c) solidDirty.add(mergeKey(c.i, c.j)); };
 function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
   for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++) solidDirty.add(i + ',' + j); }
 function flushSolid(){
-  flushSuper(); if (!solidDirty.size) return;
-  if (SYNC_NOW()){ for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); return; }
-  const k = solidDirty.values().next().value; solidDirty.delete(k); rebuildSolid(k);   // (a region a frame: each merge is 20 to 50 ms; until it is done the region's plots draw one by one, the same picture)
+  flushSuper();
+  if (solidDirty.size){
+    if (SYNC_NOW()){ for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); }
+    else { const k = solidDirty.values().next().value; solidDirty.delete(k); rebuildSolid(k); }   // (a region a frame: each merge is 20 to 50 ms; until it is done the region's plots draw one by one, the same picture)
+  }
+  ovFlush();
 }
 const mergeable = o => o.isMesh && !o.isInstancedMesh && (o.layers.mask === 1 || o.layers.mask === STATIC_BIT) && !o.material.transparent && o.geometry.index && !o.userData.noMerge;
 function rebuildSolid(key){ SC_DIRTY.quiet++; try { rebuildSolid0(key); } finally { SC_DIRTY.quiet--; } }
 function rebuildSolid0(key){
   const old = solidRegions.get(key);
-  if (old){ for (const m of old.members) m.visible = !(m.userData.sideOf && m.geometry.userData.full); world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); }   // (a walls' mesh stays hidden while its piece is swept: see showHidden)
+  if (old){ for (const m of old.members) m.visible = !(m.userData.sideOf && m.geometry.userData.full); world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); }
+  ovForget(key);   // (a walls' mesh stays hidden while its piece is swept: see showHidden)
   const byMat = new Map(), members = [];
   for (const c of [...cells.values(), ...megas.values()]){
     if (!c.view || c.view.parent !== world || !c.view.visible || mergeKey(c.i, c.j) !== key || animCells.has(c)) continue;   // (only views actually on show)
@@ -1467,7 +1529,7 @@ function rebuildSolid0(key){
     const cutting = list.some(o => o.geometry.userData.cut);
     const merged = cutting ? mergeCut(list.map(o => o.geometry)) : mergeIndexed(list.map(o => o.geometry)); if (!merged) continue;
     dropCpuCopy(merged);
-    const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow;
+    const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.blockKey = key;   // (the glow overlay is batched by it: see ovBatch)
     mesh.userData.sortId = list[0].id;   // (drawn where its first piece would have been: see the opaque sort below)
     if (merged.userData.shown !== undefined){ mesh.onBeforeRender = hideBefore; mesh.onAfterRender = hideAfter; }
     g.add(mesh);

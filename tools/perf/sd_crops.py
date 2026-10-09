@@ -16,10 +16,12 @@ if __name__ == '__main__':
     srv = H.serve(); url = H.make_site('sdc', None); sc = H.load_scenes([a.scene])[0]
     base = {'on': True, 'v0': 10, 'step': 2, 'max': 2, 'fast': 40, 'fastMax': 1, 'cursorPx': 200, 'hys': .25}
     new = dict(base, **{k: float(v) for k, v in (x.split('=') for x in a.new.split(','))})
+    res = {}
     with sync_playwright() as pw:
-        br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], 'reuse')
-        pg.evaluate('() => { zoom = zoomT = 30; S.cycle = false; S.hour = 12; ptrLast = null; }'); pg.evaluate('() => __perf.cap(60, 3)')
-        res = {n: pg.evaluate(JS, [a.rate, st, 16]) for n, st in (('full detail', {'on': False}), ('old settings', base), ('new settings', new))}
+        for n, st in (('full detail', {'on': False}), ('old settings', base), ('new settings', new)):   # (each setting in its own fresh page, the same script: the clock and the random numbers are scripted, so people, vehicles and clouds are where they were in every column)
+            br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], 'reuse')
+            pg.evaluate('() => { zoom = zoomT = 30; S.cycle = false; S.hour = 12; ptrLast = null; }'); pg.evaluate('() => __perf.cap(60, 3)')
+            res[n] = pg.evaluate(JS, [a.rate, st, 16]); br.close()
     srv.shutdown()
     ims = {n: img(r['png']) for n, r in res.items()}; W, Hh = ims['full detail'].size
     for n, r in res.items(): print('%-13s triangles %9d  fastest %5.1f px/frame  %s' % (n, r['tris'], r['top'], r['line'][:90]))

@@ -602,15 +602,19 @@ function rebuildDoorMeshes(){
 }
 // doors open in about a fifth of a second when someone is about to step through, and close behind them
 function updateDoors(dt){
+  const twoPasses = PH.tests.doorsTwo || window.__DOORS_TWO;   // (the first way: a second walk over the people for the pod doors)
   for (const p of pplList){ const w = p.walk;
     if (w){ if (w.doorA && w.s < .55) w.doorA.want = true;
       if (w.doorB && w.len - w.s < .8) w.doorB.want = true; }
+    if (twoPasses) continue;
     const r = p.ride, pd = r && r.c._podDoor;   // (up on a pod, the deck door opens for whoever steps out of it to the lift, or off the lift and in through it; this only sets flags, so it can share the pass)
     if (pd && ((r.ph === 'in' && r.t < LIFT_STEP*.6) || (r.ph === 'out' && r.t > LIFT_STEP*.35))) pd.want = true; }
   for (const b of bots){ const w = b.walk;
     if (w){ if (w.doorA && w.s < .55) w.doorA.want = true; if (w.doorB && w.len - w.s < .8) w.doorB.want = true; }
     if (b.state === 'drop' && pplNow - b.t0 > 1.6 && b.door) b.door.want = true;   // someone opens up to take the parcel
     const r = b.ride, pd = r && r.c._podDoor; if (pd && r.dropT && pplNow - r.dropT > 1.2 && pplNow - r.dropT < 3.2) pd.want = true; }   // (up on a pod: its deck door)
+  if (twoPasses) for (const p of pplList){ const r = p.ride, pd = r && r.c._podDoor; if (!pd) continue;
+    if ((r.ph === 'in' && r.t < LIFT_STEP*.6) || (r.ph === 'out' && r.t > LIFT_STEP*.35)) pd.want = true; }
   let moved = false;
   for (let i = 0; i < doorList.length && i < DOOR_MAX; i++){
     const d = doorList[i], o = Math.max(0, Math.min(1, d.open + (d.want ? 1 : -1)*dt/.2));

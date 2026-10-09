@@ -13,7 +13,7 @@ window.__proof = (() => {
     if (v === undefined) return 'undef';
     return v;
   };
-  const js = o => { try { return JSON.stringify(o, rep); } catch (e) { return 'ERR:' + e.message; } };
+  const js = o => { const seen = new Map(); const r2 = (k, v) => { v = rep(k, v); if (v && typeof v === 'object'){ if (seen.has(v)) return { ref: seen.get(v) }; seen.set(v, seen.size); } return v; }; try { return JSON.stringify(o, r2); } catch (e) { return 'ERR:' + e.message; } };
   function parts(c){
     const P = {}, geo = c.data.geo; let n = 0;
     for (const [mat, g] of geo){
@@ -80,5 +80,25 @@ window.__proof = (() => {
     for (const k of Object.keys(c)) if (!(k in keep)) delete c[k]; Object.assign(c, keep);
     const P = parts(lc); for (const g of d.geo.values()) g.dispose(); return hs(js(P));
   }
-  return { one, fp, live };
+  // one plot through the real worker: the same comparison, the worker starting from the page's stream state
+  async function oneW(c, seed){
+    const r = recipeOf(c), keep = {}; for (const k of Object.keys(c)) keep[k] = c[k];
+    const lw = new Set(), pc = new Proxy(c, { set(t, k, v){ lw.add(k); t[k] = v; return true; } });
+    __randSeed(seed); const rc0 = __randCalls(); DARK = r.dark; SIDE_SPLIT = true; let live; try { live = drain(collectGen(cellBody(pc))); } finally { DARK = false; SIDE_SPLIT = false; }
+    const liveRand = __randCalls() - rc0;
+    const lc = {}; for (const k of Object.keys(c)) lc[k] = c[k]; lc.data = live; lc._liveWritten = [...lw]; lc._airFlag = airCells.has(c);
+    for (const k of Object.keys(c)) if (!(k in keep)) delete c[k]; Object.assign(c, keep);
+    const liveParts = parts(lc); for (const g of live.geo.values()) g.dispose();
+    __randSeed(seed);
+    const job = { c }; RW.request(job);
+    while (!job.rw.done) await new Promise(res => setTimeout(res, 0));
+    if (job.rw.fail) return { err: String(job.rw.fail), nb: r.nb.join('') };
+    const u = recipeUnpack(job.rw.res.msg);
+    const wc = Object.assign({}, u.fields); wc.data = u.data; wc._written = Object.keys(u.fields); wc._air = u.air;
+    const wParts = parts(wc); for (const g of u.data.geo.values()) g.dispose();
+    const d = diff(liveParts, wParts);
+    if (liveRand !== job.rw.res.calls) d.push('random calls (' + liveRand + ' vs ' + job.rw.res.calls + ')');
+    return { d, rand: liveRand };
+  }
+  return { one, oneW, fp, live };
 })();

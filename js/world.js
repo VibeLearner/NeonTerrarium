@@ -1566,10 +1566,20 @@ const FOL_KEYS = Object.keys(SPR.size);
 const stageCap = () => ({ R, buckets, emitters, carPads, curPorts, glowList, curSpots, curCover, fol: FOL_KEYS.map(k => FOL_LIST[k]), DARK, SIDE_SPLIT, PUT_KEEPOUT, STAGE });
 const stageApply = s => { R = s.R; buckets = s.buckets; emitters = s.emitters; carPads = s.carPads; curPorts = s.curPorts; glowList = s.glowList; curSpots = s.curSpots; curCover = s.curCover;
   for (let q = 0; q < FOL_KEYS.length; q++) FOL_LIST[FOL_KEYS[q]] = s.fol[q]; DARK = s.DARK; SIDE_SPLIT = s.SIDE_SPLIT; PUT_KEEPOUT = s.PUT_KEEPOUT; STAGE = s.STAGE; };
+const stageGen = job => { job.gen = (function*(){ job.data = yield* collectGen(cellBody(job.c)); })(); };
 function stageStart(c, onDone){
-  const job = { c, onDone, state: null, dark: isDarkPlot(c), keep: null, data: null, gen: null };
-  job.gen = (function*(){ job.data = yield* collectGen(cellBody(c)); })();
+  const job = { c, onDone, state: null, dark: isDarkPlot(c), keep: null, data: null, gen: null, rw: null };
+  if (RW.usable()) RW.request(job); else stageGen(job);   // (round 9: made by the plot worker, off this thread, when it is there; else in steps as before)
   STAGE_Q.push(job); return job;
+}
+// a plot the worker made: its fields and air flag go on the plot, its data is the job's
+function stageTake(job){
+  const rw = job.rw; job.rw = null;
+  if (rw.fail){ RW.fell++; stageGen(job); return false; }   // (the worker could not make it: made here, in steps)
+  if (window.__randAdvance && rw.res.rs != null) __randAdvance(rw.res.rs, rw.res.calls);   // (the test harness: the stream goes on from where the worker left it)
+  const u = recipeUnpack(rw.res.msg);
+  Object.assign(job.c, u.fields); if (u.air) airCells.add(job.c); else airCells.delete(job.c);
+  job.data = u.data; return true;
 }
 function stageSlice(job){   // one step of the job; true when it is finished
   const prev = stageCap();
@@ -1582,6 +1592,11 @@ function stageStep(ms = 4){
   FRAME_WORK = 0;
   if (STAGE_READY.length){ const t0 = stageNow(), j = STAGE_READY.shift(); j.onDone(j.data); FRAME_WORK += stageNow() - t0; return; }   // (finishing a plot, which merges and animates, is a frame of its own)
   const job = STAGE_Q[0]; if (!job) return; const t0 = stageNow();
+  if (job.rw){   // (at the worker: nothing to do here until it answers; then taking the answer is the step)
+    if (!job.rw.done) return;
+    if (stageTake(job)){ STAGE_Q.shift(); STAGE_READY.push(job); }
+    FRAME_WORK += stageNow() - t0; return;
+  }
   for (;;){ if (stageSlice(job)){ STAGE_Q.shift(); STAGE_READY.push(job); break; } if (stageNow() - t0 >= ms) break; }
   FRAME_WORK += stageNow() - t0;
 }
@@ -1609,7 +1624,9 @@ function stageChain(c, done){
 function stageFinishAll(){
   while (STAGE_READY.length || STAGE_Q.length){
     if (STAGE_READY.length){ const j = STAGE_READY.shift(); j.onDone(j.data); continue; }
-    const job = STAGE_Q[0]; while (!stageSlice(job)); STAGE_Q.shift(); job.onDone(job.data);
+    const job = STAGE_Q[0];
+    if (job.rw){ if (job.rw.done && stageTake(job)){ STAGE_Q.shift(); job.onDone(job.data); continue; } else if (job.rw){ RW.cancel(job); stageGen(job); } }   // (an edit cannot wait for the worker: what it has not answered is made here, the same plot)
+    while (!stageSlice(job)); STAGE_Q.shift(); job.onDone(job.data);
   }
 }
 /* ---------- solid geometry merged by region ---------- */

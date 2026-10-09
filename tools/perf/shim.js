@@ -5,7 +5,9 @@
   let seed = 0x5eed1234, calls = 0;
   Math.random = () => { calls++; seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   window.__randCalls = () => calls;
-  window.__randSeed = v => { seed = v | 0; };   // (a check can start an edit from the same place in the stream in two runs)
+  window.__randSeed = v => { seed = v | 0; };
+  window.__randState = () => seed;
+  window.__randAdvance = (s2, n) => { seed = s2 | 0; calls += n; };   // (the stream after the plot worker has drawn n numbers from it)   // (the plot worker takes over the stream from here: see js/recipe.js)   // (a check can start an edit from the same place in the stream in two runs)
   let useed = 0x77aa;   // (three.js object ids: a stream of their own, see _patch_uuid in harness.py)
   window.__uuidRand = () => { useed = (Math.imul(useed, 48271) + 1) >>> 0; return useed/4294967296; };
   let clock = 1000;

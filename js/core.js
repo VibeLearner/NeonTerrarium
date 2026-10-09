@@ -2,6 +2,8 @@
 // All game scripts share one scope and load in order (see index.html).
 'use strict';
 const PI = Math.PI, TAU = PI * 2;
+const PITCH_MIN = 12*PI/180, PITCH_MAX = 82*PI/180;   // (the tilt limits and clamp were in input.js; the builders use them, and the plot worker does not load input.js)
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const S = { seed: 20260930, district: 'mixed', clutter: 1, green: 1, neon: 1,

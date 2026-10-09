@@ -8,12 +8,10 @@ let spinT = 0, yaw = .7, yawT = .7, zoom = 13.2, zoomT = 13.2;
 // nearly straight down, for placing things the isometric view hides; dragging sideways (or A and D) still turns it.
 // Space again goes back to the isometric view.
 let tiltMode = false, pitchT = PITCH0;
-const PITCH_MIN = 12*PI/180, PITCH_MAX = 82*PI/180;
 function setTiltMode(on){
   tiltMode = on; if (!on) pitchT = PITCH0;
   const el = document.getElementById('tiltChip'); if (el) el.hidden = !on;
 }
-const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const camPosTrue = new THREE.Vector3(), camPix = new THREE.Vector2(), keys = new Set(), _cr = new THREE.Vector3(), _cu = new THREE.Vector3(), _cv = new THREE.Vector3(), _cs = new THREE.Vector3();
 function updateCamera(dt){
   if (S.spin && !dragging){ spinT += dt; if (spinT > 6){ spinT = 0; yawT += PI/4; } }

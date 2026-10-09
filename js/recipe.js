@@ -20,13 +20,17 @@ function recipeOf(c){
 }
 // The lines the plots sit under. Not part of one plot's recipe (a line is long), a copy of the highways and metros as plain data, made when they change, and
 // the indexes over them (what hwAt and mtAt answer). recipeGen swaps these in for the live ones while it runs.
-const plain = v => Array.isArray(v) ? v.map(plain) : v && typeof v === 'object' ? (Object.getPrototypeOf(v) === Object.prototype ? Object.fromEntries(Object.entries(v).filter(([k, x]) => typeof x !== 'function' && !(x && typeof x === 'object' && Object.getPrototypeOf(x) !== Object.prototype && !Array.isArray(x))).map(([k, x]) => [k, plain(x)])) : undefined) : v;
-function recipeWorld(){
-  const hw = plain(highways), mt = plain(metros), hi = new Map(), mi = new Map();
+// (only the fields the builders read: the rest of a line is its drawn geometry, its cars and trains, which refer back to the line)
+const LINE_KEYS = ['id', 'lanes', 'done', 'side', 'dir0', 'st', 'sides'];
+const lineOf = o => { const r = {}; for (const k of LINE_KEYS) if (o[k] !== undefined) r[k] = structuredClone(o[k]); r.tiles = o.tiles.map(t => ({ i: t.i, j: t.j, L: t.L })); return r; };
+function recipeWorldOf(hw, mt){
+  const hi = new Map(), mi = new Map();
   for (const h of hw) h.tiles.forEach((t, k) => { const q = hwKey(t.i, t.j); (hi.get(q) || hi.set(q, []).get(q)).push({ h, k }); });
   for (const l of mt) l.tiles.forEach((t, k) => { const q = hwKey(t.i, t.j); (mi.get(q) || mi.set(q, []).get(q)).push({ l, k }); });
   return { hw, mt, hi, mi };
 }
+const recipeLines = () => ({ hw: highways.map(lineOf), mt: metros.map(lineOf) });
+const recipeWorld = () => { const L = recipeLines(); return recipeWorldOf(L.hw, L.mt); };
 const NB_FIELDS = { mega: 1, sections: 1, height: 1, lift: 1 };
 const _nbStub = i => new Proxy({}, { get(t, k){
   if (i && NB_FIELDS[k]) return k === 'mega' ? i.mega : k === 'sections' ? { length: i.sec } : k === 'height' ? i.height : i.liftY === null ? null : { y: i.liftY };
@@ -53,3 +57,144 @@ function recipeGen(r, world){
   Object.defineProperty(raw, '_written', { value: [...written] });
   return raw;
 }
+
+/* ---------- a made plot as a message (round 9, item 2) ---------- */
+// What recipeGen makes, as something structuredClone takes and a worker can hand over without copying: every geometry as its arrays (materials as ids: see matreg.js),
+// the plot's own data with the three.js vectors and matrices as tagged numbers, objects that appear twice staying one object. recipeUnpack gives back what
+// rebuildCell's collectGen returns, with the same fields on `fields` and the air flag.
+function recipePack(raw){
+  const xfer = new Set(), shared = new Map(), seen = new Map();
+  const typed = a => { xfer.add(a.buffer); return a; };
+  const count = v => {   // objects reached twice
+    if (!v || typeof v !== 'object' || ArrayBuffer.isView(v)) return;
+    if (seen.has(v)){ if (!shared.has(v)) shared.set(v, shared.size); return; }
+    seen.set(v, 1);
+    if (Array.isArray(v)) for (const x of v) count(x); else if (v.isVector3 || v.isMatrix4 || v.isVector2 || v.isColor) return; else for (const k in v) count(v[k]);
+  };
+  const open = new Set();
+  const pk = v => {
+    if (v === null || typeof v !== 'object') return v;
+    if (ArrayBuffer.isView(v)) return typed(v);
+    let id = shared.get(v);
+    if (id !== undefined && out.has(v)) return { $r: id };
+    if (open.has(v)) throw new Error('recipePack: a cycle');
+    let o;
+    if (v.isVector3) o = { $v3: [v.x, v.y, v.z] };
+    else if (v.isVector2) o = { $v2: [v.x, v.y] };
+    else if (v.isMatrix4) o = { $m4: v.elements.slice() };
+    else if (v.isColor) o = { $c: [v.r, v.g, v.b] };
+    else if (Array.isArray(v)){ open.add(v); o = v.map(pk); open.delete(v); }
+    else if (Object.getPrototypeOf(v) === Object.prototype){ open.add(v); o = {}; for (const k in v) o[k] = pk(v[k]); open.delete(v); }
+    else throw new Error('recipePack: cannot send a ' + (v.constructor && v.constructor.name));
+    if (id !== undefined){ out.set(v, id); return { $i: id, v: o }; }
+    return o;
+  };
+  const out = new Map();
+  count(raw.data.fol); count(raw.data.glows); count(raw.data.emitters); count(raw.data.pads); count(raw.data.ports); count(raw.data.spots);
+  const fields = {}; for (const k of raw._written) if (k !== 'data') count(raw[k]);
+  const geo = [];
+  for (const [mat, g] of raw.data.geo){
+    const key = mat === ATLAS ? -1 : MATREG.at.get(mat);
+    if (key === undefined) throw new Error('recipePack: a material made after load (id ' + mat.id + ')');
+    const attrs = {}; for (const k in g.attributes){ const a = g.attributes[k]; attrs[k] = { a: typed(a.array), s: a.itemSize, n: a.normalized }; }
+    const bs = g.boundingSphere;
+    const ud = {}; for (const k in g.userData){ count(g.userData[k]); }
+    for (const k in g.userData) ud[k] = pk(g.userData[k]);
+    geo.push({ key, attrs, index: g.index ? typed(g.index.array) : null, draw: [g.drawRange.start, g.drawRange.count], ud, bs: bs ? [bs.center.x, bs.center.y, bs.center.z, bs.radius] : null });
+  }
+  const d = raw.data, msg = { geo, fol: pk(d.fol), glows: pk(d.glows), emitters: pk(d.emitters), pads: pk(d.pads), ports: pk(d.ports), spots: pk(d.spots), fields, air: raw._air };
+  for (const k of raw._written) if (k !== 'data') fields[k] = pk(raw[k]);
+  return { msg, xfer: [...xfer] };
+}
+function recipeUnpack(m){
+  const table = new Map();
+  const up = v => {
+    if (v === null || typeof v !== 'object' || ArrayBuffer.isView(v)) return v;
+    if (v.$r !== undefined) return table.get(v.$r);
+    if (v.$i !== undefined){ const o = up(v.v); table.set(v.$i, o); return o; }
+    if (v.$v3) return new THREE.Vector3(v.$v3[0], v.$v3[1], v.$v3[2]);
+    if (v.$v2) return new THREE.Vector2(v.$v2[0], v.$v2[1]);
+    if (v.$m4){ const x = new THREE.Matrix4(); x.elements = v.$m4; return x; }
+    if (v.$c) return new THREE.Color(v.$c[0], v.$c[1], v.$c[2]);
+    if (Array.isArray(v)) return v.map(up);
+    const o = {}; for (const k in v) o[k] = up(v[k]); return o;
+  };
+  const geo = new Map();
+  for (const e of m.geo){
+    const g = new THREE.BufferGeometry();
+    for (const k in e.attrs){ const a = e.attrs[k]; g.setAttribute(k, new THREE.BufferAttribute(a.a, a.s, a.n)); }
+    if (e.index) g.setIndex(new THREE.BufferAttribute(e.index, 1));
+    g.setDrawRange(e.draw[0], e.draw[1]);
+    for (const k in e.ud) g.userData[k] = up(e.ud[k]);
+    if (e.bs){ g.boundingSphere = new THREE.Sphere(new THREE.Vector3(e.bs[0], e.bs[1], e.bs[2]), e.bs[3]); }
+    const mat = e.key === -1 ? ATLAS : MATREG.list[e.key];
+    if (!mat) throw new Error('recipeUnpack: no material ' + e.key);
+    geo.set(mat, g);
+  }
+  const data = { geo, fol: up(m.fol), glows: up(m.glows), emitters: up(m.emitters), pads: up(m.pads), ports: up(m.ports), spots: up(m.spots) };
+  const fields = {}; for (const k in m.fields) fields[k] = up(m.fields[k]);
+  return { data, fields, air: m.air };
+}
+
+// the load-time materials as one number (the worker and the page must agree before the worker is used: same ids for the same materials)
+function recipeMatSig(){ let h = 2166136261; for (const m of MATREG.list){ const t = m.id + ':' + m.type + ':' + (m.color ? m.color.getHex() : '') + ':' + (m.emissive ? m.emissive.getHex() : '') + ';'; for (let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } } return (h >>> 0) + ':' + MATREG.list.length; }
+MATREG.open = false;
+
+// The rounded boxes (core.js roundedBox) are cached by their sizes to two places of decimals, and a later box of nearly the same size takes the first one's shape, so what a
+// plot looks like by a few thousandths depends on which plot asked first. To make a plot the same in the worker as on the page, the two keep one cache: each request
+// carries the shapes the page has made since the last one, each answer the shapes the worker has made, and when both made one the page's stands.
+const rbPack = (g, copy) => { const a = {}; for (const k in g.attributes){ const t = g.attributes[k]; a[k] = { a: copy ? t.array.slice() : t.array, s: t.itemSize, n: t.normalized }; } return { a, i: g.index ? (copy ? g.index.array.slice() : g.index.array) : null }; };
+const rbUnpack = e => { const g = new THREE.BufferGeometry(); for (const k in e.a) g.setAttribute(k, new THREE.BufferAttribute(e.a[k].a, e.a[k].s, e.a[k].n)); if (e.i) g.setIndex(new THREE.BufferAttribute(e.i, 1)); return g; };
+const sameArr = (a, b) => { if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
+
+/* ---------- the worker, from the page ---------- */
+// RW.request(job) sends a plot's recipe; the result is picked up by stageStep (world.js). Not used (plots are made on the page as before) when the test
+// 'plots made on the page (as before)' is on, before the worker has loaded and agreed on its materials, after any error from it, and in the perf harness
+// (whose scripted clock and seeded random stream a thread of its own would break) unless window.__GEN_WORKER is set.
+const RW = { rbSent: new Set(), w: null, state: 'off', next: 1, jobs: new Map(), lastWorld: '', error: null, made: 0, fell: 0, src: document.currentScript ? document.currentScript.src : null };
+const genMain = () => !!(PH.tests.genMain || window.__GEN_MAIN);
+RW.usable = () => RW.state === 'ready' && !genMain();
+RW.start = () => {
+  if (RW.w || RW.state !== 'off' || typeof Worker === 'undefined' || !RW.src) return;
+  if (window.__realNow && !window.__GEN_WORKER) return;
+  const scripts = [...document.scripts].map(s => s.src).filter(Boolean);
+  const three = scripts.find(u => /three(\.min)?\.js/.test(u)), bgu = scripts.find(u => /BufferGeometryUtils/.test(u));
+  const names = ['matreg', 'core', 'sprites', 'buildings', 'ground', 'vehicles', 'sky', 'audio', 'world', 'mega', 'people', 'highway', 'metro', 'recipe'];
+  const urls = names.map(n => scripts.find(u => u.includes('/js/' + n + '.js'))); if (!three || urls.some(u => !u)) return;
+  RW.state = 'loading';
+  try { RW.w = new Worker(RW.src.replace('recipe.js', 'recipeworker.js')); } catch (e){ RW.state = 'failed'; RW.error = String(e); return; }
+  RW.w.onerror = e => { RW.state = 'failed'; RW.error = e.message || 'worker error'; for (const j of RW.jobs.values()) j.fail = true; RW.jobs.clear(); };
+  RW.w.onmessage = e => {
+    const m = e.data;
+    if (m.t === 'ready'){
+      if (m.sig !== recipeMatSig()){ RW.state = 'failed'; RW.error = 'materials differ: ' + m.sig + ' vs ' + recipeMatSig(); RW.w.terminate(); return; }
+      RW.state = 'ready';
+    } else if (m.t === 'err' && m.id === undefined){
+      RW.state = 'failed'; RW.error = m.err; RW.w.terminate();
+    } else if (m.t === 'done' || m.t === 'err'){
+      if (m.rb) for (const [k, e] of m.rb){ const mine = rbCache.get(k); if (!mine){ rbCache.set(k, rbUnpack(e)); RW.rbSent.add(k); } else if (!sameArr(mine.attributes.position.array, e.a.position.a)) RW.rbSent.delete(k); else RW.rbSent.add(k); }
+      const j = RW.jobs.get(m.id); RW.jobs.delete(m.id); if (!j || j.cancelled) return;
+      if (m.t === 'err'){ j.fail = m.err; RW.fell++; } else { j.res = m; RW.made++; }
+      j.done = true;
+    }
+  };
+  RW.w.postMessage({ t: 'init', three, urls: [bgu].concat(urls) });
+};
+RW.sendWorld = () => {
+  const L = recipeLines(), s = JSON.stringify(L);
+  if (s !== RW.lastWorld){ RW.lastWorld = s; RW.w.postMessage({ t: 'world', hw: L.hw, mt: L.mt }); }
+};
+// a job {c, ...}: gets job.rw = { done, res, fail, cancelled }
+RW.request = job => {
+  const id = RW.next++, rw = { id, done: false, res: null, fail: null, cancelled: false };
+  job.rw = rw; RW.jobs.set(id, rw);
+  RW.sendWorld();
+  const r = recipeOf(job.c); job.dark = r.dark;
+  const m = { t: 'gen', id, r, far: { lean: !!(PH.tests.leanRound || window.__LEAN_ROUND), sticks: !!(PH.tests.thinSticks || window.__THIN_STICKS) } };
+  m.rb = []; for (const [k, g] of rbCache) if (!RW.rbSent.has(k)){ RW.rbSent.add(k); m.rb.push([k, rbPack(g, false)]); }   // (structured clone copies them)
+  if (window.__randState) m.rs = window.__randState();
+  RW.w.postMessage(m);
+};
+RW.cancel = job => { if (job.rw){ job.rw.cancelled = true; RW.jobs.delete(job.rw.id); job.rw = null; } };
+RW.line = () => 'plot worker: ' + (genMain() ? 'off (test)' : RW.state) + (RW.error ? ' (' + RW.error + ')' : '') + '; made ' + RW.made + ', fell back ' + RW.fell;
+if (!self.IN_RECIPE_WORKER) window.addEventListener('load', () => setTimeout(RW.start, 1500));

@@ -19,6 +19,7 @@ if __name__ == '__main__':
     ap.add_argument('--control', action='store_true', help='negative control: flip one neighbor bit and one dark flag in the recipes; every plot with an edge there must then differ')
     ap.add_argument('--pods', type=int, default=0, help='hang this many pods (empty plots and over shorter buildings, beside taller ones) first and check those plots only')
     ap.add_argument('--reads', action='store_true', help='which globals do plots read: change each in turn, make a sample of plots (spread, plus those under highways or the metro) and see which change')
+    ap.add_argument('--worker', action='store_true', help='make each plot in the real worker (not on the page) and compare that')
     ap.add_argument('--globals', type=int, default=25, help='plots to fingerprint the globals over (0: skip)')
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
@@ -26,7 +27,7 @@ if __name__ == '__main__':
     t0 = time.time(); bad = 0; errs_n = 0
     with sync_playwright() as pw:
         br = H.launch(pw)
-        ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init='window.__NV_OFF = true;')
+        ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init='window.__NV_OFF = true; window.__GEN_WORKER = true;')
         pg.add_script_tag(path=os.path.join(H.HERE, 'recipe_proof.js'))
         if a.control: pg.evaluate('() => { const o = recipeOf; recipeOf = c => { const r = o(c); r.nb[0] ^= 1; return r; }; }')
         podset = None
@@ -66,7 +67,13 @@ if __name__ == '__main__':
               out._sample = sample.length; out._underLines = hot.length; return out; }""", [pick[:60], a.seed])
             print('plots that change when a global is changed (of the sample):')
             for k, v in r.items(): print('   %-28s %s' % (k, v))
-        res = pg.evaluate("""([picks, seed]) => { const out = [], world = recipeWorld(); for (const [i, j] of picks){ const c = cells.get(ckey(i, j)); const r = __proof.one(c, seed + i*7 + j*13, world); r.ij = [i, j]; r.kind = c.mega ? 'mega' : c.sections.length ? 'stack' + (c.lift ? '+lift' : '') + (c.below && c.below.length ? '+below' : '') : 'empty'; if (r.err || r.d.length) out.push(r); else out.push({ ij: r.ij, kind: r.kind, ok: 1, rand: r.rand }); } return out; }""", [pick, a.seed])
+        if a.worker:
+            pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=120000)
+            print(pg.evaluate('() => RW.line()'))
+            res = pg.evaluate("""async ([picks, seed]) => { const out = []; for (const [i, j] of picks){ const c = cells.get(ckey(i, j)); const r = await __proof.oneW(c, seed + i*7 + j*13); r.ij = [i, j]; r.kind = c.mega ? 'mega' : c.sections.length ? 'stack' + (c.lift ? '+lift' : '') + (c.below && c.below.length ? '+below' : '') : 'empty'; if (r.err || r.d.length) out.push(r); else out.push({ ij: r.ij, kind: r.kind, ok: 1, rand: r.rand }); } return out; }""", [pick, a.seed])
+            print(pg.evaluate('() => RW.line()'))
+        else:
+          res = pg.evaluate("""([picks, seed]) => { const out = [], world = recipeWorld(); for (const [i, j] of picks){ const c = cells.get(ckey(i, j)); const r = __proof.one(c, seed + i*7 + j*13, world); r.ij = [i, j]; r.kind = c.mega ? 'mega' : c.sections.length ? 'stack' + (c.lift ? '+lift' : '') + (c.below && c.below.length ? '+below' : '') : 'empty'; if (r.err || r.d.length) out.push(r); else out.push({ ij: r.ij, kind: r.kind, ok: 1, rand: r.rand }); } return out; }""", [pick, a.seed])
         kinds = {}
         for r in res:
             k = kinds.setdefault(r['kind'], [0, 0]); k[0] += 1

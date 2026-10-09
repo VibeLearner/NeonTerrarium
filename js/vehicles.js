@@ -485,6 +485,11 @@ const steamMat = new THREE.ShaderMaterial({
 });
 let steamCeil = null;
 function setupSteam(){
+  // (an edit calls this again for the whole city: the puffs of every source still there carry on where they were, instead
+  // of all restarting at once, and the new puffs are placed right away, so no frame draws them all faded out: see the end)
+  const old = new Map();
+  if (steamLife) steamSrc.forEach((e, k) => old.set(e.x.toFixed(3) + ',' + e.y.toFixed(3) + ',' + e.z.toFixed(3), k));
+  const oldLife = steamLife, oldWob = steamWob;
   if (steamPts){ scene.remove(steamPts); steamPts.geometry.dispose(); steamPts = null; }
   steamSrc = emitters.slice();
   // under a sky highway the steam can't rise through the deck: each source's ceiling (the deck's underside over it, or
@@ -502,7 +507,10 @@ function setupSteam(){
   g.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(n), 1));
   steamLife = new Float32Array(n); steamWob = new Float32Array(n);
   for (let i=0;i<n;i++){ steamLife[i] = (i % STEAM_PER)/STEAM_PER; steamWob[i] = Math.random()*TAU; }
+  if (oldLife) steamSrc.forEach((e, k) => { const o = old.get(e.x.toFixed(3) + ',' + e.y.toFixed(3) + ',' + e.z.toFixed(3));
+    if (o !== undefined){ steamLife.set(oldLife.subarray(o*STEAM_PER, o*STEAM_PER + STEAM_PER), k*STEAM_PER); steamWob.set(oldWob.subarray(o*STEAM_PER, o*STEAM_PER + STEAM_PER), k*STEAM_PER); } });
   steamPts = new THREE.Points(g, steamMat); steamPts.layers.set(1); steamPts.frustumCulled = false; scene.add(steamPts);
+  updateSteam(0, comp.uniforms.night.value);   // (positions, sizes and fades filled in now: an edit's upkeep can run after this frame's steam update)
 }
 const steamCol = new THREE.Color();
 function updateSteam(dt, night){

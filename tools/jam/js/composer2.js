@@ -355,11 +355,11 @@
     // cadence tone: a chord tone of the chord in the last segment of the last bar, nearest the line
     const lastSegs = sec.segs[b0 + nb - 1], lastSeg = lastSegs[lastSegs.length - 1];
     const degPc = d => { const sc = J.SCALES[song.scaleName]; const oct = Math.floor(d / 7); return ((song.tonic + sc[((d % 7) + 7) % 7]) % 12 + 12) % 12; };
-    const nearestCT = (seg, d, prefer) => {
+    const nearestCT = (seg, d, prefer, w) => {
       let best = d, bc = 1e9;
       for (let x = d - 5; x <= d + 5; x++) {
         const pc = degPc(x); if (!seg.chord.has ? !seg.pcs.includes(pc) : !seg.scale.chord.has(pc)) continue;
-        let c = Math.abs(x - d) + (prefer && prefer.includes(((pc - seg.root) % 12 + 12) % 12) ? -0.6 : 0);
+        let c = Math.abs(x - d) + (prefer && prefer.includes(((pc - seg.root) % 12 + 12) % 12) ? -(w || 0.6) : 0);
         if (c < bc) { bc = c; best = x; }
       }
       return best;
@@ -383,7 +383,7 @@
       if (isCadBar) {
         const startDeg = hook.a0 + regBase + lift;
         endDeg = cad === 'half' ? nearestCT(lastS, startDeg + 2, [4, 3, 7]) : nearestCT(lastS, startDeg, [0, 4, 3]);
-        if (cad === 'full' || cad === 'plagal') endDeg = nearestCT(lastS, startDeg, [0]);
+        if (cad === 'full' || cad === 'plagal') endDeg = nearestCT(lastS, startDeg, [0], 3.5);
       } else if (type === 'period' && q === 1) {
         endDeg = nearestCT(lastS, hook.a0 + regBase + lift + 2, [4, 3, 7]);       // the antecedent ends open, on the 3rd or 5th
       }
@@ -405,7 +405,7 @@
         const segIdx = (() => { let si = 0; segsB.forEach((sg, j) => { if (x.s >= sg.s0) si = j; }); return si; })();
         const seg = segsB[segIdx], nextSeg = segsB[segIdx + 1] || (sec.segs[b + 1] ? sec.segs[b + 1][0] : null);
         const t = (sec.barOff[b] - sec.barOff[b0] + x.s);
-        onsets.push({ q, bar: b, i, s: x.s, d: x.d, strong: meter.starts.includes(x.s), targetDeg: mb.degs[i], tsign: (i > 0 && (op === 'state' || op === 'repeat' || op === 'seq' || op === 'cad' || op === 'invert') && ! (isCadBar && i === mb.on.length - 1)) ? Math.sign(Math.round(mb.degs[i]) - Math.round(mb.degs[i - 1])) : undefined, scale: seg.scale, nextScale: nextSeg ? nextSeg.scale : null, seg, t, cadence: false, last: false });
+        onsets.push({ q, bar: b, i, s: x.s, d: x.d, strong: meter.starts.includes(x.s), op: op, memoKey: [steps, mb.on.map(z => z.s).join(','), seg.root, seg.base, i].join('|'), targetDeg: mb.degs[i], tsign: (i > 0 && (op === 'state' || op === 'repeat' || op === 'seq' || op === 'cad' || op === 'invert') && ! (isCadBar && i === mb.on.length - 1)) ? Math.sign(Math.round(mb.degs[i]) - Math.round(mb.degs[i - 1])) : undefined, scale: seg.scale, nextScale: nextSeg ? nextSeg.scale : null, seg, t, cadence: false, last: false });
       });
     }
     const phraseSteps = sec.barOff[b0 + nb - 1] - sec.barOff[b0] + sec.meters[b0 + nb - 1].steps;
@@ -614,7 +614,7 @@
       let nts;
       if (!anyLead) nts = [];
       else if (simple === 'safe') nts = safeNotes(plan.onsets, tonicMidi, song.scaleName);
-      else nts = J.searchPhrase({ onsets: plan.onsets, tonicMidi, scaleName: song.scaleName, band, width, seedKey: [sec.rngSeed, 'search', p, variant].join('|'), prev: st.leadLast === undefined ? null : st.leadLast, climaxT: 0.6 }).notes;
+      else nts = J.searchPhrase({ onsets: plan.onsets.map(o => Object.assign(o, { pref: (variant <= 1 && o.op === 'state') ? (st.hookMemo || {})[o.memoKey] : undefined })), tonicMidi, scaleName: song.scaleName, band, width, seedKey: [sec.rngSeed, 'search', p, variant].join('|'), prev: st.leadLast === undefined ? null : st.leadLast, climaxT: 0.6 }).notes;
       const le = buildLeadEvents(song, sec, plan, nts, eff);
       const tw = mkTwinkle();
       return { nts, le, tw, v: validatePhrase(song, sec, p, plan, le, tw, st, eff) };
@@ -642,6 +642,8 @@
       r = settle(tryOnce(99, 8, 'safe'));
       for (let k = 0; k < 6 && r.v.badLead.length; k++) { stat('leadDrops', r.v.badLead.length); r.le = r.le.filter(x => !r.v.badLead.includes(x)); r.v = validatePhrase(song, sec, p, plan, r.le, r.tw, st, eff); r = settle(r); }
     }
+    // the hook is remembered: the next time the motif is stated over the same chords it is sung on the same pitches
+    if (r.nts && r.nts.length && r.le.filter(x => !x.hv).length === r.nts.length) { st.hookMemo = st.hookMemo || {}; plan.onsets.forEach((o, i) => { if (o.op === 'state' && st.hookMemo[o.memoKey] === undefined && !o.last) st.hookMemo[o.memoKey] = r.nts[i]; }); }
     // remember the last lead note and the ringing plucks for the next phrase
     const lastLead = r.le.filter(x => !x.hv).sort((a, b) => (a.bar - b.bar) || (a.s - b.s)).pop();
     if (lastLead) st.leadLast = lastLead.n;

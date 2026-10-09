@@ -234,6 +234,7 @@
       if (o.last || o.cadence) cost += ct ? 0 : 20;
       const dg = Math.abs(J.midiToDeg(tonicMidi, scaleName, m) - o.targetDeg);
       cost += Math.min(7, dg) * 0.9;
+      if (o.pref !== undefined && m !== o.pref) cost += 3.2;                      // the hook returns on the pitches it had before
       cost += (u(seedKey, 'tie', i, m) * 0.12);
       return cost;
     };

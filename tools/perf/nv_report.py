@@ -69,14 +69,15 @@ CROPS = r"""([idx, ref, bad, neverArr, nCrops]) => {
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('color', new THREE.BufferAttribute(cc, 3)); const sc = new THREE.Scene(), m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.FrontSide })); m.frustumCulled = false; sc.add(m); return sc; };
     const scA = mk(() => true), scB = mk(t => !P.never[t]);
     const views = job.views; const cam = _nvCam, tmp = document.createElement('canvas'), cx = tmp.getContext('2d');
+    // one pass over every view of the dense reference: for each of the worst triangles, the view that shows it in most pixels
+    const bestOf = new Map(worst.map(t => [t, { n: 0 }])), ids = new Map(worst.map(t => [t + 1, t]));
     nvGuard(() => {
+      for (let vi = 0; vi < views.length; vi++){ const vw = views[vi]; nvView(job, vw[0], vw[1], vw[2], job.px);
+        const rt = job.rtId, w = rt.viewport.width, h = rt.viewport.height, buf = new Uint8Array(w*h*4); renderer.readRenderTargetPixels(rt, 0, 0, w, h, buf); const cnt = new Map(), sx = new Map(), sy = new Map();
+        for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i += 4){ if (buf[i + 3] < 128) continue; const id = buf[i] | (buf[i + 1] << 8) | (buf[i + 2] << 16); const t = ids.get(id); if (t === undefined) continue; cnt.set(t, (cnt.get(t) || 0) + 1); sx.set(t, (sx.get(t) || 0) + x); sy.set(t, (sy.get(t) || 0) + y); }
+        for (const [t, n] of cnt){ const bo = bestOf.get(t); if (n > bo.n){ bo.n = n; bo.vi = vi; bo.x = sx.get(t)/n; bo.y = sy.get(t)/n; bo.w = w; bo.h = h; } } }
       for (const t of worst){
-        // the view where the dense reference sees this triangle most (first 40 views with 6 pixels or more; else the best)
-        let best = null, bestN = 0;
-        for (let vi = 0; vi < views.length && bestN < 6; vi++){ const vw = views[vi]; nvView(job, vw[0], vw[1], vw[2], job.px);
-          const rt = job.rtId, w = rt.viewport.width, h = rt.viewport.height, buf = new Uint8Array(w*h*4); renderer.readRenderTargetPixels(rt, 0, 0, w, h, buf); let n = 0, sx = 0, sy = 0;
-          for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i += 4){ if (buf[i + 3] < 128) continue; if ((buf[i] | (buf[i + 1] << 8) | (buf[i + 2] << 16)) === t + 1){ n++; sx += x; sy += y; } }
-          if (n > bestN){ bestN = n; best = { vi, x: sx/n, y: sy/n, w, h }; } }
+        const bo = bestOf.get(t), best = bo.n ? bo : null, bestN = bo.n;
         if (!best){ crops.push({ t, none: true }); continue; }
         const vw = views[best.vi]; nvView(job, vw[0], vw[1], vw[2], job.px);   // (leaves the camera set for this view)
         const half = 70, x0 = Math.max(0, Math.min(best.w - 2*half, Math.round(best.x) - half)), y0 = Math.max(0, Math.min(best.h - 2*half, Math.round(best.y) - half)), cw = Math.min(2*half, best.w), ch = Math.min(2*half, best.h);

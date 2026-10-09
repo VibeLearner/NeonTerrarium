@@ -228,7 +228,7 @@ function keptOut(geo, m){
   const x = e[0]*cx0 + e[4]*cy0 + e[8]*cz0 + e[12], y = e[1]*cx0 + e[5]*cy0 + e[9]*cz0 + e[13], z = e[2]*cx0 + e[6]*cy0 + e[10]*cz0 + e[14];
   return inKeepOut(x, y - hy, z, Math.max(hx, hz));
 }
-function put(geo, mat, m){
+function put(geo, mat, m, lean){
   if (PUT_KEEPOUT && keptOut(geo, m)) return;
   if (LUX){ let sub = LUX.mats.get(mat); if (!sub && LUX.auto && mat.userData && mat.userData.glow) sub = LUX.auto(mat); if (sub){ mat = sub; if (LUX.halo) LUX.halo(sub, m); } }
   if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && posHash(m.elements[12], m.elements[13], m.elements[14]) < 82) mat = DARK_SUB[mat.userData.glow];
@@ -236,12 +236,25 @@ function put(geo, mat, m){
   const fid = b.f ? (DARK && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow)) : 0;
   const did = b.f ? 0 : detailId(geo, m), ord = b.f ? litOrder(m.elements[12], m.elements[13], m.elements[14]) : 0;   // lights are never dropped: they carry the look from far away
   if (curCover && geo === U.box && did === 0 && atlasable(mat) && !mat.userData.colorOnly) curCover.push(m.elements.slice());   // a solid block: may hide what's inside it (see hideCovered)
-  const P = geo.attributes.position.array, N = geo.attributes.normal ? geo.attributes.normal.array : null;
-  const e = m.elements, ne = _nm.getNormalMatrix(m).elements, bp = b.p, bn = b.n;
+  const bp = b.p, base = bp.length/3, w = weldOf(geo);
+  bucketIndexUpTo(b);
+  const nFull = pushCorners(b, geo, w, m, fid, ord, did);
+  const bi = b.i, tri = w.tri; for (let q = 0; q < tri.length; q++) bi.push(base + tri[q]);
+  b.ni = bp.length/3;
+  // far order (neverseen-like cheats, round 8 item 3): a lean twin of a round part (fewer sides), and the thin sticks, noted for the second layout of the plot (world.js sideLayoutGen)
+  if (FAR_CFG.lean && atlasable(mat)){
+    const le = lean || LEAN_OF.get(geo);
+    if (le && (lean || leanOk(geo, m))){ const lg = lean || le, w2 = weldOf(lg), base2 = bp.length/3, n2 = pushCorners(b, lg, w2, m, fid, ord, did), t2 = w2.tri;
+      const li = b.li || (b.li = []), lr = b.lr || (b.lr = []); for (let q = 0; q < t2.length; q++) li.push(base2 + t2[q]); lr.push(base, base + nFull, base2, base2 + n2); b.ni = bp.length/3; }
+  }
+  if (FAR_CFG.sticks && did > 0 && LAST_STICK && atlasable(mat)){ (b.sk || (b.sk = [])).push(base, base + nFull); }
+}
+// a shape's corners, transformed, onto the end of a bucket's lists; how many
+function pushCorners(b, geo, w, m, fid, ord, did){
+  const P = geo.attributes.position.array, N = geo.attributes.normal ? geo.attributes.normal.array : null, src = w.src, bp = b.p, bn = b.n;
+  const e = m.elements, ne = _nm.getNormalMatrix(m).elements;
   // each corner once (the shape's welded corners), and its triangles as indices into them: the same triangles in the same
   // order as before, but a corner shared by two triangles of a face is stored, and transformed on the card, only once
-  bucketIndexUpTo(b);
-  const w = weldOf(geo), src = w.src, base = bp.length/3;
   for (let q=0;q<src.length;q++){
     const v = src[q]*3, x = P[v], y = P[v+1], z = P[v+2];
     bp.push(e[0]*x + e[4]*y + e[8]*z + e[12], e[1]*x + e[5]*y + e[9]*z + e[13], e[2]*x + e[6]*y + e[10]*z + e[14]);
@@ -252,9 +265,13 @@ function put(geo, mat, m){
     if (b.f){ b.f.push(fid); b.o.push(ord); }
     b.d.push(did);
   }
-  const bi = b.i, tri = w.tri; for (let q = 0; q < tri.length; q++) bi.push(base + tri[q]);
-  b.ni = bp.length/3;
+  return src.length;
 }
+// Round parts with a lean twin (round 8 item 3, a cheat: the overlay test "full round parts"): the 16-sided cylinder has an 8-sided one (the same circle, every second corner), a rounded plate a coarser corner.
+// A twin is made only for a part small enough that the two outlines are within a quarter of a pixel of each other at the zoom where the lean ones start to be drawn (LEAN_LIM, in world units a pixel).
+const FAR_CFG = { lean: true, sticks: true }, LEAN_OF = new Map(), LEAN_LIM = .0227, STICK_LIM = .035;
+const LEAN_R = { cyl16: .098 };   // (a 16-gon against its 8-gon: the gap is .0576 of the radius, so up to 4.3 pixels of radius at LEAN_LIM)
+function leanOk(geo, m){ const e = m.elements; return .5*Math.max(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[8], e[9], e[10])) <= LEAN_R.cyl16; }
 // A shape's corners with duplicates merged (same position and normal, bit for bit) and its triangles as indices into them.
 // Kept on the shape, and remade if its positions change.
 const _wf = new Float64Array(1), _wu = new Uint32Array(_wf.buffer);
@@ -282,11 +299,13 @@ function bucketIndexUpTo(b){
 }
 // Is this piece a fine detail? Sticks (two thin sides: posts, rails, cables, frames, pipes) and tiny bits
 // (small in every direction). Flat panels, with only one thin side, are kept: they read even when small.
+let LAST_STICK = false; const STICK_W = .06;
 function detailId(geo, m){
   let s = geo.userData._size;
   if (!s){ geo.computeBoundingBox(); const bb = geo.boundingBox; s = geo.userData._size = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z]; }
   const e = m.elements;
   const d = [Math.hypot(e[0], e[1], e[2])*s[0], Math.hypot(e[4], e[5], e[6])*s[1], Math.hypot(e[8], e[9], e[10])*s[2]].sort((a, b) => a - b);
+  LAST_STICK = d[1] < STICK_W && d[2] >= .14;   // (a long piece thin in two directions: see FAR_CFG)
   return (d[1] < .09 || d[2] < .14) ? 1 + Math.floor(Math.random()*255) : 0;
 }
 // which lights flicker: some neon, fewer lamps and trims, the odd window (Math.random, so the city's layout

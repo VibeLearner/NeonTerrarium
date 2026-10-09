@@ -57,21 +57,38 @@ function showHidden(view, on){ SC_EDITS++; scNote(view); view.traverse(o => { co
 // drawn as two meshes over the same triangles: one draws A (or, for its shadow, A + H + S), the other only the slices
 // of walls that can face the camera this frame (SIDE_ARC). A wall is only ever left out when it faces away by a margin,
 // so nothing that would have been drawn is missing; the picture doesn't change. Shadows still draw every face.
-const SIDE_K = 16, SIDE_ARC = { all: true, s: 0, L: SIDE_K };
+const SIDE_K = 16, SIDE_ARC = { all: true, s: 0, L: SIDE_K, tall: true, ts: 0, tL: SIDE_K };
+const RT0 = 1 + SIDE_K + SIDE_K/2;   // (the first row of the sticks' walls in a block's second order: see mergeCutGen)
+// which order the merged blocks are drawn in (world.js, round 8 item 3): from far away the second one, with the lean round parts and the thin sticks' walls over a narrower arc
+const FARM = { on: false, lean: false, sticks: false, key: 0, stamp: 0, applied: -1, appliedOn: null }, FAR_MESHES = new Set();
+function farFrame(){
+  const lim = 2*zoom/H;
+  FARM.lean = FAR_CFG.lean && lim >= LEAN_LIM; FARM.sticks = FAR_CFG.sticks && lim >= STICK_LIM; FARM.on = FARM.lean || FARM.sticks; FARM.key = (FARM.lean ? 1 : 0) + (FARM.sticks ? 2 : 0);
+  if (FARM.on !== FARM.appliedOn || FARM.stamp !== FARM.applied){ FARM.appliedOn = FARM.on; FARM.applied = FARM.stamp; for (const m of FAR_MESHES) m.geometry = FARM.on ? m.userData.farGeo : m.userData.stdGeo; }
+}
+// the run of slices (from s, L of them) that are not turned away; null if all of them are (or none, which can't be)
+function arcRun(hid){
+  let s = -1; for (let k = 0; k < SIDE_K; k++) if (!hid[k] && hid[(k + SIDE_K - 1)%SIDE_K]){ s = k; break; }
+  if (s < 0) return null;
+  let L = 0; while (L < SIDE_K && !hid[(s + L)%SIDE_K]) L++;
+  if (s + L > SIDE_K + SIDE_K/2) return null;   // (can't happen with 8 slices; just in case)
+  return { s, L };
+}
 function sideArc(){
   cam.updateMatrixWorld(); const e = cam.matrixWorld.elements, tx = e[8], tz = e[10];   // toward the camera (it's orthographic: the same for every pixel)
-  if (Math.hypot(tx, tz) < 1e-3){ SIDE_ARC.all = true; return; }
-  const a = Math.atan2(tz, tx), w = TAU/SIDE_K, hid = [];
+  if (Math.hypot(tx, tz) < 1e-3){ SIDE_ARC.all = true; SIDE_ARC.tall = true; return; }
+  const a = Math.atan2(tz, tx), w = TAU/SIDE_K, hid = [], hidT = [];
   for (let k = 0; k < SIDE_K; k++){
     const p0 = k*w, p1 = p0 + w, da = ((a - p0)%TAU + TAU)%TAU;   // (is the camera's own direction inside the slice?)
     const best = da <= w ? 1 : Math.max(Math.cos(p0 - a), Math.cos(p1 - a));
-    hid.push(best < -.002);
+    hid.push(best < -.002); hidT.push(best < .5);
   }
-  let s = -1; for (let k = 0; k < SIDE_K; k++) if (!hid[k] && hid[(k + SIDE_K - 1)%SIDE_K]){ s = k; break; }
-  if (s < 0){ SIDE_ARC.all = true; return; }
-  let L = 0; while (L < SIDE_K && !hid[(s + L)%SIDE_K]) L++;
-  if (s + L > SIDE_K + SIDE_K/2){ SIDE_ARC.all = true; return; }   // (can't happen with 8 slices; just in case)
-  SIDE_ARC.all = false; SIDE_ARC.s = s; SIDE_ARC.L = L;
+  const r = arcRun(hid);
+  if (!r){ SIDE_ARC.all = true; SIDE_ARC.tall = true; return; }
+  SIDE_ARC.all = false; SIDE_ARC.s = r.s; SIDE_ARC.L = r.L;
+  // the thin sticks' walls, when they are drawn from far away: only the walls within 60 degrees of the camera (a stick under a pixel and a half wide shows its most frontal side; the other, at a slant, adds almost nothing)
+  const t = FARM.sticks ? arcRun(hidT) : null;
+  if (t){ SIDE_ARC.tall = false; SIDE_ARC.ts = t.s; SIDE_ARC.tL = t.L; } else { SIDE_ARC.tall = false; SIDE_ARC.ts = r.s; SIDE_ARC.tL = r.L; }
 }
 const cutRest = u => u.A + u.H + u.S;
 // Pieces off screen. A merged block is drawn whole whenever any of it shows, and a tall tower's box can be the only
@@ -159,17 +176,18 @@ function pieceVis(P){
 // the ranges of rows r0 to r1 (inclusive) for the pieces on show, runs that sit next to each other joined; sets the mesh up to
 // draw them. Returns false when everything shows (the plain draw range does it).
 const MD = { s: new Int32Array(64), n: new Int32Array(64) };
-function multiRows(o, P, r0, r1){
+function multiRows(o, P, r0, r1, t0 = 0, t1 = -1){
   if (PH.tests.noCull) return false;
-  const seen = pieceVis(P), lv = CULL.lvl, xl = CULL.sd && P.xlOn ? P.xl : null; if (seen === P.n && lv < 0 && !xl) return false;
+  const seen = pieceVis(P), lv = CULL.lvl, xl = CULL.sd && P.xlOn ? P.xl : null; if (seen === P.n && lv < 0 && !xl && t1 < t0) return false;
   const v = P.vis, n = P.n; let m = 0, tot = 0;
-  for (let r = r0; r <= r1; r++) for (let i = 0; i < n; i++){
-    if (!v[i]) continue; const x = xl ? xl[i] : 0, c = lv < 0 && !x ? P.rowN[r*n + i] : P.rowC[(r*n + i)*SMALL_N + Math.min(SMALL_N - 1, Math.max(lv, 0) + x)]; if (!c) continue;
-    const st = P.rowS[r*n + i];
-    if (m && MD.s[m - 1] + MD.n[m - 1] === st) MD.n[m - 1] += c;
-    else { if (m === MD.s.length){ const s2 = new Int32Array(m*2), n2 = new Int32Array(m*2); s2.set(MD.s); n2.set(MD.n); MD.s = s2; MD.n = n2; } MD.s[m] = st; MD.n[m++] = c; }
-    tot += c;
-  }
+  for (let sp = 0; sp < 2; sp++){ const ra = sp ? t0 : r0, rb = sp ? t1 : r1;
+    for (let r = ra; r <= rb; r++) for (let i = 0; i < n; i++){
+      if (!v[i]) continue; const x = xl ? xl[i] : 0, c = lv < 0 && !x ? P.rowN[r*n + i] : P.rowC[(r*n + i)*SMALL_N + Math.min(SMALL_N - 1, Math.max(lv, 0) + x)]; if (!c) continue;
+      const st = P.rowS[r*n + i];
+      if (m && MD.s[m - 1] + MD.n[m - 1] === st) MD.n[m - 1] += c;
+      else { if (m === MD.s.length){ const s2 = new Int32Array(m*2), n2 = new Int32Array(m*2); s2.set(MD.s); n2.set(MD.n); MD.s = s2; MD.n = n2; } MD.s[m] = st; MD.n[m++] = c; }
+      tot += c;
+    } }
   o.userData.md = m ? { s: MD.s.slice(0, m), n: MD.n.slice(0, m) } : null;
   CULL.tris += tot; return tot;
 }
@@ -179,11 +197,15 @@ function cutBefore(r, s, c, g){
 }
 function cutAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = cutRest(g.userData.cut); this.userData.md = null; }
 function sideBefore(r, s, c, g){
-  const u = g.userData.cut, b = u.A + u.H, o = u.off, P = g.userData.pcs;
-  if (SIDE_ARC.all){ g.drawRange.start = b; g.drawRange.count = u.S; if (P && c === CULL.cam){ const t = multiRows(this, P, 1, SIDE_K); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } } return; }
-  const s0 = SIDE_ARC.s, e = s0 + SIDE_ARC.L, end = e <= SIDE_K ? b + o[e] : b + u.S + o[e - SIDE_K];
+  const u = g.userData.cut, b = u.A + u.H, o = u.off, P = g.userData.pcs, A = SIDE_ARC, two = !!u.offT && !A.all;   // (two: the walls over their arc and the sticks' walls over theirs)
+  if (A.all){ g.drawRange.start = b; g.drawRange.count = u.S; if (P && c === CULL.cam){ const t = P.far ? multiRows(this, P, 1, SIDE_K, RT0, RT0 + SIDE_K - 1) : multiRows(this, P, 1, SIDE_K); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } } return; }
+  const s0 = A.s, e = s0 + A.L, end = e <= SIDE_K ? b + o[e] : b + u.S + o[e - SIDE_K];
   g.drawRange.start = b + o[s0]; g.drawRange.count = end - (b + o[s0]);
-  if (P && c === CULL.cam){ const t = multiRows(this, P, 1 + s0, e); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } }
+  if (P && c === CULL.cam){ const ts = A.ts, te = ts + A.tL; const t = two || P.far ? multiRows(this, P, 1 + s0, e, RT0 + ts, RT0 + te - 1) : multiRows(this, P, 1 + s0, e); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; return; } }
+  if (two){   // (no per-piece ranges: the two runs, in one multi-range draw)
+    const tb = b + o[SIDE_K], ot = u.offT, ts = A.ts, te = ts + A.tL, s2 = tb + ot[ts], n2 = (te <= SIDE_K ? tb + ot[te] : b + u.S + o[SIDE_K/2] + ot[te - SIDE_K]) - s2, n1 = g.drawRange.count, s1 = g.drawRange.start;
+    this.userData.md = { s: Int32Array.of(s1, s2), n: Int32Array.of(n1, n2) }; g.drawRange.start = 0; g.drawRange.count = n1 + n2;
+  }
 }
 { // (several ranges in one draw: three itself only draws one, so while a mesh with ranges is drawn the context's drawElements is swapped)
   const gl = renderer.getContext(), ext = window.NO_MULTI_DRAW ? null : gl.getExtension('WEBGL_multi_draw'), rbd = renderer.renderBufferDirect;
@@ -441,51 +463,67 @@ function hideCovered(b, C){
 // least each size in SMALL_E: a frame draws only the front of each list, leaving out what is too small to paint more than a speck.
 const SMALL_E = [0, 1, 2, 3, 4, 5].map(k => .0125*2**k), SMALL_N = SMALL_E.length;
 function sideLayout(buckets, nAt){ return drain(sideLayoutGen(buckets, nAt)); }
-function* sideLayoutGen(buckets, nAt){
-  const A = [], H = [], S = Array.from({ length: SIDE_K }, () => []), w = TAU/SIDE_K, low = Math.sin(PITCH_MIN), lowC = Math.cos(PITCH_MIN);
-  const Ae = [], Se = Array.from({ length: SIDE_K }, () => []);   // longest edge of each triangle in A and in the slices
+// far: null for the plot's own order; { lean, sticks } for its second order, the one drawn from far away (round 8 item 3): the round parts that have a lean twin are replaced by it (the full ones go to H, so the
+// shadows are the full ones), and the thin sticks' walls go to lists of their own (T), which a frame can draw over a narrower arc than the other walls.
+function* sideLayoutGen(buckets, nAt, far = null){
+  const A = [], H = [], S = Array.from({ length: SIDE_K }, () => []), T = Array.from({ length: SIDE_K }, () => []), w = TAU/SIDE_K, low = Math.sin(PITCH_MIN), lowC = Math.cos(PITCH_MIN);
+  const Ae = [], Se = Array.from({ length: SIDE_K }, () => []), Te = Array.from({ length: SIDE_K }, () => []);   // longest edge of each triangle in A and in the slices
   let o2 = 0;
   for (const [mat, b] of buckets){
     if (!atlasable(mat)) continue;
-    const I = b.i, nv = I.length - b.hid, P = b.p;
-    for (let q = 0; q < nv; q += 3){
-      const a3 = I[q]*3, b3 = I[q + 1]*3, c3 = I[q + 2]*3;
+    const I = b.i, nv = I.length - b.hid, P = b.p, nvb = P.length/3;
+    let lk = null, stk = null;
+    if (far && far.lean && b.lr){ lk = new Uint8Array(nvb); for (let i = 0; i < b.lr.length; i += 4){ lk.fill(1, b.lr[i], b.lr[i + 1]); lk.fill(2, b.lr[i + 2], b.lr[i + 3]); } }
+    if (far && far.sticks && b.sk){ stk = new Uint8Array(nvb); for (let i = 0; i < b.sk.length; i += 2) stk.fill(1, b.sk[i], b.sk[i + 1]); }
+    const add = (J, q) => {
+      const a3 = J[q]*3, b3 = J[q + 1]*3, c3 = J[q + 2]*3;
       const ux = P[b3] - P[a3], uy = P[b3 + 1] - P[a3 + 1], uz = P[b3 + 2] - P[a3 + 2], vx = P[c3] - P[a3], vy = P[c3 + 1] - P[a3 + 1], vz = P[c3 + 2] - P[a3 + 2];
       const nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx, l = Math.hypot(nx, ny, nz);
       let dst = A, de = Ae;
       if (l > 0){
         const y = ny/l, h = Math.hypot(nx, nz)/l;
         if (y*low + h*lowC < -.002){ dst = H; de = null; }   // an underside: away from the camera at every tilt and turn
-        else if (y <= 0 && h > 0){ let ph = Math.atan2(nz, nx); if (ph < 0) ph += TAU; const sl = Math.min(SIDE_K - 1, Math.floor(ph/w)); dst = S[sl]; de = Se[sl]; }
+        else if (y <= 0 && h > 0){ let ph = Math.atan2(nz, nx); if (ph < 0) ph += TAU; const sl = Math.min(SIDE_K - 1, Math.floor(ph/w));
+          if (stk && stk[J[q]]){ dst = T[sl]; de = Te[sl]; } else { dst = S[sl]; de = Se[sl]; } }
       }
-      dst.push(I[q] + o2, I[q + 1] + o2, I[q + 2] + o2);
+      dst.push(J[q] + o2, J[q + 1] + o2, J[q + 2] + o2);
       if (de) de.push(Math.max(Math.hypot(ux, uy, uz), Math.hypot(vx, vy, vz), Math.hypot(P[c3] - P[b3], P[c3 + 1] - P[b3 + 1], P[c3 + 2] - P[b3 + 2])));
+    };
+    for (let q = 0; q < nv; q += 3){
+      if (lk && lk[I[q]] === 1){ H.push(I[q] + o2, I[q + 1] + o2, I[q + 2] + o2); continue; }   // (a round part drawn by its lean twin here)
+      add(I, q);
     }
+    if (lk && b.li) for (let q = 0; q < b.li.length; q += 3) add(b.li, q);
     for (let q = nv; q < I.length; q++) H.push(I[q] + o2);
-    o2 += P.length/3;
+    o2 += nvb;
     yield;
   }
-  const cls = new Int32Array((1 + SIDE_K)*SMALL_N);
-  const bySize = (T, E, row) => {   // largest first (ties keep their order); counts of those at least each size
+  const cls = new Int32Array((1 + (far ? 2 : 1)*SIDE_K)*SMALL_N);
+  const bySize = (T_, E, row) => {   // largest first (ties keep their order); counts of those at least each size
     const n = E.length, ord = new Array(n); for (let i = 0; i < n; i++) ord[i] = i;
     ord.sort((p, q) => E[q] - E[p]);
-    const out = new Array(n*3); for (let i = 0; i < n; i++){ const t = ord[i]*3; out[i*3] = T[t]; out[i*3 + 1] = T[t + 1]; out[i*3 + 2] = T[t + 2]; }
+    const out = new Array(n*3); for (let i = 0; i < n; i++){ const t = ord[i]*3; out[i*3] = T_[t]; out[i*3 + 1] = T_[t + 1]; out[i*3 + 2] = T_[t + 2]; }
     for (let k = 0; k < SMALL_N; k++){ let c = 0; while (c < n && E[ord[c]] >= SMALL_E[k]) c++; cls[row*SMALL_N + k] = c*3; }   // (in indices, as the ranges are)
     return out;
   };
   const As = bySize(A, Ae, 0); yield; const Ss = []; for (let j = 0; j < SIDE_K; j++){ Ss.push(bySize(S[j], Se[j], 1 + j)); yield; }
+  const Ts = []; if (far) for (let j = 0; j < SIDE_K; j++){ Ts.push(bySize(T[j], Te[j], 1 + SIDE_K + j)); yield; }
   const off = [0]; for (const t of Ss) off.push(off[off.length - 1] + t.length);
-  const nS = off[SIDE_K], nD = off[SIDE_K/2], n = As.length + H.length + nS + nD;
+  const offT = [0]; for (const t of Ts) offT.push(offT[offT.length - 1] + t.length);
+  const nS = off[SIDE_K], nT = far ? offT[SIDE_K] : 0, nD = off[SIDE_K/2], nDT = far ? offT[SIDE_K/2] : 0, n = As.length + H.length + nS + nT + nD + nDT;
   const ix = nAt > 65535 ? new Uint32Array(n) : new Uint16Array(n);
-  let k = 0; for (const v of As) ix[k++] = v; for (const v of H) ix[k++] = v; for (const t of Ss) for (const v of t) ix[k++] = v;
+  let k = 0; for (const v of As) ix[k++] = v; for (const v of H) ix[k++] = v; for (const t of Ss) for (const v of t) ix[k++] = v; for (const t of Ts) for (const v of t) ix[k++] = v;
   for (let j = 0; j < SIDE_K/2; j++) for (const v of Ss[j]) ix[k++] = v;
-  return { ix, cut: { A: As.length, H: H.length, S: nS, off, cls } };
+  for (let j = 0; j < (far ? SIDE_K/2 : 0); j++) for (const v of Ts[j]) ix[k++] = v;
+  // (S, for the ranges of the shadow pass and where D starts, counts the walls of the sticks too: they sit after the other walls, before D)
+  return { ix, cut: far ? { A: As.length, H: H.length, S: nS + nT, off, offT, cls, far: true } : { A: As.length, H: H.length, S: nS, off, cls } };
 }
 // run a generator to its end (the pieces that are cut into steps, run all at once)
 function drain(g){ let r; while (!(r = g.next()).done); return r.value; }
 function collect(fn){ return drain(collectGen((function*(){ fn(); })())); }
 // the same, a step at a time (body: a generator that yields between its steps): see stageStart
 function* collectGen(body){
+  FAR_CFG.lean = !(PH.tests.fullRound || window.__FULL_ROUND); FAR_CFG.sticks = !(PH.tests.fullSticks || window.__FULL_STICKS);
   buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {}; curSpots = []; curCover = [];
   for (const k in SPR.size) FOL_LIST[k] = [];
   yield* body; yield;
@@ -512,7 +550,9 @@ function* collectGen(body){
     // their order), then the hidden ones (drawn only while the piece is being swept in or out: see hideCovered)
     let ni = 0, nh = 0; const C = prepCovers(covers); for (const [mat, b] of buckets) if (atlasable(mat)){ bucketIndexUpTo(b); hideCovered(b, C); ni += b.i.length; nh += b.hid; yield; }
     let ix, cut = null;
-    if (SIDE_SPLIT){ ({ ix, cut } = yield* sideLayoutGen(buckets, nAt)); }
+    let farL = null;
+    if (SIDE_SPLIT){ ({ ix, cut } = yield* sideLayoutGen(buckets, nAt));
+      if ([...buckets.values()].some(b => b.li || b.sk)) farL = yield* sideLayoutGen(buckets, nAt, { lean: FAR_CFG.lean, sticks: FAR_CFG.sticks }); }
     else {
       ix = nAt > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
       let k = 0, kh = ni - nh;
@@ -525,7 +565,7 @@ function* collectGen(body){
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 4, true)); g.setIndex(new THREE.BufferAttribute(ix, 1));
     g.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); g.setAttribute('aEm', new THREE.BufferAttribute(em, 4, true));
     g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aFine', new THREE.BufferAttribute(fine, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1, true));
-    if (cut){ g.userData.cut = cut; g.setDrawRange(0, cutRest(cut)); }   // (A, H, S and D: see sideArc)
+    if (cut){ g.userData.cut = cut; g.setDrawRange(0, cutRest(cut)); if (farL) g.userData.far = farL; }   // (A, H, S and D: see sideArc; far: the second order, see sideLayoutGen)
     else if (nh) g.userData.shown = ni - nh;   // (the hidden triangles come after this many indices: see hideBefore)
     geo.set(ATLAS, g);
   }
@@ -1591,6 +1631,7 @@ const mergeable = o => o.isMesh && !o.isInstancedMesh && (o.layers.mask === 1 ||
 // the block's merged meshes taken down (its plots draw one by one again, the same picture)
 function solidRemoveOld(key){
   const old = solidRegions.get(key);
+  if (old && old.far) for (const m of old.far){ FAR_MESHES.delete(m); m.geometry = m.userData.stdGeo; if (m.userData.farGeo) m.userData.farGeo.dispose(); }   // (the one not held by the mesh is let go here; the other with the group)
   if (old){ SC_DIRTY.quiet++; try { for (const m of old.members) m.visible = !(m.userData.sideOf && m.geometry.userData.full); world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); } finally { SC_DIRTY.quiet--; } }
   ovForget(key);   // (a walls' mesh stays hidden while its piece is swept: see showHidden)
 }
@@ -1614,31 +1655,34 @@ function* rebuildSolidGen(key){
   }
   if (!byMat.size) return;
   yield;
-  const g = new THREE.Group();
+  const g = new THREE.Group(), farMeshes = [];
   for (const [mat, list] of byMat){
     if (list.length < 2) continue;   // (nothing to gain)
     list.sort((a, b) => a.id - b.id);   // (in the order three would have drawn them one by one: where two pieces meet at exactly the same depth, the same one wins)
     const cutting = list.some(o => o.geometry.userData.cut);
     const merged = cutting ? yield* mergeCutGen(list.map(o => o.geometry)) : yield* mergeIndexedGen(list.map(o => o.geometry)); if (!merged) continue;
     dropCpuCopy(merged);
+    let mergedFar = null;
+    if (cutting && list.some(o => o.geometry.userData.far)){ mergedFar = yield* mergeCutGen(list.map(o => o.geometry), true, merged); if (mergedFar) dropCpuCopy(mergedFar, true); }   // (the second order, drawn from far away: sharing the corners)
     const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.blockKey = key;   // (the glow overlay is batched by it: see ovBatch)
     mesh.userData.sortId = list[0].id;   // (drawn where its first piece would have been: see the opaque sort below)
     if (merged.userData.shown !== undefined){ mesh.onBeforeRender = hideBefore; mesh.onAfterRender = hideAfter; }
     g.add(mesh);
-    if (cutting){ mesh.onBeforeRender = cutBefore; mesh.onAfterRender = cutAfter; const sm = sideMesh(mesh); sm.userData.sortId = list[0].userData.side ? list[0].userData.side.id : list[0].id; g.add(sm); }
+    if (cutting){ mesh.onBeforeRender = cutBefore; mesh.onAfterRender = cutAfter; const sm = sideMesh(mesh); sm.userData.sortId = list[0].userData.side ? list[0].userData.side.id : list[0].id; g.add(sm);
+      if (mergedFar){ for (const o of [mesh, sm]){ o.userData.stdGeo = merged; o.userData.farGeo = mergedFar; farMeshes.push(o); FAR_MESHES.add(o); } FARM.stamp++; } }
     for (const o of list){ o.visible = false; members.push(o); if (o.userData.side){ o.userData.side.visible = false; members.push(o.userData.side); } }
   }
   if (!g.children.length) return;
   yield;
-  world.add(freezeTree(g)); solidRegions.set(key, { group: g, members });
+  world.add(freezeTree(g)); solidRegions.set(key, { group: g, members, far: farMeshes });
 }
 // A region's merged geometry is read by nothing once it is on the card (the merge copies from the plots' own geometry, which stays; picking tests boxes; the glow overlay is cut from it before the first draw),
 // so its CPU arrays are let go right after their upload: they were 1.2 GB of the 3 GB heap in the biggest city. (Overlay test "keep the CPU copies of merged geometry" switches it off.)
-function dropCpuCopy(geo){
+function dropCpuCopy(geo, indexOnly = false){
   if (PH.tests.keepCpu || window.__KEEP_CPU) return;
   if (geo.index) geo.userData.bpe = geo.index.array.BYTES_PER_ELEMENT;
   const free = function(){ this.array = null; };
-  for (const n in geo.attributes) geo.attributes[n].onUpload(free);
+  if (!indexOnly) for (const n in geo.attributes) geo.attributes[n].onUpload(free);
   if (geo.index) geo.index.onUpload(free);
 }
 // Indexed geometries joined into one: corners one after another, and the triangles of all of them, the ones shown first
@@ -1667,43 +1711,52 @@ function* mergeIndexedGen(geos){
 // Building geometries joined in the A/H/S/D order (sideArc): every piece's A, every piece's H, then each wall slice of
 // every piece in turn, then slices 0 to 3 again. (A piece without the order counts as all A, and its hidden ones as H.)
 function mergeCut(geos){ return drain(mergeCutGen(geos)); }
-function* mergeCutGen(geos){
+function* mergeCutGen(geos, far = false, shared = null){
   const names = Object.keys(geos[0].attributes);
   for (const g of geos) if (Object.keys(g.attributes).length !== names.length || names.some(n => !g.attributes[n] || g.attributes[n].itemSize !== geos[0].attributes[n].itemSize || g.attributes[n].normalized !== geos[0].attributes[n].normalized || g.attributes[n].array.constructor !== geos[0].attributes[n].array.constructor)) return null;
   let nv = 0; for (const g of geos) nv += g.attributes.position.count;
   const out = new THREE.BufferGeometry();
-  for (const n of names){ const a0 = geos[0].attributes[n], arr = new a0.array.constructor(nv*a0.itemSize); let o = 0;
+  for (const n of names){
+    if (shared){ out.setAttribute(n, shared.attributes[n]); continue; }   // (the second order of a block uses the first one's corners)
+    const a0 = geos[0].attributes[n], arr = new a0.array.constructor(nv*a0.itemSize); let o = 0;
     for (const g of geos){ const a = g.attributes[n].array; arr.set(a, o); o += a.length; }
     out.setAttribute(n, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); yield; }
-  const seg = g => { const I = g.index.array, u = g.userData.cut;
-    if (u) return { I, a: [0, u.A], h: [u.A, u.A + u.H], s: u.off.map(x => u.A + u.H + x) };
-    const sh = g.userData.shown ?? I.length; return { I, a: [0, sh], h: [sh, I.length], s: new Array(SIDE_K + 1).fill(I.length) }; };
+  const seg = g => { const fo = far && g.userData.far, I = fo ? fo.ix : g.index.array, u = fo ? fo.cut : g.userData.cut;
+    if (u){ const base = u.A + u.H, r = { I, u, a: [0, u.A], h: [u.A, base], s: u.off.map(x => base + x), t: new Array(SIDE_K + 1).fill(0) };
+      if (u.offT){ const bt = base + u.off[SIDE_K]; r.t = u.offT.map(x => bt + x); } return r; }
+    const sh = g.userData.shown ?? I.length; return { I, u: null, a: [0, sh], h: [sh, I.length], s: new Array(SIDE_K + 1).fill(I.length), t: new Array(SIDE_K + 1).fill(0) }; };
   const parts = geos.map(seg);
-  let nA = 0, nH = 0; const nB = new Array(SIDE_K).fill(0);
-  for (const p of parts){ nA += p.a[1] - p.a[0]; nH += p.h[1] - p.h[0]; for (let k = 0; k < SIDE_K; k++) nB[k] += p.s[k + 1] - p.s[k]; }
+  let nA = 0, nH = 0; const nB = new Array(SIDE_K).fill(0), nT = new Array(SIDE_K).fill(0);
+  for (const p of parts){ nA += p.a[1] - p.a[0]; nH += p.h[1] - p.h[0]; for (let k = 0; k < SIDE_K; k++){ nB[k] += p.s[k + 1] - p.s[k]; nT[k] += p.t[k + 1] - p.t[k]; } }
   const off = [0]; for (let k = 0; k < SIDE_K; k++) off.push(off[k] + nB[k]);
-  const n = nA + nH + off[SIDE_K] + off[SIDE_K/2], ix = nv > 65535 ? new Uint32Array(n) : new Uint16Array(n);
+  const offT = [0]; for (let k = 0; k < SIDE_K; k++) offT.push(offT[k] + (far ? nT[k] : 0));
+  const n = nA + nH + off[SIDE_K] + offT[SIDE_K] + off[SIDE_K/2] + offT[SIDE_K/2], ix = nv > 65535 ? new Uint32Array(n) : new Uint16Array(n);
   let k = 0;
-  // where each piece's own triangles landed, row by row (row 0: A; rows 1 to 8: the wall slices; rows 9 to 12: slices 0 to 3
-  // again), and its box: what lets a frame draw only the pieces that are on screen (see cullPieces)
-  const nP = geos.length, rows = 1 + SIDE_K + SIDE_K/2, rowS = new Int32Array(rows*nP), rowN = new Int32Array(rows*nP), box = new Float32Array(nP*6);
+  // where each piece's own triangles landed, row by row (row 0: A; rows 1 to K: the wall slices; then slices 0 to K/2 - 1 again; for the far order the sticks' walls and their first half again), and its box:
+  // what lets a frame draw only the pieces that are on screen (see cullPieces)
+  const RT0 = 1 + SIDE_K + SIDE_K/2, nP = geos.length, rows = far ? RT0 + SIDE_K + SIDE_K/2 : RT0, rowS = new Int32Array(rows*nP), rowN = new Int32Array(rows*nP), box = new Float32Array(nP*6);
   const rowC = new Int32Array(rows*nP*SMALL_N);   // (per piece and row: how many triangles are at least each size)
+  const srcRow = row => row <= SIDE_K ? row : row < RT0 ? row - SIDE_K : row < RT0 + SIDE_K ? SIDE_K + 1 + (row - RT0) : SIDE_K + 1 + (row - RT0 - SIDE_K);
   const put = (lo, row) => { let base = 0; parts.forEach((p, gi) => { const I = p.I, r = typeof lo === 'function' ? lo(p) : null; const [x, y] = r || [p[lo][0], p[lo][1]];
     if (row >= 0){ rowS[row*nP + gi] = k; rowN[row*nP + gi] = y - x;
-      const src = row <= SIDE_K ? row : row - SIDE_K, cu = geos[gi].userData.cut, o = (row*nP + gi)*SMALL_N;
-      for (let l = 0; l < SMALL_N; l++) rowC[o + l] = cu && cu.cls ? cu.cls[src*SMALL_N + l] : y - x; }
+      const src = srcRow(row), cu = p.u, o = (row*nP + gi)*SMALL_N;
+      for (let l = 0; l < SMALL_N; l++) rowC[o + l] = cu && cu.cls ? (src*SMALL_N + l < cu.cls.length ? cu.cls[src*SMALL_N + l] : 0) : y - x; }
     for (let q = x; q < y; q++) ix[k++] = I[q] + base; base += geos[gi].attributes.position.count; }); };
   put('a', 0); put('h', -1); yield;
   for (let j = 0; j < SIDE_K; j++){ put(p => [p.s[j], p.s[j + 1]], 1 + j); if (j % 4 === 3) yield; }
+  if (far) for (let j = 0; j < SIDE_K; j++){ put(p => [p.t[j], p.t[j + 1]], RT0 + j); if (j % 4 === 3) yield; }
   for (let j = 0; j < SIDE_K/2; j++){ put(p => [p.s[j], p.s[j + 1]], 1 + SIDE_K + j); if (j % 4 === 3) yield; }
-  geos.forEach((g, gi) => { const P = g.attributes.position.array; let x0 = 1e30, x1 = -1e30, y0 = 1e30, y1 = -1e30, z0 = 1e30, z1 = -1e30;
+  if (far) for (let j = 0; j < SIDE_K/2; j++) put(p => [p.t[j], p.t[j + 1]], RT0 + SIDE_K + j);
+  if (shared) for (let q = 0; q < nP; q++){ const o = shared.userData.pcs ? shared.userData.pcs.box : null; if (o) box.set(o.subarray(q*6, q*6 + 6), q*6); }
+  else geos.forEach((g, gi) => { const P = g.attributes.position.array; let x0 = 1e30, x1 = -1e30, y0 = 1e30, y1 = -1e30, z0 = 1e30, z1 = -1e30;
     for (let q = 0; q < P.length; q += 3){ const x = P[q], y = P[q + 1], z = P[q + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; }
     box.set([x0, x1, y0, y1, z0, z1], gi*6); });
   yield;
   out.setIndex(new THREE.BufferAttribute(ix, 1));
-  out.userData.cut = { A: nA, H: nH, S: off[SIDE_K], off }; out.setDrawRange(0, nA + nH + off[SIDE_K]);
-  if (nP > 1) out.userData.pcs = { n: nP, rowS, rowN, rowC, box, stamp: -1, vis: new Uint8Array(nP), seen: 0 };
-  out.computeBoundingSphere();
+  const sTot = off[SIDE_K] + offT[SIDE_K];
+  out.userData.cut = far ? { A: nA, H: nH, S: sTot, off, offT, far: true } : { A: nA, H: nH, S: off[SIDE_K], off }; out.setDrawRange(0, nA + nH + sTot);
+  if (nP > 1) out.userData.pcs = { n: nP, rowS, rowN, rowC, box, stamp: -1, vis: new Uint8Array(nP), seen: 0, far };
+  if (shared && shared.boundingSphere) out.boundingSphere = shared.boundingSphere.clone(); else out.computeBoundingSphere();
   return out;
 }
 // three's own order for solid things (by layer group, render order, shader, material, distance, then creation), except that

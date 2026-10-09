@@ -210,10 +210,10 @@ function scEditRect(px, py, shk, soft){
 const SC_EPS = .003, SC_BIG = .03;   // (a change in the soft part under EPS isn't worth drawing again; over BIG is not a drift but a jump: rain, the hour set by hand)
 function scHard(out){
   let k = 0; const put = v => { out[k++] = v; };
-  put(yaw); put(PITCH); put(zoom); put(W); put(H); put(SMOOTH_LOOK.value); put(LOD.fine.value); put(CULL.lvl); put(CULL.minPx);
+  put(yaw); put(PITCH); put(zoom); put(W); put(H); put(SMOOTH_LOOK.value); put(LOD.fine.value); put(CULL.lvl); put(CULL.minPx); put(FARM.key);
   put(LIGHTS_ON.value < .17 ? 0 : LIGHTS_ON.value);   // (no window switches on below about .18: a drift under that, as the day cycle gives by day, changes nothing)
   put(sun.castShadow ? 1 : 0); put(renderer.shadowMap.enabled ? 1 : 0); put(SC.c0);   // (an edit, SC_EDITS, is dealt with apart: see scEditRect)
-  let t = 0, b = 1; for (const key in PH.tests){ if (PH.tests[key]) t |= b; b <<= 1; } put(t);
+  let t = 0; for (const key in PH.tests) t = (Math.imul(t, 31) + (PH.tests[key] ? 7 : 3)) | 0; put(t);   // (which tests are on, as one number)
   out.length = k; return out;
 }
 function scSoft(out){

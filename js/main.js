@@ -73,6 +73,7 @@ function frame(now){
   nvTick();   // idle frames: faces no camera ever sees are worked out for a plot, a few views a frame (neverseen.js)
   scene.updateMatrixWorld();   // once for every pass below (see core.js): nothing moves between them
   PH.lap('scene upkeep');
+  farFrame();   // which of its two orders the merged blocks are drawn in (world.js)
   sideArc();   // which way the buildings' walls can face the camera this frame (world.js)
   cullFrame();   // and which merged pieces are in view
   sdTrack();   // how fast the view is turning and zooming (world.js)

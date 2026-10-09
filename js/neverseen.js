@@ -168,7 +168,8 @@ function nvNeeds(c){ if (c.mega || !c.data || c.lift) return null; const g = c.d
 function nvTick(){
   if (NV.off()) return;
   if (window.__NV_CFG && !NV.cfgSet){ NV.cfgSet = true; Object.assign(NV, window.__NV_CFG); }   // (tests: a small view set)
-  NV.views = window.__NV_VIEWS || 1;
+  { const now = performance.now(), dt = now - (NV.lastT || now); NV.lastT = now;   // (views a frame: more while the frames are short, back to one when they are not)
+    NV.vf = Math.max(1, Math.min(8, dt < 18 ? (NV.vf || 1) + .05 : (NV.vf || 1)*.7)); NV.views = window.__NV_VIEWS || Math.floor(NV.vf); }
   // the test's switch: every plot with a result holds the layout the test wants
   const keep = NV.keep(); if (keep !== NV.lastKeep){ NV.lastKeep = keep; for (const c of cells.values()){ const g = c.data && c.data.geo.get(ATLAS); if (g && g.userData.nvNew){ nvSwap(g, !keep); markSolid(c); } } }
   const key = yaw.toFixed(4) + zoom.toFixed(3) + PITCH.toFixed(4) + camT.x.toFixed(2) + camT.z.toFixed(2);
@@ -182,9 +183,10 @@ function nvTick(){
   }
   const idle = NV.still >= 30 && SYNC_Q === null && !anims.length && !solidDirty.size && !document.hidden;
   if (!NV.job){
+    if (NV.queue.length > 1 && idle) NV.queue.sort((a, b) => Math.hypot(a.x - camT.x, a.z - camT.z) - Math.hypot(b.x - camT.x, b.z - camT.z));   // (the plots nearest the view first)
     while (NV.queue.length){ const c = NV.queue.shift(), g = nvNeeds(c); if (!g) continue;
       const tri = nvTriangles(g), sig = nvSig(g, tri), bits = NV.store.get(sig);
-      if (bits){ nvApply(c, g, tri, nvFromBits(bits, tri.length)); NV.stats.fromStore++; continue; }
+      if (bits){ nvApply(c, g, tri, nvFromBits(bits, tri.length)); NV.stats.fromStore++; break; }   // (one plot a frame)
       if (!idle || window.__NV_NO_COMPUTE) { NV.queue.unshift(c); break; }
       NV.job = nvStart(c); break; }
   }

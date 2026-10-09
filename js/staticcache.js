@@ -336,7 +336,7 @@ SC.frame = function(){
   // the window of it into the frame, then the live set on top
   renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
   mrtBegin(rtC, rtN, true);
-  if (PH.tests.copyByDraw || window.__COPY_DRAW) scCopyDraw(scCol(px), scRow(py)); else scBlit(scCol(px), scRow(py));
+  if (PH.tests.copyByBlit || window.__COPY_BLIT) scBlit(scCol(px), scRow(py)); else scCopyDraw(scCol(px), scRow(py));   // (drawing the copy measured 1.5 to 4 ms cheaper on the M2 than blitFramebuffer, same picture)
   cam.layers.mask = SC_LIVE_MASK; cullFrame(cam);
   if (!PH.tests.noLiveCull) scLiveCull();
   try { SC.drawView(() => renderer.render(scene, cam)); } finally { scLiveRestore(); }

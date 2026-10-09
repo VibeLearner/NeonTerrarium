@@ -5,13 +5,15 @@
 // recipeGen(r) makes the plot from the recipe alone, on a stand-in cell in a map holding only the plot and stand-ins for its four neighbors that throw when read,
 // so a builder reading any neighbor field fails loudly. Same steps as rebuildCell, nothing of the live city changed.
 const RECIPE_IN = ['i', 'j', 'x', 'z', 'green', 'style', 'mega', 'park', 'sections', 'below', 'lift'];
+// a plot that may throw the air-filter hologram (rooftopBoard picks it from the plot alone; whether there is room is decided by the neighbors' heights)
+function recipeIsAir(c){ const key = c.i + ',' + c.j; return window.AIR_FORCE === key || (!(window.WALL_FORCE === key || hash('wallholo', c.i, c.j) % WALL_HOLO_ODDS === 0) && hash('airholo', c.i, c.j) % AIR_HOLO_ODDS === 0); }
 function recipeOf(c){
   const r = { nb: SIDES4.map(([a, b]) => cells.has(ckey(c.i + a, c.j + b)) ? 1 : 0), dark: isDarkPlot(c) };
   for (const k of RECIPE_IN) if (c[k] !== undefined) r[k] = structuredClone(c[k]);
   // two builders look at the plots around beyond the four edges. A pod on a scaffold (liftSupports) asks of each side what its neighbor rises to: whether it is
   // a megastructure, how many sections it has, its height and its own pod's deck. A tower that may throw the air-filter hologram (rooftopBoard) asks the heights of
   // the three plots in front of each of its four faces (twelve plots, corners included). Those are the plots listed in nbi, with only those fields.
-  const key = c.i + ',' + c.j, air = window.AIR_FORCE === key || (!(window.WALL_FORCE === key || hash('wallholo', c.i, c.j) % WALL_HOLO_ODDS === 0) && hash('airholo', c.i, c.j) % AIR_HOLO_ODDS === 0);
+  const air = recipeIsAir(c);
   const at = [];
   if (c.lift) for (const [a, b] of SIDES4) at.push([a, b]);
   if (air) for (const [a, b] of SIDES4) for (let l = -1; l <= 1; l++) at.push([a + (a ? 0 : l), b + (b ? 0 : l)]);
@@ -208,7 +210,7 @@ RW.start = () => {
     } else if (m.t === 'done' || m.t === 'err'){
       if (m.rb) for (const [k, e] of m.rb){ const mine = rbCache.get(k); if (!mine){ rbCache.set(k, rbUnpack(e)); RW.rbSent.add(k); } else if (!sameArr(mine.attributes.position.array, e.a.position.a)) RW.rbSent.delete(k); else RW.rbSent.add(k); }
       const j = RW.jobs.get(m.id); RW.jobs.delete(m.id); if (!j || j.cancelled) return;
-      if (j.regen){ const h = j.regen; if (m.t === 'err'){ h.wait = null; h.fails = (h.fails || 0) + 1; RW.fell++; return; } if (h.out && h.c.data === h.d){ PM.async++; pmFill(h, recipeUnpack(m.msg).data); } else h.wait = null; return; }
+      if (j.regen){ const h = j.regen; if (m.t === 'err'){ h.wait = null; h.fails = (h.fails || 0) + 1; RW.fell++; return; } if (h.c.data === h.d && (h.out || pmNeeds(h, 'stand'))){ PM.async++; pmFill(h, recipeUnpack(m.msg).data); } else h.wait = null; return; }
       if (m.t === 'err'){ j.fail = m.err; RW.fell++; } else { j.res = m; RW.made++; }
       j.done = true;
     }
@@ -220,10 +222,10 @@ RW.sendWorld = () => {
   if (s !== RW.lastWorld){ RW.lastWorld = s; RW.w.postMessage({ t: 'world', hw: L.hw, mt: L.mt }); }
 };
 // a job {c, ...}: gets job.rw = { done, res, fail, cancelled }
-RW.request = job => {
+RW.request = (job, skipWorld) => {
   const id = RW.next++, rw = { id, done: false, res: null, fail: null, cancelled: false };
   job.rw = rw; RW.jobs.set(id, rw);
-  RW.sendWorld();
+  if (!skipWorld) RW.sendWorld();   // (loading a city sends the lines once, then asks for plots)
   const r = recipeOf(job.c); job.dark = r.dark; job.r = r;
   const m = { t: 'gen', id, r, far: { lean: !!(PH.tests.leanRound || window.__LEAN_ROUND), sticks: !!(PH.tests.thinSticks || window.__THIN_STICKS) } };
   m.rb = []; for (const [k, g] of rbCache) if (!RW.rbSent.has(k)){ RW.rbSent.add(k); m.rb.push([k, rbPack(g, false)]); }   // (structured clone copies them)
@@ -240,7 +242,8 @@ RW.regen = (h, r) => {
 };
 RW.cancel = job => { if (job.rw){ job.rw.cancelled = true; RW.jobs.delete(job.rw.id); job.rw = null; } };
 RW.line = () => 'plot worker: ' + (genMain() ? 'off (test)' : RW.state) + (RW.error ? ' (' + RW.error + ')' : '') + '; made ' + RW.made + ', fell back ' + RW.fell + ', walking maps taken from it ' + RW.grids;
-if (!self.IN_RECIPE_WORKER) window.addEventListener('load', () => setTimeout(RW.start, 1500));
+// (started as soon as this script is read, so the worker loads the game's scripts while the page does: loading a city from recipes, loadcity.js, wants it ready)
+if (!self.IN_RECIPE_WORKER) setTimeout(RW.start, 0);
 
 // what a plot's data needs to be made again, exactly: its recipe and the random draws of its generation (a few KB a plot)
 function attachRec(data, r, draws){
@@ -258,48 +261,58 @@ function attachRec(data, r, draws){
 const PM = { keys: ['position', 'normal', 'color', 'aEm', 'aFlk', 'aFine', 'aOn'], queue: [], frame: 0, dropped: 0, sync: 0, async: 0, why: {}, trace: false, held: new Set() };
 PM.on = () => !(PH.tests.keepGeo || window.__KEEP_GEO) && !self.IN_RECIPE_WORKER;
 PM.line = () => 'plot arrays: ' + (PM.on() ? 'let go after merging' : 'kept (test)') + '; dropped ' + PM.dropped + ', made again by the worker ' + PM.async + ', on the page ' + PM.sync;
-function pmDrop(c){
-  const d = c && c.data, g = d && d.geo.get(ATLAS);
-  if (!g || !d.rec || !d.rec.r || !PM.on() || (d.pm && d.pm.out)) return;
-  const h = d.pm || (d.pm = { c, d, out: false, wait: null, due: -1, queued: false });
+const pmHolder = c => { const d = c.data; return d.pm || (d.pm = { c, d, out: false, sout: false, wait: null, due: -1, queued: false }); };
+// (out: the full tier's arrays are let go; sout: the stand-in's are, or there is no stand-in yet, which is made from the recipe like any array that is let go)
+function pmDropOne(h, g){
   for (const k of PM.keys){
     const a = g.attributes[k]; if (!a || !a.array) continue;
     Object.defineProperty(a, 'array', { configurable: true, enumerable: true,
       get(){ pmRestoreSync(h, k); return a.array; },
       set(v){ Object.defineProperty(a, 'array', { value: v, writable: true, configurable: true, enumerable: true }); } });
   }
-  h.out = true; h.due = -1; PM.dropped++;
 }
-// the arrays are back in the plot's attributes
+function pmDrop(c){
+  const d = c && c.data; if (!d || !d.rec || !d.rec.r || !PM.on()) return;
+  const g = d.geo.get(ATLAS), h = pmHolder(c);
+  if (g && !h.out){ pmDropOne(h, g); h.out = true; PM.dropped++; }
+  if (d.sgeo && !h.sout){ pmDropOne(h, d.sgeo); h.sout = true; PM.dropped++; }
+  h.due = -1;
+}
+// the arrays are back in the plot's attributes (and the stand-in is there, if it was missing)
 function pmFill(h, nd){
-  const ng = nd.geo.get(ATLAS), g = h.d.geo.get(ATLAS);
-  if (!h.out) return;
-  for (const k of PM.keys){ const a = g.attributes[k]; if (!a) continue; a.array = ng.attributes[k].array; }
-  h.out = false; h.wait = null; h.due = PM.frame + 90;   // (let go again if nothing keeps asking)
+  const d = h.d, ng = nd.geo.get(ATLAS), g = d.geo.get(ATLAS);
+  if (h.out && g && ng){ for (const k of PM.keys){ const a = g.attributes[k]; if (a) a.array = ng.attributes[k].array; } h.out = false; }
+  if (nd.sgeo){
+    if (!d.sgeo){ d.sgeo = nd.sgeo; h.sout = false; }
+    else if (h.sout){ for (const k of PM.keys){ const a = d.sgeo.attributes[k]; if (a) a.array = nd.sgeo.attributes[k].array; } h.sout = false; }
+  }
+  h.wait = null; h.due = PM.frame + 90;   // (let go again if nothing keeps asking)
   if (!h.queued){ h.queued = true; PM.queue.push(h); }
 }
 function pmRestoreSync(h, why){
-  if (!h.out) return;
+  if (!h.out && !pmNeeds(h, 'stand')) return;
   PM.sync++; PM.why[why] = (PM.why[why] || 0) + 1;
   if (PM.trace){ const st = new Error().stack.split('\n').slice(2, 7).map(x => x.replace(/.*\//, '').replace(/\)$/, '')).join(' < '); PM.stacks = PM.stacks || new Map(); PM.stacks.set(st, (PM.stacks.get(st) || 0) + 1); }
   const rec = h.d.rec, prev = stageCap();   // (a reader can be a builder in the middle of making another plot: its globals are put back, as between the steps of a staged plot)
   let nd; try { nd = recipeGen(Object.assign({}, rec.r, { draws: rec.draws }), recipeWorld()).data; } finally { stageApply(prev); }
-  pmFill(h, nd); for (const g of nd.geo.values()) g.dispose();
+  pmFill(h, nd); for (const g of nd.geo.values()) g.dispose(); if (nd.sgeo && h.d.sgeo !== nd.sgeo) nd.sgeo.dispose();
 }
-// ask for the plot's arrays back without waiting: true when they are there. The worker makes the plot; until it answers this is false (ask again later).
-function pmEnsure(c){
-  const h = c.data && c.data.pm; if (!h || !h.out) return true;
+// are the arrays of that tier not there ('full': let go; 'stand': let go, or the stand-in has not been made)
+const pmNeeds = (h, which) => which === 'stand' ? (!h.d.sgeo || h.sout) : h.out;
+// ask for a tier's arrays without waiting: true when they are there. The worker makes the plot; until it answers this is false (ask again later).
+function pmEnsure(c, which = 'full'){
+  const d = c.data; if (!d || !d.rec || !d.rec.r) return true;
+  const h = pmHolder(c); if (!pmNeeds(h, which)) return true;
   if (h.wait) return false;
   if (!RW.usable() || (h.fails || 0) >= 2){ pmRestoreSync(h, 'ensure'); return true; }   // (no worker, or it could not make this one twice: here, at once)
-  h.wait = true; const rec = h.d.rec;
+  h.wait = true; const rec = d.rec;
   RW.regen(h, Object.assign({}, rec.r, { draws: rec.draws }));
   return false;
 }
 // a plot's arrays are to be let go in `delay` frames (it has just been merged into its block, or the arrays were made again for a reader)
 function pmSchedule(c, delay = 0){
   const d = c.data; if (!d || !d.rec || !d.rec.r || !d.geo.get(ATLAS) || !PM.on()) return;
-  const h = d.pm || (d.pm = { c, d, out: false, wait: null, due: -1, queued: false });
-  if (h.out) return;
+  const h = pmHolder(c);
   h.due = PM.frame + delay; if (!h.queued){ h.queued = true; PM.queue.push(h); }
 }
 // each frame: let go of the plots whose time is up (not while something is working on them)
@@ -316,12 +329,13 @@ function pmBusy(c){
   const k = mergeKey(c.i, c.j); if (solidDirty.has(k) || (SOLID_JOB && SOLID_JOB.key === k)) return true;
   return !!c.animating;
 }
-// every plot of a merge block has its arrays: asks the worker for the ones that are not (false until all have come); held for the merge once they are
+// every plot of a merge block has the arrays its tier needs: asks the worker for the ones that are not (false until all have come); held for the merge once they are
 function pmBlockReady(key){
-  const [a, b] = key.split(',').map(Number); let ok = true;
+  const [a, b] = key.split(',').map(Number); let ok = true; const which = tierOfKey(key);
   for (let i = a*MREG; i < a*MREG + MREG; i++) for (let j = b*MREG; j < b*MREG + MREG; j++){
-    const c = cells.get(ckey(i, j)), h = c && c.data && c.data.pm; if (!h) continue;
-    if (h.out){ if (!pmEnsure(c)) ok = false; } else if (h.queued) h.due = Math.max(h.due, PM.frame + 600);
+    const c = cells.get(ckey(i, j)); if (!c || !c.data || !c.data.rec) continue;
+    const h = pmHolder(c);
+    if (pmNeeds(h, which)){ if (!pmEnsure(c, which)) ok = false; } else if (h.queued) h.due = Math.max(h.due, PM.frame + 600);
   }
   return ok;
 }

@@ -106,6 +106,7 @@ canvas.addEventListener('pointermove', e => {
   if (act.kind === 'paint'){ paintAt(e.clientX, e.clientY); showHover(targetOf(pickAt(e.clientX, e.clientY))); }
 });
 const endPtr = e => {
+  if (act && typeof LOADP !== 'undefined' && LOADP.on) act.moved = true;   // (a city is still being loaded from its recipes: a click edits nothing yet)
   if (act && ptrs.has(e.pointerId)){
     if (act.kind === 'del' && !act.moved){   // a click: inside the selection deletes it, anywhere else clears it
       const c = groundCellAt(e.clientX, e.clientY);

@@ -252,7 +252,7 @@ function put(geo, mat, m, lean){
   if (FAR_CFG.sticks && did > 0 && LAST_STICK && atlasable(mat)){ (b.sk || (b.sk = [])).push(base, base + nFull); }
   // the stand-in tier (round 9 item 5): a piece that is a fine detail (a stick or a tiny bit) or has no side as long as TIER.small, and gives no light, is noted so that the stand-in
   // can leave it out (world.js standBuckets); the corners it and its lean twin took are one range
-  if (TIER.make && SIDE_SPLIT && !b.f && (did > 0 || LAST_BIG < TIER.small) && atlasable(mat)) (b.dr || (b.dr = [])).push(base, bp.length/3);
+  if (TIER.make && SIDE_SPLIT && atlasable(mat)){ if (!b.f){ if (did > 0 || LAST_BIG < (window.__TIER_SMALL ?? TIER.small)) (b.dr || (b.dr = [])).push(base, bp.length/3); } else if (mat.userData.glow === 'window') (b.gr || (b.gr = [])).push(base, bp.length/3); }   // (b.gr: the lit panes, whose frames stay)
 }
 // a shape's corners, transformed, onto the end of a bucket's lists; how many
 function pushCorners(b, geo, w, m, fid, ord, did){

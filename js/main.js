@@ -4,7 +4,7 @@
 /* ---------- loop ---------- */
 resize();
 bakeClouds();
-if (!load()) clearIsland(); else rebuildAll();
+if (!load()) clearIsland(); else if (loadWanted()) loadStart(); else rebuildAll();   // (a saved city is made from its recipes by the worker, nearest the camera first: loadcity.js)
 centerView(true);
 selectZone(null);
 let last = performance.now();
@@ -68,7 +68,9 @@ function frame(now){
   PH.lap('steam, rain, camera');
   runLater();
   stageStep();   // a plot being built in steps: a few milliseconds of it (world.js)
+  loadTick();    // a city being made from its recipes (loadcity.js)
   pmTick();      // plots' own arrays let go once merged (recipe.js)
+  tierTick();    // which blocks are drawn full, which as stand-ins (world.js)
   stepSync();   // what an edit leaves to do, a stage a frame (world.js)
   flushSolid();   // regions whose pieces changed are merged again (world.js)
   nvTick();   // idle frames: faces no camera ever sees are worked out for a plot, a few views a frame (neverseen.js)

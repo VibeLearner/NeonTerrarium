@@ -34,6 +34,15 @@ function scNote(o){
   if (SC_DIRTY.boxes.length >= 40){ SC_DIRTY.unknown = true; return; }
   SC_DIRTY.boxes.push(_dbx.clone());
 }
+// a merge block's box (its plots and what rises over them), noted for the static cache by hand: a merge is quiet, a change of tier is not
+function scNoteBlock(key){
+  if (SC_DIRTY.unknown) return;
+  const [a, b] = key.split(',').map(Number); let top = 0;
+  for (let i = a*MREG; i < a*MREG + MREG; i++) for (let j = b*MREG; j < b*MREG + MREG; j++){ const c = cells.get(ckey(i, j)); if (c && c.height > top) top = c.height; }
+  _dbx.min.set((a*MREG - .5)*LOT, -2, (b*MREG - .5)*LOT); _dbx.max.set((a*MREG + MREG - .5)*LOT, top + 2, (b*MREG + MREG - .5)*LOT);
+  if (SC_DIRTY.boxes.length >= 40){ SC_DIRTY.unknown = true; return; }
+  SC_DIRTY.boxes.push(_dbx.clone());
+}
 { const add = world.add, remove = world.remove;
   world.add = function(){ SC_EDITS++; const r = add.apply(this, arguments); for (let i = 0; i < arguments.length; i++) scNote(arguments[i]); return r; };
   world.remove = function(){ SC_EDITS++; for (let i = 0; i < arguments.length; i++) scNote(arguments[i]); return remove.apply(this, arguments); }; }
@@ -569,11 +578,29 @@ function* atlasGen(bks){
 const TIER = { make: false, small: .30 };   // (make: only while a plot is made from a recipe, see recipeGen: the page's own generation steps are left as they were)
 function standBuckets(bks){
   let any = false; const out = new Map();
+  if (window.__TIER_KEEPALL) return new Map(bks);   // (a test: the stand-in is laid out again from the same buckets, nothing left out, so that what the tier machinery itself changes can be seen on its own)
+  // a small piece that touches a lit pane stays (the frames and mullions round and across it: without them the pane reads as a bigger, brighter one): the panes' boxes in a grid
+  const G = .5, GM = .04, wb = [], wg = new Map(), gk = (x, z) => (x + 4096)*8192 + (z + 4096);
+  for (const [mat, b] of bks) if (b.gr) for (let q = 0; q < b.gr.length; q += 2){
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (let v = b.gr[q]; v < b.gr[q + 1]; v++){ const a = v*3, x = b.p[a], y = b.p[a + 1], z = b.p[a + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+    const id = wb.length; wb.push(x0, x1, y0, y1, z0, z1);
+    for (let x = Math.floor((x0 - GM)/G); x <= Math.floor((x1 + GM)/G); x++) for (let z = Math.floor((z0 - GM)/G); z <= Math.floor((z1 + GM)/G); z++){ const k = gk(x, z); let l = wg.get(k); if (!l) wg.set(k, l = []); l.push(id); }
+  }
+  const touchesLight = (b, s, e) => {
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (let v = s; v < e; v++){ const a = v*3, x = b.p[a], y = b.p[a + 1], z = b.p[a + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+    for (let x = Math.floor((x0 - GM)/G); x <= Math.floor((x1 + GM)/G); x++) for (let z = Math.floor((z0 - GM)/G); z <= Math.floor((z1 + GM)/G); z++){
+      const l = wg.get(gk(x, z)); if (!l) continue;
+      for (const id of l){ const o = id*6; if (wb[o] <= x1 + GM && wb[o + 1] >= x0 - GM && wb[o + 2] <= y1 + GM && wb[o + 3] >= y0 - GM && wb[o + 4] <= z1 + GM && wb[o + 5] >= z0 - GM) return true; } }
+    return false;
+  };
   for (const [mat, b] of bks){
     if (!atlasable(mat) || !b.dr || !b.dr.length){ out.set(mat, b); continue; }
+    const n = b.p.length/3, keep = new Uint8Array(n).fill(1); let dropped = 0;
+    for (let q = 0; q < b.dr.length; q += 2){ if (wb.length && touchesLight(b, b.dr[q], b.dr[q + 1])) continue; keep.fill(0, b.dr[q], b.dr[q + 1]); dropped++; }
+    if (!dropped){ out.set(mat, b); continue; }
     any = true;
-    const n = b.p.length/3, keep = new Uint8Array(n).fill(1);
-    for (let q = 0; q < b.dr.length; q += 2) keep.fill(0, b.dr[q], b.dr[q + 1]);
     const map = new Int32Array(n); let m = 0; for (let v = 0; v < n; v++) map[v] = keep[v] ? m++ : -1;
     if (!m) continue;
     const nb = { p: new Array(m*3), n: new Array(m*3), d: new Array(m), f: null, o: null, i: [], hid: 0, ni: m };
@@ -1708,19 +1735,19 @@ function solidRemoveOld(key){
 function rebuildSolid(key){ solidFinish(); SC_DIRTY.quiet++; try { drain(rebuildSolidGen(key)); } finally { SC_DIRTY.quiet--; } }
 // the same in steps (merging a block is 20 to 80 ms in one piece): a step per attribute, per row of triangles, per material. SOLID_JOB: the block being merged, if any.
 let SOLID_JOB = null;
-function solidSlice(){ SC_DIRTY.quiet++; try { return SOLID_JOB.gen.next().done; } finally { SC_DIRTY.quiet--; } }
-function solidFinish(){ if (SOLID_JOB){ while (!solidSlice()); SOLID_JOB = null; } }
+function solidSlice(){ SC_DIRTY.quiet++; try { const r = SOLID_JOB.gen.next(); return r.done ? true : r.value === 'wait' ? 'wait' : false; } finally { SC_DIRTY.quiet--; } }   // ('wait': a block that changes tier is held back until the view moves)
+function solidFinish(){ if (SOLID_JOB){ SOLID_JOB.force = true; while (solidSlice() !== true); SOLID_JOB = null; } }
 function solidStep(ms){
   if (!SOLID_JOB){
     if (!solidDirty.size) return;
-    let k = null; for (const q of solidDirty) if (pmBlockReady(q)){ k = q; break; }   // (a block whose plots' arrays have to be made again waits for them, the old merge staying drawn)
+    let k = null, asked = 0; for (const q of solidDirty){ if (pmBlockReady(q)){ k = q; break; } if (++asked >= 3) break; }   // (a block whose plots' arrays have to be made again waits for them, the old merge staying drawn; the worker is asked for the first few blocks' plots only)
     if (k === null) return;
-    solidDirty.delete(k); SOLID_JOB = { key: k, gen: rebuildSolidGen(k) }; }
+    solidDirty.delete(k); SOLID_JOB = { key: k, gen: null, force: false }; SOLID_JOB.gen = rebuildSolidGen(k, SOLID_JOB); }
   const t0 = stageNow();
-  do { if (solidSlice()){ SOLID_JOB = null; break; } } while (stageNow() - t0 < ms);
+  do { const r = solidSlice(); if (r === true){ SOLID_JOB = null; break; } if (r === 'wait') break; } while (stageNow() - t0 < ms);
   FRAME_WORK += stageNow() - t0;
 }
-function* rebuildSolidGen(key){
+function* rebuildSolidGen(key, job = null){
   // the old merged block stays drawn while the new one is made; at the last step the old goes and the new comes in, in the same frame
   const byMat = new Map(), members = [];
   ovNext.delete(key);
@@ -1751,24 +1778,80 @@ function* rebuildSolidGen(key){
   }
   if (!g.children.length){ solidRemoveOld(key); ovNext.delete(key); return; }
   yield;
+  const tier = tierOfKey(key), oldRec = solidRegions.get(key), tierChanged = !!oldRec && (oldRec.tier || 'full') !== tier;
+  // a block that changes tier shows a different picture: it is swapped in while the view moves, never in the middle of a still frame (a view that stays still gets it after TIER.stillWait frames)
+  if (tierChanged && job && !job.force) for (let waited = 0; tierSwapWait(key, waited); waited++) yield 'wait';
   freezeTree(g);   // (the glow overlays of the new meshes are made here)
+  // (a merge shows the same picture, so it notes no box for the static cache; a block changing tier does not: its whole box is noted, from its plots)
+  if (tierChanged){ scNoteBlock(key); const t0 = TIER.markedAt.get(key); if (t0 !== undefined){ TIER.lat.push(PM.frame - t0); TIER.markedAt.delete(key); } }
   solidRemoveOld(key); ovCommit(key);   // the swap: the old block and its overlays out, the new in, the plots' own meshes hidden
   for (const o of hideList) o.visible = false;
   for (const o of hideList){ const pc = o.userData.cell; if (pc) pmSchedule(pc); }   // (merged in: its own arrays are let go: recipe.js)
   for (const o of farMeshes){ FAR_MESHES.add(o); } if (farMeshes.length) FARM.stamp++;
-  world.add(g); solidRegions.set(key, { group: g, members, far: farMeshes, geoms });
+  world.add(g);
+  solidRegions.set(key, { group: g, members, far: farMeshes, geoms, tier });
 }
 // ---- the stand-in tier (round 9 item 5, a cheat) ----
-// A plot is drawn either full (its own geometry) or as a stand-in (the same plot without its small pieces: standBuckets), by block: what a plot gives to its block's merge is the
-// geometry of its tier. Tests: "full detail everywhere (as before)" (tierOff) and "stand-ins everywhere" (tierAll, for measuring).
+// A plot is drawn either full (its own geometry) or as a stand-in (the same plot without its small pieces: standBuckets), by merge block: what a plot gives to its block's merge is the
+// geometry of its block's tier. Which blocks are full: when the view is closer than TIER.zs, those whose middle is within the view's reach plus TIER.margin, at most TIER.maxFull of them
+// (the nearest to the middle of the view); a block goes back to the stand-in once it has been out of that for TIER.hold frames. When the view is farther than TIER.zs everything is a stand-in.
+// A block changes tier by being merged again from the other geometry; the old merge stays drawn until the new one is made, which waits for the worker to send the arrays it needs (recipe.js).
+// Tests: "full detail everywhere (as before)" (tierOff), "stand-in tier everywhere (to measure)" (tierAll), "show tiers (stand-ins tinted)" (tierShow).
+Object.assign(TIER, { zs: 24, margin: 12, maxFull: 36, hold: 180, of: new Map(), sig: '', since: new Map(), changes: 0, nFull: 0, nStand: 0 });
 TIER.on = () => !(PH.tests.tierOff || window.__TIER_OFF);
 TIER.all = () => !!(PH.tests.tierAll || window.__TIER_ALL);
-const tierOf = c => TIER.on() && TIER.all() ? 'stand' : 'full';
+TIER.show = () => !!(PH.tests.tierShow || window.__TIER_SHOW);
+const tierOfKey = key => TIER.on() ? (TIER.all() ? 'stand' : (TIER.of.get(key) || 'full')) : 'full';
+const tierOf = c => tierOfKey(mergeKey(c.i, c.j));
 function memberGeo(o){
   const c = o.userData.cell, d = c && c.data;
-  if (d && o.geometry === d.geo.get(ATLAS) && tierOf(c) === 'stand'){ const sg = d.sgeo || standEnsure(c); if (sg) return sg; }
+  if (d && o.geometry === d.geo.get(ATLAS) && tierOf(c) === 'stand'){ const sg = d.sgeo || standEnsure(c); if (sg) return TIER.show() ? tierTint(sg) : sg; }
   return o.geometry;
 }
+// the stand-in with its colors turned toward red (the test "show tiers")
+function tierTint(sg){
+  if (sg.userData._tint) return sg.userData._tint;
+  const t = new THREE.BufferGeometry(); for (const k in sg.attributes) t.setAttribute(k, sg.attributes[k]);
+  const ca = sg.attributes.color, col = new Uint8Array(ca.array.length); for (let i = 0; i < col.length; i += 3){ col[i] = Math.min(255, ca.array[i] + 90); col[i + 1] = ca.array[i + 1]*.55; col[i + 2] = ca.array[i + 2]*.55; }
+  t.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); t.setIndex(sg.index); t.userData = sg.userData; t.setDrawRange(sg.drawRange.start, sg.drawRange.count);
+  t.boundingSphere = sg.boundingSphere; t.boundingBox = sg.boundingBox; return sg.userData._tint = t;
+}
+// the view moved this frame or in the last two (turning, tilting, zooming, panning): a change of tier is covered by it
+TIER.prev = null; TIER.moveAt = -99; TIER.stillWait = 120;
+function tierTrack(){ const v = yaw + ',' + zoom + ',' + PITCH + ',' + camT.x + ',' + camT.z; if (v !== TIER.prev){ TIER.prev = v; TIER.moveAt = PM.frame; } }
+const tierMoving = () => PM.frame - TIER.moveAt <= 2;
+const _tbx = new THREE.Box3(), _tfr = new THREE.Frustum(), _tmx = new THREE.Matrix4();
+function tierVisible(key){
+  const [a, b] = key.split(',').map(Number); let top = 0;
+  for (let i = a*MREG; i < a*MREG + MREG; i++) for (let j = b*MREG; j < b*MREG + MREG; j++){ const c = cells.get(ckey(i, j)); if (c && c.height > top) top = c.height; }
+  _tbx.min.set((a*MREG - .5)*LOT, -2, (b*MREG - .5)*LOT); _tbx.max.set((a*MREG + MREG - .5)*LOT, top + 2, (b*MREG + MREG - .5)*LOT);
+  cam.updateMatrixWorld(); _tmx.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _tfr.setFromProjectionMatrix(_tmx);
+  return _tfr.intersectsBox(_tbx);
+}
+const tierSwapWait = (key, waited) => waited < TIER.stillWait && !tierMoving() && tierVisible(key);
+TIER.markedAt = new Map(); TIER.lat = [];   // (frames from a block being marked to its new look being swapped in)
+function tierMark(key){ solidAbort(key); solidDirty.add(key); TIER.changes++; if (!TIER.markedAt.has(key)) TIER.markedAt.set(key, PM.frame); }
+// each frame (main.js): which blocks are full, from where the view is; blocks that change are merged again
+function tierTick(){
+  tierTrack();
+  if (!TIER.on() || TIER.all()){ if (TIER.of.size){ const ks = [...TIER.of.keys()]; TIER.of.clear(); for (const k of ks) tierMark(k); } TIER.sig = ''; return; }
+  const sig = (zoomT <= TIER.zs ? 'n' : 'f') + (camGoal.x/LOT).toFixed(0) + ',' + (camGoal.z/LOT).toFixed(0) + ',' + zoomT.toFixed(1) + ',' + yawT.toFixed(1) + ',' + cells.size + ',' + PM.frame % 30;
+  if (sig === TIER.sig) return; TIER.sig = sig;
+  const near = zoomT <= TIER.zs, r = near ? Math.hypot(zoomT*(W/H), zoomT/Math.sin(Math.max(.15, PITCH)))*1.05 + TIER.margin : -1;
+  const blocks = new Map(); for (const c of cells.values()){ const k = mergeKey(c.i, c.j), b = blocks.get(k) || blocks.set(k, { x: 0, z: 0, n: 0 }).get(k); b.x += c.x; b.z += c.z; b.n++; }
+  const wantFull = [];
+  for (const [k, b] of blocks){ const d = Math.hypot(b.x/b.n - camGoal.x, b.z/b.n - camGoal.z); if (near && d <= r) wantFull.push([d, k]); }
+  wantFull.sort((p, q) => p[0] - q[0]); const keep = new Set(wantFull.slice(0, TIER.maxFull).map(e => e[1]));
+  let nFull = 0, nStand = 0;
+  for (const k of blocks.keys()){
+    const cur = TIER.of.get(k) || 'full';
+    if (keep.has(k)){ TIER.since.delete(k); if (cur === 'stand'){ TIER.of.delete(k); tierMark(k); } }
+    else if (cur === 'full'){ const t0 = TIER.since.get(k); if (t0 === undefined) TIER.since.set(k, PM.frame); else if (PM.frame - t0 >= TIER.hold){ TIER.of.set(k, 'stand'); TIER.since.delete(k); tierMark(k); } }
+    if ((TIER.of.get(k) || 'full') === 'full') nFull++; else nStand++;
+  }
+  TIER.nFull = nFull; TIER.nStand = nStand;
+}
+TIER.line = () => !TIER.on() ? 'tiers: off (test)' : TIER.all() ? 'tiers: stand-ins everywhere (test)' : 'tiers: ' + TIER.nFull + ' blocks full, ' + TIER.nStand + ' stand-in, ' + TIER.changes + ' changes';
 // a plot's stand-in, made on the page from its recipe (the worker does it ahead of time when the policy asks: see recipe.js)
 function standEnsure(c){
   const d = c.data; if (!d || !d.rec || !d.rec.r || d.sgeo) return d && d.sgeo || null;
@@ -2018,7 +2101,7 @@ function syncAgentsEnd(){
 // once). A new edit restarts the stages (each one rebuilds from the cities' cells, so a repeat is safe). Loading, and the overlay test "edit upkeep in the same frame", do it all at once.
 let SYNC_Q = null;
 const SYNC_STAGES = [() => rebuildConnections(), () => syncAgentsA(), ms => syncSteamStep(ms), ms => syncPeopleNetStep(ms), ms => syncPeopleRestStep(ms), () => syncAgentsEnd()];
-const SYNC_NOW = () => !!(PH.tests.syncNow || window.__SYNC_NOW) || !pplReady || pplFrame < 60;   // (the first second of a session is loading)
+const SYNC_NOW = () => !!(PH.tests.syncNow || window.__SYNC_NOW) || ((!pplReady || pplFrame < 60) && !(typeof LOADP !== 'undefined' && LOADP.on));   // (the first second of a session is loading)
 function queueSync(){ SYNC_Q = 0; syncPeopleAbort(); STEAM_JOB = null; }
 function stepSync(ms = 3){ if (SYNC_Q === null) return; const q = SYNC_Q, t0 = stageNow();
   const r = SYNC_STAGES[q](Math.max(1, ms - FRAME_WORK)); FRAME_WORK += stageNow() - t0; if (r === false) return; SYNC_Q = q + 1 >= SYNC_STAGES.length ? null : q + 1; }   // (a stage is a frame's work, or several frames' for the walking network and the residents: those answer false until they are done)

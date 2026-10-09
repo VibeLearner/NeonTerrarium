@@ -7,7 +7,7 @@
 // plot is drawn alone). The result is kept by the plot's geometry signature in IndexedDB, so a plot is worked out once, ever.
 // A sampled set can miss a face that shows through a narrow gap or at a grazing angle in a few views: the rare missing speck of wall is the cost (see OVERNIGHT3.md).
 const NV = { yaws: 96, np: 14, yawOff: .5, jits: [[0, 0]], px: .0045, maxPx: 4000, ver: 'v2-96x14-p0045',   // (the dense reference set of round 7: nothing it sees is removed)
-  views: 1, queue: [], job: null, store: new Map(), db: null, dbReady: false, still: 0, last: '', modeOn: true, stats: { plots: 0, removed: 0, drawn: 0, fromStore: 0, views: 0 },
+  views: 1, queue: [], job: null, store: new Map(), db: null, dbReady: false, still: 0, last: '', modeOn: true, stats: { plots: 0, removed: 0, drawn: 0, fromStore: 0, views: 0, px: 0, pxFull: 0, early: 0 },
   acc: null, rtId: null, scn: null, scatterScn: null };
 NV.off = () => !!window.__NV_OFF;
 NV.keep = () => !!(PH.tests.drawNever || window.__NV_DRAW_ALL);   // the overlay test: draw them too
@@ -43,12 +43,13 @@ function nvSig(g, tri){   // the plot's geometry as a number: its triangle count
 // ---- the job for one plot: prepare (the id geometry and the ties), run the views, read the map once, apply ----
 function nvStart(c){
   const g = c.data.geo.get(ATLAS), tri = nvTriangles(g), T = tri.length, M = c.view ? c.view.matrixWorld : new THREE.Matrix4(), P = g.attributes.position.array, I = g.index.array;
-  const job = { c, g, tri, T, M, phase: 'build', k: 0, pos: new Float32Array(T*9), idc: new Uint8Array(T*9), cen: new Float32Array(T*3), nor: new Float32Array(T*3), tie: new Uint8Array(T), vi: 0, views: null, sig: nvSig(g, tri), bb: new THREE.Box3() };
+  const job = { c, g, tri, T, M, phase: 'build', k: 0, pos: new Float32Array(T*9), idc: new Uint8Array(T*9), cen: new Float32Array(T*3), trad: new Float32Array(T), und: null, undN: T, nor: new Float32Array(T*3), tie: new Uint8Array(T), vi: 0, views: null, sig: nvSig(g, tri), bb: new THREE.Box3() };
   const v = new THREE.Vector3();
   job.build = (from, to) => { for (let t = from; t < to; t++){ const k = tri[t], id = t + 1; for (let q = 0; q < 3; q++){ v.fromArray(P, I[k + q]*3).applyMatrix4(M); const o = t*9 + q*3; job.pos[o] = v.x; job.pos[o + 1] = v.y; job.pos[o + 2] = v.z; job.idc[o] = id & 255; job.idc[o + 1] = (id >> 8) & 255; job.idc[o + 2] = (id >> 16) & 255; job.bb.expandByPoint(v); }
     const p = job.pos, o = t*9, ax = p[o + 3] - p[o], ay = p[o + 4] - p[o + 1], az = p[o + 5] - p[o + 2], bx = p[o + 6] - p[o], by = p[o + 7] - p[o + 1], bz = p[o + 8] - p[o + 2];
     let nx = ay*bz - az*by, ny = az*bx - ax*bz, nz = ax*by - ay*bx; const l = Math.hypot(nx, ny, nz) || 1; job.nor[t*3] = nx/l; job.nor[t*3 + 1] = ny/l; job.nor[t*3 + 2] = nz/l;
-    job.cen[t*3] = (p[o] + p[o + 3] + p[o + 6])/3; job.cen[t*3 + 1] = (p[o + 1] + p[o + 4] + p[o + 7])/3; job.cen[t*3 + 2] = (p[o + 2] + p[o + 5] + p[o + 8])/3; } };
+    job.cen[t*3] = (p[o] + p[o + 3] + p[o + 6])/3; job.cen[t*3 + 1] = (p[o + 1] + p[o + 4] + p[o + 7])/3; job.cen[t*3 + 2] = (p[o + 2] + p[o + 5] + p[o + 8])/3;
+    job.trad[t] = Math.max(Math.hypot(p[o] - job.cen[t*3], p[o + 1] - job.cen[t*3 + 1], p[o + 2] - job.cen[t*3 + 2]), Math.hypot(p[o + 3] - job.cen[t*3], p[o + 4] - job.cen[t*3 + 1], p[o + 5] - job.cen[t*3 + 2]), Math.hypot(p[o + 6] - job.cen[t*3], p[o + 7] - job.cen[t*3 + 1], p[o + 8] - job.cen[t*3 + 2])) + 1e-4; } };   // (trad: a sphere round each triangle, for the views' bounds)
   return job;
 }
 // depth ties: a drawn triangle facing the same way in the same plane holding this one's middle (whether it shows depends on the draw order, which a test picture does not copy): never moved
@@ -82,17 +83,34 @@ function nvPrepGpu(job){
   const AW = 1024, AH = Math.ceil((job.T + 2)/AW); job.AW = AW; job.AH = AH;
   job.acc = new THREE.WebGLRenderTarget(AW, AH, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat, depthBuffer: false });
   job.views = nvViews(NV); job.vi = 0;
+  job.und = new Uint8Array(job.T); job.undN = 0; for (let t = 0; t < job.T; t++) if (!job.tie[t]){ job.und[t] = 1; job.undN++; } job.nextCheck = 24; job.pxBuf = null;
 }
 // one view: the id picture of the plot, then the scatter into the map
+// (Round 9 item 6: only the part of the picture that can hold a triangle not yet seen is drawn and scattered. The picture is the same one, pixel for pixel: the same camera, shifted by whole
+// pixels with the viewport, so a triangle's pixels are where they were; what changes is how many pixels are made and scattered. The test "never-seen: whole boxes (as before)" switches it off.)
+NV.old = () => !!(PH.tests.nvOld || window.__NV_OLD);
 function nvView(job, yaw, pit, jit, px){
   const cam = _nvCam, bb = job.bb, ctr = job.ctr, v = _nvV;
   cam.position.set(ctr.x + Math.sin(yaw)*Math.cos(pit)*300, ctr.y + Math.sin(pit)*300, ctr.z + Math.cos(yaw)*Math.cos(pit)*300); cam.lookAt(ctr); cam.updateMatrixWorld();
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
   for (let q = 0; q < 8; q++){ v.set(q & 1 ? bb.max.x : bb.min.x, q & 2 ? bb.max.y : bb.min.y, q & 4 ? bb.max.z : bb.min.z).applyMatrix4(cam.matrixWorldInverse); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); z0 = Math.min(z0, v.z); z1 = Math.max(z1, v.z); }
   const side = job.rtId.width; let P_SZ = px; if ((Math.max(x1 - x0, y1 - y0))/P_SZ + 4 > side) P_SZ = Math.max(x1 - x0, y1 - y0)/(side - 4);
-  const w = Math.min(side, Math.ceil((x1 - x0)/P_SZ) + 4), h = Math.min(side, Math.ceil((y1 - y0)/P_SZ) + 4);
-  cam.left = x0 - (2 + jit[0])*P_SZ; cam.right = cam.left + w*P_SZ; cam.bottom = y0 - (2 + jit[1])*P_SZ; cam.top = cam.bottom + h*P_SZ; cam.near = -z1 - 1; cam.far = -z0 + 1; cam.updateProjectionMatrix();
-  const rt = job.rtId; rt.viewport.set(0, 0, w, h); rt.scissor.set(0, 0, w, h);
+  const w0 = Math.min(side, Math.ceil((x1 - x0)/P_SZ) + 4), h0 = Math.min(side, Math.ceil((y1 - y0)/P_SZ) + 4);
+  const left0 = x0 - (2 + jit[0])*P_SZ, bottom0 = y0 - (2 + jit[1])*P_SZ;
+  cam.left = left0; cam.right = left0 + w0*P_SZ; cam.bottom = bottom0; cam.top = bottom0 + h0*P_SZ; cam.near = -z1 - 1; cam.far = -z0 + 1; cam.updateProjectionMatrix();
+  let kx0 = 0, ky0 = 0, w = w0, h = h0;
+  if (!NV.old() && job.und && job.undN < job.T && !job.undN){ w = 1; h = 1; }   // (nothing left to find)
+  else if (!NV.old() && job.und && job.undN < job.T){   // (the pixels that can hold an undecided triangle: a sphere round each, as seen from here)
+    let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity; const me = cam.matrixWorldInverse.elements, C = job.cen, Rr = job.trad, U = job.und;
+    for (let t = 0; t < job.T; t++){ if (!U[t]) continue; const cx = C[t*3], cy = C[t*3 + 1], cz = C[t*3 + 2], r = Rr[t];
+      const vx = me[0]*cx + me[4]*cy + me[8]*cz + me[12], vy = me[1]*cx + me[5]*cy + me[9]*cz + me[13];
+      if (vx - r < a0) a0 = vx - r; if (vx + r > a1) a1 = vx + r; if (vy - r < b0) b0 = vy - r; if (vy + r > b1) b1 = vy + r; }
+    kx0 = Math.max(0, Math.floor((a0 - left0)/P_SZ) - 1); const kx1 = Math.min(w0, Math.ceil((a1 - left0)/P_SZ) + 1);
+    ky0 = Math.max(0, Math.floor((b0 - bottom0)/P_SZ) - 1); const ky1 = Math.min(h0, Math.ceil((b1 - bottom0)/P_SZ) + 1);
+    w = Math.max(1, kx1 - kx0); h = Math.max(1, ky1 - ky0);
+  }
+  NV.stats.px = (NV.stats.px || 0) + w*h; NV.stats.pxFull = (NV.stats.pxFull || 0) + w0*h0;
+  const rt = job.rtId; rt.viewport.set(-kx0, -ky0, w0, h0); rt.scissor.set(0, 0, w, h);   // (the whole picture's camera, shifted so its pixel kx0, ky0 is the corner: only the scissored part is drawn)
   renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(job.scn, cam);
   NV_SCATTER_MAT.uniforms.uId.value = rt.texture; NV_SCATTER_MAT.uniforms.uW.value = w; NV_SCATTER_MAT.uniforms.uAW.value = job.AW; NV_SCATTER_MAT.uniforms.uAH.value = job.AH;
   const sc = nvScatterMesh(w*h); const ac = job.acc; ac.viewport.set(0, 0, job.AW, job.AH);
@@ -102,6 +120,12 @@ function nvGuard(fn){   // the renderer's state before and after
   const rt = renderer.getRenderTarget(), cc = new THREE.Color(), ca = renderer.getClearAlpha(), ac = renderer.autoClear; renderer.getClearColor(cc);
   renderer.autoClear = false;
   try { return fn(); } finally { renderer.setRenderTarget(rt); renderer.setClearColor(cc, ca); renderer.autoClear = ac; }
+}
+// the triangles seen so far, from the map (it is only read here and at the end)
+function nvCheck(job){
+  if (!job.pxBuf) job.pxBuf = new Uint8Array(job.AW*job.AH*4);
+  renderer.readRenderTargetPixels(job.acc, 0, 0, job.AW, job.AH, job.pxBuf);
+  for (let t = 0; t < job.T; t++) if (job.und[t] && job.pxBuf[(t + 1)*4]){ job.und[t] = 0; job.undN--; }
 }
 function nvFinish(job){
   const buf = new Uint8Array(job.AW*job.AH*4);
@@ -197,13 +221,22 @@ function nvTick(){
   if (job.phase === 'ties'){ const to = Math.min(job.T, job.k + 800); nvTies(job, job.k, to); job.k = to; if (job.k >= job.T){ job.phase = 'views'; nvGuard(() => { nvPrepGpu(job); renderer.setRenderTarget(job.acc); renderer.setClearColor(0x000000, 0); renderer.clear(); }); } return; }
   if (job.phase === 'views'){
     if (!job.c.data || job.c.data.geo.get(ATLAS) !== job.g){ nvFree(job); NV.job = null; return; }   // (the plot was rebuilt meanwhile)
-    nvGuard(() => { for (let n = 0; n < NV.views && job.vi < job.views.length; n++, job.vi++){ const v = job.views[job.vi]; nvView(job, v[0], v[1], v[2], NV.px); NV.stats.views++; } });
+    nvGuard(() => { for (let n = 0; n < NV.views && job.vi < job.views.length; n++, job.vi++){ const v = job.views[job.vi]; nvView(job, v[0], v[1], v[2], NV.px); NV.stats.views++; }
+      if (!NV.old() && job.vi >= job.nextCheck && job.vi < job.views.length){ nvCheck(job); job.nextCheck = job.vi + Math.max(24, job.vi >> 1); if (!job.undN){ NV.stats.early++; job.vi = job.views.length; } } });   // (every so often the map is read back: the triangles seen so far are decided, the views shrink to what is left, and when nothing is left the job is done)
     if (job.vi >= job.views.length){ const never = nvFinish(job); nvDbPut(job.sig, never); nvApply(job.c, job.g, job.tri, never); NV.job = null; }
   }
 }
 // for tools: the whole job for one plot at once (cfg: options to compare with, e.g. a denser view set)
 NV.prepared = (c, cfg) => { const job = nvStart(c); job.build(0, job.T); nvTies(job, 0, job.T); const save = { yaws: NV.yaws, np: NV.np, jits: NV.jits, px: NV.px, yawOff: NV.yawOff }; if (cfg) Object.assign(NV, cfg);
   try { nvGuard(() => nvPrepGpu(job)); } finally { Object.assign(NV, save); } job.px = cfg && cfg.px || NV.px; return job; };
+// for tools: the job as the scheduler runs it (views, the map read back now and then, early stop), all at once; returns the same as runSync, and what it cost in pixels
+NV.runJob = (c, cfg) => {
+  const job = NV.prepared(c, cfg), g = job.g, px0 = NV.stats.px, pf0 = NV.stats.pxFull, e0 = NV.stats.early;
+  nvGuard(() => { renderer.setRenderTarget(job.acc); renderer.setClearColor(0x000000, 0); renderer.clear();
+    for (job.vi = 0; job.vi < job.views.length; job.vi++){ const v = job.views[job.vi]; nvView(job, v[0], v[1], v[2], job.px);
+      if (!NV.old() && job.vi + 1 >= job.nextCheck && job.vi + 1 < job.views.length){ nvCheck(job); job.nextCheck = job.vi + 1 + Math.max(24, (job.vi + 1) >> 1); if (!job.undN){ NV.stats.early++; break; } } } });
+  const never = nvFinish(job); return { never, tri: job.tri, tie: job.tie, T: job.T, px: NV.stats.px - px0, pxFull: NV.stats.pxFull - pf0, early: NV.stats.early - e0, views: job.views.length, g };
+};
 NV.runSync = (c, cfg) => {
   const job = NV.prepared(c, cfg), g = job.g;
   nvGuard(() => { renderer.setRenderTarget(job.acc); renderer.setClearColor(0x000000, 0); renderer.clear(); for (const v of job.views) nvView(job, v[0], v[1], v[2], job.px); });

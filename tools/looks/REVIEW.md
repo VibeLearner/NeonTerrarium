@@ -23,18 +23,20 @@ Branch `wip/looks`, from `main` at 6da3dbf. Everything in this round is in `js/l
 
 Screenshots of the same city scene (`city`, yaw 0.7, 1280x720), zoom 15 and zoom 30, from the same view, each look held at an hour that suits it with its own weather. The images in "Mood board" are the numbers and file names from `claude/looks-moodboard.md`; the mood board itself was not available to me (see "What I could not do").
 
-| Look | Hour, weather | Zoom 15 | Zoom 30 | Mood board images |
-|---|---|---|---|---|
-| Morning | 8:00, clear | ![](shots/morning_z15.jpg) | ![](shots/morning_z30.jpg) | 1, 3, 6, 12 |
-| Rainy morning | 8:00, rain | ![](shots/rainyMorning_z15.jpg) | ![](shots/rainyMorning_z30.jpg) | 18, 2, 13, 19 |
-| Mid afternoon | 13:30, clear | ![](shots/afternoon_z15.jpg) | ![](shots/afternoon_z30.jpg) | 24, 22, 17 |
-| Rainy afternoon | 14:30, rain | ![](shots/rainyAfternoon_z15.jpg) | ![](shots/rainyAfternoon_z30.jpg) | 10, 11, 15 |
-| Overcast | 12:30, overcast | ![](shots/overcast_z15.jpg) | ![](shots/overcast_z30.jpg) | none picked yet |
-| Past golden hour | 17:24, clear | ![](shots/golden_z15.jpg) | ![](shots/golden_z30.jpg) | 4, 5, 23, 14 |
-| Dusk | 19:12, clear | ![](shots/dusk_z15.jpg) | ![](shots/dusk_z30.jpg) | 7, 8, 16, 20 |
-| Night | 23:00, clear | ![](shots/night_z15.jpg) | ![](shots/night_z30.jpg) | 25, 21, 14, 9 |
-| Rainy night | 23:00, rain | ![](shots/rainyNight_z15.jpg) | ![](shots/rainyNight_z30.jpg) | 25 |
-| Late night or pre-dawn | 4:12, clear | ![](shots/late_z15.jpg) | ![](shots/late_z30.jpg) | none picked yet |
+| Look | Hour, weather | Zoom 15 | Zoom 30 | Old path, same hour and weather, zoom 15 | Mood board images |
+|---|---|---|---|---|---|
+| Morning | 8:00, clear | ![](shots/morning_z15.jpg) | ![](shots/morning_z30.jpg) | ![](shots_old/morning_z15.jpg) | 1, 3, 6, 12 |
+| Rainy morning | 8:00, rain | ![](shots/rainyMorning_z15.jpg) | ![](shots/rainyMorning_z30.jpg) | ![](shots_old/rainyMorning_z15.jpg) | 18, 2, 13, 19 |
+| Mid afternoon | 13:30, clear | ![](shots/afternoon_z15.jpg) | ![](shots/afternoon_z30.jpg) | ![](shots_old/afternoon_z15.jpg) | 24, 22, 17 |
+| Rainy afternoon | 14:30, rain | ![](shots/rainyAfternoon_z15.jpg) | ![](shots/rainyAfternoon_z30.jpg) | ![](shots_old/rainyAfternoon_z15.jpg) | 10, 11, 15 |
+| Overcast | 12:30, overcast | ![](shots/overcast_z15.jpg) | ![](shots/overcast_z30.jpg) | ![](shots_old/overcast_z15.jpg) old path: clear (it has no overcast) | none picked yet |
+| Past golden hour | 17:24, clear | ![](shots/golden_z15.jpg) | ![](shots/golden_z30.jpg) | ![](shots_old/golden_z15.jpg) | 4, 5, 23, 14 |
+| Dusk | 19:12, clear | ![](shots/dusk_z15.jpg) | ![](shots/dusk_z30.jpg) | ![](shots_old/dusk_z15.jpg) | 7, 8, 16, 20 |
+| Night | 23:00, clear | ![](shots/night_z15.jpg) | ![](shots/night_z30.jpg) | ![](shots_old/night_z15.jpg) | 25, 21, 14, 9 |
+| Rainy night | 23:00, rain | ![](shots/rainyNight_z15.jpg) | ![](shots/rainyNight_z30.jpg) | ![](shots_old/rainyNight_z15.jpg) | 25 |
+| Late night or pre-dawn | 4:12, clear | ![](shots/late_z15.jpg) | ![](shots/late_z30.jpg) | ![](shots_old/late_z15.jpg) | none picked yet |
+
+The "old path" column is the same view, hour and weather drawn with `LK.old` (the old time of day and grades; `OLD=1 python3 tools/looks/shoot.py`), to judge how far each default look has moved from today's picture: the plan asked for it to start close, apart from the new looks' colors. Judge by eye; there are no numbers for it. My own reading: Mid afternoon and Dusk stay close to today's picture; the old picture is crisper and more saturated, and the new ones add grain, a warmer tint and a little haze. Morning, Past golden hour, Rainy afternoon and the two night looks are meant to differ (warmer and hazier, grained, fringed; the new Night leans magenta and purple where the old one was blue and teal). Late night is dimmer and grayer than the old night.
 
 Regenerate with `PERF_PORT=9610 python3 tools/looks/shoot.py` (needs Playwright; software rendering, about two minutes a picture on a busy machine). Each shot is taken after 700 simulated frames so the lights have come on.
 
@@ -90,7 +92,7 @@ What this shows:
 - The weights always add up to 1 (error under 0.0003) and are never negative.
 - Smooth: the largest change per 0.02 game hours is 0.06 (L1 of the weights), per 0.01 of rain amount 0.03. No hand-off is a jump.
 - Each hand-off between times of day overlaps for about 0.8 hours with both looks above 2% (a one-hour smoothstep).
-- Looks in the blend (above 5%): one 43% of the time, two 28%, three 24%, four 3.8%, five 1%. **The plan said at most two or three; mixed weather at a hand-off can hold four or five** (each time of day brings its rainy and overcast variants). Trimming it to three was tried and gave jumps where weights tie, so I left it whole.
+- Looks in the blend (above 5%): one 43% of the time, two 28%, three 24%, four 3.8%, five 1%. **The plan said at most two or three; mixed weather at a hand-off can hold four or five** (each time of day brings its rainy and overcast variants). No continuous blend can always stay at three: at 11:00 in half rain, Morning, Rainy morning, Mid afternoon and Rainy afternoon are each 25%, and any hard cap at three has to jump somewhere (I tried capping, and it jumped where weights tie), while "never a visible switch" is the stronger requirement. So the blend is left whole.
 - Auto weather: two fresh runs give the same sequence. Over eight hours: 57% clear, 33% overcast, 10% rain; there is no rain in the first three hours of play with the default seed (rare by design; change the three numbers in `wxSlot`, or add a "rain more often" setting, if she wants it sooner).
 
 ## Main decisions
@@ -104,6 +106,15 @@ What this shows:
 - A look picked by hand also holds the weather's rain streaks (rain is still a state of its own); the looks themselves do not change with weather while picked.
 - The editor holds the time (cycle off) while open and restores it on close; "Show blends" restores the pick.
 - Reference images persist per look in IndexedDB (try/catch); nothing is uploaded.
+
+## Notes for the performance round (merging and perf runs)
+
+- **The default path is not frame-to-frame identical, by design.** Film grain is animated, sparkle twinkles, the flare moves with the sun: consecutive frames differ. `tools/perf/flicker.py` and anything else that counts frame-to-frame jumps needs `window.__OLD_GRADES = true` (or the effects off in the editor's "Compare with the old way").
+- **A pixel diff of a build with the looks against any commit before them** needs `PERF_CAND_INIT='window.__OLD_GRADES = true;'` (and `PERF_BASE_INIT` too if the base also has the looks), or it will show the looks, which is what they are for.
+- **The default path is repeatable:** `harness.py self --quick --only city` on this branch, without the flag, reports `25 captures compared, 0 problems` (the looks path against itself: grain and twinkle run on the scripted clock, so the rig stays deterministic).
+- `js/staticcache.js` has one guard added (the crossfade hold above). It is outside the files the plan named, though not in the performance round's list.
+- `index.html`: two script lines after `sky.js` (`looks.js`, `lookui.js`), and the `?v=` token of `sky.js`, `css/style.css` and the two new scripts changed. A merge meets only the script list and those lines.
+- `S.rain` is now written by `looks.js` (once a frame, from the smoothed rain amount), and read as before. Harness steps that set it directly still work (taken at once).
 
 ## Files touched
 

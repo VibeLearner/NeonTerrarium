@@ -236,13 +236,13 @@ function wxSlot(k){
 }
 function wxAutoState(t){ let k = 0; while (true){ wxSlot(k); if (t < wxSlotEnd[k]) return wxState[k]; k++; } }
 const wxTargets = s => s === 'rain' ? [1, 1] : s === 'overcast' ? [0, 1] : [0, 0];
-LK.setWeather = (s, instant) => {   // by hand: clear, overcast or rain
+LK.setWeather = (s, instant, noSave) => {   // by hand: clear, overcast or rain (noSave: a preview, the player's choice is left as it was)
   wx.mode = 'manual'; wx.set = s; const [r, c] = wxTargets(s); wx.tr = r; wx.tc = c;
   if (instant){ wx.rain = r; wx.cloud = c; }
   if (typeof S !== 'undefined'){ S.rain = wx.rain > .5; wx.wrote = S.rain; }
-  saveChoice();
+  if (!noSave) saveChoice();
 };
-LK.setAutoWeather = on => { if (on){ wx.mode = 'auto'; wx.t = 0; const s = wxAutoState(0); wx.set = s; const [r, c] = wxTargets(s); wx.tr = r; wx.tc = c; } else wx.mode = 'manual'; saveChoice(); };
+LK.setAutoWeather = (on, noSave) => { if (on){ wx.mode = 'auto'; wx.t = 0; const s = wxAutoState(0); wx.set = s; const [r, c] = wxTargets(s); wx.tr = r; wx.tc = c; } else wx.mode = 'manual'; if (!noSave) saveChoice(); };
 // jump straight to the state (tests, screenshots): no blend
 LK.snapWeather = s => LK.setWeather(s, true);
 { const [r, c] = wxTargets(wx.set); wx.tr = r; wx.tc = c; wx.rain = r; wx.cloud = c; }

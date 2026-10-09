@@ -23,6 +23,7 @@ def main(out):
         pg.click('#deckToggle')
         pg.evaluate('() => { __step(5); }')
         pg.screenshot(path=os.path.join(out, 'menu.png'))
+        pg.evaluate('() => { LK.setWeather("overcast", true); }')   # the player's choice
         pg.keyboard.press('Shift+L')
         pg.evaluate('() => { __step(5); }')
         print('editor open:', pg.evaluate('() => !document.getElementById("lookEd").hidden'), 'cycle after open:', pg.evaluate('() => S.cycle'))
@@ -44,7 +45,10 @@ def main(out):
         print('sat now:', pg.evaluate('() => LK.looks.morning.v.sat'))
         pg.get_by_role('button', name='Save', exact=True).click(); pg.wait_for_timeout(200)
         print('stored:', pg.evaluate('() => (localStorage.getItem("neonLooks.edits") || "").slice(0, 80)'))
+        pg.locator('#lookEd .chips button', has_text='Rain').first.click()   # a preview in the editor...
+        print('weather in the editor:', pg.evaluate('() => LK.wx.set'))
         pg.keyboard.press('Shift+L'); pg.evaluate('() => { __step(2); }')
+        print('weather after closing (the player chose overcast):', pg.evaluate('() => [LK.wx.set, JSON.parse(localStorage.getItem("neonLooks.weather")).set]'))
         print('editor closed:', pg.evaluate('() => document.getElementById("lookEd").hidden'))
         print('page errors:', errs[:5])
         br.close()

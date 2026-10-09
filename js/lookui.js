@@ -55,7 +55,7 @@ document.body.append(panel, refsPane);
 // typing here must never reach the game's keys (WASD, X, H, Q, E, 1 to 4, Space ...)
 panel.addEventListener('keydown', e => { e.stopPropagation(); });
 panel.addEventListener('keyup', e => { e.stopPropagation(); });
-let open = false, curId = LK.order[0], inContext = false, savedCycle = false, savedPick = 'auto', savedFast = false;
+let open = false, curId = LK.order[0], inContext = false, savedCycle = false, savedPick = 'auto', savedFast = false, savedWx = null;
 const rows = {};   // key -> { input, out } for the current look
 const head = el('header', {}, el('b', { text: 'Look editor' }), el('button', { 'aria-label': 'Close the look editor', text: '✕', onclick: () => toggleEditor(false) }));
 const pickSel = el('select', { 'aria-label': 'Look to edit' });
@@ -68,7 +68,7 @@ const hourOut = el('output', {}), hourIn = el('input', { type: 'range', min: 0, 
 hourIn.addEventListener('input', () => { S.hour = +hourIn.value; hourOut.textContent = fmtH(S.hour); });
 const fmtH = h => { const m = Math.round(h*60) % 1440; return String(Math.floor(m/60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 const wxRow2 = el('div', { class: 'chips' }); const wxBtn2 = {};
-for (const [k, n] of WX){ const b = el('button', { text: n, onclick: () => { LK.setWeather(k, true); refreshMenu(); syncEd(); } }); wxBtn2[k] = b; wxRow2.append(b); }
+for (const [k, n] of WX){ const b = el('button', { text: n, onclick: () => { LK.setWeather(k, true, true); refreshMenu(); syncEd(); } }); wxBtn2[k] = b; wxRow2.append(b); }
 const groups = {};
 const body = el('div', { class: 'edbody' });
 for (const p of LK.params){
@@ -184,12 +184,15 @@ function toggleEditor(force){
   const want = force === undefined ? !open : !!force; if (want === open) return;
   open = want; panel.hidden = !open; edBtn.classList.toggle('on', open); showRefs();
   if (open){
-    savedCycle = S.cycle; S.cycle = false; const c = $('cycle'); if (c) c.checked = false;   // time stands still while editing
+    savedWx = { mode: LK.wx.mode, set: LK.wx.set }; savedCycle = S.cycle; S.cycle = false; const c = $('cycle'); if (c) c.checked = false;   // time stands still while editing
     LK.editing = inContext ? null : curId; fillRows(); hourIn.value = S.hour; hourOut.textContent = fmtH(S.hour); syncEd();
   } else {
     LK.editing = null; LK.holdDefault = false;
     if (LK.fast.on){ fastOn.checked = false; applyFast(); }
     S.cycle = savedCycle; const c = $('cycle'); if (c) c.checked = savedCycle;
+    if (savedWx && (LK.wx.set !== savedWx.set || LK.wx.mode !== savedWx.mode)){   // the weather chips here only preview: the player's own choice comes back
+      if (savedWx.mode === 'auto') LK.setAutoWeather(true, true); else LK.setWeather(savedWx.set, false, true);
+      refreshMenu(); }
   }
 }
 LK.toggleEditor = toggleEditor;

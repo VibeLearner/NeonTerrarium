@@ -1162,6 +1162,34 @@ function syncLurkers(){
   for (const k of [...lurkers.keys()]) if (!keep.has(k)) lurkers.delete(k);
 }
 function onDutyCops(){ return pplList.filter(q => q.cop && working(q, S.hour) && (q.patrol || (q.walk && q.walk.beat) || (!q.walk && q.at === q.job))); }
+// Who a lurker picks, found with a grid of 2-unit squares over the walkers (built the first time a lurker looks in a frame; at dusk they all look in the same frame, and each
+// look walked the whole crowd: 40 ms on the biggest city). The candidates come in walker order and meet the same tests, so the pick is the same one.
+const _lgCells = new Map(), _lgCops = []; let _lgFrame = -1;
+const lgKey = (gx, gz) => (gx + 8192)*16384 + (gz + 8192);
+function lurkGrid(){
+  if (_lgFrame === pplFrame) return; _lgFrame = pplFrame;
+  for (const l of _lgCells.values()) l.length = 0; if (_lgCells.size > 4096) _lgCells.clear(); _lgCops.length = 0;
+  for (let i = 0; i < pplList.length; i++){ const p = pplList[i]; if (p.cop) _lgCops.push(p);
+    const gx = Math.floor(p.x/2), gz = Math.floor(p.z/2); if (!Number.isFinite(gx) || !Number.isFinite(gz)) continue;
+    const k = lgKey(gx, gz); let l = _lgCells.get(k); if (!l) _lgCells.set(k, l = []); l.push(i); }
+}
+const _lgNear = [];
+function lurkVictim(L, t){
+  lurkGrid(); const near = _lgNear; near.length = 0;
+  const gx = Math.floor(L.x/2), gz = Math.floor(L.z/2);
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++){ const l = _lgCells.get(lgKey(gx + dx, gz + dz)); if (l) for (const i of l) near.push(i); }
+  near.sort((a, b) => a - b);
+  for (const i of near){
+    const p = pplList[i], w = p.walk; if (!w || p.cop || p.pause > t || w.s < w.safe0 + .3 || w.s > w.safe1 - .3) continue;
+    if ((p.x - L.x)**2 + (p.z - L.z)**2 > 1.4*1.4) continue;
+    const px = Math.floor(p.x/2), pz = Math.floor(p.z/2); let alone = true;
+    for (let dz = -1; dz <= 1 && alone; dz++) for (let dx = -1; dx <= 1 && alone; dx++){ const l = _lgCells.get(lgKey(px + dx, pz + dz)); if (l) for (const j of l){ const o = pplList[j]; if (o !== p && o.walk && (o.x - p.x)**2 + (o.z - p.z)**2 < 4){ alone = false; break; } } }
+    if (!alone) continue;                                                                                    // not alone
+    if (_lgCops.some(o => (o.x - p.x)**2 + (o.z - p.z)**2 < 64)) continue;                                   // police nearby
+    return p;
+  }
+  return null;
+}
 function updateLurkers(dt, t){
   const night = isNight(S.hour);
   for (const L of lurkers.values()){
@@ -1177,13 +1205,15 @@ function updateLurkers(dt, t){
         if (t < L.until) break;
         L.until = t + .5;
         let victim = null;
-        for (const p of pplList){
-          const w = p.walk; if (!w || p.cop || p.pause > t || w.s < w.safe0 + .3 || w.s > w.safe1 - .3) continue;
-          if ((p.x - L.x)**2 + (p.z - L.z)**2 > 1.4*1.4) continue;
-          if (pplList.some(o => o !== p && o.walk && (o.x - p.x)**2 + (o.z - p.z)**2 < 4)) continue;          // not alone
-          if (pplList.some(o => o.cop && (o.x - p.x)**2 + (o.z - p.z)**2 < 64)) continue;                      // police nearby
-          victim = p; break;
-        }
+        if (PH.tests.lurkScan || window.__LURK_SCAN){
+          for (const p of pplList){
+            const w = p.walk; if (!w || p.cop || p.pause > t || w.s < w.safe0 + .3 || w.s > w.safe1 - .3) continue;
+            if ((p.x - L.x)**2 + (p.z - L.z)**2 > 1.4*1.4) continue;
+            if (pplList.some(o => o !== p && o.walk && (o.x - p.x)**2 + (o.z - p.z)**2 < 4)) continue;          // not alone
+            if (pplList.some(o => o.cop && (o.x - p.x)**2 + (o.z - p.z)**2 < 64)) continue;                      // police nearby
+            victim = p; break;
+          }
+        } else victim = lurkVictim(L, t);
         if (victim && pplRand() < (L.rare ? .3 : .5)){ L.state = 'strike'; L.victim = victim; victim.pause = t + 4; emote(victim, 'bang', 1.6); L.t0 = t; }
         else if (victim) L.until = t + 20;   // thought better of it
         break;

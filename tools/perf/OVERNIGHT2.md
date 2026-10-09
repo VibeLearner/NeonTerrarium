@@ -65,3 +65,25 @@ What I checked, exactly:
   Structure after settling is otherwise the same (tools/perf/placement_check.py: cells, bridges, regions, ports, walking network).
 - It is behind the overlay test "edit upkeep spread over frames (people differ)" and `window.__SYNC_LATER = true`. Owner decision: turn it on by default if a different people sequence after an edit is fine.
 - Check with it off (the default): harness quick city, 25 captures, 0 problems against the previous commit.
+
+**4. Stalls and memory: done (memory), stall cause found and two causes fixed exactly.**
+- Memory (tools/perf/heapkind.py, memcheck.py): the CPU copies of the merged region geometry (999 meshes, 1,186 MB of typed arrays in the biggest city) were read by nothing after the card had them. They are now let go right after their upload
+  (`dropCpuCopy` in world.js; three.js's attribute `onUpload` callback). The plots' own geometry stays (re-merging, the walking maps and door ray tests read it): 1,065 MB, which is the rest of the 2.3 GB.
+  **JS heap, maxcity, at load: 3,008 MB before, 2,299 MB after (-709 MB, -24%)**; after 12 rounds of simulated play 3,045 before, 2,332 after (flat, same shape as before). Graphics bytes unchanged (1,542 MB at load).
+  Overlay test "keep the CPU copies of merged geometry" (and `window.__KEEP_CPU = true`, which the probe scripts one.py, visprobe.py, live_tris.py, hidden_count.py, shapes_sites.py now set because they read the arrays).
+  Check: harness city, dense, megas (full script, both sizes, edit steps included): 106 captures, 0 problems.
+- Stall capture (tools/perf/stalls.py: main thread without drawing, real clock, night 22:00, rain on, zoom 15, 3,000 frames; each frame over 3x the median is broken down by function and checked for a heap drop; Chrome long tasks are listed):
+  city scene: median 1.2 ms, max 7.9 ms, no stall. **maxcity: median 8.9 ms, 99% 24.8, 99.9% 69.7, max 96 ms**; 20 slow frames in 3,000, only 3 with a heap drop (a collection). So collections are not the main cause; the main thread work is:
+  1. the first frames after load (people deciding: 30 to 40 ms);
+  2. a mugging: **the police alert sent two bikes along street routes, 21 ms each** (a search over a 5 cm grid, one frame): 43 ms, and the same search when a bike goes on patrol or re-paths in a chase (60 ms frames);
+  3. at dusk the 130 lurkers all looked for a victim in the same frame, each walking the whole crowd of 10,000: 40 ms (frame 609);
+  4. the people collision pass every N-th frame (3 to 24 ms, more when the crowd is dense).
+- Fixed (exact; each behind an overlay test): the bike route search is the same search with flat heap lists and the neighbors listed once (138 routes compared, all identical, 33 ms to 12.6 ms a search; test "bike routes: a key lookup per point (same picture)" / `__SLOW_FREE`);
+  lurkers find their victim with a grid of 2-unit squares in walker order (130 lurkers compared against the old scan, 0 differences; test "lurkers scan every walker (same picture)" / `__LURK_SCAN`; the dusk frame went from 43 to about 24 ms, the rest being the bike search).
+  maxcity at night after both: max 96 to 61 ms, 99.9% 69.7 to about 50.
+  Check: harness city, dense, megas quick (53 captures) and maxcity steps noon_f1, noon_f120, night_23h_rain, night_zoom_out: 0 problems.
+- Not fixed: the police alert still costs about 22 ms in one frame (two searches) and the first frames' decisions; spreading them over frames changes when people and bikes start, so not exact. Owner decision if wanted.
+- Owner's trace (the harness can't time a card, so a stall on the owner's machine needs a recording): Chrome DevTools, Performance panel, tick "Screenshots" and "Web Vitals"; set the in-game hour to 22:00 with rain on and the zoom to 15;
+  press record, leave the game alone for 20 seconds (a pan at the speed of a slow drag in the last 10 seconds), stop, save the trace (Save profile). Look for: (a) in the Main track a task over 50 ms (red corner): open it and read the bottom-up tab, which function is at the top
+  (updatePeople, bikeStreetRoute and bikeRoute, updateLurkers, checkBumps are the known ones; "Minor GC" or "Major GC" means a collection); (b) in the GPU track a frame whose GPU time is long while the main thread is idle (the card, not the code), and shader compile entries ("compileShader", "linkProgram")
+  at the start of a stall; (c) in the Frames track the dropped frames and whether they come in a row. Send the trace file.

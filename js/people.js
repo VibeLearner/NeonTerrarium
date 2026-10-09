@@ -166,10 +166,24 @@ function cellGrid(c){
     if (!m._pr || m._pr.src !== src) m._pr = { src, r: src ? rasterize(src, m.i*LOT - LOT/2, m.j*LOT - LOT/2, m.w*GN, m.h*GN) : null };
     r = m._pr.r;
   }
-  const solid = new Uint8Array(GN*GN), soft = new Uint8Array(GN*GN), high = new Uint8Array(GN*GN), mid = new Uint8Array(GN*GN);
-  if (m && r){ const oi = (c.i - m.i)*GN, oj = (c.j - m.j)*GN;
-    for (let j = 0; j < GN; j++) for (let i = 0; i < GN; i++){ const q = (oj + j)*r.nx + oi + i; solid[j*GN + i] = r.solid[q]; soft[j*GN + i] = r.soft[q]; high[j*GN + i] = r.high[q]; mid[j*GN + i] = r.mid[q]; } }
-  else if (src){ const q = rasterize(src, c.x - LOT/2, c.z - LOT/2, GN, GN); solid.set(q.solid); soft.set(q.soft); high.set(q.high); mid.set(q.mid); }
+  let solid, soft, high, mid, free;
+  if (!m && src && src.grids){ ({ solid, soft, high, mid, free } = src.grids); src.grids = null; RW.grids++; }   // (made by the plot worker along with the plot: round 9 item 3)
+  else if (m && r){
+    solid = new Uint8Array(GN*GN); soft = new Uint8Array(GN*GN); high = new Uint8Array(GN*GN); mid = new Uint8Array(GN*GN);
+    const oi = (c.i - m.i)*GN, oj = (c.j - m.j)*GN;
+    for (let j = 0; j < GN; j++) for (let i = 0; i < GN; i++){ const q = (oj + j)*r.nx + oi + i; solid[j*GN + i] = r.solid[q]; soft[j*GN + i] = r.soft[q]; high[j*GN + i] = r.high[q]; mid[j*GN + i] = r.mid[q]; }
+    free = freeMap(solid, soft);
+  } else ({ solid, soft, high, mid, free } = plotMaps(c.x, c.z, src));
+  return (c._pg = { src, solid, soft, high, mid, free, x0: c.x - LOT/2, z0: c.z - LOT/2 });
+}
+// a plot's footprint maps from its generated data alone (what the plot worker makes with the plot)
+function plotMaps(x, z, src){
+  let solid = new Uint8Array(GN*GN), soft = new Uint8Array(GN*GN), high = new Uint8Array(GN*GN), mid = new Uint8Array(GN*GN);
+  if (src){ const q = rasterize(src, x - LOT/2, z - LOT/2, GN, GN); solid.set(q.solid); soft.set(q.soft); high.set(q.high); mid.set(q.mid); }
+  return { solid, soft, high, mid, free: freeMap(solid, soft) };
+}
+// the walking map: free where a person fits, clear of anything solid or leafy
+function freeMap(solid, soft){
   const free = new Uint8Array(PN*PN).fill(1), rr = CLEAR + GR*.5, k = PR/GR;
   for (let j = 0; j < GN; j++) for (let i = 0; i < GN; i++){
     if (!solid[j*GN + i] && !soft[j*GN + i]) continue;
@@ -177,7 +191,7 @@ function cellGrid(c){
     const p0 = Math.max(0, Math.floor((x - rr)/PR)), p1 = Math.min(PN - 1, Math.floor((x + rr)/PR)), q0 = Math.max(0, Math.floor((z - rr)/PR)), q1 = Math.min(PN - 1, Math.floor((z + rr)/PR));
     for (let q = q0; q <= q1; q++) for (let p = p0; p <= p1; p++){ const dx = (p + .5)*PR - x, dz = (q + .5)*PR - z; if (dx*dx + dz*dz <= rr*rr) free[q*PN + p] = 0; }
   }
-  return (c._pg = { src, solid, soft, high, mid, free, x0: c.x - LOT/2, z0: c.z - LOT/2 });
+  return free;
 }
 const gIdx = (v, n, step) => Math.max(0, Math.min(n - 1, Math.floor(v/step)));
 const freeAt = (G, x, z) => G.free[gIdx(z - G.z0, PN, PR)*PN + gIdx(x - G.x0, PN, PR)] === 1;

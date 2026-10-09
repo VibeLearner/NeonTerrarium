@@ -102,7 +102,9 @@ function recipePack(raw){
     for (const k in g.userData) ud[k] = pk(g.userData[k]);
     geo.push({ key, attrs, index: g.index ? typed(g.index.array) : null, draw: [g.drawRange.start, g.drawRange.count], ud, bs: bs ? [bs.center.x, bs.center.y, bs.center.z, bs.radius] : null });
   }
-  const d = raw.data, msg = { geo, fol: pk(d.fol), glows: pk(d.glows), emitters: pk(d.emitters), pads: pk(d.pads), ports: pk(d.ports), spots: pk(d.spots), fields, air: raw._air };
+  // (the plot's footprint and walking maps, from its geometry, made here so the page need not: people.js cellGrid takes them from the data. Not for a plot inside a megastructure, whose maps come from the megastructure)
+  let grids = null; if (!raw.mega){ grids = plotMaps(raw.x, raw.z, raw.data); for (const k in grids) typed(grids[k]); }
+  const d = raw.data, msg = { grids, geo, fol: pk(d.fol), glows: pk(d.glows), emitters: pk(d.emitters), pads: pk(d.pads), ports: pk(d.ports), spots: pk(d.spots), fields, air: raw._air };
   for (const k of raw._written) if (k !== 'data') fields[k] = pk(raw[k]);
   return { msg, xfer: [...xfer] };
 }
@@ -133,6 +135,7 @@ function recipeUnpack(m){
   }
   const data = { geo, fol: up(m.fol), glows: up(m.glows), emitters: up(m.emitters), pads: up(m.pads), ports: up(m.ports), spots: up(m.spots) };
   const fields = {}; for (const k in m.fields) fields[k] = up(m.fields[k]);
+  if (m.grids) data.grids = m.grids;
   return { data, fields, air: m.air };
 }
 
@@ -151,7 +154,7 @@ const sameArr = (a, b) => { if (a.length !== b.length) return false; for (let i 
 // RW.request(job) sends a plot's recipe; the result is picked up by stageStep (world.js). Not used (plots are made on the page as before) when the test
 // 'plots made on the page (as before)' is on, before the worker has loaded and agreed on its materials, after any error from it, and in the perf harness
 // (whose scripted clock and seeded random stream a thread of its own would break) unless window.__GEN_WORKER is set.
-const RW = { rbSent: new Set(), w: null, state: 'off', next: 1, jobs: new Map(), lastWorld: '', error: null, made: 0, fell: 0, src: document.currentScript ? document.currentScript.src : null };
+const RW = { rbSent: new Set(), w: null, state: 'off', next: 1, jobs: new Map(), lastWorld: '', error: null, made: 0, fell: 0, grids: 0, src: document.currentScript ? document.currentScript.src : null };
 const genMain = () => !!(PH.tests.genMain || window.__GEN_MAIN);
 RW.usable = () => RW.state === 'ready' && !genMain();
 RW.start = () => {
@@ -196,5 +199,5 @@ RW.request = job => {
   RW.w.postMessage(m);
 };
 RW.cancel = job => { if (job.rw){ job.rw.cancelled = true; RW.jobs.delete(job.rw.id); job.rw = null; } };
-RW.line = () => 'plot worker: ' + (genMain() ? 'off (test)' : RW.state) + (RW.error ? ' (' + RW.error + ')' : '') + '; made ' + RW.made + ', fell back ' + RW.fell;
+RW.line = () => 'plot worker: ' + (genMain() ? 'off (test)' : RW.state) + (RW.error ? ' (' + RW.error + ')' : '') + '; made ' + RW.made + ', fell back ' + RW.fell + ', walking maps taken from it ' + RW.grids;
 if (!self.IN_RECIPE_WORKER) window.addEventListener('load', () => setTimeout(RW.start, 1500));

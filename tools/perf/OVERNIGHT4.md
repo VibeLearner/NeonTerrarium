@@ -9,7 +9,8 @@ Base: main at 6da3dbf. Work branch locally `wip/recipes`, pushed with `git push 
 | 0 Baseline | done (numbers below) | this file | memcheck, counts only |
 | 1 Recipe and proof | done | see git log ("Round 9 item 1") | `tools/perf/recipe_proof.py`: 0 plots differ on maxcity (2025), city (227), dense (361), megas (267), 30 pods each on city and maxcity; harness quick check city 25 captures 0 problems |
 | 2 Generation in a Web Worker | done | see git log ("Round 9 item 2") | `recipe_proof.py <scene> --worker` 0 differ on maxcity 2025, dense 361, megas 267, city 227, 30 pods; `worker_edit.py city --edits 12` 0 differ (8 by the worker, 4 taken back to the page); `diff --base 6da3dbf --quick --only city` 25 captures 0 problems |
-| 3 to 7 | not started | | |
+| 3 Walking network off the main thread | partly (see below) | see git log ("Round 9 item 3") | `worker_edit.py city --edits 12`: network hash after all edits identical, 8 walking maps taken from the worker; `recipe_proof.py --worker`: walking maps byte-identical (city, dense); `diff --base 6da3dbf --quick --only city` 0 problems |
+| 4 to 7 | not started | | |
 
 ## Item 0: baseline (main 6da3dbf, software renderer, counts only)
 
@@ -82,6 +83,13 @@ Decisions:
 - Harness: worker off by default, because a thread's answer cannot arrive on a scripted frame; the proof of the worker's output is byte for byte (`recipe_proof.py --worker`) and of the edit path (`worker_edit.py`).
 
 Not measured here (software renderer, no timing): how long the page is free per placement. Counted instead: a placement on the page is `recipeOf` (a few object copies), one `stageTake` (geometry wrappers around transferred arrays) and the sweep, where it used to be many staged slices of generation; owner timing goes in the measurement script.
+
+## Item 3: the walking network
+
+Chosen: neither of the two ways the plan names whole. The part of `buildNetwork` that is new work after an edit is the changed plot's maps (`rasterize` of its geometry and the walking map `free`, run lazily by the first `cellGrid` call), which is exactly the compact snapshot the plan describes, and the plot worker has the plot's geometry in its hands anyway. So the worker makes the maps with the plot (`plotMaps`, the same code `cellGrid` ran, now a function of its own) and sends them as typed arrays with it; `cellGrid` takes them from `data.grids` and falls back to making them as before (plots made on the page, megastructures). One line on why: the rest of the build (crossings, doors, places, paths) is already in steps from round 8 on cached per-plot results and writes objects the page owns (places point at plots and megastructures, doors carry their open state, the door meshes), so a port to a worker would be a second copy of that logic and a way to break "identical", for the small part that is left.
+Identical: after 12 edits through the worker (8 made by it, 4 taken back to the page because the next edit came first) the network built in one call has the same hash (nodes, links with their points and costs, doors, places) as after the same 12 edits on the page, and the walking maps of every plot of city and dense equal what the page makes (all five arrays, byte for byte). `diff --base 6da3dbf` on city (people state included): 0 problems. People keep the old network until the new one is committed: that is round 8's `netSlice`, unchanged.
+Not done: running the path searches and the door search in the worker. They need the neighbors' maps for the crossing points, which the worker does not hold for plots made on the page.
+The biggest single call after items 2 and 3: not measured here (no timing in the software renderer). By construction it is one of the page's own steps from round 8: a path search step in the network (a Dijkstra over at most 40 by 40 cells), `rebuildDoorMeshes` in the network's last step (it scales with the doors in the city), a region merge step, or `stageTake` (wraps arrays, copies none). `tools/perf/placement.py` now lists `stageStep stageTake recipeOf recipeUnpack plotMaps rasterize freeMap netSlice syncPeopleNetStep rebuildDoorMeshes gridPaths plotEdgesGen` too: its run on your machine names it with its time.
 
 ## Not yet done
 

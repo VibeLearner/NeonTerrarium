@@ -88,7 +88,7 @@ window.__proof = (() => {
     const liveRand = __randCalls() - rc0;
     const lc = {}; for (const k of Object.keys(c)) lc[k] = c[k]; lc.data = live; lc._liveWritten = [...lw]; lc._airFlag = airCells.has(c);
     for (const k of Object.keys(c)) if (!(k in keep)) delete c[k]; Object.assign(c, keep);
-    const liveParts = parts(lc); for (const g of live.geo.values()) g.dispose();
+    const liveParts = parts(lc); const lg = c.mega ? null : plotMaps(c.x, c.z, live); for (const g of live.geo.values()) g.dispose();
     __randSeed(seed);
     const job = { c }; RW.request(job);
     while (!job.rw.done) await new Promise(res => setTimeout(res, 0));
@@ -97,6 +97,7 @@ window.__proof = (() => {
     const wc = Object.assign({}, u.fields); wc.data = u.data; wc._written = Object.keys(u.fields); wc._air = u.air;
     const wParts = parts(wc); for (const g of u.data.geo.values()) g.dispose();
     const d = diff(liveParts, wParts);
+    { const wg = u.data.grids; if (!!lg !== !!wg) d.push('walking maps: one side has none'); else if (lg) for (const k of ['solid', 'soft', 'high', 'mid', 'free']) if (hb(bytes(lg[k])) !== hb(bytes(wg[k]))) d.push('walking map ' + k); }
     if (liveRand !== job.rw.res.calls) d.push('random calls (' + liveRand + ' vs ' + job.rw.res.calls + ')');
     return { d, rand: liveRand };
   }

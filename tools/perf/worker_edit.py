@@ -24,6 +24,13 @@ async ([mode, n]) => {
   }
   await waitDone(); stageFinishAll();
   out.push(['all', [...cells.values()].map(x => x.height).reduce((a, b) => a + b, 0)]);
+  // the walking network after all the edits, made in one call: a hash of its nodes, links (with their points), doors and places
+  buildNetwork();
+  const hh = (a, h = 2166136261) => { const t = String(a); for (let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+  let nh = 0; nh = hh(NG.x.length, nh); for (let i = 0; i < NG.x.length; i++){ nh = hh(NG.x[i] + ',' + NG.z[i], nh); for (const [b, e] of NG.adj[i]) nh = hh(b + ':' + e.len + ':' + e.cost + ':' + JSON.stringify(e.pts), nh); }
+  for (const d of doorList.concat(hiddenDoors)) nh = hh(d.key + JSON.stringify(d.stand) + JSON.stringify(d.wall), nh);
+  for (const [k, p] of places) nh = hh(k + ':' + p.jobs + ':' + p.fun + ':' + (p.doors || []).length + ':' + (p.spots || []).length, nh);
+  out.push(['network', nh, NG.x.length, places.size]);
   out.push(['rand', __randCalls()]);
   out.push(['made', typeof RW !== 'undefined' ? RW.line() : '']);
   return out;

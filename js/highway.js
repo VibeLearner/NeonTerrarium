@@ -145,7 +145,7 @@ function hwCommit(h, touched){
   hwClearCars(h);
   const list = [...new Set(touched.map(([i, j]) => cells.get(ckey(i, j))).filter(Boolean))];
   refresh(list);   // the pillars and the lift shaft stand on the plots (see hwFeet), so the walking paths go round them
-  shadowDirty = true;
+  SC_DIRTY.unknown = true; shadowDirty = true;
 }
 function hwApply(t){
   if (!t || !t.ok) return false;
@@ -369,7 +369,7 @@ function hwBuildView(h){
     for (const [geo, mat] of [[f.plain, HW_CAR_PLAIN], [f.lit, HW_CAR_GLOW]]) if (geo){ const m = new THREE.Mesh(geo, mat); m.userData.own = true; folded.add(m); }
     folded.position.set(Ls.sx, CURB, Ls.sz); h.fx.add(folded); h.cab = folded; h.cabY = [CURB + .02, hwY(h.tiles[n - 1].L) + .02];
   } else h.cab = null;
-  shadowDirty = true;
+  SC_DIRTY.unknown = true; shadowDirty = true;
 }
 // the parts that stand on the plots under a highway: a pillar from the roof or the ground up to each plot's deck, and
 // the drop-off's lift shaft down to the street. Drawn with the plot (called while it's built), so the walking paths

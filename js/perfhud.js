@@ -7,7 +7,14 @@
 // alone costs it. The waiting stops the processor and the card working side by side, so the frame rate drops while it's
 // on; the per-pass times are what count. In this mode the glow passes are also timed one by one (sky.js).
 const PH = (() => {
-  let on = false, exact = false, el = null, graph = null, body = null, lastShow = 0, exBtn = null;
+  let on = false, exact = false, el = null, graph = null, body = null, lastShow = 0, exBtn = null, testBar = null;
+  // Tests (exact mode only, to find out what the color pass is spending its time on; they change the picture while on):
+  // quarter: the color pass draws into a quarter of the pixels (the triangles are the same), plain: every surface drawn
+  // in one plain material (the same triangles, almost no shading), shadows: surfaces don't look up the shadow map.
+  // lean: the buildings' shader without the view position it passes but never uses (same picture); no glow math: lights
+  // don't switch on, flicker or blink; no color data: the buildings' colors and glow aren't read at all.
+  const tests = { quarter: false, plain: false, shadows: false, lean: false, noGlow: false, noData: false, cutoutsLast: false, compAll: false, compFloor: false, compNoShim: false, gbuf: false, noCull: false, noSmall: false, noSlowFar: false, noStatic: false, showRebuilds: false, walkAll: false, fullRate: false, noRing: false, copyByBlit: false, noSpeed: false, noRect: false, noHold: false, softFull: false, noLiveCull: false, syncNow: false, keepCpu: false, lurkScan: false, slowFree: false, steamFull: false, sdOld: false, slowSync: false, steamMapAlways: false, doorsTwo: false, ovPerBlock: false, drawNever: false, stageNow: false, alertNow: false, nvBackfill: false, leanRound: false, thinSticks: false }, plainMat = new THREE.MeshBasicMaterial({ color: 0x8a8f99 });
+  const TEST_NAMES = { quarter: 'quarter of the pixels', plain: 'plain shading', shadows: 'no surface shadows', lean: 'lean buildings (same picture)', noGlow: 'no glow math', noData: 'no color data', cutoutsLast: 'cut-outs drawn last (same picture)', compAll: 'composite: every effect compiled in (same picture)', compFloor: 'composite: no effects', compNoShim: 'composite: no air shimmer (pads, metro)', gbuf: 'buildings: colors only, no lighting', noCull: 'no per-plot culling (same picture)', noSmall: 'draw sub-pixel triangles too', noSlowFar: 'people off screen at full rate', noStatic: 'no static cache', showRebuilds: 'show cache redraws (red)', walkAll: 'walk every matrix (same picture)', fullRate: 'people at full rate', noRing: 'no ring: redraw the cache whole at the edge', copyByBlit: 'copy the cache by blitting (not drawing)', noSpeed: 'no speed-based detail', noRect: 'redraw the cache whole on edits', noHold: 'strips drawn with the current lights (not the cache\'s)', softFull: 'soft effects at full resolution', noLiveCull: 'live pass: everything in the widened view (as before)', syncNow: 'edit upkeep in the same frame (as before)', keepCpu: 'keep the CPU copies of merged geometry', lurkScan: 'lurkers scan every walker (same picture)', slowFree: 'bike routes: a key lookup per point (same picture)', steamFull: 'steam: every puff in full (same picture)', sdOld: 'turn detail: start at 10 px a frame (as before)', slowSync: 'edit upkeep: a key string per path point (same picture)', steamMapAlways: 'steam map: rebuilt at every edit (same picture)', doorsTwo: 'doors: two passes over the people (same picture)', ovPerBlock: 'glow overlay: one draw per region (same picture)', drawNever: 'draw never-seen faces too', stageNow: 'plots built in one frame (as before)', alertNow: 'police alert in one frame (as before)', nvBackfill: 'never-seen backfill', leanRound: 'lean round parts (cheat)', thinSticks: 'thin sticks, narrow arc (cheat)' };
   const gl = renderer.getContext(), info = renderer.info;
   const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
   const N = 180;   // frames of history
@@ -62,6 +69,13 @@ const PH = (() => {
     if (exact){ sync(); t = performance.now(); put(s.ex, t - c.t); if (!c.sub){ exFrame += t - c.t; if (c.name === 'color + shadow redraw') put(shadowMs, t - c.t); } }
     mark = t;
   }
+  // sections inside a lap (the people lap, say): their times are listed apart, not added into the laps' sum. The real clock where the
+  // harness scripts performance.now (tools/perf).
+  const rnow = () => typeof __realNow === 'function' ? __realNow() : performance.now();
+  let subMark = 0;
+  function subBegin(){ if (on) subMark = rnow(); }
+  function sub(name){ if (!on) return; const t = rnow(); put(stat(name, 'subsim').cpu, t - subMark); subMark = t; }
+  function laps(){ const o = {}; for (const [k, s] of stats) if (s.kind === 'sim' || s.kind === 'subsim') o[k] = avg(s.cpu); return o; }
   function shadow(){ if (on && renderer.shadowMap.needsUpdate){ shadowFrame = true; shadowTimes.push(performance.now()); } }
   function frameEnd(){
     if (!on) return;
@@ -90,11 +104,17 @@ const PH = (() => {
     const fps = 1000/avg(frameMs), L = [];
     L.push(`Neon Terrarium performance   ${new Date().toISOString().slice(0, 16)}`);
     L.push(`FPS ${fps.toFixed(0)}   frame ${avg(frameMs).toFixed(1)} ms (95% under ${pct(frameMs, .95).toFixed(1)}, worst ${pct(frameMs, 1).toFixed(1)})`);
+    const tOn = Object.keys(tests).filter(k => tests[k]);
+    if (tOn.length) L.push('TEST RUNNING (picture changed): ' + tOn.map(k => TEST_NAMES[k]).join(', '));
     if (exact){
       L.push(`EXACT TIMING: each pass waits for the graphics card, so FPS is lower than in play; the pass times are what count`);
       L.push(`main thread ${avg(jsMs).toFixed(1)} ms (includes the waiting)   all passes, exact ${exMs.n ? avg(exMs).toFixed(1) + ' ms' : 'measuring'}`);
     } else L.push(`main thread ${avg(jsMs).toFixed(1)} ms   graphics card ${!ext ? 'n/a (this browser has no GPU timers)' : gpuMs.n ? avg(gpuMs).toFixed(1) + ' ms' : 'measuring'}`);
     L.push(`render ${W}x${H} of ${DW}x${DH}   zoom ${zoom.toFixed(1)}   people ${typeof pplList !== 'undefined' ? pplList.length : '-'}   plots ${cells.size}`);
+    L.push(`building pieces drawn ${CULL.drawn} of ${CULL.total} (the rest are off screen)`);
+    if (typeof SC !== 'undefined') L.push(SC.line());
+    if (typeof SD !== 'undefined') L.push(SD.line());
+    if (typeof PPLRATE !== 'undefined') L.push(tests.fullRate ? 'people stepped every frame (full rate: on)' : `people stepped every ${PPLRATE.n} frames when typical size; people at each rate 1/2/3/4: ${PPLRATE.hist.slice(1).join(' / ')}`);
     const now = performance.now(); shadowTimes = shadowTimes.filter(t => now - t < 10000);
     L.push(`shadow redraws in the last 10 s: ${shadowTimes.length}` + (shadowMs.n ? `   (graphics card ${avg(shadowMs).toFixed(1)} ms each)` : ''));
     L.push('');
@@ -103,6 +123,7 @@ const PH = (() => {
     for (const [k, s] of stats) if (s.kind === 'sim') simSum += avg(s.cpu);
     L.push(`simulation and upkeep          ${f1(simSum)}`);
     for (const [k, s] of stats) if (s.kind === 'sim') L.push(`  ${k.padEnd(28)}${f1(avg(s.cpu))}`);
+    { const subs = [...stats].filter(([k, s]) => s.kind === 'subsim'); if (subs.length){ L.push('detail inside the laps above:'); for (const [k, s] of subs) L.push(`  ${k.padEnd(28)}${f1(avg(s.cpu))}`); } }
     // passes in the order they ran, each followed by the passes timed inside it
     const row = (label, s) => `${label.padEnd(30)}${f1(avg(s.cpu))}   ${f1(avg(exact ? s.ex : s.gpu))}  ${big(avg(s.calls)).padStart(6)}  ${big(avg(s.tris)).padStart(9)}`;
     for (const [k, s] of stats) L.push(...(s.kind === 'pass' ? [row(k, s)] : s.kind === 'sub' ? [row('  ' + k, s)] : []));
@@ -138,19 +159,29 @@ const PH = (() => {
     const note = document.createElement('span'); note.style.opacity = '.7'; note.textContent = 'F3 or ` hides';
     exBtn = document.createElement('button'); exBtn.style.cssText = copy.style.cssText; exBtn.onclick = () => setExact(!exact); label();
     copy.onclick = () => { const t = text(); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { note.textContent = 'copied'; }, () => { note.textContent = 'select the text and copy it'; }); };
-    bar.append(copy, exBtn, note); el.append(graph, body, bar); document.body.appendChild(el);
+    testBar = document.createElement('div'); testBar.style.cssText = 'margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap';
+    const tl = document.createElement('span'); tl.style.opacity = '.7'; tl.textContent = 'Tests:'; testBar.append(tl);
+    for (const k in tests){ const b = document.createElement('button'); b.style.cssText = copy.style.cssText;
+      const lab = () => { b.textContent = TEST_NAMES[k] + (tests[k] ? ': on' : ': off'); };
+      b.onclick = () => { setTest(k, !tests[k]); lab(); clearAll(); }; lab(); b._lab = lab; testBar.append(b); }
+    bar.append(copy, exBtn, note); el.append(graph, body, bar, testBar); document.body.appendChild(el); testBar.hidden = !exact;
   }
   function label(){ if (exBtn) exBtn.textContent = 'Exact timing: ' + (exact ? 'on' : 'off'); }
   function clearAll(){ stats.clear(); hist.length = 0; lastRaf = 0; shadowTimes = []; gpuOf.clear(); for (const r of [frameMs, jsMs, gpuMs, shadowMs, exMs]){ r.n = 0; r.i = 0; }
     for (const p of pending) gl.deleteQuery(p.q); pending.length = 0; }
   // (switched between frames, from a key or the button, so no pass is half timed)
-  function setExact(v){ exact = !!v; clearAll(); label(); }
+  function setExact(v){ exact = !!v; if (!exact) for (const k in tests) setTest(k, false); if (testBar){ testBar.hidden = !exact; for (const b of testBar.querySelectorAll('button')) b._lab(); } clearAll(); label(); }
+  function setTest(k, v){
+    if (tests[k] === v) return; tests[k] = v;
+    if (k in ATLAS_TEST){ ATLAS_TEST[k] = v; ATLAS.needsUpdate = true; ATLAS_SIDE.needsUpdate = true; }
+    if (k === 'shadows'){ renderer.shadowMap.enabled = !v; for (const m of ALL_MATS.concat([ATLAS, ATLAS_SIDE])) m.needsUpdate = true; if (!v) shadowDirty = true; }   // (shaders are rebuilt either way)
+  }
   function toggle(){
     on = !on;
     if (on){ if (!el) build(); el.hidden = false; clearAll(); }
-    else { if (el) el.hidden = true; info.autoReset = true; for (const p of pending) gl.deleteQuery(p.q); pending.length = 0; }
+    else { setExact(false); if (el) el.hidden = true; info.autoReset = true; for (const p of pending) gl.deleteQuery(p.q); pending.length = 0; }
   }
   addEventListener('keydown', e => { if ((e.key === 'F3' || e.key === '`') && !e.repeat && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName)){ e.preventDefault();
     if (e.shiftKey){ if (!on) toggle(); setExact(!exact); } else toggle(); } });
-  return { frameStart, lap, begin, end, shadow, frameEnd, toggle, setExact, text, get on(){ return on; }, get exact(){ return exact; } };
+  return { frameStart, lap, sub, subBegin, laps, begin, end, shadow, frameEnd, toggle, setExact, text, tests, plainMat, get on(){ return on; }, get exact(){ return exact; } };
 })();

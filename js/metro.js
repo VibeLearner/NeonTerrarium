@@ -142,7 +142,7 @@ function mtCommit(l, touched){
   if (l){ mtSides(l); touched = touched.concat(mtTouched(l)); mtBuildView(l); mtResetTrain(l); }
   const list = [...new Set(touched.map(([i, j]) => cells.get(ckey(i, j))).filter(Boolean))];
   refresh(list);   // its pillars and lift shafts stand on the plots (see mtFeet), so the walking paths go round them
-  shadowDirty = true;
+  SC_DIRTY.unknown = true; shadowDirty = true;
 }
 function mtApply(t){
   if (!t || !t.ok) return false;
@@ -280,7 +280,7 @@ function mtBuildView(l){
     for (const [geo, mat] of [[f.plain, HW_CAR_PLAIN], [f.lit, HW_CAR_GLOW]]) if (geo){ const m = new THREE.Mesh(geo, mat); m.userData.own = true; folded.add(m); }
     folded.position.set(Ls.sx, CURB, Ls.sz); l.fx.add(folded); l.cabs.push({ k, g: folded, y0: CURB + .02, y1: MT_Y + MT_PLAT_Y + .01, y: CURB + .02, state: 'idle', hold: 0, x: Ls.sx, z: Ls.sz });
   }
-  shadowDirty = true;
+  SC_DIRTY.unknown = true; shadowDirty = true;
 }
 // a station on plot k (always straight track): a platform either side, glass screen doors, a canopy over it all, a
 // STATION board at each end, benches, a ticket gate, and the bridge to the lift on its lift side

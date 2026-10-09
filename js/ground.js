@@ -162,8 +162,21 @@ function buildRim(lots){
 /* ---------- connections between buildings ---------- */
 function neighbors(lots){
   const out = [];
-  for (const a of lots) for (const b of lots){
-    if ((Math.abs(b.x-a.x-LOT)<.01 && b.z===a.z) || (Math.abs(b.z-a.z-LOT)<.01 && b.x===a.x)) if (a.height-a.base>=1.2 && b.height-b.base>=1.2) out.push([a,b]);
+  if (PH.tests.slowSync || window.__SLOW_SYNC){
+    for (const a of lots) for (const b of lots){
+      if ((Math.abs(b.x-a.x-LOT)<.01 && b.z===a.z) || (Math.abs(b.z-a.z-LOT)<.01 && b.x===a.x)) if (a.height-a.base>=1.2 && b.height-b.base>=1.2) out.push([a,b]);
+    }
+    return out;
+  }
+  // the same pairs in the same order, found through a map of the plots by grid position instead of every plot against every plot (plots sit LOT apart, so only the next one along x or z can match)
+  const at = new Map(), key = (x, z) => Math.round(x/LOT)*1048576 + Math.round(z/LOT);
+  lots.forEach((l, n) => { const k = key(l.x, l.z); if (at.has(k)) at.get(k).push(n); else at.set(k, [n]); });
+  for (const a of lots){
+    const cand = [];
+    for (const [dx, dz] of [[1, 0], [0, 1]]){ const l = at.get(key(a.x + dx*LOT, a.z + dz*LOT)); if (l) for (const n of l) cand.push(n); }
+    cand.sort((p, q) => p - q);
+    for (let q = 0; q < cand.length; q++){ if (q && cand[q] === cand[q - 1]) continue; const b = lots[cand[q]];
+      if ((Math.abs(b.x-a.x-LOT)<.01 && b.z===a.z) || (Math.abs(b.z-a.z-LOT)<.01 && b.x===a.x)) if (a.height-a.base>=1.2 && b.height-b.base>=1.2) out.push([a,b]); }
   }
   return out;
 }

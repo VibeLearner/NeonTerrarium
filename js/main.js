@@ -52,6 +52,7 @@ function frame(now){
   comp.uniforms.glowC.value.set(camT.x, camT.z);
   applyRenderRes(zoom);
   updateCamera(dt);
+  comp.uniforms.camDist.value = CAM_DIST + SC.dc;   // (depth is measured from the pinned camera: see staticcache.js)
   comp.uniforms.outlines.value = S.outlines ? 1 : 0;
   comp.uniforms.palOn.value = S.palette ? 1 : 0;
   comp.uniforms.time.value = now/1000;
@@ -65,21 +66,36 @@ function frame(now){
     const t = clamp((loss - 1.15)/1.0, 0, 1), e = t*t*(3 - 2*t);
     LOD.fine.value = e; LOD.plants.value = e; LOD.lines.value = e; }
   PH.lap('steam, rain, camera');
+  runLater();
+  stageStep();   // a plot being built in steps: a few milliseconds of it (world.js)
+  stepSync();   // what an edit leaves to do, a stage a frame (world.js)
   flushSolid();   // regions whose pieces changed are merged again (world.js)
+  nvTick();   // idle frames: faces no camera ever sees are worked out for a plot, a few views a frame (neverseen.js)
   scene.updateMatrixWorld();   // once for every pass below (see core.js): nothing moves between them
   PH.lap('scene upkeep');
+  farFrame();   // which of its two orders the merged blocks are drawn in (world.js)
+  sideArc();   // which way the buildings' walls can face the camera this frame (world.js)
+  cullFrame();   // and which merged pieces are in view
+  sdTrack();   // how fast the view is turning and zooming (world.js)
   cam.layers.enableAll(); shadowFrame();   // shadows: redrawn at once, a strip in the background, or not at all (sky.js)
   PH.shadow(); PH.begin(renderer.shadowMap.needsUpdate ? 'color + shadow redraw' : 'color');
-  renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
-  if (MRT) mrtBegin();   // the normal image is drawn along with the colors (core.js, sky.js)
-  cam.layers.enableAll(); renderer.render(scene, cam);
-  if (MRT) mrtEnd();
+  const pt = PH.tests;   // (the overlay's tests: perfhud.js)
+  if (pt.quarter) rtC.viewport.set(0, 0, W >> 1, H >> 1);   // (plain shading: see renderBufferDirect in sky.js)
+  if (pt.quarter || !SC.frame()){   // (the static cache draws the frame when it can: staticcache.js)
+    renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
+    if (MRT) mrtBegin();   // the normal image is drawn along with the colors (core.js, sky.js)
+    sdApply();   // the old way's frames: plots that move fast on screen lose their smallest triangles (world.js, speed-based detail)
+    cam.layers.enableAll(); cam.layers.disable(6); SC.drawView(() => renderer.render(scene, cam), SC.mode === 'oldview');   // (layer 6: the glow overlay, for the cache's frames only)
+    cam.layers.enableAll(); CULL.sd = false;
+    if (MRT) mrtEnd();
+  }
+  if (pt.quarter) rtC.viewport.set(0, 0, W, H);
   PH.end();
   renderer.shadowMap.needsUpdate = false;
   if (!MRT){   // (without WebGL 2: the normal image in a pass of its own)
     PH.begin('normals');
     renderer.setRenderTarget(rtN); renderer.setClearColor(0x8080ff, 1);
-    scene.overrideMaterial = normalMat; cam.layers.set(0); renderer.render(scene, cam); scene.overrideMaterial = null;
+    scene.overrideMaterial = normalMat; cam.layers.mask = 1 | STATIC_BIT; renderer.render(scene, cam); scene.overrideMaterial = null;
     renderer.autoClear = false; FOL_UNI.normalMode.value = 1; cam.layers.set(2); renderer.render(scene, cam);
     FOL_UNI.normalMode.value = 0;
     // pieces mid-animation are drawn with their clipping in the normal pass too, so outlines match what's shown
@@ -97,7 +113,7 @@ function frame(now){
   }
   comp.uniforms.VP.value.copy(cam.projectionMatrix).multiply(cam.matrixWorldInverse);
   comp.uniforms.invVP.value.copy(comp.uniforms.VP.value).invert();
-  liftShimmerCull(comp.uniforms.VP.value); mtShimmerCull(comp.uniforms.VP.value);   // the air shimmers only where they can show
+  liftShimmerCull(comp.uniforms.VP.value); mtShimmerCull(comp.uniforms.VP.value); shimTiles(comp.uniforms.VP.value);   // the air shimmers only where they can show
   megaFxFlush(comp.uniforms.VP.value);   // and the megastructures' moving parts go up to the card only while they're on screen
   PH.lap('pass setup');
   PH.begin('night lights'); renderNightLights(comp.uniforms.night.value); PH.end();   // lamps and neon lighting the surfaces round them (sky.js)
@@ -119,6 +135,8 @@ function frame(now){
   clouds.visible = !S.vclouds;
   PH.lap('pass setup');
   if (S.vclouds){ PH.begin('clouds'); renderer.setRenderTarget(rtCloud); renderer.render(cloudScene, compCam); PH.end(); }
+  compVariant();   // (sky.js)
+  PH.begin('soft effects (half resolution)'); softEffects(Math.round(camPix.x), Math.round(camPix.y)); PH.end();   // the wet-ground reflections, mist and light shafts, 2 x 2 pixels at a time (sky.js)
   PH.begin('composite'); renderer.setRenderTarget(rtOut); renderer.render(compScene, compCam); PH.end();
   PH.begin('bloom and grade'); renderGlow(); PH.end();   // bloom and halation (sky.js)
   PH.begin('to screen'); renderer.setRenderTarget(null); renderer.render(upScene, compCam); PH.end();

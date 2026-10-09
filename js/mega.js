@@ -311,7 +311,7 @@ function megaFxFlush(VP){
 function rebuildMega(m){
   finishAnimsOn(m);
   disposeData(m.data);
-  m.data = collect(() => withSkin(megaSkinOf(m), () => MEGA_TYPES[m.kind].build(m)));
+  SIDE_SPLIT = true; try { m.data = collect(() => withSkin(megaSkinOf(m), () => MEGA_TYPES[m.kind].build(m))); } finally { SIDE_SPLIT = false; }   // (buildings' walls in facing order: see sideArc in world.js)
   cellView(m);
   megaFx(m);
   for (const b of m.cells) b.height = m.roofH;
@@ -3172,20 +3172,29 @@ function policeBike(m, idx, pad){
 const nearNode = (x, z) => { let best = null, bd = Infinity; for (const c of (typeof patrolNodes !== 'undefined' ? patrolNodes : [])){ const d = (c.x - x)**2 + (c.z - z)**2; if (d < bd){ bd = d; best = c; } } return best; };
 // Bikes keep to the streets and never pass through anything: see bikeStreetRoute.
 const BIKE_R = .32;   // half a bike's width, and some
-function bikeClear(ax, az, bx, bz, r = BIKE_R){
+// freePt with the plot it last looked at remembered (a run of neighboring points is in one plot, and each lookup built a key string): the same answers, used inside one search only
+function lastPlotFree(){
+  if (PH.tests.slowFree || window.__SLOW_FREE) return freePt;
+  let ci = NaN, cj = NaN, G = null;
+  return (x, z) => { const i = Math.round(x/LOT), j = Math.round(z/LOT);
+    if (i !== ci || j !== cj){ ci = i; cj = j; const c = cells.get(ckey(i, j)); G = c ? cellGrid(c) : null; }
+    return !!G && freeAt(G, x, z); };
+}
+function bikeClear(ax, az, bx, bz, r = BIKE_R, fp = freePt){
   if (typeof freePt !== 'function') return true;
   const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L/.12)), px = L ? -(bz - az)/L*r : 0, pz = L ? (bx - ax)/L*r : 0;
   for (let k = 0; k <= n; k++){ const u = k/n, x = ax + (bx - ax)*u, z = az + (bz - az)*u;
-    if (!freePt(x, z) || !freePt(x + px, z + pz) || !freePt(x - px, z - pz)) return false; }
+    if (!fp(x, z) || !fp(x + px, z + pz) || !fp(x - px, z - pz)) return false; }
   return true;
 }
 // the way between two points for a bike: a search over a fine grid of the ground (every cell where a bike fits, its
 // width clear of buildings, pillars, street furniture and the platform's edge), the street's asphalt cheaper than the
 // sidewalks, so it keeps to the road; then pulled tight into straight runs wherever those are clear
+const NB_DI = [1, -1, 0, 0, 1, 1, -1, -1], NB_DJ = [0, 0, 1, -1, 1, -1, 1, -1], NB_DC = [1, 1, 1, 1, 1.414, 1.414, 1.414, 1.414];
 function bikeStreetRoute(sx, sz, tx, tz, rk = .8){
   const S = .2, pad = 5, x0 = Math.min(sx, tx) - pad, z0 = Math.min(sz, tz) - pad, nx = Math.ceil((Math.abs(tx - sx) + 2*pad)/S) + 1, nz = Math.ceil((Math.abs(tz - sz) + 2*pad)/S) + 1;
   if (nx*nz > 160000) return null;
-  const okC = new Int8Array(nx*nz).fill(-1), r = BIKE_R*rk;
+  const okC = new Int8Array(nx*nz).fill(-1), r = BIKE_R*rk, freePt = lastPlotFree();
   const free = (i, j) => { const k = j*nx + i; if (okC[k] < 0){ const x = x0 + i*S, z = z0 + j*S;
       okC[k] = freePt(x, z) && freePt(x + r, z) && freePt(x - r, z) && freePt(x, z + r) && freePt(x, z - r) && freePt(x + r*.7, z + r*.7) && freePt(x - r*.7, z - r*.7) && freePt(x + r*.7, z - r*.7) && freePt(x - r*.7, z + r*.7) ? 1 : 0; }
     return okC[k] === 1; };
@@ -3193,26 +3202,50 @@ function bikeStreetRoute(sx, sz, tx, tz, rk = .8){
   const at = (x, z) => [Math.round((x - x0)/S), Math.round((z - z0)/S)];
   const near = (x, z) => { const [ci, cj] = at(x, z); let best = null, bd = 1e9; for (let dj = -4; dj <= 4; dj++) for (let di = -4; di <= 4; di++){ const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= nx || j >= nz || !free(i, j)) continue; const d = di*di + dj*dj; if (d < bd){ bd = d; best = [i, j]; } } return best; };
   const A = near(sx, sz), B = near(tx, tz); if (!A || !B) return null;
-  const N = nx*nz, g = new Float32Array(N).fill(1e9), from = new Int32Array(N).fill(-1), heap = [];
-  const push = (k, f) => { heap.push([f, k]); let c = heap.length - 1; while (c > 0){ const p = (c - 1) >> 1; if (heap[p][0] <= heap[c][0]) break; [heap[p], heap[c]] = [heap[c], heap[p]]; c = p; } };
-  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length){ heap[0] = last; let c = 0; for (;;){ const l = 2*c + 1, rr = l + 1; let m = c; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (rr < heap.length && heap[rr][0] < heap[m][0]) m = rr; if (m === c) break; [heap[m], heap[c]] = [heap[c], heap[m]]; c = m; } } return top; };
+  const N = nx*nz, g = new Float32Array(N).fill(1e9), from = new Int32Array(N).fill(-1);
   const hgt = (i, j) => Math.hypot(i - B[0], j - B[1]);
-  const ka = A[1]*nx + A[0], kb = B[1]*nx + B[0]; g[ka] = 0; push(ka, hgt(A[0], A[1]));
-  let it = 0;
-  while (heap.length && it++ < 60000){
-    const [, k] = pop(); if (k === kb) break;
-    const i = k % nx, j = (k / nx) | 0;
-    for (const [di, dj, c] of [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.414],[1,-1,1.414],[-1,1,1.414],[-1,-1,1.414]]){
-      const ni = i + di, nj = j + dj; if (ni < 0 || nj < 0 || ni >= nx || nj >= nz || !free(ni, nj)) continue;
-      const nk = nj*nx + ni, v = g[k] + c*(street(ni, nj) ? 1 : 2.5);
-      if (v < g[nk]){ g[nk] = v; from[nk] = k; push(nk, v + hgt(ni, nj)); }
+  const ka = A[1]*nx + A[0], kb = B[1]*nx + B[0]; g[ka] = 0;
+  if (PH.tests.slowFree || window.__SLOW_FREE){   // (the first way: a heap of small arrays, the neighbors listed anew for every cell)
+    const heap = [];
+    const push = (k, f) => { heap.push([f, k]); let c = heap.length - 1; while (c > 0){ const p = (c - 1) >> 1; if (heap[p][0] <= heap[c][0]) break; [heap[p], heap[c]] = [heap[c], heap[p]]; c = p; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length){ heap[0] = last; let c = 0; for (;;){ const l = 2*c + 1, rr = l + 1; let m = c; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (rr < heap.length && heap[rr][0] < heap[m][0]) m = rr; if (m === c) break; [heap[m], heap[c]] = [heap[c], heap[m]]; c = m; } } return top; };
+    push(ka, hgt(A[0], A[1]));
+    let it = 0;
+    while (heap.length && it++ < 60000){
+      const [, k] = pop(); if (k === kb) break;
+      const i = k % nx, j = (k / nx) | 0;
+      for (const [di, dj, c] of [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.414],[1,-1,1.414],[-1,1,1.414],[-1,-1,1.414]]){
+        const ni = i + di, nj = j + dj; if (ni < 0 || nj < 0 || ni >= nx || nj >= nz || !free(ni, nj)) continue;
+        const nk = nj*nx + ni, v = g[k] + c*(street(ni, nj) ? 1 : 2.5);
+        if (v < g[nk]){ g[nk] = v; from[nk] = k; push(nk, v + hgt(ni, nj)); }
+      }
+    }
+  } else {   // the same search with the heap in two flat lists (same order of every compare and swap) and the neighbors listed once: a third of the time, same route
+    const hf = [], hk = [];
+    const push = (k, f) => { let c = hf.length; hf.push(f); hk.push(k); while (c > 0){ const p = (c - 1) >> 1; if (hf[p] <= f) break; hf[c] = hf[p]; hk[c] = hk[p]; c = p; } hf[c] = f; hk[c] = k; };
+    const pop = () => { const top = hk[0], lf = hf.pop(), lk = hk.pop(), n = hf.length;
+      if (n){ let c = 0; for (;;){ const l = 2*c + 1, rr = l + 1; let m = c, mf = lf; if (l < n && hf[l] < mf){ m = l; mf = hf[l]; } if (rr < n && hf[rr] < mf){ m = rr; mf = hf[rr]; } if (m === c) break; hf[c] = hf[m]; hk[c] = hk[m]; c = m; } hf[c] = lf; hk[c] = lk; }
+      return top; };
+    const stC = new Int8Array(N).fill(-1);
+    push(ka, hgt(A[0], A[1]));
+    let it = 0;
+    while (hf.length && it++ < 60000){
+      const k = pop(); if (k === kb) break;
+      const i = k % nx, j = (k / nx) | 0, gk = g[k];
+      for (let q = 0; q < 8; q++){
+        const ni = i + NB_DI[q], nj = j + NB_DJ[q]; if (ni < 0 || nj < 0 || ni >= nx || nj >= nz) continue;
+        const nk = nj*nx + ni; if (!free(ni, nj)) continue;
+        let st = stC[nk]; if (st < 0) st = stC[nk] = street(ni, nj) ? 1 : 0;
+        const v = gk + NB_DC[q]*(st ? 1 : 2.5);
+        if (v < g[nk]){ g[nk] = v; from[nk] = k; push(nk, v + hgt(ni, nj)); }
+      }
     }
   }
   if (from[kb] < 0 && kb !== ka) return null;
   const raw = []; for (let k = kb; k >= 0; k = from[k]){ raw.unshift([x0 + (k % nx)*S, z0 + ((k / nx) | 0)*S]); if (k === ka) break; }
   // pull it tight: from each point, straight on to the furthest one it can see
   const out = [raw[0]]; let c = 0;
-  while (c < raw.length - 1){ let f = raw.length - 1; while (f > c + 1 && !bikeClear(raw[c][0], raw[c][1], raw[f][0], raw[f][1], r)) f--; out.push(raw[f]); c = f; }
+  while (c < raw.length - 1){ let f = raw.length - 1; while (f > c + 1 && !bikeClear(raw[c][0], raw[c][1], raw[f][0], raw[f][1], r, freePt)) f--; out.push(raw[f]); c = f; }
   return out;
 }
 // from where it is (out of its bay first, straight ahead), along the streets, and the last stretch to the target only
@@ -3240,7 +3273,7 @@ function policeBikes(m, crew){
     // a drone has gone to a mugging: two bikes come to the spot
     alert(L){ const free = bikes.filter(b => !b.case).sort((p, q) => Math.hypot(p.x - L.x, p.z - L.z) - Math.hypot(q.x - L.x, q.z - L.z)).slice(0, 2);
       if (!free.length) return; caseL = L;
-      for (const b of free){ b.case = L; b.rider = true; b.mode = 'rush'; bikeRoute(b, L.x, L.z, 3.2); b.until = performance.now() + 50000; } },
+      free.forEach((b, i) => { const go = () => { if (b.case) return; b.case = L; b.rider = true; b.mode = 'rush'; bikeRoute(b, L.x, L.z, 3.2); b.until = performance.now() + 50000; }; if (i === 0) go(); else later(go, 1); }); },
     // the station was turned: the bays are somewhere else now. Parked bikes go to the new bays; bikes on the way home
     // head for them
     rebase(){

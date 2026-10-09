@@ -37,6 +37,7 @@ const FH = 0.95, ISL_R = 12.4;
 const LOT = 3.8;   // plot spacing; the street is what's left between a plot's sidewalk and the next one
 const CORNERS = [[1,1],[1,-1],[-1,1],[-1,-1]];
 U.cyl16 = new THREE.CylinderGeometry(.5,.5,1,16).toNonIndexed();
+LEAN_OF.set(U.cyl16, U.cyl);   // (the 8-sided cylinder has the 16-sided one's circle: see put)
 U.cone = new THREE.CylinderGeometry(0,.5,1,12).toNonIndexed();
 U.prism = (() => { const s = new THREE.Shape(); s.moveTo(-.5,0); s.lineTo(.5,0); s.lineTo(0,1); s.lineTo(-.5,0);
   const g = new THREE.ExtrudeGeometry(s, { depth:1, bevelEnabled:false }); g.translate(0,0,-.5); return g; })();
@@ -929,9 +930,13 @@ function lxPlate(mat, P, x, y, z, w, d, r, h, ry = 0){
     s.moveTo(-hx, -d/2); s.lineTo(hx, -d/2); s.absarc(hx, -hz, r, -PI/2, 0, false); s.lineTo(w/2, hz); s.absarc(hx, hz, r, 0, PI/2, false);
     s.lineTo(-hx, d/2); s.absarc(-hx, hz, r, PI/2, PI, false); s.lineTo(-w/2, -hz); s.absarc(-hx, -hz, r, PI, 1.5*PI, false);
     g = new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false, curveSegments: 7 }); g.rotateX(PI/2); g.translate(0, 1, 0); if (g.index) g = g.toNonIndexed();
+    // the lean twin, with a coarser corner (3 segments a quarter turn against 7), for a plate whose corner is small enough (see LEAN_LIM in core.js)
+    if (r <= .175){ const s2 = new THREE.Shape(); s2.moveTo(-hx, -d/2); s2.lineTo(hx, -d/2); s2.absarc(hx, -hz, r, -PI/2, 0, false); s2.lineTo(w/2, hz); s2.absarc(hx, hz, r, 0, PI/2, false);
+      s2.lineTo(-hx, d/2); s2.absarc(-hx, hz, r, PI/2, PI, false); s2.lineTo(-w/2, -hz); s2.absarc(-hx, -hz, r, PI, 1.5*PI, false);
+      let l = new THREE.ExtrudeGeometry(s2, { depth: 1, bevelEnabled: false, curveSegments: 3 }); l.rotateX(PI/2); l.translate(0, 1, 0); if (l.index) l = l.toNonIndexed(); g.userData.lean = l; }
     lxPlateCache.set(key, g);
   }
-  put(g, mat, under(P, T(x, y, z, ry, 1, h, 1)));
+  put(g, mat, under(P, T(x, y, z, ry, 1, h, 1)), g.userData.lean);
 }
 // points round a rounded rectangle, about `step` apart, each with the angle that turns local +z outward
 function lxRing(w, d, r, step){

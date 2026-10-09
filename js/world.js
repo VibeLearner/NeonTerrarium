@@ -16,6 +16,27 @@ const cells = new Map();
 const ckey = (i,j) => i + ',' + j;
 const SIDES4 = [[1,0],[-1,0],[0,1],[0,-1]];
 const world = new THREE.Group(); world.matrixAutoUpdate = false; scene.add(world); city = world;
+// The static cache (staticcache.js) is out of date whenever a static piece comes, goes, shows, hides or changes layer: every
+// such place bumps this count (the world's add and remove here; showHidden and the sweeps below).
+let SC_EDITS = 0;
+// And where: the world boxes of what came, went, showed or hid, so the cache can redraw just that part of its picture (staticcache.js, scEditRect).
+// `unknown`: something changed that has no box (the highway and metro builders say so): the whole picture is drawn again. `quiet`: a merge of a
+// region's pieces into one mesh (rebuildSolid): the same triangles in the same order, so the picture doesn't change and no box is noted.
+const SC_DIRTY = { boxes: [], unknown: false, quiet: 0 }, _dbx = new THREE.Box3();
+// (only what the static picture can hold or its lighting can feel: a mesh on the static layer, or any that casts a shadow; plants, glows and the like
+// that are drawn live and cast none change nothing in it)
+function scRelevant(o){ let r = false; o.traverse(m => { if (!r && (m.isMesh || m.isPoints) && ((m.layers.mask & STATIC_BIT) || m.castShadow)) r = true; }); return r; }
+function scNote(o){
+  if (SC_DIRTY.quiet || SC_DIRTY.unknown || !o || !scRelevant(o)) return;
+  _dbx.makeEmpty(); _dbx.setFromObject(o);
+  if (_dbx.isEmpty()){ return; }
+  const last = SC_DIRTY.boxes[SC_DIRTY.boxes.length - 1]; if (last && last.equals(_dbx)) return;   // (the same piece noted again)
+  if (SC_DIRTY.boxes.length >= 40){ SC_DIRTY.unknown = true; return; }
+  SC_DIRTY.boxes.push(_dbx.clone());
+}
+{ const add = world.add, remove = world.remove;
+  world.add = function(){ SC_EDITS++; const r = add.apply(this, arguments); for (let i = 0; i < arguments.length; i++) scNote(arguments[i]); return r; };
+  world.remove = function(){ SC_EDITS++; for (let i = 0; i < arguments.length; i++) scNote(arguments[i]); return remove.apply(this, arguments); }; }
 // Static pieces (plots, regions, their plants and glows) never move once built: their matrices are set once and left
 // alone, so the frame's world-matrix update skips them
 // A piece's hidden faces (see hideCovered) are left out of the views drawn from the camera, but the sun's shadow map still
@@ -23,9 +44,200 @@ const world = new THREE.Group(); world.matrixAutoUpdate = false; scene.add(world
 // sun a little): three calls onBeforeRender only for camera views, so the range is cut there and restored straight after.
 function hideBefore(r, s, c, g){ if (!g.userData.full) g.drawRange.count = g.userData.shown; }
 function hideAfter(r, s, c, g){ g.drawRange.count = Infinity; }
-// while a piece is swept in or out (sliced open), its hidden faces are drawn too
-function showHidden(view, on){ view.traverse(o => { const g = o.isMesh && o.geometry; if (g && g.userData.shown !== undefined) g.userData.full = on; }); }
-function freezeTree(g){ g.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; }); return g; }
+// while a piece is swept in or out (sliced open), its hidden faces are drawn too (and its walls all at once: see below)
+function showHidden(view, on){ SC_EDITS++; scNote(view); view.traverse(o => { const g = o.isMesh && o.geometry; if (!g) return;
+  if (g.userData.shown !== undefined || g.userData.cut) g.userData.full = on;
+  if (o.userData.sideOf) o.visible = !on; }); }
+// Walls facing away. The graphics card throws away every triangle turned away from the camera, but only after it has
+// done all the work for its corners; in a city of boxes that's half the walls, and every underside. So the buildings'
+// triangles are kept in this order (see collect): A, the ones that may face the camera from anywhere (roofs, slopes);
+// H, the ones never drawn by the camera (inside solid blocks: see hideCovered; and undersides, which the camera, always
+// looking down, can never see); S, the walls, sorted by which way they face into SIDE_K slices of the compass; then D,
+// the first half of S again, so that any run of slices going round the compass is one unbroken stretch. Each piece is
+// drawn as two meshes over the same triangles: one draws A (or, for its shadow, A + H + S), the other only the slices
+// of walls that can face the camera this frame (SIDE_ARC). A wall is only ever left out when it faces away by a margin,
+// so nothing that would have been drawn is missing; the picture doesn't change. Shadows still draw every face.
+const SIDE_K = 16, SIDE_ARC = { all: true, s: 0, L: SIDE_K, tall: true, ts: 0, tL: SIDE_K };
+const RT0 = 1 + SIDE_K + SIDE_K/2;   // (the first row of the sticks' walls in a block's second order: see mergeCutGen)
+// which order the merged blocks are drawn in (world.js, round 8 item 3): from far away the second one, with the lean round parts and the thin sticks' walls over a narrower arc
+const FARM = { on: false, lean: false, sticks: false, key: 0, stamp: 0, applied: -1, appliedOn: null }, FAR_MESHES = new Set();
+function farFrame(){
+  const lim = 2*zoom/H;
+  FARM.lean = FAR_CFG.lean && lim >= LEAN_LIM; FARM.sticks = FAR_CFG.sticks && lim >= STICK_LIM; FARM.on = FARM.lean || FARM.sticks; FARM.key = (FARM.lean ? 1 : 0) + (FARM.sticks ? 2 : 0);
+  if (FARM.on !== FARM.appliedOn || FARM.stamp !== FARM.applied){ FARM.appliedOn = FARM.on; FARM.applied = FARM.stamp; for (const m of FAR_MESHES) m.geometry = FARM.on ? m.userData.farGeo : m.userData.stdGeo; }
+}
+// the run of slices (from s, L of them) that are not turned away; null if all of them are (or none, which can't be)
+function arcRun(hid){
+  let s = -1; for (let k = 0; k < SIDE_K; k++) if (!hid[k] && hid[(k + SIDE_K - 1)%SIDE_K]){ s = k; break; }
+  if (s < 0) return null;
+  let L = 0; while (L < SIDE_K && !hid[(s + L)%SIDE_K]) L++;
+  if (s + L > SIDE_K + SIDE_K/2) return null;   // (can't happen with 8 slices; just in case)
+  return { s, L };
+}
+function sideArc(){
+  cam.updateMatrixWorld(); const e = cam.matrixWorld.elements, tx = e[8], tz = e[10];   // toward the camera (it's orthographic: the same for every pixel)
+  if (Math.hypot(tx, tz) < 1e-3){ SIDE_ARC.all = true; SIDE_ARC.tall = true; return; }
+  const a = Math.atan2(tz, tx), w = TAU/SIDE_K, hid = [], hidT = [];
+  for (let k = 0; k < SIDE_K; k++){
+    const p0 = k*w, p1 = p0 + w, da = ((a - p0)%TAU + TAU)%TAU;   // (is the camera's own direction inside the slice?)
+    const best = da <= w ? 1 : Math.max(Math.cos(p0 - a), Math.cos(p1 - a));
+    hid.push(best < -.002); hidT.push(best < .5);
+  }
+  const r = arcRun(hid);
+  if (!r){ SIDE_ARC.all = true; SIDE_ARC.tall = true; return; }
+  SIDE_ARC.all = false; SIDE_ARC.s = r.s; SIDE_ARC.L = r.L;
+  // the thin sticks' walls, when they are drawn from far away: only the walls within 60 degrees of the camera (a stick under a pixel and a half wide shows its most frontal side; the other, at a slant, adds almost nothing)
+  const t = FARM.sticks ? arcRun(hidT) : null;
+  if (t){ SIDE_ARC.tall = false; SIDE_ARC.ts = t.s; SIDE_ARC.tL = t.L; } else { SIDE_ARC.tall = false; SIDE_ARC.ts = r.s; SIDE_ARC.tL = r.L; }
+}
+const cutRest = u => u.A + u.H + u.S;
+// Pieces off screen. A merged block is drawn whole whenever any of it shows, and a tall tower's box can be the only
+// part of a 3 x 3 block in view. mergeCut notes where each piece's triangles went (rows: A, then the wall slices), and each
+// frame the pieces whose boxes miss the view are left out of the draw: the same triangles are drawn where they can show, in
+// the same order, so the picture doesn't change. Several ranges go up in one call where the browser has WEBGL_multi_draw,
+// else as one draw each (see renderBufferDirect below).
+const CULL = { cam: null, minPx: 1, lvl: -1, stamp: 0, pl: new Float64Array(24), pad: 0, total: 0, drawn: 0, tris: 0 }, _cullM = new THREE.Matrix4(), _cullF = new THREE.Frustum();
+function cullFrame(camera = cam, area = camera){   // (for the camera about to draw: the view's, or the static cache's; area: the camera whose frustum is what's wanted, a strip of the cache)
+  CULL.cam = camera; area.updateMatrixWorld(); _cullM.multiplyMatrices(area.projectionMatrix, area.matrixWorldInverse); _cullF.setFromProjectionMatrix(_cullM);
+  for (let i = 0; i < 6; i++){ const p = _cullF.planes[i]; CULL.pl.set([p.normal.x, p.normal.y, p.normal.z, p.constant], i*4); }
+  CULL.pad = 4*(2*zoom/H);   // (a few screen pixels of room, in world units)
+  { const lim = (2*zoom/H)*CULL.minPx; let lv = -1; for (let k = 0; k < SMALL_N; k++) if (SMALL_E[k] <= lim) lv = k; CULL.lvl = PH.tests.noSmall ? -1 : lv; }   // (triangles with no edge as long as a pixel's worth are left out)
+  CULL.stamp++; CULL.total = CULL.drawn = CULL.tris = 0;
+}
+// (6) Speed-based detail while the view turns, tilts or zooms (a cheat: the overlay test "no speed-based detail" turns it off). Frames drawn the
+// old way while the view changes leave out, per plot, triangles up to one or two size classes (SMALL_E) bigger than the usual cutoff, by how fast
+// that plot moves on screen (render pixels a frame, around the pivot at the middle of the screen). Motion hides what the cache would show at rest:
+// a still camera never reduces anything and the cache is always drawn at full detail. Plots near the cursor keep full detail whatever the speed.
+// A plot drops a class only when clearly faster than the class's threshold (SD.hys) and gets it back only when clearly slower, one class a frame.
+// Tune from the console (they take effect on the next frame): SD.v0 (px/frame where the first class goes), SD.step (each next class at this multiple),
+// SD.max (classes at most), SD.fast (px/frame where a fast spin may drop fastMax more classes), SD.cursorPx (full detail within this many px of the
+// cursor), SD.hys (margin round a threshold), SD.on = false.
+const SD = { on: true, v0: 6, step: 2, max: 2, fast: 40, fastMax: 1, cursorPx: 200, hys: .25, hist: [0, 0, 0, 0, 0, 0], top: 0, pieces: 0, moving: false,
+  dYaw: 0, dZoom: 0, dPitch: 0, pY: null, pZ: 0, pP: 0, list: [], stamp: -1 };
+function sdTrack(){   // every frame: how far the view turned, tilted and zoomed since the last one
+  SD.dYaw = SD.pY === null ? 0 : yaw - SD.pY; SD.dZoom = SD.pY === null ? 0 : (zoom - SD.pZ)/zoom; SD.dPitch = SD.pY === null ? 0 : PITCH - SD.pP;
+  SD.pY = yaw; SD.pZ = zoom; SD.pP = PITCH;
+}
+const _sdVec = new THREE.Vector3(), _sdMat = new THREE.Matrix4();
+function sdApply(){   // for a frame drawn the old way: each plot's extra size classes, from how fast it moves
+  CULL.sd = false;
+  if (!SD.on || PH.tests.noSpeed || PH.tests.noSmall) return;
+  if (SD.stamp !== SC_EDITS){ SD.list = []; const seen = new Set(); world.traverse(o => { const g = o.isMesh && o.geometry, P = g && g.userData.pcs; if (P && !seen.has(P)){ seen.add(P); SD.list.push(P); } }); SD.stamp = SC_EDITS; }
+  const w = Math.abs(SD.dYaw), tz = Math.abs(SD.dZoom), tp = Math.abs(SD.dPitch);
+  SD.moving = w + tz + tp > 1e-6; SD.hist.fill(0); SD.top = 0; SD.pieces = 0;
+  const lv = CULL.lvl, nT = SD.max + SD.fastMax, thr = [];
+  const v0 = PH.tests.sdOld ? 10 : SD.v0;   // (round 6's start speed was 10; round 7 item 6 starts the first class at 6: a slow drag, under about 5, is untouched either way)
+  for (let k = 0; k < nT; k++) thr.push(k < SD.max ? v0*SD.step**k : SD.fast*SD.step**(k - SD.max));
+  if (!SD.moving){ for (const P of SD.list) if (P.xlOn){ P.xl.fill(0); P.xlOn = 0; } return; }   // (a still view is never reduced)
+  cam.updateMatrixWorld(); const e = cam.matrixWorld.elements, upp = H/(2*zoom), sp = Math.sin(PITCH), cp = Math.cos(PITCH);
+  const rx = e[0], rz = e[2], hr = Math.hypot(e[8], e[10]) || 1, fx = -e[8]/hr, fz = -e[10]/hr;
+  const rr = renderer.domElement.getBoundingClientRect(), cur = typeof ptrLast !== 'undefined' && ptrLast ? [((ptrLast.x - rr.left)/rr.width)*2 - 1, -(((ptrLast.y - rr.top)/rr.height)*2 - 1)] : null;
+  const VPm = _sdMat.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+  for (const P of SD.list){
+    if (!P.xl) P.xl = new Int8Array(P.n);
+    let any = 0;
+    for (let i = 0; i < P.n; i++){
+      const o = i*6, b = P.box, cx = (b[o] + b[o + 1])/2, cz = (b[o + 4] + b[o + 5])/2, cy = (b[o + 2] + b[o + 3])/2, hx = (b[o + 1] - b[o])/2, hz = (b[o + 5] - b[o + 4])/2;
+      const dx = cx - camT.x, dz = cz - camT.z;
+      // the part of the piece nearest the pivot (a big piece is as slow as its slowest part)
+      const a = Math.max(0, Math.abs(dx*rx + dz*rz) - (Math.abs(rx)*hx + Math.abs(rz)*hz)), bb = Math.max(0, Math.abs(dx*fx + dz*fz) - (Math.abs(fx)*hx + Math.abs(fz)*hz));
+      let s = upp*(Math.hypot(w*bb, w*a*sp) + tp*Math.hypot(a, bb, 0));
+      if (tz) s += upp*tz*Math.hypot(a*upp, bb*sp*upp);
+      let L = P.xl[i], t = L;
+      // plots near the cursor keep everything
+      let keep = false;
+      if (cur){ _sdVec.set(cx, cy, cz).applyMatrix4(VPm); keep = Math.hypot((_sdVec.x - cur[0])*W/2, (_sdVec.y - cur[1])*H/2) - upp*Math.max(hx, hz) < SD.cursorPx; }
+      if (keep) t = 0;
+      else {
+        while (t < nT && s > thr[t]*(1 + SD.hys)) t++;                       // faster: drop a class (at once, as far as the speed says)
+        if (t === L && L > 0 && s < thr[L - 1]*(1 - SD.hys)) t = L - 1;     // clearly slower: one class back a frame
+      }
+      if (keep && L > 0) t = L - 1;   // (and back from the cursor's side the same way)
+      P.xl[i] = t; if (t) any = 1; SD.hist[t]++; SD.pieces++; if (s > SD.top) SD.top = s;
+    }
+    P.xlOn = any;
+  }
+  CULL.sd = true;
+}
+SD.line = () => 'speed-based detail: ' + (!SD.on || PH.tests.noSpeed ? 'off' : !SD.moving ? 'view still, full detail' : 'plots by extra classes ' + SD.hist.slice(0, SD.max + SD.fastMax + 1).map((n, k) => '+' + k + ': ' + n).join('  ') + '   fastest ' + SD.top.toFixed(0) + ' px/frame');
+// which of a merged mesh's pieces touch the view (worked out once a frame per mesh); returns how many do
+function pieceVis(P){
+  if (P.stamp === CULL.stamp) return P.seen;
+  const pl = CULL.pl, pad = CULL.pad, b = P.box, v = P.vis; let seen = 0;
+  for (let i = 0; i < P.n; i++){
+    const o = i*6; let ok = 1;
+    for (let q = 0; q < 24; q += 4){ const nx = pl[q], ny = pl[q + 1], nz = pl[q + 2];   // (the corner furthest along the plane's normal)
+      if (nx*(nx > 0 ? b[o + 1] : b[o]) + ny*(ny > 0 ? b[o + 3] : b[o + 2]) + nz*(nz > 0 ? b[o + 5] : b[o + 4]) + pl[q + 3] < -pad){ ok = 0; break; } }
+    v[i] = ok; seen += ok;
+  }
+  P.stamp = CULL.stamp; P.seen = seen; CULL.total += P.n; CULL.drawn += seen;
+  return seen;
+}
+// the ranges of rows r0 to r1 (inclusive) for the pieces on show, runs that sit next to each other joined; sets the mesh up to
+// draw them. Returns false when everything shows (the plain draw range does it).
+const MD = { s: new Int32Array(64), n: new Int32Array(64) };
+function multiRows(o, P, r0, r1, t0 = 0, t1 = -1){
+  if (PH.tests.noCull) return false;
+  const seen = pieceVis(P), lv = CULL.lvl, xl = CULL.sd && P.xlOn ? P.xl : null; if (seen === P.n && lv < 0 && !xl && t1 < t0) return false;
+  const v = P.vis, n = P.n; let m = 0, tot = 0;
+  for (let sp = 0; sp < 2; sp++){ const ra = sp ? t0 : r0, rb = sp ? t1 : r1;
+    for (let r = ra; r <= rb; r++) for (let i = 0; i < n; i++){
+      if (!v[i]) continue; const x = xl ? xl[i] : 0, c = lv < 0 && !x ? P.rowN[r*n + i] : P.rowC[(r*n + i)*SMALL_N + Math.min(SMALL_N - 1, Math.max(lv, 0) + x)]; if (!c) continue;
+      const st = P.rowS[r*n + i];
+      if (m && MD.s[m - 1] + MD.n[m - 1] === st) MD.n[m - 1] += c;
+      else { if (m === MD.s.length){ const s2 = new Int32Array(m*2), n2 = new Int32Array(m*2); s2.set(MD.s); n2.set(MD.n); MD.s = s2; MD.n = n2; } MD.s[m] = st; MD.n[m++] = c; }
+      tot += c;
+    } }
+  o.userData.md = m ? { s: MD.s.slice(0, m), n: MD.n.slice(0, m) } : null;
+  CULL.tris += tot; return tot;
+}
+function cutBefore(r, s, c, g){
+  const u = g.userData.cut, P = g.userData.pcs; g.drawRange.start = 0; g.drawRange.count = g.userData.full ? cutRest(u) : u.A;
+  if (P && !g.userData.full && c === CULL.cam){ const t = multiRows(this, P, 0, 0); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } }
+}
+function cutAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = cutRest(g.userData.cut); this.userData.md = null; }
+function sideBefore(r, s, c, g){
+  const u = g.userData.cut, b = u.A + u.H, o = u.off, P = g.userData.pcs, A = SIDE_ARC, two = !!u.offT && !A.all;   // (two: the walls over their arc and the sticks' walls over theirs)
+  if (A.all){ g.drawRange.start = b; g.drawRange.count = u.S; if (P && c === CULL.cam){ const t = P.far ? multiRows(this, P, 1, SIDE_K, RT0, RT0 + SIDE_K - 1) : multiRows(this, P, 1, SIDE_K); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } } return; }
+  const s0 = A.s, e = s0 + A.L, end = e <= SIDE_K ? b + o[e] : b + u.S + o[e - SIDE_K];
+  g.drawRange.start = b + o[s0]; g.drawRange.count = end - (b + o[s0]);
+  if (P && c === CULL.cam){ const ts = A.ts, te = ts + A.tL; const t = two || P.far ? multiRows(this, P, 1 + s0, e, RT0 + ts, RT0 + te - 1) : multiRows(this, P, 1 + s0, e); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; return; } }
+  if (two){   // (no per-piece ranges: the two runs, in one multi-range draw)
+    const tb = b + o[SIDE_K], ot = u.offT, ts = A.ts, te = ts + A.tL, s2 = tb + ot[ts], n2 = (te <= SIDE_K ? tb + ot[te] : b + u.S + o[SIDE_K/2] + ot[te - SIDE_K]) - s2, n1 = g.drawRange.count, s1 = g.drawRange.start;
+    this.userData.md = { s: Int32Array.of(s1, s2), n: Int32Array.of(n1, n2) }; g.drawRange.start = 0; g.drawRange.count = n1 + n2;
+  }
+}
+{ // (several ranges in one draw: three itself only draws one, so while a mesh with ranges is drawn the context's drawElements is swapped)
+  const gl = renderer.getContext(), ext = window.NO_MULTI_DRAW ? null : gl.getExtension('WEBGL_multi_draw'), rbd = renderer.renderBufferDirect;
+  renderer.renderBufferDirect = function(camera, sc, geo, mat, obj, grp){
+    const md = obj.userData.md; if (!md) return rbd.call(this, camera, sc, geo, mat, obj, grp);
+    const bpe = geo.index.array ? geo.index.array.BYTES_PER_ELEMENT : geo.userData.bpe, n = md.s.length;
+    if (ext){ if (!md.o){ md.o = new Int32Array(n); for (let i = 0; i < n; i++) md.o[i] = md.s[i]*bpe; } }
+    gl.drawElements = function(mode, count, type){
+      if (ext) ext.multiDrawElementsWEBGL(mode, md.n, 0, type, md.o, 0, n);
+      else { const f = Object.getPrototypeOf(gl).drawElements; for (let i = 0; i < n; i++) f.call(gl, mode, md.n[i], type, md.s[i]*bpe); }
+    };
+    try { return rbd.call(this, camera, sc, geo, mat, obj, grp); } finally { delete gl.drawElements; }
+  };
+}
+// how many of a geometry's indices are its own triangles (the copied wall slices left out)
+const triIndexCount = g => g.userData.cut ? cutRest(g.userData.cut) : (g.index ? g.index.count : g.attributes.position.count);
+// Static and live (the static cache: see staticcache.js). A mesh that is built once and only changes with the camera, the sun and
+// the time-of-day uniforms is moved to layer 5 (STATIC_BIT) when it joins the world; the live set (people, plants, vehicles,
+// anything with a time uniform or a clipping plane, anything see-through) stays where it was. The camera draws both
+// (layers.enableAll) until the cache is on, then the live set on top of the cache's picture. Anything unknown stays live.
+const STATIC_BIT = 32;
+const isStaticMat = m => !!m && (m.isMeshToonMaterial || m.isMeshLambertMaterial || m.isMeshBasicMaterial) && !m.transparent && !m.userData.colorOnly && !m.userData.live && !m.clippingPlanes;
+const markStatic = o => { if (o.isMesh && !o.isInstancedMesh && o.layers.mask === 1 && !o.userData.noStatic && isStaticMat(o.material)){ o.layers.mask = STATIC_BIT; if (o.material === ATLAS) glowOverlay(o); } };
+// A frozen tree's matrices are set once and never change (nothing writes to them), so after the first pass over it the world-matrix
+// update (every frame, main.js) doesn't walk it again: it was visiting some 12,000 objects a frame to find nothing to do.
+// (Overlay test "walk every matrix" switches this off.)
+const _omw = THREE.Object3D.prototype.updateMatrixWorld;
+function frozenUpdate(force){
+  if (this._mwDone && !this.matrixWorldNeedsUpdate && !force && !PH.tests.walkAll) return;
+  _omw.call(this, force); this._mwDone = true;
+}
+function freezeTree(g){ g.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; markStatic(o); }); g.updateMatrixWorld = frozenUpdate; return g; }
 let connGroup = null, curPorts = null, EXT = 12;
 const camT = new THREE.Vector3(0, TARGET_Y, 0), camGoal = new THREE.Vector3(0, TARGET_Y, 0);
 // The style (clutter, greenery, neon) of every piece is stored with it when it is built. Generation reads S.clutter,
@@ -48,17 +260,144 @@ function hash(...a){ let h = 2166136261; for (const v of a){ const s = String(v)
 // Every static toon material is folded into ONE material: its colour and glow ride along as vertex attributes,
 // so a whole building is a single draw call no matter how many materials it was modelled with.
 const ATLAS = new THREE.MeshToonMaterial({ color:0xffffff, gradientMap:gradTex, vertexColors:true });
+// (performance overlay tests, exact mode only: variants of this shader, to find what its corners cost; see perfhud.js)
+const ATLAS_TEST = { lean: false, noGlow: false, noData: false, gbuf: false };
+ATLAS.customProgramCacheKey = () => 'atlas' + (ATLAS_TEST.lean ? 'L' : '') + (ATLAS_TEST.noGlow ? 'G' : '') + (ATLAS_TEST.noData ? 'D' : '') + (ATLAS_TEST.gbuf ? 'B' : '');
 ATLAS.onBeforeCompile = sh => {
   sh.uniforms.emI = EM_I; sh.uniforms.fTime = FOL_UNI.time; sh.uniforms.lodFine = LOD.fine; sh.uniforms.lightsOn = LIGHTS_ON;
   sh.vertexShader = sh.vertexShader
     .replace('#include <common>', '#include <common>\nattribute vec4 aEm; attribute float aFlk; attribute float aFine; attribute float aOn; uniform float emI[7]; uniform float fTime; uniform float lodFine; uniform float lightsOn; varying vec3 vEmis;' + FLK_GLSL + BLINK_GLSL + LIT_GLSL)
     .replace('#include <project_vertex>', '#include <project_vertex>\n' + LOD_CULL_GLSL)
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nint ek = int(aEm.a*255.0 + .5); float lon = ek >= 1 && ek <= 4 ? litOn(aOn, lightsOn, fTime) : 1.0; vEmis = aEm.rgb * mix(ek == 1 ? .22*(1.0 - .6*lightsOn) : 0.0, emI[ek], lon) * flicker(aFlk, fTime);   // a switched-off window is just a dim room\nif (ek == 6) vEmis *= mix(0.05, 1.0, blink((modelMatrix * vec4(transformed, 1.0)).y, fTime));');
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nint ek = int(aEm.a*255.0 + .5); if (ek == 0) vEmis = vec3(0.0); else { float lon = ek >= 1 && ek <= 4 ? litOn(aOn, lightsOn, fTime) : 1.0; vEmis = aEm.rgb * mix(ek == 1 ? .22*(1.0 - .6*lightsOn) : 0.0, emI[ek], lon) * flicker(aFlk, fTime);   // a switched-off window is just a dim room (and most corners don\'t glow at all: nothing to work out)\nif (ek == 6) vEmis *= mix(0.05, 1.0, blink((modelMatrix * vec4(transformed, 1.0)).y, fTime)); }');
   sh.fragmentShader = sh.fragmentShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vEmis;')
-    .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = vEmis;');
+    .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = vEmis;')
+    // The light's three bands worked out instead of looked up: the gradient texture (core.js) is three texels, read
+    // nearest, so the band is which third of 0..1 the light falls in, and its brightness the texel's value. The same
+    // numbers, one texture read less for every pixel of every building (and at this size, many pixels are shaded
+    // several times over: a triangle smaller than a pixel still costs a few).
+    .replace('#include <gradientmap_pars_fragment>', `uniform sampler2D gradientMap;
+vec3 getGradientIrradiance( vec3 normal, vec3 lightDirection ){
+  float u = dot( normal, lightDirection )*0.5 + 0.5, i = clamp( floor( u*3.0 ), 0.0, 2.0 );
+  return vec3( i < 0.5 ? ${gData[0]}.0/255.0 : i < 1.5 ? ${gData[4]}.0/255.0 : ${gData[8]}.0/255.0 );
+}`);
+  if (ATLAS_TEST.lean){   // the view position isn't used by these lights with this camera: not passed at all (same picture)
+    sh.vertexShader = sh.vertexShader.replace('varying vec3 vViewPosition;', '').replace('vViewPosition = - mvPosition.xyz;', '');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_toon_pars_fragment>', THREE.ShaderChunk.lights_toon_pars_fragment.replace('varying vec3 vViewPosition;', 'const vec3 vViewPosition = vec3( 0.0, 0.0, 1.0 );'));
+  }
+  // colors only: no sunlight, sky light or shadow lookup, and the vertex shader no longer passes the shadow map's
+  // coordinates or the view position: what drawing the buildings would cost if the lighting were worked out afterwards,
+  // once per pixel (picture changes: flat, unlit colors)
+  if (ATLAS_TEST.gbuf){
+    sh.vertexShader = sh.vertexShader.replace('#include <shadowmap_vertex>', '').replace('varying vec3 vViewPosition;', '').replace('vViewPosition = - mvPosition.xyz;', '');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_toon_pars_fragment>', 'varying vec3 vNormal;').replace('#include <shadowmap_pars_fragment>', '')
+      .replace('#include <lights_toon_fragment>', '').replace('#include <lights_fragment_begin>', '').replace('#include <lights_fragment_maps>', '').replace('#include <lights_fragment_end>', '')
+      .replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;', 'vec3 outgoingLight = diffuseColor.rgb*0.6 + totalEmissiveRadiance;');
+  }
+  if (ATLAS_TEST.noGlow) sh.vertexShader = sh.vertexShader.replace(/int ek = int\(aEm\.a\*255\.0 \+ \.5\);[^\n]*\n[^\n]*\n/, 'vEmis = aEm.rgb;\n');   // (picture changes: lights don't switch, flicker or blink)
+  if (ATLAS_TEST.noData) sh.vertexShader = sh.vertexShader.replace(/int ek = int\(aEm\.a\*255\.0 \+ \.5\);[^\n]*\n[^\n]*\n/, 'vEmis = vec3(0.0);\n').replace('#include <color_vertex>', 'vColor = vec3(0.8);');   // (picture changes: no colors, no glow)
 };
-const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m !== ATLAS;
+// the same material for the walls' mesh (see sideArc), so its draws merge apart from the rest; the same shader
+const ATLAS_SIDE = ATLAS.clone(); ATLAS_SIDE.onBeforeCompile = ATLAS.onBeforeCompile; ATLAS_SIDE.customProgramCacheKey = ATLAS.customProgramCacheKey;
+// The glow overlay (static cache, staticcache.js). The cache holds the buildings as they were drawn; the lights that flicker
+// (aFlk) and the aircraft lights that blink (glow kind 6) change every frame. Each static building mesh carries a child mesh
+// over just those triangles, drawn after the cache is copied in, with the same shader (so the same corner positions and
+// depth), depth test "equal or nearer", no depth write, color image only: it repaints them where they're the visible surface.
+// It sits on layer 6 (OV_BIT): the live pass draws it, the old path (which draws the buildings themselves) doesn't.
+const OV_BIT = 64;
+const ATLAS_OV = ATLAS.clone(); ATLAS_OV.onBeforeCompile = ATLAS.onBeforeCompile; ATLAS_OV.customProgramCacheKey = ATLAS.customProgramCacheKey; ATLAS_OV.depthWrite = false;
+function glowOverlay(mesh){
+  const g = mesh.geometry, fl = g.attributes.aFlk, em = g.attributes.aEm, on = g.attributes.aOn, I = g.index && g.index.array; if (!fl || !em || !on || !I) return;
+  const F = fl.array, E = em.array, ON = on.array, u = g.userData.cut, fb = [], win = [];
+  // flickering lights and aircraft lights (always), and the windows that switch (their threshold, aOn, against LIGHTS_ON): a window
+  // stutters with the clock while LIGHTS_ON is within 0.04 above its threshold (litOn, core.js), so those are drawn every frame too
+  const scan = (a, b) => { for (let q = a; q < b; q += 3){ const i0 = I[q], i1 = I[q + 1], i2 = I[q + 2], k0 = E[i0*4 + 3];
+    if (F[i0] || F[i1] || F[i2] || k0 === 6 || E[i1*4 + 3] === 6 || E[i2*4 + 3] === 6) fb.push(i0, i1, i2);
+    else if (k0 >= 1 && k0 <= 4) win.push(i0, i1, i2); } };
+  if (u){ scan(0, u.A); scan(u.A + u.H, u.A + u.H + u.S); } else scan(0, g.userData.shown ?? I.length);   // (the walls once: not the copied slices; not the faces nobody sees)
+  if (!fb.length && !win.length) return;
+  const off = new Int32Array(257); for (let q = 0; q < win.length; q += 3) off[ON[win[q]] + 1]++;
+  for (let b = 0; b < 256; b++) off[b + 1] += off[b];
+  const cur = off.slice(0, 256), sorted = new Array(win.length);   // (windows by threshold, so the band of them to draw is one run)
+  for (let q = 0; q < win.length; q += 3){ const p = cur[ON[win[q]]]++*3; sorted[p] = win[q]; sorted[p + 1] = win[q + 1]; sorted[p + 2] = win[q + 2]; }
+  const out = fb.concat(sorted);
+  const og = new THREE.BufferGeometry(), blockKey = mesh.userData.blockKey;
+  if (blockKey !== undefined){
+    // a region's merged mesh: the overlay gets vertex data of its own (just the corners its triangles use), so that a whole region of them can be joined into one draw (ovBatch below)
+    const nv0 = g.attributes.position.count, map = new Int32Array(nv0).fill(-1), src = [], idx = new Array(out.length);
+    for (let q = 0; q < out.length; q++){ const v = out[q]; let r = map[v]; if (r < 0){ r = map[v] = src.length; src.push(v); } idx[q] = r; }
+    for (const k in g.attributes){ const a = g.attributes[k], n = a.itemSize, arr = new a.array.constructor(src.length*n);
+      for (let v = 0; v < src.length; v++) for (let c = 0; c < n; c++) arr[v*n + c] = a.array[src[v]*n + c];
+      og.setAttribute(k, new THREE.BufferAttribute(arr, n, a.normalized)); }
+    og.setIndex(new THREE.BufferAttribute(src.length > 65535 ? new Uint32Array(idx) : new Uint16Array(idx), 1));
+  } else {
+    for (const k in g.attributes) og.setAttribute(k, g.attributes[k]);
+    og.setIndex(new THREE.BufferAttribute(g.attributes.position.count > 65535 ? new Uint32Array(out) : new Uint16Array(out), 1));
+  }
+  if (!g.boundingSphere) g.computeBoundingSphere(); og.boundingSphere = g.boundingSphere.clone();
+  g.addEventListener('dispose', () => og.dispose());
+  const ov = new THREE.Mesh(og, ATLAS_OV); ov.layers.mask = blockKey !== undefined && !ovPerBlock() ? 0 : OV_BIT; ov.receiveShadow = mesh.receiveShadow; ov.castShadow = false; ov.userData.isOv = true;
+  ov.userData.ovInfo = { nFB: fb.length, off }; ov.onBeforeRender = ovBefore; ov.onAfterRender = ovAfter;
+  mesh.add(ov);
+  if (blockKey !== undefined) ovRegister(blockKey, ov, mesh.receiveShadow);
+}
+// what the overlay draws this frame: the flickering and blinking triangles, and the windows in the stutter band of LIGHTS_ON
+function ovBefore(r, s, c, g){
+  const u = this.userData.ovInfo, lv = LIGHTS_ON.value, lo = Math.max(0, Math.floor((lv - .04)*255) - 1), hi = Math.min(255, Math.ceil(lv*255) + 1);
+  const a = u.nFB, o0 = u.off[lo]*3, b = hi >= lo ? (u.off[hi + 1] - u.off[lo])*3 : 0;   // (offsets are in triangles, ranges in indices)
+  if (!b){ g.drawRange.start = 0; g.drawRange.count = a; }
+  else if (!a){ g.drawRange.start = o0; g.drawRange.count = b; }
+  else { g.drawRange.start = 0; g.drawRange.count = a + b; this.userData.md = { s: new Int32Array([0, a + o0]), n: new Int32Array([a, b]) }; }
+}
+function ovAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = Infinity; this.userData.md = null; }
+// The overlays of the merged regions (one each, 226 draw calls in a view at zoom 30) joined, a batch for every OVB x OVB block of regions: one mesh whose index holds each member's triangles one after another, and each frame
+// the ranges of the members in view (what each member's own overlay would draw) go up in one multi-range draw. Opaque, no depth write, depth equal or nearer: only exactly coplanar duplicates could tell the
+// order apart. The members' own overlays stay (layer 0, not drawn) for the overlay test "glow overlay: one draw per region (as before)".
+const OVB = 4, ovBlocks = new Map(), ovBatches = new Map(), ovDirty = new Set(); let ovModeNow = null;
+const ovPerBlock = () => !!(PH.tests.ovPerBlock || window.__OV_PER_BLOCK);
+const ovSuperKey = k => { const c = k.indexOf(','); return Math.floor(+k.slice(0, c)/OVB) + ',' + Math.floor(+k.slice(c + 1)/OVB); };
+function ovRegister(key, ov, rs){ let l = ovBlocks.get(key); if (!l) ovBlocks.set(key, l = []); l.push({ ov, rs }); ovDirty.add(ovSuperKey(key)); }
+function ovForget(key){ if (ovBlocks.delete(key)) ovDirty.add(ovSuperKey(key)); }
+function ovFlush(){
+  const per = ovPerBlock();
+  if (per !== ovModeNow){ ovModeNow = per; for (const l of ovBlocks.values()) for (const m of l) m.ov.layers.mask = per ? OV_BIT : 0; for (const b of ovBatches.values()) b.layers.mask = per ? 0 : OV_BIT; }
+  if (!ovDirty.size) return;
+  for (const sk of ovDirty){
+    for (const sfx of ['r', 'p']){ const old = ovBatches.get(sk + sfx); if (old){ world.remove(old); old.geometry.dispose(); ovBatches.delete(sk + sfx); } }
+    for (const rs of [true, false]){
+      const mem = []; for (const [k, l] of ovBlocks) if (ovSuperKey(k) === sk) for (const m of l) if (m.rs === rs && m.ov.parent) mem.push(m);
+      if (!mem.length) continue;
+      let nv = 0, ni = 0; for (const m of mem){ nv += m.ov.geometry.attributes.position.count; ni += m.ov.geometry.index.count; }
+      const names = Object.keys(mem[0].ov.geometry.attributes), geo = new THREE.BufferGeometry();
+      if (mem.some(m => Object.keys(m.ov.geometry.attributes).length !== names.length || names.some(n => !m.ov.geometry.attributes[n]))) continue;
+      for (const n of names){ const a0 = mem[0].ov.geometry.attributes[n], arr = new a0.array.constructor(nv*a0.itemSize); let q = 0; for (const m of mem){ const a = m.ov.geometry.attributes[n].array; arr.set(a, q); q += a.length; }
+        geo.setAttribute(n, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); }
+      const ix = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni), rec = []; let k = 0, base = 0;
+      for (const m of mem){ const g = m.ov.geometry, I = g.index.array; rec.push({ at: k, info: m.ov.userData.ovInfo, c: g.boundingSphere.center, r: g.boundingSphere.radius }); for (let q = 0; q < I.length; q++) ix[k++] = I[q] + base; base += g.attributes.position.count; }
+      geo.setIndex(new THREE.BufferAttribute(ix, 1)); geo.computeBoundingSphere();
+      const b = new THREE.Mesh(geo, ATLAS_OV); b.layers.mask = per ? 0 : OV_BIT; b.receiveShadow = rs; b.castShadow = false; b.frustumCulled = false; b.matrixAutoUpdate = false; b.updateMatrix(); b.matrixWorldNeedsUpdate = true;
+      b.userData.ovb = rec; b.onBeforeRender = ovbBefore; b.onAfterRender = ovAfter; world.add(b); ovBatches.set(sk + (rs ? 'r' : 'p'), b);
+    }
+  }
+  ovDirty.clear();
+}
+let _ovS = new Int32Array(256), _ovN = new Int32Array(256);
+function ovbBefore(r, s, c, g){
+  const rec = this.userData.ovb, lv = LIGHTS_ON.value, lo = Math.max(0, Math.floor((lv - .04)*255) - 1), hi = Math.min(255, Math.ceil(lv*255) + 1), pl = CULL.pl, pad = CULL.pad, cull = c === CULL.cam;
+  let m = 0, tot = 0;
+  for (let i = 0; i < rec.length; i++){
+    const e = rec[i];
+    if (cull){ const rr = e.r + pad; let out = false; for (let q = 0; q < 24; q += 4) if (pl[q]*e.c.x + pl[q + 1]*e.c.y + pl[q + 2]*e.c.z + pl[q + 3] < -rr){ out = true; break; } if (out) continue; }
+    const u = e.info, a = u.nFB, o0 = u.off[lo]*3, b = hi >= lo ? (u.off[hi + 1] - u.off[lo])*3 : 0;
+    if (m + 2 > _ovS.length){ const s2 = new Int32Array(_ovS.length*2), n2 = new Int32Array(_ovS.length*2); s2.set(_ovS); n2.set(_ovN); _ovS = s2; _ovN = n2; }
+    if (a){ _ovS[m] = e.at; _ovN[m++] = a; tot += a; }
+    if (b){ _ovS[m] = e.at + a + o0; _ovN[m++] = b; tot += b; }
+  }
+  if (!m){ g.drawRange.start = 0; g.drawRange.count = 0; this.userData.md = null; return; }
+  g.drawRange.start = 0; g.drawRange.count = tot; this.userData.md = { s: _ovS.slice(0, m), n: _ovN.slice(0, m) };
+}
+let SIDE_SPLIT = false;   // (set while a plot or a megastructure is collected: see collect)
+const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m !== ATLAS && m !== ATLAS_SIDE;
 // Faces nobody can ever see: wholly and well inside one of the piece's solid blocks (a box's end sunk into a wall, a post
 // buried in a slab). From any angle the block is in front of them. A block only counts if it's always drawn (never thinned
 // out when zoomed out), opaque and a true box. (Faces pressed flat against a block's face are kept: in testing they still
@@ -117,20 +456,87 @@ function hideCovered(b, C){
   for (let q = 0; q < hid.length; q++) out[nv + q] = hid[q];
   b.i = out; b.hid = hid.length;
 }
-function collect(fn){
+// The buildings' triangles in the order sideArc wants: A, H, the walls slice by slice (S), then slices 0 to 3 again (D).
+// A wall slice only takes triangles turned no higher than level (whatever faces at all upward may face the camera from
+// anywhere); an underside is one the camera can't see at its lowest tilt, nor any higher.
+// (W2a) Inside each list the triangles go largest first (by longest edge), and the layout notes how many have an edge of at
+// least each size in SMALL_E: a frame draws only the front of each list, leaving out what is too small to paint more than a speck.
+const SMALL_E = [0, 1, 2, 3, 4, 5].map(k => .0125*2**k), SMALL_N = SMALL_E.length;
+function sideLayout(buckets, nAt){ return drain(sideLayoutGen(buckets, nAt)); }
+// far: null for the plot's own order; { lean, sticks } for its second order, the one drawn from far away (round 8 item 3): the round parts that have a lean twin are replaced by it (the full ones go to H, so the
+// shadows are the full ones), and the thin sticks' walls go to lists of their own (T), which a frame can draw over a narrower arc than the other walls.
+function* sideLayoutGen(buckets, nAt, far = null){
+  const A = [], H = [], S = Array.from({ length: SIDE_K }, () => []), T = Array.from({ length: SIDE_K }, () => []), w = TAU/SIDE_K, low = Math.sin(PITCH_MIN), lowC = Math.cos(PITCH_MIN);
+  const Ae = [], Se = Array.from({ length: SIDE_K }, () => []), Te = Array.from({ length: SIDE_K }, () => []);   // longest edge of each triangle in A and in the slices
+  let o2 = 0;
+  for (const [mat, b] of buckets){
+    if (!atlasable(mat)) continue;
+    const I = b.i, nv = I.length - b.hid, P = b.p, nvb = P.length/3;
+    let lk = null, stk = null;
+    if (far && far.lean && b.lr){ lk = new Uint8Array(nvb); for (let i = 0; i < b.lr.length; i += 4){ lk.fill(1, b.lr[i], b.lr[i + 1]); lk.fill(2, b.lr[i + 2], b.lr[i + 3]); } }
+    if (far && far.sticks && b.sk){ stk = new Uint8Array(nvb); for (let i = 0; i < b.sk.length; i += 2) stk.fill(1, b.sk[i], b.sk[i + 1]); }
+    const add = (J, q) => {
+      const a3 = J[q]*3, b3 = J[q + 1]*3, c3 = J[q + 2]*3;
+      const ux = P[b3] - P[a3], uy = P[b3 + 1] - P[a3 + 1], uz = P[b3 + 2] - P[a3 + 2], vx = P[c3] - P[a3], vy = P[c3 + 1] - P[a3 + 1], vz = P[c3 + 2] - P[a3 + 2];
+      const nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx, l = Math.hypot(nx, ny, nz);
+      let dst = A, de = Ae;
+      if (l > 0){
+        const y = ny/l, h = Math.hypot(nx, nz)/l;
+        if (y*low + h*lowC < -.002){ dst = H; de = null; }   // an underside: away from the camera at every tilt and turn
+        else if (y <= 0 && h > 0){ let ph = Math.atan2(nz, nx); if (ph < 0) ph += TAU; const sl = Math.min(SIDE_K - 1, Math.floor(ph/w));
+          if (stk && stk[J[q]]){ dst = T[sl]; de = Te[sl]; } else { dst = S[sl]; de = Se[sl]; } }
+      }
+      dst.push(J[q] + o2, J[q + 1] + o2, J[q + 2] + o2);
+      if (de) de.push(Math.max(Math.hypot(ux, uy, uz), Math.hypot(vx, vy, vz), Math.hypot(P[c3] - P[b3], P[c3 + 1] - P[b3 + 1], P[c3 + 2] - P[b3 + 2])));
+    };
+    for (let q = 0; q < nv; q += 3){
+      if (lk && lk[I[q]] === 1){ H.push(I[q] + o2, I[q + 1] + o2, I[q + 2] + o2); continue; }   // (a round part drawn by its lean twin here)
+      add(I, q);
+    }
+    if (lk && b.li) for (let q = 0; q < b.li.length; q += 3) add(b.li, q);
+    for (let q = nv; q < I.length; q++) H.push(I[q] + o2);
+    o2 += nvb;
+    yield;
+  }
+  const cls = new Int32Array((1 + (far ? 2 : 1)*SIDE_K)*SMALL_N);
+  const bySize = (T_, E, row) => {   // largest first (ties keep their order); counts of those at least each size
+    const n = E.length, ord = new Array(n); for (let i = 0; i < n; i++) ord[i] = i;
+    ord.sort((p, q) => E[q] - E[p]);
+    const out = new Array(n*3); for (let i = 0; i < n; i++){ const t = ord[i]*3; out[i*3] = T_[t]; out[i*3 + 1] = T_[t + 1]; out[i*3 + 2] = T_[t + 2]; }
+    for (let k = 0; k < SMALL_N; k++){ let c = 0; while (c < n && E[ord[c]] >= SMALL_E[k]) c++; cls[row*SMALL_N + k] = c*3; }   // (in indices, as the ranges are)
+    return out;
+  };
+  const As = bySize(A, Ae, 0); yield; const Ss = []; for (let j = 0; j < SIDE_K; j++){ Ss.push(bySize(S[j], Se[j], 1 + j)); yield; }
+  const Ts = []; if (far) for (let j = 0; j < SIDE_K; j++){ Ts.push(bySize(T[j], Te[j], 1 + SIDE_K + j)); yield; }
+  const off = [0]; for (const t of Ss) off.push(off[off.length - 1] + t.length);
+  const offT = [0]; for (const t of Ts) offT.push(offT[offT.length - 1] + t.length);
+  const nS = off[SIDE_K], nT = far ? offT[SIDE_K] : 0, nD = off[SIDE_K/2], nDT = far ? offT[SIDE_K/2] : 0, n = As.length + H.length + nS + nT + nD + nDT;
+  const ix = nAt > 65535 ? new Uint32Array(n) : new Uint16Array(n);
+  let k = 0; for (const v of As) ix[k++] = v; for (const v of H) ix[k++] = v; for (const t of Ss) for (const v of t) ix[k++] = v; for (const t of Ts) for (const v of t) ix[k++] = v;
+  for (let j = 0; j < SIDE_K/2; j++) for (const v of Ss[j]) ix[k++] = v;
+  for (let j = 0; j < (far ? SIDE_K/2 : 0); j++) for (const v of Ts[j]) ix[k++] = v;
+  // (S, for the ranges of the shadow pass and where D starts, counts the walls of the sticks too: they sit after the other walls, before D)
+  return { ix, cut: far ? { A: As.length, H: H.length, S: nS + nT, off, offT, cls, far: true } : { A: As.length, H: H.length, S: nS, off, cls } };
+}
+// run a generator to its end (the pieces that are cut into steps, run all at once)
+function drain(g){ let r; while (!(r = g.next()).done); return r.value; }
+function collect(fn){ return drain(collectGen((function*(){ fn(); })())); }
+// the same, a step at a time (body: a generator that yields between its steps): see stageStart
+function* collectGen(body){
+  FAR_CFG.lean = !!(PH.tests.leanRound || window.__LEAN_ROUND); FAR_CFG.sticks = !!(PH.tests.thinSticks || window.__THIN_STICKS);   // (both off unless the tests are on)
   buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {}; curSpots = []; curCover = [];
   for (const k in SPR.size) FOL_LIST[k] = [];
-  fn();
+  yield* body; yield;
   const covers = curCover; curCover = null;
   const geo = new Map();
   let nAt = 0;
   for (const [mat, b] of buckets){ if (atlasable(mat)) nAt += b.p.length/3; else geo.set(mat, bucketGeometry(b)); }
   if (nAt){
-    const pos = new Float32Array(nAt*3), nrm = new Float32Array(nAt*3), col = new Uint8Array(nAt*3), em = new Uint8Array(nAt*4), flk = new Uint8Array(nAt), fine = new Uint8Array(nAt), ons = new Uint8Array(nAt);
+    const pos = new Float32Array(nAt*3), nrm = new Int8Array(nAt*4), col = new Uint8Array(nAt*3), em = new Uint8Array(nAt*4), flk = new Uint8Array(nAt), fine = new Uint8Array(nAt), ons = new Uint8Array(nAt);
     let o = 0;
     for (const [mat, b] of buckets){
       if (!atlasable(mat)) continue;
-      const n = b.p.length/3; pos.set(b.p, o*3); nrm.set(b.n, o*3);
+      const n = b.p.length/3; pos.set(b.p, o*3); { const bn = b.n; for (let q = 0, w = o*4; q < n; q++, w += 4){ nrm[w] = Math.round(bn[q*3]*127); nrm[w + 1] = Math.round(bn[q*3 + 1]*127); nrm[w + 2] = Math.round(bn[q*3 + 2]*127); } }   // (normals as bytes: exact on axis-aligned faces, under half a degree off otherwise)
       const r = Math.round(mat.color.r*255), gg = Math.round(mat.color.g*255), bl = Math.round(mat.color.b*255);
       for (let i=o;i<o+n;i++){ col[i*3] = r; col[i*3+1] = gg; col[i*3+2] = bl; }
       const k = mat.userData.glow;
@@ -142,18 +548,25 @@ function collect(fn){
     }
     // the triangles: each bucket's indices, moved along by where its corners landed; first every bucket's visible ones (in
     // their order), then the hidden ones (drawn only while the piece is being swept in or out: see hideCovered)
-    let ni = 0, nh = 0; const C = prepCovers(covers); for (const [mat, b] of buckets) if (atlasable(mat)){ bucketIndexUpTo(b); hideCovered(b, C); ni += b.i.length; nh += b.hid; }
-    const ix = nAt > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
-    { let k = 0, kh = ni - nh;
+    let ni = 0, nh = 0; const C = prepCovers(covers); for (const [mat, b] of buckets) if (atlasable(mat)){ bucketIndexUpTo(b); hideCovered(b, C); ni += b.i.length; nh += b.hid; yield; }
+    let ix, cut = null;
+    let farL = null;
+    if (SIDE_SPLIT){ ({ ix, cut } = yield* sideLayoutGen(buckets, nAt));
+      if ([...buckets.values()].some(b => b.li || b.sk)) farL = yield* sideLayoutGen(buckets, nAt, { lean: FAR_CFG.lean, sticks: FAR_CFG.sticks }); }
+    else {
+      ix = nAt > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+      let k = 0, kh = ni - nh;
       let o2 = 0; for (const [mat, b] of buckets){ if (!atlasable(mat)) continue; const I = b.i, nv = I.length - b.hid;
         for (let q = 0; q < nv; q++) ix[k++] = I[q] + o2;
         for (let q = nv; q < I.length; q++) ix[kh++] = I[q] + o2;
-        o2 += b.p.length/3; } }
+        o2 += b.p.length/3; }
+    }
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3)); g.setIndex(new THREE.BufferAttribute(ix, 1));
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 4, true)); g.setIndex(new THREE.BufferAttribute(ix, 1));
     g.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); g.setAttribute('aEm', new THREE.BufferAttribute(em, 4, true));
     g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aFine', new THREE.BufferAttribute(fine, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1, true));
-    if (nh) g.userData.shown = ni - nh;   // (the hidden triangles come after this many indices: see hideBefore)
+    if (cut){ g.userData.cut = cut; g.setDrawRange(0, cutRest(cut)); if (farL) g.userData.far = farL; }   // (A, H, S and D: see sideArc; far: the second order, see sideLayoutGen)
+    else if (nh) g.userData.shown = ni - nh;   // (the hidden triangles come after this many indices: see hideBefore)
     geo.set(ATLAS, g);
   }
   for (const g of geo.values()) g.computeBoundingSphere();
@@ -195,6 +608,7 @@ let GREEN_DEFAULT = (() => { try { const v = localStorage.getItem(GREEN_KEY); re
 // A click on a plot that isn't on the current setting brings it to the current setting; a click on one that is
 // moves it (and the setting) on to the next.
 function cycleGreen(c){
+  stageFinishAll();
   const cur = c.green || 'some';
   c.green = cur !== GREEN_DEFAULT ? GREEN_DEFAULT : GREEN_MODES[(GREEN_MODES.indexOf(cur) + 1) % GREEN_MODES.length];
   GREEN_DEFAULT = c.green; try { localStorage.setItem(GREEN_KEY, GREEN_DEFAULT); } catch (e) {}
@@ -351,14 +765,15 @@ const WHITE_TYPES = new Set([domeTower, shellTower, cascadeTerraces]);
 const STALL_TYPES = new Set([stallMarket, foodDeck, foodTower, foodPlaza, billboardLot, domeMarket, cornerMarket]);
 // A plot's building is its stack of sections. A plot with a side pod can have two: c.below, a building on the
 // ground, and c.sections, the pod hanging over it on its scaffold (from c.lift.y), with a gap between them.
-function buildStack(c){
+function buildStack(c){ drain(buildStackGen(c)); }
+function* buildStackGen(c){
   c.belowTop = null; c.belowTops = [];
   c.liftRoof = null;
   if (c.lift && c.below && c.below.length){
-    c.belowTop = stackRun(c, c.below, CURB, 'b', true); c.belowTops = c.sectionTops;
+    c.belowTop = yield* stackRunGen(c, c.below, CURB, 'b', true); c.belowTops = c.sectionTops;
     c.liftRoof = c._topLot && c._topLot.roof ? c._topLot.roof : null; c._topLot = null;   // the roof's corners, for the scaffold's legs
   }
-  const y = stackRun(c, c.sections, c.lift ? c.lift.y : CURB, '', !c.belowTop);   // a side pod's stack starts up in the air, on its scaffold
+  const y = yield* stackRunGen(c, c.sections, c.lift ? c.lift.y : CURB, '', !c.belowTop);   // a side pod's stack starts up in the air, on its scaffold
   c.height = y;
   c.walks = null; c.liftCab = null;
   if (c.lift) liftScaffold(c, c.lift.y);
@@ -367,10 +782,10 @@ function buildStack(c){
 }
 // one stack of sections from y; returns its top. (A section's look is seeded by its own number kh when it has one, so
 // adding a section under a pod leaves the ones above as they were.)
-function stackRun(c, secs, y, tag, first){
+function* stackRunGen(c, secs, y, tag, first){
   let prevWhite = false, prevDeck = false;
   c.sectionTops = [];
-  secs.forEach((sec, k) => {
+  for (let k = 0; k < secs.length; k++){ const sec = secs[k];
     R = mulberry32(hash('sec', c.i, c.j, sec.kh ?? k, sec.zone, sec.seed));   // (the same whether a building stands under a pod or not, so it keeps its look)
     const st = STY[sec.zone], upper = k > 0, last = k === secs.length - 1;
     LUX = sec.zone === 'high' ? luxPalette(hash('lux', c.i, c.j, k, sec.seed)) : sec.zone === 'ind' ? indPalette(hash('ind', c.i, c.j, k, sec.seed)) : null;   // each district's own light colours
@@ -407,7 +822,8 @@ function stackRun(c, secs, y, tag, first){
     if (k === 0 && first) c.firstFloors = lot.floors || 2;
     if (last && !lot.hasCarPad && R() < .7 && !hwAt(c.i, c.j).length && !mtAt(c.i, c.j).length) addPerch({ x: c.x, z: c.z, height: y });   // (no drone perch under a highway: its pillar stands there)
     if (last) c._topLot = lot;
-  });
+    yield;   // (a step: a section is built; see stageStart)
+  }
   return y;
 }
 /* ---------- side pods: a building hung off the side of a taller one ---------- */
@@ -1017,6 +1433,12 @@ const isDarkPlot = c => !!c.sections.length && !c.mega && hash('dark', c.i, c.j)
 const REG = 5, regions = new Map(), dirtyRegions = new Set();
 const regKey = (i, j) => Math.floor(i/REG) + ',' + Math.floor(j/REG);
 // a cell's solid geometry is drawn as its own mesh (usually one draw call); plants and glows are batched per region
+// the walls' mesh of a building mesh in the A/H/S/D order (sideArc): the same triangles, no shadow of its own
+function sideMesh(mesh){
+  const sm = new THREE.Mesh(mesh.geometry, ATLAS_SIDE); sm.receiveShadow = mesh.receiveShadow; sm.castShadow = false; sm.layers.mask = mesh.layers.mask;
+  sm.onBeforeRender = sideBefore; sm.onAfterRender = cutAfter; sm.userData.sideOf = mesh; mesh.userData.side = sm;
+  return sm;
+}
 function cellView(c){
   if (c.view){ world.remove(c.view); c.view = null; markSolid(c); }
   if (!c.data) return;
@@ -1026,6 +1448,7 @@ function cellView(c){
     if (m.userData.colorOnly){ mesh.layers.set(1); mesh.renderOrder = 2; } else { mesh.castShadow = !m.userData.noCast; mesh.receiveShadow = true; }   // see-through glass: colour pass only
     if (geo.userData.shown !== undefined){ mesh.onBeforeRender = hideBefore; mesh.onAfterRender = hideAfter; }
     g.add(mesh);
+    if (geo.userData.cut){ mesh.onBeforeRender = cutBefore; mesh.onAfterRender = cutAfter; g.add(sideMesh(mesh)); }   // (and its walls: see sideArc)
   }
   world.add(freezeTree(g)); c.view = g;
   markSolid(c);
@@ -1037,7 +1460,7 @@ function cellView(c){
 function corridorTris(geoMap, sx, sz, ex, ez, by0, by1, pad = .25){
   const bx0 = Math.min(sx, ex) - pad, bx1 = Math.max(sx, ex) + pad, bz0 = Math.min(sz, ez) - pad, bz1 = Math.max(sz, ez) + pad, tris = [];
   for (const [, g] of geoMap){   // (glass counts: a door can go in a shopfront)
-    const P = g.attributes.position.array, I = g.index ? g.index.array : null, n = I ? I.length : P.length/3;
+    const P = g.attributes.position.array, I = g.index ? g.index.array : null, n = I ? triIndexCount(g) : P.length/3;   // (not the copied wall slices: see sideArc)
     for (let k = 0; k < n; k += 3){
       const a = (I ? I[k] : k)*3, b = (I ? I[k + 1] : k + 1)*3, q = (I ? I[k + 2] : k + 2)*3;
       if (Math.max(P[a], P[b], P[q]) < bx0 || Math.min(P[a], P[b], P[q]) > bx1) continue;
@@ -1100,18 +1523,89 @@ function bucketHeightAt(x, z){
   return m;
 }
 function bucketTop(){ let m = CURB; for (const b of buckets.values()){ const p = b.p; for (let q = 1; q < p.length; q += 3) if (p[q] > m) m = p[q]; } return m; }
+// A plot's generation in steps: the platform, then each section, then the pieces of collect (the typed arrays, hideCovered a bucket at a time, the wall layout), each a step
+// that ends in a yield (see collectGen, stackRunGen, sideLayoutGen). Run all at once it is the old rebuildCell; run by stageStep it is a few milliseconds a frame.
+function* cellBody(c){
+  withStyle(c.style, () => buildPlatform(c)); yield;
+  if (c.sections.length){ PUT_KEEPOUT = lineKeepOut(c); if (STAGE) STAGE.keep = PUT_KEEPOUT; try { yield* buildStackGen(c); } finally { PUT_KEEPOUT = null; } }
+  c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); mtFeet(c);   // (and the feet of any highway over it)
+}
 function rebuildCell(c){
+  if (STAGE_Q.length || STAGE_READY.length) stageFinishAll();   // (a plot still being built in steps is finished first)
   finishAnimsOn(c);   // a neighbour's edit can rebuild a cell that is still animating
   disposeData(c.data);
   c.height = CURB;
   c.dark = isDarkPlot(c);
   DARK = c.dark;
-  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length){ PUT_KEEPOUT = lineKeepOut(c); try { buildStack(c); } finally { PUT_KEEPOUT = null; } } c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); mtFeet(c); }); } finally { DARK = false; }   // (and the feet of any highway over it)
+  SIDE_SPLIT = true;
+  try { c.data = drain(collectGen(cellBody(c))); } finally { DARK = false; SIDE_SPLIT = false; }
+  rebuildCellPost(c);
+}
+function rebuildCellPost(c){
+  if (pplReady && pplFrame >= 60) c._nvFresh = true;   // (built or changed during play: the never-seen job works these out)
   if (c.liftCab) podDoorSpot(c);
   if (c.mega){ const m = megas.get(c.mega); if (m && m.roofH) c.height = m.roofH; }
   cellView(c);
   c.emitters = c.data.emitters; c.pads = c.data.pads; c.ports = c.data.ports;
   dirtyRegions.add(regKey(c.i, c.j));
+}
+// ---- plots built in steps (round 8, item 2). One job at a time; between its steps the globals the builders write into are put back as they were, so nothing else that builds
+// (a megastructure, a sync edit) can see or spoil a half-made piece. A job that is still running when another edit starts is finished at once (stageFinishAll). ----
+// things to do a few frames from now (the police alert's second bike route and the like): later(fn, frames)
+const LATER = []; const later = (fn, n = 1) => { if (PH.tests.alertNow || window.__ALERT_NOW) fn(); else LATER.push({ fn, n }); };
+function runLater(){ for (let i = 0; i < LATER.length; i++){ const e = LATER[i]; if (--e.n <= 0){ LATER.splice(i--, 1); e.fn(); } } }
+let STAGE = null; const STAGE_Q = [], STAGE_READY = []; let FRAME_WORK = 0, SOLID_WAIT = 0;   // (FRAME_WORK: milliseconds of the spread work done this frame, so the region merge, a step of its own, waits for a quieter frame)
+const stageNow = () => (window.__realNow ? window.__realNow() : performance.now());
+const STAGE_ON = () => !(PH.tests.stageNow || window.__STAGE_NOW);
+const FOL_KEYS = Object.keys(SPR.size);
+const stageCap = () => ({ R, buckets, emitters, carPads, curPorts, glowList, curSpots, curCover, fol: FOL_KEYS.map(k => FOL_LIST[k]), DARK, SIDE_SPLIT, PUT_KEEPOUT, STAGE });
+const stageApply = s => { R = s.R; buckets = s.buckets; emitters = s.emitters; carPads = s.carPads; curPorts = s.curPorts; glowList = s.glowList; curSpots = s.curSpots; curCover = s.curCover;
+  for (let q = 0; q < FOL_KEYS.length; q++) FOL_LIST[FOL_KEYS[q]] = s.fol[q]; DARK = s.DARK; SIDE_SPLIT = s.SIDE_SPLIT; PUT_KEEPOUT = s.PUT_KEEPOUT; STAGE = s.STAGE; };
+function stageStart(c, onDone){
+  const job = { c, onDone, state: null, dark: isDarkPlot(c), keep: null, data: null, gen: null };
+  job.gen = (function*(){ job.data = yield* collectGen(cellBody(c)); })();
+  STAGE_Q.push(job); return job;
+}
+function stageSlice(job){   // one step of the job; true when it is finished
+  const prev = stageCap();
+  if (job.state) stageApply(job.state);
+  STAGE = job; DARK = job.dark; SIDE_SPLIT = true; PUT_KEEPOUT = job.keep;
+  let r; try { r = job.gen.next(); } finally { job.state = stageCap(); stageApply(prev); }
+  return r.done;
+}
+function stageStep(ms = 4){
+  FRAME_WORK = 0;
+  if (STAGE_READY.length){ const t0 = stageNow(), j = STAGE_READY.shift(); j.onDone(j.data); FRAME_WORK += stageNow() - t0; return; }   // (finishing a plot, which merges and animates, is a frame of its own)
+  const job = STAGE_Q[0]; if (!job) return; const t0 = stageNow();
+  for (;;){ if (stageSlice(job)){ STAGE_Q.shift(); STAGE_READY.push(job); break; } if (stageNow() - t0 >= ms) break; }
+  FRAME_WORK += stageNow() - t0;
+}
+// An edit to plot c, built in steps: c first, then whatever its edit makes rebuild (air towers, pods), each only after the one before is in place (they read each other's heights),
+// then the air towers once more (as refresh does), and then the rest of refresh. done(prebuilt) runs in the frame after the last step.
+function stageChain(c, done){
+  const old = { view: c.view, data: c.data }, built = new Map(), todo = refreshTodo([c]);
+  const seq = todo.concat(todo.filter(x => airCells.has(x)));
+  let k = 0;
+  const next = () => {
+    if (k >= seq.length){   // all made: put the plots in place and finish the edit as refresh does
+      for (const x of built.keys()) if (x !== c){ finishAnimsOn(x); disposeData(x.data); }   // (what rebuildCell does first)
+      c.view = null; c.data = null;
+      refresh([c], [], built);
+      return done({ old });
+    }
+    const x = seq[k++], job = stageStart(x, data => {
+      const prev = built.get(x); if (prev) disposeData(prev.data);   // (an air tower made twice: the first is not used)
+      built.set(x, { data, dark: job.dark });
+      next();
+    });
+  };
+  next();
+}
+function stageFinishAll(){
+  while (STAGE_READY.length || STAGE_Q.length){
+    if (STAGE_READY.length){ const j = STAGE_READY.shift(); j.onDone(j.data); continue; }
+    const job = STAGE_Q[0]; while (!stageSlice(job)); STAGE_Q.shift(); job.onDone(job.data);
+  }
 }
 /* ---------- solid geometry merged by region ---------- */
 // Every plot and megastructure keeps its own view (one mesh per material), but drawing a big city one building at a
@@ -1123,38 +1617,79 @@ function rebuildCell(c){
 const solidRegions = new Map(), solidDirty = new Set(), animCells = new Set();
 // (merged in blocks of MREG x MREG plots, smaller than the regions: a block is drawn whole whenever any of it is on screen)
 const MREG = 3, mergeKey = (i, j) => Math.floor(i/MREG) + ',' + Math.floor(j/MREG);
-const markSolid = c => { if (c) solidDirty.add(mergeKey(c.i, c.j)); };
+const solidAbort = key => { if (SOLID_JOB && SOLID_JOB.key === key) SOLID_JOB = null; };   // (a block changed while it was being merged in steps: that merge is dropped, the block is merged again)
+const markSolid = c => { if (c){ const k = mergeKey(c.i, c.j); solidAbort(k); solidDirty.add(k); } };
 // every merge block that overlaps a region (REG x REG plots)
 function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
-  for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++) solidDirty.add(i + ',' + j); }
-function flushSolid(){ flushSuper(); if (!solidDirty.size) return; for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); }
-const mergeable = o => o.isMesh && !o.isInstancedMesh && o.layers.mask === 1 && !o.material.transparent && o.geometry.index && !o.userData.noMerge;
-function rebuildSolid(key){
+  for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++){ solidAbort(i + ',' + j); solidDirty.add(i + ',' + j); } }
+function flushSolid(){
+  flushSuper();
+  if (SYNC_NOW()){ solidFinish(); if (solidDirty.size){ for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); } }
+  else if (SOLID_JOB || solidDirty.size) solidStep(Math.max(1, 4 - FRAME_WORK));   // (a block's merge in steps over the frames, after the frame's other spread work)
+  ovFlush();
+}
+const mergeable = o => o.isMesh && !o.isInstancedMesh && (o.layers.mask === 1 || o.layers.mask === STATIC_BIT) && !o.material.transparent && o.geometry.index && !o.userData.noMerge;
+// the block's merged meshes taken down (its plots draw one by one again, the same picture)
+function solidRemoveOld(key){
   const old = solidRegions.get(key);
-  if (old){ for (const m of old.members) m.visible = true; world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); }
+  if (old && old.far) for (const m of old.far){ FAR_MESHES.delete(m); m.geometry = m.userData.stdGeo; if (m.userData.farGeo) m.userData.farGeo.dispose(); }   // (the one not held by the mesh is let go here; the other with the group)
+  if (old){ SC_DIRTY.quiet++; try { for (const m of old.members) m.visible = !(m.userData.sideOf && m.geometry.userData.full); world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); } finally { SC_DIRTY.quiet--; } }
+  ovForget(key);   // (a walls' mesh stays hidden while its piece is swept: see showHidden)
+}
+function rebuildSolid(key){ solidFinish(); SC_DIRTY.quiet++; try { drain(rebuildSolidGen(key)); } finally { SC_DIRTY.quiet--; } }
+// the same in steps (merging a block is 20 to 80 ms in one piece): a step per attribute, per row of triangles, per material. SOLID_JOB: the block being merged, if any.
+let SOLID_JOB = null;
+function solidSlice(){ SC_DIRTY.quiet++; try { return SOLID_JOB.gen.next().done; } finally { SC_DIRTY.quiet--; } }
+function solidFinish(){ if (SOLID_JOB){ while (!solidSlice()); SOLID_JOB = null; } }
+function solidStep(ms){
+  if (!SOLID_JOB){ if (!solidDirty.size) return; const k = solidDirty.values().next().value; solidDirty.delete(k); SOLID_JOB = { key: k, gen: rebuildSolidGen(k) }; }
+  const t0 = stageNow();
+  do { if (solidSlice()){ SOLID_JOB = null; break; } } while (stageNow() - t0 < ms);
+  FRAME_WORK += stageNow() - t0;
+}
+function* rebuildSolidGen(key){
+  solidRemoveOld(key);
   const byMat = new Map(), members = [];
   for (const c of [...cells.values(), ...megas.values()]){
     if (!c.view || c.view.parent !== world || !c.view.visible || mergeKey(c.i, c.j) !== key || animCells.has(c)) continue;   // (only views actually on show)
-    for (const o of c.view.children) if (mergeable(o)){ let l = byMat.get(o.material); if (!l) byMat.set(o.material, l = []); l.push(o); }
+    for (const o of c.view.children) if (mergeable(o) && !o.userData.sideOf){ let l = byMat.get(o.material); if (!l) byMat.set(o.material, l = []); l.push(o); }   // (a walls' mesh goes with its building's)
   }
   if (!byMat.size) return;
-  const g = new THREE.Group();
+  yield;
+  const g = new THREE.Group(), farMeshes = [];
   for (const [mat, list] of byMat){
     if (list.length < 2) continue;   // (nothing to gain)
     list.sort((a, b) => a.id - b.id);   // (in the order three would have drawn them one by one: where two pieces meet at exactly the same depth, the same one wins)
-    const merged = mergeIndexed(list.map(o => o.geometry)); if (!merged) continue;
-    const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow;
+    const cutting = list.some(o => o.geometry.userData.cut);
+    const merged = cutting ? yield* mergeCutGen(list.map(o => o.geometry)) : yield* mergeIndexedGen(list.map(o => o.geometry)); if (!merged) continue;
+    dropCpuCopy(merged);
+    let mergedFar = null;
+    if (cutting && list.some(o => o.geometry.userData.far)){ mergedFar = yield* mergeCutGen(list.map(o => o.geometry), true, merged); if (mergedFar) dropCpuCopy(mergedFar, true); }   // (the second order, drawn from far away: sharing the corners)
+    const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.blockKey = key;   // (the glow overlay is batched by it: see ovBatch)
     mesh.userData.sortId = list[0].id;   // (drawn where its first piece would have been: see the opaque sort below)
     if (merged.userData.shown !== undefined){ mesh.onBeforeRender = hideBefore; mesh.onAfterRender = hideAfter; }
     g.add(mesh);
-    for (const o of list){ o.visible = false; members.push(o); }
+    if (cutting){ mesh.onBeforeRender = cutBefore; mesh.onAfterRender = cutAfter; const sm = sideMesh(mesh); sm.userData.sortId = list[0].userData.side ? list[0].userData.side.id : list[0].id; g.add(sm);
+      if (mergedFar){ for (const o of [mesh, sm]){ o.userData.stdGeo = merged; o.userData.farGeo = mergedFar; farMeshes.push(o); FAR_MESHES.add(o); } FARM.stamp++; } }
+    for (const o of list){ o.visible = false; members.push(o); if (o.userData.side){ o.userData.side.visible = false; members.push(o.userData.side); } }
   }
   if (!g.children.length) return;
-  world.add(freezeTree(g)); solidRegions.set(key, { group: g, members });
+  yield;
+  world.add(freezeTree(g)); solidRegions.set(key, { group: g, members, far: farMeshes });
+}
+// A region's merged geometry is read by nothing once it is on the card (the merge copies from the plots' own geometry, which stays; picking tests boxes; the glow overlay is cut from it before the first draw),
+// so its CPU arrays are let go right after their upload: they were 1.2 GB of the 3 GB heap in the biggest city. (Overlay test "keep the CPU copies of merged geometry" switches it off.)
+function dropCpuCopy(geo, indexOnly = false){
+  if (PH.tests.keepCpu || window.__KEEP_CPU) return;
+  if (geo.index) geo.userData.bpe = geo.index.array.BYTES_PER_ELEMENT;
+  const free = function(){ this.array = null; };
+  if (!indexOnly) for (const n in geo.attributes) geo.attributes[n].onUpload(free);
+  if (geo.index) geo.index.onUpload(free);
 }
 // Indexed geometries joined into one: corners one after another, and the triangles of all of them, the ones shown first
 // (each piece's in order), then the hidden ones (see hideCovered). Null if they don't share the same attributes.
-function mergeIndexed(geos){
+function mergeIndexed(geos){ return drain(mergeIndexedGen(geos)); }
+function* mergeIndexedGen(geos){
   const names = Object.keys(geos[0].attributes);
   for (const g of geos) if (Object.keys(g.attributes).length !== names.length || names.some(n => !g.attributes[n] || g.attributes[n].itemSize !== geos[0].attributes[n].itemSize || g.attributes[n].normalized !== geos[0].attributes[n].normalized || g.attributes[n].array.constructor !== geos[0].attributes[n].array.constructor)) return null;
   let nv = 0, ni = 0, nh = 0;
@@ -1162,7 +1697,7 @@ function mergeIndexed(geos){
   const out = new THREE.BufferGeometry();
   for (const n of names){ const a0 = geos[0].attributes[n], arr = new a0.array.constructor(nv*a0.itemSize); let o = 0;
     for (const g of geos){ const a = g.attributes[n].array; arr.set(a, o); o += a.length; }
-    out.setAttribute(n, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); }
+    out.setAttribute(n, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); yield; }
   const ix = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
   let k = 0, kh = ni - nh, base = 0;
   for (const g of geos){ const I = g.index.array, sh = g.userData.shown ?? I.length;
@@ -1174,11 +1709,64 @@ function mergeIndexed(geos){
   out.computeBoundingSphere();
   return out;
 }
+// Building geometries joined in the A/H/S/D order (sideArc): every piece's A, every piece's H, then each wall slice of
+// every piece in turn, then slices 0 to 3 again. (A piece without the order counts as all A, and its hidden ones as H.)
+function mergeCut(geos){ return drain(mergeCutGen(geos)); }
+function* mergeCutGen(geos, far = false, shared = null){
+  const names = Object.keys(geos[0].attributes);
+  for (const g of geos) if (Object.keys(g.attributes).length !== names.length || names.some(n => !g.attributes[n] || g.attributes[n].itemSize !== geos[0].attributes[n].itemSize || g.attributes[n].normalized !== geos[0].attributes[n].normalized || g.attributes[n].array.constructor !== geos[0].attributes[n].array.constructor)) return null;
+  let nv = 0; for (const g of geos) nv += g.attributes.position.count;
+  const out = new THREE.BufferGeometry();
+  for (const n of names){
+    if (shared){ out.setAttribute(n, shared.attributes[n]); continue; }   // (the second order of a block uses the first one's corners)
+    const a0 = geos[0].attributes[n], arr = new a0.array.constructor(nv*a0.itemSize); let o = 0;
+    for (const g of geos){ const a = g.attributes[n].array; arr.set(a, o); o += a.length; }
+    out.setAttribute(n, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); yield; }
+  const seg = g => { const fo = far && g.userData.far, I = fo ? fo.ix : g.index.array, u = fo ? fo.cut : g.userData.cut;
+    if (u){ const base = u.A + u.H, r = { I, u, a: [0, u.A], h: [u.A, base], s: u.off.map(x => base + x), t: new Array(SIDE_K + 1).fill(0) };
+      if (u.offT){ const bt = base + u.off[SIDE_K]; r.t = u.offT.map(x => bt + x); } return r; }
+    const sh = g.userData.shown ?? I.length; return { I, u: null, a: [0, sh], h: [sh, I.length], s: new Array(SIDE_K + 1).fill(I.length), t: new Array(SIDE_K + 1).fill(0) }; };
+  const parts = geos.map(seg);
+  let nA = 0, nH = 0; const nB = new Array(SIDE_K).fill(0), nT = new Array(SIDE_K).fill(0);
+  for (const p of parts){ nA += p.a[1] - p.a[0]; nH += p.h[1] - p.h[0]; for (let k = 0; k < SIDE_K; k++){ nB[k] += p.s[k + 1] - p.s[k]; nT[k] += p.t[k + 1] - p.t[k]; } }
+  const off = [0]; for (let k = 0; k < SIDE_K; k++) off.push(off[k] + nB[k]);
+  const offT = [0]; for (let k = 0; k < SIDE_K; k++) offT.push(offT[k] + (far ? nT[k] : 0));
+  const n = nA + nH + off[SIDE_K] + offT[SIDE_K] + off[SIDE_K/2] + offT[SIDE_K/2], ix = nv > 65535 ? new Uint32Array(n) : new Uint16Array(n);
+  let k = 0;
+  // where each piece's own triangles landed, row by row (row 0: A; rows 1 to K: the wall slices; then slices 0 to K/2 - 1 again; for the far order the sticks' walls and their first half again), and its box:
+  // what lets a frame draw only the pieces that are on screen (see cullPieces)
+  const RT0 = 1 + SIDE_K + SIDE_K/2, nP = geos.length, rows = far ? RT0 + SIDE_K + SIDE_K/2 : RT0, rowS = new Int32Array(rows*nP), rowN = new Int32Array(rows*nP), box = new Float32Array(nP*6);
+  const rowC = new Int32Array(rows*nP*SMALL_N);   // (per piece and row: how many triangles are at least each size)
+  const srcRow = row => row <= SIDE_K ? row : row < RT0 ? row - SIDE_K : row < RT0 + SIDE_K ? SIDE_K + 1 + (row - RT0) : SIDE_K + 1 + (row - RT0 - SIDE_K);
+  const put = (lo, row) => { let base = 0; parts.forEach((p, gi) => { const I = p.I, r = typeof lo === 'function' ? lo(p) : null; const [x, y] = r || [p[lo][0], p[lo][1]];
+    if (row >= 0){ rowS[row*nP + gi] = k; rowN[row*nP + gi] = y - x;
+      const src = srcRow(row), cu = p.u, o = (row*nP + gi)*SMALL_N;
+      for (let l = 0; l < SMALL_N; l++) rowC[o + l] = cu && cu.cls ? (src*SMALL_N + l < cu.cls.length ? cu.cls[src*SMALL_N + l] : 0) : y - x; }
+    for (let q = x; q < y; q++) ix[k++] = I[q] + base; base += geos[gi].attributes.position.count; }); };
+  put('a', 0); put('h', -1); yield;
+  for (let j = 0; j < SIDE_K; j++){ put(p => [p.s[j], p.s[j + 1]], 1 + j); if (j % 4 === 3) yield; }
+  if (far) for (let j = 0; j < SIDE_K; j++){ put(p => [p.t[j], p.t[j + 1]], RT0 + j); if (j % 4 === 3) yield; }
+  for (let j = 0; j < SIDE_K/2; j++){ put(p => [p.s[j], p.s[j + 1]], 1 + SIDE_K + j); if (j % 4 === 3) yield; }
+  if (far) for (let j = 0; j < SIDE_K/2; j++) put(p => [p.t[j], p.t[j + 1]], RT0 + SIDE_K + j);
+  if (shared) for (let q = 0; q < nP; q++){ const o = shared.userData.pcs ? shared.userData.pcs.box : null; if (o) box.set(o.subarray(q*6, q*6 + 6), q*6); }
+  else geos.forEach((g, gi) => { const P = g.attributes.position.array; let x0 = 1e30, x1 = -1e30, y0 = 1e30, y1 = -1e30, z0 = 1e30, z1 = -1e30;
+    for (let q = 0; q < P.length; q += 3){ const x = P[q], y = P[q + 1], z = P[q + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+    box.set([x0, x1, y0, y1, z0, z1], gi*6); });
+  yield;
+  out.setIndex(new THREE.BufferAttribute(ix, 1));
+  const sTot = off[SIDE_K] + offT[SIDE_K];
+  out.userData.cut = far ? { A: nA, H: nH, S: sTot, off, offT, far: true } : { A: nA, H: nH, S: off[SIDE_K], off }; out.setDrawRange(0, nA + nH + sTot);
+  if (nP > 1) out.userData.pcs = { n: nP, rowS, rowN, rowC, box, stamp: -1, vis: new Uint8Array(nP), seen: 0, far };
+  if (shared && shared.boundingSphere) out.boundingSphere = shared.boundingSphere.clone(); else out.computeBoundingSphere();
+  return out;
+}
 // three's own order for solid things (by layer group, render order, shader, material, distance, then creation), except that
 // a region's merged mesh takes the place of the first of its pieces
 // (and whatever doesn't write the normal image after everything that does: see mrtBegin in sky.js)
 const mrtLast = r => mrtWants(r.object, r.material) ? 0 : 1;
-renderer.setOpaqueSort((a, b) => a.groupOrder !== b.groupOrder ? a.groupOrder - b.groupOrder : MRT && mrtLast(a) !== mrtLast(b) ? mrtLast(a) - mrtLast(b) : a.renderOrder !== b.renderOrder ? a.renderOrder - b.renderOrder
+// (the overlay's test: cut-out sprites, which throw pixels away, after every plain solid draw; see perfhud.js)
+const cutLast = r => PH.tests.cutoutsLast && r.material.userData.cutout ? 1 : 0;
+renderer.setOpaqueSort((a, b) => a.groupOrder !== b.groupOrder ? a.groupOrder - b.groupOrder : MRT && mrtLast(a) !== mrtLast(b) ? mrtLast(a) - mrtLast(b) : cutLast(a) !== cutLast(b) ? cutLast(a) - cutLast(b) : a.renderOrder !== b.renderOrder ? a.renderOrder - b.renderOrder
   : a.program !== b.program ? a.program.id - b.program.id : a.material.id !== b.material.id ? a.material.id - b.material.id : a.z !== b.z ? a.z - b.z
   : (a.object.userData.sortId ?? a.id) - (b.object.userData.sortId ?? b.id));
 // and likewise for see-through things (three's order: layer group, render order, distance back to front, creation)
@@ -1201,7 +1789,8 @@ const SREG = 4, superRegions = new Map(), superDirty = new Set();
 const superKey = rk => { const c = rk.indexOf(','); return Math.floor(+rk.slice(0, c)/SREG) + ',' + Math.floor(+rk.slice(c + 1)/SREG); };
 function flushSuper(){
   if (!superDirty.size) return;
-  for (const sk of superDirty){
+  const once = !SYNC_NOW(), todo = once ? [superDirty.values().next().value] : superDirty;
+  for (const sk of todo){
     const old = superRegions.get(sk);
     if (old){ world.remove(old); disposeMerged(old); superRegions.delete(sk); }
     const src = sk[0] === 'r' ? [...regions].map(([k, g]) => [k, g]) : [...connRegions].map(([k, r]) => [k, r.group]), key = sk.slice(1);
@@ -1209,7 +1798,7 @@ function flushSuper(){
     if (!groups.length) continue;
     const g = mergeLeaves(groups); world.add(freezeTree(g)); superRegions.set(sk, g);
   }
-  superDirty.clear();
+  if (once) superDirty.delete(todo[0]); else superDirty.clear();
 }
 // geometry a merged batch made itself is freed with it; geometry it shares with a region's own batch is not
 function disposeMerged(g){ g.traverse(o => { if ((o.isMesh || o.isPoints) && o.userData.own) o.geometry.dispose(); }); }
@@ -1295,7 +1884,8 @@ function nearPort(){
   return near[Math.floor(Math.random()*near.length)];
 }
 // after any change: refresh steam, drone perches, landing pads, traffic heights, framing
-function syncAgents(){
+function syncAgents(){ syncAgentsA(); syncSteamMap(); syncPeople(); syncAgentsEnd(); }
+function syncAgentsA(){
   ports = []; carPads = []; emitters = [];
   for (const c of cells.values()){ ports.push(...c.ports); carPads.push(...c.pads); emitters.push(...c.emitters); }
   for (const m of megas.values()) if (m.data) emitters.push(...m.data.emitters);
@@ -1303,7 +1893,6 @@ function syncAgents(){
   for (const d of pairCache.values()) if (d.emitters) emitters.push(...d.emitters);   // steam leaking from the pipework between buildings
   portLots = [...cells.values()].map(c => ({ x: c.x, z: c.z, height: c.height }));
   VENTS = [...cells.values()].filter(c => c.vent).map(c => c.vent);   // steam vents, for the mist
-  makeSteamMap(VENTS, [...cells.values()].flatMap(c => c.lifts || []));   // steam vents for the mist, lift pads for their shimmer
   setupSteam();
   for (const d of drones) if (!ports.includes(d.at) || (d.phase !== 'inside' && !ports.includes(d.to))){
     d.phase = 'inside'; d.g.visible = false; d.at = nearPort(); d.timer = 1 + Math.random()*2;
@@ -1312,10 +1901,26 @@ function syncAgents(){
   let top = 6; for (const c of cells.values()) if (c.height > top) top = c.height;
   for (const m of megas.values()) if (m.top > top) top = m.top;
   skyTop = top + 2.4;
-  syncPeople();
+}
+// the steam map (vents for the mist, lift pads for their shimmer), a few vents a frame when the upkeep is spread
+let STEAM_JOB = null;
+const steamArgs = () => [VENTS, [...cells.values()].flatMap(c => c.lifts || [])];
+function syncSteamMap(){ makeSteamMap(...steamArgs()); }
+function syncSteamStep(ms){ if (!STEAM_JOB) STEAM_JOB = makeSteamMapGen(...steamArgs()); const t0 = stageNow(); do { if (STEAM_JOB.next().done){ STEAM_JOB = null; return true; } } while (stageNow() - t0 < ms); return false; }
+function syncAgentsEnd(){
   shadowDirty = true;
   save();
 }
+// What an edit leaves to do after its own plots are built (the bridges between neighbors, the steam map, the walking network, residents, jobs, bots, saving the city) is a
+// whole-city rebuild of 150 to 400 ms. Done at once it froze the frame the piece was placed in; now it runs a stage a frame while the sweep-in animation plays (the piece's own plots are built at
+// once). A new edit restarts the stages (each one rebuilds from the cities' cells, so a repeat is safe). Loading, and the overlay test "edit upkeep in the same frame", do it all at once.
+let SYNC_Q = null;
+const SYNC_STAGES = [() => rebuildConnections(), () => syncAgentsA(), ms => syncSteamStep(ms), ms => syncPeopleNetStep(ms), ms => syncPeopleRestStep(ms), () => syncAgentsEnd()];
+const SYNC_NOW = () => !!(PH.tests.syncNow || window.__SYNC_NOW) || !pplReady || pplFrame < 60;   // (the first second of a session is loading)
+function queueSync(){ SYNC_Q = 0; syncPeopleAbort(); STEAM_JOB = null; }
+function stepSync(ms = 3){ if (SYNC_Q === null) return; const q = SYNC_Q, t0 = stageNow();
+  const r = SYNC_STAGES[q](Math.max(1, ms - FRAME_WORK)); FRAME_WORK += stageNow() - t0; if (r === false) return; SYNC_Q = q + 1 >= SYNC_STAGES.length ? null : q + 1; }   // (a stage is a frame's work, or several frames' for the walking network and the residents: those answer false until they are done)
+function finishSync(){ while (SYNC_Q !== null){ const q = SYNC_Q; const r = SYNC_STAGES[q](Infinity); if (r === false) continue; SYNC_Q = q + 1 >= SYNC_STAGES.length ? null : q + 1; } }
 // the middle of everything built: where the camera starts, and where H jumps back to
 function centerView(now = false){
   let x = 0, z = 0, n = 0;
@@ -1339,7 +1944,8 @@ function parkCells(){
   }
   return changed;
 }
-function refresh(list, megaList = []){
+// the plots an edit to these must rebuild (the plots themselves, a park's, an air-filter hologram's tower, a side pod hanging on them), the pods last
+function refreshTodo(list, megaList = []){
   list = list.concat(parkCells());
   // an air-filter hologram hangs over the plots in front of its tower, so a change next door rebuilds the tower too
   for (const a of airCells){
@@ -1349,14 +1955,18 @@ function refresh(list, megaList = []){
   }
   // a side pod's walkways go to the neighbours tall enough to reach: a change next door rebuilds the pod, after the neighbour
   for (const c of [...list]) if (c) for (const [a, b] of SIDES4){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n && n.lift) list.push(n); }
-  const todo = [...new Set(list)].filter(Boolean).sort((p, q) => (p.lift ? 1 : 0) - (q.lift ? 1 : 0));
-  for (const c of todo) rebuildCell(c);
+  return [...new Set(list)].filter(Boolean).sort((p, q) => (p.lift ? 1 : 0) - (q.lift ? 1 : 0));
+}
+function refresh(list, megaList = [], prebuilt = null){
+  if (!prebuilt && (STAGE_Q.length || STAGE_READY.length)) stageFinishAll();
+  const todo = refreshTodo(list, megaList);
+  for (const c of todo){ if (prebuilt && prebuilt.has(c)){ c.dark = prebuilt.get(c).dark; c.data = prebuilt.get(c).data; rebuildCellPost(c); } else rebuildCell(c); }
   // an air-filter tower picks its face from its neighbours' heights, so if one of them was only built after it in this
   // pass (loading a saved city builds every plot in one go), build the tower again now that they all stand
-  for (const c of todo) if (airCells.has(c) && !anims.some(a => a.c === c)) rebuildCell(c);
+  if (!prebuilt) for (const c of todo) if (airCells.has(c) && !anims.some(a => a.c === c)) rebuildCell(c);
   for (const m of megaList) rebuildMega(m);
   for (const k of dirtyRegions){ markSolidRegion(k); if (heldRegions.has(k)) pendingRegions.add(k); else rebuildRegion(k); } dirtyRegions.clear();
-  rebuildConnections(); syncAgents();
+  if (SYNC_NOW()) { rebuildConnections(); syncAgents(); } else { queueSync(); shadowDirty = true; }   // (after a player's edit the rest is done a stage a frame: see queueSync)
 }
 function rebuildAll(){ refresh([...cells.values()], [...megas.values()]); }
 
@@ -1386,6 +1996,7 @@ function removePlatform(c){
 }
 const MAX_SECTIONS = 4, MAX_HEIGHT = 24;
 function addSection(c, zone){
+  stageFinishAll();
   if (c.sections.length >= MAX_SECTIONS || c.height > MAX_HEIGHT) return;
   finishAnimsOn(c);
   const y0 = c.sections.length ? c.height : CURB;
@@ -1393,6 +2004,17 @@ function addSection(c, zone){
   const cap = hwCap(c), sec = { zone, seed: (Math.random()*1e9)|0, style: styleNow() };
   if (cap !== null){ const f = Math.floor((cap - y0 - (c.sections.length ? .1 : 0) + .02)/FH); if (f < 1) return; sec.mf = f; }
   holdRegion(c);
+  if (cap === null && !c.lift && STAGE_ON()){
+    // the piece is made in steps over the next frames; the plot keeps its old look until it is ready, then the sweep builds the new one (the edit's own frame is a few milliseconds)
+    c.sections.push(sec);
+    stageChain(c, prebuilt => {
+      const old = { view: prebuilt.old.view, data: prebuilt.old.data };
+      dropView(old);
+      startAnim(c, 'build', y0 - .05, c.height + 1.2, zone, SIDE, null);
+      later(() => maybeSpawnMegas(c), 1);   // (a megastructure arriving is a build of its own: a frame of its own)
+    });
+    return;
+  }
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   c.sections.push(sec);
   if (cap !== null){
@@ -1412,6 +2034,7 @@ function addSection(c, zone){
 }
 // hang a pod off the side of a taller building, over the empty plot c, its deck at height y
 function addLift(c, y, zone){
+  stageFinishAll();
   if (!c || c.mega || c.lift || hwAt(c.i, c.j).length || mtAt(c.i, c.j).length) return null;   // (not under a highway or the metro)
   if (c.sections.length && y < c.height + FH - .05) return null;   // over a shorter building: a floor's gap at least
   finishAnimsOn(c);
@@ -1555,13 +2178,16 @@ function animMaterials(u){
   return { atlas, nrm };
 }
 function startAnim(c, kind, y0, y1, zone, w, old, sound, opts = {}){
+  SC_EDITS++;
   const view = kind === 'build' ? c.view : old.view;
+  scNote(view);   // (the cache's rectangle redraw: this piece's box)
   const held = kind === 'build';   // plants and glows arrive when a build finishes, but leave as soon as a removal starts
   if (!view){ if (old) dropView(old); if (held) releaseRegion(regKey(c.i, c.j)); return; }
   const col = new THREE.Color(zone ? (ZONES[zone] ? ZONES[zone].col : zone) : '#e3d6bd');
   const u = { plane: new THREE.Plane(new THREE.Vector3(0, -1, 0), kind === 'build' ? y0 : y1), h: { value: y0 }, col: { value: col.clone().multiplyScalar(1.6) }, on: { value: 1 } };
   const mats = animMaterials(u);
-  view.traverse(o => { if (!o.isMesh) return; o.userData.baseMat = o.material; o.userData.baseLayer = o.layers.mask; o.material = o.material === ATLAS ? mats.atlas : o.material; if (!o.material.userData.colorOnly) o.layers.set(3); });
+  view.traverse(o => { if (!o.isMesh) return; if (o.userData.isOv){ o.visible = false; return; }   // (the glow overlay waits: the sweep draws the piece itself)
+    o.userData.baseMat = o.material; o.userData.baseLayer = o.layers.mask; o.material = o.material === ATLAS ? mats.atlas : o.material; if (!o.material.userData.colorOnly) o.layers.set(3); });
   showHidden(view, true);   // (sliced open by the sweep: the faces normally hidden inside can show)
   if (kind === 'remove' && c.view) c.view.visible = false;   // what's left appears when the sweep is done
   const lineMat = () => new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
@@ -1578,7 +2204,7 @@ function startAnim(c, kind, y0, y1, zone, w, old, sound, opts = {}){
   for (const l of lines){ l.layers.set(1); l.renderOrder = 998; scene.add(l); }
   if (!opts.quiet){ if (sound) sfx.play(sound, { spread: 0 }); else sfx.play(kind === 'build' ? 'place' : 'remove'); }
   const a = { c, kind, view, old, u, mats, box, scan, foot, trail, lines, x: c.x, z: c.z, y0, by0, y1, wx, wz, t: 0, dur: opts.slow ? 4.6 : kind === 'build' ? .15 : .12, slow: !!opts.slow, bare: !!opts.bare, onEnd: opts.onEnd, cue: opts.cue, reg: regKey(c.i, c.j), held };
-  animCells.add(c); rebuildSolid(mergeKey(c.i, c.j)); solidDirty.delete(mergeKey(c.i, c.j));   // (out of its region's merge while it animates: its own meshes show)
+  animCells.add(c); solidAbort(mergeKey(c.i, c.j)); solidRemoveOld(mergeKey(c.i, c.j)); solidDirty.add(mergeKey(c.i, c.j));   // (out of its region's merge while it animates: its own meshes show; the rest of the block is merged again at the next flush)
   anims.push(a);
   return a;
 }
@@ -1631,10 +2257,11 @@ function updateAnims(dt){
   }
 }
 function endAnim(i){
-  const a = anims[i]; anims.splice(i, 1);
+  SC_EDITS++;
+  const a = anims[i]; anims.splice(i, 1); scNote(a.view);
   if (!anims.some(b => b.c === a.c)){ animCells.delete(a.c); markSolid(a.c); }   // (back into its region's merge)
   for (const l of a.lines){ scene.remove(l); l.material.dispose(); }
-  a.view.traverse(o => { if (o.isMesh){ o.material = o.userData.baseMat || o.material; if (o.userData.baseLayer !== undefined) o.layers.mask = o.userData.baseLayer; else o.layers.set(0); } });
+  a.view.traverse(o => { if (o.isMesh && o.userData.isOv){ o.visible = true; return; } if (o.isMesh){ o.material = o.userData.baseMat || o.material; if (o.userData.baseLayer !== undefined) o.layers.mask = o.userData.baseLayer; else o.layers.set(0); } });
   showHidden(a.view, false);
   a.mats.atlas.dispose(); a.mats.nrm.dispose();
   if (a.kind === 'remove'){ dropView(a.old); if (a.c.view) a.c.view.visible = true; }
@@ -1644,11 +2271,13 @@ function endAnim(i){
 }
 function finishAnimsOn(c){ for (let i = anims.length - 1; i >= 0; i--) if (anims[i].c === c) endAnim(i); }
 function clearIsland(){
+  STAGE_Q.length = 0; STAGE_READY.length = 0; LATER.length = 0; SYNC_Q = null; syncPeopleAbort(); STEAM_JOB = null; if (typeof NV !== 'undefined'){ NV.queue.length = 0; if (NV.job){ nvFree(NV.job); NV.job = null; } }   // (anything still being made in steps belongs to the old city)
   while (anims.length) endAnim(anims.length - 1);
   for (const c of cells.values()){ disposeData(c.data); c.data = null; cellView(c); }
   for (const m of megas.values()){ disposeData(m.data); m.data = null; cellView(m); if (m.fx){ m.fx.dispose(); m.fx = null; } }
   megas.clear();
   for (const k of [...regions.keys()]){ disposeGroup(regions.get(k)); regions.delete(k); superDirty.add('r' + superKey(k)); }
+  SOLID_JOB = null;
   for (const k of [...solidRegions.keys()]){ const r = solidRegions.get(k); world.remove(r.group); disposeGroup(r.group); solidRegions.delete(k); } solidDirty.clear(); animCells.clear();
   cells.clear(); hwClearAll(); mtClearAll();
   for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) cells.set(ckey(i,j), newCell(i, j));
@@ -1758,7 +2387,7 @@ function applyTarget(t){
   if (!zone || t.c.mega) return null;
   addSection(t.c, zone); return t.c;
 }
-function removeAt(pk){ if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMegaTier(megas.get(pk.c.mega)); if (pk.kind === 'low') return removeBelow(pk.c); removeSection(pk.c); }
+function removeAt(pk){ stageFinishAll(); if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMegaTier(megas.get(pk.c.mega)); if (pk.kind === 'low') return removeBelow(pk.c); removeSection(pk.c); }
 
 /* ---------- hover outline showing where a click would build ---------- */
 const hoverMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85, depthTest: false });

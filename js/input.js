@@ -14,7 +14,7 @@ function setTiltMode(on){
   const el = document.getElementById('tiltChip'); if (el) el.hidden = !on;
 }
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
-const camPix = new THREE.Vector2(), keys = new Set(), _cr = new THREE.Vector3(), _cu = new THREE.Vector3(), _cv = new THREE.Vector3(), _cs = new THREE.Vector3();
+const camPosTrue = new THREE.Vector3(), camPix = new THREE.Vector2(), keys = new Set(), _cr = new THREE.Vector3(), _cu = new THREE.Vector3(), _cv = new THREE.Vector3(), _cs = new THREE.Vector3();
 function updateCamera(dt){
   if (S.spin && !dragging){ spinT += dt; if (spinT > 6){ spinT = 0; yawT += PI/4; } }
   yaw += (yawT-yaw)*Math.min(1, dt*3.5);
@@ -39,8 +39,10 @@ function updateCamera(dt){
   // pixels crawling. (Motion along the view direction changes nothing in an orthographic view.)
   const px = 2*zoom/H, sy = Math.sin(yaw), cy = Math.cos(yaw), sp_ = Math.sin(PITCH), cp_ = Math.cos(PITCH);
   _cr.set(cy, 0, -sy); _cv.set(-sy*cp_, -sp_, -cy*cp_); _cu.crossVectors(_cr, _cv);
-  const a = Math.round(camT.dot(_cr)/px)*px, b = Math.round(camT.dot(_cu)/px)*px, c = camT.dot(_cv);
+  const a = Math.round(camT.dot(_cr)/px)*px, b = Math.round(camT.dot(_cu)/px)*px, cTrue = camT.dot(_cv), c = SC.pin(cTrue);   // (the static cache keeps the camera's place along the view fixed for as long as it can: see staticcache.js)
   camPix.set(a/px, b/px);
+  _cs.copy(_cr).multiplyScalar(a).addScaledVector(_cu, b).addScaledVector(_cv, cTrue);
+  camPosTrue.set(_cs.x + sy*cp_*CAM_DIST, _cs.y + sp_*CAM_DIST, _cs.z + cy*cp_*CAM_DIST);   // (where the camera really is)
   _cs.copy(_cr).multiplyScalar(a).addScaledVector(_cu, b).addScaledVector(_cv, c);
   cam.position.set(_cs.x + sy*cp_*CAM_DIST, _cs.y + sp_*CAM_DIST, _cs.z + cy*cp_*CAM_DIST);
   cam.lookAt(_cs);

@@ -94,13 +94,16 @@ def launch(pw):
     return pw.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-vsync', '--autoplay-policy=user-gesture-required'])
 
 
-def open_game(browser, url, scene, vp):
+def open_game(browser, url, scene, vp, sc_mode=None, extra_init=None):
     ctx = browser.new_context(viewport={'width': vp[0], 'height': vp[1]}, device_scale_factor=1)
     pg = ctx.new_page()
     pg.set_default_timeout(1800000)
     errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.add_init_script('window.__PERF_SCENE = ' + json.dumps({'storage': scene.get('storage', {})}) + ';')
+    if sc_mode:   # the static cache's mode (see js/staticcache.js); PERF_SC_BASE_MODE for the baseline, PERF_SC_MODE for the candidate
+        pg.add_init_script('window.__SC_MODE = ' + json.dumps(sc_mode) + ';')
+    if extra_init: pg.add_init_script(extra_init)
     pg.add_init_script(path=os.path.join(HERE, 'shim.js'))
     pg.goto('http://127.0.0.1:%d%s' % (PORT, url))
     pg.wait_for_function('() => document.readyState === "complete" && typeof frame === "function"')
@@ -124,6 +127,14 @@ def load_scenes(only=None):
 
 # The script every scene runs, step by step: (label, frames to run, JS to run first). The same on both builds.
 def steps(scene):
+    if os.environ.get('PERF_SWEEP'):   # every angle the game allows: 12 turns x 3 tilts (lowest, middle, highest) x 3 zooms; PERF_SWEEP=quick for a third of them
+        quick = os.environ['PERF_SWEEP'] == 'quick'
+        out = [('sw_start', 3, 'S.cycle = false; S.hour = 12; S.rain = false')]
+        for z in (30, 15, 6):
+            for pi, pd in enumerate((12, 45, 82)):
+                for k in range(0, 12, 3 if quick else 1):
+                    out.append(('sw_z%d_p%d_y%02d' % (z, pd, k), 3, 'zoom = zoomT = %s; PITCH = pitchT = %s*Math.PI/180; yaw = yawT = %s*Math.PI/6 + .07' % (z, pd, k)))
+        return out
     s = [
         ('noon_f1', 1, None),
         ('noon_f30', 29, None),
@@ -144,19 +155,100 @@ def steps(scene):
     if scene.get('rush'):   # a crowd at the stations: boarding, a full train, the lifts, impatience
         s += [('rush_a', 400, scene['rush'])] + [('rush_' + c, 400, None) for c in 'bcdef']
     s.append(('evening_cycle', 120, 'S.hour = 17.8; S.cycle = true; S.vclouds = true'))
+    if os.environ.get('PERF_SC_STEPS'):   # the static cache's steps (js/staticcache.js): frames before a capture are drawn, so the cache is carried along
+        far = "const f = [...cells.values()].filter(c => c.sections.length && !c.mega).sort((a, b) => Math.hypot(b.x - camT.x, b.z - camT.z) - Math.hypot(a.x - camT.x, a.z - camT.z))[0]; if (f) addSection(f, 'mid');"
+        near = "const f = [...cells.values()].filter(c => c.sections.length && !c.mega).sort((a, b) => Math.hypot(a.x - camT.x, a.z - camT.z) - Math.hypot(b.x - camT.x, b.z - camT.z))[0]; if (f) addSection(f, 'mid');"
+        lst = [
+            ('c_settle', 4, 'S.hour = 12; S.rain = false', 3),
+            ('c_still', 60, None, 4),
+            ('c_pan_slow', 12, 'camGoal.x += 1.5; camGoal.z -= 1', 10),
+            ('c_pan_fast', 20, 'camGoal.x += 25; camGoal.z += 20', 12),
+            ('c_pan_fast2', 40, None, 6),
+            ('c_pan_edge', 26, 'camGoal.x += 11; camGoal.z += 2', 22),
+            ('c_pan_edge2', 14, None, 12),
+            ('c_soft', 16, 'S.hour += .15', 14),
+            ('c_soft2', 40, None, 10),
+            ('c_ring1', 50, 'camGoal.x += 30', 40),   # long pans one way and back and on another axis: the ring wraps round its edges
+            ('c_ring2', 60, 'camGoal.x -= 60; camGoal.z += 20', 50),
+            ('c_ring3', 60, 'camGoal.z -= 40', 50),
+            ('c_ring4', 40, 'camGoal.x += 30; camGoal.z += 20', 30),
+            ('c_ring5', 60, None, 4),
+            ('c_turn', 14, 'yawT += .5', 10),
+            ('c_turn2', 150, None, 4),
+            ('c_zoom', 14, 'zoomT = zoomT*1.4', 10),
+            ('c_zoom2', 150, None, 4),
+            ('sd_slow', 6, 'yawT += .12', 6),   # speed-based detail (world.js SD): a slow turn (nothing should drop), then at rest
+            ('sd_slow_end', 80, None, 4),
+            ('sd_fast', 6, 'yawT += 3', 6),     # a fast spin, captured while it runs
+            ('sd_fast_end', 120, None, 4),
+            ('sd_zoomf', 6, 'zoomT = Math.max(6, zoomT/1.7)', 6),   # a quick zoom out
+            ('sd_zoomf_end', 150, None, 4),
+            ('c_edit_off', 8, far, 6),
+            ('c_edit_off2', 60, None, 4),
+            ('c_edit_in', 6, near, 3),
+            ('c_edit_in2', 60, None, 4),
+            # edits drawn frame by frame (the edit's own frame included): the cache's rectangle redraw (staticcache.js scEditRect); compare with PERF_BASE_INIT='window.__NO_RECT = true;'
+            ('r_sun', 6, 'S.cycle = false; S.rain = false; S.hour = 14', 6),
+            ('r_sun2', 60, None, 4),
+            ('r_place', 4, "const c = cells.get(ckey(-1, 3)); if (c && !c.mega) addSection(c, 'mid');", 3),
+            ('r_place_mid', 40, None, 8),
+            ('r_place_end', 130, None, 6),
+            ('r_place_end2', 40, None, 4),
+            ('r_demo', 4, "const c = cells.get(ckey(2, -3)); if (c && c.sections.length) removeAt({ kind: 'bld', c });", 3),
+            ('r_demo_mid', 40, None, 8),
+            ('r_demo_end', 130, None, 6),
+            ('r_demo_end2', 40, None, 4),
+            ('r_tower', 4, "const c = cells.get(ckey(2, 3)); if (c && !c.mega) { addSection(c, 'high'); addSection(c, 'high'); }", 3),
+            ('r_tower_mid', 60, None, 8),
+            ('r_tower_end', 200, None, 6),
+            ('r_tower_end2', 40, None, 4),
+            ('r_pan', 50, 'camGoal.x += 30', 40),   # the ring has wrapped by now: an edit whose rectangle straddles its edge
+            ('r_pan2', 40, None, 4),
+            ('r_wrap', 4, near, 3),
+            ('r_wrap_mid', 40, None, 8),
+            ('r_wrap_end', 130, None, 6),
+            ('r_wrap_end2', 40, None, 4),
+            ('c_dusk', 40, 'S.hour = 19', 8),
+            ('c_dusk2', 600, None, 6),
+            ('c_night', 30, 'S.hour = 23', 6),
+            ('c_night2', 600, None, 6),
+            ('c_night_still', 30, None, 5),
+            ('c_rain', 30, 'S.rain = true', 6),
+            ('c_rain2', 90, None, 6),
+            ('c_cycle', 30, 'S.rain = false; S.hour = 17.8; S.cycle = true', 10),
+            ('c_cycle2', 200, None, 12),
+            ('c_day9', 20, 'S.cycle = false; S.rain = false; S.hour = 9', 8),
+            ('c_day9b', 900, 'S.cycle = true', 6),   # the day cycle running at mid-morning: the cache serves lighting up to a drift threshold (and a strip job) old
+            ('c_day9c', 900, None, 6),
+            ('c_day9d', 900, None, 6),
+            # the day cycle at 27 times its real speed with every frame drawn (an upper bound on how far the cache's lighting lags the sun)
+            ('c_fast0', 20, 'S.cycle = false; S.rain = false; S.hour = 9; window.__at0 = window.__at0 || applyTime', 6),
+            ('c_fast1', 40, 'applyTime = function(){ S.hour = (S.hour + .003) % 24; return window.__at0(); }', 40),
+            ('c_fast2', 24, None, 24),
+            ('c_fast3', 24, None, 24),
+            ('c_fast4', 8, 'applyTime = window.__at0', 6),
+            ('c_opt', 12, 'S.cycle = false; S.hour = 12; S.capRes = false; zoomT = 30', 8),   # Settings, Render, Optimize framerate: the render size changes
+            ('c_opt2', 80, None, 4),
+            ('c_opt_off', 12, 'S.capRes = true', 8),
+            ('c_opt_off2', 80, None, 4),
+        ]
+        keep = os.environ.get('PERF_STEPS')
+        return [x for x in lst if x[0] in keep.split(',')] if keep else lst
     keep = os.environ.get('PERF_STEPS')   # a shorter run for heavy scenes: only these labels (the same on both builds)
     if keep:
         s = [x for x in s if x[0] in keep.split(',')]
     return s
 
 
-def run_scene(browser, url, scene, vp, keep_png=True):
-    ctx, pg, errs = open_game(browser, url, scene, vp)
+def run_scene(browser, url, scene, vp, keep_png=True, sc_mode=None, extra_init=None):
+    ctx, pg, errs = open_game(browser, url, scene, vp, sc_mode, extra_init)
     caps = []
-    for label, n, js in steps(scene):
+    for st in steps(scene):
+        label, n, js = st[:3]; draw = st[3] if len(st) > 3 else 0
+        if os.environ.get('PERF_SC_DRAW'): draw = min(draw, int(os.environ['PERF_SC_DRAW']))   # (fewer drawn frames for the heaviest scenes)
         if js:
             pg.evaluate('() => { ' + js + ' }')
-        c = pg.evaluate('n => __perf.cap(n)', n)
+        c = pg.evaluate('([n, d]) => __perf.cap(n, d)', [n, draw])
         caps.append((label, c))
     ctx.close()
     return caps, errs
@@ -192,6 +284,7 @@ def cmd_diff(base_ref, cand_ref, only, quick):
     uc = make_site('cand', cand_ref)
     os.makedirs(OUT, exist_ok=True)
     fails, total, info_rows, notes = [], 0, [], []
+    sc_build = os.path.exists(os.path.join(CACHE, 'sites', 'cand', 'js', 'staticcache.js'))
     vps = VIEWPORTS[:1] if quick else VIEWPORTS
     with sync_playwright() as pw:
         br = launch(pw)
@@ -200,20 +293,25 @@ def cmd_diff(base_ref, cand_ref, only, quick):
                 tag = '%s_%dx%d' % (sc['name'], vp[0], vp[1])
                 t0 = time.time()
                 # (a fresh browser for each build: two heavy scenes one after the other in one browser can lose its page)
-                br.close(); br = launch(pw); cb, eb = run_scene(br, ub, sc, vp)
-                br.close(); br = launch(pw); cc, ec = run_scene(br, uc, sc, vp)
+                br.close(); br = launch(pw); cb, eb = run_scene(br, ub, sc, vp, sc_mode=os.environ.get('PERF_SC_BASE_MODE'), extra_init=os.environ.get('PERF_BASE_INIT'))
+                br.close(); br = launch(pw); cc, ec = run_scene(br, uc, sc, vp, sc_mode=os.environ.get('PERF_SC_MODE'), extra_init=os.environ.get('PERF_CAND_INIT'))   # (PERF_CAND_INIT: JS run before the candidate's scripts, e.g. window.__FULL_RATE = true;)
                 if eb or ec:
                     fails.append('%s page errors: base %s cand %s' % (tag, eb[:2], ec[:2]))
                 for (lb, a), (lc, b) in zip(cb, cc):
                     total += 1
                     name = tag + '_' + lb
+                    if os.environ.get('PERF_SC_STEPS') and b.get('sc'):
+                        print('   %-34s %s' % (name, b['sc']))
                     pa, pb = png_bytes(a['png']), png_bytes(b['png'])
                     if pa != pb:
                         fails.append('%s: pixels: %s' % (name, pixel_diff(pa, pb, os.path.join(OUT, name))))
                     if a['state'] != b['state']:
                         fails.append('%s: state differs first at "%s"' % (name, first_state_diff(a['state'], b['state'])))
                     ia, ib = a['info'], b['info']
-                    if ib['calls'] > ia['calls'] or ib['tex'] != ia['tex']:
+                    if sc_build and ib['tex'] - ia['tex'] in (0, 3, 6):   # (the static cache: two sets of color, normal and depth targets, and its own pass: more draws and three or six more textures are by design)
+                        if ib['geos'] != ia['geos']:
+                            notes.append('%s: geometries %d -> %d' % (name, ia['geos'], ib['geos']))
+                    elif ib['calls'] > ia['calls'] or ib['tex'] != ia['tex']:
                         fails.append('%s: renderer.info base %s cand %s' % (name, ia, ib))
                     elif ib['tris'] > ia['tris'] or ib['geos'] != ia['geos']:
                         notes.append('%s: triangles %d -> %d, geometries %d -> %d' % (name, ia['tris'], ib['tris'], ia['geos'], ib['geos']))

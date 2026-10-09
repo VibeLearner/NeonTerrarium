@@ -43,33 +43,39 @@ window.__perf = (() => {
     return JSON.stringify(o);
   };
   // run n frames, then one more with renderer.info counted, and grab that frame's pixels (same task: the buffer is still there)
-  P.cap = n => {
-    if (n > 1){ P.skip = true; __step(n - 1); P.skip = false; }
+  // (draw: how many of the last frames before the captured one are drawn too, so that a cache carried from frame to frame is exercised)
+  P.cap = (n, draw = 0) => {
+    const skipN = Math.max(0, n - 1 - draw);
+    if (skipN > 0){ P.skip = true; __step(skipN); P.skip = false; }
+    if (draw > 0 && n > 1){ if (P.shadowOwed){ shadowDirty = true; P.shadowOwed = false; } __step(Math.min(draw, n - 1)); }
     if (P.shadowOwed){ shadowDirty = true; P.shadowOwed = false; }
     renderer.info.reset();
     __step(1);
     const png = canvas.toDataURL('image/png');
     const info = { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, points: renderer.info.render.points, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures };
-    return { png, info, state: P.state() };
+    return { png, info, state: P.state(), sc: typeof SC !== 'undefined' && SC.line ? SC.line() : '' };
   };
   // Timing. CPU: frames simulated without drawing (as between captures), each update function and the whole frame timed;
   // the skipped draws still do their world-matrix updates, so that cost is in "frame". GPU: one view drawn, then single
   // passes redrawn several times each, synchronised with a 1-pixel read, so a pass's own cost is measured on its own.
-  P.cpuTime = n => {
-    const now = __realNow, acc = {}, cur = {};
-    const names = ['updateCars', 'updateDrones', 'updateTrips', 'updateHighways', 'updateMetros', 'updateVehicleShadows', 'updateAnims', 'updateMegaFx', 'updatePeople', 'updateSteam', 'updateConveyors', 'updateCamera'];
+  P.cpuTime = (n, extra = []) => P.report(P.cpuFrames(n, extra).acc);
+  P.cpuFrames = (n, extra = [], perFrame = null) => {   // the raw per-frame times of each timed function (and 'frame': the whole step), in order
+    const now = __realNow, acc = {}, cur = {}, rows = [];
+    const names = extra.concat(['checkBumps', 'updateBots', 'updateLurkers', 'updateClubs', 'decide', 'arrive', 'updateLifts', 'liftCab', 'liftRide', 'drawBouncers', 'drawDeckWalkers', 'drawLiftCabs', 'lawnHolos', 'lawnPicnics', 'updateCars', 'updateDrones', 'updateTrips', 'updateHighways', 'updateMetros', 'updateVehicleShadows', 'updateAnims', 'updateMegaFx', 'updatePeople', 'updateSteam', 'updateConveyors', 'updateCamera']);
     const orig = {};
     for (const nm of names){ const f = window[nm]; if (typeof f !== 'function') continue; orig[nm] = f;
       window[nm] = function(...a){ const t0 = now(); const r_ = f.apply(this, a); cur[nm] = (cur[nm] || 0) + now() - t0; return r_; }; }
     P.skip = true;
     for (let i = 0; i < n; i++){
+      if (perFrame) eval(perFrame);
       for (const k in cur) delete cur[k];
       const t0 = now(); __step(1); cur.frame = now() - t0;
       for (const k in cur) (acc[k] || (acc[k] = [])).push(cur[k]);
+      rows.push(Object.assign({}, cur));
     }
     P.skip = false;
     for (const nm in orig) window[nm] = orig[nm];
-    return P.report(acc);
+    return { acc, rows };
   };
   P.report = acc => { const out = {}; for (const k in acc){ const a = acc[k].slice().sort((x, y) => x - y); out[k] = { mean: a.reduce((s_, v) => s_ + v, 0)/a.length, p95: a[Math.min(a.length - 1, Math.floor(a.length*.95))], n: a.length }; } return out; };
   P.gpuTime = reps => {

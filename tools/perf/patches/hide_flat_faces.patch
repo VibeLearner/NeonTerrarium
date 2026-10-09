@@ -1,0 +1,71 @@
+diff --git a/js/world.js b/js/world.js
+index e77f9b3..47d1296 100644
+--- a/js/world.js
++++ b/js/world.js
+@@ -251,6 +251,7 @@ const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m
+ // changed a few pixels.)
+ // The hidden triangles go to the end of the bucket's list (hid: how many); they're left out of drawing but kept, so a
+ // building's sweep in or out (which slices it open) can draw them, and the walking maps still see every triangle.
++const HIDE_FLAT = 1e-5, HIDE_PLANE = 1e-4;   // (a face pressed against a block's face: how far it may stick out past the face's edge, and how far off the plane)
+ const HIDE_DEEP = .01;   // how far inside a block a face must be to count as hidden (world units)
+ // the piece's blocks, ready for testing (once per piece): their inverse matrices, bounds and a grid to find them by
+ function prepCovers(covers){
+@@ -268,13 +269,48 @@ function prepCovers(covers){
+     for (let q = 0; q < 8; q++){ const a = q & 1 ? .5 : -.5, c = q & 2 ? .5 : -.5, d = q & 4 ? .5 : -.5;
+       const x = e[0]*a + e[4]*c + e[8]*d + e[12], y = e[1]*a + e[5]*c + e[9]*d + e[13], z = e[2]*a + e[6]*c + e[10]*d + e[14];
+       x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+-    return { inv, lim: [.5 - HIDE_DEEP/(sx || 1), .5 - HIDE_DEEP/(sy || 1), .5 - HIDE_DEEP/(sz || 1)], box: [x0, x1, y0, y1, z0, z1] };
++    // its six faces, for faces pressed against them from outside (see hideCovered): outward normal, plane offset, and the face's rectangle
++    const L = [sx, sy, sz], faces = [];
++    for (let ax = 0; ax < 3; ax++) for (const sg of [-1, 1]){
++      const i0 = ax*4, ob = (ax + 1)%3, oc = (ax + 2)%3, ib = ob*4, ic = oc*4;
++      const m = [sg*e[i0]/L[ax], sg*e[i0 + 1]/L[ax], sg*e[i0 + 2]/L[ax]];
++      const c0 = [e[12] + sg*.5*e[i0], e[13] + sg*.5*e[i0 + 1], e[14] + sg*.5*e[i0 + 2]];
++      faces.push({ m, d: m[0]*c0[0] + m[1]*c0[1] + m[2]*c0[2], c0, ub: [e[ib]/L[ob], e[ib + 1]/L[ob], e[ib + 2]/L[ob]], uc: [e[ic]/L[oc], e[ic + 1]/L[oc], e[ic + 2]/L[oc]], hb: .5*L[ob] + HIDE_FLAT, hc: .5*L[oc] + HIDE_FLAT });
++    }
++    return { inv, lim: [.5 - HIDE_DEEP/(sx || 1), .5 - HIDE_DEEP/(sy || 1), .5 - HIDE_DEEP/(sz || 1)], box: [x0, x1, y0, y1, z0, z1], faces };
+   });
+   cv.forEach((c, k) => { const [x0, x1, y0, y1, z0, z1] = c.box;
+-    for (let x = Math.floor(x0/G); x <= Math.floor(x1/G); x++) for (let y = Math.floor(y0/G); y <= Math.floor(y1/G); y++) for (let z = Math.floor(z0/G); z <= Math.floor(z1/G); z++){
++    for (let x = Math.floor((x0 - 1e-3)/G); x <= Math.floor((x1 + 1e-3)/G); x++) for (let y = Math.floor((y0 - 1e-3)/G); y <= Math.floor((y1 + 1e-3)/G); y++) for (let z = Math.floor((z0 - 1e-3)/G); z <= Math.floor((z1 + 1e-3)/G); z++){
+       const h = key(x, y, z); let l = grid.get(h); if (!l) grid.set(h, l = []); l.push(k); } });
+   return { cv, grid, key, G };
+ }
++// A face lying flat against a block's face, turned into that block (the back of a plate or a window pane set on a wall, the
++// touching faces of two blocks): the block is between it and every view it could be seen from, so it can never show. It has to
++// sit on the block's face (within HIDE_PLANE) and inside its rectangle, facing exactly the other way.
++// (window.__NO_HIDE_FLAT, set before the page loads, keeps these faces in the drawn lists, for comparing the two.)
++const NO_HIDE_FLAT = !!window.__NO_HIDE_FLAT;
++function flatCovered(P, a3, b3, c3, l, cv){
++  const ux = P[b3] - P[a3], uy = P[b3 + 1] - P[a3 + 1], uz = P[b3 + 2] - P[a3 + 2], vx = P[c3] - P[a3], vy = P[c3 + 1] - P[a3 + 1], vz = P[c3 + 2] - P[a3 + 2];
++  let nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx; const ln = Math.hypot(nx, ny, nz);
++  if (!(ln > 1e-12)) return false;
++  nx /= ln; ny /= ln; nz /= ln;
++  for (let li = 0; li < l.length; li++){
++    const fs = cv[l[li]].faces;
++    for (let k = 0; k < 6; k++){
++      const f = fs[k], m = f.m;
++      if (nx*m[0] + ny*m[1] + nz*m[2] > -.99999) continue;   // (not facing the opposite way)
++      let ok = true;
++      for (let q = 0; q < 3 && ok; q++){
++        const o = q === 0 ? a3 : q === 1 ? b3 : c3, x = P[o], y = P[o + 1], z = P[o + 2];
++        if (Math.abs(m[0]*x + m[1]*y + m[2]*z - f.d) > HIDE_PLANE){ ok = false; break; }
++        const rx = x - f.c0[0], ry = y - f.c0[1], rz = z - f.c0[2];
++        if (Math.abs(rx*f.ub[0] + ry*f.ub[1] + rz*f.ub[2]) > f.hb || Math.abs(rx*f.uc[0] + ry*f.uc[1] + rz*f.uc[2]) > f.hc) ok = false;
++      }
++      if (ok) return true;
++    }
++  }
++  return false;
++}
+ function hideCovered(b, C){
+   b.hid = 0;
+   if (!C || !b.i.length) return;
+@@ -296,6 +332,7 @@ function hideCovered(b, C){
+           for (let a = 0; a < 3; a++) if (Math.abs(m[a]*x + m[4 + a]*y + m[8 + a]*z + m[12 + a]) > lim[a]){ ok = false; break; } }
+         hidden = ok;
+       }
++      if (!hidden && !NO_HIDE_FLAT) hidden = flatCovered(P, a3, b3, c3, l, cv);
+     }
+     if (hidden) hid.push(I[t], I[t + 1], I[t + 2]); else { out[nv++] = I[t]; out[nv++] = I[t + 1]; out[nv++] = I[t + 2]; }
+   }

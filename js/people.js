@@ -66,7 +66,7 @@ function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMa
       vec3 col = vSpr.w > 1.5 ? c.rgb : c.rgb * mix(tint, vec3(1.0), 0.3);
       gl_FragColor = normalMode > 0.5 ? vec4(0.5, 0.5, 1.0, 1.0) : vec4(col, 1.0);
     }`,
-}), 'vec4(0.5, 0.5, 1.0, 1.0)'); }
+}), 'vec4(0.5, 0.5, 1.0, 1.0)', true); }
 const PPL_MAT = spriteMat(PPL_TEX, PPL.W, PPL.H, PPL.cw, PPL.ch, PPL.rows);
 function spriteBatch(mat, max){
   const geo = new THREE.InstancedBufferGeometry();
@@ -115,7 +115,7 @@ function rasterize(data, x0, z0, nx, nz){
   const x1 = x0 + nx*GR, z1 = z0 + nz*GR;
   for (const geo of data.geo.values()){
     if (geo.attributes.uv) continue;   // flat floor decals: nothing to walk round
-    const P = geo.attributes.position.array, I = geo.index ? geo.index.array : null, nT = I ? I.length : P.length/3;
+    const P = geo.attributes.position.array, I = geo.index ? geo.index.array : null, nT = I ? triIndexCount(geo) : P.length/3;   // (not the copied wall slices: world.js)
     for (let t = 0; t + 2 < nT; t += 3){
       const a3 = (I ? I[t] : t)*3, b3 = (I ? I[t + 1] : t + 1)*3, c3 = (I ? I[t + 2] : t + 2)*3;   // (a triangle's three corners)
       const y0 = P[a3 + 1], y1 = P[b3 + 1], y2 = P[c3 + 1];
@@ -211,6 +211,13 @@ function crossing(a, b, dx, dz){
   }
   return null;
 }
+// (kept for each plot and side while both plots' maps are the ones it was found on: an edit elsewhere leaves it as it was)
+function crossingCached(a, b, dx, dz){
+  if (PH.tests.slowSync || window.__SLOW_SYNC) return crossing(a, b, dx, dz);
+  const Ga = cellGrid(a), Gb = cellGrid(b), k = dx + ',' + dz, m = a._cx || (a._cx = {}), e = m[k];
+  if (e && e.sa === Ga.src && e.sb === Gb.src && e.b === b && e.x === a.x && e.z === a.z) return e.p;
+  const p = crossing(a, b, dx, dz); m[k] = { sa: Ga.src, sb: Gb.src, b, x: a.x, z: a.z, p }; return p;
+}
 // a door: walk in from the middle of a side to the first wall; it must be flat across the doorway, with room to stand in front
 function findDoor(c, dx, dz, maxIn, tol = .08){
   // the middle of the side first, then further along it either way
@@ -291,16 +298,26 @@ function gridPaths(G, from, targets){
 }
 function ngLink(a, b, pts, len, cost = len){ if (a === b) return; const e = { a, pts, len, cost }; NG.adj[a].set(b, e); NG.adj[b].set(a, e); }
 // one plot's paths, cached until the plot or its endpoints change
-function plotEdges(c, ends, pairOk){
-  const G = cellGrid(c), sig = ends.map(e => e.key + '@' + e.x.toFixed(2) + ',' + e.z.toFixed(2)).join('|');
-  if (!c._pe || c._pe.src !== G.src || c._pe.sig !== sig){
+function plotEdges(c, ends, pairOk){ drain(plotEdgesGen(c, ends, pairOk)); }
+function* plotEdgesGen(c, ends, pairOk){
+  const G = cellGrid(c), slow = PH.tests.slowSync || window.__SLOW_SYNC;
+  // (are the endpoints as they were? the same keys and the same positions to the centimeter; compared number by number, with the text of each position made only for one that moved, instead of a string for every endpoint of every plot at every edit)
+  let same;
+  if (slow || !c._pe) same = false;
+  else if (c._pe.src !== G.src || !c._pe.ends || c._pe.ends.length !== ends.length) same = false;
+  else { same = true; const o = c._pe.ends; for (let i = 0; i < ends.length; i++){ const e = ends[i], q = o[i];
+    if (q.key !== e.key || !((q.x === e.x && q.z === e.z) || (q.x.toFixed(2) === e.x.toFixed(2) && q.z.toFixed(2) === e.z.toFixed(2)))){ same = false; break; } } }
+  const sig = slow ? ends.map(e => e.key + '@' + e.x.toFixed(2) + ',' + e.z.toFixed(2)).join('|') : null;
+  if (slow && c._pe && c._pe.src === G.src && c._pe.sig === sig) same = true;
+  if (!same){
     const edges = [];
     for (let i = 0; i < ends.length; i++){
       const tg = []; for (let j = i + 1; j < ends.length; j++) if (pairOk(ends[i], ends[j])) tg.push(ends[j]);
       if (!tg.length) continue;
       gridPaths(G, ends[i], tg).forEach((r, k) => { if (r) edges.push({ a: ends[i].key, b: tg[k].key, pts: r.pts, len: r.len }); });
+      yield;   // (a path search is a step)
     }
-    c._pe = { src: G.src, sig, edges };
+    c._pe = { src: G.src, sig: slow ? sig : null, ends: ends.map(e => ({ key: e.key, x: e.x, z: e.z })), edges };
   }
   // a lawn is somewhere to go and sit, not a short cut: walking over one costs several times the distance, so a route
   // only crosses it when there's no reasonable way round (or when the lawn is where they're going)
@@ -308,23 +325,26 @@ function plotEdges(c, ends, pairOk){
   for (const e of c._pe.edges){ const a = NG.key.get(e.a), b = NG.key.get(e.b); if (a !== undefined && b !== undefined) ngLink(a, b, e.pts, e.len, e.len*k); }
 }
 // shortest walk between two network points (A*), as one polyline
-const routeCache = new Map(), LAWN_COST = 5;
+let routeCache = new Map(); const LAWN_COST = 5;
+let _rtG = new Float32Array(0), _rtFrom = new Int32Array(0), _rtSeen = new Int32Array(0), _rtDone = new Int32Array(0), _rtEp = 0;
 function route(a, b){
   if (a === b) return [[NG.x[a], NG.z[a]]];
   const key = a + '>' + b;
   if (routeCache.has(key)) return routeCache.get(key);
-  const n = NG.x.length, g = new Float32Array(n).fill(Infinity), from = new Int32Array(n).fill(-1), done = new Uint8Array(n);
+  const n = NG.x.length;
+  if (_rtG.length < n){ _rtG = new Float32Array(n*2); _rtFrom = new Int32Array(n*2); _rtSeen = new Int32Array(n*2); _rtDone = new Int32Array(n*2); _rtEp = 0; }
+  const ep = ++_rtEp, g = _rtG, from = _rtFrom, seen = _rtSeen, done = _rtDone;   // (g, from: valid where seen[v] === ep; done: where it is ep; the same search as filling fresh arrays with Infinity, -1 and 0)
   const heap = [], hf = [];
   const push = (v, f) => { heap.push(v); hf.push(f); let i = heap.length - 1; while (i > 0){ const p = (i - 1) >> 1; if (hf[p] <= hf[i]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; [hf[p], hf[i]] = [hf[i], hf[p]]; i = p; } };
   const pop = () => { const top = heap[0], lv = heap.pop(), lf = hf.pop(); if (heap.length){ heap[0] = lv; hf[0] = lf; let i = 0;
     for (;;){ const l = 2*i + 1, r = l + 1; let m = i; if (l < heap.length && hf[l] < hf[m]) m = l; if (r < heap.length && hf[r] < hf[m]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; [hf[m], hf[i]] = [hf[i], hf[m]]; i = m; } } return top; };
   const hz = v => Math.hypot(NG.x[v] - NG.x[b], NG.z[v] - NG.z[b]);
-  g[a] = 0; push(a, hz(a));
+  seen[a] = ep; g[a] = 0; from[a] = -1; push(a, hz(a));
   let found = false;
   while (heap.length){
-    const v = pop(); if (done[v]) continue; done[v] = 1;
+    const v = pop(); if (done[v] === ep) continue; done[v] = ep;
     if (v === b){ found = true; break; }
-    for (const [w, e] of NG.adj[v]){ const d = g[v] + e.cost; if (d < g[w]){ g[w] = d; from[w] = v; push(w, d + hz(w)); } }
+    for (const [w, e] of NG.adj[v]){ const d = g[v] + e.cost; if (seen[w] !== ep || d < g[w]){ seen[w] = ep; g[w] = d; from[w] = v; push(w, d + hz(w)); } }
   }
   let out = null;
   if (found){
@@ -362,6 +382,7 @@ const MEGA_LIFE = {
   greenhouse: { jobs: 12, fun: 1.5, night: .35 },
   logistics: { jobs: 24, fun: 0, night: .5 },   // the logistics hub: dock hands, pickers and forklift drivers, round the clock (OPEN 24H)   // the hydroponic farm: growers round the clock, and people dropping by for fresh greens   // the Neon Dome: bar staff and DJs, mostly at night (its crowd is brought out by the night: see updateClubs)
 };
+let placesEpoch = 0;   // (counts the rebuilds of the places)
 const places = new Map();   // id -> { id, x, z, doors: [{ node, out:{x,z}, in:{x,z}|null, dir:[dx,dz] }], jobs, fun, open, night, cell|mega }
 const people = new Map();   // id -> person
 const hrange = (lo, hi) => (h => lo <= hi ? (h >= lo && h < hi) : (h >= lo || h < hi));
@@ -435,22 +456,24 @@ function makeSpots(pl, list, inside, oldSpots, addEnd){
   for (const a of pl.spots) if (a.act) for (const b of pl.spots) if (b !== a && b.act === a.act && Math.hypot(a.x - b.x, a.z - b.z) < .9) a.near.push(b);
 }
 // Rebuild the network, the places and their doors after an edit. Unchanged plots reuse their cached maps and paths.
-function buildNetwork(){
+function buildNetwork(){ drain(buildNetworkGen(doorByKey, spotByKey)); }
+function* buildNetworkGen(oldDoors, oldSpots){
   NG = { x: [], z: [], adj: [], key: new Map() }; routeCache.clear();
-  const oldDoors = doorByKey, oldSpots = spotByKey;
   doorList = []; hiddenDoors = []; doorByKey = new Map(); spotByKey = new Map();
   // crossing points between neighbouring plots
   const cross = new Map();
-  for (const c of cells.values()) for (const [dx, dz] of SIDES4){
+  let nn = 0;
+  for (const c of cells.values()){ if ((++nn & 15) === 0) yield; for (const [dx, dz] of SIDES4){
     const nb = cells.get(ckey(c.i + dx, c.j + dz)); if (!nb) continue;
     if (c.mega && c.mega === nb.mega && !openMega(c)) continue;               // inside a closed megastructure
     const ok = (pathable(c) && (pathable(nb) || closedMega(nb))) || (closedMega(c) && pathable(nb));
     if (!ok) continue;
     const k = crossKey(c, dx, dz); if (cross.has(k)) continue;
-    const p = crossing(c, nb, dx, dz);
+    const p = crossingCached(c, nb, dx, dz);
     cross.set(k, p ? { key: 'x:' + k, x: p.x, z: p.z, kind: 'x' } : null);
     if (p) ngAdd('x:' + k, p.x, p.z);
-  }
+  } }
+  yield;
   patrolNodes = [...cross.values()].filter(Boolean).map(c => ({ key: c.key, node: NG.key.get(c.key), x: c.x, z: c.z }));
   crossAt = new Map(patrolNodes.map(c => [posKey(c.x, c.z), c]));
   const plotEnds = new Map();   // plot key -> extra endpoints (doors, standing spots)
@@ -458,6 +481,7 @@ function buildNetwork(){
   const fresh = new Map();
   // buildings: one front door, on a side with a street crossing if possible (the order is seeded per building)
   for (const c of cells.values()){
+    if (c.sections.length && !c.mega) yield;
     if (!c.sections.length || c.mega) continue;
     let jobs = 0, fun = 0, night = 0;
     c.sections.forEach((s, k) => { const L = ZONE_LIFE[s.zone]; if (!L) return;
@@ -497,7 +521,9 @@ function buildNetwork(){
     pl.fun = .25*pl.spots.length;
     if (pl.spots.length) fresh.set(pl.id, pl);
   }
+  yield;
   for (const m of megas.values()){
+    yield;
     const L = MEGA_LIFE[m.kind] || { jobs: 4, fun: 0 }, tiers = m.kind === 'mall' ? m.levels : 1;
     const pl = { id: 'm:' + m.id, mega: m, x: m.x, z: m.z, jobs: L.jobs*tiers, fun: L.fun*tiers, night: L.night || 0, open: !!L.open, patrol: !!L.patrol, doors: [], spots: [] };
     if (L.open){
@@ -549,17 +575,36 @@ function buildNetwork(){
   hwPlaces(fresh, oldDoors, addEnd);   // the highways' drop-offs: visitors come down their lifts (highway.js)
   mtPlaces(fresh, oldDoors, addEnd);   // and the metro's stations (metro.js)
   // paths across each plot between its crossings, door and spots
+  yield;
   for (const c of cells.values()){
+    yield;
     const ends = [];
     for (const [dx, dz] of SIDES4){ const p = cross.get(crossKey(c, dx, dz)); if (p) ends.push(p); }
     for (const e of plotEnds.get(ckey(c.i, c.j)) || []) if (!ends.some(o => o.key === e.key)) ends.push(e);
     if (ends.length < 2) continue;
     // a closed megastructure's plot only links its doors to the street, never street to street through the building
-    plotEdges(c, ends, closedMega(c) ? (a, b) => (a.kind === 'd') !== (b.kind === 'd') : () => true);
+    yield* plotEdgesGen(c, ends, closedMega(c) ? (a, b) => (a.kind === 'd') !== (b.kind === 'd') : () => true);
   }
-  places.clear(); for (const [k, v] of fresh) places.set(k, v);
+  places.clear(); for (const [k, v] of fresh) places.set(k, v); placesEpoch++;
   rebuildDoorMeshes();
 }
+// the walking network made in steps: its tables are swapped in only while a step runs, so the people go on using the old ones until the new are done
+let NET_JOB = null;
+const netCap = () => ({ NG, routeCache, doorList, hiddenDoors, doorByKey, spotByKey, patrolNodes, crossAt });
+const netApply = s => { NG = s.NG; routeCache = s.routeCache; doorList = s.doorList; hiddenDoors = s.hiddenDoors; doorByKey = s.doorByKey; spotByKey = s.spotByKey; patrolNodes = s.patrolNodes; crossAt = s.crossAt; };
+function netSlice(job){
+  const live = netCap(); netApply(job.build); let r;
+  try { r = job.gen.next(); } finally { job.build = netCap(); netApply(live); }
+  if (r.done) netApply(job.build);
+  return r.done;
+}
+function syncPeopleNetStep(ms){
+  if (!NET_JOB){ NET_JOB = { build: { NG: { x: [], z: [], adj: [], key: new Map() }, routeCache: new Map(), doorList: [], hiddenDoors: [], doorByKey: new Map(), spotByKey: new Map(), patrolNodes: [], crossAt: new Map() }, gen: buildNetworkGen(doorByKey, spotByKey) }; }
+  const t0 = stageNow();
+  do { if (netSlice(NET_JOB)){ NET_JOB = null; return true; } } while (stageNow() - t0 < ms);
+  return false;
+}
+function syncPeopleAbort(){ NET_JOB = null; REST_JOB = null; }
 
 /* ---------- doors: drawn on the buildings, sliding open when someone comes or goes ---------- */
 const DOOR_MAX = 1200;
@@ -590,15 +635,18 @@ function rebuildDoorMeshes(){
 }
 // doors open in about a fifth of a second when someone is about to step through, and close behind them
 function updateDoors(dt){
-  for (const p of pplList){ const w = p.walk; if (!w) continue;
-    if (w.doorA && w.s < .55) w.doorA.want = true;
-    if (w.doorB && w.len - w.s < .8) w.doorB.want = true; }
+  const twoPasses = PH.tests.doorsTwo || window.__DOORS_TWO;   // (the first way: a second walk over the people for the pod doors)
+  for (const p of pplList){ const w = p.walk;
+    if (w){ if (w.doorA && w.s < .55) w.doorA.want = true;
+      if (w.doorB && w.len - w.s < .8) w.doorB.want = true; }
+    if (twoPasses) continue;
+    const r = p.ride, pd = r && r.c._podDoor;   // (up on a pod, the deck door opens for whoever steps out of it to the lift, or off the lift and in through it; this only sets flags, so it can share the pass)
+    if (pd && ((r.ph === 'in' && r.t < LIFT_STEP*.6) || (r.ph === 'out' && r.t > LIFT_STEP*.35))) pd.want = true; }
   for (const b of bots){ const w = b.walk;
     if (w){ if (w.doorA && w.s < .55) w.doorA.want = true; if (w.doorB && w.len - w.s < .8) w.doorB.want = true; }
     if (b.state === 'drop' && pplNow - b.t0 > 1.6 && b.door) b.door.want = true;   // someone opens up to take the parcel
     const r = b.ride, pd = r && r.c._podDoor; if (pd && r.dropT && pplNow - r.dropT > 1.2 && pplNow - r.dropT < 3.2) pd.want = true; }   // (up on a pod: its deck door)
-  // up on a pod, the deck door opens for whoever steps out of it to the lift, or off the lift and in through it
-  for (const p of pplList){ const r = p.ride, pd = r && r.c._podDoor; if (!pd) continue;
+  if (twoPasses) for (const p of pplList){ const r = p.ride, pd = r && r.c._podDoor; if (!pd) continue;
     if ((r.ph === 'in' && r.t < LIFT_STEP*.6) || (r.ph === 'out' && r.t > LIFT_STEP*.35)) pd.want = true; }
   let moved = false;
   for (let i = 0; i < doorList.length && i < DOOR_MAX; i++){
@@ -739,12 +787,19 @@ function desire(p, h){
   const out = p.outgoing * (h >= 10 && h < 21 ? 1 : h >= 21 || h < 1 ? .5 : .25);
   return pplRand() < out ? leisure(p) || p.home : p.home;
 }
+// the places that draw anyone out in free time (fun above 0, somewhere to go), in the order of places, listed once for each rebuild of
+// the places (every door, spot and fun they have is set during that rebuild)
+let _lpEpoch = -1, _lpList = [];
+function leisurePlaces(){
+  if (_lpEpoch !== placesEpoch){ _lpEpoch = placesEpoch; _lpList = []; for (const pl of places.values()) if (!(pl.fun <= 0) && reachable(pl)) _lpList.push(pl); }
+  return _lpList;
+}
 // somewhere to spend free time: shops, bars, the mall, the square. Nearer places are more likely.
 function leisure(p){
   const home = places.get(p.home); if (!home) return null;
   let tot = 0; const list = [];
   const reach = typeof mtReachFrom === 'function' ? mtReachFrom(home.x, home.z) : null;   // (how far a place is, the metro taken into account: see metro.js)
-  for (const pl of places.values()){ if (pl.fun <= 0 || pl.id === p.home || !reachable(pl)) continue;
+  for (const pl of leisurePlaces()){ if (pl.id === p.home) continue;
     const d = reach ? reach(pl.x, pl.z) : Math.hypot(pl.x - home.x, pl.z - home.z);
     const v = pl.fun/(1 + (d/14)**2); tot += v; list.push([pl.id, v]); }
   let r = pplRand()*tot; for (const [id, v] of list) if ((r -= v) <= 0) return id;
@@ -901,7 +956,7 @@ function decide(p){
     if (back && startTrip(p, p.job)) return;
     p.until = pplNow + 10 + pplRand()*20; return;
   }
-  if (p.visitor && p.at === p.home && !p.walk && (pplNow > p.leaveAt || (p.tries = (p.tries || 0) + 1) > 4)){ p.gone = true; return; }   // back at the drop-off (or nowhere to go): off home
+  if (p.visitor && p.at === p.home && !p.walk && (pplNow > p.leaveAt || (p.tries = (p.tries || 0) + 1) > 4)){ p.gone = true; pplGoneN++; return; }   // back at the drop-off (or nowhere to go): off home
   const want = desire(p, S.hour) || p.home;
   p.walkedFor = (want !== p.job && want !== p.home && working(p, S.hour)) ? 'errand' : null;
   const chained = p.chain && want === p.at;   // move within the place: from the queue to a seat to eat
@@ -923,7 +978,7 @@ function arrive(p){
   p.at = w.to; p.spot = w.spot;
   if (p.metroPlan && w.to === p.metroPlan.station && typeof mtEnter === 'function' && mtEnter(p)) return;   // at the station: up the lift to the platform (see metro.js)
   p.metroPlan = null;
-  if (p.visitor && p.at === p.home){ p.gone = true; return; }   // up the lift and away
+  if (p.visitor && p.at === p.home){ p.gone = true; pplGoneN++; return; }   // up the lift and away
   if (p.spot && p.spot.kind === 'queue') p.chain = 'eat';
   const pl = places.get(p.at);
   if (p.clubbing && pl && pl.mega && pl.mega.kind === 'club' && clubArrive(p, pl)) return;
@@ -973,18 +1028,55 @@ function mtPlaces(fresh, oldDoors, addEnd){
 }
 
 /* ---------- keeping up with the city ---------- */
+const PPL_NMAX = 4, PPL_CURSOR_PX = 90;
+const PPLRATE = { n: 1, hist: [0, 0, 0, 0, 0] };   // (n: how often a typical walker is stepped now, and the collision check runs; hist: people at each rate)
+let pplFrame = 0, pplGoneN = 0;   // (pplGoneN: people marked gone and not yet removed)
+const _op = new THREE.Vector3();
+// is a ground point well off the screen from any height people can be at (screen x doesn't depend on height; y does)
+function offScreen(x, z){
+  const e = comp.uniforms.VP.value.elements;
+  // (the same arithmetic as Vector3.applyMatrix4, written out: this runs for every person every frame)
+  let w = 1/(e[3]*x + e[7]*0 + e[11]*z + e[15]);
+  const nx = (e[0]*x + e[4]*0 + e[8]*z + e[12])*w;
+  if (nx < -1.3 || nx > 1.3) return true;
+  const y0 = (e[1]*x + e[5]*0 + e[9]*z + e[13])*w;
+  w = 1/(e[3]*x + e[7]*40 + e[11]*z + e[15]);
+  const y1 = (e[1]*x + e[5]*40 + e[9]*z + e[13])*w;
+  return (y0 > 1.3 && y1 > 1.3) || (y0 < -1.4 && y1 < -1.4);
+}
 let pplReady = false, pplNow = 0, pplHour = S.hour, pplCursor = 0, pplList = [];
 // called after every edit (from syncAgents): rebuild the network, places and doors, then the residents and their jobs
-function syncPeople(){
-  buildNetwork();
-  syncResidents();
-  syncJobs();
+function syncPeople(){ syncPeopleNet(); syncPeopleRest(); }
+function syncPeopleNet(){ buildNetwork(); }
+// does a walk still lie over plots that exist? (the edit may have taken some away): a set of numbers made once for all the walkers, in place of a key string built for every point of every walk
+const _cn = (i, j) => (i + 65536)*131072 + (j + 65536);
+let _cellNums = null;
+function wayGone(pts){
+  if (PH.tests.slowSync || window.__SLOW_SYNC) return pts.some(([x, z]) => !cells.has(ckey(Math.round(x/LOT), Math.round(z/LOT))));
+  if (!_cellNums){ _cellNums = new Set(); for (const c of cells.values()) _cellNums.add(_cn(c.i, c.j)); }
+  for (let k = 0; k < pts.length; k++){ const q = pts[k]; if (!_cellNums.has(_cn(Math.round(q[0]/LOT), Math.round(q[1]/LOT)))) return true; }
+  return false;
+}
+function syncPeopleRest(){ drain(syncPeopleRestGen()); }
+let REST_JOB = null;
+function syncPeopleRestStep(ms){
+  if (!REST_JOB) REST_JOB = syncPeopleRestGen();
+  const t0 = stageNow();
+  do { if (REST_JOB.next().done){ REST_JOB = null; return true; } } while (stageNow() - t0 < ms);
+  return false;
+}
+function* syncPeopleRestGen(){
+  _cellNums = null;
+  syncResidents(); yield;
+  syncJobs(); yield;
   // carry everyone's spot and doors over to the rebuilt ones; anyone whose way is gone goes home
+  let np = 0;
   for (const p of people.values()){
+    if ((++np % 1500) === 0) yield;
     if (p.fresh) continue;
     if (p.walk){
       const w = p.walk;
-      const gone = !places.has(w.to) || w.pts.some(([x, z]) => !cells.has(ckey(Math.round(x/LOT), Math.round(z/LOT))));
+      const gone = !places.has(w.to) || wayGone(w.pts);
       if (gone){ sendHome(p); continue; }
       if (w.doorA && w.doorA !== UP_WAY) w.doorA = doorByKey.get(w.doorA.key) || null;
       if (w.doorB && w.doorB !== UP_WAY) w.doorB = doorByKey.get(w.doorB.key) || null;
@@ -1005,9 +1097,10 @@ function syncPeople(){
     if (pl && pl.open && p.at === want){ const sp = pickSpot(pl, pl, p); if (sp){ sp.by = p.id; p.spot = sp; } else p.at = p.home; }
     p.until = pplNow + Math.random()*40;
   }
+  yield;
   pplList = [...people.values()];
   pplReady = true;
-  syncBots();
+  syncBots(); yield;
   syncLurkers();
 }
 
@@ -1029,7 +1122,7 @@ function syncBots(){
   for (const b of bots){
     if (!b.hub || !places.has(b.hub)) b.hub = hubs[hash('bot', b.id) % hubs.length].id;
     if (b.walk){
-      const w = b.walk, gone = w.pts.some(([x, z]) => !cells.has(ckey(Math.round(x/LOT), Math.round(z/LOT))));
+      const w = b.walk, gone = wayGone(w.pts);
       if (w.doorA && w.doorA !== UP_WAY) w.doorA = doorByKey.get(w.doorA.key) || null;
       if (w.doorB && w.doorB !== UP_WAY) w.doorB = doorByKey.get(w.doorB.key) || null;
       if (gone){ b.walk = null; b.state = 'in'; b.until = pplNow + 5; }
@@ -1134,6 +1227,34 @@ function syncLurkers(){
   for (const k of [...lurkers.keys()]) if (!keep.has(k)) lurkers.delete(k);
 }
 function onDutyCops(){ return pplList.filter(q => q.cop && working(q, S.hour) && (q.patrol || (q.walk && q.walk.beat) || (!q.walk && q.at === q.job))); }
+// Who a lurker picks, found with a grid of 2-unit squares over the walkers (built the first time a lurker looks in a frame; at dusk they all look in the same frame, and each
+// look walked the whole crowd: 40 ms on the biggest city). The candidates come in walker order and meet the same tests, so the pick is the same one.
+const _lgCells = new Map(), _lgCops = []; let _lgFrame = -1;
+const lgKey = (gx, gz) => (gx + 8192)*16384 + (gz + 8192);
+function lurkGrid(){
+  if (_lgFrame === pplFrame) return; _lgFrame = pplFrame;
+  for (const l of _lgCells.values()) l.length = 0; if (_lgCells.size > 4096) _lgCells.clear(); _lgCops.length = 0;
+  for (let i = 0; i < pplList.length; i++){ const p = pplList[i]; if (p.cop) _lgCops.push(p);
+    const gx = Math.floor(p.x/2), gz = Math.floor(p.z/2); if (!Number.isFinite(gx) || !Number.isFinite(gz)) continue;
+    const k = lgKey(gx, gz); let l = _lgCells.get(k); if (!l) _lgCells.set(k, l = []); l.push(i); }
+}
+const _lgNear = [];
+function lurkVictim(L, t){
+  lurkGrid(); const near = _lgNear; near.length = 0;
+  const gx = Math.floor(L.x/2), gz = Math.floor(L.z/2);
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++){ const l = _lgCells.get(lgKey(gx + dx, gz + dz)); if (l) for (const i of l) near.push(i); }
+  near.sort((a, b) => a - b);
+  for (const i of near){
+    const p = pplList[i], w = p.walk; if (!w || p.cop || p.pause > t || w.s < w.safe0 + .3 || w.s > w.safe1 - .3) continue;
+    if ((p.x - L.x)**2 + (p.z - L.z)**2 > 1.4*1.4) continue;
+    const px = Math.floor(p.x/2), pz = Math.floor(p.z/2); let alone = true;
+    for (let dz = -1; dz <= 1 && alone; dz++) for (let dx = -1; dx <= 1 && alone; dx++){ const l = _lgCells.get(lgKey(px + dx, pz + dz)); if (l) for (const j of l){ const o = pplList[j]; if (o !== p && o.walk && (o.x - p.x)**2 + (o.z - p.z)**2 < 4){ alone = false; break; } } }
+    if (!alone) continue;                                                                                    // not alone
+    if (_lgCops.some(o => (o.x - p.x)**2 + (o.z - p.z)**2 < 64)) continue;                                   // police nearby
+    return p;
+  }
+  return null;
+}
 function updateLurkers(dt, t){
   const night = isNight(S.hour);
   for (const L of lurkers.values()){
@@ -1149,13 +1270,15 @@ function updateLurkers(dt, t){
         if (t < L.until) break;
         L.until = t + .5;
         let victim = null;
-        for (const p of pplList){
-          const w = p.walk; if (!w || p.cop || p.pause > t || w.s < w.safe0 + .3 || w.s > w.safe1 - .3) continue;
-          if ((p.x - L.x)**2 + (p.z - L.z)**2 > 1.4*1.4) continue;
-          if (pplList.some(o => o !== p && o.walk && (o.x - p.x)**2 + (o.z - p.z)**2 < 4)) continue;          // not alone
-          if (pplList.some(o => o.cop && (o.x - p.x)**2 + (o.z - p.z)**2 < 64)) continue;                      // police nearby
-          victim = p; break;
-        }
+        if (PH.tests.lurkScan || window.__LURK_SCAN){
+          for (const p of pplList){
+            const w = p.walk; if (!w || p.cop || p.pause > t || w.s < w.safe0 + .3 || w.s > w.safe1 - .3) continue;
+            if ((p.x - L.x)**2 + (p.z - L.z)**2 > 1.4*1.4) continue;
+            if (pplList.some(o => o !== p && o.walk && (o.x - p.x)**2 + (o.z - p.z)**2 < 4)) continue;          // not alone
+            if (pplList.some(o => o.cop && (o.x - p.x)**2 + (o.z - p.z)**2 < 64)) continue;                      // police nearby
+            victim = p; break;
+          }
+        } else victim = lurkVictim(L, t);
         if (victim && pplRand() < (L.rare ? .3 : .5)){ L.state = 'strike'; L.victim = victim; victim.pause = t + 4; emote(victim, 'bang', 1.6); L.t0 = t; }
         else if (victim) L.until = t + 20;   // thought better of it
         break;
@@ -1172,7 +1295,7 @@ function updateLurkers(dt, t){
         if (t - L.t0 > .8 && !(v.emoUntil > t)) emote(v, 'sweat', 2.5);
         if (t - L.t0 > 1.5){
           logEvent({ kind: 'mugging', x: L.x, z: L.z, plot: L.key, victim: v.id });
-          if (typeof policeDroneAlert === 'function' && policeDroneAlert) policeDroneAlert(L);   // sometimes a police drone comes over
+          if (typeof policeDroneAlert === 'function' && policeDroneAlert) later(() => policeDroneAlert(L), 1);   // (next frame, and its second bike a frame after that: each route search is a frame's work)   // sometimes a police drone comes over
           v.pause = 0; v.hurry = true;
           // the nearest officer on duty comes running
           let best = null, bd = 35*35;
@@ -1618,7 +1741,9 @@ function checkBumps(t){
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++){
       const cx = gx + dx - x0, cz = gz + dz - z0; if (cx < 0 || cz < 0 || cx >= GW || cz >= GH) continue;
       const c = cz*GW + cx, e = st[c + 1];
-      for (let q = st[c]; q < e; q++) bumpPair(t, m, movers[ord[q]]);
+      for (let q = st[c]; q < e; q++){ const o = movers[ord[q]];
+        if (o === m || o.bumpCD > t || m.bumpCD > t || (m.x - o.x)**2 + (m.z - o.z)**2 > .27*.27) continue;   // (bumpPair's own first tests, ahead of the call)
+        bumpPair(t, m, o); }
     }
   }
 }
@@ -1704,7 +1829,7 @@ function ghPose(p, t, dt){
   if (!p.gh || p.gh.m !== m.id){ const k = hash(p.id, 'aisle') % A.length, a = A[k]; p.gh = { m: m.id, a: k, u: (hash(p.id, 'u') % 1000)/1000, dir: hash(p.id, 'd') % 2 ? 1 : -1, pause: 0 }; }
   // the aisles along the wall nearest the camera are hidden behind that wall's racks: whoever keeps one works its twin
   // on the far side for now, where they can be seen through the glass roof
-  const e0 = gd.m, cdx = cam.position.x - e0[12], cdz = cam.position.z - e0[14], camSide = Math.sign(e0[8]*cdx + e0[10]*cdz) || 1;
+  const e0 = gd.m, cdx = camPosTrue.x - e0[12], cdz = camPosTrue.z - e0[14], camSide = Math.sign(e0[8]*cdx + e0[10]*cdz) || 1;
   const g = p.gh; let ai = g.a; const az = A[ai].z - A[0].z - .82;   // (relative to the middle of the house)
   if (m.kind === 'greenhouse' && ai >= 2 && Math.sign(A[ai].z - (A[0].z + A[1].z)/2) === camSide) ai = ai % 2 ? ai - 1 : ai + 1;
   const a = A[ai], len = a.x1 - a.x0;
@@ -1717,6 +1842,7 @@ function ghPose(p, t, dt){
   return true;
 }
 function updatePeople(dt, t){
+  PH.subBegin();
   pplNow = t;
   if (!pplReady) return;
   // the hour was changed in Settings: everyone reconsiders over the next few seconds
@@ -1734,32 +1860,80 @@ function updatePeople(dt, t){
     if (!p.walk && pplNow >= p.until) decide(p);
     if (performance.now() - tb > 2.5){ k++; break; }
   }
+  PH.sub('people: decisions');
   pplCursor = n ? (pplCursor + k) % n : 0;
-  if (pplList.some(p => p.gone)){ for (const p of pplList) if (p.gone){ if (p.spot && p.spot.by === p.id) p.spot.by = null; people.delete(p.id); } pplList = pplList.filter(p => !p.gone); }
+  if (pplGoneN > 0 && pplList.some(p => p.gone)){ for (const p of pplList) if (p.gone){ if (p.spot && p.spot.by === p.id) p.spot.by = null; people.delete(p.id); } pplList = pplList.filter(p => !p.gone); }
+  pplGoneN = 0;
   _camR.set(1, 0, 0).applyQuaternion(cam.quaternion);
+  PH.sub('people: removing the gone');
   updateBots(dt, t);
   updateLurkers(dt, t);
   updateClubs(dt, t);
-  checkBumps(t);
+  PH.sub('people: bots, lurkers, clubs');
+  if (PH.tests.fullRate || window.__FULL_RATE || PPLRATE.n <= 1 || pplFrame % PPLRATE.n === 0) checkBumps(t);   // (every PPLRATE.n-th frame (last frame's typical rate) when people are small: the pass looks at everyone, and a meeting lasts many frames)
+  PH.sub('people: bumps');
   // fill the draw batch with everyone on show
   const pos = pplMesh.geometry.attributes.aPos, spr = pplMesh.geometry.attributes.aSpr, P = pos.array, Q = spr.array;
   const VP = comp.uniforms.VP.value;
   let i = 0;
+  const ve = VP.elements;
   const emit = (x, y, z, row, frame, flip, alpha) => {
     if (i >= PPL_MAX) return false;
-    _pv.set(x, y, z).applyMatrix4(VP);
-    if (_pv.x < -1.1 || _pv.x > 1.1 || _pv.y < -1.15 || _pv.y > 1.1) return false;
+    // (Vector3.applyMatrix4's arithmetic, written out; only the screen position is needed)
+    const w = 1/(ve[3]*x + ve[7]*y + ve[11]*z + ve[15]), sx = (ve[0]*x + ve[4]*y + ve[8]*z + ve[12])*w, sy = (ve[1]*x + ve[5]*y + ve[9]*z + ve[13])*w;
+    if (sx < -1.1 || sx > 1.1 || sy < -1.15 || sy > 1.1) return false;
     P[i*3] = x; P[i*3 + 1] = y; P[i*3 + 2] = z;
     Q[i*4] = row; Q[i*4 + 1] = frame; Q[i*4 + 2] = flip; Q[i*4 + 3] = alpha;
     i++; return true;
   };
   // which stalls are being served, and who's queueing where
   const served = new Set(), queued = new Set(); holoOn.length = 0;
-  const stallKey = sp => sp.place + ':' + sp.stall;   // stall numbers repeat between squares
+  const stallKey = sp => sp._key || (sp._key = sp.place + ':' + sp.stall);   // stall numbers repeat between squares (the string is made once per spot)
   for (const p of pplList) if (!p.walk && p.spot){ if (p.spot.kind === 'vendor') served.add(stallKey(p.spot)); else if (p.spot.kind === 'queue') queued.add(stallKey(p.spot)); }
+  PH.sub('people: stall scan');
   for (const c of cells.values()) if (c.liftCab) liftCab(c);   // (every lift has its cab, so its controller runs)
   updateLifts(dt);
+  // (W5.1) Anyone well off screen is worked on every fourth frame, with the time of the frames skipped (their walks go on at
+  // the same speed; they arrive, and pick what's next, a few frames later). Lifts, clubs and the metro always run.
+  PH.sub('people: lifts');
+  const dt0 = dt; let pi = 0, idx = -1; pplFrame++;
+  // (round 6) How often a person is stepped depends on how big they are on screen: one step may move them about .75 of a render
+  // pixel at most (their speed, times the frame time, over the size of a render pixel at this zoom), so up close it is every
+  // frame and zoomed out every second to fourth. The steps are spread evenly (person i on the frames where (frame + i) % N is 0),
+  // the time of the frames between goes to the next step, the sprites are drawn every frame from what the last step left, and the
+  // collision check runs at the same rate. Lifts, clubs, the metro and anyone riding, and anyone near the cursor, stay every frame.
+  // (Overlay test "people at full rate": the way it was, W5.1 only.)
+  const full = PH.tests.fullRate || window.__FULL_RATE;
+  const rpx = 2*zoom/H, dtq = Math.max(1/240, Math.round(dt0*240)/240), reach = .75*rpx/dtq;   // (world units one step may move a person)
+  const nTyp = full ? 1 : Math.max(1, Math.min(PPL_NMAX, Math.floor(reach/PPL_SPEED)));
+  PPLRATE.n = nTyp; PPLRATE.hist.fill(0);
+  let cux = NaN, cuy = NaN;
+  if (!full && nTyp > 1 && ptrLast){ const r = canvas.getBoundingClientRect(); cux = ((ptrLast.x - r.left)/r.width)*2 - 1; cuy = -((ptrLast.y - r.top)/r.height)*2 + 1; }
+  const ve2 = comp.uniforms.VP.value.elements, curR2 = (PPL_CURSOR_PX/(H/2))**2;   // (the cursor's radius in clip units of the height)
+  const aspect = W/H;
   for (const p of pplList){
+    idx++;
+    if (full){
+      if (!PH.tests.noSlowFar && !p.ride && !p.club && !p.metro && p.x !== undefined && ((pplFrame + pi++) & 3) && offScreen(p.x, p.z)){ p.acc = (p.acc || 0) + dt0; continue; }
+    } else if (!p.ride && !p.club && !p.metro && p.x !== undefined){
+      const fac = p.rush ? 2.3 : p.hurry ? 1.6 : 1;
+      let Nn = Math.max(1, Math.min(PPL_NMAX, Math.floor(reach/(p.speed*fac))));
+      if (!PH.tests.noSlowFar && Nn < 4 && offScreen(p.x, p.z)) Nn = 4;   // (W5.1)
+      if (Nn > 1 && cux === cux){   // near the cursor: where the player is looking
+        const x = p.x, z = p.z, sx = ve2[0]*x + ve2[8]*z + ve2[12], sy = ve2[1]*x + ve2[9]*z + ve2[13];
+        if (((sx - cux)*aspect)**2 + (sy - cuy)**2 < curR2) Nn = 1; }
+      PPLRATE.hist[Nn]++;
+      if (Nn > 1 && (pplFrame + idx) % Nn){
+        p.acc = (p.acc || 0) + dt0;
+        if (p._ec){   // drawn every frame from what the last step left
+          emit(p.x, p._ey, p.z, p._er, p._ef, p.flip, p._ea);
+          if (p._eoOn && p.emoUntil > t) emit(p.x, p._ey + p._eo, p.z, ROW_EMO, p.emo, 1, 2); }
+        if (p._holo) holoOn.push(p._holo);
+        if (p._pic) picOn.add(p._pic);
+        continue; }
+    }
+    const dt = dt0 + (p.acc || 0); p.acc = 0;
+    p._ec = 0; p._holo = null; p._pic = null;
     let alpha = 1, walking = false, y = CURB, frame = 0;
     const paused = p.pause > t;
     if (p.ride){ const r = liftRide(p, dt, t); if (r){ emit(r.x, r.y, r.z, p.row, r.frame, p.flip, r.alpha); continue; } }
@@ -1804,9 +1978,9 @@ function updatePeople(dt, t){
         p.x = sp.x; p.z = sp.z; y = sp.y;
         let face = sp.face, gest = false;
         if (sp.kind === 'seat'){ y = sp.y - .09; frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4;
-          if (sp.act === 'holo'){ face = [sp.hx - sp.x, sp.hz - sp.z]; holoOn.push(sp);   // watching the show
+          if (sp.act === 'holo'){ face = [sp.hx - sp.x, sp.hz - sp.z]; holoOn.push(p._holo = sp);   // watching the show
             if (!(p.emoUntil > t) && pplRand() < dt*.03) emote(p, pplRand() < .5 ? 'bang' : 'note', 2); }
-          else if (sp.act){ if (sp.pic) picOn.add(sp.pic.x.toFixed(2) + ',' + sp.pic.z.toFixed(2) + '|' + sp.pic.ry.toFixed(3) + '|' + sp.pic.col);
+          else if (sp.act){ if (sp.pic){ const pk = sp.pic.x.toFixed(2) + ',' + sp.pic.z.toFixed(2) + '|' + sp.pic.ry.toFixed(3) + '|' + sp.pic.col; picOn.add(pk); p._pic = pk; }
             const mate = sp.near.find(o => o.by && people.get(o.by) && !people.get(o.by).walk);
             if (mate) face = [mate.x - sp.x, mate.z - sp.z];
             if (!(p.emoUntil > t)){
@@ -1832,9 +2006,11 @@ function updatePeople(dt, t){
       if (u > .8 && !p.walk.puke.left){ p.walk.puke.left = true; pukes.push({ x: p.walk.puke.x, z: p.walk.puke.z, t0: t, sx: p.x, sz: p.z }); } }
     if (p.cop && p.angry > t) frame = F_ANGRY + Math.min(5, Math.floor((t - p.angry + .9)*7));
     if (p.row === ROW_HOOD && frame >= F_SPEC) frame = F_IDLE + (frame % 4);   // (the archivist has walk and idle frames only)
+    p._ec = 1; p._ey = y; p._er = p.cop ? ROW_COP : p.row; p._ef = frame; p._ea = Math.max(0, alpha); p._eo = frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8; p._eoOn = alpha > .9;   // (what a frame between steps draws again)
     if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
   }
+  PH.sub('people: the loop over everyone');
   drawBouncers(emit, t, dt);
   drawDeckWalkers(emit, t, dt);
   drawLiftCabs();

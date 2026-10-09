@@ -205,8 +205,12 @@ const PAL_HEX = ['#1B2A4A','#2C3A52','#4A5566','#C9B89A','#E3D6BD','#9EC4E0','#F
 // the star map view: SKY_EL is the elevation at the middle of the screen, SKY_H half the screen's height (radians),
 // SKY_TURN how far the sky turns for each turn of the camera
 const SKY_EL = .3, SKY_H = .5, SKY_TURN = 1, SKY_DRIFT = 0;   // a real sky: fixed around the world, so turning the camera looks at another part of it; panning never moves it (it's infinitely far away)
+// (FX_*: each effect can be compiled out of the shader altogether when it's off: see compVariant)
+const COMP_FX = ['SHIM', 'OUTLINE', 'AO', 'NL', 'RIM', 'WET', 'CLOUDS', 'MIST', 'RAYS', 'RAIN', 'PAL'];
 const comp = new THREE.ShaderMaterial({
+  defines: Object.assign({ SOFT_HALF: 0 }, Object.fromEntries(COMP_FX.map(f => ['FX_' + f, 1]))),   // (SOFT_HALF: the wet-ground reflections, the mist and the light shafts are worked out at half resolution: see softEffects)
   uniforms: {
+    tSoftW:{value:null}, tSoftM:{value:null}, tSoftR:{value:null}, softPar:{value:new THREE.Vector2()}, softDim:{value:new THREE.Vector2(1,1)}, softSig:{value:.5},
     tColor:{value:null}, tDepth:{value:null}, tNormal:{value:null}, res:{value:new THREE.Vector2(1,1)},
     near:{value:NEAR}, far:{value:FAR}, camDist:{value:CAM_DIST}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
     night:{value:0}, smoothLook: SMOOTH_LOOK, lodLines: LOD.lines, pxK:{value:1}, starOff:{value:new THREE.Vector2()}, skyYaw:{value:0}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
@@ -215,7 +219,7 @@ const comp = new THREE.ShaderMaterial({
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
-    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, nLifts:{value:0}, mtGap:{value:Array.from({ length: 16 }, () => new THREE.Vector4())}, mtN:{value:0}, mtGapY:{value:new THREE.Vector2()}, tSteam:{value:null}, steamExt:{value:1}, nVents:{value:0},
+    sunV:{value:new THREE.Vector3(0,0,1)}, rimI:{value:0}, rimCol:{value:new THREE.Color()}, tLight:{value:null}, pxW:{value:.1}, aoI:{value:1}, mistI:{value:0}, mistNight:{value:0}, mistSun:{value:1}, nLifts:{value:0}, mtGap:{value:Array.from({ length: 16 }, () => new THREE.Vector4())}, mtN:{value:0}, mtGapY:{value:new THREE.Vector2()}, tSteam:{value:null}, tLiftMask:{value:null}, tShimTile:{value:null}, steamExt:{value:1}, nVents:{value:0},
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
@@ -223,13 +227,14 @@ const comp = new THREE.ShaderMaterial({
     uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNormal;
     uniform vec2 res; uniform float near; uniform float far; uniform float camDist;
     uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 haze;
-    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform sampler2D tSteam; uniform float steamExt; uniform int nVents; uniform float nLifts; uniform vec4 mtGap[16]; uniform int mtN; uniform vec2 mtGapY;
+    uniform vec3 sunV; uniform float rimI; uniform vec3 rimCol; uniform sampler2D tLight; uniform float pxW; uniform float aoI; uniform float mistI; uniform float mistNight; uniform float mistSun; uniform sampler2D tSteam; uniform sampler2D tLiftMask; uniform sampler2D tShimTile; uniform float steamExt; uniform int nVents; uniform float nLifts; uniform vec4 mtGap[16]; uniform int mtN; uniform vec2 mtGapY;
     uniform float night; uniform float smoothLook; uniform float lodLines; uniform float pxK; uniform vec2 starOff; uniform float skyYaw; uniform vec2 rainOff; uniform vec2 glowC; uniform float windR; uniform float outlines; uniform float palOn; uniform float time;
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
     uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float rainOn; uniform sampler2D tCloud;
     uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 cityGlow;
     uniform float cloudOn; uniform float raysOn; uniform float rayI; uniform float rainDark;
+    uniform sampler2D tSoftW; uniform sampler2D tSoftM; uniform sampler2D tSoftR; uniform vec2 softPar; uniform vec2 softDim; uniform float softSig;
     varying vec2 vUv;
     #include <packing>
     // ---- 3D value noise for the cloud volumes ----
@@ -250,12 +255,37 @@ const comp = new THREE.ShaderMaterial({
       return step(sc.z - 0.003, unpackRGBAToDepth(texture2D(shadowMap, sc.xy)));
     }
     float rawD(vec2 uv){ return texture2D(tDepth, uv).x; }
+    // the part of 0..1 where v0 + t*(v1 - v0) lies within -h..h (empty: x > y)
+    vec2 mtSpan(float v0, float v1, float h){
+      float dv = v1 - v0;
+      if (abs(dv) < 1e-6) return abs(v0) < h ? vec2(0.0, 1.0) : vec2(1.0, 0.0);
+      float t1 = (-h - v0)/dv, t2 = (h - v0)/dv;
+      return vec2(max(min(t1, t2), 0.0), min(max(t1, t2), 1.0));
+    }
     float D(vec2 uv){ return near + rawD(uv)*(far-near); }
+    #if SOFT_HALF
+    // The half-resolution results (softEffects): one texel stands for a 2 x 2 block of pixels, the block's lower left pixel, on a grid fixed to the
+    // world's pixels (softPar: the parity of the view's corner), so a pan of one pixel moves them by one pixel. For the pixel at fc: the four texels
+    // round it (bilinear), each weighted by how well the depth at its own pixel agrees with this one's, so nothing bleeds across an edge.
+    vec4 softTaps(vec2 fc, float dF, out ivec4 tx, out ivec4 ty){
+      vec2 t = (floor(fc) + softPar + 0.5)*0.5 - 0.5, i0 = floor(t), f = t - i0;
+      tx = clamp(ivec4(i0.x, i0.x + 1.0, i0.x, i0.x + 1.0), ivec4(0), ivec4(int(softDim.x) - 1));
+      ty = clamp(ivec4(i0.y, i0.y, i0.y + 1.0, i0.y + 1.0), ivec4(0), ivec4(int(softDim.y) - 1));
+      vec4 wb = vec4((1.0 - f.x)*(1.0 - f.y), f.x*(1.0 - f.y), (1.0 - f.x)*f.y, f.x*f.y), w;
+      for (int k = 0; k < 4; k++){
+        ivec2 rp = clamp(ivec2(2*tx[k], 2*ty[k]) - ivec2(softPar), ivec2(0), ivec2(res) - 1);
+        float z = (near + texelFetch(tDepth, rp, 0).x*(far - near) - dF)/softSig; z *= z;
+        w[k] = wb[k]/(1.0 + z*z);
+      }
+      return w;
+    }
+    #endif
     vec3 N(vec2 uv){ return texture2D(tNormal, uv).rgb*2.0-1.0; }
     // arithmetic hash (no sin): the sin trick loses precision on some GPUs and lines the stars up in streaks
     float hash(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
-    float ne(vec2 o, float d, vec3 n){
-      float dd = D(vUv+o) - d; vec3 nn = N(vUv+o);
+    // (dn: the neighbour's depth, already read for the silhouette test)
+    float ne(vec2 o, float dn, float d, vec3 n){
+      float dd = dn - d; vec3 nn = N(vUv+o);
       float nd = dot(n-nn, vec3(1.0,1.0,1.0));
       float ni = clamp(smoothstep(-0.01, 0.01, nd), 0.0, 1.0);
       float di = clamp(sign(dd*0.25 + 0.01), 0.0, 1.0);
@@ -271,16 +301,23 @@ const comp = new THREE.ShaderMaterial({
       float rd = rawD(vUv);
       // the pixel's line of sight (both shimmers march along it): from the near plane, and how far to what's drawn there
       vec3 o0 = vec3(0.0), dr0 = vec3(0.0, -1.0, 0.0); float tS = 0.0;
-      if (nLifts > 0.5 || mtN > 0){
+      // (which shimmers could reach this pixel at all: a coarse map of the screen, red the pads, green the metro cars,
+      // worked out each frame from where their boxes of air land on screen: see shimTiles. Elsewhere both add nothing)
+      bool shL = false, shM = false;
+      #if FX_SHIM
+      { vec4 shT = texture2D(tShimTile, vUv); shL = nLifts > 0.5 && shT.r > .5; shM = mtN > 0 && shT.g > .5; }
+      #endif
+      if (FX_SHIM > 0 && (shL || shM)){
         vec2 nd0 = vUv*2.0 - 1.0;
         vec4 a0 = invVP*vec4(nd0, -1.0, 1.0); a0 /= a0.w; vec4 b0 = invVP*vec4(nd0, 1.0, 1.0); b0 /= b0.w;
         o0 = a0.xyz; dr0 = normalize(b0.xyz - a0.xyz);
         vec4 f0 = invVP*vec4(nd0, rd*2.0 - 1.0, 1.0); f0 /= f0.w; tS = length(f0.xyz - o0);
       }
-      if (nLifts > 0.5){
+      if (FX_SHIM > 0 && shL){
         if (dr0.y < -0.01){
-          float ta = (-1.72 - o0.y)/dr0.y, tb = min((-3.9 - o0.y)/dr0.y, tS);
-          if (tb > ta){
+          float ta = (-1.72 - o0.y)/dr0.y, tf = (-3.9 - o0.y)/dr0.y, tb = min(tf, tS);
+          // (could any pad be under this line at all? see liftMaskFor)
+          if (tb > ta && texture2D(tLiftMask, (o0.xz + dr0.xz*(.5*(ta + tf)))/(2.0*steamExt) + .5).r > .5){
             for (int i=0; i<8; i++){ vec3 p = o0 + dr0*(ta + (tb - ta)*(float(i) + .5)/8.0);
               float w = texture2D(tSteam, p.xz/(2.0*steamExt) + .5).b, dep = clamp((-1.72 - p.y)/2.2, 0.0, 1.0);
               shim += w*(1.0 - dep)*(1.0 - dep*.4); }
@@ -299,15 +336,24 @@ const comp = new THREE.ShaderMaterial({
       // Each car's gap is a box (mtGap: x, z, and the way it faces); the line of sight is sampled through the slab of
       // air at the gap's height, and wherever it passes through a box, that counts.
       float mtSh = 0.0;
-      if (mtN > 0){
+      if (FX_SHIM > 0 && shM){
         vec3 o1 = o0, d1 = dr0; float tS1 = tS;
         if (abs(d1.y) > 0.001){
           float ta = (mtGapY.y - o1.y)/d1.y, tb = (mtGapY.x - o1.y)/d1.y;
           if (ta > tb){ float tt = ta; ta = tb; tb = tt; }
           tb = min(tb, tS1 + 0.04);
           if (tb > ta){
+            // which cars' boxes the six samples can reach at all (the samples lie along one straight line): a car whose
+            // box the line misses (with room to spare) would only add zeros, so it's left out of the loop below
+            int near = 0;
+            { vec3 pS = o1 + d1*(ta + (tb - ta)*.5/6.0), pE = o1 + d1*(ta + (tb - ta)*5.5/6.0);
+              for (int k=0; k<16; k++){ if (k >= mtN) break;
+                vec4 g = mtGap[k]; vec2 q0 = pS.xz - g.xy, q1 = pE.xz - g.xy;
+                vec2 ra = mtSpan(q0.x*g.z + q0.y*g.w, q1.x*g.z + q1.y*g.w, .96), rc = mtSpan(q0.x*g.w - q0.y*g.z, q1.x*g.w - q1.y*g.z, .63);
+                if (max(ra.x, rc.x) <= min(ra.y, rc.y)) near |= 1 << k; } }
             for (int i=0; i<6; i++){ vec3 p = o1 + d1*(ta + (tb - ta)*(float(i) + .5)/6.0);
               for (int k=0; k<16; k++){ if (k >= mtN) break;
+                if ((near & (1 << k)) == 0) continue;
                 vec4 g = mtGap[k]; vec2 q = p.xz - g.xy; float al = abs(q.x*g.z + q.y*g.w), ac = abs(q.x*g.w - q.y*g.z);
                 mtSh += (1.0 - smoothstep(.05, .62, ac))*(1.0 - smoothstep(.2, .95, al)); } }   // (soft all the way out: a haze, no edge)
             mtSh /= 6.0;
@@ -321,7 +367,7 @@ const comp = new THREE.ShaderMaterial({
         }
       }
       vec4 c = texture2D(tColor, sUv);
-      vec3 col;
+      vec3 col; vec3 n = vec3(0.0, 0.0, 1.0);   // (the normal: read once, used by the outlines, the wet streaks and the splashes)
       if (rd >= 0.99999){
         // pastel pixel-art sky: the gradient in ten flat bands, with only a thin dithered seam where two meet
         float tb = smoothstep(0.05, 0.95, vUv.y)*10.0, fb = fract(tb);
@@ -360,23 +406,29 @@ const comp = new THREE.ShaderMaterial({
         col = sky + vec3(star) + c.rgb;
       } else {
         float d = near + rd*(far-near);
-        vec3 n = N(vUv);
+        n = N(vUv);
+        #if FX_OUTLINE
+        // the four neighbours' depths, read once for both outline tests
+        float dR = D(vUv+vec2(px.x,0.0)), dL = D(vUv-vec2(px.x,0.0)), dU = D(vUv+vec2(0.0,px.y)), dB = D(vUv-vec2(0.0,px.y));
         float dd = 0.0;
-        dd += clamp(D(vUv+vec2(px.x,0.0)) - d, 0.0, 1.0);
-        dd += clamp(D(vUv-vec2(px.x,0.0)) - d, 0.0, 1.0);
-        dd += clamp(D(vUv+vec2(0.0,px.y)) - d, 0.0, 1.0);
-        dd += clamp(D(vUv-vec2(0.0,px.y)) - d, 0.0, 1.0);
+        dd += clamp(dR - d, 0.0, 1.0);
+        dd += clamp(dL - d, 0.0, 1.0);
+        dd += clamp(dU - d, 0.0, 1.0);
+        dd += clamp(dB - d, 0.0, 1.0);
         float dei = floor(smoothstep(0.25, 0.55, dd)*2.0)/2.0;
-        float nei = ne(vec2(px.x,0.0), d, n) + ne(vec2(-px.x,0.0), d, n) + ne(vec2(0.0,px.y), d, n) + ne(vec2(0.0,-px.y), d, n);
+        float nei = ne(vec2(px.x,0.0), dR, d, n) + ne(vec2(-px.x,0.0), dL, d, n) + ne(vec2(0.0,px.y), dU, d, n) + ne(vec2(0.0,-px.y), dB, d, n);
         nei = step(0.1, nei);
         // zoomed out: crease lines inside shapes fade away and silhouettes soften, so the city doesn't turn to noise
         float k = dei > 0.0 ? 1.0 - 0.5*dei*(1.0 - 0.5*lodLines) : 1.0 + 0.4*nei*(1.0 - lodLines);
         col = c.rgb * mix(1.0, k, outlines);
+        #else
+        col = c.rgb;
+        #endif
         // Ambient occlusion: soft darkening in creases (the foot of a wall, under a ledge, inside a corner). For pairs
         // of samples on opposite sides of the pixel, a crease is where this pixel lies further away than the average
         // of the two (a flat or sloping surface gives none); pairs that jump to something far nearer (an edge in front)
         // are skipped. Two radii, four directions; stepped and dithered to stay pixel art.
-        if (aoI > 0.0){
+        if (FX_AO > 0 && aoI > 0.0){
           float occ = 0.0;
           for (int r = 0; r < 2; r++){
             float rp = r == 0 ? 2.0 : 5.0;
@@ -398,6 +450,7 @@ const comp = new THREE.ShaderMaterial({
         // light from the city's own lamps, neon and windows falling on the surfaces round them (the night-light
         // pass, below): tinted by each surface's colour, with a little added so dark walls still pick it up; stepped
         // and dithered so it stays pixel art
+        #if FX_NL
         { vec3 lt = texture2D(tLight, vUv).rgb;
           lt = smoothLook > .5 ? lt : floor(lt*14.0 + bayer(gl_FragCoord.xy)*.99)/14.0;
           float lum = dot(c.rgb, vec3(.299, .587, .114));
@@ -406,7 +459,8 @@ const comp = new THREE.ShaderMaterial({
           // bright surfaces (signs, windows) get none
           vec3 add = min(lt*c.rgb*2.6, vec3(.22));
           col += add*(1.0 - smoothstep(.3, .6, lum)); }
-        if (rimI > 0.01){
+        #endif
+        if (FX_RIM > 0 && rimI > 0.01){
           vec2 sd2 = sunV.xy; float sl = length(sd2);
           if (sl > 0.05){
             sd2 /= sl;
@@ -430,7 +484,27 @@ const comp = new THREE.ShaderMaterial({
       float DK = 95.0/(far - near);   // depth tolerances below were set for a 95-unit depth range
       // ---- wet ground: bright lights (neon, windows, lamps) leave vertical streaks on wet pavement ----
       // Not a mirror: dull walls barely show, and only crisp puddle patches reflect clearly. No ripples or jitter.
-      if (rd < 0.99999 && wet > 0.0 && dot(N(vUv), upView) > 0.93){
+#if SOFT_HALF
+      #define SOFT_TAPS if (!haveTaps){ sw = softTaps(gl_FragCoord.xy, near + rd*(far - near), sx, sy); haveTaps = true; }
+      ivec4 sx, sy; vec4 sw = vec4(0.0); bool haveTaps = false;
+      if (FX_WET > 0 && rd < 0.99999 && wet > 0.0 && dot(n, upView) > 0.93){
+        SOFT_TAPS
+        float Wt = 0.0, Kh = 0.0, Cs = 0.0; vec3 Ch = vec3(0.0);
+        for (int k = 0; k < 4; k++){
+          vec4 s4 = texelFetch(tSoftW, ivec2(sx[k], sy[k]), 0); float a4 = s4.a;
+          if (a4 < 0.01) continue;
+          Wt += sw[k];
+          if (a4 < 0.51){ float kh = (a4 - 0.02)/0.48; Kh += sw[k]*kh; Ch += sw[k]*kh*s4.rgb; }
+          else Cs += sw[k]*(a4 - 0.52)/0.48*0.7;
+        }
+        if (Wt > 1e-4){
+          float kk = floor(Kh/Wt*5.0 + 0.5)/5.0;                                        // stepped, to stay pixel art
+          col = mix(col, max(col, Ch/max(Kh, 1e-5)*0.9), clamp(kk, 0.0, 0.8));
+          col = mix(col, mix(skyBot, skyTop, 0.5)*0.7, Cs/Wt);
+        }
+      }
+#else
+      if (FX_WET > 0 && rd < 0.99999 && wet > 0.0 && dot(n, upView) > 0.93){
         vec3 wp = ro + rdir*tEnd;
         float pud = step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
         pud *= 0.35 + 0.65*rainOn;
@@ -458,7 +532,8 @@ const comp = new THREE.ShaderMaterial({
           col = mix(col, mix(skyBot, skyTop, 0.5)*0.7, 0.35*pud*wet*2.0);   // puddles show the sky when nothing is above
         }
       }
-      if (cloudOn > 0.5 && rd >= 0.99999){
+#endif
+      if (FX_CLOUDS > 0 && cloudOn > 0.5 && rd >= 0.99999){
         // clouds come from their own lower-resolution pass (see cloudMat), upscaled with crisp pixels. They're the
         // background: drawn only where the sky shows, never over the island or anything on it (or hanging under it),
         // and over the stars, which are further back still
@@ -473,7 +548,23 @@ const comp = new THREE.ShaderMaterial({
       // grate, spreading and thinning as it rises, gone by about 4.5. So there's no limit on vents and the cost doesn't
       // grow with them. It mostly adds the light it scatters and hides little, so people stay visible: by day it's lit
       // by the sun where the shadow map says the sun reaches, at night it takes the colours the lamps and neon throw.
-      if (mistI > 0.0 && nVents > 0 && rd < 0.99999){
+#if SOFT_HALF
+      if (FX_MIST > 0 && mistI > 0.0 && nVents > 0 && rd < 0.99999){
+        ivec2 nb = ivec2((floor(gl_FragCoord.xy) + softPar)*0.5);
+        vec4 m0 = texelFetch(tSoftM, min(nb, ivec2(softDim) - 1), 0);
+        if (m0.a < 0.999 || m0.r + m0.g + m0.b > 0.0){   // (the block's own texel says whether any steam is near: elsewhere nothing is read)
+          SOFT_TAPS
+          vec3 acc = vec3(0.0); float Tm = 0.0, Ws = 0.0;
+          for (int k = 0; k < 4; k++){ vec4 s4 = texelFetch(tSoftM, ivec2(sx[k], sy[k]), 0); acc += sw[k]*s4.rgb; Tm += sw[k]*s4.a; Ws += sw[k]; }
+          if (Ws > 1e-4){
+            acc = acc/Ws*0.4; Tm /= Ws;
+            acc = smoothLook > .5 ? acc : floor(acc*20.0 + dith)/20.0;   // stepped, to stay pixel art
+            col = col*mix(1.0, Tm, .6) + acc;
+          }
+        }
+      }
+#else
+      if (FX_MIST > 0 && mistI > 0.0 && nVents > 0 && rd < 0.99999){
         vec3 hit = ro + rdir*tEnd;
         float y0 = 4.5, y1 = -0.1;
         float ta = max(0.0, (y0 - ro.y)/min(rdir.y, -0.001)), tb = min(tEnd, (y1 - ro.y)/min(rdir.y, -0.001));
@@ -500,7 +591,24 @@ const comp = new THREE.ShaderMaterial({
           col = col*mix(1.0, T, .6) + acc;
         }
       }
-      if (raysOn > 0.5 && rayI > 0.01){
+#endif
+#if SOFT_HALF
+      if (FX_RAYS > 0 && raysOn > 0.5 && rayI > 0.01){
+        ivec2 nb = ivec2((floor(gl_FragCoord.xy) + softPar)*0.5);
+        float r0 = texelFetch(tSoftR, min(nb, ivec2(softDim) - 1), 0).r;
+        if (r0 > 0.0){
+          SOFT_TAPS
+          float shafts = 0.0, Ws = 0.0;
+          for (int k = 0; k < 4; k++){ shafts += sw[k]*texelFetch(tSoftR, ivec2(sx[k], sy[k]), 0).r; Ws += sw[k]; }
+          if (Ws > 1e-4){
+            shafts = shafts/Ws*2.0;
+            shafts = smoothLook > .5 ? shafts : floor(shafts*10.0 + dith)/10.0;   // stepped, so the beams read as pixel art
+            col += sunCol * shafts;
+          }
+        }
+      }
+#else
+      if (FX_RAYS > 0 && raysOn > 0.5 && rayI > 0.01){
         // light shafts: haze near the island lit wherever the shadow map says the sun gets through
         float t0 = max(0.0, (12.0 - ro.y)/min(rdir.y, -0.001)), t1 = min(tEnd, (-0.5 - ro.y)/min(rdir.y, -0.001));
         // (the haze is only within 13 units of glowC: a line of sight that never comes that close adds exactly nothing,
@@ -520,11 +628,12 @@ const comp = new THREE.ShaderMaterial({
           col += sunCol * shafts;
         }
       }
+#endif
       // ---- rain: pixel streaks in three depth layers ----
       // Each layer sits at a depth: buildings in front of it hide its drops, so rain falls between and behind
       // things instead of lying on the screen. Layers are tied to the world (they slide with the view when it pans
       // or turns, nearer layers more), fall along one slant, and splash on wet ground.
-      if (rainOn > 0.5){
+      if (FX_RAIN > 0 && rainOn > 0.5){
         vec3 rc = mix(vec3(0.72, 0.8, 0.92), vec3(0.45, 0.55, 0.78), night);
         for (int L=0; L<3; L++){
           float fl = float(L);
@@ -540,7 +649,7 @@ const comp = new THREE.ShaderMaterial({
           col = mix(col, rc, on*(0.42 - fl*0.1));
         }
         // splashes: single pixels that flash on up-facing surfaces, fixed to the ground so they don't swim
-        if (rd < 0.99999 && dot(N(vUv), upView) > 0.9){
+        if (rd < 0.99999 && dot(n, upView) > 0.9){
           vec3 wp = ro + rdir*tEnd;
           vec2 sc = floor(wp.xz*7.0);
           float ph = fract(time*1.7 + hash(sc)*7.0);
@@ -553,7 +662,7 @@ const comp = new THREE.ShaderMaterial({
         float pulse = .7 + .2*sin(time*3.5 + vUv.x*res.x*.02) + .1*sin(time*7.0 + vUv.y*res.y*.03);   // a slow breathing, drifting across it
         col += vec3(.2, .55, 1.0)*s3*pulse*.6;
       }
-      if (palOn > 0.5){
+      if (FX_PAL > 0 && palOn > 0.5){
         vec3 best = pal[0]; float bd = 1e9;
         for (int i=0; i<${PAL_HEX.length}; i++){ vec3 df = col - pal[i]; float dist = dot(df*df, vec3(0.3,0.59,0.11)); if (dist < bd){ bd = dist; best = pal[i]; } }
         col = best;
@@ -562,6 +671,150 @@ const comp = new THREE.ShaderMaterial({
     }`,
   depthTest:false, depthWrite:false,
 });
+// The composite as one shader holding every effect is big, and the graphics card sets aside room for all of it even for
+// the effects that are off and skipped (measured: about 3 ms of its 19). So it's compiled with only the effects that are
+// on this frame, the rest left out of the program entirely (each only when it would have done nothing: same picture).
+// Programs are kept, so switching back and forth costs nothing after the first time. (The overlay's tests, exact mode:
+// everything compiled in as before, or no effects at all, to see the floor.)
+let compKey = '';
+function compVariant(){
+  const T = PH.tests, u = comp.uniforms, on = {};
+  if (T.compFloor) for (const f of COMP_FX) on[f] = false;
+  else if (!T.compAll){
+    on.SHIM = u.nLifts.value > .5 || u.mtN.value > 0; on.OUTLINE = u.outlines.value > 0; on.AO = u.aoI.value > 0; on.NL = NL_UNI.lightI.value > 0;
+    on.RIM = u.rimI.value > .01; on.WET = u.wet.value > 0; on.CLOUDS = u.cloudOn.value > .5; on.MIST = u.mistI.value > 0 && u.nVents.value > 0;
+    on.RAYS = u.raysOn.value > .5 && u.rayI.value > .01; on.RAIN = u.rainOn.value > .5; on.PAL = u.palOn.value > .5;
+  }
+  if (T.compNoShim) on.SHIM = false;
+  // the wet-ground reflections, the mist and the light shafts at half resolution (softEffects): off in the test "soft effects at full resolution"
+  // (and window.__SOFT_FULL), when none of them is on, and without WebGL 2 (texelFetch)
+  const soft = !(T.softFull || window.__SOFT_FULL) && renderer.capabilities.isWebGL2 && !T.compFloor && (on.WET !== false || on.MIST !== false || on.RAYS !== false) ? 1 : 0;
+  const key = COMP_FX.map(f => on[f] === false ? 0 : 1).join('') + soft;
+  if (key !== compKey){ compKey = key; for (const f of COMP_FX) comp.defines['FX_' + f] = on[f] === false ? 0 : 1; comp.defines.SOFT_HALF = soft;
+    for (const m of softMats){ for (const f of COMP_FX) m.defines['FX_' + f] = comp.defines['FX_' + f]; m.needsUpdate = true; }
+    comp.needsUpdate = true; }
+  SOFT_ON = soft === 1;
+}
+let SOFT_ON = false;
+// ---- soft effects at half resolution ----
+// The composite works out three soft effects for every pixel: the reflection search on wet ground (22 steps), the steam's mist (8) and the light
+// shafts (12). Each is smooth over a few pixels, so here each is worked out once for a block of 2 x 2 pixels (the block's lower left one) into a
+// target of its own, and the composite, where its cheap tests say the effect applies, reads the four nearest results weighted by depth (softTaps).
+// The pixel-art stepping and dithering (the reflection's five levels, the mist's twenty, the shafts' ten) are applied at full resolution to the
+// result, so they stay crisp. Outlines, ambient occlusion, rain, shimmer, night lights stay as they were. The test "soft effects at full resolution" gives the
+// composite exactly as it was. Each target is RGBA8: wet: the reflected color and a code (0 none; .02 to .5 a reflection of that strength; .52 to 1 a
+// sky puddle), mist: the light scattered (x 2.5) and what gets through, shafts: their strength (x .5).
+const SOFT_HEAD = `
+  vec2 ij = floor(gl_FragCoord.xy);
+  vec2 rep = clamp(2.0*ij - softPar, vec2(0.0), res - 1.0);        // the block's pixel
+  vec2 uvR = (rep + 0.5)/res;
+  float rd = rawD(uvR);
+  float dith = bayer(rep);
+  vec2 ndc = uvR*2.0 - 1.0;
+  vec4 pn = invVP * vec4(ndc, -1.0, 1.0); pn /= pn.w;
+  vec4 pf = invVP * vec4(ndc, rd*2.0 - 1.0, 1.0); pf /= pf.w;
+  vec3 ro = pn.xyz, seg = pf.xyz - pn.xyz;
+  float tEnd = length(seg); vec3 rdir = seg / tEnd;
+  float DK = 95.0/(far - near);
+  vec4 outv = vec4(0.0);
+`;
+const SOFT_WET = SOFT_HEAD + `
+  if (FX_WET > 0 && rd < 0.99999 && wet > 0.0){
+    vec3 n = N(uvR);
+    if (dot(n, upView) > 0.93){
+      vec3 wp = ro + rdir*tEnd;
+      float pud = step(0.6, fbm(vec3(floor(wp.xz*6.0)/6.0*0.8, 0.0)));        // crisp-edged puddle patches
+      pud *= 0.35 + 0.65*rainOn;
+      vec3 rr = reflect(rdir, vec3(0.0, 1.0, 0.0));
+      vec3 hitCol = vec3(0.0); float hit = 0.0, t = 0.03; vec2 huv = vec2(0.0);
+      for (int i=0; i<22; i++){
+        t += 0.05 + t*0.14;
+        vec3 q = wp + rr*t;
+        vec4 cp = VP * vec4(q, 1.0); cp.xyz /= cp.w;
+        vec2 uv = cp.xy*0.5 + 0.5;
+        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
+        float sd = texture2D(tDepth, uv).x, qd = cp.z*0.5 + 0.5;
+        if (qd > sd + 0.0003*DK && qd - sd < 0.015*DK){ huv = uv; hit = 1.0; break; }
+      }
+      if (hit > 0.5){
+        vec2 st = vec2(0.0, -1.0/res.y);
+        hitCol = texture2D(tColor, huv).rgb*0.4 + texture2D(tColor, huv+st*2.0).rgb*0.3 + texture2D(tColor, huv+st*4.0).rgb*0.2 + texture2D(tColor, huv+st*6.0).rgb*0.1;
+        float lum = dot(hitCol, vec3(0.3, 0.59, 0.11));
+        float bright = smoothstep(0.35, 0.95, lum);
+        float k = wet * mix(bright*0.9, 0.7, pud);
+        outv = vec4(hitCol, 0.02 + clamp(k, 0.0, 1.0)*0.48);
+      } else if (pud > 0.0) outv = vec4(0.0, 0.0, 0.0, 0.52 + clamp(0.35*pud*wet*2.0/0.7, 0.0, 1.0)*0.48);
+      else outv = vec4(0.0, 0.0, 0.0, 0.02);
+    }
+  }
+  gl_FragColor = outv;`;
+const SOFT_MIST = SOFT_HEAD + `
+  outv = vec4(0.0, 0.0, 0.0, 1.0);
+  if (FX_MIST > 0 && mistI > 0.0 && nVents > 0 && rd < 0.99999){
+    vec3 hit = ro + rdir*tEnd;
+    float y0 = 4.5, y1 = -0.1;
+    float ta = max(0.0, (y0 - ro.y)/min(rdir.y, -0.001)), tb = min(tEnd, (y1 - ro.y)/min(rdir.y, -0.001));
+    vec2 mA = (ro + rdir*ta).xz, mB = (ro + rdir*tb).xz;
+    vec2 sA = texture2D(tSteam, mA/(2.0*steamExt) + .5).rg, sB = texture2D(tSteam, mB/(2.0*steamExt) + .5).rg, sM = texture2D(tSteam, (mA + mB)/(4.0*steamExt) + .5).rg;
+    if (hit.y > -0.6 && tb > ta && max(max(sA.g, sB.g), sM.g) > .004){
+      vec2 px = 1.0/res;
+      vec3 nl = (texture2D(tLight, uvR).rgb*.5 + texture2D(tLight, uvR + vec2(4.0, 0.0)*px).rgb*.25 + texture2D(tLight, uvR - vec2(4.0, 0.0)*px).rgb*.25);
+      vec3 amb = mix(mix(skyBot, skyTop, .4)*.35, vec3(.03, .04, .08), mistNight);
+      vec3 sunS = sunCol*mistSun*(1.0 - mistNight);
+      vec3 glowN = (nl*2.4 + cityGlow*.03)*mistNight;
+      const int MS = 8;
+      float dt = (tb - ta)/float(MS), T = 1.0; vec3 acc = vec3(0.0);
+      for (int i = 0; i < MS; i++){
+        vec3 p = ro + rdir*(ta + (float(i) + dith)*dt);
+        float hy = clamp(p.y/4.5, 0.0, 1.0);
+        vec2 sm = texture2D(tSteam, p.xz/(2.0*steamExt) + .5).rg;
+        float w = mix(sm.r*1.6, sm.g, smoothstep(.0, .55, hy))*.95;
+        float dens = mistI*w*(1.0 - hy)*(1.0 - hy)*(.55 + .45*vnoise(vec3(p.xz*1.3, p.y*1.5 - time*.6)))*.9;
+        acc += T*dens*dt*(amb + sunS*litAt(p) + glowN);
+        T *= exp(-dens*dt*.35);
+      }
+      acc = min(acc, vec3(.4));
+      outv = vec4(acc*2.5, T);
+    }
+  }
+  gl_FragColor = outv;`;
+const SOFT_RAYS = SOFT_HEAD + `
+  if (FX_RAYS > 0 && raysOn > 0.5 && rayI > 0.01){
+    float t0 = max(0.0, (12.0 - ro.y)/min(rdir.y, -0.001)), t1 = min(tEnd, (-0.5 - ro.y)/min(rdir.y, -0.001));
+    vec2 rsa = ro.xz + rdir.xz*t0, rsb = ro.xz + rdir.xz*t1 - rsa;
+    float rsk = clamp(dot(glowC - rsa, rsb)/max(dot(rsb, rsb), 1e-6), 0.0, 1.0);
+    if (t1 > t0 && length(rsa + rsb*rsk - glowC) < 13.5){
+      const int RSTEPS = 12;
+      float dt = (t1 - t0)/float(RSTEPS), acc = 0.0;
+      for (int i=0; i<RSTEPS; i++){
+        vec3 p = ro + rdir*(t0 + (float(i) + dith)*dt);
+        float hz = smoothstep(-0.5, 1.0, p.y) * exp(-p.y/4.0) * smoothstep(13.0, 7.0, length(p.xz - glowC));
+        acc += litAt(p) * hz * dt;
+      }
+      outv = vec4(clamp(acc * 0.016 * rayI * 0.5, 0.0, 1.0), 0.0, 0.0, 1.0);
+    }
+  }
+  gl_FragColor = outv;`;
+const COMP_PRELUDE = comp.fragmentShader.slice(0, comp.fragmentShader.indexOf('void main(){'));
+const softMats = [SOFT_WET, SOFT_MIST, SOFT_RAYS].map(body => new THREE.ShaderMaterial({
+  defines: Object.assign({ SOFT_HALF: 0 }, Object.fromEntries(COMP_FX.map(f => ['FX_' + f, 1]))), uniforms: comp.uniforms, vertexShader: comp.vertexShader,
+  fragmentShader: COMP_PRELUDE + 'void main(){' + body + '}', depthTest: false, depthWrite: false }));
+const softScene = new THREE.Scene(), softQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), softMats[0]); softScene.add(softQuad);
+let rtSoft = [];
+function makeSoftTargets(){
+  for (const r of rtSoft) r.dispose();
+  const w = Math.ceil(W/2) + 1, h = Math.ceil(H/2) + 1, o = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat, depthBuffer: false };
+  rtSoft = [0, 1, 2].map(() => new THREE.WebGLRenderTarget(w, h, o));
+  comp.uniforms.softDim.value.set(w, h); comp.uniforms.tSoftW.value = rtSoft[0].texture; comp.uniforms.tSoftM.value = rtSoft[1].texture; comp.uniforms.tSoftR.value = rtSoft[2].texture;
+}
+// before the composite: the soft effects that are on, into their targets (compVariant has just said whether they're used)
+function softEffects(px, py){
+  if (!SOFT_ON) return;
+  const u = comp.uniforms, par = v => ((v % 2) + 2) % 2;
+  u.softPar.value.set(par(px - (W >> 1)), par(py - (H >> 1))); u.softSig.value = Math.max(6*2*zoom/H, .02);
+  const on = [comp.defines.FX_WET, comp.defines.FX_MIST, comp.defines.FX_RAYS];
+  for (let i = 0; i < 3; i++){ if (!on[i]) continue; softQuad.material = softMats[i]; renderer.setRenderTarget(rtSoft[i]); renderer.render(softScene, compCam); }
+}
 const compScene = new THREE.Scene(), compCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
 compScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), comp));
 
@@ -726,29 +979,30 @@ let rtC = null, rtN = null, W = 480, H = 270;
 // either writes it or leaves it alone (mrtWants), switched only when that changes. The normal pass's own depth never saw
 // glass, glows and the like, so whatever it left out mustn't hide the normals behind it: those draws come after the
 // rest among the solid ones (the opaque sort in world.js) and don't write the second image.
-let MRT_ON = false, mrtCur = 0, mrtWarned = new Set();
+let MRT_ON = false, mrtCur = 0, MRT_RT = null, mrtWarned = new Set();   // (MRT_RT: the target being drawn with both images; the color target, or the static cache's)
 if (MRT){
   const gl = renderer.getContext(), B2 = [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1], B1 = [gl.COLOR_ATTACHMENT0, gl.NONE];
   const rbd = renderer.renderBufferDirect;
   renderer.renderBufferDirect = function(camera, sc, geo, mat, obj, grp){
-    if (MRT_ON && renderer.getRenderTarget() === rtC){
+    if (MRT_ON && renderer.getRenderTarget() === MRT_RT){
+      if (PH.tests.plain && obj.isMesh && !obj.isInstancedMesh && !geo.isInstancedBufferGeometry && !mat.transparent && geo.attributes.normal && !mat.isShaderMaterial) mat = PH.plainMat;   // (the overlay's plain-shading test)
       const w = mrtWants(obj, mat) ? 2 : 1;
       if (w !== mrtCur){ gl.drawBuffers(w === 2 ? B2 : B1); mrtCur = w; }
-      if (w === 1 && (obj.layers.mask & 13) && !mrtWarned.has(mat)){ mrtWarned.add(mat); console.warn('Neon Terrarium: no normals from', mat.type, mat.name || '', obj); }
+      if (w === 1 && (obj.layers.mask & 45) && !mrtWarned.has(mat)){ mrtWarned.add(mat); console.warn('Neon Terrarium: no normals from', mat.type, mat.name || '', obj); }
     }
     return rbd.call(this, camera, sc, geo, mat, obj, grp);
   };
 }
 // before the color pass: both images cleared (the normal image to "facing the camera", as the normal pass cleared it)
-function mrtBegin(){
+function mrtBegin(rt = rtC, rn = rtN, keep = false){   // (keep: don't clear: the picture is copied in from the static cache instead)
   const gl = renderer.getContext();
-  if (rtC._mrtN !== rtN){
-    renderer.setRenderTarget(rtN); renderer.setRenderTarget(rtC);   // (three makes both targets' buffers now)
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, renderer.properties.get(rtN.texture).__webglTexture, 0);
-    rtC._mrtN = rtN;
-  }
-  gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]); mrtCur = 2;
-  renderer.clear(); gl.clearBufferfv(gl.COLOR, 1, [128/255, 128/255, 1, 1]);
+  if (rt._mrtN !== rn){
+    renderer.setRenderTarget(rn); renderer.setRenderTarget(rt);   // (three makes both targets' buffers now)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, renderer.properties.get(rn.texture).__webglTexture, 0);
+    rt._mrtN = rn;
+  } else renderer.setRenderTarget(rt);
+  gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]); mrtCur = 2; MRT_RT = rt;
+  if (!keep){ renderer.clear(); gl.clearBufferfv(gl.COLOR, 1, [128/255, 128/255, 1, 1]); }
   renderer.autoClear = false; MRT_ON = true;
 }
 function mrtEnd(){ MRT_ON = false; renderer.autoClear = true; }
@@ -768,7 +1022,7 @@ function makeTargets(){
   comp.uniforms.tCloud.value = rtCloud.texture; cloudMat.uniforms.tDepth.value = rtC.depthTexture;
   if (rtOut) rtOut.dispose();
   rtOut = new THREE.WebGLRenderTarget(W, H, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat });
-  makeGlowTargets(); makeLightTarget();
+  makeGlowTargets(); makeLightTarget(); makeSoftTargets();
   upMat.uniforms.t.value = rtFinal.texture; upMat.uniforms.srcRes.value.set(W, H); upMat.uniforms.dstRes.value.set(DW, DH);
 }
 /* ---------- bloom and halation ---------- */
@@ -959,13 +1213,84 @@ function liftShimmerCull(VP){
   let on = false;
   for (const [x, z, r] of STEAM_LIFTS) if (boxOnScreen(VP, x - r, x + r, -3.95, -1.67, z - r, z + r)){ on = true; break; }
   comp.uniforms.nLifts.value = on ? STEAM_LIFTS.length : 0;
+  if (on) liftMaskFor(comp.uniforms.invVP.value);
 }
-function makeSteamMap(vents, lifts = []){
+// Which pixels could see a pad's shimmer at all. The view is orthographic, so every pixel's line of sight runs the same
+// way, and its stretch through the air under the pads (y -1.72 down to -3.9) is the same length across the ground for
+// every pixel: within LIFT_H of that stretch's middle. A coarse top-down map (3 units a cell) marks the cells whose
+// middle point could be that close to a pad's patch of the steam map (its disc, the texels the filtering reaches, a
+// little to spare). A pixel whose middle point lands in an unmarked cell would only read zeros all along its line, so
+// it skips the eight reads (same picture). Rebuilt when the pads change or the view tilts further than it was built for.
+// Where on screen the shimmers could show. Each pad's air (its disc, from y -3.95 to -1.67) and each metro car's gap
+// (a square round it, at the gap's height) is a box; the view is orthographic, so a pixel's line of sight passes through
+// a box only if the pixel lies inside the box's outline on screen, and so inside the rectangle round its eight corners.
+// The screen is cut into SHT_W x SHT_H tiles; a tile is marked (red: a pad, green: a car) if any such rectangle reaches
+// it. A pixel in an unmarked tile would only add zeros, so the composite skips that shimmer there (same picture).
+const SHT_W = 128, SHT_H = 64, SHT_DATA = new Uint8Array(SHT_W*SHT_H*4);
+const shimTileTex = new THREE.DataTexture(SHT_DATA, SHT_W, SHT_H, THREE.RGBAFormat);
+shimTileTex.minFilter = shimTileTex.magFilter = THREE.NearestFilter; shimTileTex.generateMipmaps = false;
+comp.uniforms.tShimTile.value = shimTileTex;
+const _shtR = [0, 0, 0, 0];
+function boxRect(VP, x0, x1, y0, y1, z0, z1){
+  let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity;
+  for (let q = 0; q < 8; q++){ _sbc.set(q & 1 ? x1 : x0, q & 2 ? y1 : y0, q & 4 ? z1 : z0).applyMatrix4(VP);
+    a = Math.min(a, _sbc.x); b = Math.max(b, _sbc.x); c = Math.min(c, _sbc.y); d = Math.max(d, _sbc.y); }
+  _shtR[0] = a; _shtR[1] = b; _shtR[2] = c; _shtR[3] = d; return _shtR;
+}
+function shtMark(r, ch){
+  // tiles whose span (in -1..1) meets the rectangle, with a little to spare for rounding
+  const e = .002, i0 = Math.max(0, Math.floor((r[0] - e + 1)*.5*SHT_W)), i1 = Math.min(SHT_W - 1, Math.floor((r[1] + e + 1)*.5*SHT_W));
+  const j0 = Math.max(0, Math.floor((r[2] - e + 1)*.5*SHT_H)), j1 = Math.min(SHT_H - 1, Math.floor((r[3] + e + 1)*.5*SHT_H));
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) SHT_DATA[(j*SHT_W + i)*4 + ch] = 255;
+}
+let shtAny = true;
+function shimTiles(VP){
+  const U_ = comp.uniforms;
+  if (!shtAny && U_.nLifts.value < .5 && U_.mtN.value <= 0) return;   // (nothing marked last time, nothing to mark now)
+  SHT_DATA.fill(0); shtAny = false;
+  if (U_.nLifts.value > .5) for (const [x, z, r] of STEAM_LIFTS){ shtMark(boxRect(VP, x - r, x + r, -3.95, -1.67, z - r, z + r), 0); shtAny = true; }
+  const y0 = U_.mtGapY.value.x - .05, y1 = U_.mtGapY.value.y + .05;
+  for (let k = 0; k < U_.mtN.value; k++){ const g = U_.mtGap.value[k]; shtMark(boxRect(VP, g.x - 1.2, g.x + 1.2, y0, y1, g.y - 1.2, g.y + 1.2), 1); shtAny = true; }
+  shimTileTex.needsUpdate = true;
+}
+const LIFT_MN = 256, LIFT_MDATA = new Uint8Array(LIFT_MN*LIFT_MN*4);
+const liftMaskTex = new THREE.DataTexture(LIFT_MDATA, LIFT_MN, LIFT_MN, THREE.RGBAFormat);
+liftMaskTex.minFilter = liftMaskTex.magFilter = THREE.NearestFilter; liftMaskTex.generateMipmaps = false;
+comp.uniforms.tLiftMask.value = liftMaskTex;
+let liftMaskR = -1, liftMaskOf = null;
+const _lmA = new THREE.Vector3(), _lmB = new THREE.Vector3();
+function liftMaskFor(invVP){
+  _lmA.set(0, 0, -1).applyMatrix4(invVP); _lmB.set(0, 0, 1).applyMatrix4(invVP); _lmB.sub(_lmA).normalize();
+  const half = _lmB.y < -.01 ? (3.9 - 1.72)*.5*Math.hypot(_lmB.x, _lmB.z)/-_lmB.y : 0;
+  if (liftMaskOf === STEAM_LIFTS && half <= liftMaskR) return;
+  const R = Math.ceil(Math.max(half, liftMaskOf === STEAM_LIFTS ? liftMaskR : 0)*4 + 1)/4;   // a bit more than needed, so small tilts don't rebuild it
+  liftMaskOf = STEAM_LIFTS; liftMaskR = R;
+  const ext = comp.uniforms.steamExt.value, cell = 2*ext/LIFT_MN;
+  LIFT_MDATA.fill(0);
+  for (const [x, z, r] of STEAM_LIFTS){
+    const reach = r + R + .25;
+    const i0 = Math.max(0, Math.floor((x - reach + ext)/cell)), i1 = Math.min(LIFT_MN - 1, Math.floor((x + reach + ext)/cell));
+    const j0 = Math.max(0, Math.floor((z - reach + ext)/cell)), j1 = Math.min(LIFT_MN - 1, Math.floor((z + reach + ext)/cell));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){
+      const cx0 = -ext + i*cell, cz0 = -ext + j*cell;
+      const dx = Math.max(cx0 - x, 0, x - (cx0 + cell)), dz = Math.max(cz0 - z, 0, z - (cz0 + cell));
+      if (dx*dx + dz*dz <= reach*reach) LIFT_MDATA[(j*LIFT_MN + i)*4] = 255;
+    }
+  }
+  liftMaskTex.needsUpdate = true;
+}
+let steamMapSig = null;
+function makeSteamMap(vents, lifts = []){ drain(makeSteamMapGen(vents, lifts)); }
+function* makeSteamMapGen(vents, lifts = []){
   const ext = (GRID_MAX + 1)*LOT, k = STEAM_N/(2*ext);
   comp.uniforms.steamExt.value = ext; comp.uniforms.nVents.value = vents.length; comp.uniforms.nLifts.value = lifts.length;
-  STEAM_LIFTS = lifts.map(v => [v.x, v.z, v.r + .15 + 1.5/k]);
-  STEAM_DATA.fill(0);
-  const acc = new Float32Array(STEAM_N*STEAM_N*2);
+  // the map is a function of the vents and lifts alone; an edit that leaves them as they were (most do) leaves the map as it was (a 35 ms rebuild of the whole city's map otherwise). The test "steam map: rebuilt at every edit" restores that.
+  let sig = null;
+  if (!(PH.tests.steamMapAlways || window.__STEAM_ALWAYS)){
+    sig = vents.length + ':' + lifts.length + ':' + vents.map(v => v.x + ',' + v.z + ',' + v.s).join(';') + '|' + lifts.map(v => v.x + ',' + v.z + ',' + v.r).join(';');
+    if (sig === steamMapSig) return;
+  }
+  const acc = new Float32Array(STEAM_N*STEAM_N*2); let nv = 0;   // (worked out a few vents at a time when the upkeep is spread over frames; the map itself is replaced at the end)
   for (const v of vents){
     const cx = (v.x + ext)*k, cy = (v.z + ext)*k, R = 3.0*k*2.2;
     for (let y = Math.max(0, Math.floor(cy - R)); y <= Math.min(STEAM_N - 1, Math.ceil(cy + R)); y++)
@@ -973,7 +1298,12 @@ function makeSteamMap(vents, lifts = []){
         const d2 = ((x + .5 - cx)**2 + (y + .5 - cy)**2)/(k*k), i = (y*STEAM_N + x)*2;
         acc[i] += v.s*Math.exp(-d2/(1.1*1.1)); acc[i + 1] += v.s*Math.exp(-d2/(3.0*3.0));
       }
+    if ((++nv & 7) === 0) yield;
   }
+  yield;
+  steamMapSig = sig;
+  STEAM_LIFTS = lifts.map(v => [v.x, v.z, v.r + .15 + 1.5/k]);
+  STEAM_DATA.fill(0);
   for (let i = 0; i < STEAM_N*STEAM_N; i++){ STEAM_DATA[i*4] = Math.min(255, acc[i*2]*200); STEAM_DATA[i*4 + 1] = Math.min(255, acc[i*2 + 1]*200); }
   // blue: the lift pads, a tight disc each (for the heat shimmer under them)
   for (const v of lifts){

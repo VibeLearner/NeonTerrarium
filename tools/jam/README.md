@@ -13,6 +13,7 @@ The game's own files are untouched. Everything lives in `tools/jam/`.
 ## Controls
 
 **Transport**
+- **Composer** switch: **Old composer** is the first version, **New composer** is round 2 (the default). Switching restarts the same seed with the same sliders, so you can hear both. Ratings record which one was playing.
 - **Seed** is any text. The same seed with the same sliders always plays the same piece.
 - **New seed** picks a fresh one. The arrows step back and forward through the seeds you have visited. **Load** uses whatever is typed in the box. **Restart** replays the current seed from the top with the current settings.
 
@@ -71,7 +72,11 @@ Most sliders take effect smoothly while music plays and add or remove features i
 | `index.html`, `jam.css` | the page |
 | `js/rng.js` | seeded random numbers (every decision is a fixed draw compared to a slider level) |
 | `js/theory.js` | scales, chord building, a curated progression list, smooth voice leading |
-| `js/composer.js` | form, meter, chords, motifs, drum and bass rules, fills, game-state modulation |
+| `js/composer.js` | the old composer: form, meter, chords, motifs, drum and bass rules, fills, game-state modulation |
+| `js/rules.js` | the hand-written rule book shared by the new composer and `lint.js`: register bands, ring and release times, chord scales, avoid notes, cadences, non-chord-tone figures, the checks |
+| `js/motif.js` | the new composer's motif engine: rhythm cells, interval shapes, development ops, the seeded phrase search |
+| `js/composer2.js` | the new composer: harmony timeline, phrases and cadences, arc, layers that leave room, validator |
+| `lint.js` | Node-only checker (`node lint.js --random 200`) that counts rule violations per 100 bars for both composers |
 | `js/synth.js` | all sounds, the mixer, effects, and the master limiter |
 | `js/engine.js` | scheduling on the audio clock, one bar ahead of the music |
 | `js/ui.js` | controls, display, ratings |
@@ -79,7 +84,8 @@ Most sliders take effect smoothly while music plays and add or remove features i
 | `analyze.py` | the analyzer that made the style profile |
 | `style_profile.json` | per-song and aggregate summary numbers (no notes, no audio) |
 | `STYLE_NOTES.md` | what the profile says, and which numbers are shaky |
-| `SEEDS.md` | the five seeds to try first, and what to tune next |
+| `SEEDS.md` | the eight seeds to try first, the listening guide, and what to tune next |
+| `NOTES2.md` | what round 2 changed, the lint table before and after, decisions, and what was skipped |
 
 **Sounds**: Karplus-Strong plucked twinkle with chorus, an FM electric piano, detuned-saw pads, sub and reese bass, a saw and square lead with portamento and an arpeggio mode, a synthesized drum kit with chopped breaks, ghost notes and cymbals, and vinyl, rain, city hum and radio textures.
 

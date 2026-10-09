@@ -181,7 +181,8 @@
 
   function eAt(sec, b, eff) {
     const t01 = sec.bars > 1 ? b / (sec.bars - 1) : 0;
-    return clamp(lerp(sec.e0, sec.e1, t01) * (0.55 + 0.8 * eff.energy), 0, 1.1);
+    const pp = lerp(sec.p0, sec.p1, t01);
+    return clamp((0.55 * lerp(sec.eB0, sec.eB1, t01) + 0.45 * arcAt(pp)) * (0.55 + 0.8 * eff.energy), 0, 1.1);
   }
 
   function planSection2(song, eff, cycle, idx, kind, st, formInfo) {
@@ -190,7 +191,7 @@
     const tot = formInfo.total;
     sec.p0 = formInfo.starts[idx] / tot; sec.p1 = (formInfo.starts[idx] + sec.bars) / tot;
     sec.arc0 = arcAt(sec.p0); sec.arc1 = arcAt(sec.p1);
-    sec.e0 = 0.6 * sec.e0 + 0.4 * sec.arc0; sec.e1 = 0.6 * sec.e1 + 0.4 * sec.arc1;
+    sec.eB0 = sec.e0; sec.eB1 = sec.e1;                                  // the section's own ramp; the song arc is blended in bar by bar (eAt)
     const profile = sec.profile = pickProfile(sec, eff, song);
     const rc = J.rng(sec.rngSeed, 'cadch');
     sec.cad = planCadences(sec, profile);

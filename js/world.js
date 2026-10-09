@@ -95,7 +95,7 @@ function cullFrame(camera = cam, area = camera){   // (for the camera about to d
 // Tune from the console (they take effect on the next frame): SD.v0 (px/frame where the first class goes), SD.step (each next class at this multiple),
 // SD.max (classes at most), SD.fast (px/frame where a fast spin may drop fastMax more classes), SD.cursorPx (full detail within this many px of the
 // cursor), SD.hys (margin round a threshold), SD.on = false.
-const SD = { on: true, v0: 10, step: 2, max: 2, fast: 40, fastMax: 1, cursorPx: 200, hys: .25, hist: [0, 0, 0, 0, 0, 0], top: 0, pieces: 0, moving: false,
+const SD = { on: true, v0: 6, step: 2, max: 2, fast: 40, fastMax: 1, cursorPx: 200, hys: .25, hist: [0, 0, 0, 0, 0, 0], top: 0, pieces: 0, moving: false,
   dYaw: 0, dZoom: 0, dPitch: 0, pY: null, pZ: 0, pP: 0, list: [], stamp: -1 };
 function sdTrack(){   // every frame: how far the view turned, tilted and zoomed since the last one
   SD.dYaw = SD.pY === null ? 0 : yaw - SD.pY; SD.dZoom = SD.pY === null ? 0 : (zoom - SD.pZ)/zoom; SD.dPitch = SD.pY === null ? 0 : PITCH - SD.pP;
@@ -109,7 +109,8 @@ function sdApply(){   // for a frame drawn the old way: each plot's extra size c
   const w = Math.abs(SD.dYaw), tz = Math.abs(SD.dZoom), tp = Math.abs(SD.dPitch);
   SD.moving = w + tz + tp > 1e-6; SD.hist.fill(0); SD.top = 0; SD.pieces = 0;
   const lv = CULL.lvl, nT = SD.max + SD.fastMax, thr = [];
-  for (let k = 0; k < nT; k++) thr.push(k < SD.max ? SD.v0*SD.step**k : SD.fast*SD.step**(k - SD.max));
+  const v0 = PH.tests.sdOld ? 10 : SD.v0;   // (round 6's start speed was 10; round 7 item 6 starts the first class at 6: a slow drag, under about 5, is untouched either way)
+  for (let k = 0; k < nT; k++) thr.push(k < SD.max ? v0*SD.step**k : SD.fast*SD.step**(k - SD.max));
   if (!SD.moving){ for (const P of SD.list) if (P.xlOn){ P.xl.fill(0); P.xlOn = 0; } return; }   // (a still view is never reduced)
   cam.updateMatrixWorld(); const e = cam.matrixWorld.elements, upp = H/(2*zoom), sp = Math.sin(PITCH), cp = Math.cos(PITCH);
   const rx = e[0], rz = e[2], hr = Math.hypot(e[8], e[10]) || 1, fx = -e[8]/hr, fz = -e[10]/hr;

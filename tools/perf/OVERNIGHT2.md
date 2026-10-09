@@ -1,6 +1,6 @@
 # Overnight report 2 (round 7)
 
-(Written as the work goes; the table, decisions, owner's list and measurement script are at the end of the run.)
+Branch `wip/round7` (from `wip/round6`, b6d34e5). Nothing is merged or published. Every pushed commit passed the harness for its item (checks are named in each section).
 
 ## Details by item
 
@@ -87,3 +87,48 @@ What I checked, exactly:
   press record, leave the game alone for 20 seconds (a pan at the speed of a slow drag in the last 10 seconds), stop, save the trace (Save profile). Look for: (a) in the Main track a task over 50 ms (red corner): open it and read the bottom-up tab, which function is at the top
   (updatePeople, bikeStreetRoute and bikeRoute, updateLurkers, checkBumps are the known ones; "Minor GC" or "Major GC" means a collection); (b) in the GPU track a frame whose GPU time is long while the main thread is idle (the card, not the code), and shader compile entries ("compileShader", "linkProgram")
   at the start of a stall; (c) in the Frames track the dropped frames and whether they come in a row. Send the trace file.
+
+**5. The zoom 30 main thread: partly (small exact wins built; the big ones measured and not built).**
+- Laps (tools/perf/laps.py, maxcity, zoom 30, still, main thread without drawing, the real clock; this machine's software renderer can't time the card or the draw submission, so the 21 to 22 ms you see includes about 1,480 draw calls I can only count):
+  updatePeople 5.1 ms (the biggest: including 0.6 checkBumps and 0.3 decide), updateSteam 1.4, updateMegaFx 1.15, updateMetros 0.5, updateHighways 0.4, updateDoors 0.5, updateClubs 0.2, the rest under 0.2. Whole simulated frame about 9.7 ms here (median 8.9).
+  A profile of the same frames (V8 sampler) puts updatePeople's own time at 2.5 ms, updateSteam 1.4, three.js's matrix copy 0.9, updateDoors 0.5, updateMatrixWorld 0.5, checkBumps 0.4.
+- Built, exact: **steam** (updateSteam): a puff not under a deck, nearly all of them, is not pushed sideways, so two of its three sine and cosine calls are the sine or cosine times zero and are skipped: 17,352 puffs, 10.4 million values compared over 120 frames, 0 different;
+  1.48 to 1.01 ms a frame (-0.47 ms). Test "steam: every puff in full (same picture)" / `__STEAM_FULL`. **Doors** (updateDoors): the two passes over the 10,000 people share one pass (they only set flags): about -0.1 ms.
+  Check: harness city, dense, megas quick (53 captures): 0 problems.
+  Run-to-run noise on this machine is about 2 ms of frame mean (the same build gave 10.3 and 12.6 ms in two runs), so only the in-page A/B numbers above are reliable; the b6d34e5 and new laps files in the table of numbers are for orientation only.
+- **Collision grid kept between frames: not built.** The pass is 0.6 ms a frame on average (6% of the simulated frame): 3 to 5 ms on the frames it runs, every N-th frame, sometimes 16 to 25 ms when the crowd is dense (the stall list in item 4). A kept grid still has to move every walker that moved (nearly all of them at the rates it runs),
+  so it saves the counting sort (a third of the pass) and costs a cell update per walker per frame: about 0.2 ms gain on average, with a different order of neighbors in a cell (which changes who bumps whom, so not exact). Not worth it.
+- **Fewer draw calls (1,482 in a cached frame at zoom 30): measured, not built.** Where the calls are (one frame, maxcity): glow overlays of the merged building meshes 226 (opaque, depth equal, drawn over the cache; few triangles each);
+  hologram sign quads 273 (189 + 84, about 4 triangles each, additive, two materials); window glass and see-through boxes 151 (3,000 triangles each); three animated opaque shader materials (uniforms time and night) 222 (about 900 triangles each); sprites 136; glow points 51; instanced meshes about 130 (crowd, vehicles, lamps);
+  the rest are small meshes outside the batches (about 170, 12 to 85 triangles each).
+  Why not exact: the sign quads and glass are transparent, drawn back to front by each object's own depth against each other, so one merged mesh per super region changes their order against the glass (a sign behind a window, a window behind a sign) and the picture; the sign quads are additive,
+  which commutes except where 8-bit rounding differs by 1 level, but they are interleaved with normal blended glass in the same list. The overlays would merge exactly (opaque, no depth write, equal depth; the only order effect is coplanar duplicates, 0.08%): build one overlay per merge block by copying just its
+  flicker and window triangles (a few thousand) with multi-range draws for the stutter band, which removes about 180 of the 226 calls (12% of all calls); that needs the overlay built while the CPU arrays exist (before upload; item 4 frees them) and a per-member visibility test each frame. I did not build it: I can't measure the gain on this machine and it touches how
+  every region is merged. First thing to build next round if the draw submission is the limit on your machine; the signs and glass need your approval as a cheat (sort them with the glass by layer).
+- **The live pass's glass triangles (457,000 of 1.16 million): not built.** Glass is mostly double-sided transparent boxes (each pane 12 triangles, front and back both blended), not flat quads that share an edge: joining neighbors changes how many layers blend where they overlap, so it is not the same picture.
+  Plants per super region (cull): the per-plot cull already leaves out plants off screen.
+- Laps before and after, in-page A/B on the same page (not between runs): steam 1.48 to 1.01 ms; doors about 0.1 ms; lurkers (night) a 43 ms frame to 24; bike routes 33 to 12.6 ms a search; everything else unchanged.
+
+**6. Turning at zoom 30: done (a cheat, with crops).**
+- Tool: tools/perf/sd_tune.py (frames drawn the old way during a steady turn, draw calls stubbed so only the triangle count is read, same start view for every setting) and tools/perf/sd_crops.py.
+  City scene, zoom 30, color-pass triangles a frame, change against no speed-based detail (speeds are px a frame at the pivot's edge, which is the number SD uses):
+  | turn | now (v0 10) | v0 6 (chosen) | v0 5, 3 classes | v0 6, step 1.7 |
+  |---|---|---|---|---|
+  | 2.7 px/frame | 0.0% | 0.0% | 0.0% | 0.0% |
+  | 5.4 px/frame (slow drag) | 0.0% | 0.0% | 0.0% | 0.0% |
+  | 10.5 px/frame | 0.0% | -2.4% | -6.6% | -2.4% |
+  | 15 px/frame | -1.8% | -17.6% | -20.9% | -18.8% |
+  | 23 px/frame | -18.0% | -33.1% | -37.1% | -36.2% |
+- Chosen: **`SD.v0` 10 to 6**, everything else as it was (`step` 2, `max` 2, `fast` 40, `fastMax` 1, `cursorPx` 200, `hys` .25). With hysteresis the first class goes at 7.5 px a frame and comes back below 4.5, so a slow drag (under about 5) is untouched (measured 0.0% at 2.7 and 5.4 px), and a medium turn (10 to 15 px a frame) gets
+  2.4% to 17.6% fewer triangles (against 0 to 1.8% before); a fast spin 33% instead of 18%. I did not touch `max`, `fast` or `cursorPx`: a third class (v0 5, max 3) only gains 3 to 4 points more and drops detail further.
+  Overlay test "turn detail: start at 10 px a frame (as before)" restores the old setting; "no speed-based detail" still turns it all off.
+- Crops (cheat, yours to approve): tools/perf/overnight2/item6_city_0p012.png: one frame of a steady 14 px a frame turn at zoom 30, three places (middle, left, right), columns: full detail, the old settings, the new settings, and the difference between new and full detail times 4.
+  Triangles in that frame: full 1,214,373, old 1,188,498, new 994,842. The difference column is speck-level building detail on moving walls; the clouds differ in every column because they animate with time. Check: harness city, dense, megas quick: 0 problems (the standard script doesn't turn at those speeds).
+
+**2d. Round parts and rounded boxes by zoom band: not built (cheat; needs your approval first and a layout change).** The candidates and their share are in 2c (pipeSeg and the other 16-sided cylinders about 11% of triangles put, the rounded plates and boxes about 12%).
+A lean variant means a second set of triangles for each round part in the same buffer and a way to choose between the sets per zoom band; the index layout has only one dimension for choosing (the size classes, by edge length) and the lean set needs its own: another set of rows per piece
+(`rowS`, `rowC`) and the multi-range draw of both. I judged it a day's work in the code every region passes through, for a gain I can only count in triangles here (about 15% of what is drawn when the cache is not used: turns and cache redraws). Next round, with item 5's overlay merge.
+
+**2e. Thin sticks at far zoom: not built (the rule's measurement came out above 10%, but the real saving is smaller than first thought).** Sticks are about 47% of the drawn triangles at zoom 30 and replacing each by its most frontal long side or a quad would save about 13% of drawn triangles.
+But the walls already go through the facing arcs: every stick's long sides are in the wall slices (`sideLayout`), and the arc leaves out the slices that face away, so about half of a stick's four long sides is already not drawn and the end caps go as small triangles. What is left to save is the second visible side of each stick, which needs
+its own narrower arc, which needs its own slice rows in the layout (same cost as 2d). Test name reserved: "full sticks". Next round, with 2d.

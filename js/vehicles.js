@@ -509,12 +509,27 @@ function updateSteam(dt, night){
   if (!steamPts) return;
   steamMat.uniforms.color.value.setRGB(1,1,1).lerp(steamCol.set(0x6a7596), night);
   const P = steamPts.geometry.attributes.position.array, Sz = steamPts.geometry.attributes.size.array, A = steamPts.geometry.attributes.alpha.array;
+  if (PH.tests.steamFull || window.__STEAM_FULL){   // (the first way: three sine and cosine calls for every puff)
   for (let i=0;i<steamLife.length;i++){
     let L = steamLife[i] + dt*.32; if (L > 1) L -= 1; steamLife[i] = L;
     const e = steamSrc[(i/STEAM_PER)|0];
     const k = (i/STEAM_PER)|0, top = steamCeil ? steamCeil[k] - .45 : 1e9, up = e.y + L*2.3, over = Math.max(0, up - top);   // (over: how far past the deck above it)
     P[i*3] = e.x + L*.7 + Math.sin(steamWob[i] + L*4)*.08 + Math.cos(steamWob[i])*over*.9; P[i*3+1] = Math.min(up, top); P[i*3+2] = e.z + L*.2 + Math.sin(steamWob[i])*over*.9;
     Sz[i] = (.45 + L*1.5)*Math.max(.45, 1 - over*.5); A[i] = Math.min(1, L*6)*(1 - L)*.75*Math.max(0, 1 - over/1.3);
+  }
+  } else {
+    // (a puff not under a deck, nearly all of them, is not pushed sideways: that term is the cosine or sine times zero, so the two calls are skipped; the same numbers)
+    const n = steamLife.length, dL = dt*.32;
+    for (let k = 0, i = 0; i < n; k++){
+      const e = steamSrc[k], top = steamCeil ? steamCeil[k] - .45 : 1e9, ex = e.x, ey = e.y, ez = e.z, end = Math.min(n, i + STEAM_PER);
+      for (; i < end; i++){
+        let L = steamLife[i] + dL; if (L > 1) L -= 1; steamLife[i] = L;
+        const up = ey + L*2.3, over = Math.max(0, up - top), w = steamWob[i];
+        if (over === 0){ P[i*3] = ex + L*.7 + Math.sin(w + L*4)*.08 + 1*over*.9; P[i*3+1] = Math.min(up, top); P[i*3+2] = ez + L*.2 + 0*over*.9; }
+        else { P[i*3] = ex + L*.7 + Math.sin(w + L*4)*.08 + Math.cos(w)*over*.9; P[i*3+1] = Math.min(up, top); P[i*3+2] = ez + L*.2 + Math.sin(w)*over*.9; }
+        Sz[i] = (.45 + L*1.5)*Math.max(.45, 1 - over*.5); A[i] = Math.min(1, L*6)*(1 - L)*.75*Math.max(0, 1 - over/1.3);
+      }
+    }
   }
   steamPts.geometry.attributes.position.needsUpdate = true; steamPts.geometry.attributes.size.needsUpdate = true; steamPts.geometry.attributes.alpha.needsUpdate = true;
 }

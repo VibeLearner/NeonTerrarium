@@ -1279,9 +1279,17 @@ function liftMaskFor(invVP){
   }
   liftMaskTex.needsUpdate = true;
 }
+let steamMapSig = null;
 function makeSteamMap(vents, lifts = []){
   const ext = (GRID_MAX + 1)*LOT, k = STEAM_N/(2*ext);
   comp.uniforms.steamExt.value = ext; comp.uniforms.nVents.value = vents.length; comp.uniforms.nLifts.value = lifts.length;
+  // the map is a function of the vents and lifts alone; an edit that leaves them as they were (most do) leaves the map as it was (a 35 ms rebuild of the whole city's map otherwise). The test "steam map: rebuilt at every edit" restores that.
+  let sig = null;
+  if (!(PH.tests.steamMapAlways || window.__STEAM_ALWAYS)){
+    sig = vents.length + ':' + lifts.length + ':' + vents.map(v => v.x + ',' + v.z + ',' + v.s).join(';') + '|' + lifts.map(v => v.x + ',' + v.z + ',' + v.r).join(';');
+    if (sig === steamMapSig) return;
+  }
+  steamMapSig = sig;
   STEAM_LIFTS = lifts.map(v => [v.x, v.z, v.r + .15 + 1.5/k]);
   STEAM_DATA.fill(0);
   const acc = new Float32Array(STEAM_N*STEAM_N*2);

@@ -292,15 +292,23 @@ function gridPaths(G, from, targets){
 function ngLink(a, b, pts, len, cost = len){ if (a === b) return; const e = { a, pts, len, cost }; NG.adj[a].set(b, e); NG.adj[b].set(a, e); }
 // one plot's paths, cached until the plot or its endpoints change
 function plotEdges(c, ends, pairOk){
-  const G = cellGrid(c), sig = ends.map(e => e.key + '@' + e.x.toFixed(2) + ',' + e.z.toFixed(2)).join('|');
-  if (!c._pe || c._pe.src !== G.src || c._pe.sig !== sig){
+  const G = cellGrid(c), slow = PH.tests.slowSync || window.__SLOW_SYNC;
+  // (are the endpoints as they were? the same keys and the same positions to the centimeter; compared number by number, with the text of each position made only for one that moved, instead of a string for every endpoint of every plot at every edit)
+  let same;
+  if (slow || !c._pe) same = false;
+  else if (c._pe.src !== G.src || !c._pe.ends || c._pe.ends.length !== ends.length) same = false;
+  else { same = true; const o = c._pe.ends; for (let i = 0; i < ends.length; i++){ const e = ends[i], q = o[i];
+    if (q.key !== e.key || !((q.x === e.x && q.z === e.z) || (q.x.toFixed(2) === e.x.toFixed(2) && q.z.toFixed(2) === e.z.toFixed(2)))){ same = false; break; } } }
+  const sig = slow ? ends.map(e => e.key + '@' + e.x.toFixed(2) + ',' + e.z.toFixed(2)).join('|') : null;
+  if (slow && c._pe && c._pe.src === G.src && c._pe.sig === sig) same = true;
+  if (!same){
     const edges = [];
     for (let i = 0; i < ends.length; i++){
       const tg = []; for (let j = i + 1; j < ends.length; j++) if (pairOk(ends[i], ends[j])) tg.push(ends[j]);
       if (!tg.length) continue;
       gridPaths(G, ends[i], tg).forEach((r, k) => { if (r) edges.push({ a: ends[i].key, b: tg[k].key, pts: r.pts, len: r.len }); });
     }
-    c._pe = { src: G.src, sig, edges };
+    c._pe = { src: G.src, sig: slow ? sig : null, ends: ends.map(e => ({ key: e.key, x: e.x, z: e.z })), edges };
   }
   // a lawn is somewhere to go and sit, not a short cut: walking over one costs several times the distance, so a route
   // only crosses it when there's no reasonable way round (or when the lawn is where they're going)
@@ -1003,7 +1011,17 @@ let pplReady = false, pplNow = 0, pplHour = S.hour, pplCursor = 0, pplList = [];
 // called after every edit (from syncAgents): rebuild the network, places and doors, then the residents and their jobs
 function syncPeople(){ syncPeopleNet(); syncPeopleRest(); }
 function syncPeopleNet(){ buildNetwork(); }
+// does a walk still lie over plots that exist? (the edit may have taken some away): a set of numbers made once for all the walkers, in place of a key string built for every point of every walk
+const _cn = (i, j) => (i + 65536)*131072 + (j + 65536);
+let _cellNums = null;
+function wayGone(pts){
+  if (PH.tests.slowSync || window.__SLOW_SYNC) return pts.some(([x, z]) => !cells.has(ckey(Math.round(x/LOT), Math.round(z/LOT))));
+  if (!_cellNums){ _cellNums = new Set(); for (const c of cells.values()) _cellNums.add(_cn(c.i, c.j)); }
+  for (let k = 0; k < pts.length; k++){ const q = pts[k]; if (!_cellNums.has(_cn(Math.round(q[0]/LOT), Math.round(q[1]/LOT)))) return true; }
+  return false;
+}
 function syncPeopleRest(){
+  _cellNums = null;
   syncResidents();
   syncJobs();
   // carry everyone's spot and doors over to the rebuilt ones; anyone whose way is gone goes home
@@ -1011,7 +1029,7 @@ function syncPeopleRest(){
     if (p.fresh) continue;
     if (p.walk){
       const w = p.walk;
-      const gone = !places.has(w.to) || w.pts.some(([x, z]) => !cells.has(ckey(Math.round(x/LOT), Math.round(z/LOT))));
+      const gone = !places.has(w.to) || wayGone(w.pts);
       if (gone){ sendHome(p); continue; }
       if (w.doorA && w.doorA !== UP_WAY) w.doorA = doorByKey.get(w.doorA.key) || null;
       if (w.doorB && w.doorB !== UP_WAY) w.doorB = doorByKey.get(w.doorB.key) || null;
@@ -1056,7 +1074,7 @@ function syncBots(){
   for (const b of bots){
     if (!b.hub || !places.has(b.hub)) b.hub = hubs[hash('bot', b.id) % hubs.length].id;
     if (b.walk){
-      const w = b.walk, gone = w.pts.some(([x, z]) => !cells.has(ckey(Math.round(x/LOT), Math.round(z/LOT))));
+      const w = b.walk, gone = wayGone(w.pts);
       if (w.doorA && w.doorA !== UP_WAY) w.doorA = doorByKey.get(w.doorA.key) || null;
       if (w.doorB && w.doorB !== UP_WAY) w.doorB = doorByKey.get(w.doorB.key) || null;
       if (gone){ b.walk = null; b.state = 'in'; b.until = pplNow + 5; }

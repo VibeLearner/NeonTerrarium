@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Terrarium Jam Room</title>
+<link rel="stylesheet" href="jam.css">
+</head>
+<body>
+<div class="grid-bg" aria-hidden="true"></div>
+<header class="top">
+  <div class="brand">
+    <h1>Neon Terrarium <span>Jam Room</span></h1>
+    <p>Procedural music, built from rules and synthesized live in this tab. Nothing here is a recording.</p>
+  </div>
+  <div class="masterbox">
+    <label for="master">Master</label>
+    <input id="master" type="range" min="0" max="100" value="80" aria-label="Master volume">
+    <div class="health" id="health" title="voices playing, and how many seconds of music are scheduled ahead of the audio clock">voices 0 &middot; ahead 0.00s</div>
+  </div>
+</header>
+
+<main>
+  <section class="card transport" aria-label="Playback and seed">
+    <div class="row">
+      <button id="play" class="big" aria-pressed="false">Play</button>
+      <div class="seedbox">
+        <label for="seed">Seed</label>
+        <input id="seed" type="text" inputmode="text" autocomplete="off" spellcheck="false" aria-describedby="seedhelp">
+      </div>
+      <button id="load" title="Use the text in the seed box">Load</button>
+      <button id="prev" title="Previous seed in your history" aria-label="Previous seed">&#9664;</button>
+      <button id="newseed" class="accent">New seed</button>
+      <button id="next" title="Next seed in your history, or a fresh one" aria-label="Next seed">&#9654;</button>
+      <button id="restart" title="Play this seed again from the top with the current settings">Restart</button>
+    </div>
+    <p id="seedhelp" class="hint">A seed always plays the same piece for the same settings. Any text works as a seed. Big slider moves are best heard after Restart, because key and tempo are chosen when a piece starts.</p>
+  </section>
+
+  <section class="card now" aria-label="What is playing" aria-live="off">
+    <div class="nowgrid">
+      <div class="nowmain">
+        <div class="lbl">Section</div>
+        <div id="nowSection" class="bigtext">-</div>
+        <div id="nowBar" class="sub">bar 0 of 0</div>
+      </div>
+      <div class="nowmain">
+        <div class="lbl">Chord</div>
+        <div id="nowChord" class="bigtext chord">-</div>
+        <div id="nowKey" class="sub">key -</div>
+      </div>
+      <div class="nowmain">
+        <div class="lbl">Meter</div>
+        <div id="nowMeter" class="bigtext">-</div>
+        <div id="nowTempo" class="sub">- BPM</div>
+      </div>
+      <div class="nowmain">
+        <div class="lbl">Rules right now</div>
+        <div id="nowRules" class="rules">-</div>
+      </div>
+    </div>
+    <canvas id="beats" width="900" height="34" aria-label="Beat grid"></canvas>
+    <canvas id="timeline" width="900" height="54" aria-label="Song form timeline"></canvas>
+    <canvas id="spectrum" width="900" height="90" aria-label="Spectrum"></canvas>
+  </section>
+
+  <div class="cols">
+    <section class="card" aria-label="Genre blend">
+      <h2>Genre blend</h2>
+      <div id="genreSliders"></div>
+    </section>
+    <section class="card" aria-label="Feel">
+      <h2>Feel</h2>
+      <div id="feelSliders"></div>
+    </section>
+    <section class="card" aria-label="Game state preview">
+      <h2>Game state preview</h2>
+      <p class="hint">Shows how the music will react to the world. The sliders stay where you put them; these only nudge them.</p>
+      <div class="seg-group"><span class="lbl">Time of day</span><div class="seg" id="segTod" role="group" aria-label="Time of day"></div></div>
+      <div class="seg-group"><span class="lbl">Weather</span><div class="seg" id="segRain" role="group" aria-label="Weather"></div></div>
+      <div class="seg-group"><span class="lbl">Camera</span><div class="seg" id="segView" role="group" aria-label="Camera view"></div></div>
+      <div class="toggles">
+        <label><input type="checkbox" id="tGate"> Gated reverb</label>
+        <label><input type="checkbox" id="tVinyl" checked> Vinyl</label>
+        <label><input type="checkbox" id="tHum" checked> City hum</label>
+        <label><input type="checkbox" id="tRadio" checked> Radio crackle</label>
+      </div>
+      <div id="gameNote" class="hint"></div>
+    </section>
+  </div>
+
+  <section class="card" aria-label="Mixer">
+    <h2>Mixer</h2>
+    <div id="mixer" class="mixer"></div>
+  </section>
+
+  <div class="cols two">
+    <section class="card" aria-label="Rating">
+      <h2>Does this work?</h2>
+      <div class="row wrap">
+        <button id="keep" class="good">Keep</button>
+        <button id="reject" class="bad">Doesn't work</button>
+        <input id="note" type="text" placeholder="Optional note (what you liked or what felt wrong)" maxlength="240" aria-label="Rating note">
+      </div>
+      <p id="rateMsg" class="hint" role="status"></p>
+      <div class="row wrap">
+        <button id="export" class="accent">Export JSON</button>
+        <button id="copyjson">Copy JSON</button>
+        <button id="clearr" class="quiet">Clear list</button>
+      </div>
+      <ul id="ratings" class="ratings"></ul>
+    </section>
+
+    <section class="card" aria-label="NPC motif test">
+      <h2>NPC motif test</h2>
+      <p class="hint">Any number becomes a short theme in the current key and mood. Use it to hear how a tracked character could get its own tune.</p>
+      <div class="row wrap">
+        <input id="npc" type="number" step="1" value="7" aria-label="NPC seed">
+        <button id="npcPlay" class="accent">Play motif</button>
+        <button id="npcRand">Random NPC</button>
+      </div>
+      <div id="npcOut" class="npcout">-</div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <p>All sounds are synthesized here with the Web Audio API. Every note comes from rules and a seed. Your own songs were only used to set general defaults (see STYLE_NOTES.md). Space bar starts and stops.</p>
+</footer>
+
+<script src="style_defaults.js" onerror="void 0"></script>
+<script src="js/rng.js"></script>
+<script src="js/theory.js"></script>
+<script src="js/synth.js"></script>
+<script src="js/composer.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>

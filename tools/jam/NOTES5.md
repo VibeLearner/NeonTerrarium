@@ -75,7 +75,7 @@ Mean -14.0 LUFS, range -13.4 to -15.1. Seed 4 sits lowest because its intro and 
 - **EQ and compression numbers** are in the item 6 text above. Glue is deliberately light (2:1) because the old limiter does the rest.
 - **Loudness target**: the glue-stage makeup is 0.63 (`J.MIX_MAKEUP`). The master volume slider still scales everything.
 - **Format**: Ogg Opus. It plays in Chrome, Firefox and Edge. I could only test Chrome; Safari support for Ogg Opus is recent, and where it is missing the page stays on synth sounds because decoding fails and the fallback takes over.
-- **Published page**: loose files are impractical there (495 files), so the page reads one uncompressed zip of the same pack (`Jam.SAMPLE_ZIP`, a small zip reader in `sampler.js`). Only the default set is in the zip; picking vibraphone, glockenspiel, marimba, kalimba or upright there falls back to the synth until the full pack is served.
+- **Published page**: loose files are impractical there (495 files), so the page reads one uncompressed zip of the same pack (`Jam.SAMPLE_ZIP`, a small zip reader in `sampler.js`). The artifact host only serves text and media types, so there the zip is stored as base64 text (`pack.b64.txt`, 6.4 MB) and decoded in the page. Only the default set is in the zip; picking vibraphone, glockenspiel, marimba, kalimba or upright there falls back to the synth until the full pack is served.
 
 ## Skipped, and why
 

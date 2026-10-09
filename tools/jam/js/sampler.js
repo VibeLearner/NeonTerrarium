@@ -62,7 +62,12 @@
     // page) can set Jam.SAMPLE_ZIP to one uncompressed zip of the same pack; the sampler then reads from that.
     let zipP = null;
     function readZip(url) {
-      return fetch(url).then(r => { if (!r.ok) throw new Error('zip ' + r.status); return r.arrayBuffer(); }).then(ab => {
+      return fetch(url).then(r => {
+        if (!r.ok) throw new Error('zip ' + r.status);
+        if (!/\.txt$/.test(url)) return r.arrayBuffer();
+        // the published page can only host text, so the same zip is stored as base64 text there
+        return r.text().then(t => { const bin = atob(t.trim()), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; });
+      }).then(ab => {
         const dv = new DataView(ab), u8 = new Uint8Array(ab), td = new TextDecoder(), map = new Map();
         let e = u8.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
         if (e < 0) throw new Error('bad zip');

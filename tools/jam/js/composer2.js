@@ -350,8 +350,9 @@
     const regBase = kind === 'chorus' ? 2 : (kind === 'drop' ? 1 : 0);
     const arcP = lerp(sec.arc0, sec.arc1, (b0 + 2) / sec.bars);
     const lift = Math.round(1.6 * (arcP - 0.55));
-    const variedPool = sec.bridgeKind === 'jazz' ? ['newpitch', 'newrhythm', 'displace'] : (kind === 'build' || kind === 'swell' ? ['seq', 'frag', 'displace'] : ['seq', 'seq', 'displace', 'invert']);
-    const varied = rr.pick(variedPool);
+    const variedPool = sec.bridgeKind === 'jazz' ? ['newpitch', 'newrhythm', 'displace'] : (kind === 'build' || kind === 'swell' ? ['seq', 'frag', 'displace', 'dim'] : ['seq', 'seq', 'displace', 'invert']);
+    let varied = rr.pick(variedPool);
+    if ((varied === 'seq' || varied === 'invert') && rr.chance(0.1)) varied = 'retro';        // the rare retrograde
     const opsFor = type === 'period' ? ['state', 'seq', 'state', 'cad'] : ['state', varied, 'frag', 'ext'];
     if (!hookSection && kind !== 'bridge' && p % 2 === 1) opsFor[0] = rr.pick(['frag', 'state']);
     if (kind === 'bridge' && sec.bridgeKind === 'emo') opsFor[2] = 'aug';

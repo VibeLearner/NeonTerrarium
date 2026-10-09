@@ -96,3 +96,9 @@ Most sliders take effect smoothly while music plays and add or remove features i
 ## Re-running the analyzer
 
 `python3 analyze.py --help`. It needs librosa and numpy, reads a folder of your songs, and writes `style_profile.json` and `style_defaults.js`. It also writes `song_index.local.json` (a private map from ids like s01 to file names) and a `_cache/` folder. Both are git-ignored. Do not commit the songs.
+
+## Export MIDI and hear the notes on good instruments
+
+Press **Export MIDI** (next to Export JSON). You get 64 bars of the current seed and sliders as a MIDI file, one track per layer (Bass, Keys, Twinkle, Pads, Lead) and Drums on channel 10 with General MIDI note numbers. The tempo and the 5/4, 7/8 and 9/8 bars are written into the file. In the published page the browser can only save a few file types, so the file arrives inside a `.zip`; unzip it first.
+
+In GarageBand: drag the `.mid` onto an empty project (or File > Import). Each track becomes a software instrument; change the instruments to something good (a Steinway or Rhodes for Keys, a clean electric guitar for Twinkle, a drum kit for Drums), and press Play. If the notes sound right on those instruments, the problem is the sounds in the jam room, not the music.

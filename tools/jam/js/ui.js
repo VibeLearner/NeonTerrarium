@@ -263,6 +263,25 @@
       ratings: S.ratings,
     };
   }
+  // MIDI: 64 bars of the current seed and sliders. A published page can only save a few file types, and .mid is not one, so there it is zipped.
+  $('#exportMidi').addEventListener('click', async () => {
+    const o = { seed: curSeed(), params: S.params, game: S.game, composer: S.composer, bars: 64 };
+    let bytes;
+    try { bytes = J.exportMidi(o); } catch (e) { $('#rateMsg').textContent = 'Could not build the MIDI file: ' + e.message; return; }
+    const name = J.midiName(o);
+    try {
+      const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+      if (dl) {
+        await dl.save({ filename: name.replace(/\.mid$/, '.zip'), data: J.zipStore(name, bytes) });
+        $('#rateMsg').textContent = 'Saved a zip with ' + name + ' inside. Unzip it, then drag the .mid onto GarageBand.';
+        return;
+      }
+    } catch (e) { if (e && e.code === 'declined') { $('#rateMsg').textContent = 'MIDI export cancelled.'; return; } }
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'audio/midi' }));
+    const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    $('#rateMsg').textContent = 'Exported ' + name + ' (64 bars). Drag it onto GarageBand.';
+  });
   $('#export').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(exportObject(), null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); const d = new Date(); const pad = n => String(n).padStart(2, '0');

@@ -1,0 +1,144 @@
+{
+ "five SEEDS.md settings": {
+  "old": {
+   "clash": 2186.8,
+   "nct_strong": 0,
+   "avoid_strong": 0,
+   "stale": 1015.6,
+   "parallel": 2.2,
+   "lead_band": 2.8,
+   "holders": 3.2,
+   "cadence_none": 14.2,
+   "density_clash": 0,
+   "cadence_none_pct": 56.8,
+   "motif_bars_per_8": 4.34,
+   "leap_recovery_pct": 9.1,
+   "hist_pct": {
+    "0": 15.4,
+    "1-2": 34.4,
+    "3-4": 32.3,
+    "5-7": 14.3,
+    "8-12": 3.2,
+    "13+": 0.4
+   },
+   "cadences": {
+    "full": 24,
+    "half": 30,
+    "plagal": 0,
+    "deceptive": 0,
+    "none": 71
+   },
+   "seconds": 0.6
+  },
+  "new": {
+   "clash": 0,
+   "nct_strong": 0,
+   "avoid_strong": 0,
+   "stale": 0,
+   "parallel": 0,
+   "lead_band": 0,
+   "holders": 0,
+   "cadence_none": 0,
+   "density_clash": 0,
+   "cadence_none_pct": 0,
+   "motif_bars_per_8": 5.63,
+   "leap_recovery_pct": 40.9,
+   "hist_pct": {
+    "0": 7.1,
+    "1-2": 50,
+    "3-4": 27.7,
+    "5-7": 9.6,
+    "8-12": 5.6,
+    "13+": 0
+   },
+   "cadences": {
+    "full": 27,
+    "half": 89,
+    "plagal": 5,
+    "deceptive": 4,
+    "none": 0
+   },
+   "validator": {
+    "phrases": 125,
+    "firstTryClean": 76,
+    "twinkleDrops": 209,
+    "retries": 27,
+    "backups": 7,
+    "fallbacks": 7,
+    "leadDrops": 0
+   },
+   "seconds": 0.9
+  }
+ },
+ "200 random seeds": {
+  "old": {
+   "clash": 2648,
+   "nct_strong": 0.8,
+   "avoid_strong": 0.3,
+   "stale": 1084.5,
+   "parallel": 4.4,
+   "lead_band": 15.8,
+   "holders": 2.9,
+   "cadence_none": 13.4,
+   "density_clash": 1.9,
+   "cadence_none_pct": 53.6,
+   "motif_bars_per_8": 3.52,
+   "leap_recovery_pct": 18,
+   "hist_pct": {
+    "0": 15.6,
+    "1-2": 34,
+    "3-4": 29.4,
+    "5-7": 16.2,
+    "8-12": 4.3,
+    "13+": 0.5
+   },
+   "cadences": {
+    "full": 385,
+    "half": 1582,
+    "plagal": 148,
+    "deceptive": 206,
+    "none": 2679
+   },
+   "seconds": 26.6
+  },
+  "new": {
+   "clash": 0.3,
+   "nct_strong": 0,
+   "avoid_strong": 0,
+   "stale": 0,
+   "parallel": 0.1,
+   "lead_band": 0,
+   "holders": 0,
+   "cadence_none": 0,
+   "density_clash": 0,
+   "cadence_none_pct": 0,
+   "motif_bars_per_8": 5.72,
+   "leap_recovery_pct": 49.2,
+   "hist_pct": {
+    "0": 10.5,
+    "1-2": 46.8,
+    "3-4": 27.8,
+    "5-7": 10.6,
+    "8-12": 4.3,
+    "13+": 0.1
+   },
+   "cadences": {
+    "full": 1220,
+    "half": 3528,
+    "plagal": 180,
+    "deceptive": 72,
+    "none": 0
+   },
+   "validator": {
+    "phrases": 5000,
+    "firstTryClean": 3240,
+    "twinkleDrops": 8793,
+    "retries": 1436,
+    "backups": 423,
+    "fallbacks": 420,
+    "leadDrops": 121
+   },
+   "seconds": 35.5
+  }
+ }
+}

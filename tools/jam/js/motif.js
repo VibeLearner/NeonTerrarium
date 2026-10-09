@@ -268,7 +268,7 @@
             c += J.ivCost(d);
             if (onsets[i].tsign !== undefined && Math.sign(d) !== onsets[i].tsign) c += 4.5;     // keep the motif's up/down/repeat contour
             const pv = i > 1 ? st.seq[i - 1] - st.seq[i - 2] : (i === 1 && spec.prev !== null && spec.prev !== undefined ? st.seq[0] - spec.prev : 0);
-            if (Math.abs(pv) >= 5) { if (!(Math.abs(d) >= 1 && Math.abs(d) <= 2 && Math.sign(d) === -Math.sign(pv))) c += 3; }
+            if (Math.abs(pv) >= 5) { if (!(Math.abs(d) >= 1 && Math.abs(d) <= 2 && Math.sign(d) === -Math.sign(pv))) c += 6; }
             if (Math.abs(pv) >= 5 && Math.abs(d) >= 5 && Math.sign(pv) === Math.sign(d)) {
               const a = onsets[i - 1], b = onsets[i];
               if (!(a.scale.chord.has((prev) % 12) && b.scale.chord.has(m % 12))) c += 4;

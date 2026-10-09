@@ -204,3 +204,7 @@ In the harness on your machine, the same numbers come with `PERF_GPU=1 python3 t
 
 "copy the cache by blitting (not drawing)" (item 1, default flipped), "glow overlay: one draw per region (same picture)" (5), "doors: two passes over the people (same picture)" (5), "edit upkeep spread over frames (people differ)" (3), "keep the CPU copies of merged geometry" (4), "lurkers scan every walker (same picture)" (4), "bike routes: a key lookup per point (same picture)" (4), "steam: every puff in full (same picture)" (5), "turn detail: start at 10 px a frame (as before)" (6), "edit upkeep: a key string per path point (same picture)" (3), "steam map: rebuilt at every edit (same picture)" (3).
 The probe scripts (one.py, visprobe.py, live_tris.py, hidden_count.py, shapes_sites.py) set `window.__KEEP_CPU = true` because they read geometry arrays.
+
+## End state check
+
+Final head against b6d34e5 (the start of the round), harness city, dense, megas quick (53 captures): 0 problems (the only notes are the geometry count, 221 to 199, from the overlay batching). Items 1 to 5 are exact; item 6 (turn detail) acts only in turning frames and the standard script does not turn at those speeds; the spread-over-frames placement is off by default.

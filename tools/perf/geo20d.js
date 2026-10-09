@@ -77,28 +77,31 @@
         const hn = Math.hypot(n.x, n.z), yaw = Math.atan2(n.x, n.z), pit = Math.min(82, Math.max(12, Math.atan2(n.y, hn)*180/Math.PI))*Math.PI/180;
         const dir = new THREE.Vector3(Math.sin(yaw)*Math.cos(pit), Math.sin(pit), Math.cos(yaw)*Math.cos(pit));
         const R = (window.__GP || {}).exR || .4, SZ = 160, c3 = new THREE.OrthographicCamera(-R, R, R, -R, .1, 1000); c3.position.copy(cen).addScaledVector(dir, 100); c3.lookAt(cen); c3.updateMatrixWorld();
+        // what is in front of it: the id at the middle of the same view (the id mesh, a small window)
+        const r3 = new THREE.WebGLRenderTarget(9, 9, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat }), c4 = new THREE.OrthographicCamera(-.004, .004, .004, -.004, .1, 1000);
+        c4.position.copy(c3.position); c4.quaternion.copy(c3.quaternion); c4.updateMatrixWorld(); renderer.setRenderTarget(r3); renderer.setClearColor(0, 0); renderer.clear(); renderer.render(scn, c4);
+        const ib = new Uint8Array(9*9*4); renderer.readRenderTargetPixels(r3, 0, 0, 9, 9, ib); renderer.setRenderTarget(null); r3.dispose();
+        const o4 = (4*9 + 4)*4, hid = (ib[o4] | (ib[o4 + 1] << 8) | (ib[o4 + 2] << 16)) - 1; let hider = null; var hidIdx = hid;
+        if (hid >= 0 && hid < T){ const ha = new THREE.Vector3().fromArray(pos, hid*9), hb = new THREE.Vector3().fromArray(pos, hid*9 + 3), hc = new THREE.Vector3().fromArray(pos, hid*9 + 6), hn = new THREE.Vector3().crossVectors(hb.clone().sub(ha), hc.clone().sub(ha)).normalize();
+          hider = { cls: classOf(pcs[tag[tris[hid][0]]]), parallelDot: +hn.dot(n).toFixed(2), gapAlongView: +(cen.clone().sub(ha).dot(hn)/Math.max(1e-6, Math.abs(hn.dot(dir)))*Math.sign(hn.dot(dir))).toFixed(3), inH: inH[hid] }; }
+        window.__HID = window.__HID || {}; { const hk = hider ? (hider.cls.split(' (')[0] + (Math.abs(hider.parallelDot) > .99 ? (hider.parallelDot > 0 ? ', parallel same way' : ', parallel opposite') : ', not parallel')) : 'nothing found'; window.__HID[hk] = (window.__HID[hk] || 0) + 1; }
+        window.__HIDX = window.__HIDX || []; if (window.__HIDX.length < 40) window.__HIDX.push(hider);
         let pb = new Uint8Array(SZ*SZ*4);
         if (!(window.__GP || {}).noCrop){
         // grey shading by face normal, the chosen triangle red
         const c2 = new Uint8Array(T*9); for (let u = 0; u < T; u++){ const p0 = new THREE.Vector3().fromArray(pos, u*9), p1 = new THREE.Vector3().fromArray(pos, u*9 + 3), p2 = new THREE.Vector3().fromArray(pos, u*9 + 6);
           const nn = new THREE.Vector3().crossVectors(p1.sub(p0), p2.sub(p0)).normalize(), sh = 90 + 120*Math.max(0, nn.dot(new THREE.Vector3(.4, .8, .45).normalize()));
-          for (let k = 0; k < 3; k++){ c2[u*9 + k*3] = u === t ? 255 : sh; c2[u*9 + k*3 + 1] = u === t ? 0 : sh; c2[u*9 + k*3 + 2] = u === t ? 0 : sh; } }
+          const isH = u === hidIdx; for (let k = 0; k < 3; k++){ c2[u*9 + k*3] = isH ? 40 : sh; c2[u*9 + k*3 + 1] = isH ? 90 : sh; c2[u*9 + k*3 + 2] = isH ? 255 : sh; } }
         const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g2.setAttribute('color', new THREE.BufferAttribute(c2, 3, true));
         const m2 = new THREE.Mesh(g2, mat); m2.frustumCulled = false; const s2 = new THREE.Scene(); s2.add(m2);
         // (the triangle's own face is front-facing from here: so what covers it is in front of it, in grey)
         const r2 = new THREE.WebGLRenderTarget(SZ, SZ); renderer.setRenderTarget(r2); renderer.setClearColor(0x203040, 1); renderer.clear(); renderer.render(s2, c3);
+          { const og = new THREE.BufferGeometry(); og.setAttribute('position', new THREE.BufferAttribute(pos.slice(t*9, t*9 + 9), 3));
+            const om = new THREE.MeshBasicMaterial({ color: 0xff2020, depthTest: false, transparent: true, opacity: .55, side: THREE.DoubleSide }), lm = new THREE.LineLoop(og, new THREE.LineBasicMaterial({ color: 0xffff00, depthTest: false }));
+            const so = new THREE.Scene(); const mo = new THREE.Mesh(og, om); mo.frustumCulled = false; lm.frustumCulled = false; so.add(mo); so.add(lm); renderer.autoClear = false; renderer.render(so, c3); renderer.autoClear = true; og.dispose(); }
         renderer.readRenderTargetPixels(r2, 0, 0, SZ, SZ, pb); renderer.setRenderTarget(null); r2.dispose(); g2.dispose();
         }
         let red = 0; for (let i = 0; i < pb.length; i += 4) if (pb[i] > 200 && pb[i + 1] < 40) red++;
-        // what is in front of it: the id at the middle of the same view (the id mesh, a small window)
-        const r3 = new THREE.WebGLRenderTarget(9, 9, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat }), c4 = new THREE.OrthographicCamera(-.004, .004, .004, -.004, .1, 1000);
-        c4.position.copy(c3.position); c4.quaternion.copy(c3.quaternion); c4.updateMatrixWorld(); renderer.setRenderTarget(r3); renderer.setClearColor(0, 0); renderer.clear(); renderer.render(scn, c4);
-        const ib = new Uint8Array(9*9*4); renderer.readRenderTargetPixels(r3, 0, 0, 9, 9, ib); renderer.setRenderTarget(null); r3.dispose();
-        const o4 = (4*9 + 4)*4, hid = (ib[o4] | (ib[o4 + 1] << 8) | (ib[o4 + 2] << 16)) - 1; let hider = null;
-        if (hid >= 0 && hid < T){ const ha = new THREE.Vector3().fromArray(pos, hid*9), hb = new THREE.Vector3().fromArray(pos, hid*9 + 3), hc = new THREE.Vector3().fromArray(pos, hid*9 + 6), hn = new THREE.Vector3().crossVectors(hb.clone().sub(ha), hc.clone().sub(ha)).normalize();
-          hider = { cls: classOf(pcs[tag[tris[hid][0]]]), parallelDot: +hn.dot(n).toFixed(2), gapAlongView: +(cen.clone().sub(ha).dot(hn)/Math.max(1e-6, Math.abs(hn.dot(dir)))*Math.sign(hn.dot(dir))).toFixed(3), inH: inH[hid] }; }
-        window.__HID = window.__HID || {}; { const hk = hider ? (hider.cls.split(' (')[0] + (Math.abs(hider.parallelDot) > .99 ? (hider.parallelDot > 0 ? ', parallel same way' : ', parallel opposite') : ', not parallel')) : 'nothing found'; window.__HID[hk] = (window.__HID[hk] || 0) + 1; }
-        window.__HIDX = window.__HIDX || []; if (window.__HIDX.length < 40) window.__HIDX.push(hider);
         window.__EX.push({ hider: window.__HIDX[window.__HIDX.length - 1], zone: c.sections[0].zone, cls: classOf(tg), shape: tg && tg[2], dims: tg && tg[3].map(v => +v.toFixed(3)), glow: tg && tg[4], normal: n.toArray().map(v => +v.toFixed(2)), at: cen.toArray().map(v => +v.toFixed(2)), area: +(new THREE.Triangle(a, b, d).getArea()).toFixed(5), redPixelsInBestView: red, yawDeg: +(yaw*180/Math.PI).toFixed(0), pitchDeg: +(pit*180/Math.PI).toFixed(0), px: (window.__GP || {}).noCrop ? null : Array.from(pb) });
       } }
     scn.remove(mesh); ig.dispose(); renderer.setRenderTarget(null);

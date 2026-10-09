@@ -57,6 +57,9 @@ JS = r"""async ([zoomV, R, nyaw, pitches, at]) => {
   out.seg = r; out.neverBig = never.length;
   const cls = {}; for (const id of never){ const [seg, area, , ny, nx, nz, cy] = info[id]; const dir = Math.abs(ny) > .9 ? (ny > 0 ? 'up' : 'down') : 'side'; const k = 'AHS'[seg] + ' ' + dir; cls[k] = (cls[k] || 0) + 1; }
   out.cls = cls;
+  // what the triangles in the disc are, by height and facing: street level (paving, curbs) is flat and low; buildings are above it
+  const pop = { 'ground level, facing up (y < .6)': 0, 'low (y < 2), other facing': 0, 'above 2 units, facing up': 0, 'above 2 units, sideways or down': 0 }; for (let id = 0; id < info.length; id++){ const cy = info[id][6], up = info[id][3] > .7; const k = cy < .6 && up ? 'ground level, facing up (y < .6)' : cy < 2 ? 'low (y < 2), other facing' : up ? 'above 2 units, facing up' : 'above 2 units, sideways or down'; pop[k]++; }
+  out.population = pop; out.neverBigByPopulation = {}; for (const id of never){ const cy = info[id][6], up = info[id][3] > .7; const k = cy < .6 && up ? 'ground level, facing up (y < .6)' : cy < 2 ? 'low (y < 2), other facing' : up ? 'above 2 units, facing up' : 'above 2 units, sideways or down'; out.neverBigByPopulation[k] = (out.neverBigByPopulation[k] || 0) + 1; }
   return out;
 }"""
 if __name__ == '__main__':

@@ -677,11 +677,15 @@
 
     return {
       sec, secId: sec.id, kind, barNo, bars: sec.bars, meter, steps, clock: sec.clock, swing: sec.swing, e, mode, byStep, ev,
-      segs: segs.map(sg => ({ name: sg.chord.name, s0: sg.s0, s1: sg.s1 })), bpm: song.bpm, style: sec.style, bridgeKind: bk,
+      segs: segs.map(sg => ({ name: sg.chord.name, s0: sg.s0, s1: sg.s1, root: sg.chord.root, base: sg.chord.base, pcs: J.chordPcs(sg.chord), alt: !!(sg.chord.col && sg.chord.col.alt) })), bpm: song.bpm, style: sec.style, bridgeKind: bk,
+      composer: 'old', tonic: song.tonic, mode: song.mode, scaleName: song.scaleName,
+      motifRef: sec.lead ? { onsets: sec.lead.A.map(x => x[0]), signs: sec.lead.cA.slice(0, 4).map((x, i, a) => (i ? Math.sign(x - a[i - 1]) : 0)).slice(1) } : null,
       layers: L, barCount, last: lastB, first,
     };
   }
   function sg0IsNew(barNo, span) { return barNo === span.first; }
+  // internals shared with the second composer (composer2.js); the first composer itself is unchanged
+  J._c = { planSection, cycleForm, drumsForBar, MET, BARS, midBoundary, makeBreak, makeBassTemplate, makeTwinkleCell, clamp, lerp };
 
   // ------------------------------------------------------------------------------------------
   // NPC motif: a short theme generated from any number, in the current key and mood

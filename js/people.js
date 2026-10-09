@@ -211,6 +211,13 @@ function crossing(a, b, dx, dz){
   }
   return null;
 }
+// (kept for each plot and side while both plots' maps are the ones it was found on: an edit elsewhere leaves it as it was)
+function crossingCached(a, b, dx, dz){
+  if (PH.tests.slowSync || window.__SLOW_SYNC) return crossing(a, b, dx, dz);
+  const Ga = cellGrid(a), Gb = cellGrid(b), k = dx + ',' + dz, m = a._cx || (a._cx = {}), e = m[k];
+  if (e && e.sa === Ga.src && e.sb === Gb.src && e.b === b && e.x === a.x && e.z === a.z) return e.p;
+  const p = crossing(a, b, dx, dz); m[k] = { sa: Ga.src, sb: Gb.src, b, x: a.x, z: a.z, p }; return p;
+}
 // a door: walk in from the middle of a side to the first wall; it must be flat across the doorway, with room to stand in front
 function findDoor(c, dx, dz, maxIn, tol = .08){
   // the middle of the side first, then further along it either way
@@ -291,7 +298,8 @@ function gridPaths(G, from, targets){
 }
 function ngLink(a, b, pts, len, cost = len){ if (a === b) return; const e = { a, pts, len, cost }; NG.adj[a].set(b, e); NG.adj[b].set(a, e); }
 // one plot's paths, cached until the plot or its endpoints change
-function plotEdges(c, ends, pairOk){
+function plotEdges(c, ends, pairOk){ drain(plotEdgesGen(c, ends, pairOk)); }
+function* plotEdgesGen(c, ends, pairOk){
   const G = cellGrid(c), slow = PH.tests.slowSync || window.__SLOW_SYNC;
   // (are the endpoints as they were? the same keys and the same positions to the centimeter; compared number by number, with the text of each position made only for one that moved, instead of a string for every endpoint of every plot at every edit)
   let same;
@@ -307,6 +315,7 @@ function plotEdges(c, ends, pairOk){
       const tg = []; for (let j = i + 1; j < ends.length; j++) if (pairOk(ends[i], ends[j])) tg.push(ends[j]);
       if (!tg.length) continue;
       gridPaths(G, ends[i], tg).forEach((r, k) => { if (r) edges.push({ a: ends[i].key, b: tg[k].key, pts: r.pts, len: r.len }); });
+      yield;   // (a path search is a step)
     }
     c._pe = { src: G.src, sig: slow ? sig : null, ends: ends.map(e => ({ key: e.key, x: e.x, z: e.z })), edges };
   }
@@ -316,7 +325,7 @@ function plotEdges(c, ends, pairOk){
   for (const e of c._pe.edges){ const a = NG.key.get(e.a), b = NG.key.get(e.b); if (a !== undefined && b !== undefined) ngLink(a, b, e.pts, e.len, e.len*k); }
 }
 // shortest walk between two network points (A*), as one polyline
-const routeCache = new Map(), LAWN_COST = 5;
+let routeCache = new Map(); const LAWN_COST = 5;
 let _rtG = new Float32Array(0), _rtFrom = new Int32Array(0), _rtSeen = new Int32Array(0), _rtDone = new Int32Array(0), _rtEp = 0;
 function route(a, b){
   if (a === b) return [[NG.x[a], NG.z[a]]];
@@ -447,22 +456,24 @@ function makeSpots(pl, list, inside, oldSpots, addEnd){
   for (const a of pl.spots) if (a.act) for (const b of pl.spots) if (b !== a && b.act === a.act && Math.hypot(a.x - b.x, a.z - b.z) < .9) a.near.push(b);
 }
 // Rebuild the network, the places and their doors after an edit. Unchanged plots reuse their cached maps and paths.
-function buildNetwork(){
+function buildNetwork(){ drain(buildNetworkGen(doorByKey, spotByKey)); }
+function* buildNetworkGen(oldDoors, oldSpots){
   NG = { x: [], z: [], adj: [], key: new Map() }; routeCache.clear();
-  const oldDoors = doorByKey, oldSpots = spotByKey;
   doorList = []; hiddenDoors = []; doorByKey = new Map(); spotByKey = new Map();
   // crossing points between neighbouring plots
   const cross = new Map();
-  for (const c of cells.values()) for (const [dx, dz] of SIDES4){
+  let nn = 0;
+  for (const c of cells.values()){ if ((++nn & 15) === 0) yield; for (const [dx, dz] of SIDES4){
     const nb = cells.get(ckey(c.i + dx, c.j + dz)); if (!nb) continue;
     if (c.mega && c.mega === nb.mega && !openMega(c)) continue;               // inside a closed megastructure
     const ok = (pathable(c) && (pathable(nb) || closedMega(nb))) || (closedMega(c) && pathable(nb));
     if (!ok) continue;
     const k = crossKey(c, dx, dz); if (cross.has(k)) continue;
-    const p = crossing(c, nb, dx, dz);
+    const p = crossingCached(c, nb, dx, dz);
     cross.set(k, p ? { key: 'x:' + k, x: p.x, z: p.z, kind: 'x' } : null);
     if (p) ngAdd('x:' + k, p.x, p.z);
-  }
+  } }
+  yield;
   patrolNodes = [...cross.values()].filter(Boolean).map(c => ({ key: c.key, node: NG.key.get(c.key), x: c.x, z: c.z }));
   crossAt = new Map(patrolNodes.map(c => [posKey(c.x, c.z), c]));
   const plotEnds = new Map();   // plot key -> extra endpoints (doors, standing spots)
@@ -470,6 +481,7 @@ function buildNetwork(){
   const fresh = new Map();
   // buildings: one front door, on a side with a street crossing if possible (the order is seeded per building)
   for (const c of cells.values()){
+    if (c.sections.length && !c.mega) yield;
     if (!c.sections.length || c.mega) continue;
     let jobs = 0, fun = 0, night = 0;
     c.sections.forEach((s, k) => { const L = ZONE_LIFE[s.zone]; if (!L) return;
@@ -509,7 +521,9 @@ function buildNetwork(){
     pl.fun = .25*pl.spots.length;
     if (pl.spots.length) fresh.set(pl.id, pl);
   }
+  yield;
   for (const m of megas.values()){
+    yield;
     const L = MEGA_LIFE[m.kind] || { jobs: 4, fun: 0 }, tiers = m.kind === 'mall' ? m.levels : 1;
     const pl = { id: 'm:' + m.id, mega: m, x: m.x, z: m.z, jobs: L.jobs*tiers, fun: L.fun*tiers, night: L.night || 0, open: !!L.open, patrol: !!L.patrol, doors: [], spots: [] };
     if (L.open){
@@ -561,17 +575,36 @@ function buildNetwork(){
   hwPlaces(fresh, oldDoors, addEnd);   // the highways' drop-offs: visitors come down their lifts (highway.js)
   mtPlaces(fresh, oldDoors, addEnd);   // and the metro's stations (metro.js)
   // paths across each plot between its crossings, door and spots
+  yield;
   for (const c of cells.values()){
+    yield;
     const ends = [];
     for (const [dx, dz] of SIDES4){ const p = cross.get(crossKey(c, dx, dz)); if (p) ends.push(p); }
     for (const e of plotEnds.get(ckey(c.i, c.j)) || []) if (!ends.some(o => o.key === e.key)) ends.push(e);
     if (ends.length < 2) continue;
     // a closed megastructure's plot only links its doors to the street, never street to street through the building
-    plotEdges(c, ends, closedMega(c) ? (a, b) => (a.kind === 'd') !== (b.kind === 'd') : () => true);
+    yield* plotEdgesGen(c, ends, closedMega(c) ? (a, b) => (a.kind === 'd') !== (b.kind === 'd') : () => true);
   }
   places.clear(); for (const [k, v] of fresh) places.set(k, v); placesEpoch++;
   rebuildDoorMeshes();
 }
+// the walking network made in steps: its tables are swapped in only while a step runs, so the people go on using the old ones until the new are done
+let NET_JOB = null;
+const netCap = () => ({ NG, routeCache, doorList, hiddenDoors, doorByKey, spotByKey, patrolNodes, crossAt });
+const netApply = s => { NG = s.NG; routeCache = s.routeCache; doorList = s.doorList; hiddenDoors = s.hiddenDoors; doorByKey = s.doorByKey; spotByKey = s.spotByKey; patrolNodes = s.patrolNodes; crossAt = s.crossAt; };
+function netSlice(job){
+  const live = netCap(); netApply(job.build); let r;
+  try { r = job.gen.next(); } finally { job.build = netCap(); netApply(live); }
+  if (r.done) netApply(job.build);
+  return r.done;
+}
+function syncPeopleNetStep(ms){
+  if (!NET_JOB){ NET_JOB = { build: { NG: { x: [], z: [], adj: [], key: new Map() }, routeCache: new Map(), doorList: [], hiddenDoors: [], doorByKey: new Map(), spotByKey: new Map(), patrolNodes: [], crossAt: new Map() }, gen: buildNetworkGen(doorByKey, spotByKey) }; }
+  const t0 = stageNow();
+  do { if (netSlice(NET_JOB)){ NET_JOB = null; return true; } } while (stageNow() - t0 < ms);
+  return false;
+}
+function syncPeopleAbort(){ NET_JOB = null; REST_JOB = null; }
 
 /* ---------- doors: drawn on the buildings, sliding open when someone comes or goes ---------- */
 const DOOR_MAX = 1200;
@@ -1024,12 +1057,22 @@ function wayGone(pts){
   for (let k = 0; k < pts.length; k++){ const q = pts[k]; if (!_cellNums.has(_cn(Math.round(q[0]/LOT), Math.round(q[1]/LOT)))) return true; }
   return false;
 }
-function syncPeopleRest(){
+function syncPeopleRest(){ drain(syncPeopleRestGen()); }
+let REST_JOB = null;
+function syncPeopleRestStep(ms){
+  if (!REST_JOB) REST_JOB = syncPeopleRestGen();
+  const t0 = stageNow();
+  do { if (REST_JOB.next().done){ REST_JOB = null; return true; } } while (stageNow() - t0 < ms);
+  return false;
+}
+function* syncPeopleRestGen(){
   _cellNums = null;
-  syncResidents();
-  syncJobs();
+  syncResidents(); yield;
+  syncJobs(); yield;
   // carry everyone's spot and doors over to the rebuilt ones; anyone whose way is gone goes home
+  let np = 0;
   for (const p of people.values()){
+    if ((++np % 1500) === 0) yield;
     if (p.fresh) continue;
     if (p.walk){
       const w = p.walk;
@@ -1054,9 +1097,10 @@ function syncPeopleRest(){
     if (pl && pl.open && p.at === want){ const sp = pickSpot(pl, pl, p); if (sp){ sp.by = p.id; p.spot = sp; } else p.at = p.home; }
     p.until = pplNow + Math.random()*40;
   }
+  yield;
   pplList = [...people.values()];
   pplReady = true;
-  syncBots();
+  syncBots(); yield;
   syncLurkers();
 }
 
@@ -1251,7 +1295,7 @@ function updateLurkers(dt, t){
         if (t - L.t0 > .8 && !(v.emoUntil > t)) emote(v, 'sweat', 2.5);
         if (t - L.t0 > 1.5){
           logEvent({ kind: 'mugging', x: L.x, z: L.z, plot: L.key, victim: v.id });
-          if (typeof policeDroneAlert === 'function' && policeDroneAlert) policeDroneAlert(L);   // sometimes a police drone comes over
+          if (typeof policeDroneAlert === 'function' && policeDroneAlert) later(() => policeDroneAlert(L), 1);   // (next frame, and its second bike a frame after that: each route search is a frame's work)   // sometimes a police drone comes over
           v.pause = 0; v.hurry = true;
           // the nearest officer on duty comes running
           let best = null, bd = 35*35;

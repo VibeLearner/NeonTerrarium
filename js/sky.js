@@ -1280,7 +1280,8 @@ function liftMaskFor(invVP){
   liftMaskTex.needsUpdate = true;
 }
 let steamMapSig = null;
-function makeSteamMap(vents, lifts = []){
+function makeSteamMap(vents, lifts = []){ drain(makeSteamMapGen(vents, lifts)); }
+function* makeSteamMapGen(vents, lifts = []){
   const ext = (GRID_MAX + 1)*LOT, k = STEAM_N/(2*ext);
   comp.uniforms.steamExt.value = ext; comp.uniforms.nVents.value = vents.length; comp.uniforms.nLifts.value = lifts.length;
   // the map is a function of the vents and lifts alone; an edit that leaves them as they were (most do) leaves the map as it was (a 35 ms rebuild of the whole city's map otherwise). The test "steam map: rebuilt at every edit" restores that.
@@ -1289,10 +1290,7 @@ function makeSteamMap(vents, lifts = []){
     sig = vents.length + ':' + lifts.length + ':' + vents.map(v => v.x + ',' + v.z + ',' + v.s).join(';') + '|' + lifts.map(v => v.x + ',' + v.z + ',' + v.r).join(';');
     if (sig === steamMapSig) return;
   }
-  steamMapSig = sig;
-  STEAM_LIFTS = lifts.map(v => [v.x, v.z, v.r + .15 + 1.5/k]);
-  STEAM_DATA.fill(0);
-  const acc = new Float32Array(STEAM_N*STEAM_N*2);
+  const acc = new Float32Array(STEAM_N*STEAM_N*2); let nv = 0;   // (worked out a few vents at a time when the upkeep is spread over frames; the map itself is replaced at the end)
   for (const v of vents){
     const cx = (v.x + ext)*k, cy = (v.z + ext)*k, R = 3.0*k*2.2;
     for (let y = Math.max(0, Math.floor(cy - R)); y <= Math.min(STEAM_N - 1, Math.ceil(cy + R)); y++)
@@ -1300,7 +1298,12 @@ function makeSteamMap(vents, lifts = []){
         const d2 = ((x + .5 - cx)**2 + (y + .5 - cy)**2)/(k*k), i = (y*STEAM_N + x)*2;
         acc[i] += v.s*Math.exp(-d2/(1.1*1.1)); acc[i + 1] += v.s*Math.exp(-d2/(3.0*3.0));
       }
+    if ((++nv & 7) === 0) yield;
   }
+  yield;
+  steamMapSig = sig;
+  STEAM_LIFTS = lifts.map(v => [v.x, v.z, v.r + .15 + 1.5/k]);
+  STEAM_DATA.fill(0);
   for (let i = 0; i < STEAM_N*STEAM_N; i++){ STEAM_DATA[i*4] = Math.min(255, acc[i*2]*200); STEAM_DATA[i*4 + 1] = Math.min(255, acc[i*2 + 1]*200); }
   // blue: the lift pads, a tight disc each (for the heat shimmer under them)
   for (const v of lifts){

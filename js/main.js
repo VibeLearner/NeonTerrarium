@@ -66,8 +66,11 @@ function frame(now){
     const t = clamp((loss - 1.15)/1.0, 0, 1), e = t*t*(3 - 2*t);
     LOD.fine.value = e; LOD.plants.value = e; LOD.lines.value = e; }
   PH.lap('steam, rain, camera');
+  runLater();
+  stageStep();   // a plot being built in steps: a few milliseconds of it (world.js)
   stepSync();   // what an edit leaves to do, a stage a frame (world.js)
   flushSolid();   // regions whose pieces changed are merged again (world.js)
+  nvTick();   // idle frames: faces no camera ever sees are worked out for a plot, a few views a frame (neverseen.js)
   scene.updateMatrixWorld();   // once for every pass below (see core.js): nothing moves between them
   PH.lap('scene upkeep');
   sideArc();   // which way the buildings' walls can face the camera this frame (world.js)

@@ -3273,7 +3273,7 @@ function policeBikes(m, crew){
     // a drone has gone to a mugging: two bikes come to the spot
     alert(L){ const free = bikes.filter(b => !b.case).sort((p, q) => Math.hypot(p.x - L.x, p.z - L.z) - Math.hypot(q.x - L.x, q.z - L.z)).slice(0, 2);
       if (!free.length) return; caseL = L;
-      for (const b of free){ b.case = L; b.rider = true; b.mode = 'rush'; bikeRoute(b, L.x, L.z, 3.2); b.until = performance.now() + 50000; } },
+      free.forEach((b, i) => { const go = () => { if (b.case) return; b.case = L; b.rider = true; b.mode = 'rush'; bikeRoute(b, L.x, L.z, 3.2); b.until = performance.now() + 50000; }; if (i === 0) go(); else later(go, 1); }); },
     // the station was turned: the bays are somewhere else now. Parked bikes go to the new bays; bikes on the way home
     // head for them
     rebase(){

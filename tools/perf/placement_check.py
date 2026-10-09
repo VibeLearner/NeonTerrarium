@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Item 3 check: placing pieces with the upkeep done in the same frame (the default) against the upkeep spread over frames (window.__SYNC_LATER, the overlay test), after everything has settled.
+"""Item 3 check: placing pieces with everything done in the edit's frame (the tests 'plots built in one frame', 'edit upkeep in the same frame') against the default, built and upkept in steps over frames, after everything has settled.
 People and vehicles are expected to differ (their random streams shift with the timing), so this compares the city: the cells, bridges, merged regions, ports and emitters, the walking network
 (places, doors, graph size), and a hash of the static picture (the cache's color target after a whole redraw: no people, no vehicles).
    python3 tools/perf/placement_check.py city|maxcity"""
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     from playwright.sync_api import sync_playwright
     srv = H.serve(); url = H.make_site('pc', None); sc = H.load_scenes([scene])[0]
     with sync_playwright() as pw:
-        a, wa, ea = run(pw, url, sc, None); b, wb, eb = run(pw, url, sc, 'window.__SYNC_LATER = true;')
+        a, wa, ea = run(pw, url, sc, 'window.__SYNC_NOW = true; window.__STAGE_NOW = true; window.__ALERT_NOW = true;'); b, wb, eb = run(pw, url, sc, None)
     srv.shutdown()
     print('upkeep in the same frame :', json.dumps(a)); print('upkeep spread over frames:', json.dumps(b))
     diff = {k: (a[k], b[k]) for k in a if a[k] != b[k]}

@@ -440,7 +440,8 @@ function hideCovered(b, C){
 // (W2a) Inside each list the triangles go largest first (by longest edge), and the layout notes how many have an edge of at
 // least each size in SMALL_E: a frame draws only the front of each list, leaving out what is too small to paint more than a speck.
 const SMALL_E = [0, 1, 2, 3, 4, 5].map(k => .0125*2**k), SMALL_N = SMALL_E.length;
-function sideLayout(buckets, nAt){
+function sideLayout(buckets, nAt){ return drain(sideLayoutGen(buckets, nAt)); }
+function* sideLayoutGen(buckets, nAt){
   const A = [], H = [], S = Array.from({ length: SIDE_K }, () => []), w = TAU/SIDE_K, low = Math.sin(PITCH_MIN), lowC = Math.cos(PITCH_MIN);
   const Ae = [], Se = Array.from({ length: SIDE_K }, () => []);   // longest edge of each triangle in A and in the slices
   let o2 = 0;
@@ -462,6 +463,7 @@ function sideLayout(buckets, nAt){
     }
     for (let q = nv; q < I.length; q++) H.push(I[q] + o2);
     o2 += P.length/3;
+    yield;
   }
   const cls = new Int32Array((1 + SIDE_K)*SMALL_N);
   const bySize = (T, E, row) => {   // largest first (ties keep their order); counts of those at least each size
@@ -471,7 +473,7 @@ function sideLayout(buckets, nAt){
     for (let k = 0; k < SMALL_N; k++){ let c = 0; while (c < n && E[ord[c]] >= SMALL_E[k]) c++; cls[row*SMALL_N + k] = c*3; }   // (in indices, as the ranges are)
     return out;
   };
-  const As = bySize(A, Ae, 0), Ss = S.map((T, j) => bySize(T, Se[j], 1 + j));
+  const As = bySize(A, Ae, 0); yield; const Ss = []; for (let j = 0; j < SIDE_K; j++){ Ss.push(bySize(S[j], Se[j], 1 + j)); yield; }
   const off = [0]; for (const t of Ss) off.push(off[off.length - 1] + t.length);
   const nS = off[SIDE_K], nD = off[SIDE_K/2], n = As.length + H.length + nS + nD;
   const ix = nAt > 65535 ? new Uint32Array(n) : new Uint16Array(n);
@@ -479,10 +481,14 @@ function sideLayout(buckets, nAt){
   for (let j = 0; j < SIDE_K/2; j++) for (const v of Ss[j]) ix[k++] = v;
   return { ix, cut: { A: As.length, H: H.length, S: nS, off, cls } };
 }
-function collect(fn){
+// run a generator to its end (the pieces that are cut into steps, run all at once)
+function drain(g){ let r; while (!(r = g.next()).done); return r.value; }
+function collect(fn){ return drain(collectGen((function*(){ fn(); })())); }
+// the same, a step at a time (body: a generator that yields between its steps): see stageStart
+function* collectGen(body){
   buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {}; curSpots = []; curCover = [];
   for (const k in SPR.size) FOL_LIST[k] = [];
-  fn();
+  yield* body; yield;
   const covers = curCover; curCover = null;
   const geo = new Map();
   let nAt = 0;
@@ -504,9 +510,9 @@ function collect(fn){
     }
     // the triangles: each bucket's indices, moved along by where its corners landed; first every bucket's visible ones (in
     // their order), then the hidden ones (drawn only while the piece is being swept in or out: see hideCovered)
-    let ni = 0, nh = 0; const C = prepCovers(covers); for (const [mat, b] of buckets) if (atlasable(mat)){ bucketIndexUpTo(b); hideCovered(b, C); ni += b.i.length; nh += b.hid; }
+    let ni = 0, nh = 0; const C = prepCovers(covers); for (const [mat, b] of buckets) if (atlasable(mat)){ bucketIndexUpTo(b); hideCovered(b, C); ni += b.i.length; nh += b.hid; yield; }
     let ix, cut = null;
-    if (SIDE_SPLIT){ ({ ix, cut } = sideLayout(buckets, nAt)); }
+    if (SIDE_SPLIT){ ({ ix, cut } = yield* sideLayoutGen(buckets, nAt)); }
     else {
       ix = nAt > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
       let k = 0, kh = ni - nh;
@@ -562,6 +568,7 @@ let GREEN_DEFAULT = (() => { try { const v = localStorage.getItem(GREEN_KEY); re
 // A click on a plot that isn't on the current setting brings it to the current setting; a click on one that is
 // moves it (and the setting) on to the next.
 function cycleGreen(c){
+  stageFinishAll();
   const cur = c.green || 'some';
   c.green = cur !== GREEN_DEFAULT ? GREEN_DEFAULT : GREEN_MODES[(GREEN_MODES.indexOf(cur) + 1) % GREEN_MODES.length];
   GREEN_DEFAULT = c.green; try { localStorage.setItem(GREEN_KEY, GREEN_DEFAULT); } catch (e) {}
@@ -718,14 +725,15 @@ const WHITE_TYPES = new Set([domeTower, shellTower, cascadeTerraces]);
 const STALL_TYPES = new Set([stallMarket, foodDeck, foodTower, foodPlaza, billboardLot, domeMarket, cornerMarket]);
 // A plot's building is its stack of sections. A plot with a side pod can have two: c.below, a building on the
 // ground, and c.sections, the pod hanging over it on its scaffold (from c.lift.y), with a gap between them.
-function buildStack(c){
+function buildStack(c){ drain(buildStackGen(c)); }
+function* buildStackGen(c){
   c.belowTop = null; c.belowTops = [];
   c.liftRoof = null;
   if (c.lift && c.below && c.below.length){
-    c.belowTop = stackRun(c, c.below, CURB, 'b', true); c.belowTops = c.sectionTops;
+    c.belowTop = yield* stackRunGen(c, c.below, CURB, 'b', true); c.belowTops = c.sectionTops;
     c.liftRoof = c._topLot && c._topLot.roof ? c._topLot.roof : null; c._topLot = null;   // the roof's corners, for the scaffold's legs
   }
-  const y = stackRun(c, c.sections, c.lift ? c.lift.y : CURB, '', !c.belowTop);   // a side pod's stack starts up in the air, on its scaffold
+  const y = yield* stackRunGen(c, c.sections, c.lift ? c.lift.y : CURB, '', !c.belowTop);   // a side pod's stack starts up in the air, on its scaffold
   c.height = y;
   c.walks = null; c.liftCab = null;
   if (c.lift) liftScaffold(c, c.lift.y);
@@ -734,10 +742,10 @@ function buildStack(c){
 }
 // one stack of sections from y; returns its top. (A section's look is seeded by its own number kh when it has one, so
 // adding a section under a pod leaves the ones above as they were.)
-function stackRun(c, secs, y, tag, first){
+function* stackRunGen(c, secs, y, tag, first){
   let prevWhite = false, prevDeck = false;
   c.sectionTops = [];
-  secs.forEach((sec, k) => {
+  for (let k = 0; k < secs.length; k++){ const sec = secs[k];
     R = mulberry32(hash('sec', c.i, c.j, sec.kh ?? k, sec.zone, sec.seed));   // (the same whether a building stands under a pod or not, so it keeps its look)
     const st = STY[sec.zone], upper = k > 0, last = k === secs.length - 1;
     LUX = sec.zone === 'high' ? luxPalette(hash('lux', c.i, c.j, k, sec.seed)) : sec.zone === 'ind' ? indPalette(hash('ind', c.i, c.j, k, sec.seed)) : null;   // each district's own light colours
@@ -774,7 +782,8 @@ function stackRun(c, secs, y, tag, first){
     if (k === 0 && first) c.firstFloors = lot.floors || 2;
     if (last && !lot.hasCarPad && R() < .7 && !hwAt(c.i, c.j).length && !mtAt(c.i, c.j).length) addPerch({ x: c.x, z: c.z, height: y });   // (no drone perch under a highway: its pillar stands there)
     if (last) c._topLot = lot;
-  });
+    yield;   // (a step: a section is built; see stageStart)
+  }
   return y;
 }
 /* ---------- side pods: a building hung off the side of a taller one ---------- */
@@ -1474,19 +1483,88 @@ function bucketHeightAt(x, z){
   return m;
 }
 function bucketTop(){ let m = CURB; for (const b of buckets.values()){ const p = b.p; for (let q = 1; q < p.length; q += 3) if (p[q] > m) m = p[q]; } return m; }
+// A plot's generation in steps: the platform, then each section, then the pieces of collect (the typed arrays, hideCovered a bucket at a time, the wall layout), each a step
+// that ends in a yield (see collectGen, stackRunGen, sideLayoutGen). Run all at once it is the old rebuildCell; run by stageStep it is a few milliseconds a frame.
+function* cellBody(c){
+  withStyle(c.style, () => buildPlatform(c)); yield;
+  if (c.sections.length){ PUT_KEEPOUT = lineKeepOut(c); if (STAGE) STAGE.keep = PUT_KEEPOUT; try { yield* buildStackGen(c); } finally { PUT_KEEPOUT = null; } }
+  c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); mtFeet(c);   // (and the feet of any highway over it)
+}
 function rebuildCell(c){
+  if (STAGE_Q.length || STAGE_READY.length) stageFinishAll();   // (a plot still being built in steps is finished first)
   finishAnimsOn(c);   // a neighbour's edit can rebuild a cell that is still animating
   disposeData(c.data);
   c.height = CURB;
   c.dark = isDarkPlot(c);
   DARK = c.dark;
   SIDE_SPLIT = true;
-  try { c.data = collect(() => { withStyle(c.style, () => buildPlatform(c)); if (c.sections.length){ PUT_KEEPOUT = lineKeepOut(c); try { buildStack(c); } finally { PUT_KEEPOUT = null; } } c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); mtFeet(c); }); } finally { DARK = false; SIDE_SPLIT = false; }   // (and the feet of any highway over it)
+  try { c.data = drain(collectGen(cellBody(c))); } finally { DARK = false; SIDE_SPLIT = false; }
+  rebuildCellPost(c);
+}
+function rebuildCellPost(c){
   if (c.liftCab) podDoorSpot(c);
   if (c.mega){ const m = megas.get(c.mega); if (m && m.roofH) c.height = m.roofH; }
   cellView(c);
   c.emitters = c.data.emitters; c.pads = c.data.pads; c.ports = c.data.ports;
   dirtyRegions.add(regKey(c.i, c.j));
+}
+// ---- plots built in steps (round 8, item 2). One job at a time; between its steps the globals the builders write into are put back as they were, so nothing else that builds
+// (a megastructure, a sync edit) can see or spoil a half-made piece. A job that is still running when another edit starts is finished at once (stageFinishAll). ----
+// things to do a few frames from now (the police alert's second bike route and the like): later(fn, frames)
+const LATER = []; const later = (fn, n = 1) => { if (PH.tests.alertNow || window.__ALERT_NOW) fn(); else LATER.push({ fn, n }); };
+function runLater(){ for (let i = 0; i < LATER.length; i++){ const e = LATER[i]; if (--e.n <= 0){ LATER.splice(i--, 1); e.fn(); } } }
+let STAGE = null; const STAGE_Q = [], STAGE_READY = []; let FRAME_WORK = 0, SOLID_WAIT = 0;   // (FRAME_WORK: milliseconds of the spread work done this frame, so the region merge, a step of its own, waits for a quieter frame)
+const stageNow = () => (window.__realNow ? window.__realNow() : performance.now());
+const STAGE_ON = () => !(PH.tests.stageNow || window.__STAGE_NOW);
+const FOL_KEYS = Object.keys(SPR.size);
+const stageCap = () => ({ R, buckets, emitters, carPads, curPorts, glowList, curSpots, curCover, fol: FOL_KEYS.map(k => FOL_LIST[k]), DARK, SIDE_SPLIT, PUT_KEEPOUT, STAGE });
+const stageApply = s => { R = s.R; buckets = s.buckets; emitters = s.emitters; carPads = s.carPads; curPorts = s.curPorts; glowList = s.glowList; curSpots = s.curSpots; curCover = s.curCover;
+  for (let q = 0; q < FOL_KEYS.length; q++) FOL_LIST[FOL_KEYS[q]] = s.fol[q]; DARK = s.DARK; SIDE_SPLIT = s.SIDE_SPLIT; PUT_KEEPOUT = s.PUT_KEEPOUT; STAGE = s.STAGE; };
+function stageStart(c, onDone){
+  const job = { c, onDone, state: null, dark: isDarkPlot(c), keep: null, data: null, gen: null };
+  job.gen = (function*(){ job.data = yield* collectGen(cellBody(c)); })();
+  STAGE_Q.push(job); return job;
+}
+function stageSlice(job){   // one step of the job; true when it is finished
+  const prev = stageCap();
+  if (job.state) stageApply(job.state);
+  STAGE = job; DARK = job.dark; SIDE_SPLIT = true; PUT_KEEPOUT = job.keep;
+  let r; try { r = job.gen.next(); } finally { job.state = stageCap(); stageApply(prev); }
+  return r.done;
+}
+function stageStep(ms = 4){
+  FRAME_WORK = 0;
+  if (STAGE_READY.length){ const t0 = stageNow(), j = STAGE_READY.shift(); j.onDone(j.data); FRAME_WORK += stageNow() - t0; return; }   // (finishing a plot, which merges and animates, is a frame of its own)
+  const job = STAGE_Q[0]; if (!job) return; const t0 = stageNow();
+  for (;;){ if (stageSlice(job)){ STAGE_Q.shift(); STAGE_READY.push(job); break; } if (stageNow() - t0 >= ms) break; }
+  FRAME_WORK += stageNow() - t0;
+}
+// An edit to plot c, built in steps: c first, then whatever its edit makes rebuild (air towers, pods), each only after the one before is in place (they read each other's heights),
+// then the air towers once more (as refresh does), and then the rest of refresh. done(prebuilt) runs in the frame after the last step.
+function stageChain(c, done){
+  const old = { view: c.view, data: c.data }, built = new Map(), todo = refreshTodo([c]);
+  const seq = todo.concat(todo.filter(x => airCells.has(x)));
+  let k = 0;
+  const next = () => {
+    if (k >= seq.length){   // all made: put the plots in place and finish the edit as refresh does
+      for (const x of built.keys()) if (x !== c){ finishAnimsOn(x); disposeData(x.data); }   // (what rebuildCell does first)
+      c.view = null; c.data = null;
+      refresh([c], [], built);
+      return done({ old });
+    }
+    const x = seq[k++], job = stageStart(x, data => {
+      const prev = built.get(x); if (prev) disposeData(prev.data);   // (an air tower made twice: the first is not used)
+      built.set(x, { data, dark: job.dark });
+      next();
+    });
+  };
+  next();
+}
+function stageFinishAll(){
+  while (STAGE_READY.length || STAGE_Q.length){
+    if (STAGE_READY.length){ const j = STAGE_READY.shift(); j.onDone(j.data); continue; }
+    const job = STAGE_Q[0]; while (!stageSlice(job)); STAGE_Q.shift(); job.onDone(job.data);
+  }
 }
 /* ---------- solid geometry merged by region ---------- */
 // Every plot and megastructure keeps its own view (one mesh per material), but drawing a big city one building at a
@@ -1498,36 +1576,50 @@ function rebuildCell(c){
 const solidRegions = new Map(), solidDirty = new Set(), animCells = new Set();
 // (merged in blocks of MREG x MREG plots, smaller than the regions: a block is drawn whole whenever any of it is on screen)
 const MREG = 3, mergeKey = (i, j) => Math.floor(i/MREG) + ',' + Math.floor(j/MREG);
-const markSolid = c => { if (c) solidDirty.add(mergeKey(c.i, c.j)); };
+const solidAbort = key => { if (SOLID_JOB && SOLID_JOB.key === key) SOLID_JOB = null; };   // (a block changed while it was being merged in steps: that merge is dropped, the block is merged again)
+const markSolid = c => { if (c){ const k = mergeKey(c.i, c.j); solidAbort(k); solidDirty.add(k); } };
 // every merge block that overlaps a region (REG x REG plots)
 function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
-  for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++) solidDirty.add(i + ',' + j); }
+  for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++){ solidAbort(i + ',' + j); solidDirty.add(i + ',' + j); } }
 function flushSolid(){
   flushSuper();
-  if (solidDirty.size){
-    if (SYNC_NOW()){ for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); }
-    else { const k = solidDirty.values().next().value; solidDirty.delete(k); rebuildSolid(k); }   // (a region a frame: each merge is 20 to 50 ms; until it is done the region's plots draw one by one, the same picture)
-  }
+  if (SYNC_NOW()){ solidFinish(); if (solidDirty.size){ for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); } }
+  else if (SOLID_JOB || solidDirty.size) solidStep(Math.max(1, 4 - FRAME_WORK));   // (a block's merge in steps over the frames, after the frame's other spread work)
   ovFlush();
 }
 const mergeable = o => o.isMesh && !o.isInstancedMesh && (o.layers.mask === 1 || o.layers.mask === STATIC_BIT) && !o.material.transparent && o.geometry.index && !o.userData.noMerge;
-function rebuildSolid(key){ SC_DIRTY.quiet++; try { rebuildSolid0(key); } finally { SC_DIRTY.quiet--; } }
-function rebuildSolid0(key){
+// the block's merged meshes taken down (its plots draw one by one again, the same picture)
+function solidRemoveOld(key){
   const old = solidRegions.get(key);
-  if (old){ for (const m of old.members) m.visible = !(m.userData.sideOf && m.geometry.userData.full); world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); }
+  if (old){ SC_DIRTY.quiet++; try { for (const m of old.members) m.visible = !(m.userData.sideOf && m.geometry.userData.full); world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); } finally { SC_DIRTY.quiet--; } }
   ovForget(key);   // (a walls' mesh stays hidden while its piece is swept: see showHidden)
+}
+function rebuildSolid(key){ solidFinish(); SC_DIRTY.quiet++; try { drain(rebuildSolidGen(key)); } finally { SC_DIRTY.quiet--; } }
+// the same in steps (merging a block is 20 to 80 ms in one piece): a step per attribute, per row of triangles, per material. SOLID_JOB: the block being merged, if any.
+let SOLID_JOB = null;
+function solidSlice(){ SC_DIRTY.quiet++; try { return SOLID_JOB.gen.next().done; } finally { SC_DIRTY.quiet--; } }
+function solidFinish(){ if (SOLID_JOB){ while (!solidSlice()); SOLID_JOB = null; } }
+function solidStep(ms){
+  if (!SOLID_JOB){ if (!solidDirty.size) return; const k = solidDirty.values().next().value; solidDirty.delete(k); SOLID_JOB = { key: k, gen: rebuildSolidGen(k) }; }
+  const t0 = stageNow();
+  do { if (solidSlice()){ SOLID_JOB = null; break; } } while (stageNow() - t0 < ms);
+  FRAME_WORK += stageNow() - t0;
+}
+function* rebuildSolidGen(key){
+  solidRemoveOld(key);
   const byMat = new Map(), members = [];
   for (const c of [...cells.values(), ...megas.values()]){
     if (!c.view || c.view.parent !== world || !c.view.visible || mergeKey(c.i, c.j) !== key || animCells.has(c)) continue;   // (only views actually on show)
     for (const o of c.view.children) if (mergeable(o) && !o.userData.sideOf){ let l = byMat.get(o.material); if (!l) byMat.set(o.material, l = []); l.push(o); }   // (a walls' mesh goes with its building's)
   }
   if (!byMat.size) return;
+  yield;
   const g = new THREE.Group();
   for (const [mat, list] of byMat){
     if (list.length < 2) continue;   // (nothing to gain)
     list.sort((a, b) => a.id - b.id);   // (in the order three would have drawn them one by one: where two pieces meet at exactly the same depth, the same one wins)
     const cutting = list.some(o => o.geometry.userData.cut);
-    const merged = cutting ? mergeCut(list.map(o => o.geometry)) : mergeIndexed(list.map(o => o.geometry)); if (!merged) continue;
+    const merged = cutting ? yield* mergeCutGen(list.map(o => o.geometry)) : yield* mergeIndexedGen(list.map(o => o.geometry)); if (!merged) continue;
     dropCpuCopy(merged);
     const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.blockKey = key;   // (the glow overlay is batched by it: see ovBatch)
     mesh.userData.sortId = list[0].id;   // (drawn where its first piece would have been: see the opaque sort below)
@@ -1537,6 +1629,7 @@ function rebuildSolid0(key){
     for (const o of list){ o.visible = false; members.push(o); if (o.userData.side){ o.userData.side.visible = false; members.push(o.userData.side); } }
   }
   if (!g.children.length) return;
+  yield;
   world.add(freezeTree(g)); solidRegions.set(key, { group: g, members });
 }
 // A region's merged geometry is read by nothing once it is on the card (the merge copies from the plots' own geometry, which stays; picking tests boxes; the glow overlay is cut from it before the first draw),
@@ -1550,7 +1643,8 @@ function dropCpuCopy(geo){
 }
 // Indexed geometries joined into one: corners one after another, and the triangles of all of them, the ones shown first
 // (each piece's in order), then the hidden ones (see hideCovered). Null if they don't share the same attributes.
-function mergeIndexed(geos){
+function mergeIndexed(geos){ return drain(mergeIndexedGen(geos)); }
+function* mergeIndexedGen(geos){
   const names = Object.keys(geos[0].attributes);
   for (const g of geos) if (Object.keys(g.attributes).length !== names.length || names.some(n => !g.attributes[n] || g.attributes[n].itemSize !== geos[0].attributes[n].itemSize || g.attributes[n].normalized !== geos[0].attributes[n].normalized || g.attributes[n].array.constructor !== geos[0].attributes[n].array.constructor)) return null;
   let nv = 0, ni = 0, nh = 0;
@@ -1558,7 +1652,7 @@ function mergeIndexed(geos){
   const out = new THREE.BufferGeometry();
   for (const n of names){ const a0 = geos[0].attributes[n], arr = new a0.array.constructor(nv*a0.itemSize); let o = 0;
     for (const g of geos){ const a = g.attributes[n].array; arr.set(a, o); o += a.length; }
-    out.setAttribute(n, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); }
+    out.setAttribute(n, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); yield; }
   const ix = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
   let k = 0, kh = ni - nh, base = 0;
   for (const g of geos){ const I = g.index.array, sh = g.userData.shown ?? I.length;
@@ -1572,14 +1666,15 @@ function mergeIndexed(geos){
 }
 // Building geometries joined in the A/H/S/D order (sideArc): every piece's A, every piece's H, then each wall slice of
 // every piece in turn, then slices 0 to 3 again. (A piece without the order counts as all A, and its hidden ones as H.)
-function mergeCut(geos){
+function mergeCut(geos){ return drain(mergeCutGen(geos)); }
+function* mergeCutGen(geos){
   const names = Object.keys(geos[0].attributes);
   for (const g of geos) if (Object.keys(g.attributes).length !== names.length || names.some(n => !g.attributes[n] || g.attributes[n].itemSize !== geos[0].attributes[n].itemSize || g.attributes[n].normalized !== geos[0].attributes[n].normalized || g.attributes[n].array.constructor !== geos[0].attributes[n].array.constructor)) return null;
   let nv = 0; for (const g of geos) nv += g.attributes.position.count;
   const out = new THREE.BufferGeometry();
   for (const n of names){ const a0 = geos[0].attributes[n], arr = new a0.array.constructor(nv*a0.itemSize); let o = 0;
     for (const g of geos){ const a = g.attributes[n].array; arr.set(a, o); o += a.length; }
-    out.setAttribute(n, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); }
+    out.setAttribute(n, new THREE.BufferAttribute(arr, a0.itemSize, a0.normalized)); yield; }
   const seg = g => { const I = g.index.array, u = g.userData.cut;
     if (u) return { I, a: [0, u.A], h: [u.A, u.A + u.H], s: u.off.map(x => u.A + u.H + x) };
     const sh = g.userData.shown ?? I.length; return { I, a: [0, sh], h: [sh, I.length], s: new Array(SIDE_K + 1).fill(I.length) }; };
@@ -1598,12 +1693,13 @@ function mergeCut(geos){
       const src = row <= SIDE_K ? row : row - SIDE_K, cu = geos[gi].userData.cut, o = (row*nP + gi)*SMALL_N;
       for (let l = 0; l < SMALL_N; l++) rowC[o + l] = cu && cu.cls ? cu.cls[src*SMALL_N + l] : y - x; }
     for (let q = x; q < y; q++) ix[k++] = I[q] + base; base += geos[gi].attributes.position.count; }); };
-  put('a', 0); put('h', -1);
-  for (let j = 0; j < SIDE_K; j++) put(p => [p.s[j], p.s[j + 1]], 1 + j);
-  for (let j = 0; j < SIDE_K/2; j++) put(p => [p.s[j], p.s[j + 1]], 1 + SIDE_K + j);
+  put('a', 0); put('h', -1); yield;
+  for (let j = 0; j < SIDE_K; j++){ put(p => [p.s[j], p.s[j + 1]], 1 + j); if (j % 4 === 3) yield; }
+  for (let j = 0; j < SIDE_K/2; j++){ put(p => [p.s[j], p.s[j + 1]], 1 + SIDE_K + j); if (j % 4 === 3) yield; }
   geos.forEach((g, gi) => { const P = g.attributes.position.array; let x0 = 1e30, x1 = -1e30, y0 = 1e30, y1 = -1e30, z0 = 1e30, z1 = -1e30;
     for (let q = 0; q < P.length; q += 3){ const x = P[q], y = P[q + 1], z = P[q + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; }
     box.set([x0, x1, y0, y1, z0, z1], gi*6); });
+  yield;
   out.setIndex(new THREE.BufferAttribute(ix, 1));
   out.userData.cut = { A: nA, H: nH, S: off[SIDE_K], off }; out.setDrawRange(0, nA + nH + off[SIDE_K]);
   if (nP > 1) out.userData.pcs = { n: nP, rowS, rowN, rowC, box, stamp: -1, vis: new Uint8Array(nP), seen: 0 };
@@ -1734,7 +1830,7 @@ function nearPort(){
   return near[Math.floor(Math.random()*near.length)];
 }
 // after any change: refresh steam, drone perches, landing pads, traffic heights, framing
-function syncAgents(){ syncAgentsA(); syncPeople(); syncAgentsEnd(); }
+function syncAgents(){ syncAgentsA(); syncSteamMap(); syncPeople(); syncAgentsEnd(); }
 function syncAgentsA(){
   ports = []; carPads = []; emitters = [];
   for (const c of cells.values()){ ports.push(...c.ports); carPads.push(...c.pads); emitters.push(...c.emitters); }
@@ -1743,7 +1839,6 @@ function syncAgentsA(){
   for (const d of pairCache.values()) if (d.emitters) emitters.push(...d.emitters);   // steam leaking from the pipework between buildings
   portLots = [...cells.values()].map(c => ({ x: c.x, z: c.z, height: c.height }));
   VENTS = [...cells.values()].filter(c => c.vent).map(c => c.vent);   // steam vents, for the mist
-  makeSteamMap(VENTS, [...cells.values()].flatMap(c => c.lifts || []));   // steam vents for the mist, lift pads for their shimmer
   setupSteam();
   for (const d of drones) if (!ports.includes(d.at) || (d.phase !== 'inside' && !ports.includes(d.to))){
     d.phase = 'inside'; d.g.visible = false; d.at = nearPort(); d.timer = 1 + Math.random()*2;
@@ -1753,6 +1848,11 @@ function syncAgentsA(){
   for (const m of megas.values()) if (m.top > top) top = m.top;
   skyTop = top + 2.4;
 }
+// the steam map (vents for the mist, lift pads for their shimmer), a few vents a frame when the upkeep is spread
+let STEAM_JOB = null;
+const steamArgs = () => [VENTS, [...cells.values()].flatMap(c => c.lifts || [])];
+function syncSteamMap(){ makeSteamMap(...steamArgs()); }
+function syncSteamStep(ms){ if (!STEAM_JOB) STEAM_JOB = makeSteamMapGen(...steamArgs()); const t0 = stageNow(); do { if (STEAM_JOB.next().done){ STEAM_JOB = null; return true; } } while (stageNow() - t0 < ms); return false; }
 function syncAgentsEnd(){
   shadowDirty = true;
   save();
@@ -1761,11 +1861,12 @@ function syncAgentsEnd(){
 // whole-city rebuild of 150 to 400 ms. Done at once it froze the frame the piece was placed in; now it runs a stage a frame while the sweep-in animation plays (the piece's own plots are built at
 // once). A new edit restarts the stages (each one rebuilds from the cities' cells, so a repeat is safe). Loading, and the overlay test "edit upkeep in the same frame", do it all at once.
 let SYNC_Q = null;
-const SYNC_STAGES = [() => rebuildConnections(), () => syncAgentsA(), () => syncPeopleNet(), () => syncPeopleRest(), () => syncAgentsEnd()];
-const SYNC_NOW = () => !(PH.tests.syncLater || window.__SYNC_LATER) || !pplReady || pplFrame < 60;   // default: all at once (exact). The spread is opt-in: it shifts the people's random stream
-function queueSync(){ SYNC_Q = 0; }
-function stepSync(){ if (SYNC_Q === null) return; const q = SYNC_Q++; if (SYNC_Q >= SYNC_STAGES.length) SYNC_Q = null; SYNC_STAGES[q](); }
-function finishSync(){ while (SYNC_Q !== null) stepSync(); }
+const SYNC_STAGES = [() => rebuildConnections(), () => syncAgentsA(), ms => syncSteamStep(ms), ms => syncPeopleNetStep(ms), ms => syncPeopleRestStep(ms), () => syncAgentsEnd()];
+const SYNC_NOW = () => !!(PH.tests.syncNow || window.__SYNC_NOW) || !pplReady || pplFrame < 60;   // (the first second of a session is loading)
+function queueSync(){ SYNC_Q = 0; syncPeopleAbort(); STEAM_JOB = null; }
+function stepSync(ms = 3){ if (SYNC_Q === null) return; const q = SYNC_Q, t0 = stageNow();
+  const r = SYNC_STAGES[q](Math.max(1, ms - FRAME_WORK)); FRAME_WORK += stageNow() - t0; if (r === false) return; SYNC_Q = q + 1 >= SYNC_STAGES.length ? null : q + 1; }   // (a stage is a frame's work, or several frames' for the walking network and the residents: those answer false until they are done)
+function finishSync(){ while (SYNC_Q !== null){ const q = SYNC_Q; const r = SYNC_STAGES[q](Infinity); if (r === false) continue; SYNC_Q = q + 1 >= SYNC_STAGES.length ? null : q + 1; } }
 // the middle of everything built: where the camera starts, and where H jumps back to
 function centerView(now = false){
   let x = 0, z = 0, n = 0;
@@ -1789,7 +1890,8 @@ function parkCells(){
   }
   return changed;
 }
-function refresh(list, megaList = []){
+// the plots an edit to these must rebuild (the plots themselves, a park's, an air-filter hologram's tower, a side pod hanging on them), the pods last
+function refreshTodo(list, megaList = []){
   list = list.concat(parkCells());
   // an air-filter hologram hangs over the plots in front of its tower, so a change next door rebuilds the tower too
   for (const a of airCells){
@@ -1799,11 +1901,15 @@ function refresh(list, megaList = []){
   }
   // a side pod's walkways go to the neighbours tall enough to reach: a change next door rebuilds the pod, after the neighbour
   for (const c of [...list]) if (c) for (const [a, b] of SIDES4){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n && n.lift) list.push(n); }
-  const todo = [...new Set(list)].filter(Boolean).sort((p, q) => (p.lift ? 1 : 0) - (q.lift ? 1 : 0));
-  for (const c of todo) rebuildCell(c);
+  return [...new Set(list)].filter(Boolean).sort((p, q) => (p.lift ? 1 : 0) - (q.lift ? 1 : 0));
+}
+function refresh(list, megaList = [], prebuilt = null){
+  if (!prebuilt && (STAGE_Q.length || STAGE_READY.length)) stageFinishAll();
+  const todo = refreshTodo(list, megaList);
+  for (const c of todo){ if (prebuilt && prebuilt.has(c)){ c.dark = prebuilt.get(c).dark; c.data = prebuilt.get(c).data; rebuildCellPost(c); } else rebuildCell(c); }
   // an air-filter tower picks its face from its neighbours' heights, so if one of them was only built after it in this
   // pass (loading a saved city builds every plot in one go), build the tower again now that they all stand
-  for (const c of todo) if (airCells.has(c) && !anims.some(a => a.c === c)) rebuildCell(c);
+  if (!prebuilt) for (const c of todo) if (airCells.has(c) && !anims.some(a => a.c === c)) rebuildCell(c);
   for (const m of megaList) rebuildMega(m);
   for (const k of dirtyRegions){ markSolidRegion(k); if (heldRegions.has(k)) pendingRegions.add(k); else rebuildRegion(k); } dirtyRegions.clear();
   if (SYNC_NOW()) { rebuildConnections(); syncAgents(); } else { queueSync(); shadowDirty = true; }   // (after a player's edit the rest is done a stage a frame: see queueSync)
@@ -1836,6 +1942,7 @@ function removePlatform(c){
 }
 const MAX_SECTIONS = 4, MAX_HEIGHT = 24;
 function addSection(c, zone){
+  stageFinishAll();
   if (c.sections.length >= MAX_SECTIONS || c.height > MAX_HEIGHT) return;
   finishAnimsOn(c);
   const y0 = c.sections.length ? c.height : CURB;
@@ -1843,6 +1950,17 @@ function addSection(c, zone){
   const cap = hwCap(c), sec = { zone, seed: (Math.random()*1e9)|0, style: styleNow() };
   if (cap !== null){ const f = Math.floor((cap - y0 - (c.sections.length ? .1 : 0) + .02)/FH); if (f < 1) return; sec.mf = f; }
   holdRegion(c);
+  if (cap === null && !c.lift && STAGE_ON()){
+    // the piece is made in steps over the next frames; the plot keeps its old look until it is ready, then the sweep builds the new one (the edit's own frame is a few milliseconds)
+    c.sections.push(sec);
+    stageChain(c, prebuilt => {
+      const old = { view: prebuilt.old.view, data: prebuilt.old.data };
+      dropView(old);
+      startAnim(c, 'build', y0 - .05, c.height + 1.2, zone, SIDE, null);
+      later(() => maybeSpawnMegas(c), 1);   // (a megastructure arriving is a build of its own: a frame of its own)
+    });
+    return;
+  }
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   c.sections.push(sec);
   if (cap !== null){
@@ -1862,6 +1980,7 @@ function addSection(c, zone){
 }
 // hang a pod off the side of a taller building, over the empty plot c, its deck at height y
 function addLift(c, y, zone){
+  stageFinishAll();
   if (!c || c.mega || c.lift || hwAt(c.i, c.j).length || mtAt(c.i, c.j).length) return null;   // (not under a highway or the metro)
   if (c.sections.length && y < c.height + FH - .05) return null;   // over a shorter building: a floor's gap at least
   finishAnimsOn(c);
@@ -2031,7 +2150,7 @@ function startAnim(c, kind, y0, y1, zone, w, old, sound, opts = {}){
   for (const l of lines){ l.layers.set(1); l.renderOrder = 998; scene.add(l); }
   if (!opts.quiet){ if (sound) sfx.play(sound, { spread: 0 }); else sfx.play(kind === 'build' ? 'place' : 'remove'); }
   const a = { c, kind, view, old, u, mats, box, scan, foot, trail, lines, x: c.x, z: c.z, y0, by0, y1, wx, wz, t: 0, dur: opts.slow ? 4.6 : kind === 'build' ? .15 : .12, slow: !!opts.slow, bare: !!opts.bare, onEnd: opts.onEnd, cue: opts.cue, reg: regKey(c.i, c.j), held };
-  animCells.add(c); rebuildSolid(mergeKey(c.i, c.j)); solidDirty.delete(mergeKey(c.i, c.j));   // (out of its region's merge while it animates: its own meshes show)
+  animCells.add(c); solidAbort(mergeKey(c.i, c.j)); solidRemoveOld(mergeKey(c.i, c.j)); solidDirty.add(mergeKey(c.i, c.j));   // (out of its region's merge while it animates: its own meshes show; the rest of the block is merged again at the next flush)
   anims.push(a);
   return a;
 }
@@ -2103,6 +2222,7 @@ function clearIsland(){
   for (const m of megas.values()){ disposeData(m.data); m.data = null; cellView(m); if (m.fx){ m.fx.dispose(); m.fx = null; } }
   megas.clear();
   for (const k of [...regions.keys()]){ disposeGroup(regions.get(k)); regions.delete(k); superDirty.add('r' + superKey(k)); }
+  SOLID_JOB = null;
   for (const k of [...solidRegions.keys()]){ const r = solidRegions.get(k); world.remove(r.group); disposeGroup(r.group); solidRegions.delete(k); } solidDirty.clear(); animCells.clear();
   cells.clear(); hwClearAll(); mtClearAll();
   for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) cells.set(ckey(i,j), newCell(i, j));
@@ -2212,7 +2332,7 @@ function applyTarget(t){
   if (!zone || t.c.mega) return null;
   addSection(t.c, zone); return t.c;
 }
-function removeAt(pk){ if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMegaTier(megas.get(pk.c.mega)); if (pk.kind === 'low') return removeBelow(pk.c); removeSection(pk.c); }
+function removeAt(pk){ stageFinishAll(); if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMegaTier(megas.get(pk.c.mega)); if (pk.kind === 'low') return removeBelow(pk.c); removeSection(pk.c); }
 
 /* ---------- hover outline showing where a click would build ---------- */
 const hoverMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85, depthTest: false });

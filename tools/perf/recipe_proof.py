@@ -71,7 +71,7 @@ if __name__ == '__main__':
         if a.regen:
             res = pg.evaluate("""([picks]) => { const out = [], world = recipeWorld(); for (const [i, j] of picks){ const c = cells.get(ckey(i, j)); const r = __proof.regen(c, world); r.ij = [i, j]; r.kind = c.mega ? 'mega' : c.sections.length ? 'stack' + (c.lift ? '+lift' : '') + (c.below && c.below.length ? '+below' : '') : 'empty'; if (r.err || r.d.length) out.push(r); else out.push({ ij: r.ij, kind: r.kind, ok: 1 }); } return out; }""", [pick])
         elif a.worker:
-            pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=900000)
+            pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=120000, polling=200)
             print(pg.evaluate('() => RW.line()'))
             res = pg.evaluate("""async ([picks, seed]) => { const out = []; for (const [i, j] of picks){ const c = cells.get(ckey(i, j)); const r = await __proof.oneW(c, seed + i*7 + j*13); r.ij = [i, j]; r.kind = c.mega ? 'mega' : c.sections.length ? 'stack' + (c.lift ? '+lift' : '') + (c.below && c.below.length ? '+below' : '') : 'empty'; if (r.err || r.d.length) out.push(r); else out.push({ ij: r.ij, kind: r.kind, ok: 1, rand: r.rand }); } return out; }""", [pick, a.seed])
             print(pg.evaluate('() => RW.line()'))

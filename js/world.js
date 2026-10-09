@@ -2279,7 +2279,7 @@ function clearIsland(){
   megas.clear();
   for (const k of [...regions.keys()]){ disposeGroup(regions.get(k)); regions.delete(k); superDirty.add('r' + superKey(k)); }
   SOLID_JOB = null;
-  for (const k of [...solidRegions.keys()]){ const r = solidRegions.get(k); world.remove(r.group); disposeGroup(r.group); solidRegions.delete(k); } solidDirty.clear(); animCells.clear();
+  for (const k of [...solidRegions.keys()]){ const r = solidRegions.get(k); world.remove(r.group); disposeGroup(r.group); solidRegions.delete(k); ovForget(k); } solidDirty.clear(); animCells.clear();   // (ovForget: the glow overlay's batches drop the region too, or its lights stay drawn with nothing under them)
   cells.clear(); hwClearAll(); mtClearAll();
   for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) cells.set(ckey(i,j), newCell(i, j));
   rebuildAll(); centerView();

@@ -47,7 +47,7 @@ I developed there in a side worktree and copied each finished item over). Every 
 - Measurements are from the harness's software renderer: draw calls, triangles and main-thread time are real, card times are not; every GPU question is in the script below.
 
 ## For you to decide or look at
-1. **Speed-based detail** (item 6, a cheat): crop tools/perf/overnight/item6_fast_spin_before_after.png (base left, new right). Fast spin: 47,817 px differ (5%), slow turn identical; triangles in the color pass during a fast spin 35 to 54% fewer. Tune live with `SD.v0` (10), `SD.fast` (40), `SD.max`, `SD.cursorPx`; turn it off with `SD.on = false`.
+1. **Speed-based detail** (item 6, a cheat): crop tools/perf/overnight/item6_fast_spin_before_after.png (base left, new right). Fast spin: 47,817 px differ (5%), slow turn identical; triangles in the color pass during a fast spin 26 to 41% fewer at zoom 30, 34 to 52% at zoom 15. Tune live with `SD.v0` (10), `SD.fast` (40), `SD.max`, `SD.cursorPx`; turn it off with `SD.on = false`.
 2. **Soft effects at half resolution** (item 8, a cheat): six same-frame crops in tools/perf/overnight (item8_soft_*.png: full resolution left, half right): rain at night, mist at a vent (night and day), shafts at morning and evening. 4 to 17% of pixels differ, nearly all by a level of dither; over 32 levels 0.01 to 0.4%. Look for crawl on the shafts and reflections while panning slowly (the 2 x 2 grid is fixed to the world's pixels, but I could not measure it).
 3. **People at full rate** (item 1): flip "people at full rate" live on a busy street at zoom 15 and 30 and look for anyone stepping, jumping or sliding.
 4. **5a flat-face patch**: recommend leaving it out; tools/perf/patches/hide_flat_faces.patch if you disagree.
@@ -73,7 +73,7 @@ Builds: OLD = `a7b4449` (before the cache) or `1bc4451` (round 5, accepted); NEW
 - People stepped by their on-screen size (8d5d783): each person is updated every N-th frame, N from their own walk speed and the pixel size so one update moves them at most about .75 render pixels
   (cap 4; person i on frames where (frame + i) % N == 0; the accumulated time is passed; lifts, clubs, metro, riders, anyone within 90 px of the cursor, and people off to the side keep their old
   rate; sprites are drawn every frame from the last step's result; the collision check and the emote work run on the same rhythm: the whole pass every N-th frame). Overlay test "people at full rate"
-  (and `window.__FULL_RATE = true`), overlay line with N and its spread. In the max city N is 4 for nearly everyone at zoom 30 and zoom 15.
+  (and `window.__FULL_RATE = true`), overlay line with N and its spread. In the max city the typical rate is N = 4 (the cap) at zoom 30 and at zoom 60.
 - Check: with the test forced on the build equals the previous commit exactly (city, megas, dense 53 captures; max city 4 captures; 0 problems). Flow, max city 1920x1080 zoom 30, 30 s, 10,112 people at
   N = 4 against full rate: walking 5,171 against 5,211, standing 5,032 against 4,992, mean move a frame .054 against .055 px, largest move 2.95 against 1.92 px, decisions a minute 5,170 against 4,962,
   emotes 10,222 against 10,052, arrivals 906 against 834: the same density and flow, nobody jumps (the largest single move is 3 px, a person stepping once in four frames).
@@ -160,7 +160,7 @@ from the API calls: textures, buffers and renderbuffers asked for, minus those d
   captured while moving: 47,817 px (fast spin) and 29,214 px (quick zoom out) differ, 5% and 3% of 921,600, mostly fine detail: window bars, rails, small pieces
   (crop: tools/perf/overnight/item6_fast_spin_before_after.png, base left, new right; the crop was taken at v0 = 6, the numbers are with the final v0 = 10); the slow
   turn, and every capture at rest, are identical.
-- Triangles drawn by the color pass during a fast spin (+3 rad, city, 1280x720): zoom 30: 35 to 49% fewer; zoom 15: 39 to 54% fewer (with v0 = 6).
+- Triangles drawn by the color pass during a fast spin (+3 rad, city, 1280x720, v0 = 10): zoom 30: 26 to 41% fewer; zoom 15: 34 to 52% fewer (v0 = 6 gave 35 to 54% at both).
   GPU time can only be read on the owner's machine: record a fast spin and a Q/E turn at zoom 30 with the test on and off.
 
 **7. Building without redrawing the whole cache: done.**

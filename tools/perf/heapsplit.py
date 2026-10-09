@@ -13,7 +13,7 @@ JS = """() => { const seen = new Set(), by = {}; let geos = 0, tot = 0;
   scene.traverse(walk);
   // geometry bytes whose every mesh is hidden (a plot's own meshes once their region is merged into one): kept for the next merge
   const owners = new Map(); scene.traverse(o => { const g = o.geometry; if (!g) return; let vis = true; for (let p = o; p; p = p.parent) if (p.visible === false) vis = false; const e = owners.get(g) || { vis: false }; e.vis = e.vis || vis; owners.set(g, e); });
-  const bytes = g => { let n = 0; for (const k in g.attributes) n += g.attributes[k].array.byteLength; if (g.index) n += g.index.array.byteLength; return n; };
+  const bytes = g => { let n = 0; for (const k in g.attributes) n += g.attributes[k].array ? g.attributes[k].array.byteLength : 0; if (g.index && g.index.array) n += g.index.array.byteLength; return n; };
   let hid = 0, vis = 0; for (const [g, e] of owners){ const b = bytes(g); if (e.vis) vis += b; else hid += b; }
   const out = {}; for (const k of Object.keys(by).sort((a, b) => by[b] - by[a])) out[k] = +(by[k]/1048576).toFixed(1);
   return { geometries: geos, typedMB: +(tot/1048576).toFixed(1), top: Object.fromEntries(Object.entries(out).slice(0, 14)), heapMB: +(performance.memory.usedJSHeapSize/1048576).toFixed(0), geometryOfVisibleMeshesMB: +(vis/1048576).toFixed(0), geometryOfHiddenMeshesMB: +(hid/1048576).toFixed(0) }; }"""

@@ -9,7 +9,7 @@ if __name__ == '__main__':
     from playwright.sync_api import sync_playwright
     srv = H.serve(); url = H.make_site('one', os.environ.get('REF') or None); sc = H.load_scenes([scene])[0]
     with sync_playwright() as pw:
-        br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0])
+        br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init='window.__KEEP_CPU = true;')
         if os.environ.get('SETUP'): pg.evaluate('() => { ' + os.environ['SETUP'] + ' }')
         pg.evaluate('() => __perf.cap(90, 0)')
         r = pg.evaluate(js)

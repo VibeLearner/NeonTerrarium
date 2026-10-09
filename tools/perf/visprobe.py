@@ -68,6 +68,6 @@ if __name__ == '__main__':
     from playwright.sync_api import sync_playwright
     srv = H.serve(); url = H.make_site('vp', None); sc = H.load_scenes([a.scene])[0]
     with sync_playwright() as pw:
-        br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[1], 'off')
+        br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[1], 'off', extra_init='window.__KEEP_CPU = true;')
         print(json.dumps(pg.evaluate(JS, [a.zoom, a.radius, a.yaws, [12, 45, 82], a.at]), indent=1)); print(errs[:2]); br.close()
     srv.shutdown()

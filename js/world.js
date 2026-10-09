@@ -188,7 +188,7 @@ function sideBefore(r, s, c, g){
   const gl = renderer.getContext(), ext = window.NO_MULTI_DRAW ? null : gl.getExtension('WEBGL_multi_draw'), rbd = renderer.renderBufferDirect;
   renderer.renderBufferDirect = function(camera, sc, geo, mat, obj, grp){
     const md = obj.userData.md; if (!md) return rbd.call(this, camera, sc, geo, mat, obj, grp);
-    const bpe = geo.index.array.BYTES_PER_ELEMENT, n = md.s.length;
+    const bpe = geo.index.array ? geo.index.array.BYTES_PER_ELEMENT : geo.userData.bpe, n = md.s.length;
     if (ext){ if (!md.o){ md.o = new Int32Array(n); for (let i = 0; i < n; i++) md.o[i] = md.s[i]*bpe; } }
     gl.drawElements = function(mode, count, type){
       if (ext) ext.multiDrawElementsWEBGL(mode, md.n, 0, type, md.o, 0, n);
@@ -1465,6 +1465,7 @@ function rebuildSolid0(key){
     list.sort((a, b) => a.id - b.id);   // (in the order three would have drawn them one by one: where two pieces meet at exactly the same depth, the same one wins)
     const cutting = list.some(o => o.geometry.userData.cut);
     const merged = cutting ? mergeCut(list.map(o => o.geometry)) : mergeIndexed(list.map(o => o.geometry)); if (!merged) continue;
+    dropCpuCopy(merged);
     const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow;
     mesh.userData.sortId = list[0].id;   // (drawn where its first piece would have been: see the opaque sort below)
     if (merged.userData.shown !== undefined){ mesh.onBeforeRender = hideBefore; mesh.onAfterRender = hideAfter; }
@@ -1474,6 +1475,15 @@ function rebuildSolid0(key){
   }
   if (!g.children.length) return;
   world.add(freezeTree(g)); solidRegions.set(key, { group: g, members });
+}
+// A region's merged geometry is read by nothing once it is on the card (the merge copies from the plots' own geometry, which stays; picking tests boxes; the glow overlay is cut from it before the first draw),
+// so its CPU arrays are let go right after their upload: they were 1.2 GB of the 3 GB heap in the biggest city. (Overlay test "keep the CPU copies of merged geometry" switches it off.)
+function dropCpuCopy(geo){
+  if (PH.tests.keepCpu || window.__KEEP_CPU) return;
+  if (geo.index) geo.userData.bpe = geo.index.array.BYTES_PER_ELEMENT;
+  const free = function(){ this.array = null; };
+  for (const n in geo.attributes) geo.attributes[n].onUpload(free);
+  if (geo.index) geo.index.onUpload(free);
 }
 // Indexed geometries joined into one: corners one after another, and the triangles of all of them, the ones shown first
 // (each piece's in order), then the hidden ones (see hideCovered). Null if they don't share the same attributes.

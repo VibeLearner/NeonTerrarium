@@ -25,7 +25,7 @@ if __name__ == '__main__':
     open(f, 'w').write(s.replace('function put(geo, mat, m){\n', 'function put(geo, mat, m){\n  if (window.__PS) window.__PS(geo, mat, m);\n', 1))
     sc = H.load_scenes([a.scene])[0]
     with sync_playwright() as pw:
-        br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init=INIT); pg.evaluate('() => __perf.cap(5, 1)')
+        br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init='window.__KEEP_CPU = true;' + (INIT or '')); pg.evaluate('() => __perf.cap(5, 1)')
         r = pg.evaluate('() => __PSITE'); tot = r['tot']; rows = [(k, v) for k, v in r['by'].items() if not a.custom or not k.split(' | ')[1] in ('box', 'cyl', 'sph', 'blob')]
         print('%s: %d primitives, %.1fM triangles put; sampled every 40th (%d samples)%s' % (a.scene, r['n'], tot/1e6, sum(v['n'] for v in r['by'].values()), ', custom shapes only' if a.custom else ''))
         for k, v in sorted(rows, key=lambda kv: -kv[1]['t'])[:a.top]: print('  %-52s %5.1f%% of all  (~%d primitives, %.0f tris each)' % (k, 100*v['t']*40/tot, v['n']*40, v['t']/v['n']))

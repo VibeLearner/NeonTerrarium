@@ -23,7 +23,7 @@ if __name__ == '__main__':
     from playwright.sync_api import sync_playwright
     srv = H.serve(); url = H.make_site('lt', None); sc = H.load_scenes([a.scene])[0]
     with sync_playwright() as pw:
-        br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0])
+        br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init='window.__KEEP_CPU = true;')
         pg.evaluate('z => { zoom = zoomT = z; S.cycle = false; S.hour = 12; }', a.zoom); pg.evaluate('() => __perf.cap(60, 6)')
         r = pg.evaluate(JS); print('zoom %g: %dk triangles in %d live objects' % (a.zoom, r['totalK'], r['objects']))
         for x in r['rows']: print('  ' + x)

@@ -18,7 +18,7 @@ if __name__ == '__main__':
         for sc in H.load_scenes(names):
             res = {}
             for tag, init in (('old', 'window.__NO_HIDE_FLAT = true;'), ('new', None)):
-                ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init=init)
+                ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init='window.__KEEP_CPU = true;' + (init or ''))
                 res[tag] = pg.evaluate(JS); ctx.close()
             o, n = res['old'], res['new']
             print('%-8s pieces %5d   A drawn %9d -> %9d   hidden H %9d -> %9d   walls S %9d -> %9d   moved to H %8d (%.1f%% of A+S)' % (sc['name'], n['meshes'], o['A'], n['A'], o['H'], n['H'], o['S'], n['S'], n['H'] - o['H'], 100*(n['H'] - o['H'])/max(1, o['A'] + o['S'])), flush=True)

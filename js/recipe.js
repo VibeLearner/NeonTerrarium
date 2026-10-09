@@ -54,7 +54,7 @@ function recipeGen(r, world){
     for (const g of nd.geo.values()) g.dispose();
     i.wt = flat; i.nbrec = null;
   }
-  FX_REPLAY = r.draws || null;
+  FX_REPLAY = r.draws || null; const tierWas = TIER.make;
   const raw = { height: CURB, topY: 0, group: null, ports: [], pads: [], emitters: [], lifts: [], sectionTops: [], firstFloors: 0 };
   for (const k of RECIPE_IN) if (r[k] !== undefined) raw[k] = structuredClone(r[k]);
   raw.dark = r.dark;   // (rebuildCell sets it before generating; the builders read it)
@@ -71,8 +71,8 @@ function recipeGen(r, world){
   const live = world ? { highways, hwIndex, metros, mtIndex } : null;
   if (world){ highways = world.hw; hwIndex = world.hi; metros = world.mt; mtIndex = world.mi; }
   DARK = r.dark; SIDE_SPLIT = true;
-  try { raw.data = drain(collectGen(cellBody(c))); }
-  finally { DARK = false; SIDE_SPLIT = false; if (live){ highways = live.highways; hwIndex = live.hwIndex; metros = live.metros; mtIndex = live.mtIndex; }
+  try { TIER.make = true; raw.data = drain(collectGen(cellBody(c))); }
+  finally { TIER.make = tierWas; DARK = false; SIDE_SPLIT = false; if (live){ highways = live.highways; hwIndex = live.hwIndex; metros = live.metros; mtIndex = live.mtIndex; }
     delete cells.get; delete cells.has; delete cells.values; delete cells.keys; delete cells.entries; delete cells.forEach; delete cells[Symbol.iterator]; }
   // (the one global generation writes besides its own buffers: the towers that may throw the air hologram; what a worker sends back is this flag)
   Object.defineProperty(raw, '_air', { value: airCells.has(c) }); airCells.delete(c);
@@ -114,20 +114,24 @@ function recipePack(raw, geoOnly){
   const out = new Map();
   count(raw.data.fol); count(raw.data.glows); count(raw.data.emitters); count(raw.data.pads); count(raw.data.ports); count(raw.data.spots);
   const fields = {}; for (const k of raw._written) if (k !== 'data') count(raw[k]);
-  const geo = [];
-  for (const [mat, g] of raw.data.geo){
-    const key = mat === ATLAS ? -1 : MATREG.at.get(mat);
-    if (key === undefined) throw new Error('recipePack: a material made after load (id ' + mat.id + ')');
+  const packGeo = (key, g) => {
     const attrs = {}; for (const k in g.attributes){ const a = g.attributes[k]; attrs[k] = { a: typed(a.array), s: a.itemSize, n: a.normalized }; }
     const bs = g.boundingSphere, bb = g.boundingBox;
     const ud = {}; for (const k in g.userData){ count(g.userData[k]); }
     for (const k in g.userData) ud[k] = pk(g.userData[k]);
-    geo.push({ key, attrs, index: g.index ? typed(g.index.array) : null, draw: [g.drawRange.start, g.drawRange.count], ud, bs: bs ? [bs.center.x, bs.center.y, bs.center.z, bs.radius] : null, bb: bb ? [bb.min.x, bb.min.y, bb.min.z, bb.max.x, bb.max.y, bb.max.z] : null });
+    return { key, attrs, index: g.index ? typed(g.index.array) : null, draw: [g.drawRange.start, g.drawRange.count], ud, bs: bs ? [bs.center.x, bs.center.y, bs.center.z, bs.radius] : null, bb: bb ? [bb.min.x, bb.min.y, bb.min.z, bb.max.x, bb.max.y, bb.max.z] : null };
+  };
+  const geo = [];
+  for (const [mat, g] of raw.data.geo){
+    const key = mat === ATLAS ? -1 : MATREG.at.get(mat);
+    if (key === undefined) throw new Error('recipePack: a material made after load (id ' + mat.id + ')');
+    geo.push(packGeo(key, g));
   }
+  const sgeo = raw.data.sgeo ? packGeo(-1, raw.data.sgeo) : null;
   // (the plot's footprint and walking maps, from its geometry, made here so the page need not: people.js cellGrid takes them from the data. Not for a plot inside a megastructure, whose maps come from the megastructure)
   let grids = null; if (!raw.mega && !geoOnly){ grids = plotMaps(raw.x, raw.z, raw.data); for (const k in grids) typed(grids[k]); }
-  if (geoOnly) return { msg: { geo }, xfer: [...xfer] };   // (a plot made again for its arrays: nothing else is wanted)
-  const d = raw.data, msg = { draws: d.draws ? typed(d.draws) : null, grids, geo, fol: pk(d.fol), glows: pk(d.glows), emitters: pk(d.emitters), pads: pk(d.pads), ports: pk(d.ports), spots: pk(d.spots), fields, air: raw._air };
+  if (geoOnly) return { msg: { geo, sgeo }, xfer: [...xfer] };   // (a plot made again for its arrays: nothing else is wanted)
+  const d = raw.data, msg = { draws: d.draws ? typed(d.draws) : null, grids, geo, sgeo, fol: pk(d.fol), glows: pk(d.glows), emitters: pk(d.emitters), pads: pk(d.pads), ports: pk(d.ports), spots: pk(d.spots), fields, air: raw._air };
   for (const k of raw._written) if (k !== 'data') fields[k] = pk(raw[k]);
   return { msg, xfer: [...xfer] };
 }
@@ -144,8 +148,7 @@ function recipeUnpack(m){
     if (Array.isArray(v)) return v.map(up);
     const o = {}; for (const k in v) o[k] = up(v[k]); return o;
   };
-  const geo = new Map();
-  for (const e of m.geo){
+  const unGeo = e => {
     const g = new THREE.BufferGeometry();
     for (const k in e.attrs){ const a = e.attrs[k]; g.setAttribute(k, new THREE.BufferAttribute(a.a, a.s, a.n)); }
     if (e.index) g.setIndex(new THREE.BufferAttribute(e.index, 1));
@@ -153,11 +156,15 @@ function recipeUnpack(m){
     for (const k in e.ud) g.userData[k] = up(e.ud[k]);
     if (e.bs){ g.boundingSphere = new THREE.Sphere(new THREE.Vector3(e.bs[0], e.bs[1], e.bs[2]), e.bs[3]); }
     if (e.bb){ g.boundingBox = new THREE.Box3(new THREE.Vector3(e.bb[0], e.bb[1], e.bb[2]), new THREE.Vector3(e.bb[3], e.bb[4], e.bb[5])); }
+    return g;
+  };
+  const geo = new Map();
+  for (const e of m.geo){
     const mat = e.key === -1 ? ATLAS : MATREG.list[e.key];
     if (!mat) throw new Error('recipeUnpack: no material ' + e.key);
-    geo.set(mat, g);
+    geo.set(mat, unGeo(e));
   }
-  const data = { geo, fol: up(m.fol), glows: up(m.glows), emitters: up(m.emitters), pads: up(m.pads), ports: up(m.ports), spots: up(m.spots) };
+  const data = { geo, sgeo: m.sgeo ? unGeo(m.sgeo) : null, fol: up(m.fol), glows: up(m.glows), emitters: up(m.emitters), pads: up(m.pads), ports: up(m.ports), spots: up(m.spots) };
   const fields = {}; for (const k in m.fields) fields[k] = up(m.fields[k]);
   if (m.grids) data.grids = m.grids;
   return { data, fields, air: m.air, draws: m.draws };

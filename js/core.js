@@ -250,6 +250,9 @@ function put(geo, mat, m, lean){
       const li = b.li || (b.li = []), lr = b.lr || (b.lr = []); for (let q = 0; q < t2.length; q++) li.push(base2 + t2[q]); lr.push(base, base + nFull, base2, base2 + n2); b.ni = bp.length/3; }
   }
   if (FAR_CFG.sticks && did > 0 && LAST_STICK && atlasable(mat)){ (b.sk || (b.sk = [])).push(base, base + nFull); }
+  // the stand-in tier (round 9 item 5): a piece that is a fine detail (a stick or a tiny bit) or has no side as long as TIER.small, and gives no light, is noted so that the stand-in
+  // can leave it out (world.js standBuckets); the corners it and its lean twin took are one range
+  if (TIER.make && SIDE_SPLIT && !b.f && (did > 0 || LAST_BIG < TIER.small) && atlasable(mat)) (b.dr || (b.dr = [])).push(base, bp.length/3);
 }
 // a shape's corners, transformed, onto the end of a bucket's lists; how many
 function pushCorners(b, geo, w, m, fid, ord, did){
@@ -307,13 +310,13 @@ const fxOut = () => { throw new Error('a plot made again drew more random number
 let FX_REPLAY = null;   // set by the caller of collectGen when the draws of an earlier run are to be used again
 // Is this piece a fine detail? Sticks (two thin sides: posts, rails, cables, frames, pipes) and tiny bits
 // (small in every direction). Flat panels, with only one thin side, are kept: they read even when small.
-let LAST_STICK = false; const STICK_W = .06;
+let LAST_STICK = false, LAST_BIG = 0; const STICK_W = .06;
 function detailId(geo, m){
   let s = geo.userData._size;
   if (!s){ geo.computeBoundingBox(); const bb = geo.boundingBox; s = geo.userData._size = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z]; }
   const e = m.elements;
   const d = [Math.hypot(e[0], e[1], e[2])*s[0], Math.hypot(e[4], e[5], e[6])*s[1], Math.hypot(e[8], e[9], e[10])*s[2]].sort((a, b) => a - b);
-  LAST_STICK = d[1] < STICK_W && d[2] >= .14;   // (a long piece thin in two directions: see FAR_CFG)
+  LAST_STICK = d[1] < STICK_W && d[2] >= .14; LAST_BIG = d[2];   // (a long piece thin in two directions: see FAR_CFG; LAST_BIG: its longest side, for the stand-in tier)
   return (d[1] < .09 || d[2] < .14) ? 1 + Math.floor(fxRand()*255) : 0;
 }
 // which lights flicker: some neon, fewer lamps and trims, the odd window (Math.random, so the city's layout

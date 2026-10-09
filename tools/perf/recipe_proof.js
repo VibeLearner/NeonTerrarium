@@ -26,13 +26,15 @@ window.__proof = (() => {
       const bx = g.boundingBox; P[tag + ':bb'] = bx ? [bx.min.x, bx.min.y, bx.min.z, bx.max.x, bx.max.y, bx.max.z].join(',') : '-';
     }
     P.nGeo = n;
+    if (c.data.sgeo){ const g = c.data.sgeo, tag = 'sgeo'; for (const k of Object.keys(g.attributes).sort()){ const a = g.attributes[k]; P[tag + ':' + k] = hb(bytes(a.array)) + ':' + a.itemSize + ':' + a.normalized; } if (g.index) P[tag + ':index'] = g.index.array.constructor.name + ':' + g.index.count + ':' + hb(bytes(g.index.array)); P[tag + ':draw'] = g.drawRange.start + ',' + g.drawRange.count; P[tag + ':user'] = hs(js(g.userData)); const b = g.boundingSphere; P[tag + ':bs'] = b ? [b.center.x, b.center.y, b.center.z, b.radius].join(',') : '-'; } else P.sgeo = 'none';
     for (const k of ['fol', 'glows', 'emitters', 'pads', 'ports', 'spots']) P['data.' + k] = hs(js(c.data[k]));
     for (const k of (c._written || c._liveWritten).sort()) P['f.' + k] = hs(js(c[k]));
     P.air = String(c._airFlag ?? c._air);
     P.written = (c._written || c._liveWritten).sort().join();
     return P;
   }
-  const diff = (A, B) => { const out = []; for (const k of new Set([...Object.keys(A), ...Object.keys(B)])) if (A[k] !== B[k]) out.push(k + ' (' + A[k] + ' vs ' + B[k] + ')'); return out; };
+  // (the page's own generation makes no stand-in tier, a recipe's does: compared only where both have one)
+  const diff = (A, B) => { const out = [], nos = A.sgeo === 'none' || B.sgeo === 'none'; for (const k of new Set([...Object.keys(A), ...Object.keys(B)])){ if (nos && k.startsWith('sgeo')) continue; if (A[k] !== B[k]) out.push(k + ' (' + A[k] + ' vs ' + B[k] + ')'); } return out; };
   // a cheap fingerprint of every top-level name the page declared, to see which generation wrote to
   function fp(names){
     const o = {};
@@ -98,6 +100,7 @@ window.__proof = (() => {
     const wc = Object.assign({}, u.fields); wc.data = u.data; wc._written = Object.keys(u.fields); wc._air = u.air;
     const wParts = parts(wc); for (const g of u.data.geo.values()) g.dispose();
     const d = diff(liveParts, wParts);
+    { const sx = recipeGen(r, recipeWorld()); const sP = parts(sx); for (const g of sx.data.geo.values()) g.dispose(); if (sx.data.sgeo) sx.data.sgeo.dispose(); for (const k of diff(sP, wParts)) d.push('worker vs sandbox: ' + k); }   // (the stand-in tier too: the page makes none, the sandbox and the worker do)
     { const wg = u.data.grids; if (!!lg !== !!wg) d.push('walking maps: one side has none'); else if (lg) for (const k of ['solid', 'soft', 'high', 'mid', 'free']) if (hb(bytes(lg[k])) !== hb(bytes(wg[k]))) d.push('walking map ' + k); }
     if (liveRand !== job.rw.res.calls) d.push('random calls (' + liveRand + ' vs ' + job.rw.res.calls + ')');
     return { d, rand: liveRand };

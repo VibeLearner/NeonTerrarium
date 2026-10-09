@@ -525,6 +525,68 @@ function* sideLayoutGen(buckets, nAt, far = null){
 // run a generator to its end (the pieces that are cut into steps, run all at once)
 function drain(g){ let r; while (!(r = g.next()).done); return r.value; }
 function collect(fn){ return drain(collectGen((function*(){ fn(); })())); }
+// the atlas geometry of a plot (or of its stand-in) from buckets whose triangle lists are final (the hidden triangles last in each)
+function* atlasGen(bks){
+  let nAt = 0; for (const [mat, b] of bks) if (atlasable(mat)) nAt += b.p.length/3;
+  if (!nAt) return null;
+  const pos = new Float32Array(nAt*3), nrm = new Int8Array(nAt*4), col = new Uint8Array(nAt*3), em = new Uint8Array(nAt*4), flk = new Uint8Array(nAt), fine = new Uint8Array(nAt), ons = new Uint8Array(nAt);
+  let o = 0;
+  for (const [mat, b] of bks){
+    if (!atlasable(mat)) continue;
+    const n = b.p.length/3; pos.set(b.p, o*3); { const bn = b.n; for (let q = 0, w = o*4; q < n; q++, w += 4){ nrm[w] = Math.round(bn[q*3]*127); nrm[w + 1] = Math.round(bn[q*3 + 1]*127); nrm[w + 2] = Math.round(bn[q*3 + 2]*127); } }   // (normals as bytes: exact on axis-aligned faces, under half a degree off otherwise)
+    const r = Math.round(mat.color.r*255), gg = Math.round(mat.color.g*255), bl = Math.round(mat.color.b*255);
+    for (let i=o;i<o+n;i++){ col[i*3] = r; col[i*3+1] = gg; col[i*3+2] = bl; }
+    const k = mat.userData.glow;
+    if (k){ const er = Math.min(255, Math.round(mat.emissive.r*255)), eg = Math.min(255, Math.round(mat.emissive.g*255)), eb = Math.min(255, Math.round(mat.emissive.b*255)), ek = EM_KIND[k] || 5;
+      for (let i=o;i<o+n;i++){ em[i*4] = er; em[i*4+1] = eg; em[i*4+2] = eb; em[i*4+3] = ek; } }
+    if (b.f){ flk.set(b.f, o); ons.set(b.o, o); }
+    fine.set(b.d, o);
+    o += n;
+  }
+  let ni = 0, nh = 0; for (const [mat, b] of bks) if (atlasable(mat)){ ni += b.i.length; nh += b.hid; }
+  let ix, cut = null;
+  let farL = null;
+  if (SIDE_SPLIT){ ({ ix, cut } = yield* sideLayoutGen(bks, nAt));
+    if ([...bks.values()].some(b => b.li || b.sk)) farL = yield* sideLayoutGen(bks, nAt, { lean: FAR_CFG.lean, sticks: FAR_CFG.sticks }); }
+  else {
+    ix = nAt > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+    let k = 0, kh = ni - nh;
+    let o2 = 0; for (const [mat, b] of bks){ if (!atlasable(mat)) continue; const I = b.i, nv = I.length - b.hid;
+      for (let q = 0; q < nv; q++) ix[k++] = I[q] + o2;
+      for (let q = nv; q < I.length; q++) ix[kh++] = I[q] + o2;
+      o2 += b.p.length/3; }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 4, true)); g.setIndex(new THREE.BufferAttribute(ix, 1));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); g.setAttribute('aEm', new THREE.BufferAttribute(em, 4, true));
+  g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aFine', new THREE.BufferAttribute(fine, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1, true));
+  if (cut){ g.userData.cut = cut; g.setDrawRange(0, cutRest(cut)); if (farL) g.userData.far = farL; }   // (A, H, S and D: see sideArc; far: the second order, see sideLayoutGen)
+  else if (nh) g.userData.shown = ni - nh;   // (the hidden triangles come after this many indices: see hideBefore)
+  return g;
+}
+// The stand-in tier (round 9 item 5, a cheat): the buckets again without the pieces put() noted as small (b.dr: ranges of corners; lights are never in them). The kept pieces' corners
+// are packed together, their triangle lists (hidden ones last) and far-order lists follow. A bucket with nothing dropped is shared as it is. null when nothing is left out.
+const TIER = { make: false, small: .30 };   // (make: only while a plot is made from a recipe, see recipeGen: the page's own generation steps are left as they were)
+function standBuckets(bks){
+  let any = false; const out = new Map();
+  for (const [mat, b] of bks){
+    if (!atlasable(mat) || !b.dr || !b.dr.length){ out.set(mat, b); continue; }
+    any = true;
+    const n = b.p.length/3, keep = new Uint8Array(n).fill(1);
+    for (let q = 0; q < b.dr.length; q += 2) keep.fill(0, b.dr[q], b.dr[q + 1]);
+    const map = new Int32Array(n); let m = 0; for (let v = 0; v < n; v++) map[v] = keep[v] ? m++ : -1;
+    if (!m) continue;
+    const nb = { p: new Array(m*3), n: new Array(m*3), d: new Array(m), f: null, o: null, i: [], hid: 0, ni: m };
+    for (let v = 0, w = 0; v < n; v++) if (keep[v]){ const a = v*3, c = w*3; nb.p[c] = b.p[a]; nb.p[c + 1] = b.p[a + 1]; nb.p[c + 2] = b.p[a + 2]; nb.n[c] = b.n[a]; nb.n[c + 1] = b.n[a + 1]; nb.n[c + 2] = b.n[a + 2]; nb.d[w] = b.d[v]; w++; }
+    const I = b.i, vis = I.length - b.hid;
+    for (let t = 0; t + 2 < I.length; t += 3){ if (t === vis) nb.hid = 0; const a = I[t], c = I[t + 1], e = I[t + 2]; if (keep[a] && keep[c] && keep[e]){ nb.i.push(map[a], map[c], map[e]); if (t >= vis) nb.hid += 3; } }
+    if (b.li){ nb.li = []; for (let t = 0; t + 2 < b.li.length; t += 3){ const a = b.li[t], c = b.li[t + 1], e = b.li[t + 2]; if (keep[a] && keep[c] && keep[e]) nb.li.push(map[a], map[c], map[e]); } }
+    if (b.lr){ nb.lr = []; for (let q = 0; q + 3 < b.lr.length; q += 4) if (keep[b.lr[q]]) nb.lr.push(map[b.lr[q]], map[b.lr[q + 1] - 1] + 1, map[b.lr[q + 2]], map[b.lr[q + 3] - 1] + 1); }
+    if (b.sk){ nb.sk = []; for (let q = 0; q + 1 < b.sk.length; q += 2) if (keep[b.sk[q]]) nb.sk.push(map[b.sk[q]], map[b.sk[q + 1] - 1] + 1); }
+    out.set(mat, nb);
+  }
+  return any ? out : null;
+}
 // the same, a step at a time (body: a generator that yields between its steps): see stageStart
 function* collectGen(body){
   FAR_CFG.lean = !!(PH.tests.leanRound || window.__LEAN_ROUND); FAR_CFG.sticks = !!(PH.tests.thinSticks || window.__THIN_STICKS);   // (both off unless the tests are on)
@@ -534,49 +596,19 @@ function* collectGen(body){
   yield* body; yield;
   const covers = curCover; curCover = null;
   const geo = new Map();
-  let nAt = 0;
+  let nAt = 0, sg = null;
   for (const [mat, b] of buckets){ if (atlasable(mat)) nAt += b.p.length/3; else geo.set(mat, bucketGeometry(b)); }
   if (nAt){
-    const pos = new Float32Array(nAt*3), nrm = new Int8Array(nAt*4), col = new Uint8Array(nAt*3), em = new Uint8Array(nAt*4), flk = new Uint8Array(nAt), fine = new Uint8Array(nAt), ons = new Uint8Array(nAt);
-    let o = 0;
-    for (const [mat, b] of buckets){
-      if (!atlasable(mat)) continue;
-      const n = b.p.length/3; pos.set(b.p, o*3); { const bn = b.n; for (let q = 0, w = o*4; q < n; q++, w += 4){ nrm[w] = Math.round(bn[q*3]*127); nrm[w + 1] = Math.round(bn[q*3 + 1]*127); nrm[w + 2] = Math.round(bn[q*3 + 2]*127); } }   // (normals as bytes: exact on axis-aligned faces, under half a degree off otherwise)
-      const r = Math.round(mat.color.r*255), gg = Math.round(mat.color.g*255), bl = Math.round(mat.color.b*255);
-      for (let i=o;i<o+n;i++){ col[i*3] = r; col[i*3+1] = gg; col[i*3+2] = bl; }
-      const k = mat.userData.glow;
-      if (k){ const er = Math.min(255, Math.round(mat.emissive.r*255)), eg = Math.min(255, Math.round(mat.emissive.g*255)), eb = Math.min(255, Math.round(mat.emissive.b*255)), ek = EM_KIND[k] || 5;
-        for (let i=o;i<o+n;i++){ em[i*4] = er; em[i*4+1] = eg; em[i*4+2] = eb; em[i*4+3] = ek; } }
-      if (b.f){ flk.set(b.f, o); ons.set(b.o, o); }
-      fine.set(b.d, o);
-      o += n;
-    }
-    // the triangles: each bucket's indices, moved along by where its corners landed; first every bucket's visible ones (in
-    // their order), then the hidden ones (drawn only while the piece is being swept in or out: see hideCovered)
-    let ni = 0, nh = 0; const C = prepCovers(covers); for (const [mat, b] of buckets) if (atlasable(mat)){ bucketIndexUpTo(b); hideCovered(b, C); ni += b.i.length; nh += b.hid; yield; }
-    let ix, cut = null;
-    let farL = null;
-    if (SIDE_SPLIT){ ({ ix, cut } = yield* sideLayoutGen(buckets, nAt));
-      if ([...buckets.values()].some(b => b.li || b.sk)) farL = yield* sideLayoutGen(buckets, nAt, { lean: FAR_CFG.lean, sticks: FAR_CFG.sticks }); }
-    else {
-      ix = nAt > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
-      let k = 0, kh = ni - nh;
-      let o2 = 0; for (const [mat, b] of buckets){ if (!atlasable(mat)) continue; const I = b.i, nv = I.length - b.hid;
-        for (let q = 0; q < nv; q++) ix[k++] = I[q] + o2;
-        for (let q = nv; q < I.length; q++) ix[kh++] = I[q] + o2;
-        o2 += b.p.length/3; }
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 4, true)); g.setIndex(new THREE.BufferAttribute(ix, 1));
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); g.setAttribute('aEm', new THREE.BufferAttribute(em, 4, true));
-    g.setAttribute('aFlk', new THREE.BufferAttribute(flk, 1)); g.setAttribute('aFine', new THREE.BufferAttribute(fine, 1)); g.setAttribute('aOn', new THREE.BufferAttribute(ons, 1, true));
-    if (cut){ g.userData.cut = cut; g.setDrawRange(0, cutRest(cut)); if (farL) g.userData.far = farL; }   // (A, H, S and D: see sideArc; far: the second order, see sideLayoutGen)
-    else if (nh) g.userData.shown = ni - nh;   // (the hidden triangles come after this many indices: see hideBefore)
-    geo.set(ATLAS, g);
+    // the triangles: each bucket's indices, first every bucket's visible ones (in their order), then the hidden ones (drawn only while the piece is being swept in or out: see hideCovered)
+    const C = prepCovers(covers); for (const [mat, b] of buckets) if (atlasable(mat)){ bucketIndexUpTo(b); hideCovered(b, C); yield; }
+    geo.set(ATLAS, yield* atlasGen(buckets));
+    // the stand-in: the same plot without its small pieces, laid out the same way (no random draws: it is cut from what was just made)
+    if (SIDE_SPLIT && TIER.make){ const sb = standBuckets(buckets); if (sb) sg = yield* atlasGen(sb); }
   }
   for (const g of geo.values()){ g.computeBoundingSphere(); g.computeBoundingBox(); }   // (the box too: world.add and remove note a plot's box for the static cache, and a plot whose arrays were let go should not need them for it)
   const fol = {}; for (const k in FOL_LIST) if (FOL_LIST[k].length) fol[k] = FOL_LIST[k];
-  const out = { geo, fol, glows: glowList, emitters, pads: carPads, ports: curPorts, spots: curSpots, draws: FX.rec ? Float64Array.from(FX.rec) : null };
+  if (sg){ sg.computeBoundingSphere(); sg.computeBoundingBox(); }
+  const out = { geo, sgeo: sg, fol, glows: glowList, emitters, pads: carPads, ports: curPorts, spots: curSpots, draws: FX.rec ? Float64Array.from(FX.rec) : null };
   FX = null; glowList = null; buckets = new Map(); curSpots = null;
   return out;
 }
@@ -1702,11 +1734,12 @@ function* rebuildSolidGen(key){
   for (const [mat, list] of byMat){
     if (list.length < 2) continue;   // (nothing to gain)
     list.sort((a, b) => a.id - b.id);   // (in the order three would have drawn them one by one: where two pieces meet at exactly the same depth, the same one wins)
-    const cutting = list.some(o => o.geometry.userData.cut);
-    const merged = cutting ? yield* mergeCutGen(list.map(o => o.geometry)) : yield* mergeIndexedGen(list.map(o => o.geometry)); if (!merged) continue;
+    const gs = list.map(memberGeo);   // (a plot at the stand-in tier gives its stand-in geometry: item 5)
+    const cutting = gs.some(g => g.userData.cut);
+    const merged = cutting ? yield* mergeCutGen(gs) : yield* mergeIndexedGen(gs); if (!merged) continue;
     dropCpuCopy(merged);
     let mergedFar = null;
-    if (cutting && list.some(o => o.geometry.userData.far)){ mergedFar = yield* mergeCutGen(list.map(o => o.geometry), true, merged); if (mergedFar) dropCpuCopy(mergedFar, true); }   // (the second order, drawn from far away: sharing the corners)
+    if (cutting && gs.some(g => g.userData.far)){ mergedFar = yield* mergeCutGen(gs, true, merged); if (mergedFar) dropCpuCopy(mergedFar, true); }   // (the second order, drawn from far away: sharing the corners)
     const cellsOf = list.map(o => o.userData.cell); merged.userData.pieceCells = cellsOf; geoms.push(merged); if (mergedFar){ mergedFar.userData.pieceCells = cellsOf; geoms.push(mergedFar); }
     const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.blockKey = key;   // (the glow overlay is batched by it: see ovBatch)
     mesh.userData.sortId = list[0].id;   // (drawn where its first piece would have been: see the opaque sort below)
@@ -1725,6 +1758,27 @@ function* rebuildSolidGen(key){
   for (const o of farMeshes){ FAR_MESHES.add(o); } if (farMeshes.length) FARM.stamp++;
   world.add(g); solidRegions.set(key, { group: g, members, far: farMeshes, geoms });
 }
+// ---- the stand-in tier (round 9 item 5, a cheat) ----
+// A plot is drawn either full (its own geometry) or as a stand-in (the same plot without its small pieces: standBuckets), by block: what a plot gives to its block's merge is the
+// geometry of its tier. Tests: "full detail everywhere (as before)" (tierOff) and "stand-ins everywhere" (tierAll, for measuring).
+TIER.on = () => !(PH.tests.tierOff || window.__TIER_OFF);
+TIER.all = () => !!(PH.tests.tierAll || window.__TIER_ALL);
+const tierOf = c => TIER.on() && TIER.all() ? 'stand' : 'full';
+function memberGeo(o){
+  const c = o.userData.cell, d = c && c.data;
+  if (d && o.geometry === d.geo.get(ATLAS) && tierOf(c) === 'stand'){ const sg = d.sgeo || standEnsure(c); if (sg) return sg; }
+  return o.geometry;
+}
+// a plot's stand-in, made on the page from its recipe (the worker does it ahead of time when the policy asks: see recipe.js)
+function standEnsure(c){
+  const d = c.data; if (!d || !d.rec || !d.rec.r || d.sgeo) return d && d.sgeo || null;
+  const prev = stageCap();
+  let nd; try { nd = recipeGen(Object.assign({}, d.rec.r, { draws: d.rec.draws }), recipeWorld()).data; } finally { stageApply(prev); }
+  d.sgeo = nd.sgeo; for (const g of nd.geo.values()) g.dispose();
+  return d.sgeo;
+}
+// every block merged again (a tier changed for some)
+function tierApply(){ const ks = new Set(); for (const c of cells.values()) ks.add(mergeKey(c.i, c.j)); for (const k of ks){ solidAbort(k); solidDirty.add(k); } }
 // A region's merged geometry is read by nothing once it is on the card (the merge copies from the plots' own geometry, which stays; picking tests boxes; the glow overlay is cut from it before the first draw),
 // so its CPU arrays are let go right after their upload: they were 1.2 GB of the 3 GB heap in the biggest city. (Overlay test "keep the CPU copies of merged geometry" switches it off.)
 function dropCpuCopy(geo, indexOnly = false){

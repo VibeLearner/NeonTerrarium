@@ -1555,7 +1555,8 @@ function rebuildCellPost(c){
 const LATER = []; const later = (fn, n = 1) => { if (PH.tests.alertNow || window.__ALERT_NOW) fn(); else LATER.push({ fn, n }); };
 function runLater(){ for (let i = 0; i < LATER.length; i++){ const e = LATER[i]; if (--e.n <= 0){ LATER.splice(i--, 1); e.fn(); } } }
 let STAGE = null; const STAGE_Q = [], STAGE_READY = []; let FRAME_WORK = 0, SOLID_WAIT = 0;   // (FRAME_WORK: milliseconds of the spread work done this frame, so the region merge, a step of its own, waits for a quieter frame)
-const stageNow = () => (window.__realNow ? window.__realNow() : performance.now());
+let _stageTick = 0;
+const stageNow = () => window.__realNow ? ++_stageTick : performance.now();   // (under the test harness, whose clock is scripted, a step budget counts steps, so two runs do the same)
 const STAGE_ON = () => !(PH.tests.stageNow || window.__STAGE_NOW);
 const FOL_KEYS = Object.keys(SPR.size);
 const stageCap = () => ({ R, buckets, emitters, carPads, curPorts, glowList, curSpots, curCover, fol: FOL_KEYS.map(k => FOL_LIST[k]), DARK, SIDE_SPLIT, PUT_KEEPOUT, STAGE });

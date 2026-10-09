@@ -217,8 +217,16 @@
     const deg2m = d => J.degreeMidi(tonicMidi, scaleName, Math.round(d));
     const foldMidi = m => { while (m > hi) m -= 12; while (m < lo) m += 12; return m; };
     // candidate pitches for every onset
+    // the whole phrase moves by octaves as one piece, so the contour of the motif is kept; only a stray note is folded alone
+    const raws = onsets.map(o => deg2m(o.targetDeg));
+    let shift = 0;
+    if (raws.length) {
+      const mid = (Math.min.apply(null, raws) + Math.max.apply(null, raws)) / 2, want = (lo + hi) / 2 - 3;
+      shift = 12 * Math.round((want - mid) / 12);
+    }
+    const shiftDeg = 7 * shift / 12;
     const cand = onsets.map((o, i) => {
-      const tm = foldMidi(deg2m(o.targetDeg));
+      const tm = foldMidi(raws[i] + shift);
       const pcs = o.scale.set;
       let list = [];
       for (let m = Math.max(lo, tm - 8); m <= Math.min(hi, tm + 8); m++) if (pcs.has(m % 12)) list.push(m);
@@ -232,7 +240,7 @@
       let cost = 0;
       if (o.strong || o.cadence) cost += ct ? 0 : (av ? 30 : 2.4); else cost += ct ? 0 : (av ? 5 : 0.5);
       if (o.last || o.cadence) cost += ct ? 0 : 20;
-      const dg = Math.abs(J.midiToDeg(tonicMidi, scaleName, m) - o.targetDeg);
+      const dg = Math.abs(J.midiToDeg(tonicMidi, scaleName, m) - (o.targetDeg + shiftDeg));
       cost += Math.min(7, dg) * 0.9;
       if (o.pref !== undefined && m !== o.pref) cost += 3.2;                      // the hook returns on the pitches it had before
       cost += (u(seedKey, 'tie', i, m) * 0.12);

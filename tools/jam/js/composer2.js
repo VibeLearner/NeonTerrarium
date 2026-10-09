@@ -287,7 +287,7 @@
         const vel = clamp((kind === 'drop' || kind === 'chorus' ? 0.5 : 0.75) * (0.5 + 0.7 * e) * (1 + 0.3 * eff.emo), 0.2, 1) / Math.sqrt(3);
         sec.padEv[f.bar].push({
           l: 'pads', k: 'note', s: f.s0, d: end - f.a0, notes: [m], v: vel, shimmer: vi === voicings[i].length - 1 ? eff.synth : 0,
-          attack: i === 0 ? (kind === 'build' || kind === 'swell' ? 0.9 : 0.5) : J.RING.padXfade, release: atEnd ? 0.16 : J.RING.padXfade,
+          attack: i === 0 ? (kind === 'build' || kind === 'swell' ? 0.9 : 0.5) : J.RING.padXfade, release: atEnd ? 0.07 : J.RING.padXfade,
         });
       });
     });
@@ -295,11 +295,14 @@
     // ---- guide-tone line and keys voicings
     sec.guide = []; sec.keysLow = [];
     let gp = st.guidePrev, kp = st.keysPrev;
-    sec.flat.forEach(f => {
-      gp = guideTone(f.seg.chord, gp); sec.guide.push(gp);
+    const clashWith = (m, list) => list.some(x => Math.abs(m - x) === 1 || Math.abs(m - x) === 13);
+    sec.flat.forEach((f, fi) => {
+      gp = guideTone(f.seg.chord, gp);
+      if (clashWith(gp, voicings[fi])) { const alt = [gp - 12, gp + 12].find(m => m >= J.BANDS.keys[0] && m <= J.BANDS.keys[1] && !clashWith(m, voicings[fi])); if (alt !== undefined) gp = alt; }
+      sec.guide.push(gp);
       const lo = J.BANDS.keys[0];
       let low = J.voice(f.seg.chord, kp, { lo, hi: Math.max(lo + 7, gp - 3), n: 3, includeRoot: profile !== 'jazz' });
-      low = low.filter(m => m < gp - 1);
+      low = low.filter(m => m < gp - 1 && !clashWith(m, voicings[fi]));
       { const keep = []; low.concat([gp]).sort((a, b2) => a - b2).forEach(m => { if (!keep.some(k => Math.abs(m - k) === 1 || Math.abs(m - k) === 13)) keep.push(m); else if (m === gp) { const j = keep.findIndex(k => Math.abs(m - k) === 1 || Math.abs(m - k) === 13); keep.splice(j, 1); keep.push(m); } }); low = keep.filter(m => m !== gp); }
       kp = low.length ? low : kp; sec.keysLow.push(low);
     });
@@ -782,7 +785,7 @@
 
     // ---- damp plucks that do not belong to a new chord
     segs.forEach((sg, i) => {
-      const newChord = i > 0 || barNo === 0 || sec.bc[barNo].root !== sec.bc[barNo - 1].root || sec.bc[barNo].base !== sec.bc[barNo - 1].base || sec.segs[barNo - 1][sec.segs[barNo - 1].length - 1].root !== sg.root;
+      const newChord = i > 0 || barNo === 0 || sec.segs[barNo - 1][sec.segs[barNo - 1].length - 1].pcs.join() !== sg.pcs.join();
       if (newChord) ev.push({ l: 'fx', k: 'damp', s: sg.s0, pcs: sg.pcs });
     });
 
@@ -818,6 +821,11 @@
         if (n.t === 'approach') { n.s = Math.max(0, steps - 2); n.d = 1.7; }       // the approach note lives on the last eighth only
         if (n.s >= steps) return;
         const sg = segAt(n.s), chord = sg.chord, tones = chord.tones;
+        { // a bass note never holds into the next chord (inside the bar or across the barline)
+          const nx0 = barNo + 1 < sec.bars ? sec.segs[barNo + 1][0] : null;
+          const edge = sg.s1 < steps ? sg.s1 : (nx0 && nx0.pcs.join() !== sg.pcs.join() ? steps : 1e9);
+          if (n.t !== 'approach' && n.s + n.d > edge - 0.1) n.d = Math.max(0.8, edge - n.s - 0.3);
+        }
         let pc = rootsOf(sg);
         if (n.t === 'fifth') pc = (chord.root + (tones.includes(6) && !tones.includes(7) ? 6 : 7)) % 12;
         else if (n.t === 'b7') pc = (chord.root + (tones.includes(11) ? 11 : 10)) % 12;
@@ -842,11 +850,12 @@
         ev.push(Object.assign({ _sg: sg, _t: n.t, l: 'bass', k: 'note', s: n.s, d: n.d, n: midi, v: vel, mode: bmode, glideFrom: (bmode === 'sub' && lastMidi && lastMidi !== midi && n.s === 0 && Math.abs(lastMidi - midi) < 8 && kind !== 'drop') ? lastMidi : undefined }, x));
         lastMidi = midi;
       });
+      { const bl = bassEvs.map(i => ev[i]).sort((a, b) => a.s - b.s); for (let i = 0; i + 1 < bl.length; i++) if (bl[i].s + bl[i].d > bl[i + 1].s - 0.1) bl[i].d = Math.max(0.6, bl[i + 1].s - bl[i].s - 0.3); }
       // no parallel fifths or octaves between the lead and the bass: change the later bass note to another chord tone
       {
         const leadNow = L.lead ? phr.leadEv.filter(x => x.bar === barNo && !x.hv).sort((a, b) => a.s - b.s) : [];
         const seq = (st.prevLead ? [st.prevLead] : []).concat(leadNow.map(x => ({ m: x.n, s: x.s })));
-        const bassList = (st.prevBassTail ? [{ s: -999, n: st.prevBassTail }] : []).concat(bassEvs.map(i => ev[i])).sort((a, b) => a.s - b.s);
+        const bassList = (st.prevBass || []).concat(bassEvs.map(i => ev[i])).sort((a, b) => a.s - b.s);
         const bassAt = t => { let r = null; for (const b of bassList) { if (b.s <= t + 0.01) r = b; else break; } return r; };
         const under = fi_ => []; 
         for (let i = 1; i < seq.length; i++) {
@@ -870,10 +879,10 @@
         bassEvs.forEach(i => { delete ev[i]._sg; delete ev[i]._t; });
         const lastLeadN = leadNow.length ? leadNow[leadNow.length - 1] : null;
         st.prevLead = lastLeadN ? { m: lastLeadN.n, s: lastLeadN.s - steps } : null;
-        const lb = bassEvs.length ? ev[bassEvs[bassEvs.length - 1]] : null;
-        st.prevBassTail = lb ? lb.n : st.prevBassTail;
+        const lb = bassEvs.length ? bassEvs.map(i => ev[i]).sort((a, b) => a.s - b.s).pop() : null;
+        st.prevBass = bassEvs.length ? bassEvs.map(i => ({ s: ev[i].s - steps, n: ev[i].n })) : (st.prevBass || []).map(x => ({ s: x.s - steps, n: x.n })).slice(-1);
       }
-      st.bassMidi = bassEvs.length ? ev[bassEvs[bassEvs.length - 1]].n : lastMidi;
+      st.bassMidi = bassEvs.length ? bassEvs.map(i => ev[i]).sort((a, b) => a.s - b.s).pop().n : lastMidi;
     }
 
     // ---- keys (planned for the section)

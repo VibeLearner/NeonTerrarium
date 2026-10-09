@@ -174,7 +174,7 @@
     for (let k = 1; k < tl.length; k++) {
       const prev = tl[k - 1].seg, cur = tl[k].seg, b = tl[k].s0;
       if (prev.root === cur.root && prev.pcs.join() === cur.pcs.join()) continue;
-      const sps = spsAt(b);
+      const sps = spsAt(b - 0.5);       // a note's length was converted to steps with the clock of the bar it started in, so the tolerance uses that same clock
       for (const n of notes) {
         if (n.layer !== 'pads' && n.layer !== 'keys' && n.layer !== 'twinkle') continue;
         if (n.s >= b - 0.01 || n.e <= b + tol / sps) continue;

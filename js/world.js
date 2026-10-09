@@ -165,6 +165,7 @@ function pieceVis(P){
   if (P.stamp === CULL.stamp) return P.seen;
   const pl = CULL.pl, pad = CULL.pad, b = P.box, v = P.vis; let seen = 0;
   for (let i = 0; i < P.n; i++){
+    if (P.hide && P.hide[i]){ v[i] = 0; continue; }   // (a plot changed since the block was merged: its own meshes draw it)
     const o = i*6; let ok = 1;
     for (let q = 0; q < 24; q += 4){ const nx = pl[q], ny = pl[q + 1], nz = pl[q + 2];   // (the corner furthest along the plane's normal)
       if (nx*(nx > 0 ? b[o + 1] : b[o]) + ny*(ny > 0 ? b[o + 3] : b[o + 2]) + nz*(nz > 0 ? b[o + 5] : b[o + 4]) + pl[q + 3] < -pad){ ok = 0; break; } }
@@ -356,7 +357,10 @@ function ovAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = Infinit
 const OVB = 4, ovBlocks = new Map(), ovBatches = new Map(), ovDirty = new Set(); let ovModeNow = null;
 const ovPerBlock = () => !!(PH.tests.ovPerBlock || window.__OV_PER_BLOCK);
 const ovSuperKey = k => { const c = k.indexOf(','); return Math.floor(+k.slice(0, c)/OVB) + ',' + Math.floor(+k.slice(c + 1)/OVB); };
-function ovRegister(key, ov, rs){ let l = ovBlocks.get(key); if (!l) ovBlocks.set(key, l = []); l.push({ ov, rs }); ovDirty.add(ovSuperKey(key)); }
+// (a block's new overlays wait in ovNext while it is merged in steps; the old ones stay in their batch until ovCommit, in the frame of the swap)
+const ovNext = new Map();
+function ovRegister(key, ov, rs){ let l = ovNext.get(key); if (!l) ovNext.set(key, l = []); l.push({ ov, rs }); }
+function ovCommit(key){ const l = ovNext.get(key); ovNext.delete(key); if (l){ ovBlocks.set(key, l); ovDirty.add(ovSuperKey(key)); } }
 function ovForget(key){ if (ovBlocks.delete(key)) ovDirty.add(ovSuperKey(key)); }
 function ovFlush(){
   const per = ovPerBlock();
@@ -1444,11 +1448,11 @@ function cellView(c){
   if (!c.data) return;
   const g = new THREE.Group();
   for (const [m, geo] of c.data.geo){
-    const mesh = new THREE.Mesh(geo, m);
+    const mesh = new THREE.Mesh(geo, m); mesh.userData.cell = c;
     if (m.userData.colorOnly){ mesh.layers.set(1); mesh.renderOrder = 2; } else { mesh.castShadow = !m.userData.noCast; mesh.receiveShadow = true; }   // see-through glass: colour pass only
     if (geo.userData.shown !== undefined){ mesh.onBeforeRender = hideBefore; mesh.onAfterRender = hideAfter; }
     g.add(mesh);
-    if (geo.userData.cut){ mesh.onBeforeRender = cutBefore; mesh.onAfterRender = cutAfter; g.add(sideMesh(mesh)); }   // (and its walls: see sideArc)
+    if (geo.userData.cut){ mesh.onBeforeRender = cutBefore; mesh.onAfterRender = cutAfter; const sm = sideMesh(mesh); sm.userData.cell = c; g.add(sm); }   // (and its walls: see sideArc)
   }
   world.add(freezeTree(g)); c.view = g;
   markSolid(c);
@@ -1619,7 +1623,14 @@ const solidRegions = new Map(), solidDirty = new Set(), animCells = new Set();
 // (merged in blocks of MREG x MREG plots, smaller than the regions: a block is drawn whole whenever any of it is on screen)
 const MREG = 3, mergeKey = (i, j) => Math.floor(i/MREG) + ',' + Math.floor(j/MREG);
 const solidAbort = key => { if (SOLID_JOB && SOLID_JOB.key === key) SOLID_JOB = null; };   // (a block changed while it was being merged in steps: that merge is dropped, the block is merged again)
-const markSolid = c => { if (c){ const k = mergeKey(c.i, c.j); solidAbort(k); solidDirty.add(k); } };
+// A plot changed: the block's merge in steps is dropped and started again, and meanwhile the old merged block stays drawn, without the changed plot's own part (its meshes draw it)
+function solidHide(c){
+  const rec = solidRegions.get(mergeKey(c.i, c.j)); if (!rec) return;
+  for (const g of rec.geoms){ const pc = g.userData.pieceCells, P = g.userData.pcs; if (!pc || !P) continue;
+    for (let i = 0; i < pc.length; i++) if (pc[i] === c){ (P.hide || (P.hide = new Uint8Array(P.n)))[i] = 1; P.stamp = -1; } }
+  for (const m of rec.members) if (m.userData.cell === c) m.visible = !(m.userData.sideOf && m.geometry.userData.full);
+}
+const markSolid = c => { if (c){ const k = mergeKey(c.i, c.j); solidAbort(k); solidHide(c); solidDirty.add(k); } };
 // every merge block that overlaps a region (REG x REG plots)
 function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
   for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++){ solidAbort(i + ',' + j); solidDirty.add(i + ',' + j); } }
@@ -1649,15 +1660,16 @@ function solidStep(ms){
   FRAME_WORK += stageNow() - t0;
 }
 function* rebuildSolidGen(key){
-  solidRemoveOld(key);
+  // the old merged block stays drawn while the new one is made; at the last step the old goes and the new comes in, in the same frame
   const byMat = new Map(), members = [];
+  ovNext.delete(key);
   for (const c of [...cells.values(), ...megas.values()]){
     if (!c.view || c.view.parent !== world || !c.view.visible || mergeKey(c.i, c.j) !== key || animCells.has(c)) continue;   // (only views actually on show)
     for (const o of c.view.children) if (mergeable(o) && !o.userData.sideOf){ let l = byMat.get(o.material); if (!l) byMat.set(o.material, l = []); l.push(o); }   // (a walls' mesh goes with its building's)
   }
-  if (!byMat.size) return;
+  if (!byMat.size){ solidRemoveOld(key); return; }
   yield;
-  const g = new THREE.Group(), farMeshes = [];
+  const g = new THREE.Group(), farMeshes = [], geoms = [], hideList = [];
   for (const [mat, list] of byMat){
     if (list.length < 2) continue;   // (nothing to gain)
     list.sort((a, b) => a.id - b.id);   // (in the order three would have drawn them one by one: where two pieces meet at exactly the same depth, the same one wins)
@@ -1666,17 +1678,22 @@ function* rebuildSolidGen(key){
     dropCpuCopy(merged);
     let mergedFar = null;
     if (cutting && list.some(o => o.geometry.userData.far)){ mergedFar = yield* mergeCutGen(list.map(o => o.geometry), true, merged); if (mergedFar) dropCpuCopy(mergedFar, true); }   // (the second order, drawn from far away: sharing the corners)
+    const cellsOf = list.map(o => o.userData.cell); merged.userData.pieceCells = cellsOf; geoms.push(merged); if (mergedFar){ mergedFar.userData.pieceCells = cellsOf; geoms.push(mergedFar); }
     const mesh = new THREE.Mesh(merged, mat); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.blockKey = key;   // (the glow overlay is batched by it: see ovBatch)
     mesh.userData.sortId = list[0].id;   // (drawn where its first piece would have been: see the opaque sort below)
     if (merged.userData.shown !== undefined){ mesh.onBeforeRender = hideBefore; mesh.onAfterRender = hideAfter; }
     g.add(mesh);
     if (cutting){ mesh.onBeforeRender = cutBefore; mesh.onAfterRender = cutAfter; const sm = sideMesh(mesh); sm.userData.sortId = list[0].userData.side ? list[0].userData.side.id : list[0].id; g.add(sm);
-      if (mergedFar){ for (const o of [mesh, sm]){ o.userData.stdGeo = merged; o.userData.farGeo = mergedFar; farMeshes.push(o); FAR_MESHES.add(o); } FARM.stamp++; } }
-    for (const o of list){ o.visible = false; members.push(o); if (o.userData.side){ o.userData.side.visible = false; members.push(o.userData.side); } }
+      if (mergedFar){ for (const o of [mesh, sm]){ o.userData.stdGeo = merged; o.userData.farGeo = mergedFar; farMeshes.push(o); } } }
+    for (const o of list){ hideList.push(o); members.push(o); if (o.userData.side){ hideList.push(o.userData.side); members.push(o.userData.side); } }
   }
-  if (!g.children.length) return;
+  if (!g.children.length){ solidRemoveOld(key); ovNext.delete(key); return; }
   yield;
-  world.add(freezeTree(g)); solidRegions.set(key, { group: g, members, far: farMeshes });
+  freezeTree(g);   // (the glow overlays of the new meshes are made here)
+  solidRemoveOld(key); ovCommit(key);   // the swap: the old block and its overlays out, the new in, the plots' own meshes hidden
+  for (const o of hideList) o.visible = false;
+  for (const o of farMeshes){ FAR_MESHES.add(o); } if (farMeshes.length) FARM.stamp++;
+  world.add(g); solidRegions.set(key, { group: g, members, far: farMeshes, geoms });
 }
 // A region's merged geometry is read by nothing once it is on the card (the merge copies from the plots' own geometry, which stays; picking tests boxes; the glow overlay is cut from it before the first draw),
 // so its CPU arrays are let go right after their upload: they were 1.2 GB of the 3 GB heap in the biggest city. (Overlay test "keep the CPU copies of merged geometry" switches it off.)
@@ -2205,7 +2222,7 @@ function startAnim(c, kind, y0, y1, zone, w, old, sound, opts = {}){
   for (const l of lines){ l.layers.set(1); l.renderOrder = 998; scene.add(l); }
   if (!opts.quiet){ if (sound) sfx.play(sound, { spread: 0 }); else sfx.play(kind === 'build' ? 'place' : 'remove'); }
   const a = { c, kind, view, old, u, mats, box, scan, foot, trail, lines, x: c.x, z: c.z, y0, by0, y1, wx, wz, t: 0, dur: opts.slow ? 4.6 : kind === 'build' ? .15 : .12, slow: !!opts.slow, bare: !!opts.bare, onEnd: opts.onEnd, cue: opts.cue, reg: regKey(c.i, c.j), held };
-  animCells.add(c); solidAbort(mergeKey(c.i, c.j)); solidRemoveOld(mergeKey(c.i, c.j)); solidDirty.add(mergeKey(c.i, c.j));   // (out of its region's merge while it animates: its own meshes show; the rest of the block is merged again at the next flush)
+  animCells.add(c); markSolid(c);   // (out of its region's merge while it animates: its own meshes show; the rest of the block is merged again at the next flush)
   anims.push(a);
   return a;
 }

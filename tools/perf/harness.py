@@ -227,6 +227,13 @@ def steps(scene):
             ('c_fast2', 24, None, 24),
             ('c_fast3', 24, None, 24),
             ('c_fast4', 8, 'applyTime = window.__at0', 6),
+            # the two flicker repros (tools/perf/flicker.py counts the frame-to-frame jumps): a building placed near the camera at night, every frame drawn while its block is merged in steps; and the hour set from Settings, night to midday
+            ('fx_night', 20, 'S.cycle = false; S.rain = false; S.hour = 22.5; zoomT = 12', 6),
+            ('fx_night2', 600, None, 4),
+            ('fx_place0', 2, "const c = [...cells.values()].filter(c => !c.mega && !c.lift && !c.sections.length).sort((p, q) => Math.hypot(p.x - camT.x, p.z - camT.z) - Math.hypot(q.x - camT.x, q.z - camT.z))[0]; if (c) addSection(c, 'mid');", 2),
+            ('fx_place1', 8, None, 8), ('fx_place2', 12, None, 12), ('fx_place3', 20, None, 20), ('fx_place4', 40, None, 40), ('fx_place5', 120, None, 6),
+            ('fx_night3', 600, 'S.hour = 22.5', 4),
+            ('fx_day0', 1, 'S.hour = 12', 1), ('fx_day1', 6, None, 6), ('fx_day2', 8, None, 8), ('fx_day3', 20, None, 20), ('fx_day4', 60, None, 6),
             ('c_opt', 12, 'S.cycle = false; S.hour = 12; S.capRes = false; zoomT = 30', 8),   # Settings, Render, Optimize framerate: the render size changes
             ('c_opt2', 80, None, 4),
             ('c_opt_off', 12, 'S.capRes = true', 8),

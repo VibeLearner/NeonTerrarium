@@ -304,7 +304,7 @@ SC.frame = function(){
   else if (!SC.ok) now = 'first draw';
   else if (!scSame(hard, SC.hard)) now = 'something it depends on changed';
   else if (scCol(px) < SC.R.x0 || scCol(px) + W > SC.R.x1 || scRow(py) < SC.R.y0 || scRow(py) + H > SC.R.y1) now = 'view left the cache';
-  else if (scDelta(soft, SC.soft) > SC_BIG) now = 'the light jumped';
+  else if (scDelta(soft, SC.soft) > SC_BIG || LIGHT_JUMP) now = 'the light jumped';
   else if (SC_EDITS !== SC.editsSeen && !scEditRect(px, py, shk, soft)) now = 'an edit: ' + SC.rectWhy;
   // Still changing from frame to frame (a turn or zoom easing in, the lights switching at dusk): the cache would be drawn again every
   // frame, which costs more than the old way. Draw the old way until the inputs hold still for a frame, then draw the cache once.

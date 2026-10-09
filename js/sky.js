@@ -89,9 +89,12 @@ function shAim(m, k = -1){
   else { const K = m.K; c.bottom = -HF + 2*HF*k/K; c.top = -HF + 2*HF*(k + 1)/K; sh._viewports[0].set(0, k/K, 1, 1/K); }
   c.updateProjectionMatrix(); sh.map = m.rt;
 }
+const shPrevDir = new THREE.Vector3(); let shHavePrev = false, LIGHT_JUMP = false;   // (LIGHT_JUMP: the sun jumped this frame; the static cache is drawn again whole, not in strips)
 function shadowFrame(){
   const sh = sun.shadow;
-  let now = shadowDirty || !shFront || shSlack(shFront) < 0; shadowDirty = false;
+  // the sun jumped (the hour set from Settings, a saved time loaded): the shadow map is drawn again at once, in this frame, with the sky and the lighting that have already switched; only the running day cycle's creep goes by background strips
+  const jump = shHavePrev && shPrevDir.distanceToSquared(shNeed.dir) > SH_SUN && !(PH.tests.slowShadowJump || window.__SLOW_SHADOW_JUMP); shPrevDir.copy(shNeed.dir); shHavePrev = true; LIGHT_JUMP = jump;
+  let now = shadowDirty || jump || !shFront || shSlack(shFront) < 0; shadowDirty = false;
   if (!now){
     // time to start the next map? (the sun moved, the box size changed, or the view has used up 40% of the room; a map
     // under way is only started again if the sun has jumped, the box size changed or the view would leave it)

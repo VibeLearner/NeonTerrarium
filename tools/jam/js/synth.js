@@ -230,6 +230,19 @@
       const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 0.13; lg.gain.value = 650;
       lfo.connect(lg); lg.connect(padFilter.detune); lfo.start();
     }
+    { // gentle parallel saturation after the pad filter (soft tanh, about a quarter wet)
+      const ws = ctx.createWaveShaper(), n = 1024, cv = new Float32Array(n);
+      for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; cv[i] = Math.tanh(x * 2.2) / Math.tanh(2.2); }
+      ws.curve = cv; ws.oversample = '2x';
+      const wet = ctx.createGain(); wet.gain.value = 0.22;
+      padFilter.connect(ws); ws.connect(wet); wet.connect(this.layers.pads.input);
+    }
+    // three slow shared drift sources (cents). Pad voices tap them, so every voice wanders on its own
+    // but there are only three oscillators in total, however many notes are held.
+    const padDrift = [0.071, 0.113, 0.169].map((hz, i) => {
+      const lfo = ctx.createOscillator(), lg = ctx.createGain();
+      lfo.frequency.value = hz; lg.gain.value = 5 + i * 1.5; lfo.connect(lg); lfo.start(); return lg;
+    });
     this.padFilter = padFilter;
     this.setPadCutoff = (hz, t, tc) => padFilter.frequency.setTargetAtTime(hz, t === undefined ? ctx.currentTime : t, tc || 0.4);
 
@@ -477,9 +490,19 @@
         if (!alloc('pads', t, t + dur + rel, g, true)) return;
         const per = vel / Math.sqrt(notes.length);
         const stop = adsr(g.gain, t, att, per * 0.26, 0.6, 0.8, dur, rel);
-        [-12, 0, 12].forEach((c, k) => {
+        // five detuned saws spread across the stereo field, each one drifting a little on its own
+        const nf = ctx.createBiquadFilter(); nf.type = 'lowpass'; nf.Q.value = 0.9;
+        const open = Math.min(9000, f * (5 + 4 * Math.min(1, vel * 2)));
+        nf.frequency.setValueAtTime(Math.max(200, open * 0.3), t);
+        nf.frequency.exponentialRampToValueAtTime(open, t + Math.min(att, 1.2));
+        nf.frequency.exponentialRampToValueAtTime(Math.max(300, open * 0.55), t + att + Math.max(0.4, dur * 0.8));
+        nf.connect(g);
+        [-14, -6, 0, 6, 14].forEach((c, k) => {
           const os = ctx.createOscillator(); os.type = 'sawtooth'; os.frequency.value = f; os.detune.value = c + (i * 1.7 % 5);
-          os.connect(g); os.start(t); os.stop(stop + 0.02); if (k === 0) dropOnEnd(os, g);
+          padDrift[(k + i) % 3].connect(os.detune);
+          const pn = ctx.createStereoPanner(); pn.pan.value = (k - 2) * 0.32;
+          const vg = ctx.createGain(); vg.gain.value = k === 2 ? 0.95 : 0.68;   // five voices sum lower than the old three, so scaled up to match
+          os.connect(vg); vg.connect(pn); pn.connect(nf); os.start(t); os.stop(stop + 0.02); if (k === 0) dropOnEnd(os, g);
         });
         if ((o.shimmer || 0) > 0.05 && i >= notes.length - 2) { // neon shimmer on the top voices
           const sh = ctx.createOscillator(), sg = ctx.createGain(); sh.type = 'triangle'; sh.frequency.value = f * 2; sh.detune.value = 4;
@@ -502,8 +525,9 @@
       if (!o.hv && lastLead && lastLead.end > t) { try { lastLead.gain.gain.cancelScheduledValues(t); lastLead.gain.gain.setTargetAtTime(0, t, 0.006); } catch (e) { } }
       if (!o.hv) lastLead = { end: end + 0.1, gain: g, f };
       const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 3.5;
-      const peakC = (o.bright || 1) * 4200;
-      lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(peakC, t + 0.03); lp.frequency.exponentialRampToValueAtTime(1500 * (o.bright || 1), t + 0.35);
+      const vsens = 0.55 + 0.9 * Math.min(1, Math.max(0, vel * 1.6));   // harder notes open the filter more
+      const peakC = (o.bright || 1) * 4200 * vsens;
+      lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(peakC, t + 0.03); lp.frequency.exponentialRampToValueAtTime(1500 * (o.bright || 1) * (0.8 + 0.4 * vsens), t + 0.35);
       const stop = adsr(g.gain, t, 0.008, vel * 0.5, 0.16, 0.65, dur, 0.1);
       const waves = o.wave === 'square' ? ['square', 'sawtooth'] : ['sawtooth', 'square'];
       waves.forEach((w, i) => {
@@ -511,7 +535,7 @@
         if (gliding) { os.frequency.setValueAtTime(startF, t); os.frequency.exponentialRampToValueAtTime(f, t + (o.glideTime || 0.05)); } else os.frequency.value = f;
         const og = ctx.createGain(); og.gain.value = i ? 0.35 : 0.65; os.connect(og); og.connect(lp);
         const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5.4;
-        lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(11, t + 0.25); lfo.connect(lg); lg.connect(os.detune);
+        lg.gain.setValueAtTime(0, t); lg.gain.setValueAtTime(0, t + 0.2); lg.gain.linearRampToValueAtTime(13, t + 0.6);   // vibrato starts late lfo.connect(lg); lg.connect(os.detune);
         os.start(t); lfo.start(t); os.stop(stop + 0.02); lfo.stop(stop + 0.02); if (i === 0) dropOnEnd(os, g);
       });
       lp.connect(g); g.connect(this.layers.lead.input);

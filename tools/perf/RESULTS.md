@@ -380,3 +380,15 @@ matrices once and are skipped afterwards (`frozenUpdate`, world.js; overlay test
 alternating A/B: the whole simulated frame is 1.8 to 2.1 ms shorter (medians 19.49 against 17.35, minimums 16.72 against 14.94). Same
 verification as above, plus the cache script on the city (edits on and off screen, dusk, night, rain, day cycle) against 1bc4451 with the
 cache on both sides.
+
+## Round 6, items 2 to 12 (overnight; the full report with checks, crops and decisions is tools/perf/OVERNIGHT.md)
+
+- Item 1 (people by on-screen size, 8d5d783): people lap, decisions out, max city, alternating A/B: zoom 30 7.16 to 5.32 ms (26% less), zoom 15 6.42 to 4.80 ms (25%); whole simulated frame 12.98 to 11.82 and 12.49 to 10.79 ms.
+- Item 2 (ring cache, 40cc6b7): panning draws only the leading strip; no seams; residue as before. Item 3 (d44c52e): old-way frames use the view's own projection; "copy the cache by drawing" switch for the composite question.
+- Item 4: memory, max city, 10 minutes of play: a7b4449 2,889 to 2,925 MB JS heap and 1,495 to 1,595 MB graphics; cache build 3,008 to 3,045 and 1,555 to 1,651. No growth after the first minutes; the 3 GB is the city's geometry (2.4 GB of typed arrays).
+- Item 5: 17 to 18% of building triangles are already hidden from the camera (undersides, faces inside blocks); the flat-face rule would add 0.3 to 0.5% with tie pixels: not shipped.
+- Item 6 (78966fe, 6297025): speed-based detail while turning: fast spin 26 to 52% fewer color-pass triangles, 47,817 px (5%) differ, slow turns and rest identical.
+- Item 7 (305d348): an edit redraws a rectangle of the cache instead of the whole picture; 70/70 captures identical to whole redraws and to the previous commit.
+- Item 8 (b94b439): wet reflections, mist and shafts at half resolution; with the test on, equal to the previous commit; flip: 4 to 17% of pixels differ by dither-sized amounts.
+- Items 9, 10: custom shapes are 29.8% of the triangles put (rounded boxes 15%, cyl16 11.8%); flat detail on walls is 7 to 8% (under the 20% bar).
+- Items 11, 12: main-thread spread and the collision pass's every-N-th-frame spike; zoom 60 table; the cache frame's live pass holds 1.16 million triangles at zoom 30.

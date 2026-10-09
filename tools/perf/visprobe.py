@@ -7,8 +7,8 @@ A sampled test (a triangle under a pixel can be missed, so small ones are report
 import argparse, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import harness as H
-JS = r"""async ([zoomV, R, nyaw, pitches]) => {
-  SC.mode = 'off';
+JS = r"""async ([zoomV, R, nyaw, pitches, at]) => {
+  SC.mode = 'off'; if (at){ camGoal.set(at[0], 0, at[1]); camT.copy(camGoal); __perf.cap(3, 0); }
   const tris = [];   // {g, seg, ...} per triangle in the pieces' lists: A, H, S (D is a repeat)
   const pos = [], col = []; let total = 0;
   const info = [];   // per triangle: seg (0 A, 1 H, 2 S), area, cx, cz, cy, mat name, piece index
@@ -60,11 +60,11 @@ JS = r"""async ([zoomV, R, nyaw, pitches]) => {
   return out;
 }"""
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser(); ap.add_argument('scene'); ap.add_argument('--zoom', type=float, default=30); ap.add_argument('--radius', type=float, default=5); ap.add_argument('--yaws', type=int, default=12)
+    ap = argparse.ArgumentParser(); ap.add_argument('scene'); ap.add_argument('--zoom', type=float, default=30); ap.add_argument('--radius', type=float, default=5); ap.add_argument('--yaws', type=int, default=12); ap.add_argument('--at', type=float, nargs=2, default=None)
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
     srv = H.serve(); url = H.make_site('vp', None); sc = H.load_scenes([a.scene])[0]
     with sync_playwright() as pw:
         br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[1], 'off')
-        print(json.dumps(pg.evaluate(JS, [a.zoom, a.radius, a.yaws, [12, 45, 82]]), indent=1)); print(errs[:2]); br.close()
+        print(json.dumps(pg.evaluate(JS, [a.zoom, a.radius, a.yaws, [12, 45, 82], a.at]), indent=1)); print(errs[:2]); br.close()
     srv.shutdown()

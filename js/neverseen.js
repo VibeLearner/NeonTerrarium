@@ -112,34 +112,41 @@ function nvFinish(job){
   nvFree(job); return never;
 }
 function nvFree(job){ if (job.ig) job.ig.dispose(); if (job.rtId) job.rtId.dispose(); if (job.acc) job.acc.dispose(); job.ig = job.rtId = job.acc = null; }
-// ---- the layout again with some triangles moved to H (the order inside each list stays as it was, so the sizes stay sorted) ----
-function nvRelayout(g, tri, never){
-  const cut = g.userData.cut, I = g.index.array, P = g.attributes.position.array, nT = tri.length;
-  const hideAt = new Map(); for (let t = 0; t < nT; t++) if (never[t]) hideAt.set(tri[t], 1);
+// ---- the layout again with some triangles moved to H (the order inside each list stays as it was, so the sizes stay sorted). Done for the plot's own order and for its second one (sideLayoutGen's far),
+// a triangle being the same one by its three corners. ----
+const nvKey = (a, b, c) => a < b ? (b < c ? a + '|' + b + '|' + c : (a < c ? a + '|' + c + '|' + b : c + '|' + a + '|' + b)) : (a < c ? b + '|' + a + '|' + c : (b < c ? b + '|' + c + '|' + a : c + '|' + b + '|' + a));
+function nvRelayoutOne(g, I, cut, hide){
+  const P = g.attributes.position.array, far = !!cut.offT;
   const edge = k => { const a = I[k]*3, b = I[k + 1]*3, c = I[k + 2]*3; return Math.max(Math.hypot(P[b] - P[a], P[b + 1] - P[a + 1], P[b + 2] - P[a + 2]), Math.hypot(P[c] - P[a], P[c + 1] - P[a + 1], P[c + 2] - P[a + 2]), Math.hypot(P[c] - P[b], P[c + 1] - P[b + 1], P[c + 2] - P[b + 2])); };
-  const Al = [], Hl = [], Sl = Array.from({ length: SIDE_K }, () => []), cls = new Int32Array((1 + SIDE_K)*SMALL_N);
+  const Al = [], Hl = [], Sl = Array.from({ length: SIDE_K }, () => []), Tl = Array.from({ length: SIDE_K }, () => []), cls = new Int32Array(cut.cls.length);
   for (let k = cut.A; k < cut.A + cut.H; k++) Hl.push(I[k]);
   const take = (from, to, dst, row) => { const E = [];
-    for (let k = from; k < to; k += 3){ if (hideAt.has(k)){ Hl.push(I[k], I[k + 1], I[k + 2]); continue; } dst.push(I[k], I[k + 1], I[k + 2]); E.push(edge(k)); }
+    for (let k = from; k < to; k += 3){ if (hide.has(nvKey(I[k], I[k + 1], I[k + 2]))){ Hl.push(I[k], I[k + 1], I[k + 2]); continue; } dst.push(I[k], I[k + 1], I[k + 2]); E.push(edge(k)); }
     for (let q = 0; q < SMALL_N; q++){ let n = 0; while (n < E.length && E[n] >= SMALL_E[q]) n++; cls[row*SMALL_N + q] = n*3; } };
   take(0, cut.A, Al, 0);
-  for (let j = 0; j < SIDE_K; j++) take(cut.A + cut.H + cut.off[j], cut.A + cut.H + cut.off[j + 1], Sl[j], 1 + j);
+  const sb = cut.A + cut.H;
+  for (let j = 0; j < SIDE_K; j++) take(sb + cut.off[j], sb + cut.off[j + 1], Sl[j], 1 + j);
+  if (far){ const tb = sb + cut.off[SIDE_K]; for (let j = 0; j < SIDE_K; j++) take(tb + cut.offT[j], tb + cut.offT[j + 1], Tl[j], 1 + SIDE_K + j); }
   const off = [0]; for (const l of Sl) off.push(off[off.length - 1] + l.length);
-  const nS = off[SIDE_K], nD = off[SIDE_K/2], n = Al.length + Hl.length + nS + nD, ix = g.index.array.length > 0 && P.length/3 > 65535 ? new Uint32Array(n) : new Uint16Array(n);
-  let k = 0; for (const v of Al) ix[k++] = v; for (const v of Hl) ix[k++] = v; for (const l of Sl) for (const v of l) ix[k++] = v; for (let j = 0; j < SIDE_K/2; j++) for (const v of Sl[j]) ix[k++] = v;
-  return { ix, cut: { A: Al.length, H: Hl.length, S: nS, off, cls } };
+  const offT = [0]; for (const l of Tl) offT.push(offT[offT.length - 1] + l.length);
+  const nS = off[SIDE_K], nT = far ? offT[SIDE_K] : 0, nD = off[SIDE_K/2], nDT = far ? offT[SIDE_K/2] : 0, n = Al.length + Hl.length + nS + nT + nD + nDT, ix = P.length/3 > 65535 ? new Uint32Array(n) : new Uint16Array(n);
+  let k = 0; for (const v of Al) ix[k++] = v; for (const v of Hl) ix[k++] = v; for (const l of Sl) for (const v of l) ix[k++] = v; if (far) for (const l of Tl) for (const v of l) ix[k++] = v;
+  for (let j = 0; j < SIDE_K/2; j++) for (const v of Sl[j]) ix[k++] = v;
+  if (far) for (let j = 0; j < SIDE_K/2; j++) for (const v of Tl[j]) ix[k++] = v;
+  return { ix, cut: far ? { A: Al.length, H: Hl.length, S: nS + nT, off, offT, cls, far: true } : { A: Al.length, H: Hl.length, S: nS, off, cls } };
 }
 function nvApply(c, g, tri, never){
-  const L = nvRelayout(g, tri, never);
-  if (!g.userData.nvOrig) g.userData.nvOrig = { index: g.index, cut: g.userData.cut };
-  g.userData.nvNew = { index: new THREE.BufferAttribute(L.ix, 1), cut: L.cut };
-  c._nvGeo = g; NV.stats.plots++; NV.stats.removed += tri.length ? never.reduce((a, b) => a + b, 0) : 0; NV.stats.drawn += tri.length;
+  const I = g.index.array, hide = new Set(); for (let t = 0; t < tri.length; t++) if (never[t]){ const k = tri[t]; hide.add(nvKey(I[k], I[k + 1], I[k + 2])); }
+  const L = nvRelayoutOne(g, I, g.userData.cut, hide), F = g.userData.far ? nvRelayoutOne(g, g.userData.far.ix, g.userData.far.cut, hide) : null;
+  if (!g.userData.nvOrig) g.userData.nvOrig = { index: g.index, cut: g.userData.cut, far: g.userData.far };
+  g.userData.nvNew = { index: new THREE.BufferAttribute(L.ix, 1), cut: L.cut, far: F };
+  c._nvGeo = g; NV.stats.plots++; NV.stats.removed += never.reduce((a, b) => a + b, 0); NV.stats.drawn += tri.length;
   nvSwap(g, !NV.keep()); markSolid(c);
 }
 function nvSwap(g, removed){   // which of the two layouts the plot's geometry holds
   const o = g.userData.nvOrig, n = g.userData.nvNew; if (!o || !n) return; const want = removed ? n : o;
   if (g.index === want.index) return;
-  g.setIndex(want.index); g.userData.cut = want.cut; g.setDrawRange(0, cutRest(want.cut)); g.userData.nvOn = removed;
+  g.setIndex(want.index); g.userData.cut = want.cut; if (want.far) g.userData.far = want.far; else delete g.userData.far; g.setDrawRange(0, cutRest(want.cut)); g.userData.nvOn = removed;
 }
 // ---- the result kept between sessions: IndexedDB, one entry per plot signature (a bit for each drawn triangle) ----
 function nvDbOpen(){

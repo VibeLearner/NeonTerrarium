@@ -2270,6 +2270,7 @@ function endAnim(i){
 }
 function finishAnimsOn(c){ for (let i = anims.length - 1; i >= 0; i--) if (anims[i].c === c) endAnim(i); }
 function clearIsland(){
+  STAGE_Q.length = 0; STAGE_READY.length = 0; LATER.length = 0; SYNC_Q = null; syncPeopleAbort(); STEAM_JOB = null; if (typeof NV !== 'undefined'){ NV.queue.length = 0; if (NV.job){ nvFree(NV.job); NV.job = null; } }   // (anything still being made in steps belongs to the old city)
   while (anims.length) endAnim(anims.length - 1);
   for (const c of cells.values()){ disposeData(c.data); c.data = null; cellView(c); }
   for (const m of megas.values()){ disposeData(m.data); m.data = null; cellView(m); if (m.fx){ m.fx.dispose(); m.fx = null; } }

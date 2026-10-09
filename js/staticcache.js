@@ -307,9 +307,24 @@ SC.frame = function(){
   else if (scDelta(soft, SC.soft) > SC_BIG || LIGHT_JUMP) now = 'the light jumped';
   else if (SC_EDITS !== SC.editsSeen && !scEditRect(px, py, shk, soft)) now = 'an edit: ' + SC.rectWhy;
   // Still changing from frame to frame (a turn or zoom easing in, the lights switching at dusk): the cache would be drawn again every
-  // frame, which costs more than the old way. Draw the old way until the inputs hold still for a frame, then draw the cache once.
+  // frame, which costs more than the old way, so the old way draws. Once the inputs hold still, the new picture is drawn in strips
+  // (SC.K of them, one a frame, into the second target) while the old way still draws the frame, and it takes over when complete.
+  // (Drawing it whole on the first still frame was a frame and a half's work in one go: a hitch at the end of every turn, and on a slow
+  // mouse turn, at every pause between its moves. The test "cache drawn whole after a turn" restores that.)
   const stable = scSame(hard, SC.prev); SC.prev = hard.slice();
-  if (now === 'something it depends on changed' && SC.ok && !stable){ SC.state = 'off'; SC.why = 'changing: drawn the old way'; SC.job = null; return false; }
+  if (now === 'something it depends on changed' && SC.ok){
+    if (!stable){ SC.state = 'off'; SC.why = 'changing: drawn the old way'; SC.job = null; return false; }
+    if (!(PH.tests.wholeAfterTurn || window.__WHOLE_AFTER_TURN)){
+      if (SC.job && (!scSame(hard, SC.job.hard) || sun.shadow.map !== SC.job.map || SC.job.edits !== SC_EDITS || !SC.job.afterTurn)) SC.job = null;
+      if (!SC.job){ scJobStart(px, py, hard, soft, shk, 'after a turn or zoom'); if (SC.job) SC.job.afterTurn = true; }
+      if (SC.job){
+        scBand(SC.job); SC.job.k++;
+        if (SC.job.k < SC.job.K){ SC.state = 'off'; SC.why = 'redrawing after a turn: ' + SC.job.k + ' of ' + SC.job.K; return false; }
+        if (scCol(px) >= SC.job.ox && scCol(px) + W <= SC.job.ox + SC.w && scRow(py) >= SC.job.oy && scRow(py) + H <= SC.job.oy + SC.h){ scJobSwap(SC.job); now = ''; }
+        else SC.job = null;
+      }
+    }
+  }
   const lm = cam.layers.mask;
   if (now){ scFull(px, py, hard, soft, shk, now); }
   else {

@@ -36,3 +36,23 @@ candidates' turns; depth-tie triangles are never counted as removable). The clos
   (1) leave it; (2) a cheat: remove what a dense sampled sweep never sees (about 20% of drawn triangles), accept the rare missing speck, test "draw never-seen faces too", crops; it needs the per-piece layout change (a second index
   order, never-seen triangles moved to H, the old order restorable for the test), a GPU pass that accumulates per-triangle visibility over the views with max blending and one read-back per plot, run in idle frames, region re-merges batched (the design is worked out;
   I did not build it because it is a cheat that needs your approval first and a day of work); (3) an exact rule from geometry only (a face behind a parallel solid face that covers its whole footprint with margin) covers about half of the cases (47% of the hiders are parallel, same-facing faces) but needs the plot's solid shell, which the kit doesn't record.
+
+**2c. Custom shapes: ranked, checked, no exact fix worth shipping.** tools/perf/shapes_sites.py attributes every 40th primitive put while the max city is generated to the builder that called the kit
+(24.0 million triangles put in all; custom shapes only, share of all triangles put):
+| builder (file) | shape | share | tris each |
+|---|---|---|---|
+| pipeSeg (buildings.js) | `U.cyl16` | 8.3% | 64 |
+| lxPlate (buildings.js) | ExtrudeGeometry, rounded plate, 7 curve segments (14 a quarter turn) | 5.1% | 240 |
+| chunkBox (buildings.js) | ExtrudeGeometry (rounded box) | 2.8% | 158 |
+| slab (buildings.js) | ExtrudeGeometry (rounded slab) | 1.6% | 156 |
+| pipework (ground.js) | `U.torus` | 1.5% | 240 |
+| steamPot (mega.js) | `U.cyl16` | 1.3% | 64 |
+| pod (buildings.js) | ExtrudeGeometry | 1.2% | 177 |
+| arcBuilding (buildings.js) | ExtrudeGeometry | 1.1% | 292 |
+| annex, brutalTower, foodBowl, ring, tube, signShop, roundTower, pottedPlant, twistTower and 14 more | various | 0.1 to 0.6% each | |
+What I checked, exactly:
+- Duplicated faces (same three corners to 1e-5, same facing, same attributes, within a piece's drawn lists; a sample of 254 pieces, 2.1 million drawn triangles): 1,608 exact duplicates = 0.08%; coincident back-to-back pairs (touching faces of two blocks) 705 = 0.03%. Negligible.
+- Faces inside other faces / inside solids: the existing rule (inside a box) already puts those in H; extending it to the rounded boxes' solids (inner box inset .08 for corners and bevel) would catch 321 of the 22,867 never-seen triangles in 7 plots (0.4% of the drawn triangles). Not worth the code.
+- Faces nobody sees: bottoms of the extruded plates, rounded boxes and cylinders already face down and sit in H.
+- More segments than the outline needs at the closest zoom: a polygon with fewer sides is a different outline, so it changes pixels (the plate's 56-sided corners are over .0016 of the radius from the circle, which is under half a pixel for plates up
+  to 2 units across, but not zero); that is a cheat by the plan's own rule, item 2d. So the exact fixes are exhausted; the candidates are listed for 2d: pipeSeg and the other cyl16 (about 11% of triangles put), lxPlate and the rounded boxes (about 12%).

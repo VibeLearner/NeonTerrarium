@@ -15,7 +15,7 @@
   J.PARAM_KEYS = ['energy', 'jazz', 'math', 'emo', 'punk', 'dnb', 'synth', 'dark', 'tempoFeel', 'density'];
   J.defaultParams = function () {
     const st = G.JAM_STYLE || null;
-    const p = { energy: 0.65, jazz: 0.40, math: 0.35, emo: 0.45, punk: 0.35, dnb: 0.65, synth: 0.60, dark: 0.55, tempoFeel: 0.30, density: 0.60 };
+    const p = { energy: 0.65, jazz: 0.40, math: 0.35, emo: 0.45, punk: 0.35, dnb: 0.65, synth: 0.60, dark: 0.55, tempoFeel: 0.30, density: 0.60, bpm: 0 };
     if (st) {
       const cc = st.chord_color || {};
       // ninth + eleventh shares are the most trustworthy "jazz color" figures in the profile
@@ -73,6 +73,10 @@
   // ------------------------------------------------------------------------------------------
   // the song: key, tempo, home progressions
   // ------------------------------------------------------------------------------------------
+  // manual tempo: P.bpm of 0 means Auto (the dnb slider picks it, as in round 1)
+  J.tempoOf = function (P, autoBpm) { return P && P.bpm > 0 ? clamp(Math.round(P.bpm * 2) / 2, 60, 200) : autoBpm; };
+  // how much more or less room each step has, compared with the 174 BPM the density gates were tuned at
+  J.paceM = function (bpm) { return clamp(Math.sqrt(174 / bpm), 0.75, 1.5); };
   J.makeSong = function (seed, P) {
     const rng = J.rng(seed, 'home');
     const tonic = rng.int(0, 11);
@@ -81,7 +85,8 @@
     const st = G.JAM_STYLE;
     let lo = 170, hi = 176;
     if (st && st.tempo_fast_range) { lo = clamp(st.tempo_fast_range[0], 150, 176); hi = clamp(st.tempo_fast_range[1], lo + 4, 180); }
-    const bpm = Math.round(lerp(lo, hi, clamp(1 - (1 - P.dnb) * rng.next() * 0.9, 0, 1)) * 2) / 2;
+    const autoBpm = Math.round(lerp(lo, hi, clamp(1 - (1 - P.dnb) * rng.next() * 0.9, 0, 1)) * 2) / 2;
+    const bpm = J.tempoOf(P, autoBpm);
     const wtag = (prog, W) => prog.tags.reduce((a, t) => a + (W[t] || 0), 0.25);
     const W = { emo: P.emo * 1.2, punk: P.punk * 1.2, jazz: P.jazz * 0.9, dnb: P.dnb, synth: P.synth * 0.8, dark: P.dark, bright: 1 - P.dark };
     const mode = major ? 'major' : 'minor';
@@ -92,7 +97,7 @@
     const alt = rng.weighted(jpool, p => wtag(p, Wj) + (p.tags.includes('jazz') ? P.jazz * 2 : 0));
     const alt2 = rng.weighted(pool.filter(p => p.id !== home.id && p.id !== alt.id), p => wtag(p, W));
     const scaleName = J.scaleFor(home, J.rng(seed, 'scale'), P.dark);
-    return { seed: String(seed), tonic, major, mode, bpm, home, alt, alt2, scaleName, P0: Object.assign({}, P) };
+    return { seed: String(seed), tonic, major, mode, bpm, autoBpm, home, alt, alt2, scaleName, P0: Object.assign({}, P) };
   };
 
   // ------------------------------------------------------------------------------------------
@@ -218,7 +223,7 @@
 
   function drumsForBar(ev, sec, barNo, meter, mode, e, eff, mods, rr, info) {
     const steps = meter.steps;
-    const B = sec.brk, dens = eff.density;
+    const B = sec.brk, dens = clamp(eff.density * (sec.paceM || 1), 0, 1);
     const hs = mods.hatScale, vscale = clamp(0.55 + 0.6 * e, 0.4, 1.1);
     const add = (k, s, v, x) => { if (s >= 0 && s < steps) ev.push(Object.assign({ l: 'drums', k, s, v: clamp(v, 0.02, 1.2) }, x || {})); };
     const last = barNo === sec.bars - 1;
@@ -442,6 +447,7 @@
     this.prev = { keys: null, pad: null, bassPc: null, leadMidi: null };
     this.next = function (eff, mods) {
       if (!this.sec || this.barNo >= this.sec.bars) {
+        this.song.bpm = J.tempoOf(eff, this.song.autoBpm);
         if (this.sec) { this.idx++; if (this.idx >= this.form.length) { this.cycle++; this.idx = 0; this.form = cycleForm(this.song, eff, this.cycle); if (this.cycle > 0 && this.form[0] === 'intro') this.form.shift(); } }
         this.sec = planSection(this.song, eff, this.cycle, this.idx, this.form[this.idx], this.sec);
         this.barNo = 0;

@@ -188,6 +188,9 @@
   function planSection2(song, eff, cycle, idx, kind, st, formInfo) {
     const sec = C.planSection(song, eff, cycle, idx, kind, null);
     sec.new = true;
+    // tempo: half-time of a slow manual tempo would drag (under about 72 felt BPM), so that section stays in full time
+    if (sec.clock === 0.5 && song.bpm * 0.5 < 72) sec.clock = 1;
+    sec.paceM = J.paceM(song.bpm); sec.sm = clamp(174 / song.bpm, 0.6, 2);   // sm: seconds-based gestures (strums, slow attacks) stretch with the beat
     const tot = formInfo.total;
     sec.p0 = formInfo.starts[idx] / tot; sec.p1 = (formInfo.starts[idx] + sec.bars) / tot;
     sec.arc0 = arcAt(sec.p0); sec.arc1 = arcAt(sec.p1);
@@ -288,7 +291,7 @@
         const vel = clamp((kind === 'drop' || kind === 'chorus' ? 0.5 : 0.75) * (0.5 + 0.7 * e) * (1 + 0.3 * eff.emo), 0.2, 1) / Math.sqrt(3);
         sec.padEv[f.bar].push({
           l: 'pads', k: 'note', s: f.s0, d: end - f.a0, notes: [m], v: vel, shimmer: vi === voicings[i].length - 1 ? eff.synth : 0,
-          attack: i === 0 ? (kind === 'build' || kind === 'swell' ? 0.9 : 0.5) : J.RING.padXfade, release: atEnd ? 0.07 : J.RING.padXfade,
+          attack: i === 0 ? (kind === 'build' || kind === 'swell' ? 0.9 : 0.5) * sec.sm : J.RING.padXfade, release: atEnd ? 0.07 : J.RING.padXfade,
         });
       });
     });
@@ -460,6 +463,7 @@
       const lead = leadOnsetsByBar[q] || [];
       const rrb = J.rng(sec.rngSeed, 'twb', b);
       const segs = sec.segs[b];
+      const dn = clamp(eff.density * sec.paceM, 0, 1);
       cell.forEach((c, k) => {
         if (c.s >= steps) return;
         const beat = Math.floor(c.s / 4);
@@ -467,9 +471,9 @@
         // density budget: a busy lead thins the twinkle to downbeats, a resting lead lets it fill
         if (nLead >= 3 && c.s % 4 !== 0) return;
         if (nLead >= 1 && !c.acc && c.s % 4 !== 0) return;
-        if (style === 'sparse' && !c.acc && rrb.next() > 0.3 + 0.35 * eff.density) return;
-        if (c.pick && rrb.next() > eff.density * 0.9) return;
-        if (style === 'arp' && !c.acc && !c.pick && rrb.next() > 0.55 + 0.5 * eff.density) return;
+        if (style === 'sparse' && !c.acc && rrb.next() > 0.3 + 0.35 * dn) return;
+        if (c.pick && rrb.next() > dn * 0.9) return;
+        if (style === 'arp' && !c.acc && !c.pick && rrb.next() > 0.55 + 0.5 * dn) return;
         if ((kind === 'build' || kind === 'swell') && !c.acc && c.s % 4 !== 2 && b < sec.bars / 2) return;
         let sg = segs[0]; segs.forEach(x => { if (c.s >= x.s0) sg = x; });
         const band = J.BANDS.twinkle;
@@ -494,7 +498,7 @@
       if (newChord && (sec.keysMode === 'off' || sec.keysMode === 'stab') && eff.emo > 0.3 && u(sec.rngSeed, 'strum', b) < eff.emo * 0.9 && (kind !== 'drop' || eff.emo > 0.6) && e > 0.12 && q % 2 === 0) {
         const sg = segs[0];
         const v = J.voice(sg.chord, null, { lo: 62, hi: 79, n: 4, includeRoot: true });
-        out.push({ l: 'twinkle', k: 'strum', bar: q, s: 0, notes: v, v: 0.5 * (0.6 + 0.5 * e), cap: true });
+        out.push({ l: 'twinkle', k: 'strum', bar: q, s: 0, notes: v, v: 0.5 * (0.6 + 0.5 * e), cap: true, strum: 0.012 * sec.sm });
       }
     }
     return out;
@@ -671,6 +675,8 @@
     sec.keysEv = sec.segs.map(() => []);
     if (sec.keysMode === 'off') return;
     const kind = sec.kind, bk = sec.bridgeKind;
+    const dn = clamp(eff.density * sec.paceM, 0, 1), sm = sec.sm;
+    const sps = 60 / song.bpm / 4 / sec.clock;
     for (let b = 0; b < sec.bars; b++) {
       const meter = sec.meters[b], steps = meter.steps, segs = sec.segs[b];
       const e = eAt(sec, b, eff);
@@ -680,19 +686,19 @@
       const flatAt = s => { for (let i = 0; i < sec.flat.length; i++) { const f = sec.flat[i]; if (f.bar === b && s >= f.s0 && s < f.s1) return i; } return sec.flat.findIndex(f => f.bar === b); };
       const put = (s, dur, vel, strum) => {
         const i = flatAt(s), f = sec.flat[i];
-        const dd = Math.min(dur, f.s1 - s - 0.2);
+        const dd = Math.min(dur, f.s1 - s - 0.2 - Math.max(0, 0.18 / sps - 2.1));   // the key's 0.18 s tail is more steps at a fast tempo, so stop it earlier
         if (dd < 0.8) return;
         const notes = sec.keysLow[i].concat([sec.guide[i]]).sort((a, c) => a - c);
         sec.keysEv[b].push({ l: 'keys', k: 'chord', s, d: dd, notes, v: vel * (0.6 + 0.6 * e) * (s % 4 === 0 ? 1 : 0.85), strum, bright: 0.8 + 0.5 * eff.synth });
       };
       if (sec.keysMode === 'sustain') {
-        segs.forEach(sg => { if (sg.s1 - sg.s0 >= 4) put(sg.s0, sg.s1 - sg.s0, 0.36, 0.011); });
+        segs.forEach(sg => { if (sg.s1 - sg.s0 >= 4) put(sg.s0, sg.s1 - sg.s0, 0.36, 0.011 * sm); });
       } else if (sec.keysMode === 'comp') {
         const tpl = b % 2 ? sec.keysTpl.jazz2 : sec.keysTpl.jazz;
-        tpl.forEach((s, i) => { if (s < steps && (i === 0 || rr.next() < 0.45 + 0.55 * eff.density)) put(s, 3.2, 0.42, 0.016); });
+        tpl.forEach((s, i) => { if (s < steps && (i === 0 || rr.next() < 0.45 + 0.55 * dn)) put(s, 3.2, 0.42, 0.016 * sm); });
       } else { // stab
         const tpl = kind === 'bridge' && bk === 'math' ? meter.starts.filter((s, i) => i % 2 === 0) : sec.keysTpl.stab;
-        tpl.forEach((s, i) => { if (s < steps && (i === 0 || rr.next() < 0.45 + 0.55 * eff.density)) put(s, 1.6, 0.5, 0.009); });
+        tpl.forEach((s, i) => { if (s < steps && (i === 0 || rr.next() < 0.45 + 0.55 * dn)) put(s, 1.6, 0.5, 0.009 * sm); });
       }
     }
   }
@@ -720,6 +726,8 @@
     };
     this.next = function (eff, mods) {
       mods = mods || { hatScale: 1, forceFull: false, radio: 0 };
+      // manual tempo (0 = Auto); it takes hold at the next phrase so a slider drag never cuts a phrase in two
+      if (!this.sec || this.barNo >= this.sec.bars || this.barNo % 4 === 0) song.bpm = J.tempoOf(eff, song.autoBpm);
       if (!this.form) setupCycle(eff);
       if (!this.sec || this.barNo >= this.sec.bars) {
         if (this.sec) { this.idx++; if (this.idx >= this.form.length) { this.cycle++; this.idx = 0; setupCycle(eff); } }
@@ -914,7 +922,7 @@
     for (let i = 1; i < lv.length && signs.length < 3; i++) signs.push(Math.sign(lv[i].n - lv[i - 1].n));
     const hookRef = { onsets: song.hook.cell.on, signs: song.hook.shape.slice(0, 4).map(Math.sign) };
     return {
-      sec, secId: sec.id, kind, barNo, bars: sec.bars, meter, steps, clock: sec.clock, swing: sec.swing, e, mode, byStep, ev,
+      sec, secId: sec.id, kind, barNo, bars: sec.bars, meter, steps, clock: sec.clock, swing: sec.swing * clamp(1.25 - song.bpm * sec.clock / 280, 0.3, 1), e, mode, byStep, ev,
       segs: segs.map(sg => ({ name: sg.name, s0: sg.s0, s1: sg.s1, root: sg.root, base: sg.base, pcs: sg.pcs, alt: sg.alt, scale: sg.scale.name, sub: sg.sub || null })),
       bpm: song.bpm, style: sec.style, bridgeKind: bk, layers: L, barCount, last: lastB, first,
       composer: 'new', tonic: song.tonic, mode_: song.mode, scaleName: song.scaleName, motifRef: hookRef,

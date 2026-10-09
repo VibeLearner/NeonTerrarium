@@ -91,7 +91,7 @@
         case 'keys': synth.keys(t, ev.notes, dur, ev.v, ev); break;
         case 'twinkle':
           if (ev.k === 'pluck') synth.pluck(t, ev.n, ev.v, ev);
-          else ev.notes.forEach((n, i) => synth.pluck(t + i * 0.014, n, ev.v * (0.85 + 0.05 * i), { variant: 0, pan: (i - 1.5) * 0.25, cap: ev.cap }));
+          else ev.notes.forEach((n, i) => synth.pluck(t + i * (ev.strum || 0.014), n, ev.v * (0.85 + 0.05 * i), { variant: 0, pan: (i - 1.5) * 0.25, cap: ev.cap }));
           break;
         case 'pads': synth.pad(t, ev.notes, dur, ev.v, ev); break;
         case 'lead': synth.lead(t, ev.n, dur, ev.v, ev); break;

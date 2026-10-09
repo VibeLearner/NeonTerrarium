@@ -117,6 +117,22 @@
   }
   buildSliders($('#genreSliders'), GENRE);
   buildSliders($('#feelSliders'), FEEL);
+  // Tempo: the far left is Auto (the drum and bass slider picks it); otherwise a set BPM from 60 to 200.
+  // Every slider keeps working at the tempo you set: optional notes, strums, slow attacks, swing and half-time all follow it.
+  (function () {
+    const wrap = document.createElement('div'); wrap.className = 'slider';
+    wrap.innerHTML = '<div class="top"><label class="name" for="sl_bpm">Tempo (BPM)</label><span class="val" id="v_bpm"></span></div>' +
+      '<input id="sl_bpm" type="range" min="59" max="200" step="1"><div class="tip">Far left is Auto. Otherwise sets the base tempo. Slower tempos get busier optional notes and longer strums, faster ones get fewer, and half-time only happens when it would still feel like a pulse.</div>';
+    $('#feelSliders').appendChild(wrap);
+    const inp = $('input', wrap), val = $('.val', wrap);
+    const paint = () => { val.textContent = +inp.value < 60 ? 'Auto' : inp.value; inp.style.setProperty('--fill', ((inp.value - 59) / 1.41) + '%'); };
+    sliderEls.bpm = { inp, val, paint };
+    inp.value = S.params.bpm > 0 ? Math.round(S.params.bpm) : 59; paint();
+    inp.addEventListener('input', () => {
+      S.params.bpm = +inp.value < 60 ? 0 : +inp.value; paint(); persist();
+      if (engine) engine.setParams({ bpm: S.params.bpm });
+    });
+  })();
 
   // ---------------------------------------------------------------- game state
   function buildSeg(host, opts, get, set) {
@@ -191,7 +207,7 @@
   function mixerSync() { J.LAYERS.forEach(n => { const st = strips[n]; if (st.mute) synth.setMute(n, true); if (st.solo) synth.setSolo(n, true); }); }
 
   // ---------------------------------------------------------------- ratings
-  function fmtParams(p) { return J.PARAM_KEYS.map(k => k + ' ' + Math.round(p[k] * 100)).join(', '); }
+  function fmtParams(p) { return J.PARAM_KEYS.map(k => k + ' ' + Math.round(p[k] * 100)).join(', ') + (p.bpm > 0 ? ', bpm ' + Math.round(p.bpm) : ''); }
   function renderRatings() {
     const ul = $('#ratings'); ul.innerHTML = '';
     S.ratings.slice().reverse().forEach(r => {
@@ -215,7 +231,8 @@
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   function loadRating(r) {
     const p = r.startParams || r.params;
-    Object.assign(S.params, p);
+    Object.assign(S.params, p); S.params.bpm = (p && p.bpm > 0) ? p.bpm : 0;
+    sliderEls.bpm.inp.value = S.params.bpm > 0 ? Math.round(S.params.bpm) : 59; sliderEls.bpm.paint();
     J.PARAM_KEYS.forEach(k => { const e = sliderEls[k]; e.inp.value = Math.round(S.params[k] * 100); e.val.textContent = e.inp.value; e.inp.style.setProperty('--fill', e.inp.value + '%'); });
     if (r.game) { Object.assign(S.game, r.game); refreshSegs(); if (engine) engine.setGame(S.game); updateGameNote(); }
     if (engine) engine.setParams(S.params);

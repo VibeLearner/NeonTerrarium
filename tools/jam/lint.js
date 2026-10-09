@@ -225,6 +225,7 @@ function parseArgs(argv) {
     if (k === '--composer') a.composer = argv[++i];
     else if (k === '--random') a.random = +argv[++i];
     else if (k === '--bars') a.bars = +argv[++i];
+    else if (k === '--bpm') a.bpm = +argv[++i];
     else if (k === '--no-five') a.five = false;
     else if (k === '--md') a.md = argv[++i];
     else if (k === '--json') a.json = argv[++i];
@@ -269,10 +270,11 @@ if (require.main === module) {
   const args = parseArgs(process.argv);
   const kinds = args.composer === 'both' ? ['old', 'new'] : [args.composer];
   const sets = [];
-  if (args.five) sets.push(['five SEEDS.md settings', FIVE]);
+  const withBpm = jobs => args.bpm ? jobs.map(([sd, p]) => [sd, Object.assign({}, p, { bpm: args.bpm })]) : jobs;
+  if (args.five) sets.push(['five SEEDS.md settings' + (args.bpm ? ' at ' + args.bpm + ' BPM' : ''), withBpm(FIVE)]);
   if (args.random) {
     const jobs = []; for (let i = 0; i < args.random; i++) jobs.push(['r' + (1000 + i * 7919 % 100000), PRESETS[i % PRESETS.length]]);
-    sets.push([args.random + ' random seeds', jobs]);
+    sets.push([args.random + ' random seeds' + (args.bpm ? ' at ' + args.bpm + ' BPM' : ''), withBpm(jobs)]);
   }
   const report = {};
   for (const [name, jobs] of sets) {

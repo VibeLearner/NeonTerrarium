@@ -1137,7 +1137,7 @@ const glowMix = new THREE.ShaderMaterial({
       // colour fringing: the red and blue pictures slide a whole pixel or more apart toward the edges (whole pixels, so it stays crisp)
       if (fringe > 0.0){
         vec2 cc = (vUv - .5)*2.0; float rr = length(cc);
-        float px = floor(fringe*rr*rr + .5);
+        float px = floor(fringe*rr*rr*rr*.8 + .5);
         if (px > 0.0){ vec2 d = (rr > 1e-4 ? cc/rr : vec2(0.0))*px/res; c.r = texture2D(t, vUv + d).r; c.b = texture2D(t, vUv - d).b; }
       }
       vec3 b = texture2D(tB, vUv).rgb, h = texture2D(tH, vUv).rgb;
@@ -1172,7 +1172,7 @@ const glowMix = new THREE.ShaderMaterial({
       if (grain > 0.0){   // film grain, after the grade: re-rolled 24 times a second, in blocks of grainSize pixels, a little stronger in the shadows
         float gn = hash21(floor(gl_FragCoord.xy/grainSize) + floor(time*24.0)*37.0) - .5;
         float lg = dot(clamp(c, 0.0, 1.0), vec3(.299, .587, .114));
-        c += gn*grain*.5*(1.15 - .6*lg);
+        c += gn*grain*.28*(1.15 - .6*lg);
       }
       gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
     }`,

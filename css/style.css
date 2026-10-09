@@ -206,3 +206,39 @@ body.deleting #view{cursor:crosshair}
 .ctlpanel dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 16px;font-size:11px}
 .ctlpanel dt{color:#fff;font-weight:600;white-space:nowrap}
 .ctlpanel dd{margin:0;color:var(--muted)}
+
+/* the looks: the menu in the settings deck, and the look editor (js/lookui.js) */
+.lookmenu{display:grid;gap:4px}
+.lookitem{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;text-align:left;padding:5px 8px}
+.lookitem b{font-weight:600}
+.lookitem small{color:var(--muted);font-size:10px}
+.lookitem.on small{color:inherit;opacity:.8}
+.sws{display:flex;height:10px;width:96px;border:1px solid var(--line);border-radius:2px;overflow:hidden}
+.sws i{flex:1}
+.looked{position:fixed;left:16px;top:16px;bottom:16px;width:340px;max-width:calc(100% - 32px);z-index:5;overflow:auto;background:var(--deck);border:1px solid var(--line);border-radius:4px;padding:12px;display:grid;gap:12px;align-content:start;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-sizing:border-box}
+.looked[hidden],.lookrefs[hidden]{display:none}
+.looked header{display:flex;justify-content:space-between;align-items:center;font-family:var(--font-pixel);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan)}
+.looked .edtop{display:grid;gap:8px}
+.looked .edbody{display:grid;gap:4px}
+.edgroup{border:1px solid var(--line);border-radius:3px;padding:6px 8px}
+.edgroup > summary{cursor:pointer;font-family:var(--font-pixel);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan)}
+.edrow{display:grid;grid-template-columns:118px 1fr 46px;align-items:center;gap:6px;margin-top:6px}
+.edrow.col{grid-template-columns:118px 44px 1fr}
+.edrow label{color:var(--ink);font-size:11px}
+.edrow label small{display:block;color:var(--muted);font-size:9.5px}
+.edrow output{text-align:right;font-size:10.5px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.edrow input[type=color],.edpal input[type=color]{width:100%;height:22px;padding:0;border:1px solid var(--line);background:transparent;border-radius:2px;cursor:pointer}
+.edpal{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-top:6px}
+.edlabel{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:8px}
+.eddirty{color:var(--amber);font-size:10.5px}
+.looked textarea{font:inherit;font-size:10.5px;color:var(--ink);background:#0f1829;border:1px solid var(--line);border-radius:3px;padding:6px;width:100%;box-sizing:border-box;resize:vertical}
+.eddrop{display:grid;gap:2px;padding:10px;border:1px dashed var(--muted);border-radius:3px;cursor:pointer}
+.eddrop small{color:var(--muted);font-size:10px}
+.eddrop.over{border-color:var(--pink);background:rgba(255,79,163,.08)}
+.lookrefs{position:fixed;left:372px;top:16px;max-height:calc(100% - 32px);width:min(46vw,640px);z-index:4;overflow:auto;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;padding:10px;background:rgba(8,12,24,.55);border:1px solid var(--line);border-radius:4px;box-sizing:border-box;pointer-events:auto}
+.lookrefs header{width:100%;font-family:var(--font-pixel);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan)}
+.lookrefs figure{margin:0;position:relative;width:calc(50% - 4px)}
+.lookrefs figure.big{width:100%}
+.lookrefs img{display:block;width:100%;height:auto;border-radius:2px;cursor:zoom-in}
+.lookrefs figure button{position:absolute;right:4px;top:4px;padding:1px 6px;background:rgba(8,12,24,.8)}
+@media (max-width:760px){.lookrefs{left:16px;top:auto;bottom:16px;max-height:34%;width:calc(100% - 32px)}}

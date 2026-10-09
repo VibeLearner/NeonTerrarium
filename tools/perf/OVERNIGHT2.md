@@ -56,3 +56,12 @@ What I checked, exactly:
 - Faces nobody sees: bottoms of the extruded plates, rounded boxes and cylinders already face down and sit in H.
 - More segments than the outline needs at the closest zoom: a polygon with fewer sides is a different outline, so it changes pixels (the plate's 56-sided corners are over .0016 of the radius from the circle, which is under half a pixel for plates up
   to 2 units across, but not zero); that is a cheat by the plan's own rule, item 2d. So the exact fixes are exhausted; the candidates are listed for 2d: pipeSeg and the other cyl16 (about 11% of triangles put), lxPlate and the rounded boxes (about 12%).
+
+**3. Placement freeze: partly (built, off by default; owner decision).**
+- Split of the placing frame (house, city scene, zoom 30, tools/perf/placement.py): the placing call itself about 300 ms: the piece's own plots (generation 50 to 70 ms), the bridges (rebuildConnections), the steam map, the walking network (buildNetwork, 90 to 130 ms), residents and jobs, the save.
+- Built: after a player's edit the piece's own plots are still built at once, and the rest runs one stage a frame (bridges, agent lists, walking network, residents and jobs, save), and merged regions rebuild one per frame (each is 20 to 50 ms).
+  The placing call drops from about 300 to 68 ms (house). The worst later frame is the walking network (90 to 130 ms) and the generation (50 to 70 ms), which are single calls: **the 33 ms rule is not met**, a worker would be needed for those and they read the whole city's cells, so I did not split them further.
+- Why it is off by default: it moves the people's random draws to other frames, so the people and vehicles differ after an edit (the harness's edit steps showed 120,000+ pixels and a different random count; the harness check for the item cannot pass with it on). Sky height and four empty lots' random heights also differ.
+  Structure after settling is otherwise the same (tools/perf/placement_check.py: cells, bridges, regions, ports, walking network).
+- It is behind the overlay test "edit upkeep spread over frames (people differ)" and `window.__SYNC_LATER = true`. Owner decision: turn it on by default if a different people sequence after an edit is fine.
+- Check with it off (the default): harness quick city, 25 captures, 0 problems against the previous commit.

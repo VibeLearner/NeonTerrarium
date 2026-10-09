@@ -1002,8 +1002,9 @@ function offScreen(x, z){
 }
 let pplReady = false, pplNow = 0, pplHour = S.hour, pplCursor = 0, pplList = [];
 // called after every edit (from syncAgents): rebuild the network, places and doors, then the residents and their jobs
-function syncPeople(){
-  buildNetwork();
+function syncPeople(){ syncPeopleNet(); syncPeopleRest(); }
+function syncPeopleNet(){ buildNetwork(); }
+function syncPeopleRest(){
   syncResidents();
   syncJobs();
   // carry everyone's spot and doors over to the rebuilt ones; anyone whose way is gone goes home

@@ -66,6 +66,7 @@ function frame(now){
     const t = clamp((loss - 1.15)/1.0, 0, 1), e = t*t*(3 - 2*t);
     LOD.fine.value = e; LOD.plants.value = e; LOD.lines.value = e; }
   PH.lap('steam, rain, camera');
+  stepSync();   // what an edit leaves to do, a stage a frame (world.js)
   flushSolid();   // regions whose pieces changed are merged again (world.js)
   scene.updateMatrixWorld();   // once for every pass below (see core.js): nothing moves between them
   PH.lap('scene upkeep');

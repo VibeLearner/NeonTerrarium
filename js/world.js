@@ -1443,7 +1443,11 @@ const markSolid = c => { if (c) solidDirty.add(mergeKey(c.i, c.j)); };
 // every merge block that overlaps a region (REG x REG plots)
 function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
   for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++) solidDirty.add(i + ',' + j); }
-function flushSolid(){ flushSuper(); if (!solidDirty.size) return; for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); }
+function flushSolid(){
+  flushSuper(); if (!solidDirty.size) return;
+  if (SYNC_NOW()){ for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); return; }
+  const k = solidDirty.values().next().value; solidDirty.delete(k); rebuildSolid(k);   // (a region a frame: each merge is 20 to 50 ms; until it is done the region's plots draw one by one, the same picture)
+}
 const mergeable = o => o.isMesh && !o.isInstancedMesh && (o.layers.mask === 1 || o.layers.mask === STATIC_BIT) && !o.material.transparent && o.geometry.index && !o.userData.noMerge;
 function rebuildSolid(key){ SC_DIRTY.quiet++; try { rebuildSolid0(key); } finally { SC_DIRTY.quiet--; } }
 function rebuildSolid0(key){
@@ -1562,7 +1566,8 @@ const SREG = 4, superRegions = new Map(), superDirty = new Set();
 const superKey = rk => { const c = rk.indexOf(','); return Math.floor(+rk.slice(0, c)/SREG) + ',' + Math.floor(+rk.slice(c + 1)/SREG); };
 function flushSuper(){
   if (!superDirty.size) return;
-  for (const sk of superDirty){
+  const once = !SYNC_NOW(), todo = once ? [superDirty.values().next().value] : superDirty;
+  for (const sk of todo){
     const old = superRegions.get(sk);
     if (old){ world.remove(old); disposeMerged(old); superRegions.delete(sk); }
     const src = sk[0] === 'r' ? [...regions].map(([k, g]) => [k, g]) : [...connRegions].map(([k, r]) => [k, r.group]), key = sk.slice(1);
@@ -1570,7 +1575,7 @@ function flushSuper(){
     if (!groups.length) continue;
     const g = mergeLeaves(groups); world.add(freezeTree(g)); superRegions.set(sk, g);
   }
-  superDirty.clear();
+  if (once) superDirty.delete(todo[0]); else superDirty.clear();
 }
 // geometry a merged batch made itself is freed with it; geometry it shares with a region's own batch is not
 function disposeMerged(g){ g.traverse(o => { if ((o.isMesh || o.isPoints) && o.userData.own) o.geometry.dispose(); }); }
@@ -1656,7 +1661,8 @@ function nearPort(){
   return near[Math.floor(Math.random()*near.length)];
 }
 // after any change: refresh steam, drone perches, landing pads, traffic heights, framing
-function syncAgents(){
+function syncAgents(){ syncAgentsA(); syncPeople(); syncAgentsEnd(); }
+function syncAgentsA(){
   ports = []; carPads = []; emitters = [];
   for (const c of cells.values()){ ports.push(...c.ports); carPads.push(...c.pads); emitters.push(...c.emitters); }
   for (const m of megas.values()) if (m.data) emitters.push(...m.data.emitters);
@@ -1673,10 +1679,20 @@ function syncAgents(){
   let top = 6; for (const c of cells.values()) if (c.height > top) top = c.height;
   for (const m of megas.values()) if (m.top > top) top = m.top;
   skyTop = top + 2.4;
-  syncPeople();
+}
+function syncAgentsEnd(){
   shadowDirty = true;
   save();
 }
+// What an edit leaves to do after its own plots are built (the bridges between neighbors, the steam map, the walking network, residents, jobs, bots, saving the city) is a
+// whole-city rebuild of 150 to 400 ms. Done at once it froze the frame the piece was placed in; now it runs a stage a frame while the sweep-in animation plays (the piece's own plots are built at
+// once). A new edit restarts the stages (each one rebuilds from the cities' cells, so a repeat is safe). Loading, and the overlay test "edit upkeep in the same frame", do it all at once.
+let SYNC_Q = null;
+const SYNC_STAGES = [() => rebuildConnections(), () => syncAgentsA(), () => syncPeopleNet(), () => syncPeopleRest(), () => syncAgentsEnd()];
+const SYNC_NOW = () => !(PH.tests.syncLater || window.__SYNC_LATER) || !pplReady || pplFrame < 60;   // default: all at once (exact). The spread is opt-in: it shifts the people's random stream
+function queueSync(){ SYNC_Q = 0; }
+function stepSync(){ if (SYNC_Q === null) return; const q = SYNC_Q++; if (SYNC_Q >= SYNC_STAGES.length) SYNC_Q = null; SYNC_STAGES[q](); }
+function finishSync(){ while (SYNC_Q !== null) stepSync(); }
 // the middle of everything built: where the camera starts, and where H jumps back to
 function centerView(now = false){
   let x = 0, z = 0, n = 0;
@@ -1717,7 +1733,7 @@ function refresh(list, megaList = []){
   for (const c of todo) if (airCells.has(c) && !anims.some(a => a.c === c)) rebuildCell(c);
   for (const m of megaList) rebuildMega(m);
   for (const k of dirtyRegions){ markSolidRegion(k); if (heldRegions.has(k)) pendingRegions.add(k); else rebuildRegion(k); } dirtyRegions.clear();
-  rebuildConnections(); syncAgents();
+  if (SYNC_NOW()) { rebuildConnections(); syncAgents(); } else { queueSync(); shadowDirty = true; }   // (after a player's edit the rest is done a stage a frame: see queueSync)
 }
 function rebuildAll(){ refresh([...cells.values()], [...megas.values()]); }
 

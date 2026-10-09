@@ -102,3 +102,13 @@ Most sliders take effect smoothly while music plays and add or remove features i
 Press **Export MIDI** (next to Export JSON). You get 64 bars of the current seed and sliders as a MIDI file, one track per layer (Bass, Keys, Twinkle, Pads, Lead) and Drums on channel 10 with General MIDI note numbers. The tempo and the 5/4, 7/8 and 9/8 bars are written into the file. In the published page the browser can only save a few file types, so the file arrives inside a `.zip`; unzip it first.
 
 In GarageBand: drag the `.mid` onto an empty project (or File > Import). Each track becomes a software instrument; change the instruments to something good (a Steinway or Rhodes for Keys, a clean electric guitar for Twinkle, a drum kit for Drums), and press Play. If the notes sound right on those instruments, the problem is the sounds in the jam room, not the music.
+
+## Sampled sounds (round 5)
+
+The **Sounds** block has two switches: **Synth sounds** (the oscillator voices, exactly as before) and **Sampled sounds** (recorded single notes and single drum hits, all CC0, see `samples/CREDITS.md`). The notes are the same either way; only the instruments change. Samples load on demand while the music plays, and any instrument that has not loaded yet plays on the synth, so playback never waits.
+
+- **Serving**: samples load with `fetch`, so open the page over http (for example `python3 -m http.server` in `tools/jam`), not by double-clicking the file. Opening it from disk still works, on synth sounds only.
+- **Instrument menus** in the mixer: drums (auto / tight / jazz kit), bass (auto / bass guitar / double bass / synth), keys (FM electric piano / upright piano / synth), twinkle (guitar / vibraphone / glockenspiel / marimba / kalimba / synth). Pads and lead are always synthesized. The choices are saved with ratings.
+- **Mix chain** checkbox: per-layer EQ, the lead stepping pads and keys back, bass ducking, short room plus long hall, glue compression and tape saturation. Turn it off to hear the plain mix.
+- **Switch every 8 bars**: alternates synth and sampled at the same point in the music, for A/B listening.
+- **Rebuild the pack**: `python3 samples/build.py` (needs git, ffmpeg and about 1 GB of temporary space for the sparse downloads, which are git-ignored). `python3 samples/check_licenses.py` fails if any shipped file lacks a CC0 source in `samples/manifest.json`.

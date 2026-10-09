@@ -58,6 +58,37 @@
       })(manifest.instruments[group]);
       return out;
     }
+    // Files normally come one by one from samples/pack/. A host that cannot serve 500 loose files (the published
+    // page) can set Jam.SAMPLE_ZIP to one uncompressed zip of the same pack; the sampler then reads from that.
+    let zipP = null;
+    function readZip(url) {
+      return fetch(url).then(r => { if (!r.ok) throw new Error('zip ' + r.status); return r.arrayBuffer(); }).then(ab => {
+        const dv = new DataView(ab), u8 = new Uint8Array(ab), td = new TextDecoder(), map = new Map();
+        let e = u8.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+        if (e < 0) throw new Error('bad zip');
+        let n = dv.getUint16(e + 10, true), p = dv.getUint32(e + 16, true);
+        while (n-- > 0) {
+          const size = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+          const name = td.decode(u8.subarray(p + 46, p + 46 + nl));
+          const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+          map.set(name, ab.slice(start, start + size));
+          p += 46 + nl + xl + cl;
+        }
+        return map;
+      });
+    }
+    async function getBytes(f) {
+      const zipUrl = opts.zip || J.SAMPLE_ZIP;
+      if (zipUrl) {
+        if (!zipP) zipP = readZip(zipUrl);
+        const map = await zipP, ab = map.get('pack/' + f);
+        if (!ab) throw new Error('not in zip: ' + f);
+        return ab.slice(0);
+      }
+      const r = await fetch(base + 'pack/' + f);
+      if (!r.ok) throw new Error(String(r.status));
+      return r.arrayBuffer();
+    }
     async function loadGroup(group) {
       await getManifest();
       if (!manifest.instruments[group]) throw new Error('no such group ' + group);
@@ -68,9 +99,7 @@
         while (next < files.length) {
           const f = files[next++];
           try {
-            const r = await fetch(base + 'pack/' + f);
-            if (!r.ok) throw new Error(String(r.status));
-            const ab = await r.arrayBuffer();
+            const ab = await getBytes(f);
             buffers.set(f, await ctx.decodeAudioData(ab));
           } catch (e) { self.status.failed++; }
           self.status.loaded++;

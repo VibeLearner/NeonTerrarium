@@ -23,7 +23,7 @@ I developed there in a side worktree and copied each finished item over). Every 
 | 10 painted wall detail | measured, under the 20% threshold, no prototype | fdeb3ee | 7.7% (city), 7.0% (dense) |
 | 11 steady frame pacing | measured; one regular spike (collision pass) found, a spreading attempt reverted | 9c970b8, 8678f35 | spread and spike causes listed |
 | 12 zoom 60 | measured | 9c970b8 | table in item 12 |
-| 13 (extra) live pass drawn only for objects the view can show | done, exact | (next commit) | cache steps city 70/70 and megas 12/12, standard city 25, megas 15, dense 13: 0 problems; draw calls 1,990 to 1,363, triangles 1.67 M to 1.28 M |
+| 13 (extra) live pass drawn only for objects the view can show | done, exact | 6ecac6e | cache steps city 70/70 and megas 12/12, standard city 25, megas 15, dense 13: 0 problems; draw calls 1,990 to 1,363, triangles 1.67 M to 1.28 M |
 
 ## What I skipped or didn't finish, and why
 - 1a: can't be exact and nearly nobody is off screen; replaced by your size-based rate.

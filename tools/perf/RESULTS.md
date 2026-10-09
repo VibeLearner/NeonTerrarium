@@ -392,3 +392,4 @@ cache on both sides.
 - Item 8 (b94b439): wet reflections, mist and shafts at half resolution; with the test on, equal to the previous commit; flip: 4 to 17% of pixels differ by dither-sized amounts.
 - Items 9, 10: custom shapes are 29.8% of the triangles put (rounded boxes 15%, cyl16 11.8%); flat detail on walls is 7 to 8% (under the 20% bar).
 - Items 11, 12: main-thread spread and the collision pass's every-N-th-frame spike; zoom 60 table; the cache frame's live pass holds 1.16 million triangles at zoom 30.
+- Item 13 (extra, 6ecac6e): the cache frame's live pass no longer draws objects only the margin band could show: max city zoom 30, 1024x576: 1,990 to 1,363 draw calls, 1.67 M to 1.28 M triangles; pictures identical (cache steps 70/70 and 12/12, standard script 0).

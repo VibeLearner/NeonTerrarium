@@ -15,10 +15,27 @@ async ([mode, n]) => {
   __randSeed(4242);
   const zones = ['mid', 'high', 'low', 'ind'];
   // (no frames: only the staging steps run, so nothing else draws from the random stream between an edit's steps and the two runs draw in the same order)
+  // the walking network hashed three ways after an edit: built in steps the way the page does (syncPeopleNetStep, the caches warm), in one call (warm), and in one call with every
+  // plot's path, door and crossing caches cleared (the reference); the door meshes are hashed with it (round 9 item 3)
+  const hh = (a, h = 2166136261) => { const t = String(a); for (let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+  const hashNet = () => { let nh = 0; nh = hh(NG.x.length, nh); for (let i = 0; i < NG.x.length; i++){ nh = hh(NG.x[i] + ',' + NG.z[i], nh); for (const [b, e] of NG.adj[i]) nh = hh(b + ':' + e.len + ':' + e.cost + ':' + JSON.stringify(e.pts), nh); }
+    for (const d of doorList.concat(hiddenDoors)) nh = hh(d.key + JSON.stringify(d.stand) + JSON.stringify(d.wall) + JSON.stringify(d.inside) + JSON.stringify(d.n) + d.noDraw + d.col, nh);
+    for (const [k, p] of places) nh = hh(k + ':' + p.jobs + ':' + p.fun + ':' + (p.doors || []).length + ':' + (p.spots || []).length, nh);
+    for (const [k, p] of places) for (const sp of p.spots || []) nh = hh(sp.key + ':' + sp.ax + ',' + sp.az + ':' + sp.node + ':' + sp.near.map(q => q.key).join('|'), nh);
+    return nh; };
+  const hashMesh = () => { let h = 0; for (const m of [doorFrame, doorLight, doorPanel]){ const a = m.instanceMatrix.array, n = m.count*16; h = hh(m.count, h); h = hh(Array.from(a.subarray(0, n)).join(), h); } const ca = doorPanel.instanceColor.array; return hh(Array.from(ca.subarray(0, doorPanel.count*3)).join(), h); };
+  const netRow = k => {
+    let steps = 0; syncPeopleAbort(); while (!syncPeopleNetStep(1)) steps++; const hs = hashNet(), ms = hashMesh();
+    buildNetwork(); const hb = hashNet(), mb = hashMesh();
+    for (const c of cells.values()){ delete c._pe; delete c._pd; delete c._cx; }
+    buildNetwork(); const hr = hashNet(), mr = hashMesh();
+    return ['net', k, hs, hb, hr, ms, mb, mr, hs === hb && hb === hr && ms === mb && mb === mr, NG.x.length, doorList.length];
+  };
   const waitDone = async () => { for (let g = 0; g < 100000 && (STAGE_Q.length || STAGE_READY.length); g++){ const j = STAGE_Q[0]; if (j && j.rw && !j.rw.done){ await new Promise(r => setTimeout(r, 1)); continue; } stageStep(1e9); } };
   for (const [k, c] of picks.entries()){
     addSection(c, zones[k % 4]);
     if (k % 3 !== 1) await waitDone();   // (every third edit is followed at once by the next: stageFinishAll then takes the first from the worker and makes it here)
+    if (k % 3 !== 1) out.push(netRow(k));
     const near = [c, ...SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b))).filter(Boolean)];
     out.push(near.map(x => [x.i, x.j, x.height, x.topY, x.sections.length, x.data ? [...x.data.geo.values()].map(g => g.attributes.position.count + ':' + (g.index ? g.index.count : 0)).join() : '-', JSON.stringify(x.lifts), x.firstFloors, !!airCells.has(x)]));
   }
@@ -26,13 +43,12 @@ async ([mode, n]) => {
   out.push(['all', [...cells.values()].map(x => x.height).reduce((a, b) => a + b, 0)]);
   // the walking network after all the edits, made in one call: a hash of its nodes, links (with their points), doors and places
   buildNetwork();
-  const hh = (a, h = 2166136261) => { const t = String(a); for (let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
   let nh = 0; nh = hh(NG.x.length, nh); for (let i = 0; i < NG.x.length; i++){ nh = hh(NG.x[i] + ',' + NG.z[i], nh); for (const [b, e] of NG.adj[i]) nh = hh(b + ':' + e.len + ':' + e.cost + ':' + JSON.stringify(e.pts), nh); }
   for (const d of doorList.concat(hiddenDoors)) nh = hh(d.key + JSON.stringify(d.stand) + JSON.stringify(d.wall), nh);
   for (const [k, p] of places) nh = hh(k + ':' + p.jobs + ':' + p.fun + ':' + (p.doors || []).length + ':' + (p.spots || []).length, nh);
   out.push(['network', nh, NG.x.length, places.size]);
   out.push(['rand', __randCalls()]);
-  out.push(['made', typeof RW !== 'undefined' ? RW.line() : '']);
+  out.push(['made', (typeof RW !== 'undefined' ? RW.line() : '') + ' ' + JSON.stringify(typeof NETC !== 'undefined' ? NETC : {})]);
   return out;
 }
 """
@@ -43,7 +59,7 @@ def play(mode, scene, edits, srv):
     url = HH.make_site('wedit' + mode, None); sc = HH.load_scenes([scene])[0]
     with sync_playwright() as pw:
         br = HH.launch(pw)
-        init = 'window.__NV_OFF = true; ' + ('window.__GEN_WORKER = true; window.__LOAD_MAIN = true;' if mode == 'worker' else 'window.__GEN_MAIN = true;')
+        init = 'window.__NV_OFF = true; ' + ('window.__GEN_WORKER = true; window.__LOAD_MAIN = true; window.__NET_SPLIT = true;' if mode == 'worker' else 'window.__GEN_MAIN = true; window.__NET_OLD = true;')
         ctx, pg, errs = HH.open_game(br, url, sc, HH.VIEWPORTS[0], extra_init=init)
         if mode == 'worker': pg.wait_for_function('() => RW.state === "ready" || RW.state === "failed"', timeout=120000, polling=200)
         pg.evaluate('() => { __perf.skip = true; }')
@@ -62,5 +78,9 @@ if __name__ == '__main__':
     for k, (x, y) in enumerate(zip(A, B)):
         if x != y and not (isinstance(x, list) and x and x[0] == 'made'):
             bad += 1; print('DIFF at', k, '\n  main  ', json.dumps(x)[:600], '\n  worker', json.dumps(y)[:600])
+    for name, R in (('main', A), ('worker', B)):
+        for r in R:
+            if r[0] == 'net' and not r[8]: bad += 1; print('NETWORK differs from its own reference in', name, r)
+    nets = [r for r in B if r[0] == 'net']; print('%d network checks per run (stepped = one call = caches cleared, door meshes too), doors in the last: %d' % (len(nets), nets[-1][10] if nets else 0))
     print('worker:', B[-1][1]); print('page errors', ea[:2], eb[:2])
     print('%d edits, %d differ' % (a.edits, bad)); sys.exit(1 if bad else 0)

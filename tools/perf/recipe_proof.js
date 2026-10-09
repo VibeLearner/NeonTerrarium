@@ -102,6 +102,10 @@ window.__proof = (() => {
     const d = diff(liveParts, wParts);
     { const sx = recipeGen(r, recipeWorld()); const sP = parts(sx); for (const g of sx.data.geo.values()) g.dispose(); if (sx.data.sgeo) sx.data.sgeo.dispose(); for (const k of diff(sP, wParts)) d.push('worker vs sandbox: ' + k); }   // (the stand-in tier too: the page makes none, the sandbox and the worker do)
     { const wg = u.data.grids; if (!!lg !== !!wg) d.push('walking maps: one side has none'); else if (lg) for (const k of ['solid', 'soft', 'high', 'mid', 'free']) if (hb(bytes(lg[k])) !== hb(bytes(wg[k]))) d.push('walking map ' + k); }
+    { const wg = u.data.grids; if (lg && wg){   // the door searches of a building plot (people.js doorTable), made in the worker, against the same searches made here on the same maps, and the table's pick against a direct search
+      const G = { solid: lg.solid, soft: lg.soft, high: lg.high, mid: lg.mid, free: lg.free, x0: c.x - LOT/2, z0: c.z - LOT/2 }, T = doorTable(G, c.x, c.z);
+      if (!wg.doors) d.push('door table: none'); else if (hb(bytes(T)) !== hb(bytes(wg.doors))) d.push('door table differs');
+      else for (let pass = 0; pass < 3; pass++) for (const [dx, dz] of SIDES4){ const direct = pass === 2 ? openEntryG(G, c.x, c.z, dx, dz, 1.75) : findDoorG(G, c.x, c.z, dx, dz, 1.75, pass ? .16 : .08); if (JSON.stringify(direct) !== JSON.stringify(doorFromTable(wg.doors, pass, dx, dz))) d.push('door table pick ' + pass + ',' + dx + ',' + dz); } } }
     if (liveRand !== job.rw.res.calls) d.push('random calls (' + liveRand + ' vs ' + job.rw.res.calls + ')');
     return { d, rand: liveRand };
   }

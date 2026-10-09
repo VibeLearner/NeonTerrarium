@@ -167,20 +167,40 @@ function cellGrid(c){
     r = m._pr.r;
   }
   let solid, soft, high, mid, free;
-  if (!m && src && src.grids){ ({ solid, soft, high, mid, free } = src.grids); src.grids = null; RW.grids++; }   // (made by the plot worker along with the plot: round 9 item 3)
+  let doors = null;
+  if (!m && src && src.grids){ ({ solid, soft, high, mid, free } = src.grids); doors = src.grids.doors || null; src.grids = null; RW.grids++; }   // (made by the plot worker along with the plot: round 9 item 3)
   else if (m && r){
     solid = new Uint8Array(GN*GN); soft = new Uint8Array(GN*GN); high = new Uint8Array(GN*GN); mid = new Uint8Array(GN*GN);
     const oi = (c.i - m.i)*GN, oj = (c.j - m.j)*GN;
     for (let j = 0; j < GN; j++) for (let i = 0; i < GN; i++){ const q = (oj + j)*r.nx + oi + i; solid[j*GN + i] = r.solid[q]; soft[j*GN + i] = r.soft[q]; high[j*GN + i] = r.high[q]; mid[j*GN + i] = r.mid[q]; }
     free = freeMap(solid, soft);
   } else ({ solid, soft, high, mid, free } = plotMaps(c.x, c.z, src));
-  return (c._pg = { src, solid, soft, high, mid, free, x0: c.x - LOT/2, z0: c.z - LOT/2 });
+  return (c._pg = { src, solid, soft, high, mid, free, doors, x0: c.x - LOT/2, z0: c.z - LOT/2 });
 }
 // a plot's footprint maps from its generated data alone (what the plot worker makes with the plot)
 function plotMaps(x, z, src){
   let solid = new Uint8Array(GN*GN), soft = new Uint8Array(GN*GN), high = new Uint8Array(GN*GN), mid = new Uint8Array(GN*GN);
   if (src){ const q = rasterize(src, x - LOT/2, z - LOT/2, GN, GN); solid.set(q.solid); soft.set(q.soft); high.set(q.high); mid.set(q.mid); }
-  return { solid, soft, high, mid, free: freeMap(solid, soft) };
+  const m = { solid, soft, high, mid, free: freeMap(solid, soft) };
+  if (self.IN_RECIPE_WORKER) m.doors = doorTable({ solid, soft, high, mid, free: m.free, x0: x - LOT/2, z0: z - LOT/2 }, x, z);   // (the door search of a building plot, made here too: round 9 item 3)
+  return m;
+}
+// Every door search a building plot can ask for (plotDoor: its four sides, three passes, one way in of 1.75), found on its maps alone: 12 records of 13 numbers (found, then wall, stand, inside, n, side, noDraw).
+// The search of one side does not depend on another side, so plotDoor picks from this table in the order it always searched, and finds what it always found.
+const DOOR_IN = 1.75, DOOR_REC = 13;
+function doorTable(G, cx, cz){
+  const T = new Float64Array(3*SIDES4.length*DOOR_REC);
+  for (let pass = 0; pass < 3; pass++) for (let k = 0; k < SIDES4.length; k++){
+    const [dx, dz] = SIDES4[k], d = pass === 2 ? openEntryG(G, cx, cz, dx, dz, DOOR_IN) : findDoorG(G, cx, cz, dx, dz, DOOR_IN, pass ? .16 : .08);
+    if (!d) continue;
+    const o = (pass*SIDES4.length + k)*DOOR_REC; T.set([1, d.wall.x, d.wall.z, d.stand.x, d.stand.z, d.inside.x, d.inside.z, d.n[0], d.n[1], d.side[0], d.side[1], d.noDraw ? 1 : 0], o);
+  }
+  return T;
+}
+function doorFromTable(T, pass, dx, dz){
+  const o = (pass*SIDES4.length + SIDES4.findIndex(q => q[0] === dx && q[1] === dz))*DOOR_REC; if (!T[o]) return null;
+  const d = { wall: { x: T[o + 1], z: T[o + 2] }, stand: { x: T[o + 3], z: T[o + 4] }, inside: { x: T[o + 5], z: T[o + 6] }, n: [T[o + 7], T[o + 8]], side: [T[o + 9], T[o + 10]] };
+  if (T[o + 11]) d.noDraw = true; return d;
 }
 // the walking map: free where a person fits, clear of anything solid or leafy
 function freeMap(solid, soft){
@@ -193,6 +213,10 @@ function freeMap(solid, soft){
   }
   return free;
 }
+const NETC = { doorTab: 0, doorSearch: 0, paths: 0, pops: 0, meshDoors: 0, cross: 0, spots: 0, approach: 0, samples: 0 };   // (counts, for the tools)
+const NETOLD = () => !!(PH.tests.netOld || window.__NET_OLD);   // the test: the walking network the way it was made before round 9 item 3 (door searches and door meshes on the page, in one call)
+// (the extra steps are left out under the test harness, whose steps are counted: a run there keeps the step structure it had, so a picture and the people's state can be compared to the commit before; the tool worker_edit.py turns them on)
+const NETSPLIT = () => !NETOLD() && (!window.__realNow || !!window.__NET_SPLIT);
 const gIdx = (v, n, step) => Math.max(0, Math.min(n - 1, Math.floor(v/step)));
 const freeAt = (G, x, z) => G.free[gIdx(z - G.z0, PN, PR)*PN + gIdx(x - G.x0, PN, PR)] === 1;
 const solidAt = (G, x, z) => G.solid[gIdx(z - G.z0, GN, GR)*GN + gIdx(x - G.x0, GN, GR)] === 1;
@@ -218,6 +242,7 @@ const pathable = c => !!c && (!c.mega || openMega(c));
 const closedMega = c => !!c && !!c.mega && !openMega(c);
 // where to cross between two neighbouring plots: as near the middle of the side as is clear on both sides
 function crossing(a, b, dx, dz){
+  NETC.cross++;
   const Ga = cellGrid(a), Gb = cellGrid(b), bx = a.x + dx*LOT/2, bz = a.z + dz*LOT/2;
   for (let k = 0; k <= 26; k++){
     const t = (k % 2 ? 1 : -1)*Math.ceil(k/2)*PR, x = bx + (dz ? t : 0), z = bz + (dx ? t : 0);
@@ -233,25 +258,29 @@ function crossingCached(a, b, dx, dz){
   const p = crossing(a, b, dx, dz); m[k] = { sa: Ga.src, sb: Gb.src, b, x: a.x, z: a.z, p }; return p;
 }
 // a door: walk in from the middle of a side to the first wall; it must be flat across the doorway, with room to stand in front
-function findDoor(c, dx, dz, maxIn, tol = .08){
+// (round 9, item 3: the searches read only a plot's own maps and where it stands, so they take a map and a position: the plot worker runs all twelve of them for a plot with its maps, doorTable)
+function findDoor(c, dx, dz, maxIn, tol = .08){ return findDoorG(cellGrid(c), c.x, c.z, dx, dz, maxIn, tol); }
+function findDoorG(G, cx, cz, dx, dz, maxIn, tol = .08){
   // the middle of the side first, then further along it either way
-  for (const off of [0, .35, -.35, .65, -.65]){ const d = doorAt(c, dx, dz, maxIn, off, tol); if (d) return d; }
+  for (const off of [0, .35, -.35, .65, -.65]){ const d = doorAtG(G, cx, cz, dx, dz, maxIn, off, tol); if (d) return d; }
   return null;
 }
 // no wall to put a door on (a tower on stilts, an open ground floor): people walk in under it as far as there's room
 // and slip inside there, without a drawn door
-function openEntry(c, dx, dz, maxIn){
-  const G = cellGrid(c), bx = c.x + dx*LOT/2, bz = c.z + dz*LOT/2;
+function openEntry(c, dx, dz, maxIn){ return openEntryG(cellGrid(c), c.x, c.z, dx, dz, maxIn); }
+function openEntryG(G, cx, cz, dx, dz, maxIn){
+  const bx = cx + dx*LOT/2, bz = cz + dz*LOT/2;
   let last = -1;
   for (let u = 0; u <= maxIn; u += PR*.5){ if (freeAt(G, bx - dx*u, bz - dz*u)) last = u; else if (last >= 0) break; }
   if (last < .4) return null;
   const sx = bx - dx*last, sz = bz - dz*last;
   return { wall: { x: sx - dx*.1, z: sz - dz*.1 }, stand: { x: sx, z: sz }, inside: { x: sx - dx*.3, z: sz - dz*.3 }, n: [dx, dz], side: [dx, dz], noDraw: true };
 }
-function doorAt(c, dx, dz, maxIn, off, tol){
-  const G = cellGrid(c), lx = dz ? 1 : 0, lz = dx ? 1 : 0, bx = c.x + dx*LOT/2 + lx*off, bz = c.z + dz*LOT/2 + lz*off;
+function doorAt(c, dx, dz, maxIn, off, tol){ return doorAtG(cellGrid(c), c.x, c.z, dx, dz, maxIn, off, tol); }
+function doorAtG(G, cx, cz, dx, dz, maxIn, off, tol){
+  const lx = dz ? 1 : 0, lz = dx ? 1 : 0, bx = cx + dx*LOT/2 + lx*off, bz = cz + dz*LOT/2 + lz*off;
   const P = (u, o) => [bx - dx*u + lx*o, bz - dz*u + lz*o];
-  const hitAt = (o, test, from = 0, to = maxIn) => { for (let u = from; u <= to; u += GR*.5){ const [x, z] = P(u, o); if (test(G, x, z)) return u; } return -1; };
+  const hitAt = (o, test, from = 0, to = maxIn) => { for (let u = from; u <= to; u += GR*.5){ NETC.samples++; const [x, z] = P(u, o); if (test(G, x, z)) return u; } return -1; };
   // the first thing in the way decides where people stand; the door goes on the first door-high wall at or just behind it
   // (a low step or plinth may sit in front of it)
   const u0 = hitAt(0, solidAt); if (u0 < .3) return null;
@@ -278,9 +307,9 @@ function gridPaths(G, from, targets){
   const push = (v, f) => { heap.push(v); hf.push(f); let i = heap.length - 1; while (i > 0){ const q = (i - 1) >> 1; if (hf[q] <= hf[i]) break; [heap[q], heap[i]] = [heap[i], heap[q]]; [hf[q], hf[i]] = [hf[i], hf[q]]; i = q; } };
   const pop = () => { const top = heap[0], lv = heap.pop(), lf = hf.pop(); if (heap.length){ heap[0] = lv; hf[0] = lf; let i = 0;
     for (;;){ const l = 2*i + 1, r = l + 1; let m = i; if (l < heap.length && hf[l] < hf[m]) m = l; if (r < heap.length && hf[r] < hf[m]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; [hf[m], hf[i]] = [hf[i], hf[m]]; i = m; } } return top; };
-  _gd[s] = 0; push(s, 0);
+  _gd[s] = 0; push(s, 0); NETC.paths++;
   while (heap.length){
-    const v = pop(); if (_gh[v]) continue; _gh[v] = 1;
+    const v = pop(); if (_gh[v]) continue; _gh[v] = 1; NETC.pops++;
     const vx = v % PN, vz = (v - vx)/PN;
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++){
       if (!dx && !dz) continue;
@@ -418,9 +447,11 @@ function plotDoor(c, sides, maxIn){
   const G = cellGrid(c), sig = sides.map(s => s.join()).join('|');
   if (!c._pd || c._pd.src !== G.src || c._pd.sig !== sig){
     let found = null;
-    for (const [dx, dz] of sides){ found = findDoor(c, dx, dz, maxIn); if (found) break; }
-    if (!found) for (const [dx, dz] of sides){ found = findDoor(c, dx, dz, maxIn, .16); if (found) break; }   // a rougher wall will do
-    if (!found) for (const [dx, dz] of sides){ found = openEntry(c, dx, dz, maxIn); if (found) break; }
+    const T = G.doors && maxIn === DOOR_IN && !NETOLD() ? G.doors : null;   // (the searches the plot worker made with the plot's maps, round 9 item 3: the same three passes over the sides, from its table)
+    if (T) NETC.doorTab++; else NETC.doorSearch++;
+    for (const [dx, dz] of sides){ found = T ? doorFromTable(T, 0, dx, dz) : findDoor(c, dx, dz, maxIn); if (found) break; }
+    if (!found) for (const [dx, dz] of sides){ found = T ? doorFromTable(T, 1, dx, dz) : findDoor(c, dx, dz, maxIn, .16); if (found) break; }   // a rougher wall will do
+    if (!found) for (const [dx, dz] of sides){ found = T ? doorFromTable(T, 2, dx, dz) : openEntry(c, dx, dz, maxIn); if (found) break; }
     c._pd = { src: G.src, sig, door: found };
   }
   return c._pd.door;
@@ -430,6 +461,7 @@ function plotDoor(c, sides, maxIn){
 // earlier one are dropped, so two people never stand in each other.
 function approachFor(G, x, z, fx, fz){
   if (freeAt(G, x, z)) return { x, z };
+  NETC.approach++;
   const cx = gIdx(x - G.x0, PN, PR), cz = gIdx(z - G.z0, PN, PR); let best = null, bd = Infinity;
   for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++){
     const X = cx + dx, Z = cz + dz; if (X < 0 || Z < 0 || X >= PN || Z >= PN || !G.free[Z*PN + X]) continue;
@@ -445,15 +477,21 @@ function megaLocal(m, x, z){
   const a = (m.facing || 0)*PI/2, c = Math.cos(a), s = Math.sin(a), dx = x - m.x, dz = z - m.z;
   return [c*dx - s*dz, s*dx + c*dz];
 }
-function makeSpots(pl, list, inside, oldSpots, addEnd){
-  list.forEach((r, n) => {
-    if (pl.spots.some(o => Math.hypot(o.x - r.x, o.z - r.z) < .34 && Math.abs((o.y ?? 0) - (r.y ?? 0)) < .5)) return;
-    const c = cells.get(ckey(Math.round(r.x/LOT), Math.round(r.z/LOT))); if (!inside(c)) return;
-    if (r.act && (c.green !== 'grass' || c.sections.length)) return;   // sitting on the ground: only on a plot laid fully to lawn
+function* makeSpots(pl, list, inside, oldSpots, addEnd){   // (a generator since round 9 item 3: a square's two hundred spots are several steps)
+  let n = -1;
+  // (the crowding test only needs the spots within .34 of a point: they are kept in a grid of .34 squares, so a spot is tested against its own and the eight squares round it; the same test on a smaller list)
+  const sg = new Map(), sgk = (gx, gz) => gx*100003 + gz, crowded = r => { const gx = Math.floor(r.x/.34), gz = Math.floor(r.z/.34);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++){ const l = sg.get(sgk(gx + a, gz + b)); if (l) for (const o of l) if (Math.hypot(o.x - r.x, o.z - r.z) < .34 && Math.abs((o.y ?? 0) - (r.y ?? 0)) < .5) return true; } return false; };
+  for (const r of list){
+    n++; NETC.spots++;
+    if (n && n % 24 === 0 && NETSPLIT()) yield;
+    if (NETOLD() ? pl.spots.some(o => Math.hypot(o.x - r.x, o.z - r.z) < .34 && Math.abs((o.y ?? 0) - (r.y ?? 0)) < .5) : crowded(r)) continue;
+    const c = cells.get(ckey(Math.round(r.x/LOT), Math.round(r.z/LOT))); if (!inside(c)) continue;
+    if (r.act && (c.green !== 'grass' || c.sections.length)) continue;   // sitting on the ground: only on a plot laid fully to lawn
     // a spot up off the street (the bathhouse's terrace) is reached from its way in below: people go out of sight there
     // and come out at the spot (see startTrip)
-    const ce = r.ex !== undefined ? cells.get(ckey(Math.round(r.ex/LOT), Math.round(r.ez/LOT))) : c; if (!ce) return;
-    const ap = r.ex !== undefined ? approachFor(cellGrid(ce), r.ex, r.ez, 0, 1) : approachFor(cellGrid(c), r.x, r.z, r.fx, r.fz); if (!ap) return;
+    const ce = r.ex !== undefined ? cells.get(ckey(Math.round(r.ex/LOT), Math.round(r.ez/LOT))) : c; if (!ce) continue;
+    const ap = r.ex !== undefined ? approachFor(cellGrid(ce), r.ex, r.ez, 0, 1) : approachFor(cellGrid(c), r.x, r.z, r.fx, r.fz); if (!ap) continue;
     // the key names the spot by what and where it is, so a plot rebuilt differently (a lawn paved over, say) never
     // hands its old sitters a different seat in the wrong place
     // (a megastructure's spots are named by where they are in its own frame, not the world's, so that turning it, which
@@ -463,11 +501,13 @@ function makeSpots(pl, list, inside, oldSpots, addEnd){
     const sp = { key, x: r.x, y: r.y, z: r.z, ax: ap.x, az: ap.z, up: r.ex !== undefined, node: ngAdd(nk, ap.x, ap.z), kind: r.kind, stall: r.stall, face: [r.fx, r.fz],
                  by: old ? old.by : null, place: pl.id, near: [], act: r.act, hx: r.hx, hz: r.hz, ad: r.ad, pic: r.pic };
     pl.spots.push(sp); spotByKey.set(key, sp); addEnd(ce, { key: nk, x: ap.x, z: ap.z, kind: 's' });
-  });
+    { const k = sgk(Math.floor(sp.x/.34), Math.floor(sp.z/.34)); (sg.get(k) || sg.set(k, []).get(k)).push(sp); }
+  }
   // who could chat with whom: standing spots close together
-  for (const a of pl.spots) if (a.kind === 'stand') for (const b of pl.spots) if (b !== a && b.kind === 'stand' && Math.hypot(a.x - b.x, a.z - b.z) < .8) a.near.push(b);
+  let na = 0;
+  for (const a of pl.spots){ if ((++na & 63) === 0 && NETSPLIT()) yield; if (a.kind === 'stand') for (const b of pl.spots) if (b !== a && b.kind === 'stand' && Math.hypot(a.x - b.x, a.z - b.z) < .8) a.near.push(b); }
   // on a lawn: the other half of a picnic or a pair, and the other viewer of the same projector
-  for (const a of pl.spots) if (a.act) for (const b of pl.spots) if (b !== a && b.act === a.act && Math.hypot(a.x - b.x, a.z - b.z) < .9) a.near.push(b);
+  for (const a of pl.spots){ if ((++na & 63) === 0 && NETSPLIT()) yield; if (a.act) for (const b of pl.spots) if (b !== a && b.act === a.act && Math.hypot(a.x - b.x, a.z - b.z) < .9) a.near.push(b); }
 }
 // Rebuild the network, the places and their doors after an edit. Unchanged plots reuse their cached maps and paths.
 function buildNetwork(){ drain(buildNetworkGen(doorByKey, spotByKey)); }
@@ -528,10 +568,12 @@ function* buildNetworkGen(oldDoors, oldSpots){
     fresh.set('c:' + c.i + ',' + c.j, { id: 'c:' + c.i + ',' + c.j, cell: c, x: c.x, z: c.z, jobs, fun, night, doors });
   }
   // benches round the city: a little place to sit for a while
+  let nb = 0;
   for (const c of cells.values()){
     if (c.mega || !c.data || !c.data.spots || !c.data.spots.length) continue;
+    if ((++nb & 7) === 0 && NETSPLIT()) yield;   // (a step of its own every few plots with spots: round 9 item 3)
     const pl = { id: 'b:' + c.i + ',' + c.j, bench: true, x: c.x, z: c.z, jobs: 0, fun: 0, night: 0, open: true, doors: [], spots: [] };
-    makeSpots(pl, c.data.spots, q => q === c, oldSpots, addEnd);
+    yield* makeSpots(pl, c.data.spots, q => q === c, oldSpots, addEnd);
     pl.fun = .25*pl.spots.length;
     if (pl.spots.length) fresh.set(pl.id, pl);
   }
@@ -542,7 +584,7 @@ function* buildNetworkGen(oldDoors, oldSpots){
     const pl = { id: 'm:' + m.id, mega: m, x: m.x, z: m.z, jobs: L.jobs*tiers, fun: L.fun*tiers, night: L.night || 0, open: !!L.open, patrol: !!L.patrol, doors: [], spots: [] };
     if (L.open){
       // the spots noted while the square was built: the crowd, cafe stools, queues and stall keepers' places
-      makeSpots(pl, m.data ? m.data.spots : [], c => c && c.mega === m.id, oldSpots, addEnd);
+      yield* makeSpots(pl, m.data ? m.data.spots : [], c => c && c.mega === m.id, oldSpots, addEnd);
       pl.stalls = new Map();
       for (const sp of pl.spots) if (sp.stall !== null && sp.stall !== undefined){
         let st = pl.stalls.get(sp.stall); if (!st) pl.stalls.set(sp.stall, st = { id: sp.stall, keepers: [], queue: [] });
@@ -600,7 +642,7 @@ function* buildNetworkGen(oldDoors, oldSpots){
     yield* plotEdgesGen(c, ends, closedMega(c) ? (a, b) => (a.kind === 'd') !== (b.kind === 'd') : () => true);
   }
   places.clear(); for (const [k, v] of fresh) places.set(k, v); placesEpoch++;
-  rebuildDoorMeshes();
+  if (NETOLD()) rebuildDoorMeshes(); else { yield* doorMeshGen(); doorMeshCommit(); }   // (the door meshes of the new list made in steps into spare arrays, put in the live ones in this step: round 9 item 3)
 }
 // the walking network made in steps: its tables are swapped in only while a step runs, so the people go on using the old ones until the new are done
 let NET_JOB = null;
@@ -643,6 +685,31 @@ function rebuildDoorMeshes(){
     doorLight.setMatrixAt(i, doorPart(B, 0, .34, .006, .35, .68, .012));
     setPanel(i, d); doorPanel.setColorAt(i, _dc.setHex(d.col));
   }
+  doorFrame.count = n*3; doorLight.count = doorPanel.count = n;
+  doorFrame.instanceMatrix.needsUpdate = doorLight.instanceMatrix.needsUpdate = doorPanel.instanceMatrix.needsUpdate = true;
+  if (doorPanel.instanceColor) doorPanel.instanceColor.needsUpdate = true;
+}
+// the same matrices, made into spare arrays a hundred and fifty doors a step (nothing allocated: the matrices are reused) and copied into the instance arrays at the end, so the meshes switch to the new doors in one go
+const DM = { frame: new Float32Array(DOOR_MAX*3*16), light: new Float32Array(DOOR_MAX*16), panel: new Float32Array(DOOR_MAX*16), col: new Float32Array(DOOR_MAX*3), n: 0 };
+const _dB = new THREE.Matrix4(), _dP = new THREE.Matrix4();
+const doorPartInto = (out, B, x, y, z, w, h, dd) => out.copy(B).multiply(_dl.compose(_p.set(x, y, z), _q.identity(), _s.set(w, h, dd)));
+function* doorMeshGen(){
+  const list = doorList, n = Math.min(list.length, DOOR_MAX); DM.n = n;
+  for (let i = 0; i < n; i++){
+    if (i && i % 150 === 0 && NETSPLIT()) yield;
+    NETC.meshDoors++; const d = list[i], B = _dB.copy(doorBasis(d));
+    doorPartInto(_dP, B, -.2, .36, .025, .05, .72, .05).toArray(DM.frame, i*3*16);
+    doorPartInto(_dP, B, .2, .36, .025, .05, .72, .05).toArray(DM.frame, (i*3 + 1)*16);
+    doorPartInto(_dP, B, 0, .745, .025, .45, .06, .05).toArray(DM.frame, (i*3 + 2)*16);
+    doorPartInto(_dP, B, 0, .34, .006, .35, .68, .012).toArray(DM.light, i*16);
+    doorPartInto(_dP, doorBasis(d), d.open*.37, .34, .045, .35, .66, .03).toArray(DM.panel, i*16);
+    _dc.setHex(d.col).toArray(DM.col, i*3);
+  }
+}
+function doorMeshCommit(){
+  const n = DM.n;
+  doorFrame.instanceMatrix.array.set(DM.frame.subarray(0, n*3*16)); doorLight.instanceMatrix.array.set(DM.light.subarray(0, n*16)); doorPanel.instanceMatrix.array.set(DM.panel.subarray(0, n*16));
+  if (doorPanel.instanceColor) doorPanel.instanceColor.array.set(DM.col.subarray(0, n*3));
   doorFrame.count = n*3; doorLight.count = doorPanel.count = n;
   doorFrame.instanceMatrix.needsUpdate = doorLight.instanceMatrix.needsUpdate = doorPanel.instanceMatrix.needsUpdate = true;
   if (doorPanel.instanceColor) doorPanel.instanceColor.needsUpdate = true;

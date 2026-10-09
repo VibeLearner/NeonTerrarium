@@ -18,6 +18,11 @@
     oldMax: 2.4,       // the first composer lets the whole Karplus-Strong buffer ring
     dampRel: 0.045,    // a pluck that does not belong to a new chord is damped over this long
     padXfade: 0.09,    // pad notes that leave at a chord change fade over this long, new ones fade in over it
+    // sampled sounds (round 5). The sampler cuts every pluck at newMax with a dampRel release, so a
+    // sampled twinkle note never rings longer than the synth one. Longest recorded tails in the pack
+    // (seconds, from samples/manifest.json, checked by lint.js):
+    sampled: { gtr_green: 1.2, vibes: 3.0, glock: 2.2, marimba: 1.6, kalimba: 1.8, fmpiano: 2.4, upright: 2.6, bass_fashion: 1.6, bass_double: 1.8 },
+    sampledCut: 1.2,   // what the sampler enforces for every twinkle instrument (= newMax)
   };
 
   // ------------------------------------------------------------------------------------------

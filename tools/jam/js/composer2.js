@@ -551,7 +551,7 @@
         }
         if (c.riff) lastRiffM = m;
         const v = clamp((c.riff ? (c.acc ? 0.6 : c.k === 2 ? 0.44 : 0.38) : c.acc ? 0.62 : c.pick ? 0.4 : 0.46) * (0.55 + 0.6 * e) * crescendo, 0.1, 0.95);
-        out.push({ l: 'twinkle', k: 'pluck', bar: q, s: c.s, n: Math.min(m, band[1]), v, variant: (k + b) % 2, pan: ((k * 37 + b * 11) % 7 - 3) / 7, cap: true });
+        out.push({ l: 'twinkle', k: 'pluck', bar: q, s: c.s, n: Math.min(m, band[1]), v, variant: (k + b) % 2, pan: ((k * 37 + b * 11) % 7 - 3) / 7, cap: true, riff: !!c.riff, acc: !!c.acc });
       });
       // emo strum on the first beat of a new chord (never while keys or pads are sustaining)
       const newChord = q === 0 || sec.bc[b].root !== sec.bc[b - 1].root || sec.bc[b].base !== sec.bc[b - 1].base;

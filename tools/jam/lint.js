@@ -315,3 +315,24 @@ if (require.main === module) {
   if (args.md) fs.writeFileSync(args.md, text);
   if (args.json) fs.writeFileSync(args.json, JSON.stringify(report, null, 1));
 }
+
+// ---------------------------------------------------------------- sampled sounds: ring times (round 5)
+// J.RING.sampled lists the longest recorded tail of every sampled instrument. The sampler cuts plucks at
+// J.RING.sampledCut (= newMax) with a dampRel release, so what the lint measures is what you hear. This
+// check keeps the table honest: it reads the manifest and fails if the pack and the table disagree.
+(function ringCheck() {
+  const mf = path.join(base, 'samples', 'manifest.json');
+  if (!fs.existsSync(mf)) return;
+  const m = JSON.parse(fs.readFileSync(mf, 'utf8'));
+  const R = J.RING, bad = [];
+  if (R.sampledCut > R.newMax + 1e-9) bad.push('sampledCut > newMax');
+  Object.keys(m.instruments).forEach(g => {
+    let mx = null;
+    (function w(o) { if (Array.isArray(o)) o.forEach(w); else if (o && typeof o === 'object') { if ('maxlen' in o) mx = Math.max(mx || 0, o.maxlen); Object.values(o).forEach(w); } })(m.instruments[g]);
+    if (mx === null) return;                                  // drum kits have no tails to track
+    if (!(g in R.sampled)) bad.push(g + ' missing from J.RING.sampled');
+    else if (Math.abs(R.sampled[g] - mx) > 1e-6) bad.push(g + ': table ' + R.sampled[g] + ' vs pack ' + mx);
+  });
+  console.log(bad.length ? 'RING CHECK FAILED: ' + bad.join('; ') : 'ring check: J.RING.sampled matches the pack (sampled plucks are cut at ' + R.sampledCut + ' s)');
+  if (bad.length) process.exitCode = 1;
+})();

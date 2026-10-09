@@ -22,20 +22,25 @@
     hIdx: saved.hIdx === undefined ? 0 : saved.hIdx,
     ratings: saved.ratings || [],
     composer: saved.composer === 'old' ? 'old' : 'new',
+    sound: saved.sound === 'synth' ? 'synth' : 'sampled',
+    inst: Object.assign({}, J.SAMPLER_DEFAULTS, saved.inst || {}),
   };
   if (S.hIdx >= S.history.length) S.hIdx = S.history.length - 1;
   let saveT = null;
   function persist() { clearTimeout(saveT); saveT = setTimeout(() => store.save(S), 250); }
 
   // ---------------------------------------------------------------- audio objects (created on the first click)
-  let ctx = null, synth = null, engine = null;
+  let ctx = null, synth = null, engine = null, sampler = null;
   function ensureAudio() {
     if (ctx) return;
     const AC = window.AudioContext || window.webkitAudioContext;
     ctx = new AC({ latencyHint: 'interactive' });
     synth = new J.Synth(ctx);
-    engine = new J.Engine(ctx, synth);
-    window.__jam = { ctx, synth, engine };            // handy for debugging in the console
+    sampler = new J.Sampler(ctx, synth);
+    sampler.choice = Object.assign({}, S.inst); sampler.on = S.sound === 'sampled'; sampler.onstatus = paintSound;
+    engine = new J.Engine(ctx, synth, { sampler });
+    sampler.sync(); paintSound();
+    window.__jam = { ctx, synth, engine, sampler };            // handy for debugging in the console
     engine.setParams(S.params); engine.setGame(S.game); engine.composerKind = S.composer;
     engine.setTexture({ vinyl: S.tex.vinyl, hum: S.tex.hum, radio: S.tex.radio });
     engine.setGated(S.tex.gate);
@@ -150,6 +155,28 @@
     tod: { day: 'Day: a little brighter and more energetic, less jazz.', dusk: 'Dusk: more emo open chords, a hint of radio.', night: 'Night: jazzier, leaning to half-time, less dense, more space.' },
   };
   const CN = { new: 'New composer: harmony planned per phrase, cadences, a returning hook, plucks damped at chord changes.', old: 'Old composer: the first version, kept for comparing. Same seed, same sliders.' };
+  // Sounds: the oscillator voices as before, or the recorded single-note instruments (CC0, see samples/CREDITS.md)
+  const SN = { sampled: 'Sampled sounds: drums, electric piano and guitar are recordings of single notes and hits. Every note still comes from the composer. Until a file has loaded, that instrument plays as a synth.', synth: 'Synth sounds: every instrument is an oscillator voice, as before.' };
+  function paintSound() {
+    const st = sampler ? sampler.status : null, el = $('#soundNote');
+    let t = SN[S.sound];
+    if (S.sound === 'sampled') {
+      if (!sampler) t += ' (Loads when you press Play.)';
+      else if (st.state === 'loading') t = 'Loading sounds: ' + st.loaded + ' of ' + st.total + ' files. The synth voices cover any instrument that is not ready yet.';
+      else if (st.state === 'error') t = 'Could not load the sound files (' + st.message + '). Playing synth sounds. Opus audio needs a recent Chrome, Edge, Firefox or Safari.';
+      else if (st.state === 'ready') t = 'Sampled sounds ready (' + sampler.wanted().length + ' instrument sets loaded).';
+    }
+    el.textContent = t;
+  }
+  buildSeg($('#segSound'), [['synth', 'Synth sounds'], ['sampled', 'Sampled sounds']], () => S.sound, v => {
+    if (S.sound === v) return;
+    S.sound = v; persist(); if (sampler) sampler.setOn(v === 'sampled'); paintSound();
+  });
+  $('#abEvery8').addEventListener('change', e => {
+    if (engine) { engine.abEvery8 = e.target.checked; if (!e.target.checked && sampler) { sampler.on = S.sound === 'sampled'; } }
+    if (!engine && e.target.checked) $('#soundNote').textContent = 'Press Play first, then switch this on.';
+  });
+  paintSound();
   buildSeg($('#segComposer'), [['old', 'Old composer'], ['new', 'New composer']], () => S.composer, v => {
     if (S.composer === v) return;
     S.composer = v; persist(); $('#composerNote').textContent = CN[v];
@@ -192,6 +219,15 @@
       '<div class="meter"><i></i></div>' +
       '<input type="range" min="0" max="120" aria-label="' + n + ' level">' +
       '<div class="ms"><button type="button" class="m" aria-pressed="false" title="Mute">M</button><button type="button" class="s" aria-pressed="false" title="Solo">S</button></div>';
+    if (J.SAMPLER_CHOICES[n]) {
+      const sel = document.createElement('select'); sel.className = 'inst'; sel.setAttribute('aria-label', n + ' instrument'); sel.title = 'Instrument for this layer when sampled sounds are on';
+      J.SAMPLER_CHOICES[n].forEach(([v, label]) => { const o = document.createElement('option'); o.value = v; o.textContent = label; sel.appendChild(o); });
+      sel.value = S.inst[n];
+      sel.addEventListener('change', () => { S.inst[n] = sel.value; persist(); if (sampler) { sampler.setChoice(n, sel.value); paintSound(); } });
+      el.insertBefore(sel, el.querySelector('.ms'));
+    } else if (n === 'pads' || n === 'lead') {
+      const tag = document.createElement('div'); tag.className = 'inst-fixed'; tag.textContent = 'synth'; el.insertBefore(tag, el.querySelector('.ms'));
+    }
     $('#mixer').appendChild(el);
     const fad = $('input', el), mBtn = $('.m', el), sBtn = $('.s', el);
     const f0 = S.faders[n] === undefined ? DEFAULT_FADER[n] : S.faders[n];
@@ -215,7 +251,7 @@
       const li = document.createElement('li');
       const meta = document.createElement('div'); meta.className = 'meta';
       const g = r.game || {};
-      meta.innerHTML = '<b>seed ' + escapeHtml(r.seed) + '</b> ' + escapeHtml((r.song && r.song.key) || '') + (r.song ? ' ' + r.song.bpm + ' BPM' : '') + ' &middot; ' + escapeHtml((r.composer || 'old') + ' composer') +
+      meta.innerHTML = '<b>seed ' + escapeHtml(r.seed) + '</b> ' + escapeHtml((r.song && r.song.key) || '') + (r.song ? ' ' + r.song.bpm + ' BPM' : '') + ' &middot; ' + escapeHtml((r.composer || 'old') + ' composer' + (r.sound ? ', ' + r.sound + ' sounds' : '')) +
         ' &middot; ' + escapeHtml([g.tod, g.rain ? 'rain' : null, g.view !== 'street' ? g.view : null].filter(Boolean).join(', ')) +
         (r.at ? '<br>at ' + escapeHtml(r.at.section + ' ' + r.at.meter) : '') + (r.note ? '<br>&ldquo;' + escapeHtml(r.note) + '&rdquo;' : '');
       const tag = document.createElement('span'); tag.className = 'tag ' + r.verdict; tag.textContent = r.verdict === 'keep' ? 'KEEP' : 'NO';
@@ -237,6 +273,9 @@
     sliderEls.bpm.inp.value = S.params.bpm > 0 ? Math.round(S.params.bpm) : 59; sliderEls.bpm.paint();
     J.PARAM_KEYS.forEach(k => { const e = sliderEls[k]; e.inp.value = Math.round(S.params[k] * 100); e.val.textContent = e.inp.value; e.inp.style.setProperty('--fill', e.inp.value + '%'); });
     if (r.game) { Object.assign(S.game, r.game); refreshSegs(); if (engine) engine.setGame(S.game); updateGameNote(); }
+    if (r.sound === 'synth' || r.sound === 'sampled') { S.sound = r.sound; if (sampler) sampler.setOn(r.sound === 'sampled'); $('#segSound').querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-pressed', String(['synth', 'sampled'][i] === S.sound))); }
+    if (r.instruments) { Object.assign(S.inst, r.instruments); if (sampler) Object.keys(r.instruments).forEach(k => { sampler.choice[k] = r.instruments[k]; }); document.querySelectorAll('select.inst').forEach(sl => { const k = sl.getAttribute('aria-label').replace(' instrument', ''); if (S.inst[k]) sl.value = S.inst[k]; }); if (sampler) sampler.sync(); }
+    paintSound();
     if (engine) engine.setParams(S.params);
     pushSeed(r.seed); persist(); startPlay();
   }
@@ -247,6 +286,8 @@
   }
   function rate(verdict) {
     const snap = engine ? engine.snapshot() : { seed: curSeed(), params: Object.assign({}, S.params), startParams: Object.assign({}, S.params), game: Object.assign({}, S.game), song: null, at: null };
+    const sndNow = engine && engine.abEvery8 && engine.abNow ? engine.abNow : S.sound;
+    snap.sound = sndNow; snap.instruments = sndNow === 'sampled' ? Object.assign({}, S.inst) : null;
     const rec = Object.assign({ id: Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), time: new Date().toISOString(), verdict, note: $('#note').value.trim() }, snap);
     S.ratings.push(rec); persist(); renderRatings();
     $('#note').value = '';

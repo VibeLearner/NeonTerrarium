@@ -37,6 +37,10 @@
     <div class="seg-group composerbox"><span class="lbl">Composer</span>
       <div class="seg" id="segComposer" role="group" aria-label="Composer: old or new"></div>
       <p class="hint" id="composerNote"></p></div>
+      <div class="seg-group composerbox"><span class="lbl">Sounds</span>
+      <div class="seg" id="segSound" role="group" aria-label="Sounds: synth or sampled"></div>
+      <label class="hint" style="display:block"><input type="checkbox" id="abEvery8"> Switch between synth and sampled every 8 bars</label>
+      <p class="hint" id="soundNote" role="status"></p></div>
     <p id="seedhelp" class="hint">A seed always plays the same piece for the same settings. Any text works as a seed. Big slider moves are best heard after Restart, because key and tempo are chosen when a piece starts.</p>
   </section>
 
@@ -143,6 +147,7 @@
 <script src="js/composer.js"></script>
 <script src="js/composer2.js"></script>
 <script src="js/midi.js"></script>
+<script src="js/sampler.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/ui.js"></script>
 </body>

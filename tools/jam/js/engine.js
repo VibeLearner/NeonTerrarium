@@ -22,6 +22,9 @@
     this.stats = { bars: 0, late: 0, maxLate: 0 };
     let comp = null, queue = [], cur = null, stepIdx = 0, tNext = 0, barT0 = 0, stepDur = 0.086, ui = [], timer = null, worker = null;
     let epoch = 0;
+    this.sampler = opts.sampler || null;          // recorded-instrument sampler (js/sampler.js); null = synth sounds only
+    const sampler = this.sampler;
+    this.abEvery8 = false;                        // alternate synth and sampled sounds every 8 bars
 
     // ---------------------------------------------------------------- settings
     function pushMix() {
@@ -47,6 +50,7 @@
       // pre-render plucked strings a bar before they are needed
       bar.ev.forEach(e => {
         if (e.l !== 'twinkle') return;
+        if (sampler && sampler.handles('twinkle')) return;      // sampled twinkle needs no pre-rendered strings (a missing sample still renders on the fly)
         if (e.k === 'pluck') synth.prepare(e.n, e.variant || 0); else if (e.k === 'strum') e.notes.forEach(n => synth.prepare(n, 0));
       });
       queue.push(bar);
@@ -56,6 +60,7 @@
       this.seed = String(seed);
       epoch++;
       synth.releaseAll(ctx.currentTime, 0.04);
+      if (sampler) { sampler.releaseAll(ctx.currentTime, 0.04); sampler.setSeed(seed); }
       this.startParams = Object.assign({}, this.P);
       this.startGame = Object.assign({}, this.G);
       this.startComposer = (this.composerKind === 'old' || !J.Composer2) ? 'old' : 'new';
@@ -72,6 +77,7 @@
     this.stop = function () {
       this.running = false; stopTimer();
       synth.releaseAll(ctx.currentTime, 0.05);
+      if (sampler) sampler.releaseAll(ctx.currentTime, 0.05);
     };
 
     // ---------------------------------------------------------------- scheduling
@@ -80,17 +86,18 @@
       switch (ev.l) {
         case 'drums':
           switch (ev.k) {
-            case 'kick': synth.kick(t, ev.v, { sub: ev.sub }); break;
-            case 'snare': synth.snare(t, ev.v, { ghost: ev.ghost, rim: ev.rim }); break;
-            case 'hat': synth.hat(t, ev.v, ev.open); break;
-            case 'ride': synth.ride(t, ev.v); break;
-            case 'crash': synth.crash(t, ev.v); break;
-            case 'tom': synth.tom(t, ev.v, ev.f); break;
+            case 'kick': if (!(sampler && sampler.drum(t, ev, bar))) synth.kick(t, ev.v, { sub: ev.sub }); break;
+            case 'snare': if (!(sampler && sampler.drum(t, ev, bar))) synth.snare(t, ev.v, { ghost: ev.ghost, rim: ev.rim }); break;
+            case 'hat': if (!(sampler && sampler.drum(t, ev, bar))) synth.hat(t, ev.v, ev.open); break;
+            case 'ride': if (!(sampler && sampler.drum(t, ev, bar))) synth.ride(t, ev.v); break;
+            case 'crash': if (!(sampler && sampler.drum(t, ev, bar))) synth.crash(t, ev.v); break;
+            case 'tom': if (!(sampler && sampler.drum(t, ev, bar))) synth.tom(t, ev.v, ev.f); break;
           } break;
-        case 'bass': synth.bass(t, ev.n, dur, ev.v, ev.mode, ev); break;
-        case 'keys': synth.keys(t, ev.notes, dur, ev.v, ev); break;
+        case 'bass': if (!(sampler && sampler.bass(t, ev, dur, bar))) synth.bass(t, ev.n, dur, ev.v, ev.mode, ev); break;
+        case 'keys': if (!(sampler && sampler.keys(t, ev, dur))) synth.keys(t, ev.notes, dur, ev.v, ev); break;
         case 'twinkle':
-          if (ev.k === 'pluck') synth.pluck(t, ev.n, ev.v, ev);
+          if (ev.k === 'pluck') { if (!(sampler && sampler.pluck(t, ev))) synth.pluck(t, ev.n, ev.v, ev); }
+          else if (sampler && sampler.pluck(t, ev, ev.notes)) { /* played from samples */ }
           else ev.notes.forEach((n, i) => synth.pluck(t + i * (ev.strum || 0.014), n, ev.v * (0.85 + 0.05 * i), { variant: 0, pan: (i - 1.5) * 0.25, cap: ev.cap }));
           break;
         case 'pads': synth.pad(t, ev.notes, dur, ev.v, ev); break;
@@ -103,7 +110,7 @@
         case 'fx':
           if (ev.k === 'duck') synth.duck(t, ev.depth, ev.rel);
           else if (ev.k === 'padcut') synth.setPadCutoff(ev.hz, t, 0.6);
-          else if (ev.k === 'damp') synth.damp(t, ev.pcs, J.RING.dampRel);
+          else if (ev.k === 'damp') { synth.damp(t, ev.pcs, J.RING.dampRel); if (sampler) sampler.damp(t, ev.pcs, J.RING.dampRel); }
           break;
       }
     }
@@ -133,6 +140,7 @@
           stepIdx = 0; barT0 = tNext;
           stepDur = 60 / cur.bpm / 4 / cur.clock;
           this.stats.bars++;
+          if (sampler && this.abEvery8 && !opts.manual) { sampler.on = sampler.wanted().every(g => sampler.isReady(g)) && (Math.floor((this.stats.bars - 1) / 8) % 2 === 0); this.abNow = sampler.on ? 'sampled' : 'synth'; }
           composeNext();                       // compose the following bar now so its notes can be prepared early
           synth.setDelayTime(3 * stepDur, tNext);
           ui.push({ t: tNext, bar: cur, stepDur });
@@ -216,7 +224,15 @@
     const sr = o.sampleRate || 44100, secs = o.seconds || 60;
     const ctx = new OfflineAudioContext(2, Math.floor(sr * secs), sr);
     const synth = new J.Synth(ctx);
-    const eng = new J.Engine(ctx, synth, { manual: true });
+    let sampler = null;
+    if (o.sampled) {                                  // sampled sounds: needs the page served over http
+      sampler = new J.Sampler(ctx, synth, { base: o.samplesBase || 'samples/' });
+      if (o.inst) Object.assign(sampler.choice, o.inst);
+      sampler.on = true;
+      await sampler.sync();
+      if (sampler.status.state !== 'ready') throw new Error('samples not ready: ' + sampler.status.message);
+    }
+    const eng = new J.Engine(ctx, synth, { manual: true, sampler });
     if (o.params) eng.setParams(o.params);
     if (o.game) eng.setGame(o.game);
     if (o.mix) Object.keys(o.mix).forEach(k => { if (o.mix[k].mute) synth.setMute(k, true); if (o.mix[k].solo) synth.setSolo(k, true); });

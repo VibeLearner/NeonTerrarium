@@ -393,3 +393,7 @@ cache on both sides.
 - Items 9, 10: custom shapes are 29.8% of the triangles put (rounded boxes 15%, cyl16 11.8%); flat detail on walls is 7 to 8% (under the 20% bar).
 - Items 11, 12: main-thread spread and the collision pass's every-N-th-frame spike; zoom 60 table; the cache frame's live pass holds 1.16 million triangles at zoom 30.
 - Item 13 (extra, 6ecac6e): the cache frame's live pass no longer draws objects only the margin band could show: max city zoom 30, 1024x576: 1,990 to 1,363 draw calls, 1.67 M to 1.28 M triangles; pictures identical (cache steps 70/70 and 12/12, standard script 0).
+
+## Round 7 (wip/round7)
+
+See tools/perf/OVERNIGHT2.md: cache copy drawn by default (item 1); the never-visible question settled (about 22 to 25% of drawn building triangles are never seen; no view set is exact, item 2); JS heap -709 MB at load in the biggest city (merged geometry's CPU copies freed after upload); night stalls traced to the police bikes' route search, lurkers' victim scan, dense-crowd collision frames (two fixed exactly); placing upkeep 25% faster with identical results and a spread-over-frames option; steam update 0.47 ms faster; turn detail starts at 6 px a frame (cheat, crops).

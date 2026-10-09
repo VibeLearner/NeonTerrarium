@@ -138,3 +138,62 @@ A lean variant means a second set of triangles for each round part in the same b
 **2e. Thin sticks at far zoom: not built (the rule's measurement came out above 10%, but the real saving is smaller than first thought).** Sticks are about 47% of the drawn triangles at zoom 30 and replacing each by its most frontal long side or a quad would save about 13% of drawn triangles.
 But the walls already go through the facing arcs: every stick's long sides are in the wall slices (`sideLayout`), and the arc leaves out the slices that face away, so about half of a stick's four long sides is already not drawn and the end caps go as small triangles. What is left to save is the second visible side of each stick, which needs
 its own narrower arc, which needs its own slice rows in the layout (same cost as 2d). Test name reserved: "full sticks". Next round, with 2d.
+
+## Table
+
+| item | status | commit | check |
+|---|---|---|---|
+| 1 copy the cache by drawing | done | 2352815 | standard script + cache steps 0 differences |
+| 2a never visible: reconcile | done (measurement) | 84b7487, 899843b | owner's probe reproduced to the triangle; 10 crops |
+| 2b remove never-seen | stopped by the ladder, nothing shipped | 523f239 | 3.0 to 7.9% false removals against a dense reference |
+| 2c custom shapes | done (ranked, measured), no exact fix worth shipping | 5b26878 | duplicates 0.08%, inside rounded solids 0.4% |
+| 2d lean round parts | skipped | | |
+| 2e thin sticks | skipped | | |
+| 3 placement freeze | partly: spread version opt-in (33 ms rule not met); exact speedups on by default | 19faead, c86aae8 | harness 106 captures, 0 problems; network hashes identical |
+| 4 stalls and memory | done: heap -709 MB (-24%), stall causes found, two fixed exactly | 35d72bb, 53aa309 | harness city/dense/megas 106 captures and maxcity night steps, 0 problems |
+| 5 zoom 30 main thread | partly: steam, doors exact; grid, draw calls, glass measured and not built | b36fa91 | harness 53 captures, 0 problems |
+| 6 turning at zoom 30 | done (cheat, crops) | 5733ecf | harness 53 captures, 0 problems (the script doesn't turn at those speeds) |
+
+Skipped, one sentence each:
+- 2d (lean round parts): needs a second set of triangles per round part and its own row dimension in the index layout, a day of work in the code every region passes through, and it is a cheat that needs your approval first.
+- 2e (thin sticks): the facing arcs already leave out about half of every stick's long sides, and the rest needs its own narrower arc and rows in the layout (same cost as 2d).
+- 2b (not skipped but not shipped): no view set reaches zero false removals; the cheat design is in the 2b section.
+- Item 5's collision grid, draw-call merges and glass merges: measured, reasons in the item 5 section (below 0.3 ms, or not the same picture).
+
+## Decisions I made (one line on why)
+
+1. Item 1 default: draw the copy (as the plan said); the blit stays behind a test so you can measure both in one build.
+2. 2a: ran your probe untouched first, then only variants of it (denser views, finer pixels, tie and hider analysis), so the answer is yours reproduced, not mine.
+3. 2b: stopped after three attempts at density and offsets: zero against a sampled reference is not proof, and a wrong removal is a missing speck of wall.
+4. 3: the spread-over-frames placement is opt-in, not the default, because it moves the people's random draws (the harness's edit steps would fail) and it still doesn't reach 33 ms on this machine (walking network 90 to 130 ms, generation 50 to 70 ms are single calls).
+5. 3: the exact speedups (number sets, map-based neighbor pairs, no strings, steam map kept) are on by default, because they give the same city and make the old default faster.
+6. 4: only the merged region geometry loses its CPU arrays, and only after its upload (three.js's `onUpload` callback); the plots' own geometry stays because re-merging, the walking maps and door ray tests read it.
+7. 4: the bike route search was made faster with identical routes rather than spread over frames, because spreading would change when bikes start moving.
+8. 4: lurkers use a grid in walker order, so the pick is the same one, rather than a cheaper rule that picks a different victim.
+9. 5: no kept collision grid (about 0.2 ms on average and changes who bumps whom), no draw-call merges of signs or glass (transparent order changes the picture).
+10. 6: `SD.v0` 6 only; the third class and a gentler step gain 3 to 4 points more for more lost detail, and slow drags (under 5 px a frame) stay at 0.0%.
+11. Every item's check was run against the previous commit (`--base HEAD`) so each pushed commit stands on its own.
+
+## For you to decide, with the numbers
+
+1. **Turn detail start 10 to 6 px a frame** (cheat, built): medium turns 2.4 to 17.6% fewer color-pass triangles, fast spins 18 to 33%, slow drags unchanged. Crops: tools/perf/overnight2/item6_city_0p012.png. Test "turn detail: start at 10 px a frame (as before)".
+2. **Spread the placing upkeep over frames by default** (built, off): the placing call drops from about 300 to 68 ms (house) but the next frames still hold the walking network (90 to 130 ms here) and generation (50 to 70 ms), and people differ after an edit. Test "edit upkeep spread over frames (people differ)".
+3. **Approve 2b** (never-seen triangles, about 22% of drawn building triangles, a few false removals to accept) **and 2d, 2e** (lean round parts, thin sticks; about 15% and a few percent): each needs a layout change; I'd start with 2b.
+4. **The police alert frame** (about 22 ms: two bike route searches in one frame) and the first frames' decisions: spreading them changes when bikes start. Fine to spread?
+5. **Overlay merge** (exact, about 180 of 1,480 draw calls) is worth building if the draw submission limits you; signs and glass merges need your approval as a cheat.
+6. **Drop the plots' own CPU geometry too** (another 1,065 MB of the 2.3 GB): needs the walking maps and door ray tests to keep compact copies; say if you want it.
+
+## Measurement script for your thread (under 15 minutes; old b6d34e5 against new wip/round7)
+
+Same Chrome, laptop on power, maxcity, render 720p, optimize framerate off, no other heavy tabs. Two checkouts: `git worktree add ../old b6d34e5` and the branch `wip/round7`; serve each in turn.
+1. Zoom 30 then zoom 15, each: wait 10 s still, read the overlay's FPS and "main thread ms"; slow pan (hold an arrow key) 10 s, read the same; slow turn (drag the mouse slowly, under 5 px a frame) 10 s, read the same; medium turn (drag at a brisk walking pace, 10 to 15 px a frame) 10 s, read FPS (this is what item 6 changes: also try the test "turn detail: start at 10 px a frame" in the new build to see the difference in one build).
+2. Placing: in each build place a house, then a tall tower, at the same spot (the green plot next to the middle); in the console run `__worst = 0; (function f(){ const t = performance.now(); requestAnimationFrame(() => { __worst = Math.max(__worst, performance.now() - t); f(); }); })()` before, wait 3 s after the placement, read `__worst`. Then in the new build set `window.__SYNC_LATER = true` and repeat.
+3. Exact timing at zoom 30 still (Shift+F3): note the main-thread bars (updatePeople, updateSteam, others) in old and new.
+4. Memory: Chrome task manager (Shift+Esc) the page's memory footprint after load: the new build should read about 0.7 GB less JS memory.
+5. If a stall shows (a frame over 100 ms at night in rain), record it with the trace steps in item 4 and send the file.
+In the harness on your machine, the same numbers come with `PERF_GPU=1 python3 tools/perf/harness.py time --ref b6d34e5 --frames 120` and the same with `--ref wip/round7`, and the laps with `python3 tools/perf/laps.py maxcity --ref b6d34e5` and `python3 tools/perf/laps.py maxcity`.
+
+## Overlay tests added this round
+
+"copy the cache by blitting (not drawing)" (item 1, default flipped), "edit upkeep spread over frames (people differ)" (3), "keep the CPU copies of merged geometry" (4), "lurkers scan every walker (same picture)" (4), "bike routes: a key lookup per point (same picture)" (4), "steam: every puff in full (same picture)" (5), "turn detail: start at 10 px a frame (as before)" (6), "edit upkeep: a key string per path point (same picture)" (3), "steam map: rebuilt at every edit (same picture)" (3).
+The probe scripts (one.py, visprobe.py, live_tris.py, hidden_count.py, shapes_sites.py) set `window.__KEEP_CPU = true` because they read geometry arrays.

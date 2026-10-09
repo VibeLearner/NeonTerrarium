@@ -68,6 +68,7 @@ function frame(now){
   PH.lap('steam, rain, camera');
   runLater();
   stageStep();   // a plot being built in steps: a few milliseconds of it (world.js)
+  pmTick();      // plots' own arrays let go once merged (recipe.js)
   stepSync();   // what an edit leaves to do, a stage a frame (world.js)
   flushSolid();   // regions whose pieces changed are merged again (world.js)
   nvTick();   // idle frames: faces no camera ever sees are worked out for a plot, a few views a frame (neverseen.js)

@@ -52,7 +52,7 @@ if __name__ == '__main__':
     if a.no_edits: ACTS = ACTS[:-1]
     with sync_playwright() as pw:
         br = pw.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-vsync', '--enable-precise-memory-info', '--js-flags=--expose-gc'])
-        ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init=GL)
+        ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init=GL + os.environ.get('PERF_INIT', ''))
         cdp = ctx.new_cdp_session(pg)
         pg.evaluate('z => { zoom = zoomT = z; }', a.zoom)
         pg.evaluate('n => __perf.cap(n, 3)', 10)

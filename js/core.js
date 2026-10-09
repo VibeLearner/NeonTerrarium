@@ -299,6 +299,12 @@ function bucketIndexUpTo(b){
   if (!b.i){ b.i = []; b.ni = 0; }
   const n = b.p.length/3; for (let v = b.ni; v < n; v++) b.i.push(v); b.ni = n;
 }
+// The random numbers a plot's generation draws (detail and flicker ids) go through fxRand, so that a plot can be made again exactly: collectGen records the draws (FX.rec) or
+// replays a recording (FX.src, FX.at). Math.random is called once per draw either way when recording, and not at all when replaying.
+let FX = null;
+const fxRand = () => FX === null ? Math.random() : FX.src ? (FX.at < FX.src.length ? FX.src[FX.at++] : fxOut()) : (FX.rec.push(Math.random()), FX.rec[FX.rec.length - 1]);
+const fxOut = () => { throw new Error('a plot made again drew more random numbers than when it was first made'); };
+let FX_REPLAY = null;   // set by the caller of collectGen when the draws of an earlier run are to be used again
 // Is this piece a fine detail? Sticks (two thin sides: posts, rails, cables, frames, pipes) and tiny bits
 // (small in every direction). Flat panels, with only one thin side, are kept: they read even when small.
 let LAST_STICK = false; const STICK_W = .06;
@@ -308,14 +314,14 @@ function detailId(geo, m){
   const e = m.elements;
   const d = [Math.hypot(e[0], e[1], e[2])*s[0], Math.hypot(e[4], e[5], e[6])*s[1], Math.hypot(e[8], e[9], e[10])*s[2]].sort((a, b) => a - b);
   LAST_STICK = d[1] < STICK_W && d[2] >= .14;   // (a long piece thin in two directions: see FAR_CFG)
-  return (d[1] < .09 || d[2] < .14) ? 1 + Math.floor(Math.random()*255) : 0;
+  return (d[1] < .09 || d[2] < .14) ? 1 + Math.floor(fxRand()*255) : 0;
 }
 // which lights flicker: some neon, fewer lamps and trims, the odd window (Math.random, so the city's layout
 // randomness is untouched)
 const FLK_ODDS = { neon: .08, bulb: .06, trim: .03, window: .02 };
-function flickerId(kind){ return Math.random() < (FLK_ODDS[kind] || 0) ? 1 + Math.floor(Math.random()*198) : 0; }
+function flickerId(kind){ return fxRand() < (FLK_ODDS[kind] || 0) ? 1 + Math.floor(fxRand()*198) : 0; }
 // ids 200 to 254 flicker hard and often: the failing lights of a dark street
-const heavyFlickerId = () => 200 + Math.floor(Math.random()*55);
+const heavyFlickerId = () => 200 + Math.floor(fxRand()*55);
 function bucketGeometry(b){
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3));

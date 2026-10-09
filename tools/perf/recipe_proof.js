@@ -23,6 +23,7 @@ window.__proof = (() => {
       P[tag + ':draw'] = g.drawRange.start + ',' + g.drawRange.count;
       P[tag + ':user'] = hs(js(g.userData));
       const b = g.boundingSphere; P[tag + ':bs'] = b ? [b.center.x, b.center.y, b.center.z, b.radius].join(',') : '-';
+      const bx = g.boundingBox; P[tag + ':bb'] = bx ? [bx.min.x, bx.min.y, bx.min.z, bx.max.x, bx.max.y, bx.max.z].join(',') : '-';
     }
     P.nGeo = n;
     for (const k of ['fol', 'glows', 'emitters', 'pads', 'ports', 'spots']) P['data.' + k] = hs(js(c.data[k]));
@@ -101,5 +102,13 @@ window.__proof = (() => {
     if (liveRand !== job.rw.res.calls) d.push('random calls (' + liveRand + ' vs ' + job.rw.res.calls + ')');
     return { d, rand: liveRand };
   }
-  return { one, oneW, fp, live };
+  // a plot's current data against the same plot made again from the recipe and draws kept with it
+  function regen(c, world){
+    const rec = c.data && c.data.rec; if (!rec || !rec.r) return { err: 'no recipe kept' };
+    const A = parts({ data: c.data, _written: [] });
+    let sb; try { sb = recipeGen(Object.assign({}, rec.r, { draws: rec.draws }), world); } catch (e) { return { err: String(e.message || e) }; }
+    const B = parts({ data: sb.data, _written: [] }); for (const g of sb.data.geo.values()) g.dispose();
+    return { d: diff(A, B) };
+  }
+  return { one, oneW, fp, live, regen };
 })();

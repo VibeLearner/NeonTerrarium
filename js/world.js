@@ -530,6 +530,7 @@ function* collectGen(body){
   FAR_CFG.lean = !!(PH.tests.leanRound || window.__LEAN_ROUND); FAR_CFG.sticks = !!(PH.tests.thinSticks || window.__THIN_STICKS);   // (both off unless the tests are on)
   buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {}; curSpots = []; curCover = [];
   for (const k in SPR.size) FOL_LIST[k] = [];
+  FX = FX_REPLAY ? { src: FX_REPLAY, at: 0 } : { rec: [] }; FX_REPLAY = null;
   yield* body; yield;
   const covers = curCover; curCover = null;
   const geo = new Map();
@@ -573,10 +574,10 @@ function* collectGen(body){
     else if (nh) g.userData.shown = ni - nh;   // (the hidden triangles come after this many indices: see hideBefore)
     geo.set(ATLAS, g);
   }
-  for (const g of geo.values()) g.computeBoundingSphere();
+  for (const g of geo.values()){ g.computeBoundingSphere(); g.computeBoundingBox(); }   // (the box too: world.add and remove note a plot's box for the static cache, and a plot whose arrays were let go should not need them for it)
   const fol = {}; for (const k in FOL_LIST) if (FOL_LIST[k].length) fol[k] = FOL_LIST[k];
-  const out = { geo, fol, glows: glowList, emitters, pads: carPads, ports: curPorts, spots: curSpots };
-  glowList = null; buckets = new Map(); curSpots = null;
+  const out = { geo, fol, glows: glowList, emitters, pads: carPads, ports: curPorts, spots: curSpots, draws: FX.rec ? Float64Array.from(FX.rec) : null };
+  FX = null; glowList = null; buckets = new Map(); curSpots = null;
   return out;
 }
 function disposeData(d){ if (d) for (const g of d.geo.values()) g.dispose(); }
@@ -1476,10 +1477,15 @@ function corridorTris(geoMap, sx, sz, ex, ez, by0, by1, pad = .25){
 }
 function rayTris(tris, ray, far, hit){ let best = far; for (let k = 0; k < tris.length; k += 3) if (ray.intersectTriangle(tris[k], tris[k + 1], tris[k + 2], false, hit)){ const dd = hit.distanceTo(ray.origin); if (dd < best) best = dd; } return best; }
 // how far past a walkway's end the neighbour's wall really is (a round or set-back tower stands short of the plot's edge)
+// (the corridor in front of a walkway's end, in the world: its two ends and the unit step between them)
+function wallCorridor(F, z1, far){ const W = (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix4(F), a = W(0, 0, z1), b = W(0, 0, z1 + far); return { a, b, ux: (b.x - a.x)/far, uz: (b.z - a.z)/far }; }
 function wallGap(n, F, y0, z1, far = 1.6){
-  if (!n || !n.data || !n.data.geo) return 0;
-  const W = (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix4(F), a = W(0, 0, z1), b = W(0, 0, z1 + far), ux = (b.x - a.x)/far, uz = (b.z - a.z)/far;
-  const tris = corridorTris(n.data.geo, a.x, a.z, b.x, b.z, y0 + .2, y0 + .9), ray = new THREE.Ray(), hit = new THREE.Vector3(), ds = [];
+  const { a, b, ux, uz } = wallCorridor(F, z1, far);
+  let tris;
+  if (n && n._wallTris) tris = n._wallTris();   // (a stand-in for the plot, made from a recipe: the triangles were taken on the page, see recipeOf)
+  else { if (!n || !n.data || !n.data.geo) return 0; tris = corridorTris(n.data.geo, a.x, a.z, b.x, b.z, y0 + .2, y0 + .9); }
+  if (!tris) return 0;
+  const ray = new THREE.Ray(), hit = new THREE.Vector3(), ds = [];
   for (const h of [.3, .55, .8]) for (const o of [-.2, 0, .2]){ ray.origin.set(a.x + uz*o, y0 + h, a.z - ux*o); ray.direction.set(ux, 0, uz); ds.push(rayTris(tris, ray, far, hit)); }
   ds.sort((p, q) => p - q);
   const d = ds[ds.length - 2];   // the second furthest: a rail or a plant stops some rays short
@@ -1542,7 +1548,9 @@ function rebuildCell(c){
   c.dark = isDarkPlot(c);
   DARK = c.dark;
   SIDE_SPLIT = true;
+  const rec = recipeOf(c);
   try { c.data = drain(collectGen(cellBody(c))); } finally { DARK = false; SIDE_SPLIT = false; }
+  attachRec(c.data, rec, c.data.draws);
   rebuildCellPost(c);
 }
 function rebuildCellPost(c){
@@ -1563,13 +1571,13 @@ let _stageTick = 0;
 const stageNow = () => window.__realNow ? ++_stageTick : performance.now();   // (under the test harness, whose clock is scripted, a step budget counts steps, so two runs do the same)
 const STAGE_ON = () => !(PH.tests.stageNow || window.__STAGE_NOW);
 const FOL_KEYS = Object.keys(SPR.size);
-const stageCap = () => ({ R, buckets, emitters, carPads, curPorts, glowList, curSpots, curCover, fol: FOL_KEYS.map(k => FOL_LIST[k]), DARK, SIDE_SPLIT, PUT_KEEPOUT, STAGE });
+const stageCap = () => ({ R, buckets, emitters, carPads, curPorts, glowList, curSpots, curCover, fol: FOL_KEYS.map(k => FOL_LIST[k]), DARK, SIDE_SPLIT, PUT_KEEPOUT, STAGE, FX });
 const stageApply = s => { R = s.R; buckets = s.buckets; emitters = s.emitters; carPads = s.carPads; curPorts = s.curPorts; glowList = s.glowList; curSpots = s.curSpots; curCover = s.curCover;
-  for (let q = 0; q < FOL_KEYS.length; q++) FOL_LIST[FOL_KEYS[q]] = s.fol[q]; DARK = s.DARK; SIDE_SPLIT = s.SIDE_SPLIT; PUT_KEEPOUT = s.PUT_KEEPOUT; STAGE = s.STAGE; };
+  for (let q = 0; q < FOL_KEYS.length; q++) FOL_LIST[FOL_KEYS[q]] = s.fol[q]; DARK = s.DARK; SIDE_SPLIT = s.SIDE_SPLIT; PUT_KEEPOUT = s.PUT_KEEPOUT; STAGE = s.STAGE; FX = s.FX; };
 const stageGen = job => { job.gen = (function*(){ job.data = yield* collectGen(cellBody(job.c)); })(); };
 function stageStart(c, onDone){
-  const job = { c, onDone, state: null, dark: isDarkPlot(c), keep: null, data: null, gen: null, rw: null };
-  if (RW.usable()) RW.request(job); else stageGen(job);   // (round 9: made by the plot worker, off this thread, when it is there; else in steps as before)
+  const job = { c, onDone: d => { if (d && !d.rec) attachRec(d, job.r, d.draws); onDone(d); }, state: null, dark: isDarkPlot(c), keep: null, data: null, gen: null, rw: null, r: null };
+  if (RW.usable()) RW.request(job); else { job.r = recipeOf(c); stageGen(job); }   // (round 9: made by the plot worker, off this thread, when it is there; else in steps as before)
   STAGE_Q.push(job); return job;
 }
 // a plot the worker made: its fields and air flag go on the plot, its data is the job's
@@ -1579,7 +1587,7 @@ function stageTake(job){
   if (window.__randAdvance && rw.res.rs != null) __randAdvance(rw.res.rs, rw.res.calls);   // (the test harness: the stream goes on from where the worker left it)
   const u = recipeUnpack(rw.res.msg);
   Object.assign(job.c, u.fields); if (u.air) airCells.add(job.c); else airCells.delete(job.c);
-  job.data = u.data; return true;
+  job.data = u.data; attachRec(u.data, job.r, u.draws); return true;
 }
 function stageSlice(job){   // one step of the job; true when it is finished
   const prev = stageCap();
@@ -1671,7 +1679,11 @@ let SOLID_JOB = null;
 function solidSlice(){ SC_DIRTY.quiet++; try { return SOLID_JOB.gen.next().done; } finally { SC_DIRTY.quiet--; } }
 function solidFinish(){ if (SOLID_JOB){ while (!solidSlice()); SOLID_JOB = null; } }
 function solidStep(ms){
-  if (!SOLID_JOB){ if (!solidDirty.size) return; const k = solidDirty.values().next().value; solidDirty.delete(k); SOLID_JOB = { key: k, gen: rebuildSolidGen(k) }; }
+  if (!SOLID_JOB){
+    if (!solidDirty.size) return;
+    let k = null; for (const q of solidDirty) if (pmBlockReady(q)){ k = q; break; }   // (a block whose plots' arrays have to be made again waits for them, the old merge staying drawn)
+    if (k === null) return;
+    solidDirty.delete(k); SOLID_JOB = { key: k, gen: rebuildSolidGen(k) }; }
   const t0 = stageNow();
   do { if (solidSlice()){ SOLID_JOB = null; break; } } while (stageNow() - t0 < ms);
   FRAME_WORK += stageNow() - t0;
@@ -1709,6 +1721,7 @@ function* rebuildSolidGen(key){
   freezeTree(g);   // (the glow overlays of the new meshes are made here)
   solidRemoveOld(key); ovCommit(key);   // the swap: the old block and its overlays out, the new in, the plots' own meshes hidden
   for (const o of hideList) o.visible = false;
+  for (const o of hideList){ const pc = o.userData.cell; if (pc) pmSchedule(pc); }   // (merged in: its own arrays are let go: recipe.js)
   for (const o of farMeshes){ FAR_MESHES.add(o); } if (farMeshes.length) FARM.stamp++;
   world.add(g); solidRegions.set(key, { group: g, members, far: farMeshes, geoms });
 }

@@ -34,7 +34,7 @@ self.onmessage = e => {
       for (const [k, e] of m.rb){ rbCache.set(k, rbUnpack(e)); rbKnown.add(k); }   // (the page's shapes win: see recipe.js)
       rs = m.rs === undefined ? null : m.rs; calls = 0;
       let out;
-      try { out = recipePack(recipeGen(m.r, world)); } catch (err){ post({ t: 'err', id: m.id, err: String(err && err.message || err) }); return; }
+      try { out = recipePack(recipeGen(m.r, world), !!m.regen); } catch (err){ post({ t: 'err', id: m.id, err: String(err && err.message || err) }); return; }
       const end = rs; rs = null;
       const rb = []; for (const [k, g] of rbCache) if (!rbKnown.has(k)){ rbKnown.add(k); rb.push([k, rbPack(g, true)]); }
       post({ t: 'done', id: m.id, msg: out.msg, calls, rs: end, rb }, out.xfer.concat(rb.flatMap(([k, e]) => Object.values(e.a).map(x => x.a.buffer).concat(e.i ? [e.i.buffer] : []))));

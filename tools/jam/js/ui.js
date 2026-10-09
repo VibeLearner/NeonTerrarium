@@ -23,6 +23,7 @@
     ratings: saved.ratings || [],
     composer: saved.composer === 'old' ? 'old' : 'new',
     sound: saved.sound === 'synth' ? 'synth' : 'sampled',
+    mixChain: saved.mixChain !== false,
     inst: Object.assign({}, J.SAMPLER_DEFAULTS, saved.inst || {}),
   };
   if (S.hIdx >= S.history.length) S.hIdx = S.history.length - 1;
@@ -36,6 +37,7 @@
     const AC = window.AudioContext || window.webkitAudioContext;
     ctx = new AC({ latencyHint: 'interactive' });
     synth = new J.Synth(ctx);
+    synth.setMixChain(S.mixChain);
     sampler = new J.Sampler(ctx, synth);
     sampler.choice = Object.assign({}, S.inst); sampler.on = S.sound === 'sampled'; sampler.onstatus = paintSound;
     engine = new J.Engine(ctx, synth, { sampler });
@@ -172,6 +174,8 @@
     if (S.sound === v) return;
     S.sound = v; persist(); if (sampler) sampler.setOn(v === 'sampled'); paintSound();
   });
+  $('#mixChain').checked = S.mixChain;
+  $('#mixChain').addEventListener('change', e => { S.mixChain = e.target.checked; persist(); if (synth) synth.setMixChain(S.mixChain); });
   $('#abEvery8').addEventListener('change', e => {
     if (engine) { engine.abEvery8 = e.target.checked; if (!e.target.checked && sampler) { sampler.on = S.sound === 'sampled'; } }
     if (!engine && e.target.checked) $('#soundNote').textContent = 'Press Play first, then switch this on.';
@@ -274,6 +278,7 @@
     J.PARAM_KEYS.forEach(k => { const e = sliderEls[k]; e.inp.value = Math.round(S.params[k] * 100); e.val.textContent = e.inp.value; e.inp.style.setProperty('--fill', e.inp.value + '%'); });
     if (r.game) { Object.assign(S.game, r.game); refreshSegs(); if (engine) engine.setGame(S.game); updateGameNote(); }
     if (r.sound === 'synth' || r.sound === 'sampled') { S.sound = r.sound; if (sampler) sampler.setOn(r.sound === 'sampled'); $('#segSound').querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-pressed', String(['synth', 'sampled'][i] === S.sound))); }
+    if (r.mixChain !== undefined) { S.mixChain = !!r.mixChain; $('#mixChain').checked = S.mixChain; if (synth) synth.setMixChain(S.mixChain); }
     if (r.instruments) { Object.assign(S.inst, r.instruments); if (sampler) Object.keys(r.instruments).forEach(k => { sampler.choice[k] = r.instruments[k]; }); document.querySelectorAll('select.inst').forEach(sl => { const k = sl.getAttribute('aria-label').replace(' instrument', ''); if (S.inst[k]) sl.value = S.inst[k]; }); if (sampler) sampler.sync(); }
     paintSound();
     if (engine) engine.setParams(S.params);
@@ -287,6 +292,7 @@
   function rate(verdict) {
     const snap = engine ? engine.snapshot() : { seed: curSeed(), params: Object.assign({}, S.params), startParams: Object.assign({}, S.params), game: Object.assign({}, S.game), song: null, at: null };
     const sndNow = engine && engine.abEvery8 && engine.abNow ? engine.abNow : S.sound;
+    snap.mixChain = S.mixChain;
     snap.sound = sndNow; snap.instruments = sndNow === 'sampled' ? Object.assign({}, S.inst) : null;
     const rec = Object.assign({ id: Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), time: new Date().toISOString(), verdict, note: $('#note').value.trim() }, snap);
     S.ratings.push(rec); persist(); renderRatings();

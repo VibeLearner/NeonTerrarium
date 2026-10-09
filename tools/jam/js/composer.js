@@ -30,15 +30,15 @@
     const e = Object.assign({}, P);
     const add = (k, v) => { e[k] = clamp(e[k] + v, 0, 1); };
     const out = { layerScale: { drums: 1, bass: 1, keys: 1, twinkle: 1, pads: 1, lead: 1, texture: 1 }, space: 1, weatherHz: 19000,
-      vinyl: 0.5, rain: 0, hum: 0.15, radio: 0, forceFull: false, hatScale: 1 };
+      vinyl: 0.5, rain: 0, hum: 0.15, radio: 0, forceFull: false, hatScale: 1, mixp: { dark: 0, wide: 0, tape: 0, hall: 0 } };
     if (g.tod === 'day') { add('energy', 0.08); add('jazz', -0.12); add('dark', -0.14); add('tempoFeel', -0.10); out.hum = 0.22; }
     else if (g.tod === 'dusk') { add('emo', 0.20); add('dark', 0.05); add('jazz', 0.06); out.radio = 0.4; out.hum = 0.18; }
-    else if (g.tod === 'night') { add('jazz', 0.28); add('dark', 0.12); add('tempoFeel', 0.55); add('energy', -0.10); add('density', -0.05); out.space = 1.25; out.hum = 0.12; out.radio = 0.2; }
-    if (g.rain) { add('density', -0.12); add('energy', -0.08); add('tempoFeel', 0.12); out.space *= 1.6; out.weatherHz = 2300; out.rain = 0.55; out.hatScale = 0.55; }
+    else if (g.tod === 'night') { add('jazz', 0.28); add('dark', 0.12); add('tempoFeel', 0.55); add('energy', -0.10); add('density', -0.05); out.space = 1.25; out.hum = 0.12; out.radio = 0.2; out.mixp.tape = 1; }
+    if (g.rain) { add('density', -0.12); add('energy', -0.08); add('tempoFeel', 0.12); out.space *= 1.6; out.weatherHz = 2300; out.rain = 0.55; out.hatScale = 0.55; out.mixp.dark = 1; out.mixp.wide = 1; }
     if (g.view === 'zoomed') {
       add('energy', -0.25); add('density', -0.35);
       Object.assign(out.layerScale, { drums: 0.12, bass: 0.35, keys: 0.5, twinkle: 0.35, pads: 1.3, lead: 0.0 });
-      out.space *= 1.8;
+      out.space *= 1.8; out.mixp.hall = 1;
     } else if (g.view === 'busy') {
       add('energy', 0.18); add('density', 0.30); add('dnb', 0.30);
       out.forceFull = true; out.hum = Math.max(out.hum, 0.38); out.radio = Math.max(out.radio, 0.6);

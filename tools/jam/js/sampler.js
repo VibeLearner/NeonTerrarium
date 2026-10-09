@@ -191,7 +191,7 @@
       src.playbackRate.value = tune;
       const g = ctx.createGain();
       const gain = GAIN[kitName] * Math.pow(clamp(v / layer.center, 0.55, 1.6), 0.6) * levelVar(hitCount) * (kind === 'kick' ? 1 : 0.95);
-      g.gain.value = gain;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + 0.0012);   // 1.2 ms fade-in: some trimmed hits start mid-wave
       const end = t + buf.duration / tune;
       claim('drums', t, end, g);
       src.connect(g); g.connect(hitBus(kind));
@@ -265,7 +265,7 @@
       const lay = n.layers.length > 1 ? Math.pow(clamp(vel / layer.center, 0.6, 1.5), 0.5) : Math.pow(clamp(vel, 0.05, 1), 0.85);
       const peak = GAIN[inst] * (o.gain || 1) * lay * levelVar(hitCount);
       const end = Math.min(t + natural, off + rel);
-      g.gain.setValueAtTime(peak, t);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + 0.0012);   // 1.2 ms fade-in
       if (off < t + natural - 0.02) { g.gain.setValueAtTime(peak, off); g.gain.linearRampToValueAtTime(0, off + rel); }
       const damper = ctx.createGain();
       const pan = ctx.createStereoPanner(); pan.pan.value = o.pan || 0;

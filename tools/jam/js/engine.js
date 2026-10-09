@@ -32,6 +32,7 @@
       J.LAYERS.forEach(n => s.setStateScale(n, m.layerScale[n] === undefined ? 1 : m.layerScale[n]));
       s.setSpace(m.space);
       s.setWeatherCutoff(m.weatherHz);
+      if (s.setMixPreset) s.setMixPreset(m.mixp);
       s.setTexture({ vinyl: self.textures.vinyl ? m.vinyl : 0, rain: m.rain, hum: self.textures.hum ? m.hum : 0 });
     }
     this.setParams = function (P) { this.P = Object.assign({}, this.P, P); this.mods = J.applyGame(this.P, this.G); pushMix(); };

@@ -19,6 +19,18 @@
     texture: { fader: 0.60, rev: 0.10, dly: 0.00 },
   };
 
+  // round 5 mix: short-room send per layer, high-pass and static EQ cut per layer (kick and bass are never high-passed)
+  const ROOM_SEND = { drums: 0.16, bass: 0, keys: 0.12, twinkle: 0.05, pads: 0, lead: 0.10, texture: 0 };
+  const EQ = {
+    drums:   { hp: 22 },
+    bass:    { hp: 18 },
+    keys:    { hp: 85, cut: [300, -2.0, 1.0] },
+    twinkle: { hp: 170, cut: [320, -2.0, 1.0] },
+    pads:    { hp: 110, cut: [260, -2.5, 0.9] },
+    lead:    { hp: 150, cut: [2000, 0.0, 1.0] },
+    texture: { hp: 90 },
+  };
+  J.MIX_MAKEUP = 0.63;   // glue-stage makeup, set from the offline loudness render (about -14 LUFS integrated)
   const EPS = 1e-4;
 
   // exponential decay envelope helper: 0 -> peak (attack) -> sustain level (decay) -> hold -> release to ~0
@@ -65,7 +77,18 @@
     const vol = ctx.createGain(); vol.gain.value = 0.8;
     const guard = ctx.createWaveShaper();
     { const c = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = (i / 1023) * 2 - 1; c[i] = Math.max(-0.97, Math.min(0.97, x)); } guard.curve = c; }
-    mix.connect(soft); soft.connect(comp); comp.connect(vol); vol.connect(guard); guard.connect(ctx.destination);
+    // round 5 bus: glue compressor, makeup, light tape-style saturation (parallel) with a tone shelf, then the
+    // original soft clip and limiter. setMixChain(false) flattens all of it for comparison.
+    const glue = ctx.createDynamicsCompressor();
+    glue.threshold.value = -20; glue.knee.value = 14; glue.ratio.value = 2; glue.attack.value = 0.03; glue.release.value = 0.2;
+    const glueMk = ctx.createGain(); glueMk.gain.value = J.MIX_MAKEUP || 1.0;
+    const tapeDry = ctx.createGain(); tapeDry.gain.value = 0.7;
+    const tapeWS = ctx.createWaveShaper(); { const c = new Float32Array(2048); for (let i = 0; i < 2048; i++) { const x = (i / 2047) * 2 - 1; c[i] = Math.tanh(x * 1.6) / 1.6; } tapeWS.curve = c; tapeWS.oversample = '2x'; }
+    const tapeWet = ctx.createGain(); tapeWet.gain.value = 0.3;
+    const tapeTone = ctx.createBiquadFilter(); tapeTone.type = 'highshelf'; tapeTone.frequency.value = 9500; tapeTone.gain.value = -1.2;
+    mix.connect(glue); glue.connect(glueMk); glueMk.connect(tapeDry); tapeDry.connect(soft);
+    glueMk.connect(tapeWS); tapeWS.connect(tapeWet); tapeWet.connect(tapeTone); tapeTone.connect(soft);
+    soft.connect(comp); comp.connect(vol); vol.connect(guard); guard.connect(ctx.destination);
     const analyser = ctx.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.7; vol.connect(analyser);
     this.master = { mix, comp, vol, analyser, guard };
 
@@ -94,7 +117,21 @@
     const revHP = ctx.createBiquadFilter(); revHP.type = 'highpass'; revHP.frequency.value = 220;
     const revGate = ctx.createGain(); revGate.gain.value = 1;
     const revOut = ctx.createGain(); revOut.gain.value = 0.9;
-    revIn.connect(preDly); preDly.connect(conv); conv.connect(revHP); revHP.connect(revGate); revGate.connect(revOut); revOut.connect(bus);
+    const revLP = ctx.createBiquadFilter(); revLP.type = 'lowpass'; revLP.frequency.value = 14000; revLP.Q.value = 0.5;
+    revIn.connect(preDly); preDly.connect(conv); conv.connect(revHP); revHP.connect(revLP); revLP.connect(revGate); revGate.connect(revOut); revOut.connect(bus);
+    { // rain widens the hall: two short decorrelated copies panned hard left and right
+      [[0.013, -0.9], [0.021, 0.9]].forEach(([d, pn]) => {
+        const dl = ctx.createDelay(0.05); dl.delayTime.value = d; const pp = ctx.createStereoPanner(); pp.pan.value = pn;
+        const wg = ctx.createGain(); wg.gain.value = 0; revOut.connect(dl); dl.connect(pp); pp.connect(wg); wg.connect(bus); (this._wide = this._wide || []).push(wg);
+      });
+    }
+    // short room for drums, keys and lead (0.7 s, darker); the long hall above is for pads, twinkle and the zoomed-out view
+    const roomIn = ctx.createGain();
+    const roomConv = ctx.createConvolver(); roomConv.buffer = makeIR(0.7, 3.4, 0.6);
+    const roomHP = ctx.createBiquadFilter(); roomHP.type = 'highpass'; roomHP.frequency.value = 260;
+    const roomOut = ctx.createGain(); roomOut.gain.value = 0.8;
+    roomIn.connect(roomConv); roomConv.connect(roomHP); roomHP.connect(roomOut); roomOut.connect(bus);
+    this.room = { input: roomIn };
     this.reverb = { input: revIn, gate: revGate, out: revOut };
     this.gated = false;
 
@@ -155,13 +192,49 @@
         input.connect(hp); hp.connect(pan); head = pan;
       }
       if (head !== input) head.connect(duck); else input.connect(duck);
-      duck.connect(fader); fader.connect(out); out.connect(meter);
+      const eqHP = ctx.createBiquadFilter(); eqHP.type = 'highpass'; eqHP.frequency.value = EQ[name].hp; eqHP.Q.value = 0.6;
+      const eqCut = ctx.createBiquadFilter(); eqCut.type = 'peaking'; eqCut.frequency.value = EQ[name].cut ? EQ[name].cut[0] : 1000; eqCut.gain.value = EQ[name].cut ? EQ[name].cut[1] : 0; eqCut.Q.value = EQ[name].cut ? EQ[name].cut[2] : 1;
+      const carve = ctx.createBiquadFilter(); carve.type = 'peaking'; carve.frequency.value = 3000; carve.Q.value = 0.9; carve.gain.value = 0;   // dips when the lead plays (pads, keys)
+      duck.connect(eqHP); eqHP.connect(eqCut); eqCut.connect(carve);
+      let tail = carve;
+      if (name === 'bass') { const mono = ctx.createGain(); mono.channelCount = 1; mono.channelCountMode = 'explicit'; mono.channelInterpretation = 'speakers'; carve.connect(mono); tail = mono; }   // bass in mono
+      tail.connect(fader); fader.connect(out); out.connect(meter);
+      const room = ctx.createGain(); room.gain.value = ROOM_SEND[name]; out.connect(room); room.connect(roomIn);
       if (name === 'texture') out.connect(mix); else out.connect(bus);
       out.connect(rev); rev.connect(revIn);
       out.connect(dly); dly.connect(dlyIn);
-      this.layers[name] = { input, duck, fader, out, meter, rev, dly, cfg };
+      this.layers[name] = { input, duck, fader, out, meter, rev, dly, cfg, room, eqHP, eqCut, carve };
       this.mixState[name] = { fader: cfg.fader, mute: false, solo: false, state: 1 };
     });
+    this.chainOn = true;
+    this.mixp = { dark: 0, wide: 0, tape: 0, hall: 0 };
+    // game-state mix presets: rain darkens and widens the hall, night warms the tape, zoomed out pushes everything into the hall
+    this.setMixPreset = function (p) {
+      this.mixp = Object.assign({ dark: 0, wide: 0, tape: 0, hall: 0 }, p || {});
+      const t = ctx.currentTime, m = this.mixp;
+      revLP.frequency.setTargetAtTime(14000 - m.dark * 10500, t, 0.5);
+      this._wide.forEach(g => g.gain.setTargetAtTime(this.chainOn ? m.wide * 0.35 : 0, t, 0.5));
+      this.applyTape();
+      this.applyMix();
+    };
+    this.applyTape = function () {
+      const t = ctx.currentTime, m = this.mixp, on = this.chainOn;
+      tapeWet.gain.setTargetAtTime(on ? 0.3 + 0.3 * m.tape : 0, t, 0.3);
+      tapeDry.gain.setTargetAtTime(on ? 0.7 - 0.1 * m.tape : 1, t, 0.3);
+      tapeTone.gain.setTargetAtTime(on ? -1.2 - 2.8 * m.tape : 0, t, 0.3);
+    };
+    // switch the whole round 5 mix chain (EQ, carving, room, glue, tape, bass ducking) on or off
+    this.setMixChain = function (on) {
+      this.chainOn = !!on; const t = ctx.currentTime;
+      glue.threshold.setTargetAtTime(on ? -20 : 0, t, 0.05); glue.ratio.setTargetAtTime(on ? 2 : 1, t, 0.05);
+      glueMk.gain.setTargetAtTime(on ? (J.MIX_MAKEUP || 1) : 1, t, 0.05);
+      LAYERS.forEach(n => {
+        const L = this.layers[n];
+        L.eqHP.frequency.setTargetAtTime(on ? EQ[n].hp : 10, t, 0.05);
+        L.eqCut.gain.setTargetAtTime(on && EQ[n].cut ? EQ[n].cut[1] : 0, t, 0.05);
+      });
+      this.setMixPreset(this.mixp);
+    };
     this.applyMix = function () {
       const anySolo = LAYERS.some(n => this.mixState[n].solo);
       const t = ctx.currentTime;
@@ -170,7 +243,8 @@
         const audible = anySolo ? m.solo : !m.mute;
         this.layers[n].fader.gain.setTargetAtTime(audible ? m.fader * m.state : 0, t, 0.04);
         const L = this.layers[n];
-        L.rev.gain.setTargetAtTime(L.cfg.rev * this.space, t, 0.1);
+        L.rev.gain.setTargetAtTime(L.cfg.rev * this.space * (1 + 0.6 * this.mixp.hall) , t, 0.1);
+        L.room.gain.setTargetAtTime(this.chainOn ? ROOM_SEND[n] * (1 - 0.7 * this.mixp.hall) : 0, t, 0.1);
       });
     };
     this.setFader = (n, v) => { this.mixState[n].fader = v; this.applyMix(); };
@@ -539,6 +613,10 @@
         os.start(t); lfo.start(t); os.stop(stop + 0.02); lfo.stop(stop + 0.02); if (i === 0) dropOnEnd(os, g);
       });
       lp.connect(g); g.connect(this.layers.lead.input);
+      if (this.chainOn) ['pads', 'keys'].forEach(n => {          // pads and keys step back 2 to 4 kHz while the lead plays
+        const p = this.layers[n].carve.gain;
+        p.cancelScheduledValues(t); p.setTargetAtTime(n === 'pads' ? -4 : -3, t, 0.04); p.setTargetAtTime(0, end + 0.12, 0.25);
+      });
     };
     // glassy FM bell, used by the NPC motif test
     this.bell = function (t, midi, vel, dur) {
@@ -646,8 +724,8 @@
 
     // ---------------------------------------------------------------- sidechain-style pump
     this.duck = function (t, depth, rel) {
-      ['pads', 'keys', 'twinkle', 'lead'].forEach((n, i) => {
-        const d = depth * (n === 'pads' ? 1 : n === 'keys' ? 0.55 : n === 'twinkle' ? 0.35 : 0.5);
+      ['pads', 'keys', 'twinkle', 'lead'].concat(this.chainOn ? ['bass'] : []).forEach((n, i) => {
+        const d = depth * (n === 'pads' ? 1 : n === 'keys' ? 0.55 : n === 'twinkle' ? 0.35 : n === 'bass' ? 0.5 : 0.5);
         const p = this.layers[n].duck.gain;
         p.setValueAtTime(1 - d, t);
         p.setTargetAtTime(1, t + 0.012, rel / 3);

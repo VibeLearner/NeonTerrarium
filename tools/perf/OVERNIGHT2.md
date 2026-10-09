@@ -15,7 +15,7 @@ Check: standard script city 25, megas 15, dense 13 captures and the cache steps 
 - Is it depth ties (a face coplanar with another that wins the draw order)? No: 685 of 20,798 never-seen triangles (3.3%, mostly sticks) have a drawn same-facing triangle in the same plane holding their middle. Those must never be removed
   (whether a tie face shows depends on draw order, and the probe's order is not the game's).
 - Is it real occlusion? 395 of 400 sampled never-seen triangles have the triangle that covers them at least .1 units in front of them (only 5 within .1). What covers them: other shapes 38% (the rounded boxes and custom shapes),
-  thin plates 18%, main structure 13%, sticks 16%, glowing parts 6%, windows 5%; in 38% of the cases the covering face is parallel to the hidden one, in the rest at an angle (inside corners, behind posts).
+  thin plates 18%, main structure 13%, sticks 16%, glowing parts 6%, windows 5%; in 47% of the cases the covering face is parallel to the hidden one and faces the same way, in the rest at an angle (inside corners, behind posts).
   So these are faces behind other geometry of the same plot (interiors, the backs of fittings, the far sides of things), which touching-face rules like round 6's flat-face rule can't see.
 - Ten examples with where they are and what hides them: tools/perf/overnight2/item2a_examples.png (each crop: the plot in grey from the allowed view that faces the target best, the target triangle drawn on top in red with a yellow outline,
   the triangle in front of it in blue; label: class, zone, world position, view, the hider's class, its gap and how parallel). All ten are kept by the current build (the flat-face rule never shipped).

@@ -575,12 +575,12 @@ function* atlasGen(bks){
 }
 // The stand-in tier (round 9 item 5, a cheat): the buckets again without the pieces put() noted as small (b.dr: ranges of corners; lights are never in them). The kept pieces' corners
 // are packed together, their triangle lists (hidden ones last) and far-order lists follow. A bucket with nothing dropped is shared as it is. null when nothing is left out.
-const TIER = { make: false, small: .30 };   // (make: only while a plot is made from a recipe, see recipeGen: the page's own generation steps are left as they were)
+const TIER = { make: false, small: .30, near: .15, long: .6 };   // (long: a fine-detail piece (a stick) at least this long stays in the stand-in: the bars running down a tower's face; without them its lit windows merged into bright bands)   // (near: a small piece this close to a light stays in the stand-in: window bars, frames and ribs between lit floors; was .04 and lit panes only, which let the bars across lit towers go)   // (make: only while a plot is made from a recipe, see recipeGen: the page's own generation steps are left as they were)
 function standBuckets(bks){
   let any = false; const out = new Map();
   if (window.__TIER_KEEPALL) return new Map(bks);   // (a test: the stand-in is laid out again from the same buckets, nothing left out, so that what the tier machinery itself changes can be seen on its own)
   // a small piece that touches a lit pane stays (the frames and mullions round and across it: without them the pane reads as a bigger, brighter one): the panes' boxes in a grid
-  const G = .5, GM = .04, wb = [], wg = new Map(), gk = (x, z) => (x + 4096)*8192 + (z + 4096);
+  const G = .5, GM = window.__TIER_NEAR ?? TIER.near, wb = [], wg = new Map(), gk = (x, z) => (x + 4096)*8192 + (z + 4096);
   for (const [mat, b] of bks) if (b.gr) for (let q = 0; q < b.gr.length; q += 2){
     let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9;
     for (let v = b.gr[q]; v < b.gr[q + 1]; v++){ const a = v*3, x = b.p[a], y = b.p[a + 1], z = b.p[a + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; }

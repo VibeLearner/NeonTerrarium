@@ -1,0 +1,46 @@
+[
+ {
+  "tag": "dense_z30_h23_still",
+  "pixels_differ": 128496,
+  "of": 921600,
+  "tris_off": 156736,
+  "tris_on": 156736,
+  "calls_off": 511,
+  "calls_on": 511,
+  "tier": "tiers: 0 blocks full, 49 stand-in, 49 changes",
+  "errs": []
+ },
+ {
+  "tag": "dense_z30_h12_still",
+  "pixels_differ": 60324,
+  "of": 921600,
+  "tris_off": 155668,
+  "tris_on": 155668,
+  "calls_off": 465,
+  "calls_on": 465,
+  "tier": "tiers: 0 blocks full, 49 stand-in, 49 changes",
+  "errs": []
+ },
+ {
+  "tag": "dense_z22_h23_still",
+  "pixels_differ": 45264,
+  "of": 921600,
+  "tris_off": 154424,
+  "tris_on": 154424,
+  "calls_off": 463,
+  "calls_on": 463,
+  "tier": "tiers: 36 blocks full, 13 stand-in, 13 changes",
+  "errs": []
+ },
+ {
+  "tag": "dense_z22_h12_still",
+  "pixels_differ": 26611,
+  "of": 921600,
+  "tris_off": 154170,
+  "tris_on": 154170,
+  "calls_off": 437,
+  "calls_on": 437,
+  "tier": "tiers: 36 blocks full, 13 stand-in, 13 changes",
+  "errs": []
+ }
+]

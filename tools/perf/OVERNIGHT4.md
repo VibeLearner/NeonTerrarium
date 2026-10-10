@@ -169,3 +169,13 @@ Write down: first-frame time, settled-city time, memory, FPS at zoom 30 still, z
 ## Not yet done (nothing planned; kept for the next round)
 
 Items 2 to 7 and the final measurement script. Items listed as skipped will each get a sentence here.
+
+## Fix after review (2026-10-10): the stand-ins keep the long bars
+
+The owner's crops at zoom 30 showed lit towers changing in the stand-in: the bars running down a tower's face (long fine-detail sticks) were dropped, so the lit windows merged into bright bands. The cause was the drop rule taking every fine-detail piece whatever its length; the rule that keeps pieces touching lit panes did not help (widening it to all lights and 15 to 40 cm barely moved the difference), and with nothing dropped (`__TIER_KEEPALL`) the pictures are identical.
+
+Changes: a fine-detail piece at least `TIER.long` = 0.6 units long stays (`__TIER_LONG` to try others); the keep-near-lights rule now counts every light, not only window panes, within `TIER.near` = 0.15 (`__TIER_NEAR`).
+
+New crops in `tools/perf/overnight4/fix/` (still views; the turn crops in the folder above are from the old rule). Pixels that differ, dense scene, old rule then new: zoom 30 night 191,622 then 128,496; zoom 30 day 113,257 then 60,324; zoom 22 night 45,264, day 26,611. The striped tower that turned into bright bands now matches; what is left is scattered single pixels.
+
+Cost: the stand-in is now 55% of a full plot's triangles and 56% of its bytes (was 46% and 47%), dense scene, 186 plots: empty 77%, high 81%, industrial 51%, low 52%, mid 50%. Expect the maxcity graphics saving at zoom 30 to fall from about 44% to roughly 38% (estimated from the per-plot share, not measured).

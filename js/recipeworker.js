@@ -26,7 +26,7 @@ self.onmessage = e => {
       THREE.WebGLRenderer = function(){ new THREE.Material(); new THREE.Material(); return mk('renderer'); };   // (the real renderer makes its two shadow-pass materials, which take two of three's ids; builders use a material's id (industrial window colors), so the ids must agree)
       THREE.TextureLoader = class { load(){ return new THREE.Texture(); } };
       for (const u of m.urls) importScripts(u);
-      post({ t: 'ready', sig: recipeMatSig() });
+      post({ t: 'ready', sig: MATREG.sig });
     } else if (m.t === 'world'){
       world = recipeWorldOf(m.hw, m.mt);
     } else if (m.t === 'gen'){

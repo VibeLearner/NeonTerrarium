@@ -174,7 +174,7 @@ function recipeUnpack(m){
 
 // the load-time materials as one number (the worker and the page must agree before the worker is used: same ids for the same materials)
 function recipeMatSig(){ let h = 2166136261; for (const m of MATREG.list){ const t = m.id + ':' + m.type + ':' + (m.color ? m.color.getHex() : '') + ':' + (m.emissive ? m.emissive.getHex() : '') + ';'; for (let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } } return (h >>> 0) + ':' + MATREG.list.length; }
-MATREG.open = false;
+MATREG.open = false; MATREG.sig = recipeMatSig();   // (taken now, at load: the time of day recolors some materials (the clouds, for one) on the first frames, and the worker's is taken at the same point of its own load)
 
 // The rounded boxes (core.js roundedBox) are cached by their sizes to two places of decimals, and a later box of nearly the same size takes the first one's shape, so what a
 // plot looks like by a few thousandths depends on which plot asked first. To make a plot the same in the worker as on the page, the two keep one cache: each request
@@ -203,7 +203,7 @@ RW.start = () => {
   RW.w.onmessage = e => {
     const m = e.data;
     if (m.t === 'ready'){
-      if (m.sig !== recipeMatSig()){ RW.state = 'failed'; RW.error = 'materials differ: ' + m.sig + ' vs ' + recipeMatSig(); RW.w.terminate(); return; }
+      if (m.sig !== MATREG.sig){ RW.state = 'failed'; RW.error = 'materials differ: ' + m.sig + ' vs ' + MATREG.sig; RW.w.terminate(); return; }
       RW.state = 'ready';
     } else if (m.t === 'err' && m.id === undefined){
       RW.state = 'failed'; RW.error = m.err; RW.w.terminate();

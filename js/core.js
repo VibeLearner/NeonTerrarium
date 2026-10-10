@@ -306,7 +306,10 @@ function bucketIndexUpTo(b){
 // replays a recording (FX.src, FX.at). Math.random is called once per draw either way when recording, and not at all when replaying.
 let FX = null;
 const fxRand = () => FX === null ? Math.random() : FX.src ? (FX.at < FX.src.length ? FX.src[FX.at++] : fxOut()) : (FX.rec.push(Math.random()), FX.rec[FX.rec.length - 1]);
-const fxOut = () => { throw new Error('a plot made again drew more random numbers than when it was first made'); };
+// A plot made again that draws more than it did the first time: it goes on with fresh numbers rather than stopping the game (it used to throw, inside the frame loop, which
+// froze the page); counted in FX_OVER and warned about once, so a test can still find it. Its detail and flicker ids past that point may differ from the first time.
+let FX_OVER = 0;
+const fxOut = () => { if (!FX_OVER++) console.warn('a plot made again drew more random numbers than when it was first made (going on with fresh ones)'); return Math.random(); };
 let FX_REPLAY = null;   // set by the caller of collectGen when the draws of an earlier run are to be used again
 // Is this piece a fine detail? Sticks (two thin sides: posts, rails, cables, frames, pipes) and tiny bits
 // (small in every direction). Flat panels, with only one thin side, are kept: they read even when small.

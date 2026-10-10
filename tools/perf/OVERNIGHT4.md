@@ -179,3 +179,11 @@ Changes: a fine-detail piece at least `TIER.long` = 0.6 units long stays (`__TIE
 New crops in `tools/perf/overnight4/fix/` (still views; the turn crops in the folder above are from the old rule). Pixels that differ, dense scene, old rule then new: zoom 30 night 191,622 then 128,496; zoom 30 day 113,257 then 60,324; zoom 22 night 45,264, day 26,611. The striped tower that turned into bright bands now matches; what is left is scattered single pixels.
 
 Cost: the stand-in is now 55% of a full plot's triangles and 56% of its bytes (was 46% and 47%), dense scene, 186 plots: empty 77%, high 81%, industrial 51%, low 52%, mid 50%. Expect the maxcity graphics saving at zoom 30 to fall from about 44% to roughly 38% (estimated from the per-plot share, not measured).
+
+## Fixes after the owner's benchmark (2026-10-10)
+
+On the owner's Chrome the build froze on load. Two causes, both found and fixed:
+1. **The worker never started.** The page compared the worker's material signature with one taken when the worker reported ready, after the time of day had already recolored some materials on the first frames (the clouds), so it always differed (reproduced here with the same numbers: `389502996:712 vs 2430897162:712`). Both sides now take it when the material list closes at load (`MATREG.sig`).
+2. **The fallback froze the page.** A plot made again that drew more random numbers than the first time threw inside the frame loop. It now goes on with fresh numbers, counts it in `FX_OVER` and warns once in the console.
+
+Checked: a real-clock page (worker on) loads the city from recipes with no errors through repeated zooms in and out; the harness city check against cc5f320 gives 0 problems.

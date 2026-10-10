@@ -8,7 +8,7 @@ and a baker that spends a set time a step, never the software renderer's drawing
  5. a plot's removal drops its bake; clearCache() empties the store and every plot is queued and baked again
  6. no page errors, no console errors
    python3 tools/perf/bake_probe.py city [--real]       (PERF_PORT=... if the default port is taken)
---real: the page runs on the real clock with the worker on (no scripted clock, the game's own frame loop); the scripts are injected by the probe (test-only: the game's index.html does not load bakejob.js yet)."""
+--real: the page runs on the real clock with the worker on (no scripted clock, the game's own frame loop); bakejob.js is part of the page; the probe puts the placeholder baker back and turns the setting on (BAKE does nothing while it is off)."""
 import argparse, json, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -37,7 +37,9 @@ def open_in(ctx, url, sc, real, errs, cons):
         pg.evaluate('() => { S.cycle = false; S.hour = 12; }')
     else:
         pg.add_script_tag(path=os.path.join(HERE, 'page.js')); pg.evaluate('sc => __perf.setup(sc)', sc); pg.evaluate('() => { __perf.skip = true; }')   # (frames are simulated, not drawn: the software renderer takes about a second a frame)
-    pg.add_script_tag(path=os.path.join(REPO, 'js', 'bakejob.js'))
+    # (bakejob.js is in index.html now; the probe swaps in the placeholder baker, which is what it measures)
+    pg.evaluate('() => { BAKE.baker = BAKE.placeholder; BAKE.onReady = null; BAKE.onDrop = null; }')
+    pg.evaluate('() => { window.__BAKED_ON = true; }')
     pg.add_script_tag(path=os.path.join(HERE, 'bake_probe.js'))
     return pg
 

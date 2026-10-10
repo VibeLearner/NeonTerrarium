@@ -37,7 +37,7 @@ async ([zoom, hour, turn, mode, settle]) => {
   // the whole frame drawn (static cache off): triangles and calls; then a run of drawn frames on the card for the time a frame takes
   PH.tests.noStatic = true; __perf.skip = false; const c2 = __perf.cap(4, 4); out.trisFull = c2.info.tris; out.callsFull = c2.info.calls;
   if (!turn){ const gl = renderer.getContext(), t0 = __realNow(); for (let g = 0; g < 30; g++) __step(1); gl.finish(); out.msFrameFull = +((__realNow() - t0)/30).toFixed(2); }
-  PH.tests.noStatic = false; for (let g = 0; g < 6; g++) __step(1);
+  PH.tests.noStatic = false; for (let g = 0; g < 90; g++) __step(1);   // (the static cache is made again in steps: drawn frames until it is whole, then the time)
   if (!turn){ const gl = renderer.getContext(), t0 = __realNow(); for (let g = 0; g < 30; g++) __step(1); gl.finish(); out.msFrameCache = +((__realNow() - t0)/30).toFixed(2); }
   __perf.skip = true;
   let vb = 0, nv = 0, ni = 0; for (const r of solidRegions.values()) for (const g of r.geoms){ const v = g.attributes.position.count; nv += v; vb += v*26; const n = g.index ? g.index.count : 0; ni += n; vb += n*(g.userData.bpe || (v > 65535 ? 4 : 2)); }

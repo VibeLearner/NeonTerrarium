@@ -4,7 +4,7 @@ Base: main at b1ff117. Branch `wip/baked` (pushed). Plan: `claude/baked-far-plan
 
 ## In one paragraph
 
-It works, and it looks close to the real buildings, but it does not pay for itself the way the plan hoped, and it needs a decision from the owner. Item 1 passed: with a relief-mapped shell (the baked depth lets the shader find the surface the real building shows, so frames, sills and balconies keep their parallax), the three prototype plots at zoom 24, 27 and 30, day, dusk and night, still and mid-turn, differ from the real ones only by single-pixel edges. Built into the game (the tier `baked` of the detail tiers, the setting "Baked far buildings", off by default), the city-wide picture is close to real and, at night, close too once the lights that are not windows are kept as real geometry. Two numbers decide it: on the max city at zoom 30 the baked far view draws about as many triangles as the stand-in (6.17 M against 5.97 M, real 7.25 M), and it holds **2.9 GB of baked maps** on the card (61 pages) that the stand-in does not. The look is better than the stand-in at night for windows and frames; at noon the stand-in is as close to real as the baked one, or closer. Everything with the setting off is exactly as before (harness, below).
+It works, and it looks close to the real buildings, but it does not pay for itself the way the plan hoped, and it needs a decision from the owner. Item 1 passed: with a relief-mapped shell (the baked depth lets the shader find the surface the real building shows, so frames, sills and balconies keep their parallax), the three prototype plots at zoom 24, 27 and 30, day, dusk and night, still and mid-turn, differ from the real ones only by single-pixel edges. Built into the game (the tier `baked` of the detail tiers, the setting "Baked far buildings", off by default), the city-wide picture is close to real and, at night, close too once the lights that are not windows are kept as real geometry. Two numbers decide it: on the max city at zoom 30 the baked far view draws about as many triangles as the stand-in (6.17 M against 5.97 M, real 7.25 M), and it holds **2.9 GB of baked maps** on the card (61 pages) that the stand-in does not. The look is better than the stand-in at night for windows and frames; at noon the stand-in is as close to real as the baked one, or closer. Everything with the setting off is exactly as before (harness, below). Mac script for your card: `tools/perf/BAKED_MAC.md`.
 
 ## What each item did
 
@@ -62,6 +62,34 @@ Per baked plot on the max city: shell 104 triangles, kept 2,047 triangles, overl
 
 The last column is what the kept geometry costs: raising the keep distance from 0.3 to 0.45 and painting the lights that are not windows takes the kept triangles per plot from 941 to 208 and the frame to 522 k triangles, but it paints thin lights, which looked wrong at night (first crops); it is `window.__BAKED_SHELL = {keepDist: 0.45}` and `window.__BAKED_NOLIGHTS = true` for the owner to try.
 
+
+### Dense scene, every block baked, through the game (`far_dense_z*_h*_*.png`; pixels of 921,600 that differ at all, so a one-pixel shift counts)
+
+At zoom 24 the swap has not happened (blocks are full up to and including 24: 0 pixels differ, so those crops show nothing); the swap-zoom crops are at 24.5. Triangles are only given for mid-turn captures, where the frame is drawn in full (a still frame is the static cache copied).
+
+| zoom | hour | motion | pixels differ real/stand | pixels differ real/baked | triangles real | stand-in | baked |
+|---|---|---|---|---|---|---|---|
+| 24.5 | 12 | still | 95981 | 368388 | (static cache: not counted) | |  |
+| 24.5 | 12 | turn | 82316 | 375089 | 1189361 | 932841 | 761286 |
+| 24.5 | 19 | still | 166701 | 399236 | (static cache: not counted) | |  |
+| 24.5 | 19 | turn | 126929 | 377580 | 1188435 | 931915 | 760360 |
+| 24.5 | 23 | still | 192374 | 430512 | (static cache: not counted) | |  |
+| 24.5 | 23 | turn | 156050 | 427974 | 1188091 | 931571 | 760016 |
+| 27 | 12 | still | 80270 | 322585 | (static cache: not counted) | |  |
+| 27 | 19 | still | 139915 | 353313 | (static cache: not counted) | |  |
+| 27 | 23 | still | 166888 | 382079 | (static cache: not counted) | |  |
+| 30 | 12 | still | 60415 | 273857 | (static cache: not counted) | |  |
+| 30 | 12 | turn | 47201 | 258418 | 1043588 | 870013 | 747585 |
+| 30 | 19 | still | 110418 | 294621 | (static cache: not counted) | |  |
+| 30 | 23 | still | 128231 | 321737 | (static cache: not counted) | |  |
+| 30 | 23 | turn | 95882 | 297632 | 1044990 | 871415 | 742219 |
+
+Reading it: by this count the baked far view differs from the real one in two to four times as many pixels as the stand-in does, at every zoom, hour and motion (a count of pixels, not of what an eye sees: see the crops). Mid-turn the frame has 1.19 M triangles real, 0.93 M stand-in, 0.76 M baked at zoom 24.5, and at zoom 30 1.04 M, 0.87 M and 0.75 M: baked draws 16 to 19% fewer than the stand-in in the dense scene (the max city, above, is the other way round: about 3% more).
+
+What the crops show where the stand-in is worse: at night the stand-in merges the lit windows of a tower into bright bands and the baked version keeps the window frames (`far_dense_z30_h23_still.png`, the tower on the left).
+
+A diagnostic on the rooftop specks (a rooftop dish with yellow and teal bits that the real one has in other places): with the glow overlays hidden they stay, and with the shells hidden they stay, so they are small real pieces kept next to painted ones, not the overlay: placement differences of single pieces, not a drawing bug.
+
 ### Reading the numbers
 
 * **Triangles**: baked draws about as many as the stand-in on the max city, 3% more, and 12% fewer in the dense scene. The shell itself is nothing (about 100 triangles a plot); what is drawn is mostly the kept geometry (about 2,000 a plot on the max city). Baked does not remove the triangle cost the stand-in has.
@@ -71,9 +99,9 @@ The last column is what the kept geometry costs: raising the keep distance from 
 
 ## Checks
 
-* **Setting off is exact**: `harness.py diff --base b1ff117 --quick --only city`: 25 captures, 0 problems (dense, megas, maxcity steps: see the end of this file).
+* **Setting off is exact**: `harness.py diff --base b1ff117 --quick` against the working tree with the setting at its default (off): city 25 captures, dense 13 and megas 15 (28 together), maxcity `PERF_STEPS=noon_f1,night_zoom_out` 2 captures: 0 problems in all (1280 x 720; the 1920 x 1080 viewport was not run).
 * **Real page** (`tools/perf/baked_real.py island`, the game's own frame loop, the plot worker on, a 480 x 270 window): the city loads from its recipes; the setting on; every plot baked by the worker's shell (9 of 9); 3 of 3 blocks swapped to baked; zoom in (blocks full), out again, the setting off and on again, a plot edited (its bake dropped, made again, swapped back); no page or console error. This check found a regression the harness cannot see: `shell.js` was loaded after `recipe.js`, so the worker (which reads the script list in a timer after `recipe.js` runs) never started; it is before it now. The city scene (171 plots) bakes too slowly in the software renderer for the same script; the plot-count and bake behaviour on it are in the harness crops.
-* **Crops** (`tools/perf/baked/`): the prototype's (real, baked, difference at zoom 24, 27 and 30, day, dusk and night, still and mid-turn, three plots) and the integrated ones (`far_dense_z*_h*_still.png`, `far_turn_dense_*`: real | stand-in | baked | difference real/baked x4 | difference real/stand-in x4), and the max city wide view (`measure_maxcity_wide.png`).
+* **Crops** (`tools/perf/baked/`): the prototype's (`dense_z{24,27,30}_h{12,19,23}_{still,turn}.png` and `_zoom.png`: real | baked | difference x4 for the three plots, made by `baked_proto.py` with the prototype's own bake, at zoom 24, 27 and 30, day, dusk and night, still and mid-turn) and the integrated ones through the game's own tier (`far_dense_z{24,24.5,27,30}_h{12,19,23}_still.png`, `far_dense_z24.5_h{12,19,23}_turn.png`, `far_dense_z30_h{12,23}_turn.png`: real | stand-in | baked | difference real/baked x4 | difference real/stand-in x4, the middle of the picture; zoom 24 is before the swap), and the max city wide view (`measure_maxcity_wide.png`, the same five panels, whole picture).
 
 ## What the crops show (and do not)
 
@@ -89,7 +117,7 @@ The last column is what the kept geometry costs: raising the keep distance from 
 * **Memory reduction** (above) not done; **`BAKE.skip` for far-away plots** is the page budget only.
 * **Worker bake**: the page's step makes the plot (55 to 100 ms) when there is no worker; with the worker it is the worker's.
 * **`tools/perf/baked_prototype.js`** is the item 1 prototype, kept for the crops; its builder (voxel columns) is replaced by `shell.js` in the game.
-* **The first harness diff of the other scenes** with the setting off: see below.
+* **The 1920 x 1080 viewport and the full maxcity script** of the exactness diff were not run (quick mode, one viewport; two maxcity steps).
 
 ## The owner's measurement script
 

@@ -1,0 +1,992 @@
+[
+ {
+  "tag": "dense_z24_h12_still",
+  "pixels_differ": 10511,
+  "of": 921600,
+  "tris_real": 144354,
+  "tris_baked": 144702,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z24_h12_turn",
+  "pixels_differ": 9854,
+  "of": 921600,
+  "tris_real": 1095056,
+  "tris_baked": 1106449,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z24_h19_still",
+  "pixels_differ": 13117,
+  "of": 921600,
+  "tris_real": 1198414,
+  "tris_baked": 1209805,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z24_h19_turn",
+  "pixels_differ": 13069,
+  "of": 921600,
+  "tris_real": 1096850,
+  "tris_baked": 1108243,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z24_h23_still",
+  "pixels_differ": 13016,
+  "of": 921600,
+  "tris_real": 1198352,
+  "tris_baked": 1209743,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z24_h23_turn",
+  "pixels_differ": 13941,
+  "of": 921600,
+  "tris_real": 1095416,
+  "tris_baked": 1106809,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z27_h12_still",
+  "pixels_differ": 7740,
+  "of": 921600,
+  "tris_real": 147782,
+  "tris_baked": 148130,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z27_h12_turn",
+  "pixels_differ": 7715,
+  "of": 921600,
+  "tris_real": 1164340,
+  "tris_baked": 1175733,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z27_h19_still",
+  "pixels_differ": 10196,
+  "of": 921600,
+  "tris_real": 1242953,
+  "tris_baked": 1254344,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z27_h19_turn",
+  "pixels_differ": 9791,
+  "of": 921600,
+  "tris_real": 1166160,
+  "tris_baked": 1177553,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z27_h23_still",
+  "pixels_differ": 9842,
+  "of": 921600,
+  "tris_real": 1242893,
+  "tris_baked": 1254284,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z27_h23_turn",
+  "pixels_differ": 10709,
+  "of": 921600,
+  "tris_real": 1164732,
+  "tris_baked": 1176125,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z30_h12_still",
+  "pixels_differ": 7001,
+  "of": 921600,
+  "tris_real": 149118,
+  "tris_baked": 149466,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z30_h12_turn",
+  "pixels_differ": 6750,
+  "of": 921600,
+  "tris_real": 976053,
+  "tris_baked": 992679,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z30_h19_still",
+  "pixels_differ": 9136,
+  "of": 921600,
+  "tris_real": 1024643,
+  "tris_baked": 1040852,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z30_h19_turn",
+  "pixels_differ": 9570,
+  "of": 921600,
+  "tris_real": 977945,
+  "tris_baked": 994571,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z30_h23_still",
+  "pixels_differ": 8911,
+  "of": 921600,
+  "tris_real": 1024585,
+  "tris_baked": 1040794,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ },
+ {
+  "tag": "dense_z30_h23_turn",
+  "pixels_differ": 9088,
+  "of": 921600,
+  "tris_real": 976519,
+  "tris_baked": 993145,
+  "info": [
+   {
+    "boxes": 41,
+    "faces": 153,
+    "tris": 306,
+    "kept": 1662,
+    "baked": 12385,
+    "atlas": [
+     1024,
+     276
+    ],
+    "mb": 3.23,
+    "holeShare": 0.125,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 30,
+    "faces": 113,
+    "tris": 226,
+    "kept": 1834,
+    "baked": 6939,
+    "atlas": [
+     1024,
+     158
+    ],
+    "mb": 1.85,
+    "holeShare": 0.237,
+    "msShell": 0,
+    "msBake": 0
+   },
+   {
+    "boxes": 79,
+    "faces": 271,
+    "tris": 542,
+    "kept": 1583,
+    "baked": 18171,
+    "atlas": [
+     1024,
+     306
+    ],
+    "mb": 3.59,
+    "holeShare": 0.235,
+    "msShell": 0,
+    "msBake": 0
+   }
+  ],
+  "errs": []
+ }
+]

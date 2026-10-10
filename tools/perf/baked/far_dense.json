@@ -1,0 +1,102 @@
+[
+ {
+  "tag": "dense_z30_h12_turn",
+  "differ_real_baked": 258418,
+  "differ_real_stand": 47201,
+  "errs": [],
+  "baked": {
+   "tris": 747585,
+   "calls": 636,
+   "geos": 494,
+   "tex": 59,
+   "tier": "tiers: 0 blocks full, 49 stand-in (43 baked), 87 changes",
+   "bk": "baked far: 271 ready of 271, queued 0, store hits 0, baked 271, edits 0, failed 0; 7 pages (336 MB)"
+  },
+  "real": {
+   "tris": 1043588,
+   "calls": 552,
+   "geos": 377,
+   "tex": 38,
+   "tier": "tiers: off (test)",
+   "bk": "baked far: off"
+  },
+  "stand": {
+   "tris": 870013,
+   "calls": 552,
+   "geos": 377,
+   "tex": 38,
+   "tier": "tiers: 0 blocks full, 49 stand-in (0 baked), 49 changes",
+   "bk": "baked far: off"
+  },
+  "bkstats": {
+   "baked": 271,
+   "ms": 105106.99999999255,
+   "keptTris": 254919,
+   "ovlTris": 72777,
+   "shellTris": 19212,
+   "texels": 24310784,
+   "holes": 838159,
+   "area": 4626574,
+   "worker": 0,
+   "ph": {
+    "made": 16036.300000000745,
+    "sorted": 95.1000000089407,
+    "face": 559.6000000089407,
+    "read": 45095.199999962,
+    "compact": 183.3999999947846,
+    "pieces": 302.19999995082617,
+    "fill": 52.89999996870756
+   }
+  }
+ },
+ {
+  "tag": "dense_z30_h23_turn",
+  "differ_real_baked": 297632,
+  "differ_real_stand": 95882,
+  "errs": [],
+  "baked": {
+   "tris": 742219,
+   "calls": 694,
+   "geos": 519,
+   "tex": 59,
+   "tier": "tiers: 0 blocks full, 49 stand-in (44 baked), 74 changes",
+   "bk": "baked far: 271 ready of 271, queued 0, store hits 145, baked 126, edits 0, failed 0; 7 pages (336 MB)"
+  },
+  "real": {
+   "tris": 1044990,
+   "calls": 581,
+   "geos": 373,
+   "tex": 38,
+   "tier": "tiers: off (test)",
+   "bk": "baked far: off"
+  },
+  "stand": {
+   "tris": 871415,
+   "calls": 581,
+   "geos": 373,
+   "tex": 38,
+   "tier": "tiers: 0 blocks full, 49 stand-in (0 baked), 49 changes",
+   "bk": "baked far: off"
+  },
+  "bkstats": {
+   "baked": 126,
+   "ms": 82958.69999999553,
+   "keptTris": 127367,
+   "ovlTris": 37823,
+   "shellTris": 9432,
+   "texels": 12188672,
+   "holes": 423528,
+   "area": 2285195,
+   "worker": 0,
+   "ph": {
+    "made": 9132.599999997765,
+    "sorted": 64.99999997764826,
+    "face": 380.99999998137355,
+    "read": 34955.20000001788,
+    "compact": 111.29999999329448,
+    "pieces": 182.8999999910593,
+    "fill": 32.6999999769032
+   }
+  }
+ }
+]

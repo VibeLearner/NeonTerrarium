@@ -1646,7 +1646,7 @@ function stageTake(job){
   if (window.__randAdvance && rw.res.rs != null) __randAdvance(rw.res.rs, rw.res.calls);   // (the test harness: the stream goes on from where the worker left it)
   const u = recipeUnpack(rw.res.msg);
   Object.assign(job.c, u.fields); if (u.air) airCells.add(job.c); else airCells.delete(job.c);
-  job.data = u.data; if (!u.data.sgeo) u.data.noStand = true; attachRec(u.data, job.r, u.draws); return true;   // (noStand: the worker always makes the stand-in; none means it would be the same as the plot)
+  job.data = u.data; u.data.madeBy = 'worker'; if (!u.data.sgeo) u.data.noStand = true; attachRec(u.data, job.r, u.draws); return true;   // (noStand: the worker always makes the stand-in; none means it would be the same as the plot)
 }
 function stageSlice(job){   // one step of the job; true when it is finished
   const prev = stageCap();

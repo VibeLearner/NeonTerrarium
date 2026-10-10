@@ -210,7 +210,7 @@ RW.start = () => {
     } else if (m.t === 'done' || m.t === 'err'){
       if (m.rb) for (const [k, e] of m.rb){ const mine = rbCache.get(k); if (!mine){ rbCache.set(k, rbUnpack(e)); RW.rbSent.add(k); } else if (!sameArr(mine.attributes.position.array, e.a.position.a)) RW.rbSent.delete(k); else RW.rbSent.add(k); }
       const j = RW.jobs.get(m.id); RW.jobs.delete(m.id); if (!j || j.cancelled) return;
-      if (j.regen){ const h = j.regen; if (m.t === 'err'){ h.wait = null; h.fails = (h.fails || 0) + 1; RW.fell++; return; } if (h.c.data === h.d && (h.out || pmNeeds(h, 'stand'))){ PM.async++; const w = h.want; h.want = null; pmFill(h, recipeUnpack(m.msg).data, w); } else h.wait = null; return; }
+      if (j.regen){ const h = j.regen; if (m.t === 'err'){ h.wait = null; h.fails = (h.fails || 0) + 1; RW.fell++; return; } if (h.c.data === h.d && (h.out || pmNeeds(h, 'stand'))){ PM.async++; const w = h.want; h.want = null; h.over = m.over || 0; pmFill(h, recipeUnpack(m.msg).data, w); } else h.wait = null; return; }
       if (m.t === 'err'){ j.fail = m.err; RW.fell++; } else { j.res = m; RW.made++; }
       j.done = true;
     }
@@ -287,7 +287,14 @@ const pmFits = (g, ng) => !!(g && ng) && PM.keys.every(k => { const a = g.attrib
 function pmUnhook(g, from){ for (const k of PM.keys){ const a = g.attributes[k]; if (!a) continue; const v = from && from.attributes[k] ? from.attributes[k].array : new Float32Array(0); Object.defineProperty(a, 'array', { value: v, writable: true, configurable: true, enumerable: true }); } }
 function pmMismatch(h, which, g, ng){
   PM.mismatch++; h.d.pmKeep = true;
-  if (PM.mm.length < 8){ const r = h.d.rec && h.d.rec.r; PM.mm.push({ which, cell: h.c.i + ',' + h.c.j, kind: r && (r.kind || r.t || r.type), v: [g && g.attributes.position.count, ng && ng.attributes.position.count], ix: [g && g.index && g.index.count, ng && ng.index && ng.index.count] }); }
+  if (PM.mm.length < 8){ const rec = h.d.rec, r = rec && rec.r;
+    const e = { which, cell: h.c.i + ',' + h.c.j, v: [g && g.attributes.position.count, ng && ng.attributes.position.count], ix: [g && g.index && g.index.count, ng && ng.index && ng.index.count],
+      over: h.over || 0, draws: rec && rec.draws ? rec.draws.length : null, made: h.d.madeBy || 'page' };
+    // (a look at why: the same plot made here on the page, now, and whether its recipe still reads the same from the city)
+    try { const prev = stageCap(); let pd; try { pd = recipeGen(Object.assign({}, r, { draws: rec.draws }), recipeWorld()).data; } finally { stageApply(prev); }
+      const pg = pd.geo.get(ATLAS); e.page = [pg ? pg.attributes.position.count : null, pd.sgeo ? pd.sgeo.attributes.position.count : null]; for (const x of pd.geo.values()) x.dispose(); if (pd.sgeo) pd.sgeo.dispose(); } catch (err){ e.page = String(err && err.message || err); }
+    try { const now = recipeOf(h.c), skip = (k, v) => k === 'nbrec' || k === 'wt' ? undefined : v; e.recSame = JSON.stringify(now, skip) === JSON.stringify(r, skip); } catch (err){ e.recSame = String(err); }
+    PM.mm.push(e); }
   if (PM.mismatch === 1) console.warn('plot arrays: a plot made again came out different (' + which + ' at ' + h.c.i + ',' + h.c.j + '); its new geometry is used whole. PM.mm has the details.');
 }
 // which: what was asked for ('full', 'stand', or undefined for both). The worker sends the whole plot; only what was asked for is put back, so a block going to its stand-ins

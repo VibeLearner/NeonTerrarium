@@ -47,7 +47,7 @@ window.__sc = (() => {
     const sc = __sp.make(c, seed + it.i*7 + it.j*13, it.over); window.AIR_FORCE = undefined;
     const { parts } = __sp.partsOf(sc.data), pt = parts[0];
     const res = Shell.build([pt], opts);
-    const rec = { p: Array.from(pt.p), i: Array.from(pt.i), boxes: res.boxes, keep: Array.from(res.keep[0]), stats: res.stats };
+    const rec = { p: Array.from(pt.p), i: Array.from(pt.i), boxes: res.boxes, keep: Array.from(res.keep[0]), stats: res.stats, builders: __sp.builders() };
     for (const g of sc.data.geo.values()) g.dispose(); if (sc.data.sgeo) sc.data.sgeo.dispose();
     return rec;
   };

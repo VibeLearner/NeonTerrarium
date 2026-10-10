@@ -1,24 +1,30 @@
-// The shell builder (baked far buildings, item 2). Pure functions, no THREE and no page globals: runs in the page and in node.
+// The shell builder (baked far buildings, item 2). Pure functions, no THREE and no page globals: runs in the page, in a worker and in node.
 //
-// For one plot's finished geometry (positions + triangle indices, one or several parts) it works out a small set of axis-aligned boxes that follow the
-// building's mass, and says which triangles are NOT covered by them and so must stay real geometry ("kept"). Method:
-//   1. voxelize the visible triangles (surface voxels, by sampling each triangle finer than a voxel), everything below groundY left out
-//   2. seal the surface (grow it one voxel), flood the outside, and call everything not outside mass: closed volumes fill, free-standing thin things stay thin
-//   3. open the mass in x and z (erode, grow back, by `open` voxels): railings, antennas, plants, fences and trim thinner than 2*open+1 voxels are not mass
-//   4. cut the mass into boxes: repeatedly take the largest box that fits entirely inside the mass not yet used (so a box never holds volume the building lacks),
-//      until `maxBoxes`, or what is left is small (`minVolFrac` of the mass, or `minVol`)
-//   5. move each box face to the real wall or roof plane next to it (the voxel grid is only 0.2 fine), faces that touch together move together
-//   6. a triangle stays real geometry when any of its points (corners, edge middles, center) is farther than `keepDist` from every box; the rest is buried in
+// For one plot's finished geometry (positions + triangle indices) it works out a small set of axis-aligned boxes that follow the building's mass, and says which
+// triangles are NOT covered by them and so must stay real geometry ("kept"). Method:
+//   1. voxelize every triangle (surface voxels, by sampling each triangle finer than a voxel; undersides too, they close an overhang's volume), nothing below groundY
+//   2. seal the surface (grow it one voxel), flood the outside, and call everything not outside mass (less the outer ring the sealing added): closed volumes fill,
+//      free-standing thin things stay thin
+//   3. open the mass in x and z (erode, grow back, `open` voxels): railings, antennas, fences and trim thinner than 2*open+1 voxels are not mass
+//   4. cut the mass into boxes: repeatedly take the largest box that fits entirely inside the mass not yet used (so a box holds no volume the building lacks), until
+//      `maxBoxes`, or the largest left is small (`minVolFrac` of the mass, or `minVol`). A box that is mostly open air (reached from outside, at least two voxels from
+//      any surface: more than `maxPhantom` of it) is thrown out and its air taken from the mass.
+//   5. move each box face to the real wall or roof plane within a voxel of it (the grid is only 0.2 fine); faces on one plane move together
+//   6. a visible triangle stays real geometry when any of its points (corners, edge middles, center) is farther than `keepDist` from every box; the rest is buried in
 //      the shell (inside) or within reach of a face (painted on it by the baker)
-// Shell triangles: 2 per visible face rectangle; bottom faces are not counted (the camera is always above), faces shared between two boxes are cut away.
+// Shell triangles: 2 per visible face rectangle; bottom faces are not counted (the camera is always above), the parts of faces under another box are cut away.
 //
-// Shell.build(parts, opts) -> { boxes:[{x0,y0,z0,x1,y1,z1}], faces:[{ax,dir,c,a0,a1,b0,b1}], keep:[Uint32Array per part: triangle numbers kept], stats }
-//   parts: [{ p: positions (flat x,y,z), i: indices (triangle list; omit for a plain triangle soup), lo, hi: triangle range to use (default all) }]
-// Shell.atlasVisible(ix, cut): the visible triangle list of a plot's atlas geometry laid out by sideLayoutGen (A, hidden H, then the wall slices S; the
-//   rest is the same walls again for the shadow pass): ix.subarray(0, A) and ix.subarray(A + H, A + H + S) joined.
+// Shell.build(parts, opts) -> { boxes:[{x0,y0,z0,x1,y1,z1}], faces:[{ax,dir,c,a0,a1,b0,b1,box}], keep:[Uint32Array per part: triangle numbers kept], stats }
+//   parts: [{ p: positions (flat x,y,z), i: indices (triangle list; omit for a triangle soup), lo, hi: triangle range to voxelize (default all),
+//             vis: [[lo,hi],...] the triangle ranges that are drawn (counted, and can be kept; default: lo..hi) }]
+//   Kept numbers are triangle numbers of the part's own index list (t -> i[3t], i[3t+1], i[3t+2]).
+// Shell.atlasParts(p, ix, cut): the part for a plot's atlas geometry (position array, index array, userData.cut). Its layout (sideLayoutGen) is A (up-facing), H (undersides and
+//   covered pieces), S (wall slices), then D (the first half of the slices again, for the shadow pass); A, H and S are voxelized, A and S are the visible ones.
+// Shell.shadowCopy(cut, t): the number of the shadow-pass copy of a kept wall triangle t (or -1), for a kept triangle to cast its shadow as before.
+// Shell.atlasVisible(ix, cut): the visible index list on its own (A and S joined).
 (function (root){
 'use strict';
-const DEF = { vs: .2, groundY: -.7, open: 1, maxBoxes: 12, minVolFrac: .004, minVol: .06, minSpan: 3, keepDist: .3, snap: true, seal: 1, bottom: false, pad: 2 };
+const DEF = { vs: .2, groundY: -.7, open: 1, maxBoxes: 12, minVolFrac: .004, minVol: .06, minSpan: 3, keepDist: .3, maxPhantom: .3, snap: true, seal: 1, bottom: false, pad: 2 };
 
 function atlasVisible(ix, cut){
   if (!cut) return ix;
@@ -32,14 +38,15 @@ function build(parts, opts){
   const st = { parts: parts.length, tris: 0, timeMs: {} };
   // ---- the triangles: gather bounds
   let x0 = 1e30, y0 = 1e30, z0 = 1e30, x1 = -1e30, y1 = -1e30, z1 = -1e30, nT = 0;
-  const P = parts.map(pt => { const idx = pt.i, n = idx ? idx.length/3 : pt.p.length/9, lo = pt.lo || 0, hi = pt.hi === undefined ? n : pt.hi; return { p: pt.p, i: idx, lo, hi }; });
+  const P = parts.map(pt => { const idx = pt.i, n = idx ? idx.length/3 : pt.p.length/9, lo = pt.lo || 0, hi = pt.hi === undefined ? n : pt.hi; return { p: pt.p, i: idx, lo, hi, vis: pt.vis || [[lo, hi]] }; });
   const tri = (pt, t) => pt.i ? [pt.i[t*3]*3, pt.i[t*3 + 1]*3, pt.i[t*3 + 2]*3] : [t*9, t*9 + 3, t*9 + 6];
+  let nAll = 0;
   for (const pt of P){
-    nT += pt.hi - pt.lo;
+    nAll += pt.hi - pt.lo; for (const [a, b] of pt.vis) nT += b - a;
     for (let t = pt.lo; t < pt.hi; t++){ const [a, b, c] = tri(pt, t), p = pt.p;
       for (const o of [a, b, c]){ const x = p[o], y = p[o + 1], z = p[o + 2]; if (y < O.groundY - .5) continue; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; } }
   }
-  st.tris = nT;
+  st.tris = nT; st.trisAll = nAll;
   const out = { boxes: [], faces: [], keep: P.map(() => new Uint32Array(0)), stats: st };
   if (!nT || x1 < x0){ st.empty = true; return out; }
   // ---- the grid: a lattice common to all plots in x and z (so neighbors line up), y from the ground
@@ -65,24 +72,15 @@ function build(parts, opts){
   st.timeMs.surface = now() - t0;
   // ---- 2. seal, outside flood, mass
   t0 = now();
-  const sealed = grow(surf, NX, NY, NZ, O.seal), ext = new Uint8Array(N);
-  { // flood from the ring round the sides and the top layer, through voxels that are not sealed (6-connected)
-    const stack = new Int32Array(N); let sp = 0;
-    const push = (x, y, z) => { const k = ix_(x, y, z); if (!sealed[k] && !ext[k]){ ext[k] = 1; stack[sp++] = k; } };
-    for (let y = 0; y < NY; y++) for (let z = 0; z < NZ; z++){ push(0, y, z); push(NX - 1, y, z); }
-    for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++){ push(x, y, 0); push(x, y, NZ - 1); }
-    for (let z = 0; z < NZ; z++) for (let x = 0; x < NX; x++) push(x, NY - 1, z);
-    while (sp){ const k = stack[--sp], x = k % NX, r = (k - x)/NX, z = r % NZ, y = (r - z)/NZ;
-      if (x > 0) push(x - 1, y, z); if (x < NX - 1) push(x + 1, y, z); if (z > 0) push(x, y, z - 1); if (z < NZ - 1) push(x, y, z + 1); if (y > 0) push(x, y - 1, z); if (y < NY - 1) push(x, y + 1, z); }
-  }
+  const sealed = grow(surf, NX, NY, NZ, O.seal), ext = flood(sealed, NX, NY, NZ);
   const inside = new Uint8Array(N); let nIn = 0, nSurf = 0; for (let k = 0; k < N; k++){ inside[k] = (!sealed[k] && !ext[k]) ? 1 : 0; nIn += inside[k]; nSurf += surf[k]; }
   st.surfVoxels = nSurf; st.insideVoxels = nIn;
   // mass: everything not outside, except the outer ring the sealing added (voxels next to the outside that are not surface themselves)
   const nearExt = grow(ext, NX, NY, NZ, 1);
   let mass = new Uint8Array(N); for (let k = 0; k < N; k++) mass[k] = (!ext[k] && (surf[k] || !nearExt[k])) ? 1 : 0;
   for (let y = 0; y < NY; y++) for (let z = 0; z < NZ; z++) for (let x = 0; x < NX; x++) if (y >= ny || x === 0 || z === 0 || x === NX - 1 || z === NZ - 1) mass[ix_(x, y, z)] = 0;
-  st.timeMs.fill = now() - t0;
-  if (O.debugGrids) out.grids = { NX, NY, NZ, surf, ext, inside, mass: mass.slice() };
+    st.timeMs.fill = now() - t0;
+  if (O.debugGrids) out.grids = { NX, NY, NZ, surf, ext, ext2: flood(surf, NX, NY, NZ), inside, mass: mass.slice() };
   // ---- 3. opening in x and z
   t0 = now();
   if (O.open > 0){ mass = growXZ(erodeXZ(mass, NX, NY, NZ, O.open), NX, NY, NZ, O.open); }
@@ -91,14 +89,24 @@ function build(parts, opts){
   st.timeMs.open = now() - t0;
   // ---- 4. boxes
   t0 = now();
-  const bx = cutBoxes(mass, NX, NY, NZ, O, massN);
+  // open air: reached from outside without sealing, and at least two voxels (0.4) from any surface (facade relief and 1-voxel pinholes are not air)
+  const ext2 = flood(surf, NX, NY, NZ), nearSurf = grow(surf, NX, NY, NZ, 1); for (let k = 0; k < N; k++) if (nearSurf[k]) ext2[k] = 0;
+  const bx = cutBoxes(mass, NX, NY, NZ, O, massN, ext2);
   st.timeMs.boxes = now() - t0;
   let boxes = bx.boxes.map(b => ({ x0: ox + b[0]*vs, x1: ox + b[1]*vs, y0: oy + b[2]*vs, y1: oy + b[3]*vs, z0: oz + b[4]*vs, z1: oz + b[5]*vs }));
   st.coveredVol = bx.covered*vs*vs*vs; st.coverage = massN ? bx.covered/massN : 0;
+  // the check on "never add volume the building lacks": the outside flooded again with the surface NOT sealed, minus what is within a voxel of a surface (see ext2);
+  // the share of the boxes' voxels it reaches is the volume that is air, and a box's worst share is kept too
+  { let tot = 0, ph = 0, worst = 0;
+    for (const b of bx.boxes){ let n = 0, q = 0; for (let y = b[2]; y < b[3]; y++) for (let z = b[4]; z < b[5]; z++){ const r0 = (y*NZ + z)*NX; for (let x = b[0]; x < b[1]; x++){ n++; if (ext2[r0 + x]) q++; } } tot += n; ph += q; if (n && q/n > worst) worst = q/n; }
+    st.phantom = tot ? ph/tot : 0; st.phantomWorstBox = worst; }
+  const preVol = boxes.reduce((a, b) => a + (b.x1 - b.x0)*(b.y1 - b.y0)*(b.z1 - b.z0), 0);
   // ---- 5. snap faces to the real planes
   t0 = now();
   if (O.snap && boxes.length) snapBoxes(boxes, P, tri, vs, O);
   st.timeMs.snap = now() - t0;
+  { let out = 0; boxes.forEach((b, n) => { const g = bx.boxes[n]; const o = [ox + g[0]*vs - b.x0, b.x1 - (ox + g[1]*vs), oy + g[2]*vs - b.y0, b.y1 - (oy + g[3]*vs), oz + g[4]*vs - b.z0, b.z1 - (oz + g[5]*vs)]; for (const v of o) if (v > out) out = v; });
+    st.snapOutMax = out; st.snapGrowth = preVol ? (boxes.reduce((a, b) => a + (b.x1 - b.x0)*(b.y1 - b.y0)*(b.z1 - b.z0), 0) - preVol)/preVol : 0; }   // (how far, and how much volume, snapping moved the faces outward; negative: net inward)
   for (const b of boxes){ for (const k of ['x0', 'x1', 'y0', 'y1', 'z0', 'z1']) b[k] = Math.round(b[k]*1000)/1000; }
   // ---- 6. kept triangles
   t0 = now();
@@ -106,7 +114,7 @@ function build(parts, opts){
   const dist2 = (x, y, z) => { let m = 1e30; for (const b of boxes){ const dx = Math.max(b.x0 - x, 0, x - b.x1), dy = Math.max(b.y0 - y, 0, y - b.y1), dz = Math.max(b.z0 - z, 0, z - b.z1), d = dx*dx + dy*dy + dz*dz; if (d < m) m = d; } return m; };
   const D2 = D*D;
   P.forEach((pt, n) => { const p = pt.p, list = [];
-    for (let t = pt.lo; t < pt.hi; t++){ const [a, b, c] = tri(pt, t);
+    for (const [vlo, vhi] of pt.vis) for (let t = vlo; t < vhi; t++){ const [a, b, c] = tri(pt, t);
       if (p[a + 1] < G - 1e-6 && p[b + 1] < G - 1e-6 && p[c + 1] < G - 1e-6){ below++; continue; }   // (under the street: never seen)
       let far = false;
       if (boxes.length){
@@ -128,6 +136,18 @@ function build(parts, opts){
 }
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+// the outside: voxels reachable (6-connected) from the ring round the sides and the top layer without crossing `blocked`
+function flood(blocked, NX, NY, NZ){
+  const N = NX*NY*NZ, ext = new Uint8Array(N), stack = new Int32Array(N); let sp = 0;
+  const push = (x, y, z) => { const k = (y*NZ + z)*NX + x; if (!blocked[k] && !ext[k]){ ext[k] = 1; stack[sp++] = k; } };
+  for (let y = 0; y < NY; y++) for (let z = 0; z < NZ; z++){ push(0, y, z); push(NX - 1, y, z); }
+  for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++){ push(x, y, 0); push(x, y, NZ - 1); }
+  for (let z = 0; z < NZ; z++) for (let x = 0; x < NX; x++) push(x, NY - 1, z);
+  while (sp){ const k = stack[--sp], x = k % NX, r = (k - x)/NX, z = r % NZ, y = (r - z)/NZ;
+    if (x > 0) push(x - 1, y, z); if (x < NX - 1) push(x + 1, y, z); if (z > 0) push(x, y, z - 1); if (z < NZ - 1) push(x, y, z + 1); if (y > 0) push(x, y - 1, z); if (y < NY - 1) push(x, y + 1, z); }
+  return ext;
+}
 
 // ---- morphology on the padded grid (layout (y*NZ + z)*NX + x)
 function grow(a, NX, NY, NZ, r){   // 3D, square (Chebyshev) radius r
@@ -156,11 +176,11 @@ function erodeXZ(a, NX, NY, NZ, r){   // the complement grown, complemented (the
 }
 
 // ---- the boxes: the largest box fitting wholly in the mass left, again and again. Layers that look the same are one run, so a tall plain tower costs one step.
-function cutBoxes(mass, NX, NY, NZ, O, massN){
+function cutBoxes(mass, NX, NY, NZ, O, massN, ext2){
   const L = NX*NZ, rem = mass.slice(), boxes = []; let covered = 0;
   const minVolV = Math.max(O.minVol/(O.vs*O.vs*O.vs), O.minVolFrac*massN), span = O.minSpan;
   const hist = new Int32Array(NX), stk = new Int32Array(NX + 1);
-  for (let round = 0; round < O.maxBoxes; round++){
+  for (let round = 0; boxes.length < O.maxBoxes && round < O.maxBoxes*4; round++){
     // runs of equal layers (with something in them)
     const runs = []; let prev = -1;
     const same = (p, q) => { const a = p*L, b = q*L; for (let k = 0; k < L; k++) if (rem[a + k] !== rem[b + k]) return false; return true; };
@@ -174,11 +194,16 @@ function cutBoxes(mass, NX, NY, NZ, O, massN){
     if (!runs.length) break;
     let best = null, bestV = 0;
     const cur = new Uint8Array(L);
+    const chainEnd = new Int32Array(runs.length);   // the top of the contiguous stack of runs a belongs to
+    for (let a = runs.length - 1; a >= 0; a--) chainEnd[a] = (a + 1 < runs.length && runs[a + 1].y0 === runs[a].y1) ? chainEnd[a + 1] : runs[a].y1;
     for (let a = 0; a < runs.length; a++){
       cur.set(rem.subarray(runs[a].rep*L, runs[a].rep*L + L));
+      let cnt = 0; for (let k = 0; k < L; k++) cnt += cur[k];
       for (let b = a; b < runs.length; b++){
-        if (b > a){ if (runs[b].y0 !== runs[b - 1].y1) break; const q = runs[b].rep*L; let any = false; for (let k = 0; k < L; k++){ cur[k] &= rem[q + k]; if (cur[k]) any = true; } if (!any) break; }
+        if (b > a){ if (runs[b].y0 !== runs[b - 1].y1) break; const q = runs[b].rep*L; cnt = 0; for (let k = 0; k < L; k++){ cur[k] &= rem[q + k]; cnt += cur[k]; } if (!cnt) break; }
+        if (cnt*(chainEnd[a] - runs[a].y0) <= bestV) break;   // (no taller box over this much floor can beat the best one)
         const height = runs[b].y1 - runs[a].y0;
+        if (cnt*height <= bestV) continue;
         // largest rectangle in cur (rows z, columns x) by the histogram stack; area*height is the volume
         hist.fill(0);
         for (let z = 0; z < NZ; z++){
@@ -196,6 +221,9 @@ function cutBoxes(mass, NX, NY, NZ, O, massN){
     }
     if (!best || bestV < minVolV) break;
     const b = best;
+    // a box that is mostly air the outside reaches (an open deck, a courtyard the sealing closed): drop those voxels from the mass and look again
+    if (O.maxPhantom < 1){ let n = 0, q = 0; for (let y = b.ya; y < b.yb; y++) for (let z = b.zb - b.zh; z < b.zb; z++){ const r0 = (y*NZ + z)*NX; for (let x = b.xa; x < b.xb; x++){ n++; if (ext2[r0 + x]) q++; } }
+      if (q/n > O.maxPhantom){ for (let y = b.ya; y < b.yb; y++) for (let z = b.zb - b.zh; z < b.zb; z++){ const r0 = (y*NZ + z)*NX; for (let x = b.xa; x < b.xb; x++) if (ext2[r0 + x]) rem[r0 + x] = 0; } continue; } }
     // (the ground slab is only a voxel or two high but wide: the span test covers the footprint, not the height)
     boxes.push([b.xa, b.xb, b.ya, b.yb, b.zb - b.zh, b.zb]);   // (grid cells of the padded grid)
     for (let y = b.ya; y < b.yb; y++) for (let z = b.zb - b.zh; z < b.zb; z++){ const r0 = (y*NZ + z)*NX; for (let x = b.xa; x < b.xb; x++){ rem[r0 + x] = 0; covered++; } }
@@ -210,7 +238,7 @@ function snapBoxes(boxes, P, tri, vs, O){
   // the flat axis-aligned triangles (all three corners on one plane), by axis
   const flat = [[], [], []];
   for (const pt of P){ const p = pt.p;
-    for (let t = pt.lo; t < pt.hi; t++){ const [a, b, c] = tri(pt, t);
+    for (const [vlo, vhi] of pt.vis) for (let t = vlo; t < vhi; t++){ const [a, b, c] = tri(pt, t);
       for (let ax = 0; ax < 3; ax++){ const q = p[a + ax]; if (Math.abs(p[b + ax] - q) < 2e-3 && Math.abs(p[c + ax] - q) < 2e-3){
         const u = (ax + 1) % 3, w = (ax + 2) % 3, lo = [Math.min(p[a + u], p[b + u], p[c + u]), Math.min(p[a + w], p[b + w], p[c + w])], hi = [Math.max(p[a + u], p[b + u], p[c + u]), Math.max(p[a + w], p[b + w], p[c + w])];
         const area = Math.abs((p[b + u] - p[a + u])*(p[c + w] - p[a + w]) - (p[c + u] - p[a + u])*(p[b + w] - p[a + w]))/2;
@@ -270,6 +298,23 @@ function subtract(r, cuts){
   return out;
 }
 
-const Shell = { build, atlasVisible, DEFAULTS: DEF };
+// A plot's atlas geometry laid out by sideLayoutGen is ix = A (up-facing), H (undersides and hidden), S (wall slices), then D (the first half of the slices again, for
+// the shadow pass). Shell.atlasParts gives the part for Shell.build: all of A, H and S go into the voxelizing (an overhang's floor closes its volume), only A and S
+// are counted and can be kept. Kept triangle numbers are then triangle numbers of the atlas index buffer itself (t -> ix[3t], ix[3t+1], ix[3t+2]).
+function atlasParts(p, ix, cut){
+  if (!cut) return { p, i: ix, vis: [[0, ix.length/3]] };
+  const A = cut.A/3, H = cut.H/3, S = cut.S/3;
+  return { p, i: ix.subarray(0, (cut.A + cut.H + cut.S)), vis: [[0, A], [A + H, A + H + S]] };
+}
+// The shadow pass draws a copy of the first half of the wall slices (cut.off[K/2] indices at A + H + S). For a kept wall triangle t (a number from build), the number of its copy, or -1
+// (a top face, or a wall in the other half of the slices, has none; a far layout (cut.far) puts the thin sticks' walls in a second list and is not handled).
+function shadowCopy(cut, t){
+  const A = cut.A/3, H = cut.H/3, S = cut.S/3, K = cut.off.length - 1;
+  if (cut.far || t < A + H || t >= A + H + S) return -1;
+  const s = (t - A - H)*3;
+  return s < cut.off[K/2] ? A + H + S + (t - A - H) : -1;
+}
+
+const Shell = { build, atlasVisible, atlasParts, shadowCopy, DEFAULTS: DEF };
 if (typeof module !== 'undefined' && module.exports) module.exports = Shell; else root.Shell = Shell;
 })(typeof self !== 'undefined' ? self : this);

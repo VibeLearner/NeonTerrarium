@@ -40,6 +40,7 @@ if __name__ == '__main__':
     ap.add_argument('scene')
     ap.add_argument('--kinds', default='', help='comma list of plot kinds (see shell_probe.py output); default: a spread')
     ap.add_argument('--n', type=int, default=2, help='plots per kind')
+    ap.add_argument('--builders', default='', help='comma list of builder names (buildTenement, glassTower, ...): the plots of those builders instead of the kinds')
     ap.add_argument('--plots', nargs='*', default=[], help='i,j pairs')
     ap.add_argument('--megas', action='store_true')
     ap.add_argument('--opts', default='{}')
@@ -56,10 +57,14 @@ if __name__ == '__main__':
         if a.megas:
             for k in pg.evaluate('() => [...megas.values()].map(m => m.id)'): items.append({'mega': k})
         else:
-            lst = SPB.plan(pg, 40, a.pods, 2, True)
+            lst = SPB.plan(pg, 40, 2, a.pods, 2, True, a.seed, 250)
             want = [k for k in a.kinds.split(',') if k]
+            wantb = [k for k in a.builders.split(',') if k]
             for it in lst:
                 kind = it.get('kind', 'air' if it.get('air') else '?')
+                if wantb:
+                    if it.get('builder') in wantb: items.append(dict(it, kind=kind))
+                    continue
                 if a.plots: continue
                 if (not want or kind in want) and sum(1 for q in items if q['kind'] == kind) < a.n: items.append(dict(it, kind=kind))
             for s in a.plots:
@@ -68,9 +73,10 @@ if __name__ == '__main__':
         for it in items:
             if 'mega' in it:
                 rec = pg.evaluate('([id, o]) => { const m = megas.get(id); window.__rec = __sc.megaRec(m, o); return { stats: window.__rec.stats, kind: m.kind }; }', [it['mega'], opts])
-                it['kind'] = 'mega-' + rec['kind']; it['i'] = it['mega']; it['j'] = 0
+                it['kind'] = 'mega-' + rec['kind']; it['i'] = str(it['mega']).replace('#', ''); it['j'] = 0
             else:
-                rec = pg.evaluate('([it, s, o]) => { window.__rec = __sc.rec(it, s, o); return { stats: window.__rec.stats }; }', [it, a.seed, opts])
+                rec = pg.evaluate('([it, s, o]) => { window.__rec = __sc.rec(it, s, o); return { stats: window.__rec.stats, builders: window.__rec.builders }; }', [it, a.seed, opts])
+                if rec.get('builders'): it['kind'] = it['kind'] + '-' + '-'.join(rec['builders'][:2]).replace('+', 'p')
             st = rec['stats']
             rows = []
             for mode in ('real', 'shell', 'both'):

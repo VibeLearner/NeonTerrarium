@@ -1,21 +1,27 @@
 // In-page half of tools/perf/shell_probe.py (baked far buildings, item 2): makes plots of every kind through the game's own code (recipeGen, as the plot
-// worker does; megastructures through their own m.data), runs js/shell.js (Shell, loaded before this) on each plot's visible atlas triangles and reports
-// counts. Nothing here draws or changes the city beyond hanging a few pods (addLift) for the pod kind.
+// worker does; megastructures through their own m.data), runs js/shell.js (Shell, loaded before this) on each plot's atlas triangles and reports counts.
+// Nothing here draws or changes the city beyond hanging a few pods (addLift) for the pod kind. A builder's name is found by watching which builder function is
+// on the stack when the section's first piece is put (put and withStyle are wrapped to look, nothing else changes: the draws are the same).
 window.__sp = (() => {
   const SP = {};
-  const visTris = (g) => {   // a plot's atlas geometry: the visible triangles (the hidden ones and the shadow-pass copies left out)
-    const cut = g.userData.cut, ix = g.index.array;
-    if (cut) return Shell.atlasVisible(ix, cut);
-    return ix.subarray(0, g.userData.shown !== undefined ? g.userData.shown : ix.length);
-  };
-  const triCount = g => { if (!g) return 0; const v = visTris(g); return v.length/3; };
-  // one plot's data (what collectGen returns) as shell input
+  Error.stackTraceLimit = 60;
+  // ---- which builder made a section, and whether it put balconies on
+  const names = new Set(); for (const z of Object.values(SECTION_TYPES)) for (const l of [z.ground, z.upper]) for (const [f] of l) names.add(f.name);
+  ['buildTenement', 'buildTower', 'glassHotel'].forEach(n => names.add(n));
+  let slot = null; const slots = [];
+  const putO = put, wsO = withStyle, balO = balcony;
+  put = function (...a){ if (slot && slot.name === null){ const st = new Error().stack.split('\n'); for (const ln of st){ const m = /at (?:new )?([\w$]+)/.exec(ln); if (m && names.has(m[1])){ slot.name = m[1]; break; } } } return putO.apply(this, a); };
+  withStyle = function (st, fn){ const s = { name: null, balc: 0 }; slots.push(s); const prev = slot; slot = s; try { return wsO.call(this, st, fn); } finally { slot = prev; } };
+  balcony = function (...a){ if (slot) slot.balc++; return balO.apply(this, a); };
+  SP.builders = () => slots.filter(s => s.name).map(s => s.name + (s.balc ? '+balc' : ''));
+
+  const triCount = (g, cut) => { if (!g) return 0; const c = g.userData.cut; return c ? (c.A + c.S)/3 : (g.userData.shown !== undefined ? g.userData.shown : g.index.count)/3; };
+  // one plot's data (what collectGen returns) as shell input: the atlas part, and what is outside it (textured, glow and shader geometry) as counts
   SP.partsOf = data => {
     const parts = [], extras = { map: 0, other: 0 };
     for (const [m, g] of data.geo){
-      if (m === ATLAS){ parts.push({ p: g.attributes.position.array, i: visTris(g), kind: 'atlas' }); }
-      else if (g.index) extras[m.map ? 'map' : 'other'] += g.index.count/3;
-      else extras[m.map ? 'map' : 'other'] += g.attributes.position.count/3;
+      if (m === ATLAS){ parts.push(Shell.atlasParts(g.attributes.position.array, g.index.array, g.userData.cut)); }
+      else { const n = g.index ? g.index.count/3 : g.attributes.position.count/3; extras[m.map ? 'map' : 'other'] += n; }
     }
     return { parts, extras };
   };
@@ -30,27 +36,22 @@ window.__sp = (() => {
   SP.make = (c, seed, over) => {
     const world = SP.world || (SP.world = recipeWorld());
     const r = Object.assign(recipeOf(c), over || {});
-    __randSeed(seed);
-    const sc = recipeGen(r, world);
-    return sc;
+    __randSeed(seed); slots.length = 0;
+    return recipeGen(r, world);
   };
   const disposeRaw = sc => { for (const g of sc.data.geo.values()) g.dispose(); if (sc.data.sgeo) sc.data.sgeo.dispose(); };
-  // the shell of one made plot; returns a plain object (boxes, faces, kept triangle lists as arrays, stats)
-  SP.shellOf = (data, opts, keepLists) => {
+  SP.shellOf = (data, opts) => {
     const { parts, extras } = SP.partsOf(data);
     const res = Shell.build(parts, opts);
-    const k = res.keep[0] || new Uint32Array(0);
-    return { res, parts, extras, kept: keepLists ? Array.from(k) : null };
+    return { res, parts, extras };
   };
-  // the list of plots to examine: [{i, j, kind, over?}]
-  SP.pick = (perKind, wantKinds) => {
-    const all = [...cells.values()], by = {};
-    for (const c of all){ if (c.mega) continue; const k = SP.kindOf(c, false, null); (by[k] || (by[k] = [])).push(c); }
-    const out = [];
-    for (const k of Object.keys(by).sort()){ const l = by[k], step = Math.max(1, Math.floor(l.length/perKind)); for (let n = 0; n < l.length && out.filter(o => o.kind === k).length < perKind; n += step) out.push({ i: l[n].i, j: l[n].j, kind: k }); }
+  // every plot of the scene once (no shell), to learn its kind and builders: [{i, j, kind, builders, balc, tris}]
+  SP.scan = (seed, max) => {
+    const all = [...cells.values()].filter(c => !c.mega), step = Math.max(1, Math.floor(all.length/max)), out = [];
+    for (let n = 0; n < all.length; n += step){ const c = all[n]; const sc = SP.make(c, seed + c.i*7 + c.j*13); const b = SP.builders();
+      out.push({ i: c.i, j: c.j, kind: SP.kindOf(c, false, null), builders: b, secs: c.sections.length, lift: !!c.lift }); disposeRaw(sc); }
     return out;
   };
-  // hang pods on a few plots (empty plots beside taller buildings and over shorter ones), as recipe_proof.py --pods does
   SP.hangPods = n => {
     const out = [];
     const tall = [...cells.values()].filter(c => !c.mega && c.sections.length && c.height > CURB + FH*3);
@@ -60,42 +61,42 @@ window.__sp = (() => {
         const y = Math.min(t.height - 1.2, c.sections.length ? c.height + FH*2 : CURB + FH*2); if (addLift(c, y, 'mid')){ out.push([c.i, c.j]); break; } } }
     stageFinishAll(); return out;
   };
-  // run the shell on the picked plots; returns one row per plot (no timing: counts only)
+  const rowOf = (res, extras, stand, base) => Object.assign(base, { tris: res.stats.tris, boxes: res.boxes, faces: res.faces.length, shellTris: res.stats.shellTris, kept: res.stats.kept, buried: res.stats.buried,
+    keptShare: res.stats.keptShare, coverage: res.stats.coverage, massVol: res.stats.massVol, grid: res.stats.grid, phantom: res.stats.phantom, phantomWorstBox: res.stats.phantomWorstBox,
+    snapOutMax: res.stats.snapOutMax, snapGrowth: res.stats.snapGrowth, extras, stand });
+  // run the shell on the planned plots; one row per plot (counts only, no timing)
   SP.run = (list, opts, seed) => {
     const rows = [];
     for (const it of list){
       const c = cells.get(ckey(it.i, it.j)); if (!c) continue;
       const over = it.over || null; if (it.air) window.AIR_FORCE = c.i + ',' + c.j;
-      const sc = SP.make(c, seed + it.i*7 + it.j*13, over);
-      window.AIR_FORCE = undefined;
-      const r = recipeOf(c); if (over) Object.assign(r, over);
+      const sc = SP.make(c, seed + it.i*7 + it.j*13, over); window.AIR_FORCE = undefined;
+      const b = SP.builders(), r = recipeOf(c); if (over) Object.assign(r, over);
       const kind = it.air ? (sc._air ? 'air' : 'air-not-thrown') : it.kind || SP.kindOf(c, false, r);
-      const { res, extras } = SP.shellOf(sc.data, opts, false);
-      const stand = triCount(sc.data.sgeo);
-      rows.push({ i: c.i, j: c.j, kind, secs: c.sections.length, tris: res.stats.tris, boxes: res.boxes, faces: res.faces.length, shellTris: res.stats.shellTris, kept: res.stats.kept, buried: res.stats.buried,
-        keptShare: res.stats.keptShare, coverage: res.stats.coverage, massVol: res.stats.massVol, grid: res.stats.grid, extras, stand });
+      const { res, extras } = SP.shellOf(sc.data, opts);
+      rows.push(rowOf(res, extras, triCount(sc.data.sgeo), { i: c.i, j: c.j, kind, builders: b, secs: c.sections.length }));
       disposeRaw(sc);
     }
     return rows;
   };
-  // megastructures: through their own data
-  SP.runMegas = (opts) => {
+  // megastructures: through their own data (they are made by collect() in mega.js, not by recipeGen)
+  SP.runMegas = (opts, perCell) => {
     const rows = [];
     for (const m of megas.values()){
       if (!m.data || !m.data.geo){ rows.push({ kind: 'mega:' + m.kind, err: 'no data (arrays let go)' }); continue; }
-      const { res, extras } = SP.shellOf(m.data, opts, false);
-      rows.push({ kind: 'mega:' + m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, tris: res.stats.tris, boxes: res.boxes, faces: res.faces.length, shellTris: res.stats.shellTris, kept: res.stats.kept, buried: res.stats.buried,
-        keptShare: res.stats.keptShare, coverage: res.stats.coverage, massVol: res.stats.massVol, grid: res.stats.grid, extras, stand: triCount(m.data.sgeo) });
+      const o = Object.assign({}, opts); if (perCell) o.maxBoxes = Math.max(opts.maxBoxes || 12, Math.round(perCell*m.w*m.h));
+      const { res, extras } = SP.shellOf(m.data, o);
+      rows.push(rowOf(res, extras, triCount(m.data.sgeo), { kind: 'mega:' + m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, builders: ['mega:' + m.kind] }));
     }
     return rows;
   };
-  // geometry of one plot as binary-able arrays, for the node probe and the crops
+  // geometry of one plot as plain arrays, for the node probe: p, i (A, H and S), vis ranges
   SP.dump = (c, seed, over) => {
     const sc = SP.make(c, seed, over), { parts } = SP.partsOf(sc.data);
-    const pt = parts[0] || { p: new Float32Array(0), i: new Uint32Array(0) };
-    const out = { p: Array.from(pt.p), i: Array.from(pt.i) };
+    const pt = parts[0] || { p: new Float32Array(0), i: new Uint32Array(0), vis: [] };
+    const out = { p: Array.from(pt.p), i: Array.from(pt.i), vis: pt.vis };
     disposeRaw(sc); return out;
   };
-  SP.dumpMega = m => { const { parts } = SP.partsOf(m.data), pt = parts[0]; return { p: Array.from(pt.p), i: Array.from(pt.i) }; };
+  SP.dumpMega = id => { const m = megas.get(id), { parts } = SP.partsOf(m.data), pt = parts[0]; return { p: Array.from(pt.p), i: Array.from(pt.i), vis: pt.vis, w: m.w, h: m.h }; };
   return SP;
 })();

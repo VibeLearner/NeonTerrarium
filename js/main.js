@@ -73,6 +73,7 @@ function frame(now){
   tierTick();    // which blocks are drawn full, which as stand-ins (world.js)
   stepSync();   // what an edit leaves to do, a stage a frame (world.js)
   flushSolid();   // regions whose pieces changed are merged again (world.js)
+  bkTick();   // idle frames: plots baked for the far view, nearest the view first (bakejob.js, baked.js)
   nvTick();   // idle frames: faces no camera ever sees are worked out for a plot, a few views a frame (neverseen.js)
   scene.updateMatrixWorld();   // once for every pass below (see core.js): nothing moves between them
   PH.lap('scene upkeep');

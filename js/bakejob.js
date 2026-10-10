@@ -96,7 +96,8 @@ function bkDropEntry(e, why){
 function bkCancel(){ const j = BAKE.job; BAKE.job = null; if (j && j.gen && j.gen.return) try { j.gen.return(); } catch (e) {} if (j && j.e && j.e.state === 'baking') j.e.state = 'queued'; }
 function bkSet(e, bake){
   const m = BAKE.mem.get(e.sig); if (m){ m.refs++; bake = m.bake; } else BAKE.mem.set(e.sig, { bake, refs: 1 });
-  e.bake = bake; e.state = 'ready'; if (BAKE.onReady) try { BAKE.onReady(e.c, bake); } catch (x) { console.error(x); }
+  if (BAKE.onReady) try { const r = BAKE.onReady(e.c, bake); if (r){ bake = r; BAKE.mem.get(e.sig).bake = r; } } catch (x) { console.error(x); }   // (onReady may hand back a slimmer bake to keep in memory: baked.js puts the maps on the card and keeps no copy of them)
+  e.bake = bake; e.state = 'ready';
 }
 // the plot's entry, made or brought up to date: a new recipe (an edit, a neighbor) drops the old bake and starts again
 function bkTrack(c){
@@ -190,6 +191,7 @@ BAKE.tick = function(budgetMs){
     ctx.c = j.e.c; ctx.sig = j.e.sig;
     let st; try { st = j.gen.next(); } catch (err){ BAKE.job = null; bkFail(j.e, err); continue; }
     BAKE.c.steps++; BAKE.last.steps++;
+    if (!st.done && st.value === 'wait') break;   // (the baker waits for something outside the frame, the plot worker: the rest of this frame's budget is not spent looking)
     if (st.done){ BAKE.job = null; bkFinish(j.e, st.value); }
     if (bkNow() - t0 >= budgetMs) break;
   }

@@ -1,6 +1,6 @@
 // The plot worker (round 9, item 2): makes plots from their recipes (recipe.js) off the page's thread. It loads the game's own builder scripts, the same files in the same
 // order as index.html (no second copy of any builder), with just enough stood in for the page (a document, a renderer, texture loading) for them to load. Nothing
-// here draws. Messages in: init {urls}, world {hw, mt}, gen {id, r, far, rs}; out: ready {sig}, done {id, msg, calls, rs}, err {id, err}.
+// here draws. Messages in: init {urls}, world {hw, mt}, gen {id, r, far, rs, shell}; out: ready {sig}, done {id, msg, calls, rs, shell}, err {id, err}.
 (() => {   // (in a function: the game's scripts declare names like world and post of their own, in the same global scope)
 const mk = name => { const f = function(){ return mk(name + '()'); }; return new Proxy(f, { get(t, k){ if (k === Symbol.toPrimitive) return () => 0; if (k === 'then') return undefined; if (k === 'length') return 0; if (k === 'style') return {}; return mk(name + '.' + String(k)); }, set(){ return true; }, apply(){ return mk(name + '()'); }, construct(){ return mk('new ' + name); } }); };
 const nativeRandom = Math.random; let rs = null, calls = 0;
@@ -34,10 +34,12 @@ self.onmessage = e => {
       for (const [k, e] of m.rb){ rbCache.set(k, rbUnpack(e)); rbKnown.add(k); }   // (the page's shapes win: see recipe.js)
       rs = m.rs === undefined ? null : m.rs; calls = 0;
       let out;
-      try { out = recipePack(recipeGen(m.r, world), !!m.regen); } catch (err){ post({ t: 'err', id: m.id, err: String(err && err.message || err) }); return; }
+      let shell = null;
+      try { const gen = recipeGen(m.r, world); if (m.shell){ const g = gen.data.geo.get(ATLAS); if (g && g.index) shell = Shell.build([Shell.atlasParts(g.attributes.position.array, g.index.array, g.userData.cut)], m.shell); }   // (a plot made for its bake comes with its shell: js/shell.js, baked.js)
+        out = recipePack(gen, !!m.regen); } catch (err){ post({ t: 'err', id: m.id, err: String(err && err.message || err) }); return; }
       const end = rs; rs = null;
       const rb = []; for (const [k, g] of rbCache) if (!rbKnown.has(k)){ rbKnown.add(k); rb.push([k, rbPack(g, true)]); }
-      post({ t: 'done', id: m.id, msg: out.msg, calls, rs: end, rb }, out.xfer.concat(rb.flatMap(([k, e]) => Object.values(e.a).map(x => x.a.buffer).concat(e.i ? [e.i.buffer] : []))));
+      post({ t: 'done', id: m.id, msg: out.msg, calls, rs: end, rb, shell }, (shell ? [shell.keep[0].buffer] : []).concat(out.xfer).concat(rb.flatMap(([k, e]) => Object.values(e.a).map(x => x.a.buffer).concat(e.i ? [e.i.buffer] : []))));
     }
   } catch (err){ post({ t: 'err', id: m.id, err: String(err && err.stack || err) }); }
 };

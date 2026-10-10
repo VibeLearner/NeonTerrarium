@@ -1760,10 +1760,13 @@ function* rebuildSolidGen(key, job = null){
   if (!byMat.size){ solidRemoveOld(key); return; }
   yield;
   const g = new THREE.Group(), farMeshes = [], geoms = [], hideList = [];
+  const tier0 = tierOfKey(key), snap = new Map(); snap.used = new Set();   // (the tier this merge is made for, and the bakes it uses, as they are now: the block's shells are made from the same ones)
+  if (tier0 === 'baked') for (const [mat, list] of byMat) for (const o of list){ const c = o.userData.cell; if (c && !snap.has(c)) snap.set(c, BAKE.get(c)); }
   for (const [mat, list] of byMat){
-    if (list.length < 2) continue;   // (nothing to gain)
+    if (list.length < 2 && tier0 !== 'baked') continue;   // (nothing to gain)
     list.sort((a, b) => a.id - b.id);   // (in the order three would have drawn them one by one: where two pieces meet at exactly the same depth, the same one wins)
-    const gs = list.map(memberGeo);   // (a plot at the stand-in tier gives its stand-in geometry: item 5)
+    const gs = list.map(o => memberGeo(o, tier0, snap));   // (a plot at the stand-in tier gives its stand-in geometry: item 5; at the baked tier, the pieces that stay real)
+    if (list.length < 2 && gs[0] === list[0].geometry) continue;   // (a lone baked plot is merged all the same: its pieces that stay real are not its own geometry)
     const cutting = gs.some(g => g.userData.cut);
     const merged = cutting ? yield* mergeCutGen(gs) : yield* mergeIndexedGen(gs); if (!merged) continue;
     dropCpuCopy(merged);
@@ -1778,9 +1781,14 @@ function* rebuildSolidGen(key, job = null){
       if (mergedFar){ for (const o of [mesh, sm]){ o.userData.stdGeo = merged; o.userData.farGeo = mergedFar; farMeshes.push(o); } } }
     for (const o of list){ hideList.push(o); members.push(o); if (o.userData.side){ hideList.push(o.userData.side); members.push(o.userData.side); } }
   }
+  if (tier0 === 'baked' && snap.used.size){   // (the shells of the baked plots, and the overlay of what was baked switched off)
+    const items = [...snap.used].map(c => ({ c, bake: snap.get(c) })).filter(it => it.bake && it.bake.slot);
+    for (const m of bkBlock(key, items)) g.add(m);
+    yield;
+  }
   if (!g.children.length){ solidRemoveOld(key); ovNext.delete(key); return; }
   yield;
-  const tier = tierOfKey(key), oldRec = solidRegions.get(key), tierChanged = !!oldRec && (oldRec.tier || 'full') !== tier;
+  const tier = tier0, oldRec = solidRegions.get(key), tierChanged = !!oldRec && (oldRec.tier || 'full') !== tier;
   // a block that changes tier shows a different picture: it is swapped in while the view moves, never in the middle of a still frame (a view that stays still gets it after TIER.stillWait frames)
   if (tierChanged && job && !job.force && !TIER.rush) for (let waited = 0; tierSwapWait(key, waited); waited++) yield 'wait';   // (TIER.rush: the setting was just switched, the change shows at once)
   freezeTree(g);   // (the glow overlays of the new meshes are made here)
@@ -1804,13 +1812,21 @@ Object.assign(TIER, { zs: 24, margin: 12, maxFull: 36, hold: 180, of: new Map(),
 TIER.on = () => S.tiers !== false && !(PH.tests.tierOff || window.__TIER_OFF);   // (S.tiers: the 'Detail tiers' box in the render menu, remembered in this browser)
 TIER.all = () => !!(PH.tests.tierAll || window.__TIER_ALL);
 TIER.show = () => !!(PH.tests.tierShow || window.__TIER_SHOW);
-const tierOfKey = key => TIER.on() ? (TIER.all() ? 'stand' : (TIER.of.get(key) || 'full')) : 'full';
+const tierOfKey0 = key => TIER.on() ? (TIER.all() ? 'stand' : (TIER.of.get(key) || 'full')) : 'full';
+// (a block at the stand-in tier is 'baked' when the Baked far buildings setting is on and every plot of it that can be baked has its bake: it is then drawn from the plots' shells, js/baked.js)
+const tierOfKey = key => { const t = tierOfKey0(key); return t === 'stand' && typeof BK !== 'undefined' && BK.on() && bkBlockReady(key) ? 'baked' : t; };
 const tierOf = c => tierOfKey(mergeKey(c.i, c.j));
-function memberGeo(o){
+function memberGeo(o, tier, snap){
   const c = o.userData.cell, d = c && c.data;
-  if (d && o.geometry === d.geo.get(ATLAS) && tierOf(c) === 'stand'){ const sg = d.sgeo || standEnsure(c); if (sg) return TIER.show() ? tierTint(sg) : sg; }
+  if (d && o.geometry === d.geo.get(ATLAS)){
+    const t = tier || tierOf(c);
+    if (t === 'baked'){ const bk = snap ? snap.get(c) : BAKE.get(c); if (bk && !bk.empty){ if (snap) snap.used.add(c); return bk.keep || EMPTY_GEO(); } if (bk && bk.empty) return o.geometry; }   // (a baked plot gives the pieces that stay real: its shell is drawn beside the block's merge)
+    if (t !== 'full'){ const sg = d.sgeo || standEnsure(c); if (sg) return TIER.show() ? tierTint(sg) : sg; }
+  }
   return o.geometry;
 }
+// (a baked plot with nothing left real: a geometry with no triangles, so the merge has the same attributes to join)
+let _emptyGeo = null; function EMPTY_GEO(){ if (!_emptyGeo){ _emptyGeo = new THREE.BufferGeometry(); const F = { position: [3, false, Float32Array], normal: [4, true, Int8Array], color: [3, true, Uint8Array], aEm: [4, true, Uint8Array], aFlk: [1, false, Uint8Array], aFine: [1, false, Uint8Array], aOn: [1, true, Uint8Array] }; for (const k in F) _emptyGeo.setAttribute(k, new THREE.BufferAttribute(new F[k][2](F[k][0]*3), F[k][0], F[k][1])); _emptyGeo.setIndex(new THREE.BufferAttribute(new Uint16Array(0), 1)); _emptyGeo.boundingSphere = new THREE.Sphere(); _emptyGeo.boundingBox = new THREE.Box3(); } return _emptyGeo; }
 // the stand-in with its colors turned toward red (the test "show tiers")
 function tierTint(sg){
   if (sg.userData._tint) return sg.userData._tint;
@@ -1839,6 +1855,9 @@ function tierTick(){
   tierTrack();
   if (TIER.stash.size && PM.frame >= TIER.compareUntil && !TIER.rush) for (const k of [...TIER.stash.keys()]) tierStashDrop(k);   // (the comparison is over: the other merges go)
   if (SYNC_NOW() || (typeof LOADP !== 'undefined' && LOADP.on)) return;   // (not while a city is loading, nor in the first second of play, when merges are made at once: a tier change waits for the worker)
+  if (typeof BK !== 'undefined' && (PM.frame % 30 === 7 || TIER.rush)){   // (a block's bakes became ready, or went: it changes between the stand-in and the baked tier)
+    for (const [k, rec] of solidRegions) if ((rec.tier === 'stand' || rec.tier === 'baked') && tierOfKey(k) !== rec.tier && !solidDirty.has(k) && !(SOLID_JOB && SOLID_JOB.key === k)) tierMark(k);
+  }
   if (!TIER.on() || TIER.all()){ if (TIER.of.size){ const ks = [...TIER.of.keys()]; TIER.of.clear(); for (const k of ks) tierMark(k); } TIER.sig = ''; return; }
   const sig = (zoomT <= TIER.zs ? 'n' : 'f') + (camGoal.x/LOT).toFixed(0) + ',' + (camGoal.z/LOT).toFixed(0) + ',' + zoomT.toFixed(1) + ',' + yawT.toFixed(1) + ',' + cells.size + ',' + PM.frame % 30;
   if (sig === TIER.sig) return; TIER.sig = sig;
@@ -1895,7 +1914,7 @@ function tierSwapFromStash(key, want){
   return true;
 }
 function tierRushDone(){ if (TIER.rush && !SOLID_JOB && !solidDirty.size && PM.frame - TIER.rushAt > 2){ TIER.rush = false; TIER.rushFrames = PM.frame - TIER.rushAt; } }
-TIER.line = () => !TIER.on() ? 'tiers: off' + (S.tiers === false ? ' (setting)' : ' (test)') : TIER.all() ? 'tiers: stand-ins everywhere (test)' : 'tiers: ' + TIER.nFull + ' blocks full, ' + TIER.nStand + ' stand-in, ' + TIER.changes + ' changes';
+TIER.line = () => !TIER.on() ? 'tiers: off' + (S.tiers === false ? ' (setting)' : ' (test)') : TIER.all() ? 'tiers: stand-ins everywhere (test)' : 'tiers: ' + TIER.nFull + ' blocks full, ' + TIER.nStand + ' stand-in (' + [...solidRegions.values()].filter(r => r.tier === 'baked').length + ' baked), ' + TIER.changes + ' changes';
 // a plot's stand-in, made on the page from its recipe (the worker does it ahead of time when the policy asks: see recipe.js)
 function standEnsure(c){
   const d = c.data; if (!d || !d.rec || !d.rec.r || d.sgeo || d.noStand) return d && d.sgeo || null;

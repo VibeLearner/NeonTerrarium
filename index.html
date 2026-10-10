@@ -186,6 +186,7 @@
       <label class="tog" title="Zoomed out, draw at most 1.6 times the usual resolution instead of your screen's full resolution (fine details simplify a little sooner)"><input type="checkbox" id="capRes" checked> Cap zoom-out resolution</label>
       <label class="tog" title="When frames run slow for a couple of seconds, lower the zoomed-out resolution, and raise it again once things are smooth"><input type="checkbox" id="autoPerf" checked> Auto-adjust when slow</label>
       <label class="tog" title="Blocks away from the view, and the whole city when zoomed far out, are drawn as stand-ins with their smallest pieces left out (less memory, faster turning). Untick to compare."><input type="checkbox" id="tiers" checked> Detail tiers</label>
+      <label class="tog" title="Zoomed far out, blocks are drawn from a few boxes per building wearing pictures baked from the real building (frames and sills kept) instead of stand-ins. Needs Detail tiers. Baking runs in the background; it takes memory on the graphics card."><input type="checkbox" id="baked"> Baked far buildings</label>
     </div>
     <div class="chips" id="resChips" aria-label="Render resolution">
       <button data-lines="240" title="Chunky pixels, the lightest on the graphics card">Pixels: 240p</button>
@@ -216,15 +217,16 @@
 <script src="js/people.js?v=2026-10-10d"></script>
 <script src="js/highway.js?v=2026-10-10d"></script>
 <script src="js/metro.js?v=2026-10-10d"></script>
+<script src="js/shell.js?v=2026-10-10d"></script>
 <script src="js/recipe.js?v=2026-10-10d"></script>
 <script src="js/loadcity.js?v=2026-10-10d"></script>
-<script src="js/shell.js?v=2026-10-10d"></script>
-<script src="js/baked.js?v=2026-10-10d"></script>
 <script src="js/music.js?v=2026-10-10d"></script>
 <script src="js/input.js?v=2026-10-10d"></script>
 <script src="js/perfhud.js?v=2026-10-10d"></script>
 <script src="js/staticcache.js?v=2026-10-10d"></script>
 <script src="js/neverseen.js?v=2026-10-10d"></script>
+<script src="js/bakejob.js?v=2026-10-10d"></script>
+<script src="js/baked.js?v=2026-10-10d"></script>
 <script src="js/main.js?v=2026-10-10d"></script>
 </body>
 </html>

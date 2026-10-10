@@ -222,6 +222,9 @@ $('outlines').addEventListener('change', e => { S.outlines = e.target.checked; }
 // Detail tiers (world.js TIER): far blocks drawn as stand-ins with their smallest pieces left out; remembered in this browser, and switched at once
 { try { const v = localStorage.getItem('neonIsland.tiers'); if (v !== null) S.tiers = v === '1'; } catch (e) {} if (S.tiers === undefined) S.tiers = true; $('tiers').checked = S.tiers;
   $('tiers').addEventListener('change', e => { S.tiers = e.target.checked; try { localStorage.setItem('neonIsland.tiers', S.tiers ? '1' : '0'); } catch (e2) {} tierApplyNow(); }); }
+// Baked far buildings (baked.js): far blocks drawn from shells wearing baked pictures instead of stand-ins; remembered in this browser, switched at once like the tiers (off until it is ticked)
+{ try { S.baked = localStorage.getItem('neonIsland.baked') === '1'; } catch (e) { S.baked = false; } $('baked').checked = S.baked;
+  $('baked').addEventListener('change', e => { S.baked = e.target.checked; try { localStorage.setItem('neonIsland.baked', S.baked ? '1' : '0'); } catch (e2) {} tierApplyNow(); }); }
 for (const id of ['capRes', 'autoPerf']){
   try { const v = localStorage.getItem('neonIsland.' + id); if (v !== null){ S[id] = v === '1'; $(id).checked = S[id]; } } catch (e) {}
   $(id).addEventListener('change', e => { S[id] = e.target.checked; try { localStorage.setItem('neonIsland.' + id, S[id] ? '1' : '0'); } catch (e2) {} if (id === 'autoPerf') PERF.grow = Infinity; });

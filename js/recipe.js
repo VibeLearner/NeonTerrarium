@@ -195,7 +195,7 @@ RW.start = () => {
   if (window.__realNow && !window.__GEN_WORKER) return;
   const scripts = [...document.scripts].map(s => s.src).filter(Boolean);
   const three = scripts.find(u => /three(\.min)?\.js/.test(u)), bgu = scripts.find(u => /BufferGeometryUtils/.test(u));
-  const names = ['matreg', 'core', 'sprites', 'buildings', 'ground', 'vehicles', 'sky', 'audio', 'world', 'mega', 'people', 'highway', 'metro', 'recipe'];
+  const names = ['matreg', 'core', 'sprites', 'buildings', 'ground', 'vehicles', 'sky', 'audio', 'world', 'mega', 'people', 'highway', 'metro', 'recipe', 'shell'];
   const urls = names.map(n => scripts.find(u => u.includes('/js/' + n + '.js'))); if (!three || urls.some(u => !u)) return;
   RW.state = 'loading';
   try { RW.w = new Worker(RW.src.replace('recipe.js', 'recipeworker.js')); } catch (e){ RW.state = 'failed'; RW.error = String(e); return; }
@@ -210,6 +210,7 @@ RW.start = () => {
     } else if (m.t === 'done' || m.t === 'err'){
       if (m.rb) for (const [k, e] of m.rb){ const mine = rbCache.get(k); if (!mine){ rbCache.set(k, rbUnpack(e)); RW.rbSent.add(k); } else if (!sameArr(mine.attributes.position.array, e.a.position.a)) RW.rbSent.delete(k); else RW.rbSent.add(k); }
       const j = RW.jobs.get(m.id); RW.jobs.delete(m.id); if (!j || j.cancelled) return;
+      if (j.shellJob){ if (m.t === 'err'){ j.fail = m.err; RW.fell++; } else j.res = m; j.done = true; return; }   // (a plot made again for its bake: baked.js)
       if (j.regen){ const h = j.regen; if (m.t === 'err'){ h.wait = null; h.fails = (h.fails || 0) + 1; RW.fell++; return; } if (h.c.data === h.d && (h.out || pmNeeds(h, 'stand'))){ PM.async++; pmFill(h, recipeUnpack(m.msg).data); } else h.wait = null; return; }
       if (m.t === 'err'){ j.fail = m.err; RW.fell++; } else { j.res = m; RW.made++; }
       j.done = true;
@@ -239,6 +240,14 @@ RW.regen = (h, r) => {
   const m = { t: 'gen', id, r, far: { lean: !!(PH.tests.leanRound || window.__LEAN_ROUND), sticks: !!(PH.tests.thinSticks || window.__THIN_STICKS) }, rb: [], regen: true };
   for (const [k, g] of rbCache) if (!RW.rbSent.has(k)){ RW.rbSent.add(k); m.rb.push([k, rbPack(g, false)]); }
   RW.w.postMessage(m);
+};
+// a plot made again with its shell worked out (baked.js): the answer is the plot's geometry and Shell.build's boxes, faces and kept triangle numbers; nothing of it goes into the plot
+RW.shell = (r, opts) => {
+  const id = RW.next++, rw = { id, done: false, res: null, fail: null, cancelled: false, shellJob: true }; RW.jobs.set(id, rw);
+  RW.sendWorld();
+  const m = { t: 'gen', id, r, far: { lean: !!(PH.tests.leanRound || window.__LEAN_ROUND), sticks: !!(PH.tests.thinSticks || window.__THIN_STICKS) }, rb: [], regen: true, shell: opts || {} };
+  for (const [k, g] of rbCache) if (!RW.rbSent.has(k)){ RW.rbSent.add(k); m.rb.push([k, rbPack(g, false)]); }
+  RW.w.postMessage(m); return rw;
 };
 RW.cancel = job => { if (job.rw){ job.rw.cancelled = true; RW.jobs.delete(job.rw.id); job.rw = null; } };
 RW.line = () => 'plot worker: ' + (genMain() ? 'off (test)' : RW.state) + (RW.error ? ' (' + RW.error + ')' : '') + '; made ' + RW.made + ', fell back ' + RW.fell + ', walking maps taken from it ' + RW.grids;
@@ -337,8 +346,9 @@ function pmBlockReady(key){
   const [a, b] = key.split(',').map(Number); let ok = true; const which = tierOfKey(key);
   for (let i = a*MREG; i < a*MREG + MREG; i++) for (let j = b*MREG; j < b*MREG + MREG; j++){
     const c = cells.get(ckey(i, j)); if (!c || !c.data || !c.data.rec) continue;
-    const h = pmHolder(c);
-    if (pmNeeds(h, which)){ if (!pmEnsure(c, which)) ok = false; } else if (h.queued) h.due = Math.max(h.due, PM.frame + 600);
+    const h = pmHolder(c); let w = which;
+    if (w === 'baked'){ const bk = BAKE.get(c); if (bk && !bk.empty) continue; w = 'stand'; }   // (a baked plot gives its own small geometry: it needs no arrays of the page's)
+    if (pmNeeds(h, w)){ if (!pmEnsure(c, w)) ok = false; } else if (h.queued) h.due = Math.max(h.due, PM.frame + 600);
   }
   return ok;
 }

@@ -3,88 +3,19 @@
 // the emissive color and kind, the normal, the window's switch-on threshold). The shell is drawn with the buildings' own toon lighting reading those
 // textures instead of vertex attributes, so sun, sky light, shadows, the evening switch-on and the grade keep working. Flickering and blinking pieces
 // are baked switched off and stay live through the glow overlay. What sticks out of the shell by more than BK.keep, and the ground layer, stay real.
-const BK = { tpu: 16, out: .3, inn: .7, keep: .3, ground: .3, vox: .2, protoOn: () => !!window.__BAKED_PROTO, stats: [] };
+const BK = { shellOpts: {}, tpu: 16, out: .3, inn: .7, keep: .3, ground: .3, vox: .2, protoOn: () => !!window.__BAKED_PROTO, stats: [] };
 const bkRanges = g => { const u = g.userData.cut; return u ? [[0, u.A], [u.A + u.H, u.A + u.H + u.S]] : [[0, g.userData.shown ?? g.index.count]]; };
-// ---- the shell (a prototype builder: voxelize the mass, close it, open it to drop thin things, merge into boxes, put each face on the plane the real wall is on) ----
+// ---- the shell: js/shell.js (item 2) works out the boxes and what stays real; here its face rectangles become bake faces (u across the picture, v up it) ----
 function bkShellOf(g){
-  const P = g.attributes.position.array, I = g.index.array, mass = [];
-  for (const [a, b] of bkRanges(g)) for (let q = a; q < b; q += 3){ if (Math.max(P[I[q]*3 + 1], P[I[q + 1]*3 + 1], P[I[q + 2]*3 + 1]) >= BK.ground) mass.push(q); }
-  let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, y1 = -1e9;
-  for (const q of mass) for (let k = 0; k < 3; k++){ const v = I[q + k]*3, x = P[v], y = P[v + 1], z = P[v + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; if (y > y1) y1 = y; }
-  const R = BK.vox, ox = x0 - 2*R, oy = BK.ground - R, oz = z0 - 2*R, nx = Math.ceil((x1 - x0)/R) + 5, ny = Math.ceil((y1 - oy)/R) + 3, nz = Math.ceil((z1 - z0)/R) + 5;
-  const at = (x, y, z) => (y*nz + z)*nx + x, N = nx*ny*nz, surf = new Uint8Array(N);
-  const cl = (v, n) => v < 0 ? 0 : v >= n ? n - 1 : v;
-  for (const q of mass){
-    const a = I[q]*3, b = I[q + 1]*3, c = I[q + 2]*3; let m = 0;
-    for (const [u, v] of [[a, b], [b, c], [c, a]]) m = Math.max(m, Math.hypot(P[u] - P[v], P[u + 1] - P[v + 1], P[u + 2] - P[v + 2]));
-    const n = Math.max(1, Math.ceil(m/(R*.5)));
-    for (let i = 0; i <= n; i++) for (let j = 0; j <= n - i; j++){ const s = i/n, t = j/n, w = 1 - s - t;
-      const x = P[a]*w + P[b]*s + P[c]*t, y = P[a + 1]*w + P[b + 1]*s + P[c + 1]*t, z = P[a + 2]*w + P[b + 2]*s + P[c + 2]*t;
-      surf[at(cl(Math.floor((x - ox)/R), nx), cl(Math.floor((y - oy)/R), ny), cl(Math.floor((z - oz)/R), nz))] = 1; }
+  const P = g.attributes.position.array, I = g.index.array, cut = g.userData.cut, part = Shell.atlasParts(P, I, cut), r = Shell.build([part], BK.shellOpts);
+  const keepSet = new Set(r.keep[0]), faces = [], bakeIx = [], keepIx = [];
+  for (const f of r.faces){
+    // (a, then its next two axes: a0..a1 along (a + 1) % 3, b0..b1 along (a + 2) % 3)
+    const o = f.ax === 0 ? { u: 2, v: 1, u0: f.b0, u1: f.b1, v0: f.a0, v1: f.a1 } : f.ax === 1 ? { u: 0, v: 2, u0: f.b0, u1: f.b1, v0: f.a0, v1: f.a1 } : { u: 0, v: 1, u0: f.a0, u1: f.a1, v0: f.b0, v1: f.b1 };
+    faces.push({ a: f.ax, s: f.dir, plane: f.c, u: o.u, v: o.v, u0: o.u0, u1: o.u1, v0: o.v0, v1: o.v1, box: f.box });
   }
-  // the air outside, flooded in from the corner: through a seal (the surfaces grown by two voxels, so the gaps in a facade don't let the flood into the building); what it never reaches is mass
-  const D6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
-  const nb = (arr, x, y, z) => x >= 0 && y >= 0 && z >= 0 && x < nx && y < ny && z < nz && arr[at(x, y, z)];
-  const grow = (src, below) => { const out = new Uint8Array(N); for (let y = 0; y < ny; y++) for (let z = 0; z < nz; z++) for (let x = 0; x < nx; x++){ if (src[at(x, y, z)]){ out[at(x, y, z)] = 1; continue; } for (const [dx, dy, dz] of D6) if (nb(src, x + dx, y + dy, z + dz)){ out[at(x, y, z)] = 1; break; } } return out; };
-  const shrink = src => { const out = new Uint8Array(N); for (let y = 0; y < ny; y++) for (let z = 0; z < nz; z++) for (let x = 0; x < nx; x++){ if (!src[at(x, y, z)]) continue; let ok = 1; for (const [dx, dy, dz] of D6) if (!(y + dy < 0 ? 1 : nb(src, x + dx, y + dy, z + dz))){ ok = 0; break; } out[at(x, y, z)] = ok; } return out; };
-  const seal = grow(grow(surf)), ext = new Uint8Array(N), st = [0]; ext[0] = 1;
-  while (st.length){ const p = st.pop(), x = p % nx, z = Math.floor(p/nx) % nz, y = Math.floor(p/(nx*nz));
-    for (const [dx, dy, dz] of D6){ const X = x + dx, Y = y + dy, Z = z + dz; if (X < 0 || Y < 0 || Z < 0 || X >= nx || Y >= ny || Z >= nz) continue; const k = at(X, Y, Z); if (ext[k] || seal[k]) continue; ext[k] = 1; st.push(k); } }
-  let sol = new Uint8Array(N); for (let k = 0; k < N; k++) sol[k] = ext[k] ? 0 : 1;
-  sol = shrink(shrink(sol));   // (the seal's two voxels back off)
-  sol = grow(grow(shrink(shrink(sol))));   // (opened: what is thinner than a unit or so, railings and fins and antennas, is not mass)
-  // boxes: grow from the first free solid voxel along x, then z, then y
-  const used = new Uint8Array(N), free = (x, y, z) => x < nx && y < ny && z < nz && sol[at(x, y, z)] && !used[at(x, y, z)], boxes = [];
-  for (let y = 0; y < ny; y++) for (let z = 0; z < nz; z++) for (let x = 0; x < nx; x++){
-    if (!free(x, y, z)) continue;
-    let ex = x; while (free(ex + 1, y, z)) ex++;
-    let ez = z; for (;;){ let ok = true; for (let xx = x; xx <= ex && ok; xx++) if (!free(xx, y, ez + 1)) ok = false; if (!ok) break; ez++; }
-    let ey = y; for (;;){ let ok = true; for (let zz = z; zz <= ez && ok; zz++) for (let xx = x; xx <= ex && ok; xx++) if (!free(xx, ey + 1, zz)) ok = false; if (!ok) break; ey++; }
-    for (let yy = y; yy <= ey; yy++) for (let zz = z; zz <= ez; zz++) for (let xx = x; xx <= ex; xx++) used[at(xx, yy, zz)] = 1;
-    if ((ex - x + 1)*(ey - y + 1)*(ez - z + 1) >= 27) boxes.push({ v: [x, ex + 1, y, ey + 1, z, ez + 1] });
-  }
-  for (const b of boxes){ const [a0, a1, b0, b1, c0, c1] = b.v; b.b = [ox + a0*R, ox + a1*R, oy + b0*R, oy + b1*R, oz + c0*R, oz + c1*R]; if (b.v[2] === 0) b.b[2] = BK.ground - R; }
-  // each exposed face goes onto the plane most of the wall's area is on (within a few tenths of the voxel plane): the faces shared with another box stay where they are
-  const faces = [];
-  const AX = [[0, 2, 1], [1, 0, 2], [2, 0, 1]];   // axis, then the picture's across and up (walls: along the face and up; roofs: x and z)
-  for (const b of boxes){
-    for (let a = 0; a < 3; a++) for (const s of [-1, 1]){
-      if (a === 1 && s < 0) continue;   // (nothing looks up at a building)
-      const [, u, v] = AX[a], o = b.b, lo = [o[0], o[2], o[4]], hi = [o[1], o[3], o[5]], vv = b.v, vi = [[vv[0], vv[1]], [vv[2], vv[3]], [vv[4], vv[5]]];
-      // exposed: some voxel just outside the face is not solid
-      let exposed = false; const pl = s > 0 ? vi[a][1] : vi[a][0] - 1;
-      for (let i = vi[u][0]; i < vi[u][1] && !exposed; i++) for (let j = vi[v][0]; j < vi[v][1] && !exposed; j++){ const c = [0, 0, 0]; c[a] = pl; c[u] = i; c[v] = j; if (!(c[1] < 0 ? 1 : nb(sol, c[0], c[1], c[2]))) exposed = true; }
-      if (!exposed) continue;
-      faces.push({ b, a, s, u, v, plane: s > 0 ? hi[a] : lo[a], u0: lo[u], u1: hi[u], v0: lo[v], v1: hi[v], snapped: false });
-    }
-  }
-  // the real wall planes: area of the triangles that face this way, by position along the axis
-  for (const f of faces){
-    const hist = new Map(); const { a, s, u, v } = f; let any = false;
-    for (const q of mass){
-      const ia = I[q]*3, ib = I[q + 1]*3, ic = I[q + 2]*3, p0 = P[ia + a], p1 = P[ib + a], p2 = P[ic + a];
-      if (Math.abs(p0 - p1) > .01 || Math.abs(p0 - p2) > .01) continue;
-      if (Math.abs(p0 - f.plane) > BK.keep) continue;
-      const e1 = [P[ib] - P[ia], P[ib + 1] - P[ia + 1], P[ib + 2] - P[ia + 2]], e2 = [P[ic] - P[ia], P[ic + 1] - P[ia + 1], P[ic + 2] - P[ia + 2]];
-      const nrm = [e1[1]*e2[2] - e1[2]*e2[1], e1[2]*e2[0] - e1[0]*e2[2], e1[0]*e2[1] - e1[1]*e2[0]], area = Math.hypot(nrm[0], nrm[1], nrm[2])/2;   // (the sign of the facing comes from the stored normal)
-      const nn = g.attributes.normal.array[I[q]*4 + a]; if (nn*s <= 0) continue;
-      const cu = (P[ia + u] + P[ib + u] + P[ic + u])/3, cv = (P[ia + v] + P[ib + v] + P[ic + v])/3;
-      if (cu < f.u0 - .05 || cu > f.u1 + .05 || cv < f.v0 - .05 || cv > f.v1 + .05) continue;
-      const k = Math.round(p0*50); hist.set(k, (hist.get(k) || 0) + area); any = true;
-    }
-    if (any){ let bk = null, bv = 0; for (const [k, w] of hist) if (w > bv){ bv = w; bk = k; } const np = bk/50, ob = f.b.b, other = ob[a*2 + (s > 0 ? 0 : 1)]; if ((np - other)*s > .3){ f.plane = np; f.snapped = true; } }
-    if (f.snapped){ const o = f.b.b; o[a*2 + (s > 0 ? 1 : 0)] = f.plane; }
-  }
-  for (const f of faces){ const o = f.b.b; f.plane = o[f.a*2 + (f.s > 0 ? 1 : 0)]; const [, u, v] = AX[f.a]; f.u0 = o[u*2]; f.u1 = o[u*2 + 1]; f.v0 = o[v*2]; f.v1 = o[v*2 + 1]; }
-  // what stays real: the ground layer, and whatever is farther out than BK.keep from every box
-  const bakeIx = [], keepIx = [], dist = (x, y, z) => { let d = 1e9; for (const b of boxes){ const o = b.b, dx = Math.max(o[0] - x, 0, x - o[1]), dy = Math.max(o[2] - y, 0, y - o[3]), dz = Math.max(o[4] - z, 0, z - o[5]); d = Math.min(d, Math.hypot(dx, dy, dz)); } return d; };
-  const massSet = new Set(mass);
-  for (const [a, b] of bkRanges(g)) for (let q = a; q < b; q += 3){
-    if (!massSet.has(q)){ keepIx.push(I[q], I[q + 1], I[q + 2]); continue; }
-    let far = false; for (let k = 0; k < 3; k++){ const v = I[q + k]*3; if (dist(P[v], P[v + 1], P[v + 2]) > BK.keep){ far = true; break; } }
-    if (far) keepIx.push(I[q], I[q + 1], I[q + 2]); else bakeIx.push(I[q], I[q + 1], I[q + 2]);
-  }
-  return { boxes, faces, bakeIx, keepIx, nMass: mass.length };
+  for (const [a, b] of part.vis) for (let t = a; t < b; t++){ const q = t*3; if (keepSet.has(t)) keepIx.push(I[q], I[q + 1], I[q + 2]); else bakeIx.push(I[q], I[q + 1], I[q + 2]); }
+  return { boxes: r.boxes, faces, bakeIx, keepIx, stats: r.stats };
 }
 // ---- baking ----
 const BK_FACE_MAT = new THREE.ShaderMaterial({

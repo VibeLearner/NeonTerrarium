@@ -1,0 +1,1 @@
+() => { const out = []; for (const c of cells.values()){ if (!c.sections.length) continue; const g = c.data.geo.get(ATLAS); out.push([c.i, c.j, +c.height.toFixed(1), c.sections.length, c.lift ? 'L' : '', c.sections.map(s => s.zone + '/' + s.style).join(','), g.index.count/3 | 0].join(' ')); } return out; }

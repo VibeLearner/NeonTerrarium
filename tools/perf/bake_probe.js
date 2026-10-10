@@ -17,7 +17,7 @@ window.__bp = (() => {
     BAKE.onReady = (c, b) => P.ready.push(c.i + ',' + c.j);
     BAKE.onDrop = (c, b) => P.dropped.push({ key: c.i + ',' + c.j, h: hash(b.tex) });
   };
-  P.settled = () => { const s = BAKE.stats(); return (BAKE.cycles || 0) > 1 && !(s.by.new || 0) && !(s.by.queued || 0) && !(s.by.baking || 0) && !(s.by.looking || 0) && !s.job; };
+  P.settled = () => { const s = BAKE.stats(); return (BAKE.cycles || 0) > 1 && s.by.ready === P.eligible() && !(s.by.new || 0) && !(s.by.queued || 0) && !(s.by.baking || 0) && !(s.by.looking || 0) && !s.job; };
   P.eligible = () => [...cells.values()].filter(c => c.data && c.data.rec && c.data.rec.r && !c.mega && !c.animating).length;
   P.hashes = () => { const o = {}; for (const e of BAKE.ents.values()) if (e.bake) o[e.key] = hash(e.bake.tex); return o; };
   P.distinct = () => new Set([...BAKE.ents.values()].map(e => e.sig)).size;

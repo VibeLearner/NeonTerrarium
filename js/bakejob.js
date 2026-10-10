@@ -12,7 +12,7 @@
 // API: BAKE.tick(budgetMs) once a frame (main.js, after the regions are merged); BAKE.want(c) register and prioritise a plot; BAKE.get(c) the bake or null (null while the plot's recipe has moved on);
 // BAKE.drop(c); BAKE.stats(); BAKE.line(); BAKE.clearCache(); callbacks BAKE.onReady(c, bake) and BAKE.onDrop(c, bake) for the lead to mark the block dirty.
 const BAKE = { ver: 1, density: 'd1', maxCacheBytes: 192*1048576, mem: new Map(), ents: new Map(), keys: new Set(), meta: new Map(), db: null, dbReady: false, lookups: 0, maxLookups: 4,
-  job: null, writes: 0, scan: 0, list: [], listStamp: -1, listSize: -1, drawsInSig: false, onReady: null, onDrop: null, baker: null, view: null, lastT: 0, last: { ms: 0, steps: 0 },
+  job: null, writes: 0, pend: new Map(), pendTimer: 0, scan: 0, list: [], listStamp: -1, listSize: -1, drawsInSig: false, onReady: null, onDrop: null, baker: null, view: null, lastT: 0, last: { ms: 0, steps: 0 },
   c: { tracked: 0, edits: 0, hits: 0, memHits: 0, misses: 0, baked: 0, steps: 0, stored: 0, evicted: 0, failed: 0, dropped: 0, ticks: 0, ticksOver: 0, maxTickMs: 0, bakeMs: 0, dedup: 0 } };
 BAKE.gen = (document.currentScript && /[?&]v=([^&]+)/.exec(document.currentScript.src || '') || [0, 'dev'])[1];   // (the scripts' version: a bake is only as good as the builders and the baker that made it)
 BAKE.off = () => !!window.__BAKE_OFF;
@@ -63,10 +63,19 @@ function bkDbGet(sig, cb){   // cb(bake or null)
   if (!BAKE.db || !BAKE.keys.has(sig)){ cb(null); return; }
   try { const rq = BAKE.db.transaction('b').objectStore('b').get(sig); rq.onsuccess = () => cb(rq.result || null); rq.onerror = () => cb(null); } catch (e) { cb(null); }
 }
+// writes are batched: a finished bake is kept in memory and in the key set at once, and written with the others in one transaction from a timer (never inside a frame's budget: a transaction and the copy of
+// the arrays cost a millisecond or two now and then)
 function bkDbPut(sig, bake){
   const bytes = bkBytes(bake.tex), m = { bytes, t: Date.now() }; BAKE.keys.add(sig); BAKE.meta.set(sig, m); BAKE.c.stored++;
-  if (BAKE.db) try { const tx = BAKE.db.transaction(['b', 'm'], 'readwrite'); BAKE.writes++; tx.oncomplete = tx.onerror = tx.onabort = () => { BAKE.writes--; }; tx.objectStore('b').put(bake, sig); tx.objectStore('m').put(m, sig); } catch (e) { BAKE.writes = Math.max(0, BAKE.writes - 1); }
+  BAKE.pend.set(sig, { bake, m });
+  if (!BAKE.pendTimer){ BAKE.pendTimer = setTimeout(() => { BAKE.pendTimer = 0; (window.requestIdleCallback || (f => f()))(bkWrite); }, 100); }
   bkEvict();
+}
+function bkWrite(){
+  if (!BAKE.pend.size) return; const items = [...BAKE.pend.entries()]; BAKE.pend.clear();
+  if (!BAKE.db) return;
+  try { const tx = BAKE.db.transaction(['b', 'm'], 'readwrite'), B = tx.objectStore('b'), M = tx.objectStore('m'); BAKE.writes++; tx.oncomplete = tx.onerror = tx.onabort = () => { BAKE.writes--; };
+    for (const [sig, it] of items){ if (!BAKE.keys.has(sig)) continue; B.put(it.bake, sig); M.put(it.m, sig); } } catch (e) { BAKE.writes = Math.max(0, BAKE.writes - 1); }
 }
 function bkEvict(){   // the oldest entries go while the store holds more than maxCacheBytes (the entries in use are kept in memory regardless)
   let tot = 0; for (const m of BAKE.meta.values()) tot += m.bytes; if (tot <= BAKE.maxCacheBytes) return;
@@ -110,7 +119,7 @@ BAKE.state = c => { const e = BAKE.ents.get(bkKey(c)); return e && e.c === c ? e
 BAKE.drop = c => { const e = BAKE.ents.get(bkKey(c)); if (e) bkDropEntry(e, 'api'); };
 // clears the store and every bake in memory; every plot is queued again
 BAKE.clearCache = () => {
-  bkCancel(); for (const e of [...BAKE.ents.values()]) bkDropEntry(e, 'clear'); BAKE.mem.clear(); BAKE.keys.clear(); BAKE.meta.clear();
+  BAKE.pend.clear(); bkCancel(); for (const e of [...BAKE.ents.values()]) bkDropEntry(e, 'clear'); BAKE.mem.clear(); BAKE.keys.clear(); BAKE.meta.clear();
   if (BAKE.db) try { const tx = BAKE.db.transaction(['b', 'm'], 'readwrite'); tx.objectStore('b').clear(); tx.objectStore('m').clear(); } catch (e) {}
   BAKE.listStamp = -1;
 };
@@ -122,14 +131,18 @@ function bkRefreshList(){
   for (const e of [...BAKE.ents.values()]) if (cells.get(e.key) !== e.c) bkDropEntry(e, 'removed');   // (a plot that is gone drops its bake)
 }
 function bkLookupSome(){
-  if (BAKE.lookups >= BAKE.maxLookups) return;
-  const news = []; for (const e of BAKE.ents.values()) if (e.state === 'new') news.push(e);
-  if (!news.length) return;
-  news.sort((a, b) => bkDist(a) - bkDist(b));
-  for (const e of news){
-    if (BAKE.lookups >= BAKE.maxLookups) break;
+  // the plots the store can't hold, or memory already has, are settled with no trip and no sorting; only the ones that need a read are put in order (nearest first)
+  let need = null;
+  for (const e of BAKE.ents.values()){
+    if (e.state !== 'new') continue;
     const m = BAKE.mem.get(e.sig); if (m){ bkSet(e, m.bake); BAKE.c.memHits++; continue; }   // (the same plot again, in memory)
     if (!BAKE.keys.has(e.sig)){ e.state = 'queued'; BAKE.c.misses++; continue; }   // (not in the store: no trip)
+    (need || (need = [])).push(e);
+  }
+  if (!need) return;
+  need.sort((a, b) => bkDist(a) - bkDist(b));
+  for (const e of need){
+    if (BAKE.lookups >= BAKE.maxLookups) break;
     e.state = 'looking'; BAKE.lookups++;
     bkDbGet(e.sig, bake => { BAKE.lookups--; if (e.state !== 'looking') return;   // (dropped meanwhile)
       if (bake && bake.tex){ BAKE.c.hits++; bkSet(e, bake); } else { BAKE.keys.delete(e.sig); BAKE.meta.delete(e.sig); e.state = 'queued'; BAKE.c.misses++; } });
@@ -157,7 +170,7 @@ BAKE.tick = function(budgetMs){
   bkRefreshList();
   for (let n = 0; n < 60 && BAKE.scan < BAKE.list.length; n++, BAKE.scan++){ bkTrack(BAKE.list[BAKE.scan]); if (n && bkNow() - t0 > budgetMs*.5) { BAKE.scan++; break; } }   // (the scan counts against the budget too)
   if (BAKE.scan >= BAKE.list.length){ BAKE.scan = 0; BAKE.cycles = (BAKE.cycles || 0) + 1; }
-  bkLookupSome();
+  const tScan = bkNow() - t0; bkLookupSome(); const tLook = bkNow() - t0 - tScan, b0 = BAKE.c.baked;
   const ctx = { c: null, sig: '', density: BAKE.density, ver: BAKE.ver, left: () => Math.max(0, t0 + budgetMs - bkNow()) };
   const idle = BAKE.idle() && budgetMs > 0;
   let guard = 0;
@@ -180,7 +193,7 @@ BAKE.tick = function(budgetMs){
     if (st.done){ BAKE.job = null; bkFinish(j.e, st.value); }
     if (bkNow() - t0 >= budgetMs) break;
   }
-  const ms = bkNow() - t0; BAKE.last.ms = ms; BAKE.c.bakeMs += ms; if (ms > BAKE.c.maxTickMs) BAKE.c.maxTickMs = ms; if (ms > budgetMs + 1) BAKE.c.ticksOver++;
+  const ms = bkNow() - t0; BAKE.last.ms = ms; BAKE.c.bakeMs += ms; if (BAKE.c.ticks <= 2) BAKE.coldMs = Math.max(BAKE.coldMs || 0, ms); else if (ms > BAKE.c.maxTickMs){ BAKE.c.maxTickMs = ms; BAKE.worst = { ms, scan: tScan, look: tLook, bake: ms - tScan - tLook, steps: BAKE.last.steps, baked: BAKE.c.baked - b0, budget: budgetMs }; } if (BAKE.c.ticks > 2 && ms > budgetMs + 1) BAKE.c.ticksOver++;   // (the first two ticks run cold code: BAKE.coldMs)
 };
 BAKE.stats = () => {
   const by = {}; for (const e of BAKE.ents.values()) by[e.state] = (by[e.state] || 0) + 1;
@@ -189,7 +202,9 @@ BAKE.stats = () => {
 };
 BAKE.line = () => { const s = BAKE.stats(); return 'baked far: ' + (s.by.ready || 0) + ' ready of ' + s.plots + ', queued ' + (s.by.queued || 0) + ', store hits ' + s.hits + ', baked ' + s.baked + ', edits ' + s.edits + ', failed ' + s.failed; };
 // for tools: true while store writes are still on their way (a page closed before they land loses them: the next session bakes those plots again)
-BAKE.flushed = () => BAKE.writes === 0;
+BAKE.flushed = () => BAKE.writes === 0 && !BAKE.pend.size;
+BAKE.flush = () => { if (BAKE.pendTimer){ clearTimeout(BAKE.pendTimer); BAKE.pendTimer = 0; } bkWrite(); };
 // for tools: run ticks until the queue is empty or n ticks went by
 BAKE.drain = (budgetMs = 4, n = 1e6) => { const c0 = BAKE.cycles || 0; for (let k = 0; k < n; k++){ BAKE.tick(budgetMs); const s = BAKE.stats(); if ((BAKE.cycles || 0) > c0 && !(s.by.new || 0) && !(s.by.queued || 0) && !(s.by.baking || 0) && !(s.by.looking || 0) && !BAKE.job) return k + 1; } return -1; };
+addEventListener("pagehide", () => { try { BAKE.flush(); } catch (e) {} });   // (a reload or a closed tab writes what is waiting)
 if (!window.__BAKE_OFF) bkDbOpen(); else BAKE.dbReady = true;

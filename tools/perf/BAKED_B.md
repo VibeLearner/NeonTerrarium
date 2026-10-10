@@ -42,14 +42,14 @@ Branch `wip/baked-cache` (from `wip/baked`). Files: `js/bakejob.js` (new, the wh
 - Scan-based, not event-based: no edit to world.js, and it cannot miss a path (rebuildCell, the worker, load). The cost is a cheap loop (identity compare per plot, 60 plots a tick).
 - The bake is looked up before baking and read lazily: the atlases are large; only keys and sizes are held at open.
 - The signature excludes the draws like the never-seen job (see the note above on `drawsInSig`).
-- IndexedDB writes are one transaction per bake; `BAKE.flushed()` says whether writes are still on their way (a page closed before they land loses them: those plots are baked again next session, which is harmless).
+- IndexedDB writes are batched into one transaction a timer tick (100 ms, idle callback); `BAKE.flushed()` says whether writes are still on their way, `pagehide` flushes (a page killed before they land loses them: those plots are baked again next session, which is harmless).
 - Plots that were there at load are baked too (the never-seen job skips them): the bake is what the far view draws, so every plot needs one.
 
 ## Checks (`python3 tools/perf/bake_probe.py city`, harness clock; `--real` for the real clock)
 
 Harness mode, city scene (171 baked plots after the megastructures and animating plots): every eligible plot ready; baked once per distinct signature; baked nearest first with no step back in distance; stored; no tick past a budget of 4 ms; reload (same browser context, same IndexedDB) bakes nothing, 171 of 171 from the store, byte for byte equal; an edit drops the old bake and bakes the new signature; a removal drops the plot's bake (and its neighbors' with their new recipes); `clearCache` empties the store and every plot is baked again; no page or console errors. All ok.
 
-Real-clock mode: see the end of this file.
+Real-clock mode (`--real`: no scripted clock, the game's own frame loop, the plot worker on, a 400 by 225 page because the software renderer draws every frame; the probe injects `bakejob.js` and hooks `nvTick`, test-only): all ok as well. The 171 plots bake in 9 ticks with the placeholder (61 plots in the busiest tick, 4.0 ms against a budget of 4); a costly baker (1 ms a face) is worked through at about 4 steps a tick with the worst tick at 4.7 ms; the reload loads all 171 from the store, byte for byte equal; the edit goes through the worker (the plot is made again, its recipe changes, the old bake is dropped, the new one baked); no page or console errors. Baking waited for the city to finish merging (`BAKE.idle()`), as intended. The first two ticks run cold code and are reported apart (`BAKE.coldMs`, 4 to 5 ms: signatures of the first 60 plots); the store writes are batched and made from a timer (`BAKE.flush()`, also on `pagehide`), never inside the frame's budget.
 
 ## Skipped / not done
 

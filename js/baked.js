@@ -6,7 +6,7 @@
 // What sticks out of the shell by more than 0.3 (and what the shell builder, shell.js, does not cover) stays real geometry, merged into the block like the stand-in's pieces.
 // The pieces here: the baker (BAKE.baker, for bakejob.js: the plot made again with its shell by the plot worker, drawn face by face from outside into three maps, filled and packed), the pool (pages of
 // maps on the card, a slot per plot), the block's shell meshes (bkBlock, called by rebuildSolidGen in world.js when a block's tier is 'baked'), and the setting (S.baked: "Baked far buildings").
-const BK = { shellOpts: {}, keepLights: true, wholePiece: 700, margin: .8, tpu: 16, out: .3, inn: .7, steps: { value: 32 }, PAGE: 2048, SLOT_W: 1024, pages: [], stats: { baked: 0, ms: 0, keptTris: 0, ovlTris: 0, shellTris: 0, texels: 0, holes: 0, area: 0, worker: 0, ph: {} }, test: {} };
+const BK = { maxPages: window.__BAKED_PAGES || 10, shellOpts: window.__BAKED_SHELL || {}, keepLights: !window.__BAKED_NOLIGHTS, wholePiece: 700, margin: .8, tpu: 16, out: .3, inn: .7, steps: { value: 32 }, PAGE: 2048, SLOT_W: 1024, pages: [], stats: { baked: 0, ms: 0, keptTris: 0, ovlTris: 0, shellTris: 0, texels: 0, holes: 0, area: 0, worker: 0, ph: {} }, test: {} };
 BK.on = () => (S.baked === true || !!window.__BAKED_ON) && !window.__BAKED_OFF && TIER.on();   // (a test page turns it on with __BAKED_ON; the setting is the render menu's box)
 const bkNow2 = () => window.__realNow ? window.__realNow() : performance.now();
 const bkPh = (name, t0) => { const t = bkNow2(); BK.stats.ph[name] = (BK.stats.ph[name] || 0) + t - t0; return t; };   // (time by phase of the baker's own steps: the card's work (face, read) is a software renderer's in the test pages, so it is kept apart)
@@ -131,7 +131,9 @@ BAKE.baker = function*(c, ctx){
   }
 };
 BAKE.density = 't' + BK.tpu; BAKE.bakerTag = 'r1';
-BAKE.skip = c => !!c.mega || !BK.on();
+// the budget: pages of maps on the card (48 MB each). Plots are baked nearest the view first; once the pages are full no more are baked (what is baked stays), and a block with a plot that has no bake keeps the stand-in
+BK.full = () => BK.pages.length >= BK.maxPages && !BK.pages.some(p => p.shelves.some(sh => sh.free.length));
+BAKE.skip = c => { if (c.mega || !BK.on()) return true; if (!BK.full()) return false; const e = BAKE.ents.get(c.i + ',' + c.j); return !(e && e.c === c && (e.state === 'ready' || e.state === 'baking')); };
 // ---- the pool: pages of three maps on the card; a slot (BK.SLOT_W wide, a height class tall) for each baked plot ----
 function bkPage(){
   const mk = () => { const rt = new THREE.WebGLRenderTarget(BK.PAGE, BK.PAGE, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat, type: THREE.UnsignedByteType, depthBuffer: false, stencilBuffer: false }); rt.texture.generateMipmaps = false; return rt; };

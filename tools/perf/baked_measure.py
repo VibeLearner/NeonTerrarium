@@ -24,13 +24,13 @@ async ([zoom, hour, mode, settle]) => {
   for (const r of solidRegions.values()) for (const g of r.geoms){ ng++; const v = g.attributes.position.count; nv += v; vb += v*26; const n = g.index ? g.index.count : 0; ni += n; ib += n*(g.userData.bpe || (v > 65535 ? 4 : 2)); }
   let sv = 0, si = 0; for (const r of solidRegions.values()) r.group.traverse(o => { if (o.userData.baked && o.geometry){ sv += o.geometry.attributes.position.count; si += o.geometry.index.count; } });
   const bs = mode === 'baked' ? BK.stats : null, st = BAKE.stats();
-  return { used, tris: c.info.tris, calls: c.info.calls, geos: c.info.geos, tex: c.info.tex, blocks: solidRegions.size, mergedGeos: ng, mergedVerts: nv, mergedTris: ni/3, mergedBytes: vb + ib, shellVerts: sv, shellTris: si/3,
+  return { png: c.png, used, tris: c.info.tris, calls: c.info.calls, geos: c.info.geos, tex: c.info.tex, blocks: solidRegions.size, mergedGeos: ng, mergedVerts: nv, mergedTris: ni/3, mergedBytes: vb + ib, shellVerts: sv, shellTris: si/3,
     pages: BK.pages.length, pageBytes: BK.pages.length*3*BK.PAGE*BK.PAGE*4, plots: st.plots, ready: st.by.ready || 0, bk: BK.stats, tier: TIER.line(), line: BK.line() };
 }
 """
-INITS = {'real': 'window.__TIER_OFF = true;', 'stand': '', 'baked': 'window.__BAKED_ON = true;'}
+INITS = {'real': 'window.__TIER_OFF = true;', 'stand': '', 'baked': 'window.__BAKED_ON = true; window.__BAKED_PAGES = 1000;'}
 def run_one(br, url, scene, mode, zoom, hour, settle):
-    ctx, pg, errs = H.open_game(br, url, scene, H.VIEWPORTS[0], extra_init='window.__NV_OFF = true;' + INITS[mode])
+    ctx, pg, errs = H.open_game(br, url, scene, H.VIEWPORTS[0], extra_init='window.__NV_OFF = true;' + INITS[mode] + (os.environ.get('BK_INIT') or ''))
     r = pg.evaluate(RUN, [zoom, hour, mode, settle]); ctx.close(); return r, errs
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('scene'); ap.add_argument('--zoom', type=float, default=30); ap.add_argument('--hour', type=float, default=12); ap.add_argument('--out', default=None); ap.add_argument('--modes', nargs='+', default=['baked', 'real', 'stand'])
@@ -42,11 +42,20 @@ if __name__ == '__main__':
         for m in a.modes:
             R[m], e = run_one(br, url, sc, m, a.zoom, a.hour, 0 if m == 'baked' or used == 0 else used); E += e
             if m == 'baked': used = R[m]['used']
-            print(m, json.dumps({k: v for k, v in R[m].items() if k != 'bk'}), flush=True)
+            print(m, json.dumps({k: v for k, v in R[m].items() if k not in ('bk', 'png')}), flush=True)
         br.close()
     B = R.get('baked')
     if B:
         s = B['bk']; n = max(1, s['baked'])
         print('per baked plot: ms %.0f (phases %s), shell tris %.0f, kept tris %.0f, overlay tris %.0f, texels %.0f (%.2f MB), holes %.1f%%' % (s['ms']/n, {k: round(v/n) for k, v in s['ph'].items()}, s['shellTris']/n, s['keptTris']/n, s['ovlTris']/n, s['texels']/n, s['texels']*12/n/1048576, 100*s['holes']/max(1, s['area'])))
+    if a.out and all(m in R for m in ('real', 'stand', 'baked')):
+        import io
+        from PIL import Image, ImageChops
+        im = {m: Image.open(io.BytesIO(H.png_bytes(R[m]['png']))).convert('RGB') for m in R}
+        d1 = ImageChops.difference(im['real'], im['baked']).point(lambda v: min(255, v*4)); d2 = ImageChops.difference(im['real'], im['stand']).point(lambda v: min(255, v*4))
+        W_, H_ = im['real'].size; strip = Image.new('RGB', ((W_ + 10)*5, H_), (255, 255, 255))
+        for k, x in enumerate((im['real'], im['stand'], im['baked'], d1, d2)): strip.paste(x, (k*(W_ + 10), 0))
+        strip.save(a.out.replace('.json', '_wide.png'))
+    for m in R: R[m].pop('png', None)
     if a.out: json.dump({ 'scene': a.scene, 'zoom': a.zoom, 'hour': a.hour, 'modes': R, 'errs': E[:5] }, open(a.out, 'w'), indent=1)
     srv.shutdown()

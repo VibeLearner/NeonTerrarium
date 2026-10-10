@@ -25,11 +25,17 @@ def ensure_three():
         _patch_uuid(lib)
         return lib
     os.makedirs(lib, exist_ok=True)
-    subprocess.run(['npm', 'pack', 'three@0.128.0', '--silent'], cwd=CACHE, check=True, stdout=subprocess.DEVNULL)
-    with tarfile.open(os.path.join(CACHE, 'three-0.128.0.tgz')) as t:
-        for src, dst in [('package/build/three.min.js', 'three.min.js'), ('package/examples/js/utils/BufferGeometryUtils.js', 'BufferGeometryUtils.js')]:
-            with t.extractfile(src) as f, open(os.path.join(lib, dst), 'wb') as o:
-                o.write(f.read())
+    try:
+        subprocess.run(['npm', 'pack', 'three@0.128.0', '--silent'], cwd=CACHE, check=True, stdout=subprocess.DEVNULL)
+        with tarfile.open(os.path.join(CACHE, 'three-0.128.0.tgz')) as t:
+            for src, dst in [('package/build/three.min.js', 'three.min.js'), ('package/examples/js/utils/BufferGeometryUtils.js', 'BufferGeometryUtils.js')]:
+                with t.extractfile(src) as f, open(os.path.join(lib, dst), 'wb') as o:
+                    o.write(f.read())
+    except (OSError, subprocess.CalledProcessError):   # (no npm: the same two files from the CDNs the game itself loads them from)
+        import urllib.request
+        for url, dst in [('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 'three.min.js'), ('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js', 'BufferGeometryUtils.js')]:
+            with urllib.request.urlopen(url) as r, open(os.path.join(lib, dst), 'wb') as o:
+                o.write(r.read())
     _patch_uuid(lib)
     return lib
 
@@ -94,8 +100,8 @@ def launch(pw):
     return pw.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-vsync', '--autoplay-policy=user-gesture-required'])
 
 
-def open_game(browser, url, scene, vp, sc_mode=None, extra_init=None):
-    ctx = browser.new_context(viewport={'width': vp[0], 'height': vp[1]}, device_scale_factor=1)
+def open_game(browser, url, scene, vp, sc_mode=None, extra_init=None, ctx=None):
+    ctx = ctx or browser.new_context(viewport={'width': vp[0], 'height': vp[1]}, device_scale_factor=1)   # (ctx: a context kept from an earlier page, so the second page finds the first one's IndexedDB)
     pg = ctx.new_page()
     pg.set_default_timeout(1800000)
     errs = []

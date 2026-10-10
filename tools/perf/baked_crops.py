@@ -23,23 +23,23 @@ async ([zoom, hour, turn, mode, zl, settle]) => {
   return { used, png: c.png, tris: c.info.tris, calls: c.info.calls, geos: c.info.geos, tex: c.info.tex, tier: TIER.line(), bk: BK.line(), bkstats: BK.stats, pm: PM.line() };
 }
 """
-INITS = {'real': 'window.__TIER_OFF = true;', 'stand': '', 'baked': 'window.__BAKED_ON = true;'}
-def run_one(br, url, scene, mode, zoom, hour, turn, settle):
-    ctx, pg, errs = H.open_game(br, url, scene, H.VIEWPORTS[0], extra_init='window.__NV_OFF = true;' + INITS[mode])
-    r = pg.evaluate(RUN.replace('NOSTATIC', 'true' if os.environ.get('NOSTATIC') else 'false'), [zoom, hour, turn, mode, zoom, settle]); ctx.close(); return r, errs
+INITS = {'real': 'window.__TIER_OFF = true;', 'stand': '', 'baked': 'window.__BAKED_ON = true; window.__BAKED_PAGES = 1000;'}
+def run_one(br, url, scene, mode, zoom, hour, turn, settle, keep=None):
+    ctx, pg, errs = H.open_game(br, url, scene, H.VIEWPORTS[0], extra_init='window.__NV_OFF = true;' + INITS[mode], ctx=keep)   # (keep: the baked pages share one browser context, so the bakes of the first are in the store for the rest)
+    r = pg.evaluate(RUN.replace('NOSTATIC', 'true' if os.environ.get('NOSTATIC') else 'false'), [zoom, hour, turn, mode, zoom, settle]); (pg.close() if keep else ctx.close()); return r, errs
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('scene'); ap.add_argument('--out', default='tools/perf/baked'); ap.add_argument('--zooms', type=float, nargs='+', default=[24, 30]); ap.add_argument('--hours', type=float, nargs='+', default=[12, 23])
-    ap.add_argument('--turn', action='store_true'); ap.add_argument('--tag', default='')
+    ap.add_argument('--turn', action='store_true'); ap.add_argument('--turn-only', action='store_true'); ap.add_argument('--tag', default='')
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
     os.makedirs(a.out, exist_ok=True); srv = H.serve(); url = H.make_site('bc', None); sc = H.load_scenes([a.scene])[0]; rows = []
     with sync_playwright() as pw:
-        br = H.launch(pw)
+        br = H.launch(pw); keep = br.new_context(viewport={'width': H.VIEWPORTS[0][0], 'height': H.VIEWPORTS[0][1]}, device_scale_factor=1)
         for z in a.zooms:
             for hr in a.hours:
-                for turn in ([0, 1] if a.turn else [0]):
+                for turn in ([1] if a.turn_only else [0, 1] if a.turn else [0]):
                     R = {}; E = []
-                    R['baked'], e = run_one(br, url, sc, 'baked', z, hr, turn, 0); E += e
+                    R['baked'], e = run_one(br, url, sc, 'baked', z, hr, turn, 0, keep); E += e
                     for mode in ('real', 'stand'):
                         R[mode], e = run_one(br, url, sc, mode, z, hr, turn, R['baked']['used']); E += e
                     im = {m: Image.open(io.BytesIO(H.png_bytes(R[m]['png']))).convert('RGB') for m in R}

@@ -2,7 +2,7 @@
 """Baked far buildings, item 2: crops of the shell against the real plot, for the eye.
 
 For each chosen plot, a row of panels from two directions (a quarter turn apart) at 35 degrees down:
-   real: the plot's geometry grey, the triangles kept as real geometry (outside the shell by more than keepDist) orange, the boxes as red wire
+   real: the plot's geometry gray, the triangles kept as real geometry (outside the shell by more than keepDist) orange, the boxes as red wire
    shell: what would be drawn: the boxes solid plus the kept triangles in orange
    both: the real plot faint with the boxes as translucent blue (a box poking out of the mass, or mass out of the boxes, shows here)
 Written to tools/perf/baked/shell/<scene>_<kind>_<i>_<j>.png with the numbers in the file name.

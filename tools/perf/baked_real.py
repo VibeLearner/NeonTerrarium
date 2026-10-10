@@ -9,7 +9,7 @@ sys.path.insert(0, HERE)
 import harness as H
 
 def lines(pg):
-    return pg.evaluate('() => ({ tier: TIER.line(), bk: BK.line(), rw: RW.line(), pm: PM.line(), zoom: +zoom.toFixed(1), plots: BAKE.stats().plots, ready: BAKE.stats().by.ready || 0, failed: BAKE.stats().by.failed || 0, pages: BK.pages.length, baked: [...solidRegions.values()].filter(r => r.tier === "baked").length, blocks: solidRegions.size, dirty: solidDirty.size, job: !!SOLID_JOB })')
+    return pg.evaluate('() => ({ tier: TIER.line(), bk: BK.line(), rw: RW.line(), pm: PM.line(), zoom: +zoom.toFixed(1), plots: BAKE.stats().plots, ready: BAKE.stats().by.ready || 0, failed: BAKE.stats().by.failed || 0, pages: BK.pages.length, baked: [...solidRegions.values()].filter(r => r.tier === "baked").length, blocks: solidRegions.size, dirty: solidDirty.size, job: !!SOLID_JOB, ticks: BAKE.stats().ticks, ticksOver: BAKE.stats().ticksOver, maxTickMs: +BAKE.stats().maxTickMs.toFixed(1), worstTick: BAKE.worst || null, tpu: BK.tpu })')
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('scene', nargs='?', default='island'); ap.add_argument('--out', default=None); a = ap.parse_args()

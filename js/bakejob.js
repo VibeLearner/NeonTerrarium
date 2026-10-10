@@ -9,7 +9,7 @@
 // spent and goes on next frame, and drops it (gen.return()) if the plot changed meanwhile. A promise is waited for (one at a time, nothing else bakes meanwhile). ctx = { c, sig, density, ver, left() }: left() is
 // the milliseconds left in this frame's budget (a baker that can't yield may use it to decide on cheaper steps). A baker that throws marks the plot failed until its signature changes.
 //
-// API: BAKE.tick(budgetMs) once a frame (main.js, after the regions are merged); BAKE.want(c) register and prioritise a plot; BAKE.get(c) the bake or null (null while the plot's recipe has moved on);
+// API: BAKE.tick(budgetMs) once a frame (main.js, after the regions are merged); BAKE.want(c) register and prioritize a plot; BAKE.get(c) the bake or null (null while the plot's recipe has moved on);
 // BAKE.drop(c); BAKE.stats(); BAKE.line(); BAKE.clearCache(); callbacks BAKE.onReady(c, bake) and BAKE.onDrop(c, bake) for the lead to mark the block dirty.
 const BAKE = { ver: 1, density: 'd1', maxCacheBytes: 192*1048576, mem: new Map(), ents: new Map(), keys: new Set(), meta: new Map(), db: null, dbReady: false, lookups: 0, maxLookups: 4,
   job: null, writes: 0, pend: new Map(), pendTimer: 0, scan: 0, list: [], listStamp: -1, listSize: -1, drawsInSig: false, onReady: null, onDrop: null, baker: null, view: null, lastT: 0, last: { ms: 0, steps: 0 },
@@ -96,7 +96,7 @@ function bkDropEntry(e, why){
 function bkCancel(){ const j = BAKE.job; BAKE.job = null; if (j && j.gen && j.gen.return) try { j.gen.return(); } catch (e) {} if (j && j.e && j.e.state === 'baking') j.e.state = 'queued'; }
 function bkSet(e, bake){
   const m = BAKE.mem.get(e.sig); if (m){ m.refs++; bake = m.bake; } else BAKE.mem.set(e.sig, { bake, refs: 1 });
-  if (BAKE.onReady) try { const r = BAKE.onReady(e.c, bake); if (r){ bake = r; BAKE.mem.get(e.sig).bake = r; } } catch (x) { console.error(x); }   // (onReady may hand back a slimmer bake to keep in memory: baked.js puts the maps on the card and keeps no copy of them)
+  if (BAKE.onReady) try { const r = BAKE.onReady(e.c, bake); if (r && typeof r === 'object' && r.sig){ bake = r; BAKE.mem.get(e.sig).bake = r; } } catch (x) { console.error(x); }   // (onReady may hand back a slimmer bake, an object with the same sig, to keep in memory: baked.js puts the maps on the card and keeps no copy of them; any other return value is ignored)
   e.bake = bake; e.state = 'ready';
 }
 // the plot's entry, made or brought up to date: a new recipe (an edit, a neighbor) drops the old bake and starts again

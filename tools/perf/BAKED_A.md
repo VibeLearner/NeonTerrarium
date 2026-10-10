@@ -59,7 +59,7 @@ Per builder (ground section of single-section plots; from `shell_probe.py`, balc
 
 ## What is on screen with the shell: crops
 
-`tools/perf/baked/shell/`, three rows per plot (from two sides, 35 degrees down): real plot (grey) with the kept triangles orange and boxes as red wire; the shell as it would be drawn (boxes solid, kept triangles orange); the real plot faint with the boxes as translucent blue (a box poking out of the mass, or mass outside the boxes, shows here). The title line has the counts.
+`tools/perf/baked/shell/`, three rows per plot (from two sides, 35 degrees down): real plot (gray) with the kept triangles orange and boxes as red wire; the shell as it would be drawn (boxes solid, kept triangles orange); the real plot faint with the boxes as translucent blue (a box poking out of the mass, or mass outside the boxes, shows here). The title line has the counts.
 
 What the crops show:
 

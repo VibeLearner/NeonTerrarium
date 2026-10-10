@@ -108,9 +108,9 @@ if __name__ == '__main__':
         check('the edit changed the plot\'s recipe (or the worker is making it again)', True)
         run_until(pg, a.real, '__bp.sigOf(%s) !== %s && BAKE.state(cells.get(%s)) === "ready"' % (json.dumps(key), json.dumps(before['sig']), json.dumps(key)), 'the edit to be baked')
         run_until(pg, a.real, '__bp.settled()', 'the drain after an edit')
-        after = pg.evaluate('([k]) => ({ sig: __bp.sigOf(k), h: __bp.hashes()[k], state: BAKE.state(cells.get(k)), dropped: __bp.dropped.slice(), edits: BAKE.c.edits, baked: BAKE.c.baked, oldRefs: 0, old: BAKE.mem.has(%s) })' % json.dumps(before['sig']), [key])
+        after = pg.evaluate('([k]) => ({ sig: __bp.sigOf(k), h: __bp.hashes()[k], first: Array.from((BAKE.ents.get(k).bake.tex.albedo || []).slice(0, 4)), state: BAKE.state(cells.get(k)), dropped: __bp.dropped.slice(), edits: BAKE.c.edits, baked: BAKE.c.baked, oldRefs: 0, old: BAKE.mem.has(%s) })' % json.dumps(before['sig']), [key])
         check('edit: a new signature, the old bake dropped, the plot ready again', after['sig'] != before['sig'] and after['state'] == 'ready' and after['edits'] == before['edits'] + 1 and any(d['key'] == key and d['h'] == before['h'] for d in after['dropped']), 'edits %d, dropped %d' % (after['edits'], len(after['dropped'])))
-        check('edit: baked again (a new signature is not in the store)', after['baked'] > before['baked'] and after['h'] != before['h'])
+        check('edit: baked again (a new signature is not in the store)', after['baked'] > before['baked'] and after['h'] != before['h'], 'baked %s -> %s, data hash %s -> %s, sig %s -> %s, first bytes after %s' % (before['baked'], after['baked'], before['h'], after['h'], before['sig'][-30:], after['sig'][-30:], after.get('first')))
         check('edit: the old bake left memory (no other plot holds it)', not after['old'] or before['refs'] > 1)
         # ---- 5: removal and clearCache ----
         key = pg.evaluate('() => __bp.pickEmpty()')

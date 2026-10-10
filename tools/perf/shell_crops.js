@@ -10,7 +10,7 @@ window.__sc = (() => {
     else g.setIndex(new THREE.BufferAttribute(idx, 1));
     g.computeVertexNormals(); return g;
   };
-  // mode: 'real' (all grey, kept ones orange, boxes as red wire), 'shell' (boxes solid, kept ones orange), 'both' (real faint + boxes)
+  // mode: 'real' (all gray, kept ones orange, boxes as red wire), 'shell' (boxes solid, kept ones orange), 'both' (real faint + boxes)
   S.draw = (rec, mode, yaw, pitch, size) => {
     const r = S.renderer(size), sc = new THREE.Scene(); sc.background = new THREE.Color(0x1b1f27);
     const p = Float32Array.from(rec.p), idx = Uint32Array.from(rec.i), keep = rec.keep, boxes = rec.boxes;
@@ -19,10 +19,10 @@ window.__sc = (() => {
     const flat = (color, opacity) => new THREE.ShaderMaterial({ uniforms: { col: { value: new THREE.Color(color) }, op: { value: opacity } }, transparent: opacity < 1, depthWrite: opacity >= 1, side: THREE.DoubleSide, extensions: { derivatives: true },
       vertexShader: 'varying vec3 vP; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.); vP = mv.xyz; gl_Position = projectionMatrix*mv; }',
       fragmentShader: 'uniform vec3 col; uniform float op; varying vec3 vP; void main(){ vec3 n = normalize(cross(dFdx(vP), dFdy(vP))); float l = .42 + .58*max(dot(n, normalize(vec3(-.35,.8,.5))), 0.) ; gl_FragColor = vec4(col*l, op); }' });
-    const grey = flat(0xb8c0cc, 1), org = flat(0xff8a2a, 1);
+    const gray = flat(0xb8c0cc, 1), org = flat(0xff8a2a, 1);
     if (mode === 'real' || mode === 'both'){
       if (mode === 'both'){ sc.add(new THREE.Mesh(geoOf(p, idx, rest), flat(0xb8c0cc, .45))); }
-      else sc.add(new THREE.Mesh(geoOf(p, idx, rest), grey));
+      else sc.add(new THREE.Mesh(geoOf(p, idx, rest), gray));
     }
     if (kp.length) sc.add(new THREE.Mesh(geoOf(p, idx, kp), org));
     const faceMat = mode === 'both' ? flat(0x4f9dff, .3) : flat(0x9fb4d0, 1);

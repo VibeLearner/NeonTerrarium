@@ -6,8 +6,8 @@
 // What sticks out of the shell by more than 0.3 (and what the shell builder, shell.js, does not cover) stays real geometry, merged into the block like the stand-in's pieces.
 // The pieces here: the baker (BAKE.baker, for bakejob.js: the plot made again with its shell by the plot worker, drawn face by face from outside into three maps, filled and packed), the pool (pages of
 // maps on the card, a slot per plot), the block's shell meshes (bkBlock, called by rebuildSolidGen in world.js when a block's tier is 'baked'), and the setting (S.baked: "Baked far buildings").
-const BK = { maxPages: window.__BAKED_PAGES || 10, shellOpts: window.__BAKED_SHELL || {}, keepLights: !window.__BAKED_NOLIGHTS, wholePiece: 700, margin: .8, tpu: 16, out: .3, inn: .7, steps: { value: 32 }, PAGE: 2048, SLOT_W: 1024, pages: [], stats: { baked: 0, ms: 0, keptTris: 0, ovlTris: 0, shellTris: 0, texels: 0, holes: 0, area: 0, worker: 0, ph: {} }, test: {} };
-BK.on = () => (S.baked === true || !!window.__BAKED_ON) && !window.__BAKED_OFF && TIER.on();   // (a test page turns it on with __BAKED_ON; the setting is the render menu's box)
+const BK = { maxPages: window.__BAKED_PAGES || 10, shellOpts: window.__BAKED_SHELL || {}, keepLights: !window.__BAKED_NOLIGHTS, wholePiece: 700, margin: .8, tpu: 0, out: .3, inn: .7, steps: { value: 32 }, PAGE: 2048, SLOT_W: 1024, pages: [], stats: { baked: 0, ms: 0, keptTris: 0, ovlTris: 0, shellTris: 0, texels: 0, holes: 0, area: 0, worker: 0, ph: {} }, test: {} };
+BK.on = () => (S.baked === true || !!window.__BAKED_ON) && !window.__BAKED_OFF && TIER.on() && RENDER_LINES !== 0;   // (a test page turns it on with __BAKED_ON; the setting is the render menu's box. Not in the Smooth render mode: its pixels are the screen's own, finer than any bake made here: the stand-ins stay)
 const bkNow2 = () => window.__realNow ? window.__realNow() : performance.now();
 const bkPh = (name, t0) => { const t = bkNow2(); BK.stats.ph[name] = (BK.stats.ph[name] || 0) + t - t0; return t; };   // (time by phase of the baker's own steps: the card's work (face, read) is a software renderer's in the test pages, so it is kept apart)
 const BK_ATTRS = ['position', 'normal', 'color', 'aEm', 'aFlk', 'aFine', 'aOn'];
@@ -130,7 +130,20 @@ BAKE.baker = function*(c, ctx){
     bkScene.remove(mesh); bg.dispose(); for (const rt of rts) rt.dispose();
   }
 };
-BAKE.density = 't' + BK.tpu; BAKE.bakerTag = 'r1';
+BAKE.density = 't0'; BAKE.bakerTag = 'r1';
+// Texels a unit: one for each screen pixel at the swap zoom (TIER.zs), from the render resolution as it is now: the lines the render setting asks for, grown by the zoom-out factor (applyRenderRes, up to its cap), no more than the screen has;
+// the pixels a unit then are lines / (2 * zoom). A 1080-line screen: 18 at the 480 setting, 22.5 at 720; a 720-line screen: 12 and 15; at most 24 (the 720 setting on a tall screen), at least 10. The bake and its store entry carry the number.
+function bkWantTpu(){
+  if (window.__BAKED_TPU) return window.__BAKED_TPU;
+  const f = Math.min(Math.max(1, TIER.zs/ZOOM_REF), S.capRes !== false ? PERF.max : Infinity), h = Math.min(DH, Math.round(BASE_H*f));
+  return Math.max(10, Math.min(24, Math.ceil(h/(2*TIER.zs))));
+}
+// the density changes with the render setting and the window: what was baked at another density is dropped (the store keeps it under its own tag) and baked again
+function bkDensity(){
+  const want = bkWantTpu(); if (want === BK.tpu) return;
+  const first = BK.tpu === 0; BK.tpu = want; BAKE.density = 't' + want;
+  if (!first) for (const e of [...BAKE.ents.values()]) BAKE.drop(e.c);
+}
 // the budget: pages of maps on the card (48 MB each). Plots are baked nearest the view first; once the pages are full no more are baked (what is baked stays), and a block with a plot that has no bake keeps the stand-in
 BK.full = () => BK.pages.length >= BK.maxPages && !BK.pages.some(p => p.shelves.some(sh => sh.free.length));
 BAKE.skip = c => { if (c.mega || !BK.on()) return true; if (!BK.full()) return false; const e = BAKE.ents.get(c.i + ',' + c.j); return !(e && e.c === c && (e.state === 'ready' || e.state === 'baking')); };
@@ -262,6 +275,6 @@ BAKE.off0 = BAKE.off; BAKE.off = () => BAKE.off0() || !BK.on();
 BK.offFrame = 0;
 BK.purge = () => { for (const e of [...BAKE.ents.values()]) BAKE.drop(e.c); for (const p of BK.pages) for (const rt of p.rts) rt.dispose(); BK.pages = []; };
 function bkTick(){
-  if (BK.on()){ BK.offFrame = PM.frame; BAKE.tick(); return; }
+  if (BK.on()){ BK.offFrame = PM.frame; if (BK.tpu === 0 || PM.frame % 30 === 0) bkDensity(); BAKE.tick(); return; }
   if (BK.pages.length && PM.frame - BK.offFrame > 3700) BK.purge();
 }

@@ -186,6 +186,7 @@ const rbCache = new Map();
 function roundedBox(w,h,d,r){
   const key = [w,h,d,r].map(v=>v.toFixed(2)).join('_');
   if (rbCache.has(key)) return rbCache.get(key);
+  [w, h, d, r] = key.split('_').map(Number);   // (made from the rounded sizes, not the first asker's: the shape is then the same whichever plot asks first, so a plot made again comes out the same)
   const b = Math.min(r*0.6, h*0.2, 0.08);
   const sw = w-2*b, sd = d-2*b;
   const rr = Math.max(0, Math.min(r, sw/2-0.01, sd/2-0.01));

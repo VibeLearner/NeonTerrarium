@@ -693,6 +693,7 @@ function octSlab(mat, P, y, sx, sz, h, hx = 0, hz = 0){
   const key = [sx, sz, hx, hz].map(v => v.toFixed(3)).join(',');
   let g = octGeoCache.get(key);
   if (!g){
+    [sx, sz, hx, hz] = key.split(',').map(Number);   // (from the rounded sizes: the same slab whichever plot asks first; see roundedBox in core.js)
     const shape = new THREE.Shape(), v = octVerts(sx, sz);
     v.forEach(([x, z], k) => k ? shape.lineTo(x, -z) : shape.moveTo(x, -z));
     if (hx > 0){ const hole = new THREE.Path(), w = octVerts(hx, hz).reverse(); w.forEach(([x, z], k) => k ? hole.lineTo(x, -z) : hole.moveTo(x, -z)); shape.holes.push(hole); }
@@ -1826,6 +1827,7 @@ const dsFrustCache = new Map();
 // a square-sectioned frustum, flat-shaded (bottom half-width b, top half-width t, height 1)
 function dsFrustum(b, t){
   const k = b.toFixed(2) + '/' + t.toFixed(2); let g = dsFrustCache.get(k);
+  [b, t] = k.split('/').map(Number);   // (from the rounded sizes, as above)
   if (!g){ g = new THREE.CylinderGeometry(t*Math.SQRT2, b*Math.SQRT2, 1, 4, 1, false, PI/4).toNonIndexed(); g.computeVertexNormals(); dsFrustCache.set(k, g); }
   return g;
 }

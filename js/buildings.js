@@ -479,12 +479,14 @@ const shapeCache = new Map();
 // a pie-slice of a cylinder (for curved balconies)
 function wedgeGeo(r,h,th0,len){
   const k = ['w',r,h,th0,len].map(v=>(+v).toFixed(2)).join('_');
+  [r, h, th0, len] = k.split('_').slice(1).map(Number);   // (from the rounded values: the same shape whichever plot asks first; see roundedBox)
   if (!shapeCache.has(k)) shapeCache.set(k, new THREE.CylinderGeometry(r,r,h,14,1,false,th0,len).toNonIndexed());
   return shapeCache.get(k);
 }
 // a curved band: part of a ring between two radii, extruded upward (for the arc megablock)
 function arcGeo(rIn,rOut,h,th0,len){
   const k = ['a',rIn,rOut,h,th0,len].map(v=>(+v).toFixed(2)).join('_');
+  [rIn, rOut, h, th0, len] = k.split('_').slice(1).map(Number);   // (from the rounded values, as above)
   if (!shapeCache.has(k)){
     const s = new THREE.Shape();
     s.moveTo(Math.cos(th0)*rOut, Math.sin(th0)*rOut);
@@ -926,6 +928,7 @@ function lxPlate(mat, P, x, y, z, w, d, r, h, ry = 0){
   const key = [w, d, r].map(v => v.toFixed(2)).join(',');
   let g = lxPlateCache.get(key);
   if (!g){
+    [w, d, r] = key.split(',').map(Number); r = Math.max(.01, Math.min(r, w/2, d/2));   // (from the rounded sizes: the same plate whichever plot asks first; see roundedBox. Placing uses only x, y, z, h, ry)
     const s = new THREE.Shape(), hx = w/2 - r, hz = d/2 - r;
     s.moveTo(-hx, -d/2); s.lineTo(hx, -d/2); s.absarc(hx, -hz, r, -PI/2, 0, false); s.lineTo(w/2, hz); s.absarc(hx, hz, r, 0, PI/2, false);
     s.lineTo(-hx, d/2); s.absarc(-hx, hz, r, PI/2, PI, false); s.lineTo(-w/2, -hz); s.absarc(-hx, -hz, r, PI, 1.5*PI, false);

@@ -210,7 +210,7 @@ RW.start = () => {
     } else if (m.t === 'done' || m.t === 'err'){
       if (m.rb) for (const [k, e] of m.rb){ const mine = rbCache.get(k); if (!mine){ rbCache.set(k, rbUnpack(e)); RW.rbSent.add(k); } else if (!sameArr(mine.attributes.position.array, e.a.position.a)) RW.rbSent.delete(k); else RW.rbSent.add(k); }
       const j = RW.jobs.get(m.id); RW.jobs.delete(m.id); if (!j || j.cancelled) return;
-      if (j.regen){ const h = j.regen; if (m.t === 'err'){ h.wait = null; h.fails = (h.fails || 0) + 1; RW.fell++; return; } if (h.c.data === h.d && (h.out || pmNeeds(h, 'stand'))){ PM.async++; pmFill(h, recipeUnpack(m.msg).data); } else h.wait = null; return; }
+      if (j.regen){ const h = j.regen; if (m.t === 'err'){ h.wait = null; h.fails = (h.fails || 0) + 1; RW.fell++; return; } if (h.c.data === h.d && (h.out || pmNeeds(h, 'stand'))){ PM.async++; const w = h.want; h.want = null; pmFill(h, recipeUnpack(m.msg).data, w); } else h.wait = null; return; }
       if (m.t === 'err'){ j.fail = m.err; RW.fell++; } else { j.res = m; RW.made++; }
       j.done = true;
     }
@@ -290,9 +290,12 @@ function pmMismatch(h, which, g, ng){
   if (PM.mm.length < 8){ const r = h.d.rec && h.d.rec.r; PM.mm.push({ which, cell: h.c.i + ',' + h.c.j, kind: r && (r.kind || r.t || r.type), v: [g && g.attributes.position.count, ng && ng.attributes.position.count], ix: [g && g.index && g.index.count, ng && ng.index && ng.index.count] }); }
   if (PM.mismatch === 1) console.warn('plot arrays: a plot made again came out different (' + which + ' at ' + h.c.i + ',' + h.c.j + '); its new geometry is used whole. PM.mm has the details.');
 }
-function pmFill(h, nd){
+// which: what was asked for ('full', 'stand', or undefined for both). The worker sends the whole plot; only what was asked for is put back, so a block going to its stand-ins
+// doesn't bring every plot's full arrays back with it for a second and a half (twice the arrays, and garbage for the collector).
+function pmFill(h, nd, which){
   const d = h.d, ng = nd.geo.get(ATLAS), g = d.geo.get(ATLAS);
-  if (h.out && g){
+  const wantFull = which !== 'stand' || !!d.noStand || (!nd.sgeo && !d.sgeo), wantStand = which !== 'full';
+  if (h.out && g && wantFull){
     if (pmFits(g, ng)){ for (const k of PM.keys){ const a = g.attributes[k]; if (a) a.array = ng.attributes[k].array; } }
     else if (ng){   // (swap the whole geometry: the plot's meshes, its walls' mesh with it)
       pmMismatch(h, 'full', g, ng);
@@ -303,10 +306,10 @@ function pmFill(h, nd){
     h.out = false;
   }
   if (!nd.sgeo && !d.sgeo) d.noStand = true;
-  if (d.sgeo && h.sout && !nd.sgeo){   // (a stand-in that can't be made again: the plot goes without one, drawn full)
+  if (d.sgeo && h.sout && !nd.sgeo && wantStand){   // (a stand-in that can't be made again: the plot goes without one, drawn full)
     pmMismatch(h, 'stand (none made)', d.sgeo, null); pmUnhook(d.sgeo, null); d.sgeo.dispose(); d.sgeo = null; d.noStand = true; h.sout = false; markSolid(h.c);
   }
-  if (nd.sgeo){
+  if (nd.sgeo && wantStand){
     if (!d.sgeo){ d.sgeo = nd.sgeo; h.sout = false; }
     else if (h.sout){
       if (pmFits(d.sgeo, nd.sgeo)){ for (const k of PM.keys){ const a = d.sgeo.attributes[k]; if (a) a.array = nd.sgeo.attributes[k].array; } }
@@ -332,9 +335,9 @@ const pmNeeds = (h, which) => which === 'stand' ? (h.d.noStand ? h.out : (!h.d.s
 function pmEnsure(c, which = 'full'){
   const d = c.data; if (!d || !d.rec || !d.rec.r) return true;
   const h = pmHolder(c); if (!pmNeeds(h, which)) return true;
-  if (h.wait) return false;
+  if (h.wait){ if (h.want !== which) h.want = undefined; return false; }   // (asked for the other tier meanwhile: both are put back)
   if (!RW.usable() || (h.fails || 0) >= 2){ pmRestoreSync(h, 'ensure'); return true; }   // (no worker, or it could not make this one twice: here, at once)
-  h.wait = true; const rec = d.rec;
+  h.wait = true; h.want = which; const rec = d.rec;
   RW.regen(h, Object.assign({}, rec.r, { draws: rec.draws }));
   return false;
 }

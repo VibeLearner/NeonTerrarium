@@ -282,6 +282,19 @@ function attachRec(data, r, draws){
 const PM = { keys: ['position', 'normal', 'color', 'aEm', 'aFlk', 'aFine', 'aOn'], queue: [], frame: 0, dropped: 0, sync: 0, async: 0, mismatch: 0, byWorker: 0, fixed: 0, mm: [], why: {}, trace: false, held: new Set() };
 PM.on = () => !(PH.tests.keepGeo || window.__KEEP_GEO) && !self.IN_RECIPE_WORKER;
 PM.line = () => 'plot arrays: ' + (PM.on() ? 'let go after merging' : 'kept (test)') + '; dropped ' + PM.dropped + ', made again by the worker ' + PM.async + ', on the page ' + PM.sync + (PM.mismatch ? ', came out different ' + PM.mismatch + ' (by the worker ' + PM.byWorker + ', put right from the page ' + PM.fixed + ', worker restarts ' + RW.restarts + ')' : '');
+// what the plots' own geometry holds right now, in MB, without waiting for the garbage collector (performance.memory counts garbage not yet collected): the full arrays,
+// the stand-ins', the never-seen job's spare index orders, and the plots kept whole
+PM.mem = () => {
+  const seen = new Set(), own = a => { const d = Object.getOwnPropertyDescriptor(a, 'array'); return d && 'value' in d ? d.value : null; };
+  const by = g => { let n = 0; if (!g) return 0; for (const k in g.attributes){ const v = own(g.attributes[k]); if (v && !seen.has(v.buffer)){ seen.add(v.buffer); n += v.byteLength; } }
+    for (const ix of [g.index, g.userData.nvOrig && g.userData.nvOrig.index, g.userData.nvNew && g.userData.nvNew.index]) if (ix && ix.array && !seen.has(ix.array.buffer)){ seen.add(ix.array.buffer); n += ix.array.byteLength; } return n; };
+  const r = { full: 0, stand: 0, other: 0, kept: 0, plots: 0, fullOut: 0, standOut: 0 };
+  for (const c of [...cells.values(), ...megas.values()]){ const d = c.data; if (!d) continue; r.plots++; if (d.pm && d.pm.out) r.fullOut++; if (d.pm && d.pm.sout) r.standOut++; if (d.pmKeep) r.kept++;
+    for (const [m, g] of d.geo){ if (m === ATLAS) r.full += by(g); else r.other += by(g); } if (d.sgeo) r.stand += by(d.sgeo); }
+  let stash = 0; for (const st of TIER.stash.values()) stash += st.rec.members.length;
+  const MB = x => Math.round(x/1048576);
+  return 'plots ' + r.plots + ': full arrays ' + MB(r.full) + ' MB (let go: ' + r.fullOut + '), stand-ins ' + MB(r.stand) + ' MB (let go: ' + r.standOut + '), other pieces ' + MB(r.other) + ' MB, kept whole ' + r.kept + ', stashed merges ' + TIER.stash.size;
+};
 const pmHolder = c => { const d = c.data; return d.pm || (d.pm = { c, d, out: false, sout: false, wait: null, due: -1, queued: false }); };
 // (out: the full tier's arrays are let go; sout: the stand-in's are, or there is no stand-in yet, which is made from the recipe like any array that is let go)
 function pmDropOne(h, g){

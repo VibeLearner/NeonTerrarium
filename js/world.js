@@ -1646,7 +1646,7 @@ function stageTake(job){
   if (window.__randAdvance && rw.res.rs != null) __randAdvance(rw.res.rs, rw.res.calls);   // (the test harness: the stream goes on from where the worker left it)
   const u = recipeUnpack(rw.res.msg);
   Object.assign(job.c, u.fields); if (u.air) airCells.add(job.c); else airCells.delete(job.c);
-  job.data = u.data; attachRec(u.data, job.r, u.draws); return true;
+  job.data = u.data; if (!u.data.sgeo) u.data.noStand = true; attachRec(u.data, job.r, u.draws); return true;   // (noStand: the worker always makes the stand-in; none means it would be the same as the plot)
 }
 function stageSlice(job){   // one step of the job; true when it is finished
   const prev = stageCap();
@@ -1714,19 +1714,21 @@ function solidHide(c){
     for (let i = 0; i < pc.length; i++) if (pc[i] === c){ (P.hide || (P.hide = new Uint8Array(P.n)))[i] = 1; P.stamp = -1; } }
   for (const m of rec.members) if (m.userData.cell === c) m.visible = !(m.userData.sideOf && m.geometry.userData.full);
 }
-const markSolid = c => { if (c){ const k = mergeKey(c.i, c.j); solidAbort(k); solidHide(c); solidDirty.add(k); } };
+const markSolid = c => { if (c){ const k = mergeKey(c.i, c.j); solidAbort(k); tierStashDrop(k); solidHide(c); solidDirty.add(k); } };
 // every merge block that overlaps a region (REG x REG plots)
 function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
-  for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++){ solidAbort(i + ',' + j); solidDirty.add(i + ',' + j); } }
+  for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++){ solidAbort(i + ',' + j); tierStashDrop(i + ',' + j); solidDirty.add(i + ',' + j); } }
 function flushSolid(){
   flushSuper();
   if (SYNC_NOW()){ solidFinish(); if (solidDirty.size){ for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); } }
-  else if (SOLID_JOB || solidDirty.size) solidStep(Math.max(1, 4 - FRAME_WORK));   // (a block's merge in steps over the frames, after the frame's other spread work)
+  else if (SOLID_JOB || solidDirty.size) solidStep(TIER.rush ? 14 : Math.max(1, 4 - FRAME_WORK));
+  tierRushDone();   // (a block's merge in steps over the frames, after the frame's other spread work)
   ovFlush();
 }
 const mergeable = o => o.isMesh && !o.isInstancedMesh && (o.layers.mask === 1 || o.layers.mask === STATIC_BIT) && !o.material.transparent && o.geometry.index && !o.userData.noMerge;
 // the block's merged meshes taken down (its plots draw one by one again, the same picture)
 function solidRemoveOld(key){
+  tierStashDrop(key);
   const old = solidRegions.get(key);
   if (old && old.far) for (const m of old.far){ FAR_MESHES.delete(m); m.geometry = m.userData.stdGeo; if (m.userData.farGeo) m.userData.farGeo.dispose(); }   // (the one not held by the mesh is let go here; the other with the group)
   if (old){ SC_DIRTY.quiet++; try { for (const m of old.members) m.visible = !(m.userData.sideOf && m.geometry.userData.full); world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); } finally { SC_DIRTY.quiet--; } }
@@ -1740,7 +1742,7 @@ function solidFinish(){ if (SOLID_JOB){ SOLID_JOB.force = true; while (solidSlic
 function solidStep(ms){
   if (!SOLID_JOB){
     if (!solidDirty.size) return;
-    let k = null, asked = 0; for (const q of solidDirty){ if (pmBlockReady(q)){ k = q; break; } if (++asked >= 3) break; }   // (a block whose plots' arrays have to be made again waits for them, the old merge staying drawn; the worker is asked for the first few blocks' plots only)
+    let k = null, asked = 0; for (const q of solidDirty){ if (pmBlockReady(q)){ k = q; break; } if (++asked >= (TIER.rush ? 16 : 3)) break; }   // (a block whose plots' arrays have to be made again waits for them, the old merge staying drawn; the worker is asked for the first few blocks' plots only)
     if (k === null) return;
     solidDirty.delete(k); SOLID_JOB = { key: k, gen: null, force: false }; SOLID_JOB.gen = rebuildSolidGen(k, SOLID_JOB); }
   const t0 = stageNow();
@@ -1780,11 +1782,12 @@ function* rebuildSolidGen(key, job = null){
   yield;
   const tier = tierOfKey(key), oldRec = solidRegions.get(key), tierChanged = !!oldRec && (oldRec.tier || 'full') !== tier;
   // a block that changes tier shows a different picture: it is swapped in while the view moves, never in the middle of a still frame (a view that stays still gets it after TIER.stillWait frames)
-  if (tierChanged && job && !job.force) for (let waited = 0; tierSwapWait(key, waited); waited++) yield 'wait';
+  if (tierChanged && job && !job.force && !TIER.rush) for (let waited = 0; tierSwapWait(key, waited); waited++) yield 'wait';   // (TIER.rush: the setting was just switched, the change shows at once)
   freezeTree(g);   // (the glow overlays of the new meshes are made here)
   // (a merge shows the same picture, so it notes no box for the static cache; a block changing tier does not: its whole box is noted, from its plots)
   if (tierChanged){ scNoteBlock(key); const t0 = TIER.markedAt.get(key); if (t0 !== undefined){ TIER.lat.push(PM.frame - t0); TIER.markedAt.delete(key); } }
-  solidRemoveOld(key); ovCommit(key);   // the swap: the old block and its overlays out, the new in, the plots' own meshes hidden
+  if (tierChanged && PM.frame < TIER.compareUntil) tierStashOld(key); else solidRemoveOld(key);
+  ovCommit(key);   // the swap: the old block and its overlays out, the new in, the plots' own meshes hidden
   for (const o of hideList) o.visible = false;
   for (const o of hideList){ const pc = o.userData.cell; if (pc) pmSchedule(pc); }   // (merged in: its own arrays are let go: recipe.js)
   for (const o of farMeshes){ FAR_MESHES.add(o); } if (farMeshes.length) FARM.stamp++;
@@ -1798,7 +1801,7 @@ function* rebuildSolidGen(key, job = null){
 // A block changes tier by being merged again from the other geometry; the old merge stays drawn until the new one is made, which waits for the worker to send the arrays it needs (recipe.js).
 // Tests: "full detail everywhere (as before)" (tierOff), "stand-in tier everywhere (to measure)" (tierAll), "show tiers (stand-ins tinted)" (tierShow).
 Object.assign(TIER, { zs: 24, margin: 12, maxFull: 36, hold: 180, of: new Map(), sig: '', since: new Map(), changes: 0, nFull: 0, nStand: 0 });
-TIER.on = () => !(PH.tests.tierOff || window.__TIER_OFF);
+TIER.on = () => S.tiers !== false && !(PH.tests.tierOff || window.__TIER_OFF);   // (S.tiers: the 'Detail tiers' box in the render menu, remembered in this browser)
 TIER.all = () => !!(PH.tests.tierAll || window.__TIER_ALL);
 TIER.show = () => !!(PH.tests.tierShow || window.__TIER_SHOW);
 const tierOfKey = key => TIER.on() ? (TIER.all() ? 'stand' : (TIER.of.get(key) || 'full')) : 'full';
@@ -1830,10 +1833,11 @@ function tierVisible(key){
 }
 const tierSwapWait = (key, waited) => waited < TIER.stillWait && !tierMoving() && tierVisible(key);
 TIER.markedAt = new Map(); TIER.lat = [];   // (frames from a block being marked to its new look being swapped in)
-function tierMark(key){ solidAbort(key); solidDirty.add(key); TIER.changes++; if (!TIER.markedAt.has(key)) TIER.markedAt.set(key, PM.frame); }
+function tierMark(key){ if (TIER.rush && tierSwapFromStash(key, tierOfKey(key))){ TIER.changes++; return; } solidAbort(key); solidDirty.add(key); TIER.changes++; if (!TIER.markedAt.has(key)) TIER.markedAt.set(key, PM.frame); }
 // each frame (main.js): which blocks are full, from where the view is; blocks that change are merged again
 function tierTick(){
   tierTrack();
+  if (TIER.stash.size && PM.frame >= TIER.compareUntil && !TIER.rush) for (const k of [...TIER.stash.keys()]) tierStashDrop(k);   // (the comparison is over: the other merges go)
   if (SYNC_NOW() || (typeof LOADP !== 'undefined' && LOADP.on)) return;   // (not while a city is loading, nor in the first second of play, when merges are made at once: a tier change waits for the worker)
   if (!TIER.on() || TIER.all()){ if (TIER.of.size){ const ks = [...TIER.of.keys()]; TIER.of.clear(); for (const k of ks) tierMark(k); } TIER.sig = ''; return; }
   const sig = (zoomT <= TIER.zs ? 'n' : 'f') + (camGoal.x/LOT).toFixed(0) + ',' + (camGoal.z/LOT).toFixed(0) + ',' + zoomT.toFixed(1) + ',' + yawT.toFixed(1) + ',' + cells.size + ',' + PM.frame % 30;
@@ -1847,18 +1851,54 @@ function tierTick(){
   for (const k of blocks.keys()){
     const cur = TIER.of.get(k) || 'full';
     if (keep.has(k)){ TIER.since.delete(k); if (cur === 'stand'){ TIER.of.delete(k); tierMark(k); } }
-    else if (cur === 'full'){ const t0 = TIER.since.get(k); if (t0 === undefined) TIER.since.set(k, PM.frame); else if (PM.frame - t0 >= TIER.hold){ TIER.of.set(k, 'stand'); TIER.since.delete(k); tierMark(k); } }
+    else if (cur === 'full'){ const t0 = TIER.since.get(k); if (t0 === undefined && !TIER.rush) TIER.since.set(k, PM.frame); else if (TIER.rush || PM.frame - t0 >= TIER.hold){ TIER.of.set(k, 'stand'); TIER.since.delete(k); tierMark(k); } }
     if ((TIER.of.get(k) || 'full') === 'full') nFull++; else nStand++;
   }
   TIER.nFull = nFull; TIER.nStand = nStand;
 }
-TIER.line = () => !TIER.on() ? 'tiers: off (test)' : TIER.all() ? 'tiers: stand-ins everywhere (test)' : 'tiers: ' + TIER.nFull + ' blocks full, ' + TIER.nStand + ' stand-in, ' + TIER.changes + ' changes';
+// the setting switched (input.js): every block that changes is merged again now, the ones on screen first, with a bigger share of each frame and no waiting for the view to move,
+// until all are done (TIER.rush). Not in one frame: the plots' arrays may have to be made again by the worker first (recipe.js), which takes a few frames.
+function tierApplyNow(){
+  TIER.sig = ''; TIER.since.clear(); TIER.rush = true; TIER.rushAt = PM.frame; TIER.compareUntil = PM.frame + 3600;
+  tierTick();
+  const ks = [...solidDirty], vis = ks.filter(tierVisible); solidDirty.clear(); for (const k of vis) solidDirty.add(k); for (const k of ks) solidDirty.add(k);
+  if (SOLID_JOB){ const k = SOLID_JOB.key; solidAbort(k); solidDirty.add(k); }
+}
+// While the setting is being compared (a minute after each switch: TIER.compareUntil), a block that changes tier keeps its other merge on the graphics card (TIER.stash), so
+// switching back shows it at once. An edit to the block, or the end of the minute, lets it go.
+TIER.stash = new Map(); TIER.compareUntil = -1;
+function tierStashDrop(key){
+  const st = TIER.stash.get(key); if (!st) return; TIER.stash.delete(key);
+  for (const m of st.rec.far){ m.geometry = m.userData.stdGeo; if (m.userData.farGeo) m.userData.farGeo.dispose(); }
+  disposeGroup(st.rec.group);
+}
+function tierStashOld(key){
+  const old = solidRegions.get(key); if (!old){ ovForget(key); return; }
+  tierStashDrop(key);
+  SC_DIRTY.quiet++; try { for (const m of old.far) FAR_MESHES.delete(m); world.remove(old.group); solidRegions.delete(key); } finally { SC_DIRTY.quiet--; }
+  const ov = ovBlocks.get(key); ovForget(key);
+  TIER.stash.set(key, { rec: old, ov, tier: old.tier || 'full' });
+}
+function tierSwapFromStash(key, want){
+  const st = TIER.stash.get(key), cur = solidRegions.get(key);
+  if (!st || !cur || st.tier !== want || (cur.tier || 'full') === want) return false;
+  if (st.rec.members.length !== cur.members.length || st.rec.members.some((m, i) => m !== cur.members[i])){ tierStashDrop(key); return false; }   // (the block's plots changed since)
+  if (SOLID_JOB && SOLID_JOB.key === key) SOLID_JOB = null;
+  solidDirty.delete(key); TIER.stash.delete(key);
+  tierStashOld(key);
+  SC_DIRTY.quiet++; try { world.add(st.rec.group); solidRegions.set(key, st.rec); for (const m of st.rec.far) FAR_MESHES.add(m); FARM.stamp++; } finally { SC_DIRTY.quiet--; }
+  if (st.ov){ ovBlocks.set(key, st.ov); ovDirty.add(ovSuperKey(key)); }
+  scNoteBlock(key); TIER.markedAt.delete(key); TIER.fromStash = (TIER.fromStash || 0) + 1;
+  return true;
+}
+function tierRushDone(){ if (TIER.rush && !SOLID_JOB && !solidDirty.size && PM.frame - TIER.rushAt > 2){ TIER.rush = false; TIER.rushFrames = PM.frame - TIER.rushAt; } }
+TIER.line = () => !TIER.on() ? 'tiers: off' + (S.tiers === false ? ' (setting)' : ' (test)') : TIER.all() ? 'tiers: stand-ins everywhere (test)' : 'tiers: ' + TIER.nFull + ' blocks full, ' + TIER.nStand + ' stand-in, ' + TIER.changes + ' changes';
 // a plot's stand-in, made on the page from its recipe (the worker does it ahead of time when the policy asks: see recipe.js)
 function standEnsure(c){
-  const d = c.data; if (!d || !d.rec || !d.rec.r || d.sgeo) return d && d.sgeo || null;
+  const d = c.data; if (!d || !d.rec || !d.rec.r || d.sgeo || d.noStand) return d && d.sgeo || null;
   const prev = stageCap();
   let nd; try { nd = recipeGen(Object.assign({}, d.rec.r, { draws: d.rec.draws }), recipeWorld()).data; } finally { stageApply(prev); }
-  d.sgeo = nd.sgeo; for (const g of nd.geo.values()) g.dispose();
+  d.sgeo = nd.sgeo; if (!nd.sgeo) d.noStand = true; for (const g of nd.geo.values()) g.dispose();
   return d.sgeo;
 }
 // every block merged again (a tier changed for some)

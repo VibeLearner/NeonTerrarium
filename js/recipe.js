@@ -282,6 +282,7 @@ function pmDrop(c){
 function pmFill(h, nd){
   const d = h.d, ng = nd.geo.get(ATLAS), g = d.geo.get(ATLAS);
   if (h.out && g && ng){ for (const k of PM.keys){ const a = g.attributes[k]; if (a) a.array = ng.attributes[k].array; } h.out = false; }
+  if (!nd.sgeo && !d.sgeo) d.noStand = true;
   if (nd.sgeo){
     if (!d.sgeo){ d.sgeo = nd.sgeo; h.sout = false; }
     else if (h.sout){ for (const k of PM.keys){ const a = d.sgeo.attributes[k]; if (a) a.array = nd.sgeo.attributes[k].array; } h.sout = false; }
@@ -299,7 +300,7 @@ function pmRestoreSync(h, why){
   pmFill(h, nd); for (const g of nd.geo.values()) g.dispose(); if (nd.sgeo && h.d.sgeo !== nd.sgeo) nd.sgeo.dispose();
 }
 // are the arrays of that tier not there ('full': let go; 'stand': let go, or the stand-in has not been made)
-const pmNeeds = (h, which) => which === 'stand' ? (!h.d.sgeo || h.sout) : h.out;
+const pmNeeds = (h, which) => which === 'stand' ? (h.d.noStand ? h.out : (!h.d.sgeo || h.sout)) : h.out;   // (noStand: a plot with nothing small to leave out has no stand-in; its block draws it full, so the full arrays are what it needs)
 // ask for a tier's arrays without waiting: true when they are there. The worker makes the plot; until it answers this is false (ask again later).
 function pmEnsure(c, which = 'full'){
   const d = c.data; if (!d || !d.rec || !d.rec.r) return true;
@@ -319,6 +320,7 @@ function pmSchedule(c, delay = 0){
 // each frame: let go of the plots whose time is up (not while something is working on them)
 function pmTick(){
   PM.frame++;
+  if (typeof TIER !== 'undefined' && TIER.rush) return;   // (while the Detail tiers setting is being switched, nothing is let go: the blocks waiting their turn would lose the arrays just made for them)
   for (let i = 0; i < PM.queue.length; i++){ const h = PM.queue[i];
     if (h.due >= 0 && PM.frame >= h.due){ PM.queue.splice(i--, 1); h.queued = false; if (h.c.data === h.d){ if (pmBusy(h.c)){ h.due = PM.frame + 30; h.queued = true; PM.queue.push(h); } else pmDrop(h.c); } } else if (h.c.data !== h.d){ PM.queue.splice(i--, 1); h.queued = false; } }
 }

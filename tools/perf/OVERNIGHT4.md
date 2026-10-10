@@ -187,3 +187,11 @@ On the owner's Chrome the build froze on load. Two causes, both found and fixed:
 2. **The fallback froze the page.** A plot made again that drew more random numbers than the first time threw inside the frame loop. It now goes on with fresh numbers, counts it in `FX_OVER` and warns once in the console.
 
 Checked: a real-clock page (worker on) loads the city from recipes with no errors through repeated zooms in and out; the harness city check against cc5f320 gives 0 problems.
+
+## Detail tiers as a setting (2026-10-10)
+
+- "Detail tiers" checkbox in the render menu (Optimize framerate), remembered in this browser (`neonIsland.tiers`), on by default.
+- Switching it skips the waits (the hold before a block goes to its stand-in, the wait for the view to move), merges the blocks on screen first with a larger share of each frame, and stops letting arrays go until it is done (`TIER.rush`).
+- For a minute after each switch a block keeps its other merge on the graphics card (`TIER.stash`), so switching back is a swap on the same frame. An edit to the block, or the end of the minute, lets it go.
+- Bug found and fixed: a plot with nothing small to leave out has no stand-in, and its block asked the worker for one forever (over 6,000 remakes in minutes in the city; such blocks never changed tier). Such plots are now marked (`noStand`) and drawn full in a stand-in block.
+- Measured in a real-clock page on the city (software renderer, about 1 frame a second): off 4 frames, first on 39 frames, every switch after that 3 frames; the setting is back after a reload. Harness city against 8fafaee: 0 problems.

@@ -220,7 +220,7 @@ $('mtBtn').addEventListener('click', () => setMtMode(!mtMode));
 $('outlines').addEventListener('change', e => { S.outlines = e.target.checked; });
 // Optimize framerate (see applyRenderRes in sky.js): remembered in this browser
 // Detail tiers (world.js TIER): far blocks drawn as stand-ins with their smallest pieces left out; remembered in this browser, and switched at once
-{ try { const v = localStorage.getItem('neonIsland.tiers'); if (v !== null) S.tiers = v === '1'; } catch (e) {} if (S.tiers === undefined) S.tiers = true; $('tiers').checked = S.tiers;
+{ try { const v = localStorage.getItem('neonIsland.tiers'); if (v !== null) S.tiers = v === '1'; } catch (e) {} if (S.tiers === undefined) S.tiers = false; $('tiers').checked = S.tiers;
   $('tiers').addEventListener('change', e => { S.tiers = e.target.checked; try { localStorage.setItem('neonIsland.tiers', S.tiers ? '1' : '0'); } catch (e2) {} tierApplyNow(); }); }
 for (const id of ['capRes', 'autoPerf']){
   try { const v = localStorage.getItem('neonIsland.' + id); if (v !== null){ S[id] = v === '1'; $(id).checked = S[id]; } } catch (e) {}

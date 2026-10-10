@@ -1720,8 +1720,8 @@ function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
   for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++){ solidAbort(i + ',' + j); tierStashDrop(i + ',' + j); solidDirty.add(i + ',' + j); } }
 function flushSolid(){
   flushSuper();
-  if (SYNC_NOW()){ solidFinish(); if (solidDirty.size){ for (const k of solidDirty) rebuildSolid(k); solidDirty.clear(); } }
-  else if (SOLID_JOB || solidDirty.size) solidStep(TIER.rush ? 14 : Math.max(1, 4 - FRAME_WORK));
+  if (SYNC_NOW()){ solidFinish(); if (solidDirty.size){ for (const k of solidDirty){ try { rebuildSolid(k); } catch (e){ SOLID_FAIL.n++; if (SOLID_FAIL.n <= 3) console.warn('merging block ' + k + ' failed; its old merge stays drawn.', e); } } solidDirty.clear(); } }
+  else { solidRetry(); if (SOLID_JOB || solidDirty.size) solidStep(TIER.rush ? 14 : Math.max(1, 4 - FRAME_WORK)); }
   tierRushDone();   // (a block's merge in steps over the frames, after the frame's other spread work)
   ovFlush();
 }
@@ -1737,8 +1737,18 @@ function solidRemoveOld(key){
 function rebuildSolid(key){ solidFinish(); SC_DIRTY.quiet++; try { drain(rebuildSolidGen(key)); } finally { SC_DIRTY.quiet--; } }
 // the same in steps (merging a block is 20 to 80 ms in one piece): a step per attribute, per row of triangles, per material. SOLID_JOB: the block being merged, if any.
 let SOLID_JOB = null;
-function solidSlice(){ SC_DIRTY.quiet++; try { const r = SOLID_JOB.gen.next(); return r.done ? true : r.value === 'wait' ? 'wait' : false; } finally { SC_DIRTY.quiet--; } }   // ('wait': a block that changes tier is held back until the view moves)
+function solidSlice(){
+  if (!SOLID_JOB) return true;   // (dropped during its own step: a plot of the block changed meanwhile)
+  const job = SOLID_JOB; SC_DIRTY.quiet++;
+  try { const r = job.gen.next(); return r.done ? true : r.value === 'wait' ? 'wait' : false; }
+  catch (e){   // (a merge that fails never stops the game: the block's old merge stays drawn, the error is logged once, the block is tried again later at most twice)
+    SOLID_FAIL.n++; if (SOLID_FAIL.n <= 3) console.warn('merging block ' + job.key + ' failed; its old merge stays drawn.', e);
+    const t = (SOLID_FAIL.by.get(job.key) || 0) + 1; SOLID_FAIL.by.set(job.key, t); if (t <= 2 && !solidDirty.has(job.key)) SOLID_FAIL.retry.add(job.key);
+    return true; }
+  finally { SC_DIRTY.quiet--; } }
+const SOLID_FAIL = { n: 0, by: new Map(), retry: new Set() };   // (blocks whose merge failed: retried after a second, twice at most; SOLID_FAIL.n in the overlay)   // ('wait': a block that changes tier is held back until the view moves)
 function solidFinish(){ if (SOLID_JOB){ SOLID_JOB.force = true; while (solidSlice() !== true); SOLID_JOB = null; } }
+function solidRetry(){ if (SOLID_FAIL.retry.size && PM.frame % 60 === 0){ for (const k of SOLID_FAIL.retry) solidDirty.add(k); SOLID_FAIL.retry.clear(); } }
 function solidStep(ms){
   if (!SOLID_JOB){
     if (!solidDirty.size) return;
@@ -1746,7 +1756,7 @@ function solidStep(ms){
     if (k === null) return;
     solidDirty.delete(k); SOLID_JOB = { key: k, gen: null, force: false }; SOLID_JOB.gen = rebuildSolidGen(k, SOLID_JOB); }
   const t0 = stageNow();
-  do { const r = solidSlice(); if (r === true){ SOLID_JOB = null; break; } if (r === 'wait') break; } while (stageNow() - t0 < ms);
+  do { const r = solidSlice(); if (r === true){ SOLID_JOB = null; break; } if (r === 'wait') break; } while (SOLID_JOB && stageNow() - t0 < ms);
   FRAME_WORK += stageNow() - t0;
 }
 function* rebuildSolidGen(key, job = null){

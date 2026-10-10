@@ -8,7 +8,17 @@ if (!load()) clearIsland(); else if (loadWanted()) loadStart(); else rebuildAll(
 centerView(true);
 selectZone(null);
 let last = performance.now();
+// The next frame is asked for first, and an error in a frame is caught: one bad frame used to stop the game for good (the frame was never asked for again), with a single
+// error in the console that was easy to miss. Errors are logged (the first five, then every 600th) and counted in FRAME_ERR; the game goes on with the next frame.
+const FRAME_ERR = { n: 0, last: '' };
 function frame(now){
+  requestAnimationFrame(frame);
+  try { frameBody(now); }
+  catch (e){ FRAME_ERR.n++; FRAME_ERR.last = String(e && e.stack || e).slice(0, 400);
+    if (FRAME_ERR.n <= 5 || FRAME_ERR.n % 600 === 0) console.error('frame error #' + FRAME_ERR.n + ' (the game goes on):', e);
+    scene.overrideMaterial = null; renderer.autoClear = true; try { PH.abort(); } catch (e2){} }
+}
+function frameBody(now){
   PH.frameStart(now);   // (the performance overlay, F3: perfhud.js)
   const dt = Math.min(.05, (now-last)/1000);
   // auto performance: a running average of the frame time; slow for a couple of seconds and the zoomed-out render
@@ -144,6 +154,5 @@ function frame(now){
   PH.begin('bloom and grade'); renderGlow(); PH.end();   // bloom and halation (sky.js)
   PH.begin('to screen'); renderer.setRenderTarget(null); renderer.render(upScene, compCam); PH.end();
   PH.frameEnd();
-  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

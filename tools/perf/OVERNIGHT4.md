@@ -199,3 +199,12 @@ Checked: a real-clock page (worker on) loads the city from recipes with no error
 ## Stand-ins in view (2026-10-10)
 
 The owner saw lit windows losing their frames in view, closer in than zoom 24. Cause: closer than `TIER.zs` only the `TIER.maxFull` = 36 nearest blocks were full, and a big or high-resolution screen shows more blocks than that, so some on-screen blocks were stand-ins. Now every block on screen is full when closer than `TIER.zs` (the cap only applies to the ring of blocks just off screen). Dense scene, night: zoom 22 and zoom 15 now 0 pixels differ (were 45,264 at zoom 22). Farther than zoom 24 everything is still a stand-in, as before.
+
+## Fix after the owner's Chrome benchmark (2026-10-10, ?v=2026-10-10e)
+
+Build b1ff117 with Detail tiers on stopped drawing 9 to 60 s after load on the owner's Mac (RangeError "offset is out of bounds" in mergeCutGen, sometimes no error shown).
+- **Why the game stayed dead:** main.js asked for the next frame at the end of the frame, so one error anywhere stopped the game for good, with a single console line that was easy to miss. The next frame is now asked for first; a frame error is caught, logged (first five, then every 600th) and counted in `FRAME_ERR`.
+- **The merge error:** a plot made again whose arrays did not match the old attributes' counts had them pasted in anyway, and the next merge of its block wrote past its arrays' ends. `pmFill` now checks the lengths (`pmFits`); on a mismatch the new geometry replaces the old one whole (in the plot's meshes and as its stand-in), the block is merged again, and the plot's arrays are never let go again (`d.pmKeep`). Counted in `PM.mismatch`, details in `PM.mm`, shown in `PM.line()`. The index is not compared (the never-seen job trims it).
+- **A failed merge never stops the game:** `solidSlice` catches the error, keeps the old merge drawn, logs once (`SOLID_FAIL`), and retries the block at most twice.
+- **Detail tiers now default to off** (a stored choice still wins) until it is verified on the owner's Mac.
+- Tested: a forced length mismatch (full and stand-in) swaps cleanly; the original RangeError forced on purpose is caught with frames still advancing; thrown frame errors keep the loop running; harness city diff against b1ff117: 0 problems. A regeneration check over 1,752 plots of the max city found no plot whose corner count differs, so the exact source of the mismatch on the Mac is still open: `PM.line()` and `PM.mm` will show it if it happens again.

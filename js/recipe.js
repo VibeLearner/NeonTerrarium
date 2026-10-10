@@ -258,9 +258,9 @@ function attachRec(data, r, draws){
 // pmDrop(c) replaces the vertex attributes' arrays by accessors that make the plot again (on the page, at once) when something reads one: any reader works, slowly; the ones
 // that matter ask in good time (pmEnsure: the worker makes the plot, the arrays arrive a few frames later) and the count of slow ones is in PM.sync. The index stays (the
 // never-seen job reorders it, and it is the smaller part). Test: "keep the plots' own geometry" (PH.tests.keepGeo, window.__KEEP_GEO).
-const PM = { keys: ['position', 'normal', 'color', 'aEm', 'aFlk', 'aFine', 'aOn'], queue: [], frame: 0, dropped: 0, sync: 0, async: 0, why: {}, trace: false, held: new Set() };
+const PM = { keys: ['position', 'normal', 'color', 'aEm', 'aFlk', 'aFine', 'aOn'], queue: [], frame: 0, dropped: 0, sync: 0, async: 0, mismatch: 0, mm: [], why: {}, trace: false, held: new Set() };
 PM.on = () => !(PH.tests.keepGeo || window.__KEEP_GEO) && !self.IN_RECIPE_WORKER;
-PM.line = () => 'plot arrays: ' + (PM.on() ? 'let go after merging' : 'kept (test)') + '; dropped ' + PM.dropped + ', made again by the worker ' + PM.async + ', on the page ' + PM.sync;
+PM.line = () => 'plot arrays: ' + (PM.on() ? 'let go after merging' : 'kept (test)') + '; dropped ' + PM.dropped + ', made again by the worker ' + PM.async + ', on the page ' + PM.sync + (PM.mismatch ? ', came out different ' + PM.mismatch : '');
 const pmHolder = c => { const d = c.data; return d.pm || (d.pm = { c, d, out: false, sout: false, wait: null, due: -1, queued: false }); };
 // (out: the full tier's arrays are let go; sout: the stand-in's are, or there is no stand-in yet, which is made from the recipe like any array that is let go)
 function pmDropOne(h, g){
@@ -272,23 +272,50 @@ function pmDropOne(h, g){
   }
 }
 function pmDrop(c){
-  const d = c && c.data; if (!d || !d.rec || !d.rec.r || !PM.on()) return;
+  const d = c && c.data; if (!d || !d.rec || !d.rec.r || d.pmKeep || !PM.on()) return;
   const g = d.geo.get(ATLAS), h = pmHolder(c);
   if (g && !h.out){ pmDropOne(h, g); h.out = true; PM.dropped++; }
   if (d.sgeo && !h.sout){ pmDropOne(h, d.sgeo); h.sout = true; PM.dropped++; }
   h.due = -1;
 }
-// the arrays are back in the plot's attributes (and the stand-in is there, if it was missing)
+// the arrays are back in the plot's attributes (and the stand-in is there, if it was missing).
+// A plot made again should come out the same to the byte. If one doesn't (a different number of corners or triangles), its new arrays are never pasted into the old attributes,
+// whose counts would no longer match them (the merge then wrote past its arrays' ends and stopped the game: RangeError in mergeCutGen, round 9 on the owner's Mac). The new geometry
+// takes the old one's place whole, in the plot's meshes, and the plot's arrays are never let go again (d.pmKeep). PM.mismatch counts them; PM.mm keeps the first few for a look.
+const pmFits = (g, ng) => !!(g && ng) && PM.keys.every(k => { const a = g.attributes[k], b = ng.attributes[k]; return !a === !b && (!a || (a.itemSize === b.itemSize && a.count*a.itemSize === b.array.length)); })
+;   // (the index is not compared: the never-seen job reorders and trims it, and it stays)
+function pmUnhook(g, from){ for (const k of PM.keys){ const a = g.attributes[k]; if (!a) continue; const v = from && from.attributes[k] ? from.attributes[k].array : new Float32Array(0); Object.defineProperty(a, 'array', { value: v, writable: true, configurable: true, enumerable: true }); } }
+function pmMismatch(h, which, g, ng){
+  PM.mismatch++; h.d.pmKeep = true;
+  if (PM.mm.length < 8){ const r = h.d.rec && h.d.rec.r; PM.mm.push({ which, cell: h.c.i + ',' + h.c.j, kind: r && (r.kind || r.t || r.type), v: [g && g.attributes.position.count, ng && ng.attributes.position.count], ix: [g && g.index && g.index.count, ng && ng.index && ng.index.count] }); }
+  if (PM.mismatch === 1) console.warn('plot arrays: a plot made again came out different (' + which + ' at ' + h.c.i + ',' + h.c.j + '); its new geometry is used whole. PM.mm has the details.');
+}
 function pmFill(h, nd){
   const d = h.d, ng = nd.geo.get(ATLAS), g = d.geo.get(ATLAS);
-  if (h.out && g && ng){ for (const k of PM.keys){ const a = g.attributes[k]; if (a) a.array = ng.attributes[k].array; } h.out = false; }
+  if (h.out && g){
+    if (pmFits(g, ng)){ for (const k of PM.keys){ const a = g.attributes[k]; if (a) a.array = ng.attributes[k].array; } }
+    else if (ng){   // (swap the whole geometry: the plot's meshes, its walls' mesh with it)
+      pmMismatch(h, 'full', g, ng);
+      d.geo.set(ATLAS, ng); nd.geo.delete(ATLAS);   // (the caller disposes what is left in nd.geo)
+      if (h.c.view) h.c.view.traverse(o => { if (o.geometry === g) o.geometry = ng; });
+      pmUnhook(g, ng); g.dispose(); markSolid(h.c);
+    } else { pmMismatch(h, 'full (none made)', g, null); pmUnhook(g, null); }
+    h.out = false;
+  }
   if (!nd.sgeo && !d.sgeo) d.noStand = true;
+  if (d.sgeo && h.sout && !nd.sgeo){   // (a stand-in that can't be made again: the plot goes without one, drawn full)
+    pmMismatch(h, 'stand (none made)', d.sgeo, null); pmUnhook(d.sgeo, null); d.sgeo.dispose(); d.sgeo = null; d.noStand = true; h.sout = false; markSolid(h.c);
+  }
   if (nd.sgeo){
     if (!d.sgeo){ d.sgeo = nd.sgeo; h.sout = false; }
-    else if (h.sout){ for (const k of PM.keys){ const a = d.sgeo.attributes[k]; if (a) a.array = nd.sgeo.attributes[k].array; } h.sout = false; }
+    else if (h.sout){
+      if (pmFits(d.sgeo, nd.sgeo)){ for (const k of PM.keys){ const a = d.sgeo.attributes[k]; if (a) a.array = nd.sgeo.attributes[k].array; } }
+      else { pmMismatch(h, 'stand', d.sgeo, nd.sgeo); const old = d.sgeo; d.sgeo = nd.sgeo; pmUnhook(old, nd.sgeo); old.dispose(); markSolid(h.c); }
+      h.sout = false;
+    }
   }
   h.wait = null; h.due = PM.frame + 90;   // (let go again if nothing keeps asking)
-  if (!h.queued){ h.queued = true; PM.queue.push(h); }
+  if (!h.queued && !d.pmKeep){ h.queued = true; PM.queue.push(h); }
 }
 function pmRestoreSync(h, why){
   if (!h.out && !pmNeeds(h, 'stand')) return;
@@ -313,7 +340,7 @@ function pmEnsure(c, which = 'full'){
 }
 // a plot's arrays are to be let go in `delay` frames (it has just been merged into its block, or the arrays were made again for a reader)
 function pmSchedule(c, delay = 0){
-  const d = c.data; if (!d || !d.rec || !d.rec.r || !d.geo.get(ATLAS) || !PM.on()) return;
+  const d = c.data; if (!d || !d.rec || !d.rec.r || d.pmKeep || !d.geo.get(ATLAS) || !PM.on()) return;
   const h = pmHolder(c);
   h.due = PM.frame + delay; if (!h.queued){ h.queued = true; PM.queue.push(h); }
 }

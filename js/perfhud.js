@@ -58,6 +58,8 @@ const PH = (() => {
     if (ext && !exact){ const q = free.pop() || gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); cur.q = q; }
     stack.push(cur);
   }
+  // a frame that failed part way (main.js): passes left open are closed, so the next frame's timer queries can start
+  function abort(){ while (stack.length){ const c = stack.pop(); if (c && c.q){ gl.endQuery(ext.TIME_ELAPSED_EXT); free.push(c.q); } } cur = null; }
   function end(){
     if (!on || !stack.length) return;
     const c = stack.pop(); cur = stack.length ? stack[stack.length - 1] : null;
@@ -183,5 +185,5 @@ const PH = (() => {
   }
   addEventListener('keydown', e => { if ((e.key === 'F3' || e.key === '`') && !e.repeat && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName)){ e.preventDefault();
     if (e.shiftKey){ if (!on) toggle(); setExact(!exact); } else toggle(); } });
-  return { frameStart, lap, sub, subBegin, laps, begin, end, shadow, frameEnd, toggle, setExact, text, tests, plainMat, get on(){ return on; }, get exact(){ return exact; } };
+  return { frameStart, abort, lap, sub, subBegin, laps, begin, end, shadow, frameEnd, toggle, setExact, text, tests, plainMat, get on(){ return on; }, get exact(){ return exact; } };
 })();

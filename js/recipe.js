@@ -187,7 +187,7 @@ const sameArr = (a, b) => { if (a.length !== b.length) return false; for (let i 
 // RW.request(job) sends a plot's recipe; the result is picked up by stageStep (world.js). Not used (plots are made on the page as before) when the test
 // 'plots made on the page (as before)' is on, before the worker has loaded and agreed on its materials, after any error from it, and in the perf harness
 // (whose scripted clock and seeded random stream a thread of its own would break) unless window.__GEN_WORKER is set.
-const RW = { rbSent: new Set(), w: null, state: 'off', next: 1, jobs: new Map(), lastWorld: '', error: null, made: 0, fell: 0, grids: 0, src: document.currentScript ? document.currentScript.src : null };
+const RW = { rbSent: new Set(), w: null, state: 'off', next: 1, jobs: new Map(), lastWorld: '', error: null, made: 0, fell: 0, grids: 0, restarts: 0, jobsDone: 0, checking: false, src: document.currentScript ? document.currentScript.src : null };
 const genMain = () => !!(PH.tests.genMain || window.__GEN_MAIN);
 RW.usable = () => RW.state === 'ready' && !genMain();
 RW.start = () => {
@@ -210,7 +210,9 @@ RW.start = () => {
     } else if (m.t === 'done' || m.t === 'err'){
       if (m.rb) for (const [k, e] of m.rb){ const mine = rbCache.get(k); if (!mine){ rbCache.set(k, rbUnpack(e)); RW.rbSent.add(k); } else if (!sameArr(mine.attributes.position.array, e.a.position.a)) RW.rbSent.delete(k); else RW.rbSent.add(k); }
       const j = RW.jobs.get(m.id); RW.jobs.delete(m.id); if (!j || j.cancelled) return;
-      if (j.regen){ const h = j.regen; if (m.t === 'err'){ h.wait = null; h.fails = (h.fails || 0) + 1; RW.fell++; return; } if (h.c.data === h.d && (h.out || pmNeeds(h, 'stand'))){ PM.async++; const w = h.want; h.want = null; h.over = m.over || 0; pmFill(h, recipeUnpack(m.msg).data, w); } else h.wait = null; return; }
+      RW.jobsDone++;
+      if (j.cb){ j.cb(m); return; }
+      if (j.regen){ const h = j.regen; if (m.t === 'err'){ h.wait = null; h.fails = (h.fails || 0) + 1; RW.fell++; return; } if (h.c.data === h.d && (h.out || pmNeeds(h, 'stand'))){ PM.async++; const w = h.want; h.want = null; h.over = m.over || 0; pmFill(h, recipeUnpack(m.msg).data, w, 'worker'); } else h.wait = null; return; }
       if (m.t === 'err'){ j.fail = m.err; RW.fell++; } else { j.res = m; RW.made++; }
       j.done = true;
     }
@@ -231,6 +233,25 @@ RW.request = (job, skipWorld) => {
   m.rb = []; for (const [k, g] of rbCache) if (!RW.rbSent.has(k)){ RW.rbSent.add(k); m.rb.push([k, rbPack(g, false)]); }   // (structured clone copies them)
   if (window.__randState) m.rs = window.__randState();
   RW.w.postMessage(m);
+};
+// The worker started afresh: a plot it made again came out different from the first time while the page's matched (pmFill), so something the worker keeps between plots had
+// drifted. Jobs in flight: a plot waiting for its arrays asks again, a plot being made falls back to the page (as when the worker fails). At most RW.maxRestarts times.
+RW.maxRestarts = 5;
+RW.restart = () => {
+  if (RW.restarts >= RW.maxRestarts || !RW.w) return;
+  RW.restarts++;
+  try { RW.w.terminate(); } catch (e) {}
+  for (const j of RW.jobs.values()){ if (j.regen){ j.regen.wait = null; } else if (!j.cb){ j.fail = 'the worker was started afresh'; j.done = true; } }
+  RW.jobs.clear(); RW.w = null; RW.state = 'off'; RW.rbSent.clear(); RW.lastWorld = ''; RW.checking = false;
+  RW.start();
+};
+// the worker asked for the same plot once more, for the record (e.again: what it made then), then started afresh
+RW.recheck = (h, e) => {
+  if (RW.checking || !RW.usable() || RW.restarts >= RW.maxRestarts) return;
+  RW.checking = true; const rec = h.d.rec, id = RW.next++;
+  RW.jobs.set(id, { id, cb: m => { try { if (m.t === 'done'){ const u = recipeUnpack(m.msg).data; e.again = [pmCnt(u.geo.get(ATLAS)), pmCnt(u.sgeo)]; e.againOver = m.over || 0; } else e.again = 'error: ' + m.err; } catch (err){ e.again = 'error: ' + err; } RW.checking = false; RW.restart(); } });
+  RW.sendWorld();
+  RW.w.postMessage({ t: 'gen', id, r: Object.assign({}, rec.r, { draws: rec.draws }), far: { lean: !!(PH.tests.leanRound || window.__LEAN_ROUND), sticks: !!(PH.tests.thinSticks || window.__THIN_STICKS) }, rb: [], regen: true });
 };
 // the worker makes a plot again for its arrays (the answer goes to pmFill, not to a stage job)
 RW.regen = (h, r) => {
@@ -258,9 +279,9 @@ function attachRec(data, r, draws){
 // pmDrop(c) replaces the vertex attributes' arrays by accessors that make the plot again (on the page, at once) when something reads one: any reader works, slowly; the ones
 // that matter ask in good time (pmEnsure: the worker makes the plot, the arrays arrive a few frames later) and the count of slow ones is in PM.sync. The index stays (the
 // never-seen job reorders it, and it is the smaller part). Test: "keep the plots' own geometry" (PH.tests.keepGeo, window.__KEEP_GEO).
-const PM = { keys: ['position', 'normal', 'color', 'aEm', 'aFlk', 'aFine', 'aOn'], queue: [], frame: 0, dropped: 0, sync: 0, async: 0, mismatch: 0, mm: [], why: {}, trace: false, held: new Set() };
+const PM = { keys: ['position', 'normal', 'color', 'aEm', 'aFlk', 'aFine', 'aOn'], queue: [], frame: 0, dropped: 0, sync: 0, async: 0, mismatch: 0, byWorker: 0, fixed: 0, mm: [], why: {}, trace: false, held: new Set() };
 PM.on = () => !(PH.tests.keepGeo || window.__KEEP_GEO) && !self.IN_RECIPE_WORKER;
-PM.line = () => 'plot arrays: ' + (PM.on() ? 'let go after merging' : 'kept (test)') + '; dropped ' + PM.dropped + ', made again by the worker ' + PM.async + ', on the page ' + PM.sync + (PM.mismatch ? ', came out different ' + PM.mismatch : '');
+PM.line = () => 'plot arrays: ' + (PM.on() ? 'let go after merging' : 'kept (test)') + '; dropped ' + PM.dropped + ', made again by the worker ' + PM.async + ', on the page ' + PM.sync + (PM.mismatch ? ', came out different ' + PM.mismatch + ' (by the worker ' + PM.byWorker + ', put right from the page ' + PM.fixed + ', worker restarts ' + RW.restarts + ')' : '');
 const pmHolder = c => { const d = c.data; return d.pm || (d.pm = { c, d, out: false, sout: false, wait: null, due: -1, queued: false }); };
 // (out: the full tier's arrays are let go; sout: the stand-in's are, or there is no stand-in yet, which is made from the recipe like any array that is let go)
 function pmDropOne(h, g){
@@ -285,47 +306,68 @@ function pmDrop(c){
 const pmFits = (g, ng) => !!(g && ng) && PM.keys.every(k => { const a = g.attributes[k], b = ng.attributes[k]; return !a === !b && (!a || (a.itemSize === b.itemSize && a.count*a.itemSize === b.array.length)); })
 ;   // (the index is not compared: the never-seen job reorders and trims it, and it stays)
 function pmUnhook(g, from){ for (const k of PM.keys){ const a = g.attributes[k]; if (!a) continue; const v = from && from.attributes[k] ? from.attributes[k].array : new Float32Array(0); Object.defineProperty(a, 'array', { value: v, writable: true, configurable: true, enumerable: true }); } }
-function pmMismatch(h, which, g, ng){
-  PM.mismatch++; h.d.pmKeep = true;
+const pmCnt = g => g ? g.attributes.position.count : null;
+// the plot made here on the page, now, from its recipe (null if that fails)
+function pmPageMake(h){
+  const rec = h.d.rec; if (!rec || !rec.r) return null;
+  const prev = stageCap(); try { return recipeGen(Object.assign({}, rec.r, { draws: rec.draws }), recipeWorld()).data; } catch (err){ return null; } finally { stageApply(prev); }
+}
+function pmMismatch(h, which, g, ng, pd, src){
+  PM.mismatch++; if (src === 'worker') PM.byWorker++;
+  let e = null;
   if (PM.mm.length < 8){ const rec = h.d.rec, r = rec && rec.r;
-    const e = { which, cell: h.c.i + ',' + h.c.j, v: [g && g.attributes.position.count, ng && ng.attributes.position.count], ix: [g && g.index && g.index.count, ng && ng.index && ng.index.count],
-      over: h.over || 0, draws: rec && rec.draws ? rec.draws.length : null, made: h.d.madeBy || 'page' };
-    // (a look at why: the same plot made here on the page, now, and whether its recipe still reads the same from the city)
-    try { const prev = stageCap(); let pd; try { pd = recipeGen(Object.assign({}, r, { draws: rec.draws }), recipeWorld()).data; } finally { stageApply(prev); }
-      const pg = pd.geo.get(ATLAS); e.page = [pg ? pg.attributes.position.count : null, pd.sgeo ? pd.sgeo.attributes.position.count : null]; for (const x of pd.geo.values()) x.dispose(); if (pd.sgeo) pd.sgeo.dispose(); } catch (err){ e.page = String(err && err.message || err); }
+    e = { which, cell: h.c.i + ',' + h.c.j, v: [pmCnt(g), pmCnt(ng)], ix: [g && g.index && g.index.count, ng && ng.index && ng.index.count],
+      src: src || 'page', over: src === 'worker' ? h.over || 0 : 0, draws: rec && rec.draws ? rec.draws.length : null, made: h.d.madeBy || 'page',
+      page: pd ? [pmCnt(pd.geo.get(ATLAS)), pmCnt(pd.sgeo)] : null, restarts: RW.restarts, workerJobs: RW.jobsDone, secs: Math.round(performance.now()/1000) };
     try { const now = recipeOf(h.c), skip = (k, v) => k === 'nbrec' || k === 'wt' ? undefined : v; e.recSame = JSON.stringify(now, skip) === JSON.stringify(r, skip); } catch (err){ e.recSame = String(err); }
     PM.mm.push(e); }
-  if (PM.mismatch === 1) console.warn('plot arrays: a plot made again came out different (' + which + ' at ' + h.c.i + ',' + h.c.j + '); its new geometry is used whole. PM.mm has the details.');
+  if (PM.mismatch === 1) console.warn('plot arrays: a plot made again came out different (' + which + ' at ' + h.c.i + ',' + h.c.j + ', made by the ' + (src || 'page') + '). PM.mm has the details.');
+  return e || {};
 }
+const pmPaste = (g, from) => { for (const k of PM.keys){ const a = g.attributes[k]; if (a) a.array = from.attributes[k].array; } };
 // which: what was asked for ('full', 'stand', or undefined for both). The worker sends the whole plot; only what was asked for is put back, so a block going to its stand-ins
 // doesn't bring every plot's full arrays back with it for a second and a half (twice the arrays, and garbage for the collector).
-function pmFill(h, nd, which){
+// src: who made nd ('worker' or 'page'). When the worker's plot doesn't fit, the plot is made here on the page as well: on the owner's Mac the page's always matched the plot as
+// first made while the worker's sometimes didn't, so the page's is pasted in (the plot stays as it was, and its arrays can be let go again), the worker is asked for the same plot once
+// more (for the record) and then started afresh (RW.restart). Only if the page's doesn't fit either does the new geometry replace the old one whole, kept from then on (d.pmKeep).
+function pmFill(h, nd, which, src = 'page'){
   const d = h.d, ng = nd.geo.get(ATLAS), g = d.geo.get(ATLAS);
   const wantFull = which !== 'stand' || !!d.noStand || (!nd.sgeo && !d.sgeo), wantStand = which !== 'full';
+  let pd; const page = () => pd !== undefined ? pd : (pd = src === 'worker' ? pmPageMake(h) : null);
+  let bad = null;
   if (h.out && g && wantFull){
-    if (pmFits(g, ng)){ for (const k of PM.keys){ const a = g.attributes[k]; if (a) a.array = ng.attributes[k].array; } }
-    else if (ng){   // (swap the whole geometry: the plot's meshes, its walls' mesh with it)
-      pmMismatch(h, 'full', g, ng);
-      d.geo.set(ATLAS, ng); nd.geo.delete(ATLAS);   // (the caller disposes what is left in nd.geo)
-      if (h.c.view) h.c.view.traverse(o => { if (o.geometry === g) o.geometry = ng; });
-      pmUnhook(g, ng); g.dispose(); markSolid(h.c);
-    } else { pmMismatch(h, 'full (none made)', g, null); pmUnhook(g, null); }
+    if (pmFits(g, ng)) pmPaste(g, ng);
+    else { const pg = page() && pd.geo.get(ATLAS), e = pmMismatch(h, 'full', g, ng, pd, src); bad = bad || e;
+      if (pmFits(g, pg)){ pmPaste(g, pg); e.fixed = 'page'; PM.fixed++; }
+      else if (ng){   // (swap the whole geometry: the plot's meshes, its walls' mesh with it)
+        e.fixed = 'swap'; d.pmKeep = true;
+        d.geo.set(ATLAS, ng); nd.geo.delete(ATLAS);   // (the caller disposes what is left in nd.geo)
+        if (h.c.view) h.c.view.traverse(o => { if (o.geometry === g) o.geometry = ng; });
+        pmUnhook(g, ng); g.dispose(); markSolid(h.c);
+      } else { e.fixed = 'none'; d.pmKeep = true; pmUnhook(g, null); } }
     h.out = false;
   }
   if (!nd.sgeo && !d.sgeo) d.noStand = true;
-  if (d.sgeo && h.sout && !nd.sgeo && wantStand){   // (a stand-in that can't be made again: the plot goes without one, drawn full)
-    pmMismatch(h, 'stand (none made)', d.sgeo, null); pmUnhook(d.sgeo, null); d.sgeo.dispose(); d.sgeo = null; d.noStand = true; h.sout = false; markSolid(h.c);
+  if (d.sgeo && h.sout && !nd.sgeo && wantStand){
+    const ps = page() && pd.sgeo;
+    if (pmFits(d.sgeo, ps)){ pmPaste(d.sgeo, ps); PM.fixed++; h.sout = false; }
+    else {   // (a stand-in that can't be made again: the plot goes without one, drawn full)
+      pmMismatch(h, 'stand (none made)', d.sgeo, null, pd, src).fixed = 'dropped'; d.pmKeep = true; pmUnhook(d.sgeo, null); d.sgeo.dispose(); d.sgeo = null; d.noStand = true; h.sout = false; markSolid(h.c); }
   }
   if (nd.sgeo && wantStand){
     if (!d.sgeo){ d.sgeo = nd.sgeo; h.sout = false; }
     else if (h.sout){
-      if (pmFits(d.sgeo, nd.sgeo)){ for (const k of PM.keys){ const a = d.sgeo.attributes[k]; if (a) a.array = nd.sgeo.attributes[k].array; } }
-      else { pmMismatch(h, 'stand', d.sgeo, nd.sgeo); const old = d.sgeo; d.sgeo = nd.sgeo; pmUnhook(old, nd.sgeo); old.dispose(); markSolid(h.c); }
+      if (pmFits(d.sgeo, nd.sgeo)) pmPaste(d.sgeo, nd.sgeo);
+      else { const ps = page() && pd.sgeo, e = pmMismatch(h, 'stand', d.sgeo, nd.sgeo, pd, src); bad = bad || e;
+        if (pmFits(d.sgeo, ps)){ pmPaste(d.sgeo, ps); e.fixed = 'page'; PM.fixed++; }
+        else { e.fixed = 'swap'; d.pmKeep = true; const old = d.sgeo; d.sgeo = nd.sgeo; pmUnhook(old, nd.sgeo); old.dispose(); markSolid(h.c); } }
       h.sout = false;
     }
   }
+  if (pd){ for (const x of pd.geo.values()) if (!g || x !== g) x.dispose(); }   // (the page's copy: its arrays now belong to the plot; the geometry objects themselves go)
   h.wait = null; h.due = PM.frame + 90;   // (let go again if nothing keeps asking)
   if (!h.queued && !d.pmKeep){ h.queued = true; PM.queue.push(h); }
+  if (bad && src === 'worker') RW.recheck(h, bad);
 }
 function pmRestoreSync(h, why){
   if (!h.out && !pmNeeds(h, 'stand')) return;
@@ -343,6 +385,7 @@ function pmEnsure(c, which = 'full'){
   const d = c.data; if (!d || !d.rec || !d.rec.r) return true;
   const h = pmHolder(c); if (!pmNeeds(h, which)) return true;
   if (h.wait){ if (h.want !== which) h.want = undefined; return false; }   // (asked for the other tier meanwhile: both are put back)
+  if (RW.restarts && RW.state === 'loading') return false;   // (the worker is being started afresh: wait for it, a second or two, rather than make every plot here)
   if (!RW.usable() || (h.fails || 0) >= 2){ pmRestoreSync(h, 'ensure'); return true; }   // (no worker, or it could not make this one twice: here, at once)
   h.wait = true; h.want = which; const rec = d.rec;
   RW.regen(h, Object.assign({}, rec.r, { draws: rec.draws }));

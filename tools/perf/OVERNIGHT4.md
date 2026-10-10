@@ -195,3 +195,7 @@ Checked: a real-clock page (worker on) loads the city from recipes with no error
 - For a minute after each switch a block keeps its other merge on the graphics card (`TIER.stash`), so switching back is a swap on the same frame. An edit to the block, or the end of the minute, lets it go.
 - Bug found and fixed: a plot with nothing small to leave out has no stand-in, and its block asked the worker for one forever (over 6,000 remakes in minutes in the city; such blocks never changed tier). Such plots are now marked (`noStand`) and drawn full in a stand-in block.
 - Measured in a real-clock page on the city (software renderer, about 1 frame a second): off 4 frames, first on 39 frames, every switch after that 3 frames; the setting is back after a reload. Harness city against 8fafaee: 0 problems.
+
+## Stand-ins in view (2026-10-10)
+
+The owner saw lit windows losing their frames in view, closer in than zoom 24. Cause: closer than `TIER.zs` only the `TIER.maxFull` = 36 nearest blocks were full, and a big or high-resolution screen shows more blocks than that, so some on-screen blocks were stand-ins. Now every block on screen is full when closer than `TIER.zs` (the cap only applies to the ring of blocks just off screen). Dense scene, night: zoom 22 and zoom 15 now 0 pixels differ (were 45,264 at zoom 22). Farther than zoom 24 everything is still a stand-in, as before.

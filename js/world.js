@@ -1845,8 +1845,11 @@ function tierTick(){
   const near = zoomT <= TIER.zs, r = near ? Math.hypot(zoomT*(W/H), zoomT/Math.sin(Math.max(.15, PITCH)))*1.05 + TIER.margin : -1;
   const blocks = new Map(); for (const c of cells.values()){ const k = mergeKey(c.i, c.j), b = blocks.get(k) || blocks.set(k, { x: 0, z: 0, n: 0 }).get(k); b.x += c.x; b.z += c.z; b.n++; }
   const wantFull = [];
-  for (const [k, b] of blocks){ const d = Math.hypot(b.x/b.n - camGoal.x, b.z/b.n - camGoal.z); if (near && d <= r) wantFull.push([d, k]); }
-  wantFull.sort((p, q) => p[0] - q[0]); const keep = new Set(wantFull.slice(0, TIER.maxFull).map(e => e[1]));
+  const onScreen = new Set();
+  for (const [k, b] of blocks){ const d = Math.hypot(b.x/b.n - camGoal.x, b.z/b.n - camGoal.z); if (!near) continue; if (tierVisible(k)) onScreen.add(k); else if (d <= r) wantFull.push([d, k]); }
+  // (closer than TIER.zs every block on screen is full, however many: a big or high-resolution screen shows more than TIER.maxFull of them, which used to put stand-ins in view;
+  //  the cap is only for the ring of blocks just off screen kept full for turning and panning)
+  wantFull.sort((p, q) => p[0] - q[0]); const keep = new Set([...onScreen, ...wantFull.slice(0, Math.max(0, TIER.maxFull - onScreen.size)).map(e => e[1])]);
   let nFull = 0, nStand = 0;
   for (const k of blocks.keys()){
     const cur = TIER.of.get(k) || 'full';

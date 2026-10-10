@@ -12,7 +12,7 @@
 // API: BAKE.tick(budgetMs) once a frame (main.js, after the regions are merged); BAKE.want(c) register and prioritise a plot; BAKE.get(c) the bake or null (null while the plot's recipe has moved on);
 // BAKE.drop(c); BAKE.stats(); BAKE.line(); BAKE.clearCache(); callbacks BAKE.onReady(c, bake) and BAKE.onDrop(c, bake) for the lead to mark the block dirty.
 const BAKE = { ver: 1, density: 'd1', maxCacheBytes: 192*1048576, mem: new Map(), ents: new Map(), keys: new Set(), meta: new Map(), db: null, dbReady: false, lookups: 0, maxLookups: 4,
-  job: null, scan: 0, list: [], listStamp: -1, listSize: -1, drawsInSig: false, onReady: null, onDrop: null, baker: null, view: null, lastT: 0, last: { ms: 0, steps: 0 },
+  job: null, writes: 0, scan: 0, list: [], listStamp: -1, listSize: -1, drawsInSig: false, onReady: null, onDrop: null, baker: null, view: null, lastT: 0, last: { ms: 0, steps: 0 },
   c: { tracked: 0, edits: 0, hits: 0, memHits: 0, misses: 0, baked: 0, steps: 0, stored: 0, evicted: 0, failed: 0, dropped: 0, ticks: 0, ticksOver: 0, maxTickMs: 0, bakeMs: 0, dedup: 0 } };
 BAKE.gen = (document.currentScript && /[?&]v=([^&]+)/.exec(document.currentScript.src || '') || [0, 'dev'])[1];   // (the scripts' version: a bake is only as good as the builders and the baker that made it)
 BAKE.off = () => !!window.__BAKE_OFF;
@@ -65,7 +65,7 @@ function bkDbGet(sig, cb){   // cb(bake or null)
 }
 function bkDbPut(sig, bake){
   const bytes = bkBytes(bake.tex), m = { bytes, t: Date.now() }; BAKE.keys.add(sig); BAKE.meta.set(sig, m); BAKE.c.stored++;
-  if (BAKE.db) try { const tx = BAKE.db.transaction(['b', 'm'], 'readwrite'); tx.objectStore('b').put(bake, sig); tx.objectStore('m').put(m, sig); } catch (e) {}
+  if (BAKE.db) try { const tx = BAKE.db.transaction(['b', 'm'], 'readwrite'); BAKE.writes++; tx.oncomplete = tx.onerror = tx.onabort = () => { BAKE.writes--; }; tx.objectStore('b').put(bake, sig); tx.objectStore('m').put(m, sig); } catch (e) { BAKE.writes = Math.max(0, BAKE.writes - 1); }
   bkEvict();
 }
 function bkEvict(){   // the oldest entries go while the store holds more than maxCacheBytes (the entries in use are kept in memory regardless)
@@ -155,7 +155,7 @@ BAKE.tick = function(budgetMs){
   if (budgetMs === undefined) budgetMs = BAKE.autoBudget();
   if (!BAKE.dbReady) return;
   bkRefreshList();
-  for (let n = 0; n < 60 && BAKE.scan < BAKE.list.length; n++, BAKE.scan++) bkTrack(BAKE.list[BAKE.scan]);
+  for (let n = 0; n < 60 && BAKE.scan < BAKE.list.length; n++, BAKE.scan++){ bkTrack(BAKE.list[BAKE.scan]); if (n && bkNow() - t0 > budgetMs*.5) { BAKE.scan++; break; } }   // (the scan counts against the budget too)
   if (BAKE.scan >= BAKE.list.length){ BAKE.scan = 0; BAKE.cycles = (BAKE.cycles || 0) + 1; }
   bkLookupSome();
   const ctx = { c: null, sig: '', density: BAKE.density, ver: BAKE.ver, left: () => Math.max(0, t0 + budgetMs - bkNow()) };
@@ -188,6 +188,8 @@ BAKE.stats = () => {
   return Object.assign({ plots: BAKE.ents.size, by, memBakes: BAKE.mem.size, memBytes: bytes, storeKeys: BAKE.keys.size, storeBytes: sb, dbReady: BAKE.dbReady, lookups: BAKE.lookups, job: !!BAKE.job }, BAKE.c);
 };
 BAKE.line = () => { const s = BAKE.stats(); return 'baked far: ' + (s.by.ready || 0) + ' ready of ' + s.plots + ', queued ' + (s.by.queued || 0) + ', store hits ' + s.hits + ', baked ' + s.baked + ', edits ' + s.edits + ', failed ' + s.failed; };
+// for tools: true while store writes are still on their way (a page closed before they land loses them: the next session bakes those plots again)
+BAKE.flushed = () => BAKE.writes === 0;
 // for tools: run ticks until the queue is empty or n ticks went by
 BAKE.drain = (budgetMs = 4, n = 1e6) => { const c0 = BAKE.cycles || 0; for (let k = 0; k < n; k++){ BAKE.tick(budgetMs); const s = BAKE.stats(); if ((BAKE.cycles || 0) > c0 && !(s.by.new || 0) && !(s.by.queued || 0) && !(s.by.baking || 0) && !(s.by.looking || 0) && !BAKE.job) return k + 1; } return -1; };
 if (!window.__BAKE_OFF) bkDbOpen(); else BAKE.dbReady = true;

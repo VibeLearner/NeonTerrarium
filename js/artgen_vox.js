@@ -92,13 +92,15 @@
   // ---------- the delivery drone: a round teal hover body, a lavender dome, four rotor arms, a sensor eye in front, the parcel strapped under ----------
   const TEAL = [H('#2f6f74'), H('#6fb0b0'), H('#a8d8d4')], DOME = [H('#8d78b8'), H('#bca8d8'), H('#e0d6f4')], INK = [H('#05080a'), H('#12191d'), H('#34464c')];
   const ORANGE = [H('#b8681b'), H('#e1911d'), H('#f6bc5a')], LENS = [H('#9ae8ea'), H('#134c50')];
-  const PARCEL = [box(0, .4, 1.0, 7.6, 5.0, 7.0, ORANGE), box(0, 1.2, 1.0, 7.8, 5.3, 1.0, INK)];
+  const PARCEL = [box(0, -.4, 0, 9.0, 4.6, 9.0, ORANGE), box(-2.8, 1.6, 0, .9, 1.4, 1.4, INK), box(2.8, 1.6, 0, .9, 1.4, 1.4, INK)];   // hangs on two short straps, lower than the belly
+  const AR = 8.7, ANG = [0, 1, 2, 3, 4, 5, 6, 7].map(k => k * Math.PI / 4), STEEL = [H('#142026'), H('#2c4650'), H('#5f8590')];   // eight small rotor pods in a ring: at least 19 px wide from every side
   const DRONE = model(
-    ell(0, 7.0, 0, 6.4, 5.0, 6.4, TEAL), ell(0, 10.6, 0, 3.7, 2.4, 3.7, DOME),
-    box(0, 8.4, 0, 17.2, 1.5, 1.7, INK, { yaw: Math.PI / 4 }), box(0, 8.4, 0, 17.2, 1.5, 1.7, INK, { yaw: -Math.PI / 4 }),   // two bars crossed: four rotors
-    ...[[1, 1], [1, -1], [-1, 1], [-1, -1]].map(s => ell(s[0] * 6.1, 9.4, s[1] * 6.1, 2.4, .7, 2.4, INK)),
-    ell(0, 7.2, 6.1, 2.4, 2.2, 1.3, INK), ell(0, 7.2, 7.0, 1.4, 1.3, .8, LENS, { emit: true }),
-    box(0, .6, 1.0, 7.2, 4.4, 6.6, ORANGE));
+    ell(0, 6.4, 0, 7.0, 4.7, 7.0, TEAL), ell(0, 9.6, 0, 3.9, 2.3, 3.9, DOME),
+    box(-2.0, 12.6, 0, 1.0, 3.0, 1.0, INK), box(2.0, 12.6, 0, 1.0, 3.0, 1.0, INK),   // the two antennae
+    ...[0, 1, 2, 3].map(k => box(0, 7.4, 0, AR * 2, 1.2, 1.4, INK, { yaw: k * Math.PI / 4 })),   // four bars through the middle
+    ...ANG.map(a => ell(Math.sin(a) * AR, 8.0, Math.cos(a) * AR, 1.8, .7, 1.8, STEEL)),
+    ell(0, 6.8, 6.9, 2.4, 2.2, 1.3, INK), ell(0, 6.8, 7.8, 1.4, 1.3, .8, LENS, { emit: true }),
+    ...PARCEL);
   ART.drone = DRONE;
   ART.reg('ddrone', (g, W, Hh) => {
     const cw = 22, ch = 19;

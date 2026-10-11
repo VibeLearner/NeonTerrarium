@@ -732,11 +732,17 @@ let SOFT_ON = false;
 // with the rainy looks' sparkle: a jolt in the middle of a slow blend). So the weather's effects, once on, stay compiled in for the session (their own
 // uniforms still switch them off: a branch, not a new program), and when rain is on its way they are switched on at the start of the blend, at the click,
 // not halfway through. (Compiling every combination ahead in idle frames was tried: each compile stalls a frame, which landed while building.)
-const compSticky = {};
+// Compiled once, at load, with every effect that can come and go during play already in (the weather's, the night lights, the morning shafts, and the two
+// that follow what is on screen: the shimmer over lift pads and metro cars, the steam vents' mist): the composite is a large shader, and compiling a new
+// variant of it (with its soft-effects companions) in the middle of play froze the game for a good fraction of a second on the owner's Mac, each time a
+// lift or a metro car came into view or left it, each dusk, each shower. Each effect is still switched by its own strength per pixel, so the picture is
+// the one its own variant drew (the overlay test "every effect compiled in (same picture)" is the same idea). window.__COMP_LAZY: variants on demand, as before.
+const COMP_PLAY = ['RAIN', 'SPARK', 'WET', 'NL', 'RAYS', 'SHIM', 'MIST'];
+const compSticky = {}; if (!window.__COMP_LAZY) for (const f of COMP_PLAY) compSticky[f] = true;
 function compWeatherOn(on){
   const rainSoon = typeof LK !== 'undefined' && !LK.old && !window.__OLD_GRADES && LK.wx && (LK.wx.tr > 0 || LK.rainNow() > 0);
   if (rainSoon){ on.RAIN = true; on.SPARK = true; on.WET = true; }
-  for (const f of ['RAIN', 'SPARK', 'WET', 'NL', 'RAYS']){ if (on[f] === true) compSticky[f] = true; else if (compSticky[f] && !PH.tests.compFloor) on[f] = true; }
+  for (const f of COMP_PLAY){ if (on[f] === true) compSticky[f] = true; else if (compSticky[f] && !PH.tests.compFloor) on[f] = true; }
 }
 // ---- soft effects at half resolution ----
 // The composite works out three soft effects for every pixel: the reflection search on wet ground (22 steps), the steam's mist (8) and the light
@@ -845,8 +851,8 @@ const softMats = [SOFT_WET, SOFT_MIST, SOFT_RAYS].map(body => new THREE.ShaderMa
 // and the half-size picture is gone over once. Each effect's own code is unchanged and writes its own target (the color, normal and a third output, see
 // core.js); the targets of effects at nothing this frame are left out of the draw (drawBuffers NONE), so they keep what they had, as when their pass was skipped.
 const softBody = s => '{' + s.slice(SOFT_HEAD.length).replace(/gl_FragColor = outv;\s*$/, '') + '}';
-const softAll = MRT ? new THREE.ShaderMaterial({
-  defines: softMats[0].defines, uniforms: Object.assign({}, comp.uniforms, { softWant: { value: new THREE.Vector3() } }), vertexShader: comp.vertexShader,
+const softAll = MRT ? new THREE.ShaderMaterial({   // (its own defines, every effect in, compiled once: the uniforms decide per pixel, and softEffects decides per target)
+  defines: Object.assign({ SOFT_HALF: 0 }, Object.fromEntries(COMP_FX.map(f => ['FX_' + f, 1]))), uniforms: Object.assign({}, comp.uniforms, { softWant: { value: new THREE.Vector3() } }), vertexShader: comp.vertexShader,
   fragmentShader: COMP_PRELUDE + 'uniform vec3 softWant;\nvoid main(){' + SOFT_HEAD +
     'if (softWant.x > 0.5){ outv = vec4(0.0);' + softBody(SOFT_WET) + ' gl_FragColor = outv; }\n' +
     'if (softWant.y > 0.5){ outv = vec4(0.0);' + softBody(SOFT_MIST) + ' pc_fragNormal = outv; }\n' +

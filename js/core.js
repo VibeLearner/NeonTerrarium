@@ -19,7 +19,9 @@ const irand = (a,b) => Math.floor(rnd(a, b+1));
 
 /* ---------- renderer ---------- */
 const canvas = document.getElementById('view');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, powerPreference:'high-performance' });
+// alpha: false: every pixel the game puts on the screen is opaque (the grade and the copy to the screen write alpha 1), so the canvas says so, and the browser
+// doesn't blend the whole frame onto the page behind it every frame (a pass over every screen pixel that the overlay never saw); the picture is the same
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, alpha:false, powerPreference:'high-performance' });
 renderer.setPixelRatio(1);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.BasicShadowMap;
@@ -36,7 +38,7 @@ const MRT = renderer.capabilities.isWebGL2;
 if (MRT){
   // a second output for every fragment shader (three declares the first without a location, which two outputs need)
   const gl = renderer.getContext(), src = gl.shaderSource.bind(gl);
-  gl.shaderSource = (sh, s) => src(sh, s.replace('out highp vec4 pc_fragColor;', 'layout(location = 0) out highp vec4 pc_fragColor;\nlayout(location = 1) out highp vec4 pc_fragNormal;'));
+  gl.shaderSource = (sh, s) => src(sh, s.replace('out highp vec4 pc_fragColor;', 'layout(location = 0) out highp vec4 pc_fragColor;\nlayout(location = 1) out highp vec4 pc_fragNormal;' + (s.includes('pc_fragSoft2') ? '\nlayout(location = 2) out highp vec4 pc_fragSoft2;' : '')));   // (a third, for the soft effects drawn in one pass: sky.js)
   // every built-in material: the normal as MeshNormalMaterial computes it (normal_vert, defaultnormal_vertex), written
   // as it packs it (packNormalToRGB), at full opacity
   // (toon materials, nearly everything, already carry exactly this normal as vNormal: they reuse it rather than pass the

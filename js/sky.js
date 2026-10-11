@@ -841,6 +841,17 @@ const COMP_PRELUDE = comp.fragmentShader.slice(0, comp.fragmentShader.indexOf('v
 const softMats = [SOFT_WET, SOFT_MIST, SOFT_RAYS].map(body => new THREE.ShaderMaterial({
   defines: Object.assign({ SOFT_HALF: 0 }, Object.fromEntries(COMP_FX.map(f => ['FX_' + f, 1]))), uniforms: comp.uniforms, vertexShader: comp.vertexShader,
   fragmentShader: COMP_PRELUDE + 'void main(){' + body + '}', depthTest: false, depthWrite: false }));
+// All three in one pass (WebGL 2): the ray setup at the top (SOFT_HEAD: the depth, the ray through the pixel) is worked out once instead of three times,
+// and the half-size picture is gone over once. Each effect's own code is unchanged and writes its own target (the color, normal and a third output, see
+// core.js); the targets of effects at nothing this frame are left out of the draw (drawBuffers NONE), so they keep what they had, as when their pass was skipped.
+const softBody = s => '{' + s.slice(SOFT_HEAD.length).replace(/gl_FragColor = outv;\s*$/, '') + '}';
+const softAll = MRT ? new THREE.ShaderMaterial({
+  defines: softMats[0].defines, uniforms: Object.assign({}, comp.uniforms, { softWant: { value: new THREE.Vector3() } }), vertexShader: comp.vertexShader,
+  fragmentShader: COMP_PRELUDE + 'uniform vec3 softWant;\nvoid main(){' + SOFT_HEAD +
+    'if (softWant.x > 0.5){ outv = vec4(0.0);' + softBody(SOFT_WET) + ' gl_FragColor = outv; }\n' +
+    'if (softWant.y > 0.5){ outv = vec4(0.0);' + softBody(SOFT_MIST) + ' pc_fragNormal = outv; }\n' +
+    'if (softWant.z > 0.5){ outv = vec4(0.0);' + softBody(SOFT_RAYS) + ' pc_fragSoft2 = outv; }\n}',
+  depthTest: false, depthWrite: false }) : null;
 const softScene = new THREE.Scene(), softQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), softMats[0]); softScene.add(softQuad);
 let rtSoft = [];
 function makeSoftTargets(){
@@ -856,6 +867,21 @@ function softEffects(px, py){
   u.softPar.value.set(par(px - (W >> 1)), par(py - (H >> 1))); u.softSig.value = Math.max(6*2*zoom/H, .02);
   const on = [comp.defines.FX_WET, comp.defines.FX_MIST, comp.defines.FX_RAYS];
   const want = [u.wet.value > 0, u.mistI.value > 0, u.rayI.value > .01 && u.raysOn.value > .5];   // (a pass whose effect is at nothing this frame is skipped: the composite multiplies it by that strength)
+  if (softAll && !PH.tests.softApart && !window.__SOFT_APART){   // one pass, three targets
+    const w = [0, 1, 2].map(i => !!(on[i] && want[i])); if (!w[0] && !w[1] && !w[2]) return;
+    const gl = renderer.getContext(), r0 = rtSoft[0];
+    if (r0._softMrt !== rtSoft[2]){   // (the second and third targets joined to the first's framebuffer, once per set of targets)
+      renderer.setRenderTarget(rtSoft[1]); renderer.setRenderTarget(rtSoft[2]); renderer.setRenderTarget(r0);   // (three makes all three now)
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, renderer.properties.get(rtSoft[1].texture).__webglTexture, 0);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT2, gl.TEXTURE_2D, renderer.properties.get(rtSoft[2].texture).__webglTexture, 0);
+      r0._softMrt = rtSoft[2];
+    } else renderer.setRenderTarget(r0);
+    gl.drawBuffers([w[0] ? gl.COLOR_ATTACHMENT0 : gl.NONE, w[1] ? gl.COLOR_ATTACHMENT1 : gl.NONE, w[2] ? gl.COLOR_ATTACHMENT2 : gl.NONE]);
+    softAll.uniforms.softWant.value.set(w[0] ? 1 : 0, w[1] ? 1 : 0, w[2] ? 1 : 0);
+    softQuad.material = softAll; renderer.render(softScene, compCam);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.NONE, gl.NONE]);   // (back to one image, for anything else that draws into the first target)
+    return;
+  }
   for (let i = 0; i < 3; i++){ if (!on[i] || !want[i]) continue; softQuad.material = softMats[i]; renderer.setRenderTarget(rtSoft[i]); renderer.render(softScene, compCam); }
 }
 const compScene = new THREE.Scene(), compCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
@@ -1129,11 +1155,19 @@ const glowMix = new THREE.ShaderMaterial({
               midG: { value: new THREE.Vector3(1, 1, 1) }, midA: { value: 0 }, pal8: { value: Array.from({ length: 8 }, () => new THREE.Vector3()) }, palBlend: { value: 0 },
               grain: { value: 0 }, grainSize: { value: 1 }, fringe: { value: 0 }, flare: { value: 0 }, flareVis: { value: 0 }, sunUv: { value: new THREE.Vector2(.5, .5) }, tD: { value: null }, flareCol: { value: new THREE.Color(1, 1, 1) },
               vig: { value: 0 }, bloomK: { value: 1 }, halK: { value: 1 }, time: comp.uniforms.time, res: { value: new THREE.Vector2(1, 1) } },
-  vertexShader: fsVert,
+  // (whether the sun's place on screen is open sky is the same for every pixel: it is worked out once, at the corners of the screen-filling quad, from the same
+  //  five depth taps the pixels used to make each, and handed to every pixel unchanged (flat). The picture is the same; the five taps per pixel are gone)
+  vertexShader: `uniform sampler2D tD; uniform vec2 sunUv; uniform float flare; varying vec2 vUv; flat varying float vOpen;
+    void main(){ vUv = uv; vOpen = 0.0;
+      if (flare > 0.0){ vec2 sc = clamp(sunUv, vec2(-.02), vec2(1.02)); float open = 0.0;
+        for (int q = 0; q < 5; q++){ vec2 o = q == 0 ? vec2(0.0) : q == 1 ? vec2(.02, 0.0) : q == 2 ? vec2(-.02, 0.0) : q == 3 ? vec2(0.0, .02) : vec2(0.0, -.02);
+          open += step(.99999, texture2D(tD, clamp(sc + o, vec2(.002), vec2(.998))).x); }
+        vOpen = open/5.0; }
+      gl_Position = vec4(position.xy, 0.0, 1.0); }`,
   fragmentShader: `uniform sampler2D t; uniform sampler2D tB; uniform sampler2D tH; uniform float night; uniform float smoothLook; uniform float on; varying vec2 vUv;
     uniform vec3 lift; uniform vec3 gain; uniform float sat; uniform float con; uniform float lit;
     uniform vec3 midG; uniform float midA; uniform vec3 pal8[8]; uniform float palBlend; uniform float grain; uniform float grainSize; uniform float fringe;
-    uniform float flare; uniform float flareVis; uniform vec2 sunUv; uniform sampler2D tD; uniform vec3 flareCol; uniform float vig; uniform float bloomK; uniform float halK; uniform float time; uniform vec2 res;
+    uniform float flare; uniform float flareVis; uniform vec2 sunUv; uniform sampler2D tD; uniform vec3 flareCol; uniform float vig; uniform float bloomK; uniform float halK; uniform float time; uniform vec2 res; flat varying float vOpen;
     float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y*0.75))); }
     float bayer(vec2 a){ return b2(0.5*a)*0.25 + b2(a); }
     float hash21(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -1180,10 +1214,7 @@ const glowMix = new THREE.ShaderMaterial({
         }
         // hidden where the city stands in front of the sun: the flare and glare only where the sun's place on screen is open sky (depth at the far plane), a few taps round it
         // (the camera mostly looks down, so the sun's place is usually on the city: without this a glow and its ghosts sat on the buildings)
-        float open = 0.0;
-        for (int q = 0; q < 5; q++){ vec2 o = q == 0 ? vec2(0.0) : q == 1 ? vec2(.02, 0.0) : q == 2 ? vec2(-.02, 0.0) : q == 3 ? vec2(0.0, .02) : vec2(0.0, -.02);
-          open += step(.99999, texture2D(tD, clamp(sc + o, vec2(.002), vec2(.998))).x); }
-        open /= 5.0;
+        float open = vOpen;   // (worked out once: see the vertex shader)
         c += flareCol*flare*open*(gl*(.3 + .7*flareVis) + gh*flareVis);
       }
       if (vig > 0.0){ vec2 vv = (vUv - .5)*vec2(1.15, 1.0)*2.0; c *= 1.0 - vig*smoothstep(.55, 1.5, length(vv)); }

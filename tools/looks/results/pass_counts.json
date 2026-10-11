@@ -1,0 +1,74 @@
+{
+ "day: base": {
+  "render_calls": 15,
+  "draw_calls": 195,
+  "triangles": 47336,
+  "textures": 40,
+  "geometries": 194,
+  "programs": 43,
+  "errors": []
+ },
+ "day: looks (Auto, Mid afternoon), every effect on": {
+  "render_calls": 15,
+  "draw_calls": 195,
+  "triangles": 47336,
+  "textures": 40,
+  "geometries": 194,
+  "programs": 43,
+  "errors": []
+ },
+ "night rain: base": {
+  "render_calls": 15,
+  "draw_calls": 304,
+  "triangles": 427656,
+  "textures": 40,
+  "geometries": 195,
+  "programs": 45,
+  "errors": []
+ },
+ "night rain: old path (LK.old)": {
+  "render_calls": 15,
+  "draw_calls": 304,
+  "triangles": 427656,
+  "textures": 40,
+  "geometries": 195,
+  "programs": 45,
+  "errors": []
+ },
+ "night rain: looks (Rainy night), every effect off": {
+  "render_calls": 14,
+  "draw_calls": 303,
+  "triangles": 427654,
+  "textures": 39,
+  "geometries": 195,
+  "programs": 44,
+  "errors": []
+ },
+ "night rain: looks (Rainy night), every effect on": {
+  "render_calls": 14,
+  "draw_calls": 303,
+  "triangles": 427654,
+  "textures": 39,
+  "geometries": 195,
+  "programs": 44,
+  "errors": []
+ },
+ "morning rain: base": {
+  "render_calls": 15,
+  "draw_calls": 304,
+  "triangles": 427640,
+  "textures": 40,
+  "geometries": 195,
+  "programs": 45,
+  "errors": []
+ },
+ "morning rain: looks (Rainy morning, sparkle on)": {
+  "render_calls": 16,
+  "draw_calls": 203,
+  "triangles": 51884,
+  "textures": 40,
+  "geometries": 194,
+  "programs": 44,
+  "errors": []
+ }
+}

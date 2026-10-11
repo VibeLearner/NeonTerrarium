@@ -1,0 +1,209 @@
+[
+ {
+  "sum_error": 0.00023680000000092516,
+  "negative": 0,
+  "most_looks_at_once": 5,
+  "looks_over_5pct": 5,
+  "share_of_samples_with_looks": {
+   "1": 43.4,
+   "2": 27.8,
+   "3": 24.1,
+   "4": 3.8,
+   "5": 1
+  },
+  "max_step_L1_per_0_02h": 0.05996800000000024,
+  "max_step_L1_per_0_01_weather": 0.02999599999999991,
+  "hand_offs": {
+   "late to morning": 0.82,
+   "morning to afternoon": 0.82,
+   "afternoon to golden": 0.82,
+   "golden to dusk": 0.82,
+   "dusk to night": 0.82,
+   "night to late": 0.82
+  },
+  "nSamples": 7206,
+  "clear_by_half_hour": [
+   "0 night:100",
+   "0.5 night:100",
+   "1 night:100",
+   "1.5 night:100",
+   "2 night:100",
+   "2.5 night:100",
+   "3 late:50 night:50",
+   "3.5 late:100",
+   "4 late:100",
+   "4.5 late:100",
+   "5 late:100",
+   "5.5 morning:50 late:50",
+   "6 morning:100",
+   "6.5 morning:100",
+   "7 morning:100",
+   "7.5 morning:100",
+   "8 morning:100",
+   "8.5 morning:100",
+   "9 morning:100",
+   "9.5 morning:100",
+   "10 morning:100",
+   "10.5 morning:100",
+   "11 afternoon:50 morning:50",
+   "11.5 afternoon:100",
+   "12 afternoon:100",
+   "12.5 afternoon:100",
+   "13 afternoon:100",
+   "13.5 afternoon:100",
+   "14 afternoon:100",
+   "14.5 afternoon:100",
+   "15 afternoon:100",
+   "15.5 afternoon:100",
+   "16 afternoon:100",
+   "16.5 golden:50 afternoon:50",
+   "17 golden:100",
+   "17.5 golden:100",
+   "18 golden:100",
+   "18.5 dusk:50 golden:50",
+   "19 dusk:100",
+   "19.5 dusk:100",
+   "20 night:50 dusk:50",
+   "20.5 night:100",
+   "21 night:100",
+   "21.5 night:100",
+   "22 night:100",
+   "22.5 night:100",
+   "23 night:100",
+   "23.5 night:100"
+  ]
+ },
+ {
+  "first_changes": [
+   [
+    0,
+    "clear"
+   ],
+   [
+    529,
+    "overcast"
+   ],
+   [
+    891,
+    "clear"
+   ],
+   [
+    1832,
+    "overcast"
+   ],
+   [
+    2244,
+    "clear"
+   ],
+   [
+    4189,
+    "overcast"
+   ],
+   [
+    4618,
+    "clear"
+   ],
+   [
+    4936,
+    "overcast"
+   ],
+   [
+    5211,
+    "clear"
+   ],
+   [
+    5723,
+    "overcast"
+   ],
+   [
+    6157,
+    "clear"
+   ],
+   [
+    6608,
+    "overcast"
+   ],
+   [
+    7454,
+    "clear"
+   ],
+   [
+    11428,
+    "overcast"
+   ]
+  ],
+  "seconds_per_state_in_8h": {
+   "clear": 16369,
+   "overcast": 9638,
+   "rain": 2793
+  },
+  "errors": []
+ },
+ {
+  "first_changes": [
+   [
+    0,
+    "clear"
+   ],
+   [
+    529,
+    "overcast"
+   ],
+   [
+    891,
+    "clear"
+   ],
+   [
+    1832,
+    "overcast"
+   ],
+   [
+    2244,
+    "clear"
+   ],
+   [
+    4189,
+    "overcast"
+   ],
+   [
+    4618,
+    "clear"
+   ],
+   [
+    4936,
+    "overcast"
+   ],
+   [
+    5211,
+    "clear"
+   ],
+   [
+    5723,
+    "overcast"
+   ],
+   [
+    6157,
+    "clear"
+   ],
+   [
+    6608,
+    "overcast"
+   ],
+   [
+    7454,
+    "clear"
+   ],
+   [
+    11428,
+    "overcast"
+   ]
+  ],
+  "seconds_per_state_in_8h": {
+   "clear": 16369,
+   "overcast": 9638,
+   "rain": 2793
+  },
+  "errors": [],
+  "same_as_first_run": true
+ }
+]

@@ -23,8 +23,8 @@ function updateCamera(dt){
   if (Math.abs(zoomT-zoom) < 1e-3) zoom = zoomT;
   // WASD / arrow keys: pan across the ground, relative to the way the camera faces; Shift goes faster
   const fw = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0);
-  const rt = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
-  if (tiltMode && (fw || rt)){ pitchT = clamp(pitchT + fw*dt*.9, PITCH_MIN, PITCH_MAX); yawT -= rt*dt*1.4; }   // (locked in place: the keys tilt and turn it instead)
+  const rt = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
+  if (tiltMode && (fw || rt)){ pitchT = clamp(pitchT + fw*dt*.9, PITCH_MIN, PITCH_MAX); yawT += rt*dt*1.4; }   // (locked in place: the keys tilt and turn it instead; D swings the camera to its right, as E does)
   const panning = !tiltMode && (fw !== 0 || rt !== 0);
   if (panning){
     const sp = zoom*1.5*(keys.has('shift') ? 2.5 : 1)*dt/Math.hypot(fw, rt);
@@ -124,7 +124,7 @@ const endPtr = e => {
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
 canvas.addEventListener('pointerleave', () => { if (!ptrs.size){ hover.visible = hoverFill.visible = false; showMegaGhost(null); hwGhost.g.visible = false; hwHighlight(null); } });
 canvas.addEventListener('wheel', e => { e.preventDefault(); zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 30); }, { passive:false });
-const PAN_KEYS = ['w','a','s','d','arrowup','arrowdown'];
+const PAN_KEYS = ['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'];
 addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === 'shift') keys.delete('shift'); });
 addEventListener('blur', () => keys.clear());
 addEventListener('keydown', e => {
@@ -146,8 +146,9 @@ addEventListener('keydown', e => {
     return;
   }
   if (k === 'r' && megaPick){ megaTurn = !megaTurn; if (ptrLast) showMegaGhost(megaPick, groundCellAt(ptrLast.x, ptrLast.y), megaTurn); return; }
-  if (e.key === 'ArrowLeft' || e.key === 'q' || e.key === 'Q') yawT += PI/4;
-  else if (e.key === 'ArrowRight' || e.key === 'e' || e.key === 'E') yawT -= PI/4;
+  // Q / E: the camera swings round the spot it looks at, to its own left (Q) or right (E), the way A / D and the arrows move it
+  if (k === 'q') yawT -= PI/4;
+  else if (k === 'e') yawT += PI/4;
   else if (e.key === '+' || e.key === '=') zoomT = clamp(zoomT*.9,5,30);
   else if (e.key === '-') zoomT = clamp(zoomT*1.1,5,30);
   else if ('1234'.includes(e.key) && e.key.length === 1) selectZone(['low','mid','high','ind'][+e.key - 1]);

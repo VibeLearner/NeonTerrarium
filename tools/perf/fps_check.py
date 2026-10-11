@@ -24,9 +24,13 @@ def open_page(br, url, scene, init=''):
     pg.on('pageerror', lambda e: errs.append(str(e)))
     st = dict(scene.get('storage', {})); st['neonIsland.capRes'] = '0'; st['neonIsland.autoPerf'] = '0'
     import json
-    pg.add_init_script('(() => { try { if (!sessionStorage.getItem("fpsInit")) { localStorage.clear(); const s = ' + json.dumps(st) + '; for (const k in s) localStorage.setItem(k, s[k]); sessionStorage.setItem("fpsInit", "1"); } } catch (e) {} })();' + init)
+    # (the harness's copy of three takes its ids from window.__uuidRand, which the harness's own setup gives it; here ordinary random ids are fine)
+    pg.add_init_script('window.__uuidRand = window.__uuidRand || Math.random; (() => { try { if (!sessionStorage.getItem("fpsInit")) { localStorage.clear(); const s = ' + json.dumps(st) + '; for (const k in s) localStorage.setItem(k, s[k]); sessionStorage.setItem("fpsInit", "1"); } } catch (e) {} })();' + init)
     pg.goto('http://127.0.0.1:%d%s' % (H.PORT, url))
-    pg.wait_for_function('() => typeof frame === "function" && typeof PH !== "undefined"', timeout=120000)
+    try:
+        pg.wait_for_function('() => { try { return typeof frame === "function" && !!PH && !!renderer; } catch (e) { return false; } }', timeout=120000)
+    except Exception:
+        print('the game did not start; page errors:', errs[:5]); raise
     pg.wait_for_timeout(6000)
     pg.evaluate('([h, z]) => { S.cycle = false; S.hour = h; S.rain = false; zoomT = z; zoom = z; }', [a.hour, a.zoom])
     pg.wait_for_timeout(4000)   # (the cache is drawn, the view settles)

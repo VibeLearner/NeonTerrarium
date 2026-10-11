@@ -205,6 +205,10 @@ const PG = (() => {
     c[IX.LIT] = A; c[IX.SHOE] = mixc(shade(B, -.5), 0x0c0a12, .4); c[IX.ACC] = shade(A, -.35); c[IX.WHITE] = 0xe6e2da; c[IX.EYE] = 0x1c1620;
     return c;
   };
+  // the 15 colours of palette row n (a mix, or a special row after the mixes)
+  P.colorsOfRow = n => { if (n >= P.NPAL_MIX) return P.specialPalettes[n - P.NPAL_MIX].colors;
+    const nb = P.BOTC.length, na = P.ACCC.length, nt = P.TOPC.length, nh = P.HAIR.length; let m = n; const bo = m % nb; m = (m - bo)/nb; const ac = m % na; m = (m - ac)/na; const to = m % nt; m = (m - to)/nt; const ha = m % nh; m = (m - ha)/nh;
+    return P.palColors(m, ha, to, ac, bo); };
   P.specialPalettes = [];   // [{ name, colors: 16 }] , their rows follow the mixes
   P.palRow = (name) => { const i = P.specialPalettes.findIndex(s => s.name === name); return i < 0 ? 0 : P.NPAL_MIX + i; };
   P.specialPalette = (name, over) => { const base = P.palColors(0, 0, 0, 0, 1); for (const k in over) base[+k] = over[k]; P.specialPalettes.push({ name, colors: base }); };

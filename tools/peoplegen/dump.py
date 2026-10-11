@@ -28,8 +28,9 @@ def main():
         shapes = [i for i in range(int(lo), int(hi) + 1) if i < info['rows']]
         pals = {}
         for i in shapes:
-            n = (i * 7 + a.pal) % 3840
-            pals[i] = pg.evaluate('n => { const nb = PG.BOTC.length, na = PG.ACCC.length, nt = PG.TOPC.length, nh = PG.HAIR.length; let m = n; const bo = m % nb; m = (m - bo)/nb; const ac = m % na; m = (m - ac)/na; const to = m % nt; m = (m - to)/nt; const ha = m % nh; m = (m - ha)/nh; return PG.palColors(m, ha, to, ac, bo); }', n)
+            n = pg.evaluate('i => { for (const r in PG.roleShape) if (PG.roleShape[r] === i) return PG.rolePal[r] ? PG.rolePal[r] : -1; return -1; }', i)
+            if n < 0: n = (i * 7 + a.pal) % 3840
+            pals[i] = pg.evaluate('n => PG.colorsOfRow(n)', n)
         b.close()
     if errs: print('PAGE ERRORS:', errs[:5])
     bg = tuple(int(v) for v in a.bg.split(','))
@@ -39,7 +40,7 @@ def main():
         for v in range(1, 16):
             m = c == v; r, g, bl = (col[v] >> 16) & 255, (col[v] >> 8) & 255, col[v] & 255; out[m] = (r, g, bl, 255)
         return Image.fromarray(out, 'RGBA')
-    S = a.scale; names = info['names']
+    S = a.scale; names = info['names'] + ['(extra row)']*8
     frames = []
     for name in a.frames.split(','): s0, n = FR[name]; frames += list(range(s0, s0 + n))
     gap = 6; W = len(frames)*(12*S) + 150; H = len(shapes)*(16*S + gap) + 4

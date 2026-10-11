@@ -220,7 +220,7 @@ function scHard(out){
   let k = 0; const put = v => { out[k++] = v; };
   put(yaw); put(PITCH); put(zoom); put(W); put(H); put(SMOOTH_LOOK.value); put(LOD.fine.value); put(CULL.lvl); put(CULL.minPx); put(FARM.key);
   put(LIGHTS_ON.value < .17 ? 0 : LIGHTS_ON.value);   // (no window switches on below about .18: a drift under that, as the day cycle gives by day, changes nothing)
-  put(sun.castShadow ? 1 : 0); put(renderer.shadowMap.enabled ? 1 : 0); put(SC.c0); put(FOLST.on ? 1 : 0);   // (an edit, SC_EDITS, is dealt with apart: see scEditRect)
+  put(sun.castShadow ? 1 : 0); put(renderer.shadowMap.enabled ? 1 : 0); put(SC.c0); put(FOLST.on ? 1 : 0); put(FOL_FAR.lawn ? 1 : 0);   // (an edit, SC_EDITS, is dealt with apart: see scEditRect)
   let t = 0; for (const key in PH.tests) t = (Math.imul(t, 31) + (PH.tests[key] ? 7 : 3)) | 0; put(t);   // (which tests are on, as one number)
   out.length = k; return out;
 }

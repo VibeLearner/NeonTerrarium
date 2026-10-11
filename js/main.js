@@ -76,7 +76,7 @@ function frameBody(now){
   { // detail levels: only needed once zooming out outruns the screen's resolution (see applyRenderRes)
     const loss = (zoom/ZOOM_REF)*(BASE_H/H);   // 1 = every building keeps all its pixels
     const t = clamp((loss - 1.15)/1.0, 0, 1), e = t*t*(3 - 2*t);
-    LOD.fine.value = e; LOD.plants.value = e; LOD.lines.value = e; }
+    LOD.fine.value = e; LOD.plants.value = e; LOD.lines.value = e; folFar(loss); }
   PH.lap('steam, rain, camera');
   runLater();
   stageStep();   // a plot being built in steps: a few milliseconds of it (world.js)

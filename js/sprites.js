@@ -542,6 +542,9 @@ const bigKind = () => pick(BIG_GROUND);
 const LAUNDRY = Object.keys(SPR.size).filter(k => k.startsWith('l_') && k !== 'l_mossroots');
 const laundryKind = () => pick(LAUNDRY);
 const hangKind = () => pick(HANGING);
+// From far away (LOD, folFar below) a lawn is its flat far tile plus a few tall tufts: the lawn's tufts (gt0, laid in pairs, the plant's two crossed copies) go in a mesh of their own that stops
+// drawing then, but one pair in LAWN_KEEP stays in the main mesh for the silhouette.
+const FOL_FAR = { lawn: false }, LAWN_KEEP = 8;
 // Plants that can't be seen to sway are drawn into the static cache (staticcache.js) instead of live, frozen at rest.
 // The sway is whole texel rows (the fragment shader): its peak is A texels times the wind, A = the sum of the two sine terms
 // at the tip (laundry 1.3 + .45, hanging greenery 1.6 + .5, standing plants 1.0 + .3, lawn grass vertex lean .0525 world units,
@@ -568,23 +571,34 @@ FOLST.update = function(wind){   // each frame, before the cache: decide, and mo
   if (on !== FOLST.on){ FOLST.on = on; FOLST.apply(); }   // (what is built later takes the layer of the state it is built in: mergeLeaves, foliageMesh)
 };
 FOLST.apply = function(){
-  if (FOLST.listStamp !== SC_EDITS){ FOLST.list.length = 0; scene.traverse(o => { if (o.userData.fol === 'sway') FOLST.list.push(o); }); FOLST.listStamp = SC_EDITS; }
+  if (FOLST.listStamp !== SC_EDITS){ FOLST.list.length = 0; scene.traverse(o => { if (o.userData.swayed) FOLST.list.push(o); }); FOLST.listStamp = SC_EDITS; }
   const m = FOLST.mask(); for (const o of FOLST.list) o.layers.mask = m;
 };
 const FOL_LIT = k => k.startsWith('sign_') || k.startsWith('glyph_');
 function buildFoliage(){
-  let nS = 0, nL = 0; for (const kind in FOL_LIST){ if (FOL_LIT(kind)) nL += FOL_LIST[kind].length; else nS += FOL_LIST[kind].length; }
-  if (nS) city.add(foliageMesh(false, nS));
-  if (nL) city.add(foliageMesh(true, nL));   // (lit signs and glyphs: a mesh of their own, live always; none, no extra draw)
+  const sway = {}, signs = {}; let anySign = false;
+  for (const k in FOL_LIST){ if (FOL_LIT(k)){ signs[k] = FOL_LIST[k]; anySign = anySign || FOL_LIST[k].length > 0; } else sway[k] = FOL_LIST[k]; }
+  const lawn = sway.gt0 && sway.gt0.length > 2*LAWN_KEEP ? { gt0: sway.gt0.filter((p, i) => (i >> 1) % LAWN_KEEP) } : null;
+  if (lawn){ const main = {}; for (const k in sway) main[k] = sway[k]; main.gt0 = sway.gt0.filter((p, i) => !((i >> 1) % LAWN_KEEP)); folMesh(main, false); folMesh(lawn, true); }
+  else folMesh(sway, false);
+  if (anySign) folMesh(signs, false, true);   // (lit signs and glyphs: a mesh of their own, live always; none, no extra draw)
 }
-function foliageMesh(lit, n){
+// a plant mesh's settings, also made again for the joined mesh of a super-region (world.js mergeLeaves): culled to the view; a lawn's tufts stop drawing far away (their flat tile stands in);
+// the swaying plants (everything but the lit signs) are on the static layer or the live one as FOLST says (userData.swayed)
+function folSettings(mesh, n, isLawn, lit){
+  mesh.frustumCulled = !window.__FOL_LOD_OFF; mesh.userData.fol = true; mesh.userData.swayed = !lit; mesh.layers.mask = lit ? 4 : FOLST.mask();
+  if (isLawn){ mesh.userData.lawn = true; mesh.userData.n = n; mesh.onBeforeRender = function(){ this.count = FOL_FAR.lawn ? 0 : this.userData.n; }; }
+}
+function folMesh(LIST, isLawn, lit){
+  let n = 0; for (const kind in LIST) n += LIST[kind].length;
+  if (!n) return;
   const geo = new THREE.PlaneGeometry(1,1), attr = new Float32Array(n*4), fx = new Float32Array(n), rect = new Float32Array(n*4), kd = new Float32Array(n*2), ons = new Float32Array(n);
   const mesh = new THREE.InstancedMesh(geo, FOL_SHADER, n);
   let i = 0;
-  for (const kind in FOL_LIST){
-    const L = FOL_LIST[kind]; if (!L.length || FOL_LIT(kind) !== lit) continue;
-    const rs = FOL_RECTS[kind], sw = swayTypeFor(kind), em = lit ? 1 : 0;
-    FOLST.have |= 1 << sw; FOLST.A = Math.max(FOLST.A, FOLST.AMP[sw] || 0);
+  for (const kind in LIST){
+    const L = LIST[kind]; if (!L.length) continue;
+    const rs = FOL_RECTS[kind], sw = swayTypeFor(kind), em = FOL_LIT(kind) ? 1 : 0;
+    FOLST.A = Math.max(FOLST.A, FOLST.AMP[sw] || 0);
     for (const p of L){
       mesh.setMatrixAt(i, p.m);
       const r = rs.length > 1 ? rs[SG.vAt(rs.length, p.m.elements[12], p.m.elements[13], p.m.elements[14])] : rs[0];   // the variant from the spot (a hash, no random draw; a plant's two crossed copies share it)
@@ -597,19 +611,25 @@ function foliageMesh(lit, n){
   geo.setAttribute('aRect', new THREE.InstancedBufferAttribute(rect,4));
   geo.setAttribute('aKind', new THREE.InstancedBufferAttribute(kd,2)); geo.setAttribute('aOn', new THREE.InstancedBufferAttribute(ons,1));
   // a real bounding sphere (instances are in the group's frame, which is the mesh's own, so three's culling tests it as it is): the extent of the anchors plus the largest sprite's diagonal,
-  // with a margin for the sway's widening. Off with PH.tests.foliageLodOff (the mesh then draws every frame as it did). The box is the same extent (the static cache's edit
-  // rectangles use it: staticcache.js, flushSuper in world.js).
+  // with a margin for the sway's widening. Off with PH.tests.foliageLodOff (the mesh then draws every frame as it did).
   let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9, big = 0;
-  for (const kind in FOL_LIST) if (FOL_LIT(kind) === lit) for (const p of FOL_LIST[kind]){ const e = p.m.elements;
+  for (const kind in LIST) for (const p of LIST[kind]){ const e = p.m.elements;
     x0 = Math.min(x0, e[12]); x1 = Math.max(x1, e[12]); y0 = Math.min(y0, e[13]); y1 = Math.max(y1, e[13]); z0 = Math.min(z0, e[14]); z1 = Math.max(z1, e[14]);
     big = Math.max(big, Math.hypot(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]))); }
   const ctr = new THREE.Vector3((x0 + x1)/2, (y0 + y1)/2, (z0 + z1)/2), pad = big*1.2 + .2;
   geo.boundingSphere = new THREE.Sphere(ctr, Math.hypot(x1 - x0, y1 - y0, z1 - z0)/2 + pad);
-  geo.boundingBox = new THREE.Box3(new THREE.Vector3(x0 - pad, y0 - pad, z0 - pad), new THREE.Vector3(x1 + pad, y1 + pad, z1 + pad));
-  mesh.layers.mask = lit ? 4 : FOLST.mask(); mesh.frustumCulled = !window.__FOL_LOD_OFF; mesh.userData.fol = lit ? 'sign' : 'sway';
-  return mesh;
+  geo.boundingBox = new THREE.Box3(new THREE.Vector3(x0 - pad, y0 - pad, z0 - pad), new THREE.Vector3(x1 + pad, y1 + pad, z1 + pad));   // (the same extent: the static cache's edit rectangles, flushSuper in world.js)
+  folSettings(mesh, n, isLawn, lit);
+  city.add(mesh);
 }
 
+// Far away the lawn's tufts are less than about three pixels wide and merge into a carpet: swap the flat tile for one with the carpet's average look (GRASS_MAT, world.js) and stop drawing the tufts
+// (all but a few tall ones). Starts where the plants start to thin out (LOD, main.js: `loss` is how far zooming out has outrun the screen's resolution), with a margin so it does not flap.
+function folFar(loss){
+  const was = FOL_FAR.lawn;
+  FOL_FAR.lawn = window.__FOL_LOD_OFF || window.__OLD_SPRITES ? false : loss > 1.35 ? true : loss < 1.25 ? false : was;
+  if (FOL_FAR.lawn !== was && typeof GRASS_MAT !== 'undefined') GRASS_MAT.userData.far(FOL_FAR.lawn);
+}
 // While a piece is being generated, glows are collected as plain numbers; the region then draws each colour
 // as one batch of points. (Thousands of individual sprites used to cost one draw call each.)
 let glowList = null;

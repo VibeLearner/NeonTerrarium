@@ -344,7 +344,9 @@ function lkApply(){
   cur.cloud.setRGB(v.cloud[0], v.cloud[1], v.cloud[2]); cur.si = v.sunI; cur.hi = v.hemiI; cur.night = night;
   // One continuous path, so shadows never flip (see applyTimeOld): the sun follows the clock whatever the look
   const ang = ((h - 6)/12)*PI;
-  SUN_DIR.set(Math.cos(ang)*.9, .32 + Math.abs(Math.sin(ang))*.9, .5).normalize(); placeSun();
+  // (never quite as low as the old way's: the flat ground's light steps from its lit to its shaded tone where the sun's height above it crosses a third (the toon
+  //  ramp's band), and the old lowest sun, near 6:00 and 18:00, crossed it, so all the ground went into shade at once at 5:49 pm and came out at 6:11 am)
+  SUN_DIR.set(Math.cos(ang)*.9, .385 + Math.abs(Math.sin(ang))*.85, .5).normalize(); placeSun();
   sun.color.copy(cur.sun); sun.intensity = cur.si;
   hemi.color.copy(cur.hs); hemi.groundColor.copy(cur.hg); hemi.intensity = cur.hi;
   M.cloud.color.copy(cur.cloud);

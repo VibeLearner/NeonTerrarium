@@ -59,7 +59,7 @@ function frameBody(now){
   const windNow = S.wind * (1 + .5*rainK), cDrift = .12 + windNow;
   cloudMat.uniforms.cloudOff.value.x -= dt*.25*cDrift; cloudMat.uniforms.cloudOff.value.y -= dt*.08*cDrift;
   clouds.rotation.y += dt*.008*cDrift;
-  comp.uniforms.windR.value = windNow; clouds.position.set(camT.x, 0, camT.z); rain.position.set(camT.x, 0, camT.z);
+  comp.uniforms.windR.value = windNow; comp.uniforms.rainT.value = (comp.uniforms.rainT.value + dt*(0.9 + windNow*0.12)) % 3600; clouds.position.set(camT.x, 0, camT.z); rain.position.set(camT.x, 0, camT.z);
   comp.uniforms.glowC.value.set(camT.x, camT.z);
   applyRenderRes(zoom);
   updateCamera(dt);
@@ -154,7 +154,7 @@ function frameBody(now){
   PH.begin('soft effects (half resolution)'); softEffects(Math.round(camPix.x), Math.round(camPix.y)); PH.end();   // the wet-ground reflections, mist and light shafts, 2 x 2 pixels at a time (sky.js)
   PH.begin('composite'); renderer.setRenderTarget(rtOut); renderer.render(compScene, compCam); PH.end();
   PH.begin('bloom and grade'); renderGlow(); PH.end();   // bloom and halation (sky.js)
-  PH.begin('to screen'); renderer.setRenderTarget(null); renderer.render(upScene, compCam); PH.end();
+  if (!GLOW_DIRECT){ PH.begin('to screen'); renderer.setRenderTarget(null); renderer.render(upScene, compCam); PH.end(); }   // (drawn straight to the screen already when the sizes match: sky.js renderGlow)
   PH.frameEnd();
 }
 requestAnimationFrame(frame);

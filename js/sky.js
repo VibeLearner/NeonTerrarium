@@ -230,7 +230,7 @@ const comp = new THREE.ShaderMaterial({
     near:{value:NEAR}, far:{value:FAR}, camDist:{value:CAM_DIST}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
     night:{value:0}, smoothLook: SMOOTH_LOOK, lodLines: LOD.lines, pxK:{value:1}, starOff:{value:new THREE.Vector2()}, skyYaw:{value:0}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
     pal:{value: PAL_HEX.map(h => { const c=new THREE.Color(h); return new THREE.Vector3(c.r,c.g,c.b); })},
-    tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, rainOn:{value:0}, rainAmt:{value:0}, rainVis:{value:1}, rainDens:{value:1}, starVis:{value:0}, skyMid:{value:new THREE.Color()}, skyMidOn:{value:0}, hazeK:{value:.35}, mistTint:{value:new THREE.Color(1,1,1)}, sparkle:{value:0},
+    tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, rainOn:{value:0}, rainAmt:{value:0}, rainVis:{value:1}, rainDens:{value:1}, rainT:{value:0}, starVis:{value:0}, skyMid:{value:new THREE.Color()}, skyMidOn:{value:0}, hazeK:{value:.35}, mistTint:{value:new THREE.Color(1,1,1)}, sparkle:{value:0},
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
@@ -247,7 +247,7 @@ const comp = new THREE.ShaderMaterial({
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
     uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float rainOn; uniform sampler2D tCloud;
-    uniform float rainAmt; uniform float rainVis; uniform float rainDens; uniform float starVis; uniform vec3 skyMid; uniform float skyMidOn; uniform float hazeK; uniform vec3 mistTint; uniform float sparkle;   // (the looks: js/looks.js)
+    uniform float rainAmt; uniform float rainVis; uniform float rainDens; uniform float rainT; uniform float starVis; uniform vec3 skyMid; uniform float skyMidOn; uniform float hazeK; uniform vec3 mistTint; uniform float sparkle;   // (the looks: js/looks.js)
     uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 cityGlow;
     uniform float cloudOn; uniform float raysOn; uniform float rayI; uniform float rainDark;
     uniform sampler2D tSoftW; uniform sampler2D tSoftM; uniform sampler2D tSoftR; uniform vec2 softPar; uniform vec2 softDim; uniform float softSig;
@@ -672,8 +672,8 @@ const comp = new THREE.ShaderMaterial({
           vec2 p = (gl_FragCoord.xy + rainOff*(1.25 - fl*0.25))*pxK + vec2(fl*311.0, fl*97.0);   // base pixels, like the stars
           p.x += p.y*(0.03 + windR*0.2);                                   // the slant: near straight down when calm, raking in a storm
           float colm = floor(p.x);
-          float speed = (330.0 - fl*90.0)*(0.9 + windR*0.12), len = (6.0 - fl*1.7)*(0.9 + windR*0.15), spacing = 70.0 + fl*25.0;
-          float y = p.y + time*speed + hash(vec2(colm, fl*13.0))*500.0;
+          float speed = 330.0 - fl*90.0, len = (6.0 - fl*1.7)*(0.9 + windR*0.15), spacing = 70.0 + fl*25.0;
+          float y = p.y + rainT*speed + hash(vec2(colm, fl*13.0))*500.0;   // (rainT: how far the rain has fallen, added up frame by frame with the wind's speed-up: main.js. Time times a speed that eased down with the wind ran the drops backward up into the sky)
           float seg = floor(y/spacing), pos = mod(y, spacing);
           float on = step(hash(vec2(colm, seg + fl*71.0)), (0.16 - fl*0.03)*rainDens) * step(pos, len*(0.75 + 0.25*rainDens));
           col = mix(col, rc, min(0.9, on*(0.42 - fl*0.1)*rainVis)*rainAmt);   // (rainVis, rainDens: how strong and how dense the looks make it, 1 the old way)
@@ -736,7 +736,7 @@ const compSticky = {};
 function compWeatherOn(on){
   const rainSoon = typeof LK !== 'undefined' && !LK.old && !window.__OLD_GRADES && LK.wx && (LK.wx.tr > 0 || LK.rainNow() > 0);
   if (rainSoon){ on.RAIN = true; on.SPARK = true; on.WET = true; }
-  for (const f of ['RAIN', 'SPARK', 'WET', 'NL']){ if (on[f] === true) compSticky[f] = true; else if (compSticky[f] && !PH.tests.compFloor) on[f] = true; }
+  for (const f of ['RAIN', 'SPARK', 'WET', 'NL', 'RAYS']){ if (on[f] === true) compSticky[f] = true; else if (compSticky[f] && !PH.tests.compFloor) on[f] = true; }
 }
 // ---- soft effects at half resolution ----
 // The composite works out three soft effects for every pixel: the reflection search on wet ground (22 steps), the steam's mist (8) and the light
@@ -855,7 +855,8 @@ function softEffects(px, py){
   const u = comp.uniforms, par = v => ((v % 2) + 2) % 2;
   u.softPar.value.set(par(px - (W >> 1)), par(py - (H >> 1))); u.softSig.value = Math.max(6*2*zoom/H, .02);
   const on = [comp.defines.FX_WET, comp.defines.FX_MIST, comp.defines.FX_RAYS];
-  for (let i = 0; i < 3; i++){ if (!on[i]) continue; softQuad.material = softMats[i]; renderer.setRenderTarget(rtSoft[i]); renderer.render(softScene, compCam); }
+  const want = [u.wet.value > 0, u.mistI.value > 0, u.rayI.value > .01 && u.raysOn.value > .5];   // (a pass whose effect is at nothing this frame is skipped: the composite multiplies it by that strength)
+  for (let i = 0; i < 3; i++){ if (!on[i] || !want[i]) continue; softQuad.material = softMats[i]; renderer.setRenderTarget(rtSoft[i]); renderer.render(softScene, compCam); }
 }
 const compScene = new THREE.Scene(), compCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
 compScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), comp));
@@ -1208,12 +1209,17 @@ function makeGlowTargets(){
 // (name: how the performance overlay's exact timing lists this pass, perfhud.js)
 function glowPass(mat, target, name){ PH.begin(name, true); glowQuad.material = mat; renderer.setRenderTarget(target); renderer.render(glowScene, compCam); PH.end(); }
 // run after the composite has been drawn into rtOut; leaves the finished frame in rtFinal
+// When the game is drawn at the screen's own size (720p on a sharp screen zoomed out, or Smooth), the copy to the screen is one to one, so the graded frame
+// is drawn straight onto the screen instead: one whole-screen pass fewer, the same pixels (the copy at scale 1 reads each texel exactly). GLOW_DIRECT tells main.js.
+let GLOW_DIRECT = false;
 function renderGlow(){
+  GLOW_DIRECT = W === DW && H === DH && !PH.tests.noDirect && !window.__NO_DIRECT;
+  const fin = GLOW_DIRECT ? null : rtFinal;
   glowMix.uniforms.res.value.set(W, H); glowMix.uniforms.tD.value = comp.uniforms.tDepth.value;   // (the depth the composite read: the lens flare hides behind the city)
   if (typeof LK !== 'undefined' && !LK.old && !window.__OLD_GRADES) lkGlow();   // (the looks' lens and film values: looks.js)
   glowMix.uniforms.on.value = S.bloom ? 1 : 0;
   glowMix.uniforms.lit.value = NL_UNI.lightI.value > 0 ? Math.min(1, NL_UNI.lightI.value/.6) : 0;   // how much night light there is
-  if (!S.bloom){ glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = rtB[0].texture; glowMix.uniforms.tH.value = rtHal[0].texture; glowPass(glowMix, rtFinal, 'grade (no bloom)'); return; }   // no bloom, but still graded
+  if (!S.bloom){ glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = rtB[0].texture; glowMix.uniforms.tH.value = rtHal[0].texture; glowPass(glowMix, fin, 'grade (no bloom)'); return; }   // no bloom, but still graded
   const [b0, b1] = rtB, [h0, h1] = rtHal;
   glowPick.uniforms.t.value = rtOut.texture; glowPick.uniforms.texel.value.set(1/W, 1/H); glowPass(glowPick, b0, 'bloom: pick bright');
   glowBlur.uniforms.t.value = b0.texture; glowBlur.uniforms.dir.value.set(1/b0.width, 0); glowPass(glowBlur, b1, 'bloom: blur across');
@@ -1222,7 +1228,7 @@ function renderGlow(){
   glowBlur.uniforms.t.value = h0.texture; glowBlur.uniforms.dir.value.set(2/h0.width, 0); glowPass(glowBlur, h1, 'halation: blur across');
   glowBlur.uniforms.t.value = h1.texture; glowBlur.uniforms.dir.value.set(0, 2/h0.height); glowPass(glowBlur, h0, 'halation: blur down');
   glowMix.uniforms.t.value = rtOut.texture; glowMix.uniforms.tB.value = b0.texture; glowMix.uniforms.tH.value = h0.texture;
-  glowPass(glowMix, rtFinal, 'bloom: mix and grade');
+  glowPass(glowMix, fin, 'bloom: mix and grade');
 }
 /* ---------- night lights: light from the city's lamps falling on the surfaces round them ---------- */
 // Every glow point (lamps, neon, windows, signs, beacons) is also a small light. In one pass at half the game's

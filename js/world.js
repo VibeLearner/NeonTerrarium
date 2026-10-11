@@ -672,7 +672,7 @@ let GREEN_DEFAULT = (() => { try { const v = localStorage.getItem(GREEN_KEY); re
 // A click on a plot that isn't on the current setting brings it to the current setting; a click on one that is
 // moves it (and the setting) on to the next.
 function cycleGreen(c){
-  stageFinishAll();
+  stageFinishNear([c]);
   const cur = c.green || 'some';
   c.green = cur !== GREEN_DEFAULT ? GREEN_DEFAULT : GREEN_MODES[(GREEN_MODES.indexOf(cur) + 1) % GREEN_MODES.length];
   GREEN_DEFAULT = c.green; try { localStorage.setItem(GREEN_KEY, GREEN_DEFAULT); } catch (e) {}
@@ -1600,7 +1600,7 @@ function* cellBody(c){
   c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); mtFeet(c);   // (and the feet of any highway over it)
 }
 function rebuildCell(c){
-  if (STAGE_Q.length || STAGE_READY.length) stageFinishAll();   // (a plot still being built in steps is finished first)
+  stageFinishNear([c]);   // (a plot still being built in steps, if it is this one or near it, is finished first)
   finishAnimsOn(c);   // a neighbour's edit can rebuild a cell that is still animating
   disposeData(c.data);
   c.height = CURB;
@@ -1675,9 +1675,11 @@ function stageStep(ms = 4){
 function stageChain(c, done){
   const old = { view: c.view, data: c.data }, built = new Map(), todo = refreshTodo([c]);
   const seq = todo.concat(todo.filter(x => airCells.has(x)));
+  const mine = new Set(seq); STAGE_CHAINS.add(mine);
   let k = 0;
   const next = () => {
     if (k >= seq.length){   // all made: put the plots in place and finish the edit as refresh does
+      STAGE_CHAINS.delete(mine);
       for (const x of built.keys()) if (x !== c){ finishAnimsOn(x); disposeData(x.data); }   // (what rebuildCell does first)
       c.view = null; c.data = null;
       refresh([c], [], built);
@@ -1688,6 +1690,39 @@ function stageChain(c, done){
       built.set(x, { data, dark: job.dark });
       next();
     });
+  };
+  next();
+}
+// Plots being built in steps (or by the worker) are finished at once only when a new edit touches one of them. Placing pieces quickly used to finish
+// every plot still in the queue on the main thread at each click, which was the stutter while building. Other plots go on in the queue: jobs finish in
+// the order they were asked for, and each edit's own chain makes the plots it reads again after it, so the last word is always the newest. Chains still
+// to queue their next plots count as touched too (a plot in two chains at once could be finished out of order).
+const STAGE_CHAINS = new Set();
+function stagePending(){ const s = new Set(); for (const j of STAGE_Q) s.add(j.c); for (const j of STAGE_READY) s.add(j.c); for (const ch of STAGE_CHAINS) for (const x of ch) s.add(x); return s; }
+function stageFinishNear(list){
+  if (!STAGE_Q.length && !STAGE_READY.length && !STAGE_CHAINS.size) return;
+  if (!STAGE_ON() || SYNC_NOW()){ stageFinishAll(); return; }
+  const p = stagePending(); if (!p.size) return;
+  for (const c of list) if (c && p.has(c)){ stageFinishAll(); return; }
+}
+// plots made again by the worker (or in steps), then put in place together, as refresh(list) would: the neighbors of a new platform plot, which only lose
+// a railing, used to be made again on the main thread at the click (a building takes 20 to 80 ms to make), which was the stutter when laying tiles beside buildings
+function stageRefresh(list){
+  const todo = refreshTodo(list), seq = todo.concat(todo.filter(x => airCells.has(x)));
+  if (!seq.length) return;
+  const mine = new Set(seq), built = new Map(); STAGE_CHAINS.add(mine);
+  let k = 0;
+  const next = () => {
+    if (k >= seq.length){
+      STAGE_CHAINS.delete(mine);
+      const live = [...new Set([...list, ...built.keys()])].filter(x => cells.get(ckey(x.i, x.j)) === x);   // (every plot made goes in, as refresh would put it; a plot removed meanwhile is left out)
+      for (const x of built.keys()) if (live.includes(x)){ finishAnimsOn(x); disposeData(x.data); }
+      refresh(live, [], built);
+      return;
+    }
+    const x = seq[k++];
+    if (cells.get(ckey(x.i, x.j)) !== x){ next(); return; }
+    const job = stageStart(x, data => { const prev = built.get(x); if (prev) disposeData(prev.data); built.set(x, { data, dark: job.dark }); next(); });
   };
   next();
 }
@@ -2204,7 +2239,7 @@ function refreshTodo(list, megaList = []){
   return [...new Set(list)].filter(Boolean).sort((p, q) => (p.lift ? 1 : 0) - (q.lift ? 1 : 0));
 }
 function refresh(list, megaList = [], prebuilt = null){
-  if (!prebuilt && (STAGE_Q.length || STAGE_READY.length)) stageFinishAll();
+  if (!prebuilt) stageFinishNear(list.concat(megaList.flatMap(m => m.cells || [])));
   const todo = refreshTodo(list, megaList);
   for (const c of todo){ if (prebuilt && prebuilt.has(c)){ c.dark = prebuilt.get(c).dark; c.data = prebuilt.get(c).data; rebuildCellPost(c); } else rebuildCell(c); }
   // an air-filter tower picks its face from its neighbours' heights, so if one of them was only built after it in this
@@ -2227,7 +2262,9 @@ function addPlatform(i, j, zone = null){
   c.style = styleNow();
   cells.set(ckey(i,j), c);
   holdRegion(c);
-  refresh([c, ...SIDES4.map(([a,b]) => cells.get(ckey(i+a, j+b)))]);
+  const nbrs = SIDES4.map(([a,b]) => cells.get(ckey(i+a, j+b))).filter(Boolean);
+  if (!zone && STAGE_ON() && !SYNC_NOW() && RW.usable() && nbrs.length && !nbrs.some(n => stagePending().has(n))){ refresh([c]); stageRefresh(nbrs); }   // (the new plot now, its neighbors by the worker: see stageRefresh)
+  else refresh([c, ...nbrs]);
   startAnim(c, 'build', PLAT_BOTTOM, c.height + 1.2, zone, zone ? SIDE : LOT, null);
   if (zone) maybeSpawnMegas(c);
   return c;
@@ -2242,7 +2279,7 @@ function removePlatform(c){
 }
 const MAX_SECTIONS = 4, MAX_HEIGHT = 24;
 function addSection(c, zone){
-  stageFinishAll();
+  stageFinishNear([c]);
   if (c.sections.length >= MAX_SECTIONS || c.height > MAX_HEIGHT) return;
   finishAnimsOn(c);
   const y0 = c.sections.length ? c.height : CURB;
@@ -2633,7 +2670,7 @@ function applyTarget(t){
   if (!zone || t.c.mega) return null;
   addSection(t.c, zone); return t.c;
 }
-function removeAt(pk){ stageFinishAll(); if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMegaTier(megas.get(pk.c.mega)); if (pk.kind === 'low') return removeBelow(pk.c); removeSection(pk.c); }
+function removeAt(pk){ if (pk && pk.c && !pk.c.mega) stageFinishNear([pk.c, ...SIDES4.map(([a, b]) => cells.get(ckey(pk.c.i + a, pk.c.j + b)))]); else stageFinishAll(); if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMegaTier(megas.get(pk.c.mega)); if (pk.kind === 'low') return removeBelow(pk.c); removeSection(pk.c); }
 
 /* ---------- hover outline showing where a click would build ---------- */
 const hoverMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85, depthTest: false });
@@ -2692,3 +2729,26 @@ function showMegaGhost(kind, cell, turned){
 }
 
 function generate(){ rebuildAll(); }
+
+/* ---------- shader warm-up after a city loads ---------- */
+// The first time a material is drawn a certain way, the browser compiles a program for it, which stalls that frame (on a Mac a tenth of a second or more each).
+// Building hit several in a row: the sweep's clipped atlas, its outline lines, materials drawn for the first time on the sweep's layer, the glow sprites. So
+// once a city has loaded, every one of those is drawn for a single frame, out of sight under the island, and the programs are ready before the first click.
+let WARM_DONE = false, WARM_GROUP = null;
+function warmPrograms(){
+  if (WARM_DONE || (typeof LOADP !== 'undefined' && LOADP.on)) return;
+  if (WARM_GROUP){ SC_DIRTY.quiet++; try { world.remove(WARM_GROUP); } finally { SC_DIRTY.quiet--; } WARM_GROUP.userData.box.dispose(); WARM_GROUP = null; WARM_DONE = true; return; }   // (the frame after: gone again; only its own little box is let go, not the plot geometry or the outline box it borrowed)
+  const g = new THREE.Group(), geo = new THREE.BoxGeometry(.01, .01, .01), y = -400;
+  const add = (o, layer) => { o.position.set(camT.x, y, camT.z); o.frustumCulled = false; if (layer !== undefined) o.layers.set(layer); g.add(o); return o; };
+  const u = { plane: new THREE.Plane(new THREE.Vector3(0, -1, 0), y + 1), h: { value: y }, col: { value: new THREE.Color(1, 1, 1) }, on: { value: 1 } };
+  const mats = animMaterials(u);
+  // (the sweep's atlas is drawn with a real plot's geometry: its attributes are part of what makes the program; a merged block's, already on the card)
+  let real = null; for (const rec of solidRegions.values()){ for (const o of rec.group.children) if (o.isMesh && o.material === ATLAS && o.geometry.attributes.aEm){ real = o.geometry; break; } if (real) break; }
+  for (const layer of [0, 3]){
+    const am = add(new THREE.Mesh(real || geo, mats.atlas), layer); am.receiveShadow = true; if (real) am.position.y = y;
+    for (const m of ALL_MATS){ const o = add(new THREE.Mesh(geo, m), m.userData.colorOnly ? 1 : layer); o.castShadow = !m.userData.noCast; o.receiveShadow = true; }
+  }
+  add(new THREE.LineSegments(OUTLINE_GEO, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false, depthWrite: false })));
+  for (const k in GLOW){ const sp = new THREE.Sprite(GLOW[k]); sp.scale.set(.01, .01, 1); add(sp, 1); }
+  g.userData.box = geo; SC_DIRTY.quiet++; try { world.add(g); } finally { SC_DIRTY.quiet--; } WARM_GROUP = g;
+}

@@ -282,6 +282,7 @@ function scFull(px, py, hard, soft, shk, why){
 const _hA = [], _sA = [], _kA = [];
 // The color pass, drawn from the cache. False (nothing drawn) when the old path has to do it.
 SC.frame = function(){
+  if (typeof WARM_GROUP !== 'undefined' && WARM_GROUP){ SC.state = 'off'; SC.why = 'shader warm-up frame: drawn the old way'; SC.ok = false; SC.job = null; return false; }   // (world.js warmPrograms: one frame, so every program it holds is compiled)
   if (window.__perf && window.__perf.skip) return false;   // (the harness skips this frame's drawing: the old path's render call, which it intercepts, does what a skipped frame owes; the cache's state stays as it was)
   // a look picked by hand crossfades over three seconds (looks.js): the light moves too fast for the cache (it would be drawn whole again and again as the
   // drift passes SC_BIG), so for those seconds the old way draws and the cache is built once more when the fade is done

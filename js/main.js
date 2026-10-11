@@ -83,6 +83,7 @@ function frameBody(now){
   pmTick();      // plots' own arrays let go once merged (recipe.js)
   tierTick();    // which blocks are drawn full, which as stand-ins (world.js)
   stepSync();   // what an edit leaves to do, a stage a frame (world.js)
+  if (!WARM_DONE) warmPrograms();   // (once a city has loaded: every program building needs, compiled before the first click; world.js)
   flushSolid();   // regions whose pieces changed are merged again (world.js)
   nvTick();   // idle frames: faces no camera ever sees are worked out for a plot, a few views a frame (neverseen.js)
   scene.updateMatrixWorld();   // once for every pass below (see core.js): nothing moves between them

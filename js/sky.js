@@ -716,6 +716,7 @@ function compVariant(){
     on.RIM = u.rimI.value > .01; on.WET = u.wet.value > 0; on.CLOUDS = u.cloudOn.value > .5; on.MIST = u.mistI.value > 0 && u.nVents.value > 0;
     on.RAYS = u.raysOn.value > .5 && u.rayI.value > .01; on.RAIN = u.rainOn.value > .5; on.PAL = u.palOn.value > .5; on.SPARK = u.sparkle.value > 0 && u.wet.value > 0;
   }
+  if (!T.compFloor && !T.compAll) compWeatherOn(on);
   if (T.compNoShim) on.SHIM = false;
   // the wet-ground reflections, the mist and the light shafts at half resolution (softEffects): off in the test "soft effects at full resolution"
   // (and window.__SOFT_FULL), when none of them is on, and without WebGL 2 (texelFetch)
@@ -725,32 +726,17 @@ function compVariant(){
     for (const m of softMats){ for (const f of COMP_FX) m.defines['FX_' + f] = comp.defines['FX_' + f]; m.needsUpdate = true; }
     comp.needsUpdate = true; }
   SOFT_ON = soft === 1;
-  compWarm(on, soft);
 }
 let SOFT_ON = false;
-// The composite is compiled for each set of its effects the first time that set is used, which stalls a frame (on the owner's Mac, the moment rain came in with the rainy
-// looks' sparkle and no light shafts: a jolt in the middle of a slow blend). The sets the weather can bring next (rain, sparkle, shafts on or off, wet ground) are compiled
-// ahead, one a second while the view is still after the city has loaded, so the change itself finds its program ready.
-const compWarmed = new Set(); let compWarmAt = 0;
-function compWarm(on, soft){
-  if (PH.tests.compFloor || PH.tests.compAll || (typeof LOADP !== 'undefined' && LOADP.on) || performance.now() < compWarmAt || (typeof tierMoving === 'function' && tierMoving())) return;   // (only while the view is still, so a compile's short stall never lands in a turn or a pan)
-  // (every mix of the four the weather moves, each on or off, around the rest as they are now: a blend passes through several of them, one flag at a time)
-  const W4 = ['RAIN', 'SPARK', 'NL', 'RAYS'], flips = [];
-  for (let b = 0; b < 16; b++){ const f = {}; W4.forEach((x, q) => { f[x] = !!(b & (1 << q)); }); if (f.RAIN || f.SPARK) f.WET = true; flips.push(f); }
-  for (const f of flips){
-    const o = Object.assign({}, on, f), sft = soft && (o.WET !== false || o.MIST !== false || o.RAYS !== false) ? 1 : (soft ? 0 : (!(PH.tests.softFull || window.__SOFT_FULL) && renderer.capabilities.isWebGL2 && (o.WET !== false || o.MIST !== false || o.RAYS !== false) ? 1 : 0));
-    const key = COMP_FX.map(x => o[x] === false ? 0 : 1).join('') + sft;
-    if (key === compKey) { compWarmed.add(key); continue; }
-    if (compWarmed.has(key)) continue;
-    compWarmed.add(key); compWarmAt = performance.now() + 1000;
-    const all = [comp, ...softMats], keep = all.map(m => Object.assign({}, m.defines)), was = softQuad.material;
-    for (const m of all){ for (const x of COMP_FX) m.defines['FX_' + x] = o[x] === false ? 0 : 1; m.needsUpdate = true; }
-    comp.defines.SOFT_HALF = sft;
-    try { renderer.compile(compScene, compCam); if (sft) for (const m of softMats){ softQuad.material = m; renderer.compile(softScene, compCam); } } catch (e) {}
-    softQuad.material = was;
-    all.forEach((m, q) => { m.defines = keep[q]; m.needsUpdate = true; });
-    return;
-  }
+// The composite is compiled for each set of its effects the first time that set is used, which stalls a frame (on the owner's Mac, the moment rain came in
+// with the rainy looks' sparkle: a jolt in the middle of a slow blend). So the weather's effects, once on, stay compiled in for the session (their own
+// uniforms still switch them off: a branch, not a new program), and when rain is on its way they are switched on at the start of the blend, at the click,
+// not halfway through. (Compiling every combination ahead in idle frames was tried: each compile stalls a frame, which landed while building.)
+const compSticky = {};
+function compWeatherOn(on){
+  const rainSoon = typeof LK !== 'undefined' && !LK.old && !window.__OLD_GRADES && LK.wx && (LK.wx.tr > 0 || LK.rainNow() > 0);
+  if (rainSoon){ on.RAIN = true; on.SPARK = true; on.WET = true; }
+  for (const f of ['RAIN', 'SPARK', 'WET', 'NL']){ if (on[f] === true) compSticky[f] = true; else if (compSticky[f] && !PH.tests.compFloor) on[f] = true; }
 }
 // ---- soft effects at half resolution ----
 // The composite works out three soft effects for every pixel: the reflection search on wet ground (22 steps), the steam's mist (8) and the light

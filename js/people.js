@@ -21,17 +21,21 @@
 // robot (walk 0-3, alternate walk 4-7, parcel drop 8-13, the parcel capsule opening 14-19), row 14 the emote icons.
 const PPL = { rows: 17, cw: 12, ch: 16, walk: 6, idle: 4, W: 384, H: 272 };
 const F_IDLE = 6, F_SPEC = 10, F_SIT = 16, F_USE = 20, F_ANGRY = 26;
+const F_RUN = PG.F.RUN, F_UWALK = PG.F.UWALK, F_UIDLE = PG.F.UIDLE, F_UOPEN = PG.F.UOPEN;   // (generated people only: running, and walking, standing and opening an umbrella)
 const ROW_COP = 12, ROW_BOT = 13, ROW_EMO = 14, ROW_BOUNCER = 15, ROW_HOOD = 16, CITIZEN_ROWS = 12;   // row 16: the Data Spire's hooded archivist   // row 15: the officer redrawn in red, the club's bouncers
 const EMO = { bang: 0, quest: 1, heart: 2, anger: 3, sweat: 4, note: 5, dots: 6, bowl: 7 };
-const PPL_TEX = new THREE.TextureLoader().load('assets/sprites/people_v2.png');
+if (!window.__OLD_PEOPLE && !window.IN_RECIPE_WORKER) PG.build();   // (the generated sheet: peoplegen.js; the old Craftpix one only when asked for)
+const PPL_GEN = PG.live();
+const PPL_TEX = PPL_GEN ? new THREE.CanvasTexture(PG.sheet.cv) : new THREE.TextureLoader().load('assets/sprites/people_v2.png');
 PPL_TEX.magFilter = PPL_TEX.minFilter = THREE.NearestFilter; PPL_TEX.generateMipmaps = false;
-const PPL_MAX = 700;          // most people drawn at once (the nearest win if more are out)
+const PPL_MAX = PPL_GEN ? 1000 : 700;          // most people drawn at once (the nearest win if more are out)
 const PPL_SPEED = .55;        // walking speed, world units a second (a block takes about 7 s)
 
 // a batch of upright pixel sprites cut from one sheet (rows of equal cells): people, and the delivery drones
 function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMaterial({   // (mrtShader: writes its flat normal too, core.js)
   uniforms: { map: { value: tex }, res: FOL_UNI.res, tint: FOL_UNI.tint, normalMode: FOL_UNI.normalMode,
-              sheet: { value: new THREE.Vector4(W, H, cw, ch) }, size: { value: new THREE.Vector2(cw/PX, ch/PX) } },
+              sheet: { value: new THREE.Vector4(W, H, cw, ch) }, size: { value: new THREE.Vector2(cw/PX, ch/PX) },
+              rowsM1: { value: rows - 1 }, pal: { value: tex }, palRows: { value: 1 }, usePal: { value: 0 } },   // (the palette lookup is off for the drones, and for the old people sheet; the sampler holds the sheet itself until the generator makes a palette texture, so no texture is added)
   vertexShader: `uniform vec2 res; uniform vec2 size; attribute vec3 aPos; attribute vec4 aSpr;
     varying vec2 vUv; varying vec4 vSpr;
     void main(){
@@ -48,7 +52,7 @@ function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMa
       vUv = vec2(aSpr.z < 0.0 ? 1.0 - uv.x : uv.x, uv.y);
       vSpr = aSpr;
     }`,
-  fragmentShader: `uniform sampler2D map; uniform vec4 sheet; uniform vec3 tint; uniform float normalMode;
+  fragmentShader: `uniform sampler2D map; uniform vec4 sheet; uniform vec3 tint; uniform float normalMode; uniform float rowsM1; uniform sampler2D pal; uniform float palRows; uniform float usePal;
     varying vec2 vUv; varying vec4 vSpr;
     float bayer(vec2 p){ p = mod(floor(p), 4.0);
       float b = p.x + p.y*4.0;   // 4x4 ordered dither, written out for GLSL ES 1.0
@@ -57,17 +61,26 @@ function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMa
     void main(){
       vec2 tx = floor(vUv * sheet.zw);
       if (tx.x < 0.0 || tx.y < 0.0 || tx.x >= sheet.z || tx.y >= sheet.w) discard;
-      vec2 st = vec2(vSpr.y*sheet.z + tx.x, (${rows - 1}.0 - vSpr.x)*sheet.w + tx.y);
+      // (generated people: the row is shape + 128*palette, the sheet holds colour indices, spaced 16 apart, looked up in the person's palette row; bubbles and the old sheet are drawn as they are)
+      float shape = usePal > 0.5 ? mod(vSpr.x, 128.0) : vSpr.x;
+      vec2 st = vec2(vSpr.y*sheet.z + tx.x, (rowsM1 - shape)*sheet.w + tx.y);
       vec4 c = texture2D(map, (st + 0.5)/sheet.xy);
       if (c.a < 0.5) discard;
+      float lit = 0.0;
+      if (usePal > 0.5 && vSpr.w < 1.5){
+        float idx = floor(c.r*255.0/16.0 + 0.01);
+        c.rgb = texture2D(pal, vec2((idx + 0.5)/16.0, (floor(vSpr.x/128.0) + 0.5)/palRows)).rgb;
+        lit = idx > 10.5 && idx < 11.5 ? 1.0 : 0.0;   // (index 11: a lit accent, neon trim, which keeps its colour at night)
+      }
       // stepping out of (or into) a doorway: the figure dissolves in a pixel dither
       if (vSpr.w < 0.999 && (bayer(gl_FragCoord.xy) + 0.5)/16.0 > vSpr.w) discard;
       // people catch a little of the street light, so they still read at night; emote bubbles are always bright
-      vec3 col = vSpr.w > 1.5 ? c.rgb : c.rgb * mix(tint, vec3(1.0), 0.3);
+      vec3 col = (vSpr.w > 1.5 || lit > 0.5) ? c.rgb : c.rgb * mix(tint, vec3(1.0), 0.3);
       gl_FragColor = normalMode > 0.5 ? vec4(0.5, 0.5, 1.0, 1.0) : vec4(col, 1.0);
     }`,
 }), 'vec4(0.5, 0.5, 1.0, 1.0)', true); }
-const PPL_MAT = spriteMat(PPL_TEX, PPL.W, PPL.H, PPL.cw, PPL.ch, PPL.rows);
+const PPL_MAT = spriteMat(PPL_TEX, PPL_GEN ? PG.sheet.W : PPL.W, PPL_GEN ? PG.sheet.H : PPL.H, PPL.cw, PPL.ch, PPL_GEN ? PG.sheet.rows : PPL.rows);
+if (PPL_GEN){ PPL_MAT.uniforms.pal.value = PG.palTexture(); PPL_MAT.uniforms.palRows.value = 4096; PPL_MAT.uniforms.usePal.value = 1; }
 function spriteBatch(mat, max){
   const geo = new THREE.InstancedBufferGeometry();
   const q = new THREE.PlaneGeometry(1, 1);
@@ -565,7 +578,7 @@ function* buildNetworkGen(oldDoors, oldSpots){
       doorList.push(dd); doorByKey.set(key, dd); return dd; }));
     const d = !c.liftCab || c.below ? plotDoor(c, sides, 1.75) : null;
     if (d){ const key = 'd:' + c.i + ',' + c.j; doors.push(makeDoor(key, d, false, oldDoors.get(key))); addEnd(c, { key, x: d.stand.x, z: d.stand.z, kind: 'd' }); }
-    fresh.set('c:' + c.i + ',' + c.j, { id: 'c:' + c.i + ',' + c.j, cell: c, x: c.x, z: c.z, jobs, fun, night, doors });
+    fresh.set('c:' + c.i + ',' + c.j, { id: 'c:' + c.i + ',' + c.j, cell: c, x: c.x, z: c.z, jobs, fun, night, doors, ind: night > 0 });
   }
   // benches round the city: a little place to sit for a while
   let nb = 0;
@@ -742,10 +755,10 @@ function updateDoors(dt){
 // A person is seeded from their home section and their place in the household, so they're the same person every
 // time the city loads: same look, same habits, same walk.
 // bedtimes lean early: most turn in by midnight, a few night owls stay out till 3
-function makePerson(id, home){
+function makePerson(id, home, zone){
   const u = k => u01(id, k);
   const wake = span(u('wake'), 6, 8.5);
-  return { id, home, job: null, wantsJob: u('emp') < .8, courier: u('courier') < .2, row: hash(id, 'look') % CITIZEN_ROWS,
+  return { id, home, job: null, wantsJob: u('emp') < .8, courier: u('courier') < .2, row: PG.lookFor(id, hash(id, 'look') % CITIZEN_ROWS, k => hash(id, k), { courier: u('courier') < .2, zone }),
            speed: PPL_SPEED*span(u('speed'), .85, 1.15), lane: span(u('lane'), -.08, .32), wide: span(u('wide'), -.75, 1.05),
            wake, bed: (22 + 6*u('bed')**2) % 24, outgoing: span(u('out'), .25, .9), nightShift: u('night'),
            workS: span(u('ws'), 7.5, 9.5), workLen: span(u('wl'), 7.5, 9),
@@ -756,7 +769,7 @@ function makePerson(id, home){
            guard: undefined, guardShift: undefined, nightWorker: undefined, ws: undefined, wlen: undefined, walkedFor: undefined, chain: undefined,
            patrol: undefined, metro: undefined, metroPlan: undefined, ride: undefined, club: undefined, clubbing: undefined, rush: undefined,
            hurry: undefined, callout: undefined, gh: undefined, ghWalk: undefined, gy: undefined, dx: undefined, dz: undefined, pause: undefined,
-           bumpCD: undefined, emo: undefined, emoUntil: undefined, angry: undefined, fed: undefined, tries: undefined, gone: undefined };
+           bumpCD: undefined, zone, um: undefined, umW: undefined, rainRun: undefined, noRun: undefined, emo: undefined, emoUntil: undefined, angry: undefined, fed: undefined, tries: undefined, gone: undefined };
 }
 function syncResidents(){
   const keep = new Set();
@@ -770,7 +783,7 @@ function syncResidents(){
         const id = c.i + ',' + c.j + ',' + k + ',' + s.seed + ',' + q;
         keep.add(id);
         if (!people.has(id)){
-          const p = makePerson(id, home);
+          const p = makePerson(id, home, s.zone);
           p.fresh = true;   // placed once jobs are handed out (see syncPeople)
           people.set(id, p);
         }
@@ -813,6 +826,8 @@ function syncJobs(){
     if (tot <= 0) break;
     let r = rr()*tot, k = 0; while (k < w.length - 1 && (r -= w[k]) > 0) k++;
     p.job = open[k].id; used.set(p.job, (used.get(p.job) || 0) + 1);
+    if (p.fresh && PG.live()){ const jp = open[k]; if (jp.ind || (jp.mega && (jp.mega.kind === 'foundry' || jp.mega.kind === 'logistics')))   // someone who works in industry is dressed for it (picked once, as they first get the job)
+      p.row = PG.lookFor(p.id, p.row & 31, kk => hash(p.id, kk), { courier: p.courier, zone: p.zone, jobZone: 'ind' }); }
   }
   // the stalls and the police station are always staffed: if nobody's looking for work, people living nearby
   // swap their job for one
@@ -1051,7 +1066,7 @@ function decide(p){
   if (!ok) p.until = pplNow + 15 + pplRand()*40;
 }
 function arrive(p){
-  const w = p.walk; p.walk = null; p.hurry = false;
+  const w = p.walk; p.walk = null; p.hurry = false; p.noRun = false;
   if (p.rush){ p.rush = false; if (w.beat){ p.at = w.to; p.patrol = w.beat; p.until = pplNow + 9 + pplRand()*5; return; } }   // at the scene: looking around
   if (p.callout && w.beat){ const c = p.callout; p.callout = null; p.at = w.to; p.patrol = w.beat; if (startPatrol(p, c)){ p.rush = true; return; } }
   if (w.beat){ p.at = w.to; p.patrol = w.beat; p.until = pplNow + 4 + pplRand()*7; return; }
@@ -1065,7 +1080,7 @@ function arrive(p){
   if (p.clubbing && pl && pl.mega && pl.mega.kind === 'club' && clubArrive(p, pl)) return;
   p.until = pplNow + (pl ? stayFor(p, pl) : 20);
 }
-const sendHome = p => { p.metro = null; p.metroPlan = null; p.club = null; p.clubbing = false; if (p.spot && p.spot.by === p.id) p.spot.by = null; p.chain = null; p.patrol = null; p.rush = false; p.hurry = false; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
+const sendHome = p => { p.metro = null; p.metroPlan = null; p.club = null; p.clubbing = false; if (p.spot && p.spot.by === p.id) p.spot.by = null; p.chain = null; p.patrol = null; p.rush = false; p.hurry = false; p.noRun = false; p.walk = null; p.spot = null; p.at = p.home; p.until = pplNow + 5 + Math.random()*20; };
 
 /* ---------- visitors from the sky highways ---------- */
 // A car passing through a drop-off lets someone out: they come down its lift to the street, go round the shops, stalls
@@ -1111,6 +1126,8 @@ function mtPlaces(fresh, oldDoors, addEnd){
 /* ---------- keeping up with the city ---------- */
 const PPL_NMAX = 4, PPL_CURSOR_PX = 90;
 const PPLRATE = { n: 1, hist: [0, 0, 0, 0, 0] };   // (n: how often a typical walker is stepped now, and the collision check runs; hist: people at each rate)
+const PG_PXW = 1/PX;   // (a sprite pixel in world units)
+let pplRaining = false, pplRainEpoch = 0;   // (generated people: rain on or off with a little hysteresis, and a count of the showers, so each person decides once per shower)
 let pplFrame = 0, pplGoneN = 0;   // (pplGoneN: people marked gone and not yet removed)
 const _op = new THREE.Vector3();
 // is a ground point well off the screen from any height people can be at (screen x doesn't depend on height; y does)
@@ -1466,7 +1483,7 @@ function clubRelease(p, how){
     return;
   }
   if (!startTripAt(p, p.x, p.z, door, p.home)) sendHome(p);
-  else if (how === 'shoved' || how === 'escorted'){ p.hurry = true; emote(p, 'anger', 2.4); }
+  else if (how === 'shoved' || how === 'escorted'){ p.hurry = true; p.noRun = true; emote(p, 'anger', 2.4); }   // (shoved out: hurrying, but the club crowd always walks)
 }
 // a resident has walked up to the club
 function clubArrive(p, pl){
@@ -1958,15 +1975,21 @@ function updatePeople(dt, t){
   const VP = comp.uniforms.VP.value;
   let i = 0;
   const ve = VP.elements;
-  const emit = (x, y, z, row, frame, flip, alpha) => {
+  const newLook = PG.live();   // (the generated sheet, or the old Craftpix one: a look code is old row | shape << 5 | palette << 12, see peoplegen.js)
+  const emit = (x, y, z, row, frame, flip, alpha, raw) => {
     if (i >= PPL_MAX) return false;
     // (Vector3.applyMatrix4's arithmetic, written out; only the screen position is needed)
     const w = 1/(ve[3]*x + ve[7]*y + ve[11]*z + ve[15]), sx = (ve[0]*x + ve[4]*y + ve[8]*z + ve[12])*w, sy = (ve[1]*x + ve[5]*y + ve[9]*z + ve[13])*w;
     if (sx < -1.1 || sx > 1.1 || sy < -1.15 || sy > 1.1) return false;
     P[i*3] = x; P[i*3 + 1] = y; P[i*3 + 2] = z;
-    Q[i*4] = row; Q[i*4 + 1] = frame; Q[i*4 + 2] = flip; Q[i*4 + 3] = alpha;
+    Q[i*4] = raw ? row : newLook ? PG.shapeOf(row) : row & 31; Q[i*4 + 1] = frame; Q[i*4 + 2] = flip; Q[i*4 + 3] = alpha;
     i++; return true;
   };
+  // the umbrella: a second sprite in the same batch, its foot at the person's hand (set where the frame is chosen below)
+  const emitUm = (p, x, y, z, alpha) => { const u = p.um; if (!u || !u.on || p.club) return;
+    const k = u.dx*PG_PXW*p.flip; emit(x + _camR.x*k, y + u.dy*PG_PXW, z + _camR.z*k, PG.umbShape(u.v) | ((PG.shapeOf(p.row) >> 7) << 7), u.f, p.flip, alpha, true); };
+  const rainK = newLook && typeof LK !== 'undefined' && LK.rainNow ? LK.rainNow() : 0;
+  if (rainK > .35 && !pplRaining){ pplRaining = true; pplRainEpoch++; } else if (rainK < .12) pplRaining = false;
   // which stalls are being served, and who's queueing where
   const served = new Set(), queued = new Set(); holoOn.length = 0;
   const stallKey = sp => sp._key || (sp._key = sp.place + ':' + sp.stall);   // stall numbers repeat between squares (the string is made once per spot)
@@ -1997,7 +2020,7 @@ function updatePeople(dt, t){
     if (full){
       if (!PH.tests.noSlowFar && !p.ride && !p.club && !p.metro && p.x !== undefined && ((pplFrame + pi++) & 3) && offScreen(p.x, p.z)){ p.acc = (p.acc || 0) + dt0; continue; }
     } else if (!p.ride && !p.club && !p.metro && p.x !== undefined){
-      const fac = p.rush ? 2.3 : p.hurry ? 1.6 : 1;
+      const fac = p.rush ? 2.3 : p.hurry ? 1.6 : p.rainRun > t ? 1.6 : 1;
       let Nn = Math.max(1, Math.min(PPL_NMAX, Math.floor(reach/(p.speed*fac))));
       if (!PH.tests.noSlowFar && Nn < 4 && offScreen(p.x, p.z)) Nn = 4;   // (W5.1)
       if (Nn > 1 && cux === cux){   // near the cursor: where the player is looking
@@ -2007,7 +2030,7 @@ function updatePeople(dt, t){
       if (Nn > 1 && (pplFrame + idx) % Nn){
         p.acc = (p.acc || 0) + dt0;
         if (p._ec){   // drawn every frame from what the last step left
-          emit(p.x, p._ey, p.z, p._er, p._ef, p.flip, p._ea);
+          emit(p.x, p._ey, p.z, p._er, p._ef, p.flip, p._ea); emitUm(p, p.x, p._ey, p.z, p._ea);
           if (p._eoOn && p.emoUntil > t) emit(p.x, p._ey + p._eo, p.z, ROW_EMO, p.emo, 1, 2); }
         if (p._holo) holoOn.push(p._holo);
         if (p._pic) picOn.add(p._pic);
@@ -2019,7 +2042,7 @@ function updatePeople(dt, t){
     const paused = p.pause > t;
     if (p.ride){ const r = liftRide(p, dt, t); if (r){ emit(r.x, r.y, r.z, p.row, r.frame, p.flip, r.alpha); continue; } }
     if (p.walk){
-      const w = p.walk; if (!paused) w.s += dt*p.speed*(p.rush ? 2.3 : p.hurry ? 1.6 : 1);
+      const w = p.walk; if (!paused) w.s += dt*p.speed*(p.rush ? 2.3 : p.hurry ? 1.6 : p.rainRun > t ? 1.6 : 1);
       if (w.puke && !w.puke.t0 && w.s >= w.puke.at){   // stops by the side of the path and throws up
         w.puke.t0 = t; p.pause = t + 3.6; const L = Math.hypot(p.dx || 0, p.dz || 0) || 1, sx = -(p.dz || 0)/L, sz = (p.dx || 0)/L;
         w.puke.x = p.x + sx*.22; w.puke.z = p.z + sz*.22; emote(p, 'sweat', 1.6); }
@@ -2081,14 +2104,39 @@ function updatePeople(dt, t){
       }
     }
     if (walking) frame = paused ? F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle : Math.floor(t*9*p.speed/PPL_SPEED*(p.rush ? 2 : p.hurry ? 1.5 : 1) + p.phase) % PPL.walk;
+    if (newLook && walking && !paused){   // running: the club crowd never does, and the pace is matched to the ground speed (one run cycle covers PG.STRIDE.run / PG.STRIDE.walk times a walk cycle)
+      const sf = p.rush ? 2.3 : p.hurry ? 1.6 : p.rainRun > t ? 1.6 : 0;
+      if (sf && !p.noRun && !(p.um && p.um.st >= 2)) frame = F_RUN + Math.floor(t*9*p.speed/PPL_SPEED*sf*PG.STRIDE.walk/PG.STRIDE.run + p.phase) % PPL.walk; }
     if (walking && paused && p.walk.puke && p.walk.puke.t0 && t - p.walk.puke.t0 < 3.6){
       const u = t - p.walk.puke.t0; frame = F_SPEC + Math.floor(u*5) % 6;   // doubled over, heaving
       const sd = (p.walk.puke.x - p.x)*_camR.x + (p.walk.puke.z - p.z)*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
       if (u > .8 && !p.walk.puke.left){ p.walk.puke.left = true; pukes.push({ x: p.walk.puke.x, z: p.walk.puke.z, t0: t, sx: p.x, sz: p.z }); } }
+    if (newLook && !p.cop && !p.club && !p.archivist){   // the umbrella: who carries one, and when it opens and closes, by hash and the weather (states: 0 none, 1 waiting to open, 2 opening, 3 open, 4 closing)
+      let u = p.um;
+      if (!u) u = p.um = { st: 0, t0: 0, ep: 0, w: null, on: false, f: 0, dx: 0, dy: 0, v: hash(p.id, 'umv') % 4,
+                           carry: hash(p.id, 'umb') % 100 < (p.zone === 'high' ? 65 : p.zone === 'mid' ? 50 : 40) };
+      const w = p.walk, moving = walking && !paused;
+      if (walking && w !== u.w){ u.w = w; if (pplRaining && u.carry && u.st === 0 && w.doorA && w.s < .6){ u.st = 2; u.t0 = t; u.ep = pplRainEpoch; } }   // out of a door into the rain: it opens on the doorstep
+      if (pplRaining && u.ep !== pplRainEpoch){ u.ep = pplRainEpoch;
+        if (u.carry){ if (u.st === 0){ u.st = 1; u.t0 = t + .3 + (hash(p.id, 'umd', pplRainEpoch) % 2500)/1000; } }
+        else if (walking && !p.noRun && !p.cop) p.rainRun = t + 3 + (hash(p.id, 'umr', pplRainEpoch) % 2500)/1000; }   // no umbrella: a few seconds' run
+      if (u.st === 1){ if (!pplRaining) u.st = 0; else if (t >= u.t0){ u.st = 2; u.t0 = t; if (moving) p.pause = t + .5; } }
+      else if (u.st === 2){ if (t - u.t0 >= .5) u.st = 3; else if (!pplRaining && t - u.t0 > .1){ u.st = 4; u.t0 = t - (.5 - (t - u.t0)); } }
+      if (u.st === 3 && (!pplRaining || (walking && w.doorB && w.len - w.s < .9))){ u.st = 4; u.t0 = t; }
+      else if (u.st === 4 && t - u.t0 >= .5) u.st = 0;
+      u.on = false;
+      if (u.st && (frame < F_SPEC || u.st === 2 || u.st === 4)){
+        let uf = 0;
+        if (u.st === 1) uf = 0;
+        else if (u.st === 2 || u.st === 4){ const q = Math.min(.999, (t - u.t0)/.5), o = u.st === 2 ? q : 1 - q; uf = 1 + Math.floor(o*3); if (o > .66) uf = 3; frame = F_UOPEN + Math.min(3, Math.floor(o*4)); }
+        else { uf = 4; if (frame < F_IDLE) frame = F_UWALK + frame; else frame = F_UIDLE + (frame - F_IDLE) % PPL.idle; }
+        const h = PG.umbHand(frame); u.on = true; u.f = uf; u.dx = h[0]; u.dy = PG.umbAtt[uf] - h[1]; }
+    }
     if (p.cop && p.angry > t) frame = F_ANGRY + Math.min(5, Math.floor((t - p.angry + .9)*7));
-    if (p.row === ROW_HOOD && frame >= F_SPEC) frame = F_IDLE + (frame % 4);   // (the archivist has walk and idle frames only)
+    if ((p.row & 31) === ROW_HOOD && frame >= F_SPEC) frame = F_IDLE + (frame % 4);   // (the archivist has walk and idle frames only)
     p._ec = 1; p._ey = y; p._er = p.cop ? ROW_COP : p.row; p._ef = frame; p._ea = Math.max(0, alpha); p._eo = frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8; p._eoOn = alpha > .9;   // (what a frame between steps draws again)
     if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
+    emitUm(p, p.x, y, p.z, Math.max(0, alpha));
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
   }
   PH.sub('people: the loop over everyone');
@@ -2100,7 +2148,7 @@ function updatePeople(dt, t){
   for (const L of lurkers.values()){
     if (L.fade <= 0 || L.state === 'caught') continue;
     if (L.dx !== undefined){ const sd = L.dx*_camR.x + L.dz*_camR.z; if (Math.abs(sd) > 1e-3) L.flip = sd < 0 ? -1 : 1; }
-    const fr = L.state === 'strike' || L.state === 'flee' ? Math.floor(t*16 + L.phase) % PPL.walk
+    const fr = L.state === 'strike' || L.state === 'flee' ? (newLook ? F_RUN + Math.floor(t*11 + L.phase) % PPL.walk : Math.floor(t*16 + L.phase) % PPL.walk)
              : L.state === 'rob' ? F_SPEC + Math.floor(t*7) % 6 : F_IDLE + Math.floor(t*2 + L.phase) % PPL.idle;
     emit(L.x, CURB, L.z, L.row, fr, L.flip, L.fade >= 1 ? 1 : L.fade*.98);
   }

@@ -84,7 +84,7 @@ const pplMesh = spriteBatch(PPL_MAT, PPL_MAX);
 // (assets/sprites/ddrone.png: 22 x 19 px cells; 0 heading away from the camera, then clockwise round to 7, and
 // cell 8 the parcel set down on the doorstep).
 const DD = { W: 242, H: 19, cw: 22, ch: 19, parcel: 8, puke: 9, puddle: 10 };   // 9, 10: the club's leftovers (see pukes)
-const DD_TEX = new THREE.TextureLoader().load('assets/sprites/ddrone.png');
+const DD_TEX = ART.tex('ddrone', 'assets/sprites/ddrone.png');
 DD_TEX.magFilter = DD_TEX.minFilter = THREE.NearestFilter; DD_TEX.generateMipmaps = false;
 const DD_MAX = 80, DD_MAT = spriteMat(DD_TEX, DD.W, DD.H, DD.cw, DD.ch, 1);
 DD_MAT.uniforms.size.value.multiplyScalar(.85);

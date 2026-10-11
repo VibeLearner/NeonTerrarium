@@ -1345,7 +1345,7 @@ const KOI_SHADER = {
 };
 function koiFx(m){
   if (!koiTex){
-    koiTex = new THREE.TextureLoader().load('assets/sprites/koi_neon.png');
+    koiTex = ART.tex('koi', 'assets/sprites/koi_neon.png');
     koiTex.magFilter = koiTex.minFilter = THREE.NearestFilter; koiTex.generateMipmaps = false;
   }
   let p = m.pond; if (!p) return null;   // only the squares with the koi pond
@@ -3153,7 +3153,7 @@ function solidPush(p){
 // The bike is a billboard picked from eight drawn views by its heading; the officer (and passenger) are drawn by
 // people.js from POLICE_BIKES.
 const PBIKE_VIEWS = ['r2c1', 'r1c4', 'r2c3', 'r2c4', 'r1c1', 'r1c2', 'r1c3', 'r2c2'];   // nose away, away-right, right, ... going clockwise
-const PBIKE_TEX = PBIKE_VIEWS.map(n => { const t = new THREE.TextureLoader().load('assets/sprites/pbike_' + n + '.png'); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; });
+const PBIKE_TEX = PBIKE_VIEWS.map(n => { const t = ART.tex('pbike_' + n, 'assets/sprites/pbike_' + n + '.png'); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; });
 const PBIKE_SIZE = { r1c1: [14, 17], r1c2: [24, 17], r1c3: [26, 16], r1c4: [23, 18], r2c1: [14, 18], r2c2: [19, 18], r2c3: [26, 16], r2c4: [24, 18] };
 let POLICE_BIKES = [];
 const BIKE_Y = CURB + .28, BIKE_K = .8, BIKE_SEAT = .26;   // hover height; the rider's seat above the bike's base
@@ -3381,7 +3381,7 @@ function policeWire(){
   }) : null;
 }
 function policeFx(m){
-  if (!wantedTex){ wantedTex = new THREE.TextureLoader().load('assets/sprites/wanted.png'); wantedTex.magFilter = wantedTex.minFilter = THREE.NearestFilter; wantedTex.generateMipmaps = false; }
+  if (!wantedTex){ wantedTex = ART.tex('wanted', 'assets/sprites/wanted.png'); wantedTex.magFilter = wantedTex.minFilter = THREE.NearestFilter; wantedTex.generateMipmaps = false; }
   const parts = [], screens = [], screenMeshes = [];
   (m.screens || []).forEach((sc, k) => {
     const u = { map: { value: wantedTex }, frame: { value: (k*2) % WANTED_N }, prevFrame: { value: 0 }, glitch: { value: 0 }, seed: { value: k*13 }, time: { value: 0 } };

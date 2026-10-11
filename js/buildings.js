@@ -2703,7 +2703,7 @@ const holoText = (() => {
   draw(); if (document.fonts && document.fonts.load) document.fonts.load('8px Silkscreen').then(draw).catch(() => {});
   return tex;
 })();
-const holoAds = new THREE.TextureLoader().load('assets/sprites/holo_ads.png'); holoAds.magFilter = holoAds.minFilter = THREE.NearestFilter; holoAds.generateMipmaps = false;
+const holoAds = ART.tex('holo_ads', 'assets/sprites/holo_ads.png'); holoAds.magFilter = holoAds.minFilter = THREE.NearestFilter; holoAds.generateMipmaps = false;
 var HOLO_MAT = null;
 HOLO_MAT = new THREE.ShaderMaterial({
   uniforms: { tAds: { value: holoAds }, tText: { value: holoText }, time: FOL_UNI.time, lightsOn: LIGHTS_ON, textW: { value: HOLO_TW.slice() },
@@ -2769,14 +2769,14 @@ function holoQuad(F, x, y, z, w, h, ad, seed, kind){
 // half a minute, then glitches back, and round again. Additive, so the dark of the sign is see-through; scanlines, a
 // rolling band, flicker; torn rows, split colour and static in the glitches. A faint beam fans out from the lens.
 // two pairs: Caelum-Sol's pure air hacked by "breathe for free", Aether-Vane's Platform 9 recruitment hacked by "the sky belongs to no one"
-const AIR_A = new THREE.TextureLoader().load('assets/sprites/holo_pureair.png'), AIR_B = new THREE.TextureLoader().load('assets/sprites/holo_freeair.png');
-const AIR_A2 = new THREE.TextureLoader().load('assets/sprites/holo_aether.png'), AIR_B2 = new THREE.TextureLoader().load('assets/sprites/holo_sky.png');
-const AIR_A3 = new THREE.TextureLoader().load('assets/sprites/holo_synth.png'), AIR_B3 = new THREE.TextureLoader().load('assets/sprites/holo_watch.png');   // and Synth Corp's security, hacked by "Big Brother is watching"
+const AIR_A = ART.tex('holo_pureair', 'assets/sprites/holo_pureair.png'), AIR_B = ART.tex('holo_freeair', 'assets/sprites/holo_freeair.png');
+const AIR_A2 = ART.tex('holo_aether', 'assets/sprites/holo_aether.png'), AIR_B2 = ART.tex('holo_sky', 'assets/sprites/holo_sky.png');
+const AIR_A3 = ART.tex('holo_synth', 'assets/sprites/holo_synth.png'), AIR_B3 = ART.tex('holo_watch', 'assets/sprites/holo_watch.png');   // and Synth Corp's security, hacked by "Big Brother is watching"
 // and plain ads (no hack) for the wall holograms: tall neon signs for a sushi bar, a repair shop, an air-filter shop
 // (PureFlow), a satellite shop and a loan shop, used as they are. They share one atlas (assets/sprites/holo_walls.png, built by
 // tools/make_wall_holo_signs.py, which prints the WALL_CELLS line below), side by side; WALL_ASPECT is each sign's height
 // over width.
-const AIR_W1 = new THREE.TextureLoader().load('assets/sprites/holo_walls.png');
+const AIR_W1 = ART.tex('holo_walls', 'assets/sprites/holo_walls.png');
 const WALL_ATLAS = [2147, 2618], WALL_CELLS = [[0, 0, 431, 999], [433, 0, 351, 1254], [786, 0, 656, 1388], [1444, 0, 703, 1467], [0, 1469, 795, 1149]];   // x, y from the top, width, height of each sign
 const WALL_ASPECT = WALL_CELLS.map(c => c[3]/c[2]);
 const AIR_ASPECT = [.75, 440/512, .75, .75, .75];   // height over width of each pair's pictures

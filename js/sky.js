@@ -1115,13 +1115,13 @@ const glowMix = new THREE.ShaderMaterial({
               lift: { value: new THREE.Vector3() }, gain: { value: new THREE.Vector3(1, 1, 1) }, sat: { value: 1 }, con: { value: 1 }, lit: { value: 0 },
               // the looks (js/looks.js): midtone tint, the palette as a gradient map, grain, color fringing, lens flare and sun glare, vignette, bloom and halation strength
               midG: { value: new THREE.Vector3(1, 1, 1) }, midA: { value: 0 }, pal8: { value: Array.from({ length: 8 }, () => new THREE.Vector3()) }, palBlend: { value: 0 },
-              grain: { value: 0 }, grainSize: { value: 1 }, fringe: { value: 0 }, flare: { value: 0 }, flareVis: { value: 0 }, sunUv: { value: new THREE.Vector2(.5, .5) }, flareCol: { value: new THREE.Color(1, 1, 1) },
+              grain: { value: 0 }, grainSize: { value: 1 }, fringe: { value: 0 }, flare: { value: 0 }, flareVis: { value: 0 }, sunUv: { value: new THREE.Vector2(.5, .5) }, tD: { value: null }, flareCol: { value: new THREE.Color(1, 1, 1) },
               vig: { value: 0 }, bloomK: { value: 1 }, halK: { value: 1 }, time: comp.uniforms.time, res: { value: new THREE.Vector2(1, 1) } },
   vertexShader: fsVert,
   fragmentShader: `uniform sampler2D t; uniform sampler2D tB; uniform sampler2D tH; uniform float night; uniform float smoothLook; uniform float on; varying vec2 vUv;
     uniform vec3 lift; uniform vec3 gain; uniform float sat; uniform float con; uniform float lit;
     uniform vec3 midG; uniform float midA; uniform vec3 pal8[8]; uniform float palBlend; uniform float grain; uniform float grainSize; uniform float fringe;
-    uniform float flare; uniform float flareVis; uniform vec2 sunUv; uniform vec3 flareCol; uniform float vig; uniform float bloomK; uniform float halK; uniform float time; uniform vec2 res;
+    uniform float flare; uniform float flareVis; uniform vec2 sunUv; uniform sampler2D tD; uniform vec3 flareCol; uniform float vig; uniform float bloomK; uniform float halK; uniform float time; uniform vec2 res;
     float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y*0.75))); }
     float bayer(vec2 a){ return b2(0.5*a)*0.25 + b2(a); }
     float hash21(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -1166,7 +1166,13 @@ const glowMix = new THREE.ShaderMaterial({
           float dq = length((vUv - gp)*asp);
           gh += (smoothstep(rq, rq*.4, dq)*.22 + smoothstep(rq*1.5, rq, dq)*smoothstep(rq*.7, rq*1.5, dq)*.1)*(q == 3 ? .6 : 1.0);
         }
-        c += flareCol*flare*(gl*(.3 + .7*flareVis) + gh*flareVis);
+        // hidden where the city stands in front of the sun: the flare and glare only where the sun's place on screen is open sky (depth at the far plane), a few taps round it
+        // (the camera mostly looks down, so the sun's place is usually on the city: without this a glow and its ghosts sat on the buildings)
+        float open = 0.0;
+        for (int q = 0; q < 5; q++){ vec2 o = q == 0 ? vec2(0.0) : q == 1 ? vec2(.02, 0.0) : q == 2 ? vec2(-.02, 0.0) : q == 3 ? vec2(0.0, .02) : vec2(0.0, -.02);
+          open += step(.99999, texture2D(tD, clamp(sc + o, vec2(.002), vec2(.998))).x); }
+        open /= 5.0;
+        c += flareCol*flare*open*(gl*(.3 + .7*flareVis) + gh*flareVis);
       }
       if (vig > 0.0){ vec2 vv = (vUv - .5)*vec2(1.15, 1.0)*2.0; c *= 1.0 - vig*smoothstep(.55, 1.5, length(vv)); }
       if (grain > 0.0){   // film grain, after the grade: re-rolled 24 times a second, in blocks of grainSize pixels, a little stronger in the shadows
@@ -1192,7 +1198,7 @@ function makeGlowTargets(){
 function glowPass(mat, target, name){ PH.begin(name, true); glowQuad.material = mat; renderer.setRenderTarget(target); renderer.render(glowScene, compCam); PH.end(); }
 // run after the composite has been drawn into rtOut; leaves the finished frame in rtFinal
 function renderGlow(){
-  glowMix.uniforms.res.value.set(W, H);
+  glowMix.uniforms.res.value.set(W, H); glowMix.uniforms.tD.value = comp.uniforms.tDepth.value;   // (the depth the composite read: the lens flare hides behind the city)
   if (typeof LK !== 'undefined' && !LK.old && !window.__OLD_GRADES) lkGlow();   // (the looks' lens and film values: looks.js)
   glowMix.uniforms.on.value = S.bloom ? 1 : 0;
   glowMix.uniforms.lit.value = NL_UNI.lightI.value > 0 ? Math.min(1, NL_UNI.lightI.value/.6) : 0;   // how much night light there is

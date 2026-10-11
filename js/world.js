@@ -1619,6 +1619,9 @@ function rebuildCellPost(c){
   cellView(c);
   c.emitters = c.data.emitters; c.pads = c.data.pads; c.ports = c.data.ports;
   dirtyRegions.add(regKey(c.i, c.j));
+  // the shadows again, now that it stands: a plot built in steps or by the worker arrives frames after the edit that asked for it (which already redrew them), so a neighbor's
+  // old railing, gone since, kept its shadow on the paving until the view moved or something else was built (seen as a dashed line on a still view)
+  if (!(typeof LOADP !== 'undefined' && LOADP.on)) shadowDirty = true;
 }
 // ---- plots built in steps (round 8, item 2). One job at a time; between its steps the globals the builders write into are put back as they were, so nothing else that builds
 // (a megastructure, a sync edit) can see or spoil a half-made piece. A job that is still running when another edit starts is finished at once (stageFinishAll). ----
@@ -1795,6 +1798,10 @@ function* rebuildSolidGen(key, job = null){
   if (tierChanged && job && !job.force && !TIER.rush) for (let waited = 0; tierSwapWait(key, waited); waited++) yield 'wait';   // (TIER.rush: the setting was just switched, the change shows at once)
   freezeTree(g);   // (the glow overlays of the new meshes are made here)
   // (a merge shows the same picture, so it notes no box for the static cache; a block changing tier does not: its whole box is noted, from its plots)
+  // (a merge is meant to show the same picture as before, but when the block's pieces changed since its old merge (an edit rebuilt a plot in it) the old merge and the plot's
+  //  own meshes were standing in for each other meanwhile; the block's box is noted too, so the static cache's still picture is drawn again from what now stands)
+  const membersChanged = !!oldRec && (oldRec.members.length !== members.length || oldRec.members.some((m, q) => m !== members[q]));
+  if (membersChanged && !tierChanged) scNoteBlock(key);
   if (tierChanged){ scNoteBlock(key); const t0 = TIER.markedAt.get(key); if (t0 !== undefined){ TIER.lat.push(PM.frame - t0); TIER.markedAt.delete(key); } }
   if (tierChanged && PM.frame < TIER.compareUntil) tierStashOld(key); else solidRemoveOld(key);
   ovCommit(key);   // the swap: the old block and its overlays out, the new in, the plots' own meshes hidden

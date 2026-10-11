@@ -126,7 +126,7 @@ const SG = (() => {
     SG.COUNT.grass = 1; SG.COUNT.grassFar = 1;   // (the lawn tile sheet, 48 x 16: spritegen_lawn.js)
     set(SG.FCOUNT, ['f_moss1','f_moss2','f_weeds','f_crack','f_vine','f_mossmat','f_sprouts','f_seam','f_ivy','f_leaves','f_grass1','f_grass2'], 4); })();
   // the variant of a thing at a world position: a hash of the position, never a random draw (so the same plots come out whatever the variants are)
-  SG.vAt = (n, x, y, z) => { if (n < 2 || self.__OLD_SPRITES) return 0;   // (the old pictures: variant 0, where the single picture was)
+  SG.vAt = (n, x, y, z) => { if (n < 2) return 0;
    
     let h = Math.imul(Math.round(x*20) | 0, 0x27d4eb2d) ^ Math.imul(Math.round(y*20) | 0, 0x165667b1) ^ Math.imul(Math.round(z*20) | 0, 0x9E3779B1);
     h ^= h >>> 15; h = Math.imul(h, 0x85EBCA6B); h ^= h >>> 13; return (h >>> 0) % n; };

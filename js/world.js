@@ -678,23 +678,18 @@ function cycleGreen(c){
   GREEN_DEFAULT = c.green; try { localStorage.setItem(GREEN_KEY, GREEN_DEFAULT); } catch (e) {}
   refresh([c]); save(); sfx.play('place');
 }
-// the lawn: 16px grass tiles from the sheet (assets/floor/grass.png: fine grass, tufts, long blades)
-// (drawn in code, spritegen_lawn.js, unless the old picture is asked for: window.__OLD_SPRITES, the overlay test "old sprites (as before)", which calls GRASS_MAT.userData.repaint)
+// the lawn: 16px grass tiles from the sheet (drawn in code: fine grass, tufts, long blades)
+// (drawn in code: spritegen_lawn.js)
 const GRASS_MAT = (() => {
   const cv = document.createElement('canvas'); cv.width = 48; cv.height = 16; const g = cv.getContext('2d');
   const t = new THREE.CanvasTexture(cv); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
-  let img = null, loaded = false;
-  const paint = () => {
-    if (SG.has('grass') && !window.__OLD_SPRITES){ g.clearRect(0, 0, 48, 16); SG.blit(g, SG.draw('grass', 48, 16, 0), 0, 0); t.needsUpdate = true; return; }
-    if (!img){ img = new Image(); img.onload = () => { loaded = true; paint(); }; img.src = 'assets/floor/grass.png'; }
-    if (loaded){ g.clearRect(0, 0, 48, 16); g.drawImage(img, 0, 0); t.needsUpdate = true; }
-  };
+  const paint = () => { g.clearRect(0, 0, 48, 16); SG.blit(g, SG.draw('grass', 48, 16, 0), 0, 0); t.needsUpdate = true; };
   if (!window.IN_RECIPE_WORKER) paint();
   // the far tile: the lawn as it looks once the tufts have merged (spritegen_lawn.js 'grassFar'), swapped in by folFar (sprites.js)
   const cvF = document.createElement('canvas'); cvF.width = 48; cvF.height = 16; const gF = cvF.getContext('2d');
   const tF = new THREE.CanvasTexture(cvF); tF.magFilter = tF.minFilter = THREE.NearestFilter; tF.generateMipmaps = false;
   if (!window.IN_RECIPE_WORKER && SG.has('grassFar')){ SG.blit(gF, SG.draw('grassFar', 48, 16, 0), 0, 0); tF.needsUpdate = true; }
-  const m = toon(0xffffff); m.map = t; m.userData.noCast = true; m.userData.repaint = paint;
+  const m = toon(0xffffff); m.map = t; m.userData.noCast = true;
   m.userData.far = on => { m.map = on && SG.has('grassFar') ? tF : t; };
   return m; })();   // tinted down a little to sit with the city's palette
 const _gq = new THREE.Vector3();

@@ -327,8 +327,8 @@ const FOL_ATLAS = (() => {
     FOL_RECTS[k] = slots[k].map(([cx,cy]) => [cx, AH - cy - h, w, h]);   // in texture space (flipped: v runs up from the canvas bottom)
     FOL_RECT[k] = FOL_RECTS[k][0];
   }
-  // a kind is drawn in code when it has a generator and the old pictures are not asked for (window.__OLD_SPRITES, or the overlay test "old sprites (as before)"); the picture of the old kinds goes into every variant slot
-  const inCode = k => typeof SG !== 'undefined' && SG.has(k) && !window.__OLD_SPRITES;
+  // a kind is drawn in code when it has a generator (spritegen*.js); a kind without one loads its picture, which goes into every variant slot
+  const inCode = k => typeof SG !== 'undefined' && SG.has(k);
   const paint = k => {
     const [w,h] = SPR.size[k];
     if (inCode(k)){ for (let v = 0; v < slots[k].length; v++){ const [cx,cy] = slots[k][v]; g.clearRect(cx, cy, w, h); SG.blit(g, SG.draw(k, w, h, v), cx, cy); } tex.needsUpdate = true; return; }
@@ -465,9 +465,9 @@ const FLOOR_MAT = (() => {
     const [w,h] = FLOOR_SPR[k];
     FLOOR_UVS[k] = slots[k].map(([cx,cy]) => [cx/AW, 1 - (cy + h)/AH, (cx + w)/AW, 1 - cy/AH]); FLOOR_UV[k] = FLOOR_UVS[k][0];
   }
-  const paint = k => {   // (as the sprite atlas: in code when there is a generator and the old pictures are not asked for, else the picture in every variant slot)
+  const paint = k => {   // (as the sprite atlas: in code when there is a generator, else the picture in every variant slot)
     const [w,h] = FLOOR_SPR[k];
-    if (typeof SG !== 'undefined' && SG.has(k) && !window.__OLD_SPRITES){ for (let v = 0; v < slots[k].length; v++){ const [cx,cy] = slots[k][v]; g.clearRect(cx, cy, w, h); SG.blit(g, SG.draw(k, w, h, v), cx, cy); } tex.needsUpdate = true; return; }
+    if (typeof SG !== 'undefined' && SG.has(k)){ for (let v = 0; v < slots[k].length; v++){ const [cx,cy] = slots[k][v]; g.clearRect(cx, cy, w, h); SG.blit(g, SG.draw(k, w, h, v), cx, cy); } tex.needsUpdate = true; return; }
     const img = imgs[k] || (imgs[k] = new Image());
     const put = () => { for (const [cx,cy] of slots[k]){ g.clearRect(cx, cy, w, h); g.drawImage(img, cx, cy, w, h); } tex.needsUpdate = true; };
     if (loaded[k]){ put(); return; }
@@ -591,7 +591,7 @@ function folMesh(LIST, isLawn){
 // (all but a few tall ones). Starts where the plants start to thin out (LOD, main.js: `loss` is how far zooming out has outrun the screen's resolution), with a margin so it does not flap.
 function folFar(loss){
   const was = FOL_FAR.lawn;
-  FOL_FAR.lawn = window.__FOL_LOD_OFF || window.__OLD_SPRITES ? false : loss > 1.35 ? true : loss < 1.25 ? false : was;
+  FOL_FAR.lawn = window.__FOL_LOD_OFF ? false : loss > 1.35 ? true : loss < 1.25 ? false : was;
   if (FOL_FAR.lawn !== was && typeof GRASS_MAT !== 'undefined') GRASS_MAT.userData.far(FOL_FAR.lawn);
 }
 // While a piece is being generated, glows are collected as plain numbers; the region then draws each colour

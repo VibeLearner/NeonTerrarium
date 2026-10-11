@@ -195,7 +195,7 @@ RW.start = () => {
   if (window.__realNow && !window.__GEN_WORKER) return;
   const scripts = [...document.scripts].map(s => s.src).filter(Boolean);
   const three = scripts.find(u => /three(\.min)?\.js/.test(u)), bgu = scripts.find(u => /BufferGeometryUtils/.test(u));
-  const names = ['matreg', 'core', 'sprites', 'buildings', 'ground', 'vehicles', 'sky', 'audio', 'world', 'mega', 'people', 'highway', 'metro', 'recipe'];
+  const names = ['matreg', 'core', 'spritegen', 'sprites', 'buildings', 'ground', 'vehicles', 'sky', 'audio', 'world', 'mega', 'people', 'highway', 'metro', 'recipe'];
   const urls = names.map(n => scripts.find(u => u.includes('/js/' + n + '.js'))); if (!three || urls.some(u => !u)) return;
   RW.state = 'loading';
   try { RW.w = new Worker(RW.src.replace('recipe.js', 'recipeworker.js')); } catch (e){ RW.state = 'failed'; RW.error = String(e); return; }

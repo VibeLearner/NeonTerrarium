@@ -207,7 +207,7 @@ setInterval(() => { if (!open) return; hourOut.textContent = fmtH(S.hour); if (d
 // keys: Shift+L opens and closes it (ahead of the game's own keys: L is the highway lanes key); hold B for the shipped look
 const typing = t => t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && !(t.type === 'range' || t.type === 'color' || t.type === 'checkbox');
 addEventListener('keydown', e => {
-  if (e.key === 'L' && e.shiftKey && !e.ctrlKey && !e.metaKey && !typing(e.target)){ e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) toggleEditor(); return; }
+  if ((e.key === 'L' || e.key === 'l' || e.code === 'KeyL') && e.shiftKey && !e.ctrlKey && !e.metaKey && !typing(e.target)){ e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) toggleEditor(); return; }
   if (open && (e.key === 'b' || e.key === 'B') && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target)){ LK.holdDefault = true; }
 }, true);
 addEventListener('keyup', e => { if (e.key === 'b' || e.key === 'B') LK.holdDefault = false; }, true);

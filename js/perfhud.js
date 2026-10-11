@@ -6,6 +6,27 @@
 // pass it waits until the graphics card has finished everything queued so far, so the time between is what that pass
 // alone costs it. The waiting stops the processor and the card working side by side, so the frame rate drops while it's
 // on; the per-pass times are what count. In this mode the glow passes are also timed one by one (sky.js).
+// What the page has asked the graphics card to hold (textures, buffers, renderbuffers), counted where it is asked: the allocation and the free, never per draw, so it costs nothing in a frame.
+// An estimate (no mip chains beyond a flat third, no driver padding); `window.__GPUMEM` = { tex, buf, rb } in bytes. The F3 overlay shows it with the object counts, to see build-up as it happens.
+const GPUMEM = window.__GPUMEM = { tex: 0, buf: 0, rb: 0 };
+(() => {
+  const P = window.WebGL2RenderingContext && WebGL2RenderingContext.prototype; if (!P) return;
+  const sz = new WeakMap(), put = (k, o, b) => { if (!o) return; GPUMEM[k] += b - (sz.get(o) || 0); sz.set(o, b); };
+  const BPP = { 0x8058: 4, 0x881A: 8, 0x8814: 16, 0x81A6: 3, 0x81A7: 4, 0x81A5: 2, 0x8CAC: 4, 0x88F0: 4, 0x8051: 3, 0x8D48: 1, 0x8229: 1, 0x822B: 2, 0x822D: 2, 0x822F: 4, 0x8235: 4, 0x8C43: 4, 0x8C41: 3, 0x8059: 4, 0x8056: 2, 0x8D62: 2, 0x8C3A: 4, 0x8DAD: 8, 0x8226: 1, 0x822E: 4, 0x8230: 8, 0x8815: 12, 0x881B: 6, 0x8D7C: 4 };
+  const TYP = { 0x1401: 4, 0x140B: 8, 0x1406: 16, 0x8D61: 8 };
+  const bpp = (f, t) => f === 0x1908 || f === 0x1907 || f === 0x1903 || f === 0x8227 || f === 0x1902 ? (TYP[t] || 4)*(f === 0x1903 ? .25 : f === 0x8227 ? .5 : 1) : (BPP[f] || 4);
+  const TB = { 0x0DE1: 0x8069, 0x8C1A: 0x8C1D, 0x806F: 0x806A, 0x8513: 0x8514 }, BB = { 0x8892: 0x8894, 0x8893: 0x8895 };   // (a target's binding query: TEXTURE_2D, TEXTURE_2D_ARRAY, TEXTURE_3D, cube map; ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER)
+  const ts = P.texStorage2D; P.texStorage2D = function(t, l, f, w, h){ const q = TB[t]; if (q) put('tex', this.getParameter(q), w*h*(BPP[f] || 4)*(l > 1 ? 1.34 : 1)); return ts.apply(this, arguments); };
+  const ti = P.texImage2D; P.texImage2D = function(t, l, f, w, h){ const q = TB[t];
+    if (q && l === 0){ if (typeof w === 'number' && typeof h === 'number' && arguments.length >= 9) put('tex', this.getParameter(q), w*h*bpp(f, arguments[7])*1.34); else if (arguments.length <= 6){ const img = arguments[5]; if (img && img.width) put('tex', this.getParameter(q), img.width*img.height*4*1.34); } }
+    return ti.apply(this, arguments); };
+  const rs = P.renderbufferStorage; P.renderbufferStorage = function(t, f, w, h){ put('rb', this.getParameter(0x8CA7), w*h*(BPP[f] || 4)); return rs.apply(this, arguments); };
+  const rm = P.renderbufferStorageMultisample; P.renderbufferStorageMultisample = function(t, n, f, w, h){ put('rb', this.getParameter(0x8CA7), n*w*h*(BPP[f] || 4)); return rm.apply(this, arguments); };
+  const bd = P.bufferData; P.bufferData = function(t, d){ const q = BB[t]; if (q) put('buf', this.getParameter(q), typeof d === 'number' ? d : d.byteLength); return bd.apply(this, arguments); };
+  const dt = P.deleteTexture; P.deleteTexture = function(o){ if (o) put('tex', o, 0); return dt.call(this, o); };
+  const db = P.deleteBuffer; P.deleteBuffer = function(o){ if (o) put('buf', o, 0); return db.call(this, o); };
+  const dr = P.deleteRenderbuffer; P.deleteRenderbuffer = function(o){ if (o) put('rb', o, 0); return dr.call(this, o); };
+})();
 const PH = (() => {
   let on = false, exact = false, el = null, graph = null, body = null, lastShow = 0, exBtn = null, testBar = null;
   // Tests (exact mode only, to find out what the color pass is spending its time on; they change the picture while on):
@@ -114,6 +135,7 @@ const PH = (() => {
     } else L.push(`main thread ${avg(jsMs).toFixed(1)} ms   graphics card ${!ext ? 'n/a (this browser has no GPU timers)' : gpuMs.n ? avg(gpuMs).toFixed(1) + ' ms' : 'measuring'}`);
     L.push(`render ${W}x${H} of ${DW}x${DH}   zoom ${zoom.toFixed(1)}   people ${typeof pplList !== 'undefined' ? pplList.length : '-'}   plots ${cells.size}`);
     L.push(`building pieces drawn ${CULL.drawn} of ${CULL.total} (the rest are off screen)`);
+    { const m = info.memory, MB = v => (v/1048576).toFixed(0); L.push(`graphics: ${info.render.calls} draws a frame   on the card: ${m.geometries} geometries, ${m.textures} textures, ${info.programs ? info.programs.length : '-'} programs   about ${MB(GPUMEM.tex + GPUMEM.buf + GPUMEM.rb)} MB (textures ${MB(GPUMEM.tex)}, buffers ${MB(GPUMEM.buf)}, render buffers ${MB(GPUMEM.rb)})`); }
     if (typeof SC !== 'undefined') L.push(SC.line());
     if (typeof SD !== 'undefined') L.push(SD.line());
     if (typeof PPLRATE !== 'undefined') L.push(tests.fullRate ? 'people stepped every frame (full rate: on)' : `people stepped every ${PPLRATE.n} frames when typical size; people at each rate 1/2/3/4: ${PPLRATE.hist.slice(1).join(' / ')}`);

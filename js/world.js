@@ -1851,7 +1851,9 @@ function* rebuildSolidGen(key, job = null){
   if (tierChanged){ scNoteBlock(key); const t0 = TIER.markedAt.get(key); if (t0 !== undefined){ TIER.lat.push(PM.frame - t0); TIER.markedAt.delete(key); } }
   if (tierChanged && PM.frame < TIER.compareUntil) tierStashOld(key); else solidRemoveOld(key);
   ovCommit(key);   // the swap: the old block and its overlays out, the new in, the plots' own meshes hidden
-  for (const o of hideList) o.visible = false;
+  for (const o of hideList){ o.visible = false;
+    // (the plot's own pieces were drawn before they were merged in: an edit shows them while the block is made again. Their copies on the card go now, which a plot that was merged before its first frame never had; three uploads them again if they are ever drawn)
+    if (o.geometry) o.geometry.dispose(); }
   for (const o of hideList){ const pc = o.userData.cell; if (pc) pmSchedule(pc); }   // (merged in: its own arrays are let go: recipe.js)
   for (const o of farMeshes){ FAR_MESHES.add(o); } if (farMeshes.length) FARM.stamp++;
   world.add(g);

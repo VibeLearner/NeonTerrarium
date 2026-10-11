@@ -134,6 +134,7 @@ def fmt(tag, r):
     print('%-18s draws %4d  tris %7d | geoms %4d  textures %3d  programs %3d | tex %6.1f MB  buf %6.1f MB  rb %5.1f MB | live GL objects since load %s | scene objs %d  cells %d  anims %d' % (
         tag, r['calls'], r['tris'], r['geoms'], r['texs'], r['programs'], r['texMB'], r['bufMB'], r['rbMB'], json.dumps(r['liveKinds'], sort_keys=True), r['objs'], r['cells'], r['anims']), flush=True)
 
+# (note: the 'registered with three' counts include the game's own dispose listeners; renderer.info.memory.geometries is the authority)
 SETTLE = """() => { let g = 0; while ((anims.length || (typeof NV !== 'undefined' && (NV.job || NV.queue.length)) || SOLID_JOB || solidDirty.size || superDirty.size || dirtyRegions.size || STAGE_Q.length || STAGE_READY.length || pendingRegions.size) && g++ < 400) __perf.cap(30, 0);   // (the merges and staged builds the game finishes in a few frames' spare time)
   let n = 0; for (; n < 14; n++){ __perf.cap(2, 1); if (typeof SC === 'undefined' || SC.mode === 'off' || (SC.state === 'in use' && !anims.length && !SC.job)){ __perf.cap(2, 1); if (SC.mode === 'off' || SC.state === 'in use') break; } } return n; }"""
 

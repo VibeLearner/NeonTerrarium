@@ -35,7 +35,7 @@ const PG = (() => {
   class Cell {
     constructor(buf, stride, ox, oy){ this.b = buf; this.s = stride; this.ox = ox; this.oy = oy; }
     clear(){ for (let y = 0; y < CH; y++) this.b.fill(0, (this.oy + y)*this.s + this.ox, (this.oy + y)*this.s + this.ox + CW); }
-    set(x, y, c){ x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= CW || y >= CH) return; this.b[(this.oy + y)*this.s + this.ox + x] = c; }
+    set(x, y, c){ x = Math.round(x); y = Math.round(y); if (x < 1 || y < 1 || x > CW - 2 || y >= CH) return; this.b[(this.oy + y)*this.s + this.ox + x] = c; }   // (column 0, column 11 and row 0 stay free for the outline)
     get(x, y){ x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= CW || y >= CH) return 0; return this.b[(this.oy + y)*this.s + this.ox + x]; }
     // paints only where nothing is yet / only over a given colour
     setIfEmpty(x, y, c){ if (!this.get(x, y)) this.set(x, y, c); }
@@ -164,6 +164,7 @@ const PG = (() => {
     P.head(c, k, look);
     P.arm(c, k, true, top, look);
     for (let i = 0; i < r.front.length; i++) r.front[i].draw(c, k, look);
+    for (let i = 0; i < r.back.length; i++) if (r.back[i].over) r.back[i].over(c, k, look);   // (a back prop's part on the front: a strap)
     if (!look.outline || look.outline === 'all') outlineFast(c); else c.outline(look.outline);
   };
   // the head: skin lit from the upper left (the jaw and chin in the shade), an eye one pixel in from the front edge, then hair, hat, face gear
@@ -196,6 +197,7 @@ const PG = (() => {
     const sx = sh[0] + dx, ex = Math.max(1, Math.min(10, el[0] + dx)), hx = Math.max(1, Math.min(10, hd[0] + dx));
     c.line(sx, sh[1], ex, el[1], up); c.line(ex, el[1], hx, hd[1], lo);
     c.set(hx, hd[1], skin);
+    if (near){ k.nsx = sx; k.nsy = sh[1]; k.nex = ex; k.ney = el[1]; k.nhx = hx; k.nhy = hd[1]; }   // (the near arm's points as drawn, for the props that hold or cover it)
     if (near && sleeve !== 'none' && sleeve !== 'long') c.set(sx, sh[1], IX.TOP3);
     if (top.arm) top.arm(c, k, near, look);
   };
@@ -210,19 +212,21 @@ const PG = (() => {
       for (let y = hipY; y <= r1; y++) c.rect(lc0, y, kx - lc0 + 2, 1, y === hipY ? col : col);
       if (near) c.rect(lc0, r1, kx - lc0 + 2, 1, IX.BOT2);
       for (let y = r1 + 1; y < CH - 1; y++) c.rect(kx, y, 2, 1, short ? skin : col);
-      c.rect(kx, CH - 1, 3, 1, shc); if (shoes === 'sneaker') c.set(kx + 2, CH - 1, IX.WHITE);
+      c.rect(kx, CH - 1, 3, 1, shc); if (shoes === 'sneaker') c.rect(kx + 1, CH - 1, 2, 1, IX.WHITE);
+      k.kx = kx; k.ky = r1; k.lcx = kx; k.lcy = CH - 1;
       if (bot.leg) bot.leg(c, k, near, look);
       return;
     }
     const kn = near ? k.nearKnee : k.farKnee, ft = near ? k.nearFoot : k.farFoot, hx = k.hip[0], stand = near ? CX + 1 : CX - 1;
     const lc = Math.max(1, Math.min(8, lc0 + ft[0] - stand)), kl = Math.max(1, Math.min(8, (lc0 + lc)/2 + (kn[0] - (hx + ft[0])/2))), ky = kn[1], fy = ft[1];
+    k.kx = kl; k.ky = ky; k.lcx = lc; k.lcy = fy;   // (the knee and the foot as drawn, for the bottoms' details)
     c.line(lc0, hipY, kl, ky, col, 2);
     const lift = CH - 1 - fy > 0 ? 1 : 0, lcs = lift ? Math.max(1, lc - 1) : lc;   // a lifted foot kicks the shin back (the knee bends)
     c.line(kl, ky, lcs, fy - 1, short ? skin : col, 2);
     // the shoe: heel, sole, toe; a boot climbs one row of the shin; a sneaker has a pale toe
     c.rect(lcs, fy, 3, 1, shc);
     if (shoes === 'boot') { c.rect(lcs, fy - 1, 2, 1, shc); }
-    else if (shoes === 'sneaker') c.set(lcs + 2, fy, IX.WHITE);
+    else if (shoes === 'sneaker') c.rect(lcs + 1, fy, 2, 1, IX.WHITE);
     if (bot.leg) bot.leg(c, k, near, look);
   };
   P.legCols = LC0;

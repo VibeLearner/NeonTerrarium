@@ -578,7 +578,7 @@ function* buildNetworkGen(oldDoors, oldSpots){
       doorList.push(dd); doorByKey.set(key, dd); return dd; }));
     const d = !c.liftCab || c.below ? plotDoor(c, sides, 1.75) : null;
     if (d){ const key = 'd:' + c.i + ',' + c.j; doors.push(makeDoor(key, d, false, oldDoors.get(key))); addEnd(c, { key, x: d.stand.x, z: d.stand.z, kind: 'd' }); }
-    fresh.set('c:' + c.i + ',' + c.j, { id: 'c:' + c.i + ',' + c.j, cell: c, x: c.x, z: c.z, jobs, fun, night, doors });
+    fresh.set('c:' + c.i + ',' + c.j, { id: 'c:' + c.i + ',' + c.j, cell: c, x: c.x, z: c.z, jobs, fun, night, doors, ind: night > 0 });
   }
   // benches round the city: a little place to sit for a while
   let nb = 0;
@@ -826,6 +826,8 @@ function syncJobs(){
     if (tot <= 0) break;
     let r = rr()*tot, k = 0; while (k < w.length - 1 && (r -= w[k]) > 0) k++;
     p.job = open[k].id; used.set(p.job, (used.get(p.job) || 0) + 1);
+    if (p.fresh && PG.live()){ const jp = open[k]; if (jp.ind || (jp.mega && (jp.mega.kind === 'foundry' || jp.mega.kind === 'logistics')))   // someone who works in industry is dressed for it (picked once, as they first get the job)
+      p.row = PG.lookFor(p.id, p.row & 31, kk => hash(p.id, kk), { courier: p.courier, zone: p.zone, jobZone: 'ind' }); }
   }
   // the stalls and the police station are always staffed: if nobody's looking for work, people living nearby
   // swap their job for one

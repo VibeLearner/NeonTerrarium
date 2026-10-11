@@ -11,8 +11,13 @@ let last = performance.now();
 // The next frame is asked for first, and an error in a frame is caught: one bad frame used to stop the game for good (the frame was never asked for again), with a single
 // error in the console that was easy to miss. Errors are logged (the first five, then every 600th) and counted in FRAME_ERR; the game goes on with the next frame.
 const FRAME_ERR = { n: 0, last: '' };
+// Rest when idle (Settings, Optimize framerate): after 10 s without any input, with the view still and nothing being built, every other frame is skipped, so a
+// fanless laptop runs cooler (sustained full load makes it slow itself down after a few minutes, which shows as frames that come and go). Any input ends it at once.
+let IDLE_SKIP = false;
+const idleNow = now => S.idleRest && !PH.on && now - LAST_INPUT > 10000 && !dragging && !keys.size && Math.abs(yawT - yaw) < 1e-3 && Math.abs(zoomT - zoom) < 1e-3 && camT.distanceTo(camGoal) < 1e-3 && !anims.length && !STAGE_Q.length && !STAGE_READY.length && !STAGE_CHAINS.size;
 function frame(now){
   requestAnimationFrame(frame);
+  if (idleNow(now)){ IDLE_SKIP = !IDLE_SKIP; if (IDLE_SKIP) return; } else IDLE_SKIP = false;
   try { frameBody(now); }
   catch (e){ FRAME_ERR.n++; FRAME_ERR.last = String(e && e.stack || e).slice(0, 400);
     if (FRAME_ERR.n <= 5 || FRAME_ERR.n % 600 === 0) console.error('frame error #' + FRAME_ERR.n + ' (the game goes on):', e);

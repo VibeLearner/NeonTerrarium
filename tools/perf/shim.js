@@ -25,5 +25,6 @@
     const sc = window.__PERF_SCENE || {};
     for (const k in (sc.storage || {})) localStorage.setItem(k, sc.storage[k]);
     localStorage.setItem('neonIsland.autoPerf', '0');   // a fixed render scale: auto resolution can't drift
+    if (localStorage.getItem('neonIsland.zoomRes') === null) localStorage.setItem('neonIsland.zoomRes', '1.6');   // (the scenes were captured with the zoomed-out render growing to 1.6x, the old default; the game's default is now 1)
   } catch (e) {}
 })();

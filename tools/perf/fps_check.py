@@ -13,7 +13,7 @@ import harness as H
 
 ap = argparse.ArgumentParser()
 ap.add_argument('--scene', default='dense'); ap.add_argument('--hour', type=float, default=22); ap.add_argument('--secs', type=float, default=8)
-ap.add_argument('--width', type=int, default=1710); ap.add_argument('--height', type=int, default=876); ap.add_argument('--zoom', type=float, default=30); ap.add_argument('--lines', type=int, default=720); ap.add_argument('--rounds', type=int, default=2)
+ap.add_argument('--width', type=int, default=1710); ap.add_argument('--height', type=int, default=876); ap.add_argument('--zoom', type=float, default=30); ap.add_argument('--lines', type=int, default=720); ap.add_argument('--zoomres', default='0', help="zoomed out: 1 same pixels, 1.6 sharper, 0 the screen's full resolution (the owner's old setting)"); ap.add_argument('--rounds', type=int, default=2)
 ap.add_argument('--storage', help='a JSON file of the game\'s saved data (your own city): in the game\'s tab, open the console and run  copy(JSON.stringify(localStorage))  then paste into a file')
 ap.add_argument('--now-only', action='store_true', help='measure only the game as it is (about a minute)')
 a = ap.parse_args()
@@ -24,7 +24,7 @@ def open_page(br, url, scene, init=''):
     ctx = br.new_context(viewport={'width': a.width, 'height': a.height}, device_scale_factor=2)
     pg = ctx.new_page(); errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
-    st = dict(scene.get('storage', {})); st['neonIsland.capRes'] = '0'; st['neonIsland.autoPerf'] = '0'; st['neonIsland.renderLines'] = str(a.lines)   # (the owner's settings: 720p, both Optimize framerate boxes off)
+    st = dict(scene.get('storage', {})); st['neonIsland.zoomRes'] = str(a.zoomres); st['neonIsland.autoPerf'] = '0'; st['neonIsland.renderLines'] = str(a.lines)   # (the owner's settings: 720p, both Optimize framerate boxes off)
     import json
     # (the harness's copy of three takes its ids from window.__uuidRand, which the harness's own setup gives it; here ordinary random ids are fine)
     pg.add_init_script('window.__uuidRand = window.__uuidRand || Math.random; (() => { try { if (!sessionStorage.getItem("fpsInit")) { localStorage.clear(); const s = ' + json.dumps(st) + '; for (const k in s) localStorage.setItem(k, s[k]); sessionStorage.setItem("fpsInit", "1"); } } catch (e) {} })();' + init)

@@ -125,6 +125,8 @@ canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointerca
 canvas.addEventListener('pointerleave', () => { if (!ptrs.size){ hover.visible = hoverFill.visible = false; showMegaGhost(null); hwGhost.g.visible = false; hwHighlight(null); } });
 canvas.addEventListener('wheel', e => { e.preventDefault(); zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 30); }, { passive:false });
 const PAN_KEYS = ['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'];
+let LAST_INPUT = performance.now();   // (rest when idle: main.js)
+for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown', 'touchstart']) addEventListener(ev, () => { LAST_INPUT = performance.now(); }, { passive: true, capture: true });
 addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === 'shift') keys.delete('shift'); });
 addEventListener('blur', () => keys.clear());
 addEventListener('keydown', e => {
@@ -223,7 +225,11 @@ $('outlines').addEventListener('change', e => { S.outlines = e.target.checked; }
 // Detail tiers (world.js TIER): far blocks drawn as stand-ins with their smallest pieces left out; remembered in this browser, and switched at once
 { try { const v = localStorage.getItem('neonIsland.tiers'); if (v !== null) S.tiers = v === '1'; } catch (e) {} if (S.tiers === undefined) S.tiers = true; $('tiers').checked = S.tiers;
   $('tiers').addEventListener('change', e => { S.tiers = e.target.checked; try { localStorage.setItem('neonIsland.tiers', S.tiers ? '1' : '0'); } catch (e2) {} tierApplyNow(); }); }
-for (const id of ['capRes', 'autoPerf']){
+document.querySelectorAll('#zoomResChips button').forEach(b => {
+  b.classList.toggle('on', +b.dataset.f === ZOOM_RES);
+  b.addEventListener('click', () => { setZoomRes(+b.dataset.f); document.querySelectorAll('#zoomResChips button').forEach(x => x.classList.toggle('on', x === b)); });
+});
+for (const id of ['idleRest', 'autoPerf']){
   try { const v = localStorage.getItem('neonIsland.' + id); if (v !== null){ S[id] = v === '1'; $(id).checked = S[id]; } } catch (e) {}
   $(id).addEventListener('change', e => { S[id] = e.target.checked; try { localStorage.setItem('neonIsland.' + id, S[id] ? '1' : '0'); } catch (e2) {} if (id === 'autoPerf') PERF.grow = Infinity; });
 }

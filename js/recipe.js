@@ -236,7 +236,7 @@ RW.request = (job, skipWorld) => {
 };
 // The worker started afresh: a plot it made again came out different from the first time while the page's matched (pmFill), so something the worker keeps between plots had
 // drifted. Jobs in flight: a plot waiting for its arrays asks again, a plot being made falls back to the page (as when the worker fails). At most RW.maxRestarts times.
-RW.maxRestarts = 5;
+RW.maxRestarts = 0;   // (off: on the owner's Mac a fresh worker came out different as often as an old one, so starting it afresh did not help; RW.maxRestarts = 5 turns it back on)
 RW.restart = () => {
   if (RW.restarts >= RW.maxRestarts || !RW.w) return;
   RW.restarts++;

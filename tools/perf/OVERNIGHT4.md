@@ -224,3 +224,11 @@ The owner's runs on 64e6393: 8 stand-ins (tiers on) and 1 full plot (tiers off) 
 - **The worker started afresh:** after such a plot, the worker is asked for the same plot once more (recorded as `again` in `PM.mm`, to tell drift from chance), then it is restarted (`RW.restart`, at most 5 times a session); while it starts, plots that need arrays wait for it rather than being made on the page.
 - `PM.line()` now reads "came out different N (by the worker N, put right from the page N, worker restarts N)"; each `PM.mm` entry has `src`, `fixed`, `page`, `again`, `restarts`, `workerJobs`, `secs`.
 - Tested with a forced difference: put right from the page, the second ask recorded, the worker restarted and went on remaking plots (193 more), no merge or frame errors.
+
+## Detail tiers on by default (?v=2026-10-11a)
+
+The owner's runs on 7a79791 (max city, 8 minutes of zooming with tiers on; 90 s still with tiers off):
+- **Memory settled:** `PM.mem()` reads the same with tiers on and off (full arrays 194 against 193 MB, stand-ins 81 against 78 MB), and the heap after standing still was lower with tiers on (1,715 against 1,971 MB). The earlier 2,860 MB was garbage not yet collected during heavy remaking.
+- **Remakes that come out different:** 25 of 5,589 remakes (0.45%) in 8 minutes of constant zooming; 21 put right from the page (the plot stays exactly as it was), 4 replaced whole (for those the page and the worker agreed with each other and not with the plot as first made, and the plots were kept). No merge or frame errors. A fresh worker came out different as often as an old one, so the restart is turned off (`RW.maxRestarts = 0`).
+- **Still open:** what makes a remake differ. It is not the recipe or the shape caches, and here (no graphics card, 6,000 remakes of the max city) it never happens. Some state that changes with play, seen by both the page and the worker but not reproduced here. Harmless now; worth a look later with a profile of one such plot on the owner's machine.
+- **Decision:** Detail tiers on by default (a stored choice still wins). With it on: no freeze, FPS the same or better, tall tower placement 56 to 124 ms worst frame against 230 ms off, memory the same, no visible change in flips at zoom 22 and 30.

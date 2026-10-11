@@ -11,13 +11,19 @@ const ART = (() => {
   // sizes of everything this round draws (the textures' pixel sizes; the shaders, uvs and the builders only ever see these): a plain table, the same in the worker and on the page
   A.SIZE = {
     holo_ads: [384, 432], holo_pureair: [512, 384], holo_freeair: [512, 384], holo_aether: [512, 440], holo_sky: [512, 440], holo_synth: [512, 384], holo_watch: [512, 384],
-    holo_walls: [2147, 2618], koi: [1000, 139], wanted: [576, 68], ddrone: [242, 19], cassette: [59, 44],
+    holo_walls: [544, 658], koi: [1000, 139], wanted: [576, 68], ddrone: [242, 19], cassette: [59, 44],
     pbike_r1c1: [14, 17], pbike_r1c2: [24, 17], pbike_r1c3: [26, 16], pbike_r1c4: [23, 18], pbike_r2c1: [14, 18], pbike_r2c2: [19, 18], pbike_r2c3: [26, 16], pbike_r2c4: [24, 18],
   };
   // the sprite-atlas kinds drawn in code (sprites.js: SG.has decides, unless the old art is asked for): the 15 shop icons in 3 colors, and the police badge
   A.SHOPS = ['ramen', 'coffee', 'laundry', 'noodles', 'plant', 'repair', 'cocktail', 'music', 'arcade', 'clinic', 'books', 'hotel', 'records', 'bakery', 'games'];
   A.COLORS = ['pink', 'cyan', 'amber'];
   A.SIGNS = [].concat(...A.SHOPS.map(s => A.COLORS.map(c => 'sign_' + s + '_' + c)), ['sign_police']);
+  // the wall holograms' atlas: the old one (2147 x 2618, the pictures' own) and the code-drawn one, a quarter of its size in each direction (each sign keeps its shape); x, y from the top, width, height.
+  // The builders only use the old table (sign shapes and count), the shader the table of the art in use (see airFrag in buildings.js).
+  A.WALL_OLD = { atlas: [2147, 2618], cells: [[0, 0, 431, 999], [433, 0, 351, 1254], [786, 0, 656, 1388], [1444, 0, 703, 1467], [0, 1469, 795, 1149]] };
+  A.WALL_NEW = { atlas: [544, 658], cells: [[0, 0, 108, 250], [110, 0, 88, 314], [200, 0, 164, 347], [366, 0, 176, 367], [0, 369, 199, 287]] };
+  A.wall = () => (A.gens.holo_walls && !A.old()) ? A.WALL_NEW : A.WALL_OLD;
+  A.onFlip = [];
   const isSign = {}; for (const k of A.SIGNS) isSign[k] = true;
   A.isArtKind = k => !!isSign[k];
   A.old = () => !!window.__OLD_ART;
@@ -59,7 +65,7 @@ const ART = (() => {
       if (inWorker()) break;
       if (newArt(rec.name)){ if (!rec.painted) paint(rec); rec.tex.image = canvasOf(rec); rec.tex.needsUpdate = true; } else loadOld(rec);
     }
-    A.cassette();
+    A.cassette(); for (const f of A.onFlip) f();
   };
   // the radio cassette: an <img> in index.html (no src there: the picture is set here, so the old file is fetched only when the old art is asked for)
   A.cassette = () => {

@@ -2777,23 +2777,21 @@ const AIR_A3 = ART.tex('holo_synth', 'assets/sprites/holo_synth.png'), AIR_B3 = 
 // tools/make_wall_holo_signs.py, which prints the WALL_CELLS line below), side by side; WALL_ASPECT is each sign's height
 // over width.
 const AIR_W1 = ART.tex('holo_walls', 'assets/sprites/holo_walls.png');
-const WALL_ATLAS = [2147, 2618], WALL_CELLS = [[0, 0, 431, 999], [433, 0, 351, 1254], [786, 0, 656, 1388], [1444, 0, 703, 1467], [0, 1469, 795, 1149]];   // x, y from the top, width, height of each sign
+const WALL_ATLAS = ART.WALL_OLD.atlas, WALL_CELLS = ART.WALL_OLD.cells;   // x, y from the top, width, height of each sign (the old atlas: the builders only use the aspect ratios and the count)
 const WALL_ASPECT = WALL_CELLS.map(c => c[3]/c[2]);
 const AIR_ASPECT = [.75, 440/512, .75, .75, .75];   // height over width of each pair's pictures
 for (const t of [AIR_A, AIR_B, AIR_A2, AIR_B2, AIR_A3, AIR_B3, AIR_W1]){ t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }
 const AIR_CYCLE = [60, 2.4, 30, 2.4];   // ad, glitch, hacked, glitch back (seconds)
-const AIR_HOLO_MAT = new THREE.ShaderMaterial({
-  uniforms: { tA: { value: AIR_A }, tB: { value: AIR_B }, tA2: { value: AIR_A2 }, tB2: { value: AIR_B2 }, tA3: { value: AIR_A3 }, tB3: { value: AIR_B3 }, tW1: { value: AIR_W1 }, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
-  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform sampler2D tA; uniform sampler2D tB; uniform sampler2D tA2; uniform sampler2D tB2; uniform sampler2D tA3; uniform sampler2D tB3; uniform sampler2D tW1; uniform float time; uniform float lightsOn; varying vec2 vUv;` + LIT_GLSL + `
+// (the fragment shader is made for a wall-sign table: the old atlas or the code-drawn one, which is smaller; the table is the shader's constants, as it was)
+const airFrag = WALL => `uniform sampler2D tA; uniform sampler2D tB; uniform sampler2D tA2; uniform sampler2D tB2; uniform sampler2D tA3; uniform sampler2D tB3; uniform sampler2D tW1; uniform float time; uniform float lightsOn; varying vec2 vUv;` + LIT_GLSL + `
     float hh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
     float pr = 0.0;
-    vec3 wall(vec2 q){ float ad = mod(pr - 3.0, ${WALL_CELLS.length}.0); vec4 c = ${WALL_CELLS.map((c, k) => `ad < ${k}.5 ? vec4(${c.map(v => v + '.0').join(', ')})`).join(' : ')} : vec4(0.0);
-      return texture2D(tW1, vec2((c.x + .5 + q.x*(c.z - 1.0))/${WALL_ATLAS[0]}.0, 1.0 - (c.y + .5 + (1.0 - q.y)*(c.w - 1.0))/${WALL_ATLAS[1]}.0)).rgb; }
+    vec3 wall(vec2 q){ float ad = mod(pr - 3.0, ${WALL.cells.length}.0); vec4 c = ${WALL.cells.map((c, k) => `ad < ${k}.5 ? vec4(${c.map(v => v + '.0').join(', ')})`).join(' : ')} : vec4(0.0);
+      return texture2D(tW1, vec2((c.x + .5 + q.x*(c.z - 1.0))/${WALL.atlas[0]}.0, 1.0 - (c.y + .5 + (1.0 - q.y)*(c.w - 1.0))/${WALL.atlas[1]}.0)).rgb; }
     vec3 smp(float b, vec2 q){ q = clamp(q, 0.0, 1.0); if (pr > 2.5) return wall(q); if (pr > 1.5) return b > .5 ? texture2D(tB3, q).rgb : texture2D(tA3, q).rgb; if (pr > .5) return b > .5 ? texture2D(tB2, q).rgb : texture2D(tA2, q).rgb; return b > .5 ? texture2D(tB, q).rgb : texture2D(tA, q).rgb; }
     void main(){
       pr = floor(vUv.y + 1e-4);
-      float wl = pr > 2.5 ? 1.0 : 0.0, vr = floor((pr - 3.0)/${WALL_CELLS.length}.0 + .01), lines = 170.0;
+      float wl = pr > 2.5 ? 1.0 : 0.0, vr = floor((pr - 3.0)/${WALL.cells.length}.0 + .01), lines = 170.0;
       // wall ads: one scanline every ~0.1 world units; their pair is 3 + the ad number + ads*(the sign's height in world units, rounded)
       if (wl > .5) lines = 10.0*max(vr, 1.0);
       float id = floor(vUv.x + 1e-4), u = vUv.x - id, v = vUv.y - pr;
@@ -2831,10 +2829,15 @@ const AIR_HOLO_MAT = new THREE.ShaderMaterial({
       if (hh(vec2(floor(t*9.0), id + 5.0)) > .985) fl *= .35;
       float on = litOn(.3, lightsOn, time);
       gl_FragColor = vec4(col*edge*fl*mix(.4, .8, on)*mix(1.0, 1.4, wl), 1.0);   // the wall ads a little brighter
-    }`,
+    }`;
+const AIR_HOLO_MAT = new THREE.ShaderMaterial({
+  uniforms: { tA: { value: AIR_A }, tB: { value: AIR_B }, tA2: { value: AIR_A2 }, tB2: { value: AIR_B2 }, tA3: { value: AIR_A3 }, tB3: { value: AIR_B3 }, tW1: { value: AIR_W1 }, time: FOL_UNI.time, lightsOn: LIGHTS_ON },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: airFrag(ART.wall()),
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
 });
 AIR_HOLO_MAT.userData.colorOnly = true; AIR_HOLO_MAT.userData.noCast = true;
+ART.onFlip.push(() => { AIR_HOLO_MAT.fragmentShader = airFrag(ART.wall()); AIR_HOLO_MAT.needsUpdate = true; });   // (the old or the code-drawn wall atlas: its cells are the shader's constants)
 // the beam: faint light fanning from the lens to the picture, fading out as it goes, with streaks running along it
 const AIR_BEAM_MAT = new THREE.ShaderMaterial({
   uniforms: { time: FOL_UNI.time, lightsOn: LIGHTS_ON },

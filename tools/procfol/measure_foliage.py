@@ -46,6 +46,7 @@ def main():
     ap.add_argument('--tag', default='now'); ap.add_argument('--ref', default=os.environ.get('REF') or None)
     ap.add_argument('--draw', action='store_true', help='really rasterize the frames (software renderer: minutes a frame on the max city); the default turns the draw calls into no-ops, since only counts are wanted')
     ap.add_argument('--lawns', action='store_true', help='first lay every empty plot to lawn (green = "grass", the plot menu lawn setting), to measure what a lawn plot costs: the stock scenes have none')
+    ap.add_argument('--cache', type=int, default=0, metavar='FRAMES', help='leave the static cache ON and draw this many frames at each zoom first (e.g. 400): the frame is then the cache plus what is drawn live, which is what the owner sees standing still')
     ap.add_argument('--no-share', action='store_true', help='skip the frame-share frames (each is a whole frame in the software renderer)')
     a = ap.parse_args()
     if a.markdown:
@@ -67,7 +68,7 @@ def main():
         first = True
         for z in a.zooms:
             t0 = time.time()
-            view = pg.evaluate('z => __fol.view(z)', z)
+            view = pg.evaluate('([z, c]) => __fol.view(z, c)', [z, a.cache])
             scan = pg.evaluate('l => __fol.scan({ frustum: true, lod: l })', LODS)
             share = None if a.no_share else pg.evaluate('() => __fol.share()')
             if first:

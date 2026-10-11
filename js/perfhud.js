@@ -176,7 +176,7 @@ const PH = (() => {
   function setTest(k, v){
     if (tests[k] === v) return; tests[k] = v;
     if (k in ATLAS_TEST){ ATLAS_TEST[k] = v; ATLAS.needsUpdate = true; ATLAS_SIDE.needsUpdate = true; }
-    if (k === 'foliageLodOff'){ window.__FOL_LOD_OFF = !!v; scene.traverse(o => { if (o.userData.fol && !o.userData.own) o.frustumCulled = !v; }); }
+    if (k === 'foliageLodOff'){ window.__FOL_LOD_OFF = !!v; scene.traverse(o => { if (o.userData.fol) o.frustumCulled = !v; }); }
     if (k === 'oldSprites'){ window.__OLD_SPRITES = !!v; FOL_ATLAS.repaint(); FLOOR_ATLAS.repaint(); GRASS_MAT.userData.repaint(); }
     if (k === 'shadows'){ renderer.shadowMap.enabled = !v; for (const m of ALL_MATS.concat([ATLAS, ATLAS_SIDE])) m.needsUpdate = true; if (!v) shadowDirty = true; }   // (shaders are rebuilt either way)
   }

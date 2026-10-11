@@ -303,29 +303,45 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
 // All sprites share one texture atlas and one material, so a whole region's plants, laundry and signs
 // are a single instanced draw call. The layout is computed from the known sizes right away; each image is
 // painted into its slot as soon as it has loaded.
-const FOL_RECT = {};
+const FOL_RECT = {}, FOL_RECTS = {};   // FOL_RECTS[kind]: one rect per variant (a plain table: spritegen.js COUNT); FOL_RECT[kind]: the first
 const FOL_ATLAS = (() => {
-  const AW = 512, kinds = Object.keys(SPR.img).sort((a,b) => SPR.size[b][1] - SPR.size[a][1]);
+  const AW = 512, cnt = k => (typeof SG !== 'undefined' && SG.COUNT[k]) || 1, kinds = Object.keys(SPR.img).sort((a,b) => SPR.size[b][1] - SPR.size[a][1]);
   let x = 1, y = 1, rowH = 0;
   const slots = {};
-  for (const k of kinds){
-    const [w,h] = SPR.size[k];
-    if (x + w + 1 > AW){ x = 1; y += rowH + 1; rowH = 0; }
-    slots[k] = [x, y]; x += w + 1; rowH = Math.max(rowH, h);
+  // (the first variant of every kind sits exactly where the single picture used to; the other variants come after, so the old pictures sample the same texels as before)
+  for (let pass = 0; pass < 2; pass++) for (const k of kinds){
+    const [w,h] = SPR.size[k]; if (!slots[k]) slots[k] = [];
+    for (let v = pass ? 1 : 0; v < (pass ? cnt(k) : 1); v++){
+      if (x + w + 1 > AW){ x = 1; y += rowH + 1; rowH = 0; }
+      slots[k].push([x, y]); x += w + 1; rowH = Math.max(rowH, h);
+    }
   }
   let AH = 64; while (AH < y + rowH + 1) AH *= 2;
   const cv = document.createElement('canvas'); cv.width = AW; cv.height = AH;
   const g = cv.getContext('2d');
   const tex = new THREE.CanvasTexture(cv);
   tex.magFilter = tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false;
+  const imgs = {}, loaded = {};
   for (const k of kinds){
-    const [w,h] = SPR.size[k], [cx,cy] = slots[k];
-    FOL_RECT[k] = [cx, AH - cy - h, w, h];   // in texture space (flipped: v runs up from the canvas bottom)
-    const img = new Image();
-    img.onload = () => { g.drawImage(img, cx, cy, w, h); tex.needsUpdate = true; };
-    img.src = SPR.img[k];
+    const [w,h] = SPR.size[k];
+    FOL_RECTS[k] = slots[k].map(([cx,cy]) => [cx, AH - cy - h, w, h]);   // in texture space (flipped: v runs up from the canvas bottom)
+    FOL_RECT[k] = FOL_RECTS[k][0];
   }
-  return { tex, size: new THREE.Vector2(AW, AH) };
+  // a kind is drawn in code when it has a generator and the old pictures are not asked for (window.__OLD_SPRITES, or the overlay test "old sprites (as before)"); the picture of the old kinds goes into every variant slot
+  const inCode = k => typeof SG !== 'undefined' && SG.has(k) && !window.__OLD_SPRITES;
+  const paint = k => {
+    const [w,h] = SPR.size[k];
+    if (inCode(k)){ for (let v = 0; v < slots[k].length; v++){ const [cx,cy] = slots[k][v]; g.clearRect(cx, cy, w, h); SG.blit(g, SG.draw(k, w, h, v), cx, cy); } tex.needsUpdate = true; return; }
+    const img = imgs[k] || (imgs[k] = new Image());
+    const put = () => { for (const [cx,cy] of slots[k]){ g.clearRect(cx, cy, w, h); g.drawImage(img, cx, cy, w, h); } tex.needsUpdate = true; };
+    if (loaded[k]){ put(); return; }
+    img.onload = () => { loaded[k] = true; put(); };
+    if (!img.src) img.src = SPR.img[k];
+  };
+  const stats = { pixels: 0, ms: 0 };
+  // (the plot worker draws nothing: it needs only the layout)
+  if (!window.IN_RECIPE_WORKER){ const t0 = performance.now(); for (const k of kinds) paint(k); stats.ms = performance.now() - t0; }
+  return { tex, size: new THREE.Vector2(AW, AH), repaint(){ for (const k of kinds) if (SG.has(k)) paint(k); }, stats };
 })();
 const FOL_SHADER = new THREE.ShaderMaterial({
     uniforms: { lightsOn: LIGHTS_ON, lodPlants: LOD.plants, map:{value:FOL_ATLAS.tex}, atlasSize:{value:FOL_ATLAS.size}, tint:FOL_UNI.tint, time:FOL_UNI.time, normalMode:FOL_UNI.normalMode, neonI:FOL_UNI.neonI, res:FOL_UNI.res, wind:FOL_UNI.wind },
@@ -424,21 +440,42 @@ function plant(kind,P,x,y,z,k=1,anchor,fixed=false){
 // ordinary geometry buckets (with uvs), so a cell's floor decals cost no extra draw call per patch.
 const FLOOR_SPR = { f_moss1:[15,15], f_moss2:[16,15], f_weeds:[21,20], f_crack:[22,22], f_vine:[24,23], f_mossmat:[22,22],
   f_sprouts:[20,19], f_seam:[22,21], f_ivy:[24,24], f_leaves:[20,20], f_grass1:[30,9], f_grass2:[30,9] };
-const FLOOR_UV = {};
+const FLOOR_UV = {}, FLOOR_UVS = {};   // FLOOR_UVS[kind]: the uv rect of each variant (spritegen.js FCOUNT; a plain table the worker shares); FLOOR_UV[kind]: the first
+const FLOOR_ATLAS = {};
 const FLOOR_MAT = (() => {
-  const AW = 128; let x = 1, y = 1, rowH = 0; const slots = {};
+  // (the first variant of every kind sits exactly where the single picture was, in the left 128 texels; the other variants fill the space to the right.
+  // The sheet only grows wider, so the first variants' uvs are the old ones scaled by a power of two: the old pictures sample the same texels as before)
+  const AW = 512, cnt = k => (typeof SG !== 'undefined' && SG.FCOUNT[k]) || 1; const slots = {};
+  let x = 1, y = 1, rowH = 0, hmax = 0;
   for (const k in FLOOR_SPR){ const [w,h] = FLOOR_SPR[k];
-    if (x + w + 1 > AW){ x = 1; y += rowH + 1; rowH = 0; }
-    slots[k] = [x, y]; x += w + 1; rowH = Math.max(rowH, h); }
-  let AH = 16; while (AH < y + rowH + 1) AH *= 2;
+    if (x + w + 1 > 128){ x = 1; y += rowH + 1; rowH = 0; }
+    slots[k] = [[x, y]]; x += w + 1; rowH = Math.max(rowH, h); }
+  hmax = y + rowH + 1; x = 129; y = 1; rowH = 0;
+  for (const k in FLOOR_SPR){ const [w,h] = FLOOR_SPR[k];
+    for (let v = 1; v < cnt(k); v++){
+      if (x + w + 1 > AW){ x = 129; y += rowH + 1; rowH = 0; }
+      slots[k].push([x, y]); x += w + 1; rowH = Math.max(rowH, h); } }
+  hmax = Math.max(hmax, y + rowH + 1);
+  let AH = 16; while (AH < hmax) AH *= 2;
   const cv = document.createElement('canvas'); cv.width = AW; cv.height = AH;
   const g = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv);
   tex.magFilter = tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false;
+  const imgs = {}, loaded = {};
   for (const k in FLOOR_SPR){
-    const [w,h] = FLOOR_SPR[k], [cx,cy] = slots[k];
-    FLOOR_UV[k] = [cx/AW, 1 - (cy + h)/AH, (cx + w)/AW, 1 - cy/AH];
-    const img = new Image(); img.onload = () => { g.drawImage(img, cx, cy, w, h); tex.needsUpdate = true; }; img.src = 'assets/floor/' + k + '.png';
+    const [w,h] = FLOOR_SPR[k];
+    FLOOR_UVS[k] = slots[k].map(([cx,cy]) => [cx/AW, 1 - (cy + h)/AH, (cx + w)/AW, 1 - cy/AH]); FLOOR_UV[k] = FLOOR_UVS[k][0];
   }
+  const paint = k => {   // (as the sprite atlas: in code when there is a generator and the old pictures are not asked for, else the picture in every variant slot)
+    const [w,h] = FLOOR_SPR[k];
+    if (typeof SG !== 'undefined' && SG.has(k) && !window.__OLD_SPRITES){ for (let v = 0; v < slots[k].length; v++){ const [cx,cy] = slots[k][v]; g.clearRect(cx, cy, w, h); SG.blit(g, SG.draw(k, w, h, v), cx, cy); } tex.needsUpdate = true; return; }
+    const img = imgs[k] || (imgs[k] = new Image());
+    const put = () => { for (const [cx,cy] of slots[k]){ g.clearRect(cx, cy, w, h); g.drawImage(img, cx, cy, w, h); } tex.needsUpdate = true; };
+    if (loaded[k]){ put(); return; }
+    img.onload = () => { loaded[k] = true; put(); };
+    if (!img.src) img.src = 'assets/floor/' + k + '.png';
+  };
+  if (!window.IN_RECIPE_WORKER) for (const k in FLOOR_SPR) paint(k);
+  FLOOR_ATLAS.repaint = () => { for (const k in FLOOR_SPR) if (SG.has(k)) paint(k); };
   const m = toon(0xffffff); m.map = tex; m.alphaTest = .5; m.userData.noCast = true;
   m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -2;
   return m;
@@ -453,8 +490,9 @@ const _fv = new THREE.Vector3();
 function floorPatch(kind, P, x, y, z, k=1, ry){
   if (NO_GREEN) return;
   if (!chance(Math.min(1, .25 + .75*S.green))) return;
-  const [w,h] = FLOOR_SPR[kind], hw = w/PX*k/2, hh = h/PX*k/2, uv = FLOOR_UV[kind];
+  const [w,h] = FLOOR_SPR[kind], hw = w/PX*k/2, hh = h/PX*k/2, uvs = FLOOR_UVS[kind];
   const m = under(P, T(x, y, z, ry === undefined ? irand(0,3)*PI/2 : ry));
+  const uv = uvs[SG.vAt(uvs.length, m.elements[12], m.elements[13], m.elements[14])];   // the variant from the spot (a hash, no random draw)
   const flip = chance(.5), u0 = flip ? uv[2] : uv[0], u1 = flip ? uv[0] : uv[2];   // mirrored by the uvs, which keeps the winding facing up
   let b = buckets.get(FLOOR_MAT); if (!b){ b = { p: [], n: [], d: [], f: null, u: [] }; buckets.set(FLOOR_MAT, b); }
   const C = [[-hw,-hh,u0,uv[3]], [hw,-hh,u1,uv[3]], [hw,hh,u1,uv[1]], [-hw,hh,u0,uv[1]]];
@@ -512,9 +550,10 @@ function buildFoliage(){
   let i = 0;
   for (const kind in FOL_LIST){
     const L = FOL_LIST[kind]; if (!L.length) continue;
-    const r = FOL_RECT[kind], sw = swayTypeFor(kind), em = (kind.startsWith('sign_') || kind.startsWith('glyph_')) ? 1 : 0;
+    const rs = FOL_RECTS[kind], sw = swayTypeFor(kind), em = (kind.startsWith('sign_') || kind.startsWith('glyph_')) ? 1 : 0;
     for (const p of L){
       mesh.setMatrixAt(i, p.m);
+      const r = rs.length > 1 ? rs[SG.vAt(rs.length, p.m.elements[12], p.m.elements[13], p.m.elements[14])] : rs[0];   // the variant from the spot (a hash, no random draw; a plant's two crossed copies share it)
       attr[i*4] = p.an; attr[i*4+1] = p.flip; attr[i*4+2] = p.shade; attr[i*4+3] = p.phase; fx[i] = p.fixed;
       rect.set(r, i*4); kd[i*2] = sw; kd[i*2+1] = em; ons[i] = em ? litOrder(p.m.elements[12], p.m.elements[13], p.m.elements[14])/255 : 0; i++;
     }

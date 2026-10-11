@@ -68,7 +68,7 @@ const PG = (() => {
     const H = body.H, bw = body.bw, bob = pose.bob || 0, up = pose.up || 0, lean = pose.lean || 0, sit = pose.sit ? 1 : 0;
     const headTop = CH - H + bob - up + (sit ? 3 : 0), shoulderY = headTop + 4, hipY = shoulderY + 4;   // (sitting: the whole upper body is lower, the legs fold)
     const k = { body, pose, cx: CX, headTop, shoulderY, hipY, lean, bw, footY: CH - 1 };
-    k.hx = CX + lean - 1;                       // the head's left column (the head is 4 wide: hx .. hx + 3)
+    k.hx = CX + lean - 1 + (pose.headDx || 0);  // the head's left column (the head is 4 wide: hx .. hx + 3); headDx tilts it (a look up: back one pixel)
     k.torso = { x0: CX - Math.floor(bw/2) + lean, x1: CX - Math.floor(bw/2) + lean + bw - 1 };
     k.nearSh = [CX + lean + 1, shoulderY + 1]; k.farSh = [CX + lean, shoulderY + 1];
     k.hip = [CX, hipY];
@@ -126,59 +126,106 @@ const PG = (() => {
   P.shapes = [];   // a shape is a look: { name, body: { H, bw }, hair, hat, top, bottom, props: [], tags }
   P.addShape = (look) => { P.shapes.push(look); return P.shapes.length - 1; };
 
-  // the order a figure is painted in (back to front); every part gets (cell, skeleton, look); props say which layer they are
+  // the parts of a look, resolved once and kept on the look (no per-cell lookups or allocations)
+  const resolve = look => { let r = look._r; if (r) return r;
+    const parts = P.parts, back = [], front = [], face = [];
+    for (const n of (look.props || [])){ const pr = parts.prop[n]; if (!pr) continue; (pr.layer === 'back' ? back : pr.layer === 'face' ? face : front).push(pr); }
+    if (look.face && parts.prop[look.face]) face.push(parts.prop[look.face]);
+    r = look._r = { top: parts.top[look.top] || parts.top.tee, bot: parts.bottom[look.bottom] || parts.bottom.trousers, hair: look.hair ? parts.hair[look.hair] : null,
+      hat: look.hat ? parts.hat[look.hat] : null, back, front, face, room: 0 };
+    r.room = Math.max((r.hair && r.hair.room) || 0, (r.hat && r.hat.room) || 0, look.room || 0);
+    return r;
+  };
+  // the outline: every empty pixel next to a drawn one (4 neighbours) becomes IX.OUT; one scratch buffer, no allocations
+  const ob = new Uint8Array(CW*CH);
+  const outlineFast = c => {
+    const b = c.b, s = c.s, base = c.oy*s + c.ox;
+    for (let y = 0; y < CH; y++){ const r = base + y*s;
+      for (let x = 0; x < CW; x++){ const i = y*CW + x;
+        if (b[r + x]){ ob[i] = 0; continue; }
+        ob[i] = ((x > 0 && b[r + x - 1]) || (x < CW - 1 && b[r + x + 1]) || (y > 0 && b[r - s + x]) || (y < CH - 1 && b[r + s + x])) ? 1 : 0; } }
+    for (let y = 0; y < CH; y++){ const r = base + y*s; for (let x = 0; x < CW; x++) if (ob[y*CW + x]) b[r + x] = IX.OUT; }
+  };
+  // the order a figure is painted in (back to front); every part gets (cell, skeleton, look); props say which layer they are ('back', 'front', or 'face': drawn with the head's corner)
+  // the head needs `room` rows above it (a hat, a bun) and one more for the outline: if a frame lifts the body too high (a tall body breathing), the upper body stays down instead
+  const fitTop = (k, room) => { const d = 1 + room - (k.headTop + k.nod); if (d <= 0) return; k.headTop += d; k.shoulderY += d; k.hipY += d; k.hip[1] += d;
+    k.nearSh[1] += d; k.farSh[1] += d; k.nearElbow[1] += d; k.farElbow[1] += d; k.nearHand[1] += d; k.farHand[1] += d; };
   P.drawFigure = (c, k, look) => {
-    const parts = P.parts, top = parts.top[look.top] || parts.top.tee, bot = parts.bottom[look.bottom] || parts.bottom.trousers;
-    const props = (look.props || []).map(n => parts.prop[n]).filter(Boolean);
+    const r = resolve(look), top = r.top, bot = r.bot;
+    fitTop(k, r.room);
     P.arm(c, k, false, top, look); P.leg(c, k, false, bot, look);   // far arm, far leg
-    for (const pr of props) if (pr.layer === 'back') pr.draw(c, k, look);
-    const hr = parts.hair[look.hair]; if (hr && hr.back) hr.back(c, k, look, k.hx, k.headTop + k.nod);
+    for (let i = 0; i < r.back.length; i++) r.back[i].draw(c, k, look);
+    if (r.hair && r.hair.back) r.hair.back(c, k, look, k.hx, k.headTop + k.nod);
+    if (top.back) top.back(c, k, look);
     P.torso(c, k, top, look);
     P.leg(c, k, true, bot, look);
     if (bot.front) bot.front(c, k, look);
     if (top.front) top.front(c, k, look);
     P.head(c, k, look);
     P.arm(c, k, true, top, look);
-    for (const pr of props) if (pr.layer !== 'back') pr.draw(c, k, look);
-    c.outline(look.outline || 'all');
+    for (let i = 0; i < r.front.length; i++) r.front[i].draw(c, k, look);
+    if (!look.outline || look.outline === 'all') outlineFast(c); else c.outline(look.outline);
   };
-  // the head: skin, the face, then the hair and hat
+  // the head: skin lit from the upper left (the jaw and chin in the shade), an eye one pixel in from the front edge, then hair, hat, face gear
   P.head = (c, k, look) => {
-    const x = k.hx, y = k.headTop + k.nod;
+    const r = resolve(look), x = k.hx, y = k.headTop + k.nod;
     c.rect(x, y, 4, 4, IX.SKIN);
-    c.set(x + 3, y + 3, IX.SKIN2);   // (the chin)
-    c.set(x + 3, y + 2, IX.EYE);     // (an eye at the front edge)
-    c.set(x, y + 3, IX.SKIN2);       // (the shaded neck side)
-    const h = parts_(look.hair, 'hair'); if (h && h.draw) h.draw(c, k, look, x, y);
-    const hat = parts_(look.hat, 'hat'); if (hat) hat.draw(c, k, look, x, y);
-    if (look.face && P.parts.prop[look.face]) P.parts.prop[look.face].draw(c, k, look, x, y);
+    c.set(x + 3, y + 3, IX.SKIN2); c.set(x + 2, y + 3, IX.SKIN2);   // (the jaw in shade, the chin)
+    c.set(x, y + 3, IX.SKIN2);                                       // (the neck side)
+    c.set(x + 2, y + 2, IX.EYE);
+    if (r.hair && r.hair.draw) r.hair.draw(c, k, look, x, y);
+    if (r.hat) r.hat.draw(c, k, look, x, y);
+    for (let i = 0; i < r.face.length; i++) r.face[i].draw(c, k, look, x, y);
   };
-  const parts_ = (name, kind) => name ? P.parts[kind][name] : null;
-  // the torso: a block from the shoulders to the hips, widened by the build, drawn in the top's colour
+  // the torso: a block from the shoulders to the hips, lit from the upper left (a light rim top and left, the shade on the right and under the arm), then the top's own details
   P.torso = (c, k, top, look) => {
-    const y0 = k.shoulderY, y1 = k.hipY - 1, w = k.bw;
-    for (let y = y0; y <= y1; y++){ const lean = Math.round(k.lean*(1 - (y - y0)/Math.max(1, y1 - y0)));
-      for (let i = 0; i < w; i++) c.set(CX - Math.floor(w/2) + lean + i, y, i === 0 ? IX.TOP2 : (i === w - 1 && w > 3 ? IX.TOP2 : IX.TOP)); }
+    const y0 = k.shoulderY, y1 = k.hipY - 1, w = k.bw, rows = y1 - y0 + 1, half = w >> 1;
+    for (let j = 0; j < rows; j++){ const x0 = CX - half + Math.round(k.lean*(1 - j/Math.max(1, rows - 1)));
+      for (let i = 0; i < w; i++){
+        const col = i === w - 1 ? IX.TOP2 : (j === 0 || (i === 0 && j < 2 && w > 3)) ? IX.TOP3 : (j === rows - 1 && i > 0 ? IX.TOP2 : IX.TOP);
+        c.set(x0 + i, y0 + j, col); } }
+    if (top.neck !== 'none') c.set(k.hx + 1, y0, IX.SKIN2);
     if (top.torso) top.torso(c, k, look);
   };
-  // an arm: the upper arm and the forearm; the sleeve colour down to the elbow (short) or the wrist (long), then skin
+  // an arm hangs inside the torso (the near arm one column behind the chest edge, the far arm one in from the back) so it reads as an arm and not as part of the body; the sleeve colour to the elbow
+  // (short) or the wrist (long), then skin; the near arm is the top's colour with a light shoulder, the far arm its shade
   P.arm = (c, k, near, top, look) => {
     const sh = near ? k.nearSh : k.farSh, el = near ? k.nearElbow : k.farElbow, hd = near ? k.nearHand : k.farHand, sleeve = top.sleeve || 'short';
-    const col = near ? IX.TOP : IX.TOP2;
-    c.line(sh[0], sh[1], el[0], el[1], sleeve === 'none' ? IX.SKIN : col);
-    c.line(el[0], el[1], hd[0], hd[1], sleeve === 'long' ? col : IX.SKIN);
-    c.set(hd[0], hd[1], IX.SKIN);
+    const tx = near ? k.torso.x1 - 1 : k.torso.x0 + (k.bw > 3 ? 1 : 0), dx = tx - sh[0];
+    const col = near ? (top.armCol || IX.TOP3) : IX.TOP2, skin = near ? IX.SKIN : IX.SKIN2, up = sleeve === 'none' ? skin : col, lo = sleeve === 'long' ? col : skin;
+    const sx = sh[0] + dx, ex = Math.max(1, Math.min(10, el[0] + dx)), hx = Math.max(1, Math.min(10, hd[0] + dx));
+    c.line(sx, sh[1], ex, el[1], up); c.line(ex, el[1], hx, hd[1], lo);
+    c.set(hx, hd[1], skin);
+    if (near && sleeve !== 'none' && sleeve !== 'long') c.set(sx, sh[1], IX.TOP3);
     if (top.arm) top.arm(c, k, near, look);
   };
-  // a leg: the thigh and the shin in the bottom's colour, a shoe at the foot (pointing forward)
+  // a leg: two pixels wide, the thigh and the shin in the bottom's colour (the far leg in the shade), a shoe pointing forward at the foot. The legs stand under the hips (the feet only move away from
+  // that stance by the pose), so a standing figure stands straight; sitting folds the thigh forward.
+  const LC0 = [[4, 5], [3, 5], [3, 6]];   // left column of the far and the near leg, per build (slim, average, broad)
   P.leg = (c, k, near, bot, look) => {
-    const hip = k.hip, kn = near ? k.nearKnee : k.farKnee, ft = near ? k.nearFoot : k.farFoot, col = near ? IX.BOT : IX.BOT2, short = bot.len === 'short' || bot.len === 'skirt';
-    const x0 = hip[0] + (near ? 0 : -1), y0 = k.hipY;
-    c.line(x0, y0, kn[0], kn[1], col, 1); c.line(x0 + 1, y0, kn[0] + 1, kn[1], col, 1);
-    c.line(kn[0], kn[1], ft[0], ft[1], short ? IX.SKIN : col, 1); if (!short) c.line(kn[0] + 1, kn[1], ft[0] + 1, ft[1], col, 1);
-    c.set(ft[0], ft[1], IX.SHOE); c.set(ft[0] + 1, ft[1], IX.SHOE);
+    const lc0 = LC0[Math.min(2, Math.max(0, k.bw - 3))][near ? 1 : 0], col = near ? IX.BOT : IX.BOT2, short = bot.len === 'short' || bot.len === 'skirt', skin = near ? IX.SKIN : IX.SKIN2;
+    const shoes = look.shoes || 'shoe', shc = IX.SHOE, hipY = k.hipY;
+    if (k.sit){
+      const kx = Math.min(8, lc0 + 3) - (near ? 0 : 1), r1 = Math.min(14, hipY + 1);
+      for (let y = hipY; y <= r1; y++) c.rect(lc0, y, kx - lc0 + 2, 1, y === hipY ? col : col);
+      if (near) c.rect(lc0, r1, kx - lc0 + 2, 1, IX.BOT2);
+      for (let y = r1 + 1; y < CH - 1; y++) c.rect(kx, y, 2, 1, short ? skin : col);
+      c.rect(kx, CH - 1, 3, 1, shc); if (shoes === 'sneaker') c.set(kx + 2, CH - 1, IX.WHITE);
+      if (bot.leg) bot.leg(c, k, near, look);
+      return;
+    }
+    const kn = near ? k.nearKnee : k.farKnee, ft = near ? k.nearFoot : k.farFoot, hx = k.hip[0], stand = near ? CX + 1 : CX - 1;
+    const lc = Math.max(1, Math.min(8, lc0 + ft[0] - stand)), kl = Math.max(1, Math.min(8, (lc0 + lc)/2 + (kn[0] - (hx + ft[0])/2))), ky = kn[1], fy = ft[1];
+    c.line(lc0, hipY, kl, ky, col, 2);
+    const lift = CH - 1 - fy > 0 ? 1 : 0, lcs = lift ? Math.max(1, lc - 1) : lc;   // a lifted foot kicks the shin back (the knee bends)
+    c.line(kl, ky, lcs, fy - 1, short ? skin : col, 2);
+    // the shoe: heel, sole, toe; a boot climbs one row of the shin; a sneaker has a pale toe
+    c.rect(lcs, fy, 3, 1, shc);
+    if (shoes === 'boot') { c.rect(lcs, fy - 1, 2, 1, shc); }
+    else if (shoes === 'sneaker') c.set(lcs + 2, fy, IX.WHITE);
     if (bot.leg) bot.leg(c, k, near, look);
   };
+  P.legCols = LC0;
 
 
   // ---------- the palettes ----------
@@ -248,7 +295,7 @@ const PG = (() => {
     const rows = P.shapes.length, total = rows + P.extra.length, W = COLS*CW, H = total*CH, buf = new Uint8Array(W*H), t0 = performance.now();
     for (let r = 0; r < rows; r++){
       const look = P.shapes[r];
-      for (let f = 0; f < F.N; f++) P.drawFigure(new Cell(buf, W, f*CW, r*CH), P.skeleton(look.body, poses[f]), look);
+      for (let f = 0; f < F.N; f++){ const cell = new Cell(buf, W, f*CW, r*CH); if (look.custom) look.custom(cell, f); else P.drawFigure(cell, P.skeleton(look.body, poses[f]), look); }
     }
     P.indexBuf = buf; P.W = W; P.H = H; P.ROWS = total; P.SHAPE_ROWS = rows; P.buildMs = performance.now() - t0;
     // to a canvas as colour indices (red = index*16 + 8), alpha 255 where drawn

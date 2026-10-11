@@ -255,6 +255,7 @@ function scBand(job){
 }
 function scJobStart(px, py, hard, soft, shk, why){
   if (!SC.next){ if (!scMargin()) return; SC.next = scMake(SC.w, SC.h); }
+  SC.jobAt = performance.now();
   const job = { edits: SC_EDITS, k: 0, K: SC.K, ox: scCol(px) - SC.Muse, oy: scRow(py) - SC.Muse, hard: hard.slice(), soft: soft.slice(), shk: shk.slice(), map: sun.shadow.map, why,
     rt: SC.next.rt, rn: SC.next.rn, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR),
     sc: sun.color.clone(), si: sun.intensity, hc: hemi.color.clone(), hg: hemi.groundColor.clone(), hi: hemi.intensity, em: EM_I.value.slice(), m1: sun.matrixWorld.clone(), m2: sun.target.matrixWorld.clone() };
@@ -263,7 +264,7 @@ function scJobStart(px, py, hard, soft, shk, why){
   SC.job = job;
 }
 function scJobSwap(job){   // the finished strips become the cache
-  const rt = SC.rtS, rn = SC.rtSN; SC.rtS = job.rt; SC.rtSN = job.rn; SC.next = { rt, rn };
+  const rt = SC.rtS, rn = SC.rtSN; SC.rtS = job.rt; SC.rtSN = job.rn; SC.next = { rt, rn }; SC.jobAt = performance.now();
   SC.lt = job; SC.editsSeen = job.edits;   // (a job's own fields are the lights it was drawn with)
   SC.hard = job.hard; SC.soft = job.soft; SC.shk = job.shk; SC.ox = job.ox; SC.oy = job.oy; SC.R = { x0: job.ox, x1: job.ox + SC.w, y0: job.oy, y1: job.oy + SC.h }; SC.age = 0; SC.rebuilds++; SC.job = null;
 }
@@ -336,6 +337,9 @@ SC.frame = function(){
   if (now){ scFull(px, py, hard, soft, shk, now); }
   else {
     SC.age++; SC.state = 'in use'; SC.why = '';
+    // (the second set of targets, the one background jobs draw into, is let go after half a minute without a job: a third of the card's memory for the cache
+    //  at full size, and nothing needs it until the next job, which makes it again; while the day cycles there is always a job soon, so it stays)
+    if (SC.next && !SC.job && !S.cycle && performance.now() - (SC.jobAt || 0) > 30000){ scFree(SC.next); SC.next = null; }
     // a newer cache in the background when the light has drifted, the shadow map has been swapped, or the view has used half the room
     if (SC.job && (!scSame(hard, SC.job.hard) || sun.shadow.map !== SC.job.map || SC.job.edits !== SC_EDITS)){ SC.job = null; }   // (it was for something that's gone)
     if (!SC.job){

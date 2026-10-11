@@ -1303,7 +1303,7 @@ function buildTownSquare(m){
   m.roofH = CURB + .1;
   m.top = v.centre === 'clock' ? 9 : 5;
 }
-// The holographic koi: a 10-frame neon line-art sheet (assets/sprites/koi_neon.png, 100x139 per frame) projected
+// The holographic koi: a 10-frame neon sheet drawn in code (artgen_koi.js, 100x139 per frame) projected
 // onto the pond. The frames don't flow smoothly into each other, so the projection is made to look faulty on purpose:
 // each frame holds for a beat, and every change comes through a glitch (rows tearing sideways, colour channels
 // splitting, half the image showing the previous frame, a flicker), with smaller stray glitches in between and
@@ -1345,7 +1345,7 @@ const KOI_SHADER = {
 };
 function koiFx(m){
   if (!koiTex){
-    koiTex = ART.tex('koi', 'assets/sprites/koi_neon.png');
+    koiTex = ART.tex('koi');
     koiTex.magFilter = koiTex.minFilter = THREE.NearestFilter; koiTex.generateMipmaps = false;
   }
   let p = m.pond; if (!p) return null;   // only the squares with the koi pond
@@ -3153,7 +3153,7 @@ function solidPush(p){
 // The bike is a billboard picked from eight drawn views by its heading; the officer (and passenger) are drawn by
 // people.js from POLICE_BIKES.
 const PBIKE_VIEWS = ['r2c1', 'r1c4', 'r2c3', 'r2c4', 'r1c1', 'r1c2', 'r1c3', 'r2c2'];   // nose away, away-right, right, ... going clockwise
-const PBIKE_TEX = PBIKE_VIEWS.map(n => { const t = ART.tex('pbike_' + n, 'assets/sprites/pbike_' + n + '.png'); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; });
+const PBIKE_TEX = PBIKE_VIEWS.map(n => { const t = ART.tex('pbike_' + n); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; });
 const PBIKE_SIZE = { r1c1: [14, 17], r1c2: [24, 17], r1c3: [26, 16], r1c4: [23, 18], r2c1: [14, 18], r2c2: [19, 18], r2c3: [26, 16], r2c4: [24, 18] };
 let POLICE_BIKES = [];
 const BIKE_Y = CURB + .28, BIKE_K = .8, BIKE_SEAT = .26;   // hover height; the rider's seat above the bike's base
@@ -3381,7 +3381,7 @@ function policeWire(){
   }) : null;
 }
 function policeFx(m){
-  if (!wantedTex){ wantedTex = ART.tex('wanted', 'assets/sprites/wanted.png'); wantedTex.magFilter = wantedTex.minFilter = THREE.NearestFilter; wantedTex.generateMipmaps = false; }
+  if (!wantedTex){ wantedTex = ART.tex('wanted'); wantedTex.magFilter = wantedTex.minFilter = THREE.NearestFilter; wantedTex.generateMipmaps = false; }
   const parts = [], screens = [], screenMeshes = [];
   (m.screens || []).forEach((sc, k) => {
     const u = { map: { value: wantedTex }, frame: { value: (k*2) % WANTED_N }, prevFrame: { value: 0 }, glitch: { value: 0 }, seed: { value: k*13 }, time: { value: 0 } };

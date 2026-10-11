@@ -2678,7 +2678,7 @@ function buildLot(lot){
 }
 
 /* ---------- hologram billboards ---------- */
-// Nine animated ads cut from the neon sheets (assets/sprites/holo_ads.png: a row per ad, a 64x48 cell per frame;
+// Nine animated ads drawn in code (artgen_ads.js: a row per ad, a 64x48 cell per frame;
 // the first six are portrait 40x46, the last three landscape 64x44). Each billboard is a projector (an emitter bar,
 // on posts for the bigger ones) throwing a see-through, flickering hologram: scanlines, a bright band rolling up it,
 // now and then a glitch that tears rows sideways, splits the colour and jumps frames. The bigger boards carry a
@@ -2703,7 +2703,7 @@ const holoText = (() => {
   draw(); if (document.fonts && document.fonts.load) document.fonts.load('8px Silkscreen').then(draw).catch(() => {});
   return tex;
 })();
-const holoAds = ART.tex('holo_ads', 'assets/sprites/holo_ads.png'); holoAds.magFilter = holoAds.minFilter = THREE.NearestFilter; holoAds.generateMipmaps = false;
+const holoAds = ART.tex('holo_ads'); holoAds.magFilter = holoAds.minFilter = THREE.NearestFilter; holoAds.generateMipmaps = false;
 var HOLO_MAT = null;
 HOLO_MAT = new THREE.ShaderMaterial({
   uniforms: { tAds: { value: holoAds }, tText: { value: holoText }, time: FOL_UNI.time, lightsOn: LIGHTS_ON, textW: { value: HOLO_TW.slice() },
@@ -2769,14 +2769,13 @@ function holoQuad(F, x, y, z, w, h, ad, seed, kind){
 // half a minute, then glitches back, and round again. Additive, so the dark of the sign is see-through; scanlines, a
 // rolling band, flicker; torn rows, split colour and static in the glitches. A faint beam fans out from the lens.
 // two pairs: Caelum-Sol's pure air hacked by "breathe for free", Aether-Vane's Platform 9 recruitment hacked by "the sky belongs to no one"
-const AIR_A = ART.tex('holo_pureair', 'assets/sprites/holo_pureair.png'), AIR_B = ART.tex('holo_freeair', 'assets/sprites/holo_freeair.png');
-const AIR_A2 = ART.tex('holo_aether', 'assets/sprites/holo_aether.png'), AIR_B2 = ART.tex('holo_sky', 'assets/sprites/holo_sky.png');
-const AIR_A3 = ART.tex('holo_synth', 'assets/sprites/holo_synth.png'), AIR_B3 = ART.tex('holo_watch', 'assets/sprites/holo_watch.png');   // and Synth Corp's security, hacked by "Big Brother is watching"
+const AIR_A = ART.tex('holo_pureair'), AIR_B = ART.tex('holo_freeair');
+const AIR_A2 = ART.tex('holo_aether'), AIR_B2 = ART.tex('holo_sky');
+const AIR_A3 = ART.tex('holo_synth'), AIR_B3 = ART.tex('holo_watch');   // and Synth Corp's security, hacked by "Big Brother is watching"
 // and plain ads (no hack) for the wall holograms: tall neon signs for a sushi bar, a repair shop, an air-filter shop
-// (PureFlow), a satellite shop and a loan shop, used as they are. They share one atlas (assets/sprites/holo_walls.png, built by
-// tools/make_wall_holo_signs.py, which prints the WALL_CELLS line below), side by side; WALL_ASPECT is each sign's height
-// over width.
-const AIR_W1 = ART.tex('holo_walls', 'assets/sprites/holo_walls.png');
+// (PureFlow), a satellite shop and a loan shop, used as they are. They share one atlas drawn in code (artgen_walls.js);
+// WALL_ASPECT is each sign's height over width.
+const AIR_W1 = ART.tex('holo_walls');
 const WALL_ATLAS = ART.WALL_OLD.atlas, WALL_CELLS = ART.WALL_OLD.cells;   // x, y from the top, width, height of each sign (the old atlas: the builders only use the aspect ratios and the count)
 const WALL_ASPECT = WALL_CELLS.map(c => c[3]/c[2]);
 const AIR_ASPECT = [.75, 440/512, .75, .75, .75];   // height over width of each pair's pictures
@@ -2837,7 +2836,6 @@ const AIR_HOLO_MAT = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
 });
 AIR_HOLO_MAT.userData.colorOnly = true; AIR_HOLO_MAT.userData.noCast = true;
-ART.onFlip.push(() => { AIR_HOLO_MAT.fragmentShader = airFrag(ART.wall()); AIR_HOLO_MAT.needsUpdate = true; });   // (the old or the code-drawn wall atlas: its cells are the shader's constants)
 // the beam: faint light fanning from the lens to the picture, fading out as it goes, with streaks running along it
 const AIR_BEAM_MAT = new THREE.ShaderMaterial({
   uniforms: { time: FOL_UNI.time, lightsOn: LIGHTS_ON },

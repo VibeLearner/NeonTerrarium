@@ -328,7 +328,7 @@ const FOL_ATLAS = (() => {
     FOL_RECT[k] = FOL_RECTS[k][0];
   }
   // a kind is drawn in code when it has a generator (spritegen*.js); a kind without one loads its picture, which goes into every variant slot
-  const inCode = k => typeof SG !== 'undefined' && SG.has(k) && !(window.__OLD_ART && ART.isArtKind(k));   // (the shop signs and the police badge: the old art is the picture, when asked for)
+  const inCode = k => typeof SG !== 'undefined' && SG.has(k);
   const paint = k => {
     const [w,h] = SPR.size[k];
     if (inCode(k)){ for (let v = 0; v < slots[k].length; v++){ const [cx,cy] = slots[k][v]; g.clearRect(cx, cy, w, h); SG.blit(g, SG.draw(k, w, h, v), cx, cy); } tex.needsUpdate = true; return; }

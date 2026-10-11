@@ -11,7 +11,7 @@ A stop whose thing is not in the scene is skipped with a note (use --scene maxci
 import argparse, base64, io, os, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 sys.path.insert(0, os.path.join(ROOT, 'tools', 'perf'))
-SCENE_OF = {'signs': 'city', 'ads': 'city', 'wallholo': 'city', 'drone': 'city', 'radio': 'city', 'badge': 'megas', 'posters': 'megas', 'bikes': 'megas', 'pond': 'maxcity', 'airholo': 'maxcity', 'airholo_hacked': 'maxcity'}   # (a scene that has the thing: tools/procart/features.json)
+SCENE_OF = {'signs': 'city', 'ads': 'city', 'wallholo': 'city', 'drone': 'city', 'badge': 'megas', 'posters': 'megas', 'bikes': 'megas', 'pond': 'maxcity', 'airholo': 'maxcity', 'airholo_hacked': 'maxcity'}   # (a scene that has the thing: tools/procart/features.json)
 HOURS = {'12': 'S.cycle = false; S.rain = false; S.hour = 12', '22': 'S.cycle = false; S.rain = false; S.hour = 22'}
 # JS that returns {x, z} (world) for each stop, or null
 FIND = {
@@ -25,8 +25,7 @@ FIND = {
  'pond': "() => { const m = megasOfKind('square').find(m => m.pond); return m ? { x: m.pond.x, y: m.pond.y, z: m.pond.z } : null; }",
  'airholo': "() => holoAt(AIR_HOLO_MAT, 0, 3)", 'airholo_hacked': "() => holoAt(AIR_HOLO_MAT, 0, 3)", 'wallholo': "() => holoAt(AIR_HOLO_MAT, 3, 99)", 'ads': "() => holoAt(HOLO_MAT, 0, 99)",
  'drone': "() => { const g = ddMesh.geometry; if (!g.instanceCount) return null; const p = g.attributes.aPos.array; return { x: p[0], y: p[1], z: p[2] }; }",
- 'radio': "() => ({ x: camT.x, z: camT.z })",
-}
+ }
 HOLO_JS = """window.holoAt = (mat, lo, hi) => { let found = null; scene.traverse(m => { if (found || !m.isMesh || m.material !== mat) return; const uv = m.geometry.attributes.uv.array, p = m.geometry.attributes.position.array;
   for (let q = 0; q + 5 < uv.length/2; q += 6){ const pr = Math.floor(uv[q*2 + 1] + 1e-4); if (mat === AIR_HOLO_MAT ? (pr >= lo && pr < hi) : true){ let x = 0, y = 0, z = 0; for (let k = 0; k < 6; k++){ x += p[(q + k)*3]; y += p[(q + k)*3 + 1]; z += p[(q + k)*3 + 2]; }
     const v = new THREE.Vector3(x/6, y/6, z/6).applyMatrix4(m.matrixWorld); found = { x: v.x, z: v.z, y: v.y, id: Math.floor(uv[q*2] + 1e-4) }; break; } } }); return found; };"""
@@ -85,14 +84,33 @@ def game(a):
         if errs: print('PAGE ERRORS', errs[:5])
         br.close()
     srv.shutdown(); srv.server_close()
+def radio(out):
+    """The cassette on a static page with the game's own CSS (the .tape box, the turning reels at 45 degrees too), old picture and new one side by side, at the size the page shows it (118 x 88) and 3x."""
+    import glob
+    from PIL import Image
+    from playwright.sync_api import sync_playwright
+    files = [os.path.join(ROOT, 'js/spritegen.js'), os.path.join(ROOT, 'js/artgen.js'), os.path.join(ROOT, 'js/artgen_tools.js'), os.path.join(ROOT, 'js/artgen_wanted.js')]
+    with sync_playwright() as pw:
+        b = pw.chromium.launch(); pg = b.new_page(); pg.set_content('<body></body>')
+        pg.evaluate('() => { window.THREE = { Texture: function(){}, CanvasTexture: function(){}, TextureLoader: function(){ this.load = () => ({}); } }; }')
+        for f in files: pg.add_script_tag(content=open(f).read() + "\n;if (typeof ART !== 'undefined') window.ART = ART; if (typeof SG !== 'undefined') window.SG = SG;")
+        url = pg.evaluate("() => { const c = document.createElement('canvas'); c.width = 59; c.height = 44; ART.gens.cassette.fn(c.getContext('2d'), 59, 44, ART); return c.toDataURL(); }")
+        html = '<html><head><link rel="stylesheet" href="file://%s/css/style.css"><style>body{background:#0b0b14;margin:0;padding:16px;display:flex;gap:40px;position:static}.t{position:relative}.t .tape{display:block}.reel{animation:none!important}.r45 .reel{transform:rotate(45deg)}</style></head><body>' % ROOT
+        for lab, src, cls in (('old', 'file://%s/assets/ui/cassette.png' % ROOT, ''), ('new', url, ''), ('new, reels turned', url, 'r45')):
+            html += '<div class="t %s"><span class="tape"><img src="%s" alt="" width="118" height="88"><i class="reel l"></i><i class="reel r"></i></span></div>' % (cls, src)
+        html += '</body></html>'; path = os.path.join(out, 'radio_page.html'); open(path, 'w').write(html)
+        pg2 = b.new_page(viewport={'width': 520, 'height': 130}); pg2.goto('file://' + path); pg2.wait_for_timeout(500)
+        shot = os.path.join(out, 'radio_old_new.png'); pg2.screenshot(path=shot); b.close()
+    im = Image.open(shot); im.resize((im.size[0]*2, im.size[1]*2), Image.NEAREST).save(shot); os.remove(path); print(shot)
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument('--scene', default=None, help='default: a scene that has each thing (SCENE_OF)'); ap.add_argument('--stops', default='signs,badge,posters,bikes,pond,airholo,airholo_hacked,wallholo,ads,drone,radio')
+    ap = argparse.ArgumentParser(); ap.add_argument('--scene', default=None, help='default: a scene that has each thing (SCENE_OF)'); ap.add_argument('--stops', default='signs,badge,posters,bikes,pond,airholo,airholo_hacked,wallholo,ads,drone')
     ap.add_argument('--zooms', default='8,15,30'); ap.add_argument('--hours', default='12,22'); ap.add_argument('--out', default=os.path.join(HERE, 'sheets')); ap.add_argument('--no-dump', action='store_true'); ap.add_argument('--no-game', action='store_true')
     a = ap.parse_args(); os.makedirs(a.out, exist_ok=True)
     if not a.no_dump:
         names = ['sign_ramen_pink', 'sign_coffee_cyan', 'sign_arcade_amber', 'sign_police', 'wanted', 'cassette', 'ddrone', 'koi', 'holo_ads', 'holo_pureair', 'holo_freeair', 'holo_aether', 'holo_sky', 'holo_synth', 'holo_watch', 'holo_walls'] + ['pbike_' + n for n in ('r1c1', 'r1c2', 'r1c3', 'r1c4', 'r2c1', 'r2c2', 'r2c3', 'r2c4')]
         subprocess.check_call([sys.executable, os.path.join(HERE, 'dump.py')] + names + ['--scale', '3', '--bg', 'black', '--out', os.path.join(a.out, 'dump')])
     if not a.no_game:
+        radio(a.out)
         by = {}
         for st in a.stops.split(','): by.setdefault(a.scene or SCENE_OF[st], []).append(st)
         for sc, sts in by.items(): a.scene_run = sc; a.stops_run = ','.join(sts); game(a)

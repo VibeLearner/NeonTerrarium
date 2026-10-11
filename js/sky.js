@@ -107,7 +107,10 @@ function shadowFrame(){
       shAim(shJob, shJob.k); shJob.rt.scissor.set(0, sh.mapSize.y*shJob.k/shJob.K, sh.mapSize.x, sh.mapSize.y/shJob.K); shJob.rt.scissorTest = true;
       // (a building mid-sweep: three's own shadow pass ignores its clipping, so the strip does too)
       for (const a of anims) a.mats.atlas.clippingPlanes = [];
+      // (the strip's own culling: the merged blocks' pieces against the strip's frustum, world.js shadowRanges; no size classes dropped: the map keeps every triangle)
+      sh.updateMatrices(sun); cullFrame(sh.camera); CULL.lvl = -1; SHADOW_STRIP = [];
       const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(shHostRT); renderer.render(shHost, cam); renderer.autoClear = ac;
+      shadowRangesDone();
       for (const a of anims) a.mats.atlas.clippingPlanes = [a.u.plane];
       shJob.rt.scissorTest = false;
       PH.end();

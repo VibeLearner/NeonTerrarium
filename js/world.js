@@ -201,6 +201,23 @@ function multiRows(o, P, r0, r1, t0 = 0, t1 = -1){
   o.userData.md = m ? { s: MD.s.slice(0, m), n: MD.n.slice(0, m) } : null;
   CULL.tris += tot; return tot;
 }
+// A shadow strip (sky.js shadowFrame): the same triangles the strip drew before (A, the never-seen faces and every side, no size classes), but only of the
+// pieces whose boxes touch the strip's frustum. The shadow pass never calls onBeforeRender, so the strips used to draw every block whole: a strip of a
+// 32-strip redraw drew more triangles than the colour pass (2.4 million on the max city, the whole 7.8 million at worst), eight or more times over per block.
+let SHADOW_STRIP = null;   // (the meshes given ranges for the strip being drawn: put back after it)
+function shadowRanges(o, g){
+  const P = g.userData.pcs, u = g.userData.cut; if (!P || P.hrow === undefined || PH.tests.noCull) return;
+  const seen = pieceVis(P); if (seen === P.n) return;   // (every piece touches the strip: the plain draw range, as before)
+  const v = P.vis, n = P.n, s = MD.s; let m = 0;
+  const row = r => { for (let i = 0; i < n; i++){ if (!v[i]) continue; const c = P.rowN[r*n + i]; if (!c) continue; const st = P.rowS[r*n + i];
+    if (m && MD.s[m - 1] + MD.n[m - 1] === st) MD.n[m - 1] += c;
+    else { if (m === MD.s.length){ const s2 = new Int32Array(m*2), n2 = new Int32Array(m*2); s2.set(MD.s); n2.set(MD.n); MD.s = s2; MD.n = n2; } MD.s[m] = st; MD.n[m++] = c; } } };
+  row(0); row(P.hrow); for (let r = 1; r <= SIDE_K; r++) row(r); if (u.far) for (let r = RT0; r < RT0 + SIDE_K; r++) row(r);
+  o.userData.md = m ? { s: MD.s.slice(0, m), n: MD.n.slice(0, m) } : null;
+  if (!m) g.drawRange.count = 0;
+  SHADOW_STRIP.push([o, g]);
+}
+function shadowRangesDone(){ for (const [o, g] of SHADOW_STRIP){ o.userData.md = null; g.drawRange.start = 0; g.drawRange.count = cutRest(g.userData.cut); } SHADOW_STRIP = null; }
 function cutBefore(r, s, c, g){
   const u = g.userData.cut, P = g.userData.pcs; g.drawRange.start = 0; g.drawRange.count = g.userData.full ? cutRest(u) : u.A;
   if (P && !g.userData.full && c === CULL.cam){ const t = multiRows(this, P, 0, 0); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; } }
@@ -220,6 +237,7 @@ function sideBefore(r, s, c, g){
 { // (several ranges in one draw: three itself only draws one, so while a mesh with ranges is drawn the context's drawElements is swapped)
   const gl = renderer.getContext(), ext = window.NO_MULTI_DRAW ? null : gl.getExtension('WEBGL_multi_draw'), rbd = renderer.renderBufferDirect;
   renderer.renderBufferDirect = function(camera, sc, geo, mat, obj, grp){
+    if (SHADOW_STRIP && geo.userData.pcs && !obj.userData.md) shadowRanges(obj, geo);   // (a shadow strip: the pieces that touch it)
     const md = obj.userData.md; if (!md) return rbd.call(this, camera, sc, geo, mat, obj, grp);
     const bpe = geo.index.array ? geo.index.array.BYTES_PER_ELEMENT : geo.userData.bpe, n = md.s.length;
     if (ext){ if (!md.o){ md.o = new Int32Array(n); for (let i = 0; i < n; i++) md.o[i] = md.s[i]*bpe; } }
@@ -2029,15 +2047,16 @@ function* mergeCutGen(geos, far = false, shared = null){
   let k = 0;
   // where each piece's own triangles landed, row by row (row 0: A; rows 1 to K: the wall slices; then slices 0 to K/2 - 1 again; for the far order the sticks' walls and their first half again), and its box:
   // what lets a frame draw only the pieces that are on screen (see cullPieces)
-  const RT0 = 1 + SIDE_K + SIDE_K/2, nP = geos.length, rows = far ? RT0 + SIDE_K + SIDE_K/2 : RT0, rowS = new Int32Array(rows*nP), rowN = new Int32Array(rows*nP), box = new Float32Array(nP*6);
-  const rowC = new Int32Array(rows*nP*SMALL_N);   // (per piece and row: how many triangles are at least each size)
+  const RT0 = 1 + SIDE_K + SIDE_K/2, nP = geos.length, rows = far ? RT0 + SIDE_K + SIDE_K/2 : RT0, HROW = rows;   // (HROW: one more row, the never-seen faces per piece: the shadow strips draw them, culled by piece like the rest)
+  const rowS = new Int32Array((rows + 1)*nP), rowN = new Int32Array((rows + 1)*nP), box = new Float32Array(nP*6);
+  const rowC = new Int32Array((rows + 1)*nP*SMALL_N);   // (per piece and row: how many triangles are at least each size)
   const srcRow = row => row <= SIDE_K ? row : row < RT0 ? row - SIDE_K : row < RT0 + SIDE_K ? SIDE_K + 1 + (row - RT0) : SIDE_K + 1 + (row - RT0 - SIDE_K);
   const put = (lo, row) => { let base = 0; parts.forEach((p, gi) => { const I = p.I, r = typeof lo === 'function' ? lo(p) : null; const [x, y] = r || [p[lo][0], p[lo][1]];
     if (row >= 0){ rowS[row*nP + gi] = k; rowN[row*nP + gi] = y - x;
       const src = srcRow(row), cu = p.u, o = (row*nP + gi)*SMALL_N;
-      for (let l = 0; l < SMALL_N; l++) rowC[o + l] = cu && cu.cls ? (src*SMALL_N + l < cu.cls.length ? cu.cls[src*SMALL_N + l] : 0) : y - x; }
+      for (let l = 0; l < SMALL_N; l++) rowC[o + l] = row !== HROW && cu && cu.cls ? (src*SMALL_N + l < cu.cls.length ? cu.cls[src*SMALL_N + l] : 0) : y - x; }
     for (let q = x; q < y; q++) ix[k++] = I[q] + base; base += geos[gi].attributes.position.count; }); };
-  put('a', 0); put('h', -1); yield;
+  put('a', 0); put('h', HROW); yield;
   for (let j = 0; j < SIDE_K; j++){ put(p => [p.s[j], p.s[j + 1]], 1 + j); if (j % 4 === 3) yield; }
   if (far) for (let j = 0; j < SIDE_K; j++){ put(p => [p.t[j], p.t[j + 1]], RT0 + j); if (j % 4 === 3) yield; }
   for (let j = 0; j < SIDE_K/2; j++){ put(p => [p.s[j], p.s[j + 1]], 1 + SIDE_K + j); if (j % 4 === 3) yield; }
@@ -2050,7 +2069,7 @@ function* mergeCutGen(geos, far = false, shared = null){
   out.setIndex(new THREE.BufferAttribute(ix, 1));
   const sTot = off[SIDE_K] + offT[SIDE_K];
   out.userData.cut = far ? { A: nA, H: nH, S: sTot, off, offT, far: true } : { A: nA, H: nH, S: off[SIDE_K], off }; out.setDrawRange(0, nA + nH + sTot);
-  if (nP > 1) out.userData.pcs = { n: nP, rowS, rowN, rowC, box, stamp: -1, vis: new Uint8Array(nP), seen: 0, far };
+  if (nP > 1) out.userData.pcs = { n: nP, rowS, rowN, rowC, box, stamp: -1, vis: new Uint8Array(nP), seen: 0, far, hrow: HROW };
   if (shared && shared.boundingSphere) out.boundingSphere = shared.boundingSphere.clone(); else out.computeBoundingSphere();
   return out;
 }

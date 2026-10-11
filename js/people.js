@@ -31,7 +31,8 @@ const PPL_SPEED = .55;        // walking speed, world units a second (a block ta
 // a batch of upright pixel sprites cut from one sheet (rows of equal cells): people, and the delivery drones
 function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMaterial({   // (mrtShader: writes its flat normal too, core.js)
   uniforms: { map: { value: tex }, res: FOL_UNI.res, tint: FOL_UNI.tint, normalMode: FOL_UNI.normalMode,
-              sheet: { value: new THREE.Vector4(W, H, cw, ch) }, size: { value: new THREE.Vector2(cw/PX, ch/PX) } },
+              sheet: { value: new THREE.Vector4(W, H, cw, ch) }, size: { value: new THREE.Vector2(cw/PX, ch/PX) },
+              rowsM1: { value: rows - 1 }, pal: { value: tex }, palRows: { value: 1 }, usePal: { value: 0 } },   // (the palette lookup is off for the drones, and for the old people sheet; the sampler holds the sheet itself until the generator makes a palette texture, so no texture is added)
   vertexShader: `uniform vec2 res; uniform vec2 size; attribute vec3 aPos; attribute vec4 aSpr;
     varying vec2 vUv; varying vec4 vSpr;
     void main(){
@@ -48,7 +49,7 @@ function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMa
       vUv = vec2(aSpr.z < 0.0 ? 1.0 - uv.x : uv.x, uv.y);
       vSpr = aSpr;
     }`,
-  fragmentShader: `uniform sampler2D map; uniform vec4 sheet; uniform vec3 tint; uniform float normalMode;
+  fragmentShader: `uniform sampler2D map; uniform vec4 sheet; uniform vec3 tint; uniform float normalMode; uniform float rowsM1; uniform sampler2D pal; uniform float palRows; uniform float usePal;
     varying vec2 vUv; varying vec4 vSpr;
     float bayer(vec2 p){ p = mod(floor(p), 4.0);
       float b = p.x + p.y*4.0;   // 4x4 ordered dither, written out for GLSL ES 1.0
@@ -57,13 +58,21 @@ function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMa
     void main(){
       vec2 tx = floor(vUv * sheet.zw);
       if (tx.x < 0.0 || tx.y < 0.0 || tx.x >= sheet.z || tx.y >= sheet.w) discard;
-      vec2 st = vec2(vSpr.y*sheet.z + tx.x, (${rows - 1}.0 - vSpr.x)*sheet.w + tx.y);
+      // (generated people: the row is shape + 128*palette, the sheet holds colour indices, spaced 16 apart, looked up in the person's palette row; bubbles and the old sheet are drawn as they are)
+      float shape = usePal > 0.5 ? mod(vSpr.x, 128.0) : vSpr.x;
+      vec2 st = vec2(vSpr.y*sheet.z + tx.x, (rowsM1 - shape)*sheet.w + tx.y);
       vec4 c = texture2D(map, (st + 0.5)/sheet.xy);
       if (c.a < 0.5) discard;
+      float lit = 0.0;
+      if (usePal > 0.5 && vSpr.w < 1.5){
+        float idx = floor(c.r*255.0/16.0 + 0.01);
+        c.rgb = texture2D(pal, vec2((idx + 0.5)/16.0, (floor(vSpr.x/128.0) + 0.5)/palRows)).rgb;
+        lit = idx > 10.5 && idx < 11.5 ? 1.0 : 0.0;   // (index 11: a lit accent, neon trim, which keeps its colour at night)
+      }
       // stepping out of (or into) a doorway: the figure dissolves in a pixel dither
       if (vSpr.w < 0.999 && (bayer(gl_FragCoord.xy) + 0.5)/16.0 > vSpr.w) discard;
       // people catch a little of the street light, so they still read at night; emote bubbles are always bright
-      vec3 col = vSpr.w > 1.5 ? c.rgb : c.rgb * mix(tint, vec3(1.0), 0.3);
+      vec3 col = (vSpr.w > 1.5 || lit > 0.5) ? c.rgb : c.rgb * mix(tint, vec3(1.0), 0.3);
       gl_FragColor = normalMode > 0.5 ? vec4(0.5, 0.5, 1.0, 1.0) : vec4(col, 1.0);
     }`,
 }), 'vec4(0.5, 0.5, 1.0, 1.0)', true); }
@@ -1958,13 +1967,14 @@ function updatePeople(dt, t){
   const VP = comp.uniforms.VP.value;
   let i = 0;
   const ve = VP.elements;
+  const newLook = PG.live();   // (the generated sheet, or the old Craftpix one: a look code is old row | shape << 5 | palette << 12, see peoplegen.js)
   const emit = (x, y, z, row, frame, flip, alpha) => {
     if (i >= PPL_MAX) return false;
     // (Vector3.applyMatrix4's arithmetic, written out; only the screen position is needed)
     const w = 1/(ve[3]*x + ve[7]*y + ve[11]*z + ve[15]), sx = (ve[0]*x + ve[4]*y + ve[8]*z + ve[12])*w, sy = (ve[1]*x + ve[5]*y + ve[9]*z + ve[13])*w;
     if (sx < -1.1 || sx > 1.1 || sy < -1.15 || sy > 1.1) return false;
     P[i*3] = x; P[i*3 + 1] = y; P[i*3 + 2] = z;
-    Q[i*4] = row; Q[i*4 + 1] = frame; Q[i*4 + 2] = flip; Q[i*4 + 3] = alpha;
+    Q[i*4] = newLook ? PG.shapeOf(row) : row & 31; Q[i*4 + 1] = frame; Q[i*4 + 2] = flip; Q[i*4 + 3] = alpha;
     i++; return true;
   };
   // which stalls are being served, and who's queueing where
@@ -2086,7 +2096,7 @@ function updatePeople(dt, t){
       const sd = (p.walk.puke.x - p.x)*_camR.x + (p.walk.puke.z - p.z)*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
       if (u > .8 && !p.walk.puke.left){ p.walk.puke.left = true; pukes.push({ x: p.walk.puke.x, z: p.walk.puke.z, t0: t, sx: p.x, sz: p.z }); } }
     if (p.cop && p.angry > t) frame = F_ANGRY + Math.min(5, Math.floor((t - p.angry + .9)*7));
-    if (p.row === ROW_HOOD && frame >= F_SPEC) frame = F_IDLE + (frame % 4);   // (the archivist has walk and idle frames only)
+    if ((p.row & 31) === ROW_HOOD && frame >= F_SPEC) frame = F_IDLE + (frame % 4);   // (the archivist has walk and idle frames only)
     p._ec = 1; p._ey = y; p._er = p.cop ? ROW_COP : p.row; p._ef = frame; p._ea = Math.max(0, alpha); p._eo = frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8; p._eoOn = alpha > .9;   // (what a frame between steps draws again)
     if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);

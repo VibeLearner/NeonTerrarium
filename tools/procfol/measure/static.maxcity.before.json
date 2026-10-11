@@ -1,0 +1,143 @@
+{
+ "scene": "maxcity",
+ "ref": "wip/procfol",
+ "tol": null,
+ "off": false,
+ "zooms": {
+  "8": {
+   "zoom": 8,
+   "H": 360,
+   "texelPx": 1.25,
+   "liveTrisPerFrame": 142550,
+   "cacheTrisPerFrame": 0,
+   "folOn": null,
+   "peakPx": null,
+   "scState": "in use",
+   "rebuilds": 2,
+   "swayMeshes": 0,
+   "signMeshes": 74
+  },
+  "15": {
+   "zoom": 15,
+   "H": 405,
+   "texelPx": 0.75,
+   "liveTrisPerFrame": 177212,
+   "cacheTrisPerFrame": 0,
+   "folOn": null,
+   "peakPx": null,
+   "scState": "in use",
+   "rebuilds": 4,
+   "swayMeshes": 0,
+   "signMeshes": 74
+  },
+  "30": {
+   "zoom": 30,
+   "H": 576,
+   "texelPx": 0.5333333333333333,
+   "liveTrisPerFrame": 185206,
+   "cacheTrisPerFrame": 0,
+   "folOn": null,
+   "peakPx": null,
+   "scState": "in use",
+   "rebuilds": 6,
+   "swayMeshes": 0,
+   "signMeshes": 74
+  }
+ },
+ "script": {
+  "steps": [
+   {
+    "step": "still",
+    "wholeSwaps": 0,
+    "ringStrips": 0,
+    "editRects": 0,
+    "fullDraws": 0,
+    "bandDraws": 0,
+    "rectDraws": 0,
+    "cachePlantTris": 0
+   },
+   {
+    "step": "pan slow",
+    "wholeSwaps": 0,
+    "ringStrips": 0,
+    "editRects": 6,
+    "fullDraws": 0,
+    "bandDraws": 0,
+    "rectDraws": 6,
+    "cachePlantTris": 0
+   },
+   {
+    "step": "pan fast",
+    "wholeSwaps": 0,
+    "ringStrips": 1,
+    "editRects": 4,
+    "fullDraws": 0,
+    "bandDraws": 0,
+    "rectDraws": 5,
+    "cachePlantTris": 0
+   },
+   {
+    "step": "rest",
+    "wholeSwaps": 0,
+    "ringStrips": 0,
+    "editRects": 9,
+    "fullDraws": 0,
+    "bandDraws": 0,
+    "rectDraws": 9,
+    "cachePlantTris": 0
+   },
+   {
+    "step": "turn",
+    "wholeSwaps": 0,
+    "ringStrips": 0,
+    "editRects": 0,
+    "fullDraws": 0,
+    "bandDraws": 0,
+    "rectDraws": 0,
+    "cachePlantTris": 0
+   },
+   {
+    "step": "rest after turn",
+    "wholeSwaps": 0,
+    "ringStrips": 0,
+    "editRects": 0,
+    "fullDraws": 0,
+    "bandDraws": 6,
+    "rectDraws": 0,
+    "cachePlantTris": 0
+   },
+   {
+    "step": "pan again",
+    "wholeSwaps": 0,
+    "ringStrips": 0,
+    "editRects": 0,
+    "fullDraws": 0,
+    "bandDraws": 40,
+    "rectDraws": 0,
+    "cachePlantTris": 0
+   },
+   {
+    "step": "rest",
+    "wholeSwaps": 0,
+    "ringStrips": 0,
+    "editRects": 0,
+    "fullDraws": 0,
+    "bandDraws": 60,
+    "rectDraws": 0,
+    "cachePlantTris": 0
+   }
+  ],
+  "total": {
+   "wholeSwaps": 0,
+   "ringStrips": 1,
+   "editRects": 19,
+   "fullDraws": 0,
+   "bandDraws": 106,
+   "rectDraws": 20,
+   "cachePlantTris": 0,
+   "livePlantTris": 68174292
+  },
+  "folOn": null
+ },
+ "errors": []
+}

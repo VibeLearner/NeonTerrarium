@@ -586,7 +586,7 @@ function buildFoliage(){
 // a plant mesh's settings, also made again for the joined mesh of a super-region (world.js mergeLeaves): culled to the view; a lawn's tufts stop drawing far away (their flat tile stands in);
 // the swaying plants (everything but the lit signs) are on the static layer or the live one as FOLST says (userData.swayed)
 function folSettings(mesh, n, isLawn, lit){
-  mesh.frustumCulled = !window.__FOL_LOD_OFF; mesh.userData.fol = true; mesh.userData.swayed = !lit; mesh.layers.mask = lit ? 4 : FOLST.mask(); mesh.renderOrder = lit ? 0 : 1;
+  mesh.frustumCulled = !window.__FOL_LOD_OFF; mesh.userData.fol = true; mesh.userData.swayed = !lit; mesh.layers.mask = lit ? 4 : FOLST.mask();
   if (isLawn){ mesh.userData.lawn = true; mesh.userData.n = n; mesh.onBeforeRender = function(){ this.count = FOL_FAR.lawn ? 0 : this.userData.n; }; }
 }
 function folMesh(LIST, isLawn, lit){

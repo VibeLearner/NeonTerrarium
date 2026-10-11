@@ -77,7 +77,7 @@ All numbers are counts (instances, triangles, draw meshes, pixels). Nothing was 
 
 ## 7. Checks that were run
 
-- Harness diff with `window.__OLD_SPRITES = true` against 2709cbf: 0 problems (city, dense, megas; see the last section of this file for the set that was run).
+- Harness diff with `window.__OLD_SPRITES = true` against 2709cbf: 0 problems. Set run once at the end: city, dense and megas in full quick mode (53 captures), and the max city on two steps (`noon_f1`, `night_zoom_out`; the max city's other steps were left out to keep the check under 10 minutes). The culling was also flip-tested on the max city against its previous commit (0 problems).
 - `recipe_proof.py --worker`: 0 of 227 differing plots on city, 0 of 267 on megas.
 - A city loaded through the worker is the same city as the main-thread load (`load_check.py city`), no errors. The worker loads only the plain variant table (`spritegen.js`) and draws nothing.
 - Real page (worker on): zoom in and out, turn, flip the old/new switch, no page errors.

@@ -10,6 +10,9 @@ sys.path.insert(0, os.path.join(ROOT, 'tools', 'perf'))
 HOURS = {'12': 'S.cycle = false; S.rain = false; S.hour = 12', '22': 'S.cycle = false; S.rain = false; S.hour = 22', '17': 'S.cycle = false; S.rain = false; S.hour = 17.5'}
 FIND = {
  # the centre of the biggest cluster of people (within 3 world units of each other) that are outside
+ 'club': """() => { const q = pplList.filter(p => p.club && p.x !== undefined); if (!q.length) return null; const p = q[0]; return { x: p.x, z: p.z, n: q.length }; }""",
+ 'square': """() => { const L = pplList.filter(p => !p.walk && p.spot && p.x !== undefined && p.spot.kind); let best = null, bn = -1; for (const p of L){ let n = 0; for (const q of L) if (Math.hypot(p.x - q.x, p.z - q.z) < 3) n++; if (n > bn){ bn = n; best = p; } } return best ? { x: best.x, z: best.z, n: bn } : null; }""",
+ 'chase': """() => { const p = pplList.find(p => (p.rush || p.hurry) && p.walk && p.x !== undefined) || [...lurkers.values()].find(L => L.state === 'flee' || L.state === 'strike'); return p ? { x: p.x, z: p.z, n: 1 } : null; }""",
  'crowd': """() => { const L = pplList.filter(p => p.x !== undefined && !p.ride && !p.metro && !(p.walk === null && !p.spot)); let best = null, bn = -1;
     for (const p of L){ let n = 0; for (const q of L) if (Math.hypot(p.x - q.x, p.z - q.z) < 3) n++; if (n > bn){ bn = n; best = p; } } return best ? { x: best.x, z: best.z, n: bn } : null; }""",
 }

@@ -85,6 +85,7 @@ def game(a):
         br.close()
     srv.shutdown(); srv.server_close()
 def radio(out):
+    out = os.path.abspath(out)
     """The cassette on a static page with the game's own CSS (the .tape box, the turning reels at 45 degrees too), old picture and new one side by side, at the size the page shows it (118 x 88) and 3x."""
     import glob
     from PIL import Image
@@ -108,7 +109,7 @@ def main():
     a = ap.parse_args(); os.makedirs(a.out, exist_ok=True)
     if not a.no_dump:
         names = ['sign_ramen_pink', 'sign_coffee_cyan', 'sign_arcade_amber', 'sign_police', 'wanted', 'cassette', 'ddrone', 'koi', 'holo_ads', 'holo_pureair', 'holo_freeair', 'holo_aether', 'holo_sky', 'holo_synth', 'holo_watch', 'holo_walls'] + ['pbike_' + n for n in ('r1c1', 'r1c2', 'r1c3', 'r1c4', 'r2c1', 'r2c2', 'r2c3', 'r2c4')]
-        subprocess.check_call([sys.executable, os.path.join(HERE, 'dump.py')] + names + ['--scale', '3', '--bg', 'black', '--out', os.path.join(a.out, 'dump')])
+        subprocess.check_call([sys.executable, os.path.join(HERE, 'dump.py')] + names + ['--scale', '2', '--bg', 'black', '--out', os.path.join(a.out, 'dump')])
     if not a.no_game:
         radio(a.out)
         by = {}

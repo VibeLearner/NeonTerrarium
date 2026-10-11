@@ -44,6 +44,7 @@ def main():
                 new = Image.open(io.BytesIO(base64.b64decode(u.split(',')[1]))).convert('RGBA')
             old = old_image(n); ims = [(x, l) for x, l in ((old, 'old'), (new, 'new')) if x is not None]
             for scale in (1, a.scale):
+                if scale > 1 and max(i.size[0] for i, _ in ims) * scale > 3000: continue   # (the old wall atlas is 2147 px wide: 1x only)
                 W = max(i.size[0] for i, _ in ims) * scale + 8; H = sum(i.size[1] * scale + 6 for i, _ in ims) + 2
                 sheet = Image.new('RGBA', (W, H), bgc + (255,)); y = 2
                 for im, l in ims:

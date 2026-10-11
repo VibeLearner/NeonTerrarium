@@ -1,0 +1,42 @@
+{
+ "city": {
+  "signs": 43,
+  "police": 0,
+  "bikes": 0,
+  "ponds": 0,
+  "ads": 39,
+  "air": 0,
+  "wall": 11,
+  "drones": 9
+ },
+ "dense": {
+  "signs": 101,
+  "police": 0,
+  "bikes": 0,
+  "ponds": 0,
+  "ads": 81,
+  "air": 0,
+  "wall": 28,
+  "drones": 16
+ },
+ "megas": {
+  "signs": 2,
+  "police": 1,
+  "bikes": 3,
+  "ponds": 0,
+  "ads": 0,
+  "air": 0,
+  "wall": 0,
+  "drones": 0
+ },
+ "maxcity": {
+  "signs": 1490,
+  "police": 2,
+  "bikes": 8,
+  "ponds": 1,
+  "ads": 767,
+  "air": 8,
+  "wall": 273,
+  "drones": 8
+ }
+}

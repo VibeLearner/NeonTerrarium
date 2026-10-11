@@ -12,45 +12,47 @@
   // ---- a little robot: o.head 'box' | 'round' | 'ears', o.ant (antenna), o.blink (the antenna ball is hot), o.eyes (eye height) ----
   // (T: the top of the antenna ball; the robot is 24 wide with arms and 28 tall)
   function robot(m, cx, T, o = {}){
-    if (o.ant !== false){ m.fillRect(cx - 1, T, 2, 2, o.blink ? 1 : 2); m.line(cx, T + 2, cx, T + 3); }
-    const hy = T + 4;
-    if (o.head === 'round') m.ellipse(cx - .5, hy + 4, 6, 4.5, 1, 1);
-    else { m.rect(cx - 6, hy, 12, 8); if (o.head === 'ears'){ m.fillRect(cx - 8, hy + 2, 2, 4, 2); m.fillRect(cx + 6, hy + 2, 2, 4, 2); } }
+    if (o.ant !== false){ m.fillRect(cx - 1, T, 3, 2, o.blink ? 1 : 2); m.line(cx, T + 2, cx, T + 3, 2); }
+    const hy = T + 4, ty = T + 14, round = o.head === 'round';
+    if (round) m.fillEllipse(cx, hy + 4.5, 7, 5, 2); else m.fillRect(cx - 7, hy, 14, 9, 2);
+    m.fillRect(cx - 9, ty, 18, 11, 2); m.fillRect(cx - 6, ty + 11, 5, 5, 2); m.fillRect(cx + 1, ty + 11, 5, 5, 2);
+    if (round) m.ellipse(cx - .5, hy + 4, 7, 5, 1, 1);
+    else { m.rect(cx - 7, hy, 14, 9); if (o.head === 'ears'){ m.fillRect(cx - 11, hy + 1, 4, 7, 2); m.fillRect(cx + 7, hy + 1, 4, 7, 2); } }
     const ey = hy + 2 + (o.eyes || 0);
-    m.fillRect(cx - 4, ey, 2, 2); m.fillRect(cx + 2, ey, 2, 2); m.line(cx - 3, hy + 6, cx + 2, hy + 6, 1, 2);
-    m.fillRect(cx - 1, hy + 8, 2, 1, 2);
-    const ty = T + 13; m.rect(cx - 7, ty, 14, 10); m.rect(cx - 3, ty + 2, 6, 4, 1, 2); m.dot(cx - 1, ty + 7, 2, 2);
-    m.rect(cx - 5, ty + 10, 4, 5); m.rect(cx + 1, ty + 10, 4, 5); m.fillRect(cx - 6, ty + 14, 6, 1); m.fillRect(cx, ty + 14, 6, 1);
+    m.fillRect(cx - 5, ey, 3, 2); m.fillRect(cx + 2, ey, 3, 2); m.line(cx - 4, hy + 7, cx + 3, hy + 7, 2, 1);
+    m.fillRect(cx - 1, hy + 9, 2, 1, 1);
+    m.rect(cx - 9, ty, 18, 11); m.fillRect(cx - 4, ty + 2, 8, 4, 1); m.fillRect(cx - 7, ty + 7, 14, 1, 1); m.fillRect(cx - 2, ty + 9, 4, 1, 1);
+    m.rect(cx - 6, ty + 11, 5, 5); m.rect(cx + 1, ty + 11, 5, 5); m.fillRect(cx - 7, ty + 14, 7, 2); m.fillRect(cx, ty + 14, 7, 2);
     return { ty };
   }
-  const armR = (m, cx, ty) => { m.line(cx + 7, ty + 2, cx + 11, ty + 4); m.line(cx + 11, ty + 4, cx + 11, ty + 9); m.dot(cx + 10, ty + 9, 2); };
+  const armR = (m, cx, ty) => { m.line(cx + 9, ty + 2, cx + 12, ty + 4, 2); m.line(cx + 12, ty + 4, cx + 12, ty + 9, 2); m.dot(cx + 11, ty + 9, 3); };
   const HEART = ['0110110', '1111111', '1111111', '0111110', '0011100', '0001000'], HEART2 = ['001101100', '011111110', '111111111', '011111110', '001111100', '000111000', '000010000'];
   const heart = (m, cx, y, big) => { const p = big ? HEART2 : HEART, w = p[0].length; p.forEach((r, j) => { for (let i = 0; i < w; i++) if (r[i] === '1') m.set(cx - (w >> 1) + i, y + j, 1); }); };
 
   // ---- the portrait ads (40 x 46, six frames): label strip on top, the picture below ----
   const PORTRAIT = [
     { label: 'ROBOT ADS', draw(m, f){   // a robot waving
-        const w = Math.round(3*S(0, f, 6)), T = 15, { ty } = robot(m, 20, T, { blink: f % 3 === 0 });
+        const w = Math.round(3*S(0, f, 6)), T = 14, { ty } = robot(m, 20, T, { blink: f % 3 === 0 });
         armR(m, 20, ty);
         const ex = 9, ey = ty + 1, hx = ex + w, hy = ty - 8 - (Math.abs(w) > 2 ? 1 : 0);
-        m.line(13, ty + 2, ex, ey); m.line(ex, ey, hx, hy); m.dot(hx - 1, hy - 1, 3, 1); } },
+        m.line(11, ty + 2, ex, ey, 2); m.line(ex, ey, hx, hy, 2); m.fillEllipse(hx, hy - 1, 2.5, 2.5, 1); } },
     { label: 'BOT SHOP', draw(m, f){    // a robot swinging a wrench
-        const a = -2.25 + .28*S(0, f, 6), cx = 24, T = 15, { ty } = robot(m, cx, T, { head: 'round', blink: f % 2 === 0 });
+        const a = -2.25 + .28*S(0, f, 6), cx = 24, T = 14, { ty } = robot(m, cx, T, { head: 'round', blink: f % 2 === 0 });
         armR(m, cx, ty);
         const hx = 14, hy = ty + 3, len = 13, c = Math.cos(a), sn = Math.sin(a), tx = hx + c*len, tyy = hy + sn*len;
-        m.line(cx - 7, ty + 2, hx, hy);                  // the arm
-        m.line(hx, hy, tx, tyy, 2);                      // the wrench handle
+        m.line(cx - 9, ty + 2, hx, hy, 2);               // the arm
+        m.line(hx, hy, tx, tyy, 3); m.fillEllipse(hx, hy, 3, 3, 1);                      // the wrench handle
         const nx = -sn, ny = c;                          // the jaw: a U of two prongs
-        m.line(tx + nx*3, tyy + ny*3, tx + nx*3 + c*3, tyy + ny*3 + sn*3); m.line(tx - nx*3, tyy - ny*3, tx - nx*3 + c*3, tyy - ny*3 + sn*3);
-        m.line(tx + nx*3, tyy + ny*3, tx - nx*3, tyy - ny*3);
+        m.line(tx + nx*3, tyy + ny*3, tx + nx*3 + c*3, tyy + ny*3 + sn*3, 2); m.line(tx - nx*3, tyy - ny*3, tx - nx*3 + c*3, tyy - ny*3 + sn*3, 2);
+        m.line(tx + nx*3, tyy + ny*3, tx - nx*3, tyy - ny*3, 2);
         if (f % 3 === 1){ const sx = Math.round(tx) - 5, sy = Math.round(tyy) - 2; m.line(sx - 2, sy, sx + 2, sy); m.line(sx, sy - 2, sx, sy + 2); } } },
     { label: 'MY FRIEND', draw(m, f){   // a robot with open arms and a beating heart
-        const T = 15, { ty } = robot(m, 20, T, { ant: false, head: 'ears', eyes: f % 3 === 2 ? 1 : 0 });
+        const T = 14, { ty } = robot(m, 20, T, { ant: false, head: 'ears', eyes: f % 3 === 2 ? 1 : 0 });
         const big = [1, 0, 1, 0, 0, 0][f];
         heart(m, 20, big ? 12 : 13, big);
         const hx = Math.round(2*S(0, f, 6));
-        m.line(13, ty + 2, 9, ty + 1); m.line(9, ty + 1, 7 + hx, ty - 5); m.dot(6 + hx, ty - 6, 2);
-        m.line(27, ty + 2, 31, ty + 1); m.line(31, ty + 1, 33 - hx, ty - 5); m.dot(32 - hx, ty - 6, 2); } },
+        m.line(11, ty + 2, 9, ty + 1, 2); m.line(9, ty + 1, 7 + hx, ty - 5, 2); m.fillEllipse(7 + hx, ty - 6, 2.5, 2.5, 1);
+        m.line(29, ty + 2, 31, ty + 1, 2); m.line(31, ty + 1, 33 - hx, ty - 5, 2); m.fillEllipse(33 - hx, ty - 6, 2.5, 2.5, 1); } },
     { label: 'RAMEN', draw(m, f, fx){    // a bowl with steam
         const cx = 20, y = 32;
         m.ellipse(cx, y, 13, 8, 2, 1, 0, PI); m.line(cx - 14, y, cx + 13, y, 2); m.line(cx - 5, y + 9, cx + 4, y + 9, 2);
@@ -88,12 +90,14 @@
     { draw(m, f, fx, g){   // a dish sending waves
         const C = [12, 24], d = [.64, -.77], p = [.77, .64], E1 = [C[0] + 10*p[0], C[1] + 10*p[1]], E2 = [C[0] - 10*p[0], C[1] - 10*p[1]];
         const ctrl = [C[0] - d[0]*18, C[1] - d[1]*18], F = [C[0] + d[0]*11, C[1] + d[1]*11];
-        m.curve(E1[0], E1[1], ctrl[0], ctrl[1], E2[0], E2[1], 1, 1); m.line(E1[0], E1[1], E2[0], E2[1], 1, 1);
+        const bowl = [E1]; for (let k = 1; k < 12; k++){ const t = k/12, u = 1 - t; bowl.push([u*u*E1[0] + 2*u*t*ctrl[0] + t*t*E2[0], u*u*E1[1] + 2*u*t*ctrl[1] + t*t*E2[1]]); } bowl.push(E2);
+        m.fillPoly(bowl, 2);
+        m.curve(E1[0], E1[1], ctrl[0], ctrl[1], E2[0], E2[1], 2, 1); m.line(E1[0], E1[1], E2[0], E2[1], 2, 1);
         for (const t of [.33, .66]){ const rx = E2[0] + (E1[0] - E2[0])*t, ry = E2[1] + (E1[1] - E2[1])*t; m.line(rx, ry, rx - d[0]*(t*(1 - t))*20 , ry - d[1]*(t*(1 - t))*20, 1, 2); }
-        m.line(C[0], C[1], F[0], F[1], 1, 1); m.fillEllipse(F[0], F[1], 2, 2, 1);
-                const bx = C[0] - d[0]*6, by = C[1] - d[1]*6; m.line(bx, by, bx - 1, 38, 2); m.line(4, 40, 15, 40, 2);
+        m.line(C[0], C[1], F[0], F[1], 2, 1); m.fillEllipse(F[0], F[1], 3, 3, 1);
+                const bx = C[0] - d[0]*6, by = C[1] - d[1]*6; m.line(bx, by, bx - 1, 38, 3); m.line(4, 40, 15, 40, 3);
         const a = Math.atan2(d[1], d[0]); const wv = new Mk(m.w, m.h);
-        for (let k = 0; k < 3; k++){ const r = 4 + (3*f + 12*k) % 36; wv.ellipse(F[0], F[1], r, r, 1, r < 16 ? 1 : 2, a - .75, a + .75); }
+        for (let k = 0; k < 3; k++){ const r = 4 + (3*f + 12*k) % 36; wv.ellipse(F[0], F[1], r, r, 2, r < 18 ? 1 : 2, a - .75, a + .75); }
         for (let y = 3; y < m.h - 3; y++) for (let x = 3; x < m.w - 3; x++){ const v = wv.d[y*m.w + x]; if (v && !(y > 19 && x > 24)) fx.set(x, y, v); }
         g('MESSAGES', 23, 22, '3x5'); g('TO', 23, 28, '3x5'); g('GROUNDERS', 23, 34, '3x5'); } },
     { draw(m, f, fx, g){   // a dancer in four poses
@@ -103,13 +107,13 @@
         { n: [46, 11], h: [46, 7], le: [40, 12], lh: [35, 14], re: [52, 11], rh: [57, 8], hip: [46, 22], lk: [41, 30], lf: [43, 38], rk: [51, 30], rf: [49, 38] },
         { n: [46, 11], h: [46, 7], le: [41, 8], lh: [39, 3], re: [52, 15], rh: [56, 19], hip: [45, 22], lk: [45, 30], lf: [47, 38], rk: [48, 29], rf: [45, 38] }][f];
       const P = POSE;
-      const hx = P.hip[0], nx = P.n[0], dress = [[nx - 3, 12], [nx + 3, 12], [hx + 2, 18], [hx + 6, 28], [hx - 6, 28], [hx - 2, 18]];
+      const hx = P.hip[0], nx = P.n[0], dress = [[nx - 4, 12], [nx + 4, 12], [hx + 2, 18], [hx + 7, 28], [hx - 7, 28], [hx - 2, 18]];
       m.fillPoly(dress, 2); m.poly(dress, true, 1);
-      m.line(nx - 3, 11, ...P.le); m.line(...P.le, ...P.lh); m.line(nx + 3, 11, ...P.re); m.line(...P.re, ...P.rh);
-      m.line(hx - 3, 28, ...P.lk, 2); m.line(...P.lk, ...P.lf, 2); m.line(hx + 3, 28, ...P.rk, 2); m.line(...P.rk, ...P.rf, 2);
-      m.fillEllipse(P.h[0], P.h[1], 3, 3, 1); m.line(P.h[0] + 3, P.h[1], P.h[0] + 5, P.h[1] + 4, 1, 2);
-      m.line(33, 40, 59, 40, 1, 2);
-      const st = [[35, 8], [57, 28], [35, 28], [58, 12]][f]; m.line(st[0] - 2, st[1], st[0] + 2, st[1], 1, 1); m.line(st[0], st[1] - 2, st[0], st[1] + 2, 1, 1);
+      m.line(nx - 3, 11, ...P.le, 2); m.line(...P.le, ...P.lh, 2); m.line(nx + 3, 11, ...P.re, 2); m.line(...P.re, ...P.rh, 2);
+      m.line(hx - 3, 28, ...P.lk, 3); m.line(...P.lk, ...P.lf, 3); m.line(hx + 3, 28, ...P.rk, 3); m.line(...P.rk, ...P.rf, 3);
+      m.fillEllipse(P.h[0], P.h[1], 3.6, 3.6, 1); m.line(P.h[0] + 3, P.h[1], P.h[0] + 5, P.h[1] + 4, 1, 2);
+      m.line(33, 40, 59, 40, 2, 2);
+      const st = [[35, 30], [58, 31], [36, 26], [58, 26]][f]; m.line(st[0] - 2, st[1], st[0] + 2, st[1], 2, 1); m.line(st[0], st[1] - 2, st[0], st[1] + 2, 2, 1);
       g('NEON', 5, 9, '5x7'); g('CLUB', 5, 21, '5x7'); } },
   ];
 

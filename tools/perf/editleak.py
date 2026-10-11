@@ -116,11 +116,11 @@ window.__EL = (() => {
       else if (r === 3){ const bl = built(); if (bl.length > 14){ removeAt({ kind: 'bld', c: pick(bl, k) }); what = 'demolish'; } else { const c = pick(bl, k); if (c){ addSection(c, 'mid'); what = 'section (kept: few plots)'; } } }
       else if (r === 6){ const c = pick(built(), k); if (c){ cycleGreen(c); what = 'greenery'; } }
       else if (r === 7){
-        if (k % 16 === 7){   // a megastructure down, and on the next round up out of the way again
+        if (k % 16 === 7 && !window.__EL_NOMEGA){   // a megastructure down, and on the next round up out of the way again
           const f = [...cells.values()].filter(c => !c.mega); let ok = null;
           for (let q = 0; q < 40 && !ok; q++){ const c = pick(f, k + q); if (c && !c.sections.length){ const m = placeMega('foundry', c.i, c.j, 77 + k); if (m) ok = m; } }
           E.mega = ok ? ok.id : null; what = ok ? 'mega placed' : 'mega (no room)';
-        } else if (E.mega && megas.get(E.mega)){ removeMega(megas.get(E.mega)); E.mega = null; what = 'mega removed'; }
+        } else if (!window.__EL_NOMEGA && E.mega && megas.get(E.mega)){ removeMega(megas.get(E.mega)); E.mega = null; what = 'mega removed'; }
         else { const c = pick(empties(), k); if (c){ removePlatform(c); what = 'platform removed'; } }
       }
     } catch (e) { what = 'ERROR ' + e; }
@@ -139,16 +139,17 @@ SETTLE = """() => { let g = 0; while ((anims.length || (typeof NV !== 'undefined
   let n = 0; for (; n < 14; n++){ __perf.cap(2, 1); if (typeof SC === 'undefined' || SC.mode === 'off' || (SC.state === 'in use' && !anims.length && !SC.job)){ __perf.cap(2, 1); if (SC.mode === 'off' || SC.state === 'in use') break; } } return n; }"""
 
 def newpage(pw, url, sc, init=''):
-    br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init=GL + TRACK + init)
+    br = H.launch(pw); ctx, pg, errs = H.open_game(br, url, sc, H.VIEWPORTS[0], extra_init=GL + TRACK + init + ('window.__EL_NOMEGA = true;' if os.environ.get('EL_NOMEGA') else ''))
     pg.evaluate("() => { window.__GLLIVE.base = new Set(window.__GLLIVE.live.keys()); }"); pg.evaluate(GEOTRACK)   # (what exists after load is not counted as created by the edits)
     return br, pg, errs
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('scene'); ap.add_argument('--n', type=int, default=30); ap.add_argument('--every', type=int, default=25)
     ap.add_argument('--frames', type=int, default=45); ap.add_argument('--draw', type=int, default=2); ap.add_argument('--sites', type=int, default=12); ap.add_argument('--json', default=None)
-    ap.add_argument('--no-fresh', action='store_true'); a = ap.parse_args()
+    ap.add_argument('--no-fresh', action='store_true'); ap.add_argument('--no-mega', action='store_true', help='leave the megastructure out of the edit mix (to see whether its one-time textures and programs are the few extras)'); a = ap.parse_args()
     from playwright.sync_api import sync_playwright
     srv = H.serve(); url = H.make_site('editleak', None); sc = H.load_scenes([a.scene])[0]
+    if a.no_mega: os.environ['EL_NOMEGA'] = '1'
     res = {}
     with sync_playwright() as pw:
         br, pg, errs = newpage(pw, url, sc)

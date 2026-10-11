@@ -23,7 +23,9 @@ const PPL = { rows: 17, cw: 12, ch: 16, walk: 6, idle: 4, W: 384, H: 272 };
 const F_IDLE = 6, F_SPEC = 10, F_SIT = 16, F_USE = 20, F_ANGRY = 26;
 const ROW_COP = 12, ROW_BOT = 13, ROW_EMO = 14, ROW_BOUNCER = 15, ROW_HOOD = 16, CITIZEN_ROWS = 12;   // row 16: the Data Spire's hooded archivist   // row 15: the officer redrawn in red, the club's bouncers
 const EMO = { bang: 0, quest: 1, heart: 2, anger: 3, sweat: 4, note: 5, dots: 6, bowl: 7 };
-const PPL_TEX = new THREE.TextureLoader().load('assets/sprites/people_v2.png');
+if (!window.__OLD_PEOPLE && !window.IN_RECIPE_WORKER) PG.build();   // (the generated sheet: peoplegen.js; the old Craftpix one only when asked for)
+const PPL_GEN = PG.live();
+const PPL_TEX = PPL_GEN ? new THREE.CanvasTexture(PG.sheet.cv) : new THREE.TextureLoader().load('assets/sprites/people_v2.png');
 PPL_TEX.magFilter = PPL_TEX.minFilter = THREE.NearestFilter; PPL_TEX.generateMipmaps = false;
 const PPL_MAX = 700;          // most people drawn at once (the nearest win if more are out)
 const PPL_SPEED = .55;        // walking speed, world units a second (a block takes about 7 s)
@@ -76,7 +78,8 @@ function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMa
       gl_FragColor = normalMode > 0.5 ? vec4(0.5, 0.5, 1.0, 1.0) : vec4(col, 1.0);
     }`,
 }), 'vec4(0.5, 0.5, 1.0, 1.0)', true); }
-const PPL_MAT = spriteMat(PPL_TEX, PPL.W, PPL.H, PPL.cw, PPL.ch, PPL.rows);
+const PPL_MAT = spriteMat(PPL_TEX, PPL_GEN ? PG.sheet.W : PPL.W, PPL_GEN ? PG.sheet.H : PPL.H, PPL.cw, PPL.ch, PPL_GEN ? PG.sheet.rows : PPL.rows);
+if (PPL_GEN){ PPL_MAT.uniforms.pal.value = PG.palTexture(); PPL_MAT.uniforms.palRows.value = 4096; PPL_MAT.uniforms.usePal.value = 1; }
 function spriteBatch(mat, max){
   const geo = new THREE.InstancedBufferGeometry();
   const q = new THREE.PlaneGeometry(1, 1);
@@ -754,7 +757,7 @@ function updateDoors(dt){
 function makePerson(id, home){
   const u = k => u01(id, k);
   const wake = span(u('wake'), 6, 8.5);
-  return { id, home, job: null, wantsJob: u('emp') < .8, courier: u('courier') < .2, row: hash(id, 'look') % CITIZEN_ROWS,
+  return { id, home, job: null, wantsJob: u('emp') < .8, courier: u('courier') < .2, row: PG.lookFor(id, hash(id, 'look') % CITIZEN_ROWS, k => hash(id, k), { courier: u('courier') < .2 }),
            speed: PPL_SPEED*span(u('speed'), .85, 1.15), lane: span(u('lane'), -.08, .32), wide: span(u('wide'), -.75, 1.05),
            wake, bed: (22 + 6*u('bed')**2) % 24, outgoing: span(u('out'), .25, .9), nightShift: u('night'),
            workS: span(u('ws'), 7.5, 9.5), workLen: span(u('wl'), 7.5, 9),

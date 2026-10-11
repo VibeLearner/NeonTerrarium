@@ -381,7 +381,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
           gl_Position = vec4((ap + off)/res*2.0 - 1.0, a.z, 1.0);
         }
         // zoomed out: thin the plants and laundry (small sprites go first); lit signs always stay
-        float thin = lodPlants * (aRect.w < 24.0 ? 0.85 : 0.5);
+        float thin = lodPlants * (aRect.w < 24.0 ? 0.6 : 0.4);   // (at most six tufts in ten, four plants in ten: fewer than before, since plants cost little and the gaps showed)
         if (aKind.y < 0.5 && fract(aVar.w*5.17) < thin) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
       }`,
     side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
@@ -591,7 +591,8 @@ function folMesh(LIST, isLawn){
 // (all but a few tall ones). Starts where the plants start to thin out (LOD, main.js: `loss` is how far zooming out has outrun the screen's resolution), with a margin so it does not flap.
 function folFar(loss){
   const was = FOL_FAR.lawn;
-  FOL_FAR.lawn = window.__FOL_LOD_OFF ? false : loss > 1.35 ? true : loss < 1.25 ? false : was;
+  // (the flat far lawn from loss 2 (the owner approved the swap at loss 2.27, zoom 30 with the render fixed; at 1.35 it popped in plain view), back at 1.85)
+  FOL_FAR.lawn = window.__FOL_LOD_OFF ? false : loss > 2.0 ? true : loss < 1.85 ? false : was;
   if (FOL_FAR.lawn !== was && typeof GRASS_MAT !== 'undefined') GRASS_MAT.userData.far(FOL_FAR.lawn);
 }
 // While a piece is being generated, glows are collected as plain numbers; the region then draws each colour

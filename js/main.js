@@ -80,7 +80,10 @@ function frameBody(now){
   { // detail levels: only needed once zooming out outruns the screen's resolution (see applyRenderRes)
     const loss = (zoom/ZOOM_REF)*(BASE_H/H);   // 1 = every building keeps all its pixels
     const t = clamp((loss - 1.15)/1.0, 0, 1), e = t*t*(3 - 2*t);
-    LOD.fine.value = e; LOD.plants.value = e; LOD.lines.value = e; folFar(loss); }
+    // (plants thin later and more gently than the fine pieces: they are a few percent of a frame (tools/procfol/MEASURE.md), and tufts vanishing while
+    //  still a pixel tall showed as pop-in with the render fixed; from loss 1.6, fully thinned only by 3.2)
+    const tp = clamp((loss - 1.6)/1.6, 0, 1), ep = tp*tp*(3 - 2*tp);
+    LOD.fine.value = e; LOD.plants.value = ep; LOD.lines.value = e; folFar(loss); }
   PH.lap('steam, rain, camera');
   runLater();
   stageStep();   // a plot being built in steps: a few milliseconds of it (world.js)

@@ -93,13 +93,14 @@ window.__fol = (() => {
     for (const C of [window.WebGL2RenderingContext, window.WebGLRenderingContext]) if (C) for (const f of ['drawArrays', 'drawElements', 'drawArraysInstanced', 'drawElementsInstanced', 'drawRangeElements']) if (C.prototype[f]) { C.prototype[f] = function () {}; n++; }
     return n;
   };
-  F.view = z => {   // one zoom: settle with whole frames drawn, then report the camera and the render state
+  // (cacheFrames > 0: the static cache stays on, and that many whole frames are drawn first so that it has built what it holds)
+  F.view = (z, cacheFrames = 0) => {   // one zoom: settle with whole frames drawn, then report the camera and the render state
     zoom = zoomT = z;
-    PH.tests.noStatic = true;
+    PH.tests.noStatic = !cacheFrames;
     __perf.skip = true; __step(30); __perf.skip = false;
     if (__perf.shadowOwed){ shadowDirty = true; __perf.shadowOwed = false; }
-    __step(3);
-    return { zoom: z, lodPlants: LOD.plants.value, renderW: W, renderH: H, yaw, pitch: typeof PITCH !== 'undefined' ? PITCH : null, target: [camT.x, camT.y, camT.z], ortho: !!cam.isOrthographicCamera };
+    __step(cacheFrames || 3);
+    return { staticCache: cacheFrames ? SC.line() : 'off (PH.tests.noStatic)', zoom: z, lodPlants: LOD.plants.value, renderW: W, renderH: H, yaw, pitch: typeof PITCH !== 'undefined' ? PITCH : null, target: [camT.x, camT.y, camT.z], ortho: !!cam.isOrthographicCamera };
   };
   // Frame triangles with the foliage drawn and hidden. The people and cars move between frames, so a frame's count drifts by a few
   // hundred triangles: shown, hidden, shown, hidden, shown; the foliage's share is its exact drawn count (2 per instance, no culling

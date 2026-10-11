@@ -1,0 +1,8729 @@
+{
+ "dupRects": [],
+ "errors": [],
+ "grassPlots": [],
+ "plots": {
+  "-1,-1": {
+   "bushFlower": 2,
+   "fern": 2,
+   "l_mossroots": 1,
+   "sign_w_repairs": 1,
+   "succulent": 2,
+   "vines": 2
+  },
+  "-1,-3": {
+   "bushFlower": 2,
+   "fern": 4,
+   "g_fern2": 6,
+   "l_mossroots": 1,
+   "sign_w_parts": 1,
+   "sign_w_repairs": 1,
+   "succulent": 2,
+   "vines": 1
+  },
+  "-1,-5": {
+   "h_curtain1": 1,
+   "h_vine3": 2,
+   "vines": 1
+  },
+  "-1,0": {
+   "sign_mt_line": 2
+  },
+  "-1,1": {
+   "bonsai": 2,
+   "bushFlower": 2,
+   "fern": 2,
+   "sign_w_parts": 2,
+   "succulent": 2
+  },
+  "-1,10": {
+   "g_flowers": 2,
+   "l_mossroots": 1,
+   "pothos": 1,
+   "vines": 1
+  },
+  "-1,11": {
+   "h_curtain1": 1,
+   "h_curtain3": 1,
+   "h_heart": 1,
+   "h_ivy": 1,
+   "h_vine3": 1,
+   "pothos": 1
+  },
+  "-1,2": {
+   "bonsai": 2,
+   "bush": 2
+  },
+  "-1,3": {
+   "bush": 2,
+   "bushFlower": 2,
+   "fern": 4,
+   "l_mossroots": 2,
+   "pothos": 1,
+   "sign_w_scrap": 1,
+   "vines": 2
+  },
+  "-1,4": {
+   "bush": 2,
+   "g_fern3": 2
+  },
+  "-1,5": {
+   "h_ivy": 1,
+   "sign_w_kib": 2
+  },
+  "-1,7": {
+   "sign_w_import": 2
+  },
+  "-10,-1": {
+   "h_vine3": 1
+  },
+  "-10,-2": {
+   "h_curtain2": 1,
+   "vines": 2
+  },
+  "-10,-3": {
+   "h_curtain3": 1,
+   "h_vine3": 2
+  },
+  "-10,-4": {
+   "h_ivy": 1,
+   "pothos": 1
+  },
+  "-10,0": {
+   "h_vine3": 1,
+   "pothos": 2
+  },
+  "-10,1": {
+   "h_curtain2": 1,
+   "h_heart": 1,
+   "h_vine3": 1,
+   "pothos": 1
+  },
+  "-10,2": {
+   "h_curtain2": 1,
+   "h_ivy": 1,
+   "pothos": 1
+  },
+  "-10,3": {
+   "h_curtain1": 1,
+   "h_vine3": 1,
+   "pothos": 2,
+   "vines": 1
+  },
+  "-10,4": {
+   "h_curtain1": 1,
+   "h_curtain3": 1,
+   "vines": 1
+  },
+  "-2,-2": {
+   "bushFlower": 2,
+   "sign_w_parts": 1
+  },
+  "-2,-3": {
+   "g_fern3": 2
+  },
+  "-2,-4": {
+   "bush": 2,
+   "fern": 4,
+   "g_fern2": 4,
+   "h_curtain1": 1,
+   "h_heart": 1,
+   "h_ivy": 1,
+   "h_vine3": 1,
+   "sign_repair_amber": 1,
+   "sign_w_repairs": 1,
+   "sign_w_scrap": 1
+  },
+  "-2,-5": {
+   "h_curtain1": 1,
+   "h_vine3": 1
+  },
+  "-2,1": {
+   "bonsai": 2
+  },
+  "-2,10": {
+   "g_flowers": 2,
+   "h_ivy": 1
+  },
+  "-2,11": {
+   "h_curtain1": 1,
+   "h_curtain3": 1,
+   "h_ivy": 1,
+   "vines": 1
+  },
+  "-2,2": {
+   "bush": 8,
+   "bushFlower": 2,
+   "fern": 4
+  },
+  "-2,3": {
+   "g_fern3": 2
+  },
+  "-2,4": {
+   "bonsai": 2,
+   "bushFlower": 2
+  },
+  "-2,5": {
+   "h_ivy": 1,
+   "l_mossroots": 1
+  },
+  "-2,6": {
+   "sign_w_frag": 2
+  },
+  "-2,7": {
+   "sign_w_kib": 3
+  },
+  "-2,8": {
+   "sign_w_kib": 1
+  },
+  "-2,9": {
+   "sign_w_dronecharge": 1
+  },
+  "-3,-1": {
+   "bushFlower": 2,
+   "g_fern2": 2,
+   "sign_w_lube": 1,
+   "sign_w_scrap": 1,
+   "succulent": 2
+  },
+  "-3,-2": {
+   "bush": 2,
+   "bushFlower": 2
+  },
+  "-3,-3": {
+   "h_curtain1": 1,
+   "h_curtain3": 2
+  },
+  "-3,-4": {
+   "bonsai": 2,
+   "bushFlower": 4,
+   "g_flowers": 2
+  },
+  "-3,-5": {
+   "h_curtain2": 1,
+   "h_curtain3": 1
+  },
+  "-3,1": {
+   "bush": 4,
+   "bushFlower": 4,
+   "fern": 4,
+   "g_fern2": 2,
+   "h_curtain1": 1,
+   "h_curtain2": 2,
+   "h_heart": 1,
+   "h_ivy": 2,
+   "pothos": 1,
+   "sign_coffee_amber": 1,
+   "sign_w_repairs": 2,
+   "sign_w_scrap": 1,
+   "succulent": 4,
+   "vines": 3,
+   "w_tangle": 1
+  },
+  "-3,10": {
+   "sign_w_megahub": 1
+  },
+  "-3,11": {
+   "h_curtain3": 1,
+   "h_heart": 1,
+   "h_ivy": 3
+  },
+  "-3,3": {
+   "bamboo": 2,
+   "fern": 2,
+   "pothos": 1,
+   "sign_w_parts": 1,
+   "sign_w_scrap": 1,
+   "succulent": 2
+  },
+  "-3,4": {
+   "bush": 2
+  },
+  "-3,5": {
+   "g_spread2": 2
+  },
+  "-3,6": {
+   "g_fern3": 2,
+   "sign_w_cargo": 2
+  },
+  "-3,7": {
+   "h_ivy": 1,
+   "sign_w_fragile": 1,
+   "sign_w_megahub": 1
+  },
+  "-3,8": {
+   "g_fern2": 2,
+   "h_ivy": 1,
+   "sign_w_export": 1,
+   "sign_w_import": 2
+  },
+  "-3,9": {
+   "bushFlower": 4,
+   "sign_w_import": 2
+  },
+  "-4,-1": {
+   "bonsai": 2
+  },
+  "-4,-2": {
+   "bush": 2,
+   "glyph_h13": 1,
+   "glyph_v7": 1,
+   "succulent": 4
+  },
+  "-4,-3": {
+   "bonsai": 2
+  },
+  "-4,-4": {
+   "bush": 8,
+   "fern": 12,
+   "glyph_h0": 1,
+   "glyph_h12": 1,
+   "glyph_h7": 1,
+   "glyph_h9": 1,
+   "glyph_v0": 2,
+   "glyph_v4": 1,
+   "glyph_v8": 1,
+   "glyph_v9": 1,
+   "h_curtain1": 1,
+   "h_curtain2": 3,
+   "h_curtain3": 1,
+   "h_heart": 6,
+   "h_ivy": 2,
+   "h_vine3": 6,
+   "l_jeans": 1,
+   "l_shirt_blue": 2,
+   "l_shirt_pink": 3,
+   "l_socks": 1,
+   "l_tee_butter": 1,
+   "l_tee_peach": 1,
+   "l_tee_rose": 1,
+   "l_towel_cream": 1,
+   "pothos": 2,
+   "succulent": 34,
+   "vines": 4,
+   "w_tangle": 3
+  },
+  "-4,-5": {
+   "h_curtain2": 1,
+   "h_curtain3": 1,
+   "h_vine3": 1
+  },
+  "-4,0": {
+   "bonsai": 2,
+   "sign_mt_line": 2
+  },
+  "-4,1": {
+   "g_fern3": 2,
+   "l_towel_cream": 1
+  },
+  "-4,10": {
+   "h_curtain1": 1,
+   "h_curtain2": 2,
+   "h_heart": 1
+  },
+  "-4,2": {
+   "bush": 4,
+   "g_fern2": 2,
+   "glyph_h11": 1
+  },
+  "-4,3": {
+   "bush": 2
+  },
+  "-4,4": {
+   "bush": 10,
+   "fern": 16,
+   "glyph_h1": 1,
+   "glyph_h7": 1,
+   "glyph_v0": 2,
+   "glyph_v2": 1,
+   "glyph_v8": 2,
+   "glyph_v9": 1,
+   "h_curtain1": 1,
+   "h_curtain2": 5,
+   "h_curtain3": 4,
+   "h_heart": 3,
+   "h_ivy": 4,
+   "h_vine3": 3,
+   "l_shirt_blue": 1,
+   "l_shirt_pink": 1,
+   "l_tee_blue": 2,
+   "l_tee_lilac": 1,
+   "l_tee_peach": 1,
+   "l_tee_rose": 1,
+   "l_tee_sage": 3,
+   "l_towel_cream": 2,
+   "l_towel_green": 2,
+   "pothos": 2,
+   "sign_ramen_cyan": 1,
+   "succulent": 30,
+   "vines": 6,
+   "w_tangle": 4
+  },
+  "-4,5": {
+   "h_curtain1": 3,
+   "h_curtain2": 1,
+   "h_heart": 2,
+   "h_vine3": 1,
+   "vines": 1
+  },
+  "-4,6": {
+   "h_curtain3": 2,
+   "pothos": 1,
+   "vines": 2
+  },
+  "-4,7": {
+   "h_curtain3": 1
+  },
+  "-4,8": {
+   "h_ivy": 1,
+   "h_vine3": 1
+  },
+  "-4,9": {
+   "h_ivy": 1
+  },
+  "-5,-1": {
+   "bush": 6,
+   "fern": 6,
+   "glyph_v4": 1,
+   "glyph_v6": 1,
+   "glyph_v7": 2,
+   "glyph_v8": 1,
+   "h_curtain1": 2,
+   "h_curtain2": 3,
+   "h_curtain3": 3,
+   "h_heart": 2,
+   "h_ivy": 1,
+   "h_vine3": 2,
+   "l_jeans": 1,
+   "l_shirt_blue": 1,
+   "l_tee_butter": 3,
+   "l_tee_rose": 1,
+   "pothos": 1,
+   "sign_music_pink": 1,
+   "sign_repair_cyan": 1,
+   "succulent": 42,
+   "vines": 3,
+   "w_tangle": 3
+  },
+  "-5,-3": {
+   "bush": 14,
+   "fern": 12,
+   "glyph_h10": 1,
+   "glyph_h13": 1,
+   "glyph_h4": 1,
+   "glyph_h9": 1,
+   "glyph_v1": 1,
+   "glyph_v11": 1,
+   "glyph_v3": 2,
+   "glyph_v6": 1,
+   "glyph_v7": 1,
+   "h_curtain1": 2,
+   "h_curtain2": 8,
+   "h_curtain3": 11,
+   "h_heart": 8,
+   "h_ivy": 8,
+   "h_vine3": 6,
+   "l_jeans": 2,
+   "l_shirt_blue": 1,
+   "l_shirt_pink": 2,
+   "l_socks": 1,
+   "l_tee_blue": 4,
+   "l_tee_butter": 1,
+   "l_tee_lilac": 2,
+   "l_tee_peach": 1,
+   "l_tee_rose": 3,
+   "l_tee_sage": 2,
+   "l_towel_cream": 2,
+   "pothos": 7,
+   "sign_bakery_pink": 1,
+   "sign_cocktail_pink": 1,
+   "sign_hotel_cyan": 1,
+   "sign_noodles_amber": 1,
+   "sign_ramen_amber": 1,
+   "succulent": 88,
+   "vines": 4,
+   "w_tangle": 4
+  },
+  "-5,-4": {
+   "g_flowers": 2,
+   "g_spread1": 2
+  },
+  "-5,-5": {
+   "h_curtain1": 1,
+   "h_heart": 1,
+   "pothos": 1,
+   "vines": 1
+  },
+  "-5,1": {
+   "bush": 14,
+   "bushFlower": 2,
+   "fern": 6,
+   "glyph_h1": 1,
+   "glyph_h10": 2,
+   "glyph_h3": 1,
+   "glyph_h5": 1,
+   "glyph_v10": 1,
+   "glyph_v11": 1,
+   "glyph_v6": 1,
+   "glyph_v9": 1,
+   "h_curtain1": 3,
+   "h_curtain2": 4,
+   "h_curtain3": 1,
+   "h_heart": 3,
+   "h_ivy": 2,
+   "h_vine3": 3,
+   "l_shirt_blue": 1,
+   "l_tee_blue": 2,
+   "l_tee_butter": 2,
+   "l_towel_cream": 2,
+   "pothos": 1,
+   "sign_cocktail_amber": 1,
+   "sign_hotel_cyan": 1,
+   "succulent": 36,
+   "vines": 4,
+   "w_tangle": 1
+  },
+  "-5,3": {
+   "bamboo": 2,
+   "bush": 8,
+   "fern": 10,
+   "glyph_h12": 1,
+   "glyph_h8": 1,
+   "glyph_v10": 2,
+   "glyph_v2": 1,
+   "glyph_v5": 1,
+   "glyph_v8": 1,
+   "h_curtain1": 11,
+   "h_curtain2": 5,
+   "h_curtain3": 5,
+   "h_heart": 3,
+   "h_ivy": 5,
+   "h_vine3": 8,
+   "l_jeans": 1,
+   "l_shirt_blue": 1,
+   "l_shirt_pink": 1,
+   "l_tee_blue": 2,
+   "l_tee_butter": 1,
+   "l_towel_cream": 1,
+   "pothos": 5,
+   "sign_cocktail_pink": 1,
+   "succulent": 72,
+   "vines": 6,
+   "w_tangle": 7
+  },
+  "-5,4": {
+   "bush": 2,
+   "bushFlower": 4,
+   "g_fern2": 2,
+   "g_spread1": 2
+  },
+  "-5,5": {
+   "h_curtain2": 1,
+   "pothos": 1
+  },
+  "-6,-1": {
+   "bush": 2
+  },
+  "-6,-2": {
+   "bonsai": 2,
+   "bush": 2,
+   "fern": 2,
+   "glyph_h2": 1,
+   "glyph_h3": 1,
+   "glyph_h4": 1,
+   "glyph_h8": 1,
+   "glyph_v13": 1,
+   "glyph_v4": 1,
+   "glyph_v5": 2,
+   "h_curtain1": 2,
+   "h_curtain2": 2,
+   "h_curtain3": 1,
+   "h_ivy": 1,
+   "h_vine3": 2,
+   "l_shirt_blue": 1,
+   "l_shirt_pink": 2,
+   "l_towel_cream": 1,
+   "pothos": 2,
+   "sign_cocktail_pink": 1,
+   "succulent": 26,
+   "vines": 2
+  },
+  "-6,-3": {
+   "g_fern3": 2
+  },
+  "-6,-4": {
+   "bamboo": 2,
+   "fern": 10,
+   "glyph_h2": 1,
+   "glyph_h3": 1,
+   "h_curtain1": 3,
+   "h_curtain2": 2,
+   "h_curtain3": 1,
+   "h_heart": 7,
+   "h_ivy": 2,
+   "h_vine3": 1,
+   "l_tee_butter": 1,
+   "l_tee_lilac": 2,
+   "l_towel_cream": 2,
+   "l_towel_green": 1,
+   "pothos": 1,
+   "succulent": 18
+  },
+  "-6,-5": {
+   "h_curtain1": 1,
+   "h_curtain2": 2,
+   "h_heart": 1,
+   "h_vine3": 1
+  },
+  "-6,-6": {
+   "sign_hw_entry": 1,
+   "sign_hw_toll": 1
+  },
+  "-6,1": {
+   "g_fern3": 2
+  },
+  "-6,2": {
+   "bonsai": 6,
+   "bush": 12,
+   "bushFlower": 10,
+   "fern": 12,
+   "g_fern3": 4,
+   "g_spread1": 4,
+   "glyph_h11": 1,
+   "glyph_h7": 1,
+   "glyph_v9": 1,
+   "succulent": 2
+  },
+  "-6,3": {
+   "g_fern3": 2
+  },
+  "-6,4": {
+   "bamboo": 2,
+   "bonsai": 2,
+   "bush": 2,
+   "fern": 4,
+   "g_cover": 2,
+   "glyph_h10": 1,
+   "glyph_h11": 1,
+   "glyph_h5": 1,
+   "glyph_v13": 1,
+   "glyph_v4": 1,
+   "h_curtain1": 2,
+   "h_curtain2": 1,
+   "h_curtain3": 1,
+   "h_heart": 3,
+   "h_vine3": 2,
+   "l_jeans": 1,
+   "l_shirt_blue": 1,
+   "l_tee_butter": 1,
+   "l_tee_peach": 1,
+   "l_tee_sage": 1,
+   "l_towel_cream": 3,
+   "l_towel_green": 1,
+   "pothos": 1,
+   "sign_hotel_amber": 1,
+   "sign_noodles_amber": 1,
+   "sign_repair_pink": 1,
+   "succulent": 28,
+   "vines": 4,
+   "w_tangle": 3
+  },
+  "-6,5": {
+   "h_curtain3": 1,
+   "h_ivy": 1,
+   "pothos": 1
+  },
+  "-7,-1": {
+   "bush": 6,
+   "bushFlower": 4,
+   "fern": 12,
+   "glyph_h5": 1,
+   "glyph_v3": 1,
+   "glyph_v4": 1,
+   "glyph_v5": 1,
+   "glyph_v7": 1,
+   "glyph_v8": 1,
+   "h_curtain1": 6,
+   "h_curtain2": 5,
+   "h_curtain3": 2,
+   "h_heart": 4,
+   "h_ivy": 4,
+   "h_vine3": 7,
+   "l_jeans": 3,
+   "l_shirt_blue": 1,
+   "l_shirt_pink": 2,
+   "l_tee_blue": 1,
+   "l_tee_butter": 1,
+   "l_tee_peach": 1,
+   "l_tee_rose": 1,
+   "l_tee_sage": 2,
+   "l_towel_cream": 2,
+   "l_towel_green": 1,
+   "pothos": 3,
+   "sign_bakery_amber": 1,
+   "sign_cocktail_amber": 1,
+   "sign_hotel_cyan": 1,
+   "succulent": 36,
+   "vines": 6,
+   "w_tangle": 3
+  },
+  "-7,-2": {
+   "g_fern3": 2
+  },
+  "-7,-3": {
+   "bush": 18,
+   "fern": 18,
+   "glyph_h13": 1,
+   "glyph_h3": 1,
+   "glyph_h5": 1,
+   "glyph_h8": 1,
+   "glyph_v0": 1,
+   "glyph_v10": 1,
+   "glyph_v13": 2,
+   "glyph_v7": 1,
+   "glyph_v8": 2,
+   "h_curtain1": 10,
+   "h_curtain2": 3,
+   "h_curtain3": 6,
+   "h_heart": 11,
+   "h_ivy": 7,
+   "h_vine3": 3,
+   "l_jeans": 2,
+   "l_shirt_blue": 1,
+   "l_socks": 1,
+   "l_tee_blue": 1,
+   "l_tee_butter": 2,
+   "l_tee_lilac": 1,
+   "l_tee_peach": 1,
+   "l_tee_rose": 2,
+   "l_tee_sage": 1,
+   "l_towel_cream": 3,
+   "l_towel_green": 1,
+   "pothos": 5,
+   "sign_cocktail_cyan": 1,
+   "sign_cocktail_pink": 1,
+   "sign_music_amber": 1,
+   "succulent": 92,
+   "vines": 9,
+   "w_tangle": 3
+  },
+  "-7,-4": {
+   "g_fern3": 2,
+   "g_flowers": 2,
+   "l_tee_rose": 1
+  },
+  "-7,-5": {
+   "h_heart": 1,
+   "pothos": 1,
+   "vines": 1
+  },
+  "-7,0": {
+   "sign_mt_line": 2
+  },
+  "-7,1": {
+   "bonsai": 2,
+   "bush": 4,
+   "fern": 20,
+   "glyph_h1": 1,
+   "glyph_h13": 1,
+   "glyph_v10": 2,
+   "glyph_v13": 1,
+   "glyph_v3": 3,
+   "glyph_v4": 1,
+   "glyph_v6": 3,
+   "glyph_v9": 1,
+   "h_curtain1": 2,
+   "h_curtain2": 5,
+   "h_curtain3": 5,
+   "h_heart": 3,
+   "h_ivy": 4,
+   "h_vine3": 1,
+   "l_shirt_blue": 1,
+   "l_socks": 1,
+   "l_tee_blue": 1,
+   "l_tee_butter": 1,
+   "l_tee_lilac": 3,
+   "l_tee_rose": 1,
+   "l_tee_sage": 1,
+   "l_towel_cream": 1,
+   "l_towel_green": 2,
+   "pothos": 4,
+   "sign_bakery_amber": 1,
+   "sign_laundry_cyan": 1,
+   "succulent": 60,
+   "vines": 7,
+   "w_tangle": 2
+  },
+  "-7,2": {
+   "bonsai": 2
+  },
+  "-7,3": {
+   "bush": 2,
+   "fern": 8,
+   "glyph_h4": 1,
+   "glyph_h9": 1,
+   "glyph_v10": 1,
+   "glyph_v2": 1,
+   "glyph_v8": 1,
+   "glyph_v9": 1,
+   "h_curtain1": 3,
+   "h_curtain2": 2,
+   "h_curtain3": 4,
+   "h_heart": 1,
+   "h_ivy": 3,
+   "h_vine3": 1,
+   "l_jeans": 1,
+   "l_shirt_blue": 2,
+   "l_shirt_pink": 1,
+   "l_tee_blue": 2,
+   "l_tee_peach": 1,
+   "l_tee_sage": 1,
+   "l_towel_cream": 1,
+   "l_towel_green": 1,
+   "pothos": 2,
+   "sign_bakery_amber": 1,
+   "sign_bakery_cyan": 1,
+   "sign_cocktail_amber": 1,
+   "succulent": 44,
+   "vines": 2
+  },
+  "-7,4": {
+   "g_fern3": 2,
+   "g_spread1": 2
+  },
+  "-7,5": {
+   "h_curtain3": 1
+  },
+  "-8,-1": {
+   "g_fern3": 2
+  },
+  "-8,-2": {
+   "bush": 2,
+   "glyph_v7": 1,
+   "sign_bakery_amber": 1
+  },
+  "-8,-4": {
+   "bush": 10,
+   "fern": 8,
+   "g_clover": 2,
+   "g_fern3": 2,
+   "h_curtain1": 4,
+   "h_curtain2": 1,
+   "h_curtain3": 2,
+   "h_heart": 1,
+   "h_ivy": 5,
+   "h_vine3": 3,
+   "l_jeans": 1,
+   "l_shirt_blue": 1,
+   "l_socks": 2,
+   "l_tee_rose": 2,
+   "l_towel_cream": 1,
+   "l_towel_green": 1,
+   "pothos": 7,
+   "succulent": 28,
+   "vines": 5,
+   "w_tangle": 2
+  },
+  "-8,-5": {
+   "h_curtain1": 1,
+   "h_curtain3": 1,
+   "h_heart": 1,
+   "h_vine3": 1
+  },
+  "-8,0": {
+   "bonsai": 2,
+   "sign_mt_line": 2,
+   "sign_mt_station": 4
+  },
+  "-8,1": {
+   "g_fern3": 2
+  },
+  "-8,2": {
+   "glyph_v1": 1,
+   "sign_music_cyan": 1
+  },
+  "-8,3": {
+   "bonsai": 4
+  },
+  "-8,4": {
+   "bush": 6,
+   "fern": 18,
+   "g_clover": 2,
+   "g_fern2": 4,
+   "g_fern3": 2,
+   "glyph_h10": 1,
+   "glyph_h5": 1,
+   "glyph_h9": 1,
+   "h_curtain1": 4,
+   "h_curtain2": 1,
+   "h_curtain3": 2,
+   "h_heart": 5,
+   "h_ivy": 3,
+   "h_vine3": 5,
+   "l_tee_blue": 2,
+   "l_tee_butter": 3,
+   "l_tee_lilac": 1,
+   "l_tee_rose": 1,
+   "l_towel_cream": 1,
+   "l_towel_green": 1,
+   "pothos": 2,
+   "succulent": 24,
+   "vines": 4,
+   "w_tangle": 1
+  },
+  "-8,5": {
+   "h_curtain1": 2,
+   "h_curtain2": 1,
+   "pothos": 1
+  },
+  "-9,-1": {
+   "bamboo": 2,
+   "bush": 16,
+   "fern": 22,
+   "g_fern3": 2,
+   "g_flowers": 2,
+   "g_moss2": 2,
+   "glyph_h0": 1,
+   "glyph_h1": 1,
+   "glyph_h13": 1,
+   "glyph_v11": 1,
+   "glyph_v5": 1,
+   "glyph_v7": 1,
+   "glyph_v9": 1,
+   "h_curtain1": 6,
+   "h_curtain2": 8,
+   "h_curtain3": 4,
+   "h_heart": 4,
+   "h_ivy": 7,
+   "h_vine3": 10,
+   "l_jeans": 1,
+   "l_shirt_blue": 3,
+   "l_shirt_pink": 1,
+   "l_socks": 1,
+   "l_tee_blue": 2,
+   "l_tee_butter": 1,
+   "l_tee_lilac": 2,
+   "l_tee_rose": 3,
+   "l_towel_cream": 1,
+   "l_towel_green": 1,
+   "pothos": 8,
+   "sign_noodles_amber": 1,
+   "sign_repair_amber": 1,
+   "succulent": 60,
+   "vines": 4,
+   "w_tangle": 3
+  },
+  "-9,-2": {
+   "bonsai": 2
+  },
+  "-9,-3": {
+   "bonsai": 4,
+   "bush": 10,
+   "fern": 6,
+   "g_cover": 2,
+   "glyph_h0": 1,
+   "glyph_h13": 1,
+   "glyph_h3": 1,
+   "glyph_v0": 1,
+   "glyph_v1": 1,
+   "glyph_v11": 1,
+   "glyph_v2": 1,
+   "glyph_v6": 1,
+   "h_curtain1": 1,
+   "h_curtain2": 1,
+   "h_curtain3": 1,
+   "h_heart": 4,
+   "h_ivy": 3,
+   "l_jeans": 1,
+   "l_tee_blue": 1,
+   "l_tee_lilac": 2,
+   "l_tee_peach": 1,
+   "l_tee_sage": 1,
+   "l_towel_cream": 1,
+   "l_towel_green": 2,
+   "pothos": 3,
+   "sign_bakery_amber": 1,
+   "sign_hotel_pink": 1,
+   "succulent": 18,
+   "vines": 2,
+   "w_tangle": 1
+  },
+  "-9,-4": {
+   "g_fern3": 2
+  },
+  "-9,-5": {
+   "vines": 1
+  },
+  "-9,0": {
+   "g_fern3": 2,
+   "g_moss2": 2
+  },
+  "-9,1": {
+   "bush": 6,
+   "bushFlower": 2,
+   "fern": 4,
+   "glyph_h11": 1,
+   "glyph_h8": 1,
+   "glyph_v10": 1,
+   "glyph_v11": 1,
+   "glyph_v12": 2,
+   "glyph_v13": 1,
+   "glyph_v9": 1,
+   "h_curtain1": 4,
+   "h_curtain2": 3,
+   "h_curtain3": 3,
+   "h_heart": 10,
+   "h_ivy": 1,
+   "h_vine3": 4,
+   "l_shirt_blue": 1,
+   "l_tee_blue": 1,
+   "l_tee_butter": 3,
+   "l_tee_lilac": 1,
+   "l_tee_peach": 1,
+   "l_tee_rose": 1,
+   "l_tee_sage": 1,
+   "l_towel_cream": 1,
+   "pothos": 5,
+   "sign_music_cyan": 1,
+   "sign_repair_pink": 1,
+   "succulent": 38,
+   "vines": 4
+  },
+  "-9,2": {
+   "g_moss2": 2
+  },
+  "-9,3": {
+   "bonsai": 2,
+   "bush": 8,
+   "bushFlower": 2,
+   "fern": 16,
+   "glyph_h13": 1,
+   "glyph_h8": 1,
+   "glyph_h9": 1,
+   "glyph_v10": 1,
+   "glyph_v2": 1,
+   "glyph_v8": 1,
+   "h_curtain1": 4,
+   "h_curtain2": 2,
+   "h_curtain3": 7,
+   "h_heart": 4,
+   "h_ivy": 2,
+   "h_vine3": 3,
+   "l_tee_blue": 1,
+   "l_tee_butter": 1,
+   "l_tee_peach": 3,
+   "l_tee_sage": 1,
+   "pothos": 7,
+   "sign_laundry_amber": 1,
+   "sign_music_amber": 1,
+   "sign_repair_cyan": 1,
+   "succulent": 66,
+   "vines": 4,
+   "w_tangle": 3
+  },
+  "-9,4": {
+   "g_cover": 4,
+   "g_fern2": 2
+  },
+  "-9,5": {
+   "h_curtain1": 1,
+   "h_ivy": 1,
+   "h_vine3": 1,
+   "vines": 2
+  },
+  "0,-1": {
+   "bush": 2,
+   "bushFlower": 2
+  },
+  "0,-2": {
+   "bushFlower": 2,
+   "fern": 6,
+   "sign_w_lube": 1
+  },
+  "0,-3": {
+   "bonsai": 2
+  },
+  "0,-4": {
+   "bush": 2,
+   "g_flowers": 2,
+   "h_ivy": 1,
+   "sign_w_scrap": 1,
+   "vines": 1
+  },
+  "0,-5": {
+   "pothos": 1
+  },
+  "0,0": {
+   "bushFlower": 2,
+   "sign_mt_line": 2,
+   "sign_mt_station": 4
+  },
+  "0,1": {
+   "bushFlower": 2
+  },
+  "0,10": {
+   "sign_w_dronestore": 1,
+   "sign_w_frag": 1
+  },
+  "0,11": {
+   "h_curtain1": 1
+  },
+  "0,2": {
+   "bamboo": 4,
+   "bonsai": 10,
+   "bush": 4,
+   "bushFlower": 8,
+   "fern": 2,
+   "g_fern3": 6,
+   "sign_w_parts": 1
+  },
+  "0,4": {
+   "sign_w_scrap": 1,
+   "vines": 1
+  },
+  "0,5": {
+   "l_mossroots": 1,
+   "sign_w_frag": 2
+  },
+  "0,7": {
+   "sign_w_distro": 1,
+   "sign_w_kibou": 1
+  },
+  "0,8": {
+   "sign_w_sortout": 1
+  },
+  "0,9": {
+   "sign_w_frag": 1
+  },
+  "1,-1": {
+   "bush": 2,
+   "bushFlower": 2,
+   "fern": 4,
+   "sign_w_parts": 1,
+   "sign_w_scrap": 1
+  },
+  "1,-3": {
+   "bonsai": 4,
+   "bush": 8,
+   "fern": 4,
+   "h_ivy": 1,
+   "sign_w_scrap": 1
+  },
+  "1,-4": {
+   "g_fern3": 2
+  },
+  "1,-5": {
+   "h_vine3": 1,
+   "pothos": 1,
+   "vines": 1
+  },
+  "1,0": {
+   "bush": 2
+  },
+  "1,1": {
+   "bamboo": 2,
+   "bonsai": 2,
+   "bush": 10,
+   "fern": 2,
+   "g_fern2": 2,
+   "h_ivy": 1,
+   "l_mossroots": 1,
+   "sign_w_repairs": 1,
+   "succulent": 2
+  },
+  "1,10": {
+   "g_fern2": 2,
+   "h_ivy": 1,
+   "sign_w_import": 1
+  },
+  "1,11": {
+   "h_curtain3": 1,
+   "h_ivy": 1,
+   "h_vine3": 1
+  },
+  "1,2": {
+   "bush": 2
+  },
+  "1,3": {
+   "bamboo": 2,
+   "g_fern2": 4,
+   "h_ivy": 1,
+   "sign_w_scrap": 1
+  },
+  "1,4": {
+   "bonsai": 2
+  },
+  "1,5": {
+   "vines": 2
+  },
+  "1,6": {
+   "sign_w_sortin": 1,
+   "sign_w_sortout": 1
+  },
+  "1,9": {
+   "sign_w_import": 1
+  },
+  "10,-1": {
+   "h_curtain2": 1,
+   "h_ivy": 1
+  },
+  "10,-2": {
+   "h_curtain1": 1,
+   "h_heart": 1,
+   "vines": 2
+  },
+  "10,-3": {
+   "h_curtain2": 1,
+   "h_curtain3": 1,
+   "h_heart": 1
+  },
+  "10,-4": {
+   "vines": 1
+  },
+  "10,0": {
+   "h_curtain2": 1,
+   "h_heart": 1
+  },
+  "10,1": {
+   "h_curtain3": 1,
+   "vines": 3
+  },
+  "10,2": {
+   "h_curtain1": 1,
+   "h_curtain3": 1,
+   "h_ivy": 1,
+   "vines": 1
+  },
+  "10,3": {
+   "h_ivy": 1,
+   "h_vine3": 2
+  },
+  "10,4": {
+   "h_curtain2": 2,
+   "h_curtain3": 1,
+   "pothos": 1
+  },
+  "2,-1": {
+   "bushFlower": 2
+  },
+  "2,-3": {
+   "bushFlower": 2
+  },
+  "2,-4": {
+   "g_fern2": 2,
+   "g_fern3": 2,
+   "sign_w_scrap": 1,
+   "vines": 1
+  },
+  "2,-5": {
+   "h_curtain1": 1,
+   "h_vine3": 1,
+   "pothos": 1
+  },
+  "2,0": {
+   "bush": 2,
+   "g_fern3": 2,
+   "sign_mt_line": 2
+  },
+  "2,10": {
+   "bushFlower": 2,
+   "g_flowers": 2,
+   "g_moss2": 2,
+   "g_spread2": 4
+  },
+  "2,11": {
+   "h_curtain1": 1,
+   "h_curtain3": 1,
+   "h_heart": 1,
+   "h_vine3": 1
+  },
+  "2,2": {
+   "bush": 6,
+   "fern": 2,
+   "h_ivy": 2,
+   "sign_w_parts": 1,
+   "sign_w_repairs": 1,
+   "succulent": 2,
+   "vines": 1
+  },
+  "2,4": {
+   "bush": 2,
+   "bushFlower": 2,
+   "fern": 4,
+   "g_fern2": 2,
+   "h_ivy": 1,
+   "l_mossroots": 1,
+   "sign_w_parts": 1,
+   "sign_w_repairs": 1
+  },
+  "2,5": {
+   "l_mossroots": 1,
+   "sign_w_heavy": 2
+  },
+  "2,6": {
+   "g_cover": 2,
+   "g_spread2": 4,
+   "sign_w_cargo": 2,
+   "sign_w_grid": 1
+  },
+  "2,7": {
+   "g_moss2": 2,
+   "h_ivy": 1,
+   "sign_c_open": 1,
+   "sign_w_nofly": 1
+  },
+  "2,9": {
+   "bush": 2,
+   "bushFlower": 2,
+   "sign_w_kibou": 1
+  },
+  "3,-2": {
+   "bonsai": 2
+  },
+  "3,-3": {
+   "bush": 2,
+   "fern": 4,
+   "g_fern2": 4,
+   "h_ivy": 1,
+   "l_mossroots": 1,
+   "pothos": 1,
+   "sign_w_repairs": 1,
+   "succulent": 2,
+   "vines": 2
+  },
+  "3,-4": {
+   "g_clover": 2,
+   "g_fern3": 4,
+   "g_spread1": 2
+  },
+  "3,-5": {
+   "h_ivy": 1,
+   "h_vine3": 1
+  },
+  "3,0": {
+   "bush": 2
+  },
+  "3,1": {
+   "bushFlower": 2,
+   "fern": 2,
+   "g_fern2": 2,
+   "h_ivy": 1,
+   "sign_w_parts": 1,
+   "sign_w_repairs": 1,
+   "succulent": 2,
+   "vines": 1
+  },
+  "3,10": {
+   "h_curtain2": 1,
+   "h_curtain3": 2,
+   "h_heart": 1
+  },
+  "3,2": {
+   "bonsai": 2
+  },
+  "3,3": {
+   "h_curtain3": 1,
+   "h_heart": 1,
+   "pothos": 1,
+   "sign_w_parts": 1,
+   "vines": 2
+  },
+  "3,4": {
+   "bush": 4
+  },
+  "3,5": {
+   "h_curtain2": 1,
+   "h_curtain3": 1,
+   "h_vine3": 1,
+   "pothos": 1,
+   "vines": 2
+  },
+  "3,6": {
+   "h_curtain1": 3,
+   "h_curtain2": 2,
+   "h_curtain3": 1,
+   "h_ivy": 1,
+   "pothos": 1,
+   "vines": 1
+  },
+  "3,7": {
+   "h_curtain1": 3,
+   "h_curtain2": 1,
+   "h_curtain3": 1,
+   "h_heart": 2,
+   "h_ivy": 1,
+   "vines": 2
+  },
+  "3,8": {
+   "h_curtain1": 1,
+   "h_vine3": 1,
+   "vines": 1
+  },
+  "3,9": {
+   "h_curtain1": 3,
+   "h_curtain3": 1,
+   "pothos": 1
+  },
+  "4,-2": {
+   "bush": 2,
+   "g_fern2": 2,
+   "sign_w_hot": 1,
+   "sign_w_noodlesP": 1,
+   "vines": 1
+  },
+  "4,-4": {
+   "g_clover": 2,
+   "g_flowers": 2,
+   "glyph_v10": 1,
+   "sign_c_cramen": 1,
+   "sign_c_ramen": 1,
+   "sign_c_sushi": 1,
+   "sign_ng_6": 1
+  },
+  "4,-5": {
+   "h_curtain1": 1,
+   "h_curtain2": 1
+  },
+  "4,2": {
+   "bush": 2,
+   "g_fern2": 2,
+   "glyph_v2": 1,
+   "sign_c_cramen": 1
+  },
+  "4,3": {
+   "bush": 2
+  },
+  "4,4": {
+   "bush": 2,
+   "sign_w_hot": 1,
+   "sign_w_noodlesP": 1
+  },
+  "4,5": {
+   "bamboo": 2,
+   "g_cover": 2,
+   "pothos": 2,
+   "vines": 2
+  },
+  "4,6": {
+   "bush": 2,
+   "g_fern3": 2,
+   "g_moss2": 2,
+   "g_spread2": 2,
+   "h_ivy": 1,
+   "h_vine3": 1
+  },
+  "4,7": {
+   "bush": 2,
+   "bushFlower": 2,
+   "g_fern3": 2,
+   "g_spread2": 2,
+   "l_mossroots": 1,
+   "pothos": 2
+  },
+  "4,8": {
+   "bamboo": 2,
+   "g_clover": 2,
+   "g_fern3": 2,
+   "g_moss2": 2,
+   "vines": 1
+  },
+  "4,9": {
+   "h_curtain2": 1,
+   "h_vine3": 2
+  },
+  "5,-1": {
+   "bushFlower": 4,
+   "sign_c_arakawa": 1,
+   "sign_c_cramen": 2
+  },
+  "5,-2": {
+   "bush": 2
+  },
+  "5,-3": {
+   "fern": 2,
+   "h_curtain1": 1,
+   "sign_c_hotel": 1,
+   "sign_ng_15": 1,
+   "sign_w_hot": 1,
+   "sign_w_noodlesP": 1,
+   "succulent": 2
+  },
+  "5,-4": {
+   "g_clover": 2,
+   "g_fern3": 2,
+   "g_flowers": 2,
+   "sign_hw_arrivals": 2
+  },
+  "5,-5": {
+   "h_curtain2": 2,
+   "h_heart": 1,
+   "h_vine3": 1,
+   "vines": 1
+  },
+  "5,0": {
+   "g_fern3": 2,
+   "sign_mt_line": 2
+  },
+  "5,1": {
+   "fern": 10,
+   "glyph_h2": 1,
+   "h_heart": 2,
+   "h_ivy": 1,
+   "h_vine3": 1,
+   "pothos": 2,
+   "sign_c_noodles": 1,
+   "sign_c_pawn": 1,
+   "sign_ng_1": 1,
+   "succulent": 16,
+   "vines": 3
+  },
+  "5,2": {
+   "bushFlower": 2
+  },
+  "5,3": {
+   "fern": 2,
+   "g_fern2": 2,
+   "sign_c_noodles": 1,
+   "sign_c_pawn": 1,
+   "sign_c_sushi": 1,
+   "sign_w_24h": 1
+  },
+  "5,4": {
+   "bush": 2,
+   "g_fern3": 2
+  },
+  "5,5": {
+   "vines": 1
+  },
+  "5,6": {
+   "h_vine3": 2
+  },
+  "5,7": {
+   "sign_w_bay": 1
+  },
+  "5,8": {
+   "g_fern2": 2,
+   "g_moss2": 2,
+   "h_curtain1": 2,
+   "h_ivy": 2,
+   "l_mossroots": 1,
+   "pothos": 2,
+   "vines": 2
+  },
+  "5,9": {
+   "h_curtain2": 1,
+   "vines": 1
+  },
+  "6,-1": {
+   "bonsai": 2
+  },
+  "6,-2": {
+   "sign_c_tea": 1,
+   "sign_ng_6": 1
+  },
+  "6,-3": {
+   "bush": 4,
+   "glyph_v1": 1,
+   "glyph_v9": 1
+  },
+  "6,-4": {
+   "sign_w_hot": 1,
+   "sign_w_noodlesP": 1
+  },
+  "6,-5": {
+   "pothos": 1,
+   "vines": 2
+  },
+  "6,0": {
+   "bush": 2
+  },
+  "6,1": {
+   "bush": 2
+  },
+  "6,2": {
+   "bonsai": 2,
+   "glyph_v2": 1,
+   "h_curtain1": 1,
+   "moss": 2,
+   "sign_c_noodles": 1,
+   "sign_clinic_amber": 1,
+   "sign_hotel_amber": 1,
+   "sign_ng_3": 1,
+   "succulent": 2,
+   "vines": 1,
+   "w_tangle": 1
+  },
+  "6,4": {
+   "sign_c_cramen": 2,
+   "sign_c_noodlebar": 1,
+   "sign_c_open": 1,
+   "sign_c_sushi": 1,
+   "sign_w_24h": 1
+  },
+  "6,5": {
+   "sign_w_agri": 1,
+   "sign_w_farm24": 1,
+   "sign_w_hydro": 1
+  },
+  "6,6": {
+   "h_curtain1": 1,
+   "h_vine3": 2
+  },
+  "6,8": {
+   "g_clover": 2,
+   "h_curtain1": 2,
+   "h_ivy": 2,
+   "h_vine3": 1,
+   "pothos": 1,
+   "vines": 1
+  },
+  "6,9": {
+   "h_curtain1": 1,
+   "h_curtain2": 1,
+   "h_ivy": 1
+  },
+  "7,-1": {
+   "sign_c_cramen": 2,
+   "sign_c_noodlebar": 3,
+   "sign_c_noodles": 1,
+   "sign_c_open": 1,
+   "sign_c_ramen": 1
+  },
+  "7,-2": {
+   "bonsai": 2,
+   "bushFlower": 2
+  },
+  "7,-3": {
+   "bush": 6,
+   "fern": 4,
+   "glyph_h1": 1,
+   "glyph_h7": 1,
+   "glyph_v2": 1,
+   "h_curtain1": 1,
+   "h_curtain2": 3,
+   "h_curtain3": 1,
+   "h_heart": 3,
+   "h_ivy": 5,
+   "sign_arcade_pink": 1,
+   "sign_c_dataloan": 1,
+   "sign_c_pawn": 1,
+   "sign_ng_7": 1,
+   "succulent": 32,
+   "vines": 3,
+   "w_tangle": 1
+  },
+  "7,-4": {
+   "bonsai": 2,
+   "bush": 2,
+   "bushFlower": 4
+  },
+  "7,-5": {
+   "h_curtain2": 1,
+   "h_vine3": 1,
+   "pothos": 1
+  },
+  "7,0": {
+   "bonsai": 2
+  },
+  "7,1": {
+   "sign_c_open": 1,
+   "sign_c_ramen": 1,
+   "sign_c_sushi": 2
+  },
+  "7,3": {
+   "sign_c_tea": 1
+  },
+  "7,4": {
+   "bonsai": 2
+  },
+  "7,5": {
+   "h_ivy": 2,
+   "pothos": 1
+  },
+  "7,6": {
+   "h_curtain1": 1,
+   "h_vine3": 1,
+   "pothos": 1,
+   "vines": 1
+  },
+  "7,8": {
+   "bush": 4,
+   "g_moss2": 2,
+   "h_curtain1": 1,
+   "h_vine3": 1,
+   "pothos": 2,
+   "vines": 1
+  },
+  "7,9": {
+   "h_curtain1": 2,
+   "h_curtain2": 1,
+   "vines": 1
+  },
+  "8,-1": {
+   "g_fern3": 2
+  },
+  "8,-2": {
+   "sign_c_cramen": 1,
+   "sign_c_open": 1,
+   "sign_w_24h": 2
+  },
+  "8,-4": {
+   "bamboo": 2,
+   "bonsai": 4,
+   "bush": 6,
+   "g_fern2": 2,
+   "g_fern3": 8,
+   "g_flowers": 2,
+   "g_spread1": 2,
+   "sign_c_bios": 1
+  },
+  "8,-5": {
+   "h_curtain1": 1,
+   "h_curtain3": 1,
+   "h_ivy": 1
+  },
+  "8,0": {
+   "g_fern3": 2,
+   "sign_mt_line": 2,
+   "sign_mt_station": 4
+  },
+  "8,1": {
+   "bushFlower": 2
+  },
+  "8,2": {
+   "bamboo": 2,
+   "sign_c_dome": 1
+  },
+  "8,3": {
+   "bonsai": 2
+  },
+  "8,4": {
+   "bushFlower": 2,
+   "fern": 2,
+   "glyph_h11": 1,
+   "glyph_v11": 1,
+   "glyph_v4": 1,
+   "glyph_v6": 2,
+   "glyph_v7": 1,
+   "h_heart": 1,
+   "h_ivy": 1,
+   "pothos": 1,
+   "sign_ng_15": 1,
+   "sign_ng_16": 1,
+   "sign_noodles_cyan": 1,
+   "succulent": 22
+  },
+  "8,5": {
+   "g_clover": 2
+  },
+  "8,6": {
+   "bamboo": 4,
+   "g_fern3": 4,
+   "g_spread2": 2,
+   "l_mossroots": 2,
+   "pothos": 2
+  },
+  "8,7": {
+   "bamboo": 2,
+   "bush": 2,
+   "pothos": 1
+  },
+  "8,8": {
+   "bush": 2,
+   "bushFlower": 4,
+   "g_moss2": 2,
+   "h_curtain1": 1,
+   "l_mossroots": 2
+  },
+  "8,9": {
+   "h_curtain3": 1,
+   "h_heart": 2,
+   "h_ivy": 1,
+   "h_vine3": 1,
+   "pothos": 1
+  },
+  "9,-1": {
+   "g_fern2": 6,
+   "sign_c_baropen": 1,
+   "sign_ng_2": 1
+  },
+  "9,-2": {
+   "bush": 2,
+   "g_fern2": 2,
+   "g_fern3": 2,
+   "g_moss2": 2
+  },
+  "9,-3": {
+   "g_fern2": 2,
+   "glyph_v7": 1,
+   "sign_c_gear": 2,
+   "sign_c_pawn": 2,
+   "sign_c_prints": 2,
+   "sign_c_sushi": 1,
+   "sign_ng_0": 1,
+   "sign_ng_10": 1,
+   "sign_ng_6": 1,
+   "sign_w_24h": 1
+  },
+  "9,-4": {
+   "g_fern3": 2,
+   "g_spread1": 2
+  },
+  "9,-5": {
+   "h_curtain1": 1
+  },
+  "9,0": {
+   "bonsai": 2,
+   "bushFlower": 2,
+   "g_spread2": 2
+  },
+  "9,1": {
+   "bushFlower": 2,
+   "g_clover": 2,
+   "g_fern2": 2,
+   "sign_c_arakawa": 1,
+   "sign_c_techparts": 1,
+   "sign_ng_3": 1
+  },
+  "9,2": {
+   "bonsai": 2,
+   "g_fern3": 2,
+   "g_spread2": 2
+  },
+  "9,3": {
+   "g_clover": 2,
+   "g_cover": 2,
+   "g_fern2": 2,
+   "g_spread1": 2,
+   "g_spread2": 2,
+   "sign_c_hotel": 1,
+   "sign_c_robot": 1,
+   "sign_c_techmods": 1,
+   "sign_ng_1": 1
+  },
+  "9,4": {
+   "bushFlower": 4,
+   "g_fern2": 2,
+   "g_flowers": 2,
+   "g_spread1": 2
+  },
+  "9,5": {
+   "h_curtain2": 1,
+   "h_ivy": 2,
+   "h_vine3": 2,
+   "pothos": 1,
+   "vines": 1
+  },
+  "9,6": {
+   "pothos": 1
+  },
+  "9,7": {
+   "h_curtain3": 1,
+   "h_vine3": 1
+  },
+  "9,8": {
+   "h_curtain3": 1,
+   "h_ivy": 1,
+   "pothos": 1,
+   "vines": 1
+  }
+ },
+ "ref": "2709cbf",
+ "scene": "city",
+ "settleSeconds": 1,
+ "settled": {
+  "cool": 0,
+  "dirtyRegions": 0,
+  "inflight": 0,
+  "instances": 3643,
+  "loading": false,
+  "superDirty": 0
+ },
+ "tag": "before_cache",
+ "unknownRects": {},
+ "viewport": [
+  1280,
+  720
+ ],
+ "zooms": {
+  "15": {
+   "frame": {
+    "foliageShare": 0.13499759131390737,
+    "foliageTrisByDifference": 7285.333333333336,
+    "foliageTrisDrawn": 7286,
+    "frameTris": 53971.333333333336,
+    "frameTrisNoFoliage": 46686,
+    "hiddenFrames": [
+     46686,
+     46686
+    ],
+    "shownFrames": [
+     53972,
+     53972,
+     53970
+    ]
+   },
+   "scan": {
+    "families": {
+     "ferns and bushes": {
+      "inView": 1258,
+      "instances": 1936,
+      "kinds": 8,
+      "thinAt": [
+       382,
+       806,
+       1218,
+       1606
+      ],
+      "thinNow": 0,
+      "triangles": 3872
+     },
+     "ground cover": {
+      "inView": 60,
+      "instances": 124,
+      "kinds": 7,
+      "thinAt": [
+       10,
+       32,
+       42,
+       54
+      ],
+      "thinNow": 0,
+      "triangles": 248
+     },
+     "hanging greenery": {
+      "inView": 633,
+      "instances": 997,
+      "kinds": 10,
+      "thinAt": [
+       167,
+       313,
+       458,
+       624
+      ],
+      "thinNow": 0,
+      "triangles": 1994
+     },
+     "laundry": {
+      "inView": 114,
+      "instances": 198,
+      "kinds": 12,
+      "thinAt": [
+       42,
+       80,
+       125,
+       169
+      ],
+      "thinNow": 0,
+      "triangles": 396
+     },
+     "signs (not foliage)": {
+      "inView": 292,
+      "instances": 388,
+      "kinds": 111,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "triangles": 776
+     }
+    },
+    "kinds": {
+     "bamboo": {
+      "family": "ferns and bushes",
+      "inView": 22,
+      "inViewPoint": 18,
+      "instances": 32,
+      "thinAt": [
+       6,
+       12,
+       22,
+       32
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "bonsai": {
+      "family": "ferns and bushes",
+      "inView": 68,
+      "inViewPoint": 64,
+      "instances": 90,
+      "thinAt": [
+       24,
+       54,
+       68,
+       82
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "bush": {
+      "family": "ferns and bushes",
+      "inView": 224,
+      "inViewPoint": 208,
+      "instances": 300,
+      "thinAt": [
+       46,
+       118,
+       178,
+       240
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "bushFlower": {
+      "family": "ferns and bushes",
+      "inView": 86,
+      "inViewPoint": 82,
+      "instances": 114,
+      "thinAt": [
+       30,
+       54,
+       80,
+       102
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "fern": {
+      "family": "ferns and bushes",
+      "inView": 206,
+      "inViewPoint": 188,
+      "instances": 298,
+      "thinAt": [
+       46,
+       110,
+       186,
+       256
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_clover": {
+      "family": "ground cover",
+      "inView": 10,
+      "inViewPoint": 6,
+      "instances": 20,
+      "thinAt": [
+       0,
+       8,
+       10,
+       12
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_cover": {
+      "family": "ground cover",
+      "inView": 8,
+      "inViewPoint": 6,
+      "instances": 14,
+      "thinAt": [
+       4,
+       4,
+       4,
+       6
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_fern2": {
+      "family": "ferns and bushes",
+      "inView": 42,
+      "inViewPoint": 40,
+      "instances": 70,
+      "thinAt": [
+       10,
+       24,
+       34,
+       34
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_fern3": {
+      "family": "ferns and bushes",
+      "inView": 66,
+      "inViewPoint": 58,
+      "instances": 90,
+      "thinAt": [
+       16,
+       28,
+       40,
+       42
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_flowers": {
+      "family": "ground cover",
+      "inView": 14,
+      "inViewPoint": 14,
+      "instances": 24,
+      "thinAt": [
+       4,
+       6,
+       8,
+       10
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_moss2": {
+      "family": "ground cover",
+      "inView": 6,
+      "inViewPoint": 2,
+      "instances": 22,
+      "thinAt": [
+       0,
+       4,
+       8,
+       12
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_spread1": {
+      "family": "ground cover",
+      "inView": 10,
+      "inViewPoint": 10,
+      "instances": 20,
+      "thinAt": [
+       2,
+       10,
+       10,
+       10
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_spread2": {
+      "family": "ground cover",
+      "inView": 10,
+      "inViewPoint": 6,
+      "instances": 22,
+      "thinAt": [
+       0,
+       0,
+       2,
+       4
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h0": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h1": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h10": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h11": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 2,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h12": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 1,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h13": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 3,
+      "instances": 7,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h2": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 3,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h3": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 4,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h4": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 2,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h5": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h7": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 3,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h8": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h9": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 1,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v0": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 3,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v1": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 2,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v10": {
+      "family": "signs (not foliage)",
+      "inView": 7,
+      "inViewPoint": 7,
+      "instances": 10,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v11": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v12": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v13": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 3,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v2": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 4,
+      "instances": 8,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v3": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v4": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 4,
+      "instances": 7,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v5": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v6": {
+      "family": "signs (not foliage)",
+      "inView": 8,
+      "inViewPoint": 6,
+      "instances": 9,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v7": {
+      "family": "signs (not foliage)",
+      "inView": 7,
+      "inViewPoint": 7,
+      "instances": 10,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v8": {
+      "family": "signs (not foliage)",
+      "inView": 6,
+      "inViewPoint": 6,
+      "instances": 10,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v9": {
+      "family": "signs (not foliage)",
+      "inView": 8,
+      "inViewPoint": 6,
+      "instances": 9,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_curtain1": {
+      "family": "hanging greenery",
+      "inView": 72,
+      "inViewPoint": 57,
+      "instances": 122,
+      "thinAt": [
+       20,
+       27,
+       40,
+       55
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_curtain2": {
+      "family": "hanging greenery",
+      "inView": 66,
+      "inViewPoint": 55,
+      "instances": 100,
+      "thinAt": [
+       11,
+       28,
+       36,
+       51
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_curtain3": {
+      "family": "hanging greenery",
+      "inView": 52,
+      "inViewPoint": 39,
+      "instances": 97,
+      "thinAt": [
+       12,
+       24,
+       31,
+       45
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_heart": {
+      "family": "hanging greenery",
+      "inView": 66,
+      "inViewPoint": 49,
+      "instances": 111,
+      "thinAt": [
+       18,
+       29,
+       40,
+       58
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_ivy": {
+      "family": "hanging greenery",
+      "inView": 78,
+      "inViewPoint": 59,
+      "instances": 121,
+      "thinAt": [
+       16,
+       31,
+       51,
+       62
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_vine3": {
+      "family": "hanging greenery",
+      "inView": 73,
+      "inViewPoint": 63,
+      "instances": 113,
+      "thinAt": [
+       26,
+       49,
+       68,
+       96
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_jeans": {
+      "family": "laundry",
+      "inView": 6,
+      "inViewPoint": 6,
+      "instances": 15,
+      "thinAt": [
+       3,
+       6,
+       11,
+       14
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_mossroots": {
+      "family": "hanging greenery",
+      "inView": 11,
+      "inViewPoint": 11,
+      "instances": 17,
+      "thinAt": [
+       3,
+       6,
+       8,
+       10
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_shirt_blue": {
+      "family": "laundry",
+      "inView": 13,
+      "inViewPoint": 13,
+      "instances": 19,
+      "thinAt": [
+       7,
+       12,
+       15,
+       18
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_shirt_pink": {
+      "family": "laundry",
+      "inView": 12,
+      "inViewPoint": 9,
+      "instances": 13,
+      "thinAt": [
+       0,
+       6,
+       9,
+       11
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_socks": {
+      "family": "laundry",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 7,
+      "thinAt": [
+       3,
+       4,
+       5,
+       6
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_tee_blue": {
+      "family": "laundry",
+      "inView": 13,
+      "inViewPoint": 12,
+      "instances": 22,
+      "thinAt": [
+       3,
+       8,
+       13,
+       20
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_tee_butter": {
+      "family": "laundry",
+      "inView": 14,
+      "inViewPoint": 12,
+      "instances": 22,
+      "thinAt": [
+       9,
+       11,
+       13,
+       17
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_tee_lilac": {
+      "family": "laundry",
+      "inView": 8,
+      "inViewPoint": 7,
+      "instances": 15,
+      "thinAt": [
+       1,
+       2,
+       7,
+       12
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_tee_peach": {
+      "family": "laundry",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 12,
+      "thinAt": [
+       1,
+       4,
+       6,
+       10
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_tee_rose": {
+      "family": "laundry",
+      "inView": 6,
+      "inViewPoint": 6,
+      "instances": 18,
+      "thinAt": [
+       3,
+       5,
+       11,
+       15
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_tee_sage": {
+      "family": "laundry",
+      "inView": 9,
+      "inViewPoint": 8,
+      "instances": 14,
+      "thinAt": [
+       0,
+       4,
+       10,
+       11
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_towel_cream": {
+      "family": "laundry",
+      "inView": 18,
+      "inViewPoint": 14,
+      "instances": 27,
+      "thinAt": [
+       7,
+       11,
+       16,
+       22
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_towel_green": {
+      "family": "laundry",
+      "inView": 7,
+      "inViewPoint": 6,
+      "instances": 14,
+      "thinAt": [
+       5,
+       7,
+       9,
+       13
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "moss": {
+      "family": "ground cover",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "pothos": {
+      "family": "hanging greenery",
+      "inView": 71,
+      "inViewPoint": 49,
+      "instances": 118,
+      "thinAt": [
+       24,
+       52,
+       76,
+       100
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_arcade_pink": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_bakery_amber": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 3,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_bakery_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_bakery_pink": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_arakawa": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_baropen": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_bios": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_cramen": {
+      "family": "signs (not foliage)",
+      "inView": 8,
+      "inViewPoint": 8,
+      "instances": 9,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_dataloan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_dome": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_gear": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_hotel": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 1,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_noodlebar": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_noodles": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_open": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 4,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_pawn": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 3,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_prints": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_ramen": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 3,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_robot": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_sushi": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_tea": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_techmods": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_techparts": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_clinic_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_cocktail_amber": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 2,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_cocktail_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_cocktail_pink": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_coffee_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hotel_amber": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hotel_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hotel_pink": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hw_arrivals": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hw_entry": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hw_toll": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_laundry_amber": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_laundry_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_mt_line": {
+      "family": "signs (not foliage)",
+      "inView": 12,
+      "inViewPoint": 12,
+      "instances": 16,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_mt_station": {
+      "family": "signs (not foliage)",
+      "inView": 8,
+      "inViewPoint": 8,
+      "instances": 12,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_music_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_music_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_music_pink": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_0": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_1": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_10": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_15": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_16": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_2": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_3": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_6": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_7": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_noodles_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_noodles_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ramen_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ramen_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_repair_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_repair_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_repair_pink": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_24h": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 1,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_agri": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_bay": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_cargo": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_distro": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_dronecharge": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_dronestore": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_export": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_farm24": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_frag": {
+      "family": "signs (not foliage)",
+      "inView": 6,
+      "inViewPoint": 6,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_fragile": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_grid": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_heavy": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_hot": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 3,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_hydro": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_import": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 8,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_kib": {
+      "family": "signs (not foliage)",
+      "inView": 6,
+      "inViewPoint": 6,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_kibou": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_lube": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_megahub": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_nofly": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_noodlesP": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 3,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_parts": {
+      "family": "signs (not foliage)",
+      "inView": 11,
+      "inViewPoint": 11,
+      "instances": 11,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_repairs": {
+      "family": "signs (not foliage)",
+      "inView": 10,
+      "inViewPoint": 10,
+      "instances": 10,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_scrap": {
+      "family": "signs (not foliage)",
+      "inView": 11,
+      "inViewPoint": 11,
+      "instances": 11,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_sortin": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_sortout": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "succulent": {
+      "family": "ferns and bushes",
+      "inView": 544,
+      "inViewPoint": 494,
+      "instances": 942,
+      "thinAt": [
+       204,
+       406,
+       610,
+       818
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "vines": {
+      "family": "hanging greenery",
+      "inView": 107,
+      "inViewPoint": 88,
+      "instances": 152,
+      "thinAt": [
+       28,
+       58,
+       92,
+       123
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "w_tangle": {
+      "family": "hanging greenery",
+      "inView": 37,
+      "inViewPoint": 30,
+      "instances": 46,
+      "thinAt": [
+       9,
+       9,
+       16,
+       24
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     }
+    },
+    "lodAt": [
+     0.25,
+     0.5,
+     0.75,
+     1
+    ],
+    "lodNow": 0,
+    "meshes": 6,
+    "regions": {
+     "(not in a super-region)": {
+      "byFamily": {
+       "signs (not foliage)": {
+        "inView": 22,
+        "instances": 32
+       }
+      },
+      "inView": 22,
+      "instances": 32
+     },
+     "r-1,-1": {
+      "byFamily": {
+       "ferns and bushes": {
+        "inView": 470,
+        "instances": 734
+       },
+       "ground cover": {
+        "inView": 16,
+        "instances": 16
+       },
+       "hanging greenery": {
+        "inView": 262,
+        "instances": 381
+       },
+       "laundry": {
+        "inView": 63,
+        "instances": 113
+       },
+       "signs (not foliage)": {
+        "inView": 72,
+        "instances": 97
+       }
+      },
+      "inView": 883,
+      "instances": 1341
+     },
+     "r-1,0": {
+      "byFamily": {
+       "ferns and bushes": {
+        "inView": 482,
+        "instances": 748
+       },
+       "ground cover": {
+        "inView": 12,
+        "instances": 26
+       },
+       "hanging greenery": {
+        "inView": 233,
+        "instances": 375
+       },
+       "laundry": {
+        "inView": 51,
+        "instances": 85
+       },
+       "signs (not foliage)": {
+        "inView": 106,
+        "instances": 138
+       }
+      },
+      "inView": 884,
+      "instances": 1372
+     },
+     "r0,-1": {
+      "byFamily": {
+       "ferns and bushes": {
+        "inView": 118,
+        "instances": 184
+       },
+       "ground cover": {
+        "inView": 14,
+        "instances": 22
+       },
+       "hanging greenery": {
+        "inView": 36,
+        "instances": 64
+       },
+       "signs (not foliage)": {
+        "inView": 42,
+        "instances": 61
+       }
+      },
+      "inView": 210,
+      "instances": 331
+     },
+     "r0,0": {
+      "byFamily": {
+       "ferns and bushes": {
+        "inView": 188,
+        "instances": 270
+       },
+       "ground cover": {
+        "inView": 18,
+        "instances": 60
+       },
+       "hanging greenery": {
+        "inView": 102,
+        "instances": 177
+       },
+       "signs (not foliage)": {
+        "inView": 50,
+        "instances": 60
+       }
+      },
+      "inView": 358,
+      "instances": 567
+     }
+    },
+    "total": 3643
+   },
+   "view": {
+    "lodPlants": 0,
+    "ortho": true,
+    "pitch": 0.5585053606381855,
+    "renderH": 405,
+    "renderW": 720,
+    "staticCache": "static cache: in use   frames since redrawn 399   redrawn 2 times   ring strips 0   edit rectangles 9 (last: x 583 to 910, y from bottom -131 to 196)",
+    "target": [
+     0,
+     2.4,
+     0
+    ],
+    "yaw": 0.7,
+    "zoom": 15
+   }
+  },
+  "30": {
+   "frame": {
+    "foliageShare": 0.05388601547207581,
+    "foliageTrisByDifference": 83777.33333333334,
+    "foliageTrisDrawn": 7286,
+    "frameTris": 135211.33333333334,
+    "frameTrisNoFoliage": 51434,
+    "hiddenFrames": [
+     51434,
+     51434
+    ],
+    "shownFrames": [
+     288194,
+     58720,
+     58720
+    ]
+   },
+   "scan": {
+    "families": {
+     "ferns and bushes": {
+      "inView": 1936,
+      "instances": 1936,
+      "kinds": 8,
+      "thinAt": [
+       382,
+       806,
+       1218,
+       1606
+      ],
+      "thinNow": 304,
+      "triangles": 3872
+     },
+     "ground cover": {
+      "inView": 124,
+      "instances": 124,
+      "kinds": 7,
+      "thinAt": [
+       10,
+       32,
+       42,
+       54
+      ],
+      "thinNow": 4,
+      "triangles": 248
+     },
+     "hanging greenery": {
+      "inView": 997,
+      "instances": 997,
+      "kinds": 10,
+      "thinAt": [
+       167,
+       313,
+       458,
+       624
+      ],
+      "thinNow": 131,
+      "triangles": 1994
+     },
+     "laundry": {
+      "inView": 198,
+      "instances": 198,
+      "kinds": 12,
+      "thinAt": [
+       42,
+       80,
+       125,
+       169
+      ],
+      "thinNow": 31,
+      "triangles": 396
+     },
+     "signs (not foliage)": {
+      "inView": 388,
+      "instances": 388,
+      "kinds": 111,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "triangles": 776
+     }
+    },
+    "kinds": {
+     "bamboo": {
+      "family": "ferns and bushes",
+      "inView": 32,
+      "inViewPoint": 32,
+      "instances": 32,
+      "thinAt": [
+       6,
+       12,
+       22,
+       32
+      ],
+      "thinNow": 6,
+      "thinNowInView": 6
+     },
+     "bonsai": {
+      "family": "ferns and bushes",
+      "inView": 90,
+      "inViewPoint": 90,
+      "instances": 90,
+      "thinAt": [
+       24,
+       54,
+       68,
+       82
+      ],
+      "thinNow": 18,
+      "thinNowInView": 18
+     },
+     "bush": {
+      "family": "ferns and bushes",
+      "inView": 300,
+      "inViewPoint": 300,
+      "instances": 300,
+      "thinAt": [
+       46,
+       118,
+       178,
+       240
+      ],
+      "thinNow": 42,
+      "thinNowInView": 42
+     },
+     "bushFlower": {
+      "family": "ferns and bushes",
+      "inView": 114,
+      "inViewPoint": 114,
+      "instances": 114,
+      "thinAt": [
+       30,
+       54,
+       80,
+       102
+      ],
+      "thinNow": 20,
+      "thinNowInView": 20
+     },
+     "fern": {
+      "family": "ferns and bushes",
+      "inView": 298,
+      "inViewPoint": 298,
+      "instances": 298,
+      "thinAt": [
+       46,
+       110,
+       186,
+       256
+      ],
+      "thinNow": 38,
+      "thinNowInView": 38
+     },
+     "g_clover": {
+      "family": "ground cover",
+      "inView": 20,
+      "inViewPoint": 20,
+      "instances": 20,
+      "thinAt": [
+       0,
+       8,
+       10,
+       12
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_cover": {
+      "family": "ground cover",
+      "inView": 14,
+      "inViewPoint": 14,
+      "instances": 14,
+      "thinAt": [
+       4,
+       4,
+       4,
+       6
+      ],
+      "thinNow": 2,
+      "thinNowInView": 2
+     },
+     "g_fern2": {
+      "family": "ferns and bushes",
+      "inView": 70,
+      "inViewPoint": 70,
+      "instances": 70,
+      "thinAt": [
+       10,
+       24,
+       34,
+       34
+      ],
+      "thinNow": 6,
+      "thinNowInView": 6
+     },
+     "g_fern3": {
+      "family": "ferns and bushes",
+      "inView": 90,
+      "inViewPoint": 90,
+      "instances": 90,
+      "thinAt": [
+       16,
+       28,
+       40,
+       42
+      ],
+      "thinNow": 12,
+      "thinNowInView": 12
+     },
+     "g_flowers": {
+      "family": "ground cover",
+      "inView": 24,
+      "inViewPoint": 24,
+      "instances": 24,
+      "thinAt": [
+       4,
+       6,
+       8,
+       10
+      ],
+      "thinNow": 2,
+      "thinNowInView": 2
+     },
+     "g_moss2": {
+      "family": "ground cover",
+      "inView": 22,
+      "inViewPoint": 22,
+      "instances": 22,
+      "thinAt": [
+       0,
+       4,
+       8,
+       12
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_spread1": {
+      "family": "ground cover",
+      "inView": 20,
+      "inViewPoint": 20,
+      "instances": 20,
+      "thinAt": [
+       2,
+       10,
+       10,
+       10
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_spread2": {
+      "family": "ground cover",
+      "inView": 22,
+      "inViewPoint": 22,
+      "instances": 22,
+      "thinAt": [
+       0,
+       0,
+       2,
+       4
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h0": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 3,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h1": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h10": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h11": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h12": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h13": {
+      "family": "signs (not foliage)",
+      "inView": 7,
+      "inViewPoint": 7,
+      "instances": 7,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h2": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 3,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h3": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h4": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 3,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h5": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h7": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h8": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h9": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v0": {
+      "family": "signs (not foliage)",
+      "inView": 6,
+      "inViewPoint": 6,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v1": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v10": {
+      "family": "signs (not foliage)",
+      "inView": 10,
+      "inViewPoint": 10,
+      "instances": 10,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v11": {
+      "family": "signs (not foliage)",
+      "inView": 6,
+      "inViewPoint": 6,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v12": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v13": {
+      "family": "signs (not foliage)",
+      "inView": 6,
+      "inViewPoint": 6,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v2": {
+      "family": "signs (not foliage)",
+      "inView": 8,
+      "inViewPoint": 8,
+      "instances": 8,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v3": {
+      "family": "signs (not foliage)",
+      "inView": 6,
+      "inViewPoint": 6,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v4": {
+      "family": "signs (not foliage)",
+      "inView": 7,
+      "inViewPoint": 7,
+      "instances": 7,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v5": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v6": {
+      "family": "signs (not foliage)",
+      "inView": 9,
+      "inViewPoint": 9,
+      "instances": 9,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v7": {
+      "family": "signs (not foliage)",
+      "inView": 10,
+      "inViewPoint": 10,
+      "instances": 10,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v8": {
+      "family": "signs (not foliage)",
+      "inView": 10,
+      "inViewPoint": 10,
+      "instances": 10,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v9": {
+      "family": "signs (not foliage)",
+      "inView": 9,
+      "inViewPoint": 9,
+      "instances": 9,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_curtain1": {
+      "family": "hanging greenery",
+      "inView": 122,
+      "inViewPoint": 122,
+      "instances": 122,
+      "thinAt": [
+       20,
+       27,
+       40,
+       55
+      ],
+      "thinNow": 20,
+      "thinNowInView": 20
+     },
+     "h_curtain2": {
+      "family": "hanging greenery",
+      "inView": 100,
+      "inViewPoint": 100,
+      "instances": 100,
+      "thinAt": [
+       11,
+       28,
+       36,
+       51
+      ],
+      "thinNow": 11,
+      "thinNowInView": 11
+     },
+     "h_curtain3": {
+      "family": "hanging greenery",
+      "inView": 97,
+      "inViewPoint": 97,
+      "instances": 97,
+      "thinAt": [
+       12,
+       24,
+       31,
+       45
+      ],
+      "thinNow": 7,
+      "thinNowInView": 7
+     },
+     "h_heart": {
+      "family": "hanging greenery",
+      "inView": 111,
+      "inViewPoint": 111,
+      "instances": 111,
+      "thinAt": [
+       18,
+       29,
+       40,
+       58
+      ],
+      "thinNow": 11,
+      "thinNowInView": 11
+     },
+     "h_ivy": {
+      "family": "hanging greenery",
+      "inView": 121,
+      "inViewPoint": 121,
+      "instances": 121,
+      "thinAt": [
+       16,
+       31,
+       51,
+       62
+      ],
+      "thinNow": 14,
+      "thinNowInView": 14
+     },
+     "h_vine3": {
+      "family": "hanging greenery",
+      "inView": 113,
+      "inViewPoint": 113,
+      "instances": 113,
+      "thinAt": [
+       26,
+       49,
+       68,
+       96
+      ],
+      "thinNow": 22,
+      "thinNowInView": 22
+     },
+     "l_jeans": {
+      "family": "laundry",
+      "inView": 15,
+      "inViewPoint": 15,
+      "instances": 15,
+      "thinAt": [
+       3,
+       6,
+       11,
+       14
+      ],
+      "thinNow": 1,
+      "thinNowInView": 1
+     },
+     "l_mossroots": {
+      "family": "hanging greenery",
+      "inView": 17,
+      "inViewPoint": 17,
+      "instances": 17,
+      "thinAt": [
+       3,
+       6,
+       8,
+       10
+      ],
+      "thinNow": 3,
+      "thinNowInView": 3
+     },
+     "l_shirt_blue": {
+      "family": "laundry",
+      "inView": 19,
+      "inViewPoint": 19,
+      "instances": 19,
+      "thinAt": [
+       7,
+       12,
+       15,
+       18
+      ],
+      "thinNow": 6,
+      "thinNowInView": 6
+     },
+     "l_shirt_pink": {
+      "family": "laundry",
+      "inView": 13,
+      "inViewPoint": 13,
+      "instances": 13,
+      "thinAt": [
+       0,
+       6,
+       9,
+       11
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_socks": {
+      "family": "laundry",
+      "inView": 7,
+      "inViewPoint": 7,
+      "instances": 7,
+      "thinAt": [
+       3,
+       4,
+       5,
+       6
+      ],
+      "thinNow": 2,
+      "thinNowInView": 2
+     },
+     "l_tee_blue": {
+      "family": "laundry",
+      "inView": 22,
+      "inViewPoint": 22,
+      "instances": 22,
+      "thinAt": [
+       3,
+       8,
+       13,
+       20
+      ],
+      "thinNow": 2,
+      "thinNowInView": 2
+     },
+     "l_tee_butter": {
+      "family": "laundry",
+      "inView": 22,
+      "inViewPoint": 22,
+      "instances": 22,
+      "thinAt": [
+       9,
+       11,
+       13,
+       17
+      ],
+      "thinNow": 8,
+      "thinNowInView": 8
+     },
+     "l_tee_lilac": {
+      "family": "laundry",
+      "inView": 15,
+      "inViewPoint": 15,
+      "instances": 15,
+      "thinAt": [
+       1,
+       2,
+       7,
+       12
+      ],
+      "thinNow": 1,
+      "thinNowInView": 1
+     },
+     "l_tee_peach": {
+      "family": "laundry",
+      "inView": 12,
+      "inViewPoint": 12,
+      "instances": 12,
+      "thinAt": [
+       1,
+       4,
+       6,
+       10
+      ],
+      "thinNow": 1,
+      "thinNowInView": 1
+     },
+     "l_tee_rose": {
+      "family": "laundry",
+      "inView": 18,
+      "inViewPoint": 18,
+      "instances": 18,
+      "thinAt": [
+       3,
+       5,
+       11,
+       15
+      ],
+      "thinNow": 2,
+      "thinNowInView": 2
+     },
+     "l_tee_sage": {
+      "family": "laundry",
+      "inView": 14,
+      "inViewPoint": 14,
+      "instances": 14,
+      "thinAt": [
+       0,
+       4,
+       10,
+       11
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_towel_cream": {
+      "family": "laundry",
+      "inView": 27,
+      "inViewPoint": 27,
+      "instances": 27,
+      "thinAt": [
+       7,
+       11,
+       16,
+       22
+      ],
+      "thinNow": 5,
+      "thinNowInView": 5
+     },
+     "l_towel_green": {
+      "family": "laundry",
+      "inView": 14,
+      "inViewPoint": 14,
+      "instances": 14,
+      "thinAt": [
+       5,
+       7,
+       9,
+       13
+      ],
+      "thinNow": 3,
+      "thinNowInView": 3
+     },
+     "moss": {
+      "family": "ground cover",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "pothos": {
+      "family": "hanging greenery",
+      "inView": 118,
+      "inViewPoint": 118,
+      "instances": 118,
+      "thinAt": [
+       24,
+       52,
+       76,
+       100
+      ],
+      "thinNow": 15,
+      "thinNowInView": 15
+     },
+     "sign_arcade_pink": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_bakery_amber": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_bakery_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_bakery_pink": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_arakawa": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_baropen": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_bios": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_cramen": {
+      "family": "signs (not foliage)",
+      "inView": 9,
+      "inViewPoint": 9,
+      "instances": 9,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_dataloan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_dome": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_gear": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_hotel": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_noodlebar": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_noodles": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_open": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_pawn": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_prints": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_ramen": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 3,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_robot": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_sushi": {
+      "family": "signs (not foliage)",
+      "inView": 6,
+      "inViewPoint": 6,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_tea": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_techmods": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_techparts": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_clinic_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_cocktail_amber": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 3,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_cocktail_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_cocktail_pink": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_coffee_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hotel_amber": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hotel_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 3,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hotel_pink": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hw_arrivals": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hw_entry": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hw_toll": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_laundry_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_laundry_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_mt_line": {
+      "family": "signs (not foliage)",
+      "inView": 16,
+      "inViewPoint": 16,
+      "instances": 16,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_mt_station": {
+      "family": "signs (not foliage)",
+      "inView": 12,
+      "inViewPoint": 12,
+      "instances": 12,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_music_amber": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_music_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_music_pink": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_0": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_1": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_10": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_15": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_16": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_2": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_3": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_6": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 3,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_7": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_noodles_amber": {
+      "family": "signs (not foliage)",
+      "inView": 3,
+      "inViewPoint": 3,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_noodles_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ramen_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ramen_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_repair_amber": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_repair_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_repair_pink": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_24h": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 5,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_agri": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_bay": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_cargo": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_distro": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_dronecharge": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_dronestore": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_export": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_farm24": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_frag": {
+      "family": "signs (not foliage)",
+      "inView": 6,
+      "inViewPoint": 6,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_fragile": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_grid": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_heavy": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_hot": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_hydro": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_import": {
+      "family": "signs (not foliage)",
+      "inView": 8,
+      "inViewPoint": 8,
+      "instances": 8,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_kib": {
+      "family": "signs (not foliage)",
+      "inView": 6,
+      "inViewPoint": 6,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_kibou": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_lube": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_megahub": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_nofly": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_noodlesP": {
+      "family": "signs (not foliage)",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_parts": {
+      "family": "signs (not foliage)",
+      "inView": 11,
+      "inViewPoint": 11,
+      "instances": 11,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_repairs": {
+      "family": "signs (not foliage)",
+      "inView": 10,
+      "inViewPoint": 10,
+      "instances": 10,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_scrap": {
+      "family": "signs (not foliage)",
+      "inView": 11,
+      "inViewPoint": 11,
+      "instances": 11,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_sortin": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_sortout": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "succulent": {
+      "family": "ferns and bushes",
+      "inView": 942,
+      "inViewPoint": 942,
+      "instances": 942,
+      "thinAt": [
+       204,
+       406,
+       610,
+       818
+      ],
+      "thinNow": 162,
+      "thinNowInView": 162
+     },
+     "vines": {
+      "family": "hanging greenery",
+      "inView": 152,
+      "inViewPoint": 152,
+      "instances": 152,
+      "thinAt": [
+       28,
+       58,
+       92,
+       123
+      ],
+      "thinNow": 22,
+      "thinNowInView": 22
+     },
+     "w_tangle": {
+      "family": "hanging greenery",
+      "inView": 46,
+      "inViewPoint": 46,
+      "instances": 46,
+      "thinAt": [
+       9,
+       9,
+       16,
+       24
+      ],
+      "thinNow": 6,
+      "thinNowInView": 6
+     }
+    },
+    "lodAt": [
+     0.25,
+     0.5,
+     0.75,
+     1
+    ],
+    "lodNow": 0.179871830390684,
+    "meshes": 6,
+    "regions": {
+     "(not in a super-region)": {
+      "byFamily": {
+       "signs (not foliage)": {
+        "inView": 32,
+        "instances": 32
+       }
+      },
+      "inView": 32,
+      "instances": 32
+     },
+     "r-1,-1": {
+      "byFamily": {
+       "ferns and bushes": {
+        "inView": 734,
+        "instances": 734
+       },
+       "ground cover": {
+        "inView": 16,
+        "instances": 16
+       },
+       "hanging greenery": {
+        "inView": 381,
+        "instances": 381
+       },
+       "laundry": {
+        "inView": 113,
+        "instances": 113
+       },
+       "signs (not foliage)": {
+        "inView": 97,
+        "instances": 97
+       }
+      },
+      "inView": 1341,
+      "instances": 1341
+     },
+     "r-1,0": {
+      "byFamily": {
+       "ferns and bushes": {
+        "inView": 748,
+        "instances": 748
+       },
+       "ground cover": {
+        "inView": 26,
+        "instances": 26
+       },
+       "hanging greenery": {
+        "inView": 375,
+        "instances": 375
+       },
+       "laundry": {
+        "inView": 85,
+        "instances": 85
+       },
+       "signs (not foliage)": {
+        "inView": 138,
+        "instances": 138
+       }
+      },
+      "inView": 1372,
+      "instances": 1372
+     },
+     "r0,-1": {
+      "byFamily": {
+       "ferns and bushes": {
+        "inView": 184,
+        "instances": 184
+       },
+       "ground cover": {
+        "inView": 22,
+        "instances": 22
+       },
+       "hanging greenery": {
+        "inView": 64,
+        "instances": 64
+       },
+       "signs (not foliage)": {
+        "inView": 61,
+        "instances": 61
+       }
+      },
+      "inView": 331,
+      "instances": 331
+     },
+     "r0,0": {
+      "byFamily": {
+       "ferns and bushes": {
+        "inView": 270,
+        "instances": 270
+       },
+       "ground cover": {
+        "inView": 60,
+        "instances": 60
+       },
+       "hanging greenery": {
+        "inView": 177,
+        "instances": 177
+       },
+       "signs (not foliage)": {
+        "inView": 60,
+        "instances": 60
+       }
+      },
+      "inView": 567,
+      "instances": 567
+     }
+    },
+    "total": 3643
+   },
+   "view": {
+    "lodPlants": 0.179871830390684,
+    "ortho": true,
+    "pitch": 0.5585053606381855,
+    "renderH": 576,
+    "renderW": 1024,
+    "staticCache": "static cache: in use   frames since redrawn 399   redrawn 3 times   ring strips 0   edit rectangles 11 (last: x 405 to 630, y from bottom 242 to 444)",
+    "target": [
+     0,
+     2.4,
+     0
+    ],
+    "yaw": 0.7,
+    "zoom": 30
+   }
+  },
+  "8": {
+   "frame": {
+    "foliageShare": 0.15049365885900773,
+    "foliageTrisByDifference": 7286,
+    "foliageTrisDrawn": 7286,
+    "frameTris": 48414,
+    "frameTrisNoFoliage": 41128,
+    "hiddenFrames": [
+     41128,
+     41128
+    ],
+    "shownFrames": [
+     48414,
+     48414,
+     48414
+    ]
+   },
+   "scan": {
+    "families": {
+     "ferns and bushes": {
+      "inView": 302,
+      "instances": 1936,
+      "kinds": 8,
+      "thinAt": [
+       382,
+       806,
+       1218,
+       1606
+      ],
+      "thinNow": 0,
+      "triangles": 3872
+     },
+     "ground cover": {
+      "inView": 4,
+      "instances": 124,
+      "kinds": 7,
+      "thinAt": [
+       10,
+       32,
+       42,
+       54
+      ],
+      "thinNow": 0,
+      "triangles": 248
+     },
+     "hanging greenery": {
+      "inView": 93,
+      "instances": 997,
+      "kinds": 10,
+      "thinAt": [
+       167,
+       313,
+       458,
+       624
+      ],
+      "thinNow": 0,
+      "triangles": 1994
+     },
+     "laundry": {
+      "inView": 0,
+      "instances": 198,
+      "kinds": 12,
+      "thinAt": [
+       42,
+       80,
+       125,
+       169
+      ],
+      "thinNow": 0,
+      "triangles": 396
+     },
+     "signs (not foliage)": {
+      "inView": 61,
+      "instances": 388,
+      "kinds": 111,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "triangles": 776
+     }
+    },
+    "kinds": {
+     "bamboo": {
+      "family": "ferns and bushes",
+      "inView": 10,
+      "inViewPoint": 8,
+      "instances": 32,
+      "thinAt": [
+       6,
+       12,
+       22,
+       32
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "bonsai": {
+      "family": "ferns and bushes",
+      "inView": 36,
+      "inViewPoint": 36,
+      "instances": 90,
+      "thinAt": [
+       24,
+       54,
+       68,
+       82
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "bush": {
+      "family": "ferns and bushes",
+      "inView": 68,
+      "inViewPoint": 66,
+      "instances": 300,
+      "thinAt": [
+       46,
+       118,
+       178,
+       240
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "bushFlower": {
+      "family": "ferns and bushes",
+      "inView": 48,
+      "inViewPoint": 44,
+      "instances": 114,
+      "thinAt": [
+       30,
+       54,
+       80,
+       102
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "fern": {
+      "family": "ferns and bushes",
+      "inView": 56,
+      "inViewPoint": 54,
+      "instances": 298,
+      "thinAt": [
+       46,
+       110,
+       186,
+       256
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_clover": {
+      "family": "ground cover",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 20,
+      "thinAt": [
+       0,
+       8,
+       10,
+       12
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_cover": {
+      "family": "ground cover",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 14,
+      "thinAt": [
+       4,
+       4,
+       4,
+       6
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_fern2": {
+      "family": "ferns and bushes",
+      "inView": 24,
+      "inViewPoint": 20,
+      "instances": 70,
+      "thinAt": [
+       10,
+       24,
+       34,
+       34
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_fern3": {
+      "family": "ferns and bushes",
+      "inView": 20,
+      "inViewPoint": 16,
+      "instances": 90,
+      "thinAt": [
+       16,
+       28,
+       40,
+       42
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_flowers": {
+      "family": "ground cover",
+      "inView": 4,
+      "inViewPoint": 2,
+      "instances": 24,
+      "thinAt": [
+       4,
+       6,
+       8,
+       10
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_moss2": {
+      "family": "ground cover",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 22,
+      "thinAt": [
+       0,
+       4,
+       8,
+       12
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_spread1": {
+      "family": "ground cover",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 20,
+      "thinAt": [
+       2,
+       10,
+       10,
+       10
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "g_spread2": {
+      "family": "ground cover",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 22,
+      "thinAt": [
+       0,
+       0,
+       2,
+       4
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h0": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h1": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h10": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h11": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h12": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h13": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 7,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h2": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h3": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h4": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h5": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h7": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h8": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_h9": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v0": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v1": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v10": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 10,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v11": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v12": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v13": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v2": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 8,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v3": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v4": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 7,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v5": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v6": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 9,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v7": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 10,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v8": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 10,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "glyph_v9": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 9,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_curtain1": {
+      "family": "hanging greenery",
+      "inView": 4,
+      "inViewPoint": 4,
+      "instances": 122,
+      "thinAt": [
+       20,
+       27,
+       40,
+       55
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_curtain2": {
+      "family": "hanging greenery",
+      "inView": 6,
+      "inViewPoint": 2,
+      "instances": 100,
+      "thinAt": [
+       11,
+       28,
+       36,
+       51
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_curtain3": {
+      "family": "hanging greenery",
+      "inView": 4,
+      "inViewPoint": 0,
+      "instances": 97,
+      "thinAt": [
+       12,
+       24,
+       31,
+       45
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_heart": {
+      "family": "hanging greenery",
+      "inView": 7,
+      "inViewPoint": 3,
+      "instances": 111,
+      "thinAt": [
+       18,
+       29,
+       40,
+       58
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_ivy": {
+      "family": "hanging greenery",
+      "inView": 15,
+      "inViewPoint": 13,
+      "instances": 121,
+      "thinAt": [
+       16,
+       31,
+       51,
+       62
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "h_vine3": {
+      "family": "hanging greenery",
+      "inView": 8,
+      "inViewPoint": 4,
+      "instances": 113,
+      "thinAt": [
+       26,
+       49,
+       68,
+       96
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_jeans": {
+      "family": "laundry",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 15,
+      "thinAt": [
+       3,
+       6,
+       11,
+       14
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_mossroots": {
+      "family": "hanging greenery",
+      "inView": 7,
+      "inViewPoint": 6,
+      "instances": 17,
+      "thinAt": [
+       3,
+       6,
+       8,
+       10
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_shirt_blue": {
+      "family": "laundry",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 19,
+      "thinAt": [
+       7,
+       12,
+       15,
+       18
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_shirt_pink": {
+      "family": "laundry",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 13,
+      "thinAt": [
+       0,
+       6,
+       9,
+       11
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_socks": {
+      "family": "laundry",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 7,
+      "thinAt": [
+       3,
+       4,
+       5,
+       6
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_tee_blue": {
+      "family": "laundry",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 22,
+      "thinAt": [
+       3,
+       8,
+       13,
+       20
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_tee_butter": {
+      "family": "laundry",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 22,
+      "thinAt": [
+       9,
+       11,
+       13,
+       17
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_tee_lilac": {
+      "family": "laundry",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 15,
+      "thinAt": [
+       1,
+       2,
+       7,
+       12
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_tee_peach": {
+      "family": "laundry",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 12,
+      "thinAt": [
+       1,
+       4,
+       6,
+       10
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_tee_rose": {
+      "family": "laundry",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 18,
+      "thinAt": [
+       3,
+       5,
+       11,
+       15
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_tee_sage": {
+      "family": "laundry",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 14,
+      "thinAt": [
+       0,
+       4,
+       10,
+       11
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_towel_cream": {
+      "family": "laundry",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 27,
+      "thinAt": [
+       7,
+       11,
+       16,
+       22
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "l_towel_green": {
+      "family": "laundry",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 14,
+      "thinAt": [
+       5,
+       7,
+       9,
+       13
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "moss": {
+      "family": "ground cover",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "pothos": {
+      "family": "hanging greenery",
+      "inView": 11,
+      "inViewPoint": 5,
+      "instances": 118,
+      "thinAt": [
+       24,
+       52,
+       76,
+       100
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_arcade_pink": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_bakery_amber": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_bakery_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_bakery_pink": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_arakawa": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_baropen": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_bios": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_cramen": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 9,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_dataloan": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_dome": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_gear": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_hotel": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_noodlebar": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_noodles": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_open": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_pawn": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_prints": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_ramen": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_robot": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_sushi": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_tea": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_techmods": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_c_techparts": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_clinic_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_cocktail_amber": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_cocktail_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_cocktail_pink": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_coffee_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hotel_amber": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hotel_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hotel_pink": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hw_arrivals": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hw_entry": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_hw_toll": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_laundry_amber": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_laundry_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_mt_line": {
+      "family": "signs (not foliage)",
+      "inView": 5,
+      "inViewPoint": 2,
+      "instances": 16,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_mt_station": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 12,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_music_amber": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_music_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_music_pink": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_0": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_1": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_10": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_15": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_16": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_2": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_3": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_6": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ng_7": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_noodles_amber": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 3,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_noodles_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ramen_amber": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_ramen_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_repair_amber": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_repair_cyan": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_repair_pink": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_24h": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 5,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_agri": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_bay": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_cargo": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_distro": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_dronecharge": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_dronestore": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_export": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_farm24": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_frag": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 0,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_fragile": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_grid": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_heavy": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_hot": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_hydro": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_import": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 8,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_kib": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 6,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_kibou": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_lube": {
+      "family": "signs (not foliage)",
+      "inView": 2,
+      "inViewPoint": 2,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_megahub": {
+      "family": "signs (not foliage)",
+      "inView": 0,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_nofly": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 1,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_noodlesP": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 4,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_parts": {
+      "family": "signs (not foliage)",
+      "inView": 11,
+      "inViewPoint": 9,
+      "instances": 11,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_repairs": {
+      "family": "signs (not foliage)",
+      "inView": 9,
+      "inViewPoint": 8,
+      "instances": 10,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_scrap": {
+      "family": "signs (not foliage)",
+      "inView": 8,
+      "inViewPoint": 8,
+      "instances": 11,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_sortin": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 1,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "sign_w_sortout": {
+      "family": "signs (not foliage)",
+      "inView": 1,
+      "inViewPoint": 0,
+      "instances": 2,
+      "thinAt": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "succulent": {
+      "family": "ferns and bushes",
+      "inView": 40,
+      "inViewPoint": 38,
+      "instances": 942,
+      "thinAt": [
+       204,
+       406,
+       610,
+       818
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "vines": {
+      "family": "hanging greenery",
+      "inView": 28,
+      "inViewPoint": 18,
+      "instances": 152,
+      "thinAt": [
+       28,
+       58,
+       92,
+       123
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     },
+     "w_tangle": {
+      "family": "hanging greenery",
+      "inView": 3,
+      "inViewPoint": 1,
+      "instances": 46,
+      "thinAt": [
+       9,
+       9,
+       16,
+       24
+      ],
+      "thinNow": 0,
+      "thinNowInView": 0
+     }
+    },
+    "lodAt": [
+     0.25,
+     0.5,
+     0.75,
+     1
+    ],
+    "lodNow": 0,
+    "meshes": 6,
+    "regions": {
+     "(not in a super-region)": {
+      "byFamily": {
+       "signs (not foliage)": {
+        "inView": 6,
+        "instances": 32
+       }
+      },
+      "inView": 6,
+      "instances": 32
+     },
+     "r-1,-1": {
+      "byFamily": {
+       "ferns and bushes": {
+        "inView": 68,
+        "instances": 734
+       },
+       "ground cover": {
+        "inView": 2,
+        "instances": 16
+       },
+       "hanging greenery": {
+        "inView": 24,
+        "instances": 381
+       },
+       "laundry": {
+        "inView": 0,
+        "instances": 113
+       },
+       "signs (not foliage)": {
+        "inView": 10,
+        "instances": 97
+       }
+      },
+      "inView": 104,
+      "instances": 1341
+     },
+     "r-1,0": {
+      "byFamily": {
+       "ferns and bushes": {
+        "inView": 66,
+        "instances": 748
+       },
+       "ground cover": {
+        "inView": 0,
+        "instances": 26
+       },
+       "hanging greenery": {
+        "inView": 23,
+        "instances": 375
+       },
+       "laundry": {
+        "inView": 0,
+        "instances": 85
+       },
+       "signs (not foliage)": {
+        "inView": 20,
+        "instances": 138
+       }
+      },
+      "inView": 109,
+      "instances": 1372
+     },
+     "r0,-1": {
+      "byFamily": {
+       "ferns and bushes": {
+        "inView": 48,
+        "instances": 184
+       },
+       "ground cover": {
+        "inView": 2,
+        "instances": 22
+       },
+       "hanging greenery": {
+        "inView": 13,
+        "instances": 64
+       },
+       "signs (not foliage)": {
+        "inView": 7,
+        "instances": 61
+       }
+      },
+      "inView": 70,
+      "instances": 331
+     },
+     "r0,0": {
+      "byFamily": {
+       "ferns and bushes": {
+        "inView": 120,
+        "instances": 270
+       },
+       "ground cover": {
+        "inView": 0,
+        "instances": 60
+       },
+       "hanging greenery": {
+        "inView": 33,
+        "instances": 177
+       },
+       "signs (not foliage)": {
+        "inView": 18,
+        "instances": 60
+       }
+      },
+      "inView": 171,
+      "instances": 567
+     }
+    },
+    "total": 3643
+   },
+   "view": {
+    "lodPlants": 0,
+    "ortho": true,
+    "pitch": 0.5585053606381855,
+    "renderH": 360,
+    "renderW": 640,
+    "staticCache": "static cache: in use   frames since redrawn 398   redrawn 1 times   ring strips 0   edit rectangles 6 (last: x 168 to 678, y from bottom -256 to -48)",
+    "target": [
+     0,
+     2.4,
+     0
+    ],
+    "yaw": 0.7,
+    "zoom": 8
+   }
+  }
+ }
+}

@@ -1,5 +1,6 @@
 // Plant cost on your own computer: paste this whole file into the browser console (F12, Console) while the city is open, then wait about
-// 3 minutes and keep the tab in front (a hidden tab stops drawing). Don't touch the mouse or keys while it runs.
+// 3 minutes and keep the tab in front (a hidden tab stops drawing). Start with the F3 overlay closed and no overlay tests on, and don't
+// touch the mouse or keys while it runs.
 //
 // What it does, for each of 4 settings: (old sprites, new sprites) x (foliage level of detail off, on), at zoom 30, standing still
 // and in a slow turn:
@@ -14,6 +15,7 @@
 // The switches it uses (PH.tests.oldSprites, PH.tests.foliageLodOff) are added by the foliage work. A setting whose switch is not in this
 // build is skipped, with a note. Tunables (all optional, set before pasting): window.__OWNER_OPTS = { seconds: 10, exactSeconds: 4, turnRadPerSec: .25 }.
 (async () => {
+  if (PH.on || Object.keys(PH.tests).some(k => PH.tests[k] && k !== 'oldSprites' && k !== 'foliageLodOff')) { console.log('Close the F3 overlay and switch its tests off first (F3, then each test button), then paste this again.'); return null; }
   const OPT = Object.assign({ seconds: 10, exactSeconds: 4, turnRadPerSec: 0.25, settleMs: 1500, zoom: 30 }, window.__OWNER_OPTS || {});
   const notes = [], rows = [];
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -38,8 +40,8 @@
   for (const k of ['oldSprites', 'foliageLodOff']) if (has(k)) saved.tests[k] = T[k];
   const restore = () => {
     showPlants(true);
+    try { if (PH.on) PH.toggle(); } catch (e) { notes.push('restoring the overlay: ' + e); }   // (turning the overlay's exact mode off clears its tests, so the switches are put back after it)
     for (const k in saved.tests) T[k] = saved.tests[k];
-    try { if (PH.exact !== saved.exact) PH.setExact(saved.exact); if (PH.on !== saved.on) PH.toggle(); } catch (e) { notes.push('restoring the overlay: ' + e); }
     zoom = saved.zoom; zoomT = saved.zoomT; yaw = saved.yaw; yawT = saved.yawT;
   };
   // --- a window of frames: counts them, and turns the view if asked
@@ -58,7 +60,7 @@
   const row = re => { const m = PH.text().split('\n').find(l => re.test(l)); if (!m) return null; const f = m.slice(30).trim().split(/\s+/); const num = s => /^-?[\d.]+$/.test(s) ? parseFloat(s) : NaN; return { cpu: num(f[0]), exact: num(f[1]), draws: f[2], tris: f[3], text: m.trim() }; };
   const colorMs = async (turning, plantsShown) => {
     showPlants(plantsShown);
-    PH.setExact(false); PH.setExact(true);   // (a fresh history)
+    PH.setExact(true);   // (already on: this only clears the history, so each window is measured on its own)
     await drive(OPT.exactSeconds * 1000, turning);
     const c = row(/^color\s{2,}/), p = row(/^\S*plant/i);
     return { color: c ? c.exact : NaN, tris: c ? c.tris : null, plantsPass: p ? p.exact : null };
@@ -69,14 +71,13 @@
       if (has('oldSprites')) T.oldSprites = cfg.old;
       if (has('foliageLodOff')) T.foliageLodOff = cfg.lodOff;
       showPlants(true);
-      if (PH.on) { PH.setExact(false); PH.toggle(); }   // (no overlay while the frame rate is counted)
       yawT = saved.yawT; await sleep(OPT.settleMs);
       const f = await drive(OPT.seconds * 1000, turning);
-      PH.toggle(); const shown = await colorMs(turning, true), hid = await colorMs(turning, false);
-      showPlants(true); PH.setExact(false); PH.toggle();
+      PH.toggle(); PH.setExact(true); const shown = await colorMs(turning, true), hid = await colorMs(turning, false);
+      showPlants(true); PH.toggle();   // (off again: that also clears the overlay's tests, hence the switches are set at the top of each round)
       rows.push({ setting: cfg.label, view: turning ? 'slow turn' : 'still', zoom: OPT.zoom, fps: +f.fps.toFixed(1), worstFrameMs: +f.worst.toFixed(1), p95FrameMs: +f.p95.toFixed(1), frames: f.frames,
         colorMsPlantsShown: +shown.color.toFixed(2), colorMsPlantsHidden: +hid.color.toFixed(2), plantsMs: +(shown.color - hid.color).toFixed(2),
-        plantsPassMs: shown.plantsPass, plantInstances: plantInstances(), colorTrisShown: shown.tris, colorTrisHidden: hid.tris });
+        plantsPassMs: shown.plantsPass, plantInstances: plantInstances(), lodPlants: +LOD.plants.value.toFixed(3), render: W + 'x' + H, colorTrisShown: shown.tris, colorTrisHidden: hid.tris });
     }
   } catch (e) { notes.push('stopped by an error: ' + (e && e.stack || e)); }
   finally { restore(); }

@@ -14,6 +14,8 @@ import harness as H
 ap = argparse.ArgumentParser()
 ap.add_argument('--scene', default='dense'); ap.add_argument('--hour', type=float, default=22); ap.add_argument('--secs', type=float, default=8)
 ap.add_argument('--width', type=int, default=1710); ap.add_argument('--height', type=int, default=876); ap.add_argument('--zoom', type=float, default=30); ap.add_argument('--lines', type=int, default=720); ap.add_argument('--rounds', type=int, default=2)
+ap.add_argument('--storage', help='a JSON file of the game\'s saved data (your own city): in the game\'s tab, open the console and run  copy(JSON.stringify(localStorage))  then paste into a file')
+ap.add_argument('--now-only', action='store_true', help='measure only the game as it is (about a minute)')
 a = ap.parse_args()
 
 PASSES = ['color', 'night lights', 'clouds', 'soft effects (half resolution)', 'composite', 'bloom and grade']
@@ -61,6 +63,9 @@ def setup(pg, soft_apart=False, blit=False):
 from playwright.sync_api import sync_playwright
 if not os.environ.get('PERF_SOFTWARE'): os.environ['PERF_GPU'] = '1'   # (PERF_SOFTWARE=1: the software renderer, only to check the script runs)
 sc = H.load_scenes([a.scene])[0]
+if a.storage:
+    import json as _j
+    sc = dict(sc); sc['storage'] = _j.load(open(a.storage)); a.scene = 'your city (' + os.path.basename(a.storage) + ')'
 srv = H.serve(); url = H.make_site('fps', None)
 rows = []
 with sync_playwright() as pw:
@@ -68,7 +73,7 @@ with sync_playwright() as pw:
     ctx, pg, errs = open_page(br, url, sc)
     print('render size:', pg.evaluate('() => W + "x" + H'), flush=True)
     setup(pg); fps(pg)   # (a warm-up: the card's clocks and caches settle, so the first setup isn't the slowest for that reason alone)
-    setups = [('now (all changes on)', False, False), ('soft effects: three passes (before)', True, False), ('now + cache copied by blitting', False, True)]
+    setups = [('now (all changes on)', False, False)] + ([] if a.now_only else [('soft effects: three passes (before)', True, False), ('now + cache copied by blitting', False, True)])
     acc = {}
     for r in range(a.rounds):   # (the setups take turns, so a drift over the run falls on all of them alike)
         for label, s_, b in setups:
@@ -78,10 +83,13 @@ with sync_playwright() as pw:
         L = acc[label]; f = { 'fps': sum(x[0]['fps'] for x in L)/len(L), 'worst': max(x[0]['worst'] for x in L) }
         e = { k: (sum(x[1][k] for x in L if x[1].get(k) is not None)/len(L) if all(x[1].get(k) is not None for x in L) else None) for k in PASSES + ['all passes'] }; e['render'] = L[0][1].get('render')
         rows.append((label, f, e))
-    ctx.close()
-    ctx, pg, errs2 = open_page(br, url, sc, 'window.__CANVAS_ALPHA = true;')
-    setup(pg); fps(pg); F = [fps(pg) for _ in range(a.rounds)]; rows.append(('see-through canvas (before)', { 'fps': sum(x['fps'] for x in F)/len(F), 'worst': max(x['worst'] for x in F) }, {})); print('measured: see-through canvas', flush=True)
-    ctx.close(); br.close()
+    ctx.close(); errs2 = []
+    if not a.now_only:
+        ctx, pg, errs2 = open_page(br, url, sc, 'window.__CANVAS_ALPHA = true;')
+        setup(pg); fps(pg); F = [fps(pg) for _ in range(a.rounds)]
+        rows.append(('see-through canvas (before)', { 'fps': sum(x['fps'] for x in F)/len(F), 'worst': max(x['worst'] for x in F) }, {})); print('measured: see-through canvas', flush=True)
+        ctx.close()
+    br.close()
 srv.shutdown()
 
 print()

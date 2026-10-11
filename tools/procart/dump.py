@@ -24,7 +24,7 @@ def main():
     ap = argparse.ArgumentParser(); ap.add_argument('names', nargs='+'); ap.add_argument('--gen', nargs='*'); ap.add_argument('--scale', type=int, default=4); ap.add_argument('--out', default='/tmp/procart_dump'); ap.add_argument('--bg', default='dark')
     a = ap.parse_args(); os.makedirs(a.out, exist_ok=True)
     from playwright.sync_api import sync_playwright
-    files = [os.path.join(ROOT, 'js/spritegen.js'), os.path.join(ROOT, 'js/artgen.js')] + ([os.path.join(ROOT, g) for g in a.gen] if a.gen is not None else sorted(f for f in glob.glob(os.path.join(ROOT, 'js/artgen_*.js'))))
+    files = [os.path.join(ROOT, 'js/spritegen.js'), os.path.join(ROOT, 'js/artgen.js')] + ([os.path.join(ROOT, g) for g in a.gen] if a.gen is not None else sorted((f for f in glob.glob(os.path.join(ROOT, 'js/artgen_*.js'))), key=lambda f: (os.path.basename(f) != 'artgen_tools.js', f)))
     bgc = {'dark': (40, 46, 54), 'black': (0, 0, 0), 'light': (200, 200, 200)}[a.bg]
     with sync_playwright() as p:
         b = p.chromium.launch(); pg = b.new_page(); errs = []

@@ -28,8 +28,10 @@
     for (let i = 0; i < model.prims.length; i++) {
       const p = model.prims[i], a = heading + p.yaw, c = Math.cos(a), s = Math.sin(a), ramp = p.ramp;
       const cx = p.c[0] * ca + p.c[2] * sa, cy = p.c[1], cz = -p.c[0] * sa + p.c[2] * ca;
-      const R = (p.type === 'box' ? Math.hypot(p.s[0], p.s[1], p.s[2]) : Math.max(p.s[0], p.s[1], p.s[2])) + .5, scx = cx, scv = cy * cp + cz * sp;   // a screen circle round the primitive
-      const q0 = Math.max(0, Math.floor(ox + scx - R)), q1 = Math.min(BW - 1, Math.ceil(ox + scx + R)), r0 = Math.max(0, Math.floor(oy - scv - R)), r1 = Math.min(BH - 1, Math.ceil(oy - scv + R));
+      const scv = cy * cp + cz * sp, S = p.s, isBox = p.type === 'box';   // the primitive's screen box (exact extents of the box or ellipsoid)
+      const hu = isBox ? Math.abs(S[0] * c) + Math.abs(S[2] * s) : Math.sqrt(S[0] * c * S[0] * c + S[2] * s * S[2] * s);
+      const hv = isBox ? Math.abs(S[0] * s * sp) + S[1] * cp + Math.abs(S[2] * c * sp) : Math.sqrt((S[0] * s * sp) ** 2 + (S[1] * cp) ** 2 + (S[2] * c * sp) ** 2);
+      const q0 = Math.max(0, Math.floor(ox + cx - hu)), q1 = Math.min(BW - 1, Math.ceil(ox + cx + hu)), r0 = Math.max(0, Math.floor(oy - scv - hv)), r1 = Math.min(BH - 1, Math.ceil(oy - scv + hv));
       const dx = -cp * s, dy = -sp, dz = cp * c, box = p.type === 'box', S0 = p.s[0], S1 = p.s[1], S2 = p.s[2];
       for (let r = r0; r <= r1; r++) for (let q = q0; q <= q1; q++) {
         const u = q + .5 - ox, v = oy - (r + .5), Oy = v * cp, Oz = v * sp;
@@ -53,7 +55,7 @@
           if (D <= 0) continue;
           t = (-B - Math.sqrt(D)) / A;
           nx = (lx + dx * t) / (S0 * S0); ny = (ly + dy * t) / (S1 * S1); nz = (lz + dz * t) / (S2 * S2);
-          const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
+          const l = Math.sqrt(nx * nx + ny * ny + nz * nz); nx /= l; ny /= l; nz /= l;
         }
         const k = r * BW + q; if (t >= zb[k]) continue;
         zb[k] = t; id[k] = i;
@@ -103,11 +105,19 @@
     for (let k = 0; k < 8; k++) V.blit(g, V.render(DRONE, k * Math.PI / 4, cw, ch, { outline: 'all', outK: .85 }), k * cw, 0);
     // 8: the parcel set down on the doorstep
     V.blit(g, V.render(model(box(0, .9, 0, 6, 1.8, 3.8, ORANGE)), 0, cw, ch, { outline: 'br', outK: .5 }), 8 * cw, 0);
-    // 9, 10: the club's leftovers, by hand (yellow-green puke running down a step, and a puddle)
-    const px = new SG.Px(cw * 3, ch), put = (cell, rows, pal) => rows.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== '.') px.set((cell) * cw + x, y, pal[row[x]]); });
-    const pal = { b: H('#c4d25a'), c: H('#96be3c'), d: H('#6e8c28'), e: H('#465a1e') };
-    put(0, ['', '', '', '', '', '', '......b', '......cc', '.......bc', '........c', '........bc', '.........c', '.........bc', '..........c', '..........bc', '...........c', '...........b', '.........b..cb.b', '........d.dbd.d'], pal);
-    put(1, ['', '', '', '', '', '', '', '', '', '', '', '', '', '....e', '.........cccdc', '.....dbcccdccccdcc', '...dccccdccccbcbccdce', '..ecccdccbcdccccdccc', '.....ccccdccccdccc'], pal);
+    // 9, 10: the club's leftovers, drawn here (a yellow-green splash that has run down a step, and a puddle): blobs from a seeded random stream, three values lit from the upper left
+    const px = new SG.Px(cw * 3, ch), R = SG.rng(SG.seedOf('ddrone_puke', 1));
+    const pal = [H('#6e8c28'), H('#96be3c'), H('#c4d25a')];
+    const blob = (ox, cx, cy, rx, ry) => SG.ellipse(px, ox + cx, cy, rx, ry, (x, y, nx, ny, e) => SG.rampAt(pal, SG.lit(nx, ny)*.9 + (e < .25 ? -.12 : 0), x, y, false));
+    // puke: a splash at the top that runs down in a thinning trail, ending in a small pool
+    blob(0, 9, 8, 3.6, 1.9); blob(0, 12.5, 9.5, 1.6, 1.0);
+    for (let y = 10; y < 16; y++){ px.set(10 - (y > 12 ? 1 : 0), y, y % 3 ? pal[1] : pal[0]); if (y < 13) px.set(11 - (y > 12 ? 1 : 0), y, pal[0]); }
+    blob(0, 9.5, 17, 3.2, 1.2); blob(0, 5.8, 17.5, 1.7, .8);
+    for (let k = 0; k < 3; k++) px.set(Math.round(R.r(4, 13)), Math.round(R.r(5, 8)), pal[2]);
+    // puddle: a low irregular pool, wider than tall, a pale highlight at the upper left
+    blob(cw, 11, 15.8, 8.4, 2.6); blob(cw, 6.4, 16.8, 3.6, 1.6); blob(cw, 15.6, 17.0, 4.2, 1.5); blob(cw, 12.5, 13.6, 3.0, 1.2);
+    for (const [x, y] of [[8, 14], [9, 14], [14, 15]]) px.set(cw + x, y, pal[2]);
+    SG.despeckle(px);
     V.blit(g, px, 9 * cw, 0);
   });
 
@@ -121,7 +131,7 @@
     ell(0, 7.8, 5.2, 2.5, 2.2, 2.2, GLASS),                // the screen
     box(0, 8.6, 3.0, 8.6, 1.0, 1.2, TRIM),                 // the bars
     box(0, 7.2, -7.2, 6.4, 3.4, 4.0, HULL), box(0, 9.2, -8.8, 9.0, 1.2, 1.6, TRIM),   // the tail and the light bar's rail
-    box(-3.0, 10.2, -8.8, 2.6, 1.2, 1.6, RED, { emit: true }), box(3.0, 10.2, -8.8, 2.6, 1.2, 1.6, BLU, { emit: true }),
+    box(3.0, 10.2, -8.8, 2.6, 1.2, 1.6, RED, { emit: true }), box(-3.0, 10.2, -8.8, 2.6, 1.2, 1.6, BLU, { emit: true }),
     ell(-3.7, 5.0, -9.4, 1.8, 1.8, 2.6, TRIM), ell(3.7, 5.0, -9.4, 1.8, 1.8, 2.6, TRIM),    // the thrusters
     box(-3.7, 5.0, -11.8, 2.4, 2.4, .8, BLUE, { emit: true }), box(3.7, 5.0, -11.8, 2.4, 2.4, .8, BLUE, { emit: true }),
     box(0, 1.1, 0, 6.6, .6, 13, BLUE, { emit: true }),     // the glow under the hull

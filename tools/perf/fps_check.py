@@ -12,8 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import harness as H
 
 ap = argparse.ArgumentParser()
-ap.add_argument('--scene', default='dense'); ap.add_argument('--hour', type=float, default=22); ap.add_argument('--secs', type=float, default=10)
-ap.add_argument('--width', type=int, default=1710); ap.add_argument('--height', type=int, default=876); ap.add_argument('--zoom', type=float, default=30)
+ap.add_argument('--scene', default='dense'); ap.add_argument('--hour', type=float, default=22); ap.add_argument('--secs', type=float, default=8)
+ap.add_argument('--width', type=int, default=1710); ap.add_argument('--height', type=int, default=876); ap.add_argument('--zoom', type=float, default=30); ap.add_argument('--lines', type=int, default=720); ap.add_argument('--rounds', type=int, default=2)
 a = ap.parse_args()
 
 PASSES = ['color', 'night lights', 'clouds', 'soft effects (half resolution)', 'composite', 'bloom and grade']
@@ -22,7 +22,7 @@ def open_page(br, url, scene, init=''):
     ctx = br.new_context(viewport={'width': a.width, 'height': a.height}, device_scale_factor=2)
     pg = ctx.new_page(); errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
-    st = dict(scene.get('storage', {})); st['neonIsland.capRes'] = '0'; st['neonIsland.autoPerf'] = '0'
+    st = dict(scene.get('storage', {})); st['neonIsland.capRes'] = '0'; st['neonIsland.autoPerf'] = '0'; st['neonIsland.renderLines'] = str(a.lines)   # (the owner's settings: 720p, both Optimize framerate boxes off)
     import json
     # (the harness's copy of three takes its ids from window.__uuidRand, which the harness's own setup gives it; here ordinary random ids are fine)
     pg.add_init_script('window.__uuidRand = window.__uuidRand || Math.random; (() => { try { if (!sessionStorage.getItem("fpsInit")) { localStorage.clear(); const s = ' + json.dumps(st) + '; for (const k in s) localStorage.setItem(k, s[k]); sessionStorage.setItem("fpsInit", "1"); } } catch (e) {} })();' + init)
@@ -59,24 +59,33 @@ def setup(pg, soft_apart=False, blit=False):
     pg.wait_for_timeout(1500)
 
 from playwright.sync_api import sync_playwright
-os.environ['PERF_GPU'] = '1'
+if not os.environ.get('PERF_SOFTWARE'): os.environ['PERF_GPU'] = '1'   # (PERF_SOFTWARE=1: the software renderer, only to check the script runs)
 sc = H.load_scenes([a.scene])[0]
 srv = H.serve(); url = H.make_site('fps', None)
 rows = []
 with sync_playwright() as pw:
     br = H.launch(pw)
     ctx, pg, errs = open_page(br, url, sc)
-    for label, s, b in [('now (all changes on)', False, False), ('soft effects: three passes (before)', True, False), ('now + cache copied by blitting', False, True)]:
-        setup(pg, s, b); f = fps(pg); e = exact(pg, s, b)
-        rows.append((label, f, e)); print('measured:', label, flush=True)
+    print('render size:', pg.evaluate('() => W + "x" + H'), flush=True)
+    setup(pg); fps(pg)   # (a warm-up: the card's clocks and caches settle, so the first setup isn't the slowest for that reason alone)
+    setups = [('now (all changes on)', False, False), ('soft effects: three passes (before)', True, False), ('now + cache copied by blitting', False, True)]
+    acc = {}
+    for r in range(a.rounds):   # (the setups take turns, so a drift over the run falls on all of them alike)
+        for label, s_, b in setups:
+            setup(pg, s_, b); f = fps(pg); e = exact(pg, s_, b)
+            acc.setdefault(label, []).append((f, e)); print('measured: %s (round %d)' % (label, r + 1), flush=True)
+    for label, s_, b in setups:
+        L = acc[label]; f = { 'fps': sum(x[0]['fps'] for x in L)/len(L), 'worst': max(x[0]['worst'] for x in L) }
+        e = { k: (sum(x[1][k] for x in L if x[1].get(k) is not None)/len(L) if all(x[1].get(k) is not None for x in L) else None) for k in PASSES + ['all passes'] }; e['render'] = L[0][1].get('render')
+        rows.append((label, f, e))
     ctx.close()
     ctx, pg, errs2 = open_page(br, url, sc, 'window.__CANVAS_ALPHA = true;')
-    f = fps(pg); rows.append(('see-through canvas (before)', f, {})); print('measured: see-through canvas', flush=True)
+    setup(pg); fps(pg); F = [fps(pg) for _ in range(a.rounds)]; rows.append(('see-through canvas (before)', { 'fps': sum(x['fps'] for x in F)/len(F), 'worst': max(x['worst'] for x in F) }, {})); print('measured: see-through canvas', flush=True)
     ctx.close(); br.close()
 srv.shutdown()
 
 print()
-print('scene %s, render %s, hour %g, zoom %g   (FPS: overlay closed, vsync off; pass times: exact, in ms)' % (a.scene, rows[0][2].get('render', '?'), a.hour, a.zoom))
+print('scene %s, render %s, hour %g, zoom %g, %d rounds   (FPS: overlay closed, vsync off, the mean of the rounds; pass times: exact, in ms; exact timing makes\nevery pass wait for the card, so they add up to more than a real frame: compare them between setups, not with the FPS)' % (a.scene, rows[0][2].get('render', '?'), a.hour, a.zoom, a.rounds))
 for label, f, e in rows:
     print('\n%s\n  FPS %.1f   worst frame %.1f ms' % (label, f['fps'], f['worst']))
     if e: print('  ' + '   '.join('%s %s' % (n.split(' (')[0], '%.1f' % e[n] if e.get(n) is not None else '-') for n in PASSES + ['all passes']))

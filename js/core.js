@@ -21,7 +21,7 @@ const irand = (a,b) => Math.floor(rnd(a, b+1));
 const canvas = document.getElementById('view');
 // alpha: false: every pixel the game puts on the screen is opaque (the grade and the copy to the screen write alpha 1), so the canvas says so, and the browser
 // doesn't blend the whole frame onto the page behind it every frame (a pass over every screen pixel that the overlay never saw); the picture is the same
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, alpha:false, powerPreference:'high-performance' });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, alpha: !!window.__CANVAS_ALPHA, powerPreference:'high-performance' });   // (window.__CANVAS_ALPHA: the see-through canvas as before, for measuring: tools/perf/fps_check.py)
 renderer.setPixelRatio(1);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.BasicShadowMap;

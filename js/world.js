@@ -2767,6 +2767,8 @@ function warmPrograms(){
     const am = add(new THREE.Mesh(real || geo, mats.atlas), layer); am.receiveShadow = true; if (real) am.position.y = y;
     for (const m of ALL_MATS){ const o = add(new THREE.Mesh(geo, m), m.userData.colorOnly ? 1 : layer); o.castShadow = !m.userData.noCast; o.receiveShadow = true; }
   }
+  // the lift cabs' materials drawn instanced (people.js CAB_BATCH): an instanced program of their own
+  if (typeof CAB_MATS !== 'undefined') for (const m of new Set([...Object.values(CAB_MATS), ...Object.values(CAB_NEON), ...Object.values(CAB_IND), CAB_LUX.neon, CAB_LUX.gold])){ const im = new THREE.InstancedMesh(geo, m, 1); im.setMatrixAt(0, new THREE.Matrix4()); add(im, 0); }
   add(new THREE.LineSegments(OUTLINE_GEO, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false, depthWrite: false })));
   for (const k in GLOW){ const sp = new THREE.Sprite(GLOW[k]); sp.scale.set(.01, .01, 1); add(sp, 1); }
   g.userData.box = geo; SC_DIRTY.quiet++; try { world.add(g); } finally { SC_DIRTY.quiet--; } WARM_GROUP = g;

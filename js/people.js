@@ -1740,34 +1740,29 @@ const CAB_GLASS = new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: tr
 const CAB_NEON = { cyan: toon(0x145452, { em: 0x38e8e0, kind: 'neon' }), pink: toon(0x5a1d3a, { em: 0xff4fa3, kind: 'neon' }) };
 const CAB_IND = { steel: toon(0x34363a), rust: toon(0x4a3026), neon: toon(0x5a1010, { em: 0xff3a24, kind: 'neon' }), inside: toon(0x4a2412, { em: 0xff7a30, kind: 'window' }) };
 const CAB_LUX = { neon: toon(0x6a4a14, { em: 0xffc04a, kind: 'neon' }), gold: toon(0xc49a48), glass: new THREE.MeshBasicMaterial({ color: 0xbfe0e8, transparent: true, opacity: .18, depthWrite: false }) };
-function liftCab(c){
-  const k = ckey(c.i, c.j), style = (c.liftCab && c.liftCab.style) || 'low'; let e = liftCabs.get(k);
-  if (e && e.style !== style){ scene.remove(e.g); liftCabs.delete(k); e = null; }   // the pod changed zone: a new cab
-  if (e) return e;
-  if (style === 'com'){
-    const g = new THREE.Group(), add = (mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); g.add(m); return m; };
+// The cabs are batched: every cab of a style is the same shape, so each style's parts are baked, per material, into one geometry (each part's
+// position and scale applied to a copy of its box or cylinder, normals included), and all the cabs of that style are one instanced draw per material,
+// the instance matrix being the cab's own place and turn. A cab used to be 20 to 25 draws of its own every frame (it moves, so it can't sit in the
+// cached picture); the owner's city had some 450 draws a frame in cabs. The glass panes stay meshes of their own: see-through, their blending order matters.
+const CAB_PARTS = {};   // style -> [{ geo, mat, x, y, z, sx, sy, sz, rx, glass }]
+{
+  const P = (list, geo, mat, x, y, z, sx, sy, sz, o = {}) => { list.push({ geo, mat, x, y, z, sx, sy, sz, rx: o.rx || 0, glass: !!o.glass }); };
+  { const L = CAB_PARTS.com = [], add = (mat, x, y, z, sx, sy, sz, o) => P(L, U.box, mat, x, y, z, sx, sy, sz, o);
     add(CAB_MATS.frame, 0, .02, 0, .42, .04, .42); add(CAB_MATS.frame, 0, CAB_H, 0, .44, .05, .44);
     for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(CAB_MATS.frame, sx*.2, CAB_H/2, sz*.2, .035, CAB_H, .035);
-    for (const [x, z, sx, sz] of [[0, -.2, .38, .01], [.2, 0, .01, .38], [-.2, 0, .01, .38]]){ const m = add(CAB_GLASS, x, CAB_H/2, z, sx, CAB_H - .08, sz); m.renderOrder = 2; }
+    for (const [x, z, sx, sz] of [[0, -.2, .38, .01], [.2, 0, .01, .38], [-.2, 0, .01, .38]]) add(CAB_GLASS, x, CAB_H/2, z, sx, CAB_H - .08, sz, { glass: true });
     add(CAB_NEON.cyan, 0, .05, .215, .42, .02, .015); add(CAB_NEON.cyan, -.215, .05, 0, .015, .02, .42);
     add(CAB_NEON.pink, 0, CAB_H - .04, .225, .44, .02, .015); add(CAB_NEON.pink, -.225, CAB_H - .04, 0, .015, .02, .44);
-    add(CAB_MATS.lamp, 0, CAB_H - .05, 0, .08, .03, .08);
-    scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0, style }; liftCabs.set(k, e); return e;
-  }
-  if (style === 'lux'){   // the luxury cab: a glass capsule between gold caps, gold ribs, a little gold dome, a warm lamp
-    const g = new THREE.Group(), addG = (geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); g.add(m); return m; };
+    add(CAB_MATS.lamp, 0, CAB_H - .05, 0, .08, .03, .08); }
+  { const L = CAB_PARTS.lux = [], addG = (geo, mat, x, y, z, sx, sy, sz, o) => P(L, geo, mat, x, y, z, sx, sy, sz, o);   // the luxury cab: a glass capsule between gold caps, gold ribs, a little gold dome, a warm lamp
     addG(U.cyl16, CAB_LUX.gold, 0, .03, 0, .46, .06, .46); addG(U.cyl16, CAB_LUX.gold, 0, CAB_H + .01, 0, .48, .07, .48);
-    const gl = addG(U.cyl16, CAB_LUX.glass, 0, CAB_H/2, 0, .44, CAB_H - .06, .44); gl.renderOrder = 2;
+    addG(U.cyl16, CAB_LUX.glass, 0, CAB_H/2, 0, .44, CAB_H - .06, .44, { glass: true });
     for (let k = 0; k < 6; k++){ const a = k*TAU/6; addG(U.box, CAB_LUX.neon, Math.sin(a)*.225, CAB_H/2, Math.cos(a)*.225, .018, CAB_H - .06, .018); }   // golden neon strips up the glass
-    for (const y of [.08, CAB_H - .06]) addG(U.torus, CAB_LUX.neon, 0, y, 0, .47, .47, .3).rotation.x = PI/2;                                          // and round its foot and head
+    for (const y of [.08, CAB_H - .06]) addG(U.torus, CAB_LUX.neon, 0, y, 0, .47, .47, .3, { rx: PI/2 });                                          // and round its foot and head
     addG(U.cyl16, CAB_LUX.gold, 0, .32, 0, .45, .02, .45);
     addG(U.lxDome, CAB_LUX.gold, 0, CAB_H + .04, 0, .16, .1, .16);
-    addG(U.box, CAB_MATS.lamp, 0, CAB_H - .04, 0, .07, .03, .07);
-    scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0, style }; liftCabs.set(k, e); return e;
-  }
-  if (style === 'ind'){   // the industrial cab (after the works tower): a heavy steel box open at the front, red neon round
-    // its front and top, lit orange inside from a panel on the back wall
-    const g = new THREE.Group(), add = (mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); g.add(m); return m; };
+    addG(U.box, CAB_MATS.lamp, 0, CAB_H - .04, 0, .07, .03, .07); }
+  { const L = CAB_PARTS.ind = [], add = (mat, x, y, z, sx, sy, sz) => P(L, U.box, mat, x, y, z, sx, sy, sz);   // the industrial cab (after the works tower): a heavy steel box open at the front, red neon round its front and top, lit orange inside from a panel on the back wall
     add(CAB_IND.steel, 0, .03, 0, .44, .06, .44); add(CAB_IND.steel, 0, CAB_H + .01, 0, .46, .08, .46);
     for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(CAB_IND.rust, sx*.205, CAB_H/2, sz*.205, .045, CAB_H, .045);
     add(CAB_IND.steel, 0, CAB_H/2, -.2, .4, CAB_H - .06, .02);                                // the back wall
@@ -1776,21 +1771,58 @@ function liftCab(c){
       for (let y = .45; y < CAB_H - .05; y += .14) add(CAB_IND.rust, s*.2, y, 0, .015, .02, .38); }
     add(CAB_IND.neon, 0, .07, .23, .44, .025, .015); add(CAB_IND.neon, 0, CAB_H - .05, .235, .46, .025, .015);   // round the open front
     for (const s of [-1, 1]){ add(CAB_IND.neon, s*.23, CAB_H/2, .23, .015, CAB_H - .1, .015); add(CAB_IND.neon, s*.235, CAB_H - .05, 0, .015, .025, .46); }
-    add(CAB_MATS.lamp, 0, CAB_H - .05, 0, .07, .03, .07);
-    scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0, style }; liftCabs.set(k, e); return e;
-  }
-  {
-    const g = new THREE.Group(), add = (mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(U.box, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); g.add(m); };
+    add(CAB_MATS.lamp, 0, CAB_H - .05, 0, .07, .03, .07); }
+  { const L = CAB_PARTS.low = [], add = (mat, x, y, z, sx, sy, sz) => P(L, U.box, mat, x, y, z, sx, sy, sz);
     // CAB_H: clear of the tallest person (15 sprite pixels, 15/PX = .83, standing .02 up) with a little headroom
     add(CAB_MATS.frame, 0, .02, 0, .4, .04, .4); add(CAB_MATS.frame, 0, CAB_H, 0, .42, .05, .42);
     for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) add(CAB_MATS.iron, sx*.19, CAB_H/2, sz*.19, .03, CAB_H, .03);
     for (let y = .15; y < CAB_H - .05; y += .1) add(CAB_MATS.mesh, 0, y, -.19, .38, .012, .012);
     for (let y = .15; y < CAB_H - .05; y += .1) add(CAB_MATS.mesh, -.19, y, 0, .012, .012, .38);
     add(CAB_MATS.iron, 0, .3, .19, .4, .03, .02);
-    add(CAB_MATS.lamp, 0, CAB_H - .04, 0, .07, .04, .07);
-    scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0, style }; liftCabs.set(k, e);
+    add(CAB_MATS.lamp, 0, CAB_H - .04, 0, .07, .04, .07); }
+}
+const _cabM = new THREE.Matrix4(), _cabQ = new THREE.Quaternion(), _cabP = new THREE.Vector3(), _cabS = new THREE.Vector3(1, 1, 1), _cabY = new THREE.Vector3(0, 1, 0);
+// a style's solid parts baked into one geometry per material (made once, the first time a cab of that style is wanted)
+const CAB_GEOS = new Map();
+function cabGeos(style){
+  let byMat = CAB_GEOS.get(style); if (byMat) return byMat;
+  byMat = new Map(); const lists = new Map();
+  for (const q of CAB_PARTS[style]){
+    if (q.glass) continue;
+    let g = q.geo.index ? q.geo.toNonIndexed() : q.geo.clone(); for (const a of Object.keys(g.attributes)) if (a !== 'position' && a !== 'normal') g.deleteAttribute(a);
+    _cabP.set(q.x, q.y, q.z); _cabQ.setFromAxisAngle(new THREE.Vector3(1, 0, 0), q.rx); _cabM.compose(_cabP, _cabQ, new THREE.Vector3(q.sx, q.sy, q.sz)); g.applyMatrix4(_cabM);
+    (lists.get(q.mat) || lists.set(q.mat, []).get(q.mat)).push(g);
   }
-  return e;
+  for (const [mat, gs] of lists){ const merged = gs.length === 1 ? gs[0] : THREE.BufferGeometryUtils.mergeBufferGeometries(gs, false); if (gs.length > 1) for (const g of gs) g.dispose(); merged.computeBoundingSphere(); byMat.set(mat, merged); }
+  CAB_GEOS.set(style, byMat); return byMat;
+}
+// the batches: per style, one instanced mesh per material, an instance per cab of that style (the cabs are numbered again whenever one comes or goes)
+const CAB_BATCH = new Map();   // style -> { meshes: [{ mat, mesh }], cabs: [e] }
+function cabBatch(style){
+  let b = CAB_BATCH.get(style); if (b) return b;
+  b = { meshes: [], cabs: [], cap: 0 }; CAB_BATCH.set(style, b); return b;
+}
+function cabRebatch(){
+  for (const b of CAB_BATCH.values()) b.cabs.length = 0;
+  for (const e of liftCabs.values()){ const b = cabBatch(e.style); e.idx = b.cabs.length; b.cabs.push(e); }
+  for (const [style, b] of CAB_BATCH){
+    const n = b.cabs.length;
+    if (n > b.cap){   // more room: the meshes made again with twice the capacity
+      for (const r of b.meshes){ scene.remove(r.mesh); r.mesh.dispose(); }
+      b.meshes.length = 0; b.cap = Math.max(8, n*2);
+      for (const [mat, geo] of cabGeos(style)){ const m = new THREE.InstancedMesh(geo, mat, b.cap); m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); b.meshes.push({ mat, mesh: m }); }
+    }
+    for (const r of b.meshes){ r.mesh.count = n; r.mesh.visible = n > 0; }
+    for (const e of b.cabs) e.dirty = true;
+  }
+}
+function liftCab(c){
+  const k = ckey(c.i, c.j), style = (c.liftCab && c.liftCab.style) || 'low'; let e = liftCabs.get(k);
+  if (e && e.style !== style){ scene.remove(e.g); liftCabs.delete(k); e = null; cabRebatch(); }   // the pod changed zone: a new cab
+  if (e) return e;
+  const g = new THREE.Group();   // (only the glass panes, as meshes of their own; the solid parts are in the style's batch)
+  for (const q of CAB_PARTS[style]){ if (!q.glass) continue; const m = new THREE.Mesh(q.geo, q.mat); m.position.set(q.x, q.y, q.z); m.scale.set(q.sx, q.sy, q.sz); m.renderOrder = 2; g.add(m); }
+  scene.add(g); e = { g, y: CURB, state: 'idle', at: 'bot', hold: 0, style, idx: -1, dirty: true }; liftCabs.set(k, e); cabRebatch(); return e;
 }
 function drawLiftCabs(){
   const live = new Set();
@@ -1798,9 +1830,14 @@ function drawLiftCabs(){
     const L = c.liftCab; if (!L) continue;
     const k = ckey(c.i, c.j), e = liftCab(c); live.add(k);
     if (e.y > L.y0){ e.y = L.y0; }   // (the deck was lowered: the cab with it)
+    if (e.g.position.x !== L.x || e.g.position.y !== e.y || e.g.position.z !== L.z || e.g.rotation.y !== L.ry) e.dirty = true;
     e.g.position.set(L.x, e.y, L.z); e.g.rotation.y = L.ry;
+    if (e.dirty){ e.dirty = false; const b = CAB_BATCH.get(e.style);
+      _cabP.set(L.x, e.y, L.z); _cabQ.setFromAxisAngle(_cabY, L.ry); _cabM.compose(_cabP, _cabQ, _cabS);
+      for (const r of b.meshes){ r.mesh.setMatrixAt(e.idx, _cabM); r.mesh.instanceMatrix.needsUpdate = true; } }
   }
-  for (const [k, e] of liftCabs) if (!live.has(k)){ scene.remove(e.g); liftCabs.delete(k); }
+  let gone = false; for (const [k, e] of liftCabs) if (!live.has(k)){ scene.remove(e.g); liftCabs.delete(k); gone = true; }
+  if (gone) cabRebatch();
 }
 
 /* ---------- bumping into each other, and emotes ---------- */

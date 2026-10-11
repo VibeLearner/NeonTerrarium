@@ -2047,6 +2047,7 @@ function rebuildRegion(key){
 // plants appear, are unchanged), but they are drawn SREG x SREG regions at a time: one batch per kind of thing instead
 // of one per region. Plants and glows are drawn whole wherever the view is (they aren't culled), so a bigger batch draws
 // nothing more; it only costs fewer draw calls.
+const FOL_BLOCK = 50;   // world units: the plants of a super-region are joined in blocks this wide (mergeLeaves)
 const SREG = 4, superRegions = new Map(), superDirty = new Set();
 const superKey = rk => { const c = rk.indexOf(','); return Math.floor(+rk.slice(0, c)/SREG) + ',' + Math.floor(+rk.slice(c + 1)/SREG); };
 function flushSuper(){
@@ -2072,7 +2073,7 @@ function mergeLeaves(groups){
     if (!(o.isMesh || o.isPoints)) return;
     // (what is culled to the view, the bridges and walkways themselves, stays a mesh per region: a bigger one would be
     // drawn whenever any of it is on screen, all of it, and close up that is a lot of geometry out of sight)
-    const k = (o.isInstancedMesh ? 'I' : o.isPoints ? 'P' : 'M') + o.material.id + '|' + o.layers.mask + '|' + o.renderOrder + '|' + o.castShadow + '|' + o.receiveShadow + '|' + (o.userData.lawn ? 'L' : '') + '|' + (o.frustumCulled && !o.userData.fol ? 'cull' + gi : '');   // (plants stay merged per super-region and are culled as a whole, with a bounding sphere made below: one mesh per region would add a draw each)
+    const k = (o.isInstancedMesh ? 'I' : o.isPoints ? 'P' : 'M') + o.material.id + '|' + o.layers.mask + '|' + o.renderOrder + '|' + o.castShadow + '|' + o.receiveShadow + '|' + (o.userData.lawn ? 'L' : '') + '|' + (o.userData.fol ? 'f' + Math.floor(o.geometry.boundingSphere.center.x/FOL_BLOCK) + ',' + Math.floor(o.geometry.boundingSphere.center.z/FOL_BLOCK) : o.frustumCulled ? 'cull' + gi : '');   // (plants are joined by blocks of about 2 x 2 regions and culled block by block, with a bounding sphere made below: a block per region would add a draw each, a whole super-region culls hardly anything)
     let l = cls.get(k); if (!l) cls.set(k, l = []); l.push(o);
   }));
   const out = new THREE.Group();

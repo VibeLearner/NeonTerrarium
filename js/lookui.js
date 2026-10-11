@@ -11,15 +11,15 @@ const swatches = id => { const d = el('span', { class: 'sws', 'aria-hidden': 'tr
 const deck = $('deck');
 const menu = el('section', { id: 'looksSec' });
 menu.append(el('h2', { text: 'Look and weather' }));
-const list = el('div', { class: 'lookmenu', role: 'group', 'aria-label': 'Look' });
-const items = {};
-function addItem(id, name){
-  const b = el('button', { class: 'lookitem', 'aria-pressed': 'false', title: id === 'auto' ? 'Follows the time of day and the weather' : LK.looks[id].note, onclick: () => { LK.setPick(id); refreshMenu(); } });
-  b.append(el('b', { text: name })); b.append(id === 'auto' ? el('small', { text: 'follows the time and weather' }) : swatches(id));
-  items[id] = b; list.append(b);
-}
-addItem('auto', 'Auto');
-for (const id of LK.order) addItem(id, LK.looks[id].name);
+// the look: a drop-down (Auto, then the ten), with the chosen look's palette as a strip under it
+const list = el('div', { class: 'lookpick' });
+const sel = el('select', { id: 'lookSelect', 'aria-label': 'Look' });
+sel.append(el('option', { value: 'auto', text: 'Auto (follows the time and weather)' }));
+for (const id of LK.order) sel.append(el('option', { value: id, text: LK.looks[id].name, title: LK.looks[id].note }));
+sel.addEventListener('change', () => { LK.setPick(sel.value); refreshMenu(); });
+const swRow = el('div', { class: 'lookswrow' });
+list.append(sel, swRow);
+const items = {};   // (kept for refreshSwatches: none now)
 const status = el('p', { class: 'note', id: 'lookStatus', 'aria-live': 'off' });
 menu.append(status);
 const wxRow = el('div', { class: 'chips', id: 'wxChips', role: 'group', 'aria-label': 'Weather' });
@@ -37,7 +37,7 @@ const rainBox = $('rain'); if (rainBox && rainBox.closest('label')) rainBox.clos
 const firstSec = deck.querySelector('section');
 if (firstSec && firstSec.nextSibling) deck.insertBefore(menu, firstSec.nextSibling); else deck.append(menu);
 function refreshMenu(){
-  for (const id in items){ const on = id === LK.pick; items[id].setAttribute('aria-pressed', on ? 'true' : 'false'); items[id].classList.toggle('on', on); }
+  sel.value = LK.pick; swRow.replaceChildren(); if (LK.pick !== 'auto' && LK.looks[LK.pick]) swRow.append(swatches(LK.pick));
   for (const k in wxBtn) wxBtn[k].classList.toggle('on', LK.wx.set === k);
   autoWx.checked = LK.wx.mode === 'auto';
 }
@@ -103,7 +103,7 @@ function fillRows(){
 }
 const dirty = el('span', { class: 'eddirty' });
 function markDirty(){ dirty.textContent = 'edited (not saved)'; }
-function refreshSwatches(){ for (const id of LK.order){ const old = items[id].querySelector('.sws'); if (old) old.replaceWith(swatches(id)); } }
+function refreshSwatches(){ if (typeof refreshMenu === 'function') refreshMenu(); }
 // save, reset, copy, paste
 const msg = el('p', { class: 'note', role: 'status' });
 const say = t => { msg.textContent = t; };

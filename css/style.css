@@ -242,3 +242,6 @@ body.deleting #view{cursor:crosshair}
 .lookrefs img{display:block;width:100%;height:auto;border-radius:2px;cursor:zoom-in}
 .lookrefs figure button{position:absolute;right:4px;top:4px;padding:1px 6px;background:rgba(8,12,24,.8)}
 @media (max-width:760px){.lookrefs{left:16px;top:auto;bottom:16px;max-height:34%;width:calc(100% - 32px)}}
+.lookpick{display:grid;gap:6px}
+.lookswrow:empty{display:none}
+.lookswrow .sws{width:100%;height:8px}

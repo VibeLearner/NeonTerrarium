@@ -100,7 +100,7 @@ function mtSides(l){
   for (const k of mtStops(l)){ let s = 0; for (const c of [old[k], 1, -1]) if (c && mtLiftOK(l, k, c)){ s = c; break; } l.sides[k] = s; }
 }
 const mtLiftCell = (l, k) => { const s = l.sides && l.sides[k]; if (!s) return null; const L = mtLiftSpot(l, k, s); return [Math.round(L.sx/LOT), Math.round(L.sz/LOT)]; };
-// what a click would do in metro mode: { type: 'start'|'extend'|'finish'|'stop'|'unstop'|'none', ok, why, ... }
+// what a click would do in metro mode: { type: 'start'|'extend'|'reopen'|'finish'|'stop'|'unstop'|'none', ok, why, ... } ('reopen': a finished line carried on from its end station)
 function mtTargetAt(pk){
   if (!pk) return null;
   if (pk.kind === 'mtTile'){
@@ -119,10 +119,15 @@ function mtTargetAt(pk){
   }
   const { i, j } = pk;
   for (const l of metros){
-    if (l.done) continue;
     const n = l.tiles.length, e = l.tiles[n - 1];
     if (Math.abs(e.i - i) + Math.abs(e.j - j) !== 1) continue;
     const pv = l.tiles[n - 2]; if (pv && pv.i === i && pv.j === j) continue;
+    if (l.done){   // a finished line goes on from its end station, which stays as a station in the middle (stations sit on straight track, so the line carries on straight from it)
+      let why = mtTileWhy(i, j);
+      const keep = !mtIsStop(l, n - 2);   // (right beside another station it can't stay one: it becomes plain track)
+      if (!why && keep && pv && (i - e.i !== e.i - pv.i || j - e.j !== e.j - pv.j)) why = 'the end station stays a station: carry the line on straight from it';
+      return { type: 'reopen', l, i, j, keep, ok: !why, why };
+    }
     let why = mtTileWhy(i, j);
     if (!why && n === 1){   // the first station's lift has to fit beside the track running this way
       l.tiles.push({ i, j }); const fits = [1, -1].some(sd => mtLiftOK(l, 0, sd)); l.tiles.pop();   // (tried with the plot added, then put back)
@@ -151,6 +156,9 @@ function mtApply(t){
     metros.push(l); mtActive = l; mtCommit(l, []);
   } else if (t.type === 'extend'){
     const l = t.l; l.tiles.push({ i: t.i, j: t.j }); mtActive = l; mtCommit(l, []);
+  } else if (t.type === 'reopen'){
+    const l = t.l, before = mtTouched(l), n = l.tiles.length;
+    l.done = false; if (t.keep) l.st = [...l.st, n - 1]; l.tiles.push({ i: t.i, j: t.j }); mtActive = l; mtCommit(l, before);
   } else if (t.type === 'finish'){
     const l = t.l; l.done = true; mtActive = l; mtCommit(l, []);
   } else if (t.type === 'stop' || t.type === 'unstop'){
@@ -350,8 +358,9 @@ function mtFeet(c){
     box(MTM.pillar2, F, 0, top - .14, 0, .78, .28, .5);                 // the hammerhead under the girder
     if (roof > CURB){ box(MTM.pillar2, F, 0, roof + .06, 0, .62, .14, .62); box(MTM.pillar2, F, 0, roof + .01, 0, .74, .05, .74); }
     else box(MTM.pillar2, F, 0, bot + .05, 0, .56, .1, .56);
-    for (const s of [-1, 1]) box(MTM.green, F, s*.215, (bot + top)/2, 0, .012, Math.max(.1, top - bot - .5), .05);
-    for (let y = bot + 1.2; y < top - .6; y += 2.4) box(MTM.green2, F, 0, y, .215, .2, .025, .012);
+    // the light strips up the sides and the bands across the front: about a pixel wide or more at the usual zooms (they were a third of one, and flickered in and out as the view moved)
+    for (const s of [-1, 1]) box(MTM.green, F, s*.225, (bot + top)/2, 0, .04, Math.max(.1, top - bot - .5), .07);
+    for (let y = bot + 1.2; y < top - .6; y += 2.4) box(MTM.green2, F, 0, y, .225, .22, .05, .04);
   }
   // a station's lift shaft whose foot is on this plot
   for (const l of metros) for (const k of mtStops(l)){
@@ -659,7 +668,7 @@ function mtHighlight(t){
   if (t && t.l && (t.type === 'none' || t.type === 'stop' || t.type === 'unstop')){ const n = t.l.tiles.length;   // a built piece: it, and what a right-click would take with it
     mtHiShow(hwHiA, t.l, t.k, t.k, t.type === 'stop' && t.ok ? 0x5aff7a : t.type === 'unstop' ? 0xffd04a : 0xff6a7a); mtHiShow(hwHiB, t.l, t.k + 1, n - 1, 0xff3a4a); return; }
   if (t && t.type === 'finish'){ const n = t.l.tiles.length; mtHiShow(hwHiA, t.l, n - 1, n - 1, 0x5aff7a); mtHiShow(hwHiB, null); return; }
-  if (t && t.type === 'extend'){ const n = t.l.tiles.length; mtHiShow(hwHiA, t.l, n - 1, n - 1, 0x38e8e0); mtHiShow(hwHiB, null); return; }   // the piece the next one joins on to
+  if (t && (t.type === 'extend' || t.type === 'reopen')){ const n = t.l.tiles.length; mtHiShow(hwHiA, t.l, n - 1, n - 1, t.type === 'reopen' && t.keep ? 0x5aff7a : 0x38e8e0); mtHiShow(hwHiB, null); return; }   // the piece the next one joins on to (green: an end station that stays a station)
   mtHiShow(hwHiA, null); mtHiShow(hwHiB, null);
 }
 function mtShowGhost(t){
@@ -669,7 +678,7 @@ function mtShowGhost(t){
   hwGhostMat.color.setHex(col); hwGhostLine.color.setHex(col);
   let x, z, len, ry, w = MT_W + .1, th = MT_DECK + MT_GIRD, y = MT_Y;
   if (t.type === 'start'){ x = t.i*LOT; z = t.j*LOT; len = LOT*.92; ry = 0; w = MT_W + 2*MT_PLAT; }
-  else if (t.type === 'extend'){ const e = t.l.tiles[t.l.tiles.length - 1]; x = (e.i + t.i)*LOT/2 + (t.i - e.i)*LOT*.25; z = (e.j + t.j)*LOT/2 + (t.j - e.j)*LOT*.25; len = LOT*.95; ry = Math.atan2(t.i - e.i, t.j - e.j); }
+  else if (t.type === 'extend' || t.type === 'reopen'){ const e = t.l.tiles[t.l.tiles.length - 1]; x = (e.i + t.i)*LOT/2 + (t.i - e.i)*LOT*.25; z = (e.j + t.j)*LOT/2 + (t.j - e.j)*LOT*.25; len = LOT*.95; ry = Math.atan2(t.i - e.i, t.j - e.j); }
   else { const n = t.l.tiles.length, e = t.l.tiles[n - 1], { dout } = hwDirs(t.l, n - 1); x = e.i*LOT; z = e.j*LOT; len = LOT*.9; ry = Math.atan2(dout[0], dout[1]); w = MT_W + 2*MT_PLAT; th = MT_OH + .4; y = MT_Y + MT_OH; }
   hwGhost.deck.position.set(x, y - th/2, z); hwGhost.deck.rotation.y = ry; hwGhost.deck.scale.set(w, th, len);
   hwGhost.edge.position.copy(hwGhost.deck.position); hwGhost.edge.rotation.y = ry; hwGhost.edge.scale.copy(hwGhost.deck.scale);

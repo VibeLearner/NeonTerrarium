@@ -201,7 +201,7 @@ function applyTime(){ return (typeof LK !== 'undefined' && !LK.old && !window.__
 // every knob the looks added, at the value that leaves the old picture as it was
 function lkNeutral(night){
   const u = comp.uniforms, g = glowMix.uniforms;
-  u.starVis.value = night; u.skyMidOn.value = 0; u.hazeK.value = .35; u.mistTint.value.setRGB(1, 1, 1); u.sparkle.value = 0; u.rainAmt.value = S.rain ? 1 : 0;
+  u.starVis.value = night; u.skyMidOn.value = 0; u.hazeK.value = .35; u.mistTint.value.setRGB(1, 1, 1); u.sparkle.value = 0; u.rainAmt.value = S.rain ? 1 : 0; u.rainVis.value = 1; u.rainDens.value = 1;
   cloudMat.uniforms.cover.value = .5; cloudMat.uniforms.cloudAmt.value = 0;
   g.midA.value = 0; g.palBlend.value = 0; g.grain.value = 0; g.fringe.value = 0; g.flare.value = 0; g.vig.value = 0; g.bloomK.value = 1; g.halK.value = 1; glowPick.uniforms.thK.value = 1;
 }
@@ -230,7 +230,7 @@ const comp = new THREE.ShaderMaterial({
     near:{value:NEAR}, far:{value:FAR}, camDist:{value:CAM_DIST}, skyTop:{value:new THREE.Color()}, skyBot:{value:new THREE.Color()}, haze:{value:new THREE.Color()},
     night:{value:0}, smoothLook: SMOOTH_LOOK, lodLines: LOD.lines, pxK:{value:1}, starOff:{value:new THREE.Vector2()}, skyYaw:{value:0}, rainOff:{value:new THREE.Vector2()}, windR:{value:1}, outlines:{value:1}, palOn:{value:0}, time:{value:0},
     pal:{value: PAL_HEX.map(h => { const c=new THREE.Color(h); return new THREE.Vector3(c.r,c.g,c.b); })},
-    tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, rainOn:{value:0}, rainAmt:{value:0}, starVis:{value:0}, skyMid:{value:new THREE.Color()}, skyMidOn:{value:0}, hazeK:{value:.35}, mistTint:{value:new THREE.Color(1,1,1)}, sparkle:{value:0},
+    tCloud:{value:null}, VP:{value:new THREE.Matrix4()}, upView:{value:new THREE.Vector3(0,1,0)}, wet:{value:.2}, rainOn:{value:0}, rainAmt:{value:0}, rainVis:{value:1}, rainDens:{value:1}, starVis:{value:0}, skyMid:{value:new THREE.Color()}, skyMidOn:{value:0}, hazeK:{value:.35}, mistTint:{value:new THREE.Color(1,1,1)}, sparkle:{value:0},
     invVP:{value:new THREE.Matrix4()}, shadowMap:{value:null}, shadowMat:{value:new THREE.Matrix4()},
     sunDir:{value:new THREE.Vector3(0,1,0)}, sunCol:{value:new THREE.Color()}, cityGlow:{value:new THREE.Color(0xff4fa3)}, glowC:{value:new THREE.Vector2()},
     cloudOn:{value:1}, raysOn:{value:1}, rayI:{value:1}, rainDark:{value:0},
@@ -247,7 +247,7 @@ const comp = new THREE.ShaderMaterial({
     uniform vec3 pal[${PAL_HEX.length}];
     uniform mat4 invVP; uniform sampler2D shadowMap; uniform mat4 shadowMat;
     uniform mat4 VP; uniform vec3 upView; uniform float wet; uniform float rainOn; uniform sampler2D tCloud;
-    uniform float rainAmt; uniform float starVis; uniform vec3 skyMid; uniform float skyMidOn; uniform float hazeK; uniform vec3 mistTint; uniform float sparkle;   // (the looks: js/looks.js)
+    uniform float rainAmt; uniform float rainVis; uniform float rainDens; uniform float starVis; uniform vec3 skyMid; uniform float skyMidOn; uniform float hazeK; uniform vec3 mistTint; uniform float sparkle;   // (the looks: js/looks.js)
     uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 cityGlow;
     uniform float cloudOn; uniform float raysOn; uniform float rayI; uniform float rainDark;
     uniform sampler2D tSoftW; uniform sampler2D tSoftM; uniform sampler2D tSoftR; uniform vec2 softPar; uniform vec2 softDim; uniform float softSig;
@@ -557,9 +557,9 @@ const comp = new THREE.ShaderMaterial({
         vec3 wps = ro + rdir*tEnd;
         vec2 gc = floor(wps.xz*9.0);
         float hs0 = hash(gc + 11.3), hs1 = hash(gc*1.7 + 3.1);
-        float lightK = clamp(dot(col, vec3(.3, .59, .11))*1.6 + litAt(wps)*dot(sunCol, vec3(.3, .59, .11))*.35, 0.0, 1.0);
+        float lightK = clamp(dot(col, vec3(.3, .59, .11))*1.0 + litAt(wps)*dot(sunCol, vec3(.3, .59, .11))*.35, 0.0, 1.0);   // (the picture's brightness counts less than it did: glints crowded round lit doorways and bloomed into a starburst)
         float tw = smoothstep(.5, .95, sin(time*(2.5 + 3.5*hs1) + hs1*60.0)*.5 + .5);
-        float gl = step(1.0 - .1*lightK*min(1.0, wet*1.4), hs0)*tw*min(1.0, sparkle);
+        float gl = step(1.0 - .05*lightK*min(1.0, wet*1.4), hs0)*tw*min(1.0, sparkle);
         col += mix(vec3(1.0), sunCol/max(max(sunCol.r, max(sunCol.g, sunCol.b)), .001), .35)*gl*(.55 + .45*min(sparkle, 2.0)*.5);
       }
 #endif
@@ -675,8 +675,8 @@ const comp = new THREE.ShaderMaterial({
           float speed = (330.0 - fl*90.0)*(0.9 + windR*0.12), len = (6.0 - fl*1.7)*(0.9 + windR*0.15), spacing = 70.0 + fl*25.0;
           float y = p.y + time*speed + hash(vec2(colm, fl*13.0))*500.0;
           float seg = floor(y/spacing), pos = mod(y, spacing);
-          float on = step(hash(vec2(colm, seg + fl*71.0)), 0.16 - fl*0.03) * step(pos, len);
-          col = mix(col, rc, on*(0.42 - fl*0.1)*rainAmt);
+          float on = step(hash(vec2(colm, seg + fl*71.0)), (0.16 - fl*0.03)*rainDens) * step(pos, len*(0.75 + 0.25*rainDens));
+          col = mix(col, rc, min(0.9, on*(0.42 - fl*0.1)*rainVis)*rainAmt);   // (rainVis, rainDens: how strong and how dense the looks make it, 1 the old way)
         }
         // splashes: single pixels that flash on up-facing surfaces, fixed to the ground so they don't swim
         if (rd < 0.99999 && dot(n, upView) > 0.9){
@@ -684,7 +684,7 @@ const comp = new THREE.ShaderMaterial({
           vec2 sc = floor(wp.xz*7.0);
           float ph = fract(time*1.7 + hash(sc)*7.0);
           float sp = step(hash(sc + 19.0), 0.22) * step(ph, 0.07) * step(0.5, hash(floor(wp.xz*14.0)));
-          col = mix(col, rc*1.15, sp*0.6*rainAmt);
+          col = mix(col, rc*1.15, min(0.9, sp*0.6*rainVis)*rainAmt);
         }
       }
       if (mtSh > .002){   // the field's own light: a soft electric blue haze, breathing
@@ -725,8 +725,33 @@ function compVariant(){
     for (const m of softMats){ for (const f of COMP_FX) m.defines['FX_' + f] = comp.defines['FX_' + f]; m.needsUpdate = true; }
     comp.needsUpdate = true; }
   SOFT_ON = soft === 1;
+  compWarm(on, soft);
 }
 let SOFT_ON = false;
+// The composite is compiled for each set of its effects the first time that set is used, which stalls a frame (on the owner's Mac, the moment rain came in with the rainy
+// looks' sparkle and no light shafts: a jolt in the middle of a slow blend). The sets the weather can bring next (rain, sparkle, shafts on or off, wet ground) are compiled
+// ahead, one a second while the view is still after the city has loaded, so the change itself finds its program ready.
+const compWarmed = new Set(); let compWarmAt = 0;
+function compWarm(on, soft){
+  if (PH.tests.compFloor || PH.tests.compAll || (typeof LOADP !== 'undefined' && LOADP.on) || performance.now() < compWarmAt || (typeof tierMoving === 'function' && tierMoving())) return;   // (only while the view is still, so a compile's short stall never lands in a turn or a pan)
+  // (every mix of the four the weather moves, each on or off, around the rest as they are now: a blend passes through several of them, one flag at a time)
+  const W4 = ['RAIN', 'SPARK', 'NL', 'RAYS'], flips = [];
+  for (let b = 0; b < 16; b++){ const f = {}; W4.forEach((x, q) => { f[x] = !!(b & (1 << q)); }); if (f.RAIN || f.SPARK) f.WET = true; flips.push(f); }
+  for (const f of flips){
+    const o = Object.assign({}, on, f), sft = soft && (o.WET !== false || o.MIST !== false || o.RAYS !== false) ? 1 : (soft ? 0 : (!(PH.tests.softFull || window.__SOFT_FULL) && renderer.capabilities.isWebGL2 && (o.WET !== false || o.MIST !== false || o.RAYS !== false) ? 1 : 0));
+    const key = COMP_FX.map(x => o[x] === false ? 0 : 1).join('') + sft;
+    if (key === compKey) { compWarmed.add(key); continue; }
+    if (compWarmed.has(key)) continue;
+    compWarmed.add(key); compWarmAt = performance.now() + 1000;
+    const all = [comp, ...softMats], keep = all.map(m => Object.assign({}, m.defines)), was = softQuad.material;
+    for (const m of all){ for (const x of COMP_FX) m.defines['FX_' + x] = o[x] === false ? 0 : 1; m.needsUpdate = true; }
+    comp.defines.SOFT_HALF = sft;
+    try { renderer.compile(compScene, compCam); if (sft) for (const m of softMats){ softQuad.material = m; renderer.compile(softScene, compCam); } } catch (e) {}
+    softQuad.material = was;
+    all.forEach((m, q) => { m.defines = keep[q]; m.needsUpdate = true; });
+    return;
+  }
+}
 // ---- soft effects at half resolution ----
 // The composite works out three soft effects for every pixel: the reflection search on wet ground (22 steps), the steam's mist (8) and the light
 // shafts (12). Each is smooth over a few pixels, so here each is worked out once for a block of 2 x 2 pixels (the block's lower left one) into a

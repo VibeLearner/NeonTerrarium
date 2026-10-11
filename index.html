@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="css/style.css?v=2026-10-11e">
+<link rel="stylesheet" href="css/style.css?v=2026-10-11g">
 </head>
 <body>
 
@@ -116,6 +116,22 @@
 
 <aside id="deck" class="deck" aria-label="Playground controls">
   <section>
+    <h2>Time of day</h2>
+    <div class="clock"><output id="clock">15:30</output><span id="phase">Day</span></div>
+    <input type="range" id="hour" min="0" max="24" step="0.05" value="15.5" aria-label="Hour of day">
+    <div class="chips" id="presets">
+      <button data-h="12">Midday</button>
+      <button data-h="17.2">Golden hour</button>
+      <button data-h="18.9">Dusk</button>
+      <button data-h="22">Night</button>
+    </div>
+    <div class="togs">
+      <label class="tog"><input type="checkbox" id="cycle"> Day cycle</label>
+      <label class="tog"><input type="checkbox" id="rain"> Rain</label>
+    </div>
+    <div class="slider stack"><label for="wind">Wind strength <small>sways plants and laundry, slants the rain, pushes the clouds</small></label><input type="range" id="wind" min="0" max="2" step="0.1" value="1"><output id="windOut">Breezy</output></div>
+  </section>
+  <section>
     <h2>New buildings</h2>
     <p class="note">These set the style of what you build next. Everything already built keeps its look.</p>
     <select id="district" aria-label="District type" hidden>
@@ -183,54 +199,31 @@
   <p class="foot">Your island saves automatically in this browser.</p>
 </aside>
 
-<!-- the Lighting panel: the look, the weather and the time of day, while playing (outside the settings, which keep the performance settings); collapsible, remembered -->
-<aside id="lightPanel" class="lightpanel" aria-label="Lighting">
-  <button id="lightHead" class="bmenu-head lighthead" aria-expanded="true" aria-controls="lightBody"><span>Lighting</span><i aria-hidden="true"></i></button>
-  <div id="lightBody" class="lightbody">
-    <section>
-      <h2>Time of day</h2>
-      <div class="clock"><output id="clock">15:30</output><span id="phase">Day</span></div>
-      <input type="range" id="hour" min="0" max="24" step="0.05" value="15.5" aria-label="Hour of day">
-      <div class="chips" id="presets">
-        <button data-h="12">Midday</button>
-        <button data-h="17.2">Golden hour</button>
-        <button data-h="18.9">Dusk</button>
-        <button data-h="22">Night</button>
-      </div>
-      <div class="togs">
-        <label class="tog"><input type="checkbox" id="cycle"> Day cycle</label>
-        <label class="tog"><input type="checkbox" id="rain"> Rain</label>
-      </div>
-      <div class="slider stack"><label for="wind">Wind strength <small>sways plants and laundry, slants the rain, pushes the clouds</small></label><input type="range" id="wind" min="0" max="2" step="0.1" value="1"><output id="windOut">Breezy</output></div>
-    </section>
-  </div>
-</aside>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <!-- ?v= makes browsers fetch fresh copies after an update; change it with every release -->
-<script src="js/matreg.js?v=2026-10-11e"></script>
-<script src="js/core.js?v=2026-10-11e"></script>
-<script src="js/sprites.js?v=2026-10-11e"></script>
-<script src="js/buildings.js?v=2026-10-11e"></script>
-<script src="js/ground.js?v=2026-10-11e"></script>
-<script src="js/vehicles.js?v=2026-10-11e"></script>
-<script src="js/sky.js?v=2026-10-11e"></script>
-<script src="js/looks.js?v=2026-10-11e"></script>
-<script src="js/lookui.js?v=2026-10-11e"></script>
-<script src="js/audio.js?v=2026-10-11e"></script>
-<script src="js/world.js?v=2026-10-11e"></script>
-<script src="js/mega.js?v=2026-10-11e"></script>
-<script src="js/people.js?v=2026-10-11e"></script>
-<script src="js/highway.js?v=2026-10-11e"></script>
-<script src="js/metro.js?v=2026-10-11e"></script>
-<script src="js/recipe.js?v=2026-10-11e"></script>
-<script src="js/loadcity.js?v=2026-10-11e"></script>
-<script src="js/music.js?v=2026-10-11e"></script>
-<script src="js/input.js?v=2026-10-11e"></script>
-<script src="js/perfhud.js?v=2026-10-11e"></script>
-<script src="js/staticcache.js?v=2026-10-11e"></script>
-<script src="js/neverseen.js?v=2026-10-11e"></script>
-<script src="js/main.js?v=2026-10-11e"></script>
+<script src="js/matreg.js?v=2026-10-11g"></script>
+<script src="js/core.js?v=2026-10-11g"></script>
+<script src="js/sprites.js?v=2026-10-11g"></script>
+<script src="js/buildings.js?v=2026-10-11g"></script>
+<script src="js/ground.js?v=2026-10-11g"></script>
+<script src="js/vehicles.js?v=2026-10-11g"></script>
+<script src="js/sky.js?v=2026-10-11g"></script>
+<script src="js/looks.js?v=2026-10-11g"></script>
+<script src="js/lookui.js?v=2026-10-11g"></script>
+<script src="js/audio.js?v=2026-10-11g"></script>
+<script src="js/world.js?v=2026-10-11g"></script>
+<script src="js/mega.js?v=2026-10-11g"></script>
+<script src="js/people.js?v=2026-10-11g"></script>
+<script src="js/highway.js?v=2026-10-11g"></script>
+<script src="js/metro.js?v=2026-10-11g"></script>
+<script src="js/recipe.js?v=2026-10-11g"></script>
+<script src="js/loadcity.js?v=2026-10-11g"></script>
+<script src="js/music.js?v=2026-10-11g"></script>
+<script src="js/input.js?v=2026-10-11g"></script>
+<script src="js/perfhud.js?v=2026-10-11g"></script>
+<script src="js/staticcache.js?v=2026-10-11g"></script>
+<script src="js/neverseen.js?v=2026-10-11g"></script>
+<script src="js/main.js?v=2026-10-11g"></script>
 </body>
 </html>

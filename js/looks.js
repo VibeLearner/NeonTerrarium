@@ -381,11 +381,20 @@ function lkApply(){
   return night;
 }
 // called from compVariant (sky.js), after main.js has set the frame's own values: what the looks decide about the ground and rain
+// How much it rains on screen, 0 to 1: the weather's rain amount, eased, or the share of the rainy looks in what is shown, whichever is more (a rainy look picked by hand
+// in clear weather rains too: its wet ground and puddles used to show with no rain falling). Everything that follows the rain reads this, so nothing switches at once.
+const RAINY = { rainyMorning: 1, rainyAfternoon: 1, rainyNight: 1 };
+LK.rainNow = () => {
+  let r = smooth(wx.rain);
+  const W = LK.weights; if (W){ let t = 0, rw = 0; for (const id in W){ t += W[id]; if (RAINY[id]) rw += W[id]; } if (t > 0) r = Math.max(r, rw/t); }
+  return r;
+};
 function lkFrame(){
-  const u = comp.uniforms, v = V, r = smooth(wx.rain);
+  const u = comp.uniforms, v = V, r = LK.rainNow();
   u.wet.value = S.wetOn ? v.wet : 0;
   u.sparkle.value = LK.fx.sparkle && S.wetOn ? v.sparkle : 0;
   u.rainAmt.value = r; u.rainOn.value = r > .02 ? 1 : 0; u.rainDark.value = r;
+  u.rainVis.value = 1.45; u.rainDens.value = 1.4;   // (the rain was too faint to see at times: brighter, denser and a little longer streaks than the old way's)
   u.rayI.value *= v.shafts;
 }
 // called from renderGlow (sky.js): the lens and film values, and where the sun is on the sky map

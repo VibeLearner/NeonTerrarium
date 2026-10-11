@@ -34,15 +34,8 @@ const edBtn = el('button', { class: 'wide', id: 'lookEdBtn', title: 'Shift+L', t
 menu.append(edBtn);
 // the old Rain box stays in the page (other code listens to it) but the weather chips replace it
 const rainBox = $('rain'); if (rainBox && rainBox.closest('label')) rainBox.closest('label').style.display = 'none';
-// (in the Lighting panel, above the time of day, with the editor's button at the bottom; the settings deck if there is no panel)
-const lightBody = $('lightBody');
-if (lightBody){ lightBody.prepend(menu); edBtn.remove(); lightBody.append(edBtn); }
-else { const firstSec = deck.querySelector('section'); if (firstSec && firstSec.nextSibling) deck.insertBefore(menu, firstSec.nextSibling); else deck.append(menu); }
-// the Lighting panel opens and closes from its head, and remembers which (in this browser); closed at first
-{ const head = $('lightHead'); if (head && lightBody){
-  let openP = false; try { openP = localStorage.getItem('neonIsland.lightOpen') === '1'; } catch (e) {}
-  const setOpen = v => { openP = v; head.setAttribute('aria-expanded', v ? 'true' : 'false'); lightBody.hidden = !v; try { localStorage.setItem('neonIsland.lightOpen', v ? '1' : '0'); } catch (e) {} };
-  setOpen(openP); head.addEventListener('click', () => setOpen(!openP)); } }
+const firstSec = deck.querySelector('section');
+if (firstSec && firstSec.nextSibling) deck.insertBefore(menu, firstSec.nextSibling); else deck.append(menu);
 function refreshMenu(){
   for (const id in items){ const on = id === LK.pick; items[id].setAttribute('aria-pressed', on ? 'true' : 'false'); items[id].classList.toggle('on', on); }
   for (const k in wxBtn) wxBtn[k].classList.toggle('on', LK.wx.set === k);

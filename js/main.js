@@ -55,7 +55,8 @@ function frameBody(now){
   updateConveyors(now/1000);
   updateRain(dt);
   // wind pushes the clouds: they drift faster in a strong wind and nearly stop when it's calm
-  const windNow = S.wind * (S.rain ? 1.5 : 1), cDrift = .12 + windNow;
+  const rainK = (typeof LK !== 'undefined' && !LK.old && !window.__OLD_GRADES) ? LK.rainNow() : (S.rain ? 1 : 0);   // (how much it rains: eased by the looks, so the wind picks up with it rather than at once)
+  const windNow = S.wind * (1 + .5*rainK), cDrift = .12 + windNow;
   cloudMat.uniforms.cloudOff.value.x -= dt*.25*cDrift; cloudMat.uniforms.cloudOff.value.y -= dt*.08*cDrift;
   clouds.rotation.y += dt*.008*cDrift;
   comp.uniforms.windR.value = windNow; clouds.position.set(camT.x, 0, camT.z); rain.position.set(camT.x, 0, camT.z);
@@ -67,7 +68,7 @@ function frameBody(now){
   comp.uniforms.palOn.value = S.palette ? 1 : 0;
   comp.uniforms.time.value = now/1000;
   FOL_UNI.time.value = (now/1000) % 3600;
-  FOL_UNI.wind.value = S.wind * (S.rain ? 1.5 : 1);
+  FOL_UNI.wind.value = windNow;
 
   // shadows are redrawn only after an edit or once the sun has visibly moved
   GLOW_PTS_UNI.scale.value = H/(2*zoom);

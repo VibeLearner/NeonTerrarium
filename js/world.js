@@ -690,7 +690,13 @@ const GRASS_MAT = (() => {
     if (loaded){ g.clearRect(0, 0, 48, 16); g.drawImage(img, 0, 0); t.needsUpdate = true; }
   };
   if (!window.IN_RECIPE_WORKER) paint();
-  const m = toon(0xffffff); m.map = t; m.userData.noCast = true; m.userData.repaint = paint; return m; })();   // tinted down a little to sit with the city's palette
+  // the far tile: the lawn as it looks once the tufts have merged (spritegen_lawn.js 'grassFar'), swapped in by folFar (sprites.js)
+  const cvF = document.createElement('canvas'); cvF.width = 48; cvF.height = 16; const gF = cvF.getContext('2d');
+  const tF = new THREE.CanvasTexture(cvF); tF.magFilter = tF.minFilter = THREE.NearestFilter; tF.generateMipmaps = false;
+  if (!window.IN_RECIPE_WORKER && SG.has('grassFar')){ SG.blit(gF, SG.draw('grassFar', 48, 16, 0), 0, 0); tF.needsUpdate = true; }
+  const m = toon(0xffffff); m.map = t; m.userData.noCast = true; m.userData.repaint = paint;
+  m.userData.far = on => { m.map = on && SG.has('grassFar') ? tF : t; };
+  return m; })();   // tinted down a little to sit with the city's palette
 const _gq = new THREE.Vector3();
 function lawn(P, n){
   let b = buckets.get(GRASS_MAT); if (!b){ b = { p: [], n: [], d: [], f: null, u: [] }; buckets.set(GRASS_MAT, b); }
@@ -2066,7 +2072,7 @@ function mergeLeaves(groups){
     if (!(o.isMesh || o.isPoints)) return;
     // (what is culled to the view, the bridges and walkways themselves, stays a mesh per region: a bigger one would be
     // drawn whenever any of it is on screen, all of it, and close up that is a lot of geometry out of sight)
-    const k = (o.isInstancedMesh ? 'I' : o.isPoints ? 'P' : 'M') + o.material.id + '|' + o.layers.mask + '|' + o.renderOrder + '|' + o.castShadow + '|' + o.receiveShadow + '|' + (o.frustumCulled ? 'cull' + gi : '');
+    const k = (o.isInstancedMesh ? 'I' : o.isPoints ? 'P' : 'M') + o.material.id + '|' + o.layers.mask + '|' + o.renderOrder + '|' + o.castShadow + '|' + o.receiveShadow + '|' + (o.userData.lawn ? 'L' : '') + '|' + (o.frustumCulled && !o.userData.fol ? 'cull' + gi : '');   // (plants stay merged per super-region and are culled as a whole, with a bounding sphere made below: one mesh per region would add a draw each)
     let l = cls.get(k); if (!l) cls.set(k, l = []); l.push(o);
   }));
   const out = new THREE.Group();
@@ -2098,6 +2104,11 @@ function mergeLeaves(groups){
         geo.setIndex(new THREE.BufferAttribute(ix, 1)); }
       geo.computeBoundingSphere();
       obj = o0.isPoints ? new THREE.Points(geo, o0.material) : new THREE.Mesh(geo, o0.material); obj.userData.own = true;
+    }
+    if (o0.userData.fol){   // the plants' own settings (sprites.js folMesh), and the joined mesh's bounding sphere: the spheres of the parts, joined
+      obj.userData.fol = true; folSettings(obj, obj.count, !!o0.userData.lawn);
+      if (list.length > 1){ const cs = list.map(o => o.geometry.boundingSphere), C = new THREE.Vector3(); for (const sp of cs) C.add(sp.center); C.multiplyScalar(1/cs.length);
+        let r = 0; for (const sp of cs) r = Math.max(r, C.distanceTo(sp.center) + sp.radius); obj.geometry.boundingSphere = new THREE.Sphere(C, r); }
     }
     obj.userData.sortId = Math.min(...list.map(o => o.userData.sortId ?? o.id));   // (drawn in the order its first piece would have been: see the sorts below)
     obj.layers.mask = o0.layers.mask; obj.renderOrder = o0.renderOrder; obj.castShadow = o0.castShadow; obj.receiveShadow = o0.receiveShadow; obj.frustumCulled = o0.frustumCulled;

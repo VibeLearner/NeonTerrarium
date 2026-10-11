@@ -22,4 +22,12 @@
       }
     }
   });
+  // the lawn from far, once its tufts (gt0) have merged into a carpet: the tile with every pixel drawn three quarters of the way to the tufts' average color (what the eye averages from above), so the
+  // swap at the far zoom (sprites.js folFar) changes the average little. Drawn from the tuft generator itself, so it follows it if it changes.
+  SG.reg('grassFar', function (px, R, v, w, h) {
+    let r = 0, g = 0, b = 0, n = 0;
+    if (SG.has('gt0')) for (let k = 0; k < SG.COUNT.gt0; k++){ const t = SG.draw('gt0', 16, 15, k); for (let i = 0; i < t.d.length; i += 4) if (t.d[i + 3]){ r += t.d[i]; g += t.d[i + 1]; b += t.d[i + 2]; n++; } }
+    const avg = n ? SG.pack(r/n, g/n, b/n) : P.mid, base = SG.draw('grass', w, h, 0);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px.set(x, y, SG.mix(SG.mix(base.get(x, y), avg, .75), 0x000000, .04));
+  });
 })();

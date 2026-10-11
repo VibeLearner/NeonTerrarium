@@ -542,14 +542,27 @@ const bigKind = () => pick(BIG_GROUND);
 const LAUNDRY = Object.keys(SPR.size).filter(k => k.startsWith('l_') && k !== 'l_mossroots');
 const laundryKind = () => pick(LAUNDRY);
 const hangKind = () => pick(HANGING);
+// From far away (LOD, folFar below) a lawn is its flat far tile plus a few tall tufts: the lawn's tufts (gt0, laid in pairs, the plant's two crossed copies) go in a mesh of their own that stops
+// drawing then, but one pair in LAWN_KEEP stays in the main mesh for the silhouette.
+const FOL_FAR = { lawn: false }, LAWN_KEEP = 8;
 function buildFoliage(){
-  let n = 0; for (const kind in FOL_LIST) n += FOL_LIST[kind].length;
+  const lawn = FOL_LIST.gt0 && FOL_LIST.gt0.length > 2*LAWN_KEEP ? { gt0: FOL_LIST.gt0.filter((p, i) => (i >> 1) % LAWN_KEEP) } : null;
+  if (lawn){ const main = {}; for (const k in FOL_LIST) main[k] = FOL_LIST[k]; main.gt0 = FOL_LIST.gt0.filter((p, i) => !((i >> 1) % LAWN_KEEP)); folMesh(main, false); folMesh(lawn, true); }
+  else folMesh(FOL_LIST, false);
+}
+// a plant mesh's settings, also made again for the joined mesh of a super-region (world.js mergeLeaves): culled to the view; a lawn's tufts stop drawing far away (their flat tile stands in)
+function folSettings(mesh, n, isLawn){
+  mesh.frustumCulled = !window.__FOL_LOD_OFF; mesh.userData.fol = true;
+  if (isLawn){ mesh.userData.lawn = true; mesh.userData.n = n; mesh.onBeforeRender = function(){ this.count = FOL_FAR.lawn ? 0 : this.userData.n; }; }
+}
+function folMesh(LIST, isLawn){
+  let n = 0; for (const kind in LIST) n += LIST[kind].length;
   if (!n) return;
   const geo = new THREE.PlaneGeometry(1,1), attr = new Float32Array(n*4), fx = new Float32Array(n), rect = new Float32Array(n*4), kd = new Float32Array(n*2), ons = new Float32Array(n);
   const mesh = new THREE.InstancedMesh(geo, FOL_SHADER, n);
   let i = 0;
-  for (const kind in FOL_LIST){
-    const L = FOL_LIST[kind]; if (!L.length) continue;
+  for (const kind in LIST){
+    const L = LIST[kind]; if (!L.length) continue;
     const rs = FOL_RECTS[kind], sw = swayTypeFor(kind), em = (kind.startsWith('sign_') || kind.startsWith('glyph_')) ? 1 : 0;
     for (const p of L){
       mesh.setMatrixAt(i, p.m);
@@ -565,15 +578,22 @@ function buildFoliage(){
   // a real bounding sphere (instances are in the group's frame, which is the mesh's own, so three's culling tests it as it is): the extent of the anchors plus the largest sprite's diagonal,
   // with a margin for the sway's widening. Off with PH.tests.foliageLodOff (the mesh then draws every frame as it did).
   let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9, big = 0;
-  for (const kind in FOL_LIST) for (const p of FOL_LIST[kind]){ const e = p.m.elements;
+  for (const kind in LIST) for (const p of LIST[kind]){ const e = p.m.elements;
     x0 = Math.min(x0, e[12]); x1 = Math.max(x1, e[12]); y0 = Math.min(y0, e[13]); y1 = Math.max(y1, e[13]); z0 = Math.min(z0, e[14]); z1 = Math.max(z1, e[14]);
     big = Math.max(big, Math.hypot(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]))); }
   const ctr = new THREE.Vector3((x0 + x1)/2, (y0 + y1)/2, (z0 + z1)/2);
   geo.boundingSphere = new THREE.Sphere(ctr, Math.hypot(x1 - x0, y1 - y0, z1 - z0)/2 + big*1.2 + .2);
-  mesh.layers.set(2); mesh.frustumCulled = !window.__FOL_LOD_OFF; mesh.userData.fol = true;
+  mesh.layers.set(2); mesh.userData.fol = true; folSettings(mesh, n, isLawn);
   city.add(mesh);
 }
 
+// Far away the lawn's tufts are less than about three pixels wide and merge into a carpet: swap the flat tile for one with the carpet's average look (GRASS_MAT, world.js) and stop drawing the tufts
+// (all but a few tall ones). Starts where the plants start to thin out (LOD, main.js: `loss` is how far zooming out has outrun the screen's resolution), with a margin so it does not flap.
+function folFar(loss){
+  const was = FOL_FAR.lawn;
+  FOL_FAR.lawn = window.__FOL_LOD_OFF || window.__OLD_SPRITES ? false : loss > 1.35 ? true : loss < 1.25 ? false : was;
+  if (FOL_FAR.lawn !== was && typeof GRASS_MAT !== 'undefined') GRASS_MAT.userData.far(FOL_FAR.lawn);
+}
 // While a piece is being generated, glows are collected as plain numbers; the region then draws each colour
 // as one batch of points. (Thousands of individual sprites used to cost one draw call each.)
 let glowList = null;

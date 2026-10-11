@@ -542,15 +542,49 @@ const bigKind = () => pick(BIG_GROUND);
 const LAUNDRY = Object.keys(SPR.size).filter(k => k.startsWith('l_') && k !== 'l_mossroots');
 const laundryKind = () => pick(LAUNDRY);
 const hangKind = () => pick(HANGING);
+// Plants that can't be seen to sway are drawn into the static cache (staticcache.js) instead of live, frozen at rest.
+// The sway is whole texel rows (the fragment shader): its peak is A texels times the wind, A = the sum of the two sine terms
+// at the tip (laundry 1.3 + .45, hanging greenery 1.6 + .5, standing plants 1.0 + .3, lawn grass vertex lean .0525 world units,
+// about .95 texel), so the biggest shift is n = floor(A*wind + .5) texels (0: it never moves), and a texel is
+// texelPx = H/(2*zoom*PX) screen pixels (H the render height, PX = 18 texels to the world unit). While n*texelPx is under
+// TOL pixels (half a pixel) the sway is not drawn live: ZF, the zoom where that happens, is  zoom > H*n/(2*PX*TOL)
+// with H as the render height is at that zoom (applyRenderRes: BASE_H*min(zoom/13.2, 1.6)). Hysteresis: in below 85% of TOL,
+// out above 115%. Lit signs and glyphs (the evening switch-on, flicker) are a mesh of their own and stay live.
+const FOLST = { on: false, tol: .5, A: 0, have: 0, list: [], listStamp: -1, peakPx: 0, nq: 0, why: '', dirty: [] };
+FOLST.AMP = [0, 1.75, 2.1, 1.3, .95];   // per swayType, texels at wind 1 (see the shader)
+FOLST.off = () => !!(window.__FOL_LOD_OFF || (typeof PH !== 'undefined' && (PH.tests.foliageStaticOff || PH.tests.foliageLodOff || PH.tests.noStatic)));
+FOLST.mask = () => FOLST.on ? STATIC_BIT : 4;   // (4: layer 2, the live set)
+FOLST.texelPx = () => H/(2*zoom*PX);
+FOLST.update = function(wind){   // each frame, before the cache: decide, and move the plants' meshes between the live and the static layer when it changes
+  let on = false; FOLST.why = '';
+  if (FOLST.off()) FOLST.why = 'switched off';
+  else if (!MRT || SC.mode !== 'reuse') FOLST.why = 'no static cache';
+  else {
+    const A = FOLST.A, nq = Math.floor(A*wind + .5), tp = FOLST.texelPx(), tol = window.__FOL_TOL ?? FOLST.tol, peak = nq*tp;
+    FOLST.nq = nq; FOLST.peakPx = peak;
+    on = FOLST.on ? peak <= tol*1.15 : peak < tol*.85;
+    FOLST.why = on ? 'sway under ' + tol + ' px' : 'sway ' + peak.toFixed(2) + ' px';
+  }
+  if (on !== FOLST.on){ FOLST.on = on; FOLST.apply(); }   // (what is built later takes the layer of the state it is built in: mergeLeaves, foliageMesh)
+};
+FOLST.apply = function(){
+  if (FOLST.listStamp !== SC_EDITS){ FOLST.list.length = 0; scene.traverse(o => { if (o.userData.fol === 'sway') FOLST.list.push(o); }); FOLST.listStamp = SC_EDITS; }
+  const m = FOLST.mask(); for (const o of FOLST.list) o.layers.mask = m;
+};
+const FOL_LIT = k => k.startsWith('sign_') || k.startsWith('glyph_');
 function buildFoliage(){
-  let n = 0; for (const kind in FOL_LIST) n += FOL_LIST[kind].length;
-  if (!n) return;
+  let nS = 0, nL = 0; for (const kind in FOL_LIST){ if (FOL_LIT(kind)) nL += FOL_LIST[kind].length; else nS += FOL_LIST[kind].length; }
+  if (nS) city.add(foliageMesh(false, nS));
+  if (nL) city.add(foliageMesh(true, nL));   // (lit signs and glyphs: a mesh of their own, live always; none, no extra draw)
+}
+function foliageMesh(lit, n){
   const geo = new THREE.PlaneGeometry(1,1), attr = new Float32Array(n*4), fx = new Float32Array(n), rect = new Float32Array(n*4), kd = new Float32Array(n*2), ons = new Float32Array(n);
   const mesh = new THREE.InstancedMesh(geo, FOL_SHADER, n);
   let i = 0;
   for (const kind in FOL_LIST){
-    const L = FOL_LIST[kind]; if (!L.length) continue;
-    const rs = FOL_RECTS[kind], sw = swayTypeFor(kind), em = (kind.startsWith('sign_') || kind.startsWith('glyph_')) ? 1 : 0;
+    const L = FOL_LIST[kind]; if (!L.length || FOL_LIT(kind) !== lit) continue;
+    const rs = FOL_RECTS[kind], sw = swayTypeFor(kind), em = lit ? 1 : 0;
+    FOLST.have |= 1 << sw; FOLST.A = Math.max(FOLST.A, FOLST.AMP[sw] || 0);
     for (const p of L){
       mesh.setMatrixAt(i, p.m);
       const r = rs.length > 1 ? rs[SG.vAt(rs.length, p.m.elements[12], p.m.elements[13], p.m.elements[14])] : rs[0];   // the variant from the spot (a hash, no random draw; a plant's two crossed copies share it)
@@ -563,15 +597,17 @@ function buildFoliage(){
   geo.setAttribute('aRect', new THREE.InstancedBufferAttribute(rect,4));
   geo.setAttribute('aKind', new THREE.InstancedBufferAttribute(kd,2)); geo.setAttribute('aOn', new THREE.InstancedBufferAttribute(ons,1));
   // a real bounding sphere (instances are in the group's frame, which is the mesh's own, so three's culling tests it as it is): the extent of the anchors plus the largest sprite's diagonal,
-  // with a margin for the sway's widening. Off with PH.tests.foliageLodOff (the mesh then draws every frame as it did).
+  // with a margin for the sway's widening. Off with PH.tests.foliageLodOff (the mesh then draws every frame as it did). The box is the same extent (the static cache's edit
+  // rectangles use it: staticcache.js, flushSuper in world.js).
   let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9, big = 0;
-  for (const kind in FOL_LIST) for (const p of FOL_LIST[kind]){ const e = p.m.elements;
+  for (const kind in FOL_LIST) if (FOL_LIT(kind) === lit) for (const p of FOL_LIST[kind]){ const e = p.m.elements;
     x0 = Math.min(x0, e[12]); x1 = Math.max(x1, e[12]); y0 = Math.min(y0, e[13]); y1 = Math.max(y1, e[13]); z0 = Math.min(z0, e[14]); z1 = Math.max(z1, e[14]);
     big = Math.max(big, Math.hypot(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]))); }
-  const ctr = new THREE.Vector3((x0 + x1)/2, (y0 + y1)/2, (z0 + z1)/2);
-  geo.boundingSphere = new THREE.Sphere(ctr, Math.hypot(x1 - x0, y1 - y0, z1 - z0)/2 + big*1.2 + .2);
-  mesh.layers.set(2); mesh.frustumCulled = !window.__FOL_LOD_OFF; mesh.userData.fol = true;
-  city.add(mesh);
+  const ctr = new THREE.Vector3((x0 + x1)/2, (y0 + y1)/2, (z0 + z1)/2), pad = big*1.2 + .2;
+  geo.boundingSphere = new THREE.Sphere(ctr, Math.hypot(x1 - x0, y1 - y0, z1 - z0)/2 + pad);
+  geo.boundingBox = new THREE.Box3(new THREE.Vector3(x0 - pad, y0 - pad, z0 - pad), new THREE.Vector3(x1 + pad, y1 + pad, z1 + pad));
+  mesh.layers.mask = lit ? 4 : FOLST.mask(); mesh.frustumCulled = !window.__FOL_LOD_OFF; mesh.userData.fol = lit ? 'sign' : 'sway';
+  return mesh;
 }
 
 // While a piece is being generated, glows are collected as plain numbers; the region then draws each colour

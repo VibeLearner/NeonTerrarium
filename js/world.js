@@ -2037,14 +2037,33 @@ function flushSuper(){
   if (!superDirty.size) return;
   const once = !SYNC_NOW(), todo = once ? [superDirty.values().next().value] : superDirty;
   for (const sk of todo){
-    const old = superRegions.get(sk);
-    if (old){ world.remove(old); disposeMerged(old); superRegions.delete(sk); }
+    const old = superRegions.get(sk), fol = FOLST.on;   // (plants in the static cache: see folDiffNote)
+    if (old){ if (fol) folQuiet(() => world.remove(old)); else world.remove(old); folNoteRest(old, fol); disposeMerged(old); superRegions.delete(sk); }
     const src = sk[0] === 'r' ? [...regions].map(([k, g]) => [k, g]) : [...connRegions].map(([k, r]) => [k, r.group]), key = sk.slice(1);
     const groups = src.filter(([k]) => superKey(k) === key).map(([, g]) => g);
-    if (!groups.length) continue;
-    const g = mergeLeaves(groups); world.add(freezeTree(g)); superRegions.set(sk, g);
+    if (!groups.length){ folDiffNote(old, null); continue; }
+    const g = mergeLeaves(groups); freezeTree(g);
+    if (fol) folQuiet(() => world.add(g)); else world.add(g);
+    folNoteRest(g, fol); superRegions.set(sk, g);
+    folDiffNote(old, g);
   }
   if (once) superDirty.delete(todo[0]); else superDirty.clear();
+}
+// The plants in the static cache (FOLST.on): a super-region swapped for a new one changes the cache's picture where its plants differ. The group's own box would be
+// a whole super-region (76 units square), so the add and the remove are noted quietly, what is not a plant (a connection's bridges and walkways) is noted piece by piece,
+// and the plants by region: those of a region that didn't change share their geometry with the old group (mergeLeaves), so the regions whose geometry is in only one
+// of the two are the ones to redraw. Their boxes go to the cache as an edit's boxes do (scEditRect). Merged across regions (the test with culling off): unknown.
+const folQuiet = fn => { SC_DIRTY.quiet++; try { fn(); } finally { SC_DIRTY.quiet--; } };
+function folNoteRest(g, fol){ if (fol) for (const c of g.children) if (!c.userData.fol) scNote(c); }
+function folDiffNote(oldG, newG){
+  if (!FOLST.on || SC_DIRTY.unknown) return;
+  const gs = new Map(), take = (g, v) => { if (g) g.traverse(o => { if (o.userData.fol === 'sway') gs.set(o.geometry, (gs.get(o.geometry) || 0) | v); }); };
+  take(oldG, 1); take(newG, 2);   // (1 only in the old, 2 only in the new, 3 in both)
+  for (const [geo, v] of gs){
+    if (v === 3) continue;
+    if (!geo.boundingBox || SC_DIRTY.boxes.length >= 40){ SC_DIRTY.unknown = true; return; }
+    SC_DIRTY.boxes.push(geo.boundingBox.clone());
+  }
 }
 // geometry a merged batch made itself is freed with it; geometry it shares with a region's own batch is not
 function disposeMerged(g){ g.traverse(o => { if ((o.isMesh || o.isPoints) && o.userData.own) o.geometry.dispose(); }); }
@@ -2056,7 +2075,7 @@ function mergeLeaves(groups){
     if (!(o.isMesh || o.isPoints)) return;
     // (what is culled to the view, the bridges and walkways themselves, stays a mesh per region: a bigger one would be
     // drawn whenever any of it is on screen, all of it, and close up that is a lot of geometry out of sight)
-    const k = (o.isInstancedMesh ? 'I' : o.isPoints ? 'P' : 'M') + o.material.id + '|' + o.layers.mask + '|' + o.renderOrder + '|' + o.castShadow + '|' + o.receiveShadow + '|' + (o.frustumCulled ? 'cull' + gi : '');
+    const k = (o.isInstancedMesh ? 'I' : o.isPoints ? 'P' : 'M') + o.material.id + '|' + (o.userData.fol ? 'fol' + o.userData.fol : o.layers.mask) + '|' + o.renderOrder + '|' + o.castShadow + '|' + o.receiveShadow + '|' + (o.frustumCulled ? 'cull' + gi : '');
     let l = cls.get(k); if (!l) cls.set(k, l = []); l.push(o);
   }));
   const out = new THREE.Group();
@@ -2090,7 +2109,8 @@ function mergeLeaves(groups){
       obj = o0.isPoints ? new THREE.Points(geo, o0.material) : new THREE.Mesh(geo, o0.material); obj.userData.own = true;
     }
     obj.userData.sortId = Math.min(...list.map(o => o.userData.sortId ?? o.id));   // (drawn in the order its first piece would have been: see the sorts below)
-    obj.layers.mask = o0.layers.mask; obj.renderOrder = o0.renderOrder; obj.castShadow = o0.castShadow; obj.receiveShadow = o0.receiveShadow; obj.frustumCulled = o0.frustumCulled;
+    obj.layers.mask = o0.layers.mask; if (o0.userData.fol){ obj.userData.fol = o0.userData.fol; if (o0.userData.fol === 'sway') obj.layers.mask = FOLST.mask(); }   // (plants: live or static as of now, see FOLST in sprites.js)
+    obj.renderOrder = o0.renderOrder; obj.castShadow = o0.castShadow; obj.receiveShadow = o0.receiveShadow; obj.frustumCulled = o0.frustumCulled;
     out.add(obj);
   }
   return out;

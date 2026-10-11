@@ -119,8 +119,16 @@ function scBlit(colL, rowB){
 const _rectCam = new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR);
 // the lights as they are now, and a way to put others in place for a draw (a strip or rectangle of the cache is drawn with the lights the rest of the
 // picture was drawn with, whatever the day cycle has done since)
-function scLightSnap(){ return { sc: sun.color.clone(), si: sun.intensity, hc: hemi.color.clone(), hg: hemi.groundColor.clone(), hi: hemi.intensity, em: EM_I.value.slice(), m1: sun.matrixWorld.clone(), m2: sun.target.matrixWorld.clone() }; }
-function scLightPut(L){ sun.color.copy(L.sc); sun.intensity = L.si; hemi.color.copy(L.hc); hemi.groundColor.copy(L.hg); hemi.intensity = L.hi; sun.matrixWorld.copy(L.m1); sun.target.matrixWorld.copy(L.m2); for (let i = 0; i < 7; i++) EM_I.value[i] = L.em[i]; }
+function scLightSnap(){ return { sc: sun.color.clone(), si: sun.intensity, hc: hemi.color.clone(), hg: hemi.groundColor.clone(), hi: hemi.intensity, em: EM_I.value.slice(), m1: sun.matrixWorld.clone(), m2: sun.target.matrixWorld.clone(), tn: FOL_UNI.tint.value.clone() }; }
+function scLightPut(L){ FOL_UNI.tint.value.copy(L.tn); sun.color.copy(L.sc); sun.intensity = L.si; hemi.color.copy(L.hc); hemi.groundColor.copy(L.hg); hemi.intensity = L.hi; sun.matrixWorld.copy(L.m1); sun.target.matrixWorld.copy(L.m2); for (let i = 0; i < 7; i++) EM_I.value[i] = L.em[i]; }
+// The static pass draws the plants at rest (FOLST: sprites.js): the wind at zero (the sway is the wind times a wave, so time needs no holding), and the size of what is
+// drawn into (the widened view: the plants snap to whole pixels of 'res', as in the live pass, SC.drawView) for the draw. The tint is part of the lights held for a draw
+// (scLightSnap, scLightPut).
+function scAtRest(fn){
+  const w = FOL_UNI.wind.value, rx = FOL_UNI.res.value.x, ry = FOL_UNI.res.value.y;
+  FOL_UNI.wind.value = 0; FOL_UNI.res.value.set(SC.w, SC.h);
+  try { fn(); } finally { FOL_UNI.wind.value = w; FOL_UNI.res.value.set(rx, ry); }
+}
 function scDrawRect(c0, c1, r0, r1, px, py){
   const held = SC.lt && !PH.tests.noHold ? scLightSnap() : null; if (held) scLightPut(SC.lt);
   try { scDrawRect0(c0, c1, r0, r1, px, py); } finally { if (held) scLightPut(held); }
@@ -137,7 +145,7 @@ function scDrawRect0(c0, c1, r0, r1, px, py){
     renderer.setClearColor(0x000000, 1);
     mrtBegin(rt, SC.rtSN);
     cam_.layers.mask = STATIC_BIT; cullFrame(cam_, _rectCam);
-    try { renderer.render(scene, cam_); } finally { mrtEnd(); }
+    try { scAtRest(() => renderer.render(scene, cam_)); } finally { mrtEnd(); }
   }
   rt.viewport.set(0, 0, SC.w, SC.h); rt.scissorTest = false;
 }
@@ -212,7 +220,7 @@ function scHard(out){
   let k = 0; const put = v => { out[k++] = v; };
   put(yaw); put(PITCH); put(zoom); put(W); put(H); put(SMOOTH_LOOK.value); put(LOD.fine.value); put(CULL.lvl); put(CULL.minPx); put(FARM.key);
   put(LIGHTS_ON.value < .17 ? 0 : LIGHTS_ON.value);   // (no window switches on below about .18: a drift under that, as the day cycle gives by day, changes nothing)
-  put(sun.castShadow ? 1 : 0); put(renderer.shadowMap.enabled ? 1 : 0); put(SC.c0);   // (an edit, SC_EDITS, is dealt with apart: see scEditRect)
+  put(sun.castShadow ? 1 : 0); put(renderer.shadowMap.enabled ? 1 : 0); put(SC.c0); put(FOLST.on ? 1 : 0);   // (an edit, SC_EDITS, is dealt with apart: see scEditRect)
   let t = 0; for (const key in PH.tests) t = (Math.imul(t, 31) + (PH.tests[key] ? 7 : 3)) | 0; put(t);   // (which tests are on, as one number)
   out.length = k; return out;
 }
@@ -234,22 +242,22 @@ SC.prev = null; SC.hard = null; SC.soft = null; SC.shk = null; SC.ok = false; SC
 
 // one background strip of the next cache: the job's own camera (where the view was when it began), the strip's rows only, the
 // lights as they were when it began
-const _stripCam = new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR), _lt = { sc: new THREE.Color(), hc: new THREE.Color(), hg: new THREE.Color(), em: [], m1: new THREE.Matrix4(), m2: new THREE.Matrix4() };
+const _stripCam = new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR), _lt = { sc: new THREE.Color(), hc: new THREE.Color(), hg: new THREE.Color(), tn: new THREE.Color(), em: [], m1: new THREE.Matrix4(), m2: new THREE.Matrix4() };
 function scBand(job){
   const K = job.K, k = job.k, h = SC.h, y0 = Math.floor(h*k/K), y1 = Math.floor(h*(k + 1)/K), px = 2*zoom/H, c = job.cam;
   _stripCam.left = c.left; _stripCam.right = c.right; _stripCam.bottom = c.bottom + y0*px; _stripCam.top = c.bottom + y1*px; _stripCam.updateProjectionMatrix();
   _stripCam.position.copy(c.position); _stripCam.quaternion.copy(c.quaternion); _stripCam.updateMatrixWorld();
   // the lights as they were when the job began (and put back after)
-  _lt.sc.copy(sun.color); const si = sun.intensity; _lt.hc.copy(hemi.color); _lt.hg.copy(hemi.groundColor); const hi = hemi.intensity; _lt.m1.copy(sun.matrixWorld); _lt.m2.copy(sun.target.matrixWorld);
+  _lt.sc.copy(sun.color); const si = sun.intensity; _lt.hc.copy(hemi.color); _lt.hg.copy(hemi.groundColor); const hi = hemi.intensity; _lt.m1.copy(sun.matrixWorld); _lt.m2.copy(sun.target.matrixWorld); _lt.tn.copy(FOL_UNI.tint.value); FOL_UNI.tint.value.copy(job.tn);
   for (let i = 0; i < 7; i++){ _lt.em[i] = EM_I.value[i]; EM_I.value[i] = job.em[i]; }
   sun.color.copy(job.sc); sun.intensity = job.si; hemi.color.copy(job.hc); hemi.groundColor.copy(job.hg); hemi.intensity = job.hi; sun.matrixWorld.copy(job.m1); sun.target.matrixWorld.copy(job.m2);
   job.rt.scissor.set(0, y0, SC.w, y1 - y0); job.rt.scissorTest = true;
   renderer.setClearColor(0x000000, 1);
   mrtBegin(job.rt, job.rn);
   c.layers.mask = STATIC_BIT; cullFrame(c, _stripCam);
-  try { renderer.render(scene, c); } finally {
+  try { scAtRest(() => renderer.render(scene, c)); } finally {
     mrtEnd(); job.rt.scissorTest = false;
-    sun.color.copy(_lt.sc); sun.intensity = si; hemi.color.copy(_lt.hc); hemi.groundColor.copy(_lt.hg); hemi.intensity = hi; sun.matrixWorld.copy(_lt.m1); sun.target.matrixWorld.copy(_lt.m2);
+    FOL_UNI.tint.value.copy(_lt.tn); sun.color.copy(_lt.sc); sun.intensity = si; hemi.color.copy(_lt.hc); hemi.groundColor.copy(_lt.hg); hemi.intensity = hi; sun.matrixWorld.copy(_lt.m1); sun.target.matrixWorld.copy(_lt.m2);
     for (let i = 0; i < 7; i++) EM_I.value[i] = _lt.em[i];
   }
 }
@@ -257,7 +265,7 @@ function scJobStart(px, py, hard, soft, shk, why){
   if (!SC.next){ if (!scMargin()) return; SC.next = scMake(SC.w, SC.h); }
   const job = { edits: SC_EDITS, k: 0, K: SC.K, ox: scCol(px) - SC.Muse, oy: scRow(py) - SC.Muse, hard: hard.slice(), soft: soft.slice(), shk: shk.slice(), map: sun.shadow.map, why,
     rt: SC.next.rt, rn: SC.next.rn, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR),
-    sc: sun.color.clone(), si: sun.intensity, hc: hemi.color.clone(), hg: hemi.groundColor.clone(), hi: hemi.intensity, em: EM_I.value.slice(), m1: sun.matrixWorld.clone(), m2: sun.target.matrixWorld.clone() };
+    sc: sun.color.clone(), si: sun.intensity, hc: hemi.color.clone(), hg: hemi.groundColor.clone(), hi: hemi.intensity, em: EM_I.value.slice(), m1: sun.matrixWorld.clone(), m2: sun.target.matrixWorld.clone(), tn: FOL_UNI.tint.value.clone() };
   scCamera(); job.cam.left = SC.camS.left; job.cam.right = SC.camS.right; job.cam.top = SC.camS.top; job.cam.bottom = SC.camS.bottom; job.cam.updateProjectionMatrix();
   job.cam.position.copy(SC.camS.position); job.cam.quaternion.copy(SC.camS.quaternion); job.cam.updateMatrixWorld();
   SC.job = job;
@@ -273,7 +281,7 @@ function scFull(px, py, hard, soft, shk, why){
   renderer.setClearColor(0x000000, 1);
   mrtBegin(SC.rtS, SC.rtSN);
   SC.camS.layers.mask = STATIC_BIT; cullFrame(SC.camS);
-  renderer.render(scene, SC.camS);
+  scAtRest(() => renderer.render(scene, SC.camS));
   mrtEnd();
   SC.lt = scLightSnap(); SC.editsSeen = SC_EDITS; SC_DIRTY.boxes.length = 0; SC_DIRTY.unknown = false;
   SC.hard = hard.slice(); SC.soft = soft.slice(); SC.shk = shk.slice(); SC.ok = true; SC.ox = scCol(px) - SC.Muse; SC.oy = scRow(py) - SC.Muse; SC.R = { x0: SC.ox, x1: SC.ox + SC.w, y0: SC.oy, y1: SC.oy + SC.h }; SC.age = 0; SC.rebuilds++; SC.job = null; SC.flash = 6;

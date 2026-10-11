@@ -69,6 +69,7 @@ function frameBody(now){
   comp.uniforms.time.value = now/1000;
   FOL_UNI.time.value = (now/1000) % 3600;
   FOL_UNI.wind.value = windNow;
+  FOLST.update(windNow);   // plants whose sway can't be seen go to the static cache (sprites.js, staticcache.js)
 
   // shadows are redrawn only after an edit or once the sun has visibly moved
   GLOW_PTS_UNI.scale.value = H/(2*zoom);

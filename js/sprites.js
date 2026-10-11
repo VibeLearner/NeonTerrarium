@@ -562,7 +562,15 @@ function buildFoliage(){
   geo.setAttribute('aFixed', new THREE.InstancedBufferAttribute(fx,1));
   geo.setAttribute('aRect', new THREE.InstancedBufferAttribute(rect,4));
   geo.setAttribute('aKind', new THREE.InstancedBufferAttribute(kd,2)); geo.setAttribute('aOn', new THREE.InstancedBufferAttribute(ons,1));
-  mesh.layers.set(2); mesh.frustumCulled = false;
+  // a real bounding sphere (instances are in the group's frame, which is the mesh's own, so three's culling tests it as it is): the extent of the anchors plus the largest sprite's diagonal,
+  // with a margin for the sway's widening. Off with PH.tests.foliageLodOff (the mesh then draws every frame as it did).
+  let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9, big = 0;
+  for (const kind in FOL_LIST) for (const p of FOL_LIST[kind]){ const e = p.m.elements;
+    x0 = Math.min(x0, e[12]); x1 = Math.max(x1, e[12]); y0 = Math.min(y0, e[13]); y1 = Math.max(y1, e[13]); z0 = Math.min(z0, e[14]); z1 = Math.max(z1, e[14]);
+    big = Math.max(big, Math.hypot(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]))); }
+  const ctr = new THREE.Vector3((x0 + x1)/2, (y0 + y1)/2, (z0 + z1)/2);
+  geo.boundingSphere = new THREE.Sphere(ctr, Math.hypot(x1 - x0, y1 - y0, z1 - z0)/2 + big*1.2 + .2);
+  mesh.layers.set(2); mesh.frustumCulled = !window.__FOL_LOD_OFF; mesh.userData.fol = true;
   city.add(mesh);
 }
 

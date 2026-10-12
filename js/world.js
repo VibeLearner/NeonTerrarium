@@ -1857,6 +1857,10 @@ function* rebuildSolidGen(key, job = null){
   }
   if (!g.children.length){ solidRemoveOld(key); ovNext.delete(key); return; }
   yield;
+  // the new meshes' buffers go up to the card now, one mesh a step, before the block is swapped in: left to the first frame that drew them, a
+  // block's 10 to 20 MB went up inside the color pass of one frame (30 to 55 ms on the owner's Mac, the hitch in a turn, which is when a
+  // block changing tier is swapped in)
+  if (!(PH.tests.uploadOnDraw || window.__UPLOAD_ON_DRAW)) for (const m of g.children){ gpuUpload(m); if (m.userData.farGeo) gpuUpload(m, m.userData.farGeo); yield; }
   const tier = tierOfKey(key), oldRec = solidRegions.get(key), tierChanged = !!oldRec && (oldRec.tier || 'full') !== tier;
   // a block that changes tier shows a different picture: it is swapped in while the view moves, never in the middle of a still frame (a view that stays still gets it after TIER.stillWait frames)
   if (tierChanged && job && !job.force && !TIER.rush) for (let waited = 0; tierSwapWait(key, waited); waited++) yield 'wait';   // (TIER.rush: the setting was just switched, the change shows at once)
@@ -1876,6 +1880,23 @@ function* rebuildSolidGen(key, job = null){
   for (const o of farMeshes){ FAR_MESHES.add(o); } if (farMeshes.length) FARM.stamp++;
   world.add(g);
   solidRegions.set(key, { group: g, members, far: farMeshes, geoms, tier });
+}
+// A mesh's geometry sent to the card without drawing anything: three uploads a geometry's buffers as it sets up the draw, before it looks at the
+// draw range, so a draw of zero triangles (drawRange.count 0, the mesh's own callbacks held off) does the upload and nothing else. Into a tiny target
+// of its own, with a camera of its own that draws every layer (the mesh is kept out of the frustum test), the mesh put back where it was in its group afterwards.
+const _upScene = new THREE.Scene(), _upCam = new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR); _upCam.layers.enableAll(); let _upRT = null;
+function gpuUpload(mesh, geo){
+  if (!_upRT) _upRT = new THREE.WebGLRenderTarget(4, 4, { depthBuffer: false, stencilBuffer: false });
+  const g = geo || mesh.geometry, own = mesh.geometry, ob = mesh.onBeforeRender, oa = mesh.onAfterRender, par = mesh.parent, idx = par ? par.children.indexOf(mesh) : -1, fc = mesh.frustumCulled, dc = g.drawRange.count;
+  mesh.geometry = g; mesh.onBeforeRender = mesh.onAfterRender = () => {}; mesh.frustumCulled = false; g.drawRange.count = 0; _upScene.add(mesh);
+  const rt = renderer.getRenderTarget(), ac = renderer.autoClear; renderer.autoClear = false;
+  try { _upCam.position.copy(cam.position); _upCam.quaternion.copy(cam.quaternion); _upCam.updateMatrixWorld(); renderer.setRenderTarget(_upRT); renderer.render(_upScene, _upCam); }
+  catch (e){ if (!gpuUpload.warned){ gpuUpload.warned = true; console.warn('upload ahead of the draw failed (the first draw uploads instead):', e); } }
+  finally {
+    renderer.setRenderTarget(rt); renderer.autoClear = ac; _upScene.remove(mesh);
+    mesh.geometry = own; mesh.onBeforeRender = ob; mesh.onAfterRender = oa; mesh.frustumCulled = fc; g.drawRange.count = dc;
+    if (par){ par.add(mesh); if (idx >= 0 && idx < par.children.length - 1){ par.children.pop(); par.children.splice(idx, 0, mesh); } }
+  }
 }
 // ---- the stand-in tier (round 9 item 5, a cheat) ----
 // A plot is drawn either full (its own geometry) or as a stand-in (the same plot without its small pieces: standBuckets), by merge block: what a plot gives to its block's merge is the

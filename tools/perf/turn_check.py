@@ -45,7 +45,7 @@ def worst_frames(d, n=3):
         tr = TR[k - 1] if k - 1 < len(TR) else None
         if not tr: out.append('    %.1f ms at frame %d: no trace' % (T[k], k)); continue
         laps = sorted(tr['laps'], key=lambda x: -x[1])[:5]
-        out.append('    %.1f ms at frame %d (%s): script %s ms; biggest: %s' % (T[k], k, 'turning' if k <= d['stopAt'] else 'at rest', tr.get('js'), ', '.join('%s %.1f' % (nm.strip(), ms) for nm, ms in laps)))
+        out.append('    %.1f ms at frame %d (%s): script %s ms, sent to the card %s KB; biggest: %s' % (T[k], k, 'turning' if k <= d['stopAt'] else 'at rest', tr.get('js'), tr.get('up'), ', '.join('%s %.1f' % (nm.strip(), ms) for nm, ms in laps)))
     return out
 
 from playwright.sync_api import sync_playwright

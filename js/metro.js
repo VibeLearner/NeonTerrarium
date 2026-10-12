@@ -626,23 +626,22 @@ function mtPick(cx, cy){
     if (!_hray.ray.intersectBox(_hbox, _hhit)) return;
     const d = _hhit.distanceTo(_hray.ray.origin); if (!best || d < best.d) best = { kind: 'mtTile', l, k, d };
   });
-  // next to the open end of an unfinished line: the column over that plot counts, so the pick is easy to make
+  // next to the open end of a line: the whole column over that plot counts, from the ground up to the rail (the metro runs at
+  // one height, so pointing anywhere at the plot, its ground or its buildings, picks it; the ghost shows at the rail's height)
   for (const l of metros){
-    if (l.done) continue;
     const e = l.tiles[l.tiles.length - 1], pv = l.tiles[l.tiles.length - 2];
     for (const [a, b] of SIDES4){
       const i = e.i + a, j = e.j + b; if (pv && pv.i === i && pv.j === j) continue;
-      _hbox.min.set(i*LOT - LOT/2, MT_Y - .8, j*LOT - LOT/2); _hbox.max.set(i*LOT + LOT/2, MT_Y + .4, j*LOT + LOT/2);
+      _hbox.min.set(i*LOT - LOT/2, CURB - .05, j*LOT - LOT/2); _hbox.max.set(i*LOT + LOT/2, MT_Y + .4, j*LOT + LOT/2);
       if (!_hray.ray.intersectBox(_hbox, _hhit)) continue;
       const d = _hhit.distanceTo(_hray.ray.origin);
       if (best && best.kind === 'mtTile' && best.d < d + 1) continue;
       if (!best || best.kind === 'mtTile' || d < best.d) best = { kind: 'mtGround', i, j, d, near: true };
     }
   }
-  const o = _hray.ray.origin, dir = _hray.ray.direction;
-  if (Math.abs(dir.y) > 1e-4){ const tt = (MT_Y - o.y)/dir.y; if (tt > 0){ const p = o.clone().addScaledVector(dir, tt), d = tt*dir.length();
-    const i = Math.round(p.x/LOT), j = Math.round(p.z/LOT);
-    if (!best || (!best.near && d < best.d - .5)) best = { kind: 'mtGround', i, j, d }; } }
+  // anywhere else (a new line): the plot under the pointer on the ground, not where the pointer's line crosses the rail's
+  // height (that's a plot or two further back, which made pointing at a plot's ground pick the wrong one)
+  if (!best){ const g = groundCellAt(cx, cy); if (g) best = { kind: 'mtGround', i: g.i, j: g.j, d: 0 }; }
   return best;
 }
 // a see-through band over plots k0..k1 of a line (sharing the highway's highlight meshes: only one mode is on at a time)

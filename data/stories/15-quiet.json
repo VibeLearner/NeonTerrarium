@@ -1,0 +1,719 @@
+{
+  "category": "quiet",
+  "title": "Quiet moments",
+  "theme": "Pure texture with no consequences: a plant, the rain, a stray, a long time on a bench.",
+  "storylets": [
+    {
+      "id": "qui.long-bench",
+      "title": "An hour on one bench",
+      "tier": "mundane",
+      "note": "A person sits for a long time and nothing happens. That is the point.",
+      "roles": {
+        "A": {
+          "desc": "an adult on their own",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          21
+        ],
+        "at": [
+          "bench"
+        ],
+        "weight": 8,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits on a bench and watches the square go by.",
+          "{A} takes a bench seat and stays for a long while.",
+          "{A} lowers {A.him}self onto the slats and does not move.",
+          "{A} sits, hands on knees, eyes half closed."
+        ],
+        "b2": [
+          "{A} stands, stretches, and sits down again.",
+          "{A} gets up at last and walks one slow lap of the bench.",
+          "{A} rises, rolls both shoulders, and looks at the clock tower.",
+          "{A} stands and brushes off the coat."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "qui.pond-watching",
+      "title": "The pond and its small ripples",
+      "tier": "mundane",
+      "note": "Staring at water.",
+      "roles": {
+        "A": {
+          "desc": "an adult on their own",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          20
+        ],
+        "at": [
+          "square"
+        ],
+        "weight": 7,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "sit",
+          "who": "A",
+          "at": "square"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at the pond edge and watches the surface.",
+          "{A} stops by the water and stays there.",
+          "{A} lingers at the rail, chin on hands.",
+          "{A} stands at the fountain's lip with hands in pockets."
+        ],
+        "b2": [
+          "{A} sits on the stone rim and trails a finger in the water.",
+          "{A} takes a seat by the pond and breaks a flatbread into crumbs.",
+          "{A} perches on the edge and watches a leaf spin.",
+          "{A} lowers {A.him}self to the rim and stays."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "qui.noodle-alone",
+      "title": "A bowl for one",
+      "tier": "mundane",
+      "note": "A solitary meal at a stool.",
+      "roles": {
+        "A": {
+          "desc": "an adult on their own",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          11,
+          22
+        ],
+        "at": [
+          "cafe-stool",
+          "stall"
+        ],
+        "weight": 8,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "eat",
+          "who": "A",
+          "at": "cafe-stool"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} gets in a short line at the stall and reads the board.",
+          "{A} orders at the counter without a word, holding up one finger.",
+          "{A} orders a plain bowl and pays in coins.",
+          "{A} reaches the front and points at the first picture."
+        ],
+        "b2": [
+          "{A} eats slowly, eyes on the steam.",
+          "{A} eats at the stool, tilting the bowl at the end.",
+          "{A} slurps the last of the broth and sets the bowl down square.",
+          "{A} eats quietly and wipes the rim with a thumb."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "qui.drone-gazing",
+      "title": "Following a drone across the roofs",
+      "tier": "mundane",
+      "note": "A person watches a drone until it is out of sight.",
+      "roles": {
+        "A": {
+          "desc": "an adult on their own",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          20
+        ],
+        "at": [
+          "street",
+          "square"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "point",
+          "who": "A",
+          "at": "square"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stops mid-stride and tilts the head back.",
+          "{A} stands in the square and shades eyes with a hand.",
+          "{A} halts at the curb and follows something overhead.",
+          "{A} stands still while the crowd flows around."
+        ],
+        "b2": [
+          "{A} points up at a cargo drone and says nothing.",
+          "{A} gestures toward a drone crossing the roofs.",
+          "{A} indicates a drone with one finger and lets the hand fall.",
+          "{A} points at the sky and then at the clock tower."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "qui.pigeon-crumbs",
+      "title": "Crumbs for the pigeons",
+      "tier": "mundane",
+      "note": "Feeding the birds. Cheap and gentle.",
+      "roles": {
+        "A": {
+          "desc": "an adult on their own",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          19
+        ],
+        "at": [
+          "square",
+          "bench"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "feed-stray",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits on a bench with a paper bag open in the lap.",
+          "{A} takes a seat and crinkles a bag.",
+          "{A} perches at the bench's end and digs into a pocket.",
+          "{A} settles on the slats and pulls out a crust."
+        ],
+        "b2": [
+          "{A} scatters crumbs and pigeons descend in a gray cloud.",
+          "{A} tosses scraps in a slow arc. A crowd of birds follows.",
+          "{A} crouches, drops a handful, and lets them peck near the shoes.",
+          "{A} flings a handful of crumbs and watches them go."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "qui.hologram-night",
+      "title": "Watching the projector",
+      "tier": "mundane",
+      "note": "Sitting on the lawn watching the hologram show.",
+      "roles": {
+        "A": {
+          "desc": "an adult on their own",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          19,
+          24
+        ],
+        "at": [
+          "lawn"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "lawn"
+        },
+        {
+          "id": "b2",
+          "do": "watch-hologram",
+          "who": "A",
+          "at": "lawn"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks to the lawn and stands at the edge of the glow.",
+          "{A} stops at the grass line and looks up.",
+          "{A} stands at the back of a small crowd.",
+          "{A} stays at the lawn's edge with a cup."
+        ],
+        "b2": [
+          "{A} watches the hologram flicker, face lit blue.",
+          "{A} stands in the projector's light, mouth slightly open.",
+          "{A} watches the show to the end, hands in pockets.",
+          "{A} stays rooted, eyes tracking a slow-moving figure in light."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "qui.notice-board",
+      "title": "The corner notice board",
+      "tier": "mundane",
+      "note": "Reading ads and bulletins.",
+      "roles": {
+        "A": {
+          "desc": "an adult on their own",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          21
+        ],
+        "at": [
+          "street"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "read-notice",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stops at a wall of printed sheets and reads each in turn.",
+          "{A} reads a flyer for a rooftop market and a lost-cat poster.",
+          "{A} studies the board with arms folded.",
+          "{A} reads a notice twice and moves on to the next."
+        ],
+        "b2": [
+          "{A} walks on, humming something off key.",
+          "{A} heads off down the block at an easy pace.",
+          "{A} moves on, then glances back at the board.",
+          "{A} strolls on toward the stalls."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "qui.window-stop",
+      "title": "Looking in a shop window",
+      "tier": "mundane",
+      "note": "Stopping to look in a window.",
+      "roles": {
+        "A": {
+          "desc": "an adult on their own",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          21
+        ],
+        "at": [
+          "shop-door",
+          "street"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "shop-door"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stops at a shop window and leans toward the glass.",
+          "{A} stands in front of a display of bright jackets.",
+          "{A} halts at a window and reads the prices.",
+          "{A} lingers in front of a case of old radios."
+        ],
+        "b2": [
+          "{A} walks on without going in.",
+          "{A} moves off down the sidewalk, glancing back once.",
+          "{A} heads on, hands in pockets.",
+          "{A} crosses over and walks on."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "qui.bathhouse-soak",
+      "title": "Steam and a towel",
+      "tier": "mundane",
+      "note": "A trip to the bathhouse.",
+      "roles": {
+        "A": {
+          "desc": "an adult on their own",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          17,
+          23
+        ],
+        "at": [
+          "bathhouse"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "bathhouse"
+        },
+        {
+          "id": "b2",
+          "do": "soak",
+          "who": "A",
+          "at": "bathhouse"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} arrives at the steam doors with a towel over a shoulder.",
+          "{A} comes up to the steam doors, yawning.",
+          "{A} walks up to the steam doors with a bag of soap.",
+          "{A} crosses the square to the baths in slippers."
+        ],
+        "b2": [
+          "{A} slips into the bathhouse and the curtain falls.",
+          "{A} soaks away the day, steam leaking from the door.",
+          "{A} goes in for a long soak. A cloud drifts out.",
+          "{A} enters the bathhouse and does not reappear for an hour."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "qui.drone-wave",
+      "title": "Waving at nothing",
+      "tier": "mundane",
+      "note": "A person waves at a passing hover car.",
+      "roles": {
+        "A": {
+          "desc": "an adult on their own",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          22
+        ],
+        "at": [
+          "street"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "wave",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks along the block with a handset in one hand.",
+          "{A} crosses the square at an easy pace.",
+          "{A} strolls down the sidewalk with a cup.",
+          "{A} heads for the stalls without hurry."
+        ],
+        "b2": [
+          "{A} waves at a passing hover car for no clear reason.",
+          "{A} waves at a child in a window and gets a wave back.",
+          "{A} lifts a hand to the lamp-lighter on the corner.",
+          "{A} waves at a drone that does not wave back."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "qui.stray-cat",
+      "title": "A cat on a wall",
+      "tier": "mundane",
+      "note": "Feeding a stray, as a stranger.",
+      "roles": {
+        "A": {
+          "desc": "an adult on their own",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          22
+        ],
+        "at": [
+          "street"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "feed-stray",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stops at a low wall where a thin cat sits.",
+          "{A} stands over a thin cat curled on a vent.",
+          "{A} halts as a cat crosses the sidewalk in front of {A.him}.",
+          "{A} stands still and lets a cat approach."
+        ],
+        "b2": [
+          "{A} crouches and sets out a few scraps from a bag.",
+          "{A} offers a bit of fish on a flat palm. The cat takes it.",
+          "{A} drops a handful of kibble and steps back.",
+          "{A} bends down and pours a little water in a lid."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "qui.metro-seat",
+      "title": "Sitting on the platform",
+      "tier": "mundane",
+      "note": "Waiting for a train that is on time.",
+      "roles": {
+        "A": {
+          "desc": "an adult on their own",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          23
+        ],
+        "at": [
+          "platform"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "platform"
+        },
+        {
+          "id": "b2",
+          "do": "ride-metro",
+          "who": "A",
+          "at": "platform"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits on a platform bench with a bag between the feet.",
+          "{A} takes the platform seat and watches the arrival board.",
+          "{A} sits, one knee over the other, scanning the faces.",
+          "{A} perches on the bench and checks a handset."
+        ],
+        "b2": [
+          "{A} boards when the doors slide open.",
+          "{A} gets on the train and takes a standing spot by the door.",
+          "{A} steps into the car and the doors close.",
+          "{A} rides out. The platform is empty again."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    }
+  ]
+}

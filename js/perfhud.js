@@ -70,9 +70,10 @@ const PH = (() => {
   function frameStart(now){
     if (!on) return;
     if (trF){ trF.up = Math.round((GPUMEM.buf + GPUMEM.tex - trF.g0)/1024); trF.links = GPUMEM.links - trF.l0; trF.dels = GPUMEM.dels - trF.d0; trF.freed = Math.round((GPUMEM.freed - trF.f0)/1024);
-      if (TR) TR.push(trF); RING.push(trF); if (RING.length > 6) RING.shift();
+      if (TR) TR.push(trF); RING.push(trF); if (RING.length > 8) RING.shift();
       if (lastRaf){ const d = now - lastRaf; trF.gap = Math.round(d*10)/10;
-        if (d > HITCH_MS && d < 3000){ hitchSeen++; HITCHES.push({ gap: trF.gap, at: performance.now(), frames: RING.slice(-4) }); if (HITCHES.length > 24) HITCHES.shift(); } } }
+        if (d > HITCH_MS && d < 3000){ hitchSeen++; HITCHES.push({ gap: trF.gap, at: performance.now(), frames: RING.slice(-5), after: [] }); if (HITCHES.length > 24) HITCHES.shift(); }
+        for (const h of HITCHES) if (h.after.length < 2 && h.frames[h.frames.length - 1] !== trF && !h.frames.includes(trF)) h.after.push(trF); } }
     trF = { at: now, frame: frameNo + 1, laps: [], g0: GPUMEM.buf + GPUMEM.tex, l0: GPUMEM.links, d0: GPUMEM.dels, f0: GPUMEM.freed, gpu: null };   // (up: what the frame sent to the card, KB)
     draw.ms = 0; draw.o = draw.m = draw.fn = null; draw.n = 0; draw.first = 0;
     if (lastRaf){ const d = now - lastRaf; if (d < 500){ put(frameMs, d); hist.push([d, shadowFrame]); if (hist.length > N) hist.shift(); } }
@@ -123,8 +124,27 @@ const PH = (() => {
   function sub(name){ if (!on) return; const t = rnow(); put(stat(name, 'subsim').cpu, t - subMark); trPut('  ' + name, t - subMark); subMark = t; }
   function laps(){ const o = {}; for (const [k, s] of stats) if (s.kind === 'sim' || s.kind === 'subsim') o[k] = avg(s.cpu); return o; }
   function shadow(){ if (on && renderer.shadowMap.needsUpdate){ shadowFrame = true; shadowTimes.push(performance.now()); } }
+  // When the card finished each frame: a fence put in after the frame's last command, looked at every few milliseconds (a timer) until it has passed. The
+  // time from the frame's commands being sent to that is the card's (and the browser's graphics process's) time for it, queue included: a frame that waits
+  // behind a slow one shows it too. Coarse (a few ms), but needs no timer queries, which this browser's card reports wrongly. With the JS heap's size, so a
+  // drop between frames (the garbage collector) shows.
+  const FENCES = []; let fencePoll = 0;
+  function fenceCheck(){
+    fencePoll = 0; const t = performance.now();
+    for (let k = 0; k < FENCES.length; k++){ const f = FENCES[k];
+      let done = false; try { done = gl.getSyncParameter(f.s, gl.SYNC_STATUS) === gl.SIGNALED; } catch (e){ done = true; }
+      if (done || t - f.t > 2000){ f.fr.card = done ? Math.round(t - f.t) : -1; gl.deleteSync(f.s); FENCES.splice(k--, 1); } }
+    if (FENCES.length && on) fencePoll = setTimeout(fenceCheck, 2);
+  }
+  function fencePut(fr){
+    if (!gl.fenceSync) return;
+    const s = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); if (!s) return; gl.flush();
+    FENCES.push({ s, t: performance.now(), fr }); if (FENCES.length > 12){ const o = FENCES.shift(); gl.deleteSync(o.s); }
+    if (!fencePoll) fencePoll = setTimeout(fenceCheck, 2);
+  }
   function frameEnd(){
     if (!on) return;
+    if (trF){ fencePut(trF); const m = performance.memory; trF.heap = m ? Math.round(m.usedJSHeapSize/1048576) : 0; }
     put(jsMs, performance.now() - t0); if (trF){ trF.js = Math.round((performance.now() - t0)*100)/100; trF.draw = draw.n && draw.o ? draw.fn(draw.o, draw.m) + ' ' + draw.ms.toFixed(1) + ' ms (of ' + draw.n + ' draws, ' + draw.first + ' drawn for the first time)' : '';
       trF.calls = info.render.calls; trF.tris = info.render.triangles; trF.progs = info.programs ? info.programs.length : 0; trF.geos = info.memory.geometries;
       try { trF.st = (shadowFrame ? 'SHADOW MAP REDRAWN WHOLE THIS FRAME; ' : '') + (PH.state ? PH.state() : ''); } catch (e){ trF.st = 'state: ' + e.message; } }
@@ -195,9 +215,10 @@ const PH = (() => {
     for (const h of HITCHES){
       const f = h.frames[h.frames.length - 1];
       L.push('GAP ' + h.gap + ' ms at ' + ((h.at - t0)/1000).toFixed(1) + ' s: the frame before it ran ' + f.js + ' ms of script, so ' + Math.max(0, h.gap - f.js).toFixed(1) + ' ms went outside the script');
-      for (const g of h.frames){
+      for (const g of h.frames.concat(h.after)){
         const laps = g.laps.slice().sort((a, b) => b[1] - a[1]).slice(0, 5).map(x => x[0].trim() + ' ' + x[1].toFixed(1)).join(', ');
-        L.push('  frame ' + g.frame + (g === f ? ' (the slow one)' : '') + ': gap after ' + (g.gap === undefined ? '-' : g.gap) + ' ms, script ' + g.js + ' ms; ' + laps);
+        L.push('  frame ' + g.frame + (g === f ? ' (the slow one)' : h.after.includes(g) ? ' (after)' : '') + ': gap after ' + (g.gap === undefined ? '-' : g.gap) + ' ms, script ' + g.js + ' ms; ' + laps);
+        L.push('     the card finished it ' + (g.card === undefined ? '?' : g.card < 0 ? 'never seen' : g.card + ' ms') + ' after it was sent; JS heap ' + g.heap + ' MB');
         L.push('     sent ' + g.up + ' KB, linked ' + g.links + ', freed ' + g.dels + ' (' + g.freed + ' KB); ' + g.calls + ' draws, ' + (g.tris/1e6).toFixed(2) + 'M triangles, ' + g.progs + ' programs, ' + g.geos + ' geometries; slowest draw: ' + (g.draw || '-'));
         if (g.st) L.push('     ' + g.st);
       }

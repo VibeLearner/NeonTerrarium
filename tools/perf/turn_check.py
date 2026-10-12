@@ -28,13 +28,25 @@ def open_page(br, url, scene):
     return ctx, pg, errs
 
 # one fling: a quarter turn by key, the frame times recorded until the view has been still for a second
-TURN = '''(whole) => new Promise(res => { PH.tests.wholeAfterTurn = whole; const T = [], S0 = []; let last = performance.now(), still = 0, stopAt = -1;
+TURN = '''(whole) => new Promise(res => { PH.tests.wholeAfterTurn = whole; if (!PH.on) PH.toggle(); PH.traceStart(); const T = [], S0 = []; let last = performance.now(), still = 0, stopAt = -1;
   yawT += Math.PI/4;
   const f = t => { const dt = t - last; last = t; T.push(dt); S0.push(SC.state);
     const moving = Math.abs(yawT - yaw) > 1e-9; if (!moving && stopAt < 0) stopAt = T.length - 1;
     if (!moving) still += dt; else still = 0;
-    if (still < 1000 && T.length < 600) requestAnimationFrame(f); else res({ T, S0, stopAt }); };
+    if (still < 1000 && T.length < 600) requestAnimationFrame(f); else { const TRc = PH.traceStop(); if (PH.on) PH.toggle(); res({ T, S0, stopAt, TR: TRc }); } };
   requestAnimationFrame(f); })'''
+# the trace runs one frame ahead of the timing (a frame's laps are recorded as it is drawn; its time is the gap to the next): the frame k of T is trace k
+def worst_frames(d, n=3):
+    T, TR = d['T'], d['TR'] or []
+    idx = sorted(range(1, len(T)), key=lambda k: -T[k])[:n]
+    out = []
+    for k in idx:
+        if T[k] < 14: continue
+        tr = TR[k - 1] if k - 1 < len(TR) else None
+        if not tr: out.append('    %.1f ms at frame %d: no trace' % (T[k], k)); continue
+        laps = sorted(tr['laps'], key=lambda x: -x[1])[:5]
+        out.append('    %.1f ms at frame %d (%s): script %s ms; biggest: %s' % (T[k], k, 'turning' if k <= d['stopAt'] else 'at rest', tr.get('js'), ', '.join('%s %.1f' % (nm.strip(), ms) for nm, ms in laps)))
+    return out
 
 from playwright.sync_api import sync_playwright
 if not os.environ.get('PERF_SOFTWARE'): os.environ['PERF_GPU'] = '1'
@@ -62,4 +74,5 @@ for label, L in out.items():
         if k < 0: print('  (never came to rest)'); continue
         tail = T[k:k + 6]
         print('  stop frame %.1f   then %s   [worst of the turn %.1f, turning frames mean %.1f]   states: %s' % (tail[0], ' '.join('%.1f' % x for x in tail[1:]), max(T[1:]), sum(T[1:k + 1])/max(1, k), ' > '.join(dict.fromkeys(d['S0'][max(0, k - 1):k + 6]))))
-print('\n(the first frame at rest is where the picture is drawn again after the turn; it should now cost about the same as a turning frame. A frame over about 33 ms is a visible hitch at 60 Hz.)')
+        for line in worst_frames(d): print(line)
+print('\n(the first frame at rest is where the picture is drawn again after the turn. A frame over about 33 ms is a visible hitch at 60 Hz. Under each turn: its slowest frames, with the parts\nof the frame that took longest (processor time; the graphics card\'s time is not in these). "script" is the whole frame\'s processor time: a slow frame with little script time waited on the card or the browser.)')

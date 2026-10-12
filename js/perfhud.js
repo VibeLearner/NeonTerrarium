@@ -50,8 +50,15 @@ const PH = (() => {
   const hist = [];   // per frame, for the graph: [frame ms, shadow redrawn?]
   let lastRaf = 0, t0 = 0, mark = 0, cur = null, gpuFrame = 0, shadowFrame = false, frameNo = 0, shadowTimes = [];
   const free = [], pending = [];
+  // a trace: every frame's laps and passes, by name, with the processor time of each, kept in a list while PH.traceStart() has been called
+  // (tools/perf/turn_check.py: what the slow frames of a turn were doing). Only while the overlay is on.
+  let TR = null, trF = null;
+  function traceStart(){ TR = []; trF = null; }
+  function traceStop(){ const t = TR; TR = null; trF = null; return t; }
+  const trPut = (name, ms) => { if (trF) trF.laps.push([name, Math.round(ms*100)/100]); };
   function frameStart(now){
     if (!on) return;
+    if (TR){ if (trF) TR.push(trF); trF = { at: now, laps: [] }; }
     if (lastRaf){ const d = now - lastRaf; if (d < 500){ put(frameMs, d); hist.push([d, shadowFrame]); if (hist.length > N) hist.shift(); } }
     lastRaf = now; frameNo++; shadowFrame = false;
     t0 = mark = performance.now();
@@ -65,7 +72,7 @@ const PH = (() => {
   const px = new Uint8Array(4);
   function sync(){ gl.finish(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); }
   // simulation time since the last mark, under a name
-  function lap(name){ if (!on) return; const t = performance.now(); put(stat(name, 'sim').cpu, t - mark); mark = t; }
+  function lap(name){ if (!on) return; const t = performance.now(); put(stat(name, 'sim').cpu, t - mark); trPut(name, t - mark); mark = t; }
   // a render pass: processor time to issue it, graphics card time to draw it, its draws and triangles. A pass inside
   // another (sub = true: the glow passes) is timed only in exact mode, since timer queries can't be nested.
   const stack = [];
@@ -88,7 +95,7 @@ const PH = (() => {
     if (c.q){ gl.endQuery(ext.TIME_ELAPSED_EXT); pending.push({ q: c.q, name: c.name, frame: frameNo }); }
     const s = stat(c.name, c.sub ? 'sub' : 'pass');
     let t = performance.now();
-    put(s.cpu, t - c.t); put(s.calls, info.render.calls - c.c); put(s.tris, info.render.triangles + info.render.points + info.render.lines - c.tr);
+    put(s.cpu, t - c.t); put(s.calls, info.render.calls - c.c); put(s.tris, info.render.triangles + info.render.points + info.render.lines - c.tr); trPut(c.name, t - c.t);
     if (exact){ sync(); t = performance.now(); put(s.ex, t - c.t); if (!c.sub){ exFrame += t - c.t; if (c.name === 'color + shadow redraw') put(shadowMs, t - c.t); } }
     mark = t;
   }
@@ -97,12 +104,12 @@ const PH = (() => {
   const rnow = () => typeof __realNow === 'function' ? __realNow() : performance.now();
   let subMark = 0;
   function subBegin(){ if (on) subMark = rnow(); }
-  function sub(name){ if (!on) return; const t = rnow(); put(stat(name, 'subsim').cpu, t - subMark); subMark = t; }
+  function sub(name){ if (!on) return; const t = rnow(); put(stat(name, 'subsim').cpu, t - subMark); trPut('  ' + name, t - subMark); subMark = t; }
   function laps(){ const o = {}; for (const [k, s] of stats) if (s.kind === 'sim' || s.kind === 'subsim') o[k] = avg(s.cpu); return o; }
   function shadow(){ if (on && renderer.shadowMap.needsUpdate){ shadowFrame = true; shadowTimes.push(performance.now()); } }
   function frameEnd(){
     if (!on) return;
-    put(jsMs, performance.now() - t0);
+    put(jsMs, performance.now() - t0); if (trF) trF.js = Math.round((performance.now() - t0)*100)/100;
     if (exact) put(exMs, exFrame);
     if (performance.now() - lastShow > 250){ lastShow = performance.now(); show(); }
   }
@@ -209,5 +216,5 @@ const PH = (() => {
   }
   addEventListener('keydown', e => { if ((e.key === 'F3' || e.key === '`') && !e.repeat && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName)){ e.preventDefault();
     if (e.shiftKey){ if (!on) toggle(); setExact(!exact); } else toggle(); } });
-  return { frameStart, abort, lap, sub, subBegin, laps, begin, end, shadow, frameEnd, toggle, setExact, text, tests, plainMat, get on(){ return on; }, get exact(){ return exact; } };
+  return { frameStart, abort, lap, sub, subBegin, laps, begin, end, shadow, frameEnd, toggle, setExact, text, tests, plainMat, traceStart, traceStop, get on(){ return on; }, get exact(){ return exact; } };
 })();

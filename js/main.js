@@ -86,22 +86,24 @@ function frameBody(now){
     const tp = clamp((loss - 1.6)/1.6, 0, 1), ep = tp*tp*(3 - 2*tp);
     LOD.fine.value = e; LOD.plants.value = ep; LOD.lines.value = e; folFar(loss); }
   PH.lap('steam, rain, camera');
-  runLater();
-  stageStep();   // a plot being built in steps: a few milliseconds of it (world.js)
-  loadTick();    // a city being made from its recipes (loadcity.js)
-  pmTick();      // plots' own arrays let go once merged (recipe.js)
-  tierTick();    // which blocks are drawn full, which as stand-ins (world.js)
-  stepSync();   // what an edit leaves to do, a stage a frame (world.js)
+  PH.subBegin();
+  runLater(); PH.sub('upkeep: later');
+  stageStep(); PH.sub('upkeep: staged builds');   // a plot being built in steps: a few milliseconds of it (world.js)
+  loadTick(); PH.sub('upkeep: loading');    // a city being made from its recipes (loadcity.js)
+  pmTick(); PH.sub('upkeep: plot arrays');      // plots' own arrays let go once merged (recipe.js)
+  tierTick(); PH.sub('upkeep: tiers');    // which blocks are drawn full, which as stand-ins (world.js)
+  stepSync(); PH.sub('upkeep: edit sync');   // what an edit leaves to do, a stage a frame (world.js)
   if (!WARM_DONE) warmPrograms();   // (once a city has loaded: every program building needs, compiled before the first click; world.js)
-  flushSolid();   // regions whose pieces changed are merged again (world.js)
-  nvTick();   // idle frames: faces no camera ever sees are worked out for a plot, a few views a frame (neverseen.js)
-  scene.updateMatrixWorld();   // once for every pass below (see core.js): nothing moves between them
+  flushSolid(); PH.sub('upkeep: merges');   // regions whose pieces changed are merged again (world.js)
+  nvTick(); PH.sub('upkeep: never-seen');   // idle frames: faces no camera ever sees are worked out for a plot, a few views a frame (neverseen.js)
+  scene.updateMatrixWorld(); PH.sub('upkeep: matrices');   // once for every pass below (see core.js): nothing moves between them
   PH.lap('scene upkeep');
-  farFrame();   // which of its two orders the merged blocks are drawn in (world.js)
-  sideArc();   // which way the buildings' walls can face the camera this frame (world.js)
-  cullFrame();   // and which merged pieces are in view
+  PH.subBegin();
+  farFrame(); PH.sub('view: far order');   // which of its two orders the merged blocks are drawn in (world.js)
+  sideArc(); PH.sub('view: side arc');   // which way the buildings' walls can face the camera this frame (world.js)
+  cullFrame(); PH.sub('view: culling');   // and which merged pieces are in view
   sdTrack();   // how fast the view is turning and zooming (world.js)
-  cam.layers.enableAll(); shadowFrame();   // shadows: redrawn at once, a strip in the background, or not at all (sky.js)
+  cam.layers.enableAll(); shadowFrame(); PH.sub('view: shadows');   // shadows: redrawn at once, a strip in the background, or not at all (sky.js)
   PH.shadow(); PH.begin(renderer.shadowMap.needsUpdate ? 'color + shadow redraw' : 'color');
   const pt = PH.tests;   // (the overlay's tests: perfhud.js)
   if (pt.quarter) rtC.viewport.set(0, 0, W >> 1, H >> 1);   // (plain shading: see renderBufferDirect in sky.js)

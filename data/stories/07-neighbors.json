@@ -1162,6 +1162,150 @@
           "A+B:neighbors-greet"
         ]
       }
+    },
+    {
+      "id": "nbr.soup-for-the-sick",
+      "title": "Soup at the door",
+      "tier": "texture",
+      "note": "Someone is sick at home, which the watcher can't see: the door just stays shut. Then a neighbor turns up with food, and the reason comes out on the step. Engine: a sick day is a routine change (the person stays home); this storylet only fires while it lasts.",
+      "roles": {
+        "A": {
+          "desc": "an adult at home sick",
+          "needs": [
+            "adult",
+            "sick"
+          ]
+        },
+        "B": {
+          "desc": "a neighbor bringing food",
+          "rel": "neighbor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          20
+        ],
+        "at": [
+          "home-door",
+          "street"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 30,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "B",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "knock-and-wait",
+          "who": "B",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b4",
+          "do": "hand-over",
+          "who": "B",
+          "with": [
+            "A"
+          ],
+          "at": "home-door"
+        },
+        {
+          "id": "b5",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b6",
+          "do": "walk",
+          "who": "B",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} comes up the block holding a covered bowl level with both hands.",
+          "{B.desc} makes for the door with a paper bag, steam in the cold air above it.",
+          "{B.desc} picks a way along the walk, a lidded pot held close."
+        ],
+        "b2": [
+          "{B.desc} knocks twice and waits, the bowl balanced on one palm.",
+          "{B.desc} knocks at the door, then once more, softer.",
+          "{B.desc} knocks with an elbow, both hands full."
+        ],
+        "b3": [
+          "The door opens halfway. {A} comes out, a blanket pulled round the shoulders.",
+          "{A} comes out onto the step in a long cardigan, hair flat on one side.",
+          "The door slides open. {A} steps out slowly, one hand on the frame."
+        ],
+        "b4": [
+          "{B.desc} hands over the bowl. {A} holds it to {A.his} chest.",
+          "{B.desc} passes the bag across. {A} takes it with both hands.",
+          "{B.desc} holds out the pot. {A} takes it and nods."
+        ],
+        "b5": [
+          "{A} goes in with the food. The door slides shut.",
+          "{A} goes back inside. The door closes on the steam.",
+          "{A} steps in and the door slides shut."
+        ],
+        "b6": [
+          "{B.desc} heads off down the block, hands in pockets now.",
+          "{B.desc} walks away toward the corner without looking back.",
+          "{B.desc} goes on along the walk, lighter by one bowl."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.said",
+          "beat": "b4",
+          "channel": "conversation",
+          "chance": 0.85,
+          "log": [
+            "Overheard: {B.desc} says: \"I told them at work you're out sick. Eat this while it's hot.\"",
+            "Overheard: {A} says: \"It's just a fever. Two days. I'll live.\" {B.desc} says: \"Eat anyway.\"",
+            "Overheard: {B.desc} says: \"Heard you were sick. Don't argue, just eat.\""
+          ]
+        },
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b4",
+          "channel": "conversation",
+          "chance": 0.6,
+          "log": [
+            "Overheard: {A} says: \"You're a good {B.rel}. I mean it.\"",
+            "Overheard: {B.desc} says: \"What's a {B.rel} for? Bang on the wall if you need anything.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:brought-soup"
+        ]
+      }
     }
   ]
 }

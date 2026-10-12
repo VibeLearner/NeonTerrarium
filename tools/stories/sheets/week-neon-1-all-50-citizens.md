@@ -1,22 +1,22 @@
 # Life sheet: 50 citizens, 7 days, seed "neon-1"
 
 Eventfulness split: quiet 30 (60%), textured 15 (30%), eventful 5 (10%).
-Storylets played in the week (seen or not): 611.
-By tier: mundane 388, notable 30, texture 191, dramatic 2.
-By category: quiet 113, routine 80, secrets 67, city 65, law 50, home 43, romance 31, neighbors 28, friends 28, conflict 26, work 24, nightlife 20, milestones 15, family 14, weather 7.
-Storylets per person by life: quiet avg 11.6, eventful avg 13.0, textured avg 13.2.
-Notable and dramatic storylets by life: textured 20, eventful 12.
+Storylets played in the week (seen or not): 609.
+By tier: mundane 386, notable 33, texture 188, dramatic 2.
+By category: quiet 114, routine 79, secrets 72, city 65, law 53, home 44, friends 30, romance 30, neighbors 25, work 23, conflict 22, nightlife 22, milestones 14, family 12, weather 4.
+Storylets per person by life: quiet avg 11.6, eventful avg 13.0, textured avg 13.1.
+Notable and dramatic storylets by life: textured 23, eventful 12.
 Dramatic storylets this week (director cap 3, none within 36 hours of each other): law.arrest, law.arrest.
 Distinct full-week storylet sequences: 50 of 50.
 Distinct sequences in what the watcher saw: 50 of 50.
 Citizens with at least one live line: 48 of 50.
-Lines across all monitors: live 572, reveals 114, hearsay overheard 24, hearsay notebook entries 13, signal lost 1.
-Chains that rolled a branch: 21 (12 fizzled).
-Ambiguous setups played: 14 (hidden truths: nickname, gift, cohabitant, coworker, gift, family, friend, cohabitant, cohabitant, gift, night-job, handle, sibling, handle).
-Ambiguous setups that were later settled by a reveal storylet: 4 of 14.
-Subjects whose first name the watcher had: by day 1 13, by day 2 25, by day 3 32, by day 5 37, by day 7 41 (of 50).
-Subjects with a full name by the end of the week: 2. Other people named on the monitors: 16; with a stated relation: 8.
-Citizens who left the city: 3 (still in the notebook, past tense).
+Lines across all monitors: live 571, reveals 110, hearsay overheard 24, hearsay notebook entries 13, signal lost 1.
+Chains that rolled a branch: 20 (10 fizzled).
+Ambiguous setups played: 17 (hidden truths: nickname, gift, cohabitant, coworker, gift, family, friend, cohabitant, cohabitant, gift, neighbor-away, night-job, handle, nickname, sibling, handle, friend).
+Ambiguous setups that were later settled by a reveal storylet: 5 of 17.
+Subjects whose first name the watcher had: by day 1 13, by day 2 25, by day 3 32, by day 5 37, by day 7 40 (of 50).
+Subjects with a full name by the end of the week: 1. Other people named on the monitors: 12; with a stated relation: 9.
+Citizens who left the city: 4 (still in the notebook, past tense).
 
 ## Citizen 1: Wing (quiet life)
 
@@ -112,7 +112,7 @@ What really happened, most of it unseen: pond-watching, clear-evening-lawn, new-
 ## Citizen 3: Ivan (quiet life)
 
 Answer key (hidden from the watcher): Ivan Greco ("Vanya"); forties, male; club-staff at Neon Dome; Foundry Side, shares a home; has a partner; 3 kinds of family nearby
-Watching window each day: 12:00 to 19:00. Storylets that happened to this person this week: 15; lines the watcher got: 13.
+Watching window each day: 12:00 to 19:00. Storylets that happened to this person this week: 15; lines the watcher got: 12.
 
 Monitor log:
 
@@ -126,16 +126,14 @@ Monitor log:
     D3 17:50  The door slides open. Ivan holds out a small key on a loop of string.  [rewritten]
                   first logged as: The door slides open. Subject holds out a small key on a loop of string.
     D3 17:58  An unknown male resident turns and leaves the doorway, key in a fist.
-    D5 18:44  Ivan cuts across the square, hands in pockets.  [rewritten]
-                  first logged as: Subject cuts across the square, hands in pockets.
-    D5 18:45  An elderly man slows beside Ivan: "Ivan. Haven't seen you all week."
-    D5 18:48  An unknown male resident stands by the pond with arms folded and watches Ivan cross.  [rewritten]
-                  first logged as: An unknown male resident stands by the pond with arms folded and watches Subject cross.
-    D5 18:57  Ivan goes by an unknown male resident without a word, jaw tight.  [rewritten]
-                  first logged as: Subject goes by an unknown male resident without a word, jaw tight.
-    D6 18:42  Ivan arrives at the station and waits at the bay.
-    D6 18:48  A patrol officer listens, tablet out, and nods. Ivan talks with both hands.
-    D6 18:51  Ivan comes out from the station door, folding a receipt.
+    D5 18:16  Ivan sits on a bench with jaw set and a thumb moving fast.  [rewritten]
+                  first logged as: Subject sits on a bench with jaw set and a thumb moving fast.
+    D5 18:17  An elderly man calls from across the street: "Ivan! Later?" Ivan waves back.
+    D5 18:19  Ivan sends a post and shoves the handset into a pocket.  [rewritten]
+                  first logged as: Subject sends a post and shoves the handset into a pocket.
+    D5 18:20  Posted: "Funny how the best spots go to whoever shouts loudest."
+    D6 18:37  A patrol officer strolls the block with hands behind the back and eyes on the doors.
+    D6 18:40  Ivan nods once at a patrol officer and keeps going.
 
 Notebook, details:
 
@@ -147,9 +145,9 @@ Notebook, people around them:
 
 Notebook, observations:
 
-- (none)
+- D5 18:20 Posted: "Funny how the best spots go to whoever shouts loudest." [unconfirmed]
 
-What really happened, most of it unseen: same-stool, lost-card, rope-wait, forgot-something, drone-wave, waved-in, spare-key, walk-home, noodle-alone, stoop-gossip, glare, shift-change, weekly-parcel, witness-statement, keeper-knows.
+What really happened, most of it unseen: same-stool, lost-card, rope-wait, forgot-something, drone-wave, waved-in, spare-key, walk-home, noodle-alone, stoop-gossip, feed-jab, shift-change, weekly-parcel, patrol-passes, found-note.
 
 ## Citizen 4: Hoi (quiet life)
 
@@ -183,7 +181,7 @@ Notebook, observations:
 
 - (none)
 
-What really happened, most of it unseen: long-bench, glare, stoop-gossip, couple-post, anniversary-dinner, goodnight-call, patrol-passes, evening-pair, clear-evening-lawn, walks-up-turns-back, forgot-something.
+What really happened, most of it unseen: long-bench, glare, stoop-gossip, couple-post, anniversary-dinner, goodnight-call, scan-check, waits-at-closed-door, patrol-passes, closed-door-job, forgot-something.
 
 ## Citizen 5: Subject (quiet life)
 
@@ -224,7 +222,7 @@ What really happened, most of it unseen: lost-card, spare-key, kiosk-regular, sc
 ## Citizen 6: Amara (quiet life)
 
 Answer key (hidden from the watcher): Amara Aalto ("Mara"); fifties, female; club-staff at Neon Dome; Sky Terrace, shares a home; 2 kinds of family nearby
-Watching window each day: 17:00 to 23:00. Storylets that happened to this person this week: 15; lines the watcher got: 27.
+Watching window each day: 17:00 to 23:00. Storylets that happened to this person this week: 15; lines the watcher got: 28.
 
 Monitor log:
 
@@ -251,9 +249,10 @@ Monitor log:
     D4 22:25  Amara perches on the bench edge, typing with both thumbs.
     D4 22:31  Amara types, deletes, types, and posts.
     D4 22:32  Posted: "Long day. Noodles and then sleep."
-    D6 17:32  Amara queues behind six others and sniffs the air.
-    D6 17:41  An unknown male resident hands over the first bowl with a small flourish.
-    D6 17:49  Amara eats with eyebrows high.
+    D6 17:22  Amara stops in front of the entrance and reads the route map twice.
+    D6 17:25  Amara points at the line map and traces it with one finger.
+    D6 17:26  Overheard: Amara says: "Ten minutes to the foundry now. Used to be forty."
+    D6 17:29  Amara takes the first car on the line and is gone.
     D7 22:17  Amara lingers on the step with a handset warm in one hand.
     D7 22:26  Amara listens for a long time, then laughs under her breath.
     D7 22:29  Amara goes in at last, still holding the handset.
@@ -271,8 +270,9 @@ Notebook, observations:
 - D3 20:16 On the phone: Amara says "No. I am not telling her yet." [unconfirmed]
 - D3 22:21 Seen: Amara ordered without a word. The server poured without asking. [unconfirmed]
 - D4 22:32 Posted: "Long day. Noodles and then sleep." [unconfirmed]
+- D6 17:26 Overheard: Amara says: "Ten minutes to the foundry now. Used to be forty." [unconfirmed]
 
-What really happened, most of it unseen: same-stool, noodle-alone, bathhouse-soak, patrol-passes, scan-check, overheard-half, kiosk-regular, stranger-greets, glare, feed-post, window-stop, keeper-knows, new-stall-line, groceries-up, goodnight-call.
+What really happened, most of it unseen: same-stool, noodle-alone, bathhouse-soak, patrol-passes, scan-check, overheard-half, kiosk-regular, stranger-greets, glare, feed-post, window-stop, keeper-knows, new-metro-line, groceries-up, goodnight-call.
 
 ## Citizen 7: Amina (textured life)
 
@@ -308,12 +308,12 @@ Notebook, observations:
 
 - (none)
 
-What really happened, most of it unseen: boss-visits, long-bench, same-stool, stoop-gossip, goodnight-call, shift-change, scan-check, rent-dodge, drifting, stoop-evening, metro-seat.
+What really happened, most of it unseen: boss-visits, long-bench, same-stool, stoop-gossip, goodnight-call, shift-change, avoids-station, rent-dodge, drifting, stoop-evening, metro-seat.
 
 ## Citizen 8: Kwame (quiet life)
 
 Answer key (hidden from the watcher): Kwame Tran ("Kwam"); forties, male; club-staff at Neon Dome; Sky Terrace, shares a home; 1 kinds of family nearby
-Watching window each day: 15:00 to 22:00. Storylets that happened to this person this week: 16; lines the watcher got: 19.
+Watching window each day: 15:00 to 22:00. Storylets that happened to this person this week: 16; lines the watcher got: 18.
 
 Monitor log:
 
@@ -329,22 +329,18 @@ Monitor log:
     D2 19:18  Kwame pockets the handset and strides off.  [rewritten]
                   first logged as: Subject pockets the handset and strides off.
     D4 20:30  Overheard: Kwame says Brigid has moved away from the city for good.
-    D6 17:13  Kwame and Vikram meet at the landing.  [rewritten]
-                  first logged as: Kwame and an elderly man meet at the landing.
-    D6 17:16  Vikram says something low and Kwame laughs.  [rewritten]
-                  first logged as: An elderly man says something low and Kwame laughs.
-    D6 17:17  Overheard: Vikram says: "I heard the lift will be closed all of Thursday."  [rewritten]
-                  first logged as: Overheard: An elderly man says: "I heard the lift will be closed all of Thursday."
-    D6 17:17  Overheard: Kwame says: "Thanks, Vikram."
-    D6 19:12  Jun and Otto cross the square together, Jun leading.  [rewritten]
-                  first logged as: An unknown male resident and an unknown male resident cross the square together, an unknown male resident leading.
-    D6 19:16  Kwame stands by the pond, hands in pockets.
-    D6 19:22  Jun says a few words and the three of them stand in a loose circle.  [rewritten]
-                  first logged as: An unknown male resident says a few words and the three of them stand in a loose circle.
-    D6 19:23  Jun says: "This is Otto. Came in last month, runs the kiosk by the lift."  [rewritten]
-                  first logged as: An unknown male resident says: "This is Otto. Came in last month, runs the kiosk by the lift."
-    D6 19:23  Otto gives a name at the handshake: Otto.
-    D6 19:23  Overheard: Kwame says: "You know me, Jun."
+    D6 17:34  Kwame takes a parcel from a drone and squints at the label.
+    D6 17:35  The parcel is addressed to Eun Evans.
+    D6 17:40  Kwame knocks once and waits.
+    D6 17:43  The door slides open. Kwame hands the parcel to Eun and shrugs.  [rewritten]
+                  first logged as: The door slides open. Kwame hands the parcel to an unknown female resident and shrugs.
+    D6 17:44  Overheard: Kwame laughs: "Stop it, Eun."
+    D6 19:26  Kwame takes a seat at the stalls and looks up the block.
+    D6 19:33  Zhen arrives, waving, already talking.  [rewritten]
+                  first logged as: An elderly man arrives, waving, already talking.
+    D6 19:38  Kwame and Zhen chat, cups in hand, for a good while.  [rewritten]
+                  first logged as: Kwame and an elderly man chat, cups in hand, for a good while.
+    D6 19:39  Overheard: Kwame says: "Hey, Zhen."
     D7 20:19  Kwame drops onto a bench and lets out a long breath, visible in the cool air.
     D7 20:25  Kwame types something short on a handset and sends it. Smiles at the screen.
     D7 20:26  Posted: "The thing I was dreading turned out to be nothing. Should have said it a month ago."
@@ -355,18 +351,16 @@ Notebook, details:
 
 Notebook, people around them:
 
-- Vikram [name overheard, unconfirmed]
-- Jun [name overheard, unconfirmed]
-- Otto [name introduced, verified]
+- Eun [name overheard, unconfirmed]
+- Zhen [name overheard, unconfirmed]
 
 Notebook, observations:
 
 - D2 19:13 On the phone: Kwame says "Not yet. After the weekend. Please do not say anything." [unconfirmed]
-- D6 17:17 Overheard: Vikram says: "I heard the lift will be closed all of Thursday." [unconfirmed]
-- D6 19:23 Introduced: Otto gives a name at the handshake: Otto. [verified]
+- D6 17:35 Read: The parcel is addressed to Eun Evans. [verified]
 - D7 20:26 Posted: "The thing I was dreading turned out to be nothing. Should have said it a month ago." [unconfirmed]
 
-What really happened, most of it unseen: stray-cat, notice-board, weekly-parcel, drone-gazing, overheard-half, feed-post, wrong-door, shift-change, patrol-passes, shift-change, metro-seat, baby-post, stoop-gossip, introduction, stranger-greets, not-telling-after.
+What really happened, most of it unseen: stray-cat, notice-board, weekly-parcel, drone-gazing, overheard-half, feed-post, wrong-door, shift-change, patrol-passes, shift-change, metro-seat, baby-post, parcel-passed, regular-meetup, lost-card, not-telling-after.
 
 ## Citizen 9: Vikram (quiet life)
 
@@ -417,7 +411,7 @@ What really happened, most of it unseen: errand-shop, crush-returns, clear-eveni
 ## Citizen 10: Noor (textured life)
 
 Answer key (hidden from the watcher): Noor Yilmaz ("Noo"); forties, female; courier at Swift Parcel; Midrow, shares a home; 1 kinds of family nearby
-Watching window each day: 15:00 to 22:00. Storylets that happened to this person this week: 20; lines the watcher got: 34.
+Watching window each day: 15:00 to 22:00. Storylets that happened to this person this week: 17; lines the watcher got: 30.
 
 Monitor log:
 
@@ -451,18 +445,14 @@ Monitor log:
     D4 18:46  An unknown female resident calls out and waves from across the way, then jogs over.
     D4 18:52  An unknown female resident talks fast, then slows. Noor says something short. A beat of silence.
     D4 18:55  An unknown female resident clasps both hands in apology and turns away, shaking her head.
-    D4 20:30  Noor stands at the pond with a cup, looking at the water.
-    D4 20:33  Noor turns and walks straight into an unknown male resident, cup first. Both stop dead.
-    D4 20:37  An unknown male resident asks something and Noor answers in a word or two.
-    D4 20:40  Overheard: Noor tells an unknown male resident that Pavel left the city on the evening train. Just a bag and a coat.
-    D5 18:38  Overheard: Noor says to an elderly man: "Pavel is gone. Took the metro out and did not say where."
+    D4 20:23  Noor takes a seat on the bench and stretches both legs.
+    D4 20:29  Noor picks up a small folded note from the bench and turns it over.
+    D4 20:36  Noor turns away and folds the paper into a tight square.
+    D4 20:37  Overheard: Noor says to no one: "Wrong bench, whoever you are."
+    D4 20:40  Overheard: Noor tells an unknown female resident that Pavel left the city on the evening train. Just a bag and a coat.
+    D5 18:38  Overheard: Noor says to Arjun: "Pavel is gone. Took the metro out and did not say where."
     D5 19:15  Noor crosses the square at an easy pace.
     D5 19:22  Noor waves at a passing hover car for no clear reason.
-    D6 16:40  Noor flops down on a worn blanket and kicks the shoes off.
-    D6 16:48  Noor nibbles from a paper bag and leans on one elbow.
-    D6 18:22  Noor passes the usual crossing and keeps going straight.
-    D6 18:29  Noor stands at a crossing with no hurry, watching a courier go by.
-    D6 18:33  Noor rejoins the usual route two blocks on.
 
 Notebook, details:
 
@@ -474,9 +464,9 @@ Notebook, people around them:
 
 Notebook, observations:
 
-- (none)
+- D4 20:37 Overheard: Noor says to no one: "Wrong bench, whoever you are." [unconfirmed]
 
-What really happened, most of it unseen: wrong-door, scan-check, couple-post, new-stall-line, glare, drone-gazing, first-date, new-lawn, feed-post, crossing-nod, new-metro-line, stranger-greets, ex-reappears, promotion-grudge, certificate, drone-wave, remembrance, clear-evening-lawn, takes-longer-route, club-opening-crowd.
+What really happened, most of it unseen: wrong-door, scan-check, couple-post, new-stall-line, glare, drone-gazing, first-date, new-lawn, feed-post, crossing-nod, new-metro-line, stranger-greets, found-note, promotion-grudge, remembrance, drone-wave, farewell.
 
 ## Citizen 11: Brigid (quiet life)
 
@@ -521,7 +511,7 @@ What really happened, most of it unseen: new-stall-line, stranger-greets, siblin
 ## Citizen 12: Casimir (quiet life)
 
 Answer key (hidden from the watcher): Casimir Cruz ("Cas"); thirties, male; courier at Swift Parcel; Market Row, shares a home; has a partner; 2 kinds of family nearby
-Watching window each day: 10:00 to 16:00. Storylets that happened to this person this week: 12; lines the watcher got: 6.
+Watching window each day: 10:00 to 16:00. Storylets that happened to this person this week: 12; lines the watcher got: 8.
 
 Monitor log:
 
@@ -536,9 +526,11 @@ Monitor log:
                   first logged as: Subject and an unknown male resident talk in low tones, heads near the board.
     D6 11:33  Casimir shrugs and turns away, shaking his head.  [rewritten]
                   first logged as: Subject shrugs and turns away, shaking his head.
-    D6 15:18  Casimir leans on his doorframe while an unknown male resident stops at the next step.
-    D6 15:25  The two of them gossip for ten minutes, hands moving.
-    D7 11:00  Overheard: Casimir says to an elderly woman that Wing just got to the city and is still finding the way around.
+    D6 15:33  Casimir walks alone along the block, eyes ahead.
+    D6 15:38  A stranger, an unknown male resident, hails Casimir with a big wave.
+    D6 15:47  An unknown male resident talks fast, then slows. Casimir says something short. A beat of silence.
+    D6 15:51  An unknown male resident gives a small bow and hurries off the other way.
+    D7 11:00  Overheard: Casimir says to an unknown female resident that Wing just got to the city and is still finding the way around.
 
 Notebook, details:
 
@@ -552,7 +544,7 @@ Notebook, observations:
 
 - (none)
 
-What really happened, most of it unseen: line-cut, feed-post, parcel-passed, new-stall-line, drone-gazing, forgot-something, petition-board, stoop-gossip, nameplate-at-door, feed-post, avoids-station, pond-watching.
+What really happened, most of it unseen: line-cut, feed-post, parcel-passed, new-lawn, noodle-alone, forgot-something, petition-board, stranger-greets, nameplate-at-door, feed-post, avoids-station, pond-watching.
 
 ## Citizen 13: Lai (textured life)
 
@@ -616,7 +608,7 @@ What really happened, most of it unseen: drone-gazing, stray-cat, new-metro-line
 ## Citizen 14: Subject (quiet life)
 
 Answer key (hidden from the watcher): Ari Cole ("Ar"); forties, nonbinary; bathhouse-staff at Steam House; Midrow, lives alone; 2 kinds of family nearby
-Watching window each day: 12:00 to 18:00. Storylets that happened to this person this week: 11; lines the watcher got: 10.
+Watching window each day: 12:00 to 18:00. Storylets that happened to this person this week: 11; lines the watcher got: 7.
 
 Monitor log:
 
@@ -625,12 +617,8 @@ Monitor log:
     D4 13:38  Subject heads for the shop, a cloth bag folded in one hand.
     D4 13:42  Subject slips in between two shoppers coming out.
     D4 13:50  Subject steps out of the shop with one small bag and heads back the way they came.
-    D7 17:43  A delivery drone leaves a package at the wrong step. Subject lifts it.
-    D7 17:44  The label reads Samira Park, one door along.
-    D7 17:49  Subject walks to the next door and knocks.
-    D7 17:55  The door slides open. Subject hands the parcel to Samira and shrugs.  [rewritten]
-                  first logged as: The door slides open. Subject hands the parcel to an unknown female resident and shrugs.
-    D7 17:56  Overheard: Subject laughs: "Stop it, Samira."
+    D7 17:25  Subject and an unknown female resident meet at the landing.
+    D7 17:33  An unknown female resident says something low and Subject laughs.
 
 Notebook, details:
 
@@ -638,18 +626,18 @@ Notebook, details:
 
 Notebook, people around them:
 
-- Samira [name overheard, unconfirmed]
+- (none known)
 
 Notebook, observations:
 
-- D7 17:44 Read: The label reads Samira Park, one door along. [verified]
+- (none)
 
-What really happened, most of it unseen: hologram-night, noodle-alone, crossing-nod, drone-wave, late-for-work, errand-shop, pigeon-crumbs, long-bench, clear-evening-lawn, parcel-passed, rope-wait.
+What really happened, most of it unseen: hologram-night, noodle-alone, crossing-nod, drone-wave, late-for-work, errand-shop, pigeon-crumbs, long-bench, avoids-station, stoop-gossip, rope-wait.
 
 ## Citizen 15: Noor (textured life)
 
 Answer key (hidden from the watcher): Noor Tran ("Noo"); thirties, female; stall-keeper at Lantern Tea House; Midrow, lives alone; 0 kinds of family nearby
-Watching window each day: 12:00 to 18:00. Storylets that happened to this person this week: 21; lines the watcher got: 19.
+Watching window each day: 12:00 to 18:00. Storylets that happened to this person this week: 20; lines the watcher got: 17.
 
 Monitor log:
 
@@ -666,31 +654,29 @@ Monitor log:
     D1 16:13  Noor walks the last two blocks without looking at the shops.
     D1 16:21  Noor goes in and the door closes on the street noise.
     D3 16:01  Notebook entry: Came in on the lift with one bag, per a friend (overheard, in conversation).
-    D7 12:39  Noor takes a seat and frames a cup in the handset.
-    D7 12:45  Noor posts a picture and puts the handset face down.
-    D7 13:32  Noor crosses toward the tea stall and slows as the line comes into view.
-    D7 13:39  Noor stands at the tail of a long line. Counts heads. Shuffles forward once.
-    D7 13:42  Noor gives the line a long look, then walks away toward another stall.
-    D7 14:31  Noor knocks at a door two along from her own and stands back.
-    D7 14:39  The door opens. An unknown female resident hands Noor a coil of rope and a short ladder.
-    D7 14:40  Overheard: Noor says: "What would I do without a neighbor like you?"
-    D7 14:40  Overheard: An unknown female resident calls Noor "Noo", easy as anything.
-    D7 14:44  Noor hauls the load back to her own door, thanking the air.
+    D7 12:42  Noor stands at the corner and checks the time. 11 minutes pass.
+    D7 12:51  Noor raises a handset to one ear and leaves a message.
+    D7 12:52  Phone, one side: Noor says: "Forty minutes, friend. Forty. Call me back."
+    D7 12:52  Phone, one side: Noor says: "It's me. I waited. We said six."
+    D7 13:00  Noor leaves the corner without looking back.
+    D7 14:48  Noor gets in line, checks the menu board, and orders a small tea.
+    D7 14:56  Noor stays at the edge of the stall, a step from the till.
+    D7 15:03  An unknown female resident slides a cup over the counter. Noor nods too many times.
 
 Notebook, details:
 
 - Name: Noor [overheard, unconfirmed]
-- Goes by: Noo [overheard, unconfirmed]
 
 Notebook, people around them:
 
-- An unknown female resident: neighbor [relation overheard, unconfirmed]
+- An unknown female resident: friend [relation heard on the phone, unconfirmed]
 
 Notebook, observations:
 
 - D3 16:01 Secondhand: Came in on the lift with one bag, per a friend (overheard, in conversation). [unconfirmed; heard from 1 person]
+- D7 12:52 On the phone: Noor says: "It's me. I waited. We said six." [unconfirmed]
 
-What really happened, most of it unseen: new-metro-line, takes-longer-route, walk-home, platform-wait, call-home, cousin-arrives, new-stall-line, keeper-knows, promotion-grudge, stoop-gossip, glare, new-stall-line, club-opening-crowd, plaza-stroll, patrol-passes, spare-key, couple-post, skipped-usual-stall, borrowed-tool, bathhouse-soak, two-names.
+What really happened, most of it unseen: new-metro-line, takes-longer-route, walk-home, platform-wait, call-home, cousin-arrives, new-stall-line, keeper-knows, promotion-grudge, stoop-gossip, line-cut, new-stall-line, club-opening-crowd, plaza-stroll, patrol-passes, broken-appliance, stood-up, crush-returns, bathhouse-soak, two-names.
 
 ## Citizen 16: Eun (textured life)
 
@@ -731,7 +717,7 @@ What really happened, most of it unseen: bathhouse-soak, takes-second-home, afte
 ## Citizen 17: Lai (textured life)
 
 Answer key (hidden from the watcher): Lai Vance ("Lai"); sixties or older, female; no job; Sky Terrace, shares a home; 1 kinds of family nearby
-Watching window each day: 15:00 to 21:00. Storylets that happened to this person this week: 18; lines the watcher got: 18.
+Watching window each day: 15:00 to 21:00. Storylets that happened to this person this week: 18; lines the watcher got: 19.
 
 Monitor log:
 
@@ -752,9 +738,10 @@ Monitor log:
                   first logged as: Subject takes a call and smiles in spurts. Mostly listens.
     D3 17:12  Phone, one side: Lai says: "Tell everyone I'll be there Sunday. Save me the good chair."  [rewritten]
                   first logged as: Phone, one side: Subject says: "Tell everyone I'll be there Sunday. Save me the good chair."
-    D4 16:43  Lai sits on a bench and looks about the square.
-    D4 16:46  Lai retrieves a folded paper from the slats and smooths it flat.
-    D4 16:55  Lai reads it, shrugs, and puts it in a pocket.
+    D4 16:23  Lai idles near the rail, scrolling slowly.
+    D4 16:31  An unknown male resident rounds the stalls and nearly collides with Lai. Both freeze.
+    D4 16:35  An unknown male resident asks something and Lai answers in a word or two.
+    D4 16:36  Overheard: Lai says: "It has been two years. You cut your hair."
     D5 17:35  Lai walks alone along the block, eyes ahead.
     D5 17:44  A stranger, an unknown female resident, hails Lai with a big wave.
     D5 17:53  An unknown female resident talks fast, then slows. Lai says something short. A beat of silence.
@@ -774,8 +761,9 @@ Notebook, observations:
 
 - D1 18:39 Seen: The door opens to Lai without a knock. [unconfirmed]
 - D3 17:12 On the phone: Lai says: "Tell everyone I'll be there Sunday. Save me the good chair." [unconfirmed]
+- D4 16:36 Overheard: Lai says: "It has been two years. You cut your hair." [unconfirmed]
 
-What really happened, most of it unseen: avoids-station, groceries-up, stray-cat, new-stall-line, walk-home, rope-wait, noodle-alone, call-home, wrong-label, remembrance, found-note, stoop-evening, stranger-greets, patrol-passes, plaza-stroll, crush-returns, long-bench, overheard-half.
+What really happened, most of it unseen: avoids-station, groceries-up, stray-cat, new-stall-line, walk-home, rope-wait, noodle-alone, call-home, wrong-label, remembrance, ex-reappears, stoop-evening, stranger-greets, patrol-passes, plaza-stroll, crush-returns, long-bench, feed-jab.
 
 ## Citizen 18: Inez (quiet life)
 
@@ -869,7 +857,7 @@ Notebook, observations:
 - D4 09:39 Overheard: Kavya says: "They are putting a new stall on the corner. Rent is going up, mark me." [unconfirmed]
 - D5 07:43 Read: Card in Kavya's hand: Anton Ruiz. [verified]
 
-What really happened, most of it unseen: long-bench, glare, spare-key, stoop-gossip, drone-gazing, same-stool, witness-statement, noodle-night-delivery, lost-card, favor, new-stall-line, new-metro-line, regular-meetup, bench-rest, hologram-night.
+What really happened, most of it unseen: long-bench, glare, spare-key, stoop-gossip, drone-gazing, same-stool, witness-statement, noodle-night-delivery, lost-card, favor, new-stall-line, new-metro-line, regular-meetup, bench-rest, club-opening-crowd.
 
 ## Citizen 20: Olga (textured life)
 
@@ -902,7 +890,7 @@ Notebook, observations:
 
 - D6 11:23 Read: Card in Olga's hand: Pedro Popescu. [verified]
 
-What really happened, most of it unseen: shift-change, locked-out, found-note, wrong-label, noodle-alone, pigeon-crumbs, patrol-passes, goodnight-call, lost-card, spare-key, walk-home, curfew-word, clear-evening-lawn.
+What really happened, most of it unseen: shift-change, locked-out, found-note, wrong-label, noodle-alone, pigeon-crumbs, patrol-passes, goodnight-call, lost-card, furniture-delivery, walk-home, curfew-word, clear-evening-lawn.
 
 ## Citizen 21: Jasper (textured life)
 
@@ -1007,7 +995,7 @@ Notebook, observations:
 
 - D2 12:23 Overheard: An unknown female resident says: "Forty! Make a wish, you old thing." [unconfirmed]
 
-What really happened, most of it unseen: forgot-something, glare, new-metro-line, introduction, side-gig, birthday-cake, avoids-station, arrest, crowd-watches-crane, bench-rest, new-stall-line, stood-up, borrow-money, noodle-alone, stray-cat, nameplate-at-door, shift-change, window-plant.
+What really happened, most of it unseen: forgot-something, glare, new-metro-line, introduction, side-gig, birthday-cake, avoids-station, arrest, crowd-watches-crane, bench-rest, new-stall-line, stood-up, borrow-money, noodle-alone, stray-cat, lost-card, shift-change, window-plant.
 
 ## Citizen 24: Carmen (quiet life)
 
@@ -1090,7 +1078,7 @@ Notebook, observations:
 
 - (none)
 
-What really happened, most of it unseen: couple-post, crossing-nod, notice-board, long-bench, feed-post, call-home, broken-appliance, stoop-evening, new-lawn, same-stool, metro-seat, petition-board, line-cut, avoids-station, evening-pair.
+What really happened, most of it unseen: couple-post, crossing-nod, notice-board, long-bench, feed-post, call-home, broken-appliance, stoop-evening, new-lawn, same-stool, metro-seat, petition-board, swapped-parcels, scan-check, evening-pair.
 
 ## Citizen 26: Jasper (eventful life)
 
@@ -1146,7 +1134,7 @@ What really happened, most of it unseen: feed-post, platform-wait, envelope-at-n
 ## Citizen 27: Lai (textured life)
 
 Answer key (hidden from the watcher): Lai Volkov ("Lai"); fifties, female; industrial at Foundry No. 4; Foundry Side, shares a home; 1 kinds of family nearby
-Watching window each day: 14:00 to 22:00. Storylets that happened to this person this week: 17; lines the watcher got: 30.
+Watching window each day: 14:00 to 22:00. Storylets that happened to this person this week: 18; lines the watcher got: 34.
 
 Monitor log:
 
@@ -1188,9 +1176,13 @@ Monitor log:
     D5 18:18  Lai waves at a drone that does not wave back.
     D5 20:15  Lai takes a seat and types with both thumbs, hard.
     D5 20:22  Lai posts, deletes, posts again.
-    D7 16:21  Lai rings at a door and waits with a slip of paper in hand.
-    D7 16:28  At the door, Lai and an unknown female resident compare the paper to the number on the wall.
-    D7 16:35  An unknown female resident points two buildings along. Lai thanks her and walks on.
+    D6 18:20  Lai stands at the lawn edge and prods the grass with a toe.
+    D6 18:25  Lai points at a young sapling and says something to a stranger.
+    D6 18:29  Lai drops onto a blanket and lies back.
+    D7 16:43  Lai threads through the crowd at an even pace.
+    D7 16:49  An unknown female resident calls out and waves from across the way, then jogs over.
+    D7 16:52  An unknown female resident talks fast, then slows. Lai says something short. A beat of silence.
+    D7 16:59  An unknown female resident gives a small bow and hurries off the other way.
 
 Notebook, details:
 
@@ -1205,7 +1197,7 @@ Notebook, observations:
 
 - D5 14:39 Overheard: Sonam says to Lai: "I'm coming by every shift this week. Be ready." [unconfirmed]
 
-What really happened, most of it unseen: skipped-usual-stall, noodle-alone, lost-card, crush-returns, second-visitor, new-stall-line, lunch-break, keeper-asks, errand-shop, hologram-night, keeper-knows, boss-visits, drone-wave, feed-jab, platform-wait, leaves-by-car, wrong-door.
+What really happened, most of it unseen: skipped-usual-stall, noodle-alone, lost-card, crush-returns, second-visitor, new-stall-line, lunch-break, keeper-asks, errand-shop, hologram-night, keeper-knows, boss-visits, drone-wave, feed-jab, platform-wait, new-lawn, leaves-by-car, stranger-greets.
 
 ## Citizen 28: Subject (quiet life)
 
@@ -1233,7 +1225,7 @@ What really happened, most of it unseen: patrol-passes, crush-returns, platform-
 ## Citizen 29: Niamh (textured life)
 
 Answer key (hidden from the watcher): Niamh Ndlovu ("Neev"); sixties or older, female; no job; Lowtown, shares a home; has a partner; 2 kinds of family nearby
-Watching window each day: 10:00 to 17:00. Storylets that happened to this person this week: 13; lines the watcher got: 7.
+Watching window each day: 10:00 to 17:00. Storylets that happened to this person this week: 13; lines the watcher got: 6.
 
 Monitor log:
 
@@ -1242,11 +1234,9 @@ Monitor log:
     D3 16:36  An unknown female resident taps Niamh on the shoulder in passing: "Hey, Niamh."
     D3 16:40  Niamh crouches and sets out a few scraps from a bag.  [rewritten]
                   first logged as: Subject crouches and sets out a few scraps from a bag.
-    D7 13:16  Niamh spots a flat leather wallet on the sidewalk and picks it up.
-    D7 13:24  Niamh sprints after someone, shouting and waving the wallet.
-    D7 13:28  Niamh holds out the wallet and Giulia takes it with both hands.  [rewritten]
-                  first logged as: Niamh holds out the wallet and an unknown female resident takes it with both hands.
-    D7 13:29  Overheard: Giulia says: "I'm Giulia. Thank you. Everything I own is in there."
+    D7 13:12  Niamh approaches the station with a slip of paper and a pinched look.
+    D7 13:15  A patrol officer asks a short question. Niamh answers slowly.
+    D7 13:24  Niamh leaves the station, handing back a clip.
 
 Notebook, details:
 
@@ -1254,13 +1244,13 @@ Notebook, details:
 
 Notebook, people around them:
 
-- Giulia [name overheard, unconfirmed]
+- (none known)
 
 Notebook, observations:
 
 - (none)
 
-What really happened, most of it unseen: spare-key, bathhouse-soak, shop-regular-greeting, stray-cat, patrol-passes, sibling-quarrel, waved-in, metro-seat, pigeon-crumbs, new-lawn, nameplate-at-door, wallet-returned, cold-shoulder.
+What really happened, most of it unseen: spare-key, bathhouse-soak, shop-regular-greeting, stray-cat, patrol-passes, sibling-quarrel, waved-in, metro-seat, pigeon-crumbs, new-stall-line, nameplate-at-door, witness-statement, parent-visits.
 
 ## Citizen 30: Subject (quiet life)
 
@@ -1329,7 +1319,7 @@ Notebook, observations:
 
 - (none)
 
-What really happened, most of it unseen: new-metro-line, scan-check, locked-out, patrol-passes, new-stall-line, found-note, pigeon-crumbs, waits-at-closed-door, metro-seat, shift-change, walks-up-turns-back, notice-board, closed-door-job.
+What really happened, most of it unseen: new-metro-line, scan-check, locked-out, patrol-passes, new-stall-line, found-note, pigeon-crumbs, two-names, metro-seat, shift-change, walks-up-turns-back, notice-board, waits-at-closed-door.
 
 ## Citizen 32: Sakura (quiet life)
 
@@ -1388,12 +1378,12 @@ Notebook, observations:
 
 - (none)
 
-What really happened, most of it unseen: lost-card, pond-watching, envelope-at-night, wrong-door, stood-up, found-note, swapped-parcels, rope-wait, morning-commute, stoop-evening, hologram-night, certificate, plaza-stroll, patrol-passes, noodle-alone.
+What really happened, most of it unseen: lost-card, pond-watching, envelope-at-night, wrong-door, stood-up, found-note, swapped-parcels, rope-wait, morning-commute, stoop-evening, hologram-night, remembrance, plaza-stroll, patrol-passes, noodle-alone.
 
 ## Citizen 34: Kit (textured life)
 
 Answer key (hidden from the watcher): Kit Dvorak ("Kitty"); sixties or older, nonbinary; stall-keeper at Lantern Tea House; Market Row, shares a home; 1 kinds of family nearby
-Watching window each day: 09:00 to 16:00. Storylets that happened to this person this week: 17; lines the watcher got: 22.
+Watching window each day: 09:00 to 16:00. Storylets that happened to this person this week: 17; lines the watcher got: 21.
 
 Monitor log:
 
@@ -1411,13 +1401,12 @@ Monitor log:
     D3 09:27  Stitched over the pocket: Kit.
     D5 09:31  Kit steps out of the home door and crouches by a pot on the step.
     D5 09:34  Kit pours a thin stream into the pot and turns it a quarter turn.
-    D5 11:41  Kit and an unknown male resident meet at the landing.
-    D5 11:47  An unknown male resident says something low and Kit laughs.
-    D5 11:48  Overheard: Kit says: "They are putting a new stall on the corner. Rent is going up, mark me."
-    D5 11:48  Overheard: An unknown male resident says: "Kitty! There you are."
-    D6 11:17  Kit queues behind six others and sniffs the air.
-    D6 11:23  An unknown female resident serves Kit a bowl and a spoon and says a price.
-    D6 11:32  Kit eats with eyebrows high.
+    D5 11:29  Delivery drone hangs at the step for a count of three. Kit collects the parcel and checks the label.
+    D5 11:30  Label on the parcel reads: Nour Inoue.
+    D5 11:34  Kit takes the parcel inside and the door closes behind them.
+    D6 11:13  A patrol officer raises a scanner toward Kit and holds it steady.
+    D6 11:19  Kit stands under the lamp while the scanner blinks.
+    D6 11:22  Kit is released and goes down the block, not quite fast.
     D7 09:10  Kit walks to the corner where the usual left turn is and goes right instead.
     D7 09:16  Kit lingers in front of a window with a lit display, head tilted.
     D7 09:24  Kit picks the old way up again and does not look back.
@@ -1429,7 +1418,6 @@ Monitor log:
 Notebook, details:
 
 - Name: Kit [read on a document, verified]
-- Goes by: Kitty [overheard, unconfirmed]
 
 Notebook, people around them:
 
@@ -1438,9 +1426,9 @@ Notebook, people around them:
 Notebook, observations:
 
 - D3 09:14 Seen: The keeper starts Kit's order before they says a word. [unconfirmed]
-- D5 11:48 Overheard: Kit says: "They are putting a new stall on the corner. Rent is going up, mark me." [unconfirmed]
+- D5 11:30 Read: Label on the parcel reads: Nour Inoue. [verified]
 
-What really happened, most of it unseen: pigeon-crumbs, overtime, noodle-night-delivery, forgot-something, keeper-knows, window-stop, stoop-evening, new-metro-line, window-plant, stoop-gossip, new-stall-line, two-names, drone-wave, takes-longer-route, regular-meetup, takes-the-lift-up, walks-up-turns-back.
+What really happened, most of it unseen: pigeon-crumbs, overtime, noodle-night-delivery, forgot-something, keeper-knows, window-stop, stoop-evening, new-metro-line, window-plant, wrong-label, scan-check, label-neighbor, drone-wave, takes-longer-route, regular-meetup, takes-the-lift-up, rope-wait.
 
 ## Citizen 35: Aiko (quiet life)
 
@@ -1469,7 +1457,7 @@ Notebook, observations:
 
 - (none)
 
-What really happened, most of it unseen: bathhouse-soak, new-stall-line, locked-out, drone-wave, couple-post, line-cut, rope-wait, plaza-stroll, noodle-night-delivery.
+What really happened, most of it unseen: bathhouse-soak, new-stall-line, locked-out, drone-wave, couple-post, glare, rope-wait, plaza-stroll, noodle-night-delivery.
 
 ## Citizen 36: Brigid (eventful life)
 
@@ -1538,7 +1526,7 @@ Notebook, observations:
 
 - (none)
 
-What really happened, most of it unseen: evening-pair, errand-shop, long-bench, stoop-gossip, payday-treat, scan-check, regular-meetup, new-stall-line, patrol-passes, courier-handoff, noodle-alone.
+What really happened, most of it unseen: evening-pair, errand-shop, long-bench, stoop-gossip, payday-treat, scan-check, regular-meetup, new-stall-line, patrol-passes, weekly-parcel, noodle-alone.
 
 ## Citizen 38: Pavel (textured life)
 
@@ -1581,8 +1569,8 @@ What really happened, most of it unseen: after-robbery, weekly-parcel, bench-res
 
 ## Citizen 39: Henri (textured life)
 
-Answer key (hidden from the watcher): Henri Singh ("Hen"); twenties, male; bathhouse-staff at Steam House; Lowtown, shares a home; has a partner; 1 kinds of family nearby
-Watching window each day: 17:00 to 23:00. Storylets that happened to this person this week: 17; lines the watcher got: 23.
+Answer key (hidden from the watcher): Henri Singh ("Hen"); twenties, male; bathhouse-staff at Steam House; Lowtown, shares a home; 1 kinds of family nearby
+Watching window each day: 17:00 to 23:00. Storylets that happened to this person this week: 17; lines the watcher got: 22.
 
 Monitor log:
 
@@ -1610,15 +1598,13 @@ Monitor log:
     D6 22:25  Henri walks away from the counter with a cup in each hand.
     D6 22:28  Henri sips from one cup and carries the other level, never spilling it.
     D6 22:37  Henri enters the home door. The second cup goes in with him.
-    D7 19:23  An unknown male resident loops an arm through Henri's and steers toward the benches.
-    D7 19:26  An unknown male resident takes a seat and Henri settles beside, a jacket draped over both knees.
-    D7 19:33  An unknown male resident rests a head on Henri's shoulder and says a few words.
-    D7 19:34  Overheard: An unknown male resident says: "Hen! There you are."
+    D7 19:14  Henri comes out of the door with a packed bag over one shoulder.
+    D7 19:18  An unknown male resident holds the door and says a few words that make Henri stop.
+    D7 19:21  Henri crosses the street and keeps going.
 
 Notebook, details:
 
 - Name: Henri [read on a document, verified]
-- Goes by: Hen [overheard, unconfirmed]
 
 Notebook, people around them:
 
@@ -1628,12 +1614,12 @@ Notebook, observations:
 
 - D6 21:33 Posted: "Long day. Noodles and then sleep." [unconfirmed]
 
-What really happened, most of it unseen: borrowed-tool, patrol-passes, walk-home, regular-meetup, new-stall-line, bathhouse-soak, stray-cat, spare-key, crush-returns, envelope-at-night, walks-up-turns-back, platform-wait, avoids-station, feed-post, takes-second-home, tool-returned, evening-pair.
+What really happened, most of it unseen: borrowed-tool, patrol-passes, walk-home, regular-meetup, new-stall-line, bathhouse-soak, stray-cat, spare-key, crush-returns, envelope-at-night, walks-up-turns-back, platform-wait, witness-statement, feed-post, takes-second-home, tool-returned, breakup.
 
 ## Citizen 40: Nisha (quiet life)
 
 Answer key (hidden from the watcher): Nisha Pham ("Nish"); fifties, female; bathhouse-staff at Steam House; Lowtown, shares a home; 2 kinds of family nearby
-Watching window each day: 17:00 to 00:00. Storylets that happened to this person this week: 10; lines the watcher got: 16.
+Watching window each day: 17:00 to 00:00. Storylets that happened to this person this week: 10; lines the watcher got: 17.
 
 Monitor log:
 
@@ -1641,19 +1627,20 @@ Monitor log:
                   first logged as: Subject comes down the path to the bench by the lamp without checking the others.
     D1 17:41  Nisha settles into the bench and watches nothing in particular.  [rewritten]
                   first logged as: Subject settles into the bench and watches nothing in particular.
-    D5 19:18  Nisha stops in a doorway and takes a call. Voice kept low, hand over the mouth.  [rewritten]
-                  first logged as: Subject stops in a doorway and takes a call. Voice kept low, hand over the mouth.
-    D5 19:19  Phone, one side: Nisha says "No. I am not telling her yet."  [rewritten]
-                  first logged as: Phone, one side: Subject says "No. I am not telling her yet."
-    D5 19:26  Nisha drops the handset into a coat pocket and walks on, shoulders squared.  [rewritten]
-                  first logged as: Subject drops the handset into a coat pocket and walks on, shoulders squared.
-    D5 19:27  An unknown female resident slows beside Nisha: "Nisha. Haven't seen you all week."
-    D6 19:44  Nisha scoops a small card off the sidewalk and looks at it.
-    D6 19:45  Card in Nisha's hand: Lian Szeto.
-    D6 19:50  Nisha breaks into a run after the figure disappearing into the crowd.
-    D6 19:53  An unknown female resident turns. Nisha hands over the card. An unknown female resident laughs and bows twice.
-    D6 21:37  Nisha perches on the bench edge, handset in a fist.
-    D6 21:44  Nisha takes a call and smiles in spurts. Mostly listens.
+    D5 19:37  Drone sets a parcel on the step and lifts off. Nisha reads the label, frowns at it, reads again.  [rewritten]
+                  first logged as: Drone sets a parcel on the step and lifts off. Subject reads the label, frowns at it, reads again.
+    D5 19:40  Nisha walks the block with a parcel in both hands, scanning door plates.  [rewritten]
+                  first logged as: Subject walks the block with a parcel in both hands, scanning door plates.
+    D5 19:41  An unknown female resident taps Nisha on the shoulder in passing: "Hey, Nisha."
+    D5 19:44  Nisha and an unknown resident meet at their step, parcels out. A laugh, a swap, a bow.  [rewritten]
+                  first logged as: Subject and an unknown resident meet at their step, parcels out. A laugh, a swap, a bow.
+    D6 19:12  Nisha reaches the counter. The keeper greets her by name without asking for an order.
+    D6 19:13  Overheard: "Nish, the usual?" from the counter, to Nisha.
+    D6 19:13  Overheard: Nisha says: "You know me, Agnes."
+    D6 19:15  An unknown female resident stops Nisha in the square with a hand raised. Greets her with a different name. Nisha answers to it.
+    D6 19:16  Overheard: "Nisha, you old thing!" from an unknown female resident, to Nisha.
+    D6 21:15  Nisha perches on the bench edge, typing with both thumbs.
+    D6 21:19  Nisha posts, then checks the screen twice.
     D7 22:31  Nisha leans on the counter and says the usual without looking up.
     D7 22:32  Nisha ordered without a word. The server poured without asking.
     D7 22:34  An unknown male resident slides a glass across without a word.
@@ -1662,23 +1649,23 @@ Monitor log:
 Notebook, details:
 
 - Name: Nisha [overheard, unconfirmed]
+- Goes by: Nish [overheard, unconfirmed]
 
 Notebook, people around them:
 
-- (none known)
+- Agnes [name overheard, unconfirmed]
 
 Notebook, observations:
 
-- D5 19:19 On the phone: Nisha says "No. I am not telling her yet." [unconfirmed]
-- D6 19:45 Read: Card in Nisha's hand: Lian Szeto. [verified]
+- D6 19:16 Overheard: "Nisha, you old thing!" from an unknown female resident, to Nisha. [unconfirmed]
 - D7 22:32 Seen: Nisha ordered without a word. The server poured without asking. [unconfirmed]
 
-What really happened, most of it unseen: same-bench-evening, shift-change, lunch-break, pigeon-crumbs, overheard-half, regular-meetup, lost-card, call-home, landlord-envelope, kiosk-regular.
+What really happened, most of it unseen: same-bench-evening, shift-change, lunch-break, pigeon-crumbs, swapped-parcels, regular-meetup, two-names, feed-post, furniture-delivery, kiosk-regular.
 
 ## Citizen 41: Ari (quiet life)
 
 Answer key (hidden from the watcher): Ari Joshi ("Ar"); twenties, nonbinary; bathhouse-staff at Steam House; Lowtown, shares a home; has a partner; 1 kinds of family nearby
-Watching window each day: 17:00 to 23:00. Storylets that happened to this person this week: 10; lines the watcher got: 16.
+Watching window each day: 17:00 to 23:00. Storylets that happened to this person this week: 10; lines the watcher got: 14.
 
 Monitor log:
 
@@ -1688,28 +1675,21 @@ Monitor log:
                   first logged as: Subject gestures toward the stairwell and the lit mouth below.
     D3 18:46  Ari rides down and the train pulls out.  [rewritten]
                   first logged as: Subject rides down and the train pulls out.
-    D4 17:20  Ari takes a stool and drums fingers on the counter.  [rewritten]
-                  first logged as: Subject takes a stool and drums fingers on the counter.
-    D4 17:27  Sanjay hands Ari a small wrapped bun with a lit candle on top.  [rewritten]
-                  first logged as: An unknown male resident hands Subject a small wrapped bun with a lit candle on top.
-    D4 17:28  Overheard: Sanjay says: "Twenty-five today. Eat the bun before I do."  [rewritten]
-                  first logged as: Overheard: An unknown male resident says: "Twenty-five today. Eat the bun before I do."
-    D4 17:31  Sanjay wraps Ari in a hug while the candle gutters.  [rewritten]
-                  first logged as: An unknown male resident wraps Subject in a hug while the candle gutters.
-    D4 17:32  Overheard: Ari says: "Hey, Sanjay."  [rewritten]
-                  first logged as: Overheard: Subject says: "Hey, Sanjay."
-    D6 17:32  An unknown female resident arrives at the door carrying a heavy bag that clinks.
-    D6 17:41  Ari steps out and hugs an unknown female resident. It goes on for a while.  [rewritten]
-                  first logged as: Subject steps out and hugs an unknown female resident. It goes on for a while.
-    D6 17:42  Overheard: An unknown female resident says: "A mother worries. Eat something."
-    D6 17:45  Ari takes the pot and holds the door. An unknown female resident goes in first.  [rewritten]
-                  first logged as: Subject takes the pot and holds the door. An unknown female resident goes in first.
-    D7 18:10  Ari reaches the counter and points at the first picture.  [rewritten]
-                  first logged as: Subject reaches the counter and points at the first picture.
+    D4 17:47  Ari lingers by the fence while a drone ferries steel.  [rewritten]
+                  first logged as: Subject lingers by the fence while a drone ferries steel.
+    D4 17:51  Ari gestures toward the swinging beam.  [rewritten]
+                  first logged as: Subject gestures toward the swinging beam.
+    D4 17:57  Ari heads on down the block.  [rewritten]
+                  first logged as: Subject heads on down the block.
+    D6 17:44  An unknown male resident stands at the home door, hands tucked into sleeves.
+    D6 17:53  Ari hands an unknown male resident a key and says a few words.  [rewritten]
+                  first logged as: Subject hands an unknown male resident a key and says a few words.
+    D6 17:54  Overheard: An unknown male resident says: "What's a friend for? Go, I've got the fish."
+    D6 17:54  Overheard: An unknown male resident says "Ari" and waits for Ari to look up.
+    D6 17:58  An unknown male resident goes down the step and off at a brisk pace.
+    D7 18:10  Ari reaches the counter and points at the first picture.
     D7 18:13  An unknown female resident serves up quick and moves on to the next.
-    D7 18:14  Overheard: The keeper calls out: "Order for Ari!"
-    D7 18:21  Ari blows on the broth and samples the edge.  [rewritten]
-                  first logged as: Subject blows on the broth and samples the edge.
+    D7 18:21  Ari blows on the broth and samples the edge.
 
 Notebook, details:
 
@@ -1717,19 +1697,18 @@ Notebook, details:
 
 Notebook, people around them:
 
-- Sanjay [name overheard, unconfirmed]
-- An unknown female resident: mother [relation overheard, unconfirmed]
+- An unknown male resident: friend [relation overheard, unconfirmed]
 
 Notebook, observations:
 
-- D4 17:28 Overheard: Sanjay says: "Twenty-five today. Eat the bun before I do." [unconfirmed]
+- (none)
 
-What really happened, most of it unseen: noodle-alone, introduction, new-metro-line, patrol-passes, birthday-cake, baby-post, parent-visits, kiosk-regular, regular-meetup, new-stall-line.
+What really happened, most of it unseen: noodle-alone, introduction, new-metro-line, patrol-passes, crowd-watches-crane, long-bench, spare-key, kiosk-regular, regular-meetup, new-stall-line.
 
 ## Citizen 42: Subject (quiet life)
 
 Answer key (hidden from the watcher): Rosa Berg ("Rosie"); forties, female; bathhouse-staff at Steam House; Lowtown, lives alone; 1 kinds of family nearby
-Watching window each day: 14:00 to 20:00. Storylets that happened to this person this week: 13; lines the watcher got: 6.
+Watching window each day: 14:00 to 20:00. Storylets that happened to this person this week: 13; lines the watcher got: 7.
 
 Monitor log:
 
@@ -1737,8 +1716,9 @@ Monitor log:
     D3 18:29  Subject stands in the square and shades eyes with a hand.
     D3 18:38  Subject gestures toward a drone crossing the roofs.
     D3 19:02  Overheard: Subject tells an elderly man that Noor came in on the lift last week, a cousin of someone on the block.
-    D5 16:42  Subject sits on a bench with jaw set and a thumb moving fast.
-    D5 16:49  Subject sends a post and shoves the handset into a pocket.
+    D5 16:21  Subject waits in line at the counter, a handset in one hand.
+    D5 16:28  An unknown female resident slides into line ahead of Subject, shoulder first.
+    D5 16:34  Subject says something sharp. An unknown female resident shrugs it off. Subject shakes her head.
     D5 19:41  Subject walks to the lawn and stands at the edge of the glow.
     D5 19:49  Subject stands in the projector's light, mouth slightly open.
 
@@ -1754,56 +1734,44 @@ Notebook, observations:
 
 - (none)
 
-What really happened, most of it unseen: new-metro-line, long-bench, patrol-passes, regular-meetup, drone-gazing, stoop-evening, new-stall-line, stray-cat, errand-for-elder, feed-jab, hologram-night, feed-post, couple-post.
+What really happened, most of it unseen: new-metro-line, long-bench, patrol-passes, regular-meetup, drone-gazing, stoop-evening, new-stall-line, stray-cat, errand-for-elder, line-cut, hologram-night, introduction, goodnight-call.
 
-## Citizen 43: Maeve (quiet life)
+## Citizen 43: Subject (quiet life)
 
 Answer key (hidden from the watcher): Maeve Dvorak ("Mae"); forties, female; club-staff at Neon Dome; Midrow, lives alone; 2 kinds of family nearby
-Watching window each day: 09:00 to 16:00. Storylets that happened to this person this week: 7; lines the watcher got: 11.
+Watching window each day: 09:00 to 16:00. Storylets that happened to this person this week: 7; lines the watcher got: 9.
 
 Monitor log:
 
-    D3 11:07  Maeve rides the lift to the platform with a handful of others.  [rewritten]
-                  first logged as: Subject rides the lift to the platform with a handful of others.
-    D3 11:15  Maeve leans on a pillar and watches the track curve away.  [rewritten]
-                  first logged as: Subject leans on a pillar and watches the track curve away.
-    D3 11:21  Maeve boards the next train.  [rewritten]
-                  first logged as: Subject boards the next train.
-    D5 11:10  Maeve heads for the shop, a cloth bag folded in one hand.  [rewritten]
-                  first logged as: Subject heads for the shop, a cloth bag folded in one hand.
-    D5 11:19  Maeve slips in between two shoppers coming out.  [rewritten]
-                  first logged as: Subject slips in between two shoppers coming out.
-    D5 11:27  Maeve emerges with a paper sack and a single stalk of something green sticking out of it.  [rewritten]
-                  first logged as: Subject emerges with a paper sack and a single stalk of something green sticking out of it.
-    D7 09:22  Overheard: Maeve mentions to an unknown male resident that Lai is the one who moved in by the corner.  [rewritten]
-                  first logged as: Overheard: Subject mentions to an unknown male resident that Lai is the one who moved in by the corner.
-    D7 11:25  Drone drop at Maeve's door. Maeve picks up the parcel and holds it at arm's length to read it.  [rewritten]
-                  first logged as: Drone drop at Subject's door. Subject picks up the parcel and holds it at arm's length to read it.
-    D7 11:30  Maeve walks the block with a parcel in both hands, scanning door plates.  [rewritten]
-                  first logged as: Subject walks the block with a parcel in both hands, scanning door plates.
-    D7 11:31  An unknown female resident taps Maeve on the shoulder in passing: "Hey, Maeve."
-    D7 11:34  Katya opens the door holding a parcel of her own. Both look at each other, then at the parcels. They swap.  [rewritten]
-                  first logged as: An unknown female resident opens the door holding a parcel of her own. Both look at each other, then at the parcels. They swap.
-    D7 11:35  Label on the swapped parcel: Katya Salazar.
+    D3 11:07  Subject rides the lift to the platform with a handful of others.
+    D3 11:15  Subject leans on a pillar and watches the track curve away.
+    D3 11:21  Subject boards the next train.
+    D5 11:10  Subject heads for the shop, a cloth bag folded in one hand.
+    D5 11:19  Subject slips in between two shoppers coming out.
+    D5 11:27  Subject emerges with a paper sack and a single stalk of something green sticking out of it.
+    D7 09:22  Overheard: Subject mentions to an unknown male resident that Lai is the one who moved in by the corner.
+    D7 11:05  Subject rings at a door and waits with a slip of paper in hand.
+    D7 11:10  Subject talks, an unknown female resident listens, then answers with a short, firm sentence. Subject looks at the paper again.
+    D7 11:17  An unknown female resident points two buildings along. Subject thanks her and walks on.
 
 Notebook, details:
 
-- Name: Maeve [overheard, unconfirmed]
+- (blank)
 
 Notebook, people around them:
 
-- Katya Salazar [name read on a document, verified]
+- (none known)
 
 Notebook, observations:
 
 - (none)
 
-What really happened, most of it unseen: notice-board, overtime, platform-wait, walk-home, errand-shop, couple-post, swapped-parcels.
+What really happened, most of it unseen: notice-board, overtime, platform-wait, walk-home, errand-shop, borrowed-tool, wrong-door.
 
 ## Citizen 44: Imran (quiet life)
 
 Answer key (hidden from the watcher): Imran Choi ("Imi"); thirties, male; courier at Swift Parcel; Market Row, shares a home; has a partner; 1 kinds of family nearby
-Watching window each day: 14:00 to 22:00. Storylets that happened to this person this week: 14; lines the watcher got: 22.
+Watching window each day: 14:00 to 22:00. Storylets that happened to this person this week: 14; lines the watcher got: 23.
 
 Monitor log:
 
@@ -1822,34 +1790,36 @@ Monitor log:
     D4 15:37  Name on the card: Sung Fletcher.
     D4 15:43  Imran sprints a few steps down the walk, card held over his head.
     D4 15:48  An unknown male resident turns. Imran hands over the card. An unknown male resident laughs and bows twice.
-    D4 17:16  Imran stops at the edge of a plot and watches the work.
-    D4 17:25  Imran points at a pair of workers on a gantry.
-    D4 17:32  Imran wanders off after a few minutes, still looking back.
-    D5 17:28  Imran marches at the cafe stools with a face like a shut door.
-    D5 17:31  Imran stops two paces short of a seated figure and stays there.
-    D5 17:39  Imran shakes his head, turns away, and goes back the way he came.
-    D5 18:26  Imran reaches the door, shifts a parcel to the other arm and finds the key.
-    D5 18:27  Plate by the door reads Imran Choi.
-    D5 18:31  Imran steps inside. Door closes.
+    D4 17:29  Imran sits at a stool and scrolls a handset with one eyebrow up.
+    D4 17:34  An unknown female resident arrives and sets a bun with a single candle in front of Imran.
+    D4 17:37  An unknown female resident wraps Imran in a hug while the candle gutters.
+    D4 17:38  Overheard: An unknown female resident says: "Of course I remembered, friend. Who else would?"
+    D5 17:26  Imran sits on a bench with jaw set and a thumb moving fast.
+    D5 17:30  Imran posts, deletes, posts again.
+    D5 17:31  Posted: "Some people copy your recipe and call it theirs. You know who you are."
+    D5 18:16  Imran pauses at the corner with a handset at the ear. Back to the street.
+    D5 18:17  Phone, one side: Imran says "Not yet. After the weekend. Please do not say anything."
+    D5 18:25  Imran drops the handset into a coat pocket and walks on, shoulders squared.
     D7 17:38  Imran leans on his doorframe while an unknown female resident stops at the next step.
     D7 17:43  The two of them gossip for ten minutes, hands moving.
     D7 17:44  Overheard: An unknown female resident says: "I heard the lift will be closed all of Thursday."
 
 Notebook, details:
 
-- Name: Imran Choi [read on a document, verified]
+- Name: Imran [read on a document, verified]
 
 Notebook, people around them:
 
-- (none known)
+- An unknown female resident: friend [relation overheard, unconfirmed]
 
 Notebook, observations:
 
 - D4 15:37 Read: Name on the card: Sung Fletcher. [verified]
-- D5 18:27 Read: Plate by the door reads Imran Choi. [verified]
+- D5 17:31 Posted: "Some people copy your recipe and call it theirs. You know who you are." [unconfirmed]
+- D5 18:17 On the phone: Imran says "Not yet. After the weekend. Please do not say anything." [unconfirmed]
 - D7 17:44 Overheard: An unknown female resident says: "I heard the lift will be closed all of Thursday." [unconfirmed]
 
-What really happened, most of it unseen: morning-commute, new-metro-line, courier-handoff, metro-seat, long-bench, groceries-up, lost-card, crowd-watches-crane, feed-post, walks-up-turns-back, nameplate-at-door, patrol-passes, line-cut, stoop-gossip.
+What really happened, most of it unseen: morning-commute, new-metro-line, courier-handoff, metro-seat, long-bench, groceries-up, lost-card, birthday-cake, feed-post, feed-jab, overheard-half, patrol-passes, not-telling-after, stoop-gossip.
 
 ## Citizen 45: Shun (quiet life)
 
@@ -1965,8 +1935,8 @@ Monitor log:
                   first logged as: An unknown female resident goes in first. Subject follows a step behind.
     D5 10:26  Yan enters the shop. Inside, a hand lifts in greeting.
     D5 10:29  Yan exits and holds up the bag toward the window. A hand waves back.
-    D7 09:38  Yan takes a seat and crinkles a bag.
-    D7 09:44  Yan crouches, drops a handful, and lets them peck near the shoes.
+    D7 09:38  Yan stops at a wall of printed sheets and reads each in turn.
+    D7 09:46  Yan heads off down the block at an easy pace.
 
 Notebook, details:
 
@@ -1980,7 +1950,7 @@ Notebook, observations:
 
 - D4 14:26 Overheard: An unknown female resident says to Yan: "I'm coming by every shift this week. Be ready." [unconfirmed]
 
-What really happened, most of it unseen: shift-change, stray-cat, groceries-up, noodle-alone, boss-visits, overheard-half, not-telling-after, shop-regular-greeting, pigeon-crumbs.
+What really happened, most of it unseen: shift-change, stray-cat, groceries-up, noodle-alone, boss-visits, overheard-half, not-telling-after, shop-regular-greeting, notice-board.
 
 ## Citizen 48: Jun (quiet life)
 
@@ -2022,12 +1992,12 @@ Notebook, observations:
 
 - (none)
 
-What really happened, most of it unseen: borrowed-tool, rope-wait, new-lawn, noodle-alone, metro-seat, waits-at-closed-door, closed-door-friend, platform-wait, morning-commute, stoop-gossip, swapped-parcels, patrol-passes, bathhouse-soak, feed-jab, plaza-stroll, walk-home, noodle-alone.
+What really happened, most of it unseen: borrowed-tool, rope-wait, new-lawn, noodle-alone, metro-seat, waits-at-closed-door, closed-door-friend, platform-wait, morning-commute, stoop-gossip, nameplate-at-door, patrol-passes, drone-wave, rope-wait, plaza-stroll, walk-home, pond-watching.
 
 ## Citizen 49: Subject (textured life)
 
 Answer key (hidden from the watcher): Jun Xu ("Junny"); twenties, male; stall-keeper at Night Noodle; Market Row, shares a home; 2 kinds of family nearby
-Watching window each day: 13:00 to 20:00. Storylets that happened to this person this week: 10; lines the watcher got: 7.
+Watching window each day: 13:00 to 20:00. Storylets that happened to this person this week: 11; lines the watcher got: 9.
 
 Monitor log:
 
@@ -2038,6 +2008,8 @@ Monitor log:
     D4 17:31  Subject arrives at the home door, both arms full, kicking at the step with a boot.
     D4 17:36  Subject backs through the door and it slides shut.
     D4 17:37  Subject goes in at the third door along, arms full.
+    D6 19:12  Subject stops by the water and stays there.
+    D6 19:18  Subject sits on the stone rim and trails a finger in the water.
 
 Notebook, details:
 
@@ -2051,7 +2023,7 @@ Notebook, observations:
 
 - D4 17:37 Seen: Subject goes in at the third door along, arms full. [unconfirmed]
 
-What really happened, most of it unseen: same-stool, stranger-greets, late-walk-home, petition-board, feed-post, drone-wave, overheard-half, groceries-up, stoop-evening, lost-card.
+What really happened, most of it unseen: same-stool, stranger-greets, late-walk-home, petition-board, feed-post, drone-wave, overheard-half, groceries-up, stoop-evening, pond-watching, nameplate-at-door.
 
 ## Citizen 50: Min-ji (quiet life)
 

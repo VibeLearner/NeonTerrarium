@@ -245,3 +245,46 @@ body.deleting #view{cursor:crosshair}
 .lookpick{display:grid;gap:6px}
 .lookswrow:empty{display:none}
 .lookswrow .sws{width:100%;height:8px}
+
+/* ---------- the monitor (monitor.js): a surveillance feed on whoever was clicked, top right ---------- */
+.monitor{position:fixed;top:calc(58px + env(safe-area-inset-top,0px));right:16px;width:min(340px,calc(100vw - 32px));max-height:calc(100% - 74px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));display:grid;grid-template-rows:auto auto auto minmax(0,1fr);background:var(--deck);border:1px solid var(--line);border-radius:4px;box-sizing:border-box;z-index:3;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 0 0 1px rgba(56,232,224,.08),0 8px 24px rgba(0,0,0,.45)}
+.monitor[hidden]{display:none}
+body:has(#deck.open) .monitor{right:304px}
+.monitor header{display:flex;align-items:center;gap:6px;padding:8px 10px 6px}
+.mon-title{flex:1;min-width:0;display:grid}
+.mon-title b{font-family:var(--font-pixel);font-weight:400;font-size:12px;letter-spacing:.1em;color:var(--cyan);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mon-title small{color:var(--muted);font-size:10px}
+.monitor header button{background:transparent;border:1px solid var(--line);color:var(--muted);font:inherit;font-size:11px;padding:3px 7px;border-radius:3px;cursor:pointer}
+.monitor header button.on{border-color:var(--cyan);color:var(--cyan)}
+#monFeed{display:block;width:calc(100% - 20px);margin:0 10px;aspect-ratio:16/9;image-rendering:pixelated;border:1px solid #1d2a3d;background:#05080f}
+#monTabs{display:flex;gap:4px;padding:8px 10px 4px}
+#monTabs button{flex:1;background:transparent;border:1px solid var(--line);color:var(--muted);font-family:var(--font-pixel);font-size:10px;letter-spacing:.1em;padding:4px;border-radius:3px;cursor:pointer;text-transform:uppercase}
+#monTabs button.on{border-color:var(--pink);color:var(--pink)}
+.mon-body{overflow:auto;padding:4px 10px 10px;min-height:120px;font-size:11px;line-height:1.45}
+.mon-body h4{margin:10px 0 4px;font-family:var(--font-pixel);font-weight:400;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan)}
+.mon-empty{color:var(--muted);margin:8px 0}
+.ml,.mo{display:grid;grid-template-columns:62px 1fr;gap:6px;padding:3px 0;border-bottom:1px solid rgba(44,58,82,.45)}
+.ml time,.mo time{color:var(--muted);font-variant-numeric:tabular-nums;font-size:10px;padding-top:1px}
+.ml.reveal span{color:#f3e7cf}
+.ml.reveal span::before{content:'';display:inline-block;width:5px;height:5px;background:var(--amber);margin:0 5px 1px 0}
+.ml.hearsay span{color:#c9b8e6}
+.ml i,.mo small,.md small,.mp small{font-style:normal;color:var(--muted);font-size:10px}
+.ml i{border:1px solid var(--line);padding:0 3px;border-radius:2px;margin-left:3px;cursor:help}
+.md{display:grid;grid-template-columns:72px 1fr;gap:2px 8px;padding:2px 0}
+.md b{font-weight:600;color:var(--muted)}
+.md i{font-style:normal;color:#3f4e66;letter-spacing:.1em}
+.md small{grid-column:2}
+.mp{padding:3px 0;display:flex;flex-wrap:wrap;gap:2px 6px;align-items:baseline}
+.mp button{background:none;border:0;padding:0;color:var(--cyan);font:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.mp span{color:var(--ink)}
+.mp small{flex-basis:100%}
+.mo b{color:var(--amber);font-weight:600}
+.mon-loose{margin:2px 0;color:var(--ink)}
+.mon-key{margin-top:12px;color:var(--muted);font-size:10px}
+.mon-key summary{cursor:pointer}
+/* the speed bar, top middle */
+.ffbar{position:fixed;top:calc(16px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:4px;padding:4px 6px 4px 10px;background:var(--deck);border:1px solid var(--line);border-radius:4px;z-index:2;font-family:var(--font-pixel);font-size:10px;letter-spacing:.08em}
+.ffbar span{color:var(--muted);margin-right:4px;white-space:nowrap}
+.ffbar button{background:transparent;border:1px solid var(--line);color:var(--muted);font:inherit;padding:3px 7px;border-radius:3px;cursor:pointer}
+.ffbar button.on{border-color:var(--amber);color:var(--amber)}
+@media (max-width:700px){.ffbar{top:auto;bottom:calc(210px + env(safe-area-inset-bottom,0px))}}

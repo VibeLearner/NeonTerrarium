@@ -870,6 +870,7 @@ function desire(p, h){
   if (job && job.stalls){ p.ws = p.nightShift < .5 ? 16.5 : 10; p.wlen = 7.5; }   // day market 10:00 to 17:30, night market 16:30 to midnight
   if (job && job.patrol){ const k = Math.min(2, Math.floor(p.nightShift*3)); p.ws = [7, 15, 23][k]; p.wlen = 8; p.nightWorker = k === 2; }   // police: three shifts round the clock
   if (p.guard){ p.ws = p.guardShift ? 18 : 6; p.wlen = 12; p.nightWorker = !!p.guardShift; }   // the spire's watch: six to six, day and night
+  if (typeof STORY !== 'undefined' && STORY.on){ const o = STORY.routine(p, h); if (o) return o; }   // a day that isn't ordinary: sick at home, a late start, a day off (story.js)
   if (p.archivist){ p.ws = p.workS; p.wlen = p.workLen; p.nightWorker = false; if (working(p, h)) return p.job; return p.home; }   // straight from home to the spire and back, nothing else
   if (p.visitor) return pplNow > p.leaveAt ? p.home : (leisure(p) || p.home);   // a visitor: out seeing the town until it's time to go
   if (p.chain && !asleep(p, h) && !working(p, h)) return p.at;   // finish what they started (ordered food: now eat it)
@@ -1044,6 +1045,7 @@ function startPatrol(p, forced){
 }
 // decide what to do next once the current stay is over
 function decide(p){
+  if (p.scene){ p.until = pplNow + 2; return; }   // in a story moment: the scene moves them (story.js)
   if (p.club) return;   // out at the club: the night decides (see updateClubs)
   if (p.metro){ p.until = Infinity; return; }   // on the platform or on the train: the metro decides (see metro.js)
   if (p.cop && working(p, S.hour) && desire(p, S.hour) === p.job && (p.patrol || p.at === p.job)){
@@ -1274,6 +1276,10 @@ function updateBots(dt, t){
   for (const b of bots){
     if (b.state === 'in'){ if (t >= b.until) botNext(b); continue; }
     if (b.state === 'drop'){ if (t - b.t0 > 3.6){ b.cap = null; botNext(b); } continue; }
+    if (b.state === 'wait'){   // hovering at the door with the parcel until someone takes it; nobody (or too long): it goes on the step
+      if (b.taken){ b.state = 'drop'; b.t0 = t - 3.6; b.cap = null; b.taken = false; continue; }
+      if (!b.storyWait || t - b.waitT > 45){ b.storyWait = false; b.state = 'drop'; b.t0 = t; b.cap = { x: b.door.wall.x + b.door.n[0]*.14, z: b.door.wall.z + b.door.n[1]*.14 }; }
+      continue; }
     if (b.state === 'lift'){ botLift(b, dt, t); continue; }
     const w = b.walk; if (!w) { b.state = 'in'; continue; }
     if (!(b.pause > t)) w.s += dt*BOT_SPEED;
@@ -1285,6 +1291,7 @@ function updateBots(dt, t){
       if (d.lift && d.lift.liftCab){ b.state = 'lift'; b.door = d; b.ride = { c: d.lift, dir: 'up', ph: 'wait', t: 0 }; b.by = CURB; continue; }
       b.state = 'drop'; b.t0 = t; b.door = d; b.by = CURB;
       b.x = d.stand.x; b.z = d.stand.z; b.dx = -d.n[0]; b.dz = -d.n[1];   // facing the door
+      if (typeof STORY !== 'undefined' && STORY.botAtDoor(b, d, t)){ b.state = 'wait'; continue; }   // someone's coming out for it (story.js)
       b.cap = { x: d.wall.x + d.n[0]*.14, z: d.wall.z + d.n[1]*.14 };
       continue;
     }
@@ -1343,7 +1350,7 @@ function lurkVictim(L, t){
   for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++){ const l = _lgCells.get(lgKey(gx + dx, gz + dz)); if (l) for (const i of l) near.push(i); }
   near.sort((a, b) => a - b);
   for (const i of near){
-    const p = pplList[i], w = p.walk; if (!w || p.cop || p.pause > t || w.s < w.safe0 + .3 || w.s > w.safe1 - .3) continue;
+    const p = pplList[i], w = p.walk; if (!w || p.cop || p.scene || p.pause > t || w.s < w.safe0 + .3 || w.s > w.safe1 - .3) continue;
     if ((p.x - L.x)**2 + (p.z - L.z)**2 > 1.4*1.4) continue;
     const px = Math.floor(p.x/2), pz = Math.floor(p.z/2); let alone = true;
     for (let dz = -1; dz <= 1 && alone; dz++) for (let dx = -1; dx <= 1 && alone; dx++){ const l = _lgCells.get(lgKey(px + dx, pz + dz)); if (l) for (const j of l){ const o = pplList[j]; if (o !== p && o.walk && (o.x - p.x)**2 + (o.z - p.z)**2 < 4){ alone = false; break; } } }
@@ -1456,7 +1463,7 @@ function clubOf(pl){
 }
 const clubMembers = s => pplList.filter(p => p.club && p.club.id === s.pl.id);
 // someone free to come out: home, awake or not (it's a night out), not working, not police
-const clubCandidate = p => !p.walk && !p.club && !p.cop && !p.chain && p.at === p.home && !working(p, S.hour) && places.has(p.home);
+const clubCandidate = p => !p.walk && !p.club && !p.cop && !p.chain && !p.scene && p.at === p.home && !working(p, S.hour) && places.has(p.home);
 // a trip that starts where they stand, joining the network at a door (out of the queue, shoved away, escorted)
 function startTripAt(p, x, z, fromDoor, toId){
   const to = places.get(toId); if (!to || !reachable(to) || !fromDoor) return false;
@@ -2085,7 +2092,7 @@ function updatePeople(dt, t){
         w.puke.x = p.x + sx*.22; w.puke.z = p.z + sz*.22; emote(p, 'sweat', 1.6); }
       if (w.s >= w.len && w.doorB && w.doorB.lift && !w.rode){ w.rode = true; w.s = w.len; p.ride = { c: w.doorB.lift, dir: 'up', t: 0 }; }
       if (p.ride){}
-      else if (w.s >= w.len){ arrive(p); if (!p.spot && !p.patrol) continue; }
+      else if (w.s >= w.len){ if (w.scene) STORY.walkDone(p); else { arrive(p); if (!p.spot && !p.patrol) continue; } }   // (a scene's own walk ends where the scene wants them: story.js)
       else {
         walking = true;
         let k = walkSeg(w);
@@ -2105,6 +2112,9 @@ function updatePeople(dt, t){
       if (p.club){
         const r = clubPose(p, t, dt); if (!r) continue;
         p.x = r.x; p.z = r.z; y = r.y; frame = r.frame; p.flip = r.flip; alpha = r.alpha;
+      } else if (p.scene){   // in a story moment: standing at a door, talking, waiting (story.js); indoors, not drawn
+        const r = STORY.pose(p, t); if (!r) continue;
+        y = r.y; frame = r.frame;
       } else if (p.patrol){
         // on the beat: standing at a crossing, now and then scanning with the handheld
         p.x = p.patrol.x; p.z = p.patrol.z;

@@ -36,7 +36,7 @@ function frameBody(now){
   // day and night cycle: 24 game hours per real hour. Real elapsed time (up to a second, so a slow frame rate
   // doesn't slow the day), and none while the tab is hidden.
   const rdt = Math.min(1, (now-last)/1000);   // real time passed (fades and the day cycle shouldn't slow with the frame rate)
-  if (S.cycle) S.hour = (S.hour + rdt*24/3600) % 24;
+  if (S.cycle) S.hour = (S.hour + rdt*24/3600*FF.clock) % 24;   // (fast forward runs the clock quicker: story.js)
   last = now;
   const night = applyTime();
   { const d = LIGHTS_GOAL - LIGHTS_ON.value, st = LIGHTS_RATE*rdt; LIGHTS_ON.value += Math.max(-st, Math.min(st, d)); }   // lights catch up with the hour one by one
@@ -53,7 +53,8 @@ function frameBody(now){
   updateAnims(dt);
   updateMegaFx(dt, now/1000);
   PH.lap('megastructures, animations');
-  updatePeople(dt, now/1000);
+  updatePeople(dt*FF.ppl, FF.peopleTime(rdt, now/1000));   // (fast forward: the people's own clock runs quicker too)
+  STORY.tick(rdt);   // story moments, the shape of the day, the monitor's log (story.js)
   PH.lap('people');
   music.update(rdt);
   updateSteam(dt, night);
@@ -163,6 +164,7 @@ function frameBody(now){
   PH.begin('composite'); renderer.setRenderTarget(rtOut); renderer.render(compScene, compCam); PH.end();
   PH.begin('bloom and grade'); renderGlow(); PH.end();   // bloom and halation (sky.js)
   if (!GLOW_DIRECT){ PH.begin('to screen'); renderer.setRenderTarget(null); renderer.render(upScene, compCam); PH.end(); }   // (drawn straight to the screen already when the sizes match: sky.js renderGlow)
+  MON.blit(); MON.syncBar();   // the monitor's feed: a crop of the frame just drawn (monitor.js)
   PH.frameEnd();
 }
 requestAnimationFrame(frame);

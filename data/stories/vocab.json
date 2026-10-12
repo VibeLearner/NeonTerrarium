@@ -248,7 +248,8 @@
     "pressure-high:loneliness",
     "pressure-high:work-trouble",
     "pressure-high:secret",
-    "pressure-high:life-change"
+    "pressure-high:life-change",
+    "sick"
   ],
   "lifeChanges": [
     "job-lost",

@@ -65,6 +65,8 @@ canvas.addEventListener('pointerdown', e => {
   canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); dragging = true;
   if (ptrs.size === 2){ if (act && act.timer) clearTimeout(act.timer); act = { kind: 'pinch' }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); hover.visible = hoverFill.visible = false; return; }
   if (delMode && e.button === 0){ act = { kind: 'del', x: e.clientX, y: e.clientY, moved: false, from: groundCellAt(e.clientX, e.clientY) }; return; }   // delete mode: drag selects
+  if ((e.button === 0 || e.pointerType === 'touch') && !hwMode && !mtMode && !megaPick){   // someone in the street under the pointer: a click opens the monitor on them (monitor.js)
+    const who = MON.pick(e.clientX, e.clientY); if (who){ act = { kind: 'npc', id: who, x: e.clientX, y: e.clientY, moved: false }; return; } }
   if (e.pointerType === 'touch'){
     // tap builds, drag paints, press and hold removes
     act = { kind: 'touch', x: e.clientX, y: e.clientY, moved: false, done: new Set() };
@@ -99,6 +101,7 @@ canvas.addEventListener('pointermove', e => {
     if (act.moved && act.from && to){ delSel = { i0: Math.min(act.from.i, to.i), i1: Math.max(act.from.i, to.i), j0: Math.min(act.from.j, to.j), j1: Math.max(act.from.j, to.j) }; showAreaSel(delSel); }
     return;
   }
+  if (act.kind === 'npc'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5){ act.kind = 'sky'; act.moved = true; } return; }
   if (act.kind === 'sky'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); hover.visible = hoverFill.visible = false; if (megaPick) showMegaGhost(null); } return; }
   if (act.kind === 'right'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); } return; }
   if (act.kind === 'touch'){
@@ -111,6 +114,7 @@ canvas.addEventListener('pointermove', e => {
 const endPtr = e => {
   if (act && typeof LOADP !== 'undefined' && LOADP.on) act.moved = true;   // (a city is still being loaded from its recipes: a click edits nothing yet)
   if (act && ptrs.has(e.pointerId)){
+    if (act.kind === 'npc' && !act.moved) MON.open(act.id);
     if (act.kind === 'del' && !act.moved){   // a click: inside the selection deletes it, anywhere else clears it
       const c = groundCellAt(e.clientX, e.clientY);
       if (delSel && c && c.i >= delSel.i0 && c.i <= delSel.i1 && c.j >= delSel.j0 && c.j <= delSel.j1) removeArea(delSel);
@@ -136,7 +140,7 @@ addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input,select')) return;
   const k = e.key.toLowerCase();
   if (k === 'shift') keys.add('shift');
-  if (PAN_KEYS.includes(k)){ keys.add(k); e.preventDefault(); return; }
+  if (PAN_KEYS.includes(k)){ keys.add(k); MON.userPan(); e.preventDefault(); return; }
   if (k === 'h' || e.key === 'Home'){ centerView(); return; }
   if (e.key === ' '){ e.preventDefault(); if (!e.repeat) setTiltMode(!tiltMode); return; }
   if (k === 'x' && !e.repeat){ setDelMode(!delMode); return; }
@@ -161,6 +165,7 @@ addEventListener('keydown', e => {
   else if (e.key === 'Escape' && !$('mtHelp').hidden) setMtHelp(false);
   else if ((e.key === 'Escape' || e.key === '0') && hwMode) setHwMode(false);
   else if ((e.key === 'Escape' || e.key === '0') && mtMode) setMtMode(false);
+  else if (e.key === 'Escape' && MON.id && !delMode && !megaPick) MON.close();
   else if (e.key === 'Escape' || e.key === '0'){ if (delMode){ if (delSel){ delSel = null; showAreaSel(null); } else setDelMode(false); } else if (megaPick) selectMega(null); else selectZone(null); }
 });
 

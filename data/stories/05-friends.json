@@ -1279,6 +1279,150 @@
       "next": {
         "sets": []
       }
+    },
+    {
+      "id": "fri.soup-from-a-friend",
+      "title": "A friend with broth",
+      "tier": "texture",
+      "note": "Someone is sick at home, which the watcher can't see: the door just stays shut. Then a friend turns up with food, and the reason comes out on the step. Engine: a sick day is a routine change (the person stays home); this storylet only fires while it lasts.",
+      "roles": {
+        "A": {
+          "desc": "an adult at home sick",
+          "needs": [
+            "adult",
+            "sick"
+          ]
+        },
+        "B": {
+          "desc": "a friend bringing food",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          20
+        ],
+        "at": [
+          "home-door",
+          "street"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 30,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "B",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "knock-and-wait",
+          "who": "B",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b4",
+          "do": "hand-over",
+          "who": "B",
+          "with": [
+            "A"
+          ],
+          "at": "home-door"
+        },
+        {
+          "id": "b5",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b6",
+          "do": "walk",
+          "who": "B",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} turns onto the block with a thermos under one arm.",
+          "{B.desc} comes along the walk carrying a string bag of oranges and a jar.",
+          "{B.desc} heads for the door, a cloth-wrapped pot held in front."
+        ],
+        "b2": [
+          "{B.desc} knocks and calls something through the door.",
+          "{B.desc} knocks, waits, knocks again with the side of a fist.",
+          "{B.desc} knocks on the door with the toe of a shoe, hands full."
+        ],
+        "b3": [
+          "{A} comes out in socks and a coat over pajamas.",
+          "The door slides open and {A} steps out, squinting at the light.",
+          "{A} comes out slowly, a scarf wound up to the nose."
+        ],
+        "b4": [
+          "{B.desc} hands over the jar and the oranges. {A} takes them in a bundle.",
+          "{B.desc} passes the thermos across. {A} hugs it to {A.his} chest.",
+          "{B.desc} holds out the pot and won't let go until {A} takes it properly."
+        ],
+        "b5": [
+          "{A} goes in with an armful. The door slides shut.",
+          "{A} goes back inside, the door sliding shut behind.",
+          "{A} steps in. The door closes."
+        ],
+        "b6": [
+          "{B.desc} walks off, glancing back at the door once.",
+          "{B.desc} heads back the way {B.he} came, hands empty.",
+          "{B.desc} goes on along the block, checking the time."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.said",
+          "beat": "b4",
+          "channel": "conversation",
+          "chance": 0.85,
+          "log": [
+            "Overheard: {B.desc} says: \"You missed two days of messages. Of course I came. You're sick.\"",
+            "Overheard: {A} says: \"Fever since yesterday. Don't come in, you'll catch it.\"",
+            "Overheard: {B.desc} says: \"Your work called me looking for you. Sick, I told them. Eat.\""
+          ]
+        },
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b4",
+          "channel": "conversation",
+          "chance": 0.6,
+          "log": [
+            "Overheard: {A} says: \"Best {B.rel} in the city. Go before you catch this.\"",
+            "Overheard: {B.desc} says: \"Twenty years your {B.rel}. I know what you eat when you're sick.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:brought-soup"
+        ]
+      }
     }
   ]
 }

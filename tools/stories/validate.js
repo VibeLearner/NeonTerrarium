@@ -448,6 +448,33 @@ for (const [op, n] of hotOpeners.slice(0, 12)) warn('phrasing', `${n} lines open
   }
 }
 
+// ---------- the game's own lines (engine.json): routine, an empty doorstep, gossip, deliveries ----------
+try {
+  const E = readJSON(path.join(DATA, 'engine.json'));
+  const roles = new Set(['A', 'B', 'C']);
+  const prep = l => l.replace(/\{(when|sender|look)\}/g, 'Tuesday');
+  const lines = (where, list, kind, must) => {
+    if (!Array.isArray(list) || !list.length) { err('engine.json', `${where}: needs lines`); return; }
+    for (const l of list) { if (typeof l !== 'string') { err('engine.json', `${where}: not a string`); continue; } checkText('engine.json', where, prep(l), kind, roles, null); if (must && !must.test(l)) err('engine.json', `${where}: "${l}" must contain ${must.source.replace(/\\/g, '')}`); }
+  };
+  for (const [k, l] of Object.entries(E.routine || {})) lines('routine.' + k, l, 'reveal', k === 'enterSeen' ? /\{seen\}/ : null);
+  for (const [k, l] of Object.entries(E.absence || {})) lines('absence.' + k, l, 'reveal', k === 'first' ? /\{seen\}/ : null);
+  for (const k of ['sick', 'parcel']) lines('gossip.' + k, E.gossip[k], 'reveal', /\{C\.first\}/);
+  for (const [k, l] of Object.entries(E.gossip.entry || {})) lines('gossip.entry.' + k, l, 'entry', /\{S\}/);
+  const D = E.delivery || {};
+  for (const k of ['arrive', 'take', 'look', 'nobody']) lines('delivery.' + k, D[k], 'reveal');
+  lines('delivery.label', D.label, 'reveal', /\{A\.full\}/);
+  const WHEN = ['sick', 'any', 'outgoing', 'partnered', 'partnered-secret', 'family-away', 'money', 'work-trouble', 'industrial', 'careful', 'warm'];
+  for (const [kind, K] of Object.entries(D.kinds || {})) {
+    for (const w of K.when || []) if (!WHEN.includes(w)) err('engine.json', `delivery.${kind}: unknown when "${w}" (one of ${WHEN.join(', ')})`);
+    if (!K.sender || !K.look) err('engine.json', `delivery.${kind}: needs sender and look`);
+    for (const r of ['silent', 'phone', 'mesh']) {
+      if (!(K.react && K.react[r] >= 0)) err('engine.json', `delivery.${kind}: react.${r} weight missing`);
+      lines(`delivery.${kind}.${r}`, K[r], 'reveal', r === 'phone' ? /^Phone, one side:/ : r === 'mesh' ? /^Posted to the mesh:/ : null);
+    }
+  }
+} catch (e) { err('engine.json', 'cannot read: ' + e.message); }
+
 // ---------- names ----------
 try {
   const names = readJSON(path.join(DATA, 'names.json'));
@@ -464,7 +491,8 @@ for (const f of fs.readdirSync(__dirname).filter(x => x.endsWith('.js'))) {
   const src = fs.readFileSync(path.join(__dirname, f), 'utf8');
   if (f !== 'validate.js' && new RegExp(needle).test(src)) err(f, 'uses Math.random; use seeded hashes only');
 }
-try {
+// (the path check was for the data-only round; the game now loads the stories, so it only runs when asked for with --base)
+if (baseIx >= 0) try {
   const out = cp.execSync(`git diff --name-only ${BASE}`, { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).toString().split('\n').filter(Boolean);
   const stray = out.filter(f => !f.startsWith('data/stories/') && !f.startsWith('tools/stories/'));
   for (const f of stray) err('git', `changed outside data/stories and tools/stories: ${f}`);

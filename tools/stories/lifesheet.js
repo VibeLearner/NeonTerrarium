@@ -259,6 +259,7 @@ function meets(e, need, A) {
     case 'single': return !e.partner;
     case 'has-umbrella': return e.umbrella;
     case 'has-pet-stray-habit': return e.stray;
+    case 'sick': return roll(.03, e.id, 'sick', Math.floor((e.nowH || 0)/24));   // (the game decides sick days by hash per day: story.js)
     default:
       if (need.startsWith('regular:')) return e.regulars.includes(need.slice(8));
       if (need.startsWith('zone:')) return DISTRICTS.find(d => d.id === e.district).zone === need.slice(5);

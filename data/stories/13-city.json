@@ -1225,7 +1225,7 @@
           "chance": 0.3,
           "log": [
             "Overheard: {A} calls: \"Welcome to the row, neighbor! Shout if you need a hand.\"",
-            "Overheard: {B.desc} calls back: \"Thank you! I will!\""
+            "Overheard: {B.desc} calls back: \"Thanks, {A.rel}! I will!\""
           ]
         }
       ],

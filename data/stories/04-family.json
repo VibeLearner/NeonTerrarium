@@ -84,18 +84,27 @@
           "channel": "conversation",
           "chance": 0.55,
           "log": [
-            "Overheard: {A} says: \"Mom, you did not have to carry all that up.\"",
+            "Overheard: {A} says: \"{B.addr}, you did not have to carry all that up.\"",
+            "Overheard: {B.desc} says: \"A {B.rel} worries. Eat something.\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.55,
+          "log": [
             "Overheard: {B.desc} says to {A}: \"Eat. You are too thin. I brought enough for the week.\""
           ]
         },
         {
-          "fact": "B.family",
+          "fact": "B.said",
           "beat": "b2",
           "channel": "conversation",
           "chance": 0.2,
           "log": [
-            "Overheard: {B.desc} says to {A}: \"Your sister sends her love. She says call.\"",
-            "Overheard: {A} asks: \"Did Dad come? No? Tell him next time.\""
+            "Overheard: {B.desc} says to {A}: \"Everyone back home asks after you. Call more.\"",
+            "Overheard: {A} asks: \"Did the others come? No? Next time, then.\""
           ]
         }
       ],
@@ -199,8 +208,8 @@
           "channel": "conversation",
           "chance": 0.3,
           "log": [
-            "Overheard: {A} says: \"You always did steal my food. Ever since we were kids.\"",
-            "Overheard: {B.desc} tells {A}: \"Mom says you never call. So I'm calling in person.\""
+            "Overheard: {A} says: \"You always did steal my food. Some {B.rel} you are.\"",
+            "Overheard: {B.desc} tells {A}: \"The folks say you never call. So your {B.rel} is calling in person.\""
           ]
         }
       ],
@@ -303,8 +312,17 @@
           "channel": "conversation",
           "chance": 0.45,
           "log": [
-            "Overheard: {B.desc} says: \"Thank you, child. Your grandmother used to say you would turn out well.\"",
-            "Overheard: {A} says: \"Eat the greens first, Granddad. I counted the cans.\""
+            "Overheard: {A} says: \"Eat the greens first, {B.addr}. I counted the cans.\"",
+            "Overheard: {B.desc} says: \"What would I do without my {A.rel}?\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.45,
+          "log": [
+            "Overheard: {B.desc} says: \"Thank you, child. You always did carry more than you should.\""
           ]
         }
       ],
@@ -405,8 +423,8 @@
           "channel": "conversation",
           "chance": 0.35,
           "log": [
-            "Overheard: {B.desc} says: \"Dad, can we feed them?\"",
-            "Overheard: {A} says to {B.desc}: \"Ask your mother first. She'll say no.\""
+            "Overheard: {B.desc} says: \"{A.addr}, can we feed them?\"",
+            "Overheard: {A} says: \"Come on, my {B.rel}. One handful, then home.\""
           ]
         }
       ],
@@ -504,7 +522,7 @@
           "chance": 0.5,
           "log": [
             "Overheard: {A} shouts: \"You always do this! You said you'd take her this time!\"",
-            "Overheard: {B.desc} says: \"And you always make me the bad one. Ask Mom, she'll tell you.\""
+            "Overheard: {B.desc} says: \"And you always make me the bad one. Ask anyone, they'll tell you.\""
           ]
         },
         {
@@ -513,8 +531,8 @@
           "channel": "conversation",
           "chance": 0.4,
           "log": [
-            "Overheard: {A} says: \"Don't use that tone with me, you are my little brother.\"",
-            "Overheard: {B.desc} says: \"Sister or not, it's not your place to decide.\""
+            "Overheard: {A} says: \"Don't use that tone with me. I'm your {A.rel}.\"",
+            "Overheard: {B.desc} says: \"Being my {A.rel} doesn't make it your place to decide.\""
           ]
         }
       ],
@@ -819,9 +837,9 @@
           "channel": "phone",
           "chance": 0.55,
           "log": [
-            "Phone, one side: {A} says: \"Yes, Mom. I ate. Yes, I'm wearing the jacket.\"",
-            "Phone, one side: {A} says: \"Tell Dad I'll be there Sunday. Save me the good chair.\"",
-            "Phone, one side: {A} says: \"How is Grandma? Put her on for a second.\""
+            "Phone, one side: {A} says: \"Yes, I ate. Yes, I'm wearing the jacket.\"",
+            "Phone, one side: {A} says: \"Tell everyone I'll be there Sunday. Save me the good chair.\"",
+            "Phone, one side: {A} says: \"How is everyone? Put them all on for a second.\""
           ]
         }
       ],
@@ -918,8 +936,17 @@
           "channel": "conversation",
           "chance": 0.35,
           "log": [
-            "Overheard: {B.desc} says: \"When your mother was your age, she would not sit still either.\"",
-            "Overheard: {A} tells {B.desc}: \"Grandma, you've told me that one.\""
+            "Overheard: {A} tells {B.desc}: \"{B.addr}, you've told me that one.\"",
+            "Overheard: {B.desc} says: \"Humor your old {B.rel}. Sit.\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.35,
+          "log": [
+            "Overheard: {B.desc} says: \"When I was your age, I would not sit still either.\""
           ]
         }
       ],
@@ -1019,7 +1046,7 @@
           "chance": 0.5,
           "log": [
             "Overheard: {B.desc} says: \"Cousin! Look at you. You can have my couch as long as you need.\"",
-            "Overheard: {A} says: \"Auntie sends greetings. And this bag is mostly food from her.\""
+            "Overheard: {A} says: \"Your favorite {A.rel} made it. This bag is mostly food from home.\""
           ]
         }
       ],
@@ -1142,7 +1169,16 @@
           "channel": "conversation",
           "chance": 0.3,
           "log": [
-            "Overheard: {B.desc} calls through the door: \"It's your mother. I only want to leave this. Open up.\"",
+            "Overheard: {B.desc} calls through the door: \"It's your {B.rel}. I only want to leave this. Open up.\"",
+            "Overheard: {B.desc} calls: \"Your {B.rel} came all this way. One minute.\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
             "Overheard: {B.desc} calls: \"Please, just a word. I'm not asking to come in.\""
           ]
         }

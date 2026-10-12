@@ -338,9 +338,10 @@
           "channel": "seen",
           "chance": 0.35,
           "log": [
-            "{A} has been to this stall several times today.",
-            "{A} keeps returning to this counter."
-          ]
+            "{A} at this counter again: {seen} visits on the feed.",
+            "Back at the same counter. The feed has {A} here {seen} times."
+          ],
+          "minSeen": 2
         }
       ],
       "effects": {
@@ -436,6 +437,16 @@
       "reveals": [
         {
           "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.35,
+          "log": [
+            "Overheard: {A} says: \"For my {B.rel}. Seven years today.\"",
+            "Overheard: {B.desc} says: \"Seven years, and my {A.rel} still remembers.\""
+          ]
+        },
+        {
+          "fact": "B.said",
           "beat": "b2",
           "channel": "conversation",
           "chance": 0.35,
@@ -545,8 +556,17 @@
           "channel": "conversation",
           "chance": 0.3,
           "log": [
-            "Overheard: {A} says: \"My love, it is your turn to carry the bag home.\"",
-            "Overheard: {B.desc} says to {A}: \"Married five years and you still steal my side of the bench.\""
+            "Overheard: {B.desc} says to {A}: \"Married five years and you still steal my side of the bench.\"",
+            "Overheard: {B.desc} says: \"My {A.rel} carries the bag. That's the deal.\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {A} says: \"My love, it is your turn to carry the bag home.\""
           ]
         }
       ],
@@ -651,7 +671,7 @@
           "channel": "conversation",
           "chance": 0.4,
           "log": [
-            "Overheard: {A} says: \"I'll be at my sister's. Send the rest of my things there.\"",
+            "Overheard: {A} says: \"I'll be at a friend's. Send the rest of my things there.\"",
             "Overheard: {A} says: \"Don't call. I'll call when I'm ready.\""
           ]
         }
@@ -771,6 +791,16 @@
       "reveals": [
         {
           "fact": "B.relation-to-A",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {A} says: \"Strange, running into an {B.rel} by the pond.\"",
+            "Overheard: {B.desc} says: \"Is it odd, an {A.rel} saying hello?\""
+          ]
+        },
+        {
+          "fact": "B.said",
           "beat": "b3",
           "channel": "conversation",
           "chance": 0.5,
@@ -1092,6 +1122,16 @@
       "reveals": [
         {
           "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {B.desc} says: \"Ten years, and still my favorite {A.rel}.\"",
+            "Overheard: {A} raises a cup: \"To my {B.rel}. Ten years.\""
+          ]
+        },
+        {
+          "fact": "B.said",
           "beat": "b2",
           "channel": "conversation",
           "chance": 0.4,

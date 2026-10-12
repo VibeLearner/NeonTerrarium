@@ -76,7 +76,7 @@
           "chance": 0.35,
           "log": [
             "Overheard: {A} says: \"{B.first}, stop bouncing, we are not that late.\"",
-            "Overheard: {B.desc} says: \"If I am not in by ten, {A.nick}, I swear.\""
+            "Overheard: {A} says: \"Ten more minutes, {B.first}. Then we try the kiosk.\""
           ]
         }
       ],
@@ -159,7 +159,7 @@
           "chance": 0.45,
           "log": [
             "{A} was waved straight past the line. The door staff did not ask for anything.",
-            "{A} is a known face at this door."
+            "The door staff nod {A} through without a look at the list."
           ]
         }
       ],
@@ -683,8 +683,8 @@
           "channel": "seen",
           "chance": 0.4,
           "log": [
-            "{A} ordered without being asked what; the server already knew.",
-            "{A} drinks here often."
+            "{A} ordered without a word. The server poured without asking.",
+            "{A} at this kiosk again: {seen} nights on the feed."
           ]
         }
       ],
@@ -766,8 +766,8 @@
           "channel": "seen",
           "chance": 0.4,
           "log": [
-            "{A} lives at this door; it opened to {A.him} at once.",
-            "{A} came home to this address late at night."
+            "The door opened to {A} at once.",
+            "{A} went in at this door after midnight."
           ]
         }
       ],
@@ -1008,6 +1008,15 @@
           "chance": 0.3,
           "log": [
             "Overheard: {B.desc} says: \"You owe me breakfast for this, friend.\"",
+            "Overheard: {A} says: \"Best {B.rel} in the city... I mean it.\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
             "Overheard: {A} says: \"You're the best... I will pay... tomorrow.\""
           ]
         }

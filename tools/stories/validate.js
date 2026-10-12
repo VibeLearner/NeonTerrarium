@@ -61,6 +61,7 @@ const THOUGHT_RE = wordRe(vocab.thoughtWords);
 const CONCL_RE = wordRe(vocab.conclusionWords);
 const ATTR_RE = wordRe(vocab.attributionVerbs);
 const REL_RE = wordRe(vocab.relationWords);
+const REL_STATE_RE = new RegExp('(?<![A-Za-z])(' + vocab.relationWords.map(esc).join('|') + ')(s|es)?(?![A-Za-z])', 'i');   // a relation stated in a line, plurals too ("friends since school")
 const BRIT = vocab.britishSpellings;
 const BRIT_RE = new RegExp('(?<![A-Za-z])(' + Object.keys(BRIT).map(esc).join('|') + ')(?![A-Za-z])', 'i');
 const EXEMPT = [
@@ -90,14 +91,15 @@ function checkText(id, where, s, kind, roles, beatRoles) {
   // placeholders
   const phs = [...s.matchAll(/\{([^}]*)\}/g)].map(m => m[1]);
   for (const ph of phs) {
-    const m = ph.match(/^([A-F])(?:\.(desc|he|him|his|first|full|rel|nick|job|employer|home|age))?$/);
+    const m = ph.match(/^([A-F])(?:\.(desc|he|him|his|first|full|rel|addr|nick|job|employer|home|age))?$/);
     if (m) {
       if (!roles.has(m[1])) { err(id, `${at} uses {${ph}} but there is no role ${m[1]}`); continue; }
-      if (['first', 'full', 'rel', 'nick', 'job', 'employer', 'home', 'age'].includes(m[2]) && kind !== 'reveal' && kind !== 'hearsay' && kind !== 'entry') err(id, `${at} uses {${ph}}, which is only valid in reveal, hearsay and entry lines`);
+      if (['first', 'full', 'rel', 'addr', 'nick', 'job', 'employer', 'home', 'age'].includes(m[2]) && kind !== 'reveal' && kind !== 'hearsay' && kind !== 'entry') err(id, `${at} uses {${ph}}, which is only valid in reveal, hearsay and entry lines`);
       if (kind === 'log' && beatRoles && m[1] !== 'A' && !beatRoles.has(m[1])) err(id, `${at} names role ${m[1]}, which is not in this beat's who/with`);
       continue;
     }
     if (['place', 'place2', 'n', 'item'].includes(ph)) continue;
+    if (ph === 'seen') { if (kind !== 'reveal') err(id, `${at} uses {seen} outside a reveal line`); continue; }
     if (['S', 'L'].includes(ph)) { if (kind !== 'hearsay' && kind !== 'entry') err(id, `${at} uses {${ph}} outside hearsay`); continue; }
     err(id, `${at} has unknown placeholder {${ph}}`);
   }
@@ -303,8 +305,22 @@ for (const s of stories) {
       if (sp && !sp.includes(b.do)) err(id, `${rid}: channel "${rv.channel}" cannot come from a "${b.do}" beat`);
     }
     if (!isNum(rv.chance) || rv.chance <= 0 || rv.chance > 1) err(id, `${rid}: chance must be in (0, 1]`);
-    if (!Array.isArray(rv.log) || rv.log.length < 2) err(id, `${rid}: needs at least 2 log phrasings`);
+    if (!Array.isArray(rv.log) || rv.log.length < (factName === 'said' ? 1 : 2)) err(id, `${rid}: needs at least ${factName === 'said' ? 1 : 2} log phrasings`);
     else rv.log.forEach(l => checkText(id, `reveal ${i + 1} log`, l, 'reveal', roles, null));
+    // a line teaches exactly what it states: the engine learns a name from the name in the line, a relation
+    // from the relation word in the line, never from the fact label alone
+    if (Array.isArray(rv.log)) for (const l of rv.log) {
+      if (typeof l !== 'string') continue;
+      const X = m[1];
+      const short = `${rid}: "${l.length > 60 ? l.slice(0, 57) + '...' : l}"`;
+      if (factName === 'relation-to' && !(new RegExp(`\\{(${X}|${m[3]})\\.(rel|addr)\\}`).test(l) || REL_STATE_RE.test(l.replace(/\{[^}]*\}/g, ' ')))) err(id, `${short} is a relation reveal but does not state the relation (use {${X}.rel}, {${X}.addr} or the word; otherwise make it ${X}.said)`);
+      if ((factName === 'first-name') && !new RegExp(`\\{${X}\\.(first|full)\\}`).test(l)) err(id, `${short} is a first-name reveal without {${X}.first} or {${X}.full}`);
+      if ((factName === 'full-name' || factName === 'last-name') && !new RegExp(`\\{${X}\\.full\\}`).test(l)) err(id, `${short} is a ${factName} reveal without {${X}.full}`);
+      if (factName === 'nickname' && !new RegExp(`\\{${X}\\.nick\\}`).test(l)) err(id, `${short} is a nickname reveal without {${X}.nick}`);
+      if (/\{seen\}/.test(l) && rv.channel !== 'seen') err(id, `${short} uses {seen} on the ${rv.channel} channel (only seen lines count sightings)`);
+      if (rv.channel === 'seen' && /\b(again|often|most|regular|usual|every|always)\b/i.test(stripQuotes(l).replace(/\{[^}]*\}/g, ' ')) && !/\{seen\}/.test(l)) err(id, `${short} claims a repeat without {seen}: say how many times the feed saw it`);
+    }
+    if (rv.minSeen !== undefined && !(Number.isInteger(rv.minSeen) && rv.minSeen >= 2)) err(id, `${rid}: minSeen must be a whole number, 2 or more`);
     if (['feeling-stated', 'plan-stated', 'opinion-stated', 'money-stated'].includes(factName) && rv.log) for (const l of rv.log) if (!/Says|says|Told|told|Posted|posted|Asks|asks|"|Tells|tells|Admits|admits|Mentions|mentions/.test(l)) err(id, `${rid}: a stated fact must read as stated ("Says...", "Posted...")`);
   }
   // hearsay
@@ -406,6 +422,31 @@ const bySize = vocab.categories.map(c => [c.id, Object.values(counts[c.id] || {}
 if (!PARTIAL && !['secrets', 'routine'].every(x => bySize.slice(0, 3).some(y => y[0] === x))) warn('database', `secrets and routine should be the most developed categories (largest: ${bySize.slice(0, 3).map(x => x.join(' ')).join(', ')})`);
 const hotOpeners = [...openers.entries()].filter(([, n]) => n > 5).sort((a, b) => b[1] - a[1]);
 for (const [op, n] of hotOpeners.slice(0, 12)) warn('phrasing', `${n} lines open with "${op}"`);
+
+// ---------- names in passing (an engine rule in vocab.passing) ----------
+{
+  const P = vocab.passing;
+  if (!P) err('vocab.passing', 'missing: the names-in-passing rule');
+  else {
+    const roles = new Set(['A', 'B']);
+    for (const a of P.actions || []) if (!ACTIONS[a]) err('vocab.passing', `unknown action "${a}"`);
+    const need = { toA: /\{A\.first\}/, toANick: /\{A\.nick\}/, byA: /\{B\.first\}/ };
+    for (const [k, re] of Object.entries(need)) {
+      if (!Array.isArray(P[k]) || P[k].length < 3) err('vocab.passing', `${k} needs at least 3 lines`);
+      else for (const l of P[k]) { checkText('vocab.passing', k, l, 'reveal', roles, null); if (!re.test(l)) err('vocab.passing', `${k}: "${l}" does not contain the name it is meant to teach`); }
+    }
+    for (const [k, sub, re] of [['phone', P.phone, /\{A\.first\}/], ['nameTag', P.nameTag, /\{A\.first\}/], ['orderCall', P.orderCall, /\{A\.first\}/], ['parcelLabel', P.parcelLabel, /\{A\.full\}/], ['doorPlate', P.doorPlate, /\{A\.full\}/], ['greeting', P.greeting, /\{A\.first\}/]]) {
+      if (!sub || !Array.isArray(sub.lines) || sub.lines.length < 3) { err('vocab.passing', `${k} needs at least 3 lines`); continue; }
+      if (!isNum(sub.chance) || sub.chance <= 0 || sub.chance > 1) err('vocab.passing', `${k}.chance must be in (0, 1]`);
+      for (const a of sub.actions || []) if (!ACTIONS[a]) err('vocab.passing', `${k}: unknown action "${a}"`);
+      for (const l of sub.lines) { checkText('vocab.passing', k, l, 'reveal', roles, null); if (!re.test(l)) err('vocab.passing', `${k}: "${l}" does not contain ${re.source.replace(/\\/g, '')}`); }
+    }
+    for (const [job, ps] of Object.entries((P.nameTag && P.nameTag.jobs) || {})) { if (!vocab.jobKinds.includes(job)) err('vocab.passing', `nameTag: unknown job "${job}"`); for (const p of ps) if (!PLACES[p]) err('vocab.passing', `nameTag: unknown place "${p}"`); }
+    if (!isNum(P.chance) || P.chance <= 0 || P.chance > 1) err('vocab.passing', 'chance must be in (0, 1]');
+    for (const k of (P.greeting && P.greeting.kinds) || []) if (!vocab.relationKinds.includes(k)) err('vocab.passing', `greeting: unknown relation kind "${k}"`);
+    for (const pl of [...((P.greeting && P.greeting.places) || []), ...((P.doorPlate && P.doorPlate.places) || [])]) if (!PLACES[pl]) err('vocab.passing', `unknown place "${pl}"`);
+  }
+}
 
 // ---------- names ----------
 try {

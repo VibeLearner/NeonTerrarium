@@ -954,7 +954,8 @@
         "secret",
         "money-stated",
         "whereabouts",
-        "habit"
+        "habit",
+        "said"
       ],
       "desc": "overheard in person while watching either speaker. What the speaker says, as said."
     },
@@ -969,7 +970,8 @@
         "secret",
         "relation-to",
         "money-stated",
-        "whereabouts"
+        "whereabouts",
+        "said"
       ],
       "desc": "a call: only the watched person's side is heard, so the other party and half the story stay unknown."
     },
@@ -984,7 +986,8 @@
         "whereabouts",
         "partner",
         "habit",
-        "opinion-stated"
+        "opinion-stated",
+        "said"
       ],
       "desc": "a public feed post read on the monitor. What they chose to say, sometimes vague or performative, never the whole truth."
     },
@@ -1038,7 +1041,8 @@
     "plan-stated",
     "opinion-stated",
     "news",
-    "money-stated"
+    "money-stated",
+    "said"
   ],
   "placeholders": {
     "{A}": "the role's name for the log: 'Subject' until a name is learned, then the first name (or full name once verified)",
@@ -1047,14 +1051,16 @@
     "{A.full}": "full name (only valid in reveal lines)",
     "{A.nick}": "nickname (only valid in reveal lines)",
     "{A.job} {A.employer} {A.home} {A.age}": "job title, employer, home (as a place descriptor) and age range, only valid in reveal lines",
-    "{A.rel}": "the relation just learned, as a word: 'sister' (only valid in reveal lines)",
+    "{A.rel}": "the relation, as a word, of that role to A (for A: to B): \"sister\", \"landlord\". Only valid in reveal lines; a relation reveal teaches it",
     "{A.he} {A.him} {A.his}": "pronouns",
     "{place}": "the main place of the beat: 'the noodle stall', 'the north square'",
     "{place2}": "a second place",
     "{n}": "a count or a duration number",
     "{item}": "a carried or handed thing: 'a box', 'a paper bag'",
     "{S}": "hearsay only: the speaker (the watched person)",
-    "{L}": "hearsay only: the listener, as a descriptor"
+    "{L}": "hearsay only: the listener, as a descriptor",
+    "{A.addr}": "what the other person calls this role by relation: \"Mom\" or \"Dad\" for a parent, \"Grandma\" or \"Grandpa\" for a grandparent. Only valid in reveal lines; it states the relation",
+    "{seen}": "how many separate days the watcher has seen this person at this beat's place, counting today. Only in reveal lines; a line with it is skipped until the count is 2 or more"
   },
   "thoughtWords": [
     "think",
@@ -1208,7 +1214,18 @@
     "nephew",
     "boss",
     "landlord",
-    "roommate"
+    "roommate",
+    "neighbor",
+    "housemate",
+    "grandma",
+    "grandpa",
+    "granddad",
+    "gran",
+    "grandmother",
+    "grandfather",
+    "grandchild",
+    "auntie",
+    "married"
   ],
   "britishSpellings": {
     "colour": "color",
@@ -1283,5 +1300,182 @@
     "saviour": "savior",
     "endeavour": "endeavor",
     "tonne": "ton"
+  },
+  "passing": {
+    "_about": "Names in passing: a rule of the engine, not a storylet. When a watched beat has the subject and someone who knows them (any relation but a stranger) talking face to face, one of them may say the other's name. Each line teaches exactly the name it contains. Chances are per watched beat; the engine adds at most one passing line per storylet and never repeats a name already known.",
+    "actions": [
+      "chat",
+      "hug",
+      "hand-over",
+      "queue-order",
+      "serve",
+      "walk-together",
+      "wave",
+      "knock-and-wait",
+      "sit",
+      "eat",
+      "picnic",
+      "share-umbrella"
+    ],
+    "chance": 0.5,
+    "nickChance": 0.3,
+    "toA": [
+      "Overheard: {B.desc} says \"{A.first}\" and waits for {A} to look up.",
+      "Overheard: {B.desc} says: \"There you are, {A.first}.\"",
+      "Overheard: {B.desc} says: \"{A.first}, you look tired.\"",
+      "Overheard: {B.desc} laughs: \"Oh, {A.first}. Every time.\"",
+      "Overheard: {B.desc} says: \"Thanks, {A.first}. I owe you one.\"",
+      "Overheard: {B.desc} says: \"See you, {A.first}.\"",
+      "Overheard: {B.desc} says: \"Hey, {A.first}. Long day?\"",
+      "Overheard: {B.desc} says: \"{A.first}. Good to see you.\"",
+      "Overheard: {B.desc} says: \"Listen, {A.first}.\"",
+      "Overheard: {B.desc} says: \"All right, {A.first}, all right.\""
+    ],
+    "toANick": [
+      "Overheard: {B.desc} calls {A} \"{A.nick}\", easy as anything.",
+      "Overheard: {B.desc} says: \"Come on, {A.nick}.\"",
+      "Overheard: {B.desc} says: \"{A.nick}! There you are.\""
+    ],
+    "byA": [
+      "Overheard: {A} says: \"Thanks, {B.first}.\"",
+      "Overheard: {A} says: \"Hey, {B.first}.\"",
+      "Overheard: {A} says: \"Good to see you, {B.first}.\"",
+      "Overheard: {A} says: \"Same time tomorrow, {B.first}?\"",
+      "Overheard: {A} says: \"Go on, {B.first}. I'm listening.\"",
+      "Overheard: {A} says \"{B.first}\" twice before {B.desc} turns around.",
+      "Overheard: {A} says: \"You know me, {B.first}.\"",
+      "Overheard: {A} laughs: \"Stop it, {B.first}.\""
+    ],
+    "phone": {
+      "_about": "When a phone-call beat of the subject is watched, they may answer with their own name.",
+      "chance": 0.35,
+      "lines": [
+        "Phone, one side: {A} answers: \"{A.first} speaking.\"",
+        "Phone, one side: {A} says: \"Yes, it's {A.first}. Who's this?\"",
+        "Phone, one side: {A} says: \"This is {A.first}. Go ahead.\"",
+        "Phone, one side: {A} says: \"{A.first}. Yes. No, I can talk.\""
+      ]
+    },
+    "nameTag": {
+      "_about": "Jobs with a counter or a uniform wear a name tag. When the subject is watched at one of the places listed for their job, the tag may be read. A document, so verified.",
+      "jobs": {
+        "stall-keeper": [
+          "stall"
+        ],
+        "shop-worker": [
+          "shop-door",
+          "work-door"
+        ],
+        "bathhouse-staff": [
+          "bathhouse",
+          "work-door"
+        ],
+        "club-staff": [
+          "club-door",
+          "work-door"
+        ],
+        "courier": [
+          "street",
+          "dropoff"
+        ],
+        "office-worker": [
+          "work-door"
+        ],
+        "industrial": [
+          "foundry-gate",
+          "work-door"
+        ]
+      },
+      "chance": 0.6,
+      "lines": [
+        "Name tag on {A.his} apron: {A.first}.",
+        "Badge at {A.his} collar: {A.first}.",
+        "Stitched over the pocket: {A.first}.",
+        "A tag on {A.his} lanyard reads {A.first}."
+      ]
+    },
+    "orderCall": {
+      "_about": "At a counter the keeper calls the order by name. Any queue-order or serve beat with the subject in it.",
+      "actions": [
+        "serve",
+        "eat"
+      ],
+      "chance": 0.35,
+      "lines": [
+        "Overheard: the keeper calls out: \"{A.first}! Two dumplings, extra chili.\"",
+        "Overheard: the keeper calls out: \"Order for {A.first}!\"",
+        "Overheard: the keeper reads the slip aloud: \"{A.first}, one broth.\"",
+        "Overheard: the keeper asks a name for the order. {A} says: \"{A.first}.\""
+      ]
+    },
+    "parcelLabel": {
+      "_about": "A parcel left for the subject has a label. Not in storylets that already turn on a label (they have their own document reveal).",
+      "actions": [
+        "receive-delivery"
+      ],
+      "chance": 0.5,
+      "lines": [
+        "Name on the parcel, upside down from here: {A.full}.",
+        "Delivery tag, face up on the step: {A.full}.",
+        "The address label on the box reads {A.full}."
+      ]
+    },
+    "doorPlate": {
+      "_about": "A home with one resident has one name on the door plate. Seen when the subject comes or goes by the home door. Shared homes are left to the storylets (a plate with two names is a puzzle of its own).",
+      "actions": [
+        "enter",
+        "leave"
+      ],
+      "places": [
+        "home-door"
+      ],
+      "chance": 0.2,
+      "lines": [
+        "Plate by the door: {A.full}.",
+        "One name on the door plate: {A.full}.",
+        "Nameplate beside the frame: {A.full}."
+      ]
+    },
+    "greeting": {
+      "_about": "Someone who knows the subject passes in the street and says hello by name. The engine picks the passerby from the subject's own people (a neighbor, a friend, a coworker, the keeper of a regular stall) who live or work nearby. Only on beats where the subject is out and about.",
+      "actions": [
+        "walk",
+        "leave",
+        "stand",
+        "wait-outside",
+        "sit",
+        "read-notice",
+        "feed-stray",
+        "water-plant"
+      ],
+      "places": [
+        "street",
+        "home-door",
+        "square",
+        "stall",
+        "bench",
+        "lawn",
+        "shop-door",
+        "work-door",
+        "metro-station"
+      ],
+      "kinds": [
+        "neighbor-of",
+        "friend-of",
+        "coworker-of",
+        "shopkeeper-of",
+        "sibling-of",
+        "cousin-of"
+      ],
+      "chance": 0.25,
+      "lines": [
+        "{B.desc} passes {A} and lifts a hand: \"{A.first}! Hey.\"",
+        "{B.desc} slows beside {A}: \"{A.first}. Haven't seen you all week.\"",
+        "{B.desc} calls from across the street: \"{A.first}! Later?\" {A} waves back.",
+        "{B.desc} taps {A} on the shoulder in passing: \"Hey, {A.first}.\"",
+        "{B.desc} nods at {A} on the way by: \"{A.first}.\" {A} nods back.",
+        "{B.desc} stops long enough to say: \"Rain later, {A.first}. Take a coat.\""
+      ]
+    }
   }
 }

@@ -433,8 +433,17 @@
           "channel": "conversation",
           "chance": 0.7,
           "log": [
-            "Overheard: {A} says: \"Will you marry me? I know it's a bench. I couldn't wait for a better one.\"",
-            "Overheard: {A} says: \"Eight years. I'd like eight more. Marry me.\""
+            "Overheard: {A} says: \"You've been my {B.rel} eight years. I'd like eight more. Marry me.\"",
+            "Overheard: {A} says: \"My {B.rel}, my best friend. Will you marry me?\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.7,
+          "log": [
+            "Overheard: {A} says: \"Will you marry me? I know it's a bench. I couldn't wait for a better one.\""
           ]
         }
       ],

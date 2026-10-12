@@ -96,6 +96,16 @@
           "channel": "conversation",
           "chance": 0.35,
           "log": [
+            "Overheard: {B.desc} says to {A}: \"I'm your {B.rel}, not your doorman. Get a spare cut.\"",
+            "Overheard: {A} says: \"Thank you. Best {B.rel} in the building.\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.35,
+          "log": [
             "Overheard: {B.desc} says to {A}: \"Third time this month. Get a spare cut.\"",
             "Overheard: {A} tells {B.desc}: \"I swear it was in my coat this morning.\""
           ]
@@ -178,8 +188,8 @@
           "channel": "seen",
           "chance": 0.4,
           "log": [
-            "{A} has a home here, the third door along.",
-            "{A} lives at this address: the door took {A.him} in without a key."
+            "{A} goes in at the third door along, arms full.",
+            "The door opens to {A} without a knock."
           ]
         }
       ],
@@ -315,9 +325,10 @@
           "channel": "seen",
           "chance": 0.5,
           "log": [
-            "{A} waters this pot most mornings.",
-            "This pot gets a morning watering. {A} has done it before."
-          ]
+            "{A} waters this pot. Seen doing it on {seen} mornings.",
+            "Morning watering, the pot by the window: {seen} times on the feed."
+          ],
+          "minSeen": 2
         }
       ],
       "next": {
@@ -401,6 +412,16 @@
       "reveals": [
         {
           "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {B.desc} says: \"I'm your {B.rel}, not a bank. But this will do.\"",
+            "Overheard: {A} says to {B.desc}: \"You're the only {B.rel} who comes for it in person.\""
+          ]
+        },
+        {
+          "fact": "B.said",
           "beat": "b2",
           "channel": "conversation",
           "chance": 0.5,
@@ -738,7 +759,7 @@
           "chance": 0.5,
           "log": [
             "{B.desc} went through the door without knocking.",
-            "{A} and {B.desc} share this door."
+            "{B.desc} and {A} both go in and out of this door. No knocking."
           ]
         }
       ],
@@ -1260,6 +1281,16 @@
       "reveals": [
         {
           "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"You're a good {B.rel}. Back Sunday.\"",
+            "Overheard: {B.desc} says: \"What's a {B.rel} for? Go, I've got the fish.\""
+          ]
+        },
+        {
+          "fact": "B.said",
           "beat": "b2",
           "channel": "conversation",
           "chance": 0.4,

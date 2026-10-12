@@ -2,6 +2,19 @@
 
 Branch `wip/stories`, based on main. Data and tools only: `git diff origin/main --name-only` touches `data/stories/` and `tools/stories/` and nothing else. The game does not load any of it.
 
+## Second pass (after the owner read the first sheets)
+
+What was wrong, and what changed:
+
+- **A label claimed more than was heard.** "How is Grandma?" was filed as a plan; "I swear it was in my coat" made the other person "housemate"; a parcel label naming someone else tied that name to whoever turned up later. Now a line teaches exactly what it states: names only from a name in the line and only for someone in the scene (a name on a label for someone absent stays a loose name), relations only from a line that says the relation. About 40 relation reveals were rewritten: lines that only hinted ("Happy anniversary", "Here is the rent") became `said` reveals that go in the notebook as heard, and every relation reveal now has lines that state it. The notebook is in three parts (details, people around them, observations), and observations are labeled by how they were learned (Seen, Overheard, On the phone, Posted, Read, Secondhand), never by what they might mean.
+- **Seen lines that concluded.** "Lives at this address", "drinks here often", "has avoided this stretch before" and "visit number {n}" (a random number) claimed habits the feed hadn't watched. They are now observations, and any repeat is counted: `{seen}` is the real number of days the watcher saw it, with `minSeen` where the line only makes sense the second time.
+- **Gendered words that could lie.** "Mom", "Dad", "Granddad", "my little brother", "an old woman" were written into lines whose cast person could be anyone. They are now `{X.rel}` and `{X.addr}`, which follow the cast person ("Mom" or "Dad", "sister" or "brother"). Lines that named family the game can't back up ("Tell Dad", "at my sister's") were made neutral.
+- **Duplicate notebook entries.** The same hearsay from three people made three identical entries. Now it is one entry with a source count, one "heard again" line when a second person backs it up, and nobody repeats the same news more than twice.
+- **The arrest read backward.** Hands up first, then the cuffs.
+- **Gossip about the absent used "an unknown male resident" inside speech.** People talk about people by name: gossip now names them. That also gives the absent person's notebook their first name, heard secondhand.
+
+**Names come quicker.** Before: 4 of 50 subjects had a name by the end of the week. Now names come up the way they do in real life, through engine rules in `vocab.passing` (greetings in passing from their own people, names used in conversation, an order called at a counter, a name tag at work, answering the phone, a parcel label, a door plate). With seed neon-1 the watcher has the subject's first name by day 1 for 13, by day 2 for 25, by day 3 for 32 and by day 7 for 41 of 50. Full names stay rare (they need a document). The catalog has a new **Names** tab with these rules and their lines.
+
 ## Open the catalog
 
 Open `tools/stories/catalog.html` in a browser (double-click it; it is one file with the data inside, so it works from disk). It has a tier filter, a category dropdown, a search box (titles, notes, ids and every log line), a "New actions only" toggle, and a Chains tab that draws which storylets unlock which. Click a box in the chain chart to jump to that card. Rebuild it any time with `node tools/stories/build-catalog.js`.
@@ -86,6 +99,8 @@ If you can only build a few, `hand-over`, `carry`, `walk-together` and `phone-ca
 - **The picker in the life sheet is a stand-in**, not the game's picker. It is simple on purpose: weights, cooldowns, eligibility, a director cap. The real one will want more care about places and the time of day a person is where.
 - **Only the subject's watcher sees a storylet.** If A and B are both citizens, B's monitor does not log it as well. The game would need to decide who is being watched.
 - **A week is short.** In the sample only a minority of ambiguous setups reach their reveal inside the week; that is by design (they should take a while) but worth watching in a longer run.
+- **Names in passing are generic.** They are written to fit any friendly moment, but a "Long day?" can still land on a cheerful scene. The game could tag lines by mood once storylets carry one.
+- **Family the game doesn't model.** Lines no longer name parents or siblings the person may not have, but anything that refers to people outside the cast is a risk; the validator can't catch all of them.
 - **Phrasing warnings.** The validator gives 29 warnings, none of them errors: 17 are roles with no relation to another role (strangers, officers, stall workers), and 12 are openings that repeat ("X comes up to the", "Overheard: X says to"). A polish pass could vary those.
 - **The balance is heavy on the quiet side** (78% mundane and texture, against "about half"). If you want more drama, the notable tier is where to add: it only needs textured and eventful lives to host it.
 - **Nothing here has been seen in the game.** The catalog was rendered and checked with a headless browser for errors; a real open in your browser is still the check that counts.

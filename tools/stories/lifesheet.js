@@ -127,8 +127,8 @@ function makeEntity(id, seedKey, o) {
 const ageRange = e => e.age < 30 ? 'twenties' : e.age < 40 ? 'thirties' : e.age < 50 ? 'forties' : e.age < 60 ? 'fifties' : 'sixties or older';
 const homeText = e => DISTRICTS.find(d => d.id === e.district).name;
 
+const INV = { 'parent-of': 'child-of', 'child-of': 'parent-of', 'grandparent-of': 'grandchild-of', 'grandchild-of': 'grandparent-of', 'creditor-of': 'debtor-of', 'debtor-of': 'creditor-of', 'landlord-of': 'tenant-of', 'tenant-of': 'landlord-of', 'boss-of': 'employee-of', 'employee-of': 'boss-of', 'aunt-uncle-of': 'niece-nephew-of', 'niece-nephew-of': 'aunt-uncle-of', 'shopkeeper-of': 'customer-of', 'customer-of': 'shopkeeper-of' };
 function addRel(a, kind, b) { // a is <kind> of b
-  const INV = { 'parent-of': 'child-of', 'child-of': 'parent-of', 'grandparent-of': 'grandchild-of', 'grandchild-of': 'grandparent-of', 'creditor-of': 'debtor-of', 'debtor-of': 'creditor-of', 'landlord-of': 'tenant-of', 'tenant-of': 'landlord-of', 'boss-of': 'employee-of', 'employee-of': 'boss-of', 'aunt-uncle-of': 'niece-nephew-of', 'niece-nephew-of': 'aunt-uncle-of', 'shopkeeper-of': 'customer-of', 'customer-of': 'shopkeeper-of' };
   const inv = INV[kind] || kind;
   if (!b.rels.some(r => r.kind === kind && r.who === a.id)) b.rels.push({ kind, who: a.id });
   if (!a.rels.some(r => r.kind === inv && r.who === b.id)) a.rels.push({ kind: inv, who: a.id === b.id ? a.id : b.id });
@@ -399,12 +399,36 @@ function weightOf(s, A, cast, nowH) {
 function genderWords(e) { return e.g === 'f' ? { he: 'she', him: 'her', his: 'her', man: 'woman' } : e.g === 'm' ? { he: 'he', him: 'him', his: 'his', man: 'man' } : { he: 'they', him: 'them', his: 'their', man: 'person' }; }
 function relWord(kind, e) {
   const f = e.g === 'f', m = e.g === 'm';
-  const map = { 'sibling-of': f ? 'sister' : m ? 'brother' : 'sibling', 'parent-of': f ? 'mother' : m ? 'father' : 'parent', 'child-of': f ? 'daughter' : m ? 'son' : 'child', 'grandparent-of': f ? 'grandmother' : 'grandfather', 'cousin-of': 'cousin', 'partner-of': 'partner', 'friend-of': 'friend', 'coworker-of': 'coworker', 'neighbor-of': 'neighbor', 'ex-of': 'ex', 'rival-of': 'rival', 'creditor-of': 'creditor', 'landlord-of': 'landlord', 'boss-of': 'boss', 'cohabitant-of': 'housemate', 'acquaintance-of': 'acquaintance', 'shopkeeper-of': 'shopkeeper' };
+  const map = { 'grandchild-of': f ? 'granddaughter' : m ? 'grandson' : 'grandchild', 'stranger-to': 'stranger', 'tenant-of': 'tenant', 'employee-of': 'employee', 'debtor-of': 'debtor', 'customer-of': 'customer', 'sibling-of': f ? 'sister' : m ? 'brother' : 'sibling', 'parent-of': f ? 'mother' : m ? 'father' : 'parent', 'child-of': f ? 'daughter' : m ? 'son' : 'child', 'grandparent-of': f ? 'grandmother' : 'grandfather', 'cousin-of': 'cousin', 'partner-of': 'partner', 'friend-of': 'friend', 'coworker-of': 'coworker', 'neighbor-of': 'neighbor', 'ex-of': 'ex', 'rival-of': 'rival', 'creditor-of': 'creditor', 'landlord-of': 'landlord', 'boss-of': 'boss', 'cohabitant-of': 'housemate', 'acquaintance-of': 'acquaintance', 'shopkeeper-of': 'shopkeeper' };
   return map[kind] || kind.replace(/-of$/, '');
 }
-function descFor(e, K) {
+// the relation of role X, as a kind: to A, or (for A itself) to B. rels on Y read "who is <kind> of Y"
+function relKindOf(X, cast, to, want) {
+  const Y = to || (X === cast.A ? cast.B : cast.A); if (!X || !Y) return null;
+  if (want && Y.rels.some(r => r.who === X.id && r.kind === want)) return want;   // two people can be neighbors and coworkers: say the one the storylet is about
+  const r = Y.rels.find(r => r.who === X.id); return r ? r.kind : null;
+}
+// the relation each role has in a storylet, from its roles (B: neighbor-of:A gives B neighbor-of, A neighbor-of)
+function wantKinds(s) {
+  const w = {};
+  for (const [R, spec] of Object.entries(s.roles || {})) if (spec.rel) { const [kind, T] = spec.rel.split(':'); w[R] = kind; if (T === 'A' && R === 'B' && !w.A) w.A = INV[kind] || kind; }
+  return w;
+}
+function addrWord(kind, e) {
+  const f = e.g === 'f', m = e.g === 'm';
+  if (kind === 'parent-of') return f ? 'Mom' : m ? 'Dad' : 'Ba';
+  if (kind === 'grandparent-of') return f ? 'Grandma' : m ? 'Grandpa' : 'Gran';
+  return kind ? relWord(kind, e) : 'friend';
+}
+function relLabel(k, W) {   // a known relation, as shown next to a name: "housemate", or "friend of Niamh"
+  if (!k.rel) return null;
+  if (!k.relTo || k.relTo === W.owner) return k.rel;
+  const t = W.known[k.relTo] || {}; const T = entities.get(k.relTo);
+  return k.rel + ' of ' + (t.first || (T ? descFor(T, W.known, W).replace(/^an? /, 'the ') : 'someone'));
+}
+function descFor(e, K, W) {
   const k = K && K[e.id];
-  if (k && k.first) return k.first + (k.rel ? ' (' + k.rel + ')' : '');
+  if (k && k.first) { const rl = W ? relLabel(k, W) : k.rel; return k.first + (rl ? ' (' + rl + ')' : ''); }
   const gw = genderWords(e);
   if (e.job === 'police') return 'a patrol officer';
   if (e.age < 14) return 'a small child';
@@ -414,19 +438,21 @@ function descFor(e, K) {
 }
 function fillTemplate(line, ctx, K, mode) {
   // mode 'live' or 'reveal' or 'hearsay'
-  return line.replace(/\{([A-F])(?:\.([a-z]+))?\}|\{(place2?|n|item|S|L)\}/g, (m, role, prop, other) => {
+  return line.replace(/\{([A-F])(?:\.([a-z]+))?\}|\{(place2?|n|item|S|L|seen)\}/g, (m, role, prop, other) => {
     if (other) {
+      if (other === 'seen') return String(ctx.seen || 0);
       if (other === 'place') return ctx.place; if (other === 'place2') return ctx.place2; if (other === 'n') return String(ctx.n); if (other === 'item') return ctx.item;
-      if (other === 'S') return ctx.S; if (other === 'L') return ctx.L; return m;
+      if (other === 'S') return (ctx.Sid && K[ctx.Sid] && K[ctx.Sid].first) || ctx.S; if (other === 'L') return ctx.L; return m;
     }
     const e = ctx.cast[role]; if (!e) return m;
     const gw = genderWords(e);
     switch (prop) {
-      case undefined: { const k = K[e.id]; if (role === 'A' && !(k && k.first)) return 'Subject'; return k && k.first ? k.first : descFor(e, K); }
-      case 'desc': return descFor(e, K);
+      case undefined: { const k = K[e.id]; if (role === 'A' && !(k && k.first)) return 'Subject'; return k && k.first ? k.first : descFor(e, K, ctx.W); }
+      case 'desc': return descFor(e, K, ctx.W);
       case 'he': return gw.he; case 'him': return gw.him; case 'his': return gw.his;
       case 'first': return e.first; case 'full': return e.first + ' ' + e.last; case 'nick': return e.nick || e.first;
-      case 'rel': return ctx.relWord || 'relative'; case 'job': return e.job || 'worker'; case 'employer': return e.employer || 'a local firm';
+      case 'rel': { const kind = relKindOf(e, ctx.cast, ctx.relTo && ctx.relTo[role], ctx.want && ctx.want[role]); return kind ? relWord(kind, e) : 'acquaintance'; }
+      case 'addr': return addrWord(relKindOf(e, ctx.cast, ctx.relTo && ctx.relTo[role], ctx.want && ctx.want[role]), e); case 'job': return e.job || 'worker'; case 'employer': return e.employer || 'a local firm';
       case 'home': return 'the ' + homeText(e) + ' side'; case 'age': return ageRange(e);
       default: return m;
     }
@@ -438,7 +464,7 @@ function setup() {
   for (const c of citizens) {
     const start = 7 + (hash(c.id, 'wstart') % 11);          // watching window starts between 07 and 17
     const len = 6 + (hash(c.id, 'wlen') % 3);               // six to eight hours a day
-    watch[c.id] = { window: [start, start + len], log: [], known: {}, notebook: [], seenSeq: [] };
+    watch[c.id] = { owner: c.id, window: [start, start + len], log: [], known: {}, notebook: [], seenSeq: [], placeDays: {}, heard: {} };
   }
 }
 const inWindow = (c, absMin) => { const h = (absMin % 1440) / 60; const [a, b] = watch[c.id].window; return h >= a && h < b; };
@@ -450,11 +476,13 @@ function play(s, A, cast, nowH) {
   const startMin = nowH * 60 + (hash('min', A.id, s.id, nowH) % 40);
   let t = startMin;
   const W = watch[A.id];
-  const ctx = { cast, place: '', place2: '', n: 0, item: pick(ITEMS, A.id, s.id, 'item'), S: 'Subject', L: '', relWord: null };
+  const ctx = { cast, place: '', place2: '', n: 0, item: pick(ITEMS, A.id, s.id, 'item'), S: 'Subject', L: '', W, seen: 0, relTo: null, want: wantKinds(s) };
+  const snapCtx = extra => Object.assign({}, ctx, { cast: Object.assign({}, cast) }, extra || {});
   const placeOf = at => pick(PLACE_TEXT[at] || PLACE_TEXT.any, A.id, s.id, at, nowH);
   const rec = { id: s.id, tier: s.tier, category: s.category, A: A.id, at: startMin, seen: 0, lost: 0 };
   const beatTimes = {};
   const beatsSeen = [];
+  const day0 = Math.floor(startMin / 1440);
   for (const b of s.beats) {
     const dur = 3 + (hash('dur', A.id, s.id, b.id, nowH) % 7);
     t += dur; beatTimes[b.id] = t;
@@ -465,29 +493,32 @@ function play(s, A, cast, nowH) {
     if (!watched) continue;
     const lines = (s.log || {})[b.id]; if (!lines || !lines.length) continue;
     const idx = hash('line', A.id, s.id, b.id, nowH) % lines.length;
-    W.log.push({ t, kind: 'live', snap: JSON.stringify(W.known), tmpl: lines[idx], ctx: Object.assign({}, ctx, { cast: Object.assign({}, cast) }), sid: s.id });
+    W.log.push({ t, kind: 'live', snap: JSON.stringify(W.known), tmpl: lines[idx], ctx: snapCtx(), sid: s.id });
     beatsSeen.push(b.id); rec.seen++;
+    // sightings: on how many separate days the watcher has seen this person at this kind of place
+    const pk = b.at || 'any'; (W.placeDays[pk] = W.placeDays[pk] || new Set()).add(Math.floor(t / 1440));
   }
-  // reveals
+  // reveals: a line teaches exactly what it states (see learnFrom)
   for (const r of s.reveals || []) {
     const [role, ...rest] = r.fact.split('.'); const fact = rest.join('.');
     if (!beatsSeen.includes(r.beat)) continue;
     if (!roll(r.chance, 'reveal', A.id, s.id, r.fact, nowH)) continue;
     const e = cast[role]; if (!e) continue;
+    const beat = s.beats.find(b => b.id === r.beat);
+    const seenN = (W.placeDays[(beat && beat.at) || 'any'] || new Set()).size;
+    if (r.minSeen && seenN < r.minSeen) continue;
+    const lines = r.log.filter(l => !/\{seen\}/.test(l) || seenN >= 2); if (!lines.length) continue;
+    const line = pick(lines, 'revealline', A.id, s.id, r.fact, nowH);
     const vtime = beatTimes[r.beat] + 1;
-    const f = fact.startsWith('relation-to') ? 'relation-to' : fact;
-    const K = W.known; const k = (K[e.id] = K[e.id] || {});
-    if (f === 'first-name' || f === 'full-name') k.first = e.first;
-    if (f === 'job') k.jobKnown = true;
-    if (f === 'relation-to') {
-      const kind = relKindFor(e, cast);
-      k.rel = relWord(kind, e); k.relKind = kind;
-      ctx.relWord = k.rel;
-    }
-    const line = pick(r.log, 'revealline', A.id, s.id, r.fact, nowH);
-    W.log.push({ t: vtime, kind: 'reveal', snap: JSON.stringify(W.known), tmpl: line, ctx: Object.assign({}, ctx, { cast: Object.assign({}, cast), relWord: ctx.relWord }), channel: r.channel, fact: r.fact });
-    W.notebook.push({ at: vtime, who: e.id, fact: r.fact, channel: r.channel, verified: r.channel === 'document' || r.channel === 'introduction', tmpl: line, ctx: Object.assign({}, ctx, { cast: Object.assign({}, cast), relWord: ctx.relWord }) });
+    const relTo = {}; const rm = fact.match(/^relation-to-([A-F])$/); if (rm && rm[1] !== 'A' && cast[rm[1]]) relTo[role] = cast[rm[1]];
+    const lctx = snapCtx({ seen: seenN, relTo });
+    const present = new Set(['A', ...[].concat((beat && beat.who) || [], (beat && beat.with) || [])]);
+    const learned = learnFrom(line, lctx, W, r.channel, vtime, rm ? { role, to: rm[1] } : null, present);
+    if (fact === 'job' || fact === 'employer') (W.known[e.id] = W.known[e.id] || {}).jobKnown = true;
+    W.log.push({ t: vtime, kind: 'reveal', snap: JSON.stringify(W.known), tmpl: line, ctx: lctx, channel: r.channel, fact: r.fact });
+    W.notebook.push({ at: vtime, who: e.id, fact: r.fact, channel: r.channel, verified: r.channel === 'document' || r.channel === 'introduction', tmpl: line, ctx: lctx, learned });
   }
+  namesInPassing(s, A, cast, W, beatsSeen, beatTimes, nowH, snapCtx);
   if (s.resolves) delete pending[s.resolves.setup + '|' + A.id];
   // ambiguous setups choose a hidden truth that this life can host
   if (s.ambiguous && s.fairPlay) {
@@ -542,7 +573,102 @@ function relKindFor(e, cast) {
   return rr ? rr.kind : 'acquaintance-of';
 }
 
+// What a line teaches: the names it contains and, for a relation reveal, the relation it states. Nothing else.
+// A name in a document or an introduction is verified; anywhere else it is unconfirmed until a verified source comes.
+const REL_STATE_RE = new RegExp('(?<![A-Za-z])(' + vocab.relationWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(s|es)?(?![A-Za-z])', 'i');
+function learnFrom(line, ctx, W, channel, at, relFact, present) {
+  const verified = channel === 'document' || channel === 'introduction';
+  const out = { names: [], rel: false, loose: [] };
+  for (const [role, e] of Object.entries(ctx.cast)) {
+    if (!e || !e.id) continue;
+    // a name is tied to a person only if that person is in the scene; a name on a label for someone not there is
+    // just a name, until something links it to a face
+    if (present && !present.has(role)) { if (new RegExp('\\{' + role + '\\.(first|full|nick)\\}').test(line)) out.loose.push(e.id); continue; }
+    const k = (W.known[e.id] = W.known[e.id] || {});
+    const via = { channel, verified, at };
+    if (new RegExp('\\{' + role + '\\.(first|full)\\}').test(line)) {
+      if (!k.first) { k.first = e.first; k.firstAt = at; out.names.push(e.id); }
+      if (!k.firstVia || (verified && !k.firstVia.verified)) k.firstVia = via;
+    }
+    if (new RegExp('\\{' + role + '\\.full\\}').test(line) && !k.last) { k.last = e.last; k.lastVia = via; }
+    if (new RegExp('\\{' + role + '\\.nick\\}').test(line) && e.nick && !k.nick) { k.nick = e.nick; k.nickVia = via; out.names.push(e.id); }
+  }
+  if (relFact) {
+    const X = ctx.cast[relFact.role], T = ctx.cast[relFact.to];
+    const states = new RegExp('\\{(' + relFact.role + '|' + relFact.to + ')\\.(rel|addr)\\}').test(line) || REL_STATE_RE.test(line.replace(/\{[^}]*\}/g, ' '));
+    if (X && T && states) {
+      const kind = relKindOf(X, ctx.cast, T, ctx.want && ctx.want[relFact.role]);
+      if (kind) { const k = (W.known[X.id] = W.known[X.id] || {}); k.rel = relWord(kind, X); k.relTo = T.id; k.relVia = { channel, verified, at }; out.rel = true; }
+    }
+  }
+  return out;
+}
+// Names in passing (vocab.passing): people who know each other use names. At most one line per storylet.
+function namesInPassing(s, A, cast, W, beatsSeen, beatTimes, nowH, snapCtx) {
+  const P = vocab.passing; if (!P) return;
+  const K = W.known, kA = K[A.id] || {};
+  for (const b of s.beats) {
+    if (!beatsSeen.includes(b.id)) continue;
+    const who = [].concat(b.who || []), withs = [].concat(b.with || []), all = [...who, ...withs];
+    const at = beatTimes[b.id] + 1;
+    // a name tag at work
+    const tagAt = A.job && !A.jobless && P.nameTag.jobs[A.job];
+    if (tagAt && tagAt.includes(b.at) && who.includes('A') && !kA.first && roll(P.nameTag.chance, 'tag', A.id, s.id, b.id, nowH)) {
+      const line = pick(P.nameTag.lines, 'tagline', A.id, s.id, nowH); return push(line, { A, B: cast.B }, 'document', at, A.id, 'first-name');
+    }
+    // answering the phone
+    if (b.do === 'phone-call' && who.includes('A') && !kA.first && roll(P.phone.chance, 'phone', A.id, s.id, b.id, nowH)) {
+      const line = pick(P.phone.lines, 'phoneline', A.id, s.id, nowH); return push(line, { A, B: cast.B }, 'phone', at, A.id, 'first-name');
+    }
+    // a parcel label (not where a storylet already turns on a label), a door plate (one resident), an order called out
+    const hasDoc = (s.reveals || []).some(r => r.channel === 'document');
+    if (P.parcelLabel.actions.includes(b.do) && who.includes('A') && !kA.last && !hasDoc && !s.ambiguous && !s.resolves && roll(P.parcelLabel.chance, 'parcel', A.id, s.id, b.id, nowH)) {
+      return push(pick(P.parcelLabel.lines, 'parcelline', A.id, s.id, nowH), { A }, 'document', at, A.id, 'full-name');
+    }
+    const alone = !A.rels.some(q => q.kind === 'cohabitant-of');
+    if (P.doorPlate.actions.includes(b.do) && P.doorPlate.places.includes(b.at) && who.includes('A') && alone && !kA.last && !hasDoc && roll(P.doorPlate.chance, 'plate', A.id, s.id, b.id, nowH)) {
+      return push(pick(P.doorPlate.lines, 'plateline', A.id, s.id, nowH), { A }, 'document', at, A.id, 'full-name');
+    }
+    if (P.orderCall.actions.includes(b.do) && all.includes('A') && !kA.first && ['stall', 'cafe-stool', 'bar-kiosk', 'market-mall'].includes(b.at) && roll(P.orderCall.chance, 'order', A.id, s.id, b.id, nowH)) {
+      return push(pick(P.orderCall.lines, 'orderline', A.id, s.id, nowH), { A }, 'conversation', at, A.id, 'first-name');
+    }
+    // a hello by name from someone of theirs who happens to pass (only people who live or work nearby)
+    const G = P.greeting;
+    if (G.actions.includes(b.do) && G.places.includes(b.at) && who.includes('A') && all.length === 1 && !kA.first && roll(G.chance, 'greet', A.id, s.id, b.id, nowH)) {
+      const near = A.rels.filter(q => G.kinds.includes(q.kind)).map(q => entities.get(q.who)).filter(e => e && !e.gone && e.district === A.district && e.age >= 14);
+      if (near.length) { const X = pick(near, 'greeter', A.id, s.id, b.id, nowH); return push(pick(G.lines, 'greetline', A.id, s.id, b.id, nowH), { A, B: X }, 'conversation', at, A.id, 'first-name'); }
+    }
+    if (!P.actions.includes(b.do) || !all.includes('A')) continue;
+    for (const r of all) {
+      if (r === 'A') continue;
+      const X = cast[r]; if (!X || X.job === 'police') continue;
+      const knows = A.rels.some(q => q.who === X.id && q.kind !== 'stranger-to');
+      if (!knows) continue;
+      const kX = K[X.id] || {};
+      const canA = !kA.first || (A.nick && !kA.nick), canX = !kX.first;
+      if (!canA && !canX) continue;
+      if (!roll(P.chance, 'passing', A.id, s.id, b.id, r, nowH)) continue;
+      const toA = canA && (!canX || roll(0.6, 'passing-dir', A.id, s.id, nowH));
+      let line, fact;
+      if (toA) {
+        const nick = A.nick && !kA.nick && (kA.first || roll(P.nickChance, 'passing-nick', A.id, s.id, nowH));
+        line = pick(nick ? P.toANick : P.toA, 'passing-line', A.id, s.id, b.id, nowH); fact = nick ? 'nickname' : 'first-name';
+        return push(line, { A, B: X }, 'conversation', at, A.id, fact);
+      }
+      line = pick(P.byA, 'passing-line', A.id, s.id, b.id, nowH);
+      return push(line, { A, B: X }, 'conversation', at, X.id, 'first-name');
+    }
+  }
+  function push(line, pc, channel, at, whoId, fact) {
+    const lctx = snapCtx({ cast: pc });
+    const learned = learnFrom(line, lctx, W, channel, at, null);
+    W.log.push({ t: at, kind: 'reveal', snap: JSON.stringify(W.known), tmpl: line, ctx: lctx, channel, fact: 'passing.' + fact });
+    W.notebook.push({ at, who: whoId, fact: 'X.' + fact, channel, verified: channel === 'document', tmpl: line, ctx: lctx, learned, passing: true });
+  }
+}
+
 const hearsayQueue = [];
+const retells = {};
 function scheduleHearsay(s, A, cast, nowH, startMin) {
   const hs = s.hearsay;
   const kindsFor = { neighbor: ['neighbor-of'], friend: ['friend-of'], coworker: ['coworker-of'], family: ['sibling-of', 'parent-of', 'child-of', 'cousin-of', 'grandparent-of', 'grandchild-of'], acquaintance: ['acquaintance-of'], shopkeeper: ['shopkeeper-of', 'customer-of'], landlord: ['landlord-of', 'tenant-of'] };
@@ -569,17 +695,33 @@ function runHearsay(upToAbs, fromAbs) {
     if (!inWindow(C, h.at)) continue;
     if ((busyUntil[C.id] || 0) > h.at) continue;
     const Wc = watch[C.id];
+    // the same speaker passes the same news on at most twice
+    const evKey = h.s.id + '|' + h.A.id + '|' + h.nowH, tellKey = evKey + '|' + C.id;
+    retells[tellKey] = (retells[tellKey] || 0) + 1; if (retells[tellKey] > 2) continue;
     const L = pick(C.rels.map(r => entities.get(r.who)).filter(Boolean), 'hs-listener', h.key) || makeExtra(C, 'listener');
     const line = pick(h.s.hearsay.lines, 'hs-line', h.key);
-    const ctx = { cast: { A: h.A, S: C, L }, S: 'Subject', L: descFor(L, Wc.known), place: pick(['the stoop', 'the stall counter', 'a bench', 'the square'], h.key), place2: '', n: 0, item: '' };
-    // from C's monitor the absent person is only a descriptor
+    const ctx = { cast: { A: h.A, S: C, L }, S: 'Subject', Sid: C.id, W: Wc, L: descFor(L, Wc.known), place: pick(['the stoop', 'the stall counter', 'a bench', 'the square'], h.key), place2: '', n: 0, item: '' };
+    // people talk about people they know by name: the absent person is named in the gossip. On the speaker's monitor
+    // that is just a name (nobody in view to tie it to); on the absent person's own notebook it is their first name,
+    // heard secondhand
     const ctx2 = Object.assign({}, ctx, { cast: { A: h.A } });
-    Wc.log.push({ t: h.at, kind: 'hearsay', snap: JSON.stringify(Wc.known), tmpl: line.replace('{A.desc}', descFor(h.A, Wc.known)), ctx: ctx2, absentId: h.A.id, sid: h.s.id });
+    Wc.log.push({ t: h.at, kind: 'hearsay', snap: JSON.stringify(Wc.known), tmpl: line.replace(/\{A\.desc\}|\{A\}/g, h.A.first), ctx: ctx2, absentId: h.A.id, sid: h.s.id });
     busyUntil[C.id] = h.at + 4;
     // the absent person's notebook gains a past-tense secondhand entry
-    const entry = pick(h.s.hearsay.entry, 'hs-entry', h.key).replace('{S}', 'a ' + (h.sp.kind === 'anyone' ? 'neighbor' : h.sp.kind));
-    watch[h.A.id].notebook.push({ at: h.at, who: h.A.id, fact: 'hearsay', channel: 'conversation', verified: false, text: entry, via: C.id });
-    watch[h.A.id].log.push({ t: h.at, kind: 'entry', tmpl: entry, ctx: { cast: { A: h.A } } });
+    // one entry per event: a second person saying the same thing adds a source, it doesn't add a line
+    const kind = h.sp.kind === 'anyone' ? 'neighbor' : h.sp.kind;
+    const WA = watch[h.A.id];
+    const had = WA.notebook.find(n => n.evKey === evKey);
+    if (had) {
+      if (had.sources.includes(C.id)) continue;
+      had.sources.push(C.id); had.kinds.push(kind);
+      if (had.sources.length === 2) WA.log.push({ t: h.at, kind: 'entry', tmpl: 'Heard again, from a ' + kind + ' (in conversation). Two people now say the same.', ctx: { cast: { A: h.A } } });
+      continue;
+    }
+    const entry = pick(h.s.hearsay.entry, 'hs-entry', h.key).replace('{S}', 'a ' + kind);
+    { const k = (WA.known[h.A.id] = WA.known[h.A.id] || {}); if (!k.first) { k.first = h.A.first; k.firstAt = h.at; k.firstVia = { channel: 'hearsay', verified: false, at: h.at }; } }
+    WA.notebook.push({ at: h.at, who: h.A.id, fact: 'hearsay', channel: 'conversation', verified: false, text: entry, via: C.id, evKey, sources: [C.id], kinds: [kind] });
+    WA.log.push({ t: h.at, kind: 'entry', tmpl: entry, ctx: { cast: { A: h.A } } });
   }
 }
 
@@ -610,7 +752,7 @@ function runWeek() {
 }
 
 // ---------- output ----------
-const cap = t => t.replace(/(^|[.!?]\s+|Overheard:\s+|Posted:\s+|one side:\s+)([a-z])/g, (m, pre, ch) => pre + ch.toUpperCase());
+const cap = t => t.replace(/(^|[.!?]\s+|Overheard:\s+|Posted:\s+|one side:\s+|:\s+")([a-z])/g, (m, pre, ch) => pre + ch.toUpperCase());
 function renderLog(c) {
   const W = watch[c.id]; const out = [];
   const entries = W.log.slice().sort((a, b) => a.t - b.t);
@@ -645,19 +787,47 @@ function sheet(c, fmt) {
   if (!lines.length) L.push('    (nothing reached the monitor this week)');
   for (const l of lines) { L.push('    ' + l.stamp + '  ' + l.text + (l.was ? '  [rewritten]' : '')); if (l.was) L.push('                  first logged as: ' + l.was); }
   L.push('');
-  const LABEL = { 'first-name': 'first name', 'full-name': 'full name', nickname: 'nickname', 'age-range': 'age range', job: 'job', employer: 'employer', home: 'home', cohabitants: 'lives with', family: 'family', partner: 'partner', habit: 'habit', regular: 'regular place', secret: 'secret', whereabouts: 'whereabouts', news: 'news', 'plan-stated': 'plan, as stated', 'feeling-stated': 'feeling, as stated', 'opinion-stated': 'opinion, as stated', 'money-stated': 'money, as stated' };
-  const nb = W.notebook.map(n => {
-    const k = W.known[n.who] || {};
-    if (n.fact === 'hearsay') return '- ' + n.text.replace(/\s+$/, '') + ' [unconfirmed, secondhand]';
-    const who = n.who === c.id ? (k.first || 'Subject') : (k.first ? k.first + (k.rel ? ' (' + k.rel + ')' : '') : descFor(entities.get(n.who), W.known));
-    const f = n.fact.split('.').slice(1).join('.');
-    const label = f.startsWith('relation-to') ? 'relation to Subject' : (LABEL[f] || f);
-    const detail = cap(fillTemplate(n.tmpl, n.ctx, W.known)).replace(/^(Overheard|Posted|Phone, one side):\s*/, '');
-    return '- ' + who + ', ' + label + ': ' + detail + ' [' + n.channel + ', ' + (n.verified ? 'verified' : 'unconfirmed') + ']';
-  });
-  L.push('Notebook:');
+  // The notebook: details (only what a document, an introduction or a stated name gave), the people around them
+  // (names and stated relations), and observations (everything else, labeled by how the watcher knows it, never
+  // by what it might mean)
+  const VIA = v => !v ? '' : ({ document: 'read on a document', introduction: 'introduced', conversation: 'overheard', phone: 'heard on the phone', feed: 'posted', seen: 'seen', hearsay: 'heard secondhand' }[v.channel] || v.channel) + ', ' + (v.verified ? 'verified' : 'unconfirmed');
+  const HOW = { seen: 'Seen', conversation: 'Overheard', phone: 'On the phone', feed: 'Posted', document: 'Read', introduction: 'Introduced' };
+  const DETAIL = { job: 'Job', employer: 'Employer', home: 'Home', cohabitants: 'Lives with', 'age-range': 'Age' };
+  const stamp = t => 'D' + (Math.floor(t / 1440) + 1) + ' ' + clock(t);
+  const text = n => cap(fillTemplate(n.tmpl, n.ctx, W.known)).replace(/^(Overheard|Posted|Phone, one side):\s*/, '');
+  const ks = W.known[c.id] || {};
+  const det = [];
+  if (ks.first) det.push('- Name: ' + ks.first + (ks.last ? ' ' + ks.last : '') + ' [' + VIA(ks.lastVia && ks.lastVia.verified ? ks.lastVia : ks.firstVia) + ']');
+  if (ks.nick) det.push('- Goes by: ' + ks.nick + ' [' + VIA(ks.nickVia) + ']');
+  const isDetail = n => n.fact !== 'hearsay' && !n.passing && n.who === c.id && (n.channel === 'document' || n.channel === 'introduction') && DETAIL[n.fact.split('.').slice(1).join('.')];
+  for (const n of W.notebook.filter(isDetail)) det.push('- ' + DETAIL[n.fact.split('.').slice(1).join('.')] + ': ' + text(n) + ' [' + VIA(n) + ']');
+  const ppl = [];
+  for (const [id, k] of Object.entries(W.known)) {
+    if (id === c.id || !(k.first || k.rel)) continue;
+    const e = entities.get(id); if (!e) continue;
+    const who = k.first ? k.first + (k.last ? ' ' + k.last : '') : descFor(e, {}, W).replace(/^an? /, 'An ').replace(/^unknown/, 'Unknown');
+    const rl = relLabel(k, W);
+    const bits = []; if (k.first) bits.push('name ' + VIA(k.lastVia && k.lastVia.verified ? k.lastVia : k.firstVia)); if (rl) bits.push('relation ' + VIA(k.relVia));
+    ppl.push('- ' + who + (rl ? ': ' + rl : '') + ' [' + bits.join('; ') + ']');
+  }
+  const obs = [];
+  for (const n of W.notebook) {
+    if (n.passing || isDetail(n) || (n.learned && n.learned.rel)) continue;
+    if (n.fact === 'hearsay') { obs.push('- ' + stamp(n.at) + ' Secondhand: ' + n.text.replace(/\s+$/, '') + ' [unconfirmed; heard from ' + n.sources.length + (n.sources.length > 1 ? ' people: ' + Object.entries(n.kinds.reduce((m, k) => (m[k] = (m[k] || 0) + 1, m), {})).map(([k, v]) => v > 1 ? v + ' ' + k + 's' : 'a ' + k).join(', ') : ' person') + ']'); continue; }
+    if (n.learned && n.learned.names.length && /first-name|full-name|last-name|nickname/.test(n.fact)) continue;   // it's in the details already
+    obs.push('- ' + stamp(n.at) + ' ' + (HOW[n.channel] || n.channel) + ': ' + text(n) + ' [' + (n.verified ? 'verified' : 'unconfirmed') + ']');
+  }
+  L.push('Notebook, details:');
   L.push('');
-  L.push(nb.length ? nb.join('\n') : '- (blank)');
+  L.push(det.length ? det.join('\n') : '- (blank)');
+  L.push('');
+  L.push('Notebook, people around them:');
+  L.push('');
+  L.push(ppl.length ? ppl.join('\n') : '- (none known)');
+  L.push('');
+  L.push('Notebook, observations:');
+  L.push('');
+  L.push(obs.length ? obs.join('\n') : '- (none)');
   L.push('');
   L.push('What really happened, most of it unseen: ' + (mine.length ? mine.map(p => p.id.replace(/^[a-z]+\./, '')).join(', ') : 'nothing of note') + '.');
   L.push('');
@@ -699,6 +869,11 @@ function summary() {
   out.push('Ambiguous setups played: ' + truths.length + (truths.length ? ' (hidden truths: ' + truths.map(p => p.truth).join(', ') + ')' : '') + '.');
   const setups = played.filter(p => p.truth), resolved = played.filter(p => byId.get(p.id).resolves);
   out.push('Ambiguous setups that were later settled by a reveal storylet: ' + resolved.length + ' of ' + setups.length + '.');
+  // how fast the watcher learns names: the subject's own first name, by day of watching
+  const firstDay = citizens.map(c => { const k = watch[c.id].known[c.id]; return k && k.first ? Math.floor(k.firstAt / 1440) + 1 : null; });
+  out.push('Subjects whose first name the watcher had: ' + [1, 2, 3, 5, 7].map(d => 'by day ' + d + ' ' + firstDay.filter(x => x && x <= d).length).join(', ') + ' (of ' + PEOPLE + ').');
+  const verifiedFull = citizens.filter(c => { const k = watch[c.id].known[c.id]; return k && k.last; }).length;
+  out.push('Subjects with a full name by the end of the week: ' + verifiedFull + '. Other people named on the monitors: ' + citizens.reduce((a, c) => a + Object.entries(watch[c.id].known).filter(([id, k]) => id !== c.id && k.first).length, 0) + '; with a stated relation: ' + citizens.reduce((a, c) => a + Object.entries(watch[c.id].known).filter(([id, k]) => id !== c.id && k.rel).length, 0) + '.');
   const gone = citizens.filter(c => c.gone).length; if (gone) out.push('Citizens who left the city: ' + gone + ' (still in the notebook, past tense).');
   out.push('');
   return out.join('\n');

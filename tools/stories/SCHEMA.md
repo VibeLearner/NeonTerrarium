@@ -131,7 +131,34 @@ A storylet with `effects.life` always has `unwatched: true` and hearsay: lasting
 - `channel` must be a channel in the vocab that can carry that fact. The confidence (`unconfirmed` or `verified`) comes from the channel, never from the storylet.
 - `beat` is where in the storylet it can happen. It must be a visible beat.
 - `chance` 0 to 1 that the watcher actually gets it this time.
-- `log` has at least 2 phrasings. They are extra lines the monitor adds, and the fact rewrites earlier entries.
+- `log` has at least 2 phrasings (1 for `said`). They are extra lines the monitor adds, and the fact rewrites earlier entries.
+- `minSeen` (optional, 2 or more): the reveal only happens once the watcher has seen this person at this beat's place on that many separate days.
+
+**A line teaches exactly what it states.** The `fact` says what the author meant; the engine learns only from the line it actually shows:
+- A name is learned from `{X.first}`, `{X.full}` or `{X.nick}` in the line, and only for a person who is in that beat (in its `who` or `with`). A name on a parcel label for someone who isn't there is kept as a loose name until something links it to a face.
+- A relation is learned only from a `relation-to` reveal, and every line of one must state it: `{X.rel}` or `{X.addr}` of either person in the pair, or the word itself ("neighbor", "my sister"). A line that only hints ("Happy anniversary", "Here is the rent") is a `said` reveal: it goes in the notebook as what was heard, and the player draws the conclusion.
+- `{seen}` is the real number of separate days the watcher has seen this person at this beat's place. A seen line that says "again", "often" or "every" must use it; a line with it is skipped until the count is 2 or more. The monitor never claims a habit it hasn't watched.
+- `{X.rel}` is the relation of X to A (for A, to B), in the right gender: "sister", "landlord", "granddaughter". `{X.addr}` is what the other person calls X: "Mom", "Dad", "Grandma", "Grandpa". Never write "Mom" or "my brother" into a line: the person cast may not match.
+- The validator enforces all of this.
+
+### The notebook
+
+The sheets (and later the game) show the notebook in three parts:
+- **Details:** the subject's name (with how it was learned: overheard, read on a document, introduced, heard secondhand), and job, employer, home, lives with and age only when a document or an introduction gave them.
+- **People around them:** everyone the watcher has a name or a stated relation for, with how each was learned.
+- **Observations:** everything else, labeled by how the watcher knows it (Seen, Overheard, On the phone, Posted, Read, Secondhand), never by what it might mean. "How is everyone?" is something said on the phone, not "a plan".
+
+Secondhand news about one event is one entry. A second person saying the same thing adds a source ("heard from 2 people") and one log line; more sources only update the count. The same person repeats the same news at most twice.
+
+### Names in everyday life (`vocab.passing`)
+
+Rules of the engine, not storylets, so names come up the way they do in real life. Each fires at most once per storylet, only while the name is still unknown:
+- **Greetings in passing:** someone of theirs (neighbor, friend, coworker, the keeper of a regular stall, family) who lives or works nearby passes and says hello by name. Only on beats where the subject is out alone.
+- **Names in conversation:** when the subject talks face to face with someone who knows them, one of them may use the other's name (or nickname).
+- **Order called at a counter**, **a name tag at work** (by job and place), **answering the phone**, **a parcel label** and **a door plate** (one resident only; shared homes are left to the storylets).
+- **Gossip names the absent person:** people talk about people by name. On the speaker's monitor that's a loose name; on the absent person's own notebook it's their first name, heard secondhand.
+
+In the life sheet (seed neon-1), the watcher has the subject's first name by day 2 for about half the citizens and by day 7 for about four in five. Full names stay rarer, since they need a document.
 
 ### The channels
 

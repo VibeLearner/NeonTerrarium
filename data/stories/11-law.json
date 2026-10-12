@@ -222,9 +222,10 @@
           "channel": "seen",
           "chance": 0.35,
           "log": [
-            "{A} has avoided this stretch before.",
-            "{A} took a longer path to stay clear of the station door."
-          ]
+            "{A} crosses away from the station door again: {seen} times on the feed.",
+            "{A} crosses the street short of the station door, then crosses back past it."
+          ],
+          "minSeen": 2
         }
       ],
       "next": {
@@ -602,9 +603,9 @@
           "{B.desc} lands the bike across {A}'s path."
         ],
         "b2": [
-          "{A} is run down and tagged. {A} raises both hands.",
-          "{A} is taken in, wrists cuffed in front.",
-          "{A} is pulled up behind {B.desc} on the bike."
+          "{A} raises both hands. {B.desc} cuffs {A.his} wrists in front.",
+          "{A} stands still while {B.desc} scans {A.him}, then holds out both wrists.",
+          "{B.desc} cuffs {A} and steers {A.him} onto the back of the bike."
         ],
         "b3": [
           "The bike lifts away with both of them.",

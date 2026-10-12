@@ -83,6 +83,7 @@ const data = {
   actionStatus: Object.fromEntries(Object.entries(vocab.actions).map(([k, v]) => [k, v.status])),
   storylets: all,
   chains,
+  passing: vocab.passing,
   generated: 'from data/stories/*.json'
 };
 
@@ -122,6 +123,9 @@ main{max-width:1200px;margin:0 auto;padding:16px 20px 80px}
 .t-mundane{color:var(--green);border-color:#2c5a43}.t-texture{color:var(--acc);border-color:#255c5e}.t-notable{color:var(--amber);border-color:#6a5420}.t-dramatic{color:var(--pink);border-color:#6b2a48}
 .b-new{color:var(--violet);border-color:#4b3f80}.b-unw{color:var(--amber)}.b-amb{color:var(--pink)}
 .note{color:var(--dim);margin:6px 0;font-size:13px}
+.dim{color:var(--dim);font-size:13px}
+#view-names .card{margin:0 0 10px}
+#view-names li{margin:2px 0}
 .sec{margin-top:8px}
 .sec>summary{cursor:pointer;color:var(--acc);font-size:13px}
 .beat{margin:4px 0;font-size:13px}
@@ -154,12 +158,13 @@ svg .lbl{fill:#9aa4b2;font-size:11px}
     <span id="tiers"></span>
     <button class="btn" id="newonly" title="Only storylets that use actions the game does not have yet">New actions only</button>
     <button class="btn" id="expand">Expand all</button>
-    <span class="tabs"><button class="btn on" id="tab-cat">Categories</button><button class="btn" id="tab-chain">Chains</button></span>
+    <span class="tabs"><button class="btn on" id="tab-cat">Categories</button><button class="btn" id="tab-chain">Chains</button><button class="btn" id="tab-names">Names</button></span>
   </div>
 </header>
 <main>
   <div id="view-cat"></div>
   <div id="view-chain" class="hidden"></div>
+  <div id="view-names" class="hidden"></div>
 </main>
 <script id="data" type="application/json">${json}</script>
 <script>
@@ -370,12 +375,36 @@ svg .lbl{fill:#9aa4b2;font-size:11px}
     root.appendChild(el('p', 'note', S.length - Object.keys(inChain).length + ' storylets stand alone, with no flag in or out.'));
   }
 
+  // the engine's name rules (vocab.passing): how names come up in everyday life, outside any storylet
+  function namesView(){
+    var root = document.getElementById('view-names'), P = D.passing; if (!P) return;
+    root.appendChild(el('h2', null, 'How names come up'));
+    root.appendChild(el('p', 'note', 'These are rules of the engine, not storylets. A line teaches exactly the name it contains. A name is tied to a person only when that person is in the scene; a name on a label for someone who is not there stays just a name.'));
+    var rules = [
+      ['Greetings in passing', P.greeting, ''],
+      ['Names in conversation', { _about: P._about, chance: P.chance, lines: [].concat(P.toA, P.toANick, P.byA) }, ''],
+      ['Order called at a counter', P.orderCall, ''],
+      ['Name tag at work', P.nameTag, Object.keys(P.nameTag.jobs || {}).join(', ')],
+      ['Answering the phone', P.phone, ''],
+      ['Label on a parcel', P.parcelLabel, ''],
+      ['Plate by the door', P.doorPlate, '']
+    ];
+    rules.forEach(function(r){
+      var d = el('details', 'card'); var sm = el('summary'); sm.appendChild(el('b', null, r[0])); sm.appendChild(el('span', 'dim', '  chance ' + Math.round(r[1].chance * 100) + '% per watched moment')); d.appendChild(sm);
+      if (r[1]._about) d.appendChild(el('p', 'note', r[1]._about));
+      if (r[2]) d.appendChild(el('p', 'note', r[2]));
+      var ul = el('ul'); (r[1].lines || []).forEach(function(l){ ul.appendChild(el('li', null, l)); }); d.appendChild(ul);
+      root.appendChild(d);
+    });
+  }
+
   function showTab(w){
-    document.getElementById('view-cat').classList.toggle('hidden', w !== 'cat');
-    document.getElementById('view-chain').classList.toggle('hidden', w !== 'chain');
-    document.getElementById('tab-cat').classList.toggle('on', w === 'cat');
-    document.getElementById('tab-chain').classList.toggle('on', w === 'chain');
+    ['cat', 'chain', 'names'].forEach(function(k){
+      document.getElementById('view-' + k).classList.toggle('hidden', w !== k);
+      document.getElementById('tab-' + k).classList.toggle('on', w === k);
+    });
     if (w === 'chain' && !document.getElementById('view-chain').firstChild) chainView();
+    if (w === 'names' && !document.getElementById('view-names').firstChild) namesView();
   }
 
   document.getElementById('q').addEventListener('input', function(e){ query = e.target.value.trim().toLowerCase(); renderCats(); });
@@ -383,6 +412,7 @@ svg .lbl{fill:#9aa4b2;font-size:11px}
   document.getElementById('expand').onclick = function(){ allOpen = !allOpen; this.textContent = allOpen ? 'Collapse all' : 'Expand all'; Array.prototype.forEach.call(document.querySelectorAll('#view-cat details'), function(d){ d.open = allOpen; }); };
   document.getElementById('tab-cat').onclick = function(){ showTab('cat'); };
   document.getElementById('tab-chain').onclick = function(){ showTab('chain'); };
+  document.getElementById('tab-names').onclick = function(){ showTab('names'); };
 
   renderStats(); renderTierButtons(); fillCatSelect(); renderCats();
 })();

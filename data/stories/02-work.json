@@ -9,14 +9,54 @@
       "tier": "mundane",
       "note": "Two coworkers pass at a work door at shift change. Common, cheap and quiet.",
       "roles": {
-        "A": { "desc": "an adult finishing a shift", "needs": ["adult", "employed"] },
-        "B": { "desc": "a coworker arriving for the next shift", "rel": "coworker-of:A" }
+        "A": {
+          "desc": "an adult finishing a shift",
+          "needs": [
+            "adult",
+            "employed"
+          ]
+        },
+        "B": {
+          "desc": "a coworker arriving for the next shift",
+          "rel": "coworker-of:A"
+        }
       },
-      "when": { "hours": [5, 9], "at": ["work-door"], "weight": 6, "cooldown": { "person": 20, "city": 0 } },
+      "when": {
+        "hours": [
+          5,
+          9
+        ],
+        "at": [
+          "work-door"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 20,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "leave", "who": "A", "at": "work-door" },
-        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "work-door" },
-        { "id": "b3", "do": "enter", "who": "B", "at": "work-door" }
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "work-door"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "work-door"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": "B",
+          "at": "work-door"
+        }
       ],
       "log": {
         "b1": [
@@ -41,13 +81,64 @@
       "title": "A day gone wrong",
       "tier": "texture",
       "note": "Work trouble pressure shows as behavior only. The feeling arrives through a stated line on a call, never as fact.",
-      "roles": { "A": { "desc": "an employed adult after a bad shift", "needs": ["adult", "employed", "pressure-high:work-trouble"] } },
-      "when": { "hours": [15, 21], "days": "weekday", "at": ["work-door", "bench"], "weight": 4, "cooldown": { "person": 120, "city": 2 }, "pressure": { "work-trouble": [0.4, 1] } },
+      "roles": {
+        "A": {
+          "desc": "an employed adult after a bad shift",
+          "needs": [
+            "adult",
+            "employed",
+            "pressure-high:work-trouble"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          15,
+          21
+        ],
+        "days": "weekday",
+        "at": [
+          "work-door",
+          "bench"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 120,
+          "city": 2
+        },
+        "pressure": {
+          "work-trouble": [
+            0.4,
+            1
+          ]
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "leave", "who": "A", "at": "work-door" },
-        { "id": "b2", "do": "emote", "who": "A", "emote": "anger", "at": "work-door" },
-        { "id": "b3", "do": "sit", "who": "A", "at": "bench" },
-        { "id": "b4", "do": "phone-call", "who": "A", "at": "bench" }
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "work-door"
+        },
+        {
+          "id": "b2",
+          "do": "emote",
+          "who": "A",
+          "emote": "anger",
+          "at": "work-door"
+        },
+        {
+          "id": "b3",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b4",
+          "do": "phone-call",
+          "who": "A",
+          "at": "bench"
+        }
       ],
       "log": {
         "b1": [
@@ -72,25 +163,81 @@
         ]
       },
       "reveals": [
-        { "fact": "A.feeling-stated", "beat": "b4", "channel": "phone", "chance": 0.8, "log": [
-          "Phone, one side: {A} says \"He said it in front of everyone. I did not get a word in.\"",
-          "Phone, one side: {A} says \"I'm fine. I just need an hour. It was a long one.\""
-        ] }
+        {
+          "fact": "A.feeling-stated",
+          "beat": "b4",
+          "channel": "phone",
+          "chance": 0.8,
+          "log": [
+            "Phone, one side: {A} says \"He said it in front of everyone. I did not get a word in.\"",
+            "Phone, one side: {A} says \"I'm fine. I just need an hour. It was a long one.\""
+          ]
+        }
       ],
-      "effects": { "pressure": [["A", "work-trouble", 0.05]] },
-      "next": { "sets": ["A:bad-day-recent"] }
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "work-trouble",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:bad-day-recent"
+        ]
+      }
     },
     {
       "id": "wrk.overtime",
       "title": "Late out of the work door",
       "tier": "texture",
       "note": "A long shift runs over. Money pressure eases a little.",
-      "roles": { "A": { "desc": "an employed adult working late", "needs": ["adult", "employed"] } },
-      "when": { "hours": [20, 24], "days": "weekday", "at": ["work-door", "stall"], "weight": 4, "cooldown": { "person": 80, "city": 1 } },
+      "roles": {
+        "A": {
+          "desc": "an employed adult working late",
+          "needs": [
+            "adult",
+            "employed"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          20,
+          24
+        ],
+        "days": "weekday",
+        "at": [
+          "work-door",
+          "stall"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 80,
+          "city": 1
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "leave", "who": "A", "at": "work-door" },
-        { "id": "b2", "do": "queue-order", "who": "A", "at": "stall" },
-        { "id": "b3", "do": "eat", "who": "A", "at": "cafe-stool" }
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "work-door"
+        },
+        {
+          "id": "b2",
+          "do": "queue-order",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b3",
+          "do": "eat",
+          "who": "A",
+          "at": "cafe-stool"
+        }
       ],
       "log": {
         "b1": [
@@ -109,18 +256,59 @@
           "{A} leans against the counter and eats with {A.his} eyes half closed."
         ]
       },
-      "effects": { "pressure": [["A", "money", -0.03]] }
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            -0.03
+          ]
+        ]
+      }
     },
     {
       "id": "wrk.payday-treat",
       "title": "Payday at the counter",
       "tier": "mundane",
       "note": "A little extravagance after pay arrives. Mundane, warm.",
-      "roles": { "A": { "desc": "an employed adult on payday", "needs": ["adult", "employed"] } },
-      "when": { "hours": [16, 21], "days": "weekday", "at": ["stall", "cafe-stool"], "weight": 5, "cooldown": { "person": 100, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an employed adult on payday",
+          "needs": [
+            "adult",
+            "employed"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          16,
+          21
+        ],
+        "days": "weekday",
+        "at": [
+          "stall",
+          "cafe-stool"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 100,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "queue-order", "who": "A", "at": "stall" },
-        { "id": "b2", "do": "eat", "who": "A", "at": "cafe-stool" }
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "eat",
+          "who": "A",
+          "at": "cafe-stool"
+        }
       ],
       "log": {
         "b1": [
@@ -134,7 +322,15 @@
           "{A} eats the dessert first. A pleased look at the sky."
         ]
       },
-      "effects": { "pressure": [["A", "money", -0.05]] }
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            -0.05
+          ]
+        ]
+      }
     },
     {
       "id": "wrk.side-gig",
@@ -142,14 +338,64 @@
       "tier": "texture",
       "note": "A second small job after hours. A.job learned through talk.",
       "roles": {
-        "A": { "desc": "an adult with a second small job", "needs": ["adult", "pressure-high:money"] },
-        "B": { "desc": "someone who pays A for odd work", "rel": "boss-of:A" }
+        "A": {
+          "desc": "an adult with a second small job",
+          "needs": [
+            "adult",
+            "pressure-high:money"
+          ]
+        },
+        "B": {
+          "desc": "someone who pays A for odd work",
+          "rel": "boss-of:A"
+        }
       },
-      "when": { "hours": [17, 23], "at": ["street", "shop-door"], "weight": 4, "cooldown": { "person": 80, "city": 2 }, "pressure": { "money": [0.4, 1] } },
+      "when": {
+        "hours": [
+          17,
+          23
+        ],
+        "at": [
+          "street",
+          "shop-door"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 80,
+          "city": 2
+        },
+        "pressure": {
+          "money": [
+            0.4,
+            1
+          ]
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "carry", "who": "A", "at": "street" },
-        { "id": "b2", "do": "hand-over", "who": "A", "with": ["B"], "at": "shop-door" },
-        { "id": "b3", "do": "chat", "who": ["A", "B"], "at": "shop-door" }
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "with": [
+            "B"
+          ],
+          "at": "shop-door"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "shop-door"
+        }
       ],
       "log": {
         "b1": [
@@ -169,16 +415,45 @@
         ]
       },
       "reveals": [
-        { "fact": "A.job", "beat": "b3", "channel": "conversation", "chance": 0.6, "log": [
-          "Overheard: {B.desc} says: \"Same as last week. Six boxes, one night, cash on the step.\"",
-          "Overheard: {B.desc} tells {A}: \"You are the only runner who comes back for the second shift.\""
-        ] },
-        { "fact": "B.relation-to-A", "beat": "b3", "channel": "conversation", "chance": 0.5, "log": [
-          "Overheard: {B.desc} says to {A}: \"Pay is on the step, same as before.\"",
-          "Overheard: {A} calls {B.desc} \"boss\" and gets a laugh."
-        ] }
+        {
+          "fact": "A.job",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.6,
+          "log": [
+            "Overheard: {B.desc} says: \"Same as last week. Six boxes, one night, cash on the step.\"",
+            "Overheard: {B.desc} tells {A}: \"You are the only runner who comes back for the second shift.\""
+          ]
+        },
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {A} calls {B.desc} \"boss\" and gets a laugh.",
+            "Overheard: {A} says: \"Same rate as last time, {B.rel}?\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {B.desc} says to {A}: \"Pay is on the step, same as before.\""
+          ]
+        }
       ],
-      "effects": { "pressure": [["A", "money", -0.04]] }
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            -0.04
+          ]
+        ]
+      }
     },
     {
       "id": "wrk.borrow-money",
@@ -186,14 +461,69 @@
       "tier": "notable",
       "note": "A friend asked for a small loan. Everything is stated, nothing is thought. Chain: wrk.loan-repaid, or it fizzles into a small awkwardness.",
       "roles": {
-        "A": { "desc": "an adult short on money", "needs": ["adult", "pressure-high:money"], "rel": "friend-of:B" },
-        "B": { "desc": "a friend of A with a little spare", "rel": "friend-of:A" }
+        "A": {
+          "desc": "an adult short on money",
+          "needs": [
+            "adult",
+            "pressure-high:money"
+          ],
+          "rel": "friend-of:B"
+        },
+        "B": {
+          "desc": "a friend of A with a little spare",
+          "rel": "friend-of:A"
+        }
       },
-      "when": { "hours": [12, 22], "at": ["stall", "cafe-stool", "bench"], "weight": 3, "cooldown": { "person": 200, "city": 3 }, "pressure": { "money": [0.6, 1] } },
+      "when": {
+        "hours": [
+          12,
+          22
+        ],
+        "at": [
+          "stall",
+          "cafe-stool",
+          "bench"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 200,
+          "city": 3
+        },
+        "pressure": {
+          "money": [
+            0.6,
+            1
+          ]
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk-together", "who": ["A", "B"], "at": "street" },
-        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "bench" },
-        { "id": "b3", "do": "hand-over", "who": "B", "with": ["A"], "at": "bench" }
+        {
+          "id": "b1",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        },
+        {
+          "id": "b3",
+          "do": "hand-over",
+          "who": "B",
+          "with": [
+            "A"
+          ],
+          "at": "bench"
+        }
       ],
       "log": {
         "b1": [
@@ -213,16 +543,53 @@
         ]
       },
       "reveals": [
-        { "fact": "A.money-stated", "beat": "b2", "channel": "conversation", "chance": 0.8, "log": [
-          "Overheard: {A} says: \"Thirty, until payday. I swear it is just till payday.\"",
-          "Overheard: {A} asks: \"Can you cover the rest of the week? I'll pay you back on the fifteenth.\""
-        ] }
+        {
+          "fact": "A.money-stated",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.8,
+          "log": [
+            "Overheard: {A} says: \"Thirty, until payday. I swear it is just till payday.\"",
+            "Overheard: {A} asks: \"Can you cover the rest of the week? I'll pay you back on the fifteenth.\""
+          ]
+        }
       ],
-      "effects": { "pressure": [["A", "money", -0.1]], "warmth": [["A", "B", 0.03]] },
-      "next": { "sets": ["A+B:owes-b"], "branches": [
-        { "w": 55, "sets": ["A+B:will-repay"], "label": "A pays it back" },
-        { "w": 45, "sets": [], "label": "forgotten for months", "fizzle": true }
-      ] }
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            -0.1
+          ]
+        ],
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.03
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:owes-b"
+        ],
+        "branches": [
+          {
+            "w": 55,
+            "sets": [
+              "A+B:will-repay"
+            ],
+            "label": "A pays it back"
+          },
+          {
+            "w": 45,
+            "sets": [],
+            "label": "forgotten for months",
+            "fizzle": true
+          }
+        ]
+      }
     },
     {
       "id": "wrk.loan-repaid",
@@ -230,14 +597,64 @@
       "tier": "texture",
       "note": "The pay-off to wrk.borrow-money.",
       "roles": {
-        "A": { "desc": "an adult who borrowed from B", "needs": ["adult"], "rel": "debtor-of:B" },
-        "B": { "desc": "the friend who lent the money", "rel": "creditor-of:A" }
+        "A": {
+          "desc": "an adult who borrowed from B",
+          "needs": [
+            "adult"
+          ],
+          "rel": "debtor-of:B"
+        },
+        "B": {
+          "desc": "the friend who lent the money",
+          "rel": "creditor-of:A"
+        }
       },
-      "when": { "hours": [12, 22], "at": ["stall", "cafe-stool"], "requires": ["A+B:will-repay"], "weight": 5, "cooldown": { "person": 300, "city": 3 } },
+      "when": {
+        "hours": [
+          12,
+          22
+        ],
+        "at": [
+          "stall",
+          "cafe-stool"
+        ],
+        "requires": [
+          "A+B:will-repay"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 300,
+          "city": 3
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "queue-order", "who": ["A", "B"], "at": "stall" },
-        { "id": "b2", "do": "hand-over", "who": "A", "with": ["B"], "at": "cafe-stool" },
-        { "id": "b3", "do": "eat", "who": ["A", "B"], "at": "cafe-stool" }
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "with": [
+            "B"
+          ],
+          "at": "cafe-stool"
+        },
+        {
+          "id": "b3",
+          "do": "eat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "cafe-stool"
+        }
       ],
       "log": {
         "b1": [
@@ -257,12 +674,33 @@
         ]
       },
       "reveals": [
-        { "fact": "A.money-stated", "beat": "b2", "channel": "conversation", "chance": 0.7, "log": [
-          "Overheard: {A} says: \"That's the thirty. Thank you for not asking about it.\"",
-          "Overheard: {A} tells {B.desc}: \"Square. You can stop pretending you forgot.\""
-        ] }
+        {
+          "fact": "A.money-stated",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.7,
+          "log": [
+            "Overheard: {A} says: \"That's the thirty. Thank you for not asking about it.\"",
+            "Overheard: {A} tells {B.desc}: \"Square. You can stop pretending you forgot.\""
+          ]
+        }
       ],
-      "effects": { "pressure": [["A", "money", -0.05]], "warmth": [["A", "B", 0.08]] }
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            -0.05
+          ]
+        ],
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.08
+          ]
+        ]
+      }
     },
     {
       "id": "wrk.laid-off",
@@ -271,14 +709,61 @@
       "note": "A lost job. The watcher can see the moment only by luck; usually it arrives as hearsay. Chain: wrk.job-hunt, then wrk.found-new-job.",
       "unwatched": true,
       "roles": {
-        "A": { "desc": "an employed adult losing the job", "needs": ["adult", "employed"] },
-        "B": { "desc": "a former coworker or boss, at the door", "rel": "coworker-of:A" }
+        "A": {
+          "desc": "an employed adult losing the job",
+          "needs": [
+            "adult",
+            "employed"
+          ]
+        },
+        "B": {
+          "desc": "a former coworker or boss, at the door",
+          "rel": "coworker-of:A"
+        }
       },
-      "when": { "hours": [9, 18], "days": "weekday", "at": ["work-door"], "weight": 2, "cooldown": { "person": 2000, "city": 24 }, "pressure": { "work-trouble": [0.3, 1] } },
+      "when": {
+        "hours": [
+          9,
+          18
+        ],
+        "days": "weekday",
+        "at": [
+          "work-door"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 2000,
+          "city": 24
+        },
+        "pressure": {
+          "work-trouble": [
+            0.3,
+            1
+          ]
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "leave", "who": "A", "at": "work-door" },
-        { "id": "b2", "do": "carry", "who": "A", "at": "work-door" },
-        { "id": "b3", "do": "chat", "who": ["A", "B"], "at": "work-door" }
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "work-door"
+        },
+        {
+          "id": "b2",
+          "do": "carry",
+          "who": "A",
+          "at": "work-door"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "work-door"
+        }
       ],
       "log": {
         "b1": [
@@ -298,16 +783,48 @@
         ]
       },
       "reveals": [
-        { "fact": "A.news", "beat": "b3", "channel": "conversation", "chance": 0.6, "log": [
-          "Overheard: {B.desc} says \"Nothing personal. It came from above.\" {A} nods.",
-          "Overheard: {B.desc} tells {A}: \"I will give you a reference. Come by Friday for the paperwork.\""
-        ] }
+        {
+          "fact": "A.news",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.6,
+          "log": [
+            "Overheard: {B.desc} says \"Nothing personal. It came from above.\" {A} nods.",
+            "Overheard: {B.desc} tells {A}: \"I will give you a reference. Come by Friday for the paperwork.\""
+          ]
+        }
       ],
-      "effects": { "life": "job-lost", "pressure": [["A", "money", 0.3], ["A", "work-trouble", -0.2]], "flags": ["A:jobless"] },
-      "next": { "sets": ["A:jobless"] },
+      "effects": {
+        "life": "job-lost",
+        "pressure": [
+          [
+            "A",
+            "money",
+            0.3
+          ],
+          [
+            "A",
+            "work-trouble",
+            -0.2
+          ]
+        ],
+        "flags": [
+          "A:jobless"
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:jobless"
+        ]
+      },
       "hearsay": {
         "about": "A",
-        "speakers": ["coworker", "neighbor", "friend", "shopkeeper"],
+        "speakers": [
+          "coworker",
+          "neighbor",
+          "friend",
+          "shopkeeper"
+        ],
         "channel": "conversation",
         "lines": [
           "Overheard: {S} tells {L} that {A.desc} got let go last week, \"out of nowhere.\"",
@@ -327,12 +844,53 @@
       "title": "Reading the boards",
       "tier": "texture",
       "note": "After a job loss: boards, shop doors, a stall conversation. The jobless pressure shows as time spent in the square.",
-      "roles": { "A": { "desc": "an unemployed adult looking for work", "needs": ["adult", "unemployed"] } },
-      "when": { "hours": [9, 17], "at": ["street", "shop-door", "square"], "requires": ["A:jobless"], "weight": 5, "cooldown": { "person": 60, "city": 1 } },
+      "roles": {
+        "A": {
+          "desc": "an unemployed adult looking for work",
+          "needs": [
+            "adult",
+            "unemployed"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          17
+        ],
+        "at": [
+          "street",
+          "shop-door",
+          "square"
+        ],
+        "requires": [
+          "A:jobless"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 60,
+          "city": 1
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "read-notice", "who": "A", "at": "street" },
-        { "id": "b2", "do": "enter", "who": "A", "at": "shop-door" },
-        { "id": "b3", "do": "leave", "who": "A", "at": "shop-door" }
+        {
+          "id": "b1",
+          "do": "read-notice",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "enter",
+          "who": "A",
+          "at": "shop-door"
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "A",
+          "at": "shop-door"
+        }
       ],
       "log": {
         "b1": [
@@ -351,8 +909,20 @@
           "{A} leaves the shop at a measured pace and does not look back at it."
         ]
       },
-      "effects": { "pressure": [["A", "money", 0.04]] },
-      "next": { "sets": ["A:job-hunting"] }
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            0.04
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:job-hunting"
+        ]
+      }
     },
     {
       "id": "wrk.found-new-job",
@@ -361,14 +931,61 @@
       "note": "The job hunt ends. Usually unwatched; arrives through gossip. Sets a flag so a new-uniform storylet can show it.",
       "unwatched": true,
       "roles": {
-        "A": { "desc": "an unemployed adult who finds a job", "needs": ["adult", "unemployed"] },
-        "B": { "desc": "the new boss at the door", "rel": "boss-of:A" }
+        "A": {
+          "desc": "an unemployed adult who finds a job",
+          "needs": [
+            "adult",
+            "unemployed"
+          ]
+        },
+        "B": {
+          "desc": "the new boss at the door",
+          "rel": "boss-of:A"
+        }
       },
-      "when": { "hours": [8, 18], "days": "weekday", "at": ["work-door"], "requires": ["A:job-hunting"], "weight": 3, "cooldown": { "person": 2000, "city": 24 } },
+      "when": {
+        "hours": [
+          8,
+          18
+        ],
+        "days": "weekday",
+        "at": [
+          "work-door"
+        ],
+        "requires": [
+          "A:job-hunting"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 2000,
+          "city": 24
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "work-door" },
-        { "id": "b3", "do": "enter", "who": ["A", "B"], "at": "work-door" }
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "work-door"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "work-door"
+        }
       ],
       "log": {
         "b1": [
@@ -388,16 +1005,43 @@
         ]
       },
       "reveals": [
-        { "fact": "A.job", "beat": "b2", "channel": "conversation", "chance": 0.7, "log": [
-          "Overheard: {B.desc} says: \"Welcome. First shift Monday. You have the night counter.\"",
-          "Overheard: {B.desc} tells {A}: \"Uniform's in the back. Badge by Friday.\""
-        ] }
+        {
+          "fact": "A.job",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.7,
+          "log": [
+            "Overheard: {B.desc} says: \"Welcome. First shift Monday. You have the night counter.\"",
+            "Overheard: {B.desc} tells {A}: \"Uniform's in the back. Badge by Friday.\""
+          ]
+        }
       ],
-      "effects": { "life": "job-found", "pressure": [["A", "money", -0.2]], "flags": ["A:new-job-started"] },
-      "next": { "sets": ["A:new-job-started"] },
+      "effects": {
+        "life": "job-found",
+        "pressure": [
+          [
+            "A",
+            "money",
+            -0.2
+          ]
+        ],
+        "flags": [
+          "A:new-job-started"
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:new-job-started"
+        ]
+      },
       "hearsay": {
         "about": "A",
-        "speakers": ["friend", "neighbor", "coworker", "family"],
+        "speakers": [
+          "friend",
+          "neighbor",
+          "coworker",
+          "family"
+        ],
         "channel": "conversation",
         "lines": [
           "Overheard: {S} tells {L} that {A.desc} landed something, \"a night counter, I think.\"",
@@ -417,11 +1061,47 @@
       "title": "A badge no one has seen",
       "tier": "texture",
       "note": "Seen after a job change: a new uniform and a verified job from the badge.",
-      "roles": { "A": { "desc": "an adult in a new job", "needs": ["adult", "employed"] } },
-      "when": { "hours": [6, 10], "days": "weekday", "at": ["street", "work-door"], "requires": ["A:new-job-started"], "weight": 6, "cooldown": { "person": 400, "city": 2 } },
+      "roles": {
+        "A": {
+          "desc": "an adult in a new job",
+          "needs": [
+            "adult",
+            "employed"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          10
+        ],
+        "days": "weekday",
+        "at": [
+          "street",
+          "work-door"
+        ],
+        "requires": [
+          "A:new-job-started"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 400,
+          "city": 2
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b2", "do": "enter", "who": "A", "at": "work-door" }
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "enter",
+          "who": "A",
+          "at": "work-door"
+        }
       ],
       "log": {
         "b1": [
@@ -436,14 +1116,26 @@
         ]
       },
       "reveals": [
-        { "fact": "A.job", "beat": "b2", "channel": "document", "chance": 0.9, "log": [
-          "Badge on the new jacket reads: {A.job}.",
-          "Name tag at the work door: {A.job}."
-        ] },
-        { "fact": "A.employer", "beat": "b2", "channel": "document", "chance": 0.7, "log": [
-          "Sign over the new door: {A.employer}.",
-          "Door plaque at the new workplace: {A.employer}."
-        ] }
+        {
+          "fact": "A.job",
+          "beat": "b2",
+          "channel": "document",
+          "chance": 0.9,
+          "log": [
+            "Badge on the new jacket reads: {A.job}.",
+            "Name tag at the work door: {A.job}."
+          ]
+        },
+        {
+          "fact": "A.employer",
+          "beat": "b2",
+          "channel": "document",
+          "chance": 0.7,
+          "log": [
+            "Sign over the new door: {A.employer}.",
+            "Door plaque at the new workplace: {A.employer}."
+          ]
+        }
       ]
     },
     {
@@ -451,12 +1143,49 @@
       "title": "A quiet counter",
       "tier": "texture",
       "note": "A keeper with no customers. Money pressure and nothing else. A shrug and an early close.",
-      "roles": { "A": { "desc": "a stall keeper on a slow night", "needs": ["adult", "stall-keeper"] } },
-      "when": { "hours": [20, 24], "weather": "rain", "at": ["stall"], "weight": 4, "cooldown": { "person": 90, "city": 1 } },
+      "roles": {
+        "A": {
+          "desc": "a stall keeper on a slow night",
+          "needs": [
+            "adult",
+            "stall-keeper"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          20,
+          24
+        ],
+        "weather": "rain",
+        "at": [
+          "stall"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 90,
+          "city": 1
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "serve", "who": "A", "at": "stall" },
-        { "id": "b2", "do": "stand", "who": "A", "at": "stall" },
-        { "id": "b3", "do": "shrug", "who": "A", "at": "stall" }
+        {
+          "id": "b1",
+          "do": "serve",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b3",
+          "do": "shrug",
+          "who": "A",
+          "at": "stall"
+        }
       ],
       "log": {
         "b1": [
@@ -475,7 +1204,15 @@
           "{A} lifts both hands, palms up, toward the empty plaza."
         ]
       },
-      "effects": { "pressure": [["A", "money", 0.03]] }
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            0.03
+          ]
+        ]
+      }
     },
     {
       "id": "wrk.courier-handoff",
@@ -483,13 +1220,48 @@
       "tier": "mundane",
       "note": "A courier on foot hands a parcel between shops. Existing courier behavior.",
       "roles": {
-        "A": { "desc": "a courier on foot", "needs": ["adult", "courier"] },
-        "B": { "desc": "a shopkeeper receiving a parcel", "rel": "shopkeeper-of:A" }
+        "A": {
+          "desc": "a courier on foot",
+          "needs": [
+            "adult",
+            "courier"
+          ]
+        },
+        "B": {
+          "desc": "a shopkeeper receiving a parcel",
+          "rel": "shopkeeper-of:A"
+        }
       },
-      "when": { "hours": [9, 18], "at": ["shop-door"], "weight": 6, "cooldown": { "person": 18, "city": 0 } },
+      "when": {
+        "hours": [
+          9,
+          18
+        ],
+        "at": [
+          "shop-door"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 18,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "courier-run", "who": "A", "at": "street" },
-        { "id": "b2", "do": "hand-over", "who": "A", "with": ["B"], "at": "shop-door" }
+        {
+          "id": "b1",
+          "do": "courier-run",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "with": [
+            "B"
+          ],
+          "at": "shop-door"
+        }
       ],
       "log": {
         "b1": [
@@ -510,14 +1282,61 @@
       "tier": "texture",
       "note": "A visible reaction to a boss: posture and cleanup. A relation-to fact, stated, never inferred.",
       "roles": {
-        "A": { "desc": "an employed adult", "needs": ["adult", "employed"] },
-        "B": { "desc": "A's boss", "rel": "boss-of:A" }
+        "A": {
+          "desc": "an employed adult",
+          "needs": [
+            "adult",
+            "employed"
+          ]
+        },
+        "B": {
+          "desc": "A's boss",
+          "rel": "boss-of:A"
+        }
       },
-      "when": { "hours": [8, 17], "days": "weekday", "at": ["work-door"], "weight": 4, "cooldown": { "person": 120, "city": 2 } },
+      "when": {
+        "hours": [
+          8,
+          17
+        ],
+        "days": "weekday",
+        "at": [
+          "work-door"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 120,
+          "city": 2
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "stand", "who": "A", "with": ["B"], "at": "work-door" },
-        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "work-door" },
-        { "id": "b3", "do": "enter", "who": ["A", "B"], "at": "work-door" }
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "with": [
+            "B"
+          ],
+          "at": "work-door"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "work-door"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "work-door"
+        }
       ],
       "log": {
         "b1": [
@@ -537,10 +1356,25 @@
         ]
       },
       "reveals": [
-        { "fact": "B.relation-to-A", "beat": "b2", "channel": "conversation", "chance": 0.6, "log": [
-          "Overheard: {A} calls {B.desc} \"boss\" twice.",
-          "Overheard: {B.desc} says to {A}: \"I'm coming by every shift this week. Be ready.\""
-        ] }
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.6,
+          "log": [
+            "Overheard: {A} calls {B.desc} \"boss\" twice.",
+            "Overheard: {A} mutters: \"The {B.rel} again. Every shift this week.\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.6,
+          "log": [
+            "Overheard: {B.desc} says to {A}: \"I'm coming by every shift this week. Be ready.\""
+          ]
+        }
       ]
     },
     {
@@ -549,14 +1383,63 @@
       "tier": "mundane",
       "note": "Coworkers eat together. Warmth drift for coworkers.",
       "roles": {
-        "A": { "desc": "an employed adult", "needs": ["adult", "employed"] },
-        "B": { "desc": "a coworker", "rel": "coworker-of:A" }
+        "A": {
+          "desc": "an employed adult",
+          "needs": [
+            "adult",
+            "employed"
+          ]
+        },
+        "B": {
+          "desc": "a coworker",
+          "rel": "coworker-of:A"
+        }
       },
-      "when": { "hours": [12, 14], "days": "weekday", "at": ["work-door", "stall", "square"], "weight": 6, "cooldown": { "person": 40, "city": 0 } },
+      "when": {
+        "hours": [
+          12,
+          14
+        ],
+        "days": "weekday",
+        "at": [
+          "work-door",
+          "stall",
+          "square"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 40,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "leave", "who": ["A", "B"], "at": "work-door" },
-        { "id": "b2", "do": "queue-order", "who": ["A", "B"], "at": "stall" },
-        { "id": "b3", "do": "eat", "who": ["A", "B"], "at": "square" }
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "work-door"
+        },
+        {
+          "id": "b2",
+          "do": "queue-order",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        },
+        {
+          "id": "b3",
+          "do": "eat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "square"
+        }
       ],
       "log": {
         "b1": [
@@ -575,7 +1458,15 @@
           "{A} and {B.desc} take a corner of the square and eat. Laughter at one point. Note bubble."
         ]
       },
-      "effects": { "warmth": [["A", "B", 0.03]] }
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.03
+          ]
+        ]
+      }
     }
   ]
 }

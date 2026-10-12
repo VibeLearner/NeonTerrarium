@@ -82,6 +82,15 @@
           "chance": 0.35,
           "log": [
             "Overheard: {B.desc} says: \"Take it, neighbor. Just bring it back before the weekend.\"",
+            "Overheard: {A} says: \"What would I do without a {B.rel} like you?\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.35,
+          "log": [
             "Overheard: {A} says: \"You saved me again. Come by for dumplings on Sunday.\""
           ]
         }
@@ -496,7 +505,16 @@
           "channel": "conversation",
           "chance": 0.3,
           "log": [
-            "Overheard: {B.desc} says: \"Thank you. You are a good neighbor to an old woman.\"",
+            "Overheard: {B.desc} says: \"Thank you. You are a good {A.rel}.\"",
+            "Overheard: {A} says: \"Anytime. That's what a {A.rel} is for.\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
             "Overheard: {A} says: \"Anytime. Call down the hall, I will hear.\""
           ]
         }
@@ -732,8 +750,8 @@
           "channel": "seen",
           "chance": 0.4,
           "log": [
-            "{A} is a regular here; the keeper made the order unprompted.",
-            "The keeper treats {A} as a standing customer."
+            "The keeper starts {A}'s order before {A.he} says a word.",
+            "The keeper has a cup out for {A} before {A.he} reaches the counter."
           ]
         }
       ],
@@ -932,8 +950,17 @@
           "channel": "conversation",
           "chance": 0.4,
           "log": [
-            "Overheard: {A} says: \"Welcome to the block. I live just across, if you need anything.\"",
-            "Overheard: {B.desc} says: \"You are the first one to knock. Thank you, neighbor.\""
+            "Overheard: {B.desc} says: \"You are the first one to knock. Thank you, neighbor.\"",
+            "Overheard: {A} says: \"Welcome. I'm your {A.rel}, just across the hall.\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"Welcome to the block. I live just across, if you need anything.\""
           ]
         }
       ],
@@ -1032,8 +1059,8 @@
           "channel": "seen",
           "chance": 0.45,
           "log": [
-            "{A} feeds the strays here most mornings.",
-            "The saucer is {A}'s, and the cat comes to it."
+            "{A} fills a saucer here for the strays: {seen} mornings on the feed.",
+            "{A} fills the saucer. The cat comes to it."
           ]
         }
       ],

@@ -8,12 +8,50 @@
       "title": "Out the door for the day",
       "tier": "mundane",
       "note": "The most common moment in the database. The watcher sees someone start a workday; a badge or lanyard can give a verified job.",
-      "roles": { "A": { "desc": "an employed adult starting the day", "needs": ["adult", "employed"] } },
-      "when": { "hours": [6, 9], "days": "weekday", "at": ["home-door", "street"], "weight": 10, "cooldown": { "person": 18, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an employed adult starting the day",
+          "needs": [
+            "adult",
+            "employed"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          9
+        ],
+        "days": "weekday",
+        "at": [
+          "home-door",
+          "street"
+        ],
+        "weight": 10,
+        "cooldown": {
+          "person": 18,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "leave", "who": "A", "at": "home-door" },
-        { "id": "b2", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b3", "do": "enter", "who": "A", "at": "work-door" }
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": "A",
+          "at": "work-door"
+        }
       ],
       "log": {
         "b1": [
@@ -36,14 +74,26 @@
         ]
       },
       "reveals": [
-        { "fact": "A.job", "beat": "b3", "channel": "document", "chance": 0.3, "log": [
-          "Badge clipped to {A.his} jacket: {A.job}.",
-          "Lanyard at the work door reads: {A.job}."
-        ] },
-        { "fact": "A.employer", "beat": "b3", "channel": "document", "chance": 0.3, "log": [
-          "Name on the work door plate: {A.employer}.",
-          "Sign over the door {A} used: {A.employer}."
-        ] }
+        {
+          "fact": "A.job",
+          "beat": "b3",
+          "channel": "document",
+          "chance": 0.3,
+          "log": [
+            "Badge clipped to {A.his} jacket: {A.job}.",
+            "Lanyard at the work door reads: {A.job}."
+          ]
+        },
+        {
+          "fact": "A.employer",
+          "beat": "b3",
+          "channel": "document",
+          "chance": 0.3,
+          "log": [
+            "Name on the work door plate: {A.employer}.",
+            "Sign over the door {A} used: {A.employer}."
+          ]
+        }
       ]
     },
     {
@@ -51,12 +101,49 @@
       "title": "The usual stool",
       "tier": "mundane",
       "note": "The same seat at the same stall. Repeat sightings let the watcher record a verified-looking habit, but it is only seen, so it stays unconfirmed.",
-      "roles": { "A": { "desc": "an adult with a favorite stall", "needs": ["adult", "regular:stall"] } },
-      "when": { "hours": [11, 22], "at": ["stall", "cafe-stool"], "weight": 8, "cooldown": { "person": 20, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an adult with a favorite stall",
+          "needs": [
+            "adult",
+            "regular:stall"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          11,
+          22
+        ],
+        "at": [
+          "stall",
+          "cafe-stool"
+        ],
+        "weight": 8,
+        "cooldown": {
+          "person": 20,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "queue-order", "who": "A", "at": "stall" },
-        { "id": "b2", "do": "sit", "who": "A", "at": "cafe-stool" },
-        { "id": "b3", "do": "eat", "who": "A", "at": "cafe-stool" }
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "sit",
+          "who": "A",
+          "at": "cafe-stool"
+        },
+        {
+          "id": "b3",
+          "do": "eat",
+          "who": "A",
+          "at": "cafe-stool"
+        }
       ],
       "log": {
         "b1": [
@@ -79,10 +166,17 @@
         ]
       },
       "reveals": [
-        { "fact": "A.regular", "beat": "b2", "channel": "seen", "chance": 0.5, "log": [
-          "Seen at {place} again: visit number {n}. Same stool.",
-          "Same stall, same stool, visit number {n}."
-        ] }
+        {
+          "fact": "A.regular",
+          "beat": "b2",
+          "channel": "seen",
+          "chance": 0.5,
+          "log": [
+            "Seen at {place} on {seen} separate days. Same stool each time.",
+            "Same stall, same stool. Day {seen} the feed has caught it."
+          ],
+          "minSeen": 2
+        }
       ]
     },
     {
@@ -90,12 +184,51 @@
       "title": "Twenty minutes for lunch",
       "tier": "mundane",
       "note": "A worker steps out at midday and eats standing up. Sets nothing; it is texture.",
-      "roles": { "A": { "desc": "an employed adult on a lunch break", "needs": ["adult", "employed"] } },
-      "when": { "hours": [12, 14], "days": "weekday", "at": ["work-door", "stall", "square"], "weight": 8, "cooldown": { "person": 20, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an employed adult on a lunch break",
+          "needs": [
+            "adult",
+            "employed"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          12,
+          14
+        ],
+        "days": "weekday",
+        "at": [
+          "work-door",
+          "stall",
+          "square"
+        ],
+        "weight": 8,
+        "cooldown": {
+          "person": 20,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "leave", "who": "A", "at": "work-door" },
-        { "id": "b2", "do": "queue-order", "who": "A", "at": "stall" },
-        { "id": "b3", "do": "eat", "who": "A", "at": "square" }
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "work-door"
+        },
+        {
+          "id": "b2",
+          "do": "queue-order",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b3",
+          "do": "eat",
+          "who": "A",
+          "at": "square"
+        }
       ],
       "log": {
         "b1": [
@@ -123,12 +256,49 @@
       "title": "A cup on the way",
       "tier": "mundane",
       "note": "A habit of a single drink picked up on the walk.",
-      "roles": { "A": { "desc": "an adult heading somewhere", "needs": ["adult", "regular:bar-kiosk"] } },
-      "when": { "hours": [6, 11], "at": ["street", "bar-kiosk"], "weight": 6, "cooldown": { "person": 22, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an adult heading somewhere",
+          "needs": [
+            "adult",
+            "regular:bar-kiosk"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          11
+        ],
+        "at": [
+          "street",
+          "bar-kiosk"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 22,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b2", "do": "queue-order", "who": "A", "at": "bar-kiosk" },
-        { "id": "b3", "do": "walk", "who": "A", "at": "street" }
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "queue-order",
+          "who": "A",
+          "at": "bar-kiosk"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
       ],
       "log": {
         "b1": [
@@ -153,12 +323,48 @@
       "title": "In and out of the shop",
       "tier": "mundane",
       "note": "A short errand. Only the door and the bag are seen.",
-      "roles": { "A": { "desc": "an adult running an errand", "needs": ["adult"] } },
-      "when": { "hours": [9, 20], "at": ["street", "shop-door"], "weight": 8, "cooldown": { "person": 20, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an adult running an errand",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          20
+        ],
+        "at": [
+          "street",
+          "shop-door"
+        ],
+        "weight": 8,
+        "cooldown": {
+          "person": 20,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b2", "do": "enter", "who": "A", "at": "shop-door" },
-        { "id": "b3", "do": "leave", "who": "A", "at": "shop-door" }
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "enter",
+          "who": "A",
+          "at": "shop-door"
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "A",
+          "at": "shop-door"
+        }
       ],
       "log": {
         "b1": [
@@ -186,11 +392,42 @@
       "title": "The walk back",
       "tier": "mundane",
       "note": "The end-of-day mirror of the commute. Most lives show this daily.",
-      "roles": { "A": { "desc": "an adult walking home", "needs": ["adult"] } },
-      "when": { "hours": [16, 22], "at": ["street", "home-door"], "weight": 9, "cooldown": { "person": 20, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an adult walking home",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          16,
+          22
+        ],
+        "at": [
+          "street",
+          "home-door"
+        ],
+        "weight": 9,
+        "cooldown": {
+          "person": 20,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b2", "do": "enter", "who": "A", "at": "home-door" }
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
       ],
       "log": {
         "b1": [
@@ -212,12 +449,47 @@
       "title": "The long way round",
       "tier": "texture",
       "note": "A small deviation: someone turns off the usual route. It may become a new habit (rtn.new-stall-found) or fizzle.",
-      "roles": { "A": { "desc": "an adult on a regular route", "needs": ["adult"] } },
-      "when": { "hours": [8, 20], "at": ["street"], "weight": 4, "cooldown": { "person": 120, "city": 2 } },
+      "roles": {
+        "A": {
+          "desc": "an adult on a regular route",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          20
+        ],
+        "at": [
+          "street"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 120,
+          "city": 2
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b2", "do": "stand", "who": "A", "at": "street" },
-        { "id": "b3", "do": "walk", "who": "A", "at": "street" }
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
       ],
       "log": {
         "b1": [
@@ -236,10 +508,26 @@
           "{A} picks the old way up again and does not look back."
         ]
       },
-      "next": { "sets": ["A:tried-new-route"], "branches": [
-        { "w": 40, "sets": ["A:liked-new-route"], "label": "the new way becomes a habit" },
-        { "w": 60, "sets": [], "label": "never taken again", "fizzle": true }
-      ] }
+      "next": {
+        "sets": [
+          "A:tried-new-route"
+        ],
+        "branches": [
+          {
+            "w": 40,
+            "sets": [
+              "A:liked-new-route"
+            ],
+            "label": "the new way becomes a habit"
+          },
+          {
+            "w": 60,
+            "sets": [],
+            "label": "never taken again",
+            "fizzle": true
+          }
+        ]
+      }
     },
     {
       "id": "rtn.new-stall-found",
@@ -247,13 +535,53 @@
       "tier": "texture",
       "note": "Follow-up to rtn.takes-longer-route: a new regular stall.",
       "roles": {
-        "A": { "desc": "an adult who changed a habit", "needs": ["adult"] },
-        "B": { "desc": "the stall keeper A has just started to know", "rel": "shopkeeper-of:A" }
+        "A": {
+          "desc": "an adult who changed a habit",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "the stall keeper A has just started to know",
+          "rel": "shopkeeper-of:A"
+        }
       },
-      "when": { "hours": [11, 22], "at": ["stall"], "requires": ["A:liked-new-route"], "weight": 5, "cooldown": { "person": 200, "city": 2 } },
+      "when": {
+        "hours": [
+          11,
+          22
+        ],
+        "at": [
+          "stall"
+        ],
+        "requires": [
+          "A:liked-new-route"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 200,
+          "city": 2
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "queue-order", "who": "A", "with": ["B"], "at": "stall" },
-        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "stall" }
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": "A",
+          "with": [
+            "B"
+          ],
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        }
       ],
       "log": {
         "b1": [
@@ -268,10 +596,16 @@
         ]
       },
       "reveals": [
-        { "fact": "B.first-name", "beat": "b2", "channel": "conversation", "chance": 0.4, "log": [
-          "Overheard: {A} calls the keeper \"{B.first}\".",
-          "Overheard: {B.desc} says \"My name is {B.first}\" and offers {A} a refill."
-        ] }
+        {
+          "fact": "B.first-name",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} calls the keeper \"{B.first}\".",
+            "Overheard: {B.desc} says \"My name is {B.first}\" and offers {A} a refill."
+          ]
+        }
       ]
     },
     {
@@ -279,12 +613,48 @@
       "title": "A line too long",
       "tier": "texture",
       "note": "A small broken routine: A turns away from the stall. The keeper notices on the next visit (rtn.keeper-asks).",
-      "roles": { "A": { "desc": "an adult with a regular stall", "needs": ["adult", "regular:stall"] } },
-      "when": { "hours": [12, 21], "at": ["stall"], "weight": 5, "cooldown": { "person": 90, "city": 2 } },
+      "roles": {
+        "A": {
+          "desc": "an adult with a regular stall",
+          "needs": [
+            "adult",
+            "regular:stall"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          12,
+          21
+        ],
+        "at": [
+          "stall"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 90,
+          "city": 2
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk", "who": "A", "at": "stall" },
-        { "id": "b2", "do": "queue-order", "who": "A", "at": "stall" },
-        { "id": "b3", "do": "shrug", "who": "A", "at": "stall" }
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "queue-order",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b3",
+          "do": "shrug",
+          "who": "A",
+          "at": "stall"
+        }
       ],
       "log": {
         "b1": [
@@ -303,7 +673,11 @@
           "{A} gives the line a long look, then walks away toward another stall."
         ]
       },
-      "next": { "sets": ["A:skipped-stall"] }
+      "next": {
+        "sets": [
+          "A:skipped-stall"
+        ]
+      }
     },
     {
       "id": "rtn.keeper-asks",
@@ -311,13 +685,54 @@
       "tier": "texture",
       "note": "The keeper remarks on the missed visit, a small kindness. Sets a mild warmth increase.",
       "roles": {
-        "A": { "desc": "an adult with a regular stall", "needs": ["adult", "regular:stall"] },
-        "B": { "desc": "the keeper of that stall", "rel": "shopkeeper-of:A" }
+        "A": {
+          "desc": "an adult with a regular stall",
+          "needs": [
+            "adult",
+            "regular:stall"
+          ]
+        },
+        "B": {
+          "desc": "the keeper of that stall",
+          "rel": "shopkeeper-of:A"
+        }
       },
-      "when": { "hours": [11, 22], "at": ["stall"], "requires": ["A:skipped-stall"], "weight": 6, "cooldown": { "person": 160, "city": 2 } },
+      "when": {
+        "hours": [
+          11,
+          22
+        ],
+        "at": [
+          "stall"
+        ],
+        "requires": [
+          "A:skipped-stall"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 160,
+          "city": 2
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "queue-order", "who": "A", "with": ["B"], "at": "stall" },
-        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "stall" }
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": "A",
+          "with": [
+            "B"
+          ],
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        }
       ],
       "log": {
         "b1": [
@@ -332,24 +747,75 @@
         ]
       },
       "reveals": [
-        { "fact": "B.relation-to-A", "beat": "b2", "channel": "conversation", "chance": 0.7, "log": [
-          "Overheard: {B.desc} says: \"Missed you Tuesday. The bowl went cold on the shelf.\"",
-          "Overheard: {B.desc} says: \"Third regular I lost to the long line this week. Do not make it four.\""
-        ] }
+        {
+          "fact": "B.said",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.7,
+          "log": [
+            "Overheard: {B.desc} says: \"Missed you Tuesday. The bowl went cold on the shelf.\"",
+            "Overheard: {B.desc} says: \"Third regular I lost to the long line this week. Do not make it four.\""
+          ]
+        }
       ],
-      "effects": { "warmth": [["A", "B", 0.05]] }
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.05
+          ]
+        ]
+      }
     },
     {
       "id": "rtn.sits-elsewhere",
       "title": "Not the usual seat",
       "tier": "texture",
       "note": "A sits somewhere new. A little off-pattern; may be nothing.",
-      "roles": { "A": { "desc": "an adult with a regular seat", "needs": ["adult", "regular:bench"] } },
-      "when": { "hours": [10, 22], "at": ["bench", "square"], "weight": 4, "cooldown": { "person": 100, "city": 2 } },
+      "roles": {
+        "A": {
+          "desc": "an adult with a regular seat",
+          "needs": [
+            "adult",
+            "regular:bench"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          22
+        ],
+        "at": [
+          "bench",
+          "square"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 100,
+          "city": 2
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk", "who": "A", "at": "bench" },
-        { "id": "b2", "do": "stand", "who": "A", "at": "bench" },
-        { "id": "b3", "do": "sit", "who": "A", "at": "bench" }
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b3",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        }
       ],
       "log": {
         "b1": [
@@ -374,12 +840,54 @@
       "title": "Running late",
       "tier": "texture",
       "note": "A run, a sweat bubble, and a door. Work trouble pressure goes up a hair.",
-      "roles": { "A": { "desc": "an employed adult running late", "needs": ["adult", "employed", "impulsive"] } },
-      "when": { "hours": [7, 10], "days": "weekday", "at": ["street", "work-door"], "weight": 4, "cooldown": { "person": 120, "city": 2 }, "temper": { "careful": -0.6 } },
+      "roles": {
+        "A": {
+          "desc": "an employed adult running late",
+          "needs": [
+            "adult",
+            "employed",
+            "impulsive"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          10
+        ],
+        "days": "weekday",
+        "at": [
+          "street",
+          "work-door"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 120,
+          "city": 2
+        },
+        "temper": {
+          "careful": -0.6
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "leave", "who": "A", "at": "home-door" },
-        { "id": "b2", "do": "run", "who": "A", "at": "street" },
-        { "id": "b3", "do": "enter", "who": "A", "at": "work-door" }
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "run",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": "A",
+          "at": "work-door"
+        }
       ],
       "log": {
         "b1": [
@@ -398,20 +906,69 @@
           "{A} pulls up at the work door, smooths {A.his} hair with both hands, and enters."
         ]
       },
-      "effects": { "pressure": [["A", "work-trouble", 0.05]] }
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "work-trouble",
+            0.05
+          ]
+        ]
+      }
     },
     {
       "id": "rtn.forgot-something",
       "title": "Turned back at the corner",
       "tier": "texture",
       "note": "A tiny mistake. The watcher sees a turn, a door, and the same walk again.",
-      "roles": { "A": { "desc": "an adult who forgot something", "needs": ["adult"] } },
-      "when": { "hours": [6, 21], "at": ["street", "home-door"], "weight": 5, "cooldown": { "person": 120, "city": 1 } },
+      "roles": {
+        "A": {
+          "desc": "an adult who forgot something",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          21
+        ],
+        "at": [
+          "street",
+          "home-door"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 120,
+          "city": 1
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b2", "do": "stand", "who": "A", "at": "street" },
-        { "id": "b3", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b4", "do": "enter", "who": "A", "at": "home-door" }
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b4",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
       ],
       "log": {
         "b1": [
@@ -441,12 +998,49 @@
       "title": "On the platform",
       "tier": "mundane",
       "note": "A metro wait. Only the platform is seen.",
-      "roles": { "A": { "desc": "an adult riding the metro", "needs": ["adult", "regular:metro"] } },
-      "when": { "hours": [6, 23], "at": ["metro-station", "platform"], "weight": 6, "cooldown": { "person": 20, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an adult riding the metro",
+          "needs": [
+            "adult",
+            "regular:metro"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          23
+        ],
+        "at": [
+          "metro-station",
+          "platform"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 20,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "ride-lift", "who": "A", "at": "metro-station" },
-        { "id": "b2", "do": "stand", "who": "A", "at": "platform" },
-        { "id": "b3", "do": "ride-metro", "who": "A", "at": "platform" }
+        {
+          "id": "b1",
+          "do": "ride-lift",
+          "who": "A",
+          "at": "metro-station"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "platform"
+        },
+        {
+          "id": "b3",
+          "do": "ride-metro",
+          "who": "A",
+          "at": "platform"
+        }
       ],
       "log": {
         "b1": [
@@ -471,11 +1065,42 @@
       "title": "Bags down on the bench",
       "tier": "mundane",
       "note": "Setting down shopping to rest for a while.",
-      "roles": { "A": { "desc": "an adult carrying shopping", "needs": ["adult"] } },
-      "when": { "hours": [10, 19], "at": ["bench", "street"], "weight": 6, "cooldown": { "person": 40, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an adult carrying shopping",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          19
+        ],
+        "at": [
+          "bench",
+          "street"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 40,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "carry", "who": "A", "at": "street" },
-        { "id": "b2", "do": "sit", "who": "A", "at": "bench" }
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        }
       ],
       "log": {
         "b1": [
@@ -495,12 +1120,49 @@
       "title": "Two cups, one drunk",
       "tier": "texture",
       "note": "A tiny question mark: someone buys a second cup and carries it home. Left open deliberately: there is no reveal and no follow-up.",
-      "roles": { "A": { "desc": "an adult buying food on the way home", "needs": ["adult"] } },
-      "when": { "hours": [18, 24], "at": ["stall", "street", "home-door"], "weight": 4, "cooldown": { "person": 100, "city": 2 } },
+      "roles": {
+        "A": {
+          "desc": "an adult buying food on the way home",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          18,
+          24
+        ],
+        "at": [
+          "stall",
+          "street",
+          "home-door"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 100,
+          "city": 2
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "queue-order", "who": "A", "at": "stall" },
-        { "id": "b2", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b3", "do": "enter", "who": "A", "at": "home-door" }
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
       ],
       "log": {
         "b1": [
@@ -526,13 +1188,51 @@
       "tier": "mundane",
       "note": "Two strangers who share a commute begin to nod. Chain: rtn.nod-becomes-hello.",
       "roles": {
-        "A": { "desc": "an adult with a fixed commute", "needs": ["adult"] },
-        "B": { "desc": "another commuter at the same crossing", "rel": "stranger-to:A" }
+        "A": {
+          "desc": "an adult with a fixed commute",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "another commuter at the same crossing",
+          "rel": "stranger-to:A"
+        }
       },
-      "when": { "hours": [6, 9], "days": "weekday", "at": ["street"], "weight": 6, "cooldown": { "person": 200, "city": 2 } },
+      "when": {
+        "hours": [
+          6,
+          9
+        ],
+        "days": "weekday",
+        "at": [
+          "street"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 200,
+          "city": 2
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "stand", "who": "A", "with": ["B"], "at": "street" },
-        { "id": "b2", "do": "wave", "who": "A", "with": ["B"], "at": "street" }
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "with": [
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "wave",
+          "who": "A",
+          "with": [
+            "B"
+          ],
+          "at": "street"
+        }
       ],
       "log": {
         "b1": [
@@ -546,7 +1246,11 @@
           "A half wave from {B.desc}. {A} answers with the same half wave."
         ]
       },
-      "next": { "sets": ["A+B:nodding-acquaintances"] }
+      "next": {
+        "sets": [
+          "A+B:nodding-acquaintances"
+        ]
+      }
     },
     {
       "id": "rtn.nod-becomes-hello",
@@ -554,14 +1258,63 @@
       "tier": "texture",
       "note": "Follow-up: the nod turns into a few words. Sets a chain into the friendship category.",
       "roles": {
-        "A": { "desc": "an adult with a fixed commute", "needs": ["adult"] },
-        "B": { "desc": "the person A nods to every morning", "rel": "acquaintance-of:A" }
+        "A": {
+          "desc": "an adult with a fixed commute",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "the person A nods to every morning",
+          "rel": "acquaintance-of:A"
+        }
       },
-      "when": { "hours": [6, 9], "days": "weekday", "at": ["street"], "requires": ["A+B:nodding-acquaintances"], "weight": 5, "cooldown": { "person": 200, "city": 2 } },
+      "when": {
+        "hours": [
+          6,
+          9
+        ],
+        "days": "weekday",
+        "at": [
+          "street"
+        ],
+        "requires": [
+          "A+B:nodding-acquaintances"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 200,
+          "city": 2
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "stand", "who": "A", "with": ["B"], "at": "street" },
-        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "street" },
-        { "id": "b3", "do": "walk-together", "who": ["A", "B"], "at": "street" }
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "with": [
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        }
       ],
       "log": {
         "b1": [
@@ -581,16 +1334,32 @@
         ]
       },
       "reveals": [
-        { "fact": "B.first-name", "beat": "b2", "channel": "conversation", "chance": 0.7, "log": [
-          "Overheard: {A} says \"I'm {A.first}\" and {B.desc} answers \"{B.first}.\"",
-          "Overheard: {B.desc} says \"{B.first}, by the way\" to {A}."
-        ] },
-        { "fact": "A.first-name", "beat": "b2", "channel": "conversation", "chance": 0.6, "log": [
-          "Overheard: {B.desc} says \"{A.first}, right?\" and {A} nods.",
-          "Overheard: the name {A.first} comes up between {A} and {B.desc}."
-        ] }
+        {
+          "fact": "B.first-name",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.7,
+          "log": [
+            "Overheard: {A} says \"I'm {A.first}\" and {B.desc} answers \"{B.first}.\"",
+            "Overheard: {B.desc} says \"{B.first}, by the way\" to {A}."
+          ]
+        },
+        {
+          "fact": "A.first-name",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.6,
+          "log": [
+            "Overheard: {B.desc} says \"{A.first}, right?\" and {A} nods.",
+            "Overheard: the name {A.first} comes up between {A} and {B.desc}."
+          ]
+        }
       ],
-      "next": { "sets": ["A+B:say-hello"] }
+      "next": {
+        "sets": [
+          "A+B:say-hello"
+        ]
+      }
     },
     {
       "id": "rtn.shop-regular-greeting",
@@ -598,13 +1367,44 @@
       "tier": "mundane",
       "note": "A shopkeeper greets a regular by name. Subtle: gives no names, just warmth.",
       "roles": {
-        "A": { "desc": "a regular customer", "needs": ["adult"] },
-        "B": { "desc": "a shopkeeper", "rel": "shopkeeper-of:A" }
+        "A": {
+          "desc": "a regular customer",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a shopkeeper",
+          "rel": "shopkeeper-of:A"
+        }
       },
-      "when": { "hours": [9, 19], "at": ["shop-door"], "weight": 5, "cooldown": { "person": 30, "city": 0 } },
+      "when": {
+        "hours": [
+          9,
+          19
+        ],
+        "at": [
+          "shop-door"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 30,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "enter", "who": "A", "at": "shop-door" },
-        { "id": "b2", "do": "leave", "who": "A", "at": "shop-door" }
+        {
+          "id": "b1",
+          "do": "enter",
+          "who": "A",
+          "at": "shop-door"
+        },
+        {
+          "id": "b2",
+          "do": "leave",
+          "who": "A",
+          "at": "shop-door"
+        }
       ],
       "log": {
         "b1": [
@@ -624,11 +1424,41 @@
       "title": "The weekly drop",
       "tier": "mundane",
       "note": "A recurring drone delivery. Verified names and addresses come from labels.",
-      "roles": { "A": { "desc": "an adult who orders regularly", "needs": ["adult"] } },
-      "when": { "hours": [9, 20], "at": ["home-door"], "weight": 6, "cooldown": { "person": 80, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an adult who orders regularly",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          20
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 80,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "receive-delivery", "who": "A", "at": "home-door" },
-        { "id": "b2", "do": "enter", "who": "A", "at": "home-door" }
+        {
+          "id": "b1",
+          "do": "receive-delivery",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
       ],
       "log": {
         "b1": [
@@ -643,14 +1473,26 @@
         ]
       },
       "reveals": [
-        { "fact": "A.full-name", "beat": "b1", "channel": "document", "chance": 0.5, "log": [
-          "Label on the parcel: {A.full}.",
-          "Delivery label reads {A.full} and the door number."
-        ] },
-        { "fact": "A.home", "beat": "b1", "channel": "document", "chance": 0.4, "log": [
-          "Label gives the address: {A.home}.",
-          "Address on the parcel matches the door: {A.home}."
-        ] }
+        {
+          "fact": "A.full-name",
+          "beat": "b1",
+          "channel": "document",
+          "chance": 0.5,
+          "log": [
+            "Label on the parcel: {A.full}.",
+            "Delivery label reads {A.full} and the door number."
+          ]
+        },
+        {
+          "fact": "A.home",
+          "beat": "b1",
+          "channel": "document",
+          "chance": 0.4,
+          "log": [
+            "Label gives the address: {A.home}.",
+            "Address on the parcel matches the door: {A.home}."
+          ]
+        }
       ]
     },
     {
@@ -658,13 +1500,53 @@
       "title": "Round the block twice",
       "tier": "texture",
       "note": "An evening walk with no destination. Pure observation.",
-      "roles": { "A": { "desc": "an adult out for a walk", "needs": ["adult"] } },
-      "when": { "hours": [19, 23], "at": ["street"], "weight": 4, "cooldown": { "person": 80, "city": 1 } },
+      "roles": {
+        "A": {
+          "desc": "an adult out for a walk",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          19,
+          23
+        ],
+        "at": [
+          "street"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 80,
+          "city": 1
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "leave", "who": "A", "at": "home-door" },
-        { "id": "b2", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b3", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b4", "do": "enter", "who": "A", "at": "home-door" }
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b4",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
       ],
       "log": {
         "b1": [
@@ -694,12 +1576,49 @@
       "title": "One stop early",
       "tier": "texture",
       "note": "A rider gets off a stop before the usual one and walks.",
-      "roles": { "A": { "desc": "an adult who rides the metro", "needs": ["adult", "regular:metro"] } },
-      "when": { "hours": [16, 22], "at": ["metro-station", "street"], "weight": 4, "cooldown": { "person": 120, "city": 2 } },
+      "roles": {
+        "A": {
+          "desc": "an adult who rides the metro",
+          "needs": [
+            "adult",
+            "regular:metro"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          16,
+          22
+        ],
+        "at": [
+          "metro-station",
+          "street"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 120,
+          "city": 2
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "ride-metro", "who": "A", "at": "metro-station" },
-        { "id": "b2", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b3", "do": "stand", "who": "A", "at": "street" }
+        {
+          "id": "b1",
+          "do": "ride-metro",
+          "who": "A",
+          "at": "metro-station"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "stand",
+          "who": "A",
+          "at": "street"
+        }
       ],
       "log": {
         "b1": [
@@ -724,12 +1643,50 @@
       "title": "A late start on the weekend",
       "tier": "mundane",
       "note": "Weekend mornings are slower: a late exit, a cup, a bench.",
-      "roles": { "A": { "desc": "an adult on a day off", "needs": ["adult"] } },
-      "when": { "hours": [9, 13], "days": "weekend", "at": ["home-door", "bar-kiosk", "bench"], "weight": 7, "cooldown": { "person": 20, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an adult on a day off",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          13
+        ],
+        "days": "weekend",
+        "at": [
+          "home-door",
+          "bar-kiosk",
+          "bench"
+        ],
+        "weight": 7,
+        "cooldown": {
+          "person": 20,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "leave", "who": "A", "at": "home-door" },
-        { "id": "b2", "do": "queue-order", "who": "A", "at": "bar-kiosk" },
-        { "id": "b3", "do": "sit", "who": "A", "at": "bench" }
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "queue-order",
+          "who": "A",
+          "at": "bar-kiosk"
+        },
+        {
+          "id": "b3",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        }
       ],
       "log": {
         "b1": [
@@ -754,11 +1711,42 @@
       "title": "First bowl of the day",
       "tier": "mundane",
       "note": "A stall keeper opens the counter. Stall keepers are always behind the counter in the game, so the keeper's day is visible.",
-      "roles": { "A": { "desc": "a stall keeper starting a shift", "needs": ["adult", "stall-keeper"] } },
-      "when": { "hours": [9, 11], "at": ["stall"], "weight": 6, "cooldown": { "person": 20, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "a stall keeper starting a shift",
+          "needs": [
+            "adult",
+            "stall-keeper"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          11
+        ],
+        "at": [
+          "stall"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 20,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk", "who": "A", "at": "square" },
-        { "id": "b2", "do": "serve", "who": "A", "at": "stall" }
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "serve",
+          "who": "A",
+          "at": "stall"
+        }
       ],
       "log": {
         "b1": [
@@ -773,10 +1761,16 @@
         ]
       },
       "reveals": [
-        { "fact": "A.job", "beat": "b2", "channel": "seen", "chance": 0.7, "log": [
-          "Seen behind the counter of {place}. Handles the pots like {A.he} owns them.",
-          "Behind the counter at {place}, serving. Apron on."
-        ] }
+        {
+          "fact": "A.job",
+          "beat": "b2",
+          "channel": "seen",
+          "chance": 0.7,
+          "log": [
+            "Seen behind the counter of {place}, stirring the pots.",
+            "Behind the counter at {place}, serving. Apron on."
+          ]
+        }
       ]
     },
     {
@@ -784,12 +1778,48 @@
       "title": "Wiping down at midnight",
       "tier": "mundane",
       "note": "The close of a stall keeper's night.",
-      "roles": { "A": { "desc": "a stall keeper ending a shift", "needs": ["adult", "stall-keeper"] } },
-      "when": { "hours": [23, 24], "at": ["stall"], "weight": 5, "cooldown": { "person": 20, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "a stall keeper ending a shift",
+          "needs": [
+            "adult",
+            "stall-keeper"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          23,
+          24
+        ],
+        "at": [
+          "stall"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 20,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "serve", "who": "A", "at": "stall" },
-        { "id": "b2", "do": "leave", "who": "A", "at": "stall" },
-        { "id": "b3", "do": "walk", "who": "A", "at": "street" }
+        {
+          "id": "b1",
+          "do": "serve",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "leave",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
       ],
       "log": {
         "b1": [
@@ -814,12 +1844,50 @@
       "title": "Out for the night shift",
       "tier": "mundane",
       "note": "A night worker heads out as the city turns over.",
-      "roles": { "A": { "desc": "an adult starting a night shift", "needs": ["adult", "night-worker"] } },
-      "when": { "hours": [19, 23], "at": ["home-door", "street", "work-door"], "weight": 6, "cooldown": { "person": 20, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an adult starting a night shift",
+          "needs": [
+            "adult",
+            "night-worker"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          19,
+          23
+        ],
+        "at": [
+          "home-door",
+          "street",
+          "work-door"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 20,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "leave", "who": "A", "at": "home-door" },
-        { "id": "b2", "do": "walk", "who": "A", "at": "street" },
-        { "id": "b3", "do": "enter", "who": "A", "at": "work-door" }
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": "A",
+          "at": "work-door"
+        }
       ],
       "log": {
         "b1": [
@@ -844,11 +1912,42 @@
       "title": "The bench at seven",
       "tier": "mundane",
       "note": "Same bench, same hour, a long sit. Repeat sightings give a regular.",
-      "roles": { "A": { "desc": "an adult with a favorite bench", "needs": ["adult", "regular:bench"] } },
-      "when": { "hours": [17, 21], "at": ["bench"], "weight": 6, "cooldown": { "person": 20, "city": 0 } },
+      "roles": {
+        "A": {
+          "desc": "an adult with a favorite bench",
+          "needs": [
+            "adult",
+            "regular:bench"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          17,
+          21
+        ],
+        "at": [
+          "bench"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 20,
+          "city": 0
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk", "who": "A", "at": "bench" },
-        { "id": "b2", "do": "sit", "who": "A", "at": "bench" }
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        }
       ],
       "log": {
         "b1": [
@@ -863,10 +1962,17 @@
         ]
       },
       "reveals": [
-        { "fact": "A.regular", "beat": "b2", "channel": "seen", "chance": 0.5, "log": [
-          "This bench again, visit number {n}.",
-          "Same bench, same hour. Visit number {n}."
-        ] }
+        {
+          "fact": "A.regular",
+          "beat": "b2",
+          "channel": "seen",
+          "chance": 0.5,
+          "log": [
+            "This bench again. {seen} evenings on the feed.",
+            "Same bench, same hour: {seen} days now on the feed."
+          ],
+          "minSeen": 2
+        }
       ]
     },
     {
@@ -874,12 +1980,47 @@
       "title": "Up to the deck",
       "tier": "texture",
       "note": "A short trip up a lift to a terrace or deck, to sit and look at the city.",
-      "roles": { "A": { "desc": "an adult with a quiet habit", "needs": ["adult"] } },
-      "when": { "hours": [16, 22], "at": ["lift-base"], "weight": 3, "cooldown": { "person": 120, "city": 2 } },
+      "roles": {
+        "A": {
+          "desc": "an adult with a quiet habit",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          16,
+          22
+        ],
+        "at": [
+          "lift-base"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 120,
+          "city": 2
+        }
+      },
       "beats": [
-        { "id": "b1", "do": "walk", "who": "A", "at": "lift-base" },
-        { "id": "b2", "do": "ride-lift", "who": "A", "at": "lift-base" },
-        { "id": "b3", "do": "ride-lift", "who": "A", "at": "lift-base" }
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "lift-base"
+        },
+        {
+          "id": "b2",
+          "do": "ride-lift",
+          "who": "A",
+          "at": "lift-base"
+        },
+        {
+          "id": "b3",
+          "do": "ride-lift",
+          "who": "A",
+          "at": "lift-base"
+        }
       ],
       "log": {
         "b1": [

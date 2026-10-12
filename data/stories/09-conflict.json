@@ -80,7 +80,7 @@
       },
       "reveals": [
         {
-          "fact": "B.relation-to-A",
+          "fact": "B.said",
           "beat": "b2",
           "channel": "conversation",
           "chance": 0.4,

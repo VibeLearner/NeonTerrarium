@@ -391,8 +391,8 @@
           "channel": "conversation",
           "chance": 0.3,
           "log": [
-            "Overheard: {A} calls: \"Come on, little one! Your socks will be soaked!\"",
-            "Overheard: {B.desc} calls: \"Mom! It's deep!\""
+            "Overheard: {B.desc} calls: \"{A.addr}! It's deep!\"",
+            "Overheard: {A} calls: \"Out of the puddle, my {B.rel}! Your socks!\""
           ]
         }
       ],

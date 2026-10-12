@@ -95,9 +95,10 @@
           "channel": "seen",
           "chance": 0.35,
           "log": [
-            "{A} and {B.desc} often take these stools.",
-            "This pair meets at the stalls on a schedule."
-          ]
+            "{A} and {B.desc} at these stools again: {seen} times on the feed.",
+            "Same pair, same stools. Seen here together on {seen} days."
+          ],
+          "minSeen": 2
         }
       ],
       "effects": {
@@ -197,7 +198,7 @@
       },
       "reveals": [
         {
-          "fact": "C.relation-to-A",
+          "fact": "C.first-name",
           "beat": "b3",
           "channel": "introduction",
           "chance": 0.7,
@@ -1053,6 +1054,15 @@
           "chance": 0.4,
           "log": [
             "Phone, one side: {A} says: \"Forty minutes, friend. Forty. Call me back.\"",
+            "Phone, one side: {A} says: \"You're lucky you're my {B.rel}. I'm still here.\""
+          ]
+        },
+        {
+          "fact": "B.said",
+          "beat": "b2",
+          "channel": "phone",
+          "chance": 0.4,
+          "log": [
             "Phone, one side: {A} says: \"It's me. I waited. We said six.\""
           ]
         }

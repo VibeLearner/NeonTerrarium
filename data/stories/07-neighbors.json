@@ -1,0 +1,1140 @@
+{
+  "category": "neighbors",
+  "title": "Neighbors and community",
+  "theme": "Borrowing, a noise feud, carrying things for each other, a block gathering, the stall keeper who knows everyone.",
+  "storylets": [
+    {
+      "id": "nbr.borrowed-tool",
+      "title": "Can I borrow your ladder",
+      "tier": "texture",
+      "note": "A neighbor borrows a thing. Chain: nbr.tool-returned, or it quietly stays borrowed.",
+      "roles": {
+        "A": {
+          "desc": "an adult at a neighbor's door",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a neighbor lending something",
+          "rel": "neighbor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          19
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 200,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "knock-and-wait",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "B",
+          "at": "home-door",
+          "with": [
+            "A"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "carry",
+          "who": "A",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} knocks at a door two along from {A.his} own and stands back.",
+          "{A} raps on the door and waits with hands behind {A.his} back.",
+          "{A} knocks lightly, three taps."
+        ],
+        "b2": [
+          "The door opens. {B.desc} hands {A} a coil of rope and a short ladder.",
+          "{B.desc} holds out a toolbox. {A} takes the handle.",
+          "{B.desc} passes {A} a power drill, cord wrapped around it."
+        ],
+        "b3": [
+          "{A} carries it off down the block, the ladder knocking the rail.",
+          "{A} hauls the load back to {A.his} own door, thanking the air.",
+          "{A} walks away with the rope looped over a shoulder."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.35,
+          "log": [
+            "Overheard: {B.desc} says: \"Take it, neighbor. Just bring it back before the weekend.\"",
+            "Overheard: {A} says: \"You saved me again. Come by for dumplings on Sunday.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.03
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:borrowed-something"
+        ],
+        "branches": [
+          {
+            "w": 65,
+            "sets": [
+              "A+B:returned-tool"
+            ],
+            "label": "it comes back"
+          },
+          {
+            "w": 35,
+            "sets": [],
+            "label": "never returned",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "nbr.tool-returned",
+      "title": "The ladder goes home",
+      "tier": "mundane",
+      "note": "Pays off nbr.borrowed-tool.",
+      "roles": {
+        "A": {
+          "desc": "an adult returning a loan",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a neighbor",
+          "rel": "neighbor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          20
+        ],
+        "at": [
+          "home-door"
+        ],
+        "requires": [
+          "A+B:returned-tool"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 300,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "home-door",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} hauls a ladder along the block, a paper bag swinging from one rung.",
+          "{A} comes down the row carrying a drill in both hands.",
+          "{A} walks up with the toolbox held at arm's length."
+        ],
+        "b2": [
+          "{A} hands the tool back. {B.desc} checks the cord twice.",
+          "{A} hands over a bag of sweets and the tool.",
+          "{A} holds out the loan with a small bow. {B.desc} laughs."
+        ],
+        "b3": [
+          "{A} and {B.desc} chat on the step, then {B.desc} points down the block.",
+          "{B.desc} says something that makes {A} grin. A short wave.",
+          "The two trade a few words over a shared fence."
+        ]
+      },
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.04
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "nbr.noise-knock",
+      "title": "The knock after midnight",
+      "tier": "notable",
+      "note": "A noise complaint at a door. Chain: nbr.peace-offering, or a feud that never lands.",
+      "roles": {
+        "A": {
+          "desc": "an adult at a neighbor's door",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a neighbor, woken",
+          "rel": "neighbor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          22,
+          24
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 400,
+          "city": 4
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "knock-and-wait",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "argue",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "A",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} bangs on a neighbor's door, jaw tight.",
+          "{A} knocks hard and keeps knocking.",
+          "{A} pounds on the door, a hand on the frame."
+        ],
+        "b2": [
+          "The door opens. {B.desc} and {A} argue across the threshold.",
+          "{B.desc} snaps at {A} and {A} snaps right back. Voices carry.",
+          "{A} jabs a finger toward the ceiling. {B.desc} folds both arms."
+        ],
+        "b3": [
+          "{A} leaves, stamping down the step.",
+          "{A} turns on a heel and goes off into the night.",
+          "{A} walks away shaking {A.his} head."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.opinion-stated",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.55,
+          "log": [
+            "Overheard: {A} says: \"Every night, the same drum! Some of us work in the morning!\"",
+            "Overheard: {B.desc} says: \"Then knock like a person, not a hammer.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.1
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:noise-feud"
+        ],
+        "branches": [
+          {
+            "w": 50,
+            "sets": [
+              "A+B:peace-offering"
+            ],
+            "label": "a peace offering follows"
+          },
+          {
+            "w": 50,
+            "sets": [],
+            "label": "cold for weeks",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "nbr.peace-offering",
+      "title": "A plate on the step",
+      "tier": "texture",
+      "note": "Pays off the noise knock. A plate, a note, a nod.",
+      "roles": {
+        "A": {
+          "desc": "an adult at a neighbor's door",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a neighbor",
+          "rel": "neighbor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          20
+        ],
+        "at": [
+          "home-door"
+        ],
+        "requires": [
+          "A+B:peace-offering"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 500,
+          "city": 4
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "home-door",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} climbs the step carrying a covered plate.",
+          "{A} comes to a neighbor's door with a steaming dish in both hands.",
+          "{A} arrives with a plate under a cloth, shoulders stiff."
+        ],
+        "b2": [
+          "The door slides open. {A} holds out the plate. {B.desc} takes it.",
+          "{A} hands the plate over with a few mumbled words.",
+          "{A} passes the dish across. {B.desc} peers under the cloth."
+        ],
+        "b3": [
+          "{B.desc} nods slowly and says a few words. {A} lets out a breath.",
+          "{A} and {B.desc} talk. A hand goes out, a hand is shaken.",
+          "They speak low. The door stays open a while after."
+        ]
+      },
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.15
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:neighbors-at-peace"
+        ]
+      }
+    },
+    {
+      "id": "nbr.help-up-stairs",
+      "title": "A hand with the shopping",
+      "tier": "mundane",
+      "note": "A younger neighbor carries bags for an older one.",
+      "roles": {
+        "A": {
+          "desc": "an adult heading home",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "an older neighbor with shopping",
+          "rel": "neighbor-of:A",
+          "needs": [
+            "senior"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          19
+        ],
+        "at": [
+          "home-door",
+          "street"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 80,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "B",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} crosses the block slowly, a bag in each hand and a third on the arm.",
+          "{B.desc} climbs the sidewalk slope, stopping every few steps.",
+          "{B.desc} makes a slow way home, shopping dragging."
+        ],
+        "b2": [
+          "{A} catches up and takes two of the bags without a word.",
+          "{A} jogs over, lifts the heaviest bag, and falls into step.",
+          "{A} relieves {B.desc} of the load and walks alongside."
+        ],
+        "b3": [
+          "Both go in at the same door. The door slides shut on a thank-you.",
+          "{A} follows {B.desc} up and in with the bags.",
+          "{B.desc} unlocks, and {A} goes in with the shopping."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {B.desc} says: \"Thank you. You are a good neighbor to an old woman.\"",
+            "Overheard: {A} says: \"Anytime. Call down the hall, I will hear.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.04
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:helps-out"
+        ]
+      }
+    },
+    {
+      "id": "nbr.block-gathering",
+      "title": "Everybody on the stoop",
+      "tier": "texture",
+      "note": "A small block gathering. A good place for names and relations to leak out.",
+      "roles": {
+        "A": {
+          "desc": "an adult at a gathering",
+          "needs": [
+            "adult",
+            "outgoing"
+          ]
+        },
+        "B": {
+          "desc": "a neighbor",
+          "rel": "neighbor-of:A"
+        },
+        "C": {
+          "desc": "another neighbor",
+          "rel": "neighbor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          16,
+          22
+        ],
+        "days": "weekend",
+        "weather": "clear",
+        "at": [
+          "square",
+          "lawn",
+          "bench"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 300,
+          "city": 8
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": [
+            "A",
+            "B",
+            "C"
+          ],
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "eat",
+          "who": [
+            "A",
+            "B",
+            "C"
+          ],
+          "at": "square"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B",
+            "C"
+          ],
+          "at": "square"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A}, {B.desc} and {C.desc} gather at the edge of the square with folding stools.",
+          "A little knot of neighbors forms around {A}, {B.desc} and {C.desc}.",
+          "{A} arrives with a pot; {B.desc} and {C.desc} are already unfolding stools."
+        ],
+        "b2": [
+          "Bowls go round the circle. {C.desc} refuses seconds three times, then accepts.",
+          "{A} ladles a stew into mismatched bowls and hands them out.",
+          "{B.desc} breaks a flatbread and passes the pieces around."
+        ],
+        "b3": [
+          "The circle talks over itself. {A} laughs at something {B.desc} says.",
+          "{C.desc} tells a long story. {B.desc} corrects the details.",
+          "Voices overlap. {A} points toward the roofs and the others turn."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.first-name",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {C.desc} says: \"{B.first}, you tell it, you were there.\"",
+            "Overheard: {A} calls: \"{B.first}! Bring the salt.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.02
+          ],
+          [
+            "A",
+            "C",
+            0.02
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "nbr.keeper-knows",
+      "title": "The usual, by name",
+      "tier": "mundane",
+      "note": "A shopkeeper who knows the regulars. The best way for a first name to leak out, verified by a loyalty card.",
+      "roles": {
+        "A": {
+          "desc": "a regular at a stall",
+          "needs": [
+            "adult",
+            "regular:stall"
+          ]
+        },
+        "B": {
+          "desc": "the stall keeper",
+          "needs": [
+            "stall-keeper"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          21
+        ],
+        "at": [
+          "stall"
+        ],
+        "weight": 8,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "serve",
+          "who": "B",
+          "at": "stall",
+          "with": [
+            "A"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} steps up to the counter without looking at the board.",
+          "{A} reaches the stall and holds up two fingers.",
+          "{A} gets to the front and says nothing. The keeper nods.",
+          "{A} arrives at the counter and puts coins down."
+        ],
+        "b2": [
+          "{B.desc} serves {A}'s order before it is spoken.",
+          "{B.desc} already has the cup out. {A} grins.",
+          "{B.desc} slides the usual across the counter.",
+          "{B.desc} serves {A} and adds a small extra."
+        ],
+        "b3": [
+          "{A} and {B.desc} trade three sentences about the weather and the price of noodles.",
+          "{B.desc} asks after something; {A} waves a hand and answers.",
+          "They chat over the steam for a minute.",
+          "{B.desc} laughs at what {A} says and wipes the counter."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.first-name",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {B.desc} says: \"The usual, {A.first}? Sit, I'll bring it.\"",
+            "Overheard: {B.desc} calls: \"{A.first}! Your stool's open.\""
+          ]
+        },
+        {
+          "fact": "A.regular",
+          "beat": "b1",
+          "channel": "seen",
+          "chance": 0.4,
+          "log": [
+            "{A} is a regular here; the keeper made the order unprompted.",
+            "The keeper treats {A} as a standing customer."
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.01
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:stall-regular"
+        ]
+      }
+    },
+    {
+      "id": "nbr.parcel-passed",
+      "title": "This one is for next door",
+      "tier": "mundane",
+      "note": "A misdelivered parcel handed on.",
+      "roles": {
+        "A": {
+          "desc": "an adult holding a parcel",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a neighbor who owns it",
+          "rel": "neighbor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          20
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 150,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "receive-delivery",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "knock-and-wait",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "hand-over",
+          "who": "A",
+          "at": "home-door",
+          "with": [
+            "B"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "A drone lowers a small parcel at {A}'s door and rises.",
+          "{A} takes a parcel from a drone and squints at the label.",
+          "A delivery drone leaves a package at the wrong step. {A} lifts it."
+        ],
+        "b2": [
+          "{A} walks to the next door and knocks.",
+          "{A} raps on the neighbor's door with the parcel under one arm.",
+          "{A} knocks once and waits."
+        ],
+        "b3": [
+          "The door slides open. {A} hands the parcel to {B.desc} and shrugs.",
+          "{A} holds out the parcel. {B.desc} takes it and bows.",
+          "{A} hands over the package and points at the drone's path."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.full-name",
+          "beat": "b1",
+          "channel": "document",
+          "chance": 0.6,
+          "log": [
+            "The label reads {B.full}, one door along.",
+            "The parcel is addressed to {B.full}."
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.01
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:neighbors-greet"
+        ]
+      }
+    },
+    {
+      "id": "nbr.welcome-dish",
+      "title": "Something hot for the new tenant",
+      "tier": "texture",
+      "note": "A neighbor brings food to someone who just moved in. Uses the game's own new-neighbor flag.",
+      "roles": {
+        "A": {
+          "desc": "an adult with a covered dish",
+          "needs": [
+            "adult",
+            "warm"
+          ]
+        },
+        "B": {
+          "desc": "a new neighbor",
+          "rel": "neighbor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          20
+        ],
+        "at": [
+          "home-door"
+        ],
+        "requires": [
+          "single:new-neighbor-moved-in"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 900,
+          "city": 8
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "knock-and-wait",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "hand-over",
+          "who": "A",
+          "at": "home-door",
+          "with": [
+            "B"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} carries a covered dish across the landing.",
+          "{A} comes down the row with a steaming pot held in a towel.",
+          "{A} walks to the newest door with a plate and a spoon."
+        ],
+        "b2": [
+          "{A} knocks and waits, straightening a collar.",
+          "{A} raps on the door and stands back with the dish held forward.",
+          "{A} knocks twice. A voice answers faintly."
+        ],
+        "b3": [
+          "The door opens. {A} hands the dish to {B.desc} and says a few words.",
+          "{A} hands over the dish. {B.desc} bows and takes it with both hands.",
+          "{A} passes the pot across the threshold."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"Welcome to the block. I live just across, if you need anything.\"",
+            "Overheard: {B.desc} says: \"You are the first one to knock. Thank you, neighbor.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.1
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:neighbors-greet"
+        ]
+      }
+    },
+    {
+      "id": "nbr.stray-feeder",
+      "title": "The saucer on the curb",
+      "tier": "texture",
+      "note": "A neighbor feeds a stray; another passes and speaks.",
+      "roles": {
+        "A": {
+          "desc": "an adult with a saucer",
+          "needs": [
+            "adult",
+            "has-pet-stray-habit"
+          ]
+        },
+        "B": {
+          "desc": "a neighbor passing by",
+          "rel": "neighbor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          10
+        ],
+        "at": [
+          "street",
+          "home-door"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 48,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "feed-stray",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "B",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sets a saucer on the curb and crouches while a thin cat approaches.",
+          "{A} scatters scraps by a drain. A stray eats, flinching at every sound.",
+          "{A} crouches by the wall and puts out a dish."
+        ],
+        "b2": [
+          "{B.desc} comes along the sidewalk with a bag and slows down.",
+          "{B.desc} walks up the block and stops to look.",
+          "{B.desc} passes the corner, then turns back."
+        ],
+        "b3": [
+          "{B.desc} says something about the cat. {A} shrugs and answers.",
+          "{A} and {B.desc} talk across the saucer. {B.desc} laughs.",
+          "{B.desc} bends down too, and the two argue softly over names."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.habit",
+          "beat": "b1",
+          "channel": "seen",
+          "chance": 0.45,
+          "log": [
+            "{A} feeds the strays here most mornings.",
+            "The saucer is {A}'s, and the cat comes to it."
+          ]
+        }
+      ],
+      "next": {
+        "sets": [
+          "A:feeds-strays"
+        ]
+      }
+    },
+    {
+      "id": "nbr.stoop-gossip",
+      "title": "Two doors, one conversation",
+      "tier": "mundane",
+      "note": "Neighbors trade talk across a landing. Conversations carry names and news.",
+      "roles": {
+        "A": {
+          "desc": "an adult chatting at a door",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a neighbor",
+          "rel": "neighbor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          20
+        ],
+        "at": [
+          "home-door",
+          "street"
+        ],
+        "weight": 8,
+        "cooldown": {
+          "person": 30,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} leans on {A.his} doorframe while {B.desc} stops at the next step.",
+          "{B.desc} halts at {A}'s door, bag on one hip.",
+          "{A} stands in the doorway as {B.desc} hovers by the rail.",
+          "{A} and {B.desc} meet at the landing."
+        ],
+        "b2": [
+          "They talk about the noise from the lift and the price of broth.",
+          "{A} points down the block and {B.desc} shakes a head.",
+          "{B.desc} says something low and {A} laughs.",
+          "The two of them gossip for ten minutes, hands moving."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {A} says: \"They are putting a new stall on the corner. Rent is going up, mark me.\"",
+            "Overheard: {B.desc} says: \"I heard the lift will be closed all of Thursday.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.01
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:neighbors-greet"
+        ]
+      }
+    }
+  ]
+}

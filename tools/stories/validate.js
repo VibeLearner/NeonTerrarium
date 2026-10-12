@@ -51,7 +51,7 @@ if (!PARTIAL) for (const c of vocab.categories) if (!files.some(f => f.endsWith(
 const ACTIONS = vocab.actions;
 const PLACES = vocab.places;
 const ROLE_RE = /^[A-F]$/;
-const FLAG_RE = /^(city|world|[A-F](\+[A-F])?):[a-z0-9]+(-[a-z0-9]+)*$/;
+const FLAG_RE = /^(city|world|single|[A-F](\+[A-F])?):[a-z0-9]+(-[a-z0-9]+)*$/;
 const flagKey = f => { const [sc, name] = f.split(':'); return (sc === 'city' ? 'city' : sc === 'world' ? 'world' : sc.includes('+') ? 'pair' : 'single') + ':' + name; };
 const flagScopeRoles = f => { const sc = f.split(':')[0]; return /^[A-F](\+[A-F])?$/.test(sc) ? sc.split('+') : []; };
 const isNum = x => typeof x === 'number' && isFinite(x);

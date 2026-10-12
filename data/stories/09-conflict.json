@@ -1,0 +1,874 @@
+{
+  "category": "conflict",
+  "title": "Conflict and rivalry",
+  "theme": "Arguments, grudges, competition over a stall spot or a job, and the confrontation that never comes.",
+  "storylets": [
+    {
+      "id": "cnf.stall-spot-dispute",
+      "title": "Whose corner is this",
+      "tier": "notable",
+      "note": "Two stall workers argue over a pitch. Chain: cnf.pitch-truce or a cold war.",
+      "roles": {
+        "A": {
+          "desc": "a stall worker setting up",
+          "needs": [
+            "stall-keeper"
+          ]
+        },
+        "B": {
+          "desc": "a rival stall worker",
+          "rel": "rival-of:A",
+          "needs": [
+            "stall-keeper"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          10
+        ],
+        "at": [
+          "stall",
+          "square"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 500,
+          "city": 5
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "argue",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "B",
+          "at": "stall"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} drags a folding table to the corner and unfolds it with a bang.",
+          "{A} hauls crates to a spot by the pond and starts stacking.",
+          "{A} carries an awning pole to the corner and sets it down."
+        ],
+        "b2": [
+          "{B.desc} strides up and plants both hands on the table. They argue over the paint line on the stone.",
+          "{A} and {B.desc} shout across the table, pointing at the same square of sidewalk.",
+          "{B.desc} snaps at {A}. {A} snaps back and holds the table down."
+        ],
+        "b3": [
+          "{B.desc} leaves, kicking a crate.",
+          "{B.desc} turns and walks off, muttering at the sky.",
+          "{B.desc} stalks away to the far end of the square."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} shouts: \"Fifteen years I have had this corner! You are the new one here!\"",
+            "Overheard: {B.desc} shouts: \"The permit says whoever is first. I was first.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.1
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:pitch-feud"
+        ],
+        "branches": [
+          {
+            "w": 45,
+            "sets": [
+              "A+B:pitch-truce"
+            ],
+            "label": "they split the corner"
+          },
+          {
+            "w": 55,
+            "sets": [],
+            "label": "cold war",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "cnf.pitch-truce",
+      "title": "A chalk line down the middle",
+      "tier": "texture",
+      "note": "Pays off the stall dispute.",
+      "roles": {
+        "A": {
+          "desc": "a stall worker",
+          "needs": [
+            "stall-keeper"
+          ]
+        },
+        "B": {
+          "desc": "the rival stall worker",
+          "rel": "rival-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          10
+        ],
+        "at": [
+          "stall",
+          "square"
+        ],
+        "requires": [
+          "A+B:pitch-truce"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 600,
+          "city": 5
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "point",
+          "who": "A",
+          "at": "stall",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "hand-over",
+          "who": "B",
+          "at": "stall",
+          "with": [
+            "A"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} stand either side of a chalk mark on the stone.",
+          "{B.desc} and {A} face each other across a fresh chalk line.",
+          "{A} stands by the pond. {B.desc} stands a pace away with a stick of chalk."
+        ],
+        "b2": [
+          "{A} points at the line and then at {A.his} table. {B.desc} shrugs.",
+          "{A} gestures toward the left half. {B.desc} nods grudgingly.",
+          "{A} indicates the new border and waits."
+        ],
+        "b3": [
+          "{B.desc} hands {A} the chalk. {A} adds a mark and passes it back.",
+          "{B.desc} holds out a hand. {A} shakes it, quick.",
+          "{B.desc} passes over a sweet bun, stiff as a flag."
+        ]
+      },
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.12
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "cnf.line-cut",
+      "title": "Someone steps in front",
+      "tier": "texture",
+      "note": "A queue squabble. Small, common, and over in a minute.",
+      "roles": {
+        "A": {
+          "desc": "an adult in a queue",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "an adult stepping in ahead"
+        }
+      },
+      "when": {
+        "hours": [
+          11,
+          21
+        ],
+        "at": [
+          "stall",
+          "club-queue"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 100,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "bump",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        },
+        {
+          "id": "b3",
+          "do": "shrug",
+          "who": "A",
+          "at": "stall",
+          "with": [
+            "B"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} waits in line at the counter, a handset in one hand.",
+          "{A} stands third in the stall queue, reading the menu.",
+          "{A} queues at the stall, shifting from foot to foot."
+        ],
+        "b2": [
+          "{B.desc} slides into line ahead of {A}, shoulder first.",
+          "{B.desc} steps in front of {A} and orders without looking back.",
+          "{B.desc} cuts the queue and nudges {A} aside."
+        ],
+        "b3": [
+          "{A} says something sharp. {B.desc} shrugs it off. {A} shakes {A.his} head.",
+          "{A} shrugs and lets it go, mouthing a word.",
+          "{A} turns away from {B.desc}, jaw working."
+        ]
+      },
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.02
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "cnf.promotion-grudge",
+      "title": "Two coworkers, one door",
+      "tier": "notable",
+      "note": "A work rivalry. Observation of body language and a few overheard words.",
+      "roles": {
+        "A": {
+          "desc": "a worker at the door",
+          "needs": [
+            "adult",
+            "employed"
+          ]
+        },
+        "B": {
+          "desc": "a coworker, a rival for the same post",
+          "rel": "rival-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          19
+        ],
+        "days": "weekday",
+        "at": [
+          "work-door"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 400,
+          "city": 4
+        },
+        "pressure": {
+          "work-trouble": [
+            0.3,
+            1
+          ]
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "work-door"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "work-door"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": "B",
+          "at": "work-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at the work door, badge held in one fist.",
+          "{A} waits outside the workplace with arms crossed and a jaw set.",
+          "{A} lingers at the door, shifting a bag from shoulder to shoulder."
+        ],
+        "b2": [
+          "{B.desc} comes up. A few words, clipped. Neither smiles.",
+          "{B.desc} says something short to {A}. {A} answers with a flat sentence.",
+          "{A} and {B.desc} speak at the door without looking at each other."
+        ],
+        "b3": [
+          "{B.desc} goes in first and lets the door slide shut on {A}.",
+          "{B.desc} enters and does not hold the door.",
+          "{B.desc} steps through the door and it closes behind."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.opinion-stated",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"Congratulations on the posting. Hope the extra hours are worth it.\"",
+            "Overheard: {B.desc} says: \"It was a fair vote. Take it up with the floor manager.\""
+          ]
+        }
+      ],
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "work-trouble",
+            0.05
+          ]
+        ],
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:work-rivals"
+        ]
+      }
+    },
+    {
+      "id": "cnf.glare",
+      "title": "A look held a beat too long",
+      "tier": "mundane",
+      "note": "Two people with a history cross paths. Observed only.",
+      "roles": {
+        "A": {
+          "desc": "an adult walking",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "someone A has a grudge with",
+          "rel": "rival-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          22
+        ],
+        "at": [
+          "square",
+          "street"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 150,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "B",
+          "at": "square"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "square",
+          "with": [
+            "B"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} cuts across the square, hands in pockets.",
+          "{A} walks the south side at a steady pace.",
+          "{A} heads for the stalls with eyes on the ground."
+        ],
+        "b2": [
+          "{B.desc} stands by the pond with arms folded and watches {A} cross.",
+          "{B.desc} stays still at the rail, turning to follow {A}.",
+          "{B.desc} idles at the fountain edge with a hard stare."
+        ],
+        "b3": [
+          "{A} passes {B.desc} at arm's length and does not break stride.",
+          "{A} goes by {B.desc} without a word, jaw tight.",
+          "{A} steps wide around {B.desc} and keeps going."
+        ]
+      },
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.01
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:rivals-seen"
+        ]
+      }
+    },
+    {
+      "id": "cnf.walks-up-turns-back",
+      "title": "The confrontation that does not happen",
+      "tier": "texture",
+      "note": "A walks at someone with purpose, stops, and goes away again. Never resolved; that is the point.",
+      "roles": {
+        "A": {
+          "desc": "an adult walking fast",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "someone seated at a stall",
+          "rel": "acquaintance-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          22
+        ],
+        "at": [
+          "square",
+          "stall"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 300,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b3",
+          "do": "shrug",
+          "who": "A",
+          "at": "square"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} strides across the square toward the stalls, one fist clenched.",
+          "{A} marches at the cafe stools with a face like a shut door.",
+          "{A} heads for the counter, quick and purposeful."
+        ],
+        "b2": [
+          "{A} stops two paces short of a seated figure and stays there.",
+          "{A} halts and stands with a hand half raised.",
+          "{A} stays rooted a step from the stool, mouth working."
+        ],
+        "b3": [
+          "{A} shakes {A.his} head, turns away, and goes back the way {A.he} came.",
+          "{A} drops the hand, shrugs, and turns away.",
+          "{A} turns on a heel and leaves, the fist opening slowly."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "cnf.debt-collector",
+      "title": "A word about the thirty",
+      "tier": "notable",
+      "note": "A creditor catches someone at a stall. Chain: cnf.debt-settled or never paid.",
+      "roles": {
+        "A": {
+          "desc": "an adult at a stall",
+          "needs": [
+            "adult",
+            "pressure-high:money"
+          ]
+        },
+        "B": {
+          "desc": "a creditor, approaching",
+          "rel": "creditor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          11,
+          21
+        ],
+        "at": [
+          "stall",
+          "street"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 500,
+          "city": 5
+        },
+        "pressure": {
+          "money": [
+            0.6,
+            1
+          ]
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        },
+        {
+          "id": "b3",
+          "do": "hand-over",
+          "who": "A",
+          "at": "stall",
+          "with": [
+            "B"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at a stall counter and counts coins into a palm.",
+          "{A} queues for a bowl, thumbing a short stack of notes.",
+          "{A} reaches the counter and pats a pocket twice."
+        ],
+        "b2": [
+          "{B.desc} steps up behind {A} and speaks low. {A} stiffens.",
+          "{B.desc} taps {A} on the arm and says a few words. {A} turns slowly.",
+          "{A} and {B.desc} talk, {B.desc} calm, {A} not."
+        ],
+        "b3": [
+          "{A} hands over a few notes. {B.desc} counts them and frowns.",
+          "{A} holds out a small fold of cash. {B.desc} takes it without a word.",
+          "{A} passes {B.desc} what is in the pocket and nothing more."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.money-stated",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.55,
+          "log": [
+            "Overheard: {A} says: \"That is all I have until the fifteenth. Not a note more.\"",
+            "Overheard: {B.desc} says: \"You said that last month. Twice.\""
+          ]
+        }
+      ],
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            0.05
+          ]
+        ],
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:part-paid"
+        ],
+        "branches": [
+          {
+            "w": 45,
+            "sets": [
+              "A+B:debt-cleared"
+            ],
+            "label": "settled later"
+          },
+          {
+            "w": 55,
+            "sets": [],
+            "label": "drags on",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "cnf.debt-settled",
+      "title": "The rest of it, in an envelope",
+      "tier": "texture",
+      "note": "Pays off cnf.debt-collector.",
+      "roles": {
+        "A": {
+          "desc": "an adult paying the balance",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "the creditor",
+          "rel": "creditor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          20
+        ],
+        "at": [
+          "stall",
+          "street"
+        ],
+        "requires": [
+          "A+B:debt-cleared"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 600,
+          "city": 5
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "B",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "stall",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "B",
+          "at": "stall"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} stands at the counter, tablet under one arm.",
+          "{B.desc} waits at the stall edge with a flat expression.",
+          "{B.desc} leans on the rail by the stalls."
+        ],
+        "b2": [
+          "{A} comes up and hands over a thick envelope. {B.desc} counts it, then counts it again.",
+          "{A} holds out the envelope with both hands. {B.desc} takes it.",
+          "{A} passes the envelope across and says four words."
+        ],
+        "b3": [
+          "{B.desc} nods once and leaves without a word.",
+          "{B.desc} tucks the envelope away and walks off.",
+          "{B.desc} goes, tapping the tablet."
+        ]
+      },
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            -0.2
+          ]
+        ],
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "cnf.feed-jab",
+      "title": "Posted at a rival",
+      "tier": "texture",
+      "note": "A vague feed post that reads like a dig. The monitor reports the post, not who it is about.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a handset",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          24
+        ],
+        "at": [
+          "bench",
+          "cafe-stool"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 150,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "post-feed",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits on a bench with jaw set and a thumb moving fast.",
+          "{A} takes a seat and types with both thumbs, hard.",
+          "{A} perches on the bench edge, scrolling with a scowl."
+        ],
+        "b2": [
+          "{A} posts and puts the handset face down on the slats.",
+          "{A} posts, deletes, posts again.",
+          "{A} sends a post and shoves the handset into a pocket."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.opinion-stated",
+          "beat": "b2",
+          "channel": "feed",
+          "chance": 0.65,
+          "log": [
+            "Posted: \"Some people copy your recipe and call it theirs. You know who you are.\"",
+            "Posted: \"Funny how the best spots go to whoever shouts loudest.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    }
+  ]
+}

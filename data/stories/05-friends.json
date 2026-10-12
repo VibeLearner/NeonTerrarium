@@ -1,0 +1,1274 @@
+{
+  "category": "friends",
+  "title": "Friendship",
+  "theme": "Regular meetups, a new friend, a favor, drifting apart, a falling out and making up.",
+  "storylets": [
+    {
+      "id": "fri.regular-meetup",
+      "title": "The usual stools, the usual faces",
+      "tier": "mundane",
+      "note": "Two friends meet at a cafe stool. Quiet, common, the backbone of the friendship category.",
+      "roles": {
+        "A": {
+          "desc": "an adult meeting someone",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend, arriving",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          21
+        ],
+        "at": [
+          "cafe-stool",
+          "stall"
+        ],
+        "weight": 8,
+        "cooldown": {
+          "person": 60,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "cafe-stool"
+        },
+        {
+          "id": "b2",
+          "do": "wave",
+          "who": "B",
+          "at": "cafe-stool"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "cafe-stool"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits at a cafe stool with a cup and a view of the square.",
+          "{A} takes a stool and sets a cup down on the counter.",
+          "{A} perches on a stool and checks a handset.",
+          "{A} takes a seat at the stalls and looks up the block."
+        ],
+        "b2": [
+          "{B.desc} waves from across the square and picks up the pace.",
+          "{B.desc} spots {A} and waves with a whole arm.",
+          "{B.desc} waves a greeting and jogs the last few steps.",
+          "{B.desc} arrives, waving, already talking."
+        ],
+        "b3": [
+          "{A} and {B.desc} talk across the counter, heads close.",
+          "{B.desc} climbs onto the next stool. {A} says something and they both laugh.",
+          "{A} and {B.desc} chat, cups in hand, for a good while.",
+          "{B.desc} tells {A} a long story. {A} shakes with laughter."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.first-name",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} calls out: \"{B.first}! Over here, I saved you the stool!\"",
+            "Overheard: {A} says: \"There you are, {B.first}. You are late again.\""
+          ]
+        },
+        {
+          "fact": "A.habit",
+          "beat": "b3",
+          "channel": "seen",
+          "chance": 0.35,
+          "log": [
+            "{A} and {B.desc} often take these stools.",
+            "This pair meets at the stalls on a schedule."
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.03
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:regular-meetup"
+        ]
+      }
+    },
+    {
+      "id": "fri.introduction",
+      "title": "Meet my friend",
+      "tier": "texture",
+      "note": "The verified route to a name and a relation: someone introduces a newcomer aloud.",
+      "roles": {
+        "A": {
+          "desc": "an adult greeting someone",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend of A",
+          "rel": "friend-of:A"
+        },
+        "C": {
+          "desc": "a newcomer being introduced"
+        }
+      },
+      "when": {
+        "hours": [
+          11,
+          22
+        ],
+        "at": [
+          "square",
+          "cafe-stool",
+          "bench"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 300,
+          "city": 3
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk-together",
+          "who": [
+            "B",
+            "C"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B",
+            "C"
+          ],
+          "at": "square"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} and {C.desc} cross the square together, {B.desc} leading.",
+          "{B.desc} brings {C.desc} along the walk toward the stalls.",
+          "{C.desc} follows {B.desc} up the sidewalk, looking around."
+        ],
+        "b2": [
+          "{A} stands by the pond, hands in pockets.",
+          "{A} waits at the edge of the square.",
+          "{A} stays by the fountain with a cup."
+        ],
+        "b3": [
+          "{B.desc} gestures between {A} and {C.desc}. Handshakes all round.",
+          "{B.desc} says a few words and the three of them stand in a loose circle.",
+          "{A} and {C.desc} nod at each other while {B.desc} talks over both."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "C.relation-to-A",
+          "beat": "b3",
+          "channel": "introduction",
+          "chance": 0.7,
+          "log": [
+            "{B.desc} introduces {C.first} as a friend from work.",
+            "{B.desc} says: \"This is {C.first}. Came in last month, runs the kiosk by the lift.\""
+          ]
+        },
+        {
+          "fact": "C.first-name",
+          "beat": "b3",
+          "channel": "introduction",
+          "chance": 0.6,
+          "log": [
+            "{B.desc} presents {C.first} to {A} by name.",
+            "{C.first} gives a name at the handshake: {C.first}."
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.02
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+C:introduced"
+        ]
+      }
+    },
+    {
+      "id": "fri.favor",
+      "title": "Can you hold this for me",
+      "tier": "texture",
+      "note": "A favor, a small debt of kindness. Chain: fri.favor-returned or it fizzles.",
+      "roles": {
+        "A": {
+          "desc": "an adult asking for a favor",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend doing the favor",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          20
+        ],
+        "at": [
+          "square",
+          "bench",
+          "stall"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 200,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "square",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "B",
+          "at": "square"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} catches {B.desc} at the stalls and talks quietly, one hand up.",
+          "{A} says something to {B.desc} and points down the block.",
+          "{A} and {B.desc} talk head to head for a minute."
+        ],
+        "b2": [
+          "{A} hands over a small bag and a folded slip.",
+          "{A} holds out a key on a loop and {B.desc} takes it.",
+          "{A} passes a parcel across with both hands. {B.desc} nods."
+        ],
+        "b3": [
+          "{B.desc} goes off down the block, bag under one arm.",
+          "{B.desc} leaves the square, the parcel tucked away.",
+          "{B.desc} turns and heads for the corner."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b1",
+          "channel": "conversation",
+          "chance": 0.35,
+          "log": [
+            "Overheard: {A} says: \"Friend, I owe you one. Just keep it dry until Friday.\"",
+            "Overheard: {B.desc} tells {A}: \"We've been friends too long to count favors. Go.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.03
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:owes-favor"
+        ],
+        "branches": [
+          {
+            "w": 55,
+            "sets": [
+              "A+B:favor-returned"
+            ],
+            "label": "returned in kind"
+          },
+          {
+            "w": 45,
+            "sets": [],
+            "label": "forgotten",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "fri.favor-returned",
+      "title": "Even again",
+      "tier": "texture",
+      "note": "Pays off fri.favor.",
+      "roles": {
+        "A": {
+          "desc": "an adult returning a favor",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          21
+        ],
+        "at": [
+          "square",
+          "stall",
+          "bench"
+        ],
+        "requires": [
+          "A+B:favor-returned"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 400,
+          "city": 3
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "square",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "square",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "square"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} hurries across the square with a paper bag swinging.",
+          "{A} cuts through the crowd, eyes on {B.desc} by the pond.",
+          "{A} comes up the walk, one hand raised."
+        ],
+        "b2": [
+          "{A} hands {B.desc} a bag. {B.desc} looks inside and grins.",
+          "{A} holds out a small package. {B.desc} takes it with a bow.",
+          "{A} passes a cup across. {B.desc} sniffs it and nods."
+        ],
+        "b3": [
+          "{A} and {B.desc} talk it out, a hand on a shoulder.",
+          "{B.desc} waves off a thank-you. {A} insists, laughing.",
+          "{A} and {B.desc} clink cups and chat."
+        ]
+      },
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:even"
+        ]
+      }
+    },
+    {
+      "id": "fri.drifting",
+      "title": "The wave that is not returned",
+      "tier": "notable",
+      "note": "Two friends drifting apart. Chain: fri.falling-out or it fizzles into nothing.",
+      "roles": {
+        "A": {
+          "desc": "an adult across the square",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend, not looking over",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          21
+        ],
+        "at": [
+          "square",
+          "street"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 300,
+          "city": 3
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "wave",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "B",
+          "at": "square"
+        },
+        {
+          "id": "b3",
+          "do": "stand",
+          "who": "A",
+          "at": "square"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} waves across the square, arm high.",
+          "{A} lifts a hand and calls something across the pond.",
+          "{A} waves twice at a figure by the stalls."
+        ],
+        "b2": [
+          "{B.desc} crosses the far side of the square and keeps going.",
+          "{B.desc} walks on, eyes on a handset.",
+          "{B.desc} disappears behind the stalls without turning."
+        ],
+        "b3": [
+          "{A} lowers {A.his} arm slowly and stays where {A.he} is.",
+          "{A} stands with the handset out, thumb over a message not sent.",
+          "{A} stays rooted by the pond for a long minute."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.feeling-stated",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.35,
+          "log": [
+            "Overheard: {A} mutters: \"Third time this week. They have not answered a message in days.\"",
+            "Overheard: {A} says to no one: \"Fine. Be that way.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:drifting"
+        ],
+        "branches": [
+          {
+            "w": 40,
+            "sets": [
+              "A+B:falling-out"
+            ],
+            "label": "words follow"
+          },
+          {
+            "w": 60,
+            "sets": [],
+            "label": "they drift quietly",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "fri.falling-out",
+      "title": "Said in the square",
+      "tier": "notable",
+      "note": "A friendship breaks aloud. Chain: fri.patching-up, or the silence stays.",
+      "roles": {
+        "A": {
+          "desc": "an adult at the edge of the square",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend, once close",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          22
+        ],
+        "at": [
+          "square",
+          "street"
+        ],
+        "requires": [
+          "A+B:falling-out"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 500,
+          "city": 5
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "argue",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "leave",
+          "who": "B",
+          "at": "square"
+        },
+        {
+          "id": "b3",
+          "do": "stand",
+          "who": "A",
+          "at": "square"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} argue in the open, voices rising.",
+          "Two figures argue by the pond. {A} jabs a finger, {B.desc} flings both hands up.",
+          "{A} and {B.desc} shout across a step of distance."
+        ],
+        "b2": [
+          "{B.desc} leaves in a hurry, scattering pigeons.",
+          "{B.desc} turns away and walks off the square.",
+          "{B.desc} leaves, one hand over the face."
+        ],
+        "b3": [
+          "{A} stands alone with arms crossed.",
+          "{A} stays at the pond, staring at the water.",
+          "{A} remains in place, breathing hard."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.opinion-stated",
+          "beat": "b1",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {A} shouts: \"You said you would be there! You said it twice!\"",
+            "Overheard: {B.desc} shouts: \"You never once asked how I was doing!\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.2
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:broken-friendship"
+        ],
+        "branches": [
+          {
+            "w": 35,
+            "sets": [
+              "A+B:patching-up"
+            ],
+            "label": "one of them tries again"
+          },
+          {
+            "w": 65,
+            "sets": [],
+            "label": "the silence stays",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "fri.patching-up",
+      "title": "A drink on the table between them",
+      "tier": "texture",
+      "note": "Pays off the falling out. Awkward, a little funny, never tidy.",
+      "roles": {
+        "A": {
+          "desc": "an adult at a cafe stool",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend, returning",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          11,
+          21
+        ],
+        "at": [
+          "cafe-stool"
+        ],
+        "requires": [
+          "A+B:patching-up"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 700,
+          "city": 6
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "cafe-stool"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "B",
+          "at": "cafe-stool"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "cafe-stool"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits at a stool with two cups and one of them untouched.",
+          "{A} takes a stool with an extra cup set on the counter beside.",
+          "{A} perches on a stool, turning a cup."
+        ],
+        "b2": [
+          "{B.desc} comes up to the stalls and stops a pace behind the empty stool.",
+          "{B.desc} approaches slowly with both hands pushed into pockets.",
+          "{B.desc} arrives and stands at the edge of the counter."
+        ],
+        "b3": [
+          "{B.desc} sits. They talk for a while with long pauses.",
+          "{A} slides the second cup across. {B.desc} takes it and a few words follow.",
+          "{A} and {B.desc} talk, awkward at first and then less so."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.feeling-stated",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.55,
+          "log": [
+            "Overheard: {A} says: \"I should have called back. I'm sorry it took me this long.\"",
+            "Overheard: {B.desc} says: \"We both said too much. Let's just drink this.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.2
+          ]
+        ],
+        "flags": [
+          "A+B:mended-friendship"
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:mended-friendship"
+        ]
+      }
+    },
+    {
+      "id": "fri.lawn-picnic",
+      "title": "Three on a blanket",
+      "tier": "texture",
+      "note": "A small group on the lawn. Good for names being shouted across.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a blanket",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend on the blanket",
+          "rel": "friend-of:A"
+        },
+        "C": {
+          "desc": "a third friend",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          11,
+          17
+        ],
+        "days": "weekend",
+        "weather": "clear",
+        "at": [
+          "lawn"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 150,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "picnic",
+          "who": [
+            "A",
+            "B",
+            "C"
+          ],
+          "at": "lawn"
+        },
+        {
+          "id": "b2",
+          "do": "eat",
+          "who": [
+            "A",
+            "B",
+            "C"
+          ],
+          "at": "lawn"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B",
+            "C"
+          ],
+          "at": "lawn"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A}, {B.desc} and {C.desc} spread a blanket on the lawn and weigh the corners with shoes.",
+          "Three figures settle on a blanket under the low sun.",
+          "{A} unrolls a blanket. {B.desc} and {C.desc} drop onto it."
+        ],
+        "b2": [
+          "They pass a tin of dumplings around, each taking one.",
+          "{C.desc} breaks a flatbread into three and hands the pieces out.",
+          "{A}, {B.desc} and {C.desc} share a flask and a bowl of fruit."
+        ],
+        "b3": [
+          "Laughter on the grass. {B.desc} tells a story with both hands.",
+          "{A} and {C.desc} argue about a song while {B.desc} lies back.",
+          "The three of them talk until the light shifts."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "C.first-name",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.45,
+          "log": [
+            "Overheard: {B.desc} says: \"{C.first}, don't eat all of them!\"",
+            "Overheard: {A} calls: \"{C.first}! Pass the flask.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.02
+          ],
+          [
+            "A",
+            "C",
+            0.02
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "fri.feed-post",
+      "title": "Posted from a bench",
+      "tier": "texture",
+      "note": "A feed post: the only legal way a mood or plan reaches the monitor.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a handset",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          24
+        ],
+        "at": [
+          "bench",
+          "cafe-stool",
+          "street"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 80,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "post-feed",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits on a bench and thumbs a handset.",
+          "{A} takes a seat and holds the handset up to the light.",
+          "{A} perches on the bench edge, typing with both thumbs."
+        ],
+        "b2": [
+          "{A} posts something short and puts the handset away.",
+          "{A} types, deletes, types, and posts.",
+          "{A} posts, then checks the screen twice."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.plan-stated",
+          "beat": "b2",
+          "channel": "feed",
+          "chance": 0.6,
+          "log": [
+            "Posted: \"Anyone around the lawn Saturday? Bringing too much food.\"",
+            "Posted: \"Leaving the city for a week. Water the plants, whoever has a key.\""
+          ]
+        },
+        {
+          "fact": "A.feeling-stated",
+          "beat": "b2",
+          "channel": "feed",
+          "chance": 0.4,
+          "log": [
+            "Posted: \"Long day. Noodles and then sleep.\"",
+            "Posted: \"Rain again. Good for the plants. Less good for the shoes.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "fri.stood-up",
+      "title": "Forty minutes at the corner",
+      "tier": "notable",
+      "note": "A friend does not show. Chain: fri.apology-drink or a fizzle.",
+      "roles": {
+        "A": {
+          "desc": "an adult waiting",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend who is late",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          12,
+          22
+        ],
+        "at": [
+          "street",
+          "square"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 300,
+          "city": 3
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "wait-outside",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "phone-call",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at the corner and checks the time. {n} minutes pass.",
+          "{A} lingers by the lamp post, glancing down the block.",
+          "{A} waits outside a closed shop, then paces the length of it."
+        ],
+        "b2": [
+          "{A} raises a handset to one ear and leaves a message.",
+          "{A} takes a call out and holds it over the mouth, speaking quietly.",
+          "{A} turns away and speaks low into the handset."
+        ],
+        "b3": [
+          "{A} leaves the corner without looking back.",
+          "{A} walks off toward the stalls, handset in a fist.",
+          "{A} heads away, shoulders up."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "phone",
+          "chance": 0.4,
+          "log": [
+            "Phone, one side: {A} says: \"Forty minutes, friend. Forty. Call me back.\"",
+            "Phone, one side: {A} says: \"It's me. I waited. We said six.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:was-stood-up"
+        ],
+        "branches": [
+          {
+            "w": 60,
+            "sets": [
+              "A+B:apology-drink"
+            ],
+            "label": "B makes it up"
+          },
+          {
+            "w": 40,
+            "sets": [],
+            "label": "never mentioned again",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "fri.apology-drink",
+      "title": "A round to make up for it",
+      "tier": "texture",
+      "note": "Pays off fri.stood-up.",
+      "roles": {
+        "A": {
+          "desc": "an adult at a stall",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend, arriving with drinks",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          11,
+          22
+        ],
+        "at": [
+          "stall",
+          "cafe-stool"
+        ],
+        "requires": [
+          "A+B:apology-drink"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 400,
+          "city": 3
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "cafe-stool"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "B",
+          "at": "cafe-stool",
+          "with": [
+            "A"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "cafe-stool"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits at a stool, arms crossed, not looking around.",
+          "{A} takes a stool and keeps both hands in {A.his} lap.",
+          "{A} perches at the counter with a very straight back."
+        ],
+        "b2": [
+          "{B.desc} comes up and hands {A} a cup with both hands.",
+          "{B.desc} holds out a cup and a paper bag of sweets.",
+          "{B.desc} passes over a cup and a folded note."
+        ],
+        "b3": [
+          "{A} sips. {B.desc} talks fast. {A} lets {B.desc} finish.",
+          "{A} and {B.desc} trade a few words and then laugh at the same moment.",
+          "They talk it out over the cups, the ice slowly breaking."
+        ]
+      },
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.08
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:made-up"
+        ]
+      }
+    },
+    {
+      "id": "fri.shared-umbrella",
+      "title": "One umbrella for two",
+      "tier": "mundane",
+      "note": "Rain makes friends walk closer. A small thing.",
+      "roles": {
+        "A": {
+          "desc": "an adult with an umbrella",
+          "needs": [
+            "adult",
+            "has-umbrella"
+          ]
+        },
+        "B": {
+          "desc": "a friend without one",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          22
+        ],
+        "weather": "rain",
+        "at": [
+          "street",
+          "square"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 60,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "umbrella",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "share-umbrella",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} crosses the square under a wide umbrella, rain drumming on it.",
+          "{A} walks the sidewalk under an umbrella, collar up.",
+          "{A} hurries across wet stone with an umbrella tipped forward."
+        ],
+        "b2": [
+          "{B.desc} ducks in. {A} shifts the handle over to cover both.",
+          "{A} holds the handle high over {B.desc} and takes the rain on one shoulder.",
+          "{B.desc} laughs and squeezes in close next to {A}."
+        ],
+        "b3": [
+          "{A} and {B.desc} walk on, elbows touching, the umbrella tilted.",
+          "{B.desc} takes the handle for a stretch. {A} points the way.",
+          "The two of them cross the square at the same slow pace."
+        ]
+      },
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.02
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    }
+  ]
+}

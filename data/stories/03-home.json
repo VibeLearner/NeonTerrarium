@@ -1,0 +1,1339 @@
+{
+  "category": "home",
+  "title": "Home and household",
+  "theme": "Cohabitants, chores, a lockout, a broken appliance, a landlord, and moving things in or out.",
+  "storylets": [
+    {
+      "id": "hom.locked-out",
+      "title": "No key at the door",
+      "tier": "texture",
+      "note": "A subject is locked out until a housemate arrives. Cheap, human and common.",
+      "roles": {
+        "A": {
+          "desc": "an adult at their own door",
+          "needs": [
+            "adult",
+            "lives-with-others"
+          ]
+        },
+        "B": {
+          "desc": "a housemate coming home",
+          "rel": "cohabitant-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          17,
+          23
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 150,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "knock-and-wait",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        },
+        {
+          "id": "b4",
+          "do": "enter",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes up to the door and pats down both jacket pockets, then the bag.",
+          "{A} arrives at the home door and checks every pocket in turn.",
+          "{A} reaches the door and turns out a pocket onto the step."
+        ],
+        "b2": [
+          "{A} knocks twice and then stands back from the door with arms folded.",
+          "{A} raps on the door, waits, raps again. {n} minutes go by.",
+          "{A} stands on the step and knocks at a slow, even pace."
+        ],
+        "b3": [
+          "{B.desc} arrives at the step with a key held up. A few words with {A}.",
+          "{B.desc} comes up the step and shakes {B.his} head at {A}. They talk low.",
+          "{B.desc} reaches the door and says something short to {A}."
+        ],
+        "b4": [
+          "The lock clicks. Both go through the door and it slides shut.",
+          "{B.desc} opens up and {A} follows in.",
+          "The door slides open for {B.desc}. {A} goes in behind."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.35,
+          "log": [
+            "Overheard: {B.desc} says to {A}: \"Third time this month. Get a spare cut.\"",
+            "Overheard: {A} tells {B.desc}: \"I swear it was in my coat this morning.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.01
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:shares-home"
+        ]
+      }
+    },
+    {
+      "id": "hom.groceries-up",
+      "title": "Bags up the steps",
+      "tier": "mundane",
+      "note": "Plain, constant home life. A watcher sees where someone lives.",
+      "roles": {
+        "A": {
+          "desc": "an adult with shopping",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          20
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 8,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes along the block with a heavy paper sack in each arm.",
+          "{A} shifts a bulging sack from one hip to the other and keeps going.",
+          "{A} climbs toward the door with groceries and a loaf under one elbow.",
+          "{A} arrives at the home door, both arms full, kicking at the step with a boot."
+        ],
+        "b2": [
+          "{A} backs through the door and it slides shut.",
+          "{A} goes in, elbow on the panel.",
+          "{A} steps inside with the sacks. The door closes.",
+          "{A} enters and the light inside comes on."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.home",
+          "beat": "b2",
+          "channel": "seen",
+          "chance": 0.4,
+          "log": [
+            "{A} has a home here, the third door along.",
+            "{A} lives at this address: the door took {A.him} in without a key."
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "hom.stoop-evening",
+      "title": "The stoop after dinner",
+      "tier": "mundane",
+      "note": "Someone sits outside their own door. Pure texture.",
+      "roles": {
+        "A": {
+          "desc": "an adult at home",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          18,
+          23
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 7,
+        "cooldown": {
+          "person": 30,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "sit",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out of the door with a cup in one hand.",
+          "{A} steps out of the home door and eases it shut.",
+          "{A} leaves the building and stops on the top step."
+        ],
+        "b2": [
+          "{A} sits on the step and watches the street go by.",
+          "{A} takes a seat on the stoop, knees up, cup balanced on one.",
+          "{A} lowers {A.him}self onto the step and stretches both legs out."
+        ],
+        "b3": [
+          "{A} gets up, dusts off, and goes in.",
+          "{A} stands, stretches, and enters.",
+          "{A} goes back in. The door slides shut."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "hom.window-plant",
+      "title": "Watering the doorstep pot",
+      "tier": "mundane",
+      "note": "A person with a plant. The seed of the quiet category.",
+      "roles": {
+        "A": {
+          "desc": "an adult with a potted plant",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          10
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "water-plant",
+          "who": "A",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out with a small bottle held in one hand.",
+          "{A} steps out of the home door and crouches by a pot on the step.",
+          "{A} leaves the building carrying a dented watering can."
+        ],
+        "b2": [
+          "{A} pours a thin stream into the pot and turns it a quarter turn.",
+          "{A} waters the plant, then picks off one yellow leaf.",
+          "{A} tips the bottle over the pot, counts to five, and straightens it."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.habit",
+          "beat": "b2",
+          "channel": "seen",
+          "chance": 0.5,
+          "log": [
+            "{A} waters this pot most mornings.",
+            "This pot gets a morning watering. {A} has done it before."
+          ]
+        }
+      ],
+      "next": {
+        "sets": [
+          "A:keeps-plant"
+        ]
+      }
+    },
+    {
+      "id": "hom.landlord-envelope",
+      "title": "The first-of-the-month knock",
+      "tier": "texture",
+      "note": "Rent changes hands at a door. Reads as plain business, never as a verdict.",
+      "roles": {
+        "A": {
+          "desc": "an adult paying rent",
+          "needs": [
+            "adult",
+            "lives-with-others"
+          ]
+        },
+        "B": {
+          "desc": "the landlord, collecting",
+          "rel": "landlord-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          18
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 400,
+          "city": 4
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "B",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "home-door",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "B",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} waits at the door with a tablet under one arm.",
+          "{B.desc} stands outside the home door and checks the time.",
+          "{B.desc} paces the step in a long coat, tablet in hand."
+        ],
+        "b2": [
+          "{A} opens up and holds out a thin envelope. {B.desc} counts it.",
+          "{A} hands an envelope across. {B.desc} thumbs through it and nods.",
+          "{A} passes {B.desc} a folded packet and says a few words."
+        ],
+        "b3": [
+          "{B.desc} turns and goes off down the block.",
+          "{B.desc} leaves the doorway, tapping at the tablet.",
+          "{B.desc} heads away from the door without a word."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {A} says: \"Here is the rent. The tap is still dripping, by the way.\"",
+            "Overheard: {B.desc} tells {A}: \"Rent is in. I'll send somebody about the tap.\""
+          ]
+        },
+        {
+          "fact": "A.money-stated",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.25,
+          "log": [
+            "Overheard: {A} says: \"That is all of it this month. Next month, no promises.\"",
+            "Overheard: {A} asks: \"Can it wait till the end of the week? Half is here.\""
+          ]
+        }
+      ],
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:paid-rent"
+        ]
+      }
+    },
+    {
+      "id": "hom.rent-dodge",
+      "title": "Taking the long way past the landlord",
+      "tier": "notable",
+      "note": "A tight month: the subject avoids the landlord at the door. Chain to hom.rent-settled, or it fizzles.",
+      "roles": {
+        "A": {
+          "desc": "an adult short of rent",
+          "needs": [
+            "adult",
+            "pressure-high:money"
+          ]
+        },
+        "B": {
+          "desc": "the landlord, waiting at the door",
+          "rel": "landlord-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          19
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 500,
+          "city": 6
+        },
+        "pressure": {
+          "money": [
+            0.6,
+            1
+          ]
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "B",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "shrug",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b4",
+          "do": "phone-call",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes along the block toward a home door, bag over one shoulder.",
+          "{A} walks the last stretch to the door at an even pace.",
+          "{A} heads for the door, hands in pockets."
+        ],
+        "b2": [
+          "{B.desc} stands outside the door, tablet at the hip, looking up the block.",
+          "{B.desc} waits on the step and checks the time twice.",
+          "{B.desc} leans on the doorframe, arms crossed."
+        ],
+        "b3": [
+          "{A} turns away at the corner and takes the next street over.",
+          "{A} stops, turns away, and goes back the way {A.he} came.",
+          "{A} shakes {A.his} head once and walks off in the other direction."
+        ],
+        "b4": [
+          "{A} takes out a handset and holds it to one ear.",
+          "{A} stops by a wall and takes a call, back to the street.",
+          "{A} raises a handset to the ear and speaks low."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.money-stated",
+          "beat": "b4",
+          "channel": "phone",
+          "chance": 0.35,
+          "log": [
+            "Phone, one side: {A} says: \"Not today. I don't have it today. Tell him Friday.\"",
+            "Phone, one side: {A} says: \"Half, maybe. I'll bring half on Friday.\""
+          ]
+        }
+      ],
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:dodged-rent"
+        ],
+        "branches": [
+          {
+            "w": 60,
+            "sets": [
+              "A:rent-paid-late"
+            ],
+            "label": "paid the next week"
+          },
+          {
+            "w": 40,
+            "sets": [],
+            "label": "never mentioned again",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "hom.rent-settled",
+      "title": "Rent, late and counted",
+      "tier": "texture",
+      "note": "Pays off hom.rent-dodge. The landlord counts it and says nothing.",
+      "roles": {
+        "A": {
+          "desc": "an adult paying overdue rent",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "the landlord",
+          "rel": "landlord-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          19
+        ],
+        "at": [
+          "home-door"
+        ],
+        "requires": [
+          "A:rent-paid-late"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 600,
+          "city": 6
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "B",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "home-door",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "B",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} is back at the door, tablet in hand, same coat.",
+          "{B.desc} stands on the step again and nods at an approaching {A}.",
+          "{B.desc} waits outside the home door, scrolling slowly."
+        ],
+        "b2": [
+          "{A} hands over a thick envelope. {B.desc} counts it twice.",
+          "{A} holds out a stack of notes. {B.desc} thumbs through the whole thing.",
+          "{A} passes the envelope across and shrugs."
+        ],
+        "b3": [
+          "{B.desc} taps the tablet and leaves without a word.",
+          "{B.desc} nods once and heads off down the block.",
+          "{B.desc} leaves. {A} stays in the doorway for a while."
+        ]
+      },
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            -0.15
+          ]
+        ],
+        "flags": [
+          "A:rent-clear"
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:rent-clear"
+        ]
+      }
+    },
+    {
+      "id": "hom.furniture-delivery",
+      "title": "A couch on the sidewalk",
+      "tier": "texture",
+      "note": "A drone drops something big. Two people haul it in. Shows who lives with whom, no names.",
+      "roles": {
+        "A": {
+          "desc": "an adult taking a delivery",
+          "needs": [
+            "adult",
+            "lives-with-others"
+          ]
+        },
+        "B": {
+          "desc": "a housemate helping",
+          "rel": "cohabitant-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          19
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 300,
+          "city": 3
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "receive-delivery",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "carry",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "A drone sets a long flat crate down at {A}'s door and lifts away.",
+          "{A} signs for a delivery. The drone hums off with the receipt.",
+          "A cargo drone delivers a crate to {A} and rises straight up."
+        ],
+        "b2": [
+          "{A} and {B.desc} take an end each and shuffle the crate toward the door.",
+          "{B.desc} takes one end of the crate, {A} the other. They count to three.",
+          "{A} and {B.desc} tilt the crate to clear the frame."
+        ],
+        "b3": [
+          "Both go through the door in stages, the crate scraping the frame.",
+          "{B.desc} and {A} work the crate inside and the door slides shut.",
+          "The two of them squeeze into the doorway and disappear in."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.cohabitants",
+          "beat": "b3",
+          "channel": "seen",
+          "chance": 0.5,
+          "log": [
+            "{B.desc} went through the door without knocking.",
+            "{A} and {B.desc} share this door."
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.02
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:shares-home"
+        ]
+      }
+    },
+    {
+      "id": "hom.broken-appliance",
+      "title": "Carrying a dead heater to the repair shop",
+      "tier": "mundane",
+      "note": "A broken household thing is carried out and handed over at a shop. Mundane, with a possible follow-up.",
+      "roles": {
+        "A": {
+          "desc": "an adult with a broken appliance",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a repair-shop worker",
+          "needs": [
+            "shop-worker"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          18
+        ],
+        "at": [
+          "shop-door"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 300,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "shop-door",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "A",
+          "at": "shop-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} struggles along the block with a scorched heater held to {A.his} chest.",
+          "{A} hauls a dented appliance down the street, stopping to shift the grip.",
+          "{A} carries a cracked kettle unit in both hands, the cord trailing."
+        ],
+        "b2": [
+          "{A} hands the thing over the counter. {B.desc} turns it over and taps the base.",
+          "{B.desc} takes the appliance from {A}, holds it to the light, and tags it.",
+          "{A} passes the heater across. {B.desc} writes a number on a slip."
+        ],
+        "b3": [
+          "{A} leaves the shop empty-handed and flexes both wrists.",
+          "{A} walks out with a slip in one fist and heads off.",
+          "{A} leaves, folding the slip into a pocket."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {A} says: \"It died on the first cold night. Can you look at it this week?\"",
+            "Overheard: {B.desc} tells {A}: \"Parts take a few days. Come back Thursday.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": [
+          "A:repair-pending"
+        ]
+      }
+    },
+    {
+      "id": "hom.repair-collected",
+      "title": "Picking the heater back up",
+      "tier": "mundane",
+      "note": "Pays off the broken-appliance errand.",
+      "roles": {
+        "A": {
+          "desc": "an adult collecting a repair",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a repair-shop worker",
+          "needs": [
+            "shop-worker"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          19
+        ],
+        "at": [
+          "shop-door"
+        ],
+        "requires": [
+          "A:repair-pending"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 300,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "shop-door"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "B",
+          "at": "shop-door",
+          "with": [
+            "A"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "carry",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} waits at the repair counter with a slip held up in one hand.",
+          "{A} stands at the shop door and shows a slip at the counter.",
+          "{A} shows up at the repair counter and taps the slip twice."
+        ],
+        "b2": [
+          "{B.desc} brings the heater out and sets it in {A}'s arms.",
+          "{B.desc} hands it over and points at the cord, then the switch.",
+          "{B.desc} passes the heater across and stamps the slip."
+        ],
+        "b3": [
+          "{A} walks off, the heater out in front.",
+          "{A} carries it down the block, cord looped around one wrist.",
+          "{A} heads home with the repaired unit held in both arms."
+        ]
+      },
+      "effects": {
+        "flags": [
+          "A:repair-done"
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:repair-done"
+        ]
+      }
+    },
+    {
+      "id": "hom.moving-day",
+      "title": "Boxes into a new door",
+      "tier": "notable",
+      "unwatched": true,
+      "note": "Someone moves in. Usually missed; arrives as hearsay. Life change moved-in.",
+      "roles": {
+        "A": {
+          "desc": "an adult carrying boxes",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend helping carry",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          17
+        ],
+        "days": "weekend",
+        "at": [
+          "home-door"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 3000,
+          "city": 24
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} unload crates from a hand cart onto the sidewalk.",
+          "{A} climbs the step with a stack of boxes up to {A.his} chin. {B.desc} follows with a lamp.",
+          "{B.desc} hands up a crate and {A} stacks it by the door. There are more."
+        ],
+        "b2": [
+          "{A} stops and wipes {A.his} forehead. {B.desc} says something and laughs.",
+          "{A} and {B.desc} stand over the pile and talk it through.",
+          "{B.desc} points to the door, then the pile. {A} nods."
+        ],
+        "b3": [
+          "Both go in with armloads. The door stays propped open.",
+          "{A} and {B.desc} take the last crates through the door.",
+          "{B.desc} follows {A} in, a lamp tucked under one arm."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"First night here tonight. No bed yet, just the floor.\"",
+            "Overheard: {B.desc} tells {A}: \"You got the whole place for what you were paying for half.\""
+          ]
+        }
+      ],
+      "effects": {
+        "life": "moved-in",
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.03
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:new-home-settling"
+        ]
+      },
+      "hearsay": {
+        "about": "A",
+        "speakers": [
+          "neighbor",
+          "friend",
+          "landlord",
+          "shopkeeper"
+        ],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} tells {L} that {A.desc} moved in on the weekend. Boxes everywhere, {S} says.",
+          "Overheard: {S} says to {L}: \"New face on our block. {A.desc}. Moved in with a hand cart.\"",
+          "Overheard: {S} says {A.desc} took the empty place last week, and a lamp was the first thing through the door.",
+          "Overheard: {S} mentions to {L} that {A.desc} is the one who moved in by the corner."
+        ],
+        "entry": [
+          "Moved into a place in the district last weekend (overheard: a neighbor, in conversation).",
+          "Moved in with a hand cart, per {S} (overheard, in conversation).",
+          "Took a new home on the block, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "hom.moving-out",
+      "title": "The last crate down the steps",
+      "tier": "notable",
+      "unwatched": true,
+      "note": "Someone moves out. The watcher sees a crate; the rest arrives as past-tense hearsay.",
+      "roles": {
+        "A": {
+          "desc": "an adult carrying their things out",
+          "needs": [
+            "adult",
+            "lives-with-others"
+          ]
+        },
+        "B": {
+          "desc": "a housemate staying behind",
+          "rel": "cohabitant-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          17
+        ],
+        "days": "weekend",
+        "at": [
+          "home-door"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 3000,
+          "city": 24
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "carry",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out of the home door backward, hauling a fat crate.",
+          "{A} leaves the building with a stack of crates and sets them down on the step.",
+          "{A} steps out, a rolled rug over one shoulder."
+        ],
+        "b2": [
+          "{A} loads a hand cart. Another trip, another crate.",
+          "{A} stacks the crates on the cart and ties them down with cord.",
+          "{A} lashes a bag onto the cart and tugs the cord tight."
+        ],
+        "b3": [
+          "{B.desc} stands in the doorway. A few words, a nod, a handshake.",
+          "{A} and {B.desc} stand at the door and speak quietly. {A} takes the cart handle.",
+          "{B.desc} says something short from the step. {A} lifts a hand and turns away."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.plan-stated",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says to {B.desc}: \"I'm out by dark. I'll leave the key under the pot.\"",
+            "Overheard: {A} tells {B.desc}: \"The new place is across the river. Come by when it's set up.\""
+          ]
+        }
+      ],
+      "effects": {
+        "life": "moved-out",
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.02
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:moved-out-recently"
+        ]
+      },
+      "hearsay": {
+        "about": "A",
+        "speakers": [
+          "neighbor",
+          "friend",
+          "landlord",
+          "shopkeeper"
+        ],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} says to {L} that {A.desc} moved out last weekend. Took the cart and everything.",
+          "Overheard: {S} tells {L}: \"You hear {A.desc} cleared out? Left the key under a flowerpot.\"",
+          "Overheard: {S} says {A.desc} is gone from the old block. Not a word of warning, {S} adds.",
+          "Overheard: {S} mentions that {A.desc} moved out and that the housemate stayed."
+        ],
+        "entry": [
+          "Moved out of the old place last weekend (overheard: a neighbor, in conversation).",
+          "Left the block with a hand cart, per {S} (overheard, in conversation).",
+          "Moved out of a shared place, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "hom.spare-key",
+      "title": "A key passed through the door gap",
+      "tier": "texture",
+      "note": "A key handed to someone who does not live there. Plain and slightly intimate; says nothing.",
+      "roles": {
+        "A": {
+          "desc": "an adult at their door",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a visitor collecting a key",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          21
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 200,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "B",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "home-door",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "B",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} stands at the home door, hands tucked into sleeves.",
+          "{B.desc} waits on the step, rocking on {B.his} heels.",
+          "{B.desc} comes up to the door and stands facing it."
+        ],
+        "b2": [
+          "The door slides open. {A} holds out a small key on a loop of string.",
+          "{A} hands {B.desc} a key and says a few words.",
+          "{A} passes a key across the threshold. {B.desc} pockets it."
+        ],
+        "b3": [
+          "{B.desc} turns and leaves the doorway, key in a fist.",
+          "{B.desc} goes down the step and off at a brisk pace.",
+          "{B.desc} heads away from the door, tapping the pocket."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"Just feed the fish. Third shelf, the green tin.\"",
+            "Overheard: {A} tells {B.desc}: \"Back Sunday. Water the plant, ignore the mail.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": [
+          "A+B:has-key"
+        ]
+      }
+    },
+    {
+      "id": "hom.noodle-night-delivery",
+      "title": "Takeout for two at the door",
+      "tier": "mundane",
+      "note": "A weeknight delivery. Housemates share a bag.",
+      "roles": {
+        "A": {
+          "desc": "an adult getting dinner delivered",
+          "needs": [
+            "adult",
+            "lives-with-others"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          18,
+          23
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 8,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "receive-delivery",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "A drone sets a warm paper bag on {A}'s step and chirps once.",
+          "{A} leans out of the door and takes a bag from a hovering drone.",
+          "A delivery drone drops a steaming parcel at {A}'s door and goes straight up.",
+          "{A} taps a handset at the door and a drone lowers a bag into {A.his} hands."
+        ],
+        "b2": [
+          "{A} goes in with the bag held out in front.",
+          "{A} steps inside and the door slides shut.",
+          "{A} enters, sniffing the bag.",
+          "{A} backs through the door, bag held high."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    }
+  ]
+}

@@ -90,10 +90,10 @@ function checkText(id, where, s, kind, roles, beatRoles) {
   // placeholders
   const phs = [...s.matchAll(/\{([^}]*)\}/g)].map(m => m[1]);
   for (const ph of phs) {
-    const m = ph.match(/^([A-F])(?:\.(desc|he|him|his|first|full|rel|nick))?$/);
+    const m = ph.match(/^([A-F])(?:\.(desc|he|him|his|first|full|rel|nick|job|employer|home|age))?$/);
     if (m) {
       if (!roles.has(m[1])) { err(id, `${at} uses {${ph}} but there is no role ${m[1]}`); continue; }
-      if (['first', 'full', 'rel', 'nick'].includes(m[2]) && kind !== 'reveal' && kind !== 'hearsay' && kind !== 'entry') err(id, `${at} uses {${ph}}, which is only valid in reveal, hearsay and entry lines`);
+      if (['first', 'full', 'rel', 'nick', 'job', 'employer', 'home', 'age'].includes(m[2]) && kind !== 'reveal' && kind !== 'hearsay' && kind !== 'entry') err(id, `${at} uses {${ph}}, which is only valid in reveal, hearsay and entry lines`);
       if (kind === 'log' && beatRoles && m[1] !== 'A' && !beatRoles.has(m[1])) err(id, `${at} names role ${m[1]}, which is not in this beat's who/with`);
       continue;
     }

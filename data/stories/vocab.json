@@ -631,8 +631,10 @@
       "desc": "go to a metro station, ride the lift to the platform, board a train",
       "words": [
         "metro",
-        "platform",
-        "train"
+        "train",
+        "boards",
+        "boarded",
+        "boarding"
       ]
     },
     "ride-lift": {
@@ -644,7 +646,7 @@
         "takes the lift",
         "metro lift",
         "lift to",
-        "cab"
+        "rides the cab"
       ]
     },
     "arrive-dropoff": {
@@ -1044,6 +1046,7 @@
     "{A.first}": "first name (only valid in reveal lines, where the name has just been learned)",
     "{A.full}": "full name (only valid in reveal lines)",
     "{A.nick}": "nickname (only valid in reveal lines)",
+    "{A.job} {A.employer} {A.home} {A.age}": "job title, employer, home (as a place descriptor) and age range, only valid in reveal lines",
     "{A.rel}": "the relation just learned, as a word: 'sister' (only valid in reveal lines)",
     "{A.he} {A.him} {A.his}": "pronouns",
     "{place}": "the main place of the beat: 'the noodle stall', 'the north square'",

@@ -1,0 +1,903 @@
+{
+  "category": "routine",
+  "title": "Routine and daily life",
+  "theme": "Commutes, regular meals, the same seat, errands, and the small variations and broken routines where story starts.",
+  "storylets": [
+    {
+      "id": "rtn.morning-commute",
+      "title": "Out the door for the day",
+      "tier": "mundane",
+      "note": "The most common moment in the database. The watcher sees someone start a workday; a badge or lanyard can give a verified job.",
+      "roles": { "A": { "desc": "an employed adult starting the day", "needs": ["adult", "employed"] } },
+      "when": { "hours": [6, 9], "days": "weekday", "at": ["home-door", "street"], "weight": 10, "cooldown": { "person": 18, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "leave", "who": "A", "at": "home-door" },
+        { "id": "b2", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b3", "do": "enter", "who": "A", "at": "work-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out of the home door with a bag over one shoulder. Locks nothing. Pulls the door shut.",
+          "Door opens on {A}, already walking. Early light on the plates.",
+          "{A} steps out, checks the sky once, and starts down the block.",
+          "{A} out of the building. Jacket half on, one arm still searching for the sleeve."
+        ],
+        "b2": [
+          "{A} walks the usual stretch, eyes forward. Crosses on the first signal.",
+          "{A} threads between two stalls setting up and keeps going without a glance at either.",
+          "{A} passes the same three shopfronts at the same pace as the last time.",
+          "{A} takes the corner wide and heads for the work block."
+        ],
+        "b3": [
+          "{A} reaches the work door and goes in. It slides shut.",
+          "{A} arrives, pauses a second at the door, and enters.",
+          "{A} goes in through the work door with a nod to someone just inside.",
+          "{A} badges through the work door. Gone from view."
+        ]
+      },
+      "reveals": [
+        { "fact": "A.job", "beat": "b3", "channel": "document", "chance": 0.3, "log": [
+          "Badge clipped to {A.his} jacket: {A.job}.",
+          "Lanyard at the work door reads: {A.job}."
+        ] },
+        { "fact": "A.employer", "beat": "b3", "channel": "document", "chance": 0.3, "log": [
+          "Name on the work door plate: {A.employer}.",
+          "Sign over the door {A} used: {A.employer}."
+        ] }
+      ]
+    },
+    {
+      "id": "rtn.same-stool",
+      "title": "The usual stool",
+      "tier": "mundane",
+      "note": "The same seat at the same stall. Repeat sightings let the watcher record a verified-looking habit, but it is only seen, so it stays unconfirmed.",
+      "roles": { "A": { "desc": "an adult with a favorite stall", "needs": ["adult", "regular:stall"] } },
+      "when": { "hours": [11, 22], "at": ["stall", "cafe-stool"], "weight": 8, "cooldown": { "person": 20, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "queue-order", "who": "A", "at": "stall" },
+        { "id": "b2", "do": "sit", "who": "A", "at": "cafe-stool" },
+        { "id": "b3", "do": "eat", "who": "A", "at": "cafe-stool" }
+      ],
+      "log": {
+        "b1": [
+          "{A} joins the line at {place}. Orders without opening a menu.",
+          "{A} reaches the counter, holds up two fingers, and gets a bowl in return.",
+          "{A} orders at {place}. The keeper has the lid off before {A} finishes the sentence.",
+          "{A} steps up to {place} and points. One bowl, no changes."
+        ],
+        "b2": [
+          "{A} walks the bowl to the end stool and takes it without testing the others.",
+          "{A} takes the stool nearest the pond, the same one as before.",
+          "{A} sits at the left end of the counter and shifts the stool a hand's width.",
+          "{A} lowers onto the end stool and sets the bowl down square."
+        ],
+        "b3": [
+          "{A} eats steadily, head down. Bowl icon over {A}.",
+          "{A} drinks the broth first, then the rest. Takes {n} minutes in all.",
+          "{A} finishes the bowl, wipes the rim, and sits a minute longer.",
+          "{A} eats slowly and watches the pond."
+        ]
+      },
+      "reveals": [
+        { "fact": "A.regular", "beat": "b2", "channel": "seen", "chance": 0.5, "log": [
+          "Seen at {place} again: visit number {n}. Same stool.",
+          "Same stall, same stool, visit number {n}."
+        ] }
+      ]
+    },
+    {
+      "id": "rtn.lunch-break",
+      "title": "Twenty minutes for lunch",
+      "tier": "mundane",
+      "note": "A worker steps out at midday and eats standing up. Sets nothing; it is texture.",
+      "roles": { "A": { "desc": "an employed adult on a lunch break", "needs": ["adult", "employed"] } },
+      "when": { "hours": [12, 14], "days": "weekday", "at": ["work-door", "stall", "square"], "weight": 8, "cooldown": { "person": 20, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "leave", "who": "A", "at": "work-door" },
+        { "id": "b2", "do": "queue-order", "who": "A", "at": "stall" },
+        { "id": "b3", "do": "eat", "who": "A", "at": "square" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out of the work door at the noon bell, rubbing the back of {A.his} neck.",
+          "{A} leaves the workplace in a hurry. Lanyard still on.",
+          "{A} out of the work door, squinting at the light.",
+          "{A} exits the building and heads straight for the square without stopping."
+        ],
+        "b2": [
+          "{A} joins the stall line. Looks at the clock tower twice. Orders fast.",
+          "{A} reaches the counter and orders something off the board, no questions.",
+          "{A} gets a bowl and a pair of sticks and turns away from the counter.",
+          "{A} waits in line at {place}, reading the same menu as everyone else."
+        ],
+        "b3": [
+          "{A} eats standing at the rail, eyes on the clock tower. Done in under ten minutes.",
+          "{A} wolfs the bowl at a standing spot near the pond, then hands it back at the counter.",
+          "{A} eats on the move, one hand on the bowl, one on a handset.",
+          "{A} stands at a corner of the square with a bowl and finishes it in a few big bites."
+        ]
+      }
+    },
+    {
+      "id": "rtn.kiosk-stop",
+      "title": "A cup on the way",
+      "tier": "mundane",
+      "note": "A habit of a single drink picked up on the walk.",
+      "roles": { "A": { "desc": "an adult heading somewhere", "needs": ["adult", "regular:bar-kiosk"] } },
+      "when": { "hours": [6, 11], "at": ["street", "bar-kiosk"], "weight": 6, "cooldown": { "person": 22, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b2", "do": "queue-order", "who": "A", "at": "bar-kiosk" },
+        { "id": "b3", "do": "walk", "who": "A", "at": "street" }
+      ],
+      "log": {
+        "b1": [
+          "{A} breaks off the usual route and angles toward the kiosk.",
+          "{A} slows at the corner, then veers across to the kiosk.",
+          "{A} swerves to the kiosk without a word to the people alongside."
+        ],
+        "b2": [
+          "{A} orders one cup at the kiosk window and pays with a tap.",
+          "{A} takes a cup from the kiosk and nods once to the person inside.",
+          "{A} gets a cup at the window, no talk, no change counted."
+        ],
+        "b3": [
+          "{A} walks on with the cup in both hands.",
+          "{A} sips twice as {A.he} goes, then holds the cup out at arm's length against the wind.",
+          "{A} resumes the walk, cup held close and steaming."
+        ]
+      }
+    },
+    {
+      "id": "rtn.errand-shop",
+      "title": "In and out of the shop",
+      "tier": "mundane",
+      "note": "A short errand. Only the door and the bag are seen.",
+      "roles": { "A": { "desc": "an adult running an errand", "needs": ["adult"] } },
+      "when": { "hours": [9, 20], "at": ["street", "shop-door"], "weight": 8, "cooldown": { "person": 20, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b2", "do": "enter", "who": "A", "at": "shop-door" },
+        { "id": "b3", "do": "leave", "who": "A", "at": "shop-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks to the shop at the corner. Checks a list on a handset.",
+          "{A} heads for the shop, a cloth bag folded in one hand.",
+          "{A} crosses to the shop door, glancing at a short list written on the back of a hand.",
+          "{A} walks straight to the shopfront, no detour, no looking around."
+        ],
+        "b2": [
+          "{A} goes into the shop. The door slides shut.",
+          "{A} pushes through the shop door.",
+          "{A} enters the shop and the door closes.",
+          "{A} slips in between two shoppers coming out."
+        ],
+        "b3": [
+          "{A} comes out of the shop with a loaded bag and a second one.",
+          "{A} emerges with a paper sack and a single stalk of something green sticking out of it.",
+          "{A} leaves the shop, bag swinging, the list crumpled in a fist.",
+          "{A} steps out of the shop with one small bag and heads back the way {A.he} came."
+        ]
+      }
+    },
+    {
+      "id": "rtn.walk-home",
+      "title": "The walk back",
+      "tier": "mundane",
+      "note": "The end-of-day mirror of the commute. Most lives show this daily.",
+      "roles": { "A": { "desc": "an adult walking home", "needs": ["adult"] } },
+      "when": { "hours": [16, 22], "at": ["street", "home-door"], "weight": 9, "cooldown": { "person": 20, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b2", "do": "enter", "who": "A", "at": "home-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks home with the bag on the other shoulder this time. Slow.",
+          "{A} drifts along the block at the speed of the crowd, not ahead, not behind.",
+          "{A} walks the last two blocks without looking at the shops.",
+          "{A} follows the usual line home, stepping around the usual puddle."
+        ],
+        "b2": [
+          "{A} reaches the home door and goes in. It slides shut.",
+          "{A} stops at the step, finds the key, and goes in.",
+          "{A} opens the home door and enters in one motion.",
+          "{A} goes in and the door closes on the street noise."
+        ]
+      }
+    },
+    {
+      "id": "rtn.takes-longer-route",
+      "title": "The long way round",
+      "tier": "texture",
+      "note": "A small deviation: someone turns off the usual route. It may become a new habit (rtn.new-stall-found) or fizzle.",
+      "roles": { "A": { "desc": "an adult on a regular route", "needs": ["adult"] } },
+      "when": { "hours": [8, 20], "at": ["street"], "weight": 4, "cooldown": { "person": 120, "city": 2 } },
+      "beats": [
+        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b2", "do": "stand", "who": "A", "at": "street" },
+        { "id": "b3", "do": "walk", "who": "A", "at": "street" }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks to the corner where the usual left turn is and goes right instead.",
+          "{A} passes the usual crossing and keeps going straight.",
+          "{A} turns down a side street {A.he} has not used on the way home before."
+        ],
+        "b2": [
+          "{A} stops at a stall {A.he} has never visited and reads the board. Hands in pockets.",
+          "{A} lingers in front of a window with a lit display, head tilted.",
+          "{A} stands at a crossing with no hurry, watching a courier go by."
+        ],
+        "b3": [
+          "{A} rejoins the usual route two blocks on.",
+          "{A} walks on, a little slower than before.",
+          "{A} picks the old way up again and does not look back."
+        ]
+      },
+      "next": { "sets": ["A:tried-new-route"], "branches": [
+        { "w": 40, "sets": ["A:liked-new-route"], "label": "the new way becomes a habit" },
+        { "w": 60, "sets": [], "label": "never taken again", "fizzle": true }
+      ] }
+    },
+    {
+      "id": "rtn.new-stall-found",
+      "title": "A new counter",
+      "tier": "texture",
+      "note": "Follow-up to rtn.takes-longer-route: a new regular stall.",
+      "roles": {
+        "A": { "desc": "an adult who changed a habit", "needs": ["adult"] },
+        "B": { "desc": "the stall keeper A has just started to know", "rel": "shopkeeper-of:A" }
+      },
+      "when": { "hours": [11, 22], "at": ["stall"], "requires": ["A:liked-new-route"], "weight": 5, "cooldown": { "person": 200, "city": 2 } },
+      "beats": [
+        { "id": "b1", "do": "queue-order", "who": "A", "with": ["B"], "at": "stall" },
+        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "stall" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes back to the same counter as before. {B.desc} looks up and nods.",
+          "{A} reaches the counter. {B.desc} is already reaching for the bowl.",
+          "{A} orders at the counter. {B.desc} repeats the order back from last time."
+        ],
+        "b2": [
+          "{A} and {B.desc} talk across the counter, {B.desc} wiping down as {B.he} speaks.",
+          "{B.desc} says something and {A} laughs. Note bubble over {A}.",
+          "{A} leans on the counter and listens to {B.desc} tell a story."
+        ]
+      },
+      "reveals": [
+        { "fact": "B.first-name", "beat": "b2", "channel": "conversation", "chance": 0.4, "log": [
+          "Overheard: {A} calls the keeper \"{B.first}\".",
+          "Overheard: {B.desc} says \"My name is {B.first}\" and offers {A} a refill."
+        ] }
+      ]
+    },
+    {
+      "id": "rtn.skipped-usual-stall",
+      "title": "A line too long",
+      "tier": "texture",
+      "note": "A small broken routine: A turns away from the stall. The keeper notices on the next visit (rtn.keeper-asks).",
+      "roles": { "A": { "desc": "an adult with a regular stall", "needs": ["adult", "regular:stall"] } },
+      "when": { "hours": [12, 21], "at": ["stall"], "weight": 5, "cooldown": { "person": 90, "city": 2 } },
+      "beats": [
+        { "id": "b1", "do": "walk", "who": "A", "at": "stall" },
+        { "id": "b2", "do": "queue-order", "who": "A", "at": "stall" },
+        { "id": "b3", "do": "shrug", "who": "A", "at": "stall" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes into the square at a brisk pace, eyes on the usual stall.",
+          "{A} crosses toward {place} and slows as the line comes into view.",
+          "{A} heads for the stall and stops short, eyes on the queue."
+        ],
+        "b2": [
+          "{A} stands at the tail of a long line. Counts heads. Shuffles forward once.",
+          "{A} waits in line for a minute and a half. Looks at the clock tower.",
+          "{A} joins the end of the line and checks a handset twice."
+        ],
+        "b3": [
+          "{A} shakes {A.his} head, steps out of the line, and walks off.",
+          "{A} shrugs, turns around and leaves without ordering.",
+          "{A} gives the line a long look, then walks away toward another stall."
+        ]
+      },
+      "next": { "sets": ["A:skipped-stall"] }
+    },
+    {
+      "id": "rtn.keeper-asks",
+      "title": "Missed you Tuesday",
+      "tier": "texture",
+      "note": "The keeper remarks on the missed visit, a small kindness. Sets a mild warmth increase.",
+      "roles": {
+        "A": { "desc": "an adult with a regular stall", "needs": ["adult", "regular:stall"] },
+        "B": { "desc": "the keeper of that stall", "rel": "shopkeeper-of:A" }
+      },
+      "when": { "hours": [11, 22], "at": ["stall"], "requires": ["A:skipped-stall"], "weight": 6, "cooldown": { "person": 160, "city": 2 } },
+      "beats": [
+        { "id": "b1", "do": "queue-order", "who": "A", "with": ["B"], "at": "stall" },
+        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "stall" }
+      ],
+      "log": {
+        "b1": [
+          "{A} reaches the counter. {B.desc} sets a bowl down before {A} speaks.",
+          "{B.desc} pushes {A}'s usual across the counter without being asked.",
+          "{A} steps up and {B.desc} points a ladle at {A} in mock accusation."
+        ],
+        "b2": [
+          "{B.desc} talks at length, one hand on the counter. {A} grins and shrugs.",
+          "{A} answers in short bursts. {B.desc} laughs and waves {A} on.",
+          "{B.desc} leans over the counter and says something short. {A} puts a hand to {A.his} chest."
+        ]
+      },
+      "reveals": [
+        { "fact": "B.relation-to-A", "beat": "b2", "channel": "conversation", "chance": 0.7, "log": [
+          "Overheard: {B.desc} says: \"Missed you Tuesday. The bowl went cold on the shelf.\"",
+          "Overheard: {B.desc} says: \"Third regular I lost to the long line this week. Do not make it four.\""
+        ] }
+      ],
+      "effects": { "warmth": [["A", "B", 0.05]] }
+    },
+    {
+      "id": "rtn.sits-elsewhere",
+      "title": "Not the usual seat",
+      "tier": "texture",
+      "note": "A sits somewhere new. A little off-pattern; may be nothing.",
+      "roles": { "A": { "desc": "an adult with a regular seat", "needs": ["adult", "regular:bench"] } },
+      "when": { "hours": [10, 22], "at": ["bench", "square"], "weight": 4, "cooldown": { "person": 100, "city": 2 } },
+      "beats": [
+        { "id": "b1", "do": "walk", "who": "A", "at": "bench" },
+        { "id": "b2", "do": "stand", "who": "A", "at": "bench" },
+        { "id": "b3", "do": "sit", "who": "A", "at": "bench" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes along the path toward the usual bench and slows.",
+          "{A} approaches a bench and stops one step short of it.",
+          "{A} walks to the bench and keeps going, passing it by."
+        ],
+        "b2": [
+          "{A} stands between two benches. Looks at one, then the other.",
+          "{A} stays standing for a count of ten with a hand on the back of a bench.",
+          "{A} shifts weight foot to foot beside the bench."
+        ],
+        "b3": [
+          "{A} sits on the far bench, facing a different direction than before.",
+          "{A} lowers onto a bench on the other side of the path. Turns {A.his} shoulders away from the street.",
+          "{A} takes the seat farthest from the lamp and stays there."
+        ]
+      }
+    },
+    {
+      "id": "rtn.late-for-work",
+      "title": "Running late",
+      "tier": "texture",
+      "note": "A run, a sweat bubble, and a door. Work trouble pressure goes up a hair.",
+      "roles": { "A": { "desc": "an employed adult running late", "needs": ["adult", "employed", "impulsive"] } },
+      "when": { "hours": [7, 10], "days": "weekday", "at": ["street", "work-door"], "weight": 4, "cooldown": { "person": 120, "city": 2 }, "temper": { "careful": -0.6 } },
+      "beats": [
+        { "id": "b1", "do": "leave", "who": "A", "at": "home-door" },
+        { "id": "b2", "do": "run", "who": "A", "at": "street" },
+        { "id": "b3", "do": "enter", "who": "A", "at": "work-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} bursts out of the home door, one shoe not yet laced.",
+          "Door slides open fast. {A} out, jacket in a fist.",
+          "{A} comes out at a half jog, the door still sliding shut behind."
+        ],
+        "b2": [
+          "{A} runs the block. Sweat drop over {A}. Dodges a courier on the corner.",
+          "{A} sprints for the crossing and makes the signal with a second to spare.",
+          "{A} runs flat out, bag banging on one hip, and does not slow for the corner."
+        ],
+        "b3": [
+          "{A} slams into the work door, goes in, and the door closes on a gasp.",
+          "{A} reaches the work door, bends double, straightens and goes in.",
+          "{A} pulls up at the work door, smooths {A.his} hair with both hands, and enters."
+        ]
+      },
+      "effects": { "pressure": [["A", "work-trouble", 0.05]] }
+    },
+    {
+      "id": "rtn.forgot-something",
+      "title": "Turned back at the corner",
+      "tier": "texture",
+      "note": "A tiny mistake. The watcher sees a turn, a door, and the same walk again.",
+      "roles": { "A": { "desc": "an adult who forgot something", "needs": ["adult"] } },
+      "when": { "hours": [6, 21], "at": ["street", "home-door"], "weight": 5, "cooldown": { "person": 120, "city": 1 } },
+      "beats": [
+        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b2", "do": "stand", "who": "A", "at": "street" },
+        { "id": "b3", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b4", "do": "enter", "who": "A", "at": "home-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks to the corner with a steady stride.",
+          "{A} leaves the building behind at an ordinary pace, bag on one arm.",
+          "{A} walks half a block, pace unchanged."
+        ],
+        "b2": [
+          "{A} stops dead at the crossing and pats every pocket. Then the bag. Then the pockets again.",
+          "{A} halts mid-block and stares at nothing for a moment. Bang bubble over {A}.",
+          "{A} pulls up, slaps {A.his} forehead, and turns around."
+        ],
+        "b3": [
+          "{A} hurries back the way {A.he} came, taking big strides.",
+          "{A} walks fast back toward the building, talking to no one.",
+          "{A} retraces the block at nearly a run."
+        ],
+        "b4": [
+          "{A} goes back in through the home door. It slides shut.",
+          "{A} unlocks the home door and goes in again.",
+          "{A} ducks in through the home door."
+        ]
+      }
+    },
+    {
+      "id": "rtn.platform-wait",
+      "title": "On the platform",
+      "tier": "mundane",
+      "note": "A metro wait. Only the platform is seen.",
+      "roles": { "A": { "desc": "an adult riding the metro", "needs": ["adult", "regular:metro"] } },
+      "when": { "hours": [6, 23], "at": ["metro-station", "platform"], "weight": 6, "cooldown": { "person": 20, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "ride-lift", "who": "A", "at": "metro-station" },
+        { "id": "b2", "do": "stand", "who": "A", "at": "platform" },
+        { "id": "b3", "do": "ride-metro", "who": "A", "at": "platform" }
+      ],
+      "log": {
+        "b1": [
+          "{A} steps into the station lift and rides it up to the platform.",
+          "{A} takes the lift up. Stands at the back of the cab, eyes on the floor.",
+          "{A} rides the lift to the platform with a handful of others."
+        ],
+        "b2": [
+          "{A} stands at the edge of the platform, one foot over the yellow line, then back.",
+          "{A} waits at the platform with a handset held at chest height.",
+          "{A} leans on a pillar and watches the track curve away."
+        ],
+        "b3": [
+          "A train pulls in. {A} steps aboard and the doors close.",
+          "{A} boards the next train.",
+          "The train arrives. {A} gets on and takes a standing spot by the door."
+        ]
+      }
+    },
+    {
+      "id": "rtn.bench-rest",
+      "title": "Bags down on the bench",
+      "tier": "mundane",
+      "note": "Setting down shopping to rest for a while.",
+      "roles": { "A": { "desc": "an adult carrying shopping", "needs": ["adult"] } },
+      "when": { "hours": [10, 19], "at": ["bench", "street"], "weight": 6, "cooldown": { "person": 40, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "carry", "who": "A", "at": "street" },
+        { "id": "b2", "do": "sit", "who": "A", "at": "bench" }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks with a bag in each hand, shoulders hunched. Stops when a bench comes into view.",
+          "{A} carries three bags along the walk and shifts the heaviest from hand to hand.",
+          "{A} lugs a bag of produce down the block, blowing out a breath."
+        ],
+        "b2": [
+          "{A} sits on the bench and sets the bags down in a row beside {A.him}.",
+          "{A} drops onto the bench, bags between {A.his} feet, and tips {A.his} head back.",
+          "{A} sits and rubs both hands, red from the straps, for a few minutes."
+        ]
+      }
+    },
+    {
+      "id": "rtn.takes-second-home",
+      "title": "Two cups, one drunk",
+      "tier": "texture",
+      "note": "A tiny question mark: someone buys a second cup and carries it home. Left open deliberately: there is no reveal and no follow-up.",
+      "roles": { "A": { "desc": "an adult buying food on the way home", "needs": ["adult"] } },
+      "when": { "hours": [18, 24], "at": ["stall", "street", "home-door"], "weight": 4, "cooldown": { "person": 100, "city": 2 } },
+      "beats": [
+        { "id": "b1", "do": "queue-order", "who": "A", "at": "stall" },
+        { "id": "b2", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b3", "do": "enter", "who": "A", "at": "home-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} orders two cups at the noodle stall. Pays for both.",
+          "{A} asks the keeper for two of the same and holds up two fingers.",
+          "{A} walks away from the counter with a cup in each hand."
+        ],
+        "b2": [
+          "{A} drinks one cup on the walk. The second stays full.",
+          "{A} sips from one cup and carries the other level, never spilling it.",
+          "{A} walks home with one cup finished and the second held away from the body."
+        ],
+        "b3": [
+          "{A} reaches the home door with the second cup still full and goes in.",
+          "{A} gets the door open with an elbow and goes in, one cup still in hand.",
+          "{A} enters the home door. The second cup goes in with {A.him}."
+        ]
+      }
+    },
+    {
+      "id": "rtn.crossing-nod",
+      "title": "The same face at the crossing",
+      "tier": "mundane",
+      "note": "Two strangers who share a commute begin to nod. Chain: rtn.nod-becomes-hello.",
+      "roles": {
+        "A": { "desc": "an adult with a fixed commute", "needs": ["adult"] },
+        "B": { "desc": "another commuter at the same crossing", "rel": "stranger-to:A" }
+      },
+      "when": { "hours": [6, 9], "days": "weekday", "at": ["street"], "weight": 6, "cooldown": { "person": 200, "city": 2 } },
+      "beats": [
+        { "id": "b1", "do": "stand", "who": "A", "with": ["B"], "at": "street" },
+        { "id": "b2", "do": "wave", "who": "A", "with": ["B"], "at": "street" }
+      ],
+      "log": {
+        "b1": [
+          "{A} waits at the crossing signal. {B.desc} stops two steps away. Neither speaks.",
+          "{A} and {B.desc} stand at the same corner for the red light, each looking at the signal.",
+          "At the crossing, {A} and {B.desc} stand side by side, strangers, eyes front."
+        ],
+        "b2": [
+          "{A} gives {B.desc} a short nod. {B.desc} nods back. Light changes. They cross apart.",
+          "{B.desc} lifts two fingers to {A}. {A} lifts two back.",
+          "A half wave from {B.desc}. {A} answers with the same half wave."
+        ]
+      },
+      "next": { "sets": ["A+B:nodding-acquaintances"] }
+    },
+    {
+      "id": "rtn.nod-becomes-hello",
+      "title": "A word at the crossing",
+      "tier": "texture",
+      "note": "Follow-up: the nod turns into a few words. Sets a chain into the friendship category.",
+      "roles": {
+        "A": { "desc": "an adult with a fixed commute", "needs": ["adult"] },
+        "B": { "desc": "the person A nods to every morning", "rel": "acquaintance-of:A" }
+      },
+      "when": { "hours": [6, 9], "days": "weekday", "at": ["street"], "requires": ["A+B:nodding-acquaintances"], "weight": 5, "cooldown": { "person": 200, "city": 2 } },
+      "beats": [
+        { "id": "b1", "do": "stand", "who": "A", "with": ["B"], "at": "street" },
+        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "street" },
+        { "id": "b3", "do": "walk-together", "who": ["A", "B"], "at": "street" }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} meet at the same corner and the same red light. This time {B.desc} speaks first.",
+          "{B.desc} turns to {A} at the signal and says something short.",
+          "At the corner, {A} and {B.desc} stand closer than before. {A} looks over."
+        ],
+        "b2": [
+          "{A} and {B.desc} talk for the length of the light. {B.desc} points at the clock tower. {A} nods.",
+          "A few lines between {A} and {B.desc}. Laughter. A nod each.",
+          "{A} answers a question. {B.desc} laughs and shakes {B.his} head. The light turns."
+        ],
+        "b3": [
+          "{A} and {B.desc} cross together, still talking.",
+          "They walk the next block side by side before splitting off.",
+          "{A} and {B.desc} stay together until the next corner, then part with a wave."
+        ]
+      },
+      "reveals": [
+        { "fact": "B.first-name", "beat": "b2", "channel": "conversation", "chance": 0.7, "log": [
+          "Overheard: {A} says \"I'm {A.first}\" and {B.desc} answers \"{B.first}.\"",
+          "Overheard: {B.desc} says \"{B.first}, by the way\" to {A}."
+        ] },
+        { "fact": "A.first-name", "beat": "b2", "channel": "conversation", "chance": 0.6, "log": [
+          "Overheard: {B.desc} says \"{A.first}, right?\" and {A} nods.",
+          "Overheard: the name {A.first} comes up between {A} and {B.desc}."
+        ] }
+      ],
+      "next": { "sets": ["A+B:say-hello"] }
+    },
+    {
+      "id": "rtn.shop-regular-greeting",
+      "title": "Known at the counter",
+      "tier": "mundane",
+      "note": "A shopkeeper greets a regular by name. Subtle: gives no names, just warmth.",
+      "roles": {
+        "A": { "desc": "a regular customer", "needs": ["adult"] },
+        "B": { "desc": "a shopkeeper", "rel": "shopkeeper-of:A" }
+      },
+      "when": { "hours": [9, 19], "at": ["shop-door"], "weight": 5, "cooldown": { "person": 30, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "enter", "who": "A", "at": "shop-door" },
+        { "id": "b2", "do": "leave", "who": "A", "at": "shop-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} goes into the shop, and a wave goes up behind the door glass.",
+          "{A} enters the shop. Inside, a hand lifts in greeting.",
+          "{A} pushes through the shop door as someone inside calls out a hello."
+        ],
+        "b2": [
+          "{A} comes out with a small bag and a free sample in the other hand. The shopkeeper waves from inside.",
+          "{A} leaves the shop, grinning, tucking something into a pocket.",
+          "{A} exits and holds up the bag toward the window. A hand waves back."
+        ]
+      }
+    },
+    {
+      "id": "rtn.weekly-parcel",
+      "title": "The weekly drop",
+      "tier": "mundane",
+      "note": "A recurring drone delivery. Verified names and addresses come from labels.",
+      "roles": { "A": { "desc": "an adult who orders regularly", "needs": ["adult"] } },
+      "when": { "hours": [9, 20], "at": ["home-door"], "weight": 6, "cooldown": { "person": 80, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "receive-delivery", "who": "A", "at": "home-door" },
+        { "id": "b2", "do": "enter", "who": "A", "at": "home-door" }
+      ],
+      "log": {
+        "b1": [
+          "Drone settles at the step and drops the parcel. {A} is there to take it.",
+          "Delivery drone dips over the doorstep. {A} stoops for the parcel before it lifts away.",
+          "A drone at the step. Parcel down. {A} signs for it on a handheld with a thumb."
+        ],
+        "b2": [
+          "{A} takes the parcel in and the door closes.",
+          "{A} carries the parcel inside, humming.",
+          "Parcel under one arm, {A} goes in."
+        ]
+      },
+      "reveals": [
+        { "fact": "A.full-name", "beat": "b1", "channel": "document", "chance": 0.5, "log": [
+          "Label on the parcel: {A.full}.",
+          "Delivery label reads {A.full} and the door number."
+        ] },
+        { "fact": "A.home", "beat": "b1", "channel": "document", "chance": 0.4, "log": [
+          "Label gives the address: {A.home}.",
+          "Address on the parcel matches the door: {A.home}."
+        ] }
+      ]
+    },
+    {
+      "id": "rtn.evening-lap",
+      "title": "Round the block twice",
+      "tier": "texture",
+      "note": "An evening walk with no destination. Pure observation.",
+      "roles": { "A": { "desc": "an adult out for a walk", "needs": ["adult"] } },
+      "when": { "hours": [19, 23], "at": ["street"], "weight": 4, "cooldown": { "person": 80, "city": 1 } },
+      "beats": [
+        { "id": "b1", "do": "leave", "who": "A", "at": "home-door" },
+        { "id": "b2", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b3", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b4", "do": "enter", "who": "A", "at": "home-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out in slippers and a long coat. Looks up and down the street and starts walking.",
+          "{A} out of the home door with nothing in hand. No bag, no handset.",
+          "{A} leaves the building and heads out at a loose pace."
+        ],
+        "b2": [
+          "{A} walks to the corner, turns, passes the same lamp twice.",
+          "{A} circles the block once, hands behind {A.his} back.",
+          "{A} walks the long way round the plot and glances up at the lit windows."
+        ],
+        "b3": [
+          "{A} starts a second lap, slower this time.",
+          "{A} goes round again. The coat swings.",
+          "{A} passes the same corner again. A courier gives {A.him} a look."
+        ],
+        "b4": [
+          "{A} goes back in at the home door. The door slides shut.",
+          "{A} stops at the step, looks up at the windows, then goes in.",
+          "{A} returns to the door and enters after a last glance at the sky."
+        ]
+      }
+    },
+    {
+      "id": "rtn.walks-from-earlier-stop",
+      "title": "One stop early",
+      "tier": "texture",
+      "note": "A rider gets off a stop before the usual one and walks.",
+      "roles": { "A": { "desc": "an adult who rides the metro", "needs": ["adult", "regular:metro"] } },
+      "when": { "hours": [16, 22], "at": ["metro-station", "street"], "weight": 4, "cooldown": { "person": 120, "city": 2 } },
+      "beats": [
+        { "id": "b1", "do": "ride-metro", "who": "A", "at": "metro-station" },
+        { "id": "b2", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b3", "do": "stand", "who": "A", "at": "street" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes off the train a station before the usual one. The lift takes {A.him} down.",
+          "{A} steps off at an earlier station than usual and rides down to street level.",
+          "{A} gets off one stop early and hurries through the barriers."
+        ],
+        "b2": [
+          "{A} walks the long stretch home through streets {A.he} rarely uses.",
+          "{A} sets off on foot, taking the unfamiliar side of the road.",
+          "{A} crosses the district at an easy pace, looking up at signs."
+        ],
+        "b3": [
+          "{A} stops at a window with hands in pockets, watching a vendor stack bowls.",
+          "{A} leans on a railing for a few minutes watching the traffic overhead.",
+          "{A} pauses at a corner kiosk, buys nothing, and moves on."
+        ]
+      }
+    },
+    {
+      "id": "rtn.slow-sunday",
+      "title": "A late start on the weekend",
+      "tier": "mundane",
+      "note": "Weekend mornings are slower: a late exit, a cup, a bench.",
+      "roles": { "A": { "desc": "an adult on a day off", "needs": ["adult"] } },
+      "when": { "hours": [9, 13], "days": "weekend", "at": ["home-door", "bar-kiosk", "bench"], "weight": 7, "cooldown": { "person": 20, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "leave", "who": "A", "at": "home-door" },
+        { "id": "b2", "do": "queue-order", "who": "A", "at": "bar-kiosk" },
+        { "id": "b3", "do": "sit", "who": "A", "at": "bench" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out late, hair uncombed, eyes half shut against the light.",
+          "{A} drifts out of the home door in loose clothes and slow steps.",
+          "{A} steps out, yawns, and stands on the step for a while."
+        ],
+        "b2": [
+          "{A} gets a hot cup at the kiosk. No rush in the order.",
+          "{A} orders at the kiosk, waits, and takes the cup in both hands.",
+          "{A} stops at the kiosk window for a cup and pays slowly."
+        ],
+        "b3": [
+          "{A} finds a bench in the sun and sits with the cup, legs stretched out.",
+          "{A} sits on a bench, closes both eyes, and tips {A.his} face up.",
+          "{A} settles on a bench and watches the first crowds drift by."
+        ]
+      }
+    },
+    {
+      "id": "rtn.keeper-opens",
+      "title": "First bowl of the day",
+      "tier": "mundane",
+      "note": "A stall keeper opens the counter. Stall keepers are always behind the counter in the game, so the keeper's day is visible.",
+      "roles": { "A": { "desc": "a stall keeper starting a shift", "needs": ["adult", "stall-keeper"] } },
+      "when": { "hours": [9, 11], "at": ["stall"], "weight": 6, "cooldown": { "person": 20, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "walk", "who": "A", "at": "square" },
+        { "id": "b2", "do": "serve", "who": "A", "at": "stall" }
+      ],
+      "log": {
+        "b1": [
+          "{A} crosses the empty square toward a shuttered counter, a bundle of cloths under one arm.",
+          "{A} walks to the stall at an easy pace and ducks under the counter flap.",
+          "{A} heads across the square at first light and unlocks the counter."
+        ],
+        "b2": [
+          "{A} lifts the shutter and sets out the first pot. Steam rises.",
+          "{A} wipes the counter, sets out bowls, and serves the first customer without a word.",
+          "{A} stacks bowls, lights the burner and takes the first order from a patient early riser."
+        ]
+      },
+      "reveals": [
+        { "fact": "A.job", "beat": "b2", "channel": "seen", "chance": 0.7, "log": [
+          "Seen behind the counter of {place}. Handles the pots like {A.he} owns them.",
+          "Behind the counter at {place}, serving. Apron on."
+        ] }
+      ]
+    },
+    {
+      "id": "rtn.keeper-closes",
+      "title": "Wiping down at midnight",
+      "tier": "mundane",
+      "note": "The close of a stall keeper's night.",
+      "roles": { "A": { "desc": "a stall keeper ending a shift", "needs": ["adult", "stall-keeper"] } },
+      "when": { "hours": [23, 24], "at": ["stall"], "weight": 5, "cooldown": { "person": 20, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "serve", "who": "A", "at": "stall" },
+        { "id": "b2", "do": "leave", "who": "A", "at": "stall" },
+        { "id": "b3", "do": "walk", "who": "A", "at": "street" }
+      ],
+      "log": {
+        "b1": [
+          "{A} wipes the counter in slow circles. Last customer gone.",
+          "{A} stacks the bowls, tips the pot, and hangs the ladle on its hook.",
+          "{A} pulls the shutter halfway down while still scrubbing the near end of the counter."
+        ],
+        "b2": [
+          "{A} ducks out from under the counter and pulls the shutter the rest of the way.",
+          "{A} locks up and steps out from the counter with a bag of scraps.",
+          "{A} switches off the stall light and walks out from behind the counter."
+        ],
+        "b3": [
+          "{A} walks off through the empty square, shoulders low.",
+          "{A} crosses the dark plaza toward home with a long, slow stride.",
+          "{A} heads for home across the dark plaza."
+        ]
+      }
+    },
+    {
+      "id": "rtn.night-shift-out",
+      "title": "Out for the night shift",
+      "tier": "mundane",
+      "note": "A night worker heads out as the city turns over.",
+      "roles": { "A": { "desc": "an adult starting a night shift", "needs": ["adult", "night-worker"] } },
+      "when": { "hours": [19, 23], "at": ["home-door", "street", "work-door"], "weight": 6, "cooldown": { "person": 20, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "leave", "who": "A", "at": "home-door" },
+        { "id": "b2", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b3", "do": "enter", "who": "A", "at": "work-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out as the lamps come on. Thermos in one hand, jacket in the other.",
+          "{A} leaves the home door at dusk and zips up the jacket.",
+          "{A} steps out into the evening crowd going the opposite way."
+        ],
+        "b2": [
+          "{A} walks against the flow of people heading home.",
+          "{A} crosses the street under a flickering lamp, thermos tucked under one arm.",
+          "{A} walks the same dark block as the night before, hood up."
+        ],
+        "b3": [
+          "{A} reaches the work door and goes in. The door slides shut.",
+          "{A} arrives, greets the guard with a nod, and enters.",
+          "{A} slips through the work door and is gone from view."
+        ]
+      }
+    },
+    {
+      "id": "rtn.same-bench-evening",
+      "title": "The bench at seven",
+      "tier": "mundane",
+      "note": "Same bench, same hour, a long sit. Repeat sightings give a regular.",
+      "roles": { "A": { "desc": "an adult with a favorite bench", "needs": ["adult", "regular:bench"] } },
+      "when": { "hours": [17, 21], "at": ["bench"], "weight": 6, "cooldown": { "person": 20, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "walk", "who": "A", "at": "bench" },
+        { "id": "b2", "do": "sit", "who": "A", "at": "bench" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes down the path to the bench by the lamp without checking the others.",
+          "{A} walks to the same bench and brushes the seat with a sleeve.",
+          "{A} reaches the bench in the evening light, a paper bag in one hand."
+        ],
+        "b2": [
+          "{A} sits and stays seated for {n} minutes, watching the street go by.",
+          "{A} sits with feet flat and hands in lap, and does not move until the lamp comes on.",
+          "{A} settles into the bench and watches nothing in particular."
+        ]
+      },
+      "reveals": [
+        { "fact": "A.regular", "beat": "b2", "channel": "seen", "chance": 0.5, "log": [
+          "This bench again, visit number {n}.",
+          "Same bench, same hour. Visit number {n}."
+        ] }
+      ]
+    },
+    {
+      "id": "rtn.takes-the-lift-up",
+      "title": "Up to the deck",
+      "tier": "texture",
+      "note": "A short trip up a lift to a terrace or deck, to sit and look at the city.",
+      "roles": { "A": { "desc": "an adult with a quiet habit", "needs": ["adult"] } },
+      "when": { "hours": [16, 22], "at": ["lift-base"], "weight": 3, "cooldown": { "person": 120, "city": 2 } },
+      "beats": [
+        { "id": "b1", "do": "walk", "who": "A", "at": "lift-base" },
+        { "id": "b2", "do": "ride-lift", "who": "A", "at": "lift-base" },
+        { "id": "b3", "do": "ride-lift", "who": "A", "at": "lift-base" }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks to the lift at the base of a tall block and presses the call plate.",
+          "{A} stops at the lift and waits for the cab, rocking on {A.his} heels.",
+          "{A} reaches the lift base with a thermos and a folded blanket."
+        ],
+        "b2": [
+          "{A} steps into the cab and the cab rises out of view.",
+          "The lift closes on {A}. The cab climbs.",
+          "{A} rides the lift up, alone in the cab."
+        ],
+        "b3": [
+          "The lift returns to street level. {A} steps out, hair blown flat.",
+          "{A} comes back down in the lift, cheeks red, thermos empty.",
+          "{A} rides the cab down and steps out into the street light, blinking."
+        ]
+      }
+    }
+  ]
+}

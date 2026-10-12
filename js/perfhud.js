@@ -53,8 +53,9 @@ const PH = (() => {
   // a trace: every frame's laps and passes, by name, with the processor time of each, kept in a list while PH.traceStart() has been called
   // (tools/perf/turn_check.py: what the slow frames of a turn were doing). Only while the overlay is on.
   let TR = null, trF = null;
-  function traceStart(){ TR = []; trF = null; }
-  function traceStop(){ collect(); const t = TR; TR = null; trF = null; return t; }   // (the card's times arrive a few frames late: the last frames' may be missing)
+  // (while a trace runs the overlay is out of the way: it takes no pointer events and is not drawn, so a scripted drag lands on the city, not on it)
+  function traceStart(){ TR = []; trF = null; if (el){ el.style.pointerEvents = 'none'; el.style.visibility = 'hidden'; } }
+  function traceStop(){ collect(); const t = TR; TR = null; trF = null; if (el){ el.style.pointerEvents = 'auto'; el.style.visibility = ''; } return t; }   // (the card's times arrive a few frames late: the last frames' may be missing)
   const trPut = (name, ms) => { if (trF) trF.laps.push([name, Math.round(ms*100)/100]); };
   // work outside the frame (an input handler): noted against the frame being traced, under its own name
   function outside(name, ms){ if (on && TR) trPut('outside the frame: ' + name, ms); }

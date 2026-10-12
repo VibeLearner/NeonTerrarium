@@ -62,7 +62,7 @@ DRAG_START = '''(whole) => { PH.tests.wholeAfterTurn = whole; if (!PH.on) PH.tog
   requestAnimationFrame(f); }'''
 def drag_turn(pg, whole):
     pg.evaluate(DRAG_START, whole)
-    cx, cy = a.width*.5, a.height*.22   # (near the top: sky, so the drag turns the view and never paints)
+    cx, cy = a.width*.62, a.height*.18   # (near the top, right of the middle: sky, clear of the overlay and the speed bar, so the drag turns the view and never paints)
     pg.mouse.move(cx, cy); pg.mouse.down()
     for k in range(1, 9): pg.mouse.move(cx - k*12, cy, steps=1); pg.wait_for_timeout(16)
     for k in range(1, 5): pg.mouse.move(cx - 96 - k*45, cy, steps=1); pg.wait_for_timeout(8)   # (a quick flick at the end: the view lags behind and flings on)

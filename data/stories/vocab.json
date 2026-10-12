@@ -1,0 +1,1284 @@
+{
+  "_about": "The shared vocabulary of the story database. validate.js reads this file; SCHEMA.md explains it. Add to it deliberately: every action, channel, fact and flag a storylet uses must be listed here.",
+  "tiers": [
+    "mundane",
+    "texture",
+    "notable",
+    "dramatic"
+  ],
+  "lifeTiers": [
+    "quiet",
+    "textured",
+    "eventful"
+  ],
+  "lifeTierShare": {
+    "quiet": 0.6,
+    "textured": 0.3,
+    "eventful": 0.1
+  },
+  "defaultLifeTiers": {
+    "mundane": [
+      "quiet",
+      "textured",
+      "eventful"
+    ],
+    "texture": [
+      "quiet",
+      "textured",
+      "eventful"
+    ],
+    "notable": [
+      "textured",
+      "eventful"
+    ],
+    "dramatic": [
+      "eventful"
+    ]
+  },
+  "categories": [
+    {
+      "id": "routine",
+      "prefix": "rtn",
+      "title": "Routine and daily life",
+      "theme": "Commutes, regular meals, the same seat, errands, and the small variations and broken routines where story starts."
+    },
+    {
+      "id": "work",
+      "prefix": "wrk",
+      "title": "Work and money",
+      "theme": "Shifts, a bad day, overtime, side gigs, debts, payday, and the job that ends or begins."
+    },
+    {
+      "id": "home",
+      "prefix": "hom",
+      "title": "Home and household",
+      "theme": "Cohabitants, chores, a lockout, a broken appliance, a landlord, and moving things in or out."
+    },
+    {
+      "id": "family",
+      "prefix": "fam",
+      "title": "Family",
+      "theme": "Siblings, parents visiting, a family dinner, a disagreement, looking after someone."
+    },
+    {
+      "id": "friends",
+      "prefix": "fri",
+      "title": "Friendship",
+      "theme": "Regular meetups, a new friend, a favor, drifting apart, a falling out and making up."
+    },
+    {
+      "id": "romance",
+      "prefix": "rom",
+      "title": "Romance and dating",
+      "theme": "A first date, a crush, a breakup, a partner others do not know about, an ex reappearing. Cozy, never explicit."
+    },
+    {
+      "id": "neighbors",
+      "prefix": "nbr",
+      "title": "Neighbors and community",
+      "theme": "Borrowing, a noise feud, carrying things for each other, a block gathering, the stall keeper who knows everyone."
+    },
+    {
+      "id": "secrets",
+      "prefix": "sec",
+      "title": "Secrets and misunderstandings",
+      "theme": "The ambiguity setups and their reveals. Each setup leaves at least two truths open and has a reveal for every one."
+    },
+    {
+      "id": "conflict",
+      "prefix": "cnf",
+      "title": "Conflict and rivalry",
+      "theme": "Arguments, grudges, competition over a stall spot or a job, and the confrontation that never comes."
+    },
+    {
+      "id": "nightlife",
+      "prefix": "ngt",
+      "title": "Nightlife",
+      "theme": "The club, a bar regular, a night out going wrong, a turn away at the door, a late walk home."
+    },
+    {
+      "id": "law",
+      "prefix": "law",
+      "title": "The street and the law",
+      "theme": "Muggings, lurkers and police seen from the edges: a victim afterward, a witness, someone avoiding the station, a lurker with a day job."
+    },
+    {
+      "id": "weather",
+      "prefix": "wth",
+      "title": "Weather and the city",
+      "theme": "Rain changes plans, a metro delay, a long night, the city's moods."
+    },
+    {
+      "id": "city",
+      "prefix": "cty",
+      "title": "The player's city",
+      "theme": "Reactions to what the player builds, plus displacement and closures: homes demolished, workplaces removed, new people moving in."
+    },
+    {
+      "id": "milestones",
+      "prefix": "mil",
+      "title": "Milestones",
+      "theme": "A new job, moving out, a birthday, a farewell, someone new arriving."
+    },
+    {
+      "id": "quiet",
+      "prefix": "qui",
+      "title": "Quiet moments",
+      "theme": "Pure texture with no consequences: a plant, the rain, a stray, a long time on a bench."
+    }
+  ],
+  "places": {
+    "home-door": "outside a residence's door",
+    "street": "a sidewalk or street crossing",
+    "shop-door": "the door of a shop or other commercial building",
+    "work-door": "the door of a workplace",
+    "stall": "a food stall counter or its queue",
+    "square": "the town square (standing spots, pond, stools)",
+    "cafe-stool": "a stool at the square's cafe stalls",
+    "bench": "a sidewalk or plaza bench",
+    "lawn": "a lawn plot (blankets, pair seats, hologram projector)",
+    "bar-kiosk": "the bar kiosk or snack stand by the club",
+    "club-queue": "the rope queue outside the Neon Dome",
+    "club-door": "the club door with its bouncers",
+    "metro-station": "a metro station entrance and its lift",
+    "platform": "a metro platform",
+    "lift-base": "the street end of a lift to a deck or terrace",
+    "dropoff": "a sky highway drop-off lift at street level",
+    "empty-plot": "a plot with nothing built on it",
+    "station-door": "the police station door and its bays",
+    "market-mall": "the market mall entrance",
+    "mall": "a mall entrance",
+    "bathhouse": "the bathhouse entrance",
+    "foundry-gate": "the foundry gate",
+    "any": "no particular place"
+  },
+  "weather": [
+    "any",
+    "clear",
+    "rain"
+  ],
+  "days": [
+    "any",
+    "weekday",
+    "weekend"
+  ],
+  "temperament": [
+    "outgoing",
+    "careful",
+    "warm"
+  ],
+  "pressures": [
+    "money",
+    "loneliness",
+    "work-trouble",
+    "secret",
+    "life-change"
+  ],
+  "relationKinds": [
+    "sibling-of",
+    "parent-of",
+    "child-of",
+    "grandparent-of",
+    "grandchild-of",
+    "cousin-of",
+    "aunt-uncle-of",
+    "niece-nephew-of",
+    "in-law-of",
+    "partner-of",
+    "ex-of",
+    "friend-of",
+    "coworker-of",
+    "boss-of",
+    "employee-of",
+    "neighbor-of",
+    "acquaintance-of",
+    "rival-of",
+    "creditor-of",
+    "debtor-of",
+    "cohabitant-of",
+    "landlord-of",
+    "tenant-of",
+    "shopkeeper-of",
+    "customer-of",
+    "stranger-to"
+  ],
+  "needs": [
+    "adult",
+    "young-adult",
+    "middle-aged",
+    "senior",
+    "lives-alone",
+    "lives-with-others",
+    "lives-with-family",
+    "lives-with-nonfamily",
+    "same-district",
+    "other-district",
+    "employed",
+    "unemployed",
+    "stall-keeper",
+    "shop-worker",
+    "industrial-worker",
+    "office-worker",
+    "night-worker",
+    "courier",
+    "club-worker",
+    "outgoing",
+    "private",
+    "careful",
+    "impulsive",
+    "warm",
+    "guarded",
+    "partnered",
+    "single",
+    "has-umbrella",
+    "has-pet-stray-habit",
+    "regular:stall",
+    "regular:bench",
+    "regular:club",
+    "regular:bar-kiosk",
+    "regular:lawn",
+    "regular:square",
+    "regular:bathhouse",
+    "regular:metro",
+    "zone:low",
+    "zone:mid",
+    "zone:high",
+    "zone:ind",
+    "pressure-high:money",
+    "pressure-high:loneliness",
+    "pressure-high:work-trouble",
+    "pressure-high:secret",
+    "pressure-high:life-change"
+  ],
+  "lifeChanges": [
+    "job-lost",
+    "job-found",
+    "moved-out",
+    "moved-in",
+    "left-city",
+    "breakup",
+    "new-partner",
+    "estrangement",
+    "reconciliation",
+    "arrived-in-city",
+    "home-lost",
+    "new-home"
+  ],
+  "worldFlags": [
+    "single:home-demolished",
+    "single:workplace-removed",
+    "single:newly-arrived",
+    "single:new-neighbor-moved-in",
+    "city:metro-line-opened",
+    "city:club-opened",
+    "city:stall-opened",
+    "city:lift-built",
+    "city:lawn-built",
+    "city:bench-placed",
+    "city:dropoff-built",
+    "city:plaza-built"
+  ],
+  "speakerKinds": [
+    "neighbor",
+    "friend",
+    "coworker",
+    "family",
+    "acquaintance",
+    "shopkeeper",
+    "landlord",
+    "anyone"
+  ],
+  "jobKinds": [
+    "stall-keeper",
+    "shop-worker",
+    "office-worker",
+    "industrial",
+    "foundry",
+    "courier",
+    "police",
+    "radio",
+    "club-staff",
+    "hotel-spa",
+    "greenhouse",
+    "logistics",
+    "bathhouse-staff"
+  ],
+  "actions": {
+    "walk": {
+      "status": "existing",
+      "source": "startTrip / walkOf",
+      "desc": "walk a route between buildings or spots",
+      "words": [
+        "walk",
+        "head",
+        "cross",
+        "pass",
+        "go",
+        "went",
+        "move",
+        "turn",
+        "continu"
+      ]
+    },
+    "enter": {
+      "status": "existing",
+      "source": "door dissolve, arrive()",
+      "desc": "step through a door (feed shows SIGNAL LOST after)",
+      "words": [
+        "enters",
+        "entered",
+        "entering",
+        "goes in",
+        "go in",
+        "went in",
+        "steps in",
+        "slips in",
+        "goes inside",
+        "step inside"
+      ]
+    },
+    "leave": {
+      "status": "existing",
+      "source": "door dissolve, startTrip",
+      "desc": "come out of a door (signal returns)",
+      "words": [
+        "leaves",
+        "left",
+        "exits",
+        "exited",
+        "comes out",
+        "come out",
+        "came out",
+        "emerges",
+        "steps out",
+        "stepped out"
+      ]
+    },
+    "stand": {
+      "status": "existing",
+      "source": "idle frames, standing spots",
+      "desc": "stand still at a spot, idling",
+      "words": [
+        "stand",
+        "stood",
+        "stay",
+        "linger",
+        "idle",
+        "wait"
+      ]
+    },
+    "chat": {
+      "status": "existing",
+      "source": "gesture frames, square spots",
+      "desc": "two people face each other and talk with gestures",
+      "words": [
+        "chat",
+        "talk",
+        "speak",
+        "spoke",
+        "convers",
+        "tell",
+        "told",
+        "say",
+        "said",
+        "ask",
+        "reply",
+        "replie"
+      ]
+    },
+    "sit": {
+      "status": "existing",
+      "source": "sitting frames, benches, stools, lawns",
+      "desc": "sit on a bench, stool, lawn seat or blanket",
+      "words": [
+        "sit",
+        "sat",
+        "seat",
+        "take a seat",
+        "perch"
+      ]
+    },
+    "eat": {
+      "status": "existing",
+      "source": "bowl emote after queue",
+      "desc": "eat food taken from a stall, seated or standing",
+      "words": [
+        "eat",
+        "ate",
+        "bowl",
+        "noodle",
+        "meal",
+        "food",
+        "drink",
+        "drank",
+        "sip",
+        "cup"
+      ]
+    },
+    "queue-order": {
+      "status": "existing",
+      "source": "queue spots, gesture while ordering",
+      "desc": "queue at an open stall and order",
+      "words": [
+        "queue",
+        "line",
+        "order",
+        "buy",
+        "bought",
+        "stall"
+      ]
+    },
+    "serve": {
+      "status": "existing",
+      "source": "stall keepers at the counter",
+      "desc": "a keeper serves at the counter",
+      "words": [
+        "serve",
+        "served",
+        "counter",
+        "keeper",
+        "behind the"
+      ]
+    },
+    "receive-delivery": {
+      "status": "existing",
+      "source": "ddrone parcel drop, doorstep, door opens",
+      "desc": "a delivery drone sets a parcel on the doorstep and it is taken in",
+      "words": [
+        "drone",
+        "delivered",
+        "delivery"
+      ]
+    },
+    "run": {
+      "status": "existing",
+      "source": "run frames, hurry, rainRun",
+      "desc": "run for a few seconds",
+      "words": [
+        "run",
+        "ran",
+        "hurr",
+        "dash",
+        "sprint",
+        "jog"
+      ]
+    },
+    "umbrella": {
+      "status": "existing",
+      "source": "umbrella frames",
+      "desc": "open or carry an umbrella in rain",
+      "words": [
+        "umbrella",
+        "canopy"
+      ]
+    },
+    "emote": {
+      "status": "existing",
+      "source": "EMO: bang quest heart anger sweat note dots bowl",
+      "desc": "an emote bubble over the head (param: bang, quest, heart, anger, sweat, note, dots, bowl)",
+      "words": [
+        "bubble",
+        "icon",
+        "mark over",
+        "symbol"
+      ]
+    },
+    "bump": {
+      "status": "existing",
+      "source": "checkBumps / bumpPair",
+      "desc": "two walkers meet and both stop for a moment, with a bubble each",
+      "words": [
+        "bump",
+        "collide",
+        "nearly collide",
+        "head-on"
+      ]
+    },
+    "club-queue": {
+      "status": "existing",
+      "source": "clubArrive, CLUB_Q rope",
+      "desc": "wait in the rope queue at the club",
+      "words": [
+        "rope",
+        "club queue",
+        "line outside the club"
+      ]
+    },
+    "club-enter": {
+      "status": "existing",
+      "source": "bouncer check, stage enter",
+      "desc": "pass the bouncers and go into the club",
+      "words": [
+        "bouncer",
+        "waved in",
+        "let in",
+        "admitted"
+      ]
+    },
+    "club-turned-away": {
+      "status": "existing",
+      "source": "bR.state shove",
+      "desc": "turned away at the door and shoved off",
+      "words": [
+        "turned away",
+        "shoved",
+        "refused",
+        "denied entry"
+      ]
+    },
+    "dance": {
+      "status": "existing",
+      "source": "clubPose / drawDeckWalkers",
+      "desc": "dance on the floor or gallery (seen only from outside the dome)",
+      "words": [
+        "dance",
+        "dances",
+        "danced",
+        "dancing"
+      ]
+    },
+    "throw-up": {
+      "status": "existing",
+      "source": "pukes (DD.puke, DD.puddle)",
+      "desc": "stop by the path to throw up, leaving a puddle",
+      "words": [
+        "sick",
+        "puddle",
+        "retch",
+        "threw up",
+        "throws up"
+      ]
+    },
+    "mugged": {
+      "status": "existing",
+      "source": "lurker 'rob', victim freeze",
+      "desc": "freeze when robbed (bang then sweat)",
+      "words": [
+        "robbed",
+        "mugged",
+        "hold-up",
+        "snatch",
+        "frozen",
+        "freeze"
+      ]
+    },
+    "mug": {
+      "status": "existing",
+      "source": "updateLurkers",
+      "desc": "a lurker darts over, robs, and runs off",
+      "words": [
+        "lurker",
+        "darts",
+        "robs"
+      ]
+    },
+    "flee": {
+      "status": "existing",
+      "source": "lurker 'flee'/'hide'",
+      "desc": "run off into the dark",
+      "words": [
+        "flees",
+        "fled",
+        "melts into",
+        "vanishes"
+      ]
+    },
+    "police-scan": {
+      "status": "existing",
+      "source": "scanner frames",
+      "desc": "an officer stops and scans with the handheld scanner",
+      "words": [
+        "scan",
+        "officer",
+        "scanner"
+      ]
+    },
+    "police-arrive": {
+      "status": "existing",
+      "source": "callout / rush",
+      "desc": "an officer or hoverbike arrives at a spot",
+      "words": [
+        "officer",
+        "hoverbike",
+        "bike",
+        "arrive"
+      ]
+    },
+    "police-patrol": {
+      "status": "existing",
+      "source": "startPatrol",
+      "desc": "an officer walks a beat",
+      "words": [
+        "patrol",
+        "beat",
+        "officer"
+      ]
+    },
+    "arrest": {
+      "status": "existing",
+      "source": "'caught', pillion to the station",
+      "desc": "a tagged lurker is run down and taken to the station",
+      "words": [
+        "taken in",
+        "tagged",
+        "run down",
+        "pillion"
+      ]
+    },
+    "ride-metro": {
+      "status": "existing",
+      "source": "metro.js mtEnter / lift to platform / train",
+      "desc": "go to a metro station, ride the lift to the platform, board a train",
+      "words": [
+        "metro",
+        "platform",
+        "train"
+      ]
+    },
+    "ride-lift": {
+      "status": "existing",
+      "source": "liftRide",
+      "desc": "ride a lift to a deck, terrace or platform",
+      "words": [
+        "rides the lift",
+        "takes the lift",
+        "metro lift",
+        "lift to",
+        "cab"
+      ]
+    },
+    "arrive-dropoff": {
+      "status": "existing",
+      "source": "spawnVisitor",
+      "desc": "a visitor comes down a drop-off lift to the street",
+      "words": [
+        "drop-off",
+        "dropoff",
+        "lift down",
+        "came down"
+      ]
+    },
+    "leave-dropoff": {
+      "status": "existing",
+      "source": "visitor leaveAt",
+      "desc": "walk back to the drop-off, ride up, and be picked up",
+      "words": [
+        "drop-off",
+        "dropoff",
+        "ride up",
+        "picked up",
+        "car"
+      ]
+    },
+    "picnic": {
+      "status": "existing",
+      "source": "lawnPicnics",
+      "desc": "sit on a blanket on a lawn and eat",
+      "words": [
+        "blanket",
+        "picnic"
+      ]
+    },
+    "watch-hologram": {
+      "status": "existing",
+      "source": "lawnHolos",
+      "desc": "sit facing a hologram projector",
+      "words": [
+        "hologram",
+        "projector",
+        "show"
+      ]
+    },
+    "soak": {
+      "status": "existing",
+      "source": "bathhouse seats in the pools",
+      "desc": "go to the bathhouse (seen only at its entrance)",
+      "words": [
+        "bathhouse",
+        "soak",
+        "onsen"
+      ]
+    },
+    "escort": {
+      "status": "existing",
+      "source": "bL.state escort/eject",
+      "desc": "a bouncer walks someone out of the club",
+      "words": [
+        "escort",
+        "walked out",
+        "ejected"
+      ]
+    },
+    "courier-run": {
+      "status": "existing",
+      "source": "p.courier errand",
+      "desc": "a courier walks parcels between shops",
+      "words": [
+        "courier",
+        "parcel",
+        "errand",
+        "round"
+      ]
+    },
+    "walk-together": {
+      "status": "new",
+      "desc": "two people walk side by side along one route and arrive together",
+      "words": [
+        "together",
+        "side by side",
+        "alongside",
+        "with",
+        "walk"
+      ]
+    },
+    "wait-outside": {
+      "status": "new",
+      "desc": "stand outside a door or at a spot, waiting, for a stretch of time",
+      "words": [
+        "wait",
+        "stand",
+        "outside",
+        "linger",
+        "hang about"
+      ]
+    },
+    "knock-and-wait": {
+      "status": "new",
+      "desc": "knock at a door and wait for it to open",
+      "words": [
+        "knock",
+        "knocks",
+        "knocked",
+        "rings at",
+        "rings a"
+      ]
+    },
+    "hand-over": {
+      "status": "new",
+      "desc": "hand an object, bag or envelope to someone",
+      "words": [
+        "hands over",
+        "hand over",
+        "handed",
+        "passes",
+        "hands it",
+        "hands the",
+        "hands her",
+        "hands him",
+        "hands back",
+        "slides a",
+        "holds out",
+        "held out"
+      ]
+    },
+    "carry": {
+      "status": "new",
+      "desc": "carry a box, bag or bundle along the walk",
+      "words": [
+        "carry",
+        "carries",
+        "carrying",
+        "box",
+        "bag",
+        "bundle",
+        "crate"
+      ]
+    },
+    "argue": {
+      "status": "new",
+      "desc": "two people face each other with sharp gestures, bubbles of anger",
+      "words": [
+        "argues",
+        "argued",
+        "arguing",
+        "shouts",
+        "shouted",
+        "raised voices",
+        "snaps at"
+      ]
+    },
+    "phone-call": {
+      "status": "new",
+      "desc": "stand with a hand at the ear, talking (only the watched person's side is heard)",
+      "words": [
+        "on a call",
+        "takes a call",
+        "at the ear",
+        "over one ear",
+        "over the mouth",
+        "handset to"
+      ]
+    },
+    "post-feed": {
+      "status": "new",
+      "desc": "post an update to the public feed (the post text appears on the monitor)",
+      "words": [
+        "posts",
+        "posted",
+        "posting",
+        "sends a post"
+      ]
+    },
+    "wave": {
+      "status": "new",
+      "desc": "wave to someone across a distance",
+      "words": [
+        "waves",
+        "waved",
+        "waving",
+        "wave to"
+      ]
+    },
+    "hug": {
+      "status": "new",
+      "desc": "two people hug",
+      "words": [
+        "hug",
+        "hugs",
+        "hugged",
+        "embrace"
+      ]
+    },
+    "read-notice": {
+      "status": "new",
+      "desc": "stop at a notice board or sign and read it",
+      "words": [
+        "notice",
+        "printed sheet",
+        "notice board",
+        "reads the sign"
+      ]
+    },
+    "feed-stray": {
+      "status": "new",
+      "desc": "crouch and put food down for a stray animal",
+      "words": [
+        "stray",
+        "crouches",
+        "scraps"
+      ]
+    },
+    "water-plant": {
+      "status": "new",
+      "desc": "tend a plant at a doorstep or sill",
+      "words": [
+        "water",
+        "waters",
+        "watering",
+        "pot"
+      ]
+    },
+    "share-umbrella": {
+      "status": "new",
+      "desc": "hold an umbrella over someone else",
+      "words": [
+        "shares",
+        "shared",
+        "holds it over",
+        "holds the umbrella over"
+      ]
+    },
+    "point": {
+      "status": "new",
+      "desc": "point at a building, a sign or a direction while talking",
+      "words": [
+        "point",
+        "gesture toward",
+        "indicate"
+      ]
+    },
+    "pick-up": {
+      "status": "new",
+      "desc": "pick up something dropped or left",
+      "words": [
+        "pick",
+        "retriev",
+        "dropped",
+        "scoop"
+      ]
+    },
+    "shrug": {
+      "status": "new",
+      "desc": "a shrug, a turn away, a shake of the head",
+      "words": [
+        "shrug",
+        "shake",
+        "turn away",
+        "turns away",
+        "turned away"
+      ]
+    }
+  },
+  "emotes": [
+    "bang",
+    "quest",
+    "heart",
+    "anger",
+    "sweat",
+    "note",
+    "dots",
+    "bowl"
+  ],
+  "channels": {
+    "seen": {
+      "conf": "unconfirmed",
+      "carries": [
+        "habit",
+        "regular",
+        "home",
+        "whereabouts",
+        "cohabitants",
+        "job",
+        "age-range"
+      ],
+      "desc": "an action the camera shows: entering a building with someone, carrying a box, waiting at a drop-off. Never carries names, relations, feelings or plans."
+    },
+    "conversation": {
+      "conf": "unconfirmed",
+      "carries": [
+        "first-name",
+        "last-name",
+        "nickname",
+        "age-range",
+        "job",
+        "employer",
+        "family",
+        "partner",
+        "relation-to",
+        "feeling-stated",
+        "plan-stated",
+        "opinion-stated",
+        "news",
+        "secret",
+        "money-stated",
+        "whereabouts",
+        "habit"
+      ],
+      "desc": "overheard in person while watching either speaker. What the speaker says, as said."
+    },
+    "phone": {
+      "conf": "unconfirmed",
+      "carries": [
+        "first-name",
+        "nickname",
+        "plan-stated",
+        "feeling-stated",
+        "news",
+        "secret",
+        "relation-to",
+        "money-stated",
+        "whereabouts"
+      ],
+      "desc": "a call: only the watched person's side is heard, so the other party and half the story stay unknown."
+    },
+    "feed": {
+      "conf": "unconfirmed",
+      "carries": [
+        "first-name",
+        "nickname",
+        "feeling-stated",
+        "plan-stated",
+        "news",
+        "whereabouts",
+        "partner",
+        "habit",
+        "opinion-stated"
+      ],
+      "desc": "a public feed post read on the monitor. What they chose to say, sometimes vague or performative, never the whole truth."
+    },
+    "document": {
+      "conf": "verified",
+      "carries": [
+        "first-name",
+        "last-name",
+        "full-name",
+        "home",
+        "employer",
+        "job",
+        "cohabitants",
+        "age-range",
+        "regular"
+      ],
+      "desc": "a delivery label, a nameplate on a door, a work uniform or badge, a notice, a ticket, a loyalty card. Verified."
+    },
+    "introduction": {
+      "conf": "verified",
+      "carries": [
+        "first-name",
+        "last-name",
+        "nickname",
+        "relation-to",
+        "partner",
+        "family",
+        "job"
+      ],
+      "desc": "someone introduces them by name and relation. Verified for the relation as stated."
+    }
+  },
+  "facts": [
+    "first-name",
+    "last-name",
+    "full-name",
+    "nickname",
+    "age-range",
+    "job",
+    "employer",
+    "home",
+    "cohabitants",
+    "family",
+    "partner",
+    "habit",
+    "regular",
+    "secret",
+    "whereabouts",
+    "relation-to",
+    "feeling-stated",
+    "plan-stated",
+    "opinion-stated",
+    "news",
+    "money-stated"
+  ],
+  "placeholders": {
+    "{A}": "the role's name for the log: 'Subject' until a name is learned, then the first name (or full name once verified)",
+    "{A.desc}": "a descriptor until named: 'an unknown female resident', 'a man in a courier jacket'; the name (with relation, if learned) afterward",
+    "{A.first}": "first name (only valid in reveal lines, where the name has just been learned)",
+    "{A.full}": "full name (only valid in reveal lines)",
+    "{A.nick}": "nickname (only valid in reveal lines)",
+    "{A.rel}": "the relation just learned, as a word: 'sister' (only valid in reveal lines)",
+    "{A.he} {A.him} {A.his}": "pronouns",
+    "{place}": "the main place of the beat: 'the noodle stall', 'the north square'",
+    "{place2}": "a second place",
+    "{n}": "a count or a duration number",
+    "{item}": "a carried or handed thing: 'a box', 'a paper bag'",
+    "{S}": "hearsay only: the speaker (the watched person)",
+    "{L}": "hearsay only: the listener, as a descriptor"
+  },
+  "thoughtWords": [
+    "think",
+    "thinks",
+    "thought",
+    "feel",
+    "feels",
+    "felt",
+    "want",
+    "wants",
+    "wanted",
+    "miss",
+    "misses",
+    "wonder",
+    "wonders",
+    "hope",
+    "hopes",
+    "hoped",
+    "worry",
+    "worries",
+    "worried",
+    "remember",
+    "remembers",
+    "remembered",
+    "decide",
+    "decides",
+    "decided",
+    "plans to",
+    "wish",
+    "wishes",
+    "believe",
+    "believes",
+    "suspect",
+    "suspects",
+    "realize",
+    "realizes",
+    "notices",
+    "noticed",
+    "nervous",
+    "anxious",
+    "happy",
+    "sad",
+    "upset",
+    "excited",
+    "scared",
+    "afraid",
+    "lonely",
+    "jealous",
+    "relieved",
+    "annoyed",
+    "embarrassed",
+    "guilty",
+    "bored",
+    "angry",
+    "furious",
+    "proud",
+    "ashamed",
+    "tired of",
+    "fond of",
+    "in love",
+    "knows",
+    "knew"
+  ],
+  "conclusionWords": [
+    "probably",
+    "possibly",
+    "perhaps",
+    "maybe",
+    "apparently",
+    "obviously",
+    "suspicious",
+    "suspiciously",
+    "evidently",
+    "presumably",
+    "seems",
+    "seemed",
+    "appears to",
+    "looks like",
+    "as if",
+    "as though",
+    "close to",
+    "involved with",
+    "in a relationship",
+    "clearly",
+    "must be",
+    "surely"
+  ],
+  "attributionVerbs": [
+    "says",
+    "say",
+    "said",
+    "told",
+    "tells",
+    "telling",
+    "posted",
+    "posts",
+    "asks",
+    "asked",
+    "calls",
+    "called",
+    "mentions",
+    "mentioned",
+    "reads",
+    "writes",
+    "wrote",
+    "reply",
+    "replies",
+    "answers",
+    "answered",
+    "adds",
+    "added",
+    "admits",
+    "admitted",
+    "repeats",
+    "shouts",
+    "murmurs",
+    "mutters",
+    "announces",
+    "agrees",
+    "calls out",
+    "types",
+    "typed"
+  ],
+  "relationWords": [
+    "sister",
+    "brother",
+    "wife",
+    "husband",
+    "girlfriend",
+    "boyfriend",
+    "lover",
+    "partner",
+    "friend",
+    "colleague",
+    "coworker",
+    "cousin",
+    "mother",
+    "father",
+    "mom",
+    "dad",
+    "daughter",
+    "son",
+    "ex",
+    "date",
+    "affair",
+    "fiancé",
+    "fiancee",
+    "aunt",
+    "uncle",
+    "niece",
+    "nephew",
+    "boss",
+    "landlord",
+    "roommate"
+  ],
+  "britishSpellings": {
+    "colour": "color",
+    "colours": "colors",
+    "coloured": "colored",
+    "neighbour": "neighbor",
+    "neighbours": "neighbors",
+    "neighbourhood": "neighborhood",
+    "favourite": "favorite",
+    "grey": "gray",
+    "centre": "center",
+    "centres": "centers",
+    "theatre": "theater",
+    "metre": "meter",
+    "metres": "meters",
+    "honour": "honor",
+    "labour": "labor",
+    "behaviour": "behavior",
+    "travelled": "traveled",
+    "travelling": "traveling",
+    "cancelled": "canceled",
+    "realise": "realize",
+    "realised": "realized",
+    "organise": "organize",
+    "recognise": "recognize",
+    "apologise": "apologize",
+    "kerb": "curb",
+    "tyre": "tire",
+    "mum": "mom",
+    "programme": "program",
+    "cosy": "cozy",
+    "jewellery": "jewelry",
+    "defence": "defense",
+    "licence": "license",
+    "practise": "practice",
+    "storey": "story",
+    "plough": "plow",
+    "aluminium": "aluminum",
+    "whilst": "while",
+    "amongst": "among",
+    "judgement": "judgment",
+    "fulfil": "fulfill",
+    "enrol": "enroll",
+    "catalogue": "catalog",
+    "dialogue": "dialog",
+    "analyse": "analyze",
+    "ageing": "aging",
+    "mould": "mold",
+    "pyjamas": "pajamas",
+    "sceptic": "skeptic",
+    "cheque": "check",
+    "kilometre": "kilometer",
+    "litre": "liter",
+    "fibre": "fiber",
+    "sombre": "somber",
+    "manoeuvre": "maneuver",
+    "smelt": "smelled",
+    "learnt": "learned",
+    "spelt": "spelled",
+    "burnt": "burned",
+    "dreamt": "dreamed",
+    "pavement": "sidewalk",
+    "rubbish": "trash",
+    "bin": "trash can",
+    "queueing": "queuing",
+    "flavour": "flavor",
+    "odour": "odor",
+    "armour": "armor",
+    "harbour": "harbor",
+    "rumour": "rumor",
+    "vapour": "vapor",
+    "saviour": "savior",
+    "endeavour": "endeavor",
+    "tonne": "ton"
+  }
+}

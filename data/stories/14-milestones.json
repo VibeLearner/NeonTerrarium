@@ -1,0 +1,802 @@
+{
+  "category": "milestones",
+  "title": "Milestones",
+  "theme": "A new job, moving out, a birthday, a farewell, someone new arriving.",
+  "storylets": [
+    {
+      "id": "mil.birthday-cake",
+      "title": "A candle in a bun",
+      "tier": "texture",
+      "note": "A small birthday at a stall. Age appears only if somebody says it.",
+      "roles": {
+        "A": {
+          "desc": "an adult at a stall",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend with a bun and a candle",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          12,
+          22
+        ],
+        "at": [
+          "stall",
+          "cafe-stool"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 700,
+          "city": 4
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "cafe-stool"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "B",
+          "at": "cafe-stool",
+          "with": [
+            "A"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "hug",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "cafe-stool"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits at a stool and scrolls a handset with one eyebrow up.",
+          "{A} takes a stool and drums fingers on the counter.",
+          "{A} perches on a stool and looks across the square."
+        ],
+        "b2": [
+          "{B.desc} arrives and sets a bun with a single candle in front of {A}.",
+          "{B.desc} hands {A} a small wrapped bun with a lit candle on top.",
+          "{B.desc} holds out a paper plate with a sparkler stuck in a dumpling."
+        ],
+        "b3": [
+          "{A} blows the candle out, laughs, and the two of them hug.",
+          "{B.desc} wraps {A} in a hug while the candle gutters.",
+          "{A} grabs {B.desc} in a hug that nearly tips the plate."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.age-range",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.45,
+          "log": [
+            "Overheard: {B.desc} says: \"Forty! Make a wish, you old thing.\"",
+            "Overheard: {B.desc} says: \"Twenty-five today. Eat the bun before I do.\""
+          ]
+        },
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {A} says: \"Best friend I ever had, remembering the day.\"",
+            "Overheard: {B.desc} says: \"Of course I remembered, friend. Who else would?\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "mil.farewell",
+      "title": "A bag at the metro mouth",
+      "tier": "notable",
+      "unwatched": true,
+      "note": "Someone leaves the city. The watcher sees the goodbye; afterward the person stays in the notebook, read-only and past tense (rule 11).",
+      "roles": {
+        "A": {
+          "desc": "an adult leaving with a bag",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "someone seeing them off",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          20
+        ],
+        "at": [
+          "metro-station",
+          "dropoff"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 4000,
+          "city": 24
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "metro-station"
+        },
+        {
+          "id": "b2",
+          "do": "hug",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "metro-station"
+        },
+        {
+          "id": "b3",
+          "do": "ride-metro",
+          "who": "A",
+          "at": "platform"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} walk to the station entrance, {A} dragging a heavy bag.",
+          "{B.desc} carries half of {A}'s load as the two reach the stairs.",
+          "{A} and {B.desc} cross the plaza slowly, saying little."
+        ],
+        "b2": [
+          "{A} and {B.desc} hug for a long time at the top of the steps.",
+          "{B.desc} holds on to {A} until the platform bell rings.",
+          "{A} and {B.desc} embrace and neither lets go first."
+        ],
+        "b3": [
+          "{A} goes down alone and boards. The train pulls out.",
+          "{A} rides down and the doors hiss shut on a last wave.",
+          "{A} takes the train and does not look back."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.plan-stated",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.55,
+          "log": [
+            "Overheard: {A} says: \"I'll write when I'm settled. Don't wait up on me.\"",
+            "Overheard: {A} says: \"They gave me a place upriver. I leave tonight.\""
+          ]
+        }
+      ],
+      "effects": {
+        "life": "left-city",
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:left-city"
+        ]
+      },
+      "hearsay": {
+        "about": "A",
+        "speakers": [
+          "neighbor",
+          "friend",
+          "shopkeeper",
+          "family"
+        ],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} tells {L} that {A.desc} left the city on the evening train. Just a bag and a coat.",
+          "Overheard: {S} says to {L}: \"{A.desc} is gone. Took the metro out and did not say where.\"",
+          "Overheard: {S} says {A.desc} has moved away from the city for good.",
+          "Overheard: {S} mentions to {L} that {A.desc} left last week and sent a card."
+        ],
+        "entry": [
+          "Left the city last week (overheard: a neighbor, in conversation).",
+          "Took the train out for good, per {S} (overheard, in conversation).",
+          "Moved away from the district, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "mil.first-day",
+      "title": "A badge for the first morning",
+      "tier": "texture",
+      "note": "Follows wrk.found-new-job. The new worker stands at a door holding a fresh badge.",
+      "roles": {
+        "A": {
+          "desc": "a newcomer at a work door",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a supervisor greeting them",
+          "rel": "boss-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          10
+        ],
+        "days": "weekday",
+        "at": [
+          "work-door"
+        ],
+        "requires": [
+          "A:new-job-started"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 1500,
+          "city": 6
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "work-door"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "work-door"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "work-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at the work door with a fresh badge on a spotless jacket.",
+          "{A} waits outside the workplace, turning a badge over and over.",
+          "{A} arrives early and stays at the door with a thermos."
+        ],
+        "b2": [
+          "{B.desc} comes out and shakes {A}'s hand, then points up at the lights.",
+          "{B.desc} says a few words and {A} nods hard to each.",
+          "{B.desc} hands {A} a sheet of printed rules and explains the first hour."
+        ],
+        "b3": [
+          "{B.desc} leads {A} in. The door slides shut behind them.",
+          "{A} follows {B.desc} through the door with the badge held out.",
+          "Both go in. {A} looks back once at the street."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.job",
+          "beat": "b2",
+          "channel": "document",
+          "chance": 0.5,
+          "log": [
+            "The badge reads Floor Assistant, first week.",
+            "The new badge reads {A.job}."
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.03
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:colleagues"
+        ]
+      }
+    },
+    {
+      "id": "mil.proposal",
+      "title": "A small box on the bench",
+      "tier": "dramatic",
+      "note": "A proposal. Rare, brief, public by accident. Whether it is accepted is shown by what happens next.",
+      "roles": {
+        "A": {
+          "desc": "an adult holding a small box",
+          "needs": [
+            "adult",
+            "partnered"
+          ]
+        },
+        "B": {
+          "desc": "their partner",
+          "rel": "partner-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          17,
+          22
+        ],
+        "at": [
+          "bench",
+          "lawn",
+          "square"
+        ],
+        "weight": 1,
+        "cooldown": {
+          "person": 4000,
+          "city": 36
+        },
+        "lifeTiers": [
+          "eventful"
+        ]
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "bench",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "hug",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} sit side by side. {A} is very still and keeps a hand in a pocket.",
+          "{A} and {B.desc} take a bench by the pond. {A} fidgets with a zipper.",
+          "{B.desc} sits and {A} sits stiff beside, one knee jumping."
+        ],
+        "b2": [
+          "{A} takes a small box from a pocket and holds it out in both hands.",
+          "{A} hands {B.desc} a small box and says a few words.",
+          "{A} holds out a flat box. {B.desc} stares at it, then at {A}."
+        ],
+        "b3": [
+          "{B.desc} throws both arms around {A} and the box falls on the bench.",
+          "{A} and {B.desc} embrace. A passerby claps.",
+          "{B.desc} hugs {A} hard and says something into {A}'s shoulder."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.7,
+          "log": [
+            "Overheard: {A} says: \"Will you marry me? I know it's a bench. I couldn't wait for a better one.\"",
+            "Overheard: {A} says: \"Eight years. I'd like eight more. Marry me.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.25
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:engaged"
+        ]
+      }
+    },
+    {
+      "id": "mil.certificate",
+      "title": "Carrying a frame home",
+      "tier": "texture",
+      "note": "A framed certificate carried through the square. A graduation or a license, left unsaid.",
+      "roles": {
+        "A": {
+          "desc": "an adult carrying a flat frame",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          19
+        ],
+        "at": [
+          "street",
+          "home-door"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 1200,
+          "city": 6
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "point",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} carries a flat frame wrapped in paper, held out in front like a tray.",
+          "{A} walks the block with a framed sheet under one arm, keeping clear of the crowd.",
+          "{A} hugs a framed document to the chest and steps over puddles."
+        ],
+        "b2": [
+          "{A} points at the frame, then at the sky, and says something to a passerby.",
+          "{A} shows the corner of the frame to a stall keeper with a small bow.",
+          "{A} gestures toward the frame and a stranger nods approvingly."
+        ],
+        "b3": [
+          "{A} goes in and the door slides shut on the paper.",
+          "{A} enters, holding the frame high over the threshold.",
+          "{A} steps inside and the door closes."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.45,
+          "log": [
+            "Overheard: {A} says: \"Three years of night classes. They gave me this today.\"",
+            "Overheard: {A} says: \"It says I'm licensed. Licensed! Look at that stamp.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "mil.send-off",
+      "title": "The box and the handshakes",
+      "tier": "notable",
+      "note": "A long-serving worker leaves for the last time. A small crowd at the work door.",
+      "roles": {
+        "A": {
+          "desc": "an older worker leaving a workplace",
+          "needs": [
+            "adult",
+            "senior",
+            "employed"
+          ]
+        },
+        "B": {
+          "desc": "a coworker saying goodbye",
+          "rel": "coworker-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          15,
+          19
+        ],
+        "days": "weekday",
+        "at": [
+          "work-door"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 4000,
+          "city": 24
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "work-door"
+        },
+        {
+          "id": "b2",
+          "do": "hug",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "work-door"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out of the work door with a small box and a plant in the crook of an arm.",
+          "{A} leaves the workplace with a cake box held level.",
+          "{A} steps out of the work door to scattered applause."
+        ],
+        "b2": [
+          "{B.desc} and {A} hug at the door. A few others wait their turn.",
+          "{A} embraces {B.desc} and then shakes the next hand.",
+          "{B.desc} hugs {A} and says a few words that make {A} laugh."
+        ],
+        "b3": [
+          "{A} walks away down the block, the plant held high.",
+          "{A} heads off with a slow stride, not looking back.",
+          "{A} crosses the square with the box on a hip."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {B.desc} says: \"Thirty-one years. Nobody will remember where anything is.\"",
+            "Overheard: {A} says: \"I'm leaving the keys on the hook. Don't lose them.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:retired"
+        ]
+      }
+    },
+    {
+      "id": "mil.remembrance",
+      "title": "A flower on a bench slat",
+      "tier": "texture",
+      "note": "Someone leaves a flower where another used to sit. Never explained; never needs to be.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a bench",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          20
+        ],
+        "at": [
+          "bench"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 600,
+          "city": 4
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "pick-up",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b3",
+          "do": "stand",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks up to a bench with a single stem in one hand.",
+          "{A} approaches the bench with eyes lowered.",
+          "{A} crosses to the bench and stops at its end."
+        ],
+        "b2": [
+          "{A} lays the flower along the bench slats and lifts a withered one from the arm.",
+          "{A} replaces an old bloom with the new one and tucks the old one in a pocket.",
+          "{A} brushes the slats clear with a sleeve."
+        ],
+        "b3": [
+          "{A} stands at the bench for several minutes, hands folded.",
+          "{A} stays beside the bench, head bowed, until the bell rings.",
+          "{A} lingers, touching the slats once, then walks away."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.2,
+          "log": [
+            "Overheard: {A} says to the bench: \"I'll be back on the fifteenth. Same time.\"",
+            "Overheard: {A} says: \"This was your seat. I kept it clean.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": [
+          "A:keeps-a-bench"
+        ]
+      }
+    },
+    {
+      "id": "mil.baby-post",
+      "title": "Posted with a tiny shoe",
+      "tier": "texture",
+      "note": "News reaches the monitor only as a post. The feed says what the person chose to say.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a handset",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          23
+        ],
+        "at": [
+          "bench",
+          "cafe-stool"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 2000,
+          "city": 12
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "post-feed",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits on a bench holding a handset close and grinning at the screen.",
+          "{A} takes a seat and shows the handset to nobody in particular.",
+          "{A} perches on the bench edge, thumbing the screen with great care."
+        ],
+        "b2": [
+          "{A} posts a picture, reads the comment that appears, and laughs out loud.",
+          "{A} posts a single line and holds the handset to the chest.",
+          "{A} types, deletes, types, and finally posts."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b2",
+          "channel": "feed",
+          "chance": 0.7,
+          "log": [
+            "Posted: \"She arrived at dawn. Seven pounds, loud, perfect. Visiting hours start tomorrow.\"",
+            "Posted: \"New to the family: a small person with strong opinions. Everyone is fine.\""
+          ]
+        }
+      ],
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "life-change",
+            0.15
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:new-parent"
+        ]
+      }
+    }
+  ]
+}

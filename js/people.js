@@ -981,7 +981,7 @@ function clearSeg(ax, az, bx, bz){ const n = Math.ceil(Math.hypot(bx - ax, bz - 
 function spreadPath(p, pts, i0, i1){
   if (i1 - i0 < 1) return pts;
   const lane = p.lane ?? .12, wide = p.wide ?? lane*3, tries = [wide, wide*.65, lane, lane*.5, 0];
-  const out = pts.map(q => q.slice());
+  const out = pts.slice();   // (the points it moves are new pairs; the rest are shared with the route, which nothing changes in place: a copy of every point made a pair per point per trip that lived as long as the walk)
   let prev = out[i0];
   for (let k = i0 + 1; k < i1; k++){
     const [ax, az] = pts[k - 1], [bx, bz] = pts[k], [cx, cz] = pts[k + 1];

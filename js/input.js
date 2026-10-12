@@ -13,9 +13,12 @@ function setTiltMode(on){
   const el = document.getElementById('tiltChip'); if (el) el.hidden = !on;
 }
 const camPosTrue = new THREE.Vector3(), camPix = new THREE.Vector2(), keys = new Set(), _cr = new THREE.Vector3(), _cu = new THREE.Vector3(), _cv = new THREE.Vector3(), _cs = new THREE.Vector3();
+const YAW_MIN = .12;
 function updateCamera(dt){
   if (S.spin && !dragging){ spinT += dt; if (spinT > 6){ spinT = 0; yawT += PI/4; } }
-  yaw += (yawT-yaw)*Math.min(1, dt*3.5);
+  // the turn eases out, but never slower than YAW_MIN radians a second: an exponential ease alone crawled for about a second at the end (the whole city
+  // drawn the old way for a movement too small to see) and then snapped the last few pixels into place, a visible jump just before the turn stopped
+  { const d = yawT - yaw, ex = d*Math.min(1, dt*3.5), mn = YAW_MIN*dt; yaw += Math.abs(ex) >= mn || window.__YAW_EASE_OLD ? ex : Math.sign(d)*Math.min(Math.abs(d), mn); }
   PITCH += (pitchT - PITCH)*Math.min(1, dt*6); if (Math.abs(pitchT - PITCH) < 1e-4) PITCH = pitchT;
   zoom += (zoomT-zoom)*Math.min(1, dt*8);
   // easing never quite arrives, so a "still" camera kept drifting by fractions of a pixel; snap once close

@@ -208,8 +208,11 @@ function scEditRect(px, py, shk, soft){
 // overlay over the copied rows, where the buildings' own lights are in the copy; not over the rows drawn the old way, which draw their lights
 // themselves). Each strip makes the next frame cheaper: the frames right after a turn used to be the dearest of all, the whole city drawn the old
 // way plus a strip of the new picture, eight frames running. The test "after a turn, the old way until the picture is done" restores that.
+const _restCam = new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR);
 function scHybrid(px, py, job){
-  const d = scRow(py) - job.oy, yDone = Math.floor(SC.h*job.k/job.K), sDone = Math.max(0, Math.min(H, yDone - d));
+  // (the rows done: with the strips in view order, from the view's first strip up to the last one drawn; without an order, from the bottom)
+  const d = scRow(py) - job.oy, b0 = job.order ? job.b0 : 0, nUp = job.order ? Math.min(job.k, job.K - b0) : job.k;
+  const yLo = Math.floor(SC.h*b0/job.K), yDone = Math.floor(SC.h*(b0 + nUp)/job.K), sDone = yLo <= d ? Math.max(0, Math.min(H, yDone - d)) : 0;
   if (scCol(px) < job.ox || scCol(px) + W > job.ox + SC.w || d < 0 || d + H > SC.h || sDone <= 0) return false;
   scCopyMat();
   const lm = cam.layers.mask;
@@ -224,9 +227,13 @@ function scHybrid(px, py, job){
   // the rest: the old way, the static set and then the live set without the glow overlay
   if (sDone < H){
     rtC.scissor.set(0, sDone, W, H - sDone); renderer.setRenderTarget(rtC);
+    // (the merged blocks' pieces culled to these rows only: the scissor saves the pixels, this the triangles; the rows below come from the copy)
+    const px = 2*zoom/H; _restCam.left = cam.left; _restCam.right = cam.right; _restCam.top = cam.top; _restCam.bottom = cam.bottom + sDone*px; _restCam.near = cam.near; _restCam.far = cam.far;
+    _restCam.updateProjectionMatrix(); _restCam.position.copy(cam.position); _restCam.quaternion.copy(cam.quaternion); _restCam.updateMatrixWorld();
+    cullFrame(cam, _restCam);
     sdApply();
     cam.layers.enableAll(); cam.layers.disable(6); SC.drawView(() => renderer.render(scene, cam), false);
-    CULL.sd = false;
+    CULL.sd = false; cullFrame(cam);
   }
   rtC.scissorTest = false; renderer.setRenderTarget(rtC);
   mrtEnd(); cam.layers.mask = lm;
@@ -268,7 +275,7 @@ SC.prev = null; SC.hard = null; SC.soft = null; SC.shk = null; SC.ok = false; SC
 // lights as they were when it began
 const _stripCam = new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR), _lt = { sc: new THREE.Color(), hc: new THREE.Color(), hg: new THREE.Color(), em: [], m1: new THREE.Matrix4(), m2: new THREE.Matrix4() };
 function scBand(job){
-  const K = job.K, k = job.k, h = SC.h, y0 = Math.floor(h*k/K), y1 = Math.floor(h*(k + 1)/K), px = 2*zoom/H, c = job.cam;
+  const K = job.K, k = job.order ? job.order[job.k] : job.k, h = SC.h, y0 = Math.floor(h*k/K), y1 = Math.floor(h*(k + 1)/K), px = 2*zoom/H, c = job.cam;
   _stripCam.left = c.left; _stripCam.right = c.right; _stripCam.bottom = c.bottom + y0*px; _stripCam.top = c.bottom + y1*px; _stripCam.updateProjectionMatrix();
   _stripCam.position.copy(c.position); _stripCam.quaternion.copy(c.quaternion); _stripCam.updateMatrixWorld();
   // the lights as they were when the job began (and put back after)
@@ -349,14 +356,21 @@ SC.frame = function(){
   // Still changing from frame to frame (a turn or zoom easing in, the lights switching at dusk): the cache would be drawn again every
   // frame, which costs more than the old way, so the old way draws. Once the inputs hold still, the new picture is drawn in strips
   // (SC.K of them, one a frame, into the second target) while the old way still draws the frame, and it takes over when complete.
-  // (Drawing it whole on the first still frame was a frame and a half's work in one go: a hitch at the end of every turn, and on a slow
-  // mouse turn, at every pause between its moves. The test "cache drawn whole after a turn" restores that.)
+  // (Measured again (2026-10-12, a fling on the dense city): a strip is a thin band, but buildings are tall and cross several bands, so each of the eight
+  //  strips drew about 660,000 triangles, 5 million to make a picture that drawn whole is 1.07 million, about what a frame of the turn itself draws
+  //  (1.01 million). So after a turn the picture is drawn whole on the first still frame, as it once was; the strips stay for the light's slow drift,
+  //  where nothing else is drawn the old way. The test "after a turn: the picture in strips" brings the strips back for turns.)
   const stable = scSame(hard, SC.prev); SC.prev = hard.slice();
   if (now === 'something it depends on changed' && SC.ok){
     if (!stable){ SC.state = 'off'; SC.why = 'changing: drawn the old way'; SC.job = null; return false; }
-    if (!(PH.tests.wholeAfterTurn || window.__WHOLE_AFTER_TURN)){
+    if (PH.tests.stripsAfterTurn || window.__STRIPS_AFTER_TURN){
       if (SC.job && (!scSame(hard, SC.job.hard) || sun.shadow.map !== SC.job.map || SC.job.edits !== SC_EDITS || !SC.job.afterTurn)) SC.job = null;
-      if (!SC.job){ scJobStart(px, py, hard, soft, shk, 'after a turn or zoom'); if (SC.job) SC.job.afterTurn = true; }
+      if (!SC.job){ scJobStart(px, py, hard, soft, shk, 'after a turn or zoom');
+        if (SC.job){ SC.job.afterTurn = true;
+          // (the strips in the order the view needs them: from the one holding the view's bottom row upward, then the margin below; the rows the view
+          //  shows are then done first, and scHybrid takes them over from the second frame on, instead of after the margin's strips)
+          const K = SC.job.K, d = scRow(py) - SC.job.oy, b0 = Math.max(0, Math.min(K - 1, Math.floor(d*K/SC.h))), ord = [];
+          for (let b = b0; b < K; b++) ord.push(b); for (let b = b0 - 1; b >= 0; b--) ord.push(b); SC.job.order = ord; SC.job.b0 = b0; } }
       if (SC.job){
         scBand(SC.job); SC.job.k++;
         if (SC.job.k < SC.job.K){ SC.state = 'off'; SC.why = 'redrawing after a turn: ' + SC.job.k + ' of ' + SC.job.K;

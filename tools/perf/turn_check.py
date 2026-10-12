@@ -49,7 +49,7 @@ def worst_frames(d, n=3):
         gpu = lambda j: (TR[j].get('gpu') if 0 <= j < len(TR) and TR[j].get('gpu') is not None else None)
         gpus = ' '.join('-' if gpu(j) is None else '%.1f' % gpu(j) for j in range(k - 4, k + 2))
         gb = sorted(tr.get('gpuBy') or [], key=lambda x: -x[1])[:3]
-        out.append('    %.1f ms at frame %d (%s): script %s ms, sent to the card %s KB; biggest: %s' % (T[k], k, 'turning' if k <= d['stopAt'] else 'at rest', tr.get('js'), tr.get('up'), ', '.join('%s %.1f' % (nm.strip(), ms) for nm, ms in laps)))
+        out.append('    %.1f ms at frame %d (%s): script %s ms, sent to the card %s KB, programs linked %s, resources freed %s (%s KB); biggest: %s' % (T[k], k, 'turning' if k <= d['stopAt'] else 'at rest', tr.get('js'), tr.get('up'), tr.get('links'), tr.get('dels'), tr.get('freed'), ', '.join('%s %.1f' % (nm.strip(), ms) for nm, ms in laps)))
         out.append('        the card, frames %d to %d: %s ms%s' % (k - 4, k + 1, gpus, ('; this frame mostly ' + ', '.join('%s %.1f' % (n, ms) for n, ms in gb)) if gb else ''))
     return out
 

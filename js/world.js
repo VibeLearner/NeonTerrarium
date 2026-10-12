@@ -659,6 +659,13 @@ function* collectGen(body){
 }
 function disposeData(d){ if (d) for (const g of d.geo.values()) g.dispose(); }
 function disposeGroup(g){ g.traverse(o => { if (o.isMesh || o.isPoints) o.geometry.dispose(); }); }
+// A merged block's old meshes are freed on the card a few frames after they stop being drawn, one group a frame, not in the frame they are
+// swapped out: freeing a hundred buffers the card may still be drawing (the frame before is often still in flight) can make the driver wait
+// for it, and that wait fell inside the next frame's color pass (the owner's traces of a fling: 20 to 55 ms of waiting, nothing sent). The
+// test "old merges freed at once (as before)" keeps the old way.
+const DISPOSE_Q = [];
+function disposeGroupLater(g){ if (PH.tests.disposeNow || window.__DISPOSE_NOW) disposeGroup(g); else DISPOSE_Q.push({ g, at: PM.frame }); }
+function disposeTick(){ if (DISPOSE_Q.length && PM.frame - DISPOSE_Q[0].at >= 3){ disposeGroup(DISPOSE_Q.shift().g); } }
 // one group for many pieces: a single mesh per material, one instanced batch per plant kind, one point batch per glow colour
 function batchGroup(datas, withGeo = true){
   const g = new THREE.Group(), byMat = new Map(), fol = {}, gl = {};
@@ -1786,6 +1793,7 @@ const markSolid = c => { if (c){ const k = mergeKey(c.i, c.j); solidAbort(k); ti
 function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
   for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++){ solidAbort(i + ',' + j); tierStashDrop(i + ',' + j); solidDirty.add(i + ',' + j); } }
 function flushSolid(){
+  disposeTick();
   flushSuper();
   if (SYNC_NOW()){ solidFinish(); if (solidDirty.size){ for (const k of solidDirty){ try { rebuildSolid(k); } catch (e){ SOLID_FAIL.n++; if (SOLID_FAIL.n <= 3) console.warn('merging block ' + k + ' failed; its old merge stays drawn.', e); } } solidDirty.clear(); } }
   else { solidRetry(); if (SOLID_JOB || solidDirty.size) solidStep(TIER.rush ? 14 : Math.max(1, 4 - FRAME_WORK)); }
@@ -1797,8 +1805,8 @@ const mergeable = o => o.isMesh && !o.isInstancedMesh && (o.layers.mask === 1 ||
 function solidRemoveOld(key){
   tierStashDrop(key);
   const old = solidRegions.get(key);
-  if (old && old.far) for (const m of old.far){ FAR_MESHES.delete(m); m.geometry = m.userData.stdGeo; if (m.userData.farGeo) m.userData.farGeo.dispose(); }   // (the one not held by the mesh is let go here; the other with the group)
-  if (old){ SC_DIRTY.quiet++; try { for (const m of old.members) m.visible = !(m.userData.sideOf && m.geometry.userData.full); world.remove(old.group); disposeGroup(old.group); solidRegions.delete(key); } finally { SC_DIRTY.quiet--; } }
+  if (old && old.far) for (const m of old.far){ FAR_MESHES.delete(m); m.geometry = m.userData.stdGeo; if (m.userData.farGeo) DISPOSE_Q.push({ g: { traverse: f => f({ isMesh: true, geometry: m.userData.farGeo }) }, at: PM.frame }); }   // (the one not held by the mesh is let go here (a few frames on, see disposeGroupLater); the other with the group)
+  if (old){ SC_DIRTY.quiet++; try { for (const m of old.members) m.visible = !(m.userData.sideOf && m.geometry.userData.full); world.remove(old.group); disposeGroupLater(old.group); solidRegions.delete(key); } finally { SC_DIRTY.quiet--; } }
   ovForget(key);   // (a walls' mesh stays hidden while its piece is swept: see showHidden)
 }
 function rebuildSolid(key){ solidFinish(); SC_DIRTY.quiet++; try { drain(rebuildSolidGen(key)); } finally { SC_DIRTY.quiet--; } }
@@ -1873,9 +1881,9 @@ function* rebuildSolidGen(key, job = null){
   if (tierChanged){ scNoteBlock(key); const t0 = TIER.markedAt.get(key); if (t0 !== undefined){ TIER.lat.push(PM.frame - t0); TIER.markedAt.delete(key); } }
   if (tierChanged && PM.frame < TIER.compareUntil) tierStashOld(key); else solidRemoveOld(key);
   ovCommit(key);   // the swap: the old block and its overlays out, the new in, the plots' own meshes hidden
-  for (const o of hideList){ o.visible = false;
-    // (the plot's own pieces were drawn before they were merged in: an edit shows them while the block is made again. Their copies on the card go now, which a plot that was merged before its first frame never had; three uploads them again if they are ever drawn)
-    if (o.geometry) o.geometry.dispose(); }
+  { const gs = []; for (const o of hideList){ o.visible = false; if (o.geometry) gs.push(o.geometry); }
+    // (the plot's own pieces were drawn before they were merged in: an edit shows them while the block is made again. Their copies on the card go (a few frames on: disposeGroupLater), which a plot that was merged before its first frame never had; three uploads them again if they are ever drawn)
+    if (gs.length) disposeGroupLater({ traverse: f => { for (const g of gs) f({ isMesh: true, geometry: g }); } }); }
   for (const o of hideList){ const pc = o.userData.cell; if (pc) pmSchedule(pc); }   // (merged in: its own arrays are let go: recipe.js)
   for (const o of farMeshes){ FAR_MESHES.add(o); } if (farMeshes.length) FARM.stamp++;
   world.add(g);
@@ -1976,8 +1984,8 @@ function tierApplyNow(){
 TIER.stash = new Map(); TIER.compareUntil = -1;
 function tierStashDrop(key){
   const st = TIER.stash.get(key); if (!st) return; TIER.stash.delete(key);
-  for (const m of st.rec.far){ m.geometry = m.userData.stdGeo; if (m.userData.farGeo) m.userData.farGeo.dispose(); }
-  disposeGroup(st.rec.group);
+  for (const m of st.rec.far){ m.geometry = m.userData.stdGeo; }
+  disposeGroupLater(st.rec.group); for (const m of st.rec.far) if (m.userData.farGeo) DISPOSE_Q.push({ g: { traverse: f => f({ isMesh: true, geometry: m.userData.farGeo }) }, at: PM.frame });
 }
 function tierStashOld(key){
   const old = solidRegions.get(key); if (!old){ ovForget(key); return; }
@@ -2620,7 +2628,7 @@ function clearIsland(){
   megas.clear();
   for (const k of [...regions.keys()]){ disposeGroup(regions.get(k)); regions.delete(k); superDirty.add('r' + superKey(k)); }
   SOLID_JOB = null;
-  for (const k of [...solidRegions.keys()]){ const r = solidRegions.get(k); world.remove(r.group); disposeGroup(r.group); solidRegions.delete(k); ovForget(k); } solidDirty.clear(); animCells.clear();   // (ovForget: the glow overlay's batches drop the region too, or its lights stay drawn with nothing under them)
+  for (const k of [...solidRegions.keys()]){ const r = solidRegions.get(k); world.remove(r.group); disposeGroup(r.group); solidRegions.delete(k); ovForget(k); } DISPOSE_Q.length = 0; solidDirty.clear(); animCells.clear();   // (ovForget: the glow overlay's batches drop the region too, or its lights stay drawn with nothing under them)
   cells.clear(); hwClearAll(); mtClearAll();
   for (let i=-1;i<=1;i++) for (let j=-1;j<=1;j++) cells.set(ckey(i,j), newCell(i, j));
   rebuildAll(); centerView();

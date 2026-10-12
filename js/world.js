@@ -186,6 +186,14 @@ function pieceVis(P){
 // the ranges of rows r0 to r1 (inclusive) for the pieces on show, runs that sit next to each other joined; sets the mesh up to
 // draw them. Returns false when everything shows (the plain draw range does it).
 const MD = { s: new Int32Array(64), n: new Int32Array(64) };
+// A mesh's ranges for one draw live in arrays of its own that are reused frame after frame (userData.mdb; md.m is how many are in use), never
+// sliced fresh: every drawn mesh used to make two or three new typed arrays a frame, thousands a second during a turn, and the engine's collector
+// had to stop the page for them now and then. (A multi-draw call takes the arrays with a count, so nothing need be trimmed.)
+function mdSet(o, S, N, m){
+  let b = o.userData.mdb; if (!b || b.s.length < m){ const cap = Math.max(8, m*2); b = o.userData.mdb = { s: new Int32Array(cap), n: new Int32Array(cap), o: new Int32Array(cap), m: 0, bpe: 0 }; }
+  b.s.set(S.subarray(0, m)); b.n.set(N.subarray(0, m)); b.m = m; b.bpe = 0; o.userData.md = b;
+}
+function mdSet2(o, s1, n1, s2, n2){ let b = o.userData.mdb; if (!b) b = o.userData.mdb = { s: new Int32Array(8), n: new Int32Array(8), o: new Int32Array(8), m: 0, bpe: 0 }; b.s[0] = s1; b.n[0] = n1; b.s[1] = s2; b.n[1] = n2; b.m = 2; b.bpe = 0; o.userData.md = b; }
 function multiRows(o, P, r0, r1, t0 = 0, t1 = -1){
   if (PH.tests.noCull) return false;
   const seen = pieceVis(P), lv = CULL.lvl, xl = CULL.sd && P.xlOn ? P.xl : null; if (seen === P.n && lv < 0 && !xl && t1 < t0) return false;
@@ -198,7 +206,7 @@ function multiRows(o, P, r0, r1, t0 = 0, t1 = -1){
       else { if (m === MD.s.length){ const s2 = new Int32Array(m*2), n2 = new Int32Array(m*2); s2.set(MD.s); n2.set(MD.n); MD.s = s2; MD.n = n2; } MD.s[m] = st; MD.n[m++] = c; }
       tot += c;
     } }
-  o.userData.md = m ? { s: MD.s.slice(0, m), n: MD.n.slice(0, m) } : null;
+  if (m) mdSet(o, MD.s, MD.n, m); else o.userData.md = null;
   CULL.tris += tot; return tot;
 }
 // A shadow strip (sky.js shadowFrame): the same triangles the strip drew before (A, the never-seen faces and every side, no size classes), but only of the
@@ -213,7 +221,7 @@ function shadowRanges(o, g){
     if (m && MD.s[m - 1] + MD.n[m - 1] === st) MD.n[m - 1] += c;
     else { if (m === MD.s.length){ const s2 = new Int32Array(m*2), n2 = new Int32Array(m*2); s2.set(MD.s); n2.set(MD.n); MD.s = s2; MD.n = n2; } MD.s[m] = st; MD.n[m++] = c; } } };
   row(0); row(P.hrow); for (let r = 1; r <= SIDE_K; r++) row(r); if (u.far) for (let r = RT0; r < RT0 + SIDE_K; r++) row(r);
-  o.userData.md = m ? { s: MD.s.slice(0, m), n: MD.n.slice(0, m) } : null;
+  if (m) mdSet(o, MD.s, MD.n, m); else o.userData.md = null;
   if (!m) g.drawRange.count = 0;
   SHADOW_STRIP.push([o, g]);
 }
@@ -231,7 +239,7 @@ function sideBefore(r, s, c, g){
   if (P && c === CULL.cam){ const ts = A.ts, te = ts + A.tL; const t = two || P.far ? multiRows(this, P, 1 + s0, e, RT0 + ts, RT0 + te - 1) : multiRows(this, P, 1 + s0, e); if (t !== false){ g.drawRange.start = 0; g.drawRange.count = t; return; } }
   if (two){   // (no per-piece ranges: the two runs, in one multi-range draw)
     const tb = b + o[SIDE_K], ot = u.offT, ts = A.ts, te = ts + A.tL, s2 = tb + ot[ts], n2 = (te <= SIDE_K ? tb + ot[te] : b + u.S + o[SIDE_K/2] + ot[te - SIDE_K]) - s2, n1 = g.drawRange.count, s1 = g.drawRange.start;
-    this.userData.md = { s: Int32Array.of(s1, s2), n: Int32Array.of(n1, n2) }; g.drawRange.start = 0; g.drawRange.count = n1 + n2;
+    mdSet2(this, s1, n1, s2, n2); g.drawRange.start = 0; g.drawRange.count = n1 + n2;
   }
 }
 { // (several ranges in one draw: three itself only draws one, so while a mesh with ranges is drawn the context's drawElements is swapped)
@@ -239,8 +247,8 @@ function sideBefore(r, s, c, g){
   renderer.renderBufferDirect = function(camera, sc, geo, mat, obj, grp){
     if (SHADOW_STRIP && geo.userData.pcs && !obj.userData.md) shadowRanges(obj, geo);   // (a shadow strip: the pieces that touch it)
     const md = obj.userData.md; if (!md) return rbd.call(this, camera, sc, geo, mat, obj, grp);
-    const bpe = geo.index.array ? geo.index.array.BYTES_PER_ELEMENT : geo.userData.bpe, n = md.s.length;
-    if (ext){ if (!md.o){ md.o = new Int32Array(n); for (let i = 0; i < n; i++) md.o[i] = md.s[i]*bpe; } }
+    const bpe = geo.index.array ? geo.index.array.BYTES_PER_ELEMENT : geo.userData.bpe, n = md.m;
+    if (ext && md.bpe !== bpe){ for (let i = 0; i < n; i++) md.o[i] = md.s[i]*bpe; md.bpe = bpe; }   // (the byte offsets, once per set of ranges)
     gl.drawElements = function(mode, count, type){
       if (ext) ext.multiDrawElementsWEBGL(mode, md.n, 0, type, md.o, 0, n);
       else { const f = Object.getPrototypeOf(gl).drawElements; for (let i = 0; i < n; i++) f.call(gl, mode, md.n[i], type, md.s[i]*bpe); }
@@ -375,7 +383,7 @@ function ovBefore(r, s, c, g){
   const a = u.nFB, o0 = u.off[lo]*3, b = hi >= lo ? (u.off[hi + 1] - u.off[lo])*3 : 0;   // (offsets are in triangles, ranges in indices)
   if (!b){ g.drawRange.start = 0; g.drawRange.count = a; }
   else if (!a){ g.drawRange.start = o0; g.drawRange.count = b; }
-  else { g.drawRange.start = 0; g.drawRange.count = a + b; this.userData.md = { s: new Int32Array([0, a + o0]), n: new Int32Array([a, b]) }; }
+  else { g.drawRange.start = 0; g.drawRange.count = a + b; mdSet2(this, 0, a, a + o0, b); }
 }
 function ovAfter(r, s, c, g){ g.drawRange.start = 0; g.drawRange.count = Infinity; this.userData.md = null; }
 // The overlays of the merged regions (one each, 226 draw calls in a view at zoom 30) joined, a batch for every OVB x OVB block of regions: one mesh whose index holds each member's triangles one after another, and each frame
@@ -425,7 +433,7 @@ function ovbBefore(r, s, c, g){
     if (b){ _ovS[m] = e.at + a + o0; _ovN[m++] = b; tot += b; }
   }
   if (!m){ g.drawRange.start = 0; g.drawRange.count = 0; this.userData.md = null; return; }
-  g.drawRange.start = 0; g.drawRange.count = tot; this.userData.md = { s: _ovS.slice(0, m), n: _ovN.slice(0, m) };
+  g.drawRange.start = 0; g.drawRange.count = tot; mdSet(this, _ovS, _ovN, m);
 }
 let SIDE_SPLIT = false;   // (set while a plot or a megastructure is collected: see collect)
 const atlasable = m => m && m.isMeshToonMaterial && !m.map && m !== M.cloud && m !== ATLAS && m !== ATLAS_SIDE;

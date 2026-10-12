@@ -83,7 +83,8 @@ canvas.addEventListener('pointerdown', e => {
   else if (e.button === 2) act = { kind: 'right', x: e.clientX, y: e.clientY, moved: false };
   else if (e.button === 1) act = { kind: 'rotate' };
 });
-canvas.addEventListener('pointermove', e => {
+canvas.addEventListener('pointermove', e => { const _t0 = performance.now(); try { pointerMove(e); } finally { PH.outside('pointer move', performance.now() - _t0); } });
+function pointerMove(e){
   const p = ptrs.get(e.pointerId);
   if (!p){ ptrLast = { x: e.clientX, y: e.clientY };   // just hovering
     if (delMode){ hover.visible = hoverFill.visible = false; return; }
@@ -110,8 +111,9 @@ canvas.addEventListener('pointermove', e => {
     return;
   }
   if (act.kind === 'paint'){ paintAt(e.clientX, e.clientY); showHover(targetOf(pickAt(e.clientX, e.clientY))); }
-});
-const endPtr = e => {
+}
+const endPtr = e => { const _t0 = performance.now(); try { endPtr0(e); } finally { PH.outside('pointer up', performance.now() - _t0); } };
+function endPtr0(e){
   if (act && typeof LOADP !== 'undefined' && LOADP.on) act.moved = true;   // (a city is still being loaded from its recipes: a click edits nothing yet)
   if (act && ptrs.has(e.pointerId)){
     if (act.kind === 'npc' && !act.moved) MON.open(act.id);
@@ -127,7 +129,7 @@ const endPtr = e => {
   }
   ptrs.delete(e.pointerId);
   if (!ptrs.size){ dragging = false; act = null; }
-};
+}
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
 canvas.addEventListener('pointerleave', () => { if (!ptrs.size){ hover.visible = hoverFill.visible = false; showMegaGhost(null); hwGhost.g.visible = false; hwHighlight(null); } });
 canvas.addEventListener('wheel', e => { e.preventDefault(); zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 30); }, { passive:false });

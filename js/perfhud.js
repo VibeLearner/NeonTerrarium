@@ -56,6 +56,8 @@ const PH = (() => {
   function traceStart(){ TR = []; trF = null; }
   function traceStop(){ collect(); const t = TR; TR = null; trF = null; return t; }   // (the card's times arrive a few frames late: the last frames' may be missing)
   const trPut = (name, ms) => { if (trF) trF.laps.push([name, Math.round(ms*100)/100]); };
+  // work outside the frame (an input handler): noted against the frame being traced, under its own name
+  function outside(name, ms){ if (on && TR) trPut('outside the frame: ' + name, ms); }
   function frameStart(now){
     if (!on) return;
     if (TR){ if (trF){ trF.up = Math.round((GPUMEM.buf + GPUMEM.tex - trF.g0)/1024); TR.push(trF); } trF = { at: now, frame: frameNo + 1, laps: [], g0: GPUMEM.buf + GPUMEM.tex, gpu: null }; }   // (up: what the frame sent to the card, KB)
@@ -217,5 +219,5 @@ const PH = (() => {
   }
   addEventListener('keydown', e => { if ((e.key === 'F3' || e.key === '`') && !e.repeat && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName)){ e.preventDefault();
     if (e.shiftKey){ if (!on) toggle(); setExact(!exact); } else toggle(); } });
-  return { frameStart, abort, lap, sub, subBegin, laps, begin, end, shadow, frameEnd, toggle, setExact, text, tests, plainMat, traceStart, traceStop, get on(){ return on; }, get exact(){ return exact; } };
+  return { frameStart, abort, lap, sub, subBegin, laps, begin, end, shadow, frameEnd, toggle, setExact, text, tests, plainMat, traceStart, traceStop, outside, get on(){ return on; }, get exact(){ return exact; } };
 })();

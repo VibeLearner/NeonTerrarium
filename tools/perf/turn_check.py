@@ -12,6 +12,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument('--scene', default='dense'); ap.add_argument('--hour', type=float, default=22); ap.add_argument('--turns', type=int, default=4)
 ap.add_argument('--width', type=int, default=1710); ap.add_argument('--height', type=int, default=876); ap.add_argument('--zoom', type=float, default=20); ap.add_argument('--lines', type=int, default=720); ap.add_argument('--zoomres', default='1')
 ap.add_argument('--storage', help='a JSON file of the game\'s saved data (your own city)')
+ap.add_argument('--drag', action='store_true', help='a drag-and-release fling with the mouse (as played) instead of a key turn')
 a = ap.parse_args()
 
 def open_page(br, url, scene):
@@ -52,6 +53,24 @@ def worst_frames(d, n=3):
         out.append('        the card, frames %d to %d: %s ms%s' % (k - 4, k + 1, gpus, ('; this frame mostly ' + ', '.join('%s %.1f' % (n, ms) for n, ms in gb)) if gb else ''))
     return out
 
+# a drag fling: the mouse pressed on the sky, swept across quickly, let go; the frames from the release until the view has rested a second
+DRAG_START = '''(whole) => { PH.tests.wholeAfterTurn = whole; if (!PH.on) PH.toggle(); PH.traceStart(); window.__T = []; window.__S0 = []; window.__last = performance.now(); window.__stopAt = -1; window.__still = 0; window.__rec = false; window.__done = null;
+  const f = t => { const dt = t - window.__last; window.__last = t; if (window.__rec){ window.__T.push(dt); window.__S0.push(SC.state);
+    const moving = Math.abs(yawT - yaw) > 1e-9; if (!moving && window.__stopAt < 0) window.__stopAt = window.__T.length - 1; if (!moving) window.__still += dt; else window.__still = 0;
+    if (window.__still >= 1000 || window.__T.length >= 600){ const TRc = PH.traceStop(); if (PH.on) PH.toggle(); window.__done = { T: window.__T, S0: window.__S0, stopAt: window.__stopAt, TR: TRc }; return; } }
+    requestAnimationFrame(f); };
+  requestAnimationFrame(f); }'''
+def drag_turn(pg, whole):
+    pg.evaluate(DRAG_START, whole)
+    cx, cy = a.width*.5, a.height*.22   # (near the top: sky, so the drag turns the view and never paints)
+    pg.mouse.move(cx, cy); pg.mouse.down()
+    for k in range(1, 9): pg.mouse.move(cx - k*12, cy, steps=1); pg.wait_for_timeout(16)
+    for k in range(1, 5): pg.mouse.move(cx - 96 - k*45, cy, steps=1); pg.wait_for_timeout(8)   # (a quick flick at the end: the view lags behind and flings on)
+    pg.evaluate('window.__rec = true')
+    pg.mouse.up()
+    pg.wait_for_function('window.__done !== null', timeout=30000)
+    return pg.evaluate('window.__done')
+
 from playwright.sync_api import sync_playwright
 if not os.environ.get('PERF_SOFTWARE'): os.environ['PERF_GPU'] = '1'
 sc = H.load_scenes([a.scene])[0]
@@ -62,20 +81,22 @@ with sync_playwright() as pw:
     br = H.launch(pw)
     ctx, pg, errs = open_page(br, url, sc)
     print('render size:', pg.evaluate('() => W + "x" + H'), flush=True)
-    pg.evaluate(TURN, False); pg.wait_for_timeout(1500)   # (a warm-up turn)
+    turn = (lambda whole: drag_turn(pg, whole)) if a.drag else (lambda whole: pg.evaluate(TURN, whole))
+    turn(False); pg.wait_for_timeout(1500)   # (a warm-up turn)
     for r in range(a.turns):
         for label, whole in [('new: the view first, the ring after', False), ('before: the whole picture at once', True)]:
-            d = pg.evaluate(TURN, whole); pg.wait_for_timeout(1200)
+            d = turn(whole); pg.wait_for_timeout(1200)
             out.setdefault(label, []).append(d); print('turn %d, %s' % (r + 1, label), flush=True)
     ctx.close(); br.close()
 srv.shutdown()
 
-print('\nscene %s, hour %g, zoom %g: frame times in ms through each fling (the frame the view came to rest at, and the five after it; the worst of the turn in brackets)' % (a.scene, a.hour, a.zoom))
+print('\nscene %s, hour %g, zoom %g%s: frame times in ms through each fling (the frame the view came to rest at, and the five after it; the worst of the turn in brackets)' % (a.scene, a.hour, a.zoom, ', drag and release' if a.drag else ''))
 for label, L in out.items():
     print('\n' + label)
     for d in L:
         T, k = d['T'], d['stopAt']
         if k < 0: print('  (never came to rest)'); continue
+        if a.drag: print('  frames from the release: %s' % ' '.join('%.1f' % x for x in T[:k + 1]))
         tail = T[k:k + 6]
         print('  stop frame %.1f   then %s   [worst of the turn %.1f, turning frames mean %.1f]   states: %s' % (tail[0], ' '.join('%.1f' % x for x in tail[1:]), max(T[1:]), sum(T[1:k + 1])/max(1, k), ' > '.join(dict.fromkeys(d['S0'][max(0, k - 1):k + 6]))))
         for line in worst_frames(d): print(line)

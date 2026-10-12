@@ -1,0 +1,1402 @@
+{
+  "category": "city",
+  "title": "The player's city",
+  "theme": "Reactions to what the player builds, plus displacement and closures: homes demolished, workplaces removed, new people moving in.",
+  "storylets": [
+    {
+      "id": "cty.new-metro-line",
+      "title": "The first ride on the new line",
+      "tier": "texture",
+      "note": "Reacts to the player opening a metro line. Curious first rides.",
+      "roles": {
+        "A": {
+          "desc": "an adult at the metro entrance",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          22
+        ],
+        "at": [
+          "metro-station"
+        ],
+        "requires": [
+          "city:metro-line-opened"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 150,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "metro-station"
+        },
+        {
+          "id": "b2",
+          "do": "point",
+          "who": "A",
+          "at": "metro-station"
+        },
+        {
+          "id": "b3",
+          "do": "ride-metro",
+          "who": "A",
+          "at": "platform"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at the station entrance and studies the fresh paint on the sign.",
+          "{A} lingers at the new line's mouth with hands in pockets.",
+          "{A} stops in front of the entrance and reads the route map twice."
+        ],
+        "b2": [
+          "{A} points at the line map and traces it with one finger.",
+          "{A} gestures toward the stairwell and the lit mouth below.",
+          "{A} indicates the new line to a passing friend and shrugs."
+        ],
+        "b3": [
+          "{A} boards a car on the new line and the doors hiss shut.",
+          "{A} rides down and the train pulls out.",
+          "{A} takes the first car on the line and is gone."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.opinion-stated",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"Ten minutes to the foundry now. Used to be forty.\"",
+            "Overheard: {A} says: \"They did not skimp on the lights, I will say that.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "cty.club-opening-crowd",
+      "title": "A new club and a new crowd",
+      "tier": "texture",
+      "note": "The Neon Dome opens. Curious faces gather.",
+      "roles": {
+        "A": {
+          "desc": "an adult outside a new club",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          19,
+          24
+        ],
+        "at": [
+          "club-door",
+          "club-queue"
+        ],
+        "requires": [
+          "city:club-opened"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 150,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "point",
+          "who": "A",
+          "at": "club-door"
+        },
+        {
+          "id": "b3",
+          "do": "club-queue",
+          "who": "A",
+          "at": "club-queue"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} turns a corner and slows at the glow of a new sign.",
+          "{A} walks toward a freshly lit entrance, craning.",
+          "{A} drifts toward the club door, drawn by the thump."
+        ],
+        "b2": [
+          "{A} points up at the neon letters and says something to nobody.",
+          "{A} gestures toward the door and the bouncers.",
+          "{A} points at a poster by the door and tilts a head."
+        ],
+        "b3": [
+          "{A} joins the rope line, eyes on the door.",
+          "{A} takes a place at the end of the rope.",
+          "{A} steps into the queue and checks the time."
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:curious-about-club"
+        ]
+      }
+    },
+    {
+      "id": "cty.new-stall-line",
+      "title": "A queue at the new stall",
+      "tier": "mundane",
+      "note": "A new food stall draws a crowd.",
+      "roles": {
+        "A": {
+          "desc": "an adult in a new line",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "the new stall keeper",
+          "needs": [
+            "stall-keeper"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          11,
+          21
+        ],
+        "at": [
+          "stall"
+        ],
+        "requires": [
+          "city:stall-opened"
+        ],
+        "weight": 7,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "serve",
+          "who": "B",
+          "at": "stall",
+          "with": [
+            "A"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "eat",
+          "who": "A",
+          "at": "stall"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} joins a line at the newest stall, craning to read the board.",
+          "{A} queues behind six others and sniffs the air.",
+          "{A} waits in the stall line and counts the people ahead.",
+          "{A} reaches the counter and points at the first picture."
+        ],
+        "b2": [
+          "{B.desc} ladles something fragrant and slides it across.",
+          "{B.desc} serves {A} a bowl and a spoon and says a price.",
+          "{B.desc} hands over the first bowl with a small flourish.",
+          "{B.desc} serves up quick and moves on to the next."
+        ],
+        "b3": [
+          "{A} takes a first mouthful and goes quiet.",
+          "{A} eats standing and nods slowly at the bowl.",
+          "{A} blows on the broth and samples the edge.",
+          "{A} eats with eyebrows high."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "cty.first-lift-ride",
+      "title": "Up the new lift",
+      "tier": "mundane",
+      "note": "A new lift gets its first riders.",
+      "roles": {
+        "A": {
+          "desc": "an adult at a lift base",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          22
+        ],
+        "at": [
+          "lift-base"
+        ],
+        "requires": [
+          "city:lift-built"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 100,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "lift-base"
+        },
+        {
+          "id": "b2",
+          "do": "ride-lift",
+          "who": "A",
+          "at": "lift-base"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at the lift base and watches the cab descend.",
+          "{A} waits for the lift with a hand on the rail.",
+          "{A} stays at the base, head tilted back to follow the cable.",
+          "{A} lingers by the new lift doors."
+        ],
+        "b2": [
+          "{A} rides the lift up. The cab shrinks against the towers.",
+          "{A} takes the lift and the doors slide shut.",
+          "{A} steps in and rides the lift to the terrace.",
+          "{A} boards the cab and goes up in a hum."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "cty.new-lawn",
+      "title": "Green where there was dust",
+      "tier": "texture",
+      "note": "A new lawn attracts the first picnickers.",
+      "roles": {
+        "A": {
+          "desc": "an adult on the new lawn",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          19
+        ],
+        "weather": "clear",
+        "at": [
+          "lawn"
+        ],
+        "requires": [
+          "city:lawn-built"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 100,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "lawn"
+        },
+        {
+          "id": "b2",
+          "do": "point",
+          "who": "A",
+          "at": "lawn"
+        },
+        {
+          "id": "b3",
+          "do": "picnic",
+          "who": "A",
+          "at": "lawn"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at the lawn edge and prods the grass with a toe.",
+          "{A} steps onto the new lawn and looks around.",
+          "{A} halts at the grass and crouches to touch it."
+        ],
+        "b2": [
+          "{A} points at a young sapling and says something to a stranger.",
+          "{A} gestures toward the projector post.",
+          "{A} indicates a good patch near the pond."
+        ],
+        "b3": [
+          "{A} spreads a blanket on the new grass.",
+          "{A} lays a cloth down and settles.",
+          "{A} drops onto a blanket and lies back."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "cty.new-bench",
+      "title": "First sitter on the new bench",
+      "tier": "mundane",
+      "note": "A new bench draws the first rest.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a new bench",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          22
+        ],
+        "at": [
+          "bench"
+        ],
+        "requires": [
+          "city:bench-placed"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 100,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks around a new bench and taps it with a knuckle.",
+          "{A} stands over the bench and reads the plaque.",
+          "{A} stops at the new bench and wipes the slats.",
+          "{A} stays at the bench's end and checks the finish."
+        ],
+        "b2": [
+          "{A} sits and leans back with a long exhale.",
+          "{A} takes a seat and stretches both legs.",
+          "{A} eases onto the bench and watches the square.",
+          "{A} perches on the new bench and unwraps a snack."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "cty.dropoff-first-arrivals",
+      "title": "Down from the sky highway",
+      "tier": "texture",
+      "note": "The new dropoff gets its first arrivals.",
+      "roles": {
+        "A": {
+          "desc": "an adult arriving",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          22
+        ],
+        "at": [
+          "dropoff"
+        ],
+        "requires": [
+          "city:dropoff-built"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 200,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "arrive-dropoff",
+          "who": "A",
+          "at": "dropoff"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "dropoff"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} steps off the lift at the new dropoff with a bag over a shoulder.",
+          "{A} comes down to the pad and glances at the sign.",
+          "{A} arrives at the dropoff with a cup in each hand."
+        ],
+        "b2": [
+          "{A} stands on the pad and gets bearings by the clock tower.",
+          "{A} stays at the base of the lift and scans the street.",
+          "{A} halts and looks up, then along the block."
+        ],
+        "b3": [
+          "{A} sets off toward the square.",
+          "{A} walks away from the pad at a brisk pace.",
+          "{A} heads down the street, checking a handset."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "cty.plaza-stroll",
+      "title": "Strolling the new plaza",
+      "tier": "mundane",
+      "note": "A plaza gets its first walkers.",
+      "roles": {
+        "A": {
+          "desc": "an adult strolling",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          22
+        ],
+        "at": [
+          "square"
+        ],
+        "requires": [
+          "city:plaza-built"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 60,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "point",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b3",
+          "do": "sit",
+          "who": "A",
+          "at": "square"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} strolls onto the new plaza with a slow, wide circle.",
+          "{A} walks the paving in a loose spiral.",
+          "{A} crosses the plaza, boots on fresh stone.",
+          "{A} meanders along the plaza rim."
+        ],
+        "b2": [
+          "{A} points at the pattern in the paving and traces it with a toe.",
+          "{A} gestures toward the fountain.",
+          "{A} indicates a light fixture and says a word aloud.",
+          "{A} points out a sapling to a passing stranger."
+        ],
+        "b3": [
+          "{A} sits on the rim of the fountain and trails a hand in the water.",
+          "{A} takes a seat on the plaza steps.",
+          "{A} drops onto a ledge and lets out a breath.",
+          "{A} sits on a low wall and looks around."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "cty.home-demolished",
+      "title": "A door that is no longer there",
+      "tier": "notable",
+      "unwatched": true,
+      "note": "The player demolishes a home. The resident is shown carrying what they can. Hearsay carries the rest. Sets the chain flag A:displaced.",
+      "roles": {
+        "A": {
+          "desc": "an adult with all their things",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          20
+        ],
+        "at": [
+          "empty-plot",
+          "home-door"
+        ],
+        "requires": [
+          "single:home-demolished"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 4000,
+          "city": 24
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "empty-plot"
+        },
+        {
+          "id": "b2",
+          "do": "carry",
+          "who": "A",
+          "at": "empty-plot"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at a stretch of bare ground where a door used to be.",
+          "{A} stays on the empty plot, turning slowly in place.",
+          "{A} stands before a cleared lot with a crate at {A.his} feet."
+        ],
+        "b2": [
+          "{A} gathers belongings into crates on the bare ground.",
+          "{A} lashes a mattress to a cart and strains at the handle.",
+          "{A} carries a lamp and a bundle of clothes from the rubble."
+        ],
+        "b3": [
+          "{A} pulls a cart away down the block, looking back once.",
+          "{A} walks off with a bundle on each shoulder.",
+          "{A} heads for the metro, dragging a crate."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b1",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"They gave us a week's notice. Then the crane.\"",
+            "Overheard: {A} says: \"Everything I own is on this cart. That's the whole story.\""
+          ]
+        }
+      ],
+      "effects": {
+        "life": "home-lost",
+        "pressure": [
+          [
+            "A",
+            "life-change",
+            0.3
+          ]
+        ],
+        "flags": [
+          "A:displaced"
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:displaced"
+        ]
+      },
+      "hearsay": {
+        "about": "A",
+        "speakers": [
+          "neighbor",
+          "friend",
+          "shopkeeper",
+          "anyone"
+        ],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} says to {L} that {A.desc} lost the house when the crane came. A week's notice and gone.",
+          "Overheard: {S} tells {L}: \"{A.desc} was living in that block they tore down. Hasn't been seen since.\"",
+          "Overheard: {S} says {A.desc} lost the place to the demolition and is staying with someone.",
+          "Overheard: {S} mentions to {L} that {A.desc} had to clear out when the building came down."
+        ],
+        "entry": [
+          "Lost the home when the building was demolished (overheard: a neighbor, in conversation).",
+          "Had to leave after the demolition, per {S} (overheard, in conversation).",
+          "Was displaced by the wrecking crew, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "cty.visits-the-lot",
+      "title": "Back to look at the lot",
+      "tier": "texture",
+      "note": "Someone displaced comes back to see the empty ground. Chain: cty.new-place-found.",
+      "roles": {
+        "A": {
+          "desc": "an adult at a cleared lot",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          20
+        ],
+        "at": [
+          "empty-plot"
+        ],
+        "requires": [
+          "A:displaced"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 300,
+          "city": 3
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "empty-plot"
+        },
+        {
+          "id": "b3",
+          "do": "pick-up",
+          "who": "A",
+          "at": "empty-plot"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes along the block and slows at a gap in the row.",
+          "{A} turns a corner and stops at a cleared plot.",
+          "{A} arrives at the lot with a hand over the mouth."
+        ],
+        "b2": [
+          "{A} stands at the edge of the bare ground a long while.",
+          "{A} stays where the door used to be, hands at sides.",
+          "{A} lingers at the lot's fence with eyes lowered."
+        ],
+        "b3": [
+          "{A} bends and picks up a small ceramic shard from the dirt.",
+          "{A} retrieves a bent key from the rubble and puts it in a pocket.",
+          "{A} scoops up a handful of tiles and turns them over."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.2,
+          "log": [
+            "Overheard: {A} says to a passing stranger: \"That was my kitchen window, up there.\"",
+            "Overheard: {A} says: \"Third floor, left. I painted that door myself.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": [
+          "A:visited-lot"
+        ],
+        "branches": [
+          {
+            "w": 55,
+            "sets": [
+              "A:found-new-place"
+            ],
+            "label": "finds a new place"
+          },
+          {
+            "w": 45,
+            "sets": [],
+            "label": "drifts",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "cty.new-place-found",
+      "title": "Keys to somewhere else",
+      "tier": "notable",
+      "unwatched": true,
+      "note": "Pays off the displacement chain. A new home found; seen only in passing.",
+      "roles": {
+        "A": {
+          "desc": "an adult with a new key",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          20
+        ],
+        "at": [
+          "home-door"
+        ],
+        "requires": [
+          "A:found-new-place"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 2000,
+          "city": 24
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "carry",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} arrives at an unfamiliar door, reading a number on a slip.",
+          "{A} comes up to a door with a key held in a fist.",
+          "{A} approaches a new home and checks the slip once more."
+        ],
+        "b2": [
+          "{A} lugs a crate up the step, then a second.",
+          "{A} hauls the last of a cart's load to the door.",
+          "{A} carries a lamp and a rolled mat to the threshold."
+        ],
+        "b3": [
+          "{A} goes in. The door slides shut behind a crate.",
+          "{A} enters and the light inside flicks on.",
+          "{A} steps inside with the crate and shoulders the door shut."
+        ]
+      },
+      "effects": {
+        "life": "new-home",
+        "pressure": [
+          [
+            "A",
+            "life-change",
+            -0.2
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:rehoused"
+        ]
+      },
+      "hearsay": {
+        "about": "A",
+        "speakers": [
+          "neighbor",
+          "friend",
+          "shopkeeper",
+          "anyone"
+        ],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} says to {L} that {A.desc} found a new place over by the lift. Smaller, but dry.",
+          "Overheard: {S} tells {L}: \"{A.desc} has a new address. Moved last week.\"",
+          "Overheard: {S} says {A.desc} is settled in somewhere else after the demolition.",
+          "Overheard: {S} mentions that {A.desc} took a room across the district."
+        ],
+        "entry": [
+          "Found a new home after losing the old one (overheard: a neighbor, in conversation).",
+          "Moved into a new place across the district, per {S} (overheard, in conversation).",
+          "Moved into a new place, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "cty.workplace-gone",
+      "title": "The sign comes down",
+      "tier": "notable",
+      "unwatched": true,
+      "note": "The player removes a workplace. A worker finds the door gone. Sets A:jobless so the job-hunt chain can start.",
+      "roles": {
+        "A": {
+          "desc": "an adult at a cleared workplace",
+          "needs": [
+            "adult",
+            "employed"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          18
+        ],
+        "at": [
+          "work-door",
+          "empty-plot"
+        ],
+        "requires": [
+          "single:workplace-removed"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 4000,
+          "city": 24
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "empty-plot"
+        },
+        {
+          "id": "b3",
+          "do": "read-notice",
+          "who": "A",
+          "at": "empty-plot"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes along the block toward the work door with a lunch tin.",
+          "{A} walks to the workplace at the usual hour.",
+          "{A} turns the corner with a bag and stops short."
+        ],
+        "b2": [
+          "{A} stands at bare ground where the workplace used to be.",
+          "{A} stays at a cleared lot, tin hanging from one hand.",
+          "{A} stands before a stretch of fence and looks up."
+        ],
+        "b3": [
+          "{A} reads a printed sheet stuck to the fence, twice.",
+          "{A} reads the notice and rubs the back of the neck.",
+          "{A} studies a stamped notice taped to the barrier."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"It says closed as of Monday. Monday! It's Tuesday.\"",
+            "Overheard: {A} says: \"Eight years. And there's a sheet of paper.\""
+          ]
+        }
+      ],
+      "effects": {
+        "life": "job-lost",
+        "pressure": [
+          [
+            "A",
+            "money",
+            0.3
+          ]
+        ],
+        "flags": [
+          "A:jobless"
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:jobless"
+        ]
+      },
+      "hearsay": {
+        "about": "A",
+        "speakers": [
+          "neighbor",
+          "friend",
+          "shopkeeper",
+          "anyone"
+        ],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} says to {L} that {A.desc} lost the job when the whole place was torn down.",
+          "Overheard: {S} tells {L}: \"{A.desc}'s workplace is gone. Cleared. Nothing but a fence.\"",
+          "Overheard: {S} says {A.desc} is out of work since the closure.",
+          "Overheard: {S} mentions that {A.desc} lost the job when the place shut for good."
+        ],
+        "entry": [
+          "Lost the job when the workplace closed (overheard: a neighbor, in conversation).",
+          "Found the workplace cleared away, per {S} (overheard, in conversation).",
+          "Lost work in the closure, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "cty.newcomer-looks-around",
+      "title": "A stranger with a map",
+      "tier": "texture",
+      "unwatched": true,
+      "note": "Someone has just arrived and walks the block with a paper map.",
+      "roles": {
+        "A": {
+          "desc": "a newcomer with a map",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          20
+        ],
+        "at": [
+          "street",
+          "square"
+        ],
+        "requires": [
+          "single:newly-arrived"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 4000,
+          "city": 24
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "read-notice",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "point",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks slowly down the block with a duffel on one shoulder.",
+          "{A} wanders into the square and turns a full circle.",
+          "{A} comes along the sidewalk reading house numbers."
+        ],
+        "b2": [
+          "{A} reads a notice board, then a map, then the board again.",
+          "{A} stops at a printed sheet and scans it.",
+          "{A} checks a folded map against the street signs."
+        ],
+        "b3": [
+          "{A} points down a side street and then changes {A.his} mind.",
+          "{A} gestures toward the clock tower and asks a stranger the way.",
+          "{A} points at the tower and walks toward it."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} asks: \"Is this the way to the square? I came in this morning.\"",
+            "Overheard: {A} says: \"First day in the city. Is it always this loud?\""
+          ]
+        }
+      ],
+      "effects": {
+        "life": "arrived-in-city"
+      },
+      "next": {
+        "sets": [
+          "A:newly-arrived"
+        ]
+      },
+      "hearsay": {
+        "about": "A",
+        "speakers": [
+          "neighbor",
+          "friend",
+          "shopkeeper",
+          "anyone"
+        ],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} says to {L} that {A.desc} just got to the city and is still finding the way around.",
+          "Overheard: {S} tells {L}: \"New in town. {A.desc}. Walks around with a map.\"",
+          "Overheard: {S} says {A.desc} moved here from elsewhere only last week.",
+          "Overheard: {S} mentions that {A.desc} is brand new to the district."
+        ],
+        "entry": [
+          "Arrived in the district only days ago (overheard: a neighbor, in conversation).",
+          "Came to the district last week, per {S} (overheard, in conversation).",
+          "Came in from elsewhere, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "cty.new-tenant-boxes",
+      "title": "New boxes at the end of the row",
+      "tier": "mundane",
+      "note": "A new neighbor moves in; an existing resident watches. Uses the game's own flag.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a stoop",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a new neighbor with boxes",
+          "rel": "neighbor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          18
+        ],
+        "at": [
+          "home-door"
+        ],
+        "requires": [
+          "single:new-neighbor-moved-in"
+        ],
+        "weight": 7,
+        "cooldown": {
+          "person": 900,
+          "city": 6
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "carry",
+          "who": "B",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits on the stoop with a cup and watches the row.",
+          "{A} takes a seat on the step and stretches out.",
+          "{A} perches on the top step and sips."
+        ],
+        "b2": [
+          "{B.desc} hauls a crate up the next step along, then another.",
+          "{B.desc} backs through a door with a lamp and a rolled rug.",
+          "{B.desc} carries a box to the new door and sets it down."
+        ],
+        "b3": [
+          "{A} waves. {B.desc} waves back with a free hand and nearly drops the crate.",
+          "{A} lifts a hand to {B.desc} across the landing.",
+          "{A} waves once at {B.desc} and goes back to the cup."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {A} calls: \"Welcome to the row, neighbor! Shout if you need a hand.\"",
+            "Overheard: {B.desc} calls back: \"Thank you! I will!\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": [
+          "A+B:neighbors-greet"
+        ]
+      }
+    },
+    {
+      "id": "cty.petition-board",
+      "title": "Reading the notice board",
+      "tier": "texture",
+      "note": "Townspeople read posted notices about changes in the city. Spreads opinion without conclusions.",
+      "roles": {
+        "A": {
+          "desc": "an adult at a notice board",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a neighbor reading beside them",
+          "rel": "neighbor-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          21
+        ],
+        "at": [
+          "street",
+          "square"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 150,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "read-notice",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "shrug",
+          "who": "A",
+          "at": "street",
+          "with": [
+            "B"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} reads a sheet pinned to the board with a finger tracing the lines.",
+          "{A} stops at the notice board and reads from top to bottom.",
+          "{A} scans a printed bulletin and taps the corner."
+        ],
+        "b2": [
+          "{B.desc} comes up beside {A} and says something about the new rules.",
+          "{A} and {B.desc} talk in low tones, heads near the board.",
+          "{B.desc} points at a line and {A} answers."
+        ],
+        "b3": [
+          "{A} shrugs and turns away, shaking {A.his} head.",
+          "{A} shakes {A.his} head, shrugs, and wanders off.",
+          "{A} turns away from {B.desc} and heads for the stalls."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.opinion-stated",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {A} says: \"They'll build over it all and call it progress.\"",
+            "Overheard: {A} says: \"It's about time somebody fixed the lift. I say let them.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "cty.crowd-watches-crane",
+      "title": "Everyone looks up",
+      "tier": "mundane",
+      "note": "A crowd watches construction. Cheap texture; reacts to the player's hand.",
+      "roles": {
+        "A": {
+          "desc": "an adult watching a build",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          18
+        ],
+        "at": [
+          "empty-plot",
+          "square"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "empty-plot"
+        },
+        {
+          "id": "b2",
+          "do": "point",
+          "who": "A",
+          "at": "empty-plot"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at a fence and watches a crane lift a beam.",
+          "{A} stays at the barrier with a cup, head back.",
+          "{A} stops at the edge of a plot and watches the work.",
+          "{A} lingers by the fence while a drone ferries steel."
+        ],
+        "b2": [
+          "{A} points at the crane arm and says something aloud.",
+          "{A} gestures toward the swinging beam.",
+          "{A} indicates the half-built frame to a passing stranger.",
+          "{A} points at a pair of workers on a gantry."
+        ],
+        "b3": [
+          "{A} wanders off after a few minutes, still looking back.",
+          "{A} walks away and glances up one more time.",
+          "{A} heads on down the block.",
+          "{A} turns away from the fence and goes."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    }
+  ]
+}

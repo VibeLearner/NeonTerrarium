@@ -24,10 +24,14 @@
 /* ---------- fast forward ---------- */
 // The clock (S.hour, with the day cycle on) and the people (their walking, waiting and deciding) run faster together:
 // at 10x a day takes six minutes, at 60x one. People speed up less than the clock, so they still read as people.
-const FF = { clock: 1, ppl: 1, t: null };
+// Fast forward needs the clock running, so it switches the day cycle on if it was off, and back to 1x puts it back as it was: left running, the sun's
+// creep had the shadow map redrawn every half second at 1x, and the crisp shadows re-snapping to its new grid read as a flicker over the whole city.
+const FF = { clock: 1, ppl: 1, t: null, cycleWas: null };
 FF.set = k => {
   FF.clock = k; FF.ppl = k >= 60 ? 6 : k >= 10 ? 3 : 1;
-  if (k > 1 && !S.cycle){ S.cycle = true; const c = document.getElementById('cycle'); if (c) c.checked = true; }
+  const box = document.getElementById('cycle');
+  if (k > 1 && !S.cycle){ FF.cycleWas = false; S.cycle = true; if (box) box.checked = true; }
+  else if (k <= 1 && FF.cycleWas === false){ FF.cycleWas = null; S.cycle = false; if (box) box.checked = false; }
 };
 FF.peopleTime = (dt, now) => { if (FF.t === null) FF.t = now; FF.t += dt*FF.ppl; return FF.t; };
 

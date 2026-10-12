@@ -54,11 +54,11 @@ const PH = (() => {
   // (tools/perf/turn_check.py: what the slow frames of a turn were doing). Only while the overlay is on.
   let TR = null, trF = null;
   function traceStart(){ TR = []; trF = null; }
-  function traceStop(){ const t = TR; TR = null; trF = null; return t; }
+  function traceStop(){ collect(); const t = TR; TR = null; trF = null; return t; }   // (the card's times arrive a few frames late: the last frames' may be missing)
   const trPut = (name, ms) => { if (trF) trF.laps.push([name, Math.round(ms*100)/100]); };
   function frameStart(now){
     if (!on) return;
-    if (TR){ if (trF){ trF.up = Math.round((GPUMEM.buf + GPUMEM.tex - trF.g0)/1024); TR.push(trF); } trF = { at: now, laps: [], g0: GPUMEM.buf + GPUMEM.tex }; }   // (up: what the frame sent to the card, KB)
+    if (TR){ if (trF){ trF.up = Math.round((GPUMEM.buf + GPUMEM.tex - trF.g0)/1024); TR.push(trF); } trF = { at: now, frame: frameNo + 1, laps: [], g0: GPUMEM.buf + GPUMEM.tex, gpu: null }; }   // (up: what the frame sent to the card, KB)
     if (lastRaf){ const d = now - lastRaf; if (d < 500){ put(frameMs, d); hist.push([d, shadowFrame]); if (hist.length > N) hist.shift(); } }
     lastRaf = now; frameNo++; shadowFrame = false;
     t0 = mark = performance.now();
@@ -122,7 +122,8 @@ const PH = (() => {
       const p = pending[k];
       if (!disjoint && !gl.getQueryParameter(p.q, gl.QUERY_RESULT_AVAILABLE)) continue;
       if (!disjoint){ const ms = gl.getQueryParameter(p.q, gl.QUERY_RESULT)/1e6; put(stat(p.name, 'pass').gpu, ms);
-        let f = gpuOf.get(p.frame); if (!f) gpuOf.set(p.frame, f = { sum: 0 }); f.sum += ms; if (p.name === 'color + shadow redraw') put(shadowMs, ms); }
+        let f = gpuOf.get(p.frame); if (!f) gpuOf.set(p.frame, f = { sum: 0 }); f.sum += ms; if (p.name === 'color + shadow redraw') put(shadowMs, ms);
+        if (TR){ const e = p.frame === (trF && trF.frame) ? trF : TR.find(x => x.frame === p.frame); if (e){ e.gpu = Math.round(((e.gpu || 0) + ms)*100)/100; (e.gpuBy = e.gpuBy || []).push([p.name, Math.round(ms*100)/100]); } } }
       free.push(p.q); pending.splice(k--, 1);
     }
     for (const [f, v] of gpuOf) if (f < frameNo - 1 && !pending.some(p => p.frame === f)){ put(gpuMs, v.sum); gpuOf.delete(f); }

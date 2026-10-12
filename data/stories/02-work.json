@@ -1,0 +1,581 @@
+{
+  "category": "work",
+  "title": "Work and money",
+  "theme": "Shifts, a bad day, overtime, side gigs, debts, payday, and the job that ends or begins.",
+  "storylets": [
+    {
+      "id": "wrk.shift-change",
+      "title": "One in, one out",
+      "tier": "mundane",
+      "note": "Two coworkers pass at a work door at shift change. Common, cheap and quiet.",
+      "roles": {
+        "A": { "desc": "an adult finishing a shift", "needs": ["adult", "employed"] },
+        "B": { "desc": "a coworker arriving for the next shift", "rel": "coworker-of:A" }
+      },
+      "when": { "hours": [5, 9], "at": ["work-door"], "weight": 6, "cooldown": { "person": 20, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "leave", "who": "A", "at": "work-door" },
+        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "work-door" },
+        { "id": "b3", "do": "enter", "who": "B", "at": "work-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out of the work door stretching both arms over {A.his} head.",
+          "{A} leaves the workplace at the end of the shift, shoulders slumped, lanyard swinging.",
+          "{A} emerges from the work door and blinks at the daylight."
+        ],
+        "b2": [
+          "{B.desc} arrives at the door as {A} is coming out. A few words and a clap on the shoulder.",
+          "{A} and {B.desc} trade a short report on the step. {B.desc} nods through it.",
+          "{A} says something to {B.desc} and points back inside with a thumb."
+        ],
+        "b3": [
+          "{B.desc} goes in and the door slides shut on the end of the sentence.",
+          "{B.desc} takes over and enters. {A} is already walking away.",
+          "{B.desc} steps through the work door, tying an apron as {B.he} goes."
+        ]
+      }
+    },
+    {
+      "id": "wrk.bad-day",
+      "title": "A day gone wrong",
+      "tier": "texture",
+      "note": "Work trouble pressure shows as behavior only. The feeling arrives through a stated line on a call, never as fact.",
+      "roles": { "A": { "desc": "an employed adult after a bad shift", "needs": ["adult", "employed", "pressure-high:work-trouble"] } },
+      "when": { "hours": [15, 21], "days": "weekday", "at": ["work-door", "bench"], "weight": 4, "cooldown": { "person": 120, "city": 2 }, "pressure": { "work-trouble": [0.4, 1] } },
+      "beats": [
+        { "id": "b1", "do": "leave", "who": "A", "at": "work-door" },
+        { "id": "b2", "do": "emote", "who": "A", "emote": "anger", "at": "work-door" },
+        { "id": "b3", "do": "sit", "who": "A", "at": "bench" },
+        { "id": "b4", "do": "phone-call", "who": "A", "at": "bench" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out of the work door fast. The door is still sliding when {A} is already ten steps down the block.",
+          "{A} leaves the workplace with the bag half closed and a shoe untied.",
+          "{A} exits and does not slow down at the corner."
+        ],
+        "b2": [
+          "Anger mark over {A}. {A} stops, puts both hands on {A.his} head, and walks on.",
+          "{A} kicks the base of a lamp once. Anger mark over {A}.",
+          "{A} turns back toward the door, stops, then keeps walking."
+        ],
+        "b3": [
+          "{A} drops onto a bench, elbows on knees. Stays like that.",
+          "{A} sits on a bench with the bag held in both arms like a cushion.",
+          "{A} takes a bench at the edge of the square and stares at the ground."
+        ],
+        "b4": [
+          "{A} takes a call, voice flat. Low, short answers.",
+          "{A} picks up a call and listens for a long time before speaking.",
+          "{A} answers a call on the bench and presses the heel of one hand to {A.his} eye."
+        ]
+      },
+      "reveals": [
+        { "fact": "A.feeling-stated", "beat": "b4", "channel": "phone", "chance": 0.8, "log": [
+          "Phone, one side: {A} says \"He said it in front of everyone. I did not get a word in.\"",
+          "Phone, one side: {A} says \"I'm fine. I just need an hour. It was a long one.\""
+        ] }
+      ],
+      "effects": { "pressure": [["A", "work-trouble", 0.05]] },
+      "next": { "sets": ["A:bad-day-recent"] }
+    },
+    {
+      "id": "wrk.overtime",
+      "title": "Late out of the work door",
+      "tier": "texture",
+      "note": "A long shift runs over. Money pressure eases a little.",
+      "roles": { "A": { "desc": "an employed adult working late", "needs": ["adult", "employed"] } },
+      "when": { "hours": [20, 24], "days": "weekday", "at": ["work-door", "stall"], "weight": 4, "cooldown": { "person": 80, "city": 1 } },
+      "beats": [
+        { "id": "b1", "do": "leave", "who": "A", "at": "work-door" },
+        { "id": "b2", "do": "queue-order", "who": "A", "at": "stall" },
+        { "id": "b3", "do": "eat", "who": "A", "at": "cafe-stool" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out of the work door long after dark. The street lamps are on. A last light goes off behind {A.him}.",
+          "{A} emerges, jaw set, bag heavy, and locks the door with a key.",
+          "{A} leaves late, much later than the other doors on the block, and stretches in the empty street."
+        ],
+        "b2": [
+          "{A} orders at the late stall. Asks for the biggest bowl.",
+          "{A} reaches the counter and orders without looking up.",
+          "{A} joins a short line of other late workers at {place}."
+        ],
+        "b3": [
+          "{A} eats in silence at the end stool, spoon and handset both in hand.",
+          "{A} finishes the bowl in a minute, then sits and lets the steam rise.",
+          "{A} leans against the counter and eats with {A.his} eyes half closed."
+        ]
+      },
+      "effects": { "pressure": [["A", "money", -0.03]] }
+    },
+    {
+      "id": "wrk.payday-treat",
+      "title": "Payday at the counter",
+      "tier": "mundane",
+      "note": "A little extravagance after pay arrives. Mundane, warm.",
+      "roles": { "A": { "desc": "an employed adult on payday", "needs": ["adult", "employed"] } },
+      "when": { "hours": [16, 21], "days": "weekday", "at": ["stall", "cafe-stool"], "weight": 5, "cooldown": { "person": 100, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "queue-order", "who": "A", "at": "stall" },
+        { "id": "b2", "do": "eat", "who": "A", "at": "cafe-stool" }
+      ],
+      "log": {
+        "b1": [
+          "{A} orders the dish with the lit sign beside it, the expensive one, and a drink to go with it.",
+          "{A} orders two things and a dessert, and counts out the exact coins with a flourish.",
+          "{A} reaches the counter and points at the top of the board."
+        ],
+        "b2": [
+          "{A} eats with a spoon in each hand, grinning. Note bubble over {A}.",
+          "{A} sits with a full tray and a clean handset. Takes {n} minutes to finish.",
+          "{A} eats the dessert first. A pleased look at the sky."
+        ]
+      },
+      "effects": { "pressure": [["A", "money", -0.05]] }
+    },
+    {
+      "id": "wrk.side-gig",
+      "title": "Carrying for cash",
+      "tier": "texture",
+      "note": "A second small job after hours. A.job learned through talk.",
+      "roles": {
+        "A": { "desc": "an adult with a second small job", "needs": ["adult", "pressure-high:money"] },
+        "B": { "desc": "someone who pays A for odd work", "rel": "boss-of:A" }
+      },
+      "when": { "hours": [17, 23], "at": ["street", "shop-door"], "weight": 4, "cooldown": { "person": 80, "city": 2 }, "pressure": { "money": [0.4, 1] } },
+      "beats": [
+        { "id": "b1", "do": "carry", "who": "A", "at": "street" },
+        { "id": "b2", "do": "hand-over", "who": "A", "with": ["B"], "at": "shop-door" },
+        { "id": "b3", "do": "chat", "who": ["A", "B"], "at": "shop-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} carries two stacked boxes along the walk, chin on the top one.",
+          "{A} lugs a crate through the evening crowd, calling out apologies.",
+          "{A} drags a hand truck loaded with sacks, one wheel shrieking."
+        ],
+        "b2": [
+          "{A} sets the load down at the shop door and hands over a slip. {B.desc} signs it.",
+          "{A} passes the paperwork to {B.desc}, who checks it against the boxes.",
+          "{B.desc} takes the slip from {A} and counts the boxes under {B.his} breath."
+        ],
+        "b3": [
+          "{B.desc} talks and counts something on the fingers of one hand. {A} nods.",
+          "{A} and {B.desc} settle up on the step. A few notes change hands.",
+          "{B.desc} gives {A} a short instruction and points to the next shop down."
+        ]
+      },
+      "reveals": [
+        { "fact": "A.job", "beat": "b3", "channel": "conversation", "chance": 0.6, "log": [
+          "Overheard: {B.desc} says: \"Same as last week. Six boxes, one night, cash on the step.\"",
+          "Overheard: {B.desc} tells {A}: \"You are the only runner who comes back for the second shift.\""
+        ] },
+        { "fact": "B.relation-to-A", "beat": "b3", "channel": "conversation", "chance": 0.5, "log": [
+          "Overheard: {B.desc} says to {A}: \"Pay is on the step, same as before.\"",
+          "Overheard: {A} calls {B.desc} \"boss\" and gets a laugh."
+        ] }
+      ],
+      "effects": { "pressure": [["A", "money", -0.04]] }
+    },
+    {
+      "id": "wrk.borrow-money",
+      "title": "Thirty until payday",
+      "tier": "notable",
+      "note": "A friend asked for a small loan. Everything is stated, nothing is thought. Chain: wrk.loan-repaid, or it fizzles into a small awkwardness.",
+      "roles": {
+        "A": { "desc": "an adult short on money", "needs": ["adult", "pressure-high:money"], "rel": "friend-of:B" },
+        "B": { "desc": "a friend of A with a little spare", "rel": "friend-of:A" }
+      },
+      "when": { "hours": [12, 22], "at": ["stall", "cafe-stool", "bench"], "weight": 3, "cooldown": { "person": 200, "city": 3 }, "pressure": { "money": [0.6, 1] } },
+      "beats": [
+        { "id": "b1", "do": "walk-together", "who": ["A", "B"], "at": "street" },
+        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "bench" },
+        { "id": "b3", "do": "hand-over", "who": "B", "with": ["A"], "at": "bench" }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} walk the square together. {A} is quieter than {B.desc} for the whole stretch.",
+          "{B.desc} talks the whole walk. {A} says little and checks the clock tower.",
+          "{A} and {B.desc} cross to the benches, {A} half a step behind."
+        ],
+        "b2": [
+          "On the bench, {A} talks low and rubs a thumb along the strap of a bag. {B.desc} listens, nods once.",
+          "{A} says something and looks away. {B.desc} answers with a short sentence and a tilt of the head.",
+          "{A} and {B.desc} sit side by side. {A} leans forward, elbows on knees. {B.desc} leans back."
+        ],
+        "b3": [
+          "{B.desc} takes out a few notes and gives them to {A}. {A} presses them flat and tucks them in a pocket.",
+          "A folded note passes from {B.desc} to {A}. {A} bows, quick, and puts it away.",
+          "{B.desc} counts out a few notes and puts them in {A}'s hand. {A} holds the hand shut."
+        ]
+      },
+      "reveals": [
+        { "fact": "A.money-stated", "beat": "b2", "channel": "conversation", "chance": 0.8, "log": [
+          "Overheard: {A} says: \"Thirty, until payday. I swear it is just till payday.\"",
+          "Overheard: {A} asks: \"Can you cover the rest of the week? I'll pay you back on the fifteenth.\""
+        ] }
+      ],
+      "effects": { "pressure": [["A", "money", -0.1]], "warmth": [["A", "B", 0.03]] },
+      "next": { "sets": ["A+B:owes-b"], "branches": [
+        { "w": 55, "sets": ["A+B:will-repay"], "label": "A pays it back" },
+        { "w": 45, "sets": [], "label": "forgotten for months", "fizzle": true }
+      ] }
+    },
+    {
+      "id": "wrk.loan-repaid",
+      "title": "Paid back, plus a bowl",
+      "tier": "texture",
+      "note": "The pay-off to wrk.borrow-money.",
+      "roles": {
+        "A": { "desc": "an adult who borrowed from B", "needs": ["adult"], "rel": "debtor-of:B" },
+        "B": { "desc": "the friend who lent the money", "rel": "creditor-of:A" }
+      },
+      "when": { "hours": [12, 22], "at": ["stall", "cafe-stool"], "requires": ["A+B:will-repay"], "weight": 5, "cooldown": { "person": 300, "city": 3 } },
+      "beats": [
+        { "id": "b1", "do": "queue-order", "who": ["A", "B"], "at": "stall" },
+        { "id": "b2", "do": "hand-over", "who": "A", "with": ["B"], "at": "cafe-stool" },
+        { "id": "b3", "do": "eat", "who": ["A", "B"], "at": "cafe-stool" }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} reach the counter together. {A} orders for both and pays before {B.desc} can reach.",
+          "{A} holds up two fingers at the stall. {B.desc} objects. {A} pays.",
+          "{A} steps up first and orders two bowls, pushing {B.desc}'s hand away from the counter."
+        ],
+        "b2": [
+          "{A} puts a folded note in {B.desc}'s hand. {B.desc} counts it and gives half back. {A} refuses.",
+          "{A} hands over an envelope. {B.desc} weighs it, shrugs, and pockets it.",
+          "{A} passes a small stack of notes across the table. {B.desc} nods once and puts them away."
+        ],
+        "b3": [
+          "The two eat side by side. {A} points at {B.desc} with a spoon. {B.desc} laughs. Note bubble over both.",
+          "{A} and {B.desc} eat in comfortable silence. {B.desc} pushes the pickles toward {A}.",
+          "Both heads down over their bowls. A joke goes back and forth without looking up."
+        ]
+      },
+      "reveals": [
+        { "fact": "A.money-stated", "beat": "b2", "channel": "conversation", "chance": 0.7, "log": [
+          "Overheard: {A} says: \"That's the thirty. Thank you for not asking about it.\"",
+          "Overheard: {A} tells {B.desc}: \"Square. You can stop pretending you forgot.\""
+        ] }
+      ],
+      "effects": { "pressure": [["A", "money", -0.05]], "warmth": [["A", "B", 0.08]] }
+    },
+    {
+      "id": "wrk.laid-off",
+      "title": "A box on the work step",
+      "tier": "notable",
+      "note": "A lost job. The watcher can see the moment only by luck; usually it arrives as hearsay. Chain: wrk.job-hunt, then wrk.found-new-job.",
+      "unwatched": true,
+      "roles": {
+        "A": { "desc": "an employed adult losing the job", "needs": ["adult", "employed"] },
+        "B": { "desc": "a former coworker or boss, at the door", "rel": "coworker-of:A" }
+      },
+      "when": { "hours": [9, 18], "days": "weekday", "at": ["work-door"], "weight": 2, "cooldown": { "person": 2000, "city": 24 }, "pressure": { "work-trouble": [0.3, 1] } },
+      "beats": [
+        { "id": "b1", "do": "leave", "who": "A", "at": "work-door" },
+        { "id": "b2", "do": "carry", "who": "A", "at": "work-door" },
+        { "id": "b3", "do": "chat", "who": ["A", "B"], "at": "work-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out of the work door at an unusual hour, a cardboard box in both arms.",
+          "{A} leaves the workplace in the middle of the day, carrying a box that rattles.",
+          "{A} exits the work door, box held against {A.his} chest, jacket over the top."
+        ],
+        "b2": [
+          "{A} stands on the step with the box and looks up at the sign. Does not move for a minute.",
+          "{A} sets the box down on the step, picks it up again, sets it down.",
+          "{A} stays at the work door, box at {A.his} feet, a lanyard still around {A.his} neck."
+        ],
+        "b3": [
+          "{B.desc} talks briefly to {A}, one hand on {A}'s shoulder. {A} nods and does not look up.",
+          "{B.desc} says something short to {A} and goes back in. {A} stays where {A.he} is.",
+          "{A} and {B.desc} exchange a few words at the door. A handshake. The door slides shut on {B.desc}."
+        ]
+      },
+      "reveals": [
+        { "fact": "A.news", "beat": "b3", "channel": "conversation", "chance": 0.6, "log": [
+          "Overheard: {B.desc} says \"Nothing personal. It came from above.\" {A} nods.",
+          "Overheard: {B.desc} tells {A}: \"I will give you a reference. Come by Friday for the paperwork.\""
+        ] }
+      ],
+      "effects": { "life": "job-lost", "pressure": [["A", "money", 0.3], ["A", "work-trouble", -0.2]], "flags": ["A:jobless"] },
+      "next": { "sets": ["A:jobless"] },
+      "hearsay": {
+        "about": "A",
+        "speakers": ["coworker", "neighbor", "friend", "shopkeeper"],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} tells {L} that {A.desc} got let go last week, \"out of nowhere.\"",
+          "Overheard: {S} says {A.desc} lost the job on a Friday and has been around the block ever since.",
+          "Overheard: {S} says to {L}: \"You heard? {A.desc} is out of work. They cut a whole shift.\"",
+          "Overheard: {S} says {A.desc} was let go at the end of last month. {S} mentions the box on the step."
+        ],
+        "entry": [
+          "Lost the job a week ago (overheard: a neighbor, in conversation).",
+          "Was let go from work last month, per {S} (overheard, in conversation).",
+          "Left the workplace for good, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "wrk.job-hunt",
+      "title": "Reading the boards",
+      "tier": "texture",
+      "note": "After a job loss: boards, shop doors, a stall conversation. The jobless pressure shows as time spent in the square.",
+      "roles": { "A": { "desc": "an unemployed adult looking for work", "needs": ["adult", "unemployed"] } },
+      "when": { "hours": [9, 17], "at": ["street", "shop-door", "square"], "requires": ["A:jobless"], "weight": 5, "cooldown": { "person": 60, "city": 1 } },
+      "beats": [
+        { "id": "b1", "do": "read-notice", "who": "A", "at": "street" },
+        { "id": "b2", "do": "enter", "who": "A", "at": "shop-door" },
+        { "id": "b3", "do": "leave", "who": "A", "at": "shop-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} stops at a board by the crossing and reads each card, in order. Copies one onto a handset.",
+          "{A} reads the notices pinned to a pole, one finger moving down the list.",
+          "{A} reads a card by the shop door twice. Photographs it."
+        ],
+        "b2": [
+          "{A} straightens {A.his} jacket and goes in through the shop door.",
+          "{A} takes a breath and enters the shop. The door slides shut.",
+          "{A} goes in at the shop door, folded paper in hand."
+        ],
+        "b3": [
+          "{A} comes out ten minutes later. Shakes {A.his} head to no one in particular.",
+          "{A} emerges with the same paper still in hand and heads for the next shop.",
+          "{A} leaves the shop at a measured pace and does not look back at it."
+        ]
+      },
+      "effects": { "pressure": [["A", "money", 0.04]] },
+      "next": { "sets": ["A:job-hunting"] }
+    },
+    {
+      "id": "wrk.found-new-job",
+      "title": "A new door to use",
+      "tier": "notable",
+      "note": "The job hunt ends. Usually unwatched; arrives through gossip. Sets a flag so a new-uniform storylet can show it.",
+      "unwatched": true,
+      "roles": {
+        "A": { "desc": "an unemployed adult who finds a job", "needs": ["adult", "unemployed"] },
+        "B": { "desc": "the new boss at the door", "rel": "boss-of:A" }
+      },
+      "when": { "hours": [8, 18], "days": "weekday", "at": ["work-door"], "requires": ["A:job-hunting"], "weight": 3, "cooldown": { "person": 2000, "city": 24 } },
+      "beats": [
+        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "work-door" },
+        { "id": "b3", "do": "enter", "who": ["A", "B"], "at": "work-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks to the work block in a pressed shirt and clean shoes, a new lanyard still in its plastic.",
+          "{A} crosses the street at the signal, hair combed flat, and checks the number over the door.",
+          "{A} walks the block at a measured pace and adjusts a collar on the way."
+        ],
+        "b2": [
+          "{B.desc} meets {A} at the door and shakes {A.his} hand. A longer handshake than the others today.",
+          "{A} and {B.desc} stand at the door while {B.desc} points up and down the block, one finger tracing a route.",
+          "{B.desc} gives {A} a card and a key and says something short."
+        ],
+        "b3": [
+          "{A} follows {B.desc} through the work door. It closes.",
+          "{B.desc} holds the door and {A} goes in ahead.",
+          "{A} and {B.desc} go in. The door slides shut."
+        ]
+      },
+      "reveals": [
+        { "fact": "A.job", "beat": "b2", "channel": "conversation", "chance": 0.7, "log": [
+          "Overheard: {B.desc} says: \"Welcome. First shift Monday. You have the night counter.\"",
+          "Overheard: {B.desc} tells {A}: \"Uniform's in the back. Badge by Friday.\""
+        ] }
+      ],
+      "effects": { "life": "job-found", "pressure": [["A", "money", -0.2]], "flags": ["A:new-job-started"] },
+      "next": { "sets": ["A:new-job-started"] },
+      "hearsay": {
+        "about": "A",
+        "speakers": ["friend", "neighbor", "coworker", "family"],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} tells {L} that {A.desc} landed something, \"a night counter, I think.\"",
+          "Overheard: {S} says {A.desc} started a new job on Monday and has been out of the house early.",
+          "Overheard: {S} says: \"{A.desc} found work at last. A real contract, not odd days.\"",
+          "Overheard: {S} mentions that {A.desc} \"finally got hired somewhere.\""
+        ],
+        "entry": [
+          "Started a new job recently (overheard: a friend, in conversation).",
+          "Found work after weeks of looking, said {S} (overheard).",
+          "Was hired last week, per {S} (overheard, in conversation)."
+        ]
+      }
+    },
+    {
+      "id": "wrk.new-uniform",
+      "title": "A badge no one has seen",
+      "tier": "texture",
+      "note": "Seen after a job change: a new uniform and a verified job from the badge.",
+      "roles": { "A": { "desc": "an adult in a new job", "needs": ["adult", "employed"] } },
+      "when": { "hours": [6, 10], "days": "weekday", "at": ["street", "work-door"], "requires": ["A:new-job-started"], "weight": 6, "cooldown": { "person": 400, "city": 2 } },
+      "beats": [
+        { "id": "b1", "do": "walk", "who": "A", "at": "street" },
+        { "id": "b2", "do": "enter", "who": "A", "at": "work-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks in a stiff new jacket, the creases still showing from the pack.",
+          "{A} walks to work in a different uniform than before. The badge catches the light.",
+          "{A} crosses the street in clothes that do not match any shape {A.he} wore before."
+        ],
+        "b2": [
+          "{A} reaches the door and goes in under a new sign.",
+          "{A} stops at an unfamiliar door, checks the number, and enters.",
+          "{A} steps through the door. It slides shut behind {A}."
+        ]
+      },
+      "reveals": [
+        { "fact": "A.job", "beat": "b2", "channel": "document", "chance": 0.9, "log": [
+          "Badge on the new jacket reads: {A.job}.",
+          "Name tag at the work door: {A.job}."
+        ] },
+        { "fact": "A.employer", "beat": "b2", "channel": "document", "chance": 0.7, "log": [
+          "Sign over the new door: {A.employer}.",
+          "Door plaque at the new workplace: {A.employer}."
+        ] }
+      ]
+    },
+    {
+      "id": "wrk.slow-night",
+      "title": "A quiet counter",
+      "tier": "texture",
+      "note": "A keeper with no customers. Money pressure and nothing else. A shrug and an early close.",
+      "roles": { "A": { "desc": "a stall keeper on a slow night", "needs": ["adult", "stall-keeper"] } },
+      "when": { "hours": [20, 24], "weather": "rain", "at": ["stall"], "weight": 4, "cooldown": { "person": 90, "city": 1 } },
+      "beats": [
+        { "id": "b1", "do": "serve", "who": "A", "at": "stall" },
+        { "id": "b2", "do": "stand", "who": "A", "at": "stall" },
+        { "id": "b3", "do": "shrug", "who": "A", "at": "stall" }
+      ],
+      "log": {
+        "b1": [
+          "{A} stirs a pot no one has asked for. The square in front of the counter is empty.",
+          "{A} wipes the same corner of the counter for the third time.",
+          "{A} stands behind the counter with the ladle upright, facing the dark square."
+        ],
+        "b2": [
+          "{A} leans on the counter and watches the rain, one elbow on each side of the pot.",
+          "{A} stays still. A single customer walks past without slowing.",
+          "{A} stands at the counter edge with arms folded. Dots bubble over {A}."
+        ],
+        "b3": [
+          "{A} shrugs at no one and starts putting the ladles away an hour early.",
+          "{A} gives a slow shake of the head, switches off half the lights, and sits down on the stool.",
+          "{A} lifts both hands, palms up, toward the empty plaza."
+        ]
+      },
+      "effects": { "pressure": [["A", "money", 0.03]] }
+    },
+    {
+      "id": "wrk.courier-handoff",
+      "title": "A parcel across the step",
+      "tier": "mundane",
+      "note": "A courier on foot hands a parcel between shops. Existing courier behavior.",
+      "roles": {
+        "A": { "desc": "a courier on foot", "needs": ["adult", "courier"] },
+        "B": { "desc": "a shopkeeper receiving a parcel", "rel": "shopkeeper-of:A" }
+      },
+      "when": { "hours": [9, 18], "at": ["shop-door"], "weight": 6, "cooldown": { "person": 18, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "courier-run", "who": "A", "at": "street" },
+        { "id": "b2", "do": "hand-over", "who": "A", "with": ["B"], "at": "shop-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} cuts across two lanes of foot traffic with a parcel held high.",
+          "{A} walks fast between shops with a parcel under each arm, not looking at the numbers.",
+          "{A} ducks between two stalls and comes out the far side already moving."
+        ],
+        "b2": [
+          "{A} puts a parcel into {B.desc}'s hands, taps a handheld, and is gone again.",
+          "{A} holds out a parcel. {B.desc} signs on the handheld. {A} turns away mid-thank-you.",
+          "{B.desc} takes the parcel from {A} at the shop door and nods at a clipboard. {A} points at the line to sign."
+        ]
+      }
+    },
+    {
+      "id": "wrk.boss-visits",
+      "title": "Someone from the top",
+      "tier": "texture",
+      "note": "A visible reaction to a boss: posture and cleanup. A relation-to fact, stated, never inferred.",
+      "roles": {
+        "A": { "desc": "an employed adult", "needs": ["adult", "employed"] },
+        "B": { "desc": "A's boss", "rel": "boss-of:A" }
+      },
+      "when": { "hours": [8, 17], "days": "weekday", "at": ["work-door"], "weight": 4, "cooldown": { "person": 120, "city": 2 } },
+      "beats": [
+        { "id": "b1", "do": "stand", "who": "A", "with": ["B"], "at": "work-door" },
+        { "id": "b2", "do": "chat", "who": ["A", "B"], "at": "work-door" },
+        { "id": "b3", "do": "enter", "who": ["A", "B"], "at": "work-door" }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at attention outside the work door as {B.desc} approaches. Tucks in a shirt, smooths a sleeve.",
+          "{A} straightens fast when {B.desc} comes into view and quits fiddling with a handset.",
+          "{B.desc} arrives at the door. {A} steps aside, lanyard tucked in a pocket."
+        ],
+        "b2": [
+          "{B.desc} talks, pointing at the sign and the street. {A} nods in short, quick tips of the head.",
+          "{A} and {B.desc} talk at the door. {B.desc} does most of it.",
+          "{B.desc} says something that makes {A} laugh a half second too long."
+        ],
+        "b3": [
+          "{B.desc} goes in first. {A} follows a step behind.",
+          "Both through the work door. The door slides shut.",
+          "{B.desc} holds the door and gestures {A} through with a sweep of the arm."
+        ]
+      },
+      "reveals": [
+        { "fact": "B.relation-to-A", "beat": "b2", "channel": "conversation", "chance": 0.6, "log": [
+          "Overheard: {A} calls {B.desc} \"boss\" twice.",
+          "Overheard: {B.desc} says to {A}: \"I'm coming by every shift this week. Be ready.\""
+        ] }
+      ]
+    },
+    {
+      "id": "wrk.coworker-lunch",
+      "title": "Lunch with someone from the floor",
+      "tier": "mundane",
+      "note": "Coworkers eat together. Warmth drift for coworkers.",
+      "roles": {
+        "A": { "desc": "an employed adult", "needs": ["adult", "employed"] },
+        "B": { "desc": "a coworker", "rel": "coworker-of:A" }
+      },
+      "when": { "hours": [12, 14], "days": "weekday", "at": ["work-door", "stall", "square"], "weight": 6, "cooldown": { "person": 40, "city": 0 } },
+      "beats": [
+        { "id": "b1", "do": "leave", "who": ["A", "B"], "at": "work-door" },
+        { "id": "b2", "do": "queue-order", "who": ["A", "B"], "at": "stall" },
+        { "id": "b3", "do": "eat", "who": ["A", "B"], "at": "square" }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} come out of the work door together, arguing about which stall.",
+          "{A} and {B.desc} leave the workplace in step, lanyards swinging.",
+          "{B.desc} and {A} emerge from the work door at noon, already halfway through a sentence."
+        ],
+        "b2": [
+          "{A} and {B.desc} take the same line at {place}. {B.desc} orders for both, {A} pays.",
+          "{A} and {B.desc} reach the counter. Same order twice.",
+          "{B.desc} steps up first and holds up two fingers. {A} fishes for coins."
+        ],
+        "b3": [
+          "{A} and {B.desc} eat standing at the rail, bowls in hand, trading complaints about the floor.",
+          "At the rail, {A} and {B.desc} eat quickly and talk with their mouths half full.",
+          "{A} and {B.desc} take a corner of the square and eat. Laughter at one point. Note bubble."
+        ]
+      },
+      "effects": { "warmth": [["A", "B", 0.03]] }
+    }
+  ]
+}

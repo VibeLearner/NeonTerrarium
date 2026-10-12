@@ -383,24 +383,41 @@ function* plotEdgesGen(c, ends, pairOk){
 // shortest walk between two network points (A*), as one polyline
 let routeCache = new Map(); const LAWN_COST = 5;
 let _rtG = new Float32Array(0), _rtFrom = new Int32Array(0), _rtSeen = new Int32Array(0), _rtDone = new Int32Array(0), _rtEp = 0;
+// (the search makes no garbage: the open list is a binary heap in typed arrays kept from search to search, swapped by hand, and a node's links are
+//  walked with forEach and one callback made once, not for..of, which made a [key, value] pair for every link looked at. It was the largest share of
+//  what the page threw away each frame, about a megabyte a frame with a city full of people, and the garbage collector's pauses showed as hitches.)
+let _rhV = new Int32Array(256), _rhF = new Float64Array(256), _rhN = 0, _rtV = 0, _rtB = 0, _rtEpC = 0;
+function _rhPush(v, f){
+  if (_rhN === _rhV.length){ const V = new Int32Array(_rhN*2), F = new Float64Array(_rhN*2); V.set(_rhV); F.set(_rhF); _rhV = V; _rhF = F; }
+  let i = _rhN++;
+  while (i > 0){ const p = (i - 1) >> 1; if (_rhF[p] <= f) break; _rhV[i] = _rhV[p]; _rhF[i] = _rhF[p]; i = p; }
+  _rhV[i] = v; _rhF[i] = f;
+}
+function _rhPop(){
+  const top = _rhV[0], lv = _rhV[--_rhN], lf = _rhF[_rhN];
+  if (_rhN){ let i = 0;
+    for (;;){ const l = 2*i + 1, r = l + 1; let m = -1, mf = lf;
+      if (l < _rhN && _rhF[l] < mf){ m = l; mf = _rhF[l]; } if (r < _rhN && _rhF[r] < mf){ m = r; mf = _rhF[r]; }
+      if (m < 0) break; _rhV[i] = _rhV[m]; _rhF[i] = _rhF[m]; i = m; }
+    _rhV[i] = lv; _rhF[i] = lf; }
+  return top;
+}
+const _rtHz = v => Math.hypot(NG.x[v] - NG.x[_rtB], NG.z[v] - NG.z[_rtB]);
+const _rtVisit = (e, w) => { const d = _rtG[_rtV] + e.cost; if (_rtSeen[w] !== _rtEpC || d < _rtG[w]){ _rtSeen[w] = _rtEpC; _rtG[w] = d; _rtFrom[w] = _rtV; _rhPush(w, d + _rtHz(w)); } };
 function route(a, b){
   if (a === b) return [[NG.x[a], NG.z[a]]];
-  const key = a + '>' + b;
-  if (routeCache.has(key)) return routeCache.get(key);
+  const key = a*1048576 + b;   // (a number, not a text key: no string per lookup)
+  const hit = routeCache.get(key); if (hit !== undefined) return hit;
   const n = NG.x.length;
   if (_rtG.length < n){ _rtG = new Float32Array(n*2); _rtFrom = new Int32Array(n*2); _rtSeen = new Int32Array(n*2); _rtDone = new Int32Array(n*2); _rtEp = 0; }
-  const ep = ++_rtEp, g = _rtG, from = _rtFrom, seen = _rtSeen, done = _rtDone;   // (g, from: valid where seen[v] === ep; done: where it is ep; the same search as filling fresh arrays with Infinity, -1 and 0)
-  const heap = [], hf = [];
-  const push = (v, f) => { heap.push(v); hf.push(f); let i = heap.length - 1; while (i > 0){ const p = (i - 1) >> 1; if (hf[p] <= hf[i]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; [hf[p], hf[i]] = [hf[i], hf[p]]; i = p; } };
-  const pop = () => { const top = heap[0], lv = heap.pop(), lf = hf.pop(); if (heap.length){ heap[0] = lv; hf[0] = lf; let i = 0;
-    for (;;){ const l = 2*i + 1, r = l + 1; let m = i; if (l < heap.length && hf[l] < hf[m]) m = l; if (r < heap.length && hf[r] < hf[m]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; [hf[m], hf[i]] = [hf[i], hf[m]]; i = m; } } return top; };
-  const hz = v => Math.hypot(NG.x[v] - NG.x[b], NG.z[v] - NG.z[b]);
-  seen[a] = ep; g[a] = 0; from[a] = -1; push(a, hz(a));
+  const ep = _rtEpC = ++_rtEp, g = _rtG, from = _rtFrom, seen = _rtSeen, done = _rtDone;   // (g, from: valid where seen[v] === ep; done: where it is ep; the same search as filling fresh arrays with Infinity, -1 and 0)
+  _rtB = b; _rhN = 0;
+  seen[a] = ep; g[a] = 0; from[a] = -1; _rhPush(a, _rtHz(a));
   let found = false;
-  while (heap.length){
-    const v = pop(); if (done[v] === ep) continue; done[v] = ep;
+  while (_rhN){
+    const v = _rhPop(); if (done[v] === ep) continue; done[v] = ep;
     if (v === b){ found = true; break; }
-    for (const [w, e] of NG.adj[v]){ const d = g[v] + e.cost; if (seen[w] !== ep || d < g[w]){ seen[w] = ep; g[w] = d; from[w] = v; push(w, d + hz(w)); } }
+    _rtV = v; NG.adj[v].forEach(_rtVisit);
   }
   let out = null;
   if (found){
@@ -411,7 +428,7 @@ function route(a, b){
       for (let q = 1; q < pts.length; q++) out.push(pts[q]);
     }
   }
-  if (routeCache.size > 3000) routeCache.clear();
+  if (routeCache.size >= 3000){ let k = 0; for (const old of routeCache.keys()){ routeCache.delete(old); if (++k >= 150) break; } }   // (the oldest go a few at a time: clearing all 3000 at once left a heap of garbage in one go)
   routeCache.set(key, out);
   return out;
 }

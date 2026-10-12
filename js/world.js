@@ -150,12 +150,13 @@ function sdApply(){   // for a frame drawn the old way: each plot's extra size c
       const dx = cx - camT.x, dz = cz - camT.z;
       // the part of the piece nearest the pivot (a big piece is as slow as its slowest part)
       const a = Math.max(0, Math.abs(dx*rx + dz*rz) - (Math.abs(rx)*hx + Math.abs(rz)*hz)), bb = Math.max(0, Math.abs(dx*fx + dz*fz) - (Math.abs(fx)*hx + Math.abs(fz)*hz));
-      let s = upp*(Math.hypot(w*bb, w*a*sp) + tp*Math.hypot(a, bb, 0));
-      if (tz) s += upp*tz*Math.hypot(a*upp, bb*sp*upp);
+      const p1 = w*bb, p2 = w*a*sp, q1 = a*upp, q2 = bb*sp*upp;   // (square roots written out: Math.hypot boxed its arguments, a few hundred KB of garbage a frame of a turn)
+      let s = upp*(Math.sqrt(p1*p1 + p2*p2) + tp*Math.sqrt(a*a + bb*bb));
+      if (tz) s += upp*tz*Math.sqrt(q1*q1 + q2*q2);
       let L = P.xl[i], t = L;
       // plots near the cursor keep everything
       let keep = false;
-      if (cur){ _sdVec.set(cx, cy, cz).applyMatrix4(VPm); keep = Math.hypot((_sdVec.x - cur[0])*W/2, (_sdVec.y - cur[1])*H/2) - upp*Math.max(hx, hz) < SD.cursorPx; }
+      if (cur){ _sdVec.set(cx, cy, cz).applyMatrix4(VPm); const kx = (_sdVec.x - cur[0])*W/2, ky = (_sdVec.y - cur[1])*H/2; keep = Math.sqrt(kx*kx + ky*ky) - upp*Math.max(hx, hz) < SD.cursorPx; }
       if (keep) t = 0;
       else {
         while (t < nT && s > thr[t]*(1 + SD.hys)) t++;                       // faster: drop a class (at once, as far as the speed says)
@@ -1963,6 +1964,14 @@ function tierVisible(key){
   cam.updateMatrixWorld(); _tmx.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _tfr.setFromProjectionMatrix(_tmx);
   return _tfr.intersectsBox(_tbx);
 }
+TIER.bStamp = -1; TIER.bSize = -1; TIER.blocks = new Map();
+function tierBlocks(){
+  if (TIER.bStamp === SC_EDITS && TIER.bSize === cells.size) return TIER.blocks;
+  const B = new Map(); for (const c of cells.values()){ const k = mergeKey(c.i, c.j); let b = B.get(k); if (!b) B.set(k, b = { x: 0, z: 0, n: 0, top: 0, box: null, k }); b.x += c.x; b.z += c.z; b.n++; if (c.height > b.top) b.top = c.height; }
+  for (const b of B.values()){ b.x /= b.n; b.z /= b.n; const [a, bb] = b.k.split(',').map(Number);
+    b.box = new THREE.Box3(new THREE.Vector3((a*MREG - .5)*LOT, -2, (bb*MREG - .5)*LOT), new THREE.Vector3((a*MREG + MREG - .5)*LOT, b.top + 2, (bb*MREG + MREG - .5)*LOT)); }
+  TIER.blocks = B; TIER.bStamp = SC_EDITS; TIER.bSize = cells.size; return B;
+}
 const tierSwapWait = (key, waited) => waited < TIER.stillWait && !tierMoving() && tierVisible(key);
 TIER.markedAt = new Map(); TIER.lat = [];   // (frames from a block being marked to its new look being swapped in)
 function tierMark(key){ if (TIER.rush && tierSwapFromStash(key, tierOfKey(key))){ TIER.changes++; return; } solidAbort(key); solidDirty.add(key); TIER.changes++; if (!TIER.markedAt.has(key)) TIER.markedAt.set(key, PM.frame); }
@@ -1975,10 +1984,11 @@ function tierTick(){
   const sig = (zoomT <= TIER.zs ? 'n' : 'f') + (camGoal.x/LOT).toFixed(0) + ',' + (camGoal.z/LOT).toFixed(0) + ',' + zoomT.toFixed(1) + ',' + yawT.toFixed(1) + ',' + cells.size + ',' + PM.frame % 30;
   if (sig === TIER.sig) return; TIER.sig = sig;
   const near = zoomT <= TIER.zs, r = near ? Math.hypot(zoomT*(W/H), zoomT/Math.sin(Math.max(.15, PITCH)))*1.05 + TIER.margin : -1;
-  const blocks = new Map(); for (const c of cells.values()){ const k = mergeKey(c.i, c.j), b = blocks.get(k) || blocks.set(k, { x: 0, z: 0, n: 0 }).get(k); b.x += c.x; b.z += c.z; b.n++; }
+  const blocks = tierBlocks();   // (the blocks' middles and boxes, made again only when the plots change: during a turn this ran every frame and made a map, an object per block and a split key per test)
   const wantFull = [];
   const onScreen = new Set();
-  for (const [k, b] of blocks){ const d = Math.hypot(b.x/b.n - camGoal.x, b.z/b.n - camGoal.z); if (!near) continue; if (tierVisible(k)) onScreen.add(k); else if (d <= r) wantFull.push([d, k]); }
+  if (near){ cam.updateMatrixWorld(); _tmx.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _tfr.setFromProjectionMatrix(_tmx); }
+  if (near) for (const b of blocks.values()){ const k = b.k, d = Math.hypot(b.x - camGoal.x, b.z - camGoal.z); if (_tfr.intersectsBox(b.box)) onScreen.add(k); else if (d <= r) wantFull.push([d, k]); }
   // (closer than TIER.zs every block on screen is full, however many: a big or high-resolution screen shows more than TIER.maxFull of them, which used to put stand-ins in view;
   //  the cap is only for the ring of blocks just off screen kept full for turning and panning)
   wantFull.sort((p, q) => p[0] - q[0]); const keep = new Set([...onScreen, ...wantFull.slice(0, Math.max(0, TIER.maxFull - onScreen.size)).map(e => e[1])]);

@@ -1,0 +1,951 @@
+{
+  "category": "law",
+  "title": "The street and the law",
+  "theme": "Muggings, lurkers and police seen from the edges: a victim afterward, a witness, someone avoiding the station, a lurker with a day job.",
+  "storylets": [
+    {
+      "id": "law.patrol-passes",
+      "title": "An officer on the beat",
+      "tier": "mundane",
+      "note": "Plain presence. People look away, or do not.",
+      "roles": {
+        "A": {
+          "desc": "an adult on the sidewalk",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a patrol officer"
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          24
+        ],
+        "at": [
+          "street",
+          "square"
+        ],
+        "weight": 8,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "police-patrol",
+          "who": "B",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "A",
+          "at": "street",
+          "with": [
+            "B"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} strolls the block with hands behind the back and eyes on the doors.",
+          "{B.desc} makes a slow circuit of the square, scanner at the belt.",
+          "{B.desc} walks the beat, boots loud on stone, stopping at every corner.",
+          "{B.desc} patrols the sidewalk under the flickering signs."
+        ],
+        "b2": [
+          "{A} crosses to the other side as the officer approaches.",
+          "{A} walks on at the same pace and does not turn {A.his} head.",
+          "{A} nods once at {B.desc} and keeps going.",
+          "{A} steps around {B.desc} with eyes on the ground."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "law.scan-check",
+      "title": "A scan at the corner",
+      "tier": "mundane",
+      "note": "A routine scanner check. Nothing comes of it most of the time.",
+      "roles": {
+        "A": {
+          "desc": "an adult being scanned",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a patrol officer with a scanner"
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          24
+        ],
+        "at": [
+          "street",
+          "station-door"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 150,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "police-scan",
+          "who": "B",
+          "at": "street",
+          "with": [
+            "A"
+          ]
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "street",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street",
+          "with": [
+            "B"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} raises a scanner toward {A} and holds it steady.",
+          "{B.desc} sweeps the scanner over {A}'s wrist and checks the readout.",
+          "{B.desc} stops {A} at the corner and scans a badge."
+        ],
+        "b2": [
+          "{A} stays still with both arms out from the body.",
+          "{A} stands under the lamp while the scanner blinks.",
+          "{A} stays at the corner, jaw tight, eyes on the officer's boots."
+        ],
+        "b3": [
+          "{B.desc} waves {A} on. {A} walks off, rolling both shoulders.",
+          "{A} is released and goes down the block, not quite fast.",
+          "{A} walks away with the badge held in a fist."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "law.avoids-station",
+      "title": "The long way around the station",
+      "tier": "texture",
+      "note": "Someone changes course to avoid the police station door. Observed only; no reason is stated.",
+      "roles": {
+        "A": {
+          "desc": "an adult approaching a corner",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          22
+        ],
+        "at": [
+          "station-door",
+          "street"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 150,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks along the block toward the station, head down.",
+          "{A} approaches the corner by the station, collar turned up.",
+          "{A} heads up the sidewalk toward the station door."
+        ],
+        "b2": [
+          "{A} stops a pace short of the station's light and stands.",
+          "{A} halts and looks at the door, then at the street.",
+          "{A} stays at the corner for a moment with hands in pockets."
+        ],
+        "b3": [
+          "{A} crosses to the far side and takes the long way round.",
+          "{A} turns off into a side street and speeds up.",
+          "{A} goes back the way {A.he} came."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.habit",
+          "beat": "b3",
+          "channel": "seen",
+          "chance": 0.35,
+          "log": [
+            "{A} has avoided this stretch before.",
+            "{A} took a longer path to stay clear of the station door."
+          ]
+        }
+      ],
+      "next": {
+        "sets": [
+          "A:avoids-station"
+        ]
+      }
+    },
+    {
+      "id": "law.witness-statement",
+      "title": "A few words at the station door",
+      "tier": "texture",
+      "note": "A person speaks to an officer. The watcher hears only what is said aloud.",
+      "roles": {
+        "A": {
+          "desc": "an adult giving a statement",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "an officer at the station door"
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          20
+        ],
+        "at": [
+          "station-door"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 300,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "station-door"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "station-door"
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "A",
+          "at": "station-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes up to the station door and stops at the step.",
+          "{A} approaches the station with a slip of paper and a pinched look.",
+          "{A} arrives at the station and waits at the bay."
+        ],
+        "b2": [
+          "{B.desc} listens, tablet out, and nods. {A} talks with both hands.",
+          "{A} speaks and {B.desc} types it into a tablet.",
+          "{B.desc} asks a short question. {A} answers slowly."
+        ],
+        "b3": [
+          "{A} leaves the station, handing back a clip.",
+          "{A} comes out from the station door, folding a receipt.",
+          "{A} leaves the step and crosses the street."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {A} says: \"I saw a man go through the back door of the shop at about nine. Short, gray jacket.\"",
+            "Overheard: {A} says: \"No, I did not see his face. I saw the jacket and the limp.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "law.after-robbery",
+      "title": "Sitting very still on a bench",
+      "tier": "notable",
+      "unwatched": true,
+      "note": "The robbery happened off screen. The watcher sees only the aftermath, then hears of it secondhand.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a bench, empty hands",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a bystander offering water"
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          24
+        ],
+        "at": [
+          "bench"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 1500,
+          "city": 12
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "B",
+          "at": "bench",
+          "with": [
+            "A"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "phone-call",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits very still on a bench with both hands open on {A.his} knees.",
+          "{A} perches on the bench, jacket askew, staring at the pavers.",
+          "{A} takes a seat with a pale, flat face and does not move."
+        ],
+        "b2": [
+          "{B.desc} comes over and holds out a cup of water. {A} takes it.",
+          "{B.desc} passes {A} a bottle and says a few words.",
+          "{B.desc} hands {A} a folded handkerchief."
+        ],
+        "b3": [
+          "{A} borrows a handset and takes a call, voice low and shaky.",
+          "{A} lifts a handset to one ear and gives short, flat answers.",
+          "{A} raises the handset and speaks to someone in pieces."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b3",
+          "channel": "phone",
+          "chance": 0.55,
+          "log": [
+            "Phone, one side: {A} says: \"Everything. The card, the keys. It was a man with a hood.\"",
+            "Phone, one side: {A} says: \"No, I'm fine. They only wanted the bag. I'll call the station.\""
+          ]
+        }
+      ],
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            0.1
+          ]
+        ],
+        "flags": [
+          "A:was-robbed"
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:was-robbed"
+        ]
+      },
+      "hearsay": {
+        "about": "A",
+        "speakers": [
+          "neighbor",
+          "friend",
+          "shopkeeper",
+          "anyone"
+        ],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} says to {L} that {A.desc} was mugged by the metro last night. Bag and everything.",
+          "Overheard: {S} tells {L}: \"Did you hear? {A.desc} got robbed on the way home. Lucky no one was hurt.\"",
+          "Overheard: {S} says {A.desc} lost a bag in a hold-up and has been jumpy since.",
+          "Overheard: {S} mentions to {L} that {A.desc} was robbed near the stalls."
+        ],
+        "entry": [
+          "Was robbed on the way home, as of last night (overheard: a neighbor, in conversation).",
+          "Lost a bag to a hold-up, per {S} (overheard, in conversation).",
+          "Was held up near the metro, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "law.mugging",
+      "title": "Hands up in the passage",
+      "tier": "dramatic",
+      "note": "A real mugging seen live. Rare, brief, no gore. Chain: law.after-robbery as hearsay follow-up.",
+      "roles": {
+        "A": {
+          "desc": "an adult caught off guard",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a lurker in a hood"
+        }
+      },
+      "when": {
+        "hours": [
+          21,
+          24
+        ],
+        "at": [
+          "street"
+        ],
+        "weight": 1,
+        "cooldown": {
+          "person": 3000,
+          "city": 24
+        },
+        "lifeTiers": [
+          "eventful"
+        ]
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "mug",
+          "who": "B",
+          "at": "street",
+          "with": [
+            "A"
+          ]
+        },
+        {
+          "id": "b2",
+          "do": "mugged",
+          "who": "A",
+          "at": "street",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "flee",
+          "who": "B",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "A hooded figure steps out of a side street toward {A}.",
+          "{B.desc} darts out of an alley mouth and closes on {A}.",
+          "{B.desc} cuts across the street and blocks {A}'s path."
+        ],
+        "b2": [
+          "{A} freezes with both hands half raised. A bag changes hands.",
+          "{A} stands frozen while {B.desc} pulls at the strap of {A.his} bag.",
+          "{A} holds still. The bag is gone from {A.his} shoulder."
+        ],
+        "b3": [
+          "{B.desc} flees into the dark, the bag clutched to the chest.",
+          "{B.desc} melts into the alley and is gone.",
+          "{B.desc} vanishes down a side street at a dead run."
+        ]
+      },
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "money",
+            0.15
+          ]
+        ],
+        "flags": [
+          "A:was-robbed"
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:was-robbed"
+        ]
+      }
+    },
+    {
+      "id": "law.arrest",
+      "title": "Taken in at the corner",
+      "tier": "dramatic",
+      "note": "An arrest seen live. Rare. The reason is never stated; the player sees only the action.",
+      "roles": {
+        "A": {
+          "desc": "an adult stopped by police",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "an arresting officer"
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          24
+        ],
+        "at": [
+          "street",
+          "station-door"
+        ],
+        "weight": 1,
+        "cooldown": {
+          "person": 4000,
+          "city": 36
+        },
+        "lifeTiers": [
+          "eventful"
+        ]
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "police-arrive",
+          "who": "B",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "arrest",
+          "who": "A",
+          "at": "street",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": [
+            "B",
+            "A"
+          ],
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "A patrol bike drops in beside {A} at the curb. {B.desc} swings off.",
+          "{B.desc} arrives on a hoverbike and steps in front of {A}.",
+          "{B.desc} lands the bike across {A}'s path."
+        ],
+        "b2": [
+          "{A} is run down and tagged. {A} raises both hands.",
+          "{A} is taken in, wrists cuffed in front.",
+          "{A} is pulled up behind {B.desc} on the bike."
+        ],
+        "b3": [
+          "The bike lifts away with both of them.",
+          "{B.desc} and {A} leave the corner on the bike.",
+          "The hoverbike hums off toward the station."
+        ]
+      },
+      "effects": {
+        "pressure": [
+          [
+            "A",
+            "secret",
+            0.1
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:was-arrested"
+        ]
+      }
+    },
+    {
+      "id": "law.lurker-by-night",
+      "title": "A figure at the same corner",
+      "tier": "texture",
+      "note": "Someone stands at a corner every night. The watcher can learn who they are by day. Chain: law.lurker-at-work.",
+      "roles": {
+        "A": {
+          "desc": "an adult standing at a dark corner",
+          "needs": [
+            "adult",
+            "night-worker"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          22,
+          24
+        ],
+        "at": [
+          "street"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 150,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "wave",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at a dark corner with a hood half up, motionless.",
+          "{A} stays under a dead lamp, one shoulder against the wall.",
+          "{A} lingers at the corner and watches the crowd go by."
+        ],
+        "b2": [
+          "{A} waves at a passing drone, then lowers the hand.",
+          "{A} lifts a hand to someone across the street.",
+          "{A} waves at the empty sidewalk and puts the hand back in a pocket."
+        ],
+        "b3": [
+          "{A} walks off along the wall, unhurried.",
+          "{A} leaves the corner and heads into a side street.",
+          "{A} moves on at an even pace."
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:lurker-seen"
+        ]
+      }
+    },
+    {
+      "id": "law.lurker-at-work",
+      "title": "The same face behind a counter",
+      "tier": "texture",
+      "note": "By day the corner figure works a counter. Learned through a name badge, which is verified.",
+      "roles": {
+        "A": {
+          "desc": "an adult behind a counter",
+          "needs": [
+            "adult",
+            "night-worker"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          16
+        ],
+        "at": [
+          "stall",
+          "shop-door"
+        ],
+        "requires": [
+          "A:lurker-seen"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 150,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "serve",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "stall"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} works the counter, apron on, ladling broth into bowls.",
+          "{A} serves a line of morning customers without looking up.",
+          "{A} stacks cups at the stall and calls an order over a shoulder.",
+          "{A} sets a bowl down and wipes the counter in one move."
+        ],
+        "b2": [
+          "{A} stands at the edge of the stall and yawns into a sleeve.",
+          "{A} leans on the counter during a lull, eyes half closed.",
+          "{A} stays at the back of the stall, arms folded.",
+          "{A} stands by the till and counts coins into a tin."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.job",
+          "beat": "b1",
+          "channel": "document",
+          "chance": 0.5,
+          "log": [
+            "A name badge on the apron reads {A.first}, Noodle Stall.",
+            "The apron patch reads Night Noodle."
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "law.wallet-returned",
+      "title": "Handed back, nothing missing",
+      "tier": "notable",
+      "note": "Someone finds a dropped wallet and chases the owner down.",
+      "roles": {
+        "A": {
+          "desc": "an adult who picked up a wallet",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "the owner, hurrying back"
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          22
+        ],
+        "at": [
+          "street",
+          "square"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 600,
+          "city": 4
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "pick-up",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "run",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "hand-over",
+          "who": "A",
+          "at": "street",
+          "with": [
+            "B"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} spots a flat leather wallet on the sidewalk and picks it up.",
+          "{A} stoops, retrieves a wallet from a puddle edge, and wipes it on a sleeve.",
+          "{A} scoops a wallet from the curb and looks around."
+        ],
+        "b2": [
+          "{A} runs down the block after a figure, wallet held up.",
+          "{A} sprints after someone, shouting and waving the wallet.",
+          "{A} jogs through the crowd, calling out."
+        ],
+        "b3": [
+          "{A} catches up and hands the wallet to {B.desc}. {B.desc} opens it and stares.",
+          "{A} holds out the wallet and {B.desc} takes it with both hands.",
+          "{A} presses the wallet into {B.desc}'s palm."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.first-name",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {B.desc} says: \"I'm {B.first}. Thank you. Everything I own is in there.\"",
+            "Overheard: {A} says: \"No, no, keep it, {B.first}. Just be careful next time.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.03
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:wallet-returned"
+        ]
+      }
+    },
+    {
+      "id": "law.curfew-word",
+      "title": "A friendly word about the hour",
+      "tier": "texture",
+      "note": "A patrol officer tells someone to head home. Nothing is enforced.",
+      "roles": {
+        "A": {
+          "desc": "an adult out late",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a patrol officer"
+        }
+      },
+      "when": {
+        "hours": [
+          23,
+          24
+        ],
+        "at": [
+          "street",
+          "square"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 150,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} lounges on a bench with a cup, long past the usual crowd.",
+          "{A} sits in the dark of the square with feet up on the slats.",
+          "{A} takes a bench seat and watches the lamps."
+        ],
+        "b2": [
+          "{B.desc} stops by the bench and says a few words about the hour. {A} answers politely.",
+          "{A} and {B.desc} talk. {B.desc} points toward the nearest metro.",
+          "{B.desc} asks {A} something and nods at the reply."
+        ],
+        "b3": [
+          "{A} gets up and heads out of the square.",
+          "{A} takes the cup and leaves the bench.",
+          "{A} leaves, tossing a salute over a shoulder."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    }
+  ]
+}

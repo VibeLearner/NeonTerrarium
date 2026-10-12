@@ -1,0 +1,1287 @@
+{
+  "category": "family",
+  "title": "Family",
+  "theme": "Siblings, parents visiting, a family dinner, a disagreement, looking after someone.",
+  "storylets": [
+    {
+      "id": "fam.parent-visits",
+      "title": "A parent at the door with a pot",
+      "tier": "texture",
+      "note": "A parent arrives carrying food. A hug on the step. The relation is stated at the door and that is all.",
+      "roles": {
+        "A": {
+          "desc": "an adult at their own door",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "an older visitor",
+          "rel": "parent-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          11,
+          20
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 200,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "B",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "hug",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} comes up the step with a covered pot held in both hands.",
+          "{B.desc} arrives at the door carrying a heavy bag that clinks.",
+          "{B.desc} climbs the step slowly, a wrapped dish held in front."
+        ],
+        "b2": [
+          "The door opens. {A} and {B.desc} embrace on the step, the pot held out to one side.",
+          "{A} steps out and hugs {B.desc}. It goes on for a while.",
+          "{B.desc} and {A} hug in the doorway, a hand patting {A}'s back."
+        ],
+        "b3": [
+          "Both go in and the door slides closed on the pot.",
+          "{A} takes the pot and holds the door. {B.desc} goes in first.",
+          "{B.desc} goes through the door with {A} close behind."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.55,
+          "log": [
+            "Overheard: {A} says: \"Mom, you did not have to carry all that up.\"",
+            "Overheard: {B.desc} says to {A}: \"Eat. You are too thin. I brought enough for the week.\""
+          ]
+        },
+        {
+          "fact": "B.family",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.2,
+          "log": [
+            "Overheard: {B.desc} says to {A}: \"Your sister sends her love. She says call.\"",
+            "Overheard: {A} asks: \"Did Dad come? No? Tell him next time.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.04
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:family-visit"
+        ]
+      }
+    },
+    {
+      "id": "fam.sibling-lunch",
+      "title": "Noodles with a sibling",
+      "tier": "mundane",
+      "note": "Two siblings share a stall counter. Shows a recurring pair without naming them.",
+      "roles": {
+        "A": {
+          "desc": "an adult at lunch",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a sibling joining for lunch",
+          "rel": "sibling-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          11,
+          15
+        ],
+        "at": [
+          "stall",
+          "cafe-stool"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 60,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "queue-order",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        },
+        {
+          "id": "b3",
+          "do": "eat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "cafe-stool"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} come across the square side by side, trading shoves.",
+          "{A} falls in beside {B.desc} on the way to the stalls.",
+          "{B.desc} and {A} arrive together, arguing over where to eat."
+        ],
+        "b2": [
+          "{A} and {B.desc} reach the counter. {A} orders for both without asking.",
+          "{B.desc} leans on the counter and orders. {A} adds a second bowl.",
+          "At the stall, {A} and {B.desc} point at different pictures and settle on one."
+        ],
+        "b3": [
+          "{A} and {B.desc} eat in silence, then {B.desc} steals a piece from {A}'s bowl.",
+          "{B.desc} laughs at something and nearly spills the broth. {A} slides a napkin across.",
+          "{A} and {B.desc} share a stool, elbows touching, bowls steaming."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {A} says: \"You always did steal my food. Ever since we were kids.\"",
+            "Overheard: {B.desc} tells {A}: \"Mom says you never call. So I'm calling in person.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.02
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:ate-together"
+        ]
+      }
+    },
+    {
+      "id": "fam.errand-for-elder",
+      "title": "Groceries for an older relative",
+      "tier": "mundane",
+      "note": "A younger person carries shopping to an elder's door.",
+      "roles": {
+        "A": {
+          "desc": "an adult with a sack of shopping",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "an older relative at a door",
+          "rel": "grandparent-of:A",
+          "needs": [
+            "senior"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          9,
+          18
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 100,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "home-door",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} climbs a stair carrying a sack of shopping in each hand.",
+          "{A} brings a loaded sack up to an older person's door.",
+          "{A} arrives at the door with a paper sack, hip against the rail."
+        ],
+        "b2": [
+          "The door slides open. {A} hands the sack to {B.desc}.",
+          "{A} holds out the shopping. {B.desc} takes it with both hands and checks inside.",
+          "{A} hands over a sack and a folded slip. {B.desc} counts the change."
+        ],
+        "b3": [
+          "{B.desc} talks at length from the doorway. {A} nods through all of it.",
+          "{A} and {B.desc} chat on the step. {B.desc} wags a finger at one point.",
+          "{B.desc} presses something into {A}'s palm. {A} tries to give it back and fails."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.45,
+          "log": [
+            "Overheard: {B.desc} says: \"Thank you, child. Your grandmother used to say you would turn out well.\"",
+            "Overheard: {A} says: \"Eat the greens first, Granddad. I counted the cans.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.03
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:looks-after"
+        ]
+      }
+    },
+    {
+      "id": "fam.child-walk",
+      "title": "Walking a small one",
+      "tier": "mundane",
+      "note": "A parent and child on the square. Plain texture.",
+      "roles": {
+        "A": {
+          "desc": "an adult with a child in tow",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a child holding a hand",
+          "rel": "child-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          18
+        ],
+        "at": [
+          "street",
+          "square"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "square"
+        },
+        {
+          "id": "b3",
+          "do": "wave",
+          "who": "B",
+          "at": "square"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} crosses the square with {B.desc} swinging from one hand.",
+          "{A} and {B.desc} come along the sidewalk, {B.desc} hopping every crack.",
+          "{B.desc} drags a stick along the rail while {A} walks beside."
+        ],
+        "b2": [
+          "{A} stops at the pond edge and {B.desc} leans over to look.",
+          "{A} stands with {B.desc} at the water. {B.desc} points at something.",
+          "{A} and {B.desc} linger by the fountain. {A} fixes {B.desc}'s collar."
+        ],
+        "b3": [
+          "{B.desc} waves at a passing drone, over and over.",
+          "{B.desc} waves hard at a figure across the square.",
+          "{B.desc} waves at the pond and gets no answer."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.35,
+          "log": [
+            "Overheard: {B.desc} says: \"Dad, can we feed them?\"",
+            "Overheard: {A} says to {B.desc}: \"Ask your mother first. She'll say no.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.02
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "fam.sibling-quarrel",
+      "title": "A raised voice on the sidewalk",
+      "tier": "notable",
+      "note": "Siblings argue in public. Chain: fam.cold-shoulder, then fam.apology-hug, or it fizzles.",
+      "roles": {
+        "A": {
+          "desc": "an adult in an argument",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a sibling, arguing back",
+          "rel": "sibling-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          22
+        ],
+        "at": [
+          "street",
+          "bench",
+          "square"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 400,
+          "city": 4
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "argue",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "shrug",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "B",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} stand face to face and argue, hands moving.",
+          "Raised voices on the sidewalk. {A} jabs a finger at {B.desc}, who steps back.",
+          "{A} and {B.desc} argue by the rail. Two walkers cross to the other side."
+        ],
+        "b2": [
+          "{A} turns away, then back, then away again.",
+          "{A} shrugs once and stares at the ground.",
+          "{A} shakes {A.his} head and turns away."
+        ],
+        "b3": [
+          "{B.desc} leaves in the other direction, fast.",
+          "{B.desc} storms off toward the corner without a look back.",
+          "{B.desc} walks away, shoulders up."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.opinion-stated",
+          "beat": "b1",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {A} shouts: \"You always do this! You said you'd take her this time!\"",
+            "Overheard: {B.desc} says: \"And you always make me the bad one. Ask Mom, she'll tell you.\""
+          ]
+        },
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b1",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"Don't use that tone with me, you are my little brother.\"",
+            "Overheard: {B.desc} says: \"Sister or not, it's not your place to decide.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.12
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:fell-out"
+        ],
+        "branches": [
+          {
+            "w": 55,
+            "sets": [
+              "A+B:cold-shoulder"
+            ],
+            "label": "cold between them"
+          },
+          {
+            "w": 45,
+            "sets": [],
+            "label": "blows over",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "fam.cold-shoulder",
+      "title": "Passing without a word",
+      "tier": "texture",
+      "note": "After the quarrel, two siblings cross paths and say nothing. Observed only.",
+      "roles": {
+        "A": {
+          "desc": "an adult passing someone",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a sibling, passing in turn",
+          "rel": "sibling-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          22
+        ],
+        "at": [
+          "street",
+          "square"
+        ],
+        "requires": [
+          "A+B:cold-shoulder"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 100,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "B",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "shrug",
+          "who": "A",
+          "at": "street",
+          "with": [
+            "B"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} cuts across the square, eyes front.",
+          "{A} walks along the block, a bag over one shoulder.",
+          "{A} heads for the corner at a steady pace."
+        ],
+        "b2": [
+          "{B.desc} comes the other way, eyes on a handset.",
+          "{B.desc} turns into the same stretch from a side street.",
+          "{B.desc} crosses the path ahead, looking at nothing."
+        ],
+        "b3": [
+          "The two pass at arm's length. Neither looks. {A} turns away at the corner.",
+          "{A} shakes {A.his} head once after {B.desc} has gone.",
+          "{A} and {B.desc} pass without a word and keep going."
+        ]
+      },
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.01
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:cold-shoulder"
+        ],
+        "branches": [
+          {
+            "w": 40,
+            "sets": [
+              "A+B:ready-to-mend"
+            ],
+            "label": "one of them reaches out"
+          },
+          {
+            "w": 60,
+            "sets": [],
+            "label": "stays cold",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "fam.apology-hug",
+      "title": "Meeting halfway",
+      "tier": "notable",
+      "note": "Pays off the quarrel. One sibling holds out a hand, then a hug. Never forced.",
+      "roles": {
+        "A": {
+          "desc": "an adult waiting on a bench",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a sibling, arriving",
+          "rel": "sibling-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          21
+        ],
+        "at": [
+          "bench",
+          "square"
+        ],
+        "requires": [
+          "A+B:ready-to-mend"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 600,
+          "city": 6
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "B",
+          "at": "bench"
+        },
+        {
+          "id": "b3",
+          "do": "hug",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits on a bench and turns a cup in both hands.",
+          "{A} takes a seat on the bench and stares across the square.",
+          "{A} perches on the bench edge, knee bouncing."
+        ],
+        "b2": [
+          "{B.desc} comes across the square slowly, hands in pockets.",
+          "{B.desc} approaches the bench and stops two steps short.",
+          "{B.desc} walks up and stands a pace from the bench."
+        ],
+        "b3": [
+          "{A} stands. A few words. Then {A} and {B.desc} hug, rocking a little.",
+          "{A} says something short and {B.desc} nods. They hug on the spot.",
+          "{B.desc} holds out a hand and {A} pulls {B.desc} into a hug."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.feeling-stated",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.6,
+          "log": [
+            "Overheard: {A} says: \"I'm sorry I said it like that. I was out of line.\"",
+            "Overheard: {B.desc} says: \"Me too. Let's not do that again. Come eat.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.15
+          ]
+        ],
+        "flags": [
+          "A+B:made-up"
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:made-up"
+        ]
+      }
+    },
+    {
+      "id": "fam.call-home",
+      "title": "Calling home from a bench",
+      "tier": "texture",
+      "note": "A phone call to family. Only one side is heard.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a call",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          17,
+          23
+        ],
+        "at": [
+          "bench",
+          "street"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 120,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "phone-call",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits on a bench and takes out a handset.",
+          "{A} takes a seat and thumbs a contact open.",
+          "{A} perches on the bench edge, handset in a fist."
+        ],
+        "b2": [
+          "{A} takes a call and smiles in spurts. Mostly listens.",
+          "{A} holds the handset to one ear and rubs the back of {A.his} neck.",
+          "{A} talks softly into the handset and nods at nothing."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.plan-stated",
+          "beat": "b2",
+          "channel": "phone",
+          "chance": 0.55,
+          "log": [
+            "Phone, one side: {A} says: \"Yes, Mom. I ate. Yes, I'm wearing the jacket.\"",
+            "Phone, one side: {A} says: \"Tell Dad I'll be there Sunday. Save me the good chair.\"",
+            "Phone, one side: {A} says: \"How is Grandma? Put her on for a second.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": [
+          "A:phones-family"
+        ]
+      }
+    },
+    {
+      "id": "fam.grandparent-bench",
+      "title": "Sharing a bench with an elder",
+      "tier": "mundane",
+      "note": "A senior and a younger relative sit. A snack changes hands.",
+      "roles": {
+        "A": {
+          "desc": "a young adult on a bench",
+          "needs": [
+            "young-adult"
+          ]
+        },
+        "B": {
+          "desc": "an older relative",
+          "rel": "grandparent-of:A",
+          "needs": [
+            "senior"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          17
+        ],
+        "at": [
+          "bench"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 100,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "B",
+          "at": "bench",
+          "with": [
+            "A"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} sit on a bench and watch the foot traffic.",
+          "{B.desc} lowers {B.him}self onto a bench with {A} close by.",
+          "{A} takes a seat next to {B.desc}. Neither speaks yet."
+        ],
+        "b2": [
+          "{B.desc} hands {A} a wrapped sweet from a pocket.",
+          "{B.desc} passes {A} half a bun, wrapped in paper.",
+          "{B.desc} holds out a small tin. {A} takes one and nods."
+        ],
+        "b3": [
+          "{B.desc} talks and talks. {A} nods in the right places.",
+          "{A} listens with an elbow on a knee while {B.desc} points down the block.",
+          "{B.desc} tells a story with both hands. {A} laughs once."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.35,
+          "log": [
+            "Overheard: {B.desc} says: \"When your mother was your age, she would not sit still either.\"",
+            "Overheard: {A} tells {B.desc}: \"Grandma, you've told me that one.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.02
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "fam.cousin-arrives",
+      "title": "A bag, a drop-off, a hug",
+      "tier": "notable",
+      "unwatched": true,
+      "note": "A relative arrives in the city. The player may see the arrival; the settling in arrives as hearsay.",
+      "roles": {
+        "A": {
+          "desc": "a newcomer with a bag",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a cousin meeting them",
+          "rel": "cousin-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          20
+        ],
+        "at": [
+          "dropoff"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 3000,
+          "city": 24
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "arrive-dropoff",
+          "who": "A",
+          "at": "dropoff"
+        },
+        {
+          "id": "b2",
+          "do": "hug",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "dropoff"
+        },
+        {
+          "id": "b3",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} steps off a dropoff lift with a battered bag over one shoulder.",
+          "{A} comes down the lift, looks up at the towers, and walks on.",
+          "{A} arrives at the drop-off alone, a coat over {A.his} arm."
+        ],
+        "b2": [
+          "{B.desc} jogs up. {A} and {B.desc} hug, bag swinging.",
+          "{B.desc} spots {A} and waves. They embrace at the lift base.",
+          "{A} and {B.desc} hug, then hold each other at arm's length."
+        ],
+        "b3": [
+          "{A} and {B.desc} head off together, {B.desc} carrying the bag.",
+          "{B.desc} takes the bag and walks {A} toward the street.",
+          "{A} and {B.desc} walk off side by side, talking fast."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {B.desc} says: \"Cousin! Look at you. You can have my couch as long as you need.\"",
+            "Overheard: {A} says: \"Auntie sends greetings. And this bag is mostly food from her.\""
+          ]
+        }
+      ],
+      "effects": {
+        "life": "arrived-in-city",
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:newly-arrived"
+        ]
+      },
+      "hearsay": {
+        "about": "A",
+        "speakers": [
+          "neighbor",
+          "friend",
+          "family",
+          "shopkeeper"
+        ],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} tells {L} that {A.desc} came in on the lift last week, a cousin of someone on the block.",
+          "Overheard: {S} says to {L}: \"A new face at the lift. {A.desc}. Came with one bag.\"",
+          "Overheard: {S} says {A.desc} just got to the city and is staying with relatives.",
+          "Overheard: {S} mentions that {A.desc} is new to the district and has been seen at the stalls."
+        ],
+        "entry": [
+          "Arrived in the city last week (overheard: a neighbor, in conversation).",
+          "Came in on the lift with one bag, per {S} (overheard, in conversation).",
+          "Moved to the district from elsewhere, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "fam.door-unanswered",
+      "title": "Knocking on a door that stays shut",
+      "tier": "notable",
+      "unwatched": true,
+      "note": "A parent comes and nobody opens. Observed outcome only. Pairs with an estrangement that happens off screen.",
+      "roles": {
+        "A": {
+          "desc": "an adult behind the door",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "an older visitor at the door",
+          "rel": "parent-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          19
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 3000,
+          "city": 24
+        },
+        "pressure": {
+          "life-change": [
+            0.3,
+            1
+          ]
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "knock-and-wait",
+          "who": "B",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "B",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "B",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} knocks at the door. Three taps, a pause, three more.",
+          "{B.desc} rings at the home door and steps back to wait.",
+          "{B.desc} knocks and calls through the panel."
+        ],
+        "b2": [
+          "{B.desc} stands on the step with a small parcel held in both hands.",
+          "{B.desc} stays at the door for {n} minutes. Nobody opens.",
+          "{B.desc} waits, leans on the rail, waits."
+        ],
+        "b3": [
+          "{B.desc} sets the parcel on the step and leaves.",
+          "{B.desc} leaves with the parcel still in hand.",
+          "{B.desc} turns away from the door and goes slowly down the step."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {B.desc} calls through the door: \"It's your mother. I only want to leave this. Open up.\"",
+            "Overheard: {B.desc} calls: \"Please, just a word. I'm not asking to come in.\""
+          ]
+        }
+      ],
+      "effects": {
+        "life": "estrangement",
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.1
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:estranged"
+        ]
+      },
+      "hearsay": {
+        "about": "A",
+        "speakers": [
+          "neighbor",
+          "friend",
+          "family",
+          "shopkeeper"
+        ],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} tells {L} that {A.desc} has stopped speaking to the family. The door stays shut when they visit.",
+          "Overheard: {S} says to {L}: \"{A.desc} won't open the door to {A.his} own parent. Not a word of why.\"",
+          "Overheard: {S} says {A.desc} and the family had a falling out last year and it has not healed.",
+          "Overheard: {S} mentions that {A.desc} cut off the family some months ago."
+        ],
+        "entry": [
+          "Stopped speaking to the family a while ago (overheard: a neighbor, in conversation).",
+          "Did not open the door to a parent, per {S} (overheard, in conversation).",
+          "Fell out with the family last year, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "fam.birthday-gift",
+      "title": "A small wrapped gift on a step",
+      "tier": "texture",
+      "note": "A gift is handed over at a door. The giver is named only if someone says so.",
+      "roles": {
+        "A": {
+          "desc": "an adult with a gift",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a relative receiving it",
+          "rel": "sibling-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          20
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 600,
+          "city": 4
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "home-door",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "hug",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} climbs the step with a small wrapped package behind {A.his} back.",
+          "{A} arrives at the door and straightens a crooked ribbon.",
+          "{A} comes up to the door holding a flat parcel tied in string."
+        ],
+        "b2": [
+          "The door slides open. {A} hands the parcel to {B.desc} with both hands.",
+          "{A} holds out the package. {B.desc} turns it over twice, grinning.",
+          "{A} says something and hands the wrapped parcel across."
+        ],
+        "b3": [
+          "{B.desc} pulls {A} into a hug and the parcel is crushed between them.",
+          "{A} and {B.desc} hug on the step, laughing.",
+          "{B.desc} embraces {A}, then steps back and tears the ribbon open."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.news",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {A} says: \"Happy birthday. You are officially old.\"",
+            "Overheard: {B.desc} says: \"Thirty-two, and you still wrap like a kid. I love it.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    }
+  ]
+}

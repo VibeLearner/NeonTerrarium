@@ -186,7 +186,7 @@ Hearsay lines are the secondhand news as the watcher hears it, in the past tense
 }
 ```
 
-A setup leaves at least two truths open. Every truth names the reveal storylet that settles it, and that storylet carries `"resolves": { "setup": "<setup id>", "truth": "sibling" }` and requires a flag the setup sets. The setup's own log lines may not contain any relation word (sister, wife, friend, colleague...) so every truth stays fair. At reveal time the simulation picks among the truths that every earlier line still supports.
+A setup leaves at least two truths open, and every life tier that can host the setup must be able to host at least one of its reveals (so a quiet life is never handed a mystery it cannot resolve). Every truth names the reveal storylet that settles it, and that storylet carries `"resolves": { "setup": "<setup id>", "truth": "sibling" }` and requires a flag the setup sets. The setup's own log lines may not contain any relation word (sister, wife, friend, colleague...) so every truth stays fair. At reveal time the simulation picks among the truths that every earlier line still supports.
 
 ## Tiers and balance
 
@@ -207,7 +207,7 @@ Existing actions that the game does only in some places carry a note in the cata
 - `data/stories/vocab.json`: the vocabulary.
 - `data/stories/names.json`: name pools.
 - `data/stories/NN-<category>.json`: one file per category: `{ "category", "title", "theme", "storylets": [...] }`.
-- `tools/stories/validate.js`: `node tools/stories/validate.js` (add `--stats` for tables, `--quiet` for errors only).
+- `tools/stories/validate.js`: `node tools/stories/validate.js` (add `--stats` for tables, `--quiet` for errors only, `--partial` to skip the whole-database checks of size, balance and missing categories while a category is still being written).
 - `tools/stories/build-catalog.js`: writes `tools/stories/catalog.html` from the data.
 - `tools/stories/lifesheet.js`: a seeded dry run with no game.
 - `tools/stories/REVIEW.md`: decisions, counts, what to read first, new actions wanted.

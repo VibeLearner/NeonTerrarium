@@ -146,7 +146,7 @@ A storylet with `effects.life` always has `unwatched: true` and hearsay: lasting
 The sheets (and later the game) show the notebook in three parts:
 - **Details:** the subject's name (with how it was learned: overheard, read on a document, introduced, heard secondhand), and job, employer, home, lives with and age only when a document or an introduction gave them.
 - **People around them:** everyone the watcher has a name or a stated relation for, with how each was learned.
-- **Observations:** everything else, labeled by how the watcher knows it (Seen, Overheard, On the phone, Posted, Read, Secondhand), never by what it might mean. "How is everyone?" is something said on the phone, not "a plan".
+- **Observations:** everything else, labeled by how the watcher knows it (Seen, Overheard, On the comm, Posted, Read, Secondhand), never by what it might mean. "How is everyone?" is something said on the comm, not "a plan".
 
 Secondhand news about one event is one entry. A second person saying the same thing adds a source ("heard from 2 people") and one log line; more sources only update the count. The same person repeats the same news at most twice.
 
@@ -155,7 +155,7 @@ Secondhand news about one event is one entry. A second person saying the same th
 Rules of the engine, not storylets, so names come up the way they do in real life. Each fires at most once per storylet, only while the name is still unknown:
 - **Greetings in passing:** someone of theirs (neighbor, friend, coworker, the keeper of a regular stall, family) who lives or works nearby passes and says hello by name. Only on beats where the subject is out alone.
 - **Names in conversation:** when the subject talks face to face with someone who knows them, one of them may use the other's name (or nickname).
-- **Order called at a counter**, **a name tag at work** (by job and place), **answering the phone**, **a parcel label** and **a door plate** (one resident only; shared homes are left to the storylets).
+- **Order called at a counter**, **a name tag at work** (by job and place), **answering the comm**, **a parcel label** and **a door plate** (one resident only; shared homes are left to the storylets).
 - **Gossip names the absent person:** people talk about people by name. On the speaker's monitor that's a loose name; on the absent person's own notebook it's their first name, heard secondhand.
 
 In the life sheet (seed neon-1), the watcher has the subject's first name by day 2 for about half the citizens and by day 7 for about four in five. Full names stay rarer, since they need a document.
@@ -225,7 +225,7 @@ Surveyed from `js/people.js`. Existing means the game already draws it; new mean
 
 Existing: walk, enter, leave, stand, chat, sit, eat, queue-order, serve, receive-delivery, run, umbrella, emote (bang, quest, heart, anger, sweat, note, dots, bowl), bump, club-queue, club-enter, club-turned-away, dance, throw-up, mugged, mug, flee, police-scan, police-arrive, police-patrol, arrest, ride-metro, ride-lift, arrive-dropoff, leave-dropoff, picnic, watch-hologram, soak, escort, courier-run.
 
-New: walk-together, wait-outside, knock-and-wait, hand-over, carry, argue, phone-call, post-feed, wave, hug, read-notice, feed-stray, water-plant, share-umbrella, point, pick-up, shrug.
+New: walk-together, wait-outside, knock-and-wait, hand-over, carry, argue, phone-call, post-feed, wave, hug, read-notice, water-plant, share-umbrella, point, pick-up, shrug.
 
 Existing actions that the game does only in some places carry a note in the catalog; where a storylet needs more than the game does today, it uses a new action instead.
 

@@ -59,18 +59,18 @@
       ],
       "log": {
         "b1": [
-          "{A} knocks at a door two along from {A.his} own and stands back.",
+          "{A} knocks at {place} and stands back.",
           "{A} raps on the door and waits with hands behind {A.his} back.",
           "{A} knocks lightly, three taps."
         ],
         "b2": [
-          "The door opens. {B.desc} hands {A} a coil of rope and a short ladder.",
+          "The door slides open. {B.desc} hands {A} a coil of rope and a short ladder.",
           "{B.desc} holds out a toolbox. {A} takes the handle.",
           "{B.desc} passes {A} a power drill, cord wrapped around it."
         ],
         "b3": [
           "{A} carries it off down the block, the ladder knocking the rail.",
-          "{A} hauls the load back to {A.his} own door, thanking the air.",
+          "{A} hauls the load away from {place}, calling thanks over a shoulder.",
           "{A} walks away with the rope looped over a shoulder."
         ]
       },
@@ -91,7 +91,7 @@
           "channel": "conversation",
           "chance": 0.35,
           "log": [
-            "Overheard: {A} says: \"You saved me again. Come by for dumplings on Sunday.\""
+            "Overheard: {A} says: \"You saved me again. Come by for buns on Sunday.\""
           ]
         }
       ],
@@ -197,9 +197,9 @@
           "{A} holds out the loan with a small bow. {B.desc} laughs."
         ],
         "b3": [
-          "{A} and {B.desc} chat on the step, then {B.desc} points down the block.",
+          "{A} and {B.desc} chat outside {place}, then {B.desc} points down the block.",
           "{B.desc} says something that makes {A} grin. A short wave.",
-          "The two trade a few words over a shared fence."
+          "The two trade a few words in the doorway of {place}."
         ]
       },
       "effects": {
@@ -271,17 +271,17 @@
       ],
       "log": {
         "b1": [
-          "{A} bangs on a neighbor's door, jaw tight.",
+          "{A} bangs on the door of {place}, jaw tight.",
           "{A} knocks hard and keeps knocking.",
           "{A} pounds on the door, a hand on the frame."
         ],
         "b2": [
-          "The door opens. {B.desc} and {A} argue across the threshold.",
+          "The door slides open. {B.desc} and {A} argue across the threshold.",
           "{B.desc} snaps at {A} and {A} snaps right back. Voices carry.",
           "{A} jabs a finger toward the ceiling. {B.desc} folds both arms."
         ],
         "b3": [
-          "{A} leaves, stamping down the step.",
+          "{A} stamps away from {place}.",
           "{A} turns on a heel and goes off into the night.",
           "{A} walks away shaking {A.his} head."
         ]
@@ -293,7 +293,7 @@
           "channel": "conversation",
           "chance": 0.55,
           "log": [
-            "Overheard: {A} says: \"Every night, the same drum! Some of us work in the morning!\"",
+            "Overheard: {A} says: \"Night after night, that drum! Some of us work in the morning!\"",
             "Overheard: {B.desc} says: \"Then knock like a person, not a hammer.\""
           ]
         }
@@ -390,8 +390,8 @@
       ],
       "log": {
         "b1": [
-          "{A} climbs the step carrying a covered plate.",
-          "{A} comes to a neighbor's door with a steaming dish in both hands.",
+          "{A} comes up to {place} carrying a covered plate.",
+          "{A} stops at the door of {place} with a steaming dish in both hands.",
           "{A} arrives with a plate under a cloth, shoulders stiff."
         ],
         "b2": [
@@ -485,7 +485,7 @@
         "b1": [
           "{B.desc} crosses the block slowly, a bag in each hand and a third on the arm.",
           "{B.desc} climbs the sidewalk slope, stopping every few steps.",
-          "{B.desc} makes a slow way home, shopping dragging."
+          "{B.desc} makes a slow way along the block, shopping dragging."
         ],
         "b2": [
           "{A} catches up and takes two of the bags without a word.",
@@ -493,8 +493,8 @@
           "{A} relieves {B.desc} of the load and walks alongside."
         ],
         "b3": [
-          "Both go in at the same door. The door slides shut on a thank-you.",
-          "{A} follows {B.desc} up and in with the bags.",
+          "Both go into {place}. The door slides shut on a thank-you.",
+          "{A} follows {B.desc} into {place} with the bags.",
           "{B.desc} unlocks, and {A} goes in with the shopping."
         ]
       },
@@ -615,7 +615,7 @@
         "b2": [
           "Bowls go round the circle. {C.desc} refuses seconds three times, then accepts.",
           "{A} ladles a stew into mismatched bowls and hands them out.",
-          "{B.desc} breaks a flatbread and passes the pieces around."
+          "{B.desc} breaks a bun and passes the pieces around."
         ],
         "b3": [
           "The circle talks over itself. {A} laughs at something {B.desc} says.",
@@ -723,7 +723,7 @@
         "b2": [
           "{B.desc} serves {A}'s order before it is spoken.",
           "{B.desc} already has the cup out. {A} grins.",
-          "{B.desc} slides the usual across the counter.",
+          "{B.desc} slides a bowl across the counter. {A} has not ordered yet.",
           "{B.desc} serves {A} and adds a small extra."
         ],
         "b3": [
@@ -826,19 +826,19 @@
       ],
       "log": {
         "b1": [
-          "A drone lowers a small parcel at {A}'s door and rises.",
-          "{A} takes a parcel from a drone and squints at the label.",
-          "A delivery drone leaves a package at the wrong step. {A} lifts it."
+          "A delivery bot leaves a small parcel outside {place} and walks off.",
+          "{A} takes a parcel from a delivery bot and squints at the label.",
+          "A delivery bot sets a package down by the door of {place}. {A} lifts it."
         ],
         "b2": [
-          "{A} walks to the next door and knocks.",
-          "{A} raps on the neighbor's door with the parcel under one arm.",
+          "{A} walks the parcel over to {place} and knocks.",
+          "{A} raps on the door of {place} with the parcel under one arm.",
           "{A} knocks once and waits."
         ],
         "b3": [
           "The door slides open. {A} hands the parcel to {B.desc} and shrugs.",
           "{A} holds out the parcel. {B.desc} takes it and bows.",
-          "{A} hands over the package and points at the drone's path."
+          "{A} hands over the package and points the way the bot went."
         ]
       },
       "reveals": [
@@ -848,7 +848,7 @@
           "channel": "document",
           "chance": 0.6,
           "log": [
-            "The label reads {B.full}, one door along.",
+            "The label reads {B.full}, in small print.",
             "The parcel is addressed to {B.full}."
           ]
         }
@@ -930,7 +930,7 @@
         "b1": [
           "{A} carries a covered dish across the landing.",
           "{A} comes down the row with a steaming pot held in a towel.",
-          "{A} walks to the newest door with a plate and a spoon."
+          "{A} walks up to {place} with a plate and a spoon."
         ],
         "b2": [
           "{A} knocks and waits, straightening a collar.",
@@ -938,7 +938,7 @@
           "{A} knocks twice. A voice answers faintly."
         ],
         "b3": [
-          "The door opens. {A} hands the dish to {B.desc} and says a few words.",
+          "The door slides open. {A} hands the dish to {B.desc} and says a few words.",
           "{A} hands over the dish. {B.desc} bows and takes it with both hands.",
           "{A} passes the pot across the threshold."
         ]
@@ -981,15 +981,14 @@
     },
     {
       "id": "nbr.stray-feeder",
-      "title": "The saucer on the curb",
+      "title": "The pots along the wall",
       "tier": "texture",
-      "note": "A neighbor feeds a stray; another passes and speaks.",
+      "note": "A neighbor waters potted plants on the block; another passes and speaks.",
       "roles": {
         "A": {
-          "desc": "an adult with a saucer",
+          "desc": "an adult watering potted plants",
           "needs": [
-            "adult",
-            "has-pet-stray-habit"
+            "adult"
           ]
         },
         "B": {
@@ -1015,7 +1014,7 @@
       "beats": [
         {
           "id": "b1",
-          "do": "feed-stray",
+          "do": "water-plant",
           "who": "A",
           "at": "street"
         },
@@ -1037,9 +1036,9 @@
       ],
       "log": {
         "b1": [
-          "{A} sets a saucer on the curb and crouches while a thin cat approaches.",
-          "{A} scatters scraps by a drain. A stray eats, flinching at every sound.",
-          "{A} crouches by the wall and puts out a dish."
+          "{A} crouches by a row of potted plants and tips a cup of water into each.",
+          "{A} waters a vine climbing a pipe, a little at a time.",
+          "{A} kneels by a planter and pours slowly, pinching off a brown leaf."
         ],
         "b2": [
           "{B.desc} comes along the sidewalk with a bag and slows down.",
@@ -1047,9 +1046,9 @@
           "{B.desc} passes the corner, then turns back."
         ],
         "b3": [
-          "{B.desc} says something about the cat. {A} shrugs and answers.",
-          "{A} and {B.desc} talk across the saucer. {B.desc} laughs.",
-          "{B.desc} bends down too, and the two argue softly over names."
+          "{B.desc} says something about the plants. {A} shrugs and answers.",
+          "{A} and {B.desc} talk across the planter. {B.desc} laughs.",
+          "{B.desc} bends down too, and the two argue softly over a yellow leaf."
         ]
       },
       "reveals": [
@@ -1059,14 +1058,14 @@
           "channel": "seen",
           "chance": 0.45,
           "log": [
-            "{A} fills a saucer here for the strays: {seen} mornings on the feed.",
-            "{A} fills the saucer. The cat comes to it."
+            "{A} waters these pots: {seen} mornings on the feed.",
+            "{A} tips water into the planter again: {seen} mornings now."
           ]
         }
       ],
       "next": {
         "sets": [
-          "A:feeds-strays"
+          "A:waters-plants"
         ]
       }
     },
@@ -1124,8 +1123,8 @@
       ],
       "log": {
         "b1": [
-          "{A} leans on {A.his} doorframe while {B.desc} stops at the next step.",
-          "{B.desc} halts at {A}'s door, bag on one hip.",
+          "{A} leans in the doorway of {place} while {B.desc} stops alongside.",
+          "{B.desc} halts outside {place}, bag on one hip.",
           "{A} stands in the doorway as {B.desc} hovers by the rail.",
           "{A} and {B.desc} meet at the landing."
         ],
@@ -1240,17 +1239,17 @@
       "log": {
         "b1": [
           "{B.desc} comes up the block holding a covered bowl level with both hands.",
-          "{B.desc} makes for the door with a paper bag, steam in the cold air above it.",
+          "{B.desc} makes for {place} with a paper bag, steam in the cold air above it.",
           "{B.desc} picks a way along the walk, a lidded pot held close."
         ],
         "b2": [
           "{B.desc} knocks twice and waits, the bowl balanced on one palm.",
-          "{B.desc} knocks at the door, then once more, softer.",
+          "{B.desc} knocks at {place}, then once more, softer.",
           "{B.desc} knocks with an elbow, both hands full."
         ],
         "b3": [
-          "The door opens halfway. {A} comes out, a blanket pulled round the shoulders.",
-          "{A} comes out onto the step in a long cardigan, hair flat on one side.",
+          "The door slides halfway open. {A} comes out, a blanket pulled round the shoulders.",
+          "{A} comes out of {place} in a long cardigan, hair flat on one side.",
           "The door slides open. {A} steps out slowly, one hand on the frame."
         ],
         "b4": [
@@ -1260,7 +1259,7 @@
         ],
         "b5": [
           "{A} goes in with the food. The door slides shut.",
-          "{A} goes back inside. The door closes on the steam.",
+          "{A} goes back into {place}. The door slides shut on the steam.",
           "{A} steps in and the door slides shut."
         ],
         "b6": [

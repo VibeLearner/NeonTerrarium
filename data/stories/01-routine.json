@@ -55,22 +55,22 @@
       ],
       "log": {
         "b1": [
-          "{A} comes out of the home door with a bag over one shoulder. Locks nothing. Pulls the door shut.",
+          "{A} comes out of {place} with a bag over one shoulder. The door slides shut behind.",
           "Door opens on {A}, already walking. Early light on the plates.",
           "{A} steps out, checks the sky once, and starts down the block.",
-          "{A} out of the building. Jacket half on, one arm still searching for the sleeve."
+          "{A} out of {place}. Jacket half on, one arm still searching for the sleeve."
         ],
         "b2": [
-          "{A} walks the usual stretch, eyes forward. Crosses on the first signal.",
-          "{A} threads between two stalls setting up and keeps going without a glance at either.",
-          "{A} passes the same three shopfronts at the same pace as the last time.",
-          "{A} takes the corner wide and heads for the work block."
+          "{A} walks the block, eyes forward. Steps around a puddle without breaking stride.",
+          "{A} threads past a shutter going up and keeps going without a glance.",
+          "{A} passes three shopfronts at an even pace. A drone hums low overhead.",
+          "{A} takes the corner wide and keeps on down the next block."
         ],
         "b3": [
-          "{A} reaches the work door and goes in. It slides shut.",
-          "{A} arrives, pauses a second at the door, and enters.",
-          "{A} goes in through the work door with a nod to someone just inside.",
-          "{A} badges through the work door. Gone from view."
+          "{A} reaches {place} and goes in. The door slides shut.",
+          "{A} pauses a second at the door of {place}, then enters.",
+          "{A} goes into {place} with a nod to someone just inside.",
+          "{A} badges in at {place}. Gone from view."
         ]
       },
       "reveals": [
@@ -81,7 +81,7 @@
           "chance": 0.3,
           "log": [
             "Badge clipped to {A.his} jacket: {A.job}.",
-            "Lanyard at the work door reads: {A.job}."
+            "Lanyard on {A.his} way into {place} reads: {A.job}."
           ]
         },
         {
@@ -90,7 +90,7 @@
           "channel": "document",
           "chance": 0.3,
           "log": [
-            "Name on the work door plate: {A.employer}.",
+            "Name on the plate beside the door: {A.employer}.",
             "Sign over the door {A} used: {A.employer}."
           ]
         }
@@ -154,7 +154,7 @@
         ],
         "b2": [
           "{A} walks the bowl to the end stool and takes it without testing the others.",
-          "{A} takes the stool nearest the pond, the same one as before.",
+          "{A} takes the stool nearest the pond and hooks the bag under it.",
           "{A} sits at the left end of the counter and shifts the stool a hand's width.",
           "{A} lowers onto the end stool and sets the bowl down square."
         ],
@@ -232,21 +232,21 @@
       ],
       "log": {
         "b1": [
-          "{A} comes out of the work door at the noon bell, rubbing the back of {A.his} neck.",
-          "{A} leaves the workplace in a hurry. Lanyard still on.",
-          "{A} out of the work door, squinting at the light.",
-          "{A} exits the building and heads straight for the square without stopping."
+          "{A} comes out of {place} at midday, rubbing the back of {A.his} neck.",
+          "{A} leaves {place} in a hurry. Lanyard still on.",
+          "{A} out of {place}, squinting at the light.",
+          "{A} exits {place} and heads straight for the square without stopping."
         ],
         "b2": [
-          "{A} joins the stall line. Looks at the clock tower twice. Orders fast.",
+          "{A} joins the stall line. Checks the time on {A.his} comm twice. Orders fast.",
           "{A} reaches the counter and orders something off the board, no questions.",
           "{A} gets a bowl and a pair of sticks and turns away from the counter.",
           "{A} waits in line at {place}, reading the same menu as everyone else."
         ],
         "b3": [
-          "{A} eats standing at the rail, eyes on the clock tower. Done in under ten minutes.",
+          "{A} eats standing at the rail, eyes on an ad screen. Done in under ten minutes.",
           "{A} wolfs the bowl at a standing spot near the pond, then hands it back at the counter.",
-          "{A} eats on the move, one hand on the bowl, one on a handset.",
+          "{A} eats on the move, one hand on the bowl, one on a comm.",
           "{A} stands at a corner of the square with a bowl and finishes it in a few big bites."
         ]
       }
@@ -302,7 +302,7 @@
       ],
       "log": {
         "b1": [
-          "{A} breaks off the usual route and angles toward the kiosk.",
+          "{A} breaks off mid-block and angles toward the kiosk.",
           "{A} slows at the corner, then veers across to the kiosk.",
           "{A} swerves to the kiosk without a word to the people alongside."
         ],
@@ -368,22 +368,22 @@
       ],
       "log": {
         "b1": [
-          "{A} walks to the shop at the corner. Checks a list on a handset.",
-          "{A} heads for the shop, a cloth bag folded in one hand.",
-          "{A} crosses to the shop door, glancing at a short list written on the back of a hand.",
+          "{A} heads for a shopfront. Checks a list on a comm.",
+          "{A} heads down the block, a cloth bag folded in one hand.",
+          "{A} crosses the block, glancing at a short list written on the back of a hand.",
           "{A} walks straight to the shopfront, no detour, no looking around."
         ],
         "b2": [
-          "{A} goes into the shop. The door slides shut.",
-          "{A} pushes through the shop door.",
-          "{A} enters the shop and the door closes.",
+          "{A} goes into {place}, cloth bag tucked under an arm.",
+          "{A} steps through the sliding door of {place}.",
+          "{A} enters {place} and the door closes.",
           "{A} slips in between two shoppers coming out."
         ],
         "b3": [
-          "{A} comes out of the shop with a loaded bag and a second one.",
+          "{A} comes out of {place} with a loaded bag and a second one.",
           "{A} emerges with a paper sack and a single stalk of something green sticking out of it.",
-          "{A} leaves the shop, bag swinging, the list crumpled in a fist.",
-          "{A} steps out of the shop with one small bag and heads back the way {A.he} came."
+          "{A} leaves {place}, bag swinging, the list crumpled in a fist.",
+          "{A} steps out of {place} with one small bag and heads back the way {A.he} came."
         ]
       }
     },
@@ -431,15 +431,15 @@
       ],
       "log": {
         "b1": [
-          "{A} walks home with the bag on the other shoulder this time. Slow.",
+          "{A} walks with the bag on the other shoulder now. Slow.",
           "{A} drifts along the block at the speed of the crowd, not ahead, not behind.",
           "{A} walks the last two blocks without looking at the shops.",
-          "{A} follows the usual line home, stepping around the usual puddle."
+          "{A} follows the edge of the block under the awnings, out of the drip."
         ],
         "b2": [
-          "{A} reaches the home door and goes in. It slides shut.",
-          "{A} stops at the step, finds the key, and goes in.",
-          "{A} opens the home door and enters in one motion.",
+          "{A} reaches {place} and goes in. It slides shut.",
+          "{A} stops at {place}, finds the key, and goes in.",
+          "{A} opens the door of {place} and enters in one motion.",
           "{A} goes in and the door closes on the street noise."
         ]
       }
@@ -493,19 +493,19 @@
       ],
       "log": {
         "b1": [
-          "{A} walks to the corner where the usual left turn is and goes right instead.",
-          "{A} passes the usual crossing and keeps going straight.",
-          "{A} turns down a side street {A.he} has not used on the way home before."
+          "{A} walks to the corner, hesitates, and turns right.",
+          "{A} passes the corner and keeps going straight.",
+          "{A} turns down a side street lined with laundry and lanterns."
         ],
         "b2": [
-          "{A} stops at a stall {A.he} has never visited and reads the board. Hands in pockets.",
+          "{A} stops at a stall and reads the board, hands in pockets.",
           "{A} lingers in front of a window with a lit display, head tilted.",
-          "{A} stands at a crossing with no hurry, watching a courier go by."
+          "{A} stands at a corner with no hurry, watching a courier go by."
         ],
         "b3": [
-          "{A} rejoins the usual route two blocks on.",
+          "{A} turns back onto the main block two corners on.",
           "{A} walks on, a little slower than before.",
-          "{A} picks the old way up again and does not look back."
+          "{A} cuts through to the wider street and does not look back."
         ]
       },
       "next": {
@@ -585,7 +585,7 @@
       ],
       "log": {
         "b1": [
-          "{A} comes back to the same counter as before. {B.desc} looks up and nods.",
+          "{A} steps up to the counter. {B.desc} looks up and nods.",
           "{A} reaches the counter. {B.desc} is already reaching for the bowl.",
           "{A} orders at the counter. {B.desc} repeats the order back from last time."
         ],
@@ -658,14 +658,14 @@
       ],
       "log": {
         "b1": [
-          "{A} comes into the square at a brisk pace, eyes on the usual stall.",
+          "{A} comes into the square at a brisk pace, eyes on one stall.",
           "{A} crosses toward {place} and slows as the line comes into view.",
           "{A} heads for the stall and stops short, eyes on the queue."
         ],
         "b2": [
           "{A} stands at the tail of a long line. Counts heads. Shuffles forward once.",
-          "{A} waits in line for a minute and a half. Looks at the clock tower.",
-          "{A} joins the end of the line and checks a handset twice."
+          "{A} waits in line for a minute and a half. Looks up at an ad screen.",
+          "{A} joins the end of the line and checks a comm twice."
         ],
         "b3": [
           "{A} shakes {A.his} head, steps out of the line, and walks off.",
@@ -737,7 +737,7 @@
       "log": {
         "b1": [
           "{A} reaches the counter. {B.desc} sets a bowl down before {A} speaks.",
-          "{B.desc} pushes {A}'s usual across the counter without being asked.",
+          "{B.desc} pushes a bowl across the counter before {A} orders.",
           "{A} steps up and {B.desc} points a ladle at {A} in mock accusation."
         ],
         "b2": [
@@ -819,7 +819,7 @@
       ],
       "log": {
         "b1": [
-          "{A} comes along the path toward the usual bench and slows.",
+          "{A} comes along the path toward a bench and slows.",
           "{A} approaches a bench and stops one step short of it.",
           "{A} walks to the bench and keeps going, passing it by."
         ],
@@ -829,7 +829,7 @@
           "{A} shifts weight foot to foot beside the bench."
         ],
         "b3": [
-          "{A} sits on the far bench, facing a different direction than before.",
+          "{A} sits on the far bench, facing the planters.",
           "{A} lowers onto a bench on the other side of the path. Turns {A.his} shoulders away from the street.",
           "{A} takes the seat farthest from the lamp and stays there."
         ]
@@ -891,19 +891,19 @@
       ],
       "log": {
         "b1": [
-          "{A} bursts out of the home door, one shoe not yet laced.",
+          "{A} bursts out of {place}, one shoe not yet laced.",
           "Door slides open fast. {A} out, jacket in a fist.",
           "{A} comes out at a half jog, the door still sliding shut behind."
         ],
         "b2": [
           "{A} runs the block. Sweat drop over {A}. Dodges a courier on the corner.",
-          "{A} sprints for the crossing and makes the signal with a second to spare.",
+          "{A} sprints for the corner and cuts under a dripping awning.",
           "{A} runs flat out, bag banging on one hip, and does not slow for the corner."
         ],
         "b3": [
-          "{A} slams into the work door, goes in, and the door closes on a gasp.",
-          "{A} reaches the work door, bends double, straightens and goes in.",
-          "{A} pulls up at the work door, smooths {A.his} hair with both hands, and enters."
+          "{A} slams into {place}, goes in, and the door closes on a gasp.",
+          "{A} reaches {place}, bends double, straightens and goes in.",
+          "{A} pulls up at {place}, smooths {A.his} hair with both hands, and enters."
         ]
       },
       "effects": {
@@ -977,7 +977,7 @@
           "{A} walks half a block, pace unchanged."
         ],
         "b2": [
-          "{A} stops dead at the crossing and pats every pocket. Then the bag. Then the pockets again.",
+          "{A} stops dead at the corner and pats every pocket. Then the bag. Then the pockets again.",
           "{A} halts mid-block and stares at nothing for a moment. Bang bubble over {A}.",
           "{A} pulls up, slaps {A.his} forehead, and turns around."
         ],
@@ -987,9 +987,9 @@
           "{A} retraces the block at nearly a run."
         ],
         "b4": [
-          "{A} goes back in through the home door. It slides shut.",
-          "{A} unlocks the home door and goes in again.",
-          "{A} ducks in through the home door."
+          "{A} goes back into {place}. The door slides shut.",
+          "{A} unlocks {place} and goes in again.",
+          "{A} ducks in at {place}."
         ]
       }
     },
@@ -1050,7 +1050,7 @@
         ],
         "b2": [
           "{A} stands at the edge of the platform, one foot over the yellow line, then back.",
-          "{A} waits at the platform with a handset held at chest height.",
+          "{A} waits at the platform with a comm held at chest height.",
           "{A} leans on a pillar and watches the track curve away."
         ],
         "b3": [
@@ -1166,19 +1166,19 @@
       ],
       "log": {
         "b1": [
-          "{A} orders two cups at the noodle stall. Pays for both.",
+          "{A} orders two cups at the stall. Pays for both.",
           "{A} asks the keeper for two of the same and holds up two fingers.",
           "{A} walks away from the counter with a cup in each hand."
         ],
         "b2": [
           "{A} drinks one cup on the walk. The second stays full.",
           "{A} sips from one cup and carries the other level, never spilling it.",
-          "{A} walks home with one cup finished and the second held away from the body."
+          "{A} walks on with one cup finished and the second held away from the body."
         ],
         "b3": [
-          "{A} reaches the home door with the second cup still full and goes in.",
+          "{A} reaches {place} with the second cup still full and goes in.",
           "{A} gets the door open with an elbow and goes in, one cup still in hand.",
-          "{A} enters the home door. The second cup goes in with {A.him}."
+          "{A} enters {place}. The second cup goes in with {A.him}."
         ]
       }
     },
@@ -1195,7 +1195,7 @@
           ]
         },
         "B": {
-          "desc": "another commuter at the same crossing",
+          "desc": "another commuter at the same corner",
           "rel": "stranger-to:A"
         }
       },
@@ -1236,12 +1236,12 @@
       ],
       "log": {
         "b1": [
-          "{A} waits at the crossing signal. {B.desc} stops two steps away. Neither speaks.",
-          "{A} and {B.desc} stand at the same corner for the red light, each looking at the signal.",
-          "At the crossing, {A} and {B.desc} stand side by side, strangers, eyes front."
+          "{A} waits at the corner while a file of delivery bots rolls past. {B.desc} stops two steps away. Neither speaks.",
+          "{A} and {B.desc} stand under one awning out of the drip, each looking at the ad screen.",
+          "At the corner, {A} and {B.desc} stand side by side, eyes front, as a drone passes low."
         ],
         "b2": [
-          "{A} gives {B.desc} a short nod. {B.desc} nods back. Light changes. They cross apart.",
+          "{A} gives {B.desc} a short nod. {B.desc} nods back. The bots clear. They go separate ways.",
           "{B.desc} lifts two fingers to {A}. {A} lifts two back.",
           "A half wave from {B.desc}. {A} answers with the same half wave."
         ]
@@ -1318,14 +1318,14 @@
       ],
       "log": {
         "b1": [
-          "{A} and {B.desc} meet at the same corner and the same red light. This time {B.desc} speaks first.",
-          "{B.desc} turns to {A} at the signal and says something short.",
-          "At the corner, {A} and {B.desc} stand closer than before. {A} looks over."
+          "{A} and {B.desc} wait at the corner as the bots roll by. {B.desc} speaks first.",
+          "{B.desc} turns to {A} under the awning and says something short.",
+          "At the corner, {A} and {B.desc} stand an arm's length apart. {A} looks over."
         ],
         "b2": [
-          "{A} and {B.desc} talk for the length of the light. {B.desc} points at the clock tower. {A} nods.",
+          "{A} and {B.desc} talk while the bots pass. {B.desc} points up at an ad screen. {A} nods.",
           "A few lines between {A} and {B.desc}. Laughter. A nod each.",
-          "{A} answers a question. {B.desc} laughs and shakes {B.his} head. The light turns."
+          "{A} answers a question. {B.desc} laughs and shakes {B.his} head. The last bot rolls by."
         ],
         "b3": [
           "{A} and {B.desc} cross together, still talking.",
@@ -1408,13 +1408,13 @@
       ],
       "log": {
         "b1": [
-          "{A} goes into the shop, and a wave goes up behind the door glass.",
-          "{A} enters the shop. Inside, a hand lifts in greeting.",
-          "{A} pushes through the shop door as someone inside calls out a hello."
+          "{A} goes into {place}, and a wave goes up behind the door glass.",
+          "{A} enters {place}. Inside, a hand lifts in greeting.",
+          "{A} steps into {place} as someone inside calls out a hello."
         ],
         "b2": [
           "{A} comes out with a small bag and a free sample in the other hand. The shopkeeper waves from inside.",
-          "{A} leaves the shop, grinning, tucking something into a pocket.",
+          "{A} leaves {place}, grinning, tucking something into a pocket.",
           "{A} exits and holds up the bag toward the window. A hand waves back."
         ]
       }
@@ -1462,9 +1462,9 @@
       ],
       "log": {
         "b1": [
-          "Drone settles at the step and drops the parcel. {A} is there to take it.",
-          "Delivery drone dips over the doorstep. {A} stoops for the parcel before it lifts away.",
-          "A drone at the step. Parcel down. {A} signs for it on a handheld with a thumb."
+          "A delivery bot stops at {place} and drops the parcel. {A} is there to take it.",
+          "A delivery bot waits at {place}. {A} stoops for the parcel before it walks away.",
+          "A bot at the door. Parcel down. {A} signs for it on a comm with a thumb."
         ],
         "b2": [
           "{A} takes the parcel in and the door closes.",
@@ -1551,8 +1551,8 @@
       "log": {
         "b1": [
           "{A} comes out in slippers and a long coat. Looks up and down the street and starts walking.",
-          "{A} out of the home door with nothing in hand. No bag, no handset.",
-          "{A} leaves the building and heads out at a loose pace."
+          "{A} out of {place} with nothing in hand. No bag, no comm.",
+          "{A} leaves {place} and heads out at a loose pace."
         ],
         "b2": [
           "{A} walks to the corner, turns, passes the same lamp twice.",
@@ -1565,8 +1565,8 @@
           "{A} passes the same corner again. A courier gives {A.him} a look."
         ],
         "b4": [
-          "{A} goes back in at the home door. The door slides shut.",
-          "{A} stops at the step, looks up at the windows, then goes in.",
+          "{A} goes back in at {place}. The door slides shut.",
+          "{A} stops at {place}, looks up at the windows, then goes in.",
           "{A} returns to the door and enters after a last glance at the sky."
         ]
       }
@@ -1622,13 +1622,13 @@
       ],
       "log": {
         "b1": [
-          "{A} comes off the train a station before the usual one. The lift takes {A.him} down.",
-          "{A} steps off at an earlier station than usual and rides down to street level.",
+          "{A} comes off the train and the lift takes {A.him} down to the street.",
+          "{A} steps off the train, looks at the station sign, and rides down to street level.",
           "{A} gets off one stop early and hurries through the barriers."
         ],
         "b2": [
-          "{A} walks the long stretch home through streets {A.he} rarely uses.",
-          "{A} sets off on foot, taking the unfamiliar side of the road.",
+          "{A} walks a long stretch through blocks hung with laundry lines.",
+          "{A} sets off on foot along the shaded side of the street.",
           "{A} crosses the district at an easy pace, looking up at signs."
         ],
         "b3": [
@@ -1691,8 +1691,8 @@
       "log": {
         "b1": [
           "{A} comes out late, hair uncombed, eyes half shut against the light.",
-          "{A} drifts out of the home door in loose clothes and slow steps.",
-          "{A} steps out, yawns, and stands on the step for a while."
+          "{A} drifts out of {place} in loose clothes and slow steps.",
+          "{A} steps out of {place}, yawns, and stands by the door for a while."
         ],
         "b2": [
           "{A} gets a hot cup at the kiosk. No rush in the order.",
@@ -1834,8 +1834,8 @@
         ],
         "b3": [
           "{A} walks off through the empty square, shoulders low.",
-          "{A} crosses the dark plaza toward home with a long, slow stride.",
-          "{A} heads for home across the dark plaza."
+          "{A} crosses the dark square with a long, slow stride.",
+          "{A} heads off past the koi pond, the lanterns going out behind."
         ]
       }
     },
@@ -1892,18 +1892,18 @@
       "log": {
         "b1": [
           "{A} comes out as the lamps come on. Thermos in one hand, jacket in the other.",
-          "{A} leaves the home door at dusk and zips up the jacket.",
+          "{A} leaves {place} at dusk and zips up the jacket.",
           "{A} steps out into the evening crowd going the opposite way."
         ],
         "b2": [
-          "{A} walks against the flow of people heading home.",
+          "{A} walks against the flow of people spilling out of the metro.",
           "{A} crosses the street under a flickering lamp, thermos tucked under one arm.",
-          "{A} walks the same dark block as the night before, hood up."
+          "{A} walks a dark block under the neon, hood up."
         ],
         "b3": [
-          "{A} reaches the work door and goes in. The door slides shut.",
-          "{A} arrives, greets the guard with a nod, and enters.",
-          "{A} slips through the work door and is gone from view."
+          "{A} reaches {place} and goes in. Its door slides shut.",
+          "{A} arrives at {place}, greets the guard with a nod, and enters.",
+          "{A} slips into {place} and is gone from view."
         ]
       }
     },
@@ -1952,7 +1952,7 @@
       "log": {
         "b1": [
           "{A} comes down the path to the bench by the lamp without checking the others.",
-          "{A} walks to the same bench and brushes the seat with a sleeve.",
+          "{A} walks to a bench and brushes the seat with a sleeve.",
           "{A} reaches the bench in the evening light, a paper bag in one hand."
         ],
         "b2": [

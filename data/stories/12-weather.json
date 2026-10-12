@@ -66,10 +66,10 @@
           "{A} runs in a bent crouch, one hand over the hair."
         ],
         "b3": [
-          "{A} ducks under a shop awning, laughing, and shakes out a sleeve.",
-          "{A} reaches a doorway and wrings out a cuff.",
+          "{A} ducks under the awning of {place}, laughing, and shakes out a sleeve.",
+          "{A} reaches the doorway of {place} and wrings out a cuff.",
           "{A} arrives under cover and swipes the face with a sleeve.",
-          "{A} huddles in the shop doorway, steam rising."
+          "{A} huddles against {place}, steam rising off {A.his} shoulders."
         ]
       },
       "next": {
@@ -122,7 +122,7 @@
       ],
       "log": {
         "b1": [
-          "{A} pops open an umbrella on the step and sets off.",
+          "{A} pops open an umbrella at the curb and sets off.",
           "{A} snaps an umbrella up under a dripping awning.",
           "{A} opens a wide umbrella with a flourish.",
           "{A} ducks out of a doorway under a clear umbrella."
@@ -131,7 +131,7 @@
           "{A} walks the length of the block, rain drumming overhead.",
           "{A} crosses the square at a measured pace, heels splashing.",
           "{A} heads along the sidewalk, tilting into the wind.",
-          "{A} takes the long way round puddles."
+          "{A} takes the long way around the puddles."
         ]
       },
       "next": {
@@ -190,14 +190,14 @@
         "b1": [
           "{A} stands in a doorway with arms folded and watches the water run.",
           "{A} stays under the awning, heels on the threshold.",
-          "{A} lingers in the dry strip by the shop wall.",
+          "{A} lingers in the dry strip along the wall of {place}.",
           "{A} stands near the glass as the rain hammers."
         ],
         "b2": [
           "{A} takes a call, one finger in the other ear.",
-          "{A} holds a handset up and says, \"It's raining. I'll be late.\"",
-          "{A} talks on the handset for a minute, eyes on the sky.",
-          "{A} lifts the handset to the ear and nods."
+          "{A} holds a comm up and says, \"It's raining. I'll be late.\"",
+          "{A} talks on the comm for a minute, eyes on the sky.",
+          "{A} lifts {A.his} comm to one ear and nods."
         ],
         "b3": [
           "{A} steps out when the rain thins and heads off.",
@@ -213,8 +213,8 @@
           "channel": "phone",
           "chance": 0.3,
           "log": [
-            "Phone, one side: {A} says: \"Rain's stopping everything. I'll be there in twenty.\"",
-            "Phone, one side: {A} says: \"Start without me. Save me a seat.\""
+            "Comm, one side: {A} says: \"Rain's stopping everything. I'll be there in twenty.\"",
+            "Comm, one side: {A} says: \"Start without me. Save me a seat.\""
           ]
         }
       ],
@@ -275,7 +275,7 @@
         "b1": [
           "{A} waits on the platform, one foot on the yellow line.",
           "{A} stands among a dozen others and looks down the dark tunnel.",
-          "{A} stays at the platform edge and checks the clock.",
+          "{A} stays at the platform edge and watches the tunnel lights.",
           "{A} waits as the board flickers."
         ],
         "b2": [
@@ -286,9 +286,9 @@
         ],
         "b3": [
           "{A} takes a call and says, \"Signal fault. Maybe an hour.\"",
-          "{A} holds the handset to the ear and says, \"Start without me.\"",
+          "{A} holds {A.his} comm close and says, \"Go ahead and eat. I'm stuck.\"",
           "{A} makes a call and speaks in short bursts.",
-          "{A} lifts the handset and mouths a few words."
+          "{A} takes a comm call and mouths a few words."
         ]
       },
       "reveals": [
@@ -298,8 +298,8 @@
           "channel": "phone",
           "chance": 0.4,
           "log": [
-            "Phone, one side: {A} says: \"Train is dead. I'll walk if it's not moving by seven.\"",
-            "Phone, one side: {A} says: \"Tell them I'm on the way. Rain's closed the line.\""
+            "Comm, one side: {A} says: \"Train is dead. I'll walk if it's not moving by seven.\"",
+            "Comm, one side: {A} says: \"Tell them I'm on the way. Rain's closed the line.\""
           ]
         }
       ],
@@ -379,7 +379,7 @@
           "{B.desc} stops dead at the curb and stares at the water."
         ],
         "b3": [
-          "{A} waves a hand at {B.desc}, tries not to smile, and fails.",
+          "{A} waves a hand at {B.desc}, mouth twitching, then grins.",
           "{A} waves for {B.desc} to come, then gives up and laughs.",
           "{A} waves the umbrella handle and calls something short."
         ]
@@ -579,22 +579,22 @@
       ],
       "log": {
         "b1": [
-          "A drone drips onto {A}'s step and drops a parcel.",
+          "A dripping drone drops low outside {place} and lets a parcel fall into {A}'s hands.",
           "{A} takes a soaked parcel from a hovering drone.",
           "A courier drone sets a wet crate down and rises.",
-          "{A} signs for a dripping package at the door."
+          "A delivery bot waits at {place}. {A} signs for a dripping package."
         ],
         "b2": [
           "{A} hugs the parcel under a jacket and ducks.",
           "{A} tucks the package inside a coat and hunches over it.",
-          "{A} lifts the crate in both arms and shields it with a body.",
+          "{A} lifts the crate in both arms and bends over it against the rain.",
           "{A} wraps the parcel in a sleeve and holds it tight."
         ],
         "b3": [
-          "{A} goes in fast and the door slides shut.",
-          "{A} enters with rain streaming off the shoulders.",
+          "{A} goes into {place} fast and the door slides shut.",
+          "{A} enters {place} with rain streaming off both shoulders.",
           "{A} steps inside, dripping.",
-          "{A} backs through the door, parcel clutched."
+          "{A} backs into {place}, parcel clutched."
         ]
       },
       "next": {
@@ -658,8 +658,8 @@
       ],
       "log": {
         "b1": [
-          "{A} stands in the shop doorway, jacket dripping.",
-          "{A} presses back against the shopfront and watches the water.",
+          "{A} stands in the doorway of {place}, jacket dripping.",
+          "{A} presses back against the front of {place} and watches the water.",
           "{A} waits under the awning with a damp collar."
         ],
         "b2": [
@@ -748,7 +748,7 @@
         ],
         "b2": [
           "{A} stands at the empty counter and wrings a rag.",
-          "{A} looks at the sky for a long minute, hand on the till.",
+          "{A} looks at the sky for a long minute, hand on the register.",
           "{A} stays by the stall front, arms crossed, watching the water.",
           "{A} stands under the canopy with the shutter half down."
         ],

@@ -76,7 +76,7 @@
         "b1": [
           "{A} stands by the pond, smoothing a jacket, and checks a reflection in a window.",
           "{A} waits at the edge of the square, fixing a collar twice.",
-          "{A} stays by the fountain and rolls both shoulders."
+          "{A} stays by the koi pond and rolls both shoulders."
         ],
         "b2": [
           "{B.desc} arrives. {A} and {B.desc} greet each other with a stiff little nod and set off together.",
@@ -86,7 +86,7 @@
         "b3": [
           "{A} and {B.desc} share a counter. {A} spills a little broth and wipes it, laughing.",
           "They split a bowl, trading small talk between sips.",
-          "{B.desc} offers {A} the last dumpling. {A} offers it back."
+          "{B.desc} offers {A} the last skewer. {A} offers it back."
         ],
         "b4": [
           "{A} and {B.desc} part at the pond with a wave each, a little late to turn away.",
@@ -218,12 +218,12 @@
           "{A} and {B.desc} cross the square. {B.desc} points out something on a roof."
         ],
         "b2": [
-          "{A} and {B.desc} sit on a bench with a bag of roasted nuts between them.",
+          "{A} and {B.desc} sit on a bench with a paper bag of buns between them.",
           "{B.desc} takes a seat on the bench and {A} sits right next to {B.desc}.",
           "They settle on a bench, shoulders almost touching."
         ],
         "b3": [
-          "{A} and {B.desc} talk until the lamps come up.",
+          "{A} and {B.desc} talk until the lanterns come on.",
           "{B.desc} laughs at something {A} says and shakes a head.",
           "They talk low, the street going by in front of them."
         ]
@@ -316,12 +316,12 @@
       ],
       "log": {
         "b1": [
-          "{A} joins the queue at the stall for the third time today.",
+          "{A} joins the queue at the stall and smooths {A.his} hair.",
           "{A} gets in line, checks the menu board, and orders a small tea.",
-          "{A} queues at the same counter again, hands in pockets."
+          "{A} queues at the counter, hands in pockets, eyes on the keeper."
         ],
         "b2": [
-          "{A} lingers by the counter with the cup, pretending to read the board.",
+          "{A} lingers by the counter with the cup, facing the board.",
           "{A} stays at the edge of the stall, a step from the till.",
           "{A} loiters near the counter and looks at the pond."
         ],
@@ -420,18 +420,18 @@
       "log": {
         "b1": [
           "{A} comes up the walk with a handful of stems wrapped in paper.",
-          "{A} carries a small bunch of flowers up to the door, holding it low.",
-          "{A} arrives at the door, tugging the wrapping straight."
+          "{A} carries a small bunch of flowers up to {place}, holding it low.",
+          "{A} arrives at {place}, tugging the wrapping straight."
         ],
         "b2": [
-          "The door opens. {A} holds the bunch out. {B.desc} takes it and laughs.",
+          "The door slides open. {A} holds the bunch out. {B.desc} takes it and laughs.",
           "{A} hands over the flowers with a small bow. {B.desc} presses a hand to a cheek.",
           "{A} passes the stems across the threshold. {B.desc} looks at them, then at {A}."
         ],
         "b3": [
           "Both go in. The door slides shut on the paper.",
           "{B.desc} pulls {A} inside by the sleeve.",
-          "{A} and {B.desc} go in together."
+          "{A} and {B.desc} go into {place} together."
         ]
       },
       "reveals": [
@@ -452,7 +452,7 @@
           "chance": 0.35,
           "log": [
             "Overheard: {B.desc} says: \"You remembered. Seven years and you still remember.\"",
-            "Overheard: {A} says: \"Happy anniversary. I stole them from the roof garden.\""
+            "Overheard: {A} says: \"Happy anniversary. The stall was out of the red ones.\""
           ]
         }
       ],
@@ -539,7 +539,7 @@
           "{B.desc} loops an arm through {A}'s and steers toward the benches."
         ],
         "b2": [
-          "{A} and {B.desc} sit on a bench and watch the lamps flicker on.",
+          "{A} and {B.desc} sit on a bench and watch the lanterns flicker on.",
           "{B.desc} takes a seat and {A} settles beside, a jacket draped over both knees.",
           "They sit close, backs to the wall."
         ],
@@ -649,13 +649,13 @@
       ],
       "log": {
         "b1": [
-          "{A} comes out of the door with a packed bag over one shoulder.",
-          "{A} leaves the building, a jacket half on, a bag banging on {A.his} hip.",
+          "{A} comes out of {place} with a packed bag over one shoulder.",
+          "{A} leaves {place}, a jacket half on, a bag banging on {A.his} hip.",
           "{A} steps out, a crate of belongings in both arms."
         ],
         "b2": [
           "{B.desc} calls from the doorway. {A} answers without turning. Voices rise and fall.",
-          "{A} and {B.desc} argue at the step, hands cutting the air.",
+          "{A} and {B.desc} argue in the doorway, hands cutting the air.",
           "{B.desc} holds the door and says a few words that make {A} stop."
         ],
         "b3": [
@@ -774,8 +774,8 @@
       "log": {
         "b1": [
           "{A} stands at the pond with a cup, looking at the water.",
-          "{A} stays by the fountain, a cup in each hand.",
-          "{A} idles near the rail, scrolling slowly."
+          "{A} stays by a planter, a cup in each hand.",
+          "{A} idles near the rail, scrolling a comm slowly."
         ],
         "b2": [
           "{B.desc} rounds the stalls and nearly collides with {A}. Both freeze.",
@@ -919,7 +919,7 @@
         ],
         "b3": [
           "{A} and {B.desc} hug, long and quiet.",
-          "{B.desc} pulls {A} in for a hug that lasts until the bells ring.",
+          "{B.desc} pulls {A} in for a hug and does not let go for a while.",
           "{A} hugs {B.desc} and then steps back, laughing."
         ]
       },
@@ -1105,8 +1105,8 @@
       "log": {
         "b1": [
           "{A} and {B.desc} stand at the counter, heads together over the menu.",
-          "{A} and {B.desc} order two bowls and a small cake from the board.",
-          "{B.desc} orders for both, {A} adds a plum wine."
+          "{A} and {B.desc} order two bowls and a pair of sweet buns from the board.",
+          "{B.desc} orders for both, {A} adds two teas."
         ],
         "b2": [
           "{A} hands over a small flat box. {B.desc} opens it and stares.",
@@ -1114,8 +1114,8 @@
           "{A} passes a small parcel across the counter."
         ],
         "b3": [
-          "They eat slowly, forks crossing in the same bowl.",
-          "{A} and {B.desc} share the cake with a single spoon.",
+          "They eat slowly, chopsticks crossing in the same bowl.",
+          "{A} and {B.desc} tear a sweet bun in half and share it.",
           "{B.desc} eats and wears the gift before the bowl is empty."
         ]
       },
@@ -1203,17 +1203,17 @@
       ],
       "log": {
         "b1": [
-          "{A} stands outside the door, not going in.",
-          "{A} lingers on the step with a handset warm in one hand.",
-          "{A} paces the step in a small circle."
+          "{A} stands outside {place}, not going in.",
+          "{A} lingers by the door of {place}, a comm warm in one hand.",
+          "{A} paces a small circle outside {place}."
         ],
         "b2": [
-          "{A} takes a call, back against the doorframe, voice soft.",
-          "{A} holds the handset to one ear and smiles at the ground.",
+          "{A} takes a call on {A.his} comm, back against the doorframe, voice soft.",
+          "{A} holds the comm to one ear and smiles at the ground.",
           "{A} listens for a long time, then laughs under {A.his} breath."
         ],
         "b3": [
-          "{A} goes in at last, still holding the handset.",
+          "{A} goes into {place} at last, comm still in hand.",
           "{A} enters and the door slides shut.",
           "{A} steps in and the light behind the door comes on."
         ]
@@ -1225,8 +1225,8 @@
           "channel": "phone",
           "chance": 0.35,
           "log": [
-            "Phone, one side: {A} says: \"Goodnight, love. I will see you at the lift at seven.\"",
-            "Phone, one side: {A} says: \"You hang up first. No, you. Fine, together.\""
+            "Comm, one side: {A} says: \"Goodnight, love. I will see you at the lift at seven.\"",
+            "Comm, one side: {A} says: \"You hang up first. No, you. Fine, together.\""
           ]
         }
       ],
@@ -1241,7 +1241,7 @@
       "note": "A feed post that puts a partner on the record. Public, vague and performative.",
       "roles": {
         "A": {
-          "desc": "an adult with a handset",
+          "desc": "an adult with a comm",
           "needs": [
             "adult"
           ]
@@ -1278,12 +1278,12 @@
       ],
       "log": {
         "b1": [
-          "{A} sits on a bench and holds a handset out at arm's length.",
-          "{A} takes a seat and frames a cup in the handset.",
-          "{A} perches on the bench edge and angles the handset low."
+          "{A} sits on a bench and holds a comm out at arm's length.",
+          "{A} takes a seat and frames a cup on the comm's screen.",
+          "{A} perches on the bench edge and angles the comm low."
         ],
         "b2": [
-          "{A} posts a picture and puts the handset face down.",
+          "{A} posts a picture and puts the comm face down.",
           "{A} types a line, adds a mark, and posts.",
           "{A} posts and shows the screen to nobody."
         ]
@@ -1296,7 +1296,7 @@
           "chance": 0.55,
           "log": [
             "Posted: \"Two years today. Same cafe, same stool, still the best company.\"",
-            "Posted: \"Dinner with my favorite person. Not sharing the dumplings.\""
+            "Posted: \"Dinner with my favorite person. Not sharing the skewers.\""
           ]
         }
       ],

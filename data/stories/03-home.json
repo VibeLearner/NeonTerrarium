@@ -70,21 +70,21 @@
       "log": {
         "b1": [
           "{A} comes up to the door and pats down both jacket pockets, then the bag.",
-          "{A} arrives at the home door and checks every pocket in turn.",
-          "{A} reaches the door and turns out a pocket onto the step."
+          "{A} stops outside {place} and checks every pocket in turn.",
+          "{A} reaches the door of {place} and turns out a pocket into one palm."
         ],
         "b2": [
           "{A} knocks twice and then stands back from the door with arms folded.",
           "{A} raps on the door, waits, raps again. {n} minutes go by.",
-          "{A} stands on the step and knocks at a slow, even pace."
+          "{A} knocks at {place} at a slow, even pace."
         ],
         "b3": [
-          "{B.desc} arrives at the step with a key held up. A few words with {A}.",
-          "{B.desc} comes up the step and shakes {B.his} head at {A}. They talk low.",
+          "{B.desc} arrives with a key held up. A few words with {A}.",
+          "{B.desc} walks up and shakes {B.his} head at {A}. They talk low.",
           "{B.desc} reaches the door and says something short to {A}."
         ],
         "b4": [
-          "The lock clicks. Both go through the door and it slides shut.",
+          "The lock clicks. Both go into {place} and the door slides shut.",
           "{B.desc} opens up and {A} follows in.",
           "The door slides open for {B.desc}. {A} goes in behind."
         ]
@@ -171,14 +171,14 @@
         "b1": [
           "{A} comes along the block with a heavy paper sack in each arm.",
           "{A} shifts a bulging sack from one hip to the other and keeps going.",
-          "{A} climbs toward the door with groceries and a loaf under one elbow.",
-          "{A} arrives at the home door, both arms full, kicking at the step with a boot."
+          "{A} heads for the door with groceries and a loaf under one elbow.",
+          "{A} reaches {place}, both arms full, and nudges the panel with an elbow."
         ],
         "b2": [
           "{A} backs through the door and it slides shut.",
           "{A} goes in, elbow on the panel.",
           "{A} steps inside with the sacks. The door closes.",
-          "{A} enters and the light inside comes on."
+          "{A} goes into {place}. A light comes on behind the glass."
         ]
       },
       "reveals": [
@@ -188,7 +188,7 @@
           "channel": "seen",
           "chance": 0.4,
           "log": [
-            "{A} goes in at the third door along, arms full.",
+            "{A} lets {A.him}self into {place}, arms full.",
             "The door opens to {A} without a knock."
           ]
         }
@@ -246,17 +246,17 @@
       ],
       "log": {
         "b1": [
-          "{A} comes out of the door with a cup in one hand.",
-          "{A} steps out of the home door and eases it shut.",
+          "{A} comes out of {place} with a cup in one hand.",
+          "{A} steps out and the door of {place} slides shut behind {A.him}.",
           "{A} leaves the building and stops on the top step."
         ],
         "b2": [
-          "{A} sits on the step and watches the street go by.",
-          "{A} takes a seat on the stoop, knees up, cup balanced on one.",
+          "{A} sits by the door and watches the street go by.",
+          "{A} takes a seat outside, knees up, cup balanced on one.",
           "{A} lowers {A.him}self onto the step and stretches both legs out."
         ],
         "b3": [
-          "{A} gets up, dusts off, and goes in.",
+          "{A} gets up, dusts off, and goes into {place}.",
           "{A} stands, stretches, and enters.",
           "{A} goes back in. The door slides shut."
         ]
@@ -309,7 +309,7 @@
       "log": {
         "b1": [
           "{A} comes out with a small bottle held in one hand.",
-          "{A} steps out of the home door and crouches by a pot on the step.",
+          "{A} steps out of {place} and crouches by a potted plant.",
           "{A} leaves the building carrying a dented watering can."
         ],
         "b2": [
@@ -326,7 +326,7 @@
           "chance": 0.5,
           "log": [
             "{A} waters this pot. Seen doing it on {seen} mornings.",
-            "Morning watering, the pot by the window: {seen} times on the feed."
+            "Morning watering, the same potted plant: {seen} times on the feed."
           ],
           "minSeen": 2
         }
@@ -395,8 +395,8 @@
       "log": {
         "b1": [
           "{B.desc} waits at the door with a tablet under one arm.",
-          "{B.desc} stands outside the home door and checks the time.",
-          "{B.desc} paces the step in a long coat, tablet in hand."
+          "{B.desc} stands outside {place} and checks the time.",
+          "{B.desc} paces by the door in a long coat, tablet in hand."
         ],
         "b2": [
           "{A} opens up and holds out a thin envelope. {B.desc} counts it.",
@@ -522,13 +522,13 @@
       ],
       "log": {
         "b1": [
-          "{A} comes along the block toward a home door, bag over one shoulder.",
+          "{A} comes along the block, bag over one shoulder.",
           "{A} walks the last stretch to the door at an even pace.",
-          "{A} heads for the door, hands in pockets."
+          "{A} heads up the street, hands in pockets."
         ],
         "b2": [
-          "{B.desc} stands outside the door, tablet at the hip, looking up the block.",
-          "{B.desc} waits on the step and checks the time twice.",
+          "{B.desc} stands outside {place}, tablet at the hip, looking up the block.",
+          "{B.desc} waits by the door of {place} and checks the time twice.",
           "{B.desc} leans on the doorframe, arms crossed."
         ],
         "b3": [
@@ -537,9 +537,9 @@
           "{A} shakes {A.his} head once and walks off in the other direction."
         ],
         "b4": [
-          "{A} takes out a handset and holds it to one ear.",
+          "{A} takes out a comm and holds it to one ear.",
           "{A} stops by a wall and takes a call, back to the street.",
-          "{A} raises a handset to the ear and speaks low."
+          "{A} raises {A.his} comm and speaks low."
         ]
       },
       "reveals": [
@@ -549,8 +549,8 @@
           "channel": "phone",
           "chance": 0.35,
           "log": [
-            "Phone, one side: {A} says: \"Not today. I don't have it today. Tell him Friday.\"",
-            "Phone, one side: {A} says: \"Half, maybe. I'll bring half on Friday.\""
+            "Comm, one side: {A} says: \"Not today. I don't have it today. Tell him Friday.\"",
+            "Comm, one side: {A} says: \"Half, maybe. I'll bring half on Friday.\""
           ]
         }
       ],
@@ -643,9 +643,9 @@
       ],
       "log": {
         "b1": [
-          "{B.desc} is back at the door, tablet in hand, same coat.",
-          "{B.desc} stands on the step again and nods at an approaching {A}.",
-          "{B.desc} waits outside the home door, scrolling slowly."
+          "{B.desc} stands at the door of {place}, tablet in hand, coat buttoned.",
+          "{B.desc} waits by the door and nods at an approaching {A}.",
+          "{B.desc} waits outside {place}, scrolling slowly."
         ],
         "b2": [
           "{A} hands over a thick envelope. {B.desc} counts it twice.",
@@ -736,9 +736,9 @@
       ],
       "log": {
         "b1": [
-          "A drone sets a long flat crate down at {A}'s door and lifts away.",
-          "{A} signs for a delivery. The drone hums off with the receipt.",
-          "A cargo drone delivers a crate to {A} and rises straight up."
+          "A delivery bot sets a long flat crate down outside {place} and walks off.",
+          "{A} signs for a delivery. The bot trundles off up the street.",
+          "A delivery bot hands a crate to {A} and turns back the way it came."
         ],
         "b2": [
           "{A} and {B.desc} take an end each and shuffle the crate toward the door.",
@@ -746,7 +746,7 @@
           "{A} and {B.desc} tilt the crate to clear the frame."
         ],
         "b3": [
-          "Both go through the door in stages, the crate scraping the frame.",
+          "Both go into {place} in stages, the crate scraping the frame.",
           "{B.desc} and {A} work the crate inside and the door slides shut.",
           "The two of them squeeze into the doorway and disappear in."
         ]
@@ -841,12 +841,12 @@
           "{A} carries a cracked kettle unit in both hands, the cord trailing."
         ],
         "b2": [
-          "{A} hands the thing over the counter. {B.desc} turns it over and taps the base.",
+          "{A} hands the thing across at {place}. {B.desc} turns it over and taps the base.",
           "{B.desc} takes the appliance from {A}, holds it to the light, and tags it.",
           "{A} passes the heater across. {B.desc} writes a number on a slip."
         ],
         "b3": [
-          "{A} leaves the shop empty-handed and flexes both wrists.",
+          "{A} comes out of {place} empty-handed and flexes both wrists.",
           "{A} walks out with a slip in one fist and heads off.",
           "{A} leaves, folding the slip into a pocket."
         ]
@@ -930,9 +930,9 @@
       ],
       "log": {
         "b1": [
-          "{A} waits at the repair counter with a slip held up in one hand.",
-          "{A} stands at the shop door and shows a slip at the counter.",
-          "{A} shows up at the repair counter and taps the slip twice."
+          "{A} waits at the counter of {place} with a slip held up in one hand.",
+          "{A} steps into the doorway of {place} and shows a slip.",
+          "{A} shows up at the counter and taps the slip twice."
         ],
         "b2": [
           "{B.desc} brings the heater out and sets it in {A}'s arms.",
@@ -942,7 +942,7 @@
         "b3": [
           "{A} walks off, the heater out in front.",
           "{A} carries it down the block, cord looped around one wrist.",
-          "{A} heads home with the repaired unit held in both arms."
+          "{A} heads off with the repaired unit held in both arms."
         ]
       },
       "effects": {
@@ -1020,9 +1020,9 @@
       ],
       "log": {
         "b1": [
-          "{A} and {B.desc} unload crates from a hand cart onto the sidewalk.",
-          "{A} climbs the step with a stack of boxes up to {A.his} chin. {B.desc} follows with a lamp.",
-          "{B.desc} hands up a crate and {A} stacks it by the door. There are more."
+          "{A} and {B.desc} unload crates from a waiting delivery bot onto the sidewalk.",
+          "{A} carries a stack of boxes up to {A.his} chin. {B.desc} follows with a lamp.",
+          "{B.desc} hands over a crate and {A} stacks it by the door of {place}. There are more."
         ],
         "b2": [
           "{A} stops and wipes {A.his} forehead. {B.desc} says something and laughs.",
@@ -1030,7 +1030,7 @@
           "{B.desc} points to the door, then the pile. {A} nods."
         ],
         "b3": [
-          "Both go in with armloads. The door stays propped open.",
+          "Both go into {place} with armloads. The door stays propped open.",
           "{A} and {B.desc} take the last crates through the door.",
           "{B.desc} follows {A} in, a lamp tucked under one arm."
         ]
@@ -1073,13 +1073,13 @@
         "channel": "conversation",
         "lines": [
           "Overheard: {S} tells {L} that {A.desc} moved in on the weekend. Boxes everywhere, {S} says.",
-          "Overheard: {S} says to {L}: \"New face on our block. {A.desc}. Moved in with a hand cart.\"",
+          "Overheard: {S} says to {L}: \"New face on our block. {A.desc}. Moved in with a delivery bot full of crates.\"",
           "Overheard: {S} says {A.desc} took the empty place last week, and a lamp was the first thing through the door.",
           "Overheard: {S} mentions to {L} that {A.desc} is the one who moved in by the corner."
         ],
         "entry": [
           "Moved into a place in the district last weekend (overheard: a neighbor, in conversation).",
-          "Moved in with a hand cart, per {S} (overheard, in conversation).",
+          "Moved in with a delivery bot full of crates, per {S} (overheard, in conversation).",
           "Took a new home on the block, said {S} (overheard)."
         ]
       }
@@ -1143,19 +1143,19 @@
       ],
       "log": {
         "b1": [
-          "{A} comes out of the home door backward, hauling a fat crate.",
-          "{A} leaves the building with a stack of crates and sets them down on the step.",
+          "{A} comes out of {place} backward, hauling a fat crate.",
+          "{A} leaves {place} with a stack of crates and sets them down by the door.",
           "{A} steps out, a rolled rug over one shoulder."
         ],
         "b2": [
-          "{A} loads a hand cart. Another trip, another crate.",
-          "{A} stacks the crates on the cart and ties them down with cord.",
-          "{A} lashes a bag onto the cart and tugs the cord tight."
+          "{A} loads a waiting delivery bot. Another trip, another crate.",
+          "{A} stacks the crates on the bot's flatbed and ties them down with cord.",
+          "{A} lashes a bag onto the pile and tugs the cord tight."
         ],
         "b3": [
           "{B.desc} stands in the doorway. A few words, a nod, a handshake.",
-          "{A} and {B.desc} stand at the door and speak quietly. {A} takes the cart handle.",
-          "{B.desc} says something short from the step. {A} lifts a hand and turns away."
+          "{A} and {B.desc} stand at the door of {place} and speak quietly. {A} turns to the bot.",
+          "{B.desc} says something short from the doorway. {A} lifts a hand and turns away."
         ]
       },
       "reveals": [
@@ -1166,7 +1166,7 @@
           "chance": 0.4,
           "log": [
             "Overheard: {A} says to {B.desc}: \"I'm out by dark. I'll leave the key under the pot.\"",
-            "Overheard: {A} tells {B.desc}: \"The new place is across the river. Come by when it's set up.\""
+            "Overheard: {A} tells {B.desc}: \"The new place is out past the Data Spire. Come by when it's set up.\""
           ]
         }
       ],
@@ -1195,14 +1195,14 @@
         ],
         "channel": "conversation",
         "lines": [
-          "Overheard: {S} says to {L} that {A.desc} moved out last weekend. Took the cart and everything.",
+          "Overheard: {S} says to {L} that {A.desc} moved out last weekend. Took every crate and the plants.",
           "Overheard: {S} tells {L}: \"You hear {A.desc} cleared out? Left the key under a flowerpot.\"",
           "Overheard: {S} says {A.desc} is gone from the old block. Not a word of warning, {S} adds.",
           "Overheard: {S} mentions that {A.desc} moved out and that the housemate stayed."
         ],
         "entry": [
           "Moved out of the old place last weekend (overheard: a neighbor, in conversation).",
-          "Left the block with a hand cart, per {S} (overheard, in conversation).",
+          "Left the block with a bot full of crates, per {S} (overheard, in conversation).",
           "Moved out of a shared place, said {S} (overheard)."
         ]
       }
@@ -1263,18 +1263,18 @@
       ],
       "log": {
         "b1": [
-          "{B.desc} stands at the home door, hands tucked into sleeves.",
-          "{B.desc} waits on the step, rocking on {B.his} heels.",
+          "{B.desc} stands outside {place}, hands tucked into sleeves.",
+          "{B.desc} waits by the door, rocking on {B.his} heels.",
           "{B.desc} comes up to the door and stands facing it."
         ],
         "b2": [
-          "The door slides open. {A} holds out a small key on a loop of string.",
+          "The door of {place} slides open. {A} holds out a small key on a loop of string.",
           "{A} hands {B.desc} a key and says a few words.",
           "{A} passes a key across the threshold. {B.desc} pockets it."
         ],
         "b3": [
           "{B.desc} turns and leaves the doorway, key in a fist.",
-          "{B.desc} goes down the step and off at a brisk pace.",
+          "{B.desc} turns from {place} and goes off at a brisk pace.",
           "{B.desc} heads away from the door, tapping the pocket."
         ]
       },
@@ -1286,7 +1286,7 @@
           "chance": 0.4,
           "log": [
             "Overheard: {A} says: \"You're a good {B.rel}. Back Sunday.\"",
-            "Overheard: {B.desc} says: \"What's a {B.rel} for? Go, I've got the fish.\""
+            "Overheard: {B.desc} says: \"What's a {B.rel} for? Go, I've got the plants.\""
           ]
         },
         {
@@ -1295,8 +1295,8 @@
           "channel": "conversation",
           "chance": 0.4,
           "log": [
-            "Overheard: {A} says: \"Just feed the fish. Third shelf, the green tin.\"",
-            "Overheard: {A} tells {B.desc}: \"Back Sunday. Water the plant, ignore the mail.\""
+            "Overheard: {A} says: \"Just water the fern. Third shelf, the green can.\"",
+            "Overheard: {A} tells {B.desc}: \"Back Sunday. Water the plant, ignore the parcels.\""
           ]
         }
       ],
@@ -1350,13 +1350,13 @@
       ],
       "log": {
         "b1": [
-          "A drone sets a warm paper bag on {A}'s step and chirps once.",
-          "{A} leans out of the door and takes a bag from a hovering drone.",
-          "A delivery drone drops a steaming parcel at {A}'s door and goes straight up.",
-          "{A} taps a handset at the door and a drone lowers a bag into {A.his} hands."
+          "A delivery bot sets a warm paper bag outside {place} and chirps once.",
+          "{A} leans out of the door and takes a bag from a waiting bot.",
+          "A delivery bot drops a steaming parcel at the door of {place} and heads off.",
+          "{A} taps {A.his} comm at the door and a bot opens its capsule for the bag."
         ],
         "b2": [
-          "{A} goes in with the bag held out in front.",
+          "{A} goes into {place} with the bag held out in front.",
           "{A} steps inside and the door slides shut.",
           "{A} enters, sniffing the bag.",
           "{A} backs through the door, bag held high."

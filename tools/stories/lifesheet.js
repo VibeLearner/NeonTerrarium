@@ -795,7 +795,7 @@ function sheet(c, fmt) {
   const HOW = { seen: 'Seen', conversation: 'Overheard', phone: 'On the phone', feed: 'Posted', document: 'Read', introduction: 'Introduced' };
   const DETAIL = { job: 'Job', employer: 'Employer', home: 'Home', cohabitants: 'Lives with', 'age-range': 'Age' };
   const stamp = t => 'D' + (Math.floor(t / 1440) + 1) + ' ' + clock(t);
-  const text = n => cap(fillTemplate(n.tmpl, n.ctx, W.known)).replace(/^(Overheard|Posted|Phone, one side):\s*/, '');
+  const text = n => cap(fillTemplate(n.tmpl, n.ctx, W.known)).replace(/^(Overheard|Posted|Comm, one side):\s*/, '');
   const ks = W.known[c.id] || {};
   const det = [];
   if (ks.first) det.push('- Name: ' + ks.first + (ks.last ? ' ' + ks.last : '') + ' [' + VIA(ks.lastVia && ks.lastVia.verified ? ks.lastVia : ks.firstVia) + ']');

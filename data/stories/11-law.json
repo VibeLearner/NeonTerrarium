@@ -210,7 +210,7 @@
           "{A} stays at the corner for a moment with hands in pockets."
         ],
         "b3": [
-          "{A} crosses to the far side and takes the long way round.",
+          "{A} crosses to the far side and takes the long way around.",
           "{A} turns off into a side street and speeds up.",
           "{A} goes back the way {A.he} came."
         ]
@@ -289,7 +289,7 @@
       ],
       "log": {
         "b1": [
-          "{A} comes up to the station door and stops at the step.",
+          "{A} comes up to the station door and stops short of it.",
           "{A} approaches the station with a slip of paper and a pinched look.",
           "{A} arrives at the station and waits at the bay."
         ],
@@ -386,9 +386,9 @@
           "{B.desc} hands {A} a folded handkerchief."
         ],
         "b3": [
-          "{A} borrows a handset and takes a call, voice low and shaky.",
-          "{A} lifts a handset to one ear and gives short, flat answers.",
-          "{A} raises the handset and speaks to someone in pieces."
+          "{A} takes a call on a borrowed comm, voice low and shaky.",
+          "{A} lifts a comm to one ear and gives short, flat answers.",
+          "{A} takes a comm call and speaks to someone in pieces."
         ]
       },
       "reveals": [
@@ -398,8 +398,8 @@
           "channel": "phone",
           "chance": 0.55,
           "log": [
-            "Phone, one side: {A} says: \"Everything. The card, the keys. It was a man with a hood.\"",
-            "Phone, one side: {A} says: \"No, I'm fine. They only wanted the bag. I'll call the station.\""
+            "Comm, one side: {A} says: \"Everything. The card, the keys. It was a man with a hood.\"",
+            "Comm, one side: {A} says: \"No, I'm fine. They only wanted the bag. I'll call the station.\""
           ]
         }
       ],
@@ -599,7 +599,7 @@
       "log": {
         "b1": [
           "A patrol bike drops in beside {A} at the curb. {B.desc} swings off.",
-          "{B.desc} arrives on a hoverbike and steps in front of {A}.",
+          "{B.desc} arrives on a police bike and steps in front of {A}.",
           "{B.desc} lands the bike across {A}'s path."
         ],
         "b2": [
@@ -610,7 +610,7 @@
         "b3": [
           "The bike lifts away with both of them.",
           "{B.desc} and {A} leave the corner on the bike.",
-          "The hoverbike hums off toward the station."
+          "The police bike hums off toward the station."
         ]
       },
       "effects": {
@@ -756,7 +756,7 @@
           "{A} stands at the edge of the stall and yawns into a sleeve.",
           "{A} leans on the counter during a lull, eyes half closed.",
           "{A} stays at the back of the stall, arms folded.",
-          "{A} stands by the till and counts coins into a tin."
+          "{A} stands by the register and counts coins into a tin."
         ]
       },
       "reveals": [
@@ -766,8 +766,8 @@
           "channel": "document",
           "chance": 0.5,
           "log": [
-            "A name badge on the apron reads {A.first}, Noodle Stall.",
-            "The apron patch reads Night Noodle."
+            "A name badge on the apron reads {A.first}, Counter Staff.",
+            "The apron patch reads Counter Crew, Day Shift."
           ]
         }
       ],
@@ -929,7 +929,7 @@
       ],
       "log": {
         "b1": [
-          "{A} lounges on a bench with a cup, long past the usual crowd.",
+          "{A} lounges on a bench with a cup, the seats around {A.him} empty.",
           "{A} sits in the dark of the square with feet up on the slats.",
           "{A} takes a bench seat and watches the lamps."
         ],

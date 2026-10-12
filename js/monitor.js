@@ -30,6 +30,22 @@ const MON = (() => {
     return best ? best.id : null;
   };
 
+  /* ---------- the person under the cursor: corner brackets round them, so a click picks the one you mean ---------- */
+  const hov = document.createElement('div'); hov.id = 'npcHover'; hov.className = 'npc-hover'; hov.hidden = true; document.body.appendChild(hov);
+  let hovAt = null; M.hoverId = null;
+  M.hoverAt = (cx, cy) => { hovAt = cx === null || cx === undefined ? null : [cx, cy]; if (!hovAt) M.hoverFrame(); };
+  M.hoverFrame = () => {
+    const id = hovAt ? M.pick(hovAt[0], hovAt[1]) : null, p = id && people.get(id);
+    M.hoverId = id; view.style.cursor = id ? 'pointer' : '';
+    if (!p){ if (!hov.hidden) hov.hidden = true; return; }
+    const r = view.getBoundingClientRect(), tall = (16/PX)/zoom*r.height/2, wide = tall*.75;
+    _v.set(p.x, p._ey ?? CURB, p.z).applyMatrix4(comp.uniforms.VP.value);
+    const fx = r.left + (_v.x*.5 + .5)*r.width, fy = r.top + (1 - (_v.y*.5 + .5))*r.height, pad = 3;
+    hov.hidden = false; hov.classList.toggle('watched', id === M.id);
+    hov.style.left = Math.round(fx - wide/2 - pad) + 'px'; hov.style.top = Math.round(fy - tall - pad) + 'px';
+    hov.style.width = Math.round(wide + pad*2) + 'px'; hov.style.height = Math.round(tall + pad*2) + 'px';
+  };
+
   /* ---------- open, close, follow ---------- */
   M.open = id => {
     M.id = id; M.follow = true; M.rev = -1; M.lastDoor = null; el.hidden = false; document.body.classList.add('watching');
@@ -97,8 +113,8 @@ const MON = (() => {
 
   /* ---------- the log and the notebook ---------- */
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const VIA = v => !v ? '' : ({ document: 'read on a document', introduction: 'introduced', conversation: 'overheard', phone: 'heard on the phone', feed: 'posted', seen: 'seen', hearsay: 'heard secondhand' }[v.channel] || v.channel);
-  const HOW = { seen: 'Seen', conversation: 'Overheard', phone: 'On the phone', feed: 'Posted', document: 'Read', introduction: 'Introduced' };
+  const VIA = v => !v ? '' : ({ document: 'read on a document', introduction: 'introduced', conversation: 'overheard', phone: 'heard on a comm call', feed: 'posted', seen: 'seen', hearsay: 'heard secondhand' }[v.channel] || v.channel);
+  const HOW = { seen: 'Seen', conversation: 'Overheard', phone: 'On the comm', feed: 'Posted', document: 'Read', introduction: 'Introduced' };
   const DETAIL = { job: 'Job', employer: 'Employer', home: 'Home', cohabitants: 'Lives with', 'age-range': 'Age' };
   function render(force){
     if (!M.id || !window.STORY) return;
@@ -111,13 +127,15 @@ const MON = (() => {
     if (M.tab === 'log'){
       const L = STORY.log(M.id);
       if (!STORY.on) body.innerHTML = '<p class="mon-empty">' + (STORY.failed ? 'The story data did not load: ' + esc(STORY.failed) : 'Loading the city\'s stories...') + '</p>';
-      else if (!L.length) body.innerHTML = '<p class="mon-empty">Nothing logged yet. Stay with them.</p>';
+      else if (!L.length) body.innerHTML = '<p class="mon-empty">Nothing logged yet.</p>';
       else body.innerHTML = L.map(e => { const t = STORY.render(e), re = e.first && e.first !== t;
         return '<div class="ml ' + (e.kind || '') + '"><time>' + clockText(e.t) + '</time><span>' + esc(t) + (re ? ' <i title="' + esc('first logged as: ' + e.first) + '">rewritten</i>' : '') + '</span></div>'; }).join('');
+      fitLog(body);
       if (atBottom || force) body.scrollTop = body.scrollHeight;
       return;
     }
     // the notebook
+    $m('monBody').style.maxHeight = '';
     const N = STORY.notes(M.id), parts = [];
     const det = [];
     det.push(row('Name', k.first ? k.first + (k.last ? ' ' + k.last : '') : null, k.first ? (k.lastVia && k.lastVia.verified ? k.lastVia : k.firstVia) : null));
@@ -140,7 +158,7 @@ const MON = (() => {
       if (n.who === M.id && (n.channel === 'document' || n.channel === 'introduction') && DETAIL[f]) continue;
       if (n.fact === 'hearsay'){ obs.push('<div class="mo"><time>' + clockText(n.t) + '</time><span><b>Secondhand</b> ' + esc(n.text) + ' <small>unconfirmed · heard from ' + (n.sources ? n.sources.length : 1) + (n.sources && n.sources.length > 1 ? ' people' : ' person') + '</small></span></div>'); continue; }
       if (n.learned && n.learned.names && n.learned.names.length && /first-name|full-name|last-name|nickname/.test(n.fact)) continue;
-      const t = STORY.render(n).replace(/^(Overheard|Posted to the mesh|Phone, one side):\s*/, '');
+      const t = STORY.render(n).replace(/^(Overheard|Posted to the mesh|Comm, one side):\s*/, '');
       obs.push('<div class="mo"><time>' + clockText(n.t) + '</time><span><b>' + (HOW[n.channel] || n.channel) + '</b> ' + esc(t) + ' <small>' + (n.verified ? 'verified' : 'unconfirmed') + '</small></span></div>');
     }
     parts.push('<h4>Observations</h4>' + (obs.length ? obs.join('') : '<p class="mon-empty">Nothing yet.</p>'));
@@ -156,6 +174,13 @@ const MON = (() => {
     if (open && body.querySelector('details.mon-key')) body.querySelector('details.mon-key').open = true;
     if (top) body.scrollTop = 0;
     body.querySelectorAll('.mp button').forEach(b => b.addEventListener('click', () => M.open(b.dataset.id)));
+  }
+  // the log is as tall as its last four entries and scrolls back from there (the notebook keeps the panel's full height)
+  function fitLog(body){
+    const L = body.querySelectorAll('.ml');
+    if (L.length <= 4){ body.style.maxHeight = ''; return; }
+    let h = 0; for (let i = L.length - 4; i < L.length; i++) h += L[i].offsetHeight;
+    const cs = getComputedStyle(body); body.style.maxHeight = Math.ceil(h + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + 2) + 'px';
   }
   function row(label, value, via){
     return '<div class="md"><b>' + label + '</b><span>' + (value ? esc(value) : '<i>———</i>') + '</span>' + (value && via ? '<small>' + VIA(via) + ', ' + (via.verified ? 'verified' : 'unconfirmed') + '</small>' : '') + '</div>';

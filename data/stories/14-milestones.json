@@ -63,14 +63,14 @@
       ],
       "log": {
         "b1": [
-          "{A} sits at a stool and scrolls a handset with one eyebrow up.",
+          "{A} sits at a stool and scrolls a comm with one eyebrow up.",
           "{A} takes a stool and drums fingers on the counter.",
           "{A} perches on a stool and looks across the square."
         ],
         "b2": [
           "{B.desc} arrives and sets a bun with a single candle in front of {A}.",
           "{B.desc} hands {A} a small wrapped bun with a lit candle on top.",
-          "{B.desc} holds out a paper plate with a sparkler stuck in a dumpling."
+          "{B.desc} holds out a paper plate with a sparkler stuck in a steamed bun."
         ],
         "b3": [
           "{A} blows the candle out, laughs, and the two of them hug.",
@@ -175,12 +175,12 @@
       "log": {
         "b1": [
           "{A} and {B.desc} walk to the station entrance, {A} dragging a heavy bag.",
-          "{B.desc} carries half of {A}'s load as the two reach the stairs.",
+          "{B.desc} carries half of {A}'s load as the two reach the station lift.",
           "{A} and {B.desc} cross the plaza slowly, saying little."
         ],
         "b2": [
-          "{A} and {B.desc} hug for a long time at the top of the steps.",
-          "{B.desc} holds on to {A} until the platform bell rings.",
+          "{A} and {B.desc} hug for a long time beside the station lift.",
+          "{B.desc} holds on to {A} until the lift cab arrives.",
           "{A} and {B.desc} embrace and neither lets go first."
         ],
         "b3": [
@@ -229,7 +229,7 @@
           "Overheard: {S} tells {L} that {A.desc} left the city on the evening train. Just a bag and a coat.",
           "Overheard: {S} says to {L}: \"{A.desc} is gone. Took the metro out and did not say where.\"",
           "Overheard: {S} says {A.desc} has moved away from the city for good.",
-          "Overheard: {S} mentions to {L} that {A.desc} left last week and sent a card."
+          "Overheard: {S} mentions to {L} that {A.desc} left last week and has not called since."
         ],
         "entry": [
           "Left the city last week (overheard: a neighbor, in conversation).",
@@ -301,8 +301,8 @@
       ],
       "log": {
         "b1": [
-          "{A} stands at the work door with a fresh badge on a spotless jacket.",
-          "{A} waits outside the workplace, turning a badge over and over.",
+          "{A} stands outside {place} with a fresh badge on a spotless jacket.",
+          "{A} waits by the door of {place}, turning a badge over and over.",
           "{A} arrives early and stays at the door with a thermos."
         ],
         "b2": [
@@ -311,7 +311,7 @@
           "{B.desc} hands {A} a sheet of printed rules and explains the first hour."
         ],
         "b3": [
-          "{B.desc} leads {A} in. The door slides shut behind them.",
+          "{B.desc} leads {A} into {place}. The door slides shut behind them.",
           "{A} follows {B.desc} through the door with the badge held out.",
           "Both go in. {A} looks back once at the street."
         ]
@@ -522,9 +522,9 @@
           "{A} gestures toward the frame and a stranger nods approvingly."
         ],
         "b3": [
-          "{A} goes in and the door slides shut on the paper.",
+          "{A} goes into {place} and the door slides shut on the frame.",
           "{A} enters, holding the frame high over the threshold.",
-          "{A} steps inside and the door closes."
+          "{A} steps inside {place} and the door slides shut."
         ]
       },
       "reveals": [
@@ -602,9 +602,9 @@
       ],
       "log": {
         "b1": [
-          "{A} comes out of the work door with a small box and a plant in the crook of an arm.",
-          "{A} leaves the workplace with a cake box held level.",
-          "{A} steps out of the work door to scattered applause."
+          "{A} comes out of {place} with a small box and a plant in the crook of an arm.",
+          "{A} leaves {place} with a cake box held level.",
+          "{A} steps out of {place} to scattered applause."
         ],
         "b2": [
           "{B.desc} and {A} hug at the door. A few others wait their turn.",
@@ -704,7 +704,7 @@
         ],
         "b3": [
           "{A} stands at the bench for several minutes, hands folded.",
-          "{A} stays beside the bench, head bowed, until the bell rings.",
+          "{A} stays beside the bench, head bowed, until the lanterns come on.",
           "{A} lingers, touching the slats once, then walks away."
         ]
       },
@@ -733,7 +733,7 @@
       "note": "News reaches the monitor only as a post. The feed says what the person chose to say.",
       "roles": {
         "A": {
-          "desc": "an adult on a handset",
+          "desc": "an adult on a comm",
           "needs": [
             "adult"
           ]
@@ -770,13 +770,13 @@
       ],
       "log": {
         "b1": [
-          "{A} sits on a bench holding a handset close and grinning at the screen.",
-          "{A} takes a seat and shows the handset to nobody in particular.",
+          "{A} sits on a bench holding a comm close and grinning at the screen.",
+          "{A} takes a seat and holds up the comm to nobody in particular.",
           "{A} perches on the bench edge, thumbing the screen with great care."
         ],
         "b2": [
           "{A} posts a picture, reads the comment that appears, and laughs out loud.",
-          "{A} posts a single line and holds the handset to the chest.",
+          "{A} posts a single line and holds the comm to {A.his} chest.",
           "{A} types, deletes, types, and finally posts."
         ]
       },

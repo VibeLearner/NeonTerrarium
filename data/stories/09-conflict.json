@@ -273,7 +273,7 @@
       ],
       "log": {
         "b1": [
-          "{A} waits in line at the counter, a handset in one hand.",
+          "{A} waits in line at the counter, a comm in one hand.",
           "{A} stands third in the stall queue, reading the menu.",
           "{A} queues at the stall, shifting from foot to foot."
         ],
@@ -365,8 +365,8 @@
       ],
       "log": {
         "b1": [
-          "{A} stands at the work door, badge held in one fist.",
-          "{A} waits outside the workplace with arms crossed and a jaw set.",
+          "{A} stands outside {place}, badge held in one fist.",
+          "{A} waits by the door of {place} with arms crossed and jaw set.",
           "{A} lingers at the door, shifting a bag from shoulder to shoulder."
         ],
         "b2": [
@@ -478,7 +478,7 @@
         "b2": [
           "{B.desc} stands by the pond with arms folded and watches {A} cross.",
           "{B.desc} stays still at the rail, turning to follow {A}.",
-          "{B.desc} idles at the fountain edge with a hard stare."
+          "{B.desc} idles at the planter edge with a hard stare."
         ],
         "b3": [
           "{A} passes {B.desc} at arm's length and does not break stride.",
@@ -556,13 +556,13 @@
       "log": {
         "b1": [
           "{A} strides across the square toward the stalls, one fist clenched.",
-          "{A} marches at the cafe stools with a face like a shut door.",
+          "{A} marches toward the seats with a face like a shut door.",
           "{A} heads for the counter, quick and purposeful."
         ],
         "b2": [
           "{A} stops two paces short of a seated figure and stays there.",
           "{A} halts and stands with a hand half raised.",
-          "{A} stays rooted a step from the stool, mouth working."
+          "{A} stays rooted a step from the seats, mouth working."
         ],
         "b3": [
           "{A} shakes {A.his} head, turns away, and goes back the way {A.he} came.",
@@ -849,9 +849,9 @@
           "{A} perches on the bench edge, scrolling with a scowl."
         ],
         "b2": [
-          "{A} posts and puts the handset face down on the slats.",
+          "{A} posts and puts the comm face down on the slats.",
           "{A} posts, deletes, posts again.",
-          "{A} sends a post and shoves the handset into a pocket."
+          "{A} sends a post and shoves the comm into a pocket."
         ]
       },
       "reveals": [

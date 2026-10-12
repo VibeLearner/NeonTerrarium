@@ -783,7 +783,7 @@ function makePerson(id, home, zone){
            // Everything a person can pick up later, declared up front (not set yet: undefined, read the same as absent), so
            // every person has the same shape and the per-frame loops over thousands of them don't slow down on mixed shapes.
            fresh: undefined, visitor: undefined, stall: undefined, fixedJob: undefined, leaveAt: undefined, cop: undefined, archivist: undefined,
-           guard: undefined, guardShift: undefined, nightWorker: undefined, ws: undefined, wlen: undefined, walkedFor: undefined, chain: undefined,
+           guard: undefined, guardShift: undefined, nightWorker: undefined, ws: undefined, wlen: undefined, walkedFor: undefined, chain: undefined, _taste: null, _tasteE: -1, _tasteD: -1,
            patrol: undefined, metro: undefined, metroPlan: undefined, ride: undefined, club: undefined, clubbing: undefined, rush: undefined,
            hurry: undefined, callout: undefined, gh: undefined, ghWalk: undefined, gy: undefined, dx: undefined, dz: undefined, pause: undefined,
            bumpCD: undefined, zone, um: undefined, umW: undefined, rainRun: undefined, noRun: undefined, emo: undefined, emoUntil: undefined, angry: undefined, fed: undefined, tries: undefined, gone: undefined };
@@ -894,7 +894,7 @@ function desire(p, h){
   if (asleep(p, h) && !working(p, h)) return p.home;              // (a night-market shift runs past some keepers' usual bedtime)
   if (working(p, h)){
     if (job && (job.stalls || job.patrol || p.guard)) return p.job;   // stall keepers stay at their counter, officers on their beat
-    if (h >= 12 && h < 13.5 && !p.nightWorker && pplRand() < .3) return leisure(p) || p.job;   // out for lunch
+    { const l0 = 11.5 + 1.5*u01(p.id, 'lunch', pplDay()); if (h >= l0 && h < l0 + 1.25 && !p.nightWorker && pplRand() < .3) return leisure(p) || p.job; }   // out for lunch, a little earlier or later each day
     return p.courier ? errand(p) : p.job;
   }
   // free time: how likely they are to be out depends on the hour and on the person
@@ -908,14 +908,24 @@ function leisurePlaces(){
   if (_lpEpoch !== placesEpoch){ _lpEpoch = placesEpoch; _lpList = []; for (const pl of places.values()) if (!(pl.fun <= 0) && reachable(pl)) _lpList.push(pl); }
   return _lpList;
 }
-// somewhere to spend free time: shops, bars, the mall, the square. Nearer places are more likely.
+// the day number, for choices that hold for a day (the story clock's day once it runs)
+const pplDay = () => typeof STORY !== 'undefined' && STORY.on ? STORY.day() : 0;
+// somewhere to spend free time: shops, bars, the mall, the square. Nearer places are more likely. Each person has places they like more than others
+// (the same every day), each day leans a little differently, and around mealtimes the food counters pull harder: so the same person eats at the
+// square one day, a counter across town the next, and isn't at the same spot at the same hour every day.
 function leisure(p){
   const home = places.get(p.home); if (!home) return null;
   let tot = 0; const list = [];
   const reach = typeof mtReachFrom === 'function' ? mtReachFrom(home.x, home.z) : null;   // (how far a place is, the metro taken into account: see metro.js)
-  for (const pl of leisurePlaces()){ if (pl.id === p.home) continue;
+  const LP = leisurePlaces(), dn = pplDay();
+  if (p._tasteE !== _lpEpoch || p._tasteD !== dn || !p._taste || p._taste.length !== LP.length){   // (made once a day per person: the hashes are the cost)
+    const t = p._taste && p._taste.length === LP.length ? p._taste : new Float32Array(LP.length);
+    for (let i = 0; i < LP.length; i++) t[i] = (.5 + 1.3*u01(p.id, LP[i].id, 'taste'))*(.45 + 1.1*u01(p.id, LP[i].id, 'day', dn));
+    p._taste = t; p._tasteE = _lpEpoch; p._tasteD = dn; }
+  const meals = (S.hour >= 11.5 && S.hour < 14) || (S.hour >= 18 && S.hour < 21);
+  for (let i = 0; i < LP.length; i++){ const pl = LP[i]; if (pl.id === p.home) continue;
     const d = reach ? reach(pl.x, pl.z) : Math.hypot(pl.x - home.x, pl.z - home.z);
-    const v = pl.fun/(1 + (d/14)**2); tot += v; list.push([pl.id, v]); }
+    const v = pl.fun/(1 + (d/16)**2)*p._taste[i]*(meals ? (pl.stalls ? 2.2 : .8) : 1); tot += v; list.push([pl.id, v]); }
   let r = pplRand()*tot; for (const [id, v] of list) if ((r -= v) <= 0) return id;
   return list.length ? list[list.length - 1][0] : null;
 }

@@ -62,17 +62,17 @@
       ],
       "log": {
         "b1": [
-          "{B.desc} comes up the step with a covered pot held in both hands.",
+          "{B.desc} comes up to {place} with a covered pot held in both hands.",
           "{B.desc} arrives at the door carrying a heavy bag that clinks.",
-          "{B.desc} climbs the step slowly, a wrapped dish held in front."
+          "{B.desc} walks up slowly, a wrapped dish held in front."
         ],
         "b2": [
-          "The door opens. {A} and {B.desc} embrace on the step, the pot held out to one side.",
+          "The door slides open. {A} and {B.desc} embrace outside, the pot held out to one side.",
           "{A} steps out and hugs {B.desc}. It goes on for a while.",
           "{B.desc} and {A} hug in the doorway, a hand patting {A}'s back."
         ],
         "b3": [
-          "Both go in and the door slides closed on the pot.",
+          "Both go into {place} and the door slides closed on the pot.",
           "{A} takes the pot and holds the door. {B.desc} goes in first.",
           "{B.desc} goes through the door with {A} close behind."
         ]
@@ -290,8 +290,8 @@
       ],
       "log": {
         "b1": [
-          "{A} climbs a stair carrying a sack of shopping in each hand.",
-          "{A} brings a loaded sack up to an older person's door.",
+          "{A} comes up to {place} carrying a sack of shopping in each hand.",
+          "{A} brings a loaded sack up to the door and knocks with a knuckle.",
           "{A} arrives at the door with a paper sack, hip against the rail."
         ],
         "b2": [
@@ -301,7 +301,7 @@
         ],
         "b3": [
           "{B.desc} talks at length from the doorway. {A} nods through all of it.",
-          "{A} and {B.desc} chat on the step. {B.desc} wags a finger at one point.",
+          "{A} and {B.desc} chat outside {place}. {B.desc} wags a finger at one point.",
           "{B.desc} presses something into {A}'s palm. {A} tries to give it back and fails."
         ]
       },
@@ -408,12 +408,12 @@
         "b2": [
           "{A} stops at the pond edge and {B.desc} leans over to look.",
           "{A} stands with {B.desc} at the water. {B.desc} points at something.",
-          "{A} and {B.desc} linger by the fountain. {A} fixes {B.desc}'s collar."
+          "{A} and {B.desc} linger by a planter. {A} fixes {B.desc}'s collar."
         ],
         "b3": [
           "{B.desc} waves at a passing drone, over and over.",
           "{B.desc} waves hard at a figure across the square.",
-          "{B.desc} waves at the pond and gets no answer."
+          "{B.desc} waves at the koi pond and gets no answer."
         ]
       },
       "reveals": [
@@ -423,8 +423,8 @@
           "channel": "conversation",
           "chance": 0.35,
           "log": [
-            "Overheard: {B.desc} says: \"{A.addr}, can we feed them?\"",
-            "Overheard: {A} says: \"Come on, my {B.rel}. One handful, then home.\""
+            "Overheard: {B.desc} says: \"{A.addr}, can we stay and watch them?\"",
+            "Overheard: {A} says: \"Come on, my {B.rel}. One more minute, then home.\""
           ]
         }
       ],
@@ -631,7 +631,7 @@
           "{A} heads for the corner at a steady pace."
         ],
         "b2": [
-          "{B.desc} comes the other way, eyes on a handset.",
+          "{B.desc} comes the other way, eyes on a comm.",
           "{B.desc} turns into the same stretch from a side street.",
           "{B.desc} crosses the path ahead, looking at nothing."
         ],
@@ -820,14 +820,14 @@
       ],
       "log": {
         "b1": [
-          "{A} sits on a bench and takes out a handset.",
+          "{A} sits on a bench and takes out a comm.",
           "{A} takes a seat and thumbs a contact open.",
-          "{A} perches on the bench edge, handset in a fist."
+          "{A} perches on the bench edge, comm in a fist."
         ],
         "b2": [
           "{A} takes a call and smiles in spurts. Mostly listens.",
-          "{A} holds the handset to one ear and rubs the back of {A.his} neck.",
-          "{A} talks softly into the handset and nods at nothing."
+          "{A} holds the comm to one ear and rubs the back of {A.his} neck.",
+          "{A} talks softly into the comm and nods at nothing."
         ]
       },
       "reveals": [
@@ -837,9 +837,9 @@
           "channel": "phone",
           "chance": 0.55,
           "log": [
-            "Phone, one side: {A} says: \"Yes, I ate. Yes, I'm wearing the jacket.\"",
-            "Phone, one side: {A} says: \"Tell everyone I'll be there Sunday. Save me the good chair.\"",
-            "Phone, one side: {A} says: \"How is everyone? Put them all on for a second.\""
+            "Comm, one side: {A} says: \"Yes, I ate. Yes, I'm wearing the jacket.\"",
+            "Comm, one side: {A} says: \"Tell everyone I'll be there Sunday. Save me the good chair.\"",
+            "Comm, one side: {A} says: \"How is everyone? Put them all on for a second.\""
           ]
         }
       ],
@@ -1148,18 +1148,18 @@
       "log": {
         "b1": [
           "{B.desc} knocks at the door. Three taps, a pause, three more.",
-          "{B.desc} rings at the home door and steps back to wait.",
+          "{B.desc} raps at {place} and steps back to wait.",
           "{B.desc} knocks and calls through the panel."
         ],
         "b2": [
-          "{B.desc} stands on the step with a small parcel held in both hands.",
+          "{B.desc} stands outside {place} with a small parcel held in both hands.",
           "{B.desc} stays at the door for {n} minutes. Nobody opens.",
           "{B.desc} waits, leans on the rail, waits."
         ],
         "b3": [
-          "{B.desc} sets the parcel on the step and leaves.",
+          "{B.desc} sets the parcel by the door and leaves.",
           "{B.desc} leaves with the parcel still in hand.",
-          "{B.desc} turns away from the door and goes slowly down the step."
+          "{B.desc} turns away from {place} and walks off slowly."
         ]
       },
       "reveals": [
@@ -1279,18 +1279,18 @@
       ],
       "log": {
         "b1": [
-          "{A} climbs the step with a small wrapped package behind {A.his} back.",
+          "{A} comes up to {place} with a small wrapped package behind {A.his} back.",
           "{A} arrives at the door and straightens a crooked ribbon.",
           "{A} comes up to the door holding a flat parcel tied in string."
         ],
         "b2": [
-          "The door slides open. {A} hands the parcel to {B.desc} with both hands.",
+          "The door of {place} slides open. {A} hands the parcel to {B.desc} with both hands.",
           "{A} holds out the package. {B.desc} turns it over twice, grinning.",
           "{A} says something and hands the wrapped parcel across."
         ],
         "b3": [
           "{B.desc} pulls {A} into a hug and the parcel is crushed between them.",
-          "{A} and {B.desc} hug on the step, laughing.",
+          "{A} and {B.desc} hug in the doorway, laughing.",
           "{B.desc} embraces {A}, then steps back and tears the ribbon open."
         ]
       },

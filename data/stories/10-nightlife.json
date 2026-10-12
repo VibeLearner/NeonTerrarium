@@ -63,7 +63,7 @@
         ],
         "b2": [
           "{A} and {B.desc} talk over the thump from inside, heads close.",
-          "{B.desc} shows {A} something on a handset and they both laugh.",
+          "{B.desc} shows {A} something on a comm and they both laugh.",
           "{A} jokes with {B.desc} and swaps a cup of something warm.",
           "{B.desc} bounces on the balls of {B.his} feet and chatters."
         ]
@@ -147,7 +147,7 @@
         "b2": [
           "A bouncer unhooks the rope for {A} with a nod. {A} goes in without breaking stride.",
           "The door staff wave {A} in. Others in line grumble.",
-          "{A} is admitted at once. The door closes on the bass.",
+          "{A} is admitted at once. The door slides shut on the bass.",
           "A bouncer jerks a thumb. {A} slips through."
         ]
       },
@@ -252,7 +252,7 @@
           "chance": 0.4,
           "log": [
             "Overheard: {A} says: \"Third time this month. Same guy on the door, same excuse.\"",
-            "Overheard: {B.desc} says: \"Forget it. We can try the lawn bar instead.\""
+            "Overheard: {B.desc} says: \"Forget it. We can sit on the lawn instead.\""
           ]
         }
       ],
@@ -332,8 +332,8 @@
       ],
       "log": {
         "b1": [
-          "{A} comes up to the rope for the second time this week, jacket straightened.",
-          "{A} arrives and tugs at a sleeve. The line is shorter tonight.",
+          "{A} comes up to the rope, straightening a jacket twice.",
+          "{A} arrives and tugs at a sleeve. The line is short.",
           "{A} walks to the rope with careful steps."
         ],
         "b2": [
@@ -404,7 +404,7 @@
         "b2": [
           "{A} dances along the sidewalk to music no one else can hear.",
           "{A} spins once on the curb and keeps moving to a private beat.",
-          "{A} dances a few steps, nearly bumps a lamp post, and bows to it."
+          "{A} dances a few steps, nearly bumps a vending machine, and bows to it."
         ]
       },
       "next": {
@@ -659,7 +659,7 @@
       "log": {
         "b1": [
           "{A} steps up to the kiosk and orders two fingers of something amber.",
-          "{A} leans on the counter and says the usual without looking up.",
+          "{A} leans on the counter and orders without looking up.",
           "{A} reaches the kiosk and holds up a coin.",
           "{A} gets to the window and points at a bottle."
         ],
@@ -747,16 +747,16 @@
           "{A} walks the middle of the street, boots echoing."
         ],
         "b2": [
-          "{A} stops under a lamp and looks up at the buildings.",
-          "{A} stays at a crossing and waits for a light that does not change.",
+          "{A} stops under a lantern and looks up at the buildings.",
+          "{A} stays at a crossing and watches the sky highway lights far overhead.",
           "{A} stands at the corner and rubs both arms.",
-          "{A} lingers by the fountain for a moment."
+          "{A} lingers by a vending machine for a moment."
         ],
         "b3": [
-          "{A} climbs the step and goes in. The door slides shut.",
-          "{A} reaches the door and enters.",
+          "{A} goes into {place} with the hood still up. The door slides shut.",
+          "{A} reaches {place} and enters.",
           "{A} steps inside and the light behind the panel goes on.",
-          "{A} arrives at the home door and goes in."
+          "{A} arrives at {place}, stops a moment, and goes in."
         ]
       },
       "reveals": [
@@ -766,8 +766,8 @@
           "channel": "seen",
           "chance": 0.4,
           "log": [
-            "The door opened to {A} at once.",
-            "{A} went in at this door after midnight."
+            "The door of {place} slides open for {A} at once.",
+            "{A} goes into {place} after midnight."
           ]
         }
       ],
@@ -825,10 +825,10 @@
           "{A} arrives early, rolling both shoulders."
         ],
         "b2": [
-          "{A} unlocks the staff side and goes in.",
+          "{A} keys a lock on the dome's flank and goes in.",
           "{A} swipes a badge at the club door and enters.",
-          "{A} slips in through the side door, still yawning.",
-          "{A} enters through the club door and it closes."
+          "{A} slips into the dome, still yawning.",
+          "{A} enters through the club door and it slides shut."
         ]
       },
       "reveals": [
@@ -851,7 +851,7 @@
       "id": "ngt.leaves-by-car",
       "title": "Picked up at the drop-off",
       "tier": "texture",
-      "note": "Two people leave together by car. Observed only. Fits the ambiguity theme but leaves it as texture.",
+      "note": "Two people ride the drop-off lift up together. Observed only. Fits the ambiguity theme but leaves it as texture.",
       "roles": {
         "A": {
           "desc": "an adult at the drop-off",
@@ -912,9 +912,9 @@
           "{B.desc} approaches the drop-off at a brisk pace."
         ],
         "b3": [
-          "A car drops to the pad. Both get in. It rises.",
-          "{A} and {B.desc} climb in together and the car lifts away.",
-          "The pair board a waiting car and ride up out of sight."
+          "{A} and {B.desc} step into the drop-off lift. The cab rises toward the sky highway.",
+          "{A} and {B.desc} ride the drop-off lift up together and pass out of sight.",
+          "The pair board the lift cab and rise toward the traffic overhead."
         ]
       },
       "next": {
@@ -992,11 +992,11 @@
         "b2": [
           "They stop at a bench. {A} sits with eyes shut, {B.desc} standing guard.",
           "{B.desc} lowers {A} onto a bench and hands over water.",
-          "{A} slumps on the bench while {B.desc} checks a handset."
+          "{A} slumps on the bench while {B.desc} checks a comm."
         ],
         "b3": [
-          "{B.desc} gets {A} to the door. Both go in, the door sliding shut.",
-          "{A} and {B.desc} tumble in at the door.",
+          "{B.desc} gets {A} to {place}. Both go in, the door sliding shut.",
+          "{A} and {B.desc} tumble into {place}.",
           "{B.desc} half drags {A} through the entry."
         ]
       },

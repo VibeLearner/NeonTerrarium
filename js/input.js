@@ -87,6 +87,9 @@ canvas.addEventListener('pointermove', e => { const _t0 = performance.now(); try
 function pointerMove(e){
   const p = ptrs.get(e.pointerId);
   if (!p){ ptrLast = { x: e.clientX, y: e.clientY };   // just hovering
+    // someone in the street under the pointer: they're outlined, and a click opens the monitor on them instead of building (monitor.js)
+    if (!delMode && !hwMode && !mtMode && !megaPick && e.pointerType !== 'touch'){ MON.hoverAt(e.clientX, e.clientY); if (MON.pick(e.clientX, e.clientY)){ hover.visible = hoverFill.visible = false; return; } }
+    else MON.hoverAt(null);
     if (delMode){ hover.visible = hoverFill.visible = false; return; }
     if (hwMode){ hwHover(e.clientX, e.clientY); return; }
     if (mtMode){ mtHover(e.clientX, e.clientY); return; }
@@ -131,7 +134,7 @@ function endPtr0(e){
   if (!ptrs.size){ dragging = false; act = null; }
 }
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
-canvas.addEventListener('pointerleave', () => { if (!ptrs.size){ hover.visible = hoverFill.visible = false; showMegaGhost(null); hwGhost.g.visible = false; hwHighlight(null); } });
+canvas.addEventListener('pointerleave', () => { MON.hoverAt(null); if (!ptrs.size){ hover.visible = hoverFill.visible = false; showMegaGhost(null); hwGhost.g.visible = false; hwHighlight(null); } });
 canvas.addEventListener('wheel', e => { e.preventDefault(); zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 30); }, { passive:false });
 const PAN_KEYS = ['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'];
 let LAST_INPUT = performance.now();   // (rest when idle: main.js)

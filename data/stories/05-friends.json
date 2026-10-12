@@ -60,9 +60,9 @@
       ],
       "log": {
         "b1": [
-          "{A} sits at a cafe stool with a cup and a view of the square.",
+          "{A} sits at the counter with a cup and a view of the square.",
           "{A} takes a stool and sets a cup down on the counter.",
-          "{A} perches on a stool and checks a handset.",
+          "{A} perches on a stool and checks a comm.",
           "{A} takes a seat at the stalls and looks up the block."
         ],
         "b2": [
@@ -186,9 +186,9 @@
           "{C.desc} follows {B.desc} up the sidewalk, looking around."
         ],
         "b2": [
-          "{A} stands by the pond, hands in pockets.",
+          "{A} stands by the koi pond, hands in pockets.",
           "{A} waits at the edge of the square.",
-          "{A} stays by the fountain with a cup."
+          "{A} stays by a planter with a cup."
         ],
         "b3": [
           "{B.desc} gestures between {A} and {C.desc}. Handshakes all round.",
@@ -508,12 +508,12 @@
         ],
         "b2": [
           "{B.desc} crosses the far side of the square and keeps going.",
-          "{B.desc} walks on, eyes on a handset.",
+          "{B.desc} walks on, eyes on a comm.",
           "{B.desc} disappears behind the stalls without turning."
         ],
         "b3": [
           "{A} lowers {A.his} arm slowly and stays where {A.he} is.",
-          "{A} stands with the handset out, thumb over a message not sent.",
+          "{A} stands with the comm out, thumb over a message not sent.",
           "{A} stays rooted by the pond for a long minute."
         ]
       },
@@ -624,7 +624,7 @@
           "{A} and {B.desc} shout across a step of distance."
         ],
         "b2": [
-          "{B.desc} leaves in a hurry, scattering pigeons.",
+          "{B.desc} leaves in a hurry, cutting between the food stalls.",
           "{B.desc} turns away and walks off the square.",
           "{B.desc} leaves, one hand over the face."
         ],
@@ -856,7 +856,7 @@
           "{A} unrolls a blanket. {B.desc} and {C.desc} drop onto it."
         ],
         "b2": [
-          "They pass a tin of dumplings around, each taking one.",
+          "They pass a bag of buns around, each taking one.",
           "{C.desc} breaks a flatbread into three and hands the pieces out.",
           "{A}, {B.desc} and {C.desc} share a flask and a bowl of fruit."
         ],
@@ -903,7 +903,7 @@
       "note": "A feed post: the only legal way a mood or plan reaches the monitor.",
       "roles": {
         "A": {
-          "desc": "an adult on a handset",
+          "desc": "an adult on a comm",
           "needs": [
             "adult"
           ]
@@ -941,12 +941,12 @@
       ],
       "log": {
         "b1": [
-          "{A} sits on a bench and thumbs a handset.",
-          "{A} takes a seat and holds the handset up to the light.",
+          "{A} sits on a bench and thumbs a comm.",
+          "{A} takes a seat and holds the comm up to the light.",
           "{A} perches on the bench edge, typing with both thumbs."
         ],
         "b2": [
-          "{A} posts something short and puts the handset away.",
+          "{A} posts something short and puts the comm away.",
           "{A} types, deletes, types, and posts.",
           "{A} posts, then checks the screen twice."
         ]
@@ -1032,17 +1032,17 @@
       "log": {
         "b1": [
           "{A} stands at the corner and checks the time. {n} minutes pass.",
-          "{A} lingers by the lamp post, glancing down the block.",
+          "{A} lingers under a neon sign, glancing down the block.",
           "{A} waits outside a closed shop, then paces the length of it."
         ],
         "b2": [
-          "{A} raises a handset to one ear and leaves a message.",
-          "{A} takes a call out and holds it over the mouth, speaking quietly.",
-          "{A} turns away and speaks low into the handset."
+          "{A} raises a comm to one ear and records a short message.",
+          "{A} makes a comm call, one hand cupped over the mouth, speaking quietly.",
+          "{A} turns away and speaks low into the comm."
         ],
         "b3": [
           "{A} leaves the corner without looking back.",
-          "{A} walks off toward the stalls, handset in a fist.",
+          "{A} walks off toward the stalls, comm in a fist.",
           "{A} heads away, shoulders up."
         ]
       },
@@ -1053,8 +1053,8 @@
           "channel": "phone",
           "chance": 0.4,
           "log": [
-            "Phone, one side: {A} says: \"Forty minutes, friend. Forty. Call me back.\"",
-            "Phone, one side: {A} says: \"You're lucky you're my {B.rel}. I'm still here.\""
+            "Comm, one side: {A} says: \"Forty minutes, friend. Forty. Call me back.\"",
+            "Comm, one side: {A} says: \"You're lucky you're my {B.rel}. I'm still here.\""
           ]
         },
         {
@@ -1063,7 +1063,7 @@
           "channel": "phone",
           "chance": 0.4,
           "log": [
-            "Phone, one side: {A} says: \"It's me. I waited. We said six.\""
+            "Comm, one side: {A} says: \"It's me. I waited. We said six.\""
           ]
         }
       ],
@@ -1172,7 +1172,7 @@
         "b3": [
           "{A} sips. {B.desc} talks fast. {A} lets {B.desc} finish.",
           "{A} and {B.desc} trade a few words and then laugh at the same moment.",
-          "They talk it out over the cups, the ice slowly breaking."
+          "They talk it out over the cups. The pauses get shorter."
         ]
       },
       "effects": {
@@ -1358,16 +1358,16 @@
         "b1": [
           "{B.desc} turns onto the block with a thermos under one arm.",
           "{B.desc} comes along the walk carrying a string bag of oranges and a jar.",
-          "{B.desc} heads for the door, a cloth-wrapped pot held in front."
+          "{B.desc} heads up the street, a cloth-wrapped pot held in front."
         ],
         "b2": [
-          "{B.desc} knocks and calls something through the door.",
+          "{B.desc} knocks at {place} and calls something through the door.",
           "{B.desc} knocks, waits, knocks again with the side of a fist.",
           "{B.desc} knocks on the door with the toe of a shoe, hands full."
         ],
         "b3": [
           "{A} comes out in socks and a coat over pajamas.",
-          "The door slides open and {A} steps out, squinting at the light.",
+          "The door of {place} slides open and {A} steps out, squinting at the light.",
           "{A} comes out slowly, a scarf wound up to the nose."
         ],
         "b4": [
@@ -1376,12 +1376,12 @@
           "{B.desc} holds out the pot and won't let go until {A} takes it properly."
         ],
         "b5": [
-          "{A} goes in with an armful. The door slides shut.",
+          "{A} goes into {place} with an armful. The door slides shut.",
           "{A} goes back inside, the door sliding shut behind.",
           "{A} steps in. The door closes."
         ],
         "b6": [
-          "{B.desc} walks off, glancing back at the door once.",
+          "{B.desc} walks off, glancing back at {place} once.",
           "{B.desc} heads back the way {B.he} came, hands empty.",
           "{B.desc} goes on along the block, checking the time."
         ]

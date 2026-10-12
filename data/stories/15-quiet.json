@@ -1,7 +1,7 @@
 {
   "category": "quiet",
   "title": "Quiet moments",
-  "theme": "Pure texture with no consequences: a plant, the rain, a stray, a long time on a bench.",
+  "theme": "Pure texture with no consequences: a plant, the rain, a delivery bot, a long time on a bench.",
   "storylets": [
     {
       "id": "qui.long-bench",
@@ -54,7 +54,7 @@
         "b2": [
           "{A} stands, stretches, and sits down again.",
           "{A} gets up at last and walks one slow lap of the bench.",
-          "{A} rises, rolls both shoulders, and looks at the clock tower.",
+          "{A} rises, rolls both shoulders, and looks up at the sky highway.",
           "{A} stands and brushes off the coat."
         ]
       },
@@ -108,11 +108,11 @@
           "{A} stands at the pond edge and watches the surface.",
           "{A} stops by the water and stays there.",
           "{A} lingers at the rail, chin on hands.",
-          "{A} stands at the fountain's lip with hands in pockets."
+          "{A} stands at the koi pond's lip with hands in pockets."
         ],
         "b2": [
           "{A} sits on the stone rim and trails a finger in the water.",
-          "{A} takes a seat by the pond and breaks a flatbread into crumbs.",
+          "{A} takes a seat by the pond and watches the koi turn under the lanterns.",
           "{A} perches on the edge and watches a leaf spin.",
           "{A} lowers {A.him}self to the rim and stays."
         ]
@@ -227,14 +227,14 @@
         "b1": [
           "{A} stops mid-stride and tilts the head back.",
           "{A} stands in the square and shades eyes with a hand.",
-          "{A} halts at the curb and follows something overhead.",
+          "{A} halts by a planter and follows something overhead.",
           "{A} stands still while the crowd flows around."
         ],
         "b2": [
           "{A} points up at a cargo drone and says nothing.",
           "{A} gestures toward a drone crossing the roofs.",
           "{A} indicates a drone with one finger and lets the hand fall.",
-          "{A} points at the sky and then at the clock tower."
+          "{A} points at the sky and then at the Data Spire."
         ]
       },
       "next": {
@@ -243,9 +243,9 @@
     },
     {
       "id": "qui.pigeon-crumbs",
-      "title": "Crumbs for the pigeons",
+      "title": "Water for the planter",
       "tier": "mundane",
-      "note": "Feeding the birds. Cheap and gentle.",
+      "note": "Watering a square planter that nobody asked anyone to water. Cheap and gentle.",
       "roles": {
         "A": {
           "desc": "an adult on their own",
@@ -278,23 +278,23 @@
         },
         {
           "id": "b2",
-          "do": "feed-stray",
+          "do": "water-plant",
           "who": "A",
           "at": "bench"
         }
       ],
       "log": {
         "b1": [
-          "{A} sits on a bench with a paper bag open in the lap.",
-          "{A} takes a seat and crinkles a bag.",
-          "{A} perches at the bench's end and digs into a pocket.",
-          "{A} settles on the slats and pulls out a crust."
+          "{A} sits on a bench beside a planter, a bottle in the lap.",
+          "{A} takes a seat next to a planter and looks at the dry soil.",
+          "{A} perches at the bench's end, one hand on the planter's rim.",
+          "{A} settles on the slats and pulls a bottle from a bag."
         ],
         "b2": [
-          "{A} scatters crumbs and pigeons descend in a gray cloud.",
-          "{A} tosses scraps in a slow arc. A crowd of birds follows.",
-          "{A} crouches, drops a handful, and lets them peck near the shoes.",
-          "{A} flings a handful of crumbs and watches them go."
+          "{A} tips the bottle over the planter. The soil darkens.",
+          "{A} pours a thin stream around the stem of a small tree.",
+          "{A} crouches and waters the planter, a little at a time.",
+          "{A} empties the bottle into the planter and watches it soak in."
         ]
       },
       "next": {
@@ -404,7 +404,7 @@
       "log": {
         "b1": [
           "{A} stops at a wall of printed sheets and reads each in turn.",
-          "{A} reads a flyer for a rooftop market and a lost-cat poster.",
+          "{A} reads a flyer for the Sky Mall and a wanted poster.",
           "{A} studies the board with arms folded.",
           "{A} reads a notice twice and moves on to the next."
         ],
@@ -463,7 +463,7 @@
       ],
       "log": {
         "b1": [
-          "{A} stops at a shop window and leans toward the glass.",
+          "{A} stops at the window of {place} and leans toward the glass.",
           "{A} stands in front of a display of bright jackets.",
           "{A} halts at a window and reads the prices.",
           "{A} lingers in front of a case of old radios."
@@ -522,13 +522,13 @@
       ],
       "log": {
         "b1": [
-          "{A} arrives at the steam doors with a towel over a shoulder.",
-          "{A} comes up to the steam doors, yawning.",
+          "{A} arrives at the sliding doors with a towel over a shoulder.",
+          "{A} comes up to the entrance under a drift of steam, yawning.",
           "{A} walks up to the steam doors with a bag of soap.",
           "{A} crosses the square to the baths in slippers."
         ],
         "b2": [
-          "{A} slips into the bathhouse and the curtain falls.",
+          "{A} slips into the bathhouse and the door slides shut.",
           "{A} soaks away the day, steam leaking from the door.",
           "{A} goes in for a long soak. A cloud drifts out.",
           "{A} enters the bathhouse and does not reappear for an hour."
@@ -542,7 +542,7 @@
       "id": "qui.drone-wave",
       "title": "Waving at nothing",
       "tier": "mundane",
-      "note": "A person waves at a passing hover car.",
+      "note": "A person waves at a passing delivery bot.",
       "roles": {
         "A": {
           "desc": "an adult on their own",
@@ -581,15 +581,15 @@
       ],
       "log": {
         "b1": [
-          "{A} walks along the block with a handset in one hand.",
+          "{A} walks along the block with a comm in one hand.",
           "{A} crosses the square at an easy pace.",
           "{A} strolls down the sidewalk with a cup.",
           "{A} heads for the stalls without hurry."
         ],
         "b2": [
-          "{A} waves at a passing hover car for no clear reason.",
+          "{A} waves at a delivery bot as it rolls by.",
           "{A} waves at a child in a window and gets a wave back.",
-          "{A} lifts a hand to the lamp-lighter on the corner.",
+          "{A} lifts a hand to an officer on patrol across the street.",
           "{A} waves at a drone that does not wave back."
         ]
       },
@@ -599,9 +599,9 @@
     },
     {
       "id": "qui.stray-cat",
-      "title": "A cat on a wall",
+      "title": "A bot at a door",
       "tier": "mundane",
-      "note": "Feeding a stray, as a stranger.",
+      "note": "Helping a stuck delivery bot, as a stranger.",
       "roles": {
         "A": {
           "desc": "an adult on their own",
@@ -633,23 +633,23 @@
         },
         {
           "id": "b2",
-          "do": "feed-stray",
+          "do": "pick-up",
           "who": "A",
           "at": "street"
         }
       ],
       "log": {
         "b1": [
-          "{A} stops at a low wall where a thin cat sits.",
-          "{A} stands over a thin cat curled on a vent.",
-          "{A} halts as a cat crosses the sidewalk in front of {A.him}.",
-          "{A} stands still and lets a cat approach."
+          "{A} stops beside a delivery bot waiting at a closed door.",
+          "{A} stands over a delivery bot, its light blinking amber.",
+          "{A} halts as a delivery bot bumps against {A.his} shin and stops.",
+          "{A} stands still and lets a delivery bot nose past."
         ],
         "b2": [
-          "{A} crouches and sets out a few scraps from a bag.",
-          "{A} offers a bit of fish on a flat palm. The cat takes it.",
-          "{A} drops a handful of kibble and steps back.",
-          "{A} bends down and pours a little water in a lid."
+          "{A} crouches and picks up a parcel that slid off the bot's tray.",
+          "{A} picks the dropped parcel off the sidewalk and sets it back on the bot.",
+          "{A} lifts a fallen parcel, squares it on the tray, and steps back.",
+          "{A} bends down, scoops up a parcel by the bot's wheels, and puts it back."
         ]
       },
       "next": {
@@ -702,12 +702,12 @@
           "{A} sits on a platform bench with a bag between the feet.",
           "{A} takes the platform seat and watches the arrival board.",
           "{A} sits, one knee over the other, scanning the faces.",
-          "{A} perches on the bench and checks a handset."
+          "{A} perches on the bench and checks a comm."
         ],
         "b2": [
           "{A} boards when the doors slide open.",
           "{A} gets on the train and takes a standing spot by the door.",
-          "{A} steps into the car and the doors close.",
+          "{A} steps into the carriage and the doors close.",
           "{A} rides out. The platform is empty again."
         ]
       },

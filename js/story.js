@@ -49,7 +49,7 @@ const STORY = (() => {
   const get = f => fetch('data/stories/' + f + '.json' + (ST.ver ? '?v=' + ST.ver : '')).then(r => { if (!r.ok) throw new Error(f + ': ' + r.status); return r.json(); });
   // what the game can stage on its streets today: storylets whose seen steps are all things people can do here
   const ACT_OK = new Set(['walk', 'run', 'walk-together', 'enter', 'leave', 'stand', 'wait-outside', 'knock-and-wait', 'read-notice', 'point', 'shrug', 'wave', 'emote', 'umbrella',
-    'feed-stray', 'water-plant', 'chat', 'argue', 'hug', 'hand-over', 'serve', 'queue-order', 'phone-call', 'post-feed', 'sit', 'eat', 'picnic', 'bump', 'carry', 'pick-up', 'share-umbrella',
+    'water-plant', 'chat', 'argue', 'hug', 'hand-over', 'serve', 'queue-order', 'phone-call', 'post-feed', 'sit', 'eat', 'picnic', 'bump', 'carry', 'pick-up', 'share-umbrella',
     'watch-hologram']);   // (no 'receive-delivery': parcels come with a real drone, from the engine's deliveries below)
   const AT_OK = new Set(['home-door', 'street', 'shop-door', 'work-door', 'stall', 'square', 'cafe-stool', 'bench', 'lawn', 'market-mall', 'bar-kiosk', 'any', 'foundry-gate']);
   const MOVE = new Set(['walk', 'run', 'walk-together', 'carry']);
@@ -124,15 +124,48 @@ const STORY = (() => {
   }
   // a place as the camera sees it: never "home" or "work" (the player has to work that out)
   function placeText(pl, salt){
-    if (!pl) return 'a door';
+    if (!pl) return 'a building';
     const k = pl.mega && pl.mega.kind;
-    if (pl.open && !k) return pick(['a bench by the walk', 'the little plaza', 'a bench on the lawn'], pl.id, salt || 'op');
-    if (k) return { square: 'the night market', mall: 'the mall', market: 'the market mall', foundry: 'the foundry gate', logistics: 'the logistics hub', club: 'the Neon Dome', radio: 'the radio station',
-      police: 'the precinct door', pagoda: 'the Cloud Pagoda', greenhouse: 'the greenhouse farm', bathhouse: 'the bathhouse', spire: 'the Data Spire' }[k] || 'the ' + k;
-    const c = pl.cell, z = c && c.sections && c.sections.length ? c.sections[0].zone : 'mid';
-    return pick({ low: ['a tenement door', 'a patched metal door', 'a door under the laundry lines'], mid: ['a shopfront door', 'a door under an awning', 'a door between two stalls'],
-      high: ['a tower lobby', 'a glass door in a white tower', 'a lobby with cyan trim'], ind: ['a factory door', 'a green-painted works door', 'a door by the tank yard'] }[z] || ['a door'], pl.id, salt || 'pt');
+    if (k) return MEGA_NAME[k] || 'the ' + k;
+    if (pl.open) return pl.cell && pl.cell.green === 'grass' ? 'the lawn' : 'the plaza';
+    return 'a building';
   }
+  // (logs saved before buildings were named plainly: their old descriptions read as "a building")
+  const OLD_PLACE = new Map([...['a door', 'a tenement door', 'a patched metal door', 'a door under the laundry lines', 'a shopfront door', 'a door under an awning', 'a door between two stalls',
+    'a tower lobby', 'a glass door in a white tower', 'a lobby with cyan trim', 'a factory door', 'a green-painted works door', 'a door by the tank yard', 'the door', 'the step', 'the front step',
+    'the work door', 'the staff door', 'the shop door'].map(t => [t, 'a building']), ['the precinct door', 'the police station'], ['the foundry gate', 'the foundry'], ['the noodle stall', 'the stall'],
+    ['the tea stall', 'the stall'], ['the dumpling counter', 'the counter'], ['the pond edge', 'the square'], ['the cafe stools', 'the seats'], ['the stool row', 'the seats'], ['the bench by the pond', 'the seats'],
+    ['a plaza bench', 'the seats'], ['the grass plot', 'the lawn'], ['the bar kiosk', 'the kiosk'], ['the market mall', 'the market plaza'], ['the little plaza', 'the plaza'], ['a bench by the walk', 'the plaza'], ['a bench on the lawn', 'the lawn']]);
+
+  // A building as the log names it, from what the player has found out so far (rendered each time, so an old line catches up): the subject's own
+  // home or workplace once a line has stated it ("her home", "his workplace"), someone else's once their name and that fact are known ("Mika's
+  // building"), a landmark by its name (the signs say so), and otherwise just "a building". Open places by what they are.
+  const MEGA_NAME = { square: 'the town square', mall: 'the sky mall', market: 'the market plaza', foundry: 'the foundry', logistics: 'the logistics hub', club: 'the Neon Dome',
+    radio: 'the radio station', police: 'the police station', pagoda: 'the Cloud Pagoda', greenhouse: 'the hydroponic farm', bathhouse: 'the bathhouse', spire: 'the Data Spire' };
+  const ASSOC = { rev: -1, m: new Map() };   // place id -> [{ who, kind: 'home' | 'work' }], from the notebook's stated facts
+  function assocOf(pid){
+    if (ASSOC.rev !== ST.rev){ ASSOC.rev = ST.rev; ASSOC.m.clear();
+      for (const list of NOTES.values()) for (const n of list){
+        const f = (n.fact || '').split('.').slice(1).join('.'), p = n.who && pOf(n.who); if (!p) continue;
+        const kind = f === 'home' || f === 'cohabitants' ? 'home' : f === 'job' || f === 'employer' ? 'work' : null; if (!kind) continue;
+        const at = kind === 'home' ? p.home : p.job; if (!at) continue;
+        const a = ASSOC.m.get(at) || ASSOC.m.set(at, []).get(at); if (!a.some(x => x.who === n.who && x.kind === kind)) a.push({ who: n.who, kind });
+      } }
+    return ASSOC.m.get(pid) || null;
+  }
+  function placeName(pid, subj){
+    const pl = places.get(pid); if (!pl) return 'a building';
+    const k = pl.mega && pl.mega.kind, a = assocOf(pid) || [];
+    const own = a.find(x => x.who === subj);
+    if (own) return PRON(ident(subj).g).his + (own.kind === 'home' ? ' home' : ' workplace');
+    if (k) return MEGA_NAME[k] || 'the ' + k;
+    if (pl.open) return pl.cell && pl.cell.green === 'grass' ? 'the lawn' : 'the plaza';
+    for (const x of a){ const kk = KN.get(x.who); if (kk && kk.first) return kk.first + '\'s ' + (x.kind === 'home' ? 'building' : 'workplace'); }
+    for (const x of a){ const kk = KN.get(x.who); if (kk && kk.rel && (!kk.relTo || kk.relTo === subj)) return 'a ' + kk.rel + '\'s building'; }
+    return 'a building';
+  }
+  ST.placeName = placeName;
+  ST.testFact = (who, fact) => note(who, { t: ST.clock, who, fact: 'A.' + fact, channel: 'document', verified: true, tmpl: '(test)', cast: { A: who }, ctx: {}, learned: { names: [], rel: false, loose: [] } });   // (tools: as if a line had stated it)
 
   /* ---------- the web of people (six degrees) ---------- */
   const INV = { 'parent-of': 'child-of', 'child-of': 'parent-of', 'grandparent-of': 'grandchild-of', 'grandchild-of': 'grandparent-of', 'creditor-of': 'debtor-of', 'debtor-of': 'creditor-of',
@@ -306,7 +339,7 @@ const STORY = (() => {
   function render(e){
     const c = e.cast || {}, x = e.ctx || {};
     const t = e.tmpl.replace(/\{([A-F])(?:\.([a-z]+))?\}|\{(place2?|n|item|seen|when|sender|look|S|L)\}/g, (m, role, prop, other) => {
-      if (other) return other === 'place' ? x.place || 'the street' : other === 'place2' ? x.place2 || 'the street' : other === 'n' ? String(x.n || 3) : other === 'item' ? x.item || 'a bag'
+      if (other) return other === 'place' ? (x.placeId !== undefined && places.has(x.placeId) ? placeName(x.placeId, c.A || e.subject || ST.watch) : (OLD_PLACE.get(x.place) || x.place) || 'the street') : other === 'place2' ? x.place2 || 'the street' : other === 'n' ? String(x.n || 3) : other === 'item' ? x.item || 'a bag'
         : other === 'seen' ? String(x.seen || 1) : other === 'when' ? x.when || 'yesterday' : other === 'sender' ? x.sender || 'a sender' : other === 'look' ? x.look || 'a parcel'
         : other === 'S' ? x.S || 'someone' : x.L || 'someone';
       const id = c[role]; if (!id) return m;
@@ -323,7 +356,7 @@ const STORY = (() => {
         default: return m;
       }
     });
-    return cap(t.replace(/^Posted: /, 'Posted to the mesh: '));
+    return cap(t.replace(/^Posted: /, 'Posted to the mesh: ').replace(/^Phone, one side:/, 'Comm, one side:').replace(/\bhandset\b/g, 'comm'));   // (the last two: logs saved before the comm)
   }
   const cap = t => t.replace(/(^|[.!?]\s+|Overheard:\s+|mesh:\s+|one side:\s+|:\s+")([a-z])/g, (m, pre, ch) => pre + ch.toUpperCase());
   ST.render = render;
@@ -521,13 +554,21 @@ const STORY = (() => {
     return false;
   }
   const EMO_FOR = { argue: 'anger', hug: 'heart', 'hand-over': 'bang', chat: 'note', 'phone-call': 'dots', 'post-feed': 'note', 'knock-and-wait': 'dots', 'queue-order': 'dots', point: 'bang', wave: 'note', shrug: 'quest' };
-  const PLACE_TEXT = { 'home-door': ['the door', 'the step', 'the front step'], street: ['the sidewalk', 'the street', 'the corner'], 'shop-door': ['the shop door', 'a shopfront'], 'work-door': ['the work door', 'the staff door'],
-    stall: ['the noodle stall', 'the tea stall', 'the dumpling counter'], square: ['the square', 'the pond edge'], 'cafe-stool': ['the cafe stools', 'the stool row'], bench: ['the bench by the pond', 'a plaza bench'],
-    lawn: ['the lawn', 'the grass plot'], 'bar-kiosk': ['the bar kiosk'], 'market-mall': ['the market mall'], 'foundry-gate': ['the foundry gate'], any: ['the block'] };
+  const PLACE_TEXT = { 'home-door': ['a building'], street: ['the sidewalk', 'the street', 'the corner'], 'shop-door': ['a shopfront'], 'work-door': ['a building'],
+    stall: ['the stall', 'the counter'], square: ['the square'], 'cafe-stool': ['the seats'], bench: ['the seats'],
+    lawn: ['the lawn'], 'bar-kiosk': ['the kiosk'], 'market-mall': ['the market plaza'], 'foundry-gate': ['the foundry'], any: ['the block'] };
   const ITEMS = ['a paper bag', 'a box', 'a crate', 'a bundle', 'a parcel', 'a lamp'];
-  function ctxFor(sc, b){
-    const A = pOf(sc.cast.A);
-    return { place: pick(PLACE_TEXT[b.at || 'any'] || PLACE_TEXT.any, sc.id, b.id), place2: pick(PLACE_TEXT.street, sc.id, 'p2'), n: 3 + H(sc.id, b.id, 'n') % 12, item: pick(ITEMS, sc.id, 'item'),
+  // the building or open place a step is at, by id (rendered by placeName): the anchor's, or for a step into a building, the one being entered
+  function placeIdOf(sc, b, anc){
+    if (anc){ if (anc.kind === 'home') return anc.owner.home; if (anc.kind === 'door') return anc.place; if (anc.kind === 'open') return anc.place.id; }
+    const lead = pOf(sc.cast[[].concat(b.who || [])[0]]); if (!lead) return undefined;
+    if (lead.walk && lead.walk.tgt && lead.walk.tgt.place !== undefined) return lead.walk.tgt.place;
+    if (lead.sc && lead.sc.mode === 'in' && lead.sc.place !== undefined) return lead.sc.place;
+    return undefined;
+  }
+  function ctxFor(sc, b, anc){
+    const A = pOf(sc.cast.A), pid = placeIdOf(sc, b, anc);
+    return { placeId: pid, place: pick(PLACE_TEXT[b.at || 'any'] || PLACE_TEXT.any, sc.id, b.id), place2: pick(PLACE_TEXT.street, sc.id, 'p2'), n: 3 + H(sc.id, b.id, 'n') % 12, item: pick(ITEMS, sc.id, 'item'),
       want: sc.want, job: A ? JOB_WORD[jobKind(A)] || 'worker' : 'worker', employer: A ? employerName(A) : '', when: DAYS[day() % 7] };
   }
   // one step at a time: gather, then hold the moment for a few seconds
@@ -611,7 +652,7 @@ const STORY = (() => {
     if (!vis) return;
     (sc.seenBeat = sc.seenBeat || {})[b.id] = true; sc.seen.push(b.id);
     const lines = (sc.opts.lines && sc.opts.lines[b.id]) || (sc.s.log || {})[b.id]; if (!lines || !lines.length) return;
-    const ctx = ctxFor(sc, b);
+    const ctx = ctxFor(sc, b, anc);
     const line = typeof lines === 'function' ? lines(sc) : pick(lines, sc.id, b.id, 'line');
     if (line) logLine(line, sc.cast, ctx, 'live', { sid: sc.s.id });
     // a place this subject was seen at, for counted sightings
@@ -619,7 +660,7 @@ const STORY = (() => {
   }
   function afterBeat(sc){
     const b = sc.b; if (!b || !sc.seen.includes(b.id)) return;
-    const ctxBase = ctxFor(sc, b);
+    const ctxBase = ctxFor(sc, b, sc.anchor);
     for (const r of sc.s.reveals || []){
       if (r.beat !== b.id) continue;
       if (!roll(r.chance, 'rv', sc.id, r.fact)) continue;
@@ -698,7 +739,7 @@ const STORY = (() => {
       case 'outgoing': return s.temper.outgoing > .6; case 'private': return s.temper.outgoing < .4; case 'careful': return s.temper.careful > .6; case 'impulsive': return s.temper.careful < .4;
       case 'warm': return s.temper.warm > .6; case 'guarded': return s.temper.warm < .4;
       case 'partnered': return s.rels.some(r => r.kind === 'partner-of'); case 'single': return !s.rels.some(r => r.kind === 'partner-of');
-      case 'has-umbrella': return s.umbrella; case 'has-pet-stray-habit': return roll(.25, s.id, 'stray');
+      case 'has-umbrella': return s.umbrella; 
       case 'sick': return sickOn(s.id, day()) !== null;
       default:
         if (need.startsWith('regular:')) return s.regulars.includes(need.slice(8));
@@ -920,20 +961,20 @@ const STORY = (() => {
     if (state === 'metro'){ logLine(pick(E.metro, sub, ST.clock, 'mt'), A, {}, 'live'); return; }
     if (prev === 'metro'){ logLine(pick(E.metroOff, sub, ST.clock, 'mo'), A, {}, 'live'); return; }
     if (state.startsWith('walk:') && prev.startsWith('in:') && p.walk && p.walk.doorA){
-      const pl = places.get(prev.slice(3)); logLine(pick(E.leave, sub, ST.clock, 'lv'), A, { place: placeText(pl) }, 'live');
+      const pl = places.get(prev.slice(3)); logLine(pick(E.leave, sub, ST.clock, 'lv'), A, { place: placeText(pl), placeId: pl ? pl.id : undefined }, 'live');
       if (pl && pl.id === p.home){ seenDays(sub, 'leave-home').add(day()); const firsts = DEP.get(sub) || DEP.set(sub, new Map()).get(sub); if (!firsts.has(day())) firsts.set(day(), hourNow()); }
     }
     else if (state.startsWith('in:') && prev.startsWith('walk:')){
       const pl = places.get(p.at), n = seenDays(sub, 'enter:' + p.at); n.add(day());
       const useSeen = n.size >= 2 && roll(.5, sub, ST.clock, 'es');
-      logLine(pick(useSeen ? E.enterSeen : E.enter, sub, ST.clock, 'en'), A, { place: placeText(pl), seen: n.size }, 'live');
+      logLine(pick(useSeen ? E.enterSeen : E.enter, sub, ST.clock, 'en'), A, { place: placeText(pl), placeId: pl ? pl.id : undefined, seen: n.size }, 'live');
     }
     else if (state.startsWith('spot:') && p.spot){
       const pl = places.get(p.at), k = p.spot.kind, list = k === 'seat' ? E.seat : k === 'queue' ? E.queue : k === 'vendor' ? E.keeper : E.stand;
-      logLine(pick(list, sub, ST.clock, 'sp'), A, { place: placeText(pl) }, 'live');
+      logLine(pick(list, sub, ST.clock, 'sp'), A, { place: placeText(pl), placeId: pl ? pl.id : undefined }, 'live');
       // chatting with someone standing beside them: smalltalk, and now and then a name or some news
       const mate = p.spot.near && p.spot.near.find(o => o.by && people.get(o.by) && !people.get(o.by).walk);
-      if (mate){ const B = mate.by; logLine(pick(E.chat, sub, B, ST.clock), { A: sub, B }, { place: placeText(pl) }, 'live');
+      if (mate){ const B = mate.by; logLine(pick(E.chat, sub, B, ST.clock), { A: sub, B }, { place: placeText(pl), placeId: pl ? pl.id : undefined }, 'live');
         if (!tellNews(B, 'amb' + ST.clock) && roll(.35, sub, B, ST.clock, 'st')) logLine(pick(E.smalltalk, sub, B, ST.clock, 'stl'), { A: sub, B }, {}, 'live');
         const fake = { id: 'amb:' + ST.clock, cast: { A: sub, B } }; passing(fake, { id: 'b1', do: 'chat', who: ['A'], with: ['B'], at: 'square' }); }
     }
@@ -972,7 +1013,7 @@ const STORY = (() => {
     if (react === 'mesh') beats.push({ id: 'b6', do: 'post-feed', who: 'A', at: 'home-door', indoors: true });
     const s = { id: 'dlv.' + kind, category: 'deliveries', tier: 'mundane', roles: { A: { desc: 'someone at home' } }, when: D.stories[0].when, beats, log: {}, game: true };
     const lines = { b2: E.take, b3: () => null, b4: K.phone, b5: react === 'silent' ? K.silent : ['{A} goes back in with it. The door slides shut.', '{A} goes in, the parcel under one arm.'] };
-    if (ST.watch === q.id) logLine(pick(E.arrive, q.id, ST.clock, 'arr'), { A: q.id }, {}, 'live');
+    if (ST.watch === q.id) logLine(pick(E.arrive, q.id, ST.clock, 'arr'), { A: q.id }, { placeId: pl.id }, 'live');
     const sc = startScene(s, { A: q.id }, { lines, done: (sc2, why) => { b.storyWait = false; if (why !== 'done' && !b.taken){ b.storyNobody = true; } } });
     if (!sc) return false;
     sc.dlv = { kind, K, react, bot: b }; b.storyWait = true; b.taken = false; b.waitT = t;

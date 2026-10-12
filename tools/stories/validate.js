@@ -64,6 +64,10 @@ const REL_RE = wordRe(vocab.relationWords);
 const REL_STATE_RE = new RegExp('(?<![A-Za-z])(' + vocab.relationWords.map(esc).join('|') + ')(s|es)?(?![A-Za-z])', 'i');   // a relation stated in a line, plurals too ("friends since school")
 const BRIT = vocab.britishSpellings;
 const BRIT_RE = new RegExp('(?<![A-Za-z])(' + Object.keys(BRIT).map(esc).join('|') + ')(?![A-Za-z])', 'i');
+// (vocab.notInWorld: things the city has no asset for, the old word for a comm, and wording that tells the player what to conclude: errors in any line)
+const NIW = vocab.notInWorld || {};
+const NIW_RE = Object.entries(NIW).filter(([k]) => k !== '_about' && k !== 'telling').map(([k, list]) => [k, wordRe(list)]);
+const TELL_RE = NIW.telling ? wordRe(NIW.telling) : null;
 const EXEMPT = [
   /wanted (poster|posters|notice|notices|sign|signs)/gi,
   /miss(es|ed)? (the|a|his|her|their|it|an)( last| next)? (train|metro|car|lift|stall|shift|closing|door|bell|bus|queue|drop-off|platform|cab)/gi,
@@ -88,6 +92,8 @@ function checkText(id, where, s, kind, roles, beatRoles) {
   const brit = s.match(BRIT_RE);
   if (brit) err(id, `${at} uses British spelling "${brit[1]}" (use "${BRIT[brit[1].toLowerCase()]}")`);
   if (s.length > 220) warn(id, `${at} is long (${s.length} chars); the voice is terse`);
+  for (const [k, re] of NIW_RE){ const m = s.replace(/\{[^}]*\}/g, 'X').match(re); if (m) err(id, `${at} mentions "${m[1]}" (${k === 'animals' ? 'no animals in the city' : k === 'vehicles' ? 'no such vehicle in the city' : k === 'phone' ? 'say comm, not phone' : 'never name a building by what it is to someone: use {place}'})`); }
+  if (TELL_RE && kind !== 'entry'){ const m = stripQuotes(s.replace(/\{[^}]*\}/g, 'X')).match(TELL_RE); if (m) err(id, `${at} tells the player a pattern ("${m[1]}"): show it, or count sightings with {seen} in a reveal`); }
   // placeholders
   const phs = [...s.matchAll(/\{([^}]*)\}/g)].map(m => m[1]);
   for (const ph of phs) {
@@ -337,7 +343,7 @@ for (const s of stories) {
       if (!ch.carries.includes('news')) err(id, `hearsay.channel "${h.channel}" cannot carry news`);
       bump(usage.channels, h.channel);
     }
-    const lead = { conversation: 'Overheard:', phone: 'Phone, one side:', feed: 'Posted:' }[h.channel];
+    const lead = { conversation: 'Overheard:', phone: 'Comm, one side:', feed: 'Posted:' }[h.channel];
     if (!Array.isArray(h.lines) || h.lines.length < 3) err(id, 'hearsay.lines needs at least 3 phrasings');
     else h.lines.forEach(l => { checkText(id, 'hearsay line', l, 'hearsay', roles, null); if (lead && !l.startsWith(lead)) err(id, `hearsay line must start with "${lead}": "${l.slice(0, 50)}"`); });
     if (!Array.isArray(h.entry) || h.entry.length < 2) err(id, 'hearsay.entry needs at least 2 phrasings');
@@ -470,7 +476,7 @@ try {
     if (!K.sender || !K.look) err('engine.json', `delivery.${kind}: needs sender and look`);
     for (const r of ['silent', 'phone', 'mesh']) {
       if (!(K.react && K.react[r] >= 0)) err('engine.json', `delivery.${kind}: react.${r} weight missing`);
-      lines(`delivery.${kind}.${r}`, K[r], 'reveal', r === 'phone' ? /^Phone, one side:/ : r === 'mesh' ? /^Posted to the mesh:/ : null);
+      lines(`delivery.${kind}.${r}`, K[r], 'reveal', r === 'phone' ? /^Comm, one side:/ : r === 'mesh' ? /^Posted to the mesh:/ : null);
     }
   }
 } catch (e) { err('engine.json', 'cannot read: ' + e.message); }

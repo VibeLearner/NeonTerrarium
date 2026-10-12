@@ -62,12 +62,12 @@
         "b2": [
           "{A} points at the line map and traces it with one finger.",
           "{A} gestures toward the stairwell and the lit mouth below.",
-          "{A} indicates the new line to a passing friend and shrugs."
+          "{A} indicates the new line to a passerby and shrugs."
         ],
         "b3": [
-          "{A} boards a car on the new line and the doors hiss shut.",
+          "{A} boards a train on the new line and the doors hiss shut.",
           "{A} rides down and the train pulls out.",
-          "{A} takes the first car on the line and is gone."
+          "{A} takes the first train on the line and is gone."
         ]
       },
       "reveals": [
@@ -145,8 +145,8 @@
         ],
         "b2": [
           "{A} points up at the neon letters and says something to nobody.",
-          "{A} gestures toward the door and the bouncers.",
-          "{A} points at a poster by the door and tilts a head."
+          "{A} gestures toward the door and the door staff.",
+          "{A} points at a poster by the door and tilts {A.his} head."
         ],
         "b3": [
           "{A} joins the rope line, eyes on the door.",
@@ -364,8 +364,8 @@
         ],
         "b2": [
           "{A} points at a young sapling and says something to a stranger.",
-          "{A} gestures toward the projector post.",
-          "{A} indicates a good patch near the pond."
+          "{A} gestures toward the hologram projector.",
+          "{A} indicates a good patch under a tree."
         ],
         "b3": [
           "{A} spreads a blanket on the new grass.",
@@ -496,14 +496,14 @@
           "{A} arrives at the dropoff with a cup in each hand."
         ],
         "b2": [
-          "{A} stands on the pad and gets bearings by the clock tower.",
+          "{A} stands on the pad and gets bearings by the Data Spire.",
           "{A} stays at the base of the lift and scans the street.",
           "{A} halts and looks up, then along the block."
         ],
         "b3": [
           "{A} sets off toward the square.",
           "{A} walks away from the pad at a brisk pace.",
-          "{A} heads down the street, checking a handset."
+          "{A} heads down the street, checking {A.his} comm."
         ]
       },
       "next": {
@@ -562,20 +562,20 @@
       ],
       "log": {
         "b1": [
-          "{A} strolls onto the new plaza with a slow, wide circle.",
+          "{A} strolls into {place} in a slow, wide circle.",
           "{A} walks the paving in a loose spiral.",
-          "{A} crosses the plaza, boots on fresh stone.",
-          "{A} meanders along the plaza rim."
+          "{A} crosses {place}, boots on fresh stone.",
+          "{A} meanders along the edge of {place}."
         ],
         "b2": [
           "{A} points at the pattern in the paving and traces it with a toe.",
-          "{A} gestures toward the fountain.",
+          "{A} gestures toward the koi pond.",
           "{A} indicates a light fixture and says a word aloud.",
           "{A} points out a sapling to a passing stranger."
         ],
         "b3": [
-          "{A} sits on the rim of the fountain and trails a hand in the water.",
-          "{A} takes a seat on the plaza steps.",
+          "{A} sits on the rim of the koi pond and watches the fish turn.",
+          "{A} takes one of the seats by the planters.",
           "{A} drops onto a ledge and lets out a breath.",
           "{A} sits on a low wall and looks around."
         ]
@@ -644,11 +644,11 @@
         ],
         "b2": [
           "{A} gathers belongings into crates on the bare ground.",
-          "{A} lashes a mattress to a cart and strains at the handle.",
+          "{A} ties a rolled mattress with cord and hoists it onto one shoulder.",
           "{A} carries a lamp and a bundle of clothes from the rubble."
         ],
         "b3": [
-          "{A} pulls a cart away down the block, looking back once.",
+          "{A} carries a stack of bags away down the block, looking back once.",
           "{A} walks off with a bundle on each shoulder.",
           "{A} heads for the metro, dragging a crate."
         ]
@@ -660,8 +660,8 @@
           "channel": "conversation",
           "chance": 0.4,
           "log": [
-            "Overheard: {A} says: \"They gave us a week's notice. Then the crane.\"",
-            "Overheard: {A} says: \"Everything I own is on this cart. That's the whole story.\""
+            "Overheard: {A} says: \"They gave us a week's notice. Then the drones came.\"",
+            "Overheard: {A} says: \"Everything I own is in these bags. That's the whole story.\""
           ]
         }
       ],
@@ -693,13 +693,13 @@
         ],
         "channel": "conversation",
         "lines": [
-          "Overheard: {S} says to {L} that {A.desc} lost the house when the crane came. A week's notice and gone.",
+          "Overheard: {S} says to {L} that {A.desc} lost the apartment when the building came down. A week's notice and gone.",
           "Overheard: {S} tells {L}: \"{A.desc} was living in that block they tore down. Hasn't been seen since.\"",
           "Overheard: {S} says {A.desc} lost the place to the demolition and is staying with someone.",
-          "Overheard: {S} mentions to {L} that {A.desc} had to clear out when the building came down."
+          "Overheard: {S} mentions to {L} that {A.desc} had to clear out before the demolition."
         ],
         "entry": [
-          "Lost the home when the building was demolished (overheard: a neighbor, in conversation).",
+          "Lost a place to live when the building was demolished (overheard: a neighbor, in conversation).",
           "Had to leave after the demolition, per {S} (overheard, in conversation).",
           "Was displaced by the wrecking crew, said {S} (overheard)."
         ]
@@ -858,19 +858,19 @@
       ],
       "log": {
         "b1": [
-          "{A} arrives at an unfamiliar door, reading a number on a slip.",
-          "{A} comes up to a door with a key held in a fist.",
-          "{A} approaches a new home and checks the slip once more."
+          "{A} arrives at {place}, reading a number off a slip.",
+          "{A} comes up to {place} with a key held in a fist.",
+          "{A} approaches {place} and checks the slip once more."
         ],
         "b2": [
-          "{A} lugs a crate up the step, then a second.",
-          "{A} hauls the last of a cart's load to the door.",
+          "{A} lugs a crate to {place}, then a second.",
+          "{A} hauls the last of the bags to the door of {place}.",
           "{A} carries a lamp and a rolled mat to the threshold."
         ],
         "b3": [
-          "{A} goes in. The door slides shut behind a crate.",
-          "{A} enters and the light inside flicks on.",
-          "{A} steps inside with the crate and shoulders the door shut."
+          "{A} goes into {place}. The door slides shut behind a crate.",
+          "{A} enters {place} and a light inside flicks on.",
+          "{A} steps into {place} with the crate and the door slides closed."
         ]
       },
       "effects": {
@@ -965,12 +965,12 @@
       ],
       "log": {
         "b1": [
-          "{A} comes along the block toward the work door with a lunch tin.",
-          "{A} walks to the workplace at the usual hour.",
+          "{A} comes along the block with a lunch tin swinging from one hand.",
+          "{A} walks up the block at an easy pace, comm in one hand.",
           "{A} turns the corner with a bag and stops short."
         ],
         "b2": [
-          "{A} stands at bare ground where the workplace used to be.",
+          "{A} stands at bare ground where a building used to be.",
           "{A} stays at a cleared lot, tin hanging from one hand.",
           "{A} stands before a stretch of fence and looks up."
         ],
@@ -1088,7 +1088,7 @@
         "b1": [
           "{A} walks slowly down the block with a duffel on one shoulder.",
           "{A} wanders into the square and turns a full circle.",
-          "{A} comes along the sidewalk reading house numbers."
+          "{A} comes along the sidewalk reading the numbers over the doors."
         ],
         "b2": [
           "{A} reads a notice board, then a map, then the board again.",
@@ -1097,7 +1097,7 @@
         ],
         "b3": [
           "{A} points down a side street and then changes {A.his} mind.",
-          "{A} gestures toward the clock tower and asks a stranger the way.",
+          "{A} gestures toward the Data Spire and asks a stranger the way.",
           "{A} points at the tower and walks toward it."
         ]
       },
@@ -1202,14 +1202,14 @@
       ],
       "log": {
         "b1": [
-          "{A} sits on the stoop with a cup and watches the row.",
-          "{A} takes a seat on the step and stretches out.",
-          "{A} perches on the top step and sips."
+          "{A} sits outside {place} with a cup and watches the row.",
+          "{A} takes a seat by the door of {place} and stretches out.",
+          "{A} perches on an upturned crate outside {place} and sips."
         ],
         "b2": [
-          "{B.desc} hauls a crate up the next step along, then another.",
+          "{B.desc} hauls a crate to the next door along, then another.",
           "{B.desc} backs through a door with a lamp and a rolled rug.",
-          "{B.desc} carries a box to the new door and sets it down."
+          "{B.desc} carries a box to a door down the row and sets it down."
         ],
         "b3": [
           "{A} waves. {B.desc} waves back with a free hand and nearly drops the crate.",
@@ -1376,14 +1376,14 @@
       ],
       "log": {
         "b1": [
-          "{A} stands at a fence and watches a crane lift a beam.",
+          "{A} stands at a fence and watches a drone lift a beam.",
           "{A} stays at the barrier with a cup, head back.",
-          "{A} stops at the edge of a plot and watches the work.",
+          "{A} stops at the edge of a plot and watches the frame go up.",
           "{A} lingers by the fence while a drone ferries steel."
         ],
         "b2": [
-          "{A} points at the crane arm and says something aloud.",
-          "{A} gestures toward the swinging beam.",
+          "{A} points at a cargo drone overhead and says something aloud.",
+          "{A} gestures toward a beam swinging under a drone.",
           "{A} indicates the half-built frame to a passing stranger.",
           "{A} points at a pair of workers on a gantry."
         ],

@@ -170,7 +170,7 @@ function frameBody(now){
   PH.begin('composite'); renderer.setRenderTarget(rtOut); renderer.render(compScene, compCam); PH.end();
   PH.begin('bloom and grade'); renderGlow(); PH.end();   // bloom and halation (sky.js)
   if (!GLOW_DIRECT){ PH.begin('to screen'); renderer.setRenderTarget(null); renderer.render(upScene, compCam); PH.end(); }   // (drawn straight to the screen already when the sizes match: sky.js renderGlow)
-  MON.blit(); MON.syncBar();   // the monitor's feed: a crop of the frame just drawn (monitor.js)
+  MON.blit(); MON.syncBar(); MON.hoverFrame();   // the monitor's feed: a crop of the frame just drawn (monitor.js)
   PH.frameEnd();
 }
 requestAnimationFrame(frame);

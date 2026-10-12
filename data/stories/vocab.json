@@ -231,7 +231,6 @@
     "partnered",
     "single",
     "has-umbrella",
-    "has-pet-stray-habit",
     "regular:stall",
     "regular:bench",
     "regular:club",
@@ -852,15 +851,6 @@
         "reads the sign"
       ]
     },
-    "feed-stray": {
-      "status": "new",
-      "desc": "crouch and put food down for a stray animal",
-      "words": [
-        "stray",
-        "crouches",
-        "scraps"
-      ]
-    },
     "water-plant": {
       "status": "new",
       "desc": "tend a plant at a doorstep or sill",
@@ -1351,10 +1341,10 @@
       "_about": "When a phone-call beat of the subject is watched, they may answer with their own name.",
       "chance": 0.35,
       "lines": [
-        "Phone, one side: {A} answers: \"{A.first} speaking.\"",
-        "Phone, one side: {A} says: \"Yes, it's {A.first}. Who's this?\"",
-        "Phone, one side: {A} says: \"This is {A.first}. Go ahead.\"",
-        "Phone, one side: {A} says: \"{A.first}. Yes. No, I can talk.\""
+        "Comm, one side: {A} answers: \"{A.first} speaking.\"",
+        "Comm, one side: {A} says: \"Yes, it's {A.first}. Who's this?\"",
+        "Comm, one side: {A} says: \"This is {A.first}. Go ahead.\"",
+        "Comm, one side: {A} says: \"{A.first}. Yes. No, I can talk.\""
       ]
     },
     "nameTag": {
@@ -1403,7 +1393,7 @@
       ],
       "chance": 0.35,
       "lines": [
-        "Overheard: the keeper calls out: \"{A.first}! Two dumplings, extra chili.\"",
+        "Overheard: the keeper calls out: \"{A.first}! Two skewers, extra chili.\"",
         "Overheard: the keeper calls out: \"Order for {A.first}!\"",
         "Overheard: the keeper reads the slip aloud: \"{A.first}, one broth.\"",
         "Overheard: the keeper asks a name for the order. {A} says: \"{A.first}.\""
@@ -1446,7 +1436,6 @@
         "wait-outside",
         "sit",
         "read-notice",
-        "feed-stray",
         "water-plant"
       ],
       "places": [
@@ -1478,5 +1467,110 @@
         "{B.desc} stops long enough to say: \"Rain later, {A.first}. Take a coat.\""
       ]
     }
+  },
+  "notInWorld": {
+    "_about": "Things the city does not have, or wording the player must not be told. A line (even inside speech) that matches one of these is an error. The world has: residential tenements (laundry lines, potted plants, vines, lanterns, neon), shopfronts and food counters, luxury towers, factories; the Town Square (food stalls with trays, a steaming pot, skewers and buns; a koi pond; vending machines, kiosks, planters, trees, seats), lawns (picnics), the Market Plaza mall, the Sky Mall, the Cloud Pagoda hotel and spa, the Bath House (pools, front desk, tea counter), the Neon Dome club (queue, door staff, bar kiosk, snack stand), the Foundry, the Logistics Hub, the Hydroponic Farm, the Data Spire, the Radio station, the Police station (officers on patrol, police bikes), metro stations, platforms and trains, lifts with cabs, sky highways with traffic overhead, drones, delivery bots that wait at doors, rain and umbrellas, steam, holograms and ad screens, wanted posters, graffiti. People carry small things (bags, parcels, cups, bowls, a comm). There are no animals except the koi in the square's pond, and nobody feeds them.",
+    "animals": [
+      "pigeon",
+      "pigeons",
+      "stray",
+      "strays",
+      "cat",
+      "cats",
+      "kitten",
+      "kittens",
+      "dog",
+      "dogs",
+      "puppy",
+      "bird",
+      "birds",
+      "crow",
+      "crows",
+      "gull",
+      "gulls",
+      "rat",
+      "rats",
+      "sparrow",
+      "sparrows",
+      "dove",
+      "doves",
+      "pet",
+      "pets",
+      "peck",
+      "pecks",
+      "pecking",
+      "crumbs",
+      "birdseed"
+    ],
+    "vehicles": [
+      "bus",
+      "buses",
+      "tram",
+      "trams",
+      "taxi",
+      "taxis",
+      "bicycle",
+      "bicycles",
+      "scooter",
+      "scooters",
+      "cab rank",
+      "parked car",
+      "car door",
+      "car horn",
+      "traffic light",
+      "traffic lights"
+    ],
+    "phone": [
+      "phone",
+      "phones",
+      "telephone",
+      "telephones",
+      "cellphone",
+      "cell phone",
+      "handset",
+      "smartphone",
+      "landline",
+      "dial tone",
+      "ringtone",
+      "texts",
+      "texted",
+      "texting",
+      "text message"
+    ],
+    "buildingLeaks": [
+      "home door",
+      "work door",
+      "staff door",
+      "office door",
+      "shop door",
+      "work block",
+      "home block",
+      "front step",
+      "doorstep",
+      "their building",
+      "his building",
+      "her building",
+      "own building",
+      "own door",
+      "the home",
+      "the work"
+    ],
+    "telling": [
+      "usual",
+      "usually",
+      "as always",
+      "every day",
+      "every morning",
+      "every evening",
+      "every night",
+      "routine",
+      "habit",
+      "regular",
+      "regulars",
+      "same as yesterday",
+      "same as ever",
+      "like clockwork",
+      "familiar"
+    ]
   }
 }

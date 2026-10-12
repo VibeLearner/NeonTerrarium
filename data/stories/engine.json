@@ -9,14 +9,14 @@
       "{A} comes out of {place}, collar up."
     ],
     "enter": [
-      "{A} goes in at {place}. The door slides shut.",
+      "{A} goes into {place}. The door slides shut.",
       "{A} reaches {place} and goes in.",
-      "{A} slips in at {place}.",
-      "{A} goes through {place} without a look back."
+      "{A} slips into {place}.",
+      "{A} goes into {place} without looking back."
     ],
     "enterSeen": [
-      "{A} goes in at {place}: the same door, {seen} days on the feed.",
-      "Same door as before, {place}. Seen going in here on {seen} days."
+      "{A} goes into {place}. Seen going in here on {seen} days now.",
+      "Into {place} again: {seen} days on the feed going in at this door."
     ],
     "seat": [
       "{A} takes a seat at {place}.",
@@ -31,7 +31,7 @@
     "queue": [
       "{A} joins the queue at {place}.",
       "{A} waits in line at {place}.",
-      "{A} gets in line at {place}, reading the board."
+      "{A} gets in line at {place}, eyes on the trays."
     ],
     "keeper": [
       "{A} takes the counter at {place} and ties an apron on.",
@@ -83,7 +83,7 @@
       "Overheard: {B} says someone should bring {C.first} soup. \"Sick since {when}, poor thing.\""
     ],
     "parcel": [
-      "Overheard: {B} says a drone came for {C.first} {when}. \"It was {look}, from {sender}.\"",
+      "Overheard: {B} says a delivery bot came for {C.first} {when}. \"It was {look}, from {sender}.\"",
       "Overheard: {B} mentions {C.first} got a delivery {when}. \"From {sender}, if you can believe it.\"",
       "Overheard: {B} says {C.first} had something from {sender} come {when}."
     ],
@@ -99,13 +99,13 @@
   },
   "delivery": {
     "arrive": [
-      "A delivery drone settles at the door and waits.",
-      "A drone drops to the doorstep and hovers, parcel strapped on.",
-      "A delivery drone comes in low and holds at the door."
+      "A delivery bot walks up to {place} and stands at the door, waiting.",
+      "A delivery bot stops at the door of {place}, a parcel capsule on its back.",
+      "A delivery bot reaches {place} and holds at the door, light blinking."
     ],
     "take": [
-      "The door opens. {A} takes the parcel from the drone.",
-      "{A} comes to the door and lifts the parcel off the drone.",
+      "The door slides open. {A} takes the parcel from the bot.",
+      "{A} comes to the door and lifts the parcel out of the bot's capsule.",
       "{A} steps out, signs with a thumb, and takes the parcel."
     ],
     "label": [
@@ -118,8 +118,8 @@
       "The parcel: {look}."
     ],
     "nobody": [
-      "Nobody comes to the door. The drone sets the parcel on the step and leaves.",
-      "The drone waits, then lowers the parcel onto the step and goes."
+      "Nobody comes to the door. The bot sets the parcel down by it and walks off.",
+      "The bot waits, then drops the parcel at the door and goes."
     ],
     "kinds": {
       "medicine": {
@@ -139,12 +139,12 @@
           "{A} pulls the cardigan tighter and goes back in with the box."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"It came. No, just the fever. I'm not dying.\"",
-          "Phone, one side: {A} says: \"The pharmacy sent it. I'll take it now. Yes, with food.\""
+          "Comm, one side: {A} says: \"It came. No, just the fever. I'm not dying.\"",
+          "Comm, one side: {A} says: \"The pharmacy sent it. I'll take it now. Yes, with food.\""
         ],
         "mesh": [
-          "Posted to the mesh: \"Fever, a blanket, and a pharmacy drone. Living the dream.\"",
-          "Posted to the mesh: \"Pharmacy drone is the only visitor I want today.\""
+          "Posted to the mesh: \"Fever, a blanket, and a pharmacy bot at the door. Living the dream.\"",
+          "Posted to the mesh: \"A pharmacy bot is the only visitor I want today.\""
         ]
       },
       "soup": {
@@ -165,7 +165,7 @@
           "{A} sniffs the bag and goes back in."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"You sent noodles? You didn't have to. Thank you.\""
+          "Comm, one side: {A} says: \"You sent noodles? You didn't have to. Thank you.\""
         ],
         "mesh": [
           "Posted to the mesh: \"Broth delivered. The only good thing about today.\""
@@ -189,8 +189,8 @@
           "{A} tucks the long box under one arm and goes in."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"It's here. It's here! I'm trying it on now. Hold on.\"",
-          "Phone, one side: {A} says: \"The dress came. For Saturday. You'll see it Saturday.\""
+          "Comm, one side: {A} says: \"It's here. It's here! I'm trying it on now. Hold on.\"",
+          "Comm, one side: {A} says: \"The dress came. For Saturday. You'll see it Saturday.\""
         ],
         "mesh": [
           "Posted to the mesh: \"It fits. Saturday cannot come fast enough.\"",
@@ -214,8 +214,8 @@
           "{A} holds the envelope up to the light and goes in."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"Your letter came. Yes, today. I'll read it tonight, I promise.\"",
-          "Phone, one side: {A} says: \"A real letter. Who writes letters? You do, I know.\""
+          "Comm, one side: {A} says: \"Your letter came. Yes, today. I'll read it tonight, I promise.\"",
+          "Comm, one side: {A} says: \"A real letter. Who writes letters? You do, I know.\""
         ],
         "mesh": [
           "Posted to the mesh: \"Got a letter. On paper. In handwriting.\""
@@ -239,8 +239,8 @@
           "{A} stands on the step with the envelope a long time, then goes in."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"The papers came. No. I'll sign them. Just not today.\"",
-          "Phone, one side: {A} says: \"It's from the lawyers. Can you come over? Tonight?\""
+          "Comm, one side: {A} says: \"The papers came. No. I'll sign them. Just not today.\"",
+          "Comm, one side: {A} says: \"It's from the lawyers. Can you come over? Tonight?\""
         ],
         "mesh": [
           "Posted to the mesh: \"Some mail you don't open on the step.\""
@@ -264,7 +264,7 @@
           "{A} glances up and down the street and goes in with the tube."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"Come over. I've got something to open. No reason.\""
+          "Comm, one side: {A} says: \"Come over. I've got something to open. No reason.\""
         ],
         "mesh": [
           "Posted to the mesh: \"Long week. Short evening.\""
@@ -287,8 +287,8 @@
           "{A} holds the flowers out at arm's length, then goes in with them."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"You did not. You did. They're on the table already.\"",
-          "Phone, one side: {A} says: \"What's the occasion? There isn't one? Then thank you.\""
+          "Comm, one side: {A} says: \"You did not. You did. They're on the table already.\"",
+          "Comm, one side: {A} says: \"What's the occasion? There isn't one? Then thank you.\""
         ],
         "mesh": [
           "Posted to the mesh: \"Someone sent flowers for no reason. Best reason.\""
@@ -312,7 +312,7 @@
           "{A} carries the box in, already peeling the tape."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"The part came. The heater will live. Tell nobody I fixed it myself.\""
+          "Comm, one side: {A} says: \"The part came. The heater will live. Tell nobody I fixed it myself.\""
         ],
         "mesh": [
           "Posted to the mesh: \"Replacement part for a heater older than me.\""
@@ -335,7 +335,7 @@
           "{A} carries the square parcel in flat, like a tray."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"It came. The pressing with the blue label. Come listen.\""
+          "Comm, one side: {A} says: \"It came. The pressing with the blue label. Come listen.\""
         ],
         "mesh": [
           "Posted to the mesh: \"New record. Neighbors, I'm sorry in advance.\""
@@ -359,7 +359,7 @@
           "{A} reads the spine through the wrapping, then goes in."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"The book came. Six hundred pages. See you next month.\""
+          "Comm, one side: {A} says: \"The book came. Six hundred pages. See you next month.\""
         ],
         "mesh": [
           "Posted to the mesh: \"Weekend plans: one very long book.\""
@@ -382,7 +382,7 @@
           "{A} tucks the shoebox under an arm and goes in."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"They came in the wrong size. Of course they did.\""
+          "Comm, one side: {A} says: \"They came in the wrong size. Of course they did.\""
         ],
         "mesh": [
           "Posted to the mesh: \"New shoes. The puddles have been warned.\""
@@ -406,7 +406,7 @@
           "{A} carries the crate in level, slow."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"The seedlings came. All alive. I'll bring you two.\""
+          "Comm, one side: {A} says: \"The seedlings came. All alive. I'll bring you two.\""
         ],
         "mesh": [
           "Posted to the mesh: \"Balcony garden, attempt number three.\""
@@ -429,8 +429,8 @@
           "{A} reads the tag twice, then goes in."
         ],
         "phone": [
-          "Phone, one side: {A} says: \"Did you send me something? No? Then who did?\"",
-          "Phone, one side: {A} says: \"There's no name on it. Was it you?\""
+          "Comm, one side: {A} says: \"Did you send me something? No? Then who did?\"",
+          "Comm, one side: {A} says: \"There's no name on it. Was it you?\""
         ],
         "mesh": [
           "Posted to the mesh: \"A gift with no name on it. Whoever you are: thank you.\""

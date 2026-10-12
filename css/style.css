@@ -260,7 +260,7 @@ body:has(#deck.open) .monitor{right:304px}
 #monTabs{display:flex;gap:4px;padding:8px 10px 4px}
 #monTabs button{flex:1;background:transparent;border:1px solid var(--line);color:var(--muted);font-family:var(--font-pixel);font-size:10px;letter-spacing:.1em;padding:4px;border-radius:3px;cursor:pointer;text-transform:uppercase}
 #monTabs button.on{border-color:var(--pink);color:var(--pink)}
-.mon-body{overflow:auto;padding:4px 10px 10px;min-height:120px;font-size:11px;line-height:1.45}
+.mon-body{overflow:auto;padding:4px 10px 10px;min-height:64px;font-size:11px;line-height:1.45}
 .mon-body h4{margin:10px 0 4px;font-family:var(--font-pixel);font-weight:400;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan)}
 .mon-empty{color:var(--muted);margin:8px 0}
 .ml,.mo{display:grid;grid-template-columns:62px 1fr;gap:6px;padding:3px 0;border-bottom:1px solid rgba(44,58,82,.45)}
@@ -282,6 +282,13 @@ body:has(#deck.open) .monitor{right:304px}
 .mon-loose{margin:2px 0;color:var(--ink)}
 .mon-key{margin-top:12px;color:var(--muted);font-size:10px}
 .mon-key summary{cursor:pointer}
+/* the person under the cursor: surveillance corner brackets (monitor.js) */
+.npc-hover{position:fixed;pointer-events:none;z-index:2;box-sizing:border-box;--c:#5ae8ff;
+  background:linear-gradient(var(--c),var(--c)) top left/7px 2px,linear-gradient(var(--c),var(--c)) top left/2px 7px,linear-gradient(var(--c),var(--c)) top right/7px 2px,linear-gradient(var(--c),var(--c)) top right/2px 7px,
+    linear-gradient(var(--c),var(--c)) bottom left/7px 2px,linear-gradient(var(--c),var(--c)) bottom left/2px 7px,linear-gradient(var(--c),var(--c)) bottom right/7px 2px,linear-gradient(var(--c),var(--c)) bottom right/2px 7px;
+  background-repeat:no-repeat;filter:drop-shadow(0 0 3px rgba(90,232,255,.7))}
+.npc-hover[hidden]{display:none}
+.npc-hover.watched{--c:#ff4f6a;filter:drop-shadow(0 0 3px rgba(255,79,106,.7))}
 /* the speed bar, top middle */
 .ffbar{position:fixed;top:calc(16px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:4px;padding:4px 6px 4px 10px;background:var(--deck);border:1px solid var(--line);border-radius:4px;z-index:2;font-family:var(--font-pixel);font-size:10px;letter-spacing:.08em}
 .ffbar span{color:var(--muted);margin-right:4px;white-space:nowrap}

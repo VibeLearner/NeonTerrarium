@@ -1,0 +1,1029 @@
+{
+  "category": "nightlife",
+  "title": "Nightlife",
+  "theme": "The club, a bar regular, a night out going wrong, a turn away at the door, a late walk home.",
+  "storylets": [
+    {
+      "id": "ngt.rope-wait",
+      "title": "Forty people and a rope",
+      "tier": "mundane",
+      "note": "Friends waiting outside the club. Common, cheap, loud.",
+      "roles": {
+        "A": {
+          "desc": "an adult in the rope line",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend beside them",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          21,
+          24
+        ],
+        "at": [
+          "club-queue"
+        ],
+        "weight": 8,
+        "cooldown": {
+          "person": 60,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "club-queue",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "club-queue"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "club-queue"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} join the rope line, twenty back from the door.",
+          "{A} and {B.desc} take a spot at the rope. The line shuffles.",
+          "{A} and {B.desc} fall in behind a tall figure in a neon jacket.",
+          "{B.desc} drags {A} to the end of the rope and crosses both arms."
+        ],
+        "b2": [
+          "{A} and {B.desc} talk over the thump from inside, heads close.",
+          "{B.desc} shows {A} something on a handset and they both laugh.",
+          "{A} jokes with {B.desc} and swaps a cup of something warm.",
+          "{B.desc} bounces on the balls of {B.his} feet and chatters."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.first-name",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.35,
+          "log": [
+            "Overheard: {A} says: \"{B.first}, stop bouncing, we are not that late.\"",
+            "Overheard: {B.desc} says: \"If I am not in by ten, {A.nick}, I swear.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.02
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:night-out"
+        ]
+      }
+    },
+    {
+      "id": "ngt.waved-in",
+      "title": "The bouncer's nod",
+      "tier": "mundane",
+      "note": "A regular is waved through. Shows regular:club without naming anyone.",
+      "roles": {
+        "A": {
+          "desc": "a regular at the rope",
+          "needs": [
+            "adult",
+            "regular:club"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          21,
+          24
+        ],
+        "at": [
+          "club-door"
+        ],
+        "weight": 7,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "club-queue",
+          "who": "A",
+          "at": "club-queue"
+        },
+        {
+          "id": "b2",
+          "do": "club-enter",
+          "who": "A",
+          "at": "club-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} arrives at the end of the rope and is already looking at the door.",
+          "{A} approaches the rope with a casual stride and a half wave.",
+          "{A} comes up to the club, collar high, eyes on the bouncers.",
+          "{A} strolls up the walk, hands in pockets."
+        ],
+        "b2": [
+          "A bouncer unhooks the rope for {A} with a nod. {A} goes in without breaking stride.",
+          "The door staff wave {A} in. Others in line grumble.",
+          "{A} is admitted at once. The door closes on the bass.",
+          "A bouncer jerks a thumb. {A} slips through."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.regular",
+          "beat": "b2",
+          "channel": "seen",
+          "chance": 0.45,
+          "log": [
+            "{A} was waved straight past the line. The door staff did not ask for anything.",
+            "{A} is a known face at this door."
+          ]
+        }
+      ],
+      "next": {
+        "sets": [
+          "A:club-regular"
+        ]
+      }
+    },
+    {
+      "id": "ngt.turned-away",
+      "title": "Not tonight",
+      "tier": "notable",
+      "note": "Turned away at the rope. A friend walks off with them. Chain: ngt.makes-it-in-later, or it ends there.",
+      "roles": {
+        "A": {
+          "desc": "an adult at the door",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend, waiting with them",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          21,
+          24
+        ],
+        "at": [
+          "club-door",
+          "club-queue"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 400,
+          "city": 3
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "club-turned-away",
+          "who": "A",
+          "at": "club-door"
+        },
+        {
+          "id": "b2",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "club-door"
+        },
+        {
+          "id": "b3",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "A bouncer stops {A} at the rope with one flat hand. {A} is turned away.",
+          "{A} reaches the front and is refused entry. A short exchange; the rope stays closed.",
+          "{A} is shoved back a step by a bouncer and told to move on."
+        ],
+        "b2": [
+          "{B.desc} catches up with {A} and talks fast, a hand on {A}'s sleeve.",
+          "{A} says something and {B.desc} answers with a flat laugh.",
+          "{B.desc} points down the block and tries a smile."
+        ],
+        "b3": [
+          "{A} and {B.desc} walk off into the dark, {B.desc} talking the whole way.",
+          "{A} lets {B.desc} steer away from the door. Neither looks back.",
+          "The two of them head down the street side by side."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.opinion-stated",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"Third time this month. Same guy on the door, same excuse.\"",
+            "Overheard: {B.desc} says: \"Forget it. We can try the lawn bar instead.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.01
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:turned-away-recently"
+        ],
+        "branches": [
+          {
+            "w": 35,
+            "sets": [
+              "A:got-in-later"
+            ],
+            "label": "gets in another night"
+          },
+          {
+            "w": 65,
+            "sets": [],
+            "label": "gives up",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "ngt.second-try",
+      "title": "The same door, a better night",
+      "tier": "texture",
+      "note": "Pays off ngt.turned-away.",
+      "roles": {
+        "A": {
+          "desc": "an adult at the door",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          21,
+          24
+        ],
+        "at": [
+          "club-door"
+        ],
+        "requires": [
+          "A:got-in-later"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 500,
+          "city": 3
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "club-queue",
+          "who": "A",
+          "at": "club-queue"
+        },
+        {
+          "id": "b2",
+          "do": "club-enter",
+          "who": "A",
+          "at": "club-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes up to the rope for the second time this week, jacket straightened.",
+          "{A} arrives and tugs at a sleeve. The line is shorter tonight.",
+          "{A} walks to the rope with careful steps."
+        ],
+        "b2": [
+          "The bouncer looks {A} over, then lifts the rope. {A} goes in, quick.",
+          "{A} is admitted. A small fist pump on the way through the door.",
+          "The door staff let {A} in without a word."
+        ]
+      },
+      "effects": {
+        "flags": [
+          "A:club-regular"
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:club-regular"
+        ]
+      }
+    },
+    {
+      "id": "ngt.spill-out-dance",
+      "title": "Dancing on the sidewalk",
+      "tier": "texture",
+      "note": "Someone spills out of the club still dancing. Visible, joyful, harmless.",
+      "roles": {
+        "A": {
+          "desc": "an adult leaving the club",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          23,
+          24
+        ],
+        "at": [
+          "club-door",
+          "street"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 150,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "club-door"
+        },
+        {
+          "id": "b2",
+          "do": "dance",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out of the club door in a rush of bass and steam.",
+          "{A} leaves the club, jacket over a shoulder, grinning.",
+          "{A} emerges from the club door and blinks at the street."
+        ],
+        "b2": [
+          "{A} dances along the sidewalk to music no one else can hear.",
+          "{A} spins once on the curb and keeps moving to a private beat.",
+          "{A} dances a few steps, nearly bumps a lamp post, and bows to it."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "ngt.sick-in-gutter",
+      "title": "One drink too many",
+      "tier": "texture",
+      "note": "Throw-up outside a club, a friend holding a jacket. Plain, unglamorous, true.",
+      "roles": {
+        "A": {
+          "desc": "an adult who has had too much",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend taking care",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          23,
+          24
+        ],
+        "at": [
+          "club-door",
+          "street"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 300,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "club-door"
+        },
+        {
+          "id": "b2",
+          "do": "throw-up",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out of the club door fast, hand over the mouth.",
+          "{A} stumbles out of the door and heads for the curb.",
+          "{A} leaves the club at speed, one hand on the wall."
+        ],
+        "b2": [
+          "{A} bends over the gutter and is sick.",
+          "{A} retches at the curb. A puddle spreads.",
+          "{A} throws up beside a drain, hands on knees."
+        ],
+        "b3": [
+          "{B.desc} pats {A}'s back, hands over a cup of water, and steers {A} away.",
+          "{B.desc} takes {A}'s arm and the two shuffle off together.",
+          "{B.desc} drapes a jacket over {A} and walks {A} toward the metro."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {B.desc} says: \"Next time I count your drinks, friend. Three, not five.\"",
+            "Overheard: {A} says: \"Sorry. You are a good friend. Don't tell anyone.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.03
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "ngt.shown-out",
+      "title": "Escorted to the curb",
+      "tier": "notable",
+      "note": "Bouncers walk someone out. Chain: ngt.cooling-off-walk fizzle only.",
+      "roles": {
+        "A": {
+          "desc": "an adult being shown out",
+          "needs": [
+            "adult",
+            "impulsive"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          22,
+          24
+        ],
+        "at": [
+          "club-door"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 600,
+          "city": 4
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "escort",
+          "who": "A",
+          "at": "club-door"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "Two bouncers walk {A} out of the club door, one on each arm.",
+          "{A} is ejected from the club and set down on the sidewalk.",
+          "Door staff escort {A} off the step and release {A.his} sleeves."
+        ],
+        "b2": [
+          "{A} stands on the sidewalk and straightens a collar with great dignity.",
+          "{A} stays at the curb, arms spread, saying something to the door.",
+          "{A} lingers, then points at the club and shouts."
+        ],
+        "b3": [
+          "{A} walks off down the block, muttering.",
+          "{A} heads for the metro at a stiff pace.",
+          "{A} turns and wanders away, hands in pockets."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.opinion-stated",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} shouts: \"I will be back! I will be back, and I will be wearing a better jacket!\"",
+            "Overheard: {A} says to the air: \"Not even a refund on the drink.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": [
+          "A:was-shown-out"
+        ],
+        "branches": [
+          {
+            "w": 100,
+            "sets": [],
+            "label": "never mentioned again",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "ngt.kiosk-regular",
+      "title": "The bar kiosk, round two",
+      "tier": "mundane",
+      "note": "A kiosk drink. The keeper knows the order.",
+      "roles": {
+        "A": {
+          "desc": "an adult at the kiosk",
+          "needs": [
+            "adult",
+            "regular:bar-kiosk"
+          ]
+        },
+        "B": {
+          "desc": "the kiosk server",
+          "needs": [
+            "club-worker"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          20,
+          24
+        ],
+        "at": [
+          "bar-kiosk"
+        ],
+        "weight": 7,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": "A",
+          "at": "bar-kiosk"
+        },
+        {
+          "id": "b2",
+          "do": "serve",
+          "who": "B",
+          "at": "bar-kiosk",
+          "with": [
+            "A"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "eat",
+          "who": "A",
+          "at": "bar-kiosk"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} steps up to the kiosk and orders two fingers of something amber.",
+          "{A} leans on the counter and says the usual without looking up.",
+          "{A} reaches the kiosk and holds up a coin.",
+          "{A} gets to the window and points at a bottle."
+        ],
+        "b2": [
+          "{B.desc} slides a glass across without a word.",
+          "{B.desc} serves {A} and wipes a ring from the counter.",
+          "{B.desc} pours it slowly and sets it down.",
+          "{B.desc} serves up the drink and taps the till."
+        ],
+        "b3": [
+          "{A} drinks standing, one elbow on the counter.",
+          "{A} takes a long sip and watches the club door.",
+          "{A} sips and looks up at the sign.",
+          "{A} finishes the glass in three swallows."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.regular",
+          "beat": "b1",
+          "channel": "seen",
+          "chance": 0.4,
+          "log": [
+            "{A} ordered without being asked what; the server already knew.",
+            "{A} drinks here often."
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "ngt.late-walk-home",
+      "title": "The long way back",
+      "tier": "mundane",
+      "note": "A solitary walk home late. Atmospheric, no event.",
+      "roles": {
+        "A": {
+          "desc": "an adult walking home late",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          23,
+          24
+        ],
+        "at": [
+          "street"
+        ],
+        "weight": 7,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} walks alone down the block, hood up, under dripping neon.",
+          "{A} heads along the empty sidewalk, hands deep in pockets.",
+          "{A} takes the long way past the shuttered stalls.",
+          "{A} walks the middle of the street, boots echoing."
+        ],
+        "b2": [
+          "{A} stops under a lamp and looks up at the buildings.",
+          "{A} stays at a crossing and waits for a light that does not change.",
+          "{A} stands at the corner and rubs both arms.",
+          "{A} lingers by the fountain for a moment."
+        ],
+        "b3": [
+          "{A} climbs the step and goes in. The door slides shut.",
+          "{A} reaches the door and enters.",
+          "{A} steps inside and the light behind the panel goes on.",
+          "{A} arrives at the home door and goes in."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.home",
+          "beat": "b3",
+          "channel": "seen",
+          "chance": 0.4,
+          "log": [
+            "{A} lives at this door; it opened to {A.him} at once.",
+            "{A} came home to this address late at night."
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "ngt.staff-arrives",
+      "title": "The doorman's shift begins",
+      "tier": "mundane",
+      "note": "A club worker arrives early. Routine seen from the other side of the rope.",
+      "roles": {
+        "A": {
+          "desc": "a club worker arriving",
+          "needs": [
+            "adult",
+            "club-worker"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          18,
+          21
+        ],
+        "at": [
+          "club-door"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "enter",
+          "who": "A",
+          "at": "club-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes down the block in a dark uniform, a thermos under one arm.",
+          "{A} walks up with a clipboard and an unlit sign under one arm.",
+          "{A} crosses to the club in a long coat, badge swinging.",
+          "{A} arrives early, rolling both shoulders."
+        ],
+        "b2": [
+          "{A} unlocks the staff side and goes in.",
+          "{A} swipes a badge at the club door and enters.",
+          "{A} slips in through the side door, still yawning.",
+          "{A} enters through the club door and it closes."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.job",
+          "beat": "b2",
+          "channel": "document",
+          "chance": 0.5,
+          "log": [
+            "The badge reads Door Staff, Neon Dome.",
+            "A uniform patch reads Neon Dome, Security."
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "ngt.leaves-by-car",
+      "title": "Picked up at the drop-off",
+      "tier": "texture",
+      "note": "Two people leave together by car. Observed only. Fits the ambiguity theme but leaves it as texture.",
+      "roles": {
+        "A": {
+          "desc": "an adult at the drop-off",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "someone they meet there"
+        }
+      },
+      "when": {
+        "hours": [
+          22,
+          24
+        ],
+        "at": [
+          "dropoff"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 300,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "dropoff"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "B",
+          "at": "dropoff"
+        },
+        {
+          "id": "b3",
+          "do": "leave-dropoff",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "dropoff"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at the drop-off with hands in pockets and the neon behind.",
+          "{A} lingers at the lift base, glancing at the sky.",
+          "{A} waits near the drop-off sign."
+        ],
+        "b2": [
+          "{B.desc} walks up and stops beside {A}.",
+          "{B.desc} crosses the plaza to {A} and says a few words.",
+          "{B.desc} approaches the drop-off at a brisk pace."
+        ],
+        "b3": [
+          "A car drops to the pad. Both get in. It rises.",
+          "{A} and {B.desc} climb in together and the car lifts away.",
+          "The pair board a waiting car and ride up out of sight."
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:left-together"
+        ]
+      }
+    },
+    {
+      "id": "ngt.carried-home",
+      "title": "One shoulder under another",
+      "tier": "texture",
+      "note": "A friend helps someone home. Shows friend relation by action, never by label.",
+      "roles": {
+        "A": {
+          "desc": "an adult barely walking",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a friend holding them up",
+          "rel": "friend-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          23,
+          24
+        ],
+        "at": [
+          "street"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 300,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "sit",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{B.desc} takes most of {A}'s weight and steers down the block.",
+          "{A} leans heavily on {B.desc} all the way along the wall.",
+          "{B.desc} half carries {A} past the closed stalls."
+        ],
+        "b2": [
+          "They stop at a bench. {A} sits with eyes shut, {B.desc} standing guard.",
+          "{B.desc} lowers {A} onto a bench and hands over water.",
+          "{A} slumps on the bench while {B.desc} checks a handset."
+        ],
+        "b3": [
+          "{B.desc} gets {A} to the door. Both go in, the door sliding shut.",
+          "{A} and {B.desc} tumble in at the door.",
+          "{B.desc} half drags {A} through the entry."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {B.desc} says: \"You owe me breakfast for this, friend.\"",
+            "Overheard: {A} says: \"You're the best... I will pay... tomorrow.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.04
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    }
+  ]
+}

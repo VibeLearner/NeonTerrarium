@@ -1,0 +1,767 @@
+{
+  "category": "weather",
+  "title": "Weather and the city",
+  "theme": "Rain changes plans, a metro delay, a long night, the city's moods.",
+  "storylets": [
+    {
+      "id": "wth.rain-dash",
+      "title": "Caught without cover",
+      "tier": "mundane",
+      "note": "The first drops, and everyone runs. Common on rainy days.",
+      "roles": {
+        "A": {
+          "desc": "an adult in the open",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          23
+        ],
+        "weather": "rain",
+        "at": [
+          "street",
+          "square"
+        ],
+        "weight": 9,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "run",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b3",
+          "do": "stand",
+          "who": "A",
+          "at": "shop-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stops mid-square and looks up as the first drops land.",
+          "{A} holds out a palm and finds it wet.",
+          "{A} stands by the pond and squints at the sky.",
+          "{A} pauses on the stone as the rain thickens."
+        ],
+        "b2": [
+          "{A} breaks into a run, bag held over head.",
+          "{A} sprints for the awnings, jacket flapping.",
+          "{A} dashes across the stones, boots slapping puddles.",
+          "{A} runs in a bent crouch, one hand over the hair."
+        ],
+        "b3": [
+          "{A} ducks under a shop awning, laughing, and shakes out a sleeve.",
+          "{A} reaches a doorway and wrings out a cuff.",
+          "{A} arrives under cover and swipes the face with a sleeve.",
+          "{A} huddles in the shop doorway, steam rising."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "wth.umbrella-up",
+      "title": "The umbrella goes up",
+      "tier": "mundane",
+      "note": "A person with an umbrella. Pure texture.",
+      "roles": {
+        "A": {
+          "desc": "an adult with an umbrella",
+          "needs": [
+            "adult",
+            "has-umbrella"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          24
+        ],
+        "weather": "rain",
+        "at": [
+          "street",
+          "square"
+        ],
+        "weight": 9,
+        "cooldown": {
+          "person": 24,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "umbrella",
+          "who": "A",
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} pops open an umbrella on the step and sets off.",
+          "{A} snaps an umbrella up under a dripping awning.",
+          "{A} opens a wide umbrella with a flourish.",
+          "{A} ducks out of a doorway under a clear umbrella."
+        ],
+        "b2": [
+          "{A} walks the length of the block, rain drumming overhead.",
+          "{A} crosses the square at a measured pace, heels splashing.",
+          "{A} heads along the sidewalk, tilting into the wind.",
+          "{A} takes the long way round puddles."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "wth.doorway-wait",
+      "title": "Waiting out the downpour",
+      "tier": "mundane",
+      "note": "A person waits under a shop awning for the rain to ease.",
+      "roles": {
+        "A": {
+          "desc": "an adult sheltering",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          23
+        ],
+        "weather": "rain",
+        "at": [
+          "shop-door"
+        ],
+        "weight": 7,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "shop-door"
+        },
+        {
+          "id": "b2",
+          "do": "phone-call",
+          "who": "A",
+          "at": "shop-door"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "shop-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands in a doorway with arms folded and watches the water run.",
+          "{A} stays under the awning, heels on the threshold.",
+          "{A} lingers in the dry strip by the shop wall.",
+          "{A} stands near the glass as the rain hammers."
+        ],
+        "b2": [
+          "{A} takes a call, one finger in the other ear.",
+          "{A} holds a handset up and says, \"It's raining. I'll be late.\"",
+          "{A} talks on the handset for a minute, eyes on the sky.",
+          "{A} lifts the handset to the ear and nods."
+        ],
+        "b3": [
+          "{A} steps out when the rain thins and heads off.",
+          "{A} walks away once the sky lightens.",
+          "{A} goes at last, collar up.",
+          "{A} leaves the awning at a jog."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.plan-stated",
+          "beat": "b2",
+          "channel": "phone",
+          "chance": 0.3,
+          "log": [
+            "Phone, one side: {A} says: \"Rain's stopping everything. I'll be there in twenty.\"",
+            "Phone, one side: {A} says: \"Start without me. Save me a seat.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "wth.metro-delay",
+      "title": "Delay on the platform",
+      "tier": "texture",
+      "note": "A rainy-day delay, a notice, a call. Stalled people reveal small things.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a platform",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          6,
+          23
+        ],
+        "weather": "rain",
+        "at": [
+          "platform",
+          "metro-station"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 150,
+          "city": 3
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "platform"
+        },
+        {
+          "id": "b2",
+          "do": "read-notice",
+          "who": "A",
+          "at": "platform"
+        },
+        {
+          "id": "b3",
+          "do": "phone-call",
+          "who": "A",
+          "at": "platform"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} waits on the platform, one foot on the yellow line.",
+          "{A} stands among a dozen others and looks down the dark tunnel.",
+          "{A} stays at the platform edge and checks the clock.",
+          "{A} waits as the board flickers."
+        ],
+        "b2": [
+          "{A} reads the delay board, lips moving.",
+          "{A} studies the printed sheet taped to a pillar.",
+          "{A} checks the notice board and sighs.",
+          "{A} reads the notice twice and rubs the back of the neck."
+        ],
+        "b3": [
+          "{A} takes a call and says, \"Signal fault. Maybe an hour.\"",
+          "{A} holds the handset to the ear and says, \"Start without me.\"",
+          "{A} makes a call and speaks in short bursts.",
+          "{A} lifts the handset and mouths a few words."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.plan-stated",
+          "beat": "b3",
+          "channel": "phone",
+          "chance": 0.4,
+          "log": [
+            "Phone, one side: {A} says: \"Train is dead. I'll walk if it's not moving by seven.\"",
+            "Phone, one side: {A} says: \"Tell them I'm on the way. Rain's closed the line.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "wth.puddle-child",
+      "title": "A child and a puddle",
+      "tier": "mundane",
+      "note": "Small joy in a wet street.",
+      "roles": {
+        "A": {
+          "desc": "an adult holding an umbrella",
+          "needs": [
+            "adult",
+            "has-umbrella"
+          ]
+        },
+        "B": {
+          "desc": "a child in boots",
+          "rel": "child-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          7,
+          19
+        ],
+        "weather": "rain",
+        "at": [
+          "street",
+          "square"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 60,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "B",
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "wave",
+          "who": "A",
+          "at": "street",
+          "with": [
+            "B"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} come along the sidewalk, {B.desc} two steps ahead.",
+          "{B.desc} drags {A} down the block by a sleeve.",
+          "{A} and {B.desc} cross the square, rain bouncing off the coat."
+        ],
+        "b2": [
+          "{B.desc} plants both boots in the biggest puddle and stays.",
+          "{B.desc} stands in the middle of a puddle, arms spread.",
+          "{B.desc} stops dead at the curb and stares at the water."
+        ],
+        "b3": [
+          "{A} waves a hand at {B.desc}, tries not to smile, and fails.",
+          "{A} waves for {B.desc} to come, then gives up and laughs.",
+          "{A} waves the umbrella handle and calls something short."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {A} calls: \"Come on, little one! Your socks will be soaked!\"",
+            "Overheard: {B.desc} calls: \"Mom! It's deep!\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "wth.long-night-lamp",
+      "title": "A bench under a hissing lamp",
+      "tier": "texture",
+      "note": "A long rainy night. Someone sits it out.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a bench",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          22,
+          24
+        ],
+        "weather": "rain",
+        "at": [
+          "bench"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 150,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "umbrella",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b3",
+          "do": "stand",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits on a bench with a hood up, rain streaming past.",
+          "{A} takes a seat under a hissing lamp.",
+          "{A} perches on the bench edge and watches the puddles."
+        ],
+        "b2": [
+          "{A} unfolds a small umbrella and holds it low.",
+          "{A} spreads a coat and holds it overhead.",
+          "{A} lifts an umbrella and rests it on a shoulder."
+        ],
+        "b3": [
+          "{A} stands, stretches, and looks up the block.",
+          "{A} gets up slowly and shakes out a wet sleeve.",
+          "{A} rises and stays at the bench edge, hands in pockets."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "wth.clear-evening-lawn",
+      "title": "A clear sky and a blanket",
+      "tier": "mundane",
+      "note": "Fine weather draws people outdoors.",
+      "roles": {
+        "A": {
+          "desc": "an adult on the lawn",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          16,
+          21
+        ],
+        "weather": "clear",
+        "at": [
+          "lawn"
+        ],
+        "weight": 7,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "picnic",
+          "who": "A",
+          "at": "lawn"
+        },
+        {
+          "id": "b2",
+          "do": "eat",
+          "who": "A",
+          "at": "lawn"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} spreads a blanket on the lawn and weighs the corners with shoes.",
+          "{A} flops down on a worn blanket and kicks the shoes off.",
+          "{A} lays out a blanket and sets a flask on one corner.",
+          "{A} claims a patch of grass with a faded cloth."
+        ],
+        "b2": [
+          "{A} eats a flatbread slowly and watches the sky.",
+          "{A} drinks from the flask and breaks off a piece of fruit.",
+          "{A} eats alone, one knee up, eyes on the towers.",
+          "{A} nibbles from a paper bag and leans on one elbow."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "wth.wet-delivery",
+      "title": "Parcel under a coat",
+      "tier": "mundane",
+      "note": "A delivery in the rain, carried in under a jacket.",
+      "roles": {
+        "A": {
+          "desc": "an adult receiving a delivery",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          21
+        ],
+        "weather": "rain",
+        "at": [
+          "home-door"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "receive-delivery",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "carry",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "A drone drips onto {A}'s step and drops a parcel.",
+          "{A} takes a soaked parcel from a hovering drone.",
+          "A courier drone sets a wet crate down and rises.",
+          "{A} signs for a dripping package at the door."
+        ],
+        "b2": [
+          "{A} hugs the parcel under a jacket and ducks.",
+          "{A} tucks the package inside a coat and hunches over it.",
+          "{A} lifts the crate in both arms and shields it with a body.",
+          "{A} wraps the parcel in a sleeve and holds it tight."
+        ],
+        "b3": [
+          "{A} goes in fast and the door slides shut.",
+          "{A} enters with rain streaming off the shoulders.",
+          "{A} steps inside, dripping.",
+          "{A} backs through the door, parcel clutched."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "wth.shared-doorway",
+      "title": "Two strangers, one awning",
+      "tier": "texture",
+      "note": "Rain throws strangers together. One conversation, no follow-up promised.",
+      "roles": {
+        "A": {
+          "desc": "an adult sheltering",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a stranger sheltering too",
+          "rel": "stranger-to:A"
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          22
+        ],
+        "weather": "rain",
+        "at": [
+          "shop-door"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 150,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "shop-door"
+        },
+        {
+          "id": "b2",
+          "do": "run",
+          "who": "B",
+          "at": "shop-door"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "shop-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands in the shop doorway, jacket dripping.",
+          "{A} presses back against the shopfront and watches the water.",
+          "{A} waits under the awning with a damp collar."
+        ],
+        "b2": [
+          "{B.desc} dashes in beside {A}, bag over the head.",
+          "{B.desc} splashes into the doorway and shakes out both sleeves.",
+          "{B.desc} bursts under the awning, gasping."
+        ],
+        "b3": [
+          "{A} and {B.desc} trade a remark about the weather and then a longer one.",
+          "{B.desc} says something that makes {A} laugh out loud.",
+          "{A} and {B.desc} chat for a few minutes without moving."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.first-name",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.25,
+          "log": [
+            "Overheard: {B.desc} says: \"I'm {B.first}, by the way. Pleasure to be rained on with you.\"",
+            "Overheard: {A} says: \"{B.first}? I think I've seen you at the stalls.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": [
+          "A+B:met-in-rain"
+        ]
+      }
+    },
+    {
+      "id": "wth.rain-market",
+      "title": "The stall packs up early",
+      "tier": "mundane",
+      "note": "A keeper closes up in a downpour.",
+      "roles": {
+        "A": {
+          "desc": "a stall keeper packing up",
+          "needs": [
+            "stall-keeper"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          12,
+          22
+        ],
+        "weather": "rain",
+        "at": [
+          "stall"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b3",
+          "do": "leave",
+          "who": "A",
+          "at": "stall"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} hauls crates under a shaking canopy and stacks them in the dry.",
+          "{A} lashes down the awning and carries a pot indoors.",
+          "{A} drags a table in with rain on both shoulders.",
+          "{A} carries the last tin of broth under a coat."
+        ],
+        "b2": [
+          "{A} stands at the empty counter and wrings a rag.",
+          "{A} looks at the sky for a long minute, hand on the till.",
+          "{A} stays by the stall front, arms crossed, watching the water.",
+          "{A} stands under the canopy with the shutter half down."
+        ],
+        "b3": [
+          "{A} leaves, the shutter rattling down behind.",
+          "{A} comes out of the stall and pulls the cover shut.",
+          "{A} leaves with a lamp in one hand and a bag in the other.",
+          "{A} locks the shutter and walks off through the rain."
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    }
+  ]
+}

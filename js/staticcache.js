@@ -82,6 +82,12 @@ function scPieces(a, len, o, n){
 // targets in a state that makes the composite slower (overlay test "copy by drawing").
 let _cdMat = null, _cdScene = null;
 function scCopyDraw(colL, rowB){
+  scCopyMat();
+  const u = _cdMat.uniforms; u.tC.value = SC.rtS.texture; u.tN.value = SC.rtSN.texture; u.tD.value = SC.rtS.depthTexture;
+  u.off.value.set(scMod(colL - SC.ox, SC.w), scMod(rowB - SC.oy, SC.h)); u.size.value.set(SC.w, SC.h);
+  renderer.render(_cdScene, compCam);
+}
+function scCopyMat(){
   if (!_cdMat){
     _cdMat = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, depthTest: true, depthWrite: true, depthFunc: THREE.AlwaysDepth, blending: THREE.NoBlending,
       uniforms: { tC: { value: null }, tN: { value: null }, tD: { value: null }, off: { value: new THREE.Vector2() }, size: { value: new THREE.Vector2() } },
@@ -94,9 +100,6 @@ function scCopyDraw(colL, rowB){
     _cdMat.userData.mrt = true;
     const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), _cdMat); m.frustumCulled = false; _cdScene = new THREE.Scene(); _cdScene.add(m);
   }
-  const u = _cdMat.uniforms; u.tC.value = SC.rtS.texture; u.tN.value = SC.rtSN.texture; u.tD.value = SC.rtS.depthTexture;
-  u.off.value.set(scMod(colL - SC.ox, SC.w), scMod(rowB - SC.oy, SC.h)); u.size.value.set(SC.w, SC.h);
-  renderer.render(_cdScene, compCam);
 }
 // copy the window of the cache that is the view (color, depth and normals) into the color target: up to four rectangles
 function scBlit(colL, rowB){
@@ -198,6 +201,35 @@ function scEditRect(px, py, shk, soft){
     scDrawRect(c0, c1, r0, r1, px, py); SC.rects++; SC.rectLast = [c0 - scCol(px), c1 - scCol(px), r0 - scRow(py), r1 - scRow(py)];
   }
   D.boxes.length = 0; SC.editsSeen = SC_EDITS;
+  return true;
+}
+// The frames while the picture is redrawn after a turn: the rows its finished strips already cover are copied from it (as the cache's frames
+// do), only the rest of the static city is drawn the old way, and the live set goes on top of each part as its kind of frame has it (the glow
+// overlay over the copied rows, where the buildings' own lights are in the copy; not over the rows drawn the old way, which draw their lights
+// themselves). Each strip makes the next frame cheaper: the frames right after a turn used to be the dearest of all, the whole city drawn the old
+// way plus a strip of the new picture, eight frames running. The test "after a turn, the old way until the picture is done" restores that.
+function scHybrid(px, py, job){
+  const d = scRow(py) - job.oy, yDone = Math.floor(SC.h*job.k/job.K), sDone = Math.max(0, Math.min(H, yDone - d));
+  if (scCol(px) < job.ox || scCol(px) + W > job.ox + SC.w || d < 0 || d + H > SC.h || sDone <= 0) return false;
+  scCopyMat();
+  const lm = cam.layers.mask;
+  renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1); mrtBegin(rtC, rtN);   // (both images cleared, as the old way's frame starts)
+  // the finished rows: the new picture's (no ring: a job's picture has its origin at job.ox, job.oy)
+  rtC.scissor.set(0, 0, W, sDone); rtC.scissorTest = true; renderer.setRenderTarget(rtC);
+  const u = _cdMat.uniforms; u.tC.value = job.rt.texture; u.tN.value = job.rn.texture; u.tD.value = job.rt.depthTexture;
+  u.off.value.set(scCol(px) - job.ox, d); u.size.value.set(SC.w, SC.h);
+  renderer.render(_cdScene, compCam);
+  cam.layers.mask = SC_LIVE_MASK; cullFrame(cam);
+  SC.drawView(() => renderer.render(scene, cam));
+  // the rest: the old way, the static set and then the live set without the glow overlay
+  if (sDone < H){
+    rtC.scissor.set(0, sDone, W, H - sDone); renderer.setRenderTarget(rtC);
+    sdApply();
+    cam.layers.enableAll(); cam.layers.disable(6); SC.drawView(() => renderer.render(scene, cam), false);
+    CULL.sd = false;
+  }
+  rtC.scissorTest = false; renderer.setRenderTarget(rtC);
+  mrtEnd(); cam.layers.mask = lm;
   return true;
 }
 // What the static pieces' pictures depend on, in two parts.
@@ -327,7 +359,9 @@ SC.frame = function(){
       if (!SC.job){ scJobStart(px, py, hard, soft, shk, 'after a turn or zoom'); if (SC.job) SC.job.afterTurn = true; }
       if (SC.job){
         scBand(SC.job); SC.job.k++;
-        if (SC.job.k < SC.job.K){ SC.state = 'off'; SC.why = 'redrawing after a turn: ' + SC.job.k + ' of ' + SC.job.K; return false; }
+        if (SC.job.k < SC.job.K){ SC.state = 'off'; SC.why = 'redrawing after a turn: ' + SC.job.k + ' of ' + SC.job.K;
+          if (!(PH.tests.turnOldWay || window.__TURN_OLD_WAY) && scHybrid(px, py, SC.job)){ SC.state = 'taking over'; return true; }
+          return false; }
         if (scCol(px) >= SC.job.ox && scCol(px) + W <= SC.job.ox + SC.w && scRow(py) >= SC.job.oy && scRow(py) + H <= SC.job.oy + SC.h){ scJobSwap(SC.job); now = ''; }
         else SC.job = null;
       }
@@ -337,9 +371,6 @@ SC.frame = function(){
   if (now){ scFull(px, py, hard, soft, shk, now); }
   else {
     SC.age++; SC.state = 'in use'; SC.why = '';
-    // (the second set of targets, the one background jobs draw into, is let go after half a minute without a job: a third of the card's memory for the cache
-    //  at full size, and nothing needs it until the next job, which makes it again; while the day cycles there is always a job soon, so it stays)
-    if (SC.next && !SC.job && !S.cycle && performance.now() - (SC.jobAt || 0) > 30000){ scFree(SC.next); SC.next = null; }
     // a newer cache in the background when the light has drifted, the shadow map has been swapped, or the view has used half the room
     if (SC.job && (!scSame(hard, SC.job.hard) || sun.shadow.map !== SC.job.map || SC.job.edits !== SC_EDITS)){ SC.job = null; }   // (it was for something that's gone)
     if (!SC.job){

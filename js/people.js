@@ -21,7 +21,8 @@
 // robot (walk 0-3, alternate walk 4-7, parcel drop 8-13, the parcel capsule opening 14-19), row 14 the emote icons.
 const PPL = { rows: 17, cw: 12, ch: 16, walk: 6, idle: 4, W: 384, H: 272 };
 const F_IDLE = 6, F_SPEC = 10, F_SIT = 16, F_USE = 20, F_ANGRY = 26;
-const F_RUN = PG.F.RUN, F_UWALK = PG.F.UWALK, F_UIDLE = PG.F.UIDLE, F_UOPEN = PG.F.UOPEN;   // (generated people only: running, and walking, standing and opening an umbrella)
+const F_RUN = PG.F.RUN, F_UWALK = PG.F.UWALK, F_UIDLE = PG.F.UIDLE, F_UOPEN = PG.F.UOPEN;
+const F_EAT = PG.F.EAT, F_SITEAT = PG.F.SITEAT, F_CROUCH = PG.F.CROUCH, F_CARRY = PG.F.CARRY, F_CARRYIDLE = PG.F.CARRYIDLE, F_COMM = PG.F.COMM, F_WAVE = PG.F.WAVE, F_HUG = PG.F.HUG, F_GIVE = PG.F.GIVE, F_WATER = PG.F.WATER;   // (the doing frames, generated people only: peoplegen_poses.js)   // (generated people only: running, and walking, standing and opening an umbrella)
 const ROW_COP = 12, ROW_BOT = 13, ROW_EMO = 14, ROW_BOUNCER = 15, ROW_HOOD = 16, CITIZEN_ROWS = 12;   // row 16: the Data Spire's hooded archivist   // row 15: the officer redrawn in red, the club's bouncers
 const EMO = { bang: 0, quest: 1, heart: 2, anger: 3, sweat: 4, note: 5, dots: 6, bowl: 7 };
 if (!window.__OLD_PEOPLE && !window.IN_RECIPE_WORKER) PG.build();   // (the generated sheet: peoplegen.js; the old Craftpix one only when asked for)
@@ -786,7 +787,7 @@ function makePerson(id, home, zone){
            guard: undefined, guardShift: undefined, nightWorker: undefined, ws: undefined, wlen: undefined, walkedFor: undefined, chain: undefined, _taste: null, _tasteE: -1, _tasteD: -1,
            patrol: undefined, metro: undefined, metroPlan: undefined, ride: undefined, club: undefined, clubbing: undefined, rush: undefined,
            hurry: undefined, callout: undefined, gh: undefined, ghWalk: undefined, gy: undefined, dx: undefined, dz: undefined, pause: undefined,
-           bumpCD: undefined, zone, um: undefined, umW: undefined, rainRun: undefined, noRun: undefined, emo: undefined, emoUntil: undefined, angry: undefined, fed: undefined, tries: undefined, gone: undefined };
+           bumpCD: undefined, zone, um: undefined, umW: undefined, rainRun: undefined, noRun: undefined, emo: undefined, emoUntil: undefined, angry: undefined, fed: undefined, eating: undefined, carrying: undefined, tries: undefined, gone: undefined };
 }
 function syncResidents(){
   const keep = new Set();
@@ -1099,7 +1100,7 @@ function arrive(p){
   if (p.rush){ p.rush = false; if (w.beat){ p.at = w.to; p.patrol = w.beat; p.until = pplNow + 9 + pplRand()*5; return; } }   // at the scene: looking around
   if (p.callout && w.beat){ const c = p.callout; p.callout = null; p.at = w.to; p.patrol = w.beat; if (startPatrol(p, c)){ p.rush = true; return; } }
   if (w.beat){ p.at = w.to; p.patrol = w.beat; p.until = pplNow + 4 + pplRand()*7; return; }
-  if (w.spot && w.spot.kind === 'seat' && p.fed){ p.fed = false; emote(p, 'bowl', 2.8); }
+  if (w.spot && (w.spot.kind === 'seat' || w.spot.kind === 'stand') && p.fed){ p.fed = false; p.eating = w.spot; emote(p, 'bowl', 2.8); }   // (eating: the frames with the bowl, while they stay on this spot)
   p.at = w.to; p.spot = w.spot;
   if (p.metroPlan && w.to === p.metroPlan.station && typeof mtEnter === 'function' && mtEnter(p)) return;   // at the station: up the lift to the platform (see metro.js)
   p.metroPlan = null;
@@ -1159,8 +1160,12 @@ const PG_PXW = 1/PX;   // (a sprite pixel in world units)
 let pplRaining = false, pplRainEpoch = 0;   // (generated people: rain on or off with a little hysteresis, and a count of the showers, so each person decides once per shower)
 let pplFrame = 0, pplGoneN = 0;   // (pplGoneN: people marked gone and not yet removed)
 const _op = new THREE.Vector3();
+// the monitor's own camera (monitor.js): people round the person it watches count as on screen, so they are stepped at full rate and drawn into its view
+const MON_FOCUS = { on: false, x: 0, z: 0, r: 7 };
+const nearFocus = (x, z) => MON_FOCUS.on && Math.abs(x - MON_FOCUS.x) < MON_FOCUS.r && Math.abs(z - MON_FOCUS.z) < MON_FOCUS.r;
 // is a ground point well off the screen from any height people can be at (screen x doesn't depend on height; y does)
 function offScreen(x, z){
+  if (nearFocus(x, z)) return false;
   const e = comp.uniforms.VP.value.elements;
   // (the same arithmetic as Vector3.applyMatrix4, written out: this runs for every person every frame)
   let w = 1/(e[3]*x + e[7]*0 + e[11]*z + e[15]);
@@ -2051,7 +2056,7 @@ function updatePeople(dt, t){
     if (i >= PPL_MAX) return false;
     // (Vector3.applyMatrix4's arithmetic, written out; only the screen position is needed)
     const w = 1/(ve[3]*x + ve[7]*y + ve[11]*z + ve[15]), sx = (ve[0]*x + ve[4]*y + ve[8]*z + ve[12])*w, sy = (ve[1]*x + ve[5]*y + ve[9]*z + ve[13])*w;
-    if (sx < -1.1 || sx > 1.1 || sy < -1.15 || sy > 1.1) return false;
+    if ((sx < -1.1 || sx > 1.1 || sy < -1.15 || sy > 1.1) && !nearFocus(x, z)) return false;
     P[i*3] = x; P[i*3 + 1] = y; P[i*3 + 2] = z;
     Q[i*4] = raw ? row : newLook ? PG.shapeOf(row) : row & 31; Q[i*4 + 1] = frame; Q[i*4 + 2] = flip; Q[i*4 + 3] = alpha;
     i++; return true;
@@ -2156,6 +2161,7 @@ function updatePeople(dt, t){
         p.x = sp.x; p.z = sp.z; y = sp.y;
         let face = sp.face, gest = false;
         if (sp.kind === 'seat'){ y = sp.y - .09; frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4;
+          if (newLook && (p.eating === sp || sp.act === 'eat') && Math.floor(t*.22 + p.phase) % 3 > (p.eating === sp ? 0 : 1)) frame = F_SITEAT + Math.floor(t*1.6 + p.phase) % 4;   // eating what they ordered (and at a picnic, now and then)
           if (sp.act === 'holo'){ face = [sp.hx - sp.x, sp.hz - sp.z]; holoOn.push(p._holo = sp);   // watching the show
             if (!(p.emoUntil > t) && pplRand() < dt*.03) emote(p, pplRand() < .5 ? 'bang' : 'note', 2); }
           else if (sp.act){ if (sp.pic){ const pk = sp.pic.x.toFixed(2) + ',' + sp.pic.z.toFixed(2) + '|' + sp.pic.ry.toFixed(3) + '|' + sp.pic.col; picOn.add(pk); p._pic = pk; }
@@ -2173,11 +2179,13 @@ function updatePeople(dt, t){
               if (!(p.emoUntil > t) && pplRand() < dt*.05) emote(p, pplRand() < .4 ? 'note' : pplRand() < .5 ? 'heart' : 'bang', 2.2); }
             else face = null; }
           frame = gest ? F_SPEC + Math.floor(t*6 + p.phase) % 6 : F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
+          if (newLook && p.eating === sp && !gest) frame = F_EAT + Math.floor(t*1.6 + p.phase) % 4;   // standing at the counter with the bowl
         }
         if (face){ const sd = face[0]*_camR.x + face[1]*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }
       }
     }
     if (walking) frame = paused ? F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle : Math.floor(t*9*p.speed/PPL_SPEED*(p.rush ? 2 : p.hurry ? 1.5 : 1) + p.phase) % PPL.walk;
+    if (walking && newLook && p.carrying) frame = paused ? F_CARRYIDLE + Math.floor(t*2 + p.phase) % 2 : F_CARRY + frame % PPL.walk;   // a box in the arms (a parcel taken in, story.js)
     if (newLook && walking && !paused){   // running: the club crowd never does, and the pace is matched to the ground speed (one run cycle covers PG.STRIDE.run / PG.STRIDE.walk times a walk cycle)
       const sf = p.rush ? 2.3 : p.hurry ? 1.6 : p.rainRun > t ? 1.6 : 0;
       if (sf && !p.noRun && !(p.um && p.um.st >= 2)) frame = F_RUN + Math.floor(t*9*p.speed/PPL_SPEED*sf*PG.STRIDE.walk/PG.STRIDE.run + p.phase) % PPL.walk; }
@@ -2251,7 +2259,7 @@ function updatePeople(dt, t){
   const emitD = (x, y, z, frame, alpha) => {
     if (di >= DD_MAX) return false;
     _pv.set(x, y, z).applyMatrix4(VP);
-    if (_pv.x < -1.1 || _pv.x > 1.1 || _pv.y < -1.15 || _pv.y > 1.1) return false;
+    if ((_pv.x < -1.1 || _pv.x > 1.1 || _pv.y < -1.15 || _pv.y > 1.1) && !nearFocus(x, z)) return false;
     DP[di*3] = x; DP[di*3 + 1] = y; DP[di*3 + 2] = z; DQ[di*4] = 0; DQ[di*4 + 1] = frame; DQ[di*4 + 2] = 1; DQ[di*4 + 3] = alpha;
     di++; return true;
   };

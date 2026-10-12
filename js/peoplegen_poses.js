@@ -52,7 +52,7 @@
   // ---------- using a handheld (6): the near arm out in front with the device (pose.extra.device = the frame number), the other hand at the belt ----------
   const uy = [1, 0, 0, 1, 2, 2], un = [0, 0, 0, 0, 1, 1];
   for (let k = 0; k < 6; k++)
-    poses[F.USE + k] = { nearFoot: [1, 0], farFoot: [-1, 0], nearHand: [3, uy[k]], nearElbow: [1, 3], farHand: [0, 3], farElbow: [0, 2], nod: un[k], extra: { device: k } };
+    poses[F.USE + k] = { nearFoot: [1, 0], farFoot: [-1, 0], nearHand: [3, uy[k]], nearElbow: [1, 3], farHand: [0, 3], farElbow: [0, 2], nod: un[k], extra: { device: k, item: 'screen' } };
 
   // ---------- angry (6): both arms up, the fists shaking, leaning in ----------
   const angN = [[3, -3], [4, -2], [3, -3], [4, -2], [3, -3], [4, -2]], angF = [[3, -1], [2, -2], [3, -1], [2, -2], [3, -1], [2, -2]];
@@ -93,6 +93,33 @@
   const oH = [[1, 2], [3, 0], [3, -2], UH], oE = [[0, 2], [2, 2], [3, 1], UE];
   for (let k = 0; k < 4; k++)
     poses[F.UOPEN + k] = { nearFoot: [1, 0], farFoot: [-1, 0], nearHand: oH[k], nearElbow: oE[k], farHand: [0, 3], farElbow: [0, 2], headDx: (k === 1 || k === 2) ? -1 : 0, nod: 0, extra: { hand: 'umbrella', open: k } };
+
+  // ---------- the doing frames (see P.items in peoplegen.js for what's held) ----------
+  // eating standing (4): the bowl at the chest in the far hand, the chopsticks dip and come up to the mouth
+  const eN = [[2, 1], [2, 0], [1, -2], [2, 0]], eNod = [1, 0, 0, 0];
+  for (let k = 0; k < 4; k++) poses[F.EAT + k] = { nearFoot: [1, 0], farFoot: [-1, 0], nearHand: eN[k], nearElbow: [1, 2], farHand: [2, 1], farElbow: [1, 2], nod: eNod[k], bob: k === 2 ? 1 : 0, extra: { item: 'bowl' } };
+  // eating seated (4): the same, on a seat
+  for (let k = 0; k < 4; k++) poses[F.SITEAT + k] = { sit: true, nearHand: eN[k], nearElbow: [1, 2], farHand: [2, 1], farElbow: [1, 2], nod: eNod[k], extra: { item: 'bowl' } };
+  // crouching to pick something up (4): down, reach, the box in the hands, up again (played once, then CARRYIDLE)
+  const cBob = [1, 2, 3, 2], cH = [[1, 4], [2, 5], [2, 5], [2, 3]];
+  for (let k = 0; k < 4; k++) poses[F.CROUCH + k] = { nearFoot: [1, 0], farFoot: [-1, 0], bob: cBob[k], lean: 1, bend: k ? 1 : .5, nod: 1, nearHand: cH[k], nearElbow: [1, 2], farHand: [cH[k][0] - 1, cH[k][1]], farElbow: [0, 2],
+    extra: k >= 2 ? { item: 'box' } : null };
+  // walking with a box held at the chest (6): the walk's legs, both hands on the box
+  for (let k = 0; k < 6; k++){ const w = poses[F.WALK + k];
+    poses[F.CARRY + k] = { nearFoot: w.nearFoot, farFoot: w.farFoot, kneeUp: w.kneeUp, bend: 0, bob: w.bob, swing: w.swing*.6, nearHand: [2, 1], nearElbow: [1, 2], farHand: [1, 1], farElbow: [0, 2], extra: { item: 'box' } }; }
+  for (let k = 0; k < 2; k++) poses[F.CARRYIDLE + k] = { nearFoot: [1, 0], farFoot: [-1, 0], bob: k, nearHand: [2, 1], nearElbow: [1, 2], farHand: [1, 1], farElbow: [0, 2], extra: { item: 'box' } };
+  // a call on the comm (4): the near hand at the side of the head, the other hand now and then talking
+  const kF = [[0, 3], [0, 3], [2, 1], [0, 3]];
+  for (let k = 0; k < 4; k++) poses[F.COMM + k] = { nearFoot: [1, 0], farFoot: [-1, 0], nearHand: [-1, -3], nearElbow: [1, 0], farHand: kF[k], farElbow: [0, 2], nod: k === 1 ? 1 : 0, bob: k === 3 ? 1 : 0, extra: { item: 'comm' } };
+  // a wave (4): the near arm up, the hand going side to side
+  const wv = [[2, -4], [3, -5], [2, -4], [1, -5]];
+  for (let k = 0; k < 4; k++) poses[F.WAVE + k] = { nearFoot: [1, 0], farFoot: [-1, 0], nearHand: wv[k], nearElbow: [2, -1], farHand: [0, 3], farElbow: [0, 2] };
+  // a hug (2): both arms forward round someone at shoulder height, leaning in
+  for (let k = 0; k < 2; k++) poses[F.HUG + k] = { nearFoot: [2, 0], farFoot: [-1, 0], lean: 1, nod: k, nearHand: [3, 0], nearElbow: [2, 1], farHand: [3, -1], farElbow: [2, 0] };
+  // handing something over (2): the near arm out with it
+  for (let k = 0; k < 2; k++) poses[F.GIVE + k] = { nearFoot: [2, 0], farFoot: [-1, 0], nod: k, nearHand: [3, 1], nearElbow: [2, 1], farHand: [0, 3], farElbow: [0, 2], extra: { item: 'small' } };
+  // watering a plant (4): the can held out and tipped, the water falling on the last three
+  for (let k = 0; k < 4; k++) poses[F.WATER + k] = { nearFoot: [1, 0], farFoot: [-1, 0], lean: 1, nod: 1, nearHand: [1, 2], nearElbow: [1, 2], farHand: [0, 3], farElbow: [0, 2], extra: { item: 'can', pour: k } };
 
   // ---------- STRIDE: how far a planted foot travels in the sprite's own frame over a full 6-frame cycle (measured on the poses above) ----------
   // For each foot, take the pairs of consecutive frames where it is on the ground (lift 0 in both): the foot moves back by (x[k] - x[k+1]); the stride is the mean step times 6.

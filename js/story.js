@@ -443,6 +443,22 @@ const STORY = (() => {
     p.x = st.x; p.z = st.z;
     let frame = F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
     if (st.gest && Math.floor(t*.6 + p.phase) % 3 > 0) frame = F_SPEC + Math.floor(t*6 + p.phase) % 6;
+    // what the step has them doing, in its own frames (generated people only; the old sheet keeps the talk and idle frames)
+    const sc = p.scene, b = sc && sc.b, mine = b && [].concat(b.who || []).some(r => sc.cast[r] === p.id), since = t - (st.t0 ?? t);
+    if (b && PG.live() && sc.phase !== 'gather'){
+      if (b.do !== st.do0){ st.do0 = b.do; st.t0 = t; }
+      const d = b.do;
+      if (d === 'pick-up' && mine){ frame = since < 1 ? F_CROUCH + Math.min(3, Math.floor(since*4)) : F_CARRYIDLE + Math.floor(t*2 + p.phase) % 2; p.carrying = since > .6; }
+      else if (p.carrying) frame = F_CARRYIDLE + Math.floor(t*2 + p.phase) % 2;
+      else if ((d === 'eat' || d === 'picnic') && mine) frame = F_SITEAT + Math.floor(t*1.6 + p.phase) % 4;   // (an eat step seats them: see beginHold)
+      else if (d === 'phone-call' && mine) frame = F_COMM + Math.floor(t*1.5 + p.phase) % 4;
+      else if (d === 'post-feed' && mine) frame = F_USE + Math.floor(t*4 + p.phase) % 6;
+      else if (d === 'wave') frame = F_WAVE + Math.floor(t*6 + p.phase) % 4;
+      else if (d === 'hug') frame = F_HUG + Math.floor(t*1.2 + p.phase) % 2;
+      else if (d === 'hand-over' && mine) frame = since < 2 ? F_GIVE + Math.floor(t*2) % 2 : frame;
+      else if (d === 'water-plant' && mine) frame = F_WATER + Math.floor(t*3 + p.phase) % 4;
+      else if (d === 'argue' && Math.floor(t*.8 + p.phase) % 2) frame = F_ANGRY + Math.floor(t*6 + p.phase) % 6;
+    }
     if (st.face){ const sd = st.face[0]*_camR.x + st.face[1]*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }
     return { x: st.x, z: st.z, y: st.y ?? CURB, frame };
   };
@@ -524,7 +540,7 @@ const STORY = (() => {
     for (const sp of sc.spots) if (sp.by && Object.values(sc.cast).includes(sp.by)) sp.by = null;
     for (const id of Object.values(sc.cast)){
       const p = pOf(id); if (!p || p.scene !== sc) continue;
-      const st = p.sc; p.scene = null; p.sc = null;
+      const st = p.sc; p.scene = null; p.sc = null; p.carrying = false;
       if (p.walk && p.walk.scene){ const w = p.walk; p.walk = null; if (w.tgt && w.tgt.kind === 'inside'){ p.at = w.tgt.place; p.until = pplNow + 2; continue; } const e = w.pts[Math.min(w.pts.length - 1, walkSeg(w))]; if (st){ st.mode = 'out'; st.x = p.x ?? e[0]; st.z = p.z ?? e[1]; } }
       if (!st || st.mode === 'in'){ p.at = st ? st.place : p.at; p.until = pplNow + 25 + pplRand()*40; continue; }   // (in for a while: not straight back out)
       // out on the street: back to the day, from where they stand
@@ -589,6 +605,7 @@ const STORY = (() => {
     sc.b = b;
     const who = [].concat(b.who || []), withs = [].concat(b.with || []);
     for (const id of Object.values(sc.cast)){ const p = pOf(id); if (p && p.sc){ p.sc.gest = false; } }
+    if (b.do === 'carry') for (const r of who){ const p = pOf(sc.cast[r]); if (p) p.carrying = true; }   // (a box in their arms as they walk: people.js)
     if (b.indoors){   // inside, out of sight: the people in it go in where they stand, and time passes
       for (const r of who){ const p = pOf(sc.cast[r]); if (p && p.sc && p.sc.mode === 'out'){ const pl = places.get(p.at) && streetDoor(places.get(p.at)) ? places.get(p.at) : places.get(p.home); const d = streetDoor(pl); if (d) walkFrom(p, { kind: 'inside', door: d, place: pl.id }); } }
       sc.movers = who.map(r => sc.cast[r]); sc.phase = 'gather'; sc.since = pplNow; sc.anchor = null; sc.indoorHold = 14 + U(sc.id, b.id)*16;

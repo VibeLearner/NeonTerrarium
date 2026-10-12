@@ -25,7 +25,9 @@ const PG = (() => {
   // ---------- the cell, the frames ----------
   const CW = 12, CH = 16;
   // frames: the old ones keep their numbers; 32 on are new (running, the umbrella poses)
-  const F = { WALK: 0, IDLE: 6, SPEC: 10, SIT: 16, USE: 20, ANGRY: 26, RUN: 32, UWALK: 38, UIDLE: 44, UOPEN: 48, N: 52 };
+  const F = { WALK: 0, IDLE: 6, SPEC: 10, SIT: 16, USE: 20, ANGRY: 26, RUN: 32, UWALK: 38, UIDLE: 44, UOPEN: 48,
+    // (the doing frames, peoplegen_poses.js: eating standing and seated, crouching to pick something up, walking and standing with a box, a call on the comm, a wave, a hug, handing something over, watering a plant)
+    EAT: 52, SITEAT: 56, CROUCH: 60, CARRY: 64, CARRYIDLE: 70, COMM: 72, WAVE: 76, HUG: 80, GIVE: 82, WATER: 84, N: 88 };
   P.F = F; P.CW = CW; P.CH = CH;
   // the colour indices of the sheet
   const IX = { OUT: 1, SKIN: 2, SKIN2: 3, HAIR: 4, HAIR2: 5, TOP: 6, TOP2: 7, TOP3: 8, BOT: 9, BOT2: 10, LIT: 11, SHOE: 12, ACC: 13, WHITE: 14, EYE: 15 };
@@ -119,6 +121,7 @@ const PG = (() => {
   // (the umbrella poses: placeholders until the umbrella step: the walk and idle poses)
   for (let k = 0; k < 6; k++) poses[F.UWALK + k] = poses[F.WALK + k];
   for (let k = 0; k < 4; k++){ poses[F.UIDLE + k] = poses[F.IDLE + k]; poses[F.UOPEN + k] = poses[F.IDLE + k]; }
+  for (let f = F.EAT; f < F.N; f++) poses[f] = poses[F.IDLE + (f % 4)];   // (the doing frames: placeholders until peoplegen_poses.js)
   P.poses = poses;
 
   // ---------- the looks: parts and shapes (registered by peoplegen_parts.js and the files after it) ----------
@@ -150,6 +153,24 @@ const PG = (() => {
   // the head needs `room` rows above it (a hat, a bun) and one more for the outline: if a frame lifts the body too high (a tall body breathing), the upper body stays down instead
   const fitTop = (k, room) => { const d = 1 + room - (k.headTop + k.nod); if (d <= 0) return; k.headTop += d; k.shoulderY += d; k.hipY += d; k.hip[1] += d;
     k.nearSh[1] += d; k.farSh[1] += d; k.nearElbow[1] += d; k.farElbow[1] += d; k.nearHand[1] += d; k.farHand[1] += d; };
+  // the things held on the doing frames (pose.extra.item), drawn over the near arm: whole pixels, the person's own palette (WHITE for crockery and water, ACC for
+  // a box or a can, LIT for a comm's screen, which keeps its glow at night)
+  P.items = {
+    // a bowl held at the chest in the far hand, the chopsticks in the near hand (dipping, or up at the mouth)
+    bowl(c, k, e){ const b = k.farHand, h = k.nearHand; c.rect(b[0] - 1, b[1], 3, 1, IX.WHITE); c.set(b[0], b[1] + 1, IX.WHITE); c.set(b[0] - 1, b[1] - 1, IX.ACC); c.set(b[0] + 1, b[1] - 1, IX.ACC);
+      c.set(h[0] + 1, h[1] - 1, IX.SHOE); c.set(h[0] + 2, h[1] - 2, IX.SHOE); },
+    // a box in both hands (the near hand's place), its top lit by a strip of tape
+    box(c, k){ const h = k.nearHand; c.rect(h[0] - 1, h[1] - 2, 3, 3, IX.ACC); c.rect(h[0] - 1, h[1] - 2, 3, 1, IX.TOP3); c.set(h[0], h[1] - 1, IX.WHITE); },
+    // a small thing being handed over
+    small(c, k){ const h = k.nearHand; c.rect(h[0], h[1] - 1, 2, 2, IX.ACC); c.set(h[0] + 1, h[1] - 1, IX.WHITE); },
+    // a comm held out in front, its screen lit (posting, reading)
+    screen(c, k){ const h = k.nearHand; c.set(h[0] + 1, h[1] - 1, IX.LIT); c.set(h[0] + 1, h[1], IX.OUT); },
+    // a comm held to the ear: a lit sliver by the side of the head
+    comm(c, k){ const h = k.nearHand; c.set(h[0], h[1] - 1, IX.LIT); c.set(h[0], h[1], IX.OUT); },
+    // a watering can in the near hand, tipped forward; drops fall from the spout on the pouring frames
+    can(c, k, e){ const h = k.nearHand; c.rect(h[0], h[1], 2, 2, IX.ACC); c.set(h[0], h[1] - 1, IX.TOP3); c.set(h[0] + 2, h[1] + 1, IX.ACC);
+      if (e.pour){ c.set(h[0] + 2, h[1] + 2 + (e.pour === 2 ? 1 : 0), IX.WHITE); if (e.pour === 3) c.set(h[0] + 2, h[1] + 4, IX.WHITE); } }
+  };
   P.drawFigure = (c, k, look) => {
     const r = resolve(look), top = r.top, bot = r.bot;
     fitTop(k, r.room);
@@ -165,6 +186,7 @@ const PG = (() => {
     P.arm(c, k, true, top, look);
     for (let i = 0; i < r.front.length; i++) r.front[i].draw(c, k, look);
     for (let i = 0; i < r.back.length; i++) if (r.back[i].over) r.back[i].over(c, k, look);   // (a back prop's part on the front: a strap)
+    if (k.extra && k.extra.item && P.items[k.extra.item]) P.items[k.extra.item](c, k, k.extra);   // a thing in the hands on the doing frames (a bowl, a box, a comm, a can)
     if (!look.outline || look.outline === 'all') outlineFast(c); else c.outline(look.outline);
   };
   // the head: skin lit from the upper left (the jaw and chin in the shade), an eye one pixel in from the front edge, then hair, hat, face gear

@@ -1,0 +1,1268 @@
+{
+  "category": "romance",
+  "title": "Romance and dating",
+  "theme": "A first date, a crush, a breakup, a partner others do not know about, an ex reappearing. Cozy, never explicit.",
+  "storylets": [
+    {
+      "id": "rom.first-date",
+      "title": "Two people, one bowl too many",
+      "tier": "notable",
+      "note": "A first meeting at the stalls. Awkward and sweet. Chain: rom.second-date or a fizzle.",
+      "roles": {
+        "A": {
+          "desc": "an adult dressed a little better than usual",
+          "needs": [
+            "adult",
+            "single"
+          ]
+        },
+        "B": {
+          "desc": "someone A is meeting",
+          "rel": "acquaintance-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          17,
+          23
+        ],
+        "at": [
+          "stall",
+          "cafe-stool",
+          "square"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 500,
+          "city": 4
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b3",
+          "do": "eat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        },
+        {
+          "id": "b4",
+          "do": "wave",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands by the pond, smoothing a jacket, and checks a reflection in a window.",
+          "{A} waits at the edge of the square, fixing a collar twice.",
+          "{A} stays by the fountain and rolls both shoulders."
+        ],
+        "b2": [
+          "{B.desc} arrives. {A} and {B.desc} greet each other with a stiff little nod and set off together.",
+          "{A} and {B.desc} cross toward the stalls, a careful arm's length apart.",
+          "{B.desc} falls in next to {A}. They walk without saying much."
+        ],
+        "b3": [
+          "{A} and {B.desc} share a counter. {A} spills a little broth and wipes it, laughing.",
+          "They split a bowl, trading small talk between sips.",
+          "{B.desc} offers {A} the last dumpling. {A} offers it back."
+        ],
+        "b4": [
+          "{A} and {B.desc} part at the pond with a wave each, a little late to turn away.",
+          "{B.desc} waves from the corner. {A} waves back and stays there a while.",
+          "{A} lifts a hand to {B.desc} across the square, then lowers it."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.first-name",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.45,
+          "log": [
+            "Overheard: {A} says: \"So, {B.first}. How long have you lived over this side?\"",
+            "Overheard: {B.desc} says: \"Call me {B.first}. Everybody does.\""
+          ]
+        },
+        {
+          "fact": "A.plan-stated",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {A} says: \"We could do this again. Thursday, maybe, if you are free.\"",
+            "Overheard: {B.desc} says: \"Thursday works. I know a better stall near the lift.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.1
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:first-date"
+        ],
+        "branches": [
+          {
+            "w": 55,
+            "sets": [
+              "A+B:second-date"
+            ],
+            "label": "another meeting is set"
+          },
+          {
+            "w": 45,
+            "sets": [],
+            "label": "nothing follows",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "rom.second-date",
+      "title": "Thursday near the lift",
+      "tier": "texture",
+      "note": "Pays off rom.first-date. More easy than the first. Sets the pair as dating.",
+      "roles": {
+        "A": {
+          "desc": "an adult meeting someone again",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "the person from before",
+          "rel": "acquaintance-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          17,
+          23
+        ],
+        "at": [
+          "lift-base",
+          "square",
+          "stall"
+        ],
+        "requires": [
+          "A+B:second-date"
+        ],
+        "weight": 5,
+        "cooldown": {
+          "person": 600,
+          "city": 5
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "sit",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} meet at the lift base and set off together, closer this time.",
+          "{B.desc} falls in beside {A}. Their steps match after a few paces.",
+          "{A} and {B.desc} cross the square. {B.desc} points out something on a roof."
+        ],
+        "b2": [
+          "{A} and {B.desc} sit on a bench with a bag of roasted nuts between them.",
+          "{B.desc} takes a seat on the bench and {A} sits right next to {B.desc}.",
+          "They settle on a bench, shoulders almost touching."
+        ],
+        "b3": [
+          "{A} and {B.desc} talk until the lamps come up.",
+          "{B.desc} laughs at something {A} says and shakes a head.",
+          "They talk low, the street going by in front of them."
+        ]
+      },
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.1
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:dating"
+        ],
+        "branches": [
+          {
+            "w": 60,
+            "sets": [
+              "A+B:going-steady"
+            ],
+            "label": "it continues"
+          },
+          {
+            "w": 40,
+            "sets": [],
+            "label": "it ends quietly",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "rom.crush-returns",
+      "title": "The stall visited three times",
+      "tier": "texture",
+      "note": "Observation only: someone returns to the same counter over and over. No inner state is claimed.",
+      "roles": {
+        "A": {
+          "desc": "an adult in the queue",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a stall worker behind the counter",
+          "needs": [
+            "stall-keeper"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          11,
+          21
+        ],
+        "at": [
+          "stall"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 150,
+          "city": 1
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "stand",
+          "who": "A",
+          "at": "stall"
+        },
+        {
+          "id": "b3",
+          "do": "serve",
+          "who": "B",
+          "at": "stall",
+          "with": [
+            "A"
+          ]
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} joins the queue at the stall for the third time today.",
+          "{A} gets in line, checks the menu board, and orders a small tea.",
+          "{A} queues at the same counter again, hands in pockets."
+        ],
+        "b2": [
+          "{A} lingers by the counter with the cup, pretending to read the board.",
+          "{A} stays at the edge of the stall, a step from the till.",
+          "{A} loiters near the counter and looks at the pond."
+        ],
+        "b3": [
+          "{B.desc} serves {A} a second cup without being asked and says a few words.",
+          "{B.desc} slides a cup over the counter. {A} nods too many times.",
+          "{B.desc} serves {A} and gets a very quick thanks."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.habit",
+          "beat": "b1",
+          "channel": "seen",
+          "chance": 0.35,
+          "log": [
+            "{A} has been to this stall several times today.",
+            "{A} keeps returning to this counter."
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.01
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A:stall-regular"
+        ]
+      }
+    },
+    {
+      "id": "rom.flowers",
+      "title": "A bunch of something green",
+      "tier": "texture",
+      "note": "Flowers handed over at a door or a lift base. Never explained.",
+      "roles": {
+        "A": {
+          "desc": "an adult with a small bouquet",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "someone waiting at a door",
+          "rel": "partner-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          16,
+          22
+        ],
+        "at": [
+          "home-door",
+          "lift-base"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 300,
+          "city": 3
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "carry",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "home-door",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes up the walk with a handful of stems wrapped in paper.",
+          "{A} carries a small bunch of flowers up to the door, holding it low.",
+          "{A} arrives at the door, tugging the wrapping straight."
+        ],
+        "b2": [
+          "The door opens. {A} holds the bunch out. {B.desc} takes it and laughs.",
+          "{A} hands over the flowers with a small bow. {B.desc} presses a hand to a cheek.",
+          "{A} passes the stems across the threshold. {B.desc} looks at them, then at {A}."
+        ],
+        "b3": [
+          "Both go in. The door slides shut on the paper.",
+          "{B.desc} pulls {A} inside by the sleeve.",
+          "{A} and {B.desc} go in together."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.35,
+          "log": [
+            "Overheard: {B.desc} says: \"You remembered. Seven years and you still remember.\"",
+            "Overheard: {A} says: \"Happy anniversary. I stole them from the roof garden.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "rom.evening-pair",
+      "title": "A slow loop after dinner",
+      "tier": "mundane",
+      "note": "A couple walks and sits. The pair stays unlabeled until someone says something.",
+      "roles": {
+        "A": {
+          "desc": "an adult walking with someone",
+          "needs": [
+            "adult",
+            "partnered"
+          ]
+        },
+        "B": {
+          "desc": "their companion",
+          "rel": "partner-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          18,
+          23
+        ],
+        "at": [
+          "square",
+          "street",
+          "bench"
+        ],
+        "weight": 7,
+        "cooldown": {
+          "person": 48,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "sit",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} walk the square, fingers hooked together.",
+          "{A} and {B.desc} take the long way round the pond, in step.",
+          "{B.desc} loops an arm through {A}'s and steers toward the benches."
+        ],
+        "b2": [
+          "{A} and {B.desc} sit on a bench and watch the lamps flicker on.",
+          "{B.desc} takes a seat and {A} settles beside, a jacket draped over both knees.",
+          "They sit close, backs to the wall."
+        ],
+        "b3": [
+          "{A} and {B.desc} talk in low voices. {B.desc} laughs at something.",
+          "{B.desc} rests a head on {A}'s shoulder and says a few words.",
+          "They talk about nothing in particular for a good while."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.3,
+          "log": [
+            "Overheard: {A} says: \"My love, it is your turn to carry the bag home.\"",
+            "Overheard: {B.desc} says to {A}: \"Married five years and you still steal my side of the bench.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.02
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:partners-confirmed"
+        ]
+      }
+    },
+    {
+      "id": "rom.breakup",
+      "title": "The door that stayed open",
+      "tier": "notable",
+      "unwatched": true,
+      "note": "A breakup mostly happens indoors. The street sees the end of it. Hearsay carries the rest.",
+      "roles": {
+        "A": {
+          "desc": "an adult leaving with a bag",
+          "needs": [
+            "adult",
+            "partnered"
+          ]
+        },
+        "B": {
+          "desc": "a partner standing in the doorway",
+          "rel": "partner-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          14,
+          24
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 3000,
+          "city": 24
+        },
+        "pressure": {
+          "life-change": [
+            0.2,
+            1
+          ]
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "leave",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "argue",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "walk",
+          "who": "A",
+          "at": "street"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} comes out of the door with a packed bag over one shoulder.",
+          "{A} leaves the building, a jacket half on, a bag banging on {A.his} hip.",
+          "{A} steps out, a crate of belongings in both arms."
+        ],
+        "b2": [
+          "{B.desc} calls from the doorway. {A} answers without turning. Voices rise and fall.",
+          "{A} and {B.desc} argue at the step, hands cutting the air.",
+          "{B.desc} holds the door and says a few words that make {A} stop."
+        ],
+        "b3": [
+          "{A} walks off down the block and does not look back.",
+          "{A} crosses the street and keeps going.",
+          "{A} heads toward the metro with the bag held tight."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.plan-stated",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"I'll be at my sister's. Send the rest of my things there.\"",
+            "Overheard: {A} says: \"Don't call. I'll call when I'm ready.\""
+          ]
+        }
+      ],
+      "effects": {
+        "life": "breakup",
+        "warmth": [
+          [
+            "A",
+            "B",
+            -0.3
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:broke-up"
+        ]
+      },
+      "hearsay": {
+        "about": "A",
+        "speakers": [
+          "neighbor",
+          "friend",
+          "family",
+          "shopkeeper"
+        ],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} tells {L} that {A.desc} and the partner split last week. A bag, an argument, and that was that.",
+          "Overheard: {S} says to {L}: \"You heard? {A.desc} walked out of the apartment and has not been back.\"",
+          "Overheard: {S} says {A.desc} and the partner broke up and the whole block heard the shouting.",
+          "Overheard: {S} mentions to {L} that {A.desc} is on {A.his} own now."
+        ],
+        "entry": [
+          "Broke up with a partner last week (overheard: a neighbor, in conversation).",
+          "Left a shared home after an argument, per {S} (overheard, in conversation).",
+          "Ended things with a partner, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "rom.ex-reappears",
+      "title": "An old face by the pond",
+      "tier": "notable",
+      "note": "An ex crosses the square. Neither is quite sure what to do with their hands.",
+      "roles": {
+        "A": {
+          "desc": "an adult by the pond",
+          "needs": [
+            "adult"
+          ]
+        },
+        "B": {
+          "desc": "a former partner passing by",
+          "rel": "ex-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          21
+        ],
+        "at": [
+          "square",
+          "street"
+        ],
+        "weight": 2,
+        "cooldown": {
+          "person": 900,
+          "city": 8
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "square"
+        },
+        {
+          "id": "b2",
+          "do": "bump",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "square"
+        },
+        {
+          "id": "b3",
+          "do": "chat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "square"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands at the pond with a cup, looking at the water.",
+          "{A} stays by the fountain, a cup in each hand.",
+          "{A} idles near the rail, scrolling slowly."
+        ],
+        "b2": [
+          "{B.desc} rounds the stalls and nearly collides with {A}. Both freeze.",
+          "{A} turns and walks straight into {B.desc}, cup first. Both stop dead.",
+          "{B.desc} comes around a corner and halts a pace from {A}."
+        ],
+        "b3": [
+          "They talk with stiff shoulders. {B.desc} laughs once, short.",
+          "{A} and {B.desc} trade a few careful sentences and look at their feet.",
+          "{B.desc} asks something and {A} answers in a word or two."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.5,
+          "log": [
+            "Overheard: {A} says: \"It has been two years. You cut your hair.\"",
+            "Overheard: {B.desc} says: \"I did. Good to see you. I should not keep you.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.01
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:met-again"
+        ],
+        "branches": [
+          {
+            "w": 30,
+            "sets": [
+              "A+B:talked-again"
+            ],
+            "label": "they keep in touch"
+          },
+          {
+            "w": 70,
+            "sets": [],
+            "label": "just a hello",
+            "fizzle": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "rom.new-partner",
+      "title": "Hands in a coat pocket",
+      "tier": "notable",
+      "unwatched": true,
+      "note": "A new relationship starts. The watcher sees a walk; hearsay supplies the rest.",
+      "roles": {
+        "A": {
+          "desc": "an adult walking with someone new",
+          "needs": [
+            "adult",
+            "single"
+          ]
+        },
+        "B": {
+          "desc": "the companion",
+          "rel": "acquaintance-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          17,
+          24
+        ],
+        "at": [
+          "street",
+          "square"
+        ],
+        "requires": [
+          "A+B:going-steady"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 2000,
+          "city": 12
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "walk-together",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "street"
+        },
+        {
+          "id": "b2",
+          "do": "sit",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        },
+        {
+          "id": "b3",
+          "do": "hug",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} stroll the block with a hand shared between two coat pockets.",
+          "{A} and {B.desc} walk slowly, shoulders touching.",
+          "{B.desc} steers {A} around a puddle without letting go."
+        ],
+        "b2": [
+          "They sit on a bench and share a drink with two straws.",
+          "{A} sits and {B.desc} sits close, the drink passing between them.",
+          "{A} and {B.desc} take the bench by the pond."
+        ],
+        "b3": [
+          "{A} and {B.desc} hug, long and quiet.",
+          "{B.desc} pulls {A} in for a hug that lasts until the bells ring.",
+          "{A} hugs {B.desc} and then steps back, laughing."
+        ]
+      },
+      "effects": {
+        "life": "new-partner",
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.2
+          ]
+        ]
+      },
+      "next": {
+        "sets": [
+          "A+B:partners"
+        ]
+      },
+      "hearsay": {
+        "about": "A",
+        "speakers": [
+          "neighbor",
+          "friend",
+          "family",
+          "shopkeeper"
+        ],
+        "channel": "conversation",
+        "lines": [
+          "Overheard: {S} says to {L} that {A.desc} has been seeing someone new. Seen on the benches most nights.",
+          "Overheard: {S} tells {L}: \"{A.desc} is walking out with a new face. Smiling all week.\"",
+          "Overheard: {S} says {A.desc} found someone, per {S}'s own eyes.",
+          "Overheard: {S} mentions that {A.desc} is courting and the whole block knows."
+        ],
+        "entry": [
+          "Started seeing someone, as of last week (overheard: a neighbor, in conversation).",
+          "Took up with someone new, per {S} (overheard, in conversation).",
+          "Was seen on the benches with a new companion, said {S} (overheard)."
+        ]
+      }
+    },
+    {
+      "id": "rom.found-note",
+      "title": "A folded note on the bench",
+      "tier": "texture",
+      "note": "A note found, picked up, put away. Nothing is read aloud.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a bench",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          8,
+          21
+        ],
+        "at": [
+          "bench"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 400,
+          "city": 3
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "pick-up",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b3",
+          "do": "stand",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits on a bench and looks about the square.",
+          "{A} takes a seat on the bench and stretches both legs.",
+          "{A} perches at the bench edge with a cup."
+        ],
+        "b2": [
+          "{A} retrieves a folded paper from the slats and smooths it flat.",
+          "{A} picks up a small folded note from the bench and turns it over.",
+          "{A} scoops a crumpled paper from beside {A.him} and unfolds it."
+        ],
+        "b3": [
+          "{A} reads it, shrugs, and puts it in a pocket.",
+          "{A} turns away and folds the paper into a tight square.",
+          "{A} shakes {A.his} head and tucks it away."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.news",
+          "beat": "b3",
+          "channel": "conversation",
+          "chance": 0.2,
+          "log": [
+            "Overheard: {A} says to no one: \"Wrong bench, whoever you are.\"",
+            "Overheard: {A} mutters: \"Somebody's left a message for somebody else.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "rom.anniversary-dinner",
+      "title": "Dinner with a candle",
+      "tier": "texture",
+      "note": "A pair at the stalls with a gift. Anniversary or just a Thursday.",
+      "roles": {
+        "A": {
+          "desc": "an adult at dinner",
+          "needs": [
+            "adult",
+            "partnered"
+          ]
+        },
+        "B": {
+          "desc": "the dinner companion",
+          "rel": "partner-of:A"
+        }
+      },
+      "when": {
+        "hours": [
+          18,
+          23
+        ],
+        "at": [
+          "stall",
+          "cafe-stool"
+        ],
+        "weight": 3,
+        "cooldown": {
+          "person": 600,
+          "city": 4
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "queue-order",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        },
+        {
+          "id": "b2",
+          "do": "hand-over",
+          "who": "A",
+          "at": "stall",
+          "with": [
+            "B"
+          ]
+        },
+        {
+          "id": "b3",
+          "do": "eat",
+          "who": [
+            "A",
+            "B"
+          ],
+          "at": "stall"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} and {B.desc} stand at the counter, heads together over the menu.",
+          "{A} and {B.desc} order two bowls and a small cake from the board.",
+          "{B.desc} orders for both, {A} adds a plum wine."
+        ],
+        "b2": [
+          "{A} hands over a small flat box. {B.desc} opens it and stares.",
+          "{A} holds out a wrapped gift. {B.desc} turns it over twice.",
+          "{A} passes a small parcel across the counter."
+        ],
+        "b3": [
+          "They eat slowly, forks crossing in the same bowl.",
+          "{A} and {B.desc} share the cake with a single spoon.",
+          "{B.desc} eats and wears the gift before the bowl is empty."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "B.relation-to-A",
+          "beat": "b2",
+          "channel": "conversation",
+          "chance": 0.4,
+          "log": [
+            "Overheard: {A} says: \"Happy anniversary. Ten years. I counted the stalls we ate at.\"",
+            "Overheard: {B.desc} says: \"You and your counting. Come here.\""
+          ]
+        }
+      ],
+      "effects": {
+        "warmth": [
+          [
+            "A",
+            "B",
+            0.05
+          ]
+        ]
+      },
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "rom.goodnight-call",
+      "title": "A long goodnight at the door",
+      "tier": "mundane",
+      "note": "A late call that outlasts the evening. One side only.",
+      "roles": {
+        "A": {
+          "desc": "an adult on a call outside a door",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          21,
+          24
+        ],
+        "at": [
+          "home-door"
+        ],
+        "weight": 6,
+        "cooldown": {
+          "person": 60,
+          "city": 0
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "stand",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b2",
+          "do": "phone-call",
+          "who": "A",
+          "at": "home-door"
+        },
+        {
+          "id": "b3",
+          "do": "enter",
+          "who": "A",
+          "at": "home-door"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} stands outside the door, not going in.",
+          "{A} lingers on the step with a handset warm in one hand.",
+          "{A} paces the step in a small circle."
+        ],
+        "b2": [
+          "{A} takes a call, back against the doorframe, voice soft.",
+          "{A} holds the handset to one ear and smiles at the ground.",
+          "{A} listens for a long time, then laughs under {A.his} breath."
+        ],
+        "b3": [
+          "{A} goes in at last, still holding the handset.",
+          "{A} enters and the door slides shut.",
+          "{A} steps in and the light behind the door comes on."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.plan-stated",
+          "beat": "b2",
+          "channel": "phone",
+          "chance": 0.35,
+          "log": [
+            "Phone, one side: {A} says: \"Goodnight, love. I will see you at the lift at seven.\"",
+            "Phone, one side: {A} says: \"You hang up first. No, you. Fine, together.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    },
+    {
+      "id": "rom.couple-post",
+      "title": "Posted with two hands in the frame",
+      "tier": "texture",
+      "note": "A feed post that puts a partner on the record. Public, vague and performative.",
+      "roles": {
+        "A": {
+          "desc": "an adult with a handset",
+          "needs": [
+            "adult"
+          ]
+        }
+      },
+      "when": {
+        "hours": [
+          10,
+          24
+        ],
+        "at": [
+          "bench",
+          "cafe-stool"
+        ],
+        "weight": 4,
+        "cooldown": {
+          "person": 300,
+          "city": 2
+        }
+      },
+      "beats": [
+        {
+          "id": "b1",
+          "do": "sit",
+          "who": "A",
+          "at": "bench"
+        },
+        {
+          "id": "b2",
+          "do": "post-feed",
+          "who": "A",
+          "at": "bench"
+        }
+      ],
+      "log": {
+        "b1": [
+          "{A} sits on a bench and holds a handset out at arm's length.",
+          "{A} takes a seat and frames a cup in the handset.",
+          "{A} perches on the bench edge and angles the handset low."
+        ],
+        "b2": [
+          "{A} posts a picture and puts the handset face down.",
+          "{A} types a line, adds a mark, and posts.",
+          "{A} posts and shows the screen to nobody."
+        ]
+      },
+      "reveals": [
+        {
+          "fact": "A.partner",
+          "beat": "b2",
+          "channel": "feed",
+          "chance": 0.55,
+          "log": [
+            "Posted: \"Two years today. Same cafe, same stool, still the best company.\"",
+            "Posted: \"Dinner with my favorite person. Not sharing the dumplings.\""
+          ]
+        }
+      ],
+      "next": {
+        "sets": []
+      }
+    }
+  ]
+}

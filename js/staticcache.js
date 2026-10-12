@@ -269,7 +269,7 @@ function scShadowKey(out){ let k = 0; for (const v of sun.shadow.matrix.elements
 function scSame(a, b){ if (!a || !b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
 function scDelta(a, b){ let m = 0; for (let i = 0; i < a.length; i++){ const d = Math.abs(a[i] - b[i]); if (d > m) m = d; } return m; }
 SC.editsSeen = 0; SC.rects = 0; SC.lt = null;   // (rects: edits drawn as a rectangle; lt: the lights the picture was drawn with)
-SC.prev = null; SC.hard = null; SC.soft = null; SC.shk = null; SC.ok = false; SC.ox = 0; SC.oy = 0; SC.R = { x0: 0, x1: 0, y0: 0, y1: 0 }; SC.strips = 0; SC.age = 0; SC.rebuilds = 0; SC.next = null; SC.job = null; SC.K = 8; SC.flash = 0;
+SC.prev = null; SC.hard = null; SC.soft = null; SC.shk = null; SC.ok = false; SC.ox = 0; SC.oy = 0; SC.R = { x0: 0, x1: 0, y0: 0, y1: 0 }; SC.strips = 0; SC.age = 0; SC.rebuilds = 0; SC.next = null; SC.job = null; SC.K = 8; SC.flash = 0; SC.fill = null;
 
 // one background strip of the next cache: the job's own camera (where the view was when it began), the strip's rows only, the
 // lights as they were when it began
@@ -305,7 +305,7 @@ function scJobStart(px, py, hard, soft, shk, why){
 function scJobSwap(job){   // the finished strips become the cache
   const rt = SC.rtS, rn = SC.rtSN; SC.rtS = job.rt; SC.rtSN = job.rn; SC.next = { rt, rn }; SC.jobAt = performance.now();
   SC.lt = job; SC.editsSeen = job.edits;   // (a job's own fields are the lights it was drawn with)
-  SC.hard = job.hard; SC.soft = job.soft; SC.shk = job.shk; SC.ox = job.ox; SC.oy = job.oy; SC.R = { x0: job.ox, x1: job.ox + SC.w, y0: job.oy, y1: job.oy + SC.h }; SC.age = 0; SC.rebuilds++; SC.job = null;
+  SC.hard = job.hard; SC.soft = job.soft; SC.shk = job.shk; SC.ox = job.ox; SC.oy = job.oy; SC.R = { x0: job.ox, x1: job.ox + SC.w, y0: job.oy, y1: job.oy + SC.h }; SC.age = 0; SC.rebuilds++; SC.job = null; SC.fill = null;
 }
 // the static set into the cache in one go, at the view's own place
 function scFull(px, py, hard, soft, shk, why){
@@ -317,7 +317,23 @@ function scFull(px, py, hard, soft, shk, why){
   mrtEnd();
   SC.lt = scLightSnap(); SC.editsSeen = SC_EDITS; SC_DIRTY.boxes.length = 0; SC_DIRTY.unknown = false;
   SC.hard = hard.slice(); SC.soft = soft.slice(); SC.shk = shk.slice(); SC.ok = true; SC.ox = scCol(px) - SC.Muse; SC.oy = scRow(py) - SC.Muse; SC.R = { x0: SC.ox, x1: SC.ox + SC.w, y0: SC.oy, y1: SC.oy + SC.h }; SC.age = 0; SC.rebuilds++; SC.job = null; SC.flash = 6;
+  SC.fill = null;
   SC.state = 'redrawn'; SC.why = why;
+}
+// After a turn or zoom: only the view's own rectangle of the picture, drawn on the first still frame (about what a frame of the turn itself
+// draws: the same triangles, the same pixels), and the ring round it in four strips on the frames after, one a frame, while the view is drawn
+// from the cache. Drawing the whole ring at once (the view plus a margin on every side, 2.4 times the pixels and every triangle the wider
+// frustum holds) made the first still frame about twice a turn frame: the stutter at the end of a fling. Until the ring is whole, the view
+// leaving the rectangle costs a whole picture (as a fast pan always did). The test "after a turn: the whole picture at once" restores the old way.
+function scFullView(px, py, hard, soft, shk, why){
+  const M = SC.Muse, colL = scCol(px), rowB = scRow(py), ox = colL - M, oy = rowB - M;
+  SC.lt = scLightSnap(); SC.editsSeen = SC_EDITS; SC_DIRTY.boxes.length = 0; SC_DIRTY.unknown = false;
+  SC.hard = hard.slice(); SC.soft = soft.slice(); SC.shk = shk.slice(); SC.ok = true; SC.ox = ox; SC.oy = oy; SC.age = 0; SC.rebuilds++; SC.job = null; SC.flash = 6;
+  SC.R = { x0: colL, x1: colL + W, y0: rowB, y1: rowB + H };
+  scDrawRect0(colL, colL + W, rowB, rowB + H, px, py);
+  // (the columns first: a column strip is narrow and cheap; a row strip under the view holds every tall building's base)
+  SC.fill = { px, py, strips: [[ox, colL, oy, oy + SC.h], [colL + W, ox + SC.w, oy, oy + SC.h], [colL, colL + W, oy, rowB], [colL, colL + W, rowB + H, oy + SC.h]] };
+  SC.state = 'redrawn (the view; the ring follows)'; SC.why = why;
 }
 const _hA = [], _sA = [], _kA = [];
 // The color pass, drawn from the cache. False (nothing drawn) when the old path has to do it.
@@ -350,7 +366,12 @@ SC.frame = function(){
   if (SC.mode === 'every') now = 'redrawn every frame';
   else if (!SC.ok) now = 'first draw';
   else if (!scSame(hard, SC.hard)) now = 'something it depends on changed';
-  else if (scCol(px) < SC.R.x0 || scCol(px) + W > SC.R.x1 || scRow(py) < SC.R.y0 || scRow(py) + H > SC.R.y1) now = 'view left the cache';
+  else if (scCol(px) < SC.R.x0 || scCol(px) + W > SC.R.x1 || scRow(py) < SC.R.y0 || scRow(py) + H > SC.R.y1){
+    // (a pan while the ring after a turn is still being filled in: the rest of the ring now, in this frame, which is at most what the whole picture cost before)
+    if (SC.fill && scCol(px) >= SC.ox && scCol(px) + W <= SC.ox + SC.w && scRow(py) >= SC.oy && scRow(py) + H <= SC.oy + SC.h){
+      const F = SC.fill; for (const st of F.strips) scDrawRect(st[0], st[1], st[2], st[3], F.px, F.py);
+      SC.fill = null; SC.R = { x0: SC.ox, x1: SC.ox + SC.w, y0: SC.oy, y1: SC.oy + SC.h }; }
+    else now = 'view left the cache'; }
   else if (scDelta(soft, SC.soft) > SC_BIG || LIGHT_JUMP) now = 'the light jumped';
   else if (SC_EDITS !== SC.editsSeen && !scEditRect(px, py, shk, soft)) now = 'an edit: ' + SC.rectWhy;
   // Still changing from frame to frame (a turn or zoom easing in, the lights switching at dusk): the cache would be drawn again every
@@ -361,8 +382,10 @@ SC.frame = function(){
   //  (1.01 million). So after a turn the picture is drawn whole on the first still frame, as it once was; the strips stay for the light's slow drift,
   //  where nothing else is drawn the old way. The test "after a turn: the picture in strips" brings the strips back for turns.)
   const stable = scSame(hard, SC.prev); SC.prev = hard.slice();
+  let viewOnly = false;
   if (now === 'something it depends on changed' && SC.ok){
     if (!stable){ SC.state = 'off'; SC.why = 'changing: drawn the old way'; SC.job = null; return false; }
+    viewOnly = !(PH.tests.wholeAfterTurn || window.__WHOLE_AFTER_TURN);
     if (PH.tests.stripsAfterTurn || window.__STRIPS_AFTER_TURN){
       if (SC.job && (!scSame(hard, SC.job.hard) || sun.shadow.map !== SC.job.map || SC.job.edits !== SC_EDITS || !SC.job.afterTurn)) SC.job = null;
       if (!SC.job){ scJobStart(px, py, hard, soft, shk, 'after a turn or zoom');
@@ -382,7 +405,13 @@ SC.frame = function(){
     }
   }
   const lm = cam.layers.mask;
-  if (now){ scFull(px, py, hard, soft, shk, now); }
+  if (now){ if (viewOnly) scFullView(px, py, hard, soft, shk, now); else scFull(px, py, hard, soft, shk, now); }
+  else if (SC.fill){   // the ring round the view, a strip a frame (see scFullView)
+    const F = SC.fill, st = F.strips.shift();
+    scDrawRect(st[0], st[1], st[2], st[3], F.px, F.py);
+    SC.age++; SC.state = 'the ring after a turn: ' + (4 - F.strips.length) + ' of 4'; SC.why = '';
+    if (!F.strips.length){ SC.fill = null; SC.R = { x0: SC.ox, x1: SC.ox + SC.w, y0: SC.oy, y1: SC.oy + SC.h }; }
+  }
   else {
     SC.age++; SC.state = 'in use'; SC.why = '';
     // a newer cache in the background when the light has drifted, the shadow map has been swapped, or the view has used half the room
@@ -401,7 +430,7 @@ SC.frame = function(){
       }
     }
   }
-  if (!now && !PH.tests.noRing && !scExtend(px, py)){   // the strip that keeps the view inside the ring; a pan too fast for it: the whole picture
+  if (!now && !SC.fill && !PH.tests.noRing && !scExtend(px, py)){   // the strip that keeps the view inside the ring; a pan too fast for it: the whole picture
     scFull(px, py, hard, soft, shk, 'pan too fast for the ring');
   }
   // the window of it into the frame, then the live set on top

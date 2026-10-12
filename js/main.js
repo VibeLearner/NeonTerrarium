@@ -15,6 +15,10 @@ const FRAME_ERR = { n: 0, last: '' };
 // fanless laptop runs cooler (sustained full load makes it slow itself down after a few minutes, which shows as frames that come and go). Any input ends it at once.
 let IDLE_SKIP = false;
 const idleNow = now => S.idleRest && !PH.on && now - LAST_INPUT > 10000 && !dragging && !keys.size && Math.abs(yawT - yaw) < 1e-3 && Math.abs(zoomT - zoom) < 1e-3 && camT.distanceTo(camGoal) < 1e-3 && !anims.length && !STAGE_Q.length && !STAGE_READY.length && !STAGE_CHAINS.size;
+// what the hitch catcher (perfhud.js) notes with each frame: the cache, how fast the view turned, the speed classes, the shadow map, merges and tiers
+PH.state = () => 'cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + '; turned ' + (SD.dYaw*180/Math.PI).toFixed(2) + ' deg, speed classes ' + SD.hist.slice(0, 4).join('/') + ' (fastest ' + SD.top.toFixed(0) + ' px)'
+  + '; shadows ' + (LIGHT_JUMP ? 'sun jumped' : shJob ? 'strip ' + shJob.k + ' of ' + shJob.K : 'kept')
+  + '; merges waiting ' + solidDirty.size + (SOLID_JOB ? ' (one under way)' : '') + ', tier changes ' + TIER.changes + ', to free ' + DISPOSE_Q.length + '; drag ' + (dragging ? 'held' : 'off');
 function frame(now){
   requestAnimationFrame(frame);
   if (idleNow(now)){ IDLE_SKIP = !IDLE_SKIP; if (IDLE_SKIP) return; } else IDLE_SKIP = false;

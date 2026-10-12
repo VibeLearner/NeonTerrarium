@@ -59,10 +59,22 @@ const PH = (() => {
   function traceStop(){ collect(); const t = TR; TR = null; trF = null; if (el){ el.style.pointerEvents = 'auto'; el.style.visibility = ''; } return t; }   // (the card's times arrive a few frames late: the last frames' may be missing)
   const trPut = (name, ms) => { if (trF) trF.laps.push([name, Math.round(ms*100)/100]); };
   // work outside the frame (an input handler): noted against the frame being traced, under its own name
-  function outside(name, ms){ if (on && TR) trPut('outside the frame: ' + name, ms); }
+  function outside(name, ms){ if (on && trF) trPut('outside the frame: ' + name, ms); }
+  // The hitch catcher (while the overlay is open): every frame is noted as a trace frame is, the last few kept; when the gap from one frame to the next is over
+  // HITCH_MS, that frame and the ones before it are kept with the game's state (PH.state, set by main.js) and the slowest single draw of each (world.js).
+  // A frame whose script took far less than the gap lost the rest outside it: the browser, the engine's garbage collector, or waiting for the graphics card.
+  // "Copy hitches" puts them on the clipboard. (Only while the overlay is open: closed, it costs nothing.)
+  const HITCH_MS = 30, RING = [], HITCHES = []; let hitchSeen = 0;
+  const draw = { ms: 0, o: null, m: null, fn: null, n: 0, first: 0 };   // (the slowest draw of the frame being drawn: world.js PH.drawTimed; its name is made only at the frame's end)
+  function drawTimed(ms, o, m, first, fn){ draw.n++; if (first) draw.first++; if (ms > draw.ms){ draw.ms = ms; draw.o = o; draw.m = m; draw.fn = fn; } }
   function frameStart(now){
     if (!on) return;
-    if (TR){ if (trF){ trF.up = Math.round((GPUMEM.buf + GPUMEM.tex - trF.g0)/1024); trF.links = GPUMEM.links - trF.l0; trF.dels = GPUMEM.dels - trF.d0; trF.freed = Math.round((GPUMEM.freed - trF.f0)/1024); TR.push(trF); } trF = { at: now, frame: frameNo + 1, laps: [], g0: GPUMEM.buf + GPUMEM.tex, l0: GPUMEM.links, d0: GPUMEM.dels, f0: GPUMEM.freed, gpu: null }; }   // (up: what the frame sent to the card, KB)
+    if (trF){ trF.up = Math.round((GPUMEM.buf + GPUMEM.tex - trF.g0)/1024); trF.links = GPUMEM.links - trF.l0; trF.dels = GPUMEM.dels - trF.d0; trF.freed = Math.round((GPUMEM.freed - trF.f0)/1024);
+      if (TR) TR.push(trF); RING.push(trF); if (RING.length > 6) RING.shift();
+      if (lastRaf){ const d = now - lastRaf; trF.gap = Math.round(d*10)/10;
+        if (d > HITCH_MS && d < 3000){ hitchSeen++; HITCHES.push({ gap: trF.gap, at: performance.now(), frames: RING.slice(-4) }); if (HITCHES.length > 24) HITCHES.shift(); } } }
+    trF = { at: now, frame: frameNo + 1, laps: [], g0: GPUMEM.buf + GPUMEM.tex, l0: GPUMEM.links, d0: GPUMEM.dels, f0: GPUMEM.freed, gpu: null };   // (up: what the frame sent to the card, KB)
+    draw.ms = 0; draw.o = draw.m = draw.fn = null; draw.n = 0; draw.first = 0;
     if (lastRaf){ const d = now - lastRaf; if (d < 500){ put(frameMs, d); hist.push([d, shadowFrame]); if (hist.length > N) hist.shift(); } }
     lastRaf = now; frameNo++; shadowFrame = false;
     t0 = mark = performance.now();
@@ -113,7 +125,9 @@ const PH = (() => {
   function shadow(){ if (on && renderer.shadowMap.needsUpdate){ shadowFrame = true; shadowTimes.push(performance.now()); } }
   function frameEnd(){
     if (!on) return;
-    put(jsMs, performance.now() - t0); if (trF) trF.js = Math.round((performance.now() - t0)*100)/100;
+    put(jsMs, performance.now() - t0); if (trF){ trF.js = Math.round((performance.now() - t0)*100)/100; trF.draw = draw.n && draw.o ? draw.fn(draw.o, draw.m) + ' ' + draw.ms.toFixed(1) + ' ms (of ' + draw.n + ' draws, ' + draw.first + ' drawn for the first time)' : '';
+      trF.calls = info.render.calls; trF.tris = info.render.triangles; trF.progs = info.programs ? info.programs.length : 0; trF.geos = info.memory.geometries;
+      try { trF.st = (shadowFrame ? 'SHADOW MAP REDRAWN WHOLE THIS FRAME; ' : '') + (PH.state ? PH.state() : ''); } catch (e){ trF.st = 'state: ' + e.message; } }
     if (exact) put(exMs, exFrame);
     if (performance.now() - lastShow > 250){ lastShow = performance.now(); show(); }
   }
@@ -175,6 +189,23 @@ const PH = (() => {
     }
     return L.join('\n');
   }
+  function hitchText(){
+    const L = ['Neon Terrarium hitches   ' + new Date().toISOString().slice(0, 16) + '   ' + hitchSeen + ' gaps over ' + HITCH_MS + ' ms since the overlay opened (the last ' + HITCHES.length + ' below, oldest first)', ''];
+    const t0 = HITCHES.length ? HITCHES[0].at : 0;
+    for (const h of HITCHES){
+      const f = h.frames[h.frames.length - 1];
+      L.push('GAP ' + h.gap + ' ms at ' + ((h.at - t0)/1000).toFixed(1) + ' s: the frame before it ran ' + f.js + ' ms of script, so ' + Math.max(0, h.gap - f.js).toFixed(1) + ' ms went outside the script');
+      for (const g of h.frames){
+        const laps = g.laps.slice().sort((a, b) => b[1] - a[1]).slice(0, 5).map(x => x[0].trim() + ' ' + x[1].toFixed(1)).join(', ');
+        L.push('  frame ' + g.frame + (g === f ? ' (the slow one)' : '') + ': gap after ' + (g.gap === undefined ? '-' : g.gap) + ' ms, script ' + g.js + ' ms; ' + laps);
+        L.push('     sent ' + g.up + ' KB, linked ' + g.links + ', freed ' + g.dels + ' (' + g.freed + ' KB); ' + g.calls + ' draws, ' + (g.tris/1e6).toFixed(2) + 'M triangles, ' + g.progs + ' programs, ' + g.geos + ' geometries; slowest draw: ' + (g.draw || '-'));
+        if (g.st) L.push('     ' + g.st);
+      }
+      L.push('');
+    }
+    if (!HITCHES.length) L.push('(no gaps yet: play with the overlay open, then copy again)');
+    return L.join('\n');
+  }
   function show(){
     if (!el) return;
     body.textContent = text();
@@ -200,10 +231,12 @@ const PH = (() => {
     for (const k in tests){ const b = document.createElement('button'); b.style.cssText = copy.style.cssText;
       const lab = () => { b.textContent = TEST_NAMES[k] + (tests[k] ? ': on' : ': off'); };
       b.onclick = () => { setTest(k, !tests[k]); lab(); clearAll(); }; lab(); b._lab = lab; testBar.append(b); }
-    bar.append(copy, exBtn, note); el.append(graph, body, bar, testBar); document.body.appendChild(el); testBar.hidden = !exact;
+    const hc = document.createElement('button'); hc.textContent = 'Copy hitches'; hc.style.cssText = copy.style.cssText;
+    hc.onclick = () => { const t = hitchText(); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { note.textContent = 'hitches copied (' + HITCHES.length + ')'; }, () => { console.log(t); note.textContent = 'printed to the console'; }); };
+    bar.append(copy, hc, exBtn, note); el.append(graph, body, bar, testBar); document.body.appendChild(el); testBar.hidden = !exact;
   }
   function label(){ if (exBtn) exBtn.textContent = 'Exact timing: ' + (exact ? 'on' : 'off'); }
-  function clearAll(){ stats.clear(); hist.length = 0; lastRaf = 0; shadowTimes = []; gpuOf.clear(); for (const r of [frameMs, jsMs, gpuMs, shadowMs, exMs]){ r.n = 0; r.i = 0; }
+  function clearAll(){ HITCHES.length = 0; RING.length = 0; hitchSeen = 0; trF = null; stats.clear(); hist.length = 0; lastRaf = 0; shadowTimes = []; gpuOf.clear(); for (const r of [frameMs, jsMs, gpuMs, shadowMs, exMs]){ r.n = 0; r.i = 0; }
     for (const p of pending) gl.deleteQuery(p.q); pending.length = 0; }
   // (switched between frames, from a key or the button, so no pass is half timed)
   function setExact(v){ exact = !!v; if (!exact) for (const k in tests) setTest(k, false); if (testBar){ testBar.hidden = !exact; for (const b of testBar.querySelectorAll('button')) b._lab(); } clearAll(); label(); }
@@ -221,5 +254,5 @@ const PH = (() => {
   }
   addEventListener('keydown', e => { if ((e.key === 'F3' || e.key === '`') && !e.repeat && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName)){ e.preventDefault();
     if (e.shiftKey){ if (!on) toggle(); setExact(!exact); } else toggle(); } });
-  return { frameStart, abort, lap, sub, subBegin, laps, begin, end, shadow, frameEnd, toggle, setExact, text, tests, plainMat, traceStart, traceStop, outside, get on(){ return on; }, get exact(){ return exact; } };
+  return { frameStart, abort, lap, sub, subBegin, laps, begin, end, shadow, frameEnd, toggle, setExact, text, tests, plainMat, traceStart, traceStop, outside, drawTimed, hitchText, state: null, get on(){ return on; }, get exact(){ return exact; } };
 })();

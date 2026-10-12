@@ -242,18 +242,30 @@ function sideBefore(r, s, c, g){
     mdSet2(this, s1, n1, s2, n2); g.drawRange.start = 0; g.drawRange.count = n1 + n2;
   }
 }
-{ // (several ranges in one draw: three itself only draws one, so while a mesh with ranges is drawn the context's drawElements is swapped)
-  const gl = renderer.getContext(), ext = window.NO_MULTI_DRAW ? null : gl.getExtension('WEBGL_multi_draw'), rbd = renderer.renderBufferDirect;
-  renderer.renderBufferDirect = function(camera, sc, geo, mat, obj, grp){
+{ // (several ranges in one draw: three itself only draws one, so while a mesh with ranges is drawn the context's drawElements is sent to them)
+  // (The context's drawElements is replaced once, by one that looks at the mesh being drawn: it used to be set and deleted on the context object for every
+  //  such draw, a new function each time, which also turns the context into a slow dictionary object for every later call on it.)
+  const gl = renderer.getContext(), ext = window.NO_MULTI_DRAW ? null : gl.getExtension('WEBGL_multi_draw'), rbd = renderer.renderBufferDirect, de = gl.drawElements.bind(gl);
+  let MDC = null, MDB = 4;   // (the ranges of the mesh being drawn, and its index size)
+  gl.drawElements = function(mode, count, type, off){
+    const md = MDC; if (!md) return de(mode, count, type, off);
+    if (ext) ext.multiDrawElementsWEBGL(mode, md.n, 0, type, md.o, 0, md.m);
+    else for (let i = 0; i < md.m; i++) de(mode, md.n[i], type, md.s[i]*MDB);
+  };
+  // (with the overlay open, each draw is timed and the slowest of the frame noted: the hitch catcher in perfhud.js)
+  const seen = new WeakSet(), what = (o, m) => (o.name || o.type) + ' / ' + (m.name || m.type) + (o.geometry && o.geometry.index ? ' ' + Math.round(o.geometry.index.count/3) + ' tris' : '');
+  const draw = function(camera, sc, geo, mat, obj, grp){
     if (SHADOW_STRIP && geo.userData.pcs && !obj.userData.md) shadowRanges(obj, geo);   // (a shadow strip: the pieces that touch it)
     const md = obj.userData.md; if (!md) return rbd.call(this, camera, sc, geo, mat, obj, grp);
-    const bpe = geo.index.array ? geo.index.array.BYTES_PER_ELEMENT : geo.userData.bpe, n = md.m;
-    if (ext && md.bpe !== bpe){ for (let i = 0; i < n; i++) md.o[i] = md.s[i]*bpe; md.bpe = bpe; }   // (the byte offsets, once per set of ranges)
-    gl.drawElements = function(mode, count, type){
-      if (ext) ext.multiDrawElementsWEBGL(mode, md.n, 0, type, md.o, 0, n);
-      else { const f = Object.getPrototypeOf(gl).drawElements; for (let i = 0; i < n; i++) f.call(gl, mode, md.n[i], type, md.s[i]*bpe); }
-    };
-    try { return rbd.call(this, camera, sc, geo, mat, obj, grp); } finally { delete gl.drawElements; }
+    const bpe = geo.index.array ? geo.index.array.BYTES_PER_ELEMENT : geo.userData.bpe;
+    if (ext && md.bpe !== bpe){ for (let i = 0; i < md.m; i++) md.o[i] = md.s[i]*bpe; md.bpe = bpe; }   // (the byte offsets, once per set of ranges)
+    MDC = md; MDB = bpe;
+    try { return rbd.call(this, camera, sc, geo, mat, obj, grp); } finally { MDC = null; }
+  };
+  renderer.renderBufferDirect = function(camera, sc, geo, mat, obj, grp){
+    if (!PH.on) return draw.call(this, camera, sc, geo, mat, obj, grp);
+    const t = performance.now(), first = !seen.has(obj) && (seen.add(obj), true);
+    try { return draw.call(this, camera, sc, geo, mat, obj, grp); } finally { PH.drawTimed(performance.now() - t, obj, mat, first, what); }
   };
 }
 // how many of a geometry's indices are its own triangles (the copied wall slices left out)

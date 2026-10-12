@@ -66,12 +66,12 @@
         "b2": [
           "The door slides open. {B.desc} hands {A} a coil of rope and a short ladder.",
           "{B.desc} holds out a toolbox. {A} takes the handle.",
-          "{B.desc} passes {A} a power drill, cord wrapped around it."
+          "{B.desc} passes {A} a power drill, its cord wrapped around it."
         ],
         "b3": [
-          "{A} carries it off down the block, the ladder knocking the rail.",
-          "{A} hauls the load away from {place}, calling thanks over a shoulder.",
-          "{A} walks away with the rope looped over a shoulder."
+          "{A} carries the load off down the block, the ladder knocking against the rail.",
+          "{A} hauls the load away from {place}, calling thanks over {A.his} shoulder.",
+          "{A} walks away with the rope looped over one shoulder."
         ]
       },
       "reveals": [
@@ -194,7 +194,7 @@
         "b2": [
           "{A} hands the tool back. {B.desc} checks the cord twice.",
           "{A} hands over a bag of sweets and the tool.",
-          "{A} holds out the loan with a small bow. {B.desc} laughs."
+          "{A} holds out the borrowed tool with a small bow. {B.desc} laughs."
         ],
         "b3": [
           "{A} and {B.desc} chat outside {place}, then {B.desc} points down the block.",
@@ -281,8 +281,8 @@
           "{A} jabs a finger toward the ceiling. {B.desc} folds both arms."
         ],
         "b3": [
-          "{A} stamps away from {place}.",
-          "{A} turns on a heel and goes off into the night.",
+          "{A} stomps away from {place}.",
+          "{A} turns on {A.his} heel and goes off into the night.",
           "{A} walks away shaking {A.his} head."
         ]
       },
@@ -401,8 +401,8 @@
         ],
         "b3": [
           "{B.desc} nods slowly and says a few words. {A} lets out a breath.",
-          "{A} and {B.desc} talk. A hand goes out, a hand is shaken.",
-          "They speak low. The door stays open a while after."
+          "{A} and {B.desc} talk. A hand goes out and gets shaken.",
+          "They speak low. The door stays open a while afterward."
         ]
       },
       "effects": {
@@ -483,9 +483,9 @@
       ],
       "log": {
         "b1": [
-          "{B.desc} crosses the block slowly, a bag in each hand and a third on the arm.",
+          "{B.desc} crosses the block slowly, a bag in each hand and a third over one arm.",
           "{B.desc} climbs the sidewalk slope, stopping every few steps.",
-          "{B.desc} makes a slow way along the block, shopping dragging."
+          "{B.desc} makes {B.his} slow way along the block, the grocery bags dragging."
         ],
         "b2": [
           "{A} catches up and takes two of the bags without a word.",
@@ -495,7 +495,7 @@
         "b3": [
           "Both go into {place}. The door slides shut on a thank-you.",
           "{A} follows {B.desc} into {place} with the bags.",
-          "{B.desc} unlocks, and {A} goes in with the shopping."
+          "{B.desc} unlocks the door, and {A} goes in with the groceries."
         ]
       },
       "reveals": [
@@ -515,7 +515,7 @@
           "channel": "conversation",
           "chance": 0.3,
           "log": [
-            "Overheard: {A} says: \"Anytime. Call down the hall, I will hear.\""
+            "Overheard: {A} says: \"Anytime. Call down the hall. I will hear you.\""
           ]
         }
       ],
@@ -613,8 +613,8 @@
           "{A} arrives with a pot; {B.desc} and {C.desc} are already unfolding stools."
         ],
         "b2": [
-          "Bowls go round the circle. {C.desc} refuses seconds three times, then accepts.",
-          "{A} ladles a stew into mismatched bowls and hands them out.",
+          "Bowls go around the circle. {C.desc} refuses seconds three times, then accepts.",
+          "{A} ladles stew into mismatched bowls and hands them out.",
           "{B.desc} breaks a bun and passes the pieces around."
         ],
         "b3": [
@@ -630,7 +630,7 @@
           "channel": "conversation",
           "chance": 0.5,
           "log": [
-            "Overheard: {C.desc} says: \"{B.first}, you tell it, you were there.\"",
+            "Overheard: {C.desc} says: \"{B.first}, you tell it. You were there.\"",
             "Overheard: {A} calls: \"{B.first}! Bring the salt.\""
           ]
         }
@@ -717,18 +717,18 @@
         "b1": [
           "{A} steps up to the counter without looking at the board.",
           "{A} reaches the stall and holds up two fingers.",
-          "{A} gets to the front and says nothing. The keeper nods.",
+          "{A} gets to the front and says nothing. The stall keeper nods.",
           "{A} arrives at the counter and puts coins down."
         ],
         "b2": [
-          "{B.desc} serves {A}'s order before it is spoken.",
+          "{B.desc} serves {A} before the order is even spoken.",
           "{B.desc} already has the cup out. {A} grins.",
           "{B.desc} slides a bowl across the counter. {A} has not ordered yet.",
           "{B.desc} serves {A} and adds a small extra."
         ],
         "b3": [
           "{A} and {B.desc} trade three sentences about the weather and the price of noodles.",
-          "{B.desc} asks after something; {A} waves a hand and answers.",
+          "{B.desc} asks a question; {A} waves a hand and answers.",
           "They chat over the steam for a minute.",
           "{B.desc} laughs at what {A} says and wipes the counter."
         ]
@@ -750,8 +750,8 @@
           "channel": "seen",
           "chance": 0.4,
           "log": [
-            "The keeper starts {A}'s order before {A.he} says a word.",
-            "The keeper has a cup out for {A} before {A.he} reaches the counter."
+            "The stall keeper starts an order for {A} before {A.he} says a word.",
+            "The stall keeper has a cup out for {A} before {A.he} reaches the counter."
           ]
         }
       ],
@@ -933,7 +933,7 @@
           "{A} walks up to {place} with a plate and a spoon."
         ],
         "b2": [
-          "{A} knocks and waits, straightening a collar.",
+          "{A} knocks and waits, straightening {A.his} collar.",
           "{A} raps on the door and stands back with the dish held forward.",
           "{A} knocks twice. A voice answers faintly."
         ],
@@ -960,7 +960,7 @@
           "channel": "conversation",
           "chance": 0.4,
           "log": [
-            "Overheard: {A} says: \"Welcome to the block. I live just across, if you need anything.\""
+            "Overheard: {A} says: \"Welcome to the block. I live right across the hall if you need anything.\""
           ]
         }
       ],
@@ -1130,7 +1130,7 @@
         ],
         "b2": [
           "They talk about the noise from the lift and the price of broth.",
-          "{A} points down the block and {B.desc} shakes a head.",
+          "{A} points down the block, and {B.desc} shakes {B.his} head.",
           "{B.desc} says something low and {A} laughs.",
           "The two of them gossip for ten minutes, hands moving."
         ]
@@ -1142,7 +1142,7 @@
           "channel": "conversation",
           "chance": 0.3,
           "log": [
-            "Overheard: {A} says: \"They are putting a new stall on the corner. Rent is going up, mark me.\"",
+            "Overheard: {A} says: \"They are putting a new stall on the corner. Rent is going up, mark my words.\"",
             "Overheard: {B.desc} says: \"I heard the lift will be closed all of Thursday.\""
           ]
         }
@@ -1239,8 +1239,8 @@
       "log": {
         "b1": [
           "{B.desc} comes up the block holding a covered bowl level with both hands.",
-          "{B.desc} makes for {place} with a paper bag, steam in the cold air above it.",
-          "{B.desc} picks a way along the walk, a lidded pot held close."
+          "{B.desc} heads for {place} with a paper bag, steam rising from it in the cold air.",
+          "{B.desc} picks {B.his} way along the sidewalk, a lidded pot held close."
         ],
         "b2": [
           "{B.desc} knocks twice and waits, the bowl balanced on one palm.",
@@ -1248,7 +1248,7 @@
           "{B.desc} knocks with an elbow, both hands full."
         ],
         "b3": [
-          "The door slides halfway open. {A} comes out, a blanket pulled round the shoulders.",
+          "The door slides halfway open. {A} comes out, a blanket pulled around {A.his} shoulders.",
           "{A} comes out of {place} in a long cardigan, hair flat on one side.",
           "The door slides open. {A} steps out slowly, one hand on the frame."
         ],
@@ -1265,7 +1265,7 @@
         "b6": [
           "{B.desc} heads off down the block, hands in pockets now.",
           "{B.desc} walks away toward the corner without looking back.",
-          "{B.desc} goes on along the walk, lighter by one bowl."
+          "{B.desc} continues down the sidewalk, lighter by one bowl."
         ]
       },
       "reveals": [

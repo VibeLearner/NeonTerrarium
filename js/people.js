@@ -22,6 +22,7 @@
 const PPL = { rows: 17, cw: 12, ch: 16, walk: 6, idle: 4, W: 384, H: 272 };
 const F_IDLE = 6, F_SPEC = 10, F_SIT = 16, F_USE = 20, F_ANGRY = 26;
 const F_RUN = PG.F.RUN, F_UWALK = PG.F.UWALK, F_UIDLE = PG.F.UIDLE, F_UOPEN = PG.F.UOPEN;
+const F_SIDE = PG.F.SIDE, F_SIDEIDLE = PG.F.SIDEIDLE, F_HOLD = PG.F.HOLD, F_HOLDIDLE = PG.F.HOLDIDLE;
 const F_EAT = PG.F.EAT, F_SITEAT = PG.F.SITEAT, F_CROUCH = PG.F.CROUCH, F_CARRY = PG.F.CARRY, F_CARRYIDLE = PG.F.CARRYIDLE, F_COMM = PG.F.COMM, F_WAVE = PG.F.WAVE, F_HUG = PG.F.HUG, F_GIVE = PG.F.GIVE, F_WATER = PG.F.WATER;   // (the doing frames, generated people only: peoplegen_poses.js)   // (generated people only: running, and walking, standing and opening an umbrella)
 const ROW_COP = 12, ROW_BOT = 13, ROW_EMO = 14, ROW_BOUNCER = 15, ROW_HOOD = 16, CITIZEN_ROWS = 12;   // row 16: the Data Spire's hooded archivist   // row 15: the officer redrawn in red, the club's bouncers
 const EMO = { bang: 0, quest: 1, heart: 2, anger: 3, sweat: 4, note: 5, dots: 6, bowl: 7 };
@@ -787,7 +788,7 @@ function makePerson(id, home, zone){
            guard: undefined, guardShift: undefined, nightWorker: undefined, ws: undefined, wlen: undefined, walkedFor: undefined, chain: undefined, _taste: null, _tasteE: -1, _tasteD: -1,
            patrol: undefined, metro: undefined, metroPlan: undefined, ride: undefined, club: undefined, clubbing: undefined, rush: undefined,
            hurry: undefined, callout: undefined, gh: undefined, ghWalk: undefined, gy: undefined, dx: undefined, dz: undefined, pause: undefined,
-           bumpCD: undefined, zone, um: undefined, umW: undefined, rainRun: undefined, noRun: undefined, emo: undefined, emoUntil: undefined, angry: undefined, fed: undefined, eating: undefined, carrying: undefined, tries: undefined, gone: undefined };
+           bumpCD: undefined, zone, um: undefined, umW: undefined, rainRun: undefined, noRun: undefined, emo: undefined, emoUntil: undefined, angry: undefined, fed: undefined, eating: undefined, held: undefined, tries: undefined, gone: undefined };
 }
 function syncResidents(){
   const keep = new Set();
@@ -1027,6 +1028,9 @@ function startTrip(p, toId){
     if (to.mega && to.mega.kind === 'club' && p.clubbing){ tail = []; dB = null; } }   // club-goers stop outside: the queue's next (see clubArrive)
   if (!mid) mid = route(a, b); if (!mid) return false;
   const base = head.concat(mid, tail), pts = p.cop ? base : spreadPath(p, base, head.length, base.length - 1 - tail.length);
+  // out of the malls and the market with a bag now and then, carried home (peoplegen_held.js; put down on arrival)
+  if (!p.scene && !p.cop && toId === p.home && from.mega && (from.mega.kind === 'mall' || from.mega.kind === 'market') && pplRand() < .55) p.held = pplRand() < .8 ? 'bag' : 'box';
+  else if (!p.scene && from.stalls && toId === p.home && pplRand() < .25) p.held = 'food';
   const cum = [0];
   for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
   if (p.spot){ p.spot.by = null; p.spot = null; }
@@ -1102,6 +1106,7 @@ function arrive(p){
   if (w.beat){ p.at = w.to; p.patrol = w.beat; p.until = pplNow + 4 + pplRand()*7; return; }
   if (w.spot && (w.spot.kind === 'seat' || w.spot.kind === 'stand') && p.fed){ p.fed = false; p.eating = w.spot; emote(p, 'bowl', 2.8); }   // (eating: the frames with the bowl, while they stay on this spot)
   p.at = w.to; p.spot = w.spot;
+  if (p.held && !p.scene && w.to === p.home) p.held = undefined;   // (home: what they carried is put down)
   if (p.metroPlan && w.to === p.metroPlan.station && typeof mtEnter === 'function' && mtEnter(p)) return;   // at the station: up the lift to the platform (see metro.js)
   p.metroPlan = null;
   if (p.visitor && p.at === p.home){ p.gone = true; pplGoneN++; return; }   // up the lift and away
@@ -2062,6 +2067,12 @@ function updatePeople(dt, t){
     i++; return true;
   };
   // the umbrella: a second sprite in the same batch, its foot at the person's hand (set where the frame is chosen below)
+  // the thing in their hands: a sprite of its own (peoplegen_held.js), its grip at this person's hand on this frame
+  const heldFrame = f => (f >= F_CARRY && f < F_CARRYIDLE + 2) || (f >= F_SIDE && f < F_HOLDIDLE + 2) || (f >= F_GIVE && f < F_GIVE + 2) || f === F_CROUCH + 2 || f === F_CROUCH + 3;
+  const emitHeld = (p, x, y, z, frame, alpha) => {
+    if (!p.held || !newLook || alpha < .99 || !heldFrame(frame)) return; const code = PG.heldCode(p.held); if (code < 0) return;
+    const h = PG.heldHand(PG.shapeOf(p.row) & 127, frame), g = PG.heldGrip, dx = (h[0] - g[0])*PG_PXW*p.flip;
+    emit(x + _camR.x*dx, y + (g[1] - h[1])*PG_PXW, z + _camR.z*dx, code, 0, p.flip, alpha, true); };
   const emitUm = (p, x, y, z, alpha) => { const u = p.um; if (!u || !u.on || p.club) return;
     const k = u.dx*PG_PXW*p.flip; emit(x + _camR.x*k, y + u.dy*PG_PXW, z + _camR.z*k, PG.umbShape(u.v) | ((PG.shapeOf(p.row) >> 7) << 7), u.f, p.flip, alpha, true); };
   const rainK = newLook && typeof LK !== 'undefined' && LK.rainNow ? LK.rainNow() : 0;
@@ -2106,7 +2117,7 @@ function updatePeople(dt, t){
       if (Nn > 1 && (pplFrame + idx) % Nn){
         p.acc = (p.acc || 0) + dt0;
         if (p._ec){   // drawn every frame from what the last step left
-          emit(p.x, p._ey, p.z, p._er, p._ef, p.flip, p._ea); emitUm(p, p.x, p._ey, p.z, p._ea);
+          emit(p.x, p._ey, p.z, p._er, p._ef, p.flip, p._ea); emitUm(p, p.x, p._ey, p.z, p._ea); emitHeld(p, p.x, p._ey, p.z, p._ef, p._ea);
           if (p._eoOn && p.emoUntil > t) emit(p.x, p._ey + p._eo, p.z, ROW_EMO, p.emo, 1, 2); }
         if (p._holo) holoOn.push(p._holo);
         if (p._pic) picOn.add(p._pic);
@@ -2185,7 +2196,8 @@ function updatePeople(dt, t){
       }
     }
     if (walking) frame = paused ? F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle : Math.floor(t*9*p.speed/PPL_SPEED*(p.rush ? 2 : p.hurry ? 1.5 : 1) + p.phase) % PPL.walk;
-    if (walking && newLook && p.carrying) frame = paused ? F_CARRYIDLE + Math.floor(t*2 + p.phase) % 2 : F_CARRY + frame % PPL.walk;   // a box in the arms (a parcel taken in, story.js)
+    if (walking && newLook && p.held && !(p.um && p.um.on)){ const m = PG.heldMode[p.held];   // something in their hands (peoplegen_held.js): its frames, by how it's held
+      frame = paused ? (m === 'side' ? F_SIDEIDLE : m === 'hand' ? F_HOLDIDLE : F_CARRYIDLE) + Math.floor(t*2 + p.phase) % 2 : (m === 'side' ? F_SIDE : m === 'hand' ? F_HOLD : F_CARRY) + frame % PPL.walk; }
     if (newLook && walking && !paused){   // running: the club crowd never does, and the pace is matched to the ground speed (one run cycle covers PG.STRIDE.run / PG.STRIDE.walk times a walk cycle)
       const sf = p.rush ? 2.3 : p.hurry ? 1.6 : p.rainRun > t ? 1.6 : 0;
       if (sf && !p.noRun && !(p.um && p.um.st >= 2)) frame = F_RUN + Math.floor(t*9*p.speed/PPL_SPEED*sf*PG.STRIDE.walk/PG.STRIDE.run + p.phase) % PPL.walk; }
@@ -2218,7 +2230,7 @@ function updatePeople(dt, t){
     if ((p.row & 31) === ROW_HOOD && frame >= F_SPEC) frame = F_IDLE + (frame % 4);   // (the archivist has walk and idle frames only)
     p._ec = 1; p._ey = y; p._er = p.cop ? ROW_COP : p.row; p._ef = frame; p._ea = Math.max(0, alpha); p._eo = frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8; p._eoOn = alpha > .9;   // (what a frame between steps draws again)
     if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
-    emitUm(p, p.x, y, p.z, Math.max(0, alpha));
+    emitUm(p, p.x, y, p.z, Math.max(0, alpha)); emitHeld(p, p.x, y, p.z, frame, Math.max(0, alpha));
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
   }
   PH.sub('people: the loop over everyone');

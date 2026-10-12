@@ -69,10 +69,10 @@
         "b2": [
           "The door slides open. {A} and {B.desc} embrace outside, the pot held out to one side.",
           "{A} steps out and hugs {B.desc}. It goes on for a while.",
-          "{B.desc} and {A} hug in the doorway, a hand patting {A}'s back."
+          "{B.desc} hugs {A} in the doorway and pats {A.his} back."
         ],
         "b3": [
-          "Both go into {place} and the door slides closed on the pot.",
+          "Both go into {place} with the pot, and the door slides shut.",
           "{A} takes the pot and holds the door. {B.desc} goes in first.",
           "{B.desc} goes through the door with {A} close behind."
         ]
@@ -103,7 +103,7 @@
           "channel": "conversation",
           "chance": 0.2,
           "log": [
-            "Overheard: {B.desc} says to {A}: \"Everyone back home asks after you. Call more.\"",
+            "Overheard: {B.desc} says to {A}: \"Everyone back home asks after you. Call more often.\"",
             "Overheard: {A} asks: \"Did the others come? No? Next time, then.\""
           ]
         }
@@ -196,7 +196,7 @@
           "At the stall, {A} and {B.desc} point at different pictures and settle on one."
         ],
         "b3": [
-          "{A} and {B.desc} eat in silence, then {B.desc} steals a piece from {A}'s bowl.",
+          "{A} and {B.desc} eat in silence until {B.desc} steals a bite out of {A.his} bowl.",
           "{B.desc} laughs at something and nearly spills the broth. {A} slides a napkin across.",
           "{A} and {B.desc} share a stool, elbows touching, bowls steaming."
         ]
@@ -290,19 +290,19 @@
       ],
       "log": {
         "b1": [
-          "{A} comes up to {place} carrying a sack of shopping in each hand.",
+          "{A} comes up to {place} carrying a sack of groceries in each hand.",
           "{A} brings a loaded sack up to the door and knocks with a knuckle.",
           "{A} arrives at the door with a paper sack, hip against the rail."
         ],
         "b2": [
           "The door slides open. {A} hands the sack to {B.desc}.",
-          "{A} holds out the shopping. {B.desc} takes it with both hands and checks inside.",
+          "{A} holds out the groceries. {B.desc} takes them with both hands and checks inside.",
           "{A} hands over a sack and a folded slip. {B.desc} counts the change."
         ],
         "b3": [
           "{B.desc} talks at length from the doorway. {A} nods through all of it.",
           "{A} and {B.desc} chat outside {place}. {B.desc} wags a finger at one point.",
-          "{B.desc} presses something into {A}'s palm. {A} tries to give it back and fails."
+          "{B.desc} presses something into {A.his} palm. {A} tries to give it back and fails."
         ]
       },
       "reveals": [
@@ -402,13 +402,13 @@
       "log": {
         "b1": [
           "{A} crosses the square with {B.desc} swinging from one hand.",
-          "{A} and {B.desc} come along the sidewalk, {B.desc} hopping every crack.",
-          "{B.desc} drags a stick along the rail while {A} walks beside."
+          "{A} and {B.desc} come along the sidewalk, {B.desc} hopping over every crack.",
+          "{B.desc} drags a stick along the rail while {A} walks alongside."
         ],
         "b2": [
-          "{A} stops at the pond edge and {B.desc} leans over to look.",
+          "{A} stops at the edge of the pond and {B.desc} leans over to look.",
           "{A} stands with {B.desc} at the water. {B.desc} points at something.",
-          "{A} and {B.desc} linger by a planter. {A} fixes {B.desc}'s collar."
+          "{A} and {B.desc} linger by a planter. {A} fixes {B.his} collar."
         ],
         "b3": [
           "{B.desc} waves at a passing drone, over and over.",
@@ -733,7 +733,7 @@
         "b1": [
           "{A} sits on a bench and turns a cup in both hands.",
           "{A} takes a seat on the bench and stares across the square.",
-          "{A} perches on the bench edge, knee bouncing."
+          "{A} perches on the edge of the bench, knee bouncing."
         ],
         "b2": [
           "{B.desc} comes across the square slowly, hands in pockets.",
@@ -822,10 +822,10 @@
         "b1": [
           "{A} sits on a bench and takes out a comm.",
           "{A} takes a seat and thumbs a contact open.",
-          "{A} perches on the bench edge, comm in a fist."
+          "{A} perches on the edge of the bench, comm in a fist."
         ],
         "b2": [
-          "{A} takes a call and smiles in spurts. Mostly listens.",
+          "{A} takes a call and smiles now and then. Mostly listens.",
           "{A} holds the comm to one ear and rubs the back of {A.his} neck.",
           "{A} talks softly into the comm and nods at nothing."
         ]
@@ -1023,13 +1023,13 @@
       ],
       "log": {
         "b1": [
-          "{A} steps off a dropoff lift with a battered bag over one shoulder.",
-          "{A} comes down the lift, looks up at the towers, and walks on.",
+          "{A} steps off a drop-off lift with a battered bag over one shoulder.",
+          "{A} rides the lift down, looks up at the towers, and walks on.",
           "{A} arrives at the drop-off alone, a coat over {A.his} arm."
         ],
         "b2": [
           "{B.desc} jogs up. {A} and {B.desc} hug, bag swinging.",
-          "{B.desc} spots {A} and waves. They embrace at the lift base.",
+          "{B.desc} spots {A} and waves. They embrace at the foot of the lift.",
           "{A} and {B.desc} hug, then hold each other at arm's length."
         ],
         "b3": [
@@ -1147,8 +1147,8 @@
       ],
       "log": {
         "b1": [
-          "{B.desc} knocks at the door. Three taps, a pause, three more.",
-          "{B.desc} raps at {place} and steps back to wait.",
+          "{B.desc} knocks on the door. Three taps, a pause, three more.",
+          "{B.desc} raps on the door of {place} and steps back to wait.",
           "{B.desc} knocks and calls through the panel."
         ],
         "b2": [
@@ -1210,7 +1210,7 @@
         "lines": [
           "Overheard: {S} tells {L} that {A.desc} has stopped speaking to the family. The door stays shut when they visit.",
           "Overheard: {S} says to {L}: \"{A.desc} won't open the door to {A.his} own parent. Not a word of why.\"",
-          "Overheard: {S} says {A.desc} and the family had a falling out last year and it has not healed.",
+          "Overheard: {S} says {A.desc} and the family had a falling-out last year, and it has not healed.",
           "Overheard: {S} mentions that {A.desc} cut off the family some months ago."
         ],
         "entry": [
@@ -1291,7 +1291,7 @@
         "b3": [
           "{B.desc} pulls {A} into a hug and the parcel is crushed between them.",
           "{A} and {B.desc} hug in the doorway, laughing.",
-          "{B.desc} embraces {A}, then steps back and tears the ribbon open."
+          "{B.desc} embraces {A}, then steps back and tears off the ribbon."
         ]
       },
       "reveals": [

@@ -56,17 +56,17 @@
       "log": {
         "b1": [
           "{A} stands at the station entrance and studies the fresh paint on the sign.",
-          "{A} lingers at the new line's mouth with hands in pockets.",
+          "{A} lingers at the mouth of the new line, hands in {A.his} pockets.",
           "{A} stops in front of the entrance and reads the route map twice."
         ],
         "b2": [
           "{A} points at the line map and traces it with one finger.",
           "{A} gestures toward the stairwell and the lit mouth below.",
-          "{A} indicates the new line to a passerby and shrugs."
+          "{A} points out the new line to a passerby and shrugs."
         ],
         "b3": [
           "{A} boards a train on the new line and the doors hiss shut.",
-          "{A} rides down and the train pulls out.",
+          "{A} rides down to the platform, and the train pulls out.",
           "{A} takes the first train on the line and is gone."
         ]
       },
@@ -140,18 +140,18 @@
       "log": {
         "b1": [
           "{A} turns a corner and slows at the glow of a new sign.",
-          "{A} walks toward a freshly lit entrance, craning.",
+          "{A} walks toward a freshly lit entrance, craning {A.his} neck.",
           "{A} drifts toward the club door, drawn by the thump."
         ],
         "b2": [
-          "{A} points up at the neon letters and says something to nobody.",
+          "{A} points up at the neon letters and says something to no one in particular.",
           "{A} gestures toward the door and the door staff.",
           "{A} points at a poster by the door and tilts {A.his} head."
         ],
         "b3": [
           "{A} joins the rope line, eyes on the door.",
-          "{A} takes a place at the end of the rope.",
-          "{A} steps into the queue and checks the time."
+          "{A} takes a place at the end of the rope line.",
+          "{A} steps into the line and checks the time."
         ]
       },
       "next": {
@@ -222,21 +222,21 @@
       "log": {
         "b1": [
           "{A} joins a line at the newest stall, craning to read the board.",
-          "{A} queues behind six others and sniffs the air.",
+          "{A} lines up behind six others and sniffs the air.",
           "{A} waits in the stall line and counts the people ahead.",
           "{A} reaches the counter and points at the first picture."
         ],
         "b2": [
-          "{B.desc} ladles something fragrant and slides it across.",
+          "{B.desc} ladles out something fragrant and slides it across the counter.",
           "{B.desc} serves {A} a bowl and a spoon and says a price.",
           "{B.desc} hands over the first bowl with a small flourish.",
-          "{B.desc} serves up quick and moves on to the next."
+          "{B.desc} serves quickly and moves on to the next customer."
         ],
         "b3": [
           "{A} takes a first mouthful and goes quiet.",
           "{A} eats standing and nods slowly at the bowl.",
-          "{A} blows on the broth and samples the edge.",
-          "{A} eats with eyebrows high."
+          "{A} blows on the broth and sips from the edge of the bowl.",
+          "{A} eats with {A.his} eyebrows raised."
         ]
       },
       "next": {
@@ -298,7 +298,7 @@
           "{A} rides the lift up. The cab shrinks against the towers.",
           "{A} takes the lift and the doors slide shut.",
           "{A} steps in and rides the lift to the terrace.",
-          "{A} boards the cab and goes up in a hum."
+          "{A} boards the cab and goes up with a hum."
         ]
       },
       "next": {
@@ -358,14 +358,14 @@
       ],
       "log": {
         "b1": [
-          "{A} stands at the lawn edge and prods the grass with a toe.",
+          "{A} stands at the edge of the lawn and prods the grass with a toe.",
           "{A} steps onto the new lawn and looks around.",
           "{A} halts at the grass and crouches to touch it."
         ],
         "b2": [
-          "{A} points at a young sapling and says something to a stranger.",
+          "{A} points at a sapling and says something to a stranger.",
           "{A} gestures toward the hologram projector.",
-          "{A} indicates a good patch under a tree."
+          "{A} points out a good patch under a tree."
         ],
         "b3": [
           "{A} spreads a blanket on the new grass.",
@@ -426,11 +426,11 @@
           "{A} walks around a new bench and taps it with a knuckle.",
           "{A} stands over the bench and reads the plaque.",
           "{A} stops at the new bench and wipes the slats.",
-          "{A} stays at the bench's end and checks the finish."
+          "{A} stays at the end of the bench and checks the finish."
         ],
         "b2": [
           "{A} sits and leans back with a long exhale.",
-          "{A} takes a seat and stretches both legs.",
+          "{A} takes a seat and stretches out both legs.",
           "{A} eases onto the bench and watches the square.",
           "{A} perches on the new bench and unwraps a snack."
         ]
@@ -491,12 +491,12 @@
       ],
       "log": {
         "b1": [
-          "{A} steps off the lift at the new dropoff with a bag over a shoulder.",
+          "{A} steps off the lift at the new dropoff with a bag over one shoulder.",
           "{A} comes down to the pad and glances at the sign.",
           "{A} arrives at the dropoff with a cup in each hand."
         ],
         "b2": [
-          "{A} stands on the pad and gets bearings by the Data Spire.",
+          "{A} stands on the pad and gets {A.his} bearings by the Data Spire.",
           "{A} stays at the base of the lift and scans the street.",
           "{A} halts and looks up, then along the block."
         ],
@@ -570,7 +570,7 @@
         "b2": [
           "{A} points at the pattern in the paving and traces it with a toe.",
           "{A} gestures toward the koi pond.",
-          "{A} indicates a light fixture and says a word aloud.",
+          "{A} points to a light fixture and says something aloud.",
           "{A} points out a sapling to a passing stranger."
         ],
         "b3": [
@@ -643,7 +643,7 @@
           "{A} stands before a cleared lot with a crate at {A.his} feet."
         ],
         "b2": [
-          "{A} gathers belongings into crates on the bare ground.",
+          "{A} gathers {A.his} belongings into crates on the bare ground.",
           "{A} ties a rolled mattress with cord and hoists it onto one shoulder.",
           "{A} carries a lamp and a bundle of clothes from the rubble."
         ],
@@ -693,9 +693,9 @@
         ],
         "channel": "conversation",
         "lines": [
-          "Overheard: {S} says to {L} that {A.desc} lost the apartment when the building came down. A week's notice and gone.",
+          "Overheard: {S} says to {L} that {A.desc} lost {A.his} apartment when the building came down. A week's notice and gone.",
           "Overheard: {S} tells {L}: \"{A.desc} was living in that block they tore down. Hasn't been seen since.\"",
-          "Overheard: {S} says {A.desc} lost the place to the demolition and is staying with someone.",
+          "Overheard: {S} says {A.desc} lost {A.his} place to the demolition and is staying with someone now.",
           "Overheard: {S} mentions to {L} that {A.desc} had to clear out before the demolition."
         ],
         "entry": [
@@ -759,16 +759,16 @@
         "b1": [
           "{A} comes along the block and slows at a gap in the row.",
           "{A} turns a corner and stops at a cleared plot.",
-          "{A} arrives at the lot with a hand over the mouth."
+          "{A} arrives at the lot with a hand over {A.his} mouth."
         ],
         "b2": [
-          "{A} stands at the edge of the bare ground a long while.",
-          "{A} stays where the door used to be, hands at sides.",
-          "{A} lingers at the lot's fence with eyes lowered."
+          "{A} stands at the edge of the bare ground for a long while.",
+          "{A} stays where the door used to be, hands at {A.his} sides.",
+          "{A} lingers at the fence around the lot, eyes lowered."
         ],
         "b3": [
           "{A} bends and picks up a small ceramic shard from the dirt.",
-          "{A} retrieves a bent key from the rubble and puts it in a pocket.",
+          "{A} pulls a bent key from the rubble and pockets it.",
           "{A} scoops up a handful of tiles and turns them over."
         ]
       },
@@ -859,7 +859,7 @@
       "log": {
         "b1": [
           "{A} arrives at {place}, reading a number off a slip.",
-          "{A} comes up to {place} with a key held in a fist.",
+          "{A} comes up to {place} with a key in {A.his} fist.",
           "{A} approaches {place} and checks the slip once more."
         ],
         "b2": [
@@ -868,7 +868,7 @@
           "{A} carries a lamp and a rolled mat to the threshold."
         ],
         "b3": [
-          "{A} goes into {place}. The door slides shut behind a crate.",
+          "{A} goes into {place} with a crate. The door slides shut behind {A.him}.",
           "{A} enters {place} and a light inside flicks on.",
           "{A} steps into {place} with the crate and the door slides closed."
         ]
@@ -900,7 +900,7 @@
         "lines": [
           "Overheard: {S} says to {L} that {A.desc} found a new place over by the lift. Smaller, but dry.",
           "Overheard: {S} tells {L}: \"{A.desc} has a new address. Moved last week.\"",
-          "Overheard: {S} says {A.desc} is settled in somewhere else after the demolition.",
+          "Overheard: {S} says {A.desc} has settled in somewhere else since the demolition.",
           "Overheard: {S} mentions that {A.desc} took a room across the district."
         ],
         "entry": [
@@ -970,13 +970,13 @@
           "{A} turns the corner with a bag and stops short."
         ],
         "b2": [
-          "{A} stands at bare ground where a building used to be.",
+          "{A} stands at a patch of bare ground where a building used to be.",
           "{A} stays at a cleared lot, tin hanging from one hand.",
           "{A} stands before a stretch of fence and looks up."
         ],
         "b3": [
           "{A} reads a printed sheet stuck to the fence, twice.",
-          "{A} reads the notice and rubs the back of the neck.",
+          "{A} reads the notice and rubs the back of {A.his} neck.",
           "{A} studies a stamped notice taped to the barrier."
         ]
       },
@@ -1020,13 +1020,13 @@
         ],
         "channel": "conversation",
         "lines": [
-          "Overheard: {S} says to {L} that {A.desc} lost the job when the whole place was torn down.",
-          "Overheard: {S} tells {L}: \"{A.desc}'s workplace is gone. Cleared. Nothing but a fence.\"",
-          "Overheard: {S} says {A.desc} is out of work since the closure.",
-          "Overheard: {S} mentions that {A.desc} lost the job when the place shut for good."
+          "Overheard: {S} says to {L} that {A.desc} lost {A.his} job when the whole place was torn down.",
+          "Overheard: {S} tells {L}: \"The place {A.desc} worked is gone. Cleared. Nothing but a fence.\"",
+          "Overheard: {S} says {A.desc} has been out of work since the closure.",
+          "Overheard: {S} mentions that {A.desc} lost {A.his} job when the place shut for good."
         ],
         "entry": [
-          "Lost the job when the workplace closed (overheard: a neighbor, in conversation).",
+          "Lost a job when the workplace closed (overheard: a neighbor, in conversation).",
           "Found the workplace cleared away, per {S} (overheard, in conversation).",
           "Lost work in the closure, said {S} (overheard)."
         ]
@@ -1131,7 +1131,7 @@
         ],
         "channel": "conversation",
         "lines": [
-          "Overheard: {S} says to {L} that {A.desc} just got to the city and is still finding the way around.",
+          "Overheard: {S} says to {L} that {A.desc} just got to the city and is still finding {A.his} way around.",
           "Overheard: {S} tells {L}: \"New in town. {A.desc}. Walks around with a map.\"",
           "Overheard: {S} says {A.desc} moved here from elsewhere only last week.",
           "Overheard: {S} mentions that {A.desc} is brand new to the district."
@@ -1207,14 +1207,14 @@
           "{A} perches on an upturned crate outside {place} and sips."
         ],
         "b2": [
-          "{B.desc} hauls a crate to the next door along, then another.",
+          "{B.desc} hauls a crate to the next door down, then another.",
           "{B.desc} backs through a door with a lamp and a rolled rug.",
           "{B.desc} carries a box to a door down the row and sets it down."
         ],
         "b3": [
           "{A} waves. {B.desc} waves back with a free hand and nearly drops the crate.",
           "{A} lifts a hand to {B.desc} across the landing.",
-          "{A} waves once at {B.desc} and goes back to the cup."
+          "{A} waves once at {B.desc} and goes back to {A.his} cup."
         ]
       },
       "reveals": [
@@ -1295,7 +1295,7 @@
       ],
       "log": {
         "b1": [
-          "{A} reads a sheet pinned to the board with a finger tracing the lines.",
+          "{A} reads a sheet pinned to the board, a finger tracing the lines.",
           "{A} stops at the notice board and reads from top to bottom.",
           "{A} scans a printed bulletin and taps the corner."
         ],
@@ -1384,7 +1384,7 @@
         "b2": [
           "{A} points at a cargo drone overhead and says something aloud.",
           "{A} gestures toward a beam swinging under a drone.",
-          "{A} indicates the half-built frame to a passing stranger.",
+          "{A} points out the half-built frame to a passing stranger.",
           "{A} points at a pair of workers on a gantry."
         ],
         "b3": [

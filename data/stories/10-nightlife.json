@@ -56,15 +56,15 @@
       ],
       "log": {
         "b1": [
-          "{A} and {B.desc} join the rope line, twenty back from the door.",
+          "{A} and {B.desc} join the rope line, twenty people back from the door.",
           "{A} and {B.desc} take a spot at the rope. The line shuffles.",
           "{A} and {B.desc} fall in behind a tall figure in a neon jacket.",
-          "{B.desc} drags {A} to the end of the rope and crosses both arms."
+          "{B.desc} drags {A} to the end of the rope line and crosses {B.his} arms."
         ],
         "b2": [
           "{A} and {B.desc} talk over the thump from inside, heads close.",
           "{B.desc} shows {A} something on a comm and they both laugh.",
-          "{A} jokes with {B.desc} and swaps a cup of something warm.",
+          "{A} jokes with {B.desc}, and the two pass a cup of something warm back and forth.",
           "{B.desc} bounces on the balls of {B.his} feet and chatters."
         ]
       },
@@ -75,7 +75,7 @@
           "channel": "conversation",
           "chance": 0.35,
           "log": [
-            "Overheard: {A} says: \"{B.first}, stop bouncing, we are not that late.\"",
+            "Overheard: {A} says: \"{B.first}, stop bouncing. We are not that late.\"",
             "Overheard: {A} says: \"Ten more minutes, {B.first}. Then we try the kiosk.\""
           ]
         }
@@ -139,7 +139,7 @@
       ],
       "log": {
         "b1": [
-          "{A} arrives at the end of the rope and is already looking at the door.",
+          "{A} reaches the end of the rope, eyes already on the door.",
           "{A} approaches the rope with a casual stride and a half wave.",
           "{A} comes up to the club, collar high, eyes on the bouncers.",
           "{A} strolls up the walk, hands in pockets."
@@ -234,13 +234,13 @@
           "{A} is shoved back a step by a bouncer and told to move on."
         ],
         "b2": [
-          "{B.desc} catches up with {A} and talks fast, a hand on {A}'s sleeve.",
+          "{B.desc} catches up with {A} and talks fast, a hand on {A.his} sleeve.",
           "{A} says something and {B.desc} answers with a flat laugh.",
           "{B.desc} points down the block and tries a smile."
         ],
         "b3": [
           "{A} and {B.desc} walk off into the dark, {B.desc} talking the whole way.",
-          "{A} lets {B.desc} steer away from the door. Neither looks back.",
+          "{A} lets {B.desc} steer {A.him} away from the door. Neither looks back.",
           "The two of them head down the street side by side."
         ]
       },
@@ -332,12 +332,12 @@
       ],
       "log": {
         "b1": [
-          "{A} comes up to the rope, straightening a jacket twice.",
-          "{A} arrives and tugs at a sleeve. The line is short.",
+          "{A} comes up to the rope, straightening {A.his} jacket twice.",
+          "{A} arrives and tugs at {A.his} sleeve. The line is short.",
           "{A} walks to the rope with careful steps."
         ],
         "b2": [
-          "The bouncer looks {A} over, then lifts the rope. {A} goes in, quick.",
+          "The bouncer looks {A} over, then lifts the rope. {A} goes in quickly.",
           "{A} is admitted. A small fist pump on the way through the door.",
           "The door staff let {A} in without a word."
         ]
@@ -398,7 +398,7 @@
       "log": {
         "b1": [
           "{A} comes out of the club door in a rush of bass and steam.",
-          "{A} leaves the club, jacket over a shoulder, grinning.",
+          "{A} leaves the club, jacket over one shoulder, grinning.",
           "{A} emerges from the club door and blinks at the street."
         ],
         "b2": [
@@ -468,9 +468,9 @@
       ],
       "log": {
         "b1": [
-          "{A} comes out of the club door fast, hand over the mouth.",
+          "{A} comes out of the club door fast, a hand over {A.his} mouth.",
           "{A} stumbles out of the door and heads for the curb.",
-          "{A} leaves the club at speed, one hand on the wall."
+          "{A} leaves the club in a hurry, one hand on the wall."
         ],
         "b2": [
           "{A} bends over the gutter and is sick.",
@@ -478,9 +478,9 @@
           "{A} throws up beside a drain, hands on knees."
         ],
         "b3": [
-          "{B.desc} pats {A}'s back, hands over a cup of water, and steers {A} away.",
-          "{B.desc} takes {A}'s arm and the two shuffle off together.",
-          "{B.desc} drapes a jacket over {A} and walks {A} toward the metro."
+          "{B.desc} pats {A} on the back, hands over a cup of water, and steers {A.him} away.",
+          "{B.desc} takes {A} by the arm, and the two shuffle off together.",
+          "{B.desc} drapes a jacket over {A} and walks {A.him} toward the metro."
         ]
       },
       "reveals": [
@@ -560,10 +560,10 @@
         "b1": [
           "Two bouncers walk {A} out of the club door, one on each arm.",
           "{A} is ejected from the club and set down on the sidewalk.",
-          "Door staff escort {A} off the step and release {A.his} sleeves."
+          "Door staff escort {A} off the step and let go of {A.his} sleeves."
         ],
         "b2": [
-          "{A} stands on the sidewalk and straightens a collar with great dignity.",
+          "{A} stands on the sidewalk and straightens {A.his} collar with great dignity.",
           "{A} stays at the curb, arms spread, saying something to the door.",
           "{A} lingers, then points at the club and shouts."
         ],
@@ -667,7 +667,7 @@
           "{B.desc} slides a glass across without a word.",
           "{B.desc} serves {A} and wipes a ring from the counter.",
           "{B.desc} pours it slowly and sets it down.",
-          "{B.desc} serves up the drink and taps the till."
+          "{B.desc} serves up the drink and taps the register."
         ],
         "b3": [
           "{A} drinks standing, one elbow on the counter.",
@@ -748,15 +748,15 @@
         ],
         "b2": [
           "{A} stops under a lantern and looks up at the buildings.",
-          "{A} stays at a crossing and watches the sky highway lights far overhead.",
+          "{A} pauses at a crosswalk and watches the sky highway lights far overhead.",
           "{A} stands at the corner and rubs both arms.",
           "{A} lingers by a vending machine for a moment."
         ],
         "b3": [
           "{A} goes into {place} with the hood still up. The door slides shut.",
           "{A} reaches {place} and enters.",
-          "{A} steps inside and the light behind the panel goes on.",
-          "{A} arrives at {place}, stops a moment, and goes in."
+          "{A} steps inside, and the light behind the panel comes on.",
+          "{A} arrives at {place}, stops for a moment, and goes in."
         ]
       },
       "reveals": [
@@ -825,10 +825,10 @@
           "{A} arrives early, rolling both shoulders."
         ],
         "b2": [
-          "{A} keys a lock on the dome's flank and goes in.",
+          "{A} unlocks a side door of the dome and goes in.",
           "{A} swipes a badge at the club door and enters.",
           "{A} slips into the dome, still yawning.",
-          "{A} enters through the club door and it slides shut."
+          "{A} enters through the club door, which slides shut behind {A.him}."
         ]
       },
       "reveals": [
@@ -902,8 +902,8 @@
       ],
       "log": {
         "b1": [
-          "{A} stands at the drop-off with hands in pockets and the neon behind.",
-          "{A} lingers at the lift base, glancing at the sky.",
+          "{A} stands at the drop-off, hands in pockets, the neon behind {A.him}.",
+          "{A} lingers at the foot of the lift, glancing at the sky.",
           "{A} waits near the drop-off sign."
         ],
         "b2": [
@@ -985,12 +985,12 @@
       ],
       "log": {
         "b1": [
-          "{B.desc} takes most of {A}'s weight and steers down the block.",
+          "{B.desc} props {A} up and steers {A.him} down the block.",
           "{A} leans heavily on {B.desc} all the way along the wall.",
           "{B.desc} half carries {A} past the closed stalls."
         ],
         "b2": [
-          "They stop at a bench. {A} sits with eyes shut, {B.desc} standing guard.",
+          "They stop at a bench. {A} sits with {A.his} eyes shut while {B.desc} stands guard.",
           "{B.desc} lowers {A} onto a bench and hands over water.",
           "{A} slumps on the bench while {B.desc} checks a comm."
         ],

@@ -186,7 +186,7 @@
       ],
       "log": {
         "b1": [
-          "{A} and {B.desc} stand either side of a chalk mark on the stone.",
+          "{A} and {B.desc} stand on either side of a chalk mark on the stone.",
           "{B.desc} and {A} face each other across a fresh chalk line.",
           "{A} stands by the pond. {B.desc} stands a pace away with a stick of chalk."
         ],
@@ -274,13 +274,13 @@
       "log": {
         "b1": [
           "{A} waits in line at the counter, a comm in one hand.",
-          "{A} stands third in the stall queue, reading the menu.",
-          "{A} queues at the stall, shifting from foot to foot."
+          "{A} stands third in line at the stall, reading the menu.",
+          "{A} waits at the back of the line at the stall, shifting from foot to foot."
         ],
         "b2": [
           "{B.desc} slides into line ahead of {A}, shoulder first.",
           "{B.desc} steps in front of {A} and orders without looking back.",
-          "{B.desc} cuts the queue and nudges {A} aside."
+          "{B.desc} cuts in line and nudges {A} aside."
         ],
         "b3": [
           "{A} says something sharp. {B.desc} shrugs it off. {A} shakes {A.his} head.",
@@ -366,7 +366,7 @@
       "log": {
         "b1": [
           "{A} stands outside {place}, badge held in one fist.",
-          "{A} waits by the door of {place} with arms crossed and jaw set.",
+          "{A} waits by the door of {place}, arms crossed and jaw set.",
           "{A} lingers at the door, shifting a bag from shoulder to shoulder."
         ],
         "b2": [
@@ -377,7 +377,7 @@
         "b3": [
           "{B.desc} goes in first and lets the door slide shut on {A}.",
           "{B.desc} enters and does not hold the door.",
-          "{B.desc} steps through the door and it closes behind."
+          "{B.desc} steps through the door and lets it close."
         ]
       },
       "reveals": [
@@ -473,10 +473,10 @@
         "b1": [
           "{A} cuts across the square, hands in pockets.",
           "{A} walks the south side at a steady pace.",
-          "{A} heads for the stalls with eyes on the ground."
+          "{A} heads for the stalls, eyes on the ground."
         ],
         "b2": [
-          "{B.desc} stands by the pond with arms folded and watches {A} cross.",
+          "{B.desc} stands by the pond, arms folded, and watches {A} cross.",
           "{B.desc} stays still at the rail, turning to follow {A}.",
           "{B.desc} idles at the planter edge with a hard stare."
         ],
@@ -567,7 +567,7 @@
         "b3": [
           "{A} shakes {A.his} head, turns away, and goes back the way {A.he} came.",
           "{A} drops the hand, shrugs, and turns away.",
-          "{A} turns on a heel and leaves, the fist opening slowly."
+          "{A} turns on {A.his} heel and leaves, the fist opening slowly."
         ]
       },
       "next": {
@@ -641,8 +641,8 @@
       ],
       "log": {
         "b1": [
-          "{A} stands at a stall counter and counts coins into a palm.",
-          "{A} queues for a bowl, thumbing a short stack of notes.",
+          "{A} stands at a stall counter and counts coins into {A.his} palm.",
+          "{A} waits in line for a bowl, thumbing a short stack of notes.",
           "{A} reaches the counter and pats a pocket twice."
         ],
         "b2": [
@@ -653,7 +653,7 @@
         "b3": [
           "{A} hands over a few notes. {B.desc} counts them and frowns.",
           "{A} holds out a small fold of cash. {B.desc} takes it without a word.",
-          "{A} passes {B.desc} what is in the pocket and nothing more."
+          "{A} passes {B.desc} what is in {A.his} pocket and nothing more."
         ]
       },
       "reveals": [
@@ -844,7 +844,7 @@
       ],
       "log": {
         "b1": [
-          "{A} sits on a bench with jaw set and a thumb moving fast.",
+          "{A} sits on a bench, jaw set, one thumb moving fast.",
           "{A} takes a seat and types with both thumbs, hard.",
           "{A} perches on the bench edge, scrolling with a scowl."
         ],

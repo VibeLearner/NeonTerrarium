@@ -48,14 +48,14 @@
         "b1": [
           "{A} sits on a bench and watches the square go by.",
           "{A} takes a bench seat and stays for a long while.",
-          "{A} lowers {A.him}self onto the slats and does not move.",
-          "{A} sits, hands on knees, eyes half closed."
+          "{A} sinks onto the slats and does not move.",
+          "{A} sits, hands on {A.his} knees, eyes half closed."
         ],
         "b2": [
           "{A} stands, stretches, and sits down again.",
-          "{A} gets up at last and walks one slow lap of the bench.",
+          "{A} gets up at last and walks one slow lap around the bench.",
           "{A} rises, rolls both shoulders, and looks up at the sky highway.",
-          "{A} stands and brushes off the coat."
+          "{A} stands and brushes off {A.his} coat."
         ]
       },
       "next": {
@@ -105,16 +105,16 @@
       ],
       "log": {
         "b1": [
-          "{A} stands at the pond edge and watches the surface.",
+          "{A} stands at the edge of the pond and watches the surface.",
           "{A} stops by the water and stays there.",
-          "{A} lingers at the rail, chin on hands.",
-          "{A} stands at the koi pond's lip with hands in pockets."
+          "{A} lingers at the rail, chin on {A.his} hands.",
+          "{A} stands at the lip of the koi pond, hands in {A.his} pockets."
         ],
         "b2": [
           "{A} sits on the stone rim and trails a finger in the water.",
           "{A} takes a seat by the pond and watches the koi turn under the lanterns.",
           "{A} perches on the edge and watches a leaf spin.",
-          "{A} lowers {A.him}self to the rim and stays."
+          "{A} sits down on the rim and stays put."
         ]
       },
       "next": {
@@ -165,14 +165,14 @@
       ],
       "log": {
         "b1": [
-          "{A} gets in a short line at the stall and reads the board.",
+          "{A} joins a short line at the stall and reads the board.",
           "{A} orders at the counter without a word, holding up one finger.",
           "{A} orders a plain bowl and pays in coins.",
           "{A} reaches the front and points at the first picture."
         ],
         "b2": [
           "{A} eats slowly, eyes on the steam.",
-          "{A} eats at the stool, tilting the bowl at the end.",
+          "{A} eats on the stool, tipping the bowl up at the end.",
           "{A} slurps the last of the broth and sets the bowl down square.",
           "{A} eats quietly and wipes the rim with a thumb."
         ]
@@ -225,15 +225,15 @@
       ],
       "log": {
         "b1": [
-          "{A} stops mid-stride and tilts the head back.",
-          "{A} stands in the square and shades eyes with a hand.",
+          "{A} stops mid-stride and tilts {A.his} head back.",
+          "{A} stands in the square and shades {A.his} eyes with a hand.",
           "{A} halts by a planter and follows something overhead.",
-          "{A} stands still while the crowd flows around."
+          "{A} stands still while the crowd flows around {A.him}."
         ],
         "b2": [
           "{A} points up at a cargo drone and says nothing.",
           "{A} gestures toward a drone crossing the roofs.",
-          "{A} indicates a drone with one finger and lets the hand fall.",
+          "{A} indicates a drone with one finger and lets {A.his} hand fall.",
           "{A} points at the sky and then at the Data Spire."
         ]
       },
@@ -285,9 +285,9 @@
       ],
       "log": {
         "b1": [
-          "{A} sits on a bench beside a planter, a bottle in the lap.",
+          "{A} sits on a bench beside a planter, a bottle in {A.his} lap.",
           "{A} takes a seat next to a planter and looks at the dry soil.",
-          "{A} perches at the bench's end, one hand on the planter's rim.",
+          "{A} perches at the end of the bench, one hand on the rim of the planter.",
           "{A} settles on the slats and pulls a bottle from a bag."
         ],
         "b2": [
@@ -347,12 +347,12 @@
           "{A} walks to the lawn and stands at the edge of the glow.",
           "{A} stops at the grass line and looks up.",
           "{A} stands at the back of a small crowd.",
-          "{A} stays at the lawn's edge with a cup."
+          "{A} stays at the edge of the lawn, a cup in hand."
         ],
         "b2": [
-          "{A} watches the hologram flicker, face lit blue.",
+          "{A} watches the hologram flicker, {A.his} face lit blue.",
           "{A} stands in the projector's light, mouth slightly open.",
-          "{A} watches the show to the end, hands in pockets.",
+          "{A} watches the show to the end, hands in {A.his} pockets.",
           "{A} stays rooted, eyes tracking a slow-moving figure in light."
         ]
       },
@@ -405,11 +405,11 @@
         "b1": [
           "{A} stops at a wall of printed sheets and reads each in turn.",
           "{A} reads a flyer for the Sky Mall and a wanted poster.",
-          "{A} studies the board with arms folded.",
+          "{A} studies the board with {A.his} arms folded.",
           "{A} reads a notice twice and moves on to the next."
         ],
         "b2": [
-          "{A} walks on, humming something off key.",
+          "{A} walks on, humming something off-key.",
           "{A} heads off down the block at an easy pace.",
           "{A} moves on, then glances back at the board.",
           "{A} strolls on toward the stalls."
@@ -471,8 +471,8 @@
         "b2": [
           "{A} walks on without going in.",
           "{A} moves off down the sidewalk, glancing back once.",
-          "{A} heads on, hands in pockets.",
-          "{A} crosses over and walks on."
+          "{A} walks on, hands in {A.his} pockets.",
+          "{A} crosses the street and walks on."
         ]
       },
       "next": {
@@ -522,9 +522,9 @@
       ],
       "log": {
         "b1": [
-          "{A} arrives at the sliding doors with a towel over a shoulder.",
+          "{A} arrives at the sliding doors with a towel over one shoulder.",
           "{A} comes up to the entrance under a drift of steam, yawning.",
-          "{A} walks up to the steam doors with a bag of soap.",
+          "{A} walks up to the steamy doors with a small bag of bath things.",
           "{A} crosses the square to the baths in slippers."
         ],
         "b2": [
@@ -699,16 +699,16 @@
       ],
       "log": {
         "b1": [
-          "{A} sits on a platform bench with a bag between the feet.",
-          "{A} takes the platform seat and watches the arrival board.",
+          "{A} sits on a platform bench with a bag between {A.his} feet.",
+          "{A} takes a seat on the platform and watches the arrival board.",
           "{A} sits, one knee over the other, scanning the faces.",
-          "{A} perches on the bench and checks a comm."
+          "{A} perches on the bench and checks {A.his} comm."
         ],
         "b2": [
           "{A} boards when the doors slide open.",
           "{A} gets on the train and takes a standing spot by the door.",
-          "{A} steps into the carriage and the doors close.",
-          "{A} rides out. The platform is empty again."
+          "{A} steps into the train car, and the doors close.",
+          "{A} rides away. The platform is empty again."
         ]
       },
       "next": {

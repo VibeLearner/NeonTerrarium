@@ -16,7 +16,7 @@
     ],
     "enterSeen": [
       "{A} goes into {place}. Seen going in here on {seen} days now.",
-      "Into {place} again: {seen} days on the feed going in at this door."
+      "Into {place} again: seen going in at this door on {seen} days."
     ],
     "seat": [
       "{A} takes a seat at {place}.",
@@ -29,7 +29,7 @@
       "{A} finds a spot at {place} and waits there."
     ],
     "queue": [
-      "{A} joins the queue at {place}.",
+      "{A} joins the line at {place}.",
       "{A} waits in line at {place}.",
       "{A} gets in line at {place}, eyes on the trays."
     ],
@@ -50,7 +50,7 @@
     ],
     "smalltalk": [
       "Overheard: {B.desc} says the lift was slow again this morning.",
-      "Overheard: {A} says the rain is meant to come back tonight.",
+      "Overheard: {A} says the rain is supposed to come back tonight.",
       "Overheard: {B.desc} says the broth here was better last year.",
       "Overheard: {A} says the new stall on the corner runs out by eight.",
       "Overheard: {B.desc} asks if {A} heard the sirens last night."
@@ -62,13 +62,13 @@
     ],
     "metroOff": [
       "{A} comes down from the platform.",
-      "{A} steps off the lift from the trains."
+      "{A} steps out of the lift, down from the trains."
     ]
   },
   "absence": {
     "first": [
-      "The door stays shut. Seen opening near this hour on {seen} days before.",
-      "No sign of {A} at the door. Out by now on {seen} days before."
+      "The door stays shut. On {seen} earlier days it opened near this hour.",
+      "No sign of {A} at the door. On {seen} earlier days, out the door by this hour."
     ],
     "later": [
       "Still nothing at the door.",
@@ -78,14 +78,14 @@
   "gossip": {
     "sick": [
       "Overheard: {B} says {C.first} has been out sick since {when}.",
-      "Overheard: {B} mentions {C.first} is down with a fever. Hasn't left the apartment.",
+      "Overheard: {B} mentions {C.first} is down with a fever and hasn't left the apartment.",
       "Overheard: {B} says {C.first} missed work {when}. \"Sick, apparently.\"",
       "Overheard: {B} says someone should bring {C.first} soup. \"Sick since {when}, poor thing.\""
     ],
     "parcel": [
       "Overheard: {B} says a delivery bot came for {C.first} {when}. \"It was {look}, from {sender}.\"",
       "Overheard: {B} mentions {C.first} got a delivery {when}. \"From {sender}, if you can believe it.\"",
-      "Overheard: {B} says {C.first} had something from {sender} come {when}."
+      "Overheard: {B} says something from {sender} came for {C.first} {when}."
     ],
     "entry": {
       "sick": [
@@ -136,7 +136,7 @@
         },
         "silent": [
           "{A} turns the box over once and goes back in.",
-          "{A} pulls the cardigan tighter and goes back in with the box."
+          "{A} pulls {A.his} cardigan tighter and goes back in with the box."
         ],
         "phone": [
           "Comm, one side: {A} says: \"It came. No, just the fever. I'm not dying.\"",
@@ -236,7 +236,7 @@
         },
         "silent": [
           "{A} reads the sender twice and goes in.",
-          "{A} stands on the step with the envelope a long time, then goes in."
+          "{A} stands on the step with the envelope for a long time, then goes in."
         ],
         "phone": [
           "Comm, one side: {A} says: \"The papers came. No. I'll sign them. Just not today.\"",
@@ -308,7 +308,7 @@
           "mesh": 1
         },
         "silent": [
-          "{A} shakes the box by one ear and goes in.",
+          "{A} holds the box up to one ear, shakes it, and goes in.",
           "{A} carries the box in, already peeling the tape."
         ],
         "phone": [
@@ -403,7 +403,7 @@
         },
         "silent": [
           "{A} counts the seedlings with one finger and goes in.",
-          "{A} carries the crate in level, slow."
+          "{A} carries the crate in slowly, holding it level."
         ],
         "phone": [
           "Comm, one side: {A} says: \"The seedlings came. All alive. I'll bring you two.\""
@@ -425,7 +425,7 @@
           "mesh": 3
         },
         "silent": [
-          "{A} shakes the little box by one ear and goes in.",
+          "{A} shakes the little box next to one ear and goes in.",
           "{A} reads the tag twice, then goes in."
         ],
         "phone": [

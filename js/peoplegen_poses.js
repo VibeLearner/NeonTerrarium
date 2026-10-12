@@ -103,11 +103,19 @@
   // crouching to pick something up (4): down, reach, the box in the hands, up again (played once, then CARRYIDLE)
   const cBob = [1, 2, 3, 2], cH = [[1, 4], [2, 5], [2, 5], [2, 3]];
   for (let k = 0; k < 4; k++) poses[F.CROUCH + k] = { nearFoot: [1, 0], farFoot: [-1, 0], bob: cBob[k], lean: 1, bend: k ? 1 : .5, nod: 1, nearHand: cH[k], nearElbow: [1, 2], farHand: [cH[k][0] - 1, cH[k][1]], farElbow: [0, 2],
-    extra: k >= 2 ? { item: 'box' } : null };
+    extra: null };   // (what comes up in the hands is drawn over them: peoplegen_held.js)
   // walking with a box held at the chest (6): the walk's legs, both hands on the box
   for (let k = 0; k < 6; k++){ const w = poses[F.WALK + k];
-    poses[F.CARRY + k] = { nearFoot: w.nearFoot, farFoot: w.farFoot, kneeUp: w.kneeUp, bend: 0, bob: w.bob, swing: w.swing*.6, nearHand: [2, 1], nearElbow: [1, 2], farHand: [1, 1], farElbow: [0, 2], extra: { item: 'box' } }; }
-  for (let k = 0; k < 2; k++) poses[F.CARRYIDLE + k] = { nearFoot: [1, 0], farFoot: [-1, 0], bob: k, nearHand: [2, 1], nearElbow: [1, 2], farHand: [1, 1], farElbow: [0, 2], extra: { item: 'box' } };
+    poses[F.CARRY + k] = { nearFoot: w.nearFoot, farFoot: w.farFoot, kneeUp: w.kneeUp, bend: 0, bob: w.bob, swing: w.swing*.6, nearHand: [2, 1], nearElbow: [1, 2], farHand: [1, 1], farElbow: [0, 2] }; }
+  for (let k = 0; k < 2; k++) poses[F.CARRYIDLE + k] = { nearFoot: [1, 0], farFoot: [-1, 0], bob: k, nearHand: [2, 1], nearElbow: [1, 2], farHand: [1, 1], farElbow: [0, 2] };
+  // walking with something hanging from the lowered near hand (6) and standing with it (2): the near arm still, a little out from the side; the far arm swings
+  for (let k = 0; k < 6; k++){ const w = poses[F.WALK + k];
+    poses[F.SIDE + k] = Object.assign({}, w, { nearHand: [1, 3], nearElbow: [0, 2] }); }
+  for (let k = 0; k < 2; k++) poses[F.SIDEIDLE + k] = { nearFoot: [1, 0], farFoot: [-1, 0], bob: k, nearHand: [1, 3], nearElbow: [0, 2], farHand: [0, 3] };
+  // walking with something held up in front in one hand (6) and standing with it (2)
+  for (let k = 0; k < 6; k++){ const w = poses[F.WALK + k];
+    poses[F.HOLD + k] = Object.assign({}, w, { nearHand: [2, 1], nearElbow: [1, 2] }); }
+  for (let k = 0; k < 2; k++) poses[F.HOLDIDLE + k] = { nearFoot: [1, 0], farFoot: [-1, 0], bob: k, nearHand: [2, 1], nearElbow: [1, 2], farHand: [0, 3] };
   // a call on the comm (4): the near hand at the side of the head, the other hand now and then talking
   const kF = [[0, 3], [0, 3], [2, 1], [0, 3]];
   for (let k = 0; k < 4; k++) poses[F.COMM + k] = { nearFoot: [1, 0], farFoot: [-1, 0], nearHand: [-1, -3], nearElbow: [1, 0], farHand: kF[k], farElbow: [0, 2], nod: k === 1 ? 1 : 0, bob: k === 3 ? 1 : 0, extra: { item: 'comm' } };
@@ -117,7 +125,7 @@
   // a hug (2): both arms forward round someone at shoulder height, leaning in
   for (let k = 0; k < 2; k++) poses[F.HUG + k] = { nearFoot: [2, 0], farFoot: [-1, 0], lean: 1, nod: k, nearHand: [3, 0], nearElbow: [2, 1], farHand: [3, -1], farElbow: [2, 0] };
   // handing something over (2): the near arm out with it
-  for (let k = 0; k < 2; k++) poses[F.GIVE + k] = { nearFoot: [2, 0], farFoot: [-1, 0], nod: k, nearHand: [3, 1], nearElbow: [2, 1], farHand: [0, 3], farElbow: [0, 2], extra: { item: 'small' } };
+  for (let k = 0; k < 2; k++) poses[F.GIVE + k] = { nearFoot: [2, 0], farFoot: [-1, 0], nod: k, nearHand: [3, 1], nearElbow: [2, 1], farHand: [0, 3], farElbow: [0, 2] };
   // watering a plant (4): the can held out and tipped, the water falling on the last three
   for (let k = 0; k < 4; k++) poses[F.WATER + k] = { nearFoot: [1, 0], farFoot: [-1, 0], lean: 1, nod: 1, nearHand: [1, 2], nearElbow: [1, 2], farHand: [0, 3], farElbow: [0, 2], extra: { item: 'can', pour: k } };
 

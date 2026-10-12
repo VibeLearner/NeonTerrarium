@@ -347,7 +347,7 @@ const STORY = (() => {
       switch (prop){
         case undefined: return k.first ? k.first : (role === 'A' && id === (e.subject || ST.watch)) ? 'Subject' : descOf(id);
         case 'desc': return id === (e.subject || ST.watch) ? (k.first || 'Subject') : descOf(id);   // (the watched person is never a descriptor on their own monitor)
-        case 'he': return pr.he; case 'him': return pr.him; case 'his': return pr.his;
+        case 'he': return pr.he === 'they' ? '\u0001they' : pr.he; case 'him': return pr.him; case 'his': return pr.his;   // (they: its verb is made plural below)
         case 'first': return I.first; case 'full': return I.first + ' ' + I.last; case 'nick': return I.nick || I.first;
         case 'rel': { const kd = relKind(id, c, x.relTo && x.relTo[role], x.want && x.want[role]); return kd ? relWord(kd, I.g) : 'acquaintance'; }
         case 'addr': return addrWord(relKind(id, c, x.relTo && x.relTo[role], x.want && x.want[role]), I.g);
@@ -356,8 +356,11 @@ const STORY = (() => {
         default: return m;
       }
     });
-    return cap(t.replace(/^Posted: /, 'Posted to the mesh: ').replace(/^Phone, one side:/, 'Comm, one side:').replace(/\bhandset\b/g, 'comm'));   // (the last two: logs saved before the comm)
+    return cap(plural(t).replace(/^Posted: /, 'Posted to the mesh: ').replace(/^Phone, one side:/, 'Comm, one side:').replace(/\bhandset\b/g, 'comm'));   // (the last two: logs saved before the comm)
   }
+  // "they" with a verb written for he or she: is/was/has/does/goes/-es/-s made plural ("they goes" reads "they go")
+  const IRREG = { is: 'are', was: 'were', has: 'have', does: 'do', goes: 'go', says: 'say' };
+  const plural = t => t.indexOf('\u0001') < 0 ? t : t.replace(/\u0001they (\w+)/g, (m, v) => 'they ' + (IRREG[v] || (/(ch|sh|ss|x|z|o)es$/.test(v) ? v.slice(0, -2) : /ies$/.test(v) ? v.slice(0, -3) + 'y' : /[^su]s$/.test(v) ? v.slice(0, -1) : v))).replace(/\u0001/g, '');
   const cap = t => t.replace(/(^|[.!?]\s+|Overheard:\s+|mesh:\s+|one side:\s+|:\s+")([a-z])/g, (m, pre, ch) => pre + ch.toUpperCase());
   ST.render = render;
 
@@ -448,14 +451,15 @@ const STORY = (() => {
     if (b && PG.live() && sc.phase !== 'gather'){
       if (b.do !== st.do0){ st.do0 = b.do; st.t0 = t; }
       const d = b.do;
-      if (d === 'pick-up' && mine){ frame = since < 1 ? F_CROUCH + Math.min(3, Math.floor(since*4)) : F_CARRYIDLE + Math.floor(t*2 + p.phase) % 2; p.carrying = since > .6; }
-      else if (p.carrying) frame = F_CARRYIDLE + Math.floor(t*2 + p.phase) % 2;
+      const holdIdle = () => { const m = PG.heldMode[p.held]; return (m === 'side' ? F_SIDEIDLE : m === 'hand' ? F_HOLDIDLE : F_CARRYIDLE) + Math.floor(t*2 + p.phase) % 2; };
+      if (d === 'pick-up' && mine){ if (!p.held) p.held = st.pick || 'box'; frame = since < 1 ? F_CROUCH + Math.min(3, Math.floor(since*4)) : holdIdle(); }
+      else if (d === 'hand-over' && mine && p.held) frame = F_GIVE + Math.floor(t*2) % 2;
+      else if (p.held && !(st.gest && Math.floor(t*.6 + p.phase) % 3 > 0)) frame = holdIdle();
       else if ((d === 'eat' || d === 'picnic') && mine) frame = F_SITEAT + Math.floor(t*1.6 + p.phase) % 4;   // (an eat step seats them: see beginHold)
       else if (d === 'phone-call' && mine) frame = F_COMM + Math.floor(t*1.5 + p.phase) % 4;
       else if (d === 'post-feed' && mine) frame = F_USE + Math.floor(t*4 + p.phase) % 6;
       else if (d === 'wave') frame = F_WAVE + Math.floor(t*6 + p.phase) % 4;
       else if (d === 'hug') frame = F_HUG + Math.floor(t*1.2 + p.phase) % 2;
-      else if (d === 'hand-over' && mine) frame = since < 2 ? F_GIVE + Math.floor(t*2) % 2 : frame;
       else if (d === 'water-plant' && mine) frame = F_WATER + Math.floor(t*3 + p.phase) % 4;
       else if (d === 'argue' && Math.floor(t*.8 + p.phase) % 2) frame = F_ANGRY + Math.floor(t*6 + p.phase) % 6;
     }
@@ -540,7 +544,7 @@ const STORY = (() => {
     for (const sp of sc.spots) if (sp.by && Object.values(sc.cast).includes(sp.by)) sp.by = null;
     for (const id of Object.values(sc.cast)){
       const p = pOf(id); if (!p || p.scene !== sc) continue;
-      const st = p.sc; p.scene = null; p.sc = null; p.carrying = false;
+      const st = p.sc; p.scene = null; p.sc = null; p.held = undefined;
       if (p.walk && p.walk.scene){ const w = p.walk; p.walk = null; if (w.tgt && w.tgt.kind === 'inside'){ p.at = w.tgt.place; p.until = pplNow + 2; continue; } const e = w.pts[Math.min(w.pts.length - 1, walkSeg(w))]; if (st){ st.mode = 'out'; st.x = p.x ?? e[0]; st.z = p.z ?? e[1]; } }
       if (!st || st.mode === 'in'){ p.at = st ? st.place : p.at; p.until = pplNow + 25 + pplRand()*40; continue; }   // (in for a while: not straight back out)
       // out on the street: back to the day, from where they stand
@@ -605,7 +609,6 @@ const STORY = (() => {
     sc.b = b;
     const who = [].concat(b.who || []), withs = [].concat(b.with || []);
     for (const id of Object.values(sc.cast)){ const p = pOf(id); if (p && p.sc){ p.sc.gest = false; } }
-    if (b.do === 'carry') for (const r of who){ const p = pOf(sc.cast[r]); if (p) p.carrying = true; }   // (a box in their arms as they walk: people.js)
     if (b.indoors){   // inside, out of sight: the people in it go in where they stand, and time passes
       for (const r of who){ const p = pOf(sc.cast[r]); if (p && p.sc && p.sc.mode === 'out'){ const pl = places.get(p.at) && streetDoor(places.get(p.at)) ? places.get(p.at) : places.get(p.home); const d = streetDoor(pl); if (d) walkFrom(p, { kind: 'inside', door: d, place: pl.id }); } }
       sc.movers = who.map(r => sc.cast[r]); sc.phase = 'gather'; sc.since = pplNow; sc.anchor = null; sc.indoorHold = 14 + U(sc.id, b.id)*16;
@@ -672,8 +675,24 @@ const STORY = (() => {
     const ctx = ctxFor(sc, b, anc);
     const line = typeof lines === 'function' ? lines(sc) : pick(lines, sc.id, b.id, 'line');
     if (line) logLine(line, sc.cast, ctx, 'live', { sid: sc.s.id });
+    heldFor(sc, b, line ? line.replace(/\{item\}/g, ctx.item || '') : '');
     // a place this subject was seen at, for counted sightings
     if (anc && ST.watch){ const key = anc.kind === 'home' ? 'home:' + anc.owner.home : anc.kind === 'door' ? 'door:' + anc.place : anc.kind === 'open' ? 'open:' + anc.place.id : 'street'; seenDays(ST.watch, sc.s.id + '|' + b.at + '|' + key).add(day()); }
+  }
+  // what the step's line says is in their hands, drawn there (peoplegen_held.js): a carry, a pick-up or a hand-over always holds something (a box if the line
+  // doesn't say); walking, leaving and going in hold what the line names when it says they have it with them
+  const WITH_RE = /\b(carr(y|ies|ying)|with|holding|holds|hauls|lugs|clutch\w*|under one arm|takes|lifts|picks up|hands|passes|brings|balanc\w*)\b/i;
+  function heldFor(sc, b, line){
+    const who = [].concat(b.who || []), p = who.length && pOf(sc.cast[who[0]]); if (!p) return;
+    const k = PG.heldFromText ? PG.heldFromText(line) : null;
+    if (b.do === 'carry' || b.do === 'hand-over'){ if (!p.held || k) p.held = k || p.held || 'box'; }
+    else if (b.do === 'pick-up'){ if (p.sc) p.sc.pick = k || 'box'; }
+    else if (k && WITH_RE.test(line) && ['walk', 'leave', 'enter', 'walk-together', 'stand', 'wait-outside', 'knock-and-wait'].includes(b.do)) p.held = k;
+  }
+  function afterHandOver(sc, b){
+    if (b.do !== 'hand-over') return;
+    const giver = pOf(sc.cast[[].concat(b.who || [])[0]]), to = pOf(sc.cast[[].concat(b.with || [])[0]]);
+    if (giver && giver.held){ if (to) to.held = giver.held; giver.held = undefined; }
   }
   function afterBeat(sc){
     const b = sc.b; if (!b || !sc.seen.includes(b.id)) return;
@@ -696,6 +715,7 @@ const STORY = (() => {
     }
     passing(sc, b);
     gossipIn(sc, b);
+    afterHandOver(sc, b);
   }
   function finishScene(sc){
     const s = sc.s, A = SPM.get(sc.cast.A);
@@ -1051,6 +1071,7 @@ const STORY = (() => {
   function deliveryTake(sc){
     const d = sc.dlv; if (!d || d.took) return; d.took = true;
     const b = d.bot; b.taken = true; b.storyWait = false;
+    { const q = pOf(sc.cast.A); if (q) q.held = { flowers: 'flowers', soup: 'food', bottle: 'bottle', letter: 'paper', legal: 'paper', seeds: 'pot', medicine: 'bag' }[d.kind] || 'box'; }   // (what came, in their hands: peoplegen_held.js)
     if (!sc.seen.includes('b3') && !sc.seen.includes('b2')) return;
     const E = D.engine.delivery, A = sc.cast.A, ctx = { sender: d.K.sender, look: d.K.look };
     const lab = pick(E.label, sc.id, 'lab'), learned = learnFrom(lab, sc.cast, new Set(['A']), 'document', null, ctx);

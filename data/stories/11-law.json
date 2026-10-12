@@ -53,8 +53,8 @@
       ],
       "log": {
         "b1": [
-          "{B.desc} strolls the block with hands behind the back and eyes on the doors.",
-          "{B.desc} makes a slow circuit of the square, scanner at the belt.",
+          "{B.desc} strolls the block, hands clasped behind {B.his} back, eyes on the doors.",
+          "{B.desc} makes a slow circuit of the square, a scanner on {B.his} belt.",
           "{B.desc} walks the beat, boots loud on stone, stopping at every corner.",
           "{B.desc} patrols the sidewalk under the flickering signs."
         ],
@@ -62,7 +62,7 @@
           "{A} crosses to the other side as the officer approaches.",
           "{A} walks on at the same pace and does not turn {A.his} head.",
           "{A} nods once at {B.desc} and keeps going.",
-          "{A} steps around {B.desc} with eyes on the ground."
+          "{A} steps around {B.desc}, eyes on the ground."
         ]
       },
       "next": {
@@ -132,17 +132,17 @@
       "log": {
         "b1": [
           "{B.desc} raises a scanner toward {A} and holds it steady.",
-          "{B.desc} sweeps the scanner over {A}'s wrist and checks the readout.",
-          "{B.desc} stops {A} at the corner and scans a badge."
+          "{B.desc} sweeps the scanner over {A.his} wrist and checks the readout.",
+          "{B.desc} stops {A} at the corner and scans {A.his} badge."
         ],
         "b2": [
-          "{A} stays still with both arms out from the body.",
+          "{A} holds still, both arms out from {A.his} sides.",
           "{A} stands under the lamp while the scanner blinks.",
           "{A} stays at the corner, jaw tight, eyes on the officer's boots."
         ],
         "b3": [
-          "{B.desc} waves {A} on. {A} walks off, rolling both shoulders.",
-          "{A} is released and goes down the block, not quite fast.",
+          "{B.desc} waves {A} on. {A} walks off, rolling {A.his} shoulders.",
+          "{A} is let go and heads down the block, not quite hurrying.",
           "{A} walks away with the badge held in a fist."
         ]
       },
@@ -205,9 +205,9 @@
           "{A} heads up the sidewalk toward the station door."
         ],
         "b2": [
-          "{A} stops a pace short of the station's light and stands.",
+          "{A} stops a pace short of the station's lights and stands there.",
           "{A} halts and looks at the door, then at the street.",
-          "{A} stays at the corner for a moment with hands in pockets."
+          "{A} stays at the corner for a moment, hands in {A.his} pockets."
         ],
         "b3": [
           "{A} crosses to the far side and takes the long way around.",
@@ -222,7 +222,7 @@
           "channel": "seen",
           "chance": 0.35,
           "log": [
-            "{A} crosses away from the station door again: {seen} times on the feed.",
+            "{A} crosses away from the station door again: {seen} days on the feed.",
             "{A} crosses the street short of the station door, then crosses back past it."
           ],
           "minSeen": 2
@@ -300,7 +300,7 @@
         ],
         "b3": [
           "{A} leaves the station, handing back a clip.",
-          "{A} comes out from the station door, folding a receipt.",
+          "{A} steps away from the station door, folding a receipt.",
           "{A} leaves the step and crosses the street."
         ]
       },
@@ -388,7 +388,7 @@
         "b3": [
           "{A} takes a call on a borrowed comm, voice low and shaky.",
           "{A} lifts a comm to one ear and gives short, flat answers.",
-          "{A} takes a comm call and speaks to someone in pieces."
+          "{A} takes a comm call and answers in broken pieces."
         ]
       },
       "reveals": [
@@ -432,12 +432,12 @@
         "lines": [
           "Overheard: {S} says to {L} that {A.desc} was mugged by the metro last night. Bag and everything.",
           "Overheard: {S} tells {L}: \"Did you hear? {A.desc} got robbed on the way home. Lucky no one was hurt.\"",
-          "Overheard: {S} says {A.desc} lost a bag in a hold-up and has been jumpy since.",
+          "Overheard: {S} says {A.desc} lost {A.his} bag in a holdup and has been jumpy ever since.",
           "Overheard: {S} mentions to {L} that {A.desc} was robbed near the stalls."
         ],
         "entry": [
-          "Was robbed on the way home, as of last night (overheard: a neighbor, in conversation).",
-          "Lost a bag to a hold-up, per {S} (overheard, in conversation).",
+          "Was robbed on the way home last night (overheard: a neighbor, in conversation).",
+          "Lost a bag in a holdup, per {S} (overheard, in conversation).",
           "Was held up near the metro, said {S} (overheard)."
         ]
       }
@@ -505,7 +505,7 @@
         "b1": [
           "A hooded figure steps out of a side street toward {A}.",
           "{B.desc} darts out of an alley mouth and closes on {A}.",
-          "{B.desc} cuts across the street and blocks {A}'s path."
+          "{B.desc} cuts across the street and blocks {A.his} path."
         ],
         "b2": [
           "{A} freezes with both hands half raised. A bag changes hands.",
@@ -513,7 +513,7 @@
           "{A} holds still. The bag is gone from {A.his} shoulder."
         ],
         "b3": [
-          "{B.desc} flees into the dark, the bag clutched to the chest.",
+          "{B.desc} flees into the dark, the bag clutched to {B.his} chest.",
           "{B.desc} melts into the alley and is gone.",
           "{B.desc} vanishes down a side street at a dead run."
         ]
@@ -600,7 +600,7 @@
         "b1": [
           "A patrol bike drops in beside {A} at the curb. {B.desc} swings off.",
           "{B.desc} arrives on a police bike and steps in front of {A}.",
-          "{B.desc} lands the bike across {A}'s path."
+          "{B.desc} lands the bike across {A.his} path."
         ],
         "b2": [
           "{A} raises both hands. {B.desc} cuffs {A.his} wrists in front.",
@@ -678,14 +678,14 @@
       ],
       "log": {
         "b1": [
-          "{A} stands at a dark corner with a hood half up, motionless.",
+          "{A} stands at a dark corner, {A.his} hood half up, motionless.",
           "{A} stays under a dead lamp, one shoulder against the wall.",
           "{A} lingers at the corner and watches the crowd go by."
         ],
         "b2": [
-          "{A} waves at a passing drone, then lowers the hand.",
+          "{A} waves at a passing drone, then lowers {A.his} hand.",
           "{A} lifts a hand to someone across the street.",
-          "{A} waves at the empty sidewalk and puts the hand back in a pocket."
+          "{A} waves at the empty sidewalk and puts {A.his} hand back in a pocket."
         ],
         "b3": [
           "{A} walks off along the wall, unhurried.",
@@ -749,7 +749,7 @@
         "b1": [
           "{A} works the counter, apron on, ladling broth into bowls.",
           "{A} serves a line of morning customers without looking up.",
-          "{A} stacks cups at the stall and calls an order over a shoulder.",
+          "{A} stacks cups at the stall and calls an order over {A.his} shoulder.",
           "{A} sets a bowl down and wipes the counter in one move."
         ],
         "b2": [
@@ -832,7 +832,7 @@
       "log": {
         "b1": [
           "{A} spots a flat leather wallet on the sidewalk and picks it up.",
-          "{A} stoops, retrieves a wallet from a puddle edge, and wipes it on a sleeve.",
+          "{A} stoops, pulls a wallet from the edge of a puddle, and wipes it on a sleeve.",
           "{A} scoops a wallet from the curb and looks around."
         ],
         "b2": [
@@ -843,7 +843,7 @@
         "b3": [
           "{A} catches up and hands the wallet to {B.desc}. {B.desc} opens it and stares.",
           "{A} holds out the wallet and {B.desc} takes it with both hands.",
-          "{A} presses the wallet into {B.desc}'s palm."
+          "{A} presses the wallet into the hand of {B.desc}."
         ]
       },
       "reveals": [
@@ -930,7 +930,7 @@
       "log": {
         "b1": [
           "{A} lounges on a bench with a cup, the seats around {A.him} empty.",
-          "{A} sits in the dark of the square with feet up on the slats.",
+          "{A} sits in the dark of the square, {A.his} feet up on the slats.",
           "{A} takes a bench seat and watches the lamps."
         ],
         "b2": [
@@ -941,7 +941,7 @@
         "b3": [
           "{A} gets up and heads out of the square.",
           "{A} takes the cup and leaves the bench.",
-          "{A} leaves, tossing a salute over a shoulder."
+          "{A} leaves, tossing a salute over {A.his} shoulder."
         ]
       },
       "next": {

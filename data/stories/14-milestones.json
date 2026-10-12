@@ -63,8 +63,8 @@
       ],
       "log": {
         "b1": [
-          "{A} sits at a stool and scrolls a comm with one eyebrow up.",
-          "{A} takes a stool and drums fingers on the counter.",
+          "{A} sits on a stool and scrolls through {A.his} comm with one eyebrow up.",
+          "{A} takes a stool and drums {A.his} fingers on the counter.",
           "{A} perches on a stool and looks across the square."
         ],
         "b2": [
@@ -73,7 +73,7 @@
           "{B.desc} holds out a paper plate with a sparkler stuck in a steamed bun."
         ],
         "b3": [
-          "{A} blows the candle out, laughs, and the two of them hug.",
+          "{A} blows out the candle and laughs. The two of them hug.",
           "{B.desc} wraps {A} in a hug while the candle gutters.",
           "{A} grabs {B.desc} in a hug that nearly tips the plate."
         ]
@@ -95,7 +95,7 @@
           "channel": "conversation",
           "chance": 0.3,
           "log": [
-            "Overheard: {A} says: \"Best friend I ever had, remembering the day.\"",
+            "Overheard: {A} says: \"Best friend I ever had, and you remembered the day.\"",
             "Overheard: {B.desc} says: \"Of course I remembered, friend. Who else would?\""
           ]
         }
@@ -175,7 +175,7 @@
       "log": {
         "b1": [
           "{A} and {B.desc} walk to the station entrance, {A} dragging a heavy bag.",
-          "{B.desc} carries half of {A}'s load as the two reach the station lift.",
+          "{B.desc} shares the load with {A} as the two reach the station lift.",
           "{A} and {B.desc} cross the plaza slowly, saying little."
         ],
         "b2": [
@@ -196,7 +196,7 @@
           "channel": "conversation",
           "chance": 0.55,
           "log": [
-            "Overheard: {A} says: \"I'll write when I'm settled. Don't wait up on me.\"",
+            "Overheard: {A} says: \"I'll write when I'm settled. Don't wait up for me.\"",
             "Overheard: {A} says: \"They gave me a place upriver. I leave tonight.\""
           ]
         }
@@ -306,8 +306,8 @@
           "{A} arrives early and stays at the door with a thermos."
         ],
         "b2": [
-          "{B.desc} comes out and shakes {A}'s hand, then points up at the lights.",
-          "{B.desc} says a few words and {A} nods hard to each.",
+          "{B.desc} comes out and shakes hands with {A}, then points up at the lights.",
+          "{B.desc} says a few words, and {A} nods hard at each one.",
           "{B.desc} hands {A} a sheet of printed rules and explains the first hour."
         ],
         "b3": [
@@ -411,9 +411,9 @@
       ],
       "log": {
         "b1": [
-          "{A} and {B.desc} sit side by side. {A} is very still and keeps a hand in a pocket.",
+          "{A} and {B.desc} sit side by side. {A} is very still and keeps one hand in a pocket.",
           "{A} and {B.desc} take a bench by the pond. {A} fidgets with a zipper.",
-          "{B.desc} sits and {A} sits stiff beside, one knee jumping."
+          "{B.desc} sits, and {A} sits stiffly beside {B.him}, one knee jumping."
         ],
         "b2": [
           "{A} takes a small box from a pocket and holds it out in both hands.",
@@ -421,9 +421,9 @@
           "{A} holds out a flat box. {B.desc} stares at it, then at {A}."
         ],
         "b3": [
-          "{B.desc} throws both arms around {A} and the box falls on the bench.",
+          "{B.desc} throws both arms around {A}, and the box falls onto the bench.",
           "{A} and {B.desc} embrace. A passerby claps.",
-          "{B.desc} hugs {A} hard and says something into {A}'s shoulder."
+          "{B.desc} hugs {A} hard and says something into {A.his} shoulder."
         ]
       },
       "reveals": [
@@ -433,7 +433,7 @@
           "channel": "conversation",
           "chance": 0.7,
           "log": [
-            "Overheard: {A} says: \"You've been my {B.rel} eight years. I'd like eight more. Marry me.\"",
+            "Overheard: {A} says: \"You've been my {B.rel} for eight years. I'd like eight more. Marry me.\"",
             "Overheard: {A} says: \"My {B.rel}, my best friend. Will you marry me?\""
           ]
         },
@@ -514,7 +514,7 @@
         "b1": [
           "{A} carries a flat frame wrapped in paper, held out in front like a tray.",
           "{A} walks the block with a framed sheet under one arm, keeping clear of the crowd.",
-          "{A} hugs a framed document to the chest and steps over puddles."
+          "{A} hugs a framed document to {A.his} chest and steps over puddles."
         ],
         "b2": [
           "{A} points at the frame, then at the sky, and says something to a passerby.",
@@ -602,7 +602,7 @@
       ],
       "log": {
         "b1": [
-          "{A} comes out of {place} with a small box and a plant in the crook of an arm.",
+          "{A} comes out of {place} with a small box and a plant in the crook of one arm.",
           "{A} leaves {place} with a cake box held level.",
           "{A} steps out of {place} to scattered applause."
         ],
@@ -614,7 +614,7 @@
         "b3": [
           "{A} walks away down the block, the plant held high.",
           "{A} heads off with a slow stride, not looking back.",
-          "{A} crosses the square with the box on a hip."
+          "{A} crosses the square with the box on one hip."
         ]
       },
       "reveals": [
@@ -694,13 +694,13 @@
       "log": {
         "b1": [
           "{A} walks up to a bench with a single stem in one hand.",
-          "{A} approaches the bench with eyes lowered.",
+          "{A} approaches the bench with {A.his} eyes lowered.",
           "{A} crosses to the bench and stops at its end."
         ],
         "b2": [
           "{A} lays the flower along the bench slats and lifts a withered one from the arm.",
-          "{A} replaces an old bloom with the new one and tucks the old one in a pocket.",
-          "{A} brushes the slats clear with a sleeve."
+          "{A} replaces an old bloom with the new one and tucks the old one into a pocket.",
+          "{A} brushes the slats clear with {A.his} sleeve."
         ],
         "b3": [
           "{A} stands at the bench for several minutes, hands folded.",
@@ -772,10 +772,10 @@
         "b1": [
           "{A} sits on a bench holding a comm close and grinning at the screen.",
           "{A} takes a seat and holds up the comm to nobody in particular.",
-          "{A} perches on the bench edge, thumbing the screen with great care."
+          "{A} perches on the edge of the bench, thumbing the screen with great care."
         ],
         "b2": [
-          "{A} posts a picture, reads the comment that appears, and laughs out loud.",
+          "{A} posts a picture, reads the first comment, and laughs out loud.",
           "{A} posts a single line and holds the comm to {A.his} chest.",
           "{A} types, deletes, types, and finally posts."
         ]

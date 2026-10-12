@@ -85,7 +85,7 @@
           "channel": "conversation",
           "chance": 0.4,
           "log": [
-            "Overheard: {A} calls out: \"{B.first}! Over here, I saved you the stool!\"",
+            "Overheard: {A} calls out: \"{B.first}! Over here, I saved you a stool!\"",
             "Overheard: {A} says: \"There you are, {B.first}. You are late again.\""
           ]
         },
@@ -191,9 +191,9 @@
           "{A} stays by a planter with a cup."
         ],
         "b3": [
-          "{B.desc} gestures between {A} and {C.desc}. Handshakes all round.",
+          "{B.desc} gestures between {A} and {C.desc}. Handshakes all around.",
           "{B.desc} says a few words and the three of them stand in a loose circle.",
-          "{A} and {C.desc} nod at each other while {B.desc} talks over both."
+          "{A} and {C.desc} nod at each other while {B.desc} talks over them both."
         ]
       },
       "reveals": [
@@ -214,7 +214,7 @@
           "chance": 0.6,
           "log": [
             "{B.desc} presents {C.first} to {A} by name.",
-            "{C.first} gives a name at the handshake: {C.first}."
+            "At the handshake, the newcomer gives a name: {C.first}."
           ]
         }
       ],
@@ -513,7 +513,7 @@
         ],
         "b3": [
           "{A} lowers {A.his} arm slowly and stays where {A.he} is.",
-          "{A} stands with the comm out, thumb over a message not sent.",
+          "{A} stands with the comm out, thumb over an unsent message.",
           "{A} stays rooted by the pond for a long minute."
         ]
       },
@@ -621,12 +621,12 @@
         "b1": [
           "{A} and {B.desc} argue in the open, voices rising.",
           "Two figures argue by the pond. {A} jabs a finger, {B.desc} flings both hands up.",
-          "{A} and {B.desc} shout across a step of distance."
+          "{A} and {B.desc} shout at each other from a step apart."
         ],
         "b2": [
           "{B.desc} leaves in a hurry, cutting between the food stalls.",
           "{B.desc} turns away and walks off the square.",
-          "{B.desc} leaves, one hand over the face."
+          "{B.desc} leaves, one hand over {B.his} face."
         ],
         "b3": [
           "{A} stands alone with arms crossed.",
@@ -735,8 +735,8 @@
       ],
       "log": {
         "b1": [
-          "{A} sits at a stool with two cups and one of them untouched.",
-          "{A} takes a stool with an extra cup set on the counter beside.",
+          "{A} sits on a stool with two cups, one of them untouched.",
+          "{A} takes a stool, an extra cup set on the counter beside {A.him}.",
           "{A} perches on a stool, turning a cup."
         ],
         "b2": [
@@ -851,7 +851,7 @@
       ],
       "log": {
         "b1": [
-          "{A}, {B.desc} and {C.desc} spread a blanket on the lawn and weigh the corners with shoes.",
+          "{A}, {B.desc} and {C.desc} spread a blanket on the lawn and weigh down the corners with shoes.",
           "Three figures settle on a blanket under the low sun.",
           "{A} unrolls a blanket. {B.desc} and {C.desc} drop onto it."
         ],
@@ -943,7 +943,7 @@
         "b1": [
           "{A} sits on a bench and thumbs a comm.",
           "{A} takes a seat and holds the comm up to the light.",
-          "{A} perches on the bench edge, typing with both thumbs."
+          "{A} perches on the edge of the bench, typing with both thumbs."
         ],
         "b2": [
           "{A} posts something short and puts the comm away.",
@@ -1037,7 +1037,7 @@
         ],
         "b2": [
           "{A} raises a comm to one ear and records a short message.",
-          "{A} makes a comm call, one hand cupped over the mouth, speaking quietly.",
+          "{A} makes a call on the comm, speaking quietly, one hand cupped over {A.his} mouth.",
           "{A} turns away and speaks low into the comm."
         ],
         "b3": [
@@ -1160,7 +1160,7 @@
       ],
       "log": {
         "b1": [
-          "{A} sits at a stool, arms crossed, not looking around.",
+          "{A} sits on a stool, arms crossed, not looking around.",
           "{A} takes a stool and keeps both hands in {A.his} lap.",
           "{A} perches at the counter with a very straight back."
         ],
@@ -1253,11 +1253,11 @@
       "log": {
         "b1": [
           "{A} crosses the square under a wide umbrella, rain drumming on it.",
-          "{A} walks the sidewalk under an umbrella, collar up.",
+          "{A} walks down the sidewalk under an umbrella, collar up.",
           "{A} hurries across wet stone with an umbrella tipped forward."
         ],
         "b2": [
-          "{B.desc} ducks in. {A} shifts the handle over to cover both.",
+          "{B.desc} ducks in. {A} shifts the handle over to cover them both.",
           "{A} holds the handle high over {B.desc} and takes the rain on one shoulder.",
           "{B.desc} laughs and squeezes in close next to {A}."
         ],
@@ -1371,13 +1371,13 @@
           "{A} comes out slowly, a scarf wound up to the nose."
         ],
         "b4": [
-          "{B.desc} hands over the jar and the oranges. {A} takes them in a bundle.",
+          "{B.desc} hands over the jar and the oranges. {A} gathers them up in both arms.",
           "{B.desc} passes the thermos across. {A} hugs it to {A.his} chest.",
           "{B.desc} holds out the pot and won't let go until {A} takes it properly."
         ],
         "b5": [
           "{A} goes into {place} with an armful. The door slides shut.",
-          "{A} goes back inside, the door sliding shut behind.",
+          "{A} goes back inside, the door sliding shut behind {A.him}.",
           "{A} steps in. The door closes."
         ],
         "b6": [

@@ -27,7 +27,8 @@ const PG = (() => {
   // frames: the old ones keep their numbers; 32 on are new (running, the umbrella poses)
   const F = { WALK: 0, IDLE: 6, SPEC: 10, SIT: 16, USE: 20, ANGRY: 26, RUN: 32, UWALK: 38, UIDLE: 44, UOPEN: 48,
     // (the doing frames, peoplegen_poses.js: eating standing and seated, crouching to pick something up, walking and standing with a box, a call on the comm, a wave, a hug, handing something over, watering a plant)
-    EAT: 52, SITEAT: 56, CROUCH: 60, CARRY: 64, CARRYIDLE: 70, COMM: 72, WAVE: 76, HUG: 80, GIVE: 82, WATER: 84, N: 88 };
+    EAT: 52, SITEAT: 56, CROUCH: 60, CARRY: 64, CARRYIDLE: 70, COMM: 72, WAVE: 76, HUG: 80, GIVE: 82, WATER: 84,
+    SIDE: 88, SIDEIDLE: 94, HOLD: 96, HOLDIDLE: 102, N: 104 };   // (SIDE: walking with something hanging from the lowered near hand; HOLD: something held up in front in one hand; the things themselves: peoplegen_held.js)
   P.F = F; P.CW = CW; P.CH = CH;
   // the colour indices of the sheet
   const IX = { OUT: 1, SKIN: 2, SKIN2: 3, HAIR: 4, HAIR2: 5, TOP: 6, TOP2: 7, TOP3: 8, BOT: 9, BOT2: 10, LIT: 11, SHOE: 12, ACC: 13, WHITE: 14, EYE: 15 };

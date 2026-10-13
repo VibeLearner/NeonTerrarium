@@ -308,7 +308,7 @@
   // Gravity is slowed to 0.45 g so the motion reads at the game's scale. (1 unit is about a metre.)
   const WAVE_GLSL = `
     uniform float wForce;   // (a test switch: louder swell)
-    const vec2 WD = vec2(-0.932, 0.362), WP = vec2(-0.362, -0.932);
+    const vec2 WD = vec2(-0.7071, -0.7071), WP = vec2(0.7071, -0.7071);   // (from the left of the starting view, running to its right)
     const float GRAV = 9.81*0.45;
     float tanh_(float x){ float e = exp(2.0*clamp(x, -9.0, 9.0)); return (e - 1.0)/(e + 1.0); }
     float shAt(vec2 q){ vec2 i = (q - box.xy)/box.zw; if (i.x < 0.0 || i.y < 0.0 || i.x > 1.0 || i.y > 1.0) return 4.0; return texture2D(depthTex, q/box.zw).g*4.0; }
@@ -337,19 +337,24 @@
     }
     // the whole sea at p (a point of the still surface): returns its displacement (xyz), and through out-arguments the
     // surface normal, the Jacobian (below ~0.25 the crest is folding: whitecaps) and how much it's breaking in the shallows
+    // The sets: the swell arrives in sets of one to three waves, calm between them. A set is a group: its envelope travels
+    // at the group speed (half the waves' own speed), so each wave of it rises at the back of the set, runs through it and
+    // fades out at its front. Each set has its own size (how many waves) and its own strength, from a gentle rise to a big
+    // one; the strength also wanders a little along the crest. (s: distance along the swell in the set's own frame.)
+    const float SWL = 28.0, SETP = 85.0;
+    float setEnv(vec2 p){ float k0 = 6.2832/SWL, cg = 0.5*sqrt(GRAV/k0);
+      float s = dot(WD, p) - cg*time, idx = floor(s/SETP), u = s - idx*SETP;
+      float h1 = fract(sin(idx*12.9898)*43758.5453), h2 = fract(sin(idx*78.233 + 1.3)*24634.6345), h3 = fract(sin(idx*39.425 + 2.7)*13719.913);
+      float n = 1.0 + floor(h1*2.999), len = n*SWL*1.25, o = h3*(SETP - len - 4.0);
+      float e = (u > o && u < o + len) ? pow(sin(3.14159*(u - o)/len), 2.0) : 0.0;
+      return e*(0.35 + 0.85*h2)*(0.72 + 0.28*sin(dot(WP, p)*0.035 + idx*2.1)); }
     vec3 waves(vec2 p, float d, float sh, out vec3 nrm, out float jac, out float brk){
       // behind a rock (up-swell of here) the water is sheltered; it fills in further on
-      float lee = 0.0;
-      for (int k = 0; k < 4; k++){ float dk = 2.0 + float(k)*2.6; lee = max(lee, (1.0 - smoothstep(0.2, 0.9, shAt(p - WD*dk)))*(1.0 - dk/14.0)); }
+      float lee = max((1.0 - smoothstep(0.2, 0.9, shAt(p - WD*3.0)))*0.8, (1.0 - smoothstep(0.2, 0.9, shAt(p - WD*7.0)))*0.5);
       float big = (1.0 + wForce)*(1.0 - 0.85*lee)*smoothstep(0.05, 1.2, sh);
-      float sc = big;
       vec3 disp = vec3(0.0); vec2 slope = vec2(0.0); jac = 1.0;
-      train(p, d, sh, 30.0, 1.4, 0.00, 0.0, sc, 0.22, disp, slope, jac);   // (the swell: four trains, nearly alike, so they fall into groups)
-      train(p, d, sh, 26.5, 1.1, 0.13, 1.7, sc, 0.20, disp, slope, jac);
-      train(p, d, sh, 34.0, 0.9, -0.09, 3.9, sc, 0.18, disp, slope, jac);
-      train(p, d, sh, 23.0, 0.65, 0.05, 5.2, sc, 0.16, disp, slope, jac);
-      train(p, d, sh, 9.0, 0.16, 0.65, 0.4, sc, 0.10, disp, slope, jac);    // (wind chop across it)
-      train(p, d, sh, 6.2, 0.10, -0.85, 2.3, sc, 0.08, disp, slope, jac);
+      train(p, d, sh, SWL, 2.6*setEnv(p), 0.0, 0.0, big, 0.5, disp, slope, jac);   // (the set's waves)
+      train(p, d, sh, 8.0, 0.13, 0.7, 0.4, big, 0.08, disp, slope, jac);            // (a little wind chop across it)
       // depth-limited breaking, wave by wave: a crest can stand at most about 0.39 of the depth above the still water (a
       // height of 0.78 of the depth, crest to trough). Where this crest gets there it breaks: its top is cut off and runs
       // on as a bore of white water
@@ -360,12 +365,15 @@
       nrm = normalize(vec3(-sl.x, 1.0, -sl.y));
       return disp; }`;
   // the same swell on the cpu (deep water, no shoaling): for the spray against the rocks
-  const WAVE = { D: [-0.932, 0.362], P: [-0.362, -0.932] };
-  WAVE.h = (x, z, t) => {
-    const G = 9.81*.45, T = [[30, 1.4, 0, 0], [26.5, 1.1, .13, 1.7], [34, .9, -.09, 3.9], [23, .65, .05, 5.2]];
-    let h = 0; for (const [L, A, ang, ph] of T){ const c = Math.cos(ang), s = Math.sin(ang), dx = c*WAVE.D[0] - s*WAVE.D[1], dz = s*WAVE.D[0] + c*WAVE.D[1], k = 2*PI/L;
-      h += A*Math.cos(k*(dx*x + dz*z) - Math.sqrt(G*k)*t + ph); }
-    return h;
+  const WAVE = { D: [-0.7071, -0.7071], P: [0.7071, -0.7071] };
+  WAVE.h = (x, z, t) => {   // the set's wave height at a point (deep water: no shoaling)
+    const G = 9.81*.45, SWL = 28, SETP = 85, k0 = 2*PI/SWL, cg = .5*Math.sqrt(G/k0), fr = v => v - Math.floor(v);
+    const s = WAVE.D[0]*x + WAVE.D[1]*z - cg*t, idx = Math.floor(s/SETP), u = s - idx*SETP;
+    const h1 = fr(Math.sin(idx*12.9898)*43758.5453), h2 = fr(Math.sin(idx*78.233 + 1.3)*24634.6345), h3 = fr(Math.sin(idx*39.425 + 2.7)*13719.913);
+    const n = 1 + Math.floor(h1*2.999), len = n*SWL*1.25, o = h3*(SETP - len - 4);
+    const e = (u > o && u < o + len) ? Math.pow(Math.sin(PI*(u - o)/len), 2) : 0;
+    const A = 2.6*e*(.35 + .85*h2)*(.72 + .28*Math.sin((WAVE.P[0]*x + WAVE.P[1]*z)*.035 + idx*2.1));
+    return A*Math.cos(k0*(WAVE.D[0]*x + WAVE.D[1]*z) - Math.sqrt(G*k0)*t);
   };
   // The ripple map (a "dudv" map: two channels, each an offset to where the water's pattern is read) and the caustics (a
   // net of bright lines: where the edges between seeded cells come close, a Worley pattern), both 64 x 64 and tiling, made
@@ -385,8 +393,8 @@
   const seaU = Object.assign({ dudvTex: { value: dudvTex }, causTex: { value: causTex }, reflTex: { value: null }, resPx: { value: new THREE.Vector2(480, 270) }, pxW: { value: .1 }, time: { value: 0 }, depthTex: { value: dtex }, box: { value: new THREE.Vector4(0, 0, DW_, DW_) },
     sunDir: { value: new THREE.Vector3() }, camXZ: { value: new THREE.Vector2() }, tint: { value: new THREE.Color(1, 1, 1) }, glint: { value: new THREE.Color(1, 1, 1) }, glintK: { value: 1 }, wForce: { value: 0 }, foamTex: { value: null }, foamBox: { value: new THREE.Vector3(0, 0, 128) } }, CURV);
   seaU.gO = { value: new THREE.Vector2() }; seaU.gU = { value: new THREE.Vector2(1, 0) }; seaU.gV = { value: new THREE.Vector2(0, 1) };
-  const sea = new THREE.Mesh(gridGeo(320), new THREE.ShaderMaterial({ uniforms: seaU,
-    vertexShader: `uniform vec2 ctr, fwd, gO, gU, gV; uniform float curveK, g0, time; uniform sampler2D depthTex; uniform vec4 box; varying vec2 vP; varying float vG;
+  const sea = new THREE.Mesh(gridGeo(200), new THREE.ShaderMaterial({ uniforms: seaU,
+    vertexShader: `uniform vec2 ctr, fwd, gO, gU, gV; uniform float curveK, g0, time; uniform sampler2D depthTex; uniform vec4 box; varying vec2 vP; varying float vG; varying vec3 vWN; varying vec3 vWJ;
       ${WAVE_GLSL}
       void main(){
         vec2 p = gO + gU*position.x + gV*position.y;
@@ -394,12 +402,13 @@
         vec2 tx = texture2D(depthTex, p/box.zw).rg; float d = inBox > 0.5 ? tx.r*tx.r*24.0 : 24.0, sh = inBox > 0.5 ? tx.g*4.0 : 4.0;
         // the waves move the surface: up and down, and sideways (the water bunching into the crests)
         vec3 nw; float jw, bw; vec3 dsp = waves(p, d, sh, nw, jw, bw);
+        vWN = nw; vWJ = vec3(jw, bw, dsp.y);   // (the fragment reads these instead of working the waves out again)
         float y = dsp.y + ebb(p)*smoothstep(0.5, 3.0, sh);
         vec4 wp = vec4(p.x + dsp.x, y, p.y + dsp.z, 1.0);
         vP = p; vG = dot(p - ctr, fwd); float gp = max(vG - g0, 0.0); wp.y -= curveK*gp*gp; gl_Position = projectionMatrix * viewMatrix * wp; }`,
     fragmentShader: `
       uniform float time, pxW; uniform sampler2D depthTex, dudvTex, causTex, reflTex, foamTex; uniform vec3 foamBox; uniform vec2 resPx; uniform vec4 box; uniform vec3 sunDir; uniform vec2 camXZ; uniform vec3 tint, glint, hazeC; uniform float hzNear, hzFar, hzMax, glintK;
-      varying vec2 vP; varying float vG;
+      varying vec2 vP; varying float vG; varying vec3 vWN; varying vec3 vWJ;
       float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
       float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); vec2 a = mod(q, 2.0), b = floor(q/2.0);
         float b2 = (a.x*2.0 + a.y*3.0 - 2.0*a.x*a.y), b1 = (b.x*2.0 + b.y*3.0 - 2.0*b.x*b.y); return (b2*4.0 + b1)/16.0; }
@@ -467,7 +476,7 @@
         }
         // the waves: lit by their true surface (the sun on it, in a few flat steps), lighter up the crests where the water is
         // thin and the light comes through it (turquoise), darker down in the troughs
-        vec3 wn_; float wj, wbrk; vec3 wd = waves(p, d, sh, wn_, wj, wbrk);
+        vec3 wn_ = normalize(vWN); float wj = vWJ.x, wbrk = vWJ.y; vec3 wd = vec3(0.0, vWJ.z, 0.0);
         vec3 sunN = normalize(sunDir);
         float rel = dot(wn_, sunN) - sunN.y + dith*0.05;
         col *= rel < -0.2 ? 0.7 : rel < -0.08 ? 0.84 : rel > 0.16 ? 1.16 : rel > 0.05 ? 1.07 : 1.0;
@@ -517,7 +526,7 @@
   /* ---------- foam that lasts: a window of the sea around the view, kept frame to frame ---------- */
   // Each frame: what was there, a little dissolved and drifted on with the waves, and whatever is breaking now (crests
   // folding over, waves breaking in the shallows) added. Two targets taking turns; the window follows the view in whole texels.
-  const FN = 512, FW = 128, FT = FW/FN;
+  const FN = 256, FW = 128, FT = FW/FN;   // (half a unit a texel: the lace pattern drawn over it gives the detail)
   const fOpt = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, type: THREE.HalfFloatType, depthBuffer: false };
   let foamA = new THREE.WebGLRenderTarget(FN, FN, fOpt), foamB = new THREE.WebGLRenderTarget(FN, FN, fOpt);
   const foamU = { prev: { value: null }, time: seaU.time, depthTex: seaU.depthTex, box: seaU.box, wForce: seaU.wForce,
@@ -648,7 +657,8 @@
     H = Math.ceil(DHp/Math.max(1, Math.round(DHp/lines))); W = Math.max(1, Math.round(H*DWp/DHp));
     renderer.setSize(DWp, DHp, false); canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
     if (rt) rt.dispose(); rt = new THREE.WebGLRenderTarget(W, H, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
-    if (reflRT) reflRT.dispose(); reflRT = new THREE.WebGLRenderTarget(W, H, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    if (reflRT) reflRT.dispose(); reflRT = new THREE.WebGLRenderTarget(Math.ceil(W/2), Math.ceil(H/2),   // (half size: it's rippled anyway)
+      { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     seaU.reflTex.value = reflRT.texture; seaU.resPx.value.set(W, H);
     blit.material.map = rt.texture; blit.material.needsUpdate = true;
   }

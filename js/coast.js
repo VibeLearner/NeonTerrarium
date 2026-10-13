@@ -1140,7 +1140,7 @@
   const freePaint = a => { PAINT_POOL.push({ u: a.u, mat: a.mat }); };
   function paintIn(p){
     const pm = PAINT_POOL.pop() || newPaint(); pm.u.pRise.value = 0; pm.u.pDry.value = 0; pm.u.pB.value = p.y;
-    p.anim = { t: -Math.min(ANIM.n++*.045, 1.2), u: pm.u, mat: pm.mat, bloomed: false };
+    p.anim = { t: -Math.min(ANIM.n++*.02, .5), u: pm.u, mat: pm.mat, bloomed: false };
     ANIM.list.push(p); }
   const PIGMENT = [new THREE.Color(.8, .46, .32), new THREE.Color(.3, .62, .6), new THREE.Color(.86, .7, .42), new THREE.Color(.5, .68, .44), new THREE.Color(.88, .62, .58)];
   const BLOOMS = [];
@@ -1171,14 +1171,14 @@
   for (let i = 0; i < 24; i++){ const m = new THREE.Mesh(bloomGeo, bloomM.clone()); m.material.uniforms.nightK = CURV.nightK; m.frustumCulled = false; m.renderOrder = 3; m.visible = false; scene.add(m); BLOOMS.push(m); }
   function animTick(dt){
     ANIM.n = 0;
-    for (const m of BLOOMS) if (m.visible){ m.userData.t = ANIM.hold !== undefined ? ANIM.hold/.9 : m.userData.t + dt/.9; m.material.uniforms.bT.value = m.userData.t; if (m.userData.t >= 1) m.visible = false; }
+    for (const m of BLOOMS) if (m.visible){ m.userData.t = ANIM.hold !== undefined ? ANIM.hold/.5 : m.userData.t + dt/.5; m.material.uniforms.bT.value = m.userData.t; if (m.userData.t >= 1) m.visible = false; }
     for (let i = ANIM.list.length - 1; i >= 0; i--){ const p = ANIM.list[i], a = p.anim;
       if (!a || !PIECES.includes(p)){ if (a) freePaint(a); p.anim = null; ANIM.list.splice(i, 1); continue; }
       a.t = ANIM.hold !== undefined ? ANIM.hold : a.t + dt; if (a.t < 0) continue;   // (hold: a test hook)
       if (!a.bloomed){ a.bloomed = true; bloom(p); }
-      const r = Math.min(a.t/.4, 1); a.u.pRise.value = 1 - Math.pow(1 - r, 2.2); a.u.pDry.value = smooth(.15, .6, a.t);
+      const r = Math.min(a.t/.17, 1); a.u.pRise.value = 1 - Math.pow(1 - r, 2.2); a.u.pDry.value = smooth(.06, .26, a.t);
       if (r >= 1 && p.mesh && !p.mesh.castShadow) p.mesh.castShadow = true;   // (its shadow comes once the wash has reached the top)
-      if (a.t > .62){ p.anim = null; p.mesh.material = pieceM; p.mesh.castShadow = true; freePaint(a); ANIM.list.splice(i, 1); } } }
+      if (a.t > .27){ p.anim = null; p.mesh.material = pieceM; p.mesh.castShadow = true; freePaint(a); ANIM.list.splice(i, 1); } } }
   // A block can also be built off the side of another (host), on the same floor: it hangs from the wall it's set against, on
   // a stepped plaster corbel. How far a block reaches out from anything that stands on the ground is kept (reach): past
   // SUPPORT_REACH it gets supports of its own down to the ground, in the style of the home, and they count as standing.

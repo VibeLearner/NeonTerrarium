@@ -1082,7 +1082,7 @@
   const ghostM = bent(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .55, depthWrite: false }), false);
   const ringM = bent(new THREE.MeshBasicMaterial({ color: 0x7dffb0, transparent: true, opacity: .9, depthWrite: false, side: THREE.DoubleSide }), false);
   ghostM.customProgramCacheKey = () => 'bentGhost'; ringM.customProgramCacheKey = () => 'bentRing';
-  const ghost = new THREE.Mesh(blockOf('townhouse', 1, false, false).geo, ghostM); ghost.visible = false; ghost.frustumCulled = false; ghost.renderOrder = 5; scene.add(ghost);
+  const ghost = new THREE.Mesh(blockOf('townhouse', 1, false, false).geo, ghostM);   // (the one-by-one ghost; zone mode has a pool of them) ghost.visible = false; ghost.frustumCulled = false; ghost.renderOrder = 5; scene.add(ghost);
   const RN = 48, ringGeo = new THREE.BufferGeometry(); ringGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array((RN + 1)*2*3), 3));
   { const idx = []; for (let i = 0; i < RN; i++){ const a = i*2, b = a + 1, c = a + 2, d = a + 3; idx.push(a, b, c, b, d, c); } ringGeo.setIndex(idx); }
   const ring = new THREE.Mesh(ringGeo, ringM); ring.visible = false; ring.frustumCulled = false; ring.renderOrder = 6; scene.add(ring);
@@ -1119,12 +1119,74 @@
     if (PL.onto){ const t = PL.onto; addPiece(PL.kind, t.x, t.z, t.rot, t.y + t.top, false, PL.seed, t); }
     else addPiece(PL.kind, PL.hit.x, PL.hit.z, PL.rot, PL.ok.y, false, PL.seed);
     PL.seed++; }
+  /* ---------- zone mode: paint homes, the neighborhood generated inside the brush ---------- */
+  // The brush is a circle; Q makes it bigger, E smaller. At its smallest it places one home, a little stack at most; as it
+  // grows it holds more homes, scattered off any grid (some touching, some a walk apart, so they join every way), and taller
+  // stacks, the tallest toward the middle. The layout comes from a seed (V for another) and turns with R; each spot is
+  // checked as a home placed alone would be, and the ones that can't go (the sea, a slope, a home already there) are left out.
+  // Right click in zone mode clears the homes inside the brush.
+  const ZONE = { on: true, size: 2 }, ZSIZE = [0, 2.8, 4.2, 5.8, 7.6, 9.6, 12];
+  const ZW = [['townhouse', .35], ['villa', .25], ['tower', .2], ['pods', .2]];
+  const zPick = R => { let u = R.f(); for (const [k, w] of ZW){ if ((u -= w) < 0) return k; } return 'townhouse'; };
+  let zLayout = null, zKey = '';
+  function zoneLayout(){
+    const key = PL.seed + ':' + ZONE.size; if (key === zKey) return zLayout; zKey = key;
+    const R = rng(Math.imul(PL.seed, 2246822519) ^ ZONE.size*7919), rad = ZSIZE[ZONE.size], out = [];
+    const target = ZONE.size === 0 ? 1 : Math.max(2, Math.round(PI*rad*rad/15));
+    const maxH = ZONE.size <= 1 ? 2 : ZONE.size <= 3 ? 3 : 4;
+    for (let t = 0; t < 400 && out.length < target; t++){
+      const kind = zPick(R), rb = KINDS[kind].rb, a = R.r(0, PI*2), q = ZONE.size === 0 ? 0 : Math.sqrt(R.f())*Math.max(0, rad - rb*.6);
+      const lx = Math.cos(a)*q, lz = Math.sin(a)*q;
+      if (out.some(o => Math.hypot(o.lx - lx, o.lz - lz) < o.rb + rb + R.r(-.1, 2.4))) continue;
+      const h = 1 + Math.floor(Math.pow(R.f(), 1.4)*maxH*(1 - .45*q/Math.max(rad, 1))), stack = [];
+      for (let k = 1; k < Math.min(h, maxH); k++) stack.push(R.chance(.55) ? kind : zPick(R));
+      out.push({ kind, rb, lx, lz, rot: R.chance(.5) ? 0 : R.pick([PI/2, -PI/2, PI, R.r(-.6, .6)]), seed: R.i(1, 1e6), stack });
+    }
+    return zLayout = out; }
+  const zGhosts = [];
+  const zGhost = i => { while (zGhosts.length <= i){ const m = new THREE.Mesh(ghost.geometry, ghostM); m.frustumCulled = false; m.renderOrder = 5; m.visible = false; scene.add(m); zGhosts.push(m); } return zGhosts[i]; };
+  const zHide = () => { for (const m of zGhosts) m.visible = false; };
+  // where each home of the layout lands here, and whether it can go
+  function zoneSpots(cx, cz){ const c = Math.cos(PL.rot), s_ = Math.sin(PL.rot);
+    return zoneLayout().map(o => { const x = cx + o.lx*c - o.lz*s_, z = cz + o.lx*s_ + o.lz*c; return Object.assign({}, o, { x, z, rot: o.rot + PL.rot, ck: check(o.kind, x, z) }); }); }
+  function showZoneGhost(){
+    zHide(); ghost.visible = false;
+    const hit = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
+    if (!hit || hit.sea){ ring.visible = false; PL.ok = null; if (status) status.textContent = hit ? 'not on the sea' : ''; return; }
+    const spots = zoneSpots(hit.x, hit.z); let gi = 0, n = 0;
+    for (const sp of spots){ if (!sp.ck.ok) continue; n++;
+      let y = sp.ck.y, below = false; const kinds = [sp.kind, ...sp.stack];
+      kinds.forEach((k, i) => { const b = blockOf(k, sp.seed + i*17, below, i < kinds.length - 1), m = zGhost(gi++);
+        m.geometry = b.geo; m.position.set(sp.x, y, sp.z); m.rotation.y = sp.rot; m.visible = true; y += b.top; below = true; }); }
+    PL.ok = n ? { ok: true } : { ok: false, why: 'no room here' };
+    const r = Math.max(ZSIZE[ZONE.size], 1.4), a = ringGeo.attributes.position.array;
+    for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s_ = Math.sin(t);
+      for (const [j, rr] of [[0, r], [1, r + .18]]){ const x = hit.x + c*rr, z = hit.z + s_*rr, o = (i*2 + j)*3; a[o] = x; a[o + 1] = heightAt(x, z) + .07; a[o + 2] = z; } }
+    ringGeo.attributes.position.needsUpdate = true; ring.visible = true; ringM.color.set(n ? 0x7dffb0 : 0xff6a5a);
+    if (status) status.textContent = (ZONE.size === 0 ? 'one home' : 'brush ' + ZONE.size + ': ' + n + ' homes') + (n ? '' : ': no room here'); if (status) status.style.color = n ? '#0f3b4a' : '';
+  }
+  function placeZone(){
+    if (!PL.hit || PL.hit.sea) return;
+    for (const sp of zoneSpots(PL.hit.x, PL.hit.z)){
+      const ck = check(sp.kind, sp.x, sp.z); if (!ck.ok) continue;   // (checked again: an earlier home of this layout may now be there)
+      let p = addPiece(sp.kind, sp.x, sp.z, sp.rot, ck.y, true, sp.seed);
+      sp.stack.forEach((k, i) => { p = addPiece(k, p.x, p.z, p.rot, p.y + p.top, true, sp.seed + (i + 1)*17, p); });
+    }
+    save(); PL.seed++; }
+  function clearZone(cx, cz){ const r = Math.max(ZSIZE[ZONE.size], 1.4);
+    for (const p of PIECES.filter(q => !q.level && Math.hypot(q.x - cx, q.z - cz) < r)) removePiece(p); }
+  function setMode(zone){
+    ZONE.on = zone; document.querySelectorAll('.place .single').forEach(b => { b.hidden = zone; }); document.querySelectorAll('.place .zone').forEach(b => { b.hidden = !zone; });
+    const mb = document.getElementById('modeBtn'); if (mb) mb.textContent = zone ? 'mode: zone' : 'mode: one by one';
+    if (PL.kind) setKind(PL.kind); zHide(); }
+  document.getElementById('modeBtn') && document.getElementById('modeBtn').addEventListener('click', () => setMode(!ZONE.on));
   function setKind(k){
     PL.kind = PL.kind === k ? null : k;
-    document.querySelectorAll('.place button').forEach(b => b.classList.toggle('on', b.dataset.k === PL.kind));
-    if (!PL.kind){ ghost.visible = ring.visible = false; if (status) status.textContent = ''; }
+    document.querySelectorAll('.place button[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === PL.kind));
+    if (!PL.kind){ ghost.visible = ring.visible = false; zHide(); if (status) status.textContent = ''; }
   }
-  document.querySelectorAll('.place button').forEach(b => b.addEventListener('click', () => setKind(b.dataset.k)));
+  document.querySelectorAll('.place button[data-k]').forEach(b => b.addEventListener('click', () => setKind(b.dataset.k)));
+  setMode(true);
 
   /* ---------- turning, zooming, panning, tilting: as in the sky city; a click places, a right click removes ---------- */
   const ptrs = new Map(); let act = null, pinch0 = 0, zoom0 = 0, pinchX = 0;
@@ -1147,8 +1209,8 @@
   canvas.addEventListener('pointerleave', () => { PL.ptr = null; });
   const endPtr = e => {
     if (act && act.kind === 'turn' && !act.moved && ptrs.has(e.pointerId)){
-      if ((act.b === 0 || e.pointerType === 'touch') && PL.kind){ PL.ptr = { x: e.clientX, y: e.clientY }; showGhost(); placeHere(); }
-      else if (act.b === 2){ const p = pieceAt(e.clientX, e.clientY); if (p) removePiece(p); }
+      if ((act.b === 0 || e.pointerType === 'touch') && PL.kind){ PL.ptr = { x: e.clientX, y: e.clientY }; if (PL.kind === 'zone') showZoneGhost(); else showGhost(); if (PL.kind === 'zone') placeZone(); else placeHere(); }
+      else if (act.b === 2){ if (PL.kind === 'zone'){ const h = pick(e.clientX, e.clientY); if (h) clearZone(h.x, h.z); } else { const p = pieceAt(e.clientX, e.clientY); if (p) removePiece(p); } }
     }
     ptrs.delete(e.pointerId); if (!ptrs.size){ act = null; canvas.style.cursor = 'grab'; }
   };
@@ -1165,7 +1227,9 @@
     if (e.key === ' '){ e.preventDefault(); if (!e.repeat){ tiltMode = !tiltMode; if (!tiltMode) pitchT = PITCH0; if (tiltChip) tiltChip.hidden = !tiltMode; } return; }
     if (k === 'h' || e.key === 'Home'){ camGoal.set(HOME.x, TY, HOME.z); return; }
     if (k === 'r'){ PL.rot += (e.shiftKey ? -1 : 1)*PI/12; return; }   // (turn the piece: 15 degrees a press, any angle it lands on)
-    if ('1234'.includes(e.key) && e.key.length === 1){ setKind(KIND_KEYS[+e.key - 1]); return; }
+    if ('1234'.includes(e.key) && e.key.length === 1){ if (ZONE.on) setKind('zone'); else setKind(KIND_KEYS[+e.key - 1]); return; }
+    if (k === 'z'){ setMode(!ZONE.on); return; }
+    if (PL.kind === 'zone' && (k === 'q' || k === 'e')){ ZONE.size = clamp(ZONE.size + (k === 'q' ? 1 : -1), 0, ZSIZE.length - 1); return; }   // (Q: a bigger brush, E: a smaller one)
     if (k === 'v'){ PL.seed++; return; }   // (another look for the next home)
     if (e.key === 'Escape' || e.key === '0'){ if (PL.kind) setKind(PL.kind); return; }
     if (k === 'q') yawT -= PI/4;
@@ -1194,7 +1258,7 @@
   function frame(now){
     const dt = Math.min(.1, (now - last)/1000); last = now;
     updateCamera(dt); stream(6);
-    if (PL.kind) showGhost();
+    if (PL.kind === 'zone') showZoneGhost(); else if (PL.kind) showGhost();
     if (linksDirty) buildLinks();
     const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t);
     foamStep(dt); renderRefl();

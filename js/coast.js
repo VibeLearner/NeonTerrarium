@@ -108,11 +108,12 @@
   /* ---------- the bend, the haze, the materials ---------- */
   const scene = new THREE.Scene();
   const CURV = { ctr: { value: new THREE.Vector2() }, fwd: { value: new THREE.Vector2(1, 0) }, curveK: { value: 0 }, g0: { value: 30 },
-    hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) } };
+    hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) }, nightK: { value: 0 } };
   const BEND = `{ vec4 wq = modelMatrix * vec4(transformed, 1.0); float gq = dot(wq.xz - ctr, fwd); vG = gq; float gp = max(gq - g0, 0.0); transformed.y -= curveK*gp*gp; vWq = wq.xyz; }`;
   // cliff faces are painted per pixel by height (crisp strata, a dark wet splash zone, a weed line at the water), not by
   // their few vertices: a face is any steep, not green, surface of the land
   const ROCKY = `
+    uniform float nightK;
     vec3 rockAt(vec3 w){
       float wob = 0.35*sin(w.x*0.41 + w.z*0.33) + 0.2*sin(w.x*1.3 - w.z*1.1), y = w.y + wob*0.3;
       if (y < 0.22 + 0.1*sin(w.x*2.1 + w.z*1.7)) return vec3(0.384, 0.439, 0.306);
@@ -125,21 +126,46 @@
     rockFace = false;
     { vec3 upV = normalize((viewMatrix*vec4(0.0, 1.0, 0.0, 0.0)).xyz); float st = dot(normalize(vNormal), upV);
       bool green = diffuseColor.g > diffuseColor.r*1.12;
-      if (st < 0.55 && vWq.y > -0.4){ diffuseColor.rgb = rockAt(vWq); rockFace = true; }
+      if (st < 0.55 && vWq.y > -0.4){ diffuseColor.rgb = rockAt(vWq)*(1.0 - 0.4*nightK); rockFace = true; }
       else if (st < 0.8 && green) diffuseColor.rgb = vec3(0.243, 0.420, 0.180);   // (the grass's lip, darker where it rolls over the edge)
-      else if (st < 0.8 && vWq.y > -0.4){ diffuseColor.rgb = rockAt(vWq); rockFace = true; } }`;
+      else if (st < 0.8 && vWq.y > -0.4){ diffuseColor.rgb = rockAt(vWq)*(1.0 - 0.4*nightK); rockFace = true; } }`;
   // (a cliff face takes its shade from which way it faces, not from cast shadows: on its narrow upright facets the shadow map
   // drew stepped bands)
   const ROCKY_LIGHTS = THREE.ShaderChunk.lights_fragment_begin.replace('directLight.visible, receiveShadow ) ) ? getShadow( directionalShadowMap', 'directLight.visible, receiveShadow && !rockFace ) ) ? getShadow( directionalShadowMap');
+  // night: what glows. A block's lamps, lit windows and greenhouse glass carry a glow (0..1, per vertex; see Tris); by night
+  // it turns them warm amber, the glass a gold-green, as in the solarpunk boards (a teal, rainy dusk, every window warm)
+  const GLOW_V = 'attribute float glow; varying float vGlow;\n';
+  const GLOW_F = 'uniform float nightK; varying float vGlow;\n';
+  const GLOW_APPLY = `if (vGlow > 0.0){ vec3 amber = vec3(1.0, 0.62, 0.28);
+      float lamp = step(0.85, vGlow), sh = 0.74 + 0.26*abs(normalize(vNormal).x);
+      vec3 gc = lamp > 0.5 ? amber*1.05 : mix(vec3(1.0, 0.78, 0.42), vColor*vec3(0.75, 0.95, 0.5), 0.3)*sh;   // (glass: a soft gold-green, still shaded by its facets)
+      gl_FragColor.rgb = mix(gl_FragColor.rgb, gc, nightK*(lamp > 0.5 ? 1.0 : 0.85)); }`;
+  // a new home painted in, in watercolor: the wash rises up it from the ground with a ragged, bleeding edge (darker where the
+  // pigment pools at the wash's rim), pale and watery behind the edge, then the color deepens to full as it dries
+  const PAINT_F = `uniform float pRise, pDry, pB, pH;
+    float ph21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
+    float pvn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
+      return mix(mix(ph21(i), ph21(i + vec2(1.0, 0.0)), f.x), mix(ph21(i + vec2(0.0, 1.0)), ph21(i + vec2(1.0, 1.0)), f.x), f.y); }\n`;
+  const PAINT_APPLY = `{ float L = pB - 0.7 + (pH + 1.3)*pRise;
+      float n = pvn(vWq.xz*2.1 + vWq.y*1.3)*0.6 + pvn(vWq.xz*5.3 - vWq.y*2.7)*0.3 + pvn(vWq.zx*11.0 + vWq.y*5.0)*0.1;
+      float e = L + (n - 0.5)*1.1 - vWq.y;
+      if (e < 0.0) discard;
+      vec3 paper = vec3(0.98, 0.96, 0.91), base = diffuseColor.rgb;
+      float wash = 1.0 - pDry, wet = 1.0 - smoothstep(0.0, 0.8, e);
+      vec3 pale = mix(base, paper, 0.55) + (ph21(floor(gl_FragCoord.xy)) - 0.5)*0.06;   // (pale, with a little granulation)
+      diffuseColor.rgb = mix(base, pale, clamp(wash*0.85 + wet*0.6, 0.0, 1.0));
+      diffuseColor.rgb *= 1.0 - 0.3*(1.0 - smoothstep(0.0, 0.08, e))*step(pRise, 0.999); }`;
   // bend any built-in material the same way (and haze it toward the horizon, unless it's only drawn into the shadow map)
-  function bent(mat, haze = true, rocky = false){
+  function bent(mat, haze = true, rocky = false, glow = false, paint = null){
     mat.onBeforeCompile = sh => {
-      Object.assign(sh.uniforms, CURV);
-      sh.vertexShader = 'uniform vec2 ctr, fwd; uniform float curveK, g0; varying float vG; varying vec3 vWq;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BEND);
+      Object.assign(sh.uniforms, CURV); if (paint) Object.assign(sh.uniforms, paint);
+      sh.vertexShader = 'uniform vec2 ctr, fwd; uniform float curveK, g0; varying float vG; varying vec3 vWq;\n' + (glow ? GLOW_V : '') + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BEND + (glow ? '\n vGlow = glow;' : ''));
+      if (glow) sh.fragmentShader = GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', GLOW_APPLY + '\n#include <fog_fragment>');
+      if (paint) sh.fragmentShader = PAINT_F + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + PAINT_APPLY);
       if (haze) sh.fragmentShader = 'uniform float hzNear, hzFar, hzMax; uniform vec3 hazeC; varying float vG; varying vec3 vWq;\n' + (rocky ? 'bool rockFace;\n' + ROCKY + '\n' : '') + sh.fragmentShader.replace('#include <fog_fragment>', '#include <fog_fragment>\n gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeC, smoothstep(hzNear, hzFar, vG)*hzMax);')
         .replace('#include <color_fragment>', rocky ? ROCKY_APPLY : '#include <color_fragment>').replace('#include <lights_fragment_begin>', rocky ? ROCKY_LIGHTS : '#include <lights_fragment_begin>');
     };
-    mat.customProgramCacheKey = () => 'bent' + (haze ? 1 : 0) + (rocky ? 'r' : '');
+    mat.customProgramCacheKey = () => 'bent' + (haze ? 1 : 0) + (rocky ? 'r' : '') + (glow ? 'g' : '') + (paint ? 'p' : '');
     return mat;
   }
   const gData = new Uint8Array([150, 150, 150, 255, 200, 200, 200, 255, 240, 240, 240, 255]);
@@ -151,16 +177,22 @@
     white: C(0xf6f1e6), white2: C(0xe9e2d2), terra: C(0xc8663e), terra2: C(0xa9522f), door: C(0x3e6e7a), stone: C(0xe6d3ad), soil: C(0x5b4532), plank: C(0x8a6644), leaf: C(0x6a9a3c) };
   // everything on the land is one material, colored per vertex: one draw for each chunk, props and all
   const landM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }), true, true);
-  const pieceM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }));   // (pieces: walls stay their own color)
+  const pieceM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }), true, false, true);   // (pieces: walls stay their own color)
   const landDepth = bent(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), false);
 
   // a growing list of flat-shaded, colored triangles; props are merged into it
+  // (what glows by night is known by its color: GLOW maps a palette color to how it glows; dark window glass is lit in about
+  // half the windows, picked by a count kept in the Tris so the same home always lights the same ones)
+  const GLOW = new Map();
   class Tris {
-    constructor(){ this.p = []; this.c = []; }
-    add(geo, m, col){ const g = geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(m); const a = g.attributes.position.array;
-      for (let i = 0; i < a.length; i += 3){ this.p.push(a[i], a[i + 1], a[i + 2]); this.c.push(col.r, col.g, col.b); } g.dispose(); }
-    quad(a, b, c, d, col){ for (const v of [a, b, c, a, c, d]){ this.p.push(v[0], v[1], v[2]); this.c.push(col.r, col.g, col.b); } }
-    geo(){ const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3)); g.computeVertexNormals(); return g; }
+    constructor(){ this.p = []; this.c = []; this.gl = null; this.k = 0; }
+    glowRun(n0, col){ let v = GLOW.get(col); if (v === undefined) return; if (v < 0) v = hash2(++this.k, 77) < -v ? .9 : 0; if (v) (this.gl || (this.gl = [])).push(n0, this.p.length/3 - n0, v); }
+    add(geo, m, col){ const g = geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(m); const a = g.attributes.position.array, n0 = this.p.length/3;
+      for (let i = 0; i < a.length; i += 3){ this.p.push(a[i], a[i + 1], a[i + 2]); this.c.push(col.r, col.g, col.b); } g.dispose(); this.glowRun(n0, col); }
+    quad(a, b, c, d, col){ const n0 = this.p.length/3; for (const v of [a, b, c, a, c, d]){ this.p.push(v[0], v[1], v[2]); this.c.push(col.r, col.g, col.b); } this.glowRun(n0, col); }
+    geo(){ const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3)); g.computeVertexNormals();
+      if (this.gl){ const a = new Float32Array(this.p.length/3); for (let i = 0; i < this.gl.length; i += 3) a.fill(this.gl[i + 2], this.gl[i], this.gl[i] + this.gl[i + 1]); g.setAttribute('glow', new THREE.BufferAttribute(a, 1)); }
+      return g; }
     mesh(mat = landM){ const m = new THREE.Mesh(this.geo(), mat); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.matrixAutoUpdate = false; m.frustumCulled = false; return m; }
   }
   const GEO = { cyl5: new THREE.CylinderGeometry(1, 1, 1, 5), cyl6: new THREE.CylinderGeometry(1, 1, 1, 6), cyl8: new THREE.CylinderGeometry(1, 1, 1, 8),
@@ -416,7 +448,7 @@
         vec4 wp = vec4(p.x + dsp.x, y, p.y + dsp.z, 1.0);
         vP = p; vG = dot(p - ctr, fwd); float gp = max(vG - g0, 0.0); wp.y -= curveK*gp*gp; gl_Position = projectionMatrix * viewMatrix * wp; }`,
     fragmentShader: `
-      uniform float time, pxW; uniform sampler2D depthTex, dudvTex, causTex, reflTex, foamTex; uniform vec3 foamBox; uniform vec2 resPx; uniform vec4 box; uniform vec3 sunDir; uniform vec2 camXZ; uniform vec3 tint, glint, hazeC; uniform float hzNear, hzFar, hzMax, glintK;
+      uniform float time, pxW; uniform sampler2D depthTex, dudvTex, causTex, reflTex, foamTex; uniform vec3 foamBox; uniform vec2 resPx; uniform vec4 box; uniform vec3 sunDir; uniform vec2 camXZ; uniform vec3 tint, glint, hazeC; uniform float hzNear, hzFar, hzMax, glintK, nightK;
       varying vec2 vP; varying float vG; varying vec3 vWN; varying vec3 vWJ;
       float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
       float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); vec2 a = mod(q, 2.0), b = floor(q/2.0);
@@ -481,7 +513,7 @@
         if (d < 4.5){
           vec2 cu = (p + off)*0.17;
           float c = max(texture2D(causTex, cu + vec2(time*0.021, time*0.013)).r, texture2D(causTex, cu*1.13 + vec2(-time*0.017, time*0.024) + 0.37).r);
-          col += c * (1.0 - smoothstep(0.0, 4.5, d + dith*0.4)) * vec3(0.2, 0.18, 0.11);
+          col += c * (1.0 - smoothstep(0.0, 4.5, d + dith*0.4)) * vec3(0.2, 0.18, 0.11) * (1.0 - nightK);
         }
         // the waves: lit by their true surface (the sun on it, in a few flat steps), lighter up the crests where the water is
         // thin and the light comes through it (turquoise), darker down in the troughs
@@ -527,6 +559,7 @@
         float roll = step(1.0 - band*0.75, vn(p*1.9 + vec2(time*0.12, -time*0.07)) + dith*0.15) * step(sh, 2.0) * step(0.1, sh);
         col = mix(col, vec3(0.96, 0.99, 0.98), clamp(lip + roll*0.85, 0.0, 1.0));
         col *= tint;
+        col += nightK*rf.a*max(rf.rgb - vec3(0.45), 0.0)*vec3(0.9, 0.75, 0.55);   // (by night: the warm windows, mirrored and rippled)
         col = mix(col, hazeC, smoothstep(hzNear, hzFar, vG)*hzMax);
         gl_FragColor = vec4(col, 1.0);
       }` }));
@@ -644,6 +677,22 @@
     seaU.sunDir.value.copy(sunDir);
     // golden hour: the low sun's glitter is fewer, bigger sparkles, not a carpet of them (see glint density in the sea)
     seaU.glintK.value = lerp(1, .4, warm);
+    // night (past 19:00, full by 21:00): a high moon instead of the sun, cool and dim; a deep teal sky and haze; the sea gone
+    // ink blue with pale moon glitter; and every lamp, lit window and greenhouse warm (nightK). A little of the glow comes on
+    // at golden hour already, as the first lights do
+    const n = smooth(19, 21, h); CURV.nightK.value = Math.max(n, .25*smooth(17.8, 18.8, h));
+    if (poolMesh) poolMesh.visible = CURV.nightK.value > .01;
+    if (n > 0){
+      const mz = new THREE.Vector3(-.35, .86, -.38).normalize(); sunDir.lerp(mz, n).normalize();
+      sun.color.lerp(new THREE.Color(.55, .74, 1.0), n); sun.intensity = lerp(sun.intensity, .3, n);
+      hemi.color.lerp(new THREE.Color(.3, .52, .62), n); hemi.groundColor.setRGB(lerp(.42, .06, n), lerp(.48, .12, n), lerp(.29, .14, n)); hemi.intensity = lerp(hemi.intensity, .3, n);
+      amb.color.setRGB(lerp(.81, .2, n), lerp(.9, .4, n), lerp(.94, .48, n));
+      SKY.top.lerp(new THREE.Color(.02, .05, .1), n); SKY.mid.lerp(new THREE.Color(.04, .11, .17), n); SKY.low.lerp(new THREE.Color(.09, .2, .25), n);
+      CURV.hazeC.value.copy(SKY.low);
+      seaU.tint.value.lerp(new THREE.Color(.3, .42, .55), n); seaU.glint.value.lerp(new THREE.Color(.78, .88, 1.0), n); seaU.glintK.value = lerp(seaU.glintK.value, .5, n);
+      seaU.sunDir.value.copy(sunDir);
+    } else { hemi.groundColor.setRGB(.42, .48, .29); amb.color.setRGB(.81, .9, .94); }
+    reflM.color.setRGB(lerp(1, .26, n), lerp(1, .36, n), lerp(1, .46, n));
   }
 
   /* ---------- the pixels: drawn at the city's line count, then scaled up hard ---------- */
@@ -812,6 +861,7 @@
     terra: C(0xc8663e), terra2: C(0xa9522f), tile: C(0xb85a36), glass: C(0x8fd8c4).multiplyScalar(1.12), glass2: C(0x84d4be).multiplyScalar(1.2), glassT: C(0x7fc0c4).multiplyScalar(1.15), glassD: C(0x2f5960), frame: C(0x2e403e),
     doorO: C(0xd0702e), doorT: C(0x3e6e7a), wood: C(0x9a6a3e), rail: C(0x3a3f3e), metal: C(0x9aa3a6), blue: C(0x3a9ec4), lamp: C(0xffd27a),
     leaf: [C(0x4e8a34), C(0x6aa03c), C(0x3d7430), C(0x82b048)], pot: C(0xb5583a), stone: C(0xd8ccb2), flower: [C(0xf08a5a), C(0xf5c84c), C(0xe6739a)] };
+  GLOW.set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .5).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
   Object.assign(GEO, { cyl12: new THREE.CylinderGeometry(1, 1, 1, 12), cyl16: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.IcosahedronGeometry(1, 1),
     dome: new THREE.SphereGeometry(1, 12, 6, 0, PI*2, 0, PI/2), ring: new THREE.CylinderGeometry(1, 1, 1, 16, 1, true) });
   const rng = seed => { let a = seed >>> 0; return { f(){ a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0)/4294967296; },
@@ -983,7 +1033,8 @@
   let nextId = 1;
   const pieceMeshes = [];
   function pieceMesh(p){ const b = blockOf(p.kind, p.seed, !!p.base || p.level > 0, !!p.up);
-    const m = new THREE.Mesh(b.geo, pieceM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.frustumCulled = false;
+    if (p.anim) p.anim.u.pH.value = b.h;
+    const m = new THREE.Mesh(b.geo, p.anim ? p.anim.mat : pieceM); m.castShadow = !p.anim; m.receiveShadow = true; m.customDepthMaterial = landDepth; m.frustumCulled = false;
     m.position.set(p.x, p.y, p.z); m.rotation.y = p.rot; m.matrixAutoUpdate = false; m.updateMatrix(); m.updateMatrixWorld(); m.userData.piece = p; p.top = b.top; p.h = b.h; p.hullL = b.hull; p.hullW = placeHull(b.hull, p.x, p.z, p.rot); return m; }
   function remesh(p){ if (p.mesh){ scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); } p.mesh = pieceMesh(p); scene.add(p.mesh); pieceMeshes.push(p.mesh); }
   const stackTop = p => { while (p.up) p = p.up; return p; };
@@ -1008,6 +1059,54 @@
   const dirtyAround = p => { for (const ch of chunks.values()) if (ch.land && ch.i*CH < p.x + p.r + 3 && ch.i*CH + CH > p.x - p.r - 3 && ch.j*CH < p.z + p.r + 3 && ch.j*CH + CH > p.z - p.r - 3) ch.dirty = true; };
   const SAVE_KEY = 'neonIsland.coast.pieces';
   const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(PIECES.map(p => [p.kind, +p.x.toFixed(3), +p.z.toFixed(3), +p.rot.toFixed(4), +p.y.toFixed(3), p.seed, p.id, p.base ? p.base.id : 0, p.host ? p.host.id : 0, p.level]))); } catch (e) {} };
+  /* ---------- a new home painted in, in watercolor ---------- */
+  // Each new block gets its own copy of the material for a moment (see PAINT_APPLY): the wash rises up it from its floor,
+  // then the color dries to full, and a bloom of pigment spreads on the ground (or roof) under it and soaks away. Homes put
+  // down together (a brush full) are painted one after another, a beat apart. The links between homes wait until the
+  // painting is done, then join them.
+  const ANIM = { live: false, n: 0, list: [] };
+  function paintIn(p){
+    const u = { pRise: { value: 0 }, pDry: { value: 0 }, pB: { value: p.y }, pH: { value: 2 } };
+    p.anim = { t: -Math.min(ANIM.n++*.09, 2.4), u, mat: bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }), true, false, true, u), bloomed: false };
+    ANIM.list.push(p); }
+  const PIGMENT = [new THREE.Color(.8, .46, .32), new THREE.Color(.3, .62, .6), new THREE.Color(.86, .7, .42), new THREE.Color(.5, .68, .44), new THREE.Color(.88, .62, .58)];
+  const BLOOMS = [];
+  const bloomGeo = new THREE.PlaneGeometry(2, 2).rotateX(-PI/2);
+  function bloom(p){
+    let m = BLOOMS.find(b => !b.visible);
+    if (!m){ if (BLOOMS.length >= 24) return;
+      m = new THREE.Mesh(bloomGeo, new THREE.ShaderMaterial({ uniforms: { bT: { value: 0 }, bCol: { value: new THREE.Color() }, bSeed: { value: 0 }, nightK: CURV.nightK },
+        transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+        vertexShader: 'varying vec2 vU; void main(){ vU = position.xz; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
+        fragmentShader: `uniform float bT, bSeed, nightK; uniform vec3 bCol; varying vec2 vU;
+          float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
+          float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
+            return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
+          float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); vec2 a = mod(q, 2.0), b = floor(q/2.0);
+            float b2 = (a.x*2.0 + a.y*3.0 - 2.0*a.x*a.y), b1 = (b.x*2.0 + b.y*3.0 - 2.0*b.x*b.y); return (b2*4.0 + b1)/16.0; }
+          void main(){
+            float r = length(vU), g = 1.0 - pow(1.0 - min(bT*2.4, 1.0), 3.0), R = 0.3 + 0.62*g;
+            float e = R*(0.8 + vn(vU*3.2 + bSeed)*0.32 + vn(vU*8.0 - bSeed)*0.1) - r;   // (inside the wash where e > 0: a ragged, bleeding rim)
+            vec2 cell = floor(vU*6.0), cc = (cell + 0.5 + (vec2(h21(cell + bSeed), h21(cell - bSeed + 3.0)) - 0.5)*0.7)/6.0;
+            float hd = h21(cell*1.3 + bSeed*0.7), drop = step(0.72, hd)*step(length(vU - cc), 0.035 + 0.05*hd)*step(R*0.85, length(cc))*step(length(cc), R*1.2);   // (splashed droplets past it)
+            if (e < 0.0 && drop < 0.5) discard;
+            float rim = e > 0.0 ? 1.0 - smoothstep(0.0, 0.07, e) : 1.0;
+            float a = (0.26 + 0.34*rim)*(1.0 - smoothstep(0.4, 1.0, bT));
+            a = floor(a*6.0 + bayer(gl_FragCoord.xy))/6.0; if (a <= 0.0) discard;
+            gl_FragColor = vec4(bCol*(1.0 - 0.22*rim)*mix(1.0, 0.45, nightK), a); }` }));
+      m.frustumCulled = false; m.renderOrder = 3; scene.add(m); BLOOMS.push(m); }
+    const r = KINDS[p.kind].rb*1.7 + .8; m.scale.set(r, 1, r); m.position.set(p.x, p.y + .03, p.z); m.rotation.y = p.seed;
+    m.material.uniforms.bCol.value.copy(PIGMENT[p.seed % PIGMENT.length]); m.material.uniforms.bSeed.value = (p.seed % 97)*.37; m.material.uniforms.bT.value = 0; m.visible = true; m.userData.t = 0; }
+  function animTick(dt){
+    ANIM.n = 0;
+    for (const m of BLOOMS) if (m.visible){ m.userData.t = ANIM.hold !== undefined ? ANIM.hold/1.6 : m.userData.t + dt/1.6; m.material.uniforms.bT.value = m.userData.t; if (m.userData.t >= 1) m.visible = false; }
+    for (let i = ANIM.list.length - 1; i >= 0; i--){ const p = ANIM.list[i], a = p.anim;
+      if (!a || !PIECES.includes(p)){ if (a) a.mat.dispose(); p.anim = null; ANIM.list.splice(i, 1); continue; }
+      a.t = ANIM.hold !== undefined ? ANIM.hold : a.t + dt; if (a.t < 0) continue;   // (hold: a test hook)
+      if (!a.bloomed){ a.bloomed = true; bloom(p); }
+      const r = Math.min(a.t/.85, 1); a.u.pRise.value = 1 - Math.pow(1 - r, 2.2); a.u.pDry.value = smooth(.35, 1.25, a.t);
+      if (r >= 1 && p.mesh && !p.mesh.castShadow) p.mesh.castShadow = true;   // (its shadow comes once the wash has reached the top)
+      if (a.t > 1.3){ p.anim = null; p.mesh.material = pieceM; p.mesh.castShadow = true; a.mat.dispose(); ANIM.list.splice(i, 1); } } }
   // A block can also be built off the side of another (host), on the same floor: it hangs from the wall it's set against, on
   // a stepped plaster corbel. How far a block reaches out from anything that stands on the ground is kept (reach): past
   // SUPPORT_REACH it gets supports of its own down to the ground, in the style of the home, and they count as standing.
@@ -1018,6 +1117,7 @@
     if (base) p.reach = base.reach;
     else if (host && lv > 0){ p.reach = host.reach + Math.hypot(x - host.x, z - host.z); if (p.reach > SUPPORT_REACH){ p.cols = true; p.reach = 0; } }
     nextId = Math.max(nextId, p.id + 1);
+    if (ANIM.live) paintIn(p);
     if (base){ base.up = p; remesh(base); }
     remesh(p); PIECES.push(p);
     if (!base && lv === 0){ gridAdd(p); dirtyAround(p); }
@@ -1064,7 +1164,8 @@
   function buildLinks(){
     linksDirty = false;
     if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); linksMesh = null; }
-    const T = new Tris(), pairs = [], deg = new Map(), joined = new Set();
+    const T = new Tris(), pairs = [], deg = new Map(), joined = new Set(), pools = [];
+    for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, 1]);   // (by night: the windows' light on the ground round a home)
     for (let i = 0; i < PIECES.length; i++) for (let j = i + 1; j < PIECES.length; j++){
       const A = PIECES[i], B = PIECES[j]; if (A.level !== B.level) continue;
       if (Math.abs(A.y - B.y) > (A.level ? .6 : 1.4)) continue;
@@ -1100,6 +1201,7 @@
             for (let u = 0; u <= 1.001; u += 1/Math.max(1, Math.round(len/.6))){ const c = at(u, s, 0); box(T, c.x, c.y + .25, c.z, .04, .42, .04, HP.rail); } }
           for (let u = .2; u < .85; u += .3) if (R.chance(.7)){ const c = at(u, R.pick([-.28, .28]), .1); pot(T, R, c.x, c.y, c.z, .8); }
           if (len > 2.5){ const c = at(.5, 0, 0); box(T, c.x, c.y - 1.2, c.z, .14, 2.4, .14, HP.cream); }   // (a slim strut under a long one)
+          { const c = at(.5, .38, 0); box(T, c.x, c.y + .62, c.z, .1, .1, .1, HP.lamp); box(T, c.x, c.y + .69, c.z, .14, .03, .14, HP.rail); }   // (a lamp on the rail)
         } else {
           seg(T, a, b, .9, .08, HP.stone, .04); seg(T, a, b, .92, .7, HP.glass, .45); seg(T, a, b, .96, .08, HP.cream, .84);
           for (let u = 0; u <= 1.001; u += 1/Math.max(1, Math.round(len/.5))){ const c = at(u, 0, 0); seg(T, at(u - .01, 0, 0), at(u + .01, 0, 0), .98, .82, HP.frame, .45); }
@@ -1114,12 +1216,17 @@
           if (R.chance(.3)) T.add(GEO.ico, mat(c.x, c.y + .07, c.z, 0, 0, 0, .06, .06, .06), R.pick(HP.flower)); }
         for (let k = 0; k < n; k++) if (R.chance(.5)){ const c = at((k + .5)/n, R.pick([-.3, .3]), 0); T.add(GEO.ico, mat(c.x, c.y + 1.05, c.z, 0, 0, 0, .12, .25, .12), R.pick(HP.leaf)); }
         for (const u of [0, 1]) if (R.chance(.8)){ const c = at(u, R.pick([-.65, .65]), 0); pot(T, R, c.x, c.y, c.z, 1.1); }
+        { const c = at(.5, 0, 0); pools.push([c.x, c.z, len/2 + 1, .9]); }
+        // festoon lights strung along the beams, sagging between the posts
+        for (const s of [-.45, .45]){ const nb = n*4; for (let k = 0; k <= nb; k++){ const u = k/nb, sag = .14*Math.sin(PI*((u*n) % 1)), c = at(u, s, 1.22 - sag); box(T, c.x, c.y, c.z, .06, .07, .06, HP.lamp); } }
       } else {   // on the ground: an arcade, white columns under a tiled roof, planters along it
         seg(T, a, b, 1.1, .14, HP.stone, .02);
         const n = Math.max(2, Math.round(len/.8));
         for (let k = 0; k <= n; k++) for (const s of [-.5, .5]){ const c = at(k/n, s, 0); if (solidAt(c.x, c.z, c.y, c.y + 1.2)) continue; T.add(GEO.cyl8, mat(c.x, c.y + .6, c.z, 0, 0, 0, .08, 1.2, .08), HP.white); }
         seg(T, at(-.04, 0, 1.2), at(1.04, 0, 1.2), 1.3, .12, HP.white); seg(T, at(-.04, 0, 1.34), at(1.04, 0, 1.34), 1.4, .1, HP.tile);
         for (let k = 0; k < n; k++) if (R.chance(.6)){ const c = at((k + .5)/n, R.pick([-.65, .65]), 0); pot(T, R, c.x, c.y, c.z, 1); }
+        { const c = at(.5, 0, 0); pools.push([c.x, c.z, len/2 + .9, .8]); }
+        for (let k = 0; k < n; k++){ const c = at((k + .5)/n, 0, 0); box(T, c.x, c.y + 1.06, c.z, .02, .2, .02, HP.rail); box(T, c.x, c.y + .9, c.z, .12, .14, .12, HP.lamp); }   // (a lantern hung in each bay)
       }
     }
     // courtyards: three ground homes all joined to each other
@@ -1129,7 +1236,7 @@
       if (!joined.has(A.id + '|' + B.id) || !joined.has(B.id + '|' + C.id) || !joined.has(A.id + '|' + C.id)) continue;
       const cx = (A.x + B.x + C.x)/3, cz = (A.z + B.z + C.z)/3, cy = heightAt(cx, cz), R = rng(Math.imul(A.id + B.id*7 + C.id*31, 2654435761) >>> 0);
       if ([A, B, C].some(P => Math.hypot(P.x - cx, P.z - cz) < KINDS[P.kind].rb + .9)) continue;
-      T.add(GEO.cyl12, mat(cx, cy + .05, cz, 0, 0, 0, 1.1, .12, 1.1), HP.stone);
+      T.add(GEO.cyl12, mat(cx, cy + .05, cz, 0, 0, 0, 1.1, .12, 1.1), HP.stone); pools.push([cx, cz, 2.2, .8]);
       if (R.chance(.5)){ T.add(GEO.cyl12, mat(cx, cy + .2, cz, 0, 0, 0, .55, .2, .55), HP.cream); T.add(GEO.cyl12, mat(cx, cy + .29, cz, 0, 0, 0, .45, .03, .45), HP.glass);
         T.add(GEO.cyl8, mat(cx, cy + .5, cz, 0, 0, 0, .08, .45, .08), HP.cream); }
       else { T.add(GEO.cyl5, mat(cx, cy + .55, cz, 0, 0, 0, .08, 1.1, .08), HP.wood); T.add(GEO.ico, mat(cx, cy + 1.3, cz, 0, 0, 0, .7, .5, .7), R.pick(HP.leaf)); }
@@ -1162,13 +1269,33 @@
       }
     }
     if (T.p.length){ linksMesh = T.mesh(pieceM); linksMesh.customDepthMaterial = landDepth; scene.add(linksMesh); }
+    buildPools(pools);
   }
+  // the warm light by night: a soft pool on the ground round each home, under each pergola and arcade, in each courtyard
+  // (flat quads added over the ground, in a few dithered steps; only drawn when it's dark)
+  const poolM = new THREE.ShaderMaterial({ uniforms: { nightK: CURV.nightK }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: 'attribute vec3 aL; varying vec3 vL; void main(){ vL = aL; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
+    fragmentShader: `uniform float nightK; varying vec3 vL;
+      float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); vec2 a = mod(q, 2.0), b = floor(q/2.0);
+        float b2 = (a.x*2.0 + a.y*3.0 - 2.0*a.x*a.y), b1 = (b.x*2.0 + b.y*3.0 - 2.0*b.x*b.y); return (b2*4.0 + b1)/16.0; }
+      void main(){ float r = length(vL.xy); if (r > 1.0) discard;
+        float a = pow(1.0 - r, 1.6)*vL.z, q = floor(a*4.0 + bayer(gl_FragCoord.xy))/4.0*0.68;
+        gl_FragColor = vec4(vec3(0.75, 0.42, 0.15)*q*nightK, 1.0); }` });
+  let poolMesh = null;
+  function buildPools(pools){
+    if (poolMesh){ scene.remove(poolMesh); poolMesh.geometry.dispose(); poolMesh = null; } if (!pools.length) return;
+    const P = [], L = [];
+    for (const [x, z, r, k] of pools){ const y = heightAt(x, z) + .04;
+      for (const [u, v] of [[-1, -1], [1, 1], [1, -1], [-1, -1], [-1, 1], [1, 1]]){ P.push(x + u*r, y, z + v*r); L.push(u, v, k); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aL', new THREE.Float32BufferAttribute(L, 3));
+    poolMesh = new THREE.Mesh(g, poolM); poolMesh.frustumCulled = false; poolMesh.renderOrder = 2; poolMesh.visible = CURV.nightK.value > .01; scene.add(poolMesh); }
 
   try { const L = JSON.parse(localStorage.getItem(SAVE_KEY) || '[]'), byId = new Map();
     for (const [kind, x, z, rot, y, seed, id, baseId, hostId, level] of L){ if (!KINDS[kind]) continue; const base = baseId ? byId.get(baseId) : null, host = hostId ? byId.get(hostId) : null;
       if ((baseId && !base) || (hostId && !host)) continue;
       byId.set(id || 0, addPiece(kind, x, z, rot, y, true, seed || 1, base, id || 0, host, level ?? null)); } } catch (e) {}
 
+  ANIM.live = true;   // (homes from the save just appear; new ones are painted in)
   // the ghost: the block under the pointer, see-through, and a ring on the ground green or red
   const ghostM = bent(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .55, depthWrite: false }), false);
   const ringM = bent(new THREE.MeshBasicMaterial({ color: 0x7dffb0, transparent: true, opacity: .9, depthWrite: false, side: THREE.DoubleSide }), false);
@@ -1376,9 +1503,12 @@
   // the reflection pass: everything above the water, flipped upside down about it and drawn flat in its own colors (no
   // lights, no shadows) into a target the size of the view, where the sea reads it at its own pixel, through the ripples
   const reflM = new THREE.MeshBasicMaterial({ vertexColors: true, clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0)] });
+  reflM.onBeforeCompile = sh => { sh.uniforms.nightK = CURV.nightK;   // (by night the lit windows show in the water, warm)
+    sh.vertexShader = GLOW_V + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vGlow = glow;');
+    sh.fragmentShader = GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(1.0, 0.72, 0.38), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
   renderer.localClippingEnabled = true;
   function renderRefl(){
-    const hide = [sea, spray, ghost, ring], vis = hide.map(o => o.visible); hide.forEach(o => { o.visible = false; });
+    const hide = [sea, spray, ghost, ring, ...zGhosts, ...(poolMesh ? [poolMesh] : []), ...BLOOMS], vis = hide.map(o => o.visible); hide.forEach(o => { o.visible = false; });
     scene.overrideMaterial = reflM; scene.scale.y = -1; scene.updateMatrixWorld(true);
     renderer.shadowMap.autoUpdate = false;
     renderer.setRenderTarget(reflRT); renderer.setClearColor(0x000000, 0); renderer.autoClear = true; renderer.render(scene, cam);
@@ -1392,7 +1522,8 @@
     const dt = Math.min(.1, (now - last)/1000); last = now;
     updateCamera(dt); stream(6);
     if (PL.kind === 'zone' && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost();
-    if (linksDirty) buildLinks();
+    animTick(dt);
+    if (linksDirty && !ANIM.list.length) buildLinks();
     const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t);
     foamStep(dt); renderRefl();
     renderer.setRenderTarget(rt); renderer.autoClear = true; renderer.render(skyScene, skyCam);
@@ -1401,7 +1532,7 @@
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { seaU, TOFF, WAVE, get t0(){ return t0; }, setHour, heightAt, coastX, pick, PIECES,
+  window.COAST = { seaU, TOFF, WAVE, ANIM, scene, get t0(){ return t0; }, setHour, heightAt, coastX, pick, PIECES,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

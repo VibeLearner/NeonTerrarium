@@ -949,12 +949,12 @@
   // (up to four high), square on the one below. Every change remakes the links between neighbors (see links, below).
   let nextId = 1;
   const pieceMeshes = [];
-  function pieceMesh(p){ const b = blockOf(p.kind, p.seed, !!p.base, !!p.up);
+  function pieceMesh(p){ const b = blockOf(p.kind, p.seed, !!p.base || p.level > 0, !!p.up);
     const m = new THREE.Mesh(b.geo, pieceM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.frustumCulled = false;
     m.position.set(p.x, p.y, p.z); m.rotation.y = p.rot; m.matrixAutoUpdate = false; m.updateMatrix(); m.updateMatrixWorld(); m.userData.piece = p; p.top = b.top; return m; }
   function remesh(p){ if (p.mesh){ scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); } p.mesh = pieceMesh(p); scene.add(p.mesh); pieceMeshes.push(p.mesh); }
   const stackTop = p => { while (p.up) p = p.up; return p; };
-  const stackH = p => { let n = 1; while (p.base){ p = p.base; } while (p.up){ p = p.up; n++; } return n; };
+  const MAXLV = 8;   // (how many floors of blocks a home can reach)
   // can a block go here on the ground? wholly on land (right up to the cliff edge is fine), on ground that isn't too steep,
   // not on top of another home (they may touch: touching homes are joined); returns the pad height
   function check(kind, x, z){
@@ -973,19 +973,41 @@
   }
   const dirtyAround = p => { for (const ch of chunks.values()) if (ch.land && ch.i*CH < p.x + p.r + 3 && ch.i*CH + CH > p.x - p.r - 3 && ch.j*CH < p.z + p.r + 3 && ch.j*CH + CH > p.z - p.r - 3) ch.dirty = true; };
   const SAVE_KEY = 'neonIsland.coast.pieces';
-  const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(PIECES.map(p => [p.kind, +p.x.toFixed(3), +p.z.toFixed(3), +p.rot.toFixed(4), +p.y.toFixed(3), p.seed, p.id, p.base ? p.base.id : 0]))); } catch (e) {} };
-  function addPiece(kind, x, z, rot, y, quiet, seed = 1, base = null, id = 0){
-    const p = { id: id || nextId, kind, x, z, rot, y, seed, base, up: null, level: base ? base.level + 1 : 0, r: KINDS[kind].r };
+  const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(PIECES.map(p => [p.kind, +p.x.toFixed(3), +p.z.toFixed(3), +p.rot.toFixed(4), +p.y.toFixed(3), p.seed, p.id, p.base ? p.base.id : 0, p.host ? p.host.id : 0, p.level]))); } catch (e) {} };
+  // A block can also be built off the side of another (host), on the same floor: it hangs from the wall it's set against, on
+  // a stepped plaster corbel. How far a block reaches out from anything that stands on the ground is kept (reach): past
+  // SUPPORT_REACH it gets supports of its own down to the ground, in the style of the home, and they count as standing.
+  const SUPPORT_REACH = 3.6;
+  function addPiece(kind, x, z, rot, y, quiet, seed = 1, base = null, id = 0, host = null, level = null){
+    const lv = level !== null ? level : base ? base.level + 1 : host ? host.level : 0;
+    const p = { id: id || nextId, kind, x, z, rot, y, seed, base, host, up: null, level: lv, r: KINDS[kind].r, reach: 0, cols: false };
+    if (base) p.reach = base.reach;
+    else if (host && lv > 0){ p.reach = host.reach + Math.hypot(x - host.x, z - host.z); if (p.reach > SUPPORT_REACH){ p.cols = true; p.reach = 0; } }
     nextId = Math.max(nextId, p.id + 1);
     if (base){ base.up = p; remesh(base); }
     remesh(p); PIECES.push(p);
-    if (!base){ gridAdd(p); dirtyAround(p); }
+    if (!base && lv === 0){ gridAdd(p); dirtyAround(p); }
     linksDirty = true; if (!quiet) save(); return p; }
-  function removePiece(p){   // (and everything stacked on it)
+  function removePiece(p){   // (and everything stacked on it or built off its side)
+    if (!PIECES.includes(p)) return;
     if (p.up) removePiece(p.up);
+    for (const q of PIECES.filter(q => q.host === p)) removePiece(q);
     scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); PIECES.splice(PIECES.indexOf(p), 1);
-    if (p.base){ p.base.up = null; remesh(p.base); } else { gridDel(p); dirtyAround(p); }
+    if (p.base){ p.base.up = null; remesh(p.base); } else if (p.level === 0){ gridDel(p); dirtyAround(p); }
     linksDirty = true; save(); }
+
+  // where a block of `kind` goes built off `host`'s side facing the point (wx, wz): square to the host, against its wall
+  function sideSpot(host, kind, wx, wz){
+    let best = null, bd = -2;
+    for (let k = 0; k < 4; k++){ const a = host.rot + k*PI/2, dx = Math.sin(a), dz = Math.cos(a), dd = (wx - host.x)*dx + (wz - host.z)*dz; if (dd > bd){ bd = dd; best = [dx, dz]; } }
+    const off = (KINDS[host.kind].rb + KINDS[kind].rb)*.93, x = host.x + best[0]*off, z = host.z + best[1]*off;
+    if (host.level === 0){ const ck = check(kind, x, z); return Object.assign({ x, z, rot: host.rot, host }, ck); }   // (on the ground: a home set against it)
+    const y = host.y, rbN = KINDS[kind].rb;
+    if (heightAt(x, z) > y - .3) return { ok: false, why: 'into the hillside', x, z, y, rot: host.rot, host };
+    for (const q of PIECES){ if (q === host) continue; const qt = q.y + (q.top || 1);
+      if (qt > y + .1 && q.y < y + 1.2 && Math.hypot(q.x - x, q.z - z) < KINDS[q.kind].rb + rbN - .3) return { ok: false, why: 'something is in the way', x, z, y, rot: host.rot, host }; }
+    const reach = host.reach + off;
+    return { ok: true, x, z, y, rot: host.rot, host, supports: reach > SUPPORT_REACH }; }
 
   /* ---------- links: what joins neighbors ---------- */
   // Two blocks on the same level whose walls come within a few units of each other are joined, by what suits the gap and
@@ -1071,18 +1093,45 @@
       else { T.add(GEO.cyl5, mat(cx, cy + .55, cz, 0, 0, 0, .08, 1.1, .08), HP.wood); T.add(GEO.ico, mat(cx, cy + 1.3, cz, 0, 0, 0, .7, .5, .7), R.pick(HP.leaf)); }
       for (let q = 0; q < 6; q++){ const a = q/6*PI*2 + R.r(0, .5); pot(T, R, cx + Math.cos(a)*.95, cy + .1, cz + Math.sin(a)*.95, 1); }
     }
+    // under each block built off a side: a stepped plaster corbel springing from the wall it hangs on; and, where it
+    // reaches too far out, supports to the ground in the home's own style
+    for (const p of PIECES){ if (!p.host || p.level === 0) continue;
+      const h = p.host, dx = (p.x - h.x), dz = (p.z - h.z), dl = Math.hypot(dx, dz) || 1, ux = dx/dl, uz = dz/dl, rbH = KINDS[h.kind].rb*.9, rbP = KINDS[p.kind].rb;
+      const R = rng(Math.imul(p.id, 2654435761) >>> 0), wall = h.kind === 'tower' ? HP.cream : h.kind === 'pods' ? HP.white : HP.cream;
+      if (!p.cols){
+        for (let k = 0; k < 3; k++){ const out = rbP*1.7*(1 - k*.3), y = p.y - .08 - k*.16;
+          const a = V3(h.x + ux*rbH, y, h.z + uz*rbH), b = V3(h.x + ux*(rbH + out), y, h.z + uz*(rbH + out)); seg(T, a, b, rbP*1.5*(1 - k*.15), .16, wall); }
+        for (const s of [-1, 1]){ const sx = -uz*s*rbP*.55, sz = ux*s*rbP*.55;   // (a curved bracket each side)
+          for (let k = 0; k < 4; k++){ const f = k/3, y = p.y - .1 - f*.9, o = rbH + (1 - f)*rbP*.9; box(T, h.x + ux*o + sx, y, h.z + uz*o + sz, .14, .2, .14, HP.terra); } }
+        if (R.chance(.7)) for (let k = 0; k < 3; k++){ const c = V3(p.x - ux*rbP*.3 + R.r(-.4, .4)*-uz, p.y - .5 - k*.25, p.z - uz*rbP*.3 + R.r(-.4, .4)*ux); T.add(GEO.ico, mat(c.x, c.y, c.z, 0, 0, 0, .13, .22, .13), R.pick(HP.leaf)); }   // (vines hanging from it)
+      } else {
+        const g = Math.min(heightAt(p.x, p.z), p.y - .4), sty = h.kind;
+        if (sty === 'tower' || sty === 'pods'){   // a round column, banded, a planter at its foot
+          const col = sty === 'pods' ? HP.white : HP.cream; T.add(GEO.cyl12, mat(p.x, (p.y + g)/2, p.z, 0, 0, 0, .22, p.y - g, .22), col);
+          for (let y = g + .8; y < p.y - .2; y += 1.1) T.add(GEO.cyl12, mat(p.x, y, p.z, 0, 0, 0, .26, .1, .26), sty === 'pods' ? HP.blue : HP.terra);
+          T.add(GEO.cyl12, mat(p.x, p.y - .1, p.z, 0, 0, 0, .55, .2, .55), col); T.add(GEO.cyl12, mat(p.x, g + .12, p.z, 0, 0, 0, .45, .24, .45), HP.stone); plant(T, R, p.x + .3, g + .2, p.z, 1.2);
+        } else {   // plaster piers carrying an arch, vines climbing them
+          for (const s of [-1, 1]){ const px = p.x - uz*s*rbP*.7 + ux*rbP*.3, pz = p.z + ux*s*rbP*.7 + uz*rbP*.3;
+            box(T, px, (p.y + g)/2, pz, .28, p.y - g, .28, HP.white); box(T, px, g + .1, pz, .4, .2, .4, HP.stone);
+            for (let y = g + .3; y < p.y - .3; y += .45) if (R.chance(.6)) T.add(GEO.ico, mat(px + R.r(-.15, .15), y, pz + R.r(-.15, .15), 0, R.r(0, 3), 0, .14, .18, .14), R.pick(HP.leaf)); }
+          const a = V3(p.x + uz*rbP*.7 + ux*rbP*.3, p.y - .15, p.z - ux*rbP*.7 + uz*rbP*.3), b = V3(p.x - uz*rbP*.7 + ux*rbP*.3, p.y - .15, p.z + ux*rbP*.7 + uz*rbP*.3);
+          seg(T, a, b, .3, .3, HP.cream); seg(T, a, b, .34, .08, HP.terra, .17);
+        }
+      }
+    }
     if (T.p.length){ linksMesh = T.mesh(pieceM); linksMesh.customDepthMaterial = landDepth; scene.add(linksMesh); }
   }
 
   try { const L = JSON.parse(localStorage.getItem(SAVE_KEY) || '[]'), byId = new Map();
-    for (const [kind, x, z, rot, y, seed, id, baseId] of L){ if (!KINDS[kind]) continue; const base = baseId ? byId.get(baseId) : null; if (baseId && !base) continue;
-      byId.set(id || 0, addPiece(kind, x, z, rot, y, true, seed || 1, base, id || 0)); } } catch (e) {}
+    for (const [kind, x, z, rot, y, seed, id, baseId, hostId, level] of L){ if (!KINDS[kind]) continue; const base = baseId ? byId.get(baseId) : null, host = hostId ? byId.get(hostId) : null;
+      if ((baseId && !base) || (hostId && !host)) continue;
+      byId.set(id || 0, addPiece(kind, x, z, rot, y, true, seed || 1, base, id || 0, host, level ?? null)); } } catch (e) {}
 
   // the ghost: the block under the pointer, see-through, and a ring on the ground green or red
   const ghostM = bent(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .55, depthWrite: false }), false);
   const ringM = bent(new THREE.MeshBasicMaterial({ color: 0x7dffb0, transparent: true, opacity: .9, depthWrite: false, side: THREE.DoubleSide }), false);
   ghostM.customProgramCacheKey = () => 'bentGhost'; ringM.customProgramCacheKey = () => 'bentRing';
-  const ghost = new THREE.Mesh(blockOf('townhouse', 1, false, false).geo, ghostM);   // (the one-by-one ghost; zone mode has a pool of them) ghost.visible = false; ghost.frustumCulled = false; ghost.renderOrder = 5; scene.add(ghost);
+  const ghost = new THREE.Mesh(blockOf('townhouse', 1, false, false).geo, ghostM); ghost.visible = false;; ghost.frustumCulled = false; ghost.renderOrder = 5; scene.add(ghost);
   const RN = 48, ringGeo = new THREE.BufferGeometry(); ringGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array((RN + 1)*2*3), 3));
   { const idx = []; for (let i = 0; i < RN; i++){ const a = i*2, b = a + 1, c = a + 2, d = a + 3; idx.push(a, b, c, b, d, c); } ringGeo.setIndex(idx); }
   const ring = new THREE.Mesh(ringGeo, ringM); ring.visible = false; ring.frustumCulled = false; ring.renderOrder = 6; scene.add(ring);
@@ -1090,18 +1139,25 @@
   const status = document.getElementById('placeStatus');
   // the home under the pointer, if any (its block)
   const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2();
-  function pieceAt(cx, cy){
+  const _nm = new THREE.Matrix3();
+  function pieceHit(cx, cy){
     if (!pieceMeshes.length) return null;
     const r = canvas.getBoundingClientRect(); _ndc.set((cx - r.left)/r.width*2 - 1, 1 - (cy - r.top)/r.height*2);
-    _ray.setFromCamera(_ndc, cam); const h = _ray.intersectObjects(pieceMeshes, false)[0];
-    return h ? h.object.userData.piece : null; }
+    _ray.setFromCamera(_ndc, cam); const h = _ray.intersectObjects(pieceMeshes, false)[0]; if (!h) return null;
+    const n = h.face ? h.face.normal.clone().applyMatrix3(_nm.getNormalMatrix(h.object.matrixWorld)).normalize() : new THREE.Vector3(0, 1, 0);
+    return { piece: h.object.userData.piece, point: h.point, top: n.y > .6 }; }
+  const pieceAt = (cx, cy) => { const h = pieceHit(cx, cy); return h ? h.piece : null; };
   function showGhost(){
-    PL.onto = null;
-    const over = PL.kind && PL.ptr ? pieceAt(PL.ptr.x, PL.ptr.y) : null;
-    if (over){   // over a home: stack on top of it
-      const t = stackTop(over), ok = stackH(t) < 4; PL.onto = ok ? t : null; PL.ok = ok ? { ok: true, y: t.y + t.top } : { ok: false, why: 'as high as it goes' };
+    PL.onto = null; PL.side = null;
+    const hov = PL.kind && PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, over = hov && hov.top ? hov.piece : null;
+    if (hov && !hov.top){   // against a wall: build off that side, on that floor
+      const sp = sideSpot(hov.piece, PL.kind, hov.point.x, hov.point.z); PL.ok = sp; PL.side = sp.ok ? sp : null;
+      ghost.geometry = blockOf(PL.kind, PL.seed, hov.piece.level > 0, false).geo; ghost.position.set(sp.x, sp.ok ? sp.y : hov.piece.y, sp.z); ghost.rotation.y = sp.rot; ghost.visible = true; ring.visible = false;
+      if (status){ status.textContent = sp.ok ? (sp.supports ? 'off the side (far out: it gets supports)' : 'off the side') : sp.why; status.style.color = sp.ok ? '#0f3b4a' : ''; } return; }
+    if (over){   // over a home's roof: stack on top of it
+      const t = stackTop(over), ok = t.level < MAXLV - 1; PL.onto = ok ? t : null; PL.ok = ok ? { ok: true, y: t.y + t.top } : { ok: false, why: 'as high as it goes' };
       ghost.geometry = blockOf(PL.kind, PL.seed, true, false).geo; ghost.position.set(t.x, t.y + t.top, t.z); ghost.rotation.y = t.rot; ghost.visible = true; ring.visible = false;
-      if (status) status.textContent = ok ? 'stack on top' : PL.ok.why; return; }
+      if (status){ status.textContent = ok ? 'stack on top (floor ' + (t.level + 2) + ')' : PL.ok.why; status.style.color = ok ? '#0f3b4a' : ''; } return; }
     const hit = PL.kind && PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
     if (!hit || hit.sea){ ghost.visible = ring.visible = false; PL.ok = null; if (status) status.textContent = PL.kind ? (hit ? 'not on the sea' : '') : ''; return; }
     const ck = check(PL.kind, hit.x, hit.z), r = KINDS[PL.kind].rb + .3; PL.ok = ck;
@@ -1112,11 +1168,12 @@
       for (const [j, rr] of [[0, r], [1, r + .14]]){ const x = hit.x + c*rr, z = hit.z + s*rr, o = (i*2 + j)*3; a[o] = x; a[o + 1] = heightAt(x, z) + .07; a[o + 2] = z; } }
     ringGeo.attributes.position.needsUpdate = true; ring.visible = true;
     ringM.color.set(ck.ok ? 0x7dffb0 : 0xff6a5a);
-    if (status) status.textContent = ck.ok ? '' : ck.why;
+    if (status){ status.textContent = ck.ok ? '' : ck.why; status.style.color = ''; }
   }
   function placeHere(){
     if (!PL.ok || !PL.ok.ok) return;
-    if (PL.onto){ const t = PL.onto; addPiece(PL.kind, t.x, t.z, t.rot, t.y + t.top, false, PL.seed, t); }
+    if (PL.side){ const sp = PL.side; addPiece(PL.kind, sp.x, sp.z, sp.rot, sp.y, false, PL.seed, null, 0, sp.host); }
+    else if (PL.onto){ const t = PL.onto; addPiece(PL.kind, t.x, t.z, t.rot, t.y + t.top, false, PL.seed, t); }
     else addPiece(PL.kind, PL.hit.x, PL.hit.z, PL.rot, PL.ok.y, false, PL.seed);
     PL.seed++; }
   /* ---------- zone mode: paint homes, the neighborhood generated inside the brush ---------- */
@@ -1133,7 +1190,7 @@
     const key = PL.seed + ':' + ZONE.size; if (key === zKey) return zLayout; zKey = key;
     const R = rng(Math.imul(PL.seed, 2246822519) ^ ZONE.size*7919), rad = ZSIZE[ZONE.size], out = [];
     const target = ZONE.size === 0 ? 1 : Math.max(2, Math.round(PI*rad*rad/15));
-    const maxH = ZONE.size <= 1 ? 2 : ZONE.size <= 3 ? 3 : 4;
+    const maxH = ZONE.size <= 1 ? 2 : ZONE.size <= 3 ? 4 : 6;
     for (let t = 0; t < 400 && out.length < target; t++){
       const kind = zPick(R), rb = KINDS[kind].rb, a = R.r(0, PI*2), q = ZONE.size === 0 ? 0 : Math.sqrt(R.f())*Math.max(0, rad - rb*.6);
       const lx = Math.cos(a)*q, lz = Math.sin(a)*q;
@@ -1170,7 +1227,11 @@
     for (const sp of zoneSpots(PL.hit.x, PL.hit.z)){
       const ck = check(sp.kind, sp.x, sp.z); if (!ck.ok) continue;   // (checked again: an earlier home of this layout may now be there)
       let p = addPiece(sp.kind, sp.x, sp.z, sp.rot, ck.y, true, sp.seed);
-      sp.stack.forEach((k, i) => { p = addPiece(k, p.x, p.z, p.rot, p.y + p.top, true, sp.seed + (i + 1)*17, p); });
+      const col = [p]; sp.stack.forEach((k, i) => { p = addPiece(k, p.x, p.z, p.rot, p.y + p.top, true, sp.seed + (i + 1)*17, p); col.push(p); });
+      // now and then a room reaches out off the side of a tall stack, a floor or two up
+      const R = rng(sp.seed*7 + 3);
+      if (col.length >= 3 && R.chance(.45)){ const host = col[R.i(1, col.length - 2)], kind = R.pick(['townhouse', 'villa', host.kind]), a = host.rot + R.i(0, 3)*PI/2;
+        const ss = sideSpot(host, kind, host.x + Math.sin(a)*5, host.z + Math.cos(a)*5); if (ss.ok) addPiece(kind, ss.x, ss.z, ss.rot, ss.y, true, sp.seed + 991, null, 0, host); }
     }
     save(); PL.seed++; }
   function clearZone(cx, cz){ const r = Math.max(ZSIZE[ZONE.size], 1.4);
@@ -1273,6 +1334,7 @@
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },
     place(kind, x, z, rot = 0, seed = 1){ const ck = check(kind, x, z); return ck.ok ? addPiece(kind, x, z, rot, ck.y, false, seed) : ck; },
-    stack(onto, kind, seed = 1){ const t = stackTop(onto); return stackH(t) < 4 ? addPiece(kind, t.x, t.z, t.rot, t.y + t.top, false, seed, t) : null; },
+    stack(onto, kind, seed = 1){ const t = stackTop(onto); return t.level < MAXLV - 1 ? addPiece(kind, t.x, t.z, t.rot, t.y + t.top, false, seed, t) : null; },
+    side(host, kind, ang, seed = 1){ const ss = sideSpot(host, kind, host.x + Math.sin(host.rot + ang)*5, host.z + Math.cos(host.rot + ang)*5); return ss.ok ? addPiece(kind, ss.x, ss.z, ss.rot, ss.y, false, seed, null, 0, host) : ss; },
     clear(){ while (PIECES.length) removePiece(PIECES[0]); } };
 })();

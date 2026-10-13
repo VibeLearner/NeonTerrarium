@@ -1094,7 +1094,7 @@ function decide(p){
   const chained = p.chain && want === p.at;   // move within the place: from the queue to a seat to eat
   if (chained && p.spot && p.spot.kind === 'queue') p.fed = true;   // walking off with their food
   if (p.visitor && want === p.home && p.home.startsWith('mt:') && typeof mtNearestStation === 'function'){ const st = mtNearestStation(p.x, p.z); if (st && places.has(st)) p.home = st; }   // came by metro: leaves from the nearest station
-  if (!chained && want !== p.at && !p.cop && !p.archivist && typeof mtPlanTrip === 'function'){   // far, and the metro would save the walk: off to the station
+  if (!chained && want !== p.at && !p.cop && !p.archivist && typeof mtPlanTrip === 'function' && !(typeof CASES !== 'undefined' && CASES.soon(p.id))){   // (not when a case moment of theirs is coming up: they walk, and stay reachable)   // far, and the metro would save the walk: off to the station
     const via = mtPlanTrip(p, want);
     if (via && startTrip(p, via.station)){ p.metroPlan = via; p.chain = null; return; } }
   const ok = !(want === p.at && !chained) && places.has(want) && startTrip(p, want);

@@ -537,6 +537,7 @@ const STORY = (() => {
   // where in the anchor this person stands, and whether that's a walk
   function targetIn(sc, anc, p, slot, b){
     if (anc.fixed && anc.fixed[p.id]) return anc.fixed[p.id];   // (someone with a place of their own in it: the keeper behind the counter)
+    if (anc.kind === 'point'){ const a = slot*2.1 + .4, r = slot ? .42 : 0; return { kind: 'pt', x: anc.x + Math.cos(a)*r, z: anc.z + Math.sin(a)*r, node: anc.node }; }   // (a spot on the street: under the highway)
     if (anc.kind === 'home') return homeDoorTarget(anc.owner, slot);
     if (anc.kind === 'door'){ const d = anc.door, tx = -d.n[1], tz = d.n[0], o = (slot - .5)*.34; return { kind: 'door', door: d, place: anc.place, x: d.stand.x + tx*o + d.n[0]*.15, z: d.stand.z + tz*o + d.n[1]*.15 }; }
     if (anc.kind === 'open'){
@@ -952,7 +953,7 @@ const STORY = (() => {
     const sc = startScene(ch.s, ids); DBG.why = sc ? 'started ' + ch.s.id : 'could not start ' + ch.s.id;
   }
   const DBG = { runs: 0, opts: 0, why: '', top: [] };
-  ST.startScene = startScene; ST.endScene = endScene; ST.openPlaceNear = openPlaceNear; ST.streetDoor = streetDoor; ST.shopNear = shopNear; ST.H = H; ST.U = U;
+  ST.startScene = startScene; ST.endScene = endScene; ST.openPlaceNear = openPlaceNear; ST.nearestNode = nearestNode; ST.streetDoor = streetDoor; ST.shopNear = shopNear; ST.H = H; ST.U = U;
   ST.dbg = DBG; ST._dir = () => { dirNext = 0; director(); return DBG; };   // (for tests: a director pass now)
 
   /* ---------- names in passing, and gossip ---------- */

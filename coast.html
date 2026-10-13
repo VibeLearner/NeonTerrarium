@@ -8,11 +8,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <style>
   /* the calm kit (her UI boards): ivory frosted cards, sage and moss, a terracotta accent, a serif for headings */
-  :root { --ivory: #f6f1e9; --ivory2: #efe7da; --sand: #c9bdaf; --line: #e3d9ca; --ink: #2a3a33; --ink2: #6f7d74; --sage: #6b7f6e; --sage2: #5c7060; --moss: #a7b8a7; --mist: #d9e1d9; --terra: #c0623f; }
+  :root { --ivory: #f6f1e9; --ivory2: #efe7da; --sand: #c9bdaf; --line: #e3d9ca; --ink: #2a3a33; --ink2: #55635a; --sage: #6b7f6e; --sage2: #5c7060; --moss: #a7b8a7; --mist: #d9e1d9; --terra: #c0623f; }
   html, body { margin: 0; height: 100%; background: #7fbfc8; overflow: hidden; }
   canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; cursor: grab; }
   .card { position: fixed; font: 400 13px/1.4 'DM Sans', system-ui, sans-serif; color: var(--ink); user-select: none; box-sizing: border-box;
-    background: color-mix(in srgb, var(--ivory) 96%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1);
+    background: rgba(246, 241, 233, .52); -webkit-backdrop-filter: blur(18px) saturate(1.15) brightness(1.06); backdrop-filter: blur(18px) saturate(1.15) brightness(1.06);   /* (frosted: the scene shows through, softened) */
     border: 1px solid #ffffffb0; border-radius: 22px; box-shadow: 0 1px 0 #ffffffc0 inset, 0 12px 32px -8px #2a3a3338, 0 2px 6px #2a3a331a; padding: 16px 18px; }
   .label { font: 600 10px/1 'DM Sans', sans-serif; letter-spacing: 2.2px; text-transform: uppercase; color: var(--ink2); }
   .label b { color: var(--sage); font-weight: 600; margin-right: 6px; }
@@ -33,8 +33,8 @@
   #timeSlider::-moz-range-progress { height: 6px; border-radius: 6px; background: var(--sage); }
   #timeSlider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%; background: var(--ivory); border: 1px solid #fff; box-shadow: 0 0 0 4px #6b7f6e26, 0 3px 8px #2a3a3340; }
   #timeSlider::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--ivory); border: 1px solid #fff; box-shadow: 0 0 0 4px #6b7f6e26, 0 3px 8px #2a3a3340; }
-  .ticks { display: flex; justify-content: space-between; margin: 2px 2px 12px; font: 500 10px 'DM Sans', sans-serif; color: #9aa59d; }
-  .seg { display: flex; padding: 3px; gap: 2px; border-radius: 14px; background: var(--ivory2); box-shadow: 0 1px 2px #2a3a331c inset; }
+  .ticks { display: flex; justify-content: space-between; margin: 2px 2px 12px; font: 500 10px 'DM Sans', sans-serif; color: #6f7b72; }
+  .seg { display: flex; padding: 3px; gap: 2px; border-radius: 14px; background: rgba(239, 231, 218, .55); box-shadow: 0 1px 2px #2a3a331c inset; }
   .seg button { flex: 1; border: 0; background: transparent; padding: 7px 0; border-radius: 11px; font: 500 11.5px 'DM Sans', sans-serif; color: var(--ink2); cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; }
   .seg button:hover { color: var(--ink); background: #ffffff80; }
   .seg button.on { background: var(--sage); color: #fbf8f2; box-shadow: 0 3px 8px -2px #5c706080; }
@@ -46,14 +46,14 @@
   .sec { margin: 14px 0 8px; }
   .tiles { display: flex; gap: 8px; }
   .tile { flex: 0 0 82px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 11px 4px 9px; border-radius: 16px; cursor: pointer;
-    background: #fffdf9; border: 1px solid var(--line); box-shadow: 0 2px 5px -1px #2a3a331c; font: 500 12px 'DM Sans', sans-serif; color: var(--ink); transition: transform .15s, box-shadow .15s, background .15s; }
+    background: rgba(255, 253, 249, .6); border: 1px solid #ffffffa0; box-shadow: 0 2px 5px -1px #2a3a331c; font: 500 12px 'DM Sans', sans-serif; color: var(--ink); transition: transform .15s, box-shadow .15s, background .15s; }
   .tile svg { width: 26px; height: 26px; stroke: var(--sage2); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .tile:hover { transform: translateY(-2px); box-shadow: 0 8px 16px -6px #2a3a3340; }
   .tile.on { background: var(--sage); border-color: var(--sage2); color: #fbf8f2; box-shadow: 0 8px 18px -6px #5c7060a0; }
   .tile.on svg { stroke: #fbf8f2; }
   #placeStatus { min-height: 15px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font: italic 500 14px/1.2 'Cormorant Garamond', Georgia, serif; color: var(--sage2); }
-  #placeStatus.idle:empty::before { content: 'Choose a zone or a tool.'; color: #a3ada6; }
-  #placeStatus:not(.idle):empty::before { content: 'Point at the ground to place.'; color: #a3ada6; }
+  #placeStatus.idle:empty::before { content: 'Choose a zone or a tool.'; color: #6f7b72; }
+  #placeStatus:not(.idle):empty::before { content: 'Point at the ground to place.'; color: #6f7b72; }
 
   /* controls: a pill; hovering it shows the keys */
   .ctrl { position: static; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 6px; border-radius: 20px; background: var(--ivory2); cursor: help;

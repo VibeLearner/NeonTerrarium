@@ -163,13 +163,20 @@
     float wcn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
       return mix(mix(wch(i), wch(i + vec2(1.0, 0.0)), f.x), mix(wch(i + vec2(0.0, 1.0)), wch(i + vec2(1.0, 1.0)), f.x), f.y); }\n`;
   const WC_SHADOW = `#include <shadowmap_pars_fragment>
-    #ifdef USE_SHADOWMAP
-    float wcShadow(sampler2D sm, vec2 size, float bias, vec4 sc){
-      vec2 w = vWq.xz + vWq.y*0.3, t = 1.0/size;
-      vec2 o = (vec2(wcn(w*1.3), wcn(w*1.3 + 17.3)) - 0.5)*7.0 + (vec2(wcn(w*4.7 + 3.1), wcn(w*4.7 - 8.2)) - 0.5)*3.0;   // (in texels)
-      float s0 = getShadow(sm, size, bias, 1.0, sc + vec4(o*t, 0.0, 0.0));
-      float sn = 0.25*(getShadow(sm, size, bias, 1.0, sc + vec4((o + vec2(3.5, 0.0))*t, 0.0, 0.0)) + getShadow(sm, size, bias, 1.0, sc + vec4((o - vec2(3.5, 0.0))*t, 0.0, 0.0))
-                     + getShadow(sm, size, bias, 1.0, sc + vec4((o + vec2(0.0, 3.5))*t, 0.0, 0.0)) + getShadow(sm, size, bias, 1.0, sc + vec4((o - vec2(0.0, 3.5))*t, 0.0, 0.0)));
+    #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+    uniform mat4 directionalShadowMatrix[ NUM_DIR_LIGHT_SHADOWS ];
+    // (the wander is measured in world units and kept on the surface being lit, then projected into the shadow map: so it
+    // stays put as the view turns, pans or zooms, and a wall never reads its own shadow from a spot off itself)
+    float wcAt(sampler2D sm, vec2 size, float bias, mat4 M, vec3 p){ vec4 sc = M*vec4(p, 1.0); return getShadow(sm, size, bias, 1.0, sc); }
+    float wcShadow(sampler2D sm, vec2 size, float bias, float nBias, mat4 M, vec3 nV){
+      vec3 nW = normalize((vec4(nV, 0.0)*viewMatrix).xyz), w = vWq;
+      vec2 q = w.xz + w.y*0.3;
+      vec3 o = vec3(wcn(q*1.3) - 0.5, wcn(q*1.3 + 9.1) - 0.5, wcn(q*1.3 + 17.3) - 0.5)*0.34 + vec3(wcn(q*4.7 + 3.1) - 0.5, wcn(q*4.7 + 5.5) - 0.5, wcn(q*4.7 - 8.2) - 0.5)*0.12;
+      o -= nW*dot(o, nW);
+      vec3 ta = normalize(abs(nW.y) < 0.9 ? cross(nW, vec3(0.0, 1.0, 0.0)) : cross(nW, vec3(1.0, 0.0, 0.0))), tb = cross(nW, ta);
+      vec3 base = w + nW*nBias + o;
+      float s0 = wcAt(sm, size, bias, M, base);
+      float sn = 0.25*(wcAt(sm, size, bias, M, base + ta*0.17) + wcAt(sm, size, bias, M, base - ta*0.17) + wcAt(sm, size, bias, M, base + tb*0.17) + wcAt(sm, size, bias, M, base - tb*0.17));
       wcS = min(wcS, s0); wcE = max(wcE, (1.0 - s0)*sn);
       return s0; }
     #endif`;
@@ -178,7 +185,7 @@
       gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb*vec3(0.88, 0.94, 1.1), sh*0.75*(1.0 - nightK));   // (a cool glaze)
       gl_FragColor.rgb *= 1.0 - sh*0.09*gr; }`;                                                 // (granulating in the shade)
   const WC_LIGHTS = c => c.replace('getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] )',
-    'wcShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, vDirectionalShadowCoord[ i ] )');
+    'wcShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowNormalBias, directionalShadowMatrix[ i ], geometry.normal )');
   // foliage in the wind: each vertex knows how far up its blade it is (aH, in units); it's pushed downwind by the square of
   // that, by a steady lean, by gusts that roll across the field in long waves, and by a quick flutter of its own; and it
   // dips a little as it bends, so the blade keeps its length. (The sway is applied before the bend: the mesh is in world units)
@@ -296,14 +303,7 @@
     const SK = new Tris(), BT = new Tris();   // (skirts: their own mesh, which casts no shadow; a skirt showing on a cliff face shadowed it in a dotted line)
     for (let i = 0; i < CN; i++){ skirt(i, i + 1); skirt(CN*VN + i, CN*VN + i + 1); skirt(i*VN, (i + 1)*VN); skirt(i*VN + CN, (i + 1)*VN + CN); }
     const near = (x, z, m) => pads.some(p => Math.hypot(x - p.x, z - p.z) < p.r + m);
-    if (lod < 2){
-      // bushes, scattered over the whole land the same way whatever the chunks (one chance in each 4-unit patch, thicker in clumps)
-      for (let a = x0/4; a < (x0 + CH)/4; a++) for (let b = z0/4; b < (z0 + CH)/4; b++){
-        if (hash2(a*7 + 3, b*13 + 5) > .06 + .4*smooth(.5, .72, fbm(a*.22 + 3, b*.22 - 7))) continue;
-        const x = a*4 + hash2(a, b + 77)*4, z = b*4 + hash2(a + 31, b)*4, s = coastX(z) - x;
-        if (s*rowCos(z) > 2.2 && !near(x, z, .6)) bush(BT, x, z, (a*92821) ^ b);
-      }
-    }
+    // (no bushes: the land is left open for homes and painted foliage)
     const m = T.mesh(), sk = SK.mesh(), nr = sk.geometry.attributes.normal;
     for (let v = 0; v < nr.count; v++) nr.setXYZ(v, 0, 1, 0);   // (a skirt that shows in a crack is lit like the ground, not like a wall)
     sk.castShadow = false; m.add(sk);
@@ -761,9 +761,9 @@
       void main(){ vec3 c = vec3(0.0); float wt = 0.0;
         for (int i = -6; i <= 6; i++){ float f = float(i), w = exp(-f*f/18.0); c += texture2D(src, vU + dir*f*1.6).rgb*w; wt += w; }
         gl_FragColor = vec4(c/wt, 1.0); }` });
-  const blit = new THREE.Mesh(quad, new THREE.ShaderMaterial({ uniforms: { tex: { value: null }, glow: { value: null }, nightK: CURV.darkK, res: { value: new THREE.Vector2(480, 270) } },
+  const blit = new THREE.Mesh(quad, new THREE.ShaderMaterial({ uniforms: { tex: { value: null }, glow: { value: null }, nightK: CURV.darkK, res: { value: new THREE.Vector2(480, 270) }, pOff: { value: new THREE.Vector2() } },
     vertexShader: postV, depthTest: false, depthWrite: false,
-    fragmentShader: `uniform sampler2D tex, glow; uniform float nightK; uniform vec2 res; varying vec2 vU;
+    fragmentShader: `uniform sampler2D tex, glow; uniform float nightK; uniform vec2 res, pOff; varying vec2 vU;
       float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
       float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
         return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
@@ -771,7 +771,7 @@
         if (nightK > 0.01){
           vec2 px = floor(vU*res) + 0.5, q = px/res;                     // (one picture pixel at a time)
           vec3 g = texture2D(glow, q).rgb; float gl = dot(g, vec3(0.4, 0.4, 0.2));
-          float paper = vn(px*0.11)*0.55 + vn(px*0.31 + 9.0)*0.3 + h21(px)*0.15;
+          vec2 pp = floor(px - pOff); float paper = vn(pp*0.11)*0.55 + vn(pp*0.31 + 9.0)*0.3 + h21(pp)*0.15;   // (the grain moves with the ground as the view pans)
           float wash = smoothstep(0.02, 0.09, gl + (paper - 0.5)*0.05);
           float rim = wash*(1.0 - smoothstep(0.02, 0.1, gl - 0.04 + (paper - 0.5)*0.05));
           vec3 tint = normalize(g + 1e-4)*vec3(1.0, 0.92, 0.8);
@@ -779,8 +779,10 @@
         }
         gl_FragColor = vec4(c, 1.0); }` }));
   const blitScene = new THREE.Scene(); blitScene.add(blit);
+  const _po = new THREE.Vector3();
   function glowPass(){
     if (CURV.darkK.value <= .01) return;
+    _po.set(0, 0, 0).project(cam); blit.material.uniforms.pOff.value.set(Math.round((_po.x + 1)/2*W), Math.round((_po.y + 1)/2*H));
     postQ.material = extractM; extractM.uniforms.src.value = rt.texture; renderer.setRenderTarget(glA); renderer.render(postScene, skyCam);
     postQ.material = blurM; blurM.uniforms.src.value = glA.texture; blurM.uniforms.dir.value.set(1/glA.width, 0); renderer.setRenderTarget(glB); renderer.render(postScene, skyCam);
     blurM.uniforms.src.value = glB.texture; blurM.uniforms.dir.value.set(0, 1/glA.height); renderer.setRenderTarget(glA); renderer.render(postScene, skyCam); }

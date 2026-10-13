@@ -1440,7 +1440,8 @@
   const sqKey = (i, j) => Math.floor(i*GC/GSQ) + ',' + Math.floor(j*GC/GSQ);
   try { for (const [i, j, st] of JSON.parse(localStorage.getItem(GRASS_KEY) || '[]')){ tufts.set(i + ',' + j, [i, j, st]); gDirty.add(sqKey(i, j)); } } catch (e) {}
   let gSaveT = 0; const saveGrass = () => { clearTimeout(gSaveT); gSaveT = setTimeout(() => { try { localStorage.setItem(GRASS_KEY, JSON.stringify([...tufts.values()])); } catch (e) {} }, 400); };
-  const GG = { greenA: [.34, .55, .24], greenB: [.27, .47, .3], greenC: [.46, .62, .27], dry: [.71, .66, .38], tip: [.88, .86, .55], fern: [.3, .52, .3], reed: [.74, .68, .4], head: [.86, .74, .44] };
+  // (a sage, blue-leaning green, set apart from the meadow's yellow-green and kin to the homes' teal; warm ochre and cream at the tips)
+  const GG = { greenA: [.37, .57, .38], greenB: [.29, .49, .38], greenC: [.5, .65, .42], dry: [.74, .66, .42], tip: [.92, .91, .7], fern: [.27, .49, .38], reed: [.76, .66, .44], head: [.88, .74, .5] };
   const FLOWERS = [[.95, .55, .42], [.96, .74, .76], [.72, .63, .88], [.99, .86, .46], [.97, .95, .9], [.93, .45, .52]];
   // a little indexed-mesh builder: positions, normals (mostly up, so a blade is lit like the meadow, whichever side shows),
   // colors, and aH
@@ -1694,7 +1695,7 @@
       say(P ? '· click to pick this one' : '· pick the first block', !!P); return; }
     const A = CN.a; ringAt(A.x, A.z, KINDS[A.kind].rb + .35, A.level ? A.y : null); ringM.color.set(0xffd27a);
     if (!P || P === A){ connGhost.visible = false; CN.ok = false; say('· now pick the second block', false); return; }
-    const L = pairOf(A, P), why = !L ? 'they overlap' : L.gap > 12 ? 'too far apart' : L.gap < -.2 ? 'they overlap' : null;
+    const L = pairOf(A, P), why = !L ? 'they overlap' : L.gap < -.2 ? 'they overlap' : null;   // (no limit on how far: long spans get piers)
     CN.ok = !why;
     if (why){ connGhost.visible = false; say('· ' + why, false); return; }
     const key = A.id + '|' + P.id + '|' + CN.type;

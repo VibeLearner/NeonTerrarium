@@ -22,6 +22,9 @@
   renderer.setPixelRatio(1);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.BasicShadowMap;
+  renderer.shadowMap.autoUpdate = false;
+const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook: time per part of the frame)
+    const SHD = { dirty: true, key: '' };   // (set dirty wherever something that casts a shadow comes, goes or changes)   // (the shadow map is redrawn only when the light, the view's shadow box or what casts changes: see shadowTick)
   renderer.outputEncoding = THREE.LinearEncoding;
 
   /* ---------- seeded noise ---------- */
@@ -246,7 +249,7 @@
     geo(){ const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3)); g.computeVertexNormals();
       if (this.gl){ const a = new Float32Array(this.p.length/3); for (let i = 0; i < this.gl.length; i += 3) a.fill(this.gl[i + 2], this.gl[i], this.gl[i] + this.gl[i + 1]); g.setAttribute('glow', new THREE.BufferAttribute(a, 1)); }
       return g; }
-    mesh(mat = landM){ const m = new THREE.Mesh(this.geo(), mat); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.matrixAutoUpdate = false; m.frustumCulled = false; return m; }
+    mesh(mat = landM){ const m = new THREE.Mesh(this.geo(), mat); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.matrixAutoUpdate = false; m.frustumCulled = true; return m; }
   }
   const GEO = { cyl5: new THREE.CylinderGeometry(1, 1, 1, 5), cyl6: new THREE.CylinderGeometry(1, 1, 1, 6), cyl8: new THREE.CylinderGeometry(1, 1, 1, 8),
     cone4: new THREE.CylinderGeometry(0, 1, 1, 4), cone8: new THREE.CylinderGeometry(0, 1, 1, 8), ico: new THREE.IcosahedronGeometry(1, 0), dod: new THREE.DodecahedronGeometry(1, 0), box: new THREE.BoxGeometry(1, 1, 1) };
@@ -299,9 +302,14 @@
       }
       col[k*3] = cc.r; col[k*3 + 1] = cc.g; col[k*3 + 2] = cc.b;
     }
-    const T = new Tris();
-    const vert = v => { T.p.push(pos[v*3], pos[v*3 + 1], pos[v*3 + 2]); T.c.push(col[v*3], col[v*3 + 1], col[v*3 + 2]); };
-    for (let j = 0; j < CN; j++) for (let i = 0; i < CN; i++){ const a = j*VN + i, b = a + 1, c2 = a + VN, d = c2 + 1; for (const v of [a, c2, b, b, c2, d]) vert(v); }
+    // (the land's triangles written straight into typed arrays, each with its flat normal worked out here: building them
+    // through growing arrays and letting three work out the normals took most of a chunk's time)
+    const NV = CN*CN*6, LP = new Float32Array(NV*3), LC = new Float32Array(NV*3), LN = new Float32Array(NV*3); let w = 0;
+    const tri = (A, B, C2) => { const ax = pos[A*3], ay = pos[A*3 + 1], az = pos[A*3 + 2], bx = pos[B*3], by = pos[B*3 + 1], bz = pos[B*3 + 2], cx = pos[C2*3], cy = pos[C2*3 + 1], cz = pos[C2*3 + 2];
+      const ux = cx - bx, uy = cy - by, uz = cz - bz, vx = ax - bx, vy = ay - by, vz = az - bz;
+      let nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+      for (let q = 0; q < 3; q++){ const v = q === 0 ? A : q === 1 ? B : C2; LP[w] = pos[v*3]; LP[w + 1] = pos[v*3 + 1]; LP[w + 2] = pos[v*3 + 2]; LC[w] = col[v*3]; LC[w + 1] = col[v*3 + 1]; LC[w + 2] = col[v*3 + 2]; LN[w] = nx; LN[w + 1] = ny; LN[w + 2] = nz; w += 3; } };
+    for (let j = 0; j < CN; j++) for (let i = 0; i < CN; i++){ const a = j*VN + i, b = a + 1, c2 = a + VN, d = c2 + 1; tri(a, c2, b); tri(b, c2, d); }
     // skirts down from the edges, both ways round, so a coarser neighbor never leaves a crack
     const skirt = (a, b) => { const A = [pos[a*3], pos[a*3 + 1], pos[a*3 + 2]], B = [pos[b*3], pos[b*3 + 1], pos[b*3 + 2]], A2 = [A[0], A[1] - 3, A[2]], B2 = [B[0], B[1] - 3, B[2]], cl = new THREE.Color(col[a*3], col[a*3 + 1], col[a*3 + 2]);
       SK.quad(A, B, B2, A2, cl); SK.quad(A, A2, B2, B, cl); };
@@ -309,7 +317,9 @@
     for (let i = 0; i < CN; i++){ skirt(i, i + 1); skirt(CN*VN + i, CN*VN + i + 1); skirt(i*VN, (i + 1)*VN); skirt(i*VN + CN, (i + 1)*VN + CN); }
     const near = (x, z, m) => pads.some(p => Math.hypot(x - p.x, z - p.z) < p.r + m);
     // (no bushes: the land is left open for homes and painted foliage)
-    const m = T.mesh(), sk = SK.mesh(), nr = sk.geometry.attributes.normal;
+    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(LP, 3)); lg.setAttribute('color', new THREE.BufferAttribute(LC, 3)); lg.setAttribute('normal', new THREE.BufferAttribute(LN, 3));
+    const m = new THREE.Mesh(lg, landM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.matrixAutoUpdate = false; m.frustumCulled = true;
+    const sk = SK.mesh(), nr = sk.geometry.attributes.normal;
     for (let v = 0; v < nr.count; v++) nr.setXYZ(v, 0, 1, 0);   // (a skirt that shows in a crack is lit like the ground, not like a wall)
     sk.castShadow = false; m.add(sk);
     if (BT.p.length) m.add(BT.mesh(pieceM));
@@ -399,12 +409,14 @@
     // its crests have fallen behind by slowing in the shallows
     void train(vec2 p, float d, float sh, float L, float A0, float ang, float ph, float Ksc, float qs,
                inout vec3 disp, inout vec2 slope, inout float jac){
+      // (faked, not solved: the look of shoaling from plain curves of depth, which cost a few multiplies where the real
+      // dispersion relation took a tanh, two pows and a sinh per wave per vertex. In the shallows the crests bunch up
+      // (k grows), the wave stands up taller (Ks) and its crests fall behind (lag), as before)
       vec2 D = rot(WD, ang); float k0 = 6.2832/L, w = sqrt(GRAV*k0);
-      float h = max(d, 0.02), kh0 = k0*h;
-      float k = min(k0/pow(tanh_(pow(kh0, 0.75)), 0.6667), 3.0*k0);     // (the dispersion relation, solved: Fenton & McKee; bounded, so the phase can't tear where the floor drops sharply)
-      float kh = k*h, n = 0.5*(1.0 + 2.0*kh/max(sinh(min(2.0*kh, 18.0)), 1e-4));
-      float cg = n*w/k, cg0 = 0.5*w/k0, Ks = clamp(sqrt(cg0/cg), 1.0, 2.2);   // (shoaling: as the group slows, the wave grows)
-      float lag = (k - k0)*3.2*(1.0 - smoothstep(0.0, 5.0, sh));         // (its crests fall behind where it's shallow)
+      float shallow = 1.0 - smoothstep(0.15, 0.9*L/6.2832 + 1.0, d);   // (0 in deep water, 1 at the shore)
+      float k = k0*(1.0 + 1.6*shallow*shallow);
+      float Ks = 1.0 + 1.1*shallow*shallow;
+      float lag = (k - k0)*3.2*(1.0 - smoothstep(0.0, 5.0, sh));
       float a = A0*Ks*Ksc, th = k0*dot(D, p) - w*time + ph - lag;
       float Q = qs/(k*max(a, 1e-3));                                     // (how far the water swings sideways: sharpens the crest)
       Q = min(Q, 1.0);
@@ -430,8 +442,8 @@
       // behind a rock (up-swell of here) the water is sheltered; it fills in further on
       float lee = max((1.0 - smoothstep(0.2, 0.9, shAt(p - WD*3.0)))*0.8, (1.0 - smoothstep(0.2, 0.9, shAt(p - WD*7.0)))*0.5);
       float big = (1.0 + wForce)*(1.0 - 0.85*lee)*smoothstep(0.05, 1.2, sh);
-      vec3 disp = vec3(0.0); vec2 slope = vec2(0.0); jac = 1.0;
-      train(p, d, sh, SWL, 2.6*setEnv(p), 0.0, 0.0, big, 0.5, disp, slope, jac);   // (the set's waves)
+      vec3 disp = vec3(0.0); vec2 slope = vec2(0.0); jac = 1.0; float env = setEnv(p);
+      train(p, d, sh, SWL, 2.6*env, 0.0, 0.0, big, 0.5, disp, slope, jac);   // (the set's waves)
       train(p, d, sh, 8.0, 0.13, 0.7, 0.4, big, 0.08, disp, slope, jac);            // (a little wind chop across it)
       // depth-limited breaking, wave by wave: a crest can stand at most about 0.39 of the depth above the still water (a
       // height of 0.78 of the depth, crest to trough). Where this crest gets there it breaks: its top is cut off and runs
@@ -440,7 +452,7 @@
       brk = smoothstep(0.8, 1.2, ratio)*smoothstep(0.05, 0.6, sh);
       // against rock (a stack, a boulder, the cliff's foot) the wave doesn't just fade: the open sea's crest arriving there
       // slams into it and turns to white water round it
-      float k0r = 6.2832/SWL, raw = 2.6*setEnv(p)*cos(k0r*dot(WD, p) - sqrt(GRAV*k0r)*time)*(1.0 + wForce);
+      float k0r = 6.2832/SWL, raw = 2.6*env*cos(k0r*dot(WD, p) - sqrt(GRAV*k0r)*time)*(1.0 + wForce);
       brk = max(brk, (1.0 - smoothstep(0.25, 1.9, sh))*smoothstep(0.5, 1.5, raw));
       if (ratio > 1.0){ float f = 1.0/ratio; disp.y *= f; slope *= f; }
       // a trough can't reach the seabed (it flattens over the shallows), and the water's swing sideways dies away as the
@@ -683,14 +695,14 @@
       for (let i = 0; i < n; i++){ const a = i/n*PI*2; hitPts.push([k.x + Math.cos(a)*r, k.z + Math.sin(a)*r, k.stack ? 2.4 : 1.6]); }
     }
   }
-  function sprayTick(dt, t){
-    hitPoints();
+  function sprayTick(dt, t, check = true){
+    if (check){ hitPoints();
     for (const [x, z, up] of hitPts){
       const key = x.toFixed(2) + ',' + z.toFixed(2), hh = WAVE.h(x, z, t), prev = hitPrev.get(key);
       hitPrev.set(key, hh);
       if (prev !== undefined && prev < 1.3 && hh >= 1.3){ const a = Math.min(1, (hh - 1.0)/1.8); spawnSpray(x, z, Math.round(4 + a*10), up*(.6 + .5*a)); }   // (a big crest just arrived)
     }
-    if (hitPrev.size > 6000) hitPrev.clear();
+    if (hitPrev.size > 6000) hitPrev.clear(); }
     for (let i = 0; i < SPN; i++){
       if (spAge[i] >= spL[i]){ spA[i] = 0; continue; }
       spAge[i] += dt; spV[i*3 + 1] -= 6.5*dt;
@@ -894,12 +906,12 @@
     }
     for (let c = Math.floor(z0/ROCK_CELL) - 1; c <= Math.floor(z1/ROCK_CELL) + 1; c++){
       const rs = rocksOf(c); if (!rs.some(k => inRect(k.x, k.z, 14) !== null)) continue;
-      let rc = rockMeshes.get(c); if (!rc){ rc = { mesh: buildRocks(c), seen: 0 }; rockMeshes.set(c, rc); } rc.seen = fcount;
+      let rc = rockMeshes.get(c); if (!rc){ rc = { mesh: buildRocks(c), seen: 0 }; rockMeshes.set(c, rc); SHD.dirty = true; } rc.seen = fcount;
     }
     todo.sort((a, b) => a[0] - b[0]);   // (pieces just placed first, then what's missing, nearest first, then detail changes)
     const t0 = performance.now();
     for (const [, ch, lod] of todo){
-      const old = ch.mesh; ch.mesh = buildChunk(ch.i, ch.j, lod); ch.lod = lod; ch.dirty = false;
+      const old = ch.mesh; ch.mesh = buildChunk(ch.i, ch.j, lod); ch.lod = lod; ch.dirty = false; SHD.dirty = true; if (PROF.on){ PROF.builds = (PROF.builds || 0) + 1; (PROF.log || (PROF.log = [])).push(ch.i + ',' + ch.j + ':' + lod); }
       if (old){ scene.remove(old); old.traverse(o => o.geometry && o.geometry.dispose()); }
       if (performance.now() - t0 > budget) break;
     }
@@ -911,7 +923,7 @@
     }
     // the depth window: centered a little ahead of the view, where most of the sea on screen is
     const ahead = Math.min(V.gH*.4, DW_*.25);
-    moveWindow(V.cx + V.fx*ahead, V.cz + V.fz*ahead, budget > 100 ? 1e9 : 3);
+    const tw = performance.now(); moveWindow(V.cx + V.fx*ahead, V.cz + V.fz*ahead, budget > 100 ? 1e9 : 3); if (PROF.on) PROF.win = (PROF.win || 0) + performance.now() - tw;
     seaU.box.value.set(WIN.x0*TEX, WIN.z0*TEX, DW_, DW_);
   }
 
@@ -1288,10 +1300,10 @@
   const pieceMeshes = [];
   function pieceMesh(p){ const b = blockOf(p.kind, p.seed, !!p.base || p.level > 0, !!p.up);
     if (p.anim) p.anim.u.pH.value = b.h;
-    const m = new THREE.Mesh(b.geo, p.anim ? p.anim.mat : pieceM); m.castShadow = !p.anim; m.receiveShadow = true; m.customDepthMaterial = landDepth; m.frustumCulled = false;
-    if (b.fol){ const f = new THREE.Mesh(b.fol, grassM); f.receiveShadow = true; f.frustumCulled = false; f.visible = !p.anim; f.raycast = () => {}; m.add(f); m.userData.fol = f; }   // (its plants, swaying; shown once it's painted in)
+    const m = new THREE.Mesh(b.geo, p.anim ? p.anim.mat : pieceM); m.castShadow = !p.anim; m.receiveShadow = true; m.customDepthMaterial = landDepth; m.frustumCulled = true;
+    if (b.fol){ if (!b.fol.boundingSphere){ b.fol.computeBoundingSphere(); b.fol.boundingSphere.radius += .6; } const f = new THREE.Mesh(b.fol, grassM); f.receiveShadow = true; f.frustumCulled = true; f.visible = !p.anim; f.raycast = () => {}; m.add(f); m.userData.fol = f; }   // (its plants, swaying; shown once it's painted in)
     m.position.set(p.x, p.y, p.z); m.rotation.y = p.rot; m.matrixAutoUpdate = false; m.updateMatrix(); m.updateMatrixWorld(); m.userData.piece = p; p.top = b.top; p.h = b.h; p.hullL = b.hull; p.hullW = placeHull(b.hull, p.x, p.z, p.rot); return m; }
-  function remesh(p){ if (p.mesh){ scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); } p.mesh = pieceMesh(p); scene.add(p.mesh); pieceMeshes.push(p.mesh); }
+  function remesh(p){ SHD.dirty = true; if (p.mesh){ scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); } p.mesh = pieceMesh(p); scene.add(p.mesh); pieceMeshes.push(p.mesh); }
   const stackTop = p => { while (p.up) p = p.up; return p; };
   const MAXLV = 8;   // (how many floors of blocks a home can reach)
   // can a block go here on the ground? wholly on land (right up to the cliff edge is fine), on ground that isn't too steep,
@@ -1370,8 +1382,8 @@
       a.t = ANIM.hold !== undefined ? ANIM.hold : a.t + dt; if (a.t < 0) continue;   // (hold: a test hook)
       if (!a.bloomed){ a.bloomed = true; bloom(p); }
       const r = Math.min(a.t/.17, 1); a.u.pRise.value = 1 - Math.pow(1 - r, 2.2); a.u.pDry.value = smooth(.06, .26, a.t);
-      if (r >= 1 && p.mesh && !p.mesh.castShadow) p.mesh.castShadow = true;   // (its shadow comes once the wash has reached the top)
-      if (a.t > .27){ p.anim = null; p.mesh.material = pieceM; p.mesh.castShadow = true; if (p.mesh.userData.fol) p.mesh.userData.fol.visible = true; freePaint(a); ANIM.list.splice(i, 1); } } }
+      if (r >= 1 && p.mesh && !p.mesh.castShadow){ p.mesh.castShadow = true; SHD.dirty = true; }   // (its shadow comes once the wash has reached the top)
+      if (a.t > .27){ SHD.dirty = true; p.anim = null; p.mesh.material = pieceM; p.mesh.castShadow = true; if (p.mesh.userData.fol) p.mesh.userData.fol.visible = true; freePaint(a); ANIM.list.splice(i, 1); } } }
   // A block can also be built off the side of another (host), on the same floor: it hangs from the wall it's set against, on
   // a stepped plaster corbel. How far a block reaches out from anything that stands on the ground is kept (reach): past
   // SUPPORT_REACH it gets supports of its own down to the ground, in the style of the home, and they count as standing.
@@ -1392,7 +1404,7 @@
     if (!PIECES.includes(p)) return;
     if (p.up) removePiece(p.up);
     for (const q of PIECES.filter(q => q.host === p)) removePiece(q);
-    scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); PIECES.splice(PIECES.indexOf(p), 1);
+    scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); PIECES.splice(PIECES.indexOf(p), 1); SHD.dirty = true;
     if (ULINKS.some(u => u.a === p.id || u.b === p.id)){ ULINKS = ULINKS.filter(u => u.a !== p.id && u.b !== p.id); saveLinks(); }
     if (p.base){ p.base.up = null; remesh(p.base); } else if (p.level === 0){ gridDel(p); dirtyAround(p); }
     if (p.level === 0) grassAround(p.x, p.z, p.r + 1);
@@ -1511,7 +1523,7 @@
     }
   }
   function buildLinks(){
-    linksDirty = false;
+    linksDirty = false; SHD.dirty = true;
     if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); for (const c of linksMesh.children) c.geometry.dispose(); linksMesh = null; }
     const T = new Tris(true), pairs = [], deg = new Map(), joined = new Set(), pools = [];
     for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, 1]);   // (by night: the windows' light on the ground round a home)
@@ -1577,7 +1589,7 @@
       }
     }
     if (T.p.length){ linksMesh = T.mesh(pieceM); linksMesh.customDepthMaterial = landDepth; scene.add(linksMesh);
-      const fg = folGeo(T.fol); if (fg){ const f = new THREE.Mesh(fg, grassM); f.receiveShadow = true; f.frustumCulled = false; f.raycast = () => {}; linksMesh.add(f); } }
+      const fg = folGeo(T.fol); if (fg){ fg.computeBoundingSphere(); fg.boundingSphere.radius += .6; const f = new THREE.Mesh(fg, grassM); f.receiveShadow = true; f.frustumCulled = true; f.raycast = () => {}; linksMesh.add(f); } }
     buildPools(pools);
   }
   // the warm light by night: a soft pool on the ground round each home, under each pergola and arcade, in each courtyard
@@ -1990,19 +2002,34 @@
   /* ---------- every frame ---------- */
   // the reflection pass: everything above the water, flipped upside down about it and drawn flat in its own colors (no
   // lights, no shadows) into a target the size of the view, where the sea reads it at its own pixel, through the ripples
-  const reflM = new THREE.MeshBasicMaterial({ vertexColors: true, clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0)] });
+  const reflM = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)] });   // (double sided: a mirrored view turns the faces' winding round)
   reflM.onBeforeCompile = sh => { sh.uniforms.nightK = CURV.nightK;   // (by night the lit windows show in the water, warm)
     sh.vertexShader = GLOW_V + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vGlow = glow;');
     sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vGlow > 0.85 ? vec3(1.0, 0.85, 0.46) : vec3(1.0, 0.6, 0.28), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
   renderer.localClippingEnabled = true;
+  // (the reflection is drawn from a camera mirrored in the water's plane, not by flipping the whole scene, which made
+  // every object's matrix be worked out again twice a frame; it's drawn every other frame, the ripples hide the step, and
+  // only from what stands near enough the water to show in it: the land and homes far inland are left out)
+  const reflCam = new THREE.OrthographicCamera(); reflCam.matrixAutoUpdate = false;
+  const MIRROR = new THREE.Matrix4().makeScale(1, -1, 1);
+  let reflFrame = 0;
+  const nearSea = (x, z, m) => coastX(z) - x < m;
   function renderRefl(){
-    const hide = [sea, spray, ghost, ring, connGhost, ...gSquares.values(), ...pieceMeshes.map(m => m.userData.fol).filter(Boolean), ...(linksMesh ? linksMesh.children : []), ...zGhosts, ...(poolMesh ? [poolMesh] : []), ...BLOOMS], vis = hide.map(o => o.visible); hide.forEach(o => { o.visible = false; });
-    scene.overrideMaterial = reflM; scene.scale.y = -1; scene.updateMatrixWorld(true);
-    renderer.shadowMap.autoUpdate = false;
-    renderer.setRenderTarget(reflRT); renderer.setClearColor(0x000000, 0); renderer.autoClear = true; renderer.render(scene, cam);
-    renderer.shadowMap.autoUpdate = true;
-    scene.overrideMaterial = null; scene.scale.y = 1; scene.updateMatrixWorld(true); hide.forEach((o, i) => { o.visible = vis[i]; });
+    if ((reflFrame++ & 1) && !TOFF.fix) return;
+    reflCam.projectionMatrix.copy(cam.projectionMatrix); reflCam.projectionMatrixInverse.copy(cam.projectionMatrixInverse);
+    reflCam.matrix.multiplyMatrices(MIRROR, cam.matrixWorld); reflCam.updateMatrixWorld(true);
+    const hide = [sea, spray, ghost, ring, connGhost, ...zGhosts, ...BLOOMS];
+    for (const m of gSquares.values()) hide.push(m);
+    if (poolMesh) hide.push(poolMesh);
+    if (linksMesh) hide.push(...linksMesh.children);
+    for (const m of pieceMeshes){ if (m.userData.fol) hide.push(m.userData.fol); if (!nearSea(m.position.x, m.position.z, 22)) hide.push(m); }
+    for (const ch of chunks.values()) if (ch.mesh && !nearSea(ch.i*CH + CH, ch.j*CH + CH/2, 14) && !nearSea(ch.i*CH + CH, ch.j*CH, 14) && !nearSea(ch.i*CH + CH, ch.j*CH + CH, 14)) hide.push(ch.mesh);
+    const vis = hide.map(o => o.visible); for (const o of hide) o.visible = false;
+    scene.overrideMaterial = reflM;
+    renderer.setRenderTarget(reflRT); renderer.setClearColor(0x000000, 0); renderer.autoClear = true; renderer.render(scene, reflCam);
+    scene.overrideMaterial = null; hide.forEach((o, i) => { o.visible = vis[i]; });
   }
+
   setTime(11); resize();
   updateCamera(0); stream(1e9);   // (the first view whole, before the first frame)
   // compile now, while loading, every shader that would otherwise first be needed in play (the paint-in, the pigment
@@ -2011,22 +2038,35 @@
     for (const m of tmp){ m.visible = false; scene.add(m); } renderer.compile(scene, cam); for (const m of tmp) scene.remove(m);
     for (const m of [extractM, blurM]){ postQ.material = m; renderer.compile(postScene, skyCam); } renderer.compile(blitScene, skyCam); }
   const t0 = performance.now(), TOFF = { v: 0 }; let last = t0;   // (TOFF: a test hook, to look at the sea at a given moment)
+  // The shadows are cached: the scene's casters don't move, so the shadow map is drawn again only when the light moves,
+  // the shadow box moves with the view, or a caster comes, goes or changes (SHD.dirty, set wherever that happens)
+  function shadowTick(){
+    const sc = sun.shadow.camera, k = sun.position.x.toFixed(3) + ',' + sun.position.y.toFixed(3) + ',' + sun.position.z.toFixed(3) + ',' + sc.right.toFixed(2) + ',' + sc.far.toFixed(1) + ',' + sun.target.position.x.toFixed(3);
+    if (k !== SHD.key || SHD.dirty){ SHD.key = k; SHD.dirty = false; renderer.shadowMap.needsUpdate = true; } }
+  // PROF: a test hook, time per part of the frame (CPU side; the GPU's share shows up in render)
+  const tk = (name, t0_) => { if (PROF.on){ const t1 = performance.now(); PROF.acc[name] = (PROF.acc[name] || 0) + t1 - t0_; return t1; } return 0; };
+  let fNo = 0, halfDt = 0, ghostKey = '';
   function frame(now){
-    const dt = Math.min(.1, (now - last)/1000); last = now;
-    updateCamera(dt); stream(6);
-    if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'grass') showGrass(); else if (PL.kind === 'zone' && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost();
+    const dt = Math.min(.1, (now - last)/1000); last = now; fNo++; let q = PROF.on ? performance.now() : 0;
+    updateCamera(dt); q = tk('camera', q); stream(3); q = tk('stream', q);
+    { const gk = PL.kind ? [PL.kind, PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkind, PL.rot, GR.size, GR.style, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|') : '';
+      if (gk !== ghostKey){ ghostKey = gk;   // (the ghost is worked out again only when something it shows has changed: the raycasts and checks are the costly part)
+        if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'grass') showGrass(); else if (PL.kind === 'zone' && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); } }
+    q = tk('ghost', q);
     animTick(dt);
     if (linksDirty && !ANIM.list.length) buildLinks();
-    const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t); grassTick(t);
-    foamStep(dt); renderRefl();
+    q = tk('anim+links', q);
+    const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t, !(fNo & 3) || TOFF.fix !== undefined); /* (a crest's arrival is caught every fourth frame; the spray itself moves every frame) */ q = tk('spray', q); grassTick(t); q = tk('grass', q);
+    halfDt += dt; if ((fNo & 1) || TOFF.fix !== undefined){ foamStep(halfDt); halfDt = 0; } q = tk('foam', q); renderRefl(); q = tk('reflection', q);   // (the foam's slow: it keeps up at half the rate)
+    shadowTick();
     renderer.setRenderTarget(rt); renderer.autoClear = true; renderer.render(skyScene, skyCam);
-    renderer.autoClear = false; renderer.clearDepth(); renderer.render(scene, cam);
-    renderer.autoClear = true; glowPass();
-    renderer.setRenderTarget(null); renderer.autoClear = true; renderer.render(blitScene, skyCam);
+    renderer.autoClear = false; renderer.clearDepth(); renderer.render(scene, cam); if (PROF.on){ PROF.calls += renderer.info.render.calls; PROF.tris += renderer.info.render.triangles; } q = tk('main render', q);
+    renderer.autoClear = true; glowPass(); q = tk('glow', q);
+    renderer.setRenderTarget(null); renderer.autoClear = true; renderer.render(blitScene, skyCam); q = tk('blit', q); if (PROF.on) PROF.n++;
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour, heightAt, coastX, pick, PIECES,
+  window.COAST = { buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

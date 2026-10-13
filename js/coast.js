@@ -308,7 +308,7 @@
   // Gravity is slowed to 0.45 g so the motion reads at the game's scale. (1 unit is about a metre.)
   const WAVE_GLSL = `
     uniform float wForce;   // (a test switch: louder swell)
-    const vec2 WD = vec2(-0.7071, -0.7071), WP = vec2(0.7071, -0.7071);   // (from the left of the starting view, running to its right)
+    const vec2 WD = vec2(-1.0, 0.0), WP = vec2(0.0, -1.0);   // (straight in from the open sea, square on to the cliffs: the land lies toward -x)
     const float GRAV = 9.81*0.45;
     float tanh_(float x){ float e = exp(2.0*clamp(x, -9.0, 9.0)); return (e - 1.0)/(e + 1.0); }
     float shAt(vec2 q){ vec2 i = (q - box.xy)/box.zw; if (i.x < 0.0 || i.y < 0.0 || i.x > 1.0 || i.y > 1.0) return 4.0; return texture2D(depthTex, q/box.zw).g*4.0; }
@@ -370,7 +370,7 @@
       nrm = normalize(vec3(-sl.x, 1.0, -sl.y));
       return disp; }`;
   // the same swell on the cpu (deep water, no shoaling): for the spray against the rocks
-  const WAVE = { D: [-0.7071, -0.7071], P: [0.7071, -0.7071] };
+  const WAVE = { D: [-1, 0], P: [0, -1] };
   WAVE.h = (x, z, t) => {   // the set's wave height at a point (deep water: no shoaling)
     const G = 9.81*.45, SWL = 28, SETP = 85, k0 = 2*PI/SWL, cg = .5*Math.sqrt(G/k0), fr = v => v - Math.floor(v);
     const s = WAVE.D[0]*x + WAVE.D[1]*z - cg*t, idx = Math.floor(s/SETP), u = s - idx*SETP;

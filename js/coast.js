@@ -323,7 +323,7 @@
                inout vec3 disp, inout vec2 slope, inout float jac){
       vec2 D = rot(WD, ang); float k0 = 6.2832/L, w = sqrt(GRAV*k0);
       float h = max(d, 0.02), kh0 = k0*h;
-      float k = k0/pow(tanh_(pow(kh0, 0.75)), 0.6667);                   // (the dispersion relation, solved: Fenton & McKee)
+      float k = min(k0/pow(tanh_(pow(kh0, 0.75)), 0.6667), 3.0*k0);     // (the dispersion relation, solved: Fenton & McKee; bounded, so the phase can't tear where the floor drops sharply)
       float kh = k*h, n = 0.5*(1.0 + 2.0*kh/max(sinh(min(2.0*kh, 18.0)), 1e-4));
       float cg = n*w/k, cg0 = 0.5*w/k0, Ks = clamp(sqrt(cg0/cg), 1.0, 2.2);   // (shoaling: as the group slows, the wave grows)
       float lag = (k - k0)*3.2*(1.0 - smoothstep(0.0, 5.0, sh));         // (its crests fall behind where it's shallow)
@@ -361,6 +361,11 @@
       float ratio = disp.y/max(0.39*d, 1e-3);
       brk = smoothstep(0.8, 1.2, ratio)*smoothstep(0.05, 0.6, sh);
       if (ratio > 1.0){ float f = 1.0/ratio; disp.y *= f; slope *= f; }
+      // a trough can't reach the seabed (it flattens over the shallows), and the water's swing sideways dies away as the
+      // floor comes up, so the surface never dips below the sand or slides into the rock
+      float floorY = -0.55*max(d, 0.0);
+      if (disp.y < floorY){ float f = floorY/min(disp.y, -1e-4); disp.y = floorY; slope *= f; }
+      float sw = smoothstep(0.3, 3.0, d); disp.x *= sw; disp.z *= sw; jac = mix(1.0, jac, sw);
       vec2 sl = slope/max(jac, 0.2);
       nrm = normalize(vec3(-sl.x, 1.0, -sl.y));
       return disp; }`;

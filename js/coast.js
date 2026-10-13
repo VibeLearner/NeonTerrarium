@@ -288,17 +288,51 @@
     }
     if (changed) dtex.needsUpdate = true;
   }
-  // the sea's mesh: rings around the view, closer together near the middle, wide enough to reach past the horizon
-  function polarGeo(nA, nR){ const p = [0, 0, 0], idx = [];
-    for (let r = 1; r <= nR; r++){ const rr = Math.pow(r/nR, 1.35); for (let a = 0; a < nA; a++){ const t = a/nA*PI*2; p.push(Math.cos(t)*rr, 0, Math.sin(t)*rr); } }
-    for (let a = 0; a < nA; a++) idx.push(0, 1 + (a + 1) % nA, 1 + a);
-    for (let r = 1; r < nR; r++) for (let a = 0; a < nA; a++){ const i0 = 1 + (r - 1)*nA, i1 = 1 + r*nA, a1 = (a + 1) % nA; idx.push(i0 + a, i0 + a1, i1 + a, i0 + a1, i1 + a1, i1 + a); }
+  // the sea's mesh: a fine grid laid over the ground the view shows (moved and stretched to it every frame), fine enough for
+  // the waves to lift it
+  function gridGeo(n){ const p = [], idx = [];
+    for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) p.push(i/n, j/n, 0);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++){ const a = j*(n + 1) + i, b = a + 1, c = a + n + 1, d = c + 1; idx.push(a, b, c, b, d, c); }   // (wound to face up: the grid's axes are the view's right and forward)
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setIndex(idx); return g; }
+  // The big waves, shared by the grid (their height), the shading (their face, crest and foam) and the spray (cpu, below).
+  // Each crest is a band travelling landward (along WD) at 2.6 units a second. Only some crests are waves; each runs only so
+  // far along its length, and each lives and dies: it swells up out of the sea, rolls on, and sinks away again, unless it
+  // reaches the rocks first, where it flattens into white water (shore distance) and throws spray.
+  // bigWave: (strength now, place across the crest 0..1 (1: its front), crest number, place along it).
+  const WAVE_GLSL = `
+    const vec2 WD = vec2(-0.932, 0.362), WP = vec2(-0.362, -0.932);
+    vec4 bigWave(vec2 p){ float along = dot(p, WP), u = dot(p, WD)/26.0 - time/10.0 + 0.3*sin(along*0.05 + 1.7);
+      float wn = floor(u), wc = u - wn;
+      float ex = step(0.3, fract(wn*0.6180339887 + 0.13));
+      float seg = smoothstep(-0.55, 0.1, sin(along*0.045 + wn*2.3) + 0.45*sin(along*0.13 - wn*1.1));
+      float life = smoothstep(0.12, 0.6, 0.5 + 0.5*sin(time*0.3 + wn*2.1));
+      return vec4(ex*seg*life, wc, wn, along); }
+    // its height across it (x: units behind its front): a steep face up to the peak, a long back
+    float waveShape(float x){ return x < 2.4 ? smoothstep(0.0, 2.4, x) : 1.0 - smoothstep(2.4, 12.0, x); }`;
+  const WAVE = { D: [-0.932, 0.362], P: [-0.362, -0.932] };
+  WAVE.at = (x, z, t) => {   // the same as bigWave, on the cpu
+    const along = x*WAVE.P[0] + z*WAVE.P[1], u = (x*WAVE.D[0] + z*WAVE.D[1])/26 - t/10 + .3*Math.sin(along*.05 + 1.7), wn = Math.floor(u), wc = u - wn;
+    const fr = v => v - Math.floor(v), ex = fr(wn*0.6180339887 + .13) >= .3 ? 1 : 0;
+    const seg = smooth(-.55, .1, Math.sin(along*.045 + wn*2.3) + .45*Math.sin(along*.13 - wn*1.1)), life = smooth(.12, .6, .5 + .5*Math.sin(t*.3 + wn*2.1));
+    return [ex*seg*life, wc, wn];
+  };
   const seaU = Object.assign({ time: { value: 0 }, depthTex: { value: dtex }, box: { value: new THREE.Vector4(0, 0, DW_, DW_) },
     sunDir: { value: new THREE.Vector3() }, camXZ: { value: new THREE.Vector2() }, tint: { value: new THREE.Color(1, 1, 1) }, glint: { value: new THREE.Color(1, 1, 1) }, glintK: { value: 1 } }, CURV);
-  const sea = new THREE.Mesh(polarGeo(192, 110), new THREE.ShaderMaterial({ uniforms: seaU,
-    vertexShader: `uniform vec2 ctr, fwd; uniform float curveK, g0; varying vec2 vP; varying float vG;
-      void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vP = w.xz; vG = dot(w.xz - ctr, fwd); float gp = max(vG - g0, 0.0); w.y -= curveK*gp*gp; gl_Position = projectionMatrix * viewMatrix * w; }`,
+  seaU.gO = { value: new THREE.Vector2() }; seaU.gU = { value: new THREE.Vector2(1, 0) }; seaU.gV = { value: new THREE.Vector2(0, 1) };
+  const sea = new THREE.Mesh(gridGeo(320), new THREE.ShaderMaterial({ uniforms: seaU,
+    vertexShader: `uniform vec2 ctr, fwd, gO, gU, gV; uniform float curveK, g0, time; uniform sampler2D depthTex; uniform vec4 box; varying vec2 vP; varying float vG;
+      ${WAVE_GLSL}
+      void main(){
+        vec2 p = gO + gU*position.x + gV*position.y;
+        vec2 inn = (p - box.xy)/box.zw; float inBox = step(0.0, inn.x)*step(inn.x, 1.0)*step(0.0, inn.y)*step(inn.y, 1.0);
+        vec2 tx = texture2D(depthTex, p/box.zw).rg; float d = inBox > 0.5 ? tx.r*tx.r*24.0 : 24.0, sh = inBox > 0.5 ? tx.g*4.0 : 4.0;
+        // the big waves lift the surface: higher as they come into shallower water, flattening out against the rocks
+        vec4 w = bigWave(p); float x = (1.0 - w.y)*26.0, ahead = w.y*26.0;
+        float amp = 1.0*w.x*smoothstep(0.3, 2.2, sh)*(1.0 + 0.5*(1.0 - smoothstep(1.0, 5.0, d)));
+        float y = amp*waveShape(x) - 0.22*w.x*(1.0 - smoothstep(0.0, 3.5, ahead))*smoothstep(0.3, 2.2, sh);
+        y += 0.035*sin(dot(p, vec2(-0.91, 0.41))*0.42 + time*0.95)*smoothstep(0.5, 3.0, sh);   // (the long swell, gently)
+        vec4 wp = vec4(p.x, y, p.y, 1.0);
+        vP = p; vG = dot(p - ctr, fwd); float gp = max(vG - g0, 0.0); wp.y -= curveK*gp*gp; gl_Position = projectionMatrix * viewMatrix * wp; }`,
     fragmentShader: `
       uniform float time; uniform sampler2D depthTex; uniform vec4 box; uniform vec3 sunDir; uniform vec2 camXZ; uniform vec3 tint, glint, hazeC; uniform float hzNear, hzFar, hzMax, glintK;
       varying vec2 vP; varying float vG;
@@ -313,6 +347,7 @@
         return mix(c3, c4, clamp((d - 7.0)/12.0, 0.0, 1.0)); }
       float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
         return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
+      ${WAVE_GLSL}
       // one travelling wave: adds its height and its slope
       void wave(vec2 q, vec2 dir, float f, float sp, float a, inout float h, inout vec2 gr){ float ph = dot(dir, q)*f + time*sp; h += a*sin(ph); gr += a*f*cos(ph)*dir; }
       void main(){
@@ -348,30 +383,31 @@
           float c = abs(sin(c2.x*1.6 + time*0.9 + sin(c2.y*1.2 + time*0.6)*1.4) * sin(c2.y*1.8 - time*0.7 + sin(c2.x*1.05 - time*0.4)*1.3));
           col += step(0.82 + dith*0.08, c) * (1.0 - d/3.2) * vec3(0.16, 0.14, 0.08);
         }
-        // swells: now and then a set of bigger waves rolls in toward the shore. Each crest is a band moving landward; only some
-        // crests are waves, and each runs only so far along its length. A wave lifts the water ahead of a dark trough, with
-        // a broken white cap on its front edge that thickens as it reaches the shallows and breaks.
-        vec2 D = vec2(-0.932, 0.362), P = vec2(-0.362, -0.932);
-        float along = dot(p, P), u = dot(p, D)/26.0 - time/10.0 + 0.3*sin(along*0.05 + 1.7);
-        float wn = floor(u), wc = fract(u);
-        float wave = step(0.45, h21(vec2(wn, 3.1))) * smoothstep(-0.2, 0.35, sin(along*0.045 + wn*2.3) + 0.45*sin(along*0.13 - wn*1.1));
-        float shoal = 1.0 - smoothstep(0.4, 3.0, d);
-        float capW = 0.025 + 0.11*shoal;
-        // the wave's shape across it (x: how far behind the front, in units): a shadowed trough ahead, a steep glassy face
-        // lit through from behind (turquoise), a white crest with a ragged lip, and foam left behind on its back, breaking up
-        // into lace and thinning out
+        // the big waves (bigWave, shared with the grid that they lift): a shadowed trough ahead; the steep face, glassy and lit
+        // through (turquoise); a white crest at the peak, ragged along its length, thicker as the water shallows; foam left
+        // on its back, breaking into lace and thinning out. Against the rocks (near the shore) the wave is spent: its height
+        // goes into a burst of white water that spreads and fades over the next few seconds.
+        vec4 bw = bigWave(p); float wave = bw.x, wc = bw.y, wn = bw.z, along = bw.w;
+        float shoal = 1.0 - smoothstep(0.4, 3.0, d), open = smoothstep(0.3, 2.2, sh);
         float x = (1.0 - wc)*26.0, ahead = wc*26.0;
         if (wave > 0.02 && d > 0.15){
-          float lw = wave*(0.6 + 0.4*shoal);
-          col *= 1.0 - 0.2*lw*(1.0 - smoothstep(0.0, 3.0, ahead + dith*0.6));                                          // (the trough)
-          float face = 1.0 - smoothstep(0.2, 4.2*lw + 0.6, x + dith*0.9);
-          col = mix(col, mix(vec3(0.1, 0.48, 0.58), vec3(0.24, 0.72, 0.72), face), step(0.12, face)*0.85*lw);                                 // (the face, lit through)
+          float lw = wave*(0.7 + 0.3*shoal)*open;
+          col *= 1.0 - 0.28*lw*(1.0 - smoothstep(0.0, 4.0, ahead + dith*0.8));                                       // (the trough, in its shadow)
+          float f = smoothstep(0.0, 2.4, x);                                                                           // (up the face)
+          vec3 faceC = mix(vec3(0.07, 0.42, 0.55), vec3(0.3, 0.8, 0.78), floor(f*3.0 + dith*0.8)/3.0);               // (glassy, lit through near the top: three steps)
+          col = mix(col, faceC, step(0.0, x)*step(x, 2.4)*0.9*lw);
           float lipN = vn(vec2(along*0.9, time*0.6)) + 0.5*vn(vec2(along*2.7 - time, wn));
-          float crest = step(x + dith*0.25, (0.3 + 0.55*lipN + 0.6*shoal)*lw);                                 // (the crest, ragged)
-          float lace = vn(vec2(along*0.8, x*1.4) + vec2(wn*7.0, 0.0)) * 0.7 + vn(vec2(along*2.3, x*3.1) + wn) * 0.3;
-          float trail = step(0.24 + x*0.07 + dith*0.12, lace*lw) * step(0.2, x) * step(x, 10.0);                  // (foam left behind)
+          float crest = step(abs(x - 2.4) + dith*0.3, (0.25 + 0.45*lipN + 0.6*shoal)*lw);                            // (the crest, at the peak, ragged)
+          float lace = vn(vec2(along*0.8, x*1.1) + vec2(wn*7.0, 0.0)) * 0.7 + vn(vec2(along*2.3, x*2.6) + wn) * 0.3;
+          float trail = step(0.36 + (x - 2.6)*0.045 + dith*0.12, lace*lw) * step(2.6, x) * step(x, 11.0);             // (foam left behind, thinning)
+          col = mix(col, col*1.1 + vec3(0.02, 0.05, 0.05), step(2.4, x)*step(x, 12.0)*(1.0 - smoothstep(2.4, 12.0, x))*0.9*lw);   // (its back, raised and lit)
           col = mix(col, vec3(0.94, 0.99, 0.98), max(crest, trail*0.85));
-          col = mix(col, col*1.06 + vec3(0.02, 0.04, 0.04), step(x, 9.0)*step(2.0, x)*0.5*lw);                    // (its back, still raised)
+        }
+        // spent on the rocks: white water where the wave hit, spreading back out and fading over a few seconds
+        float spent = wave*(1.0 - open*0.85)*(1.0 - smoothstep(0.0, 12.0, x))*step(0.0, x)*(1.0 - smoothstep(1.2, 3.2, sh));
+        if (spent > 0.02){
+          float foamN = vn(p*1.6 + vec2(wn*3.1, time*0.4))*0.6 + vn(p*3.3 - time*0.3)*0.4;
+          col = mix(col, vec3(0.95, 0.99, 0.98), step(1.0 - spent*1.4 + x*0.03 + dith*0.15, foamN));
         }
         // whitecaps: little flecks of white that pop up out at sea and fade, here and there
         vec2 wcell = floor(p/3.4); float wph = h21(wcell*1.7 + 4.0), wt = time*0.22 + wph, wk = floor(wt), wl = fract(wt);
@@ -393,7 +429,7 @@
         float surge = 0.5 + 0.5*sin(time*0.9 + p.x*0.05 + p.y*0.04 + h*0.6);
         float churn = 1.0 - smoothstep(0.0, 1.5, sh);
         col = mix(col, col*0.75 + vec3(0.22, 0.27, 0.26), step(dith + 0.51, churn*0.9));
-        float hit = wave*smoothstep(0.75, 1.0, wc);   // (a wave reaching the rocks throws the foam further out)
+        float hit = wave*(1.0 - smoothstep(0.0, 6.0, x))*step(0.0, x);   // (a wave reaching the rocks throws the foam further out)
         float lip = step(sh + dith*0.14, 0.18 + 0.09*nz + 0.2*surge + 0.55*hit) + step(d, 0.08);
         float rp = fract(sh*0.55 + time*0.2 + nz*0.05), band = smoothstep(0.7, 0.92, rp)*(1.0 - smoothstep(0.94, 1.0, rp));
         float roll = step(1.0 - band*0.75, vn(p*1.9 + vec2(time*0.12, -time*0.07)) + dith*0.15) * step(sh, 2.0) * step(0.1, sh);
@@ -403,6 +439,59 @@
         gl_FragColor = vec4(col, 1.0);
       }` }));
   sea.frustumCulled = false; scene.add(sea);
+
+  /* ---------- spray: where a wave hits the rocks ---------- */
+  // Points along the cliff's foot and round the rocks in view are checked each frame against the big waves (WAVE.at, the
+  // shader's bigWave on the cpu): when a living wave's front reaches one, it throws a burst of white drops up and back out
+  // over the water, higher against the cliff; they fall and thin out. Drawn as single dithered pixels in the scene, so the
+  // cliff hides what's behind it. (A seeded stream, not Math.random.)
+  const SPN = 1200, spPos = new Float32Array(SPN*3), spA = new Float32Array(SPN), spV = new Float32Array(SPN*3), spL = new Float32Array(SPN).fill(1), spAge = new Float32Array(SPN).fill(9);
+  const spGeo = new THREE.BufferGeometry(); spGeo.setAttribute('position', new THREE.BufferAttribute(spPos, 3)); spGeo.setAttribute('aA', new THREE.BufferAttribute(spA, 1));
+  const spray = new THREE.Points(spGeo, new THREE.ShaderMaterial({ uniforms: { tint: seaU.tint, size: { value: 2 } }, depthWrite: false,
+    vertexShader: 'attribute float aA; uniform float size; varying float vA; void main(){ vA = aA; gl_PointSize = size; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform vec3 tint; varying float vA;
+      float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); vec2 a = mod(q, 2.0), b = floor(q/2.0); float b2 = (a.x*2.0 + a.y*3.0 - 2.0*a.x*a.y), b1 = (b.x*2.0 + b.y*3.0 - 2.0*b.x*b.y); return (b2*4.0 + b1)/16.0; }
+      void main(){ if (vA < 0.03 || bayer(gl_FragCoord.xy) > vA) discard; gl_FragColor = vec4(vec3(0.95, 0.99, 1.0)*tint, 1.0); }` }));
+  spray.frustumCulled = false; spray.renderOrder = 4; scene.add(spray);
+  let spI = 0, spSeed = 12345;
+  const srnd = () => { spSeed = (Math.imul(spSeed, 1664525) + 1013904223) >>> 0; return spSeed/4294967296; };
+  function spawnSpray(x, z, n, up){
+    for (let k = 0; k < n; k++){
+      const i = spI++ % SPN, back = .3 + srnd()*1.3, side = (srnd() - .5)*1.6;
+      spPos[i*3] = x + (srnd() - .5)*.5; spPos[i*3 + 1] = .05 + srnd()*.25; spPos[i*3 + 2] = z + (srnd() - .5)*.5;
+      spV[i*3] = -WAVE.D[0]*back + WAVE.P[0]*side; spV[i*3 + 1] = up*(.55 + srnd()*.6); spV[i*3 + 2] = -WAVE.D[1]*back + WAVE.P[1]*side;
+      spL[i] = .55 + srnd()*.7; spAge[i] = 0;
+    }
+  }
+  const hitPts = [], hitPrev = new Map(); let hitAt = '';
+  function hitPoints(){   // the cliff's foot every unit along the coast in view, and a ring round each rock
+    const key = Math.round(V.cx) + ',' + Math.round(V.cz) + ',' + Math.round(zoom) + ',' + yaw.toFixed(2);
+    if (key === hitAt) return; hitAt = key; hitPts.length = 0;
+    const pts = [[-V.hw, V.back], [V.hw, V.back], [-V.hw, V.gMax], [V.hw, V.gMax]].map(([u, g]) => [V.cx + V.rx*u + V.fx*g, V.cz + V.rz*u + V.fz*g]);
+    const z0 = Math.min(...pts.map(p => p[1])), z1 = Math.max(...pts.map(p => p[1]));
+    for (let z = Math.floor(z0); z <= z1; z += 1){ const x = coastX(z) + .3*rowCos(z); if (inRect(x, z, 2) !== null) hitPts.push([x, z, coveAt(z)[0] > .4 ? 1.4 : 2.6 + 1.2*vnoise(z*.3, 3)]); }
+    for (let c = Math.floor(z0/ROCK_CELL) - 1; c <= Math.floor(z1/ROCK_CELL) + 1; c++) for (const k of rocksOf(c)){
+      if (inRect(k.x, k.z, 4) === null) continue;
+      const r = (k.stack ? k.r*1.05 : k.r*.95) + .3, n = k.stack ? 14 : 7;
+      for (let i = 0; i < n; i++){ const a = i/n*PI*2; hitPts.push([k.x + Math.cos(a)*r, k.z + Math.sin(a)*r, k.stack ? 2.4 : 1.6]); }
+    }
+  }
+  function sprayTick(dt, t){
+    hitPoints();
+    for (const [x, z, up] of hitPts){
+      const key = x.toFixed(2) + ',' + z.toFixed(2), [a, wc] = WAVE.at(x, z, t), prev = hitPrev.get(key);
+      hitPrev.set(key, wc);
+      if (prev !== undefined && wc > prev + .5 && a > .15) spawnSpray(x, z, Math.round(3 + a*10), up*(.5 + .5*a));   // (a wave's front just reached it)
+    }
+    if (hitPrev.size > 6000) hitPrev.clear();
+    for (let i = 0; i < SPN; i++){
+      if (spAge[i] >= spL[i]){ spA[i] = 0; continue; }
+      spAge[i] += dt; spV[i*3 + 1] -= 6.5*dt;
+      spPos[i*3] += spV[i*3]*dt; spPos[i*3 + 1] += spV[i*3 + 1]*dt; spPos[i*3 + 2] += spV[i*3 + 2]*dt;
+      spA[i] = spPos[i*3 + 1] < -.05 ? 0 : Math.max(0, 1 - spAge[i]/spL[i])*1.1;
+    }
+    spGeo.attributes.position.needsUpdate = true; spGeo.attributes.aA.needsUpdate = true;
+  }
 
   /* ---------- light: noon, afternoon, golden hour ---------- */
   const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
@@ -509,7 +598,8 @@
     CURV.hzNear.value = 1e5; CURV.hzFar.value = 2e5; CURV.hzMax.value = 0;   // (no haze: nothing is far off)
     skyU.hor.value = 1;
     seaU.camXZ.value.set(cam.position.x, cam.position.z);
-    const rad = Math.max(Math.hypot(Math.min(gMax, gH*1.3), hw), Math.hypot(back, hw)) + 12; sea.scale.set(rad, 1, rad); sea.position.set(_cs.x, 0, _cs.z); sea.updateMatrixWorld();
+    { const m = 6, u0 = -hw - m, g0_ = back - m, g1 = gMax + m;   // (the grid: across the screen's width, from below the bottom edge to past the top)
+      seaU.gO.value.set(_cs.x + (-sy*0 + cy)*u0 + (-sy)*g0_, _cs.z + (-sy)*u0 + (-cy)*g0_); seaU.gU.value.set(cy*(2*(hw + m)), -sy*(2*(hw + m))); seaU.gV.value.set(-sy*(g1 - g0_), -cy*(g1 - g0_)); }
     fitShadow();
   }
 
@@ -714,14 +804,14 @@
     const dt = Math.min(.1, (now - last)/1000); last = now;
     updateCamera(dt); stream(6);
     if (PL.kind) showGhost();
-    const t = (now - t0)/1000 + TOFF.v; seaU.time.value = t;
+    const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t);
     renderer.setRenderTarget(rt); renderer.autoClear = true; renderer.render(skyScene, skyCam);
     renderer.autoClear = false; renderer.clearDepth(); renderer.render(scene, cam);
     renderer.setRenderTarget(null); renderer.autoClear = true; renderer.render(blitScene, skyCam);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { TOFF, setHour, heightAt, coastX, pick, PIECES,
+  window.COAST = { seaU, TOFF, WAVE, get t0(){ return t0; }, setHour, heightAt, coastX, pick, PIECES,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

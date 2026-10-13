@@ -51,10 +51,32 @@ const MON = (() => {
     if (M.id !== id) FC.init = false;   // (a new subject: the feed's camera starts from the view's angle)
     M.id = id; M.rev = -1; M.lastDoor = null; el.hidden = false; document.body.classList.add('watching');
     if (window.STORY) STORY.setWatch(id);
-    render(true);
+    render(true); drawPins(true);
   };
   M.close = () => { M.id = null; el.hidden = true; document.body.classList.remove('watching'); MON_FOCUS.on = false; if (window.STORY) STORY.setWatch(null); };
   M.userPan = () => {};   // (the main view is the player's own: the feed has its own camera)
+
+  /* ---------- pins: people kept a click away (a star by the name; chips by the monitor; a chip glows while its person is in a story moment) ---------- */
+  const PIN_KEY = 'neonIsland.pins', PIN_MAX = 6;
+  let pins = []; try { pins = JSON.parse(localStorage.getItem(PIN_KEY) || '[]').filter(x => typeof x === 'string').slice(0, PIN_MAX); } catch (e){ pins = []; }
+  const savePins = () => { try { localStorage.setItem(PIN_KEY, JSON.stringify(pins)); } catch (e){} };
+  const pinBox = $m('monPins'), pinBtn = $m('monPin');
+  const pinName = id => { const k = window.STORY && STORY.known(id); if (k && k.first) return k.first + (k.last ? ' ' + k.last[0] + '.' : '');
+    const d = window.STORY ? STORY.descOf(id) : 'someone'; return d.replace(/^(an?|the) (unknown )?/i, '').replace(/^\w/, c => c.toUpperCase()); };
+  let pinSig = '';
+  M.pins = () => pins.slice();
+  M.togglePin = id => { if (!id) return; const i = pins.indexOf(id); if (i >= 0) pins.splice(i, 1); else { pins.unshift(id); if (pins.length > PIN_MAX) pins.pop(); } savePins(); drawPins(true); };
+  function drawPins(force){
+    if (typeof people !== 'undefined' && typeof pplReady !== 'undefined' && pplReady && people.size){ const n = pins.length; pins = pins.filter(id => people.has(id)); if (pins.length !== n) savePins(); }   // (someone gone from the city)
+    if (pinBtn){ const on = !!M.id && pins.includes(M.id); pinBtn.classList.toggle('on', on); pinBtn.textContent = on ? '★' : '☆'; pinBtn.title = on ? 'Unpin' : 'Pin: keep them a click away'; }
+    const rows = pins.map(id => { const p = typeof people !== 'undefined' && people.get(id); return [id, pinName(id), !!(p && p.scene), id === M.id]; });
+    const sig = JSON.stringify(rows); if (!force && sig === pinSig) return; pinSig = sig;
+    pinBox.innerHTML = rows.map(([id, nm, live, on]) => '<div class="mon-pin' + (live ? ' live' : '') + (on ? ' on' : '') + '" data-id="' + esc(id) + '" title="' + esc(nm) + (live ? ': something is happening' : '') + '"><span class="st">★</span><b>' + esc(nm) + '</b><button class="x" aria-label="Unpin" title="Unpin">✕</button></div>').join('');
+  }
+  pinBox.addEventListener('click', e => { const chip = e.target.closest('.mon-pin'); if (!chip) return; const id = chip.dataset.id;
+    if (e.target.closest('.x')){ M.togglePin(id); return; } if (typeof people !== 'undefined' && people.has(id)) M.open(id); });
+  if (pinBtn) pinBtn.addEventListener('click', () => M.togglePin(M.id));
+  setInterval(() => drawPins(false), 700);
   $m('monClose').addEventListener('click', M.close);
   document.querySelectorAll('#monTabs button').forEach(b => b.addEventListener('click', () => { M.tab = b.dataset.tab; document.querySelectorAll('#monTabs button').forEach(x => x.classList.toggle('on', x === b)); render(true); }));
 

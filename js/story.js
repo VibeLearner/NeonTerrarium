@@ -459,6 +459,7 @@ const STORY = (() => {
       if (d === 'pick-up' && mine){ if (!p.held) p.held = st.pick || 'box'; frame = since < 1 ? F_CROUCH + Math.min(3, Math.floor(since*4)) : holdIdle(); }
       else if (d === 'hand-over' && mine && p.held) frame = F_GIVE + Math.floor(t*2) % 2;
       else if (p.held && !(st.gest && Math.floor(t*.6 + p.phase) % 3 > 0)) frame = holdIdle();
+      else if (d === 'sit' && mine) frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4;
       else if ((d === 'eat' || d === 'picnic') && mine) frame = F_SITEAT + Math.floor(t*1.6 + p.phase) % 4;   // (an eat step seats them: see beginHold)
       else if (d === 'phone-call' && mine) frame = F_COMM + Math.floor(t*1.5 + p.phase) % 4;
       else if (d === 'post-feed' && mine) frame = F_USE + Math.floor(t*4 + p.phase) % 6;
@@ -477,10 +478,27 @@ const STORY = (() => {
     const tx = -d.n[1], tz = d.n[0], o = (slot - .5)*.34, out = .12 + (slot > 1 ? .2 : 0);
     return { kind: 'door', door: d, place: pl.id, x: d.stand.x + tx*o + d.n[0]*out, z: d.stand.z + tz*o + d.n[1]*out };
   }
-  function openPlaceNear(x, z){
+  // the open place a step happens at, of the kind its line describes: a lawn is a lawn plot, the square and its stalls are the town square, a seat
+  // anywhere with seats; for a step that sits (sit, eat, picnic) only a place with a free seat. None near enough: the storylet isn't started (placesOk).
+  const OPEN_FIT = {
+    lawn: pl => !!pl.bench,
+    square: pl => !!(pl.mega && pl.mega.kind === 'square'), stall: pl => !!(pl.mega && pl.mega.kind === 'square'), 'market-mall': pl => !!(pl.mega && pl.mega.kind === 'square'),
+    'bar-kiosk': pl => !!(pl.mega && pl.mega.kind === 'square'), 'cafe-stool': pl => !!pl.stalls, bench: pl => true };
+  const SEATED = new Set(['sit', 'eat', 'picnic']);
+  function openPlaceNear(x, z, at, seated){   // (seated: how many free seats it needs, one for each person in the step)
+    const fit = OPEN_FIT[at] || (() => true);
     let best = null, bd = Infinity;
-    for (const pl of places.values()){ if (!pl.open || !pl.spots || !pl.spots.length) continue; const d = Math.hypot(pl.x - x, pl.z - z); if (d < bd){ bd = d; best = pl; } }
+    for (const pl of places.values()){ if (!pl.open || !pl.spots || !pl.spots.length || !fit(pl)) continue;
+      if (seated && pl.spots.reduce((n, sp) => n + (sp.kind === 'seat' && !sp.by && !sp.up ? 1 : 0), 0) < seated) continue;
+      const d = Math.hypot(pl.x - x, pl.z - z); if (d < bd){ bd = d; best = pl; } }
     return bd < 40 ? best : null;
+  }
+  // every open-place step of a storylet has a place of its kind near the one who leads it (so a line about the lawn is played on a lawn)
+  function placesOk(s, cast){
+    for (const b of s.beats){ if (b.indoors || !OPEN_FIT[b.at]) continue;
+      const lead = pOf(cast[[].concat(b.who || [])[0]] || cast.A); if (!lead) return false;
+      const [x, z] = posOf(lead); if (!openPlaceNear(x, z, b.at, SEATED.has(b.do) ? [].concat(b.who || [], b.with || []).length : 0)) return false; }
+    return true;
   }
   function shopNear(x, z, not){
     let best = null, bd = Infinity;
@@ -506,7 +524,7 @@ const STORY = (() => {
     if (at === 'home-door'){ const owner = pOf(sc.cast[sc.owner]); return owner ? { kind: 'home', owner } : null; }
     if (at === 'work-door' || at === 'foundry-gate'){ const wp = pOf(sc.cast.A); const pl = wp && wp.job && places.get(wp.job); const d = streetDoor(pl); return d ? { kind: 'door', door: d, place: pl.id } : null; }
     if (at === 'shop-door'){ const [x, z] = posOf(lead), pl = shopNear(x, z, lead.home); const d = streetDoor(pl); return d ? { kind: 'door', door: d, place: pl.id } : null; }
-    if (['stall', 'square', 'cafe-stool', 'bench', 'lawn', 'market-mall', 'bar-kiosk'].includes(at)){ const [x, z] = posOf(lead), pl = openPlaceNear(x, z); return pl ? { kind: 'open', place: pl } : null; }
+    if (OPEN_FIT[at]){ const [x, z] = posOf(lead), pl = openPlaceNear(x, z, at, SEATED.has(b.do) ? [].concat(b.who || [], b.with || []).length : 0); return pl ? { kind: 'open', place: pl } : null; }
     return { kind: 'here' };
   }
   // where in the anchor this person stands, and whether that's a walk
@@ -514,8 +532,9 @@ const STORY = (() => {
     if (anc.kind === 'home') return homeDoorTarget(anc.owner, slot);
     if (anc.kind === 'door'){ const d = anc.door, tx = -d.n[1], tz = d.n[0], o = (slot - .5)*.34; return { kind: 'door', door: d, place: anc.place, x: d.stand.x + tx*o + d.n[0]*.15, z: d.stand.z + tz*o + d.n[1]*.15 }; }
     if (anc.kind === 'open'){
-      if (!anc.spot){ const [x, z] = posOf(p); anc.spot = freeSpotAt(anc.place, b.do === 'sit' || b.do === 'eat' ? 'seat' : null, [x, z]); if (!anc.spot) return null; anc.spot.by = p.id; sc.spots.push(anc.spot); }
+      if (!anc.spot){ const [x, z] = posOf(p); anc.spot = freeSpotAt(anc.place, SEATED.has(b.do) ? 'seat' : null, [x, z]); if (!anc.spot) return null; anc.spot.by = p.id; sc.spots.push(anc.spot); }
       const s = anc.spot; if (slot === 0) return { kind: 'spot', spot: s, x: s.x, z: s.z, node: s.node, y: s.y };
+      if (SEATED.has(b.do)){ const s2 = freeSpotAt(anc.place, 'seat', [s.x, s.z]); if (!s2) return null; s2.by = p.id; sc.spots.push(s2); return { kind: 'spot', spot: s2, x: s2.x, z: s2.z, node: s2.node, y: s2.y }; }   // (everyone in a sitting step on a seat of their own)
       const a = slot*2.1, x = s.x + Math.cos(a)*.38, z = s.z + Math.sin(a)*.38; return { kind: 'pt', x, z, node: s.node };
     }
     // here: the lead stays where they are (or steps out of where they are); others come to them
@@ -643,12 +662,13 @@ const STORY = (() => {
         if (walkFrom(p, tgt)) movers.push(p.id);
         return;
       }
-      const tgt = targetIn(sc, anc, p, slot, b); if (!tgt || tgt.kind === 'stay') return;
+      const tgt = targetIn(sc, anc, p, slot, b); if (!tgt && anc.kind === 'open' && (isWho || SEATED.has(b.do))){ sc.noSpot = true; return; } if (!tgt || tgt.kind === 'stay') return;
       const st = p.sc;
       if (st.mode === 'out' && Math.hypot(st.x - tgt.x, st.z - tgt.z) < .2) return;
       if (tgt.kind === 'spot'){ if (walkFrom(p, { kind: 'pt', x: tgt.x, z: tgt.z, node: tgt.node })) { movers.push(p.id); st.y = tgt.y; } return; }
       if (walkFrom(p, tgt)) movers.push(p.id);
     });
+    if (sc.noSpot){ endScene(sc, 'no spot'); return; }   // (nowhere free to do it: nothing logged)
     sc.walkTo = MOVE.has(b.do) ? sc.walkTo : null;
     sc.movers = movers; sc.phase = 'gather'; sc.since = pplNow;
     // a walk is logged as it starts; everything else once everyone's there
@@ -664,7 +684,7 @@ const STORY = (() => {
       if (other) p.sc.face = [other.sc.x - p.sc.x, other.sc.z - p.sc.z];
       else if (sc.anchor && sc.anchor.kind === 'home'){ const d = streetDoor(places.get(sc.anchor.owner.home)); if (d) p.sc.face = [-d.n[0], -d.n[1]]; }
       p.sc.gest = TALK.has(b.do) || b.do === 'phone-call' || b.do === 'post-feed' || b.do === 'knock-and-wait';
-      if (b.do === 'sit' || b.do === 'eat'){ p.sc.y = (p.sc.y ?? CURB) - .09; p.sc.gest = false; }
+      if (SEATED.has(b.do)){ p.sc.y = (p.sc.y ?? CURB) - .09; p.sc.gest = false; }
     }
     const em = b.emote || EMO_FOR[b.do]; if (em && ppl[0] && EMO[em] !== undefined) emote(ppl[0], em, 2.4);
     if (!MOVE.has(b.do) && b.do !== 'enter') logBeat(sc, b, sc.anchor);
@@ -906,6 +926,7 @@ const STORY = (() => {
       if (ST.isSick(p.id) && !(s.roles.A.needs || []).includes('sick')) return;   // (the watched person is sick: nothing takes them out)
       if (atWork && !s.beats.some(b => b.at === 'work-door') && s.category !== 'work') return;
       const cast = tryCast(s, a, fixed, nowH); if (!cast) return;
+      if (!placesOk(s, Object.fromEntries(Object.entries(cast).filter(([r]) => !r.startsWith('_lazy')).map(([r, x]) => [r, x.id])))) return;   // (its lawn, square or seat isn't near)
       opts.push({ s, cast, w: weightOf(s, As, a)*(a === p ? 1 : .6) });
     };
     for (const s of D.stories) consider(s, p, null);

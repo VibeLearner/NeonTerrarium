@@ -1128,17 +1128,25 @@
   // down together (a brush full) are painted one after another, a beat apart. The links between homes wait until the
   // painting is done, then join them.
   const ANIM = { live: false, n: 0, list: [] };
+  // (the paint materials are kept and reused, never thrown away: a new one, or the last one let go, meant compiling the
+  // shader again in the middle of play, which is what made placing a home hitch)
+  const PAINT_POOL = [];
+  const newPaint = () => { const u = { pRise: { value: 0 }, pDry: { value: 0 }, pB: { value: 0 }, pH: { value: 2 } };
+    return { u, mat: bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }), true, false, true, u) }; };
+  for (let i = 0; i < 8; i++) PAINT_POOL.push(newPaint());
+  const freePaint = a => { PAINT_POOL.push({ u: a.u, mat: a.mat }); };
   function paintIn(p){
-    const u = { pRise: { value: 0 }, pDry: { value: 0 }, pB: { value: p.y }, pH: { value: 2 } };
-    p.anim = { t: -Math.min(ANIM.n++*.09, 2.4), u, mat: bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }), true, false, true, u), bloomed: false };
+    const pm = PAINT_POOL.pop() || newPaint(); pm.u.pRise.value = 0; pm.u.pDry.value = 0; pm.u.pB.value = p.y;
+    p.anim = { t: -Math.min(ANIM.n++*.09, 2.4), u: pm.u, mat: pm.mat, bloomed: false };
     ANIM.list.push(p); }
   const PIGMENT = [new THREE.Color(.8, .46, .32), new THREE.Color(.3, .62, .6), new THREE.Color(.86, .7, .42), new THREE.Color(.5, .68, .44), new THREE.Color(.88, .62, .58)];
   const BLOOMS = [];
   const bloomGeo = new THREE.PlaneGeometry(2, 2).rotateX(-PI/2);
   function bloom(p){
-    let m = BLOOMS.find(b => !b.visible);
-    if (!m){ if (BLOOMS.length >= 24) return;
-      m = new THREE.Mesh(bloomGeo, new THREE.ShaderMaterial({ uniforms: { bT: { value: 0 }, bCol: { value: new THREE.Color() }, bSeed: { value: 0 }, nightK: CURV.nightK },
+    const m = BLOOMS.find(b => !b.visible); if (!m) return;
+    const r = KINDS[p.kind].rb*1.7 + .8; m.scale.set(r, 1, r); m.position.set(p.x, p.y + .03, p.z); m.rotation.y = p.seed;
+    m.material.uniforms.bCol.value.copy(PIGMENT[p.seed % PIGMENT.length]); m.material.uniforms.bSeed.value = (p.seed % 97)*.37; m.material.uniforms.bT.value = 0; m.visible = true; m.userData.t = 0; }
+  const bloomM = new THREE.ShaderMaterial({ uniforms: { bT: { value: 0 }, bCol: { value: new THREE.Color() }, bSeed: { value: 0 }, nightK: CURV.nightK },
         transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
         vertexShader: 'varying vec2 vU; void main(){ vU = position.xz; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
         fragmentShader: `uniform float bT, bSeed, nightK; uniform vec3 bCol; varying vec2 vU;
@@ -1156,20 +1164,18 @@
             float rim = e > 0.0 ? 1.0 - smoothstep(0.0, 0.07, e) : 1.0;
             float a = (0.26 + 0.34*rim)*(1.0 - smoothstep(0.4, 1.0, bT));
             a = floor(a*6.0 + bayer(gl_FragCoord.xy))/6.0; if (a <= 0.0) discard;
-            gl_FragColor = vec4(bCol*(1.0 - 0.22*rim)*mix(1.0, 0.45, nightK), a); }` }));
-      m.frustumCulled = false; m.renderOrder = 3; scene.add(m); BLOOMS.push(m); }
-    const r = KINDS[p.kind].rb*1.7 + .8; m.scale.set(r, 1, r); m.position.set(p.x, p.y + .03, p.z); m.rotation.y = p.seed;
-    m.material.uniforms.bCol.value.copy(PIGMENT[p.seed % PIGMENT.length]); m.material.uniforms.bSeed.value = (p.seed % 97)*.37; m.material.uniforms.bT.value = 0; m.visible = true; m.userData.t = 0; }
+            gl_FragColor = vec4(bCol*(1.0 - 0.22*rim)*mix(1.0, 0.45, nightK), a); }` });
+  for (let i = 0; i < 24; i++){ const m = new THREE.Mesh(bloomGeo, bloomM.clone()); m.material.uniforms.nightK = CURV.nightK; m.frustumCulled = false; m.renderOrder = 3; m.visible = false; scene.add(m); BLOOMS.push(m); }
   function animTick(dt){
     ANIM.n = 0;
     for (const m of BLOOMS) if (m.visible){ m.userData.t = ANIM.hold !== undefined ? ANIM.hold/1.6 : m.userData.t + dt/1.6; m.material.uniforms.bT.value = m.userData.t; if (m.userData.t >= 1) m.visible = false; }
     for (let i = ANIM.list.length - 1; i >= 0; i--){ const p = ANIM.list[i], a = p.anim;
-      if (!a || !PIECES.includes(p)){ if (a) a.mat.dispose(); p.anim = null; ANIM.list.splice(i, 1); continue; }
+      if (!a || !PIECES.includes(p)){ if (a) freePaint(a); p.anim = null; ANIM.list.splice(i, 1); continue; }
       a.t = ANIM.hold !== undefined ? ANIM.hold : a.t + dt; if (a.t < 0) continue;   // (hold: a test hook)
       if (!a.bloomed){ a.bloomed = true; bloom(p); }
       const r = Math.min(a.t/.85, 1); a.u.pRise.value = 1 - Math.pow(1 - r, 2.2); a.u.pDry.value = smooth(.35, 1.25, a.t);
       if (r >= 1 && p.mesh && !p.mesh.castShadow) p.mesh.castShadow = true;   // (its shadow comes once the wash has reached the top)
-      if (a.t > 1.3){ p.anim = null; p.mesh.material = pieceM; p.mesh.castShadow = true; a.mat.dispose(); ANIM.list.splice(i, 1); } } }
+      if (a.t > 1.3){ p.anim = null; p.mesh.material = pieceM; p.mesh.castShadow = true; freePaint(a); ANIM.list.splice(i, 1); } } }
   // A block can also be built off the side of another (host), on the same floor: it hangs from the wall it's set against, on
   // a stepped plaster corbel. How far a block reaches out from anything that stands on the ground is kept (reach): past
   // SUPPORT_REACH it gets supports of its own down to the ground, in the style of the home, and they count as standing.
@@ -1587,6 +1593,11 @@
   }
   setHour(11); resize();
   updateCamera(0); stream(1e9);   // (the first view whole, before the first frame)
+  // compile now, while loading, every shader that would otherwise first be needed in play (the paint-in, the pigment
+  // blooms, the night's light pools and glow bleed): a shader compiled mid-play stalls the frame
+  { const g = blockOf('townhouse', 1, false, false).geo, tmp = [...PAINT_POOL.map(pm => new THREE.Mesh(g, pm.mat)), new THREE.Mesh(g, poolM)];
+    for (const m of tmp){ m.visible = false; scene.add(m); } renderer.compile(scene, cam); for (const m of tmp) scene.remove(m);
+    for (const m of [extractM, blurM]){ postQ.material = m; renderer.compile(postScene, skyCam); } renderer.compile(blitScene, skyCam); }
   const t0 = performance.now(), TOFF = { v: 0 }; let last = t0;   // (TOFF: a test hook, to look at the sea at a given moment)
   function frame(now){
     const dt = Math.min(.1, (now - last)/1000); last = now;
@@ -1603,7 +1614,7 @@
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { seaU, TOFF, WAVE, ANIM, scene, get t0(){ return t0; }, setHour, heightAt, coastX, pick, PIECES,
+  window.COAST = { seaU, TOFF, WAVE, ANIM, scene, renderer, get t0(){ return t0; }, setHour, heightAt, coastX, pick, PIECES,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

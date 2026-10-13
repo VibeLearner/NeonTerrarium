@@ -122,18 +122,22 @@
            : m < 5.0 ? vec3(0.937, 0.898, 0.812) : m < 6.0 ? vec3(0.788, 0.624, 0.424) : vec3(0.886, 0.812, 0.663);
     }`;
   const ROCKY_APPLY = `#include <color_fragment>
+    rockFace = false;
     { vec3 upV = normalize((viewMatrix*vec4(0.0, 1.0, 0.0, 0.0)).xyz); float st = dot(normalize(vNormal), upV);
       bool green = diffuseColor.g > diffuseColor.r*1.12;
-      if (st < 0.55 && vWq.y > -0.4) diffuseColor.rgb = rockAt(vWq);
+      if (st < 0.55 && vWq.y > -0.4){ diffuseColor.rgb = rockAt(vWq); rockFace = true; }
       else if (st < 0.8 && green) diffuseColor.rgb = vec3(0.243, 0.420, 0.180);   // (the grass's lip, darker where it rolls over the edge)
-      else if (st < 0.8 && vWq.y > -0.4) diffuseColor.rgb = rockAt(vWq); }`;
+      else if (st < 0.8 && vWq.y > -0.4){ diffuseColor.rgb = rockAt(vWq); rockFace = true; } }`;
+  // (a cliff face takes its shade from which way it faces, not from cast shadows: on its narrow upright facets the shadow map
+  // drew stepped bands)
+  const ROCKY_LIGHTS = THREE.ShaderChunk.lights_fragment_begin.replace('directLight.visible, receiveShadow ) ) ? getShadow( directionalShadowMap', 'directLight.visible, receiveShadow && !rockFace ) ) ? getShadow( directionalShadowMap');
   // bend any built-in material the same way (and haze it toward the horizon, unless it's only drawn into the shadow map)
   function bent(mat, haze = true, rocky = false){
     mat.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, CURV);
       sh.vertexShader = 'uniform vec2 ctr, fwd; uniform float curveK, g0; varying float vG; varying vec3 vWq;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BEND);
-      if (haze) sh.fragmentShader = 'uniform float hzNear, hzFar, hzMax; uniform vec3 hazeC; varying float vG; varying vec3 vWq;\n' + (rocky ? ROCKY + '\n' : '') + sh.fragmentShader.replace('#include <fog_fragment>', '#include <fog_fragment>\n gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeC, smoothstep(hzNear, hzFar, vG)*hzMax);')
-        .replace('#include <color_fragment>', rocky ? ROCKY_APPLY : '#include <color_fragment>');
+      if (haze) sh.fragmentShader = 'uniform float hzNear, hzFar, hzMax; uniform vec3 hazeC; varying float vG; varying vec3 vWq;\n' + (rocky ? 'bool rockFace;\n' + ROCKY + '\n' : '') + sh.fragmentShader.replace('#include <fog_fragment>', '#include <fog_fragment>\n gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeC, smoothstep(hzNear, hzFar, vG)*hzMax);')
+        .replace('#include <color_fragment>', rocky ? ROCKY_APPLY : '#include <color_fragment>').replace('#include <lights_fragment_begin>', rocky ? ROCKY_LIGHTS : '#include <lights_fragment_begin>');
     };
     mat.customProgramCacheKey = () => 'bent' + (haze ? 1 : 0) + (rocky ? 'r' : '');
     return mat;
@@ -307,6 +311,8 @@
         if (d < 2.4) return mix(c1, c2, (d - 0.6)/1.8);
         if (d < 7.0) return mix(c2, c3, (d - 2.4)/4.6);
         return mix(c3, c4, clamp((d - 7.0)/12.0, 0.0, 1.0)); }
+      float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
+        return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
       // one travelling wave: adds its height and its slope
       void wave(vec2 q, vec2 dir, float f, float sp, float a, inout float h, inout vec2 gr){ float ph = dot(dir, q)*f + time*sp; h += a*sin(ph); gr += a*f*cos(ph)*dir; }
       void main(){
@@ -351,11 +357,21 @@
         float wave = step(0.45, h21(vec2(wn, 3.1))) * smoothstep(-0.2, 0.35, sin(along*0.045 + wn*2.3) + 0.45*sin(along*0.13 - wn*1.1));
         float shoal = 1.0 - smoothstep(0.4, 3.0, d);
         float capW = 0.025 + 0.11*shoal;
-        if (wave > 0.0 && d > 0.15){
-          col *= wc < 0.07 ? 1.0 - 0.1*wave : 1.0;                                                      // (the trough ahead of it)
-          col = mix(col, col*1.12 + vec3(0.02, 0.05, 0.05), step(0.8 + dith*0.05, wc) * wave * 0.9);     // (the lifted face)
-          float cap = step(1.0 - capW, wc) * step(0.35 + dith*0.5, 0.5 + 0.5*sin(along*1.9 + time*2.3 + wn)) * wave;
-          col = mix(col, vec3(0.95, 0.99, 0.98), cap);
+        // the wave's shape across it (x: how far behind the front, in units): a shadowed trough ahead, a steep glassy face
+        // lit through from behind (turquoise), a white crest with a ragged lip, and foam left behind on its back, breaking up
+        // into lace and thinning out
+        float x = (1.0 - wc)*26.0, ahead = wc*26.0;
+        if (wave > 0.02 && d > 0.15){
+          float lw = wave*(0.6 + 0.4*shoal);
+          col *= 1.0 - 0.2*lw*(1.0 - smoothstep(0.0, 3.0, ahead + dith*0.6));                                          // (the trough)
+          float face = 1.0 - smoothstep(0.2, 4.2*lw + 0.6, x + dith*0.9);
+          col = mix(col, mix(vec3(0.1, 0.48, 0.58), vec3(0.24, 0.72, 0.72), face), step(0.12, face)*0.85*lw);                                 // (the face, lit through)
+          float lipN = vn(vec2(along*0.9, time*0.6)) + 0.5*vn(vec2(along*2.7 - time, wn));
+          float crest = step(x + dith*0.25, (0.3 + 0.55*lipN + 0.6*shoal)*lw);                                 // (the crest, ragged)
+          float lace = vn(vec2(along*0.8, x*1.4) + vec2(wn*7.0, 0.0)) * 0.7 + vn(vec2(along*2.3, x*3.1) + wn) * 0.3;
+          float trail = step(0.24 + x*0.07 + dith*0.12, lace*lw) * step(0.2, x) * step(x, 10.0);                  // (foam left behind)
+          col = mix(col, vec3(0.94, 0.99, 0.98), max(crest, trail*0.85));
+          col = mix(col, col*1.06 + vec3(0.02, 0.04, 0.04), step(x, 9.0)*step(2.0, x)*0.5*lw);                    // (its back, still raised)
         }
         // whitecaps: little flecks of white that pop up out at sea and fade, here and there
         vec2 wcell = floor(p/3.4); float wph = h21(wcell*1.7 + 4.0), wt = time*0.22 + wph, wk = floor(wt), wl = fract(wt);
@@ -379,7 +395,8 @@
         col = mix(col, col*0.75 + vec3(0.22, 0.27, 0.26), step(dith + 0.51, churn*0.9));
         float hit = wave*smoothstep(0.75, 1.0, wc);   // (a wave reaching the rocks throws the foam further out)
         float lip = step(sh + dith*0.14, 0.18 + 0.09*nz + 0.2*surge + 0.55*hit) + step(d, 0.08);
-        float roll = step(0.9, fract(sh*0.62 + time*0.21 + nz*0.06)) * step(sh, 1.7 + nz*0.4) * step(-0.1, nz) * step(0.1, sh);
+        float rp = fract(sh*0.55 + time*0.2 + nz*0.05), band = smoothstep(0.7, 0.92, rp)*(1.0 - smoothstep(0.94, 1.0, rp));
+        float roll = step(1.0 - band*0.75, vn(p*1.9 + vec2(time*0.12, -time*0.07)) + dith*0.15) * step(sh, 2.0) * step(0.1, sh);
         col = mix(col, vec3(0.96, 0.99, 0.98), clamp(lip + roll*0.85, 0.0, 1.0));
         col *= tint;
         col = mix(col, hazeC, smoothstep(hzNear, hzFar, vG)*hzMax);
@@ -396,7 +413,7 @@
   const amb = new THREE.AmbientLight(0xcfe6f0, .1); scene.add(amb);   // (shade is lit by the bright sky and the sea: shadows stay soft, not black)
   const SKY = { top: new THREE.Color(), mid: new THREE.Color(), low: new THREE.Color() };
   function setHour(h){
-    const t = clamp((h - 6)/12.6, 0, 1), el = Math.sin(t*PI)*1.05 + .08, az = lerp(-.9, 2.4, t);
+    const t = clamp((h - 6)/12.6, 0, 1), el = Math.sin(t*PI)*.82 + .3, az = lerp(-.9, 2.4, t);
     sunDir.set(Math.cos(az)*Math.cos(el), Math.sin(el), Math.sin(az)*Math.cos(el));
     const warm = smooth(15.5, 18.8, h);
     sun.color.setRGB(1, lerp(.98, .78, warm), lerp(.94, .55, warm)); sun.intensity = lerp(.92, .82, warm);
@@ -692,19 +709,19 @@
   /* ---------- every frame ---------- */
   setHour(11); resize();
   updateCamera(0); stream(1e9);   // (the first view whole, before the first frame)
-  const t0 = performance.now(); let last = t0;
+  const t0 = performance.now(), TOFF = { v: 0 }; let last = t0;   // (TOFF: a test hook, to look at the sea at a given moment)
   function frame(now){
     const dt = Math.min(.1, (now - last)/1000); last = now;
     updateCamera(dt); stream(6);
     if (PL.kind) showGhost();
-    const t = (now - t0)/1000; seaU.time.value = t;
+    const t = (now - t0)/1000 + TOFF.v; seaU.time.value = t;
     renderer.setRenderTarget(rt); renderer.autoClear = true; renderer.render(skyScene, skyCam);
     renderer.autoClear = false; renderer.clearDepth(); renderer.render(scene, cam);
     renderer.setRenderTarget(null); renderer.autoClear = true; renderer.render(blitScene, skyCam);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { setHour, heightAt, coastX, pick, PIECES,
+  window.COAST = { TOFF, setHour, heightAt, coastX, pick, PIECES,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

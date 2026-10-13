@@ -1,441 +1,448 @@
 {
-  "_about": "Lines the game itself writes, outside the storylets: what the monitor says about a person's ordinary day (comings and goings), an empty doorstep at the usual hour, gossip about people in the subject's world, and deliveries. Placeholders as in the storylets: {A} the subject, {B} the other person in view, {C} someone talked about who isn't there, {place} where it happens, {seen} a real count of sightings, {when} a day name, {sender} and {look} for a parcel. The same rules apply: only what is seen or heard, no thoughts, names only from a name in the line.",
-  "routine": {
-    "leave": [
-      "{A} comes out of {place}.",
-      "{A} steps out of {place} and looks up and down the street.",
-      "Door slides open: {A}, out of {place}.",
-      "{A} leaves {place} at an easy pace.",
-      "{A} comes out of {place}, collar up."
-    ],
-    "enter": [
-      "{A} goes into {place}. The door slides shut.",
-      "{A} reaches {place} and goes in.",
-      "{A} slips into {place}.",
-      "{A} goes into {place} without looking back."
-    ],
-    "enterSeen": [
-      "{A} goes into {place}. Seen going in here on {seen} days now.",
-      "Into {place} again: seen going in at this door on {seen} days."
-    ],
-    "seat": [
-      "{A} takes a seat at {place}.",
-      "{A} sits down at {place} and stays put.",
-      "{A} drops onto a seat at {place}."
-    ],
-    "stand": [
-      "{A} stops at {place} and stands a while.",
-      "{A} lingers at {place}.",
-      "{A} finds a spot at {place} and waits there."
-    ],
-    "queue": [
-      "{A} joins the line at {place}.",
-      "{A} waits in line at {place}.",
-      "{A} gets in line at {place}, eyes on the trays."
-    ],
-    "keeper": [
-      "{A} takes the counter at {place} and ties an apron on.",
-      "{A} steps behind the counter at {place}.",
-      "{A} sets up behind the counter at {place}."
-    ],
-    "eat": [
-      "{A} eats, head down.",
-      "{A} eats slowly and watches the street.",
-      "{A} works through a bowl at {place}."
-    ],
-    "chat": [
-      "{A} talks with {B.desc} at {place}.",
-      "{A} and {B.desc} trade a few words at {place}.",
-      "{A} laughs at something {B.desc} says."
-    ],
-    "smalltalk": [
-      "Overheard: {B.desc} says the lift was slow again this morning.",
-      "Overheard: {A} says the rain is supposed to come back tonight.",
-      "Overheard: {B.desc} says the broth here was better last year.",
-      "Overheard: {A} says the new stall on the corner runs out by eight.",
-      "Overheard: {B.desc} asks if {A} heard the sirens last night."
-    ],
-    "metro": [
-      "{A} heads up to the metro platform.",
-      "{A} takes the lift up to the platform.",
-      "{A} goes up to the trains."
-    ],
-    "metroOff": [
-      "{A} comes down from the platform.",
-      "{A} steps out of the lift, down from the trains."
-    ]
-  },
-  "absence": {
-    "first": [
-      "The door stays shut. On {seen} earlier days it opened near this hour.",
-      "No sign of {A} at the door. On {seen} earlier days, out the door by this hour."
-    ],
-    "later": [
-      "Still nothing at the door.",
-      "No movement at the door. The window stays dark."
-    ]
-  },
-  "gossip": {
-    "sick": [
-      "Overheard: {B} says {C.first} has been out sick since {when}.",
-      "Overheard: {B} mentions {C.first} is down with a fever and hasn't left the apartment.",
-      "Overheard: {B} says {C.first} missed work {when}. \"Sick, apparently.\"",
-      "Overheard: {B} says someone should bring {C.first} soup. \"Sick since {when}, poor thing.\""
-    ],
-    "parcel": [
-      "Overheard: {B} says a delivery bot came for {C.first} {when}. \"It was {look}, from {sender}.\"",
-      "Overheard: {B} mentions {C.first} got a delivery {when}. \"From {sender}, if you can believe it.\"",
-      "Overheard: {B} says something from {sender} came for {C.first} {when}."
-    ],
-    "entry": {
-      "sick": [
-        "Out sick since {when}, per {S} (overheard).",
-        "Down with a fever since {when}, per {S} (overheard)."
-      ],
-      "parcel": [
-        "A delivery from {sender} {when}, per {S} (overheard)."
-      ]
-    }
-  },
-  "delivery": {
-    "arrive": [
-      "A delivery bot walks up to {place} and stands at the door, waiting.",
-      "A delivery bot stops at the door of {place}, a parcel capsule on its back.",
-      "A delivery bot reaches {place} and holds at the door, light blinking."
-    ],
-    "take": [
-      "The door slides open. {A} takes the parcel from the bot.",
-      "{A} comes to the door and lifts the parcel out of the bot's capsule.",
-      "{A} steps out, signs with a thumb, and takes the parcel."
-    ],
-    "label": [
-      "Label on the box: {A.full}. Printed under it: {sender}.",
-      "Shipping tag, face up: {A.full}, from {sender}.",
-      "The label reads {A.full}. Sender: {sender}."
-    ],
-    "look": [
-      "It's {look}.",
-      "The parcel: {look}."
-    ],
-    "nobody": [
-      "Nobody comes to the door. The bot sets the parcel down by it and walks off.",
-      "The bot waits, then drops the parcel at the door and goes."
-    ],
-    "kinds": {
-      "medicine": {
-        "when": [
-          "sick"
-        ],
-        "weight": 20,
-        "sender": "Clear Water Pharmacy",
-        "look": "a small white box with a green cross",
-        "react": {
-          "silent": 3,
-          "phone": 4,
-          "mesh": 3
-        },
-        "silent": [
-          "{A} turns the box over once and goes back in.",
-          "{A} pulls {A.his} cardigan tighter and goes back in with the box."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"It came. No, just the fever. I'm not dying.\"",
-          "Comm, one side: {A} says: \"The pharmacy sent it. I'll take it now. Yes, with food.\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"Fever, a blanket, and a pharmacy bot at the door. Living the dream.\"",
-          "Posted to the mesh: \"A pharmacy bot is the only visitor I want today.\""
-        ]
-      },
-      "soup": {
-        "when": [
-          "sick",
-          "any"
-        ],
-        "weight": 6,
-        "sender": "Night Noodle",
-        "look": "a warm bag with a broth tub inside",
-        "react": {
-          "silent": 5,
-          "phone": 1,
-          "mesh": 2
-        },
-        "silent": [
-          "{A} carries the bag in with both hands.",
-          "{A} sniffs the bag and goes back in."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"You sent noodles? You didn't have to. Thank you.\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"Broth delivered. The only good thing about today.\""
-        ]
-      },
-      "dress": {
-        "when": [
-          "outgoing",
-          "partnered"
-        ],
-        "weight": 4,
-        "sender": "Silk Row Tailors",
-        "look": "a long flat box tied with ribbon",
-        "react": {
-          "silent": 2,
-          "phone": 4,
-          "mesh": 4
-        },
-        "silent": [
-          "{A} holds the box flat and goes in carefully.",
-          "{A} tucks the long box under one arm and goes in."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"It's here. It's here! I'm trying it on now. Hold on.\"",
-          "Comm, one side: {A} says: \"The dress came. For Saturday. You'll see it Saturday.\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"It fits. Saturday cannot come fast enough.\"",
-          "Posted to the mesh: \"New dress. Old shoes. Nobody will look at the shoes.\""
-        ]
-      },
-      "letter": {
-        "when": [
-          "family-away"
-        ],
-        "weight": 5,
-        "sender": "a handwritten return address",
-        "look": "a thin envelope, the address written by hand",
-        "react": {
-          "silent": 4,
-          "phone": 4,
-          "mesh": 1
-        },
-        "silent": [
-          "{A} reads the envelope on the step, then goes in.",
-          "{A} holds the envelope up to the light and goes in."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"Your letter came. Yes, today. I'll read it tonight, I promise.\"",
-          "Comm, one side: {A} says: \"A real letter. Who writes letters? You do, I know.\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"Got a letter. On paper. In handwriting.\""
-        ]
-      },
-      "legal": {
-        "when": [
-          "partnered-secret",
-          "money"
-        ],
-        "weight": 2,
-        "sender": "Hale and Moreno, Family Law",
-        "look": "a stiff envelope with a law office's seal",
-        "react": {
-          "silent": 6,
-          "phone": 3,
-          "mesh": 1
-        },
-        "silent": [
-          "{A} reads the sender twice and goes in.",
-          "{A} stands on the step with the envelope for a long time, then goes in."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"The papers came. No. I'll sign them. Just not today.\"",
-          "Comm, one side: {A} says: \"It's from the lawyers. Can you come over? Tonight?\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"Some mail you don't open on the step.\""
-        ]
-      },
-      "bottle": {
-        "when": [
-          "work-trouble",
-          "money"
-        ],
-        "weight": 3,
-        "sender": "Lantern Liquor",
-        "look": "a bottle-shaped tube in padded wrap",
-        "react": {
-          "silent": 6,
-          "phone": 1,
-          "mesh": 2
-        },
-        "silent": [
-          "{A} takes the tube in under one arm.",
-          "{A} glances up and down the street and goes in with the tube."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"Come over. I've got something to open. No reason.\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"Long week. Short evening.\""
-        ]
-      },
-      "flowers": {
-        "when": [
-          "partnered"
-        ],
-        "weight": 3,
-        "sender": "Rooftop Blooms",
-        "look": "a cone of flowers wrapped in paper",
-        "react": {
-          "silent": 2,
-          "phone": 5,
-          "mesh": 3
-        },
-        "silent": [
-          "{A} smells the flowers on the step and goes in.",
-          "{A} holds the flowers out at arm's length, then goes in with them."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"You did not. You did. They're on the table already.\"",
-          "Comm, one side: {A} says: \"What's the occasion? There isn't one? Then thank you.\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"Someone sent flowers for no reason. Best reason.\""
-        ]
-      },
-      "parts": {
-        "when": [
-          "industrial",
-          "any"
-        ],
-        "weight": 3,
-        "sender": "Okada Repair",
-        "look": "a heavy little box that rattles",
-        "react": {
-          "silent": 6,
-          "phone": 2,
-          "mesh": 1
-        },
-        "silent": [
-          "{A} holds the box up to one ear, shakes it, and goes in.",
-          "{A} carries the box in, already peeling the tape."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"The part came. The heater will live. Tell nobody I fixed it myself.\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"Replacement part for a heater older than me.\""
-        ]
-      },
-      "records": {
-        "when": [
-          "any"
-        ],
-        "weight": 3,
-        "sender": "Harbor Records",
-        "look": "a square flat parcel",
-        "react": {
-          "silent": 4,
-          "phone": 1,
-          "mesh": 4
-        },
-        "silent": [
-          "{A} turns the square parcel over and grins at it.",
-          "{A} carries the square parcel in flat, like a tray."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"It came. The pressing with the blue label. Come listen.\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"New record. Neighbors, I'm sorry in advance.\""
-        ]
-      },
-      "books": {
-        "when": [
-          "careful",
-          "any"
-        ],
-        "weight": 2,
-        "sender": "Lamplight Books",
-        "look": "a brick of a parcel, corners soft",
-        "react": {
-          "silent": 6,
-          "phone": 1,
-          "mesh": 2
-        },
-        "silent": [
-          "{A} weighs the parcel in both hands and goes in.",
-          "{A} reads the spine through the wrapping, then goes in."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"The book came. Six hundred pages. See you next month.\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"Weekend plans: one very long book.\""
-        ]
-      },
-      "shoes": {
-        "when": [
-          "any"
-        ],
-        "weight": 3,
-        "sender": "Kick Street",
-        "look": "a shoebox with a neon logo",
-        "react": {
-          "silent": 4,
-          "phone": 1,
-          "mesh": 4
-        },
-        "silent": [
-          "{A} lifts the lid on the step, looks, and closes it.",
-          "{A} tucks the shoebox under an arm and goes in."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"They came in the wrong size. Of course they did.\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"New shoes. The puddles have been warned.\""
-        ]
-      },
-      "seeds": {
-        "when": [
-          "warm",
-          "any"
-        ],
-        "weight": 2,
-        "sender": "Greenhouse Farm",
-        "look": "a crate of seedlings in damp paper",
-        "react": {
-          "silent": 5,
-          "phone": 1,
-          "mesh": 3
-        },
-        "silent": [
-          "{A} counts the seedlings with one finger and goes in.",
-          "{A} carries the crate in slowly, holding it level."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"The seedlings came. All alive. I'll bring you two.\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"Balcony garden, attempt number three.\""
-        ]
-      },
-      "gift": {
-        "when": [
-          "any"
-        ],
-        "weight": 2,
-        "sender": "no return address",
-        "look": "a small box in bright paper",
-        "react": {
-          "silent": 3,
-          "phone": 4,
-          "mesh": 3
-        },
-        "silent": [
-          "{A} shakes the little box next to one ear and goes in.",
-          "{A} reads the tag twice, then goes in."
-        ],
-        "phone": [
-          "Comm, one side: {A} says: \"Did you send me something? No? Then who did?\"",
-          "Comm, one side: {A} says: \"There's no name on it. Was it you?\""
-        ],
-        "mesh": [
-          "Posted to the mesh: \"A gift with no name on it. Whoever you are: thank you.\""
-        ]
-      }
-    }
+ "_about": "Lines the game itself writes, outside the storylets: what the monitor says about a person's ordinary day (comings and goings), an empty doorstep at the usual hour, gossip about people in the subject's world, and deliveries. Placeholders as in the storylets: {A} the subject, {B} the other person in view, {C} someone talked about who isn't there, {place} where it happens, {seen} a real count of sightings, {when} a day name, {sender} and {look} for a parcel. The same rules apply: only what is seen or heard, no thoughts, names only from a name in the line.",
+ "routine": {
+  "leave": [
+   "{A} comes out of {place}.",
+   "{A} steps out of {place} and looks up and down the street.",
+   "Door slides open: {A}, out of {place}.",
+   "{A} leaves {place} at an easy pace.",
+   "{A} comes out of {place}, collar up."
+  ],
+  "enter": [
+   "{A} goes into {place}. The door slides shut.",
+   "{A} reaches {place} and goes in.",
+   "{A} slips into {place}.",
+   "{A} goes into {place} without looking back."
+  ],
+  "enterSeen": [
+   "{A} goes into {place}. Seen going in here on {seen} days now.",
+   "Into {place} again: seen going in at this door on {seen} days."
+  ],
+  "seat": [
+   "{A} takes a seat at {place}.",
+   "{A} sits down at {place} and stays put.",
+   "{A} drops onto a seat at {place}."
+  ],
+  "stand": [
+   "{A} stops at {place} and stands a while.",
+   "{A} lingers at {place}.",
+   "{A} finds a spot at {place} and waits there."
+  ],
+  "queue": [
+   "{A} joins the line at {place}.",
+   "{A} waits in line at {place}.",
+   "{A} gets in line at {place}, eyes on the trays."
+  ],
+  "keeper": [
+   "{A} takes the counter at {place} and ties an apron on.",
+   "{A} steps behind the counter at {place}.",
+   "{A} sets up behind the counter at {place}."
+  ],
+  "eat": [
+   "{A} eats, head down.",
+   "{A} eats slowly and watches the street.",
+   "{A} works through a bowl at {place}."
+  ],
+  "chat": [
+   "{A} talks with {B.desc} at {place}.",
+   "{A} and {B.desc} trade a few words at {place}.",
+   "{A} laughs at something {B.desc} says."
+  ],
+  "smalltalk": [
+   "Overheard: {B.desc} says the lift was slow again this morning.",
+   "Overheard: {A} says the rain is supposed to come back tonight.",
+   "Overheard: {B.desc} says the broth here was better last year.",
+   "Overheard: {A} says the new stall on the corner runs out by eight.",
+   "Overheard: {B.desc} asks if {A} heard the sirens last night."
+  ],
+  "metro": [
+   "{A} heads up to the metro platform.",
+   "{A} takes the lift up to the platform.",
+   "{A} goes up to the trains."
+  ],
+  "metroOff": [
+   "{A} comes down from the platform.",
+   "{A} steps out of the lift, down from the trains."
+  ],
+  "patrol": [
+   "{A} stops at the corner and looks up and down the street.",
+   "{A} pauses at the crossing, scanner at the hip.",
+   "{A} waits at the corner a while, watching the doors.",
+   "{A} reaches the next corner and turns slowly, taking in the block.",
+   "{A} stands at the crossing, hands behind the back, and lets the street go by."
+  ]
+ },
+ "absence": {
+  "first": [
+   "The door stays shut. On {seen} earlier days it opened near this hour.",
+   "No sign of {A} at the door. On {seen} earlier days, out the door by this hour."
+  ],
+  "later": [
+   "Still nothing at the door.",
+   "No movement at the door. The window stays dark."
+  ]
+ },
+ "gossip": {
+  "sick": [
+   "Overheard: {B} says {C.first} has been out sick since {when}.",
+   "Overheard: {B} mentions {C.first} is down with a fever and hasn't left the apartment.",
+   "Overheard: {B} says {C.first} missed work {when}. \"Sick, apparently.\"",
+   "Overheard: {B} says someone should bring {C.first} soup. \"Sick since {when}, poor thing.\""
+  ],
+  "parcel": [
+   "Overheard: {B} says a delivery bot came for {C.first} {when}. \"It was {look}, from {sender}.\"",
+   "Overheard: {B} mentions {C.first} got a delivery {when}. \"From {sender}, if you can believe it.\"",
+   "Overheard: {B} says something from {sender} came for {C.first} {when}."
+  ],
+  "entry": {
+   "sick": [
+    "Out sick since {when}, per {S} (overheard).",
+    "Down with a fever since {when}, per {S} (overheard)."
+   ],
+   "parcel": [
+    "A delivery from {sender} {when}, per {S} (overheard)."
+   ]
   }
+ },
+ "delivery": {
+  "arrive": [
+   "A delivery bot walks up to {place} and stands at the door, waiting.",
+   "A delivery bot stops at the door of {place}, a parcel capsule on its back.",
+   "A delivery bot reaches {place} and holds at the door, light blinking."
+  ],
+  "take": [
+   "The door slides open. {A} takes the parcel from the bot.",
+   "{A} comes to the door and lifts the parcel out of the bot's capsule.",
+   "{A} steps out, signs with a thumb, and takes the parcel."
+  ],
+  "label": [
+   "Label on the box: {A.full}. Printed under it: {sender}.",
+   "Shipping tag, face up: {A.full}, from {sender}.",
+   "The label reads {A.full}. Sender: {sender}."
+  ],
+  "look": [
+   "It's {look}.",
+   "The parcel: {look}."
+  ],
+  "nobody": [
+   "Nobody comes to the door. The bot sets the parcel down by it and walks off.",
+   "The bot waits, then drops the parcel at the door and goes."
+  ],
+  "kinds": {
+   "medicine": {
+    "when": [
+     "sick"
+    ],
+    "weight": 20,
+    "sender": "Clear Water Pharmacy",
+    "look": "a small white box with a green cross",
+    "react": {
+     "silent": 3,
+     "phone": 4,
+     "mesh": 3
+    },
+    "silent": [
+     "{A} turns the box over once and goes back in.",
+     "{A} pulls {A.his} cardigan tighter and goes back in with the box."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"It came. No, just the fever. I'm not dying.\"",
+     "Comm, one side: {A} says: \"The pharmacy sent it. I'll take it now. Yes, with food.\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"Fever, a blanket, and a pharmacy bot at the door. Living the dream.\"",
+     "Posted to the mesh: \"A pharmacy bot is the only visitor I want today.\""
+    ]
+   },
+   "soup": {
+    "when": [
+     "sick",
+     "any"
+    ],
+    "weight": 6,
+    "sender": "Night Noodle",
+    "look": "a warm bag with a broth tub inside",
+    "react": {
+     "silent": 5,
+     "phone": 1,
+     "mesh": 2
+    },
+    "silent": [
+     "{A} carries the bag in with both hands.",
+     "{A} sniffs the bag and goes back in."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"You sent noodles? You didn't have to. Thank you.\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"Broth delivered. The only good thing about today.\""
+    ]
+   },
+   "dress": {
+    "when": [
+     "outgoing",
+     "partnered"
+    ],
+    "weight": 4,
+    "sender": "Silk Row Tailors",
+    "look": "a long flat box tied with ribbon",
+    "react": {
+     "silent": 2,
+     "phone": 4,
+     "mesh": 4
+    },
+    "silent": [
+     "{A} holds the box flat and goes in carefully.",
+     "{A} tucks the long box under one arm and goes in."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"It's here. It's here! I'm trying it on now. Hold on.\"",
+     "Comm, one side: {A} says: \"The dress came. For Saturday. You'll see it Saturday.\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"It fits. Saturday cannot come fast enough.\"",
+     "Posted to the mesh: \"New dress. Old shoes. Nobody will look at the shoes.\""
+    ]
+   },
+   "letter": {
+    "when": [
+     "family-away"
+    ],
+    "weight": 5,
+    "sender": "a handwritten return address",
+    "look": "a thin envelope, the address written by hand",
+    "react": {
+     "silent": 4,
+     "phone": 4,
+     "mesh": 1
+    },
+    "silent": [
+     "{A} reads the envelope on the step, then goes in.",
+     "{A} holds the envelope up to the light and goes in."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"Your letter came. Yes, today. I'll read it tonight, I promise.\"",
+     "Comm, one side: {A} says: \"A real letter. Who writes letters? You do, I know.\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"Got a letter. On paper. In handwriting.\""
+    ]
+   },
+   "legal": {
+    "when": [
+     "partnered-secret",
+     "money"
+    ],
+    "weight": 2,
+    "sender": "Hale and Moreno, Family Law",
+    "look": "a stiff envelope with a law office's seal",
+    "react": {
+     "silent": 6,
+     "phone": 3,
+     "mesh": 1
+    },
+    "silent": [
+     "{A} reads the sender twice and goes in.",
+     "{A} stands on the step with the envelope for a long time, then goes in."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"The papers came. No. I'll sign them. Just not today.\"",
+     "Comm, one side: {A} says: \"It's from the lawyers. Can you come over? Tonight?\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"Some mail you don't open on the step.\""
+    ]
+   },
+   "bottle": {
+    "when": [
+     "work-trouble",
+     "money"
+    ],
+    "weight": 3,
+    "sender": "Lantern Liquor",
+    "look": "a bottle-shaped tube in padded wrap",
+    "react": {
+     "silent": 6,
+     "phone": 1,
+     "mesh": 2
+    },
+    "silent": [
+     "{A} takes the tube in under one arm.",
+     "{A} glances up and down the street and goes in with the tube."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"Come over. I've got something to open. No reason.\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"Long week. Short evening.\""
+    ]
+   },
+   "flowers": {
+    "when": [
+     "partnered"
+    ],
+    "weight": 3,
+    "sender": "Rooftop Blooms",
+    "look": "a cone of flowers wrapped in paper",
+    "react": {
+     "silent": 2,
+     "phone": 5,
+     "mesh": 3
+    },
+    "silent": [
+     "{A} smells the flowers on the step and goes in.",
+     "{A} holds the flowers out at arm's length, then goes in with them."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"You did not. You did. They're on the table already.\"",
+     "Comm, one side: {A} says: \"What's the occasion? There isn't one? Then thank you.\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"Someone sent flowers for no reason. Best reason.\""
+    ]
+   },
+   "parts": {
+    "when": [
+     "industrial",
+     "any"
+    ],
+    "weight": 3,
+    "sender": "Okada Repair",
+    "look": "a heavy little box that rattles",
+    "react": {
+     "silent": 6,
+     "phone": 2,
+     "mesh": 1
+    },
+    "silent": [
+     "{A} holds the box up to one ear, shakes it, and goes in.",
+     "{A} carries the box in, already peeling the tape."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"The part came. The heater will live. Tell nobody I fixed it myself.\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"Replacement part for a heater older than me.\""
+    ]
+   },
+   "records": {
+    "when": [
+     "any"
+    ],
+    "weight": 3,
+    "sender": "Harbor Records",
+    "look": "a square flat parcel",
+    "react": {
+     "silent": 4,
+     "phone": 1,
+     "mesh": 4
+    },
+    "silent": [
+     "{A} turns the square parcel over and grins at it.",
+     "{A} carries the square parcel in flat, like a tray."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"It came. The pressing with the blue label. Come listen.\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"New record. Neighbors, I'm sorry in advance.\""
+    ]
+   },
+   "books": {
+    "when": [
+     "careful",
+     "any"
+    ],
+    "weight": 2,
+    "sender": "Lamplight Books",
+    "look": "a brick of a parcel, corners soft",
+    "react": {
+     "silent": 6,
+     "phone": 1,
+     "mesh": 2
+    },
+    "silent": [
+     "{A} weighs the parcel in both hands and goes in.",
+     "{A} reads the spine through the wrapping, then goes in."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"The book came. Six hundred pages. See you next month.\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"Weekend plans: one very long book.\""
+    ]
+   },
+   "shoes": {
+    "when": [
+     "any"
+    ],
+    "weight": 3,
+    "sender": "Kick Street",
+    "look": "a shoebox with a neon logo",
+    "react": {
+     "silent": 4,
+     "phone": 1,
+     "mesh": 4
+    },
+    "silent": [
+     "{A} lifts the lid on the step, looks, and closes it.",
+     "{A} tucks the shoebox under an arm and goes in."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"They came in the wrong size. Of course they did.\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"New shoes. The puddles have been warned.\""
+    ]
+   },
+   "seeds": {
+    "when": [
+     "warm",
+     "any"
+    ],
+    "weight": 2,
+    "sender": "Greenhouse Farm",
+    "look": "a crate of seedlings in damp paper",
+    "react": {
+     "silent": 5,
+     "phone": 1,
+     "mesh": 3
+    },
+    "silent": [
+     "{A} counts the seedlings with one finger and goes in.",
+     "{A} carries the crate in slowly, holding it level."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"The seedlings came. All alive. I'll bring you two.\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"Balcony garden, attempt number three.\""
+    ]
+   },
+   "gift": {
+    "when": [
+     "any"
+    ],
+    "weight": 2,
+    "sender": "no return address",
+    "look": "a small box in bright paper",
+    "react": {
+     "silent": 3,
+     "phone": 4,
+     "mesh": 3
+    },
+    "silent": [
+     "{A} shakes the little box next to one ear and goes in.",
+     "{A} reads the tag twice, then goes in."
+    ],
+    "phone": [
+     "Comm, one side: {A} says: \"Did you send me something? No? Then who did?\"",
+     "Comm, one side: {A} says: \"There's no name on it. Was it you?\""
+    ],
+    "mesh": [
+     "Posted to the mesh: \"A gift with no name on it. Whoever you are: thank you.\""
+    ]
+   }
+  }
+ }
 }

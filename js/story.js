@@ -1025,14 +1025,16 @@ const STORY = (() => {
   function watchRoutine(){
     const sub = ST.watch, p = sub && pOf(sub); if (!p || !D || p.scene) { subPrev = null; return; }
     const E = D.engine.routine;
-    const state = p.metro ? 'metro' : p.walk ? 'walk:' + (p.walk.to || '') : p.spot ? 'spot:' + p.spot.key : 'in:' + p.at;
+    // (an officer on the beat walks from corner to corner: their walk is headed for the station on paper, but they're at a street corner, not inside)
+    const state = p.metro ? 'metro' : p.walk ? (p.walk.beat ? 'beat' : 'walk:' + (p.walk.to || '')) : p.patrol ? 'post:' + p.patrol.key : p.spot ? 'spot:' + p.spot.key : 'in:' + p.at;
     if (subPrev === null){ subPrev = state; return; }
     if (state === subPrev) return;
     const prev = subPrev; subPrev = state;
     const A = { A: sub };
     if (state === 'metro'){ logLine(pick(E.metro, sub, ST.clock, 'mt'), A, {}, 'live'); return; }
     if (prev === 'metro'){ logLine(pick(E.metroOff, sub, ST.clock, 'mo'), A, {}, 'live'); return; }
-    if (state.startsWith('walk:') && prev.startsWith('in:') && p.walk && p.walk.doorA){
+    if (state.startsWith('post:')){ if (prev === 'beat' && roll(.35, sub, ST.clock, 'pt') && E.patrol) logLine(pick(E.patrol, sub, ST.clock, 'pt'), A, {}, 'live'); return; }
+    if ((state === 'beat' || state.startsWith('walk:')) && prev.startsWith('in:') && p.walk && p.walk.doorA){
       const pl = places.get(prev.slice(3)); logLine(pick(E.leave, sub, ST.clock, 'lv'), A, { place: placeText(pl), placeId: pl ? pl.id : undefined }, 'live');
       if (pl && pl.id === p.home){ seenDays(sub, 'leave-home').add(day()); const firsts = DEP.get(sub) || DEP.set(sub, new Map()).get(sub); if (!firsts.has(day())) firsts.set(day(), hourNow()); }
     }

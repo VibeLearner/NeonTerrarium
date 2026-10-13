@@ -65,8 +65,6 @@
     rockCache.set(c, r); return r;
   }
   function rocksNear(z){ const c0 = Math.floor(z/ROCK_CELL), out = []; for (let c = c0 - 1; c <= c0 + 1; c++) out.push(...rocksOf(c)); return out; }
-  // the lane across the meadow, keeping about the same distance from the cliff, with a whitewashed wall beside it
-  const laneS = z => 17 + 5*n1(z*.035 + 11);
 
   /* ---------- placed pieces (they level the ground under them, so the heights need them) ---------- */
   const PIECES = [], PCELL = 16, pieceGrid = new Map();   // (the lookup buckets are only for finding pieces near a point; pieces sit anywhere)
@@ -78,24 +76,26 @@
     return [...out]; }
 
   // the height at (x, z), with the row's coast, cove and rocks worked out once (a terrain row and a depth row share z)
-  function heightRow(x, z, cx, cv, rocks, pads){
-    const s = cx - x;   // inland distance from the cliff edge (negative: out at sea)
+  // how the coast runs at z: distances are taken across it, not along x, so a cove's sides keep the same cliff as the open coast
+  const rowCos = z => { const sl = (coastX(z + .4) - coastX(z - .4))/.8; return 1/Math.sqrt(1 + sl*sl); };
+  function heightRow(x, z, cx, cv, rocks, pads, cs){
+    const s = cx - x;   // inland distance from the cliff edge, along x (negative: out at sea)
     if (s > 0){
+      const sp = s*cs;   // (and across the coast)
       const top = TOP + .55*(fbm(x*.07, z*.07) - .5) + clamp(s*.025, 0, .8) + 3.2*smooth(26, 90, s)*(fbm(x*.018 + 5, z*.018 - 3) - .38);   // (rolling a little more, far inland)
-      // the cliff: a steep face with a ledge two thirds of the way down, then the meadow
-      const face = s < 1.6 ? (s/1.6) : 1;
-      let cliffY = top*Math.pow(face, .32);
-      if (s < .9 && s > .45) cliffY = Math.min(cliffY, top*.62 + (s - .45)*1.2);   // (the ledge)
-      const beachY = Math.min(top, .25 + .42*s + .02*s*s);   // in a cove: a sandy slope
-      let y = lerp(cliffY, beachY, cv);
+      // the cliff: sheer, with a ledge part way down, rolling over onto the meadow in about a unit; a cove is the same cliff
+      // curving round its bay
+      let y = top*(sp < 1 ? Math.pow(sp, .35) : 1);
+      if (sp < .7 && sp > .35) y = Math.min(y, top*.6 + (sp - .35)*1.4);   // (the ledge)
       if (pads) for (const p of pads){ const d = Math.hypot(x - p.x, z - p.z), w = 1 - smooth(p.r + .2, p.r + 1.8, d); if (w > 0) y = lerp(y, p.y, w); }
       return y;
     }
-    // the seabed: a rocky shelf at the cliff's foot, sand in a cove, then the drop to deep water
-    const o = -s;
+    // the seabed: a rocky shelf at the cliff's foot, then the drop to deep water; in a cove, a sandy floor and a strip of
+    // sand at the foot of the cliff, just above the water
+    const o = -s*cs;
     let y = -.15 - 1.1*Math.pow(o, .8) - .012*o*o;
-    if (o < 9) y += (fbm(x*.25, z*.25) - .5)*1.6*(1 - cv*.7)*smooth(9, 2, o);   // rocks on the shelf, smoother sand in a cove
-    y = lerp(y, .2 - .55*o, cv*smooth(5, 0, o));                                 // the beach running into the water
+    if (o < 9) y += (fbm(x*.25, z*.25) - .5)*1.6*(1 - cv*.7)*smooth(9, 2, o);
+    y = lerp(y, .32 - .7*o, cv*smooth(4, 0, o));
     // rubble at the cliff's foot: rock fallen from the face, some of it just breaking the surface, so the waterline is
     // ragged and broken up, not a ruled line where the cliff meets the sea
     if (o < 1.8 && cv < .6){ const rb = ((fbm(x*1.15 + 7, z*1.15 - 3, 3) - .5)*1.7 + .2 - o*.5)*(1 - cv*1.6); if (rb > y) y = rb; }
@@ -103,7 +103,7 @@
     return Math.max(y, -24);
   }
   // the height anywhere; raw: as the land lies before any piece leveled it
-  const heightAt = (x, z, raw) => { const [cv] = coveAt(z); return heightRow(x, z, coastX(z), cv, rocksNear(z), raw ? null : piecesNear(x - 4, z - 4, x + 4, z + 4)); };
+  const heightAt = (x, z, raw) => { const [cv] = coveAt(z); return heightRow(x, z, coastX(z), cv, rocksNear(z), raw ? null : piecesNear(x - 4, z - 4, x + 4, z + 4), rowCos(z)); };
 
   /* ---------- the bend, the haze, the materials ---------- */
   const scene = new THREE.Scene();
@@ -123,7 +123,10 @@
     }`;
   const ROCKY_APPLY = `#include <color_fragment>
     { vec3 upV = normalize((viewMatrix*vec4(0.0, 1.0, 0.0, 0.0)).xyz); float st = dot(normalize(vNormal), upV);
-      if (st < 0.6 && diffuseColor.g < diffuseColor.r*1.12 && vWq.y > -0.4) diffuseColor.rgb = rockAt(vWq); }`;
+      bool green = diffuseColor.g > diffuseColor.r*1.12;
+      if (st < 0.55 && vWq.y > -0.4) diffuseColor.rgb = rockAt(vWq);
+      else if (st < 0.8 && green) diffuseColor.rgb = vec3(0.243, 0.420, 0.180);   // (the grass's lip, darker where it rolls over the edge)
+      else if (st < 0.8 && vWq.y > -0.4) diffuseColor.rgb = rockAt(vWq); }`;
   // bend any built-in material the same way (and haze it toward the horizon, unless it's only drawn into the shadow map)
   function bent(mat, haze = true, rocky = false){
     mat.onBeforeCompile = sh => {
@@ -180,31 +183,29 @@
   function buildChunk(ci, cj, lod){
     const STEP = .4*(1 << lod), CN = Math.round(CH/STEP), x0 = ci*CH, z0 = cj*CH, n = CN + 3;   // heights with a one-cell border (for the slope)
     const pads = piecesNear(x0 - 3, z0 - 3, x0 + CH + 3, z0 + CH + 3);
-    const hs = new Float32Array(n*n), rowC = [], rowV = [];
-    for (let j = 0; j < n; j++){ const z = z0 + (j - 1)*STEP, [cv] = coveAt(z), cx = coastX(z), rk = rocksNear(z); rowC.push(cx); rowV.push(cv);
-      for (let i = 0; i < n; i++) hs[j*n + i] = heightRow(x0 + (i - 1)*STEP, z, cx, cv, rk, pads); }
+    const hs = new Float32Array(n*n), rowC = [], rowV = [], rowS = [];
+    for (let j = 0; j < n; j++){ const z = z0 + (j - 1)*STEP, [cv] = coveAt(z), cx = coastX(z), rk = rocksNear(z), cs = rowCos(z); rowC.push(cx); rowV.push(cv); rowS.push(cs);
+      for (let i = 0; i < n; i++) hs[j*n + i] = heightRow(x0 + (i - 1)*STEP, z, cx, cv, rk, pads, cs); }
     const VN = CN + 1, pos = new Float32Array(VN*VN*3), col = new Float32Array(VN*VN*3);
     for (let j = 0; j < VN; j++) for (let i = 0; i < VN; i++){
       const k = j*VN + i, x = x0 + i*STEP, z = z0 + j*STEP, h = (a, b) => hs[(j + 1 + b)*n + i + 1 + a], y = h(0, 0);
       pos[k*3] = x; pos[k*3 + 1] = y; pos[k*3 + 2] = z;
-      const cx = rowC[j + 1], c = rowV[j + 1], s = cx - x;
+      const cx = rowC[j + 1], c = rowV[j + 1], s = cx - x, sp = s*rowS[j + 1];
       let cc;
       if (y < -.05) cc = fbm(x*.25, z*.25) > .55 ? PAL.seaRock : PAL.under;
+      else if (s <= 0 && c > .3) cc = y < .14 ? PAL.wet : PAL.sand;   // (a cove's strip of sand at the cliff's foot)
       else if (s <= 0) cc = y < .18 ? PAL.algae : y < .45 ? PAL.wetRock : (vnoise(x*2.3, z*2.3) > .5 ? PAL.rubble : PAL.rubble2);   // (fallen rock at the foot: dark and wet where the sea reaches)
       else {
         const slope = (Math.abs(h(1, 0) - h(-1, 0)) + Math.abs(h(0, 1) - h(0, -1)))*.15/STEP;
         let pad = 0; for (const p of pads){ const d = Math.hypot(x - p.x, z - p.z); if (d < p.r*.9) pad = 1; }
         if (pad) cc = PAL.pad;   // (the leveled ground under a piece: packed earth)
-        else if (c > .45 && y < 2.2 && slope < 1.4) cc = y < .35 ? PAL.wet : PAL.sand;
-        else if (slope > .9 && s < 4 && y < .2 + .15*n1(z*1.7)) cc = PAL.algae;                // (the tide line: weed on the wet rock)
-        else if (slope > .9 && s < 4 && y < .75 + .25*n1(z*.9 + 4)) cc = PAL.wetRock;    // (the splash zone, darker)
-        else if (slope > .9 && s < 4){ const band = Math.floor(y*1.35 + .6*n1(z*.3)) & 7; cc = PAL.rock[[0, 1, 3, 2, 0, 4, 1, 3][band]]; }   // strata in the limestone
+        else if (slope > .9 && sp < 4 && y < .2 + .15*n1(z*1.7)) cc = PAL.algae;                // (the tide line: weed on the wet rock)
+        else if (slope > .9 && sp < 4 && y < .75 + .25*n1(z*.9 + 4)) cc = PAL.wetRock;    // (the splash zone, darker)
+        else if (slope > .9 && sp < 4){ const band = Math.floor(y*1.35 + .6*n1(z*.3)) & 7; cc = PAL.rock[[0, 1, 3, 2, 0, 4, 1, 3][band]]; }   // strata in the limestone
         else {
           const p = fbm(x*.11 + 40, z*.11), q = vnoise(x*.9, z*.9);
           cc = PAL.grass[p < .38 ? 3 : p < .5 ? 0 : p < .62 ? 1 : 2].clone();
-          if (s < 1.9 && s > 0) cc.lerp(PAL.dry, .55);                                   // sun-dried grass at the edge
-          else if (fbm(x*.05 - 9, z*.05 + 4) > .64) cc.lerp(PAL.dry, .35);              // dry patches inland
-          if (Math.abs(s - laneS(z)) < .55 + .25*q) cc = PAL.path;
+          if (fbm(x*.05 - 9, z*.05 + 4) > .64) cc.lerp(PAL.dry, .3 + .1*q);              // dry patches inland
         }
       }
       col[k*3] = cc.r; col[k*3 + 1] = cc.g; col[k*3 + 2] = cc.b;
@@ -215,7 +216,7 @@
     // skirts down from the edges, both ways round, so a coarser neighbor never leaves a crack
     const skirt = (a, b) => { const A = [pos[a*3], pos[a*3 + 1], pos[a*3 + 2]], B = [pos[b*3], pos[b*3 + 1], pos[b*3 + 2]], A2 = [A[0], A[1] - 3, A[2]], B2 = [B[0], B[1] - 3, B[2]], cl = new THREE.Color(col[a*3], col[a*3 + 1], col[a*3 + 2]);
       SK.quad(A, B, B2, A2, cl); SK.quad(A, A2, B2, B, cl); };
-    const SK = new Tris();   // (skirts: their own mesh, which casts no shadow; a skirt showing on a cliff face shadowed it in a dotted line)
+    const SK = new Tris(), BT = new Tris();   // (skirts: their own mesh, which casts no shadow; a skirt showing on a cliff face shadowed it in a dotted line)
     for (let i = 0; i < CN; i++){ skirt(i, i + 1); skirt(CN*VN + i, CN*VN + i + 1); skirt(i*VN, (i + 1)*VN); skirt(i*VN + CN, (i + 1)*VN + CN); }
     const near = (x, z, m) => pads.some(p => Math.hypot(x - p.x, z - p.z) < p.r + m);
     if (lod < 2){
@@ -223,12 +224,14 @@
       for (let a = x0/4; a < (x0 + CH)/4; a++) for (let b = z0/4; b < (z0 + CH)/4; b++){
         if (hash2(a*7 + 3, b*13 + 5) > .06 + .4*smooth(.5, .72, fbm(a*.22 + 3, b*.22 - 7))) continue;
         const x = a*4 + hash2(a, b + 77)*4, z = b*4 + hash2(a + 31, b)*4, s = coastX(z) - x;
-        if (s > 2.5 && Math.abs(s - laneS(z)) > 1.5 && coveAt(z)[0] < .3 && !near(x, z, .6)) bush(T, x, z, (a*92821) ^ b);
+        if (s*rowCos(z) > 2.2 && !near(x, z, .6)) bush(BT, x, z, (a*92821) ^ b);
       }
     }
     const m = T.mesh(), sk = SK.mesh(), nr = sk.geometry.attributes.normal;
     for (let v = 0; v < nr.count; v++) nr.setXYZ(v, 0, 1, 0);   // (a skirt that shows in a crack is lit like the ground, not like a wall)
-    sk.castShadow = false; m.add(sk); scene.add(m); return m;
+    sk.castShadow = false; m.add(sk);
+    if (BT.p.length) m.add(BT.mesh(pieceM));
+    scene.add(m); return m;
   }
   // stacks and rocks, a stretch at a time
   const rockMeshes = new Map();
@@ -264,7 +267,7 @@
     let dist = o*r.cos;
     for (const k of r.rk){ const dd = Math.hypot(x - k.x, r.z - k.z) - (k.stack ? k.r*1.05 : k.r*.95); if (dd < dist) dist = dd; }
     let dep = 255;
-    if (o < 27){ const h = heightRow(x, r.z, r.cx, r.cv, r.rk, null); if (h >= 0) dist = 0; dep = Math.round(Math.sqrt(clamp(-h, 0, 24)/24)*255); }
+    if (o < 27){ const h = heightRow(x, r.z, r.cx, r.cv, r.rk, null, r.cos); if (h >= 0) dist = 0; dep = Math.round(Math.sqrt(clamp(-h, 0, 24)/24)*255); }
     out[o2] = dep; out[o2 + 1] = Math.round(clamp(dist/4, 0, 1)*255);
   }
   function fillRow(iz){ const r = WIN.rows[mod(iz, DN)] = rowInfo(iz), row = mod(iz, DN)*DN; for (let ix = WIN.x0; ix < WIN.x0 + DN; ix++) cell(ix, r, D, (row + mod(ix, DN))*2); }
@@ -587,16 +590,16 @@
   // levels the ground out to the edge.
   function check(kind, x, z){
     const r = KINDS[kind].r, cx = coastX(z), sl = (coastX(z + .5) - coastX(z - .5)), edge = (cx - x)/Math.sqrt(1 + sl*sl);
-    if (edge < r + .05 && coveAt(z)[0] < .45) return { ok: false, why: 'over the edge' };
+    if (edge < r + .05) return { ok: false, why: 'over the edge' };
     let lo = 1e9, hi = -1e9, sum = 0, n = 0;
     for (const [a, rr] of [[0, 0], ...[...Array(8)].map((_, i) => [i/8*PI*2 + .4, r*.6])]){
-      const sx = x + Math.cos(a)*rr, sz = z + Math.sin(a)*rr; if (coastX(sz) - sx < 1.7 && coveAt(sz)[0] < .45) continue;   // (the cliff's rounded rim: the pad levels it)
+      const sx = x + Math.cos(a)*rr, sz = z + Math.sin(a)*rr; if ((coastX(sz) - sx)*rowCos(sz) < 1.2) continue;   // (the cliff's rounded rim: the pad levels it)
       const h = heightAt(sx, sz, true); lo = Math.min(lo, h); hi = Math.max(hi, h); sum += h; n++; }
     if (!n) return { ok: false, why: 'over the edge' };
     const y = sum/n;
     if (lo < .35) return { ok: false, why: 'too close to the water' };
     if (hi - lo > 1.0) return { ok: false, why: 'too steep' };
-    for (let i = 0; i < 12; i++){ const a = i/12*PI*2, h = heightAt(x + Math.cos(a)*r, z + Math.sin(a)*r, true); if (h > y + 1.0 && coastX(z + Math.sin(a)*r) - x - Math.cos(a)*r >= 1.7) return { ok: false, why: 'too steep' }; if (h < .2) return { ok: false, why: 'too close to the water' }; }
+    for (let i = 0; i < 12; i++){ const a = i/12*PI*2, h = heightAt(x + Math.cos(a)*r, z + Math.sin(a)*r, true); if (h > y + 1.0 && (coastX(z + Math.sin(a)*r) - x - Math.cos(a)*r)*rowCos(z + Math.sin(a)*r) >= 1.2) return { ok: false, why: 'too steep' }; if (h < .2) return { ok: false, why: 'too close to the water' }; }
     for (const p of piecesNear(x - r - 4, z - r - 4, x + r + 4, z + r + 4)) if (Math.hypot(x - p.x, z - p.z) < r + p.r + .25) return { ok: false, why: 'something is in the way' };
     return { ok: true, y };
   }

@@ -75,7 +75,7 @@
           "channel": "conversation",
           "chance": 0.35,
           "log": [
-            "Overheard: {A} says: \"{B.first}, stop bouncing. We are not that late.\"",
+            "Overheard: {A} says: \"{B.first}, relax. We are not that late.\"",
             "Overheard: {A} says: \"Ten more minutes, {B.first}. Then we try the kiosk.\""
           ]
         }
@@ -139,7 +139,7 @@
       ],
       "log": {
         "b1": [
-          "{A} reaches the end of the rope, eyes already on the door.",
+          "{A} walks past the end of the rope line, eyes already on the door.",
           "{A} approaches the rope with a casual stride and a half wave.",
           "{A} comes up to the club, collar high, eyes on the bouncers.",
           "{A} strolls up the walk, hands in pockets."
@@ -158,7 +158,7 @@
           "channel": "seen",
           "chance": 0.45,
           "log": [
-            "{A} was waved straight past the line. The door staff did not ask for anything.",
+            "{A} is waved straight past the line. The door staff do not ask for anything.",
             "The door staff nod {A} through without a look at the list."
           ]
         }
@@ -658,7 +658,7 @@
       ],
       "log": {
         "b1": [
-          "{A} steps up to the kiosk and orders two fingers of something amber.",
+          "{A} steps up to the kiosk and holds up two fingers.",
           "{A} leans on the counter and orders without looking up.",
           "{A} reaches the kiosk and holds up a coin.",
           "{A} gets to the window and points at a bottle."
@@ -683,7 +683,7 @@
           "channel": "seen",
           "chance": 0.4,
           "log": [
-            "{A} ordered without a word. The server poured without asking.",
+            "The server has a glass out before {A} finishes ordering.",
             "{A} at this kiosk again: {seen} nights on the feed."
           ]
         }
@@ -753,7 +753,7 @@
           "{A} lingers by a vending machine for a moment."
         ],
         "b3": [
-          "{A} goes into {place} with the hood still up. The door slides shut.",
+          "{A} goes into {place} without a backward glance. The door slides shut.",
           "{A} reaches {place} and enters.",
           "{A} steps inside, and the light behind the panel comes on.",
           "{A} arrives at {place}, stops for a moment, and goes in."
@@ -767,7 +767,7 @@
           "chance": 0.4,
           "log": [
             "The door of {place} slides open for {A} at once.",
-            "{A} goes into {place} after midnight."
+            "{A} goes into {place}, the street empty behind {A.him}."
           ]
         }
       ],
@@ -838,8 +838,8 @@
           "channel": "document",
           "chance": 0.5,
           "log": [
-            "The badge reads Door Staff, Neon Dome.",
-            "A uniform patch reads Neon Dome, Security."
+            "A badge clipped to {A.his} chest reads Door Staff, Neon Dome.",
+            "A patch on {A.his} sleeve reads Neon Dome, Security."
           ]
         }
       ],
@@ -903,7 +903,7 @@
       "log": {
         "b1": [
           "{A} stands at the drop-off, hands in pockets, the neon behind {A.him}.",
-          "{A} lingers at the foot of the lift, glancing at the sky.",
+          "{A} lingers at the foot of the drop-off lift, glancing at the sky.",
           "{A} waits near the drop-off sign."
         ],
         "b2": [

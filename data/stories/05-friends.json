@@ -72,7 +72,7 @@
           "{B.desc} arrives, waving, already talking."
         ],
         "b3": [
-          "{A} and {B.desc} talk across the counter, heads close.",
+          "{A} and {B.desc} talk at the counter, heads close.",
           "{B.desc} climbs onto the next stool. {A} says something and they both laugh.",
           "{A} and {B.desc} chat, cups in hand, for a good while.",
           "{B.desc} tells {A} a long story. {A} shakes with laughter."
@@ -204,7 +204,7 @@
           "chance": 0.7,
           "log": [
             "{B.desc} introduces {C.first} as a friend from work.",
-            "{B.desc} says: \"This is {C.first}. Came in last month, runs the kiosk by the lift.\""
+            "{B.desc} says: \"This is {C.first}. New around here, so be nice.\""
           ]
         },
         {
@@ -214,7 +214,7 @@
           "chance": 0.6,
           "log": [
             "{B.desc} presents {C.first} to {A} by name.",
-            "At the handshake, the newcomer gives a name: {C.first}."
+            "When {B.desc} pauses, the newcomer gives a name: {C.first}."
           ]
         }
       ],
@@ -299,12 +299,12 @@
           "{A} and {B.desc} talk head to head for a minute."
         ],
         "b2": [
-          "{A} hands over a small bag and a folded slip.",
-          "{A} holds out a key on a loop and {B.desc} takes it.",
+          "{A} hands over a small parcel and a folded slip.",
+          "{A} holds out a parcel tied with string, and {B.desc} takes it.",
           "{A} passes a parcel across with both hands. {B.desc} nods."
         ],
         "b3": [
-          "{B.desc} goes off down the block, bag under one arm.",
+          "{B.desc} goes off down the block, the parcel under one arm.",
           "{B.desc} leaves the square, the parcel tucked away.",
           "{B.desc} turns and heads for the corner."
         ]
@@ -418,7 +418,7 @@
       ],
       "log": {
         "b1": [
-          "{A} hurries across the square with a paper bag swinging.",
+          "{A} hurries across the square toward {B.desc}.",
           "{A} cuts through the crowd, eyes on {B.desc} by the pond.",
           "{A} comes up the walk, one hand raised."
         ],
@@ -428,9 +428,9 @@
           "{A} passes a cup across. {B.desc} sniffs it and nods."
         ],
         "b3": [
-          "{A} and {B.desc} talk it out, a hand on a shoulder.",
+          "{A} and {B.desc} talk for a while, a hand on a shoulder.",
           "{B.desc} waves off a thank-you. {A} insists, laughing.",
-          "{A} and {B.desc} clink cups and chat."
+          "{A} and {B.desc} chat, both talking at once."
         ]
       },
       "effects": {
@@ -737,7 +737,7 @@
         "b1": [
           "{A} sits on a stool with two cups, one of them untouched.",
           "{A} takes a stool, an extra cup set on the counter beside {A.him}.",
-          "{A} perches on a stool, turning a cup."
+          "{A} perches on a stool, turning one cup and leaving a second alone."
         ],
         "b2": [
           "{B.desc} comes up to the stalls and stops a pace behind the empty stool.",
@@ -852,7 +852,7 @@
       "log": {
         "b1": [
           "{A}, {B.desc} and {C.desc} spread a blanket on the lawn and weigh down the corners with shoes.",
-          "Three figures settle on a blanket under the low sun.",
+          "Three figures settle on a blanket under a clear sky.",
           "{A} unrolls a blanket. {B.desc} and {C.desc} drop onto it."
         ],
         "b2": [
@@ -873,8 +873,8 @@
           "channel": "conversation",
           "chance": 0.45,
           "log": [
-            "Overheard: {B.desc} says: \"{C.first}, don't eat all of them!\"",
-            "Overheard: {A} calls: \"{C.first}! Pass the flask.\""
+            "Overheard: {B.desc} says: \"{C.first}, leave some for the rest of us!\"",
+            "Overheard: {A} calls: \"{C.first}! Pass that over here.\""
           ]
         }
       ],
@@ -1031,7 +1031,7 @@
       ],
       "log": {
         "b1": [
-          "{A} stands at the corner and checks the time. {n} minutes pass.",
+          "{A} stands at the corner and checks the time, then checks it again.",
           "{A} lingers under a neon sign, glancing down the block.",
           "{A} waits outside a closed shop, then paces the length of it."
         ],
@@ -1172,7 +1172,7 @@
         "b3": [
           "{A} sips. {B.desc} talks fast. {A} lets {B.desc} finish.",
           "{A} and {B.desc} trade a few words and then laugh at the same moment.",
-          "They talk it out over the cups. The pauses get shorter."
+          "They talk it out. The pauses get shorter."
         ]
       },
       "effects": {
@@ -1356,9 +1356,9 @@
       ],
       "log": {
         "b1": [
-          "{B.desc} turns onto the block with a thermos under one arm.",
-          "{B.desc} comes along the walk carrying a string bag of oranges and a jar.",
-          "{B.desc} heads up the street, a cloth-wrapped pot held in front."
+          "{B.desc} turns onto the block with a thermos under one arm and a paper bag in hand.",
+          "{B.desc} comes along the walk carrying a thermos and a string bag of oranges.",
+          "{B.desc} heads up the street, a thermos and a paper bag held in front."
         ],
         "b2": [
           "{B.desc} knocks at {place} and calls something through the door.",
@@ -1371,9 +1371,9 @@
           "{A} comes out slowly, a scarf wound up to the nose."
         ],
         "b4": [
-          "{B.desc} hands over the jar and the oranges. {A} gathers them up in both arms.",
+          "{B.desc} hands over the thermos and the bag. {A} gathers them up in both arms.",
           "{B.desc} passes the thermos across. {A} hugs it to {A.his} chest.",
-          "{B.desc} holds out the pot and won't let go until {A} takes it properly."
+          "{B.desc} holds out the thermos and won't let go until {A} takes it properly."
         ],
         "b5": [
           "{A} goes into {place} with an armful. The door slides shut.",
@@ -1395,7 +1395,7 @@
           "log": [
             "Overheard: {B.desc} says: \"You missed two days of messages. Of course I came. You're sick.\"",
             "Overheard: {A} says: \"Fever since yesterday. Don't come in, you'll catch it.\"",
-            "Overheard: {B.desc} says: \"Your work called me looking for you. Sick, I told them. Eat.\""
+            "Overheard: {B.desc} says: \"Two days and not a word from you. Sick, I guessed. Eat.\""
           ]
         },
         {
@@ -1405,7 +1405,7 @@
           "chance": 0.6,
           "log": [
             "Overheard: {A} says: \"Best {B.rel} in the city. Go before you catch this.\"",
-            "Overheard: {B.desc} says: \"Twenty years your {B.rel}. I know what you eat when you're sick.\""
+            "Overheard: {B.desc} says: \"I'm your {B.rel}. I know what you eat when you're sick.\""
           ]
         }
       ],

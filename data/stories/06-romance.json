@@ -316,9 +316,9 @@
       ],
       "log": {
         "b1": [
-          "{A} joins the line at the stall and smooths {A.his} hair.",
+          "{A} joins the line at the stall, smooths {A.his} hair, and orders a tea.",
           "{A} gets in line, checks the menu board, and orders a small tea.",
-          "{A} waits in line at the counter, hands in pockets, eyes on the stall keeper."
+          "{A} waits in line at the counter, eyes on the stall keeper, then orders a cup of tea."
         ],
         "b2": [
           "{A} lingers by the counter with the cup, facing the board.",
@@ -421,7 +421,7 @@
         "b1": [
           "{A} comes up the walk with a handful of stems wrapped in paper.",
           "{A} carries a small bunch of flowers up to {place}, holding it low.",
-          "{A} arrives at {place}, tugging the wrapping straight."
+          "{A} arrives at {place} with a paper-wrapped bunch of flowers, tugging the wrapping straight."
         ],
         "b2": [
           "The door slides open. {A} holds the bunch out. {B.desc} takes it and laughs.",
@@ -556,8 +556,8 @@
           "channel": "conversation",
           "chance": 0.3,
           "log": [
-            "Overheard: {B.desc} says to {A}: \"Married five years and you still steal my side of the bench.\"",
-            "Overheard: {B.desc} says: \"My {A.rel} carries the bag. That's the deal.\""
+            "Overheard: {B.desc} says to {A}: \"My {A.rel} steals my side of the bench. Five years of it.\"",
+            "Overheard: {B.desc} says: \"My {A.rel} walks me home. That's the deal.\""
           ]
         },
         {
@@ -566,7 +566,7 @@
           "channel": "conversation",
           "chance": 0.3,
           "log": [
-            "Overheard: {A} says: \"My love, it is your turn to carry the bag home.\""
+            "Overheard: {A} says: \"My love, you pick the way home tonight.\""
           ]
         }
       ],
@@ -651,7 +651,7 @@
         "b1": [
           "{A} comes out of {place} with a packed bag over one shoulder.",
           "{A} leaves {place}, a jacket half on, a bag banging on {A.his} hip.",
-          "{A} steps out, a crate of belongings in both arms."
+          "{A} steps out, a stuffed bag of belongings in both arms."
         ],
         "b2": [
           "{B.desc} calls from the doorway. {A} answers without turning. Voices rise and fall.",
@@ -775,7 +775,7 @@
         "b1": [
           "{A} stands at the pond with a cup, looking at the water.",
           "{A} stays by a planter, a cup in each hand.",
-          "{A} idles near the rail, scrolling slowly through {A.his} comm."
+          "{A} idles near the rail with a cup, scrolling slowly through {A.his} comm."
         ],
         "b2": [
           "{B.desc} rounds the stalls and nearly collides with {A}. Both freeze.",
@@ -795,7 +795,7 @@
           "channel": "conversation",
           "chance": 0.5,
           "log": [
-            "Overheard: {A} says: \"Strange, running into an {B.rel} by the pond.\"",
+            "Overheard: {A} says: \"Strange, running into an {B.rel} like this.\"",
             "Overheard: {B.desc} says: \"Is it odd, an {A.rel} saying hello?\""
           ]
         },
@@ -920,7 +920,7 @@
         "b3": [
           "{A} and {B.desc} hug, long and quiet.",
           "{B.desc} pulls {A} in for a hug and does not let go for a while.",
-          "{A} hugs {B.desc} and then steps back, laughing."
+          "{A} hugs {B.desc} and then sits back, laughing."
         ]
       },
       "effects": {
@@ -1115,8 +1115,8 @@
         ],
         "b3": [
           "They eat slowly, chopsticks crossing in the same bowl.",
-          "{A} and {B.desc} tear a sweet bun in half and share it.",
-          "{B.desc} has the gift on before the bowl is empty."
+          "{A} and {B.desc} split the last skewer between them.",
+          "{B.desc} keeps the gift in {B.his} lap through the whole bowl."
         ]
       },
       "reveals": [
@@ -1243,7 +1243,8 @@
         "A": {
           "desc": "an adult with a comm",
           "needs": [
-            "adult"
+            "adult",
+            "partnered"
           ]
         }
       },
@@ -1295,7 +1296,7 @@
           "channel": "feed",
           "chance": 0.55,
           "log": [
-            "Posted: \"Two years today. Same cafe, same stool, still the best company.\"",
+            "Posted: \"Two years today. Still the best company I know.\"",
             "Posted: \"Dinner with my favorite person. Not sharing the skewers.\""
           ]
         }

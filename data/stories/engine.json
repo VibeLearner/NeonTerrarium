@@ -31,7 +31,7 @@
   "queue": [
    "{A} joins the line at {place}.",
    "{A} waits in line at {place}.",
-   "{A} gets in line at {place}, eyes on the trays."
+   "{A} gets in line at {place}, eyes on the counter."
   ],
   "keeper": [
    "{A} takes the counter at {place} and ties an apron on.",
@@ -51,7 +51,7 @@
   "smalltalk": [
    "Overheard: {B.desc} says the lift was slow again this morning.",
    "Overheard: {A} says the rain is supposed to come back tonight.",
-   "Overheard: {B.desc} says the broth here was better last year.",
+   "Overheard: {B.desc} says the broth at the corner stall was better last year.",
    "Overheard: {A} says the new stall on the corner runs out by eight.",
    "Overheard: {B.desc} asks if {A} heard the sirens last night."
   ],
@@ -86,13 +86,13 @@
   "sick": [
    "Overheard: {B} says {C.first} has been out sick since {when}.",
    "Overheard: {B} mentions {C.first} is down with a fever and hasn't left the apartment.",
-   "Overheard: {B} says {C.first} missed work {when}. \"Sick, apparently.\"",
+   "Overheard: {B} says {C.first} stayed in bed {when}. \"Sick, apparently.\"",
    "Overheard: {B} says someone should bring {C.first} soup. \"Sick since {when}, poor thing.\""
   ],
   "parcel": [
-   "Overheard: {B} says a delivery bot came for {C.first} {when}. \"It was {look}, from {sender}.\"",
-   "Overheard: {B} mentions {C.first} got a delivery {when}. \"From {sender}, if you can believe it.\"",
-   "Overheard: {B} says something from {sender} came for {C.first} {when}."
+   "Overheard: {B} says a delivery bot came for {C.first} {when}. \"It was {look}. The label said {sender}.\"",
+   "Overheard: {B} mentions {C.first} got a delivery {when}. \"Sender: {sender}, if you can believe it.\"",
+   "Overheard: {B} says a parcel came for {C.first} {when}, and the label said {sender}."
   ],
   "entry": {
    "sick": [
@@ -100,7 +100,7 @@
     "Down with a fever since {when}, per {S} (overheard)."
    ],
    "parcel": [
-    "A delivery from {sender} {when}, per {S} (overheard)."
+    "A delivery {when}, sender: {sender}, per {S} (overheard)."
    ]
   }
  },
@@ -116,9 +116,9 @@
    "{A} steps out, signs with a thumb, and takes the parcel."
   ],
   "label": [
-   "Label on the box: {A.full}. Printed under it: {sender}.",
-   "Shipping tag, face up: {A.full}, from {sender}.",
-   "The label reads {A.full}. Sender: {sender}."
+   "Label on the parcel: {A.full}. Sender line: {sender}.",
+   "Shipping tag, face up: {A.full}. Sender: {sender}.",
+   "The label reads {A.full}. From: {sender}."
   ],
   "look": [
    "It's {look}.",
@@ -143,7 +143,7 @@
     },
     "silent": [
      "{A} turns the box over once and goes back in.",
-     "{A} pulls {A.his} cardigan tighter and goes back in with the box."
+     "{A} pulls {A.his} collar tight and goes back in with the box."
     ],
     "phone": [
      "Comm, one side: {A} says: \"It came. No, just the fever. I'm not dying.\"",
@@ -197,11 +197,11 @@
     ],
     "phone": [
      "Comm, one side: {A} says: \"It's here. It's here! I'm trying it on now. Hold on.\"",
-     "Comm, one side: {A} says: \"The dress came. For Saturday. You'll see it Saturday.\""
+     "Comm, one side: {A} says: \"The outfit came. For Saturday. You'll see it Saturday.\""
     ],
     "mesh": [
      "Posted to the mesh: \"It fits. Saturday cannot come fast enough.\"",
-     "Posted to the mesh: \"New dress. Old shoes. Nobody will look at the shoes.\""
+     "Posted to the mesh: \"New outfit. Old shoes. Nobody will look at the shoes.\""
     ]
    },
    "letter": {
@@ -294,7 +294,7 @@
      "{A} holds the flowers out at arm's length, then goes in with them."
     ],
     "phone": [
-     "Comm, one side: {A} says: \"You did not. You did. They're on the table already.\"",
+     "Comm, one side: {A} says: \"You did not. You did. They're going on the table right now.\"",
      "Comm, one side: {A} says: \"What's the occasion? There isn't one? Then thank you.\""
     ],
     "mesh": [
@@ -319,7 +319,7 @@
      "{A} carries the box in, already peeling the tape."
     ],
     "phone": [
-     "Comm, one side: {A} says: \"The part came. The heater will live. Tell nobody I fixed it myself.\""
+     "Comm, one side: {A} says: \"The part came. The heater will live. Tell nobody I'm fixing it myself.\""
     ],
     "mesh": [
      "Posted to the mesh: \"Replacement part for a heater older than me.\""
@@ -416,7 +416,7 @@
      "Comm, one side: {A} says: \"The seedlings came. All alive. I'll bring you two.\""
     ],
     "mesh": [
-     "Posted to the mesh: \"Balcony garden, attempt number three.\""
+     "Posted to the mesh: \"Windowsill garden, attempt number three.\""
     ]
    },
    "gift": {

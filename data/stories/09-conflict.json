@@ -64,12 +64,12 @@
       "log": {
         "b1": [
           "{A} drags a folding table to the corner and unfolds it with a bang.",
-          "{A} hauls crates to a spot by the pond and starts stacking.",
-          "{A} carries an awning pole to the corner and sets it down."
+          "{A} hauls a folding table and two crates to the corner by the pond and starts setting up.",
+          "{A} carries a folding table and an awning pole to the corner and sets them down."
         ],
         "b2": [
           "{B.desc} strides up and plants both hands on the table. They argue over the paint line on the stone.",
-          "{A} and {B.desc} shout across the table, pointing at the same square of sidewalk.",
+          "{A} and {B.desc} shout across the table, pointing at the same patch of stone.",
           "{B.desc} snaps at {A}. {A} snaps back and holds the table down."
         ],
         "b3": [
@@ -85,7 +85,7 @@
           "channel": "conversation",
           "chance": 0.4,
           "log": [
-            "Overheard: {A} shouts: \"Fifteen years I have had this corner! You are the new one here!\"",
+            "Overheard: {A} shouts: \"Years I have had this corner! You are the new one here!\"",
             "Overheard: {B.desc} shouts: \"The permit says whoever is first. I was first.\""
           ]
         }
@@ -188,17 +188,17 @@
         "b1": [
           "{A} and {B.desc} stand on either side of a chalk mark on the stone.",
           "{B.desc} and {A} face each other across a fresh chalk line.",
-          "{A} stands by the pond. {B.desc} stands a pace away with a stick of chalk."
+          "{A} stands by the pond at one end of a fresh chalk line. {B.desc} stands a pace away, chalk in hand."
         ],
         "b2": [
           "{A} points at the line and then at {A.his} table. {B.desc} shrugs.",
-          "{A} gestures toward the left half. {B.desc} nods grudgingly.",
+          "{A} gestures toward the left half. {B.desc} nods once, slowly.",
           "{A} indicates the new border and waits."
         ],
         "b3": [
           "{B.desc} hands {A} the chalk. {A} adds a mark and passes it back.",
           "{B.desc} holds out a hand. {A} shakes it, quick.",
-          "{B.desc} passes over a sweet bun, stiff as a flag."
+          "{B.desc} holds a sweet bun out to {A} at arm's length. {A} takes it."
         ]
       },
       "effects": {
@@ -279,7 +279,7 @@
         ],
         "b2": [
           "{B.desc} slides into line ahead of {A}, shoulder first.",
-          "{B.desc} steps in front of {A} and orders without looking back.",
+          "{B.desc} steps in front of {A} and does not look back.",
           "{B.desc} cuts in line and nudges {A} aside."
         ],
         "b3": [
@@ -316,7 +316,7 @@
         },
         "B": {
           "desc": "a coworker, a rival for the same post",
-          "rel": "rival-of:A"
+          "rel": "coworker-of:A"
         }
       },
       "when": {
@@ -472,13 +472,13 @@
       "log": {
         "b1": [
           "{A} cuts across the square, hands in pockets.",
-          "{A} walks the south side at a steady pace.",
+          "{A} walks the south side of the square at a steady pace.",
           "{A} heads for the stalls, eyes on the ground."
         ],
         "b2": [
           "{B.desc} stands by the pond, arms folded, and watches {A} cross.",
           "{B.desc} stays still at the rail, turning to follow {A}.",
-          "{B.desc} idles at the planter edge with a hard stare."
+          "{B.desc} idles at the planter edge, eyes on {A}."
         ],
         "b3": [
           "{A} passes {B.desc} at arm's length and does not break stride.",
@@ -555,9 +555,9 @@
       ],
       "log": {
         "b1": [
-          "{A} strides across the square toward the stalls, one fist clenched.",
+          "{A} strides across the square toward the seats by the stalls, one fist clenched.",
           "{A} marches toward the seats with a face like a shut door.",
-          "{A} heads for the counter, quick and purposeful."
+          "{A} heads for the seats by the pond, quick, eyes fixed ahead."
         ],
         "b2": [
           "{A} stops two paces short of a seated figure and stays there.",
@@ -566,8 +566,8 @@
         ],
         "b3": [
           "{A} shakes {A.his} head, turns away, and goes back the way {A.he} came.",
-          "{A} drops the hand, shrugs, and turns away.",
-          "{A} turns on {A.his} heel and leaves, the fist opening slowly."
+          "{A} lets both hands fall, shrugs, and turns away.",
+          "{A} turns on {A.his} heel and leaves, hands opening and closing."
         ]
       },
       "next": {
@@ -648,7 +648,7 @@
         "b2": [
           "{B.desc} steps up behind {A} and speaks low. {A} stiffens.",
           "{B.desc} taps {A} on the arm and says a few words. {A} turns slowly.",
-          "{A} and {B.desc} talk, {B.desc} calm, {A} not."
+          "{A} and {B.desc} talk, {B.desc} at an even pitch, {A} louder and faster."
         ],
         "b3": [
           "{A} hands over a few notes. {B.desc} counts them and frowns.",
@@ -771,13 +771,13 @@
         ],
         "b2": [
           "{A} comes up and hands over a thick envelope. {B.desc} counts it, then counts it again.",
-          "{A} holds out the envelope with both hands. {B.desc} takes it.",
-          "{A} passes the envelope across and says four words."
+          "{A} holds out an envelope with both hands. {B.desc} takes it.",
+          "{A} passes an envelope across and says four words."
         ],
         "b3": [
           "{B.desc} nods once and leaves without a word.",
           "{B.desc} tucks the envelope away and walks off.",
-          "{B.desc} goes, tapping the tablet."
+          "{B.desc} goes, tapping the envelope against {B.his} palm."
         ]
       },
       "effects": {

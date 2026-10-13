@@ -46,7 +46,7 @@
       ],
       "log": {
         "b1": [
-          "{A} sits on a bench and watches the square go by.",
+          "{A} sits on a bench and watches the street go by.",
           "{A} takes a bench seat and stays for a long while.",
           "{A} sinks onto the slats and does not move.",
           "{A} sits, hands on {A.his} knees, eyes half closed."
@@ -286,8 +286,8 @@
       "log": {
         "b1": [
           "{A} sits on a bench beside a planter, a bottle in {A.his} lap.",
-          "{A} takes a seat next to a planter and looks at the dry soil.",
-          "{A} perches at the end of the bench, one hand on the rim of the planter.",
+          "{A} takes a seat next to a planter, a water bottle in hand, and looks at the dry soil.",
+          "{A} perches at the end of the bench, a bottle in one hand, the other on the rim of the planter.",
           "{A} settles on the slats and pulls a bottle from a bag."
         ],
         "b2": [
@@ -525,11 +525,11 @@
           "{A} arrives at the sliding doors with a towel over one shoulder.",
           "{A} comes up to the entrance under a drift of steam, yawning.",
           "{A} walks up to the steamy doors with a small bag of bath things.",
-          "{A} crosses the square to the baths in slippers."
+          "{A} crosses the street to the baths in slippers."
         ],
         "b2": [
           "{A} slips into the bathhouse and the door slides shut.",
-          "{A} soaks away the day, steam leaking from the door.",
+          "{A} goes in to soak away the day. Steam leaks from the door.",
           "{A} goes in for a long soak. A cloud drifts out.",
           "{A} enters the bathhouse and does not reappear for an hour."
         ]
@@ -582,13 +582,13 @@
       "log": {
         "b1": [
           "{A} walks along the block with a comm in one hand.",
-          "{A} crosses the square at an easy pace.",
+          "{A} crosses the street at an easy pace.",
           "{A} strolls down the sidewalk with a cup.",
           "{A} heads for the stalls without hurry."
         ],
         "b2": [
           "{A} waves at a delivery bot as it rolls by.",
-          "{A} waves at a child in a window and gets a wave back.",
+          "{A} waves at someone in a window and gets a wave back.",
           "{A} lifts a hand to an officer on patrol across the street.",
           "{A} waves at a drone that does not wave back."
         ]
@@ -647,7 +647,7 @@
         ],
         "b2": [
           "{A} crouches and picks up a parcel that slid off the bot's tray.",
-          "{A} picks the dropped parcel off the sidewalk and sets it back on the bot.",
+          "{A} picks a dropped parcel off the sidewalk and sets it back on the bot.",
           "{A} lifts a fallen parcel, squares it on the tray, and steps back.",
           "{A} bends down, scoops up a parcel by the bot's wheels, and puts it back."
         ]

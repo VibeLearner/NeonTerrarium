@@ -63,8 +63,8 @@
       "log": {
         "b1": [
           "{B.desc} comes up to {place} with a covered pot held in both hands.",
-          "{B.desc} arrives at the door carrying a heavy bag that clinks.",
-          "{B.desc} walks up slowly, a wrapped dish held in front."
+          "{B.desc} arrives at the door carrying a heavy pot wrapped in a cloth, the lid rattling.",
+          "{B.desc} walks up slowly, a lidded pot held out in front."
         ],
         "b2": [
           "The door slides open. {A} and {B.desc} embrace outside, the pot held out to one side.",
@@ -198,7 +198,7 @@
         "b3": [
           "{A} and {B.desc} eat in silence until {B.desc} steals a bite out of {A.his} bowl.",
           "{B.desc} laughs at something and nearly spills the broth. {A} slides a napkin across.",
-          "{A} and {B.desc} share a stool, elbows touching, bowls steaming."
+          "{A} and {B.desc} sit on neighboring stools, elbows touching, bowls steaming."
         ]
       },
       "reveals": [
@@ -290,14 +290,14 @@
       ],
       "log": {
         "b1": [
-          "{A} comes up to {place} carrying a sack of groceries in each hand.",
+          "{A} comes up to {place} with a full sack of groceries in both arms.",
           "{A} brings a loaded sack up to the door and knocks with a knuckle.",
           "{A} arrives at the door with a paper sack, hip against the rail."
         ],
         "b2": [
           "The door slides open. {A} hands the sack to {B.desc}.",
           "{A} holds out the groceries. {B.desc} takes them with both hands and checks inside.",
-          "{A} hands over a sack and a folded slip. {B.desc} counts the change."
+          "{A} hands over the sack, a folded receipt and the change. {B.desc} counts the coins."
         ],
         "b3": [
           "{B.desc} talks at length from the doorway. {A} nods through all of it.",
@@ -343,18 +343,18 @@
     },
     {
       "id": "fam.child-walk",
-      "title": "Walking a small one",
+      "title": "A walk with a grown child",
       "tier": "mundane",
-      "note": "A parent and child on the square. Plain texture.",
+      "note": "A parent and an adult son or daughter on the square. Plain texture.",
       "roles": {
         "A": {
-          "desc": "an adult with a child in tow",
+          "desc": "a parent out walking with a grown child",
           "needs": [
             "adult"
           ]
         },
         "B": {
-          "desc": "a child holding a hand",
+          "desc": "an adult son or daughter",
           "rel": "child-of:A"
         }
       },
@@ -401,19 +401,19 @@
       ],
       "log": {
         "b1": [
-          "{A} crosses the square with {B.desc} swinging from one hand.",
-          "{A} and {B.desc} come along the sidewalk, {B.desc} hopping over every crack.",
-          "{B.desc} drags a stick along the rail while {A} walks alongside."
+          "{A} crosses the square with {B.desc}, the two of them in step.",
+          "{A} and {B.desc} come along the sidewalk, {B.desc} carrying both bags.",
+          "{B.desc} walks on the outside of the sidewalk, half a pace ahead of {A}."
         ],
         "b2": [
-          "{A} stops at the edge of the pond and {B.desc} leans over to look.",
+          "{A} stops at the edge of the pond and {B.desc} leans over to look at the koi.",
           "{A} stands with {B.desc} at the water. {B.desc} points at something.",
-          "{A} and {B.desc} linger by a planter. {A} fixes {B.his} collar."
+          "{A} and {B.desc} linger by a planter. {A} straightens {B.his} collar, and {B.desc} lets it happen."
         ],
         "b3": [
-          "{B.desc} waves at a passing drone, over and over.",
-          "{B.desc} waves hard at a figure across the square.",
-          "{B.desc} waves at the koi pond and gets no answer."
+          "{B.desc} lifts a hand to someone leaving the stalls.",
+          "{B.desc} waves at a figure across the square, then lowers the hand.",
+          "{B.desc} gives a quick wave to someone by the vending machines."
         ]
       },
       "reveals": [
@@ -423,8 +423,8 @@
           "channel": "conversation",
           "chance": 0.35,
           "log": [
-            "Overheard: {B.desc} says: \"{A.addr}, can we stay and watch them?\"",
-            "Overheard: {A} says: \"Come on, my {B.rel}. One more minute, then home.\""
+            "Overheard: {B.desc} says: \"{A.addr}, sit a minute. You've been on your feet all day.\"",
+            "Overheard: {A} says: \"Look at my {B.rel}, all grown up and still letting me fuss.\""
           ]
         }
       ],
@@ -742,8 +742,8 @@
         ],
         "b3": [
           "{A} stands. A few words. Then {A} and {B.desc} hug, rocking a little.",
-          "{A} says something short and {B.desc} nods. They hug on the spot.",
-          "{B.desc} holds out a hand and {A} pulls {B.desc} into a hug."
+          "{A} gets up and says something short. {B.desc} nods, and they hug on the spot.",
+          "{B.desc} holds out a hand. {A} takes it, stands, and pulls {B.desc} into a hug."
         ]
       },
       "reveals": [
@@ -825,7 +825,7 @@
           "{A} perches on the edge of the bench, comm in a fist."
         ],
         "b2": [
-          "{A} takes a call and smiles now and then. Mostly listens.",
+          "{A} talks on the comm and smiles now and then. Mostly listens.",
           "{A} holds the comm to one ear and rubs the back of {A.his} neck.",
           "{A} talks softly into the comm and nods at nothing."
         ]
@@ -937,7 +937,7 @@
           "chance": 0.35,
           "log": [
             "Overheard: {A} tells {B.desc}: \"{B.addr}, you've told me that one.\"",
-            "Overheard: {B.desc} says: \"Humor your old {B.rel}. Sit.\""
+            "Overheard: {B.desc} says: \"Humor your old {B.rel}. Listen.\""
           ]
         },
         {
@@ -1024,8 +1024,8 @@
       "log": {
         "b1": [
           "{A} steps off a drop-off lift with a battered bag over one shoulder.",
-          "{A} rides the lift down, looks up at the towers, and walks on.",
-          "{A} arrives at the drop-off alone, a coat over {A.his} arm."
+          "{A} rides the lift down with one bag, looks up at the towers, and waits.",
+          "{A} arrives at the drop-off alone, a coat over {A.his} arm and a bag at {A.his} feet."
         ],
         "b2": [
           "{B.desc} jogs up. {A} and {B.desc} hug, bag swinging.",
@@ -1147,12 +1147,12 @@
       ],
       "log": {
         "b1": [
-          "{B.desc} knocks on the door. Three taps, a pause, three more.",
-          "{B.desc} raps on the door of {place} and steps back to wait.",
-          "{B.desc} knocks and calls through the panel."
+          "{B.desc} knocks on the door, a small parcel under one arm. Three taps, a pause, three more.",
+          "{B.desc} raps on the door of {place} with a parcel in the other hand and steps back to wait.",
+          "{B.desc} knocks and calls through the panel, a small parcel held against {B.his} chest."
         ],
         "b2": [
-          "{B.desc} stands outside {place} with a small parcel held in both hands.",
+          "{B.desc} stands outside {place}, the parcel held in both hands.",
           "{B.desc} stays at the door for {n} minutes. Nobody opens.",
           "{B.desc} waits, leans on the rail, waits."
         ],
@@ -1280,7 +1280,7 @@
       "log": {
         "b1": [
           "{A} comes up to {place} with a small wrapped package behind {A.his} back.",
-          "{A} arrives at the door and straightens a crooked ribbon.",
+          "{A} arrives at the door with a wrapped package and straightens a crooked ribbon.",
           "{A} comes up to the door holding a flat parcel tied in string."
         ],
         "b2": [
@@ -1291,7 +1291,7 @@
         "b3": [
           "{B.desc} pulls {A} into a hug and the parcel is crushed between them.",
           "{A} and {B.desc} hug in the doorway, laughing.",
-          "{B.desc} embraces {A}, then steps back and tears off the ribbon."
+          "{B.desc} embraces {A}, then steps back and tears the wrapping open."
         ]
       },
       "reveals": [
@@ -1301,8 +1301,8 @@
           "channel": "conversation",
           "chance": 0.5,
           "log": [
-            "Overheard: {A} says: \"Happy birthday. You are officially old.\"",
-            "Overheard: {B.desc} says: \"Thirty-two, and you still wrap like a kid. I love it.\""
+            "Overheard: {A} says: \"Happy birthday. One more year on you.\"",
+            "Overheard: {B.desc} says: \"Another year, and you still wrap presents like a kid. I love it.\""
           ]
         }
       ],

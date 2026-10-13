@@ -61,12 +61,12 @@
         ],
         "b2": [
           "{A} points at the line map and traces it with one finger.",
-          "{A} gestures toward the stairwell and the lit mouth below.",
+          "{A} gestures up at the lift shaft and the lit platform above.",
           "{A} points out the new line to a passerby and shrugs."
         ],
         "b3": [
           "{A} boards a train on the new line and the doors hiss shut.",
-          "{A} rides down to the platform, and the train pulls out.",
+          "{A} takes the lift up to the platform and boards. The train pulls out.",
           "{A} takes the first train on the line and is gone."
         ]
       },
@@ -141,7 +141,7 @@
         "b1": [
           "{A} turns a corner and slows at the glow of a new sign.",
           "{A} walks toward a freshly lit entrance, craning {A.his} neck.",
-          "{A} drifts toward the club door, drawn by the thump."
+          "{A} drifts toward the club door and the thump coming out of it."
         ],
         "b2": [
           "{A} points up at the neon letters and says something to no one in particular.",
@@ -431,7 +431,7 @@
         "b2": [
           "{A} sits and leans back with a long exhale.",
           "{A} takes a seat and stretches out both legs.",
-          "{A} eases onto the bench and watches the square.",
+          "{A} eases onto the bench and watches the passersby.",
           "{A} perches on the new bench and unwraps a snack."
         ]
       },
@@ -491,9 +491,9 @@
       ],
       "log": {
         "b1": [
-          "{A} steps off the lift at the new dropoff with a bag over one shoulder.",
+          "{A} steps off the lift at the new drop-off with a bag over one shoulder.",
           "{A} comes down to the pad and glances at the sign.",
-          "{A} arrives at the dropoff with a cup in each hand."
+          "{A} arrives at the drop-off with a cup in one hand."
         ],
         "b2": [
           "{A} stands on the pad and gets {A.his} bearings by the Data Spire.",
@@ -648,7 +648,7 @@
           "{A} carries a lamp and a bundle of clothes from the rubble."
         ],
         "b3": [
-          "{A} carries a stack of bags away down the block, looking back once.",
+          "{A} carries a stack of belongings away down the block, looking back once.",
           "{A} walks off with a bundle on each shoulder.",
           "{A} heads for the metro, dragging a crate."
         ]
@@ -660,8 +660,8 @@
           "channel": "conversation",
           "chance": 0.4,
           "log": [
-            "Overheard: {A} says: \"They gave us a week's notice. Then the drones came.\"",
-            "Overheard: {A} says: \"Everything I own is in these bags. That's the whole story.\""
+            "Overheard: {A} says: \"A week's notice. Then the drones came.\"",
+            "Overheard: {A} says: \"Everything I own is right here. That's the whole story.\""
           ]
         }
       ],
@@ -699,7 +699,7 @@
           "Overheard: {S} mentions to {L} that {A.desc} had to clear out before the demolition."
         ],
         "entry": [
-          "Lost a place to live when the building was demolished (overheard: a neighbor, in conversation).",
+          "Lost a place to live when the building was demolished, per {S} (overheard).",
           "Had to leave after the demolition, per {S} (overheard, in conversation).",
           "Was displaced by the wrecking crew, said {S} (overheard)."
         ]
@@ -870,7 +870,7 @@
         "b3": [
           "{A} goes into {place} with a crate. The door slides shut behind {A.him}.",
           "{A} enters {place} and a light inside flicks on.",
-          "{A} steps into {place} with the crate and the door slides closed."
+          "{A} steps into {place} with an armful, and the door slides closed."
         ]
       },
       "effects": {
@@ -904,7 +904,7 @@
           "Overheard: {S} mentions that {A.desc} took a room across the district."
         ],
         "entry": [
-          "Found a new home after losing the old one (overheard: a neighbor, in conversation).",
+          "Found a new home after losing the old one, per {S} (overheard).",
           "Moved into a new place across the district, per {S} (overheard, in conversation).",
           "Moved into a new place, said {S} (overheard)."
         ]
@@ -971,7 +971,7 @@
         ],
         "b2": [
           "{A} stands at a patch of bare ground where a building used to be.",
-          "{A} stays at a cleared lot, tin hanging from one hand.",
+          "{A} stays at a cleared lot, arms hanging at {A.his} sides.",
           "{A} stands before a stretch of fence and looks up."
         ],
         "b3": [
@@ -987,8 +987,8 @@
           "channel": "conversation",
           "chance": 0.4,
           "log": [
-            "Overheard: {A} says: \"It says closed as of Monday. Monday! It's Tuesday.\"",
-            "Overheard: {A} says: \"Eight years. And there's a sheet of paper.\""
+            "Overheard: {A} says: \"It was standing on my last shift. Right here. It was right here.\"",
+            "Overheard: {A} says: \"Eight years I worked here. And now it's a fence.\""
           ]
         }
       ],
@@ -1026,7 +1026,7 @@
           "Overheard: {S} mentions that {A.desc} lost {A.his} job when the place shut for good."
         ],
         "entry": [
-          "Lost a job when the workplace closed (overheard: a neighbor, in conversation).",
+          "Lost a job when the workplace closed, per {S} (overheard).",
           "Found the workplace cleared away, per {S} (overheard, in conversation).",
           "Lost work in the closure, said {S} (overheard)."
         ]
@@ -1087,7 +1087,7 @@
       "log": {
         "b1": [
           "{A} walks slowly down the block with a duffel on one shoulder.",
-          "{A} wanders into the square and turns a full circle.",
+          "{A} stops in the middle of the block and turns a full circle.",
           "{A} comes along the sidewalk reading the numbers over the doors."
         ],
         "b2": [
@@ -1108,8 +1108,8 @@
           "channel": "conversation",
           "chance": 0.4,
           "log": [
-            "Overheard: {A} asks: \"Is this the way to the square? I came in this morning.\"",
-            "Overheard: {A} says: \"First day in the city. Is it always this loud?\""
+            "Overheard: {A} asks: \"Is this the way to the square? I only got here this week.\"",
+            "Overheard: {A} says: \"First week in the city. Is it always this loud?\""
           ]
         }
       ],
@@ -1137,7 +1137,7 @@
           "Overheard: {S} mentions that {A.desc} is brand new to the district."
         ],
         "entry": [
-          "Arrived in the district only days ago (overheard: a neighbor, in conversation).",
+          "Arrived in the district only days ago, per {S} (overheard).",
           "Came to the district last week, per {S} (overheard, in conversation).",
           "Came in from elsewhere, said {S} (overheard)."
         ]
@@ -1203,7 +1203,7 @@
       "log": {
         "b1": [
           "{A} sits outside {place} with a cup and watches the row.",
-          "{A} takes a seat by the door of {place} and stretches out.",
+          "{A} takes a seat by the door of {place} with a cup and stretches out.",
           "{A} perches on an upturned crate outside {place} and sips."
         ],
         "b2": [
@@ -1212,8 +1212,8 @@
           "{B.desc} carries a box to a door down the row and sets it down."
         ],
         "b3": [
-          "{A} waves. {B.desc} waves back with a free hand and nearly drops the crate.",
-          "{A} lifts a hand to {B.desc} across the landing.",
+          "{A} waves. {B.desc} waves back with a free hand and nearly drops {B.his} load.",
+          "{A} lifts a hand to {B.desc} down the row.",
           "{A} waves once at {B.desc} and goes back to {A.his} cup."
         ]
       },
@@ -1391,7 +1391,7 @@
           "{A} wanders off after a few minutes, still looking back.",
           "{A} walks away and glances up one more time.",
           "{A} heads on down the block.",
-          "{A} turns away from the fence and goes."
+          "{A} turns away from the build and goes."
         ]
       },
       "next": {

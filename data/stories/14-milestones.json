@@ -65,12 +65,12 @@
         "b1": [
           "{A} sits on a stool and scrolls through {A.his} comm with one eyebrow up.",
           "{A} takes a stool and drums {A.his} fingers on the counter.",
-          "{A} perches on a stool and looks across the square."
+          "{A} perches on a stool and looks out at the street."
         ],
         "b2": [
-          "{B.desc} arrives and sets a bun with a single candle in front of {A}.",
-          "{B.desc} hands {A} a small wrapped bun with a lit candle on top.",
-          "{B.desc} holds out a paper plate with a sparkler stuck in a steamed bun."
+          "{B.desc} arrives and sets a paper plate in front of {A}: a bun, a single candle.",
+          "{B.desc} hands {A} a paper plate with a lit candle stuck in a bun.",
+          "{B.desc} holds out a paper plate, a candle burning in a steamed bun."
         ],
         "b3": [
           "{A} blows out the candle and laughs. The two of them hug.",
@@ -184,8 +184,8 @@
           "{A} and {B.desc} embrace and neither lets go first."
         ],
         "b3": [
-          "{A} goes down alone and boards. The train pulls out.",
-          "{A} rides down and the doors hiss shut on a last wave.",
+          "{A} goes up alone and boards. The train pulls out.",
+          "{A} rides up to the platform, and the doors hiss shut on a last wave.",
           "{A} takes the train and does not look back."
         ]
       },
@@ -196,7 +196,7 @@
           "channel": "conversation",
           "chance": 0.55,
           "log": [
-            "Overheard: {A} says: \"I'll write when I'm settled. Don't wait up for me.\"",
+            "Overheard: {A} says: \"I'll write when I'm settled. Don't worry about me.\"",
             "Overheard: {A} says: \"They gave me a place upriver. I leave tonight.\""
           ]
         }
@@ -226,13 +226,13 @@
         ],
         "channel": "conversation",
         "lines": [
-          "Overheard: {S} tells {L} that {A.desc} left the city on the evening train. Just a bag and a coat.",
+          "Overheard: {S} tells {L} that {A.desc} left the city on the train. Just a bag and a coat.",
           "Overheard: {S} says to {L}: \"{A.desc} is gone. Took the metro out and did not say where.\"",
           "Overheard: {S} says {A.desc} has moved away from the city for good.",
           "Overheard: {S} mentions to {L} that {A.desc} left last week and has not called since."
         ],
         "entry": [
-          "Left the city last week (overheard: a neighbor, in conversation).",
+          "Left the city last week, per {S} (overheard).",
           "Took the train out for good, per {S} (overheard, in conversation).",
           "Moved away from the district, said {S} (overheard)."
         ]
@@ -303,7 +303,7 @@
         "b1": [
           "{A} stands outside {place} with a fresh badge on a spotless jacket.",
           "{A} waits by the door of {place}, turning a badge over and over.",
-          "{A} arrives early and stays at the door with a thermos."
+          "{A} arrives early and stays at the door, a thermos in one hand and a badge in the other."
         ],
         "b2": [
           "{B.desc} comes out and shakes hands with {A}, then points up at the lights.",
@@ -412,13 +412,13 @@
       "log": {
         "b1": [
           "{A} and {B.desc} sit side by side. {A} is very still and keeps one hand in a pocket.",
-          "{A} and {B.desc} take a bench by the pond. {A} fidgets with a zipper.",
+          "{A} and {B.desc} take a bench under the lanterns. {A} fidgets with a zipper.",
           "{B.desc} sits, and {A} sits stiffly beside {B.him}, one knee jumping."
         ],
         "b2": [
           "{A} takes a small box from a pocket and holds it out in both hands.",
           "{A} hands {B.desc} a small box and says a few words.",
-          "{A} holds out a flat box. {B.desc} stares at it, then at {A}."
+          "{A} holds out a small box, lid open. {B.desc} stares at it, then at {A}."
         ],
         "b3": [
           "{B.desc} throws both arms around {A}, and the box falls onto the bench.",
@@ -514,7 +514,7 @@
         "b1": [
           "{A} carries a flat frame wrapped in paper, held out in front like a tray.",
           "{A} walks the block with a framed sheet under one arm, keeping clear of the crowd.",
-          "{A} hugs a framed document to {A.his} chest and steps over puddles."
+          "{A} hugs a framed document to {A.his} chest and walks with care."
         ],
         "b2": [
           "{A} points at the frame, then at the sky, and says something to a passerby.",
@@ -522,7 +522,7 @@
           "{A} gestures toward the frame and a stranger nods approvingly."
         ],
         "b3": [
-          "{A} goes into {place} and the door slides shut on the frame.",
+          "{A} goes into {place} frame first, and the door slides shut.",
           "{A} enters, holding the frame high over the threshold.",
           "{A} steps inside {place} and the door slides shut."
         ]
@@ -612,9 +612,9 @@
           "{B.desc} hugs {A} and says a few words that make {A} laugh."
         ],
         "b3": [
-          "{A} walks away down the block, the plant held high.",
+          "{A} walks away down the block, arms full.",
           "{A} heads off with a slow stride, not looking back.",
-          "{A} crosses the square with the box on one hip."
+          "{A} heads down the block, waving over {A.his} shoulder."
         ]
       },
       "reveals": [
@@ -694,8 +694,8 @@
       "log": {
         "b1": [
           "{A} walks up to a bench with a single stem in one hand.",
-          "{A} approaches the bench with {A.his} eyes lowered.",
-          "{A} crosses to the bench and stops at its end."
+          "{A} approaches the bench with a single flower, {A.his} eyes lowered.",
+          "{A} crosses to the bench, a stem in one hand, and stops at its end."
         ],
         "b2": [
           "{A} lays the flower along the bench slats and lifts a withered one from the arm.",
@@ -728,7 +728,7 @@
     },
     {
       "id": "mil.baby-post",
-      "title": "Posted with a tiny shoe",
+      "title": "Good news, posted",
       "tier": "texture",
       "note": "News reaches the monitor only as a post. The feed says what the person chose to say.",
       "roles": {
@@ -787,8 +787,8 @@
           "channel": "feed",
           "chance": 0.7,
           "log": [
-            "Posted: \"She arrived at dawn. Seven pounds, loud, perfect. Visiting hours start tomorrow.\"",
-            "Posted: \"New to the family: a small person with strong opinions. Everyone is fine.\""
+            "Posted: \"Out of surgery at dawn, sitting up, already complaining about the food. Visiting hours start tomorrow.\"",
+            "Posted: \"The test came back clear. Everyone is fine. Everyone is more than fine.\""
           ]
         }
       ],

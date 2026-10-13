@@ -179,11 +179,23 @@
       gl_FragColor.rgb *= 1.0 - sh*0.09*gr; }`;                                                 // (granulating in the shade)
   const WC_LIGHTS = c => c.replace('getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] )',
     'wcShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, vDirectionalShadowCoord[ i ] )');
+  // foliage in the wind: each vertex knows how far up its blade it is (aH, in units); it's pushed downwind by the square of
+  // that, by a steady lean, by gusts that roll across the field in long waves, and by a quick flutter of its own; and it
+  // dips a little as it bends, so the blade keeps its length. (The sway is applied before the bend: the mesh is in world units)
+  const SWAY_V = 'attribute float aH; uniform float wTime;\n';
+  const SWAY = `{ vec2 wd = vec2(0.83, 0.55), q = transformed.xz; float ph = dot(q, wd)*0.32 - wTime*1.25;
+      float gust = 0.5 + 0.5*sin(ph) + 0.22*sin(ph*2.3 + q.x*0.7 - q.y*0.4);
+      float flut = sin(wTime*4.1 + q.x*3.1 + q.y*2.3) + 0.5*sin(wTime*6.3 + q.x*5.0 - q.y*4.1);
+      float k = aH*aH;
+      vec2 d = wd*(0.08 + 0.3*gust*gust)*k + vec2(-wd.y, wd.x)*flut*0.035*k;
+      transformed.xz += d; transformed.y -= dot(d, d)*0.55/max(aH, 0.05); }`;
   // bend any built-in material the same way (and haze it toward the horizon, unless it's only drawn into the shadow map)
-  function bent(mat, haze = true, rocky = false, glow = false, paint = null){
+  function bent(mat, haze = true, rocky = false, glow = false, paint = null, sway = null){
     mat.onBeforeCompile = sh => {
-      Object.assign(sh.uniforms, CURV); if (paint) Object.assign(sh.uniforms, paint);
+      Object.assign(sh.uniforms, CURV); if (paint) Object.assign(sh.uniforms, paint); if (sway) Object.assign(sh.uniforms, sway);
       sh.vertexShader = 'uniform vec2 ctr, fwd; uniform float curveK, g0; varying float vG; varying vec3 vWq;\n' + (glow ? GLOW_V : '') + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BEND + (glow ? '\n vGlow = glow;' : ''));
+      if (sway){ sh.vertexShader = SWAY_V + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + SWAY);
+        sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal = normal * faceDirection;', '')); }
       if (glow) sh.fragmentShader = GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', GLOW_APPLY + '\n#include <fog_fragment>');
       if (paint) sh.fragmentShader = PAINT_F + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + PAINT_APPLY);
       if (haze) sh.fragmentShader = 'uniform float hzNear, hzFar, hzMax; uniform vec3 hazeC; varying float vG; varying vec3 vWq;\n' + (rocky ? 'bool rockFace;\n' + ROCKY + '\n' : '') + (rocky ? '' : 'uniform float nightK;\n') + WC_F + sh.fragmentShader
@@ -191,7 +203,7 @@
         .replace('#include <shadowmap_pars_fragment>', WC_SHADOW)
         .replace('#include <color_fragment>', rocky ? ROCKY_APPLY : '#include <color_fragment>').replace('#include <lights_fragment_begin>', WC_LIGHTS(rocky ? ROCKY_LIGHTS : THREE.ShaderChunk.lights_fragment_begin));
     };
-    mat.customProgramCacheKey = () => 'bent' + (haze ? 1 : 0) + (rocky ? 'r' : '') + (glow ? 'g' : '') + (paint ? 'p' : '');
+    mat.customProgramCacheKey = () => 'bent' + (haze ? 1 : 0) + (rocky ? 'r' : '') + (glow ? 'g' : '') + (paint ? 'p' : '') + (sway ? 's' : '');
     return mat;
   }
   const gData = new Uint8Array([150, 150, 150, 255, 200, 200, 200, 255, 240, 240, 240, 255]);
@@ -1124,6 +1136,10 @@
   }
   const dirtyAround = p => { for (const ch of chunks.values()) if (ch.land && ch.i*CH < p.x + p.r + 3 && ch.i*CH + CH > p.x - p.r - 3 && ch.j*CH < p.z + p.r + 3 && ch.j*CH + CH > p.z - p.r - 3) ch.dirty = true; };
   const SAVE_KEY = 'neonIsland.coast.pieces';
+  // the connections built with the connect brush: [{ a, b, type }] by block id
+  const ULINK_KEY = 'neonIsland.coast.links';
+  let ULINKS = []; try { ULINKS = JSON.parse(localStorage.getItem(ULINK_KEY) || '[]').filter(u => u && u.a && u.b); } catch (e) {}
+  const saveLinks = () => { try { localStorage.setItem(ULINK_KEY, JSON.stringify(ULINKS)); } catch (e) {} };
   const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(PIECES.map(p => [p.kind, +p.x.toFixed(3), +p.z.toFixed(3), +p.rot.toFixed(4), +p.y.toFixed(3), p.seed, p.id, p.base ? p.base.id : 0, p.host ? p.host.id : 0, p.level]))); } catch (e) {} };
   /* ---------- a new home painted in, in watercolor ---------- */
   // Each new block gets its own copy of the material for a moment (see PAINT_APPLY): the wash rises up it from its floor,
@@ -1193,13 +1209,16 @@
     if (base){ base.up = p; remesh(base); }
     remesh(p); PIECES.push(p);
     if (!base && lv === 0){ gridAdd(p); dirtyAround(p); }
+    if (ANIM.live && lv === 0) grassAround(x, z, p.r + 1);   // (the grass under a new home goes)
     linksDirty = true; if (!quiet) save(); return p; }
   function removePiece(p){   // (and everything stacked on it or built off its side)
     if (!PIECES.includes(p)) return;
     if (p.up) removePiece(p.up);
     for (const q of PIECES.filter(q => q.host === p)) removePiece(q);
     scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); PIECES.splice(PIECES.indexOf(p), 1);
+    if (ULINKS.some(u => u.a === p.id || u.b === p.id)){ ULINKS = ULINKS.filter(u => u.a !== p.id && u.b !== p.id); saveLinks(); }
     if (p.base){ p.base.up = null; remesh(p.base); } else if (p.level === 0){ gridDel(p); dirtyAround(p); }
+    if (p.level === 0) grassAround(p.x, p.z, p.r + 1);
     linksDirty = true; save(); }
 
   // where a block of `kind` goes built off `host`'s side facing the point (wx, wz): square to the host, against its wall
@@ -1233,73 +1252,102 @@
     _sm.setPosition(_sa.addVectors(a, b).multiplyScalar(.5).addScaledVector(_sy, up));
     T.add(GEO.box, _sm, col); }
   const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+  // two blocks' facing walls: how far apart their middles are, which way, where each wall is, and the gap between them
+  function pairOf(A, B){
+    const dc = Math.hypot(B.x - A.x, B.z - A.z); if (dc < .05) return null;
+    const dx = (B.x - A.x)/dc, dz = (B.z - A.z)/dc, tA = hullExit(A.hullW, A.x, A.z, dx, dz), tB = hullExit(B.hullW, B.x, B.z, -dx, -dz);
+    return { A, B, dc, gap: dc - tA - tB, tA, tB, dx, dz }; }
+  // what a connection is built as. Chosen ones are kept where they can be (a shared wall only between blocks that nearly
+  // touch, a pergola or an arcade only on the ground with both homes about level; otherwise a bridge). 'random', and the
+  // ones neighbors make themselves, pick what suits the spot: a wall when they touch; on the ground a pergola walk or an
+  // arcade (now and then a glass walk); in the air a planted bridge or a skywalk, the skywalk more often the longer it is
+  const LINK_TYPES = ['bridge', 'skywalk', 'pergola', 'arcade', 'wall', 'random'];
+  function linkType(L, R){
+    const ground = !L.A.level && !L.B.level && Math.abs(L.A.y - L.B.y) < 1.4, t = L.type || 'random';
+    if (t === 'wall') return L.gap < 1.6 && L.A.level === L.B.level ? 'wall' : ground ? 'arcade' : 'bridge';
+    if (t === 'pergola' || t === 'arcade') return ground ? t : 'bridge';
+    if (t === 'bridge' || t === 'skywalk') return t;
+    if (L.gap < .5 && L.A.level === L.B.level) return 'wall';
+    if (ground) return R.chance(.12) ? 'skywalk' : R.chance(.58) ? 'pergola' : 'arcade';
+    return R.chance(Math.min(.8, .35 + L.gap*.08)) ? 'skywalk' : 'bridge'; }
+  // one connection drawn into T (its walk, bridge, arcade or shared wall, and the doorways where it meets the walls)
+  function drawLink(T, L, pools){
+    const { A, B, dc, dx, dz, tA, tB } = L;
+    const ra = tA - .04, rb_ = tB - .04, h = hashPair(A.id, B.id), R = rng((h*4294967296) >>> 0);
+    const type = linkType(L, R), fy = A.level ? 0 : .12, a = V3(A.x + dx*ra, A.y + fy, A.z + dz*ra), b = V3(B.x - dx*rb_, B.y + (B.level ? 0 : .12), B.z - dz*rb_);
+    const len = a.distanceTo(b), sx = -dz, sz = dx, at = (u, s, y) => V3(a.x + (b.x - a.x)*u + sx*s, a.y + (b.y - a.y)*u + y, a.z + (b.z - a.z)*u + sz*s);
+    // a doorway in each wall where the walk or the bridge meets it: a dark opening in a cream frame, under a small hood
+    const door = (p, q) => { const d = V3(q.x - p.x, 0, q.z - p.z).normalize(), o = p.clone().addScaledVector(d, -.02), o2 = p.clone().addScaledVector(d, .05);
+      seg(T, o, o2, .66, .98, HP.cream, .49); seg(T, o, o2.clone().addScaledVector(d, .02), .5, .82, HP.glassD, .41); seg(T, o, o2.clone().addScaledVector(d, .12), .8, .06, HP.terra, 1.02); };
+    if (type !== 'wall'){ door(a, b); door(b, a); }
+    if (type === 'wall'){   // touching: a shared wall with an arched way through
+      const a2 = at(-.15, 0, 0), b2 = at(1.15, 0, 0), wh = A.level ? .9 : 1.1, wc = R.pick([HP.cream, HP.white, HP.sand]);
+      seg(T, a2, b2, 1.3, wh, wc, wh/2); seg(T, a2, b2, 1.4, .08, HP.cream, wh + .04);
+      for (const s of [-.66, .66]){ const c = at(.5, s, 0); box(T, c.x, c.y + .38, c.z, .5, .6, .5, HP.glassD); }
+      for (let k = 0; k < 3; k++){ const c = at(.2 + k*.3, 0, wh + .08); plant(T, R, c.x, c.y, c.z, 1.1); }
+    } else if (type === 'bridge' || type === 'skywalk'){   // up in the air: a planted bridge, or a glass skywalk
+      if (len > 3.6 && (A.level || B.level)) for (let u = 1/Math.ceil(len/3); u < .999; u += 1/Math.ceil(len/3)){ const c = at(u, 0, 0), g = heightAt(c.x, c.z);   // (a long span: slim piers down to the ground)
+        if (c.y - g > .4){ box(T, c.x, (c.y + g)/2 - .05, c.z, .16, c.y - g - .1, .16, HP.cream); box(T, c.x, g + .1, c.z, .3, .2, .3, HP.stone); } }
+      if (type === 'bridge'){
+        seg(T, a, b, .8, .1, HP.wood, .05);
+        for (const s of [-.38, .38]){ seg(T, at(0, s, .45), at(1, s, .45), .05, .05, HP.rail);
+          for (let u = 0; u <= 1.001; u += 1/Math.max(1, Math.round(len/.6))){ const c = at(u, s, 0); box(T, c.x, c.y + .25, c.z, .04, .42, .04, HP.rail); } }
+        for (let u = .2; u < .85; u += .3) if (R.chance(.7)){ const c = at(u, R.pick([-.28, .28]), .1); pot(T, R, c.x, c.y, c.z, .8); }
+        if (len > 2.5 && len <= 3.6){ const c = at(.5, 0, 0), g = heightAt(c.x, c.z); if (c.y - g > .4) box(T, c.x, (c.y + g)/2, c.z, .14, c.y - g, .14, HP.cream); }   // (a slim strut under a long one)
+        { const c = at(.5, .38, 0); box(T, c.x, c.y + .62, c.z, .1, .1, .1, HP.lamp); box(T, c.x, c.y + .69, c.z, .14, .03, .14, HP.rail); }   // (a lamp on the rail)
+      } else {
+        seg(T, a, b, .9, .08, HP.stone, .04); seg(T, a, b, .92, .7, HP.glass, .45); seg(T, a, b, .96, .08, HP.cream, .84);
+        for (let u = 0; u <= 1.001; u += 1/Math.max(1, Math.round(len/.5))){ const c = at(u, 0, 0); seg(T, at(u - .01, 0, 0), at(u + .01, 0, 0), .98, .82, HP.frame, .45); }
+      }
+    } else if (type === 'pergola'){   // on the ground: a pergola walk, posts and beams, vines along them, plants hanging down
+      seg(T, a, b, 1.0, .14, HP.stone, .02);
+      const n = Math.max(2, Math.round(len/.9));
+      for (let k = 0; k <= n; k++) for (const s of [-.45, .45]){ const c = at(k/n, s, 0); if (solidAt(c.x, c.z, c.y, c.y + 1.3)) continue; box(T, c.x, c.y + .65, c.z, .09, 1.3, .09, HP.wood); }
+      for (const s of [-.45, .45]) seg(T, at(-.03, s, 1.32), at(1.03, s, 1.32), .08, .1, HP.wood);
+      for (let k = 0; k <= n*2; k++){ const c0 = at(k/(n*2), -.6, 1.4), c1 = at(k/(n*2), .6, 1.4); seg(T, c0, c1, .05, .06, HP.wood); }
+      for (let k = 0; k < n*3; k++){ const c = at(R.r(0, 1), R.r(-.5, .5), 1.45); T.add(GEO.ico, mat(c.x, c.y, c.z, 0, R.r(0, 3), 0, .2, .12, .2), R.pick(HP.leaf));
+        if (R.chance(.3)) T.add(GEO.ico, mat(c.x, c.y + .07, c.z, 0, 0, 0, .06, .06, .06), R.pick(HP.flower)); }
+      for (let k = 0; k < n; k++) if (R.chance(.5)){ const c = at((k + .5)/n, R.pick([-.3, .3]), 0); T.add(GEO.ico, mat(c.x, c.y + 1.05, c.z, 0, 0, 0, .12, .25, .12), R.pick(HP.leaf)); }
+      for (const u of [0, 1]) if (R.chance(.8)){ const c = at(u, R.pick([-.65, .65]), 0); pot(T, R, c.x, c.y, c.z, 1.1); }
+      { const c = at(.5, 0, 0); pools.push([c.x, c.z, len/2 + 1, .9]); }
+      // festoon lights strung along the beams, sagging between the posts
+      for (const s of [-.45, .45]){ const nb = n*4; for (let k = 0; k <= nb; k++){ const u = k/nb, sag = .14*Math.sin(PI*((u*n) % 1)), c = at(u, s, 1.22 - sag); box(T, c.x, c.y, c.z, .06, .07, .06, HP.lamp); } }
+    } else {   // on the ground: an arcade, white columns under a tiled roof, planters along it
+      seg(T, a, b, 1.1, .14, HP.stone, .02);
+      const n = Math.max(2, Math.round(len/.8));
+      for (let k = 0; k <= n; k++) for (const s of [-.5, .5]){ const c = at(k/n, s, 0); if (solidAt(c.x, c.z, c.y, c.y + 1.2)) continue; T.add(GEO.cyl8, mat(c.x, c.y + .6, c.z, 0, 0, 0, .08, 1.2, .08), HP.white); }
+      seg(T, at(-.04, 0, 1.2), at(1.04, 0, 1.2), 1.3, .12, HP.white); seg(T, at(-.04, 0, 1.34), at(1.04, 0, 1.34), 1.4, .1, HP.tile);
+      for (let k = 0; k < n; k++) if (R.chance(.6)){ const c = at((k + .5)/n, R.pick([-.65, .65]), 0); pot(T, R, c.x, c.y, c.z, 1); }
+      { const c = at(.5, 0, 0); pools.push([c.x, c.z, len/2 + .9, .8]); }
+      for (let k = 0; k < n; k++){ const c = at((k + .5)/n, 0, 0); box(T, c.x, c.y + 1.06, c.z, .02, .2, .02, HP.rail); box(T, c.x, c.y + .9, c.z, .12, .14, .12, HP.lamp); }   // (a lantern hung in each bay)
+    }
+  }
   function buildLinks(){
     linksDirty = false;
     if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); linksMesh = null; }
     const T = new Tris(), pairs = [], deg = new Map(), joined = new Set(), pools = [];
     for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, 1]);   // (by night: the windows' light on the ground round a home)
+    // the connections built with the connect brush come first, as chosen; then the ones neighbors make on their own
+    const byId = new Map(PIECES.map(p => [p.id, p])), userKey = new Set();
+    for (const u of ULINKS){ const A = byId.get(u.a), B = byId.get(u.b); if (!A || !B) continue; const L = pairOf(A, B); if (!L) continue;
+      L.user = true; L.type = u.type; pairs.push(L); userKey.add(Math.min(A.id, B.id) + '|' + Math.max(A.id, B.id)); }
+    const nUser = pairs.length;
     for (let i = 0; i < PIECES.length; i++) for (let j = i + 1; j < PIECES.length; j++){
       const A = PIECES[i], B = PIECES[j]; if (A.level !== B.level) continue;
       if (Math.abs(A.y - B.y) > (A.level ? .6 : 1.4)) continue;
-      const dc = Math.hypot(B.x - A.x, B.z - A.z); if (dc < .05 || dc > 9) continue;
-      const dx = (B.x - A.x)/dc, dz = (B.z - A.z)/dc, tA = hullExit(A.hullW, A.x, A.z, dx, dz), tB = hullExit(B.hullW, B.x, B.z, -dx, -dz), gap = dc - tA - tB;
-      if (gap > 3.6) continue;
-      pairs.push({ A, B, dc, gap, tA, tB, dx, dz }); }
-    pairs.sort((p, q) => p.gap - q.gap);
+      if (userKey.has(Math.min(A.id, B.id) + '|' + Math.max(A.id, B.id))) continue;
+      const L = pairOf(A, B); if (!L || L.dc > 9 || L.gap > 3.6) continue;
+      pairs.push(L); }
+    const auto = pairs.splice(nUser).sort((p, q) => p.gap - q.gap); pairs.push(...auto);
     for (const L of pairs){
-      const { A, B, dc, dx, dz, tA, tB } = L; if ((deg.get(A) || 0) >= 3 || (deg.get(B) || 0) >= 3) continue;
+      const { A, B, dc, dx, dz, tA, tB } = L; if (!L.user && ((deg.get(A) || 0) >= 3 || (deg.get(B) || 0) >= 3)) continue;
       // the way between the two walls must be clear of every other block at its height, a body's width to each side
       const ly0 = Math.min(A.y, B.y) + .1, ly1 = ly0 + 1.4, ax0 = A.x + dx*tA, az0 = A.z + dz*tA, span = Math.max(0, dc - tA - tB);
       let clear = true;
       for (let u = 0; u <= span + 1e-6 && clear; u += .3) for (const s_ of [-.6, 0, .6]) if (solidAt(ax0 + dx*u - dz*s_, az0 + dz*u + dx*s_, ly0, ly1, [A, B])){ clear = false; break; }
-      if (!clear) continue;
+      if (!clear && !L.user) continue;
       deg.set(A, (deg.get(A) || 0) + 1); deg.set(B, (deg.get(B) || 0) + 1); joined.add(A.id + '|' + B.id); joined.add(B.id + '|' + A.id);
-      const ra = tA - .04, rb_ = tB - .04, h = hashPair(A.id, B.id), R = rng((h*4294967296) >>> 0);
-      const fy = A.level ? 0 : .12, a = V3(A.x + dx*ra, A.y + fy, A.z + dz*ra), b = V3(B.x - dx*rb_, B.y + fy, B.z - dz*rb_);
-      const len = a.distanceTo(b), sx = -dz, sz = dx, at = (u, s, y) => V3(a.x + (b.x - a.x)*u + sx*s, a.y + (b.y - a.y)*u + y, a.z + (b.z - a.z)*u + sz*s);
-      // a doorway in each wall where the walk or the bridge meets it: a dark opening in a cream frame, under a small hood
-      const door = (p, q) => { const d = V3(q.x - p.x, 0, q.z - p.z).normalize(), o = p.clone().addScaledVector(d, -.02), o2 = p.clone().addScaledVector(d, .05);
-        seg(T, o, o2, .66, .98, HP.cream, .49); seg(T, o, o2.clone().addScaledVector(d, .02), .5, .82, HP.glassD, .41); seg(T, o, o2.clone().addScaledVector(d, .12), .8, .06, HP.terra, 1.02); };
-      if (L.gap >= .5){ door(a, b); door(b, a); }
-      if (L.gap < .5){   // touching: a shared wall with an arched way through
-        const a2 = at(-.15, 0, 0), b2 = at(1.15, 0, 0), wh = A.level ? .9 : 1.1, wc = R.pick([HP.cream, HP.white, HP.sand]);
-        seg(T, a2, b2, 1.3, wh, wc, wh/2); seg(T, a2, b2, 1.4, .08, HP.cream, wh + .04);
-        for (const s of [-.66, .66]){ const c = at(.5, s, 0); box(T, c.x, c.y + .38, c.z, .5, .6, .5, HP.glassD); }
-        for (let k = 0; k < 3; k++){ const c = at(.2 + k*.3, 0, wh + .08); plant(T, R, c.x, c.y, c.z, 1.1); }
-      } else if (A.level){   // up in the air: a planted bridge, or a glass skywalk
-        if (R.chance(.55)){
-          seg(T, a, b, .8, .1, HP.wood, .05);
-          for (const s of [-.38, .38]){ seg(T, at(0, s, .45), at(1, s, .45), .05, .05, HP.rail);
-            for (let u = 0; u <= 1.001; u += 1/Math.max(1, Math.round(len/.6))){ const c = at(u, s, 0); box(T, c.x, c.y + .25, c.z, .04, .42, .04, HP.rail); } }
-          for (let u = .2; u < .85; u += .3) if (R.chance(.7)){ const c = at(u, R.pick([-.28, .28]), .1); pot(T, R, c.x, c.y, c.z, .8); }
-          if (len > 2.5){ const c = at(.5, 0, 0); box(T, c.x, c.y - 1.2, c.z, .14, 2.4, .14, HP.cream); }   // (a slim strut under a long one)
-          { const c = at(.5, .38, 0); box(T, c.x, c.y + .62, c.z, .1, .1, .1, HP.lamp); box(T, c.x, c.y + .69, c.z, .14, .03, .14, HP.rail); }   // (a lamp on the rail)
-        } else {
-          seg(T, a, b, .9, .08, HP.stone, .04); seg(T, a, b, .92, .7, HP.glass, .45); seg(T, a, b, .96, .08, HP.cream, .84);
-          for (let u = 0; u <= 1.001; u += 1/Math.max(1, Math.round(len/.5))){ const c = at(u, 0, 0); seg(T, at(u - .01, 0, 0), at(u + .01, 0, 0), .98, .82, HP.frame, .45); }
-        }
-      } else if (R.chance(.55)){   // on the ground: a pergola walk, posts and beams, vines along them, plants hanging down
-        seg(T, a, b, 1.0, .14, HP.stone, .02);
-        const n = Math.max(2, Math.round(len/.9));
-        for (let k = 0; k <= n; k++) for (const s of [-.45, .45]){ const c = at(k/n, s, 0); if (solidAt(c.x, c.z, c.y, c.y + 1.3)) continue; box(T, c.x, c.y + .65, c.z, .09, 1.3, .09, HP.wood); }
-        for (const s of [-.45, .45]) seg(T, at(-.03, s, 1.32), at(1.03, s, 1.32), .08, .1, HP.wood);
-        for (let k = 0; k <= n*2; k++){ const c0 = at(k/(n*2), -.6, 1.4), c1 = at(k/(n*2), .6, 1.4); seg(T, c0, c1, .05, .06, HP.wood); }
-        for (let k = 0; k < n*3; k++){ const c = at(R.r(0, 1), R.r(-.5, .5), 1.45); T.add(GEO.ico, mat(c.x, c.y, c.z, 0, R.r(0, 3), 0, .2, .12, .2), R.pick(HP.leaf));
-          if (R.chance(.3)) T.add(GEO.ico, mat(c.x, c.y + .07, c.z, 0, 0, 0, .06, .06, .06), R.pick(HP.flower)); }
-        for (let k = 0; k < n; k++) if (R.chance(.5)){ const c = at((k + .5)/n, R.pick([-.3, .3]), 0); T.add(GEO.ico, mat(c.x, c.y + 1.05, c.z, 0, 0, 0, .12, .25, .12), R.pick(HP.leaf)); }
-        for (const u of [0, 1]) if (R.chance(.8)){ const c = at(u, R.pick([-.65, .65]), 0); pot(T, R, c.x, c.y, c.z, 1.1); }
-        { const c = at(.5, 0, 0); pools.push([c.x, c.z, len/2 + 1, .9]); }
-        // festoon lights strung along the beams, sagging between the posts
-        for (const s of [-.45, .45]){ const nb = n*4; for (let k = 0; k <= nb; k++){ const u = k/nb, sag = .14*Math.sin(PI*((u*n) % 1)), c = at(u, s, 1.22 - sag); box(T, c.x, c.y, c.z, .06, .07, .06, HP.lamp); } }
-      } else {   // on the ground: an arcade, white columns under a tiled roof, planters along it
-        seg(T, a, b, 1.1, .14, HP.stone, .02);
-        const n = Math.max(2, Math.round(len/.8));
-        for (let k = 0; k <= n; k++) for (const s of [-.5, .5]){ const c = at(k/n, s, 0); if (solidAt(c.x, c.z, c.y, c.y + 1.2)) continue; T.add(GEO.cyl8, mat(c.x, c.y + .6, c.z, 0, 0, 0, .08, 1.2, .08), HP.white); }
-        seg(T, at(-.04, 0, 1.2), at(1.04, 0, 1.2), 1.3, .12, HP.white); seg(T, at(-.04, 0, 1.34), at(1.04, 0, 1.34), 1.4, .1, HP.tile);
-        for (let k = 0; k < n; k++) if (R.chance(.6)){ const c = at((k + .5)/n, R.pick([-.65, .65]), 0); pot(T, R, c.x, c.y, c.z, 1); }
-        { const c = at(.5, 0, 0); pools.push([c.x, c.z, len/2 + .9, .8]); }
-        for (let k = 0; k < n; k++){ const c = at((k + .5)/n, 0, 0); box(T, c.x, c.y + 1.06, c.z, .02, .2, .02, HP.rail); box(T, c.x, c.y + .9, c.z, .12, .14, .12, HP.lamp); }   // (a lantern hung in each bay)
-      }
+      drawLink(T, L, pools);
     }
     // courtyards: three ground homes all joined to each other
     const g0 = PIECES.filter(p => !p.level);
@@ -1373,6 +1421,103 @@
     for (const [kind, x, z, rot, y, seed, id, baseId, hostId, level] of L){ if (!KINDS[kind]) continue; const base = baseId ? byId.get(baseId) : null, host = hostId ? byId.get(hostId) : null;
       if ((baseId && !base) || (hostId && !host)) continue;
       byId.set(id || 0, addPiece(kind, x, z, rot, y, true, seed || 1, base, id || 0, host, level ?? null)); } } catch (e) {}
+
+  /* ---------- foliage: painted with the grass brush ---------- */
+  // Nothing tiled: every tuft is made of real blades, each its own curved, tapering strip (a few segments, leaning and
+  // curling, lit from both sides), so the meadow has depth and length and moves. Five kinds: meadow grass; wildflowers (grass
+  // with stems and five-petaled heads); ferns (arching fronds with paired leaflets); tall grass (long reeds with seed heads);
+  // and a mix, which lays the kinds in drifts (fern in the hollows, flowers in patches, reeds in clumps) the way a meadow
+  // grows. The color is laid on in watercolor: two greens running into each other across the ground in broad washes, a dry
+  // ochre wash here and there, cool and dark at the roots, warm and pale at the tips where the light comes through.
+  // The ground is cut into cells (.4 units) and each holds one tuft at most, so painting over the same place again adds
+  // nothing; tufts are kept by cell and made again from their cell's seed. A mesh per 8-unit square, remade when painted.
+  const GRASS_KEY = 'neonIsland.coast.grass', GC = .4, GSQ = 8;
+  const GSTYLES = ['meadow', 'wildflowers', 'ferns', 'tall grass', 'mix'];
+  const tufts = new Map(), gSquares = new Map(), gDirty = new Set(), gU = { wTime: { value: 0 } };
+  const grassM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true, side: THREE.DoubleSide }), true, false, false, null, gU);
+  const sqKey = (i, j) => Math.floor(i*GC/GSQ) + ',' + Math.floor(j*GC/GSQ);
+  try { for (const [i, j, st] of JSON.parse(localStorage.getItem(GRASS_KEY) || '[]')){ tufts.set(i + ',' + j, [i, j, st]); gDirty.add(sqKey(i, j)); } } catch (e) {}
+  let gSaveT = 0; const saveGrass = () => { clearTimeout(gSaveT); gSaveT = setTimeout(() => { try { localStorage.setItem(GRASS_KEY, JSON.stringify([...tufts.values()])); } catch (e) {} }, 400); };
+  const GG = { greenA: [.34, .55, .24], greenB: [.27, .47, .3], greenC: [.46, .62, .27], dry: [.71, .66, .38], tip: [.88, .86, .55], fern: [.3, .52, .3], reed: [.74, .68, .4], head: [.86, .74, .44] };
+  const FLOWERS = [[.95, .55, .42], [.96, .74, .76], [.72, .63, .88], [.99, .86, .46], [.97, .95, .9], [.93, .45, .52]];
+  // a little indexed-mesh builder: positions, normals (mostly up, so a blade is lit like the meadow, whichever side shows),
+  // colors, and aH
+  class GB { constructor(){ this.P = []; this.N = []; this.C = []; this.H = []; this.I = []; }
+    v(x, y, z, nx, ny, nz, c, h){ this.P.push(x, y, z); const l = Math.hypot(nx, ny, nz) || 1; this.N.push(nx/l, ny/l, nz/l); this.C.push(c[0], c[1], c[2]); this.H.push(h); return this.P.length/3 - 1; }
+    tri(a, b, c){ this.I.push(a, b, c); }
+    mesh(){ const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(this.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.N, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(this.C, 3)); g.setAttribute('aH', new THREE.Float32BufferAttribute(this.H, 1)); g.setIndex(this.I); return g; } }
+  const mix3 = (a, b, t) => [a[0] + (b[0] - a[0])*t, a[1] + (b[1] - a[1])*t, a[2] + (b[2] - a[2])*t];
+  const mul3 = (a, k, cool = 0) => [a[0]*k*(1 - cool*.2), a[1]*k, a[2]*k*(1 + cool*.25)];
+  // one blade: from its root up a gentle curve, leaning one way, tapering to a point; nSeg segments
+  function blade(G, x, y, z, ang, len, w, lean, base, tip, nSeg = 3){
+    const dx = Math.cos(ang), dz = Math.sin(ang), sx = -dz, sz = dx, nx = dx*.35, nz = dz*.35;
+    let prev = null;
+    for (let k = 0; k <= nSeg; k++){ const t = k/nSeg, ht = len*t, out = lean*len*Math.pow(t, 1.7), px = x + dx*out, pz = z + dz*out, py = y + ht*(1 - .18*lean*t), ww = w*Math.pow(1 - t, .8)*.5;
+      const c = k === 0 ? mul3(base, .62, 1) : mix3(base, tip, Math.pow(t, 1.3)*.85);
+      if (k === nSeg){ const tI = G.v(px, py, pz, nx, 1, nz, c, ht); if (prev) G.tri(prev[0], prev[1], tI); }
+      else { const a = G.v(px - sx*ww, py, pz - sz*ww, nx, 1, nz, c, ht), b = G.v(px + sx*ww, py, pz + sz*ww, nx, 1, nz, c, ht); if (prev){ G.tri(prev[0], prev[1], b); G.tri(prev[0], b, a); } prev = [a, b]; } }
+    return [x + dx*lean*len, y + len*(1 - .18*lean), z + dz*lean*len]; }
+  // a flower head: five petals round a heart, facing up and a little out
+  function flower(G, x, y, z, r, col, h){
+    const heart = [.96, .8, .32], c0 = G.v(x, y + r*.15, z, 0, 1, 0, heart, h), n = 5, a0 = hash2(Math.round(x*97), Math.round(z*89))*6.28;
+    for (let k = 0; k < n; k++){ const a = a0 + k/n*6.28, a1 = a - .5, a2 = a + .5;
+      const p1 = G.v(x + Math.cos(a1)*r*.55, y + r*.05, z + Math.sin(a1)*r*.55, 0, 1, 0, col, h), p2 = G.v(x + Math.cos(a)*r, y - r*.1, z + Math.sin(a)*r, 0, 1, 0, mul3(col, .92), h), p3 = G.v(x + Math.cos(a2)*r*.55, y + r*.05, z + Math.sin(a2)*r*.55, 0, 1, 0, col, h);
+      G.tri(c0, p1, p2); G.tri(c0, p2, p3); } }
+  // a fern frond: an arching midrib with leaflets paired along it, smaller toward the tip
+  function frond(G, x, y, z, ang, len, col){
+    const dx = Math.cos(ang), dz = Math.sin(ang), sx = -dz, sz = dx, N = 7;
+    const at = t => { const out = len*.85*Math.sin(t*1.45), up = len*.62*Math.sin(t*2.4)*(1 - .25*t); return [x + dx*out, y + Math.max(up, len*.05*(1 - t)), z + dz*out]; };
+    blade(G, x, y, z, ang, len*.62, .04, 1.25, mul3(col, .8), col, 4);
+    for (let k = 1; k <= N; k++){ const t = k/(N + 1), [px, py, pz] = at(t), L = len*.32*(1 - t*.75), c = mix3(col, GG.tip, t*.3);
+      for (const sd of [-1, 1]){ const ex = px + (sx*sd*.9 + dx*.35)*L, ez = pz + (sz*sd*.9 + dz*.35)*L, ey = py - L*.22;
+        const r0 = G.v(px, py, pz, 0, 1, 0, mul3(c, .85), py - y), r1 = G.v(px + dx*L*.28, py + .01, pz + dz*L*.28, 0, 1, 0, c, py - y), e = G.v(ex, ey, ez, 0, 1, 0, c, py - y + L*.4);
+        G.tri(r0, r1, e); } } }
+  // a seed head on a reed: a slim spindle
+  function seedHead(G, x, y, z, len, col, h){ const w = len*.16, a = G.v(x, y, z, 0, 1, 0, col, h), b = G.v(x + w, y + len*.45, z, 0, 1, 0, col, h + len*.45), c = G.v(x - w*.6, y + len*.5, z + w*.6, 0, 1, 0, col, h + len*.5), d = G.v(x, y + len, z, 0, 1, 0, mul3(col, 1.08), h + len);
+    G.tri(a, b, d); G.tri(a, d, c); }
+  // can a tuft grow here: on land, back from the cliff's edge, not steep, not inside a home
+  function grassOK(x, z){ if ((coastX(z) - x)*rowCos(z) < 1.1) return null; const y = heightAt(x, z);
+    if (Math.abs(heightAt(x + .35, z) - y) > .3 || Math.abs(heightAt(x, z + .35) - y) > .3) return null;
+    if (solidAt(x, z, y - .2, y + .5)) return null; return y; }
+  function tuft(G, i, j, st){
+    const R = rng((Math.imul(i, 73856093) ^ Math.imul(j, 19349663)) >>> 0), x = (i + R.r(.1, .9))*GC, z = (j + R.r(.1, .9))*GC, y = grassOK(x, z); if (y === null) return;
+    const wash = fbm(x*.12 + 3, z*.12 - 5), dryK = smooth(.58, .75, fbm(x*.07 - 20, z*.07 + 9))*.55;
+    let base = mix3(mix3(GG.greenA, GG.greenB, smooth(.35, .65, wash)), GG.greenC, smooth(.55, .8, fbm(x*.3, z*.3))*.6); base = mix3(base, GG.dry, dryK);
+    const tipC = mix3(GG.tip, base, .35), lean0 = R.r(.15, .45);
+    // the ground under it washed darker, a ragged blot: blots run together into the patch's shadowed floor
+    { const gc = mul3(base, .72, .6), c0 = G.v(x, y + .025, z, 0, 1, 0, gc, 0), n = 7, rr = GC*R.r(.85, 1.15), a0 = R.r(0, 6.28), ring_ = [];
+      for (let k = 0; k < n; k++){ const a = a0 + k/n*6.28, q = rr*(.75 + .45*hash2(i*31 + k, j*17 - k)); ring_.push(G.v(x + Math.cos(a)*q, y + .02, z + Math.sin(a)*q, 0, 1, 0, mul3(gc, 1.06), 0)); }
+      for (let k = 0; k < n; k++) G.tri(c0, ring_[(k + 1) % n], ring_[k]); }
+    const grass = (n, l0, l1) => { for (let k = 0; k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .16), c = mix3(base, [base[0]*1.12, base[1]*1.06, base[2]*.9], R.f());
+      blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a + R.r(-.6, .6), R.r(l0, l1), R.r(.08, .14), lean0 + R.r(-.15, .2), c, tipC, 3); } };
+    if (st === 0) grass(R.i(10, 15), .24, .6);
+    else if (st === 1){ grass(R.i(6, 9), .2, .45);
+      const fc = R.pick(FLOWERS);   // (a clump keeps mostly to one color, as wildflowers do)
+      for (let k = 0, n = R.i(2, 4); k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .17), col = R.chance(.75) ? fc : R.pick(FLOWERS), top = blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a, R.r(.3, .62), .04, R.r(.05, .25), mul3(base, .9), base, 3);
+        flower(G, top[0], top[1], top[2], R.r(.09, .14), col, top[1] - y); } }
+    else if (st === 2){ const n = R.i(5, 8), a0 = R.r(0, 6.28), fc = mix3(GG.fern, base, .25); for (let k = 0; k < n; k++) frond(G, x, y, z, a0 + k/n*6.28 + R.r(-.3, .3), R.r(.42, .72), fc); }
+    else { const rc = mix3(GG.reed, base, .45); for (let k = 0, n = R.i(6, 9); k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .12), top = blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a, R.r(.75, 1.3), .05, R.r(.05, .2), mul3(base, .85), rc, 4);
+        if (R.chance(.65)) seedHead(G, top[0], top[1] - .02, top[2], R.r(.16, .26), GG.head, top[1] - y); } grass(R.i(2, 4), .2, .4); } }
+  // the mix: which kind grows where, in drifts
+  function mixStyle(i, j){ const x = i*GC, z = j*GC, n = fbm(x*.16 + 11, z*.16 - 4), m = fbm(x*.35 - 7, z*.35 + 2), h = hash2(i*7 + 1, j*13 + 5);
+    if (n < .33) return 2; if (n > .7 && m > .45) return 3; if (m > .62 || h < .08) return 1; return 0; }
+  function paintGrass(cx, cz, r, style, erase){
+    let any = false;
+    for (let i = Math.floor((cx - r)/GC); i <= Math.ceil((cx + r)/GC); i++) for (let j = Math.floor((cz - r)/GC); j <= Math.ceil((cz + r)/GC); j++){
+      const x = (i + .5)*GC, z = (j + .5)*GC, d = Math.hypot(x - cx, z - cz); if (d > r) continue; const k = i + ',' + j;
+      if (erase){ if (tufts.delete(k)){ gDirty.add(sqKey(i, j)); any = true; } continue; }
+      if (tufts.has(k) || hash2(i*3 + 17, j*5 + 29) > .93 - .25*smooth(r*.7, r, d)) continue;   // (a little thinner at the brush's rim)
+      tufts.set(k, [i, j, style === 4 ? mixStyle(i, j) : style]); gDirty.add(sqKey(i, j)); any = true; }
+    if (any) saveGrass(); }
+  function buildSquare(key){
+    const old = gSquares.get(key); if (old){ scene.remove(old); old.geometry.dispose(); gSquares.delete(key); }
+    const [si, sj] = key.split(',').map(Number), G = new GB(), n = GSQ/GC;
+    for (let i = si*n; i < si*n + n; i++) for (let j = sj*n; j < sj*n + n; j++){ const t = tufts.get(i + ',' + j); if (t) tuft(G, i, j, t[2]); }
+    if (!G.I.length) return;
+    const m = new THREE.Mesh(G.mesh(), grassM); m.receiveShadow = true; m.castShadow = false; m.frustumCulled = false; m.matrixAutoUpdate = false; scene.add(m); gSquares.set(key, m); }
+  function grassTick(t){ gU.wTime.value = t; let n = 0; for (const k of gDirty){ gDirty.delete(k); buildSquare(k); if (++n >= 3) break; } }
+  const grassAround = (x, z, r) => { for (let a = Math.floor((x - r)/GSQ); a <= Math.floor((x + r)/GSQ); a++) for (let b = Math.floor((z - r)/GSQ); b <= Math.floor((z + r)/GSQ); b++) if (gSquares.has(a + ',' + b)) gDirty.add(a + ',' + b); };
 
   ANIM.live = true;   // (homes from the save just appear; new ones are painted in)
   // the ghost: the block under the pointer, see-through, and a ring on the ground green or red
@@ -1519,10 +1664,63 @@
     if (PL.kind) setKind(PL.kind); zHide(); }
   document.getElementById('modeBtn') && document.getElementById('modeBtn').addEventListener('click', () => setMode(!ZONE.on));
   function setKind(k){
-    PL.kind = PL.kind === k ? null : k;
+    PL.kind = PL.kind === k ? null : k; CN.a = null; connGhost.visible = false;
     document.querySelectorAll('.place button[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === PL.kind));
-    if (!PL.kind){ ghost.visible = ring.visible = false; zHide(); if (status) status.textContent = ''; }
+    const tool = PL.kind === 'connect' || PL.kind === 'grass';
+    document.querySelectorAll('.place .tip').forEach(t => { t.style.display = tool ? (t.classList.contains('t-' + PL.kind) ? '' : 'none') : (t.classList.contains('t-connect') || t.classList.contains('t-grass') ? 'none' : ''); });
+    ghost.visible = ring.visible = false; zHide();
+    if (!PL.kind && status) status.textContent = '';
   }
+  // a ring round (x, z): on the ground, or at height y
+  function ringAt(x, z, r, y = null, w = .14){ const a = ringGeo.attributes.position.array;
+    for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s_ = Math.sin(t);
+      for (const [j, rr] of [[0, r], [1, r + w]]){ const px = x + c*rr, pz = z + s_*rr, o = (i*2 + j)*3; a[o] = px; a[o + 1] = (y === null ? heightAt(px, pz) : y) + .07; a[o + 2] = pz; } }
+    ringGeo.attributes.position.needsUpdate = true; ring.visible = true; }
+
+  /* ---------- the connect brush: a walk, a bridge, an arcade or a shared wall between two blocks you pick ---------- */
+  // Click one block, then another: what joins them is shown, and a click builds it. V steps through the kinds; the last,
+  // random, lets each connection choose what suits it (see linkType). Right click: let go of the first block, or, over a
+  // block, take away the connections built to it.
+  const CN = { a: null, type: 0, key: '', ok: false };
+  const connGhost = new THREE.Mesh(new THREE.BufferGeometry(), ghostM); connGhost.visible = false; connGhost.frustumCulled = false; connGhost.renderOrder = 5; scene.add(connGhost);
+  function showConnect(){
+    ghost.visible = false; zHide();
+    const hov = PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, P = hov ? hov.piece : null, tn = LINK_TYPES[CN.type];
+    const say = (t, ok) => { if (status){ status.textContent = 'connect: ' + tn + ' (V next) ' + t; status.style.color = ok ? '#0f3b4a' : ''; } };
+    if (!CN.a){ connGhost.visible = false; CN.ok = false;
+      if (P){ ringAt(P.x, P.z, KINDS[P.kind].rb + .35, P.level ? P.y : null); ringM.color.set(0x7dffb0); } else ring.visible = false;
+      say(P ? '· click to pick this one' : '· pick the first block', !!P); return; }
+    const A = CN.a; ringAt(A.x, A.z, KINDS[A.kind].rb + .35, A.level ? A.y : null); ringM.color.set(0xffd27a);
+    if (!P || P === A){ connGhost.visible = false; CN.ok = false; say('· now pick the second block', false); return; }
+    const L = pairOf(A, P), why = !L ? 'they overlap' : L.gap > 12 ? 'too far apart' : L.gap < -.2 ? 'they overlap' : null;
+    CN.ok = !why;
+    if (why){ connGhost.visible = false; say('· ' + why, false); return; }
+    const key = A.id + '|' + P.id + '|' + CN.type;
+    if (key !== CN.key){ CN.key = key; const T = new Tris(); L.user = true; L.type = LINK_TYPES[CN.type]; drawLink(T, L, []); connGhost.geometry.dispose(); connGhost.geometry = T.geo(); }
+    connGhost.visible = true; say('· click to build it', true); }
+  function placeConnect(){
+    const hov = PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, P = hov ? hov.piece : null;
+    if (!CN.a){ if (P){ CN.a = P; CN.key = ''; } return; }
+    if (!P || P === CN.a || !CN.ok) return;
+    const a = CN.a.id, b = P.id; ULINKS = ULINKS.filter(u => !((u.a === a && u.b === b) || (u.a === b && u.b === a))); ULINKS.push({ a, b, type: LINK_TYPES[CN.type] });
+    saveLinks(); linksDirty = true; CN.a = null; CN.key = ''; connGhost.visible = false; }
+  function unConnect(cx, cy){
+    if (CN.a){ CN.a = null; connGhost.visible = false; return; }
+    const P = pieceAt(cx, cy); if (!P) return; const n = ULINKS.length; ULINKS = ULINKS.filter(u => u.a !== P.id && u.b !== P.id); if (ULINKS.length !== n){ saveLinks(); linksDirty = true; } }
+
+  /* ---------- the grass brush ---------- */
+  // Click or drag to paint foliage, right click or right drag to clear it; Q bigger, E smaller; V steps through the kinds.
+  const GR = { size: 2, style: 4, last: null }, GRS = [.6, 1.1, 1.8, 2.8, 4.2, 6];
+  function showGrass(){
+    ghost.visible = false; zHide(); connGhost.visible = false;
+    const hit = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
+    if (!hit || hit.sea){ ring.visible = false; if (status) status.textContent = 'grass: ' + GSTYLES[GR.style] + (hit ? ' · not on the sea' : ''); return; }
+    ringAt(hit.x, hit.z, GRS[GR.size], null, .12); ringM.color.set(0xb8e08a);
+    if (status){ status.textContent = 'grass: ' + GSTYLES[GR.style] + ' (V next) · brush ' + (GR.size + 1); status.style.color = '#0f3b4a'; } }
+  function grassStroke(cx, cy, erase, force){
+    const h = pick(cx, cy); if (!h || h.sea) return; const r = GRS[GR.size];
+    if (!force && GR.last && Math.hypot(h.x - GR.last[0], h.z - GR.last[1]) < r*.35) return;
+    GR.last = [h.x, h.z]; paintGrass(h.x, h.z, r, GR.style, erase); }
   document.querySelectorAll('.place button[data-k]').forEach(b => b.addEventListener('click', () => setKind(b.dataset.k)));
   setMode(true);
 
@@ -1535,10 +1733,13 @@
     canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (ptrs.size === 2){ act = { kind: 'pinch' }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); return; }
     act = { kind: 'turn', b: e.button, x: e.clientX, y: e.clientY, moved: false };
+    // the grass brush paints (left) or clears (right) as it's dragged; Alt+drag or the middle button still turns the view
+    if (PL.kind === 'grass' && (e.button === 0 || e.button === 2) && !e.altKey && e.pointerType !== 'touch'){ act = { kind: 'paint', erase: e.button === 2 }; GR.last = null; grassStroke(e.clientX, e.clientY, act.erase, true); }
   });
   canvas.addEventListener('pointermove', e => {
     PL.ptr = { x: e.clientX, y: e.clientY };
     const p = ptrs.get(e.pointerId); if (!p || !act) return;
+    if (act.kind === 'paint'){ ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); grassStroke(e.clientX, e.clientY, act.erase, false); return; }
     const dx = e.clientX - p.x, dy = e.clientY - p.y; ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), ZMIN, ZMAX); const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } return; }
     if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true;
@@ -1547,7 +1748,11 @@
   canvas.addEventListener('pointerleave', () => { PL.ptr = null; });
   const endPtr = e => {
     if (act && act.kind === 'turn' && !act.moved && ptrs.has(e.pointerId)){
-      if ((act.b === 0 || e.pointerType === 'touch') && PL.kind){ PL.ptr = { x: e.clientX, y: e.clientY }; if (PL.kind === 'zone' && !oneHome()){ showZoneGhost(); placeZone(); } else { showGhost(); placeHere(); } }
+      if ((act.b === 0 || e.pointerType === 'touch') && PL.kind){ PL.ptr = { x: e.clientX, y: e.clientY };
+        if (PL.kind === 'connect'){ showConnect(); placeConnect(); }
+        else if (PL.kind === 'grass') grassStroke(e.clientX, e.clientY, false, true);
+        else if (PL.kind === 'zone' && !oneHome()){ showZoneGhost(); placeZone(); } else { showGhost(); placeHere(); } }
+      else if (act.b === 2 && PL.kind === 'connect') unConnect(e.clientX, e.clientY);
       else if (act.b === 2){ if (PL.kind === 'zone' && !oneHome()){ const h = pick(e.clientX, e.clientY); if (h) clearZone(h.x, h.z); } else { const p = pieceAt(e.clientX, e.clientY); if (p) removePiece(p); } }
     }
     ptrs.delete(e.pointerId); if (!ptrs.size){ act = null; canvas.style.cursor = 'grab'; }
@@ -1566,6 +1771,11 @@
     if (k === 'h' || e.key === 'Home'){ camGoal.set(HOME.x, TY, HOME.z); return; }
     if (k === 'r'){ PL.rot += (e.shiftKey ? -1 : 1)*PI/12; return; }   // (turn the piece: 15 degrees a press, any angle it lands on)
     if ('1234'.includes(e.key) && e.key.length === 1){ if (ZONE.on) setKind('zone'); else setKind(KIND_KEYS[+e.key - 1]); return; }
+    if (e.key === '5'){ setKind('connect'); return; }
+    if (e.key === '6'){ setKind('grass'); return; }
+    if (PL.kind === 'grass' && (k === 'q' || k === 'e')){ GR.size = clamp(GR.size + (k === 'q' ? 1 : -1), 0, GRS.length - 1); return; }
+    if (PL.kind === 'grass' && k === 'v'){ GR.style = (GR.style + 1) % GSTYLES.length; return; }
+    if (PL.kind === 'connect' && k === 'v'){ CN.type = (CN.type + 1) % LINK_TYPES.length; CN.key = ''; return; }
     if (k === 'z'){ setMode(!ZONE.on); return; }
     if (PL.kind === 'zone' && (k === 'q' || k === 'e')){ ZONE.size = clamp(ZONE.size + (k === 'q' ? 1 : -1), 0, ZSIZE.length - 1); return; }   // (Q: a bigger brush, E: a smaller one)
     if (k === 'v'){   // (single mode: the next kind of home, Shift+V another look of it; otherwise another look or layout)
@@ -1587,7 +1797,7 @@
     sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vGlow > 0.85 ? vec3(1.0, 0.85, 0.46) : vec3(1.0, 0.6, 0.28), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
   renderer.localClippingEnabled = true;
   function renderRefl(){
-    const hide = [sea, spray, ghost, ring, ...zGhosts, ...(poolMesh ? [poolMesh] : []), ...BLOOMS], vis = hide.map(o => o.visible); hide.forEach(o => { o.visible = false; });
+    const hide = [sea, spray, ghost, ring, connGhost, ...gSquares.values(), ...zGhosts, ...(poolMesh ? [poolMesh] : []), ...BLOOMS], vis = hide.map(o => o.visible); hide.forEach(o => { o.visible = false; });
     scene.overrideMaterial = reflM; scene.scale.y = -1; scene.updateMatrixWorld(true);
     renderer.shadowMap.autoUpdate = false;
     renderer.setRenderTarget(reflRT); renderer.setClearColor(0x000000, 0); renderer.autoClear = true; renderer.render(scene, cam);
@@ -1598,17 +1808,17 @@
   updateCamera(0); stream(1e9);   // (the first view whole, before the first frame)
   // compile now, while loading, every shader that would otherwise first be needed in play (the paint-in, the pigment
   // blooms, the night's light pools and glow bleed): a shader compiled mid-play stalls the frame
-  { const g = blockOf('townhouse', 1, false, false).geo, tmp = [...PAINT_POOL.map(pm => new THREE.Mesh(g, pm.mat)), new THREE.Mesh(g, poolM)];
+  { const g = blockOf('townhouse', 1, false, false).geo, tmp = [...PAINT_POOL.map(pm => new THREE.Mesh(g, pm.mat)), new THREE.Mesh(g, poolM), new THREE.Mesh(g, grassM)];
     for (const m of tmp){ m.visible = false; scene.add(m); } renderer.compile(scene, cam); for (const m of tmp) scene.remove(m);
     for (const m of [extractM, blurM]){ postQ.material = m; renderer.compile(postScene, skyCam); } renderer.compile(blitScene, skyCam); }
   const t0 = performance.now(), TOFF = { v: 0 }; let last = t0;   // (TOFF: a test hook, to look at the sea at a given moment)
   function frame(now){
     const dt = Math.min(.1, (now - last)/1000); last = now;
     updateCamera(dt); stream(6);
-    if (PL.kind === 'zone' && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost();
+    if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'grass') showGrass(); else if (PL.kind === 'zone' && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost();
     animTick(dt);
     if (linksDirty && !ANIM.list.length) buildLinks();
-    const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t);
+    const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t); grassTick(t);
     foamStep(dt); renderRefl();
     renderer.setRenderTarget(rt); renderer.autoClear = true; renderer.render(skyScene, skyCam);
     renderer.autoClear = false; renderer.clearDepth(); renderer.render(scene, cam);
@@ -1617,7 +1827,7 @@
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { seaU, TOFF, WAVE, ANIM, scene, renderer, get t0(){ return t0; }, setHour, heightAt, coastX, pick, PIECES,
+  window.COAST = { seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, get t0(){ return t0; }, setHour, heightAt, coastX, pick, PIECES,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

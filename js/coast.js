@@ -360,6 +360,10 @@
       // on as a bore of white water
       float ratio = disp.y/max(0.39*d, 1e-3);
       brk = smoothstep(0.8, 1.2, ratio)*smoothstep(0.05, 0.6, sh);
+      // against rock (a stack, a boulder, the cliff's foot) the wave doesn't just fade: the open sea's crest arriving there
+      // slams into it and turns to white water round it
+      float k0r = 6.2832/SWL, raw = 2.6*setEnv(p)*cos(k0r*dot(WD, p) - sqrt(GRAV*k0r)*time)*(1.0 + wForce);
+      brk = max(brk, (1.0 - smoothstep(0.25, 1.9, sh))*smoothstep(0.5, 1.5, raw));
       if (ratio > 1.0){ float f = 1.0/ratio; disp.y *= f; slope *= f; }
       // a trough can't reach the seabed (it flattens over the shallows), and the water's swing sideways dies away as the
       // floor comes up, so the surface never dips below the sand or slides into the rock
@@ -548,7 +552,7 @@
         vec2 i = (p - box.xy)/box.zw; float inB = step(0.0, i.x)*step(i.x, 1.0)*step(0.0, i.y)*step(i.y, 1.0);
         vec2 tx = texture2D(depthTex, p/box.zw).rg; float d = inB > 0.5 ? tx.r*tx.r*24.0 : 24.0, sh = inB > 0.5 ? tx.g*4.0 : 4.0;
         vec3 n; float j, b; vec3 w = waves(p, d, sh, n, j, b);
-        float now = max(smoothstep(0.45, 0.05, j)*step(0.0, w.y), b*smoothstep(-0.5, 0.8, w.y));   // (folding crests; breaking in the shallows)
+        float now = max(smoothstep(0.45, 0.05, j)*step(0.0, w.y), b);   // (folding crests; breaking in the shallows and against rock)
         now *= step(0.01, d);
         float keep = old*exp(-dt/(2.2 + 2.5*old));   // (thick foam lasts longer than thin)
         gl_FragColor = vec4(max(keep, now), 0.0, 0.0, 1.0);
@@ -605,7 +609,7 @@
     for (const [x, z, up] of hitPts){
       const key = x.toFixed(2) + ',' + z.toFixed(2), hh = WAVE.h(x, z, t), prev = hitPrev.get(key);
       hitPrev.set(key, hh);
-      if (prev !== undefined && prev < 2.2 && hh >= 2.2){ const a = Math.min(1, (hh - 1.8)/1.8); spawnSpray(x, z, Math.round(4 + a*10), up*(.6 + .5*a)); }   // (a big crest just arrived)
+      if (prev !== undefined && prev < 1.3 && hh >= 1.3){ const a = Math.min(1, (hh - 1.0)/1.8); spawnSpray(x, z, Math.round(4 + a*10), up*(.6 + .5*a)); }   // (a big crest just arrived)
     }
     if (hitPrev.size > 6000) hitPrev.clear();
     for (let i = 0; i < SPN; i++){

@@ -945,11 +945,14 @@
   const HP = { teal: C(0x3f8f8a), sea: C(0x5aa79a), cream: C(0xf2e8d5), ochre: C(0xe8c48a), white: C(0xf6f1e6), blush: C(0xefc9b8), sand: C(0xe9d9b8),
     terra: C(0xc8663e), terra2: C(0xa9522f), tile: C(0xb85a36), glass: C(0x8fd8c4).multiplyScalar(1.12), glass2: C(0x84d4be).multiplyScalar(1.2), glassT: C(0x7fc0c4).multiplyScalar(1.15), glassD: C(0x2f5960), frame: C(0x2e403e),
     doorO: C(0xd0702e), doorT: C(0x3e6e7a), wood: C(0x9a6a3e), rail: C(0x3a3f3e), metal: C(0x9aa3a6), blue: C(0x3a9ec4), lamp: C(0xffd27a),
-    leaf: [C(0x4e8a34), C(0x6aa03c), C(0x3d7430), C(0x82b048)], pot: C(0xb5583a), stone: C(0xd8ccb2), flower: [C(0xf08a5a), C(0xf5c84c), C(0xe6739a)] };
+    leaf: [C(0x4e8a34), C(0x6aa03c), C(0x3d7430), C(0x82b048)], pot: C(0xb5583a), stone: C(0xd8ccb2), flower: [C(0xf08a5a), C(0xf5c84c), C(0xe6739a)],
+    red: C(0xb84a3c), redD: C(0x8a3329), jade: C(0x3a8a76), jade2: C(0x276556), lattice: C(0x5a2a22),   // (the pagoda house: lacquer red, jade tiles)
+    rust: C(0xc4703e), rust2: C(0x9e5530), solar: C(0x2b4877), solarL: C(0x6f8fbf), tank: C(0xb9b7ad) };   // (the garden terrace: weathered rust, solar glass)
   for (const c of HP.leaf) LEAFC.add(c);
   GLOW.set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
   Object.assign(GEO, { cyl12: new THREE.CylinderGeometry(1, 1, 1, 12), cyl16: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.IcosahedronGeometry(1, 1),
-    dome: new THREE.SphereGeometry(1, 12, 6, 0, PI*2, 0, PI/2), ring: new THREE.CylinderGeometry(1, 1, 1, 16, 1, true) });
+    dome: new THREE.SphereGeometry(1, 12, 6, 0, PI*2, 0, PI/2), ring: new THREE.CylinderGeometry(1, 1, 1, 16, 1, true),
+    frus4: new THREE.CylinderGeometry(.62, 1, 1, 4, 1).rotateY(PI/4), hip4: new THREE.CylinderGeometry(.08, 1, 1, 4, 1).rotateY(PI/4) });   // (square frustums: a roof's flared skirt, and a hipped roof)
   const rng = seed => { let a = seed >>> 0; return { f(){ a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0)/4294967296; },
     r(lo, hi){ return lo + (hi - lo)*this.f(); }, i(lo, hi){ return lo + Math.floor(this.f()*(hi - lo + 1)); }, pick(l){ return l[Math.floor(this.f()*l.length)]; }, chance(p){ return this.f() < p; } }; };
   // little parts
@@ -962,6 +965,20 @@
   const winZ = (T, R, x, y, z, w, h, arch) => { box(T, x, y, z + .01, w + .08, h + .08, .04, HP.frame); box(T, x, y, z + .03, w, h, .04, R.chance(.35) ? HP.lamp : HP.glassD);
     if (arch) T.add(GEO.cyl8, mat(x, y + h/2, z + .02, PI/2, 0, 0, w/2 + .04, .05, w/2 + .04), HP.frame);
     box(T, x, y - h/2 - .04, z + .08, w + .14, .04, .12, HP.stone); };
+  // a square flared roof w by d (at its eaves), h tall, its base at y; the corners turned up, a jade ridge and a finial
+  const SQ2 = Math.SQRT2;
+  function jadeRoof(T, D, y, w, d, h, hip){
+    T.add(hip ? GEO.hip4 : GEO.frus4, mat(0, y + h/2, 0, 0, 0, 0, w/2*SQ2, h, d/2*SQ2), HP.jade);
+    T.add(hip ? GEO.hip4 : GEO.frus4, mat(0, y + .02, 0, 0, 0, 0, w/2*SQ2 + .04, .05, d/2*SQ2 + .04), HP.jade2);   // (the eave's edge, darker)
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]){ const cx = sx*w/2, cz = sz*d/2;   // (each corner swept up)
+      T.add(GEO.box, mat(cx*.97, y + .1, cz*.97, -sz*.55, 0, sx*.55, .12, .22, .12), HP.jade2); T.add(GEO.box, mat(cx*1.0, y + .2, cz*1.0, 0, 0, 0, .06, .06, .06), HP.jade); }
+    if (D.chance(.85)){ const lx = w*.36, lz = d/2 + .08; for (const sx of [-1, 1]){ box(T, sx*lx, y - .12, lz, .02, .12, .02, HP.rail); box(T, sx*lx, y - .26, lz, .13, .17, .13, HP.lamp); box(T, sx*lx, y - .17, lz, .16, .03, .16, HP.redD); } } }   // (paper lanterns under the eave)
+  // a lattice window on a face facing +z: dark frame, glass, and a fret of bars across it
+  const latticeZ = (T, R, x, y, z, w, h) => { box(T, x, y, z + .01, w + .1, h + .1, .04, HP.lattice); box(T, x, y, z + .03, w, h, .04, R.chance(.4) ? HP.lamp : HP.glassD);
+    for (let k = 1; k < 3; k++){ box(T, x - w/2 + k*w/3, y, z + .06, .025, h, .02, HP.lattice); box(T, x, y - h/2 + k*h/3, z + .06, w, .025, .02, HP.lattice); } };
+  // the same, on a face facing +x (sd 1) or -x (sd -1)
+  const latticeX = (T, R, x, y, z, w, h, sd) => { box(T, x + sd*.01, y, z, .04, h + .1, w + .1, HP.lattice); box(T, x + sd*.03, y, z, .04, h, w, R.chance(.4) ? HP.lamp : HP.glassD);
+    for (let k = 1; k < 3; k++){ box(T, x + sd*.06, y, z - w/2 + k*w/3, .02, h, .025, HP.lattice); box(T, x + sd*.06, y - h/2 + k*h/3, z, .02, .025, w, HP.lattice); } };
   // Each kind is a block: build(T, R, D, ctx) draws it at the origin and returns how high its top is. R draws its body (so
   // a block's size never changes), D its trimmings. ctx.below: it sits on another block (no pad, steps, door or garden at
   // its foot); ctx.above: another block sits on it (no roof garden, dome or greenhouse: a flat roof to stand on).
@@ -1068,6 +1085,80 @@
         T.add(GEO.cyl5, mat(0, top + .3 + dr*.9, bz, 0, 0, 0, .03, .3, .03), HP.rail); }
       if (!ctx.below){ for (const [x, z] of [[-1.5, 1.2], [1.5, -1.1]]) if (D.chance(.8)) T.add(GEO.cone8, mat(x, .75, z, 0, 0, 0, .28, 1.4, .28), HP.leaf[2]);
         for (let k = 0; k < 3; k++) shrub(T, D, D.r(-1.4, 1.4), D.r(1.25, 1.45), .8); }
+      return top;
+    } },
+    // the pagoda house (boards 15, 27): lacquer-red timber floors, each a little narrower, a flared jade-tiled skirt between
+    // them with its corners swept up, lattice windows, paper lanterns under the eaves, a balcony with a rail on the upper
+    // floor, a hipped jade roof with a finial; a stone plinth, a double door, potted pines and grasses at its foot
+    pagoda: { name: 'Pagoda house', r: 1.9, rb: 1.15, build(T, R, D, ctx){
+      const w = R.r(1.75, 2.05), d = R.r(1.55, 1.8), fl = ctx.below ? 1 : R.i(1, 2), fh = 1.0, wall = R.pick([HP.red, HP.red, HP.redD]);
+      let y = ctx.below ? 0 : .2;
+      if (!ctx.below){ box(T, 0, .1, 0, w + .7, .2, d + .7, HP.stone); box(T, 0, .21, d/2 + .45, .9, .06, .3, HP.stone); }
+      for (let f = 0; f < fl; f++){
+        const ww = w - f*.22, dd = d - f*.18;
+        box(T, 0, y + fh/2, 0, ww, fh, dd, wall);
+        for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(T, sx*ww/2, y + fh/2, sz*dd/2, .11, fh, .11, HP.redD);   // (the corner posts)
+        box(T, 0, y + fh - .06, 0, ww + .04, .1, dd + .04, HP.redD);   // (the beam under the eave)
+        const front = f === 0 && !ctx.below;
+        for (const wx of [-ww*.29, ww*.29]) latticeZ(T, D, wx, y + fh*.55, dd/2, .38, .42);
+        latticeZ(T, D, 0, y + fh*.55, -dd/2 - .07, .5, .4);
+        for (const sd of [-1, 1]) latticeX(T, D, sd*ww/2, y + fh*.55, 0, .42, .38, sd);   // (a window in each side)
+        if (front){ box(T, 0, y + .45, dd/2 + .03, .62, .82, .06, HP.lattice); box(T, 0, y + .45, dd/2 + .05, .02, .8, .04, HP.redD); for (const sx of [-.16, .16]) box(T, sx, y + .45, dd/2 + .07, .22, .6, .02, HP.wood); }   // (a double door)
+        if (f > 0 || ctx.below){ box(T, 0, y + .04, dd/2 + .22, ww*.8, .07, .4, HP.wood);   // (a balcony on the upper floor)
+          for (let k = 0; k <= 6; k++) box(T, -ww*.4 + k*ww*.8/6, y + .25, dd/2 + .4, .03, .38, .03, HP.lattice); box(T, 0, y + .44, dd/2 + .4, ww*.8, .04, .04, HP.lattice);
+          if (D.chance(.7)) pot(T, D, ww*.3, y + .07, dd/2 + .25, .8); }
+        y += fh;
+        if (f < fl - 1 || ctx.above){ jadeRoof(T, D, y - .02, ww + .6, dd + .55, .2, false); y += .16; }
+      }
+      let top;
+      if (!ctx.above){ const ww = w - (fl - 1)*.22, dd = d - (fl - 1)*.18, rh = .95; jadeRoof(T, D, y - .02, ww + .7, dd + .65, rh, true);
+        // (the hips: a darker tile line down each corner, so the roof's planes read)
+        for (const sx of [-1, 1]) for (const sz of [-1, 1]){ const a = V3(sx*(ww + .7)/2*.04, y + rh - .02, sz*(dd + .65)/2*.04), b = V3(sx*(ww + .7)/2*.98, y + .02, sz*(dd + .65)/2*.98); seg(T, a, b, .07, .05, HP.jade2, .02); }
+        T.add(GEO.cyl5, mat(0, y + rh + .12, 0, 0, 0, 0, .03, .3, .03), HP.ochre); T.add(GEO.ico, mat(0, y + rh + .28, 0, 0, 0, 0, .06, .06, .06), HP.ochre);
+        top = y + .05; }   // (a roof can't be stood on: top is the eave line)
+      else { box(T, 0, y - .04, 0, w - (fl - 1)*.22 + .1, .08, d - (fl - 1)*.18 + .1, HP.redD); top = y; }
+      if (!ctx.below){ for (const sx of [-1, 1]){ T.add(GEO.cyl5, mat(sx*(w/2 + .2), .45, d/2 + .2, 0, 0, sx*.15, .05, .5, .05), HP.wood); T.add(GEO.ico, mat(sx*(w/2 + .25), .78, d/2 + .2, 0, 0, 0, .3, .2, .3), D.pick(HP.leaf)); }   // (a little pine each side of the door)
+        for (let k = 0; k < 4; k++) if (D.chance(.7)) pot(T, D, D.r(-w/2, w/2), .2, -d/2 - .25, .9); }
+      return top;
+    } },
+    // the garden terrace (boards 08, 29): weathered rust boxes stacked and cantilevered off each other, each with a ribbon of
+    // glass, planted troughs along the open edges spilling grass and trailing vines down the faces; up top a tilted solar
+    // panel on legs and a water tank, among roof planters
+    terrace: { name: 'Garden terrace', r: 2.0, rb: 1.3, build(T, R, D, ctx){
+      const y0 = ctx.below ? 0 : .12, n = ctx.below ? R.i(1, 2) : R.i(2, 3), bh = .85;
+      if (!ctx.below) box(T, 0, .06, 0, 2.9, .12, 2.6, HP.stone);
+      box(T, 0, y0 + n*bh/2, 0, .7, n*bh, .7, HP.stone);   // (the core every box hangs off: stair and pipes)
+      let y = y0, lastW = 1.6, lastD = 1.3;
+      for (let i = 0; i < n; i++){
+        const turn = (i + (ctx.below ? 1 : 0)) % 2, w = R.r(1.5, 1.95), d = R.r(1.1, 1.35), ox = i === n - 1 ? 0 : R.r(-.35, .35), oz = i === n - 1 ? 0 : R.r(-.3, .3);
+        const W = turn ? d : w, Dd = turn ? w : d, col = R.pick([HP.rust, HP.rust, HP.rust2]);
+        box(T, ox, y + bh/2, oz, W, bh, Dd, col);
+        box(T, ox, y + bh - .04, oz, W + .08, .08, Dd + .08, HP.rust2);   // (its lip)
+        // a ribbon of glass round it, cut by mullions
+        box(T, ox, y + bh*.52, oz, W + .02, bh*.38, Dd + .02, HP.glassD);
+        for (const [fx, fz, len, along] of [[0, Dd/2 + .02, W, 'x'], [0, -Dd/2 - .02, W, 'x'], [W/2 + .02, 0, Dd, 'z'], [-W/2 - .02, 0, Dd, 'z']]){
+          const k = Math.max(2, Math.round(len/.32)); for (let j = 0; j <= k; j++){ const t = -len/2 + j*len/k; box(T, ox + fx + (along === 'x' ? t : 0), y + bh*.52, oz + fz + (along === 'z' ? t : 0), .035, bh*.4, .035, HP.frame); } }
+        if (D.chance(.5)) box(T, ox + W*.25, y + bh*.52, oz + Dd/2 + .03, W*.3, bh*.34, .02, HP.lamp);   // (one room lit)
+        // planted troughs along the open edges, spilling over; vines hanging down the faces
+        for (const sz of [-1, 1]) if (D.chance(.75)){ const tz = oz + sz*(Dd/2 + .14); box(T, ox, y + bh + .02, tz, W*.9, .16, .2, HP.rust2);
+          for (let j = 0; j < 4; j++) plant(T, D, ox - W*.38 + j*W*.76/3, y + bh + .08, tz, .95);
+          for (let j = 0; j < 2; j++) if (D.chance(.7)) T.add(GEO.ico, mat(ox + D.r(-W*.4, W*.4), y + bh*.55, tz + sz*.04, 0, 0, 0, .1, .3, .1), D.pick(HP.leaf)); }
+        lastW = W; lastD = Dd; y += bh;
+      }
+      const top = y + .04;
+      box(T, 0, y + .02, 0, lastW + .1, .06, lastD + .1, HP.stone);
+      if (!ctx.above){
+        // a tilted solar panel on legs, its cells lined out, and a water tank with bands
+        const pw = Math.min(1.3, lastW*.8), pd = .75, tilt = .42, px = -lastW*.08, pz = -lastD*.12;
+        for (const [lx, lz, lh] of [[-pw/2 + .08, -pd/2 + .1, .2], [pw/2 - .08, -pd/2 + .1, .2], [-pw/2 + .08, pd/2 - .1, .52], [pw/2 - .08, pd/2 - .1, .52]]) box(T, px + lx, y + lh/2, pz + lz, .04, lh, .04, HP.metal);
+        T.add(GEO.box, mat(px, y + .38, pz, tilt, 0, 0, pw, .05, pd), HP.solar);
+        for (let k = 1; k < 4; k++) T.add(GEO.box, mat(px - pw/2 + k*pw/4, y + .41, pz, tilt, 0, 0, .015, .02, pd), HP.solarL);
+        T.add(GEO.box, mat(px, y + .41, pz, tilt, 0, 0, pw, .02, .015), HP.solarL);
+        const tx = lastW*.32, tz = lastD*.22; T.add(GEO.cyl12, mat(tx, y + .35, tz, 0, 0, 0, .2, .6, .2), HP.tank);
+        for (const by of [.15, .55]) T.add(GEO.cyl12, mat(tx, y + by, tz, 0, 0, 0, .215, .04, .215), HP.metal); T.add(GEO.cyl8, mat(tx, y + .7, tz, 0, 0, 0, .1, .1, .1), HP.metal);
+        for (let k = 0; k < 3; k++) if (D.chance(.8)) plant(T, D, D.r(-lastW*.4, lastW*.4), y + .05, lastD*.38, 1.1);
+      }
+      if (!ctx.below){ box(T, .36, .5, .36, .06, .8, .06, HP.metal); for (let k = 0; k < 5; k++) if (D.chance(.75)) pot(T, D, D.r(-1.2, 1.2), .12, D.r(.9, 1.15), 1); }
       return top;
     } },
   };
@@ -1662,7 +1753,7 @@
   // checked as a home placed alone would be, and the ones that can't go (the sea, a slope, a home already there) are left out.
   // Right click in zone mode clears the homes inside the brush.
   const ZONE = { on: true, size: 2 }, ZSIZE = [0, 2.8, 4.2, 5.8, 7.6, 9.6, 12];
-  const ZW = [['townhouse', .35], ['villa', .25], ['tower', .2], ['pods', .2]];
+  const ZW = [['townhouse', .26], ['villa', .2], ['tower', .15], ['pods', .14], ['pagoda', .12], ['terrace', .13]];
   const zPick = R => { let u = R.f(); for (const [k, w] of ZW){ if ((u -= w) < 0) return k; } return 'townhouse'; };
   let zLayout = null, zKey = '';
   function zoneLayout(){

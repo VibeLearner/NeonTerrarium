@@ -1858,11 +1858,11 @@
     const row = (k, t) => '<div class="row"><kbd>' + k + '</kbd><span>' + t + '</span></div>';
     if (PL.kind === 'grass') return '<h4>Grass</h4>' + row('click / drag', 'paint') + row('right drag', 'clear') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: meadow, wildflowers, ferns, tall grass, mix') + row('Alt + drag', 'turn the view');
     if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('click, click', 'pick two buildings to join') + row('V', 'next kind: bridge, skywalk, pergola, arcade, shared wall, random') + row('right click', 'let go, or clear a building\'s walkways');
-    if (PL.kind === 'zone') return '<h4>Residential: brush</h4>' + row('click', 'build the homes in the brush') + row('Q / E', 'bigger / smaller (smallest: one home)') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', 'clear the brush') + row('Z', 'switch to one by one');
+    if (PL.kind === 'zone') return '<h4>Residential: brush</h4>' + row('click', 'build the homes in the brush') + row('Q / E', 'bigger / smaller (smallest: one home)') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', ZONE.size ? 'clear the brush' : 'remove the home under it');
     if (PL.kind && KINDS[PL.kind]) return '<h4>Residential: one by one</h4>' + row('click', 'place (on a roof: stack; on a wall: build off it)') + row('V', 'another look') + row('R', 'turn') + row('right click', 'remove (and all above)') + row('Z', 'switch to the brush');
     return '<h4>Pick a zone or a tool</h4>' + row('1', 'residential') + row('5', 'walkways') + row('6', 'grass');
   }
-  document.getElementById('zoneRes') && document.getElementById('zoneRes').addEventListener('click', () => setKind(resActive() ? PL.kind : ZONE.on ? 'zone' : lastKind));
+  document.getElementById('zoneRes') && document.getElementById('zoneRes').addEventListener('click', () => setKind(resActive() ? PL.kind : 'zone'));   // (always the brush: Q/E size it, smallest is one home)
   document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode === 'zone')));
   // a ring round (x, z): on the ground, or at height y
   function ringAt(x, z, r, y = null, w = .14){ const a = ringGeo.attributes.position.array;
@@ -1963,13 +1963,12 @@
     if (e.key === ' '){ e.preventDefault(); if (!e.repeat){ tiltMode = !tiltMode; if (!tiltMode) pitchT = PITCH0; if (tiltChip) tiltChip.hidden = !tiltMode; } return; }
     if (k === 'h' || e.key === 'Home'){ camGoal.set(HOME.x, TY, HOME.z); return; }
     if (k === 'r'){ PL.rot += (e.shiftKey ? -1 : 1)*PI/12; return; }   // (turn the piece: 15 degrees a press, any angle it lands on)
-    if (e.key === '1'){ setKind(ZONE.on ? 'zone' : lastKind); return; }
+    if (e.key === '1'){ setKind('zone'); return; }
     if (e.key === '5'){ setKind('connect'); return; }
     if (e.key === '6'){ setKind('grass'); return; }
     if (PL.kind === 'grass' && (k === 'q' || k === 'e')){ GR.size = clamp(GR.size + (k === 'q' ? 1 : -1), 0, GRS.length - 1); return; }
     if (PL.kind === 'grass' && k === 'v'){ GR.style = (GR.style + 1) % GSTYLES.length; return; }
     if (PL.kind === 'connect' && k === 'v'){ CN.type = (CN.type + 1) % LINK_TYPES.length; CN.key = ''; return; }
-    if (k === 'z'){ setMode(!ZONE.on); return; }
     if (PL.kind === 'zone' && (k === 'q' || k === 'e')){ ZONE.size = clamp(ZONE.size + (k === 'q' ? 1 : -1), 0, ZSIZE.length - 1); return; }   // (Q: a bigger brush, E: a smaller one)
     if (k === 'v'){   // (single mode: the next kind of home, Shift+V another look of it; otherwise another look or layout)
       if (oneHome()){ if (e.shiftKey) PL.zseed++; else PL.zkind = KIND_KEYS[(KIND_KEYS.indexOf(PL.zkind) + 1) % KIND_KEYS.length]; } else PL.seed++; return; }

@@ -334,7 +334,10 @@
     // peak sits there; then the back.) Returns (height, slope, x, fw).
     vec4 waveH(vec4 w, float sh, float d){
       float x = (1.0 - w.y)*26.0, along = w.w, wn = w.z, h2 = waveStage(wn).z;
-      float fw = 3.6 + 2.2*h2 + 0.6*sin(along*0.17 + time*0.9 + wn*3.0), bl = 7.0 + 4.0*fract(h2*2.3);   // (a broad face out in front, a full back)
+      // its size here (how big it is overall, its crest's rise along it, how far through its life): the height and the width
+      // both come from it, so a tall wave is a big one, and a wave grows broader as it builds
+      float sz = clamp(w.x*waveCv(along, wn)/1.3, 0.0, 1.0);
+      float fw = (1.4 + 4.6*sz)*(0.9 + 0.2*h2), bl = (3.0 + 9.0*sz)*(0.9 + 0.2*fract(h2*2.3));   // (the face out in front, the back)
       float amp = 11.0*w.x*waveCv(along, wn)*smoothstep(0.3, 2.6, sh)*(0.45 + 0.55*smoothstep(1.5, 8.0, d));   // (big swells out deep; lower as the water shallows, so they don't stand over the cliffs)
       float hs, ds;
       // a rounded swell: a cosine up the face and down the back, so it has body rather than a sharp ridge
@@ -465,7 +468,7 @@
           vec3 nrm = normalize(vec3(WD.x*wh.y*1.3, 1.0, WD.y*wh.y*1.3));
           float rel = dot(nrm, normalize(sunDir)) - normalize(sunDir).y + dith*0.08;
           col *= rel < -0.22 ? 0.66 : rel < -0.08 ? 0.8 : rel > 0.18 ? 1.18 : rel > 0.06 ? 1.08 : 1.0;   // (the side turned from the sun falls into a clear shadow band)
-          float bk = fw + 7.0 + 4.0*fract(waveStage(wn).z*2.3);
+          float szB = clamp(wave*waveCv(along, wn)/1.3, 0.0, 1.0), bk = fw + (3.0 + 9.0*szB)*(0.9 + 0.2*fract(waveStage(wn).z*2.3));
           // the shadow band behind it: where its back drops to the sea there's a hard-edged band of shadow, in two steps (drawn
           // whatever the sun, so its height reads from any side)
           float sbx = x - (bk - 1.2);
@@ -492,7 +495,7 @@
           // foam on its back once it has broken, sliding back over it and thinning into lace; more of it as it spends itself
           float spentN = smoothstep(0.55, 0.9, age)*(1.0 - smoothstep(0.9, 1.0, age));
           float lace = vn(vec2(along*0.8 + 0.6*sin(time*0.7 + x*0.3), x*1.1 - time*1.1) + vec2(wn*7.0, st.w*3.0))*0.7 + vn(vec2(along*2.3, x*2.6 - time*1.6) + wn)*0.3;
-          float trail = step(0.72 - 0.18*spentN + (x - fw)*0.035 + dith*0.12, lace*(0.4 + 0.6*cvN)) * step(fw + 0.2, x) * step(x, fw + 11.0) * max(brk, spentN) * step(0.15, wave*open + spentN*0.4);
+          float trail = step(0.72 - 0.18*spentN + (x - fw)*0.035 + dith*0.12, lace*(0.4 + 0.6*cvN)) * step(fw + 0.2, x) * step(x, bk) * max(brk, spentN) * step(0.15, wave*open + spentN*0.4);
           col = mix(col, vec3(0.94, 0.99, 0.98), max(max(crest, spill), trail*0.85));
         }
         // thrown back: after a wave hits a rock, a ring of disturbed water runs back out from it and fades

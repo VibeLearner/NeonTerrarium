@@ -300,15 +300,27 @@
   // reaches the rocks first, where it flattens into white water (shore distance) and throws spray.
   // bigWave: (strength now, place across the crest 0..1 (1: its front), crest number, place along it).
   const WAVE_GLSL = `
+    uniform float wForce;   // (a test switch: every crest a full wave)
     const vec2 WD = vec2(-0.932, 0.362), WP = vec2(-0.362, -0.932);
     vec4 bigWave(vec2 p){ float along = dot(p, WP), u = dot(p, WD)/26.0 - time/10.0 + 0.3*sin(along*0.05 + 1.7);
       float wn = floor(u), wc = u - wn;
       float ex = step(0.3, fract(wn*0.6180339887 + 0.13));
       float seg = smoothstep(-0.55, 0.1, sin(along*0.045 + wn*2.3) + 0.45*sin(along*0.13 - wn*1.1));
       float life = smoothstep(0.12, 0.6, 0.5 + 0.5*sin(time*0.3 + wn*2.1));
-      return vec4(ex*seg*life, wc, wn, along); }
-    // its height across it (x: units behind its front): a steep face up to the peak, a long back
-    float waveShape(float x){ return x < 2.4 ? smoothstep(0.0, 2.4, x) : 1.0 - smoothstep(2.4, 12.0, x); }`;
+      return vec4(max(ex*seg*life, wForce), wc, wn, along); }
+    // The wave's height there, and its slope (per unit behind the front), with its life along it: the face's width and the
+    // crest's height ripple along the crest and change as it goes, so it swells and sags as it travels rather than sliding
+    // like a line. (x, 0 at the front's foot; fw, the face's width: the peak sits there; then the long back.)
+    // Returns (height, slope, x, fw).
+    vec4 waveH(vec4 w, float sh, float d){
+      float x = (1.0 - w.y)*26.0, along = w.w, wn = w.z;
+      float fw = 2.1 + 0.7*sin(along*0.17 + time*0.9 + wn*3.0);
+      float cv = 0.78 + 0.28*sin(along*0.21 - time*1.3 + wn) + 0.14*sin(along*0.57 + time*2.1 + wn*2.0);
+      float amp = 1.35*w.x*cv*smoothstep(0.3, 2.2, sh)*(1.0 + 0.5*(1.0 - smoothstep(1.0, 5.0, d)));
+      float hs, ds;
+      if (x < fw){ float u = clamp(x/fw, 0.0, 1.0); hs = u*u*(3.0 - 2.0*u); ds = 6.0*u*(1.0 - u)/fw; }
+      else { float u = clamp((x - fw)/(12.0 - fw), 0.0, 1.0); hs = 1.0 - u*u*(3.0 - 2.0*u); ds = -6.0*u*(1.0 - u)/(12.0 - fw); }
+      return vec4(amp*hs, amp*ds, x, fw); }`;
   const WAVE = { D: [-0.932, 0.362], P: [-0.362, -0.932] };
   WAVE.at = (x, z, t) => {   // the same as bigWave, on the cpu
     const along = x*WAVE.P[0] + z*WAVE.P[1], u = (x*WAVE.D[0] + z*WAVE.D[1])/26 - t/10 + .3*Math.sin(along*.05 + 1.7), wn = Math.floor(u), wc = u - wn;
@@ -317,7 +329,7 @@
     return [ex*seg*life, wc, wn];
   };
   const seaU = Object.assign({ time: { value: 0 }, depthTex: { value: dtex }, box: { value: new THREE.Vector4(0, 0, DW_, DW_) },
-    sunDir: { value: new THREE.Vector3() }, camXZ: { value: new THREE.Vector2() }, tint: { value: new THREE.Color(1, 1, 1) }, glint: { value: new THREE.Color(1, 1, 1) }, glintK: { value: 1 } }, CURV);
+    sunDir: { value: new THREE.Vector3() }, camXZ: { value: new THREE.Vector2() }, tint: { value: new THREE.Color(1, 1, 1) }, glint: { value: new THREE.Color(1, 1, 1) }, glintK: { value: 1 }, wForce: { value: 0 } }, CURV);
   seaU.gO = { value: new THREE.Vector2() }; seaU.gU = { value: new THREE.Vector2(1, 0) }; seaU.gV = { value: new THREE.Vector2(0, 1) };
   const sea = new THREE.Mesh(gridGeo(320), new THREE.ShaderMaterial({ uniforms: seaU,
     vertexShader: `uniform vec2 ctr, fwd, gO, gU, gV; uniform float curveK, g0, time; uniform sampler2D depthTex; uniform vec4 box; varying vec2 vP; varying float vG;
@@ -327,9 +339,8 @@
         vec2 inn = (p - box.xy)/box.zw; float inBox = step(0.0, inn.x)*step(inn.x, 1.0)*step(0.0, inn.y)*step(inn.y, 1.0);
         vec2 tx = texture2D(depthTex, p/box.zw).rg; float d = inBox > 0.5 ? tx.r*tx.r*24.0 : 24.0, sh = inBox > 0.5 ? tx.g*4.0 : 4.0;
         // the big waves lift the surface: higher as they come into shallower water, flattening out against the rocks
-        vec4 w = bigWave(p); float x = (1.0 - w.y)*26.0, ahead = w.y*26.0;
-        float amp = 1.0*w.x*smoothstep(0.3, 2.2, sh)*(1.0 + 0.5*(1.0 - smoothstep(1.0, 5.0, d)));
-        float y = amp*waveShape(x) - 0.22*w.x*(1.0 - smoothstep(0.0, 3.5, ahead))*smoothstep(0.3, 2.2, sh);
+        vec4 w = bigWave(p), wh = waveH(w, sh, d); float ahead = w.y*26.0;
+        float y = wh.x - 0.25*w.x*(1.0 - smoothstep(0.0, 3.5, ahead))*smoothstep(0.3, 2.2, sh);
         y += 0.035*sin(dot(p, vec2(-0.91, 0.41))*0.42 + time*0.95)*smoothstep(0.5, 3.0, sh);   // (the long swell, gently)
         vec4 wp = vec4(p.x, y, p.y, 1.0);
         vP = p; vG = dot(p - ctr, fwd); float gp = max(vG - g0, 0.0); wp.y -= curveK*gp*gp; gl_Position = projectionMatrix * viewMatrix * wp; }`,
@@ -390,18 +401,33 @@
         vec4 bw = bigWave(p); float wave = bw.x, wc = bw.y, wn = bw.z, along = bw.w;
         float shoal = 1.0 - smoothstep(0.4, 3.0, d), open = smoothstep(0.3, 2.2, sh);
         float x = (1.0 - wc)*26.0, ahead = wc*26.0;
+        vec4 wh = waveH(bw, sh, d); float fw = wh.w;
         if (wave > 0.02 && d > 0.15){
           float lw = wave*(0.7 + 0.3*shoal)*open;
-          col *= 1.0 - 0.28*lw*(1.0 - smoothstep(0.0, 4.0, ahead + dith*0.8));                                       // (the trough, in its shadow)
-          float f = smoothstep(0.0, 2.4, x);                                                                           // (up the face)
-          vec3 faceC = mix(vec3(0.07, 0.42, 0.55), vec3(0.3, 0.8, 0.78), floor(f*3.0 + dith*0.8)/3.0);               // (glassy, lit through near the top: three steps)
-          col = mix(col, faceC, step(0.0, x)*step(x, 2.4)*0.9*lw);
-          float lipN = vn(vec2(along*0.9, time*0.6)) + 0.5*vn(vec2(along*2.7 - time, wn));
-          float crest = step(abs(x - 2.4) + dith*0.3, (0.25 + 0.45*lipN + 0.6*shoal)*lw);                            // (the crest, at the peak, ragged)
-          float lace = vn(vec2(along*0.8, x*1.1) + vec2(wn*7.0, 0.0)) * 0.7 + vn(vec2(along*2.3, x*2.6) + wn) * 0.3;
-          float trail = step(0.36 + (x - 2.6)*0.045 + dith*0.12, lace*lw) * step(2.6, x) * step(x, 11.0);             // (foam left behind, thinning)
-          col = mix(col, col*1.1 + vec3(0.02, 0.05, 0.05), step(2.4, x)*step(x, 12.0)*(1.0 - smoothstep(2.4, 12.0, x))*0.9*lw);   // (its back, raised and lit)
-          col = mix(col, vec3(0.94, 0.99, 0.98), max(crest, trail*0.85));
+          // its form: the surface's slope against the sun, in four flat steps (the sunlit face, the shaded back), and the
+          // trough's shadow at its foot
+          vec3 nrm = normalize(vec3(WD.x*wh.y*3.0, 1.0, WD.y*wh.y*3.0));   // (the slope tripled: pixel art draws form bolder than it is)
+          float rel = dot(nrm, normalize(sunDir)) - normalize(sunDir).y + dith*0.08;
+          col *= rel < -0.18 ? 0.8 : rel < -0.06 ? 0.9 : rel > 0.14 ? 1.14 : rel > 0.04 ? 1.06 : 1.0;
+          col *= 1.0 - 0.3*lw*(1.0 - smoothstep(0.0, 4.0, ahead + dith*0.8));                                        // (the trough, in its shadow)
+          // its swell: the higher the water, the more sky and sun it catches, in three steps up to the crest
+          float hb = floor(clamp(wh.x/1.35, 0.0, 1.2)*3.0 + dith*0.9)/3.0;
+          col = col*(1.0 + 0.2*hb) + vec3(0.0, 0.025, 0.035)*hb;
+          // the face: glassy, lit through near the top
+          float f = clamp(x/fw, 0.0, 1.0);
+          vec3 faceC = mix(vec3(0.07, 0.42, 0.55), vec3(0.32, 0.82, 0.8), floor(f*3.0 + dith*0.8)/3.0);
+          col = mix(col, faceC*(rel > 0.04 ? 1.08 : 0.95), step(0.0, x)*step(x, fw)*0.85*lw);
+          // a breaking section peels along the crest, white water tumbling down the face; in the shallows it all breaks
+          float peel = max(smoothstep(0.62, 0.95, 0.5 + 0.5*sin(along*0.12 - time*1.7 + wn*1.7)), shoal)*lw;
+          float tumble = vn(vec2(along*1.3 + time*2.4, x*2.2 - time*5.0))*0.65 + vn(vec2(along*3.1 - time*1.7, x*4.4 - time*7.0))*0.35;
+          float spill = step(x, fw*(0.15 + 0.85*peel))*step(0.0, x)*step(0.72 - peel*0.45 + dith*0.12, tumble);
+          // the crest at the peak: ragged, the ragging running along it
+          float lipN = vn(vec2(along*0.9 - time*1.4, time*0.6)) + 0.5*vn(vec2(along*2.7 - time*2.2, wn));
+          float crest = step(abs(x - fw) + dith*0.3, (0.08 + 0.42*lipN*lipN + 0.5*peel)*lw);   // (thin where the lip is glassy, thick where it's breaking)
+          // foam left on its back, sliding back over it (the wave runs on, the foam stays behind) and thinning into lace
+          float lace = vn(vec2(along*0.8 + 0.6*sin(time*0.7 + x*0.3), x*1.1 - time*1.1) + vec2(wn*7.0, 0.0))*0.7 + vn(vec2(along*2.3, x*2.6 - time*1.6) + wn)*0.3;
+          float trail = step(0.34 + (x - fw)*0.045 + dith*0.12, lace*lw*(0.6 + 0.6*peel)) * step(fw + 0.2, x) * step(x, 12.0);
+          col = mix(col, vec3(0.94, 0.99, 0.98), max(max(crest, spill), trail*0.85));
         }
         // spent on the rocks: white water where the wave hit, spreading back out and fading over a few seconds
         float spent = wave*(1.0 - open*0.85)*(1.0 - smoothstep(0.0, 12.0, x))*step(0.0, x)*(1.0 - smoothstep(1.2, 3.2, sh));

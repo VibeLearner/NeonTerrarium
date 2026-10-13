@@ -711,7 +711,8 @@
   function setHour(h){
     const t = clamp((h - 6)/12.6, 0, 1), el = Math.sin(t*PI)*.82 + .3, az = lerp(-.9, 2.4, t);
     sunDir.set(Math.cos(az)*Math.cos(el), Math.sin(el), Math.sin(az)*Math.cos(el));
-    const warm = smooth(15.5, 18.8, h);
+    h = ((h % 24) + 24) % 24; const morning = h < 12;
+    const warm = morning ? 1 - smooth(6.4, 8.6, h) : smooth(15.5, 18.8, h);   // (low sun: warm light at both ends of the day)
     sun.color.setRGB(1, lerp(.98, .78, warm), lerp(.94, .55, warm)); sun.intensity = lerp(.92, .82, warm);
     hemi.color.setRGB(lerp(.8, 1, warm), lerp(.92, .8, warm), lerp(1, .78, warm)); hemi.intensity = lerp(.52, .5, warm);
     SKY.top.setRGB(lerp(.03, .1, warm), lerp(.27, .22, warm), lerp(.42, .4, warm));
@@ -726,7 +727,7 @@
     // night (past 19:00, full by 21:00): a high moon instead of the sun, cool and dim; a deep teal sky and haze; the sea gone
     // ink blue with pale moon glitter; and every lamp, lit window and greenhouse warm (nightK). A little of the glow comes on
     // at golden hour already, as the first lights do
-    const n = smooth(19, 21, h); CURV.nightK.value = Math.max(n, .25*smooth(17.8, 18.8, h)); CURV.darkK.value = n;
+    const n = morning ? 1 - smooth(4.8, 6.3, h) : smooth(19, 21, h); CURV.nightK.value = Math.max(n, .25*(morning ? 1 - smooth(6.2, 7.2, h) : smooth(17.8, 18.8, h))); CURV.darkK.value = n;
     if (poolMesh) poolMesh.visible = n > .01;
     if (n > 0){
       const mz = new THREE.Vector3(-.35, .86, -.38).normalize(); sunDir.lerp(mz, n).normalize();
@@ -947,7 +948,11 @@
     doorO: C(0xd0702e), doorT: C(0x3e6e7a), wood: C(0x9a6a3e), rail: C(0x3a3f3e), metal: C(0x9aa3a6), blue: C(0x3a9ec4), lamp: C(0xffd27a),
     leaf: [C(0x4e8a34), C(0x6aa03c), C(0x3d7430), C(0x82b048)], pot: C(0xb5583a), stone: C(0xd8ccb2), flower: [C(0xf08a5a), C(0xf5c84c), C(0xe6739a)],
     red: C(0xb84a3c), redD: C(0x8a3329), jade: C(0x3a8a76), jade2: C(0x276556), lattice: C(0x5a2a22),   // (the pagoda house: lacquer red, jade tiles)
-    rust: C(0xc4703e), rust2: C(0x9e5530), solar: C(0x2b4877), solarL: C(0x6f8fbf), tank: C(0xb9b7ad) };   // (the garden terrace: weathered rust, solar glass)
+    rust: C(0xc4703e), rust2: C(0x9e5530), solar: C(0x2b4877), solarL: C(0x6f8fbf), tank: C(0xb9b7ad),
+    apricot: C(0xe8a578), butter: C(0xe9c877), mist: C(0x98c6bb), sage: C(0xadc493), rose: C(0xd99788), blushD: C(0xe2ad99) };
+  // the plaster colors a home can be washed in besides white: soft, chalky, and all from the scene's own colors (the sand,
+  // the terracotta, the sea's teal, the meadow's sage), so a street of them reads as one watercolor
+  const PLASTER = [HP.blushD, HP.apricot, HP.butter, HP.mist, HP.sage, HP.rose, HP.apricot, HP.mist];   // (the garden terrace: weathered rust, solar glass)
   for (const c of HP.leaf) LEAFC.add(c);
   GLOW.set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
   Object.assign(GEO, { cyl12: new THREE.CylinderGeometry(1, 1, 1, 12), cyl16: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.IcosahedronGeometry(1, 1),
@@ -984,7 +989,7 @@
   // its foot); ctx.above: another block sits on it (no roof garden, dome or greenhouse: a flat roof to stand on).
   const KINDS = {
     townhouse: { name: 'Greenhouse townhouse', r: 1.9, rb: 1.1, build(T, R, D, ctx){
-      const w = R.r(1.9, 2.3), d = R.r(1.5, 1.9), fl = ctx.below ? 1 : R.i(1, 2), fh = 1.2, H = fl*fh, wall = R.pick([HP.teal, HP.sea, HP.teal, HP.ochre, HP.blush]), y0 = ctx.below ? 0 : .12;
+      const w = R.r(1.9, 2.3), d = R.r(1.5, 1.9), fl = ctx.below ? 1 : R.i(1, 2), fh = 1.2, H = fl*fh, wall = R.pick([HP.teal, HP.sea, HP.teal, HP.ochre, HP.blush, HP.apricot, HP.rose, HP.sage]), y0 = ctx.below ? 0 : .12;
       if (!ctx.below) box(T, 0, .06, 0, w + .5, .12, d + .5, HP.stone);
       box(T, 0, y0 + H/2, 0, w, H, d, wall);
       for (let f = 0; f < fl; f++) box(T, 0, y0 + (f + 1)*fh - .05, 0, w + .06, .08, d + .06, HP.cream);
@@ -1015,9 +1020,10 @@
     } },
     tower: { name: 'Round terrace tower', r: 1.8, rb: 1.15, build(T, R, D, ctx){
       const lv = ctx.below ? R.i(1, 2) : R.i(2, 3), lh = 1.0; let y = ctx.below ? 0 : .12, ox = 0, oz = 0;
+      const towerC = [HP.cream, HP.cream, HP.butter, HP.mist, HP.blush, HP.apricot][Math.floor(D.f()*6)];   // (its plaster bands: cream, or a soft color)
       if (!ctx.below) T.add(GEO.cyl12, mat(0, .06, 0, 0, 0, 0, 1.55, .12, 1.55), HP.stone);
       for (let i = 0; i < lv; i++){
-        const r = R.r(.85, 1.15) - i*.04, band = (i + (ctx.below ? 1 : 0)) % 2 ? HP.terra : HP.cream;
+        const r = R.r(.85, 1.15) - i*.04, band = (i + (ctx.below ? 1 : 0)) % 2 ? HP.terra : towerC;
         if (i > 0){ ox = clamp(ox + R.r(-.3, .3), -.35, .35); oz = clamp(oz + R.r(-.3, .3), -.35, .35); }
         T.add(GEO.cyl16, mat(ox, y + .17, oz, 0, 0, 0, r + .04, .34, r + .04), band);
         T.add(GEO.cyl16, mat(ox, y + .34 + (lh - .46)/2, oz, 0, 0, 0, r*.95, lh - .46, r*.95), HP.glassT);
@@ -1038,7 +1044,7 @@
       return y + .02;
     } },
     pods: { name: 'Patchwork pod house', r: 1.9, rb: 1.2, build(T, R, D, ctx){
-      const y0 = ctx.below ? 0 : .2, main = R.r(.85, 1.0), c2 = R.pick([HP.white, HP.cream, HP.white]);
+      const y0 = ctx.below ? 0 : .2, main = R.r(.85, 1.0), c2 = R.pick([HP.white, HP.cream, HP.white, HP.mist, HP.blush, HP.butter, HP.apricot]);
       if (!ctx.below) box(T, 0, .1, 0, 2.8, .2, 2.4, HP.stone);
       const cyD = y0 + main*.85;
       T.add(GEO.sph, mat(.2, cyD, -.1, 0, 0, 0, main, main*.95, main), c2);
@@ -1065,8 +1071,9 @@
     villa: { name: 'White terraced villa', r: 2.0, rb: 1.4, build(T, R, D, ctx){
       if (!ctx.below) box(T, 0, .06, 0, 3.3, .12, 3.0, HP.stone);
       const n = ctx.below ? 1 : R.i(2, 3); let w = R.r(2.5, 2.8), d = R.r(2.2, 2.5), y = ctx.below ? 0 : .12, bz = 0;
+      const vc = Math.floor(w*997) % 3 === 0 ? HP.white : PLASTER[Math.floor(d*991) % PLASTER.length];   // (a third stay white; the rest take a plaster color, and its upper floors mostly keep to it)
       for (let i = 0; i < n; i++){
-        const h = i === 0 && !ctx.below ? 1.1 : .95, c = R.pick([HP.white, HP.white, HP.cream, HP.sand]);
+        const h = i === 0 && !ctx.below ? 1.1 : .95, c = R.pick([vc, vc, vc, HP.white]);
         box(T, 0, y + h/2, bz, w, h, d, c);
         const k = Math.max(2, Math.round(w/.7));
         for (let j = 0; j < k; j++){ const x = -w/2 + (j + .5)*w/k; if (i === 0 && !ctx.below){ box(T, x, y + .38, bz + d/2 + .02, .34, .56, .04, HP.glassD); T.add(GEO.cyl8, mat(x, y + .66, bz + d/2 + .02, PI/2, 0, 0, .17, .04, .17), HP.glassD); }
@@ -1825,19 +1832,38 @@
     save(); PL.seed++; }
   function clearZone(cx, cz){ const r = Math.max(ZSIZE[ZONE.size], 1.4);
     for (const p of PIECES.filter(q => !q.level && Math.hypot(q.x - cx, q.z - cz) < r)) removePiece(p); }
+  /* ---------- the panels: zones (residential, for now), then the landscape tools; the controls on hover ---------- */
+  // Residential is one zone with two ways to build: the brush (Q/E sizes it; smallest is one home) or one by one (pick a
+  // kind). Choosing it turns the zone on in the current way; the way and the kinds show under it while it's on.
+  let lastKind = 'townhouse';
+  const resActive = () => PL.kind === 'zone' || !!(PL.kind && KINDS[PL.kind]);
   function setMode(zone){
-    ZONE.on = zone; document.querySelectorAll('.place .single').forEach(b => { b.hidden = zone; }); document.querySelectorAll('.place .zone').forEach(b => { b.hidden = !zone; });
-    const mb = document.getElementById('modeBtn'); if (mb) mb.textContent = zone ? 'mode: zone' : 'mode: one by one';
-    if (PL.kind) setKind(PL.kind); zHide(); }
-  document.getElementById('modeBtn') && document.getElementById('modeBtn').addEventListener('click', () => setMode(!ZONE.on));
+    ZONE.on = zone; const was = resActive();
+    document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', (b.dataset.mode === 'zone') === zone));
+    if (was){ PL.kind = null; setKind(zone ? 'zone' : lastKind); } else refreshUI(); zHide(); }
   function setKind(k){
     PL.kind = PL.kind === k ? null : k; CN.a = null; connGhost.visible = false;
-    document.querySelectorAll('.place button[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === PL.kind));
-    const tool = PL.kind === 'connect' || PL.kind === 'grass';
-    document.querySelectorAll('.place .tip').forEach(t => { t.style.display = tool ? (t.classList.contains('t-' + PL.kind) ? '' : 'none') : (t.classList.contains('t-connect') || t.classList.contains('t-grass') ? 'none' : ''); });
+    if (PL.kind && KINDS[PL.kind]) lastKind = PL.kind;
     ghost.visible = ring.visible = false; zHide();
     if (!PL.kind && status) status.textContent = '';
+    refreshUI(); }
+  function refreshUI(){
+    const res = document.getElementById('zoneRes'); if (res) res.classList.toggle('on', resActive());
+    const sub = document.getElementById('resSub'); if (sub) sub.hidden = !resActive();
+    const kinds = document.getElementById('resKinds'); if (kinds) kinds.hidden = ZONE.on;
+    document.querySelectorAll('button[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === PL.kind));
+    const tip = document.getElementById('ctrlTool'); if (tip) tip.innerHTML = controlsFor(); }
+  // what the keys and the mouse do with whatever is chosen (shown when Controls is hovered)
+  function controlsFor(){
+    const row = (k, t) => '<div class="row"><kbd>' + k + '</kbd><span>' + t + '</span></div>';
+    if (PL.kind === 'grass') return '<h4>Grass</h4>' + row('click / drag', 'paint') + row('right drag', 'clear') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: meadow, wildflowers, ferns, tall grass, mix') + row('Alt + drag', 'turn the view');
+    if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('click, click', 'pick two buildings to join') + row('V', 'next kind: bridge, skywalk, pergola, arcade, shared wall, random') + row('right click', 'let go, or clear a building\'s walkways');
+    if (PL.kind === 'zone') return '<h4>Residential: brush</h4>' + row('click', 'build the homes in the brush') + row('Q / E', 'bigger / smaller (smallest: one home)') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', 'clear the brush') + row('Z', 'switch to one by one');
+    if (PL.kind && KINDS[PL.kind]) return '<h4>Residential: one by one</h4>' + row('click', 'place (on a roof: stack; on a wall: build off it)') + row('V', 'another look') + row('R', 'turn') + row('right click', 'remove (and all above)') + row('Z', 'switch to the brush');
+    return '<h4>Pick a zone or a tool</h4>' + row('1', 'residential') + row('5', 'walkways') + row('6', 'grass');
   }
+  document.getElementById('zoneRes') && document.getElementById('zoneRes').addEventListener('click', () => setKind(resActive() ? PL.kind : ZONE.on ? 'zone' : lastKind));
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode === 'zone')));
   // a ring round (x, z): on the ground, or at height y
   function ringAt(x, z, r, y = null, w = .14){ const a = ringGeo.attributes.position.array;
     for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s_ = Math.sin(t);
@@ -1888,7 +1914,7 @@
     const h = pick(cx, cy); if (!h || h.sea) return; const r = GRS[GR.size];
     if (!force && GR.last && Math.hypot(h.x - GR.last[0], h.z - GR.last[1]) < r*.35) return;
     GR.last = [h.x, h.z]; paintGrass(h.x, h.z, r, GR.style, erase); }
-  document.querySelectorAll('.place button[data-k]').forEach(b => b.addEventListener('click', () => setKind(b.dataset.k)));
+  document.querySelectorAll('button[data-k]').forEach(b => b.addEventListener('click', () => setKind(b.dataset.k)));
   setMode(true);
 
   /* ---------- turning, zooming, panning, tilting: as in the sky city; a click places, a right click removes ---------- */
@@ -1937,7 +1963,7 @@
     if (e.key === ' '){ e.preventDefault(); if (!e.repeat){ tiltMode = !tiltMode; if (!tiltMode) pitchT = PITCH0; if (tiltChip) tiltChip.hidden = !tiltMode; } return; }
     if (k === 'h' || e.key === 'Home'){ camGoal.set(HOME.x, TY, HOME.z); return; }
     if (k === 'r'){ PL.rot += (e.shiftKey ? -1 : 1)*PI/12; return; }   // (turn the piece: 15 degrees a press, any angle it lands on)
-    if ('1234'.includes(e.key) && e.key.length === 1){ if (ZONE.on) setKind('zone'); else setKind(KIND_KEYS[+e.key - 1]); return; }
+    if (e.key === '1'){ setKind(ZONE.on ? 'zone' : lastKind); return; }
     if (e.key === '5'){ setKind('connect'); return; }
     if (e.key === '6'){ setKind('grass'); return; }
     if (PL.kind === 'grass' && (k === 'q' || k === 'e')){ GR.size = clamp(GR.size + (k === 'q' ? 1 : -1), 0, GRS.length - 1); return; }
@@ -1953,7 +1979,12 @@
     else if (e.key === '+' || e.key === '=') zoomT = clamp(zoomT*.9, ZMIN, ZMAX);
     else if (e.key === '-') zoomT = clamp(zoomT*1.1, ZMIN, ZMAX);
   });
-  document.querySelectorAll('.hud .light button').forEach(b => b.addEventListener('click', () => { document.querySelectorAll('.hud .light button').forEach(x => x.classList.toggle('on', x === b)); setHour(+b.dataset.h); }));
+  // the time panel: a slider through the whole day, and the times to jump to
+  const tSlider = document.getElementById('timeSlider'), tClock = document.getElementById('clock');
+  function setTime(h){ setHour(h); if (tSlider) tSlider.value = h; if (tClock){ const hh = Math.floor(h) % 24, mm = Math.floor((h % 1)*60); tClock.textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); }
+    document.querySelectorAll('[data-h]').forEach(b => b.classList.toggle('on', Math.abs(+b.dataset.h - h) < .01)); }
+  if (tSlider) tSlider.addEventListener('input', () => setTime(+tSlider.value));
+  document.querySelectorAll('[data-h]').forEach(b => b.addEventListener('click', () => setTime(+b.dataset.h)));
 
   /* ---------- every frame ---------- */
   // the reflection pass: everything above the water, flipped upside down about it and drawn flat in its own colors (no
@@ -1971,7 +2002,7 @@
     renderer.shadowMap.autoUpdate = true;
     scene.overrideMaterial = null; scene.scale.y = 1; scene.updateMatrixWorld(true); hide.forEach((o, i) => { o.visible = vis[i]; });
   }
-  setHour(11); resize();
+  setTime(11); resize();
   updateCamera(0); stream(1e9);   // (the first view whole, before the first frame)
   // compile now, while loading, every shader that would otherwise first be needed in play (the paint-in, the pigment
   // blooms, the night's light pools and glow bleed): a shader compiled mid-play stalls the frame

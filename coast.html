@@ -4,26 +4,73 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Neon Terrarium: the coast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,500&family=Nunito:wght@500;700&display=swap" rel="stylesheet">
 <style>
+  :root { --ink: #173f48; --ink2: #3d6a70; --paper: #fbf6ea; --paper2: #f3ead7; --edge: #d9c9a8; --terra: #c8663e; --sage: #8fb08a; --teal: #3f8f8a; }
   html, body { margin: 0; height: 100%; background: #7fbfc8; overflow: hidden; }
   canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; cursor: grab; }
-  .hud { position: fixed; left: 14px; bottom: 12px; font: 12px/1.4 ui-monospace, Menlo, monospace; color: #0f3b4a;
-    background: rgba(255, 252, 244, .72); padding: 6px 9px; border-radius: 4px; user-select: none; }
-  .hud b { font-weight: 600; }
-  .hud > div + div { margin-top: 4px; }
-  .hud .tip { opacity: .7; margin-left: 6px; }
-  #placeStatus { color: #b03a2a; margin-left: 6px; }
-  .hud button { font: inherit; margin-left: 4px; border: 1px solid #0f3b4a55; background: #fffaf0; border-radius: 3px; cursor: pointer; padding: 1px 6px; }
-  .chip { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); font: 12px ui-monospace, Menlo, monospace; color: #fffaf0; background: #0f3b4acc; padding: 4px 10px; border-radius: 4px; }
-  .hud button.on { background: #0f3b4a; color: #fffaf0; }
+  /* paper panels: a warm sheet with a soft deckled shadow, as if laid on the scene */
+  .panel { position: fixed; font: 13px/1.35 Nunito, system-ui, sans-serif; color: var(--ink); user-select: none;
+    background: radial-gradient(120% 140% at 20% 0%, var(--paper) 55%, var(--paper2) 100%); border: 1px solid var(--edge);
+    border-radius: 14px 10px 13px 9px; box-shadow: 0 2px 0 #fff8 inset, 0 6px 18px #0f2a3026, 0 1px 3px #0f2a3033; padding: 10px 12px; }
+  .panel h3 { margin: 0 0 6px; font: italic 500 15px/1 Fraunces, Georgia, serif; color: var(--ink); letter-spacing: .2px; }
+  .panel .sec { margin: 10px 0 5px; font: 700 10.5px/1 Nunito, sans-serif; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink2); }
+  .panel button { font: 700 12.5px/1 Nunito, sans-serif; color: var(--ink); background: #fffdf7; border: 1px solid var(--edge); border-radius: 9px 7px 9px 8px;
+    padding: 6px 10px; margin: 0 4px 4px 0; cursor: pointer; transition: background .12s, transform .12s, box-shadow .12s; }
+  .panel button:hover { background: #fff; transform: translateY(-1px); box-shadow: 0 2px 6px #0f2a3018; }
+  .panel button.on { background: var(--teal); color: #fffaf0; border-color: #2f716d; box-shadow: 0 1px 0 #ffffff40 inset; }
+  .panel button.small { font-size: 11.5px; padding: 4px 8px; }
+  /* time, top left */
+  #timePanel { top: 14px; left: 14px; width: 292px; }
+  #timePanel .clockrow { display: flex; align-items: baseline; justify-content: space-between; }
+  #clock { font: 700 13px Nunito, sans-serif; color: var(--ink2); font-variant-numeric: tabular-nums; }
+  #timeSlider { -webkit-appearance: none; appearance: none; width: 100%; height: 10px; margin: 8px 0 9px; border-radius: 6px; cursor: pointer;
+    background: linear-gradient(90deg, #233a5a 0%, #33507a 18%, #f1b98c 26%, #bfe1e6 36%, #a6d4dc 60%, #f3c28d 74%, #e3866a 79%, #33507a 86%, #233a5a 100%); border: 1px solid #0f2a3033; }
+  #timeSlider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); box-shadow: 0 1px 3px #0004; }
+  #timeSlider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); }
+  #timePanel .presets button { margin: 0 3px 0 0; padding: 4px 7px; font-size: 11.5px; }
+  /* building, bottom left */
+  #buildPanel { left: 14px; bottom: 14px; width: 270px; }
+  .ctrl { position: relative; display: inline-block; font: 700 11px Nunito, sans-serif; color: var(--ink2); cursor: help; padding: 2px 8px 2px 6px;
+    border: 1px dashed var(--edge); border-radius: 10px; background: #fffaf080; }
+  .ctrl::before { content: '?'; display: inline-block; width: 13px; height: 13px; margin-right: 5px; border-radius: 50%; background: var(--ink2); color: var(--paper); text-align: center; font-size: 10px; line-height: 13px; }
+  .ctrl .pop { display: none; position: absolute; left: 0; bottom: calc(100% + 8px); width: 330px; z-index: 5; cursor: default; }
+  .ctrl:hover .pop { display: block; }
+  .pop h4 { margin: 0 0 6px; font: italic 500 14px Fraunces, Georgia, serif; color: var(--ink); }
+  .pop .row { display: flex; gap: 10px; align-items: baseline; margin: 4px 0; font-weight: 500; color: var(--ink); }
+  .pop kbd { flex: 0 0 96px; font: 700 11px Nunito, sans-serif; color: var(--terra); }
+  .pop .view { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--edge); }
+  #resSub { margin: 2px 0 0 10px; padding-left: 9px; border-left: 2px solid #3f8f8a55; }
+  #resSub .seg button { margin-right: 2px; }
+  #placeStatus { min-height: 16px; margin-top: 6px; font: 500 11.5px Nunito, sans-serif; color: #b03a2a; }
+  .chip { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); font: 700 12px Nunito, sans-serif; color: #fffaf0; background: #173f48dd; padding: 5px 12px; border-radius: 10px; }
 </style>
 </head>
 <body>
 <canvas id="view"></canvas>
-<div class="hud"><div><b>The coast</b> &middot; drag to turn (Q / E too, but not with a brush) &middot; wheel to zoom &middot; WASD or arrows to pan (Shift: faster) &middot; Space to tilt &middot; H home</div>
-  <div class="light">light: <button data-h="11" class="on">noon</button><button data-h="16.5">afternoon</button><button data-h="18.6">golden</button><button data-h="21.5">night</button></div>
-  <div class="place">place: <button id="modeBtn">mode: zone</button> <button data-k="zone" class="zone">homes</button><button data-k="townhouse" class="single">townhouse</button><button data-k="tower" class="single">tower</button><button data-k="pods" class="single">pod house</button><button data-k="villa" class="single">villa</button><button data-k="pagoda" class="single">pagoda</button><button data-k="terrace" class="single">terrace</button> <button data-k="connect">connect</button><button data-k="grass">grass</button>
-    <span class="tip zone">Q bigger, E smaller &middot; group: builds onto and against homes already there, V another layout, right click clears &middot; smallest = one home: roof stacks, wall builds off it, V next kind, Shift+V new look &middot; R turn &middot; Z one by one</span><span class="tip single">click to place (on a roof: stack it; on a wall: build off the side) &middot; V another look &middot; R to turn it &middot; right click removes (and all above) &middot; Z zone mode</span> <span class="tip t-connect" style="display:none">click a block, then another, to join them &middot; V next kind (bridge, skywalk, pergola, arcade, shared wall, random) &middot; right click: let go, or clear a block's connections &middot; 5</span><span class="tip t-grass" style="display:none">click or drag to paint, right drag to clear &middot; Q bigger, E smaller &middot; V next kind (meadow, wildflowers, ferns, tall grass, mix) &middot; Alt+drag turns &middot; 6</span> <span id="placeStatus"></span></div></div>
+
+<div id="timePanel" class="panel">
+  <div class="clockrow"><h3>Time of day</h3><span id="clock">11:00</span></div>
+  <input id="timeSlider" type="range" min="0" max="23.99" step="0.05" value="11" aria-label="time of day">
+  <div class="presets"><button data-h="6.6">dawn</button><button data-h="11" class="on">noon</button><button data-h="16.5">afternoon</button><button data-h="18.6">golden</button><button data-h="21.5">night</button></div>
+</div>
+
+<div id="buildPanel" class="panel">
+  <span class="ctrl">Controls
+    <div class="pop panel"><div id="ctrlTool"></div>
+      <div class="view"><h4>The view</h4><div class="row"><kbd>drag</kbd><span>turn (Q / E too, when no brush is on)</span></div><div class="row"><kbd>wheel</kbd><span>zoom</span></div><div class="row"><kbd>WASD / arrows</kbd><span>pan (Shift: faster)</span></div><div class="row"><kbd>Space</kbd><span>tilt</span></div><div class="row"><kbd>H</kbd><span>home</span></div><div class="row"><kbd>Esc</kbd><span>put the tool down</span></div></div></div></span>
+  <div class="sec">Zones</div>
+  <button id="zoneRes">Residential</button>
+  <div id="resSub" hidden>
+    <div class="seg"><button class="small" data-mode="zone">Brush</button><button class="small" data-mode="single">One by one</button></div>
+    <div id="resKinds" hidden><button class="small" data-k="townhouse">townhouse</button><button class="small" data-k="tower">tower</button><button class="small" data-k="pods">pod house</button><button class="small" data-k="villa">villa</button><button class="small" data-k="pagoda">pagoda</button><button class="small" data-k="terrace">terrace</button></div>
+  </div>
+  <div class="sec">Landscape</div>
+  <button data-k="grass">Grass</button><button data-k="connect">Walkways</button>
+  <div id="placeStatus"></div>
+</div>
+
 <div id="tiltChip" class="chip" hidden>Tilt: drag up and down, Space to go back</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/coast.js"></script>

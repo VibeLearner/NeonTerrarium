@@ -19,21 +19,26 @@
 <script src="../../js/artgen_vox.js"></script>
 <script>
 // A sheet of generated hoverbikes: each cell is one seed, seen from four of the game's eight views, drawn 3x over a street-gray ground.
-// ?n=: how many seeds; ?from=: the first; ?seeds=1,2,3: just these; ?s=: scale; ?cols=; ?pick=: the one the game uses, outlined.
-const q = new URLSearchParams(location.search), N = +(q.get('n') || 32), FROM = +(q.get('from') || 1), PICK = +(q.get('pick') || 0), S = +(q.get('s') || 3), VIEWS = q.get('all') ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 1, 2, 3];
+// ?views=: views round the circle (the game: 32); ?all=1: show them all; ?rowlen=: views a row; ?n=: how many seeds; ?from=: the first; ?seeds=1,2,3: just these; ?s=: scale; ?cols=; ?pick=: the one the game uses, outlined.
+const q = new URLSearchParams(location.search), N = +(q.get('n') || 32), FROM = +(q.get('from') || 1), PICK = +(q.get('pick') || 0), S = +(q.get('s') || 3), NV = +(q.get('views') || 8), VIEWS = q.get('all') ? Array.from({ length: NV }, (_, k) => k) : [NV - 1, NV/8, NV/4, NV*3/8];
 const SEEDS = q.get('seeds') ? q.get('seeds').split(',').map(Number) : Array.from({ length: N }, (_, i) => FROM + i);
 if (q.get('cols')) document.getElementById('grid').style.gridTemplateColumns = 'repeat(' + q.get('cols') + ', 1fr)';
 const grid = document.getElementById('grid');
 for (const seed of SEEDS){
-  const b = ART.bikeGen(seed), vs = ART.bikeViews(b.model);
-  const W = VIEWS.reduce((a, k) => a + vs[k].w + 4, 0) * S, Hh = Math.max(...VIEWS.map(k => vs[k].h)) * S + 6;
-  const cv = document.createElement('canvas'); cv.width = W; cv.height = Hh; const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
-  g.fillStyle = '#3a3f47'; g.fillRect(0, Hh - 10, W, 10);
-  let x = 0;
-  for (const k of VIEWS){ const v = vs[k], off = document.createElement('canvas'); off.width = v.w; off.height = v.h; ART.vox.blit(off.getContext('2d'), v.px, 0, 0);
-    g.drawImage(off, x, Hh - 6 - v.h*S, v.w*S, v.h*S); x += (v.w + 4)*S; }
+  const b = ART.bikeGen(seed), vs = ART.bikeViews(b.model, undefined, NV), RL = +(q.get('rowlen') || VIEWS.length);
   const d = document.createElement('div'); d.className = 'cell' + (seed === PICK ? ' pick' : '');
-  d.innerHTML = `<div>#${seed} ${b.build} · ${b.livery}${b.panels ? ' + panels' : ''} · ${b.accent} · ${b.glow} glow</div>`; d.appendChild(cv); grid.appendChild(d);
+  d.innerHTML = `<div>#${seed} ${b.build} · ${b.livery}${b.panels ? ' + panels' : ''} · ${b.accent} · ${b.glow} glow</div>`;
+  for (let r0 = 0; r0 < VIEWS.length; r0 += RL){
+    const row = VIEWS.slice(r0, r0 + RL);
+    const W = row.reduce((a, k) => a + vs[k].w + 4, 0) * S, Hh = Math.max(...row.map(k => vs[k].h)) * S + 6;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = Hh; const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+    g.fillStyle = '#3a3f47'; g.fillRect(0, Hh - 10, W, 10);
+    let x = 0;
+    for (const k of row){ const v = vs[k], off = document.createElement('canvas'); off.width = v.w; off.height = v.h; ART.vox.blit(off.getContext('2d'), v.px, 0, 0);
+      g.drawImage(off, x, Hh - 6 - v.h*S, v.w*S, v.h*S); x += (v.w + 4)*S; }
+    d.appendChild(cv);
+  }
+  grid.appendChild(d);
 }
 document.title = 'ready';
 </script>

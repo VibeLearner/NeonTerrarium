@@ -11,7 +11,7 @@ const ART = (() => {
   A.SIZE = {
     holo_ads: [384, 432], holo_pureair: [512, 384], holo_freeair: [512, 384], holo_aether: [512, 440], holo_sky: [512, 440], holo_synth: [512, 384], holo_watch: [512, 384],
     holo_walls: [544, 658], koi: [1000, 139], wanted: [576, 68], ddrone: [242, 19], cassette: [59, 44],
-    pbike_r1c1: [14, 17], pbike_r1c2: [24, 17], pbike_r1c3: [26, 16], pbike_r1c4: [23, 18], pbike_r2c1: [14, 18], pbike_r2c2: [19, 18], pbike_r2c3: [26, 16], pbike_r2c4: [24, 18],
+    // (the police bike's views, pbike_v0 ... pbike_v31, are sized by artgen_vox.js from the generated model)
   };
   // the sprite-atlas kinds drawn in code (sprites.js: SG.has decides): the 15 shop icons in 3 colors, and the police badge
   A.SHOPS = ['ramen', 'coffee', 'laundry', 'noodles', 'plant', 'repair', 'cocktail', 'music', 'arcade', 'clinic', 'books', 'hotel', 'records', 'bakery', 'games'];

@@ -197,14 +197,15 @@
     return { model: model(...P), build, livery: liv, accent: acc, glow: gl, panels };
   };
   // render a bike's eight views, each cropped to its drawn pixels (width kept even about the middle, so the origin stays the middle column)
-  ART.bikeViews = (M, opts = { outline: 'br', outK: .5 }) => [0, 1, 2, 3, 4, 5, 6, 7].map(k => {
-    const big = V.render(M, k*Math.PI/4, 48, 36, opts), bd = big.bounds, cx = Math.round(big.ox);
+  ART.BIKE_VIEWS = 32;   // views round the circle: one every 11.25 degrees, so a turn steps through them smoothly
+  ART.bikeViews = (M, opts = { outline: 'br', outK: .5 }, n = 8) => Array.from({ length: n }, (_, k) => {
+    const a = k*Math.PI*2/n, big = V.render(M, a, 48, 36, opts), bd = big.bounds, cx = Math.round(big.ox);
     const half = Math.max(cx - bd.c0, bd.c1 + 1 - cx), w = Math.max(8, half*2), h = bd.r1 - bd.r0 + 1;
-    return { w, h, px: V.render(M, k*Math.PI/4, w, h, opts) };
+    return { w, h, px: V.render(M, a, w, h, opts) };
   });
   const BIKE_SEED = 8;   // (an interceptor: gunmetal with white police panels, cyan strips, violet underglow)
-  const BIKE = ART.bikeGen(BIKE_SEED).model, BV = ART.bikeViews(BIKE);
+  const BIKE = ART.bikeGen(BIKE_SEED).model, NV = ART.BIKE_VIEWS, BV = ART.bikeViews(BIKE, undefined, NV);
   ART.bike = BIKE;
-  const BVIEWS = ['r2c1', 'r1c4', 'r2c3', 'r2c4', 'r1c1', 'r1c2', 'r1c3', 'r2c2'];   // view k of the game: heading k * 45 degrees (0: nose away, then clockwise)
-  BVIEWS.forEach((n, k) => { ART.SIZE['pbike_' + n] = [BV[k].w, BV[k].h]; ART.reg('pbike_' + n, (g, w, h) => V.blit(g, V.render(BIKE, k*Math.PI/4, w, h, { outline: 'br', outK: .5 }), 0, 0)); });
+  // textures 'pbike_v0' ... 'pbike_v31': view k is the heading k*360/32 degrees (0: nose away from the camera, then clockwise)
+  BV.forEach((v, k) => { ART.SIZE['pbike_v' + k] = [v.w, v.h]; ART.reg('pbike_v' + k, (g, w, h) => V.blit(g, V.render(BIKE, k*Math.PI*2/NV, w, h, { outline: 'br', outK: .5 }), 0, 0)); });
 })();

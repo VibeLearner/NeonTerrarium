@@ -3152,7 +3152,7 @@ function solidPush(p){
 // first takes the mugger back to the station on its pillion and they go in; the other patrols the area a while.
 // The bike is a billboard picked from eight drawn views by its heading; the officer (and passenger) are drawn by
 // people.js from POLICE_BIKES.
-const PBIKE_VIEWS = ['r2c1', 'r1c4', 'r2c3', 'r2c4', 'r1c1', 'r1c2', 'r1c3', 'r2c2'];   // nose away, away-right, right, ... going clockwise
+const PBIKE_N = ART.BIKE_VIEWS, PBIKE_VIEWS = Array.from({ length: PBIKE_N }, (_, k) => 'v' + k);   // nose away, then on round clockwise, a view every 360/PBIKE_N degrees
 const PBIKE_TEX = PBIKE_VIEWS.map(n => { const t = ART.tex('pbike_' + n); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; });
 const PBIKE_SIZE = Object.fromEntries(PBIKE_VIEWS.map(n => [n, ART.SIZE['pbike_' + n]]));   // (the generated bike's views, each cropped to its pixels: artgen_vox.js)
 let POLICE_BIKES = [];
@@ -3347,16 +3347,15 @@ function policeBikes(m, crew){
         if (b.mode === 'park') b.y += (CURB + .08 - b.y)*Math.min(1, dt*2);
         // the sprite: the view that matches the heading as the camera sees it
         const ax = b.hx*_bkR.x + b.hz*_bkR.z, az = b.hx*_bkF.x + b.hz*_bkF.z;   // heading against the view: + away from the camera (view 0, nose away), - toward it
-        // which of the eight views: with a little slack past each boundary, so it doesn't flick back and forth on the edge
-        const a8 = Math.atan2(ax, az)/(Math.PI/4);
-        if (b.oct === undefined) b.oct = ((Math.round(a8) % 8) + 8) % 8;
-        else { let dv = a8 - b.oct; dv -= 8*Math.round(dv/8); if (Math.abs(dv) > .62){ b.octFrom = b.oct; b.oct = ((Math.round(a8) % 8) + 8) % 8; b.turnT = 0; } }
-        // a quick turn between views: it narrows a touch, swaps halfway, and eases out to the new view's width
-        const TURN = .16; let oct = b.oct, sq = 1, [w, h] = PBIKE_SIZE[PBIKE_VIEWS[b.oct]];
+        // which of the views: with a little slack past each boundary, so it doesn't flick back and forth on the edge
+        const N = PBIKE_N, a8 = Math.atan2(ax, az)/(Math.PI*2/N);
+        if (b.oct === undefined) b.oct = ((Math.round(a8) % N) + N) % N;
+        else { let dv = a8 - b.oct; dv -= N*Math.round(dv/N); if (Math.abs(dv) > .6){ b.octFrom = b.oct; b.oct = ((Math.round(a8) % N) + N) % N; b.turnT = 0; } }
+        // between two views (they're only 11.25 degrees apart): the size eases over to the new view's, no squash
+        const TURN = .08; let oct = b.oct, sq = 1, [w, h] = PBIKE_SIZE[PBIKE_VIEWS[b.oct]];
         if (b.turnT !== undefined && b.turnT < TURN){
           const k = b.turnT/TURN, e = k*k*(3 - 2*k), [w0, h0] = PBIKE_SIZE[PBIKE_VIEWS[b.octFrom]];
-          if (k < .5) oct = b.octFrom;
-          w = w0 + (w - w0)*e; h = h0 + (h - h0)*e; sq = 1 - .3*Math.sin(PI*k);
+          w = w0 + (w - w0)*e; h = h0 + (h - h0)*e;
           b.turnT += dt;
         }
         w *= sq;

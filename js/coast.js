@@ -108,7 +108,7 @@
   /* ---------- the bend, the haze, the materials ---------- */
   const scene = new THREE.Scene();
   const CURV = { ctr: { value: new THREE.Vector2() }, fwd: { value: new THREE.Vector2(1, 0) }, curveK: { value: 0 }, g0: { value: 30 },
-    hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) }, nightK: { value: 0 } };
+    hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) }, nightK: { value: 0 }, darkK: { value: 0 } };   // (nightK: the lamps; darkK: full night only)
   const BEND = `{ vec4 wq = modelMatrix * vec4(transformed, 1.0); float gq = dot(wq.xz - ctr, fwd); vG = gq; float gp = max(gq - g0, 0.0); transformed.y -= curveK*gp*gp; vWq = wq.xyz; }`;
   // cliff faces are painted per pixel by height (crisp strata, a dark wet splash zone, a weed line at the water), not by
   // their few vertices: a face is any steep, not green, surface of the land
@@ -135,7 +135,7 @@
   // night: what glows. A block's lamps, lit windows and greenhouse glass carry a glow (0..1, per vertex; see Tris); by night
   // it turns them warm amber, the glass a gold-green, as in the solarpunk boards (a teal, rainy dusk, every window warm)
   const GLOW_V = 'attribute float glow; varying float vGlow;\n';
-  const GLOW_F = 'uniform float nightK; varying float vGlow;\n';
+  const GLOW_F = 'varying float vGlow;\n';
   const GLOW_APPLY = `if (vGlow > 0.0){ vec3 amber = vec3(1.0, 0.62, 0.28);
       float lamp = step(0.85, vGlow), sh = 0.74 + 0.26*abs(normalize(vNormal).x);
       vec3 gc = lamp > 0.5 ? amber*1.05 : mix(vec3(1.0, 0.78, 0.42), vColor*vec3(0.75, 0.95, 0.5), 0.3)*sh;   // (glass: a soft gold-green, still shaded by its facets)
@@ -155,6 +155,30 @@
       vec3 pale = mix(base, paper, 0.55) + (ph21(floor(gl_FragCoord.xy)) - 0.5)*0.06;   // (pale, with a little granulation)
       diffuseColor.rgb = mix(base, pale, clamp(wash*0.85 + wet*0.6, 0.0, 1.0));
       diffuseColor.rgb *= 1.0 - 0.3*(1.0 - smoothstep(0.0, 0.08, e))*step(pRise, 0.999); }`;
+  // Light in watercolor: shade is a glaze laid over the paper, not a cut-out. The sun's shadow is read a few texels off along
+  // a world-fixed noise, so its edge wanders like a brushed wash; where shade meets light the pigment pools in a darker
+  // rim; and in the shade the color goes a little cool and granulates (the paper's tooth). (Directional light only.)
+  const WC_F = `float wcS = 1.0, wcE = 0.0;
+    float wch(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
+    float wcn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
+      return mix(mix(wch(i), wch(i + vec2(1.0, 0.0)), f.x), mix(wch(i + vec2(0.0, 1.0)), wch(i + vec2(1.0, 1.0)), f.x), f.y); }\n`;
+  const WC_SHADOW = `#include <shadowmap_pars_fragment>
+    #ifdef USE_SHADOWMAP
+    float wcShadow(sampler2D sm, vec2 size, float bias, vec4 sc){
+      vec2 w = vWq.xz + vWq.y*0.3, t = 1.0/size;
+      vec2 o = (vec2(wcn(w*1.3), wcn(w*1.3 + 17.3)) - 0.5)*7.0 + (vec2(wcn(w*4.7 + 3.1), wcn(w*4.7 - 8.2)) - 0.5)*3.0;   // (in texels)
+      float s0 = getShadow(sm, size, bias, 1.0, sc + vec4(o*t, 0.0, 0.0));
+      float sn = 0.25*(getShadow(sm, size, bias, 1.0, sc + vec4((o + vec2(3.5, 0.0))*t, 0.0, 0.0)) + getShadow(sm, size, bias, 1.0, sc + vec4((o - vec2(3.5, 0.0))*t, 0.0, 0.0))
+                     + getShadow(sm, size, bias, 1.0, sc + vec4((o + vec2(0.0, 3.5))*t, 0.0, 0.0)) + getShadow(sm, size, bias, 1.0, sc + vec4((o - vec2(0.0, 3.5))*t, 0.0, 0.0)));
+      wcS = min(wcS, s0); wcE = max(wcE, (1.0 - s0)*sn);
+      return s0; }
+    #endif`;
+  const WC_APPLY = `{ float sh = 1.0 - wcS, gr = wcn(vWq.xz*5.3 + vWq.y*3.7)*0.6 + wcn(vWq.xz*11.0 - vWq.y*7.0)*0.4;
+      gl_FragColor.rgb *= 1.0 - 0.2*wcE;                                                        // (the rim of the wash)
+      gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb*vec3(0.88, 0.94, 1.1), sh*0.75*(1.0 - nightK));   // (a cool glaze)
+      gl_FragColor.rgb *= 1.0 - sh*0.09*gr; }`;                                                 // (granulating in the shade)
+  const WC_LIGHTS = c => c.replace('getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] )',
+    'wcShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, vDirectionalShadowCoord[ i ] )');
   // bend any built-in material the same way (and haze it toward the horizon, unless it's only drawn into the shadow map)
   function bent(mat, haze = true, rocky = false, glow = false, paint = null){
     mat.onBeforeCompile = sh => {
@@ -162,8 +186,10 @@
       sh.vertexShader = 'uniform vec2 ctr, fwd; uniform float curveK, g0; varying float vG; varying vec3 vWq;\n' + (glow ? GLOW_V : '') + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BEND + (glow ? '\n vGlow = glow;' : ''));
       if (glow) sh.fragmentShader = GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', GLOW_APPLY + '\n#include <fog_fragment>');
       if (paint) sh.fragmentShader = PAINT_F + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + PAINT_APPLY);
-      if (haze) sh.fragmentShader = 'uniform float hzNear, hzFar, hzMax; uniform vec3 hazeC; varying float vG; varying vec3 vWq;\n' + (rocky ? 'bool rockFace;\n' + ROCKY + '\n' : '') + sh.fragmentShader.replace('#include <fog_fragment>', '#include <fog_fragment>\n gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeC, smoothstep(hzNear, hzFar, vG)*hzMax);')
-        .replace('#include <color_fragment>', rocky ? ROCKY_APPLY : '#include <color_fragment>').replace('#include <lights_fragment_begin>', rocky ? ROCKY_LIGHTS : '#include <lights_fragment_begin>');
+      if (haze) sh.fragmentShader = 'uniform float hzNear, hzFar, hzMax; uniform vec3 hazeC; varying float vG; varying vec3 vWq;\n' + (rocky ? 'bool rockFace;\n' + ROCKY + '\n' : '') + (rocky ? '' : 'uniform float nightK;\n') + WC_F + sh.fragmentShader
+        .replace('#include <fog_fragment>', WC_APPLY + '\n#include <fog_fragment>\n gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeC, smoothstep(hzNear, hzFar, vG)*hzMax);')
+        .replace('#include <shadowmap_pars_fragment>', WC_SHADOW)
+        .replace('#include <color_fragment>', rocky ? ROCKY_APPLY : '#include <color_fragment>').replace('#include <lights_fragment_begin>', WC_LIGHTS(rocky ? ROCKY_LIGHTS : THREE.ShaderChunk.lights_fragment_begin));
     };
     mat.customProgramCacheKey = () => 'bent' + (haze ? 1 : 0) + (rocky ? 'r' : '') + (glow ? 'g' : '') + (paint ? 'p' : '');
     return mat;
@@ -680,8 +706,8 @@
     // night (past 19:00, full by 21:00): a high moon instead of the sun, cool and dim; a deep teal sky and haze; the sea gone
     // ink blue with pale moon glitter; and every lamp, lit window and greenhouse warm (nightK). A little of the glow comes on
     // at golden hour already, as the first lights do
-    const n = smooth(19, 21, h); CURV.nightK.value = Math.max(n, .25*smooth(17.8, 18.8, h));
-    if (poolMesh) poolMesh.visible = CURV.nightK.value > .01;
+    const n = smooth(19, 21, h); CURV.nightK.value = Math.max(n, .25*smooth(17.8, 18.8, h)); CURV.darkK.value = n;
+    if (poolMesh) poolMesh.visible = n > .01;
     if (n > 0){
       const mz = new THREE.Vector3(-.35, .86, -.38).normalize(); sunDir.lerp(mz, n).normalize();
       sun.color.lerp(new THREE.Color(.55, .74, 1.0), n); sun.intensity = lerp(sun.intensity, .3, n);
@@ -706,8 +732,43 @@
         gl_FragColor = vec4(c, 1.0); }` }));
   const skyScene = new THREE.Scene(); skyScene.add(skyQuad);
   const skyCam = new THREE.Camera();
-  const blit = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: null }));
+  // By night the warm lights bleed, as wet paint does: what glows (warm and bright) is taken out at half size, spread out
+  // (two blurs), and laid back over the picture as a wash: its edge ragged against the paper's grain (fixed to the screen,
+  // as paper is), a touch more pigment where it gives out. Its grain is read per pixel of the picture, so it stays pixel art.
+  let glA = null, glB = null;
+  const quad = new THREE.PlaneGeometry(2, 2), postScene = new THREE.Scene(), postQ = new THREE.Mesh(quad); postScene.add(postQ);
+  const postV = 'varying vec2 vU; void main(){ vU = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+  const extractM = new THREE.ShaderMaterial({ uniforms: { src: { value: null } }, vertexShader: postV, depthTest: false, depthWrite: false,
+    fragmentShader: `uniform sampler2D src; varying vec2 vU;
+      void main(){ vec3 c = texture2D(src, vU).rgb; float m = smoothstep(0.18, 0.42, c.r - c.b)*smoothstep(0.45, 0.8, c.r); gl_FragColor = vec4(c*m, 1.0); }` });
+  const blurM = new THREE.ShaderMaterial({ uniforms: { src: { value: null }, dir: { value: new THREE.Vector2() } }, vertexShader: postV, depthTest: false, depthWrite: false,
+    fragmentShader: `uniform sampler2D src; uniform vec2 dir; varying vec2 vU;
+      void main(){ vec3 c = vec3(0.0); float wt = 0.0;
+        for (int i = -6; i <= 6; i++){ float f = float(i), w = exp(-f*f/18.0); c += texture2D(src, vU + dir*f*1.6).rgb*w; wt += w; }
+        gl_FragColor = vec4(c/wt, 1.0); }` });
+  const blit = new THREE.Mesh(quad, new THREE.ShaderMaterial({ uniforms: { tex: { value: null }, glow: { value: null }, nightK: CURV.darkK, res: { value: new THREE.Vector2(480, 270) } },
+    vertexShader: postV, depthTest: false, depthWrite: false,
+    fragmentShader: `uniform sampler2D tex, glow; uniform float nightK; uniform vec2 res; varying vec2 vU;
+      float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
+      float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
+        return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
+      void main(){ vec3 c = texture2D(tex, vU).rgb;
+        if (nightK > 0.01){
+          vec2 px = floor(vU*res) + 0.5, q = px/res;                     // (one picture pixel at a time)
+          vec3 g = texture2D(glow, q).rgb; float gl = dot(g, vec3(0.4, 0.4, 0.2));
+          float paper = vn(px*0.11)*0.55 + vn(px*0.31 + 9.0)*0.3 + h21(px)*0.15;
+          float wash = smoothstep(0.02, 0.09, gl + (paper - 0.5)*0.05);
+          float rim = wash*(1.0 - smoothstep(0.02, 0.1, gl - 0.04 + (paper - 0.5)*0.05));
+          vec3 tint = normalize(g + 1e-4)*vec3(1.0, 0.92, 0.8);
+          c += (g*1.6*(0.8 + 0.4*paper) + tint*0.08*wash + tint*0.1*rim)*nightK;
+        }
+        gl_FragColor = vec4(c, 1.0); }` }));
   const blitScene = new THREE.Scene(); blitScene.add(blit);
+  function glowPass(){
+    if (CURV.darkK.value <= .01) return;
+    postQ.material = extractM; extractM.uniforms.src.value = rt.texture; renderer.setRenderTarget(glA); renderer.render(postScene, skyCam);
+    postQ.material = blurM; blurM.uniforms.src.value = glA.texture; blurM.uniforms.dir.value.set(1/glA.width, 0); renderer.setRenderTarget(glB); renderer.render(postScene, skyCam);
+    blurM.uniforms.src.value = glB.texture; blurM.uniforms.dir.value.set(0, 1/glA.height); renderer.setRenderTarget(glA); renderer.render(postScene, skyCam); }
   function resize(){
     const dpr = devicePixelRatio || 1, DWp = Math.max(1, Math.round(innerWidth*dpr)), DHp = Math.max(1, Math.round(innerHeight*dpr));
     // the city's render lines (its Settings choice if one is saved, else 480), each a whole number of screen pixels
@@ -718,7 +779,9 @@
     if (reflRT) reflRT.dispose(); reflRT = new THREE.WebGLRenderTarget(Math.ceil(W/2), Math.ceil(H/2),   // (half size: it's rippled anyway)
       { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     seaU.reflTex.value = reflRT.texture; seaU.resPx.value.set(W, H);
-    blit.material.map = rt.texture; blit.material.needsUpdate = true;
+    for (const g of [glA, glB]) if (g) g.dispose();
+    glA = new THREE.WebGLRenderTarget(Math.ceil(W/2), Math.ceil(H/2), { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }); glB = glA.clone();
+    blit.material.uniforms.tex.value = rt.texture; blit.material.uniforms.glow.value = glA.texture; blit.material.uniforms.res.value.set(W, H);
   }
   addEventListener('resize', resize);
 
@@ -1273,14 +1336,21 @@
   }
   // the warm light by night: a soft pool on the ground round each home, under each pergola and arcade, in each courtyard
   // (flat quads added over the ground, in a few dithered steps; only drawn when it's dark)
-  const poolM = new THREE.ShaderMaterial({ uniforms: { nightK: CURV.nightK }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    vertexShader: 'attribute vec3 aL; varying vec3 vL; void main(){ vL = aL; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
-    fragmentShader: `uniform float nightK; varying vec3 vL;
-      float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); vec2 a = mod(q, 2.0), b = floor(q/2.0);
-        float b2 = (a.x*2.0 + a.y*3.0 - 2.0*a.x*a.y), b1 = (b.x*2.0 + b.y*3.0 - 2.0*b.x*b.y); return (b2*4.0 + b1)/16.0; }
-      void main(){ float r = length(vL.xy); if (r > 1.0) discard;
-        float a = pow(1.0 - r, 1.6)*vL.z, q = floor(a*4.0 + bayer(gl_FragCoord.xy))/4.0*0.68;
-        gl_FragColor = vec4(vec3(0.75, 0.42, 0.15)*q*nightK, 1.0); }` });
+  const poolM = new THREE.ShaderMaterial({ uniforms: { nightK: CURV.darkK }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: 'attribute vec3 aL; varying vec3 vL; varying vec2 vW; void main(){ vL = aL; vW = position.xz; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
+    // (a wash of warm light: a ragged blot, its color running wet-in-wet from gold at the heart to rose-orange at the edge,
+    // blooms where the water backed up into it, and more pigment at its rim)
+    fragmentShader: `uniform float nightK; varying vec3 vL; varying vec2 vW;
+      float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
+      float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
+        return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
+      void main(){ float r = length(vL.xy);
+        float edge = 0.6 + 0.26*vn(vW*0.8) + 0.1*vn(vW*2.6 + 5.0), e = edge - r; if (e < 0.0) discard;
+        float body = smoothstep(0.0, 0.45, e), bloom = vn(vW*1.4 + 7.0);
+        vec3 c = mix(vec3(0.95, 0.42, 0.24), vec3(1.0, 0.74, 0.36), body*(0.6 + 0.4*bloom));
+        float a = (0.25 + 0.5*body)*(0.75 + 0.5*smoothstep(0.35, 0.75, bloom)) + 0.45*(1.0 - smoothstep(0.0, 0.05, e));
+        a = floor(a*7.0)/7.0;
+        gl_FragColor = vec4(c*a*0.42*vL.z*nightK, 1.0); }` });
   let poolMesh = null;
   function buildPools(pools){
     if (poolMesh){ scene.remove(poolMesh); poolMesh.geometry.dispose(); poolMesh = null; } if (!pools.length) return;
@@ -1288,7 +1358,7 @@
     for (const [x, z, r, k] of pools){ const y = heightAt(x, z) + .04;
       for (const [u, v] of [[-1, -1], [1, 1], [1, -1], [-1, -1], [-1, 1], [1, 1]]){ P.push(x + u*r, y, z + v*r); L.push(u, v, k); } }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aL', new THREE.Float32BufferAttribute(L, 3));
-    poolMesh = new THREE.Mesh(g, poolM); poolMesh.frustumCulled = false; poolMesh.renderOrder = 2; poolMesh.visible = CURV.nightK.value > .01; scene.add(poolMesh); }
+    poolMesh = new THREE.Mesh(g, poolM); poolMesh.frustumCulled = false; poolMesh.renderOrder = 2; poolMesh.visible = CURV.darkK.value > .01; scene.add(poolMesh); }
 
   try { const L = JSON.parse(localStorage.getItem(SAVE_KEY) || '[]'), byId = new Map();
     for (const [kind, x, z, rot, y, seed, id, baseId, hostId, level] of L){ if (!KINDS[kind]) continue; const base = baseId ? byId.get(baseId) : null, host = hostId ? byId.get(hostId) : null;
@@ -1505,7 +1575,7 @@
   const reflM = new THREE.MeshBasicMaterial({ vertexColors: true, clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0)] });
   reflM.onBeforeCompile = sh => { sh.uniforms.nightK = CURV.nightK;   // (by night the lit windows show in the water, warm)
     sh.vertexShader = GLOW_V + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vGlow = glow;');
-    sh.fragmentShader = GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(1.0, 0.72, 0.38), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
+    sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(1.0, 0.72, 0.38), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
   renderer.localClippingEnabled = true;
   function renderRefl(){
     const hide = [sea, spray, ghost, ring, ...zGhosts, ...(poolMesh ? [poolMesh] : []), ...BLOOMS], vis = hide.map(o => o.visible); hide.forEach(o => { o.visible = false; });
@@ -1528,6 +1598,7 @@
     foamStep(dt); renderRefl();
     renderer.setRenderTarget(rt); renderer.autoClear = true; renderer.render(skyScene, skyCam);
     renderer.autoClear = false; renderer.clearDepth(); renderer.render(scene, cam);
+    renderer.autoClear = true; glowPass();
     renderer.setRenderTarget(null); renderer.autoClear = true; renderer.render(blitScene, skyCam);
     requestAnimationFrame(frame);
   }

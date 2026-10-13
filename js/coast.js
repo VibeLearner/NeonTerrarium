@@ -794,30 +794,147 @@
     return null;
   }
 
-  /* ---------- pieces: placed anywhere, at any angle, on a leveled pad (stand-ins for the buildings to come) ---------- */
+  /* ---------- homes: placed anywhere, at any angle, on a leveled pad, each one generated from its own seed ---------- */
+  // The residential zone, from the solarpunk board: homes that wear their plants, soft shapes, warm plaster and
+  // terracotta, greenhouse glass. Four kinds, each built from parts by a seeded stream, so no two come out the same:
+  //   townhouse: a plaster house of one or two floors, a curved glass greenhouse on the roof, an outside stair, a tiled
+  //              lean-to, an awning over a bright door, planters on every ledge
+  //   tower:     round rooms stacked and offset, wrapped in glass, cream and terracotta bands, planted balconies, a roof garden
+  //   pods:      white domes and a capsule room stacked together, round windows, a blue trim, a little tiled hut on top,
+  //              pipes and an antenna
+  //   villa:     white blocks stepping back as they rise, flat terraces with planters, an arcade, a terracotta dome
+  // (the glass colors go a little past full: it glows, even on its shaded side)
+  const HP = { teal: C(0x3f8f8a), sea: C(0x5aa79a), cream: C(0xf2e8d5), ochre: C(0xe8c48a), white: C(0xf6f1e6), blush: C(0xefc9b8), sand: C(0xe9d9b8),
+    terra: C(0xc8663e), terra2: C(0xa9522f), tile: C(0xb85a36), glass: C(0x8fd8c4).multiplyScalar(1.12), glass2: C(0x84d4be).multiplyScalar(1.2), glassT: C(0x7fc0c4).multiplyScalar(1.15), glassD: C(0x2f5960), frame: C(0x2e403e),
+    doorO: C(0xd0702e), doorT: C(0x3e6e7a), wood: C(0x9a6a3e), rail: C(0x3a3f3e), metal: C(0x9aa3a6), blue: C(0x3a9ec4), lamp: C(0xffd27a),
+    leaf: [C(0x4e8a34), C(0x6aa03c), C(0x3d7430), C(0x82b048)], pot: C(0xb5583a), stone: C(0xd8ccb2), flower: [C(0xf08a5a), C(0xf5c84c), C(0xe6739a)] };
+  Object.assign(GEO, { cyl12: new THREE.CylinderGeometry(1, 1, 1, 12), cyl16: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.IcosahedronGeometry(1, 1),
+    dome: new THREE.SphereGeometry(1, 12, 6, 0, PI*2, 0, PI/2), ring: new THREE.CylinderGeometry(1, 1, 1, 16, 1, true) });
+  const rng = seed => { let a = seed >>> 0; return { f(){ a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0)/4294967296; },
+    r(lo, hi){ return lo + (hi - lo)*this.f(); }, i(lo, hi){ return lo + Math.floor(this.f()*(hi - lo + 1)); }, pick(l){ return l[Math.floor(this.f()*l.length)]; }, chance(p){ return this.f() < p; } }; };
+  // little parts
+  const plant = (T, R, x, y, z, s = 1) => { T.add(GEO.ico, mat(x, y + .1*s, z, 0, R.r(0, PI), 0, .2*s, .17*s, .2*s), R.pick(HP.leaf));
+    if (R.chance(.35)) T.add(GEO.ico, mat(x + .06*s, y + .2*s, z, 0, 0, 0, .07*s, .07*s, .07*s), R.pick(HP.flower)); };
+  const pot = (T, R, x, y, z, s = 1) => { T.add(GEO.cyl6, mat(x, y + .08*s, z, 0, 0, 0, .1*s, .16*s, .1*s), HP.pot); plant(T, R, x, y + .14*s, z, s); };
+  const box = (T, x, y, z, w, h, d, c, ry = 0) => T.add(GEO.box, mat(x, y, z, 0, ry, 0, w, h, d), c);
+  const shrub = (T, R, x, z, s = 1) => { for (let k = 0; k < 3; k++) T.add(GEO.ico, mat(x + R.r(-.15, .15)*s, .18*s + k*.05, z + R.r(-.15, .15)*s, 0, R.r(0, 3), 0, .28*s, .22*s, .28*s), R.pick(HP.leaf)); };
+  // a window on a flat face facing +z (at depth z), with a frame and a sill; lit warm or dark glass
+  const winZ = (T, R, x, y, z, w, h, arch) => { box(T, x, y, z + .01, w + .08, h + .08, .04, HP.frame); box(T, x, y, z + .03, w, h, .04, R.chance(.35) ? HP.lamp : HP.glassD);
+    if (arch) T.add(GEO.cyl8, mat(x, y + h/2, z + .02, PI/2, 0, 0, w/2 + .04, .05, w/2 + .04), HP.frame);
+    box(T, x, y - h/2 - .04, z + .08, w + .14, .04, .12, HP.stone); };
   const KINDS = {
-    cottage: { name: 'Cottage', r: 1.9, build(T){
-      T.add(GEO.box, mat(0, .07, 0, 0, 0, 0, 2.9, .14, 2.3), PAL.stone);
-      T.add(GEO.box, mat(0, .85, 0, 0, 0, 0, 2.4, 1.5, 1.8), PAL.white);
-      T.add(GEO.cone4, mat(0, 2.08, 0, 0, PI/4, 0, 1.95, 1.0, 1.6), PAL.terra);
-      T.add(GEO.box, mat(.45, .48, .91, 0, 0, 0, .46, .8, .06), PAL.door);
-      for (const x of [-.6, .62]) T.add(GEO.box, mat(x - (x > 0 ? 0 : 0), 1.05, .91, 0, 0, 0, .34, .3, .05), PAL.door);
-      T.add(GEO.box, mat(-.75, 2.3, -.3, 0, 0, 0, .26, .6, .26), PAL.white2);
+    townhouse: { name: 'Greenhouse townhouse', r: 1.9, build(T, R){
+      const w = R.r(1.9, 2.4), d = R.r(1.5, 1.9), fl = R.i(1, 2), fh = 1.2, H = fl*fh, wall = R.pick([HP.teal, HP.sea, HP.teal, HP.ochre, HP.blush]);
+      box(T, 0, .06, 0, w + .5, .12, d + .5, HP.stone);
+      box(T, 0, H/2 + .12, 0, w, H, d, wall);
+      for (let f = 0; f < fl; f++) box(T, 0, .12 + (f + 1)*fh - .05, 0, w + .06, .08, d + .06, HP.cream);   // (a band at each floor)
+      const dx = R.r(-w/2 + .4, w/2 - .4), door = R.pick([HP.doorO, HP.doorO, HP.doorT]);
+      box(T, dx, .55, d/2 + .03, .42, .8, .06, door); T.add(GEO.cyl8, mat(dx, .95, d/2 + .03, PI/2, 0, 0, .21, .06, .21), door);
+      box(T, dx, 1.12, d/2 + .2, .66, .05, .4, R.pick([HP.cream, HP.terra])); box(T, dx + .32, .9, d/2 + .12, .07, .12, .07, HP.lamp);
+      for (let f = 0; f < fl; f++) for (const wx of [-w*.3, w*.28]) if (f > 0 || Math.abs(wx - dx) > .5) winZ(T, R, wx, .12 + f*fh + .65, d/2, .34, .42, R.chance(.5));
+      for (let f = 0; f < fl; f++) winZ(T, R, 0, .12 + f*fh + .65, -d/2 - .07, .3, .38, false);   // (the back)
+      box(T, 0, H + .18, 0, w + .14, .1, d + .14, HP.cream);                                         // (the roof slab)
+      // the greenhouse on the roof: glass walls, a half-round glass roof, dark ribs
+      if (R.chance(.9)){ const gw = w*R.r(.6, .85), gd = d*R.r(.7, .85), gh = .6, gy = H + .23, gx = R.r(-.15, .15)*w;
+        box(T, gx, gy + gh/2, 0, gw, gh, gd, HP.glass); T.add(GEO.cyl12, mat(gx, gy + gh, 0, 0, 0, PI/2, gd/2, gw, gd/2), HP.glass2);
+        for (let k = 0; k <= Math.round(gw/.35); k++){ const x = gx - gw/2 + k*gw/Math.round(gw/.35); box(T, x, gy + gh/2, gd/2 + .01, .04, gh, .02, HP.frame); box(T, x, gy + gh/2, -gd/2 - .01, .04, gh, .02, HP.frame);
+          T.add(GEO.ring, mat(x, gy + gh, 0, 0, 0, PI/2, gd/2 + .02, .05, gd/2 + .02), HP.frame); }   // (the ribs: open hoops over the glass)
+        for (let k = 0; k < 4; k++) pot(T, R, gx - gw/2 + .2 + k*(gw - .4)/3, gy, gd/2 - .2, .9); }
+      for (let k = 0; k < 4; k++) if (R.chance(.7)) pot(T, R, -w/2 + .2 + k*(w - .4)/3, H + .23, d/2 + .02, .8);   // (planters along the roof edge)
+      // the outside stair up the side, with its rail and pots on the steps
+      if (fl > 1 || R.chance(.6)){ const sx = -w/2 - .28, n = Math.round((fl > 1 ? fh : H) /.2);
+        for (let k = 0; k < n; k++){ const y = .12 + k*.2, z = d/2 - .25 - k*(d - .5)/n; box(T, sx, y + .1, z, .5, .08, .25, HP.stone); if (k % 3 === 1) pot(T, R, sx - .17, y + .14, z, .6); }
+        box(T, sx - .24, .12 + n*.1 + .35, 0, .04, .05, d - .3, HP.rail);
+        box(T, sx, .12 + n*.2 + .05, -d/2 + .3, .5, .1, .55, HP.stone); }
+      // a tiled lean-to on the other side
+      if (R.chance(.6)){ const lw = .7, lh = fh*.75, lx = w/2 + lw/2 - .02;
+        box(T, lx, .12 + lh/2, R.r(-.2, .2), lw, lh, d*.7, wall); T.add(GEO.box, mat(lx + .05, .12 + lh + .08, 0, 0, 0, -.3, lw + .25, .08, d*.8), HP.tile);
+        winZ(T, R, lx, .12 + lh*.55, d*.35, .28, .3, false); }
+      box(T, w/2 + .02, .12 + fh*.75, -d*.2, .2, .3, .3, HP.metal);                                   // (an air unit)
+      for (let k = 0; k < 4; k++) if (R.chance(.7)) pot(T, R, R.r(-w/2, w/2), .12, d/2 + .3 + R.r(0, .2), 1);
+      shrub(T, R, -w/2 - .2, d/2 + .2, .9);
     } },
-    round: { name: 'Round house', r: 1.6, build(T){
-      T.add(GEO.cyl8, mat(0, .07, 0, 0, 0, 0, 1.5, .14, 1.5), PAL.stone);
-      T.add(GEO.cyl8, mat(0, .9, 0, 0, PI/8, 0, 1.2, 1.6, 1.2), PAL.white);
-      T.add(GEO.cone8, mat(0, 2.15, 0, 0, PI/8, 0, 1.42, .95, 1.42), PAL.terra2);
-      T.add(GEO.box, mat(0, .48, 1.16, 0, 0, 0, .42, .78, .1), PAL.door);
+    tower: { name: 'Round terrace tower', r: 1.8, build(T, R){
+      const lv = R.i(2, 4), lh = 1.0; let y = .12, ox = 0, oz = 0;
+      T.add(GEO.cyl12, mat(0, .06, 0, 0, 0, 0, 1.55, .12, 1.55), HP.stone);
+      for (let i = 0; i < lv; i++){
+        const r = R.r(.85, 1.2) - i*.04, band = i % 2 ? HP.terra : HP.cream, other = i % 2 ? HP.cream : HP.terra;
+        if (i > 0){ ox = clamp(ox + R.r(-.35, .35), -.45, .45); oz = clamp(oz + R.r(-.35, .35), -.45, .45); }
+        T.add(GEO.cyl16, mat(ox, y + .17, oz, 0, 0, 0, r + .04, .34, r + .04), band);                 // (the parapet band)
+        T.add(GEO.cyl16, mat(ox, y + .34 + (lh - .46)/2, oz, 0, 0, 0, r*.95, lh - .46, r*.95), HP.glassT);   // (the glass round)
+        for (let k = 0; k < 8; k++){ const a = k/8*PI*2 + i; box(T, ox + Math.cos(a)*r*.95, y + .34 + (lh - .46)/2, oz + Math.sin(a)*r*.95, .05, lh - .46, .05, HP.frame); }
+        T.add(GEO.cyl16, mat(ox, y + lh - .06, oz, 0, 0, 0, r + .08, .12, r + .08), other === HP.terra ? HP.cream : HP.cream);   // (the slab over it)
+        if (R.chance(.5)) for (let k = 0; k < 3; k++){ const a = R.r(0, PI*2); plant(T, R, ox + Math.cos(a)*(r - .1), y + .34, oz + Math.sin(a)*(r - .1), .9); }   // (plants spilling over the band)
+        y += lh;
+      }
+      // the roof: a rail, a garden, sometimes a small tree
+      const rr = 1.0;
+      for (let k = 0; k < 12; k++){ const a = k/12*PI*2; box(T, ox + Math.cos(a)*rr*.95, y + .15, oz + Math.sin(a)*rr*.95, .04, .3, .04, HP.rail); }
+      T.add(GEO.ring, mat(ox, y + .3, oz, 0, 0, 0, rr*.97, .04, rr*.97), HP.rail);
+      for (let k = 0; k < 5; k++){ const a = R.r(0, PI*2), q = R.r(.1, .65); plant(T, R, ox + Math.cos(a)*q, y, oz + Math.sin(a)*q, 1.4); }
+      if (R.chance(.5)){ T.add(GEO.cyl5, mat(ox + .2, y + .35, oz, 0, 0, 0, .06, .7, .06), HP.wood); T.add(GEO.ico, mat(ox + .2, y + .85, oz, 0, 0, 0, .42, .32, .42), R.pick(HP.leaf)); }
+      // the door at the foot, with steps and flowers
+      box(T, 0, .5, 1.12, .44, .76, .1, HP.wood); T.add(GEO.cyl8, mat(0, .88, 1.12, PI/2, 0, 0, .22, .1, .22), HP.wood);
+      box(T, 0, .08, 1.35, .8, .1, .35, HP.stone);
+      for (let k = 0; k < 5; k++){ const a = .4 + k*1.1; shrub(T, R, Math.cos(a)*1.35, Math.sin(a)*1.35, .8); if (R.chance(.6)) T.add(GEO.ico, mat(Math.cos(a)*1.35, .38, Math.sin(a)*1.35, 0, 0, 0, .09, .09, .09), R.pick(HP.flower)); }
     } },
-    garden: { name: 'Garden', r: 1.5, build(T){
-      T.add(GEO.box, mat(0, .17, 0, 0, 0, 0, 2.4, .34, 1.7), PAL.plank);
-      T.add(GEO.box, mat(0, .3, 0, 0, 0, 0, 2.2, .1, 1.5), PAL.soil);
-      for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) T.add(GEO.ico, mat(-.8 + i*.53, .42, -.45 + j*.45, 0, i + j, 0, .2, .16, .2), PAL.leaf);
+    pods: { name: 'Patchwork pod house', r: 1.9, build(T, R){
+      box(T, 0, .1, 0, 2.8, .2, 2.4, HP.stone);
+      const main = R.r(.85, 1.05), c2 = R.pick([HP.white, HP.cream, HP.white]);
+      T.add(GEO.sph, mat(.2, .2 + main*.85, -.1, 0, 0, 0, main, main*.95, main), c2);              // (the main dome)
+      T.add(GEO.cyl16, mat(.2, .2 + main*.85, -.1, 0, 0, 0, main*1.02, .1, main*1.02), HP.blue);  // (its blue trim)
+      // the capsule room on the side, a big round window at its end
+      const cy = .35 + R.r(.55, .8), cl = R.r(1.0, 1.3), cr = R.r(.42, .55), side = R.chance(.5) ? -1 : 1;
+      T.add(GEO.cyl16, mat(side*.9, cy, .35, 0, 0, PI/2, cr, cl, cr), c2); T.add(GEO.sph, mat(side*(.9 + cl/2), cy, .35, 0, 0, 0, cr, cr, cr), c2);
+      T.add(GEO.cyl16, mat(side*(.9 + cl/2 + cr*.82), cy, .35, 0, 0, PI/2, cr*.62, .06, cr*.62), HP.glassD); T.add(GEO.cyl16, mat(side*(.9 + cl/2 + cr*.86), cy, .35, 0, 0, PI/2, cr*.66, .03, cr*.66), HP.frame);
+      box(T, side*.9, cy - cr - .15, .35, .12, .3, .12, HP.metal);
+      // round windows round the dome
+      for (let k = 0; k < 4; k++){ const a = R.r(-.9, .9) + (k < 2 ? 0 : PI), el = R.r(.15, .5), nx = Math.sin(a)*Math.cos(el), ny = Math.sin(el), nz = Math.cos(a)*Math.cos(el);
+        T.add(GEO.cyl8, mat(.2 + nx*main, .2 + main*.85 + ny*main*.95, -.1 + nz*main, Math.PI/2 - el, a, 0, .17, .06, .17), R.chance(.4) ? HP.lamp : HP.glassD); }
+      // a second smaller dome up on top, and a little tiled hut
+      const top = .2 + main*1.75;
+      if (R.chance(.7)){ const r2 = R.r(.45, .6); T.add(GEO.sph, mat(-.3, top + r2*.6, -.2, 0, 0, 0, r2, r2*.9, r2), c2); T.add(GEO.cyl8, mat(-.3, top + r2*.6, -.2 + r2*.98, PI/2, 0, 0, .13, .05, .13), HP.glassD); }
+      if (R.chance(.8)){ box(T, .45, top + .25, .1, .6, .5, .5, HP.cream); T.add(GEO.cone4, mat(.45, top + .62, .1, 0, PI/4, 0, .55, .3, .5), HP.tile); winZ(T, R, .45, top + .28, .35, .2, .2, false); }
+      // pipes and an antenna
+      T.add(GEO.cyl5, mat(-.75, .2 + main*.6, -.6, 0, 0, 0, .05, main*1.4, .05), HP.metal); T.add(GEO.cyl5, mat(-.4, .2 + main*1.3, -.6, 0, 0, PI/2, .05, .7, .05), HP.metal);
+      T.add(GEO.cyl5, mat(.75, top + .6, -.3, 0, 0, 0, .025, 1.2, .025), HP.rail); box(T, .75, top + 1.1, -.3, .25, .06, .06, HP.blue);
+      // the door, steps, plants round the base
+      box(T, -.3, .55, .78, .4, .7, .1, R.pick([HP.doorT, HP.wood])); box(T, -.3, .25, 1.05, .6, .1, .35, HP.stone);
+      for (let k = 0; k < 5; k++) pot(T, R, R.r(-1.2, 1.2), .2, R.r(.7, 1.1), 1);
+      shrub(T, R, -1.1, -.8, .9); shrub(T, R, 1.1, -.9, .8);
+    } },
+    villa: { name: 'White terraced villa', r: 2.0, build(T, R){
+      box(T, 0, .06, 0, 3.3, .12, 3.0, HP.stone);
+      const n = R.i(2, 3); let w = R.r(2.5, 2.9), d = R.r(2.2, 2.6), y = .12, bz = 0;
+      for (let i = 0; i < n; i++){
+        const h = i === 0 ? 1.1 : .95, c = R.pick([HP.white, HP.white, HP.cream, HP.sand]);
+        box(T, 0, y + h/2, bz, w, h, d, c);
+        // arched openings on the front, an arcade on the ground floor
+        const k = Math.max(2, Math.round(w/.7));
+        for (let j = 0; j < k; j++){ const x = -w/2 + (j + .5)*w/k; if (i === 0){ box(T, x, y + .38, bz + d/2 + .02, .34, .56, .04, HP.glassD); T.add(GEO.cyl8, mat(x, y + .66, bz + d/2 + .02, PI/2, 0, 0, .17, .04, .17), HP.glassD); }
+          else if (R.chance(.6)) winZ(T, R, x, y + h*.5, bz + d/2, .26, .36, true); }
+        box(T, 0, y + h + .04, bz, w + .1, .08, d + .1, HP.cream);
+        // the terrace in front of the next floor up: a low wall and planters
+        const nd = d*R.r(.55, .7), nz = bz - (d - nd)/2;
+        if (i < n - 1){ box(T, 0, y + h + .16, bz + d/2 - .03, w, .2, .06, c); for (let j = 0; j < 4; j++) if (R.chance(.7)) pot(T, R, -w/2 + .3 + j*(w - .6)/3, y + h + .08, bz + d/2 - .2, .9); }
+        y += h; w *= R.r(.6, .8); d = nd; bz = nz;
+      }
+      // the dome on a drum
+      const dr = Math.min(w, d)*.45; T.add(GEO.cyl12, mat(0, y + .2, bz, 0, 0, 0, dr, .3, dr), HP.white);
+      T.add(GEO.dome, mat(0, y + .35, bz, 0, 0, 0, dr*1.02, dr*.9, dr*1.02), R.pick([HP.terra, HP.terra2, HP.ochre]));
+      T.add(GEO.cyl5, mat(0, y + .35 + dr*.9, bz, 0, 0, 0, .03, .3, .03), HP.rail);
+      // cypress and bushes round it
+      for (const [x, z] of [[-1.5, 1.2], [1.5, -1.1]]) if (R.chance(.8)){ T.add(GEO.cone8, mat(x, .75, z, 0, 0, 0, .28, 1.4, .28), HP.leaf[2]); }
+      for (let k = 0; k < 3; k++) shrub(T, R, R.r(-1.4, 1.4), R.r(1.25, 1.45), .8);
     } },
   };
-  const pieceGeo = {}; for (const k in KINDS){ const T = new Tris(); KINDS[k].build(T); pieceGeo[k] = T.geo(); }
-  function pieceMesh(p){ const m = new THREE.Mesh(pieceGeo[p.kind], pieceM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.frustumCulled = false;
+  const KIND_KEYS = Object.keys(KINDS);
+  const geoCache = new Map();
+  function geoFor(kind, seed){ const key = kind + ':' + seed; let g = geoCache.get(key); if (g) return g;
+    const T = new Tris(); KINDS[kind].build(T, rng(Math.imul(seed, 2654435761) ^ (KIND_KEYS.indexOf(kind) + 1)*97)); g = T.geo(); geoCache.set(key, g);
+    if (geoCache.size > 300){ const k0 = geoCache.keys().next().value; geoCache.get(k0).dispose(); geoCache.delete(k0); }
+    return g; }
+  function pieceMesh(p){ const m = new THREE.Mesh(geoFor(p.kind, p.seed), pieceM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.frustumCulled = false;
     m.position.set(p.x, p.y, p.z); m.rotation.y = p.rot; m.matrixAutoUpdate = false; m.updateMatrix(); m.updateMatrixWorld(); return m; }
   // can a piece go here? on land above the water, on ground that isn't too steep, clear of other pieces; returns the pad height
   // can a piece go here? wholly on land (right up to the cliff edge is fine), on ground that isn't too steep, clear of other
@@ -840,28 +957,28 @@
   }
   const dirtyAround = p => { for (const ch of chunks.values()) if (ch.land && ch.i*CH < p.x + p.r + 3 && ch.i*CH + CH > p.x - p.r - 3 && ch.j*CH < p.z + p.r + 3 && ch.j*CH + CH > p.z - p.r - 3) ch.dirty = true; };
   const SAVE_KEY = 'neonIsland.coast.pieces';
-  const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(PIECES.map(p => [p.kind, +p.x.toFixed(3), +p.z.toFixed(3), +p.rot.toFixed(4), +p.y.toFixed(3)]))); } catch (e) {} };
-  function addPiece(kind, x, z, rot, y, quiet){
-    const p = { kind, x, z, rot, y, r: KINDS[kind].r }; p.mesh = pieceMesh(p); scene.add(p.mesh); PIECES.push(p); gridAdd(p); dirtyAround(p); if (!quiet) save(); return p; }
+  const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(PIECES.map(p => [p.kind, +p.x.toFixed(3), +p.z.toFixed(3), +p.rot.toFixed(4), +p.y.toFixed(3), p.seed]))); } catch (e) {} };
+  function addPiece(kind, x, z, rot, y, quiet, seed = 1){
+    const p = { kind, x, z, rot, y, seed, r: KINDS[kind].r }; p.mesh = pieceMesh(p); scene.add(p.mesh); PIECES.push(p); gridAdd(p); dirtyAround(p); if (!quiet) save(); return p; }
   function removePiece(p){ scene.remove(p.mesh); PIECES.splice(PIECES.indexOf(p), 1); gridDel(p); dirtyAround(p); save(); }
-  try { for (const [kind, x, z, rot, y] of JSON.parse(localStorage.getItem(SAVE_KEY) || '[]')) if (KINDS[kind]) addPiece(kind, x, z, rot, y, true); } catch (e) {}
+  try { for (const [kind, x, z, rot, y, seed] of JSON.parse(localStorage.getItem(SAVE_KEY) || '[]')) if (KINDS[kind]) addPiece(kind, x, z, rot, y, true, seed || 1); } catch (e) {}
 
   // the ghost: the piece under the pointer, see-through, and a ring on the ground green or red
   const ghostM = bent(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .55, depthWrite: false }), false);
   const ringM = bent(new THREE.MeshBasicMaterial({ color: 0x7dffb0, transparent: true, opacity: .9, depthWrite: false, side: THREE.DoubleSide }), false);
   ghostM.customProgramCacheKey = () => 'bentGhost'; ringM.customProgramCacheKey = () => 'bentRing';
-  const ghost = new THREE.Mesh(pieceGeo.cottage, ghostM); ghost.visible = false; ghost.frustumCulled = false; ghost.renderOrder = 5; scene.add(ghost);
+  const ghost = new THREE.Mesh(geoFor('townhouse', 1), ghostM); ghost.visible = false; ghost.frustumCulled = false; ghost.renderOrder = 5; scene.add(ghost);
   const RN = 48, ringGeo = new THREE.BufferGeometry(); ringGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array((RN + 1)*2*3), 3));
   { const idx = []; for (let i = 0; i < RN; i++){ const a = i*2, b = a + 1, c = a + 2, d = a + 3; idx.push(a, b, c, b, d, c); } ringGeo.setIndex(idx); }
   const ring = new THREE.Mesh(ringGeo, ringM); ring.visible = false; ring.frustumCulled = false; ring.renderOrder = 6; scene.add(ring);
-  const PL = { kind: null, rot: 0, hit: null, ok: null, ptr: null };
+  const PL = { kind: null, rot: 0, hit: null, ok: null, ptr: null, seed: 1 + PIECES.length*7 + (PIECES.reduce((a, p) => a + (p.seed || 0), 0) % 997) };   // (seed: the next home's look; V rolls another)
   const status = document.getElementById('placeStatus');
   function showGhost(){
     const hit = PL.kind && PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
     if (!hit || hit.sea){ ghost.visible = ring.visible = false; PL.ok = null; if (status) status.textContent = PL.kind ? (hit ? 'not on the sea' : '') : ''; return; }
     const ck = check(PL.kind, hit.x, hit.z), r = KINDS[PL.kind].r; PL.ok = ck;
     const y = ck.ok ? ck.y : heightAt(hit.x, hit.z, true);
-    ghost.geometry = pieceGeo[PL.kind]; ghost.position.set(hit.x, y, hit.z); ghost.rotation.y = PL.rot; ghost.visible = true;
+    ghost.geometry = geoFor(PL.kind, PL.seed); ghost.position.set(hit.x, y, hit.z); ghost.rotation.y = PL.rot; ghost.visible = true;
     const a = ringGeo.attributes.position.array;
     for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s = Math.sin(t);
       for (const [j, rr] of [[0, r], [1, r + .14]]){ const x = hit.x + c*rr, z = hit.z + s*rr, o = (i*2 + j)*3; a[o] = x; a[o + 1] = heightAt(x, z) + .07; a[o + 2] = z; } }
@@ -897,7 +1014,7 @@
   canvas.addEventListener('pointerleave', () => { PL.ptr = null; });
   const endPtr = e => {
     if (act && act.kind === 'turn' && !act.moved && ptrs.has(e.pointerId)){
-      if ((act.b === 0 || e.pointerType === 'touch') && PL.kind){ PL.ptr = { x: e.clientX, y: e.clientY }; showGhost(); if (PL.ok && PL.ok.ok) addPiece(PL.kind, PL.hit.x, PL.hit.z, PL.rot, PL.ok.y); }
+      if ((act.b === 0 || e.pointerType === 'touch') && PL.kind){ PL.ptr = { x: e.clientX, y: e.clientY }; showGhost(); if (PL.ok && PL.ok.ok){ addPiece(PL.kind, PL.hit.x, PL.hit.z, PL.rot, PL.ok.y, false, PL.seed); PL.seed++; } }
       else if (act.b === 2){ const hit = pick(e.clientX, e.clientY); if (hit){ const p = PIECES.find(q => Math.hypot(hit.x - q.x, hit.z - q.z) < q.r); if (p) removePiece(p); } }
     }
     ptrs.delete(e.pointerId); if (!ptrs.size){ act = null; canvas.style.cursor = 'grab'; }
@@ -915,7 +1032,8 @@
     if (e.key === ' '){ e.preventDefault(); if (!e.repeat){ tiltMode = !tiltMode; if (!tiltMode) pitchT = PITCH0; if (tiltChip) tiltChip.hidden = !tiltMode; } return; }
     if (k === 'h' || e.key === 'Home'){ camGoal.set(HOME.x, TY, HOME.z); return; }
     if (k === 'r'){ PL.rot += (e.shiftKey ? -1 : 1)*PI/12; return; }   // (turn the piece: 15 degrees a press, any angle it lands on)
-    if ('123'.includes(e.key) && e.key.length === 1){ setKind(['cottage', 'round', 'garden'][+e.key - 1]); return; }
+    if ('1234'.includes(e.key) && e.key.length === 1){ setKind(KIND_KEYS[+e.key - 1]); return; }
+    if (k === 'v'){ PL.seed++; return; }   // (another look for the next home)
     if (e.key === 'Escape' || e.key === '0'){ if (PL.kind) setKind(PL.kind); return; }
     if (k === 'q') yawT -= PI/4;
     else if (k === 'e') yawT += PI/4;
@@ -956,6 +1074,6 @@
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },
-    place(kind, x, z, rot = 0){ const ck = check(kind, x, z); if (ck.ok) addPiece(kind, x, z, rot, ck.y); return ck; },
+    place(kind, x, z, rot = 0, seed = 1){ const ck = check(kind, x, z); if (ck.ok) addPiece(kind, x, z, rot, ck.y, false, seed); return ck; },
     clear(){ while (PIECES.length) removePiece(PIECES[0]); } };
 })();

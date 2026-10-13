@@ -190,7 +190,7 @@
   // that, by a steady lean, by gusts that roll across the field in long waves, and by a quick flutter of its own; and it
   // dips a little as it bends, so the blade keeps its length. (The sway is applied before the bend: the mesh is in world units)
   const SWAY_V = 'attribute float aH; uniform float wTime;\n';
-  const SWAY = `{ vec2 wd = vec2(0.83, 0.55), q = transformed.xz; float ph = dot(q, wd)*0.32 - wTime*1.25;
+  const SWAY = `{ vec2 wd = vec2(0.83, 0.55), q = (modelMatrix*vec4(transformed, 1.0)).xz; float ph = dot(q, wd)*0.32 - wTime*1.25;
       float gust = 0.5 + 0.5*sin(ph) + 0.22*sin(ph*2.3 + q.x*0.7 - q.y*0.4);
       float flut = sin(wTime*4.1 + q.x*3.1 + q.y*2.3) + 0.5*sin(wTime*6.3 + q.x*5.0 - q.y*4.1);
       float k = aH*aH;
@@ -228,14 +228,19 @@
   // a growing list of flat-shaded, colored triangles; props are merged into it
   // (what glows by night is known by its color: GLOW maps a palette color to how it glows; dark window glass is lit in about
   // half the windows, picked by the window's position, so a window never flips when other homes or links are built)
-  const GLOW = new Map();
+  const GLOW = new Map(), LEAFC = new Set();
   class Tris {
-    constructor(){ this.p = []; this.c = []; this.gl = null; this.k = 0; }
+    constructor(fol = false){ this.p = []; this.c = []; this.gl = null; this.k = 0; this.fol = fol ? [] : null; }
     glowRun(n0, col){ let v = GLOW.get(col); if (v === undefined) return;
       if (v < 0){ const P = this.p, n1 = this.p.length/3; let x = 0, y = 0, z = 0; for (let i = n0; i < n1; i++){ x += P[i*3]; y += P[i*3 + 1]; z += P[i*3 + 2]; } const k = n1 - n0;
         v = hash2(Math.round(x/k*8)*73856093 ^ Math.round(z/k*8)*19349663, Math.round(y/k*8)) < -v ? .9 : 0; }   // (lit or not by where the window is: the same window stays lit whatever else is built)
       if (v) (this.gl || (this.gl = [])).push(n0, this.p.length/3 - n0, v); }
-    add(geo, m, col){ const g = geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(m); const a = g.attributes.position.array, n0 = this.p.length/3;
+    add(geo, m, col){
+      // (on a home or a link, a leafy blob isn't drawn as a blob: it's noted, where it is and its size and shape, and grown
+      // as real foliage instead; see folGeo)
+      if (this.fol && LEAFC.has(col) && (geo === GEO.ico || geo === GEO.cone8)){ const e = m.elements, sx = Math.hypot(e[0], e[1], e[2]), sy = Math.hypot(e[4], e[5], e[6]), sz = Math.hypot(e[8], e[9], e[10]);
+        this.fol.push([geo === GEO.cone8 ? 3 : sy > sx*1.5 ? 2 : sx > .38 ? 1 : 0, e[12], e[13], e[14], sx, sy, sz]); return; }
+      const g = geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(m); const a = g.attributes.position.array, n0 = this.p.length/3;
       for (let i = 0; i < a.length; i += 3){ this.p.push(a[i], a[i + 1], a[i + 2]); this.c.push(col.r, col.g, col.b); } g.dispose(); this.glowRun(n0, col); }
     quad(a, b, c, d, col){ const n0 = this.p.length/3; for (const v of [a, b, c, a, c, d]){ this.p.push(v[0], v[1], v[2]); this.c.push(col.r, col.g, col.b); } this.glowRun(n0, col); }
     geo(){ const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3)); g.computeVertexNormals();
@@ -941,6 +946,7 @@
     terra: C(0xc8663e), terra2: C(0xa9522f), tile: C(0xb85a36), glass: C(0x8fd8c4).multiplyScalar(1.12), glass2: C(0x84d4be).multiplyScalar(1.2), glassT: C(0x7fc0c4).multiplyScalar(1.15), glassD: C(0x2f5960), frame: C(0x2e403e),
     doorO: C(0xd0702e), doorT: C(0x3e6e7a), wood: C(0x9a6a3e), rail: C(0x3a3f3e), metal: C(0x9aa3a6), blue: C(0x3a9ec4), lamp: C(0xffd27a),
     leaf: [C(0x4e8a34), C(0x6aa03c), C(0x3d7430), C(0x82b048)], pot: C(0xb5583a), stone: C(0xd8ccb2), flower: [C(0xf08a5a), C(0xf5c84c), C(0xe6739a)] };
+  for (const c of HP.leaf) LEAFC.add(c);
   GLOW.set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
   Object.assign(GEO, { cyl12: new THREE.CylinderGeometry(1, 1, 1, 12), cyl16: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.IcosahedronGeometry(1, 1),
     dome: new THREE.SphereGeometry(1, 12, 6, 0, PI*2, 0, PI/2), ring: new THREE.CylinderGeometry(1, 1, 1, 16, 1, true) });
@@ -1097,13 +1103,83 @@
     return null; }
   // is the point (x, z) at height y inside a block (but not those in skip)
   const solidAt = (x, z, y0, y1, skip) => PIECES.some(q => !(skip && skip.includes(q)) && q.y < y1 && q.y + q.h > y0 && inHull(q.hullW, x, z));
+  /* ---------- foliage parts: blades, flowers, fern fronds, seed heads (the grass brush and the homes' plants both use them) ---------- */
+  const gU = { wTime: { value: 0 } };
+  const grassM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true, side: THREE.DoubleSide }), true, false, false, null, gU);
+  // (a sage, blue-leaning green, set apart from the meadow's yellow-green and kin to the homes' teal; warm ochre and cream at the tips)
+  const GG = { greenA: [.37, .57, .38], greenB: [.29, .49, .38], greenC: [.5, .65, .42], dry: [.74, .66, .42], tip: [.92, .91, .7], fern: [.27, .49, .38], reed: [.76, .66, .44], head: [.88, .74, .5] };
+  const FLOWERS = [[.95, .55, .42], [.96, .74, .76], [.72, .63, .88], [.99, .86, .46], [.97, .95, .9], [.93, .45, .52]];
+  // a little indexed-mesh builder: positions, normals (mostly up, so a blade is lit like the meadow, whichever side shows),
+  // colors, and aH
+  class GB { constructor(){ this.P = []; this.N = []; this.C = []; this.H = []; this.I = []; }
+    v(x, y, z, nx, ny, nz, c, h){ this.P.push(x, y, z); const l = Math.hypot(nx, ny, nz) || 1; this.N.push(nx/l, ny/l, nz/l); this.C.push(c[0], c[1], c[2]); this.H.push(h); return this.P.length/3 - 1; }
+    tri(a, b, c){ this.I.push(a, b, c); }
+    mesh(){ const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(this.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.N, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(this.C, 3)); g.setAttribute('aH', new THREE.Float32BufferAttribute(this.H, 1)); g.setIndex(this.I); return g; } }
+  const mix3 = (a, b, t) => [a[0] + (b[0] - a[0])*t, a[1] + (b[1] - a[1])*t, a[2] + (b[2] - a[2])*t];
+  const mul3 = (a, k, cool = 0) => [a[0]*k*(1 - cool*.2), a[1]*k, a[2]*k*(1 + cool*.25)];
+  // one blade: from its root up a gentle curve, leaning one way, tapering to a point; nSeg segments
+  function blade(G, x, y, z, ang, len, w, lean, base, tip, nSeg = 3){
+    const dx = Math.cos(ang), dz = Math.sin(ang), sx = -dz, sz = dx, nx = dx*.35, nz = dz*.35;
+    let prev = null;
+    for (let k = 0; k <= nSeg; k++){ const t = k/nSeg, ht = len*t, out = lean*len*Math.pow(t, 1.7), px = x + dx*out, pz = z + dz*out, py = y + ht*(1 - .18*lean*t), ww = w*Math.pow(1 - t, .8)*.5;
+      const c = k === 0 ? mul3(base, .62, 1) : mix3(base, tip, Math.pow(t, 1.3)*.85);
+      if (k === nSeg){ const tI = G.v(px, py, pz, nx, 1, nz, c, ht); if (prev) G.tri(prev[0], prev[1], tI); }
+      else { const a = G.v(px - sx*ww, py, pz - sz*ww, nx, 1, nz, c, ht), b = G.v(px + sx*ww, py, pz + sz*ww, nx, 1, nz, c, ht); if (prev){ G.tri(prev[0], prev[1], b); G.tri(prev[0], b, a); } prev = [a, b]; } }
+    return [x + dx*lean*len, y + len*(1 - .18*lean), z + dz*lean*len]; }
+  // a flower head: five petals round a heart, facing up and a little out
+  function flower(G, x, y, z, r, col, h){
+    const heart = [.96, .8, .32], c0 = G.v(x, y + r*.15, z, 0, 1, 0, heart, h), n = 5, a0 = hash2(Math.round(x*97), Math.round(z*89))*6.28;
+    for (let k = 0; k < n; k++){ const a = a0 + k/n*6.28, a1 = a - .5, a2 = a + .5;
+      const p1 = G.v(x + Math.cos(a1)*r*.55, y + r*.05, z + Math.sin(a1)*r*.55, 0, 1, 0, col, h), p2 = G.v(x + Math.cos(a)*r, y - r*.1, z + Math.sin(a)*r, 0, 1, 0, mul3(col, .92), h), p3 = G.v(x + Math.cos(a2)*r*.55, y + r*.05, z + Math.sin(a2)*r*.55, 0, 1, 0, col, h);
+      G.tri(c0, p1, p2); G.tri(c0, p2, p3); } }
+  // a fern frond: an arching midrib with leaflets paired along it, smaller toward the tip
+  function frond(G, x, y, z, ang, len, col){
+    const dx = Math.cos(ang), dz = Math.sin(ang), sx = -dz, sz = dx, N = 7;
+    const at = t => { const out = len*.85*Math.sin(t*1.45), up = len*.62*Math.sin(t*2.4)*(1 - .25*t); return [x + dx*out, y + Math.max(up, len*.05*(1 - t)), z + dz*out]; };
+    blade(G, x, y, z, ang, len*.62, .04, 1.25, mul3(col, .8), col, 4);
+    for (let k = 1; k <= N; k++){ const t = k/(N + 1), [px, py, pz] = at(t), L = len*.32*(1 - t*.75), c = mix3(col, GG.tip, t*.3);
+      for (const sd of [-1, 1]){ const ex = px + (sx*sd*.9 + dx*.35)*L, ez = pz + (sz*sd*.9 + dz*.35)*L, ey = py - L*.22;
+        const r0 = G.v(px, py, pz, 0, 1, 0, mul3(c, .85), py - y), r1 = G.v(px + dx*L*.28, py + .01, pz + dz*L*.28, 0, 1, 0, c, py - y), e = G.v(ex, ey, ez, 0, 1, 0, c, py - y + L*.4);
+        G.tri(r0, r1, e); } } }
+  // a seed head on a reed: a slim spindle
+  function seedHead(G, x, y, z, len, col, h){ const w = len*.16, a = G.v(x, y, z, 0, 1, 0, col, h), b = G.v(x + w, y + len*.45, z, 0, 1, 0, col, h + len*.45), c = G.v(x - w*.6, y + len*.5, z + w*.6, 0, 1, 0, col, h + len*.5), d = G.v(x, y + len, z, 0, 1, 0, mul3(col, 1.08), h + len);
+    G.tri(a, b, d); G.tri(a, d, c); }
+  // the foliage grown where the leafy blobs were: 0 a mound of blades (now and then with a few flowers) for the plants in
+  // pots and planters and along pergolas; 1 a fountain of arching fern fronds for the little trees' crowns (a tree fern);
+  // 2 trailing vines with small leaves, hanging down, for the long thin blobs; 3 tall ornamental grass with seed heads for
+  // the cypresses
+  const VINE = [[.3, .55, .36], [.36, .6, .34], [.26, .5, .38]];
+  function folGeo(fol){
+    if (!fol || !fol.length) return null; const G = new GB();
+    for (const [k, x, y, z, sx, sy, sz] of fol){ const R = rng((Math.imul(Math.round(x*97), 73856093) ^ Math.imul(Math.round(z*89), 19349663) ^ Math.imul(Math.round(y*71), 83492791)) >>> 0);
+      const base = mix3(R.chance(.5) ? GG.greenA : GG.greenC, GG.greenB, R.r(.3, .7)), tip = mix3(GG.tip, base, .55);   // (a shade deeper than the meadow's: plants against pale walls)
+      if (k === 0 && R.chance(.3)){ const y0 = y - sy*.5, n = R.i(6, 9), a0 = R.r(0, 6.28), fc = mix3(GG.fern, base, .5);   // (a little fern, spilling over)
+        for (let i = 0; i < n; i++) frond(G, x, y0, z, a0 + i/n*6.28 + R.r(-.25, .25), (.22 + sy*1.2)*R.r(.85, 1.15), fc); }
+      else if (k === 0){ const y0 = y - sy*.55, n = Math.max(18, Math.round(450*sx*sz)), L = .2 + sy*1.3;   // (a mound of blades, the outer ones arching over and down past the rim)
+        for (let i = 0; i < n; i++){ const a = R.r(0, 6.28), rr = R.r(0, sx*.7), out = rr/(sx*.7); blade(G, x + Math.cos(a)*rr, y0, z + Math.sin(a)*rr, a, L*R.r(.65, 1.2), R.r(.06, .095), .3 + out*1.1 + R.r(0, .3), base, tip, 3); }
+        if (R.chance(.35)){ const fc = R.pick(FLOWERS); for (let i = 0, m = R.i(1, 3); i < m; i++){ const a = R.r(0, 6.28), rr = R.r(0, sx*.4), top = blade(G, x + Math.cos(a)*rr, y0, z + Math.sin(a)*rr, a, L*1.15, .03, .25, base, base, 2); flower(G, top[0], top[1], top[2], .06, fc, top[1] - y0); } } }
+      else if (k === 1){ const n = R.i(11, 16), fc = mix3(GG.fern, base, .4), a0 = R.r(0, 6.28);
+        for (let i = 0; i < n; i++) frond(G, x, y - sy*.35, z, a0 + i/n*6.28 + R.r(-.2, .2), sx*R.r(1.3, 1.8), fc);
+        for (let i = 0; i < 6; i++){ const a = R.r(0, 6.28); blade(G, x, y - sy*.35, z, a, sx*.9, .06, .3, base, tip, 3); } }
+      else if (k === 2){ const top = y + sy*.8, n = R.i(2, 4);
+        for (let i = 0; i < n; i++){ let px = x + R.r(-sx, sx)*.6, pz = z + R.r(-sz, sz)*.6, py = top; const L = sy*R.r(1.8, 2.8), steps = 7, c = R.pick(VINE), dx = R.r(-.04, .04), dz = R.r(-.04, .04);
+          for (let st = 0; st < steps; st++){ const ny = py - L/steps, nx = px + dx, nz = pz + dz, h = top - ny;
+            const a = G.v(px - .012, py, pz, 0, 1, 0, mul3(c, .8), top - py), b = G.v(px + .012, py, pz, 0, 1, 0, mul3(c, .8), top - py), cc = G.v(nx, ny, nz, 0, 1, 0, mul3(c, .8), h); G.tri(a, b, cc);
+            const sd = st % 2 ? 1 : -1, la = R.r(0, 6.28), lx = Math.cos(la)*.09, lz = Math.sin(la)*.09, lc = mix3(c, GG.tip, R.r(0, .25));   // (a small heart-shaped leaf off each node, turning side to side)
+            const l0 = G.v(nx, ny, nz, 0, 1, 0, lc, h), l1 = G.v(nx + lx*sd + lz*.4, ny - .03, nz + lz*sd - lx*.4, 0, 1, 0, lc, h + .03), l2 = G.v(nx + lx*sd*1.4, ny - .09, nz + lz*sd*1.4, 0, 1, 0, mul3(lc, .9), h + .09), l3 = G.v(nx + lx*sd*.6 - lz*.4, ny - .08, nz + lz*sd*.6 + lx*.4, 0, 1, 0, lc, h + .08);
+            G.tri(l0, l1, l2); G.tri(l0, l2, l3); px = nx; py = ny; pz = nz; } } }
+      else { const y0 = y - sy*.5, n = R.i(12, 18), rc = mix3(GG.reed, base, .5);
+        for (let i = 0; i < n; i++){ const a = R.r(0, 6.28), rr = R.r(0, sx*.5), top = blade(G, x + Math.cos(a)*rr, y0, z + Math.sin(a)*rr, a, sy*R.r(.7, 1.05), .055, R.r(.08, .3), mul3(base, .85), rc, 4);
+          if (R.chance(.5)) seedHead(G, top[0], top[1] - .02, top[2], R.r(.14, .22), GG.head, top[1] - y0); } } }
+    return G.I.length ? G.mesh() : null; }
   const geoCache = new Map();
   function blockOf(kind, seed, below, above){ const key = kind + ':' + seed + ':' + (below ? 1 : 0) + (above ? 1 : 0); let g = geoCache.get(key); if (g) return g;
-    const T = new Tris(), k = KIND_KEYS.indexOf(kind) + 1, R = rng(Math.imul(seed, 2654435761) ^ k*97), D = rng(Math.imul(seed, 1597334677) ^ k*131);
+    const T = new Tris(true), k = KIND_KEYS.indexOf(kind) + 1, R = rng(Math.imul(seed, 2654435761) ^ k*97), D = rng(Math.imul(seed, 1597334677) ^ k*131);
     const top = KINDS[kind].build(T, R, D, { below, above }), cut = below ? .1 : .6, pts = [];
     let hmax = top; for (let i = 0; i < T.p.length; i += 3){ if (T.p[i + 1] > hmax) hmax = T.p[i + 1]; if (T.p[i + 1] > cut) pts.push([T.p[i], T.p[i + 2]]); }
-    g = { geo: T.geo(), top, hull: hull2(pts), h: hmax }; geoCache.set(key, g);
-    if (geoCache.size > 400){ const k0 = geoCache.keys().next().value; geoCache.get(k0).geo.dispose(); geoCache.delete(k0); }
+    g = { geo: T.geo(), fol: folGeo(T.fol), top, hull: hull2(pts), h: hmax }; geoCache.set(key, g);
+    if (geoCache.size > 400){ const k0 = geoCache.keys().next().value, o = geoCache.get(k0); o.geo.dispose(); if (o.fol) o.fol.dispose(); geoCache.delete(k0); }
     return g; }
 
   /* ---------- the homes as placed: free on the ground, stacked on each other, and joined to their neighbors ---------- */
@@ -1115,6 +1191,7 @@
   function pieceMesh(p){ const b = blockOf(p.kind, p.seed, !!p.base || p.level > 0, !!p.up);
     if (p.anim) p.anim.u.pH.value = b.h;
     const m = new THREE.Mesh(b.geo, p.anim ? p.anim.mat : pieceM); m.castShadow = !p.anim; m.receiveShadow = true; m.customDepthMaterial = landDepth; m.frustumCulled = false;
+    if (b.fol){ const f = new THREE.Mesh(b.fol, grassM); f.receiveShadow = true; f.frustumCulled = false; f.visible = !p.anim; f.raycast = () => {}; m.add(f); m.userData.fol = f; }   // (its plants, swaying; shown once it's painted in)
     m.position.set(p.x, p.y, p.z); m.rotation.y = p.rot; m.matrixAutoUpdate = false; m.updateMatrix(); m.updateMatrixWorld(); m.userData.piece = p; p.top = b.top; p.h = b.h; p.hullL = b.hull; p.hullW = placeHull(b.hull, p.x, p.z, p.rot); return m; }
   function remesh(p){ if (p.mesh){ scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); } p.mesh = pieceMesh(p); scene.add(p.mesh); pieceMeshes.push(p.mesh); }
   const stackTop = p => { while (p.up) p = p.up; return p; };
@@ -1196,7 +1273,7 @@
       if (!a.bloomed){ a.bloomed = true; bloom(p); }
       const r = Math.min(a.t/.17, 1); a.u.pRise.value = 1 - Math.pow(1 - r, 2.2); a.u.pDry.value = smooth(.06, .26, a.t);
       if (r >= 1 && p.mesh && !p.mesh.castShadow) p.mesh.castShadow = true;   // (its shadow comes once the wash has reached the top)
-      if (a.t > .27){ p.anim = null; p.mesh.material = pieceM; p.mesh.castShadow = true; freePaint(a); ANIM.list.splice(i, 1); } } }
+      if (a.t > .27){ p.anim = null; p.mesh.material = pieceM; p.mesh.castShadow = true; if (p.mesh.userData.fol) p.mesh.userData.fol.visible = true; freePaint(a); ANIM.list.splice(i, 1); } } }
   // A block can also be built off the side of another (host), on the same floor: it hangs from the wall it's set against, on
   // a stepped plaster corbel. How far a block reaches out from anything that stands on the ground is kept (reach): past
   // SUPPORT_REACH it gets supports of its own down to the ground, in the style of the home, and they count as standing.
@@ -1326,8 +1403,8 @@
   }
   function buildLinks(){
     linksDirty = false;
-    if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); linksMesh = null; }
-    const T = new Tris(), pairs = [], deg = new Map(), joined = new Set(), pools = [];
+    if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); for (const c of linksMesh.children) c.geometry.dispose(); linksMesh = null; }
+    const T = new Tris(true), pairs = [], deg = new Map(), joined = new Set(), pools = [];
     for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, 1]);   // (by night: the windows' light on the ground round a home)
     // the connections built with the connect brush come first, as chosen; then the ones neighbors make on their own
     const byId = new Map(PIECES.map(p => [p.id, p])), userKey = new Set();
@@ -1390,7 +1467,8 @@
         }
       }
     }
-    if (T.p.length){ linksMesh = T.mesh(pieceM); linksMesh.customDepthMaterial = landDepth; scene.add(linksMesh); }
+    if (T.p.length){ linksMesh = T.mesh(pieceM); linksMesh.customDepthMaterial = landDepth; scene.add(linksMesh);
+      const fg = folGeo(T.fol); if (fg){ const f = new THREE.Mesh(fg, grassM); f.receiveShadow = true; f.frustumCulled = false; f.raycast = () => {}; linksMesh.add(f); } }
     buildPools(pools);
   }
   // the warm light by night: a soft pool on the ground round each home, under each pergola and arcade, in each courtyard
@@ -1435,50 +1513,10 @@
   // nothing; tufts are kept by cell and made again from their cell's seed. A mesh per 8-unit square, remade when painted.
   const GRASS_KEY = 'neonIsland.coast.grass', GC = .4, GSQ = 8;
   const GSTYLES = ['meadow', 'wildflowers', 'ferns', 'tall grass', 'mix'];
-  const tufts = new Map(), gSquares = new Map(), gDirty = new Set(), gU = { wTime: { value: 0 } };
-  const grassM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true, side: THREE.DoubleSide }), true, false, false, null, gU);
+  const tufts = new Map(), gSquares = new Map(), gDirty = new Set();
   const sqKey = (i, j) => Math.floor(i*GC/GSQ) + ',' + Math.floor(j*GC/GSQ);
   try { for (const [i, j, st] of JSON.parse(localStorage.getItem(GRASS_KEY) || '[]')){ tufts.set(i + ',' + j, [i, j, st]); gDirty.add(sqKey(i, j)); } } catch (e) {}
   let gSaveT = 0; const saveGrass = () => { clearTimeout(gSaveT); gSaveT = setTimeout(() => { try { localStorage.setItem(GRASS_KEY, JSON.stringify([...tufts.values()])); } catch (e) {} }, 400); };
-  // (a sage, blue-leaning green, set apart from the meadow's yellow-green and kin to the homes' teal; warm ochre and cream at the tips)
-  const GG = { greenA: [.37, .57, .38], greenB: [.29, .49, .38], greenC: [.5, .65, .42], dry: [.74, .66, .42], tip: [.92, .91, .7], fern: [.27, .49, .38], reed: [.76, .66, .44], head: [.88, .74, .5] };
-  const FLOWERS = [[.95, .55, .42], [.96, .74, .76], [.72, .63, .88], [.99, .86, .46], [.97, .95, .9], [.93, .45, .52]];
-  // a little indexed-mesh builder: positions, normals (mostly up, so a blade is lit like the meadow, whichever side shows),
-  // colors, and aH
-  class GB { constructor(){ this.P = []; this.N = []; this.C = []; this.H = []; this.I = []; }
-    v(x, y, z, nx, ny, nz, c, h){ this.P.push(x, y, z); const l = Math.hypot(nx, ny, nz) || 1; this.N.push(nx/l, ny/l, nz/l); this.C.push(c[0], c[1], c[2]); this.H.push(h); return this.P.length/3 - 1; }
-    tri(a, b, c){ this.I.push(a, b, c); }
-    mesh(){ const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(this.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.N, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(this.C, 3)); g.setAttribute('aH', new THREE.Float32BufferAttribute(this.H, 1)); g.setIndex(this.I); return g; } }
-  const mix3 = (a, b, t) => [a[0] + (b[0] - a[0])*t, a[1] + (b[1] - a[1])*t, a[2] + (b[2] - a[2])*t];
-  const mul3 = (a, k, cool = 0) => [a[0]*k*(1 - cool*.2), a[1]*k, a[2]*k*(1 + cool*.25)];
-  // one blade: from its root up a gentle curve, leaning one way, tapering to a point; nSeg segments
-  function blade(G, x, y, z, ang, len, w, lean, base, tip, nSeg = 3){
-    const dx = Math.cos(ang), dz = Math.sin(ang), sx = -dz, sz = dx, nx = dx*.35, nz = dz*.35;
-    let prev = null;
-    for (let k = 0; k <= nSeg; k++){ const t = k/nSeg, ht = len*t, out = lean*len*Math.pow(t, 1.7), px = x + dx*out, pz = z + dz*out, py = y + ht*(1 - .18*lean*t), ww = w*Math.pow(1 - t, .8)*.5;
-      const c = k === 0 ? mul3(base, .62, 1) : mix3(base, tip, Math.pow(t, 1.3)*.85);
-      if (k === nSeg){ const tI = G.v(px, py, pz, nx, 1, nz, c, ht); if (prev) G.tri(prev[0], prev[1], tI); }
-      else { const a = G.v(px - sx*ww, py, pz - sz*ww, nx, 1, nz, c, ht), b = G.v(px + sx*ww, py, pz + sz*ww, nx, 1, nz, c, ht); if (prev){ G.tri(prev[0], prev[1], b); G.tri(prev[0], b, a); } prev = [a, b]; } }
-    return [x + dx*lean*len, y + len*(1 - .18*lean), z + dz*lean*len]; }
-  // a flower head: five petals round a heart, facing up and a little out
-  function flower(G, x, y, z, r, col, h){
-    const heart = [.96, .8, .32], c0 = G.v(x, y + r*.15, z, 0, 1, 0, heart, h), n = 5, a0 = hash2(Math.round(x*97), Math.round(z*89))*6.28;
-    for (let k = 0; k < n; k++){ const a = a0 + k/n*6.28, a1 = a - .5, a2 = a + .5;
-      const p1 = G.v(x + Math.cos(a1)*r*.55, y + r*.05, z + Math.sin(a1)*r*.55, 0, 1, 0, col, h), p2 = G.v(x + Math.cos(a)*r, y - r*.1, z + Math.sin(a)*r, 0, 1, 0, mul3(col, .92), h), p3 = G.v(x + Math.cos(a2)*r*.55, y + r*.05, z + Math.sin(a2)*r*.55, 0, 1, 0, col, h);
-      G.tri(c0, p1, p2); G.tri(c0, p2, p3); } }
-  // a fern frond: an arching midrib with leaflets paired along it, smaller toward the tip
-  function frond(G, x, y, z, ang, len, col){
-    const dx = Math.cos(ang), dz = Math.sin(ang), sx = -dz, sz = dx, N = 7;
-    const at = t => { const out = len*.85*Math.sin(t*1.45), up = len*.62*Math.sin(t*2.4)*(1 - .25*t); return [x + dx*out, y + Math.max(up, len*.05*(1 - t)), z + dz*out]; };
-    blade(G, x, y, z, ang, len*.62, .04, 1.25, mul3(col, .8), col, 4);
-    for (let k = 1; k <= N; k++){ const t = k/(N + 1), [px, py, pz] = at(t), L = len*.32*(1 - t*.75), c = mix3(col, GG.tip, t*.3);
-      for (const sd of [-1, 1]){ const ex = px + (sx*sd*.9 + dx*.35)*L, ez = pz + (sz*sd*.9 + dz*.35)*L, ey = py - L*.22;
-        const r0 = G.v(px, py, pz, 0, 1, 0, mul3(c, .85), py - y), r1 = G.v(px + dx*L*.28, py + .01, pz + dz*L*.28, 0, 1, 0, c, py - y), e = G.v(ex, ey, ez, 0, 1, 0, c, py - y + L*.4);
-        G.tri(r0, r1, e); } } }
-  // a seed head on a reed: a slim spindle
-  function seedHead(G, x, y, z, len, col, h){ const w = len*.16, a = G.v(x, y, z, 0, 1, 0, col, h), b = G.v(x + w, y + len*.45, z, 0, 1, 0, col, h + len*.45), c = G.v(x - w*.6, y + len*.5, z + w*.6, 0, 1, 0, col, h + len*.5), d = G.v(x, y + len, z, 0, 1, 0, mul3(col, 1.08), h + len);
-    G.tri(a, b, d); G.tri(a, d, c); }
   // can a tuft grow here: on land, back from the cliff's edge, not steep, not inside a home
   function grassOK(x, z){ if ((coastX(z) - x)*rowCos(z) < 1.1) return null; const y = heightAt(x, z);
     if (Math.abs(heightAt(x + .35, z) - y) > .3 || Math.abs(heightAt(x, z + .35) - y) > .3) return null;
@@ -1519,7 +1557,7 @@
     for (let i = si*n; i < si*n + n; i++) for (let j = sj*n; j < sj*n + n; j++){ const t = tufts.get(i + ',' + j); if (t) tuft(G, i, j, t[2]); }
     if (!G.I.length) return;
     const m = new THREE.Mesh(G.mesh(), grassM); m.receiveShadow = true; m.castShadow = false; m.frustumCulled = false; m.matrixAutoUpdate = false; scene.add(m); gSquares.set(key, m); }
-  function grassTick(t){ gU.wTime.value = t; let n = 0; for (const k of gDirty){ gDirty.delete(k); buildSquare(k); if (++n >= 3) break; } }
+  function grassTick(t){ gU.wTime.value = t; const t0 = performance.now(); for (const k of gDirty){ gDirty.delete(k); buildSquare(k); if (performance.now() - t0 > 6) break; } }   // (about 6 ms of remaking a frame at most, so painting stays smooth)
   const grassAround = (x, z, r) => { for (let a = Math.floor((x - r)/GSQ); a <= Math.floor((x + r)/GSQ); a++) for (let b = Math.floor((z - r)/GSQ); b <= Math.floor((z + r)/GSQ); b++) if (gSquares.has(a + ',' + b)) gDirty.add(a + ',' + b); };
 
   ANIM.live = true;   // (homes from the save just appear; new ones are painted in)
@@ -1800,7 +1838,7 @@
     sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vGlow > 0.85 ? vec3(1.0, 0.85, 0.46) : vec3(1.0, 0.6, 0.28), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
   renderer.localClippingEnabled = true;
   function renderRefl(){
-    const hide = [sea, spray, ghost, ring, connGhost, ...gSquares.values(), ...zGhosts, ...(poolMesh ? [poolMesh] : []), ...BLOOMS], vis = hide.map(o => o.visible); hide.forEach(o => { o.visible = false; });
+    const hide = [sea, spray, ghost, ring, connGhost, ...gSquares.values(), ...pieceMeshes.map(m => m.userData.fol).filter(Boolean), ...(linksMesh ? linksMesh.children : []), ...zGhosts, ...(poolMesh ? [poolMesh] : []), ...BLOOMS], vis = hide.map(o => o.visible); hide.forEach(o => { o.visible = false; });
     scene.overrideMaterial = reflM; scene.scale.y = -1; scene.updateMatrixWorld(true);
     renderer.shadowMap.autoUpdate = false;
     renderer.setRenderTarget(reflRT); renderer.setClearColor(0x000000, 0); renderer.autoClear = true; renderer.render(scene, cam);
@@ -1830,7 +1868,7 @@
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, get t0(){ return t0; }, setHour, heightAt, coastX, pick, PIECES,
+  window.COAST = { seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour, heightAt, coastX, pick, PIECES,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

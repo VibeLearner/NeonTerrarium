@@ -339,7 +339,32 @@
           float c = abs(sin(c2.x*1.6 + time*0.9 + sin(c2.y*1.2 + time*0.6)*1.4) * sin(c2.y*1.8 - time*0.7 + sin(c2.x*1.05 - time*0.4)*1.3));
           col += step(0.82 + dith*0.08, c) * (1.0 - d/3.2) * vec3(0.16, 0.14, 0.08);
         }
-        // sun glints: a pixel or two on the facets that catch the most light, twinkling on and off
+        // swells: now and then a set of bigger waves rolls in toward the shore. Each crest is a band moving landward; only some
+        // crests are waves, and each runs only so far along its length. A wave lifts the water ahead of a dark trough, with
+        // a broken white cap on its front edge that thickens as it reaches the shallows and breaks.
+        vec2 D = vec2(-0.932, 0.362), P = vec2(-0.362, -0.932);
+        float along = dot(p, P), u = dot(p, D)/26.0 - time/10.0 + 0.3*sin(along*0.05 + 1.7);
+        float wn = floor(u), wc = fract(u);
+        float wave = step(0.45, h21(vec2(wn, 3.1))) * smoothstep(-0.2, 0.35, sin(along*0.045 + wn*2.3) + 0.45*sin(along*0.13 - wn*1.1));
+        float shoal = 1.0 - smoothstep(0.4, 3.0, d);
+        float capW = 0.025 + 0.11*shoal;
+        if (wave > 0.0 && d > 0.15){
+          col *= wc < 0.07 ? 1.0 - 0.1*wave : 1.0;                                                      // (the trough ahead of it)
+          col = mix(col, col*1.12 + vec3(0.02, 0.05, 0.05), step(0.8 + dith*0.05, wc) * wave * 0.9);     // (the lifted face)
+          float cap = step(1.0 - capW, wc) * step(0.35 + dith*0.5, 0.5 + 0.5*sin(along*1.9 + time*2.3 + wn)) * wave;
+          col = mix(col, vec3(0.95, 0.99, 0.98), cap);
+        }
+        // whitecaps: little flecks of white that pop up out at sea and fade, here and there
+        vec2 wcell = floor(p/3.4); float wph = h21(wcell*1.7 + 4.0), wt = time*0.22 + wph, wk = floor(wt), wl = fract(wt);
+        vec2 wpos = (wcell + 0.2 + 0.6*vec2(h21(wcell + wk), h21(wcell - wk + 9.0)))*3.4;
+        float wr = length((p - wpos)*vec2(1.0, 1.7));
+        col = mix(col, vec3(0.93, 0.98, 0.98), step(0.62, h21(wcell + wk*1.3)) * step(wl, 0.16) * step(wr, 0.45*(1.0 - wl/0.16) + dith*0.08) * smoothstep(3.0, 6.0, d));
+        // sun glints: a scatter of sparkles winking on and off, thicker looking toward the sun, and a pixel or two on the
+        // facets that catch the most light
+        vec2 gcell = floor(p*3.2);
+        float gg = h21(gcell + floor(time*2.2 + h21(gcell)*7.0));
+        float toward = dot(normalize(p - camXZ + 1e-4), sd);
+        col = mix(col, glint, step(0.9978 - 0.009*glintK*smoothstep(0.1, 1.0, toward) - 0.002, gg) * smoothstep(0.8, 3.0, d));
         vec2 cell = floor(p*3.0);
         float tw = h21(cell + floor(time*3.0 + h21(cell)*9.0));
         col = mix(col, glint, step(1.5 - 0.3*glintK, lit + dith*0.25) * step(0.5, tw) * calm);
@@ -349,7 +374,8 @@
         float surge = 0.5 + 0.5*sin(time*0.9 + p.x*0.05 + p.y*0.04 + h*0.6);
         float churn = 1.0 - smoothstep(0.0, 1.5, sh);
         col = mix(col, col*0.75 + vec3(0.22, 0.27, 0.26), step(dith + 0.51, churn*0.9));
-        float lip = step(sh + dith*0.14, 0.18 + 0.09*nz + 0.2*surge) + step(d, 0.08);
+        float hit = wave*smoothstep(0.75, 1.0, wc);   // (a wave reaching the rocks throws the foam further out)
+        float lip = step(sh + dith*0.14, 0.18 + 0.09*nz + 0.2*surge + 0.55*hit) + step(d, 0.08);
         float roll = step(0.9, fract(sh*0.62 + time*0.21 + nz*0.06)) * step(sh, 1.7 + nz*0.4) * step(-0.1, nz) * step(0.1, sh);
         col = mix(col, vec3(0.96, 0.99, 0.98), clamp(lip + roll*0.85, 0.0, 1.0));
         col *= tint;

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Terrarium: the coast</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #7fbfc8; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; cursor: grab; }
+  .hud { position: fixed; left: 14px; bottom: 12px; font: 12px/1.4 ui-monospace, Menlo, monospace; color: #0f3b4a;
+    background: rgba(255, 252, 244, .72); padding: 6px 9px; border-radius: 4px; user-select: none; }
+  .hud b { font-weight: 600; }
+  .hud button { font: inherit; margin-left: 4px; border: 1px solid #0f3b4a55; background: #fffaf0; border-radius: 3px; cursor: pointer; padding: 1px 6px; }
+  .hud button.on { background: #0f3b4a; color: #fffaf0; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div class="hud"><b>The coast</b> &middot; drag to turn, wheel to zoom, right-drag to pan &middot; light:
+  <button data-h="11" class="on">noon</button><button data-h="16.5">afternoon</button><button data-h="18.6">golden</button></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/coast.js"></script>
+</body>
+</html>

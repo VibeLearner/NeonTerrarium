@@ -1354,7 +1354,18 @@
     const { A, B, dc, dx, dz, tA, tB } = L;
     const ra = tA - .04, rb_ = tB - .04, h = hashPair(A.id, B.id), R = rng((h*4294967296) >>> 0);
     const type = linkType(L, R), fy = A.level ? 0 : .12, a = V3(A.x + dx*ra, A.y + fy, A.z + dz*ra), b = V3(B.x - dx*rb_, B.y + (B.level ? 0 : .12), B.z - dz*rb_);
-    const len = a.distanceTo(b), sx = -dz, sz = dx, at = (u, s, y) => V3(a.x + (b.x - a.x)*u + sx*s, a.y + (b.y - a.y)*u + y, a.z + (b.z - a.z)*u + sz*s);
+    const len = a.distanceTo(b), sx = -dz, sz = dx;
+    // the way follows the ground: wherever the land between the two doors rises above the straight line, the path is lifted
+    // to ride over it (a long walk between two homes otherwise sank into the hill between them); see run, below
+    const NP = Math.max(2, Math.ceil(len/.7)), lift = new Float32Array(NP + 1);
+    for (let k = 0; k <= NP; k++){ const u = k/NP, px = a.x + (b.x - a.x)*u, pz = a.z + (b.z - a.z)*u, yl = a.y + (b.y - a.y)*u;
+      let g = -1e9; for (const s_ of [-.55, 0, .55]) g = Math.max(g, heightAt(px + sx*s_, pz + sz*s_)); lift[k] = Math.max(0, g + .1 - yl); }
+    for (let pass = 0; pass < 2; pass++) for (let k = 1; k < NP; k++) lift[k] = Math.max(lift[k], (lift[k - 1] + lift[k + 1])*.5);   // (eased, so it doesn't kink)
+    const liftAt = u => { const f = clamp(u, 0, 1)*NP, k = Math.min(NP - 1, Math.floor(f)), t = f - k; return lift[k]*(1 - t) + lift[k + 1]*t; };
+    const at = (u, s, y) => V3(a.x + (b.x - a.x)*u + sx*s, a.y + (b.y - a.y)*u + y + liftAt(u), a.z + (b.z - a.z)*u + sz*s);
+    // a long piece (deck, rail, beam, roof) laid along the way in short lengths, so it bends with the lift
+    const run = (s, y, w, h, col, up = 0, u0 = 0, u1 = 1) => { const n = Math.max(1, Math.ceil((u1 - u0)*NP)), o = .02/Math.max(len, .1);
+      for (let k = 0; k < n; k++){ const ua = u0 + (u1 - u0)*k/n, ub = u0 + (u1 - u0)*(k + 1)/n; seg(T, at(ua - (k ? o : 0), s, y), at(ub + (k < n - 1 ? o : 0), s, y), w, h, col, up); } };
     // a doorway in each wall where the walk or the bridge meets it: a dark opening in a cream frame, under a small hood
     const door = (p, q) => { const d = V3(q.x - p.x, 0, q.z - p.z).normalize(), o = p.clone().addScaledVector(d, -.02), o2 = p.clone().addScaledVector(d, .05);
       seg(T, o, o2, .66, .98, HP.cream, .49); seg(T, o, o2.clone().addScaledVector(d, .02), .5, .82, HP.glassD, .41); seg(T, o, o2.clone().addScaledVector(d, .12), .8, .06, HP.terra, 1.02); };
@@ -1368,21 +1379,21 @@
       if (len > 3.6 && (A.level || B.level)) for (let u = 1/Math.ceil(len/3); u < .999; u += 1/Math.ceil(len/3)){ const c = at(u, 0, 0), g = heightAt(c.x, c.z);   // (a long span: slim piers down to the ground)
         if (c.y - g > .4){ box(T, c.x, (c.y + g)/2 - .05, c.z, .16, c.y - g - .1, .16, HP.cream); box(T, c.x, g + .1, c.z, .3, .2, .3, HP.stone); } }
       if (type === 'bridge'){
-        seg(T, a, b, .8, .1, HP.wood, .05);
-        for (const s of [-.38, .38]){ seg(T, at(0, s, .45), at(1, s, .45), .05, .05, HP.rail);
+        run(0, 0, .8, .1, HP.wood, .05);
+        for (const s of [-.38, .38]){ run(s, .45, .05, .05, HP.rail);
           for (let u = 0; u <= 1.001; u += 1/Math.max(1, Math.round(len/.6))){ const c = at(u, s, 0); box(T, c.x, c.y + .25, c.z, .04, .42, .04, HP.rail); } }
         for (let u = .2; u < .85; u += .3) if (R.chance(.7)){ const c = at(u, R.pick([-.28, .28]), .1); pot(T, R, c.x, c.y, c.z, .8); }
         if (len > 2.5 && len <= 3.6){ const c = at(.5, 0, 0), g = heightAt(c.x, c.z); if (c.y - g > .4) box(T, c.x, (c.y + g)/2, c.z, .14, c.y - g, .14, HP.cream); }   // (a slim strut under a long one)
         { const c = at(.5, .38, 0); box(T, c.x, c.y + .62, c.z, .1, .1, .1, HP.lamp); box(T, c.x, c.y + .69, c.z, .14, .03, .14, HP.rail); }   // (a lamp on the rail)
       } else {
-        seg(T, a, b, .9, .08, HP.stone, .04); seg(T, a, b, .92, .7, HP.glass, .45); seg(T, a, b, .96, .08, HP.cream, .84);
+        run(0, 0, .9, .08, HP.stone, .04); run(0, 0, .92, .7, HP.glass, .45); run(0, 0, .96, .08, HP.cream, .84);
         for (let u = 0; u <= 1.001; u += 1/Math.max(1, Math.round(len/.5))){ const c = at(u, 0, 0); seg(T, at(u - .01, 0, 0), at(u + .01, 0, 0), .98, .82, HP.frame, .45); }
       }
     } else if (type === 'pergola'){   // on the ground: a pergola walk, posts and beams, vines along them, plants hanging down
-      seg(T, a, b, 1.0, .14, HP.stone, .02);
+      run(0, 0, 1.0, .14, HP.stone, .02);
       const n = Math.max(2, Math.round(len/.9));
       for (let k = 0; k <= n; k++) for (const s of [-.45, .45]){ const c = at(k/n, s, 0); if (solidAt(c.x, c.z, c.y, c.y + 1.3)) continue; box(T, c.x, c.y + .65, c.z, .09, 1.3, .09, HP.wood); }
-      for (const s of [-.45, .45]) seg(T, at(-.03, s, 1.32), at(1.03, s, 1.32), .08, .1, HP.wood);
+      for (const s of [-.45, .45]) run(s, 1.32, .08, .1, HP.wood, 0, -.03, 1.03);
       for (let k = 0; k <= n*2; k++){ const c0 = at(k/(n*2), -.6, 1.4), c1 = at(k/(n*2), .6, 1.4); seg(T, c0, c1, .05, .06, HP.wood); }
       for (let k = 0; k < n*3; k++){ const c = at(R.r(0, 1), R.r(-.5, .5), 1.45); T.add(GEO.ico, mat(c.x, c.y, c.z, 0, R.r(0, 3), 0, .2, .12, .2), R.pick(HP.leaf));
         if (R.chance(.3)) T.add(GEO.ico, mat(c.x, c.y + .07, c.z, 0, 0, 0, .06, .06, .06), R.pick(HP.flower)); }
@@ -1392,10 +1403,10 @@
       // festoon lights strung along the beams, sagging between the posts
       for (const s of [-.45, .45]){ const nb = n*4; for (let k = 0; k <= nb; k++){ const u = k/nb, sag = .14*Math.sin(PI*((u*n) % 1)), c = at(u, s, 1.22 - sag); box(T, c.x, c.y, c.z, .06, .07, .06, HP.lamp); } }
     } else {   // on the ground: an arcade, white columns under a tiled roof, planters along it
-      seg(T, a, b, 1.1, .14, HP.stone, .02);
+      run(0, 0, 1.1, .14, HP.stone, .02);
       const n = Math.max(2, Math.round(len/.8));
       for (let k = 0; k <= n; k++) for (const s of [-.5, .5]){ const c = at(k/n, s, 0); if (solidAt(c.x, c.z, c.y, c.y + 1.2)) continue; T.add(GEO.cyl8, mat(c.x, c.y + .6, c.z, 0, 0, 0, .08, 1.2, .08), HP.white); }
-      seg(T, at(-.04, 0, 1.2), at(1.04, 0, 1.2), 1.3, .12, HP.white); seg(T, at(-.04, 0, 1.34), at(1.04, 0, 1.34), 1.4, .1, HP.tile);
+      run(0, 1.2, 1.3, .12, HP.white, 0, -.04, 1.04); run(0, 1.34, 1.4, .1, HP.tile, 0, -.04, 1.04);
       for (let k = 0; k < n; k++) if (R.chance(.6)){ const c = at((k + .5)/n, R.pick([-.65, .65]), 0); pot(T, R, c.x, c.y, c.z, 1); }
       { const np = Math.max(1, Math.round(len/2.2)); for (let k = 0; k < np; k++){ const c = at((k + .5)/np, 0, 0); pools.push([c.x, c.z, Math.min(len/2, 1.1) + .8, .8]); } }
       for (let k = 0; k < n; k++){ const c = at((k + .5)/n, 0, 0); box(T, c.x, c.y + 1.06, c.z, .02, .2, .02, HP.rail); box(T, c.x, c.y + .9, c.z, .12, .14, .12, HP.lamp); }   // (a lantern hung in each bay)

@@ -7,11 +7,8 @@
 //
 // Drawn and steered like the sky city: the same orthographic camera, tilt, zoom range and controls, drawn at the city's
 // line count and scaled up in hard pixels, toon lighting in three steps.
-// The horizon: an orthographic view has none, so the world is bent. Everything ahead of the point the camera looks at
-// drops away by k*g*g (g: how far ahead), the same for land, sea, rocks and shadows. The sea then rises on screen to a
-// highest line and falls away behind it: a real horizon, straight across the screen, with far headlands sinking behind it
-// the way they do at sea. k is worked out each frame so the horizon sits a set way up the screen for the zoom and tilt
-// (and off the top when zoomed right in or looking down), and haze thickens toward it.
+// The ground is flat, as in the sky city, seen at a true isometric angle (35.26 degrees down, turned 45 degrees), zoom
+// 30 to start and out to 60. (The materials can still bend the far ground down into a horizon; it's switched off: k = 0.)
 // The land comes in chunks, made as they come into view (coarser where the view squeezes them small) and dropped once
 // long out of view. The sea is one shader whose color comes from how deep the seabed is under each point: a window of
 // depths around the view, kept in a texture that wraps around, so as the view moves only the new strip is worked out.
@@ -107,14 +104,14 @@
 
   /* ---------- the bend, the haze, the materials ---------- */
   const scene = new THREE.Scene();
-  const CURV = { ctr: { value: new THREE.Vector2() }, fwd: { value: new THREE.Vector2(1, 0) }, curveK: { value: 0 },
+  const CURV = { ctr: { value: new THREE.Vector2() }, fwd: { value: new THREE.Vector2(1, 0) }, curveK: { value: 0 }, g0: { value: 30 },
     hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) } };
-  const BEND = `{ vec4 wq = modelMatrix * vec4(transformed, 1.0); float gq = dot(wq.xz - ctr, fwd); vG = gq; float gp = max(gq, 0.0); transformed.y -= curveK*gp*gp; }`;
+  const BEND = `{ vec4 wq = modelMatrix * vec4(transformed, 1.0); float gq = dot(wq.xz - ctr, fwd); vG = gq; float gp = max(gq - g0, 0.0); transformed.y -= curveK*gp*gp; }`;
   // bend any built-in material the same way (and haze it toward the horizon, unless it's only drawn into the shadow map)
   function bent(mat, haze = true){
     mat.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, CURV);
-      sh.vertexShader = 'uniform vec2 ctr, fwd; uniform float curveK; varying float vG;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BEND);
+      sh.vertexShader = 'uniform vec2 ctr, fwd; uniform float curveK, g0; varying float vG;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BEND);
       if (haze) sh.fragmentShader = 'uniform float hzNear, hzFar, hzMax; uniform vec3 hazeC; varying float vG;\n' + sh.fragmentShader.replace('#include <fog_fragment>', '#include <fog_fragment>\n gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeC, smoothstep(hzNear, hzFar, vG)*hzMax);');
     };
     mat.customProgramCacheKey = () => 'bent' + (haze ? 1 : 0);
@@ -147,11 +144,11 @@
   function bush(T, x, z, seed){ const y = heightAt(x, z), r = .45 + hash2(seed, 5)*.5; T.add(GEO.ico, mat(x, y + r*.3, z, 0, hash2(seed, 6)*PI, 0, r, r*.6, r), PAL.bush[seed & 1]); }
 
   /* ---------- the view (needed by the chunks for their detail) ---------- */
-  const PITCH0 = 32*PI/180, PITCH_MIN = 12*PI/180, PITCH_MAX = 82*PI/180, CAM_DIST = 400, TY = 2, ZMIN = 5, ZMAX = 30, YAW_MIN = .12;
-  const HOME = { x: 0, z: -4, yaw: PI - .5, zoom: 13.2 };
+  const PITCH0 = Math.atan(1/Math.SQRT2), PITCH_MIN = 12*PI/180, PITCH_MAX = 82*PI/180, CAM_DIST = 400, TY = 2, ZMIN = 5, ZMAX = 60, YAW_MIN = .12;
+  const HOME = { x: 0, z: -4, yaw: PI*3/4, zoom: 30 };   // (true isometric: 35.26 degrees down, turned 45 degrees)
   let yaw = HOME.yaw, yawT = yaw, zoom = HOME.zoom, zoomT = zoom, pitch = PITCH0, pitchT = PITCH0, tiltMode = false;
   let W = 480, H = 270;
-  const V = { cx: 0, cz: 0, fx: 0, fz: -1, rx: 1, rz: 0, sp: .5, cp: .85, k: 0, gH: 40, hw: 30, back: -30, gMax: 60, asp: 1.6 };
+  const V = { g0: 30, cx: 0, cz: 0, fx: 0, fz: -1, rx: 1, rz: 0, sp: .5, cp: .85, k: 0, gH: 40, hw: 30, back: -30, gMax: 60, asp: 1.6 };
 
   /* ---------- chunks of land, made as they come into view ---------- */
   const CH = 16;   // a chunk: 16 units square; its grid is 40, 20 or 10 across, finer where the view shows it bigger
@@ -237,7 +234,7 @@
   // the seabed's depth under the water, as bytes, square-rooted (fine steps in the shallows where the foam and caustics
   // need them). The texture wraps around: texel i holds world texel i mod DN, so when the window around the view moves,
   // only the strip that came into it is worked out, a few rows or columns a frame.
-  const DN = 1024, TEX = .375, DW_ = DN*TEX;
+  const DN = 2048, TEX = .375, DW_ = DN*TEX;
   const D = new Uint8Array(DN*DN).fill(255);
   const dtex = new THREE.DataTexture(D, DN, DN, THREE.RedFormat, THREE.UnsignedByteType);
   dtex.minFilter = dtex.magFilter = THREE.LinearFilter; dtex.wrapS = dtex.wrapT = THREE.RepeatWrapping; dtex.needsUpdate = true;
@@ -268,8 +265,8 @@
   const seaU = Object.assign({ time: { value: 0 }, depthTex: { value: dtex }, box: { value: new THREE.Vector4(0, 0, DW_, DW_) },
     sunDir: { value: new THREE.Vector3() }, camXZ: { value: new THREE.Vector2() }, tint: { value: new THREE.Color(1, 1, 1) }, glint: { value: new THREE.Color(1, 1, 1) }, glintK: { value: 1 } }, CURV);
   const sea = new THREE.Mesh(polarGeo(192, 110), new THREE.ShaderMaterial({ uniforms: seaU,
-    vertexShader: `uniform vec2 ctr, fwd; uniform float curveK; varying vec2 vP; varying float vG;
-      void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vP = w.xz; vG = dot(w.xz - ctr, fwd); float gp = max(vG, 0.0); w.y -= curveK*gp*gp; gl_Position = projectionMatrix * viewMatrix * w; }`,
+    vertexShader: `uniform vec2 ctr, fwd; uniform float curveK, g0; varying vec2 vP; varying float vG;
+      void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vP = w.xz; vG = dot(w.xz - ctr, fwd); float gp = max(vG - g0, 0.0); w.y -= curveK*gp*gp; gl_Position = projectionMatrix * viewMatrix * w; }`,
     fragmentShader: `
       uniform float time; uniform sampler2D depthTex; uniform vec4 box; uniform vec3 sunDir; uniform vec2 camXZ; uniform vec3 tint, glint, hazeC; uniform float hzNear, hzFar, hzMax, glintK;
       varying vec2 vP; varying float vG;
@@ -378,9 +375,6 @@
   const camT = new THREE.Vector3(HOME.x, TY, HOME.z), camGoal = camT.clone(), keys = new Set();
   const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 10, 1400);
   const _cr = new THREE.Vector3(), _cu = new THREE.Vector3(), _cv = new THREE.Vector3(), _cs = new THREE.Vector3();
-  // where the horizon sits, as a fraction up the screen: lower when the view looks out low, off the top when zoomed right in
-  // or looking down
-  const horizonAt = (z, p) => Math.max(p <= PITCH0 ? lerp(.68, .76, smooth(PITCH_MIN, PITCH0, p)) : lerp(.76, 1.25, smooth(PITCH0, 55*PI/180, p)), lerp(1.12, 0, smooth(5, 15, z)));
   // the shadow box: fitted around the ground on screen, seen from the sun, its texels kept still as the view pans
   const sunM = new THREE.Matrix4(), sunX = new THREE.Vector3(), sunY = new THREE.Vector3(), sunZ = new THREE.Vector3(), _o = new THREE.Vector3(), SHADOW = { size: 0 };
   function fitShadow(){
@@ -388,7 +382,7 @@
     let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9;
     const gF = Math.min(V.gMax, V.gH*1.05);
     for (const u of [-V.hw, V.hw]) for (const g of [V.back, (V.back + gF)/2, gF]) for (const y of [-3, TOP + 12]){
-      const gp = Math.max(g, 0), px = V.cx + V.rx*u + V.fx*g, pz = V.cz + V.rz*u + V.fz*g, py = y - V.k*gp*gp;
+      const gp = Math.max(g - V.g0, 0), px = V.cx + V.rx*u + V.fx*g, pz = V.cz + V.rz*u + V.fz*g, py = y - V.k*gp*gp;
       const a = px*sunX.x + py*sunX.y + pz*sunX.z, b = px*sunY.x + py*sunY.y + pz*sunY.z, c = px*sunZ.x + py*sunZ.y + pz*sunZ.z;
       x0 = Math.min(x0, a); x1 = Math.max(x1, a); y0 = Math.min(y0, b); y1 = Math.max(y1, b); z0 = Math.min(z0, c); z1 = Math.max(z1, c);
     }
@@ -423,19 +417,15 @@
     cam.position.set(_cs.x + sy*cp*CAM_DIST, _cs.y + sp*CAM_DIST, _cs.z + cy*cp*CAM_DIST);
     cam.lookAt(_cs); cam.updateMatrixWorld();
     const asp = W/H; cam.left = -zoom*asp; cam.right = zoom*asp; cam.top = zoom; cam.bottom = -zoom; cam.updateProjectionMatrix();
-    // the bend: a point g ahead at height y shows g*sin(pitch) + (y - TY)*cos(pitch) up the screen from the middle; with the
-    // sea dropped by k*g*g its highest point is sin^2/(4k cos) - TY cos: set that to where the horizon should be
-    const f = horizonAt(zoom, pitch), vh = (2*f - 1)*zoom, den = Math.max(vh + TY*cp - .5*TOP*cp, .25*zoom);   // (the meadow stands above the sea, so its own skyline sits higher: set the sea's a little lower to leave sky)
-    const k0 = sp*sp/(4*Math.max(cp, .05)*den), gH = 2*den/sp, k = k0*(1 - smooth(1.02, 1.25, f));   // (the horizon well off the screen: no need to bend)
+    // flat ground, as in the sky city: no bend (k stays 0; the bend code is kept should a horizon be wanted again)
+    const k = 0, g0 = 0;
     // the ground on screen: across, the screen's width; along, from behind the bottom edge (tall stacks there still show) to
-    // where it goes over the top edge or sinks behind the horizon
-    const hw = zoom*asp + 4, back = -(zoom + (TOP + 12 - TY)*cp)/sp - 2;
-    const C0 = zoom + (TY + 3)*cp, disc = sp*sp - 4*k*cp*C0, gTop = disc >= 0 ? 2*C0/(sp + Math.sqrt(disc)) : Infinity;
-    const gMax = Math.min(gTop, k > 1e-6 ? gH + Math.sqrt((TOP + 10)/k) : Infinity) + 4;
-    Object.assign(V, { cx: _cs.x, cz: _cs.z, fx: -sy, fz: -cy, rx: cy, rz: -sy, sp, cp, k, gH, hw, back, gMax, asp });
-    CURV.ctr.value.set(_cs.x, _cs.z); CURV.fwd.value.set(-sy, -cy); CURV.curveK.value = k;
-    CURV.hzNear.value = gH*.28; CURV.hzFar.value = gH*1.02; CURV.hzMax.value = .84;
-    skyU.hor.value = f; skyU.ease.value = clamp(.9*TOP*cp/(2*zoom)/Math.max(.05, 1 - f) + .22, .3, .8);
+    // the top edge
+    const hw = zoom*asp + 4, back = -(zoom + (TOP + 12 - TY)*cp)/sp - 2, gMax = (zoom + (TY + 3)*cp)/sp + 4, gH = gMax;
+    Object.assign(V, { g0, cx: _cs.x, cz: _cs.z, fx: -sy, fz: -cy, rx: cy, rz: -sy, sp, cp, k, gH, hw, back, gMax, asp });
+    CURV.ctr.value.set(_cs.x, _cs.z); CURV.fwd.value.set(-sy, -cy); CURV.curveK.value = k; CURV.g0.value = g0;
+    CURV.hzNear.value = 1e5; CURV.hzFar.value = 2e5; CURV.hzMax.value = 0;   // (no haze: nothing is far off)
+    skyU.hor.value = 1;
     seaU.camXZ.value.set(cam.position.x, cam.position.z);
     const rad = Math.max(Math.hypot(Math.min(gMax, gH*1.3), hw), Math.hypot(back, hw)) + 12; sea.scale.set(rad, 1, rad); sea.position.set(_cs.x, 0, _cs.z); sea.updateMatrixWorld();
     fitShadow();
@@ -445,7 +435,7 @@
   let fcount = 0;
   // the grid step a spot g ahead needs: about 3.5 render pixels a cell, with the view's squeeze along g counted in
   function lodAt(g, cur){
-    const along = g > 0 ? V.sp - 2*V.k*g*V.cp : V.sp, dens = H/(2*zoom)*Math.max(along, .2), L = Math.log2(3.5/dens/.4);
+    const along = g > V.g0 ? V.sp - 2*V.k*(g - V.g0)*V.cp : V.sp, dens = H/(2*zoom)*Math.max(along, .2), L = Math.log2(3.5/dens/.4);
     if (cur !== undefined && L > cur - .3 && L < cur + 1.3) return cur;   // (hysteresis: a chunk at a boundary doesn't flicker between two)
     return clamp(Math.floor(L), 0, 2);
   }
@@ -476,8 +466,8 @@
     }
     // drop what's long out of view (kept a while, so a turn back and forth doesn't remake it)
     if (fcount % 30 === 0){
-      for (const [k, ch] of chunks) if (fcount - ch.seen > 400 && chunks.size > 260){ if (ch.mesh){ scene.remove(ch.mesh); ch.mesh.geometry.dispose(); } chunks.delete(k); }
-      for (const [k, rc] of rockMeshes) if (fcount - rc.seen > 400 && rockMeshes.size > 40){ scene.remove(rc.mesh); rc.mesh.geometry.dispose(); rockMeshes.delete(k); }
+      for (const [k, ch] of chunks) if (fcount - ch.seen > 400 && chunks.size > 700){ if (ch.mesh){ scene.remove(ch.mesh); ch.mesh.geometry.dispose(); } chunks.delete(k); }
+      for (const [k, rc] of rockMeshes) if (fcount - rc.seen > 400 && rockMeshes.size > 140){ scene.remove(rc.mesh); rc.mesh.geometry.dispose(); rockMeshes.delete(k); }
       if (rockCache.size > 600) rockCache.clear();
     }
     // the depth window: centered a little ahead of the view, where most of the sea on screen is
@@ -491,14 +481,14 @@
   function pick(clientX, clientY){
     const r = canvas.getBoundingClientRect(), nx = (clientX - r.left)/r.width*2 - 1, ny = 1 - (clientY - r.top)/r.height*2;
     _ro.set(nx, ny, -1).unproject(cam); cam.getWorldDirection(_rd);
-    const surf = (x, z) => { const g = (x - V.cx)*V.fx + (z - V.cz)*V.fz, gp = Math.max(g, 0), h = heightAt(x, z); return [Math.max(h, 0) - V.k*gp*gp, h]; };
+    const surf = (x, z) => { const g = (x - V.cx)*V.fx + (z - V.cz)*V.fz, gp = Math.max(g - V.g0, 0), h = heightAt(x, z); return [Math.max(h, 0) - V.k*gp*gp, h]; };
     let t = _rd.y < 0 ? Math.max(0, (_ro.y - (TOP + 14))/(-_rd.y)) : 0, prev = t;
     for (let n = 0; n < 4000; n++){
       const x = _ro.x + _rd.x*t, y = _ro.y + _rd.y*t, z = _ro.z + _rd.z*t, [sy] = surf(x, z), gap = y - sy;
       if (gap <= 0){   // crossed: narrow it down
         let lo = prev, hi = t; for (let i = 0; i < 10; i++){ const m = (lo + hi)/2, [s2] = surf(_ro.x + _rd.x*m, _ro.z + _rd.z*m); if (_ro.y + _rd.y*m <= s2) hi = m; else lo = m; }
         const hx = _ro.x + _rd.x*hi, hz = _ro.z + _rd.z*hi, [, h] = surf(hx, hz); return { x: hx, z: hz, sea: h < 0 }; }
-      if (y < -V.k*Math.pow(Math.max(0, (x - V.cx)*V.fx + (z - V.cz)*V.fz), 2) - 40) return null;   // (under everything: past the horizon)
+      if (y < -V.k*Math.pow(Math.max(0, (x - V.cx)*V.fx + (z - V.cz)*V.fz - V.g0), 2) - 40) return null;   // (under everything: past the horizon)
       prev = t; t += clamp(gap*.3, .15, 2.5);
     }
     return null;

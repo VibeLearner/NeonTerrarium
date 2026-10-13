@@ -302,12 +302,18 @@
   const WAVE_GLSL = `
     uniform float wForce;   // (a test switch: every crest a full wave)
     const vec2 WD = vec2(-0.932, 0.362), WP = vec2(-0.362, -0.932);
-    vec4 bigWave(vec2 p){ float along = dot(p, WP), u = dot(p, WD)/26.0 - time/10.0 + 0.3*sin(along*0.05 + 1.7);
+    float shAt(vec2 q){ vec2 i = (q - box.xy)/box.zw; if (i.x < 0.0 || i.y < 0.0 || i.x > 1.0 || i.y > 1.0) return 4.0; return texture2D(depthTex, q/box.zw).g*4.0; }
+    vec4 bigWave(vec2 p){ float s0 = shAt(p);
+      // near rock the crest drags (shallower water slows it), so a wave bends round a stack and turns to meet the cliff
+      float along = dot(p, WP), u = dot(p, WD)/26.0 - time/10.0 + 0.3*sin(along*0.05 + 1.7) + 0.09*(1.0 - smoothstep(0.0, 3.5, s0));
       float wn = floor(u), wc = u - wn;
+      // behind a rock (seaward of here, along the way the waves come) the water is sheltered; it fills back in further on
+      float lee = 0.0;
+      for (int k = 0; k < 4; k++){ float dk = 2.0 + float(k)*2.6; lee = max(lee, (1.0 - smoothstep(0.2, 0.9, shAt(p - WD*dk)))*(1.0 - dk/14.0)); }
       float ex = step(0.3, fract(wn*0.6180339887 + 0.13));
       float seg = smoothstep(-0.55, 0.1, sin(along*0.045 + wn*2.3) + 0.45*sin(along*0.13 - wn*1.1));
       float life = smoothstep(0.12, 0.6, 0.5 + 0.5*sin(time*0.3 + wn*2.1));
-      return vec4(max(ex*seg*life, wForce), wc, wn, along); }
+      return vec4(max(ex*seg*life*(1.0 - 0.85*lee), wForce), wc, wn, along); }
     // The wave's height there, and its slope (per unit behind the front), with its life along it: the face's width and the
     // crest's height ripple along the crest and change as it goes, so it swells and sags as it travels rather than sliding
     // like a line. (x, 0 at the front's foot; fw, the face's width: the peak sits there; then the long back.)
@@ -328,7 +334,22 @@
     const seg = smooth(-.55, .1, Math.sin(along*.045 + wn*2.3) + .45*Math.sin(along*.13 - wn*1.1)), life = smooth(.12, .6, .5 + .5*Math.sin(t*.3 + wn*2.1));
     return [ex*seg*life, wc, wn];
   };
-  const seaU = Object.assign({ time: { value: 0 }, depthTex: { value: dtex }, box: { value: new THREE.Vector4(0, 0, DW_, DW_) },
+  // The ripple map (a "dudv" map: two channels, each an offset to where the water's pattern is read) and the caustics (a
+  // net of bright lines: where the edges between seeded cells come close, a Worley pattern), both 64 x 64 and tiling, made
+  // here from sums of whole-number sines and points on a torus.
+  const TN = 64, dudvD = new Uint8Array(TN*TN*2), causD = new Uint8Array(TN*TN);
+  for (let y = 0; y < TN; y++) for (let x = 0; x < TN; x++){ const a = x/TN*PI*2, b = y/TN*PI*2, k = (y*TN + x)*2;
+    dudvD[k] = Math.round(255*clamp(.5 + .24*Math.sin(a + 2*b + 1.3) + .15*Math.sin(3*a - b + .4) + .1*Math.sin(2*a + 5*b + 2.2), 0, 1));
+    dudvD[k + 1] = Math.round(255*clamp(.5 + .24*Math.sin(2*a - b + .7) + .15*Math.sin(a + 3*b + 2.9) + .1*Math.sin(5*a - 2*b + 1.1), 0, 1)); }
+  { const pts = []; for (let i = 0; i < 11; i++) pts.push([hash2(i, 901)*TN, hash2(i, 902)*TN]);
+    for (let y = 0; y < TN; y++) for (let x = 0; x < TN; x++){ let f1 = 1e9, f2 = 1e9;
+      for (const [px, py] of pts) for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++){ const d = Math.hypot(x + .5 - px - ox*TN, y + .5 - py - oy*TN); if (d < f1){ f2 = f1; f1 = d; } else if (d < f2) f2 = d; }
+      const e = f2 - f1; causD[y*TN + x] = e < 1.6 ? 255 : e < 2.8 ? 120 : 0; } }
+  const dudvTex = new THREE.DataTexture(dudvD, TN, TN, THREE.RGFormat, THREE.UnsignedByteType); dudvTex.internalFormat = 'RG8';
+  dudvTex.wrapS = dudvTex.wrapT = THREE.RepeatWrapping; dudvTex.minFilter = dudvTex.magFilter = THREE.LinearFilter; dudvTex.needsUpdate = true;
+  const causTex = new THREE.DataTexture(causD, TN, TN, THREE.RedFormat, THREE.UnsignedByteType);
+  causTex.wrapS = causTex.wrapT = THREE.RepeatWrapping; causTex.minFilter = causTex.magFilter = THREE.NearestFilter; causTex.needsUpdate = true;
+  const seaU = Object.assign({ dudvTex: { value: dudvTex }, causTex: { value: causTex }, reflTex: { value: null }, resPx: { value: new THREE.Vector2(480, 270) }, pxW: { value: .1 }, time: { value: 0 }, depthTex: { value: dtex }, box: { value: new THREE.Vector4(0, 0, DW_, DW_) },
     sunDir: { value: new THREE.Vector3() }, camXZ: { value: new THREE.Vector2() }, tint: { value: new THREE.Color(1, 1, 1) }, glint: { value: new THREE.Color(1, 1, 1) }, glintK: { value: 1 }, wForce: { value: 0 } }, CURV);
   seaU.gO = { value: new THREE.Vector2() }; seaU.gU = { value: new THREE.Vector2(1, 0) }; seaU.gV = { value: new THREE.Vector2(0, 1) };
   const sea = new THREE.Mesh(gridGeo(320), new THREE.ShaderMaterial({ uniforms: seaU,
@@ -345,7 +366,7 @@
         vec4 wp = vec4(p.x, y, p.y, 1.0);
         vP = p; vG = dot(p - ctr, fwd); float gp = max(vG - g0, 0.0); wp.y -= curveK*gp*gp; gl_Position = projectionMatrix * viewMatrix * wp; }`,
     fragmentShader: `
-      uniform float time; uniform sampler2D depthTex; uniform vec4 box; uniform vec3 sunDir; uniform vec2 camXZ; uniform vec3 tint, glint, hazeC; uniform float hzNear, hzFar, hzMax, glintK;
+      uniform float time, pxW; uniform sampler2D depthTex, dudvTex, causTex, reflTex; uniform vec2 resPx; uniform vec4 box; uniform vec3 sunDir; uniform vec2 camXZ; uniform vec3 tint, glint, hazeC; uniform float hzNear, hzFar, hzMax, glintK;
       varying vec2 vP; varying float vG;
       float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
       float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); vec2 a = mod(q, 2.0), b = floor(q/2.0);
@@ -363,11 +384,15 @@
       void wave(vec2 q, vec2 dir, float f, float sp, float a, inout float h, inout vec2 gr){ float ph = dot(dir, q)*f + time*sp; h += a*sin(ph); gr += a*f*cos(ph)*dir; }
       void main(){
         vec2 p = vP;
-        vec2 uv = p/box.zw, inn = (p - box.xy)/box.zw;
+        float dith = bayer(gl_FragCoord.xy) - 0.5;
+        // the ripples: two layers of the ripple map drifting different ways give an offset; it's snapped to whole pixels of
+        // the view (pxW: a pixel's width on the ground), so what it moves stays crisp pixel art instead of smearing
+        vec2 dd = texture2D(dudvTex, p*0.045 + vec2(time*0.013, time*0.008)).rg + texture2D(dudvTex, p*vec2(-0.07, 0.065) + vec2(-time*0.01, time*0.016)).rg - 1.0;
+        vec2 off = floor(dd*0.45/pxW + 0.5)*pxW;
+        vec2 uv = (p + off*0.5)/box.zw, inn = (p - box.xy)/box.zw;
         float inBox = step(0.0, inn.x)*step(inn.x, 1.0)*step(0.0, inn.y)*step(inn.y, 1.0);
         vec2 tx = texture2D(depthTex, uv).rg;
         float d = inBox > 0.5 ? tx.r*tx.r*24.0 : 24.0, sh = inBox > 0.5 ? tx.g*4.0 : 4.0;
-        float dith = bayer(gl_FragCoord.xy) - 0.5;
         // the color by depth, banded the way pixel art bands a gradient (dithered at the edges of the bands)
         float dq = d + dith*0.55*(0.3 + d*0.12);
         float bands = d < 3.0 ? 6.0 : 2.0;
@@ -388,11 +413,16 @@
         float lit = (-dot(gr, sd)*0.55 - dot(gr, tc)*0.45)*calm, ld = lit + dith*0.32;
         col *= ld < -0.62 ? 0.84 : ld < -0.2 ? 0.93 : ld > 0.78 ? 1.13 : ld > 0.32 ? 1.05 : 1.0;
         col += ld > 0.78 ? vec3(0.015, 0.035, 0.045) : vec3(0.0);
-        // caustics in the shallows: a net of light on the sand, rippling with the surface above it
-        if (d < 3.2){
-          vec2 c2 = p + gr*0.25;
-          float c = abs(sin(c2.x*1.6 + time*0.9 + sin(c2.y*1.2 + time*0.6)*1.4) * sin(c2.y*1.8 - time*0.7 + sin(c2.x*1.05 - time*0.4)*1.3));
-          col += step(0.82 + dith*0.08, c) * (1.0 - d/3.2) * vec3(0.16, 0.14, 0.08);
+        // reflections: the cliffs, stacks and buildings drawn upside down under the water line (a pass of their own each frame),
+        // read through the same ripples, a whole number of pixels off
+        vec4 rf = texture2D(reflTex, (gl_FragCoord.xy + floor(dd*vec2(2.0, 3.0) + 0.5))/resPx);
+        col = mix(col, rf.rgb*vec3(0.5, 0.68, 0.78) + col*0.25, rf.a*0.42);
+        // caustics: two layers of the tiled net drifting across each other, read through the ripples, brightest in the
+        // shallows and gone by deep water
+        if (d < 4.5){
+          vec2 cu = (p + off)*0.17;
+          float c = max(texture2D(causTex, cu + vec2(time*0.021, time*0.013)).r, texture2D(causTex, cu*1.13 + vec2(-time*0.017, time*0.024) + 0.37).r);
+          col += c * (1.0 - smoothstep(0.0, 4.5, d + dith*0.4)) * vec3(0.2, 0.18, 0.11);
         }
         // the big waves (bigWave, shared with the grid that they lift): a shadowed trough ahead; the steep face, glassy and lit
         // through (turquoise); a white crest at the peak, ragged along its length, thicker as the water shallows; foam left
@@ -429,6 +459,9 @@
           float trail = step(0.34 + (x - fw)*0.045 + dith*0.12, lace*lw*(0.6 + 0.6*peel)) * step(fw + 0.2, x) * step(x, 12.0);
           col = mix(col, vec3(0.94, 0.99, 0.98), max(max(crest, spill), trail*0.85));
         }
+        // thrown back: after a wave hits a rock, a ring of disturbed water runs back out from it and fades
+        float bwr = wave*step(0.0, x)*(1.0 - smoothstep(4.0, 11.0, x))*(1.0 - smoothstep(2.6, 4.0, sh));
+        col = mix(col, vec3(0.84, 0.95, 0.95), step(abs(sh - 0.35 - x*0.5) + dith*0.1, 0.12)*step(0.45, sh)*bwr*0.85);
         // spent on the rocks: white water where the wave hit, spreading back out and fading over a few seconds
         float spent = wave*(1.0 - open*0.85)*(1.0 - smoothstep(0.0, 12.0, x))*step(0.0, x)*(1.0 - smoothstep(1.2, 3.2, sh));
         if (spent > 0.02){
@@ -545,7 +578,7 @@
   }
 
   /* ---------- the pixels: drawn at the city's line count, then scaled up hard ---------- */
-  let rt = null;
+  let rt = null, reflRT = null;
   const skyU = { top: { value: SKY.top }, mid: { value: SKY.mid }, low: { value: SKY.low }, hor: { value: .7 }, ease: { value: .4 } };
   const skyQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: skyU, depthWrite: false, depthTest: false,
     vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
@@ -564,6 +597,8 @@
     H = Math.ceil(DHp/Math.max(1, Math.round(DHp/lines))); W = Math.max(1, Math.round(H*DWp/DHp));
     renderer.setSize(DWp, DHp, false); canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
     if (rt) rt.dispose(); rt = new THREE.WebGLRenderTarget(W, H, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    if (reflRT) reflRT.dispose(); reflRT = new THREE.WebGLRenderTarget(W, H, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    seaU.reflTex.value = reflRT.texture; seaU.resPx.value.set(W, H);
     blit.material.map = rt.texture; blit.material.needsUpdate = true;
   }
   addEventListener('resize', resize);
@@ -627,6 +662,7 @@
     { const m = 6, u0 = -hw - m, g0_ = back - m, g1 = gMax + m;   // (the grid: across the screen's width, from below the bottom edge to past the top)
       seaU.gO.value.set(_cs.x + (-sy*0 + cy)*u0 + (-sy)*g0_, _cs.z + (-sy)*u0 + (-cy)*g0_); seaU.gU.value.set(cy*(2*(hw + m)), -sy*(2*(hw + m))); seaU.gV.value.set(-sy*(g1 - g0_), -cy*(g1 - g0_)); }
     fitShadow();
+    seaU.pxW.value = 2*zoom/H;   // (a render pixel's width on the ground: the ripples move things by whole pixels)
   }
 
   /* ---------- streaming: which chunks the view needs, and how finely ---------- */
@@ -823,6 +859,18 @@
   document.querySelectorAll('.hud .light button').forEach(b => b.addEventListener('click', () => { document.querySelectorAll('.hud .light button').forEach(x => x.classList.toggle('on', x === b)); setHour(+b.dataset.h); }));
 
   /* ---------- every frame ---------- */
+  // the reflection pass: everything above the water, flipped upside down about it and drawn flat in its own colors (no
+  // lights, no shadows) into a target the size of the view, where the sea reads it at its own pixel, through the ripples
+  const reflM = new THREE.MeshBasicMaterial({ vertexColors: true, clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0)] });
+  renderer.localClippingEnabled = true;
+  function renderRefl(){
+    const hide = [sea, spray, ghost, ring], vis = hide.map(o => o.visible); hide.forEach(o => { o.visible = false; });
+    scene.overrideMaterial = reflM; scene.scale.y = -1; scene.updateMatrixWorld(true);
+    renderer.shadowMap.autoUpdate = false;
+    renderer.setRenderTarget(reflRT); renderer.setClearColor(0x000000, 0); renderer.autoClear = true; renderer.render(scene, cam);
+    renderer.shadowMap.autoUpdate = true;
+    scene.overrideMaterial = null; scene.scale.y = 1; scene.updateMatrixWorld(true); hide.forEach((o, i) => { o.visible = vis[i]; });
+  }
   setHour(11); resize();
   updateCamera(0); stream(1e9);   // (the first view whole, before the first frame)
   const t0 = performance.now(), TOFF = { v: 0 }; let last = t0;   // (TOFF: a test hook, to look at the sea at a given moment)
@@ -831,6 +879,7 @@
     updateCamera(dt); stream(6);
     if (PL.kind) showGhost();
     const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t);
+    renderRefl();
     renderer.setRenderTarget(rt); renderer.autoClear = true; renderer.render(skyScene, skyCam);
     renderer.autoClear = false; renderer.clearDepth(); renderer.render(scene, cam);
     renderer.setRenderTarget(null); renderer.autoClear = true; renderer.render(blitScene, skyCam);

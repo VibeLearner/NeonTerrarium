@@ -53,7 +53,8 @@ const CASES = (() => {
     const st = stations()[0], cops = [...people.values()].filter(p => p.job === st.id).sort((a, b) => a.id < b.id ? -1 : 1);
     const order = cops.slice().sort((a, b) => U(a.id, run.seed, 'cop') - U(b.id, run.seed, 'cop'));
     const cast = run.cast;
-    for (const [id, L] of Object.entries(IDX.officers)){ const p = order.shift(); if (!p) return 'too few officers'; cast[id] = p.id; run.shift[p.id] = SHIFT[L]; }
+    const hb = Math.round(HABIT[run.arc] ?? 12) % 24, lead = hb >= 7 && hb < 15 ? 0 : hb >= 15 && hb < 23 ? 1 : 2;   // (the pair on the case works the hours the operation does)
+    for (const [id, L] of Object.entries(IDX.officers)){ const p = order.shift(); if (!p) return 'too few officers'; cast[id] = p.id; run.shift[p.id] = (L === 'A' || L === 'B') ? lead : SHIFT[L]; }
     const st2 = stations()[1]; if (st2){ const q = [...people.values()].filter(p => p.job === st2.id).sort((a, b) => U(a.id, run.seed, 'cop2') - U(b.id, run.seed, 'cop2'))[0]; if (q) cast['inside-officer-extra'] = q.id; }
     run.station = st.id;
     const ctr = CENTRE[run.arc](); run.centre = ctr.id;
@@ -287,7 +288,7 @@ const CASES = (() => {
   const FIND = .045, LEADK = .2;   // (how often a covered trace is found in an hour, and what a find is worth: tuned so a case runs two to four weeks)
   const lerp = (a, b, t) => a + (b - a)*t;
   const PAIR = { 'inside-officer': 'framed-officer', 'framed-officer': 'inside-officer', 'veteran-officer': 'rookie-officer', 'rookie-officer': 'veteran-officer' };
-  const ON_SHIFT = (slot, h) => { const k = SHIFT[IDX.officers[slot]] ?? 0, ws = [7, 15, 23][k]; return ((h - ws + 24) % 24) < 8; };
+  const ON_SHIFT = (slot, h) => { const id = C.run && C.run.cast[slot], k = (C.run && id !== undefined && C.run.shift[id] !== undefined) ? C.run.shift[id] : SHIFT[IDX.officers[slot]] ?? 0, ws = [7, 15, 23][k]; return ((h - ws + 24) % 24) < 8; };
   // when each boss's operation runs: the collection hour (their habit), and where it happens
   const HABIT = { 'b1-long-queue': 11.8, 'b2-door-work': 22.5, 'b3-the-regular': 7.5, 'b4-dead-drop-days': 9, 'b5-last-train': 7 };
   const CENTRE_AT = { 'b1-long-queue': 'town-square/food-stalls', 'b2-door-work': 'neon-dome/door-staff', 'b3-the-regular': 'bath-house/tea-counter', 'b4-dead-drop-days': 'logistics-hub', 'b5-last-train': 'metro-station/platform' };
@@ -498,7 +499,7 @@ const CASES = (() => {
     const s = run.sim, h = ((s.h % 24) + 24) % 24, B = s.boss, hb = HABIT[run.arc] ?? 12;
     if (s.ending) return;
     const low = s.heat > .75 && U(run.seed, s.h, 'low') < .6;   // (lying low: the operation slows)
-    const near = (x, y) => Math.abs(((x - y + 36) % 24) - 12) > 11.5;   // (this is that hour)
+    const near = (x, y) => h === Math.round(y) % 24;   // (this is that hour: a habit at 7:30 is the 8 o'clock hour)
     if (!low && near(h, hb)){ act(run, 'collect', 'g1', 'centre'); if (B.habit > .6) act(run, 'habit', 'boss', 'centre'); }
     if (!low && near(h, (hb + 2.5) % 24)) act(run, 'run', 'safe1', 'flat');
     if (!low && s.nodes.g3 && !s.nodes.g3.burned && near(h, 23) && s.h % 72 < 24) act(run, 'pass', 'g3', 'lift');
@@ -553,7 +554,7 @@ const CASES = (() => {
       const f = focusOf(s, 'veteran-officer'); if (U(run.seed, s.h, 'wit') < .03*f){ s.witness.back = s.h; run.flags['inf:talking'] = true; applyPeople(); lead(run, 'boss', .22, 'the witness talks'); queue(run, { kind: 'found' }); } }
     if (tunedOut && !s.framed && s.heat > .62){ const pt = PAIR[tunedOut]; if (focusOf(s, pt) > .4){ s.framed = { who: pt, at: s.h }; s.cops[pt].state = 'suspended'; run.flags[IDX.officers[pt] + ':suspended'] = true; applyPeople(); s.cops[pt].stress = clamp(s.cops[pt].stress + .2); queue(run, { kind: 'suspend', slot: pt }); simNote(run, 'frame', pt); } }
     if (s.framed && !s.framed.cleared && s.h - s.framed.at > 36){ const f = Math.max(focusOf(s, 'desk-sergeant'), focusOf(s, 'veteran-officer')); if (U(run.seed, s.h, 'clear') < .025*f){ s.framed.cleared = s.h; s.cops[s.framed.who].state = 'ok'; run.flags[IDX.officers[s.framed.who] + ':cleared'] = true; applyPeople(); queue(run, { kind: 'cleared', slot: s.framed.who }); lead(run, 'boss', .12, 'the frame comes apart'); } }
-    if (!s.running && s.heat > .8 && sday(s) >= 9){ s.running = s.h + Math.round(lerp(18, 60, B.care)); simNote(run, 'the boss gets ready to run, hour', s.running); }
+    if (!s.running && s.heat > .8 + (1 - B.care)*.12 && sday(s) >= 9){ s.running = s.h + Math.round(lerp(72, 30, B.care)); simNote(run, 'the boss gets ready to run, hour', s.running); }   // (a careless boss is slow to see it coming and slow to go; a careful one has the exit ready)
     if (s.running && s.h >= s.running && !s.ending) end(run, 'escaped');
     if (sday(s) > 32 && !s.ending) end(run, 'cold');
   }
@@ -624,10 +625,10 @@ const CASES = (() => {
         else if (!c.home.who && r < .08) queue(run, { kind: 'home-alone', slot });
       }
       if (c.state === 'turned'){
-        c.guilt = clamp(c.guilt + c.integ*.07 + (c.home.kind === 'partner' ? c.home.q*.03 : 0) + (s.bonds[slot] ? s.bonds[slot].v*.03 : 0));
+        c.guilt = clamp(c.guilt + .02 + c.integ*.07 + (c.home.kind === 'partner' ? c.home.q*.03 : 0) + (s.bonds[slot] ? s.bonds[slot].v*.03 : 0));
         if (U(run.seed, s.h, slot, 'leak') < .3) queue(run, { kind: 'leak', slot });
         if (c.guilt > .35 && U(run.seed, s.h, slot, 'g') < .3) queue(run, { kind: 'guilt', slot });
-        if (c.guilt > .6 && U(run.seed, s.h, slot, 'flip') < .5){ c.state = 'flipped'; queue(run, { kind: 'flip', slot }); lead(run, 'boss', .3, slot + ' talks'); lead(run, 'g1', .2, slot + ' talks'); s.heat = clamp(s.heat + .25); simNote(run, slot, 'flips back'); continue; }
+        if (c.guilt > .5 && U(run.seed, s.h, slot, 'flip') < .5){ c.state = 'flipped'; queue(run, { kind: 'flip', slot }); lead(run, 'boss', .3, slot + ' talks'); lead(run, 'g1', .2, slot + ' talks'); s.heat = clamp(s.heat + .25); simNote(run, slot, 'flips back'); continue; }
         const pt = PAIR[slot], pf = s.cops[pt] && s.cops[pt].state === 'ok' ? focusOf(s, pt) : 0;
         if (U(run.seed, s.h, slot, 'exp') < pf*.05*c.buried + focusOf(s, 'desk-sergeant')*.015*c.buried){ c.state = 'fired'; queue(run, { kind: 'exposed', slot }); lead(run, 'boss', .15, 'the inside man exposed'); simNote(run, slot, 'exposed'); run.flags[(IDX.officers[slot] || 'A') + ':arrested'] = true; applyPeople(); }
       }

@@ -34,16 +34,25 @@ const MON = (() => {
   const hov = document.createElement('div'); hov.id = 'npcHover'; hov.className = 'npc-hover'; hov.hidden = true; document.body.appendChild(hov);
   let hovAt = null; M.hoverId = null;
   M.hoverAt = (cx, cy) => { hovAt = cx === null || cx === undefined ? null : [cx, cy]; if (!hovAt) M.hoverFrame(); };
+  // the brackets: one on whoever is under the cursor, and one that stays on the person being watched until the monitor closes
+  const sel = document.createElement('div'); sel.id = 'npcSel'; sel.className = 'npc-hover watched'; sel.hidden = true; document.body.appendChild(sel);
+  function bracket(box, p){
+    if (!p || p.x === undefined || !p._ec || !(p._ea > .3)){ if (!box.hidden) box.hidden = true; return false; }   // (not drawn: indoors, or away)
+    const r = view.getBoundingClientRect(), tall = (16/PX)/zoom*r.height/2, wide = tall*.75;
+    _v.set(p.x, p._ey ?? CURB, p.z).applyMatrix4(comp.uniforms.VP.value);
+    if (_v.x < -1.2 || _v.x > 1.2 || _v.y < -1.2 || _v.y > 1.2){ if (!box.hidden) box.hidden = true; return false; }
+    const fx = r.left + (_v.x*.5 + .5)*r.width, fy = r.top + (1 - (_v.y*.5 + .5))*r.height, pad = 3;
+    box.hidden = false;
+    box.style.left = Math.round(fx - wide/2 - pad) + 'px'; box.style.top = Math.round(fy - tall - pad) + 'px';
+    box.style.width = Math.round(wide + pad*2) + 'px'; box.style.height = Math.round(tall + pad*2) + 'px';
+    return true;
+  }
   M.hoverFrame = () => {
     const id = hovAt ? M.pick(hovAt[0], hovAt[1]) : null, p = id && people.get(id);
     M.hoverId = id; view.style.cursor = id ? 'pointer' : '';
-    if (!p){ if (!hov.hidden) hov.hidden = true; return; }
-    const r = view.getBoundingClientRect(), tall = (16/PX)/zoom*r.height/2, wide = tall*.75;
-    _v.set(p.x, p._ey ?? CURB, p.z).applyMatrix4(comp.uniforms.VP.value);
-    const fx = r.left + (_v.x*.5 + .5)*r.width, fy = r.top + (1 - (_v.y*.5 + .5))*r.height, pad = 3;
-    hov.hidden = false; hov.classList.toggle('watched', id === M.id);
-    hov.style.left = Math.round(fx - wide/2 - pad) + 'px'; hov.style.top = Math.round(fy - tall - pad) + 'px';
-    hov.style.width = Math.round(wide + pad*2) + 'px'; hov.style.height = Math.round(tall + pad*2) + 'px';
+    bracket(sel, M.id ? people.get(M.id) : null);
+    if (!p || id === M.id){ if (!hov.hidden) hov.hidden = true; return; }   // (the watched one has its own)
+    hov.classList.remove('watched'); bracket(hov, p);
   };
 
   /* ---------- open, close, follow ---------- */
@@ -53,7 +62,7 @@ const MON = (() => {
     if (window.STORY) STORY.setWatch(id);
     render(true); drawPins(true);
   };
-  M.close = () => { M.id = null; el.hidden = true; document.body.classList.remove('watching'); MON_FOCUS.on = false; if (window.STORY) STORY.setWatch(null); };
+  M.close = () => { M.id = null; sel.hidden = true; el.hidden = true; document.body.classList.remove('watching'); MON_FOCUS.on = false; if (window.STORY) STORY.setWatch(null); };
   M.userPan = () => {};   // (the main view is the player's own: the feed has its own camera)
 
   /* ---------- pins: people kept a click away (a star by the name; chips by the monitor; a chip glows while its person is in a story moment) ---------- */

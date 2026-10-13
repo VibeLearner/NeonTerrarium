@@ -572,7 +572,9 @@ const STORY = (() => {
     }
     SC.add(sc); return sc;
   }
+  ST.endStats = {};   // (how moments end, by kind: for the stress test, tools/stress)
   function endScene(sc, why){
+    { const k = (sc.s.tier === 'case' ? 'case' : (sc.s.category || 'story')) + ' ' + String(why || '').split(' ')[0]; ST.endStats[k] = (ST.endStats[k] || 0) + 1; }
     SC.delete(sc);
     for (const sp of sc.spots) if (sp.by && Object.values(sc.cast).includes(sp.by)) sp.by = null;
     for (const id of Object.values(sc.cast)){

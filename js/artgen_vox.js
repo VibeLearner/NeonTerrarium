@@ -1,4 +1,4 @@
-// Neon Terrarium: a tiny voxel renderer (ART.vox) and the two models drawn with it: the delivery drone (texture 'ddrone') and the police hoverbike (textures 'pbike_r1c1' ... 'pbike_r2c4').
+// Neon Terrarium: a tiny voxel renderer (ART.vox) and the two models drawn with it: the delivery drone (texture 'ddrone') and the police hoverbike (textures 'pbike_r1c1' ... 'pbike_r2c4'), generated from a seed (ART.bikeGen).
 // A model is a short list of boxes and ellipsoids on a pixel grid: one model unit is one screen pixel across (x), and a unit of height is cos(pitch) pixels. render() casts one ray per pixel (orthographic, at
 // the game's camera pitch), keeps the nearest hit, shades it flat in 3 steps from the upper left, outlines it where the shape meets empty space, and returns a pixel buffer with alpha 0 or 255 only.
 // All views of one model come from the same boxes, so they agree with each other. No Math.random, no Date.
@@ -123,24 +123,88 @@
     V.blit(g, px, 9 * cw, 0);
   });
 
-  // ---------- the police hoverbike: a dark chunky hull, cyan light strips, blue thruster glow, a low saddle, a screen and a red and blue light bar at the back ----------
-  const HULL = [H('#101114'), H('#1f2125'), H('#3a3d44')], TRIM = [H('#0c0d0f'), H('#1c1d20'), H('#303237')], CY = [H('#3cc4cc'), H('#0f5a60')], BLUE = [H('#2a9cff'), H('#0b3f8a')];
-  const RED = [H('#ff2a2a'), H('#701016')], BLU = [H('#2a6cff'), H('#0c2a80')], GLASS = [H('#10242c'), H('#1f4856'), H('#4a8a9a')];
-  const BIKE = model(
-    ell(0, 4.0, 0, 4.8, 3.0, 11.6, HULL),                  // the hull (its ends rise, like a boat's)
-    ell(-3.4, 3.6, -1, 1.9, 2.0, 8, TRIM), ell(3.4, 3.6, -1, 1.9, 2.0, 8, TRIM),   // the side pods
-    ell(0, 5.4, 7.4, 3.0, 2.6, 4.6, HULL),                 // the nose fairing
-    ell(0, 7.8, 5.2, 2.5, 2.2, 2.2, GLASS),                // the screen
-    box(0, 8.6, 3.0, 8.6, 1.0, 1.2, TRIM),                 // the bars
-    box(0, 7.2, -7.2, 6.4, 3.4, 4.0, HULL), box(0, 9.2, -8.8, 9.0, 1.2, 1.6, TRIM),   // the tail and the light bar's rail
-    box(3.0, 10.2, -8.8, 2.6, 1.2, 1.6, RED, { emit: true }), box(-3.0, 10.2, -8.8, 2.6, 1.2, 1.6, BLU, { emit: true }),
-    ell(-3.7, 5.0, -9.4, 1.8, 1.8, 2.6, TRIM), ell(3.7, 5.0, -9.4, 1.8, 1.8, 2.6, TRIM),    // the thrusters
-    box(-3.7, 5.0, -11.8, 2.4, 2.4, .8, BLUE, { emit: true }), box(3.7, 5.0, -11.8, 2.4, 2.4, .8, BLUE, { emit: true }),
-    box(0, 1.1, 0, 6.6, .6, 13, BLUE, { emit: true }),     // the glow under the hull
-    box(-4.8, 4.6, -4, .7, 1.0, 4, CY, { emit: true }), box(4.8, 4.6, -4, .7, 1.0, 4, CY, { emit: true }), box(-4.8, 4.6, 3, .7, 1.0, 5, CY, { emit: true }), box(4.8, 4.6, 3, .7, 1.0, 5, CY, { emit: true }),   // the light strips
-    box(0, 5.6, 11.8, 3.6, 1.1, .7, CY, { emit: true }));  // the headlight
+  // ---------- the police hoverbike, generated ----------
+  // ART.bikeGen(seed): a hoverbike from a seed. Five builds (a low wedge interceptor, an armored brick, a twin-boom speeder,
+  // a flat sled with one big ring thruster, a wasp with two pods and a waist), a livery (dark hull, sometimes white police
+  // panels), an accent color for the light strips and headlight, the underglow, fins, and always the red and blue light bar
+  // at the back. Whatever the build, the saddle's top sits at y 7 just behind the middle, where people.js seats the rider,
+  // and the bars are in front of it. The seed the game rides is BIKE_SEED (picked from a sheet: tools/bikes.html).
+  const RAMPS = {
+    graphite: [H('#101114'), H('#1f2125'), H('#3a3d44')], gunmetal: [H('#111620'), H('#232c3c'), H('#45526a')],
+    navy: [H('#0b1224'), H('#1a2848'), H('#36507e')], plum: [H('#140f1b'), H('#2a2136'), H('#4b3d62')], olive: [H('#12140f'), H('#262a20'), H('#454b3a')] };
+  const PANEL = [H('#8f96a3'), H('#c9ced6'), H('#eef1f4')], DARK = [H('#08090b'), H('#15161a'), H('#2a2c32')], SEAT = [H('#0a0a0c'), H('#18181c'), H('#2c2c33')];
+  const ACC = { cyan: [H('#3ce4ec'), H('#0f5a60')], magenta: [H('#ff4fd0'), H('#6a1a58')], amber: [H('#ffb43c'), H('#6a4210')], ice: [H('#9fd8ff'), H('#2a5a80')], acid: [H('#b4ff4a'), H('#3e6a14')] };
+  const GLOWS = { blue: [H('#2a9cff'), H('#0b3f8a')], violet: [H('#9a5cff'), H('#3a1a80')], cyan: [H('#3cc4cc'), H('#0f5a60')], rose: [H('#ff4a8a'), H('#6a1a38')] };
+  const GLASSR = [H('#10242c'), H('#1f4856'), H('#4a8a9a')];
+  const RED_L = [H('#ff2a2a'), H('#701016')], BLUE_L = [H('#2a6cff'), H('#0c2a80')];
+  const BUILDS = ['interceptor', 'brick', 'speeder', 'sled', 'wasp'];
+  ART.bikeGen = seed => {
+    const R = SG.rng(SG.seedOf('pbike', seed)), build = BUILDS[R.i(0, BUILDS.length - 1)];
+    const liv = R.pick(Object.keys(RAMPS)), HULLR = RAMPS[liv], TRIMR = DARK, acc = R.pick(Object.keys(ACC)), A = ACC[acc], gl = R.pick(Object.keys(GLOWS)), G = GLOWS[gl];
+    const panels = R.chance(.5), L = R.r(10, 12.5), Wd = R.r(3.6, 5), P = [];
+    const emit = { emit: true };
+    // the shared bits: saddle (top at y 7), bars, screen, headlight, light bar, underglow
+    const common = (noseZ, tailZ, sideX, hullTop) => {
+      P.push(box(0, 6.4, -1.2, 3.6, 1.2, 5.2, SEAT));                                          // the saddle
+      P.push(box(0, Math.min(6.0, hullTop + .3), -1.2, 4.4, Math.max(.6, 6.0 - hullTop + .6), 6, TRIMR));   // its base on the hull
+      P.push(box(0, 8.6, 3.2, 8.4, .9, 1.0, TRIMR), box(-4.1, 8.0, 3.2, .8, 1.6, .8, TRIMR), box(4.1, 8.0, 3.2, .8, 1.6, .8, TRIMR));   // the bars
+      P.push(ell(0, 8.0, 5.0, 2.4, 2.0, 1.8, GLASSR));                                           // the screen
+      P.push(box(0, 5.4, noseZ + .2, R.r(2.6, 4.2), 1.0, .7, A, emit));                          // the headlight
+      const ly = hullTop + 1.4, lz = tailZ + R.r(2.2, 3.2);
+      P.push(box(0, ly - .9, lz, 6.4, .8, 2.0, TRIMR));                                          // the light bar's base, on the tail
+      P.push(box(2.2, ly, lz, 2.4, 1.1, 1.4, RED_L, emit), box(-2.2, ly, lz, 2.4, 1.1, 1.4, BLUE_L, emit));
+      P.push(box(0, 1.1, (noseZ + tailZ)/2, sideX*1.3, .6, (noseZ - tailZ)*.85, G, emit));        // the glow under it
+    };
+    const strips = (x, y, z0, z1) => { P.push(box(-x, y, (z0 + z1)/2, .7, .9, z1 - z0, A, emit), box(x, y, (z0 + z1)/2, .7, .9, z1 - z0, A, emit)); };
+    const fins = (x, y, z, h) => { if (R.chance(.6)) P.push(box(-x, y + h/2, z, .6, h, 2.6, HULLR), box(x, y + h/2, z, .6, h, 2.6, HULLR)); };
+    if (build === 'interceptor'){   // long, low, a wedge nose stepping down, a tail fin, twin thrusters
+      P.push(box(0, 3.8, -1, Wd*2, 3.2, L*1.6, HULLR));
+      for (let k = 0; k < 3; k++) P.push(box(0, 3.4 - k*.5, L*.8 + k*1.3, Wd*2*(1 - k*.22), 2.4 - k*.5, 1.4, HULLR));
+      if (panels) P.push(box(-Wd - .05, 4.0, 1, .4, 1.6, L, PANEL), box(Wd + .05, 4.0, 1, .4, 1.6, L, PANEL));
+      P.push(box(0, 6.4, -L*.8 + 1, 1.0, 3.0, 3.2, HULLR));                                      // the tail fin
+      for (const s of [-1, 1]){ P.push(ell(s*(Wd - .6), 4.0, -L*.8 - .6, 1.8, 1.8, 2.4, TRIMR), box(s*(Wd - .6), 4.0, -L*.8 - 2.6, 2.2, 2.2, .7, G, emit)); }
+      strips(Wd + .1, 2.6, -L*.6, L*.6); common(L*.8 + 3.2, -L*.8 - 2.6, Wd, 5.4);
+    } else if (build === 'brick'){   // a heavy armored block, a ram in front, one big square thruster
+      const w = Wd + .8;
+      P.push(box(0, 4.0, 0, w*2, 4.4, L*1.7, HULLR), box(0, 6.0, -.5, w*2 - 1.6, 1.2, L*1.4, HULLR));
+      P.push(box(0, 2.8, L*.85 + .8, w*2 - .6, 2.2, 1.6, TRIMR));                              // the ram
+      if (panels) P.push(box(-w - .05, 4.4, 0, .4, 2.0, L*1.2, PANEL), box(w + .05, 4.4, 0, .4, 2.0, L*1.2, PANEL));
+      for (const s of [-1, 1]) P.push(box(s*(w + .3), 3.2, 0, .6, 2.6, L*.9, TRIMR));            // armor plates
+      P.push(box(0, 4.2, -L*.85 - .8, w*1.4, 3.2, 1.6, TRIMR), box(0, 4.2, -L*.85 - 1.8, w*1.1, 2.4, .7, G, emit));
+      strips(w + .65, 4.6, -L*.5, L*.5); common(L*.85 + 1.8, -L*.85 - 1.8, w, 6.6);
+    } else if (build === 'speeder'){   // two long pods on booms, a thin spine with the saddle, a thruster at each pod's tail
+      const x = Wd + .4;
+      for (const s of [-1, 1]){ P.push(ell(s*x, 3.6, 0, 1.9, 1.9, L*.95, HULLR), box(s*x, 3.6, -L*.95, 2.2, 2.2, .7, G, emit));
+        if (panels) P.push(box(s*(x + 1.6), 3.8, 1, .4, 1.0, L*.9, PANEL)); }
+      P.push(box(0, 4.6, 0, 2.6, 2.4, L*1.5, HULLR), box(0, 4.2, L*.4, x*2, 1.0, 1.4, TRIMR), box(0, 4.2, -L*.5, x*2, 1.0, 1.4, TRIMR));
+      P.push(ell(0, 5.2, L*.75, 2.0, 1.8, 3.2, HULLR));
+      fins(x, 5.0, -L*.7, 2.2);
+      strips(x + 1.9, 3.6, -L*.5, L*.5); common(L*.95 + .2, -L*.95, x + 2, 5.8);
+    } else if (build === 'sled'){   // a flat wide hull, a spoiler, one big ring thruster
+      P.push(ell(0, 3.6, 0, Wd + 1.2, 2.2, L, HULLR), box(0, 5.0, -1, Wd*1.4, 1.4, L*1.2, HULLR));
+      if (panels) P.push(ell(0, 3.7, .5, Wd + 1.3, 1.0, L*.8, PANEL));
+      P.push(box(0, 7.8, -L + 2, Wd*2 + 1, .7, 2.0, TRIMR), box(-Wd, 6.6, -L + 2, .6, 2.2, 1.6, TRIMR), box(Wd, 6.6, -L + 2, .6, 2.2, 1.6, TRIMR));   // the spoiler
+      P.push(ell(0, 4.2, -L - .4, 2.8, 2.8, 1.4, TRIMR), ell(0, 4.2, -L - 1.4, 2.0, 2.0, .6, G, emit));
+      strips(Wd + 1.1, 3.4, -L*.6, L*.6); common(L + .2, -L - 1.4, Wd + 1, 6.2);
+    } else {   // wasp: a big front pod and rear pod, a narrow waist under the saddle, hover pods at the front
+      P.push(ell(0, 4.6, L*.45, Wd, 2.8, L*.55, HULLR), ell(0, 4.8, -L*.5, Wd + .4, 3.0, L*.5, HULLR), box(0, 4.6, 0, 2.4, 2.0, L*.6, TRIMR));
+      if (panels) P.push(ell(0, 5.0, -L*.5, Wd + .5, 1.2, L*.42, PANEL));
+      for (const s of [-1, 1]){ P.push(ell(s*(Wd + .8), 3.0, L*.55, 1.4, 1.2, 2.4, TRIMR), box(s*(Wd + .8), 1.8, L*.55, 1.6, .5, 2.0, G, emit)); }
+      P.push(ell(0, 4.8, -L - .2, 2.0, 2.0, 1.0, G, emit));
+      fins(Wd*.7, 6.4, -L*.6, 2.6);
+      strips(Wd + .1, 4.2, -L*.8, -L*.2); common(L, -L - .2, Wd, 6.8);
+    }
+    return { model: model(...P), build, livery: liv, accent: acc, glow: gl, panels };
+  };
+  // render a bike's eight views, each cropped to its drawn pixels (width kept even about the middle, so the origin stays the middle column)
+  ART.bikeViews = (M, opts = { outline: 'br', outK: .5 }) => [0, 1, 2, 3, 4, 5, 6, 7].map(k => {
+    const big = V.render(M, k*Math.PI/4, 48, 36, opts), bd = big.bounds, cx = Math.round(big.ox);
+    const half = Math.max(cx - bd.c0, bd.c1 + 1 - cx), w = Math.max(8, half*2), h = bd.r1 - bd.r0 + 1;
+    return { w, h, px: V.render(M, k*Math.PI/4, w, h, opts) };
+  });
+  const BIKE_SEED = 8;   // (an interceptor: gunmetal with white police panels, cyan strips, violet underglow)
+  const BIKE = ART.bikeGen(BIKE_SEED).model, BV = ART.bikeViews(BIKE);
   ART.bike = BIKE;
-  const BSIZE = { r1c1: [14, 17], r1c2: [24, 17], r1c3: [26, 16], r1c4: [23, 18], r2c1: [14, 18], r2c2: [19, 18], r2c3: [26, 16], r2c4: [24, 18] };
   const BVIEWS = ['r2c1', 'r1c4', 'r2c3', 'r2c4', 'r1c1', 'r1c2', 'r1c3', 'r2c2'];   // view k of the game: heading k * 45 degrees (0: nose away, then clockwise)
-  BVIEWS.forEach((n, k) => ART.reg('pbike_' + n, (g, w, h) => V.blit(g, V.render(BIKE, k * Math.PI / 4, w, h, { outline: 'br', outK: .5 }), 0, 0)));
+  BVIEWS.forEach((n, k) => { ART.SIZE['pbike_' + n] = [BV[k].w, BV[k].h]; ART.reg('pbike_' + n, (g, w, h) => V.blit(g, V.render(BIKE, k*Math.PI/4, w, h, { outline: 'br', outK: .5 }), 0, 0)); });
 })();

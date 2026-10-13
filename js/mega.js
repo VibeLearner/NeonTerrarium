@@ -3154,7 +3154,7 @@ function solidPush(p){
 // people.js from POLICE_BIKES.
 const PBIKE_VIEWS = ['r2c1', 'r1c4', 'r2c3', 'r2c4', 'r1c1', 'r1c2', 'r1c3', 'r2c2'];   // nose away, away-right, right, ... going clockwise
 const PBIKE_TEX = PBIKE_VIEWS.map(n => { const t = ART.tex('pbike_' + n); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; });
-const PBIKE_SIZE = { r1c1: [14, 17], r1c2: [24, 17], r1c3: [26, 16], r1c4: [23, 18], r2c1: [14, 18], r2c2: [19, 18], r2c3: [26, 16], r2c4: [24, 18] };
+const PBIKE_SIZE = Object.fromEntries(PBIKE_VIEWS.map(n => [n, ART.SIZE['pbike_' + n]]));   // (the generated bike's views, each cropped to its pixels: artgen_vox.js)
 let POLICE_BIKES = [];
 // who rides: an officer of this station who's on shift and in the station (not out on the beat, in a moment, or held);
 // they go back in when the bike parks. With nobody free the bike still goes, its rider nobody in particular.
@@ -3166,7 +3166,7 @@ function bikeBoard(b, m){
   if (c){ b.cop = c; c.onBike = b; c.x = b.x; c.z = b.z; }
 }
 function bikeLeave(b){ if (!b.cop) return; b.cop.onBike = null; b.cop._ec = 0; b.cop = null; }
-const BIKE_Y = CURB + .28, BIKE_K = .8, BIKE_SEAT = .26;   // hover height; the rider's seat above the bike's base
+const BIKE_Y = CURB + .28, BIKE_K = 1.05, BIKE_SEAT = .34;   // hover height; the sprite scale; the rider's seat above the bike's base (the saddle top, 7 model units up, at this scale)
 function policeBike(m, idx, pad){
   const mat = new THREE.SpriteMaterial({ map: PBIKE_TEX[0], alphaTest: .5, transparent: false });
   const spr = new THREE.Sprite(mat); spr.center.set(.5, 0); spr.layers.set(1); spr.renderOrder = 2; scene.add(spr);

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hoverbike sheet</title>
+<style>
+  body { margin: 0; background: #0b0d12; color: #8fa3b8; font: 11px ui-monospace, Menlo, monospace; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 8px; }
+  .cell { background: #232831; border: 1px solid #2f3540; padding: 4px 6px; }
+  .cell.pick { border-color: #ff4fd0; box-shadow: 0 0 0 1px #ff4fd0; }
+  canvas { image-rendering: pixelated; display: block; }
+</style>
+</head>
+<body>
+<div class="grid" id="grid"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="../../js/spritegen.js"></script>
+<script src="../../js/artgen.js"></script>
+<script src="../../js/artgen_vox.js"></script>
+<script>
+// A sheet of generated hoverbikes: each cell is one seed, seen from four of the game's eight views, drawn 3x over a street-gray ground.
+// ?n=: how many seeds; ?from=: the first; ?seeds=1,2,3: just these; ?s=: scale; ?cols=; ?pick=: the one the game uses, outlined.
+const q = new URLSearchParams(location.search), N = +(q.get('n') || 32), FROM = +(q.get('from') || 1), PICK = +(q.get('pick') || 0), S = +(q.get('s') || 3), VIEWS = q.get('all') ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 1, 2, 3];
+const SEEDS = q.get('seeds') ? q.get('seeds').split(',').map(Number) : Array.from({ length: N }, (_, i) => FROM + i);
+if (q.get('cols')) document.getElementById('grid').style.gridTemplateColumns = 'repeat(' + q.get('cols') + ', 1fr)';
+const grid = document.getElementById('grid');
+for (const seed of SEEDS){
+  const b = ART.bikeGen(seed), vs = ART.bikeViews(b.model);
+  const W = VIEWS.reduce((a, k) => a + vs[k].w + 4, 0) * S, Hh = Math.max(...VIEWS.map(k => vs[k].h)) * S + 6;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = Hh; const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+  g.fillStyle = '#3a3f47'; g.fillRect(0, Hh - 10, W, 10);
+  let x = 0;
+  for (const k of VIEWS){ const v = vs[k], off = document.createElement('canvas'); off.width = v.w; off.height = v.h; ART.vox.blit(off.getContext('2d'), v.px, 0, 0);
+    g.drawImage(off, x, Hh - 6 - v.h*S, v.w*S, v.h*S); x += (v.w + 4)*S; }
+  const d = document.createElement('div'); d.className = 'cell' + (seed === PICK ? ' pick' : '');
+  d.innerHTML = `<div>#${seed} ${b.build} · ${b.livery}${b.panels ? ' + panels' : ''} · ${b.accent} · ${b.glow} glow</div>`; d.appendChild(cv); grid.appendChild(d);
+}
+document.title = 'ready';
+</script>
+</body>
+</html>

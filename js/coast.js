@@ -752,7 +752,7 @@
         gl_FragColor = vec4(c, 1.0); }` }));
   const skyScene = new THREE.Scene(); skyScene.add(skyQuad);
   const skyCam = new THREE.Camera();
-  // By night the warm lights bleed, as wet paint does: what glows (warm and bright) is taken out at half size, spread out
+  // By night the warm lights bleed, as wet paint does: what glows (warm and bright) is taken out, spread out
   // (two blurs), and laid back over the picture as a wash: its edge ragged against the paper's grain (fixed to the screen,
   // as paper is), a touch more pigment where it gives out. Its grain is read per pixel of the picture, so it stays pixel art.
   let glA = null, glB = null;
@@ -764,7 +764,7 @@
   const blurM = new THREE.ShaderMaterial({ uniforms: { src: { value: null }, dir: { value: new THREE.Vector2() } }, vertexShader: postV, depthTest: false, depthWrite: false,
     fragmentShader: `uniform sampler2D src; uniform vec2 dir; varying vec2 vU;
       void main(){ vec3 c = vec3(0.0); float wt = 0.0;
-        for (int i = -6; i <= 6; i++){ float f = float(i), w = exp(-f*f/18.0); c += texture2D(src, vU + dir*f*1.6).rgb*w; wt += w; }
+        for (int i = -6; i <= 6; i++){ float f = float(i), w = exp(-f*f/18.0); c += texture2D(src, vU + dir*f*3.2).rgb*w; wt += w; }
         gl_FragColor = vec4(c/wt, 1.0); }` });
   const blit = new THREE.Mesh(quad, new THREE.ShaderMaterial({ uniforms: { tex: { value: null }, glow: { value: null }, nightK: CURV.darkK, res: { value: new THREE.Vector2(480, 270) }, pOff: { value: new THREE.Vector2() } },
     vertexShader: postV, depthTest: false, depthWrite: false,
@@ -802,7 +802,7 @@
       { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     seaU.reflTex.value = reflRT.texture; seaU.resPx.value.set(W, H);
     for (const g of [glA, glB]) if (g) g.dispose();
-    glA = new THREE.WebGLRenderTarget(Math.ceil(W/2), Math.ceil(H/2), { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }); glB = glA.clone();
+    glA = new THREE.WebGLRenderTarget(W, H, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }); glB = glA.clone();   // (full size: at half size each one-pixel pan picked different pixels, and the glow shimmered)
     blit.material.uniforms.tex.value = rt.texture; blit.material.uniforms.glow.value = glA.texture; blit.material.uniforms.res.value.set(W, H);
   }
   addEventListener('resize', resize);
@@ -1388,7 +1388,7 @@
         if (R.chance(.3)) T.add(GEO.ico, mat(c.x, c.y + .07, c.z, 0, 0, 0, .06, .06, .06), R.pick(HP.flower)); }
       for (let k = 0; k < n; k++) if (R.chance(.5)){ const c = at((k + .5)/n, R.pick([-.3, .3]), 0); T.add(GEO.ico, mat(c.x, c.y + 1.05, c.z, 0, 0, 0, .12, .25, .12), R.pick(HP.leaf)); }
       for (const u of [0, 1]) if (R.chance(.8)){ const c = at(u, R.pick([-.65, .65]), 0); pot(T, R, c.x, c.y, c.z, 1.1); }
-      { const c = at(.5, 0, 0); pools.push([c.x, c.z, len/2 + 1, .9]); }
+      { const np = Math.max(1, Math.round(len/2.2)); for (let k = 0; k < np; k++){ const c = at((k + .5)/np, 0, 0); pools.push([c.x, c.z, Math.min(len/2, 1.1) + .9, .9]); } }   // (light pools spaced along the walk, not one stretched over all of it)
       // festoon lights strung along the beams, sagging between the posts
       for (const s of [-.45, .45]){ const nb = n*4; for (let k = 0; k <= nb; k++){ const u = k/nb, sag = .14*Math.sin(PI*((u*n) % 1)), c = at(u, s, 1.22 - sag); box(T, c.x, c.y, c.z, .06, .07, .06, HP.lamp); } }
     } else {   // on the ground: an arcade, white columns under a tiled roof, planters along it
@@ -1397,7 +1397,7 @@
       for (let k = 0; k <= n; k++) for (const s of [-.5, .5]){ const c = at(k/n, s, 0); if (solidAt(c.x, c.z, c.y, c.y + 1.2)) continue; T.add(GEO.cyl8, mat(c.x, c.y + .6, c.z, 0, 0, 0, .08, 1.2, .08), HP.white); }
       seg(T, at(-.04, 0, 1.2), at(1.04, 0, 1.2), 1.3, .12, HP.white); seg(T, at(-.04, 0, 1.34), at(1.04, 0, 1.34), 1.4, .1, HP.tile);
       for (let k = 0; k < n; k++) if (R.chance(.6)){ const c = at((k + .5)/n, R.pick([-.65, .65]), 0); pot(T, R, c.x, c.y, c.z, 1); }
-      { const c = at(.5, 0, 0); pools.push([c.x, c.z, len/2 + .9, .8]); }
+      { const np = Math.max(1, Math.round(len/2.2)); for (let k = 0; k < np; k++){ const c = at((k + .5)/np, 0, 0); pools.push([c.x, c.z, Math.min(len/2, 1.1) + .8, .8]); } }
       for (let k = 0; k < n; k++){ const c = at((k + .5)/n, 0, 0); box(T, c.x, c.y + 1.06, c.z, .02, .2, .02, HP.rail); box(T, c.x, c.y + .9, c.z, .12, .14, .12, HP.lamp); }   // (a lantern hung in each bay)
     }
   }
@@ -1521,15 +1521,16 @@
   function grassOK(x, z){ if ((coastX(z) - x)*rowCos(z) < 1.1) return null; const y = heightAt(x, z);
     if (Math.abs(heightAt(x + .35, z) - y) > .3 || Math.abs(heightAt(x, z + .35) - y) > .3) return null;
     if (solidAt(x, z, y - .2, y + .5)) return null; return y; }
-  function tuft(G, i, j, st){
+  function tuft(G, i, j, st, part){   // (part: 'blot', the washed ground under it; or 'plant', the plant itself)
     const R = rng((Math.imul(i, 73856093) ^ Math.imul(j, 19349663)) >>> 0), x = (i + R.r(.1, .9))*GC, z = (j + R.r(.1, .9))*GC, y = grassOK(x, z); if (y === null) return;
     const wash = fbm(x*.12 + 3, z*.12 - 5), dryK = smooth(.58, .75, fbm(x*.07 - 20, z*.07 + 9))*.55;
     let base = mix3(mix3(GG.greenA, GG.greenB, smooth(.35, .65, wash)), GG.greenC, smooth(.55, .8, fbm(x*.3, z*.3))*.6); base = mix3(base, GG.dry, dryK);
     const tipC = mix3(GG.tip, base, .35), lean0 = R.r(.15, .45);
     // the ground under it washed darker, a ragged blot: blots run together into the patch's shadowed floor
-    { const gc = mul3(base, .72, .6), c0 = G.v(x, y + .025, z, 0, 1, 0, gc, 0), n = 7, rr = GC*R.r(.85, 1.15), a0 = R.r(0, 6.28), ring_ = [];
-      for (let k = 0; k < n; k++){ const a = a0 + k/n*6.28, q = rr*(.75 + .45*hash2(i*31 + k, j*17 - k)); ring_.push(G.v(x + Math.cos(a)*q, y + .02, z + Math.sin(a)*q, 0, 1, 0, mul3(gc, 1.06), 0)); }
-      for (let k = 0; k < n; k++) G.tri(c0, ring_[(k + 1) % n], ring_[k]); }
+    { const rr = GC*R.r(.85, 1.15), a0 = R.r(0, 6.28);
+      if (part === 'blot'){ const gc = mul3(base, .72, .6), c0 = G.v(x, y + .025, z, 0, 1, 0, gc, 0), n = 7, ring_ = [];
+        for (let k = 0; k < n; k++){ const a = a0 + k/n*6.28, q = rr*(.75 + .45*hash2(i*31 + k, j*17 - k)); ring_.push(G.v(x + Math.cos(a)*q, y + .02, z + Math.sin(a)*q, 0, 1, 0, mul3(gc, 1.06), 0)); }
+        for (let k = 0; k < n; k++) G.tri(c0, ring_[(k + 1) % n], ring_[k]); return; } }
     const grass = (n, l0, l1) => { for (let k = 0; k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .16), c = mix3(base, [base[0]*1.12, base[1]*1.06, base[2]*.9], R.f());
       blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a + R.r(-.6, .6), R.r(l0, l1), R.r(.08, .14), lean0 + R.r(-.15, .2), c, tipC, 3); } };
     if (st === 0) grass(R.i(10, 15), .24, .6);
@@ -1553,11 +1554,27 @@
     if (any) saveGrass(); }
   function buildSquare(key){
     const old = gSquares.get(key); if (old){ scene.remove(old); old.geometry.dispose(); gSquares.delete(key); }
-    const [si, sj] = key.split(',').map(Number), G = new GB(), n = GSQ/GC;
-    for (let i = si*n; i < si*n + n; i++) for (let j = sj*n; j < sj*n + n; j++){ const t = tufts.get(i + ',' + j); if (t) tuft(G, i, j, t[2]); }
+    // (the washed ground first, all of it; then the plants in a shuffled order, noting where each ends, so the far or
+    // zoomed-out view can draw just the first so many: an even thinning, see grassLOD)
+    const [si, sj] = key.split(',').map(Number), G = new GB(), n = GSQ/GC, list = [];
+    for (let i = si*n; i < si*n + n; i++) for (let j = sj*n; j < sj*n + n; j++){ const t = tufts.get(i + ',' + j); if (t) list.push([hash2(i*7 + 3, j*11 + 1), i, j, t[2]]); }
+    list.sort((a, b) => a[0] - b[0]);
+    for (const [, i, j, st] of list) tuft(G, i, j, st, 'blot');
+    const blotEnd = G.I.length, cuts = [];
+    for (const [, i, j, st] of list){ tuft(G, i, j, st, 'plant'); cuts.push(G.I.length); }
     if (!G.I.length) return;
-    const m = new THREE.Mesh(G.mesh(), grassM); m.receiveShadow = true; m.castShadow = false; m.frustumCulled = false; m.matrixAutoUpdate = false; scene.add(m); gSquares.set(key, m); }
-  function grassTick(t){ gU.wTime.value = t; const t0 = performance.now(); for (const k of gDirty){ gDirty.delete(k); buildSquare(k); if (performance.now() - t0 > 6) break; } }   // (about 6 ms of remaking a frame at most, so painting stays smooth)
+    const m = new THREE.Mesh(G.mesh(), grassM); m.receiveShadow = true; m.castShadow = false; m.frustumCulled = false; m.matrixAutoUpdate = false;
+    m.userData = { blotEnd, cuts, cx: (si + .5)*GSQ, cz: (sj + .5)*GSQ, keep: -1 }; scene.add(m); gSquares.set(key, m); }
+  // Thinning by distance: up close every plant; zoomed out, and toward the edges and far side of the view, fewer (the
+  // washed ground stays, so a thinned meadow still reads as one); squares well out of view aren't drawn at all
+  function grassLOD(){
+    const zk = clamp(13/Math.max(zoom, 1), .22, 1);
+    for (const m of gSquares.values()){ const u = m.userData, d = Math.hypot(u.cx - camT.x, u.cz - camT.z), r = d/(V.hw + 1);
+      if (r > 1.6){ m.visible = false; continue; } m.visible = true;
+      const keep = Math.round(clamp(zk*(1 - .55*smooth(.45, 1.2, r)), .12, 1)*40)/40;   // (in steps of a fortieth, so it isn't redone every frame)
+      if (keep === u.keep) continue; u.keep = keep;
+      const k = Math.floor(keep*u.cuts.length), end = k > 0 ? u.cuts[k - 1] : u.blotEnd; m.geometry.setDrawRange(0, Math.max(end, u.blotEnd)); } }
+  function grassTick(t){ gU.wTime.value = t; grassLOD(); const t0 = performance.now(); for (const k of gDirty){ gDirty.delete(k); buildSquare(k); if (performance.now() - t0 > 6) break; } }   // (about 6 ms of remaking a frame at most, so painting stays smooth)
   const grassAround = (x, z, r) => { for (let a = Math.floor((x - r)/GSQ); a <= Math.floor((x + r)/GSQ); a++) for (let b = Math.floor((z - r)/GSQ); b <= Math.floor((z + r)/GSQ); b++) if (gSquares.has(a + ',' + b)) gDirty.add(a + ',' + b); };
 
   ANIM.live = true;   // (homes from the save just appear; new ones are painted in)

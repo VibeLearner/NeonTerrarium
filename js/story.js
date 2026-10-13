@@ -455,8 +455,8 @@ const STORY = (() => {
     if (b && PG.live() && sc.phase !== 'gather'){
       if (b.do !== st.do0){ st.do0 = b.do; st.t0 = t; }
       const d = b.do;
-      const holdIdle = () => { const m = PG.heldMode[p.held]; return (m === 'side' ? F_SIDEIDLE : m === 'hand' ? F_HOLDIDLE : F_CARRYIDLE) + Math.floor(t*2 + p.phase) % 2; };
-      if (d === 'pick-up' && mine){ if (!p.held) p.held = st.pick || 'box'; frame = since < 1 ? F_CROUCH + Math.min(3, Math.floor(since*4)) : holdIdle(); }
+      const holdIdle = () => { const m = PG.heldModeOf(p.held); return (m === 'side' ? F_SIDEIDLE : m === 'hand' ? F_HOLDIDLE : F_CARRYIDLE) + Math.floor(t*2 + p.phase) % 2; };
+      if (d === 'pick-up' && mine){ if (!p.held) p.held = st.pick || PG.heldPick('box', '', p.id); frame = since < 1 ? F_CROUCH + Math.min(3, Math.floor(since*4)) : holdIdle(); }
       else if (d === 'hand-over' && mine && p.held) frame = F_GIVE + Math.floor(t*2) % 2;
       else if (p.held && !(st.gest && Math.floor(t*.6 + p.phase) % 3 > 0)) frame = holdIdle();
       else if (d === 'sit' && mine) frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4;
@@ -708,9 +708,9 @@ const STORY = (() => {
   const WITH_RE = /\b(carr(y|ies|ying)|with|holding|holds|hauls|lugs|clutch\w*|under one arm|takes|lifts|picks up|hands|passes|brings|balanc\w*)\b/i;
   function heldFor(sc, b, line){
     const who = [].concat(b.who || []), p = who.length && pOf(sc.cast[who[0]]); if (!p) return;
-    const k = PG.heldFromText ? PG.heldFromText(line) : null;
-    if (b.do === 'carry' || b.do === 'hand-over'){ if (!p.held || k) p.held = k || p.held || 'box'; }
-    else if (b.do === 'pick-up'){ if (p.sc) p.sc.pick = k || 'box'; }
+    const k = PG.heldFromText ? PG.heldFromText(line, p.id) : null;
+    if (b.do === 'carry' || b.do === 'hand-over'){ if (!p.held || k) p.held = k || p.held || PG.heldPick('box', '', p.id); }
+    else if (b.do === 'pick-up'){ if (p.sc) p.sc.pick = k || PG.heldPick('box', '', p.id); }
     else if (k && WITH_RE.test(line) && ['walk', 'leave', 'enter', 'walk-together', 'stand', 'wait-outside', 'knock-and-wait'].includes(b.do)) p.held = k;
   }
   function afterHandOver(sc, b){
@@ -1096,7 +1096,7 @@ const STORY = (() => {
   function deliveryTake(sc){
     const d = sc.dlv; if (!d || d.took) return; d.took = true;
     const b = d.bot; b.taken = true; b.storyWait = false;
-    { const q = pOf(sc.cast.A); if (q) q.held = { flowers: 'flowers', soup: 'food', bottle: 'bottle', letter: 'paper', legal: 'paper', seeds: 'pot', medicine: 'bag' }[d.kind] || 'box'; }   // (what came, in their hands: peoplegen_held.js)
+    { const q = pOf(sc.cast.A); if (q){ const k = { flowers: 'flowers', soup: 'food', bottle: 'bottle', letter: 'paper', legal: 'paper', seeds: 'pot', medicine: 'bag' }[d.kind] || 'box'; q.held = PG.heldPick(k, d.K.look || '', q.id); } }   // (what came, in their hands: peoplegen_held.js)
     if (!sc.seen.includes('b3') && !sc.seen.includes('b2')) return;
     const E = D.engine.delivery, A = sc.cast.A, ctx = { sender: d.K.sender, look: d.K.look };
     const lab = pick(E.label, sc.id, 'lab'), learned = learnFrom(lab, sc.cast, new Set(['A']), 'document', null, ctx);

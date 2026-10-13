@@ -1029,8 +1029,8 @@ function startTrip(p, toId){
   if (!mid) mid = route(a, b); if (!mid) return false;
   const base = head.concat(mid, tail), pts = p.cop ? base : spreadPath(p, base, head.length, base.length - 1 - tail.length);
   // out of the malls and the market with a bag now and then, carried home (peoplegen_held.js; put down on arrival)
-  if (!p.scene && !p.cop && toId === p.home && from.mega && (from.mega.kind === 'mall' || from.mega.kind === 'market') && pplRand() < .55) p.held = pplRand() < .8 ? 'bag' : 'box';
-  else if (!p.scene && from.stalls && toId === p.home && pplRand() < .25) p.held = 'food';
+  if (!p.scene && !p.cop && toId === p.home && from.mega && (from.mega.kind === 'mall' || from.mega.kind === 'market') && pplRand() < .55) p.held = PG.heldPick(pplRand() < .8 ? 'bag' : 'box', '', p.id);
+  else if (!p.scene && from.stalls && toId === p.home && pplRand() < .25) p.held = PG.heldPick('food', '', p.id);
   const cum = [0];
   for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
   if (p.spot){ p.spot.by = null; p.spot = null; }
@@ -2196,7 +2196,7 @@ function updatePeople(dt, t){
       }
     }
     if (walking) frame = paused ? F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle : Math.floor(t*9*p.speed/PPL_SPEED*(p.rush ? 2 : p.hurry ? 1.5 : 1) + p.phase) % PPL.walk;
-    if (walking && newLook && p.held && !(p.um && p.um.on)){ const m = PG.heldMode[p.held];   // something in their hands (peoplegen_held.js): its frames, by how it's held
+    if (walking && newLook && p.held && !(p.um && p.um.on)){ const m = PG.heldModeOf(p.held);   // something in their hands (peoplegen_held.js): its frames, by how it's held
       frame = paused ? (m === 'side' ? F_SIDEIDLE : m === 'hand' ? F_HOLDIDLE : F_CARRYIDLE) + Math.floor(t*2 + p.phase) % 2 : (m === 'side' ? F_SIDE : m === 'hand' ? F_HOLD : F_CARRY) + frame % PPL.walk; }
     if (newLook && walking && !paused){   // running: the club crowd never does, and the pace is matched to the ground speed (one run cycle covers PG.STRIDE.run / PG.STRIDE.walk times a walk cycle)
       const sf = p.rush ? 2.3 : p.hurry ? 1.6 : p.rainRun > t ? 1.6 : 0;

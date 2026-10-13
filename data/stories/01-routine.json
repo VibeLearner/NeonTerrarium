@@ -381,7 +381,9 @@
         ],
         "b3": [
           "{A} comes out of {place} with a full bag in each hand.",
-          "{A} emerges with a paper sack and a single stalk of something green sticking out of it.",
+          "{A} comes out of {place} with a bag of groceries on one arm.",
+          "{A} leaves {place} with a paper sack of groceries held against {A.his} hip.",
+          "{A} comes out of {place} carrying a cloth bag, heavier than it went in.",
           "{A} leaves {place}, bag swinging, the list crumpled in a fist.",
           "{A} steps out of {place} with one small bag and heads back the way {A.he} came."
         ]

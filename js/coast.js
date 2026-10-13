@@ -208,11 +208,14 @@
 
   // a growing list of flat-shaded, colored triangles; props are merged into it
   // (what glows by night is known by its color: GLOW maps a palette color to how it glows; dark window glass is lit in about
-  // half the windows, picked by a count kept in the Tris so the same home always lights the same ones)
+  // half the windows, picked by the window's position, so a window never flips when other homes or links are built)
   const GLOW = new Map();
   class Tris {
     constructor(){ this.p = []; this.c = []; this.gl = null; this.k = 0; }
-    glowRun(n0, col){ let v = GLOW.get(col); if (v === undefined) return; if (v < 0) v = hash2(++this.k, 77) < -v ? .9 : 0; if (v) (this.gl || (this.gl = [])).push(n0, this.p.length/3 - n0, v); }
+    glowRun(n0, col){ let v = GLOW.get(col); if (v === undefined) return;
+      if (v < 0){ const P = this.p, n1 = this.p.length/3; let x = 0, y = 0, z = 0; for (let i = n0; i < n1; i++){ x += P[i*3]; y += P[i*3 + 1]; z += P[i*3 + 2]; } const k = n1 - n0;
+        v = hash2(Math.round(x/k*8)*73856093 ^ Math.round(z/k*8)*19349663, Math.round(y/k*8)) < -v ? .9 : 0; }   // (lit or not by where the window is: the same window stays lit whatever else is built)
+      if (v) (this.gl || (this.gl = [])).push(n0, this.p.length/3 - n0, v); }
     add(geo, m, col){ const g = geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(m); const a = g.attributes.position.array, n0 = this.p.length/3;
       for (let i = 0; i < a.length; i += 3){ this.p.push(a[i], a[i + 1], a[i + 2]); this.c.push(col.r, col.g, col.b); } g.dispose(); this.glowRun(n0, col); }
     quad(a, b, c, d, col){ const n0 = this.p.length/3; for (const v of [a, b, c, a, c, d]){ this.p.push(v[0], v[1], v[2]); this.c.push(col.r, col.g, col.b); } this.glowRun(n0, col); }

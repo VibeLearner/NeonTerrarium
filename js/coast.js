@@ -136,9 +136,9 @@
   // it turns them warm amber, the glass a gold-green, as in the solarpunk boards (a teal, rainy dusk, every window warm)
   const GLOW_V = 'attribute float glow; varying float vGlow;\n';
   const GLOW_F = 'varying float vGlow;\n';
-  const GLOW_APPLY = `if (vGlow > 0.0){ vec3 amber = vec3(1.0, 0.62, 0.28);
+  const GLOW_APPLY = `if (vGlow > 0.0){ vec3 amber = vec3(1.0, 0.5, 0.2), lampY = vec3(1.0, 0.87, 0.47);
       float lamp = step(0.85, vGlow), sh = 0.74 + 0.26*abs(normalize(vNormal).x);
-      vec3 gc = lamp > 0.5 ? amber*1.05 : mix(vec3(1.0, 0.78, 0.42), vColor*vec3(0.75, 0.95, 0.5), 0.3)*sh;   // (glass: a soft gold-green, still shaded by its facets)
+      vec3 gc = lamp > 0.5 ? lampY*1.04 : vGlow > 0.6 ? lampY*0.95*sh : mix(amber, vColor*vec3(0.9, 0.75, 0.45), 0.18)*sh;   // (.7: a tower's glass rooms, lit like windows)   // (windows and lamps: warm yellow; the glass up top: orange, still shaded by its facets)
       gl_FragColor.rgb = mix(gl_FragColor.rgb, gc, nightK*(lamp > 0.5 ? 1.0 : 0.85)); }`;
   // a new home painted in, in watercolor: the wash rises up it from the ground with a ragged, bleeding edge (darker where the
   // pigment pools at the wash's rim), pale and watery behind the edge, then the color deepens to full as it dries
@@ -713,12 +713,12 @@
     if (poolMesh) poolMesh.visible = n > .01;
     if (n > 0){
       const mz = new THREE.Vector3(-.35, .86, -.38).normalize(); sunDir.lerp(mz, n).normalize();
-      sun.color.lerp(new THREE.Color(.55, .74, 1.0), n); sun.intensity = lerp(sun.intensity, .3, n);
-      hemi.color.lerp(new THREE.Color(.3, .52, .62), n); hemi.groundColor.setRGB(lerp(.42, .06, n), lerp(.48, .12, n), lerp(.29, .14, n)); hemi.intensity = lerp(hemi.intensity, .3, n);
-      amb.color.setRGB(lerp(.81, .2, n), lerp(.9, .4, n), lerp(.94, .48, n));
-      SKY.top.lerp(new THREE.Color(.02, .05, .1), n); SKY.mid.lerp(new THREE.Color(.04, .11, .17), n); SKY.low.lerp(new THREE.Color(.09, .2, .25), n);
+      sun.color.lerp(new THREE.Color(.72, .76, .9), n); sun.intensity = lerp(sun.intensity, .3, n);   // (a warmer night: the moon less blue, the shade a warm teal)
+      hemi.color.lerp(new THREE.Color(.46, .52, .54), n); hemi.groundColor.setRGB(lerp(.42, .14, n), lerp(.48, .11, n), lerp(.29, .09, n)); hemi.intensity = lerp(hemi.intensity, .32, n);
+      amb.color.setRGB(lerp(.81, .36, n), lerp(.9, .36, n), lerp(.94, .38, n));
+      SKY.top.lerp(new THREE.Color(.06, .05, .1), n); SKY.mid.lerp(new THREE.Color(.11, .1, .16), n); SKY.low.lerp(new THREE.Color(.2, .19, .22), n);
       CURV.hazeC.value.copy(SKY.low);
-      seaU.tint.value.lerp(new THREE.Color(.3, .42, .55), n); seaU.glint.value.lerp(new THREE.Color(.78, .88, 1.0), n); seaU.glintK.value = lerp(seaU.glintK.value, .5, n);
+      seaU.tint.value.lerp(new THREE.Color(.38, .42, .52), n); seaU.glint.value.lerp(new THREE.Color(.78, .88, 1.0), n); seaU.glintK.value = lerp(seaU.glintK.value, .5, n);
       seaU.sunDir.value.copy(sunDir);
     } else { hemi.groundColor.setRGB(.42, .48, .29); amb.color.setRGB(.81, .9, .94); }
     reflM.color.setRGB(lerp(1, .26, n), lerp(1, .36, n), lerp(1, .46, n));
@@ -927,7 +927,7 @@
     terra: C(0xc8663e), terra2: C(0xa9522f), tile: C(0xb85a36), glass: C(0x8fd8c4).multiplyScalar(1.12), glass2: C(0x84d4be).multiplyScalar(1.2), glassT: C(0x7fc0c4).multiplyScalar(1.15), glassD: C(0x2f5960), frame: C(0x2e403e),
     doorO: C(0xd0702e), doorT: C(0x3e6e7a), wood: C(0x9a6a3e), rail: C(0x3a3f3e), metal: C(0x9aa3a6), blue: C(0x3a9ec4), lamp: C(0xffd27a),
     leaf: [C(0x4e8a34), C(0x6aa03c), C(0x3d7430), C(0x82b048)], pot: C(0xb5583a), stone: C(0xd8ccb2), flower: [C(0xf08a5a), C(0xf5c84c), C(0xe6739a)] };
-  GLOW.set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .5).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
+  GLOW.set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
   Object.assign(GEO, { cyl12: new THREE.CylinderGeometry(1, 1, 1, 12), cyl16: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.IcosahedronGeometry(1, 1),
     dome: new THREE.SphereGeometry(1, 12, 6, 0, PI*2, 0, PI/2), ring: new THREE.CylinderGeometry(1, 1, 1, 16, 1, true) });
   const rng = seed => { let a = seed >>> 0; return { f(){ a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0)/4294967296; },
@@ -1584,7 +1584,7 @@
   const reflM = new THREE.MeshBasicMaterial({ vertexColors: true, clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0)] });
   reflM.onBeforeCompile = sh => { sh.uniforms.nightK = CURV.nightK;   // (by night the lit windows show in the water, warm)
     sh.vertexShader = GLOW_V + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vGlow = glow;');
-    sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(1.0, 0.72, 0.38), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
+    sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vGlow > 0.85 ? vec3(1.0, 0.85, 0.46) : vec3(1.0, 0.6, 0.28), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
   renderer.localClippingEnabled = true;
   function renderRefl(){
     const hide = [sea, spray, ghost, ring, ...zGhosts, ...(poolMesh ? [poolMesh] : []), ...BLOOMS], vis = hide.map(o => o.visible); hide.forEach(o => { o.visible = false; });

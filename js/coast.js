@@ -1521,7 +1521,7 @@
   function grassOK(x, z){ if ((coastX(z) - x)*rowCos(z) < 1.1) return null; const y = heightAt(x, z);
     if (Math.abs(heightAt(x + .35, z) - y) > .3 || Math.abs(heightAt(x, z + .35) - y) > .3) return null;
     if (solidAt(x, z, y - .2, y + .5)) return null; return y; }
-  function tuft(G, i, j, st, part){   // (part: 'blot', the washed ground under it; or 'plant', the plant itself)
+  function tuft(G, i, j, st, part){   // (part: 'blot', the washed ground under it; 'plant', the plant itself; 'lo', the plant drawn simply, for far views)
     const R = rng((Math.imul(i, 73856093) ^ Math.imul(j, 19349663)) >>> 0), x = (i + R.r(.1, .9))*GC, z = (j + R.r(.1, .9))*GC, y = grassOK(x, z); if (y === null) return;
     const wash = fbm(x*.12 + 3, z*.12 - 5), dryK = smooth(.58, .75, fbm(x*.07 - 20, z*.07 + 9))*.55;
     let base = mix3(mix3(GG.greenA, GG.greenB, smooth(.35, .65, wash)), GG.greenC, smooth(.55, .8, fbm(x*.3, z*.3))*.6); base = mix3(base, GG.dry, dryK);
@@ -1531,6 +1531,17 @@
       if (part === 'blot'){ const gc = mul3(base, .72, .6), c0 = G.v(x, y + .025, z, 0, 1, 0, gc, 0), n = 7, ring_ = [];
         for (let k = 0; k < n; k++){ const a = a0 + k/n*6.28, q = rr*(.75 + .45*hash2(i*31 + k, j*17 - k)); ring_.push(G.v(x + Math.cos(a)*q, y + .02, z + Math.sin(a)*q, 0, 1, 0, mul3(gc, 1.06), 0)); }
         for (let k = 0; k < n; k++) G.tri(c0, ring_[(k + 1) % n], ring_[k]); return; } }
+    // the simple one: the same tuft in the same place and colors, of a few broad single-triangle blades (and a triangle for a
+    // flower, a frond, a seed head); about a tenth of the triangles, and at a distance it reads the same
+    if (part === 'lo'){
+      const one = (n, l0, l1, w, c0, c1, lean) => { const tops = []; for (let k = 0; k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .14); tops.push(blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a, R.r(l0, l1), w, lean + R.r(-.1, .2), c0, c1, 1)); } return tops; };
+      const dot = (p, r, col) => { const h = p[1] - y, a = G.v(p[0] - r, p[1], p[2], 0, 1, 0, col, h), b = G.v(p[0] + r*.5, p[1] + r*.3, p[2] - r*.86, 0, 1, 0, col, h), c = G.v(p[0] + r*.5, p[1] - r*.3, p[2] + r*.86, 0, 1, 0, col, h); G.tri(a, b, c); };
+      const b2 = mix3(base, tipC, .22);   // (a touch lighter at the root: fewer, broader blades hide less of the dark ground, so they carry more of the tip color)
+      if (st === 0) one(8, .26, .58, .32, b2, tipC, lean0);
+      else if (st === 1){ one(6, .2, .42, .3, b2, tipC, lean0); const fc = R.pick(FLOWERS); for (const t of one(2, .32, .55, .05, mul3(base, .9), base, .15)) dot(t, .11, fc); }
+      else if (st === 2){ const fc = mix3(GG.fern, base, .25); one(6, .4, .65, .36, mix3(fc, GG.tip, .12), mix3(fc, GG.tip, .35), 1.05); }
+      else { const rc = mix3(GG.reed, base, .45); for (const t of one(5, .75, 1.25, .16, mix3(base, rc, .3), rc, .12)) if (R.chance(.6)) dot([t[0], t[1] + .06, t[2]], .07, GG.head); one(3, .2, .38, .26, b2, tipC, lean0); }
+      return; }
     const grass = (n, l0, l1) => { for (let k = 0; k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .16), c = mix3(base, [base[0]*1.12, base[1]*1.06, base[2]*.9], R.f());
       blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a + R.r(-.6, .6), R.r(l0, l1), R.r(.08, .14), lean0 + R.r(-.15, .2), c, tipC, 3); } };
     if (st === 0) grass(R.i(10, 15), .24, .6);
@@ -1553,27 +1564,23 @@
       tufts.set(k, [i, j, style === 4 ? mixStyle(i, j) : style]); gDirty.add(sqKey(i, j)); any = true; }
     if (any) saveGrass(); }
   function buildSquare(key){
-    const old = gSquares.get(key); if (old){ scene.remove(old); old.geometry.dispose(); gSquares.delete(key); }
-    // (the washed ground first, all of it; then the plants in a shuffled order, noting where each ends, so the far or
-    // zoomed-out view can draw just the first so many: an even thinning, see grassLOD)
-    const [si, sj] = key.split(',').map(Number), G = new GB(), n = GSQ/GC, list = [];
-    for (let i = si*n; i < si*n + n; i++) for (let j = sj*n; j < sj*n + n; j++){ const t = tufts.get(i + ',' + j); if (t) list.push([hash2(i*7 + 3, j*11 + 1), i, j, t[2]]); }
-    list.sort((a, b) => a[0] - b[0]);
-    for (const [, i, j, st] of list) tuft(G, i, j, st, 'blot');
-    const blotEnd = G.I.length, cuts = [];
-    for (const [, i, j, st] of list){ tuft(G, i, j, st, 'plant'); cuts.push(G.I.length); }
+    const old = gSquares.get(key); if (old){ scene.remove(old); old.userData.hi.dispose(); old.userData.lo.dispose(); gSquares.delete(key); }
+    // (two versions of the square: the full one, and the simple one for far views; every tuft is in both, so switching
+    // never thins the meadow, see grassLOD)
+    const [si, sj] = key.split(',').map(Number), G = new GB(), L = new GB(), n = GSQ/GC;
+    for (let i = si*n; i < si*n + n; i++) for (let j = sj*n; j < sj*n + n; j++){ const t = tufts.get(i + ',' + j); if (!t) continue;
+      tuft(G, i, j, t[2], 'blot'); tuft(G, i, j, t[2], 'plant'); tuft(L, i, j, t[2], 'blot'); tuft(L, i, j, t[2], 'lo'); }
     if (!G.I.length) return;
-    const m = new THREE.Mesh(G.mesh(), grassM); m.receiveShadow = true; m.castShadow = false; m.frustumCulled = false; m.matrixAutoUpdate = false;
-    m.userData = { blotEnd, cuts, cx: (si + .5)*GSQ, cz: (sj + .5)*GSQ, keep: -1 }; scene.add(m); gSquares.set(key, m); }
-  // Thinning by distance: up close every plant; zoomed out, and toward the edges and far side of the view, fewer (the
-  // washed ground stays, so a thinned meadow still reads as one); squares well out of view aren't drawn at all
+    const hi = G.mesh(), lo = L.mesh();
+    for (const g of [hi, lo]){ g.computeBoundingSphere(); g.boundingSphere.radius += 1.5; }   // (room for the sway and the tall reeds: culled only when truly out of view)
+    const m = new THREE.Mesh(GLOD.hi ? hi : lo, grassM); m.receiveShadow = true; m.castShadow = false; m.frustumCulled = true; m.matrixAutoUpdate = false;
+    m.userData = { hi, lo }; scene.add(m); gSquares.set(key, m); }
+  // Far views draw the simple grass: below zoom 16 the full grass, past 19 the simple one (the gap keeps it from switching
+  // back and forth at the edge); the whole meadow switches at once, at a zoom where a blade is about a pixel wide
+  const GLOD = { hi: true };
   function grassLOD(){
-    const zk = clamp(13/Math.max(zoom, 1), .22, 1);
-    for (const m of gSquares.values()){ const u = m.userData, d = Math.hypot(u.cx - camT.x, u.cz - camT.z), r = d/(V.hw + 1);
-      if (r > 1.6){ m.visible = false; continue; } m.visible = true;
-      const keep = Math.round(clamp(zk*(1 - .55*smooth(.45, 1.2, r)), .12, 1)*40)/40;   // (in steps of a fortieth, so it isn't redone every frame)
-      if (keep === u.keep) continue; u.keep = keep;
-      const k = Math.floor(keep*u.cuts.length), end = k > 0 ? u.cuts[k - 1] : u.blotEnd; m.geometry.setDrawRange(0, Math.max(end, u.blotEnd)); } }
+    const want = GLOD.hi ? zoom < 19 : zoom < 16; if (want === GLOD.hi) return; GLOD.hi = want;
+    for (const m of gSquares.values()) m.geometry = want ? m.userData.hi : m.userData.lo; }
   function grassTick(t){ gU.wTime.value = t; grassLOD(); const t0 = performance.now(); for (const k of gDirty){ gDirty.delete(k); buildSquare(k); if (performance.now() - t0 > 6) break; } }   // (about 6 ms of remaking a frame at most, so painting stays smooth)
   const grassAround = (x, z, r) => { for (let a = Math.floor((x - r)/GSQ); a <= Math.floor((x + r)/GSQ); a++) for (let b = Math.floor((z - r)/GSQ); b <= Math.floor((z + r)/GSQ); b++) if (gSquares.has(a + ',' + b)) gDirty.add(a + ',' + b); };
 

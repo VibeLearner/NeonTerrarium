@@ -1002,7 +1002,7 @@
     if (lo < .35) return { ok: false, why: 'too close to the water' };
     if (hi - lo > 1.0) return { ok: false, why: 'too steep' };
     const b = blockOf(kind, seed, false, false);
-    if (blocked(placeHull(b.hull, x, z, rot), y, y + b.h)) return { ok: false, why: 'something is in the way' };
+    const by = blocked(placeHull(b.hull, x, z, rot), y, y + b.h); if (by) return { ok: false, why: 'something is in the way', by, y };
     return { ok: true, y };
   }
   const dirtyAround = p => { for (const ch of chunks.values()) if (ch.land && ch.i*CH < p.x + p.r + 3 && ch.i*CH + CH > p.x - p.r - 3 && ch.j*CH < p.z + p.r + 3 && ch.j*CH + CH > p.z - p.r - 3) ch.dirty = true; };
@@ -1177,7 +1177,8 @@
   const RN = 48, ringGeo = new THREE.BufferGeometry(); ringGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array((RN + 1)*2*3), 3));
   { const idx = []; for (let i = 0; i < RN; i++){ const a = i*2, b = a + 1, c = a + 2, d = a + 3; idx.push(a, b, c, b, d, c); } ringGeo.setIndex(idx); }
   const ring = new THREE.Mesh(ringGeo, ringM); ring.visible = false; ring.frustumCulled = false; ring.renderOrder = 6; scene.add(ring);
-  const PL = { kind: null, rot: 0, hit: null, ok: null, ptr: null, onto: null, seed: 1 + PIECES.length*7 + (PIECES.reduce((a, p) => a + (p.seed || 0), 0) % 997) };   // (seed: the next home's look; V rolls another)
+  const PL = { kind: null, rot: 0, hit: null, ok: null, ptr: null, onto: null, seed: 1 + PIECES.length*7 + (PIECES.reduce((a, p) => a + (p.seed || 0), 0) % 997), zkind: 'townhouse', zseed: 0 };   // (zkind, zseed: single mode's home)
+  PL.zseed = PL.seed + 500;   // (seed: the next home's look; V rolls another)
   const status = document.getElementById('placeStatus');
   // the home under the pointer, if any (its block)
   const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2();
@@ -1189,37 +1190,44 @@
     const n = h.face ? h.face.normal.clone().applyMatrix3(_nm.getNormalMatrix(h.object.matrixWorld)).normalize() : new THREE.Vector3(0, 1, 0);
     return { piece: h.object.userData.piece, point: h.point, top: n.y > .6 }; }
   const pieceAt = (cx, cy) => { const h = pieceHit(cx, cy); return h ? h.piece : null; };
+  // what the next single home is: in one-by-one mode the picked kind and a fresh look each time; with the homes brush at its
+  // smallest (single mode) a kind V steps through and a look that stays put until Shift+V, so the same home goes down again
+  const oneHome = () => PL.kind === 'zone' && ZONE.size === 0;
+  const curKind = () => oneHome() ? PL.zkind : PL.kind, curSeed = () => oneHome() ? PL.zseed : PL.seed;
   function showGhost(){
-    PL.onto = null; PL.side = null;
-    const hov = PL.kind && PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, over = hov && hov.top ? hov.piece : null;
+    PL.onto = null; PL.side = null; zHide();
+    const K = curKind(), S = curSeed(), pre = oneHome() ? 'one home: ' + K + ' (V next) ' : '';
+    const say = (t, ok) => { if (status){ status.textContent = pre + t; status.style.color = ok ? '#0f3b4a' : ''; } };
+    const hov = K && PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, over = hov && hov.top ? hov.piece : null;
     if (hov && !hov.top){   // against a wall: build off that side, on that floor
-      const sp = sideSpot(hov.piece, PL.kind, hov.point.x, hov.point.z); PL.ok = sp; PL.side = sp.ok ? sp : null;
-      ghost.geometry = blockOf(PL.kind, PL.seed, hov.piece.level > 0, false).geo; ghost.position.set(sp.x, sp.ok ? sp.y : hov.piece.y, sp.z); ghost.rotation.y = sp.rot; ghost.visible = true; ring.visible = false;
-      if (status){ status.textContent = sp.ok ? (sp.supports ? 'off the side (far out: it gets supports)' : 'off the side') : sp.why; status.style.color = sp.ok ? '#0f3b4a' : ''; } return; }
+      const sp = sideSpot(hov.piece, K, hov.point.x, hov.point.z, S); PL.ok = sp; PL.side = sp.ok ? sp : null;
+      ghost.geometry = blockOf(K, S, hov.piece.level > 0, false).geo; ghost.position.set(sp.x, sp.ok ? sp.y : hov.piece.y, sp.z); ghost.rotation.y = sp.rot; ghost.visible = true; ring.visible = false;
+      say(sp.ok ? (sp.supports ? 'off the side (far out: it gets supports)' : 'off the side') : sp.why, sp.ok); return; }
     if (over){   // over a home's roof: stack on top of it
-      const t = stackTop(over), bS = blockOf(PL.kind, PL.seed, true, false), yS = t.y + t.top;
+      const t = stackTop(over), bS = blockOf(K, S, true, false), yS = t.y + t.top;
       const hitN = t.level < MAXLV - 1 ? blocked(placeHull(bS.hull, t.x, t.z, t.rot), yS, yS + bS.h, [t]) : null;
       const ok = t.level < MAXLV - 1 && !hitN; PL.onto = ok ? t : null; PL.ok = ok ? { ok: true, y: yS } : { ok: false, why: hitN ? 'it would run into a neighbor' : 'as high as it goes' };
-      ghost.geometry = blockOf(PL.kind, PL.seed, true, false).geo; ghost.position.set(t.x, t.y + t.top, t.z); ghost.rotation.y = t.rot; ghost.visible = true; ring.visible = false;
-      if (status){ status.textContent = ok ? 'stack on top (floor ' + (t.level + 2) + ')' : PL.ok.why; status.style.color = ok ? '#0f3b4a' : ''; } return; }
-    const hit = PL.kind && PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
-    if (!hit || hit.sea){ ghost.visible = ring.visible = false; PL.ok = null; if (status) status.textContent = PL.kind ? (hit ? 'not on the sea' : '') : ''; return; }
-    const ck = check(PL.kind, hit.x, hit.z, PL.seed, PL.rot), r = KINDS[PL.kind].rb + .3; PL.ok = ck;
+      ghost.geometry = bS.geo; ghost.position.set(t.x, t.y + t.top, t.z); ghost.rotation.y = t.rot; ghost.visible = true; ring.visible = false;
+      say(ok ? 'stack on top (floor ' + (t.level + 2) + ')' : PL.ok.why, ok); return; }
+    const hit = K && PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
+    if (!hit || hit.sea){ ghost.visible = ring.visible = false; PL.ok = null; say(K ? (hit ? 'not on the sea' : '') : '', false); return; }
+    const ck = check(K, hit.x, hit.z, S, PL.rot), r = KINDS[K].rb + .3; PL.ok = ck;
     const y = ck.ok ? ck.y : heightAt(hit.x, hit.z, true);
-    ghost.geometry = blockOf(PL.kind, PL.seed, false, false).geo; ghost.position.set(hit.x, y, hit.z); ghost.rotation.y = PL.rot; ghost.visible = true;
+    ghost.geometry = blockOf(K, S, false, false).geo; ghost.position.set(hit.x, y, hit.z); ghost.rotation.y = PL.rot; ghost.visible = true;
     const a = ringGeo.attributes.position.array;
     for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s = Math.sin(t);
       for (const [j, rr] of [[0, r], [1, r + .14]]){ const x = hit.x + c*rr, z = hit.z + s*rr, o = (i*2 + j)*3; a[o] = x; a[o + 1] = heightAt(x, z) + .07; a[o + 2] = z; } }
     ringGeo.attributes.position.needsUpdate = true; ring.visible = true;
     ringM.color.set(ck.ok ? 0x7dffb0 : 0xff6a5a);
-    if (status){ status.textContent = ck.ok ? '' : ck.why; status.style.color = ''; }
+    say(ck.ok ? '' : ck.why, ck.ok);
   }
   function placeHere(){
     if (!PL.ok || !PL.ok.ok) return;
-    if (PL.side){ const sp = PL.side; addPiece(PL.kind, sp.x, sp.z, sp.rot, sp.y, false, PL.seed, null, 0, sp.host); }
-    else if (PL.onto){ const t = PL.onto; addPiece(PL.kind, t.x, t.z, t.rot, t.y + t.top, false, PL.seed, t); }
-    else addPiece(PL.kind, PL.hit.x, PL.hit.z, PL.rot, PL.ok.y, false, PL.seed);
-    PL.seed++; }
+    const K = curKind(), S = curSeed();
+    if (PL.side){ const sp = PL.side; addPiece(K, sp.x, sp.z, sp.rot, sp.y, false, S, null, 0, sp.host); }
+    else if (PL.onto){ const t = PL.onto; addPiece(K, t.x, t.z, t.rot, t.y + t.top, false, S, t); }
+    else addPiece(K, PL.hit.x, PL.hit.z, PL.rot, PL.ok.y, false, S);
+    if (!oneHome()) PL.seed++; }
   /* ---------- zone mode: paint homes, the neighborhood generated inside the brush ---------- */
   // The brush is a circle; Q makes it bigger, E smaller. At its smallest it places one home, a little stack at most; as it
   // grows it holds more homes, scattered off any grid (some touching, some a walk apart, so they join every way), and taller
@@ -1250,28 +1258,47 @@
   // where each home of the layout lands here, and whether it can go
   function zoneSpots(cx, cz){ const c = Math.cos(PL.rot), s_ = Math.sin(PL.rot);
     return zoneLayout().map(o => { const x = cx + o.lx*c - o.lz*s_, z = cz + o.lx*s_ + o.lz*c; return Object.assign({}, o, { x, z, rot: o.rot + PL.rot, ck: check(o.kind, x, z, o.seed, o.rot + PL.rot) }); }); }
+  // How one spot of the layout goes down among the homes already built. Clear ground: as laid out. Landing on a home (the
+  // spot's middle inside one): its blocks go on top of that stack, square to it, as many as fit. Not on one but bumping
+  // into one: it is set against that home's wall, on the same floor as the home, and rises from there. Returns the column
+  // (x, z, rot, and each block's kind, look, floor height), or null if it can't go at all.
+  function planSpot(sp){
+    const kinds = [sp.kind, ...sp.stack], ck = check(sp.kind, sp.x, sp.z, sp.seed, sp.rot);
+    let x = sp.x, z = sp.z, rot = sp.rot, y = 0, base = null, host = null, lv = 0, how = 'ground';
+    if (ck.ok) y = ck.y;
+    else if (!ck.by) return null;
+    else {
+      const unders = PIECES.filter(q => inHull(q.hullW, sp.x, sp.z)).map(stackTop).sort((a, b) => (b.y + b.top) - (a.y + a.top));
+      if (unders.length){ base = unders[0]; x = base.x; z = base.z; rot = base.rot; y = base.y + base.top; lv = base.level + 1; how = 'stack'; }
+      else { const ss = sideSpot(ck.by, sp.kind, sp.x, sp.z, sp.seed); if (!ss.ok) return null;
+        x = ss.x; z = ss.z; rot = ss.rot; y = ss.y; host = ss.host; lv = host.level; how = 'side'; } }
+    const blocks = [], skip = base ? [base] : [];
+    for (let i = 0; i < kinds.length && lv + i < MAXLV; i++){
+      const k = kinds[i], sd = sp.seed + i*17, below = i > 0 || !!base || lv > 0, b = blockOf(k, sd, below, i < kinds.length - 1);
+      if ((i > 0 || how === 'stack') && blocked(placeHull(b.hull, x, z, rot), y, y + b.h, skip)) break;
+      blocks.push({ kind: k, seed: sd, y, below }); y += b.top;
+    }
+    return blocks.length ? { x, z, rot, base, host, how, blocks } : null; }
   function showZoneGhost(){
     zHide(); ghost.visible = false;
     const hit = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
     if (!hit || hit.sea){ ring.visible = false; PL.ok = null; if (status) status.textContent = hit ? 'not on the sea' : ''; return; }
-    const spots = zoneSpots(hit.x, hit.z); let gi = 0, n = 0;
-    for (const sp of spots){ if (!sp.ck.ok) continue; n++;
-      let y = sp.ck.y, below = false; const kinds = [sp.kind, ...sp.stack];
-      kinds.forEach((k, i) => { const b = blockOf(k, sp.seed + i*17, below, i < kinds.length - 1), m = zGhost(gi++);
-        m.geometry = b.geo; m.position.set(sp.x, y, sp.z); m.rotation.y = sp.rot; m.visible = true; y += b.top; below = true; }); }
+    let gi = 0, n = 0, ns = 0, nd = 0;
+    for (const sp of zoneSpots(hit.x, hit.z)){ const P = planSpot(sp); if (!P) continue; n++; if (P.how === 'stack') ns++; else if (P.how === 'side') nd++;
+      P.blocks.forEach((bk, i) => { const m = zGhost(gi++); m.geometry = blockOf(bk.kind, bk.seed, bk.below, i < P.blocks.length - 1).geo; m.position.set(P.x, bk.y, P.z); m.rotation.y = P.rot; m.visible = true; }); }
     PL.ok = n ? { ok: true } : { ok: false, why: 'no room here' };
     const r = Math.max(ZSIZE[ZONE.size], 1.4), a = ringGeo.attributes.position.array;
     for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s_ = Math.sin(t);
       for (const [j, rr] of [[0, r], [1, r + .18]]){ const x = hit.x + c*rr, z = hit.z + s_*rr, o = (i*2 + j)*3; a[o] = x; a[o + 1] = heightAt(x, z) + .07; a[o + 2] = z; } }
     ringGeo.attributes.position.needsUpdate = true; ring.visible = true; ringM.color.set(n ? 0x7dffb0 : 0xff6a5a);
-    if (status) status.textContent = (ZONE.size === 0 ? 'one home' : 'brush ' + ZONE.size + ': ' + n + ' homes') + (n ? '' : ': no room here'); if (status) status.style.color = n ? '#0f3b4a' : '';
+    if (status){ status.textContent = 'brush ' + ZONE.size + ': ' + n + ' homes' + (ns ? ', ' + ns + ' on top of homes' : '') + (nd ? ', ' + nd + ' against homes' : '') + (n ? '' : ': no room here'); status.style.color = n ? '#0f3b4a' : ''; }
   }
   function placeZone(){
     if (!PL.hit || PL.hit.sea) return;
     for (const sp of zoneSpots(PL.hit.x, PL.hit.z)){
-      const ck = check(sp.kind, sp.x, sp.z, sp.seed, sp.rot); if (!ck.ok) continue;   // (checked again: an earlier home of this layout may now be there)
-      let p = addPiece(sp.kind, sp.x, sp.z, sp.rot, ck.y, true, sp.seed);
-      const col = [p]; sp.stack.forEach((k, i) => { p = addPiece(k, p.x, p.z, p.rot, p.y + p.top, true, sp.seed + (i + 1)*17, p); col.push(p); });
+      const P = planSpot(sp); if (!P) continue;   // (planned again for each: an earlier home of this layout may now be there)
+      const col = []; let p = null;
+      P.blocks.forEach((bk, i) => { p = i === 0 ? addPiece(bk.kind, P.x, P.z, P.rot, bk.y, true, bk.seed, P.base, 0, P.host) : addPiece(bk.kind, P.x, P.z, P.rot, p.y + p.top, true, bk.seed, p); col.push(p); });
       // now and then a room reaches out off the side of a tall stack, a floor or two up
       const R = rng(sp.seed*7 + 3);
       if (col.length >= 3 && R.chance(.45)){ const host = col[R.i(1, col.length - 2)], kind = R.pick(['townhouse', 'villa', host.kind]), a = host.rot + R.i(0, 3)*PI/2;
@@ -1314,8 +1341,8 @@
   canvas.addEventListener('pointerleave', () => { PL.ptr = null; });
   const endPtr = e => {
     if (act && act.kind === 'turn' && !act.moved && ptrs.has(e.pointerId)){
-      if ((act.b === 0 || e.pointerType === 'touch') && PL.kind){ PL.ptr = { x: e.clientX, y: e.clientY }; if (PL.kind === 'zone') showZoneGhost(); else showGhost(); if (PL.kind === 'zone') placeZone(); else placeHere(); }
-      else if (act.b === 2){ if (PL.kind === 'zone'){ const h = pick(e.clientX, e.clientY); if (h) clearZone(h.x, h.z); } else { const p = pieceAt(e.clientX, e.clientY); if (p) removePiece(p); } }
+      if ((act.b === 0 || e.pointerType === 'touch') && PL.kind){ PL.ptr = { x: e.clientX, y: e.clientY }; if (PL.kind === 'zone' && !oneHome()){ showZoneGhost(); placeZone(); } else { showGhost(); placeHere(); } }
+      else if (act.b === 2){ if (PL.kind === 'zone' && !oneHome()){ const h = pick(e.clientX, e.clientY); if (h) clearZone(h.x, h.z); } else { const p = pieceAt(e.clientX, e.clientY); if (p) removePiece(p); } }
     }
     ptrs.delete(e.pointerId); if (!ptrs.size){ act = null; canvas.style.cursor = 'grab'; }
   };
@@ -1335,7 +1362,8 @@
     if ('1234'.includes(e.key) && e.key.length === 1){ if (ZONE.on) setKind('zone'); else setKind(KIND_KEYS[+e.key - 1]); return; }
     if (k === 'z'){ setMode(!ZONE.on); return; }
     if (PL.kind === 'zone' && (k === 'q' || k === 'e')){ ZONE.size = clamp(ZONE.size + (k === 'q' ? 1 : -1), 0, ZSIZE.length - 1); return; }   // (Q: a bigger brush, E: a smaller one)
-    if (k === 'v'){ PL.seed++; return; }   // (another look for the next home)
+    if (k === 'v'){   // (single mode: the next kind of home, Shift+V another look of it; otherwise another look or layout)
+      if (oneHome()){ if (e.shiftKey) PL.zseed++; else PL.zkind = KIND_KEYS[(KIND_KEYS.indexOf(PL.zkind) + 1) % KIND_KEYS.length]; } else PL.seed++; return; }
     if (e.key === 'Escape' || e.key === '0'){ if (PL.kind) setKind(PL.kind); return; }
     if (k === 'q') yawT -= PI/4;
     else if (k === 'e') yawT += PI/4;
@@ -1363,7 +1391,7 @@
   function frame(now){
     const dt = Math.min(.1, (now - last)/1000); last = now;
     updateCamera(dt); stream(6);
-    if (PL.kind === 'zone') showZoneGhost(); else if (PL.kind) showGhost();
+    if (PL.kind === 'zone' && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost();
     if (linksDirty) buildLinks();
     const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t);
     foamStep(dt); renderRefl();

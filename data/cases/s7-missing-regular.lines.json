@@ -4,16 +4,16 @@
    "desc": "a quiet lunch regular"
   },
   "s7-neighbor": {
-   "desc": "a neighbor in yellow slippers"
+   "desc": "a neighbor from 6A"
   },
   "s7-shift-lead": {
-   "desc": "a worker in a staff vest with a clipboard"
+   "desc": "a shift lead from the work crew"
   },
   "s7-night-visitor": {
-   "desc": "a visitor in a long coat"
+   "desc": "a visitor on the landing"
   },
   "s7-sister": {
-   "desc": "a woman in a blue headscarf"
+   "desc": "a woman at a picnic on the lawn"
   },
   "extra:partner": {
    "desc": "the resident of 6C"
@@ -366,7 +366,7 @@
     "s7-sister"
    ],
    "with": [],
-   "line": "{s7-sister} on the comm, one side: \"He eats when the shift is over. Tell the old one, only him.\""
+   "line": "{s7-sister} on the comm, one side: \"My sibling eats when the shift is over. Tell the old officer, nobody else.\""
   },
   "sister-s-call.1.3": {
    "who": [
@@ -434,7 +434,7 @@
    "with": [
     "veteran-officer"
    ],
-   "line": "{informant} sits at the desk of {veteran-officer} in the station, hands flat on the desk."
+   "line": "{informant} sits at the desk of {veteran-officer} in the station, both hands flat on the desk."
   },
   "statement-at-the-desk.1.2": {
    "who": [

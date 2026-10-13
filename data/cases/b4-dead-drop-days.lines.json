@@ -2,14 +2,14 @@
   "slots": {
     "boss-careless": { "desc": "a logistics hub dispatcher" },
     "boss-careful": { "desc": "a logistics hub dispatcher" },
-    "go-between-courier": { "desc": "a doorstep courier in a gray jacket" },
+    "go-between-courier": { "desc": "a doorstep courier" },
     "go-between-bartender": { "desc": "a drone bay fixer" },
     "informant": { "desc": "the bot bay mechanic" },
-    "red-herring-night-courier": { "desc": "a night courier with a shoulder bag" },
+    "red-herring-night-courier": { "desc": "a night courier" },
     "red-herring-stall-neighbor": { "desc": "a plaza stall keeper" },
     "extra:resident": { "desc": "a resident at door 5B" },
     "extra:caller": { "desc": "a resident at door 7B" },
-    "extra:driver": { "desc": "a bot handler in coveralls" }
+    "extra:driver": { "desc": "a bot handler" }
   },
   "steps": {
     "hub-first-days.1.1": { "who": ["boss-careless"], "with": [], "line": "{boss-careless} stands at terminal T-07 at the start of the day, bots and drones queued below." },
@@ -52,15 +52,15 @@
     "swap-and-night-knock.2.3": { "who": ["go-between-courier"], "with": [], "line": "{go-between-courier} sets an identical parcel down on the mat in its place.", "held": "box" },
     "swap-and-night-knock.2.4": { "who": ["go-between-courier"], "with": [], "line": "{go-between-courier} steps into the lift carrying the first parcel.", "held": "box" },
 
-    "longer-way-and-night-bay.1.1": { "who": ["inside-officer"], "with": ["framed-officer"], "line": "{inside-officer} turns the patrol left past the hub window, ten blocks the long way round." },
-    "longer-way-and-night-bay.1.2": { "who": ["framed-officer"], "with": ["inside-officer"], "line": "{framed-officer} says to {inside-officer}: \"We turned left here yesterday.\"" },
-    "longer-way-and-night-bay.1.3": { "who": ["inside-officer"], "with": ["go-between-courier"], "line": "{inside-officer} waves {go-between-courier} over at the gate and offers a ride." },
+    "longer-way-and-night-bay.1.1": { "who": ["inside-officer"], "with": ["framed-officer"], "line": "{inside-officer} turns the patrol left past the hub window, ten blocks the long way around." },
+    "longer-way-and-night-bay.1.2": { "who": ["framed-officer"], "with": ["inside-officer"], "line": "{framed-officer} says to {inside-officer}: \"Left? The route sheet says right.\"" },
+    "longer-way-and-night-bay.1.3": { "who": ["inside-officer"], "with": ["go-between-courier"], "line": "{inside-officer} waves {go-between-courier} over at the gate and offers to walk {go-between-courier.him} home." },
     "longer-way-and-night-bay.1.4": { "who": ["go-between-courier"], "with": ["inside-officer"], "line": "{go-between-courier} shrugs at {inside-officer} and shakes {go-between-courier.his} head." },
     "longer-way-and-night-bay.1.5": { "who": ["go-between-courier"], "with": [], "line": "{go-between-courier} walks away from the hub gate on foot." },
     "longer-way-and-night-bay.1.6": { "who": ["framed-officer"], "with": [], "line": "{framed-officer} stands at the gate with {framed-officer.his} back turned, reading the notice board." },
     "longer-way-and-night-bay.1.7": { "who": ["boss-careless"], "with": ["inside-officer"], "line": "{boss-careless} passes {inside-officer} a flat parcel through the hub window.", "held": "box" },
     "longer-way-and-night-bay.1.8": { "who": ["inside-officer"], "with": [], "line": "{inside-officer} takes the flat parcel and turns it over once.", "held": "box" },
-    "longer-way-and-night-bay.1.9": { "who": ["inside-officer"], "with": [], "line": "{inside-officer} slides the parcel under {inside-officer.his} coat and walks on." },
+    "longer-way-and-night-bay.1.9": { "who": ["inside-officer"], "with": [], "line": "{inside-officer} slides the parcel out of sight and walks on." },
     "longer-way-and-night-bay.1.10": { "who": ["red-herring-stall-neighbor"], "with": [], "line": "{red-herring-stall-neighbor} carries a heavy bag to the hub drop window late at night.", "held": "bag" },
     "longer-way-and-night-bay.1.11": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} stands at the drone bay late at night, comm in hand." },
     "longer-way-and-night-bay.1.12": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} reads a gold-edged sticker on a drone tray: \"T-07.\"" },
@@ -71,7 +71,7 @@
     "call-and-chase.1.2": { "who": ["red-herring-night-courier"], "with": ["rookie-officer"], "line": "{rookie-officer} calls out \"Police!\" and {red-herring-night-courier} runs down the stairs.", "held": "bag" },
     "call-and-chase.1.3": { "who": ["veteran-officer"], "with": ["rookie-officer"], "line": "{veteran-officer} walks slowly down the stairs behind {rookie-officer}." },
     "call-and-chase.1.4": { "who": ["veteran-officer"], "with": ["rookie-officer"], "line": "{veteran-officer} says to {rookie-officer}: \"Ask again tomorrow.\"" },
-    "call-and-chase.1.5": { "who": ["extra:caller"], "with": [], "line": "Comm, one side: \"Who? No, he gave badge 2207, from the station. Hold it by the door. Sounded like him.\"" },
+    "call-and-chase.1.5": { "who": ["extra:caller"], "with": [], "line": "Comm, one side: \"Who? The caller gave badge 2207, from the station. Hold it by the door, they said.\"" },
 
     "parcel-found.1.1": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} searches behind a bot rack in bay 14 in the early morning." },
     "parcel-found.1.2": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} lifts a parcel, and its base panel comes away over a hollow three centimeters deep.", "held": "box" },
@@ -102,7 +102,7 @@
     "bench-empty.1.5": { "who": ["veteran-officer"], "with": [], "line": "{veteran-officer} leaves the bot bay by the lift.", "held": "tools" },
 
     "burned-watch.1.1": { "who": ["night-stakeout-officer", "rookie-officer"], "with": [], "line": "{night-stakeout-officer} and {rookie-officer} watch the bay door from the dark before dawn.", "stay": true },
-    "burned-watch.1.2": { "who": ["rookie-officer"], "with": ["inside-officer"], "line": "{rookie-officer} reads the shift board: {inside-officer} swapped onto the predawn slot with the desk sergeant." },
+    "burned-watch.1.2": { "who": ["rookie-officer"], "with": ["inside-officer"], "line": "{rookie-officer} reads the shift board: {inside-officer} swapped onto the predawn slot." },
     "burned-watch.1.3": { "who": ["inside-officer"], "with": [], "line": "{inside-officer} walks into the hub before dawn carrying a takeaway bag.", "held": "bag" },
     "burned-watch.1.4": { "who": ["inside-officer"], "with": ["boss-careless"], "line": "{inside-officer} and {boss-careless} talk low at the hub window." },
     "burned-watch.1.5": { "who": ["boss-careless"], "with": [], "line": "Comm, one side: \"Not tonight. No. Not tonight.\"" },
@@ -116,8 +116,8 @@
     "posted-and-missing.1.5": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} sits in a lobby seat in the afternoon and stays there.", "stay": true },
     "posted-and-missing.1.6": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} eats from a carton in the lobby seat.", "held": "food" },
     "posted-and-missing.1.7": { "who": ["burnout-officer"], "with": ["desk-sergeant"], "line": "{burnout-officer} shrugs at {desk-sergeant} across the lobby." },
-    "posted-and-missing.1.8": { "who": ["rookie-officer"], "with": [], "line": "{rookie-officer} searches the evidence shelf and finds an empty space where the parcel sat." },
-    "posted-and-missing.1.9": { "who": ["rookie-officer"], "with": ["inside-officer"], "line": "The shelf log shows the last signature, {inside-officer}'s, from the evening before." },
+    "posted-and-missing.1.8": { "who": ["rookie-officer"], "with": [], "line": "{rookie-officer} searches the evidence shelf and finds an empty space where a parcel was logged." },
+    "posted-and-missing.1.9": { "who": ["rookie-officer"], "with": ["inside-officer"], "line": "The shelf log shows the last signature, from the evening before: {inside-officer}." },
 
     "doorstep-stakeout.1.1": { "who": ["night-stakeout-officer"], "with": [], "line": "{night-stakeout-officer} waits at the corner of the tenement hall before dawn.", "stay": true },
     "doorstep-stakeout.1.2": { "who": ["red-herring-night-courier"], "with": [], "line": "{red-herring-night-courier} knocks at door 5B and waits, holding flowers and bread.", "held": "flowers" },
@@ -135,7 +135,7 @@
     "poster-restored.1.3": { "who": ["red-herring-stall-neighbor"], "with": [], "line": "{red-herring-stall-neighbor} stands at the front screens for ten minutes.", "stay": true },
     "poster-restored.1.4": { "who": ["red-herring-stall-neighbor"], "with": ["rookie-officer"], "line": "{red-herring-stall-neighbor} hands {rookie-officer} a receipt from the shop landlord.", "held": "paper:slip" },
     "poster-restored.1.5": { "who": ["rookie-officer"], "with": ["red-herring-stall-neighbor"], "line": "{rookie-officer} reads the receipt aloud: \"Rent paid through the month.\"", "held": "paper:slip" },
-    "poster-restored.1.6": { "who": ["rookie-officer"], "with": ["red-herring-stall-neighbor"], "line": "{rookie-officer} opens {red-herring-stall-neighbor}'s heavy bag and finds bolts of cloth inside." },
+    "poster-restored.1.6": { "who": ["rookie-officer"], "with": ["red-herring-stall-neighbor"], "line": "{rookie-officer} opens the heavy bag {red-herring-stall-neighbor} carries and finds bolts of cloth inside." },
 
     "shed-opened.1.1": { "who": ["veteran-officer", "rookie-officer"], "with": [], "line": "{veteran-officer} and {rookie-officer} open the shed door behind the leaf rows in the morning." },
     "shed-opened.1.2": { "who": ["veteran-officer"], "with": [], "line": "{veteran-officer} finds crates of parcels inside, their base panels unscrewed." },
@@ -144,17 +144,17 @@
     "shed-opened.1.5": { "who": ["rookie-officer"], "with": [], "line": "{rookie-officer} carries the comm rig out to the cart.", "held": "box" },
     "shed-opened.1.6": { "who": ["veteran-officer"], "with": [], "line": "{veteran-officer} points at a pile of label stubs, each one stamped \"2207.\"" },
 
-    "log-checked.1.1": { "who": ["desk-sergeant"], "with": [], "line": "{desk-sergeant} reads the rig's call sheet: one call, \"14:10,\" on the day of the stairwell chase.", "held": "paper:slip" },
-    "log-checked.1.2": { "who": ["desk-sergeant"], "with": ["framed-officer"], "line": "A screen camera still shows {framed-officer} at the front screens that day, stamped \"14:10.\"" },
+    "log-checked.1.1": { "who": ["desk-sergeant"], "with": [], "line": "{desk-sergeant} reads the call sheet from a seized comm rig: one call to door 7B, \"14:10.\"", "held": "paper:slip" },
+    "log-checked.1.2": { "who": ["desk-sergeant"], "with": ["framed-officer"], "line": "A screen camera still shows {framed-officer} at the station front screens that same day, stamped \"14:10.\"" },
     "log-checked.1.3": { "who": ["desk-sergeant"], "with": ["framed-officer"], "line": "{desk-sergeant} posts a corrected notice to the station screens: \"{framed-officer} cleared.\"" },
     "log-checked.1.4": { "who": ["framed-officer"], "with": ["desk-sergeant"], "line": "{framed-officer} hands {desk-sergeant} {framed-officer.his} paper notebook.", "held": "paper:notebook" },
     "log-checked.1.5": { "who": ["framed-officer"], "with": ["rookie-officer"], "line": "{framed-officer} gives {rookie-officer} a small wave on the way past." },
 
     "found-on-the-lawn.1.1": { "who": ["veteran-officer"], "with": [], "line": "{veteran-officer} walks across the lawn in the early morning, a tool roll under one arm.", "held": "tools" },
-    "found-on-the-lawn.1.2": { "who": ["informant"], "with": [], "line": "{informant} sits on a lawn bench in a new coat." },
+    "found-on-the-lawn.1.2": { "who": ["informant"], "with": [], "line": "{informant} sits alone on a lawn bench, a bag at {informant.his} feet." },
     "found-on-the-lawn.1.3": { "who": ["veteran-officer"], "with": ["informant"], "line": "{veteran-officer} sits down on the same bench beside {informant}.", "held": "tools" },
-    "found-on-the-lawn.1.4": { "who": ["veteran-officer"], "with": ["informant"], "line": "{veteran-officer} hands {informant} the tool roll from the bay bench.", "held": "tools" },
-    "found-on-the-lawn.1.5": { "who": ["informant"], "with": ["veteran-officer"], "line": "{informant} tells {veteran-officer}: \"T-07, every payday, 15:00. Bay three. I fitted the panels.\"" },
+    "found-on-the-lawn.1.4": { "who": ["veteran-officer"], "with": ["informant"], "line": "{veteran-officer} hands {informant} the tool roll.", "held": "tools" },
+    "found-on-the-lawn.1.5": { "who": ["informant"], "with": ["veteran-officer"], "line": "{informant} tells {veteran-officer}: \"T-07, every payday, midafternoon. Bay three. I fitted the panels.\"" },
 
     "last-stakeout.1.1": { "who": ["night-stakeout-officer"], "with": [], "line": "{night-stakeout-officer} stands at the hub gate in the afternoon, a paper cup on the ledge.", "stay": true },
     "last-stakeout.1.2": { "who": ["boss-careless"], "with": [], "line": "{boss-careless} steps up to terminal T-07 in midafternoon." },
@@ -165,7 +165,7 @@
     "last-stakeout.1.7": { "who": ["rookie-officer"], "with": [], "line": "{rookie-officer} pries up the base panels of the parcels in bay three." },
 
     "case-closed.1.1": { "who": ["desk-sergeant"], "with": [], "line": "{desk-sergeant} posts a closing notice to the station screens: \"Case closed.\"" },
-    "case-closed.1.2": { "who": ["framed-officer"], "with": [], "line": "{framed-officer} walks up to the front desk with {framed-officer.his} badge back on." },
+    "case-closed.1.2": { "who": ["framed-officer"], "with": [], "line": "{framed-officer} walks up to the front desk, badge clipped on." },
     "case-closed.1.3": { "who": ["veteran-officer"], "with": ["rookie-officer"], "line": "{veteran-officer} passes {rookie-officer} the beat sheet.", "held": "paper:slip" },
     "case-closed.1.4": { "who": ["rookie-officer"], "with": [], "line": "{rookie-officer} shrugs, folds the beat sheet, and tucks it away." },
 
@@ -174,13 +174,13 @@
     "care-second-station-shares-scans.1.3": { "who": ["desk-sergeant"], "with": ["rookie-officer"], "line": "{desk-sergeant} says to {rookie-officer}: \"Their log has the same gap.\"" },
 
     "care-found-on-the-lawn.1.1": { "who": ["veteran-officer"], "with": [], "line": "{veteran-officer} walks across the lawn in the early morning, a tool roll under one arm.", "held": "tools" },
-    "care-found-on-the-lawn.1.2": { "who": ["informant"], "with": [], "line": "{informant} sits on a lawn bench in a new coat." },
+    "care-found-on-the-lawn.1.2": { "who": ["informant"], "with": [], "line": "{informant} sits alone on a lawn bench, a bag at {informant.his} feet." },
     "care-found-on-the-lawn.1.3": { "who": ["veteran-officer"], "with": ["informant"], "line": "{veteran-officer} sits down on the same bench beside {informant}.", "held": "tools" },
-    "care-found-on-the-lawn.1.4": { "who": ["veteran-officer"], "with": ["informant"], "line": "{veteran-officer} hands {informant} the tool roll from the bay bench.", "held": "tools" },
-    "care-found-on-the-lawn.1.5": { "who": ["informant"], "with": ["veteran-officer"], "line": "{informant} tells {veteran-officer}: \"T-07, every payday, 15:00. Bay three. I fitted the panels.\"" },
+    "care-found-on-the-lawn.1.4": { "who": ["veteran-officer"], "with": ["informant"], "line": "{veteran-officer} hands {informant} the tool roll.", "held": "tools" },
+    "care-found-on-the-lawn.1.5": { "who": ["informant"], "with": ["veteran-officer"], "line": "{informant} tells {veteran-officer}: \"T-07, every payday, midafternoon. Bay three. I fitted the panels.\"" },
 
     "care-same-minute-every-day.1.1": { "who": ["night-stakeout-officer"], "with": [], "line": "{night-stakeout-officer} watches the logistics hub from the gate before the day shift.", "stay": true },
-    "care-same-minute-every-day.1.2": { "who": ["boss-careless"], "with": [], "line": "{boss-careless} steps up to terminal T-07 at the same minute as on the first morning." },
+    "care-same-minute-every-day.1.2": { "who": ["boss-careless"], "with": [], "line": "{boss-careless} steps up to terminal T-07 at the same minute as every other morning." },
     "care-same-minute-every-day.1.3": { "who": ["night-stakeout-officer"], "with": [], "line": "{night-stakeout-officer} waits at the gate, and nothing in the routine at the window changes.", "stay": true },
 
     "care-last-stakeout-early.1.1": { "who": ["night-stakeout-officer"], "with": [], "line": "{night-stakeout-officer} stands at the hub gate in the afternoon, a paper cup on the ledge.", "stay": true },
@@ -191,13 +191,13 @@
     "care-last-stakeout-early.1.6": { "who": ["rookie-officer"], "with": [], "line": "{rookie-officer} pries up the base panels of the parcels in bay three." },
 
     "care-case-closed-early.1.1": { "who": ["desk-sergeant"], "with": [], "line": "{desk-sergeant} posts a closing notice to the station screens: \"Case closed.\"" },
-    "care-case-closed-early.1.2": { "who": ["framed-officer"], "with": [], "line": "{framed-officer} walks up to the front desk with {framed-officer.his} badge back on." },
+    "care-case-closed-early.1.2": { "who": ["framed-officer"], "with": [], "line": "{framed-officer} walks up to the front desk, badge clipped on." },
     "care-case-closed-early.1.3": { "who": ["veteran-officer"], "with": ["rookie-officer"], "line": "{veteran-officer} passes {rookie-officer} the beat sheet.", "held": "paper:slip" },
 
     "care-fixer-at-the-bay.1.1": { "who": ["go-between-bartender"], "with": ["extra:driver"], "line": "{go-between-bartender} hands {extra:driver} a cup of tea first at the drone bay.", "held": "cup:tea" },
     "care-fixer-at-the-bay.1.2": { "who": ["go-between-bartender"], "with": ["extra:driver"], "line": "The line of bot handlers stacks up behind {extra:driver} while {go-between-bartender} waits." },
     "care-fixer-at-the-bay.1.3": { "who": ["go-between-bartender"], "with": ["extra:driver"], "line": "{go-between-bartender} passes {extra:driver} a tray tag with no drone number on it." },
-    "care-fixer-at-the-bay.1.4": { "who": ["go-between-bartender"], "with": [], "line": "{go-between-bartender} leaves by the service door at the same minute as the night before." },
+    "care-fixer-at-the-bay.1.4": { "who": ["go-between-bartender"], "with": [], "line": "{go-between-bartender} leaves by the service door, right on the hour." },
     "care-fixer-at-the-bay.1.5": { "who": ["go-between-bartender"], "with": ["go-between-courier"], "line": "{go-between-bartender} and {go-between-courier} pass at the lift without a word." },
 
     "care-sits-apart.1.1": { "who": ["inside-officer-extra"], "with": [], "line": "{inside-officer-extra} sits a little apart from the others at the briefing." },
@@ -230,7 +230,7 @@
     "care-last-night-at-the-flat.2.6": { "who": ["night-stakeout-officer", "framed-officer", "rookie-officer"], "with": ["boss-careful", "inside-officer", "go-between-bartender"], "line": "{night-stakeout-officer}, {framed-officer} and {rookie-officer} walk all three of them to the lift." },
 
     "care-case-closed.1.1": { "who": ["desk-sergeant"], "with": [], "line": "{desk-sergeant} posts a closing notice to the station screens: \"Case closed.\"" },
-    "care-case-closed.1.2": { "who": ["framed-officer"], "with": [], "line": "{framed-officer} walks up to the front desk with {framed-officer.his} badge back on." },
+    "care-case-closed.1.2": { "who": ["framed-officer"], "with": [], "line": "{framed-officer} walks up to the front desk, badge clipped on." },
     "care-case-closed.1.3": { "who": ["veteran-officer"], "with": ["rookie-officer"], "line": "{veteran-officer} passes {rookie-officer} the beat sheet.", "held": "paper:slip" },
     "care-case-closed.1.4": { "who": ["veteran-officer"], "with": [], "line": "{veteran-officer} waves once from the station door on the way out." }
   }

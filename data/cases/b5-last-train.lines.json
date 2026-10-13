@@ -1,10 +1,10 @@
 {
  "slots": {
   "boss-careless": {
-   "desc": "a platform attendant in an orange vest"
+   "desc": "a platform attendant"
   },
   "boss-careful": {
-   "desc": "a platform attendant in an orange vest"
+   "desc": "a platform attendant"
   },
   "informant": {
    "desc": "a lost property clerk"
@@ -13,37 +13,37 @@
    "desc": "a delivery runner"
   },
   "go-between-bartender": {
-   "desc": "a platform sweeper with a cart"
+   "desc": "a platform sweeper"
   },
   "red-herring-night-courier": {
-   "desc": "a rider with a cloth bag"
+   "desc": "an early rider"
   },
   "red-herring-bath-regular": {
    "desc": "a regular from the bath house"
   },
   "s5-lurker": {
-   "desc": "a young man in a gray coat"
+   "desc": "a young man on the platform"
   },
   "s4-thief": {
-   "desc": "a man in a gray hood"
+   "desc": "a young man at the sky mall"
   },
   "s1-mugger": {
-   "desc": "a thin man in a green knit scarf"
+   "desc": "a thin man"
   },
   "extra:commuter": {
-   "desc": "a commuter with a black umbrella"
+   "desc": "a morning commuter"
   },
   "extra:passenger": {
-   "desc": "a commuter on bench 3"
+   "desc": "a rider on bench 3"
   },
   "extra:claimant": {
-   "desc": "a commuter in a rain jacket"
+   "desc": "a commuter at the bin"
   },
   "extra:cousin": {
-   "desc": "a stranger in a knit cap"
+   "desc": "a stranger"
   },
   "extra:shopper": {
-   "desc": "a commuter with a shoulder bag"
+   "desc": "a shopper"
   },
   "extra:partner": {
    "desc": "the resident of 3A"
@@ -65,7 +65,7 @@
    "with": [
     "inside-officer"
    ],
-   "line": "{boss-careless} waves from beside the lost property bin."
+   "line": "{boss-careless} waves to {inside-officer} from beside the lost property bin."
   },
   "platform-morning.1.3": {
    "who": [
@@ -283,7 +283,7 @@
    "with": [
     "boss-careless"
    ],
-   "line": "{extra:claimant} takes the black umbrella with the green tag from the bin and shows no ticket."
+   "line": "{extra:claimant} takes a black umbrella with a green tag from the bin and shows no ticket."
   },
   "thin-bag-claim-at-the-bin.2.3": {
    "who": [
@@ -333,7 +333,7 @@
     "informant"
    ],
    "with": [],
-   "line": "{informant} gets up and leaves, a paper tag stub tucked under the empty cup."
+   "line": "{informant} gets up and walks off, leaving a paper tag stub under the empty cup."
   },
   "bench-lunch-runner.2.1": {
    "who": [
@@ -400,7 +400,7 @@
    "with": [
     "inside-officer"
    ],
-   "line": "{framed-officer} says to {inside-officer}: \"We turned left here yesterday.\""
+   "line": "{framed-officer} says to {inside-officer}: \"That bin is on the scan list.\""
   },
   "scan-skipped.1.6": {
    "who": [
@@ -519,14 +519,14 @@
    "with": [
     "s1-mugger"
    ],
-   "line": "{rookie-officer} searches the coat of {s1-mugger}, sleeve by sleeve."
+   "line": "{rookie-officer} pats down {s1-mugger}, sleeve by sleeve."
   },
   "mugger-s-slip.1.3": {
    "who": [
     "rookie-officer"
    ],
    "with": [],
-   "line": "{rookie-officer} unfolds a slip from the coat: \"Bin, platform 3, 0712 train.\"",
+   "line": "{rookie-officer} unfolds a slip from a sleeve: \"Bin, platform 3, 0712 train.\"",
    "held": "paper:slip"
   },
   "mugger-s-slip.1.4": {
@@ -578,7 +578,7 @@
    "with": [
     "boss-careless"
    ],
-   "line": "{veteran-officer} asks {boss-careless} the same question a second time, word for word."
+   "line": "{veteran-officer} asks {boss-careless} the same question twice, word for word."
   },
   "log-on-the-screens.1.1": {
    "who": [
@@ -594,7 +594,7 @@
    "with": [
     "desk-sergeant"
    ],
-   "line": "{framed-officer} argues with {desk-sergeant}: \"I was at the north stair at six fifty-two.\""
+   "line": "{framed-officer} argues with {desk-sergeant}: \"I was at the north stair at that minute, not the platform.\""
   },
   "log-on-the-screens.1.3": {
    "who": [
@@ -656,7 +656,7 @@
    "with": [
     "night-stakeout-officer"
    ],
-   "line": "{s5-lurker} tells {night-stakeout-officer} the times went to the window."
+   "line": "{s5-lurker} tells {night-stakeout-officer} {s5-lurker.he} passed the train times to the lost property window."
   },
   "lurker-caught.1.5": {
    "who": [
@@ -839,7 +839,7 @@
    "with": [
     "burnout-officer"
    ],
-   "line": "{rookie-officer} tells {burnout-officer}: \"My notes put that badge at the north stair at six fifty-two.\"",
+   "line": "{rookie-officer} tells {burnout-officer}: \"My notes have that badge at the north stair right then, not the platform.\"",
    "held": "paper:notebook"
   },
   "edit-stamp-at-the-spire.1.7": {
@@ -927,7 +927,7 @@
     "informant"
    ],
    "with": [],
-   "line": "{informant} sits on a lawn bench in a coat that looks new."
+   "line": "{informant} sits alone on a lawn bench, a new shopping bag at {informant.his} feet."
   },
   "found-on-the-lawn.1.3": {
    "who": [
@@ -1001,7 +1001,7 @@
    "with": [
     "framed-officer"
    ],
-   "line": "{desk-sergeant} reads the access list aloud: \"FD-2 opened 2214,\" with the badge of the partner of {framed-officer} beside it."
+   "line": "{desk-sergeant} reads the access list aloud, \"FD-2 opened 2214,\" and stops at the badge number beside it."
   },
   "b-cleared-at-the-spire.1.4": {
    "who": [
@@ -1134,7 +1134,7 @@
     "boss-careless"
    ],
    "with": [],
-   "line": "{boss-careless} stands at the lost property bin at the same minute as the last two mornings."
+   "line": "{boss-careless} stands at the lost property bin, eyes on the station clock, as the first train pulls in."
   },
   "care-same-minute-every-day.1.3": {
    "who": [
@@ -1255,7 +1255,7 @@
     "go-between-bartender"
    ],
    "with": [],
-   "line": "{go-between-bartender} walks into the foundry yard without the cart."
+   "line": "{go-between-bartender} walks into the foundry yard at dusk, coming from the metro side."
   },
   "care-cart-to-the-foundry.1.2": {
    "who": [
@@ -1470,7 +1470,7 @@
     "inside-officer-extra"
    ],
    "with": [],
-   "line": "{inside-officer-extra} walks onto the platform in a civilian coat."
+   "line": "{inside-officer-extra} walks onto the platform off shift, with no scanner and no badge showing."
   },
   "care-closing-night.1.6": {
    "who": [

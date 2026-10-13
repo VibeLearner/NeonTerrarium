@@ -1,18 +1,18 @@
 {
   "slots": {
-    "s1-victim": { "desc": "a night cook in a stained apron" },
-    "s1-victim-b": { "desc": "an older resident with a quilted bag" },
+    "s1-victim": { "desc": "a night cook" },
+    "s1-victim-b": { "desc": "an older resident" },
     "s1-lobby-guard": { "desc": "the lobby desk guard" },
-    "s1-mugger": { "desc": "a thin man in a green scarf" },
-    "red-herring-night-courier": { "desc": "a night courier with a shoulder bag" },
-    "go-between-courier": { "desc": "a delivery runner in a gray jacket" },
-    "extra:partner": { "desc": "a resident in a night robe" },
-    "extra:resident": { "desc": "a resident carrying takeaway" }
+    "s1-mugger": { "desc": "a thin man" },
+    "red-herring-night-courier": { "desc": "a night courier" },
+    "go-between-courier": { "desc": "a delivery runner" },
+    "extra:partner": { "desc": "the resident of 3B" },
+    "extra:resident": { "desc": "a resident coming home" }
   },
   "steps": {
-    "first-report.1.1": { "who": ["s1-victim"], "with": [], "line": "{s1-victim} hurries into the lift hall with empty hands, apron still on." },
+    "first-report.1.1": { "who": ["s1-victim"], "with": [], "line": "{s1-victim} hurries into the lift hall with empty hands, straight from the night kitchen." },
     "first-report.1.2": { "who": ["s1-victim"], "with": ["night-stakeout-officer"], "line": "{s1-victim} points {night-stakeout-officer} at the empty floor of lift 2." },
-    "first-report.1.3": { "who": ["s1-victim"], "with": ["night-stakeout-officer"], "line": "{s1-victim} tells {night-stakeout-officer} {s1-victim.his} takeaway bag was snatched in lift 2 a few minutes ago." },
+    "first-report.1.3": { "who": ["s1-victim"], "with": ["night-stakeout-officer"], "line": "{s1-victim} tells {night-stakeout-officer} {s1-victim.his} takeout bag was snatched in lift 2 a few minutes ago." },
     "first-report.1.4": { "who": ["night-stakeout-officer"], "with": [], "line": "{night-stakeout-officer} runs a handheld scan along the seams of the lift door." },
 
     "lobby-watch.1.1": { "who": ["night-stakeout-officer"], "with": [], "line": "{night-stakeout-officer} stands at the lift hall corner, a paper cup on the ledge, watching the lifts.", "stay": true },
@@ -25,11 +25,11 @@
     "wrong-door.1.3": { "who": ["rookie-officer"], "with": ["red-herring-night-courier"], "line": "{rookie-officer} runs after {red-herring-night-courier} toward the stair door." },
     "wrong-door.1.4": { "who": ["night-stakeout-officer"], "with": ["rookie-officer"], "line": "{night-stakeout-officer} puts a hand on {rookie-officer}'s arm and holds {rookie-officer.him} at the door." },
 
-    "green-scarf.1.1": { "who": ["s1-victim-b"], "with": ["rookie-officer"], "line": "{s1-victim-b} tells {rookie-officer} the man wore a green scarf and held {s1-victim-b.his} bag in his left hand." },
+    "green-scarf.1.1": { "who": ["s1-victim-b"], "with": ["rookie-officer"], "line": "{s1-victim-b} tells {rookie-officer} the thief had a green scarf and held the bag in the left hand." },
     "green-scarf.1.2": { "who": ["s1-victim-b"], "with": ["rookie-officer"], "line": "{s1-victim-b} points at the lobby screen beside the lift doors." },
     "green-scarf.1.3": { "who": ["rookie-officer"], "with": ["s1-victim-b"], "line": "{rookie-officer} reads the lobby screen still: a figure in a green scarf, stamped \"03:40.\"" },
 
-    "bag-at-the-counter.1.1": { "who": ["s1-mugger"], "with": [], "line": "{s1-mugger} waits outside the food counter, green scarf pulled up, hands in {s1-mugger.his} pockets." },
+    "bag-at-the-counter.1.1": { "who": ["s1-mugger"], "with": [], "line": "{s1-mugger} waits outside the food counter, a green scarf wadded in one hand." },
     "bag-at-the-counter.1.2": { "who": ["go-between-courier"], "with": ["s1-mugger"], "line": "{go-between-courier} hands {s1-mugger} a folded paper bag without a word.", "held": "bag" },
     "bag-at-the-counter.1.3": { "who": ["s1-mugger"], "with": [], "line": "{s1-mugger} carries the paper bag in {s1-mugger.his} left hand into the lift hall.", "held": "bag" },
 
@@ -42,7 +42,7 @@
     "scrap-in-the-gap.1.3": { "who": ["rookie-officer"], "with": [], "line": "{rookie-officer} reads the scrap aloud: \"RT,\" then a column of numbers.", "held": "paper:slip" },
 
     "grab-and-arrest.1.1": { "who": ["night-stakeout-officer"], "with": [], "line": "{night-stakeout-officer} stands at the lift hall corner again, the paper cup on the same ledge.", "stay": true },
-    "grab-and-arrest.1.2": { "who": ["s1-mugger"], "with": ["extra:resident"], "line": "{s1-mugger}, green scarf up, bumps {extra:resident} at lift 2 and takes the takeaway bag in {s1-mugger.his} left hand.", "held": "bag" },
+    "grab-and-arrest.1.2": { "who": ["s1-mugger"], "with": ["extra:resident"], "line": "{s1-mugger}, a green scarf trailing from one pocket, bumps {extra:resident} at lift 2 and grabs the takeout bag left-handed.", "held": "bag" },
     "grab-and-arrest.1.3": { "who": ["s1-mugger"], "with": [], "line": "{s1-mugger} runs for the stair door, not the lifts, the bag swinging.", "held": "bag" },
     "grab-and-arrest.1.4": { "who": ["night-stakeout-officer"], "with": ["s1-mugger"], "line": "{night-stakeout-officer} steps out at the stair door and pins {s1-mugger} to the wall." },
     "grab-and-arrest.1.5": { "who": ["rookie-officer"], "with": ["s1-mugger"], "line": "{rookie-officer} pulls a folded paper slip from {s1-mugger}'s left sleeve.", "held": "paper:slip" },
@@ -50,12 +50,12 @@
 
     "slip-on-the-desk.1.1": { "who": ["s1-mugger"], "with": [], "line": "{s1-mugger} sits at the interview table, the green scarf in {s1-mugger.his} lap." },
     "slip-on-the-desk.1.2": { "who": ["s1-mugger"], "with": ["rookie-officer"], "line": "{s1-mugger} tells {rookie-officer} a courier paid {s1-mugger.him} ten credits a run and handed over the slip each Thursday." },
-    "slip-on-the-desk.1.3": { "who": ["rookie-officer"], "with": [], "line": "{rookie-officer} lifts a second takeaway bag out of the property box.", "held": "bag" },
+    "slip-on-the-desk.1.3": { "who": ["rookie-officer"], "with": [], "line": "{rookie-officer} lifts a second takeout bag out of the property box.", "held": "bag" },
     "slip-on-the-desk.1.4": { "who": ["rookie-officer"], "with": ["desk-sergeant"], "line": "{rookie-officer} hands the folded slip to {desk-sergeant} for the case file.", "held": "paper:slip" },
 
     "guard-on-the-comm.1.1": { "who": ["s1-lobby-guard"], "with": [], "line": "Comm, one side: \"I said stew. Eat the stew.\"" },
     "guard-on-the-comm.1.2": { "who": ["night-stakeout-officer"], "with": ["s1-lobby-guard"], "line": "{night-stakeout-officer} passes the lobby desk and gives {s1-lobby-guard} a small wave." },
-    "guard-on-the-comm.1.3": { "who": ["s1-lobby-guard"], "with": [], "line": "{s1-lobby-guard} stays seated at the lobby desk, comm at {s1-lobby-guard.his} ear, through the usual eight minutes away." },
+    "guard-on-the-comm.1.3": { "who": ["s1-lobby-guard"], "with": [], "line": "{s1-lobby-guard} stays seated at the lobby desk, comm at {s1-lobby-guard.his} ear, and never leaves for the back corridor." },
 
     "quiet-lobby.1.1": { "who": ["night-stakeout-officer"], "with": [], "line": "{night-stakeout-officer} watches the lift hall from the corner, cup on the ledge, and no bags are taken.", "stay": true },
     "quiet-lobby.1.2": { "who": ["rookie-officer"], "with": ["s1-victim-b"], "line": "{rookie-officer} hands {s1-victim-b} {s1-victim-b.his} quilted bag back at the lift doors.", "held": "bag" },

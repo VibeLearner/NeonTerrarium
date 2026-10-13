@@ -1,23 +1,23 @@
 {
   "slots": {
     "s3-stall-owner": { "desc": "the lantern stall keeper" },
-    "s3-suspect": { "desc": "a young man in a red cap" },
+    "s3-suspect": { "desc": "a young man" },
     "s3-rival-vendor": { "desc": "a vendor from the next aisle" },
-    "go-between-courier": { "desc": "a courier in a gray jacket" },
+    "go-between-courier": { "desc": "a delivery runner" },
     "informant": { "desc": "a snack stand worker" }
   },
   "steps": {
     "stall-burns.1.1": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} walks the market plaza slowly, hands in pockets, past corners without scanning them." },
     "stall-burns.1.2": { "who": ["s3-stall-owner"], "with": [], "line": "Shoppers scatter from the lantern stall as flames run up the awning, and {s3-stall-owner} stays put." },
-    "stall-burns.1.3": { "who": ["s3-stall-owner"], "with": ["burnout-officer"], "line": "{s3-stall-owner} points {burnout-officer} at the burning awning, apron balled in one fist." },
+    "stall-burns.1.3": { "who": ["s3-stall-owner"], "with": ["burnout-officer"], "line": "{s3-stall-owner} points {burnout-officer} at the burning awning and shouts over the crackle." },
     "stall-burns.1.4": { "who": ["s3-stall-owner"], "with": ["burnout-officer"], "line": "{s3-stall-owner} points at a melted power strip under the counter." },
     "stall-burns.1.5": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} stands at the scorched stall as the smoke thins out." },
     "stall-burns.1.6": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} picks a melted gel cap off the ground and drops it in an evidence bag." },
 
     "fire-log.1.1": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} sits on a plaza seat in mid-afternoon, eating noodles from a carton.", "held": "food" },
     "fire-log.1.2": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} reads the fire log: \"Gel residue on the awning struts. Strip melted after ignition.\"", "held": "paper:tablet" },
-    "fire-log.1.3": { "who": ["s3-stall-owner"], "with": ["burnout-officer"], "line": "{s3-stall-owner} tells {burnout-officer} a man came by Thursday and said \"the usual.\"" },
-    "fire-log.1.4": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} reads the same log line a third time, lips moving.", "held": "paper:tablet" },
+    "fire-log.1.3": { "who": ["s3-stall-owner"], "with": ["burnout-officer"], "line": "{s3-stall-owner} tells {burnout-officer} someone came by Thursday and said \"the usual.\"" },
+    "fire-log.1.4": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} reads the same log line twice more, lips moving.", "held": "paper:tablet" },
 
     "rival-words.1.1": { "who": ["s3-rival-vendor"], "with": ["s3-stall-owner"], "line": "{s3-rival-vendor} shouts at {s3-stall-owner} across the aisle, loud enough to turn heads." },
     "rival-words.1.2": { "who": ["s3-rival-vendor"], "with": ["s3-stall-owner"], "line": "{s3-rival-vendor} jabs a finger at the scorched stall." },
@@ -43,14 +43,14 @@
     "rival-s-receipt.1.4": { "who": ["burnout-officer"], "with": ["s3-rival-vendor"], "line": "{burnout-officer} shrugs at {s3-rival-vendor} and slides the receipt back along the counter." },
 
     "arrest-at-the-plaza.1.1": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} sits on a plaza seat facing the burnt stall, not eating, not moving.", "stay": true },
-    "arrest-at-the-plaza.1.2": { "who": ["s3-suspect"], "with": [], "line": "{s3-suspect} stops beside the burnt stall in a red cap, hands in {s3-suspect.his} pockets." },
+    "arrest-at-the-plaza.1.2": { "who": ["s3-suspect"], "with": [], "line": "{s3-suspect} stops beside the burnt stall, hands in {s3-suspect.his} pockets." },
     "arrest-at-the-plaza.1.3": { "who": ["s3-suspect"], "with": ["burnout-officer"], "line": "{burnout-officer} stands up, and {s3-suspect} breaks into a run across the plaza." },
     "arrest-at-the-plaza.1.4": { "who": ["burnout-officer"], "with": ["s3-suspect"], "line": "{burnout-officer} catches {s3-suspect} by the collar at the edge of the plaza." },
     "arrest-at-the-plaza.1.5": { "who": ["burnout-officer"], "with": ["s3-suspect"], "line": "{burnout-officer} pulls a gel vial and half of a scorched paper stub from {s3-suspect}'s pocket.", "held": "paper:slip" },
     "arrest-at-the-plaza.1.6": { "who": ["burnout-officer"], "with": ["s3-suspect"], "line": "{burnout-officer} walks {s3-suspect} out of the plaza toward the station." },
 
-    "statement.1.1": { "who": ["s3-suspect"], "with": [], "line": "{s3-suspect} sits at the interview table, the red cap turning in {s3-suspect.his} hands." },
-    "statement.1.2": { "who": ["s3-suspect"], "with": ["burnout-officer"], "line": "{s3-suspect} tells {burnout-officer} a courier paid {s3-suspect.him} twenty credits and a cousin said the stall had refused." },
+    "statement.1.1": { "who": ["s3-suspect"], "with": [], "line": "{s3-suspect} sits at the interview table, turning a snack token over in {s3-suspect.his} fingers." },
+    "statement.1.2": { "who": ["s3-suspect"], "with": ["burnout-officer"], "line": "{s3-suspect} tells {burnout-officer} a courier paid {s3-suspect.him} twenty credits, and a cousin said the stall refused to pay." },
     "statement.1.3": { "who": ["burnout-officer"], "with": ["desk-sergeant"], "line": "{burnout-officer} hands the gel vial in its evidence bag to {desk-sergeant}." },
 
     "leave-request.1.1": { "who": ["burnout-officer"], "with": ["desk-sergeant"], "line": "{burnout-officer} argues with {desk-sergeant} over a shift swap, voice low and flat." },

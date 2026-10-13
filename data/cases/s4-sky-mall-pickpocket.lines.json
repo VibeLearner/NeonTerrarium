@@ -1,25 +1,25 @@
 {
  "slots": {
   "s4-owner": {
-   "desc": "a kiosk clerk in a tea apron"
+   "desc": "a tea kiosk clerk"
   },
   "s4-thief": {
-   "desc": "a man in a gray hood"
+   "desc": "a man by the mall benches"
   },
   "s4-teen": {
-   "desc": "a teenager with a school bag"
+   "desc": "a young student"
   },
   "s4-colleague": {
-   "desc": "a kiosk clerk with a brown envelope"
+   "desc": "a clerk from the next kiosk"
   },
   "extra:shopper": {
    "desc": "a shopper"
   },
   "extra:sibling": {
-   "desc": "a kid with a mall pass"
+   "desc": "a young resident with a mall pass"
   },
   "extra:relative": {
-   "desc": "an older resident in a long cardigan"
+   "desc": "an older resident"
   }
  },
  "steps": {
@@ -86,7 +86,7 @@
     "s4-thief"
    ],
    "with": [],
-   "line": "{s4-thief} walks past the bench, hood up, a minute after the clerk leaves."
+   "line": "{s4-thief} walks past the bench a minute after the clerk leaves, a gray hood bunched in one hand."
   },
   "envelope-lifted.1.4": {
    "who": [
@@ -101,7 +101,7 @@
     "s4-thief"
    ],
    "with": [],
-   "line": "{s4-thief} walks on toward the lift with the envelope under {s4-thief.his} jacket.",
+   "line": "{s4-thief} walks on toward the lift with the envelope tucked under one arm.",
    "held": "paper:envelope"
   },
   "envelope-lifted.1.6": {
@@ -157,7 +157,7 @@
    "with": [
     "extra:shopper"
    ],
-   "line": "{rookie-officer} clips the bag of {extra:shopper} and keeps running.",
+   "line": "{rookie-officer} clips the bag of {extra:shopper} with one shoulder and keeps running.",
    "held": "paper:notebook"
   },
   "two-envelopes.1.4": {
@@ -173,7 +173,7 @@
     "rookie-officer"
    ],
    "with": [],
-   "line": "{rookie-officer} reads a still on the mall screen: a gray hood at the bench, stamped six past four."
+   "line": "{rookie-officer} reads a still on the mall screen: a gray hood at the bench, stamped \"16:06.\""
   },
   "screen-still.1.2": {
    "who": [
@@ -200,7 +200,7 @@
    "with": [
     "rookie-officer"
    ],
-   "line": "{veteran-officer} points at the notebook in the hand of {rookie-officer}."
+   "line": "{veteran-officer} points at the notebook in {rookie-officer.his} hand."
   },
   "hold-back.1.3": {
    "who": [
@@ -224,7 +224,7 @@
     "s4-teen"
    ],
    "with": [],
-   "line": "{s4-teen} waits by the bench with a school bag, watching the lift doors.",
+   "line": "{s4-teen} waits by the bench with a satchel, watching the lift doors.",
    "held": "bag"
   },
   "teen-cleared.1.2": {
@@ -244,14 +244,14 @@
    "with": [
     "extra:sibling"
    ],
-   "line": "{rookie-officer} reads the mall pass of {extra:sibling}: \"Entered seven past four.\""
+   "line": "{rookie-officer} reads the mall pass {extra:sibling} holds up: \"Entered 16:07.\""
   },
   "badge-on-the-stair.1.1": {
    "who": [
     "s4-thief"
    ],
    "with": [],
-   "line": "{s4-thief} walks to the staff stair, gray hood up."
+   "line": "{s4-thief} walks to the staff stair, a gray hood bunched in one hand."
   },
   "badge-on-the-stair.1.2": {
    "who": [
@@ -283,7 +283,7 @@
     "s4-thief"
    ],
    "with": [],
-   "line": "{s4-thief} sits down on the same bench, hood up."
+   "line": "{s4-thief} sits down on the bench across from the tea kiosk, a gray hood over one knee."
   },
   "same-bench-16-00.1.3": {
    "who": [
@@ -332,7 +332,7 @@
     "s4-thief"
    ],
    "with": [],
-   "line": "{s4-thief} sits down on the bench, hood up."
+   "line": "{s4-thief} sits down on the bench, a gray hood over one knee."
   },
   "arrest-on-the-bench.1.3": {
    "who": [
@@ -374,7 +374,7 @@
     "s4-thief"
    ],
    "with": [],
-   "line": "{s4-thief} sits at the interview table, hood down."
+   "line": "{s4-thief} sits at the interview table, a gray hood folded in front of {s4-thief.him}."
   },
   "statement.1.2": {
    "who": [
@@ -383,7 +383,7 @@
    "with": [
     "rookie-officer"
    ],
-   "line": "{s4-thief} tells {rookie-officer} a man paid {s4-thief.him} forty credits to lift whatever lay on the bench."
+   "line": "{s4-thief} tells {rookie-officer} a stranger paid {s4-thief.him} forty credits to lift whatever lay on the bench."
   },
   "statement.1.3": {
    "who": [

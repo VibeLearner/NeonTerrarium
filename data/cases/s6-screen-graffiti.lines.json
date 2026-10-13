@@ -1,10 +1,10 @@
 {
  "slots": {
   "s6-painter": {
-   "desc": "a teen in a dark jacket"
+   "desc": "a young visitor at the screens"
   },
   "s6-screen-wiper": {
-   "desc": "a man in gray overalls"
+   "desc": "a man with a long cloth"
   },
   "extra:visitor": {
    "desc": "a resident at the screens"
@@ -79,7 +79,7 @@
     "s6-painter"
    ],
    "with": [],
-   "line": "{s6-painter} enters the station hall before dawn, orange smudges on both cuffs."
+   "line": "{s6-painter} enters the station hall before dawn, orange paint smudged on both wrists."
   },
   "cuffs-at-the-screens.1.2": {
    "who": [
@@ -194,7 +194,7 @@
     "s6-painter"
    ],
    "with": [],
-   "line": "{s6-painter} on the comm, one side: \"He is not like the poster. He is not like that.\""
+   "line": "{s6-painter} on the comm, one side: \"My sibling is not like the poster. Not like that.\""
   },
   "comm-call-at-the-lift.1.3": {
    "who": [
@@ -238,7 +238,7 @@
    "with": [
     "desk-sergeant"
    ],
-   "line": "{s6-screen-wiper} unclips a work card from {s6-screen-wiper.his} overalls and hands it to {desk-sergeant}.",
+   "line": "{s6-screen-wiper} takes a work card from a pocket and hands it to {desk-sergeant}.",
    "held": "paper"
   },
   "can-in-the-bin-and-a-work-card.1.5": {
@@ -270,7 +270,7 @@
     "s6-painter"
    ],
    "with": [],
-   "line": "{s6-painter} turns the lanyard over: the printed surname is the same as the one in the caption of poster 4."
+   "line": "{s6-painter} turns a lanyard over: its printed surname matches the one in the caption of poster 4."
   },
   "lanyard-at-the-screens.1.4": {
    "who": [

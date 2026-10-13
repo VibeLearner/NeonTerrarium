@@ -322,16 +322,16 @@ const CASES = (() => {
       ['chat', ['g1'], ['cop'], '{g1} says something low, and {cop} stops walking.'],
       ['walk', ['g1'], [], '{g1} walks on alone, hands in pockets.'] ] },
     'approach-comm': { at: 'home:cop', steps: [
-      ['phone-call', ['cop'], [], 'At the door, comm, one side, {cop}: "Who is this? How do you have this number?"'],
-      ['phone-call', ['cop'], [], 'Comm, one side, {cop}, quieter: "Leave my family out of it."'],
+      ['phone-call', ['cop'], [], '{cop} on the comm at the door, one side: "Who is this? How do you have this number?"'],
+      ['phone-call', ['cop'], [], '{cop} on the comm, quieter now, one side: "Leave my family out of it."'],
       ['stand', ['cop'], [], '{cop} stands on the step a long time after the call ends.'] ] },
     'confide-home': { at: 'home:cop', steps: [
       ['sit', ['cop'], ['home'], '{cop} sits on the step with {home} and talks low for a long time.'],
       ['hand-over', ['cop'], ['home'], '{cop} shows {home} a folded envelope.', 'paper:envelope'],
       ['hug', ['home'], ['cop'], '{home} puts an arm around {cop} and says: "Tell them. Tomorrow."'] ] },
     'confide-partner': { at: 'station', steps: [
-      ['chat', ['cop'], ['partner'], '{cop} pulls {partner} aside by the station door: "Somebody came to my house."'],
-      ['hand-over', ['cop'], ['partner'], '{cop} hands {partner} the envelope.', 'paper:envelope'],
+      ['chat', ['cop'], ['partner'], '{cop} pulls {partner} aside by the station door: "Somebody got to me. They know where I live."'],
+      ['hand-over', ['cop'], ['partner'], '{cop} hands {partner} a folded envelope.', 'paper:envelope'],
       ['read-notice', ['partner'], [], '{partner} reads it twice and looks up at {cop}: "Then we use it."'] ] },
     'sting': { at: 'centre', steps: [
       ['wait-outside', ['g1'], [], '{g1} waits at the corner, an envelope ready, eyes on the street.'],
@@ -339,36 +339,36 @@ const CASES = (() => {
       ['arrest', ['partner'], ['g1'], '{partner} steps out of a doorway and takes hold of {g1}.'],
       ['escort', ['partner'], ['g1'], '{partner} walks {g1} toward the station, {cop} a step behind.'] ] },
     'leak': { at: 'centre', steps: [
-      ['police-patrol', ['cop'], [], '{cop} walks past without scanning, then looks back over one shoulder.'],
+      ['police-patrol', ['cop'], [], '{cop} walks the beat past the stalls without scanning anyone, then looks back over one shoulder.'],
       ['hand-over', ['cop'], ['g1'], '{cop} passes {g1} a folded sheet in the crowd and keeps walking.', 'paper:slip'] ] },
     'guilt': { at: 'home:cop', steps: [
       ['sit', ['cop'], [], ['{cop} sits on the step after the shift, comm in hand, and does not call anyone.', '{cop} stands at the door a long time with a hand on it, not going in.', '{cop} turns a folded envelope over and over, then puts it away.']],
-      ['stand', ['cop'], [], '{cop} goes to the door, stops, and sits down again.'] ] },
+      ['stand', ['cop'], [], '{cop} finally goes inside and shuts the door quietly.'] ] },
     'flip': { at: 'station', steps: [
       ['hand-over', ['cop'], ['partner'], '{cop} sets a folded sheet in front of {partner}: "Read it before you say anything."', 'paper:slip'],
       ['read-notice', ['partner'], [], '{partner} reads it, then reads it again.'],
-      ['walk-together', ['partner'], ['cop'], '{partner} walks {cop} to the desk sergeant without a word.'] ] },
+      ['walk-together', ['partner'], ['cop'], '{partner} walks {cop} to the front desk without a word.'] ] },
     'exposed': { at: 'station', steps: [
       ['read-notice', ['desk'], [], '{desk} runs a finger down the evidence log and stops on one line.'],
       ['point', ['desk'], ['cop'], '{desk} calls {cop} over to the counter and points at the line.'],
-      ['arrest', ['partner'], ['cop'], '{partner} takes the badge off {cop} and holds out a hand for the scanner.'],
+      ['arrest', ['partner'], ['cop'], '{partner} takes the badge off {cop} and holds out a hand for {cop.his} comm.'],
       ['escort', ['partner'], ['cop'], '{partner} walks {cop} to the back of the station.'] ] },
     'home-argue': { at: 'home:cop', steps: [
-      ['argue', ['home'], ['cop'], ['{home} and {cop} argue on the step: "You said you would be home by eight."', '{home} meets {cop} at the door with folded arms: "Again? Every night now?"', '{cop} and {home} argue in low voices on the step, then louder.']],
+      ['argue', ['home'], ['cop'], ['{home} and {cop} argue on the step: "You said you would be home for dinner."', '{home} meets {cop} at the door with folded arms: "Again? Every night now?"', '{cop} and {home} argue in low voices on the step, then louder.']],
       ['walk', ['cop'], [], '{cop} walks back down the street alone.'] ] },
     'home-support': { at: 'home:cop', steps: [
-      ['hand-over', ['home'], ['cop'], ['{home} meets {cop} at the door with a covered bowl kept warm.', '{home} waits up on the step with two cups of tea for when {cop} gets in.', '{home} takes the heavy bag off the shoulder of {cop} at the door.'], 'bowls:one'],
+      ['hand-over', ['home'], ['cop'], ['{home} meets {cop} at the door with a covered bowl kept warm.', '{home} waits up on the step with a covered bowl for when {cop} gets in.', '{home} hands {cop} a lidded bowl at the door: "Eat first. Then talk."'], 'bowls:one'],
       ['hug', ['home'], ['cop'], '{home} holds on to {cop} a moment longer than usual.'] ] },
     'home-alone': { at: 'home:cop', steps: [
-      ['eat', ['cop'], [], ['{cop} sits on the step outside, eating out of a paper bag, alone.', '{cop} comes home late and stands at the door a while before going in.', '{cop} eats standing at the corner stall, then walks home alone.'], 'food'] ] },
+      ['eat', ['cop'], [], ['{cop} sits on the step outside, eating out of a paper bag, alone.', '{cop} comes home late with a paper bag of food and stands at the door a while.', '{cop} eats a bun from a paper bag at the door, then goes in alone.'], 'food'] ] },
     'pair-good': { at: 'centre', steps: [
       ['eat', ['cop'], ['partner'], ['{cop} and {partner} split a bowl at the counter after the shift.', '{cop} and {partner} sit on the same bench and share a paper bag of buns.', '{cop} buys {partner} a tea without asking how {partner.he} takes it, and gets it right.']],
-      ['chat', ['partner'], ['cop'], ['{partner} laughs at something {cop} says, the first time in days.', '{partner} tells {cop} a long story, hands going, and {cop} listens to all of it.', '{cop} and {partner} walk back to the station side by side, still talking.']] ] },
+      ['chat', ['partner'], ['cop'], ['{partner} laughs out loud at something {cop} says.', '{partner} tells {cop} a long story, hands going, and {cop} listens to all of it.', '{cop} and {partner} walk back to the station side by side, still talking.']] ] },
     'pair-bad': { at: 'centre', steps: [
       ['walk-together', ['cop'], ['partner'], ['{cop} and {partner} walk the beat a step apart, saying nothing.', '{cop} and {partner} take opposite sides of the street and do not cross.', '{partner} answers {cop} with one word and keeps walking.']],
       ['shrug', ['partner'], [], '{partner} writes in a notebook and does not show it to anyone.', 'paper:notebook'] ] },
     'find': { at: 'trace', steps: [
-      ['search', ['cop'], [], ['{cop} crouches by the curb and picks up something small.', '{cop} stops, crouches, and pulls a folded scrap out from under a crate.', '{cop} lifts a torn label off the ground with two fingers.']],
+      ['search', ['cop'], [], ['{cop} crouches by a wall and picks up something small.', '{cop} stops, crouches, and pulls a folded scrap out from under a crate.', '{cop} lifts a torn label off the ground with two fingers.']],
       ['read-notice', ['cop'], [], '{cop} turns it over, reads it, and slips it into an evidence bag.', 'paper:slip'] ] },
     'find-record': { at: 'station', steps: [
       ['read-notice', ['desk'], [], '{desk} runs a finger down the scan log and stops at one line.'],
@@ -398,8 +398,8 @@ const CASES = (() => {
       ['arrest', ['cop'], ['g1'], '{cop} catches {g1} and holds {g1.him} down until {g1.he} stops pulling.'],
       ['escort', ['cop'], ['g1'], '{cop} walks {g1} away in cuffs.'] ] },
     'arrest-boss': { at: 'centre', steps: [
-      ['stakeout', ['h'], [], '{h} waits across from the place, a paper cup going cold.', 'cup'],
-      ['arrest', ['h'], ['boss'], '{h} and {cop} step in and take {boss} by the arms.'],
+      ['stakeout', ['h'], [], '{h} waits across the way, a paper cup going cold on the ledge.', 'cup'],
+      ['arrest', ['h'], ['boss'], '{h} steps in and takes {boss} firmly by the arm.'],
       ['escort', ['h'], ['boss'], '{h} walks {boss} out past the people staring.'] ] },
     'arrest-miss': { at: 'centre', steps: [
       ['stakeout', ['h'], [], '{h} waits across the way all morning.'],
@@ -408,12 +408,12 @@ const CASES = (() => {
       ['carry', ['boss'], [], '{boss} leaves before dawn with a single bag.', 'duffel'],
       ['walk', ['boss'], [], '{boss} walks out of the neighborhood and does not look back.'] ] },
     'gone-notice': { at: 'centre', steps: [
-      ['read-notice', ['cop'], [], '{cop} reads the sign taped up where {boss} used to be: "Closed until further notice."'] ] },
+      ['read-notice', ['cop'], [], '{cop} reads a sign taped to a shuttered front: "Closed until further notice."'] ] },
     'suspend': { at: 'station', steps: [
       ['read-notice', ['partner'], [], 'The screen shows a notice: "Officer {partner}, suspended pending review."'],
       ['stand', ['partner'], [], '{partner} stands in front of the screen and does not move.'] ] },
     'cleared': { at: 'station', steps: [
-      ['post-feed', ['desk'], [], '{desk} posts a correction under the notice about {partner}.'],
+      ['post-feed', ['desk'], [], '{desk} posts a correction on the station screen: "Suspension lifted, effective now."'],
       ['read-notice', ['partner'], [], '{partner} reads the corrected screen, then reads it again.'] ] },
     'demoted': { at: 'station', steps: [
       ['read-notice', ['cop'], [], 'The screen shows a notice: "Officer {cop}, reassigned to desk duty."'],

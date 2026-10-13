@@ -1,19 +1,19 @@
 {
  "slots": {
   "s5-lurker": {
-   "desc": "a young man in a gray coat"
+   "desc": "a young man on the platform bench"
   },
   "s5-bench-reader": {
-   "desc": "an old man in a brown cap"
+   "desc": "an old man on the east bench"
   },
   "s5-gray-coat-woman": {
    "desc": "a woman on her break"
   },
   "extra:attendant": {
-   "desc": "a platform attendant in an orange vest"
+   "desc": "the platform attendant"
   },
   "extra:counterhand": {
-   "desc": "a counter hand in an apron"
+   "desc": "a counter hand"
   },
   "extra:arrival": {
    "desc": "a young woman off the train"
@@ -33,7 +33,7 @@
     "s5-lurker"
    ],
    "with": [],
-   "line": "{s5-lurker} sits on the platform bench, orange scarf wound high."
+   "line": "{s5-lurker} sits on the platform bench, a gray coat and an orange scarf folded beside {s5-lurker.him}."
   },
   "gray-coat-on-the-bench.1.3": {
    "who": [
@@ -109,14 +109,14 @@
     "s5-bench-reader"
    ],
    "with": [],
-   "line": "{s5-bench-reader} leans on {s5-bench-reader.his} cane and leaves the platform by the stairs."
+   "line": "{s5-bench-reader} gets up slowly and leaves the platform by the stairs."
   },
   "never-boards.1.1": {
    "who": [
     "s5-lurker"
    ],
    "with": [],
-   "line": "{s5-lurker} comes through the platform gate, orange scarf up."
+   "line": "{s5-lurker} comes through the platform gate, an orange scarf balled in one hand."
   },
   "never-boards.1.2": {
    "who": [
@@ -177,14 +177,14 @@
     "s5-lurker"
    ],
    "with": [],
-   "line": "{s5-lurker} sits at the corner table across from the tea counter, scarf on, ordering nothing."
+   "line": "{s5-lurker} sits at the corner table across from the tea counter, an orange scarf on the table, ordering nothing."
   },
   "across-from-the-tea-counter.1.2": {
    "who": [
     "s5-gray-coat-woman"
    ],
    "with": [],
-   "line": "{s5-gray-coat-woman} steps up to the tea counter in a gray coat and orders tea.",
+   "line": "{s5-gray-coat-woman} steps up to the tea counter, a gray coat over one arm, and orders tea.",
    "held": "cup:tea"
   },
   "across-from-the-tea-counter.1.3": {
@@ -331,7 +331,7 @@
    "with": [
     "s5-lurker"
    ],
-   "line": "{night-stakeout-officer} empties the coat pockets of {s5-lurker}: a pencil scrap and a leaf-stamped chip.",
+   "line": "{night-stakeout-officer} turns out the pockets of the gray coat {s5-lurker} carries: a pencil scrap and a leaf-stamped chip.",
    "held": "paper:slip"
   },
   "lurker-caught-on-the-platform.1.5": {
@@ -355,7 +355,7 @@
     "s5-gray-coat-woman"
    ],
    "with": [],
-   "line": "{s5-gray-coat-woman} swipes a badge and enters by the staff door behind the counter, gray coat on."
+   "line": "{s5-gray-coat-woman} swipes a badge at the staff door behind the counter, a gray coat over one arm."
   },
   "gray-coat-behind-the-counter.1.2": {
    "who": [
@@ -369,7 +369,7 @@
     "s5-gray-coat-woman"
    ],
    "with": [],
-   "line": "{s5-gray-coat-woman}, now in a pale green apron, pours tea for a patron.",
+   "line": "{s5-gray-coat-woman} hangs the gray coat on a staff hook and pours tea for a patron.",
    "held": "cup:tea"
   },
   "slip-filed.1.1": {

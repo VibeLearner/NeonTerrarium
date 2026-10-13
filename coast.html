@@ -5,66 +5,96 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Neon Terrarium: the coast</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,500&family=Nunito:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <style>
-  :root { --ink: #173f48; --ink2: #3d6a70; --paper: #fbf6ea; --paper2: #f3ead7; --edge: #d9c9a8; --terra: #c8663e; --sage: #8fb08a; --teal: #3f8f8a; }
+  /* the calm kit (her UI boards): ivory frosted cards, sage and moss, a terracotta accent, a serif for headings */
+  :root { --ivory: #f6f1e9; --ivory2: #efe7da; --sand: #c9bdaf; --line: #e3d9ca; --ink: #2a3a33; --ink2: #6f7d74; --sage: #6b7f6e; --sage2: #5c7060; --moss: #a7b8a7; --mist: #d9e1d9; --terra: #c0623f; }
   html, body { margin: 0; height: 100%; background: #7fbfc8; overflow: hidden; }
   canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; cursor: grab; }
-  /* paper panels: a warm sheet with a soft deckled shadow, as if laid on the scene */
-  .panel { position: fixed; font: 13px/1.35 Nunito, system-ui, sans-serif; color: var(--ink); user-select: none;
-    background: radial-gradient(120% 140% at 20% 0%, var(--paper) 55%, var(--paper2) 100%); border: 1px solid var(--edge);
-    border-radius: 14px 10px 13px 9px; box-shadow: 0 2px 0 #fff8 inset, 0 6px 18px #0f2a3026, 0 1px 3px #0f2a3033; padding: 10px 12px; }
-  .panel h3 { margin: 0 0 6px; font: italic 500 15px/1 Fraunces, Georgia, serif; color: var(--ink); letter-spacing: .2px; }
-  .panel .sec { margin: 10px 0 5px; font: 700 10.5px/1 Nunito, sans-serif; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink2); }
-  .panel button { font: 700 12.5px/1 Nunito, sans-serif; color: var(--ink); background: #fffdf7; border: 1px solid var(--edge); border-radius: 9px 7px 9px 8px;
-    padding: 6px 10px; margin: 0 4px 4px 0; cursor: pointer; transition: background .12s, transform .12s, box-shadow .12s; }
-  .panel button:hover { background: #fff; transform: translateY(-1px); box-shadow: 0 2px 6px #0f2a3018; }
-  .panel button.on { background: var(--teal); color: #fffaf0; border-color: #2f716d; box-shadow: 0 1px 0 #ffffff40 inset; }
-  .panel button.small { font-size: 11.5px; padding: 4px 8px; }
+  .card { position: fixed; font: 400 13px/1.4 'DM Sans', system-ui, sans-serif; color: var(--ink); user-select: none; box-sizing: border-box;
+    background: color-mix(in srgb, var(--ivory) 96%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1);
+    border: 1px solid #ffffffb0; border-radius: 22px; box-shadow: 0 1px 0 #ffffffc0 inset, 0 12px 32px -8px #2a3a3338, 0 2px 6px #2a3a331a; padding: 16px 18px; }
+  .label { font: 600 10px/1 'DM Sans', sans-serif; letter-spacing: 2.2px; text-transform: uppercase; color: var(--ink2); }
+  .label b { color: var(--sage); font-weight: 600; margin-right: 6px; }
+  .serif { font-family: 'Cormorant Garamond', Georgia, serif; }
+  button { font-family: inherit; }
+
   /* time, top left */
-  #timePanel { top: 14px; left: 14px; width: 292px; }
-  #timePanel .clockrow { display: flex; align-items: baseline; justify-content: space-between; }
-  #clock { font: 700 13px Nunito, sans-serif; color: var(--ink2); font-variant-numeric: tabular-nums; }
-  #timeSlider { -webkit-appearance: none; appearance: none; width: 100%; height: 10px; margin: 8px 0 9px; border-radius: 6px; cursor: pointer;
-    background: linear-gradient(90deg, #233a5a 0%, #33507a 18%, #f1b98c 26%, #bfe1e6 36%, #a6d4dc 60%, #f3c28d 74%, #e3866a 79%, #33507a 86%, #233a5a 100%); border: 1px solid #0f2a3033; }
-  #timeSlider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); box-shadow: 0 1px 3px #0004; }
-  #timeSlider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); }
-  #timePanel .presets button { margin: 0 3px 0 0; padding: 4px 7px; font-size: 11.5px; }
+  #timePanel { top: 16px; left: 16px; width: 330px; }
+  #timePanel .top { display: flex; align-items: flex-end; justify-content: space-between; margin: 8px 0 12px; }
+  #clock { font: 500 44px/0.9 'Cormorant Garamond', Georgia, serif; color: var(--ink); font-variant-numeric: lining-nums tabular-nums; letter-spacing: .5px; }
+  #period { font: italic 500 18px/1 'Cormorant Garamond', Georgia, serif; color: var(--sage2); margin-bottom: 4px; }
+  .track { position: relative; height: 26px; }
+  #timeSlider { -webkit-appearance: none; appearance: none; position: absolute; inset: 0; width: 100%; margin: 0; background: transparent; cursor: pointer; --p: 45.8%; }
+  #timeSlider:focus { outline: none; }
+  #timeSlider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 5px #6b7f6e40, 0 3px 8px #2a3a3340; }
+  #timeSlider::-webkit-slider-runnable-track { height: 6px; border-radius: 6px; background: linear-gradient(90deg, var(--sage) var(--p), var(--mist) var(--p)); box-shadow: 0 1px 2px #2a3a3322 inset; }
+  #timeSlider::-moz-range-track { height: 6px; border-radius: 6px; background: var(--mist); }
+  #timeSlider::-moz-range-progress { height: 6px; border-radius: 6px; background: var(--sage); }
+  #timeSlider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%; background: var(--ivory); border: 1px solid #fff; box-shadow: 0 0 0 4px #6b7f6e26, 0 3px 8px #2a3a3340; }
+  #timeSlider::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--ivory); border: 1px solid #fff; box-shadow: 0 0 0 4px #6b7f6e26, 0 3px 8px #2a3a3340; }
+  .ticks { display: flex; justify-content: space-between; margin: 2px 2px 12px; font: 500 10px 'DM Sans', sans-serif; color: #9aa59d; }
+  .seg { display: flex; padding: 3px; gap: 2px; border-radius: 14px; background: var(--ivory2); box-shadow: 0 1px 2px #2a3a331c inset; }
+  .seg button { flex: 1; border: 0; background: transparent; padding: 7px 0; border-radius: 11px; font: 500 11.5px 'DM Sans', sans-serif; color: var(--ink2); cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; }
+  .seg button:hover { color: var(--ink); background: #ffffff80; }
+  .seg button.on { background: var(--sage); color: #fbf8f2; box-shadow: 0 3px 8px -2px #5c706080; }
+
   /* building, bottom left */
-  #buildPanel { left: 14px; bottom: 14px; width: 270px; }
-  .ctrl { position: relative; display: inline-block; font: 700 11px Nunito, sans-serif; color: var(--ink2); cursor: help; padding: 2px 8px 2px 6px;
-    border: 1px dashed var(--edge); border-radius: 10px; background: #fffaf080; }
-  .ctrl::before { content: '?'; display: inline-block; width: 13px; height: 13px; margin-right: 5px; border-radius: 50%; background: var(--ink2); color: var(--paper); text-align: center; font-size: 10px; line-height: 13px; }
-  .ctrl .pop { display: none; position: absolute; left: 0; bottom: calc(100% + 8px); width: 330px; z-index: 5; cursor: default; }
+  #buildPanel { left: 16px; bottom: 16px; width: 330px; }
+  #buildPanel .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  #buildPanel h2 { margin: 0; font: 600 24px/1 'Cormorant Garamond', Georgia, serif; color: var(--ink); }
+  .sec { margin: 14px 0 8px; }
+  .tiles { display: flex; gap: 8px; }
+  .tile { flex: 0 0 82px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 11px 4px 9px; border-radius: 16px; cursor: pointer;
+    background: #fffdf9; border: 1px solid var(--line); box-shadow: 0 2px 5px -1px #2a3a331c; font: 500 12px 'DM Sans', sans-serif; color: var(--ink); transition: transform .15s, box-shadow .15s, background .15s; }
+  .tile svg { width: 26px; height: 26px; stroke: var(--sage2); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .tile:hover { transform: translateY(-2px); box-shadow: 0 8px 16px -6px #2a3a3340; }
+  .tile.on { background: var(--sage); border-color: var(--sage2); color: #fbf8f2; box-shadow: 0 8px 18px -6px #5c7060a0; }
+  .tile.on svg { stroke: #fbf8f2; }
+  #placeStatus { min-height: 15px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font: italic 500 14px/1.2 'Cormorant Garamond', Georgia, serif; color: var(--sage2); }
+  #placeStatus.idle:empty::before { content: 'Choose a zone or a tool.'; color: #a3ada6; }
+  #placeStatus:not(.idle):empty::before { content: 'Point at the ground to place.'; color: #a3ada6; }
+
+  /* controls: a pill; hovering it shows the keys */
+  .ctrl { position: static; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 6px; border-radius: 20px; background: var(--ivory2); cursor: help;
+    font: 600 10px 'DM Sans', sans-serif; letter-spacing: 1.6px; text-transform: uppercase; color: var(--ink2); }
+  .ctrl i { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--sage); color: #fbf8f2; font: 600 11px 'DM Sans'; font-style: normal; letter-spacing: 0; }
+  .ctrl .pop { display: none; position: absolute; left: calc(100% + 14px); bottom: 0; width: 330px; text-transform: none; letter-spacing: 0; cursor: default; }
   .ctrl:hover .pop { display: block; }
-  .pop h4 { margin: 0 0 6px; font: italic 500 14px Fraunces, Georgia, serif; color: var(--ink); }
-  .pop .row { display: flex; gap: 10px; align-items: baseline; margin: 4px 0; font-weight: 500; color: var(--ink); }
-  .pop kbd { flex: 0 0 96px; font: 700 11px Nunito, sans-serif; color: var(--terra); }
-  .pop .view { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--edge); }
-  #resSub { margin: 2px 0 0 10px; padding-left: 9px; border-left: 2px solid #3f8f8a55; }
-  #resSub .seg button { margin-right: 2px; }
-  #placeStatus { min-height: 16px; margin-top: 6px; font: 500 11.5px Nunito, sans-serif; color: #b03a2a; }
-  .chip { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); font: 700 12px Nunito, sans-serif; color: #fffaf0; background: #173f48dd; padding: 5px 12px; border-radius: 10px; }
+  .ctrl .pop::before { content: ''; position: absolute; left: -70px; top: 0; width: 70px; height: 100%; }   /* (a bridge over the gap, so the hover holds) */
+  .pop h4 { margin: 0 0 8px; font: 600 19px 'Cormorant Garamond', Georgia, serif; color: var(--ink); }
+  .pop .row { display: flex; gap: 12px; align-items: baseline; margin: 5px 0; font: 400 12.5px 'DM Sans', sans-serif; color: var(--ink); }
+  .pop kbd { flex: 0 0 92px; font: 600 11px 'DM Sans', sans-serif; color: var(--terra); }
+  .pop .view { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .chip { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); font: 500 12px 'DM Sans', sans-serif; color: #fbf8f2; background: #2a3a33d0; padding: 7px 14px; border-radius: 14px; }
 </style>
 </head>
 <body>
 <canvas id="view"></canvas>
 
-<div id="timePanel" class="panel">
-  <div class="clockrow"><h3>Time of day</h3><span id="clock">11:00</span></div>
-  <input id="timeSlider" type="range" min="0" max="23.99" step="0.05" value="11" aria-label="time of day">
-  <div class="presets"><button data-h="6.6">dawn</button><button data-h="11" class="on">noon</button><button data-h="16.5">afternoon</button><button data-h="18.6">golden</button><button data-h="21.5">night</button></div>
+<div id="timePanel" class="card">
+  <div class="label"><b>01</b>Time of day</div>
+  <div class="top"><span id="clock">11:00</span><span id="period">Late morning</span></div>
+  <div class="track"><input id="timeSlider" type="range" min="0" max="23.99" step="0.05" value="11" aria-label="time of day"></div>
+  <div class="ticks"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div>
+  <div class="seg"><button data-h="6.6">Dawn</button><button data-h="11" class="on">Noon</button><button data-h="16.5">Afternoon</button><button data-h="18.6">Golden</button><button data-h="21.5">Night</button></div>
 </div>
 
-<div id="buildPanel" class="panel">
-  <span class="ctrl">Controls
-    <div class="pop panel"><div id="ctrlTool"></div>
-      <div class="view"><h4>The view</h4><div class="row"><kbd>drag</kbd><span>turn (Q / E too, when no brush is on)</span></div><div class="row"><kbd>wheel</kbd><span>zoom</span></div><div class="row"><kbd>WASD / arrows</kbd><span>pan (Shift: faster)</span></div><div class="row"><kbd>Space</kbd><span>tilt</span></div><div class="row"><kbd>H</kbd><span>home</span></div><div class="row"><kbd>Esc</kbd><span>put the tool down</span></div></div></div></span>
-  <div class="sec">Zones</div>
-  <button id="zoneRes">Residential</button>
-  <div class="sec">Landscape</div>
-  <button data-k="grass">Grass</button><button data-k="connect">Walkways</button>
-  <div id="placeStatus"></div>
+<div id="buildPanel" class="card">
+  <div class="head"><h2>Build</h2>
+    <span class="ctrl"><i>?</i>Controls
+      <div class="pop card"><div id="ctrlTool"></div>
+        <div class="view"><h4>The view</h4><div class="row"><kbd>drag</kbd><span>turn (Q / E too, when no brush is on)</span></div><div class="row"><kbd>wheel</kbd><span>zoom</span></div><div class="row"><kbd>WASD / arrows</kbd><span>pan (Shift: faster)</span></div><div class="row"><kbd>Space</kbd><span>tilt</span></div><div class="row"><kbd>H</kbd><span>home</span></div><div class="row"><kbd>Esc</kbd><span>put the tool down</span></div></div></div></span></div>
+  <div class="sec label"><b>02</b>Zones</div>
+  <div class="tiles">
+    <button id="zoneRes" class="tile"><svg viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/><path d="M15.5 6.2V4h2v3.8"/></svg>Residential</button>
+  </div>
+  <div class="sec label"><b>03</b>Landscape</div>
+  <div class="tiles">
+    <button class="tile" data-k="grass"><svg viewBox="0 0 24 24"><path d="M4 20c1-4 2.5-7 5-9"/><path d="M8 20c.3-4.5 1.5-8.5 4-12"/><path d="M12 20c0-4 1-6.5 3-8.5"/><path d="M15.5 20c.5-3 2-5.5 4.5-7"/><path d="M3 20h18"/></svg>Grass</button>
+    <button class="tile" data-k="connect"><svg viewBox="0 0 24 24"><path d="M2.5 15h19"/><path d="M2.5 15c3-5 6-6.5 9.5-6.5s6.5 1.5 9.5 6.5"/><path d="M6 15v-3.5M9 15v-5.6M12 15V8.5M15 15V9.4M18 15v-3.5"/><path d="M4 15v4M20 15v4"/></svg>Walkways</button>
+  </div>
+  <div id="placeStatus" class="idle"></div>
 </div>
 
 <div id="tiltChip" class="chip" hidden>Tilt: drag up and down, Space to go back</div>

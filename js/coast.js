@@ -1722,7 +1722,7 @@
   function showGhost(){
     PL.onto = null; PL.side = null; zHide();
     const K = curKind(), S = curSeed(), pre = oneHome() ? 'one home: ' + K + ' (V next) ' : '';
-    const say = (t, ok) => { if (status){ status.textContent = pre + t; status.style.color = ok ? '#0f3b4a' : ''; } };
+    const say = (t, ok) => { if (status){ status.textContent = pre + t; status.style.color = ok ? '#5c7060' : '#c0623f'; } };
     const hov = K && PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, over = hov && hov.top ? hov.piece : null;
     if (hov && !hov.top){   // against a wall: build off that side, on that floor
       const sp = sideSpot(hov.piece, K, hov.point.x, hov.point.z, S); PL.ok = sp; PL.side = sp.ok ? sp : null;
@@ -1816,7 +1816,7 @@
     for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s_ = Math.sin(t);
       for (const [j, rr] of [[0, r], [1, r + .18]]){ const x = hit.x + c*rr, z = hit.z + s_*rr, o = (i*2 + j)*3; a[o] = x; a[o + 1] = heightAt(x, z) + .07; a[o + 2] = z; } }
     ringGeo.attributes.position.needsUpdate = true; ring.visible = true; ringM.color.set(n ? 0x7dffb0 : 0xff6a5a);
-    if (status){ status.textContent = 'brush ' + ZONE.size + ': ' + n + ' homes' + (ns ? ', ' + ns + ' on top of homes' : '') + (nd ? ', ' + nd + ' against homes' : '') + (n ? '' : ': no room here'); status.style.color = n ? '#0f3b4a' : ''; }
+    if (status){ status.textContent = 'brush ' + ZONE.size + ': ' + n + ' homes' + (ns ? ', ' + ns + ' on top of homes' : '') + (nd ? ', ' + nd + ' against homes' : '') + (n ? '' : ': no room here'); status.style.color = n ? '#5c7060' : '#c0623f'; }
   }
   function placeZone(){
     if (!PL.hit || PL.hit.sea) return;
@@ -1852,7 +1852,8 @@
     const sub = document.getElementById('resSub'); if (sub) sub.hidden = !resActive();
     const kinds = document.getElementById('resKinds'); if (kinds) kinds.hidden = ZONE.on;
     document.querySelectorAll('button[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === PL.kind));
-    const tip = document.getElementById('ctrlTool'); if (tip) tip.innerHTML = controlsFor(); }
+    const tip = document.getElementById('ctrlTool'); if (tip) tip.innerHTML = controlsFor();
+    if (status) status.classList.toggle('idle', !PL.kind); }
   // what the keys and the mouse do with whatever is chosen (shown when Controls is hovered)
   function controlsFor(){
     const row = (k, t) => '<div class="row"><kbd>' + k + '</kbd><span>' + t + '</span></div>';
@@ -1879,7 +1880,7 @@
   function showConnect(){
     ghost.visible = false; zHide();
     const hov = PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, P = hov ? hov.piece : null, tn = LINK_TYPES[CN.type];
-    const say = (t, ok) => { if (status){ status.textContent = 'connect: ' + tn + ' (V next) ' + t; status.style.color = ok ? '#0f3b4a' : ''; } };
+    const say = (t, ok) => { if (status){ status.textContent = 'walkways: ' + tn + ' (V next) ' + t; status.style.color = ok ? '#5c7060' : '#c0623f'; } };
     if (!CN.a){ connGhost.visible = false; CN.ok = false;
       if (P){ ringAt(P.x, P.z, KINDS[P.kind].rb + .35, P.level ? P.y : null); ringM.color.set(0x7dffb0); } else ring.visible = false;
       say(P ? '· click to pick this one' : '· pick the first block', !!P); return; }
@@ -1980,7 +1981,8 @@
   });
   // the time panel: a slider through the whole day, and the times to jump to
   const tSlider = document.getElementById('timeSlider'), tClock = document.getElementById('clock');
-  function setTime(h){ setHour(h); if (tSlider) tSlider.value = h; if (tClock){ const hh = Math.floor(h) % 24, mm = Math.floor((h % 1)*60); tClock.textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); }
+  const periodOf = h => h < 4.8 || h >= 21 ? 'Night' : h < 6.4 ? 'Dawn' : h < 9 ? 'Morning' : h < 12 ? 'Late morning' : h < 14 ? 'Midday' : h < 17 ? 'Afternoon' : h < 19 ? 'Golden hour' : 'Dusk';
+  function setTime(h){ setHour(h); if (tSlider){ tSlider.value = h; tSlider.style.setProperty('--p', (h/24*100).toFixed(2) + '%'); } const pe = document.getElementById('period'); if (pe) pe.textContent = periodOf(h); if (tClock){ const hh = Math.floor(h) % 24, mm = Math.floor((h % 1)*60); tClock.textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); }
     document.querySelectorAll('[data-h]').forEach(b => b.classList.toggle('on', Math.abs(+b.dataset.h - h) < .01)); }
   if (tSlider) tSlider.addEventListener('input', () => setTime(+tSlider.value));
   document.querySelectorAll('[data-h]').forEach(b => b.addEventListener('click', () => setTime(+b.dataset.h)));

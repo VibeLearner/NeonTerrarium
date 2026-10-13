@@ -334,8 +334,8 @@
     // peak sits there; then the back.) Returns (height, slope, x, fw).
     vec4 waveH(vec4 w, float sh, float d){
       float x = (1.0 - w.y)*26.0, along = w.w, wn = w.z, h2 = waveStage(wn).z;
-      float fw = 1.5 + 1.6*h2 + 0.5*sin(along*0.17 + time*0.9 + wn*3.0), bl = 8.0 + 7.0*fract(h2*2.3);
-      float amp = 1.9*w.x*waveCv(along, wn)*smoothstep(0.3, 2.2, sh)*(1.0 + 0.5*(1.0 - smoothstep(1.0, 5.0, d)));
+      float fw = 1.1 + 1.0*h2 + 0.35*sin(along*0.17 + time*0.9 + wn*3.0), bl = 5.5 + 4.0*fract(h2*2.3);
+      float amp = 11.0*w.x*waveCv(along, wn)*smoothstep(0.3, 2.6, sh)*(0.45 + 0.55*smoothstep(1.5, 8.0, d));   // (big swells out deep; lower as the water shallows, so they don't stand over the cliffs)
       float hs, ds;
       if (x < fw){ float u = clamp(x/fw, 0.0, 1.0); hs = u*u*(3.0 - 2.0*u); ds = 6.0*u*(1.0 - u)/fw; }
       else { float u = clamp((x - fw)/bl, 0.0, 1.0); hs = 1.0 - u*u*(3.0 - 2.0*u); ds = -6.0*u*(1.0 - u)/bl; }
@@ -461,12 +461,17 @@
           float lw = wave*(0.7 + 0.3*shoal)*open;
           // its form: the surface's slope against the sun, in four flat steps (the sunlit face, the shaded back), and the
           // trough's shadow at its foot
-          vec3 nrm = normalize(vec3(WD.x*wh.y*3.0, 1.0, WD.y*wh.y*3.0));   // (the slope tripled: pixel art draws form bolder than it is)
+          vec3 nrm = normalize(vec3(WD.x*wh.y*1.3, 1.0, WD.y*wh.y*1.3));
           float rel = dot(nrm, normalize(sunDir)) - normalize(sunDir).y + dith*0.08;
-          col *= rel < -0.18 ? 0.8 : rel < -0.06 ? 0.9 : rel > 0.14 ? 1.14 : rel > 0.04 ? 1.06 : 1.0;
+          col *= rel < -0.22 ? 0.66 : rel < -0.08 ? 0.8 : rel > 0.18 ? 1.18 : rel > 0.06 ? 1.08 : 1.0;   // (the side turned from the sun falls into a clear shadow band)
+          float bk = fw + 5.5 + 4.0*fract(waveStage(wn).z*2.3);
+          // the shadow band behind it: where its back drops to the sea there's a hard-edged band of shadow, in two steps (drawn
+          // whatever the sun, so its height reads from any side)
+          float sbx = x - (bk - 1.2);
+          col *= 1.0 - lw*(step(abs(sbx - 0.6) + dith*0.5, 1.5)*0.24 + step(abs(sbx - 0.3) + dith*0.4, 0.7)*0.16);
           col *= 1.0 - 0.42*lw*(1.0 - smoothstep(0.0, 4.5, ahead + dith*0.8));                                        // (the trough, in its shadow)
           // its swell: the higher the water, the more sky and sun it catches, in three steps up to the crest
-          float hb = floor(clamp(wh.x/1.6, 0.0, 1.2)*4.0 + dith*0.9)/4.0;
+          float hb = floor(clamp(wh.x/8.0, 0.0, 1.2)*4.0 + dith*0.9)/4.0;
           col = col*(1.0 + 0.34*hb) + vec3(0.0, 0.04, 0.05)*hb;
           // the face: glassy, lit through near the top
           float f = clamp(x/fw, 0.0, 1.0);

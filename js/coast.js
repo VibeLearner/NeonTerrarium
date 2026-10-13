@@ -936,10 +936,43 @@
     } },
   };
   const KIND_KEYS = Object.keys(KINDS);
+  // ---- outlines (seen from above): convex hulls, placed in the world, tested against each other ----
+  function hull2(P){ if (P.length < 3) return [[-.5, -.5], [.5, -.5], [.5, .5], [-.5, .5]];
+    P = P.map(q => [Math.round(q[0]*200)/200, Math.round(q[1]*200)/200]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cr = (o, a, b) => (a[0] - o[0])*(b[1] - o[1]) - (a[1] - o[1])*(b[0] - o[0]), lo = [], up = [];
+    for (const q of P){ while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+    for (let i = P.length - 1; i >= 0; i--){ const q = P[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+    return lo.slice(0, -1).concat(up.slice(0, -1)); }
+  // a local outline turned by rot and moved to (x, z) (as the mesh's rotation.y turns it)
+  const placeHull = (H, x, z, rot) => { const c = Math.cos(rot), s_ = Math.sin(rot); return H.map(([u, v]) => [x + u*c + v*s_, z - u*s_ + v*c]); };
+  // do two outlines overlap by more than a touch (separating axes)
+  function hullsHit(A, B, tol = .1){
+    for (const P of [A, B]) for (let i = 0; i < P.length; i++){ const a = P[i], b = P[(i + 1) % P.length], nx = b[1] - a[1], nz = a[0] - b[0], l = Math.hypot(nx, nz) || 1;
+      let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9;
+      for (const q of A){ const d = (q[0]*nx + q[1]*nz)/l; a0 = Math.min(a0, d); a1 = Math.max(a1, d); }
+      for (const q of B){ const d = (q[0]*nx + q[1]*nz)/l; b0 = Math.min(b0, d); b1 = Math.max(b1, d); }
+      if (a1 - tol <= b0 || b1 - tol <= a0) return false; }
+    return true; }
+  const inHull = (P, x, z) => { let sg = 0; for (let i = 0; i < P.length; i++){ const a = P[i], b = P[(i + 1) % P.length], c = (b[0] - a[0])*(z - a[1]) - (b[1] - a[1])*(x - a[0]); if (c > 1e-9) sg |= 1; else if (c < -1e-9) sg |= 2; if (sg === 3) return false; } return true; };
+  // how far from (cx, cz) along (dx, dz) the outline's edge is
+  function hullExit(P, cx, cz, dx, dz){ let t = 0;
+    for (let i = 0; i < P.length; i++){ const a = P[i], b = P[(i + 1) % P.length], ex = b[0] - a[0], ez = b[1] - a[1], den = dx*ez - dz*ex; if (Math.abs(den) < 1e-9) continue;
+      const tt = ((a[0] - cx)*ez - (a[1] - cz)*ex)/den, u = ((a[0] - cx)*dz - (a[1] - cz)*dx)/den; if (u >= -1e-6 && u <= 1 + 1e-6 && tt > t) t = tt; }
+    return t; }
+  // the farthest the outline (local) reaches along a local direction
+  const hullReach = (H, ux, uz) => H.reduce((m, q) => Math.max(m, q[0]*ux + q[1]*uz), 0);
+  // is anything already there: a placed block whose height range meets [y0, y1] and whose outline meets this one
+  function blocked(W, y0, y1, skip){
+    for (const q of PIECES){ if (skip && skip.includes(q)) continue; if (q.y > y1 - .05 || q.y + q.h < y0 + .05) continue; if (hullsHit(W, q.hullW)) return q; }
+    return null; }
+  // is the point (x, z) at height y inside a block (but not those in skip)
+  const solidAt = (x, z, y0, y1, skip) => PIECES.some(q => !(skip && skip.includes(q)) && q.y < y1 && q.y + q.h > y0 && inHull(q.hullW, x, z));
   const geoCache = new Map();
   function blockOf(kind, seed, below, above){ const key = kind + ':' + seed + ':' + (below ? 1 : 0) + (above ? 1 : 0); let g = geoCache.get(key); if (g) return g;
     const T = new Tris(), k = KIND_KEYS.indexOf(kind) + 1, R = rng(Math.imul(seed, 2654435761) ^ k*97), D = rng(Math.imul(seed, 1597334677) ^ k*131);
-    const top = KINDS[kind].build(T, R, D, { below, above }); g = { geo: T.geo(), top }; geoCache.set(key, g);
+    const top = KINDS[kind].build(T, R, D, { below, above }), cut = below ? .1 : .6, pts = [];
+    let hmax = top; for (let i = 0; i < T.p.length; i += 3){ if (T.p[i + 1] > hmax) hmax = T.p[i + 1]; if (T.p[i + 1] > cut) pts.push([T.p[i], T.p[i + 2]]); }
+    g = { geo: T.geo(), top, hull: hull2(pts), h: hmax }; geoCache.set(key, g);
     if (geoCache.size > 400){ const k0 = geoCache.keys().next().value; geoCache.get(k0).geo.dispose(); geoCache.delete(k0); }
     return g; }
 
@@ -951,13 +984,13 @@
   const pieceMeshes = [];
   function pieceMesh(p){ const b = blockOf(p.kind, p.seed, !!p.base || p.level > 0, !!p.up);
     const m = new THREE.Mesh(b.geo, pieceM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.frustumCulled = false;
-    m.position.set(p.x, p.y, p.z); m.rotation.y = p.rot; m.matrixAutoUpdate = false; m.updateMatrix(); m.updateMatrixWorld(); m.userData.piece = p; p.top = b.top; return m; }
+    m.position.set(p.x, p.y, p.z); m.rotation.y = p.rot; m.matrixAutoUpdate = false; m.updateMatrix(); m.updateMatrixWorld(); m.userData.piece = p; p.top = b.top; p.h = b.h; p.hullL = b.hull; p.hullW = placeHull(b.hull, p.x, p.z, p.rot); return m; }
   function remesh(p){ if (p.mesh){ scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); } p.mesh = pieceMesh(p); scene.add(p.mesh); pieceMeshes.push(p.mesh); }
   const stackTop = p => { while (p.up) p = p.up; return p; };
   const MAXLV = 8;   // (how many floors of blocks a home can reach)
   // can a block go here on the ground? wholly on land (right up to the cliff edge is fine), on ground that isn't too steep,
   // not on top of another home (they may touch: touching homes are joined); returns the pad height
-  function check(kind, x, z){
+  function check(kind, x, z, seed = 1, rot = 0){
     const r = KINDS[kind].r, rb = KINDS[kind].rb, cx = coastX(z), sl = (coastX(z + .5) - coastX(z - .5)), edge = (cx - x)/Math.sqrt(1 + sl*sl);
     if (edge < rb + .3) return { ok: false, why: 'over the edge' };
     let lo = 1e9, hi = -1e9, sum = 0, n = 0;
@@ -968,7 +1001,8 @@
     const y = sum/n;
     if (lo < .35) return { ok: false, why: 'too close to the water' };
     if (hi - lo > 1.0) return { ok: false, why: 'too steep' };
-    for (const p of piecesNear(x - r - 4, z - r - 4, x + r + 4, z + r + 4)) if (Math.hypot(x - p.x, z - p.z) < rb + KINDS[p.kind].rb - .15) return { ok: false, why: 'something is in the way' };
+    const b = blockOf(kind, seed, false, false);
+    if (blocked(placeHull(b.hull, x, z, rot), y, y + b.h)) return { ok: false, why: 'something is in the way' };
     return { ok: true, y };
   }
   const dirtyAround = p => { for (const ch of chunks.values()) if (ch.land && ch.i*CH < p.x + p.r + 3 && ch.i*CH + CH > p.x - p.r - 3 && ch.j*CH < p.z + p.r + 3 && ch.j*CH + CH > p.z - p.r - 3) ch.dirty = true; };
@@ -997,15 +1031,16 @@
     linksDirty = true; save(); }
 
   // where a block of `kind` goes built off `host`'s side facing the point (wx, wz): square to the host, against its wall
-  function sideSpot(host, kind, wx, wz){
-    let best = null, bd = -2;
-    for (let k = 0; k < 4; k++){ const a = host.rot + k*PI/2, dx = Math.sin(a), dz = Math.cos(a), dd = (wx - host.x)*dx + (wz - host.z)*dz; if (dd > bd){ bd = dd; best = [dx, dz]; } }
-    const off = (KINDS[host.kind].rb + KINDS[kind].rb)*.93, x = host.x + best[0]*off, z = host.z + best[1]*off;
-    if (host.level === 0){ const ck = check(kind, x, z); return Object.assign({ x, z, rot: host.rot, host }, ck); }   // (on the ground: a home set against it)
-    const y = host.y, rbN = KINDS[kind].rb;
+  function sideSpot(host, kind, wx, wz, seed = PL.seed){
+    let best = null, bd = -1e9, bk = 0;
+    for (let k = 0; k < 4; k++){ const a = host.rot + k*PI/2, dx = Math.sin(a), dz = Math.cos(a), dd = (wx - host.x)*dx + (wz - host.z)*dz; if (dd > bd){ bd = dd; best = [dx, dz]; bk = k; } }
+    // the new block's wall set right against the host's: how far the host reaches that way, and how far the new one reaches back
+    const la = bk*PI/2, ux = Math.sin(la), uz = Math.cos(la), bN = blockOf(kind, seed, host.level > 0, false);
+    const off = hullReach(host.hullL, ux, uz) + hullReach(bN.hull, -ux, -uz) - .06, x = host.x + best[0]*off, z = host.z + best[1]*off;
+    if (host.level === 0){ const ck = check(kind, x, z, seed, host.rot); return Object.assign({ x, z, rot: host.rot, host }, ck); }   // (on the ground: a home set against it)
+    const y = host.y;
     if (heightAt(x, z) > y - .3) return { ok: false, why: 'into the hillside', x, z, y, rot: host.rot, host };
-    for (const q of PIECES){ if (q === host) continue; const qt = q.y + (q.top || 1);
-      if (qt > y + .1 && q.y < y + 1.2 && Math.hypot(q.x - x, q.z - z) < KINDS[q.kind].rb + rbN - .3) return { ok: false, why: 'something is in the way', x, z, y, rot: host.rot, host }; }
+    if (blocked(placeHull(bN.hull, x, z, host.rot), y, y + bN.h, [host])) return { ok: false, why: 'something is in the way', x, z, y, rot: host.rot, host };
     const reach = host.reach + off;
     return { ok: true, x, z, y, rot: host.rot, host, supports: reach > SUPPORT_REACH }; }
 
@@ -1033,19 +1068,26 @@
     for (let i = 0; i < PIECES.length; i++) for (let j = i + 1; j < PIECES.length; j++){
       const A = PIECES[i], B = PIECES[j]; if (A.level !== B.level) continue;
       if (Math.abs(A.y - B.y) > (A.level ? .6 : 1.4)) continue;
-      const dc = Math.hypot(B.x - A.x, B.z - A.z), gap = dc - KINDS[A.kind].rb - KINDS[B.kind].rb;
+      const dc = Math.hypot(B.x - A.x, B.z - A.z); if (dc < .05 || dc > 9) continue;
+      const dx = (B.x - A.x)/dc, dz = (B.z - A.z)/dc, tA = hullExit(A.hullW, A.x, A.z, dx, dz), tB = hullExit(B.hullW, B.x, B.z, -dx, -dz), gap = dc - tA - tB;
       if (gap > 3.6) continue;
-      pairs.push({ A, B, dc, gap }); }
+      pairs.push({ A, B, dc, gap, tA, tB, dx, dz }); }
     pairs.sort((p, q) => p.gap - q.gap);
     for (const L of pairs){
-      const { A, B, dc } = L; if ((deg.get(A) || 0) >= 3 || (deg.get(B) || 0) >= 3) continue;
-      const dx = (B.x - A.x)/dc, dz = (B.z - A.z)/dc;
-      // not through another home on the same level
-      if (PIECES.some(C => C !== A && C !== B && C.level === A.level && (() => { const t = (C.x - A.x)*dx + (C.z - A.z)*dz; if (t < 0 || t > dc) return false; return Math.abs((C.x - A.x)*dz - (C.z - A.z)*dx) < KINDS[C.kind].rb + .3; })())) continue;
+      const { A, B, dc, dx, dz, tA, tB } = L; if ((deg.get(A) || 0) >= 3 || (deg.get(B) || 0) >= 3) continue;
+      // the way between the two walls must be clear of every other block at its height, a body's width to each side
+      const ly0 = Math.min(A.y, B.y) + .1, ly1 = ly0 + 1.4, ax0 = A.x + dx*tA, az0 = A.z + dz*tA, span = Math.max(0, dc - tA - tB);
+      let clear = true;
+      for (let u = 0; u <= span + 1e-6 && clear; u += .3) for (const s_ of [-.6, 0, .6]) if (solidAt(ax0 + dx*u - dz*s_, az0 + dz*u + dx*s_, ly0, ly1, [A, B])){ clear = false; break; }
+      if (!clear) continue;
       deg.set(A, (deg.get(A) || 0) + 1); deg.set(B, (deg.get(B) || 0) + 1); joined.add(A.id + '|' + B.id); joined.add(B.id + '|' + A.id);
-      const ra = KINDS[A.kind].rb*.85, rb_ = KINDS[B.kind].rb*.85, h = hashPair(A.id, B.id), R = rng((h*4294967296) >>> 0);
+      const ra = tA - .04, rb_ = tB - .04, h = hashPair(A.id, B.id), R = rng((h*4294967296) >>> 0);
       const fy = A.level ? 0 : .12, a = V3(A.x + dx*ra, A.y + fy, A.z + dz*ra), b = V3(B.x - dx*rb_, B.y + fy, B.z - dz*rb_);
       const len = a.distanceTo(b), sx = -dz, sz = dx, at = (u, s, y) => V3(a.x + (b.x - a.x)*u + sx*s, a.y + (b.y - a.y)*u + y, a.z + (b.z - a.z)*u + sz*s);
+      // a doorway in each wall where the walk or the bridge meets it: a dark opening in a cream frame, under a small hood
+      const door = (p, q) => { const d = V3(q.x - p.x, 0, q.z - p.z).normalize(), o = p.clone().addScaledVector(d, -.02), o2 = p.clone().addScaledVector(d, .05);
+        seg(T, o, o2, .66, .98, HP.cream, .49); seg(T, o, o2.clone().addScaledVector(d, .02), .5, .82, HP.glassD, .41); seg(T, o, o2.clone().addScaledVector(d, .12), .8, .06, HP.terra, 1.02); };
+      if (L.gap >= .5){ door(a, b); door(b, a); }
       if (L.gap < .5){   // touching: a shared wall with an arched way through
         const a2 = at(-.15, 0, 0), b2 = at(1.15, 0, 0), wh = A.level ? .9 : 1.1, wc = R.pick([HP.cream, HP.white, HP.sand]);
         seg(T, a2, b2, 1.3, wh, wc, wh/2); seg(T, a2, b2, 1.4, .08, HP.cream, wh + .04);
@@ -1065,7 +1107,7 @@
       } else if (R.chance(.55)){   // on the ground: a pergola walk, posts and beams, vines along them, plants hanging down
         seg(T, a, b, 1.0, .14, HP.stone, .02);
         const n = Math.max(2, Math.round(len/.9));
-        for (let k = 0; k <= n; k++) for (const s of [-.45, .45]){ const c = at(k/n, s, 0); box(T, c.x, c.y + .65, c.z, .09, 1.3, .09, HP.wood); }
+        for (let k = 0; k <= n; k++) for (const s of [-.45, .45]){ const c = at(k/n, s, 0); if (solidAt(c.x, c.z, c.y, c.y + 1.3)) continue; box(T, c.x, c.y + .65, c.z, .09, 1.3, .09, HP.wood); }
         for (const s of [-.45, .45]) seg(T, at(-.03, s, 1.32), at(1.03, s, 1.32), .08, .1, HP.wood);
         for (let k = 0; k <= n*2; k++){ const c0 = at(k/(n*2), -.6, 1.4), c1 = at(k/(n*2), .6, 1.4); seg(T, c0, c1, .05, .06, HP.wood); }
         for (let k = 0; k < n*3; k++){ const c = at(R.r(0, 1), R.r(-.5, .5), 1.45); T.add(GEO.ico, mat(c.x, c.y, c.z, 0, R.r(0, 3), 0, .2, .12, .2), R.pick(HP.leaf));
@@ -1075,7 +1117,7 @@
       } else {   // on the ground: an arcade, white columns under a tiled roof, planters along it
         seg(T, a, b, 1.1, .14, HP.stone, .02);
         const n = Math.max(2, Math.round(len/.8));
-        for (let k = 0; k <= n; k++) for (const s of [-.5, .5]){ const c = at(k/n, s, 0); T.add(GEO.cyl8, mat(c.x, c.y + .6, c.z, 0, 0, 0, .08, 1.2, .08), HP.white); }
+        for (let k = 0; k <= n; k++) for (const s of [-.5, .5]){ const c = at(k/n, s, 0); if (solidAt(c.x, c.z, c.y, c.y + 1.2)) continue; T.add(GEO.cyl8, mat(c.x, c.y + .6, c.z, 0, 0, 0, .08, 1.2, .08), HP.white); }
         seg(T, at(-.04, 0, 1.2), at(1.04, 0, 1.2), 1.3, .12, HP.white); seg(T, at(-.04, 0, 1.34), at(1.04, 0, 1.34), 1.4, .1, HP.tile);
         for (let k = 0; k < n; k++) if (R.chance(.6)){ const c = at((k + .5)/n, R.pick([-.65, .65]), 0); pot(T, R, c.x, c.y, c.z, 1); }
       }
@@ -1096,7 +1138,7 @@
     // under each block built off a side: a stepped plaster corbel springing from the wall it hangs on; and, where it
     // reaches too far out, supports to the ground in the home's own style
     for (const p of PIECES){ if (!p.host || p.level === 0) continue;
-      const h = p.host, dx = (p.x - h.x), dz = (p.z - h.z), dl = Math.hypot(dx, dz) || 1, ux = dx/dl, uz = dz/dl, rbH = KINDS[h.kind].rb*.9, rbP = KINDS[p.kind].rb;
+      const h = p.host, dx = (p.x - h.x), dz = (p.z - h.z), dl = Math.hypot(dx, dz) || 1, ux = dx/dl, uz = dz/dl, rbH = hullExit(h.hullW, h.x, h.z, ux, uz) - .05, rbP = Math.min(KINDS[p.kind].rb, (dl - rbH)*.9);
       const R = rng(Math.imul(p.id, 2654435761) >>> 0), wall = h.kind === 'tower' ? HP.cream : h.kind === 'pods' ? HP.white : HP.cream;
       if (!p.cols){
         for (let k = 0; k < 3; k++){ const out = rbP*1.7*(1 - k*.3), y = p.y - .08 - k*.16;
@@ -1155,12 +1197,14 @@
       ghost.geometry = blockOf(PL.kind, PL.seed, hov.piece.level > 0, false).geo; ghost.position.set(sp.x, sp.ok ? sp.y : hov.piece.y, sp.z); ghost.rotation.y = sp.rot; ghost.visible = true; ring.visible = false;
       if (status){ status.textContent = sp.ok ? (sp.supports ? 'off the side (far out: it gets supports)' : 'off the side') : sp.why; status.style.color = sp.ok ? '#0f3b4a' : ''; } return; }
     if (over){   // over a home's roof: stack on top of it
-      const t = stackTop(over), ok = t.level < MAXLV - 1; PL.onto = ok ? t : null; PL.ok = ok ? { ok: true, y: t.y + t.top } : { ok: false, why: 'as high as it goes' };
+      const t = stackTop(over), bS = blockOf(PL.kind, PL.seed, true, false), yS = t.y + t.top;
+      const hitN = t.level < MAXLV - 1 ? blocked(placeHull(bS.hull, t.x, t.z, t.rot), yS, yS + bS.h, [t]) : null;
+      const ok = t.level < MAXLV - 1 && !hitN; PL.onto = ok ? t : null; PL.ok = ok ? { ok: true, y: yS } : { ok: false, why: hitN ? 'it would run into a neighbor' : 'as high as it goes' };
       ghost.geometry = blockOf(PL.kind, PL.seed, true, false).geo; ghost.position.set(t.x, t.y + t.top, t.z); ghost.rotation.y = t.rot; ghost.visible = true; ring.visible = false;
       if (status){ status.textContent = ok ? 'stack on top (floor ' + (t.level + 2) + ')' : PL.ok.why; status.style.color = ok ? '#0f3b4a' : ''; } return; }
     const hit = PL.kind && PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
     if (!hit || hit.sea){ ghost.visible = ring.visible = false; PL.ok = null; if (status) status.textContent = PL.kind ? (hit ? 'not on the sea' : '') : ''; return; }
-    const ck = check(PL.kind, hit.x, hit.z), r = KINDS[PL.kind].rb + .3; PL.ok = ck;
+    const ck = check(PL.kind, hit.x, hit.z, PL.seed, PL.rot), r = KINDS[PL.kind].rb + .3; PL.ok = ck;
     const y = ck.ok ? ck.y : heightAt(hit.x, hit.z, true);
     ghost.geometry = blockOf(PL.kind, PL.seed, false, false).geo; ghost.position.set(hit.x, y, hit.z); ghost.rotation.y = PL.rot; ghost.visible = true;
     const a = ringGeo.attributes.position.array;
@@ -1205,7 +1249,7 @@
   const zHide = () => { for (const m of zGhosts) m.visible = false; };
   // where each home of the layout lands here, and whether it can go
   function zoneSpots(cx, cz){ const c = Math.cos(PL.rot), s_ = Math.sin(PL.rot);
-    return zoneLayout().map(o => { const x = cx + o.lx*c - o.lz*s_, z = cz + o.lx*s_ + o.lz*c; return Object.assign({}, o, { x, z, rot: o.rot + PL.rot, ck: check(o.kind, x, z) }); }); }
+    return zoneLayout().map(o => { const x = cx + o.lx*c - o.lz*s_, z = cz + o.lx*s_ + o.lz*c; return Object.assign({}, o, { x, z, rot: o.rot + PL.rot, ck: check(o.kind, x, z, o.seed, o.rot + PL.rot) }); }); }
   function showZoneGhost(){
     zHide(); ghost.visible = false;
     const hit = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
@@ -1225,13 +1269,13 @@
   function placeZone(){
     if (!PL.hit || PL.hit.sea) return;
     for (const sp of zoneSpots(PL.hit.x, PL.hit.z)){
-      const ck = check(sp.kind, sp.x, sp.z); if (!ck.ok) continue;   // (checked again: an earlier home of this layout may now be there)
+      const ck = check(sp.kind, sp.x, sp.z, sp.seed, sp.rot); if (!ck.ok) continue;   // (checked again: an earlier home of this layout may now be there)
       let p = addPiece(sp.kind, sp.x, sp.z, sp.rot, ck.y, true, sp.seed);
       const col = [p]; sp.stack.forEach((k, i) => { p = addPiece(k, p.x, p.z, p.rot, p.y + p.top, true, sp.seed + (i + 1)*17, p); col.push(p); });
       // now and then a room reaches out off the side of a tall stack, a floor or two up
       const R = rng(sp.seed*7 + 3);
       if (col.length >= 3 && R.chance(.45)){ const host = col[R.i(1, col.length - 2)], kind = R.pick(['townhouse', 'villa', host.kind]), a = host.rot + R.i(0, 3)*PI/2;
-        const ss = sideSpot(host, kind, host.x + Math.sin(a)*5, host.z + Math.cos(a)*5); if (ss.ok) addPiece(kind, ss.x, ss.z, ss.rot, ss.y, true, sp.seed + 991, null, 0, host); }
+        const ss = sideSpot(host, kind, host.x + Math.sin(a)*5, host.z + Math.cos(a)*5, sp.seed + 991); if (ss.ok) addPiece(kind, ss.x, ss.z, ss.rot, ss.y, true, sp.seed + 991, null, 0, host); }
     }
     save(); PL.seed++; }
   function clearZone(cx, cz){ const r = Math.max(ZSIZE[ZONE.size], 1.4);
@@ -1333,8 +1377,8 @@
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },
-    place(kind, x, z, rot = 0, seed = 1){ const ck = check(kind, x, z); return ck.ok ? addPiece(kind, x, z, rot, ck.y, false, seed) : ck; },
+    place(kind, x, z, rot = 0, seed = 1){ const ck = check(kind, x, z, seed, rot); return ck.ok ? addPiece(kind, x, z, rot, ck.y, false, seed) : ck; },
     stack(onto, kind, seed = 1){ const t = stackTop(onto); return t.level < MAXLV - 1 ? addPiece(kind, t.x, t.z, t.rot, t.y + t.top, false, seed, t) : null; },
-    side(host, kind, ang, seed = 1){ const ss = sideSpot(host, kind, host.x + Math.sin(host.rot + ang)*5, host.z + Math.cos(host.rot + ang)*5); return ss.ok ? addPiece(kind, ss.x, ss.z, ss.rot, ss.y, false, seed, null, 0, host) : ss; },
+    side(host, kind, ang, seed = 1){ const ss = sideSpot(host, kind, host.x + Math.sin(host.rot + ang)*5, host.z + Math.cos(host.rot + ang)*5, seed); return ss.ok ? addPiece(kind, ss.x, ss.z, ss.rot, ss.y, false, seed, null, 0, host) : ss; },
     clear(){ while (PIECES.length) removePiece(PIECES[0]); } };
 })();

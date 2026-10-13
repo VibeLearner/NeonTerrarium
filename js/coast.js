@@ -302,6 +302,10 @@
   const WAVE_GLSL = `
     uniform float wForce;   // (a test switch: every crest a full wave)
     const vec2 WD = vec2(-0.932, 0.362), WP = vec2(-0.362, -0.932);
+    // The ebb and flow: two sine waves at right angles to each other, multiplied (and a second, smaller pair turned another
+    // way), so the swell rises and sinks in slow cells that drift, rather than running in lines.
+    float ebb(vec2 q){ return 0.24*sin(dot(q, vec2(0.8, 0.6))*0.55 + time*1.1)*sin(dot(q, vec2(-0.6, 0.8))*0.42 - time*0.8)
+                            + 0.12*sin(dot(q, vec2(0.28, 0.96))*0.9 + time*1.6)*sin(dot(q, vec2(-0.96, 0.28))*0.75 + time*1.3); }
     float shAt(vec2 q){ vec2 i = (q - box.xy)/box.zw; if (i.x < 0.0 || i.y < 0.0 || i.x > 1.0 || i.y > 1.0) return 4.0; return texture2D(depthTex, q/box.zw).g*4.0; }
     vec4 bigWave(vec2 p){ float s0 = shAt(p);
       // near rock the crest drags (shallower water slows it), so a wave bends round a stack and turns to meet the cliff
@@ -362,7 +366,7 @@
         // the big waves lift the surface: higher as they come into shallower water, flattening out against the rocks
         vec4 w = bigWave(p), wh = waveH(w, sh, d); float ahead = w.y*26.0;
         float y = wh.x - 0.25*w.x*(1.0 - smoothstep(0.0, 3.5, ahead))*smoothstep(0.3, 2.2, sh);
-        y += 0.035*sin(dot(p, vec2(-0.91, 0.41))*0.42 + time*0.95)*smoothstep(0.5, 3.0, sh);   // (the long swell, gently)
+        y += ebb(p)*smoothstep(0.5, 3.0, sh);   // (the ebb and flow, calmer against the rocks)
         vec4 wp = vec4(p.x, y, p.y, 1.0);
         vP = p; vG = dot(p - ctr, fwd); float gp = max(vG - g0, 0.0); wp.y -= curveK*gp*gp; gl_Position = projectionMatrix * viewMatrix * wp; }`,
     fragmentShader: `
@@ -410,9 +414,18 @@
         wave(q, vec2(0.71, -0.70), 2.61, 2.90, 0.12, h, gr);
         float calm = smoothstep(0.3, 3.0, d);   // (the shallows lie calmer and clearer)
         vec2 sd = normalize(sunDir.xz + 1e-4), tc = normalize(camXZ - p);
-        float lit = (-dot(gr, sd)*0.55 - dot(gr, tc)*0.45)*calm, ld = lit + dith*0.32;
-        col *= ld < -0.62 ? 0.84 : ld < -0.2 ? 0.93 : ld > 0.78 ? 1.13 : ld > 0.32 ? 1.05 : 1.0;
-        col += ld > 0.78 ? vec3(0.015, 0.035, 0.045) : vec3(0.0);
+        // the ebb and flow lit in facets: the surface taken as flat triangles on a coarse grid (1.25 units), each lit by the
+        // sun as one, in a few steps, so the swell reads as slow-moving low-poly planes (the pixel-art way of drawing it)
+        const float CS = 1.25;
+        vec2 cg = p/CS, c0 = floor(cg), cf = cg - c0;
+        vec2 qa = c0*CS, qb = (cf.x > cf.y ? c0 + vec2(1.0, 0.0) : c0 + vec2(1.0, 1.0))*CS, qc = (cf.x > cf.y ? c0 + vec2(1.0, 1.0) : c0 + vec2(0.0, 1.0))*CS;
+        vec3 fa = vec3(qa.x, ebb(qa)*2.2, qa.y), fb = vec3(qb.x, ebb(qb)*2.2, qb.y), fc = vec3(qc.x, ebb(qc)*2.2, qc.y);   // (its heights doubled: drawn bolder than it is)
+        vec3 fn = normalize(cross(fc - fa, fb - fa)); if (fn.y < 0.0) fn = -fn;
+        vec3 sun3 = normalize(sunDir);
+        float frel = (dot(fn, sun3) - sun3.y)*calm*smoothstep(0.5, 3.0, sh), fl = frel + dith*0.03;
+        col *= fl < -0.1 ? 0.86 : fl < -0.035 ? 0.94 : fl > 0.1 ? 1.11 : fl > 0.035 ? 1.05 : 1.0;
+        col += fl > 0.1 ? vec3(0.015, 0.035, 0.045) : vec3(0.0);
+        float lit = frel*5.5 + (-dot(gr, sd)*0.55 - dot(gr, tc)*0.45)*calm*0.35;   // (where the glints sit: the brightest facets, and a little of the chop)
         // reflections: the cliffs, stacks and buildings drawn upside down under the water line (a pass of their own each frame),
         // read through the same ripples, a whole number of pixels off
         vec4 rf = texture2D(reflTex, (gl_FragCoord.xy + floor(dd*vec2(2.0, 3.0) + 0.5))/resPx);
@@ -481,7 +494,7 @@
         col = mix(col, glint, step(0.9978 - 0.009*glintK*smoothstep(0.1, 1.0, toward) - 0.002, gg) * smoothstep(0.8, 3.0, d));
         vec2 cell = floor(p*3.0);
         float tw = h21(cell + floor(time*3.0 + h21(cell)*9.0));
-        col = mix(col, glint, step(1.5 - 0.3*glintK, lit + dith*0.25) * step(0.5, tw) * calm);
+        col = mix(col, glint, step(1.5 - 0.3*glintK, lit + dith*0.25) * step(0.8, tw) * calm);
         // the shore: white water churning close in, broken foam lines rolling in toward it, and a lip of foam that runs up
         // and draws back
         float nz = sin(p.x*1.3 + p.y*2.1 + time*0.5)*0.5 + sin(p.x*2.9 - p.y*1.1 - time*0.8)*0.5;

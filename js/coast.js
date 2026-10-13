@@ -337,7 +337,7 @@
       // its size here (how big it is overall, its crest's rise along it, how far through its life): the height and the width
       // both come from it, so a tall wave is a big one, and a wave grows broader as it builds
       float sz = clamp(w.x*waveCv(along, wn)/1.3, 0.0, 1.0);
-      float fw = (1.4 + 4.6*sz)*(0.9 + 0.2*h2), bl = (3.0 + 9.0*sz)*(0.9 + 0.2*fract(h2*2.3));   // (the face out in front, the back)
+      float fw = (2.0 + 8.0*sz)*(0.9 + 0.2*h2), bl = (1.6 + 3.4*sz)*(0.9 + 0.2*fract(h2*2.3));   // (the face out in front, wide; the back behind, short)
       float amp = 11.0*w.x*waveCv(along, wn)*smoothstep(0.3, 2.6, sh)*(0.45 + 0.55*smoothstep(1.5, 8.0, d));   // (big swells out deep; lower as the water shallows, so they don't stand over the cliffs)
       float hs, ds;
       // a rounded swell: a cosine up the face and down the back, so it has body rather than a sharp ridge
@@ -468,7 +468,7 @@
           vec3 nrm = normalize(vec3(WD.x*wh.y*1.3, 1.0, WD.y*wh.y*1.3));
           float rel = dot(nrm, normalize(sunDir)) - normalize(sunDir).y + dith*0.08;
           col *= rel < -0.22 ? 0.66 : rel < -0.08 ? 0.8 : rel > 0.18 ? 1.18 : rel > 0.06 ? 1.08 : 1.0;   // (the side turned from the sun falls into a clear shadow band)
-          float szB = clamp(wave*waveCv(along, wn)/1.3, 0.0, 1.0), bk = fw + (3.0 + 9.0*szB)*(0.9 + 0.2*fract(waveStage(wn).z*2.3));
+          float szB = clamp(wave*waveCv(along, wn)/1.3, 0.0, 1.0), bk = fw + (1.6 + 3.4*szB)*(0.9 + 0.2*fract(waveStage(wn).z*2.3));
           // the shadow band behind it: where its back drops to the sea there's a hard-edged band of shadow, in two steps (drawn
           // whatever the sun, so its height reads from any side)
           float sbx = x - (bk - 1.2);

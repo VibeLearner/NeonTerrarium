@@ -96,6 +96,9 @@
     let y = -.15 - 1.1*Math.pow(o, .8) - .012*o*o;
     if (o < 9) y += (fbm(x*.25, z*.25) - .5)*1.6*(1 - cv*.7)*smooth(9, 2, o);   // rocks on the shelf, smoother sand in a cove
     y = lerp(y, .2 - .55*o, cv*smooth(5, 0, o));                                 // the beach running into the water
+    // rubble at the cliff's foot: rock fallen from the face, some of it just breaking the surface, so the waterline is
+    // ragged and broken up, not a ruled line where the cliff meets the sea
+    if (o < 1.8 && cv < .6){ const rb = ((fbm(x*1.15 + 7, z*1.15 - 3, 3) - .5)*1.7 + .2 - o*.5)*(1 - cv*1.6); if (rb > y) y = rb; }
     for (const k of rocks){ const r = k.r + (k.stack ? 1.2 : .5), hgt = k.stack ? .45 : .35, d = Math.hypot(x - k.x, z - k.z); if (d < r) y = Math.max(y, hgt - (d/r)**2*(hgt + 2.5)); }
     return Math.max(y, -24);
   }
@@ -106,26 +109,42 @@
   const scene = new THREE.Scene();
   const CURV = { ctr: { value: new THREE.Vector2() }, fwd: { value: new THREE.Vector2(1, 0) }, curveK: { value: 0 }, g0: { value: 30 },
     hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) } };
-  const BEND = `{ vec4 wq = modelMatrix * vec4(transformed, 1.0); float gq = dot(wq.xz - ctr, fwd); vG = gq; float gp = max(gq - g0, 0.0); transformed.y -= curveK*gp*gp; }`;
+  const BEND = `{ vec4 wq = modelMatrix * vec4(transformed, 1.0); float gq = dot(wq.xz - ctr, fwd); vG = gq; float gp = max(gq - g0, 0.0); transformed.y -= curveK*gp*gp; vWq = wq.xyz; }`;
+  // cliff faces are painted per pixel by height (crisp strata, a dark wet splash zone, a weed line at the water), not by
+  // their few vertices: a face is any steep, not green, surface of the land
+  const ROCKY = `
+    vec3 rockAt(vec3 w){
+      float wob = 0.35*sin(w.x*0.41 + w.z*0.33) + 0.2*sin(w.x*1.3 - w.z*1.1), y = w.y + wob*0.3;
+      if (y < 0.22 + 0.1*sin(w.x*2.1 + w.z*1.7)) return vec3(0.384, 0.439, 0.306);
+      if (y < 0.85 + 0.2*sin(w.x*0.9 + w.z*0.7)) return vec3(0.549, 0.478, 0.376);
+      float m = mod(floor(y*1.5 + wob), 7.0);
+      return m < 1.0 ? vec3(0.937, 0.898, 0.812) : m < 2.0 ? vec3(0.886, 0.812, 0.663) : m < 3.0 ? vec3(0.957, 0.925, 0.863) : m < 4.0 ? vec3(0.839, 0.698, 0.494)
+           : m < 5.0 ? vec3(0.937, 0.898, 0.812) : m < 6.0 ? vec3(0.788, 0.624, 0.424) : vec3(0.886, 0.812, 0.663);
+    }`;
+  const ROCKY_APPLY = `#include <color_fragment>
+    { vec3 upV = normalize((viewMatrix*vec4(0.0, 1.0, 0.0, 0.0)).xyz); float st = dot(normalize(vNormal), upV);
+      if (st < 0.6 && diffuseColor.g < diffuseColor.r*1.12 && vWq.y > -0.4) diffuseColor.rgb = rockAt(vWq); }`;
   // bend any built-in material the same way (and haze it toward the horizon, unless it's only drawn into the shadow map)
-  function bent(mat, haze = true){
+  function bent(mat, haze = true, rocky = false){
     mat.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, CURV);
-      sh.vertexShader = 'uniform vec2 ctr, fwd; uniform float curveK, g0; varying float vG;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BEND);
-      if (haze) sh.fragmentShader = 'uniform float hzNear, hzFar, hzMax; uniform vec3 hazeC; varying float vG;\n' + sh.fragmentShader.replace('#include <fog_fragment>', '#include <fog_fragment>\n gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeC, smoothstep(hzNear, hzFar, vG)*hzMax);');
+      sh.vertexShader = 'uniform vec2 ctr, fwd; uniform float curveK, g0; varying float vG; varying vec3 vWq;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BEND);
+      if (haze) sh.fragmentShader = 'uniform float hzNear, hzFar, hzMax; uniform vec3 hazeC; varying float vG; varying vec3 vWq;\n' + (rocky ? ROCKY + '\n' : '') + sh.fragmentShader.replace('#include <fog_fragment>', '#include <fog_fragment>\n gl_FragColor.rgb = mix(gl_FragColor.rgb, hazeC, smoothstep(hzNear, hzFar, vG)*hzMax);')
+        .replace('#include <color_fragment>', rocky ? ROCKY_APPLY : '#include <color_fragment>');
     };
-    mat.customProgramCacheKey = () => 'bent' + (haze ? 1 : 0);
+    mat.customProgramCacheKey = () => 'bent' + (haze ? 1 : 0) + (rocky ? 'r' : '');
     return mat;
   }
   const gData = new Uint8Array([150, 150, 150, 255, 200, 200, 200, 255, 240, 240, 240, 255]);
   const gradTex = new THREE.DataTexture(gData, 3, 1, THREE.RGBAFormat); gradTex.minFilter = gradTex.magFilter = THREE.NearestFilter; gradTex.needsUpdate = true;
   const C = h => new THREE.Color(h);
   const PAL = { grass: [C(0x5a8a3c), C(0x66934a), C(0x7a9f52), C(0x52803a)], dry: C(0xbdb07a), path: C(0xd2b282), sand: C(0xecd7a2), wet: C(0xc8b07f),
-    rock: [C(0xefe5cf), C(0xe2cfa9), C(0xd6b27e), C(0xf4ecdc), C(0xc99f6c)], under: C(0xcdb98c), seaRock: C(0x8a9a86), pad: C(0xd9c9a3),
+    rock: [C(0xefe5cf), C(0xe2cfa9), C(0xd6b27e), C(0xf4ecdc), C(0xc99f6c)], under: C(0xcdb98c), wetRock: C(0x8c7a60), algae: C(0x62704e), rubble: C(0xcbb48c), rubble2: C(0xb59c74), seaRock: C(0x8a9a86), pad: C(0xd9c9a3),
     bush: [C(0x4a7a30), C(0x5d8a38)], wall: C(0xf6f1e6), cap: C(0xe8e0cf), stack: [C(0xf2ead8), C(0xe6d3ad), C(0xd8b98a)],
     white: C(0xf6f1e6), white2: C(0xe9e2d2), terra: C(0xc8663e), terra2: C(0xa9522f), door: C(0x3e6e7a), stone: C(0xe6d3ad), soil: C(0x5b4532), plank: C(0x8a6644), leaf: C(0x6a9a3c) };
   // everything on the land is one material, colored per vertex: one draw for each chunk, props and all
-  const landM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }));
+  const landM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }), true, true);
+  const pieceM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }));   // (pieces: walls stay their own color)
   const landDepth = bent(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), false);
 
   // a growing list of flat-shaded, colored triangles; props are merged into it
@@ -171,11 +190,14 @@
       const cx = rowC[j + 1], c = rowV[j + 1], s = cx - x;
       let cc;
       if (y < -.05) cc = fbm(x*.25, z*.25) > .55 ? PAL.seaRock : PAL.under;
+      else if (s <= 0) cc = y < .18 ? PAL.algae : y < .45 ? PAL.wetRock : (vnoise(x*2.3, z*2.3) > .5 ? PAL.rubble : PAL.rubble2);   // (fallen rock at the foot: dark and wet where the sea reaches)
       else {
         const slope = (Math.abs(h(1, 0) - h(-1, 0)) + Math.abs(h(0, 1) - h(0, -1)))*.15/STEP;
         let pad = 0; for (const p of pads){ const d = Math.hypot(x - p.x, z - p.z); if (d < p.r*.9) pad = 1; }
         if (pad) cc = PAL.pad;   // (the leveled ground under a piece: packed earth)
         else if (c > .45 && y < 2.2 && slope < 1.4) cc = y < .35 ? PAL.wet : PAL.sand;
+        else if (slope > .9 && s < 4 && y < .2 + .15*n1(z*1.7)) cc = PAL.algae;                // (the tide line: weed on the wet rock)
+        else if (slope > .9 && s < 4 && y < .75 + .25*n1(z*.9 + 4)) cc = PAL.wetRock;    // (the splash zone, darker)
         else if (slope > .9 && s < 4){ const band = Math.floor(y*1.35 + .6*n1(z*.3)) & 7; cc = PAL.rock[[0, 1, 3, 2, 0, 4, 1, 3][band]]; }   // strata in the limestone
         else {
           const p = fbm(x*.11 + 40, z*.11), q = vnoise(x*.9, z*.9);
@@ -192,19 +214,11 @@
     for (let j = 0; j < CN; j++) for (let i = 0; i < CN; i++){ const a = j*VN + i, b = a + 1, c2 = a + VN, d = c2 + 1; for (const v of [a, c2, b, b, c2, d]) vert(v); }
     // skirts down from the edges, both ways round, so a coarser neighbor never leaves a crack
     const skirt = (a, b) => { const A = [pos[a*3], pos[a*3 + 1], pos[a*3 + 2]], B = [pos[b*3], pos[b*3 + 1], pos[b*3 + 2]], A2 = [A[0], A[1] - 3, A[2]], B2 = [B[0], B[1] - 3, B[2]], cl = new THREE.Color(col[a*3], col[a*3 + 1], col[a*3 + 2]);
-      T.quad(A, B, B2, A2, cl); T.quad(A, A2, B2, B, cl); };
-    const sk0 = T.p.length/3;
+      SK.quad(A, B, B2, A2, cl); SK.quad(A, A2, B2, B, cl); };
+    const SK = new Tris();   // (skirts: their own mesh, which casts no shadow; a skirt showing on a cliff face shadowed it in a dotted line)
     for (let i = 0; i < CN; i++){ skirt(i, i + 1); skirt(CN*VN + i, CN*VN + i + 1); skirt(i*VN, (i + 1)*VN); skirt(i*VN + CN, (i + 1)*VN + CN); }
-    const sk1 = T.p.length/3;
     const near = (x, z, m) => pads.some(p => Math.hypot(x - p.x, z - p.z) < p.r + m);
     if (lod < 2){
-      // the wall along the lane, with gaps (and none through a piece)
-      for (let z = z0 + .6; z < z0 + CH; z += 1.2){
-        if (n1(z*.05 + 30) < -.35) continue;
-        const x = coastX(z) - laneS(z) - 1.6; if (x < x0 || x >= x0 + CH || near(x, z, .6)) continue;
-        const dx = (coastX(z + .3) - laneS(z + .3)) - (coastX(z - .3) - laneS(z - .3)), ry = Math.atan2(dx, .6) + PI/2, y = heightAt(x, z);
-        T.add(GEO.box, mat(x, y + .25, z, 0, ry, 0, 1.22, .55, .3), PAL.wall); T.add(GEO.box, mat(x, y + .56, z, 0, ry, 0, 1.22, .08, .36), PAL.cap);
-      }
       // bushes, scattered over the whole land the same way whatever the chunks (one chance in each 4-unit patch, thicker in clumps)
       for (let a = x0/4; a < (x0 + CH)/4; a++) for (let b = z0/4; b < (z0 + CH)/4; b++){
         if (hash2(a*7 + 3, b*13 + 5) > .06 + .4*smooth(.5, .72, fbm(a*.22 + 3, b*.22 - 7))) continue;
@@ -212,9 +226,9 @@
         if (s > 2.5 && Math.abs(s - laneS(z)) > 1.5 && coveAt(z)[0] < .3 && !near(x, z, .6)) bush(T, x, z, (a*92821) ^ b);
       }
     }
-    const m = T.mesh(), nr = m.geometry.attributes.normal;
-    for (let v = sk0; v < sk1; v++) nr.setXYZ(v, 0, 1, 0);   // (a skirt that shows in a crack is lit like the ground, not like a wall)
-    scene.add(m); return m;
+    const m = T.mesh(), sk = SK.mesh(), nr = sk.geometry.attributes.normal;
+    for (let v = 0; v < nr.count; v++) nr.setXYZ(v, 0, 1, 0);   // (a skirt that shows in a crack is lit like the ground, not like a wall)
+    sk.castShadow = false; m.add(sk); scene.add(m); return m;
   }
   // stacks and rocks, a stretch at a time
   const rockMeshes = new Map();
@@ -235,15 +249,26 @@
   // need them). The texture wraps around: texel i holds world texel i mod DN, so when the window around the view moves,
   // only the strip that came into it is worked out, a few rows or columns a frame.
   const DN = 2048, TEX = .375, DW_ = DN*TEX;
-  const D = new Uint8Array(DN*DN).fill(255);
-  const dtex = new THREE.DataTexture(D, DN, DN, THREE.RedFormat, THREE.UnsignedByteType);
+  const D = new Uint8Array(DN*DN*2).fill(255);   // (two bytes a texel: the depth, and how far the shore is)
+  const dtex = new THREE.DataTexture(D, DN, DN, THREE.RGFormat, THREE.UnsignedByteType); dtex.internalFormat = 'RG8';   // (r128 doesn't pick RG8 on its own)
   dtex.minFilter = dtex.magFilter = THREE.LinearFilter; dtex.wrapS = dtex.wrapT = THREE.RepeatWrapping; dtex.needsUpdate = true;
   const WIN = { x0: null, z0: null, rows: new Array(DN) };   // the window's first texel in x and z; per texture row, its coast
   const mod = (a, n) => ((a % n) + n) % n;
-  function rowInfo(iz){ const z = (iz + .5)*TEX, [cv] = coveAt(z); return { cx: coastX(z), cv, rk: rocksNear(z), z }; }
-  function cell(ix, r){ const x = (ix + .5)*TEX, o = x - r.cx; return o <= 0 ? 0 : o > 27 ? 255 : Math.round(Math.sqrt(clamp(-heightRow(x, r.z, r.cx, r.cv, r.rk, null), 0, 24)/24)*255); }
-  function fillRow(iz){ const r = WIN.rows[mod(iz, DN)] = rowInfo(iz), row = mod(iz, DN)*DN; for (let ix = WIN.x0; ix < WIN.x0 + DN; ix++) D[row + mod(ix, DN)] = cell(ix, r); }
-  function fillCol(ix){ const c = mod(ix, DN); for (let iz = WIN.z0; iz < WIN.z0 + DN; iz++) D[mod(iz, DN)*DN + c] = cell(ix, WIN.rows[mod(iz, DN)]); }
+  function rowInfo(iz){ const z = (iz + .5)*TEX, [cv] = coveAt(z), sl = (coastX(z + .4) - coastX(z - .4))/.8; return { cx: coastX(z), cv, rk: rocksNear(z), z, cos: 1/Math.sqrt(1 + sl*sl) }; }
+  // a texel: [depth (square-rooted, 24 units deep at most), distance to the shore (4 units at most)]. The shore distance is
+  // the distance out from the cliff edge (straightened by how the coast runs here), or from a rock, whichever is nearer;
+  // anything standing above the water (a beach, fallen rock) is shore itself.
+  function cell(ix, r, out, o2){
+    const x = (ix + .5)*TEX, o = x - r.cx;
+    if (o <= 0){ out[o2] = 0; out[o2 + 1] = 0; return; }
+    let dist = o*r.cos;
+    for (const k of r.rk){ const dd = Math.hypot(x - k.x, r.z - k.z) - (k.stack ? k.r*1.05 : k.r*.95); if (dd < dist) dist = dd; }
+    let dep = 255;
+    if (o < 27){ const h = heightRow(x, r.z, r.cx, r.cv, r.rk, null); if (h >= 0) dist = 0; dep = Math.round(Math.sqrt(clamp(-h, 0, 24)/24)*255); }
+    out[o2] = dep; out[o2 + 1] = Math.round(clamp(dist/4, 0, 1)*255);
+  }
+  function fillRow(iz){ const r = WIN.rows[mod(iz, DN)] = rowInfo(iz), row = mod(iz, DN)*DN; for (let ix = WIN.x0; ix < WIN.x0 + DN; ix++) cell(ix, r, D, (row + mod(ix, DN))*2); }
+  function fillCol(ix){ const c = mod(ix, DN); for (let iz = WIN.z0; iz < WIN.z0 + DN; iz++) cell(ix, WIN.rows[mod(iz, DN)], D, (mod(iz, DN)*DN + c)*2); }
   function moveWindow(cx, cz, ms){
     const tx = Math.floor(cx/TEX) - DN/2, tz = Math.floor(cz/TEX) - DN/2;
     if (WIN.x0 === null || Math.abs(tx - WIN.x0) >= DN || Math.abs(tz - WIN.z0) >= DN){   // (a jump: the whole window afresh)
@@ -279,44 +304,55 @@
         if (d < 2.4) return mix(c1, c2, (d - 0.6)/1.8);
         if (d < 7.0) return mix(c2, c3, (d - 2.4)/4.6);
         return mix(c3, c4, clamp((d - 7.0)/12.0, 0.0, 1.0)); }
+      // one travelling wave: adds its height and its slope
+      void wave(vec2 q, vec2 dir, float f, float sp, float a, inout float h, inout vec2 gr){ float ph = dot(dir, q)*f + time*sp; h += a*sin(ph); gr += a*f*cos(ph)*dir; }
       void main(){
         vec2 p = vP;
         vec2 uv = p/box.zw, inn = (p - box.xy)/box.zw;
         float inBox = step(0.0, inn.x)*step(inn.x, 1.0)*step(0.0, inn.y)*step(inn.y, 1.0);
-        float dv = texture2D(depthTex, uv).r; float d = inBox > 0.5 ? dv*dv*24.0 : 24.0;
+        vec2 tx = texture2D(depthTex, uv).rg;
+        float d = inBox > 0.5 ? tx.r*tx.r*24.0 : 24.0, sh = inBox > 0.5 ? tx.g*4.0 : 4.0;
         float dith = bayer(gl_FragCoord.xy) - 0.5;
-        float far = smoothstep(hzNear, hzFar*0.8, vG);   // (fine detail fades out toward the horizon, where the view squeezes it thin)
         // the color by depth, banded the way pixel art bands a gradient (dithered at the edges of the bands)
-        float dq = d + dith*0.55*(0.3 + d*0.12)*(1.0 - far);
+        float dq = d + dith*0.55*(0.3 + d*0.12);
         float bands = d < 3.0 ? 6.0 : 2.0;
         dq = floor(dq*bands + 0.5)/bands;
         vec3 col = ramp(max(dq, 0.0));
-        // caustics in the shallows: a net of light on the sand
+        // the moving surface: a long swell, a cross swell and three sizes of chop, each a sine travelling its own way,
+        // over a slowly warped plane so no crest runs dead straight. Their summed slope lights each spot: turned toward the
+        // sun or the eye it catches light, turned away it falls into shade; drawn in a few flat steps, dithered between.
+        vec2 q = p + 0.9*vec2(sin(p.y*0.23 + time*0.31), sin(p.x*0.21 - time*0.27));
+        float h = 0.0; vec2 gr = vec2(0.0);
+        wave(q, vec2(-0.91, 0.41), 0.42, 0.95, 1.00, h, gr);
+        wave(q, vec2(-0.58, -0.81), 0.66, 1.25, 0.55, h, gr);
+        wave(q, vec2(0.28, 0.96), 1.07, 1.70, 0.34, h, gr);
+        wave(q, vec2(-0.97, -0.24), 1.73, 2.20, 0.21, h, gr);
+        wave(q, vec2(0.71, -0.70), 2.61, 2.90, 0.12, h, gr);
+        float calm = smoothstep(0.3, 3.0, d);   // (the shallows lie calmer and clearer)
+        vec2 sd = normalize(sunDir.xz + 1e-4), tc = normalize(camXZ - p);
+        float lit = (-dot(gr, sd)*0.55 - dot(gr, tc)*0.45)*calm, ld = lit + dith*0.32;
+        col *= ld < -0.62 ? 0.84 : ld < -0.2 ? 0.93 : ld > 0.78 ? 1.13 : ld > 0.32 ? 1.05 : 1.0;
+        col += ld > 0.78 ? vec3(0.015, 0.035, 0.045) : vec3(0.0);
+        // caustics in the shallows: a net of light on the sand, rippling with the surface above it
         if (d < 3.2){
-          float c = abs(sin(p.x*1.6 + time*0.9 + sin(p.y*1.2 + time*0.6)*1.4) * sin(p.y*1.8 - time*0.7 + sin(p.x*1.05 - time*0.4)*1.3));
-          col += step(0.82 + dith*0.08, c) * (1.0 - d/3.2) * vec3(0.16, 0.14, 0.08) * (1.0 - far);
+          vec2 c2 = p + gr*0.25;
+          float c = abs(sin(c2.x*1.6 + time*0.9 + sin(c2.y*1.2 + time*0.6)*1.4) * sin(c2.y*1.8 - time*0.7 + sin(c2.x*1.05 - time*0.4)*1.3));
+          col += step(0.82 + dith*0.08, c) * (1.0 - d/3.2) * vec3(0.16, 0.14, 0.08);
         }
-        // long swell crests out deep, drifting toward the shore
-        vec2 dir = vec2(-0.92, 0.38), per = vec2(0.38, 0.92);
-        float w = sin(dot(p, dir)*0.55 + time*0.65 + sin(dot(p, per)*0.09)*1.6);
-        float wm = sin(dot(p, per)*0.21 + dot(p, dir)*0.05 + 1.3) * sin(dot(p, per)*0.083 - time*0.05 - 0.7);
-        col = mix(col, col*1.1 + vec3(0.03, 0.045, 0.05), step(0.982, w) * step(0.3, wm) * smoothstep(1.5, 5.0, d) * (1.0 - far));
-        // foam: a white lip on the rocks and the sand, and lines that breathe in and out from it
-        float fn = sin(p.x*2.3 + p.y*1.7) * 0.18;
-        float lip = step(d, 0.16 + fn*0.3);
-        float surge = 0.5 + 0.5*sin(time*0.8 + p.x*0.07 + p.y*0.05);
-        float ring = step(abs(fract(d*0.85 - time*0.22 + fn) - 0.5), 0.05) * step(d, 1.3 + surge*0.6) * step(0.05, d) * (1.0 - far);
-        float edge = step(d, 0.32 + surge*0.22 + fn*0.4);
-        col = mix(col, vec3(0.97, 1.0, 0.98), clamp(lip + ring*0.85 + edge*0.55, 0.0, 1.0));
-        // sun glints: sparkles thicker where the sea lies toward the sun
-        vec2 sd = normalize(sunDir.xz + 1e-4);
-        float toward = dot(normalize(p - camXZ + 1e-4), sd);
-        vec2 cell = floor(p*3.2);
-        float g = h21(cell + floor(time*2.2 + h21(cell)*7.0));
-        float dens = 0.9988 - 0.006*glintK*smoothstep(0.35, 1.0, toward) * smoothstep(1.0, 4.0, d);
-        col = mix(col, glint, step(dens, g) * smoothstep(0.8, 3.0, d) * (1.0 - far));
+        // sun glints: a pixel or two on the facets that catch the most light, twinkling on and off
+        vec2 cell = floor(p*3.0);
+        float tw = h21(cell + floor(time*3.0 + h21(cell)*9.0));
+        col = mix(col, glint, step(1.5 - 0.3*glintK, lit + dith*0.25) * step(0.5, tw) * calm);
+        // the shore: white water churning close in, broken foam lines rolling in toward it, and a lip of foam that runs up
+        // and draws back
+        float nz = sin(p.x*1.3 + p.y*2.1 + time*0.5)*0.5 + sin(p.x*2.9 - p.y*1.1 - time*0.8)*0.5;
+        float surge = 0.5 + 0.5*sin(time*0.9 + p.x*0.05 + p.y*0.04 + h*0.6);
+        float churn = 1.0 - smoothstep(0.0, 1.5, sh);
+        col = mix(col, col*0.75 + vec3(0.22, 0.27, 0.26), step(dith + 0.51, churn*0.9));
+        float lip = step(sh + dith*0.14, 0.18 + 0.09*nz + 0.2*surge) + step(d, 0.08);
+        float roll = step(0.9, fract(sh*0.62 + time*0.21 + nz*0.06)) * step(sh, 1.7 + nz*0.4) * step(-0.1, nz) * step(0.1, sh);
+        col = mix(col, vec3(0.96, 0.99, 0.98), clamp(lip + roll*0.85, 0.0, 1.0));
         col *= tint;
-        // haze toward the horizon (the same as the land's)
         col = mix(col, hazeC, smoothstep(hzNear, hzFar, vG)*hzMax);
         gl_FragColor = vec4(col, 1.0);
       }` }));
@@ -324,7 +360,7 @@
 
   /* ---------- light: noon, afternoon, golden hour ---------- */
   const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.bias = -.0012; sun.shadow.normalBias = .14;
+  sun.shadow.bias = -.0015; sun.shadow.normalBias = .3;
   scene.add(sun, sun.target);
   const sunDir = new THREE.Vector3();
   const hemi = new THREE.HemisphereLight(0xcfe9ff, 0x6a7a4a, .55); scene.add(hemi);
@@ -461,12 +497,12 @@
     const t0 = performance.now();
     for (const [, ch, lod] of todo){
       const old = ch.mesh; ch.mesh = buildChunk(ch.i, ch.j, lod); ch.lod = lod; ch.dirty = false;
-      if (old){ scene.remove(old); old.geometry.dispose(); }
+      if (old){ scene.remove(old); old.traverse(o => o.geometry && o.geometry.dispose()); }
       if (performance.now() - t0 > budget) break;
     }
     // drop what's long out of view (kept a while, so a turn back and forth doesn't remake it)
     if (fcount % 30 === 0){
-      for (const [k, ch] of chunks) if (fcount - ch.seen > 400 && chunks.size > 700){ if (ch.mesh){ scene.remove(ch.mesh); ch.mesh.geometry.dispose(); } chunks.delete(k); }
+      for (const [k, ch] of chunks) if (fcount - ch.seen > 400 && chunks.size > 700){ if (ch.mesh){ scene.remove(ch.mesh); ch.mesh.traverse(o => o.geometry && o.geometry.dispose()); } chunks.delete(k); }
       for (const [k, rc] of rockMeshes) if (fcount - rc.seen > 400 && rockMeshes.size > 140){ scene.remove(rc.mesh); rc.mesh.geometry.dispose(); rockMeshes.delete(k); }
       if (rockCache.size > 600) rockCache.clear();
     }
@@ -517,17 +553,26 @@
     } },
   };
   const pieceGeo = {}; for (const k in KINDS){ const T = new Tris(); KINDS[k].build(T); pieceGeo[k] = T.geo(); }
-  function pieceMesh(p){ const m = new THREE.Mesh(pieceGeo[p.kind], landM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.frustumCulled = false;
+  function pieceMesh(p){ const m = new THREE.Mesh(pieceGeo[p.kind], pieceM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.frustumCulled = false;
     m.position.set(p.x, p.y, p.z); m.rotation.y = p.rot; m.matrixAutoUpdate = false; m.updateMatrix(); m.updateMatrixWorld(); return m; }
   // can a piece go here? on land above the water, on ground that isn't too steep, clear of other pieces; returns the pad height
+  // can a piece go here? wholly on land (right up to the cliff edge is fine), on ground that isn't too steep, clear of other
+  // pieces; returns the pad height. Ground falling away at the rim (over the cliff edge) doesn't count as steep: the pad
+  // levels the ground out to the edge.
   function check(kind, x, z){
-    const r = KINDS[kind].r; let lo = 1e9, hi = -1e9, sum = 0, n = 0;
-    for (const [a, rr] of [[0, 0], ...[...Array(12)].map((_, i) => [i/12*PI*2, r]), ...[...Array(6)].map((_, i) => [i/6*PI*2 + .5, r*.55])]){
-      const h = heightAt(x + Math.cos(a)*rr, z + Math.sin(a)*rr, true); lo = Math.min(lo, h); hi = Math.max(hi, h); sum += h; n++; }
+    const r = KINDS[kind].r, cx = coastX(z), sl = (coastX(z + .5) - coastX(z - .5)), edge = (cx - x)/Math.sqrt(1 + sl*sl);
+    if (edge < r + .05 && coveAt(z)[0] < .45) return { ok: false, why: 'over the edge' };
+    let lo = 1e9, hi = -1e9, sum = 0, n = 0;
+    for (const [a, rr] of [[0, 0], ...[...Array(8)].map((_, i) => [i/8*PI*2 + .4, r*.6])]){
+      const sx = x + Math.cos(a)*rr, sz = z + Math.sin(a)*rr; if (coastX(sz) - sx < 1.7 && coveAt(sz)[0] < .45) continue;   // (the cliff's rounded rim: the pad levels it)
+      const h = heightAt(sx, sz, true); lo = Math.min(lo, h); hi = Math.max(hi, h); sum += h; n++; }
+    if (!n) return { ok: false, why: 'over the edge' };
+    const y = sum/n;
     if (lo < .35) return { ok: false, why: 'too close to the water' };
-    if (hi - lo > 1.1) return { ok: false, why: 'too steep' };
+    if (hi - lo > 1.0) return { ok: false, why: 'too steep' };
+    for (let i = 0; i < 12; i++){ const a = i/12*PI*2, h = heightAt(x + Math.cos(a)*r, z + Math.sin(a)*r, true); if (h > y + 1.0 && coastX(z + Math.sin(a)*r) - x - Math.cos(a)*r >= 1.7) return { ok: false, why: 'too steep' }; if (h < .2) return { ok: false, why: 'too close to the water' }; }
     for (const p of piecesNear(x - r - 4, z - r - 4, x + r + 4, z + r + 4)) if (Math.hypot(x - p.x, z - p.z) < r + p.r + .25) return { ok: false, why: 'something is in the way' };
-    return { ok: true, y: sum/n };
+    return { ok: true, y };
   }
   const dirtyAround = p => { for (const ch of chunks.values()) if (ch.land && ch.i*CH < p.x + p.r + 3 && ch.i*CH + CH > p.x - p.r - 3 && ch.j*CH < p.z + p.r + 3 && ch.j*CH + CH > p.z - p.r - 3) ch.dirty = true; };
   const SAVE_KEY = 'neonIsland.coast.pieces';

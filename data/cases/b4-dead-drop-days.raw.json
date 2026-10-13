@@ -1,0 +1,2296 @@
+{
+ "id": "b4-dead-drop-days",
+ "type": "main",
+ "rows": [
+  {
+   "title": "Hub first days",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    1,
+    3
+   ],
+   "who": [
+    "boss-careless",
+    "veteran-officer",
+    "informant",
+    "inside-officer",
+    "framed-officer",
+    "bot",
+    "drone"
+   ],
+   "where": "logistics-hub",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b4-c05"
+    },
+    {
+     "k": "plant",
+     "id": "b4-c07"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 1,
+     "hour": 6,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "dispatcher at terminal T-07, d01 06:00, bots and drones queued below",
+       "id": "hub-first-days.1.1"
+      },
+      {
+       "do": "queue-order",
+       "raw": "bots roll out in numbered order, one tray has no recipient line",
+       "id": "hub-first-days.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "manifest screen row T-07, recipient blank",
+       "id": "hub-first-days.1.3"
+      }
+     ],
+     "id": "hub-first-days.1"
+    },
+    {
+     "day": 2,
+     "hour": 15.166666666666666,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "C on the bench by the bot bay, d02 15:10",
+       "id": "hub-first-days.2.1"
+      },
+      {
+       "do": "eat",
+       "raw": "C beside the mechanic, tool roll on the bench, nobody speaks",
+       "id": "hub-first-days.2.2"
+      }
+     ],
+     "id": "hub-first-days.2"
+    },
+    {
+     "day": 3,
+     "hour": 10.333333333333334,
+     "steps": [
+      {
+       "do": "walk-together",
+       "raw": "A and B on patrol past the hub door, d03 10:20",
+       "id": "hub-first-days.3.1"
+      },
+      {
+       "do": "wave",
+       "raw": "dispatcher at the window calls \"Morning, Sunny\" to A, no word to B",
+       "id": "hub-first-days.3.2"
+      },
+      {
+       "do": "police-scan",
+       "raw": "B scans the hub door alone",
+       "id": "hub-first-days.3.3"
+      },
+      {
+       "do": "walk",
+       "raw": "A on past the door, no scan",
+       "id": "hub-first-days.3.4"
+      }
+     ],
+     "id": "hub-first-days.3"
+    }
+   ],
+   "id": "hub-first-days"
+  },
+  {
+   "title": "Doorstep rounds",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    2,
+    3
+   ],
+   "who": [
+    "go-between-courier",
+    "bot",
+    "resident"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b4-c03"
+    },
+    {
+     "k": "plant",
+     "id": "b4-c01"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 2,
+     "hour": 9.666666666666666,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "courier at 5B and 9A, d02 09:40, no parcel in hand",
+       "id": "doorstep-rounds.1.1"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "courier at 9A two minutes",
+       "id": "doorstep-rounds.1.2"
+      },
+      {
+       "do": "carry",
+       "raw": "bot rolls past with parcels, courier takes none",
+       "id": "doorstep-rounds.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "courier to the lift",
+       "id": "doorstep-rounds.1.4"
+      }
+     ],
+     "id": "doorstep-rounds.1"
+    },
+    {
+     "day": 3,
+     "hour": 9.166666666666666,
+     "steps": [
+      {
+       "do": "carry",
+       "raw": "bot sets a parcel at 5B, d03 09:10",
+       "id": "doorstep-rounds.2.1"
+      },
+      {
+       "do": "pick-up",
+       "raw": "courier lifts the parcel, tilts it, presses the base corner with a thumb",
+       "id": "doorstep-rounds.2.2"
+      },
+      {
+       "do": "walk",
+       "raw": "courier into the lift, parcel under one arm",
+       "id": "doorstep-rounds.2.3"
+      }
+     ],
+     "id": "doorstep-rounds.2"
+    }
+   ],
+   "id": "doorstep-rounds"
+  },
+  {
+   "title": "Poster and rent",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    4,
+    4
+   ],
+   "who": [
+    "go-between-courier",
+    "desk-sergeant",
+    "red-herring-stall-neighbor",
+    "crowd"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b4-c04"
+    },
+    {
+     "k": "herring",
+     "id": "b4-c15"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7.75,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "G at the screens, 07:45",
+       "id": "poster-and-rent.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "G at a new poster",
+       "id": "poster-and-rent.1.2"
+      },
+      {
+       "do": "post-feed",
+       "raw": "G posts the shift list",
+       "id": "poster-and-rent.1.3"
+      },
+      {
+       "do": "read-notice",
+       "raw": "courier stops at the screens and reads two posters",
+       "id": "poster-and-rent.1.4"
+      },
+      {
+       "do": "walk",
+       "raw": "courier out",
+       "id": "poster-and-rent.1.5"
+      },
+      {
+       "do": "argue",
+       "raw": "stall neighbor at the courier, one word loud, \"rent\"",
+       "id": "poster-and-rent.1.6"
+      },
+      {
+       "do": "stand",
+       "raw": "neighbor at the screens ten minutes after the courier leaves",
+       "id": "poster-and-rent.1.7"
+      }
+     ],
+     "id": "poster-and-rent.1"
+    }
+   ],
+   "id": "poster-and-rent"
+  },
+  {
+   "title": "Shed run",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    5,
+    6
+   ],
+   "who": [
+    "boss-careless",
+    "night-stakeout-officer",
+    "bot"
+   ],
+   "where": "hydroponic-farm",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b4-c09"
+    },
+    {
+     "k": "plant",
+     "id": "b4-c10"
+    }
+   ],
+   "sets": [
+    "H:stakeout"
+   ],
+   "moments": [
+    {
+     "day": 5,
+     "hour": 18.5,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "dispatcher through the leaf rows with a parcel, d05 18:30",
+       "id": "shed-run.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "dispatcher, the shed behind the rows",
+       "id": "shed-run.1.2"
+      },
+      {
+       "do": "leave",
+       "raw": "dispatcher, 18:50, hands empty",
+       "id": "shed-run.1.3"
+      }
+     ],
+     "id": "shed-run.1"
+    },
+    {
+     "day": 6,
+     "hour": 23,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "H at the farm gate, d06 23:00, paper cup on the ledge",
+       "id": "shed-run.2.1"
+      },
+      {
+       "do": "point",
+       "raw": "H at a lit shed window",
+       "id": "shed-run.2.2"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "a bot parked at the shed door, nobody seen",
+       "id": "shed-run.2.3"
+      }
+     ],
+     "id": "shed-run.2"
+    }
+   ],
+   "id": "shed-run"
+  },
+  {
+   "title": "Swap and night knock",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    5,
+    6
+   ],
+   "who": [
+    "go-between-courier",
+    "red-herring-night-courier",
+    "drone",
+    "resident"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b4-c02"
+    },
+    {
+     "k": "herring",
+     "id": "b4-c13"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 5,
+     "hour": 3.1666666666666665,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "night courier at 5B, d05 03:10, bag in hand",
+       "id": "swap-and-night-knock.1.1"
+      },
+      {
+       "do": "walk",
+       "raw": "night courier away down the hall",
+       "id": "swap-and-night-knock.1.2"
+      }
+     ],
+     "id": "swap-and-night-knock.1"
+    },
+    {
+     "day": 6,
+     "hour": 9.25,
+     "steps": [
+      {
+       "do": "carry",
+       "raw": "drone sets a parcel at 9A, d06 09:15",
+       "id": "swap-and-night-knock.2.1"
+      },
+      {
+       "do": "pick-up",
+       "raw": "courier lifts it",
+       "id": "swap-and-night-knock.2.2"
+      },
+      {
+       "do": "carry",
+       "raw": "courier sets an identical parcel on the mat",
+       "id": "swap-and-night-knock.2.3"
+      },
+      {
+       "do": "walk",
+       "raw": "courier into the lift with the first parcel",
+       "id": "swap-and-night-knock.2.4"
+      }
+     ],
+     "id": "swap-and-night-knock.2"
+    }
+   ],
+   "id": "swap-and-night-knock"
+  },
+  {
+   "title": "Longer way and night bay",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    7,
+    7
+   ],
+   "who": [
+    "inside-officer",
+    "framed-officer",
+    "go-between-courier",
+    "boss-careless",
+    "family-caller-officer",
+    "red-herring-stall-neighbor",
+    "drone"
+   ],
+   "where": "logistics-hub",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b4-c08"
+    },
+    {
+     "k": "plant",
+     "id": "b4-c06"
+    },
+    {
+     "k": "herring",
+     "id": "b4-c16"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 7,
+     "hour": 14.083333333333334,
+     "steps": [
+      {
+       "do": "police-patrol",
+       "raw": "A turns the patrol left past the hub window, d07 14:05, ten blocks longer",
+       "id": "longer-way-and-night-bay.1.1"
+      },
+      {
+       "do": "chat",
+       "raw": "B to A, \"We turned left here yesterday.\"",
+       "id": "longer-way-and-night-bay.1.2"
+      },
+      {
+       "do": "wave",
+       "raw": "A offers the courier a ride at the gate",
+       "id": "longer-way-and-night-bay.1.3"
+      },
+      {
+       "do": "shrug",
+       "raw": "courier",
+       "id": "longer-way-and-night-bay.1.4"
+      },
+      {
+       "do": "walk",
+       "raw": "courier away on foot",
+       "id": "longer-way-and-night-bay.1.5"
+      },
+      {
+       "do": "stand",
+       "raw": "B at the gate, back turned, reads the notice board",
+       "id": "longer-way-and-night-bay.1.6"
+      },
+      {
+       "do": "hand-over",
+       "raw": "dispatcher passes A a flat parcel through the window",
+       "id": "longer-way-and-night-bay.1.7"
+      },
+      {
+       "do": "pick-up",
+       "raw": "A",
+       "id": "longer-way-and-night-bay.1.8"
+      },
+      {
+       "do": "carry",
+       "raw": "A, parcel under his coat",
+       "id": "longer-way-and-night-bay.1.9"
+      },
+      {
+       "do": "carry",
+       "raw": "stall neighbor with a heavy bag to the drop window, 23:00",
+       "id": "longer-way-and-night-bay.1.10"
+      },
+      {
+       "do": "stand",
+       "raw": "E at the bay, 23:30",
+       "id": "longer-way-and-night-bay.1.11"
+      },
+      {
+       "do": "read-notice",
+       "raw": "E at a drone tray, gold-edged sticker T-07",
+       "id": "longer-way-and-night-bay.1.12"
+      },
+      {
+       "do": "leave",
+       "raw": "E to the lift, 23:35",
+       "id": "longer-way-and-night-bay.1.13"
+      },
+      {
+       "do": "enter",
+       "raw": "E back at the bay, 23:50, takeaway bag",
+       "id": "longer-way-and-night-bay.1.14"
+      }
+     ],
+     "id": "longer-way-and-night-bay.1"
+    }
+   ],
+   "id": "longer-way-and-night-bay"
+  },
+  {
+   "title": "Call and chase",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    8,
+    8
+   ],
+   "who": [
+    "resident",
+    "rookie-officer",
+    "veteran-officer",
+    "red-herring-night-courier"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b4-c11"
+    },
+    {
+     "k": "herring",
+     "id": "b4-c14"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3.0833333333333335,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "night courier at 5B, 03:05",
+       "id": "call-and-chase.1.1"
+      },
+      {
+       "do": "run",
+       "raw": "night courier down the stairs as D calls \"Police\"",
+       "id": "call-and-chase.1.2"
+      },
+      {
+       "do": "walk",
+       "raw": "C behind D, slow",
+       "id": "call-and-chase.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "C to D, \"Ask again tomorrow.\"",
+       "id": "call-and-chase.1.4"
+      },
+      {
+       "do": "phone-call",
+       "raw": "resident at 7B, one side, 07:50, \"Who? No, he said Officer B from the station.\" \"He said hold it by the door.\" \"It sounded like him.\"",
+       "id": "call-and-chase.1.5"
+      }
+     ],
+     "id": "call-and-chase.1"
+    }
+   ],
+   "id": "call-and-chase"
+  },
+  {
+   "title": "Parcel found",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s2-missing-delivery"
+   ],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "family-caller-officer",
+    "boss-careless",
+    "bot"
+   ],
+   "where": "logistics-hub",
+   "channel": [
+    "document",
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s2-c01"
+    },
+    {
+     "k": "pay",
+     "id": "b4-c01"
+    },
+    {
+     "k": "pay",
+     "id": "b4-c02"
+    },
+    {
+     "k": "pay",
+     "id": "b4-c05"
+    },
+    {
+     "k": "pay",
+     "id": "b4-c06"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6.166666666666667,
+     "steps": [
+      {
+       "do": "search",
+       "raw": "E behind a bot rack, bay 14, 06:10",
+       "id": "parcel-found.1.1"
+      },
+      {
+       "do": "pick-up",
+       "raw": "E lifts a parcel, the base panel lifts off, hollow 3 cm",
+       "id": "parcel-found.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "label under the panel, terminal id T-07",
+       "id": "parcel-found.1.3"
+      },
+      {
+       "do": "point",
+       "raw": "E at the label",
+       "id": "parcel-found.1.4"
+      },
+      {
+       "do": "stand",
+       "raw": "dispatcher at the terminal",
+       "id": "parcel-found.1.5"
+      },
+      {
+       "do": "shrug",
+       "raw": "dispatcher",
+       "id": "parcel-found.1.6"
+      },
+      {
+       "do": "phone-call",
+       "raw": "E, one side, \"Not now, Mama. I found it.\"",
+       "id": "parcel-found.1.7"
+      }
+     ],
+     "id": "parcel-found.1"
+    }
+   ],
+   "id": "parcel-found"
+  },
+  {
+   "title": "Poster covered",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s6-screen-graffiti"
+   ],
+   "loop": null,
+   "days": [
+    10,
+    10
+   ],
+   "who": [
+    "desk-sergeant",
+    "go-between-courier",
+    "crowd"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b4-c03"
+    },
+    {
+     "k": "pay",
+     "id": "b4-c04"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 8,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "crowd at the screens, 08:00",
+       "id": "poster-covered.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "G at a gray bar sprayed over a wanted poster headed \"courier, doorsteps\"",
+       "id": "poster-covered.1.2"
+      },
+      {
+       "do": "post-feed",
+       "raw": "G posts a cover notice",
+       "id": "poster-covered.1.3"
+      },
+      {
+       "do": "stand",
+       "raw": "courier at the screens, 30 seconds",
+       "id": "poster-covered.1.4"
+      },
+      {
+       "do": "walk",
+       "raw": "courier out by the lift",
+       "id": "poster-covered.1.5"
+      }
+     ],
+     "id": "poster-covered.1"
+    }
+   ],
+   "id": "poster-covered"
+  },
+  {
+   "title": "Two logs",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    11,
+    11
+   ],
+   "who": [
+    "rookie-officer",
+    "veteran-officer",
+    "desk-sergeant",
+    "framed-officer"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b4-c12"
+    },
+    {
+     "k": "pay",
+     "id": "b4-c07"
+    },
+    {
+     "k": "pay",
+     "id": "b4-c08"
+    }
+   ],
+   "sets": [
+    "B:framed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "D at the hub scan log",
+       "id": "two-logs.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "D at the hub door row, blank on six mornings",
+       "id": "two-logs.1.2"
+      },
+      {
+       "do": "chat",
+       "raw": "C to D, \"Ask again tomorrow.\"",
+       "id": "two-logs.1.3"
+      },
+      {
+       "do": "post-feed",
+       "raw": "G posts the hub delivery log",
+       "id": "two-logs.1.4"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B at the log, badge 2207 beside pickups on d05 and d08",
+       "id": "two-logs.1.5"
+      },
+      {
+       "do": "argue",
+       "raw": "B to G, \"I was at the tenements Tuesday.\"",
+       "id": "two-logs.1.6"
+      },
+      {
+       "do": "shrug",
+       "raw": "G",
+       "id": "two-logs.1.7"
+      }
+     ],
+     "id": "two-logs.1"
+    }
+   ],
+   "id": "two-logs"
+  },
+  {
+   "title": "Bench empty",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    12,
+    12
+   ],
+   "who": [
+    "veteran-officer",
+    "informant",
+    "bot"
+   ],
+   "where": "logistics-hub",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "inf:missing"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 15.166666666666666,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "C by the bot bay bench, 15:10",
+       "id": "bench-empty.1.1"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "C, ten minutes, no mechanic",
+       "id": "bench-empty.1.2"
+      },
+      {
+       "do": "search",
+       "raw": "C, tool roll open on the bench, one wrench gone",
+       "id": "bench-empty.1.3"
+      },
+      {
+       "do": "read-notice",
+       "raw": "bay rota, mechanic's name struck out in pencil",
+       "id": "bench-empty.1.4"
+      },
+      {
+       "do": "leave",
+       "raw": "C by the lift",
+       "id": "bench-empty.1.5"
+      }
+     ],
+     "id": "bench-empty.1"
+    }
+   ],
+   "id": "bench-empty"
+  },
+  {
+   "title": "Burned watch",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    13
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "rookie-officer",
+    "inside-officer",
+    "boss-careless"
+   ],
+   "where": "logistics-hub",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:tipped-off"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 4,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H and D at the bay door, 04:00",
+       "id": "burned-watch.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "shift board, A swapped with G for 04:00",
+       "id": "burned-watch.1.2"
+      },
+      {
+       "do": "walk",
+       "raw": "A into the hub, 04:20, takeaway bag",
+       "id": "burned-watch.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "A and dispatcher at the window",
+       "id": "burned-watch.1.4"
+      },
+      {
+       "do": "phone-call",
+       "raw": "dispatcher, one side, \"Not tonight.\"",
+       "id": "burned-watch.1.5"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "H and D at the gate, 05:30, no courier",
+       "id": "burned-watch.1.6"
+      },
+      {
+       "do": "shrug",
+       "raw": "D",
+       "id": "burned-watch.1.7"
+      }
+     ],
+     "id": "burned-watch.1"
+    }
+   ],
+   "id": "burned-watch"
+  },
+  {
+   "title": "Posted and missing",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    13
+   ],
+   "who": [
+    "desk-sergeant",
+    "framed-officer",
+    "rookie-officer",
+    "burnout-officer",
+    "inside-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document",
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "B:suspended",
+    "case:evidence-missing"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 9,
+     "steps": [
+      {
+       "do": "post-feed",
+       "raw": "G posts B's suspension on the screens, 09:00",
+       "id": "posted-and-missing.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B, twice",
+       "id": "posted-and-missing.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "B hands G his badge",
+       "id": "posted-and-missing.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "B out",
+       "id": "posted-and-missing.1.4"
+      },
+      {
+       "do": "sit",
+       "raw": "F in the lobby seat, 15:00",
+       "id": "posted-and-missing.1.5"
+      },
+      {
+       "do": "eat",
+       "raw": "F",
+       "id": "posted-and-missing.1.6"
+      },
+      {
+       "do": "shrug",
+       "raw": "F at G",
+       "id": "posted-and-missing.1.7"
+      },
+      {
+       "do": "search",
+       "raw": "D at the evidence shelf, 14:10, shelf empty where the parcel sat",
+       "id": "posted-and-missing.1.8"
+      },
+      {
+       "do": "read-notice",
+       "raw": "shelf log, signature A, d12 18:35",
+       "id": "posted-and-missing.1.9"
+      }
+     ],
+     "id": "posted-and-missing.1"
+    }
+   ],
+   "id": "posted-and-missing"
+  },
+  {
+   "title": "Doorstep stakeout",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "rookie-officer",
+    "red-herring-night-courier",
+    "go-between-courier",
+    "resident"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "b4-c13"
+    },
+    {
+     "k": "debunk",
+     "id": "b4-c14"
+    }
+   ],
+   "sets": [
+    "g1:arrested"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the hall corner, 03:00",
+       "id": "doorstep-stakeout.1.1"
+      },
+      {
+       "do": "knock-and-wait",
+       "raw": "night courier at 5B, 03:05",
+       "id": "doorstep-stakeout.1.2"
+      },
+      {
+       "do": "hug",
+       "raw": "resident opens, night courier hands over flowers and bread",
+       "id": "doorstep-stakeout.1.3"
+      },
+      {
+       "do": "police-scan",
+       "raw": "H lowers the handheld",
+       "id": "doorstep-stakeout.1.4"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "D at the stairs, 09:30",
+       "id": "doorstep-stakeout.1.5"
+      },
+      {
+       "do": "point",
+       "raw": "D to H, hold",
+       "id": "doorstep-stakeout.1.6"
+      },
+      {
+       "do": "knock-and-wait",
+       "raw": "courier at 9A, 09:40",
+       "id": "doorstep-stakeout.1.7"
+      },
+      {
+       "do": "pick-up",
+       "raw": "courier lifts a parcel",
+       "id": "doorstep-stakeout.1.8"
+      },
+      {
+       "do": "arrest",
+       "raw": "H and D at 9A",
+       "id": "doorstep-stakeout.1.9"
+      },
+      {
+       "do": "escort",
+       "raw": "courier to the lift",
+       "id": "doorstep-stakeout.1.10"
+      }
+     ],
+     "id": "doorstep-stakeout.1"
+    }
+   ],
+   "id": "doorstep-stakeout"
+  },
+  {
+   "title": "Poster restored",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s6-screen-graffiti"
+   ],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "desk-sergeant",
+    "red-herring-stall-neighbor",
+    "rookie-officer",
+    "crowd"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document",
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s6-c01"
+    },
+    {
+     "k": "debunk",
+     "id": "b4-c15"
+    },
+    {
+     "k": "debunk",
+     "id": "b4-c16"
+    }
+   ],
+   "sets": [
+    "rh3:cleared"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 13,
+     "steps": [
+      {
+       "do": "post-feed",
+       "raw": "G restores the courier poster, 13:00",
+       "id": "poster-restored.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "crowd",
+       "id": "poster-restored.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "stall neighbor at the screens, ten minutes",
+       "id": "poster-restored.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "neighbor gives D a landlord receipt",
+       "id": "poster-restored.1.4"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D, rent paid through the month",
+       "id": "poster-restored.1.5"
+      },
+      {
+       "do": "search",
+       "raw": "D opens the neighbor's bag, bolts of cloth",
+       "id": "poster-restored.1.6"
+      }
+     ],
+     "id": "poster-restored.1"
+    }
+   ],
+   "id": "poster-restored"
+  },
+  {
+   "title": "Shed opened",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    15
+   ],
+   "who": [
+    "veteran-officer",
+    "rookie-officer",
+    "night-stakeout-officer"
+   ],
+   "where": "hydroponic-farm",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b4-c09"
+    },
+    {
+     "k": "pay",
+     "id": "b4-c10"
+    }
+   ],
+   "sets": [
+    "boss:safehouse-burned"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 10,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "C and D, shed door, 10:00",
+       "id": "shed-opened.1.1"
+      },
+      {
+       "do": "search",
+       "raw": "crates of parcels, base panels unscrewed",
+       "id": "shed-opened.1.2"
+      },
+      {
+       "do": "search",
+       "raw": "comm rig on a shelf, call sheet",
+       "id": "shed-opened.1.3"
+      },
+      {
+       "do": "stand",
+       "raw": "H at the door",
+       "id": "shed-opened.1.4"
+      },
+      {
+       "do": "carry",
+       "raw": "D, rig out to the cart",
+       "id": "shed-opened.1.5"
+      },
+      {
+       "do": "point",
+       "raw": "C at the stub pile stamped 2207",
+       "id": "shed-opened.1.6"
+      }
+     ],
+     "id": "shed-opened.1"
+    }
+   ],
+   "id": "shed-opened"
+  },
+  {
+   "title": "Log checked",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    15
+   ],
+   "who": [
+    "desk-sergeant",
+    "framed-officer",
+    "rookie-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document",
+    "feed"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b4-c11"
+    },
+    {
+     "k": "pay",
+     "id": "b4-c12"
+    }
+   ],
+   "sets": [
+    "B:cleared",
+    "G:corrected-post"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 14.166666666666666,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "G, rig call sheet, call at 14:10 on d08",
+       "id": "log-checked.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "G, screen camera stills, B at the screens 14:10",
+       "id": "log-checked.1.2"
+      },
+      {
+       "do": "post-feed",
+       "raw": "G posts a corrected notice",
+       "id": "log-checked.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "B hands G his notebook",
+       "id": "log-checked.1.4"
+      },
+      {
+       "do": "wave",
+       "raw": "B to D",
+       "id": "log-checked.1.5"
+      }
+     ],
+     "id": "log-checked.1"
+    }
+   ],
+   "id": "log-checked"
+  },
+  {
+   "title": "Found on the lawn",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    16,
+    16
+   ],
+   "who": [
+    "veteran-officer",
+    "informant"
+   ],
+   "where": "lawn",
+   "channel": [
+    "conversation"
+   ],
+   "clues": [],
+   "sets": [
+    "inf:talking"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7.5,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "C across the lawn, 07:30",
+       "id": "found-on-the-lawn.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "mechanic on a bench, new coat",
+       "id": "found-on-the-lawn.1.2"
+      },
+      {
+       "do": "sit",
+       "raw": "C, same bench",
+       "id": "found-on-the-lawn.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "C returns the tool roll",
+       "id": "found-on-the-lawn.1.4"
+      },
+      {
+       "do": "chat",
+       "raw": "mechanic to C, \"T-07, every payday, 15:00. Bay three. I fitted the panels.\"",
+       "id": "found-on-the-lawn.1.5"
+      }
+     ],
+     "id": "found-on-the-lawn.1"
+    }
+   ],
+   "id": "found-on-the-lawn"
+  },
+  {
+   "title": "Last stakeout",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    17,
+    17
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "framed-officer",
+    "inside-officer",
+    "boss-careless",
+    "veteran-officer",
+    "rookie-officer"
+   ],
+   "where": "logistics-hub",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:arrested",
+    "A:arrested"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 14.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the hub gate, 14:30, paper cup on the ledge",
+       "id": "last-stakeout.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "dispatcher at the terminal, 15:00",
+       "id": "last-stakeout.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "dispatcher passes A a flat parcel through the window",
+       "id": "last-stakeout.1.3"
+      },
+      {
+       "do": "arrest",
+       "raw": "B at A",
+       "id": "last-stakeout.1.4"
+      },
+      {
+       "do": "arrest",
+       "raw": "C and H at the dispatcher",
+       "id": "last-stakeout.1.5"
+      },
+      {
+       "do": "escort",
+       "raw": "both to the lift",
+       "id": "last-stakeout.1.6"
+      },
+      {
+       "do": "search",
+       "raw": "D at bay three, base panels",
+       "id": "last-stakeout.1.7"
+      }
+     ],
+     "id": "last-stakeout.1"
+    }
+   ],
+   "id": "last-stakeout"
+  },
+  {
+   "title": "Case closed",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    18,
+    18
+   ],
+   "who": [
+    "desk-sergeant",
+    "framed-officer",
+    "rookie-officer",
+    "veteran-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document",
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "case:closed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "post-feed",
+       "raw": "G posts the closing notice",
+       "id": "case-closed.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "B at the front desk, badge on",
+       "id": "case-closed.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "C passes D the beat sheet",
+       "id": "case-closed.1.3"
+      },
+      {
+       "do": "shrug",
+       "raw": "D",
+       "id": "case-closed.1.4"
+      }
+     ],
+     "id": "case-closed.1"
+    }
+   ],
+   "id": "case-closed"
+  },
+  {
+   "title": "Second station shares scans",
+   "variant": "careless",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    11,
+    11
+   ],
+   "who": [
+    "desk-sergeant",
+    "rookie-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document"
+   ],
+   "clues": [],
+   "sets": [
+    "station2:cooperating"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "hand-over",
+       "raw": "station 2 desk sends the hub scan log to the screens",
+       "id": "care-second-station-shares-scans.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D, the list",
+       "id": "care-second-station-shares-scans.1.2"
+      },
+      {
+       "do": "chat",
+       "raw": "G to D, \"Their log has the same gap.\"",
+       "id": "care-second-station-shares-scans.1.3"
+      }
+     ],
+     "id": "care-second-station-shares-scans.1"
+    }
+   ],
+   "id": "care-second-station-shares-scans"
+  },
+  {
+   "title": "Found on the lawn",
+   "variant": "careless",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "veteran-officer",
+    "informant"
+   ],
+   "where": "lawn",
+   "channel": [
+    "conversation"
+   ],
+   "clues": [],
+   "sets": [
+    "inf:talking"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7.5,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "C across the lawn, 07:30",
+       "id": "care-found-on-the-lawn.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "mechanic on a bench, new coat",
+       "id": "care-found-on-the-lawn.1.2"
+      },
+      {
+       "do": "sit",
+       "raw": "C, same bench",
+       "id": "care-found-on-the-lawn.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "C returns the tool roll",
+       "id": "care-found-on-the-lawn.1.4"
+      },
+      {
+       "do": "chat",
+       "raw": "mechanic to C, \"T-07, every payday, 15:00. Bay three. I fitted the panels.\"",
+       "id": "care-found-on-the-lawn.1.5"
+      }
+     ],
+     "id": "care-found-on-the-lawn.1"
+    }
+   ],
+   "id": "care-found-on-the-lawn"
+  },
+  {
+   "title": "Same minute every day",
+   "variant": "careless",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "boss-careless"
+   ],
+   "where": "logistics-hub",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 5.916666666666667,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the gate, 05:55",
+       "id": "care-same-minute-every-day.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "dispatcher at the terminal, 06:00, same minute as d01",
+       "id": "care-same-minute-every-day.1.2"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "H, no change in the routine",
+       "id": "care-same-minute-every-day.1.3"
+      }
+     ],
+     "id": "care-same-minute-every-day.1"
+    }
+   ],
+   "id": "care-same-minute-every-day"
+  },
+  {
+   "title": "Last stakeout, early",
+   "variant": "careless",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    15
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "framed-officer",
+    "inside-officer",
+    "boss-careless",
+    "veteran-officer",
+    "rookie-officer"
+   ],
+   "where": "logistics-hub",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:arrested",
+    "A:arrested"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 14.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the hub gate, 14:30",
+       "id": "care-last-stakeout-early.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "dispatcher at the terminal, 15:00",
+       "id": "care-last-stakeout-early.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "dispatcher passes A a flat parcel through the window",
+       "id": "care-last-stakeout-early.1.3"
+      },
+      {
+       "do": "arrest",
+       "raw": "B at A",
+       "id": "care-last-stakeout-early.1.4"
+      },
+      {
+       "do": "arrest",
+       "raw": "C and H at the dispatcher",
+       "id": "care-last-stakeout-early.1.5"
+      },
+      {
+       "do": "search",
+       "raw": "D at bay three, base panels",
+       "id": "care-last-stakeout-early.1.6"
+      }
+     ],
+     "id": "care-last-stakeout-early.1"
+    }
+   ],
+   "id": "care-last-stakeout-early"
+  },
+  {
+   "title": "Case closed, early",
+   "variant": "careless",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    15
+   ],
+   "who": [
+    "desk-sergeant",
+    "framed-officer",
+    "rookie-officer",
+    "veteran-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document",
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "case:closed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "post-feed",
+       "raw": "G posts the closing notice",
+       "id": "care-case-closed-early.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "B at the front desk, badge on",
+       "id": "care-case-closed-early.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "C passes D the beat sheet",
+       "id": "care-case-closed-early.1.3"
+      }
+     ],
+     "id": "care-case-closed-early.1"
+    }
+   ],
+   "id": "care-case-closed-early"
+  },
+  {
+   "title": "Fixer at the bay",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    5,
+    7
+   ],
+   "who": [
+    "go-between-bartender",
+    "go-between-courier",
+    "boss-careful",
+    "drone"
+   ],
+   "where": "logistics-hub",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 18.666666666666668,
+     "steps": [
+      {
+       "do": "serve",
+       "raw": "fixer at the drone bay hands one driver a tea first, 18:40",
+       "id": "care-fixer-at-the-bay.1.1"
+      },
+      {
+       "do": "queue-order",
+       "raw": "the line of drivers stacks behind",
+       "id": "care-fixer-at-the-bay.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "fixer passes a tray tag, not for a drone",
+       "id": "care-fixer-at-the-bay.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "fixer by the service door, 19:10 sharp, three nights",
+       "id": "care-fixer-at-the-bay.1.4"
+      },
+      {
+       "do": "bump",
+       "raw": "fixer and courier at the lift, no word",
+       "id": "care-fixer-at-the-bay.1.5"
+      }
+     ],
+     "id": "care-fixer-at-the-bay.1"
+    }
+   ],
+   "id": "care-fixer-at-the-bay"
+  },
+  {
+   "title": "Sits apart",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    10,
+    10
+   ],
+   "who": [
+    "inside-officer-extra",
+    "desk-sergeant"
+   ],
+   "where": "police-station",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "extra officer a little apart at briefing",
+       "id": "care-sits-apart.1.1"
+      },
+      {
+       "do": "phone-call",
+       "raw": "extra officer, one side, \"Not here.\"",
+       "id": "care-sits-apart.1.2"
+      },
+      {
+       "do": "leave",
+       "raw": "extra officer first",
+       "id": "care-sits-apart.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "extra officer asks G what station 1 is working on",
+       "id": "care-sits-apart.1.4"
+      }
+     ],
+     "id": "care-sits-apart.1"
+    }
+   ],
+   "id": "care-sits-apart"
+  },
+  {
+   "title": "Fixer sent to talk",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "go-between-bartender",
+    "go-between-courier"
+   ],
+   "where": "logistics-hub",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7,
+     "steps": [
+      {
+       "do": "wait-outside",
+       "raw": "courier at the lift, 07:00, does not enter the gate",
+       "id": "care-fixer-sent-to-talk.1.1"
+      },
+      {
+       "do": "walk",
+       "raw": "fixer to the lift",
+       "id": "care-fixer-sent-to-talk.1.2"
+      },
+      {
+       "do": "chat",
+       "raw": "fixer and courier, short",
+       "id": "care-fixer-sent-to-talk.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "fixer takes a tray tag from the courier",
+       "id": "care-fixer-sent-to-talk.1.4"
+      },
+      {
+       "do": "leave",
+       "raw": "fixer by the service door",
+       "id": "care-fixer-sent-to-talk.1.5"
+      }
+     ],
+     "id": "care-fixer-sent-to-talk.1"
+    }
+   ],
+   "id": "care-fixer-sent-to-talk"
+  },
+  {
+   "title": "Flat lit",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    15
+   ],
+   "who": [
+    "boss-careful"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 21.666666666666668,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "dispatcher through the lobby, 21:40, bag in hand",
+       "id": "care-flat-lit.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "flat 4C",
+       "id": "care-flat-lit.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "a lit window on the fourth floor",
+       "id": "care-flat-lit.1.3"
+      }
+     ],
+     "id": "care-flat-lit.1"
+    }
+   ],
+   "id": "care-flat-lit"
+  },
+  {
+   "title": "Empty terminal",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    17,
+    17
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "framed-officer",
+    "inside-officer",
+    "veteran-officer",
+    "rookie-officer"
+   ],
+   "where": "logistics-hub",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 14.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the hub gate, 14:30",
+       "id": "care-empty-terminal.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "a stand-in bot at terminal T-07, 15:00",
+       "id": "care-empty-terminal.1.2"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "H and C, no dispatcher",
+       "id": "care-empty-terminal.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "A with a takeaway bag",
+       "id": "care-empty-terminal.1.4"
+      },
+      {
+       "do": "shrug",
+       "raw": "D",
+       "id": "care-empty-terminal.1.5"
+      }
+     ],
+     "id": "care-empty-terminal.1"
+    }
+   ],
+   "id": "care-empty-terminal"
+  },
+  {
+   "title": "Last night at the flat",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    19,
+    20
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "framed-officer",
+    "inside-officer",
+    "inside-officer-extra",
+    "boss-careful",
+    "go-between-bartender",
+    "veteran-officer",
+    "rookie-officer"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:safehouse2-burned",
+    "boss:arrested",
+    "A:arrested",
+    "g3:arrested",
+    "station2:insider-exposed"
+   ],
+   "moments": [
+    {
+     "day": 19,
+     "hour": 15,
+     "steps": [
+      {
+       "do": "search",
+       "raw": "H and D, flat 4C, d19 15:00, bags and a comm rig",
+       "id": "care-last-night-at-the-flat.1.1"
+      }
+     ],
+     "id": "care-last-night-at-the-flat.1"
+    },
+    {
+     "day": 20,
+     "hour": 3.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H in the hall, d20 03:30",
+       "id": "care-last-night-at-the-flat.2.1"
+      },
+      {
+       "do": "enter",
+       "raw": "dispatcher at 4C, 04:10",
+       "id": "care-last-night-at-the-flat.2.2"
+      },
+      {
+       "do": "arrest",
+       "raw": "H at 4C door",
+       "id": "care-last-night-at-the-flat.2.3"
+      },
+      {
+       "do": "arrest",
+       "raw": "B at A",
+       "id": "care-last-night-at-the-flat.2.4"
+      },
+      {
+       "do": "arrest",
+       "raw": "D at the fixer on the stairs",
+       "id": "care-last-night-at-the-flat.2.5"
+      },
+      {
+       "do": "escort",
+       "raw": "all to the lift",
+       "id": "care-last-night-at-the-flat.2.6"
+      }
+     ],
+     "id": "care-last-night-at-the-flat.2"
+    }
+   ],
+   "id": "care-last-night-at-the-flat"
+  },
+  {
+   "title": "Case closed",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    21,
+    21
+   ],
+   "who": [
+    "desk-sergeant",
+    "framed-officer",
+    "rookie-officer",
+    "veteran-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document",
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "case:closed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "post-feed",
+       "raw": "G posts the closing notice",
+       "id": "care-case-closed.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "B at the front desk, badge on",
+       "id": "care-case-closed.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "C passes D the beat sheet",
+       "id": "care-case-closed.1.3"
+      },
+      {
+       "do": "wave",
+       "raw": "C at the door",
+       "id": "care-case-closed.1.4"
+      }
+     ],
+     "id": "care-case-closed.1"
+    }
+   ],
+   "id": "care-case-closed"
+  }
+ ]
+}

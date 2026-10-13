@@ -1,0 +1,734 @@
+{
+ "id": "s5-platform-lurker",
+ "type": "subplot",
+ "rows": [
+  {
+   "title": "Gray coat on the bench",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    4,
+    5
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "s5-lurker",
+    "bystander"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s5-c02"
+    }
+   ],
+   "sets": [
+    "H:stakeout"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 23.166666666666668,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "H at the pillar 23:10",
+       "id": "gray-coat-on-the-bench.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "lurker on the bench, gray coat, orange scarf",
+       "id": "gray-coat-on-the-bench.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "lurker at the yellow line as the 23:20 train stops, does not board",
+       "id": "gray-coat-on-the-bench.1.3"
+      },
+      {
+       "do": "wave",
+       "raw": "lurker raises one hand toward the attendant booth, bystander in orange vest at the booth",
+       "id": "gray-coat-on-the-bench.1.4"
+      }
+     ],
+     "id": "gray-coat-on-the-bench.1"
+    }
+   ],
+   "id": "gray-coat-on-the-bench"
+  },
+  {
+   "title": "Pencil numbers under the slat",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    6,
+    6
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "s5-lurker"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s5-c01"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 23.416666666666668,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "lurker writes in pencil on a scrap 23:25",
+       "id": "pencil-numbers-under-the-slat.1.1"
+      },
+      {
+       "do": "leave",
+       "raw": "lurker walks to the stairs",
+       "id": "pencil-numbers-under-the-slat.1.2"
+      },
+      {
+       "do": "pick-up",
+       "raw": "H lifts the scrap from under the bench slat",
+       "id": "pencil-numbers-under-the-slat.1.3"
+      },
+      {
+       "do": "read-notice",
+       "raw": "H on a column of times with minute marks: 23:20 23:41 00:02",
+       "id": "pencil-numbers-under-the-slat.1.4"
+      }
+     ],
+     "id": "pencil-numbers-under-the-slat.1"
+    }
+   ],
+   "id": "pencil-numbers-under-the-slat"
+  },
+  {
+   "title": "Old man on the east bench",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    6,
+    6
+   ],
+   "who": [
+    "s5-bench-reader"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "herring",
+     "id": "s5-c08"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 17,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "old man on the east bench 17:00, slate in his lap",
+       "id": "old-man-on-the-east-bench.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "old man at the yellow line for each arriving train until 17:40",
+       "id": "old-man-on-the-east-bench.1.2"
+      },
+      {
+       "do": "sit",
+       "raw": "old man back on the bench 17:45",
+       "id": "old-man-on-the-east-bench.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "old man 18:30",
+       "id": "old-man-on-the-east-bench.1.4"
+      }
+     ],
+     "id": "old-man-on-the-east-bench.1"
+    }
+   ],
+   "id": "old-man-on-the-east-bench"
+  },
+  {
+   "title": "Never boards",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    7,
+    7
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "s5-lurker"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s5-c03"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 22.833333333333332,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "lurker through the gate 22:50",
+       "id": "never-boards.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "lurker on the bench while three trains open their doors",
+       "id": "never-boards.1.2"
+      },
+      {
+       "do": "walk",
+       "raw": "lurker to the stairs 00:10 without boarding",
+       "id": "never-boards.1.3"
+      },
+      {
+       "do": "stand",
+       "raw": "H at the pillar",
+       "id": "never-boards.1.4"
+      }
+     ],
+     "id": "never-boards.1"
+    }
+   ],
+   "id": "never-boards"
+  },
+  {
+   "title": "Cup on the bin ledge",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    8,
+    8
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "s5-lurker",
+    "bystander"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s5-c04"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 23.666666666666668,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "bystander in orange vest at the lost property bin 23:40",
+       "id": "cup-on-the-bin-ledge.1.1"
+      },
+      {
+       "do": "serve",
+       "raw": "bystander sets a paper cup on the bin ledge",
+       "id": "cup-on-the-bin-ledge.1.2"
+      },
+      {
+       "do": "pick-up",
+       "raw": "lurker lifts the cup and walks off",
+       "id": "cup-on-the-bin-ledge.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "bystander to H, weather only",
+       "id": "cup-on-the-bin-ledge.1.4"
+      }
+     ],
+     "id": "cup-on-the-bin-ledge.1"
+    }
+   ],
+   "id": "cup-on-the-bin-ledge"
+  },
+  {
+   "title": "Across from the tea counter",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "s5-lurker",
+    "s5-gray-coat-woman",
+    "night-stakeout-officer"
+   ],
+   "where": "bath-house/tea-counter",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s5-c05"
+    },
+    {
+     "k": "herring",
+     "id": "s5-c09"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 16,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "lurker at the corner table 16:00, gray coat, orange scarf, no order",
+       "id": "across-from-the-tea-counter.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "woman in a gray coat at the counter, orders tea",
+       "id": "across-from-the-tea-counter.1.2"
+      },
+      {
+       "do": "stakeout",
+       "raw": "H at the entrance 15:50",
+       "id": "across-from-the-tea-counter.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "lurker 16:40",
+       "id": "across-from-the-tea-counter.1.4"
+      }
+     ],
+     "id": "across-from-the-tea-counter.1"
+    }
+   ],
+   "id": "across-from-the-tea-counter"
+  },
+  {
+   "title": "Last train at the hatch",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    10,
+    10
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "s5-lurker",
+    "bystander"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s5-c06"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 0.08333333333333333,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "lurker at the lost property hatch 00:05 after the last train",
+       "id": "last-train-at-the-hatch.1.1"
+      },
+      {
+       "do": "chat",
+       "raw": "lurker, one word through the hatch",
+       "id": "last-train-at-the-hatch.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "bystander closes the shutter",
+       "id": "last-train-at-the-hatch.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "lurker 00:08",
+       "id": "last-train-at-the-hatch.1.4"
+      },
+      {
+       "do": "stakeout",
+       "raw": "H at the pillar",
+       "id": "last-train-at-the-hatch.1.5"
+      }
+     ],
+     "id": "last-train-at-the-hatch.1"
+    }
+   ],
+   "id": "last-train-at-the-hatch"
+  },
+  {
+   "title": "Leaf chip",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    10,
+    10
+   ],
+   "who": [
+    "s5-lurker",
+    "bystander"
+   ],
+   "where": "bath-house/tea-counter",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s5-c07"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 17.5,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "lurker at the counter 17:30",
+       "id": "leaf-chip.1.1"
+      },
+      {
+       "do": "serve",
+       "raw": "counter hand slides a cup",
+       "id": "leaf-chip.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "lurker sets a round chip with a leaf stamp on the counter",
+       "id": "leaf-chip.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "lurker 17:40",
+       "id": "leaf-chip.1.4"
+      }
+     ],
+     "id": "leaf-chip.1"
+    }
+   ],
+   "id": "leaf-chip"
+  },
+  {
+   "title": "Old man meets the 17:40",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    10,
+    10
+   ],
+   "who": [
+    "s5-bench-reader",
+    "bystander"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "s5-c08"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 17.666666666666668,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "old man at the yellow line 17:40",
+       "id": "old-man-meets-the-17-40.1.1"
+      },
+      {
+       "do": "hug",
+       "raw": "young woman steps off the train and hugs old man",
+       "id": "old-man-meets-the-17-40.1.2"
+      },
+      {
+       "do": "walk-together",
+       "raw": "old man and young woman to the stairs",
+       "id": "old-man-meets-the-17-40.1.3"
+      }
+     ],
+     "id": "old-man-meets-the-17-40.1"
+    }
+   ],
+   "id": "old-man-meets-the-17-40"
+  },
+  {
+   "title": "Lurker caught on the platform",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    11,
+    11
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "s5-lurker",
+    "bystander"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s5-c01"
+    },
+    {
+     "k": "pay",
+     "id": "s5-c02"
+    },
+    {
+     "k": "pay",
+     "id": "s5-c03"
+    },
+    {
+     "k": "pay",
+     "id": "s5-c04"
+    },
+    {
+     "k": "pay",
+     "id": "s5-c05"
+    }
+   ],
+   "sets": [
+    "case:s5-caught"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 23.366666666666667,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "H steps from the pillar 23:22",
+       "id": "lurker-caught-on-the-platform.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "H at the bench",
+       "id": "lurker-caught-on-the-platform.1.2"
+      },
+      {
+       "do": "arrest",
+       "raw": "H at the yellow line, lurker offers both wrists",
+       "id": "lurker-caught-on-the-platform.1.3"
+      },
+      {
+       "do": "search",
+       "raw": "H empties the coat pockets, pencil scrap and leaf chip",
+       "id": "lurker-caught-on-the-platform.1.4"
+      },
+      {
+       "do": "escort",
+       "raw": "H and lurker to the stairs",
+       "id": "lurker-caught-on-the-platform.1.5"
+      },
+      {
+       "do": "stand",
+       "raw": "bystander in orange vest at the booth, hand on the shutter",
+       "id": "lurker-caught-on-the-platform.1.6"
+      }
+     ],
+     "id": "lurker-caught-on-the-platform.1"
+    }
+   ],
+   "id": "lurker-caught-on-the-platform"
+  },
+  {
+   "title": "Gray coat behind the counter",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    13
+   ],
+   "who": [
+    "s5-gray-coat-woman"
+   ],
+   "where": "bath-house/tea-counter",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "s5-c09"
+    },
+    {
+     "k": "pay",
+     "id": "s5-c06"
+    },
+    {
+     "k": "pay",
+     "id": "s5-c07"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 15.5,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "woman in the gray coat by the staff door, badge swipe 15:30",
+       "id": "gray-coat-behind-the-counter.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "woman at the staff rota on the wall",
+       "id": "gray-coat-behind-the-counter.1.2"
+      },
+      {
+       "do": "serve",
+       "raw": "woman pours tea for a patron in a pale green apron",
+       "id": "gray-coat-behind-the-counter.1.3"
+      }
+     ],
+     "id": "gray-coat-behind-the-counter.1"
+    }
+   ],
+   "id": "gray-coat-behind-the-counter"
+  },
+  {
+   "title": "Slip filed",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    15
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "desk-sergeant"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document"
+   ],
+   "clues": [],
+   "sets": [
+    "case:s5-closed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7.166666666666667,
+     "steps": [
+      {
+       "do": "hand-over",
+       "raw": "H gives G the pencil scrap in a sealed bag",
+       "id": "slip-filed.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "G at the intake log",
+       "id": "slip-filed.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "G at tonight's rota",
+       "id": "slip-filed.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "H and G about overtime",
+       "id": "slip-filed.1.4"
+      },
+      {
+       "do": "walk",
+       "raw": "H out at 07:10",
+       "id": "slip-filed.1.5"
+      }
+     ],
+     "id": "slip-filed.1"
+    }
+   ],
+   "id": "slip-filed"
+  }
+ ]
+}

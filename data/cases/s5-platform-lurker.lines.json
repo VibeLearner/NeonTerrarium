@@ -1,0 +1,418 @@
+{
+ "slots": {
+  "s5-lurker": {
+   "desc": "a young man in a gray coat"
+  },
+  "s5-bench-reader": {
+   "desc": "an old man in a brown cap"
+  },
+  "s5-gray-coat-woman": {
+   "desc": "a woman on her break"
+  },
+  "extra:attendant": {
+   "desc": "a platform attendant in an orange vest"
+  },
+  "extra:counterhand": {
+   "desc": "a counter hand in an apron"
+  },
+  "extra:arrival": {
+   "desc": "a young woman off the train"
+  }
+ },
+ "steps": {
+  "gray-coat-on-the-bench.1.1": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [],
+   "line": "{night-stakeout-officer} takes up a post at the platform pillar and stands still.",
+   "stay": true
+  },
+  "gray-coat-on-the-bench.1.2": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} sits on the platform bench, orange scarf wound high."
+  },
+  "gray-coat-on-the-bench.1.3": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} stands at the yellow line as the late train stops, then lets the doors close without boarding."
+  },
+  "gray-coat-on-the-bench.1.4": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [
+    "extra:attendant"
+   ],
+   "line": "{s5-lurker} raises one hand toward the attendant booth, where {extra:attendant} stands."
+  },
+  "pencil-numbers-under-the-slat.1.1": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} sits on the bench writing in pencil on a scrap of paper.",
+   "held": "paper:slip"
+  },
+  "pencil-numbers-under-the-slat.1.2": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} walks to the stairs with empty hands."
+  },
+  "pencil-numbers-under-the-slat.1.3": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [],
+   "line": "{night-stakeout-officer} crouches and lifts a paper scrap from under the bench slat.",
+   "held": "paper:slip"
+  },
+  "pencil-numbers-under-the-slat.1.4": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [],
+   "line": "{night-stakeout-officer} reads the scrap: a column of pencil minute marks, \"20, 41, 02.\"",
+   "held": "paper:slip"
+  },
+  "old-man-on-the-east-bench.1.1": {
+   "who": [
+    "s5-bench-reader"
+   ],
+   "with": [],
+   "line": "{s5-bench-reader} sits on the east bench with a slate in {s5-bench-reader.his} lap."
+  },
+  "old-man-on-the-east-bench.1.2": {
+   "who": [
+    "s5-bench-reader"
+   ],
+   "with": [],
+   "line": "{s5-bench-reader} stands at the yellow line for each arriving train, then steps back.",
+   "stay": true
+  },
+  "old-man-on-the-east-bench.1.3": {
+   "who": [
+    "s5-bench-reader"
+   ],
+   "with": [],
+   "line": "{s5-bench-reader} sits back down on the east bench, slate on {s5-bench-reader.his} knees."
+  },
+  "old-man-on-the-east-bench.1.4": {
+   "who": [
+    "s5-bench-reader"
+   ],
+   "with": [],
+   "line": "{s5-bench-reader} leans on {s5-bench-reader.his} cane and leaves the platform by the stairs."
+  },
+  "never-boards.1.1": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} comes through the platform gate, orange scarf up."
+  },
+  "never-boards.1.2": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} sits on the bench while three trains open and close their doors.",
+   "stay": true
+  },
+  "never-boards.1.3": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} walks to the stairs after the last doors close, never having boarded."
+  },
+  "never-boards.1.4": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [],
+   "line": "{night-stakeout-officer} stands at the pillar, watching the bench."
+  },
+  "cup-on-the-bin-ledge.1.1": {
+   "who": [
+    "extra:attendant"
+   ],
+   "with": [],
+   "line": "{extra:attendant} stands at the lost property bin with a paper cup.",
+   "held": "cup"
+  },
+  "cup-on-the-bin-ledge.1.2": {
+   "who": [
+    "extra:attendant"
+   ],
+   "with": [],
+   "line": "{extra:attendant} sets the paper cup on the ledge of the lost property bin."
+  },
+  "cup-on-the-bin-ledge.1.3": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} lifts the cup from the bin ledge and walks off with it.",
+   "held": "cup"
+  },
+  "cup-on-the-bin-ledge.1.4": {
+   "who": [
+    "extra:attendant"
+   ],
+   "with": [
+    "night-stakeout-officer"
+   ],
+   "line": "{extra:attendant} chats with {night-stakeout-officer} about the weather and nothing else."
+  },
+  "across-from-the-tea-counter.1.1": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} sits at the corner table across from the tea counter, scarf on, ordering nothing."
+  },
+  "across-from-the-tea-counter.1.2": {
+   "who": [
+    "s5-gray-coat-woman"
+   ],
+   "with": [],
+   "line": "{s5-gray-coat-woman} steps up to the tea counter in a gray coat and orders tea.",
+   "held": "cup:tea"
+  },
+  "across-from-the-tea-counter.1.3": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [],
+   "line": "{night-stakeout-officer} watches the tea counter from the bath house entrance.",
+   "stay": true
+  },
+  "across-from-the-tea-counter.1.4": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} gets up from the corner table and leaves without ordering."
+  },
+  "last-train-at-the-hatch.1.1": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} stands at the lost property hatch after the last train pulls out."
+  },
+  "last-train-at-the-hatch.1.2": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [
+    "extra:attendant"
+   ],
+   "line": "{s5-lurker} says one word through the hatch to {extra:attendant}, too low to catch."
+  },
+  "last-train-at-the-hatch.1.3": {
+   "who": [
+    "extra:attendant"
+   ],
+   "with": [],
+   "line": "{extra:attendant} pulls the hatch shutter down from inside."
+  },
+  "last-train-at-the-hatch.1.4": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} turns from the hatch and leaves by the stairs."
+  },
+  "last-train-at-the-hatch.1.5": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [],
+   "line": "{night-stakeout-officer} stays at the pillar, watching the shut hatch.",
+   "stay": true
+  },
+  "leaf-chip.1.1": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} sits down at the bath house tea counter."
+  },
+  "leaf-chip.1.2": {
+   "who": [
+    "extra:counterhand"
+   ],
+   "with": [
+    "s5-lurker"
+   ],
+   "line": "{extra:counterhand} slides a cup of tea across to {s5-lurker}.",
+   "held": "cup:tea"
+  },
+  "leaf-chip.1.3": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [
+    "extra:counterhand"
+   ],
+   "line": "{s5-lurker} sets a round chip stamped with a leaf on the counter.",
+   "held": "cup:tea"
+  },
+  "leaf-chip.1.4": {
+   "who": [
+    "s5-lurker"
+   ],
+   "with": [],
+   "line": "{s5-lurker} finishes the tea and leaves the counter."
+  },
+  "old-man-meets-the-17-40.1.1": {
+   "who": [
+    "s5-bench-reader"
+   ],
+   "with": [],
+   "line": "{s5-bench-reader} stands at the yellow line as the train pulls in."
+  },
+  "old-man-meets-the-17-40.1.2": {
+   "who": [
+    "extra:arrival"
+   ],
+   "with": [
+    "s5-bench-reader"
+   ],
+   "line": "{extra:arrival} steps off the train and hugs {s5-bench-reader}."
+  },
+  "old-man-meets-the-17-40.1.3": {
+   "who": [
+    "s5-bench-reader"
+   ],
+   "with": [
+    "extra:arrival"
+   ],
+   "line": "{s5-bench-reader} and {extra:arrival} walk to the stairs together, arm in arm."
+  },
+  "lurker-caught-on-the-platform.1.1": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [],
+   "line": "{night-stakeout-officer} steps away from the pillar for the first time tonight."
+  },
+  "lurker-caught-on-the-platform.1.2": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [
+    "s5-lurker"
+   ],
+   "line": "{night-stakeout-officer} points at the bench where {s5-lurker} sits."
+  },
+  "lurker-caught-on-the-platform.1.3": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [
+    "s5-lurker"
+   ],
+   "line": "{night-stakeout-officer} arrests {s5-lurker} at the yellow line, and {s5-lurker.he} holds out both wrists."
+  },
+  "lurker-caught-on-the-platform.1.4": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [
+    "s5-lurker"
+   ],
+   "line": "{night-stakeout-officer} empties the coat pockets of {s5-lurker}: a pencil scrap and a leaf-stamped chip.",
+   "held": "paper:slip"
+  },
+  "lurker-caught-on-the-platform.1.5": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [
+    "s5-lurker"
+   ],
+   "line": "{night-stakeout-officer} walks {s5-lurker} to the stairs in cuffs."
+  },
+  "lurker-caught-on-the-platform.1.6": {
+   "who": [
+    "extra:attendant"
+   ],
+   "with": [],
+   "line": "{extra:attendant} stands in the booth with one hand on the shutter."
+  },
+  "gray-coat-behind-the-counter.1.1": {
+   "who": [
+    "s5-gray-coat-woman"
+   ],
+   "with": [],
+   "line": "{s5-gray-coat-woman} swipes a badge and enters by the staff door behind the counter, gray coat on."
+  },
+  "gray-coat-behind-the-counter.1.2": {
+   "who": [
+    "s5-gray-coat-woman"
+   ],
+   "with": [],
+   "line": "{s5-gray-coat-woman} reads the staff rota pinned to the wall."
+  },
+  "gray-coat-behind-the-counter.1.3": {
+   "who": [
+    "s5-gray-coat-woman"
+   ],
+   "with": [],
+   "line": "{s5-gray-coat-woman}, now in a pale green apron, pours tea for a patron.",
+   "held": "cup:tea"
+  },
+  "slip-filed.1.1": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [
+    "desk-sergeant"
+   ],
+   "line": "{night-stakeout-officer} hands {desk-sergeant} the pencil scrap in a sealed evidence bag.",
+   "held": "paper:slip"
+  },
+  "slip-filed.1.2": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} enters it in the intake log: \"Pencil scrap, platform bench. Match to attendant shift sheet.\""
+  },
+  "slip-filed.1.3": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [
+    "night-stakeout-officer"
+   ],
+   "line": "{desk-sergeant} points at tonight's rota on the screen."
+  },
+  "slip-filed.1.4": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [
+    "desk-sergeant"
+   ],
+   "line": "{night-stakeout-officer} argues with {desk-sergeant} about overtime: \"Three nights at that pillar.\""
+  },
+  "slip-filed.1.5": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [],
+   "line": "{night-stakeout-officer} walks out of the station at the end of shift."
+  }
+ }
+}

@@ -1,0 +1,723 @@
+{
+ "id": "s4-sky-mall-pickpocket",
+ "type": "subplot",
+ "rows": [
+  {
+   "title": "Stub on the floor",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    6,
+    6
+   ],
+   "who": [
+    "s4-owner",
+    "rookie-officer"
+   ],
+   "where": "sky-mall",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s4-c01"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 16,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "owner on a bench 16:00 counting paper stubs from a brown envelope",
+       "id": "stub-on-the-floor.1.1"
+      },
+      {
+       "do": "bump",
+       "raw": "owner knocks her bag",
+       "id": "stub-on-the-floor.1.2"
+      },
+      {
+       "do": "pick-up",
+       "raw": "D lifts a fallen stub",
+       "id": "stub-on-the-floor.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "D returns the stub",
+       "id": "stub-on-the-floor.1.4"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D reads the stub, a printed row of numbers and a handwritten 3",
+       "id": "stub-on-the-floor.1.5"
+      }
+     ],
+     "id": "stub-on-the-floor.1"
+    }
+   ],
+   "id": "stub-on-the-floor"
+  },
+  {
+   "title": "Envelope lifted",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    7,
+    7
+   ],
+   "who": [
+    "s4-owner",
+    "s4-thief",
+    "rookie-officer"
+   ],
+   "where": "sky-mall",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s4-c02"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 16,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "owner on the bench with the envelope 16:00",
+       "id": "envelope-lifted.1.1"
+      },
+      {
+       "do": "leave",
+       "raw": "owner toward the tea kiosk 16:05",
+       "id": "envelope-lifted.1.2"
+      },
+      {
+       "do": "walk",
+       "raw": "gray hood passes the bench 16:06",
+       "id": "envelope-lifted.1.3"
+      },
+      {
+       "do": "pick-up",
+       "raw": "gray hood lifts the envelope",
+       "id": "envelope-lifted.1.4"
+      },
+      {
+       "do": "walk",
+       "raw": "gray hood leaves toward the lift",
+       "id": "envelope-lifted.1.5"
+      },
+      {
+       "do": "enter",
+       "raw": "owner back 16:09",
+       "id": "envelope-lifted.1.6"
+      },
+      {
+       "do": "point",
+       "raw": "owner at the empty bench",
+       "id": "envelope-lifted.1.7"
+      },
+      {
+       "do": "hand-over",
+       "raw": "owner gives D a spare stub from her pocket",
+       "id": "envelope-lifted.1.8"
+      }
+     ],
+     "id": "envelope-lifted.1"
+    }
+   ],
+   "id": "envelope-lifted"
+  },
+  {
+   "title": "Two envelopes",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    7,
+    7
+   ],
+   "who": [
+    "s4-teen",
+    "s4-colleague",
+    "rookie-officer"
+   ],
+   "where": "sky-mall",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "herring",
+     "id": "s4-c08"
+    },
+    {
+     "k": "herring",
+     "id": "s4-c09"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 16.116666666666667,
+     "steps": [
+      {
+       "do": "run",
+       "raw": "teen from the bench 16:07",
+       "id": "two-envelopes.1.1"
+      },
+      {
+       "do": "run",
+       "raw": "D follows",
+       "id": "two-envelopes.1.2"
+      },
+      {
+       "do": "bump",
+       "raw": "D knocks a shopper's bag",
+       "id": "two-envelopes.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "colleague passes carrying a brown envelope",
+       "id": "two-envelopes.1.4"
+      }
+     ],
+     "id": "two-envelopes.1"
+    }
+   ],
+   "id": "two-envelopes"
+  },
+  {
+   "title": "Screen still",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    8,
+    8
+   ],
+   "who": [
+    "rookie-officer",
+    "s4-owner"
+   ],
+   "where": "sky-mall",
+   "channel": [
+    "document",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s4-c03"
+    },
+    {
+     "k": "plant",
+     "id": "s4-c06"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 16.1,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "D reads the mall screen still, gray hood at 16:06",
+       "id": "screen-still.1.1"
+      },
+      {
+       "do": "chat",
+       "raw": "owner tells D it was just paper stubs",
+       "id": "screen-still.1.2"
+      }
+     ],
+     "id": "screen-still.1"
+    }
+   ],
+   "id": "screen-still"
+  },
+  {
+   "title": "Hold back",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "veteran-officer",
+    "rookie-officer"
+   ],
+   "where": "sky-mall",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "D:reprimanded"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "argue",
+       "raw": "C with D at the lift hall about the chase",
+       "id": "hold-back.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "C at the notebook",
+       "id": "hold-back.1.2"
+      },
+      {
+       "do": "shrug",
+       "raw": "D",
+       "id": "hold-back.1.3"
+      },
+      {
+       "do": "sit",
+       "raw": "D on a seat",
+       "id": "hold-back.1.4"
+      }
+     ],
+     "id": "hold-back.1"
+    }
+   ],
+   "id": "hold-back"
+  },
+  {
+   "title": "Teen cleared",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "s4-teen",
+    "resident",
+    "rookie-officer"
+   ],
+   "where": "sky-mall",
+   "channel": [
+    "document",
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "s4-c08"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 16,
+     "steps": [
+      {
+       "do": "wait-outside",
+       "raw": "teen at the bench 16:00",
+       "id": "teen-cleared.1.1"
+      },
+      {
+       "do": "hug",
+       "raw": "teen and sibling",
+       "id": "teen-cleared.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D reads the sibling's mall pass, entered 16:07",
+       "id": "teen-cleared.1.3"
+      }
+     ],
+     "id": "teen-cleared.1"
+    }
+   ],
+   "id": "teen-cleared"
+  },
+  {
+   "title": "Badge on the stair",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "s4-thief",
+    "rookie-officer"
+   ],
+   "where": "sky-mall",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s4-c04"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 12.5,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "gray hood at the staff stair 12:30",
+       "id": "badge-on-the-stair.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "hood at the door with a lanyard",
+       "id": "badge-on-the-stair.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D reads number 22 on the lanyard",
+       "id": "badge-on-the-stair.1.3"
+      }
+     ],
+     "id": "badge-on-the-stair.1"
+    }
+   ],
+   "id": "badge-on-the-stair"
+  },
+  {
+   "title": "Same bench, 16:00",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    10,
+    10
+   ],
+   "who": [
+    "rookie-officer",
+    "s4-thief"
+   ],
+   "where": "sky-mall",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s4-c05"
+    },
+    {
+     "k": "plant",
+     "id": "s4-c07"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 15.75,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "D at the tea kiosk 15:45",
+       "id": "same-bench-16-00.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "gray hood on the bench 16:00",
+       "id": "same-bench-16-00.1.2"
+      },
+      {
+       "do": "search",
+       "raw": "D along the bin",
+       "id": "same-bench-16-00.1.3"
+      },
+      {
+       "do": "pick-up",
+       "raw": "D lifts a wad of stubs from the bin",
+       "id": "same-bench-16-00.1.4"
+      }
+     ],
+     "id": "same-bench-16-00.1"
+    }
+   ],
+   "id": "same-bench-16-00"
+  },
+  {
+   "title": "Colleague cleared",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    11,
+    11
+   ],
+   "who": [
+    "s4-colleague",
+    "s4-owner"
+   ],
+   "where": "sky-mall",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "s4-c09"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "hand-over",
+       "raw": "colleague gives owner a brown envelope",
+       "id": "colleague-cleared.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D reads the label, staff memo",
+       "id": "colleague-cleared.1.2"
+      }
+     ],
+     "id": "colleague-cleared.1"
+    }
+   ],
+   "id": "colleague-cleared"
+  },
+  {
+   "title": "Arrest on the bench",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    12,
+    12
+   ],
+   "who": [
+    "rookie-officer",
+    "s4-thief",
+    "s4-owner"
+   ],
+   "where": "sky-mall",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s4-c02"
+    },
+    {
+     "k": "pay",
+     "id": "s4-c03"
+    },
+    {
+     "k": "pay",
+     "id": "s4-c04"
+    },
+    {
+     "k": "pay",
+     "id": "s4-c05"
+    },
+    {
+     "k": "pay",
+     "id": "s4-c06"
+    },
+    {
+     "k": "pay",
+     "id": "s4-c07"
+    },
+    {
+     "k": "pay",
+     "id": "s4-c01"
+    }
+   ],
+   "sets": [
+    "case:s4-thief-arrested"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 16,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "D at the tea kiosk",
+       "id": "arrest-on-the-bench.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "gray hood on the bench 16:00",
+       "id": "arrest-on-the-bench.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "D, no run",
+       "id": "arrest-on-the-bench.1.3"
+      },
+      {
+       "do": "arrest",
+       "raw": "D at the bench",
+       "id": "arrest-on-the-bench.1.4"
+      },
+      {
+       "do": "escort",
+       "raw": "D takes the thief to the lift",
+       "id": "arrest-on-the-bench.1.5"
+      },
+      {
+       "do": "search",
+       "raw": "D pulls a stub with row 3 from the thief's pocket",
+       "id": "arrest-on-the-bench.1.6"
+      }
+     ],
+     "id": "arrest-on-the-bench.1"
+    }
+   ],
+   "id": "arrest-on-the-bench"
+  },
+  {
+   "title": "Statement",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    12,
+    12
+   ],
+   "who": [
+    "rookie-officer",
+    "s4-thief"
+   ],
+   "where": "police-station",
+   "channel": [
+    "conversation"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "thief at the table",
+       "id": "statement.1.1"
+      },
+      {
+       "do": "chat",
+       "raw": "thief tells D a man paid forty credits to lift whatever lay on the bench",
+       "id": "statement.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D logs the statement",
+       "id": "statement.1.3"
+      }
+     ],
+     "id": "statement.1"
+    }
+   ],
+   "id": "statement"
+  },
+  {
+   "title": "Envelope back",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    14
+   ],
+   "who": [
+    "rookie-officer",
+    "s4-owner"
+   ],
+   "where": "lawn",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "hand-over",
+       "raw": "D returns the stubs to the owner on the lawn",
+       "id": "envelope-back.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "owner signs the sheet",
+       "id": "envelope-back.1.2"
+      },
+      {
+       "do": "hug",
+       "raw": "D and a relative",
+       "id": "envelope-back.1.3"
+      },
+      {
+       "do": "sit",
+       "raw": "D reads his notebook",
+       "id": "envelope-back.1.4"
+      }
+     ],
+     "id": "envelope-back.1"
+    }
+   ],
+   "id": "envelope-back"
+  }
+ ]
+}

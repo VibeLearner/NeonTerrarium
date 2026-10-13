@@ -80,7 +80,12 @@
     paper: { mode: 'hand', v: [
       { words: /envelope|letter/i, pal: C(0xece6da, 0xb4ac9c, 0xffffff, 0xff5a6a, 0x8a8478), draw(g){ g.rect(GX, GY - 2, 3, 2, T); g.set(GX + 2, GY - 1, T2); g.set(GX + 1, GY - 2, L); } },   // an envelope, a red seal
       { words: /papers|folder|file|documents|paperwork|stack/i, pal: C(0x3a6aa8, 0x26487a, 0x5a8ad0, 0xe8e2d4, 0x182a48), draw(g){ g.rect(GX, GY - 3, 3, 3, T); g.rect(GX, GY - 3, 3, 1, L); g.set(GX + 2, GY - 1, T2); } },   // a blue folder, papers peeking out
+      { words: /notebook|notepad/i, pal: C(0x2a2e38, 0x1a1c24, 0x4a5060, 0xe8e2d4, 0x0c0e12), draw(g){ g.rect(GX, GY - 3, 2, 3, T); g.set(GX + 1, GY - 3, L); g.set(GX + 1, GY - 2, L); } },   // a black paper notebook, pages showing
+      { words: /slip|folded|sheet/i, pal: C(0xece6da, 0xb4ac9c, 0xffffff, 0x8a8478, 0x8a8478), draw(g){ g.rect(GX, GY - 1, 2, 1, T); g.set(GX + 1, GY - 2, T3); g.set(GX, GY - 2, T2); } },   // a folded slip of paper
       { words: /tablet|clipboard|slate/i, pal: C(0x22262e, 0x16181e, 0x3a404c, 0x5ae8ff, 0x0c0e12), draw(g){ g.rect(GX, GY - 3, 2, 3, T); g.set(GX, GY - 2, L); g.set(GX + 1, GY - 3, L); } } ] },   // a tablet, screen lit
+    bowls: { mode: 'chest', v: [
+      { words: /tower|stack|bowls|sack/i, pal: C(0xe8e2d4, 0xb4ac9c, 0xffffff, 0xd84a3a, 0x8a8478), draw(g){ for (let k = 0; k < 3; k++){ const y = GY - 1 - k*2; g.rect(GX - 1, y, 4, 1, T); g.set(GX + 2, y, T2); g.rect(GX - 1, y - 1, 4, 1, L); } } },   // a tower of white bowls, red lids
+      { words: /\bone\b|single|a bowl|lid/i, pal: C(0xe8e2d4, 0xb4ac9c, 0xffffff, 0xd84a3a, 0x8a8478), draw(g){ g.rect(GX - 1, GY - 1, 4, 1, T); g.set(GX + 2, GY - 1, T2); g.rect(GX - 1, GY - 2, 4, 1, L); g.set(GX, GY - 3, A); } } ] },   // one lidded bowl
     jar: { mode: 'hand', v: [
       { pal: C(0xd0e8e0, 0x9ab8b0, 0xf0fff8, 0xffb43a, 0x6a8078), draw(g){ g.rect(GX, GY - 2, 2, 2, L); g.set(GX, GY - 3, A); g.set(GX + 1, GY - 3, A); g.set(GX + 1, GY - 1, T2); } } ] },   // a jar of something golden
   };
@@ -117,6 +122,7 @@
     ['pot', /\b(potted|plant|pot|seedlings?|fern|bonsai|cutting|succulent)\b/i], ['thermos', /\b(thermos|flask|lunch tin)\b/i], ['bucket', /\b(bucket|pail)\b/i],
     ['appliance', /\b(heater|kettle|appliance|unit|fan|radio set)\b/i], ['frame', /\b(frame|framed|picture|painting)\b/i], ['tray', /\b(tray)\b/i], ['stool', /\b(stool)\b/i],
     ['duffel', /\b(duffel|gym bag|holdall|backpack|rucksack|suitcase)\b/i], ['jar', /\b(jar)\b/i],
+    ['bowls', /\b(lidded bowls?|bowl tower|stack of bowls)\b/i],
     ['food', /\b(takeout|to go|noodles|broth|dinner|lunch|soup|warm paper bag)\b/i], ['bag', /\b(bag|bags|groceries|sack|sacks|tote)\b/i], ['crate', /\b(crates?)\b/i],
     ['box', /\b(box|boxes|parcel|package|carton|delivery|cake)\b/i], ['bottle', /\b(bottle|wine)\b/i], ['cup', /\b(cup|cups|mug)\b/i],
     ['paper', /\b(envelope|letter|papers|document|folder|paperwork|tablet|clipboard|file)\b/i], ['lamp', /\b(lamp|lantern)\b/i], ['bundle', /\b(bundle|blanket|laundry|clothes)\b/i]];

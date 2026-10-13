@@ -1,0 +1,67 @@
+{
+  "slots": {
+    "s2-recipient": { "desc": "a resident from door 4C" },
+    "s2-hub-clerk": { "desc": "a hub counter clerk" },
+    "s2-neighbor": { "desc": "an older woman in a cardigan" },
+    "go-between-courier": { "desc": "a figure in a delivery jacket" }
+  },
+  "steps": {
+    "vanished.1.1": { "who": ["s2-recipient"], "with": [], "line": "{s2-recipient} stands at the hub counter holding a paper receipt for door 4C.", "held": "paper:slip" },
+    "vanished.1.2": { "who": ["s2-recipient"], "with": ["family-caller-officer"], "line": "{s2-recipient} points {family-caller-officer} to the hub screen above the counter.", "held": "paper:slip" },
+    "vanished.1.3": { "who": ["family-caller-officer"], "with": ["s2-recipient"], "line": "{family-caller-officer} reads the hub screen: \"P-7731. Out for delivery 02:58. Door 4D.\"" },
+    "vanished.1.4": { "who": ["s2-hub-clerk"], "with": ["s2-recipient"], "line": "{s2-hub-clerk} shrugs at {s2-recipient} across the counter and turns back to the till." },
+
+    "bot-log.1.1": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} scrolls back through the route records at the bot bay terminal." },
+    "bot-log.1.2": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} reads the route log on the terminal: \"Stop, door 4D, 03:07, 40 seconds.\"" },
+    "bot-log.1.3": { "who": ["s2-hub-clerk"], "with": [], "line": "{s2-hub-clerk} leaves the hub at closing with a taped box under one arm.", "held": "box" },
+    "bot-log.1.4": { "who": ["family-caller-officer"], "with": [], "line": "Comm, one side: \"Not now, Mama. I'm at work.\"" },
+
+    "jacket-at-4c.1.1": { "who": ["go-between-courier"], "with": [], "line": "{go-between-courier} waits outside tenement door 4C before dawn, hands empty." },
+    "jacket-at-4c.1.2": { "who": ["go-between-courier"], "with": [], "line": "{go-between-courier} knocks at door 4C and waits, but nobody answers." },
+    "jacket-at-4c.1.3": { "who": ["go-between-courier"], "with": [], "line": "{go-between-courier} walks off down the corridor with nothing in hand." },
+    "jacket-at-4c.1.4": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} walks a patrol along the floor above, comm in hand." },
+
+    "late-handoff.1.1": { "who": ["family-caller-officer"], "with": [], "line": "Comm, one side, from inside the lift: \"Put him on. Mama, put him on.\"" },
+    "late-handoff.1.2": { "who": ["family-caller-officer"], "with": ["night-stakeout-officer"], "line": "{family-caller-officer} steps away from the meeting point and takes the lift down." },
+    "late-handoff.1.3": { "who": ["family-caller-officer"], "with": ["night-stakeout-officer"], "line": "{family-caller-officer} comes back to the meeting point twelve minutes later." },
+    "late-handoff.1.4": { "who": ["night-stakeout-officer"], "with": ["family-caller-officer"], "line": "{night-stakeout-officer} stands at the meeting point and says nothing about the time." },
+
+    "mama-s-neighbor.1.1": { "who": ["family-caller-officer"], "with": [], "line": "Comm, one side: \"A box at 4D? She did not open it? Mama, slow down.\"" },
+    "mama-s-neighbor.1.2": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} stands still in the lift hall, comm pressed to {family-caller-officer.his} ear." },
+    "mama-s-neighbor.1.3": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} holds up the hub screen photo of door 4D and taps it.", "held": "paper:tablet" },
+
+    "heavy-box.1.1": { "who": ["s2-recipient"], "with": [], "line": "{s2-recipient} comes out of door 4C before dawn hugging a heavy closed crate.", "held": "crate" },
+    "heavy-box.1.2": { "who": ["s2-recipient"], "with": [], "line": "{s2-recipient} shuffles the crate down the corridor toward the lift.", "held": "crate" },
+    "heavy-box.1.3": { "who": ["s2-recipient"], "with": [], "line": "{s2-recipient} backs into the lift with the crate, and the doors close.", "held": "crate" },
+
+    "strip-on-the-rail.1.1": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} walks the bot bay rail slowly, crouching at each bracket." },
+    "strip-on-the-rail.1.2": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} picks a peeled label strip off the rail, printed \"4417.\"", "held": "paper:slip" },
+    "strip-on-the-rail.1.3": { "who": ["family-caller-officer"], "with": [], "line": "A weigh slip on the rail reads \"3.4 kg\" for a parcel listed as \"kettle, 1.1 kg.\"", "held": "paper:slip" },
+
+    "jacket-at-4d.1.1": { "who": ["go-between-courier"], "with": [], "line": "{go-between-courier} waits outside tenement door 4D before dawn, hands empty." },
+    "jacket-at-4d.1.2": { "who": ["go-between-courier"], "with": [], "line": "{go-between-courier} knocks at door 4D and waits, but nobody answers." },
+    "jacket-at-4d.1.3": { "who": ["go-between-courier"], "with": [], "line": "{go-between-courier} leaves the corridor empty-handed and takes the lift down." },
+
+    "gift-receipt.1.1": { "who": ["s2-hub-clerk"], "with": ["family-caller-officer"], "line": "{s2-hub-clerk} pulls a shop receipt from a coat pocket and hands it to {family-caller-officer}.", "held": "paper:slip" },
+    "gift-receipt.1.2": { "who": ["family-caller-officer"], "with": ["s2-hub-clerk"], "line": "The receipt reads \"Kettle, gift wrapped, 21:40,\" from the night {s2-hub-clerk} left with the taped box.", "held": "paper:slip" },
+
+    "tool-crate.1.1": { "who": ["s2-recipient"], "with": ["family-caller-officer"], "line": "{s2-recipient} opens the crate for {family-caller-officer}: wrenches, a drill, coils of cable.", "held": "crate" },
+    "tool-crate.1.2": { "who": ["s2-recipient"], "with": ["family-caller-officer"], "line": "{s2-recipient} points at a work ticket clipped inside the crate lid." },
+    "tool-crate.1.3": { "who": ["family-caller-officer"], "with": ["s2-recipient"], "line": "{family-caller-officer} reads the work ticket aloud: \"Shift start 05:15.\"" },
+
+    "box-at-4d.1.1": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} knocks at door 4D and waits while slow steps come to the door." },
+    "box-at-4d.1.2": { "who": ["s2-neighbor"], "with": ["family-caller-officer"], "line": "{s2-neighbor} hands {family-caller-officer} a sealed box from the shelf by {s2-neighbor.his} door.", "held": "box" },
+    "box-at-4d.1.3": { "who": ["family-caller-officer"], "with": ["s2-neighbor"], "line": "{family-caller-officer} lifts the lid, then pries up a false bottom inside the box.", "held": "box" },
+    "box-at-4d.1.4": { "who": ["family-caller-officer"], "with": [], "line": "A label under the false bottom reads \"T-4417,\" the same digits as the peeled strip.", "held": "box" },
+
+    "label-logged.1.1": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} carries the box up to the evidence desk at the station.", "held": "box" },
+    "label-logged.1.2": { "who": ["family-caller-officer"], "with": ["desk-sergeant"], "line": "{family-caller-officer} hands the label to {desk-sergeant} across the evidence desk.", "held": "paper:slip" },
+    "label-logged.1.3": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} sits down at the desk and fills in the evidence form." },
+
+    "door-4d-at-03-00.1.1": { "who": ["family-caller-officer", "night-stakeout-officer"], "with": [], "line": "{family-caller-officer} and {night-stakeout-officer} wait at the end of the fourth floor corridor before dawn.", "stay": true },
+    "door-4d-at-03-00.1.2": { "who": ["go-between-courier"], "with": [], "line": "{go-between-courier} stops outside door 4D and looks along the corridor." },
+    "door-4d-at-03-00.1.3": { "who": ["go-between-courier"], "with": [], "line": "{go-between-courier} knocks at door 4D and waits, but nobody answers." },
+    "door-4d-at-03-00.1.4": { "who": ["go-between-courier"], "with": [], "line": "{go-between-courier} walks away from 4D empty-handed, toward the lift." },
+    "door-4d-at-03-00.1.5": { "who": ["family-caller-officer"], "with": [], "line": "Comm, one side, in a whisper: \"Ten minutes, Mama. Ten minutes and I'm home.\"" }
+  }
+}

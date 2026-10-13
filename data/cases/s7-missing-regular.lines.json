@@ -1,0 +1,469 @@
+{
+ "slots": {
+  "informant": {
+   "desc": "a quiet lunch regular"
+  },
+  "s7-neighbor": {
+   "desc": "a neighbor in yellow slippers"
+  },
+  "s7-shift-lead": {
+   "desc": "a worker in a staff vest with a clipboard"
+  },
+  "s7-night-visitor": {
+   "desc": "a visitor in a long coat"
+  },
+  "s7-sister": {
+   "desc": "a woman in a blue headscarf"
+  },
+  "extra:partner": {
+   "desc": "the resident of 6C"
+  }
+ },
+ "steps": {
+  "last-lunch-on-bench-3.1.1": {
+   "who": [
+    "informant"
+   ],
+   "with": [],
+   "line": "{informant} sits alone on bench 3 at the food counter with a bowl of noodles.",
+   "held": "food"
+  },
+  "last-lunch-on-bench-3.1.2": {
+   "who": [
+    "informant"
+   ],
+   "with": [],
+   "line": "{informant} takes three bites, then sets the chopsticks down across the bowl.",
+   "held": "food"
+  },
+  "last-lunch-on-bench-3.1.3": {
+   "who": [
+    "informant"
+   ],
+   "with": [],
+   "line": "{informant} slides a folded paper under the bench slat with two fingers."
+  },
+  "last-lunch-on-bench-3.1.4": {
+   "who": [
+    "informant"
+   ],
+   "with": [],
+   "line": "{informant} gets up and leaves, the meal half eaten on the tray."
+  },
+  "last-lunch-on-bench-3.1.5": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} sits on the next bench with the same meal and eats slowly.",
+   "held": "food"
+  },
+  "empty-bench.1.1": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} sits on bench 3 with {veteran-officer.his} meal, and nobody takes the seat beside {veteran-officer.him}.",
+   "held": "food"
+  },
+  "empty-bench.1.2": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} counts the bench slats twice, lips moving."
+  },
+  "empty-bench.1.3": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} lifts a folded paper from under the slat.",
+   "held": "paper:slip"
+  },
+  "empty-bench.1.4": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} unfolds the paper, which reads in pencil: \"bench 3, ten past.\"",
+   "held": "paper:slip"
+  },
+  "empty-bench.1.5": {
+   "who": [
+    "s7-shift-lead"
+   ],
+   "with": [
+    "veteran-officer"
+   ],
+   "line": "{s7-shift-lead} stops at the bench and tells {veteran-officer} one of the crew did not clock in today.",
+   "held": "paper"
+  },
+  "neighbor-at-the-door.1.1": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} knocks at door 6B and waits on the landing."
+  },
+  "neighbor-at-the-door.1.2": {
+   "who": [
+    "s7-neighbor"
+   ],
+   "with": [
+    "veteran-officer"
+   ],
+   "line": "{s7-neighbor} opens the next door and steps out to {veteran-officer}, arms folded."
+  },
+  "neighbor-at-the-door.1.3": {
+   "who": [
+    "s7-neighbor"
+   ],
+   "with": [
+    "veteran-officer"
+   ],
+   "line": "{s7-neighbor} tells {veteran-officer} a bag went down to the lift just before midnight last night."
+  },
+  "neighbor-at-the-door.1.4": {
+   "who": [
+    "s7-neighbor"
+   ],
+   "with": [
+    "veteran-officer"
+   ],
+   "line": "{s7-neighbor} shrugs when {veteran-officer} asks who carried it."
+  },
+  "neighbor-at-the-door.1.5": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [
+    "s7-neighbor"
+   ],
+   "line": "{veteran-officer} tells {s7-neighbor}: \"I will ask again, same hour tomorrow.\""
+  },
+  "flat-6b.1.1": {
+   "who": [
+    "s7-neighbor"
+   ],
+   "with": [
+    "veteran-officer"
+   ],
+   "line": "{s7-neighbor} reaches a key down from the ledge above door 6B and lets {veteran-officer} in."
+  },
+  "flat-6b.1.2": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} searches along the shelf, lifting each jar and setting it back."
+  },
+  "flat-6b.1.3": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [
+    "s7-neighbor"
+   ],
+   "line": "{veteran-officer} points at a made bed and a single cup on the drying rack."
+  },
+  "flat-6b.1.4": {
+   "who": [
+    "s7-shift-lead"
+   ],
+   "with": [],
+   "line": "{s7-shift-lead} knocks at 6B with a folded vest bag over one arm and waits.",
+   "held": "bag"
+  },
+  "flat-6b.1.5": {
+   "who": [
+    "s7-shift-lead"
+   ],
+   "with": [],
+   "line": "{s7-shift-lead} leans the bag against the door of 6B and leaves."
+  },
+  "landing-at-03-05.1.1": {
+   "who": [
+    "s7-night-visitor"
+   ],
+   "with": [],
+   "line": "{s7-night-visitor} walks along the dark landing before dawn, flowers wrapped in paper.",
+   "held": "flowers"
+  },
+  "landing-at-03-05.1.2": {
+   "who": [
+    "s7-night-visitor"
+   ],
+   "with": [],
+   "line": "{s7-night-visitor} knocks at door 6C and waits.",
+   "held": "flowers"
+  },
+  "landing-at-03-05.1.3": {
+   "who": [
+    "s7-night-visitor"
+   ],
+   "with": [],
+   "line": "{s7-night-visitor} stands at 6C for four minutes, the flowers held low.",
+   "held": "flowers"
+  },
+  "landing-at-03-05.1.4": {
+   "who": [
+    "s7-night-visitor"
+   ],
+   "with": [],
+   "line": "{s7-night-visitor} turns and leaves along the landing, still holding the flowers.",
+   "held": "flowers"
+  },
+  "lunch-boxes-to-the-lawn.1.1": {
+   "who": [
+    "s7-neighbor"
+   ],
+   "with": [],
+   "line": "{s7-neighbor} carries two lunch boxes across the edge of the lawn.",
+   "held": "food"
+  },
+  "lunch-boxes-to-the-lawn.1.2": {
+   "who": [
+    "s7-neighbor"
+   ],
+   "with": [],
+   "line": "{s7-neighbor} walks to a picnic cloth on the far side of the lawn.",
+   "held": "food"
+  },
+  "lunch-boxes-to-the-lawn.1.3": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} stands on the path on the far side of the lawn."
+  },
+  "lunch-boxes-to-the-lawn.1.4": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} stays at the end of the path for ten minutes, hands behind {veteran-officer.his} back.",
+   "stay": true
+  },
+  "lunch-boxes-to-the-lawn.1.5": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [
+    "s7-neighbor"
+   ],
+   "line": "{veteran-officer} asks {s7-neighbor} the same question as yesterday: \"Who carried the bag?\""
+  },
+  "door-6c-opens.1.1": {
+   "who": [
+    "s7-night-visitor"
+   ],
+   "with": [],
+   "line": "{s7-night-visitor} knocks at door 6C before dawn, flowers in one hand and bread under one arm.",
+   "held": "flowers"
+  },
+  "door-6c-opens.1.2": {
+   "who": [
+    "extra:partner"
+   ],
+   "with": [
+    "s7-night-visitor"
+   ],
+   "line": "The door of 6C opens and {extra:partner} hugs {s7-night-visitor} on the threshold."
+  },
+  "door-6c-opens.1.3": {
+   "who": [
+    "s7-shift-lead"
+   ],
+   "with": [
+    "s7-neighbor"
+   ],
+   "line": "{s7-shift-lead} hands the folded vest bag to {s7-neighbor} at the door of 6A.",
+   "held": "bag"
+  },
+  "door-6c-opens.1.4": {
+   "who": [
+    "s7-neighbor"
+   ],
+   "with": [],
+   "line": "{s7-neighbor} shrugs and takes the vest bag inside 6A.",
+   "held": "bag"
+  },
+  "third-cup-on-the-cloth.1.1": {
+   "who": [
+    "s7-sister"
+   ],
+   "with": [],
+   "line": "{s7-sister} spreads a picnic on the lawn: a wicker basket and three tin cups."
+  },
+  "third-cup-on-the-cloth.1.2": {
+   "who": [
+    "s7-sister"
+   ],
+   "with": [],
+   "line": "{s7-sister} fills two of the three tin cups and leaves the third empty."
+  },
+  "third-cup-on-the-cloth.1.3": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} stands on the far path, facing the lawn."
+  },
+  "third-cup-on-the-cloth.1.4": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} walks past the picnic cloth and does not stop."
+  },
+  "second-note-under-slat-3.1.1": {
+   "who": [
+    "s7-neighbor"
+   ],
+   "with": [],
+   "line": "{s7-neighbor} sits on bench 3 at the food counter just before noon."
+  },
+  "second-note-under-slat-3.1.2": {
+   "who": [
+    "s7-neighbor"
+   ],
+   "with": [],
+   "line": "{s7-neighbor} slides a folded paper under the slat of bench 3."
+  },
+  "second-note-under-slat-3.1.3": {
+   "who": [
+    "s7-neighbor"
+   ],
+   "with": [],
+   "line": "{s7-neighbor} gets up and leaves the counter without ordering."
+  },
+  "second-note-under-slat-3.1.4": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} reaches under the slat of bench 3 and lifts out the folded paper.",
+   "held": "paper:slip"
+  },
+  "second-note-under-slat-3.1.5": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} unfolds the paper, which reads: \"bench 3, ten past, eat alone.\"",
+   "held": "paper:slip"
+  },
+  "sister-s-call.1.1": {
+   "who": [
+    "s7-sister"
+   ],
+   "with": [],
+   "line": "{s7-sister} stands at the picnic cloth with the basket at {s7-sister.his} feet."
+  },
+  "sister-s-call.1.2": {
+   "who": [
+    "s7-sister"
+   ],
+   "with": [],
+   "line": "{s7-sister} on the comm, one side: \"He eats when the shift is over. Tell the old one, only him.\""
+  },
+  "sister-s-call.1.3": {
+   "who": [
+    "s7-sister"
+   ],
+   "with": [],
+   "line": "{s7-sister} carries the basket off the lawn toward the lift.",
+   "held": "food"
+  },
+  "found-on-the-lawn.1.1": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [],
+   "line": "{veteran-officer} walks onto the lawn toward the picnic cloth."
+  },
+  "found-on-the-lawn.1.2": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [
+    "s7-sister"
+   ],
+   "line": "{veteran-officer} sits down on the cloth beside {s7-sister}."
+  },
+  "found-on-the-lawn.1.3": {
+   "who": [
+    "informant"
+   ],
+   "with": [
+    "veteran-officer"
+   ],
+   "line": "{informant} waves once from the edge of the cloth."
+  },
+  "found-on-the-lawn.1.4": {
+   "who": [
+    "informant"
+   ],
+   "with": [],
+   "line": "{informant} sits down on the side of the cloth with the third cup."
+  },
+  "found-on-the-lawn.1.5": {
+   "who": [
+    "veteran-officer",
+    "informant"
+   ],
+   "with": [],
+   "line": "{veteran-officer} and {informant} eat the same meal for ten minutes without a word.",
+   "held": "food",
+   "stay": true
+  },
+  "found-on-the-lawn.1.6": {
+   "who": [
+    "s7-sister"
+   ],
+   "with": [
+    "informant"
+   ],
+   "line": "{s7-sister} leans over the basket and hugs {informant} for a long moment."
+  },
+  "statement-at-the-desk.1.1": {
+   "who": [
+    "informant"
+   ],
+   "with": [
+    "veteran-officer"
+   ],
+   "line": "{informant} sits at the desk of {veteran-officer} in the station, hands flat on the desk."
+  },
+  "statement-at-the-desk.1.2": {
+   "who": [
+    "informant"
+   ],
+   "with": [
+    "veteran-officer"
+   ],
+   "line": "{informant} talks to {veteran-officer} for forty minutes, low and steady, while {veteran-officer} writes.",
+   "stay": true
+  },
+  "statement-at-the-desk.1.3": {
+   "who": [
+    "informant"
+   ],
+   "with": [
+    "veteran-officer"
+   ],
+   "line": "{informant} hands {veteran-officer} a bag of folded slips.",
+   "held": "bag"
+  },
+  "statement-at-the-desk.1.4": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [
+    "informant"
+   ],
+   "line": "{veteran-officer} walks {informant} to the station exit."
+  }
+ }
+}

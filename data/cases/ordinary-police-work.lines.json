@@ -1,0 +1,101 @@
+{
+  "slots": {
+    "ow-umbrella-seller": { "desc": "an umbrella seller in a yellow raincoat" },
+    "ow-glove-thief": { "desc": "a man in green gloves" },
+    "ow-hood-waiter": { "desc": "a person in a rain-dark hood" },
+    "extra:passerby": { "desc": "a passerby" },
+    "extra:victim": { "desc": "a commuter with a shoulder bag" },
+    "extra:cap": { "desc": "a man in a gray cap" },
+    "extra:counter-hand": { "desc": "a counter hand" },
+    "extra:friend": { "desc": "a friend" },
+    "extra:tag-finder": { "desc": "a resident with a paper tag" }
+  },
+  "steps": {
+    "briefing-at-the-screens.1.1": { "who": ["desk-sergeant"], "with": [], "line": "{desk-sergeant} stands at the front screens before the morning briefing." },
+    "briefing-at-the-screens.1.2": { "who": ["framed-officer"], "with": [], "line": "{framed-officer} reads the patrol rota on the screen, then reads it again." },
+    "briefing-at-the-screens.1.3": { "who": ["desk-sergeant"], "with": [], "line": "{desk-sergeant} points at one line of the rota: \"Corner 7, 22:00, once a week.\"" },
+    "briefing-at-the-screens.1.4": { "who": ["inside-officer", "framed-officer"], "with": [], "line": "{inside-officer} and {framed-officer} walk out of the station together for the day shift." },
+
+    "corner-scan-at-the-pond.1.1": { "who": ["veteran-officer", "rookie-officer"], "with": [], "line": "{veteran-officer} and {rookie-officer} walk the north path around the koi pond." },
+    "corner-scan-at-the-pond.1.2": { "who": ["rookie-officer"], "with": [], "line": "{rookie-officer} scans corner 3 with the handheld, arm held out straight." },
+    "corner-scan-at-the-pond.1.3": { "who": ["veteran-officer"], "with": [], "line": "{veteran-officer} stands at the pond rail, lips moving without a sound." },
+    "corner-scan-at-the-pond.1.4": { "who": ["veteran-officer"], "with": ["rookie-officer"], "line": "{veteran-officer} turns to {rookie-officer} and says one word: \"Again.\"" },
+
+    "night-round-on-the-highway.1.1": { "who": ["family-caller-officer", "night-stakeout-officer"], "with": [], "line": "{family-caller-officer} and {night-stakeout-officer} walk the night round along the sky highway." },
+    "night-round-on-the-highway.1.2": { "who": ["family-caller-officer"], "with": [], "line": "Comm, one side, {family-caller-officer}, a few steps behind: \"Not now, Mama.\"" },
+    "night-round-on-the-highway.1.3": { "who": ["night-stakeout-officer"], "with": [], "line": "{night-stakeout-officer} stands at the east rail, looking down over the city." },
+    "night-round-on-the-highway.1.4": { "who": ["night-stakeout-officer"], "with": [], "line": "{night-stakeout-officer} scans one door along the highway and none of the others." },
+
+    "scan-skipped-at-corner-3.1.1": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} walks past corner 3 without raising the scanner." },
+    "scan-skipped-at-corner-3.1.2": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} sits on a square seat and stays there for twenty-five minutes.", "stay": true },
+    "scan-skipped-at-corner-3.1.3": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} looks at the scan slate: the corner 3 line is empty.", "held": "paper:tablet" },
+    "scan-skipped-at-corner-3.1.4": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} shrugs at the scan slate and tucks it away." },
+
+    "umbrellas-at-the-plaza.1.1": { "who": ["ow-umbrella-seller"], "with": [], "line": "{ow-umbrella-seller} stands under the plaza awning beside a rack of folded umbrellas." },
+    "umbrellas-at-the-plaza.1.2": { "who": ["ow-umbrella-seller"], "with": ["rookie-officer"], "line": "{ow-umbrella-seller} hands {rookie-officer} an umbrella with a numbered paper tag on the handle." },
+    "umbrellas-at-the-plaza.1.3": { "who": ["rookie-officer"], "with": ["extra:passerby"], "line": "{rookie-officer} shares the umbrella with {extra:passerby} along the path to the koi pond." },
+    "umbrellas-at-the-plaza.1.4": { "who": ["rookie-officer"], "with": [], "line": "{rookie-officer} bumps into a queue, and {rookie-officer.his} notebook drops onto the wet stones." },
+
+    "bag-grab-at-the-lift.1.1": { "who": ["ow-glove-thief"], "with": ["extra:victim"], "line": "{ow-glove-thief} bumps hard into {extra:victim} by the lift doors." },
+    "bag-grab-at-the-lift.1.2": { "who": ["ow-glove-thief"], "with": ["extra:victim"], "line": "{ow-glove-thief} snatches up {extra:victim}'s bag from the floor.", "held": "bag" },
+    "bag-grab-at-the-lift.1.3": { "who": ["ow-glove-thief"], "with": [], "line": "{ow-glove-thief} runs through the lobby, and one green glove drops behind {ow-glove-thief.him}.", "held": "bag" },
+    "bag-grab-at-the-lift.1.4": { "who": ["rookie-officer"], "with": ["ow-glove-thief"], "line": "{rookie-officer} runs through the lobby after {ow-glove-thief}." },
+    "bag-grab-at-the-lift.1.5": { "who": ["veteran-officer"], "with": [], "line": "{veteran-officer} picks up the green glove, red stitches running across the fingers." },
+
+    "fruit-and-a-limp.1.1": { "who": ["extra:cap"], "with": [], "line": "{extra:cap} stands at a fruit stall counter, looking over the trays." },
+    "fruit-and-a-limp.1.2": { "who": ["extra:cap"], "with": [], "line": "{extra:cap} lifts a bag of fruit from the counter, and no coins go down.", "held": "bag" },
+    "fruit-and-a-limp.1.3": { "who": ["extra:cap"], "with": [], "line": "{extra:cap} walks toward the stairs with the bag, left foot dragging.", "held": "bag" },
+
+    "hood-at-the-shutter.1.1": { "who": ["ow-hood-waiter"], "with": [], "line": "{ow-hood-waiter} stands at a shopfront shutter, hood up, for forty minutes.", "stay": true },
+    "hood-at-the-shutter.1.2": { "who": ["night-stakeout-officer"], "with": ["ow-hood-waiter"], "line": "{night-stakeout-officer} stands across the lane, watching {ow-hood-waiter} at the shutter.", "stay": true },
+    "hood-at-the-shutter.1.3": { "who": ["ow-hood-waiter"], "with": [], "line": "{ow-hood-waiter} leaves the shutter after midnight, hands in pockets." },
+    "hood-at-the-shutter.1.4": { "who": ["night-stakeout-officer"], "with": [], "line": "{night-stakeout-officer} walks home the long way, by the last block." },
+
+    "two-cups-at-the-counter.1.1": { "who": ["framed-officer"], "with": [], "line": "{framed-officer} sits at the food counter with a paper notebook open.", "held": "paper:notebook" },
+    "two-cups-at-the-counter.1.2": { "who": ["inside-officer"], "with": ["framed-officer"], "line": "{inside-officer} eats a bowl at the counter beside {framed-officer}.", "held": "bowls:one" },
+    "two-cups-at-the-counter.1.3": { "who": ["extra:counter-hand"], "with": ["framed-officer", "inside-officer"], "line": "{extra:counter-hand} slides two cups across the counter to {framed-officer} and {inside-officer}.", "held": "cup" },
+    "two-cups-at-the-counter.1.4": { "who": ["framed-officer"], "with": ["extra:counter-hand"], "line": "{framed-officer} pays {extra:counter-hand} for both cups." },
+    "two-cups-at-the-counter.1.5": { "who": ["framed-officer"], "with": [], "line": "The receipt reads \"13:07,\" and {framed-officer} tucks it into the notebook.", "held": "paper:notebook" },
+
+    "the-regular-seat.1.1": { "who": ["veteran-officer"], "with": [], "line": "{veteran-officer} sits in {veteran-officer.his} usual seat at the food counter." },
+    "the-regular-seat.1.2": { "who": ["veteran-officer"], "with": [], "line": "{veteran-officer} eats the same meal from the same bowl as last time.", "held": "food" },
+    "the-regular-seat.1.3": { "who": ["rookie-officer"], "with": [], "line": "{rookie-officer} reads the notices pinned to the board by the door." },
+    "the-regular-seat.1.4": { "who": ["ow-hood-waiter"], "with": [], "line": "{ow-hood-waiter} comes in out of the rain and pushes the hood down." },
+    "the-regular-seat.1.5": { "who": ["ow-hood-waiter"], "with": ["extra:friend"], "line": "{ow-hood-waiter} and {extra:friend} hug beside the counter." },
+    "the-regular-seat.1.6": { "who": ["extra:friend"], "with": ["ow-hood-waiter"], "line": "{extra:friend} says to {ow-hood-waiter}: \"You stood forty minutes in the rain?\"" },
+
+    "takeaway-run.1.1": { "who": ["family-caller-officer"], "with": ["night-stakeout-officer"], "line": "{family-caller-officer} leaves the stakeout post, and {night-stakeout-officer} stays on it alone." },
+    "takeaway-run.1.2": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} steps up to the night food counter." },
+    "takeaway-run.1.3": { "who": ["extra:counter-hand"], "with": ["family-caller-officer"], "line": "{extra:counter-hand} hands {family-caller-officer} a paper bag of takeaway.", "held": "bag" },
+    "takeaway-run.1.4": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} reads the receipt, stamped \"02:14,\" and pockets it.", "held": "bag" },
+    "takeaway-run.1.5": { "who": ["family-caller-officer"], "with": [], "line": "{family-caller-officer} walks back along the lane with the paper bag.", "held": "bag" },
+
+    "umbrellas-on-the-highway.1.1": { "who": ["inside-officer", "framed-officer"], "with": [], "line": "{inside-officer} and {framed-officer} share one umbrella along the sky highway." },
+    "umbrellas-on-the-highway.1.2": { "who": ["framed-officer"], "with": [], "line": "{framed-officer} reads a paper tag on an umbrella hooked over the rail: \"4471.\"" },
+    "umbrellas-on-the-highway.1.3": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} sits on the rail bench in the rain, a taped paper bag on {burnout-officer.his} knee.", "held": "bag", "stay": true },
+    "umbrellas-on-the-highway.1.4": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} leaves the bench with the bag tucked under {burnout-officer.his} coat.", "held": "bag" },
+
+    "glove-again.1.1": { "who": ["ow-glove-thief"], "with": [], "line": "{ow-glove-thief} walks into the lift hall wearing two green gloves with red stitching." },
+    "glove-again.1.2": { "who": ["ow-glove-thief"], "with": ["extra:victim"], "line": "{ow-glove-thief} bumps into {extra:victim} near the lift doors." },
+    "glove-again.1.3": { "who": ["ow-glove-thief"], "with": ["extra:victim"], "line": "{ow-glove-thief} lifts {extra:victim}'s bag and does not run.", "held": "bag" },
+    "glove-again.1.4": { "who": ["rookie-officer"], "with": ["ow-glove-thief"], "line": "{rookie-officer} arrests {ow-glove-thief} in the lift hall." },
+    "glove-again.1.5": { "who": ["veteran-officer", "rookie-officer"], "with": ["ow-glove-thief"], "line": "{veteran-officer} and {rookie-officer} walk {ow-glove-thief} to the exit." },
+
+    "corner-3-scanned.1.1": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} stops at corner 3 and scans it with the handheld." },
+    "corner-3-scanned.1.2": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} stands at corner 3 for three minutes, looking up and down the lanes." },
+    "corner-3-scanned.1.3": { "who": ["desk-sergeant"], "with": [], "line": "{desk-sergeant} reads the scan slate: the corner 3 line is filled in.", "held": "paper:tablet" },
+    "corner-3-scanned.1.4": { "who": ["desk-sergeant"], "with": [], "line": "{desk-sergeant} points at the corner 3 line on the slate.", "held": "paper:tablet" },
+
+    "fruit-stall-again.1.1": { "who": ["extra:cap"], "with": [], "line": "{extra:cap}, limping, lifts a bag of fruit from a stall counter.", "held": "bag" },
+    "fruit-stall-again.1.2": { "who": ["rookie-officer"], "with": ["extra:cap"], "line": "{rookie-officer} runs after {extra:cap} toward the stairs." },
+    "fruit-stall-again.1.3": { "who": ["rookie-officer"], "with": ["extra:cap"], "line": "{rookie-officer} arrests {extra:cap} at the foot of the stairs." },
+    "fruit-stall-again.1.4": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} sits on the bench by the fruit stall with a taped paper bag.", "held": "bag" },
+    "fruit-stall-again.1.5": { "who": ["burnout-officer"], "with": [], "line": "{burnout-officer} opens the taped paper bag and eats the sandwich inside.", "held": "food" },
+
+    "quiet-week-at-the-screens.1.1": { "who": ["desk-sergeant"], "with": [], "line": "{desk-sergeant} posts a new patrol rota to the station screens." },
+    "quiet-week-at-the-screens.1.2": { "who": ["desk-sergeant"], "with": [], "line": "{desk-sergeant} points at the new rota line: \"Corner 7, twice a week.\"" },
+    "quiet-week-at-the-screens.1.3": { "who": ["framed-officer"], "with": ["desk-sergeant"], "line": "{framed-officer} hands {desk-sergeant} the counter receipt stamped \"13:07.\"", "held": "paper:slip" },
+    "quiet-week-at-the-screens.1.4": { "who": ["family-caller-officer"], "with": ["desk-sergeant"], "line": "{family-caller-officer} hands {desk-sergeant} the takeaway receipt stamped \"02:14.\"", "held": "paper:slip" },
+    "quiet-week-at-the-screens.1.5": { "who": ["extra:tag-finder"], "with": ["desk-sergeant"], "line": "{extra:tag-finder} hands {desk-sergeant} a paper umbrella tag numbered \"4471.\"", "held": "paper:slip" }
+  }
+}

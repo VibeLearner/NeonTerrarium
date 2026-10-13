@@ -1,0 +1,734 @@
+{
+ "id": "s6-screen-graffiti",
+ "type": "subplot",
+ "rows": [
+  {
+   "title": "Three dots on the corner",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    8,
+    8
+   ],
+   "who": [
+    "desk-sergeant"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s6-c02"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7.833333333333333,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "G at the screens 07:50",
+       "id": "three-dots-on-the-corner.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "G on six posters",
+       "id": "three-dots-on-the-corner.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "G at three orange dots on the corner of poster 4",
+       "id": "three-dots-on-the-corner.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "G to the supply cabinet",
+       "id": "three-dots-on-the-corner.1.4"
+      },
+      {
+       "do": "carry",
+       "raw": "G a cloth to the screens",
+       "id": "three-dots-on-the-corner.1.5"
+      }
+     ],
+     "id": "three-dots-on-the-corner.1"
+    }
+   ],
+   "id": "three-dots-on-the-corner"
+  },
+  {
+   "title": "Wiper at dawn",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "s6-screen-wiper"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "herring",
+     "id": "s6-c08"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6.5,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "man in gray overalls 06:30",
+       "id": "wiper-at-dawn.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "man at the lower edge of the screens",
+       "id": "wiper-at-dawn.1.2"
+      },
+      {
+       "do": "carry",
+       "raw": "long cloth along posters 5 and 6",
+       "id": "wiper-at-dawn.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "man 06:42",
+       "id": "wiper-at-dawn.1.4"
+      }
+     ],
+     "id": "wiper-at-dawn.1"
+    }
+   ],
+   "id": "wiper-at-dawn"
+  },
+  {
+   "title": "Cuffs at the screens",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "s6-painter"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s6-c01"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 5.666666666666667,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "teen in a dark jacket 05:40, orange smudges on both cuffs",
+       "id": "cuffs-at-the-screens.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "teen at poster 4",
+       "id": "cuffs-at-the-screens.1.2"
+      },
+      {
+       "do": "leave",
+       "raw": "teen 05:46, flat bag with a blue bot sticker under one arm",
+       "id": "cuffs-at-the-screens.1.3"
+      }
+     ],
+     "id": "cuffs-at-the-screens.1"
+    }
+   ],
+   "id": "cuffs-at-the-screens"
+  },
+  {
+   "title": "Poster 4 smeared",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "desk-sergeant",
+    "bystander"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s6-c03"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7.916666666666667,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "G at poster 4 07:55, orange spread across the face",
+       "id": "poster-4-smeared.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "G at the five clean posters",
+       "id": "poster-4-smeared.1.2"
+      },
+      {
+       "do": "argue",
+       "raw": "G and a bystander about who locked the hall overnight",
+       "id": "poster-4-smeared.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "G to the desk",
+       "id": "poster-4-smeared.1.4"
+      }
+     ],
+     "id": "poster-4-smeared.1"
+    }
+   ],
+   "id": "poster-4-smeared"
+  },
+  {
+   "title": "Poster 4 covered",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    10,
+    10
+   ],
+   "who": [
+    "desk-sergeant",
+    "bystander"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s6-c02"
+    }
+   ],
+   "sets": [
+    "G:overruled"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "G at poster 4, orange edge to edge, caption hidden",
+       "id": "poster-4-covered.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "G at the screen",
+       "id": "poster-4-covered.1.2"
+      },
+      {
+       "do": "post-feed",
+       "raw": "G posts 'screen 4 offline'",
+       "id": "poster-4-covered.1.3"
+      },
+      {
+       "do": "stand",
+       "raw": "bystander at the glass, hand on the frame",
+       "id": "poster-4-covered.1.4"
+      }
+     ],
+     "id": "poster-4-covered.1"
+    }
+   ],
+   "id": "poster-4-covered"
+  },
+  {
+   "title": "Prints and a dripping drone",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    11,
+    11
+   ],
+   "who": [
+    "desk-sergeant",
+    "drone"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s6-c04"
+    },
+    {
+     "k": "herring",
+     "id": "s6-c09"
+    },
+    {
+     "k": "pay",
+     "id": "s6-c03"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6.166666666666667,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "G at the floor below poster 4 06:10",
+       "id": "prints-and-a-dripping-drone.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "G at small orange sneaker prints, four steps from the door",
+       "id": "prints-and-a-dripping-drone.1.2"
+      },
+      {
+       "do": "search",
+       "raw": "drone passes an arm over the top of poster 2",
+       "id": "prints-and-a-dripping-drone.1.3"
+      },
+      {
+       "do": "carry",
+       "raw": "drone leaves a trail of orange drops down the glass",
+       "id": "prints-and-a-dripping-drone.1.4"
+      }
+     ],
+     "id": "prints-and-a-dripping-drone.1"
+    }
+   ],
+   "id": "prints-and-a-dripping-drone"
+  },
+  {
+   "title": "Comm call at the lift",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    11,
+    11
+   ],
+   "who": [
+    "s6-painter"
+   ],
+   "where": "lift",
+   "channel": [
+    "phone"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s6-c06"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 18.333333333333332,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "teen in a dark jacket at the lift hall 18:20",
+       "id": "comm-call-at-the-lift.1.1"
+      },
+      {
+       "do": "phone-call",
+       "raw": "teen, one side, 'He is not like the poster. He is not like that.'",
+       "id": "comm-call-at-the-lift.1.2"
+      },
+      {
+       "do": "enter",
+       "raw": "lift",
+       "id": "comm-call-at-the-lift.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "lift lobby",
+       "id": "comm-call-at-the-lift.1.4"
+      }
+     ],
+     "id": "comm-call-at-the-lift.1"
+    }
+   ],
+   "id": "comm-call-at-the-lift"
+  },
+  {
+   "title": "Can in the bin and a work card",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    12,
+    12
+   ],
+   "who": [
+    "desk-sergeant",
+    "s6-screen-wiper"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s6-c05"
+    },
+    {
+     "k": "debunk",
+     "id": "s6-c08"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6.5,
+     "steps": [
+      {
+       "do": "pick-up",
+       "raw": "G lifts a flat spray can from the bin by the screens",
+       "id": "can-in-the-bin-and-a-work-card.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "G at a blue bot sticker on the can",
+       "id": "can-in-the-bin-and-a-work-card.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "wiper at the glass 06:30",
+       "id": "can-in-the-bin-and-a-work-card.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "wiper gives G a work card",
+       "id": "can-in-the-bin-and-a-work-card.1.4"
+      },
+      {
+       "do": "read-notice",
+       "raw": "G on the card, contract cleaner",
+       "id": "can-in-the-bin-and-a-work-card.1.5"
+      }
+     ],
+     "id": "can-in-the-bin-and-a-work-card.1"
+    }
+   ],
+   "id": "can-in-the-bin-and-a-work-card"
+  },
+  {
+   "title": "Lanyard at the screens",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    13
+   ],
+   "who": [
+    "desk-sergeant",
+    "s6-painter",
+    "drone"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s6-c07"
+    },
+    {
+     "k": "debunk",
+     "id": "s6-c09"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7.333333333333333,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "teen 07:20 in a dark jacket",
+       "id": "lanyard-at-the-screens.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "teen at poster 4",
+       "id": "lanyard-at-the-screens.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "teen turns the lanyard, surname printed, same as the caption surname on poster 4",
+       "id": "lanyard-at-the-screens.1.3"
+      },
+      {
+       "do": "stand",
+       "raw": "drone docks on the ceiling rail, orange sealant label on its tank",
+       "id": "lanyard-at-the-screens.1.4"
+      },
+      {
+       "do": "leave",
+       "raw": "teen",
+       "id": "lanyard-at-the-screens.1.5"
+      }
+     ],
+     "id": "lanyard-at-the-screens.1"
+    }
+   ],
+   "id": "lanyard-at-the-screens"
+  },
+  {
+   "title": "Poster 4 restored",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "desk-sergeant",
+    "s6-painter",
+    "bystander"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s6-c04"
+    },
+    {
+     "k": "pay",
+     "id": "s6-c05"
+    },
+    {
+     "k": "pay",
+     "id": "s6-c06"
+    },
+    {
+     "k": "pay",
+     "id": "s6-c01"
+    }
+   ],
+   "sets": [
+    "case:s6-restored"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "carry",
+       "raw": "G a fresh print of poster 4",
+       "id": "poster-4-restored.1.1"
+      },
+      {
+       "do": "post-feed",
+       "raw": "G posts the reprint",
+       "id": "poster-4-restored.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "teen at the glass with the lanyard turned out",
+       "id": "poster-4-restored.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "G and teen, two minutes",
+       "id": "poster-4-restored.1.4"
+      },
+      {
+       "do": "hand-over",
+       "raw": "teen gives G the flat bag",
+       "id": "poster-4-restored.1.5"
+      }
+     ],
+     "id": "poster-4-restored.1"
+    }
+   ],
+   "id": "poster-4-restored"
+  },
+  {
+   "title": "Night watch at the screens",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    16
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "desk-sergeant"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s6-c07"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 2,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H in the hall corner 02:00",
+       "id": "night-watch-at-the-screens.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "H at the screens",
+       "id": "night-watch-at-the-screens.1.2"
+      },
+      {
+       "do": "argue",
+       "raw": "G and H about overtime",
+       "id": "night-watch-at-the-screens.1.3"
+      },
+      {
+       "do": "read-notice",
+       "raw": "G at all six posters, clean",
+       "id": "night-watch-at-the-screens.1.4"
+      }
+     ],
+     "id": "night-watch-at-the-screens.1"
+    }
+   ],
+   "id": "night-watch-at-the-screens"
+  },
+  {
+   "title": "Hours at the screens",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    17,
+    17
+   ],
+   "who": [
+    "desk-sergeant",
+    "s6-painter"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document"
+   ],
+   "clues": [],
+   "sets": [
+    "case:s6-closed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "hand-over",
+       "raw": "teen gives G a signed sheet",
+       "id": "hours-at-the-screens.1.1"
+      },
+      {
+       "do": "carry",
+       "raw": "teen a broom and a bucket",
+       "id": "hours-at-the-screens.1.2"
+      },
+      {
+       "do": "walk",
+       "raw": "teen along the glass",
+       "id": "hours-at-the-screens.1.3"
+      },
+      {
+       "do": "police-scan",
+       "raw": "G at the hall door",
+       "id": "hours-at-the-screens.1.4"
+      }
+     ],
+     "id": "hours-at-the-screens.1"
+    }
+   ],
+   "id": "hours-at-the-screens"
+  }
+ ]
+}

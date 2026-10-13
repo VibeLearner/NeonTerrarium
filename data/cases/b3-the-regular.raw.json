@@ -1,0 +1,2116 @@
+{
+ "id": "b3-the-regular",
+ "type": "main",
+ "rows": [
+  {
+   "title": "Free tea, rolled towel",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    1,
+    2
+   ],
+   "who": [
+    "boss-careless",
+    "go-between-clerk",
+    "inside-officer",
+    "informant",
+    "patrons"
+   ],
+   "where": "bath-house",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b3-c01"
+    },
+    {
+     "k": "plant",
+     "id": "b3-c05"
+    },
+    {
+     "k": "plant",
+     "id": "b3-c13"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 1,
+     "hour": 7.666666666666667,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "regular on the tea counter stool 07:40 d01",
+       "id": "free-tea-rolled-towel.1.1"
+      },
+      {
+       "do": "serve",
+       "raw": "clerk pours tea and slides the cup over",
+       "id": "free-tea-rolled-towel.1.2"
+      },
+      {
+       "do": "leave",
+       "raw": "regular walks out with the cup, no payment taken",
+       "id": "free-tea-rolled-towel.1.3"
+      },
+      {
+       "do": "wave",
+       "raw": "clerk waves off a patron who points at the queue",
+       "id": "free-tea-rolled-towel.1.4"
+      }
+     ],
+     "id": "free-tea-rolled-towel.1"
+    },
+    {
+     "day": 2,
+     "hour": 14.333333333333334,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "A in a civilian jacket at the pools 14:20 d02",
+       "id": "free-tea-rolled-towel.2.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "regular passes A a rolled towel at the pool edge",
+       "id": "free-tea-rolled-towel.2.2"
+      },
+      {
+       "do": "leave",
+       "raw": "A carries the roll out past the front desk",
+       "id": "free-tea-rolled-towel.2.3"
+      },
+      {
+       "do": "stand",
+       "raw": "attendant at the front desk with eyes on the floor as the regular walks by",
+       "id": "free-tea-rolled-towel.2.4"
+      }
+     ],
+     "id": "free-tea-rolled-towel.2"
+    }
+   ],
+   "id": "free-tea-rolled-towel"
+  },
+  {
+   "title": "Tab, slips, skipped door, exact change",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    3,
+    5
+   ],
+   "who": [
+    "go-between-clerk",
+    "boss-careless",
+    "inside-officer",
+    "framed-officer",
+    "red-herring-bath-regular",
+    "patrons"
+   ],
+   "where": "bath-house",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b3-c03"
+    },
+    {
+     "k": "plant",
+     "id": "b3-c02"
+    },
+    {
+     "k": "plant",
+     "id": "b3-c07"
+    },
+    {
+     "k": "plant",
+     "id": "b3-c04"
+    },
+    {
+     "k": "herring",
+     "id": "b3-c15"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 3,
+     "hour": 8.083333333333334,
+     "steps": [
+      {
+       "do": "chat",
+       "raw": "clerk and regular on the weather 08:05 d03",
+       "id": "tab-slips-skipped-door-exact-cha.1.1"
+      },
+      {
+       "do": "serve",
+       "raw": "clerk marks a paper tab and tucks it under the till",
+       "id": "tab-slips-skipped-door-exact-cha.1.2"
+      }
+     ],
+     "id": "tab-slips-skipped-door-exact-cha.1"
+    },
+    {
+     "day": 4,
+     "hour": 10.25,
+     "steps": [
+      {
+       "do": "serve",
+       "raw": "clerk taps a stack of paper credit slips against the regular's cup d04",
+       "id": "tab-slips-skipped-door-exact-cha.2.1"
+      },
+      {
+       "do": "police-patrol",
+       "raw": "A and B pass the bath house door 10:15 d04",
+       "id": "tab-slips-skipped-door-exact-cha.2.2"
+      },
+      {
+       "do": "police-scan",
+       "raw": "B scans the door and writes the time in a paper notebook",
+       "id": "tab-slips-skipped-door-exact-cha.2.3"
+      },
+      {
+       "do": "walk",
+       "raw": "A keeps walking and waves B along without scanning",
+       "id": "tab-slips-skipped-door-exact-cha.2.4"
+      }
+     ],
+     "id": "tab-slips-skipped-door-exact-cha.2"
+    },
+    {
+     "day": 5,
+     "hour": null,
+     "steps": [
+      {
+       "do": "hand-over",
+       "raw": "clerk gives the regular coins counted to the exact amount d05",
+       "id": "tab-slips-skipped-door-exact-cha.3.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "bath regular passes the clerk folded notes in odd amounts",
+       "id": "tab-slips-skipped-door-exact-cha.3.2"
+      },
+      {
+       "do": "argue",
+       "raw": "bath regular and clerk over a tab",
+       "id": "tab-slips-skipped-door-exact-cha.3.3"
+      }
+     ],
+     "id": "tab-slips-skipped-door-exact-cha.3"
+    }
+   ],
+   "id": "tab-slips-skipped-door-exact-cha"
+  },
+  {
+   "title": "Roll past the bench, clerk gone",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    6,
+    7
+   ],
+   "who": [
+    "veteran-officer",
+    "informant",
+    "inside-officer",
+    "go-between-clerk",
+    "bystander"
+   ],
+   "where": "bath-house",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b3-c06"
+    },
+    {
+     "k": "plant",
+     "id": "b3-c14"
+    }
+   ],
+   "sets": [
+    "g2:missing"
+   ],
+   "moments": [
+    {
+     "day": 6,
+     "hour": 13,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "C on the bench by the front desk 13:00 d06",
+       "id": "roll-past-the-bench-clerk-gone.1.1"
+      },
+      {
+       "do": "chat",
+       "raw": "C to a patron, \"Fifteen days left on my badge.\"",
+       "id": "roll-past-the-bench-clerk-gone.1.2"
+      },
+      {
+       "do": "sit",
+       "raw": "attendant on the same bench with a rice box, no words",
+       "id": "roll-past-the-bench-clerk-gone.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "A passes the bench with a rolled towel under his arm",
+       "id": "roll-past-the-bench-clerk-gone.1.4"
+      },
+      {
+       "do": "stand",
+       "raw": "attendant gets up and goes back to the desk",
+       "id": "roll-past-the-bench-clerk-gone.1.5"
+      }
+     ],
+     "id": "roll-past-the-bench-clerk-gone.1"
+    },
+    {
+     "day": 7,
+     "hour": 7.5,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "clerk at the tea counter 07:30 d07",
+       "id": "roll-past-the-bench-clerk-gone.2.1"
+      },
+      {
+       "do": "leave",
+       "raw": "clerk out the service door 07:42 with a coat over her arm",
+       "id": "roll-past-the-bench-clerk-gone.2.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "patrons read a handwritten sign \"back soon\"",
+       "id": "roll-past-the-bench-clerk-gone.2.3"
+      }
+     ],
+     "id": "roll-past-the-bench-clerk-gone.2"
+    }
+   ],
+   "id": "roll-past-the-bench-clerk-gone"
+  },
+  {
+   "title": "Lift to nine",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    6,
+    6
+   ],
+   "who": [
+    "boss-careless",
+    "family-caller-officer",
+    "bot"
+   ],
+   "where": "cloud-pagoda",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b3-c09"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 22.166666666666668,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "regular in the lobby 22:10 with a folded towel on his arm",
+       "id": "lift-to-nine.1.1"
+      },
+      {
+       "do": "walk",
+       "raw": "regular passes the front desk without stopping",
+       "id": "lift-to-nine.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "regular at the lift panel, floor nine",
+       "id": "lift-to-nine.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "lift doors close",
+       "id": "lift-to-nine.1.4"
+      },
+      {
+       "do": "phone-call",
+       "raw": "E in the lobby, \"Not now, Mama. I said ten.\"",
+       "id": "lift-to-nine.1.5"
+      },
+      {
+       "do": "stand",
+       "raw": "E with back to the lift",
+       "id": "lift-to-nine.1.6"
+      }
+     ],
+     "id": "lift-to-nine.1"
+    }
+   ],
+   "id": "lift-to-nine"
+  },
+  {
+   "title": "Wrong door at 03:00",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    6,
+    6
+   ],
+   "who": [
+    "red-herring-night-courier",
+    "rookie-officer"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "herring",
+     "id": "b3-c17"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "night courier at door 4C 03:00 with a bag",
+       "id": "wrong-door-at-03-00.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "D on the stair landing writing in a notebook",
+       "id": "wrong-door-at-03-00.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "D at the bag",
+       "id": "wrong-door-at-03-00.1.3"
+      },
+      {
+       "do": "run",
+       "raw": "night courier down the stairs",
+       "id": "wrong-door-at-03-00.1.4"
+      }
+     ],
+     "id": "wrong-door-at-03-00.1"
+    }
+   ],
+   "id": "wrong-door-at-03-00"
+  },
+  {
+   "title": "Left turn, loose page",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    8,
+    9
+   ],
+   "who": [
+    "inside-officer",
+    "framed-officer",
+    "burnout-officer",
+    "bystander"
+   ],
+   "where": "bath-house",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b3-c08"
+    },
+    {
+     "k": "plant",
+     "id": "b3-c11"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 8,
+     "hour": 10.083333333333334,
+     "steps": [
+      {
+       "do": "police-patrol",
+       "raw": "A and B enter the lobby 10:05 d08",
+       "id": "left-turn-loose-page.1.1"
+      },
+      {
+       "do": "chat",
+       "raw": "B to A, \"We turned left here yesterday.\"",
+       "id": "left-turn-loose-page.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B at the pool rules board",
+       "id": "left-turn-loose-page.1.3"
+      },
+      {
+       "do": "pick-up",
+       "raw": "A lifts a folded page from the till drawer",
+       "id": "left-turn-loose-page.1.4"
+      },
+      {
+       "do": "carry",
+       "raw": "A tucks the page inside his jacket",
+       "id": "left-turn-loose-page.1.5"
+      }
+     ],
+     "id": "left-turn-loose-page.1"
+    },
+    {
+     "day": 9,
+     "hour": 15,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "F on a pool bench 15:00 d09 for forty minutes",
+       "id": "left-turn-loose-page.2.1"
+      },
+      {
+       "do": "eat",
+       "raw": "F with a rice box",
+       "id": "left-turn-loose-page.2.2"
+      },
+      {
+       "do": "shrug",
+       "raw": "F when asked about the door scan",
+       "id": "left-turn-loose-page.2.3"
+      }
+     ],
+     "id": "left-turn-loose-page.2"
+    }
+   ],
+   "id": "left-turn-loose-page"
+  },
+  {
+   "title": "Route slip names the tea counter",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s1-lift-lobby-muggings"
+   ],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "rookie-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s1-c01"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "D reads a paper route slip taken from the arrested mugger",
+       "id": "route-slip-names-the-tea-counter.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "H at a line \"tea counter, locker 14, Friday\"",
+       "id": "route-slip-names-the-tea-counter.1.2"
+      },
+      {
+       "do": "chat",
+       "raw": "D and H over the slip",
+       "id": "route-slip-names-the-tea-counter.1.3"
+      },
+      {
+       "do": "carry",
+       "raw": "H bags the slip",
+       "id": "route-slip-names-the-tea-counter.1.4"
+      }
+     ],
+     "id": "route-slip-names-the-tea-counter.1"
+    }
+   ],
+   "id": "route-slip-names-the-tea-counter"
+  },
+  {
+   "title": "Front desk empty",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s7-missing-regular"
+   ],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "veteran-officer",
+    "bystander"
+   ],
+   "where": "bath-house/front-desk",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "inf:missing"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "front desk unattended 06:00",
+       "id": "front-desk-empty.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "a shift sheet with the attendant's name struck through",
+       "id": "front-desk-empty.1.2"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "C at the front desk 16:00",
+       "id": "front-desk-empty.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "C and a patron",
+       "id": "front-desk-empty.1.4"
+      },
+      {
+       "do": "shrug",
+       "raw": "patron",
+       "id": "front-desk-empty.1.5"
+      }
+     ],
+     "id": "front-desk-empty.1"
+    }
+   ],
+   "id": "front-desk-empty"
+  },
+  {
+   "title": "Poster covered",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s6-screen-graffiti"
+   ],
+   "loop": null,
+   "days": [
+    10,
+    10
+   ],
+   "who": [
+    "desk-sergeant",
+    "rookie-officer"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7.833333333333333,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "G at the front screens 07:50",
+       "id": "poster-covered.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "wanted poster of the tea counter clerk with paint across the face",
+       "id": "poster-covered.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "G at the paint",
+       "id": "poster-covered.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "G and D",
+       "id": "poster-covered.1.4"
+      }
+     ],
+     "id": "poster-covered.1"
+    }
+   ],
+   "id": "poster-covered"
+  },
+  {
+   "title": "Courier at the suite door",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    10,
+    10
+   ],
+   "who": [
+    "go-between-courier"
+   ],
+   "where": "cloud-pagoda",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b3-c10"
+    },
+    {
+     "k": "plant",
+     "id": "b3-c12"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 23.25,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "courier at suite 9F 23:15 with a paper bag",
+       "id": "courier-at-the-suite-door.1.1"
+      },
+      {
+       "do": "phone-call",
+       "raw": "courier into a comm at the door, \"B? You sound rough tonight. Yes, the bag is here.\"",
+       "id": "courier-at-the-suite-door.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "bag passed through a hand-wide gap in the door",
+       "id": "courier-at-the-suite-door.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "courier by the lift",
+       "id": "courier-at-the-suite-door.1.4"
+      }
+     ],
+     "id": "courier-at-the-suite-door.1"
+    }
+   ],
+   "id": "courier-at-the-suite-door"
+  },
+  {
+   "title": "Lurker caught",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s5-platform-lurker"
+   ],
+   "loop": null,
+   "days": [
+    11,
+    11
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "red-herring-bath-regular",
+    "bystander"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s5-c01"
+    },
+    {
+     "k": "herring",
+     "id": "b3-c16"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 21.666666666666668,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "H at the far bench 21:40, a paper cup on the ledge",
+       "id": "lurker-caught.1.1"
+      },
+      {
+       "do": "arrest",
+       "raw": "H holds the lurker by the bench",
+       "id": "lurker-caught.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "photo log on H's handheld shows the lurker seated across from the tea counter d04 and d09",
+       "id": "lurker-caught.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "bath regular passes a stranger in a blue coat a thin bag at the platform end",
+       "id": "lurker-caught.1.4"
+      }
+     ],
+     "id": "lurker-caught.1"
+    }
+   ],
+   "id": "lurker-caught"
+  },
+  {
+   "title": "Partner opens the door",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    11,
+    11
+   ],
+   "who": [
+    "red-herring-night-courier",
+    "resident"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "b3-c17"
+    }
+   ],
+   "sets": [
+    "rh1:cleared"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3.0833333333333335,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "night courier at door 4C 03:05 with flowers and bread",
+       "id": "partner-opens-the-door.1.1"
+      },
+      {
+       "do": "hug",
+       "raw": "partner opens the door and hugs",
+       "id": "partner-opens-the-door.1.2"
+      },
+      {
+       "do": "wave",
+       "raw": "partner to a landlord bot in the corridor",
+       "id": "partner-opens-the-door.1.3"
+      }
+     ],
+     "id": "partner-opens-the-door.1"
+    }
+   ],
+   "id": "partner-opens-the-door"
+  },
+  {
+   "title": "Locker 14",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    12,
+    12
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "rookie-officer",
+    "go-between-courier",
+    "red-herring-bath-regular",
+    "bystander"
+   ],
+   "where": "bath-house",
+   "channel": [
+    "document",
+    "feed"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b3-c01"
+    },
+    {
+     "k": "pay",
+     "id": "b3-c02"
+    },
+    {
+     "k": "pay",
+     "id": "b3-c03"
+    },
+    {
+     "k": "pay",
+     "id": "b3-c04"
+    },
+    {
+     "k": "debunk",
+     "id": "b3-c15"
+    }
+   ],
+   "sets": [
+    "g1:arrested",
+    "rh2:cleared"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the locker row 06:30",
+       "id": "locker-14.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "courier with a paper bag",
+       "id": "locker-14.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "courier puts the bag in locker 14",
+       "id": "locker-14.1.3"
+      },
+      {
+       "do": "search",
+       "raw": "H opens locker 14 with a master key",
+       "id": "locker-14.1.4"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D reads paper tabs and credit slips with cup counts beside the regular's name",
+       "id": "locker-14.1.5"
+      },
+      {
+       "do": "arrest",
+       "raw": "H and D arrest the courier",
+       "id": "locker-14.1.6"
+      },
+      {
+       "do": "post-feed",
+       "raw": "bath regular posts a photo with a cousin in a blue coat at the platform",
+       "id": "locker-14.1.7"
+      },
+      {
+       "do": "chat",
+       "raw": "bath regular and D over the cousin's loan",
+       "id": "locker-14.1.8"
+      }
+     ],
+     "id": "locker-14.1"
+    }
+   ],
+   "id": "locker-14"
+  },
+  {
+   "title": "Page marked B, bag gone",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    13
+   ],
+   "who": [
+    "desk-sergeant",
+    "framed-officer",
+    "inside-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document",
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "b3-c16"
+    }
+   ],
+   "sets": [
+    "B:framed",
+    "B:suspended"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7.25,
+     "steps": [
+      {
+       "do": "carry",
+       "raw": "A with an evidence box down the corridor 07:15",
+       "id": "page-marked-b-bag-gone.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "G reads a ledger page logged as evidence with the initials B in the margin",
+       "id": "page-marked-b-bag-gone.1.2"
+      },
+      {
+       "do": "search",
+       "raw": "G at the evidence shelf finds the tea counter bag tag over an empty bag",
+       "id": "page-marked-b-bag-gone.1.3"
+      },
+      {
+       "do": "post-feed",
+       "raw": "G posts B suspension on the station screens",
+       "id": "page-marked-b-bag-gone.1.4"
+      },
+      {
+       "do": "argue",
+       "raw": "B and G over the log entry",
+       "id": "page-marked-b-bag-gone.1.5"
+      }
+     ],
+     "id": "page-marked-b-bag-gone.1"
+    }
+   ],
+   "id": "page-marked-b-bag-gone"
+  },
+  {
+   "title": "Suite nine opened",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    13
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "rookie-officer"
+   ],
+   "where": "cloud-pagoda",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b3-c09"
+    },
+    {
+     "k": "pay",
+     "id": "b3-c10"
+    }
+   ],
+   "sets": [
+    "boss:safehouse-burned"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7.5,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "H and D at suite 9F 07:30",
+       "id": "suite-nine-opened.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "D opens the door with a hotel key",
+       "id": "suite-nine-opened.1.2"
+      },
+      {
+       "do": "search",
+       "raw": "D lifts a stack of towels from the bed",
+       "id": "suite-nine-opened.1.3"
+      },
+      {
+       "do": "read-notice",
+       "raw": "credit slips under the towels with the tea counter stamp",
+       "id": "suite-nine-opened.1.4"
+      },
+      {
+       "do": "carry",
+       "raw": "D bags the slips",
+       "id": "suite-nine-opened.1.5"
+      }
+     ],
+     "id": "suite-nine-opened.1"
+    }
+   ],
+   "id": "suite-nine-opened"
+  },
+  {
+   "title": "Notebook against the logs",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "framed-officer",
+    "veteran-officer",
+    "rookie-officer",
+    "desk-sergeant",
+    "inside-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document",
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b3-c05"
+    },
+    {
+     "k": "pay",
+     "id": "b3-c06"
+    },
+    {
+     "k": "pay",
+     "id": "b3-c07"
+    },
+    {
+     "k": "pay",
+     "id": "b3-c08"
+    },
+    {
+     "k": "pay",
+     "id": "b3-c11"
+    },
+    {
+     "k": "pay",
+     "id": "b3-c12"
+    }
+   ],
+   "sets": [
+    "B:cleared",
+    "A:reassigned"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 23.2,
+     "steps": [
+      {
+       "do": "hand-over",
+       "raw": "B passes C his paper notebook",
+       "id": "notebook-against-the-logs.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "C and D read nine dates marked beside skipped door scans",
+       "id": "notebook-against-the-logs.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D reads the comm log for the call to the courier, caller comm registered to A, 23:12 d10",
+       "id": "notebook-against-the-logs.1.3"
+      },
+      {
+       "do": "read-notice",
+       "raw": "C reads a food counter receipt for B at 23:09 d10",
+       "id": "notebook-against-the-logs.1.4"
+      },
+      {
+       "do": "chat",
+       "raw": "G signs a locker search sheet",
+       "id": "notebook-against-the-logs.1.5"
+      },
+      {
+       "do": "search",
+       "raw": "C and D open A's locker",
+       "id": "notebook-against-the-logs.1.6"
+      },
+      {
+       "do": "pick-up",
+       "raw": "D lifts credit slips from a rolled towel",
+       "id": "notebook-against-the-logs.1.7"
+      }
+     ],
+     "id": "notebook-against-the-logs.1"
+    }
+   ],
+   "id": "notebook-against-the-logs"
+  },
+  {
+   "title": "Poster restored",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s6-screen-graffiti"
+   ],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "desk-sergeant",
+    "bystander"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s6-c01"
+    }
+   ],
+   "sets": [
+    "G:corrected-post"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "post-feed",
+       "raw": "G posts a correction under B's notice",
+       "id": "poster-restored.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "G at the front screens",
+       "id": "poster-restored.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "poster of the tea counter clerk clean again, text \"wanted for questioning\"",
+       "id": "poster-restored.1.3"
+      },
+      {
+       "do": "point",
+       "raw": "bystander at the poster",
+       "id": "poster-restored.1.4"
+      }
+     ],
+     "id": "poster-restored.1"
+    }
+   ],
+   "id": "poster-restored"
+  },
+  {
+   "title": "Stay out of the pools",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    15
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "inside-officer",
+    "patrons"
+   ],
+   "where": "bath-house",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:tipped-off"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the pools door 06:30",
+       "id": "stay-out-of-the-pools.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "clerk at the tea counter, stool empty",
+       "id": "stay-out-of-the-pools.1.2"
+      },
+      {
+       "do": "enter",
+       "raw": "A in a civilian jacket 06:50",
+       "id": "stay-out-of-the-pools.1.3"
+      },
+      {
+       "do": "phone-call",
+       "raw": "A at the front desk, \"Not today. Stay out of the pools.\"",
+       "id": "stay-out-of-the-pools.1.4"
+      },
+      {
+       "do": "leave",
+       "raw": "A by the side door",
+       "id": "stay-out-of-the-pools.1.5"
+      }
+     ],
+     "id": "stay-out-of-the-pools.1"
+    }
+   ],
+   "id": "stay-out-of-the-pools"
+  },
+  {
+   "title": "Found in the lift hall",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s7-missing-regular"
+   ],
+   "loop": null,
+   "days": [
+    17,
+    17
+   ],
+   "who": [
+    "veteran-officer",
+    "informant"
+   ],
+   "where": "lift",
+   "channel": [
+    "conversation",
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s7-c01"
+    },
+    {
+     "k": "pay",
+     "id": "b3-c13"
+    },
+    {
+     "k": "pay",
+     "id": "b3-c14"
+    }
+   ],
+   "sets": [
+    "inf:talking",
+    "inf:safe"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 14,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "C in the lift hall 14:00",
+       "id": "found-in-the-lift-hall.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "attendant out of the lift with a rolled bag",
+       "id": "found-in-the-lift-hall.1.2"
+      },
+      {
+       "do": "escort",
+       "raw": "C walks the attendant to the food-counter bench",
+       "id": "found-in-the-lift-hall.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "attendant to C, \"Towels to nine on Fridays. He comes back for the tea at 07:40.\"",
+       "id": "found-in-the-lift-hall.1.4"
+      },
+      {
+       "do": "sit",
+       "raw": "both on the bench, eating",
+       "id": "found-in-the-lift-hall.1.5"
+      }
+     ],
+     "id": "found-in-the-lift-hall.1"
+    }
+   ],
+   "id": "found-in-the-lift-hall"
+  },
+  {
+   "title": "Last cup",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    18,
+    18
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "veteran-officer",
+    "framed-officer",
+    "inside-officer",
+    "boss-careless",
+    "rookie-officer"
+   ],
+   "where": "bath-house",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:arrested",
+    "A:arrested",
+    "case:closed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the pools door 07:00, a paper cup on the same ledge",
+       "id": "last-cup.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "regular on the tea counter stool 07:40",
+       "id": "last-cup.1.2"
+      },
+      {
+       "do": "serve",
+       "raw": "bystander clerk pours tea",
+       "id": "last-cup.1.3"
+      },
+      {
+       "do": "stand",
+       "raw": "B at the front desk",
+       "id": "last-cup.1.4"
+      },
+      {
+       "do": "enter",
+       "raw": "A in a civilian jacket",
+       "id": "last-cup.1.5"
+      },
+      {
+       "do": "arrest",
+       "raw": "C and D at the stool",
+       "id": "last-cup.1.6"
+      },
+      {
+       "do": "arrest",
+       "raw": "B arrests A at the front desk",
+       "id": "last-cup.1.7"
+      },
+      {
+       "do": "escort",
+       "raw": "both led out through the lobby",
+       "id": "last-cup.1.8"
+      }
+     ],
+     "id": "last-cup.1"
+    }
+   ],
+   "id": "last-cup"
+  },
+  {
+   "title": "Station 2 log matches",
+   "variant": "careless",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    12,
+    12
+   ],
+   "who": [
+    "desk-sergeant",
+    "rookie-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document"
+   ],
+   "clues": [],
+   "sets": [
+    "station2:cooperating"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "D reads a call log from station 2 listing the same comm hour as the call to the courier",
+       "id": "care-station-2-log-matches.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "G at two matching lines",
+       "id": "care-station-2-log-matches.1.2"
+      },
+      {
+       "do": "chat",
+       "raw": "G and D",
+       "id": "care-station-2-log-matches.1.3"
+      }
+     ],
+     "id": "care-station-2-log-matches.1"
+    }
+   ],
+   "id": "care-station-2-log-matches"
+  },
+  {
+   "title": "Swap refused",
+   "variant": "careless",
+   "rel": "replaces",
+   "relTo": [
+    "stay-out-of-the-pools"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "inside-officer",
+    "desk-sergeant"
+   ],
+   "where": "police-station",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6.5,
+     "steps": [
+      {
+       "do": "argue",
+       "raw": "A asks G to swap the 06:30 shift",
+       "id": "care-swap-refused.1.1"
+      },
+      {
+       "do": "shrug",
+       "raw": "G",
+       "id": "care-swap-refused.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "A at the roster, name unchanged",
+       "id": "care-swap-refused.1.3"
+      }
+     ],
+     "id": "care-swap-refused.1"
+    }
+   ],
+   "id": "care-swap-refused"
+  },
+  {
+   "title": "Arrest at the pools",
+   "variant": "careless",
+   "rel": "replaces",
+   "relTo": [
+    "last-cup"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "veteran-officer",
+    "rookie-officer",
+    "framed-officer",
+    "boss-careless",
+    "inside-officer"
+   ],
+   "where": "bath-house",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:arrested",
+    "A:arrested"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the pools door 07:00",
+       "id": "care-arrest-at-the-pools.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "regular on the tea counter stool 07:40",
+       "id": "care-arrest-at-the-pools.1.2"
+      },
+      {
+       "do": "arrest",
+       "raw": "C and D at the stool",
+       "id": "care-arrest-at-the-pools.1.3"
+      },
+      {
+       "do": "arrest",
+       "raw": "B arrests A at the front desk",
+       "id": "care-arrest-at-the-pools.1.4"
+      },
+      {
+       "do": "escort",
+       "raw": "both led out",
+       "id": "care-arrest-at-the-pools.1.5"
+      }
+     ],
+     "id": "care-arrest-at-the-pools.1"
+    }
+   ],
+   "id": "care-arrest-at-the-pools"
+  },
+  {
+   "title": "Statement and closing",
+   "variant": "careless",
+   "rel": "replaces",
+   "relTo": [
+    "last-cup"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    15
+   ],
+   "who": [
+    "boss-careless",
+    "desk-sergeant",
+    "framed-officer",
+    "veteran-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [],
+   "sets": [
+    "case:closed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "regular at the interview table",
+       "id": "care-statement-and-closing.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "B returns the paper notebook to C",
+       "id": "care-statement-and-closing.1.2"
+      },
+      {
+       "do": "post-feed",
+       "raw": "G posts a closed notice on the station screens",
+       "id": "care-statement-and-closing.1.3"
+      }
+     ],
+     "id": "care-statement-and-closing.1"
+    }
+   ],
+   "id": "care-statement-and-closing"
+  },
+  {
+   "title": "Pool cart tea",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    5,
+    6
+   ],
+   "who": [
+    "go-between-bartender",
+    "boss-careful",
+    "patrons"
+   ],
+   "where": "bath-house/pools",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 18,
+     "steps": [
+      {
+       "do": "serve",
+       "raw": "g3 pours tea at the pool cart for the regular first",
+       "id": "care-pool-cart-tea.1.1"
+      },
+      {
+       "do": "queue-order",
+       "raw": "patrons wait while the line stacks",
+       "id": "care-pool-cart-tea.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "g3 passes the regular a green token that is not for tea",
+       "id": "care-pool-cart-tea.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "g3 through the service door at 18:00",
+       "id": "care-pool-cart-tea.1.4"
+      }
+     ],
+     "id": "care-pool-cart-tea.1"
+    }
+   ],
+   "id": "care-pool-cart-tea"
+  },
+  {
+   "title": "Bump at the lift",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "go-between-bartender",
+    "go-between-courier"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 18.083333333333332,
+     "steps": [
+      {
+       "do": "bump",
+       "raw": "g3 and the courier at the lift doors 18:05",
+       "id": "care-bump-at-the-lift.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "courier passes g3 a folded towel",
+       "id": "care-bump-at-the-lift.1.2"
+      },
+      {
+       "do": "walk",
+       "raw": "each takes a different lift",
+       "id": "care-bump-at-the-lift.1.3"
+      }
+     ],
+     "id": "care-bump-at-the-lift.1"
+    }
+   ],
+   "id": "care-bump-at-the-lift"
+  },
+  {
+   "title": "Flat on the third",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    13
+   ],
+   "who": [
+    "boss-careful"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 19,
+     "steps": [
+      {
+       "do": "carry",
+       "raw": "regular with a towel roll 19:00",
+       "id": "care-flat-on-the-third.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "flat 3B",
+       "id": "care-flat-on-the-third.1.2"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "lamp in the window stays off",
+       "id": "care-flat-on-the-third.1.3"
+      }
+     ],
+     "id": "care-flat-on-the-third.1"
+    }
+   ],
+   "id": "care-flat-on-the-third"
+  },
+  {
+   "title": "Station 2 asks",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    15
+   ],
+   "who": [
+    "inside-officer-extra",
+    "desk-sergeant"
+   ],
+   "where": "police-station",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "extra insider apart at briefing",
+       "id": "care-station-2-asks.1.1"
+      },
+      {
+       "do": "chat",
+       "raw": "extra insider asks G what the pools stakeout is",
+       "id": "care-station-2-asks.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "G at the schedule",
+       "id": "care-station-2-asks.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "extra insider first",
+       "id": "care-station-2-asks.1.4"
+      }
+     ],
+     "id": "care-station-2-asks.1"
+    }
+   ],
+   "id": "care-station-2-asks"
+  },
+  {
+   "title": "Late to the handoff",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    16,
+    16
+   ],
+   "who": [
+    "family-caller-officer",
+    "night-stakeout-officer",
+    "go-between-bartender"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [],
+   "sets": [
+    "E:late"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 22,
+     "steps": [
+      {
+       "do": "phone-call",
+       "raw": "E in the lift lobby 22:00, \"I said ten.\"",
+       "id": "care-late-to-the-handoff.1.1"
+      },
+      {
+       "do": "leave",
+       "raw": "E for ten minutes",
+       "id": "care-late-to-the-handoff.1.2"
+      },
+      {
+       "do": "enter",
+       "raw": "E with takeaway",
+       "id": "care-late-to-the-handoff.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "g3 passes a token at the lift doors",
+       "id": "care-late-to-the-handoff.1.4"
+      },
+      {
+       "do": "walk",
+       "raw": "H follows g3 toward the tenements",
+       "id": "care-late-to-the-handoff.1.5"
+      }
+     ],
+     "id": "care-late-to-the-handoff.1"
+    }
+   ],
+   "id": "care-late-to-the-handoff"
+  },
+  {
+   "title": "Flat 3B opened",
+   "variant": "careful",
+   "rel": "replaces",
+   "relTo": [
+    "last-cup"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    19,
+    19
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "veteran-officer",
+    "rookie-officer"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:safehouse2-burned"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 5.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the corridor end 05:30",
+       "id": "care-flat-3b-opened.1.1"
+      },
+      {
+       "do": "knock-and-wait",
+       "raw": "C and D at flat 3B",
+       "id": "care-flat-3b-opened.1.2"
+      },
+      {
+       "do": "search",
+       "raw": "D lifts towels from a chair",
+       "id": "care-flat-3b-opened.1.3"
+      },
+      {
+       "do": "read-notice",
+       "raw": "tea counter credit slips in the towels",
+       "id": "care-flat-3b-opened.1.4"
+      },
+      {
+       "do": "carry",
+       "raw": "D bags the slips",
+       "id": "care-flat-3b-opened.1.5"
+      }
+     ],
+     "id": "care-flat-3b-opened.1"
+    }
+   ],
+   "id": "care-flat-3b-opened"
+  },
+  {
+   "title": "Arrest in the corridor, closing",
+   "variant": "careful",
+   "rel": "replaces",
+   "relTo": [
+    "last-cup"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    20,
+    21
+   ],
+   "who": [
+    "veteran-officer",
+    "framed-officer",
+    "night-stakeout-officer",
+    "boss-careful",
+    "inside-officer",
+    "inside-officer-extra"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:arrested",
+    "A:arrested",
+    "station2:insider-exposed",
+    "case:closed"
+   ],
+   "moments": [
+    {
+     "day": 20,
+     "hour": 6.166666666666667,
+     "steps": [
+      {
+       "do": "wait-outside",
+       "raw": "C and B at flat 3B 06:10 d20",
+       "id": "care-arrest-in-the-corridor-closing.1.1"
+      },
+      {
+       "do": "arrest",
+       "raw": "C and B at the door as the regular opens it",
+       "id": "care-arrest-in-the-corridor-closing.1.2"
+      },
+      {
+       "do": "arrest",
+       "raw": "H arrests A in the stairwell",
+       "id": "care-arrest-in-the-corridor-closing.1.3"
+      },
+      {
+       "do": "arrest",
+       "raw": "B arrests the extra insider on the stairs",
+       "id": "care-arrest-in-the-corridor-closing.1.4"
+      },
+      {
+       "do": "escort",
+       "raw": "all led out",
+       "id": "care-arrest-in-the-corridor-closing.1.5"
+      }
+     ],
+     "id": "care-arrest-in-the-corridor-closing.1"
+    },
+    {
+     "day": 21,
+     "hour": null,
+     "steps": [
+      {
+       "do": "post-feed",
+       "raw": "G posts a closed notice on the station screens d21",
+       "id": "care-arrest-in-the-corridor-closing.2.1"
+      }
+     ],
+     "id": "care-arrest-in-the-corridor-closing.2"
+    }
+   ],
+   "id": "care-arrest-in-the-corridor-closing"
+  }
+ ]
+}

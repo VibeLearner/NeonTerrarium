@@ -104,6 +104,7 @@ const STORY = (() => {
   const FLAGS0 = new Map();   // flags and counts saved last session, put back when the person is next made
   const spOf = p => { if (!p) return null; let s = SPM.get(p.id); if (!s && D){ s = makeSP(p); SPM.set(p.id, s); const f = FLAGS0.get(p.id); if (f){ FLAGS0.delete(p.id); Object.assign(s.flags, f[0]); Object.assign(s.counts, f[1]); } } return s; };
   ST.sp = spOf;
+  ST.pOf = id => pOf(id);
   const pOf = id => people.get(id) || null;
   const ident = id => { const s = SPM.get(id); if (s){ const v = { first: s.first, last: s.last, nick: s.nick, g: s.g }; IDENT.set(id, v); return v; } return IDENT.get(id) || { first: '?', last: '?', nick: null, g: 'n' }; };
 
@@ -330,6 +331,8 @@ const STORY = (() => {
   function descOf(id){
     const k = KN.get(id), I = ident(id), p = pOf(id), s = SPM.get(id);
     if (k && k.first) return k.first + (k.rel ? ' (' + relLabel(k) + ')' : '');
+    if (p && p.cop && !p.guard) return 'Officer ' + I.last;   // (the badge on the uniform says it)
+    const cd = ST.caseDesc && ST.caseDesc(id); if (cd) return cd;
     if (p && p.cop) return 'a patrol officer';
     if (s && s.age >= 60) return 'an elderly ' + (I.g === 'f' ? 'woman' : I.g === 'm' ? 'man' : 'person');
     return I.g === 'f' ? 'an unknown female resident' : I.g === 'm' ? 'an unknown male resident' : 'an unknown resident';
@@ -404,7 +407,7 @@ const STORY = (() => {
   const SC = new Set();
   ST.scenes = SC;
   const free = p => p && people.get(p.id) === p && !p.visitor && !p.cop && !p.guard && !p.archivist && !p.club && !p.clubbing && !p.metro && !p.metroPlan && !p.ride && !p.scene && !p.patrol
-    && !p.gone && !(p.walk && (p.walk.beat || p.walk.puke)) && places.has(p.home);
+    && !p.gone && !p.custody && !(p.walk && (p.walk.beat || p.walk.puke)) && places.has(p.home);
   // the nearest node of the walking network to a point (a grid of the nodes, made again when the network is)
   let _ngRef = null, _ngGrid = null;
   function nearestNode(x, z){
@@ -467,6 +470,9 @@ const STORY = (() => {
       else if (d === 'hug') frame = F_HUG + Math.floor(t*1.2 + p.phase) % 2;
       else if (d === 'water-plant' && mine) frame = F_WATER + Math.floor(t*3 + p.phase) % 4;
       else if (d === 'argue' && Math.floor(t*.8 + p.phase) % 2) frame = F_ANGRY + Math.floor(t*6 + p.phase) % 6;
+      else if ((d === 'police-scan' || d === 'read-notice') && mine && !p.held) frame = F_USE + Math.floor(t*4 + p.phase) % 6;   // (the scanner, or a screen held up to read)
+      else if (d === 'search' && mine) frame = F_CROUCH + (since < 1 ? Math.min(3, Math.floor(since*4)) : 2 + Math.floor(t*1.5 + p.phase) % 2);   // (down at the drawer, the bin, the floor)
+      else if ((d === 'arrest' || d === 'point') && mine) frame = F_GIVE + Math.floor(t*2) % 2;   // (a hand out: on a shoulder, at the thing)
     }
     if (st.face){ const sd = st.face[0]*_camR.x + st.face[1]*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }
     return { x: st.x, z: st.z, y: st.y ?? CURB, frame };
@@ -519,6 +525,7 @@ const STORY = (() => {
   }
   // resolve a step's place for the whole step: one anchor all its people gather at
   function anchorFor(sc, b){
+    if (b.anc) return typeof b.anc === 'function' ? b.anc(sc) : b.anc;   // (a case step brings its own: cases.js)
     const who = [].concat(b.who || []), lead = sc.cast[who[0]] ? pOf(sc.cast[who[0]]) : null; if (!lead) return null;
     const at = b.at || 'any';
     if (at === 'home-door'){ const owner = pOf(sc.cast[sc.owner]); return owner ? { kind: 'home', owner } : null; }
@@ -529,6 +536,7 @@ const STORY = (() => {
   }
   // where in the anchor this person stands, and whether that's a walk
   function targetIn(sc, anc, p, slot, b){
+    if (anc.fixed && anc.fixed[p.id]) return anc.fixed[p.id];   // (someone with a place of their own in it: the keeper behind the counter)
     if (anc.kind === 'home') return homeDoorTarget(anc.owner, slot);
     if (anc.kind === 'door'){ const d = anc.door, tx = -d.n[1], tz = d.n[0], o = (slot - .5)*.34; return { kind: 'door', door: d, place: anc.place, x: d.stand.x + tx*o + d.n[0]*.15, z: d.stand.z + tz*o + d.n[1]*.15 }; }
     if (anc.kind === 'open'){
@@ -556,6 +564,7 @@ const STORY = (() => {
       const st = { mode: 'in', place: p.at, x: p.x, z: p.z, face: null, gest: false };
       if (p.walk){ st.mode = 'out'; if (p.walk.spot && p.walk.spot.by === p.id) p.walk.spot.by = null; p.walk = null; st.x = p.x; st.z = p.z; }
       else if (p.spot){ st.mode = 'out'; st.x = p.spot.x; st.z = p.spot.z; st.y = p.spot.y; if (p.spot.by === p.id) p.spot.by = null; p.spot = null; }
+      else if (p.patrol){ st.mode = 'out'; st.x = p.x; st.z = p.z; p.patrol = null; }
       else if (!places.has(p.at) || !places.get(p.at).doors.length) return null;
       if (st.mode === 'out' && (st.x === undefined || nearestNode(st.x, st.z) < 0)) return null;
       p.chain = null; p.hurry = false; p.rush = false; p.sc = st; p.scene = sc;
@@ -641,7 +650,7 @@ const STORY = (() => {
     sc.anchor = anc;
     const movers = [];
     const people_ = [...who, ...withs], roleOrder = Object.keys(sc.cast);
-    const nb = sc.s.beats[sc.i + 1], nAnc = MOVE.has(b.do) && anc.kind === 'here' && nb && !nb.indoors && nb.at && nb.at !== 'street' && nb.at !== 'any' ? anchorFor(sc, nb) : null;
+    const nb = sc.s.beats[sc.i + 1], nAnc = MOVE.has(b.do) && !b.away && anc.kind === 'here' && nb && !nb.indoors && nb.at && nb.at !== 'street' && nb.at !== 'any' ? anchorFor(sc, nb) : null;
     people_.forEach(r => {
       const slot = roleOrder.indexOf(r);
       const p = pOf(sc.cast[r]); if (!p || !p.sc) return;
@@ -688,7 +697,7 @@ const STORY = (() => {
     }
     const em = b.emote || EMO_FOR[b.do]; if (em && ppl[0] && EMO[em] !== undefined) emote(ppl[0], em, 2.4);
     if (!MOVE.has(b.do) && b.do !== 'enter') logBeat(sc, b, sc.anchor);
-    sc.phase = 'hold'; sc.until = pplNow + (MOVE.has(b.do) || b.do === 'enter' ? .5 : 4 + U(sc.id, b.id, 'hold')*4);
+    sc.phase = 'hold'; sc.until = pplNow + (b.hold ?? (MOVE.has(b.do) || b.do === 'enter' ? .5 : 4 + U(sc.id, b.id, 'hold')*4));
   }
   function logBeat(sc, b, anc){
     if (sc.seenBeat && sc.seenBeat[b.id]) return;
@@ -708,10 +717,10 @@ const STORY = (() => {
   const WITH_RE = /\b(carr(y|ies|ying)|with|holding|holds|hauls|lugs|clutch\w*|under one arm|takes|lifts|picks up|hands|passes|brings|balanc\w*)\b/i;
   function heldFor(sc, b, line){
     const who = [].concat(b.who || []), p = who.length && pOf(sc.cast[who[0]]); if (!p) return;
-    const k = PG.heldFromText ? PG.heldFromText(line, p.id) : null;
+    const k = b.held ? PG.heldPick(b.held.split(':')[0], b.held.split(':')[1] || '', p.id) : PG.heldFromText ? PG.heldFromText(line, p.id) : null;
     if (b.do === 'carry' || b.do === 'hand-over'){ if (!p.held || k) p.held = k || p.held || PG.heldPick('box', '', p.id); }
     else if (b.do === 'pick-up'){ if (p.sc) p.sc.pick = k || PG.heldPick('box', '', p.id); }
-    else if (k && WITH_RE.test(line) && ['walk', 'leave', 'enter', 'walk-together', 'stand', 'wait-outside', 'knock-and-wait'].includes(b.do)) p.held = k;
+    else if (k && (b.held || WITH_RE.test(line)) && ['walk', 'leave', 'enter', 'walk-together', 'stand', 'wait-outside', 'knock-and-wait'].includes(b.do)) p.held = k;
   }
   function afterHandOver(sc, b){
     if (b.do !== 'hand-over') return;
@@ -737,8 +746,7 @@ const STORY = (() => {
       const ln = logLine(line, sc.cast, ctx, 'reveal', { channel: r.channel, fact: r.fact });
       if (ln) note(ST.watch, { t: ST.clock, who: e, fact: r.fact, channel: r.channel, verified: r.channel === 'document' || r.channel === 'introduction', tmpl: line, cast: Object.assign({}, sc.cast), ctx, learned });
     }
-    passing(sc, b);
-    gossipIn(sc, b);
+    if (sc.s.tier !== 'case'){ passing(sc, b); gossipIn(sc, b); }   // (a case's moment is its own: no names in passing, no gossip in it)
     afterHandOver(sc, b);
   }
   function finishScene(sc){
@@ -944,6 +952,7 @@ const STORY = (() => {
     const sc = startScene(ch.s, ids); DBG.why = sc ? 'started ' + ch.s.id : 'could not start ' + ch.s.id;
   }
   const DBG = { runs: 0, opts: 0, why: '', top: [] };
+  ST.startScene = startScene; ST.endScene = endScene; ST.openPlaceNear = openPlaceNear; ST.streetDoor = streetDoor; ST.shopNear = shopNear; ST.H = H; ST.U = U;
   ST.dbg = DBG; ST._dir = () => { dirNext = 0; director(); return DBG; };   // (for tests: a director pass now)
 
   /* ---------- names in passing, and gossip ---------- */
@@ -1131,11 +1140,12 @@ const STORY = (() => {
     maybeBuildNet();
     for (const sc of [...SC]){
       // someone in it was taken away (a rebuild, the club, a removal): it ends where it is
-      if (Object.values(sc.cast).some(id => { const p = pOf(id); return !p || p.scene !== sc || (p.walk && !p.walk.scene); })){ endScene(sc, 'lost'); continue; }
+      { const lost = Object.values(sc.cast).find(id => { const p = pOf(id); return !p || p.scene !== sc || (p.walk && !p.walk.scene); }); if (lost){ const p = pOf(lost); endScene(sc, 'lost ' + (!p ? 'gone' : p.scene !== sc ? 'other scene' : 'walk ' + (p.walk.beat ? 'beat' : p.walk.to))); continue; } }
       if (sc.dlv && sc.b && sc.b.id === 'b3' && sc.phase === 'hold') deliveryTake(sc);
       if (sc.dlv && sc.dlv.mesh && sc.b && sc.b.id === 'b6' && sc.phase === 'hold'){ const m = sc.dlv.mesh; sc.dlv.mesh = null; if (ST.watch === sc.cast.A) logLine(m, sc.cast, {}, 'reveal', { channel: 'feed', fact: 'A.said' }); }
       try { stepScene(sc); } catch (e){ console.warn('story scene', sc.s.id, e); endScene(sc, 'error'); }
     }
+    if (typeof CASES !== 'undefined') try { CASES.tick(); } catch (e){ console.warn('cases', e); }
     director(); watchRoutine(); watchAbsence(); scanNews();
     if (ST.clockReal - savedAt > 10){ savedAt = ST.clockReal; save(); }
   };

@@ -1,0 +1,2183 @@
+{
+ "id": "b5-last-train",
+ "type": "main",
+ "rows": [
+  {
+   "title": "Platform morning",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    1,
+    2
+   ],
+   "who": [
+    "boss-careless",
+    "inside-officer",
+    "framed-officer",
+    "informant"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b5-c01"
+    },
+    {
+     "k": "plant",
+     "id": "b5-c11"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6.583333333333333,
+     "steps": [
+      {
+       "do": "police-patrol",
+       "raw": "A and B, 06:35, along the platform",
+       "id": "platform-morning.1.1"
+      },
+      {
+       "do": "wave",
+       "raw": "attendant at the lost property bin",
+       "id": "platform-morning.1.2"
+      },
+      {
+       "do": "chat",
+       "raw": "attendant to A, \"Morning, Ace\"",
+       "id": "platform-morning.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "attendant passes B without a word",
+       "id": "platform-morning.1.4"
+      },
+      {
+       "do": "hand-over",
+       "raw": "attendant to A, paper cup, no coin",
+       "id": "platform-morning.1.5"
+      },
+      {
+       "do": "carry",
+       "raw": "B keeps a paper notebook, writes the time",
+       "id": "platform-morning.1.6"
+      },
+      {
+       "do": "stand",
+       "raw": "clerk at the tag drawer, 07:05, looks at attendant then at the floor",
+       "id": "platform-morning.1.7"
+      }
+     ],
+     "id": "platform-morning.1"
+    }
+   ],
+   "id": "platform-morning"
+  },
+  {
+   "title": "Green tag umbrella",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    3,
+    4
+   ],
+   "who": [
+    "boss-careless",
+    "informant",
+    "bystander"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b5-c03"
+    },
+    {
+     "k": "plant",
+     "id": "b5-c02"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 4,
+     "hour": 7.2,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "commuter, 07:12, black umbrella",
+       "id": "green-tag-umbrella.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "commuter to clerk, umbrella",
+       "id": "green-tag-umbrella.1.2"
+      },
+      {
+       "do": "carry",
+       "raw": "clerk ties a green tag, sets umbrella in the bin",
+       "id": "green-tag-umbrella.1.3"
+      },
+      {
+       "do": "stand",
+       "raw": "attendant at the bin, d04 06:40",
+       "id": "green-tag-umbrella.1.4"
+      },
+      {
+       "do": "search",
+       "raw": "attendant turns the bin key at 06:40, clerk's shift starts 07:00",
+       "id": "green-tag-umbrella.1.5"
+      }
+     ],
+     "id": "green-tag-umbrella.1"
+    }
+   ],
+   "id": "green-tag-umbrella"
+  },
+  {
+   "title": "Bench handoff, early rider",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    4,
+    5
+   ],
+   "who": [
+    "go-between-courier",
+    "red-herring-night-courier",
+    "bystander"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b5-c05"
+    },
+    {
+     "k": "herring",
+     "id": "b5-c13"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 4,
+     "hour": 7.416666666666667,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "commuter at bench 3, d04 07:25",
+       "id": "bench-handoff-early-rider.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "commuter to courier, paper bag",
+       "id": "bench-handoff-early-rider.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "courier at the departures board",
+       "id": "bench-handoff-early-rider.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "courier to the lift, not the stairs",
+       "id": "bench-handoff-early-rider.1.4"
+      },
+      {
+       "do": "stand",
+       "raw": "rider on the empty platform, d04 04:30, cloth bag",
+       "id": "bench-handoff-early-rider.1.5"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "rider at the stair door",
+       "id": "bench-handoff-early-rider.1.6"
+      }
+     ],
+     "id": "bench-handoff-early-rider.1"
+    }
+   ],
+   "id": "bench-handoff-early-rider"
+  },
+  {
+   "title": "Roster on the screens",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    5,
+    5
+   ],
+   "who": [
+    "desk-sergeant",
+    "inside-officer",
+    "framed-officer"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b5-c07"
+    }
+   ],
+   "sets": [
+    "A:reassigned"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "G at the screens, 06:00",
+       "id": "roster-on-the-screens.1.1"
+      },
+      {
+       "do": "post-feed",
+       "raw": "roster, A and B to metro patrol from d06",
+       "id": "roster-on-the-screens.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B, twice",
+       "id": "roster-on-the-screens.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "G tells B that A asked for the swap last week",
+       "id": "roster-on-the-screens.1.4"
+      },
+      {
+       "do": "chat",
+       "raw": "A to B, \"Sergeant's idea. Quiet beat.\"",
+       "id": "roster-on-the-screens.1.5"
+      },
+      {
+       "do": "shrug",
+       "raw": "B",
+       "id": "roster-on-the-screens.1.6"
+      }
+     ],
+     "id": "roster-on-the-screens.1"
+    }
+   ],
+   "id": "roster-on-the-screens"
+  },
+  {
+   "title": "Thin bag, claim at the bin",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    5,
+    6
+   ],
+   "who": [
+    "red-herring-bath-regular",
+    "boss-careless",
+    "informant",
+    "bystander"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "herring",
+     "id": "b5-c14"
+    },
+    {
+     "k": "plant",
+     "id": "b5-c04"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 5,
+     "hour": 18.166666666666668,
+     "steps": [
+      {
+       "do": "wait-outside",
+       "raw": "bath regular at the stair door, d05 18:10",
+       "id": "thin-bag-claim-at-the-bin.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "bath regular and stranger, thin bag",
+       "id": "thin-bag-claim-at-the-bin.1.2"
+      }
+     ],
+     "id": "thin-bag-claim-at-the-bin.1"
+    },
+    {
+     "day": 6,
+     "hour": 7.333333333333333,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "commuter, d06 07:20",
+       "id": "thin-bag-claim-at-the-bin.2.1"
+      },
+      {
+       "do": "pick-up",
+       "raw": "commuter at the bin, shows no ticket, takes the black umbrella with the green tag",
+       "id": "thin-bag-claim-at-the-bin.2.2"
+      },
+      {
+       "do": "wave",
+       "raw": "attendant lets the commuter through",
+       "id": "thin-bag-claim-at-the-bin.2.3"
+      },
+      {
+       "do": "carry",
+       "raw": "umbrella, held by the middle, heavy",
+       "id": "thin-bag-claim-at-the-bin.2.4"
+      }
+     ],
+     "id": "thin-bag-claim-at-the-bin.2"
+    }
+   ],
+   "id": "thin-bag-claim-at-the-bin"
+  },
+  {
+   "title": "Bench lunch, runner",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    6,
+    7
+   ],
+   "who": [
+    "informant",
+    "veteran-officer",
+    "rookie-officer",
+    "red-herring-night-courier"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b5-c12"
+    },
+    {
+     "k": "herring",
+     "id": "b5-c15"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 6,
+     "hour": 12.5,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "clerk and C on one bench, d06 12:30",
+       "id": "bench-lunch-runner.1.1"
+      },
+      {
+       "do": "eat",
+       "raw": "both, no talk",
+       "id": "bench-lunch-runner.1.2"
+      },
+      {
+       "do": "chat",
+       "raw": "C tells clerk this is his last month on the loop",
+       "id": "bench-lunch-runner.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "clerk, paper tag stub under the cup",
+       "id": "bench-lunch-runner.1.4"
+      }
+     ],
+     "id": "bench-lunch-runner.1"
+    },
+    {
+     "day": 7,
+     "hour": 4.666666666666667,
+     "steps": [
+      {
+       "do": "run",
+       "raw": "D after the rider, d07 04:40",
+       "id": "bench-lunch-runner.2.1"
+      },
+      {
+       "do": "run",
+       "raw": "rider, bag swinging",
+       "id": "bench-lunch-runner.2.2"
+      },
+      {
+       "do": "chat",
+       "raw": "C to D, \"Leave it a day.\"",
+       "id": "bench-lunch-runner.2.3"
+      }
+     ],
+     "id": "bench-lunch-runner.2"
+    }
+   ],
+   "id": "bench-lunch-runner"
+  },
+  {
+   "title": "Scan skipped",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    7,
+    7
+   ],
+   "who": [
+    "inside-officer",
+    "framed-officer",
+    "boss-careless"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b5-c08"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6.833333333333333,
+     "steps": [
+      {
+       "do": "police-patrol",
+       "raw": "A and B, 06:50",
+       "id": "scan-skipped.1.1"
+      },
+      {
+       "do": "police-scan",
+       "raw": "B at the north stair door",
+       "id": "scan-skipped.1.2"
+      },
+      {
+       "do": "walk",
+       "raw": "A past the bin, no scan",
+       "id": "scan-skipped.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "attendant to A, paper cup",
+       "id": "scan-skipped.1.4"
+      },
+      {
+       "do": "chat",
+       "raw": "B to A, \"We turned left here yesterday.\"",
+       "id": "scan-skipped.1.5"
+      },
+      {
+       "do": "shrug",
+       "raw": "A",
+       "id": "scan-skipped.1.6"
+      }
+     ],
+     "id": "scan-skipped.1"
+    }
+   ],
+   "id": "scan-skipped"
+  },
+  {
+   "title": "Envelope lifted at the sky mall",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s4-sky-mall-pickpocket"
+   ],
+   "loop": null,
+   "days": [
+    7,
+    7
+   ],
+   "who": [
+    "rookie-officer",
+    "bystander"
+   ],
+   "where": "sky-mall",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 12.25,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "D along the concourse, 12:15",
+       "id": "envelope-lifted-at-the-sky-mall.1.1"
+      },
+      {
+       "do": "carry",
+       "raw": "D writes in a notebook while walking",
+       "id": "envelope-lifted-at-the-sky-mall.1.2"
+      },
+      {
+       "do": "bump",
+       "raw": "stranger and commuter at a kiosk",
+       "id": "envelope-lifted-at-the-sky-mall.1.3"
+      },
+      {
+       "do": "pick-up",
+       "raw": "stranger lifts a brown envelope from the commuter's bag",
+       "id": "envelope-lifted-at-the-sky-mall.1.4"
+      },
+      {
+       "do": "run",
+       "raw": "stranger",
+       "id": "envelope-lifted-at-the-sky-mall.1.5"
+      },
+      {
+       "do": "run",
+       "raw": "D after",
+       "id": "envelope-lifted-at-the-sky-mall.1.6"
+      },
+      {
+       "do": "chat",
+       "raw": "commuter tells D the envelope held lost property tags",
+       "id": "envelope-lifted-at-the-sky-mall.1.7"
+      }
+     ],
+     "id": "envelope-lifted-at-the-sky-mall.1"
+    }
+   ],
+   "id": "envelope-lifted-at-the-sky-mall"
+  },
+  {
+   "title": "Knock at 5D",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    8,
+    8
+   ],
+   "who": [
+    "go-between-courier"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b5-c06"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 21.666666666666668,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "courier through the lobby, 21:40",
+       "id": "knock-at-5d.1.1"
+      },
+      {
+       "do": "knock-and-wait",
+       "raw": "door 5D, two knocks then one",
+       "id": "knock-at-5d.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "paper bag through the door gap",
+       "id": "knock-at-5d.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "courier by the lift",
+       "id": "knock-at-5d.1.4"
+      }
+     ],
+     "id": "knock-at-5d.1"
+    }
+   ],
+   "id": "knock-at-5d"
+  },
+  {
+   "title": "Mugger's slip",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s1-lift-lobby-muggings"
+   ],
+   "loop": null,
+   "days": [
+    8,
+    9
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "rookie-officer"
+   ],
+   "where": "lift",
+   "channel": [
+    "document",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s1-c01"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c03"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c04"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 8,
+     "hour": 23.833333333333332,
+     "steps": [
+      {
+       "do": "arrest",
+       "raw": "H, mugger at the lift lobby, d08 23:50",
+       "id": "mugger-s-slip.1.1"
+      },
+      {
+       "do": "search",
+       "raw": "D, mugger's coat",
+       "id": "mugger-s-slip.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D, folded slip, \"Bin, platform 3, 07:12 train\"",
+       "id": "mugger-s-slip.1.3"
+      },
+      {
+       "do": "point",
+       "raw": "D at the slip",
+       "id": "mugger-s-slip.1.4"
+      },
+      {
+       "do": "chat",
+       "raw": "mugger tells H the slip came from a runner at the metro",
+       "id": "mugger-s-slip.1.5"
+      }
+     ],
+     "id": "mugger-s-slip.1"
+    }
+   ],
+   "id": "mugger-s-slip"
+  },
+  {
+   "title": "Clerk's chair empty",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s7-missing-regular"
+   ],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "veteran-officer",
+    "boss-careless"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [],
+   "sets": [
+    "inf:missing"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 14,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "C at the lost property window, 14:00, shutter half down",
+       "id": "clerk-s-chair-empty.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "C, sign \"Back soon\"",
+       "id": "clerk-s-chair-empty.1.2"
+      },
+      {
+       "do": "chat",
+       "raw": "attendant tells C the clerk went off sick this morning",
+       "id": "clerk-s-chair-empty.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "C asks the same question twice",
+       "id": "clerk-s-chair-empty.1.4"
+      }
+     ],
+     "id": "clerk-s-chair-empty.1"
+    }
+   ],
+   "id": "clerk-s-chair-empty"
+  },
+  {
+   "title": "Log on the screens",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    10,
+    10
+   ],
+   "who": [
+    "framed-officer",
+    "desk-sergeant"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b5-c09"
+    }
+   ],
+   "sets": [
+    "B:framed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6.866666666666667,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "B at the screens, log line \"06:52 platform, courier scanned, badge B\"",
+       "id": "log-on-the-screens.1.1"
+      },
+      {
+       "do": "argue",
+       "raw": "B to G, \"I was at the north stair at 06:52.\"",
+       "id": "log-on-the-screens.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "G at the paper log",
+       "id": "log-on-the-screens.1.3"
+      },
+      {
+       "do": "shrug",
+       "raw": "G",
+       "id": "log-on-the-screens.1.4"
+      },
+      {
+       "do": "carry",
+       "raw": "B copies the line into his notebook",
+       "id": "log-on-the-screens.1.5"
+      }
+     ],
+     "id": "log-on-the-screens.1"
+    }
+   ],
+   "id": "log-on-the-screens"
+  },
+  {
+   "title": "Lurker caught",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s5-platform-lurker"
+   ],
+   "loop": null,
+   "days": [
+    11,
+    11
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "boss-careless"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s5-c01"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 5.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the stair, 05:30 to 06:40, paper cup on the ledge",
+       "id": "lurker-caught.1.1"
+      },
+      {
+       "do": "arrest",
+       "raw": "H, lurker on bench 2",
+       "id": "lurker-caught.1.2"
+      },
+      {
+       "do": "search",
+       "raw": "H, lurker's notebook, train times",
+       "id": "lurker-caught.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "lurker tells H the times went to the window",
+       "id": "lurker-caught.1.4"
+      },
+      {
+       "do": "chat",
+       "raw": "H, \"Three nights at that stair.\"",
+       "id": "lurker-caught.1.5"
+      },
+      {
+       "do": "wave",
+       "raw": "attendant at the bin as H escorts the lurker out",
+       "id": "lurker-caught.1.6"
+      }
+     ],
+     "id": "lurker-caught.1"
+    }
+   ],
+   "id": "lurker-caught"
+  },
+  {
+   "title": "Thief arrested, cousin on the feed",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s4-sky-mall-pickpocket"
+   ],
+   "loop": null,
+   "days": [
+    12,
+    12
+   ],
+   "who": [
+    "rookie-officer",
+    "red-herring-bath-regular"
+   ],
+   "where": "sky-mall",
+   "channel": [
+    "document",
+    "feed"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s4-c01"
+    },
+    {
+     "k": "debunk",
+     "id": "b5-c14"
+    }
+   ],
+   "sets": [
+    "rh2:cleared"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 13.166666666666666,
+     "steps": [
+      {
+       "do": "arrest",
+       "raw": "D, thief at the kiosk, 13:10",
+       "id": "thief-arrested-cousin-on-the-fee.1.1"
+      },
+      {
+       "do": "search",
+       "raw": "D, brown envelope",
+       "id": "thief-arrested-cousin-on-the-fee.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D, tags marked \"P3, lost property\"",
+       "id": "thief-arrested-cousin-on-the-fee.1.3"
+      },
+      {
+       "do": "hug",
+       "raw": "bath regular and a cousin",
+       "id": "thief-arrested-cousin-on-the-fee.1.4"
+      },
+      {
+       "do": "post-feed",
+       "raw": "cousin, \"Paid it back, Dee.\"",
+       "id": "thief-arrested-cousin-on-the-fee.1.5"
+      },
+      {
+       "do": "chat",
+       "raw": "bath regular tells cousin the thin bag was the last payment",
+       "id": "thief-arrested-cousin-on-the-fee.1.6"
+      }
+     ],
+     "id": "thief-arrested-cousin-on-the-fee.1"
+    }
+   ],
+   "id": "thief-arrested-cousin-on-the-fee"
+  },
+  {
+   "title": "Flat 5D opened",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    13
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "family-caller-officer",
+    "go-between-courier",
+    "red-herring-night-courier"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b5-c05"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c06"
+    },
+    {
+     "k": "debunk",
+     "id": "b5-c13"
+    },
+    {
+     "k": "debunk",
+     "id": "b5-c15"
+    }
+   ],
+   "sets": [
+    "boss:safehouse-burned",
+    "g1:missing",
+    "rh1:cleared",
+    "E:late"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 22,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H in the stairwell facing 5D, 22:00",
+       "id": "flat-5d-opened.1.1"
+      },
+      {
+       "do": "phone-call",
+       "raw": "E in the lift hall, \"Not now, Mama.\"",
+       "id": "flat-5d-opened.1.2"
+      },
+      {
+       "do": "leave",
+       "raw": "E, ten minutes",
+       "id": "flat-5d-opened.1.3"
+      },
+      {
+       "do": "enter",
+       "raw": "E, with takeaway",
+       "id": "flat-5d-opened.1.4"
+      },
+      {
+       "do": "knock-and-wait",
+       "raw": "rider at 3A, 03:05",
+       "id": "flat-5d-opened.1.5"
+      },
+      {
+       "do": "hug",
+       "raw": "rider and partner at 3A, flowers and bread",
+       "id": "flat-5d-opened.1.6"
+      },
+      {
+       "do": "run",
+       "raw": "courier down the stairs from 5D",
+       "id": "flat-5d-opened.1.7"
+      },
+      {
+       "do": "search",
+       "raw": "H, flat 5D, one chair, tag bags, empty drawers",
+       "id": "flat-5d-opened.1.8"
+      }
+     ],
+     "id": "flat-5d-opened.1"
+    }
+   ],
+   "id": "flat-5d-opened"
+  },
+  {
+   "title": "Edit stamp at the spire",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "rookie-officer",
+    "burnout-officer"
+   ],
+   "where": "data-spire",
+   "channel": [
+    "document",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b5-c10"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 15,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "D with notebook",
+       "id": "edit-stamp-at-the-spire.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "F at a terminal, 15:00",
+       "id": "edit-stamp-at-the-spire.1.2"
+      },
+      {
+       "do": "eat",
+       "raw": "F",
+       "id": "edit-stamp-at-the-spire.1.3"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D, log page, \"06:52 courier scan, edited 22:15, terminal FD-2\"",
+       "id": "edit-stamp-at-the-spire.1.4"
+      },
+      {
+       "do": "point",
+       "raw": "D at the stamp",
+       "id": "edit-stamp-at-the-spire.1.5"
+      },
+      {
+       "do": "chat",
+       "raw": "D to F, \"B was at the north stair at 06:52, it is in my notes.\"",
+       "id": "edit-stamp-at-the-spire.1.6"
+      },
+      {
+       "do": "shrug",
+       "raw": "F",
+       "id": "edit-stamp-at-the-spire.1.7"
+      }
+     ],
+     "id": "edit-stamp-at-the-spire.1"
+    }
+   ],
+   "id": "edit-stamp-at-the-spire"
+  },
+  {
+   "title": "Cabinet empty, suspension posted",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    15
+   ],
+   "who": [
+    "inside-officer",
+    "desk-sergeant",
+    "framed-officer",
+    "rookie-officer"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document",
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:tipped-off",
+    "B:suspended"
+   ],
+   "moments": [
+    {
+     "day": 14,
+     "hour": 22.166666666666668,
+     "steps": [
+      {
+       "do": "phone-call",
+       "raw": "A outside the doors, d14 22:10, \"Not here. Not tonight.\"",
+       "id": "cabinet-empty-suspension-posted.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "A to the front desk terminal, 22:14",
+       "id": "cabinet-empty-suspension-posted.1.2"
+      },
+      {
+       "do": "leave",
+       "raw": "A, 22:16",
+       "id": "cabinet-empty-suspension-posted.1.3"
+      }
+     ],
+     "id": "cabinet-empty-suspension-posted.1"
+    },
+    {
+     "day": 15,
+     "hour": 18,
+     "steps": [
+      {
+       "do": "search",
+       "raw": "G and D, d15, evidence cabinet, tag bags gone",
+       "id": "cabinet-empty-suspension-posted.2.1"
+      },
+      {
+       "do": "argue",
+       "raw": "G and B",
+       "id": "cabinet-empty-suspension-posted.2.2"
+      },
+      {
+       "do": "post-feed",
+       "raw": "G, suspension notice for B",
+       "id": "cabinet-empty-suspension-posted.2.3"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B, twice",
+       "id": "cabinet-empty-suspension-posted.2.4"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "B at the station doors, 18:00, notebook in hand",
+       "id": "cabinet-empty-suspension-posted.2.5"
+      }
+     ],
+     "id": "cabinet-empty-suspension-posted.2"
+    }
+   ],
+   "id": "cabinet-empty-suspension-posted"
+  },
+  {
+   "title": "Found on the lawn",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s7-missing-regular"
+   ],
+   "loop": null,
+   "days": [
+    17,
+    17
+   ],
+   "who": [
+    "veteran-officer",
+    "informant"
+   ],
+   "where": "lawn",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s7-c01"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c11"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c12"
+    }
+   ],
+   "sets": [
+    "inf:talking"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 12.5,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "C across the lawn, 12:30",
+       "id": "found-on-the-lawn.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "clerk on a bench, new coat",
+       "id": "found-on-the-lawn.1.2"
+      },
+      {
+       "do": "sit",
+       "raw": "C, same bench",
+       "id": "found-on-the-lawn.1.3"
+      },
+      {
+       "do": "eat",
+       "raw": "both",
+       "id": "found-on-the-lawn.1.4"
+      },
+      {
+       "do": "chat",
+       "raw": "clerk tells C the window key was only ever the attendant's",
+       "id": "found-on-the-lawn.1.5"
+      },
+      {
+       "do": "hand-over",
+       "raw": "clerk to C, tag stub book",
+       "id": "found-on-the-lawn.1.6"
+      },
+      {
+       "do": "escort",
+       "raw": "C and clerk to the station",
+       "id": "found-on-the-lawn.1.7"
+      }
+     ],
+     "id": "found-on-the-lawn.1"
+    }
+   ],
+   "id": "found-on-the-lawn"
+  },
+  {
+   "title": "B cleared at the spire",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    17,
+    17
+   ],
+   "who": [
+    "framed-officer",
+    "desk-sergeant",
+    "rookie-officer"
+   ],
+   "where": "data-spire",
+   "channel": [
+    "document",
+    "feed"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b5-c09"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c10"
+    }
+   ],
+   "sets": [
+    "B:cleared",
+    "G:corrected-post"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 22.233333333333334,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "D and B",
+       "id": "b-cleared-at-the-spire.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "D to B, notebook page",
+       "id": "b-cleared-at-the-spire.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "G, access list, \"FD-2 opened 22:14, badge A\"",
+       "id": "b-cleared-at-the-spire.1.3"
+      },
+      {
+       "do": "read-notice",
+       "raw": "G, edit stamp 22:15",
+       "id": "b-cleared-at-the-spire.1.4"
+      },
+      {
+       "do": "post-feed",
+       "raw": "G, corrected notice, B cleared",
+       "id": "b-cleared-at-the-spire.1.5"
+      }
+     ],
+     "id": "b-cleared-at-the-spire.1"
+    }
+   ],
+   "id": "b-cleared-at-the-spire"
+  },
+  {
+   "title": "Last train",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    18,
+    18
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "framed-officer",
+    "inside-officer",
+    "boss-careless",
+    "veteran-officer",
+    "rookie-officer"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b5-c01"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c02"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c07"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c08"
+    }
+   ],
+   "sets": [
+    "boss:arrested",
+    "A:arrested",
+    "C:retired",
+    "D:promoted",
+    "case:closed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 5.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the stair, 05:30",
+       "id": "last-train.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "attendant at the bin, 06:40",
+       "id": "last-train.1.2"
+      },
+      {
+       "do": "search",
+       "raw": "attendant turns the key, lid up",
+       "id": "last-train.1.3"
+      },
+      {
+       "do": "search",
+       "raw": "H, bin, tagged umbrella",
+       "id": "last-train.1.4"
+      },
+      {
+       "do": "arrest",
+       "raw": "H, attendant, 06:41",
+       "id": "last-train.1.5"
+      },
+      {
+       "do": "walk",
+       "raw": "A onto the platform, 06:44",
+       "id": "last-train.1.6"
+      },
+      {
+       "do": "arrest",
+       "raw": "B, A",
+       "id": "last-train.1.7"
+      },
+      {
+       "do": "hand-over",
+       "raw": "C to D, handheld scanner and the beat map",
+       "id": "last-train.1.8"
+      },
+      {
+       "do": "walk",
+       "raw": "C off the platform",
+       "id": "last-train.1.9"
+      }
+     ],
+     "id": "last-train.1"
+    }
+   ],
+   "id": "last-train"
+  },
+  {
+   "title": "Second station shares scans",
+   "variant": "careless",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    11,
+    12
+   ],
+   "who": [
+    "desk-sergeant",
+    "framed-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document"
+   ],
+   "clues": [],
+   "sets": [
+    "station2:cooperating"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "hand-over",
+       "raw": "G to B, printed scan list from station 2",
+       "id": "care-second-station-shares-scans.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B, the list, twice",
+       "id": "care-second-station-shares-scans.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "B at two matching platform times",
+       "id": "care-second-station-shares-scans.1.3"
+      }
+     ],
+     "id": "care-second-station-shares-scans.1"
+    }
+   ],
+   "id": "care-second-station-shares-scans"
+  },
+  {
+   "title": "Same minute every day",
+   "variant": "careless",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    13
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "veteran-officer",
+    "boss-careless"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H and C, 06:30",
+       "id": "care-same-minute-every-day.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "attendant at the bin, 06:40 exactly, third morning running",
+       "id": "care-same-minute-every-day.1.2"
+      },
+      {
+       "do": "police-scan",
+       "raw": "H at the lost property window",
+       "id": "care-same-minute-every-day.1.3"
+      }
+     ],
+     "id": "care-same-minute-every-day.1"
+    }
+   ],
+   "id": "care-same-minute-every-day"
+  },
+  {
+   "title": "Last train, early",
+   "variant": "careless",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "framed-officer",
+    "inside-officer",
+    "boss-careless",
+    "veteran-officer",
+    "rookie-officer"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:arrested",
+    "A:arrested"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 5.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the stair, 05:30",
+       "id": "care-last-train-early.1.1"
+      },
+      {
+       "do": "search",
+       "raw": "attendant turns the key",
+       "id": "care-last-train-early.1.2"
+      },
+      {
+       "do": "arrest",
+       "raw": "H, attendant",
+       "id": "care-last-train-early.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "A onto the platform",
+       "id": "care-last-train-early.1.4"
+      },
+      {
+       "do": "arrest",
+       "raw": "B, A",
+       "id": "care-last-train-early.1.5"
+      },
+      {
+       "do": "hand-over",
+       "raw": "C to D, handheld scanner and the beat map",
+       "id": "care-last-train-early.1.6"
+      }
+     ],
+     "id": "care-last-train-early.1"
+    }
+   ],
+   "id": "care-last-train-early"
+  },
+  {
+   "title": "Statement and clearing",
+   "variant": "careless",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    15
+   ],
+   "who": [
+    "desk-sergeant",
+    "framed-officer",
+    "rookie-officer"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document",
+    "feed"
+   ],
+   "clues": [],
+   "sets": [
+    "B:cleared",
+    "G:corrected-post",
+    "C:retired",
+    "D:promoted",
+    "case:closed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "post-feed",
+       "raw": "G, corrected notice, B cleared",
+       "id": "care-statement-and-clearing.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "D to B, notebook page",
+       "id": "care-statement-and-clearing.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B, once",
+       "id": "care-statement-and-clearing.1.3"
+      }
+     ],
+     "id": "care-statement-and-clearing.1"
+    }
+   ],
+   "id": "care-statement-and-clearing"
+  },
+  {
+   "title": "Sweeper's cart",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    6,
+    6
+   ],
+   "who": [
+    "go-between-bartender",
+    "boss-careful",
+    "bystander"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b5-c16"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 6.833333333333333,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "sweeper with a cart, 06:50",
+       "id": "care-sweeper-s-cart.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "sweeper at the bin",
+       "id": "care-sweeper-s-cart.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "attendant to sweeper, tag stub",
+       "id": "care-sweeper-s-cart.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "sweeper by the service door, 07:30 sharp",
+       "id": "care-sweeper-s-cart.1.4"
+      }
+     ],
+     "id": "care-sweeper-s-cart.1"
+    }
+   ],
+   "id": "care-sweeper-s-cart"
+  },
+  {
+   "title": "Cart to the foundry",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "go-between-bartender"
+   ],
+   "where": "foundry",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b5-c17"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 19.5,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "sweeper, no cart, 19:30",
+       "id": "care-cart-to-the-foundry.1.1"
+      },
+      {
+       "do": "carry",
+       "raw": "gray bag",
+       "id": "care-cart-to-the-foundry.1.2"
+      },
+      {
+       "do": "knock-and-wait",
+       "raw": "foundry room door, one knock",
+       "id": "care-cart-to-the-foundry.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "gray bag through the gap",
+       "id": "care-cart-to-the-foundry.1.4"
+      },
+      {
+       "do": "leave",
+       "raw": "sweeper",
+       "id": "care-cart-to-the-foundry.1.5"
+      }
+     ],
+     "id": "care-cart-to-the-foundry.1"
+    }
+   ],
+   "id": "care-cart-to-the-foundry"
+  },
+  {
+   "title": "Extra insider at station 2",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    13
+   ],
+   "who": [
+    "inside-officer-extra",
+    "desk-sergeant"
+   ],
+   "where": "police-station",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "extra insider apart at briefing",
+       "id": "care-extra-insider-at-station-2.1.1"
+      },
+      {
+       "do": "phone-call",
+       "raw": "extra insider, \"Not here.\"",
+       "id": "care-extra-insider-at-station-2.1.2"
+      },
+      {
+       "do": "leave",
+       "raw": "extra insider first",
+       "id": "care-extra-insider-at-station-2.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "extra insider asks G what station 1 is working on",
+       "id": "care-extra-insider-at-station-2.1.4"
+      }
+     ],
+     "id": "care-extra-insider-at-station-2.1"
+    }
+   ],
+   "id": "care-extra-insider-at-station-2"
+  },
+  {
+   "title": "Bags move to the foundry room",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "go-between-bartender"
+   ],
+   "where": "foundry",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 21,
+     "steps": [
+      {
+       "do": "carry",
+       "raw": "sweeper, two gray bags, 21:00",
+       "id": "care-bags-move-to-the-foundry-room.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "sweeper, foundry room",
+       "id": "care-bags-move-to-the-foundry-room.1.2"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "sweeper, five minutes",
+       "id": "care-bags-move-to-the-foundry-room.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "sweeper empty-handed",
+       "id": "care-bags-move-to-the-foundry-room.1.4"
+      }
+     ],
+     "id": "care-bags-move-to-the-foundry-room.1"
+    }
+   ],
+   "id": "care-bags-move-to-the-foundry-room"
+  },
+  {
+   "title": "Last train, empty bin",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    18,
+    18
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "framed-officer",
+    "inside-officer",
+    "boss-careful",
+    "veteran-officer",
+    "rookie-officer"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b5-c01"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c02"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c07"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c08"
+    }
+   ],
+   "sets": [
+    "A:arrested",
+    "boss:tipped-off",
+    "C:retired",
+    "D:promoted"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 5.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the stair, 05:30",
+       "id": "care-last-train-empty-bin.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "attendant at the bin, 06:40",
+       "id": "care-last-train-empty-bin.1.2"
+      },
+      {
+       "do": "walk",
+       "raw": "attendant off the platform, key unturned",
+       "id": "care-last-train-empty-bin.1.3"
+      },
+      {
+       "do": "search",
+       "raw": "H, bin, empty",
+       "id": "care-last-train-empty-bin.1.4"
+      },
+      {
+       "do": "walk",
+       "raw": "A onto the platform, 06:44",
+       "id": "care-last-train-empty-bin.1.5"
+      },
+      {
+       "do": "arrest",
+       "raw": "B, A",
+       "id": "care-last-train-empty-bin.1.6"
+      },
+      {
+       "do": "hand-over",
+       "raw": "C to D, handheld scanner and the beat map",
+       "id": "care-last-train-empty-bin.1.7"
+      }
+     ],
+     "id": "care-last-train-empty-bin.1"
+    }
+   ],
+   "id": "care-last-train-empty-bin"
+  },
+  {
+   "title": "Foundry room raid",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    19,
+    19
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "veteran-officer",
+    "rookie-officer",
+    "go-between-bartender"
+   ],
+   "where": "foundry",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b5-c16"
+    },
+    {
+     "k": "pay",
+     "id": "b5-c17"
+    }
+   ],
+   "sets": [
+    "boss:safehouse2-burned",
+    "g3:arrested"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "search",
+       "raw": "H, foundry room, gray bags, tag stubs",
+       "id": "care-foundry-room-raid.1.1"
+      },
+      {
+       "do": "arrest",
+       "raw": "H, sweeper",
+       "id": "care-foundry-room-raid.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "C at the green tags",
+       "id": "care-foundry-room-raid.1.3"
+      },
+      {
+       "do": "carry",
+       "raw": "D, bags out",
+       "id": "care-foundry-room-raid.1.4"
+      }
+     ],
+     "id": "care-foundry-room-raid.1"
+    }
+   ],
+   "id": "care-foundry-room-raid"
+  },
+  {
+   "title": "Closing night",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    20,
+    20
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "boss-careful",
+    "inside-officer-extra",
+    "framed-officer"
+   ],
+   "where": "metro-station/platform",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:arrested",
+    "station2:insider-exposed",
+    "case:closed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 4.833333333333333,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the stair, 04:50",
+       "id": "care-closing-night.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "attendant at the bin, 05:40, first train",
+       "id": "care-closing-night.1.2"
+      },
+      {
+       "do": "search",
+       "raw": "attendant turns the key",
+       "id": "care-closing-night.1.3"
+      },
+      {
+       "do": "arrest",
+       "raw": "H, attendant",
+       "id": "care-closing-night.1.4"
+      },
+      {
+       "do": "walk",
+       "raw": "extra insider onto the platform, civilian coat",
+       "id": "care-closing-night.1.5"
+      },
+      {
+       "do": "arrest",
+       "raw": "B, extra insider",
+       "id": "care-closing-night.1.6"
+      }
+     ],
+     "id": "care-closing-night.1"
+    }
+   ],
+   "id": "care-closing-night"
+  }
+ ]
+}

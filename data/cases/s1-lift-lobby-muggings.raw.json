@@ -1,0 +1,647 @@
+{
+ "id": "s1-lift-lobby-muggings",
+ "type": "subplot",
+ "rows": [
+  {
+   "title": "First report",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    2,
+    2
+   ],
+   "who": [
+    "s1-victim",
+    "night-stakeout-officer"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s1-c02"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3.75,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "victim at the lift hall 03:45",
+       "id": "first-report.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "victim at the empty floor of lift car 2",
+       "id": "first-report.1.2"
+      },
+      {
+       "do": "chat",
+       "raw": "victim tells H her takeaway bag was taken at 03:40",
+       "id": "first-report.1.3"
+      },
+      {
+       "do": "police-scan",
+       "raw": "H at the lift door",
+       "id": "first-report.1.4"
+      }
+     ],
+     "id": "first-report.1"
+    }
+   ],
+   "id": "first-report"
+  },
+  {
+   "title": "Lobby watch",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    3,
+    4
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "rookie-officer",
+    "s1-lobby-guard"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s1-c03"
+    },
+    {
+     "k": "herring",
+     "id": "s1-c08"
+    }
+   ],
+   "sets": [
+    "H:stakeout"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the lift hall 03:00 to 04:30",
+       "id": "lobby-watch.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D reads the lobby log aloud, entries 03:40, 03:12, 03:05, all lift car 2",
+       "id": "lobby-watch.1.2"
+      },
+      {
+       "do": "leave",
+       "raw": "guard leaves the lobby desk at 03:00",
+       "id": "lobby-watch.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "guard back at 03:08",
+       "id": "lobby-watch.1.4"
+      }
+     ],
+     "id": "lobby-watch.1"
+    }
+   ],
+   "id": "lobby-watch"
+  },
+  {
+   "title": "Wrong door",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    4,
+    5
+   ],
+   "who": [
+    "red-herring-night-courier",
+    "rookie-officer",
+    "night-stakeout-officer"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "herring",
+     "id": "s1-c07"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3.1666666666666665,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "courier at the lift hall door 03:10 holding a bag",
+       "id": "wrong-door.1.1"
+      },
+      {
+       "do": "run",
+       "raw": "courier runs when D calls out",
+       "id": "wrong-door.1.2"
+      },
+      {
+       "do": "run",
+       "raw": "D follows to the stairs",
+       "id": "wrong-door.1.3"
+      },
+      {
+       "do": "stand",
+       "raw": "H holds D back at the door",
+       "id": "wrong-door.1.4"
+      }
+     ],
+     "id": "wrong-door.1"
+    }
+   ],
+   "id": "wrong-door"
+  },
+  {
+   "title": "Green scarf",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    5,
+    6
+   ],
+   "who": [
+    "s1-victim-b",
+    "rookie-officer"
+   ],
+   "where": "lift",
+   "channel": [
+    "conversation",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s1-c04"
+    },
+    {
+     "k": "plant",
+     "id": "s1-c05"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3.6666666666666665,
+     "steps": [
+      {
+       "do": "chat",
+       "raw": "victim tells D the man wore a green scarf and held her bag in his left hand",
+       "id": "green-scarf.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "victim at the lobby screen",
+       "id": "green-scarf.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D reads the lobby screen still, a green scarf at 03:40",
+       "id": "green-scarf.1.3"
+      }
+     ],
+     "id": "green-scarf.1"
+    }
+   ],
+   "id": "green-scarf"
+  },
+  {
+   "title": "Bag at the counter",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    6,
+    6
+   ],
+   "who": [
+    "go-between-courier",
+    "s1-mugger"
+   ],
+   "where": "food-counter",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s1-c06"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 22.5,
+     "steps": [
+      {
+       "do": "wait-outside",
+       "raw": "man in a green scarf outside the food-counter 22:30",
+       "id": "bag-at-the-counter.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "courier gives him a paper bag",
+       "id": "bag-at-the-counter.1.2"
+      },
+      {
+       "do": "walk",
+       "raw": "he enters the lift hall",
+       "id": "bag-at-the-counter.1.3"
+      }
+     ],
+     "id": "bag-at-the-counter.1"
+    }
+   ],
+   "id": "bag-at-the-counter"
+  },
+  {
+   "title": "Door opens",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    6,
+    6
+   ],
+   "who": [
+    "red-herring-night-courier"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "s1-c07"
+    }
+   ],
+   "sets": [
+    "rh1:cleared"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "courier at door 3B 03:00",
+       "id": "door-opens.1.1"
+      },
+      {
+       "do": "hug",
+       "raw": "partner opens the door",
+       "id": "door-opens.1.2"
+      },
+      {
+       "do": "carry",
+       "raw": "flowers and bread seen at the door",
+       "id": "door-opens.1.3"
+      }
+     ],
+     "id": "door-opens.1"
+    }
+   ],
+   "id": "door-opens"
+  },
+  {
+   "title": "Scrap in the gap",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    7,
+    7
+   ],
+   "who": [
+    "rookie-officer"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s1-c01"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "search",
+       "raw": "D at the lift floor gap",
+       "id": "scrap-in-the-gap.1.1"
+      },
+      {
+       "do": "pick-up",
+       "raw": "torn paper scrap with printed columns",
+       "id": "scrap-in-the-gap.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D reads printed letters RT and a column of numbers",
+       "id": "scrap-in-the-gap.1.3"
+      }
+     ],
+     "id": "scrap-in-the-gap.1"
+    }
+   ],
+   "id": "scrap-in-the-gap"
+  },
+  {
+   "title": "Grab and arrest",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    8,
+    8
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "rookie-officer",
+    "s1-mugger"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s1-c02"
+    },
+    {
+     "k": "pay",
+     "id": "s1-c03"
+    },
+    {
+     "k": "pay",
+     "id": "s1-c04"
+    },
+    {
+     "k": "pay",
+     "id": "s1-c05"
+    },
+    {
+     "k": "pay",
+     "id": "s1-c06"
+    }
+   ],
+   "sets": [
+    "case:s1-mugger-arrested"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the lift hall 03:00",
+       "id": "grab-and-arrest.1.1"
+      },
+      {
+       "do": "bump",
+       "raw": "man in a green scarf bumps a resident and takes her bag",
+       "id": "grab-and-arrest.1.2"
+      },
+      {
+       "do": "run",
+       "raw": "he runs for the stair door",
+       "id": "grab-and-arrest.1.3"
+      },
+      {
+       "do": "arrest",
+       "raw": "H at the stair door",
+       "id": "grab-and-arrest.1.4"
+      },
+      {
+       "do": "search",
+       "raw": "D pulls a folded paper slip from his left sleeve",
+       "id": "grab-and-arrest.1.5"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D reads the slip, columns and a payday",
+       "id": "grab-and-arrest.1.6"
+      }
+     ],
+     "id": "grab-and-arrest.1"
+    }
+   ],
+   "id": "grab-and-arrest"
+  },
+  {
+   "title": "Slip on the desk",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "rookie-officer",
+    "s1-mugger",
+    "desk-sergeant"
+   ],
+   "where": "police-station",
+   "channel": [
+    "conversation",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s1-c01"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "mugger at the interview table",
+       "id": "slip-on-the-desk.1.1"
+      },
+      {
+       "do": "chat",
+       "raw": "mugger tells D a courier paid ten credits a run and handed him the slip each Thursday",
+       "id": "slip-on-the-desk.1.2"
+      },
+      {
+       "do": "pick-up",
+       "raw": "D lifts a second bag from the property box",
+       "id": "slip-on-the-desk.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "D hands the slip to the desk sergeant",
+       "id": "slip-on-the-desk.1.4"
+      }
+     ],
+     "id": "slip-on-the-desk.1"
+    }
+   ],
+   "id": "slip-on-the-desk"
+  },
+  {
+   "title": "Guard on the comm",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    10,
+    10
+   ],
+   "who": [
+    "s1-lobby-guard",
+    "night-stakeout-officer"
+   ],
+   "where": "lift",
+   "channel": [
+    "phone"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "s1-c08"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3.1333333333333333,
+     "steps": [
+      {
+       "do": "phone-call",
+       "raw": "guard at the lobby desk, one side, 'I said stew, eat the stew'",
+       "id": "guard-on-the-comm.1.1"
+      },
+      {
+       "do": "wave",
+       "raw": "H passes the desk",
+       "id": "guard-on-the-comm.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "guard at the desk through 03:08",
+       "id": "guard-on-the-comm.1.3"
+      }
+     ],
+     "id": "guard-on-the-comm.1"
+    }
+   ],
+   "id": "guard-on-the-comm"
+  },
+  {
+   "title": "Quiet lobby",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    11,
+    12
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "rookie-officer",
+    "s1-victim-b"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the lift hall three nights, no grabs",
+       "id": "quiet-lobby.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "D returns the recovered bag to the victim",
+       "id": "quiet-lobby.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D reads the closed log",
+       "id": "quiet-lobby.1.3"
+      }
+     ],
+     "id": "quiet-lobby.1"
+    }
+   ],
+   "id": "quiet-lobby"
+  }
+ ]
+}

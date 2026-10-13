@@ -1,0 +1,143 @@
+{
+ "officers": {
+  "inside-officer": "A",
+  "framed-officer": "B",
+  "veteran-officer": "C",
+  "rookie-officer": "D",
+  "family-caller-officer": "E",
+  "burnout-officer": "F",
+  "desk-sergeant": "G",
+  "night-stakeout-officer": "H"
+ },
+ "ns": {
+  "boss": [
+   "boss-careless",
+   "boss-careful"
+  ],
+  "g1": [
+   "go-between-courier"
+  ],
+  "g2": [
+   "go-between-clerk"
+  ],
+  "g3": [
+   "go-between-bartender"
+  ],
+  "inf": [
+   "informant"
+  ],
+  "rh1": [
+   "red-herring-night-courier"
+  ],
+  "rh2": [
+   "red-herring-bath-regular"
+  ],
+  "rh3": [
+   "red-herring-stall-neighbor"
+  ],
+  "A": [
+   "inside-officer"
+  ],
+  "B": [
+   "framed-officer"
+  ],
+  "C": [
+   "veteran-officer"
+  ],
+  "D": [
+   "rookie-officer"
+  ],
+  "E": [
+   "family-caller-officer"
+  ],
+  "F": [
+   "burnout-officer"
+  ],
+  "G": [
+   "desk-sergeant"
+  ],
+  "H": [
+   "night-stakeout-officer"
+  ]
+ },
+ "arcs": [
+  {
+   "id": "b1-long-queue",
+   "type": "main",
+   "rows": 32,
+   "steps": 160
+  },
+  {
+   "id": "b2-door-work",
+   "type": "main",
+   "rows": 31,
+   "steps": 158
+  },
+  {
+   "id": "b3-the-regular",
+   "type": "main",
+   "rows": 31,
+   "steps": 158
+  },
+  {
+   "id": "b4-dead-drop-days",
+   "type": "main",
+   "rows": 32,
+   "steps": 190
+  },
+  {
+   "id": "b5-last-train",
+   "type": "main",
+   "rows": 31,
+   "steps": 173
+  },
+  {
+   "id": "ordinary-police-work",
+   "type": "thematic",
+   "rows": 16,
+   "steps": 71
+  },
+  {
+   "id": "s1-lift-lobby-muggings",
+   "type": "subplot",
+   "rows": 11,
+   "steps": 40
+  },
+  {
+   "id": "s2-missing-delivery",
+   "type": "subplot",
+   "rows": 13,
+   "steps": 45
+  },
+  {
+   "id": "s3-stall-fire",
+   "type": "subplot",
+   "rows": 11,
+   "steps": 45
+  },
+  {
+   "id": "s4-sky-mall-pickpocket",
+   "type": "subplot",
+   "rows": 12,
+   "steps": 48
+  },
+  {
+   "id": "s5-platform-lurker",
+   "type": "subplot",
+   "rows": 12,
+   "steps": 50
+  },
+  {
+   "id": "s6-screen-graffiti",
+   "type": "subplot",
+   "rows": 12,
+   "steps": 51
+  },
+  {
+   "id": "s7-missing-regular",
+   "type": "subplot",
+   "rows": 12,
+   "steps": 55
+  }
+ ]
+}

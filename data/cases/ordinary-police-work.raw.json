@@ -1,0 +1,971 @@
+{
+ "id": "ordinary-police-work",
+ "type": "thematic",
+ "rows": [
+  {
+   "title": "Briefing at the screens",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "day shift",
+   "days": [
+    1,
+    1
+   ],
+   "who": [
+    "desk-sergeant",
+    "inside-officer",
+    "framed-officer"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "ow-c01"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 7.75,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "G at the screens 07:45",
+       "id": "briefing-at-the-screens.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B at the patrol rota, twice",
+       "id": "briefing-at-the-screens.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "G at corner 7, 22:00, once a week",
+       "id": "briefing-at-the-screens.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "A and B to the exit",
+       "id": "briefing-at-the-screens.1.4"
+      }
+     ],
+     "id": "briefing-at-the-screens.1"
+    }
+   ],
+   "id": "briefing-at-the-screens"
+  },
+  {
+   "title": "Corner scan at the pond",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "swing shift",
+   "days": [
+    1,
+    2
+   ],
+   "who": [
+    "veteran-officer",
+    "rookie-officer"
+   ],
+   "where": "town-square/koi-pond",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 15.166666666666666,
+     "steps": [
+      {
+       "do": "police-patrol",
+       "raw": "C and D along the north path 15:10",
+       "id": "corner-scan-at-the-pond.1.1"
+      },
+      {
+       "do": "police-scan",
+       "raw": "D at corner 3 with the handheld",
+       "id": "corner-scan-at-the-pond.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "C at the pond rail, lips moving",
+       "id": "corner-scan-at-the-pond.1.3"
+      },
+      {
+       "do": "chat",
+       "raw": "C to D, 'Again.'",
+       "id": "corner-scan-at-the-pond.1.4"
+      }
+     ],
+     "id": "corner-scan-at-the-pond.1"
+    }
+   ],
+   "id": "corner-scan-at-the-pond"
+  },
+  {
+   "title": "Night round on the highway",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "night shift",
+   "days": [
+    2,
+    2
+   ],
+   "who": [
+    "family-caller-officer",
+    "night-stakeout-officer"
+   ],
+   "where": "sky-highway",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 1.5,
+     "steps": [
+      {
+       "do": "police-patrol",
+       "raw": "E and H 01:30",
+       "id": "night-round-on-the-highway.1.1"
+      },
+      {
+       "do": "phone-call",
+       "raw": "E, one side, 'Not now, Mama.'",
+       "id": "night-round-on-the-highway.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "H at the east rail",
+       "id": "night-round-on-the-highway.1.3"
+      },
+      {
+       "do": "police-scan",
+       "raw": "H at one door only",
+       "id": "night-round-on-the-highway.1.4"
+      }
+     ],
+     "id": "night-round-on-the-highway.1"
+    }
+   ],
+   "id": "night-round-on-the-highway"
+  },
+  {
+   "title": "Scan skipped at corner 3",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "corner scan",
+   "days": [
+    3,
+    3
+   ],
+   "who": [
+    "burnout-officer"
+   ],
+   "where": "town-square/seats",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "ow-c02"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 15.666666666666666,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "F past corner 3 at 15:40, no scan",
+       "id": "scan-skipped-at-corner-3.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "F on the seat for twenty-five minutes",
+       "id": "scan-skipped-at-corner-3.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "F at the scan slate, corner 3 line empty",
+       "id": "scan-skipped-at-corner-3.1.3"
+      },
+      {
+       "do": "shrug",
+       "raw": "F at the slate",
+       "id": "scan-skipped-at-corner-3.1.4"
+      }
+     ],
+     "id": "scan-skipped-at-corner-3.1"
+    }
+   ],
+   "id": "scan-skipped-at-corner-3"
+  },
+  {
+   "title": "Umbrellas at the plaza",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "rain",
+   "days": [
+    4,
+    5
+   ],
+   "who": [
+    "rookie-officer",
+    "ow-umbrella-seller",
+    "bystander"
+   ],
+   "where": "market-plaza",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "seller in a yellow raincoat under the awning, rack of umbrellas",
+       "id": "umbrellas-at-the-plaza.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "seller gives D an umbrella",
+       "id": "umbrellas-at-the-plaza.1.2"
+      },
+      {
+       "do": "share-umbrella",
+       "raw": "D and a bystander to the pond path",
+       "id": "umbrellas-at-the-plaza.1.3"
+      },
+      {
+       "do": "bump",
+       "raw": "D into the queue, notebook drops",
+       "id": "umbrellas-at-the-plaza.1.4"
+      }
+     ],
+     "id": "umbrellas-at-the-plaza.1"
+    }
+   ],
+   "id": "umbrellas-at-the-plaza"
+  },
+  {
+   "title": "Bag grab at the lift",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "mugging",
+   "days": [
+    6,
+    6
+   ],
+   "who": [
+    "veteran-officer",
+    "rookie-officer",
+    "ow-glove-thief"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "ow-c03"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 18.083333333333332,
+     "steps": [
+      {
+       "do": "bump",
+       "raw": "thief into a bystander 18:05",
+       "id": "bag-grab-at-the-lift.1.1"
+      },
+      {
+       "do": "pick-up",
+       "raw": "thief lifts the bag",
+       "id": "bag-grab-at-the-lift.1.2"
+      },
+      {
+       "do": "run",
+       "raw": "thief through the lobby, one green glove drops",
+       "id": "bag-grab-at-the-lift.1.3"
+      },
+      {
+       "do": "run",
+       "raw": "D after him",
+       "id": "bag-grab-at-the-lift.1.4"
+      },
+      {
+       "do": "pick-up",
+       "raw": "C lifts the glove, red stitches across the fingers",
+       "id": "bag-grab-at-the-lift.1.5"
+      }
+     ],
+     "id": "bag-grab-at-the-lift.1"
+    }
+   ],
+   "id": "bag-grab-at-the-lift"
+  },
+  {
+   "title": "Fruit and a limp",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "thief",
+   "days": [
+    8,
+    8
+   ],
+   "who": [
+    "bystander"
+   ],
+   "where": "town-square/food-stalls",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "ow-c04"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 12.166666666666666,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "bystander in a gray cap at a fruit stall 12:10",
+       "id": "fruit-and-a-limp.1.1"
+      },
+      {
+       "do": "pick-up",
+       "raw": "bystander lifts a bag of fruit from the counter",
+       "id": "fruit-and-a-limp.1.2"
+      },
+      {
+       "do": "walk",
+       "raw": "bystander toward the stairs, left foot dragging",
+       "id": "fruit-and-a-limp.1.3"
+      }
+     ],
+     "id": "fruit-and-a-limp.1"
+    }
+   ],
+   "id": "fruit-and-a-limp"
+  },
+  {
+   "title": "Hood at the shutter",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "lurker",
+   "days": [
+    9,
+    10
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "ow-hood-waiter"
+   ],
+   "where": "shopfront",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "herring",
+     "id": "ow-c05"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 23.5,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "hooded person at the shutter 23:30 for forty minutes",
+       "id": "hood-at-the-shutter.1.1"
+      },
+      {
+       "do": "stakeout",
+       "raw": "H across the lane",
+       "id": "hood-at-the-shutter.1.2"
+      },
+      {
+       "do": "leave",
+       "raw": "hooded person 00:15",
+       "id": "hood-at-the-shutter.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "H home by the last block",
+       "id": "hood-at-the-shutter.1.4"
+      }
+     ],
+     "id": "hood-at-the-shutter.1"
+    }
+   ],
+   "id": "hood-at-the-shutter"
+  },
+  {
+   "title": "Two cups at the counter",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "day shift",
+   "days": [
+    11,
+    11
+   ],
+   "who": [
+    "framed-officer",
+    "inside-officer"
+   ],
+   "where": "food-counter",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "ow-c06"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 13.083333333333334,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "B at the counter, paper notebook open",
+       "id": "two-cups-at-the-counter.1.1"
+      },
+      {
+       "do": "eat",
+       "raw": "A a bowl 13:05",
+       "id": "two-cups-at-the-counter.1.2"
+      },
+      {
+       "do": "serve",
+       "raw": "counter hand slides two cups",
+       "id": "two-cups-at-the-counter.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "B pays for both",
+       "id": "two-cups-at-the-counter.1.4"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B on the receipt, 13:07, tucks it into the notebook",
+       "id": "two-cups-at-the-counter.1.5"
+      }
+     ],
+     "id": "two-cups-at-the-counter.1"
+    }
+   ],
+   "id": "two-cups-at-the-counter"
+  },
+  {
+   "title": "The regular seat",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "swing shift",
+   "days": [
+    12,
+    12
+   ],
+   "who": [
+    "veteran-officer",
+    "rookie-officer",
+    "ow-hood-waiter"
+   ],
+   "where": "food-counter",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "ow-c05"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 19,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "C in the same seat 19:00",
+       "id": "the-regular-seat.1.1"
+      },
+      {
+       "do": "eat",
+       "raw": "C the same meal",
+       "id": "the-regular-seat.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "D at the notice board",
+       "id": "the-regular-seat.1.3"
+      },
+      {
+       "do": "enter",
+       "raw": "hooded person, hood down 19:20",
+       "id": "the-regular-seat.1.4"
+      },
+      {
+       "do": "hug",
+       "raw": "hooded person and a friend",
+       "id": "the-regular-seat.1.5"
+      },
+      {
+       "do": "chat",
+       "raw": "friend, 'You stood forty minutes in the rain?'",
+       "id": "the-regular-seat.1.6"
+      }
+     ],
+     "id": "the-regular-seat.1"
+    }
+   ],
+   "id": "the-regular-seat"
+  },
+  {
+   "title": "Takeaway run",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "night shift",
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "family-caller-officer",
+    "night-stakeout-officer"
+   ],
+   "where": "food-counter",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "ow-c07"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 2.0833333333333335,
+     "steps": [
+      {
+       "do": "leave",
+       "raw": "E leaves the stakeout post 02:05",
+       "id": "takeaway-run.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "E at the counter",
+       "id": "takeaway-run.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "counter hand gives E a paper bag",
+       "id": "takeaway-run.1.3"
+      },
+      {
+       "do": "read-notice",
+       "raw": "E on the receipt, 02:14",
+       "id": "takeaway-run.1.4"
+      },
+      {
+       "do": "walk",
+       "raw": "E back along the lane 02:20",
+       "id": "takeaway-run.1.5"
+      }
+     ],
+     "id": "takeaway-run.1"
+    }
+   ],
+   "id": "takeaway-run"
+  },
+  {
+   "title": "Umbrellas on the highway",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "rain",
+   "days": [
+    15,
+    16
+   ],
+   "who": [
+    "inside-officer",
+    "framed-officer",
+    "burnout-officer"
+   ],
+   "where": "sky-highway",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "ow-c08"
+    },
+    {
+     "k": "herring",
+     "id": "ow-c09"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 16.333333333333332,
+     "steps": [
+      {
+       "do": "share-umbrella",
+       "raw": "A and B 16:20",
+       "id": "umbrellas-on-the-highway.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B at a paper tag, 4471, on an umbrella hooked on the rail",
+       "id": "umbrellas-on-the-highway.1.2"
+      },
+      {
+       "do": "sit",
+       "raw": "F on the rail bench 22:30 in the rain, taped paper bag on his knee",
+       "id": "umbrellas-on-the-highway.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "F at 23:00, bag under his coat",
+       "id": "umbrellas-on-the-highway.1.4"
+      }
+     ],
+     "id": "umbrellas-on-the-highway.1"
+    }
+   ],
+   "id": "umbrellas-on-the-highway"
+  },
+  {
+   "title": "Glove again",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "mugging",
+   "days": [
+    17,
+    17
+   ],
+   "who": [
+    "veteran-officer",
+    "rookie-officer",
+    "ow-glove-thief"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "ow-c03"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 18.033333333333335,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "thief 18:02, two green gloves, red stitching",
+       "id": "glove-again.1.1"
+      },
+      {
+       "do": "bump",
+       "raw": "thief into a bystander",
+       "id": "glove-again.1.2"
+      },
+      {
+       "do": "pick-up",
+       "raw": "thief lifts a bag",
+       "id": "glove-again.1.3"
+      },
+      {
+       "do": "arrest",
+       "raw": "D at the lift hall",
+       "id": "glove-again.1.4"
+      },
+      {
+       "do": "escort",
+       "raw": "C and D to the exit",
+       "id": "glove-again.1.5"
+      }
+     ],
+     "id": "glove-again.1"
+    }
+   ],
+   "id": "glove-again"
+  },
+  {
+   "title": "Corner 3 scanned",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "corner scan",
+   "days": [
+    18,
+    18
+   ],
+   "who": [
+    "burnout-officer",
+    "desk-sergeant"
+   ],
+   "where": "town-square",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "ow-c02"
+    }
+   ],
+   "sets": [
+    "F:recovered"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 15.583333333333334,
+     "steps": [
+      {
+       "do": "police-scan",
+       "raw": "F at corner 3 15:35",
+       "id": "corner-3-scanned.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "F three minutes",
+       "id": "corner-3-scanned.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "G at the scan slate, corner 3 line filled",
+       "id": "corner-3-scanned.1.3"
+      },
+      {
+       "do": "point",
+       "raw": "G at the line",
+       "id": "corner-3-scanned.1.4"
+      }
+     ],
+     "id": "corner-3-scanned.1"
+    }
+   ],
+   "id": "corner-3-scanned"
+  },
+  {
+   "title": "Fruit stall, again",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "thief",
+   "days": [
+    19,
+    19
+   ],
+   "who": [
+    "rookie-officer",
+    "burnout-officer",
+    "bystander"
+   ],
+   "where": "town-square/food-stalls",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "ow-c04"
+    },
+    {
+     "k": "debunk",
+     "id": "ow-c09"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 12.25,
+     "steps": [
+      {
+       "do": "pick-up",
+       "raw": "limping bystander lifts a bag of fruit 12:15",
+       "id": "fruit-stall-again.1.1"
+      },
+      {
+       "do": "run",
+       "raw": "D after him",
+       "id": "fruit-stall-again.1.2"
+      },
+      {
+       "do": "arrest",
+       "raw": "D at the stairs",
+       "id": "fruit-stall-again.1.3"
+      },
+      {
+       "do": "sit",
+       "raw": "F at the stall bench",
+       "id": "fruit-stall-again.1.4"
+      },
+      {
+       "do": "eat",
+       "raw": "F from the taped paper bag, a sandwich",
+       "id": "fruit-stall-again.1.5"
+      }
+     ],
+     "id": "fruit-stall-again.1"
+    }
+   ],
+   "id": "fruit-stall-again"
+  },
+  {
+   "title": "Quiet week at the screens",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": "day shift",
+   "days": [
+    20,
+    21
+   ],
+   "who": [
+    "desk-sergeant",
+    "framed-officer",
+    "family-caller-officer",
+    "bystander"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "ow-c01"
+    },
+    {
+     "k": "pay",
+     "id": "ow-c06"
+    },
+    {
+     "k": "pay",
+     "id": "ow-c07"
+    },
+    {
+     "k": "pay",
+     "id": "ow-c08"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 13.116666666666667,
+     "steps": [
+      {
+       "do": "post-feed",
+       "raw": "G posts a new rota",
+       "id": "quiet-week-at-the-screens.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "G at corner 7, now twice a week",
+       "id": "quiet-week-at-the-screens.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "B gives G the counter receipt, 13:07",
+       "id": "quiet-week-at-the-screens.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "E gives G the takeaway receipt, 02:14",
+       "id": "quiet-week-at-the-screens.1.4"
+      },
+      {
+       "do": "hand-over",
+       "raw": "bystander gives G the umbrella tag, 4471",
+       "id": "quiet-week-at-the-screens.1.5"
+      }
+     ],
+     "id": "quiet-week-at-the-screens.1"
+    }
+   ],
+   "id": "quiet-week-at-the-screens"
+  }
+ ]
+}

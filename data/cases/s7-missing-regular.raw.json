@@ -1,0 +1,756 @@
+{
+ "id": "s7-missing-regular",
+ "type": "subplot",
+ "rows": [
+  {
+   "title": "Last lunch on bench 3",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    8,
+    9
+   ],
+   "who": [
+    "veteran-officer",
+    "informant"
+   ],
+   "where": "food-counter",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s7-c01"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 12,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "resident on bench 3 at 12:00",
+       "id": "last-lunch-on-bench-3.1.1"
+      },
+      {
+       "do": "eat",
+       "raw": "resident, three bites",
+       "id": "last-lunch-on-bench-3.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "resident slides a folded paper under the bench slat",
+       "id": "last-lunch-on-bench-3.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "resident 12:12 without finishing",
+       "id": "last-lunch-on-bench-3.1.4"
+      },
+      {
+       "do": "sit",
+       "raw": "C on the next bench 12:20, same meal",
+       "id": "last-lunch-on-bench-3.1.5"
+      }
+     ],
+     "id": "last-lunch-on-bench-3.1"
+    }
+   ],
+   "id": "last-lunch-on-bench-3"
+  },
+  {
+   "title": "Empty bench",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "veteran-officer",
+    "s7-shift-lead"
+   ],
+   "where": "food-counter",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [],
+   "sets": [
+    "inf:missing"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 12,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "C on bench 3 at 12:00, no resident",
+       "id": "empty-bench.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "C counts the bench slats twice, lips moving",
+       "id": "empty-bench.1.2"
+      },
+      {
+       "do": "pick-up",
+       "raw": "C lifts a folded paper from the slat",
+       "id": "empty-bench.1.3"
+      },
+      {
+       "do": "read-notice",
+       "raw": "C on bench 3 and a time, ten past",
+       "id": "empty-bench.1.4"
+      },
+      {
+       "do": "chat",
+       "raw": "shift lead to C, did not clock in today",
+       "id": "empty-bench.1.5"
+      }
+     ],
+     "id": "empty-bench.1"
+    }
+   ],
+   "id": "empty-bench"
+  },
+  {
+   "title": "Neighbor at the door",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "veteran-officer",
+    "s7-neighbor"
+   ],
+   "where": "tenements",
+   "channel": [
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s7-c02"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 16.5,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "C at door 6B 16:30",
+       "id": "neighbor-at-the-door.1.1"
+      },
+      {
+       "do": "chat",
+       "raw": "neighbor in yellow slippers",
+       "id": "neighbor-at-the-door.1.2"
+      },
+      {
+       "do": "chat",
+       "raw": "neighbor tells C a bag went to the lift at 23:40 last night",
+       "id": "neighbor-at-the-door.1.3"
+      },
+      {
+       "do": "shrug",
+       "raw": "neighbor at the question of who carried it",
+       "id": "neighbor-at-the-door.1.4"
+      },
+      {
+       "do": "chat",
+       "raw": "C to neighbor, will ask again same hour tomorrow",
+       "id": "neighbor-at-the-door.1.5"
+      }
+     ],
+     "id": "neighbor-at-the-door.1"
+    }
+   ],
+   "id": "neighbor-at-the-door"
+  },
+  {
+   "title": "Flat 6B",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    10,
+    10
+   ],
+   "who": [
+    "veteran-officer",
+    "s7-neighbor",
+    "s7-shift-lead"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s7-c03"
+    },
+    {
+     "k": "herring",
+     "id": "s7-c08"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 18.666666666666668,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "C and neighbor, key from the door frame",
+       "id": "flat-6b.1.1"
+      },
+      {
+       "do": "search",
+       "raw": "C along the shelf",
+       "id": "flat-6b.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "C at a made bed and one cup on the rack",
+       "id": "flat-6b.1.3"
+      },
+      {
+       "do": "knock-and-wait",
+       "raw": "shift lead at 6B 18:40 with a folded vest bag",
+       "id": "flat-6b.1.4"
+      },
+      {
+       "do": "leave",
+       "raw": "shift lead, bag against the door",
+       "id": "flat-6b.1.5"
+      }
+     ],
+     "id": "flat-6b.1"
+    }
+   ],
+   "id": "flat-6b"
+  },
+  {
+   "title": "Landing at 03:05",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    11,
+    11
+   ],
+   "who": [
+    "s7-night-visitor"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "herring",
+     "id": "s7-c09"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3.0833333333333335,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "visitor along the landing 03:05, flowers in paper",
+       "id": "landing-at-03-05.1.1"
+      },
+      {
+       "do": "knock-and-wait",
+       "raw": "visitor at door 6C",
+       "id": "landing-at-03-05.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "visitor four minutes",
+       "id": "landing-at-03-05.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "visitor 03:10",
+       "id": "landing-at-03-05.1.4"
+      }
+     ],
+     "id": "landing-at-03-05.1"
+    }
+   ],
+   "id": "landing-at-03-05"
+  },
+  {
+   "title": "Lunch boxes to the lawn",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    12,
+    12
+   ],
+   "who": [
+    "veteran-officer",
+    "s7-neighbor"
+   ],
+   "where": "lawn",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s7-c04"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 12.333333333333334,
+     "steps": [
+      {
+       "do": "carry",
+       "raw": "neighbor two lunch boxes across the lawn edge 12:20",
+       "id": "lunch-boxes-to-the-lawn.1.1"
+      },
+      {
+       "do": "walk",
+       "raw": "neighbor to a picnic cloth",
+       "id": "lunch-boxes-to-the-lawn.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "C on the path, far side",
+       "id": "lunch-boxes-to-the-lawn.1.3"
+      },
+      {
+       "do": "stand",
+       "raw": "C at the path end for ten minutes",
+       "id": "lunch-boxes-to-the-lawn.1.4"
+      },
+      {
+       "do": "chat",
+       "raw": "C to neighbor, same question as yesterday",
+       "id": "lunch-boxes-to-the-lawn.1.5"
+      }
+     ],
+     "id": "lunch-boxes-to-the-lawn.1"
+    }
+   ],
+   "id": "lunch-boxes-to-the-lawn"
+  },
+  {
+   "title": "Door 6C opens",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    13
+   ],
+   "who": [
+    "s7-night-visitor",
+    "s7-shift-lead",
+    "s7-neighbor"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "s7-c09"
+    },
+    {
+     "k": "debunk",
+     "id": "s7-c08"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3.0833333333333335,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "visitor at door 6C 03:05, flowers and bread",
+       "id": "door-6c-opens.1.1"
+      },
+      {
+       "do": "hug",
+       "raw": "resident of 6C opens, hugs visitor",
+       "id": "door-6c-opens.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "shift lead gives the vest bag to neighbor at 6A 18:30",
+       "id": "door-6c-opens.1.3"
+      },
+      {
+       "do": "shrug",
+       "raw": "neighbor, takes the bag inside",
+       "id": "door-6c-opens.1.4"
+      }
+     ],
+     "id": "door-6c-opens.1"
+    }
+   ],
+   "id": "door-6c-opens"
+  },
+  {
+   "title": "Third cup on the cloth",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "s7-sister",
+    "veteran-officer"
+   ],
+   "where": "lawn",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s7-c05"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 12,
+     "steps": [
+      {
+       "do": "picnic",
+       "raw": "sister on the lawn 12:00, basket, three tin cups",
+       "id": "third-cup-on-the-cloth.1.1"
+      },
+      {
+       "do": "serve",
+       "raw": "sister fills two cups",
+       "id": "third-cup-on-the-cloth.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "C on the far path",
+       "id": "third-cup-on-the-cloth.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "C past, does not stop",
+       "id": "third-cup-on-the-cloth.1.4"
+      }
+     ],
+     "id": "third-cup-on-the-cloth.1"
+    }
+   ],
+   "id": "third-cup-on-the-cloth"
+  },
+  {
+   "title": "Second note under slat 3",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    15
+   ],
+   "who": [
+    "veteran-officer",
+    "s7-neighbor"
+   ],
+   "where": "food-counter",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s7-c06"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 11.833333333333334,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "neighbor on bench 3 at 11:50",
+       "id": "second-note-under-slat-3.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "neighbor slides a folded paper under the slat",
+       "id": "second-note-under-slat-3.1.2"
+      },
+      {
+       "do": "leave",
+       "raw": "neighbor",
+       "id": "second-note-under-slat-3.1.3"
+      },
+      {
+       "do": "pick-up",
+       "raw": "C 12:05",
+       "id": "second-note-under-slat-3.1.4"
+      },
+      {
+       "do": "read-notice",
+       "raw": "C on 'bench 3, ten past, eat alone'",
+       "id": "second-note-under-slat-3.1.5"
+      }
+     ],
+     "id": "second-note-under-slat-3.1"
+    }
+   ],
+   "id": "second-note-under-slat-3"
+  },
+  {
+   "title": "Sister's call",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    16,
+    16
+   ],
+   "who": [
+    "s7-sister"
+   ],
+   "where": "lawn",
+   "channel": [
+    "phone"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "s7-c07"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 12.5,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "sister at the picnic cloth 12:30",
+       "id": "sister-s-call.1.1"
+      },
+      {
+       "do": "phone-call",
+       "raw": "sister, one side, 'He eats when the shift is over. Tell the old one, only him.'",
+       "id": "sister-s-call.1.2"
+      },
+      {
+       "do": "carry",
+       "raw": "sister the basket toward the lift",
+       "id": "sister-s-call.1.3"
+      }
+     ],
+     "id": "sister-s-call.1"
+    }
+   ],
+   "id": "sister-s-call"
+  },
+  {
+   "title": "Found on the lawn",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    17,
+    17
+   ],
+   "who": [
+    "veteran-officer",
+    "informant",
+    "s7-sister"
+   ],
+   "where": "lawn",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s7-c02"
+    },
+    {
+     "k": "pay",
+     "id": "s7-c03"
+    },
+    {
+     "k": "pay",
+     "id": "s7-c04"
+    },
+    {
+     "k": "pay",
+     "id": "s7-c05"
+    },
+    {
+     "k": "pay",
+     "id": "s7-c06"
+    },
+    {
+     "k": "pay",
+     "id": "s7-c01"
+    }
+   ],
+   "sets": [
+    "inf:safe"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 12,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "C onto the lawn 12:00",
+       "id": "found-on-the-lawn.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "C on the cloth beside sister",
+       "id": "found-on-the-lawn.1.2"
+      },
+      {
+       "do": "wave",
+       "raw": "resident at the cloth",
+       "id": "found-on-the-lawn.1.3"
+      },
+      {
+       "do": "sit",
+       "raw": "resident on the third cup's side",
+       "id": "found-on-the-lawn.1.4"
+      },
+      {
+       "do": "eat",
+       "raw": "C and resident, same meal, no words for ten minutes",
+       "id": "found-on-the-lawn.1.5"
+      },
+      {
+       "do": "hug",
+       "raw": "sister and resident",
+       "id": "found-on-the-lawn.1.6"
+      }
+     ],
+     "id": "found-on-the-lawn.1"
+    }
+   ],
+   "id": "found-on-the-lawn"
+  },
+  {
+   "title": "Statement at the desk",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    18,
+    19
+   ],
+   "who": [
+    "veteran-officer",
+    "informant"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s7-c07"
+    }
+   ],
+   "sets": [
+    "inf:talking"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 10,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "resident at C's desk 10:00",
+       "id": "statement-at-the-desk.1.1"
+      },
+      {
+       "do": "chat",
+       "raw": "resident, forty minutes, one side to C",
+       "id": "statement-at-the-desk.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "resident gives C a bag of folded slips",
+       "id": "statement-at-the-desk.1.3"
+      },
+      {
+       "do": "escort",
+       "raw": "C to the exit",
+       "id": "statement-at-the-desk.1.4"
+      }
+     ],
+     "id": "statement-at-the-desk.1"
+    }
+   ],
+   "id": "statement-at-the-desk"
+  }
+ ]
+}

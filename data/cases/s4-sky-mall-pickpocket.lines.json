@@ -1,0 +1,435 @@
+{
+ "slots": {
+  "s4-owner": {
+   "desc": "a kiosk clerk in a tea apron"
+  },
+  "s4-thief": {
+   "desc": "a man in a gray hood"
+  },
+  "s4-teen": {
+   "desc": "a teenager with a school bag"
+  },
+  "s4-colleague": {
+   "desc": "a kiosk clerk with a brown envelope"
+  },
+  "extra:shopper": {
+   "desc": "a shopper"
+  },
+  "extra:sibling": {
+   "desc": "a kid with a mall pass"
+  },
+  "extra:relative": {
+   "desc": "an older resident in a long cardigan"
+  }
+ },
+ "steps": {
+  "stub-on-the-floor.1.1": {
+   "who": [
+    "s4-owner"
+   ],
+   "with": [],
+   "line": "{s4-owner} sits on a sky mall bench counting paper stubs from a brown envelope.",
+   "held": "paper:envelope"
+  },
+  "stub-on-the-floor.1.2": {
+   "who": [
+    "s4-owner"
+   ],
+   "with": [],
+   "line": "{s4-owner} knocks {s4-owner.his} bag with an elbow, and a stub flutters to the floor.",
+   "held": "paper:envelope"
+  },
+  "stub-on-the-floor.1.3": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [],
+   "line": "{rookie-officer} stoops and lifts the fallen stub off the floor.",
+   "held": "paper:slip"
+  },
+  "stub-on-the-floor.1.4": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "s4-owner"
+   ],
+   "line": "{rookie-officer} holds the stub out to {s4-owner}.",
+   "held": "paper:slip"
+  },
+  "stub-on-the-floor.1.5": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "s4-owner"
+   ],
+   "line": "{rookie-officer} reads the stub as {s4-owner} takes it: a printed row of numbers and a handwritten 3."
+  },
+  "envelope-lifted.1.1": {
+   "who": [
+    "s4-owner"
+   ],
+   "with": [],
+   "line": "{s4-owner} sits on the same bench with the brown envelope on {s4-owner.his} knee.",
+   "held": "paper:envelope"
+  },
+  "envelope-lifted.1.2": {
+   "who": [
+    "s4-owner"
+   ],
+   "with": [],
+   "line": "{s4-owner} sets the envelope down on the bench and walks off toward the tea kiosk."
+  },
+  "envelope-lifted.1.3": {
+   "who": [
+    "s4-thief"
+   ],
+   "with": [],
+   "line": "{s4-thief} walks past the bench, hood up, a minute after the clerk leaves."
+  },
+  "envelope-lifted.1.4": {
+   "who": [
+    "s4-thief"
+   ],
+   "with": [],
+   "line": "{s4-thief} scoops the brown envelope off the bench without breaking stride.",
+   "held": "paper:envelope"
+  },
+  "envelope-lifted.1.5": {
+   "who": [
+    "s4-thief"
+   ],
+   "with": [],
+   "line": "{s4-thief} walks on toward the lift with the envelope under {s4-thief.his} jacket.",
+   "held": "paper:envelope"
+  },
+  "envelope-lifted.1.6": {
+   "who": [
+    "s4-owner"
+   ],
+   "with": [],
+   "line": "{s4-owner} comes back from the tea kiosk with a cup in hand.",
+   "held": "cup:tea"
+  },
+  "envelope-lifted.1.7": {
+   "who": [
+    "s4-owner"
+   ],
+   "with": [
+    "rookie-officer"
+   ],
+   "line": "{s4-owner} points at the empty bench where the envelope sat.",
+   "held": "cup:tea"
+  },
+  "envelope-lifted.1.8": {
+   "who": [
+    "s4-owner"
+   ],
+   "with": [
+    "rookie-officer"
+   ],
+   "line": "{s4-owner} pulls a spare stub from {s4-owner.his} pocket and gives it to {rookie-officer}.",
+   "held": "paper:slip"
+  },
+  "two-envelopes.1.1": {
+   "who": [
+    "s4-teen"
+   ],
+   "with": [],
+   "line": "{s4-teen} jumps up from a nearby bench and runs.",
+   "held": "bag"
+  },
+  "two-envelopes.1.2": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "s4-teen"
+   ],
+   "line": "{rookie-officer} runs after {s4-teen}, notebook flapping in one hand.",
+   "held": "paper:notebook"
+  },
+  "two-envelopes.1.3": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "extra:shopper"
+   ],
+   "line": "{rookie-officer} clips the bag of {extra:shopper} and keeps running.",
+   "held": "paper:notebook"
+  },
+  "two-envelopes.1.4": {
+   "who": [
+    "s4-colleague"
+   ],
+   "with": [],
+   "line": "{s4-colleague} walks past the bench carrying a brown envelope.",
+   "held": "paper:envelope"
+  },
+  "screen-still.1.1": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [],
+   "line": "{rookie-officer} reads a still on the mall screen: a gray hood at the bench, stamped six past four."
+  },
+  "screen-still.1.2": {
+   "who": [
+    "s4-owner"
+   ],
+   "with": [
+    "rookie-officer"
+   ],
+   "line": "{s4-owner} tells {rookie-officer} it was just paper stubs, nothing anyone would pay for."
+  },
+  "hold-back.1.1": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [
+    "rookie-officer"
+   ],
+   "line": "{veteran-officer} argues with {rookie-officer} in the lift hall: \"You ran. Nobody else did.\""
+  },
+  "hold-back.1.2": {
+   "who": [
+    "veteran-officer"
+   ],
+   "with": [
+    "rookie-officer"
+   ],
+   "line": "{veteran-officer} points at the notebook in the hand of {rookie-officer}."
+  },
+  "hold-back.1.3": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "veteran-officer"
+   ],
+   "line": "{rookie-officer} shrugs and looks at the floor."
+  },
+  "hold-back.1.4": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [],
+   "line": "{rookie-officer} sits down on a lift hall seat, notebook on {rookie-officer.his} knee.",
+   "held": "paper:notebook"
+  },
+  "teen-cleared.1.1": {
+   "who": [
+    "s4-teen"
+   ],
+   "with": [],
+   "line": "{s4-teen} waits by the bench with a school bag, watching the lift doors.",
+   "held": "bag"
+  },
+  "teen-cleared.1.2": {
+   "who": [
+    "s4-teen"
+   ],
+   "with": [
+    "extra:sibling"
+   ],
+   "line": "{s4-teen} hugs {extra:sibling} as the lift doors open.",
+   "held": "bag"
+  },
+  "teen-cleared.1.3": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "extra:sibling"
+   ],
+   "line": "{rookie-officer} reads the mall pass of {extra:sibling}: \"Entered seven past four.\""
+  },
+  "badge-on-the-stair.1.1": {
+   "who": [
+    "s4-thief"
+   ],
+   "with": [],
+   "line": "{s4-thief} walks to the staff stair, gray hood up."
+  },
+  "badge-on-the-stair.1.2": {
+   "who": [
+    "s4-thief"
+   ],
+   "with": [],
+   "line": "{s4-thief} stands at the staff door with a lanyard turned inward."
+  },
+  "badge-on-the-stair.1.3": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "s4-thief"
+   ],
+   "line": "{rookie-officer} reads the number on the lanyard of {s4-thief} as it swings: 22."
+  },
+  "same-bench-16-00.1.1": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [],
+   "line": "{rookie-officer} watches the bench from the tea kiosk, cup in hand.",
+   "held": "cup:tea",
+   "stay": true
+  },
+  "same-bench-16-00.1.2": {
+   "who": [
+    "s4-thief"
+   ],
+   "with": [],
+   "line": "{s4-thief} sits down on the same bench, hood up."
+  },
+  "same-bench-16-00.1.3": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [],
+   "line": "{rookie-officer} searches through the bin beside the bench."
+  },
+  "same-bench-16-00.1.4": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [],
+   "line": "{rookie-officer} lifts a wad of perforated paper stubs out of the bin.",
+   "held": "paper"
+  },
+  "colleague-cleared.1.1": {
+   "who": [
+    "s4-colleague"
+   ],
+   "with": [
+    "s4-owner"
+   ],
+   "line": "{s4-colleague} hands {s4-owner} a brown envelope across the kiosk counter.",
+   "held": "paper:envelope"
+  },
+  "colleague-cleared.1.2": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "s4-owner"
+   ],
+   "line": "{rookie-officer} reads the label on the envelope {s4-owner} holds: \"Staff memo.\""
+  },
+  "arrest-on-the-bench.1.1": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [],
+   "line": "{rookie-officer} waits at the tea kiosk, eyes on the bench.",
+   "stay": true
+  },
+  "arrest-on-the-bench.1.2": {
+   "who": [
+    "s4-thief"
+   ],
+   "with": [],
+   "line": "{s4-thief} sits down on the bench, hood up."
+  },
+  "arrest-on-the-bench.1.3": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [],
+   "line": "{rookie-officer} stands still at the kiosk and does not run."
+  },
+  "arrest-on-the-bench.1.4": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "s4-thief"
+   ],
+   "line": "{rookie-officer} walks to the bench and arrests {s4-thief}."
+  },
+  "arrest-on-the-bench.1.5": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "s4-thief"
+   ],
+   "line": "{rookie-officer} walks {s4-thief} to the lift in cuffs."
+  },
+  "arrest-on-the-bench.1.6": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "s4-thief"
+   ],
+   "line": "{rookie-officer} pulls a paper stub from the pocket of {s4-thief}, a handwritten 3 on its row.",
+   "held": "paper:slip"
+  },
+  "statement.1.1": {
+   "who": [
+    "s4-thief"
+   ],
+   "with": [],
+   "line": "{s4-thief} sits at the interview table, hood down."
+  },
+  "statement.1.2": {
+   "who": [
+    "s4-thief"
+   ],
+   "with": [
+    "rookie-officer"
+   ],
+   "line": "{s4-thief} tells {rookie-officer} a man paid {s4-thief.him} forty credits to lift whatever lay on the bench."
+  },
+  "statement.1.3": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "s4-thief"
+   ],
+   "line": "{rookie-officer} logs the statement and reads it back from the screen."
+  },
+  "envelope-back.1.1": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "s4-owner"
+   ],
+   "line": "{rookie-officer} hands the envelope of stubs back to {s4-owner} on the lawn.",
+   "held": "paper:envelope"
+  },
+  "envelope-back.1.2": {
+   "who": [
+    "s4-owner"
+   ],
+   "with": [
+    "rookie-officer"
+   ],
+   "line": "{s4-owner} signs the return sheet {rookie-officer} holds out."
+  },
+  "envelope-back.1.3": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [
+    "extra:relative"
+   ],
+   "line": "{rookie-officer} hugs {extra:relative} on the lawn, then straightens {rookie-officer.his} uniform."
+  },
+  "envelope-back.1.4": {
+   "who": [
+    "rookie-officer"
+   ],
+   "with": [],
+   "line": "{rookie-officer} sits on the lawn and reads through {rookie-officer.his} notebook.",
+   "held": "paper:notebook",
+   "stay": true
+  }
+ }
+}

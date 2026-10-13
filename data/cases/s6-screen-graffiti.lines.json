@@ -1,0 +1,395 @@
+{
+ "slots": {
+  "s6-painter": {
+   "desc": "a teen in a dark jacket"
+  },
+  "s6-screen-wiper": {
+   "desc": "a man in gray overalls"
+  },
+  "extra:visitor": {
+   "desc": "a resident at the screens"
+  }
+ },
+ "steps": {
+  "three-dots-on-the-corner.1.1": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} stands at the front screens at the start of shift."
+  },
+  "three-dots-on-the-corner.1.2": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} reads down the row of six wanted posters."
+  },
+  "three-dots-on-the-corner.1.3": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} points at three orange dots on the corner of poster 4."
+  },
+  "three-dots-on-the-corner.1.4": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} walks to the supply cabinet behind the desk."
+  },
+  "three-dots-on-the-corner.1.5": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} carries a cloth back to the screens."
+  },
+  "wiper-at-dawn.1.1": {
+   "who": [
+    "s6-screen-wiper"
+   ],
+   "with": [],
+   "line": "{s6-screen-wiper} comes into the station hall at dawn with a long cloth."
+  },
+  "wiper-at-dawn.1.2": {
+   "who": [
+    "s6-screen-wiper"
+   ],
+   "with": [],
+   "line": "{s6-screen-wiper} stands at the lower edge of the screens."
+  },
+  "wiper-at-dawn.1.3": {
+   "who": [
+    "s6-screen-wiper"
+   ],
+   "with": [],
+   "line": "{s6-screen-wiper} runs the long cloth along posters 5 and 6."
+  },
+  "wiper-at-dawn.1.4": {
+   "who": [
+    "s6-screen-wiper"
+   ],
+   "with": [],
+   "line": "{s6-screen-wiper} folds the cloth over {s6-screen-wiper.his} shoulder and leaves the hall."
+  },
+  "cuffs-at-the-screens.1.1": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} enters the station hall before dawn, orange smudges on both cuffs."
+  },
+  "cuffs-at-the-screens.1.2": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} stands in front of poster 4, close to the glass."
+  },
+  "cuffs-at-the-screens.1.3": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} leaves the hall with a flat bag under one arm, a blue bot sticker on it.",
+   "held": "bag"
+  },
+  "poster-4-smeared.1.1": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} reads poster 4: orange paint is spread across the face."
+  },
+  "poster-4-smeared.1.2": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} points at the other five posters, all of them clean."
+  },
+  "poster-4-smeared.1.3": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [
+    "extra:visitor"
+   ],
+   "line": "{desk-sergeant} argues with {extra:visitor} about who locked the hall overnight."
+  },
+  "poster-4-smeared.1.4": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} walks back to the front desk."
+  },
+  "poster-4-covered.1.1": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} reads poster 4: orange from edge to edge, the caption gone under it."
+  },
+  "poster-4-covered.1.2": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} points at the covered screen for the hall to see."
+  },
+  "poster-4-covered.1.3": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "Posted to the mesh by {desk-sergeant}: \"Screen 4 offline.\""
+  },
+  "poster-4-covered.1.4": {
+   "who": [
+    "extra:visitor"
+   ],
+   "with": [],
+   "line": "{extra:visitor} stands at the glass with one hand on the edge of the screen."
+  },
+  "prints-and-a-dripping-drone.1.1": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} stands looking down at the floor below poster 4."
+  },
+  "prints-and-a-dripping-drone.1.2": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} points at small orange sneaker prints, four steps from the door."
+  },
+  "prints-and-a-dripping-drone.1.3": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "A cleaning drone passes an arm over the top of poster 2 while {desk-sergeant} watches."
+  },
+  "prints-and-a-dripping-drone.1.4": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "The drone leaves a trail of orange drops down the glass past {desk-sergeant}."
+  },
+  "comm-call-at-the-lift.1.1": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} stands in the lift hall, waiting for the lift."
+  },
+  "comm-call-at-the-lift.1.2": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} on the comm, one side: \"He is not like the poster. He is not like that.\""
+  },
+  "comm-call-at-the-lift.1.3": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} steps into the lift as the doors open."
+  },
+  "comm-call-at-the-lift.1.4": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} rides the lift up and out of the lobby."
+  },
+  "can-in-the-bin-and-a-work-card.1.1": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} lifts a flat spray can out of the bin by the screens."
+  },
+  "can-in-the-bin-and-a-work-card.1.2": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} turns the can over: a blue bot sticker on its side."
+  },
+  "can-in-the-bin-and-a-work-card.1.3": {
+   "who": [
+    "s6-screen-wiper"
+   ],
+   "with": [],
+   "line": "{s6-screen-wiper} stands at the glass at dawn with a long cloth."
+  },
+  "can-in-the-bin-and-a-work-card.1.4": {
+   "who": [
+    "s6-screen-wiper"
+   ],
+   "with": [
+    "desk-sergeant"
+   ],
+   "line": "{s6-screen-wiper} unclips a work card from {s6-screen-wiper.his} overalls and hands it to {desk-sergeant}.",
+   "held": "paper"
+  },
+  "can-in-the-bin-and-a-work-card.1.5": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [
+    "s6-screen-wiper"
+   ],
+   "line": "{desk-sergeant} reads the card: \"Contract cleaner, front screens.\"",
+   "held": "paper"
+  },
+  "lanyard-at-the-screens.1.1": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} comes into the station hall early, hands in pockets."
+  },
+  "lanyard-at-the-screens.1.2": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} stands at poster 4 and looks at the orange-covered glass."
+  },
+  "lanyard-at-the-screens.1.3": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} turns the lanyard over: the printed surname is the same as the one in the caption of poster 4."
+  },
+  "lanyard-at-the-screens.1.4": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "A drone docks on the ceiling rail above {desk-sergeant}, a label on its tank: \"Orange sealant.\""
+  },
+  "lanyard-at-the-screens.1.5": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} leaves the hall without looking back."
+  },
+  "poster-4-restored.1.1": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} carries a fresh print of poster 4 to the screens.",
+   "held": "paper"
+  },
+  "poster-4-restored.1.2": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "Posted to the mesh by {desk-sergeant}: \"Poster 4 reprinted. Screen 4 back online.\""
+  },
+  "poster-4-restored.1.3": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} stands at the glass with the lanyard turned out."
+  },
+  "poster-4-restored.1.4": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [
+    "s6-painter"
+   ],
+   "line": "{desk-sergeant} talks with {s6-painter} at the glass for two minutes."
+  },
+  "poster-4-restored.1.5": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [
+    "desk-sergeant"
+   ],
+   "line": "{s6-painter} hands {desk-sergeant} the flat bag with the blue bot sticker.",
+   "held": "bag"
+  },
+  "night-watch-at-the-screens.1.1": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [],
+   "line": "{night-stakeout-officer} stands in a corner of the station hall, eyes on the screens.",
+   "stay": true
+  },
+  "night-watch-at-the-screens.1.2": {
+   "who": [
+    "night-stakeout-officer"
+   ],
+   "with": [],
+   "line": "{night-stakeout-officer} walks up to the screens and stands close to the glass."
+  },
+  "night-watch-at-the-screens.1.3": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [
+    "night-stakeout-officer"
+   ],
+   "line": "{desk-sergeant} argues with {night-stakeout-officer} about overtime: \"Two more nights, then I sign nothing.\""
+  },
+  "night-watch-at-the-screens.1.4": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} reads down all six posters, every one of them clean."
+  },
+  "hours-at-the-screens.1.1": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [
+    "desk-sergeant"
+   ],
+   "line": "{s6-painter} hands {desk-sergeant} a signed sheet for cleaning hours at the screens.",
+   "held": "paper:slip"
+  },
+  "hours-at-the-screens.1.2": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} carries a broom and a bucket to the screens.",
+   "held": "tools"
+  },
+  "hours-at-the-screens.1.3": {
+   "who": [
+    "s6-painter"
+   ],
+   "with": [],
+   "line": "{s6-painter} works along the glass with the broom and bucket.",
+   "held": "tools"
+  },
+  "hours-at-the-screens.1.4": {
+   "who": [
+    "desk-sergeant"
+   ],
+   "with": [],
+   "line": "{desk-sergeant} runs a scan at the hall door with the handheld."
+  }
+ }
+}

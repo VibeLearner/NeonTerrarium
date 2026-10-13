@@ -1,0 +1,2275 @@
+{
+ "id": "b1-long-queue",
+ "type": "main",
+ "rows": [
+  {
+   "title": "Free bowl",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    1,
+    2
+   ],
+   "who": [
+    "crowd",
+    "boss-careless",
+    "inside-officer",
+    "framed-officer"
+   ],
+   "where": "town-square/food-stalls",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b1-c01"
+    },
+    {
+     "k": "plant",
+     "id": "b1-c02"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 1,
+     "hour": 11.833333333333334,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "queue of 12 at the noodle stall, 11:50",
+       "id": "free-bowl.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "patron passes a folded slip under an empty bowl, d01 11:52",
+       "id": "free-bowl.1.2"
+      },
+      {
+       "do": "pick-up",
+       "raw": "keeper tucks the slip into the lid rack",
+       "id": "free-bowl.1.3"
+      }
+     ],
+     "id": "free-bowl.1"
+    },
+    {
+     "day": 2,
+     "hour": 12.166666666666666,
+     "steps": [
+      {
+       "do": "police-patrol",
+       "raw": "A and B stop at the stall, d02 12:10",
+       "id": "free-bowl.2.1"
+      },
+      {
+       "do": "eat",
+       "raw": "A, a bowl served, no coins on the counter",
+       "id": "free-bowl.2.2"
+      },
+      {
+       "do": "wave",
+       "raw": "keeper nods at A",
+       "id": "free-bowl.2.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "B pays two coins for his bowl",
+       "id": "free-bowl.2.4"
+      }
+     ],
+     "id": "free-bowl.2"
+    }
+   ],
+   "id": "free-bowl"
+  },
+  {
+   "title": "Bench lunch",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    3,
+    3
+   ],
+   "who": [
+    "veteran-officer",
+    "informant",
+    "burnout-officer"
+   ],
+   "where": "town-square/seats",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b1-c04"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 13.083333333333334,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "restocker on the bench by the vending machines, 13:05",
+       "id": "bench-lunch.1.1"
+      },
+      {
+       "do": "eat",
+       "raw": "restocker, bag lunch",
+       "id": "bench-lunch.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "restocker turns toward the noodle stall, then faces the ground",
+       "id": "bench-lunch.1.3"
+      },
+      {
+       "do": "stand",
+       "raw": "C at the far corner, then sit on the same bench",
+       "id": "bench-lunch.1.4"
+      },
+      {
+       "do": "chat",
+       "raw": "C, \"Same bench tomorrow.\"",
+       "id": "bench-lunch.1.5"
+      },
+      {
+       "do": "sit",
+       "raw": "F on a seat, 15:00, 40 minutes",
+       "id": "bench-lunch.1.6"
+      },
+      {
+       "do": "shrug",
+       "raw": "F, \"I will finish the fire report tomorrow.\"",
+       "id": "bench-lunch.1.7"
+      }
+     ],
+     "id": "bench-lunch.1"
+    }
+   ],
+   "id": "bench-lunch"
+  },
+  {
+   "title": "Bowl tower",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    3,
+    4
+   ],
+   "who": [
+    "go-between-courier",
+    "boss-careless",
+    "red-herring-stall-neighbor",
+    "rookie-officer"
+   ],
+   "where": "town-square/food-stalls",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b1-c03"
+    },
+    {
+     "k": "plant",
+     "id": "b1-c05"
+    },
+    {
+     "k": "herring",
+     "id": "b1-c06"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 3,
+     "hour": 14,
+     "steps": [
+      {
+       "do": "carry",
+       "raw": "courier leaves the stall with a tower of six lidded bowls, d03 14:00",
+       "id": "bowl-tower.1.1"
+      },
+      {
+       "do": "walk",
+       "raw": "courier past the seats, no lid lifted",
+       "id": "bowl-tower.1.2"
+      }
+     ],
+     "id": "bowl-tower.1"
+    },
+    {
+     "day": 4,
+     "hour": 12.666666666666666,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "stencil on the lid rack, lids numbered 11 to 17, d04",
+       "id": "bowl-tower.2.1"
+      },
+      {
+       "do": "point",
+       "raw": "D at the stencil, reads it out loud",
+       "id": "bowl-tower.2.2"
+      },
+      {
+       "do": "argue",
+       "raw": "neighbor and courier at the stall line, d04 12:40, \"Rent is rent\"",
+       "id": "bowl-tower.2.3"
+      },
+      {
+       "do": "shrug",
+       "raw": "courier",
+       "id": "bowl-tower.2.4"
+      }
+     ],
+     "id": "bowl-tower.2"
+    }
+   ],
+   "id": "bowl-tower"
+  },
+  {
+   "title": "Wrong door",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    5,
+    5
+   ],
+   "who": [
+    "go-between-courier",
+    "red-herring-night-courier",
+    "resident"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b1-c08"
+    },
+    {
+     "k": "herring",
+     "id": "b1-c09"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "night courier at door 6B, 03:00",
+       "id": "wrong-door.1.1"
+      },
+      {
+       "do": "wave",
+       "raw": "nobody answers, night courier leaves",
+       "id": "wrong-door.1.2"
+      },
+      {
+       "do": "knock-and-wait",
+       "raw": "courier at door 4C, 14:20",
+       "id": "wrong-door.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "courier gives one lidded bowl, resident returns a thin paper bag",
+       "id": "wrong-door.1.4"
+      },
+      {
+       "do": "leave",
+       "raw": "courier by the lift",
+       "id": "wrong-door.1.5"
+      }
+     ],
+     "id": "wrong-door.1"
+    }
+   ],
+   "id": "wrong-door"
+  },
+  {
+   "title": "Scan skipped",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    5,
+    7
+   ],
+   "who": [
+    "inside-officer",
+    "framed-officer",
+    "boss-careless"
+   ],
+   "where": "town-square/food-stalls",
+   "channel": [
+    "seen",
+    "conversation",
+    "phone"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b1-c07"
+    },
+    {
+     "k": "plant",
+     "id": "b1-c11"
+    },
+    {
+     "k": "plant",
+     "id": "b1-c12"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 5,
+     "hour": 10.25,
+     "steps": [
+      {
+       "do": "police-scan",
+       "raw": "A at the stalls left and right of the noodle stall, d05 10:15",
+       "id": "scan-skipped.1.1"
+      },
+      {
+       "do": "walk",
+       "raw": "A past the noodle stall, no scan",
+       "id": "scan-skipped.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B at the scan sheet, twice, the noodle stall line blank",
+       "id": "scan-skipped.1.3"
+      },
+      {
+       "do": "carry",
+       "raw": "B writes in a paper notebook and keeps it",
+       "id": "scan-skipped.1.4"
+      }
+     ],
+     "id": "scan-skipped.1"
+    },
+    {
+     "day": 6,
+     "hour": 11,
+     "steps": [
+      {
+       "do": "walk-together",
+       "raw": "A and B on a longer route past the stall, d06 11:00",
+       "id": "scan-skipped.2.1"
+      },
+      {
+       "do": "chat",
+       "raw": "B, \"We turned left here yesterday.\"",
+       "id": "scan-skipped.2.2"
+      }
+     ],
+     "id": "scan-skipped.2"
+    },
+    {
+     "day": 7,
+     "hour": 12.666666666666666,
+     "steps": [
+      {
+       "do": "phone-call",
+       "raw": "A behind a pillar, d07 12:40, \"Not here.\"",
+       "id": "scan-skipped.3.1"
+      },
+      {
+       "do": "wave",
+       "raw": "keeper at A",
+       "id": "scan-skipped.3.2"
+      }
+     ],
+     "id": "scan-skipped.3"
+    }
+   ],
+   "id": "scan-skipped"
+  },
+  {
+   "title": "Empty bowls",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    6,
+    7
+   ],
+   "who": [
+    "resident",
+    "go-between-courier",
+    "family-caller-officer"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b1-c10"
+    },
+    {
+     "k": "plant",
+     "id": "b1-c13"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 6,
+     "hour": 23,
+     "steps": [
+      {
+       "do": "carry",
+       "raw": "resident leaves 4C with a sack of empty lidded bowls, d06 23:00",
+       "id": "empty-bowls.1.1"
+      }
+     ],
+     "id": "empty-bowls.1"
+    },
+    {
+     "day": 7,
+     "hour": 16,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "courier into the lift, d07 16:00",
+       "id": "empty-bowls.2.1"
+      },
+      {
+       "do": "stand",
+       "raw": "lift panel lit to 4",
+       "id": "empty-bowls.2.2"
+      },
+      {
+       "do": "phone-call",
+       "raw": "E in the corridor, \"Not now, Mama.\"",
+       "id": "empty-bowls.2.3"
+      },
+      {
+       "do": "phone-call",
+       "raw": "E, \"Put him on.\"",
+       "id": "empty-bowls.2.4"
+      },
+      {
+       "do": "walk",
+       "raw": "E to the stairs",
+       "id": "empty-bowls.2.5"
+      }
+     ],
+     "id": "empty-bowls.2"
+    }
+   ],
+   "id": "empty-bowls"
+  },
+  {
+   "title": "Machine dark",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s7"
+   ],
+   "loop": null,
+   "days": [
+    8,
+    9
+   ],
+   "who": [
+    "informant",
+    "veteran-officer",
+    "crowd"
+   ],
+   "where": "town-square/vending-machines",
+   "channel": [
+    "seen",
+    "document",
+    "phone"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b1-c14"
+    }
+   ],
+   "sets": [
+    "inf:missing"
+   ],
+   "moments": [
+    {
+     "day": 8,
+     "hour": 9,
+     "steps": [
+      {
+       "do": "carry",
+       "raw": "restocker with a crate, d08 09:00, back to the machine",
+       "id": "machine-dark.1.1"
+      },
+      {
+       "do": "walk",
+       "raw": "restocker by the far lane, d08 15:00, not past the noodle stall",
+       "id": "machine-dark.1.2"
+      }
+     ],
+     "id": "machine-dark.1"
+    },
+    {
+     "day": 9,
+     "hour": 9,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "C at the machine, d09 09:00, light dark",
+       "id": "machine-dark.2.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "sign \"restock Thursday\", no initials",
+       "id": "machine-dark.2.2"
+      },
+      {
+       "do": "phone-call",
+       "raw": "C, \"No, nobody has seen him.\"",
+       "id": "machine-dark.2.3"
+      }
+     ],
+     "id": "machine-dark.2"
+    }
+   ],
+   "id": "machine-dark"
+  },
+  {
+   "title": "Route slip",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s1"
+   ],
+   "loop": null,
+   "days": [
+    8,
+    9
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "rookie-officer",
+    "bystander"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s1-c01"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c03"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c08"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 8,
+     "hour": 6.5,
+     "steps": [
+      {
+       "do": "escort",
+       "raw": "H and D walk a mugger in, d08 06:30",
+       "id": "route-slip.1.1"
+      },
+      {
+       "do": "search",
+       "raw": "D empties a pocket",
+       "id": "route-slip.1.2"
+      }
+     ],
+     "id": "route-slip.1"
+    },
+    {
+     "day": 9,
+     "hour": null,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "slip listing seven Square stall numbers and \"pay Fri\", d09",
+       "id": "route-slip.2.1"
+      },
+      {
+       "do": "point",
+       "raw": "D at the stall numbers",
+       "id": "route-slip.2.2"
+      },
+      {
+       "do": "chat",
+       "raw": "mugger tells D the bowls came from the runner at the Square and went to doors off the list",
+       "id": "route-slip.2.3"
+      }
+     ],
+     "id": "route-slip.2"
+    }
+   ],
+   "id": "route-slip"
+  },
+  {
+   "title": "Parcel lid",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s2"
+   ],
+   "loop": null,
+   "days": [
+    9,
+    9
+   ],
+   "who": [
+    "family-caller-officer",
+    "rookie-officer",
+    "veteran-officer",
+    "red-herring-night-courier"
+   ],
+   "where": "tenements",
+   "channel": [
+    "document",
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s2-c01"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c01"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c05"
+    },
+    {
+     "k": "herring",
+     "id": "b1-c15"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 5.5,
+     "steps": [
+      {
+       "do": "pick-up",
+       "raw": "E lifts a parcel from a doorstep, 05:30",
+       "id": "parcel-lid.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "label under the false bottom, \"lid 14\"",
+       "id": "parcel-lid.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "E at the label",
+       "id": "parcel-lid.1.3"
+      },
+      {
+       "do": "run",
+       "raw": "night courier down the stairs, 22:40",
+       "id": "parcel-lid.1.4"
+      },
+      {
+       "do": "run",
+       "raw": "D after him",
+       "id": "parcel-lid.1.5"
+      },
+      {
+       "do": "wave",
+       "raw": "C waves D back",
+       "id": "parcel-lid.1.6"
+      }
+     ],
+     "id": "parcel-lid.1"
+    }
+   ],
+   "id": "parcel-lid"
+  },
+  {
+   "title": "Arson suspect",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s3"
+   ],
+   "loop": null,
+   "days": [
+    9,
+    10
+   ],
+   "who": [
+    "burnout-officer",
+    "go-between-courier",
+    "bystander"
+   ],
+   "where": "market-plaza",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "s3-c01"
+    }
+   ],
+   "sets": [],
+   "moments": [
+    {
+     "day": 9,
+     "hour": 7,
+     "steps": [
+      {
+       "do": "stand",
+       "raw": "courier at the burnt stall, d09 07:00",
+       "id": "arson-suspect.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "courier gives a thin bag to a man at the stall edge",
+       "id": "arson-suspect.1.2"
+      },
+      {
+       "do": "arrest",
+       "raw": "F takes the man, d09 15:20",
+       "id": "arson-suspect.1.3"
+      },
+      {
+       "do": "escort",
+       "raw": "F walks him to the patrol",
+       "id": "arson-suspect.1.4"
+      }
+     ],
+     "id": "arson-suspect.1"
+    },
+    {
+     "day": 10,
+     "hour": null,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "F on the plaza steps, d10, 40 minutes",
+       "id": "arson-suspect.2.1"
+      },
+      {
+       "do": "eat",
+       "raw": "F, cold noodles",
+       "id": "arson-suspect.2.2"
+      }
+     ],
+     "id": "arson-suspect.2"
+    }
+   ],
+   "id": "arson-suspect"
+  },
+  {
+   "title": "Label and feed",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    10,
+    11
+   ],
+   "who": [
+    "framed-officer",
+    "desk-sergeant",
+    "inside-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document",
+    "feed"
+   ],
+   "clues": [
+    {
+     "k": "plant",
+     "id": "b1-c16"
+    },
+    {
+     "k": "plant",
+     "id": "b1-c17"
+    }
+   ],
+   "sets": [
+    "B:framed"
+   ],
+   "moments": [
+    {
+     "day": 10,
+     "hour": null,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "payment label on a recovered parcel at the evidence counter, d10, a badge number in a looped hand",
+       "id": "label-and-feed.1.1"
+      },
+      {
+       "do": "point",
+       "raw": "G at the badge number",
+       "id": "label-and-feed.1.2"
+      },
+      {
+       "do": "argue",
+       "raw": "B and G, B says the digits are not his hand",
+       "id": "label-and-feed.1.3"
+      }
+     ],
+     "id": "label-and-feed.1"
+    },
+    {
+     "day": 11,
+     "hour": 14,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "B's notebook page, lift lobby duty 14:00 to 14:30, d11",
+       "id": "label-and-feed.2.1"
+      },
+      {
+       "do": "post-feed",
+       "raw": "mesh post d11 14:02 from the station terminal naming B's badge number with an amount",
+       "id": "label-and-feed.2.2"
+      }
+     ],
+     "id": "label-and-feed.2"
+    }
+   ],
+   "id": "label-and-feed"
+  },
+  {
+   "title": "Suspended on screens",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    12,
+    12
+   ],
+   "who": [
+    "desk-sergeant",
+    "framed-officer",
+    "inside-officer",
+    "red-herring-stall-neighbor"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document",
+    "feed",
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "herring",
+     "id": "b1-c18"
+    }
+   ],
+   "sets": [
+    "B:suspended"
+   ],
+   "moments": [
+    {
+     "day": 12,
+     "hour": 8,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "poster, B suspended pending review, d12 08:00",
+       "id": "suspended-on-screens.1.1"
+      },
+      {
+       "do": "post-feed",
+       "raw": "G posts it to the station feed",
+       "id": "suspended-on-screens.1.2"
+      },
+      {
+       "do": "stand",
+       "raw": "B before the screen",
+       "id": "suspended-on-screens.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "A past B with two cups, one cup only",
+       "id": "suspended-on-screens.1.4"
+      },
+      {
+       "do": "stand",
+       "raw": "neighbor outside the screens, ten minutes",
+       "id": "suspended-on-screens.1.5"
+      }
+     ],
+     "id": "suspended-on-screens.1"
+    }
+   ],
+   "id": "suspended-on-screens"
+  },
+  {
+   "title": "Tray empty",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    12,
+    13
+   ],
+   "who": [
+    "inside-officer",
+    "framed-officer",
+    "desk-sergeant"
+   ],
+   "where": "police-station",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": 12,
+     "hour": 6.833333333333333,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "A at the evidence counter, d12 06:50",
+       "id": "tray-empty.1.1"
+      },
+      {
+       "do": "carry",
+       "raw": "A leaves with a flat box",
+       "id": "tray-empty.1.2"
+      }
+     ],
+     "id": "tray-empty.1"
+    },
+    {
+     "day": 13,
+     "hour": 9.166666666666666,
+     "steps": [
+      {
+       "do": "search",
+       "raw": "B at the evidence tray, d13 09:10, empty",
+       "id": "tray-empty.2.1"
+      },
+      {
+       "do": "argue",
+       "raw": "B and G about the log",
+       "id": "tray-empty.2.2"
+      },
+      {
+       "do": "shrug",
+       "raw": "G",
+       "id": "tray-empty.2.3"
+      }
+     ],
+     "id": "tray-empty.2"
+    }
+   ],
+   "id": "tray-empty"
+  },
+  {
+   "title": "Door 6B",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    13
+   ],
+   "who": [
+    "framed-officer",
+    "red-herring-night-courier"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "b1-c09"
+    },
+    {
+     "k": "debunk",
+     "id": "b1-c15"
+    }
+   ],
+   "sets": [
+    "rh1:cleared"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 3,
+     "steps": [
+      {
+       "do": "wait-outside",
+       "raw": "B outside A's door, 03:00",
+       "id": "door-6b.1.1"
+      },
+      {
+       "do": "knock-and-wait",
+       "raw": "B at A's door, no answer",
+       "id": "door-6b.1.2"
+      },
+      {
+       "do": "knock-and-wait",
+       "raw": "night courier at door 6B",
+       "id": "door-6b.1.3"
+      },
+      {
+       "do": "hug",
+       "raw": "partner opens the door",
+       "id": "door-6b.1.4"
+      },
+      {
+       "do": "carry",
+       "raw": "night courier's bag, flowers and bread",
+       "id": "door-6b.1.5"
+      },
+      {
+       "do": "leave",
+       "raw": "B",
+       "id": "door-6b.1.6"
+      }
+     ],
+     "id": "door-6b.1"
+    }
+   ],
+   "id": "door-6b"
+  },
+  {
+   "title": "Stakeout hand-over",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    14
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "inside-officer",
+    "go-between-courier"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b1-c02"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c07"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c11"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c12"
+    }
+   ],
+   "sets": [
+    "g1:arrested"
+   ],
+   "moments": [
+    {
+     "day": 13,
+     "hour": 21,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the lift hall, d13 21:00, paper cup on the ledge",
+       "id": "stakeout-hand-over.1.1"
+      }
+     ],
+     "id": "stakeout-hand-over.1"
+    },
+    {
+     "day": 14,
+     "hour": 21.5,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H again, d14 21:30",
+       "id": "stakeout-hand-over.2.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "A in a jacket passes a folded sheet to courier at the lift doors, d14 22:10",
+       "id": "stakeout-hand-over.2.2"
+      },
+      {
+       "do": "arrest",
+       "raw": "H takes courier, 22:12",
+       "id": "stakeout-hand-over.2.3"
+      },
+      {
+       "do": "escort",
+       "raw": "H and courier out through the lobby",
+       "id": "stakeout-hand-over.2.4"
+      }
+     ],
+     "id": "stakeout-hand-over.2"
+    }
+   ],
+   "id": "stakeout-hand-over"
+  },
+  {
+   "title": "Shutter down",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    15
+   ],
+   "who": [
+    "inside-officer",
+    "boss-careless",
+    "red-herring-stall-neighbor",
+    "crowd"
+   ],
+   "where": "town-square/food-stalls",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [
+    {
+     "k": "debunk",
+     "id": "b1-c06"
+    },
+    {
+     "k": "debunk",
+     "id": "b1-c18"
+    }
+   ],
+   "sets": [
+    "boss:tipped-off",
+    "rh3:cleared"
+   ],
+   "moments": [
+    {
+     "day": 15,
+     "hour": 6.666666666666667,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "A to the stall, d15 06:40, before opening",
+       "id": "shutter-down.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "A passes a folded sheet over the counter",
+       "id": "shutter-down.1.2"
+      },
+      {
+       "do": "leave",
+       "raw": "A",
+       "id": "shutter-down.1.3"
+      },
+      {
+       "do": "serve",
+       "raw": "keeper pulls the shutter at 07:00",
+       "id": "shutter-down.1.4"
+      },
+      {
+       "do": "read-notice",
+       "raw": "landlord receipt on neighbor's shutter, stamped paid",
+       "id": "shutter-down.1.5"
+      },
+      {
+       "do": "carry",
+       "raw": "neighbor unloads stock crates",
+       "id": "shutter-down.1.6"
+      }
+     ],
+     "id": "shutter-down.1"
+    }
+   ],
+   "id": "shutter-down"
+  },
+  {
+   "title": "Flat 4C",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    15
+   ],
+   "who": [
+    "veteran-officer",
+    "rookie-officer",
+    "resident"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b1-c10"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c13"
+    }
+   ],
+   "sets": [
+    "boss:safehouse-burned"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 9,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "C and D at 4C, 09:00",
+       "id": "flat-4c.1.1"
+      },
+      {
+       "do": "enter",
+       "raw": "C and D with the landlord key",
+       "id": "flat-4c.1.2"
+      },
+      {
+       "do": "search",
+       "raw": "D, lids stacked, no ledger",
+       "id": "flat-4c.1.3"
+      },
+      {
+       "do": "pick-up",
+       "raw": "C a bowl lid stenciled 14",
+       "id": "flat-4c.1.4"
+      },
+      {
+       "do": "shrug",
+       "raw": "D, the flat swept",
+       "id": "flat-4c.1.5"
+      }
+     ],
+     "id": "flat-4c.1"
+    }
+   ],
+   "id": "flat-4c"
+  },
+  {
+   "title": "Found on the lawn",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [
+    "s7"
+   ],
+   "loop": null,
+   "days": [
+    17,
+    17
+   ],
+   "who": [
+    "veteran-officer",
+    "informant"
+   ],
+   "where": "lawn",
+   "channel": [
+    "seen",
+    "conversation"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b1-c04"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c14"
+    }
+   ],
+   "sets": [
+    "inf:talking"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 10,
+     "steps": [
+      {
+       "do": "walk",
+       "raw": "C onto the lawn, 10:00",
+       "id": "found-on-the-lawn.1.1"
+      },
+      {
+       "do": "sit",
+       "raw": "restocker on a blanket, hat down",
+       "id": "found-on-the-lawn.1.2"
+      },
+      {
+       "do": "chat",
+       "raw": "C asks twice, a minute apart",
+       "id": "found-on-the-lawn.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "restocker gives C a sheet of lid numbers",
+       "id": "found-on-the-lawn.1.4"
+      },
+      {
+       "do": "walk-together",
+       "raw": "C and restocker to the station",
+       "id": "found-on-the-lawn.1.5"
+      }
+     ],
+     "id": "found-on-the-lawn.1"
+    }
+   ],
+   "id": "found-on-the-lawn"
+  },
+  {
+   "title": "Cleared on the screens",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    18,
+    18
+   ],
+   "who": [
+    "desk-sergeant",
+    "framed-officer",
+    "inside-officer"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document",
+    "feed"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b1-c16"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c17"
+    }
+   ],
+   "sets": [
+    "B:cleared",
+    "G:corrected-post",
+    "A:suspended"
+   ],
+   "moments": [
+    {
+     "day": 18,
+     "hour": 8.5,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "G at the terminal log, d18 08:30, the 14:02 post from A's sign-in",
+       "id": "cleared-on-the-screens.1.1"
+      },
+      {
+       "do": "post-feed",
+       "raw": "G corrects the post",
+       "id": "cleared-on-the-screens.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B at the screen, twice",
+       "id": "cleared-on-the-screens.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "B gives G his notebook",
+       "id": "cleared-on-the-screens.1.4"
+      },
+      {
+       "do": "walk",
+       "raw": "A past the screen, no cup",
+       "id": "cleared-on-the-screens.1.5"
+      }
+     ],
+     "id": "cleared-on-the-screens.1"
+    }
+   ],
+   "id": "cleared-on-the-screens"
+  },
+  {
+   "title": "Arrest at the stall",
+   "variant": "base",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    19,
+    20
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "veteran-officer",
+    "boss-careless",
+    "inside-officer",
+    "crowd"
+   ],
+   "where": "town-square/food-stalls",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:arrested",
+    "A:arrested",
+    "case:closed"
+   ],
+   "moments": [
+    {
+     "day": 19,
+     "hour": 11,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H across from the stall, d19 11:00",
+       "id": "arrest-at-the-stall.1.1"
+      },
+      {
+       "do": "stand",
+       "raw": "queue forms at 11:50",
+       "id": "arrest-at-the-stall.1.2"
+      },
+      {
+       "do": "arrest",
+       "raw": "H takes keeper at the counter, 11:55",
+       "id": "arrest-at-the-stall.1.3"
+      },
+      {
+       "do": "search",
+       "raw": "C at A's locker, flat box found",
+       "id": "arrest-at-the-stall.1.4"
+      },
+      {
+       "do": "arrest",
+       "raw": "H takes A at the station door",
+       "id": "arrest-at-the-stall.1.5"
+      }
+     ],
+     "id": "arrest-at-the-stall.1"
+    },
+    {
+     "day": 20,
+     "hour": null,
+     "steps": [
+      {
+       "do": "read-notice",
+       "raw": "tape across the stall, d20",
+       "id": "arrest-at-the-stall.2.1"
+      },
+      {
+       "do": "walk",
+       "raw": "queue disperses",
+       "id": "arrest-at-the-stall.2.2"
+      }
+     ],
+     "id": "arrest-at-the-stall.2"
+    }
+   ],
+   "id": "arrest-at-the-stall"
+  },
+  {
+   "title": "Scan logs shared",
+   "variant": "careless",
+   "rel": "adds",
+   "relTo": [
+    "label-and-feed"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    10,
+    11
+   ],
+   "who": [
+    "desk-sergeant",
+    "family-caller-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "document",
+    "phone"
+   ],
+   "clues": [],
+   "sets": [
+    "station2:cooperating"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "phone-call",
+       "raw": "G to station 2, \"Send the hour sheets.\"",
+       "id": "care-scan-logs-shared.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "station 2 runner gives G a printout",
+       "id": "care-scan-logs-shared.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "G at the noodle stall line, same hour every day",
+       "id": "care-scan-logs-shared.1.3"
+      }
+     ],
+     "id": "care-scan-logs-shared.1"
+    }
+   ],
+   "id": "care-scan-logs-shared"
+  },
+  {
+   "title": "Early stakeout",
+   "variant": "careless",
+   "rel": "replaces",
+   "relTo": [
+    "stakeout-hand-over"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    12,
+    13
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "inside-officer",
+    "go-between-courier"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b1-c02"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c07"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c11"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c12"
+    }
+   ],
+   "sets": [
+    "g1:arrested"
+   ],
+   "moments": [
+    {
+     "day": 12,
+     "hour": 21,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H at the lift hall, d12 21:00",
+       "id": "care-early-stakeout.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "A passes a folded sheet to courier, 22:10",
+       "id": "care-early-stakeout.1.2"
+      }
+     ],
+     "id": "care-early-stakeout.1"
+    },
+    {
+     "day": 13,
+     "hour": 22.2,
+     "steps": [
+      {
+       "do": "arrest",
+       "raw": "H takes courier, d13 22:12",
+       "id": "care-early-stakeout.2.1"
+      }
+     ],
+     "id": "care-early-stakeout.2"
+    }
+   ],
+   "id": "care-early-stakeout"
+  },
+  {
+   "title": "Tray in the locker",
+   "variant": "careless",
+   "rel": "replaces",
+   "relTo": [
+    "tray-empty",
+    "shutter-down",
+    "flat-4c"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    13,
+    14
+   ],
+   "who": [
+    "veteran-officer",
+    "rookie-officer",
+    "inside-officer"
+   ],
+   "where": "police-station",
+   "channel": [
+    "seen"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b1-c10"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c13"
+    }
+   ],
+   "sets": [
+    "boss:safehouse-burned"
+   ],
+   "moments": [
+    {
+     "day": 13,
+     "hour": null,
+     "steps": [
+      {
+       "do": "search",
+       "raw": "C and D at A's locker, d13",
+       "id": "care-tray-in-the-locker.1.1"
+      },
+      {
+       "do": "pick-up",
+       "raw": "C a flat box",
+       "id": "care-tray-in-the-locker.1.2"
+      }
+     ],
+     "id": "care-tray-in-the-locker.1"
+    },
+    {
+     "day": 14,
+     "hour": 9,
+     "steps": [
+      {
+       "do": "knock-and-wait",
+       "raw": "C and D at 4C, d14 09:00",
+       "id": "care-tray-in-the-locker.2.1"
+      },
+      {
+       "do": "search",
+       "raw": "D, lids stacked",
+       "id": "care-tray-in-the-locker.2.2"
+      }
+     ],
+     "id": "care-tray-in-the-locker.2"
+    }
+   ],
+   "id": "care-tray-in-the-locker"
+  },
+  {
+   "title": "Arrest at the stall",
+   "variant": "careless",
+   "rel": "replaces",
+   "relTo": [
+    "arrest-at-the-stall"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    14
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "boss-careless",
+    "inside-officer",
+    "crowd"
+   ],
+   "where": "town-square/food-stalls",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:arrested",
+    "A:arrested"
+   ],
+   "moments": [
+    {
+     "day": 14,
+     "hour": 11.916666666666666,
+     "steps": [
+      {
+       "do": "arrest",
+       "raw": "H takes keeper at the counter, d14 11:55",
+       "id": "care-arrest-at-the-stall.1.1"
+      },
+      {
+       "do": "arrest",
+       "raw": "H takes A at the station door",
+       "id": "care-arrest-at-the-stall.1.2"
+      },
+      {
+       "do": "read-notice",
+       "raw": "tape across the stall",
+       "id": "care-arrest-at-the-stall.1.3"
+      }
+     ],
+     "id": "care-arrest-at-the-stall.1"
+    }
+   ],
+   "id": "care-arrest-at-the-stall"
+  },
+  {
+   "title": "Corrected on the screens",
+   "variant": "careless",
+   "rel": "replaces",
+   "relTo": [
+    "cleared-on-the-screens"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    15
+   ],
+   "who": [
+    "desk-sergeant",
+    "framed-officer"
+   ],
+   "where": "police-station/front-screens",
+   "channel": [
+    "document",
+    "feed"
+   ],
+   "clues": [
+    {
+     "k": "pay",
+     "id": "b1-c16"
+    },
+    {
+     "k": "pay",
+     "id": "b1-c17"
+    }
+   ],
+   "sets": [
+    "B:cleared",
+    "G:corrected-post",
+    "case:closed"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "post-feed",
+       "raw": "G corrects the post",
+       "id": "care-corrected-on-the-screens.1.1"
+      },
+      {
+       "do": "read-notice",
+       "raw": "B at the screen, twice",
+       "id": "care-corrected-on-the-screens.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "B gives G his notebook",
+       "id": "care-corrected-on-the-screens.1.3"
+      }
+     ],
+     "id": "care-corrected-on-the-screens.1"
+    }
+   ],
+   "id": "care-corrected-on-the-screens"
+  },
+  {
+   "title": "Tea cart",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    5,
+    7
+   ],
+   "who": [
+    "go-between-bartender",
+    "boss-careful",
+    "crowd"
+   ],
+   "where": "town-square/food-stalls",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": 21,
+     "steps": [
+      {
+       "do": "serve",
+       "raw": "cart keeper at a tea cart one stall down serves one regular first",
+       "id": "care-tea-cart.1.1"
+      },
+      {
+       "do": "queue-order",
+       "raw": "the line stacks",
+       "id": "care-tea-cart.1.2"
+      },
+      {
+       "do": "hand-over",
+       "raw": "cart keeper passes a paper tab, no drink",
+       "id": "care-tea-cart.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "cart keeper by the service lane, 21:00, same minute each night",
+       "id": "care-tea-cart.1.4"
+      }
+     ],
+     "id": "care-tea-cart.1"
+    }
+   ],
+   "id": "care-tea-cart"
+  },
+  {
+   "title": "Pass at the lift",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    8,
+    8
+   ],
+   "who": [
+    "go-between-bartender",
+    "go-between-courier"
+   ],
+   "where": "lift",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "bump",
+       "raw": "courier and cart keeper at the lift hall",
+       "id": "care-pass-at-the-lift.1.1"
+      },
+      {
+       "do": "hand-over",
+       "raw": "a lid passes between them",
+       "id": "care-pass-at-the-lift.1.2"
+      },
+      {
+       "do": "walk",
+       "raw": "each to a different door, no word",
+       "id": "care-pass-at-the-lift.1.3"
+      }
+     ],
+     "id": "care-pass-at-the-lift.1"
+    }
+   ],
+   "id": "care-pass-at-the-lift"
+  },
+  {
+   "title": "Second station",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    12,
+    12
+   ],
+   "who": [
+    "inside-officer-extra",
+    "desk-sergeant"
+   ],
+   "where": "police-station",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "sit",
+       "raw": "extra insider apart at station 2 briefing",
+       "id": "care-second-station.1.1"
+      },
+      {
+       "do": "phone-call",
+       "raw": "extra insider, \"Not here.\"",
+       "id": "care-second-station.1.2"
+      },
+      {
+       "do": "chat",
+       "raw": "extra insider asks G what station 1 is working on",
+       "id": "care-second-station.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "extra insider first",
+       "id": "care-second-station.1.4"
+      }
+     ],
+     "id": "care-second-station.1"
+    }
+   ],
+   "id": "care-second-station"
+  },
+  {
+   "title": "Cart takes the route",
+   "variant": "careful",
+   "rel": "replaces",
+   "relTo": [
+    "shutter-down"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    14,
+    15
+   ],
+   "who": [
+    "go-between-bartender",
+    "boss-careful",
+    "inside-officer",
+    "crowd"
+   ],
+   "where": "town-square/food-stalls",
+   "channel": [
+    "seen",
+    "phone"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:tipped-off"
+   ],
+   "moments": [
+    {
+     "day": null,
+     "hour": 11.5,
+     "steps": [
+      {
+       "do": "serve",
+       "raw": "stall opens at 11:30",
+       "id": "care-cart-takes-the-route.1.1"
+      },
+      {
+       "do": "carry",
+       "raw": "cart keeper takes the bowl tower to the lift",
+       "id": "care-cart-takes-the-route.1.2"
+      },
+      {
+       "do": "phone-call",
+       "raw": "A, \"Not here.\"",
+       "id": "care-cart-takes-the-route.1.3"
+      },
+      {
+       "do": "hand-over",
+       "raw": "A to the extra insider's runner, a folded sheet",
+       "id": "care-cart-takes-the-route.1.4"
+      }
+     ],
+     "id": "care-cart-takes-the-route.1"
+    }
+   ],
+   "id": "care-cart-takes-the-route"
+  },
+  {
+   "title": "Locker key",
+   "variant": "careful",
+   "rel": "adds",
+   "relTo": [
+    "flat-4c"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    15,
+    16
+   ],
+   "who": [
+    "veteran-officer",
+    "rookie-officer"
+   ],
+   "where": "tenements",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [],
+   "sets": [],
+   "moments": [
+    {
+     "day": null,
+     "hour": null,
+     "steps": [
+      {
+       "do": "search",
+       "raw": "D, a locker key tag stamped with a foundry number in a lid",
+       "id": "care-locker-key.1.1"
+      },
+      {
+       "do": "pick-up",
+       "raw": "C the tag",
+       "id": "care-locker-key.1.2"
+      },
+      {
+       "do": "point",
+       "raw": "C at the stamp",
+       "id": "care-locker-key.1.3"
+      },
+      {
+       "do": "walk",
+       "raw": "C and D to the lift",
+       "id": "care-locker-key.1.4"
+      }
+     ],
+     "id": "care-locker-key.1"
+    }
+   ],
+   "id": "care-locker-key"
+  },
+  {
+   "title": "Locker room",
+   "variant": "careful",
+   "rel": null,
+   "relTo": [],
+   "cross": [],
+   "loop": null,
+   "days": [
+    19,
+    20
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "veteran-officer",
+    "rookie-officer",
+    "inside-officer-extra"
+   ],
+   "where": "foundry",
+   "channel": [
+    "seen"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:safehouse2-burned"
+   ],
+   "moments": [
+    {
+     "day": 19,
+     "hour": null,
+     "steps": [
+      {
+       "do": "enter",
+       "raw": "C and D at the foundry locker room, d19",
+       "id": "care-locker-room.1.1"
+      },
+      {
+       "do": "search",
+       "raw": "D, the locker empty, a lid ring on the shelf",
+       "id": "care-locker-room.1.2"
+      },
+      {
+       "do": "wait-outside",
+       "raw": "H at the service door",
+       "id": "care-locker-room.1.3"
+      },
+      {
+       "do": "leave",
+       "raw": "extra insider by the back door",
+       "id": "care-locker-room.1.4"
+      }
+     ],
+     "id": "care-locker-room.1"
+    }
+   ],
+   "id": "care-locker-room"
+  },
+  {
+   "title": "Arrest on the stakeout",
+   "variant": "careful",
+   "rel": "replaces",
+   "relTo": [
+    "arrest-at-the-stall"
+   ],
+   "cross": [],
+   "loop": null,
+   "days": [
+    21,
+    21
+   ],
+   "who": [
+    "night-stakeout-officer",
+    "boss-careful",
+    "inside-officer",
+    "inside-officer-extra",
+    "go-between-bartender",
+    "crowd"
+   ],
+   "where": "town-square/food-stalls",
+   "channel": [
+    "seen",
+    "document"
+   ],
+   "clues": [],
+   "sets": [
+    "boss:arrested",
+    "A:arrested",
+    "g3:arrested",
+    "station2:insider-exposed",
+    "case:closed"
+   ],
+   "moments": [
+    {
+     "day": 21,
+     "hour": 11.916666666666666,
+     "steps": [
+      {
+       "do": "stakeout",
+       "raw": "H across from the stall, d19 to d21",
+       "id": "care-arrest-on-the-stakeout.1.1"
+      },
+      {
+       "do": "arrest",
+       "raw": "H takes keeper at the counter, d21 11:55",
+       "id": "care-arrest-on-the-stakeout.1.2"
+      },
+      {
+       "do": "arrest",
+       "raw": "H takes cart keeper",
+       "id": "care-arrest-on-the-stakeout.1.3"
+      },
+      {
+       "do": "arrest",
+       "raw": "H takes A at the station door",
+       "id": "care-arrest-on-the-stakeout.1.4"
+      },
+      {
+       "do": "escort",
+       "raw": "extra insider out of station 2",
+       "id": "care-arrest-on-the-stakeout.1.5"
+      },
+      {
+       "do": "read-notice",
+       "raw": "tape across the stall",
+       "id": "care-arrest-on-the-stakeout.1.6"
+      }
+     ],
+     "id": "care-arrest-on-the-stakeout.1"
+    }
+   ],
+   "id": "care-arrest-on-the-stakeout"
+  }
+ ]
+}

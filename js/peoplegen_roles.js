@@ -67,6 +67,11 @@
   // the officer: a dark blue uniform, a cap, a lit blue badge and trim
   const copPal = pal('cop', { top: 0x24386a, bot: 0x1a2644, hair: 0x2a2024, lit: 0x4aa8ff, acc: 0x1a2a52 });
   PG.role(12, shape('officer', { H: 14, bw: 4 }, 'short', 'r_copcap', 'r_uniform', 'trousers', ['r_scanner']), copPal);
+  // each officer their own face under the cap (a case follows them one by one: cases.js): four builds and hair, five skins and four hair colors, the uniform the same
+  { const sh = [PG.roleShape[12], shape('officer bun', { H: 13, bw: 4 }, 'bun', 'r_copcap', 'r_uniform', 'trousers', ['r_scanner']),
+      shape('officer broad', { H: 15, bw: 5 }, 'buzz', 'r_copcap', 'r_uniform', 'trousers', ['r_scanner']), shape('officer tail', { H: 14, bw: 4 }, 'ponytail', 'r_copcap', 'r_uniform', 'trousers', ['r_scanner'])];
+    const pals = []; for (let sk = 0; sk < 5; sk++) for (const hc of [0x1c1820, 0x3a2418, 0x6a4430, 0x9a9aa4]) pals.push(pal('cop' + sk + hc, { skin: sk, top: 0x24386a, bot: 0x1a2644, hair: hc, lit: 0x4aa8ff, acc: 0x1a2a52 }));
+    PG.copLook = h => PG.code(12, sh[h % sh.length], pals[(h >>> 4) % pals.length]); }
   // the club's bouncers: broad, bald, in black and red
   const bouncerPal = pal('bouncer', { skin: 2, top: 0x22222c, bot: 0x16161c, hair: 0x1c1820, lit: 0xff3a3a, acc: 0x7a1818 });
   PG.role(15, shape('bouncer', { H: 15, bw: 5 }, 'bald', null, 'r_suit', 'trousers', ['r_shades', 'r_scanner']), bouncerPal);

@@ -788,7 +788,7 @@ function makePerson(id, home, zone){
            guard: undefined, guardShift: undefined, nightWorker: undefined, ws: undefined, wlen: undefined, walkedFor: undefined, chain: undefined, _taste: null, _tasteE: -1, _tasteD: -1,
            patrol: undefined, metro: undefined, metroPlan: undefined, ride: undefined, club: undefined, clubbing: undefined, rush: undefined,
            hurry: undefined, callout: undefined, gh: undefined, ghWalk: undefined, gy: undefined, dx: undefined, dz: undefined, pause: undefined,
-           bumpCD: undefined, zone, um: undefined, umW: undefined, rainRun: undefined, noRun: undefined, emo: undefined, emoUntil: undefined, angry: undefined, fed: undefined, eating: undefined, held: undefined, tries: undefined, gone: undefined };
+           bumpCD: undefined, zone, um: undefined, umW: undefined, rainRun: undefined, noRun: undefined, emo: undefined, emoUntil: undefined, angry: undefined, copShift: undefined, copRow: undefined, custody: undefined, offDuty: undefined, fed: undefined, eating: undefined, held: undefined, tries: undefined, gone: undefined };
 }
 function syncResidents(){
   const keep = new Set();
@@ -872,7 +872,7 @@ function assignStalls(){
     const ids = [...sq.stalls.keys()].sort((a, b) => a - b);
     if (ids.length) staff.forEach((p, k) => { p.stall = ids[k % ids.length]; });
   }
-  for (const p of people.values()){ const j = p.job && places.get(p.job); p.cop = !!(j && j.patrol) || !!p.guard; }   // police staff (and the spire's guards) wear the uniform
+  for (const p of people.values()){ const j = p.job && places.get(p.job); p.cop = !!(j && j.patrol) || !!p.guard; p.copRow = p.cop && PG.copLook ? PG.copLook(hash(p.id, 'cop') >>> 0) : undefined; }   // police staff (and the spire's guards) wear the uniform
 }
 
 /* ---------- routines ---------- */
@@ -887,8 +887,10 @@ function desire(p, h){
   p.nightWorker = !!(job && job.night && p.nightShift < job.night);
   p.ws = p.nightWorker ? 21 + p.nightShift*4 : p.workS; p.wlen = p.workLen;
   if (job && job.stalls){ p.ws = p.nightShift < .5 ? 16.5 : 10; p.wlen = 7.5; }   // day market 10:00 to 17:30, night market 16:30 to midnight
-  if (job && job.patrol){ const k = Math.min(2, Math.floor(p.nightShift*3)); p.ws = [7, 15, 23][k]; p.wlen = 8; p.nightWorker = k === 2; }   // police: three shifts round the clock
+  if (job && job.patrol){ const k = p.copShift ?? Math.min(2, Math.floor(p.nightShift*3));   // (a case gives its officers their shifts: cases.js)
+    p.ws = [7, 15, 23][k]; p.wlen = 8; p.nightWorker = k === 2; }   // police: three shifts round the clock
   if (p.guard){ p.ws = p.guardShift ? 18 : 6; p.wlen = 12; p.nightWorker = !!p.guardShift; }   // the spire's watch: six to six, day and night
+  if (p.custody || p.offDuty){ const o = typeof CASES !== 'undefined' && CASES.routine(p, h); if (o) return o; }   // held at the station, or kept home by a case (cases.js)
   if (typeof STORY !== 'undefined' && STORY.on){ const o = STORY.routine(p, h); if (o) return o; }   // a day that isn't ordinary: sick at home, a late start, a day off (story.js)
   if (p.archivist){ p.ws = p.workS; p.wlen = p.workLen; p.nightWorker = false; if (working(p, h)) return p.job; return p.home; }   // straight from home to the spire and back, nothing else
   if (p.visitor) return pplNow > p.leaveAt ? p.home : (leisure(p) || p.home);   // a visitor: out seeing the town until it's time to go
@@ -1080,7 +1082,7 @@ function decide(p){
   if (p.scene){ p.until = pplNow + 2; return; }   // in a story moment: the scene moves them (story.js)
   if (p.club) return;   // out at the club: the night decides (see updateClubs)
   if (p.metro){ p.until = Infinity; return; }   // on the platform or on the train: the metro decides (see metro.js)
-  if (p.cop && working(p, S.hour) && desire(p, S.hour) === p.job && (p.patrol || p.at === p.job)){
+  if (p.cop && !p.custody && !p.offDuty && working(p, S.hour) && desire(p, S.hour) === p.job && (p.patrol || p.at === p.job)){
     const back = p.patrol && pplRand() < (p.guard ? .05 : .15);   // back to the station for a bit (guards rarely step inside)
     if (!back && (p.patrol || pplRand() < .85) && startPatrol(p)) return;
     if (back && startTrip(p, p.job)) return;
@@ -1368,7 +1370,7 @@ function syncLurkers(){
   }
   for (const k of [...lurkers.keys()]) if (!keep.has(k)) lurkers.delete(k);
 }
-function onDutyCops(){ return pplList.filter(q => q.cop && working(q, S.hour) && (q.patrol || (q.walk && q.walk.beat) || (!q.walk && q.at === q.job))); }
+function onDutyCops(){ return pplList.filter(q => q.cop && !q.scene && !q.custody && !q.offDuty && working(q, S.hour) && (q.patrol || (q.walk && q.walk.beat) || (!q.walk && q.at === q.job))); }
 // Who a lurker picks, found with a grid of 2-unit squares over the walkers (built the first time a lurker looks in a frame; at dusk they all look in the same frame, and each
 // look walked the whole crowd: 40 ms on the biggest city). The candidates come in walker order and meet the same tests, so the pick is the same one.
 const _lgCells = new Map(), _lgCops = []; let _lgFrame = -1;
@@ -2228,8 +2230,8 @@ function updatePeople(dt, t){
     }
     if (p.cop && p.angry > t) frame = F_ANGRY + Math.min(5, Math.floor((t - p.angry + .9)*7));
     if ((p.row & 31) === ROW_HOOD && frame >= F_SPEC) frame = F_IDLE + (frame % 4);   // (the archivist has walk and idle frames only)
-    p._ec = 1; p._ey = y; p._er = p.cop ? ROW_COP : p.row; p._ef = frame; p._ea = Math.max(0, alpha); p._eo = frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8; p._eoOn = alpha > .9;   // (what a frame between steps draws again)
-    if (!emit(p.x, y, p.z, p.cop ? ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
+    p._ec = 1; p._ey = y; p._er = p.cop ? p.copRow || ROW_COP : p.row; p._ef = frame; p._ea = Math.max(0, alpha); p._eo = frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8; p._eoOn = alpha > .9;   // (what a frame between steps draws again)
+    if (!emit(p.x, y, p.z, p.cop ? p.copRow || ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
     emitUm(p, p.x, y, p.z, Math.max(0, alpha)); emitHeld(p, p.x, y, p.z, frame, Math.max(0, alpha));
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
   }

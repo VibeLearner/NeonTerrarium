@@ -788,7 +788,7 @@ function makePerson(id, home, zone){
            guard: undefined, guardShift: undefined, nightWorker: undefined, ws: undefined, wlen: undefined, walkedFor: undefined, chain: undefined, _taste: null, _tasteE: -1, _tasteD: -1,
            patrol: undefined, metro: undefined, metroPlan: undefined, ride: undefined, club: undefined, clubbing: undefined, rush: undefined,
            hurry: undefined, callout: undefined, gh: undefined, ghWalk: undefined, gy: undefined, dx: undefined, dz: undefined, pause: undefined,
-           bumpCD: undefined, zone, um: undefined, umW: undefined, rainRun: undefined, noRun: undefined, emo: undefined, emoUntil: undefined, angry: undefined, copShift: undefined, copRow: undefined, custody: undefined, offDuty: undefined, fed: undefined, eating: undefined, held: undefined, tries: undefined, gone: undefined };
+           bumpCD: undefined, zone, um: undefined, umW: undefined, rainRun: undefined, noRun: undefined, emo: undefined, emoUntil: undefined, angry: undefined, copShift: undefined, copRow: undefined, custody: undefined, offDuty: undefined, onBike: undefined, fed: undefined, eating: undefined, held: undefined, tries: undefined, gone: undefined };
 }
 function syncResidents(){
   const keep = new Set();
@@ -1082,7 +1082,7 @@ function decide(p){
   if (p.scene){ p.until = pplNow + 2; return; }   // in a story moment: the scene moves them (story.js)
   if (p.club) return;   // out at the club: the night decides (see updateClubs)
   if (p.metro){ p.until = Infinity; return; }   // on the platform or on the train: the metro decides (see metro.js)
-  if (p.cop && !p.custody && !p.offDuty && working(p, S.hour) && desire(p, S.hour) === p.job && (p.patrol || p.at === p.job)){
+  if (p.cop && !p.onBike && !p.custody && !p.offDuty && working(p, S.hour) && desire(p, S.hour) === p.job && (p.patrol || p.at === p.job)){
     const back = p.patrol && pplRand() < (p.guard ? .05 : .15);   // back to the station for a bit (guards rarely step inside)
     if (!back && (p.patrol || pplRand() < .85) && startPatrol(p)) return;
     if (back && startTrip(p, p.job)) return;
@@ -1370,7 +1370,9 @@ function syncLurkers(){
   }
   for (const k of [...lurkers.keys()]) if (!keep.has(k)) lurkers.delete(k);
 }
-function onDutyCops(){ return pplList.filter(q => q.cop && !q.scene && !q.custody && !q.offDuty && working(q, S.hour) && (q.patrol || (q.walk && q.walk.beat) || (!q.walk && q.at === q.job))); }
+// the officer riding a bike stands where the bike's rider is drawn, so the monitor can find them, follow them and draw the brackets
+function bikeCopAt(b, x, y, z, a){ const c = b.cop; if (!c) return; c.x = x; c.z = z; c._ey = y; c._ea = a; c._ec = 1; c._er = c.copRow || ROW_COP; }
+function onDutyCops(){ return pplList.filter(q => q.cop && !q.onBike && !q.scene && !q.custody && !q.offDuty && working(q, S.hour) && (q.patrol || (q.walk && q.walk.beat) || (!q.walk && q.at === q.job))); }
 // Who a lurker picks, found with a grid of 2-unit squares over the walkers (built the first time a lurker looks in a frame; at dusk they all look in the same frame, and each
 // look walked the whole crowd: 40 ms on the biggest city). The candidates come in walker order and meet the same tests, so the pick is the same one.
 const _lgCells = new Map(), _lgCops = []; let _lgFrame = -1;
@@ -2106,6 +2108,7 @@ function updatePeople(dt, t){
   const aspect = W/H;
   for (const p of pplList){
     idx++;
+    if (p.onBike){ p.acc = 0; continue; }   // (out on a hoverbike: drawn with it, below)
     if (full){
       if (!PH.tests.noSlowFar && !p.ride && !p.club && !p.metro && p.x !== undefined && ((pplFrame + pi++) & 3) && offScreen(p.x, p.z)){ p.acc = (p.acc || 0) + dt0; continue; }
     } else if (!p.ride && !p.club && !p.metro && p.x !== undefined){
@@ -2255,7 +2258,7 @@ function updatePeople(dt, t){
     if (b.walkIn){   // off the bike and walking into the station, the officer leading the mugger by the arm
       const W = b.walkIn, dx = W.x1 - W.x0, dz = W.z1 - W.z0, l = Math.hypot(dx, dz) || 1, x = W.x0 + dx*W.u, z = W.z0 + dz*W.u;
       const sd = dx*_camR.x + dz*_camR.z, fl = Math.abs(sd) > 1e-3 ? (sd < 0 ? -1 : 1) : 1, fr = Math.floor(t*9) % PPL.walk;
-      emit(x, CURB, z, ROW_COP, fr, fl, a0);
+      emit(x, CURB, z, b.cop ? b.cop.copRow || ROW_COP : ROW_COP, fr, fl, a0); bikeCopAt(b, x, CURB, z, a0);
       if (b.passenger) emit(x - dx/l*.32, CURB, z - dz/l*.32, b.passenger.row, (fr + 3) % PPL.walk, fl, a0);
       continue;
     }
@@ -2264,7 +2267,7 @@ function updatePeople(dt, t){
     const y = b.ry + BIKE_SEAT, a = a0;
     if (b.passenger){ const L = b.passenger;
       emit(b.x - b.hx*.24 - _bkF.x*.03, y + .03, b.z - b.hz*.24 - _bkF.z*.03, L.row, F_SIT, b.flip || 1, a); }
-    emit(b.x + b.hx*.06 + ox, y, b.z + b.hz*.06 + oz, ROW_COP, F_SIT, b.flip || 1, a);
+    emit(b.x + b.hx*.06 + ox, y, b.z + b.hz*.06 + oz, b.cop ? b.cop.copRow || ROW_COP : ROW_COP, F_SIT, b.flip || 1, a); bikeCopAt(b, b.x + b.hx*.06 + ox, y, b.z + b.hz*.06 + oz, a);
   }
   // delivery drones and their parcels, in their own batch
   _camFw.set(0, 0, -1).applyQuaternion(cam.quaternion); _camFw.y = 0; _camFw.normalize();

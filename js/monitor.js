@@ -14,10 +14,31 @@ const MON = (() => {
 
   /* ---------- picking someone ---------- */
   const _v = new THREE.Vector3();
+  // Only someone the player can actually see: what's drawn under the cursor is read back from the depth of the last frame
+  // (one pixel), and a person counts only if they're no further away than it (a building in front is nearer). Their
+  // depth is taken at the feet; a sprite standing up off the ground is a little nearer than that, hence the slack.
+  let dRT = null, dMat = null, dScene = null, dCam = null; const dBuf = new Uint8Array(4), dAt = { x: NaN, y: NaN, f: -1, d: 1 };
+  function depthUnder(cx, cy){
+    if (typeof rtC === 'undefined' || !rtC || !rtC.depthTexture) return 1;
+    const f = typeof pplFrame !== 'undefined' ? pplFrame : 0;
+    if (dAt.x === cx && dAt.y === cy && dAt.f === f) return dAt.d;
+    if (!dRT){
+      dRT = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
+      dMat = new THREE.ShaderMaterial({ uniforms: { tD: { value: null }, uv: { value: new THREE.Vector2() } }, depthTest: false, depthWrite: false,
+        vertexShader: 'void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }',
+        fragmentShader: '#include <packing>\nuniform sampler2D tD; uniform vec2 uv; void main(){ gl_FragColor = packDepthToRGBA(texture2D(tD, uv).x); }' });
+      dScene = new THREE.Scene(); const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), dMat); q.frustumCulled = false; dScene.add(q); dCam = new THREE.Camera();
+    }
+    const r = view.getBoundingClientRect();
+    dMat.uniforms.tD.value = rtC.depthTexture; dMat.uniforms.uv.value.set((cx - r.left)/r.width, 1 - (cy - r.top)/r.height);
+    const prev = renderer.getRenderTarget(); renderer.setRenderTarget(dRT); renderer.render(dScene, dCam); renderer.readRenderTargetPixels(dRT, 0, 0, 1, 1, dBuf); renderer.setRenderTarget(prev);
+    const d = (255/256)*(dBuf[0]/255/16777216 + dBuf[1]/255/65536 + dBuf[2]/255/256 + dBuf[3]/255);
+    dAt.x = cx; dAt.y = cy; dAt.f = f; dAt.d = d; return d;
+  }
   M.pick = (cx, cy) => {
     if (typeof pplList === 'undefined') return null;
     const r = view.getBoundingClientRect(), VP = comp.uniforms.VP.value, tall = (16/PX)/zoom*r.height/2, wide = tall*.75;
-    let best = null, bd = Infinity;
+    const cands = [];
     for (const p of pplList){
       if (!p._ec || !(p._ea > .5) || p.x === undefined) continue;
       _v.set(p.x, p._ey ?? CURB, p.z).applyMatrix4(VP);
@@ -25,9 +46,13 @@ const MON = (() => {
       const fx = r.left + (_v.x*.5 + .5)*r.width, fy = r.top + (1 - (_v.y*.5 + .5))*r.height;
       const dx = cx - fx, dy = cy - fy;
       if (Math.abs(dx) > wide/2 + 4 || dy < -tall - 4 || dy > 5) continue;
-      const d = dx*dx + (dy + tall/2)**2; if (d < bd){ bd = d; best = p; }
+      cands.push([dx*dx + (dy + tall/2)**2, p, _v.z*.5 + .5]);
     }
-    return best ? best.id : null;
+    if (!cands.length) return null;
+    cands.sort((a, b) => a[0] - b[0]);
+    const sd = depthUnder(cx, cy), slack = 1.5/(FAR - NEAR);   // (a unit and a half of slack: a sprite's head is nearer than its feet)
+    for (const [, p, pd] of cands) if (sd >= .9999 || pd <= sd + slack) return p.id;
+    return null;
   };
 
   /* ---------- the person under the cursor: corner brackets round them, so a click picks the one you mean ---------- */
@@ -92,7 +117,7 @@ const MON = (() => {
   // where the subject is in the world: on the street, or the door of the place they went into
   function subjectAt(){
     const p = M.id && people.get(M.id); if (!p) return null;
-    const out = (p.scene && p.sc && p.sc.mode !== 'in') || p.walk || p.spot || (p.metro) || (p.club);
+    const out = (p.scene && p.sc && p.sc.mode !== 'in') || p.walk || p.spot || p.patrol || p.onBike || (p.metro) || (p.club) || (p._ec && p._ea > .3);   // (anyone drawn in the street: on a beat post, on a bike, up on a deck)
     if (out && p.x !== undefined) return { x: p.x, z: p.z, y: (p._ey ?? CURB) + .45, inside: false };
     const pl = places.get((p.sc && p.sc.place) || p.at); if (!pl || !pl.doors.length) return p.x !== undefined ? { x: p.x, z: p.z, y: CURB + .45, inside: true } : null;
     if (!M.lastDoor || !pl.doors.includes(M.lastDoor)) M.lastDoor = nearestOf(pl.doors, p.x ?? pl.x, p.z ?? pl.z);

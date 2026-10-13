@@ -3156,6 +3156,16 @@ const PBIKE_VIEWS = ['r2c1', 'r1c4', 'r2c3', 'r2c4', 'r1c1', 'r1c2', 'r1c3', 'r2
 const PBIKE_TEX = PBIKE_VIEWS.map(n => { const t = ART.tex('pbike_' + n); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; });
 const PBIKE_SIZE = { r1c1: [14, 17], r1c2: [24, 17], r1c3: [26, 16], r1c4: [23, 18], r2c1: [14, 18], r2c2: [19, 18], r2c3: [26, 16], r2c4: [24, 18] };
 let POLICE_BIKES = [];
+// who rides: an officer of this station who's on shift and in the station (not out on the beat, in a moment, or held);
+// they go back in when the bike parks. With nobody free the bike still goes, its rider nobody in particular.
+function bikeBoard(b, m){
+  if (b.cop || typeof pplList === 'undefined') return;
+  const here = pplList.filter(q => q.cop && !q.onBike && !q.scene && !q.custody && !q.offDuty && !q.walk && !q.patrol && q.at === q.job
+    && places.get(q.job) && places.get(q.job).mega === m);
+  const c = here.find(q => working(q, S.hour)) || here[0];   // (one on shift if there is one; else whoever is still in the station)
+  if (c){ b.cop = c; c.onBike = b; c.x = b.x; c.z = b.z; }
+}
+function bikeLeave(b){ if (!b.cop) return; b.cop.onBike = null; b.cop._ec = 0; b.cop = null; }
 const BIKE_Y = CURB + .28, BIKE_K = .8, BIKE_SEAT = .26;   // hover height; the rider's seat above the bike's base
 function policeBike(m, idx, pad){
   const mat = new THREE.SpriteMaterial({ map: PBIKE_TEX[0], alphaTest: .5, transparent: false });
@@ -3275,7 +3285,7 @@ function policeBikes(m, crew){
     // a drone has gone to a mugging: two bikes come to the spot
     alert(L){ const free = bikes.filter(b => !b.case).sort((p, q) => Math.hypot(p.x - L.x, p.z - L.z) - Math.hypot(q.x - L.x, q.z - L.z)).slice(0, 2);
       if (!free.length) return; caseL = L;
-      free.forEach((b, i) => { const go = () => { if (b.case) return; b.case = L; b.rider = true; b.mode = 'rush'; bikeRoute(b, L.x, L.z, 3.2); b.until = performance.now() + 50000; }; if (i === 0) go(); else later(go, 1); }); },
+      free.forEach((b, i) => { const go = () => { if (b.case) return; b.case = L; b.rider = true; bikeBoard(b, m); b.mode = 'rush'; bikeRoute(b, L.x, L.z, 3.2); b.until = performance.now() + 50000; }; if (i === 0) go(); else later(go, 1); }); },
     // the station was turned: the bays are somewhere else now. Parked bikes go to the new bays; bikes on the way home
     // head for them
     rebase(){
@@ -3291,10 +3301,10 @@ function policeBikes(m, crew){
       for (const b of bikes){
         const L = b.case;
         if (b.mode === 'park'){
-          b.rider = false; b.timer -= dt;
+          b.rider = false; bikeLeave(b); b.timer -= dt;
           if (b.timer <= 0){ b.timer = 70 + Math.random()*90;   // out on patrol: a few crossings somewhere in the city, then back
             const nodes = typeof patrolNodes !== 'undefined' ? patrolNodes : [];
-            if (nodes.length && bikes.filter(q => q.mode !== 'park').length < 2){ b.rider = true; b.mode = 'patrol'; b.legs = 3 + Math.floor(Math.random()*3); const t = nodes[Math.floor(Math.random()*nodes.length)]; bikeRoute(b, t.x, t.z, 1.7); } }
+            if (nodes.length && bikes.filter(q => q.mode !== 'park').length < 2){ b.rider = true; bikeBoard(b, m); b.mode = 'patrol'; b.legs = 3 + Math.floor(Math.random()*3); const t = nodes[Math.floor(Math.random()*nodes.length)]; bikeRoute(b, t.x, t.z, 1.7); } }
         }
         // moving along the path
         if (b.path && b.mode !== 'park' && b.mode !== 'enter'){
@@ -3324,7 +3334,7 @@ function policeBikes(m, crew){
         else if (b.mode === 'guard'){ if (done) sweep(b, b.x, b.z, 7, 1.5); if (now > b.until){ b.case = null; home(b); } }
         else if (b.mode === 'home' && done){
           b.x = b.pad.x; b.z = b.pad.z; b.hx = b.pad.fx; b.hz = b.pad.fz;
-          if (b.passenger){ b.mode = 'enter'; b.t = 0; } else { b.mode = 'park'; b.rider = false; }
+          if (b.passenger){ b.mode = 'enter'; b.t = 0; } else { b.mode = 'park'; b.rider = false; bikeLeave(b); }
         }
         else if (b.mode === 'enter'){   // the officer takes the mugger in: both fade through the station doors
           // they get off and walk to the door together (people.js draws the walk from b.walkIn), fading in the doorway
@@ -3332,7 +3342,7 @@ function policeBikes(m, crew){
           b.t += dt; b.walkIn = { x0: b.pad.x, z0: b.pad.z, x1: door.x, z1: door.z, u: Math.min(1, b.t/dur) };
           b.alpha = Math.max(0, Math.min(1, 1 - (b.t - dur + .5)/.6));
           if (b.t > dur + .15){ b.walkIn = null; const Lp = b.passenger; if (Lp){ Lp.state = 'away'; Lp.tagged = false; Lp.bike = null; Lp.until = (typeof pplNow !== 'undefined' ? pplNow : 0) + 400 + Math.random()*400; Lp.x = Lp.home.x; Lp.z = Lp.home.z; }
-            b.passenger = null; b.rider = false; b.alpha = 1; b.mode = 'park'; }
+            b.passenger = null; b.rider = false; bikeLeave(b); b.alpha = 1; b.mode = 'park'; }
         }
         if (b.mode === 'park') b.y += (CURB + .08 - b.y)*Math.min(1, dt*2);
         // the sprite: the view that matches the heading as the camera sees it
@@ -3364,7 +3374,7 @@ function policeBikes(m, crew){
         b.siren.position.set(b.x - b.hx*.15 + _bkR.x*side, b.ry + h/PX*BIKE_K*.8, b.z - b.hz*.15 + _bkR.z*side);
       }
     },
-    dispose(){ for (const b of bikes){ scene.remove(b.spr, b.hum, b.siren); b.mat.dispose(); b.hum.material.dispose(); b.siren.material.dispose(); if (b.passenger){ b.passenger.state = 'away'; b.passenger = null; } } POLICE_BIKES = POLICE_BIKES.filter(b => !bikes.includes(b)); },
+    dispose(){ for (const b of bikes){ bikeLeave(b); scene.remove(b.spr, b.hum, b.siren); b.mat.dispose(); b.hum.material.dispose(); b.siren.material.dispose(); if (b.passenger){ b.passenger.state = 'away'; b.passenger = null; } } POLICE_BIKES = POLICE_BIKES.filter(b => !bikes.includes(b)); },
   };
   return api;
 }

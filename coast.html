@@ -62,7 +62,7 @@
   /* bottom: the hint, the controls, the zone cards */
   .zonebar { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .hint { padding: 3px 14px 4px; font: 19px/1.1 'Caveat', cursive; color: var(--ink); --w: var(--paper); --w2: var(--ochre); white-space: nowrap; }
-  #placeStatus.idle:empty::before { content: 'Pick a zone or a tool to start building'; color: var(--ink2); }
+  .hint:has(#placeStatus.idle:empty) { display: none; }   /* (nothing to say with no tool picked) */
   #placeStatus:not(.idle):empty::before { content: 'Point at the ground to place'; color: var(--ink2); }
   .ctlwrap { position: relative; }
   .ctlhover { padding: 1px 12px 2px; font: 17px/1.1 'Caveat', cursive; color: var(--ink2); cursor: help; --w: var(--sage); --w2: var(--paper); }

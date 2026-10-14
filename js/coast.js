@@ -111,7 +111,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   /* ---------- the bend, the haze, the materials ---------- */
   const scene = new THREE.Scene();
   const CURV = { ctr: { value: new THREE.Vector2() }, fwd: { value: new THREE.Vector2(1, 0) }, curveK: { value: 0 }, g0: { value: 30 },
-    hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) }, nightK: { value: 0 }, darkK: { value: 0 }, gTime: { value: 0 }, uRip: { value: [0, 1, 2, 3].map(() => new THREE.Vector3(0, 0, -99)) } };   // (nightK: the lamps; darkK: full night only; gTime: seconds, for the water's glow)
+    hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) }, nightK: { value: 0 }, darkK: { value: 0 }, gTime: { value: 0 }, uRip: { value: [...Array(8)].map(() => new THREE.Vector3(0, 0, -99)) } };   // (nightK: the lamps; darkK: full night only; gTime: seconds, for the water's glow)
   const BEND = `{ vec4 wq = vec4(transformed, 1.0);
     #ifdef USE_INSTANCING
       wq = instanceMatrix * wq;   // (a copy's own place in the world: the watercolor shadow is looked up there)
@@ -142,29 +142,43 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // night: what glows. A block's lamps, lit windows and greenhouse glass carry a glow (0..1, per vertex; see Tris); by night
   // it turns them warm amber, the glass a gold-green, as in the solarpunk boards (a teal, rainy dusk, every window warm)
   const GLOW_V = 'attribute float glow; varying float vGlow;\n';
-  const GLOW_F = 'varying float vGlow; uniform float gTime; uniform vec3 uRip[4];\n';
+  // One ring wave from a touch at c, age seconds ago: a fake of the real thing (the Cauchy-Poisson ring wave on deep water),
+  // not a simulation. A packet of a few crests whose envelope spreads at the group speed cg while the crests themselves run
+  // at twice that (born at the back of the packet, gone at its front), stretching longer as it travels (longer waves are
+  // faster), weaker as 1/sqrt(r) as it spreads and dying away with time. Adds its height to h; returns how much it shears
+  // the water there (the slope of the passing wave, |dh/dt|), which is what makes plankton glow.
+  const GLOW_F = `varying float vGlow; uniform float gTime; uniform vec3 uRip[8];
+  float ripW(vec2 q, vec2 c, float age, float amp, inout float h){
+    if (age <= 0.0 || age > 3.2) return 0.0;
+    float r = length(q - c), cg = 0.42, R = 0.05 + cg*age, w = 0.16 + 0.14*age;
+    float x = (r - R)/(r < R ? w : w*0.35), env = exp(-x*x);
+    float kk = 22.0/(1.0 + 0.8*age), ph = kk*(r - 2.0*cg*age), d = amp*env*exp(-0.9*age)/sqrt(1.0 + 3.0*r);
+    h += sin(ph)*d; return pow(abs(cos(ph)), 6.0)*d; }
+`;
   const GLOW_APPLY = `if (vGlow > 0.0){ vec3 amber = vec3(1.0, 0.5, 0.2), lampY = vec3(1.0, 0.87, 0.47);
       float lamp = step(0.85, vGlow), sh = 0.74 + 0.26*abs(normalize(vNormal).x), k = nightK*(lamp > 0.5 ? 1.0 : 0.85);
       vec3 gc;
       if (lamp > 0.5) gc = lampY*1.04;
       else if (vGlow > 0.2 && vGlow < 0.3) gc = vColor*1.25;
       else if (vGlow > 0.3 && vGlow < 0.4){
-        // water, alive by night: dark and still, but here and there a touch stirs it and a faint ring of mint light spreads
-        // out and fades (a ripple through glowing water), a softer ring trailing it; scattered in time and place (cells of
-        // 1.8 units, each with its own moment and pace), never all at once, stepped into a few soft washes
-        vec2 q = vWq.xz, c0 = floor(q/1.8); float g = 0.0;
+        // water, alive by night: dark and still, but stirred here and there (each 2.2-unit cell has its own moment and pace;
+        // some stay quiet) and wherever the pointer passes; each stir sends out a ring wave (ripW), and the plankton light up
+        // where it shears the water, with single sparks flashing in the stirred places and a rare twinkle anywhere. The glow
+        // is stepped into a few washes, so it stays watercolor. By day the same waves only shade the water a little.
+        vec2 q = vWq.xz, c0 = floor(q/2.2); float g = 0.0, hh = 0.0;
         for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++){
           vec2 c = c0 + vec2(float(i), float(j));
           float h1 = fract(sin(dot(c, vec2(127.1, 311.7)))*43758.5), h2 = fract(sin(dot(c, vec2(269.5, 183.3)))*43758.5);
-          vec2 ctr = (c + 0.2 + 0.6*vec2(h1, h2))*1.8;
-          float per = 5.0 + 5.0*h1, age = mod(gTime + h2*per, per), r = 0.08 + age*0.42, d = length(q - ctr), fade = (1.0 - smoothstep(0.0, 2.8, age))*step(h2, 0.7);
-          g = max(g, (exp(-pow((d - r)/0.07, 2.0)) + 0.45*exp(-pow((d - r*0.62)/0.05, 2.0)))*fade); }
-        // and where the pointer passes over the water, it stirs: rings from its last few spots (x, z, when)
-        for (int i = 0; i < 4; i++){ float age = gTime - uRip[i].z, r = 0.05 + age*0.55, d = length(q - uRip[i].xy);
-          g = max(g, (exp(-pow((d - r)/0.07, 2.0)) + 0.5*exp(-pow((d - r*0.6)/0.05, 2.0)))*(1.0 - smoothstep(0.0, 2.2, age))*step(0.0, age)); }
-        g = floor(min(g, 1.0)*3.0 + 0.3)/3.0;
-        gc = mix(vec3(0.08, 0.18, 0.22), vec3(0.44, 0.74, 0.64), g*0.8);
-        k = nightK*0.85; }
+          float per = 6.0 + 6.0*h1, age = mod(gTime + h2*per, per);
+          if (h2 < 0.6) g += ripW(q, (c + 0.2 + 0.6*vec2(h1, h2))*2.2, age, 0.75, hh); }
+        for (int i = 0; i < 8; i++) g += ripW(q, uRip[i].xy, gTime - uRip[i].z, 1.0, hh);
+        vec2 sc = floor(q*22.0); float sn = fract(sin(dot(sc + floor(gTime*7.0)*vec2(1.7, 3.1), vec2(12.9898, 78.233)))*43758.5);
+        g *= 3.5;   // (the plankton's gain: a gentle stir lights them well)
+        float spark = step(0.88, sn)*smoothstep(0.12, 0.5, g) + step(0.997, sn)*0.45;
+        float gs = floor(min(g, 1.2)*4.0 + 0.4)/4.0;
+        gc = vec3(0.05, 0.13, 0.17) + vec3(0.36, 0.9, 0.7)*gs + vec3(0.78, 1.0, 0.88)*spark*0.85;
+        gl_FragColor.rgb *= 1.0 + hh*0.22*(1.0 - nightK);
+        k = nightK; }
       else gc = vGlow > 0.6 ? lampY*0.95*sh : mix(amber, vColor*vec3(0.9, 0.75, 0.45), 0.18)*sh;   // (.7: a tower's glass rooms, lit like windows)
       // (windows and lamps: warm yellow; the glass up top: orange, still shaded by its facets; .25: lit in its own color, for
       // neon, screens, red lanterns; .35: water, lit softly from within)
@@ -796,7 +810,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   }
 
   /* ---------- the pixels: drawn at the city's line count, then scaled up hard ---------- */
-  let rt = null, reflRT = null;
+  let rt = null, reflRT = null, hlRT = null;
   const skyU = { top: { value: SKY.top }, mid: { value: SKY.mid }, low: { value: SKY.low }, hor: { value: .7 }, ease: { value: .4 } };
   const skyQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: skyU, depthWrite: false, depthTest: false,
     vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
@@ -820,9 +834,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       void main(){ vec3 c = vec3(0.0); float wt = 0.0;
         for (int i = -6; i <= 6; i++){ float f = float(i), w = exp(-f*f/18.0); c += texture2D(src, vU + dir*f*3.2).rgb*w; wt += w; }
         gl_FragColor = vec4(c/wt, 1.0); }` });
-  const blit = new THREE.Mesh(quad, new THREE.ShaderMaterial({ uniforms: { tex: { value: null }, glow: { value: null }, nightK: CURV.darkK, res: { value: new THREE.Vector2(480, 270) }, pOff: { value: new THREE.Vector2() } },
+  const blit = new THREE.Mesh(quad, new THREE.ShaderMaterial({ uniforms: { tex: { value: null }, glow: { value: null }, nightK: CURV.darkK, res: { value: new THREE.Vector2(480, 270) }, pOff: { value: new THREE.Vector2() }, hlTex: { value: null }, hlOn: { value: 0 } },
     vertexShader: postV, depthTest: false, depthWrite: false,
-    fragmentShader: `uniform sampler2D tex, glow; uniform float nightK; uniform vec2 res, pOff; varying vec2 vU;
+    fragmentShader: `uniform sampler2D tex, glow, hlTex; uniform float nightK, hlOn; uniform vec2 res, pOff; varying vec2 vU;
       float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
       float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
         return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
@@ -836,6 +850,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
           vec3 tint = normalize(g + 1e-4)*vec3(1.0, 0.92, 0.8);
           c += (g*1.6*(0.8 + 0.4*paper) + tint*0.08*wash + tint*0.1*rim)*nightK;
         }
+        if (hlOn > 0.5){   // (the highlight: a one-pixel line just outside the shape's outline, and the faintest wash inside)
+          vec2 q = (floor(vU*res) + 0.5)/res, e = 1.0/res; vec2 m = texture2D(hlTex, q).rg;
+          vec2 n = max(max(texture2D(hlTex, q + vec2(e.x, 0.0)).rg, texture2D(hlTex, q - vec2(e.x, 0.0)).rg), max(texture2D(hlTex, q + vec2(0.0, e.y)).rg, texture2D(hlTex, q - vec2(0.0, e.y)).rg));
+          vec3 hc = n.r > n.g ? vec3(0.9, 0.38, 0.26) : vec3(0.66, 0.94, 0.7); float edge = step(0.5, max(n.r, n.g))*(1.0 - step(0.5, max(m.r, m.g)));
+          c = mix(c, hc, edge*0.7); c = mix(c, m.r > m.g ? vec3(0.9, 0.38, 0.26) : vec3(0.66, 0.94, 0.7), step(0.5, max(m.r, m.g))*0.06); }
         gl_FragColor = vec4(c, 1.0); }` }));
   const blitScene = new THREE.Scene(); blitScene.add(blit);
   const _po = new THREE.Vector3();
@@ -858,6 +877,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (const g of [glA, glB]) if (g) g.dispose();
     glA = new THREE.WebGLRenderTarget(W, H, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }); glB = glA.clone();   // (full size: at half size each one-pixel pan picked different pixels, and the glow shimmered)
     blit.material.uniforms.tex.value = rt.texture; blit.material.uniforms.glow.value = glA.texture; blit.material.uniforms.res.value.set(W, H);
+    if (hlRT) hlRT.dispose(); hlRT = new THREE.WebGLRenderTarget(W, H, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false }); blit.material.uniforms.hlTex.value = hlRT.texture;
   }
   addEventListener('resize', resize);
 
@@ -2394,17 +2414,19 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (!P || P === CN.a || !CN.ok) return;
     const a = CN.a.id, b = P.id; NOLINK.delete(pairId(a, b)); ULINKS = ULINKS.filter(u => !((u.a === a && u.b === b) || (u.a === b && u.b === a))); ULINKS.push({ a, b, type: LINK_TYPES[CN.type] });
     saveLinks(); linksDirty = true; CN.a = null; CN.key = ''; connGhost.visible = false; outline.visible = false; }
-  // What a click is about to act on, shown as a tint laid over it: terracotta for what a right click would take away, a soft
-  // green for what a click would pick. Drawn over the real thing (same shapes, pushed a hair toward the eye).
-  const hlDel = new THREE.MeshBasicMaterial({ color: 0xe0583c, transparent: true, opacity: .45, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8 });
-  const hlSel = hlDel.clone(); hlSel.color.set(0x7fe0a0); hlSel.opacity = .35;
-  const hlGroup = new THREE.Group(); hlGroup.renderOrder = 8; scene.add(hlGroup);
+  // What a click is about to act on, shown by its outline only, faintly: terracotta for what a right click would take away,
+  // a soft green for what a click would pick.
+  // (how: the shapes are drawn flat into a mask of their own, red for take-away, green for pick, and the last pass draws a
+  // line one pixel wide just outside the mask's edge, so only the outline shows, over whatever is in front of it)
+  const hlDel = new THREE.MeshBasicMaterial({ color: 0xff0000, depthTest: false, depthWrite: false }), hlSel = new THREE.MeshBasicMaterial({ color: 0x00ff00, depthTest: false, depthWrite: false });
+  const hlScene = new THREE.Scene();
+  const hlGroup = new THREE.Group(); hlGroup.renderOrder = 8;
   const _I4 = new THREE.Matrix4(), hlDisc = new THREE.CircleGeometry(.9, 24).rotateX(-PI/2), hlDisk = new THREE.MeshBasicMaterial({ color: 0xe0583c, transparent: true, opacity: .28, depthTest: false, depthWrite: false });
   function hlClear(){ while (hlGroup.children.length) hlGroup.remove(hlGroup.children[0]); }
   function hlAdd(geo, M, mat){ const m = new THREE.Mesh(geo, mat); m.matrixAutoUpdate = false; m.matrix.copy(M); m.matrixWorld.copy(M); m.frustumCulled = false; m.renderOrder = 8; m.raycast = () => {}; hlGroup.add(m); }
   function hlPiece(p, mat, all = true){ const seen = new Set(), go = q => { if (!q || seen.has(q)) return; seen.add(q); if (q.mesh) hlAdd(q.mesh.geometry, q.mesh.matrixWorld, mat);
       if (all){ go(q.up); for (const r of PIECES) if (r.host === q) go(r); } }; go(p); }   // (a home and all that goes with it: what's stacked on it and built off it)
-  function hlLink(lk, mat){ for (const v of LCACHE.values()) if (v.used && v.geo && pairId(v.a, v.b) === pairId(lk[0], lk[1])){ hlAdd(v.geo, _I4, mat); if (v.fol) hlAdd(v.fol, _I4, mat); } }
+  function hlLink(lk, mat){ for (const v of LCACHE.values()) if (v.used && v.geo && pairId(v.a, v.b) === pairId(lk[0], lk[1])){ hlAdd(v.geo, _I4, mat); } }   // (its plants left out: blades would be all edges)
   const grassNear = (x, z, r) => { for (let i = Math.floor((x - r)/GC); i <= Math.ceil((x + r)/GC); i++) for (let j = Math.floor((z - r)/GC); j <= Math.ceil((z + r)/GC); j++) if (tufts.has(i + ',' + j)) return true; return false; };
   function showRemoveHover(){
     ghost.visible = false; zHide(); connGhost.visible = false; ring.visible = false;
@@ -2414,8 +2436,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (lk){ hlLink(lk, hlDel); say('Right click to take away this walkway'); return; }
     const p = pieceAt(x, y); if (p){ hlPiece(p, hlDel); const nm = COM(p.kind) || SOLO(p.kind) ? 'this ' + KINDS[p.kind].name.toLowerCase() : 'this home'; say(p.up || PIECES.some(r => r.host === p) ? 'Right click to take away ' + nm + ' and what\'s built on it' : 'Right click to take away ' + nm); return; }
     const h = pick(x, y);
-    if (h && !h.sea && grassNear(h.x, h.z, .9)){ ringAt(h.x, h.z, .9, null, .12); ringM.color.set(0xe0583c); ringM.depthTest = false;   // (over the blades, so it shows)
-      const d = new THREE.Mesh(hlDisc, hlDisk); d.position.set(h.x, heightAt(h.x, h.z) + .08, h.z); d.updateMatrix(); hlAdd(hlDisc, d.matrix, hlDisk); say('Right click to clear the grass here'); return; }
+    if (h && !h.sea && grassNear(h.x, h.z, .9)){ ringAt(h.x, h.z, .9, null, .06); ringM.color.set(0xe0583c); ringM.depthTest = false;   // (over the blades, so it shows)
+      say('Right click to clear the grass here'); return; }   // (just the ring round it)
     if (status) status.textContent = ''; }
   // the walkway under the pointer, if it's nearer than any block there: [a id, b id]
   function linkAt(cx, cy){
@@ -2464,15 +2486,15 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     // the grass brush paints (left) or clears (right) as it's dragged; Alt+drag or the middle button still turns the view
     if (PL.kind === 'grass' && (e.button === 0 || e.button === 2) && !e.altKey && e.pointerType !== 'touch'){ act = { kind: 'paint', erase: e.button === 2 }; GR.last = null; grassStroke(e.clientX, e.clientY, act.erase, true); }
   });
-  // the pointer stirring the glowing water (the lagoon garden's pool, the grotto's): at night, a ring from where it passed,
-  // a few spots kept (uRip: x, z, time), a new one each time it has moved a little over the water
+  // the pointer stirring the water (the lagoon garden's pool, the grotto's): a ring wave from where it passed (glowing by
+  // night), the last 8 spots kept (uRip: x, z, time), a new one each time it has moved a little over the water
   const RIP = { i: 0, x: 1e9, z: 1e9, t: 0 };
   function stirWater(cx, cy){
-    if (CURV.nightK.value < .05) return; const now = CURV.gTime.value; if (now - RIP.t < .12) return;
+    const now = CURV.gTime.value; if (now - RIP.t < .07) return;
     const h = pick(cx, cy); if (!h) return;
     const inPool = PIECES.some(p => p.kind === 'lagoon' ? Math.hypot(h.x - p.x, h.z - p.z) < 1.85 : p.kind === 'grotto' ? Math.hypot(h.x - (p.x - Math.sin(p.rot)*.25), h.z - (p.z - Math.cos(p.rot)*.25)) < .45 : false);
-    if (!inPool || Math.hypot(h.x - RIP.x, h.z - RIP.z) < .35) return;
-    CURV.uRip.value[RIP.i].set(h.x, h.z, now); RIP.i = (RIP.i + 1) % 4; RIP.x = h.x; RIP.z = h.z; RIP.t = now; }
+    if (!inPool || Math.hypot(h.x - RIP.x, h.z - RIP.z) < .25) return;
+    CURV.uRip.value[RIP.i].set(h.x, h.z, now); RIP.i = (RIP.i + 1) % 8; RIP.x = h.x; RIP.z = h.z; RIP.t = now; }
   canvas.addEventListener('pointermove', e => {
     PL.ptr = { x: e.clientX, y: e.clientY };
     stirWater(e.clientX, e.clientY);
@@ -2604,11 +2626,13 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     renderer.setRenderTarget(rt); renderer.autoClear = true; renderer.render(skyScene, skyCam);
     renderer.autoClear = false; renderer.clearDepth(); renderer.render(scene, cam); if (PROF.on){ PROF.calls += renderer.info.render.calls; PROF.tris += renderer.info.render.triangles; } q = tk('main render', q);
     renderer.autoClear = true; glowPass(); q = tk('glow', q);
+    blit.material.uniforms.hlOn.value = hlGroup.children.length ? 1 : 0;
+    if (hlGroup.children.length){ hlScene.add(hlGroup); renderer.setRenderTarget(hlRT); const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha(); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(hlScene, cam); renderer.setClearColor(cc, ca); }
     renderer.setRenderTarget(null); renderer.autoClear = true; renderer.render(blitScene, skyCam); q = tk('blit', q); if (PROF.on) PROF.n++;
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES,
+  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

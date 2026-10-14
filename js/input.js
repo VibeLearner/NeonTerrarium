@@ -53,6 +53,15 @@ function updateCamera(dt){
 const ptrs = new Map(); let dragging = false, pinch0 = 0, zoom0 = 0, pinchX = 0;
 let act = null;   // the gesture in progress: { kind:'paint'|'rotate'|'right'|'touch', x, y, moved, done:Set, timer }
 const pdist = () => { const [a,b] = [...ptrs.values()]; return Math.hypot(a.x-b.x, a.y-b.y) || 1; };
+const pang = () => { const [a,b] = [...ptrs.values()]; return Math.atan2(b.y - a.y, b.x - a.x); };
+const pmid = () => { const [a,b] = [...ptrs.values()]; return { x: (a.x + b.x)/2, y: (a.y + b.y)/2 }; };
+// a finger dragging the ground: the ground follows it (touch only; a mouse drag still turns the view)
+function touchPan(dx, dy){
+  const k = 2*zoom/(canvas.clientHeight || 1), sy = Math.sin(yaw), cy = Math.cos(yaw), f = dy*k/Math.max(.3, Math.sin(PITCH)), r = -dx*k;
+  camGoal.x += cy*r - sy*f; camGoal.z += -sy*r - cy*f;
+  const lim = GRID_MAX*LOT; camGoal.x = clamp(camGoal.x, -lim, lim); camGoal.z = clamp(camGoal.z, -lim, lim);
+  camT.copy(camGoal); MON.userPan();
+}
 const pmidX = () => { const [a,b] = [...ptrs.values()]; return (a.x + b.x)/2; };
 function paintAt(x, y){
   const t = targetOf(pickAt(x, y)); if (!t) return;
@@ -63,14 +72,14 @@ function paintAt(x, y){
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
   canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); dragging = true;
-  if (ptrs.size === 2){ if (act && act.timer) clearTimeout(act.timer); act = { kind: 'pinch' }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); hover.visible = hoverFill.visible = false; return; }
+  if (ptrs.size === 2){ if (act && act.timer) clearTimeout(act.timer); act = { kind: 'pinch', touch: e.pointerType === 'touch', ang: pang(), mid: pmid() }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); hover.visible = hoverFill.visible = false; return; }
   if (delMode && e.button === 0){ act = { kind: 'del', x: e.clientX, y: e.clientY, moved: false, from: groundCellAt(e.clientX, e.clientY) }; return; }   // delete mode: drag selects
   if ((e.button === 0 || e.pointerType === 'touch') && !hwMode && !mtMode && !megaPick){   // someone in the street under the pointer: a click opens the monitor on them (monitor.js)
     const who = MON.pick(e.clientX, e.clientY); if (who){ act = { kind: 'npc', id: who, x: e.clientX, y: e.clientY, moved: false }; return; } }
   if (e.pointerType === 'touch'){
     // tap builds, drag paints, press and hold removes
     act = { kind: 'touch', x: e.clientX, y: e.clientY, moved: false, done: new Set() };
-    act.timer = setTimeout(() => { if (act && act.kind === 'touch' && !act.moved){ if (hwMode) hwRightClick(act.x, act.y); else if (mtMode) mtRightClick(act.x, act.y); else removeAt(pickAt(act.x, act.y)); act.kind = 'none'; } }, 550);
+    act.timer = setTimeout(() => { if (act && act.kind === 'touch' && !act.moved){ if (hwMode) hwRightClick(act.x, act.y); else if (mtMode) mtRightClick(act.x, act.y); else if (megaPick) selectMega(null); else removeAt(pickAt(act.x, act.y)); act.kind = 'none'; } }, 550);
     return;
   }
   if (e.button === 0 && (hwMode || mtMode)){ act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false }; return; }   // highway or metro mode: a click builds, a drag turns the view
@@ -97,7 +106,9 @@ function pointerMove(e){
   const dx = e.clientX - p.x, dy = e.clientY - p.y, tilt = () => { if (tiltMode) pitchT = clamp(pitchT + dy*.006, PITCH_MIN, PITCH_MAX); };
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!act) return;
-  if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), 5, 30); const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } return; }
+  if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), 5, 30);
+    if (act.touch){ const a = pang(), m = pmid(); let da = a - act.ang; if (da > PI) da -= 2*PI; if (da < -PI) da += 2*PI; yawT += da; act.ang = a; touchPan(m.x - act.mid.x, m.y - act.mid.y); act.mid = m; }   // (twist turns, the pair together pans)
+    else { const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } } return; }
   if (act.kind === 'rotate'){ yawT -= dx*.008; tilt(); return; }
   if (act.kind === 'del'){
     if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true;
@@ -105,12 +116,12 @@ function pointerMove(e){
     if (act.moved && act.from && to){ delSel = { i0: Math.min(act.from.i, to.i), i1: Math.max(act.from.i, to.i), j0: Math.min(act.from.j, to.j), j1: Math.max(act.from.j, to.j) }; showAreaSel(delSel); }
     return;
   }
-  if (act.kind === 'npc'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5){ act.kind = 'sky'; act.moved = true; } return; }
+  if (act.kind === 'npc'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5){ act.moved = true; if (e.pointerType === 'touch'){ act.kind = 'touch'; touchPan(e.clientX - act.x, e.clientY - act.y); } else act.kind = 'sky'; } return; }
   if (act.kind === 'sky'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); hover.visible = hoverFill.visible = false; if (megaPick) showMegaGhost(null); } return; }
   if (act.kind === 'right'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); } return; }
   if (act.kind === 'touch'){
-    if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) > 10){ act.moved = true; clearTimeout(act.timer); const pk = pickAt(act.x, act.y); act.spin = !pk || pk.kind === 'sky' || !S.paint; if (!act.spin) paintAt(act.x, act.y); }
-    if (act.moved){ if (act.spin){ yawT -= dx*.008; tilt(); } else paintAt(e.clientX, e.clientY); }
+    if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) > 10){ act.moved = true; clearTimeout(act.timer); hover.visible = hoverFill.visible = false; if (megaPick) showMegaGhost(null); touchPan(e.clientX - act.x, e.clientY - act.y); return; }
+    if (act.moved) touchPan(dx, dy);
     return;
   }
   if (act.kind === 'paint'){ paintAt(e.clientX, e.clientY); showHover(targetOf(pickAt(e.clientX, e.clientY))); }

@@ -9,7 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="css/style.css?v=2026-10-13l">
+<script src="js/touch.js?v=2026-10-14a"></script>
+<link rel="stylesheet" href="css/style.css?v=2026-10-14b">
 </head>
 <body>
 
@@ -114,7 +115,19 @@
   <div class="ctlwrap hint">
     <p class="modehint ctlhover" tabindex="0">Hover for controls</p>
     <div class="ctlpanel" role="tooltip">
-      <dl>
+      <header class="touchonly"><b>Controls</b><button class="ctlclose" aria-label="Close controls">✕</button></header>
+      <dl class="touchonly">
+        <dt>Drag</dt><dd>Move around</dd>
+        <dt>Pinch</dt><dd>Zoom</dd>
+        <dt>Twist two fingers</dt><dd>Turn the view</dd>
+        <dt>Tap a zone, then a plot</dt><dd>Build</dd>
+        <dt>Tap a roof</dt><dd>Stack a section</dd>
+        <dt>Tap the sky</dt><dd>Grow the platform</dd>
+        <dt>Press and hold</dt><dd>Remove a section</dd>
+        <dt>Tap someone</dt><dd>Watch them (once there's a police station)</dd>
+        <dt>✕</dt><dd>Delete mode</dd>
+      </dl>
+      <dl class="mouseonly">
         <dt>WASD · arrow keys</dt><dd>Move</dd>
         <dt>Drag the sky · Q / E</dt><dd>Rotate</dd>
         <dt>Scroll</dt><dd>Zoom</dd>
@@ -274,7 +287,7 @@
 <script src="js/recipe.js?v=2026-10-13l"></script>
 <script src="js/loadcity.js?v=2026-10-13l"></script>
 <script src="js/music.js?v=2026-10-14a"></script>
-<script src="js/input.js?v=2026-10-13l"></script>
+<script src="js/input.js?v=2026-10-14a"></script>
 <script src="js/perfhud.js?v=2026-10-13l"></script>
 <script src="js/staticcache.js?v=2026-10-13l"></script>
 <script src="js/neverseen.js?v=2026-10-13l"></script>

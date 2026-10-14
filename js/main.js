@@ -21,6 +21,7 @@ PH.state = () => 'cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + ';
   + '; merges waiting ' + solidDirty.size + (SOLID_JOB ? ' (one under way)' : '') + ', tier changes ' + TIER.changes + ', to free ' + DISPOSE_Q.length + '; drag ' + (dragging ? 'held' : 'off');
 function frame(now){
   requestAnimationFrame(frame);
+  if (typeof OVERSEER !== 'undefined' && OVERSEER.hold) return;   // (the Overseer's desk covers the screen: the city waits)
   if (idleNow(now)){ IDLE_SKIP = !IDLE_SKIP; if (IDLE_SKIP) return; } else IDLE_SKIP = false;
   try { frameBody(now); }
   catch (e){ FRAME_ERR.n++; FRAME_ERR.last = String(e && e.stack || e).slice(0, 400);

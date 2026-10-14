@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Neon Terrarium: the coast</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
+<script src="js/tv.js?v=2026-10-14a"></script>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Patrick+Hand&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
 <style>
   /* Hand-painted UI: watercolor washes on paper with bleeding edges, wobbly ink lines, hand lettering. The washes and the
      ink are filtered once (static), never animated, so they cost nothing per frame. Laid out as the sky city is: the title
@@ -86,6 +87,23 @@
   .rot { width: 44px; height: 44px; font: 700 26px/1 'Caveat', cursive; --w: var(--paper); --w2: var(--sky); transition: transform .15s; }
   .rot:hover { transform: rotate(-8deg); }
   .chip { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); padding: 3px 14px 5px; font: 19px/1.1 'Caveat', cursive; --w: var(--paper); --w2: var(--apricot); }
+  /* the way back up: a glitching sky-city terminal button, deliberately not of this watercolour world */
+  .exitg { position: fixed; top: 14px; right: 16px; z-index: 50; padding: 9px 18px 9px 30px; border: 1px solid #2affe0; background: rgba(4,10,14,.88); color: #e8fffb; cursor: pointer;
+    font: 600 14px/1 'JetBrains Mono', ui-monospace, monospace; letter-spacing: .42em; text-indent: .42em; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+    box-shadow: 0 0 0 1px rgba(255,42,90,.35) inset, 0 0 18px rgba(42,255,224,.25); animation: exFlick 4.2s infinite; }
+  .exitg::before { content: ''; position: absolute; left: 11px; top: 50%; width: 8px; height: 8px; margin-top: -4px; background: #ff2a5a; box-shadow: 0 0 8px #ff2a5a; animation: exDot 1s steps(2) infinite; }
+  .exitg span { position: relative; display: inline-block; }
+  .exitg span::before, .exitg span::after { content: attr(data-t); position: absolute; left: 0; top: 0; width: 100%; overflow: hidden; }
+  .exitg span::before { color: #ff2a5a; transform: translate(-2px, 0); clip-path: inset(0 0 55% 0); animation: exA 2.3s steps(1) infinite; mix-blend-mode: screen; }
+  .exitg span::after { color: #2affe0; transform: translate(2px, 0); clip-path: inset(50% 0 0 0); animation: exB 1.9s steps(1) infinite; mix-blend-mode: screen; }
+  .exitg i { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,.35) 0 1px, transparent 1px 3px); }
+  .exitg:hover, .exitg:focus-visible { background: #2affe0; color: #04090c; outline: none; animation: exJit .18s steps(2) infinite; }
+  .exitg:hover span::before, .exitg:hover span::after { opacity: .9; }
+  @keyframes exA { 0%, 100% { transform: translate(-2px, 0); clip-path: inset(0 0 55% 0); } 33% { transform: translate(-4px, -1px); clip-path: inset(15% 0 40% 0); } 66% { transform: translate(1px, 1px); clip-path: inset(60% 0 5% 0); } }
+  @keyframes exB { 0%, 100% { transform: translate(2px, 0); clip-path: inset(50% 0 0 0); } 40% { transform: translate(4px, 1px); clip-path: inset(70% 0 10% 0); } 75% { transform: translate(-1px, 0); clip-path: inset(5% 0 70% 0); } }
+  @keyframes exFlick { 0%, 87%, 91%, 100% { opacity: 1; transform: none; } 88% { opacity: .55; transform: translateX(-3px) skewX(-8deg); } 89% { opacity: 1; clip-path: polygon(0 20%, 100% 20%, 100% 60%, 0 60%); } 90% { opacity: .8; transform: translateX(2px); } }
+  @keyframes exDot { 50% { opacity: .25; } }
+  @keyframes exJit { 50% { transform: translate(1px, -1px); } }
 </style>
 </head>
 <body>
@@ -127,6 +145,12 @@
 
 <div id="tiltChip" class="chip wash" hidden>Tilt: drag up and down, Space to go back</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<button id="exitg" class="exitg" type="button" aria-label="Exit to the sky city"><span data-t="EXIT">EXIT</span><i></i></button>
 <script src="js/coast.js"></script>
+<script>
+  // back up to the sky city: the television switches off, and the city comes on
+  document.getElementById('exitg').addEventListener('click', () => { if (typeof TV !== 'undefined') TV.go('index.html'); else location.href = 'index.html'; });
+  if (typeof TV !== 'undefined') TV.ready = () => !!(window.COAST && COAST.state && COAST.state.built > 0);
+</script>
 </body>
 </html>

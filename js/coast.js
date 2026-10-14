@@ -193,12 +193,20 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // that, by a steady lean, by gusts that roll across the field in long waves, and by a quick flutter of its own; and it
   // dips a little as it bends, so the blade keeps its length. (The sway is applied before the bend: the mesh is in world units)
   const SWAY_V = 'attribute float aH; uniform float wTime;\n';
-  const SWAY = `{ vec2 wd = vec2(0.83, 0.55), q = (modelMatrix*vec4(transformed, 1.0)).xz; float ph = dot(q, wd)*0.32 - wTime*1.25;
+  const SWAY = `{ vec2 wd = vec2(0.83, 0.55); vec4 wq_ = vec4(transformed, 1.0); float sc_ = 1.0;
+      #ifdef USE_INSTANCING
+        wq_ = instanceMatrix*wq_; sc_ = length(instanceMatrix[0].xyz);
+      #endif
+      vec2 q = (modelMatrix*wq_).xz; float ph = dot(q, wd)*0.32 - wTime*1.25;
       float gust = 0.5 + 0.5*sin(ph) + 0.22*sin(ph*2.3 + q.x*0.7 - q.y*0.4);
       float flut = sin(wTime*4.1 + q.x*3.1 + q.y*2.3) + 0.5*sin(wTime*6.3 + q.x*5.0 - q.y*4.1);
-      float k = aH*aH;
+      float hw = aH*sc_, k = hw*hw;
       vec2 d = wd*(0.08 + 0.3*gust*gust)*k + vec2(-wd.y, wd.x)*flut*0.035*k;
-      transformed.xz += d; transformed.y -= dot(d, d)*0.55/max(aH, 0.05); }`;
+      vec3 dl = vec3(d.x, -dot(d, d)*0.55/max(hw, 0.05), d.y);
+      #ifdef USE_INSTANCING
+        dl = (dl*mat3(instanceMatrix))/(sc_*sc_);   // (back into the copy's own frame)
+      #endif
+      transformed += dl; }`;
   // bend any built-in material the same way (and haze it toward the horizon, unless it's only drawn into the shadow map)
   function bent(mat, haze = true, rocky = false, glow = false, paint = null, sway = null){
     mat.onBeforeCompile = sh => {
@@ -1696,9 +1704,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // ochre wash here and there, cool and dark at the roots, warm and pale at the tips where the light comes through.
   // The ground is cut into cells (.4 units) and each holds one tuft at most, so painting over the same place again adds
   // nothing; tufts are kept by cell and made again from their cell's seed. A mesh per 8-unit square, remade when painted.
-  const GRASS_KEY = 'neonIsland.coast.grass', GC = .4, GSQ = 8;
+  const GRASS_KEY = 'neonIsland.coast.grass', GC = .4, GSQ = 32;   // (GC: a tuft's cell; GSQ: an area of grass, drawn together)
   const GSTYLES = ['meadow', 'wildflowers', 'ferns', 'tall grass', 'mix'];
-  const tufts = new Map(), gSquares = new Map(), gDirty = new Set();
+  const tufts = new Map(), gSquares = new Map(), gDirty = new Set(), tdata = new Map();
   const sqKey = (i, j) => Math.floor(i*GC/GSQ) + ',' + Math.floor(j*GC/GSQ);
   try { for (const [i, j, st] of JSON.parse(localStorage.getItem(GRASS_KEY) || '[]')){ tufts.set(i + ',' + j, [i, j, st]); gDirty.add(sqKey(i, j)); } } catch (e) {}
   let gSaveT = 0; const saveGrass = () => { clearTimeout(gSaveT); gSaveT = setTimeout(() => { try { localStorage.setItem(GRASS_KEY, JSON.stringify([...tufts.values()])); } catch (e) {} }, 400); };
@@ -1706,27 +1714,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function grassOK(x, z){ if ((coastX(z) - x)*rowCos(z) < 1.1) return null; const y = heightAt(x, z);
     if (Math.abs(heightAt(x + .35, z) - y) > .3 || Math.abs(heightAt(x, z + .35) - y) > .3) return null;
     if (solidAt(x, z, y - .2, y + .5)) return null; return y; }
-  function tuft(G, i, j, st, part){   // (part: 'blot', the washed ground under it; 'plant', the plant itself; 'lo', the plant drawn simply, for far views)
-    const R = rng((Math.imul(i, 73856093) ^ Math.imul(j, 19349663)) >>> 0), x = (i + R.r(.1, .9))*GC, z = (j + R.r(.1, .9))*GC, y = grassOK(x, z); if (y === null) return;
-    const wash = fbm(x*.12 + 3, z*.12 - 5), dryK = smooth(.58, .75, fbm(x*.07 - 20, z*.07 + 9))*.55;
-    let base = mix3(mix3(GG.greenA, GG.greenB, smooth(.35, .65, wash)), GG.greenC, smooth(.55, .8, fbm(x*.3, z*.3))*.6); base = mix3(base, GG.dry, dryK);
-    const tipC = mix3(GG.tip, base, .35), lean0 = R.r(.15, .45);
-    // the ground under it washed darker, a ragged blot: blots run together into the patch's shadowed floor
-    { const rr = GC*R.r(.85, 1.15), a0 = R.r(0, 6.28);
-      if (part === 'blot'){ const gc = mul3(base, .72, .6), c0 = G.v(x, y + .025, z, 0, 1, 0, gc, 0), n = 7, ring_ = [];
-        for (let k = 0; k < n; k++){ const a = a0 + k/n*6.28, q = rr*(.75 + .45*hash2(i*31 + k, j*17 - k)); ring_.push(G.v(x + Math.cos(a)*q, y + .02, z + Math.sin(a)*q, 0, 1, 0, mul3(gc, 1.06), 0)); }
-        for (let k = 0; k < n; k++) G.tri(c0, ring_[(k + 1) % n], ring_[k]); return; } }
-    // the simple one: the same tuft in the same place and colors, of a few broad single-triangle blades (and a triangle for a
-    // flower, a frond, a seed head); about a tenth of the triangles, and at a distance it reads the same
-    if (part === 'lo'){
-      const one = (n, l0, l1, w, c0, c1, lean) => { const tops = []; for (let k = 0; k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .14); tops.push(blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a, R.r(l0, l1), w, lean + R.r(-.1, .2), c0, c1, 1)); } return tops; };
-      const dot = (p, r, col) => { const h = p[1] - y, a = G.v(p[0] - r, p[1], p[2], 0, 1, 0, col, h), b = G.v(p[0] + r*.5, p[1] + r*.3, p[2] - r*.86, 0, 1, 0, col, h), c = G.v(p[0] + r*.5, p[1] - r*.3, p[2] + r*.86, 0, 1, 0, col, h); G.tri(a, b, c); };
-      const b2 = mix3(base, tipC, .22);   // (a touch lighter at the root: fewer, broader blades hide less of the dark ground, so they carry more of the tip color)
-      if (st === 0) one(8, .26, .58, .32, b2, tipC, lean0);
-      else if (st === 1){ one(6, .2, .42, .3, b2, tipC, lean0); const fc = R.pick(FLOWERS); for (const t of one(2, .32, .55, .05, mul3(base, .9), base, .15)) dot(t, .11, fc); }
-      else if (st === 2){ const fc = mix3(GG.fern, base, .25); one(6, .4, .65, .36, mix3(fc, GG.tip, .12), mix3(fc, GG.tip, .35), 1.05); }
-      else { const rc = mix3(GG.reed, base, .45); for (const t of one(5, .75, 1.25, .16, mix3(base, rc, .3), rc, .12)) if (R.chance(.6)) dot([t[0], t[1] + .06, t[2]], .07, GG.head); one(3, .2, .38, .26, b2, tipC, lean0); }
-      return; }
+  // one plant of a kind, at (x, y, z), in the colors given
+  function plantOf(G, R, x, y, z, st, base, tipC, lean0){
     const grass = (n, l0, l1) => { for (let k = 0; k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .16), c = mix3(base, [base[0]*1.12, base[1]*1.06, base[2]*.9], R.f());
       blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a + R.r(-.6, .6), R.r(l0, l1), R.r(.08, .14), lean0 + R.r(-.15, .2), c, tipC, 3); } };
     if (st === 0) grass(R.i(10, 15), .24, .6);
@@ -1737,6 +1726,77 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     else if (st === 2){ const n = R.i(5, 8), a0 = R.r(0, 6.28), fc = mix3(GG.fern, base, .25); for (let k = 0; k < n; k++) frond(G, x, y, z, a0 + k/n*6.28 + R.r(-.3, .3), R.r(.42, .72), fc); }
     else { const rc = mix3(GG.reed, base, .45); for (let k = 0, n = R.i(6, 9); k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .12), top = blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a, R.r(.75, 1.3), .05, R.r(.05, .2), mul3(base, .85), rc, 4);
         if (R.chance(.65)) seedHead(G, top[0], top[1] - .02, top[2], R.r(.16, .26), GG.head, top[1] - y); } grass(R.i(2, 4), .2, .4); } }
+
+  /* ---------- the grass as copies: a few tufts of each kind made once, stamped everywhere ---------- */
+  // Each kind has GV tufts, made at load in a neutral green. Every tuft painted on the ground is one of those, turned, sized
+  // and tinted by where it grows (the watercolor washes of greens and dry ochre, as before), so a meadow is a handful of
+  // draws whatever its size, and painting only adds a copy. Under each, a ragged darker blot of ground (one shape, copied).
+  const GV = 5, VBASE = GG.greenA, VTIP = mix3(GG.tip, GG.greenA, .35), VAR = [];
+  for (let st = 0; st < 4; st++){ VAR.push([]); for (let v = 0; v < GV; v++){ const G = new GB(), R = rng(st*7919 + v*104729 + 11); plantOf(G, R, 0, 0, 0, st, VBASE, VTIP, R.r(.15, .45)); VAR[st].push(G.mesh()); } }
+  const blotGeo = (() => { const G = new GB(), gc = mul3(VBASE, .72, .6), c0 = G.v(0, .025, 0, 0, 1, 0, gc, 0), n = 9, ring_ = [];
+    for (let k = 0; k < n; k++){ const a = k/n*6.28, q = GC*(.8 + .4*hash2(k*31 + 5, k*17 + 3)); ring_.push(G.v(Math.cos(a)*q, .02, Math.sin(a)*q, 0, 1, 0, mul3(gc, 1.06), 0)); }
+    for (let k = 0; k < n; k++) G.tri(c0, ring_[(k + 1) % n], ring_[k]); return G.mesh(); })();
+  // where a tuft grows, which copy, how it's turned and sized, and its tint (kept, until the ground under it changes)
+  function tuftRec(i, j, st){
+    const k = i + ',' + j; let r = tdata.get(k); if (r !== undefined) return r;
+    const R = rng((Math.imul(i, 73856093) ^ Math.imul(j, 19349663)) >>> 0), x = (i + R.r(.1, .9))*GC, z = (j + R.r(.1, .9))*GC, y = grassOK(x, z);
+    if (y === null){ tdata.set(k, null); return null; }
+    const wash = fbm(x*.12 + 3, z*.12 - 5), dryK = smooth(.58, .75, fbm(x*.07 - 20, z*.07 + 9))*.55;
+    let base = mix3(mix3(GG.greenA, GG.greenB, smooth(.35, .65, wash)), GG.greenC, smooth(.55, .8, fbm(x*.3, z*.3))*.6); base = mix3(base, GG.dry, dryK);
+    const tint = base.map((c, q) => clamp(c/VBASE[q], .55, 1.9));
+    r = { x, y, z, st, v: Math.floor(hash2(i*13 + 7, j*29 + 3)*GV) % GV, rot: hash2(i*5 + 1, j*7 + 2)*PI*2, s: .85 + .3*hash2(i*11 + 4, j*3 + 9), tint };
+    tdata.set(k, r); return r; }
+
+  // the far grass: each tuft as a card, an image of it baked at load from 16 sides (at the view's own downward angle), its
+  // colors and the way its surfaces face kept apart so the light, shadows, the night and the haze still fall on it live. A
+  // card shows the bake nearest the angle it's seen from, blended with the next, and sways at the top in the wind. All the
+  // cards of an area are one draw.
+  const CARD = { cols: 16, rows: 4*GV, cell: 40, x0: -1.1, x1: 1.1, y0: -.6, y1: 1.6 };
+  const cardAlb = new THREE.WebGLRenderTarget(CARD.cols*CARD.cell, CARD.rows*CARD.cell, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+  const cardNrm = new THREE.WebGLRenderTarget(CARD.cols*CARD.cell, CARD.rows*CARD.cell, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+  (function bakeCards(){
+    const bs = new THREE.Scene(), bm = new THREE.Mesh(VAR[0][0], null); bm.frustumCulled = false; bs.add(bm);
+    const albM = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    const nrmM = new THREE.ShaderMaterial({ side: THREE.DoubleSide, vertexShader: 'varying vec3 vN; void main(){ vN = normal; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
+      fragmentShader: 'varying vec3 vN; void main(){ gl_FragColor = vec4(normalize(vN)*0.5 + 0.5, 1.0); }' });
+    const bc = new THREE.OrthographicCamera(CARD.x0, CARD.x1, CARD.y1, CARD.y0, .1, 60), P = PITCH0;
+    const cc = new THREE.Color(), ca = renderer.getClearAlpha(); renderer.getClearColor(cc);
+    for (const [rt, m] of [[cardAlb, albM], [cardNrm, nrmM]]){
+      bm.material = m; rt.scissorTest = false; rt.viewport.set(0, 0, rt.width, rt.height); renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear();
+      rt.scissorTest = true;
+      for (let st = 0; st < 4; st++) for (let v = 0; v < GV; v++){ bm.geometry = VAR[st][v]; const row = st*GV + v;
+        for (let c = 0; c < CARD.cols; c++){ const th = c/CARD.cols*PI*2;
+          bc.position.set(-Math.sin(th)*Math.cos(P)*20, Math.sin(P)*20, -Math.cos(th)*Math.cos(P)*20); bc.up.set(0, 1, 0); bc.lookAt(0, 0, 0); bc.updateMatrixWorld();
+          rt.viewport.set(c*CARD.cell, row*CARD.cell, CARD.cell, CARD.cell); rt.scissor.copy(rt.viewport); renderer.setRenderTarget(rt); renderer.render(bs, bc); } }
+      rt.scissorTest = false; }
+    renderer.setRenderTarget(null); renderer.setClearColor(cc, ca);
+  })();
+  const cardGeo = (() => { const g = new THREE.BufferGeometry(), { x0, x1, y0, y1 } = CARD;
+    g.setAttribute('position', new THREE.Float32BufferAttribute([x0, y0, 0, x1, y0, 0, x1, y1, 0, x0, y1, 0], 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], 3)); g.setAttribute('color', new THREE.Float32BufferAttribute([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 3)); g.setIndex([0, 1, 2, 0, 2, 3]); return g; })();
+  const cardM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true, map: cardAlb.texture, alphaTest: .5 }));
+  { const ob = cardM.onBeforeCompile, cu = { nTex: { value: cardNrm.texture } };
+    cardM.onBeforeCompile = sh => { ob(sh); Object.assign(sh.uniforms, gU, cu);
+      sh.vertexShader = 'attribute vec2 aCard; uniform float wTime; varying vec2 vCA; varying vec2 vCB; varying float vCm; varying float vCy;\n' + sh.vertexShader
+        .replace('#include <project_vertex>', `
+          vec4 anc = modelViewMatrix*instanceMatrix*vec4(0.0, 0.0, 0.0, 1.0); float sc = length(instanceMatrix[0].xyz);
+          vec3 fw = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]); float cy = cos(aCard.y), sy = sin(aCard.y);
+          float lx = cy*fw.x - sy*fw.z, lz = sy*fw.x + cy*fw.z, f = mod(atan(lx, lz)/6.2831853*${CARD.cols}.0 + ${CARD.cols*4}.0, ${CARD.cols}.0), c0 = floor(f), c1 = mod(c0 + 1.0, ${CARD.cols}.0);
+          vCm = f - c0; vCy = aCard.y;
+          vCA = vec2((c0 + uv.x)/${CARD.cols}.0, (aCard.x + uv.y)/${CARD.rows}.0); vCB = vec2((c1 + uv.x)/${CARD.cols}.0, (aCard.x + uv.y)/${CARD.rows}.0);
+          vec2 q = (modelMatrix*instanceMatrix*vec4(0.0, 0.0, 0.0, 1.0)).xz, wd = vec2(0.83, 0.55); float ph = dot(q, wd)*0.32 - wTime*1.25, gust = 0.5 + 0.5*sin(ph) + 0.22*sin(ph*2.3 + q.x*0.7 - q.y*0.4);
+          float k = uv.y*uv.y*0.7; vec2 d = wd*(0.08 + 0.3*gust*gust)*k;
+          vec3 dv = (viewMatrix*vec4(d.x, 0.0, d.y, 0.0)).xyz*sc;
+          vec4 mvPosition = anc + vec4(position.xy*sc + dv.xy, 0.0, 0.0);
+          gl_Position = projectionMatrix*mvPosition;`)
+        .replace('#include <worldpos_vertex>', `vec4 worldPosition = vec4((mvPosition.xyz - viewMatrix[3].xyz)*mat3(viewMatrix), 1.0); vWq = worldPosition.xyz; vG = dot(worldPosition.xz - ctr, fwd);`);
+      sh.fragmentShader = 'uniform sampler2D nTex; varying vec2 vCA; varying vec2 vCB; varying float vCm; varying float vCy;\n' + sh.fragmentShader
+        .replace('#include <map_fragment>', `{ vec4 tA = texture2D(map, vCA), tB = texture2D(map, vCB), tx = mix(tA, tB, vCm); diffuseColor *= vec4(tx.rgb/max(tx.a, 1e-3), tx.a); }`)
+        .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
+          { vec4 nA = texture2D(nTex, vCA), nB = texture2D(nTex, vCB); vec3 nl = normalize((nA.xyz*nA.a*(1.0 - vCm) + nB.xyz*nB.a*vCm)/max(nA.a*(1.0 - vCm) + nB.a*vCm, 1e-3)*2.0 - 1.0 + 1e-4);
+            float c = cos(vCy), s = sin(vCy); vec3 nw = vec3(c*nl.x + s*nl.z, nl.y, -s*nl.x + c*nl.z); normal = normalize((viewMatrix*vec4(nw, 0.0)).xyz); }`); };
+    cardM.customProgramCacheKey = () => 'grassCard'; }
+
   // the mix: which kind grows where, in drifts
   function mixStyle(i, j){ const x = i*GC, z = j*GC, n = fbm(x*.16 + 11, z*.16 - 4), m = fbm(x*.35 - 7, z*.35 + 2), h = hash2(i*7 + 1, j*13 + 5);
     if (n < .33) return 2; if (n > .7 && m > .45) return 3; if (m > .62 || h < .08) return 1; return 0; }
@@ -1744,30 +1804,39 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     let any = false;
     for (let i = Math.floor((cx - r)/GC); i <= Math.ceil((cx + r)/GC); i++) for (let j = Math.floor((cz - r)/GC); j <= Math.ceil((cz + r)/GC); j++){
       const x = (i + .5)*GC, z = (j + .5)*GC, d = Math.hypot(x - cx, z - cz); if (d > r) continue; const k = i + ',' + j;
-      if (erase){ if (tufts.delete(k)){ gDirty.add(sqKey(i, j)); any = true; } continue; }
+      if (erase){ if (tufts.delete(k)){ tdata.delete(k); gDirty.add(sqKey(i, j)); any = true; } continue; }
       if (tufts.has(k) || hash2(i*3 + 17, j*5 + 29) > .93 - .25*smooth(r*.7, r, d)) continue;   // (a little thinner at the brush's rim)
       tufts.set(k, [i, j, style === 4 ? mixStyle(i, j) : style]); gDirty.add(sqKey(i, j)); any = true; }
     if (any) saveGrass(); }
+  // an area of grass: its tufts as copies, a draw for each kind and copy up close, one draw of cards far off, one of blots
+  const _gm = new THREE.Matrix4(), _gq = new THREE.Quaternion(), _gp = new THREE.Vector3(), _gs = new THREE.Vector3(), _gc = new THREE.Color(), _gy = new THREE.Vector3(0, 1, 0);
   function buildSquare(key){
-    const old = gSquares.get(key); if (old){ scene.remove(old); old.userData.hi.dispose(); old.userData.lo.dispose(); gSquares.delete(key); }
-    // (two versions of the square: the full one, and the simple one for far views; every tuft is in both, so switching
-    // never thins the meadow, see grassLOD)
-    const [si, sj] = key.split(',').map(Number), G = new GB(), L = new GB(), n = GSQ/GC;
-    for (let i = si*n; i < si*n + n; i++) for (let j = sj*n; j < sj*n + n; j++){ const t = tufts.get(i + ',' + j); if (!t) continue;
-      tuft(G, i, j, t[2], 'blot'); tuft(G, i, j, t[2], 'plant'); tuft(L, i, j, t[2], 'blot'); tuft(L, i, j, t[2], 'lo'); }
-    if (!G.I.length) return;
-    const hi = G.mesh(), lo = L.mesh();
-    for (const g of [hi, lo]){ g.computeBoundingSphere(); g.boundingSphere.radius += 1.5; }   // (room for the sway and the tall reeds: culled only when truly out of view)
-    const m = new THREE.Mesh(GLOD.hi ? hi : lo, grassM); m.receiveShadow = true; m.castShadow = false; m.frustumCulled = true; m.matrixAutoUpdate = false;
-    m.userData = { hi, lo }; scene.add(m); gSquares.set(key, m); }
-  // Far views draw the simple grass: below zoom 16 the full grass, past 19 the simple one (the gap keeps it from switching
-  // back and forth at the edge); the whole meadow switches at once, at a zoom where a blade is about a pixel wide
-  const GLOD = { hi: true };
+    const old = gSquares.get(key); if (old){ scene.remove(old); for (const m of old.children){ if (m.userData.own) m.geometry.dispose(); m.dispose && m.dispose(); } gSquares.delete(key); }
+    const [si, sj] = key.split(',').map(Number), n = GSQ/GC, recs = [];
+    for (let i = si*n; i < si*n + n; i++) for (let j = sj*n; j < sj*n + n; j++){ const t = tufts.get(i + ',' + j); if (!t) continue; const r = tuftRec(i, j, t[2]); if (r) recs.push(r); }
+    if (!recs.length) return;
+    const grp = new THREE.Group(); let ylo = 1e9, yhi = -1e9;
+    const put = (im, k, r) => { _gq.setFromAxisAngle(_gy, r.rot); _gm.compose(_gp.set(r.x, r.y, r.z), _gq, _gs.setScalar(r.s)); im.setMatrixAt(k, _gm); im.setColorAt(k, _gc.setRGB(r.tint[0], r.tint[1], r.tint[2])); };
+    const mk = (geo, mat, list) => { const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((r, k) => put(im, k, r)); im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      im.frustumCulled = false; im.receiveShadow = true; im.castShadow = false; im.raycast = () => {}; grp.add(im); return im; };
+    for (const r of recs){ ylo = Math.min(ylo, r.y); yhi = Math.max(yhi, r.y); }
+    mk(blotGeo, grassM, recs).userData.kind = 'blot';
+    for (let st = 0; st < 4; st++) for (let v = 0; v < GV; v++){ const l = recs.filter(r => r.st === st && r.v === v); if (l.length) mk(VAR[st][v], grassM, l).userData.kind = 'near'; }
+    const cg = cardGeo.clone(), ac = new Float32Array(recs.length*2); recs.forEach((r, k) => { ac[k*2] = r.st*GV + r.v; ac[k*2 + 1] = r.rot; });
+    cg.setAttribute('aCard', new THREE.InstancedBufferAttribute(ac, 2)); const cm = mk(cg, cardM, recs); cm.userData.kind = 'far'; cm.userData.own = true;
+    grp.userData = { box: new THREE.Box3(new THREE.Vector3(si*GSQ, ylo - .5, sj*GSQ), new THREE.Vector3(si*GSQ + GSQ, yhi + 2, sj*GSQ + GSQ)) };
+    for (const m of grp.children) m.visible = m.userData.kind === 'blot' || (m.userData.kind === 'near') === GLOD.hi;
+    scene.add(grp); gSquares.set(key, grp); }
+  // Up close the real tufts; past zoom 19 the cards (back below 16: the gap keeps it from switching to and fro). Areas out
+  // of view aren't drawn.
+  const GLOD = { hi: true }, _gf = new THREE.Frustum(), _gpm = new THREE.Matrix4();
   function grassLOD(){
-    const want = GLOD.hi ? zoom < 19 : zoom < 16; if (want === GLOD.hi) return; GLOD.hi = want;
-    for (const m of gSquares.values()) m.geometry = want ? m.userData.hi : m.userData.lo; }
-  function grassTick(t){ gU.wTime.value = t; grassLOD(); const t0 = performance.now(); for (const k of gDirty){ gDirty.delete(k); buildSquare(k); if (performance.now() - t0 > 6) break; } }   // (about 6 ms of remaking a frame at most, so painting stays smooth)
-  const grassAround = (x, z, r) => { for (let a = Math.floor((x - r)/GSQ); a <= Math.floor((x + r)/GSQ); a++) for (let b = Math.floor((z - r)/GSQ); b <= Math.floor((z + r)/GSQ); b++) if (gSquares.has(a + ',' + b)) gDirty.add(a + ',' + b); };
+    const want = GLOD.hi ? zoom < 19 : zoom < 16;
+    if (want !== GLOD.hi){ GLOD.hi = want; for (const g of gSquares.values()) for (const m of g.children) m.visible = m.userData.kind === 'blot' || (m.userData.kind === 'near') === want; }
+    _gf.setFromProjectionMatrix(_gpm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    for (const g of gSquares.values()) g.visible = _gf.intersectsBox(g.userData.box); }
+  function grassTick(t){ gU.wTime.value = t; grassLOD(); const t0 = performance.now(); for (const k of gDirty){ gDirty.delete(k); buildSquare(k); if (performance.now() - t0 > 6) break; } }   // (about 6 ms of remaking a frame at most)
+  const grassAround = (x, z, r) => { for (let i = Math.floor((x - r)/GC); i <= Math.ceil((x + r)/GC); i++) for (let j = Math.floor((z - r)/GC); j <= Math.ceil((z + r)/GC); j++){ const k = i + ',' + j; if (tdata.has(k)){ tdata.delete(k); gDirty.add(sqKey(i, j)); } } };
 
   ANIM.live = true;   // (homes from the save just appear; new ones are painted in)
   // the ghost: the block under the pointer, see-through, and a ring on the ground green or red
@@ -2121,6 +2190,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // compile now, while loading, every shader that would otherwise first be needed in play (the paint-in, the pigment
   // blooms, the night's light pools and glow bleed): a shader compiled mid-play stalls the frame
   { const g = blockOf('townhouse', 1, false, false).geo, tmp = [...PAINT_POOL.map(pm => new THREE.Mesh(g, pm.mat)), new THREE.Mesh(g, poolM), new THREE.Mesh(g, grassM)];
+    { const ig = new THREE.InstancedMesh(blotGeo, grassM, 1); ig.setColorAt(0, new THREE.Color()); tmp.push(ig); const cg = cardGeo.clone(); cg.setAttribute('aCard', new THREE.InstancedBufferAttribute(new Float32Array(2), 2)); const ic = new THREE.InstancedMesh(cg, cardM, 1); ic.setColorAt(0, new THREE.Color()); tmp.push(ic); }
     for (const m of tmp){ m.visible = false; scene.add(m); } renderer.compile(scene, cam); for (const m of tmp) scene.remove(m);
     for (const m of [extractM, blurM]){ postQ.material = m; renderer.compile(postScene, skyCam); } renderer.compile(blitScene, skyCam); }
   const t0 = performance.now(), TOFF = { v: 0 }; let last = t0;   // (TOFF: a test hook, to look at the sea at a given moment)

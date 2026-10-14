@@ -591,6 +591,7 @@ function updateMetros(dt, t){
       cur = hwAlong(P, s, cur, _mpos); const p0 = _mp0, p1 = _mp1; hwAlong(P, a, 0, p0); hwAlong(P, b, 0, p1);
       const yaw = Math.atan2(p1.x - p0.x, p1.z - p0.z), cab = q === 0 || q === MT_CARS - 1;
       _mdm.position.set(_mpos.x, _mpos.y + MT_LEV + .008*Math.sin(t*2.2 + l.id + q), _mpos.z);   // (floating: a slow bob on its magnets)
+      { const cp = (tr.cp || (tr.cp = []))[q] || (tr.cp[q] = [0, 0, 0]); cp[0] = _mpos.x; cp[1] = _mpos.y + MT_LEV + .4; cp[2] = _mpos.z; }   // (each car's middle, for the force field: see fieldCrossings)
       _mdm.rotation.set(0, yaw, 0, 'YXZ'); _mdm.scale.setScalar(1); _mdm.updateMatrix();
       const M_ = MT_MODELS[!cab ? 0 : q === 0 ? 2 : 1]; if (M_.n < MT_CAR_MAX){ for (const m of M_.meshes) m.setMatrixAt(M_.n, _mdm.matrix); M_.n++; }
       { const stn = tr.dwell > 0 && l.stn && l.stn.get(stops[tr.at].k); mtLeaves(_mdm.matrix, q, stn ? stn.side : 0, stn ? tr.doors : 0); }

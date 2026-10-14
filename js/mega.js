@@ -2329,7 +2329,7 @@ function emitterFx(m){
 // ground is enough for the whole city (the box round all its plots), it wraps the whole city instead. A field is a
 // dome on a rounded square, a geodesic lattice of light with a brighter rim and base, breathing, a soft band of light
 // climbing it now and then; always high enough to clear what stands under it.
-const FIELD = { key: '', domes: [], at: 0 }, FIELD_N = 10;
+const FIELD = { key: '', domes: [], at: 0, ep: 0 }, FIELD_N = 10;
 const fieldPulse = t => .5 + .5*Math.sin(t*1.6);   // (the field's breath; the cores' nodes keep time with it)
 function fieldPlan(){
   const ems = megasOfKind('emitter'); if (!ems.length) return [];
@@ -2359,19 +2359,20 @@ const FIELD_SEG = [96, 32], FIELD_GEO = new THREE.SphereGeometry(1, FIELD_SEG[0]
 const FIELD_ROW = (() => { const o = [0]; for (let r = 0; r < FIELD_SEG[1]; r++) o.push(o[r] + (r === 0 ? 3 : 6)*FIELD_SEG[0]); return o; })();
 function fieldMat(hw, H, hd, seg){
   const m = new THREE.ShaderMaterial({
-    uniforms: { time: FIELD_UNI.time, uSize: { value: new THREE.Vector3(hw, H, hd) }, uSeg: { value: seg }, uT0: { value: 0 }, uReveal: { value: 0 }, uMerge: { value: -1 }, uMP: { value: new THREE.Vector2() }, uMS: { value: 10 } },
+    uniforms: { time: FIELD_UNI.time, uSize: { value: new THREE.Vector3(hw, H, hd) }, uSeg: { value: seg }, uT0: { value: 0 }, uReveal: { value: 0 }, uMerge: { value: -1 }, uMP: { value: new THREE.Vector2() }, uMS: { value: 10 }, uRip: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, -1e4, 0, -100)) }, uRipN: { value: 0 } },
     vertexShader: `uniform vec3 uSize; varying vec3 vW; varying vec3 vNo; varying float vEl; varying float vAz;
       void main(){
-        vec3 p = position; float a = atan(p.z, p.x), c = abs(cos(a)), s = abs(sin(a)), k = pow(pow(c, 4.0) + pow(s, 4.0), -.25);   // the rounded square
-        vec3 q = vec3(p.x*k*uSize.x, p.y*uSize.y, p.z*k*uSize.z);
+        vec3 p = position; float a = atan(p.z, p.x), c = abs(cos(a)), s = abs(sin(a)), k = pow(pow(c, 6.0) + pow(s, 6.0), -1.0/6.0);   // the rounded square (squarish: its corners hold the covered rectangle's)
+        float rr = length(p.xz), yb = pow(max(0.0, 1.0 - pow(rr, 6.0)), 1.0/6.0);   // (a squarer profile than a sphere's: steep sides, a broad top, so what stands near the edge stays under it)
+        vec3 q = vec3(p.x*k*uSize.x, yb*uSize.y, p.z*k*uSize.z);
         vEl = asin(clamp(p.y, 0.0, 1.0))/1.5708; vAz = a/6.2832 + .5;
-        vNo = normalize(vec3(p.x/uSize.x, p.y/uSize.y, p.z/uSize.z));
+        vec3 qn = q/uSize, q2 = qn*qn; vNo = normalize(q2*q2*qn/uSize);
         vec4 w = modelMatrix*vec4(q, 1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
-    fragmentShader: `uniform float time, uSeg, uT0, uReveal, uMerge, uMS; uniform vec2 uMP; varying vec3 vW; varying vec3 vNo; varying float vEl; varying float vAz;
+    fragmentShader: `uniform float time, uSeg, uT0, uReveal, uMerge, uMS, uRipN; uniform vec2 uMP; uniform vec4 uRip[6]; varying vec3 vW; varying vec3 vNo; varying float vEl; varying float vAz;
       float ln(float x, float w){ float f = abs(fract(x) - .5); return 1.0 - smoothstep(.5 - w*1.6, .5 - w*.6, f); }   // a line at every whole number, w wide in its own units
       void main(){
         float ph0 = mod(time - uT0, 30.0), e0 = ph0/5.0;
-        if (uReveal < .001 && (e0 > 1.15 || vEl > e0 + .07 || vEl < e0 - .16)){ gl_FragColor = vec4(0.0); return; }   // (away from the front: nothing to work out; a return, not a discard, which would cost the early depth test that skips what's behind the buildings)
+        if (uReveal < .001 && uRipN < .5 && (e0 > 1.15 || vEl > e0 + .07 || vEl < e0 - .16)){ gl_FragColor = vec4(0.0); return; }   // (away from the front: nothing to work out; a return, not a discard, which would cost the early depth test that skips what's behind the buildings)
         float u = vAz*uSeg, v = vEl*uSeg*.32;
         float w = .035;
         float L = max(ln(v, w), max(ln(u + v*.5, w), ln(u - v*.5, w)));                 // a triangular lattice: geodesic
@@ -2393,7 +2394,12 @@ function fieldMat(hw, H, hd, seg){
         if (uMerge >= 0.0){ float dist = length(vW.xz - uMP), r = uMerge*uMS;
           full *= smoothstep(r + .6, r - 3.0, dist);
           full += exp(-pow((dist - r)/1.2, 2.0))*(.06 + L*.5 + node*.45)*(1.0 - smoothstep(2.2, 3.2, uMerge)); }
-        float a = full*uReveal*breath + sweep;
+        // something passing through (a car off the highway, a train): a little flash of the lattice where it went, a ring running out from it
+        float rip = 0.0;
+        for (int i = 0; i < 6; i++){ if (float(i) >= uRipN) break; vec4 Rp = uRip[i]; float age = time - Rp.w; if (age < 0.0 || age > 1.3) continue;
+          float d = distance(vW, Rp.xyz), f = 1.0 - age/1.3, ring = exp(-pow((d - age*2.4)/.22, 2.0)), core = exp(-d*1.6)*f;
+          rip += (ring*(.1 + L*.55 + node*.4) + core*(L*.5 + node*.7 + .04))*f; }
+        float a = full*uReveal*breath + sweep + rip;
         a *= gl_FrontFacing ? 1.0 : .45;
         gl_FragColor = vec4(col*a, 1.0); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
@@ -2402,14 +2408,20 @@ function fieldMat(hw, H, hd, seg){
 }
 function fieldBuild(plan){
   const was = new Set(FIELD.domes.map(d => d.userData.field.ids)), now = FOL_UNI.time.value;
-  for (const d of FIELD.domes){ scene.remove(d); d.material.dispose(); d.geometry.dispose(); } FIELD.domes = [];
+  for (const d of FIELD.domes){ scene.remove(d); d.material.dispose(); d.geometry.dispose(); } FIELD.domes = []; FIELD.ep++;
   for (const f of plan){
-    const x0 = f.i0*LOT, x1 = f.i1*LOT, z0 = f.j0*LOT, z1 = f.j1*LOT, hw = (x1 - x0)/2 + LOT*.3, hd = (z1 - z0)/2 + LOT*.3;
-    let top = 0; for (const c of cells.values()) if (c.i >= f.i0 && c.i <= f.i1 && c.j >= f.j0 && c.j <= f.j1) top = Math.max(top, c.height || 0, c.topY || 0);
-    for (const m of megas.values()) if (m.x >= x0 && m.x <= x1 && m.z >= z0 && m.z <= z1) top = Math.max(top, m.top || 0);
-    const H = Math.min(Math.max(hw, hd)*1.1, Math.max(Math.min(hw, hd)*.55, top*1.18 + 3));   // (over the tallest thing in it, and roughly round)
+    const x0 = f.i0*LOT, x1 = f.i1*LOT, z0 = f.j0*LOT, z1 = f.j1*LOT, hw = (x1 - x0)/2 + LOT*.8, hd = (z1 - z0)/2 + LOT*.8, mx = (x0 + x1)/2, mz = (z0 + z1)/2, Y0 = -.4;
+    // high enough that everything under it clears it where it stands (the profile is lower toward the edge: a plot's farthest
+    // corner counts), and always over the tallest building in the city
+    const rho = (x, z) => Math.pow(Math.pow(Math.abs(x - mx)/hw, 6) + Math.pow(Math.abs(z - mz)/hd, 6), 1/6), prof = r => Math.pow(Math.max(.02, 1 - Math.pow(r, 6)), 1/6);
+    let need = 0, tallest = 0;
+    const under = (x, z, h, rx, rz) => { for (const sx of [-1, 1]) for (const sz of [-1, 1]){ const r = rho(x + sx*rx, z + sz*rz); if (r < .995) need = Math.max(need, (h + 1.5 - Y0)/prof(r)); } };   // (every corner under it, even a plot the edge passes over)
+    for (const c of cells.values()){ const h = Math.max(c.height || 0, c.topY || 0); tallest = Math.max(tallest, h); if (h > .5) under(c.i*LOT, c.j*LOT, h, LOT/2, LOT/2); }
+    for (const m of megas.values()){ const h = Math.max(m.top || 0, m.roofH || 0); tallest = Math.max(tallest, h); under(m.x, m.z, h, m.w*LOT/2, m.h*LOT/2); }
+    const H = Math.max(need, tallest + 2.5 - Y0, Math.min(hw, hd)*.5);
     const seg = Math.max(10, Math.round((hw + hd)*2/(LOT*1.5)));   // (the lattice's cells about a plot and a half across: finer ones blur at the render's size)
-    const geo = FIELD_GEO.clone(), mesh = new THREE.Mesh(geo, fieldMat(hw, H, hd, seg)); mesh.position.set((x0 + x1)/2, -.4, (z0 + z1)/2);
+    const geo = FIELD_GEO.clone(), mesh = new THREE.Mesh(geo, fieldMat(hw, H, hd, seg)); mesh.position.set(mx, Y0, mz);
+    mesh.userData.box = { mx, mz, hw, hd, H, Y0 };   // (for telling what's inside it: see fieldInside)
     mesh.frustumCulled = false; mesh.renderOrder = 20; mesh.raycast = () => {}; mesh.userData.field = f; scene.add(mesh); FIELD.domes.push(mesh);
     mesh.material.uniforms.uT0.value = now;   // (a sweep straight away, to show where it stands)
     mesh.userData.reveal = f.n > 1 && !was.has(f.ids) ? 7 : 0;   // (cores just paired: the whole field shows for a while, then fades)
@@ -2420,6 +2432,25 @@ function fieldBuild(plan){
       const U_ = mesh.material.uniforms; U_.uMP.value.set(best ? best[0] : (x0 + x1)/2, best ? best[1] : (z0 + z1)/2); U_.uMS.value = Math.hypot(hw, hd)*2/2.5; U_.uMerge.value = 0; mesh.userData.merge = 0; }
   }
 }
+// is a point inside a dome (under its surface)?
+function fieldInside(d, x, y, z){ const b = d.userData.box, r = Math.pow(Math.pow(Math.abs(x - b.mx)/b.hw, 6) + Math.pow(Math.abs(z - b.mz)/b.hd, 6), 1/6);
+  if (r >= 1) return false; return y - b.Y0 < b.H*Math.pow(1 - Math.pow(r, 6), 1/6); }
+// the ring of the dome's triangles at a height
+function fieldRow(d, y){ const b = d.userData.box, yy = Math.min(1, Math.max(0, (y - b.Y0)/b.H)), el = Math.acos(Math.pow(1 - Math.pow(yy, 6), 1/6))/(PI/2); return Math.round((1 - el)*FIELD_SEG[1]); }
+// Things crossing a field: a car coming in off a highway from beyond it (or going out), a metro car where a field covers only
+// part of the city. Each is checked every frame against the domes; going in or out leaves a ripple where it passed.
+const _fdOld = new WeakMap();
+function fieldCrossings(now){
+  if (!FIELD.domes.length) return;
+  const test = (o, key, x, y, z) => { let inD = null; for (const d of FIELD.domes) if (fieldInside(d, x, y, z)){ inD = d; break; }
+    let m = _fdOld.get(o); if (!m || m.ep !== FIELD.ep){ m = { ep: FIELD.ep }; _fdOld.set(o, m); } const was = m[key];   // (the domes made again: everything starts from where it is, no ripple)
+    m[key] = inD ? inD.uuid : 0;
+    if (was === undefined || was === m[key]) return;   // (no change; or first seen: it was already where it is)
+    const d = inD || FIELD.domes.find(q => q.uuid === was); if (!d) return;
+    const rips = d.userData.rips || (d.userData.rips = []); if (rips.length >= 6) rips.shift(); rips.push([x, y, z, now]); };
+  if (typeof hwCars !== 'undefined') for (const c of hwCars) if (c.pos) test(c, 'c', c.pos[0], c.pos[1] + .2, c.pos[2]);
+  if (typeof metros !== 'undefined') for (const l of metros){ const tr = l.train; if (tr && tr.cp) for (let q = 0; q < tr.cp.length; q++) test(tr, q, tr.cp[q][0], tr.cp[q][1], tr.cp[q][2]); }
+}
 // checked every second: rebuilt when the cores or the city's bounds have changed
 function fieldTick(dt){
   const now = FOL_UNI.time.value, NR = FIELD_SEG[1];
@@ -2428,16 +2459,22 @@ function fieldTick(dt){
     if (d.userData.merge !== undefined){ d.userData.merge += dt; U_.uMerge.value = d.userData.reveal > 0 ? d.userData.merge : -1; if (d.userData.reveal <= 0) d.userData.merge = undefined; }
     // (between sweeps it shows nothing, so it isn't drawn at all; in a sweep only the rings near the front are: the
     // row at elevation el is about (1 - el)*NR from the top)
+    // (the ripples still running, packed into the uniform; the rows they need)
+    const rips = (d.userData.rips || []).filter(r => now - r[3] < 1.35); d.userData.rips = rips; U_.uRipN.value = rips.length;
+    rips.forEach((r, k) => U_.uRip.value[k].set(r[0], r[1], r[2], r[3]));
     if (U_.uReveal.value > 0){ d.visible = true; d.geometry.setDrawRange(0, Infinity); continue; }
+    let r0 = NR, r1 = 0;
     const e = (((now - U_.uT0.value) % 30) + 30) % 30/5;
-    if (e > 1.15){ d.visible = false; continue; }
-    const r0 = Math.max(0, Math.floor((1 - e - .08)*NR)), r1 = Math.min(NR, Math.ceil((1 - e + .17)*NR) + 1);   // (the front and the tail behind it, as far as it shows)
+    if (e <= 1.15){ r0 = Math.max(0, Math.floor((1 - e - .08)*NR)); r1 = Math.min(NR, Math.ceil((1 - e + .17)*NR) + 1); }   // (the sweep's front and the tail behind it)
+    for (const r of rips){ const row = fieldRow(d, r[1]); r0 = Math.min(r0, Math.max(0, row - 4)); r1 = Math.max(r1, Math.min(NR, row + 5)); }
     if (r1 <= r0){ d.visible = false; continue; }
     d.visible = true; d.geometry.setDrawRange(FIELD_ROW[r0], FIELD_ROW[r1] - FIELD_ROW[r0]); }
+  fieldCrossings(now);
   FIELD.at -= dt; if (FIELD.at > 0) return; FIELD.at = 1;
   const ems = megasOfKind('emitter'); let key = ems.map(m => m.id + '@' + m.i + ',' + m.j).sort().join('|');
   if (ems.length){ let i0 = 1e9, i1 = -1e9, j0 = 1e9, j1 = -1e9, top = 0; for (const c of cells.values()){ i0 = Math.min(i0, c.i); i1 = Math.max(i1, c.i); j0 = Math.min(j0, c.j); j1 = Math.max(j1, c.j); top = Math.max(top, c.height || 0); }
-    key += '#' + [i0, i1, j0, j1, Math.round(top)].join(','); }
+    for (const m of megas.values()) top = Math.max(top, m.top || 0);
+    key += '#' + [i0, i1, j0, j1, Math.round(top*2)].join(','); }
   if (key === FIELD.key) return; FIELD.key = key; fieldBuild(fieldPlan());
 }
 

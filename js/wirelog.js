@@ -5,6 +5,9 @@
 // swarm (which types out the same commands the hacking uses later, so the player learns them by watching), then the
 // signal ladder. Only the last 40 lines are kept; the ones that matter (the leak, files pulled) also go to an archive.
 // Content plan: claude/transmission-log-plan.md in the project. Ticked from main.js; saves in this browser.
+// Under the lines, a prompt: the player types the same commands the swarm does (-probe, -cd, -ls, -scan, -read, -pull,
+// -deploy, and -help, never pointed at) against the corporations' file systems (wirefs.js). Click it or press / to type;
+// while typing the game's keys are off; Esc leaves; Up recalls; Tab completes.
 'use strict';
 const WIRELOG = (() => {
   const KEY = 'neonIsland.wirelog', COLLAPSE_KEY = 'neonIsland.wirelog.collapsed';
@@ -79,6 +82,19 @@ const WIRELOG = (() => {
   body:has(#deck.open) #wirelog { right: 304px; }
   body.watching:has(#deck.open) #wirelog { right: calc(304px + min(340px, 100vw - 32px) + 8px); }
   body.wl-on .mon-pins { top: calc(58px + var(--wl-h, 0px) + 8px + env(safe-area-inset-top,0px)); }
+  /* the prompt */
+  #wirelog .wl-in { display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-top: 1px solid var(--wl-hair); cursor: text; }
+  #wirelog .wl-in .pw { max-width: 52%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; color: var(--wl-dim); font-size: 9.5px; }
+  #wirelog .wl-in .pr { color: var(--wl-head); }
+  #wirelog .wl-in input { flex: 1; min-width: 0; font: inherit; color: var(--c-cmd); background: transparent; border: 0; outline: none; padding: 0; caret-color: var(--wl-head); caret-shape: block; }
+  #wirelog .wl-in .fk { display: none; } #wirelog .wl-in:not(.on):not(.has) .fk { display: inline-block; margin-left: -4px; }
+  #wirelog .wl-in.on { background: rgba(214,92,255,.06); } #wirelog .wl-in.busy input { color: var(--wl-dim); }
+  #wirelog.collapsed .wl-in { display: none; }
+  #wirelog .ch-OP .ch { color: var(--wl-head); } #wirelog .ch-OP .tx { color: var(--c-cmd); }
+  #wirelog .ch-DOC .ch { color: var(--c-corp); } #wirelog .ch-DOC .tx { color: #efe6d2; }
+  #wirelog .wl-line.ch-DOC > span:last-child { white-space: normal; overflow: visible; }
+  #wirelog .ag.op .h span:first-child { color: var(--c-cmd); }
+  #wirelog .ag .b .ln { color: var(--wl-txt); }
   @media (max-width: 700px) {
     #wirelog { width: calc(100vw - 32px); }
     #wirelog.collapsed { width: auto; }
@@ -92,9 +108,10 @@ const WIRELOG = (() => {
   `;
 
   /* ---------- state (saved) ---------- */
-  const W = { on: false, stage: 0, st: 0, lines: [], archive: [], leak: 'none', leakT: 0, sig: 0, seed: 0, mesh: ['A'] };
+  const W = { on: false, stage: 0, st: 0, lines: [], archive: [], leak: 'none', leakT: 0, sig: 0, seed: 0, mesh: ['A'], cwd: [], probed: [], scanned: [], hist: [] };
   let el = null, bodyEl = null, footEl = null, agentsEl = null, view = 'log', fast = false, stick = true;
-  const load = () => { try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); if (v && typeof v === 'object') Object.assign(W, v); } catch (e) {} };
+  const load = () => { try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); if (v && typeof v === 'object') Object.assign(W, v); } catch (e) {}
+    for (const k of ['cwd', 'probed', 'scanned', 'hist']) if (!Array.isArray(W[k])) W[k] = []; };
   let saveDue = false;
   const save = () => { saveDue = true; };
   const flushSave = () => { if (!saveDue) return; saveDue = false; try { localStorage.setItem(KEY, JSON.stringify(W)); } catch (e) {} };
@@ -147,7 +164,7 @@ const WIRELOG = (() => {
   /* ---------- lines ---------- */
   function lineEl(L){
     const d = document.createElement('div'); d.className = 'wl-line ch-' + L.ch + (L.key ? ' key' : '');
-    d.innerHTML = `<span class="ts">${esc(L.t)}</span><span class="ch">${L.ch === 'CMD' ? 'AGENT' : esc(L.ch)}</span><span class="tx">${esc(L.x)}</span>`;
+    d.innerHTML = `<span class="ts">${esc(L.t)}</span><span class="ch">${L.ch === 'CMD' ? 'AGENT' : L.ch === 'OP' ? 'OPER' : L.ch === 'DOC' ? 'FILE' : esc(L.ch)}</span><span class="tx">${esc(L.x)}</span>`;
     return d;
   }
   function add(ch, x, o = {}){
@@ -289,19 +306,7 @@ const WIRELOG = (() => {
   }
 
   /* ---------- the data leak (stage 2): the swarm shows how the hacking commands go ---------- */
-  const MEMO = [
-    'SYNTHCORP · INTERNAL · RESTRICTED',
-    'RE · SK-3 optics · batch 14-J · recall scope',
-    '',
-    'Field returns · 212 units',
-    'Units with log gaps · 31',
-    'Gap window · 02:00-04:00 · consistent across units',
-    '',
-    'Public notice · cite thermal fault only',
-    'Gap pattern · not to be referenced',
-    'Returned units · route to Halvren depot 4 · not to clinic',
-    'Retention · 30 days · then purge',
-  ];
+  const MEMO = WIREFS.MEMO;
   function offer(){
     W.leak = 'offered'; save();
     add('MESH', 'Mesh A · data leak detected · 3 packets', { key: 1, arc: { title: 'Data leak · mesh A · 3 packets', kind: 'EVENT' } });
@@ -334,13 +339,13 @@ const WIRELOG = (() => {
     add('SYS', 'Agent swarm · 3 deployed · mesh A');
     await sleep(.6);
     await cmd('> -probe mesha');
-    add('MESH', `Mesh A · 3 hosts · ${CORP.synth.toLowerCase()} · ${CORP.logi.toLowerCase()} · ${CORP.media.toLowerCase()}`);
+    add('MESH', `Mesh A · 3 hosts · ${CORP.synth.toLowerCase()} · ${CORP.logi.toLowerCase()} · ${CORP.media.toLowerCase()}`); if (!W.probed.includes('A')) W.probed.push('A');
     await sleep(1);
     await cmd('> -cd mesha/synthcorp');
     add('CORP', `${CORP.synth} · root · 4 dirs`);
     await sleep(.8);
     const boxes = await Promise.all([ agent(1, 'documents', 3, '3 files flagged', true), agent(2, 'reports', 4.4, '0 files flagged', false), agent(3, 'archive', 5.8, '1 file flagged · 2.1 MB', true) ]);
-    add('SYS', 'Scan complete · 4 files flagged');
+    add('SYS', 'Scan complete · 4 files flagged'); for (const d of ['documents', 'reports', 'archive']) if (!W.scanned.includes('synthcorp/' + d)) W.scanned.push('synthcorp/' + d);
     await sleep(1);
     await cmd('> -pull root/archive/sk3_recall_memo');
     const L = { t: now(), ch: 'MESH', x: '' }; const d = lineEl(L), tx = d.querySelector('.tx');
@@ -359,6 +364,215 @@ const WIRELOG = (() => {
     await sleep(.4);
     for (const b of boxes) b.remove();
   }
+
+
+  /* ---------- the command line: the player's own -probe, -cd, -ls, -scan, -read, -pull, -deploy ---------- */
+  const FS = WIREFS, MESHN = { mesha: 'A', meshb: 'B', meshc: 'C' }, MESHL = { A: 'mesha', B: 'meshb', C: 'meshc' };
+  const CMDS = ['-probe', '-cd', '-ls', '-scan', '-read', '-pull', '-deploy', '-help'];
+  const meshOn = m => W.stage >= 1 && W.mesh.includes(m);
+  const sizeTxt = kb => kb >= 1024 ? (kb/1024).toFixed(1) + ' MB' : kb + ' KB';
+  const pstr = p => '/' + p.join('/');
+  function nodeAt(p){
+    if (!p.length) return { k: 'top', p };
+    const m = MESHN[p[0]]; if (!m) return null; if (!meshOn(m)) return { k: 'off', p, m };
+    if (p.length === 1) return { k: 'mesh', p, m };
+    const h = p[1]; if (!FS.HOSTS[m].includes(h)) return null;
+    if (p.length === 2) return { k: 'host', p, m, h };
+    if (p[2] !== 'root') return null;
+    if (p.length === 3) return { k: 'root', p, m, h };
+    const files = FS.TREE[h][p[3]]; if (!files) return null;
+    if (p.length === 4) return { k: 'dir', p, m, h, d: p[3], files };
+    if (p.length === 5){ const f = files.find(x => x[0] === p[4]); return f ? { k: 'file', p, m, h, d: p[3], f } : null; }
+    return null;
+  }
+  function norm(base, str){ const out = str.startsWith('/') ? [] : base.slice(); for (const seg of str.split('/')){ if (!seg || seg === '.') continue; if (seg === '..') out.pop(); else out.push(seg.toLowerCase()); } return out; }
+  function resolve(str, base){ if (!str) return nodeAt(base); let n = nodeAt(norm(base, str)); if (!n || n.k === 'off'){ const a = norm([], str); if (MESHN[a[0]]) n = nodeAt(a) || n; } return n; }
+  function kids(n){
+    if (!n) return [];
+    if (n.k === 'top') return ['A', 'B', 'C'].filter(meshOn).map(m => MESHL[m]);
+    if (n.k === 'mesh') return W.probed.includes(n.m) ? FS.HOSTS[n.m].slice() : [];
+    if (n.k === 'host') return ['root'];
+    if (n.k === 'root') return Object.keys(FS.TREE[n.h]);
+    if (n.k === 'dir') return n.files.map(f => f[0]);
+    return [];
+  }
+  const nope = (str, n) => n && n.k === 'off' ? `Mesh ${n.m} · no route` : `No such path · ${str}`;
+  const flagged = (h, d) => W.scanned.includes(h + '/' + d);
+  const archived = name => W.archive.some(a => a.title === name);
+  // each command, run against a context: the log (the player) or an agent's box
+  const RUN = {
+    async probe(c, a){
+      let m = a[0] ? (MESHN[a[0].toLowerCase()] || MESHN['mesh' + a[0].toLowerCase()]) : c.cwd.length ? MESHN[c.cwd[0]] : null;
+      if (!m) return c.say('SYS', a[0] ? `No such mesh · ${a[0]}` : 'Probe · mesh required');
+      if (!meshOn(m)) return c.say('SYS', `Mesh ${m} · no route`);
+      await c.wait(1.2);
+      if (!W.probed.includes(m)){ W.probed.push(m); save(); }
+      return c.say('MESH', `Mesh ${m} · ${FS.HOSTS[m].length} hosts · ${FS.HOSTS[m].join(' · ')}`, true);
+    },
+    async cd(c, a){
+      if (!a[0]){ c.cwd.length = 0; c.moved(); return; }
+      const n = resolve(a[0], c.cwd); if (!n || n.k === 'off') return c.say('SYS', nope(a[0], n));
+      if (n.k === 'file') return c.say('SYS', `Not a folder · ${n.f[0]}`);
+      if (n.k === 'host' && !W.probed.includes(n.m)) return c.say('SYS', `Host unlisted · -probe ${MESHL[n.m]}`);
+      c.cwd.length = 0; c.cwd.push(...n.p); c.moved();
+      if (n.k === 'host') c.say('CORP', `${n.h.toUpperCase()} · root · ${Object.keys(FS.TREE[n.h]).length} dirs`);
+    },
+    async ls(c, a){
+      const n = resolve(a[0] || '', c.cwd); if (!n || n.k === 'off') return c.say('SYS', nope(a[0] || pstr(c.cwd), n));
+      if (n.k === 'top'){ const k = kids(n); return c.say('SYS', k.length ? `Meshes · ${k.join(' · ')}` : 'No mesh in range'); }
+      if (n.k === 'mesh') return W.probed.includes(n.m) ? c.say('MESH', `${MESHL[n.m]} · ${FS.HOSTS[n.m].join(' · ')}`) : c.say('SYS', `${MESHL[n.m]} · hosts unlisted · -probe ${MESHL[n.m]}`);
+      if (n.k === 'host') return c.say('CORP', `${n.h} · root`);
+      if (n.k === 'root') return c.say('CORP', `root · ${kids(n).length} dirs · ${kids(n).join(' · ')}`);
+      if (n.k === 'file') return c.say('SYS', `${n.f[0]} · ${sizeTxt(n.f[1])}${n.f[2].includes('e') ? ' · ENC' : ''}`);
+      c.say('CORP', `${n.d} · ${n.files.length} files${flagged(n.h, n.d) ? '' : ' · unscanned'}`);
+      for (const f of n.files) c.say('SYS', `${f[0]} · ${sizeTxt(f[1])}${f[2].includes('e') ? ' · ENC' : ''}${flagged(n.h, n.d) && f[2].includes('f') ? ' · FLAG' : ''}`);
+    },
+    async scan(c, a){
+      const n = resolve(a[0] || '', c.cwd); if (!n || n.k === 'off') return c.say('SYS', nope(a[0] || pstr(c.cwd), n));
+      if (n.k !== 'dir') return c.say('SYS', 'Scan · folder required');
+      const t = 1.2 + .45*n.files.length, live = c.live(); const t0 = t;
+      for (let r = t; r > 0; r -= .25){ const k = Math.round(10*(1 - r/t0)); live(`Scan · ${n.d} · ${'█'.repeat(k)}${'░'.repeat(10 - k)}`); await c.wait(.25); }
+      if (!flagged(n.h, n.d)){ W.scanned.push(n.h + '/' + n.d); save(); }
+      const fl = n.files.filter(f => f[2].includes('f')), mb = fl.reduce((s, f) => s + f[1], 0);
+      live(`Scan · ${n.d} · ${fl.length} file${fl.length === 1 ? '' : 's'} flagged${fl.length ? ' · ' + sizeTxt(mb) : ''}`, true);
+      for (const f of fl) c.say('SYS', `FLAG · ${f[0]} · ${sizeTxt(f[1])}`);
+      return `${n.d} · ${fl.length} flagged`;
+    },
+    async read(c, a){
+      const n = resolve(a[0] || '', c.cwd); if (!a[0]) return c.say('SYS', 'Read · file required'); if (!n || n.k === 'off') return c.say('SYS', nope(a[0], n));
+      if (n.k !== 'file') return c.say('SYS', `Not a file · ${a[0]}`);
+      const [name, kb, mk, body] = n.f;
+      if (mk.includes('e')) return c.say('SYS', `${name} · encrypted · key not held`);
+      if (kb > FS.READ_MAX) return c.say('SYS', `${name} · ${sizeTxt(kb)} · too large to read · pull it`);
+      await c.wait(.3);
+      add('DOC', `${name} · ${sizeTxt(kb)} · ${n.h}`, { key: 1 });
+      for (const l of body) if (l) add('DOC', l);
+      return `${name} · read`;
+    },
+    async pull(c, a){
+      const n = resolve(a[0] || '', c.cwd); if (!a[0]) return c.say('SYS', 'Pull · file required'); if (!n || n.k === 'off') return c.say('SYS', nope(a[0], n));
+      if (n.k !== 'file') return c.say('SYS', `Not a file · ${a[0]}`);
+      const [name, kb, mk, body] = n.f;
+      if (mk.includes('e')) return c.say('SYS', `Transfer refused · ${name} · encrypted`);
+      if (archived(name)) return c.say('SYS', `${name} · already archived`);
+      const secs = Math.max(2, Math.min(30, Math.round(kb/1024*6.7))), live = c.live();
+      for (let r = secs; r >= 0; r--){ const k = Math.round(10*(secs - r)/secs);
+        live(`Transfer · ${sizeTxt(kb)} · 00:${pad(r)} <span class="bar">${'█'.repeat(k)}${'░'.repeat(10 - k)}</span>`, false, true); if (r) await c.wait(1); }
+      live(`Transfer · ${sizeTxt(kb)} · complete`, true);
+      add('SYS', 'Pull complete · 1 file archived', { key: 1, arc: { title: name, kind: 'FILE', body } });
+      return `${name} · archived`;
+    },
+    async deploy(c, a){
+      if (c.agent) return c.say('SYS', 'Agent · cannot deploy');
+      const id = +String(a[0] || '').replace(/^(agent|a)/i, ''); if (!(id >= 1 && id <= 3)) return c.say('SYS', 'Deploy · agent 1-3 required');
+      if (agentsBusy[id]) return c.say('SYS', `Agent ${pad(id)} · busy`);
+      const sub = a.slice(1).join(' ').trim(); if (!sub) return c.say('SYS', `Deploy · agent ${pad(id)} · command required`);
+      const verb = sub.split(/\s+/)[0].replace(/^-/, '').toLowerCase();
+      if (!RUN[verb] || verb === 'deploy' || verb === 'help') return c.say('SYS', `Agent ${pad(id)} · command not supported · ${verb}`);
+      runAgent(id, sub, c.cwd.slice());
+      return c.say('SYS', `Agent ${pad(id)} · deployed · ${sub.startsWith('-') ? sub : '-' + sub}`);
+    },
+    async help(c){
+      for (const l of ['-probe <mesh> · list its hosts', '-cd <path> · move · .. goes up · / to top', '-ls [path] · list what is there', '-scan <folder> · flag what matters',
+        '-read <file> · open a small file', '-pull <file> · download to the archive', '-deploy <1-3> <command> · an agent runs it', 'Tab · complete · Up · recall · Esc · leave']) c.say('SYS', l);
+    },
+  };
+  // the player's context: the log itself
+  let inEl = null, pwEl = null, rowEl = null, busy = false, hi = -1, draft = '', lastCmd = -1e9;
+  // the city's chatter holds while the player is at the prompt, so what they read comes through in one piece
+  const typing = () => busy || (inEl && document.activeElement === inEl) || performance.now() - lastCmd < 8000;
+  const opCtx = { cwd: null, agent: 0,
+    say(ch, x){ add(ch, x); return x; },
+    wait: sec => sleep(sec),
+    moved(){ W.cwd = opCtx.cwd; save(); showCwd(); },
+    live(){ const L = { t: now(), ch: 'SYS', x: '' }, d = lineEl(L), tx = d.querySelector('.tx'); let put = false;
+      return (txt, final, html) => { if (!put){ put = true; if (bodyEl && view === 'log'){ bodyEl.appendChild(d); trim(); } }
+        if (html) tx.innerHTML = txt; else tx.textContent = txt; toBottom();
+        if (final){ L.x = txt; W.lines.push(L); while (W.lines.length > MAX_LINES) W.lines.shift(); save(); } }; },
+  };
+  // an agent's context: its own box beside the log; what it finds goes to the log as well
+  const agentsBusy = {}, FAILS = /^(No such|Not a|Mesh . · no route|Transfer refused|Unknown|Host unlisted|Agent)|encrypted · key|too large to read|required$|already archived$/;
+  function runAgent(id, sub, cwd){
+    agentsBusy[id] = true;
+    const b = document.createElement('div'); b.className = 'ag op';
+    const verb = sub.split(/\s+/)[0].replace(/^-/, '').toLowerCase();
+    b.innerHTML = `<div class="h"><span>AGENT ${pad(id)} · ${esc(verb.toUpperCase())}</span><span class="chip wait">WAIT</span></div><div class="b"><div class="cmd"></div><div class="ln res">&nbsp;</div></div>`;
+    agentsEl.appendChild(b); requestAnimationFrame(() => b.classList.add('on'));
+    const res = b.querySelector('.res'); let lastSay = '';
+    const ctx = { cwd, agent: id,
+      say(ch, x, toLog){ res.textContent = x; lastSay = x; if (ch === 'SYS' && FAILS.test(x)) ctx.failed = true; if (toLog || ch === 'MESH') add(ch, x); return x; },
+      wait: sec => sleep(sec), moved(){},
+      live(){ return (txt, final, html) => { if (html) res.innerHTML = txt; else res.textContent = txt.replace(/<[^>]+>/g, ''); if (final) lastSay = txt; }; },
+    };
+    (async () => {
+      await typeInto(b.querySelector('.cmd'), '> ' + (sub.startsWith('-') ? sub : '-' + sub), 24);
+      const parts = sub.split(/\s+/).slice(1);
+      let out = null; try { out = await RUN[verb](ctx, parts); } catch (e) { ctx.failed = true; out = 'fault'; }
+      if (ctx.failed) out = lastSay;
+      const fail = !!ctx.failed;
+      const chip = b.querySelector('.chip'); chip.className = 'chip ' + (fail ? 'flag' : 'clear'); chip.textContent = fail ? 'FAIL' : 'DONE';
+      add('SYS', `Agent ${pad(id)} · ${fail ? 'failed' : 'done'} · ${out || lastSay}`);
+      agentsBusy[id] = false;
+      await sleep(6); b.classList.add('gone'); await sleep(.4); b.remove();
+    })();
+  }
+  function showCwd(){ if (pwEl) pwEl.textContent = '‎' + (opCtx.cwd.length ? pstr(opCtx.cwd) : '/'); }
+  async function exec(raw){
+    const line = raw.trim(); if (!line) return;
+    if (view !== 'log') showView('log');
+    W.hist.push(line); while (W.hist.length > 30) W.hist.shift(); hi = -1; save(); lastCmd = performance.now();
+    add('OP', '> ' + line);
+    const parts = line.split(/\s+/), verb = parts[0].replace(/^-/, '').toLowerCase();
+    if (!RUN[verb]){ add('SYS', `Unknown command · ${parts[0]}`); return; }
+    busy = true; rowEl.classList.add('busy'); inEl.readOnly = true;
+    try { await RUN[verb](opCtx, parts.slice(1)); } catch (e) { add('SYS', 'Fault · ' + verb); }
+    busy = false; rowEl.classList.remove('busy'); inEl.readOnly = false; toBottom();
+  }
+  // Tab: the command, an agent number, a mesh or a path, from what's there now
+  function complete(){
+    const v = inEl.value, parts = v.split(' '), last = parts[parts.length - 1], verb = parts[0].replace(/^-/, '').toLowerCase();
+    let opts = [], pre = last, head = '';
+    if (parts.length === 1) opts = CMDS.slice();
+    else if (verb === 'deploy' && parts.length === 2) opts = ['1', '2', '3'];
+    else if (verb === 'probe' && parts.length === 2) opts = ['A', 'B', 'C'].filter(meshOn).map(m => MESHL[m]);
+    else {
+      const k = last.lastIndexOf('/'); head = k >= 0 ? last.slice(0, k + 1) : ''; pre = last.slice(k + 1).toLowerCase();
+      const base = k >= 0 ? resolve(head.length > 1 ? head.slice(0, -1) : head, opCtx.cwd) : nodeAt(opCtx.cwd);
+      opts = kids(base).map(x => base.k === 'dir' ? x : x + '/');
+    }
+    const m = opts.filter(o => o.toLowerCase().startsWith(pre.toLowerCase())); if (!m.length) return;
+    let common = m[0]; for (const o of m) while (!o.toLowerCase().startsWith(common.toLowerCase())) common = common.slice(0, -1);
+    const tail = m.length === 1 ? m[0] + (m[0].endsWith('/') ? '' : ' ') : common;
+    const nv = parts.slice(0, -1).concat([head + tail]).join(' ');
+    if (nv !== v){ inEl.value = nv; return; }
+    if (m.length > 1) add('SYS', m.join(' · '));
+  }
+  function promptSetup(){
+    rowEl = el.querySelector('.wl-in'); inEl = rowEl.querySelector('input'); pwEl = rowEl.querySelector('.pw');
+    opCtx.cwd = W.cwd = (nodeAt(W.cwd) && nodeAt(W.cwd).k !== 'off') ? W.cwd : []; showCwd();
+    inEl.addEventListener('focus', () => { rowEl.classList.add('on'); try { keys.clear(); } catch (e) {} });
+    inEl.addEventListener('blur', () => rowEl.classList.remove('on'));
+    const has = () => rowEl.classList.toggle('has', !!inEl.value); inEl.addEventListener('input', has); inEl.addEventListener('keyup', has);
+    inEl.addEventListener('keydown', e => {
+      e.stopPropagation();   // (the game's keys stay off while typing)
+      if (e.key === 'Escape'){ e.preventDefault(); inEl.blur(); return; }
+      if (e.key === 'Tab'){ e.preventDefault(); if (!busy) complete(); return; }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown'){ e.preventDefault(); if (busy || !W.hist.length) return;
+        if (hi < 0){ draft = inEl.value; hi = W.hist.length; } hi = Math.max(0, Math.min(W.hist.length, hi + (e.key === 'ArrowUp' ? -1 : 1)));
+        inEl.value = hi === W.hist.length ? draft : W.hist[hi]; if (hi === W.hist.length) hi = -1; return; }
+      if (e.key === 'Enter'){ e.preventDefault(); if (busy) return; const v = inEl.value; inEl.value = ''; exec(v); }
+    });
+    inEl.addEventListener('keyup', e => e.stopPropagation());
+  }
+  // "/" anywhere in the game: start typing
+  addEventListener('keydown', e => {
+    if (e.key !== '/' || !el || el.hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target; if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+    if (typeof OVERSEER !== 'undefined' && OVERSEER.open) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (el.classList.contains('collapsed')) setCollapsed(false);
+    if (inEl) inEl.focus();
+  }, true);
 
   /* ---------- stages ---------- */
   function boot(){
@@ -393,6 +607,7 @@ const WIRELOG = (() => {
       <header><span class="t"><span class="full">Transmission log</span><span class="short">Log</span></span><span class="r"><span class="live" aria-hidden="true"></span><span class="nd">NODE 07</span>
         <button type="button" id="wlArc" title="Saved events and pulled files">ARC 0</button><button type="button" id="wlFold" aria-expanded="true" title="Fold the log">–</button></span></header>
       <div class="wl-body" role="log" aria-live="polite"></div>
+      <label class="wl-in"><span class="pw"></span><span class="pr">&gt;</span><span class="cur fk" aria-hidden="true"></span><input type="text" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Command line"></label>
       <div class="wl-foot"><span>RX <b id="wlRx">0</b> pkt/s</span><span>MESH <b id="wlMesh">A</b></span><span>LINES <b id="wlN">0</b>/${MAX_LINES}</span></div></div>`;
     document.body.appendChild(el);
     bodyEl = el.querySelector('.wl-body'); footEl = el.querySelector('.wl-foot'); agentsEl = el.querySelector('.wl-agents');
@@ -404,6 +619,7 @@ const WIRELOG = (() => {
     setCollapsed(col === null ? matchMedia('(max-width:700px)').matches : col === '1', true);
     document.body.classList.add('wl-on');
     new ResizeObserver(() => document.body.style.setProperty('--wl-h', el.getBoundingClientRect().height + 'px')).observe(el);
+    promptSetup();
     showView('log');
   }
   function setCollapsed(c, quiet){
@@ -457,7 +673,7 @@ const WIRELOG = (() => {
     if (zIter || (snapT += dt) > 3){ if (zoneStep()){ snapT = 0; cur = snap(); events(cur); } }
     flushBuild(dt);
     stageTick(dt);
-    if (W.leak !== 'running' && (next -= dt) <= 0){ next = T.gapLo + rnd()*(T.gapHi - T.gapLo); ambient(); }
+    if (W.leak !== 'running' && !typing() && (next -= dt) <= 0){ next = T.gapLo + rnd()*(T.gapHi - T.gapLo); ambient(); }
     if ((footT += dt) > 3 && cur){ footT = 0; foot(cur); }
     if ((saveT += dt) > 3){ saveT = 0; flushSave(); }
   }
@@ -470,6 +686,7 @@ const WIRELOG = (() => {
     line: () => ambient(),
     reset: () => { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); },
     state: () => W,
+    run: line => exec(line), complete: v => { inEl.value = v; complete(); return inEl.value; },
   };
   return { tick, dev, state: () => W };
 })();

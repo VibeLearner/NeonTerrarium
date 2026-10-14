@@ -1109,6 +1109,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // Each kind is a block: build(T, R, D, ctx) draws it at the origin and returns how high its top is. R draws its body (so
   // a block's size never changes), D its trimmings. ctx.below: it sits on another block (no pad, steps, door or garden at
   // its foot); ctx.above: another block sits on it (no roof garden, dome or greenhouse: a flat roof to stand on).
+  // the smart field's layout (local units): 4 plots of P a side, lanes Ln between them, a margin lane E round them
+  const FIELD = { P: 1.15, Ln: .78, E: .62 }; FIELD.S = 4*FIELD.P + 3*FIELD.Ln + 2*FIELD.E;
+  FIELD.c = i => -FIELD.S/2 + FIELD.E + FIELD.P/2 + i*(FIELD.P + FIELD.Ln); FIELD.lane = k => -FIELD.S/2 + FIELD.E + FIELD.P + FIELD.Ln/2 + k*(FIELD.P + FIELD.Ln); FIELD.edge = FIELD.S/2 - FIELD.E/2;
   const KINDS = {
     townhouse: { name: 'Greenhouse townhouse', r: 1.9, rb: 1.1, build(T, R, D, ctx){
       const w = R.r(1.9, 2.3), d = R.r(1.5, 1.9), fl = ctx.below ? 1 : R.i(1, 2), fh = 1.2, H = fl*fh, wall = R.pick([HP.teal, HP.sea, HP.teal, HP.ochre, HP.blush, HP.apricot, HP.rose, HP.sage]), y0 = ctx.below ? 0 : .12;
@@ -1595,22 +1598,20 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       return H; } },
     // The smart field: a plot of dark soil in beds, rows of crops (lettuce heads, a taller grain), the beds edged and divided
     // by rails of glowing blue (the board's grid of light), sensor posts at the corners, an irrigation pipe along one side.
-    field: { name: 'Smart field', ind: true, solo: true, r: 2.8, rb: 2.45, build(T, R, D, ctx){
-      const y0 = .12, w = R.r(4.2, 4.8), d = R.r(3.2, 3.8), nb = R.i(2, 3), CROPS = [[C(0x5f8f3e), C(0x76a64a)], [C(0x8fa83c), C(0xb5c060)], [C(0x3f7d5c), C(0x5a9a74)]];
-      box(T, 0, .06, 0, w + .3, .12, d + .3, HP.stone); box(T, 0, y0 + .04, 0, w, .08, d, HP.soil);
-      const bw = w/nb;
-      for (let b = 0; b < nb; b++){ const cx = -w/2 + bw*(b + .5), [c1, c2] = R.pick(CROPS), grain = R.chance(.35), rows = Math.max(3, Math.round(d/.42));
-        for (let r_ = 0; r_ < rows; r_++){ const z = -d/2 + .25 + r_*(d - .5)/(rows - 1);
-          box(T, cx, y0 + .1, z, bw - .35, .06, .16, HP.soil2);
-          for (let x = cx - bw/2 + .3; x <= cx + bw/2 - .3; x += grain ? .14 : .24){
-            if (grain) box(T, x, y0 + .26, z, .05, .26 + D.r(0, .06), .05, D.chance(.5) ? c1 : c2);
-            else T.add(GEO.ico, mat(x, y0 + .2, z, 0, D.r(0, 3), 0, .11, .08, .11), D.chance(.5) ? c1 : c2); } } }
-      // the glowing rails: round the edge and between the beds
-      const rail = (x, z, lx, lz) => { box(T, x, y0 + .1, z, Math.max(lx, .1), .06, Math.max(lz, .1), HP.indBlue); box(T, x, y0 + .06, z, Math.max(lx, .1) + .05, .04, Math.max(lz, .1) + .05, HP.metal); };
-      rail(0, d/2 + .06, w + .12, .05); rail(0, -d/2 - .06, w + .12, .05); rail(w/2 + .06, 0, .05, d + .12); rail(-w/2 - .06, 0, .05, d + .12);
-      for (let b = 1; b < nb; b++) rail(-w/2 + bw*b, 0, .05, d);
-      for (const sx of [-1, 1]) for (const sz of [-1, 1]){ T.add(GEO.cyl5, mat(sx*(w/2 + .06), y0 + .45, sz*(d/2 + .06), 0, 0, 0, .03, .9, .03), HP.metal); box(T, sx*(w/2 + .06), y0 + .92, sz*(d/2 + .06), .1, .06, .1, HP.indBlue); }
-      T.add(GEO.cyl8, mat(0, y0 + .12, -d/2 - .22, 0, 0, PI/2, .05, w, .05), HP.metal); for (let k = 0; k < 5; k++) T.add(GEO.cyl8, mat(-w/2 + .4 + k*(w - .8)/4, y0 + .2, -d/2 - .22, 0, 0, 0, .07, .14, .07), HP.metal);
+    field: { name: 'Smart field', ind: true, solo: true, r: 4.6, rb: 4.1, build(T, R, D, ctx){
+      // a 4 x 4 grid of plots, each its own crop, each edged in glowing blue; paved lanes between them and round them, wide
+      // enough for the harvesters to drive (FIELD gives the layout to the machines)
+      const y0 = .12, { P, Ln, E, S } = FIELD, CROPS = [[C(0x5f8f3e), C(0x76a64a)], [C(0x8fa83c), C(0xb5c060)], [C(0x3f7d5c), C(0x5a9a74)], [C(0x6f9a3a), C(0x9fb850)]];
+      box(T, 0, .06, 0, S + .2, .12, S + .2, HP.stone); box(T, 0, y0 + .02, 0, S, .04, S, C(0xc9c2b2));   // (the paving: lanes and margin)
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++){ const cx = FIELD.c(i), cz = FIELD.c(j), [c1, c2] = R.pick(CROPS), grain = R.chance(.3);
+        box(T, cx, y0 + .06, cz, P, .08, P, HP.soil);
+        for (let r_ = 0; r_ < 3; r_++){ const z = cz - P/2 + .2 + r_*(P - .4)/2;
+          for (let x = cx - P/2 + .16; x <= cx + P/2 - .14; x += grain ? .12 : .2){
+            if (grain) box(T, x, y0 + .22, z, .04, .24 + D.r(0, .05), .04, D.chance(.5) ? c1 : c2);
+            else T.add(GEO.ico, mat(x, y0 + .16, z, 0, D.r(0, 3), 0, .09, .07, .09), D.chance(.5) ? c1 : c2); } }
+        for (const [x, z, lx, lz] of [[cx, cz - P/2 - .03, P + .1, .05], [cx, cz + P/2 + .03, P + .1, .05], [cx - P/2 - .03, cz, .05, P + .1], [cx + P/2 + .03, cz, .05, P + .1]]) box(T, x, y0 + .1, z, lx, .05, lz, HP.indBlue); }
+      for (let k = 0; k < 3; k++){ const l = FIELD.lane(k); for (let q = -1; q <= 1; q += 2) box(T, l, y0 + .05, q*(S/2 - .1), .04, .02, .2, HP.white); }   // (lane markings at the ends)
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]){ T.add(GEO.cyl5, mat(sx*(S/2 - .05), y0 + .5, sz*(S/2 - .05), 0, 0, 0, .04, 1.0, .04), HP.metal); box(T, sx*(S/2 - .05), y0 + 1.02, sz*(S/2 - .05), .12, .07, .12, HP.indBlue); }
       return y0 + .3; } },
     // The geodesic dome greenhouse: a low ring wall with round windows, a glass dome ribbed in white (meridians and two
     // latitudes), an airlock porch at the front, rows of planters and a little tree inside showing through, grow lights
@@ -1904,28 +1905,50 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       for (let k = 0; k < 3; k++){ const id = 'd' + h.id + ':' + k, a = old.get(id) || { id, type: 'd', x: h.x, y: h.y + h.top - .35, z: h.z, wp: [], wait: 1 + k*2.2, yaw: 0, vx: 0, vz: 0 };
         a.home = h; a.port = k; a.near = near; AG.list.push(a); } }
     for (const b of PIECES.filter(p => p.kind === 'barn')){
-      const near = work.filter(f => f.kind === 'field' && Math.hypot(f.x - b.x, f.z - b.z) < 16 && (() => { const [dx, dz] = toW(b, 0, 1.5); for (let t = .1; t < .9; t += .08){ const x = dx + (f.x - dx)*t, z = dz + (f.z - dz)*t; if (PIECES.some(q => q !== f && q !== b && q.hullW && inHull(q.hullW, x, z))) return false; } return true; })());
-      for (let k = 0; k < 2; k++){ const id = 'v' + b.id + ':' + k, [hx, hz] = toW(b, (k - .5)*.5, .4), a = old.get(id) || { id, type: 'v', x: hx, y: b.y + .14, z: hz, wp: [], wait: 2 + k*5, yaw: b.rot, vx: 0, vz: 0 };
+      const near = work.filter(f => f.kind === 'field' && Math.hypot(f.x - b.x, f.z - b.z) < 18);
+      for (let k = 0; k < 2; k++){ const id = 'v' + b.id + ':' + k, [hx, hz] = toW(b, (k - .5)*.55, .45), a = old.get(id) || { id, type: 'v', x: hx, y: b.y + .14, z: hz, wp: [], wait: 2 + k*5, yaw: b.rot, vx: 0, vz: 0 };
         a.home = b; a.slot = k; a.near = near; AG.list.push(a); } }
     RAILS.forEach((r, i) => { const id = 'p' + i + ':' + r.ax.toFixed(1) + ',' + r.az.toFixed(1), a = old.get(id) || { id, type: 'p', u: (i*.37) % 1, dir: 1, pause: 0 }; a.rail = r; AG.list.push(a); }); }
   // where a drone docks, and the passes it flies over a field, a tunnel or a dome
   const dockOf = a => { const h = a.home, ang = a.port/3*PI*2 + .4; return [h.x + Math.sin(ang)*.62, h.y + h.top - .38, h.z + Math.cos(ang)*.62]; };
+  // a drone's way from (x0, z0) to (x1, z1) at cruise height: high enough over everything along it, and round a turbine's
+  // mast (never up through its blades) by a waypoint stepped out to the side
+  function droneLeg(x0, z0, x1, z1, base, floor){
+    let cy = base; const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz) || 1, out = [];
+    for (const q of PIECES){ if (!q.bb) continue; const t = clamp(((q.x - x0)*dx + (q.z - z0)*dz)/(L*L), 0, 1), px = x0 + dx*t, pz = z0 + dz*t, d = Math.hypot(q.x - px, q.z - pz);
+      if (q.kind === 'turbine'){ if (d < 1.8 && t > 0 && t < 1){ const sd = ((q.x - x0)*dz - (q.z - z0)*dx) > 0 ? 1 : -1; out.push([t, q.x + (dz/L)*2.6*sd, q.z - (dx/L)*2.6*sd]); } continue; }
+      if (d < (q.r || 2) + .8) cy = Math.max(cy, q.y + q.h + .7); }
+    out.sort((a, b) => a[0] - b[0]); return { y: Math.min(cy, floor + 6.6), via: out.map(o => [o[1], o[2]]) }; }   // (never as high as a turbine's blades reach down)
+  // a drone's round: up off its port, over to a field, a tunnel or a dome (round anything tall, round turbines), down low
+  // over it (over a field, along each row of plots), back up and home
   function planDrone(a){
     const [dx, dy, dz] = dockOf(a), cruise = a.home.y + a.home.top + 1.2 + a.port*.35, R = Math.random;
-    if (!a.near.length){ const ang = R()*6.28; a.wp = [[dx, cruise, dz, 1.2], [a.home.x + Math.sin(ang)*3, cruise, a.home.z + Math.cos(ang)*3, 2.2], [dx, cruise, dz, 2.2], [dx, dy, dz, .9, 3 + R()*4]]; return; }
-    const f = a.near[Math.floor(R()*a.near.length)], [u0, u1, v0, v1] = extentOf(f), low = f.y + (f.kind === 'field' ? 1.0 : f.kind === 'tunnels' ? 1.5 : 2.4), passes = 3 + Math.floor(R()*2), wp = [[dx, cruise, dz, 1.2]];
-    const [ex, ez] = toW(f, u0 + .3, v0 + .4); wp.push([ex, cruise, ez, 2.6], [ex, low, ez, 1.0]);
-    for (let k = 0; k < passes; k++){ const v = v0 + .4 + (v1 - v0 - .8)*(k + .5)/passes, [x0, z0] = toW(f, k % 2 ? u1 - .3 : u0 + .3, v), [x1, z1] = toW(f, k % 2 ? u0 + .3 : u1 - .3, v); wp.push([x0, low, z0, .9], [x1, low, z1, .9, 0, 1]); }
-    const last = wp[wp.length - 1]; wp.push([last[0], cruise, last[2], 1.0], [dx, cruise, dz, 2.6], [dx, dy, dz, .8, 3 + R()*6]); a.wp = wp; }
+    if (!a.near.length){ const ang = R()*6.28, px = a.home.x + Math.sin(ang)*3, pz = a.home.z + Math.cos(ang)*3, g = droneLeg(dx, dz, px, pz, cruise, a.home.y); a.wp = [[dx, g.y, dz, 1.2], [px, g.y, pz, 2.2], [dx, g.y, dz, 2.2], [dx, dy, dz, .9, 3 + R()*4]]; return; }
+    const f = a.near[Math.floor(R()*a.near.length)], [u0, u1, v0, v1] = extentOf(f), low = f.y + f.h + (f.kind === 'field' ? .8 : .5), passes = f.kind === 'field' ? 4 : 3, wp = [];
+    const [ex, ez] = toW(f, u0 + .3, v0 + .4), go = droneLeg(dx, dz, ex, ez, cruise, a.home.y);
+    wp.push([dx, go.y, dz, 1.2]); for (const [vx, vz] of go.via) wp.push([vx, go.y, vz, 2.6]); wp.push([ex, go.y, ez, 2.6], [ex, low, ez, 1.0]);
+    for (let k = 0; k < passes; k++){ const v = f.kind === 'field' ? FIELD.c(k) : v0 + .4 + (v1 - v0 - .8)*(k + .5)/passes, [x0, z0] = toW(f, k % 2 ? u1 - .3 : u0 + .3, v), [x1, z1] = toW(f, k % 2 ? u0 + .3 : u1 - .3, v); wp.push([x0, low, z0, .9], [x1, low, z1, .9, 0, 1]); }
+    const last = wp[wp.length - 1], back = droneLeg(last[0], last[2], dx, dz, cruise, a.home.y);
+    wp.push([last[0], back.y, last[2], 1.0]); for (const [vx, vz] of back.via) wp.push([vx, back.y, vz, 2.6]); wp.push([dx, back.y, dz, 2.6], [dx, dy, dz, .8, 3 + R()*6]); a.wp = wp; }
+  // is the way from (x0, z0) to (x1, z1) clear of every piece but those in skip, a rover's width wide
+  const wayClear = (x0, z0, x1, z1, skip) => { const L = Math.hypot(x1 - x0, z1 - z0) || 1, nx = -(z1 - z0)/L, nz = (x1 - x0)/L;
+    for (let t = 0; t <= 1.0001; t += .25/L) for (const o of [-.38, 0, .38]){ const x = x0 + (x1 - x0)*t + nx*o, z = z0 + (z1 - z0)*t + nz*o; if (PIECES.some(q => !skip.includes(q) && q.hullW && !q.level && inHull(q.hullW, x, z))) return false; } return true; };
+  // a harvester's round: out of the barn's bay to the nearest corner of the field's margin lane it has a clear way to, then
+  // up and down the lanes between the plots (never over them), round the margin and home the same way
   function planRover(a){
-    const b = a.home, [hx, hz] = toW(b, (a.slot - .5)*.5, .4), [ox, oz] = toW(b, (a.slot - .5)*.5, 1.6), R = Math.random;
-    if (!a.near.length){ a.wp = [[ox, 0, oz, .5], [hx, 0, hz, .5, 6 + R()*6]]; return; }
-    const f = a.near[Math.floor(R()*a.near.length)], [u0, u1, v0, v1] = extentOf(f), rows = 3 + Math.floor(R()*2), wp = [[ox, 0, oz, .55]];
-    let best = null, bd = 1e9; for (const [u, v] of [[u0 - .2, (v0 + v1)/2], [u1 + .2, (v0 + v1)/2], [(u0 + u1)/2, v0 - .2], [(u0 + u1)/2, v1 + .2]]){ const [x, z] = toW(f, u, v), d = Math.hypot(x - ox, z - oz); if (d < bd){ bd = d; best = [x, z]; } }
-    wp.push([best[0], 0, best[1], .6]);
-    for (let k = 0; k < rows; k++){ const v = v0 + .45 + (v1 - v0 - .9)*(k + .5)/rows, [x0, z0] = toW(f, k % 2 ? u1 - .35 : u0 + .35, v), [x1, z1] = toW(f, k % 2 ? u0 + .35 : u1 - .35, v); wp.push([x0, 0, z0, .5], [x1, 0, z1, .4, 0, 1]); }
-    wp.push([best[0], 0, best[1], .6], [ox, 0, oz, .6], [hx, 0, hz, .45, 8 + R()*10]); a.wp = wp; a.field = f; }
-  const groundY = (x, z) => { let y = heightAt(x, z); for (const q of PIECES) if (!q.level && q.bb && x >= q.bb[0] && x <= q.bb[2] && z >= q.bb[1] && z <= q.bb[3] && inHull(q.hullW, x, z)) y = Math.max(y, q.y + .12 + (q.kind === 'field' ? .08 : 0)); return y; };
+    const b = a.home, [hx, hz] = toW(b, (a.slot - .5)*.55, .45), [ox, oz] = toW(b, (a.slot - .5)*.55, 1.9), R = Math.random;
+    const park = () => { a.wp = [[ox, 0, oz, .5], [hx, 0, hz, .5, 6 + R()*6]]; };
+    if (!a.near.length) return park();
+    const f = a.near[Math.floor(R()*a.near.length)], E = FIELD.edge, lanes = [0, 1, 2].map(FIELD.lane);
+    const corners = [[-E, -E], [E, -E], [E, E], [-E, E]].map(([u, v]) => { const [x, z] = toW(f, u, v); return { u, v, x, z, d: Math.hypot(x - ox, z - oz) }; }).sort((p, q) => p.d - q.d);
+    const ent = corners.find(c => wayClear(ox, oz, c.x, c.z, [b, f])); if (!ent) return park();
+    const wp = [[ox, 0, oz, .55], [ent.x, 0, ent.z, .7]], P = (u, v, sp, work = 0) => { const [x, z] = toW(f, u, v); wp.push([x, 0, z, sp, 0, work]); };
+    const vs = ent.v, us = ent.u, order = us < 0 ? lanes : lanes.slice().reverse();
+    P(order[0], vs, .6);
+    order.forEach((l, k) => { const vFrom = k % 2 ? -vs : vs; P(l, -vFrom, .42, 1); if (k < order.length - 1) P(order[k + 1], -vFrom, .6); });
+    const vEnd = order.length % 2 ? -vs : vs; P(us, vEnd, .6); P(us, vs, .6);
+    wp.push([ent.x, 0, ent.z, .6], [ox, 0, oz, .6], [hx, 0, hz, .45, 8 + R()*10]); a.wp = wp; a.field = f; }
+  const groundY = (x, z) => { let y = heightAt(x, z); for (const q of PIECES) if (!q.level && q.bb && x >= q.bb[0] && x <= q.bb[2] && z >= q.bb[1] && z <= q.bb[3] && inHull(q.hullW, x, z)) y = Math.max(y, q.y + (q.kind === 'field' ? .16 : .12)); return y; };
   const _am = new THREE.Matrix4(), _aq = new THREE.Quaternion(), _ae = new THREE.Euler(0, 0, 0, 'YXZ'), _ap = new THREE.Vector3(), _as = new THREE.Vector3(1, 1, 1);
   function agentTick(dt){
     dt = Math.min(dt, .1); AG.t += dt;
@@ -1942,7 +1965,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         if (d <= step){ a.x = w[0]; a.z = w[2]; if (a.type === 'd') a.y = ty; a.wp.shift(); if (w[4]) a.wait = w[4]; }
         else { a.x += dx/d*step; a.z += dz/d*step; if (a.type === 'd') a.y += dy/d*step; const h = Math.hypot(dx, dz); if (h > .01) a.yaw = Math.atan2(dx, dz); }
         a.vx = a.vx*.85 + (d > step ? dx/d*w[3] : 0)*.15; a.vz = a.vz*.85 + (d > step ? dz/d*w[3] : 0)*.15; }
-      if (a.type === 'v'){ a.y = groundY(a.x, a.z); _ae.set(0, a.yaw, 0); _am.compose(_ap.set(a.x, a.y, a.z), _aq.setFromEuler(_ae), _as.setScalar(1.8)); AGM.v.setMatrixAt(nv++, _am); continue; }
+      if (a.type === 'v'){ a.y = groundY(a.x, a.z); _ae.set(0, a.yaw, 0); _am.compose(_ap.set(a.x, a.y, a.z), _aq.setFromEuler(_ae), _as.setScalar(1.45)); AGM.v.setMatrixAt(nv++, _am); continue; }
       // a drone leans into its flight, and bobs a little as it hovers
       const sp = Math.hypot(a.vx, a.vz), bob = Math.sin(performance.now()*.004 + a.port*2)*.02;
       _ae.set(Math.min(.35, sp*.12), a.yaw, 0); _am.compose(_ap.set(a.x, a.y + bob, a.z), _aq.setFromEuler(_ae), _as.setScalar(2.1)); AGM.d.setMatrixAt(nd++, _am);
@@ -2155,8 +2178,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       let top = Math.max(a.y, b.y) + 1.9;
       for (let k = 0; k <= 24; k++){ const u = k/24, px = a.x + (b.x - a.x)*u, pz = a.z + (b.z - a.z)*u;
         for (const q of PIECES){ if (q === A || q === B || !q.hullW || !q.bb || px < q.bb[0] - .6 || px > q.bb[2] + .6 || pz < q.bb[1] - .6 || pz > q.bb[3] + .6) continue;
-          if (inHull(q.hullW, px, pz) || [[.5, 0], [-.5, 0], [0, .5], [0, -.5]].some(([ox, oz]) => inHull(q.hullW, px + ox, pz + oz))) top = Math.max(top, q.y + q.h + .45); } }
-      const pa = V3(a.x - dx*.5, 0, a.z - dz*.5), pb = V3(b.x + dx*.5, 0, b.z + dz*.5);   // (the end pylons stand just off each building's wall)
+          if (inHull(q.hullW, px, pz) || [[.6, 0], [-.6, 0], [0, .6], [0, -.6]].some(([ox, oz]) => inHull(q.hullW, px + ox, pz + oz))) top = Math.max(top, q.y + q.h + 1.05); } }   // (clear of it with the pods hanging under)
+      const pa = V3(a.x + dx*.55, 0, a.z + dz*.55), pb = V3(b.x - dx*.55, 0, b.z - dz*.55);   // (the end pylons stand just off each building's wall, outside it)
       L.rail = { ax: pa.x, az: pa.z, bx: pb.x, bz: pb.z, y: top };   // (for the shuttle pods; see AGENTS)
       const rp = u => V3(pa.x + (pb.x - pa.x)*u, top, pa.z + (pb.z - pa.z)*u), L2 = Math.hypot(pb.x - pa.x, pb.z - pa.z), nseg = Math.max(2, Math.ceil(L2/.8));
       for (let k = 0; k < nseg; k++){ const r0 = rp(k/nseg), r1 = rp((k + 1)/nseg); seg(T, r0, r1, .26, .18, HP.white); seg(T, r0, r1, .3, .04, HP.metal, -.1);
@@ -2220,7 +2243,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); for (const c of linksMesh.children) c.geometry.dispose(); linksMesh = null; }   // (merged copies only: the cached parts stay)
     const T = new Tris(true), pairs = [], deg = new Map(), joined = new Set(), pools = [];
     for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, IND(p.kind) ? 41.6 : 1 + 10*shopOf(p.kind, p.seed)]);
-    for (const p of PIECES) if (p.kind === 'field'){ const c = Math.cos(p.rot), s_ = Math.sin(p.rot); for (const [u, v] of [[-1.6, -1.4], [1.6, -1.4], [-1.6, 1.4], [1.6, 1.4], [0, 1.9], [0, -1.9]]) pools.push([p.x + u*c + v*s_, p.z - u*s_ + v*c, 1.4, 41.5]); }   // (the blue round a field's edges)   // (+10 per shop light: a shop's, in its light)   // (by night: the windows' light on the ground round a home)
+    for (const p of PIECES) if (p.kind === 'field'){ const c = Math.cos(p.rot), s_ = Math.sin(p.rot); const h = FIELD.S/2 - .9; for (const [u, v] of [[-h, -h], [h, -h], [-h, h], [h, h], [0, h], [0, -h], [h, 0], [-h, 0], [0, 0]]) pools.push([p.x + u*c + v*s_, p.z - u*s_ + v*c, 1.7, 41.5]); }   // (the blue round a field's edges)   // (+10 per shop light: a shop's, in its light)   // (by night: the windows' light on the ground round a home)
     // the connections built with the connect brush come first, as chosen; then the ones neighbors make on their own
     const byId = new Map(PIECES.map(p => [p.id, p])), userKey = new Set();
     for (const u of ULINKS){ const A = byId.get(u.a), B = byId.get(u.b); if (!A || !B) continue; const L = pairOf(A, B); if (!L) continue;
@@ -2776,8 +2799,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function controlsFor(){
     const row = (k, t) => '<div class="row"><kbd>' + k + '</kbd><span>' + t + '</span></div>';
     if (PL.kind === 'del') return '<h4>Clear an area</h4>' + row('drag', 'select an area') + row('click inside', 'clear it: buildings, walkways, grass') + row('click outside / Esc', 'let the selection go') + row('X', 'back to building');
-    if (PL.kind === 'grass' && PL.zoneFol === 'ind') return '<h4>Planting (industrial)</h4>' + row('click / drag', 'plant') + row('right drag', 'clear it (the grass stays)') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: ' + IPSTYLES.join(', ')) + '<div class="row"><span>pick Residential first for grass, which grows under it</span></div>';
-    if (PL.kind === 'grass' && PL.zoneFol === 'com') return '<h4>Trees (commercial)</h4>' + row('click / drag', 'plant') + row('right drag', 'clear the trees (the grass stays)') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: ' + PSTYLES.join(', ')) + row('Alt + drag', 'turn the view') + '<div class="row"><span>pick Residential first for grass, which grows under the trees</span></div>';
+    if (PL.kind === 'grass' && PL.zoneFol === 'ind') return '<h4>Planting (industrial)</h4>' + row('click / drag', 'plant') + row('right drag', 'clear it (the grass stays)') + row('Q / E', 'bigger / smaller brush') + '<div class="row"><span>pick Residential first for grass, which grows under it</span></div>';
+    if (PL.kind === 'grass' && PL.zoneFol === 'com') return '<h4>Trees (commercial)</h4>' + row('click / drag', 'plant') + row('right drag', 'clear the trees (the grass stays)') + row('Q / E', 'bigger / smaller brush') + row('Alt + drag', 'turn the view') + '<div class="row"><span>pick Residential first for grass, which grows under the trees</span></div>';
     if (PL.kind === 'grass') return '<h4>Grass</h4>' + row('click / drag', 'paint') + row('right drag', 'clear') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: meadow, wildflowers, ferns, tall grass, mix') + row('Alt + drag', 'turn the view');
     if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('click, click', 'pick two buildings to join') + row('V', 'next kind: bridge, skywalk, pergola, arcade, wall (or a wing, if they\'re apart), random') + row('right click', 'take away the walkway under it (or let go of the first pick)');
     if (isZone(PL.kind)){ const u = ZUNIT(); return '<h4>' + (PL.kind === 'czone' ? 'Commercial' : PL.kind === 'izone' ? 'Industrial' : 'Residential') + ': brush</h4>' + row('click', 'build the ' + u + 's in the brush') + row('Q / E', 'bigger / smaller (smallest: one ' + u + ')') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', ZONE.size ? 'clear the brush' : 'remove the ' + u + ' under it'); }
@@ -2916,10 +2939,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function showGrass(){
     ghost.visible = false; zHide(); connGhost.visible = false;
     const hit = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
-    const com = PL.zoneFol === 'com', ind = PL.zoneFol === 'ind', nm = com ? 'trees: ' + PSTYLES[GR.pstyle] : ind ? 'planting: ' + IPSTYLES[GR.istyle] : 'grass: ' + GSTYLES[GR.style];
+    const com = PL.zoneFol === 'com', ind = PL.zoneFol === 'ind', nm = com ? 'trees, mixed' : ind ? 'sunflowers, grain and wildflowers' : 'grass: ' + GSTYLES[GR.style];
     if (!hit || hit.sea){ ring.visible = false; if (status) status.textContent = nm + (hit ? ' · not on the sea' : ''); return; }
     ringAt(hit.x, hit.z, GRS[GR.size], null, .12); ringM.color.set(com ? 0x9fd8e0 : ind ? 0xf0d080 : 0xb8e08a);
-    if (status){ status.textContent = nm + ' (V next) · brush ' + (GR.size + 1); status.style.color = '#33413a'; } }
+    if (status){ status.textContent = nm + (com || ind ? '' : ' (V next)') + ' · brush ' + (GR.size + 1); status.style.color = '#33413a'; } }
   function grassStroke(cx, cy, erase, force){
     const h = pick(cx, cy); if (!h || h.sea) return; const r = GRS[GR.size];
     if (!force && GR.last && Math.hypot(h.x - GR.last[0], h.z - GR.last[1]) < r*.35) return;
@@ -2996,7 +3019,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (e.key === '6'){ setKind('grass'); return; }
     if (k === 'x' && !e.repeat){ setKind('del'); return; }
     if (PL.kind === 'grass' && (k === 'q' || k === 'e')){ GR.size = clamp(GR.size + (k === 'q' ? 1 : -1), 0, GRS.length - 1); return; }
-    if (PL.kind === 'grass' && k === 'v'){ if (PL.zoneFol === 'com') GR.pstyle = (GR.pstyle + 1) % PSTYLES.length; else if (PL.zoneFol === 'ind') GR.istyle = (GR.istyle + 1) % IPSTYLES.length; else GR.style = (GR.style + 1) % GSTYLES.length; return; }
+    if (PL.kind === 'grass' && k === 'v'){ if (PL.zoneFol === 'com' || PL.zoneFol === 'ind') return; else GR.style = (GR.style + 1) % GSTYLES.length; return; }
     if (PL.kind === 'connect' && k === 'v'){ CN.type = (CN.type + 1) % LINK_TYPES.length; CN.key = ''; return; }
     if (isZone(PL.kind) && (k === 'q' || k === 'e')){ ZONE.size = clamp(ZONE.size + (k === 'q' ? 1 : -1), 0, ZSIZE.length - 1); return; }   // (Q: a bigger brush, E: a smaller one)
     if (k === 'v'){   // (single mode: the next kind of home, Shift+V another look of it; otherwise another look or layout)
@@ -3092,7 +3115,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, AG, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
+  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, AG, agentTick: dt => agentTick(dt), FIELD, inHull: (P, x, z) => inHull(P, x, z), RAILS, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

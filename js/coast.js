@@ -1514,12 +1514,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const LINK_TYPES = ['bridge', 'skywalk', 'pergola', 'arcade', 'wall', 'random'];
   function linkType(L, R){
     const ground = !L.A.level && !L.B.level && Math.abs(L.A.y - L.B.y) < 1.4, t = L.type || 'random';
-    if (t === 'wall') return L.gap < 1.6 && L.A.level === L.B.level ? 'wall' : ground ? 'arcade' : 'bridge';
-    if (t === 'pergola' || t === 'arcade') return ground ? t : 'bridge';
-    if (t === 'bridge' || t === 'skywalk') return t;
+    if (t === 'wall') return L.gap < .5 && L.A.level === L.B.level ? 'wall' : 'wing';   // (apart: an enclosed wing joins them instead of a shared wall)
+    if (t === 'pergola' || t === 'arcade' || t === 'bridge' || t === 'skywalk') return t;   // (every kind, at any height: up in the air a pergola or an arcade is carried as a bridge)
     if (L.gap < .5 && L.A.level === L.B.level) return 'wall';
     if (ground) return R.chance(.12) ? 'skywalk' : R.chance(.58) ? 'pergola' : 'arcade';
-    return R.chance(Math.min(.8, .35 + L.gap*.08)) ? 'skywalk' : 'bridge'; }
+    return R.chance(.15) ? R.pick(['pergola', 'arcade']) : R.chance(Math.min(.8, .35 + L.gap*.08)) ? 'skywalk' : 'bridge'; }
   // one connection drawn into T (its walk, bridge, arcade or shared wall, and the doorways where it meets the walls)
   function drawLink(T, L, pools){
     const { A, B, dc, dx, dz, tA, tB } = L;
@@ -1540,15 +1539,23 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     // a doorway in each wall where the walk or the bridge meets it: a dark opening in a cream frame, under a small hood
     const door = (p, q) => { const d = V3(q.x - p.x, 0, q.z - p.z).normalize(), o = p.clone().addScaledVector(d, -.02), o2 = p.clone().addScaledVector(d, .05);
       seg(T, o, o2, .66, .98, HP.cream, .49); seg(T, o, o2.clone().addScaledVector(d, .02), .5, .82, HP.glassD, .41); seg(T, o, o2.clone().addScaledVector(d, .12), .8, .06, HP.terra, 1.02); };
-    if (type !== 'wall'){ door(a, b); door(b, a); }
+    if (type !== 'wall' && type !== 'wing'){ door(a, b); door(b, a); }
+    // a long span up in the air gets slim piers down to the ground, whatever it's built as
+    if (len > 3.6 && (A.level || B.level)) for (let u = 1/Math.ceil(len/3); u < .999; u += 1/Math.ceil(len/3)){ const c = at(u, 0, 0), g = heightAt(c.x, c.z);
+      if (c.y - g > .4){ box(T, c.x, (c.y + g)/2 - .05, c.z, .16, c.y - g - .1, .16, HP.cream); box(T, c.x, g + .1, c.z, .3, .2, .3, HP.stone); } }
     if (type === 'wall'){   // touching: a shared wall with an arched way through
       const a2 = at(-.15, 0, 0), b2 = at(1.15, 0, 0), wh = A.level ? .9 : 1.1, wc = R.pick([HP.cream, HP.white, HP.sand]);
       seg(T, a2, b2, 1.3, wh, wc, wh/2); seg(T, a2, b2, 1.4, .08, HP.cream, wh + .04);
       for (const s of [-.66, .66]){ const c = at(.5, s, 0); box(T, c.x, c.y + .38, c.z, .5, .6, .5, HP.glassD); }
       for (let k = 0; k < 3; k++){ const c = at(.2 + k*.3, 0, wh + .08); plant(T, R, c.x, c.y, c.z, 1.1); }
+    } else if (type === 'wing'){   // an enclosed wing between them: plaster walls with a row of windows, a tiled roof
+      const wc = R.pick([HP.cream, HP.white, HP.sand, HP.apricot, HP.butter]), h = A.level ? .95 : 1.15, n = Math.max(1, Math.round(len/.7));
+      run(0, 0, 1.2, .14, HP.stone, .02, -.02, 1.02); run(0, 0, 1.1, h, wc, h/2 + .08, -.04, 1.04);
+      for (let k = 0; k < n; k++) for (const s_ of [-.56, .56]){ const c = at((k + .5)/n, s_, 0); box(T, c.x, c.y + h*.55, c.z, .1, .42, .1, HP.frame);
+        box(T, c.x + sx*Math.sign(s_)*.01, c.y + h*.55, c.z + sz*Math.sign(s_)*.01, .08, .36, .08, R.chance(.45) ? HP.lamp : HP.glassD); }
+      run(0, h + .1, 1.3, .1, HP.cream, 0, -.06, 1.06); run(0, h + .22, 1.36, .12, HP.tile, 0, -.06, 1.06);
+      if (R.chance(.7)) for (let k = 0; k < n; k++){ const c = at((k + .5)/n, 0, h + .28); plant(T, R, c.x, c.y, c.z, .9); }
     } else if (type === 'bridge' || type === 'skywalk'){   // up in the air: a planted bridge, or a glass skywalk
-      if (len > 3.6 && (A.level || B.level)) for (let u = 1/Math.ceil(len/3); u < .999; u += 1/Math.ceil(len/3)){ const c = at(u, 0, 0), g = heightAt(c.x, c.z);   // (a long span: slim piers down to the ground)
-        if (c.y - g > .4){ box(T, c.x, (c.y + g)/2 - .05, c.z, .16, c.y - g - .1, .16, HP.cream); box(T, c.x, g + .1, c.z, .3, .2, .3, HP.stone); } }
       if (type === 'bridge'){
         run(0, 0, .8, .1, HP.wood, .05);
         for (const s of [-.38, .38]){ run(s, .45, .05, .05, HP.rail);
@@ -2007,7 +2014,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function controlsFor(){
     const row = (k, t) => '<div class="row"><kbd>' + k + '</kbd><span>' + t + '</span></div>';
     if (PL.kind === 'grass') return '<h4>Grass</h4>' + row('click / drag', 'paint') + row('right drag', 'clear') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: meadow, wildflowers, ferns, tall grass, mix') + row('Alt + drag', 'turn the view');
-    if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('click, click', 'pick two buildings to join') + row('V', 'next kind: bridge, skywalk, pergola, arcade, shared wall, random') + row('right click', 'let go, or clear a building\'s walkways');
+    if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('click, click', 'pick two buildings to join') + row('V', 'next kind: bridge, skywalk, pergola, arcade, wall (or a wing, if they\'re apart), random') + row('right click', 'let go, or clear a building\'s walkways');
     if (PL.kind === 'zone') return '<h4>Residential: brush</h4>' + row('click', 'build the homes in the brush') + row('Q / E', 'bigger / smaller (smallest: one home)') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', ZONE.size ? 'clear the brush' : 'remove the home under it');
     if (PL.kind && KINDS[PL.kind]) return '<h4>Residential: one by one</h4>' + row('click', 'place (on a roof: stack; on a wall: build off it)') + row('V', 'another look') + row('R', 'turn') + row('right click', 'remove (and all above)') + row('Z', 'switch to the brush');
     return '<h4>Pick a zone or a tool</h4>' + row('1', 'residential') + row('5', 'walkways') + row('6', 'grass');

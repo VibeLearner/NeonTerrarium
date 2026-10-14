@@ -29,6 +29,9 @@ const RJ_INTROS = ['intro1', 'intro2', 'intro3', 'intro4', 'intro5', 'intro6', '
 // picks up where it left off. Each plays once, only after the first lore drop, and never on the song before lore 2.
 const RJ_INTERRUPTS = ['interrupt1', 'interrupt2'], RJ_INTERRUPT_ODDS = .3;
 const STATIC_IN = ['in1', 'in2'], STATIC_OUT = ['out1', 'out2', 'out3', 'out4', 'out5', 'out6', 'out7'];
+// RJ_MUTED: the host's voice-overs (talk, lore, intros, interrupts) are off for now; the music plays on its own, and
+// nothing the host would have said is marked as said, so turning this off later picks up where it would have begun
+const RJ_MUTED = true;
 const RJ_KEY = 'neonIsland.radioHost', RJ_INTRO_ODDS = .45, DUCK = .22, STATIC_VOL = .7;
 const rj = (() => {
   let st = null;
@@ -168,11 +171,11 @@ const music = (() => {
     cutIn = null;
     if (talking && !voLore) hush();   // skipping during an intro: straight to the song (a lore drop carries on over it)
     if (++idx >= order.length){ shuffle(); idx = 0; }
-    const k = idx, plan = talking ? null : rj.plan();
-    rj.started(plan);
+    const k = idx, plan = talking || RJ_MUTED ? null : rj.plan();
+    if (!RJ_MUTED) rj.started(plan);
     load(k);
     if (plan) talk(plan);   // the song starts underneath the talk, turned down, and comes back up after
-    const cut = rj.planInterrupt(plan);
+    const cut = RJ_MUTED ? null : rj.planInterrupt(plan);
     cutIn = cut ? { name: cut, k, frac: .3 + Math.random()*.35 } : null;   // where in the song, once its length is known
   }
   // previous: back to the start of this song if it's been playing a while, otherwise the song before it

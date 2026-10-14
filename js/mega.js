@@ -2307,7 +2307,7 @@ function emitterFx(m){
   const d = m.ec; if (!d) return null;
   const root = new THREE.Group(); root.matrixAutoUpdate = false; root.matrix.fromArray(d.m); root.matrixWorldNeedsUpdate = true; scene.add(root);
   const geo = new THREE.CylinderGeometry(d.gr*.9, d.gr*.9, d.gh*.94, 32, 1, true), geo2 = new THREE.CylinderGeometry(d.gr*.55, d.gr*.55, d.gh*.9, 24, 1, true);
-  const pl = new THREE.Mesh(geo, EC_PLASMA), pl2 = new THREE.Mesh(geo2, EC_PLASMA); for (const q of [pl, pl2]){ q.position.set(0, d.g0 + d.gh/2, 0); q.frustumCulled = false; q.raycast = () => {}; root.add(q); }
+  const pl = new THREE.Mesh(geo, EC_PLASMA), pl2 = new THREE.Mesh(geo2, EC_PLASMA); for (const q of [pl, pl2]){ q.position.set(0, d.g0 + d.gh/2, 0); q.raycast = () => {}; root.add(q); }   // (culled off screen like anything else)
   pl2.rotation.y = 1.3; pl2.scale.y = -1;
   const heart = new THREE.Sprite(GLOW.arc.clone()); heart.position.set(0, d.g0 + d.gh*.5, 0); heart.scale.set(1.6, 1.6, 1); heart.layers.set(1); root.add(heart);
   const aura = new THREE.Sprite(GLOW.platinum.clone()); aura.position.copy(heart.position); aura.scale.set(3.4, 3.4, 1); aura.layers.set(1); root.add(aura);
@@ -2353,7 +2353,10 @@ function fieldPlan(){
   const whole = out.find(f => f.city); return whole ? [whole] : out;   // (one that wraps the city takes in the rest)
 }
 const FIELD_UNI = { time: FOL_UNI.time };
-const FIELD_GEO = new THREE.SphereGeometry(1, 96, 32, 0, TAU, 0, PI/2);
+const FIELD_SEG = [96, 32], FIELD_GEO = new THREE.SphereGeometry(1, FIELD_SEG[0], FIELD_SEG[1], 0, TAU, 0, PI/2);
+// where each ring of the dome's triangles starts in its index list (row 0, at the top, has one triangle a segment, the
+// rest two), so a sweep draws only the rows round its front
+const FIELD_ROW = (() => { const o = [0]; for (let r = 0; r < FIELD_SEG[1]; r++) o.push(o[r] + (r === 0 ? 3 : 6)*FIELD_SEG[0]); return o; })();
 function fieldMat(hw, H, hd, seg){
   const m = new THREE.ShaderMaterial({
     uniforms: { time: FIELD_UNI.time, uSize: { value: new THREE.Vector3(hw, H, hd) }, uSeg: { value: seg }, uT0: { value: 0 }, uReveal: { value: 0 } },
@@ -2367,6 +2370,8 @@ function fieldMat(hw, H, hd, seg){
     fragmentShader: `uniform float time, uSeg, uT0, uReveal; varying vec3 vW; varying vec3 vNo; varying float vEl; varying float vAz;
       float ln(float x, float w){ float f = abs(fract(x) - .5); return 1.0 - smoothstep(.5 - w*1.6, .5 - w*.6, f); }   // a line at every whole number, w wide in its own units
       void main(){
+        float ph0 = mod(time - uT0, 30.0), e0 = ph0/5.0;
+        if (uReveal < .001 && (e0 > 1.15 || vEl > e0 + .07 || vEl < e0 - .16)){ gl_FragColor = vec4(0.0); return; }   // (away from the front: nothing to work out; a return, not a discard, which would cost the early depth test that skips what's behind the buildings)
         float u = vAz*uSeg, v = vEl*uSeg*.32;
         float w = .035;
         float L = max(ln(v, w), max(ln(u + v*.5, w), ln(u - v*.5, w)));                 // a triangular lattice: geodesic
@@ -2381,7 +2386,7 @@ function fieldMat(hw, H, hd, seg){
         // tail of light fading behind it; otherwise nothing at all
         float ph = mod(time - uT0, 30.0), e = ph/5.0;
         float sweep = 0.0;
-        if (e < 1.15){ float dv = e - vEl, front = exp(-pow(dv/.028, 2.0)), tail = dv > 0.0 ? exp(-dv*16.0)*.3 : 0.0, fade = 1.0 - smoothstep(.85, 1.15, e);
+        if (e < 1.15){ float dv = e - vEl, front = exp(-pow(dv/.028, 2.0)), tail = dv > 0.0 ? exp(-dv*22.0)*.3 : 0.0, fade = 1.0 - smoothstep(.85, 1.15, e);
           float Ls = max(ln(u + v*.5, w*1.5), ln(u - v*.5, w*1.5)), Lh = ln(v, w*1.5);   // (the lines a little wider while lit, so they read from afar; the rings round it fainter, or the front is a solid band)
           sweep = (front + tail)*fade*(Ls*.42 + Lh*.18 + node*.4) + exp(-vEl*40.0)*smoothstep(.2, 0.0, e)*.25; }
         float a = full*uReveal*breath + sweep;
@@ -2393,14 +2398,14 @@ function fieldMat(hw, H, hd, seg){
 }
 function fieldBuild(plan){
   const was = new Set(FIELD.domes.map(d => d.userData.field.ids)), now = FOL_UNI.time.value;
-  for (const d of FIELD.domes){ scene.remove(d); d.material.dispose(); } FIELD.domes = [];
+  for (const d of FIELD.domes){ scene.remove(d); d.material.dispose(); d.geometry.dispose(); } FIELD.domes = [];
   for (const f of plan){
     const x0 = f.i0*LOT, x1 = f.i1*LOT, z0 = f.j0*LOT, z1 = f.j1*LOT, hw = (x1 - x0)/2 + LOT*.3, hd = (z1 - z0)/2 + LOT*.3;
     let top = 0; for (const c of cells.values()) if (c.i >= f.i0 && c.i <= f.i1 && c.j >= f.j0 && c.j <= f.j1) top = Math.max(top, c.height || 0, c.topY || 0);
     for (const m of megas.values()) if (m.x >= x0 && m.x <= x1 && m.z >= z0 && m.z <= z1) top = Math.max(top, m.top || 0);
     const H = Math.min(Math.max(hw, hd)*1.1, Math.max(Math.min(hw, hd)*.55, top*1.18 + 3));   // (over the tallest thing in it, and roughly round)
     const seg = Math.max(10, Math.round((hw + hd)*2/(LOT*1.5)));   // (the lattice's cells about a plot and a half across: finer ones blur at the render's size)
-    const mesh = new THREE.Mesh(FIELD_GEO, fieldMat(hw, H, hd, seg)); mesh.position.set((x0 + x1)/2, -.4, (z0 + z1)/2);
+    const geo = FIELD_GEO.clone(), mesh = new THREE.Mesh(geo, fieldMat(hw, H, hd, seg)); mesh.position.set((x0 + x1)/2, -.4, (z0 + z1)/2);
     mesh.frustumCulled = false; mesh.renderOrder = 20; mesh.raycast = () => {}; mesh.userData.field = f; scene.add(mesh); FIELD.domes.push(mesh);
     mesh.material.uniforms.uT0.value = now;   // (a sweep straight away, to show where it stands)
     mesh.userData.reveal = f.n > 1 && !was.has(f.ids) ? 7 : 0;   // (cores just paired: the whole field shows for a while, then fades)
@@ -2408,7 +2413,17 @@ function fieldBuild(plan){
 }
 // checked every second: rebuilt when the cores or the city's bounds have changed
 function fieldTick(dt){
-  for (const d of FIELD.domes) if (d.userData.reveal > 0){ d.userData.reveal = Math.max(0, d.userData.reveal - dt); d.material.uniforms.uReveal.value = Math.min(1, d.userData.reveal/2); }   // (held, then faded over its last 2 s)
+  const now = FOL_UNI.time.value, NR = FIELD_SEG[1];
+  for (const d of FIELD.domes){ const U_ = d.material.uniforms;
+    if (d.userData.reveal > 0){ d.userData.reveal = Math.max(0, d.userData.reveal - dt); U_.uReveal.value = Math.min(1, d.userData.reveal/2); }   // (held, then faded over its last 2 s)
+    // (between sweeps it shows nothing, so it isn't drawn at all; in a sweep only the rings near the front are: the
+    // row at elevation el is about (1 - el)*NR from the top)
+    if (U_.uReveal.value > 0){ d.visible = true; d.geometry.setDrawRange(0, Infinity); continue; }
+    const e = (((now - U_.uT0.value) % 30) + 30) % 30/5;
+    if (e > 1.15){ d.visible = false; continue; }
+    const r0 = Math.max(0, Math.floor((1 - e - .08)*NR)), r1 = Math.min(NR, Math.ceil((1 - e + .17)*NR) + 1);   // (the front and the tail behind it, as far as it shows)
+    if (r1 <= r0){ d.visible = false; continue; }
+    d.visible = true; d.geometry.setDrawRange(FIELD_ROW[r0], FIELD_ROW[r1] - FIELD_ROW[r0]); }
   FIELD.at -= dt; if (FIELD.at > 0) return; FIELD.at = 1;
   const ems = megasOfKind('emitter'); let key = ems.map(m => m.id + '@' + m.i + ',' + m.j).sort().join('|');
   if (ems.length){ let i0 = 1e9, i1 = -1e9, j0 = 1e9, j1 = -1e9, top = 0; for (const c of cells.values()){ i0 = Math.min(i0, c.i); i1 = Math.max(i1, c.i); j0 = Math.min(j0, c.j); j1 = Math.max(j1, c.j); top = Math.max(top, c.height || 0); }

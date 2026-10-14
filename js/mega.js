@@ -33,6 +33,8 @@ const MEGA_TYPES = {
            colour: '#ffe600', build: buildLogisticsHub, fx: logisticsFx },
   wirenest: { name: 'Wire Nest', need: { mid: 60, high: 30 }, after: ['radio'], odds: 30, w: 4, h: 4, maxLevels: 1,   // the data sniffer: 60 commercial and 30 luxury floors and the radio station, then a 1 in 30 chance with each build
            colour: '#5affa8', build: buildWireNest, fx: wireNestFx },
+  emitter: { name: 'Emitter Core', need: { any: 120 }, after: ['spire'], odds: 25, w: 2, h: 2, maxLevels: 1,   // the forcefield emitter: 120 buildings and the Data Spire, then a 1 in 25 chance with each build; more can be placed from the menu (their fields join)
+           colour: '#7ab8ff', build: buildEmitterCore, fx: emitterFx },
   club: { name: 'Neon Dome', need: { highPlots: 30, midPlots: 30, lowPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives once there are 30 each of luxury, commercial and residential buildings
            colour: '#c070ff', build: buildNeonDome, fx: clubFx },
 };
@@ -79,7 +81,7 @@ function maybeSpawnMegas(c){
 }
 // can a w x h block go at (i, j)? Every plot free ground or open sky, inside the world, touching the platform
 // how far some megastructures hang out past their block (measured), so a highway beside one keeps its distance
-const MEGA_OVER = { wirenest: .3, logistics: .3, square: .4, police: .8, foundry: .3, pagoda: 1.0, greenhouse: .35, spire: .35 };
+const MEGA_OVER = { emitter: .2, wirenest: .3, logistics: .3, square: .4, police: .8, foundry: .3, pagoda: 1.0, greenhouse: .35, spire: .35 };
 // would a highway over or beside the block at (i, j) meet it? (kind: what overhang to allow for)
 function megaHwNear(i, j, w, h, kind){
   const over = (MEGA_OVER[kind] || 0) + .05, x0 = i*LOT - LOT/2 - over, x1 = (i + w - 1)*LOT + LOT/2 + over, z0 = j*LOT - LOT/2 - over, z1 = (j + h - 1)*LOT + LOT/2 + over;
@@ -297,7 +299,7 @@ function megaFx(m){
   if (m.carryFx){ const fx = m.carryFx; m.carryFx = null; fx.rebase(m); m.fx = m.keptFx = fx; return; }   // turned: the same live parts, set down in the new layout
   const t = MEGA_TYPES[m.kind]; if (t.fx) m.fx = t.fx(m) || null;
 }
-function updateMegaFx(dt, time){ for (const m of megas.values()) if (m.fx) m.fx.update(dt, time); }
+function updateMegaFx(dt, time){ for (const m of megas.values()) if (m.fx) m.fx.update(dt, time); fieldTick(dt); }
 // The effects' instance buffers (belts, crates, the spire's light) change every frame, but only go up to the graphics card
 // while their megastructure is on screen (none of them casts a shadow, so off screen they show nowhere); a change made off
 // screen waits and goes up the frame it comes into view. megaFxFlush runs once the frame's view is known (main.js).
@@ -2206,6 +2208,199 @@ function wireNestFx(m){
     },
     dispose(){ scene.remove(root); mesh.geometry.dispose(); mesh.material.dispose(); halo.material.dispose(); }
   };
+}
+
+/* ---------- the emitter core ---------- */
+// A forcefield emitter on a 2x2 block, after the reference: an octagonal plinth ringed by eight blocky concrete modules
+// (vents, slit windows, panel joints), radial arms carrying glowing blue conduits in to a ring platform, and on it a
+// glass cylinder full of plasma (live: lightning crawling round inside it, a white-hot heart), held under a heavy crown
+// ring of segmented blocks on pillars, studded with blue light nodes that pulse with the field. A crystal stands at the
+// way in. The field it throws up is drawn apart from it (see FIELD below).
+M.ecConc = toon(0x8c9196); M.ecConc2 = toon(0x7a8085); M.ecConc3 = toon(0x666c72); M.ecDark = toon(0x40464e); M.ecJoint = toon(0x4c5258);
+M.ecConduit = toon(0x1a2a60, { em: 0x6a9aff, kind: 'neon' }); M.ecNode = toon(0x203a70, { em: 0x9ad0ff, kind: 'neon' }); M.ecCrystal = toon(0x2a4a80, { em: 0xa8e0ff, kind: 'neon' });
+M.ecGlass = new THREE.MeshBasicMaterial({ color: 0xb8e0ff, transparent: true, opacity: .12, depthWrite: false }); M.ecGlass.userData.colorOnly = true;
+function ecModule(P, a, r, w, d, h){   // a concrete module out on the ring, facing the middle (F: its local +z faces out)
+  const F = under(P, T(Math.sin(a)*r, 0, Math.cos(a)*r, a));
+  box(M.ecConc, F, 0, CURB + .3 + h/2, 0, w, h, d);
+  box(M.ecConc2, F, 0, CURB + .3 + h + .06, -.05, w + .1, .12, d + .05);                       // a heavy cap
+  box(M.ecConc2, F, 0, CURB + .3 + h*.35, d/2 + .08, w*.7, h*.5, .16);                         // a stepped buttress on the outer face
+  for (const s of [-1, 1]) box(M.ecJoint, F, s*w*.18, CURB + .3 + h/2, d/2 + .005, .02, h - .1, .02);
+  for (let k = 0; k < 3; k++) box(M.ecConc3, F, 0, CURB + .45 + k*.14, d/2 + .17, w*.55, .05, .04, 0, -.5);   // louvres
+  box(M.wnSlit, F, (chance(.5) ? -1 : 1)*w*.3, CURB + .3 + h*.78, d/2 + .01, w*.22, .14, .02);
+  for (const s of [-1, 1]){ const Fs = under(F, T(s*w/2, 0, 0, s*PI/2)); box(M.ecJoint, Fs, 0, CURB + .3 + h*.6, .005, d - .1, .02, .02); box(M.wnSlit, Fs, rnd(-.2, .2), CURB + .3 + h*.4, .01, .25, .1, .02); }
+  if (chance(.5)) for (let k = 0; k < 2; k++) cyl(M.ecDark, F, -w/2 + .2 + k*.25, CURB + .3 + h + .25, -.1, .07, .3);   // vent stacks
+  return F;
+}
+function buildEmitterCore(m){
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
+  const S_ = m.w*LOT, P = T(m.x, 0, m.z, megaAngle(m, pick([0, PI/2, PI, -PI/2])));
+  // the ground and the octagonal plinth, with a railing round its edge
+  box(G.asph, P, 0, .012, 0, S_, .025, S_);
+  const n = 10, st = S_/n; for (let a=0;a<n;a++) for (let b=0;b<n;b++) if (!chance(.05)) box(pick(TILES.ind), P, (a-(n-1)/2)*st, .03, (b-(n-1)/2)*st, st - .05, .045, st - .05);
+  put(U.cyl8 || U.cyl, M.ecConc3, under(P, T(0, CURB + .15, 0, PI/8, 6.9, .3, 6.9)));
+  put(U.cyl8 || U.cyl, M.ecConc2, under(P, T(0, CURB + .32, 0, PI/8, 6.3, .06, 6.3)));
+  for (let k = 0; k < 8; k++){ const a0 = k*PI/4 + PI/8, a1 = a0 + PI/4, r = 3.32; strut(M.metal, P, Math.sin(a0)*r, CURB + .7, Math.cos(a0)*r, Math.sin(a1)*r, CURB + .7, Math.cos(a1)*r, .03); cyl(M.metal, P, Math.sin(a0)*r, CURB + .5, Math.cos(a0)*r, .02, .4); }
+  // the ring of eight modules, big and small in turn; the arms from each in to the ring platform, two conduits on each
+  const ringR = 1.55, ringY = CURB + .35;
+  for (let k = 0; k < 8; k++){ const a = k*PI/4, big = k % 2 === 0;
+    ecModule(P, a, big ? 2.75 : 2.85, big ? 1.35 : 1.0, big ? 1.0 : .8, big ? 1.75 : 1.2);
+    const A = under(P, T(0, 0, 0, a)), r0 = ringR + .2, r1 = big ? 2.2 : 2.4, y = CURB + (big ? 1.15 : .85);
+    box(M.ecConc2, A, 0, y - .12, (r0 + r1)/2, .5, .18, r1 - r0);                                 // the arm
+    for (const s of [-1, 1]) put(U.cyl16, M.ecConduit, under(A, T(s*.13, y + .05, (r0 + r1)/2, 0, .12, r1 - r0, .12, PI/2)));   // conduits
+    box(M.ecConc, A, 0, y, r1 - .05, .6, .4, .28); box(M.ecConc, A, 0, y, r0 + .15, .55, .36, .26);   // couplings at each end
+    glow(A, 0, y + .05, (r0 + r1)/2, 'blue', .7); }
+  // pipes running low round the outside, between the modules
+  for (let k = 0; k < 8; k++){ const a0 = k*PI/4 + .25, a1 = a0 + PI/4 - .5, r = 3.15; strut(M.metalDark, P, Math.sin(a0)*r, CURB + .45, Math.cos(a0)*r, Math.sin(a1)*r, CURB + .45, Math.cos(a1)*r, .09); strut(M.ecConduit, P, Math.sin(a0)*r, CURB + .6, Math.cos(a0)*r, Math.sin(a1)*r, CURB + .6, Math.cos(a1)*r, .05); }
+  // the ring platform: twelve curved segments, a gap between each
+  for (let k = 0; k < 12; k++){ const a = k*TAU/12, F = under(P, T(0, 0, 0, a)); box(M.ecConc, F, 0, ringY + .25, ringR, .78, .5, .55); box(M.ecConc2, F, 0, ringY + .52, ringR, .7, .06, .5); if (k % 3 === 0) box(M.ecNode, F, 0, ringY + .3, ringR + .28, .14, .14, .02); }
+  // the glass cylinder, its frame, and the glyph circle on the floor inside
+  const g0 = ringY + .55, gh = 2.5, gr = 1.0;
+  put(U.cyl16, M.ecDark, under(P, T(0, g0 - .02, 0, 0, 2*gr + .2, .08, 2*gr + .2)));
+  put(U.cyl16, M.ecGlass, under(P, T(0, g0 + gh/2, 0, 0, 2*gr, gh, 2*gr)));
+  for (let k = 0; k < 6; k++){ const a = k*TAU/6; box(M.frame, P, Math.sin(a)*gr, g0 + gh/2, Math.cos(a)*gr, .07, gh, .07); }
+  for (const y of [g0 + .05, g0 + gh - .05]) for (let k = 0; k < 12; k++){ const a0 = k*TAU/12, a1 = a0 + TAU/12; strut(M.frame, P, Math.sin(a0)*gr, y, Math.cos(a0)*gr, Math.sin(a1)*gr, y, Math.cos(a1)*gr, .07); }
+  for (let k = 0; k < 16; k++){ const a0 = k*TAU/16, a1 = a0 + TAU/16; strut(M.ecConduit, P, Math.sin(a0)*.7, g0 + .03, Math.cos(a0)*.7, Math.sin(a1)*.7, g0 + .03, Math.cos(a1)*.7, .03); }
+  // the crown: pillars up from the ring platform, then a heavy ring of segmented blocks with light nodes on top
+  const c0 = g0 + gh + .1, cR = 1.6;
+  for (let k = 0; k < 4; k++){ const a = k*PI/2 + PI/4; box(M.ecConc2, P, Math.sin(a)*1.25, (ringY + .5 + c0)/2, Math.cos(a)*1.25, .28, c0 - ringY - .5, .28); }
+  const nodes = [];
+  for (let k = 0; k < 10; k++){ const a = k*TAU/10, F = under(P, T(0, 0, 0, a));
+    box(M.ecConc, F, 0, c0 + .25, cR, .95, .5, .6); box(M.ecConc2, F, 0, c0 + .25, cR + .33, .7, .32, .1); box(M.ecConc3, F, 0, c0 + .52, cR - .05, .85, .06, .5);
+    box(M.ecJoint, F, .46, c0 + .25, cR, .03, .5, .62);
+    box(M.ecConc, F, 0, c0 + .15, cR - .55, .5, .3, .3);   // the inner ring
+    if (k % 2 === 0){ box(M.ecNode, F, 0, c0 + .62, cR, .16, .14, .16); nodes.push(new THREE.Vector3(0, c0 + .65, cR).applyMatrix4(under(P, T(0, 0, 0, a)))); glow(F, 0, c0 + .65, cR, 'blue', .9); }
+    else box(M.ecConduit, F, 0, c0 + .5, cR + .39, .5, .05, .02); }
+  for (let k = 0; k < 8; k++){ const a = k*TAU/8, F = under(P, T(0, 0, 0, a)); strut(M.ecConduit, F, 0, c0 + .35, .15, 0, c0 + .35, cR - .7, .04); }   // spokes in to the hub
+  put(U.cyl16, M.ecConc3, under(P, T(0, c0 + .35, 0, 0, .5, .3, .5))); box(M.ecNode, P, 0, c0 + .55, 0, .12, .12, .12); glow(P, 0, c0 + .6, 0, 'arc', 1.2);
+  // the way in: a gate module out front, a crystal on a plinth before it
+  { const F = under(P, T(0, 0, 3.1, 0)); box(M.ecDark, F, 0, CURB + .7, .32, .6, .8, .05); box(M.wnSlit, F, 0, CURB + .65, .345, .45, .65, .02);
+    box(M.ecConc3, F, 0, CURB + .45, .9, .4, .3, .4); put(U.ico || U.sph, M.ecCrystal, under(F, T(0, CURB + .95, .9, .4, .22, .5, .22))); glow(F, 0, CURB + .95, .95, 'blue', 1.0); }
+  m.ec = { m: P.toArray(), g0, gh, gr, nodes: nodes.map(v => v.toArray()) };
+  m.solid = { m: P.toArray(), x0: -3.6, x1: 3.6, z0: -3.6, z1: 3.6, y1: c0 + 1 };
+  m.roofH = CURB + .4;
+  m.top = c0 + 1;
+}
+// The plasma: lightning crawling round inside the glass (a cylinder of light, filaments wound by noise, violet to white),
+// a white-hot heart that flickers, and the crown's nodes breathing with the field.
+const EC_PLASMA = new THREE.ShaderMaterial({
+  uniforms: { time: FOL_UNI.time },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
+  fragmentShader: `uniform float time; varying vec2 vUv;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
+    float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
+    void main(){
+      float t = time, a = vUv.x*6.2832, y = vUv.y;
+      vec3 c = vec3(0.0);
+      for (int k = 0; k < 3; k++){ float fk = float(k);
+        float w = n(vec2(vUv.x*5.0 + fk*3.7, y*3.0 - t*(1.2 + fk*.4))) + .5*n(vec2(vUv.x*11.0 - fk, y*7.0 + t*2.3));
+        float d = abs(sin(a*(2.0 + fk) + w*5.0 + t*(1.5 + fk*.7) + y*4.0));
+        float line = pow(max(0.0, 1.0 - d), 5.0 + fk*3.0);   // (thick enough to show at the render's pixel size)
+        c += mix(vec3(.55, .4, 1.0), vec3(.45, .85, 1.0), fk*.5)*line*(1.2 - fk*.25); }
+      float flick = .75 + .25*step(.5, h(vec2(floor(t*14.0), 3.0)));
+      c *= flick; c += vec3(.35, .3, .85)*(.25 + .15*sin(t*1.6));
+      c *= smoothstep(0.0, .12, y)*smoothstep(1.0, .85, y);
+      gl_FragColor = vec4(c, 1.0); }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+});
+EC_PLASMA.userData.colorOnly = true;
+function emitterFx(m){
+  const d = m.ec; if (!d) return null;
+  const root = new THREE.Group(); root.matrixAutoUpdate = false; root.matrix.fromArray(d.m); root.matrixWorldNeedsUpdate = true; scene.add(root);
+  const geo = new THREE.CylinderGeometry(d.gr*.9, d.gr*.9, d.gh*.94, 32, 1, true), geo2 = new THREE.CylinderGeometry(d.gr*.55, d.gr*.55, d.gh*.9, 24, 1, true);
+  const pl = new THREE.Mesh(geo, EC_PLASMA), pl2 = new THREE.Mesh(geo2, EC_PLASMA); for (const q of [pl, pl2]){ q.position.set(0, d.g0 + d.gh/2, 0); q.frustumCulled = false; q.raycast = () => {}; root.add(q); }
+  pl2.rotation.y = 1.3; pl2.scale.y = -1;
+  const heart = new THREE.Sprite(GLOW.arc.clone()); heart.position.set(0, d.g0 + d.gh*.5, 0); heart.scale.set(1.6, 1.6, 1); heart.layers.set(1); root.add(heart);
+  const aura = new THREE.Sprite(GLOW.platinum.clone()); aura.position.copy(heart.position); aura.scale.set(3.4, 3.4, 1); aura.layers.set(1); root.add(aura);
+  const inv = new THREE.Matrix4().fromArray(d.m).invert(), halos = d.nodes.map(p => { const sp = new THREE.Sprite(GLOW.blue.clone()); sp.position.fromArray(p).applyMatrix4(inv); sp.scale.set(.9, .9, 1); sp.layers.set(1); root.add(sp); return sp; });
+  return {
+    update(dt, t){
+      const fl = .7 + .3*Math.sin(t*23.0)*Math.sin(t*7.1), pulse = fieldPulse(t);
+      heart.material.opacity = .7 + .3*fl; heart.scale.setScalar(1.3 + .4*fl); aura.material.opacity = .25 + .35*pulse;
+      halos.forEach((h, k) => { h.material.opacity = .35 + .65*pulse*(.8 + .2*Math.sin(t*3 + k)); });
+    },
+    dispose(){ scene.remove(root); geo.dispose(); geo2.dispose(); heart.material.dispose(); aura.material.dispose(); for (const h of halos) h.material.dispose(); }
+  };
+}
+
+/* ---------- the force field ---------- */
+// Each emitter core raises a field over the 10 x 10 plots round it. Cores whose fields come within a plot of each other
+// (the gap between their squares, on both axes, one plot at most; overlapping counts) join into one, and a joined field
+// covers as many plots as all of its cores together: two cores twice the ground, three three times. When a field's
+// ground is enough for the whole city (the box round all its plots), it wraps the whole city instead. A field is a
+// dome on a rounded square, a geodesic lattice of light with a brighter rim and base, breathing, a soft band of light
+// climbing it now and then; always high enough to clear what stands under it.
+const FIELD = { key: '', domes: [], at: 0 }, FIELD_N = 10;
+const fieldPulse = t => .5 + .5*Math.sin(t*1.6);   // (the field's breath; the cores' nodes keep time with it)
+function fieldPlan(){
+  const ems = megasOfKind('emitter'); if (!ems.length) return [];
+  const cs = ems.map(m => ({ m, ci: m.i + (m.w - 1)/2, cj: m.j + (m.h - 1)/2 })), par = cs.map((_, k) => k);
+  const root = k => par[k] === k ? k : (par[k] = root(par[k]));
+  for (let a = 0; a < cs.length; a++) for (let b = a + 1; b < cs.length; b++)
+    if (Math.abs(cs[a].ci - cs[b].ci) - FIELD_N <= 1 && Math.abs(cs[a].cj - cs[b].cj) - FIELD_N <= 1) par[root(a)] = root(b);
+  const groups = new Map(); cs.forEach((c, k) => { const r = root(k); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(c); });
+  let i0 = 1e9, i1 = -1e9, j0 = 1e9, j1 = -1e9; for (const c of cells.values()){ i0 = Math.min(i0, c.i); i1 = Math.max(i1, c.i); j0 = Math.min(j0, c.j); j1 = Math.max(j1, c.j); }
+  const cityArea = (i1 - i0 + 1)*(j1 - j0 + 1), out = [];
+  for (const g of groups.values()){
+    const cap = FIELD_N*FIELD_N*g.length;
+    if (cap >= cityArea){ out.push({ city: true, i0: i0 - .5, i1: i1 + .5, j0: j0 - .5, j1: j1 + .5, n: g.length }); continue; }
+    let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; for (const c of g){ a0 = Math.min(a0, c.ci - FIELD_N/2); a1 = Math.max(a1, c.ci + FIELD_N/2); b0 = Math.min(b0, c.cj - FIELD_N/2); b1 = Math.max(b1, c.cj + FIELD_N/2); }
+    // (exactly its share of ground: a rectangle round the group's middle, shaped like the spread of its cores, every core inside it)
+    const k = Math.sqrt(cap/((a1 - a0)*(b1 - b0))), mi = (a0 + a1)/2, mj = (b0 + b1)/2;
+    let hi = (a1 - a0)/2*k, hj = (b1 - b0)/2*k; for (const c of g){ hi = Math.max(hi, Math.abs(c.ci - mi) + 1.5); hj = Math.max(hj, Math.abs(c.cj - mj) + 1.5); }
+    out.push({ city: false, i0: mi - hi, i1: mi + hi, j0: mj - hj, j1: mj + hj, n: g.length });
+  }
+  const whole = out.find(f => f.city); return whole ? [whole] : out;   // (one that wraps the city takes in the rest)
+}
+const FIELD_UNI = { time: FOL_UNI.time };
+const FIELD_GEO = new THREE.SphereGeometry(1, 96, 32, 0, TAU, 0, PI/2);
+function fieldMat(hw, H, hd, seg){
+  const m = new THREE.ShaderMaterial({
+    uniforms: { time: FIELD_UNI.time, uSize: { value: new THREE.Vector3(hw, H, hd) }, uSeg: { value: seg } },
+    vertexShader: `uniform vec3 uSize; varying vec3 vW; varying vec3 vNo; varying float vEl; varying float vAz;
+      void main(){
+        vec3 p = position; float a = atan(p.z, p.x), c = abs(cos(a)), s = abs(sin(a)), k = pow(pow(c, 4.0) + pow(s, 4.0), -.25);   // the rounded square
+        vec3 q = vec3(p.x*k*uSize.x, p.y*uSize.y, p.z*k*uSize.z);
+        vEl = asin(clamp(p.y, 0.0, 1.0))/1.5708; vAz = a/6.2832 + .5;
+        vNo = normalize(vec3(p.x/uSize.x, p.y/uSize.y, p.z/uSize.z));
+        vec4 w = modelMatrix*vec4(q, 1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
+    fragmentShader: `uniform float time, uSeg; varying vec3 vW; varying vec3 vNo; varying float vEl; varying float vAz;
+      float ln(float x, float w){ float f = abs(fract(x) - .5); return 1.0 - smoothstep(.5 - w*1.6, .5 - w*.6, f); }   // a line at every whole number, w wide in its own units
+      void main(){
+        float u = vAz*uSeg, v = vEl*uSeg*.32;
+        float w = .035;
+        float L = max(ln(v, w), max(ln(u + v*.5, w), ln(u - v*.5, w)));                 // a triangular lattice: geodesic
+        float node = ln(v, w*2.2)*ln(u + v*.5, w*2.2);
+        vec3 V = normalize(cameraPosition - vW); float fres = pow(1.0 - abs(dot(normalize(vNo), V)), 2.2);
+        float breath = .78 + .22*(.5 + .5*sin(time*1.6));
+        float climb = exp(-pow((vEl - fract(time*.12))*9.0, 2.0));                     // a band of light climbing it
+        float base = exp(-vEl*28.0);
+        vec3 col = mix(vec3(.42, .72, 1.0), vec3(.62, .52, 1.0), vEl*.7);
+        float a = .004 + L*.13*(1.0 - vEl*.35) + node*.2 + fres*fres*.1 + climb*(.012 + L*.16) + base*.3;   // (faint: seen through from inside, it mustn't wash the city)
+        a *= breath*(gl_FrontFacing ? 1.0 : .45);
+        gl_FragColor = vec4(col*a, 1.0); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  });
+  m.userData.colorOnly = true; m.userData.noCast = true; return m;
+}
+function fieldBuild(plan){
+  for (const d of FIELD.domes){ scene.remove(d); d.material.dispose(); } FIELD.domes = [];
+  for (const f of plan){
+    const x0 = f.i0*LOT, x1 = f.i1*LOT, z0 = f.j0*LOT, z1 = f.j1*LOT, hw = (x1 - x0)/2 + LOT*.3, hd = (z1 - z0)/2 + LOT*.3;
+    let top = 0; for (const c of cells.values()) if (c.i >= f.i0 && c.i <= f.i1 && c.j >= f.j0 && c.j <= f.j1) top = Math.max(top, c.height || 0, c.topY || 0);
+    for (const m of megas.values()) if (m.x >= x0 && m.x <= x1 && m.z >= z0 && m.z <= z1) top = Math.max(top, m.top || 0);
+    const H = Math.min(Math.max(hw, hd)*1.1, Math.max(Math.min(hw, hd)*.55, top*1.18 + 3));   // (over the tallest thing in it, and roughly round)
+    const seg = Math.max(10, Math.round((hw + hd)*2/(LOT*1.5)));   // (the lattice's cells about a plot and a half across: finer ones blur at the render's size)
+    const mesh = new THREE.Mesh(FIELD_GEO, fieldMat(hw, H, hd, seg)); mesh.position.set((x0 + x1)/2, -.4, (z0 + z1)/2);
+    mesh.frustumCulled = false; mesh.renderOrder = 20; mesh.raycast = () => {}; mesh.userData.field = f; scene.add(mesh); FIELD.domes.push(mesh);
+  }
+}
+// checked every second: rebuilt when the cores or the city's bounds have changed
+function fieldTick(dt){
+  FIELD.at -= dt; if (FIELD.at > 0) return; FIELD.at = 1;
+  const ems = megasOfKind('emitter'); let key = ems.map(m => m.id + '@' + m.i + ',' + m.j).sort().join('|');
+  if (ems.length){ let i0 = 1e9, i1 = -1e9, j0 = 1e9, j1 = -1e9, top = 0; for (const c of cells.values()){ i0 = Math.min(i0, c.i); i1 = Math.max(i1, c.i); j0 = Math.min(j0, c.j); j1 = Math.max(j1, c.j); top = Math.max(top, c.height || 0); }
+    key += '#' + [i0, i1, j0, j1, Math.round(top)].join(','); }
+  if (key === FIELD.key) return; FIELD.key = key; fieldBuild(fieldPlan());
 }
 
 /* ---------- the geothermal bathhouse ---------- */

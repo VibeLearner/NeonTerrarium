@@ -146,7 +146,7 @@ const STORY = (() => {
   // home or workplace once a line has stated it ("her home", "his workplace"), someone else's once their name and that fact are known ("Mika's
   // building"), a landmark by its name (the signs say so), and otherwise just "a building". Open places by what they are.
   const MEGA_NAME = { square: 'the town square', mall: 'the sky mall', market: 'the market plaza', foundry: 'the foundry', logistics: 'the logistics hub', club: 'the Neon Dome',
-    radio: 'the radio station', police: 'the police station', pagoda: 'the Cloud Pagoda', greenhouse: 'the hydroponic farm', bathhouse: 'the bathhouse', spire: 'the Data Spire', wirenest: 'the Wire Nest' };
+    radio: 'the radio station', police: 'the police station', pagoda: 'the Cloud Pagoda', greenhouse: 'the hydroponic farm', bathhouse: 'the bathhouse', spire: 'the Data Spire', wirenest: 'the Wire Nest', emitter: 'the Emitter Core' };
   const ASSOC = { rev: -1, m: new Map() };   // place id -> [{ who, kind: 'home' | 'work' }], from the notebook's stated facts
   function assocOf(pid){
     if (ASSOC.rev !== ST.rev){ ASSOC.rev = ST.rev; ASSOC.m.clear();

@@ -2026,7 +2026,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   document.getElementById('zoneRes') && document.getElementById('zoneRes').addEventListener('click', () => setKind(resActive() ? PL.kind : 'zone'));   // (always the brush: Q/E size it, smallest is one home)
   document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode === 'zone')));
   // a ring round (x, z): on the ground, or at height y
-  function ringAt(x, z, r, y = null, w = .14){ const a = ringGeo.attributes.position.array;
+  function ringAt(x, z, r, y = null, w = .14){ ringM.depthTest = true; const a = ringGeo.attributes.position.array;
     for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s_ = Math.sin(t);
       for (const [j, rr] of [[0, r], [1, r + w]]){ const px = x + c*rr, pz = z + s_*rr, o = (i*2 + j)*3; a[o] = px; a[o + 1] = (y === null ? heightAt(px, pz) : y) + .07; a[o + 2] = pz; } }
     ringGeo.attributes.position.needsUpdate = true; ring.visible = true; }
@@ -2055,9 +2055,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const hov = PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, P = hov ? hov.piece : null, tn = LINK_TYPES[CN.type];
     const say = (t, ok) => { if (status){ status.textContent = 'walkways: ' + tn + ' (V next) ' + t; status.style.color = ok ? '#5c7060' : '#c0623f'; } };
     if (!CN.a){ connGhost.visible = false; outline.visible = false; CN.ok = false;
-      if (P){ ringAt(P.x, P.z, KINDS[P.kind].rb + .35, P.level ? P.y : null); ringM.color.set(0x7dffb0); } else ring.visible = false;
+      const lk = PL.ptr ? linkAt(PL.ptr.x, PL.ptr.y) : null;
+      if (lk){ ring.visible = false; hlLink(lk, hlDel); say('· right click takes away this walkway', false); return; }
+      if (P){ ringAt(P.x, P.z, KINDS[P.kind].rb + .35, P.level ? P.y : null); ringM.color.set(0x7dffb0); hlPiece(P, hlSel, false); } else ring.visible = false;
       say(P ? '· click to pick this one' : '· pick the first block', !!P); return; }
     const A = CN.a; ringAt(A.x, A.z, KINDS[A.kind].rb + .35, A.level ? A.y : null); ringM.color.set(0xffd27a);
+    hlPiece(A, hlSel, false); if (P && P !== A) hlPiece(P, hlSel, false);
     if (!P || P === A){ connGhost.visible = false; CN.ok = false; const h = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null;
       if (h) drawOutline(A, h.x, h.z, A.level ? A.y : heightAt(h.x, h.z) + .12, false); else outline.visible = false;
       say('· now pick the second block', false); return; }
@@ -2074,6 +2077,29 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (!P || P === CN.a || !CN.ok) return;
     const a = CN.a.id, b = P.id; NOLINK.delete(pairId(a, b)); ULINKS = ULINKS.filter(u => !((u.a === a && u.b === b) || (u.a === b && u.b === a))); ULINKS.push({ a, b, type: LINK_TYPES[CN.type] });
     saveLinks(); linksDirty = true; CN.a = null; CN.key = ''; connGhost.visible = false; outline.visible = false; }
+  // What a click is about to act on, shown as a tint laid over it: terracotta for what a right click would take away, a soft
+  // green for what a click would pick. Drawn over the real thing (same shapes, pushed a hair toward the eye).
+  const hlDel = new THREE.MeshBasicMaterial({ color: 0xe0583c, transparent: true, opacity: .45, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8 });
+  const hlSel = hlDel.clone(); hlSel.color.set(0x7fe0a0); hlSel.opacity = .35;
+  const hlGroup = new THREE.Group(); hlGroup.renderOrder = 8; scene.add(hlGroup);
+  const _I4 = new THREE.Matrix4(), hlDisc = new THREE.CircleGeometry(.9, 24).rotateX(-PI/2), hlDisk = new THREE.MeshBasicMaterial({ color: 0xe0583c, transparent: true, opacity: .28, depthTest: false, depthWrite: false });
+  function hlClear(){ while (hlGroup.children.length) hlGroup.remove(hlGroup.children[0]); }
+  function hlAdd(geo, M, mat){ const m = new THREE.Mesh(geo, mat); m.matrixAutoUpdate = false; m.matrix.copy(M); m.matrixWorld.copy(M); m.frustumCulled = false; m.renderOrder = 8; m.raycast = () => {}; hlGroup.add(m); }
+  function hlPiece(p, mat, all = true){ const seen = new Set(), go = q => { if (!q || seen.has(q)) return; seen.add(q); if (q.mesh) hlAdd(q.mesh.geometry, q.mesh.matrixWorld, mat);
+      if (all){ go(q.up); for (const r of PIECES) if (r.host === q) go(r); } }; go(p); }   // (a home and all that goes with it: what's stacked on it and built off it)
+  function hlLink(lk, mat){ for (const v of LCACHE.values()) if (v.used && v.geo && pairId(v.a, v.b) === pairId(lk[0], lk[1])){ hlAdd(v.geo, _I4, mat); if (v.fol) hlAdd(v.fol, _I4, mat); } }
+  const grassNear = (x, z, r) => { for (let i = Math.floor((x - r)/GC); i <= Math.ceil((x + r)/GC); i++) for (let j = Math.floor((z - r)/GC); j <= Math.ceil((z + r)/GC); j++) if (tufts.has(i + ',' + j)) return true; return false; };
+  function showRemoveHover(){
+    ghost.visible = false; zHide(); connGhost.visible = false; ring.visible = false;
+    const say = t => { if (status){ status.textContent = t; status.style.color = '#c0623f'; } };
+    if (!PL.ptr){ if (status) status.textContent = ''; return; }
+    const { x, y } = PL.ptr, lk = linkAt(x, y);
+    if (lk){ hlLink(lk, hlDel); say('Right click to take away this walkway'); return; }
+    const p = pieceAt(x, y); if (p){ hlPiece(p, hlDel); say(p.up || PIECES.some(r => r.host === p) ? 'Right click to take away this home and what\'s built on it' : 'Right click to take away this home'); return; }
+    const h = pick(x, y);
+    if (h && !h.sea && grassNear(h.x, h.z, .9)){ ringAt(h.x, h.z, .9, null, .12); ringM.color.set(0xe0583c); ringM.depthTest = false;   // (over the blades, so it shows)
+      const d = new THREE.Mesh(hlDisc, hlDisk); d.position.set(h.x, heightAt(h.x, h.z) + .08, h.z); d.updateMatrix(); hlAdd(hlDisc, d.matrix, hlDisk); say('Right click to clear the grass here'); return; }
+    if (status) status.textContent = ''; }
   // the walkway under the pointer, if it's nearer than any block there: [a id, b id]
   function linkAt(cx, cy){
     if (!linksMesh) return null; const r = canvas.getBoundingClientRect(); _ndc.set((cx - r.left)/r.width*2 - 1, 1 - (cy - r.top)/r.height*2);
@@ -2130,7 +2156,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true;
     if (act.moved){ yawT -= dx*.008; if (tiltMode) pitchT = clamp(pitchT + dy*.006, PITCH_MIN, PITCH_MAX); canvas.style.cursor = 'grabbing'; }
   });
-  canvas.addEventListener('pointerleave', () => { PL.ptr = null; });
+  canvas.addEventListener('pointerleave', () => { PL.ptr = null; hlClear(); });
   const endPtr = e => {
     if (act && act.kind === 'turn' && !act.moved && ptrs.has(e.pointerId)){
       if ((act.b === 0 || e.pointerType === 'touch') && PL.kind){ PL.ptr = { x: e.clientX, y: e.clientY };
@@ -2203,7 +2229,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if ((reflFrame++ & 1) && !TOFF.fix) return;
     reflCam.projectionMatrix.copy(cam.projectionMatrix); reflCam.projectionMatrixInverse.copy(cam.projectionMatrixInverse);
     reflCam.matrix.multiplyMatrices(MIRROR, cam.matrixWorld); reflCam.updateMatrixWorld(true);
-    const hide = [sea, spray, ghost, ring, connGhost, outline, ...zGhosts, ...BLOOMS];
+    const hide = [sea, spray, ghost, ring, connGhost, outline, hlGroup, ...zGhosts, ...BLOOMS];
     for (const m of gSquares.values()) hide.push(m);
     if (poolMesh) hide.push(poolMesh);
     if (linksMesh) hide.push(...linksMesh.children);
@@ -2236,9 +2262,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function frame(now){
     const dt = Math.min(.1, (now - last)/1000); last = now; fNo++; let q = PROF.on ? performance.now() : 0;
     updateCamera(dt); q = tk('camera', q); stream(3); q = tk('stream', q);
-    { const gk = PL.kind ? [PL.kind, PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkind, PL.rot, GR.size, GR.style, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|') : '';
+    { const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkind, PL.rot, GR.size, GR.style, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
       if (gk !== ghostKey){ ghostKey = gk;   // (the ghost is worked out again only when something it shows has changed: the raycasts and checks are the costly part)
-        if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'grass') showGrass(); else if (PL.kind === 'zone' && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); } }
+        hlClear();
+        if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'grass') showGrass(); else if (PL.kind === 'zone' && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } }
     q = tk('ghost', q);
     animTick(dt); const batched = batchTick();
     if (linksDirty && !ANIM.list.length && !batched) buildLinks();   // (not in the same frame as a batch: the two together made a hitch)

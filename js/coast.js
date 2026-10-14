@@ -145,7 +145,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const GLOW_F = 'varying float vGlow;\n';
   const GLOW_APPLY = `if (vGlow > 0.0){ vec3 amber = vec3(1.0, 0.5, 0.2), lampY = vec3(1.0, 0.87, 0.47);
       float lamp = step(0.85, vGlow), sh = 0.74 + 0.26*abs(normalize(vNormal).x);
-      vec3 gc = lamp > 0.5 ? lampY*1.04 : vGlow > 0.6 ? lampY*0.95*sh : mix(amber, vColor*vec3(0.9, 0.75, 0.45), 0.18)*sh;   // (.7: a tower's glass rooms, lit like windows)   // (windows and lamps: warm yellow; the glass up top: orange, still shaded by its facets)
+      vec3 gc = lamp > 0.5 ? lampY*1.04 : vGlow > 0.2 && vGlow < 0.3 ? vColor*1.25 : vGlow > 0.6 ? lampY*0.95*sh : mix(amber, vColor*vec3(0.9, 0.75, 0.45), 0.18)*sh;   // (.7: a tower's glass rooms, lit like windows)   // (windows and lamps: warm yellow; the glass up top: orange, still shaded by its facets; .25: lit in its own color, for neon, lit water, screens, red lanterns)
       gl_FragColor.rgb = mix(gl_FragColor.rgb, gc, nightK*(lamp > 0.5 ? 1.0 : 0.85)); }`;
   // a new home painted in, in watercolor: the wash rises up it from the ground with a ragged, bleeding edge (darker where the
   // pigment pools at the wash's rim), pale and watery behind the edge, then the color deepens to full as it dries
@@ -988,12 +988,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     red: C(0xb84a3c), redD: C(0x8a3329), jade: C(0x3a8a76), jade2: C(0x276556), lattice: C(0x5a2a22),   // (the pagoda house: lacquer red, jade tiles)
     rust: C(0xc4703e), rust2: C(0x9e5530), solar: C(0x2b4877), solarL: C(0x6f8fbf), tank: C(0xb9b7ad),
     apricot: C(0xe8a578), butter: C(0xe9c877), mist: C(0x98c6bb), sage: C(0xadc493), rose: C(0xd99788), blushD: C(0xe2ad99),
-    neonG: C(0x8dffc6).multiplyScalar(1.1), neonP: C(0xff86b4).multiplyScalar(1.1), pool: C(0x46c2b0).multiplyScalar(1.1), fall: C(0xb8f4e6).multiplyScalar(1.1), lily: C(0x5f9a5a), moss: C(0x7f9e5c), timber: C(0x5a3a2a), lanternR: C(0xe0503a).multiplyScalar(1.1), screen: C(0x7fd0ff).multiplyScalar(1.1) };   // (the grotto: neon trim and signs, the lit pool and its falls)
+    neonG: C(0x8dffc6).multiplyScalar(1.1), neonP: C(0xff86b4).multiplyScalar(1.1), pool: C(0x46c2b0).multiplyScalar(1.1), fall: C(0xb8f4e6).multiplyScalar(1.1), lily: C(0x5f9a5a), moss: C(0x7f9e5c), timber: C(0x5a3a2a), lanternR: C(0xe0503a).multiplyScalar(1.1), screen: C(0x7fd0ff).multiplyScalar(1.1), ringW: C(0xe2fff2).multiplyScalar(1.1) };   // (the grotto: neon trim and signs, the lit pool and its falls)
   // the plaster colors a home can be washed in besides white: soft, chalky, and all from the scene's own colors (the sand,
   // the terracotta, the sea's teal, the meadow's sage), so a street of them reads as one watercolor
   const PLASTER = [HP.blushD, HP.apricot, HP.butter, HP.mist, HP.sage, HP.rose, HP.apricot, HP.mist];   // (the garden terrace: weathered rust, solar glass)
   for (const c of HP.leaf) LEAFC.add(c);
-  GLOW.set(HP.lanternR, 1).set(HP.screen, .9).set(HP.neonG, 1).set(HP.neonP, 1).set(HP.pool, .75).set(HP.fall, .85).set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
+  GLOW.set(HP.ringW, .25).set(HP.lanternR, .25).set(HP.screen, .25).set(HP.neonG, .25).set(HP.neonP, .25).set(HP.pool, .25).set(HP.fall, .25).set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
   Object.assign(GEO, { cyl12: new THREE.CylinderGeometry(1, 1, 1, 12), cyl16: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.IcosahedronGeometry(1, 1),
     dome: new THREE.SphereGeometry(1, 12, 6, 0, PI*2, 0, PI/2), ring: new THREE.CylinderGeometry(1, 1, 1, 16, 1, true),
     frus4: new THREE.CylinderGeometry(.62, 1, 1, 4, 1).rotateY(PI/4), half16: new THREE.CylinderGeometry(1, 1, 1, 16, 1, false, -PI/2, PI), hip4: new THREE.CylinderGeometry(.08, 1, 1, 4, 1).rotateY(PI/4) });   // (square frustums: a roof's flared skirt, and a hipped roof)
@@ -1382,6 +1382,115 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       for (let k = 0, n = D.i(1, 3); k < n; k++){ const th = D.r(-PI, PI), q = D.r(roc + .35, Math.max(roc + .4, ell(th)*shrink[shrink.length - 1] - .2)), [x, z] = at(th, q);
         T.add(GEO.cyl5, mat(x, Htop + .4, z, 0, 0, D.r(-.1, .1), .06, .8, .06), HP.wood); T.add(GEO.ico, mat(x, Htop + .85, z, 0, 0, 0, .5, .3, .5), D.pick(HP.leaf)); }
       return Htop + .1;
+    } },
+    // From the cavern colony (board 20): the ring rotunda, the viaduct arcade, the ring court and the lagoon plaza.
+    // The ring rotunda: a round stone drum with an arched glass door under a canopy, then floors of glass each girdled by a
+    // balcony with a rail and a ring of white neon, plants along the balconies; a shallow glass dome and a roof garden.
+    rotunda: { name: 'Ring rotunda', com: true, r: 1.9, rb: 1.25, build(T, R, D, ctx){
+      const fl = ctx.below ? R.i(1, 2) : R.i(2, 3), fh = .78, rr = R.r(.9, 1.0); let y = ctx.below ? 0 : .12;
+      if (!ctx.below){ T.add(GEO.cyl16, mat(0, .06, 0, 0, 0, 0, 1.5, .12, 1.5), HP.stone);
+        T.add(GEO.cyl16, mat(0, y + .45, 0, 0, 0, 0, rr + .15, .9, rr + .15), HP.cream);
+        for (let k = 0; k < 8; k++){ const a = k/8*PI*2 + PI/8, x = Math.sin(a)*(rr + .16), z = Math.cos(a)*(rr + .16); if (Math.abs(a - PI*2) < .5 || a < .5) continue;
+          T.add(GEO.box, mat(x, y + .45, z, 0, a, 0, .22, .4, .03), D.chance(.7) ? HP.lamp : HP.glassD); T.add(GEO.cyl8, mat(x, y + .65, z, PI/2, a, 0, .11, .03, .11), HP.frame); }
+        box(T, 0, y + .36, rr + .16, .5, .62, .04, HP.glass2); T.add(GEO.cyl8, mat(0, y + .67, rr + .16, PI/2, 0, 0, .25, .045, .25), HP.glass2);   // (the arched door)
+        box(T, 0, y + .9, rr + .4, .9, .04, .55, HP.glassT); for (const sx of [-1, 1]) box(T, sx*.42, y + .45, rr + .62, .03, .9, .03, HP.frame);   // (its glass canopy)
+        y += .9; ringBal(y); }
+      for (let f = 0; f < fl; f++){ const r = rr - f*.04;
+        T.add(GEO.cyl16, mat(0, y + fh/2, 0, 0, 0, 0, r, fh - .02, r), D.chance(.6) ? HP.glass2 : HP.glassT);
+        for (let k = 0; k < 12; k++){ const a = k/12*PI*2; box(T, Math.sin(a)*r, y + fh/2, Math.cos(a)*r, .05, fh, .05, HP.frame); }
+        y += fh; if (f < fl - 1 || ctx.above) ringBal(y); }
+      function ringBal(yb){ T.add(GEO.cyl16, mat(0, yb + .02, 0, 0, 0, 0, rr + .28, .08, rr + .28), HP.cream);
+        for (let k = 0; k < 16; k++){ const a = k/16*PI*2; box(T, Math.sin(a)*(rr + .25), yb + .15, Math.cos(a)*(rr + .25), .025, .22, .025, HP.rail); } T.add(GEO.ring, mat(0, yb + .26, 0, 0, 0, 0, rr + .25, .03, rr + .25), HP.rail); T.add(GEO.ring, mat(0, yb - .03, 0, 0, 0, 0, rr + .3, .03, rr + .3), HP.ringW);
+        for (let k = 0; k < 3; k++) if (D.chance(.7)){ const a = D.r(0, PI*2); plant(T, D, Math.sin(a)*(rr + .14), yb + .06, Math.cos(a)*(rr + .14), .8); }
+        if (D.chance(.5)){ const a = D.r(0, PI*2); T.add(GEO.ico, mat(Math.sin(a)*(rr + .28), yb - .2, Math.cos(a)*(rr + .28), 0, 0, 0, .07, .3, .07), D.pick(HP.leaf)); } }
+      let top;
+      if (!ctx.above){ T.add(GEO.cyl16, mat(0, y + .03, 0, 0, 0, 0, rr + .06, .06, rr + .06), HP.cream); T.add(GEO.dome, mat(0, y + .06, 0, 0, 0, 0, rr*.75, .35, rr*.75), HP.glass2);
+        T.add(GEO.ring, mat(0, y + .03, 0, 0, 0, 0, rr + .09, .03, rr + .09), HP.ringW); T.add(GEO.cyl5, mat(0, y + .5, 0, 0, 0, 0, .025, .3, .025), HP.metal);
+        for (let k = 0; k < 6; k++){ const a = k/6*PI*2 + D.r(-.3, .3); plant(T, D, Math.sin(a)*(rr - .1), y + .06, Math.cos(a)*(rr - .1), 1.0); }
+        top = y + .06; }
+      else { T.add(GEO.cyl16, mat(0, y - .03, 0, 0, 0, 0, rr + .1, .06, rr + .1), HP.cream); top = y; }
+      return top;
+    } },
+    // The viaduct arcade: a run of stone arches carrying a planted walk, a little shop tucked under each arch (lit window,
+    // awning, sign) with a lantern hung from the keystone; on top a rail, planters spilling vines down the face, lamps.
+    viaduct: { name: 'Viaduct arcade', com: true, r: 2.0, rb: 1.4, build(T, R, D, ctx){
+      const n = 3, L = R.r(2.6, 3.0), d = R.r(.85, 1.0), y0 = ctx.below ? 0 : .12, H = y0 + R.r(1.2, 1.4), pw = .24, bw = (L - (n + 1)*pw)/n, ar = bw/2, spr = H - .12 - ar;
+      const AW = [HP.terra, HP.teal, HP.butter, HP.rose, HP.sea], SG = [HP.neonG, HP.neonP, HP.lamp, HP.ringW], stoneC = R.pick([HP.stone, PAL.rock[1], HP.cream]);
+      if (!ctx.below) box(T, 0, .06, .1, L + .5, .12, d + .8, HP.stone);
+      box(T, 0, (y0 + H)/2, -d/2 + .06, L, H - y0, .12, PAL.rock[2]);   // (the back of the bays: the shops' walls)
+      for (let i = 0; i <= n; i++){ const x = -L/2 + pw/2 + i*(bw + pw); box(T, x, (y0 + H)/2, 0, pw, H - y0, d, stoneC); box(T, x, y0 + .06, 0, pw + .06, .12, d + .06, HP.cream); }
+      for (let i = 0; i < n; i++){ const cx = -L/2 + pw + bw/2 + i*(bw + pw);
+        for (let x = -ar; x < ar - .01; x += .12){ const xm = x + .06, ay = spr + Math.sqrt(Math.max(0, ar*ar - xm*xm)); box(T, cx + xm, (ay + H)/2, d/2 - .12, .13, H - ay + .02, .24, stoneC); }
+        box(T, cx, spr - .02, d/2 - .06, bw + .02, .04, .14, HP.cream);   // (the springing line)
+        const wy = y0 + .45, sz = -d/2 + .14; box(T, cx, wy, sz, bw*.75, .5, .04, D.chance(.85) ? HP.lamp : HP.glassD); box(T, cx, wy, sz - .01, bw*.82, .56, .02, HP.frame);
+        box(T, cx, wy + .32, sz + .12, bw*.85, .04, .24, D.pick(AW)); box(T, cx, wy + .44, sz + .02, bw*.5, .08, .03, D.pick(SG));
+        box(T, cx, spr + ar - .25, d/2 - .2, .02, .2, .02, HP.rail); box(T, cx, spr + ar - .38, d/2 - .2, .12, .14, .12, D.pick([HP.lamp, HP.lanternR]));
+        if (!ctx.below && D.chance(.7)) pot(T, D, cx + D.r(-bw*.3, bw*.3), y0, d/2 + .15, .8); }
+      box(T, 0, H + .07, 0, L + .12, .14, d + .2, HP.cream);
+      const top = H + .14;
+      for (let j = 0; j < 6; j++) if (D.chance(.65)) T.add(GEO.ico, mat(-L/2 + .2 + j*(L - .4)/5 + D.r(-.1, .1), H - .12, d/2 + .1, 0, 0, 0, .07, D.r(.24, .36), .07), D.pick(HP.leaf));
+      if (!ctx.above){
+        for (const sz of [-1, 1]){ for (let k = 0; k <= 8; k++) box(T, -L/2 + .05 + k*(L - .1)/8, top + .14, sz*(d/2 + .06), .03, .28, .03, HP.rail); box(T, 0, top + .28, sz*(d/2 + .06), L, .04, .04, HP.rail); }
+        box(T, 0, top + .08, d/2 - .08, L - .2, .14, .18, HP.terra2); for (let k = 0; k < 6; k++) plant(T, D, -L/2 + .3 + k*(L - .6)/5, top + .14, d/2 - .08, .9);
+        for (const sx of [-1, 1]){ const lx = sx*(L/2 - .3); T.add(GEO.cyl5, mat(lx, top + .35, -d/2 + .15, 0, 0, 0, .025, .7, .025), HP.metal); T.add(GEO.ico, mat(lx, top + .74, -d/2 + .15, 0, 0, 0, .07, .07, .07), HP.ringW); }
+        if (D.chance(.6)){ const tx = D.r(-L*.2, L*.2); T.add(GEO.cyl5, mat(tx, top + .4, -.05, 0, 0, 0, .05, .8, .05), HP.wood); T.add(GEO.ico, mat(tx, top + .85, -.05, 0, 0, 0, .45, .3, .45), D.pick(HP.leaf)); } }
+      return top;
+    } },
+    // The ring court: two floors of shops in a ring round an open court, glass inside and out, white neon round each floor's
+    // edge, a gap in the front to walk in; in the court a tree and a little round pool; on top a ring of garden, its vines
+    // hanging down into the court.
+    ringcourt: { name: 'Ring court', com: true, solo: true, r: 2.6, rb: 2.25, build(T, R, D, ctx){
+      const y0 = .12, Ro = R.r(2.0, 2.15), Ri = R.r(1.05, 1.15), fh = .8, fl = 2, NS = 20, gap = .32;
+      const at = (th, r) => [Math.sin(th)*r, Math.cos(th)*r];
+      T.add(GEO.cyl16, mat(0, .06, 0, 0, 0, 0, Ro + .3, .12, Ro + .3), HP.stone);
+      T.add(GEO.cyl16, mat(0, y0 + .01, 0, 0, 0, 0, Ri, .02, Ri), HP.cream);
+      for (let f = 0; f <= fl; f++){ const y = y0 + f*fh;
+        for (let i = 0; i < NS; i++){ const th = (i + .5)/NS*PI*2 - PI, door = f === 0 && Math.abs(th) < gap, cw = 2*Ro*Math.sin(PI/NS) + .05, ci = 2*Ri*Math.sin(PI/NS) + .03;
+          const [sx, sz] = at(th, (Ri + Ro)/2);
+          if (f > 0 || !door) T.add(GEO.box, mat(sx, y + (f ? .04 : .03), sz, 0, th, 0, cw, f ? .1 : .06, Ro - Ri), f === fl ? HP.cream : HP.stone);   // (a floor, or the roof)
+          if (f === fl) continue;
+          if (door){ const [px, pz] = at(th, Ro); T.add(GEO.box, mat(px, y + .5, pz, 0, th, 0, .04, .9, .06), HP.frame); continue; }
+          const [ox, oz] = at(th, Ro - .03), [ix, iz] = at(th, Ri + .03), lit = c => D.chance(c) ? HP.lamp : HP.glassD;
+          T.add(GEO.box, mat(ox, y + fh/2 + .04, oz, 0, th, 0, cw - .06, fh - .14, .04), i % 3 === 0 ? lit(.7) : HP.glassT);
+          T.add(GEO.box, mat(ix, y + fh/2 + .04, iz, 0, th, 0, ci - .05, fh - .14, .04), i % 2 ? lit(.75) : HP.glass2);
+          const [mx, mz] = at(th + PI/NS, Ro - .02), [nx, nz] = at(th + PI/NS, Ri + .02); T.add(GEO.box, mat(mx, y + fh/2 + .04, mz, 0, th, 0, .05, fh, .05), HP.frame); T.add(GEO.box, mat(nx, y + fh/2 + .04, nz, 0, th, 0, .05, fh, .05), HP.frame);
+          if (f === 0 && i % 4 === 1){ const [ax, az] = at(th, Ri - .1); T.add(GEO.box, mat(ax, y + .72, az, 0, th, 0, ci + .05, .04, .22), D.pick([HP.terra, HP.teal, HP.butter, HP.rose])); } }
+        if (f > 0){ T.add(GEO.ring, mat(0, y + .02, 0, 0, 0, 0, Ro + .02, .03, Ro + .02), HP.ringW); } }
+      const top = y0 + fl*fh + .09;
+      for (let k = 0; k < 10; k++){ const th = D.r(-PI, PI), [x, z] = at(th, D.r(Ri + .2, Ro - .2)); plant(T, D, x, top, z, D.r(1.0, 1.4)); }
+      for (let k = 0; k < 8; k++){ const th = D.r(-PI, PI), [x, z] = at(th, Ri - .02); T.add(GEO.ico, mat(x, top - .2, z, 0, 0, 0, .07, D.r(.24, .36), .07), D.pick(HP.leaf)); }
+      for (let i = 0; i < 24; i++){ const th = i/24*PI*2, [x, z] = at(th, Ro - .05); box(T, x, top + .12, z, .03, .24, .03, HP.rail); }
+      T.add(GEO.ring, mat(0, top + .24, 0, 0, 0, 0, Ro - .05, .03, Ro - .05), HP.rail);
+      // the court: a tree, a little pool, benches
+      T.add(GEO.cyl5, mat(-.25, y0 + .7, -.2, 0, 0, .08, .07, 1.4, .07), HP.wood); T.add(GEO.ico, mat(-.2, y0 + 1.45, -.2, 0, 0, 0, .7, .45, .7), D.pick(HP.leaf));
+      T.add(GEO.cyl16, mat(.35, y0 + .07, .25, 0, 0, 0, .38, .12, .38), HP.stone); T.add(GEO.cyl16, mat(.35, y0 + .13, .25, 0, 0, 0, .32, .03, .32), HP.pool);
+      for (const a of [2.2, 4.0]){ const [x, z] = at(a, Ri - .3); T.add(GEO.box, mat(x, y0 + .12, z, 0, a, 0, .45, .06, .16), HP.wood); }
+      return top;
+    } },
+    // The lagoon plaza: a round pool in a stone rim, lit from below, with lily pads; a curving walk out to an island with a
+    // tree; lamp posts round the rim with white globes; a little glass cafe on the rim with an awning, tables out front.
+    lagoon: { name: 'Lagoon plaza', com: true, solo: true, r: 2.6, rb: 2.25, build(T, R, D, ctx){
+      const y0 = .12, Rp = R.r(1.85, 2.0), at = (th, r) => [Math.sin(th)*r, Math.cos(th)*r];
+      T.add(GEO.cyl16, mat(0, .06, 0, 0, 0, 0, Rp + .4, .12, Rp + .4), HP.stone);
+      T.add(GEO.ring, mat(0, y0 + .1, 0, 0, 0, 0, Rp + .1, .2, Rp + .1), HP.cream); T.add(GEO.ring, mat(0, y0 + .1, 0, 0, 0, 0, Rp, .2, Rp), HP.stone);
+      T.add(GEO.cyl16, mat(0, y0 + .12, 0, 0, 0, 0, Rp, .04, Rp), HP.pool);
+      for (let k = 0; k < 7; k++){ const a = D.r(0, PI*2), q = D.r(.5, Rp - .3), [x, z] = at(a, q); T.add(GEO.cyl8, mat(x, y0 + .15, z, 0, 0, 0, D.r(.1, .2), .01, D.r(.1, .2)), HP.lily); }
+      const ia = R.r(-.6, .6), [ix, iz] = at(ia + PI, Rp*.35);   // (the island, toward the back)
+      T.add(GEO.cyl16, mat(ix, y0 + .14, iz, 0, 0, 0, .5, .2, .5), HP.stone); T.add(GEO.cyl16, mat(ix, y0 + .25, iz, 0, 0, 0, .44, .04, .44), HP.moss);
+      T.add(GEO.cyl5, mat(ix, y0 + .85, iz, 0, 0, .06, .07, 1.2, .07), HP.wood); T.add(GEO.ico, mat(ix, y0 + 1.5, iz, 0, 0, 0, .75, .45, .75), D.pick(HP.leaf));
+      for (let k = 0; k < 4; k++) plant(T, D, ix + D.r(-.3, .3), y0 + .27, iz + D.r(-.3, .3), .9);
+      // the walk: a curve of stone slabs from the front rim out to the island
+      const N = 8, [fx, fz] = at(.5, Rp + .05);
+      for (let k = 0; k <= N; k++){ const t = k/N, bx = fx + (ix - fx)*t + Math.sin(t*PI)*.55, bz = fz + (iz - fz)*t, dx = (ix - fx) + Math.cos(t*PI)*PI*.55, dz = iz - fz;
+        T.add(GEO.box, mat(bx, y0 + .24 + Math.sin(t*PI)*.08, bz, 0, Math.atan2(dx, dz), 0, .42, .07, .3), HP.cream); }
+      for (let k = 0; k < 6; k++){ const a = k/6*PI*2 + .3, [x, z] = at(a, Rp + .25); T.add(GEO.cyl5, mat(x, y0 + .45, z, 0, 0, 0, .025, .9, .025), HP.metal); T.add(GEO.ico, mat(x, y0 + .93, z, 0, 0, 0, .08, .08, .08), HP.ringW); }
+      // the cafe on the rim
+      const ca = R.r(-2.4, -1.9)*(R.chance(.5) ? 1 : -1), [cx, cz] = at(ca, Rp + .05);
+      T.add(GEO.cyl12, mat(cx, y0 + .45, cz, 0, 0, 0, .42, .8, .42), HP.glass2); T.add(GEO.cyl12, mat(cx, y0 + .87, cz, 0, 0, 0, .48, .06, .48), HP.cream);
+      T.add(GEO.dome, mat(cx, y0 + .9, cz, 0, 0, 0, .4, .25, .4), HP.terra); T.add(GEO.ring, mat(cx, y0 + .85, cz, 0, 0, 0, .5, .03, .5), HP.ringW);
+      for (let k = 0; k < 2; k++){ const a = ca + (k ? .35 : -.35), [tx, tz] = at(a, Rp + .3); T.add(GEO.cyl8, mat(tx, y0 + .2, tz, 0, 0, 0, .03, .4, .03), HP.metal); T.add(GEO.cyl8, mat(tx, y0 + .4, tz, 0, 0, 0, .14, .03, .14), HP.cream); }
+      for (let k = 0; k < 5; k++){ const a = D.r(0, PI*2); if (Math.abs(a - ((ca + PI*2) % (PI*2))) < .5) continue; const [x, z] = at(a, Rp + .3); pot(T, D, x, y0, z, .9); }
+      return y0 + .25;
     } },
   };
   // COM: a shop (the commercial zone's); SOLO: one that stands alone on the ground (nothing stacks on it, it stacks on nothing)
@@ -2101,7 +2210,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // Right click in zone mode clears the homes inside the brush.
   const ZONE = { on: true, size: 2 }, ZSIZE = [0, 2.8, 4.2, 5.8, 7.6, 9.6, 12];
   const ZW = [['townhouse', .26], ['villa', .2], ['tower', .15], ['pods', .14], ['pagoda', .12], ['terrace', .13]];
-  const CW = [['noodle', .3], ['lantern', .3], ['kiosk', .26], ['grotto', .14]];   // (the commercial zone's mix)
+  const CW = [['noodle', .19], ['lantern', .19], ['kiosk', .15], ['rotunda', .14], ['viaduct', .14], ['grotto', .07], ['ringcourt', .06], ['lagoon', .06]];   // (the commercial zone's mix)
   const zPick = R => { const W = PL.kind === 'czone' ? CW : ZW; let u = R.f(); for (const [k, w] of W){ if ((u -= w) < 0) return k; } return W[0][0]; };
   const zPickStack = R => { for (let t = 0; t < 8; t++){ const k = zPick(R); if (!SOLO(k)) return k; } return PL.kind === 'czone' ? 'lantern' : 'townhouse'; };
   let zLayout = null, zKey = '';
@@ -2403,7 +2512,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const reflM = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)] });   // (double sided: a mirrored view turns the faces' winding round)
   reflM.onBeforeCompile = sh => { sh.uniforms.nightK = CURV.nightK;   // (by night the lit windows show in the water, warm)
     sh.vertexShader = GLOW_V + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vGlow = glow;');
-    sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vGlow > 0.85 ? vec3(1.0, 0.85, 0.46) : vec3(1.0, 0.6, 0.28), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
+    sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vGlow > 0.85 ? vec3(1.0, 0.85, 0.46) : vGlow > 0.2 && vGlow < 0.3 ? vColor*1.2 : vec3(1.0, 0.6, 0.28), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
   renderer.localClippingEnabled = true;
   // (the reflection is drawn from a camera mirrored in the water's plane, not by flipping the whole scene, which made
   // every object's matrix be worked out again twice a frame; it's drawn every other frame, the ripples hide the step, and

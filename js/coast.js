@@ -3129,35 +3129,69 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const last = Q[Q.length - 1], e = out[out.length - 1]; if (Math.hypot(last[0] - e[0], last[1] - e[1]) > .12) out.push(last); else if (out.length > 1) out[out.length - 1] = last; return out; }
   // a flat four-cornered piece laid on the ground (corners [x, y, z]), wound to face up
   function flatQ(T, A, B, Cc, D, col){ const cy = (B[2] - A[2])*(Cc[0] - A[0]) - (B[0] - A[0])*(Cc[2] - A[2]); if (cy > 0) T.quad(A, B, Cc, D, col); else T.quad(A, D, Cc, B, col); }
+  // What ground each path takes, so where paths meet they join rather than run through each other: its paving (walk:
+  // the part people walk on, across [o0, o1] of its line) and, for a causeway, its canal. Kept as a quad per step of each
+  // path, bucketed by 2-unit cells; a path asks it about other paths only (and about its own far parts, where it crosses
+  // itself), never its own neighboring steps.
+  const PWALK = [[-.45, .45], [-.88, .88], [-.68, .68], [-1.06, -.04], [-.52, .52]], PCAN = [-.06, 1.31];
+  function pathLine(stroke){ if (stroke._g && stroke._g.n === stroke.p.length) return stroke._g;
+    const P = smoothPts(stroke.p), n = P.length, N = P.map((p, i) => { const a = P[Math.max(0, i - 1)], b = P[Math.min(n - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [-dz/l, dx/l, dx/l, dz/l]; });
+    return stroke._g = { n: stroke.p.length, P, N }; }
+  function pathFP(list){ const B = new Map();
+    list.forEach((st, pid) => { const { P, N } = pathLine(st); const q = (i, o0, o1) => [[P[i][0] + N[i][0]*o0, P[i][1] + N[i][1]*o0], [P[i][0] + N[i][0]*o1, P[i][1] + N[i][1]*o1], [P[i + 1][0] + N[i + 1][0]*o1, P[i + 1][1] + N[i + 1][1]*o1], [P[i + 1][0] + N[i + 1][0]*o0, P[i + 1][1] + N[i + 1][1]*o0]];
+      const add = e => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of e.poly){ x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
+        for (let a = Math.floor(x0/2); a <= Math.floor(x1/2); a++) for (let b = Math.floor(z0/2); b <= Math.floor(z1/2); b++){ const k = a + ',' + b; let l = B.get(k); if (!l) B.set(k, l = []); l.push(e); } };
+      for (let i = 0; i < P.length - 1; i++){ add({ pid, i, kind: 'w', poly: q(i, ...PWALK[st.s]) }); if (st.s === 3) add({ pid, i, kind: 'c', poly: q(i, ...PCAN) }); } });
+    return B; }
   function drawPath(T, stroke, pools, opt = {}){
-    const P = smoothPts(stroke.p), st = stroke.s, n = P.length; if (n < 2) return;
+    const { P, N } = pathLine(stroke), st = stroke.s, n = P.length; if (n < 2) return;
     const R = rng((Math.imul(Math.round(P[0][0]*31), 73856093) ^ Math.imul(Math.round(P[0][1]*37), 19349663) ^ st*97) >>> 0);
-    const N = P.map((p, i) => { const a = P[Math.max(0, i - 1)], b = P[Math.min(n - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [-dz/l, dx/l, dx/l, dz/l]; });   // (across, along)
     const G = (i, o) => { const x = P[i][0] + N[i][0]*o, z = P[i][1] + N[i][1]*o; return [x, z]; };
     const V = (i, o, y) => { const [x, z] = G(i, o); return [x, heightAt(x, z) + y, z]; };
     const inside = (x, z) => PIECES.some(q => !q.level && q.hullW && q.bb && x > q.bb[0] && x < q.bb[2] && z > q.bb[1] && z < q.bb[3] && inHull(q.hullW, x, z));
     const insideAny = (x, z) => { const l = pieceGrid.get(Math.floor(x/PCELL) + ',' + Math.floor(z/PCELL)); return !!l && l.some(q => q.hullW && q.bb && x > q.bb[0] - .05 && x < q.bb[2] + .05 && z > q.bb[1] - .05 && z < q.bb[3] + .05 && inHull(q.hullW, x, z)); };
     const segIn = (i, o) => { const a = G(i, o), b = G(i + 1, o); return insideAny((a[0] + b[0])/2, (a[1] + b[1])/2); };   // (a piece of path that would run into a building is left out)
-    const strip = (o0, o1, y, colF) => { for (let i = 0; i < n - 1; i++){ if (segIn(i, o0) || segIn(i, o1) || segIn(i, (o0 + o1)/2)) continue; flatQ(T, V(i, o0, y), V(i, o1, y), V(i + 1, o1, y), V(i + 1, o0, y), colF(i)); } };
-    const kerb = (o, w, h, col) => { for (let i = 0; i < n - 1; i++){ if (segIn(i, o)) continue; const a = V(i, o, h/2 + .01), b = V(i + 1, o, h/2 + .01); seg(T, V3(a[0], a[1], a[2]), V3(b[0], b[1], b[2]), w, h, col); } };
-    const stone = (x, z, s, col, h = .05) => { if (inside(x, z)) return; T.add(GEO.box, mat(x, heightAt(x, z) + h/2 + .01, z, 0, R.r(0, PI), 0, s*R.r(.8, 1.2), h, s*R.r(.7, 1.1)), col); };
-    const lampPost = (i, o, tall = 1.2) => { const [x, z] = G(i, o); if (inside(x, z)) return; const y = heightAt(x, z); T.add(GEO.cyl5, mat(x, y + tall/2, z, 0, 0, 0, .035, tall, .035), HP.rail);
+    // the other paths here: kind 'w' (paving) or 'c' (canal); earlier: only those drawn before this one (or this one's own
+    // earlier steps), so of two that overlap one gives way
+    const pid = opt.pid === undefined ? -1 : opt.pid, FP = opt.fp;
+    const fpHit = (x, z, kind, i, earlier) => { if (!FP) return false; const l = FP.get(Math.floor(x/2) + ',' + Math.floor(z/2)); if (!l) return false;
+      for (const e of l){ if (e.kind !== kind) continue; if (e.pid === pid && Math.abs(e.i - i) < 6) continue; if (earlier && !(e.pid < pid || (e.pid === pid && e.i < i))) continue; if (inHull(e.poly, x, z)) return true; } return false; };
+    const qMid = (i, o) => { const a = G(i, o), b = G(i + 1, o); return [(a[0] + b[0])/2, (a[1] + b[1])/2]; };
+    const [w0, w1] = PWALK[st], wm = (w0 + w1)/2;
+    // where this path crosses a canal (another's, or its own far part): a slab bridge across it, a stone face under its
+    // edges and a low parapet each side; its own paving, kerbs and stones give way to it there
+    const bridge = new Uint8Array(n), gone = new Uint8Array(n);
+    for (let i = 0; i < n - 1; i++){ const [cx, cz] = qMid(i, wm); if (fpHit(cx, cz, 'c', i, false)) bridge[i] = 1; else if (fpHit(cx, cz, 'w', i, true)) gone[i] = 1; }
+    const DECK = st === 2 ? [HP.luxWhite, HP.luxCream] : [C(0xd8cfbb), C(0xcfc5af)];
+    for (let i = 0; i < n - 1; i++){ if (!bridge[i] || segIn(i, wm)) continue; const e0 = w0 - .04, e1 = w1 + .04;
+      flatQ(T, V(i, e0, .07), V(i, e1, .07), V(i + 1, e1, .07), V(i + 1, e0, .07), DECK[i % 2]);
+      for (const o of [e0, e1]){ const a = V(i, o, 0), b = V(i + 1, o, 0); seg(T, V3(a[0], a[1] - .02, a[2]), V3(b[0], b[1] - .02, b[2]), .05, .16, C(0xb3a993)); seg(T, V3(a[0], a[1] + .15, a[2]), V3(b[0], b[1] + .15, b[2]), .07, .12, DECK[1]); } }
+    // (paving and kerbs: not into a building, not where another path's paving is first, not over water (the bridge is))
+    const strip = (o0, o1, y, colF) => { for (let i = 0; i < n - 1; i++){ if (bridge[i] || gone[i] || segIn(i, o0) || segIn(i, o1) || segIn(i, (o0 + o1)/2)) continue; flatQ(T, V(i, o0, y), V(i, o1, y), V(i + 1, o1, y), V(i + 1, o0, y), colF(i)); } };
+    const kerb = (o, w, h, col, canalK = false) => { for (let i = 0; i < n - 1; i++){ if (segIn(i, o)) continue; const [mx, mz] = qMid(i, o);
+        if (canalK ? (fpHit(mx, mz, 'w', i, false) || fpHit(mx, mz, 'c', i, false)) : (bridge[i] || fpHit(mx, mz, 'w', i, false))) continue;   // (where paths meet, the kerbs open)
+        const a = V(i, o, h/2 + .01), b = V(i + 1, o, h/2 + .01); seg(T, V3(a[0], a[1], a[2]), V3(b[0], b[1], b[2]), w, h, col); } };
+    const free = (x, z, i) => !inside(x, z) && !fpHit(x, z, 'w', i, false) && !fpHit(x, z, 'c', i, false);   // (a lamp, a bench, a pot: on open ground)
+    const stone = (x, z, s, col, i, h = .05) => { if (inside(x, z) || bridge[Math.min(i, n - 2)] || fpHit(x, z, 'c', i, false) || fpHit(x, z, 'w', i, true)) return; T.add(GEO.box, mat(x, heightAt(x, z) + h/2 + .01, z, 0, R.r(0, PI), 0, s*R.r(.8, 1.2), h, s*R.r(.7, 1.1)), col); };
+    const lampPost = (i, o, tall = 1.2) => { const [x, z] = G(i, o); if (!free(x, z, i)) return; const y = heightAt(x, z); T.add(GEO.cyl5, mat(x, y + tall/2, z, 0, 0, 0, .035, tall, .035), HP.rail);
       box(T, x, y + tall + .06, z, .14, .16, .14, HP.lamp); box(T, x, y + tall + .17, z, .2, .04, .2, HP.rail); pools.push([x, z, 1.4, .8]); };
     const STONE = [C(0xd9d0bd), C(0xcfc5ae), C(0xe4dccb), C(0xc5bba6)];
     if (st === 0){   // flagstones
-      for (let i = 0; i < n; i++) for (let j = 0; j < 3; j++) if (R.chance(.82)){ const [x, z] = G(i, -.3 + j*.3 + R.r(-.06, .06)); stone(x, z, R.r(.2, .28), R.pick(STONE)); }
-      for (let i = 3; i < n; i += 7){ const [x, z] = G(i, (i % 2 ? 1 : -1)*.6); if (inside(x, z)) continue; const y = heightAt(x, z); T.add(GEO.cyl8, mat(x, y + .05, z, 0, 0, 0, .06, .1, .06), HP.rail); T.add(GEO.cyl8, mat(x, y + .11, z, 0, 0, 0, .05, .03, .05), HP.lamp); pools.push([x, z, .9, .6]); } }
+      for (let i = 0; i < n; i++) for (let j = 0; j < 3; j++) if (R.chance(.82)){ const [x, z] = G(i, -.3 + j*.3 + R.r(-.06, .06)); stone(x, z, R.r(.2, .28), R.pick(STONE), i); }
+      for (let i = 3; i < n; i += 7){ const [x, z] = G(i, (i % 2 ? 1 : -1)*.6); if (!free(x, z, i)) continue; const y = heightAt(x, z); T.add(GEO.cyl8, mat(x, y + .05, z, 0, 0, 0, .06, .1, .06), HP.rail); T.add(GEO.cyl8, mat(x, y + .11, z, 0, 0, 0, .05, .03, .05), HP.lamp); pools.push([x, z, .9, .6]); } }
     else if (st === 1){   // promenade
       const pv = [C(0xcdbfa8), C(0xbfb29b)]; strip(-.8, .8, .03, i => pv[Math.floor(i/2) % 2]); kerb(-.83, .08, .08, C(0x9c917f)); kerb(.83, .08, .08, C(0x9c917f));
-      for (let i = 0; i < n; i += 3){ const a = V(i, -.8, .035), b = V(i, .8, .035); seg(T, V3(...a), V3(...b), .03, .01, C(0xa89c87)); }
+      for (let i = 0; i < n - 1; i += 3){ if (bridge[i] || gone[i] || segIn(i, 0)) continue; const a = V(i, -.8, .035), b = V(i, .8, .035); seg(T, V3(...a), V3(...b), .03, .01, C(0xa89c87)); }
       for (let i = 4; i < n; i += 9) lampPost(i, (Math.floor(i/9) % 2 ? 1 : -1)*1.0);
-      for (let i = 9; i < n; i += 17){ const [x, z] = G(i, -1.05); if (inside(x, z)) continue; const y = heightAt(x, z), a = Math.atan2(N[i][2], N[i][3]); T.add(GEO.box, mat(x, y + .18, z, 0, a, 0, .55, .05, .18), HP.wood); for (const s_ of [-.2, .2]) T.add(GEO.box, mat(x + N[i][2]*s_, y + .09, z + N[i][3]*s_, 0, a, 0, .05, .18, .16), HP.rail); } }
+      for (let i = 9; i < n; i += 17){ const [x, z] = G(i, -1.05); if (!free(x, z, i)) continue; const y = heightAt(x, z), a = Math.atan2(N[i][2], N[i][3]); T.add(GEO.box, mat(x, y + .18, z, 0, a, 0, .55, .05, .18), HP.wood); for (const s_ of [-.2, .2]) T.add(GEO.box, mat(x + N[i][2]*s_, y + .09, z + N[i][3]*s_, 0, a, 0, .05, .18, .16), HP.rail); } }
     else if (st === 2){   // marble walk
-      strip(-.6, .6, .03, i => i % 4 === 0 ? HP.luxCream : HP.luxWhite); kerb(-.63, .08, .07, HP.luxCream); kerb(.63, .08, .07, HP.luxCream); kerb(0, .05, .01, HP.luxGold);
-      for (let i = 5; i < n; i += 11) for (const s_ of [-.85, .85]){ const [x, z] = G(i, s_); if (!inside(x, z)) blossomPot(T, R, x, heightAt(x, z), z); } }
+      strip(-.6, .6, .03, i => i % 4 === 0 ? HP.luxCream : HP.luxWhite); kerb(-.63, .08, .07, HP.luxCream); kerb(.63, .08, .07, HP.luxCream);
+      for (let i = 0; i < n - 1; i++){ if (bridge[i] || gone[i] || segIn(i, 0)) continue; const a = V(i, 0, .035), b = V(i + 1, 0, .035); seg(T, V3(...a), V3(...b), .05, .01, HP.luxGold); }   // (the gold inlay, down the middle)
+      for (let i = 5; i < n; i += 11) for (const s_ of [-.85, .85]){ const [x, z] = G(i, s_); if (free(x, z, i)) blossomPot(T, R, x, heightAt(x, z), z); } }
     else if (st === 3){   // water causeway: a walk on the left; on the right a canal sunk into the ground (board 19)
-      strip(-1.0, -.1, .05, i => i % 2 ? C(0xd8cfbb) : C(0xcfc5af)); kerb(-1.02, .08, .1, C(0xb5aa95)); kerb(-.05, .1, .14, C(0xbdb29d)); kerb(1.25, .1, .14, C(0xbdb29d));
-      if (opt.flat){ strip(-.02, 1.22, .03, () => HP.pool); for (let i = 5; i < n; i += 11) lampPost(i, -1.15, 1.0); return; }   // (a preview: the water shown at the top)
+      strip(-1.0, -.1, .05, i => i % 2 ? C(0xd8cfbb) : C(0xcfc5af)); kerb(-1.02, .08, .1, C(0xb5aa95)); kerb(-.05, .1, .14, C(0xbdb29d), true); kerb(1.25, .1, .14, C(0xbdb29d), true);
+      if (opt.flat){ for (let i = 0; i < n - 1; i++){ const [cx, cz] = qMid(i, .6); if (segIn(i, .6) || fpHit(cx, cz, 'c', i, true)) continue; flatQ(T, V(i, -.02, .03), V(i, 1.22, .03), V(i + 1, 1.22, .03), V(i + 1, -.02, .03), HP.pool); }
+        for (let i = 5; i < n; i += 11) lampPost(i, -1.15, 1.0); return; }   // (a preview: the water shown at the top)
       // its walls of dressed stone, dry above the water and green below, going down to a pale pebbled bed; the water clear
       // (its own see-through mesh, W), so the bed, the weed and the koi show through it, deeper toward the middle
       const WL = -.03, WR = 1.23, D = .62, WS = .2, Wt = opt.W || T;
@@ -3174,9 +3208,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       for (const [s0, e0] of runs){
         for (let i = s0; i < e0; i++){ const k = (i*7 + (i >> 1)) % 3, nx = N[i][0], nz = N[i][1], ym0 = (ys[i] + yb[i])/2, ym1 = (ys[i + 1] + yb[i + 1])/2;
           for (const [q, s_] of [[gl, 1], [gr, -1]]){ const a = q[i], b = q[i + 1];
+            if (fpHit((a[0] + b[0])/2 - N[i][0]*s_*.04, (a[2] + b[2])/2 - N[i][1]*s_*.04, 'c', i, false)) continue;   // (another canal crosses here: the wall opens into it)
             face(a, b, at(b, ys[i + 1] + .02), at(a, ys[i] + .02), DRY[k], nx*s_, nz*s_);
             face(at(a, ys[i] + .02), at(b, ys[i + 1] + .02), at(b, ym1), at(a, ym0), WET[i % 2], nx*s_, nz*s_);
             face(at(a, ym0), at(b, ym1), at(b, yb[i + 1]), at(a, yb[i]), DEEP[i % 2], nx*s_, nz*s_); }
+          const cm = G(i, (WL + WR)/2), cm1 = G(i + 1, (WL + WR)/2); if (fpHit((cm[0] + cm1[0])/2, (cm[1] + cm1[1])/2, 'c', i, true)) continue;   // (where a canal drawn before is already: its bed and water serve)
           // the bed: pale toward the middle, where the light reaches it
           const m0 = [(gl[i][0] + gr[i][0])/2, yb[i], (gl[i][2] + gr[i][2])/2], m1 = [(gl[i + 1][0] + gr[i + 1][0])/2, yb[i + 1], (gl[i + 1][2] + gr[i + 1][2])/2];
           flatQ(T, at(gl[i], yb[i]), m0, m1, at(gl[i + 1], yb[i + 1]), i % 2 ? C(0xb9cdb4) : C(0xb2c7ae)); flatQ(T, m0, at(gr[i], yb[i]), at(gr[i + 1], yb[i + 1]), m1, i % 2 ? C(0xc6d6bd) : C(0xbfd1b7));   // (sandy, so it reads as the bottom, below the water)
@@ -3202,11 +3238,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       for (let i = 5; i < n; i += 11) lampPost(i, -1.15, 1.0); }
     else {   // mossy cobbles
       strip(-.5, .5, .015, () => C(0x5b6b48)); const CB = [C(0x9c9a92), C(0x8a8780), C(0xb0ada3), C(0x7f8a74)];
-      for (let i = 0; i < n; i++) for (let j = 0; j < 4; j++) if (R.chance(.9)){ const [x, z] = G(i, -.36 + j*.24 + R.r(-.04, .04)); stone(x, z, R.r(.13, .17), R.pick(CB), .06); }
-      for (let i = 8; i < n; i += 15){ const [x, z] = G(i, (Math.floor(i/15) % 2 ? 1 : -1)*.7); if (inside(x, z)) continue; const y = heightAt(x, z); box(T, x, y + .25, z, .1, .5, .1, HP.stone); box(T, x, y + .56, z, .14, .14, .14, HP.lamp); pools.push([x, z, 1.0, .7]); } } }
+      for (let i = 0; i < n; i++) for (let j = 0; j < 4; j++) if (R.chance(.9)){ const [x, z] = G(i, -.36 + j*.24 + R.r(-.04, .04)); stone(x, z, R.r(.13, .17), R.pick(CB), i, .06); }
+      for (let i = 8; i < n; i += 15){ const [x, z] = G(i, (Math.floor(i/15) % 2 ? 1 : -1)*.7); if (!free(x, z, i)) continue; const y = heightAt(x, z); box(T, x, y + .25, z, .1, .5, .1, HP.stone); box(T, x, y + .56, z, .14, .14, .14, HP.lamp); pools.push([x, z, 1.0, .7]); } } }
   // the paths drawn: one mesh for all of them, made again when one changes; the stroke being drawn has its own
   const pathWaterM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true, transparent: true, opacity: .42, depthWrite: false }), true, false, true);
-  function pathMesh(list, pools, preview = false, cuts = null){ const T = new Tris(), W = new Tris(); for (const p of list) drawPath(T, p, pools, preview ? { flat: true } : { W, cuts }); if (!T.p.length) return null;
+  function pathMesh(list, pools, preview = false, cuts = null){ const T = new Tris(), W = new Tris(), all = preview ? PATHS.concat(list) : list, fp = pathFP(all), o = all.length - list.length;
+    list.forEach((p, k) => drawPath(T, p, pools, preview ? { flat: true, fp, pid: o + k } : { W, cuts, fp, pid: k })); if (!T.p.length) return null;
     const m = new THREE.Mesh(releaseCPU(T.geo()), preview ? ghostM : pieceM); m.receiveShadow = true; m.castShadow = false; m.matrixAutoUpdate = false; m.raycast = () => {}; if (preview){ m.renderOrder = 5; m.frustumCulled = false; }
     if (W.p.length){ const w = new THREE.Mesh(releaseCPU(W.geo()), pathWaterM); w.receiveShadow = true; w.castShadow = false; w.matrixAutoUpdate = false; w.raycast = () => {}; w.renderOrder = 3; m.add(w); }
     scene.add(m); return m; }
@@ -3571,7 +3608,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { inCanal: (x, z, m) => inCanal(x, z, m), clearRect: (a, b) => clearArea(delRect(a, b)), remove: p => removePiece(p), pieceHit: (x, y) => pieceHit(x, y), linkAt: (x, y) => linkAt(x, y), stirWater: (x, y) => stirWater(x, y), buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, PATHS: () => PATHS, addPath: (s, p) => { PATHS.push({ s, p }); savePaths(); buildPaths(); }, buildPaths: () => buildPaths(), AG, agentTick: dt => agentTick(dt), FIELD, inHull: (P, x, z) => inHull(P, x, z), RAILS, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
+  window.COAST = { setPaths: v => { PATHS = v; savePaths(); buildPaths(); }, inCanal: (x, z, m) => inCanal(x, z, m), clearRect: (a, b) => clearArea(delRect(a, b)), remove: p => removePiece(p), pieceHit: (x, y) => pieceHit(x, y), linkAt: (x, y) => linkAt(x, y), stirWater: (x, y) => stirWater(x, y), buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, PATHS: () => PATHS, addPath: (s, p) => { PATHS.push({ s, p }); savePaths(); buildPaths(); }, buildPaths: () => buildPaths(), AG, agentTick: dt => agentTick(dt), FIELD, inHull: (P, x, z) => inHull(P, x, z), RAILS, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

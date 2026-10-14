@@ -256,6 +256,13 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       vec2 p = vec2(dot(q, wd) - t*1.5, dot(q, wn));   // (carried downwind)
       float n = 0.62*wVn(p*vec2(0.1, 0.24) + vec2(0.0, t*0.04)) + 0.38*wVn(p*vec2(0.23, 0.52) + vec2(t*0.09, 5.3));   // (drawn out along the wind; slowly changing)
       return smoothstep(0.44, 0.76, n); }
+    // the gust pushing the grass at a place and time (what the sway bends by); and the glow: a blade lights as the gust
+    // pushes it over (the bend growing), and dims as it lets go and springs back
+    float windCrest(vec2 q, float t);
+    float windGust(vec2 q, float t){ vec2 wd = vec2(0.83, 0.55); float ph = dot(q, wd)*0.32 - t*1.25;
+      return 0.3 + 0.3*sin(ph) + 0.12*sin(ph*2.3 + q.x*0.7 - q.y*0.4) + 0.75*windPaw(q, t)*(0.75 + 0.25*windCrest(q, t)); }
+    float windStir(vec2 q, float t){ float g1 = windGust(q, t), g0 = windGust(q, t - 0.35), b1 = g1*g1, b0 = g0*g0;
+      return smoothstep(0.12, 0.45, b1 - b0); }   // (how fast the bend is growing: the blade being pushed)
     float windCrest(vec2 q, float t){ return 0.5 + 0.5*sin(dot(q, vec2(0.83, 0.55))*5.5 - t*4.2 + 1.3*wVn(q*0.9)); }
     // the glow's own touch of it: small gusts that live only a moment (born, carried a little way downwind, gone), and in
     // each a single thin slice of light across the wind, fading gently in and out
@@ -274,7 +281,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       vec2 q = (modelMatrix*wq_).xz; float ph = dot(q, wd)*0.32 - wTime*1.25;
       float paw = windPaw(q, wTime), crest = windCrest(q, wTime);
       float gust = 0.3 + 0.3*sin(ph) + 0.12*sin(ph*2.3 + q.x*0.7 - q.y*0.4) + 0.75*paw*(0.75 + 0.25*crest);
-      vGc = aG; vGl = windGlint(q, wTime)*smoothstep(0.08, 0.5, aH);   // (the tips glow, in a thin slice where a passing gust touches)
+      vGc = aG; vGl = windStir(q, wTime)*smoothstep(0.08, 0.5, aH);   // (the tips glow as the gust pushes them over: the glow is the sway)
       float flut = sin(wTime*4.1 + q.x*3.1 + q.y*2.3) + 0.5*sin(wTime*6.3 + q.x*5.0 - q.y*4.1);
       float hw = aH*sc_, hk = min(hw, 0.8), k = hk*hk;   // (the bend tops out at a tall grass's height: a tree's crown sways, its trunk stays put)
       vec2 d = wd*(0.08 + 0.3*gust*gust)*k + vec2(-wd.y, wd.x)*flut*0.035*k;
@@ -290,7 +297,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       sh.vertexShader = 'uniform vec2 ctr, fwd; uniform float curveK, g0; varying float vG; varying vec3 vWq;\n' + (glow ? GLOW_V : '') + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BEND + (glow ? '\n vGlow = glow;' : ''));
       if (sway){ sh.vertexShader = SWAY_V + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + SWAY);
         // (by night, the wind's glow: stepped into a few washes, faint)
-        sh.fragmentShader = 'varying float vGl; varying vec3 vGc;\n' + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb += vGc*(floor(vGl*3.0 + 0.35)/3.0)*0.75*nightK;\n#include <fog_fragment>');
+        sh.fragmentShader = 'varying float vGl; varying vec3 vGc;\n' + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb += vGc*(floor(vGl*3.0 + 0.35)/3.0)*0.5*nightK;\n#include <fog_fragment>');
         sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal = normal * faceDirection;', '')); }
       if (glow) sh.fragmentShader = GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', GLOW_APPLY + '\n#include <fog_fragment>');
       if (paint) sh.fragmentShader = PAINT_F + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + PAINT_APPLY);
@@ -2566,13 +2573,13 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
           vCm = f - c0; vCy = aCard.y;
           vCA = vec2((c0 + uv.x)/${CARD.cols}.0, (aCard.x + uv.y)/${CARD.rows}.0); vCB = vec2((c1 + uv.x)/${CARD.cols}.0, (aCard.x + uv.y)/${CARD.rows}.0);
           vec2 q = (modelMatrix*instanceMatrix*vec4(0.0, 0.0, 0.0, 1.0)).xz, wd = vec2(0.83, 0.55); float ph = dot(q, wd)*0.32 - wTime*1.25, paw = windPaw(q, wTime), crest = windCrest(q, wTime), gust = 0.3 + 0.3*sin(ph) + 0.12*sin(ph*2.3 + q.x*0.7 - q.y*0.4) + 0.75*paw*(0.75 + 0.25*crest);
-          vGc2 = aGc; vGl2 = windGlint(q, wTime)*smoothstep(0.25, 0.7, uv.y);
+          vGc2 = aGc; vGl2 = windStir(q, wTime)*smoothstep(0.25, 0.7, uv.y);
           float k = uv.y*uv.y*0.7; vec2 d = wd*(0.08 + 0.3*gust*gust)*k;
           vec3 dv = (viewMatrix*vec4(d.x, 0.0, d.y, 0.0)).xyz*sc;
           vec4 mvPosition = anc + vec4(position.xy*sc + dv.xy, 0.0, 0.0);
           gl_Position = projectionMatrix*mvPosition;`)
         .replace('#include <worldpos_vertex>', `vec4 worldPosition = vec4((mvPosition.xyz - viewMatrix[3].xyz)*mat3(viewMatrix), 1.0); vWq = worldPosition.xyz; vG = dot(worldPosition.xz - ctr, fwd);`);
-      sh.fragmentShader = 'uniform sampler2D nTex; varying vec2 vCA; varying vec2 vCB; varying float vCm; varying float vCy; varying float vGl2; varying vec3 vGc2;\n' + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb += vGc2*(floor(vGl2*3.0 + 0.35)/3.0)*0.75*nightK;\n#include <fog_fragment>')
+      sh.fragmentShader = 'uniform sampler2D nTex; varying vec2 vCA; varying vec2 vCB; varying float vCm; varying float vCy; varying float vGl2; varying vec3 vGc2;\n' + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb += vGc2*(floor(vGl2*3.0 + 0.35)/3.0)*0.5*nightK;\n#include <fog_fragment>')
         .replace('#include <map_fragment>', `{ vec4 tA = texture2D(map, vCA), tB = texture2D(map, vCB), tx = mix(tA, tB, vCm); diffuseColor *= vec4(tx.rgb/max(tx.a, 1e-3), tx.a); }`)
         .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
           { vec4 nA = texture2D(nTex, vCA), nB = texture2D(nTex, vCB); vec3 nl = normalize((nA.xyz*nA.a*(1.0 - vCm) + nB.xyz*nB.a*vCm)/max(nA.a*(1.0 - vCm) + nB.a*vCm, 1e-3)*2.0 - 1.0 + 1e-4);

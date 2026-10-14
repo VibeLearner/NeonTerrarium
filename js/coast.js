@@ -1922,7 +1922,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const hit = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
     if (!hit || hit.sea){ ring.visible = false; if (status) status.textContent = 'grass: ' + GSTYLES[GR.style] + (hit ? ' · not on the sea' : ''); return; }
     ringAt(hit.x, hit.z, GRS[GR.size], null, .12); ringM.color.set(0xb8e08a);
-    if (status){ status.textContent = 'grass: ' + GSTYLES[GR.style] + ' (V next) · brush ' + (GR.size + 1); status.style.color = '#0f3b4a'; } }
+    if (status){ status.textContent = 'grass: ' + GSTYLES[GR.style] + ' (V next) · brush ' + (GR.size + 1); status.style.color = '#33413a'; } }
   function grassStroke(cx, cy, erase, force){
     const h = pick(cx, cy); if (!h || h.sea) return; const r = GRS[GR.size];
     if (!force && GR.last && Math.hypot(h.x - GR.last[0], h.z - GR.last[1]) < r*.35) return;
@@ -1994,10 +1994,15 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // the time panel: a slider through the whole day, and the times to jump to
   const tSlider = document.getElementById('timeSlider'), tClock = document.getElementById('clock');
   const periodOf = h => h < 4.8 || h >= 21 ? 'Night' : h < 6.4 ? 'Dawn' : h < 9 ? 'Morning' : h < 12 ? 'Late morning' : h < 14 ? 'Midday' : h < 17 ? 'Afternoon' : h < 19 ? 'Golden hour' : 'Dusk';
-  function setTime(h){ setHour(h); if (tSlider){ tSlider.value = h; tSlider.style.setProperty('--p', (h/24*100).toFixed(2) + '%'); } const pe = document.getElementById('period'); if (pe) pe.textContent = periodOf(h); if (tClock){ const hh = Math.floor(h) % 24, mm = Math.floor((h % 1)*60); tClock.textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); }
+  function setTime(h){ setHour(h); if (tSlider){ tSlider.value = h; tSlider.style.setProperty('--p', (h/24*100).toFixed(2) + '%'); } const pe = document.getElementById('period'); if (pe) pe.textContent = periodOf(h); const ro = document.getElementById('readout'); if (ro) ro.textContent = String(Math.floor(h) % 24).padStart(2, '0') + ':' + String(Math.floor((h % 1)*60)).padStart(2, '0') + ' · ' + periodOf(h); if (tClock){ const hh = Math.floor(h) % 24, mm = Math.floor((h % 1)*60); tClock.textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); }
     document.querySelectorAll('[data-h]').forEach(b => b.classList.toggle('on', Math.abs(+b.dataset.h - h) < .01)); }
   if (tSlider) tSlider.addEventListener('input', () => setTime(+tSlider.value));
   document.querySelectorAll('[data-h]').forEach(b => b.addEventListener('click', () => setTime(+b.dataset.h)));
+  // settings opens on the right, as in the sky city; the turn buttons either side of the cards
+  { const dt_ = document.getElementById('deckToggle'), dk = document.getElementById('deck');
+    if (dt_ && dk) dt_.addEventListener('click', () => { dk.hidden = !dk.hidden; dt_.textContent = dk.hidden ? 'Settings' : 'Close'; dt_.setAttribute('aria-expanded', String(!dk.hidden)); }); }
+  document.getElementById('rotL') && document.getElementById('rotL').addEventListener('click', () => { yawT -= PI/4; });
+  document.getElementById('rotR') && document.getElementById('rotR').addEventListener('click', () => { yawT += PI/4; });
 
   /* ---------- every frame ---------- */
   // the reflection pass: everything above the water, flipped upside down about it and drawn flat in its own colors (no

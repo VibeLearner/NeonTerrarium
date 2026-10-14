@@ -988,12 +988,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     red: C(0xb84a3c), redD: C(0x8a3329), jade: C(0x3a8a76), jade2: C(0x276556), lattice: C(0x5a2a22),   // (the pagoda house: lacquer red, jade tiles)
     rust: C(0xc4703e), rust2: C(0x9e5530), solar: C(0x2b4877), solarL: C(0x6f8fbf), tank: C(0xb9b7ad),
     apricot: C(0xe8a578), butter: C(0xe9c877), mist: C(0x98c6bb), sage: C(0xadc493), rose: C(0xd99788), blushD: C(0xe2ad99),
-    neonG: C(0x8dffc6).multiplyScalar(1.1), neonP: C(0xff86b4).multiplyScalar(1.1), pool: C(0x46c2b0).multiplyScalar(1.1), fall: C(0xb8f4e6).multiplyScalar(1.1), lily: C(0x5f9a5a), moss: C(0x7f9e5c) };   // (the grotto: neon trim and signs, the lit pool and its falls)
+    neonG: C(0x8dffc6).multiplyScalar(1.1), neonP: C(0xff86b4).multiplyScalar(1.1), pool: C(0x46c2b0).multiplyScalar(1.1), fall: C(0xb8f4e6).multiplyScalar(1.1), lily: C(0x5f9a5a), moss: C(0x7f9e5c), timber: C(0x5a3a2a), lanternR: C(0xe0503a).multiplyScalar(1.1), screen: C(0x7fd0ff).multiplyScalar(1.1) };   // (the grotto: neon trim and signs, the lit pool and its falls)
   // the plaster colors a home can be washed in besides white: soft, chalky, and all from the scene's own colors (the sand,
   // the terracotta, the sea's teal, the meadow's sage), so a street of them reads as one watercolor
   const PLASTER = [HP.blushD, HP.apricot, HP.butter, HP.mist, HP.sage, HP.rose, HP.apricot, HP.mist];   // (the garden terrace: weathered rust, solar glass)
   for (const c of HP.leaf) LEAFC.add(c);
-  GLOW.set(HP.neonG, 1).set(HP.neonP, 1).set(HP.pool, .75).set(HP.fall, .85).set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
+  GLOW.set(HP.lanternR, 1).set(HP.screen, .9).set(HP.neonG, 1).set(HP.neonP, 1).set(HP.pool, .75).set(HP.fall, .85).set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
   Object.assign(GEO, { cyl12: new THREE.CylinderGeometry(1, 1, 1, 12), cyl16: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.IcosahedronGeometry(1, 1),
     dome: new THREE.SphereGeometry(1, 12, 6, 0, PI*2, 0, PI/2), ring: new THREE.CylinderGeometry(1, 1, 1, 16, 1, true),
     frus4: new THREE.CylinderGeometry(.62, 1, 1, 4, 1).rotateY(PI/4), half16: new THREE.CylinderGeometry(1, 1, 1, 16, 1, false, -PI/2, PI), hip4: new THREE.CylinderGeometry(.08, 1, 1, 4, 1).rotateY(PI/4) });   // (square frustums: a roof's flared skirt, and a hipped roof)
@@ -1207,13 +1207,112 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       if (!ctx.below){ box(T, .36, .5, .36, .06, .8, .06, HP.metal); for (let k = 0; k < 5; k++) if (D.chance(.75)) pot(T, D, D.r(-1.2, 1.2), .12, D.r(.9, 1.15), 1); }
       return top;
     } },
-    // COMMERCIAL. The grotto market (boards 20, 14, 22): a round hill of the coast's own limestone, in strata, on flat
+    // COMMERCIAL (the commercial zone mixes these four; see CW).
+    // the noodle stall (board 09): a little box of a shop with its whole front open on a lit kitchen, a counter and stools,
+    // cloth flaps over the opening, a tiled canopy, vertical neon signs off its side; on the roof the clutter of a city
+    // stall (air units, pipes, a water drum) and now and then an old rail beam on posts gone over to vines
+    noodle: { name: 'Noodle stall', com: true, r: 1.7, rb: 1.05, build(T, R, D, ctx){
+      const y0 = ctx.below ? 0 : .12, w = R.r(1.5, 1.8), d = R.r(1.1, 1.3), h = R.r(1.0, 1.12), zf = d/2 - .1, wall = R.pick([HP.teal, HP.sea, HP.mist, HP.rust2, HP.teal]);
+      if (!ctx.below){ box(T, 0, .06, .1, w + .6, .12, d + .8, HP.stone); }
+      box(T, 0, y0 + h/2, -.1, w, h, d, wall);
+      box(T, 0, y0 + h - .04, -.1, w + .06, .08, d + .06, HP.rail);
+      box(T, 0, y0 + .6, zf + .02, w - .26, .5, .04, HP.lamp);   // (the lit kitchen)
+      for (let k = 0; k < 3; k++) box(T, -w/2 + .35 + k*(w - .7)/2, y0 + .62, zf + .05, .16, .1, .04, HP.metal);   // (pots on the range)
+      box(T, 0, y0 + .36, zf + .17, w - .16, .07, .3, HP.wood); box(T, 0, y0 + .17, zf + .29, w - .16, .34, .04, D.pick([HP.rust, HP.red, HP.wood]));
+      const noren = D.pick([HP.red, HP.cream, HP.doorT]); for (let k = 0; k < 4; k++) box(T, -w*.36 + k*w*.24, y0 + h - .2, zf + .06, w*.2, .22, .02, k % 2 ? noren : HP.cream);
+      if (!ctx.below) for (let k = 0; k < 3; k++){ const sx = -w*.3 + k*w*.3; T.add(GEO.cyl8, mat(sx, .27, zf + .55, 0, 0, 0, .025, .3, .025), HP.metal); T.add(GEO.cyl8, mat(sx, .43, zf + .55, 0, 0, 0, .1, .04, .1), D.pick([HP.red, HP.butter, HP.teal])); }
+      else { box(T, 0, .04, zf + .45, w, .06, .5, HP.wood); box(T, 0, .3, zf + .68, w, .04, .03, HP.rail); }
+      box(T, 0, y0 + h + .02, zf + .32, w + .3, .05, .7, D.pick([HP.tile, HP.terra2, HP.jade]));   // (the canopy)
+      for (const sx of [-1, 1]) T.add(GEO.cyl5, mat(sx*(w/2 + .1), y0 + h - .2, zf + .62, 0, 0, 0, .025, .45, .025), HP.rail);
+      const sd = D.chance(.5) ? 1 : -1; for (let k = 0; k < D.i(1, 2); k++){ const sz = zf - .15 - k*.45;
+        box(T, sd*(w/2 + .08), y0 + h*.62 + k*.12, sz, .06, .74, .24, HP.frame); box(T, sd*(w/2 + .12), y0 + h*.62 + k*.12, sz, .03, .64, .18, D.pick([HP.neonP, HP.neonG, HP.lamp]));
+        for (let j = 0; j < 3; j++) box(T, sd*(w/2 + .14), y0 + h*.62 + k*.12 + .2 - j*.2, sz, .02, .08, .1, HP.frame); }
+      const top = y0 + h + .04;
+      if (!ctx.above){
+        box(T, -w*.25, top + .16, -.3, .4, .3, .34, HP.metal); box(T, -w*.25, top + .16, -.12, .26, .2, .02, HP.rail);   // (an air unit)
+        T.add(GEO.cyl12, mat(w*.25, top + .25, -.4, 0, 0, 0, .16, .5, .16), HP.tank); T.add(GEO.cyl5, mat(w*.25 + .2, top + .05, 0, 0, 0, PI/2, .03, .5, .03), HP.metal);
+        for (let k = 0; k < 3; k++) if (D.chance(.7)) pot(T, D, D.r(-w*.4, w*.4), top, zf - .15, .8);
+        for (let k = 0; k < 4; k++) if (D.chance(.6)) T.add(GEO.ico, mat(D.r(-w*.45, w*.45), top - .1, zf + .04, 0, 0, 0, .07, D.r(.2, .32), .07), D.pick(HP.leaf));
+        if (!ctx.below && D.chance(.55)){ const by = top + .7;   // (the old rail beam, overgrown)
+          for (const sx of [-1, 1]) box(T, sx*(w/2 + .15), by/2, -.6, .12, by, .12, HP.rust2);
+          box(T, 0, by + .06, -.6, w + .7, .14, .3, HP.rust2); for (let k = 0; k < 5; k++) plant(T, D, -w/2 + k*w/4, by + .13, -.6, .8);
+          for (let k = 0; k < 4; k++) T.add(GEO.ico, mat(D.r(-w/2, w/2), by - .2, -.45, 0, 0, 0, .07, D.r(.25, .35), .07), D.pick(HP.leaf)); } }
+      return top;
+    } },
+    // the lantern shophouse (board 28): a narrow two-floor house of dark timber, its ground floor an open shop spilling crates
+    // of fruit under an awning, signs hung out sideways off the front, the upper floor jutting over the street with lattice
+    // windows and a planted balcony; a string of lanterns slung across the front between two poles; a tiled hip roof
+    lantern: { name: 'Lantern shophouse', com: true, r: 1.8, rb: 1.15, build(T, R, D, ctx){
+      const w = R.r(1.4, 1.65), d = R.r(1.5, 1.8), fh = .95, fl = ctx.below ? 1 : 2, up = R.pick([HP.cream, HP.blush, HP.butter, HP.mist, HP.cream]);
+      let y = ctx.below ? 0 : .12;
+      if (!ctx.below) box(T, 0, .06, .15, w + .6, .12, d + .9, HP.stone);
+      for (let f = 0; f < fl; f++){ const shop = f === 0 && !ctx.below, oz = shop ? 0 : .15, wc = shop ? HP.timber : up;
+        box(T, 0, y + fh/2, oz, w, fh, d, wc);
+        for (const sx of [-1, 1]) box(T, sx*w/2, y + fh/2, oz + d/2, .09, fh, .09, HP.timber);
+        box(T, 0, y + fh - .04, oz, w + .08, .08, d + .08, HP.timber);
+        if (shop){ box(T, 0, y + .48, d/2 + .02, w - .24, .72, .04, HP.lamp);
+          for (let k = 0; k < 3; k++){ const cx = -w*.3 + k*w*.3; box(T, cx, .2, d/2 + .2, .3, .16, .24, HP.wood); for (let j = 0; j < 3; j++) T.add(GEO.ico, mat(cx - .08 + j*.08, .32, d/2 + .2, 0, 0, 0, .05, .05, .05), D.pick(HP.flower)); }
+          box(T, 0, y + fh - .1, d/2 + .25, w + .1, .04, .5, D.pick([HP.terra, HP.teal, HP.red, HP.sea])); }
+        else { latticeZ(T, D, -w*.22, y + fh*.55, oz + d/2, .38, .42); latticeZ(T, D, w*.22, y + fh*.55, oz + d/2, .38, .42);
+          if (f > 0 || ctx.below){ box(T, 0, y + .04, oz + d/2 + .18, w*.85, .06, .32, HP.timber); for (let k = 0; k <= 5; k++) box(T, -w*.42 + k*w*.84/5, y + .2, oz + d/2 + .33, .03, .3, .03, HP.timber);
+            box(T, 0, y + .36, oz + d/2 + .33, w*.85, .04, .04, HP.timber); for (let k = 0; k < 2; k++) if (D.chance(.75)) pot(T, D, -w*.3 + k*w*.6, y + .07, oz + d/2 + .2, .8);
+            for (let k = 0; k < 2; k++) if (D.chance(.6)) T.add(GEO.ico, mat(D.r(-w*.4, w*.4), y - .02, oz + d/2 + .34, 0, 0, 0, .06, D.r(.2, .3), .06), D.pick(HP.leaf)); } }
+        latticeZ(T, D, 0, y + fh*.55, oz - d/2 - .07, .4, .38);
+        // signs hung out sideways off the front corners
+        for (const sx of [-1, 1]) if (D.chance(shop ? .9 : .5)){ const sy = y + fh*.55, sz = oz + d/2 + .18;
+          box(T, sx*(w/2 - .02), sy, sz, .24, .56, .05, HP.frame); box(T, sx*(w/2 - .02), sy, sz, .2, .48, .07, D.pick([HP.lamp, HP.neonP, HP.neonG, HP.butter, HP.red]));
+          box(T, sx*(w/2 - .02), sy + .32, sz - .06, .03, .1, .16, HP.rail); }
+        y += fh; }
+      let top;
+      if (!ctx.above){ const oz = ctx.below ? 0 : .15; T.add(GEO.hip4, mat(0, y + .32, oz, 0, 0, 0, (w + .45)/2*SQ2, .64, (d + .45)/2*SQ2), HP.tile); T.add(GEO.hip4, mat(0, y + .02, oz, 0, 0, 0, (w + .5)/2*SQ2, .05, (d + .5)/2*SQ2), HP.terra2);
+        top = y + .05; }
+      else { box(T, 0, y - .04, 0, w + .1, .08, d + .1, HP.timber); top = y; }
+      if (!ctx.below){ const lz = d/2 + .75, px = w/2 + .3;   // (the lantern string)
+        for (const sx of [-1, 1]) T.add(GEO.cyl5, mat(sx*px, .95, lz, 0, 0, 0, .03, 1.7, .03), HP.timber);
+        const n = 6; for (let k = 0; k < n; k++){ const t = (k + .5)/n, x = -px + t*2*px, sag = 1.68 - Math.sin(t*PI)*.25;
+          box(T, x, sag, lz, .14, .17, .14, k % 2 ? HP.lamp : HP.lanternR); box(T, x, sag + .1, lz, .1, .03, .1, HP.timber); }
+        for (let k = 0; k < 2; k++) if (D.chance(.7)) pot(T, D, D.r(-w/2, w/2), .12, -d/2 - .2, .9); }
+      return top;
+    } },
+    // the solar workshop (board 29): a chunky rust-orange box, its front a workbench under a strip light with a glowing
+    // screen, tools and pots on the shelves; a big solar panel tilted over it all on a frame, overhanging; a water tank and a
+    // flue pipe on the roof, a ladder up the side, a roof planter trailing vines, pots and a paved pad out front
+    kiosk: { name: 'Solar workshop', com: true, r: 1.8, rb: 1.15, build(T, R, D, ctx){
+      const y0 = ctx.below ? 0 : .12, w = R.r(1.6, 1.9), d = R.r(1.3, 1.5), h = R.r(1.1, 1.25), zf = d/2;
+      if (!ctx.below){ box(T, 0, .06, .1, w + .6, .12, d + .8, HP.stone); for (let k = 0; k < 3; k++) box(T, -w*.3 + k*w*.3, .13, zf + .5, .4, .02, .3, HP.sand); }
+      box(T, 0, y0 + h/2, 0, w, h, d, HP.rust);
+      box(T, 0, y0 + h - .05, 0, w + .08, .1, d + .08, HP.rust2); box(T, 0, y0 + .05, 0, w + .06, .1, d + .06, HP.rust2);
+      box(T, 0, y0 + .6, zf + .01, w - .3, .62, .04, HP.glassD);   // (the open front: dark inside)
+      box(T, 0, y0 + .9, zf + .04, w - .4, .04, .04, HP.lamp);   // (the strip light)
+      box(T, 0, y0 + .36, zf + .14, w - .25, .06, .3, HP.wood); box(T, 0, y0 + .18, zf + .06, w - .25, .3, .1, HP.rust2);
+      box(T, -w*.2, y0 + .52, zf + .08, .3, .22, .03, HP.frame); box(T, -w*.2, y0 + .52, zf + .1, .26, .18, .02, HP.screen);
+      for (let k = 0; k < 3; k++) if (D.chance(.8)) pot(T, D, w*.05 + k*w*.13, y0 + .39, zf + .12, .6);
+      for (let k = 0; k < 4; k++) box(T, w*.25 + (k % 2)*.1, y0 + .7 + Math.floor(k/2)*.1, zf + .04, .04, .08, .02, D.pick([HP.blue, HP.metal, HP.butter]));
+      if (!ctx.below){ T.add(GEO.cyl8, mat(w*.25, .3, zf + .45, 0, 0, 0, .09, .36, .09), HP.wood); T.add(GEO.cyl8, mat(w*.25, .5, zf + .45, 0, 0, 0, .15, .04, .15), HP.wood); }   // (a stool)
+      else { box(T, 0, .04, zf + .3, w, .06, .4, HP.rust2); box(T, 0, .3, zf + .48, w, .04, .03, HP.rail); }
+      for (let k = 0; k < 6; k++) box(T, -w/2 - .02, y0 + .15 + k*.17, -d*.2, .04, .03, .3, HP.metal);   // (a ladder rung up the side)
+      for (const sz of [-d*.2 - .15, -d*.2 + .15]) box(T, -w/2 - .02, y0 + h/2, sz, .04, h, .03, HP.metal);
+      const top = y0 + h + .04;
+      if (!ctx.above){
+        const pw = w + .3, pd = d + .35, tilt = .3, py = top + .55;   // (rising toward the back, its front edge low over the counter)
+        for (const [lx, lz, lh] of [[-pw/2 + .15, -pd/2 + .2, .95], [pw/2 - .15, -pd/2 + .2, .95], [-pw/2 + .15, pd/2 - .25, .2], [pw/2 - .15, pd/2 - .25, .2]]) box(T, lx, top + lh/2, lz, .05, lh, .05, HP.metal);
+        T.add(GEO.box, mat(0, py, 0, tilt, 0, 0, pw, .06, pd), HP.solar);
+        for (let k = 1; k < 5; k++) T.add(GEO.box, mat(-pw/2 + k*pw/5, py + .035, 0, tilt, 0, 0, .015, .02, pd), HP.solarL);
+        for (let k = 1; k < 3; k++) T.add(GEO.box, mat(0, py + .035 - Math.sin(tilt)*(-pd/2 + k*pd/3), Math.cos(tilt)*(-pd/2 + k*pd/3), tilt, 0, 0, pw, .02, .015), HP.solarL);
+        T.add(GEO.cyl12, mat(w*.3, top + .3, -d*.25, 0, 0, 0, .2, .55, .2), HP.tank); for (const by of [.12, .45]) T.add(GEO.cyl12, mat(w*.3, top + by, -d*.25, 0, 0, 0, .215, .04, .215), HP.metal);
+        T.add(GEO.cyl5, mat(-w*.32, top + .5, -d*.3, 0, 0, 0, .05, 1.0, .05), HP.metal);
+        box(T, -w*.1, top + .08, zf - .15, w*.6, .14, .2, HP.rust2); for (let k = 0; k < 3; k++) plant(T, D, -w*.35 + k*w*.25, top + .12, zf - .15, .85);
+        for (let k = 0; k < 3; k++) if (D.chance(.7)) T.add(GEO.ico, mat(-w*.1 + D.r(-w*.25, w*.25), top - .12, zf + .04, 0, 0, 0, .07, D.r(.22, .34), .07), D.pick(HP.leaf)); }
+      if (!ctx.below) for (let k = 0; k < 4; k++) if (D.chance(.75)) pot(T, D, D.r(-w/2 - .1, w/2 + .1), .12, D.r(zf + .3, zf + .6), 1);
+      return top;
+    } },
+    // The grotto market (boards 20, 14, 22): a round hill of the coast's own limestone, in strata, on flat
     // ground and opened toward the front by one great arch, so the camera looks into it. Inside, ring terraces step up the
     // back wall, each lined with lit shopfronts under awnings and little neon signs, planters spilling vines over the edges,
     // a stair up the middle; a pool on the floor, lit from below, with ribbons of water falling into it through a round
     // skylight in the roof. The arch is ringed with stones and a green neon trim; neon blade signs on its pillars; the roof is
     // moss and grass and tree ferns, with the skylight's rim of stones and vines hanging down through it.
-    grotto: { name: 'Grotto market', com: true, r: 3.0, rb: 2.7, build(T, R, D, ctx){
+    grotto: { name: 'Grotto market', com: true, solo: true, r: 3.0, rb: 2.7, build(T, R, D, ctx){
       const y0 = .12, zc = -.25, ax = R.r(2.5, 2.7), az = R.r(2.25, 2.45), rc = R.r(1.68, 1.8), hc = R.r(2.0, 2.25), ao = R.r(1.05, 1.18), roc = .5, NS = 26;
       const ROCK = [PAL.rock[0], PAL.rock[1], PAL.rock[3], PAL.rock[2], PAL.rock[0], PAL.rock[4]], band0 = R.i(0, 5);
       const Ly = []; { let y = y0; const Ht = R.r(3.5, 3.85); while (y < Ht - .1){ const hh = Math.min(R.r(.32, .44), Ht - y); Ly.push([y, hh]); y += hh; } }
@@ -1285,7 +1384,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       return Htop + .1;
     } },
   };
-  const COM = k => !!(KINDS[k] && KINDS[k].com), RES_KEYS = Object.keys(KINDS).filter(k => !KINDS[k].com);
+  // COM: a shop (the commercial zone's); SOLO: one that stands alone on the ground (nothing stacks on it, it stacks on nothing)
+  const COM = k => !!(KINDS[k] && KINDS[k].com), SOLO = k => !!(KINDS[k] && KINDS[k].solo), RES_KEYS = Object.keys(KINDS).filter(k => !KINDS[k].com), COM_KEYS = Object.keys(KINDS).filter(k => KINDS[k].com);
   const KIND_KEYS = Object.keys(KINDS);
   // ---- outlines (seen from above): convex hulls, placed in the world, tested against each other ----
   function hull2(P){ if (P.length < 3) return [[-.5, -.5], [.5, -.5], [.5, .5], [-.5, .5]];
@@ -1941,7 +2041,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const RN = 48, ringGeo = new THREE.BufferGeometry(); ringGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array((RN + 1)*2*3), 3));
   { const idx = []; for (let i = 0; i < RN; i++){ const a = i*2, b = a + 1, c = a + 2, d = a + 3; idx.push(a, b, c, b, d, c); } ringGeo.setIndex(idx); }
   const ring = new THREE.Mesh(ringGeo, ringM); ring.visible = false; ring.frustumCulled = false; ring.renderOrder = 6; scene.add(ring);
-  const PL = { kind: null, rot: 0, hit: null, ok: null, ptr: null, onto: null, seed: 1 + PIECES.length*7 + (PIECES.reduce((a, p) => a + (p.seed || 0), 0) % 997), zkind: 'townhouse', zseed: 0 };   // (zkind, zseed: single mode's home)
+  const PL = { kind: null, rot: 0, hit: null, ok: null, ptr: null, onto: null, seed: 1 + PIECES.length*7 + (PIECES.reduce((a, p) => a + (p.seed || 0), 0) % 997), zkinds: { zone: 'townhouse', czone: 'noodle' }, zseed: 0 };   // (zkinds, zseed: single mode's building, per zone)
   PL.zseed = PL.seed + 500;   // (seed: the next home's look; V rolls another)
   const status = document.getElementById('placeStatus');
   // the home under the pointer, if any (its block)
@@ -1956,13 +2056,14 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const pieceAt = (cx, cy) => { const h = pieceHit(cx, cy); return h ? h.piece : null; };
   // what the next single home is: in one-by-one mode the picked kind and a fresh look each time; with the homes brush at its
   // smallest (single mode) a kind V steps through and a look that stays put until Shift+V, so the same home goes down again
-  const oneHome = () => PL.kind === 'zone' && ZONE.size === 0;
-  const curKind = () => oneHome() ? PL.zkind : PL.kind, curSeed = () => oneHome() ? PL.zseed : PL.seed;
+  const isZone = k => k === 'zone' || k === 'czone', ZUNIT = () => PL.kind === 'czone' ? 'shop' : 'home';
+  const oneHome = () => isZone(PL.kind) && ZONE.size === 0;
+  const curKind = () => oneHome() ? PL.zkinds[PL.kind] : PL.kind, curSeed = () => oneHome() ? PL.zseed : PL.seed;
   function showGhost(){
     PL.onto = null; PL.side = null; zHide();
-    const K = curKind(), S = curSeed(), pre = oneHome() ? 'one home: ' + K + ' (V next) ' : '';
+    const K = curKind(), S = curSeed(), pre = oneHome() ? 'one ' + ZUNIT() + ': ' + KINDS[K].name.toLowerCase() + ' (V next) ' : '';
     const say = (t, ok) => { if (status){ status.textContent = pre + t; status.style.color = ok ? '#5c7060' : '#c0623f'; } };
-    const hov0 = K && !COM(K) && PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, hov = hov0 && !(hov0.top && COM(hov0.piece.kind)) ? hov0 : null, over = hov && hov.top ? hov.piece : null;   // (a shop goes on the ground only; nothing stacks on a shop)
+    const hov0 = K && !SOLO(K) && PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, hov = hov0 && !(hov0.top && SOLO(hov0.piece.kind)) ? hov0 : null, over = hov && hov.top ? hov.piece : null;   // (the grotto goes on the ground only, and nothing stacks on it)
     if (hov && !hov.top){   // against a wall: build off that side, on that floor
       const sp = sideSpot(hov.piece, K, hov.point.x, hov.point.z, S); PL.ok = sp; PL.side = sp.ok ? sp : null;
       ghost.geometry = blockOf(K, S, hov.piece.level > 0, false).geo; ghost.position.set(sp.x, sp.ok ? sp.y : hov.piece.y, sp.z); ghost.rotation.y = sp.rot; ghost.visible = true; ring.visible = false;
@@ -2000,10 +2101,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // Right click in zone mode clears the homes inside the brush.
   const ZONE = { on: true, size: 2 }, ZSIZE = [0, 2.8, 4.2, 5.8, 7.6, 9.6, 12];
   const ZW = [['townhouse', .26], ['villa', .2], ['tower', .15], ['pods', .14], ['pagoda', .12], ['terrace', .13]];
-  const zPick = R => { let u = R.f(); for (const [k, w] of ZW){ if ((u -= w) < 0) return k; } return 'townhouse'; };
+  const CW = [['noodle', .3], ['lantern', .3], ['kiosk', .26], ['grotto', .14]];   // (the commercial zone's mix)
+  const zPick = R => { const W = PL.kind === 'czone' ? CW : ZW; let u = R.f(); for (const [k, w] of W){ if ((u -= w) < 0) return k; } return W[0][0]; };
+  const zPickStack = R => { for (let t = 0; t < 8; t++){ const k = zPick(R); if (!SOLO(k)) return k; } return PL.kind === 'czone' ? 'lantern' : 'townhouse'; };
   let zLayout = null, zKey = '';
   function zoneLayout(){
-    const key = PL.seed + ':' + ZONE.size; if (key === zKey) return zLayout; zKey = key;
+    const key = PL.kind + ':' + PL.seed + ':' + ZONE.size; if (key === zKey) return zLayout; zKey = key;
     const R = rng(Math.imul(PL.seed, 2246822519) ^ ZONE.size*7919), rad = ZSIZE[ZONE.size], out = [];
     const target = ZONE.size === 0 ? 1 : Math.max(2, Math.round(PI*rad*rad/15));
     const maxH = ZONE.size <= 1 ? 2 : ZONE.size <= 3 ? 4 : 6;
@@ -2012,8 +2115,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       const lx = Math.cos(a)*q, lz = Math.sin(a)*q;
       if (out.some(o => Math.hypot(o.lx - lx, o.lz - lz) < o.rb + rb + R.r(-.1, 2.4))) continue;
       const h = 1 + Math.floor(Math.pow(R.f(), 1.4)*maxH*(1 - .45*q/Math.max(rad, 1))), stack = [];
-      for (let k = 1; k < Math.min(h, maxH); k++) stack.push(R.chance(.55) ? kind : zPick(R));
-      out.push({ kind, rb, lx, lz, rot: R.chance(.5) ? 0 : R.pick([PI/2, -PI/2, PI, R.r(-.6, .6)]), seed: R.i(1, 1e6), stack });
+      if (!SOLO(kind)) for (let k = 1; k < Math.min(h, maxH); k++) stack.push(R.chance(.55) ? kind : zPickStack(R));
+      out.push({ kind, rb, lx, lz, rot: SOLO(kind) || R.chance(.5) ? 0 : R.pick([PI/2, -PI/2, PI, R.r(-.6, .6)]), seed: R.i(1, 1e6), stack });
     }
     return zLayout = out; }
   const zGhosts = [];
@@ -2030,9 +2133,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const kinds = [sp.kind, ...sp.stack], ck = check(sp.kind, sp.x, sp.z, sp.seed, sp.rot);
     let x = sp.x, z = sp.z, rot = sp.rot, y = 0, base = null, host = null, lv = 0, how = 'ground';
     if (ck.ok) y = ck.y;
-    else if (!ck.by) return null;
+    else if (!ck.by || SOLO(sp.kind)) return null;
     else {
-      const unders = PIECES.filter(q => !COM(q.kind) && inHull(q.hullW, sp.x, sp.z)).map(stackTop).sort((a, b) => (b.y + b.top) - (a.y + a.top));
+      const unders = PIECES.filter(q => !SOLO(q.kind) && inHull(q.hullW, sp.x, sp.z)).map(stackTop).sort((a, b) => (b.y + b.top) - (a.y + a.top));
       if (unders.length){ base = unders[0]; x = base.x; z = base.z; rot = base.rot; y = base.y + base.top; lv = base.level + 1; how = 'stack'; }
       else { const ss = sideSpot(ck.by, sp.kind, sp.x, sp.z, sp.seed); if (!ss.ok) return null;
         x = ss.x; z = ss.z; rot = ss.rot; y = ss.y; host = ss.host; lv = host.level; how = 'side'; } }
@@ -2055,7 +2158,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s_ = Math.sin(t);
       for (const [j, rr] of [[0, r], [1, r + .18]]){ const x = hit.x + c*rr, z = hit.z + s_*rr, o = (i*2 + j)*3; a[o] = x; a[o + 1] = heightAt(x, z) + .07; a[o + 2] = z; } }
     ringGeo.attributes.position.needsUpdate = true; ring.visible = true; ringM.color.set(n ? 0x7dffb0 : 0xff6a5a);
-    if (status){ status.textContent = 'brush ' + ZONE.size + ': ' + n + ' homes' + (ns ? ', ' + ns + ' on top of homes' : '') + (nd ? ', ' + nd + ' against homes' : '') + (n ? '' : ': no room here'); status.style.color = n ? '#5c7060' : '#c0623f'; }
+    if (status){ status.textContent = 'brush ' + ZONE.size + ': ' + n + ' ' + ZUNIT() + 's' + (ns ? ', ' + ns + ' on top of others' : '') + (nd ? ', ' + nd + ' against others' : '') + (n ? '' : ': no room here'); status.style.color = n ? '#5c7060' : '#c0623f'; }
   }
   function placeZone(){
     if (!PL.hit || PL.hit.sea) return;
@@ -2065,7 +2168,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       P.blocks.forEach((bk, i) => { p = i === 0 ? addPiece(bk.kind, P.x, P.z, P.rot, bk.y, true, bk.seed, P.base, 0, P.host) : addPiece(bk.kind, P.x, P.z, P.rot, p.y + p.top, true, bk.seed, p); col.push(p); });
       // now and then a room reaches out off the side of a tall stack, a floor or two up
       const R = rng(sp.seed*7 + 3);
-      if (col.length >= 3 && R.chance(.45)){ const host = col[R.i(1, col.length - 2)], kind = R.pick(['townhouse', 'villa', host.kind]), a = host.rot + R.i(0, 3)*PI/2;
+      if (col.length >= 3 && R.chance(.45)){ const host = col[R.i(1, col.length - 2)], kind = R.pick(PL.kind === 'czone' ? ['lantern', 'noodle', host.kind] : ['townhouse', 'villa', host.kind]), a = host.rot + R.i(0, 3)*PI/2;
         const ss = sideSpot(host, kind, host.x + Math.sin(a)*5, host.z + Math.cos(a)*5, sp.seed + 991); if (ss.ok) addPiece(kind, ss.x, ss.z, ss.rot, ss.y, true, sp.seed + 991, null, 0, host); }
     }
     save(); PL.seed++; }
@@ -2075,7 +2178,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // Residential is one zone with two ways to build: the brush (Q/E sizes it; smallest is one home) or one by one (pick a
   // kind). Choosing it turns the zone on in the current way; the way and the kinds show under it while it's on.
   let lastKind = 'townhouse';
-  const resActive = () => PL.kind === 'zone' || !!(PL.kind && KINDS[PL.kind] && !COM(PL.kind)), comActive = () => COM(PL.kind);
+  const resActive = () => PL.kind === 'zone' || !!(PL.kind && KINDS[PL.kind] && !COM(PL.kind)), comActive = () => PL.kind === 'czone' || COM(PL.kind);
   function setMode(zone){
     ZONE.on = zone; const was = resActive();
     document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', (b.dataset.mode === 'zone') === zone));
@@ -2083,7 +2186,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function setKind(k){
     PL.kind = PL.kind === k ? null : k; CN.a = null; connGhost.visible = false; outline.visible = false;
     if (PL.kind && KINDS[PL.kind] && !COM(PL.kind)) lastKind = PL.kind;
-    if (COM(PL.kind)) PL.rot = Math.round(yaw/(PI/12))*(PI/12);   // (a shop comes turned to face the view: its arch toward the camera)
+    if (PL.kind === 'czone' || COM(PL.kind)) PL.rot = Math.round(yaw/(PI/12))*(PI/12);   // (shops come turned to face the view: their fronts (the grotto's arch) toward the camera)
     ghost.visible = ring.visible = false; zHide();
     if (!PL.kind && status) status.textContent = '';
     refreshUI(); }
@@ -2100,13 +2203,13 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const row = (k, t) => '<div class="row"><kbd>' + k + '</kbd><span>' + t + '</span></div>';
     if (PL.kind === 'grass') return '<h4>Grass</h4>' + row('click / drag', 'paint') + row('right drag', 'clear') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: meadow, wildflowers, ferns, tall grass, mix') + row('Alt + drag', 'turn the view');
     if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('click, click', 'pick two buildings to join') + row('V', 'next kind: bridge, skywalk, pergola, arcade, wall (or a wing, if they\'re apart), random') + row('right click', 'take away the walkway under it (or let go of the first pick)');
-    if (PL.kind === 'zone') return '<h4>Residential: brush</h4>' + row('click', 'build the homes in the brush') + row('Q / E', 'bigger / smaller (smallest: one home)') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', ZONE.size ? 'clear the brush' : 'remove the home under it');
+    if (isZone(PL.kind)){ const u = ZUNIT(); return '<h4>' + (PL.kind === 'czone' ? 'Commercial' : 'Residential') + ': brush</h4>' + row('click', 'build the ' + u + 's in the brush') + row('Q / E', 'bigger / smaller (smallest: one ' + u + ')') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', ZONE.size ? 'clear the brush' : 'remove the ' + u + ' under it'); }
     if (COM(PL.kind)) return '<h4>Commercial: ' + KINDS[PL.kind].name.toLowerCase() + '</h4>' + row('click', 'build it (on flat ground)') + row('V', 'another look') + row('R', 'turn (it starts facing you)') + row('right click', 'remove the building under it');
     if (PL.kind && KINDS[PL.kind]) return '<h4>Residential: one by one</h4>' + row('click', 'place (on a roof: stack; on a wall: build off it)') + row('V', 'another look') + row('R', 'turn') + row('right click', 'remove (and all above)') + row('Z', 'switch to the brush');
     return '<h4>Pick a zone or a tool</h4>' + row('right click', 'take away the walkway, home or grass under it') + row('1', 'residential') + row('2', 'commercial') + row('5', 'walkways') + row('6', 'grass');
   }
   document.getElementById('zoneRes') && document.getElementById('zoneRes').addEventListener('click', () => setKind(resActive() ? PL.kind : 'zone'));   // (always the brush: Q/E size it, smallest is one home)
-  document.getElementById('zoneCom') && document.getElementById('zoneCom').addEventListener('click', () => setKind(comActive() ? PL.kind : 'grotto'));
+  document.getElementById('zoneCom') && document.getElementById('zoneCom').addEventListener('click', () => setKind(comActive() ? PL.kind : 'czone'));
   document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode === 'zone')));
   // a ring round (x, z): on the ground, or at height y
   function ringAt(x, z, r, y = null, w = .14){ ringM.depthTest = true; const a = ringGeo.attributes.position.array;
@@ -2245,10 +2348,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       if ((act.b === 0 || e.pointerType === 'touch') && PL.kind){ PL.ptr = { x: e.clientX, y: e.clientY };
         if (PL.kind === 'connect'){ showConnect(); placeConnect(); }
         else if (PL.kind === 'grass') grassStroke(e.clientX, e.clientY, false, true);
-        else if (PL.kind === 'zone' && !oneHome()){ showZoneGhost(); placeZone(); } else { showGhost(); placeHere(); } }
+        else if (isZone(PL.kind) && !oneHome()){ showZoneGhost(); placeZone(); } else { showGhost(); placeHere(); } }
       else if (act.b === 2 && PL.kind === 'connect') unConnect(e.clientX, e.clientY);
       else if (act.b === 2 && !PL.kind) removeAt(e.clientX, e.clientY);   // (no tool: take away what's under the pointer)
-      else if (act.b === 2){ if (PL.kind === 'zone' && !oneHome()){ const h = pick(e.clientX, e.clientY); if (h) clearZone(h.x, h.z); } else { const p = pieceAt(e.clientX, e.clientY); if (p) removePiece(p); } }
+      else if (act.b === 2){ if (isZone(PL.kind) && !oneHome()){ const h = pick(e.clientX, e.clientY); if (h) clearZone(h.x, h.z); } else { const p = pieceAt(e.clientX, e.clientY); if (p) removePiece(p); } }
     }
     ptrs.delete(e.pointerId); if (!ptrs.size){ act = null; canvas.style.cursor = 'grab'; }
   };
@@ -2266,15 +2369,15 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (k === 'h' || e.key === 'Home'){ camGoal.set(HOME.x, TY, HOME.z); return; }
     if (k === 'r'){ PL.rot += (e.shiftKey ? -1 : 1)*PI/12; return; }   // (turn the piece: 15 degrees a press, any angle it lands on)
     if (e.key === '1'){ setKind('zone'); return; }
-    if (e.key === '2'){ setKind('grotto'); return; }
+    if (e.key === '2'){ setKind('czone'); return; }
     if (e.key === '5'){ setKind('connect'); return; }
     if (e.key === '6'){ setKind('grass'); return; }
     if (PL.kind === 'grass' && (k === 'q' || k === 'e')){ GR.size = clamp(GR.size + (k === 'q' ? 1 : -1), 0, GRS.length - 1); return; }
     if (PL.kind === 'grass' && k === 'v'){ GR.style = (GR.style + 1) % GSTYLES.length; return; }
     if (PL.kind === 'connect' && k === 'v'){ CN.type = (CN.type + 1) % LINK_TYPES.length; CN.key = ''; return; }
-    if (PL.kind === 'zone' && (k === 'q' || k === 'e')){ ZONE.size = clamp(ZONE.size + (k === 'q' ? 1 : -1), 0, ZSIZE.length - 1); return; }   // (Q: a bigger brush, E: a smaller one)
+    if (isZone(PL.kind) && (k === 'q' || k === 'e')){ ZONE.size = clamp(ZONE.size + (k === 'q' ? 1 : -1), 0, ZSIZE.length - 1); return; }   // (Q: a bigger brush, E: a smaller one)
     if (k === 'v'){   // (single mode: the next kind of home, Shift+V another look of it; otherwise another look or layout)
-      if (oneHome()){ if (e.shiftKey) PL.zseed++; else PL.zkind = RES_KEYS[(RES_KEYS.indexOf(PL.zkind) + 1) % RES_KEYS.length]; } else PL.seed++; return; }
+      if (oneHome()){ if (e.shiftKey) PL.zseed++; else { const KS = PL.kind === 'czone' ? COM_KEYS : RES_KEYS; PL.zkinds[PL.kind] = KS[(KS.indexOf(PL.zkinds[PL.kind]) + 1) % KS.length]; } } else PL.seed++; return; }
     if (e.key === 'Escape' || e.key === '0'){ if (PL.kind) setKind(PL.kind); return; }
     if (k === 'q') yawT -= PI/4;
     else if (k === 'e') yawT += PI/4;
@@ -2346,10 +2449,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function frame(now){
     const dt = Math.min(.1, (now - last)/1000); last = now; fNo++; let q = PROF.on ? performance.now() : 0;
     updateCamera(dt); q = tk('camera', q); stream(3); q = tk('stream', q);
-    { const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkind, PL.rot, GR.size, GR.style, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
+    { const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.rot, GR.size, GR.style, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
       if (gk !== ghostKey){ ghostKey = gk;   // (the ghost is worked out again only when something it shows has changed: the raycasts and checks are the costly part)
         hlClear();
-        if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'grass') showGrass(); else if (PL.kind === 'zone' && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } }
+        if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'grass') showGrass(); else if (isZone(PL.kind) && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } }
     q = tk('ghost', q);
     animTick(dt); const batched = batchTick();
     if (linksDirty && !ANIM.list.length && !batched) buildLinks();   // (not in the same frame as a batch: the two together made a hitch)

@@ -111,8 +111,17 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   /* ---------- the bend, the haze, the materials ---------- */
   const scene = new THREE.Scene();
   const CURV = { ctr: { value: new THREE.Vector2() }, fwd: { value: new THREE.Vector2(1, 0) }, curveK: { value: 0 }, g0: { value: 30 },
-    hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) }, nightK: { value: 0 }, darkK: { value: 0 }, gTime: { value: 0 }, uRip: { value: [...Array(8)].map(() => new THREE.Vector3(0, 0, -99)) } };   // (nightK: the lamps; darkK: full night only; gTime: seconds, for the water's glow)
-  const BEND = `{ vec4 wq = vec4(transformed, 1.0);
+    hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) }, nightK: { value: 0 }, darkK: { value: 0 }, gTime: { value: 0 }, uShop: { value: new THREE.Color(.8, .7, 1.0) }, uShopH: { value: new THREE.Color(.78, .62, 1.0) }, uShopE: { value: new THREE.Color(.55, .4, .9) }, uRip: { value: [...Array(8)].map(() => new THREE.Vector3(0, 0, -99)) } };   // (nightK: the lamps; darkK: full night only; gTime: seconds, for the water's glow)
+
+  // The shops' light by night, set apart from the homes' gold: three palettes, all soft enough for watercolor. The windows
+  // take `w`; the light they cast on the ground runs from `h` at its heart to `e` at its rim.
+  //   lilac:   a dusky violet (gold's complement, so a market reads at a glance among the homes), lavender on the ground
+  //   peach:   a lantern rose-peach, a warm market glow that stays apart from the homes' amber
+  //   sunleaf: a pale green-gold, like light through new leaves; the solar one
+  const SHOPLIGHTS = { lilac: { w: [.8, .7, 1.0], h: [.78, .62, 1.0], e: [.55, .4, .9] }, peach: { w: [.92, .56, .5], h: [.95, .62, .52], e: [.86, .38, .46] }, sunleaf: { w: [.86, .96, .56], h: [.85, .95, .5], e: [.45, .75, .35] } };
+  let SHOPLIGHT = 'lilac'; try { const v = localStorage.getItem('neonIsland.coast.shoplight'); if (SHOPLIGHTS[v]) SHOPLIGHT = v; } catch (e) {}
+  function setShopLight(n){ const L = SHOPLIGHTS[n]; if (!L) return; SHOPLIGHT = n; CURV.uShop.value.setRGB(...L.w); CURV.uShopH.value.setRGB(...L.h); CURV.uShopE.value.setRGB(...L.e); try { localStorage.setItem('neonIsland.coast.shoplight', n); } catch (e) {} }
+  setShopLight(SHOPLIGHT);  const BEND = `{ vec4 wq = vec4(transformed, 1.0);
     #ifdef USE_INSTANCING
       wq = instanceMatrix * wq;   // (a copy's own place in the world: the watercolor shadow is looked up there)
     #endif
@@ -147,7 +156,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // at twice that (born at the back of the packet, gone at its front), stretching longer as it travels (longer waves are
   // faster), weaker as 1/sqrt(r) as it spreads and dying away with time. Adds its height to h; returns how much it shears
   // the water there (the slope of the passing wave, |dh/dt|), which is what makes plankton glow.
-  const GLOW_F = `varying float vGlow; uniform float gTime; uniform vec3 uRip[8];
+  const GLOW_F = `varying float vGlow; uniform float gTime; uniform vec3 uRip[8], uShop;
   float ripW(vec2 q, vec2 c, float age, float amp, inout float h){
     if (age <= 0.0 || age > 3.2) return 0.0;
     float r = length(q - c), cg = 0.42, R = 0.05 + cg*age, w = 0.16 + 0.14*age;
@@ -160,6 +169,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       vec3 gc;
       if (lamp > 0.5) gc = lampY*1.04;
       else if (vGlow > 0.2 && vGlow < 0.3) gc = vColor*1.25;
+      else if (vGlow > 0.1 && vGlow < 0.2){ gc = uShop*(0.9 + 0.12*sh); k = nightK; }   // (.15: a shop's windows, in the shops' own light)
       else if (vGlow > 0.3 && vGlow < 0.4){
         // water, alive by night: dark and still, but stirred here and there (each 2.2-unit cell has its own moment and pace;
         // some stay quiet) and wherever the pointer passes; each stir sends out a ring wave (ripW), and the plankton light up
@@ -285,13 +295,14 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // half the windows, picked by the window's position, so a window never flips when other homes or links are built)
   const GLOW = new Map(), LEAFC = new Set();
   class Tris {
-    constructor(fol = false){ this.p = []; this.c = []; this.gl = null; this.k = 0; this.fol = fol ? [] : null; }
+    constructor(fol = false, shop = false){ this.p = []; this.c = []; this.gl = null; this.k = 0; this.fol = fol ? [] : null; this.shop = shop; }
     append(o){ const n0 = this.p.length/3; for (let i = 0; i < o.p.length; i++){ this.p.push(o.p[i]); this.c.push(o.c[i]); }
       if (o.gl) for (let i = 0; i < o.gl.length; i += 3) (this.gl || (this.gl = [])).push(o.gl[i] + n0, o.gl[i + 1], o.gl[i + 2]);
       if (o.fol && this.fol) for (const f of o.fol) this.fol.push(f); }
     glowRun(n0, col){ let v = GLOW.get(col); if (v === undefined) return;
       if (v < 0){ const P = this.p, n1 = this.p.length/3; let x = 0, y = 0, z = 0; for (let i = n0; i < n1; i++){ x += P[i*3]; y += P[i*3 + 1]; z += P[i*3 + 2]; } const k = n1 - n0;
         v = hash2(Math.round(x/k*8)*73856093 ^ Math.round(z/k*8)*19349663, Math.round(y/k*8)) < -v ? .9 : 0; }   // (lit or not by where the window is: the same window stays lit whatever else is built)
+      if (v && this.shop && !(v > .2 && v < .4)) v = .15;   // (a shop: its windows and glass lit in the shops' color, not the homes' gold)
       if (v) (this.gl || (this.gl = [])).push(n0, this.p.length/3 - n0, v); }
     add(geo, m, col){
       // (on a home or a link, a leafy blob isn't drawn as a blob: it's noted, where it is and its size and shape, and grown
@@ -1642,7 +1653,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     return G.I.length ? G.mesh() : null; }
   const geoCache = new Map();
   function blockOf(kind, seed, below, above){ const key = kind + ':' + seed + ':' + (below ? 1 : 0) + (above ? 1 : 0); let g = geoCache.get(key); if (g) return g;
-    const T = new Tris(true), k = KIND_KEYS.indexOf(kind) + 1, R = rng(Math.imul(seed, 2654435761) ^ k*97), D = rng(Math.imul(seed, 1597334677) ^ k*131);
+    const T = new Tris(true, COM(kind)), k = KIND_KEYS.indexOf(kind) + 1, R = rng(Math.imul(seed, 2654435761) ^ k*97), D = rng(Math.imul(seed, 1597334677) ^ k*131);
     const top = KINDS[kind].build(T, R, D, { below, above }), cut = below ? .1 : .6, pts = [];
     let hmax = top; for (let i = 0; i < T.p.length; i += 3){ if (T.p[i + 1] > hmax) hmax = T.p[i + 1]; if (T.p[i + 1] > cut) pts.push([T.p[i], T.p[i + 2]]); }
     g = { geo: T.geo(), fol: folGeo(T.fol), top, hull: hull2(pts), h: hmax }; geoCache.set(key, g);
@@ -1927,7 +1938,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     linksDirty = false; SHD.dirty = true;
     if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); for (const c of linksMesh.children) c.geometry.dispose(); linksMesh = null; }   // (merged copies only: the cached parts stay)
     const T = new Tris(true), pairs = [], deg = new Map(), joined = new Set(), pools = [];
-    for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, 1]);   // (by night: the windows' light on the ground round a home)
+    for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, COM(p.kind) ? 11 : 1]);   // (11: a shop's, in the shops' light)   // (by night: the windows' light on the ground round a home)
     // the connections built with the connect brush come first, as chosen; then the ones neighbors make on their own
     const byId = new Map(PIECES.map(p => [p.id, p])), userKey = new Set();
     for (const u of ULINKS){ const A = byId.get(u.a), B = byId.get(u.b); if (!A || !B) continue; const L = pairOf(A, B); if (!L) continue;
@@ -1953,7 +1964,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       deg.set(A, (deg.get(A) || 0) + 1); deg.set(B, (deg.get(B) || 0) + 1); joined.add(A.id + '|' + B.id); joined.add(B.id + '|' + A.id);
       // (each connection is drawn once and kept: a rebuild after placing one home only draws the new ones)
       const ck = [A.id, B.id, L.user ? L.type : '-', A.x.toFixed(2), A.z.toFixed(2), A.y.toFixed(2), B.x.toFixed(2), B.z.toFixed(2), B.y.toFixed(2), A.rot.toFixed(3), B.rot.toFixed(3), A.kind, B.kind, A.seed, B.seed, !!A.up, !!B.up].join('|');
-      let cl = LCACHE.get(ck); if (!cl){ const lt = new Tris(true), lp = []; drawLink(lt, L, lp); cl = { geo: lt.p.length ? lt.geo() : null, fol: folGeo(lt.fol), pools: lp, ax: (A.x + B.x)/2, az: (A.z + B.z)/2, r: L.dc/2, a: A.id, b: B.id }; LCACHE.set(ck, cl); }
+      let cl = LCACHE.get(ck); if (!cl){ const shopL = COM(A.kind) && COM(B.kind), lt = new Tris(true, shopL), lp = []; drawLink(lt, L, lp); if (shopL) for (const q of lp) q[3] += 10; cl = { geo: lt.p.length ? lt.geo() : null, fol: folGeo(lt.fol), pools: lp, ax: (A.x + B.x)/2, az: (A.z + B.z)/2, r: L.dc/2, a: A.id, b: B.id }; LCACHE.set(ck, cl); }
       cl.used = true; for (const q of cl.pools) pools.push(q);
     }
     // courtyards: three ground homes all joined to each other
@@ -2011,21 +2022,22 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function dropLinkCache(p){ for (const [k, v] of LCACHE) if (Math.hypot(v.ax - p.x, v.az - p.z) < v.r + 8){ if (v.geo) v.geo.dispose(); if (v.fol) v.fol.dispose(); LCACHE.delete(k); } }
   // the warm light by night: a soft pool on the ground round each home, under each pergola and arcade, in each courtyard
   // (flat quads added over the ground, in a few dithered steps; only drawn when it's dark)
-  const poolM = new THREE.ShaderMaterial({ uniforms: { nightK: CURV.darkK }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  const poolM = new THREE.ShaderMaterial({ uniforms: { nightK: CURV.darkK, uShopH: CURV.uShopH, uShopE: CURV.uShopE }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     vertexShader: 'attribute vec3 aL; varying vec3 vL; varying vec2 vW; void main(){ vL = aL; vW = position.xz; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
     // (a wash of warm light: a ragged blot, its color running wet-in-wet from gold at the heart to rose-orange at the edge,
     // blooms where the water backed up into it, and more pigment at its rim)
-    fragmentShader: `uniform float nightK; varying vec3 vL; varying vec2 vW;
+    fragmentShader: `uniform float nightK; uniform vec3 uShopH, uShopE; varying vec3 vL; varying vec2 vW;
       float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
       float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
         return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
       void main(){ float r = length(vL.xy);
         float edge = 0.6 + 0.26*vn(vW*0.8) + 0.1*vn(vW*2.6 + 5.0), e = edge - r; if (e < 0.0) discard;
         float body = smoothstep(0.0, 0.45, e), bloom = vn(vW*1.4 + 7.0);
-        vec3 c = mix(vec3(0.95, 0.42, 0.24), vec3(1.0, 0.74, 0.36), body*(0.6 + 0.4*bloom));
+        float shop = step(5.0, vL.z);
+        vec3 c = mix(mix(vec3(0.95, 0.42, 0.24), uShopE, shop), mix(vec3(1.0, 0.74, 0.36), uShopH, shop), body*(0.6 + 0.4*bloom));
         float a = (0.25 + 0.5*body)*(0.75 + 0.5*smoothstep(0.35, 0.75, bloom)) + 0.45*(1.0 - smoothstep(0.0, 0.05, e));
         a = floor(a*7.0)/7.0;
-        gl_FragColor = vec4(c*a*0.42*vL.z*nightK, 1.0); }` });
+        gl_FragColor = vec4(c*a*0.42*(vL.z - 10.0*shop)*nightK, 1.0); }` });
   let poolMesh = null;
   function buildPools(pools){
     if (poolMesh){ scene.remove(poolMesh); poolMesh.geometry.dispose(); poolMesh = null; } if (!pools.length) return;
@@ -2564,9 +2576,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // the reflection pass: everything above the water, flipped upside down about it and drawn flat in its own colors (no
   // lights, no shadows) into a target the size of the view, where the sea reads it at its own pixel, through the ripples
   const reflM = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)] });   // (double sided: a mirrored view turns the faces' winding round)
-  reflM.onBeforeCompile = sh => { sh.uniforms.nightK = CURV.nightK;   // (by night the lit windows show in the water, warm)
+  reflM.onBeforeCompile = sh => { sh.uniforms.nightK = CURV.nightK; sh.uniforms.uShop = CURV.uShop;   // (by night the lit windows show in the water, warm)
     sh.vertexShader = GLOW_V + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vGlow = glow;');
-    sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vGlow > 0.85 ? vec3(1.0, 0.85, 0.46) : vGlow > 0.2 && vGlow < 0.3 ? vColor*1.2 : vGlow > 0.3 && vGlow < 0.4 ? vec3(0.1, 0.22, 0.25) : vec3(1.0, 0.6, 0.28), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
+    sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vGlow > 0.85 ? vec3(1.0, 0.85, 0.46) : vGlow > 0.2 && vGlow < 0.3 ? vColor*1.2 : vGlow > 0.1 && vGlow < 0.2 ? uShop : vGlow > 0.3 && vGlow < 0.4 ? vec3(0.1, 0.22, 0.25) : vec3(1.0, 0.6, 0.28), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
   renderer.localClippingEnabled = true;
   // (the reflection is drawn from a camera mirrored in the water's plane, not by flipping the whole scene, which made
   // every object's matrix be worked out again twice a frame; it's drawn every other frame, the ripples hide the step, and
@@ -2632,7 +2644,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV,
+  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, setShopLight: n => setShopLight(n), SHOPLIGHT: () => SHOPLIGHT,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

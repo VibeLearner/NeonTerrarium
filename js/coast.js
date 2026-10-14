@@ -1389,7 +1389,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // the connections built with the connect brush: [{ a, b, type }] by block id
   const ULINK_KEY = 'neonIsland.coast.links';
   let ULINKS = []; try { ULINKS = JSON.parse(localStorage.getItem(ULINK_KEY) || '[]').filter(u => u && u.a && u.b); } catch (e) {}
-  const saveLinks = () => { try { localStorage.setItem(ULINK_KEY, JSON.stringify(ULINKS)); } catch (e) {} };
+  // and the ones neighbors would make on their own that were taken away (by pair of ids), so they stay gone
+  const NOLINK_KEY = 'neonIsland.coast.nolinks'; let NOLINK = new Set(); try { NOLINK = new Set(JSON.parse(localStorage.getItem(NOLINK_KEY) || '[]')); } catch (e) {}
+  const pairId = (a, b) => Math.min(a, b) + '|' + Math.max(a, b);
+  const saveLinks = () => { try { localStorage.setItem(ULINK_KEY, JSON.stringify(ULINKS)); localStorage.setItem(NOLINK_KEY, JSON.stringify([...NOLINK])); } catch (e) {} };
   const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(PIECES.map(p => [p.kind, +p.x.toFixed(3), +p.z.toFixed(3), +p.rot.toFixed(4), +p.y.toFixed(3), p.seed, p.id, p.base ? p.base.id : 0, p.host ? p.host.id : 0, p.level]))); } catch (e) {} };
   /* ---------- a new home painted in, in watercolor ---------- */
   // Each new block gets its own copy of the material for a moment (see PAINT_APPLY): the wash rises up it from its floor,
@@ -1604,7 +1607,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       const A = PIECES[i], B = PIECES[j]; if (A.level !== B.level) continue;
       if (Math.abs(A.y - B.y) > (A.level ? .6 : 1.4)) continue;
       if (Math.abs(A.x - B.x) > 9 || Math.abs(A.z - B.z) > 9) continue;
-      if (userKey.has(Math.min(A.id, B.id) + '|' + Math.max(A.id, B.id))) continue;
+      if (userKey.has(Math.min(A.id, B.id) + '|' + Math.max(A.id, B.id)) || NOLINK.has(pairId(A.id, B.id))) continue;
       const L = pairOf(A, B); if (!L || L.dc > 9 || L.gap > 3.6) continue;
       pairs.push(L); }
     const auto = pairs.splice(nUser).sort((p, q) => p.gap - q.gap); pairs.push(...auto);
@@ -1620,7 +1623,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       deg.set(A, (deg.get(A) || 0) + 1); deg.set(B, (deg.get(B) || 0) + 1); joined.add(A.id + '|' + B.id); joined.add(B.id + '|' + A.id);
       // (each connection is drawn once and kept: a rebuild after placing one home only draws the new ones)
       const ck = [A.id, B.id, L.user ? L.type : '-', A.x.toFixed(2), A.z.toFixed(2), A.y.toFixed(2), B.x.toFixed(2), B.z.toFixed(2), B.y.toFixed(2), A.rot.toFixed(3), B.rot.toFixed(3), A.kind, B.kind, A.seed, B.seed, !!A.up, !!B.up].join('|');
-      let cl = LCACHE.get(ck); if (!cl){ const lt = new Tris(true), lp = []; drawLink(lt, L, lp); cl = { geo: lt.p.length ? lt.geo() : null, fol: folGeo(lt.fol), pools: lp, ax: (A.x + B.x)/2, az: (A.z + B.z)/2, r: L.dc/2 }; LCACHE.set(ck, cl); }
+      let cl = LCACHE.get(ck); if (!cl){ const lt = new Tris(true), lp = []; drawLink(lt, L, lp); cl = { geo: lt.p.length ? lt.geo() : null, fol: folGeo(lt.fol), pools: lp, ax: (A.x + B.x)/2, az: (A.z + B.z)/2, r: L.dc/2, a: A.id, b: B.id }; LCACHE.set(ck, cl); }
       cl.used = true; for (const q of cl.pools) pools.push(q);
     }
     // courtyards: three ground homes all joined to each other
@@ -1665,15 +1668,16 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       }
     }
     // (the links' parts kept from before are merged with what's new: courtyards and corbels, drawn fresh, are few)
-    const used = [...LCACHE.values()].filter(v => v.used), gs = used.filter(v => v.geo).map(v => [v.geo, null]), fs = used.filter(v => v.fol).map(v => [v.fol, null]);
+    const used = [...LCACHE.values()].filter(v => v.used), withGeo = used.filter(v => v.geo), gs = withGeo.map(v => [v.geo, null]), fs = used.filter(v => v.fol).map(v => [v.fol, null]);
     if (T.p.length) gs.push([T.geo(), null]); const tf = folGeo(T.fol); if (tf) fs.push([tf, null]);
+    linkRanges = []; { let o = 0; for (const v of withGeo){ const n = v.geo.attributes.position.count; linkRanges.push([o, o + n, v.a, v.b]); o += n; } }   // (which vertices are which link: for picking one to take away)
     if (gs.length){ linksMesh = new THREE.Mesh(mergeInto(gs, false), pieceM); linksMesh.castShadow = linksMesh.receiveShadow = true; linksMesh.customDepthMaterial = landDepth; linksMesh.matrixAutoUpdate = false; scene.add(linksMesh);
       if (fs.length){ const f = new THREE.Mesh(mergeInto(fs, true), grassM); f.receiveShadow = true; f.frustumCulled = true; f.raycast = () => {}; f.matrixAutoUpdate = false; linksMesh.add(f); } }
     buildPools(pools);
     for (const [k, v] of LCACHE) if (!v.used){ if (v.geo) v.geo.dispose(); if (v.fol) v.fol.dispose(); LCACHE.delete(k); }
   }
   // connections kept from earlier rebuilds; the ones near a home that comes or goes are drawn again (its pad changes the ground)
-  const LCACHE = new Map();
+  const LCACHE = new Map(); let linkRanges = [];
   function dropLinkCache(p){ for (const [k, v] of LCACHE) if (Math.hypot(v.ax - p.x, v.az - p.z) < v.r + 8){ if (v.geo) v.geo.dispose(); if (v.fol) v.fol.dispose(); LCACHE.delete(k); } }
   // the warm light by night: a soft pool on the ground round each home, under each pergola and arcade, in each courtyard
   // (flat quads added over the ground, in a few dithered steps; only drawn when it's dark)
@@ -2014,7 +2018,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function controlsFor(){
     const row = (k, t) => '<div class="row"><kbd>' + k + '</kbd><span>' + t + '</span></div>';
     if (PL.kind === 'grass') return '<h4>Grass</h4>' + row('click / drag', 'paint') + row('right drag', 'clear') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: meadow, wildflowers, ferns, tall grass, mix') + row('Alt + drag', 'turn the view');
-    if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('click, click', 'pick two buildings to join') + row('V', 'next kind: bridge, skywalk, pergola, arcade, wall (or a wing, if they\'re apart), random') + row('right click', 'let go, or clear a building\'s walkways');
+    if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('click, click', 'pick two buildings to join') + row('V', 'next kind: bridge, skywalk, pergola, arcade, wall (or a wing, if they\'re apart), random') + row('right click', 'take away the walkway under it (or let go of the first pick)');
     if (PL.kind === 'zone') return '<h4>Residential: brush</h4>' + row('click', 'build the homes in the brush') + row('Q / E', 'bigger / smaller (smallest: one home)') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', ZONE.size ? 'clear the brush' : 'remove the home under it');
     if (PL.kind && KINDS[PL.kind]) return '<h4>Residential: one by one</h4>' + row('click', 'place (on a roof: stack; on a wall: build off it)') + row('V', 'another look') + row('R', 'turn') + row('right click', 'remove (and all above)') + row('Z', 'switch to the brush');
     return '<h4>Pick a zone or a tool</h4>' + row('1', 'residential') + row('5', 'walkways') + row('6', 'grass');
@@ -2068,10 +2072,19 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const hov = PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, P = hov ? hov.piece : null;
     if (!CN.a){ if (P){ CN.a = P; CN.key = ''; } return; }
     if (!P || P === CN.a || !CN.ok) return;
-    const a = CN.a.id, b = P.id; ULINKS = ULINKS.filter(u => !((u.a === a && u.b === b) || (u.a === b && u.b === a))); ULINKS.push({ a, b, type: LINK_TYPES[CN.type] });
+    const a = CN.a.id, b = P.id; NOLINK.delete(pairId(a, b)); ULINKS = ULINKS.filter(u => !((u.a === a && u.b === b) || (u.a === b && u.b === a))); ULINKS.push({ a, b, type: LINK_TYPES[CN.type] });
     saveLinks(); linksDirty = true; CN.a = null; CN.key = ''; connGhost.visible = false; outline.visible = false; }
+  // the walkway under the pointer, if it's nearer than any block there: [a id, b id]
+  function linkAt(cx, cy){
+    if (!linksMesh) return null; const r = canvas.getBoundingClientRect(); _ndc.set((cx - r.left)/r.width*2 - 1, 1 - (cy - r.top)/r.height*2);
+    _ray.setFromCamera(_ndc, cam); const h = _ray.intersectObject(linksMesh, false)[0]; if (!h || !h.face) return null;
+    const ph = _ray.intersectObjects(pieceMeshes, false)[0]; if (ph && ph.distance < h.distance - .05) return null;
+    const v = h.face.a; for (const [o0, o1, a, b] of linkRanges) if (v >= o0 && v < o1) return [a, b]; return null; }
   function unConnect(cx, cy){
     if (CN.a){ CN.a = null; connGhost.visible = false; outline.visible = false; return; }
+    const lk = linkAt(cx, cy);
+    if (lk){ const [a, b] = lk, n = ULINKS.length; ULINKS = ULINKS.filter(u => pairId(u.a, u.b) !== pairId(a, b)); if (ULINKS.length === n) NOLINK.add(pairId(a, b));   // (a built one is unbuilt; one homes made themselves stays away)
+      saveLinks(); linksDirty = true; return; }
     const P = pieceAt(cx, cy); if (!P) return; const n = ULINKS.length; ULINKS = ULINKS.filter(u => u.a !== P.id && u.b !== P.id); if (ULINKS.length !== n){ saveLinks(); linksDirty = true; } }
 
   /* ---------- the grass brush ---------- */

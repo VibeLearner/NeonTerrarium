@@ -111,7 +111,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   /* ---------- the bend, the haze, the materials ---------- */
   const scene = new THREE.Scene();
   const CURV = { ctr: { value: new THREE.Vector2() }, fwd: { value: new THREE.Vector2(1, 0) }, curveK: { value: 0 }, g0: { value: 30 },
-    hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) }, nightK: { value: 0 }, darkK: { value: 0 }, gTime: { value: 0 } };   // (nightK: the lamps; darkK: full night only; gTime: seconds, for the water's glow)
+    hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) }, nightK: { value: 0 }, darkK: { value: 0 }, gTime: { value: 0 }, uRip: { value: [0, 1, 2, 3].map(() => new THREE.Vector3(0, 0, -99)) } };   // (nightK: the lamps; darkK: full night only; gTime: seconds, for the water's glow)
   const BEND = `{ vec4 wq = vec4(transformed, 1.0);
     #ifdef USE_INSTANCING
       wq = instanceMatrix * wq;   // (a copy's own place in the world: the watercolor shadow is looked up there)
@@ -142,22 +142,29 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // night: what glows. A block's lamps, lit windows and greenhouse glass carry a glow (0..1, per vertex; see Tris); by night
   // it turns them warm amber, the glass a gold-green, as in the solarpunk boards (a teal, rainy dusk, every window warm)
   const GLOW_V = 'attribute float glow; varying float vGlow;\n';
-  const GLOW_F = 'varying float vGlow; uniform float gTime;\n';
+  const GLOW_F = 'varying float vGlow; uniform float gTime; uniform vec3 uRip[4];\n';
   const GLOW_APPLY = `if (vGlow > 0.0){ vec3 amber = vec3(1.0, 0.5, 0.2), lampY = vec3(1.0, 0.87, 0.47);
       float lamp = step(0.85, vGlow), sh = 0.74 + 0.26*abs(normalize(vNormal).x), k = nightK*(lamp > 0.5 ? 1.0 : 0.85);
       vec3 gc;
       if (lamp > 0.5) gc = lampY*1.04;
       else if (vGlow > 0.2 && vGlow < 0.3) gc = vColor*1.25;
       else if (vGlow > 0.3 && vGlow < 0.4){
-        // water, glowing as if alive: a deep teal wash with slow drifting blooms of mint and paler sea-glass, in a few soft
-        // bands (watercolor, not neon), dimmer than a lamp
-        vec2 q = vWq.xz;
-        float n = 0.5 + 0.5*sin(q.x*1.9 + gTime*0.3 + 1.4*sin(q.y*1.5 - gTime*0.22));
-        float m = 0.5 + 0.5*sin(q.y*2.7 - q.x*1.1 + gTime*0.45);
-        n = floor(n*4.0 + 0.5)/4.0;
-        gc = mix(vec3(0.11, 0.25, 0.29), vec3(0.36, 0.64, 0.56), smoothstep(0.2, 0.9, n));
-        gc = mix(gc, vec3(0.66, 0.84, 0.74), smoothstep(0.7, 1.0, n*m)*0.55);
-        k = nightK*0.8; }
+        // water, alive by night: dark and still, but here and there a touch stirs it and a faint ring of mint light spreads
+        // out and fades (a ripple through glowing water), a softer ring trailing it; scattered in time and place (cells of
+        // 1.8 units, each with its own moment and pace), never all at once, stepped into a few soft washes
+        vec2 q = vWq.xz, c0 = floor(q/1.8); float g = 0.0;
+        for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++){
+          vec2 c = c0 + vec2(float(i), float(j));
+          float h1 = fract(sin(dot(c, vec2(127.1, 311.7)))*43758.5), h2 = fract(sin(dot(c, vec2(269.5, 183.3)))*43758.5);
+          vec2 ctr = (c + 0.2 + 0.6*vec2(h1, h2))*1.8;
+          float per = 5.0 + 5.0*h1, age = mod(gTime + h2*per, per), r = 0.08 + age*0.42, d = length(q - ctr), fade = (1.0 - smoothstep(0.0, 2.8, age))*step(h2, 0.7);
+          g = max(g, (exp(-pow((d - r)/0.07, 2.0)) + 0.45*exp(-pow((d - r*0.62)/0.05, 2.0)))*fade); }
+        // and where the pointer passes over the water, it stirs: rings from its last few spots (x, z, when)
+        for (int i = 0; i < 4; i++){ float age = gTime - uRip[i].z, r = 0.05 + age*0.55, d = length(q - uRip[i].xy);
+          g = max(g, (exp(-pow((d - r)/0.07, 2.0)) + 0.5*exp(-pow((d - r*0.6)/0.05, 2.0)))*(1.0 - smoothstep(0.0, 2.2, age))*step(0.0, age)); }
+        g = floor(min(g, 1.0)*3.0 + 0.3)/3.0;
+        gc = mix(vec3(0.08, 0.18, 0.22), vec3(0.44, 0.74, 0.64), g*0.8);
+        k = nightK*0.85; }
       else gc = vGlow > 0.6 ? lampY*0.95*sh : mix(amber, vColor*vec3(0.9, 0.75, 0.45), 0.18)*sh;   // (.7: a tower's glass rooms, lit like windows)
       // (windows and lamps: warm yellow; the glass up top: orange, still shaded by its facets; .25: lit in its own color, for
       // neon, screens, red lanterns; .35: water, lit softly from within)
@@ -1003,12 +1010,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     red: C(0xb84a3c), redD: C(0x8a3329), jade: C(0x3a8a76), jade2: C(0x276556), lattice: C(0x5a2a22),   // (the pagoda house: lacquer red, jade tiles)
     rust: C(0xc4703e), rust2: C(0x9e5530), solar: C(0x2b4877), solarL: C(0x6f8fbf), tank: C(0xb9b7ad),
     apricot: C(0xe8a578), butter: C(0xe9c877), mist: C(0x98c6bb), sage: C(0xadc493), rose: C(0xd99788), blushD: C(0xe2ad99),
-    neonG: C(0x8dffc6).multiplyScalar(1.1), neonP: C(0xff86b4).multiplyScalar(1.1), pool: C(0x5f968f), fall: C(0xb9d9cd), lily: C(0x5f9a5a), moss: C(0x7f9e5c), timber: C(0x5a3a2a), lanternR: C(0xe0503a).multiplyScalar(1.1), screen: C(0x7fd0ff).multiplyScalar(1.1), ringW: C(0xe2fff2).multiplyScalar(1.1) };   // (the grotto: neon trim and signs, the lit pool and its falls)
+    neonG: C(0x8dffc6).multiplyScalar(1.1), neonP: C(0xff86b4).multiplyScalar(1.1), pool: C(0x5f968f), fall: C(0x9cc7b8), lily: C(0x5f9a5a), moss: C(0x7f9e5c), timber: C(0x5a3a2a), lanternR: C(0xe0503a).multiplyScalar(1.1), screen: C(0x7fd0ff).multiplyScalar(1.1), ringW: C(0xe2fff2).multiplyScalar(1.1) };   // (the grotto: neon trim and signs, the lit pool and its falls)
   // the plaster colors a home can be washed in besides white: soft, chalky, and all from the scene's own colors (the sand,
   // the terracotta, the sea's teal, the meadow's sage), so a street of them reads as one watercolor
   const PLASTER = [HP.blushD, HP.apricot, HP.butter, HP.mist, HP.sage, HP.rose, HP.apricot, HP.mist];   // (the garden terrace: weathered rust, solar glass)
   for (const c of HP.leaf) LEAFC.add(c);
-  GLOW.set(HP.ringW, .25).set(HP.lanternR, .25).set(HP.screen, .25).set(HP.neonG, .25).set(HP.neonP, .25).set(HP.pool, .35).set(HP.fall, .35).set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
+  GLOW.set(HP.ringW, .25).set(HP.lanternR, .25).set(HP.screen, .25).set(HP.neonG, .25).set(HP.neonP, .25).set(HP.pool, .35).set(HP.fall, .25).set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
   Object.assign(GEO, { cyl12: new THREE.CylinderGeometry(1, 1, 1, 12), cyl16: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.IcosahedronGeometry(1, 1),
     dome: new THREE.SphereGeometry(1, 12, 6, 0, PI*2, 0, PI/2), ring: new THREE.CylinderGeometry(1, 1, 1, 16, 1, true),
     frus4: new THREE.CylinderGeometry(.62, 1, 1, 4, 1).rotateY(PI/4), half16: new THREE.CylinderGeometry(1, 1, 1, 16, 1, false, -PI/2, PI), hip4: new THREE.CylinderGeometry(.08, 1, 1, 4, 1).rotateY(PI/4) });   // (square frustums: a roof's flared skirt, and a hipped roof)
@@ -2457,8 +2464,18 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     // the grass brush paints (left) or clears (right) as it's dragged; Alt+drag or the middle button still turns the view
     if (PL.kind === 'grass' && (e.button === 0 || e.button === 2) && !e.altKey && e.pointerType !== 'touch'){ act = { kind: 'paint', erase: e.button === 2 }; GR.last = null; grassStroke(e.clientX, e.clientY, act.erase, true); }
   });
+  // the pointer stirring the glowing water (the lagoon garden's pool, the grotto's): at night, a ring from where it passed,
+  // a few spots kept (uRip: x, z, time), a new one each time it has moved a little over the water
+  const RIP = { i: 0, x: 1e9, z: 1e9, t: 0 };
+  function stirWater(cx, cy){
+    if (CURV.nightK.value < .05) return; const now = CURV.gTime.value; if (now - RIP.t < .12) return;
+    const h = pick(cx, cy); if (!h) return;
+    const inPool = PIECES.some(p => p.kind === 'lagoon' ? Math.hypot(h.x - p.x, h.z - p.z) < 1.85 : p.kind === 'grotto' ? Math.hypot(h.x - (p.x - Math.sin(p.rot)*.25), h.z - (p.z - Math.cos(p.rot)*.25)) < .45 : false);
+    if (!inPool || Math.hypot(h.x - RIP.x, h.z - RIP.z) < .35) return;
+    CURV.uRip.value[RIP.i].set(h.x, h.z, now); RIP.i = (RIP.i + 1) % 4; RIP.x = h.x; RIP.z = h.z; RIP.t = now; }
   canvas.addEventListener('pointermove', e => {
     PL.ptr = { x: e.clientX, y: e.clientY };
+    stirWater(e.clientX, e.clientY);
     const p = ptrs.get(e.pointerId); if (!p || !act) return;
     if (act.kind === 'paint'){ ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); grassStroke(e.clientX, e.clientY, act.erase, false); return; }
     const dx = e.clientX - p.x, dy = e.clientY - p.y; ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -2527,7 +2544,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const reflM = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)] });   // (double sided: a mirrored view turns the faces' winding round)
   reflM.onBeforeCompile = sh => { sh.uniforms.nightK = CURV.nightK;   // (by night the lit windows show in the water, warm)
     sh.vertexShader = GLOW_V + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vGlow = glow;');
-    sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vGlow > 0.85 ? vec3(1.0, 0.85, 0.46) : vGlow > 0.2 && vGlow < 0.3 ? vColor*1.2 : vGlow > 0.3 && vGlow < 0.4 ? vec3(0.32, 0.6, 0.52) : vec3(1.0, 0.6, 0.28), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
+    sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vGlow > 0.85 ? vec3(1.0, 0.85, 0.46) : vGlow > 0.2 && vGlow < 0.3 ? vColor*1.2 : vGlow > 0.3 && vGlow < 0.4 ? vec3(0.1, 0.22, 0.25) : vec3(1.0, 0.6, 0.28), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
   renderer.localClippingEnabled = true;
   // (the reflection is drawn from a camera mirrored in the water's plane, not by flipping the whole scene, which made
   // every object's matrix be worked out again twice a frame; it's drawn every other frame, the ripples hide the step, and

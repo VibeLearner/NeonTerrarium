@@ -257,6 +257,14 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       float n = 0.62*wVn(p*vec2(0.1, 0.24) + vec2(0.0, t*0.04)) + 0.38*wVn(p*vec2(0.23, 0.52) + vec2(t*0.09, 5.3));   // (drawn out along the wind; slowly changing)
       return smoothstep(0.44, 0.76, n); }
     float windCrest(vec2 q, float t){ return 0.5 + 0.5*sin(dot(q, vec2(0.83, 0.55))*5.5 - t*4.2 + 1.3*wVn(q*0.9)); }
+    // the glow's own touch of it: small gusts that live only a moment (born, carried a little way downwind, gone), and in
+    // each a single thin slice of light across the wind, fading gently in and out
+    float windGlint(vec2 q, float t){ vec2 wd = vec2(0.83, 0.55), wn = vec2(-0.55, 0.83);
+      vec2 p = vec2(dot(q, wd) - t*0.9, dot(q, wn));
+      float life = 0.5 + 0.5*sin(t*1.7 + 6.2831*wVn(floor(p*vec2(0.2, 0.3)) + 3.1)), n = wVn(p*vec2(0.2, 0.3) + vec2(t*0.3, 0.0));   // (each patch has its own short life)
+      float gp = smoothstep(0.52, 0.8, n)*smoothstep(0.3, 0.9, life);   // (not 'patch': a reserved word in GLSL)
+      float slice = pow(0.5 + 0.5*sin(dot(q, wd)*4.0 - t*2.2), 10.0);   // (thin: a slice, not a band)
+      return gp*slice; }
   `;
   const SWAY_V = 'attribute float aH; attribute vec3 aG; uniform float wTime; varying float vGl; varying vec3 vGc;\n' + WIND_GLSL;
   const SWAY = `{ vec2 wd = vec2(0.83, 0.55); vec4 wq_ = vec4(transformed, 1.0); float sc_ = 1.0;
@@ -266,7 +274,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       vec2 q = (modelMatrix*wq_).xz; float ph = dot(q, wd)*0.32 - wTime*1.25;
       float paw = windPaw(q, wTime), crest = windCrest(q, wTime);
       float gust = 0.3 + 0.3*sin(ph) + 0.12*sin(ph*2.3 + q.x*0.7 - q.y*0.4) + 0.75*paw*(0.75 + 0.25*crest);
-      vGc = aG; vGl = paw*(0.45 + 0.55*crest)*smoothstep(0.08, 0.5, aH);   // (the tips glow, where the gust is)
+      vGc = aG; vGl = windGlint(q, wTime)*smoothstep(0.08, 0.5, aH);   // (the tips glow, in a thin slice where a passing gust touches)
       float flut = sin(wTime*4.1 + q.x*3.1 + q.y*2.3) + 0.5*sin(wTime*6.3 + q.x*5.0 - q.y*4.1);
       float hw = aH*sc_, hk = min(hw, 0.8), k = hk*hk;   // (the bend tops out at a tall grass's height: a tree's crown sways, its trunk stays put)
       vec2 d = wd*(0.08 + 0.3*gust*gust)*k + vec2(-wd.y, wd.x)*flut*0.035*k;
@@ -2241,7 +2249,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
           vCm = f - c0; vCy = aCard.y;
           vCA = vec2((c0 + uv.x)/${CARD.cols}.0, (aCard.x + uv.y)/${CARD.rows}.0); vCB = vec2((c1 + uv.x)/${CARD.cols}.0, (aCard.x + uv.y)/${CARD.rows}.0);
           vec2 q = (modelMatrix*instanceMatrix*vec4(0.0, 0.0, 0.0, 1.0)).xz, wd = vec2(0.83, 0.55); float ph = dot(q, wd)*0.32 - wTime*1.25, paw = windPaw(q, wTime), crest = windCrest(q, wTime), gust = 0.3 + 0.3*sin(ph) + 0.12*sin(ph*2.3 + q.x*0.7 - q.y*0.4) + 0.75*paw*(0.75 + 0.25*crest);
-          vGc2 = aGc; vGl2 = paw*(0.45 + 0.55*crest)*smoothstep(0.25, 0.7, uv.y);
+          vGc2 = aGc; vGl2 = windGlint(q, wTime)*smoothstep(0.25, 0.7, uv.y);
           float k = uv.y*uv.y*0.7; vec2 d = wd*(0.08 + 0.3*gust*gust)*k;
           vec3 dv = (viewMatrix*vec4(d.x, 0.0, d.y, 0.0)).xyz*sc;
           vec4 mvPosition = anc + vec4(position.xy*sc + dv.xy, 0.0, 0.0);

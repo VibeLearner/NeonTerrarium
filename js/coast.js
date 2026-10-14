@@ -1082,7 +1082,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     neonG: C(0x8dffc6).multiplyScalar(1.1), neonP: C(0xff86b4).multiplyScalar(1.1), pool: C(0x5f968f), fall: C(0x9cc7b8), lily: C(0x5f9a5a), moss: C(0x7f9e5c), timber: C(0x5a3a2a), lanternR: C(0xe0503a).multiplyScalar(1.1), screen: C(0x7fd0ff).multiplyScalar(1.1), ringW: C(0xe2fff2).multiplyScalar(1.1),
     soil: C(0x5b4532), indBlue: C(0x6cc4ff).multiplyScalar(1.1), indWhite: C(0xd6efff).multiplyScalar(1.05), ghGlass: C(0x9fcfc6), soil2: C(0x4a3626),
     luxPink: C(0xe8a0b6), luxPink2: C(0xdb88a3), luxRose: C(0xb9647f), luxSilver: C(0xa9bfd8), luxSilver2: C(0x8499b5), luxGold: C(0xd9b25a), luxCream: C(0xf4ecdd), luxWhite: C(0xfbf7f1),
-    luxDome: C(0xf1e3c2), luxCopper: C(0xd29a5a), cypress: C(0x2f5a3a), blossom: [C(0xf4a7c0), C(0xf8c4d4), C(0xfde3ec), C(0xee93b2)], petal: C(0xf7bccd) };   // (luxury)   // (industrial: cool blue light, blue-white windows, greenhouse glass)   // (the grotto: neon trim and signs, the lit pool and its falls)
+    luxDome: C(0xf1e3c2), luxCopper: C(0xd29a5a), cypress: C(0x2f5a3a), luxPearl: C(0xe6d2dc), luxJade: C(0x9cc4bd), luxOrange: C(0xf0a040), luxSage: C(0x9fbfa6), luxTile: C(0x6f9fc0), blossom: [C(0xf4a7c0), C(0xf8c4d4), C(0xfde3ec), C(0xee93b2)], petal: C(0xf7bccd) };   // (luxury)   // (industrial: cool blue light, blue-white windows, greenhouse glass)   // (the grotto: neon trim and signs, the lit pool and its falls)
   // the plaster colors a home can be washed in besides white: soft, chalky, and all from the scene's own colors (the sand,
   // the terracotta, the sea's teal, the meadow's sage), so a street of them reads as one watercolor
   const PLASTER = [HP.blushD, HP.apricot, HP.butter, HP.mist, HP.sage, HP.rose, HP.apricot, HP.mist];   // (the garden terrace: weathered rust, solar glass)
@@ -1119,11 +1119,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (let k = 1; k < 3; k++){ box(T, x + sd*.06, y, z - w/2 + k*w/3, .02, h, .025, HP.lattice); box(T, x + sd*.06, y - h/2 + k*h/3, z, .02, .025, w, HP.lattice); } };
   // luxury parts: a flared silver-tiled roof with upturned gold corners (hip: a full hipped roof, with a gold ridge line);
   // a cherry tree in blossom (a crown of pink puffs, not leaves, so it stays pink); a pot of blossom
-  function luxRoof(T, y, w, d, h, hip){
-    T.add(hip ? GEO.hip4 : GEO.frus4, mat(0, y + h/2, 0, 0, 0, 0, w/2*SQ2, h, d/2*SQ2), HP.luxSilver);
+  function luxRoof(T, y, w, d, h, hip, rc = HP.luxSilver){
+    T.add(hip ? GEO.hip4 : GEO.frus4, mat(0, y + h/2, 0, 0, 0, 0, w/2*SQ2, h, d/2*SQ2), rc);
     T.add(hip ? GEO.hip4 : GEO.frus4, mat(0, y + .02, 0, 0, 0, 0, w/2*SQ2 + .04, .05, d/2*SQ2 + .04), HP.luxGold);
     for (const sx of [-1, 1]) for (const sz of [-1, 1]){ const cx = sx*w/2, cz = sz*d/2; T.add(GEO.box, mat(cx*.97, y + .12, cz*.97, -sz*.6, 0, sx*.6, .1, .26, .1), HP.luxGold); }
-    if (hip) for (const sx of [-1, 1]) for (const sz of [-1, 1]){ const a = V3(sx*w/2*.05, y + h - .02, sz*d/2*.05), b = V3(sx*w/2*.97, y + .02, sz*d/2*.97); seg(T, a, b, .06, .05, HP.luxSilver2, .02); } }
+    if (hip) for (const sx of [-1, 1]) for (const sz of [-1, 1]){ const a = V3(sx*w/2*.05, y + h - .02, sz*d/2*.05), b = V3(sx*w/2*.97, y + .02, sz*d/2*.97); seg(T, a, b, .06, .05, rc === HP.luxSilver ? HP.luxSilver2 : rc === HP.luxPearl ? HP.luxRose : HP.luxGold, .02); } }
   function blossomTree(T, D, x, y, z, s = 1){ const th = .7*s;
     T.add(GEO.cyl5, mat(x, y + th/2, z, 0, 0, D.r(-.12, .12), .05*s, th, .05*s), HP.timber);
     for (let k = 0; k < 7; k++){ const a = D.r(0, PI*2), q = D.r(0, .32)*s; T.add(GEO.sph, mat(x + Math.cos(a)*q, y + th + D.r(.05, .35)*s, z + Math.sin(a)*q, 0, D.r(0, 3), 0, D.r(.2, .3)*s, D.r(.16, .22)*s, D.r(.2, .3)*s), D.pick(HP.blossom)); }
@@ -1723,21 +1723,23 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     // ground hall, lattice windows; between tiers flared silver roofs with upturned gold corners; on top a tall hipped roof
     // with a gold ridge and finial; cherry trees at the stair's foot.
     palace: { name: 'Blossom palace', lux: true, solo: true, r: 2.7, rb: 2.25, build(T, R, D, ctx){
-      const y0 = .3, pk = R.pick([HP.luxPink, HP.luxPink, HP.luxPink2]);
+      const y0 = .3, pk = R.pick([HP.luxPink, HP.luxPink, HP.luxPink2, HP.luxWhite]), roofC = R.pick([HP.luxSilver, HP.luxPearl, HP.luxJade]), cols = R.chance(.75), sc = R.r(.9, 1.06);
       box(T, 0, .15, 0, 4.4, .3, 3.9, HP.luxCream); box(T, 0, .31, 0, 4.2, .04, 3.7, HP.luxWhite);
       for (let k = 0; k < 3; k++) box(T, 0, .05 + k*.1, 1.95 + .5 - k*.17, 1.3, .1, .2, HP.luxCream);   // (the stair)
-      let y = y0; const tiers = [[3.3, 2.7, 1.05], [2.4, 2.0, .9], [1.5, 1.3, .8]];
+      let y = y0; const tiers = (R.chance(.65) ? [[3.3, 2.7, 1.05], [2.4, 2.0, .9], [1.5, 1.3, .8]] : [[3.2, 2.7, 1.15], [2.0, 1.7, 1.0]]).map(([a, b, c]) => [a*sc, b*sc, c]), nt = tiers.length;
       tiers.forEach(([w, d, h], i) => {
         box(T, 0, y + h/2, 0, w, h, d, pk); box(T, 0, y + h - .05, 0, w + .06, .1, d + .06, HP.luxRose);
         const nw = Math.max(2, Math.round(w/.55));
         for (let k = 0; k < nw; k++){ const x = -w/2 + (k + .5)*w/nw; latticeZ(T, D, x, y + h*.5, d/2, .28, h*.46); latticeZ(T, D, x, y + h*.5, -d/2 - .07, .28, h*.46); }
         for (const sd of [-1, 1]) for (let k = 0; k < Math.max(1, Math.round(d/.7)); k++) latticeX(T, D, sd*w/2, y + h*.5, -d/2 + (k + .5)*d/Math.max(1, Math.round(d/.7)), .3, h*.46, sd);
-        if (i === 0){ for (let k = 0; k <= 6; k++) for (const sz of [-1, 1]){ T.add(GEO.cyl8, mat(-w/2 - .18 + k*(w + .36)/6, y + h/2, sz*(d/2 + .2), 0, 0, 0, .07, h, .07), HP.luxWhite); }
-          box(T, 0, y + .45, d/2 + .03, .6, .8, .05, HP.luxGold); box(T, 0, y + .45, d/2 + .06, .5, .7, .03, HP.glassD); }
+        if (i === 0 && cols){ for (let k = 0; k <= 6; k++) for (const sz of [-1, 1]){ T.add(GEO.cyl8, mat(-w/2 - .18 + k*(w + .36)/6, y + h/2, sz*(d/2 + .2), 0, 0, 0, .07, h, .07), HP.luxWhite); }
+        } if (i === 0){ box(T, 0, y + .45, d/2 + .03, .6, .8, .05, HP.luxGold); box(T, 0, y + .45, d/2 + .06, .5, .7, .03, HP.glassD); }
         y += h;
-        if (i < 2){ luxRoof(T, y - .02, w + .9, d + .8, .28, false); for (const sz of [-1, 1]){ box(T, 0, y + .26, sz*(d/2 + .2), w*.7, .04, .04, HP.luxWhite); for (let k = 0; k <= 5; k++) box(T, -w*.35 + k*w*.14, y + .17, sz*(d/2 + .2), .03, .18, .03, HP.luxWhite); } y += .24; } });
-      luxRoof(T, y - .02, tiers[2][0] + .8, tiers[2][1] + .7, 1.0, true);
+        if (i < nt - 1){ luxRoof(T, y - .02, w + .9, d + .8, .28, false, roofC); for (const sz of [-1, 1]){ box(T, 0, y + .26, sz*(d/2 + .2), w*.7, .04, .04, HP.luxWhite); for (let k = 0; k <= 5; k++) box(T, -w*.35 + k*w*.14, y + .17, sz*(d/2 + .2), .03, .18, .03, HP.luxWhite); } y += .24; } });
+      luxRoof(T, y - .02, tiers[nt - 1][0] + .8, tiers[nt - 1][1] + .7, 1.0, true, roofC);
       T.add(GEO.cyl5, mat(0, y + 1.15, 0, 0, 0, 0, .04, .4, .04), HP.luxGold); T.add(GEO.sph, mat(0, y + 1.4, 0, 0, 0, 0, .09, .12, .09), HP.luxGold);
+      if (R.chance(.45)) for (const sx of [-1, 1]){ const px = sx*(tiers[0][0]/2 + .1), pw = .8, ph = .75;   // (a pavilion at each side)
+        box(T, px, y0 + ph/2, -.4, pw, ph, pw, pk); latticeZ(T, D, px, y0 + ph*.5, -.4 + pw/2, .3, .36); T.add(GEO.hip4, mat(px, y0 + ph + .25, -.4, 0, 0, 0, (pw + .4)/2*SQ2, .5, (pw + .4)/2*SQ2), roofC); T.add(GEO.sph, mat(px, y0 + ph + .55, -.4, 0, 0, 0, .06, .08, .06), HP.luxGold); }
       for (const sx of [-1, 1]) blossomTree(T, D, sx*1.7, .3, 1.55, .9);
       for (const sx of [-1, 1]) for (const sz of [-1, 1]){ box(T, sx*2.0, .55, sz*1.7, .1, .5, .1, HP.luxCream); box(T, sx*2.0, .86, sz*1.7, .16, .16, .16, HP.lamp); }
       return y + 1.0; } },
@@ -1781,7 +1783,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       T.add(GEO.cyl16, mat(0, y + .04, 0, 0, 0, 0, rr + .08, .08, rr + .08), HP.luxGold);
       T.add(GEO.cyl16, mat(0, y + .3, 0, 0, 0, 0, rr*.72, .45, rr*.72), HP.luxCream);
       for (let k = 0; k < 8; k++){ const a = k/8*PI*2; T.add(GEO.box, mat(Math.sin(a)*rr*.72, y + .3, Math.cos(a)*rr*.72, 0, a, 0, .12, .26, .03), HP.lamp); }
-      T.add(GEO.dome, mat(0, y + .52, 0, 0, 0, 0, rr*.76, rr*.85, rr*.76), HP.luxDome);
+      T.add(GEO.dome, mat(0, y + .52, 0, 0, 0, 0, rr*.76, rr*.85, rr*.76), R.pick([HP.luxDome, HP.luxGold, HP.luxPink, HP.luxTile, HP.luxDome]));
       for (let k = 0; k < 8; k++) T.add(GEO.ring, mat(0, y + .52, 0, PI/2, k/8*PI, 0, rr*.77, .02, rr*.86), HP.luxGold);
       T.add(GEO.cyl8, mat(0, y + .52 + rr*.85 + .1, 0, 0, 0, 0, .12, .22, .12), HP.luxGold); T.add(GEO.cyl5, mat(0, y + .52 + rr*.85 + .4, 0, 0, 0, 0, .025, .45, .025), HP.luxGold);
       return y + .52 + rr*.85; } },
@@ -1790,14 +1792,14 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     cornerhouse: { name: 'Blossom corner house', lux: true, r: 1.8, rb: 1.25, build(T, R, D, ctx){
       const w = R.r(1.9, 2.2), d = R.r(1.7, 2.0), fl = ctx.below ? 1 : R.i(2, 3), fh = .9, pk = R.pick([HP.luxPink, HP.luxPink2, HP.luxPink]), br = .58; let y = ctx.below ? 0 : .14;
       if (!ctx.below) box(T, 0, .07, 0, w + .5, .14, d + .5, HP.luxCream);
-      const bx = w/2 - .2, bzz = d/2 - .2;
+      const bx = (R.chance(.5) ? 1 : -1)*(w/2 - .2), bzz = d/2 - .2, awn = R.pick([HP.luxSilver, HP.luxGold, HP.luxRose, HP.luxSage]);
       for (let f = 0; f < fl; f++){
         box(T, 0, y + fh/2, 0, w, fh, d, pk); T.add(GEO.cyl16, mat(bx, y + fh/2, bzz, 0, 0, 0, br, fh, br), pk);
         box(T, 0, y + fh - .04, 0, w + .08, .08, d + .08, HP.luxWhite); T.add(GEO.cyl16, mat(bx, y + fh - .04, bzz, 0, 0, 0, br + .05, .08, br + .05), HP.luxWhite);
         for (let k = 0; k < 4; k++){ const a = PI/4 - .6 + k*.4, x = bx + Math.sin(a)*(br + .01), z = bzz + Math.cos(a)*(br + .01); T.add(GEO.box, mat(x, y + fh*.5, z, 0, a, 0, .2, .52, .04), D.chance(.5) ? HP.lamp : HP.glassD); }
         winZ(T, D, -w*.28, y + fh*.52, d/2, .3, .44, true); winZ(T, D, 0, y + fh*.52, -d/2 - .07, .3, .44, true);
         if (f > 0 && D.chance(.7)){ box(T, -w*.28, y + .04, d/2 + .16, .6, .05, .3, HP.luxCream); for (let k = 0; k <= 4; k++) box(T, -w*.28 - .28 + k*.14, y + .18, d/2 + .3, .02, .24, .02, HP.rail); box(T, -w*.28, y + .3, d/2 + .3, .6, .03, .03, HP.rail); }
-        if (f === 0 && !ctx.below){ box(T, -w*.05, y + .4, d/2 + .03, .44, .74, .05, HP.luxGold); box(T, -w*.05, y + .4, d/2 + .06, .34, .64, .03, HP.glassD); box(T, -w*.05, y + .86, d/2 + .2, .7, .04, .34, HP.luxSilver); }
+        if (f === 0 && !ctx.below){ box(T, -w*.05, y + .4, d/2 + .03, .44, .74, .05, HP.luxGold); box(T, -w*.05, y + .4, d/2 + .06, .34, .64, .03, HP.glassD); box(T, -w*.05, y + .86, d/2 + .2, .7, .04, .34, awn); }
         y += fh; }
       if (ctx.above) return y;
       box(T, 0, y + .03, 0, w + .1, .06, d + .1, HP.luxCream); T.add(GEO.cyl16, mat(bx, y + .03, bzz, 0, 0, 0, br + .08, .06, br + .08), HP.luxCream);
@@ -1824,12 +1826,73 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
           T.add(GEO.cone8, mat(w/2 - .25, y + .6, bz + d/2 - .3, 0, 0, 0, .14, 1.0, .14), HP.cypress); if (D.chance(.7)) blossomPot(T, D, -w/2 + .3, y + .08, bz + d/2 - .3);
           w *= R.r(.68, .8); d = nd; bz = nz; } }
       const top = y + .08;
-      if (!ctx.above){ const nd = D.chance(.5) ? 2 : 1;
-        for (let k = 0; k < nd; k++){ const dx = nd === 1 ? 0 : (k ? .45 : -.45)*w, dr = Math.min(w, d)*(nd === 1 ? .32 : .22);
+      if (!ctx.above){ const nd = R.i(1, 3), domeC = R.pick([HP.luxCopper, HP.luxGold, HP.luxTile, HP.luxCopper]);
+        for (let k = 0; k < nd; k++){ const dx = nd === 1 ? 0 : (k - (nd - 1)/2)*w*(nd === 3 ? .42 : .9), dr = Math.min(w, d)*(nd === 1 ? .32 : nd === 2 ? .22 : k === 1 ? .26 : .17);
           T.add(GEO.cyl12, mat(dx, top + .17, bz, 0, 0, 0, dr*1.05, .34, dr*1.05), stone); for (let j = 0; j < 6; j++){ const a = j/6*PI*2; T.add(GEO.box, mat(dx + Math.sin(a)*dr*1.05, top + .17, bz + Math.cos(a)*dr*1.05, 0, a, 0, .08, .2, .03), HP.lamp); }
-          T.add(GEO.dome, mat(dx, top + .34, bz, 0, 0, 0, dr, dr*1.05, dr), HP.luxCopper); T.add(GEO.cyl5, mat(dx, top + .34 + dr*1.05 + .12, bz, 0, 0, 0, .02, .26, .02), HP.luxGold); } }
+          T.add(GEO.dome, mat(dx, top + .34, bz, 0, 0, 0, dr, dr*1.05, dr), domeC); T.add(GEO.cyl5, mat(dx, top + .34 + dr*1.05 + .12, bz, 0, 0, 0, .02, .26, .02), HP.luxGold); } }
       if (!ctx.below){ for (const sx of [-1, 1]) T.add(GEO.cone8, mat(sx*(w/2 + .35), .85, d/2 + .2, 0, 0, 0, .18, 1.5, .18), HP.cypress); }
       return ctx.above ? top : top; } },
+    // The pagoda tower (board 23's skyline): a slim tower of four to six tiers, each a little narrower, pink or white walls,
+    // flared roofs between the tiers (silver, pearl or jade-silver), gold corners, a balcony now and then, a string of
+    // lanterns down one corner, a tall spire with gold rings.
+    pagodatower: { name: 'Pagoda tower', lux: true, r: 1.8, rb: 1.2, build(T, R, D, ctx){
+      const n = ctx.below ? R.i(1, 2) : R.i(4, 6), wall = R.pick([HP.luxPink, HP.luxPink2, HP.luxWhite, HP.luxPink]), roofC = R.pick([HP.luxSilver, HP.luxPearl, HP.luxSilver, HP.luxJade]);
+      let w = R.r(1.7, 2.0), y = ctx.below ? 0 : .2, th = R.r(.7, .82);
+      if (!ctx.below){ box(T, 0, .1, 0, w + 1.0, .2, w + 1.0, HP.luxCream); for (const sx of [-1, 1]) blossomTree(T, D, sx*(w/2 + .35), .2, w/2 + .35, .75); }
+      for (let i = 0; i < n; i++){
+        box(T, 0, y + th/2, 0, w, th, w, wall); for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(T, sx*w/2, y + th/2, sz*w/2, .09, th, .09, HP.luxRose);
+        for (const sd of [-1, 1]){ latticeZ(T, D, 0, y + th*.5, sd*w/2 + (sd < 0 ? -.07 : 0), w*.36, th*.5); latticeX(T, D, sd*w/2, y + th*.5, 0, w*.36, th*.5, sd); }
+        if (i === 0 && !ctx.below){ box(T, 0, y + .38, w/2 + .04, .44, .66, .05, HP.luxGold); box(T, 0, y + .38, w/2 + .07, .34, .56, .03, HP.glassD); }
+        if (i > 0 && D.chance(.45)){ box(T, 0, y + .03, w/2 + .18, w*.8, .05, .32, HP.luxCream); for (let k = 0; k <= 5; k++) box(T, -w*.4 + k*w*.16, y + .16, w/2 + .32, .025, .24, .025, HP.luxWhite); }
+        y += th;
+        if (i < n - 1 || !ctx.above){ luxRoof(T, y - .02, w + .6, w + .6, .22, false, roofC); y += .18; }
+        w *= R.r(.82, .88); th *= .97; }
+      if (!ctx.above){ T.add(GEO.cyl5, mat(0, y + .5, 0, 0, 0, 0, .04, 1.0, .04), HP.luxGold); for (let k = 0; k < 4; k++) T.add(GEO.cyl8, mat(0, y + .2 + k*.18, 0, 0, 0, 0, .1 - k*.015, .03, .1 - k*.015), HP.luxGold);
+        if (D.chance(.7)){ const L = y - .3; for (let k = 0; k < 6; k++){ const t = (k + .5)/6; box(T, w/2 + .45 - t*.1, L*(1 - t) + .4*t + .2, w/2 + .45 - t*.1, .1, .12, .1, k % 2 ? HP.lamp : HP.lanternR); } } }
+      return ctx.above ? y : y + .1; } },
+    // The glass orangery: a white-framed glass hall on a stone base, a central glass dome (or a ridged roof) with a gold
+    // finial, one or two glass wings, citrus and blossom trees showing through, urns at the door.
+    orangery: { name: 'Glass orangery', lux: true, solo: true, r: 2.4, rb: 1.95, build(T, R, D, ctx){
+      const y0 = .2, style = R.i(0, 2), L = R.r(2.6, 3.2), d = R.r(1.5, 1.8), h = R.r(1.0, 1.2), dome = style !== 1, twin = style === 2, wings = R.i(0, 2), fr = R.pick([HP.luxWhite, HP.luxWhite, HP.luxGold, HP.luxSage]);   // (styles: a dome, a ridged glass roof, twin domes; white, gold or sage ironwork)
+      box(T, 0, .1, 0, L + 1.6, .2, d + 1.4, HP.luxCream);
+      const hall = (cx, w, dd, hh) => { box(T, cx, y0 + .1, 0, w, .2, dd, HP.luxWhite); box(T, cx, y0 + .2 + hh/2, 0, w - .04, hh, dd - .04, HP.glass2);
+        const nx = Math.max(2, Math.round(w/.36)), nz = Math.max(2, Math.round(dd/.36));
+        for (let k = 0; k <= nx; k++) for (const sz of [-1, 1]) box(T, cx - w/2 + k*w/nx, y0 + .2 + hh/2, sz*dd/2, .04, hh, .04, fr);
+        for (let k = 0; k <= nz; k++) for (const sx of [-1, 1]) box(T, cx + sx*w/2, y0 + .2 + hh/2, -dd/2 + k*dd/nz, .04, hh, .04, fr);
+        box(T, cx, y0 + .2 + hh, 0, w + .08, .06, dd + .08, fr); };
+      hall(0, L, d, h);
+      if (dome) for (const cx of twin ? [-L*.25, L*.25] : [0]){ const dr = Math.min(L, d)*(twin ? .32 : .42); T.add(GEO.cyl12, mat(cx, y0 + .2 + h + .14, 0, 0, 0, 0, dr*1.05, .28, dr*1.05), fr); T.add(GEO.dome, mat(cx, y0 + .2 + h + .28, 0, 0, 0, 0, dr, dr*.95, dr), HP.glass2);
+        for (let k = 0; k < 8; k++) T.add(GEO.ring, mat(cx, y0 + .2 + h + .28, 0, PI/2, k/8*PI, 0, dr + .01, .025, dr*.96), fr);
+        T.add(GEO.cyl5, mat(cx, y0 + .2 + h + .28 + dr*.95 + .15, 0, 0, 0, 0, .03, .3, .03), HP.luxGold); }
+      else { T.add(GEO.cyl12, mat(0, y0 + .2 + h, 0, 0, 0, PI/2, d/2, L, .35), HP.glass2); for (let k = 0; k <= 6; k++) T.add(GEO.ring, mat(-L/2 + k*L/6, y0 + .2 + h, 0, 0, 0, PI/2, d/2 + .01, .04, .36), fr); }
+      for (let k = 0; k < wings; k++){ const sx = k ? 1 : -1, ww = R.r(.9, 1.2); hall(sx*(L/2 + ww/2), ww, d*.8, h*.78); }
+      for (let k = 0; k < 3; k++){ const x = -L*.3 + k*L*.3; T.add(GEO.cyl5, mat(x, y0 + .45, 0, 0, 0, 0, .04, .5, .04), HP.timber); T.add(GEO.sph, mat(x, y0 + .8, 0, 0, 0, 0, .28, .24, .28), D.chance(.5) ? C(0x6f9a4a) : D.pick(HP.blossom));
+        if (D.chance(.6)) for (let j = 0; j < 4; j++) T.add(GEO.ico, mat(x + D.r(-.2, .2), y0 + .8 + D.r(-.1, .15), D.r(-.2, .2), 0, 0, 0, .04, .04, .04), HP.luxOrange); }
+      box(T, 0, y0 + .5, d/2 + .03, .5, .6, .05, HP.luxGold); box(T, 0, y0 + .5, d/2 + .06, .42, .54, .03, HP.lamp);
+      for (const sx of [-1, 1]){ T.add(GEO.cyl8, mat(sx*.5, .4, d/2 + .45, 0, 0, 0, .13, .3, .13), HP.luxWhite); T.add(GEO.sph, mat(sx*.5, .66, d/2 + .45, 0, 0, 0, .16, .14, .16), D.pick(HP.blossom)); }
+      return y0 + .2 + h + (dome ? .9 : .4); } },
+    // The pool villa: two or three white slabs stepping and sliding past each other, bands of tall glass, pink or gold trim,
+    // a terrace with a pink parasol and loungers; on top a pool of lit water (it ripples and glows at night), a cherry tree.
+    poolvilla: { name: 'Pool villa', lux: true, r: 2.2, rb: 1.6, build(T, R, D, ctx){
+      const n = ctx.below ? 1 : R.i(2, 3), trim = R.pick([HP.luxPink, HP.luxGold, HP.luxRose, HP.luxPink2]), slab = R.pick([HP.luxWhite, HP.luxCream, HP.luxWhite]);
+      let y = ctx.below ? 0 : .14, w = R.r(2.6, 3.0), d = R.r(2.0, 2.3), ox = 0;
+      if (!ctx.below) box(T, 0, .07, 0, w + .6, .14, d + .6, HP.luxCream);
+      for (let i = 0; i < n; i++){ const h = .85;
+        box(T, ox, y + h/2, 0, w, h, d, slab); box(T, ox, y + h*.52, 0, w + .02, h*.56, d + .02, D.chance(.4) ? HP.glass2 : HP.glassD);
+        for (let k = 0; k <= Math.round(w/.45); k++) box(T, ox - w/2 + k*w/Math.round(w/.45), y + h*.52, d/2 + .02, .04, h*.56, .03, slab);
+        for (let k = 0; k < Math.round(w/.9); k++) if (D.chance(.6)) box(T, ox - w/2 + (k + .5)*w/Math.round(w/.9), y + h*.52, d/2 + .035, .34, h*.48, .02, HP.lamp);
+        box(T, ox, y + h - .03, 0, w + .1, .07, d + .1, trim);
+        y += h; if (i < n - 1){ const nw = w*R.r(.7, .82), shift = R.pick([-1, 1])*(w - nw)/2*R.r(.4, 1); 
+          box(T, ox + (shift > 0 ? -1 : 1)*(w - nw)/2*.6, y + .04, d/2 - .3, .5, .02, .25, HP.luxSilver); w = nw; ox += shift; } }
+      const top = y + .04;
+      if (!ctx.above){ const pw = w*R.r(.5, .65), pd = d*R.r(.45, .6), px = ox + (w - pw)/2 - .15, pz = (d - pd)/2 - .15;
+        box(T, px, top + .1, pz, pw + .2, .2, pd + .2, HP.luxCream); box(T, px, top + .19, pz, pw, .02, pd, HP.pool);
+        const lx = ox - w/2 + .45; for (let k = 0; k < 2; k++){ T.add(GEO.box, mat(lx, top + .1, -d*.15 + k*.4, 0, 0, -.2, .45, .05, .2), HP.luxWhite); }
+        T.add(GEO.cyl5, mat(lx + .1, top + .4, d*.3, 0, 0, 0, .02, .8, .02), HP.metal); T.add(GEO.cone8, mat(lx + .1, top + .78, d*.3, 0, 0, 0, .42, .16, .42), D.pick([HP.luxPink, HP.luxPink2, HP.luxGold]));
+        if (D.chance(.7)) blossomTree(T, D, ox - w/2 + .35, top, -d/2 + .35, .7);
+        for (let k = 0; k <= 10; k++) box(T, ox - w/2 + k*w/10, top + .15, d/2, .02, .26, .02, HP.glass2); }
+      if (!ctx.below){ for (const sx of [-1, 1]) if (D.chance(.8)) blossomPot(T, D, sx*1.5, .14, d/2 + .2); }
+      return top; } },
   };
   // COM: a shop (the commercial zone's); SOLO: one that stands alone on the ground (nothing stacks on it, it stacks on nothing)
   // industry's blues: each building lit in one shade of neon blue, picked by its seed (its rails, rings, lights and the
@@ -2863,7 +2926,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const ZW = [['townhouse', .24], ['villa', .19], ['tower', .14], ['pods', .13], ['pagoda', .12], ['terrace', .12], ['lagoon', .06]];
   const CW = [['noodle', .21], ['lantern', .21], ['kiosk', .17], ['rotunda', .14], ['viaduct', .14], ['grotto', .07], ['ringcourt', .06]];   // (the commercial zone's mix)
   const IW = [['field', .34], ['tunnels', .2], ['dome', .13], ['barn', .11], ['hive', .07], ['vfarm', .06], ['turbine', .09]];   // (fields often don't fit where smaller things do, so they're weighted up)   // (the industrial zone's mix)
-  const LW = [['mansion', .26], ['cornerhouse', .24], ['dometower', .2], ['arcvilla', .18], ['palace', .12]];   // (luxury's mix)
+  const LW = [['mansion', .17], ['cornerhouse', .16], ['dometower', .14], ['arcvilla', .13], ['poolvilla', .14], ['pagodatower', .12], ['orangery', .07], ['palace', .07]];   // (luxury's mix)
   const zPick = R => { const W = PL.kind === 'czone' ? CW : PL.kind === 'izone' ? IW : PL.kind === 'lzone' ? LW : ZW; let u = R.f(); for (const [k, w] of W){ if ((u -= w) < 0) return k; } return W[0][0]; };
   const zPickStack = R => { for (let t = 0; t < 8; t++){ const k = zPick(R); if (!SOLO(k)) return k; } return PL.kind === 'czone' ? 'lantern' : 'townhouse'; };
   let zLayout = null, zKey = '';

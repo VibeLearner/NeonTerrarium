@@ -2667,7 +2667,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const curKind = () => oneHome() ? PL.zkinds[PL.kind] : PL.kind, curSeed = () => oneHome() ? PL.zseed : PL.seed;
   function showGhost(){
     PL.onto = null; PL.side = null; zHide();
-    const K = curKind(), S = curSeed(), pre = oneHome() ? 'one ' + ZUNIT() + ': ' + KINDS[K].name.toLowerCase() + ' (V next) ' : '';
+    const K = curKind(), S = curSeed(), pre = '' /* (no running commentary on what the brush holds) */
     const say = (t, ok) => { if (status){ status.textContent = pre + t; status.style.color = ok ? '#5c7060' : '#c0623f'; } };
     const hov0 = K && !SOLO(K) && PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, hov = hov0 && !(hov0.top && SOLO(hov0.piece.kind)) ? hov0 : null, over = hov && hov.top ? hov.piece : null;   // (the grotto goes on the ground only, and nothing stacks on it)
     if (hov && !hov.top){   // against a wall: build off that side, on that floor
@@ -2766,7 +2766,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s_ = Math.sin(t);
       for (const [j, rr] of [[0, r], [1, r + .18]]){ const x = hit.x + c*rr, z = hit.z + s_*rr, o = (i*2 + j)*3; a[o] = x; a[o + 1] = heightAt(x, z) + .07; a[o + 2] = z; } }
     ringGeo.attributes.position.needsUpdate = true; ring.visible = true; ringM.color.set(n ? 0x7dffb0 : 0xff6a5a);
-    if (status){ status.textContent = 'brush ' + ZONE.size + ': ' + n + ' ' + ZUNIT() + 's' + (ns ? ', ' + ns + ' on top of others' : '') + (nd ? ', ' + nd + ' against others' : '') + (n ? '' : ': no room here'); status.style.color = n ? '#5c7060' : '#c0623f'; }
+    if (status){ status.textContent = n ? '' : 'no room here'; /* (what's in the brush shows in the ghosts; words only when nothing fits) */ status.style.color = n ? '#5c7060' : '#c0623f'; }
   }
   function placeZone(){
     if (!PL.hit || PL.hit.sea) return;

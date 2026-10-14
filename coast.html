@@ -62,8 +62,7 @@
   /* bottom: the hint, the controls, the zone cards */
   .zonebar { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .hint { padding: 3px 14px 4px; font: 19px/1.1 'Caveat', cursive; color: var(--ink); --w: var(--paper); --w2: var(--ochre); white-space: nowrap; }
-  .hint:has(#placeStatus.idle:empty) { display: none; }   /* (nothing to say with no tool picked) */
-  #placeStatus:not(.idle):empty::before { content: 'Point at the ground to place'; color: var(--ink2); }
+  .hint:has(#placeStatus:empty) { display: none; }   /* (nothing to say: no hint at all) */
   .ctlwrap { position: relative; }
   .ctlhover { padding: 1px 12px 2px; font: 17px/1.1 'Caveat', cursive; color: var(--ink2); cursor: help; --w: var(--sage); --w2: var(--paper); }
   .ctlpanel { display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: 320px; padding: 12px 16px 14px; --w: var(--paper); --w2: var(--sky); cursor: default; }

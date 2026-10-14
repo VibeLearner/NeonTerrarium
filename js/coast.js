@@ -111,7 +111,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   /* ---------- the bend, the haze, the materials ---------- */
   const scene = new THREE.Scene();
   const CURV = { ctr: { value: new THREE.Vector2() }, fwd: { value: new THREE.Vector2(1, 0) }, curveK: { value: 0 }, g0: { value: 30 },
-    hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) }, nightK: { value: 0 }, darkK: { value: 0 } };   // (nightK: the lamps; darkK: full night only)
+    hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) }, nightK: { value: 0 }, darkK: { value: 0 }, gTime: { value: 0 } };   // (nightK: the lamps; darkK: full night only; gTime: seconds, for the water's glow)
   const BEND = `{ vec4 wq = vec4(transformed, 1.0);
     #ifdef USE_INSTANCING
       wq = instanceMatrix * wq;   // (a copy's own place in the world: the watercolor shadow is looked up there)
@@ -142,11 +142,26 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // night: what glows. A block's lamps, lit windows and greenhouse glass carry a glow (0..1, per vertex; see Tris); by night
   // it turns them warm amber, the glass a gold-green, as in the solarpunk boards (a teal, rainy dusk, every window warm)
   const GLOW_V = 'attribute float glow; varying float vGlow;\n';
-  const GLOW_F = 'varying float vGlow;\n';
+  const GLOW_F = 'varying float vGlow; uniform float gTime;\n';
   const GLOW_APPLY = `if (vGlow > 0.0){ vec3 amber = vec3(1.0, 0.5, 0.2), lampY = vec3(1.0, 0.87, 0.47);
-      float lamp = step(0.85, vGlow), sh = 0.74 + 0.26*abs(normalize(vNormal).x);
-      vec3 gc = lamp > 0.5 ? lampY*1.04 : vGlow > 0.2 && vGlow < 0.3 ? vColor*1.25 : vGlow > 0.6 ? lampY*0.95*sh : mix(amber, vColor*vec3(0.9, 0.75, 0.45), 0.18)*sh;   // (.7: a tower's glass rooms, lit like windows)   // (windows and lamps: warm yellow; the glass up top: orange, still shaded by its facets; .25: lit in its own color, for neon, lit water, screens, red lanterns)
-      gl_FragColor.rgb = mix(gl_FragColor.rgb, gc, nightK*(lamp > 0.5 ? 1.0 : 0.85)); }`;
+      float lamp = step(0.85, vGlow), sh = 0.74 + 0.26*abs(normalize(vNormal).x), k = nightK*(lamp > 0.5 ? 1.0 : 0.85);
+      vec3 gc;
+      if (lamp > 0.5) gc = lampY*1.04;
+      else if (vGlow > 0.2 && vGlow < 0.3) gc = vColor*1.25;
+      else if (vGlow > 0.3 && vGlow < 0.4){
+        // water, glowing as if alive: a deep teal wash with slow drifting blooms of mint and paler sea-glass, in a few soft
+        // bands (watercolor, not neon), dimmer than a lamp
+        vec2 q = vWq.xz;
+        float n = 0.5 + 0.5*sin(q.x*1.9 + gTime*0.3 + 1.4*sin(q.y*1.5 - gTime*0.22));
+        float m = 0.5 + 0.5*sin(q.y*2.7 - q.x*1.1 + gTime*0.45);
+        n = floor(n*4.0 + 0.5)/4.0;
+        gc = mix(vec3(0.11, 0.25, 0.29), vec3(0.36, 0.64, 0.56), smoothstep(0.2, 0.9, n));
+        gc = mix(gc, vec3(0.66, 0.84, 0.74), smoothstep(0.7, 1.0, n*m)*0.55);
+        k = nightK*0.8; }
+      else gc = vGlow > 0.6 ? lampY*0.95*sh : mix(amber, vColor*vec3(0.9, 0.75, 0.45), 0.18)*sh;   // (.7: a tower's glass rooms, lit like windows)
+      // (windows and lamps: warm yellow; the glass up top: orange, still shaded by its facets; .25: lit in its own color, for
+      // neon, screens, red lanterns; .35: water, lit softly from within)
+      gl_FragColor.rgb = mix(gl_FragColor.rgb, gc, k); }`;
   // a new home painted in, in watercolor: the wash rises up it from the ground with a ragged, bleeding edge (darker where the
   // pigment pools at the wash's rim), pale and watery behind the edge, then the color deepens to full as it dries
   const PAINT_F = `uniform float pRise, pDry, pB, pH;
@@ -988,12 +1003,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     red: C(0xb84a3c), redD: C(0x8a3329), jade: C(0x3a8a76), jade2: C(0x276556), lattice: C(0x5a2a22),   // (the pagoda house: lacquer red, jade tiles)
     rust: C(0xc4703e), rust2: C(0x9e5530), solar: C(0x2b4877), solarL: C(0x6f8fbf), tank: C(0xb9b7ad),
     apricot: C(0xe8a578), butter: C(0xe9c877), mist: C(0x98c6bb), sage: C(0xadc493), rose: C(0xd99788), blushD: C(0xe2ad99),
-    neonG: C(0x8dffc6).multiplyScalar(1.1), neonP: C(0xff86b4).multiplyScalar(1.1), pool: C(0x46c2b0).multiplyScalar(1.1), fall: C(0xb8f4e6).multiplyScalar(1.1), lily: C(0x5f9a5a), moss: C(0x7f9e5c), timber: C(0x5a3a2a), lanternR: C(0xe0503a).multiplyScalar(1.1), screen: C(0x7fd0ff).multiplyScalar(1.1), ringW: C(0xe2fff2).multiplyScalar(1.1) };   // (the grotto: neon trim and signs, the lit pool and its falls)
+    neonG: C(0x8dffc6).multiplyScalar(1.1), neonP: C(0xff86b4).multiplyScalar(1.1), pool: C(0x5f968f), fall: C(0xb9d9cd), lily: C(0x5f9a5a), moss: C(0x7f9e5c), timber: C(0x5a3a2a), lanternR: C(0xe0503a).multiplyScalar(1.1), screen: C(0x7fd0ff).multiplyScalar(1.1), ringW: C(0xe2fff2).multiplyScalar(1.1) };   // (the grotto: neon trim and signs, the lit pool and its falls)
   // the plaster colors a home can be washed in besides white: soft, chalky, and all from the scene's own colors (the sand,
   // the terracotta, the sea's teal, the meadow's sage), so a street of them reads as one watercolor
   const PLASTER = [HP.blushD, HP.apricot, HP.butter, HP.mist, HP.sage, HP.rose, HP.apricot, HP.mist];   // (the garden terrace: weathered rust, solar glass)
   for (const c of HP.leaf) LEAFC.add(c);
-  GLOW.set(HP.ringW, .25).set(HP.lanternR, .25).set(HP.screen, .25).set(HP.neonG, .25).set(HP.neonP, .25).set(HP.pool, .25).set(HP.fall, .25).set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
+  GLOW.set(HP.ringW, .25).set(HP.lanternR, .25).set(HP.screen, .25).set(HP.neonG, .25).set(HP.neonP, .25).set(HP.pool, .35).set(HP.fall, .35).set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
   Object.assign(GEO, { cyl12: new THREE.CylinderGeometry(1, 1, 1, 12), cyl16: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.IcosahedronGeometry(1, 1),
     dome: new THREE.SphereGeometry(1, 12, 6, 0, PI*2, 0, PI/2), ring: new THREE.CylinderGeometry(1, 1, 1, 16, 1, true),
     frus4: new THREE.CylinderGeometry(.62, 1, 1, 4, 1).rotateY(PI/4), half16: new THREE.CylinderGeometry(1, 1, 1, 16, 1, false, -PI/2, PI), hip4: new THREE.CylinderGeometry(.08, 1, 1, 4, 1).rotateY(PI/4) });   // (square frustums: a roof's flared skirt, and a hipped roof)
@@ -1383,7 +1398,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         T.add(GEO.cyl5, mat(x, Htop + .4, z, 0, 0, D.r(-.1, .1), .06, .8, .06), HP.wood); T.add(GEO.ico, mat(x, Htop + .85, z, 0, 0, 0, .5, .3, .5), D.pick(HP.leaf)); }
       return Htop + .1;
     } },
-    // From the cavern colony (board 20): the ring rotunda, the viaduct arcade, the ring court and the lagoon plaza.
+    // From the cavern colony (board 20): the ring rotunda, the viaduct arcade and the ring court (and the lagoon garden, which went to residential).
     // The ring rotunda: a round stone drum with an arched glass door under a canopy, then floors of glass each girdled by a
     // balcony with a rail and a ring of white neon, plants along the balconies; a shallow glass dome and a roof garden.
     rotunda: { name: 'Ring rotunda', com: true, r: 1.9, rb: 1.25, build(T, R, D, ctx){
@@ -1467,9 +1482,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       for (const a of [2.2, 4.0]){ const [x, z] = at(a, Ri - .3); T.add(GEO.box, mat(x, y0 + .12, z, 0, a, 0, .45, .06, .16), HP.wood); }
       return top;
     } },
-    // The lagoon plaza: a round pool in a stone rim, lit from below, with lily pads; a curving walk out to an island with a
+    // RESIDENTIAL, though it came from the colony. The lagoon garden: a round pool in a stone rim, softly aglow at night, lily pads; a curving walk out to an island with a
     // tree; lamp posts round the rim with white globes; a little glass cafe on the rim with an awning, tables out front.
-    lagoon: { name: 'Lagoon plaza', com: true, solo: true, r: 2.6, rb: 2.25, build(T, R, D, ctx){
+    lagoon: { name: 'Lagoon garden', solo: true, r: 2.6, rb: 2.25, build(T, R, D, ctx){
       const y0 = .12, Rp = R.r(1.85, 2.0), at = (th, r) => [Math.sin(th)*r, Math.cos(th)*r];
       T.add(GEO.cyl16, mat(0, .06, 0, 0, 0, 0, Rp + .4, .12, Rp + .4), HP.stone);
       T.add(GEO.ring, mat(0, y0 + .1, 0, 0, 0, 0, Rp + .1, .2, Rp + .1), HP.cream); T.add(GEO.ring, mat(0, y0 + .1, 0, 0, 0, 0, Rp, .2, Rp), HP.stone);
@@ -2138,7 +2153,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (want !== GLOD.hi){ GLOD.hi = want; for (const g of gSquares.values()) for (const m of g.children) m.visible = m.userData.kind === 'blot' || (m.userData.kind === 'near') === want; }
     _gf.setFromProjectionMatrix(_gpm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     for (const g of gSquares.values()) g.visible = _gf.intersectsBox(g.userData.box); }
-  function grassTick(t){ gU.wTime.value = t; grassLOD(); const t0 = performance.now(); for (const k of gDirty){ gDirty.delete(k); buildSquare(k); if (performance.now() - t0 > 6) break; } }   // (about 6 ms of remaking a frame at most)
+  function grassTick(t){ gU.wTime.value = t; CURV.gTime.value = t; grassLOD(); const t0 = performance.now(); for (const k of gDirty){ gDirty.delete(k); buildSquare(k); if (performance.now() - t0 > 6) break; } }   // (about 6 ms of remaking a frame at most)
   const grassAround = (x, z, r) => { for (let i = Math.floor((x - r)/GC); i <= Math.ceil((x + r)/GC); i++) for (let j = Math.floor((z - r)/GC); j <= Math.ceil((z + r)/GC); j++){ const k = i + ',' + j; if (tdata.has(k)){ tdata.delete(k); gDirty.add(sqKey(i, j)); } } };
 
   ANIM.live = true;   // (homes from the save just appear; new ones are painted in)
@@ -2209,8 +2224,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // checked as a home placed alone would be, and the ones that can't go (the sea, a slope, a home already there) are left out.
   // Right click in zone mode clears the homes inside the brush.
   const ZONE = { on: true, size: 2 }, ZSIZE = [0, 2.8, 4.2, 5.8, 7.6, 9.6, 12];
-  const ZW = [['townhouse', .26], ['villa', .2], ['tower', .15], ['pods', .14], ['pagoda', .12], ['terrace', .13]];
-  const CW = [['noodle', .19], ['lantern', .19], ['kiosk', .15], ['rotunda', .14], ['viaduct', .14], ['grotto', .07], ['ringcourt', .06], ['lagoon', .06]];   // (the commercial zone's mix)
+  const ZW = [['townhouse', .24], ['villa', .19], ['tower', .14], ['pods', .13], ['pagoda', .12], ['terrace', .12], ['lagoon', .06]];
+  const CW = [['noodle', .21], ['lantern', .21], ['kiosk', .17], ['rotunda', .14], ['viaduct', .14], ['grotto', .07], ['ringcourt', .06]];   // (the commercial zone's mix)
   const zPick = R => { const W = PL.kind === 'czone' ? CW : ZW; let u = R.f(); for (const [k, w] of W){ if ((u -= w) < 0) return k; } return W[0][0]; };
   const zPickStack = R => { for (let t = 0; t < 8; t++){ const k = zPick(R); if (!SOLO(k)) return k; } return PL.kind === 'czone' ? 'lantern' : 'townhouse'; };
   let zLayout = null, zKey = '';
@@ -2390,7 +2405,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (!PL.ptr){ if (status) status.textContent = ''; return; }
     const { x, y } = PL.ptr, lk = linkAt(x, y);
     if (lk){ hlLink(lk, hlDel); say('Right click to take away this walkway'); return; }
-    const p = pieceAt(x, y); if (p){ hlPiece(p, hlDel); const nm = COM(p.kind) ? 'this ' + KINDS[p.kind].name.toLowerCase() : 'this home'; say(p.up || PIECES.some(r => r.host === p) ? 'Right click to take away ' + nm + ' and what\'s built on it' : 'Right click to take away ' + nm); return; }
+    const p = pieceAt(x, y); if (p){ hlPiece(p, hlDel); const nm = COM(p.kind) || SOLO(p.kind) ? 'this ' + KINDS[p.kind].name.toLowerCase() : 'this home'; say(p.up || PIECES.some(r => r.host === p) ? 'Right click to take away ' + nm + ' and what\'s built on it' : 'Right click to take away ' + nm); return; }
     const h = pick(x, y);
     if (h && !h.sea && grassNear(h.x, h.z, .9)){ ringAt(h.x, h.z, .9, null, .12); ringM.color.set(0xe0583c); ringM.depthTest = false;   // (over the blades, so it shows)
       const d = new THREE.Mesh(hlDisc, hlDisk); d.position.set(h.x, heightAt(h.x, h.z) + .08, h.z); d.updateMatrix(); hlAdd(hlDisc, d.matrix, hlDisk); say('Right click to clear the grass here'); return; }
@@ -2512,7 +2527,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const reflM = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)] });   // (double sided: a mirrored view turns the faces' winding round)
   reflM.onBeforeCompile = sh => { sh.uniforms.nightK = CURV.nightK;   // (by night the lit windows show in the water, warm)
     sh.vertexShader = GLOW_V + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vGlow = glow;');
-    sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vGlow > 0.85 ? vec3(1.0, 0.85, 0.46) : vGlow > 0.2 && vGlow < 0.3 ? vColor*1.2 : vec3(1.0, 0.6, 0.28), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
+    sh.fragmentShader = 'uniform float nightK;\n' + GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb = mix(gl_FragColor.rgb, vGlow > 0.85 ? vec3(1.0, 0.85, 0.46) : vGlow > 0.2 && vGlow < 0.3 ? vColor*1.2 : vGlow > 0.3 && vGlow < 0.4 ? vec3(0.32, 0.6, 0.52) : vec3(1.0, 0.6, 0.28), step(0.01, vGlow)*nightK);\n#include <fog_fragment>'); };
   renderer.localClippingEnabled = true;
   // (the reflection is drawn from a camera mirrored in the water's plane, not by flipping the whole scene, which made
   // every object's matrix be worked out again twice a frame; it's drawn every other frame, the ripples hide the step, and

@@ -2298,6 +2298,39 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a, R.r(.55, .95), R.r(.11, .16), R.r(.03, .14), mul3(c, .75), mix3(c, P.tip, .7), 4); } } }
   const comFolGeo = (kind, pal, seed = 1) => { const G = new GB(); comPlant(G, rng(seed*7919 + kind*31 + 5), 0, 0, 0, kind, COMPAL[pal]); return G.mesh(); };
 
+  /* ---------- the industrial zone's planting (preview): working land, warm against the blue ---------- */
+  // Five kinds: a poplar (a tall narrow windbreak tree, planted in rows), sunflowers (tall stems, broad leaves, gold heads
+  // with dark hearts), golden grain (wheat-like blades with heavy seed heads), a wildflower strip (low grass full of small
+  // flowers, for the pollinators) and reeds (tall blades with brown cattail heads). Colored from a palette: leaf, grain,
+  // the flowers it scatters, and the warm glow it gives when the wind stirs it by night.
+  const INDPAL = {
+    harvest: { acc: [.6, .62, .3], leaf: [.4, .55, .26], tip: [.72, .78, .42], grain: [.86, .68, .3], grainTip: [.98, .86, .5], fl: [[.98, .8, .25], [.62, .45, .8], [.97, .95, .88], [.95, .58, .22]], bark: [.4, .33, .26], glow: [.72, .52, .22] },
+    rust: { acc: [.62, .4, .24], leaf: [.3, .45, .28], tip: [.6, .68, .4], grain: [.76, .44, .22], grainTip: [.92, .66, .4], fl: [[.9, .45, .2], [.82, .3, .2], [.96, .88, .7], [.95, .7, .3]], bark: [.36, .28, .24], glow: [.72, .4, .2] },
+    sage: { acc: [.56, .66, .6], leaf: [.42, .56, .48], tip: [.74, .82, .7], grain: [.84, .78, .58], grainTip: [.96, .93, .78], fl: [[.72, .66, .9], [.97, .96, .92], [.95, .86, .5], [.6, .72, .9]], bark: [.4, .36, .32], glow: [.66, .64, .42] } };
+  const INDKINDS = ['poplar', 'sunflowers', 'golden grain', 'wildflower strip', 'reeds'];
+  function sunHead(G, x, y, z, r, petal, h){   // (a disc tilted up toward the sky: a small dark heart, a solid ring of gold, petal tips beyond)
+    const heart = [.32, .2, .1], N = [0, .8, -.55], U = (a, k) => [x + Math.cos(a)*r*k, y + Math.sin(a)*r*k*.55, z + Math.sin(a)*r*k*.8], n = 13;
+    const c0 = G.v(x, y + .01, z - .01, ...N, heart, h), r1 = [], r2 = [];
+    for (let k = 0; k <= n; k++){ const a = k/n*6.28; r1.push(G.v(...U(a, .34), ...N, mul3(heart, 1.25), h)); r2.push(G.v(...U(a, .78), ...N, petal, h)); }
+    for (let k = 0; k < n; k++){ G.tri(c0, r1[k], r1[k + 1]); G.tri(r1[k], r2[k], r2[k + 1]); G.tri(r1[k], r2[k + 1], r1[k + 1]);
+      const tip = G.v(...U((k + .5)/n*6.28, 1.18), ...N, mix3(petal, [1, 1, .9], .15), h); G.tri(r2[k], tip, r2[k + 1]); } }
+  function indPlant(G, R, x, y, z, kind, P){
+    G.gc = P.glow;
+    if (kind === 0){ G.hs = .45; const th = R.r(.9, 1.1); trunkG(G, x, z, x, th, .05, .035, P.bark, 4); crown(G, R, x, y + th + .55, z, .22, .75, .22, 300, P, th); }
+    else if (kind === 1){ G.hs = .7; for (let k = 0, n = R.i(3, 5); k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .16), L = R.r(.8, 1.25), la = R.r(0, 6.28);
+        G.gc = [0, 0, 0]; const top = blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, la, L, .05, R.r(.02, .1), mul3(P.leaf, .8), P.leaf, 4); G.gc = P.glow;
+        for (let j = 0; j < 2; j++) blade(G, x + Math.cos(a)*rr, y + L*R.r(.3, .6), z + Math.sin(a)*rr, R.r(0, 6.28), R.r(.2, .3), .16, R.r(.8, 1.3), P.leaf, P.tip, 2);
+        sunHead(G, top[0], top[1], top[2], R.r(.2, .26), P.fl[0], L); } }
+    else if (kind === 2){ for (let k = 0, n = R.i(12, 16); k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .15), c = mix3(P.grain, P.leaf, R.r(0, .25));
+        const top = blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a, R.r(.55, .85), .05, R.r(.05, .25), mul3(c, .8), P.grainTip, 4);
+        if (R.chance(.75)) seedHead(G, top[0], top[1] - .02, top[2], R.r(.14, .2), P.grainTip, top[1] - y); } }
+    else if (kind === 3){ for (let k = 0, n = R.i(14, 18); k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .3); blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a, R.r(.2, .36), .08, R.r(.2, .5), mul3(P.leaf, .85), P.tip, 3); }
+      for (let k = 0, n = R.i(10, 14); k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .32), top = blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a, R.r(.28, .55), .03, R.r(.05, .2), P.leaf, P.leaf, 2);
+        flower(G, top[0], top[1], top[2], R.r(.08, .12), R.pick(P.fl), top[1] - y); } }
+    else { for (let k = 0, n = R.i(9, 13); k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .12), L = R.r(.8, 1.3), top = blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a, L, .06, R.r(.03, .15), mul3(P.leaf, .8), P.tip, 4);
+        if (R.chance(.45)){ G.gc = [0, 0, 0]; seedHead(G, top[0], top[1] - .1, top[2], R.r(.16, .22), [.38, .24, .14], L); G.gc = P.glow; } } } }
+  const indFolGeo = (kind, pal, seed = 1) => { const G = new GB(); indPlant(G, rng(seed*6151 + kind*37 + 9), 0, 0, 0, kind, INDPAL[pal]); return G.mesh(); };
+
   /* ---------- the grass as copies: a few tufts of each kind made once, stamped everywhere ---------- */
   // Each kind has GV tufts, made at load in a neutral green. Every tuft painted on the ground is one of those, turned, sized
   // and tinted by where it grows (the watercolor washes of greens and dry ochre, as before), so a meadow is a handful of
@@ -2936,7 +2969,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
+  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

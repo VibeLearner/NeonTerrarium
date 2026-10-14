@@ -2342,12 +2342,13 @@ function fieldPlan(){
   const cityArea = (i1 - i0 + 1)*(j1 - j0 + 1), out = [];
   for (const g of groups.values()){
     const cap = FIELD_N*FIELD_N*g.length;
-    if (cap >= cityArea){ out.push({ city: true, i0: i0 - .5, i1: i1 + .5, j0: j0 - .5, j1: j1 + .5, n: g.length }); continue; }
+    const ids = g.map(c => c.m.id).sort().join('|');
+    if (cap >= cityArea){ out.push({ city: true, i0: i0 - .5, i1: i1 + .5, j0: j0 - .5, j1: j1 + .5, n: g.length, ids }); continue; }
     let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; for (const c of g){ a0 = Math.min(a0, c.ci - FIELD_N/2); a1 = Math.max(a1, c.ci + FIELD_N/2); b0 = Math.min(b0, c.cj - FIELD_N/2); b1 = Math.max(b1, c.cj + FIELD_N/2); }
     // (exactly its share of ground: a rectangle round the group's middle, shaped like the spread of its cores, every core inside it)
     const k = Math.sqrt(cap/((a1 - a0)*(b1 - b0))), mi = (a0 + a1)/2, mj = (b0 + b1)/2;
     let hi = (a1 - a0)/2*k, hj = (b1 - b0)/2*k; for (const c of g){ hi = Math.max(hi, Math.abs(c.ci - mi) + 1.5); hj = Math.max(hj, Math.abs(c.cj - mj) + 1.5); }
-    out.push({ city: false, i0: mi - hi, i1: mi + hi, j0: mj - hj, j1: mj + hj, n: g.length });
+    out.push({ city: false, i0: mi - hi, i1: mi + hi, j0: mj - hj, j1: mj + hj, n: g.length, ids });
   }
   const whole = out.find(f => f.city); return whole ? [whole] : out;   // (one that wraps the city takes in the rest)
 }
@@ -2355,7 +2356,7 @@ const FIELD_UNI = { time: FOL_UNI.time };
 const FIELD_GEO = new THREE.SphereGeometry(1, 96, 32, 0, TAU, 0, PI/2);
 function fieldMat(hw, H, hd, seg){
   const m = new THREE.ShaderMaterial({
-    uniforms: { time: FIELD_UNI.time, uSize: { value: new THREE.Vector3(hw, H, hd) }, uSeg: { value: seg } },
+    uniforms: { time: FIELD_UNI.time, uSize: { value: new THREE.Vector3(hw, H, hd) }, uSeg: { value: seg }, uT0: { value: 0 }, uReveal: { value: 0 } },
     vertexShader: `uniform vec3 uSize; varying vec3 vW; varying vec3 vNo; varying float vEl; varying float vAz;
       void main(){
         vec3 p = position; float a = atan(p.z, p.x), c = abs(cos(a)), s = abs(sin(a)), k = pow(pow(c, 4.0) + pow(s, 4.0), -.25);   // the rounded square
@@ -2363,7 +2364,7 @@ function fieldMat(hw, H, hd, seg){
         vEl = asin(clamp(p.y, 0.0, 1.0))/1.5708; vAz = a/6.2832 + .5;
         vNo = normalize(vec3(p.x/uSize.x, p.y/uSize.y, p.z/uSize.z));
         vec4 w = modelMatrix*vec4(q, 1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
-    fragmentShader: `uniform float time, uSeg; varying vec3 vW; varying vec3 vNo; varying float vEl; varying float vAz;
+    fragmentShader: `uniform float time, uSeg, uT0, uReveal; varying vec3 vW; varying vec3 vNo; varying float vEl; varying float vAz;
       float ln(float x, float w){ float f = abs(fract(x) - .5); return 1.0 - smoothstep(.5 - w*1.6, .5 - w*.6, f); }   // a line at every whole number, w wide in its own units
       void main(){
         float u = vAz*uSeg, v = vEl*uSeg*.32;
@@ -2375,14 +2376,23 @@ function fieldMat(hw, H, hd, seg){
         float climb = exp(-pow((vEl - fract(time*.12))*9.0, 2.0));                     // a band of light climbing it
         float base = exp(-vEl*28.0);
         vec3 col = mix(vec3(.42, .72, 1.0), vec3(.62, .52, 1.0), vEl*.7);
-        float a = .004 + L*.13*(1.0 - vEl*.35) + node*.2 + fres*fres*.1 + climb*(.012 + L*.16) + base*.3;   // (faint: seen through from inside, it mustn't wash the city)
-        a *= breath*(gl_FrontFacing ? 1.0 : .45);
+        float full = .004 + L*.13*(1.0 - vEl*.35) + node*.2 + fres*fres*.1 + climb*(.012 + L*.16) + base*.3;   // the whole field, shown while cores have just paired
+        // the sweep: every 30 s a front climbs from the base to the top in 5 s, lighting the lattice as it passes, a short
+        // tail of light fading behind it; otherwise nothing at all
+        float ph = mod(time - uT0, 30.0), e = ph/5.0;
+        float sweep = 0.0;
+        if (e < 1.15){ float dv = e - vEl, front = exp(-pow(dv/.028, 2.0)), tail = dv > 0.0 ? exp(-dv*16.0)*.3 : 0.0, fade = 1.0 - smoothstep(.85, 1.15, e);
+          float Ls = max(ln(u + v*.5, w*1.5), ln(u - v*.5, w*1.5)), Lh = ln(v, w*1.5);   // (the lines a little wider while lit, so they read from afar; the rings round it fainter, or the front is a solid band)
+          sweep = (front + tail)*fade*(Ls*.42 + Lh*.18 + node*.4) + exp(-vEl*40.0)*smoothstep(.2, 0.0, e)*.25; }
+        float a = full*uReveal*breath + sweep;
+        a *= gl_FrontFacing ? 1.0 : .45;
         gl_FragColor = vec4(col*a, 1.0); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   });
   m.userData.colorOnly = true; m.userData.noCast = true; return m;
 }
 function fieldBuild(plan){
+  const was = new Set(FIELD.domes.map(d => d.userData.field.ids)), now = FOL_UNI.time.value;
   for (const d of FIELD.domes){ scene.remove(d); d.material.dispose(); } FIELD.domes = [];
   for (const f of plan){
     const x0 = f.i0*LOT, x1 = f.i1*LOT, z0 = f.j0*LOT, z1 = f.j1*LOT, hw = (x1 - x0)/2 + LOT*.3, hd = (z1 - z0)/2 + LOT*.3;
@@ -2392,10 +2402,13 @@ function fieldBuild(plan){
     const seg = Math.max(10, Math.round((hw + hd)*2/(LOT*1.5)));   // (the lattice's cells about a plot and a half across: finer ones blur at the render's size)
     const mesh = new THREE.Mesh(FIELD_GEO, fieldMat(hw, H, hd, seg)); mesh.position.set((x0 + x1)/2, -.4, (z0 + z1)/2);
     mesh.frustumCulled = false; mesh.renderOrder = 20; mesh.raycast = () => {}; mesh.userData.field = f; scene.add(mesh); FIELD.domes.push(mesh);
+    mesh.material.uniforms.uT0.value = now;   // (a sweep straight away, to show where it stands)
+    mesh.userData.reveal = f.n > 1 && !was.has(f.ids) ? 7 : 0;   // (cores just paired: the whole field shows for a while, then fades)
   }
 }
 // checked every second: rebuilt when the cores or the city's bounds have changed
 function fieldTick(dt){
+  for (const d of FIELD.domes) if (d.userData.reveal > 0){ d.userData.reveal = Math.max(0, d.userData.reveal - dt); d.material.uniforms.uReveal.value = Math.min(1, d.userData.reveal/2); }   // (held, then faded over its last 2 s)
   FIELD.at -= dt; if (FIELD.at > 0) return; FIELD.at = 1;
   const ems = megasOfKind('emitter'); let key = ems.map(m => m.id + '@' + m.i + ',' + m.j).sort().join('|');
   if (ems.length){ let i0 = 1e9, i1 = -1e9, j0 = 1e9, j1 = -1e9, top = 0; for (const c of cells.values()){ i0 = Math.min(i0, c.i); i1 = Math.max(i1, c.i); j0 = Math.min(j0, c.j); j1 = Math.max(j1, c.j); top = Math.max(top, c.height || 0); }

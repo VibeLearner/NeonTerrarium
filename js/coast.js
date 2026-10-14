@@ -1069,12 +1069,13 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     red: C(0xb84a3c), redD: C(0x8a3329), jade: C(0x3a8a76), jade2: C(0x276556), lattice: C(0x5a2a22),   // (the pagoda house: lacquer red, jade tiles)
     rust: C(0xc4703e), rust2: C(0x9e5530), solar: C(0x2b4877), solarL: C(0x6f8fbf), tank: C(0xb9b7ad),
     apricot: C(0xe8a578), butter: C(0xe9c877), mist: C(0x98c6bb), sage: C(0xadc493), rose: C(0xd99788), blushD: C(0xe2ad99),
-    neonG: C(0x8dffc6).multiplyScalar(1.1), neonP: C(0xff86b4).multiplyScalar(1.1), pool: C(0x5f968f), fall: C(0x9cc7b8), lily: C(0x5f9a5a), moss: C(0x7f9e5c), timber: C(0x5a3a2a), lanternR: C(0xe0503a).multiplyScalar(1.1), screen: C(0x7fd0ff).multiplyScalar(1.1), ringW: C(0xe2fff2).multiplyScalar(1.1) };   // (the grotto: neon trim and signs, the lit pool and its falls)
+    neonG: C(0x8dffc6).multiplyScalar(1.1), neonP: C(0xff86b4).multiplyScalar(1.1), pool: C(0x5f968f), fall: C(0x9cc7b8), lily: C(0x5f9a5a), moss: C(0x7f9e5c), timber: C(0x5a3a2a), lanternR: C(0xe0503a).multiplyScalar(1.1), screen: C(0x7fd0ff).multiplyScalar(1.1), ringW: C(0xe2fff2).multiplyScalar(1.1),
+    soil: C(0x5b4532), indBlue: C(0x6cc4ff).multiplyScalar(1.1), indWhite: C(0xd6efff).multiplyScalar(1.05), ghGlass: C(0x9fcfc6), soil2: C(0x4a3626) };   // (industrial: cool blue light, blue-white windows, greenhouse glass)   // (the grotto: neon trim and signs, the lit pool and its falls)
   // the plaster colors a home can be washed in besides white: soft, chalky, and all from the scene's own colors (the sand,
   // the terracotta, the sea's teal, the meadow's sage), so a street of them reads as one watercolor
   const PLASTER = [HP.blushD, HP.apricot, HP.butter, HP.mist, HP.sage, HP.rose, HP.apricot, HP.mist];   // (the garden terrace: weathered rust, solar glass)
   for (const c of HP.leaf) LEAFC.add(c);
-  GLOW.set(HP.ringW, .25).set(HP.lanternR, .25).set(HP.screen, .25).set(HP.neonG, .25).set(HP.neonP, .25).set(HP.pool, .35).set(HP.fall, .25).set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
+  GLOW.set(HP.indBlue, .25).set(HP.indWhite, .25).set(HP.ringW, .25).set(HP.lanternR, .25).set(HP.screen, .25).set(HP.neonG, .25).set(HP.neonP, .25).set(HP.pool, .35).set(HP.fall, .25).set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
   Object.assign(GEO, { cyl12: new THREE.CylinderGeometry(1, 1, 1, 12), cyl16: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.IcosahedronGeometry(1, 1),
     dome: new THREE.SphereGeometry(1, 12, 6, 0, PI*2, 0, PI/2), ring: new THREE.CylinderGeometry(1, 1, 1, 16, 1, true),
     frus4: new THREE.CylinderGeometry(.62, 1, 1, 4, 1).rotateY(PI/4), half16: new THREE.CylinderGeometry(1, 1, 1, 16, 1, false, -PI/2, PI), hip4: new THREE.CylinderGeometry(.08, 1, 1, 4, 1).rotateY(PI/4) });   // (square frustums: a roof's flared skirt, and a hipped roof)
@@ -1573,9 +1574,120 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       for (let k = 0; k < 5; k++){ const a = D.r(0, PI*2); if (Math.abs(a - ((ca + PI*2) % (PI*2))) < .5) continue; const [x, z] = at(a, Rp + .3); pot(T, D, x, y0, z, .9); }
       return y0 + .25;
     } },
+    // INDUSTRIAL: power and food, run by drones and machines (the solarpunk farm boards). All stand alone on the ground.
+    // Their light by night is a cool blue-white, set apart from the homes' gold and the shops' pinks; the fields are edged
+    // in glowing blue. (The drones and machines that will work them come later; the hive and the barn are where they'll
+    // launch from.)
+    // The wind megaturbine: a mast far taller than anything else on the coast, tapering, banded, ringed with blue lights,
+    // on an octagonal plinth with a service block; its nacelle and blades are a separate part that turns to face the wind
+    // and spins (see ROTORS).
+    turbine: { name: 'Wind megaturbine', ind: true, solo: true, rotor: true, r: 2.4, rb: 1.7, build(T, R, D, ctx){
+      const y0 = .12, H = R.r(13, 15.5); ctx.hub = H;
+      T.add(GEO.cyl8, mat(0, .25, 0, 0, PI/8, 0, 1.75, .5, 1.75), HP.stone); T.add(GEO.cyl8, mat(0, .52, 0, 0, PI/8, 0, 1.35, .08, 1.35), HP.cream);
+      for (let k = 0; k < 8; k++){ const a = k/8*PI*2 + PI/8; box(T, Math.sin(a)*1.72, .53, Math.cos(a)*1.72, .12, .06, .12, HP.indBlue); }   // (lights round the plinth)
+      box(T, 1.0, .9, .7, .9, .8, .8, HP.white); box(T, 1.0, 1.32, .7, 1.0, .06, .9, HP.metal); box(T, 1.0, .85, 1.11, .32, .5, .03, HP.indWhite);   // (the service block, its door lit)
+      const segs = 7; for (let k = 0; k < segs; k++){ const t0 = k/segs, t1 = (k + 1)/segs, ya = .56 + (H - .56)*t0, yb = .56 + (H - .56)*t1, ra = .58 - .3*t0, rb = .58 - .3*t1;
+        T.add(GEO.cyl12, mat(0, (ya + yb)/2, 0, 0, 0, 0, (ra + rb)/2, yb - ya + .01, (ra + rb)/2), k % 3 === 2 ? HP.cream : HP.white);
+        if (k % 2 === 1) T.add(GEO.cyl12, mat(0, yb, 0, 0, 0, 0, rb + .04, .08, rb + .04), HP.indBlue); }   // (a ring of blue light every other band)
+      T.add(GEO.cyl8, mat(0, H - .1, 0, 0, 0, 0, .34, .2, .34), HP.metal);
+      for (let k = 0; k < 10; k++) box(T, -.3, 1.0 + k*(H - 2)/10, .45 - k*.01, .05, .05, .16, HP.metal);   // (rungs of the climbing ladder)
+      return H; } },
+    // The smart field: a plot of dark soil in beds, rows of crops (lettuce heads, a taller grain), the beds edged and divided
+    // by rails of glowing blue (the board's grid of light), sensor posts at the corners, an irrigation pipe along one side.
+    field: { name: 'Smart field', ind: true, solo: true, r: 2.8, rb: 2.45, build(T, R, D, ctx){
+      const y0 = .12, w = R.r(4.2, 4.8), d = R.r(3.2, 3.8), nb = R.i(2, 3), CROPS = [[C(0x5f8f3e), C(0x76a64a)], [C(0x8fa83c), C(0xb5c060)], [C(0x3f7d5c), C(0x5a9a74)]];
+      box(T, 0, .06, 0, w + .3, .12, d + .3, HP.stone); box(T, 0, y0 + .04, 0, w, .08, d, HP.soil);
+      const bw = w/nb;
+      for (let b = 0; b < nb; b++){ const cx = -w/2 + bw*(b + .5), [c1, c2] = R.pick(CROPS), grain = R.chance(.35), rows = Math.max(3, Math.round(d/.42));
+        for (let r_ = 0; r_ < rows; r_++){ const z = -d/2 + .25 + r_*(d - .5)/(rows - 1);
+          box(T, cx, y0 + .1, z, bw - .35, .06, .16, HP.soil2);
+          for (let x = cx - bw/2 + .3; x <= cx + bw/2 - .3; x += grain ? .14 : .24){
+            if (grain) box(T, x, y0 + .26, z, .05, .26 + D.r(0, .06), .05, D.chance(.5) ? c1 : c2);
+            else T.add(GEO.ico, mat(x, y0 + .2, z, 0, D.r(0, 3), 0, .11, .08, .11), D.chance(.5) ? c1 : c2); } } }
+      // the glowing rails: round the edge and between the beds
+      const rail = (x, z, lx, lz) => { box(T, x, y0 + .1, z, Math.max(lx, .1), .06, Math.max(lz, .1), HP.indBlue); box(T, x, y0 + .06, z, Math.max(lx, .1) + .05, .04, Math.max(lz, .1) + .05, HP.metal); };
+      rail(0, d/2 + .06, w + .12, .05); rail(0, -d/2 - .06, w + .12, .05); rail(w/2 + .06, 0, .05, d + .12); rail(-w/2 - .06, 0, .05, d + .12);
+      for (let b = 1; b < nb; b++) rail(-w/2 + bw*b, 0, .05, d);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]){ T.add(GEO.cyl5, mat(sx*(w/2 + .06), y0 + .45, sz*(d/2 + .06), 0, 0, 0, .03, .9, .03), HP.metal); box(T, sx*(w/2 + .06), y0 + .92, sz*(d/2 + .06), .1, .06, .1, HP.indBlue); }
+      T.add(GEO.cyl8, mat(0, y0 + .12, -d/2 - .22, 0, 0, PI/2, .05, w, .05), HP.metal); for (let k = 0; k < 5; k++) T.add(GEO.cyl8, mat(-w/2 + .4 + k*(w - .8)/4, y0 + .2, -d/2 - .22, 0, 0, 0, .07, .14, .07), HP.metal);
+      return y0 + .3; } },
+    // The geodesic dome greenhouse: a low ring wall with round windows, a glass dome ribbed in white (meridians and two
+    // latitudes), an airlock porch at the front, rows of planters and a little tree inside showing through, grow lights
+    // in a blue ring under the dome by night.
+    dome: { name: 'Dome greenhouse', ind: true, solo: true, r: 2.1, rb: 1.75, build(T, R, D, ctx){
+      const y0 = .12, rr = R.r(1.45, 1.65), wh = .5;
+      T.add(GEO.cyl16, mat(0, .06, 0, 0, 0, 0, rr + .35, .12, rr + .35), HP.stone);
+      T.add(GEO.cyl16, mat(0, y0 + wh/2, 0, 0, 0, 0, rr, wh, rr), R.pick([HP.white, HP.mist, HP.cream]));
+      for (let k = 0; k < 8; k++){ const a = k/8*PI*2 + .2; if (Math.abs(Math.sin(a/2)) < .2) continue; T.add(GEO.cyl8, mat(Math.sin(a)*(rr + .01), y0 + wh/2, Math.cos(a)*(rr + .01), PI/2, a, 0, .1, .03, .1), HP.indWhite); }
+      T.add(GEO.ring, mat(0, y0 + wh + .02, 0, 0, 0, 0, rr - .02, .06, rr - .02), HP.indBlue);
+      T.add(GEO.dome, mat(0, y0 + wh, 0, 0, 0, 0, rr - .05, rr*.85, rr - .05), HP.ghGlass);
+      for (let k = 0; k < 8; k++) T.add(GEO.ring, mat(0, y0 + wh, 0, PI/2, k/8*PI, 0, rr - .02, .04, rr*.86), HP.white);   // (meridian ribs: rings stood on edge, half of each under the wall)
+      for (const f of [.45, .8]){ const ry = Math.sqrt(1 - f*f); T.add(GEO.ring, mat(0, y0 + wh + rr*.85*f, 0, 0, 0, 0, (rr - .02)*ry, .04, (rr - .02)*ry), HP.white); }
+      box(T, 0, y0 + .4, rr + .25, .6, .8, .5, HP.white); box(T, 0, y0 + .38, rr + .51, .34, .62, .03, HP.ghGlass); box(T, 0, y0 + .83, rr + .25, .66, .06, .56, HP.metal);
+      for (let k = 0; k < 6; k++) plant(T, D, D.r(-rr*.55, rr*.55), y0 + wh, D.r(-rr*.55, rr*.55), 1.2);
+      T.add(GEO.cyl5, mat(.1, y0 + wh + .45, -.2, 0, 0, 0, .05, .9, .05), HP.wood); T.add(GEO.ico, mat(.1, y0 + wh + 1.0, -.2, 0, 0, 0, .45, .3, .45), D.pick(HP.leaf));
+      return y0 + wh + rr*.85; } },
+    // Glass tunnels: two or three hoop houses side by side, glass over white hoops, ends glazed with a door, crops in rows
+    // inside, a blue light strip along each ridge.
+    tunnels: { name: 'Glass tunnels', ind: true, solo: true, r: 2.5, rb: 2.1, build(T, R, D, ctx){
+      const y0 = .12, n = R.i(2, 3), L = R.r(3.4, 4.0), rt = .62, gap = .2, W = n*2*rt + (n - 1)*gap;
+      box(T, 0, .06, 0, W + .5, .12, L + .5, HP.stone);
+      for (let i = 0; i < n; i++){ const cx = -W/2 + rt + i*(2*rt + gap);
+        box(T, cx, y0 + .03, 0, 2*rt - .05, .06, L, HP.soil);
+        for (let r_ = 0; r_ < 3; r_++) for (let z = -L/2 + .3; z <= L/2 - .3; z += .3) T.add(GEO.ico, mat(cx - rt*.55 + r_*rt*.55, y0 + .14, z, 0, D.r(0, 3), 0, .1, .08, .1), D.chance(.5) ? C(0x5f8f3e) : C(0x76a64a));
+        T.add(GEO.half16, mat(cx, y0, 0, -PI/2, 0, 0, rt, L, rt), HP.ghGlass);
+        for (let h = 0; h <= 5; h++){ const z = -L/2 + h*L/5; for (let s = 0; s < 8; s++){ const a = (s + .5)/8*PI; T.add(GEO.box, mat(cx + Math.cos(a)*(rt + .01), y0 + Math.sin(a)*(rt + .01), z, 0, 0, a, .04, 2*rt*Math.sin(PI/16) + .02, .05), HP.white); } }
+        box(T, cx, y0 + rt + .02, 0, .04, .03, L - .1, HP.indBlue);
+        box(T, cx, y0 + .3, L/2 + .01, .3, .55, .03, HP.white); box(T, cx, y0 + .3, L/2 + .03, .22, .45, .02, HP.indWhite); }
+      return y0 + rt; } },
+    // The solar barn: a dark timber barn under a big roof of solar panels tilted to the sun, battery cabinets along its side
+    // with blue charge lights, a wide door open on a lit bay (where the machines will roll out), a small wind vane.
+    barn: { name: 'Solar barn', ind: true, solo: true, r: 2.2, rb: 1.7, build(T, R, D, ctx){
+      const y0 = .12, w = R.r(2.6, 3.0), d = R.r(1.8, 2.1), h = 1.1;
+      box(T, 0, .06, .2, w + .7, .12, d + 1.1, HP.stone);
+      box(T, 0, y0 + h/2, 0, w, h, d, R.pick([HP.timber, HP.rust2, C(0x3e4a4c)]));
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(T, sx*w/2, y0 + h/2, sz*d/2, .1, h, .1, HP.metal);
+      box(T, 0, y0 + .42, d/2 + .01, w*.55, .78, .03, HP.indWhite); box(T, 0, y0 + .83, d/2 + .03, w*.6, .06, .05, HP.metal);   // (the bay, lit)
+      for (const sz of [-1, 1]){ const tz = sz*d/4, ty = y0 + h + .22 + (sz < 0 ? .35 : 0);   // (two banks of panels, the back one higher: a sawtooth)
+        T.add(GEO.box, mat(0, ty, tz, -.32, 0, 0, w + .3, .06, d/2 + .15), HP.solar);
+        for (let k = 1; k < 6; k++) T.add(GEO.box, mat(-(w + .3)/2 + k*(w + .3)/6, ty + .035, tz, -.32, 0, 0, .015, .02, d/2 + .15), HP.solarL); }
+      box(T, 0, y0 + h + .2, -d/4, w, .4, .06, HP.metal);
+      for (let k = 0; k < 3; k++){ const z = -d/2 + .35 + k*.55; box(T, w/2 + .25, y0 + .35, z, .36, .7, .42, HP.white); box(T, w/2 + .44, y0 + .45, z, .02, .3, .12, HP.indBlue); }
+      T.add(GEO.cyl5, mat(-w/2 + .2, y0 + h + .9, -d/2 + .2, 0, 0, 0, .025, 1.2, .025), HP.metal); box(T, -w/2 + .2, y0 + h + 1.45, -d/2 + .2, .4, .04, .06, HP.metal);
+      for (let k = 0; k < 3; k++) if (D.chance(.7)) pot(T, D, D.r(-w/2, -w/4), .12, d/2 + .4, 1);
+      return y0 + h + .6; } },
+    // The drone hive: a white mast on four legs carrying a saucer hangar (a flattened dome with a ring of docking ports and a
+    // band of blue light), a landing deck under it ringed with lights, a lit lift door at its foot. The drones will come and
+    // go from here.
+    hive: { name: 'Drone hive', ind: true, solo: true, r: 2.2, rb: 1.6, build(T, R, D, ctx){
+      const y0 = .12, H = R.r(3.4, 4.2), sr = R.r(1.25, 1.45);
+      T.add(GEO.cyl12, mat(0, .06, 0, 0, 0, 0, 1.7, .12, 1.7), HP.stone); T.add(GEO.cyl12, mat(0, .15, 0, 0, 0, 0, 1.3, .06, 1.3), HP.cream);
+      for (let k = 0; k < 12; k++){ const a = k/12*PI*2; box(T, Math.sin(a)*1.25, .2, Math.cos(a)*1.25, .08, .04, .08, HP.indBlue); }
+      T.add(GEO.cyl12, mat(0, y0 + H/2, 0, 0, 0, 0, .32, H, .32), HP.white); box(T, 0, y0 + .4, .33, .3, .6, .03, HP.indWhite);
+      for (let k = 0; k < 4; k++){ const a = k/4*PI*2 + PI/4, lx = Math.sin(a), lz = Math.cos(a); seg(T, V3(lx*1.05, y0, lz*1.05), V3(lx*.35, y0 + H*.55, lz*.35), .08, .08, HP.metal, 0); }
+      const sy = y0 + H; T.add(GEO.cyl16, mat(0, sy, 0, 0, 0, 0, sr, .22, sr), HP.white); T.add(GEO.dome, mat(0, sy + .1, 0, 0, 0, 0, sr*.82, .55, sr*.82), HP.white);
+      T.add(GEO.dome, mat(0, sy - .1, 0, PI, 0, 0, sr*.9, .3, sr*.9), HP.mist);   // (its underside)
+      T.add(GEO.ring, mat(0, sy, 0, 0, 0, 0, sr + .02, .07, sr + .02), HP.indBlue);
+      for (let k = 0; k < 8; k++){ const a = k/8*PI*2; T.add(GEO.cyl8, mat(Math.sin(a)*sr*.7, sy + .32, Math.cos(a)*sr*.7, 0, 0, 0, .14, .06, .14), HP.glassD); }   // (docking ports)
+      T.add(GEO.cyl8, mat(0, sy + .7, 0, 0, 0, 0, .12, .12, .12), HP.indBlue); T.add(GEO.cyl5, mat(0, sy + .95, 0, 0, 0, 0, .02, .4, .02), HP.metal);
+      return sy + .7; } },
+    // The vertical farm: a tall glass capsule (a cylinder with a rounded top) on a white collar, white bands at each floor,
+    // the floors inside green with crops and lit in blue-white, a lift tube up one side.
+    vfarm: { name: 'Vertical farm', ind: true, solo: true, r: 1.8, rb: 1.3, build(T, R, D, ctx){
+      const y0 = .12, rr = R.r(.95, 1.1), fl = R.i(4, 6), fh = .62, H = fl*fh;
+      T.add(GEO.cyl16, mat(0, .06, 0, 0, 0, 0, rr + .45, .12, rr + .45), HP.stone); T.add(GEO.cyl16, mat(0, y0 + .2, 0, 0, 0, 0, rr + .12, .4, rr + .12), HP.white);
+      for (let f = 0; f < fl; f++){ const y = y0 + .4 + f*fh;
+        T.add(GEO.cyl16, mat(0, y + .03, 0, 0, 0, 0, rr - .08, .06, rr - .08), HP.white);
+        T.add(GEO.cyl16, mat(0, y + .14, 0, 0, 0, 0, rr - .18, .16, rr - .18), f % 2 ? C(0x5f8f3e) : C(0x76a64a));
+        T.add(GEO.cyl16, mat(0, y + fh - .06, 0, 0, 0, 0, rr - .2, .03, rr - .2), HP.indWhite);   // (grow lights)
+        T.add(GEO.ring, mat(0, y + .02, 0, 0, 0, 0, rr + .02, .06, rr + .02), HP.white); }
+      T.add(GEO.ring, mat(0, y0 + .4 + H/2, 0, 0, 0, 0, rr, H, rr), HP.ghGlass);
+      T.add(GEO.dome, mat(0, y0 + .4 + H, 0, 0, 0, 0, rr, rr*.7, rr), HP.ghGlass); T.add(GEO.ring, mat(0, y0 + .4 + H, 0, 0, 0, 0, rr + .03, .08, rr + .03), HP.indBlue);
+      T.add(GEO.cyl8, mat(rr + .12, y0 + .4 + H/2, 0, 0, 0, 0, .14, H + .3, .14), HP.ghGlass); T.add(GEO.cyl8, mat(rr + .12, y0 + .4 + H + .17, 0, 0, 0, 0, .16, .05, .16), HP.indBlue); T.add(GEO.cyl8, mat(rr + .12, y0 + .5 + H*.4, 0, 0, 0, 0, .1, .2, .1), HP.white);
+      return y0 + .4 + H + rr*.7; } },
   };
   // COM: a shop (the commercial zone's); SOLO: one that stands alone on the ground (nothing stacks on it, it stacks on nothing)
-  const COM = k => !!(KINDS[k] && KINDS[k].com), SOLO = k => !!(KINDS[k] && KINDS[k].solo), RES_KEYS = Object.keys(KINDS).filter(k => !KINDS[k].com), COM_KEYS = Object.keys(KINDS).filter(k => KINDS[k].com);
+  const COM = k => !!(KINDS[k] && KINDS[k].com), SOLO = k => !!(KINDS[k] && KINDS[k].solo), RES_KEYS = Object.keys(KINDS).filter(k => !KINDS[k].com && !KINDS[k].ind), COM_KEYS = Object.keys(KINDS).filter(k => KINDS[k].com), IND_KEYS = Object.keys(KINDS).filter(k => KINDS[k].ind), IND = k => !!(KINDS[k] && KINDS[k].ind);
   const KIND_KEYS = Object.keys(KINDS);
   // ---- outlines (seen from above): convex hulls, placed in the world, tested against each other ----
   function hull2(P){ if (P.length < 3) return [[-.5, -.5], [.5, -.5], [.5, .5], [-.5, .5]];
@@ -1685,9 +1797,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const geoCache = new Map();
   function blockOf(kind, seed, below, above){ const key = kind + ':' + seed + ':' + (below ? 1 : 0) + (above ? 1 : 0); let g = geoCache.get(key); if (g) return g;
     const T = new Tris(true, shopOf(kind, seed)), k = KIND_KEYS.indexOf(kind) + 1, R = rng(Math.imul(seed, 2654435761) ^ k*97), D = rng(Math.imul(seed, 1597334677) ^ k*131);
-    const top = KINDS[kind].build(T, R, D, { below, above }), cut = below ? .1 : .6, pts = [];
+    const cx_ = { below, above }, top = KINDS[kind].build(T, R, D, cx_), cut = below ? .1 : .6, pts = [];
     let hmax = top; for (let i = 0; i < T.p.length; i += 3){ if (T.p[i + 1] > hmax) hmax = T.p[i + 1]; if (T.p[i + 1] > cut) pts.push([T.p[i], T.p[i + 2]]); }
-    g = { geo: T.geo(), fol: folGeo(T.fol), top, hull: hull2(pts), h: hmax }; geoCache.set(key, g);
+    g = { geo: T.geo(), fol: folGeo(T.fol), top, hull: hull2(pts), h: hmax, hub: cx_.hub }; geoCache.set(key, g);
     if (geoCache.size > 400){ const k0 = geoCache.keys().next().value, o = geoCache.get(k0); o.geo.dispose(); if (o.fol) o.fol.dispose(); geoCache.delete(k0); }
     return g; }
 
@@ -1736,7 +1848,26 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (fs.length){ const fm = new THREE.Mesh(mergeInto(fs, true), grassM); fm.receiveShadow = true; fm.matrixAutoUpdate = false; fm.raycast = () => {}; fm.userData.batch = key; fm.userData.fol = true; scene.add(fm); out.push(fm); }
     HB.map.set(key, out); SHD.dirty = true; }
   function batchTick(){ if (!HB.dirty.size) return false; for (const k of HB.dirty) buildBatch(k); HB.dirty.clear(); return true; }
-  function remesh(p){ SHD.dirty = true; HB.dirty.add(regKey(p)); if (p.mesh){ scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); } p.mesh = pieceMesh(p); scene.add(p.mesh); pieceMeshes.push(p.mesh); }
+  // The megaturbines' moving part (ROTORS): a nacelle turned to face into the wind (the same wind the grass bends in), and
+  // three long white blades on its hub, spinning slowly; drawn on its own, outside the batches, and kept out of the cached
+  // shadows (a turning shadow would mean redrawing them every frame).
+  // (the wind up at the hub isn't the wind at the ground: it veers with height (the Ekman spiral), and here it's turned
+  // so the rotors face the usual view three-quarters on, their blades reading as a wheel and not a line)
+  const ROTORS = new Set(), WIND_YAW = HOME.yaw - .45;
+  const rotorGeo = (() => { const N = new Tris(), B = new Tris();
+    N.add(GEO.box, mat(0, 0, -.25, 0, 0, 0, .7, .7, 2.0), HP.white); N.add(GEO.box, mat(0, -.3, -.25, 0, 0, 0, .72, .1, 2.02), HP.metal); N.add(GEO.box, mat(0, .1, -1.27, 0, 0, 0, .5, .3, .05), HP.indBlue);
+    B.add(GEO.cone8, mat(0, 0, .95, PI/2, 0, 0, .38, .7, .38), HP.white);
+    for (let k = 0; k < 3; k++){ const a = k/3*PI*2, L = 6.2, n = 5;
+      for (let i = 0; i < n; i++){ const t0 = i/n, t1 = (i + 1)/n, r0 = .3 + L*t0, r1 = .3 + L*t1, w = .42 - .3*(t0 + t1)/2;
+        B.add(GEO.box, mat(Math.sin(a)*(r0 + r1)/2, Math.cos(a)*(r0 + r1)/2, .75, 0, .12, -a, w, r1 - r0 + .02, .07), i === n - 1 ? HP.indBlue : HP.white); } }
+    return { n: N.geo(), b: B.geo() }; })();
+  function makeRotor(p, hub){ const g = new THREE.Group(), n = new THREE.Mesh(rotorGeo.n, pieceM), b = new THREE.Mesh(rotorGeo.b, pieceM);
+    for (const m of [n, b]){ m.receiveShadow = true; m.castShadow = false; m.raycast = () => {}; g.add(m); }
+    g.position.set(p.x, p.y + hub + .2, p.z); g.rotation.y = WIND_YAW; g.userData.spin = b; b.rotation.z = (p.seed % 7)*.9; return g; }
+  function rotorTick(dt){ for (const g of ROTORS) g.userData.spin.rotation.z -= dt*.55; }
+  function remesh(p){ SHD.dirty = true; HB.dirty.add(regKey(p)); if (p.mesh){ scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); } p.mesh = pieceMesh(p); scene.add(p.mesh); pieceMeshes.push(p.mesh);
+    if (p.rotorG){ scene.remove(p.rotorG); ROTORS.delete(p.rotorG); p.rotorG = null; }
+    if (KINDS[p.kind].rotor){ const b = blockOf(p.kind, p.seed, false, false); p.rotorG = makeRotor(p, b.hub || 10); scene.add(p.rotorG); ROTORS.add(p.rotorG); } }
   const stackTop = p => { while (p.up) p = p.up; return p; };
   const MAXLV = 8;   // (how many floors of blocks a home can reach)
   // can a block go here on the ground? wholly on land (right up to the cliff edge is fine), on ground that isn't too steep,
@@ -1840,7 +1971,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (!PIECES.includes(p)) return;
     if (p.up) removePiece(p.up);
     for (const q of PIECES.filter(q => q.host === p)) removePiece(q);
-    scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); PIECES.splice(PIECES.indexOf(p), 1); SHD.dirty = true; HB.dirty.add(regKey(p)); dropLinkCache(p);
+    scene.remove(p.mesh); if (p.rotorG){ scene.remove(p.rotorG); ROTORS.delete(p.rotorG); p.rotorG = null; } pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); PIECES.splice(PIECES.indexOf(p), 1); SHD.dirty = true; HB.dirty.add(regKey(p)); dropLinkCache(p);
     if (ULINKS.some(u => u.a === p.id || u.b === p.id)){ ULINKS = ULINKS.filter(u => u.a !== p.id && u.b !== p.id); saveLinks(); }
     if (p.base){ p.base.up = null; remesh(p.base); } else if (p.level === 0){ gridDel(p); dirtyAround(p); }
     if (p.level === 0) grassAround(p.x, p.z, p.r + 1);
@@ -1969,7 +2100,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     linksDirty = false; SHD.dirty = true;
     if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); for (const c of linksMesh.children) c.geometry.dispose(); linksMesh = null; }   // (merged copies only: the cached parts stay)
     const T = new Tris(true), pairs = [], deg = new Map(), joined = new Set(), pools = [];
-    for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, 1 + 10*shopOf(p.kind, p.seed)]);   // (+10 per shop light: a shop's, in its light)   // (by night: the windows' light on the ground round a home)
+    for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, IND(p.kind) ? 41.6 : 1 + 10*shopOf(p.kind, p.seed)]);
+    for (const p of PIECES) if (p.kind === 'field'){ const c = Math.cos(p.rot), s_ = Math.sin(p.rot); for (const [u, v] of [[-1.6, -1.4], [1.6, -1.4], [-1.6, 1.4], [1.6, 1.4], [0, 1.9], [0, -1.9]]) pools.push([p.x + u*c + v*s_, p.z - u*s_ + v*c, 1.4, 41.5]); }   // (the blue round a field's edges)   // (+10 per shop light: a shop's, in its light)   // (by night: the windows' light on the ground round a home)
     // the connections built with the connect brush come first, as chosen; then the ones neighbors make on their own
     const byId = new Map(PIECES.map(p => [p.id, p])), userKey = new Set();
     for (const u of ULINKS){ const A = byId.get(u.a), B = byId.get(u.b); if (!A || !B) continue; const L = pairOf(A, B); if (!L) continue;
@@ -1977,6 +2109,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const nUser = pairs.length;
     for (let i = 0; i < PIECES.length; i++) for (let j = i + 1; j < PIECES.length; j++){
       const A = PIECES[i], B = PIECES[j]; if (A.level !== B.level) continue;
+      if (IND(A.kind) || IND(B.kind)) continue;   // (industry isn't joined by itself: no pergolas between fields and turbines; the walkways brush still can)
       if (Math.abs(A.y - B.y) > (A.level ? .6 : 1.4)) continue;
       if (Math.abs(A.x - B.x) > 9 || Math.abs(A.z - B.z) > 9) continue;
       if (userKey.has(Math.min(A.id, B.id) + '|' + Math.max(A.id, B.id)) || NOLINK.has(pairId(A.id, B.id))) continue;
@@ -2057,7 +2190,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     vertexShader: 'attribute vec3 aL; varying vec3 vL; varying vec2 vW; void main(){ vL = aL; vW = position.xz; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
     // (a wash of warm light: soft all the way out, fading to nothing at a gently ragged edge (no rim, no step at the edge,
     // so it never reads as a patch laid on the ground), its color running from gold at the heart to rose-orange outward)
-    fragmentShader: `uniform float nightK; uniform vec3 uSH[3], uSE[3]; varying vec3 vL; varying vec2 vW;
+    fragmentShader: `uniform float nightK; uniform vec3 uSH[4], uSE[4]; varying vec3 vL; varying vec2 vW;
       float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
       float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
         return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
@@ -2065,12 +2198,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         float edge = 0.6 + 0.26*vn(vW*0.8) + 0.1*vn(vW*2.6 + 5.0), e = edge - r; if (e < 0.0) discard;
         float body = smoothstep(0.0, 0.45, e), bloom = vn(vW*1.4 + 7.0);
         float si = floor(vL.z/10.0), shop = step(0.5, si);
-        vec3 sH = si < 1.5 ? uSH[0] : si < 2.5 ? uSH[1] : uSH[2], sE = si < 1.5 ? uSE[0] : si < 2.5 ? uSE[1] : uSE[2];
+        vec3 sH = si < 1.5 ? uSH[0] : si < 2.5 ? uSH[1] : si < 3.5 ? uSH[2] : uSH[3], sE = si < 1.5 ? uSE[0] : si < 2.5 ? uSE[1] : si < 3.5 ? uSE[2] : uSE[3];
         vec3 c = mix(mix(vec3(0.95, 0.42, 0.24), sE, shop), mix(vec3(1.0, 0.74, 0.36), sH, shop), body*(0.6 + 0.4*bloom));
         float a = pow(smoothstep(0.0, 0.6, e), 1.6)*(0.55 + 0.3*bloom);
         a = floor(a*10.0 + h21(gl_FragCoord.xy)*0.999)/10.0;   // (fine steps, dithered: no bands)
         gl_FragColor = vec4(c*a*0.42*(vL.z - 10.0*si)*nightK, 1.0); }` });
-  poolM.uniforms.uSH.value = SHOPLIGHTS.map(L => new THREE.Color(...L[1])); poolM.uniforms.uSE.value = SHOPLIGHTS.map(L => new THREE.Color(...L[2]));
+  poolM.uniforms.uSH.value = [...SHOPLIGHTS.map(L => new THREE.Color(...L[1])), new THREE.Color(.62, .82, 1.0)]; poolM.uniforms.uSE.value = [...SHOPLIGHTS.map(L => new THREE.Color(...L[2])), new THREE.Color(.3, .5, .9)];   // (the 4th: industry's cool blue)
   let poolMesh = null;
   function buildPools(pools){
     if (poolMesh){ scene.remove(poolMesh); poolMesh.geometry.dispose(); poolMesh = null; } if (!pools.length) return;
@@ -2317,7 +2450,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const RN = 48, ringGeo = new THREE.BufferGeometry(); ringGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array((RN + 1)*2*3), 3));
   { const idx = []; for (let i = 0; i < RN; i++){ const a = i*2, b = a + 1, c = a + 2, d = a + 3; idx.push(a, b, c, b, d, c); } ringGeo.setIndex(idx); }
   const ring = new THREE.Mesh(ringGeo, ringM); ring.visible = false; ring.frustumCulled = false; ring.renderOrder = 6; scene.add(ring);
-  const PL = { kind: null, rot: 0, hit: null, ok: null, ptr: null, onto: null, seed: 1 + PIECES.length*7 + (PIECES.reduce((a, p) => a + (p.seed || 0), 0) % 997), zkinds: { zone: 'townhouse', czone: 'noodle' }, zseed: 0, zoneFol: 'res' };   // (zkinds, zseed: single mode's building, per zone)
+  const PL = { kind: null, rot: 0, hit: null, ok: null, ptr: null, onto: null, seed: 1 + PIECES.length*7 + (PIECES.reduce((a, p) => a + (p.seed || 0), 0) % 997), zkinds: { zone: 'townhouse', czone: 'noodle', izone: 'field' }, zseed: 0, zoneFol: 'res' };   // (zkinds, zseed: single mode's building, per zone)
   PL.zseed = PL.seed + 500;   // (seed: the next home's look; V rolls another)
   const status = document.getElementById('placeStatus');
   // the home under the pointer, if any (its block)
@@ -2332,7 +2465,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const pieceAt = (cx, cy) => { const h = pieceHit(cx, cy); return h ? h.piece : null; };
   // what the next single home is: in one-by-one mode the picked kind and a fresh look each time; with the homes brush at its
   // smallest (single mode) a kind V steps through and a look that stays put until Shift+V, so the same home goes down again
-  const isZone = k => k === 'zone' || k === 'czone', ZUNIT = () => PL.kind === 'czone' ? 'shop' : 'home';
+  const isZone = k => k === 'zone' || k === 'czone' || k === 'izone', ZUNIT = () => PL.kind === 'czone' ? 'shop' : PL.kind === 'izone' ? 'structure' : 'home';
   const oneHome = () => isZone(PL.kind) && ZONE.size === 0;
   const curKind = () => oneHome() ? PL.zkinds[PL.kind] : PL.kind, curSeed = () => oneHome() ? PL.zseed : PL.seed;
   function showGhost(){
@@ -2378,7 +2511,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const ZONE = { on: true, size: 2 }, ZSIZE = [0, 2.8, 4.2, 5.8, 7.6, 9.6, 12];
   const ZW = [['townhouse', .24], ['villa', .19], ['tower', .14], ['pods', .13], ['pagoda', .12], ['terrace', .12], ['lagoon', .06]];
   const CW = [['noodle', .21], ['lantern', .21], ['kiosk', .17], ['rotunda', .14], ['viaduct', .14], ['grotto', .07], ['ringcourt', .06]];   // (the commercial zone's mix)
-  const zPick = R => { const W = PL.kind === 'czone' ? CW : ZW; let u = R.f(); for (const [k, w] of W){ if ((u -= w) < 0) return k; } return W[0][0]; };
+  const IW = [['field', .34], ['tunnels', .2], ['dome', .13], ['barn', .11], ['hive', .07], ['vfarm', .06], ['turbine', .09]];   // (fields often don't fit where smaller things do, so they're weighted up)   // (the industrial zone's mix)
+  const zPick = R => { const W = PL.kind === 'czone' ? CW : PL.kind === 'izone' ? IW : ZW; let u = R.f(); for (const [k, w] of W){ if ((u -= w) < 0) return k; } return W[0][0]; };
   const zPickStack = R => { for (let t = 0; t < 8; t++){ const k = zPick(R); if (!SOLO(k)) return k; } return PL.kind === 'czone' ? 'lantern' : 'townhouse'; };
   let zLayout = null, zKey = '';
   function zoneLayout(){
@@ -2454,22 +2588,23 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // Residential is one zone with two ways to build: the brush (Q/E sizes it; smallest is one home) or one by one (pick a
   // kind). Choosing it turns the zone on in the current way; the way and the kinds show under it while it's on.
   let lastKind = 'townhouse';
-  const resActive = () => PL.kind === 'zone' || !!(PL.kind && KINDS[PL.kind] && !COM(PL.kind)), comActive = () => PL.kind === 'czone' || COM(PL.kind);
+  const resActive = () => PL.kind === 'zone' || !!(PL.kind && KINDS[PL.kind] && !COM(PL.kind) && !IND(PL.kind)), comActive = () => PL.kind === 'czone' || COM(PL.kind), indActive = () => PL.kind === 'izone' || IND(PL.kind);
   function setMode(zone){
     ZONE.on = zone; const was = resActive();
     document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', (b.dataset.mode === 'zone') === zone));
     if (was){ PL.kind = null; setKind(zone ? 'zone' : lastKind); } else refreshUI(); zHide(); }
   function setKind(k){
     PL.kind = PL.kind === k ? null : k; DSEL = null; delLine.visible = false;
-    if (k === 'czone' || COM(k)) PL.zoneFol = 'com'; else if (k === 'zone' || KINDS[k]) PL.zoneFol = 'res';   // (the grass tool plants what the last zone picked grows) CN.a = null; connGhost.visible = false; outline.visible = false;
-    if (PL.kind && KINDS[PL.kind] && !COM(PL.kind)) lastKind = PL.kind;
-    if (PL.kind === 'czone' || COM(PL.kind)) PL.rot = Math.round(yaw/(PI/12))*(PI/12);   // (shops come turned to face the view: their fronts (the grotto's arch) toward the camera)
+    if (k === 'czone' || COM(k)) PL.zoneFol = 'com'; else if (k === 'zone' || k === 'izone' || KINDS[k]) PL.zoneFol = 'res';   // (the grass tool plants what the last zone picked grows) CN.a = null; connGhost.visible = false; outline.visible = false;
+    if (PL.kind && KINDS[PL.kind] && !COM(PL.kind) && !IND(PL.kind)) lastKind = PL.kind;
+    if (PL.kind === 'czone' || PL.kind === 'izone' || COM(PL.kind) || IND(PL.kind)) PL.rot = Math.round(yaw/(PI/12))*(PI/12);   // (shops come turned to face the view: their fronts (the grotto's arch) toward the camera)
     ghost.visible = ring.visible = false; zHide();
     if (!PL.kind && status) status.textContent = '';
     refreshUI(); }
   function refreshUI(){
     const res = document.getElementById('zoneRes'); if (res) res.classList.toggle('on', resActive());
     const com = document.getElementById('zoneCom'); if (com) com.classList.toggle('on', comActive());
+    const ind = document.getElementById('zoneInd'); if (ind) ind.classList.toggle('on', indActive());
     const sub = document.getElementById('resSub'); if (sub) sub.hidden = !resActive();
     const kinds = document.getElementById('resKinds'); if (kinds) kinds.hidden = ZONE.on;
     document.querySelectorAll('button[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === PL.kind));
@@ -2483,13 +2618,14 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (PL.kind === 'grass' && PL.zoneFol === 'com') return '<h4>Trees (commercial)</h4>' + row('click / drag', 'plant') + row('right drag', 'clear the trees (the grass stays)') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: ' + PSTYLES.join(', ')) + row('Alt + drag', 'turn the view') + '<div class="row"><span>pick Residential first for grass, which grows under the trees</span></div>';
     if (PL.kind === 'grass') return '<h4>Grass</h4>' + row('click / drag', 'paint') + row('right drag', 'clear') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: meadow, wildflowers, ferns, tall grass, mix') + row('Alt + drag', 'turn the view');
     if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('click, click', 'pick two buildings to join') + row('V', 'next kind: bridge, skywalk, pergola, arcade, wall (or a wing, if they\'re apart), random') + row('right click', 'take away the walkway under it (or let go of the first pick)');
-    if (isZone(PL.kind)){ const u = ZUNIT(); return '<h4>' + (PL.kind === 'czone' ? 'Commercial' : 'Residential') + ': brush</h4>' + row('click', 'build the ' + u + 's in the brush') + row('Q / E', 'bigger / smaller (smallest: one ' + u + ')') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', ZONE.size ? 'clear the brush' : 'remove the ' + u + ' under it'); }
+    if (isZone(PL.kind)){ const u = ZUNIT(); return '<h4>' + (PL.kind === 'czone' ? 'Commercial' : PL.kind === 'izone' ? 'Industrial' : 'Residential') + ': brush</h4>' + row('click', 'build the ' + u + 's in the brush') + row('Q / E', 'bigger / smaller (smallest: one ' + u + ')') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', ZONE.size ? 'clear the brush' : 'remove the ' + u + ' under it'); }
     if (COM(PL.kind)) return '<h4>Commercial: ' + KINDS[PL.kind].name.toLowerCase() + '</h4>' + row('click', 'build it (on flat ground)') + row('V', 'another look') + row('R', 'turn (it starts facing you)') + row('right click', 'remove the building under it');
     if (PL.kind && KINDS[PL.kind]) return '<h4>Residential: one by one</h4>' + row('click', 'place (on a roof: stack; on a wall: build off it)') + row('V', 'another look') + row('R', 'turn') + row('right click', 'remove (and all above)') + row('Z', 'switch to the brush');
-    return '<h4>Pick a zone or a tool</h4>' + row('right click', 'take away the walkway, home or grass under it') + row('1', 'residential') + row('2', 'commercial') + row('5', 'walkways') + row('6', 'grass') + row('X', 'clear an area');
+    return '<h4>Pick a zone or a tool</h4>' + row('right click', 'take away the walkway, home or grass under it') + row('1', 'residential') + row('2', 'commercial') + row('3', 'industrial') + row('5', 'walkways') + row('6', 'grass') + row('X', 'clear an area');
   }
   document.getElementById('zoneRes') && document.getElementById('zoneRes').addEventListener('click', () => setKind(resActive() ? PL.kind : 'zone'));   // (always the brush: Q/E size it, smallest is one home)
   document.getElementById('zoneCom') && document.getElementById('zoneCom').addEventListener('click', () => setKind(comActive() ? PL.kind : 'czone'));
+  document.getElementById('zoneInd') && document.getElementById('zoneInd').addEventListener('click', () => setKind(indActive() ? PL.kind : 'izone'));
   document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode === 'zone')));
   // a ring round (x, z): on the ground, or at height y
   function ringAt(x, z, r, y = null, w = .14){ ringM.depthTest = true; const a = ringGeo.attributes.position.array;
@@ -2693,6 +2829,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (k === 'r'){ PL.rot += (e.shiftKey ? -1 : 1)*PI/12; return; }   // (turn the piece: 15 degrees a press, any angle it lands on)
     if (e.key === '1'){ setKind('zone'); return; }
     if (e.key === '2'){ setKind('czone'); return; }
+    if (e.key === '3'){ setKind('izone'); return; }
     if (e.key === '5'){ setKind('connect'); return; }
     if (e.key === '6'){ setKind('grass'); return; }
     if (k === 'x' && !e.repeat){ setKind('del'); return; }
@@ -2701,7 +2838,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (PL.kind === 'connect' && k === 'v'){ CN.type = (CN.type + 1) % LINK_TYPES.length; CN.key = ''; return; }
     if (isZone(PL.kind) && (k === 'q' || k === 'e')){ ZONE.size = clamp(ZONE.size + (k === 'q' ? 1 : -1), 0, ZSIZE.length - 1); return; }   // (Q: a bigger brush, E: a smaller one)
     if (k === 'v'){   // (single mode: the next kind of home, Shift+V another look of it; otherwise another look or layout)
-      if (oneHome()){ if (e.shiftKey) PL.zseed++; else { const KS = PL.kind === 'czone' ? COM_KEYS : RES_KEYS; PL.zkinds[PL.kind] = KS[(KS.indexOf(PL.zkinds[PL.kind]) + 1) % KS.length]; } } else PL.seed++; return; }
+      if (oneHome()){ if (e.shiftKey) PL.zseed++; else { const KS = PL.kind === 'czone' ? COM_KEYS : PL.kind === 'izone' ? IND_KEYS : RES_KEYS; PL.zkinds[PL.kind] = KS[(KS.indexOf(PL.zkinds[PL.kind]) + 1) % KS.length]; } } else PL.seed++; return; }
     if (e.key === 'Escape' || e.key === '0'){ if (PL.kind === 'del' && DSEL){ DSEL = null; return; } if (PL.kind) setKind(PL.kind); return; }
     if (k === 'q') yawT -= PI/4;
     else if (k === 'e') yawT += PI/4;
@@ -2773,12 +2910,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function frame(now){
     const dt = Math.min(.1, (now - last)/1000); last = now; fNo++; let q = PROF.on ? performance.now() : 0;
     updateCamera(dt); q = tk('camera', q); stream(3); q = tk('stream', q);
-    { const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.rot, DSEL ? DSEL.key : '-', GR.size, GR.style, GR.pstyle, PL.zoneFol, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
+    { const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.zkinds.izone, PL.rot, DSEL ? DSEL.key : '-', GR.size, GR.style, GR.pstyle, PL.zoneFol, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
       if (gk !== ghostKey){ ghostKey = gk;   // (the ghost is worked out again only when something it shows has changed: the raycasts and checks are the costly part)
         hlClear();
         if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'del') showDel(); else if (PL.kind === 'grass') showGrass(); else if (isZone(PL.kind) && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } }
     q = tk('ghost', q);
-    animTick(dt); const batched = batchTick();
+    animTick(dt); rotorTick(dt); const batched = batchTick();
     if (linksDirty && !ANIM.list.length && !batched) buildLinks();   // (not in the same frame as a batch: the two together made a hitch)
     q = tk('anim+links', q);
     const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t, !(fNo & 3) || TOFF.fix !== undefined); /* (a crest's arrival is caught every fourth frame; the spray itself moves every frame) */ q = tk('spray', q); grassTick(t); q = tk('grass', q);

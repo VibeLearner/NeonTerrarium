@@ -2458,6 +2458,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     RAILS.length = 0;
     if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); for (const c of linksMesh.children) c.geometry.dispose(); linksMesh = null; }   // (merged copies only: the cached parts stay)
     const T = new Tris(true), pairs = [], deg = new Map(), joined = new Set(), pools = [];
+    for (const q of PTH.pools) pools.push(q);   // (the paths' lamps)
     for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, IND(p.kind) ? 41.6 : LUX(p.kind) ? 51.6 : 1 + 10*shopOf(p.kind, p.seed)]);
     for (const p of PIECES) if (p.kind === 'field'){ const c = Math.cos(p.rot), s_ = Math.sin(p.rot); const h = FIELD.S/2 - .9; for (const [u, v] of [[-h, -h], [h, -h], [-h, h], [h, h], [0, h], [0, -h], [h, 0], [-h, 0], [0, 0]]) pools.push([p.x + u*c + v*s_, p.z - u*s_ + v*c, 1.7, 41.5]); }   // (the blue round a field's edges)   // (+10 per shop light: a shop's, in its light)   // (by night: the windows' light on the ground round a home)
     // the connections built with the connect brush come first, as chosen; then the ones neighbors make on their own
@@ -2855,6 +2856,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (let i = Math.floor((x - r - .5)/PC); i <= Math.ceil((x + r + .5)/PC); i++) for (let j = Math.floor((z - r - .5)/PC); j <= Math.ceil((z + r + .5)/PC); j++){ const k = i + ',' + j; if (pdata.has(k)){ pdata.delete(k); gDirty.add(pSqKey(i, j)); SHD.dirty = true; } } };
 
   ANIM.live = true;   // (homes from the save just appear; new ones are painted in)
+  setTimeout(() => buildPaths(), 0);   // (the saved paths, once everything they need exists)
   // the ghost: the block under the pointer, see-through, and a ring on the ground green or red
   const ghostM = bent(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .55, depthWrite: false }), false);
   const ringM = bent(new THREE.MeshBasicMaterial({ color: 0x7dffb0, transparent: true, opacity: .9, depthWrite: false, side: THREE.DoubleSide }), false);
@@ -3030,6 +3032,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // what the keys and the mouse do with whatever is chosen (shown when Controls is hovered)
   function controlsFor(){
     const row = (k, t) => '<div class="row"><kbd>' + k + '</kbd><span>' + t + '</span></div>';
+    if (PL.kind === 'path') return '<h4>Paths</h4>' + row('drag', 'draw a path') + row('right drag', 'rub paths out') + row('V', 'next kind: ' + PSTY.join(', '));
     if (PL.kind === 'del') return '<h4>Clear an area</h4>' + row('drag', 'select an area') + row('click inside', 'clear it: buildings, walkways, grass') + row('click outside / Esc', 'let the selection go') + row('X', 'back to building');
     if (PL.kind === 'grass' && PL.zoneFol === 'lux') return '<h4>Cherry trees (luxury)</h4>' + row('click / drag', 'plant') + row('right drag', 'clear them (the grass stays)') + row('Q / E', 'bigger / smaller brush') + '<div class="row"><span>pick Residential first for grass, which grows under them</span></div>';
     if (PL.kind === 'grass' && PL.zoneFol === 'ind') return '<h4>Planting (industrial)</h4>' + row('click / drag', 'plant') + row('right drag', 'clear it (the grass stays)') + row('Q / E', 'bigger / smaller brush') + '<div class="row"><span>pick Residential first for grass, which grows under it</span></div>';
@@ -3039,7 +3042,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (isZone(PL.kind)){ const u = ZUNIT(); return '<h4>' + (PL.kind === 'czone' ? 'Commercial' : PL.kind === 'izone' ? 'Industrial' : PL.kind === 'lzone' ? 'Luxury' : 'Residential') + ': brush</h4>' + row('click', 'build the ' + u + 's in the brush') + row('Q / E', 'bigger / smaller (smallest: one ' + u + ')') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', ZONE.size ? 'clear the brush' : 'remove the ' + u + ' under it'); }
     if (COM(PL.kind)) return '<h4>Commercial: ' + KINDS[PL.kind].name.toLowerCase() + '</h4>' + row('click', 'build it (on flat ground)') + row('V', 'another look') + row('R', 'turn (it starts facing you)') + row('right click', 'remove the building under it');
     if (PL.kind && KINDS[PL.kind]) return '<h4>Residential: one by one</h4>' + row('click', 'place (on a roof: stack; on a wall: build off it)') + row('V', 'another look') + row('R', 'turn') + row('right click', 'remove (and all above)') + row('Z', 'switch to the brush');
-    return '<h4>Pick a zone or a tool</h4>' + row('right click', 'take away the walkway, home or grass under it') + row('1', 'residential') + row('2', 'commercial') + row('3', 'industrial') + row('4', 'luxury') + row('5', 'walkways') + row('6', 'grass') + row('X', 'clear an area');
+    return '<h4>Pick a zone or a tool</h4>' + row('right click', 'take away the walkway, home or grass under it') + row('1', 'residential') + row('2', 'commercial') + row('3', 'industrial') + row('4', 'luxury') + row('5', 'walkways') + row('6', 'grass') + row('7', 'paths') + row('X', 'clear an area');
   }
   document.getElementById('zoneRes') && document.getElementById('zoneRes').addEventListener('click', () => setKind(resActive() ? PL.kind : 'zone'));   // (always the brush: Q/E size it, smallest is one home)
   document.getElementById('zoneCom') && document.getElementById('zoneCom').addEventListener('click', () => setKind(comActive() ? PL.kind : 'czone'));
@@ -3052,6 +3055,77 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       for (const [j, rr] of [[0, r], [1, r + w]]){ const px = x + c*rr, pz = z + s_*rr, o = (i*2 + j)*3; a[o] = px; a[o + 1] = (y === null ? heightAt(px, pz) : y) + .07; a[o + 2] = pz; } }
     ringGeo.attributes.position.needsUpdate = true; ring.visible = true; }
 
+  /* ---------- paths: drawn by dragging across the ground (the Paths tool, key 7) ---------- */
+  // Five kinds, from the boards: flagstones (pale stepping stones in the grass, little ground lights; board 02), a promenade
+  // (wide paving, kerbs, lamp posts; board 31), a marble walk (white stone, cream kerbs, a gold inlay, urns of blossom;
+  // boards 13 and 23), a water causeway (a stone walk beside a clear canal with koi and lilies, its water lit and rippling
+  // at night like the pools; board 19), and mossy cobbles (board 18). A stroke is kept as the points the pointer passed
+  // (saved), smoothed and resampled every .35 and laid on the ground, following it. Grass and plants under a path go.
+  const PATH_KEY = 'neonIsland.coast.paths', PSTY = ['flagstones', 'promenade', 'marble walk', 'water causeway', 'mossy cobbles'], PW = [.95, 1.6, 1.2, 2.0, 1.0];
+  let PATHS = []; try { PATHS = JSON.parse(localStorage.getItem(PATH_KEY) || '[]').filter(p => p && p.p && p.p.length > 1); } catch (e) {}
+  const PTH = { style: 0, cur: null, mesh: null, live: null, pools: [], dirty: true };
+  const savePaths = () => { try { localStorage.setItem(PATH_KEY, JSON.stringify(PATHS.map(p => ({ s: p.s, p: p.p.map(q => [+q[0].toFixed(2), +q[1].toFixed(2)]) })))); } catch (e) {} };
+  function smoothPts(P){ let Q = P; for (let it = 0; it < 2; it++){ if (Q.length < 3) break; const R2 = [Q[0]]; for (let i = 0; i < Q.length - 1; i++){ const a = Q[i], b = Q[i + 1]; R2.push([a[0]*.75 + b[0]*.25, a[1]*.75 + b[1]*.25], [a[0]*.25 + b[0]*.75, a[1]*.25 + b[1]*.75]); } R2.push(Q[Q.length - 1]); Q = R2; }
+    const out = [Q[0]]; let acc = 0; for (let i = 1; i < Q.length; i++){ let a = out[out.length - 1]; const b = Q[i]; let d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      while (acc + d >= .35){ const t = (.35 - acc)/d; const p = [a[0] + (b[0] - a[0])*t, a[1] + (b[1] - a[1])*t]; out.push(p); a = p; d = Math.hypot(b[0] - a[0], b[1] - a[1]); acc = 0; } acc += d; }
+    const last = Q[Q.length - 1], e = out[out.length - 1]; if (Math.hypot(last[0] - e[0], last[1] - e[1]) > .1) out.push(last); return out; }
+  // a flat four-cornered piece laid on the ground (corners [x, y, z]), wound to face up
+  function flatQ(T, A, B, Cc, D, col){ const cy = (B[2] - A[2])*(Cc[0] - A[0]) - (B[0] - A[0])*(Cc[2] - A[2]); if (cy > 0) T.quad(A, B, Cc, D, col); else T.quad(A, D, Cc, B, col); }
+  function drawPath(T, stroke, pools){
+    const P = smoothPts(stroke.p), st = stroke.s, n = P.length; if (n < 2) return;
+    const R = rng((Math.imul(Math.round(P[0][0]*31), 73856093) ^ Math.imul(Math.round(P[0][1]*37), 19349663) ^ st*97) >>> 0);
+    const N = P.map((p, i) => { const a = P[Math.max(0, i - 1)], b = P[Math.min(n - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [-dz/l, dx/l, dx/l, dz/l]; });   // (across, along)
+    const G = (i, o) => { const x = P[i][0] + N[i][0]*o, z = P[i][1] + N[i][1]*o; return [x, z]; };
+    const V = (i, o, y) => { const [x, z] = G(i, o); return [x, heightAt(x, z) + y, z]; };
+    const inside = (x, z) => PIECES.some(q => !q.level && q.hullW && q.bb && x > q.bb[0] && x < q.bb[2] && z > q.bb[1] && z < q.bb[3] && inHull(q.hullW, x, z));
+    const strip = (o0, o1, y, colF) => { for (let i = 0; i < n - 1; i++) flatQ(T, V(i, o0, y), V(i, o1, y), V(i + 1, o1, y), V(i + 1, o0, y), colF(i)); };
+    const kerb = (o, w, h, col) => { for (let i = 0; i < n - 1; i++){ const a = V(i, o, h/2 + .01), b = V(i + 1, o, h/2 + .01); seg(T, V3(a[0], a[1], a[2]), V3(b[0], b[1], b[2]), w, h, col); } };
+    const stone = (x, z, s, col, h = .05) => { if (inside(x, z)) return; T.add(GEO.box, mat(x, heightAt(x, z) + h/2 + .01, z, 0, R.r(0, PI), 0, s*R.r(.8, 1.2), h, s*R.r(.7, 1.1)), col); };
+    const lampPost = (i, o, tall = 1.2) => { const [x, z] = G(i, o); if (inside(x, z)) return; const y = heightAt(x, z); T.add(GEO.cyl5, mat(x, y + tall/2, z, 0, 0, 0, .035, tall, .035), HP.rail);
+      box(T, x, y + tall + .06, z, .14, .16, .14, HP.lamp); box(T, x, y + tall + .17, z, .2, .04, .2, HP.rail); pools.push([x, z, 1.4, .8]); };
+    const STONE = [C(0xd9d0bd), C(0xcfc5ae), C(0xe4dccb), C(0xc5bba6)];
+    if (st === 0){   // flagstones
+      for (let i = 0; i < n; i++) for (let j = 0; j < 3; j++) if (R.chance(.82)){ const [x, z] = G(i, -.3 + j*.3 + R.r(-.06, .06)); stone(x, z, R.r(.2, .28), R.pick(STONE)); }
+      for (let i = 3; i < n; i += 7){ const [x, z] = G(i, (i % 2 ? 1 : -1)*.6); if (inside(x, z)) continue; const y = heightAt(x, z); T.add(GEO.cyl8, mat(x, y + .05, z, 0, 0, 0, .06, .1, .06), HP.rail); T.add(GEO.cyl8, mat(x, y + .11, z, 0, 0, 0, .05, .03, .05), HP.lamp); pools.push([x, z, .9, .6]); } }
+    else if (st === 1){   // promenade
+      const pv = [C(0xcdbfa8), C(0xbfb29b)]; strip(-.8, .8, .03, i => pv[Math.floor(i/2) % 2]); kerb(-.83, .08, .08, C(0x9c917f)); kerb(.83, .08, .08, C(0x9c917f));
+      for (let i = 0; i < n; i += 3){ const a = V(i, -.8, .035), b = V(i, .8, .035); seg(T, V3(...a), V3(...b), .03, .01, C(0xa89c87)); }
+      for (let i = 4; i < n; i += 9) lampPost(i, (Math.floor(i/9) % 2 ? 1 : -1)*1.0);
+      for (let i = 9; i < n; i += 17){ const [x, z] = G(i, -1.05); if (inside(x, z)) continue; const y = heightAt(x, z), a = Math.atan2(N[i][2], N[i][3]); T.add(GEO.box, mat(x, y + .18, z, 0, a, 0, .55, .05, .18), HP.wood); for (const s_ of [-.2, .2]) T.add(GEO.box, mat(x + N[i][2]*s_, y + .09, z + N[i][3]*s_, 0, a, 0, .05, .18, .16), HP.rail); } }
+    else if (st === 2){   // marble walk
+      strip(-.6, .6, .03, i => i % 4 === 0 ? HP.luxCream : HP.luxWhite); kerb(-.63, .08, .07, HP.luxCream); kerb(.63, .08, .07, HP.luxCream); kerb(0, .05, .01, HP.luxGold);
+      for (let i = 5; i < n; i += 11) for (const s_ of [-.85, .85]){ const [x, z] = G(i, s_); if (!inside(x, z)) blossomPot(T, R, x, heightAt(x, z), z); } }
+    else if (st === 3){   // water causeway: a walk on the left, the canal on the right
+      strip(-1.0, -.1, .05, i => i % 2 ? C(0xd8cfbb) : C(0xcfc5af)); kerb(-1.02, .08, .1, C(0xb5aa95)); kerb(-.05, .1, .14, C(0xbdb29d)); kerb(.95, .1, .14, C(0xbdb29d));
+      strip(-.02, .92, .015, () => HP.pool); strip(-.02, .92, -.04, () => C(0x5f8a84));
+      for (let i = 0; i < n; i++){ if (R.chance(.12)){ const [x, z] = G(i, R.r(.15, .75)); T.add(GEO.cyl8, mat(x, heightAt(x, z) + .03, z, 0, 0, 0, R.r(.08, .14), .01, R.r(.08, .14)), HP.lily); }
+        if (R.chance(.07)){ const [x, z] = G(i, R.r(.2, .7)); T.add(GEO.ico, mat(x, heightAt(x, z) + .025, z, 0, R.r(0, PI), 0, .1, .02, .04), HP.luxOrange); } }
+      for (let i = 5; i < n; i += 11) lampPost(i, -1.15, 1.0); }
+    else {   // mossy cobbles
+      strip(-.5, .5, .015, () => C(0x5b6b48)); const CB = [C(0x9c9a92), C(0x8a8780), C(0xb0ada3), C(0x7f8a74)];
+      for (let i = 0; i < n; i++) for (let j = 0; j < 4; j++) if (R.chance(.9)){ const [x, z] = G(i, -.36 + j*.24 + R.r(-.04, .04)); stone(x, z, R.r(.13, .17), R.pick(CB), .06); }
+      for (let i = 8; i < n; i += 15){ const [x, z] = G(i, (Math.floor(i/15) % 2 ? 1 : -1)*.7); if (inside(x, z)) continue; const y = heightAt(x, z); box(T, x, y + .25, z, .1, .5, .1, HP.stone); box(T, x, y + .56, z, .14, .14, .14, HP.lamp); pools.push([x, z, 1.0, .7]); } } }
+  // the paths drawn: one mesh for all of them, made again when one changes; the stroke being drawn has its own
+  function pathMesh(list, pools){ const T = new Tris(); for (const p of list) drawPath(T, p, pools); if (!T.p.length) return null;
+    const m = new THREE.Mesh(T.geo(), pieceM); m.receiveShadow = true; m.castShadow = false; m.matrixAutoUpdate = false; m.raycast = () => {}; scene.add(m); return m; }
+  function buildPaths(){ if (PTH.mesh){ scene.remove(PTH.mesh); PTH.mesh.geometry.dispose(); } PTH.pools = []; PTH.mesh = pathMesh(PATHS, PTH.pools); PTH.dirty = false; linksDirty = true; SHD.dirty = true; }
+  function liveStroke(){ if (PTH.live){ scene.remove(PTH.live); PTH.live.geometry.dispose(); PTH.live = null; } if (PTH.cur && PTH.cur.p.length > 1) PTH.live = pathMesh([PTH.cur], []); }
+  // the ground under a path is cleared of grass and plants
+  function clearUnder(stroke){ const w = PW[stroke.s]/2 + .1; for (const q of smoothPts(stroke.p)){ paintGrass(q[0], q[1], w, GR.style, true); paintPlants(q[0], q[1], w, 0, true); } }
+  // erasing: the points of every path within r of (x, z) go, and a path cut in two becomes two
+  function erasePaths(x, z, r){ let any = false; const out = [];
+    for (const p of PATHS){ let run = []; for (const q of p.p){ if (Math.hypot(q[0] - x, q[1] - z) < r + PW[p.s]/2){ any = true; if (run.length > 1) out.push({ s: p.s, p: run }); run = []; } else run.push(q); } if (run.length > 1) out.push({ s: p.s, p: run }); }
+    if (any){ PATHS = out; savePaths(); buildPaths(); } return any; }
+  function pathStroke(cx, cy, erase, start){
+    const h = pick(cx, cy); if (!h || h.sea) return;
+    if (erase){ erasePaths(h.x, h.z, .6); return; }
+    if (start || !PTH.cur){ PTH.cur = { s: PTH.style, p: [[h.x, h.z]] }; return; }
+    const l = PTH.cur.p[PTH.cur.p.length - 1]; if (Math.hypot(h.x - l[0], h.z - l[1]) < .3) return;
+    PTH.cur.p.push([h.x, h.z]); liveStroke(); }
+  function endPathStroke(){ if (PTH.cur && PTH.cur.p.length > 1){ PATHS.push(PTH.cur); clearUnder(PTH.cur); savePaths(); buildPaths(); } PTH.cur = null; liveStroke(); }
+  function showPath(){ ghost.visible = false; zHide(); connGhost.visible = false; const h = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null;
+    if (!h || h.sea){ ring.visible = false; if (status) status.textContent = h ? 'not on the sea' : ''; return; }
+    ringAt(h.x, h.z, PW[PTH.style]/2, null, .08); ringM.color.set(0xf0e2c0); if (status){ status.textContent = 'path: ' + PSTY[PTH.style] + ' (V next)'; status.style.color = '#33413a'; } }
   /* ---------- clearing an area (X), as in the sky city: drag to select, click inside to clear, outside to let go ---------- */
   // The selection is a rectangle squared to the view as it was when the drag began (its sides along the screen's right and
   // up, laid on the ground); everything whose middle is inside goes: homes and shops with all built on or off them, the
@@ -3075,6 +3149,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function clearArea(r){
     for (const p of PIECES.slice()) if (PIECES.includes(p) && inDel(r, p.x, p.z)) removePiece(p);
     for (let u = r.u0; u <= r.u1 + .01; u += .7) for (let v = r.v0; v <= r.v1 + .01; v += .7){ const q = delAt(r, Math.min(u, r.u1), Math.min(v, r.v1)); paintGrass(q.x, q.z, .5, GR.style, true); paintPlants(q.x, q.z, .5, 0, true); }
+    { let any = false; const out = []; for (const p of PATHS){ let run = []; for (const q of p.p){ if (inDel(r, q[0], q[1])){ any = true; if (run.length > 1) out.push({ s: p.s, p: run }); run = []; } else run.push(q); } if (run.length > 1) out.push({ s: p.s, p: run }); } if (any){ PATHS = out; savePaths(); buildPaths(); } }
     delLine.visible = false; save(); }
 
   /* ---------- the connect brush: a walk, a bridge, an arcade or a shared wall between two blocks you pick ---------- */
@@ -3193,6 +3268,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (ptrs.size === 2){ act = { kind: 'pinch' }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); return; }
     act = { kind: 'turn', b: e.button, x: e.clientX, y: e.clientY, moved: false };
+    if (PL.kind === 'path' && (e.button === 0 || e.button === 2) && !e.altKey && e.pointerType !== 'touch'){ act = { kind: 'path', erase: e.button === 2 }; pathStroke(e.clientX, e.clientY, act.erase, true); return; }
     if (PL.kind === 'del' && e.button === 0 && !e.altKey){ act = { kind: 'del', x: e.clientX, y: e.clientY, moved: false, from: pick(e.clientX, e.clientY) }; return; }   // (clear mode: a drag selects)
     // the grass brush paints (left) or clears (right) as it's dragged; Alt+drag or the middle button still turns the view
     if (PL.kind === 'grass' && (e.button === 0 || e.button === 2) && !e.altKey && e.pointerType !== 'touch'){ act = { kind: 'paint', erase: e.button === 2 }; GR.last = null; grassStroke(e.clientX, e.clientY, act.erase, true); }
@@ -3212,6 +3288,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const p = ptrs.get(e.pointerId); if (!p || !act) return;
     if (act.kind === 'paint'){ ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); grassStroke(e.clientX, e.clientY, act.erase, false); return; }
     const dx = e.clientX - p.x, dy = e.clientY - p.y; ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (act.kind === 'path'){ pathStroke(e.clientX, e.clientY, act.erase, false); return; }
     if (act.kind === 'del'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; const to = pick(e.clientX, e.clientY);
       if (act.moved && act.from && to) DSEL = delRect(act.from, to); return; }
     if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), ZMIN, ZMAX); const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } return; }
@@ -3220,6 +3297,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   });
   canvas.addEventListener('pointerleave', () => { PL.ptr = null; hlClear(); });
   const endPtr = e => {
+    if (act && act.kind === 'path' && ptrs.has(e.pointerId)) endPathStroke();
     if (act && act.kind === 'del' && !act.moved && ptrs.has(e.pointerId)){ const h = pick(e.clientX, e.clientY); if (DSEL && h && inDel(DSEL, h.x, h.z)) clearArea(DSEL); DSEL = null; }   // (a click: inside the selection clears it, anywhere else lets it go)
     if (act && act.kind === 'turn' && !act.moved && ptrs.has(e.pointerId) && PL.kind === 'del' && act.b === 2){ DSEL = null; }
     else if (act && act.kind === 'turn' && !act.moved && ptrs.has(e.pointerId)){
@@ -3253,6 +3331,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (e.key === '5'){ setKind('connect'); return; }
     if (e.key === '6'){ setKind('grass'); return; }
     if (k === 'x' && !e.repeat){ setKind('del'); return; }
+    if (e.key === '7'){ setKind('path'); return; }
+    if (PL.kind === 'path' && k === 'v'){ PTH.style = (PTH.style + 1) % PSTY.length; return; }
     if (PL.kind === 'grass' && (k === 'q' || k === 'e')){ GR.size = clamp(GR.size + (k === 'q' ? 1 : -1), 0, GRS.length - 1); return; }
     if (PL.kind === 'grass' && k === 'v'){ if (PL.zoneFol === 'com' || PL.zoneFol === 'ind' || PL.zoneFol === 'lux') return; else GR.style = (GR.style + 1) % GSTYLES.length; return; }
     if (PL.kind === 'connect' && k === 'v'){ CN.type = (CN.type + 1) % LINK_TYPES.length; CN.key = ''; return; }
@@ -3330,10 +3410,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function frame(now){
     const dt = Math.min(.1, (now - last)/1000); last = now; fNo++; let q = PROF.on ? performance.now() : 0;
     updateCamera(dt); q = tk('camera', q); stream(3); q = tk('stream', q);
-    { const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.zkinds.izone, PL.zkinds.lzone, PL.rot, DSEL ? DSEL.key : '-', GR.size, GR.style, GR.pstyle, GR.istyle, PL.zoneFol, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
+    { const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.zkinds.izone, PL.zkinds.lzone, PL.rot, DSEL ? DSEL.key : '-', PTH.style, GR.size, GR.style, GR.pstyle, GR.istyle, PL.zoneFol, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
       if (gk !== ghostKey){ ghostKey = gk;   // (the ghost is worked out again only when something it shows has changed: the raycasts and checks are the costly part)
         hlClear();
-        if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'del') showDel(); else if (PL.kind === 'grass') showGrass(); else if (isZone(PL.kind) && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } }
+        if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'path') showPath(); else if (PL.kind === 'del') showDel(); else if (PL.kind === 'grass') showGrass(); else if (isZone(PL.kind) && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } }
     q = tk('ghost', q);
     animTick(dt); rotorTick(dt); agentTick(dt); const batched = batchTick();
     if (linksDirty && !ANIM.list.length && !batched) buildLinks();   // (not in the same frame as a batch: the two together made a hitch)
@@ -3350,7 +3430,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, AG, agentTick: dt => agentTick(dt), FIELD, inHull: (P, x, z) => inHull(P, x, z), RAILS, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
+  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, PATHS: () => PATHS, addPath: (s, p) => { PATHS.push({ s, p }); savePaths(); buildPaths(); }, buildPaths: () => buildPaths(), AG, agentTick: dt => agentTick(dt), FIELD, inHull: (P, x, z) => inHull(P, x, z), RAILS, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

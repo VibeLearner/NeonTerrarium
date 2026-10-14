@@ -16,17 +16,17 @@ const WIRELOG = (() => {
   const ZONE_NAME = { low: 'Zone A', mid: 'Zone B', high: 'Zone C', ind: 'Zone D' };
 
   const css = `
-  #wirelog { --wl-bg: rgba(13,9,24,.88); --wl-line: rgba(214,92,255,.42); --wl-hair: rgba(214,92,255,.16); --wl-head: #ff6fb8; --wl-dim: #6f6888; --wl-txt: #d9d2ea;
+  #wirelog { --wl-bg: rgba(13,9,24,.94); --wl-line: rgba(214,92,255,.42); --wl-hair: rgba(214,92,255,.16); --wl-head: #ff6fb8; --wl-dim: #6f6888; --wl-txt: #d9d2ea;
     --c-city: #38e8e0; --c-mesh: #5affa8; --c-corp: #ffb347; --c-sig: #ff5a6e; --c-cmd: #f6d6ff;
     position: fixed; top: calc(58px + env(safe-area-inset-top,0px)); right: 16px; width: min(372px, calc(100vw - 32px)); z-index: 3;
     font: 10.5px/1.5 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--wl-txt); letter-spacing: .02em; }
   #wirelog[hidden] { display: none; }
-  #wirelog .wl-box { background: var(--wl-bg); border: 1px solid var(--wl-line); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  #wirelog .wl-box { background: var(--wl-bg); border: 1px solid var(--wl-line); contain: layout paint style; }
   #wirelog header { display: flex; align-items: center; gap: 8px; height: 24px; padding: 0 6px 0 9px; border-bottom: 1px solid var(--wl-hair); }
   #wirelog header .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--wl-head); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; white-space: nowrap; }
   #wirelog header .t .short { display: none; }
   #wirelog header .r { flex-shrink: 0; margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--wl-dim); font-size: 9px; letter-spacing: .14em; white-space: nowrap; }
-  #wirelog .live { display: inline-block; width: 6px; height: 6px; background: var(--c-mesh); box-shadow: 0 0 6px var(--c-mesh); animation: wlBlink 1.6s steps(2) infinite; }
+  #wirelog .live { display: inline-block; width: 6px; height: 6px; background: var(--c-mesh); animation: wlBlink 1.6s steps(2) infinite; }
   @keyframes wlBlink { 50% { opacity: .25; } }
   #wirelog header button { font: inherit; font-size: 9px; letter-spacing: .14em; color: var(--wl-dim); background: transparent; border: 1px solid var(--wl-hair); border-radius: 0; padding: 1px 6px; cursor: pointer; }
   #wirelog header button:hover, #wirelog header button:focus-visible { color: var(--wl-head); border-color: var(--wl-line); outline: none; }
@@ -64,7 +64,7 @@ const WIRELOG = (() => {
   #wirelog .doc .back { font: inherit; font-size: 9px; letter-spacing: .14em; color: var(--wl-dim); background: transparent; border: 1px solid var(--wl-hair); border-radius: 0; padding: 1px 6px; margin-top: 6px; cursor: pointer; }
   /* the agents: boxes branching off the log's left side, joined to it by a wire */
   #wirelog .wl-agents { position: absolute; right: calc(100% + 22px); top: 30px; display: grid; gap: 8px; width: 238px; pointer-events: none; }
-  #wirelog .ag { position: relative; background: var(--wl-bg); border: 1px solid var(--wl-line); opacity: 0; transform: translateX(8px); transition: opacity .25s, transform .25s; }
+  #wirelog .ag { position: relative; contain: layout paint style; background: var(--wl-bg); border: 1px solid var(--wl-line); opacity: 0; transform: translateX(8px); transition: opacity .25s, transform .25s; }
   #wirelog .ag.on { opacity: 1; transform: none; } #wirelog .ag.gone { opacity: 0; }
   #wirelog .ag::after { content: ''; position: absolute; left: 100%; top: 12px; width: 22px; height: 1px; background: var(--wl-line); }
   #wirelog .ag::before { content: ''; position: absolute; left: calc(100% + 19px); top: 10px; width: 5px; height: 5px; background: var(--c-mesh); box-shadow: 0 0 5px var(--c-mesh); }
@@ -110,8 +110,22 @@ const WIRELOG = (() => {
   const safe = (f, d) => { try { const v = f(); return v === undefined || Number.isNaN(v) ? d : v; } catch (e) { return d; } };
 
   /* ---------- reading the city ---------- */
+  // the zone counts, a slice of the city per frame (a big city in one go is a hitch every few seconds)
+  const Z0 = () => ({ low: 0, mid: 0, high: 0, ind: 0, any: 0, lowPlots: 0, midPlots: 0, highPlots: 0 });
+  let zIter = null, zAcc = null, zLast = null;
+  function zoneStep(budget = 250){
+    if (!zIter){ zIter = safe(() => cells.values(), null); zAcc = Z0(); if (!zIter){ zLast = zAcc; return true; } }
+    for (let n = 0; n < budget; n++){
+      const r = zIter.next(); if (r.done){ zLast = zAcc; zIter = null; return true; }
+      const c = r.value, sec = c.sections; if (!sec || !sec.length) continue;
+      zAcc.any++; let lo = 0, mi = 0, hi = 0;
+      for (const x of sec){ if (zAcc[x.zone] !== undefined) zAcc[x.zone]++; if (x.zone === 'low') lo = 1; else if (x.zone === 'mid') mi = 1; else if (x.zone === 'high') hi = 1; }
+      zAcc.lowPlots += lo; zAcc.midPlots += mi; zAcc.highPlots += hi;
+    }
+    return false;
+  }
   function snap(){
-    const z = safe(() => zoneCounts(), { low: 0, mid: 0, high: 0, ind: 0, any: 0, lowPlots: 0, midPlots: 0, highPlots: 0 });
+    const z = zLast || Z0();
     const kinds = {}; safe(() => { for (const m of megas.values()) kinds[m.kind] = (kinds[m.kind] || 0) + 1; });
     return { z, kinds, metros: safe(() => metros.length, 0), hw: safe(() => highways.length, 0), rain: safe(() => pplRaining, !!S.rain),
       phase: safe(() => phaseName(S.hour), 'Day'), club: !!kinds.club && safe(() => clubOpenAt(S.hour), false) };
@@ -419,11 +433,12 @@ const WIRELOG = (() => {
     });
     bodyEl.appendChild(box); bodyEl.scrollTop = 0;
   }
+  const setTxt = (n, v) => { v = String(v); if (n && n.textContent !== v) n.textContent = v; };
   function foot(s){
-    if (!footEl) return;
-    footEl.querySelector('#wlRx').textContent = Math.round((60 + s.z.any*4.5 + outside()*.8) * (.9 + rnd()*.2));
-    footEl.querySelector('#wlMesh').textContent = W.stage >= 1 ? W.mesh.join(' ') : '—';
-    footEl.querySelector('#wlN').textContent = W.lines.length;
+    if (!footEl || el.classList.contains('collapsed')) return;
+    setTxt(footEl.querySelector('#wlRx'), Math.round((60 + s.z.any*4.5 + outside()*.8) * (.9 + rnd()*.2)));
+    setTxt(footEl.querySelector('#wlMesh'), W.mesh.join(' '));
+    setTxt(footEl.querySelector('#wlN'), W.lines.length);
   }
 
   /* ---------- the tick (main.js, once a frame; not while the Overseer's desk is up) ---------- */
@@ -433,17 +448,17 @@ const WIRELOG = (() => {
     const dt = Math.min(rdt, .25);
     if (!started){
       if (!unlocked()) return;
-      started = true; load(); rs = W.seed || 1; makePanel();
+      started = true; load(); rs = W.seed || 1; while (!zoneStep(1e9)); makePanel();
       if (!W.on){ W.on = true; boot(); }
       if (W.leak === 'running') W.leak = 'offered';   // (reloaded mid-swarm: offer it again)
       el.hidden = false; showView('log');
     }
     runWaits(dt);
-    if ((snapT += dt) > 2){ snapT = 0; cur = snap(); events(cur); }
+    if (zIter || (snapT += dt) > 3){ if (zoneStep()){ snapT = 0; cur = snap(); events(cur); } }
     flushBuild(dt);
     stageTick(dt);
     if (W.leak !== 'running' && (next -= dt) <= 0){ next = T.gapLo + rnd()*(T.gapHi - T.gapLo); ambient(); }
-    if ((footT += dt) > 1.5 && cur){ footT = 0; foot(cur); }
+    if ((footT += dt) > 3 && cur){ footT = 0; foot(cur); }
     if ((saveT += dt) > 3){ saveT = 0; flushSave(); }
   }
   addEventListener('pagehide', flushSave);

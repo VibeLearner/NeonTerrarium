@@ -1,6 +1,6 @@
 // Neon Terrarium: the High Overseer. Double-click the Data Spire and the city glitches, a curtain of falling glyphs closes
 // over it, and the Overseer's desk boots up, laid out after the "Overturn" rotation desk of uispace: a strip of readouts
-// across the top (the archive window counting down in amber, the clock), the city's plan in the middle, cut into 48
+// across the top (the archive's integrity in amber, the clock), the city's plan in the middle, cut into 48
 // sectors and drawn as tiny extruded blocks coloured by whether each sector has turned in for the night (its residents'
 // bedtimes), the turn schedule beside it, and along the bottom the tiers (the four zones), a crossings log streaming in,
 // and the hold lever. Everything on it is read from the city as it stands. In a callout on the plan, wired to the Spire,
@@ -273,7 +273,7 @@ const OVERSEER = (() => {
         <div class="c opt"><small>PLOTS ${fmt(m.plots.length)}</small><span class="v">CITIZENS ${fmt(m.pop)}</span><small>STRUCT ${m.megs.length} · H ${hr.toFixed(2)}</small></div>
         <div class="c"><small>TURNING</small><span class="v"><i class="sq"></i>&nbsp; TIER ${tPrev} <span class="dim">→</span> <span class="amb">${tNext}</span></span><small>&nbsp;</small></div>
         <div class="c fix"><div class="row"><div style="display:flex;flex-direction:column;gap:3px"><small>${nx ? 'SECTOR ' + nx.n + ' NEXT' : 'ALL SECTORS'}</small><span class="v">TURN AT ${nx ? hm(nx.at) : '--:--'}</span><small>#${nx ? nx.q : '--'} / 48</small></div>
-          <div style="display:flex;flex-direction:column;gap:2px"><small class="amb">ARCHIVE WINDOW</small><span class="big tmr">00:06:40</span></div></div></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><small class="amb">ARCHIVE · COAST.MEM</small><span class="big">63%</span></div></div></div>
         <div class="c opt2"><small>NEXT ${nx ? 'S' + nx.n : '--'} · ${nx ? hm(nx.dt).replace(':', 'H ') + 'M' : '--'}</small><span class="v">${m.turned} / 48 TURNED</span><small>${m.live} LIVE · SLIP 0 S</small></div>
         <div class="c"><small>TURN ${tPrev} → ${tNext} · RING ${Math.max(1, Math.ceil(frac*6))}</small><div class="seg">${segs.map(c => `<i class="${c}"></i>`).join('')}</div><small>${Math.round(frac*100)}% · ${m.turned}/${m.live || 0}</small></div>
         <div class="c"><small>AWAKE</small><span class="v grn">${fmt(m.awake)}</span><small>ASLEEP <b>${fmt(m.asleep)}</b></small></div>
@@ -307,7 +307,7 @@ const OVERSEER = (() => {
             <svg viewBox="0 0 112 104"><path d="M14 86 A46 46 0 0 1 98 86" fill="none" stroke="#262b28" stroke-width="7"/><path d="M14 86 A46 46 0 0 1 40 46" fill="none" stroke="#3f8f57" stroke-width="7"/><path d="M74 46 A46 46 0 0 1 98 86" fill="none" stroke="#8c2f1f" stroke-width="7"/>
               <text x="8" y="100" fill="#6b736f" font-size="7" font-family="JetBrains Mono" letter-spacing="1">NORMAL</text><text x="80" y="100" fill="#6b736f" font-size="7" font-family="JetBrains Mono" letter-spacing="1">HOLD</text>
               <g class="lev" style="transform-origin:56px 86px"><line x1="56" y1="86" x2="56" y2="34" stroke="#e8ebe9" stroke-width="3"/><rect x="49" y="24" width="14" height="12" fill="#ffa834"/></g><circle cx="56" cy="86" r="6" fill="#0a0c0b" stroke="#a8b0ac"/></svg></div>
-            <div><div class="kv"><span>HOLD AVAILABLE</span><span class="amb">90 S</span><span>SLIP</span><span>0 S</span><span>HOLDS THIS YEAR</span><span>2</span><span>CUTOFF</span><span class="cut">06:40</span><span>CIRCUIT</span><span class="grn">A · OK</span></div>
+            <div><div class="kv"><span>HOLD AVAILABLE</span><span class="amb">90 S</span><span>SLIP</span><span>0 S</span><span>HOLDS THIS YEAR</span><span>2</span><span>ARCHIVE</span><span class="amb">FRAGMENT 03</span><span>CIRCUIT</span><span class="grn">A · OK</span></div>
               <div class="mimic">${m.sec.map(s => `<i class="${s.state === 'nxt' ? 'nx' : ''}" style="background:${s.k === m.spSec ? '#e5432d' : SCOL[s.state][0]}"></i>`).join('')}</div></div></div></div>
       </div>
       <div class="scan"></div>`;
@@ -426,12 +426,11 @@ const OVERSEER = (() => {
     g.fillStyle = 'rgba(255,168,52,.85)'; g.fillText((cx/W*M.ni + M.i0).toFixed(2) + ' / ' + (cy/H*M.nj + M.j0).toFixed(2), cx + 16*d, cy - 8*d);
     const sy = ((t*.12) % 1)*H; const gr = g.createLinearGradient(0, sy - 30*d, 0, sy); gr.addColorStop(0, 'rgba(255,168,52,0)'); gr.addColorStop(1, 'rgba(255,168,52,.07)'); g.fillStyle = gr; g.fillRect(0, sy - 30*d, W, 30*d);
   }
-  let lastClk = '', lastTmr = '';
+  let lastClk = '';
   function loop(now){
     if (!O.open) return; raf = requestAnimationFrame(loop);
     if (now - last < 33) return; const dt = last ? Math.min(.1, (now - last)/1000) : 0; last = now; const t = now/1000, el = (now - t0)/1000;
     if (base) drawPlan(t, dt);
-    const tm = '00:' + hms(400 - el).slice(3); if (tm !== lastTmr){ lastTmr = tm; const c = $('.tmr'); if (c) c.textContent = tm; const cu = $('.cut'); if (cu) cu.textContent = tm.slice(3); }
     const ck = hms(M.hour*3600 + el); if (ck !== lastClk){ lastClk = ck; const c = $('.clk'); if (c) c.textContent = ck; }
     logT += dt; if (logT > 2.4){ logT = 0; logPush(); }
     const lv = $('.lev'); if (lv) lv.style.transform = 'rotate(' + (-38 + Math.sin(t*.8)*3) + 'deg)';

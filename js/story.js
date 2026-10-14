@@ -331,7 +331,7 @@ const STORY = (() => {
   function descOf(id){
     const k = KN.get(id), I = ident(id), p = pOf(id), s = SPM.get(id);
     if (k && k.first) return k.first + (k.rel ? ' (' + relLabel(k) + ')' : '');
-    if (p && p.cop && !p.guard) return 'Officer ' + I.last;   // (the badge on the uniform says it)
+    if (p && p.cop && !p.guard) return 'officer #' + (1000 + H(id, 'badge') % 9000);   // (the badge shows a number; the name has to be heard)
     const cd = ST.caseDesc && ST.caseDesc(id); if (cd) return cd;
     if (p && p.cop) return 'a patrol officer';
     if (s && s.age >= 60) return 'an elderly ' + (I.g === 'f' ? 'woman' : I.g === 'm' ? 'man' : 'person');
@@ -750,7 +750,24 @@ const STORY = (() => {
       if (ln) note(ST.watch, { t: ST.clock, who: e, fact: r.fact, channel: r.channel, verified: r.channel === 'document' || r.channel === 'introduction', tmpl: line, cast: Object.assign({}, sc.cast), ctx, learned });
     }
     if (sc.s.tier !== 'case'){ passing(sc, b); gossipIn(sc, b); }   // (a case's moment is its own: no names in passing, no gossip in it)
+    else copNames(sc, b);
     afterHandOver(sc, b);
+  }
+  // Officers working a case together call each other by name (across the room, on the radio): when the one you're watching
+  // is in a moment with another officer, now and then one of them says the other's first name, and the log hears it.
+  const COP_CALLS = ['{X} calls across to {Y}: "{Y.first}, with me."', '{X} on the radio: "{Y.first}, you copy?"', '{X} nods to {Y}. "Morning, {Y.first}."',
+    '{X} waves {Y} over: "{Y.first}, over here."', '{X} to {Y}, quietly: "Easy, {Y.first}."'];
+  function copNames(sc, b){
+    if (!ST.watch) return;
+    const roles = [...new Set([].concat(b.who || [], b.with || []))].filter(r => { const p = pOf(sc.cast[r]); return p && p.cop && !p.guard; });
+    if (roles.length < 2 || !Object.values(sc.cast).includes(ST.watch)) return;
+    if (U(sc.id, b.id, 'copname') > .45) return;
+    const unknown = roles.filter(r => { const k = KN.get(sc.cast[r]); return !(k && k.first); }); if (!unknown.length) return;
+    const yR = unknown.includes(Object.keys(sc.cast).find(r => sc.cast[r] === ST.watch)) ? Object.keys(sc.cast).find(r => sc.cast[r] === ST.watch) : unknown[0];   // (the one being watched first: their name is what you'd want)
+    const xR = roles.find(r => r !== yR), tmpl = pick(COP_CALLS, sc.id, b.id, 'cc').replace(/\{X/g, '{' + xR).replace(/\{Y/g, '{' + yR);
+    const ctx = ctxFor(sc, b, sc.anchor), learned = learnFrom(tmpl, sc.cast, new Set([xR, yR]), 'conversation', null, ctx);
+    const ln = logLine(tmpl, sc.cast, ctx, 'reveal', { channel: 'conversation', fact: yR + '.name' });
+    if (ln) note(ST.watch, { t: ST.clock, who: sc.cast[yR], fact: 'name', channel: 'conversation', verified: false, tmpl, cast: Object.assign({}, sc.cast), ctx, learned });
   }
   function finishScene(sc){
     const s = sc.s, A = SPM.get(sc.cast.A);

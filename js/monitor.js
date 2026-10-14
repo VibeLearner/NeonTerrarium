@@ -35,8 +35,9 @@ const MON = (() => {
     const d = (255/256)*(dBuf[0]/255/16777216 + dBuf[1]/255/65536 + dBuf[2]/255/256 + dBuf[3]/255);
     dAt.x = cx; dAt.y = cy; dAt.f = f; dAt.d = d; return d;
   }
+  M.ready = () => typeof megasOfKind === 'function' && megasOfKind('police').length > 0;   // (people can be watched once the city has a police station)
   M.pick = (cx, cy) => {
-    if (typeof pplList === 'undefined') return null;
+    if (typeof pplList === 'undefined' || !M.ready()) return null;
     const r = view.getBoundingClientRect(), VP = comp.uniforms.VP.value, tall = (16/PX)/zoom*r.height/2, wide = tall*.75;
     const cands = [];
     for (const p of pplList){
@@ -82,6 +83,7 @@ const MON = (() => {
 
   /* ---------- open, close, follow ---------- */
   M.open = id => {
+    if (!M.ready()) return;
     if (M.id !== id) FC.init = false;   // (a new subject: the feed's camera starts from the view's angle)
     M.id = id; M.rev = -1; M.lastDoor = null; el.hidden = false; document.body.classList.add('watching');
     if (window.STORY) STORY.setWatch(id);

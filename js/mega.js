@@ -2359,7 +2359,7 @@ const FIELD_SEG = [96, 32], FIELD_GEO = new THREE.SphereGeometry(1, FIELD_SEG[0]
 const FIELD_ROW = (() => { const o = [0]; for (let r = 0; r < FIELD_SEG[1]; r++) o.push(o[r] + (r === 0 ? 3 : 6)*FIELD_SEG[0]); return o; })();
 function fieldMat(hw, H, hd, seg){
   const m = new THREE.ShaderMaterial({
-    uniforms: { time: FIELD_UNI.time, uSize: { value: new THREE.Vector3(hw, H, hd) }, uSeg: { value: seg }, uT0: { value: 0 }, uReveal: { value: 0 } },
+    uniforms: { time: FIELD_UNI.time, uSize: { value: new THREE.Vector3(hw, H, hd) }, uSeg: { value: seg }, uT0: { value: 0 }, uReveal: { value: 0 }, uMerge: { value: -1 }, uMP: { value: new THREE.Vector2() }, uMS: { value: 10 } },
     vertexShader: `uniform vec3 uSize; varying vec3 vW; varying vec3 vNo; varying float vEl; varying float vAz;
       void main(){
         vec3 p = position; float a = atan(p.z, p.x), c = abs(cos(a)), s = abs(sin(a)), k = pow(pow(c, 4.0) + pow(s, 4.0), -.25);   // the rounded square
@@ -2367,7 +2367,7 @@ function fieldMat(hw, H, hd, seg){
         vEl = asin(clamp(p.y, 0.0, 1.0))/1.5708; vAz = a/6.2832 + .5;
         vNo = normalize(vec3(p.x/uSize.x, p.y/uSize.y, p.z/uSize.z));
         vec4 w = modelMatrix*vec4(q, 1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
-    fragmentShader: `uniform float time, uSeg, uT0, uReveal; varying vec3 vW; varying vec3 vNo; varying float vEl; varying float vAz;
+    fragmentShader: `uniform float time, uSeg, uT0, uReveal, uMerge, uMS; uniform vec2 uMP; varying vec3 vW; varying vec3 vNo; varying float vEl; varying float vAz;
       float ln(float x, float w){ float f = abs(fract(x) - .5); return 1.0 - smoothstep(.5 - w*1.6, .5 - w*.6, f); }   // a line at every whole number, w wide in its own units
       void main(){
         float ph0 = mod(time - uT0, 30.0), e0 = ph0/5.0;
@@ -2389,6 +2389,10 @@ function fieldMat(hw, H, hd, seg){
         if (e < 1.15){ float dv = e - vEl, front = exp(-pow(dv/.028, 2.0)), tail = dv > 0.0 ? exp(-dv*22.0)*.3 : 0.0, fade = 1.0 - smoothstep(.85, 1.15, e);
           float Ls = max(ln(u + v*.5, w*1.5), ln(u - v*.5, w*1.5)), Lh = ln(v, w*1.5);   // (the lines a little wider while lit, so they read from afar; the rings round it fainter, or the front is a solid band)
           sweep = (front + tail)*fade*(Ls*.42 + Lh*.18 + node*.4) + exp(-vEl*40.0)*smoothstep(.2, 0.0, e)*.25; }
+        // fields joining: from where they met, a ring of light runs out over the dome, the lattice appearing behind it
+        if (uMerge >= 0.0){ float dist = length(vW.xz - uMP), r = uMerge*uMS;
+          full *= smoothstep(r + .6, r - 3.0, dist);
+          full += exp(-pow((dist - r)/1.2, 2.0))*(.06 + L*.5 + node*.45)*(1.0 - smoothstep(2.2, 3.2, uMerge)); }
         float a = full*uReveal*breath + sweep;
         a *= gl_FrontFacing ? 1.0 : .45;
         gl_FragColor = vec4(col*a, 1.0); }`,
@@ -2409,6 +2413,11 @@ function fieldBuild(plan){
     mesh.frustumCulled = false; mesh.renderOrder = 20; mesh.raycast = () => {}; mesh.userData.field = f; scene.add(mesh); FIELD.domes.push(mesh);
     mesh.material.uniforms.uT0.value = now;   // (a sweep straight away, to show where it stands)
     mesh.userData.reveal = f.n > 1 && !was.has(f.ids) ? 7 : 0;   // (cores just paired: the whole field shows for a while, then fades)
+    if (mesh.userData.reveal){   // (where they met: between the nearest two cores that weren't in one field before)
+      const mem = f.ids.split('|').map(id => megas.get(id)).filter(Boolean), prev = id => { for (const w of was) if (w.split('|').includes(id)) return w; return 'new:' + id; };
+      let best = null, bd = 1e9; for (let a = 0; a < mem.length; a++) for (let q = a + 1; q < mem.length; q++){ if (prev(mem[a].id) === prev(mem[q].id)) continue; const d = Math.hypot(mem[a].x - mem[q].x, mem[a].z - mem[q].z); if (d < bd){ bd = d; best = [(mem[a].x + mem[q].x)/2, (mem[a].z + mem[q].z)/2]; } }
+      if (!best && mem.length) best = [mem.reduce((t, m) => t + m.x, 0)/mem.length, mem.reduce((t, m) => t + m.z, 0)/mem.length];
+      const U_ = mesh.material.uniforms; U_.uMP.value.set(best ? best[0] : (x0 + x1)/2, best ? best[1] : (z0 + z1)/2); U_.uMS.value = Math.hypot(hw, hd)*2/2.5; U_.uMerge.value = 0; mesh.userData.merge = 0; }
   }
 }
 // checked every second: rebuilt when the cores or the city's bounds have changed
@@ -2416,6 +2425,7 @@ function fieldTick(dt){
   const now = FOL_UNI.time.value, NR = FIELD_SEG[1];
   for (const d of FIELD.domes){ const U_ = d.material.uniforms;
     if (d.userData.reveal > 0){ d.userData.reveal = Math.max(0, d.userData.reveal - dt); U_.uReveal.value = Math.min(1, d.userData.reveal/2); }   // (held, then faded over its last 2 s)
+    if (d.userData.merge !== undefined){ d.userData.merge += dt; U_.uMerge.value = d.userData.reveal > 0 ? d.userData.merge : -1; if (d.userData.reveal <= 0) d.userData.merge = undefined; }
     // (between sweeps it shows nothing, so it isn't drawn at all; in a sweep only the rings near the front are: the
     // row at elevation el is about (1 - el)*NR from the top)
     if (U_.uReveal.value > 0){ d.visible = true; d.geometry.setDrawRange(0, Infinity); continue; }
@@ -3661,7 +3671,11 @@ function bikeBoard(b, m){
   if (b.cop || typeof pplList === 'undefined') return;
   const here = pplList.filter(q => q.cop && !q.onBike && !q.scene && !q.custody && !q.offDuty && !q.walk && !q.patrol && q.at === q.job
     && places.get(q.job) && places.get(q.job).mega === m);
-  const c = here.find(q => working(q, S.hour)) || here[0];   // (one on shift if there is one; else whoever is still in the station)
+  let c = here.find(q => working(q, S.hour)) || here[0];   // (one on shift if there is one; else whoever is still in the station)
+  // nobody in: one of the station's officers who is indoors somewhere, out of sight (so the rider is always someone you can
+  // click and follow; anyone out in the street stays where they are)
+  if (!c) c = pplList.find(q => q.cop && !q.guard && !q.onBike && !q.scene && !q.custody && !q.walk && !q.patrol && !q.spot && !q.metro && !q.ride && !(q._ec && q._ea > .3)
+    && places.get(q.job) && places.get(q.job).mega === m) || null;
   if (c){ b.cop = c; c.onBike = b; c.x = b.x; c.z = b.z; }
 }
 function bikeLeave(b){ if (!b.cop) return; b.cop.onBike = null; b.cop._ec = 0; b.cop = null; }

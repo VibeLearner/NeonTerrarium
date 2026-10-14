@@ -325,10 +325,25 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const landM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }), true, true);
   const pieceM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }), true, false, true);   // (pieces: walls stay their own color)
   const landDepth = bent(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), false);
+  // The land is cut open where a water causeway's canal is sunk into it: a mask over the ground (a texture laid over the
+  // box the canals take up, 1 where the land is left out), read by the land and by its shadow, so the canal is a real
+  // trench with the light falling into it. Made again only when the paths change.
+  const CUTU = { uCut: { value: new THREE.DataTexture(new Uint8Array([0]), 1, 1, THREE.LuminanceFormat) }, uCutO: { value: new THREE.Vector2() }, uCutS: { value: new THREE.Vector2(1, 1) }, uCutOn: { value: 0 } };
+  const CUT_F = 'uniform sampler2D uCut; uniform vec2 uCutO, uCutS; uniform float uCutOn;\n', CUT_APPLY = '\n if (uCutOn > 0.5){ vec2 cu_ = (vWq.xz - uCutO)/uCutS; if (cu_.x > 0.0 && cu_.x < 1.0 && cu_.y > 0.0 && cu_.y < 1.0 && texture2D(uCut, cu_).r > 0.5) discard; }';
+  function cutLand(m, varying){ const ob = m.onBeforeCompile, ok = m.customProgramCacheKey; m.onBeforeCompile = sh => { ob(sh); Object.assign(sh.uniforms, CUTU);
+      sh.fragmentShader = CUT_F + (varying ? 'varying vec3 vWq;\n' : '') + sh.fragmentShader.replace('void main() {', 'void main() {' + CUT_APPLY); };
+    m.customProgramCacheKey = () => ok() + 'cut'; return m; }
   { const ob = landDepth.onBeforeCompile; landDepth.onBeforeCompile = sh => { ob(sh);   // (a land patch's skirts are in its own mesh, marked: they cast no shadow)
       sh.vertexShader = 'attribute float skirt; varying float vSk;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vSk = skirt;');
       sh.fragmentShader = 'varying float vSk;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n if (vSk > 0.5) discard;'); };
     landDepth.customProgramCacheKey = () => 'bentDepthSk'; }
+  // (the land's own: the same, with the canals cut out; pieces keep landDepth)
+  const chunkDepth = bent(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), false);
+  { const ob = chunkDepth.onBeforeCompile; chunkDepth.onBeforeCompile = sh => { ob(sh);
+      sh.vertexShader = 'attribute float skirt; varying float vSk;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vSk = skirt;');
+      sh.fragmentShader = 'varying float vSk;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n if (vSk > 0.5) discard;'); };
+    chunkDepth.customProgramCacheKey = () => 'bentDepthSk'; cutLand(chunkDepth, true); }
+  cutLand(landM, false);
 
   // a growing list of flat-shaded, colored triangles; props are merged into it
   // (what glows by night is known by its color: GLOW maps a palette color to how it glows; dark window glass is lit in about
@@ -428,7 +443,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const ns = SK.p.length/3, NT = NV + ns, P2 = new Float32Array(NT*3), C2 = new Float32Array(NT*3), N2 = new Float32Array(NT*3), S2 = new Float32Array(NT);
     P2.set(LP); C2.set(LC); N2.set(LN); P2.set(SK.p, NV*3); C2.set(SK.c, NV*3); for (let v = NV; v < NT; v++){ N2[v*3 + 1] = 1; S2[v] = 1; }   // (skirts lit like the ground)
     const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(P2, 3)); lg.setAttribute('color', new THREE.BufferAttribute(C2, 3)); lg.setAttribute('normal', new THREE.BufferAttribute(N2, 3)); lg.setAttribute('skirt', new THREE.BufferAttribute(S2, 1));
-    releaseCPU(lg); const m = new THREE.Mesh(lg, landM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.matrixAutoUpdate = false; m.frustumCulled = true;
+    releaseCPU(lg); const m = new THREE.Mesh(lg, landM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = chunkDepth; m.matrixAutoUpdate = false; m.frustumCulled = true;
     // (the skirts are in the land mesh itself, above)
     if (BT.p.length) m.add(BT.mesh(pieceM));
     scene.add(m); return m;
@@ -1094,7 +1109,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // the terracotta, the sea's teal, the meadow's sage), so a street of them reads as one watercolor
   const PLASTER = [HP.blushD, HP.apricot, HP.butter, HP.mist, HP.sage, HP.rose, HP.apricot, HP.mist];   // (the garden terrace: weathered rust, solar glass)
   for (const c of HP.leaf) LEAFC.add(c);
-  GLOW.set(HP.indBlue, .25).set(HP.indWhite, .25).set(HP.ringW, .25).set(HP.lanternR, .25).set(HP.screen, .25).set(HP.neonG, .25).set(HP.neonP, .25).set(HP.pool, .35).set(HP.fall, .25).set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
+  HP.glowPeb = C(0xb6fff0).multiplyScalar(1.15); GLOW.set(HP.glowPeb, .25).set(HP.indBlue, .25).set(HP.indWhite, .25).set(HP.ringW, .25).set(HP.lanternR, .25).set(HP.screen, .25).set(HP.neonG, .25).set(HP.neonP, .25).set(HP.pool, .35).set(HP.fall, .25).set(HP.lamp, 1).set(HP.glass, .45).set(HP.glass2, .45).set(HP.glassT, .7).set(HP.glassD, -.5);   // (glassD: half the dark windows lit)
   Object.assign(GEO, { cyl12: new THREE.CylinderGeometry(1, 1, 1, 12), cyl16: new THREE.CylinderGeometry(1, 1, 1, 16), sph: new THREE.IcosahedronGeometry(1, 1),
     dome: new THREE.SphereGeometry(1, 12, 6, 0, PI*2, 0, PI/2), ring: new THREE.CylinderGeometry(1, 1, 1, 16, 1, true),
     frus4: new THREE.CylinderGeometry(.62, 1, 1, 4, 1).rotateY(PI/4), half16: new THREE.CylinderGeometry(1, 1, 1, 16, 1, false, -PI/2, PI), hip4: new THREE.CylinderGeometry(.08, 1, 1, 4, 1).rotateY(PI/4) });   // (square frustums: a roof's flared skirt, and a hipped roof)
@@ -3080,17 +3095,18 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // boards 13 and 23), a water causeway (a stone walk beside a clear canal with koi and lilies, its water lit and rippling
   // at night like the pools; board 19), and mossy cobbles (board 18). A stroke is kept as the points the pointer passed
   // (saved), smoothed and resampled every .35 and laid on the ground, following it. Grass and plants under a path go.
-  const PATH_KEY = 'neonIsland.coast.paths', PSTY = ['flagstones', 'promenade', 'marble walk', 'water causeway', 'mossy cobbles'], PW = [.95, 1.6, 1.2, 2.0, 1.0];
+  const PATH_KEY = 'neonIsland.coast.paths', PSTY = ['flagstones', 'promenade', 'marble walk', 'water causeway', 'mossy cobbles'], PW = [.95, 1.6, 1.2, 2.3, 1.0];
   let PATHS = []; try { PATHS = JSON.parse(localStorage.getItem(PATH_KEY) || '[]').filter(p => p && p.p && p.p.length > 1); } catch (e) {}
-  const PTH = { style: 0, cur: null, mesh: null, live: null, pools: [], dirty: true };
+  const PTH = { style: 0, cur: null, mesh: null, live: null, pools: [], dirty: true, hov: null, hk: '' };
   const savePaths = () => { try { localStorage.setItem(PATH_KEY, JSON.stringify(PATHS.map(p => ({ s: p.s, p: p.p.map(q => [+q[0].toFixed(2), +q[1].toFixed(2)]) })))); } catch (e) {} };
   function smoothPts(P){ let Q = P; for (let it = 0; it < 2; it++){ if (Q.length < 3) break; const R2 = [Q[0]]; for (let i = 0; i < Q.length - 1; i++){ const a = Q[i], b = Q[i + 1]; R2.push([a[0]*.75 + b[0]*.25, a[1]*.75 + b[1]*.25], [a[0]*.25 + b[0]*.75, a[1]*.25 + b[1]*.75]); } R2.push(Q[Q.length - 1]); Q = R2; }
-    const out = [Q[0]]; let acc = 0; for (let i = 1; i < Q.length; i++){ let a = out[out.length - 1]; const b = Q[i]; let d = Math.hypot(b[0] - a[0], b[1] - a[1]);
-      while (acc + d >= .35){ const t = (.35 - acc)/d; const p = [a[0] + (b[0] - a[0])*t, a[1] + (b[1] - a[1])*t]; out.push(p); a = p; d = Math.hypot(b[0] - a[0], b[1] - a[1]); acc = 0; } acc += d; }
-    const last = Q[Q.length - 1], e = out[out.length - 1]; if (Math.hypot(last[0] - e[0], last[1] - e[1]) > .1) out.push(last); return out; }
+    // (resampled every .35 along its length: a point each time that much more of the line has gone by)
+    const out = [Q[0]]; let rem = .35; for (let i = 1; i < Q.length; i++){ const a = Q[i - 1], b = Q[i], d = Math.hypot(b[0] - a[0], b[1] - a[1]); let pos = 0;
+      while (d - pos >= rem){ pos += rem; const t = pos/d; out.push([a[0] + (b[0] - a[0])*t, a[1] + (b[1] - a[1])*t]); rem = .35; } rem -= d - pos; }
+    const last = Q[Q.length - 1], e = out[out.length - 1]; if (Math.hypot(last[0] - e[0], last[1] - e[1]) > .12) out.push(last); else if (out.length > 1) out[out.length - 1] = last; return out; }
   // a flat four-cornered piece laid on the ground (corners [x, y, z]), wound to face up
   function flatQ(T, A, B, Cc, D, col){ const cy = (B[2] - A[2])*(Cc[0] - A[0]) - (B[0] - A[0])*(Cc[2] - A[2]); if (cy > 0) T.quad(A, B, Cc, D, col); else T.quad(A, D, Cc, B, col); }
-  function drawPath(T, stroke, pools){
+  function drawPath(T, stroke, pools, opt = {}){
     const P = smoothPts(stroke.p), st = stroke.s, n = P.length; if (n < 2) return;
     const R = rng((Math.imul(Math.round(P[0][0]*31), 73856093) ^ Math.imul(Math.round(P[0][1]*37), 19349663) ^ st*97) >>> 0);
     const N = P.map((p, i) => { const a = P[Math.max(0, i - 1)], b = P[Math.min(n - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [-dz/l, dx/l, dx/l, dz/l]; });   // (across, along)
@@ -3114,21 +3130,68 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     else if (st === 2){   // marble walk
       strip(-.6, .6, .03, i => i % 4 === 0 ? HP.luxCream : HP.luxWhite); kerb(-.63, .08, .07, HP.luxCream); kerb(.63, .08, .07, HP.luxCream); kerb(0, .05, .01, HP.luxGold);
       for (let i = 5; i < n; i += 11) for (const s_ of [-.85, .85]){ const [x, z] = G(i, s_); if (!inside(x, z)) blossomPot(T, R, x, heightAt(x, z), z); } }
-    else if (st === 3){   // water causeway: a walk on the left, the canal on the right
-      strip(-1.0, -.1, .05, i => i % 2 ? C(0xd8cfbb) : C(0xcfc5af)); kerb(-1.02, .08, .1, C(0xb5aa95)); kerb(-.05, .1, .14, C(0xbdb29d)); kerb(.95, .1, .14, C(0xbdb29d));
-      strip(-.02, .92, .015, () => HP.pool); strip(-.02, .92, -.04, () => C(0x5f8a84));
-      for (let i = 0; i < n; i++){ if (R.chance(.12)){ const [x, z] = G(i, R.r(.15, .75)); T.add(GEO.cyl8, mat(x, heightAt(x, z) + .03, z, 0, 0, 0, R.r(.08, .14), .01, R.r(.08, .14)), HP.lily); }
-        if (R.chance(.07)){ const [x, z] = G(i, R.r(.2, .7)); T.add(GEO.ico, mat(x, heightAt(x, z) + .025, z, 0, R.r(0, PI), 0, .1, .02, .04), HP.luxOrange); } }
+    else if (st === 3){   // water causeway: a walk on the left; on the right a canal sunk into the ground (board 19)
+      strip(-1.0, -.1, .05, i => i % 2 ? C(0xd8cfbb) : C(0xcfc5af)); kerb(-1.02, .08, .1, C(0xb5aa95)); kerb(-.05, .1, .14, C(0xbdb29d)); kerb(1.25, .1, .14, C(0xbdb29d));
+      if (opt.flat){ strip(-.02, 1.22, .03, () => HP.pool); for (let i = 5; i < n; i += 11) lampPost(i, -1.15, 1.0); return; }   // (a preview: the water shown at the top)
+      // its walls of dressed stone, dry above the water and green below, going down to a pale pebbled bed; the water clear
+      // (its own see-through mesh, W), so the bed, the weed and the koi show through it, deeper toward the middle
+      const WL = -.03, WR = 1.23, D = .62, WS = .2, Wt = opt.W || T;
+      const gl = [], gr = [], yb = [], ys = []; for (let i = 0; i < n; i++){ const [lx, lz] = G(i, WL), [rx, rz] = G(i, WR), hl = heightAt(lx, lz), hr = heightAt(rx, rz), lo = Math.min(hl, hr);
+        gl.push([lx, hl, lz]); gr.push([rx, hr, rz]); yb.push(lo - D); ys.push(lo - WS); }
+      const at = (q, y) => [q[0], y, q[2]], face = (A, B, Cc, Dd, col, nx, nz) => { const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2], vx = Cc[0] - A[0], vy = Cc[1] - A[1], vz = Cc[2] - A[2];
+        if ((uy*vz - uz*vy)*nx + (ux*vy - uy*vx)*nz > 0) T.quad(A, B, Cc, Dd, col); else T.quad(A, Dd, Cc, B, col); };
+      const DRY = [C(0xc4bda8), C(0xb6af9a), C(0xbdb6a1)], WET = [C(0x7aa592), C(0x70998a)], DEEP = [C(0x355a50), C(0x30544a)];
+      for (let i = 0; i < n - 1; i++){ const k = (i*7 + (i >> 1)) % 3, nx = N[i][0], nz = N[i][1], ym0 = (ys[i] + yb[i])/2, ym1 = (ys[i + 1] + yb[i + 1])/2;
+        for (const [q, s_] of [[gl, 1], [gr, -1]]){ const a = q[i], b = q[i + 1];
+          face(a, b, at(b, ys[i + 1] + .02), at(a, ys[i] + .02), DRY[k], nx*s_, nz*s_);
+          face(at(a, ys[i] + .02), at(b, ys[i + 1] + .02), at(b, ym1), at(a, ym0), WET[i % 2], nx*s_, nz*s_);
+          face(at(a, ym0), at(b, ym1), at(b, yb[i + 1]), at(a, yb[i]), DEEP[i % 2], nx*s_, nz*s_); }
+        // the bed: pale toward the middle, where the light reaches it
+        const m0 = [(gl[i][0] + gr[i][0])/2, yb[i], (gl[i][2] + gr[i][2])/2], m1 = [(gl[i + 1][0] + gr[i + 1][0])/2, yb[i + 1], (gl[i + 1][2] + gr[i + 1][2])/2];
+        flatQ(T, at(gl[i], yb[i]), m0, m1, at(gl[i + 1], yb[i + 1]), i % 2 ? C(0xb9cdb4) : C(0xb2c7ae)); flatQ(T, m0, at(gr[i], yb[i]), at(gr[i + 1], yb[i + 1]), m1, i % 2 ? C(0xc6d6bd) : C(0xbfd1b7));   // (sandy, so it reads as the bottom, below the water)
+        // the water, a little below the ground
+        flatQ(Wt, at(gl[i], ys[i]), at(gr[i], ys[i]), at(gr[i + 1], ys[i + 1]), at(gl[i + 1], ys[i + 1]), HP.pool); }
+      // the ends: walled off
+      for (const [i, sg] of [[0, 1], [n - 1, -1]]){ const ax = N[i][2]*sg, az = N[i][3]*sg, ym = (ys[i] + yb[i])/2;
+        face(gl[i], gr[i], at(gr[i], ys[i] + .02), at(gl[i], ys[i] + .02), DRY[0], ax, az); face(at(gl[i], ys[i] + .02), at(gr[i], ys[i] + .02), at(gr[i], ym), at(gl[i], ym), WET[0], ax, az); face(at(gl[i], ym), at(gr[i], ym), at(gr[i], yb[i]), at(gl[i], yb[i]), DEEP[0], ax, az); }
+      if (opt.cuts){ const ins = .02, P0 = (i, o) => G(i, o); for (let i = 0; i < n - 1; i++){ let a0 = P0(i, WL + ins), a1 = P0(i, WR - ins), b0 = P0(i + 1, WL + ins), b1 = P0(i + 1, WR - ins);
+          if (i === 0){ a0 = [a0[0] + N[0][2]*ins, a0[1] + N[0][3]*ins]; a1 = [a1[0] + N[0][2]*ins, a1[1] + N[0][3]*ins]; }
+          if (i === n - 2){ b0 = [b0[0] - N[n - 1][2]*ins, b0[1] - N[n - 1][3]*ins]; b1 = [b1[0] - N[n - 1][2]*ins, b1[1] - N[n - 1][3]*ins]; }
+          opt.cuts.push([a0, a1, b1, b0]); } }
+      // the bed's pebbles and weed; koi in the water, lilies on it
+      const PEB = [C(0xe6e0cd), C(0x8fa595), C(0x6f8a7c), C(0xd2cbb5)];
+      for (let i = 0; i < n; i++){ const ot = (o) => { const [x, z] = G(i, o); return [x, z]; };
+        for (let j = 0; j < 4; j++) if (R.chance(.7)){ const [x, z] = ot(R.r(.05, 1.15)); T.add(GEO.ico, mat(x, yb[i] + .02, z, R.r(0, PI), R.r(0, PI), 0, R.r(.04, .09), R.r(.025, .045), R.r(.04, .08)), R.pick(PEB)); }
+        if (R.chance(.18)){ const [x, z] = ot(R.chance(.5) ? R.r(.04, .18) : R.r(1.02, 1.16)), h = R.r(.2, .42); T.add(GEO.cone8, mat(x, yb[i] + h/2, z, R.r(-.15, .15), 0, R.r(-.15, .15), .035, h, .035), R.pick([HP.lily, HP.moss])); }
+        if (R.chance(.16)){ const [x, z] = ot(R.r(.25, .95)), y = R.r((yb[i] + ys[i])/2, ys[i] - .07), a = Math.atan2(N[i][2], N[i][3]) + R.r(-.5, .5), col = R.chance(.75) ? HP.luxOrange : C(0xf4efe4);
+          T.add(GEO.ico, mat(x, y, z, 0, a, 0, .07, .055, .19), col); T.add(GEO.box, mat(x - Math.sin(a)*.19, y, z - Math.cos(a)*.19, 0, a, 0, .015, .08, .08), col); }
+        if (R.chance(.3)){ const [x, z] = ot(R.r(.15, 1.05)); T.add(GEO.ico, mat(x, yb[i] + .035, z, 0, R.r(0, PI), 0, .08, .05, .07), HP.glowPeb); }   // (by night a few pebbles glow, down on the bed)
+        if (R.chance(.1)){ const [x, z] = ot(R.r(.12, 1.08)); T.add(GEO.cyl8, mat(x, ys[i] + .008, z, 0, 0, 0, R.r(.08, .14), .01, R.r(.08, .14)), HP.lily); } }
       for (let i = 5; i < n; i += 11) lampPost(i, -1.15, 1.0); }
     else {   // mossy cobbles
       strip(-.5, .5, .015, () => C(0x5b6b48)); const CB = [C(0x9c9a92), C(0x8a8780), C(0xb0ada3), C(0x7f8a74)];
       for (let i = 0; i < n; i++) for (let j = 0; j < 4; j++) if (R.chance(.9)){ const [x, z] = G(i, -.36 + j*.24 + R.r(-.04, .04)); stone(x, z, R.r(.13, .17), R.pick(CB), .06); }
       for (let i = 8; i < n; i += 15){ const [x, z] = G(i, (Math.floor(i/15) % 2 ? 1 : -1)*.7); if (inside(x, z)) continue; const y = heightAt(x, z); box(T, x, y + .25, z, .1, .5, .1, HP.stone); box(T, x, y + .56, z, .14, .14, .14, HP.lamp); pools.push([x, z, 1.0, .7]); } } }
   // the paths drawn: one mesh for all of them, made again when one changes; the stroke being drawn has its own
-  function pathMesh(list, pools){ const T = new Tris(); for (const p of list) drawPath(T, p, pools); if (!T.p.length) return null;
-    const m = new THREE.Mesh(releaseCPU(T.geo()), pieceM); m.receiveShadow = true; m.castShadow = false; m.matrixAutoUpdate = false; m.raycast = () => {}; scene.add(m); return m; }
-  function buildPaths(){ if (PTH.mesh){ scene.remove(PTH.mesh); PTH.mesh.geometry.dispose(); } PTH.pools = []; PTH.mesh = pathMesh(PATHS, PTH.pools); PTH.dirty = false; linksDirty = true; SHD.dirty = true; }
-  function liveStroke(){ if (PTH.live){ scene.remove(PTH.live); PTH.live.geometry.dispose(); PTH.live = null; } if (PTH.cur && PTH.cur.p.length > 1) PTH.live = pathMesh([PTH.cur], []); }
+  const pathWaterM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true, transparent: true, opacity: .42, depthWrite: false }), true, false, true);
+  function pathMesh(list, pools, preview = false, cuts = null){ const T = new Tris(), W = new Tris(); for (const p of list) drawPath(T, p, pools, preview ? { flat: true } : { W, cuts }); if (!T.p.length) return null;
+    const m = new THREE.Mesh(releaseCPU(T.geo()), preview ? ghostM : pieceM); m.receiveShadow = true; m.castShadow = false; m.matrixAutoUpdate = false; m.raycast = () => {}; if (preview){ m.renderOrder = 5; m.frustumCulled = false; }
+    if (W.p.length){ const w = new THREE.Mesh(releaseCPU(W.geo()), pathWaterM); w.receiveShadow = true; w.castShadow = false; w.matrixAutoUpdate = false; w.raycast = () => {}; w.renderOrder = 3; m.add(w); }
+    scene.add(m); return m; }
+  const dropMesh = m => { if (!m) return; scene.remove(m); m.traverse(o => o.geometry && o.geometry.dispose()); };
+  // the mask of where the land is cut open (see CUTU): the canals' outlines filled into a canvas over the box they take up,
+  // fine enough that the kerbs cover its steps
+  function buildCut(cuts){
+    if (!cuts.length){ CUTU.uCutOn.value = 0; return; }
+    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const q of cuts) for (const [x, z] of q){ x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
+    x0 -= .5; z0 -= .5; x1 += .5; z1 += .5; const pix = Math.max(.025, (x1 - x0)/2048, (z1 - z0)/2048), W = Math.ceil((x1 - x0)/pix), H = Math.ceil((z1 - z0)/pix);
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d', { willReadFrequently: true }); g.fillStyle = '#fff';
+    for (const q of cuts){ g.beginPath(); q.forEach(([x, z], k) => { const u = (x - x0)/pix, v = (z - z0)/pix; if (k) g.lineTo(u, v); else g.moveTo(u, v); }); g.closePath(); g.fill(); }
+    const rgba = g.getImageData(0, 0, W, H).data, L = new Uint8Array(W*H); for (let k = 0; k < L.length; k++) L[k] = rgba[k*4] > 127 ? 255 : 0;
+    const tx = new THREE.DataTexture(L, W, H, THREE.LuminanceFormat); tx.magFilter = tx.minFilter = THREE.NearestFilter; tx.generateMipmaps = false; tx.needsUpdate = true;
+    CUTU.uCut.value.dispose(); CUTU.uCut.value = tx; CUTU.uCutO.value.set(x0, z0); CUTU.uCutS.value.set(W*pix, H*pix); CUTU.uCutOn.value = 1; }
+  function buildPaths(){ dropMesh(PTH.mesh); PTH.pools = []; const cuts = []; PTH.mesh = pathMesh(PATHS, PTH.pools, false, cuts); buildCut(cuts); PTH.dirty = false; linksDirty = true; SHD.dirty = true; }
+  function liveStroke(){ dropMesh(PTH.live); PTH.live = null; if (PTH.cur && PTH.cur.p.length > 1) PTH.live = pathMesh([PTH.cur], [], true); }   // (see-through until let go: a preview)
   // the ground under a path is cleared of grass and plants
   function clearUnder(stroke){ const w = PW[stroke.s]/2 + .1; for (const q of smoothPts(stroke.p)){ paintGrass(q[0], q[1], w, GR.style, true); paintPlants(q[0], q[1], w, 0, true); } }
   // erasing: the points of every path within r of (x, z) go, and a path cut in two becomes two
@@ -3142,9 +3205,13 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const l = PTH.cur.p[PTH.cur.p.length - 1]; if (Math.hypot(h.x - l[0], h.z - l[1]) < .3) return;
     PTH.cur.p.push([h.x, h.z]); liveStroke(); }
   function endPathStroke(){ if (PTH.cur && PTH.cur.p.length > 1){ PATHS.push(PTH.cur); clearUnder(PTH.cur); savePaths(); buildPaths(); } PTH.cur = null; liveStroke(); }
+  // before drawing, a short piece of the path in the chosen style lies under the pointer, see-through, across the view
+  function pathHover(h){ const key = h ? h.x.toFixed(2) + ',' + h.z.toFixed(2) + ',' + PTH.style + ',' + yaw.toFixed(2) : '';
+    if (key === PTH.hk) return; PTH.hk = key; dropMesh(PTH.hov); PTH.hov = null; if (!h) return;
+    const c = Math.cos(yaw), s_ = Math.sin(yaw), L = 1.4; PTH.hov = pathMesh([{ s: PTH.style, p: [[h.x - c*L, h.z + s_*L], [h.x, h.z], [h.x + c*L, h.z - s_*L]] }], [], true); }
   function showPath(){ ghost.visible = false; zHide(); connGhost.visible = false; const h = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null;
-    if (!h || h.sea){ ring.visible = false; if (status) status.textContent = h ? 'not on the sea' : ''; return; }
-    ringAt(h.x, h.z, PW[PTH.style]/2, null, .08); ringM.color.set(0xf0e2c0); if (status){ status.textContent = 'path: ' + PSTY[PTH.style] + ' (V next)'; status.style.color = '#33413a'; } }
+    if (!h || h.sea || (act && act.kind === 'path')){ pathHover(null); ring.visible = false; if (status) status.textContent = h && h.sea ? 'not on the sea' : ''; return; }
+    pathHover(h); ring.visible = false; if (status){ status.textContent = 'path: ' + PSTY[PTH.style] + ' (V next)'; status.style.color = '#33413a'; } }
   /* ---------- clearing an area (X), as in the sky city: drag to select, click inside to clear, outside to let go ---------- */
   // The selection is a rectangle squared to the view as it was when the drag began (its sides along the screen's right and
   // up, laid on the ground); everything whose middle is inside goes: homes and shops with all built on or off them, the
@@ -3438,7 +3505,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     { const vk = camT.x.toFixed(3) + ',' + camT.z.toFixed(3) + ',' + yaw.toFixed(4) + ',' + zoom.toFixed(3) + ',' + pitch.toFixed(4);
       const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.zkinds.izone, PL.zkinds.lzone, PL.rot, DSEL ? DSEL.key : '-', PTH.style, GR.size, GR.style, GR.pstyle, GR.istyle, PL.zoneFol, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
       if (gk !== ghostKey || (vk !== ghostVK && fNo % 3 === 0) || (vk !== ghostVK && vk === lastVK)){ ghostKey = gk; ghostVK = vk;   // (the view moving alone: every third frame, and once more when it settles)   // (the ghost is worked out again only when something it shows has changed: the raycasts and checks are the costly part)
-        hlClear();
+        hlClear(); if (PL.kind !== 'path') pathHover(null);
         if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'path') showPath(); else if (PL.kind === 'del') showDel(); else if (PL.kind === 'grass') showGrass(); else if (isZone(PL.kind) && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } lastVK = vk; }
     q = tk('ghost', q);
     animTick(dt); rotorTick(dt); agentTick(dt); const batched = batchTick();

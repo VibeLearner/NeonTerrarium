@@ -193,7 +193,7 @@ function syncTimeUI(){
   const label = fmt(S.hour)+'|'+phaseName(S.hour)+'|'+W+'|'+H;
   if (label === lastLabel) return; lastLabel = label;
   $('clock').textContent = fmt(S.hour); $('phase').textContent = phaseName(S.hour);
-  $('readout').textContent = fmt(S.hour)+' · '+phaseName(S.hour)+(S.rain?' · Rain':'')+' · '+W+'×'+H;
+  $('readout').textContent = fmt(S.hour)+' · '+phaseName(S.hour)+(S.rain?' · Rain':'');
   if (document.activeElement !== $('hour')) $('hour').value = S.hour;
 }
 function setPresetActive(btn){ document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', b === btn)); }

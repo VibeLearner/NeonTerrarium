@@ -60,6 +60,7 @@ function frameBody(now){
   PH.lap('megastructures, animations');
   updatePeople(dt*FF.ppl, FF.peopleTime(rdt, now/1000));   // (fast forward: the people's own clock runs quicker too)
   STORY.tick(rdt);   // story moments, the shape of the day, the monitor's log (story.js)
+  if (typeof WIRELOG !== 'undefined') WIRELOG.tick(rdt);   // the transmission log, once the Wire Nest has come (wirelog.js)
   PH.lap('people');
   music.update(rdt);
   updateSteam(dt, night);

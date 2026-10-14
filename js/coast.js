@@ -333,13 +333,14 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       if (v && this.shop && !(v > .2 && v < .4)) v = .09 + .03*this.shop;   // (a shop: its windows and glass lit in its own light (.12, .15, .18), not the homes' gold)
       if (v) (this.gl || (this.gl = [])).push(n0, this.p.length/3 - n0, v); }
     add(geo, m, col){
+      if (this.remap){ const c2 = this.remap.get(col); if (c2) col = c2; }   // (a building's own shade of a shared color)
       // (on a home or a link, a leafy blob isn't drawn as a blob: it's noted, where it is and its size and shape, and grown
       // as real foliage instead; see folGeo)
       if (this.fol && LEAFC.has(col) && (geo === GEO.ico || geo === GEO.cone8)){ const e = m.elements, sx = Math.hypot(e[0], e[1], e[2]), sy = Math.hypot(e[4], e[5], e[6]), sz = Math.hypot(e[8], e[9], e[10]);
         this.fol.push([geo === GEO.cone8 ? 3 : sy > sx*1.5 ? 2 : sx > .38 ? 1 : 0, e[12], e[13], e[14], sx, sy, sz]); return; }
       const g = geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(m); const a = g.attributes.position.array, n0 = this.p.length/3;
       for (let i = 0; i < a.length; i += 3){ this.p.push(a[i], a[i + 1], a[i + 2]); this.c.push(col.r, col.g, col.b); } g.dispose(); this.glowRun(n0, col); }
-    quad(a, b, c, d, col){ const n0 = this.p.length/3; for (const v of [a, b, c, a, c, d]){ this.p.push(v[0], v[1], v[2]); this.c.push(col.r, col.g, col.b); } this.glowRun(n0, col); }
+    quad(a, b, c, d, col){ if (this.remap){ const c2 = this.remap.get(col); if (c2) col = c2; } const n0 = this.p.length/3; for (const v of [a, b, c, a, c, d]){ this.p.push(v[0], v[1], v[2]); this.c.push(col.r, col.g, col.b); } this.glowRun(n0, col); }
     geo(){ const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3)); g.computeVertexNormals();
       if (this.gl){ const a = new Float32Array(this.p.length/3); for (let i = 0; i < this.gl.length; i += 3) a.fill(this.gl[i + 2], this.gl[i], this.gl[i] + this.gl[i + 1]); g.setAttribute('glow', new THREE.BufferAttribute(a, 1)); }
       return g; }
@@ -1687,6 +1688,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       return y0 + .4 + H + rr*.7; } },
   };
   // COM: a shop (the commercial zone's); SOLO: one that stands alone on the ground (nothing stacks on it, it stacks on nothing)
+  // industry's blues: each building lit in one shade of neon blue, picked by its seed (its rails, rings, lights and the
+  // blue-white of its windows together): ice cyan, cyan, azure, cornflower
+  const IND_SHADES = [[0x7fe9ff, 0xdaf8ff], [0x2fcfff, 0xc6f0ff], [0x4f98ff, 0xcfe0ff], [0x7a80ff, 0xdcdcff]].map(([b, w]) => {
+    const B = C(b).multiplyScalar(1.1), W = C(w).multiplyScalar(1.05); GLOW.set(B, .25).set(W, .25); return new Map([[HP.indBlue, B], [HP.indWhite, W]]); });
+  const indShade = seed => (Math.imul(seed | 0, 2246822519) >>> 0) % IND_SHADES.length;
   const COM = k => !!(KINDS[k] && KINDS[k].com), SOLO = k => !!(KINDS[k] && KINDS[k].solo), RES_KEYS = Object.keys(KINDS).filter(k => !KINDS[k].com && !KINDS[k].ind), COM_KEYS = Object.keys(KINDS).filter(k => KINDS[k].com), IND_KEYS = Object.keys(KINDS).filter(k => KINDS[k].ind), IND = k => !!(KINDS[k] && KINDS[k].ind);
   const KIND_KEYS = Object.keys(KINDS);
   // ---- outlines (seen from above): convex hulls, placed in the world, tested against each other ----
@@ -1796,7 +1802,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     return G.I.length ? G.mesh() : null; }
   const geoCache = new Map();
   function blockOf(kind, seed, below, above){ const key = kind + ':' + seed + ':' + (below ? 1 : 0) + (above ? 1 : 0); let g = geoCache.get(key); if (g) return g;
-    const T = new Tris(true, shopOf(kind, seed)), k = KIND_KEYS.indexOf(kind) + 1, R = rng(Math.imul(seed, 2654435761) ^ k*97), D = rng(Math.imul(seed, 1597334677) ^ k*131);
+    const T = new Tris(true, shopOf(kind, seed)), k = KIND_KEYS.indexOf(kind) + 1; if (KINDS[kind].ind) T.remap = IND_SHADES[indShade(seed)]; const R = rng(Math.imul(seed, 2654435761) ^ k*97), D = rng(Math.imul(seed, 1597334677) ^ k*131);
     const cx_ = { below, above }, top = KINDS[kind].build(T, R, D, cx_), cut = below ? .1 : .6, pts = [];
     let hmax = top; for (let i = 0; i < T.p.length; i += 3){ if (T.p[i + 1] > hmax) hmax = T.p[i + 1]; if (T.p[i + 1] > cut) pts.push([T.p[i], T.p[i + 2]]); }
     g = { geo: T.geo(), fol: folGeo(T.fol), top, hull: hull2(pts), h: hmax, hub: cx_.hub }; geoCache.set(key, g);
@@ -1854,14 +1860,14 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // (the wind up at the hub isn't the wind at the ground: it veers with height (the Ekman spiral), and here it's turned
   // so the rotors face the usual view three-quarters on, their blades reading as a wheel and not a line)
   const ROTORS = new Set(), WIND_YAW = HOME.yaw - .45;
-  const rotorGeo = (() => { const N = new Tris(), B = new Tris();
+  const rotorGeo = IND_SHADES.map(sh => { const N = new Tris(), B = new Tris(); N.remap = B.remap = sh;
     N.add(GEO.box, mat(0, 0, -.25, 0, 0, 0, .7, .7, 2.0), HP.white); N.add(GEO.box, mat(0, -.3, -.25, 0, 0, 0, .72, .1, 2.02), HP.metal); N.add(GEO.box, mat(0, .1, -1.27, 0, 0, 0, .5, .3, .05), HP.indBlue);
     B.add(GEO.cone8, mat(0, 0, .95, PI/2, 0, 0, .38, .7, .38), HP.white);
     for (let k = 0; k < 3; k++){ const a = k/3*PI*2, L = 6.2, n = 5;
       for (let i = 0; i < n; i++){ const t0 = i/n, t1 = (i + 1)/n, r0 = .3 + L*t0, r1 = .3 + L*t1, w = .42 - .3*(t0 + t1)/2;
         B.add(GEO.box, mat(Math.sin(a)*(r0 + r1)/2, Math.cos(a)*(r0 + r1)/2, .75, 0, .12, -a, w, r1 - r0 + .02, .07), i === n - 1 ? HP.indBlue : HP.white); } }
-    return { n: N.geo(), b: B.geo() }; })();
-  function makeRotor(p, hub){ const g = new THREE.Group(), n = new THREE.Mesh(rotorGeo.n, pieceM), b = new THREE.Mesh(rotorGeo.b, pieceM);
+    return { n: N.geo(), b: B.geo() }; });
+  function makeRotor(p, hub){ const rg = rotorGeo[indShade(p.seed)], g = new THREE.Group(), n = new THREE.Mesh(rg.n, pieceM), b = new THREE.Mesh(rg.b, pieceM);
     for (const m of [n, b]){ m.receiveShadow = true; m.castShadow = false; m.raycast = () => {}; g.add(m); }
     g.position.set(p.x, p.y + hub + .2, p.z); g.rotation.y = WIND_YAW; g.userData.spin = b; b.rotation.z = (p.seed % 7)*.9; return g; }
   function rotorTick(dt){ for (const g of ROTORS) g.userData.spin.rotation.z -= dt*.55; }

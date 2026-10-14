@@ -1606,17 +1606,21 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     // The smart field: a plot of dark soil in beds, rows of crops (lettuce heads, a taller grain), the beds edged and divided
     // by rails of glowing blue (the board's grid of light), sensor posts at the corners, an irrigation pipe along one side.
     field: { name: 'Smart field', ind: true, solo: true, r: 4.6, rb: 4.1, build(T, R, D, ctx){
-      // a 4 x 4 grid of plots, each its own crop, each edged in glowing blue; paved lanes between them and round them, wide
-      // enough for the harvesters to drive (FIELD gives the layout to the machines)
+      // (FIELD gives the layout to the machines)
       const y0 = .12, { P, Ln, E, S } = FIELD, CROPS = [[C(0x5f8f3e), C(0x76a64a)], [C(0x8fa83c), C(0xb5c060)], [C(0x3f7d5c), C(0x5a9a74)], [C(0x6f9a3a), C(0x9fb850)]];
-      box(T, 0, .06, 0, S + .2, .12, S + .2, HP.stone); box(T, 0, y0 + .02, 0, S, .04, S, C(0xc9c2b2));   // (the paving: lanes and margin)
-      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++){ const cx = FIELD.c(i), cz = FIELD.c(j), [c1, c2] = R.pick(CROPS), grain = R.chance(.3);
-        box(T, cx, y0 + .06, cz, P, .08, P, HP.soil);
-        for (let r_ = 0; r_ < 3; r_++){ const z = cz - P/2 + .2 + r_*(P - .4)/2;
-          for (let x = cx - P/2 + .16; x <= cx + P/2 - .14; x += grain ? .12 : .2){
+      // one big plot: soil edge to edge inside the margin, crop rows across it in bands of one crop, with three tracks of bare
+      // soil through it where the harvesters drive (FIELD.lane), and one glowing blue border round it all
+      const I = S/2 - E, onTrack = u => [0, 1, 2].some(k => Math.abs(u - FIELD.lane(k)) < Ln/2 - .04);
+      box(T, 0, .06, 0, S + .2, .12, S + .2, HP.stone); box(T, 0, y0 + .02, 0, S, .04, S, C(0xc9c2b2));
+      box(T, 0, y0 + .06, 0, 2*I, .08, 2*I, HP.soil);
+      for (let k = 0; k < 3; k++) box(T, FIELD.lane(k), y0 + .065, 0, Ln - .1, .08, 2*I - .02, HP.soil2);   // (the tracks: darker, packed)
+      const bands = 4, rowsPer = 4;
+      for (let bI = 0; bI < bands; bI++){ const [c1, c2] = R.pick(CROPS), grain = R.chance(.3);
+        for (let r_ = 0; r_ < rowsPer; r_++){ const z = -I + .2 + (bI*rowsPer + r_)*(2*I - .4)/(bands*rowsPer - 1);
+          for (let x = -I + .15; x <= I - .12; x += grain ? .12 : .2){ if (onTrack(x)) continue;
             if (grain) box(T, x, y0 + .22, z, .04, .24 + D.r(0, .05), .04, D.chance(.5) ? c1 : c2);
-            else T.add(GEO.ico, mat(x, y0 + .16, z, 0, D.r(0, 3), 0, .09, .07, .09), D.chance(.5) ? c1 : c2); } }
-        for (const [x, z, lx, lz] of [[cx, cz - P/2 - .03, P + .1, .05], [cx, cz + P/2 + .03, P + .1, .05], [cx - P/2 - .03, cz, .05, P + .1], [cx + P/2 + .03, cz, .05, P + .1]]) box(T, x, y0 + .1, z, lx, .05, lz, HP.indBlue); }
+            else T.add(GEO.ico, mat(x, y0 + .16, z, 0, D.r(0, 3), 0, .09, .07, .09), D.chance(.5) ? c1 : c2); } } }
+      for (const [x, z, lx, lz] of [[0, -I - .04, 2*I + .12, .06], [0, I + .04, 2*I + .12, .06], [-I - .04, 0, .06, 2*I + .12], [I + .04, 0, .06, 2*I + .12]]) box(T, x, y0 + .1, z, lx, .06, lz, HP.indBlue);
       for (let k = 0; k < 3; k++){ const l = FIELD.lane(k); for (let q = -1; q <= 1; q += 2) box(T, l, y0 + .05, q*(S/2 - .1), .04, .02, .2, HP.white); }   // (lane markings at the ends)
       for (const sx of [-1, 1]) for (const sz of [-1, 1]){ T.add(GEO.cyl5, mat(sx*(S/2 - .05), y0 + .5, sz*(S/2 - .05), 0, 0, 0, .04, 1.0, .04), HP.metal); box(T, sx*(S/2 - .05), y0 + 1.02, sz*(S/2 - .05), .12, .07, .12, HP.indBlue); }
       return y0 + .3; } },

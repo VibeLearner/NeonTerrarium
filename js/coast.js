@@ -242,13 +242,31 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // foliage in the wind: each vertex knows how far up its blade it is (aH, in units); it's pushed downwind by the square of
   // that, by a steady lean, by gusts that roll across the field in long waves, and by a quick flutter of its own; and it
   // dips a little as it bends, so the blade keeps its length. (The sway is applied before the bend: the mesh is in world units)
-  const SWAY_V = 'attribute float aH; uniform float wTime;\n';
+  // The wind, as it moves over a liquid (Paquier, Moisy and Rabaud's "turbulent windprint"; cat's paws): below the onset of
+  // waves, gusts only wrinkle the surface, in disordered streaks drawn out along the wind and carried downwind with it;
+  // where a gust is strong enough, a patch of regular ripples grows (the shear instability), crests across the wind,
+  // running downwind, and fades as the gust passes. The grass is treated as that liquid: windPaw() is the strength of the
+  // gust at a place (0 calm, 1 a full cat's paw), and windCrest() the ripple crests inside it. Both the sway and the glow
+  // by night follow them, so what glows is what the wind is stirring.
+  const WIND_GLSL = `
+    float wHn(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
+    float wVn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
+      return mix(mix(wHn(i), wHn(i + vec2(1.0, 0.0)), f.x), mix(wHn(i + vec2(0.0, 1.0)), wHn(i + vec2(1.0, 1.0)), f.x), f.y); }
+    float windPaw(vec2 q, float t){ vec2 wd = vec2(0.83, 0.55), wn = vec2(-0.55, 0.83);
+      vec2 p = vec2(dot(q, wd) - t*1.5, dot(q, wn));   // (carried downwind)
+      float n = 0.62*wVn(p*vec2(0.1, 0.24) + vec2(0.0, t*0.04)) + 0.38*wVn(p*vec2(0.23, 0.52) + vec2(t*0.09, 5.3));   // (drawn out along the wind; slowly changing)
+      return smoothstep(0.44, 0.76, n); }
+    float windCrest(vec2 q, float t){ return 0.5 + 0.5*sin(dot(q, vec2(0.83, 0.55))*5.5 - t*4.2 + 1.3*wVn(q*0.9)); }
+  `;
+  const SWAY_V = 'attribute float aH; attribute vec3 aG; uniform float wTime; varying float vGl; varying vec3 vGc;\n' + WIND_GLSL;
   const SWAY = `{ vec2 wd = vec2(0.83, 0.55); vec4 wq_ = vec4(transformed, 1.0); float sc_ = 1.0;
       #ifdef USE_INSTANCING
         wq_ = instanceMatrix*wq_; sc_ = length(instanceMatrix[0].xyz);
       #endif
       vec2 q = (modelMatrix*wq_).xz; float ph = dot(q, wd)*0.32 - wTime*1.25;
-      float gust = 0.5 + 0.5*sin(ph) + 0.22*sin(ph*2.3 + q.x*0.7 - q.y*0.4);
+      float paw = windPaw(q, wTime), crest = windCrest(q, wTime);
+      float gust = 0.3 + 0.3*sin(ph) + 0.12*sin(ph*2.3 + q.x*0.7 - q.y*0.4) + 0.75*paw*(0.75 + 0.25*crest);
+      vGc = aG; vGl = paw*(0.45 + 0.55*crest)*smoothstep(0.08, 0.5, aH);   // (the tips glow, where the gust is)
       float flut = sin(wTime*4.1 + q.x*3.1 + q.y*2.3) + 0.5*sin(wTime*6.3 + q.x*5.0 - q.y*4.1);
       float hw = aH*sc_, k = hw*hw;
       vec2 d = wd*(0.08 + 0.3*gust*gust)*k + vec2(-wd.y, wd.x)*flut*0.035*k;
@@ -263,6 +281,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       Object.assign(sh.uniforms, CURV); if (paint) Object.assign(sh.uniforms, paint); if (sway) Object.assign(sh.uniforms, sway);
       sh.vertexShader = 'uniform vec2 ctr, fwd; uniform float curveK, g0; varying float vG; varying vec3 vWq;\n' + (glow ? GLOW_V : '') + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BEND + (glow ? '\n vGlow = glow;' : ''));
       if (sway){ sh.vertexShader = SWAY_V + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + SWAY);
+        // (by night, the wind's glow: stepped into a few washes, faint)
+        sh.fragmentShader = 'varying float vGl; varying vec3 vGc;\n' + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb += vGc*(floor(vGl*3.0 + 0.35)/3.0)*0.75*nightK;\n#include <fog_fragment>');
         sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal = normal * faceDirection;', '')); }
       if (glow) sh.fragmentShader = GLOW_F + sh.fragmentShader.replace('#include <fog_fragment>', GLOW_APPLY + '\n#include <fog_fragment>');
       if (paint) sh.fragmentShader = PAINT_F + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + PAINT_APPLY);
@@ -1585,15 +1605,18 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const gU = { wTime: { value: 0 } };
   const grassM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true, side: THREE.DoubleSide }), true, false, false, null, gU);
   // (a sage, blue-leaning green, set apart from the meadow's yellow-green and kin to the homes' teal; warm ochre and cream at the tips)
+  // the wind's glow by night (see WIND_GLSL): the meadow and the homes' plants a pale foxfire green, kin to the sage
+  const WGLOW = [.58, 1.0, .72];
   const GG = { greenA: [.37, .57, .38], greenB: [.29, .49, .38], greenC: [.5, .65, .42], dry: [.74, .66, .42], tip: [.92, .91, .7], fern: [.27, .49, .38], reed: [.76, .66, .44], head: [.88, .74, .5] };
   const FLOWERS = [[.95, .55, .42], [.96, .74, .76], [.72, .63, .88], [.99, .86, .46], [.97, .95, .9], [.93, .45, .52]];
   // a little indexed-mesh builder: positions, normals (mostly up, so a blade is lit like the meadow, whichever side shows),
   // colors, and aH
-  class GB { constructor(){ this.P = []; this.N = []; this.C = []; this.H = []; this.I = []; }
-    v(x, y, z, nx, ny, nz, c, h){ this.P.push(x, y, z); const l = Math.hypot(nx, ny, nz) || 1; this.N.push(nx/l, ny/l, nz/l); this.C.push(c[0], c[1], c[2]); this.H.push(h); return this.P.length/3 - 1; }
+  // (gc: the glow color the vertices made next take, for the wind's glow by night (see SWAY); black is none)
+  class GB { constructor(gc = null){ this.P = []; this.N = []; this.C = []; this.H = []; this.I = []; this.GL = []; this.gc = gc || [0, 0, 0]; }
+    v(x, y, z, nx, ny, nz, c, h){ this.P.push(x, y, z); const l = Math.hypot(nx, ny, nz) || 1; this.N.push(nx/l, ny/l, nz/l); this.C.push(c[0], c[1], c[2]); this.H.push(h); this.GL.push(this.gc[0], this.gc[1], this.gc[2]); return this.P.length/3 - 1; }
     tri(a, b, c){ this.I.push(a, b, c); }
     mesh(){ const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(this.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.N, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(this.C, 3)); g.setAttribute('aH', new THREE.Float32BufferAttribute(this.H, 1)); g.setIndex(this.I); return g; } }
+      g.setAttribute('color', new THREE.Float32BufferAttribute(this.C, 3)); g.setAttribute('aH', new THREE.Float32BufferAttribute(this.H, 1)); g.setAttribute('aG', new THREE.Float32BufferAttribute(this.GL, 3)); g.setIndex(this.I); return g; } }
   const mix3 = (a, b, t) => [a[0] + (b[0] - a[0])*t, a[1] + (b[1] - a[1])*t, a[2] + (b[2] - a[2])*t];
   const mul3 = (a, k, cool = 0) => [a[0]*k*(1 - cool*.2), a[1]*k, a[2]*k*(1 + cool*.25)];
   // one blade: from its root up a gentle curve, leaning one way, tapering to a point; nSeg segments
@@ -1629,7 +1652,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // the cypresses
   const VINE = [[.3, .55, .36], [.36, .6, .34], [.26, .5, .38]];
   function folGeo(fol){
-    if (!fol || !fol.length) return null; const G = new GB();
+    if (!fol || !fol.length) return null; const G = new GB(WGLOW);
     for (const [k, x, y, z, sx, sy, sz] of fol){ const R = rng((Math.imul(Math.round(x*97), 73856093) ^ Math.imul(Math.round(z*89), 19349663) ^ Math.imul(Math.round(y*71), 83492791)) >>> 0);
       const base = mix3(R.chance(.5) ? GG.greenA : GG.greenC, GG.greenB, R.r(.3, .7)), tip = mix3(GG.tip, base, .55);   // (a shade deeper than the meadow's: plants against pale walls)
       if (k === 0 && R.chance(.3)){ const y0 = y - sy*.5, n = R.i(6, 9), a0 = R.r(0, 6.28), fc = mix3(GG.fern, base, .5);   // (a little fern, spilling over)
@@ -1681,7 +1704,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const regKey = p => Math.floor(p.x/HB.size) + ',' + Math.floor(p.z/HB.size);
   function mergeInto(geos, indexed){
     let nv = 0, ni = 0; for (const [g] of geos){ nv += g.attributes.position.count; if (indexed) ni += g.index.count; }
-    const P = new Float32Array(nv*3), N = new Float32Array(nv*3), Cc = new Float32Array(nv*3), X = new Float32Array(nv), I = indexed ? new Uint32Array(ni) : null;
+    const P = new Float32Array(nv*3), N = new Float32Array(nv*3), Cc = new Float32Array(nv*3), X = new Float32Array(nv), I = indexed ? new Uint32Array(ni) : null, GLc = indexed ? new Float32Array(nv*3) : null;
     let o = 0, oi = 0;
     for (const [g, M] of geos){ const pa = g.attributes.position.array, na = g.attributes.normal.array, ca = g.attributes.color.array, xa = indexed ? g.attributes.aH.array : g.attributes.glow ? g.attributes.glow.array : null, n = g.attributes.position.count;
       if (!M){ P.set(pa, o*3); N.set(na, o*3); }
@@ -1690,11 +1713,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
           P[w] = e[0]*x + e[4]*y + e[8]*z + e[12]; P[w + 1] = e[1]*x + e[5]*y + e[9]*z + e[13]; P[w + 2] = e[2]*x + e[6]*y + e[10]*z + e[14];
           const nx = na[a], ny = na[a + 1], nz = na[a + 2]; N[w] = e[0]*nx + e[4]*ny + e[8]*nz; N[w + 1] = e[1]*nx + e[5]*ny + e[9]*nz; N[w + 2] = e[2]*nx + e[6]*ny + e[10]*nz; } }
       if (xa) X.set(xa, o);
-      Cc.set(ca, o*3);
+      Cc.set(ca, o*3); if (GLc && g.attributes.aG) GLc.set(g.attributes.aG.array, o*3);
       if (indexed){ const ia = g.index.array; for (let k = 0; k < ia.length; k++) I[oi + k] = ia[k] + o; oi += ia.length; }
       o += n; }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('color', new THREE.BufferAttribute(Cc, 3));
-    g.setAttribute(indexed ? 'aH' : 'glow', new THREE.BufferAttribute(X, 1)); if (indexed) g.setIndex(new THREE.BufferAttribute(I, 1));
+    g.setAttribute(indexed ? 'aH' : 'glow', new THREE.BufferAttribute(X, 1)); if (indexed){ g.setIndex(new THREE.BufferAttribute(I, 1)); g.setAttribute('aG', new THREE.BufferAttribute(GLc, 3)); }
     g.computeBoundingSphere(); if (indexed) g.boundingSphere.radius += .6; return g; }
   function buildBatch(key){
     const old = HB.map.get(key); if (old){ for (const m of old){ scene.remove(m); m.geometry.dispose(); } HB.map.delete(key); }
@@ -2068,6 +2091,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const tufts = new Map(), gSquares = new Map(), gDirty = new Set(), tdata = new Map();
   const sqKey = (i, j) => Math.floor(i*GC/GSQ) + ',' + Math.floor(j*GC/GSQ);
   try { for (const [i, j, st] of JSON.parse(localStorage.getItem(GRASS_KEY) || '[]')){ tufts.set(i + ',' + j, [i, j, st]); gDirty.add(sqKey(i, j)); } } catch (e) {}
+  let PLOAD = []; try { PLOAD = JSON.parse(localStorage.getItem('neonIsland.coast.plants') || '[]'); } catch (e) {}   // (the trees; taken in once their layer is made, below)
   let gSaveT = 0; const saveGrass = () => { clearTimeout(gSaveT); gSaveT = setTimeout(() => { try { localStorage.setItem(GRASS_KEY, JSON.stringify([...tufts.values()])); } catch (e) {} }, 400); };
   // can a tuft grow here: on land, back from the cliff's edge, not steep, not inside a home
   function grassOK(x, z){ if ((coastX(z) - x)*rowCos(z) < 1.1) return null; const y = heightAt(x, z);
@@ -2093,10 +2117,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // Leaves are small diamonds laid over the crown's shape, facing out, dark beneath and catching light on top. Colored from
   // a palette of a leaf color, a tip (light) color and an accent, plus bark.
   const COMPAL = {
-    seaglass: { leaf: [.3, .52, .55], tip: [.64, .82, .78], acc: [.4, .6, .7], bark: [.36, .31, .3] },   // (cool blue-green and silver: the far side of the wheel from rust and rose)
-    chartreuse: { leaf: [.42, .6, .22], tip: [.84, .9, .42], acc: [.6, .72, .24], bark: [.4, .33, .25] },   // (lime and olive: yellow-green, the complement of magenta)
-    indigo: { leaf: [.24, .27, .5], tip: [.62, .67, .84], acc: [.34, .44, .66], bark: [.3, .28, .32] },   // (deep blue-violet with silver: a night garden)
-    gold: { leaf: [.66, .52, .2], tip: [.96, .84, .46], acc: [.44, .48, .24], bark: [.38, .3, .24] } };   // (ochre gold and olive: autumn in the market)
+    // (glow: its light by night, when the wind stirs it; each a lighter, cooler-or-warmer kin of its leaves, none pink)
+    seaglass: { leaf: [.3, .52, .55], tip: [.64, .82, .78], acc: [.4, .6, .7], bark: [.36, .31, .3], glow: [.3, .6, .74] },   // (cool blue-green and silver; glows aqua)
+    indigo: { leaf: [.24, .27, .5], tip: [.62, .67, .84], acc: [.34, .44, .66], bark: [.3, .28, .32], glow: [.44, .46, .8] },   // (deep blue-violet with silver; glows periwinkle)
+    gold: { leaf: [.66, .52, .2], tip: [.96, .84, .46], acc: [.44, .48, .24], bark: [.38, .3, .24], glow: [.66, .52, .26] } };   // (ochre gold and olive; glows amber, like fireflies)
+  const COMPALS = ['seaglass', 'indigo', 'gold'];
   const COMKINDS = ['parasol tree', 'street tree', 'column shrub', 'bamboo', 'sword plants'];
   function leafD(G, x, y, z, nx, ny, nz, s, col, h){ const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
     let ux = -nz, uy = 0, uz = nx; const ul = Math.hypot(ux, uz) || 1; ux /= ul; uz /= ul; const vx = ny*uz - nz*uy, vy = nz*ux - nx*uz, vz = nx*uy - ny*ux;
@@ -2106,23 +2131,24 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (let k = 0; k < n; k++){ const th = R.r(0, 6.28), ph = Math.acos(R.r(-.75, 1)), q = R.r(.7, 1.02), dx = Math.sin(ph)*Math.cos(th), dy = Math.cos(ph), dz = Math.sin(ph)*Math.sin(th);
       const x = cx + dx*rx*q, y = cy + dy*ry*q, z = cz + dz*rz*q, up = (dy + 1)/2, col = mix3(mix3(mul3(P.leaf, .62, .5), P.leaf, smooth(0, .5, up)), P.tip, smooth(.55, 1, up)*R.r(.5, 1));
       leafD(G, x, y, z, dx + R.r(-.4, .4), dy + .5 + R.r(-.3, .3), dz + R.r(-.4, .4), R.r(.05, .08), R.chance(.12) ? mix3(col, P.acc, .6) : col, h0 + (y - cy) + ry); } }
-  function trunkG(G, x0, z0, x1, h, r0, r1, col, segs = 4){ let prev = null;
+  function trunkG(G, x0, z0, x1, h, r0, r1, col, segs = 4){ let prev = null; const gc0 = G.gc; G.gc = [0, 0, 0];   // (bark doesn't glow)
     for (let k = 0; k <= segs; k++){ const t = k/segs, y = h*t, x = x0 + (x1 - x0)*t*t, r = r0 + (r1 - r0)*t, ring_ = [];
       for (let m = 0; m < 5; m++){ const a = m/5*6.28; ring_.push(G.v(x + Math.cos(a)*r, y, z0 + Math.sin(a)*r, Math.cos(a), 0, Math.sin(a), mul3(col, .85 + .15*t), y)); }
-      if (prev) for (let m = 0; m < 5; m++){ const m2 = (m + 1) % 5; G.tri(prev[m], ring_[m2], ring_[m]); G.tri(prev[m], prev[m2], ring_[m2]); } prev = ring_; } }
+      if (prev) for (let m = 0; m < 5; m++){ const m2 = (m + 1) % 5; G.tri(prev[m], ring_[m2], ring_[m]); G.tri(prev[m], prev[m2], ring_[m2]); } prev = ring_; } G.gc = gc0; }
   function comPlant(G, R, x, y, z, kind, P){
+    G.gc = P.glow;
     if (kind === 0){ const lean = R.r(.08, .2), th = R.r(.7, .85); trunkG(G, x, z, x + lean, th, .045, .03, P.bark);
       crown(G, R, x + lean, y + th + .1, z, R.r(.42, .52), .16, R.r(.38, .48), 260, P, th - .1); crown(G, R, x + lean*.7 - .08, y + th - .08, z + .06, .26, .1, .24, 70, P, th - .3); }
     else if (kind === 1){ const th = R.r(.5, .62); trunkG(G, x, z, x, th, .035, .028, P.bark); crown(G, R, x, y + th + .2, z, .28, .26, .28, 190, P, th); }
     else if (kind === 2){ const hh = R.r(.42, .55); crown(G, R, x, y + hh + .02, z, .15, hh, .15, 170, P, 0); trunkG(G, x, z, x, .08, .03, .03, P.bark, 1); }
     else if (kind === 3){ const n = R.i(5, 8);
       for (let k = 0; k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .13), bx = x + Math.cos(a)*rr, bz = z + Math.sin(a)*rr, L = R.r(.75, 1.15), lean = R.r(.02, .1), la = R.r(0, 6.28), cane = mix3(P.acc, P.tip, R.r(0, .35));
-        const top = blade(G, bx, y, bz, la, L, .045, lean, mul3(cane, .8), cane, 6);
+        G.gc = [0, 0, 0]; const top = blade(G, bx, y, bz, la, L, .045, lean, mul3(cane, .8), cane, 6); G.gc = P.glow;
         for (let j = 3; j <= 6; j++){ const t = j/6, px = bx + Math.cos(la)*lean*L*Math.pow(t, 1.7), pz = bz + Math.sin(la)*lean*L*Math.pow(t, 1.7), py = y + L*t*.97;
           for (let m = 0; m < 2; m++) blade(G, px, py, pz, R.r(0, 6.28), R.r(.12, .2), .045, R.r(1.1, 1.6), P.leaf, P.tip, 2); } } }
     else { const n = R.i(7, 11);
       for (let k = 0; k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .1), c = R.chance(.3) ? mix3(P.leaf, P.acc, .7) : P.leaf;
-        blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a, R.r(.38, .72), R.r(.09, .13), R.r(.03, .14), mul3(c, .75), mix3(c, P.tip, .7), 4); } } }
+        blade(G, x + Math.cos(a)*rr, y, z + Math.sin(a)*rr, a, R.r(.55, .95), R.r(.11, .16), R.r(.03, .14), mul3(c, .75), mix3(c, P.tip, .7), 4); } } }
   const comFolGeo = (kind, pal, seed = 1) => { const G = new GB(); comPlant(G, rng(seed*7919 + kind*31 + 5), 0, 0, 0, kind, COMPAL[pal]); return G.mesh(); };
 
   /* ---------- the grass as copies: a few tufts of each kind made once, stamped everywhere ---------- */
@@ -2130,7 +2156,37 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // and tinted by where it grows (the watercolor washes of greens and dry ochre, as before), so a meadow is a handful of
   // draws whatever its size, and painting only adds a copy. Under each, a ragged darker blot of ground (one shape, copied).
   const GV = 5, VBASE = GG.greenA, VTIP = mix3(GG.tip, GG.greenA, .35), VAR = [];
-  for (let st = 0; st < 4; st++){ VAR.push([]); for (let v = 0; v < GV; v++){ const G = new GB(), R = rng(st*7919 + v*104729 + 11); plantOf(G, R, 0, 0, 0, st, VBASE, VTIP, R.r(.15, .45)); VAR[st].push(G.mesh()); } }
+  for (let st = 0; st < 4; st++){ VAR.push([]); for (let v = 0; v < GV; v++){ const G = new GB(WGLOW), R = rng(st*7919 + v*104729 + 11); plantOf(G, R, 0, 0, 0, st, VBASE, VTIP, R.r(.15, .45)); VAR[st].push(G.mesh()); } }
+  /* ---------- the commercial zone's trees and plants: a layer of their own, over or under the grass ---------- */
+  // On a coarser grid than the grass (cells of PC units, a plant in most), kept apart from it, so the grass can be painted
+  // under the trees and the trees over the grass. Each plant is a copy of one of PV made at load for each kind and palette
+  // (the 3D plant up close, a card far off, as the grass); the palette is laid on in drifts, sea-glass, indigo and gold
+  // running into each other across an area.
+  const PLANT_KEY = 'neonIsland.coast.plants', PC = 1.6, PV = 3, PSTYLES = [...COMKINDS, 'mix'];
+  const PVAR = COMKINDS.map((_, k) => COMPALS.map((pal, pi) => [...Array(PV)].map((_, v) => { const G = new GB(); comPlant(G, rng(k*7919 + pi*104729 + v*31 + 3), 0, 0, 0, k, COMPAL[pal]); return G.mesh(); })));
+  const plants = new Map(), pdata = new Map();
+  const pSqKey = (i, j) => Math.floor(i*PC/GSQ) + ',' + Math.floor(j*PC/GSQ);
+  for (const [i, j, k] of PLOAD){ plants.set(i + ',' + j, [i, j, k]); gDirty.add(pSqKey(i, j)); }
+  let pSaveT = 0; const savePlants = () => { clearTimeout(pSaveT); pSaveT = setTimeout(() => { try { localStorage.setItem(PLANT_KEY, JSON.stringify([...plants.values()])); } catch (e) {} }, 400); };
+  // which kind grows where, in the mix: trees in groves, columns and swords along their edges, bamboo in clumps
+  function mixPlant(i, j){ const x = i*PC, z = j*PC, n = fbm(x*.13 + 31, z*.13 - 8), m = fbm(x*.31 - 2, z*.31 + 17), h = hash2(i*7 + 3, j*11 + 1);
+    if (n > .58) return h < .5 ? 0 : 1; if (m > .62) return 3; if (n < .36) return h < .55 ? 4 : 2; return h < .5 ? 2 : h < .8 ? 1 : 4; }
+  function plantRec(i, j, kind){
+    const k = i + ',' + j; let r = pdata.get(k); if (r !== undefined) return r;
+    const R = rng((Math.imul(i, 83492791) ^ Math.imul(j, 19349663) ^ 0x5bd1) >>> 0), x = (i + R.r(.25, .75))*PC, z = (j + R.r(.25, .75))*PC, y = grassOK(x, z);
+    const roomy = y !== null && [0, 1, 2, 3].every(q => { const a = q*PI/2 + .7; return !solidAt(x + Math.cos(a)*.4, z + Math.sin(a)*.4, y - .2, y + 1.2); });   // (a crown keeps clear of walls)
+    if (!roomy){ pdata.set(k, null); return null; }
+    const d = fbm(x*.08 - 13, z*.08 + 21) + (R.f() - .5)*.12, pal = d < .46 ? 0 : d < .56 ? 1 : 2;
+    r = { x, y, z, kind, pal, v: R.i(0, PV - 1), rot: R.r(0, PI*2), s: R.r(.88, 1.12), tint: [1, 1, 1], plant: true };
+    pdata.set(k, r); return r; }
+  function paintPlants(cx, cz, r, style, erase){
+    let any = false;
+    for (let i = Math.floor((cx - r)/PC); i <= Math.ceil((cx + r)/PC); i++) for (let j = Math.floor((cz - r)/PC); j <= Math.ceil((cz + r)/PC); j++){
+      const d = Math.hypot((i + .5)*PC - cx, (j + .5)*PC - cz); if (d > r + PC*.3) continue; const k = i + ',' + j;
+      if (erase){ if (plants.delete(k)){ pdata.delete(k); gDirty.add(pSqKey(i, j)); any = true; } continue; }
+      if (plants.has(k) || hash2(i*5 + 41, j*3 + 7) > .8) continue;
+      plants.set(k, [i, j, style >= COMKINDS.length ? mixPlant(i, j) : style]); gDirty.add(pSqKey(i, j)); any = true; }
+    if (any){ savePlants(); SHD.dirty = true; } }
   const blotGeo = (() => { const G = new GB(), gc = mul3(VBASE, .72, .6), c0 = G.v(0, .025, 0, 0, 1, 0, gc, 0), n = 9, ring_ = [];
     for (let k = 0; k < n; k++){ const a = k/n*6.28, q = GC*(.8 + .4*hash2(k*31 + 5, k*17 + 3)); ring_.push(G.v(Math.cos(a)*q, .02, Math.sin(a)*q, 0, 1, 0, mul3(gc, 1.06), 0)); }
     for (let k = 0; k < n; k++) G.tri(c0, ring_[(k + 1) % n], ring_[k]); return G.mesh(); })();
@@ -2149,7 +2205,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // colors and the way its surfaces face kept apart so the light, shadows, the night and the haze still fall on it live. A
   // card shows the bake nearest the angle it's seen from, blended with the next, and sways at the top in the wind. All the
   // cards of an area are one draw.
-  const CARD = { cols: 16, rows: 4*GV, cell: 40, x0: -1.1, x1: 1.1, y0: -.6, y1: 1.6 };
+  const CARD = { cols: 16, rows: 4*GV + 5*3*PV, cell: 40, x0: -1.1, x1: 1.1, y0: -.6, y1: 1.6 };
   const cardAlb = new THREE.WebGLRenderTarget(CARD.cols*CARD.cell, CARD.rows*CARD.cell, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
   const cardNrm = new THREE.WebGLRenderTarget(CARD.cols*CARD.cell, CARD.rows*CARD.cell, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
   (function bakeCards(){
@@ -2162,7 +2218,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (const [rt, m] of [[cardAlb, albM], [cardNrm, nrmM]]){
       bm.material = m; rt.scissorTest = false; rt.viewport.set(0, 0, rt.width, rt.height); renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear();
       rt.scissorTest = true;
-      for (let st = 0; st < 4; st++) for (let v = 0; v < GV; v++){ bm.geometry = VAR[st][v]; const row = st*GV + v;
+      const ROWS = []; for (let st = 0; st < 4; st++) for (let v = 0; v < GV; v++) ROWS.push([VAR[st][v], st*GV + v]);
+      for (let k = 0; k < COMKINDS.length; k++) for (let pi = 0; pi < 3; pi++) for (let v = 0; v < PV; v++) ROWS.push([PVAR[k][pi][v], 4*GV + (k*3 + pi)*PV + v]);
+      for (const [geo, row] of ROWS){ bm.geometry = geo;
         for (let c = 0; c < CARD.cols; c++){ const th = c/CARD.cols*PI*2;
           bc.position.set(-Math.sin(th)*Math.cos(P)*20, Math.sin(P)*20, -Math.cos(th)*Math.cos(P)*20); bc.up.set(0, 1, 0); bc.lookAt(0, 0, 0); bc.updateMatrixWorld();
           rt.viewport.set(c*CARD.cell, row*CARD.cell, CARD.cell, CARD.cell); rt.scissor.copy(rt.viewport); renderer.setRenderTarget(rt); renderer.render(bs, bc); } }
@@ -2175,20 +2233,21 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const cardM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true, map: cardAlb.texture, alphaTest: .5 }));
   { const ob = cardM.onBeforeCompile, cu = { nTex: { value: cardNrm.texture } };
     cardM.onBeforeCompile = sh => { ob(sh); Object.assign(sh.uniforms, gU, cu);
-      sh.vertexShader = 'attribute vec2 aCard; uniform float wTime; varying vec2 vCA; varying vec2 vCB; varying float vCm; varying float vCy;\n' + sh.vertexShader
+      sh.vertexShader = 'attribute vec2 aCard; attribute vec3 aGc; uniform float wTime; varying vec2 vCA; varying vec2 vCB; varying float vCm; varying float vCy; varying float vGl2; varying vec3 vGc2;\n' + WIND_GLSL + sh.vertexShader
         .replace('#include <project_vertex>', `
           vec4 anc = modelViewMatrix*instanceMatrix*vec4(0.0, 0.0, 0.0, 1.0); float sc = length(instanceMatrix[0].xyz);
           vec3 fw = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]); float cy = cos(aCard.y), sy = sin(aCard.y);
           float lx = cy*fw.x - sy*fw.z, lz = sy*fw.x + cy*fw.z, f = mod(atan(lx, lz)/6.2831853*${CARD.cols}.0 + ${CARD.cols*4}.0, ${CARD.cols}.0), c0 = floor(f), c1 = mod(c0 + 1.0, ${CARD.cols}.0);
           vCm = f - c0; vCy = aCard.y;
           vCA = vec2((c0 + uv.x)/${CARD.cols}.0, (aCard.x + uv.y)/${CARD.rows}.0); vCB = vec2((c1 + uv.x)/${CARD.cols}.0, (aCard.x + uv.y)/${CARD.rows}.0);
-          vec2 q = (modelMatrix*instanceMatrix*vec4(0.0, 0.0, 0.0, 1.0)).xz, wd = vec2(0.83, 0.55); float ph = dot(q, wd)*0.32 - wTime*1.25, gust = 0.5 + 0.5*sin(ph) + 0.22*sin(ph*2.3 + q.x*0.7 - q.y*0.4);
+          vec2 q = (modelMatrix*instanceMatrix*vec4(0.0, 0.0, 0.0, 1.0)).xz, wd = vec2(0.83, 0.55); float ph = dot(q, wd)*0.32 - wTime*1.25, paw = windPaw(q, wTime), crest = windCrest(q, wTime), gust = 0.3 + 0.3*sin(ph) + 0.12*sin(ph*2.3 + q.x*0.7 - q.y*0.4) + 0.75*paw*(0.75 + 0.25*crest);
+          vGc2 = aGc; vGl2 = paw*(0.45 + 0.55*crest)*smoothstep(0.25, 0.7, uv.y);
           float k = uv.y*uv.y*0.7; vec2 d = wd*(0.08 + 0.3*gust*gust)*k;
           vec3 dv = (viewMatrix*vec4(d.x, 0.0, d.y, 0.0)).xyz*sc;
           vec4 mvPosition = anc + vec4(position.xy*sc + dv.xy, 0.0, 0.0);
           gl_Position = projectionMatrix*mvPosition;`)
         .replace('#include <worldpos_vertex>', `vec4 worldPosition = vec4((mvPosition.xyz - viewMatrix[3].xyz)*mat3(viewMatrix), 1.0); vWq = worldPosition.xyz; vG = dot(worldPosition.xz - ctr, fwd);`);
-      sh.fragmentShader = 'uniform sampler2D nTex; varying vec2 vCA; varying vec2 vCB; varying float vCm; varying float vCy;\n' + sh.fragmentShader
+      sh.fragmentShader = 'uniform sampler2D nTex; varying vec2 vCA; varying vec2 vCB; varying float vCm; varying float vCy; varying float vGl2; varying vec3 vGc2;\n' + sh.fragmentShader.replace('#include <fog_fragment>', 'gl_FragColor.rgb += vGc2*(floor(vGl2*3.0 + 0.35)/3.0)*0.75*nightK;\n#include <fog_fragment>')
         .replace('#include <map_fragment>', `{ vec4 tA = texture2D(map, vCA), tB = texture2D(map, vCB), tx = mix(tA, tB, vCm); diffuseColor *= vec4(tx.rgb/max(tx.a, 1e-3), tx.a); }`)
         .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
           { vec4 nA = texture2D(nTex, vCA), nB = texture2D(nTex, vCB); vec3 nl = normalize((nA.xyz*nA.a*(1.0 - vCm) + nB.xyz*nB.a*vCm)/max(nA.a*(1.0 - vCm) + nB.a*vCm, 1e-3)*2.0 - 1.0 + 1e-4);
@@ -2212,16 +2271,20 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const old = gSquares.get(key); if (old){ scene.remove(old); for (const m of old.children){ if (m.userData.own) m.geometry.dispose(); m.dispose && m.dispose(); } gSquares.delete(key); }
     const [si, sj] = key.split(',').map(Number), n = GSQ/GC, recs = [];
     for (let i = si*n; i < si*n + n; i++) for (let j = sj*n; j < sj*n + n; j++){ const t = tufts.get(i + ',' + j); if (!t) continue; const r = tuftRec(i, j, t[2]); if (r) recs.push(r); }
-    if (!recs.length) return;
+    const pn = GSQ/PC, precs = [];
+    for (let i = si*pn; i < si*pn + pn; i++) for (let j = sj*pn; j < sj*pn + pn; j++){ const t = plants.get(i + ',' + j); if (!t) continue; const r = plantRec(i, j, t[2]); if (r) precs.push(r); }
+    if (!recs.length && !precs.length) return;
     const grp = new THREE.Group(); let ylo = 1e9, yhi = -1e9;
     const put = (im, k, r) => { _gq.setFromAxisAngle(_gy, r.rot); _gm.compose(_gp.set(r.x, r.y, r.z), _gq, _gs.setScalar(r.s)); im.setMatrixAt(k, _gm); im.setColorAt(k, _gc.setRGB(r.tint[0], r.tint[1], r.tint[2])); };
     const mk = (geo, mat, list) => { const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((r, k) => put(im, k, r)); im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
       im.frustumCulled = false; im.receiveShadow = true; im.castShadow = false; im.raycast = () => {}; grp.add(im); return im; };
-    for (const r of recs){ ylo = Math.min(ylo, r.y); yhi = Math.max(yhi, r.y); }
-    mk(blotGeo, grassM, recs).userData.kind = 'blot';
+    for (const r of recs.concat(precs)){ ylo = Math.min(ylo, r.y); yhi = Math.max(yhi, r.y); }
+    if (recs.length) mk(blotGeo, grassM, recs).userData.kind = 'blot';
+    for (let k = 0; k < COMKINDS.length; k++) for (let pi = 0; pi < 3; pi++) for (let v = 0; v < PV; v++){ const l = precs.filter(r => r.kind === k && r.pal === pi && r.v === v); if (l.length){ const im = mk(PVAR[k][pi][v], grassM, l); im.userData.kind = 'near'; im.castShadow = true; } }
     for (let st = 0; st < 4; st++) for (let v = 0; v < GV; v++){ const l = recs.filter(r => r.st === st && r.v === v); if (l.length) mk(VAR[st][v], grassM, l).userData.kind = 'near'; }
-    const cg = cardGeo.clone(), ac = new Float32Array(recs.length*2); recs.forEach((r, k) => { ac[k*2] = r.st*GV + r.v; ac[k*2 + 1] = r.rot; });
-    cg.setAttribute('aCard', new THREE.InstancedBufferAttribute(ac, 2)); const cm = mk(cg, cardM, recs); cm.userData.kind = 'far'; cm.userData.own = true;
+    const all = recs.concat(precs), cg = cardGeo.clone(), ac = new Float32Array(all.length*2), agc = new Float32Array(all.length*3);
+    all.forEach((r, k) => { ac[k*2] = r.plant ? 4*GV + (r.kind*3 + r.pal)*PV + r.v : r.st*GV + r.v; ac[k*2 + 1] = r.rot; agc.set(r.plant ? COMPAL[COMPALS[r.pal]].glow : WGLOW, k*3); });
+    cg.setAttribute('aCard', new THREE.InstancedBufferAttribute(ac, 2)); cg.setAttribute('aGc', new THREE.InstancedBufferAttribute(agc, 3)); const cm = mk(cg, cardM, all); cm.userData.kind = 'far'; cm.userData.own = true;
     grp.userData = { box: new THREE.Box3(new THREE.Vector3(si*GSQ, ylo - .5, sj*GSQ), new THREE.Vector3(si*GSQ + GSQ, yhi + 2, sj*GSQ + GSQ)) };
     for (const m of grp.children) m.visible = m.userData.kind === 'blot' || (m.userData.kind === 'near') === GLOD.hi;
     scene.add(grp); gSquares.set(key, grp); }
@@ -2234,7 +2297,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     _gf.setFromProjectionMatrix(_gpm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     for (const g of gSquares.values()) g.visible = _gf.intersectsBox(g.userData.box); }
   function grassTick(t){ gU.wTime.value = t; CURV.gTime.value = t; grassLOD(); const t0 = performance.now(); for (const k of gDirty){ gDirty.delete(k); buildSquare(k); if (performance.now() - t0 > 6) break; } }   // (about 6 ms of remaking a frame at most)
-  const grassAround = (x, z, r) => { for (let i = Math.floor((x - r)/GC); i <= Math.ceil((x + r)/GC); i++) for (let j = Math.floor((z - r)/GC); j <= Math.ceil((z + r)/GC); j++){ const k = i + ',' + j; if (tdata.has(k)){ tdata.delete(k); gDirty.add(sqKey(i, j)); } } };
+  const grassAround = (x, z, r) => { for (let i = Math.floor((x - r)/GC); i <= Math.ceil((x + r)/GC); i++) for (let j = Math.floor((z - r)/GC); j <= Math.ceil((z + r)/GC); j++){ const k = i + ',' + j; if (tdata.has(k)){ tdata.delete(k); gDirty.add(sqKey(i, j)); } }
+    for (let i = Math.floor((x - r - .5)/PC); i <= Math.ceil((x + r + .5)/PC); i++) for (let j = Math.floor((z - r - .5)/PC); j <= Math.ceil((z + r + .5)/PC); j++){ const k = i + ',' + j; if (pdata.has(k)){ pdata.delete(k); gDirty.add(pSqKey(i, j)); SHD.dirty = true; } } };
 
   ANIM.live = true;   // (homes from the save just appear; new ones are painted in)
   // the ghost: the block under the pointer, see-through, and a ring on the ground green or red
@@ -2245,7 +2309,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const RN = 48, ringGeo = new THREE.BufferGeometry(); ringGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array((RN + 1)*2*3), 3));
   { const idx = []; for (let i = 0; i < RN; i++){ const a = i*2, b = a + 1, c = a + 2, d = a + 3; idx.push(a, b, c, b, d, c); } ringGeo.setIndex(idx); }
   const ring = new THREE.Mesh(ringGeo, ringM); ring.visible = false; ring.frustumCulled = false; ring.renderOrder = 6; scene.add(ring);
-  const PL = { kind: null, rot: 0, hit: null, ok: null, ptr: null, onto: null, seed: 1 + PIECES.length*7 + (PIECES.reduce((a, p) => a + (p.seed || 0), 0) % 997), zkinds: { zone: 'townhouse', czone: 'noodle' }, zseed: 0 };   // (zkinds, zseed: single mode's building, per zone)
+  const PL = { kind: null, rot: 0, hit: null, ok: null, ptr: null, onto: null, seed: 1 + PIECES.length*7 + (PIECES.reduce((a, p) => a + (p.seed || 0), 0) % 997), zkinds: { zone: 'townhouse', czone: 'noodle' }, zseed: 0, zoneFol: 'res' };   // (zkinds, zseed: single mode's building, per zone)
   PL.zseed = PL.seed + 500;   // (seed: the next home's look; V rolls another)
   const status = document.getElementById('placeStatus');
   // the home under the pointer, if any (its block)
@@ -2388,7 +2452,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', (b.dataset.mode === 'zone') === zone));
     if (was){ PL.kind = null; setKind(zone ? 'zone' : lastKind); } else refreshUI(); zHide(); }
   function setKind(k){
-    PL.kind = PL.kind === k ? null : k; DSEL = null; delLine.visible = false; CN.a = null; connGhost.visible = false; outline.visible = false;
+    PL.kind = PL.kind === k ? null : k; DSEL = null; delLine.visible = false;
+    if (k === 'czone' || COM(k)) PL.zoneFol = 'com'; else if (k === 'zone' || KINDS[k]) PL.zoneFol = 'res';   // (the grass tool plants what the last zone picked grows) CN.a = null; connGhost.visible = false; outline.visible = false;
     if (PL.kind && KINDS[PL.kind] && !COM(PL.kind)) lastKind = PL.kind;
     if (PL.kind === 'czone' || COM(PL.kind)) PL.rot = Math.round(yaw/(PI/12))*(PI/12);   // (shops come turned to face the view: their fronts (the grotto's arch) toward the camera)
     ghost.visible = ring.visible = false; zHide();
@@ -2401,11 +2466,13 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const kinds = document.getElementById('resKinds'); if (kinds) kinds.hidden = ZONE.on;
     document.querySelectorAll('button[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === PL.kind));
     const tip = document.getElementById('ctrlTool'); if (tip) tip.innerHTML = controlsFor();
+    const gb = document.querySelector('button[data-k=grass] b'); if (gb) gb.textContent = PL.zoneFol === 'com' ? 'Trees' : 'Grass';
     if (status) status.classList.toggle('idle', !PL.kind || PL.kind === 'del'); }
   // what the keys and the mouse do with whatever is chosen (shown when Controls is hovered)
   function controlsFor(){
     const row = (k, t) => '<div class="row"><kbd>' + k + '</kbd><span>' + t + '</span></div>';
     if (PL.kind === 'del') return '<h4>Clear an area</h4>' + row('drag', 'select an area') + row('click inside', 'clear it: buildings, walkways, grass') + row('click outside / Esc', 'let the selection go') + row('X', 'back to building');
+    if (PL.kind === 'grass' && PL.zoneFol === 'com') return '<h4>Trees (commercial)</h4>' + row('click / drag', 'plant') + row('right drag', 'clear the trees (the grass stays)') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: ' + PSTYLES.join(', ')) + row('Alt + drag', 'turn the view') + '<div class="row"><span>pick Residential first for grass, which grows under the trees</span></div>';
     if (PL.kind === 'grass') return '<h4>Grass</h4>' + row('click / drag', 'paint') + row('right drag', 'clear') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: meadow, wildflowers, ferns, tall grass, mix') + row('Alt + drag', 'turn the view');
     if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('click, click', 'pick two buildings to join') + row('V', 'next kind: bridge, skywalk, pergola, arcade, wall (or a wing, if they\'re apart), random') + row('right click', 'take away the walkway under it (or let go of the first pick)');
     if (isZone(PL.kind)){ const u = ZUNIT(); return '<h4>' + (PL.kind === 'czone' ? 'Commercial' : 'Residential') + ': brush</h4>' + row('click', 'build the ' + u + 's in the brush') + row('Q / E', 'bigger / smaller (smallest: one ' + u + ')') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', ZONE.size ? 'clear the brush' : 'remove the ' + u + ' under it'); }
@@ -2444,7 +2511,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (const p of PIECES) if (inDel(r, p.x, p.z)) hlPiece(p, hlDel); }
   function clearArea(r){
     for (const p of PIECES.slice()) if (PIECES.includes(p) && inDel(r, p.x, p.z)) removePiece(p);
-    for (let u = r.u0; u <= r.u1 + .01; u += .7) for (let v = r.v0; v <= r.v1 + .01; v += .7){ const q = delAt(r, Math.min(u, r.u1), Math.min(v, r.v1)); paintGrass(q.x, q.z, .5, GR.style, true); }
+    for (let u = r.u0; u <= r.u1 + .01; u += .7) for (let v = r.v0; v <= r.v1 + .01; v += .7){ const q = delAt(r, Math.min(u, r.u1), Math.min(v, r.v1)); paintGrass(q.x, q.z, .5, GR.style, true); paintPlants(q.x, q.z, .5, 0, true); }
     delLine.visible = false; save(); }
 
   /* ---------- the connect brush: a walk, a bridge, an arcade or a shared wall between two blocks you pick ---------- */
@@ -2539,17 +2606,18 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
 
   /* ---------- the grass brush ---------- */
   // Click or drag to paint foliage, right click or right drag to clear it; Q bigger, E smaller; V steps through the kinds.
-  const GR = { size: 2, style: 4, last: null }, GRS = [.6, 1.1, 1.8, 2.8, 4.2, 6];
+  const GR = { size: 2, style: 4, pstyle: 5, last: null }, GRS = [.6, 1.1, 1.8, 2.8, 4.2, 6];
   function showGrass(){
     ghost.visible = false; zHide(); connGhost.visible = false;
     const hit = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
-    if (!hit || hit.sea){ ring.visible = false; if (status) status.textContent = 'grass: ' + GSTYLES[GR.style] + (hit ? ' · not on the sea' : ''); return; }
-    ringAt(hit.x, hit.z, GRS[GR.size], null, .12); ringM.color.set(0xb8e08a);
-    if (status){ status.textContent = 'grass: ' + GSTYLES[GR.style] + ' (V next) · brush ' + (GR.size + 1); status.style.color = '#33413a'; } }
+    const com = PL.zoneFol === 'com', nm = com ? 'trees: ' + PSTYLES[GR.pstyle] : 'grass: ' + GSTYLES[GR.style];
+    if (!hit || hit.sea){ ring.visible = false; if (status) status.textContent = nm + (hit ? ' · not on the sea' : ''); return; }
+    ringAt(hit.x, hit.z, GRS[GR.size], null, .12); ringM.color.set(com ? 0x9fd8e0 : 0xb8e08a);
+    if (status){ status.textContent = nm + ' (V next) · brush ' + (GR.size + 1); status.style.color = '#33413a'; } }
   function grassStroke(cx, cy, erase, force){
     const h = pick(cx, cy); if (!h || h.sea) return; const r = GRS[GR.size];
     if (!force && GR.last && Math.hypot(h.x - GR.last[0], h.z - GR.last[1]) < r*.35) return;
-    GR.last = [h.x, h.z]; paintGrass(h.x, h.z, r, GR.style, erase); }
+    GR.last = [h.x, h.z]; if (PL.zoneFol === 'com') paintPlants(h.x, h.z, r, GR.pstyle, erase); else paintGrass(h.x, h.z, r, GR.style, erase); }
   document.querySelectorAll('button[data-k]').forEach(b => b.addEventListener('click', () => setKind(b.dataset.k)));
   setMode(true);
 
@@ -2621,7 +2689,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (e.key === '6'){ setKind('grass'); return; }
     if (k === 'x' && !e.repeat){ setKind('del'); return; }
     if (PL.kind === 'grass' && (k === 'q' || k === 'e')){ GR.size = clamp(GR.size + (k === 'q' ? 1 : -1), 0, GRS.length - 1); return; }
-    if (PL.kind === 'grass' && k === 'v'){ GR.style = (GR.style + 1) % GSTYLES.length; return; }
+    if (PL.kind === 'grass' && k === 'v'){ if (PL.zoneFol === 'com') GR.pstyle = (GR.pstyle + 1) % PSTYLES.length; else GR.style = (GR.style + 1) % GSTYLES.length; return; }
     if (PL.kind === 'connect' && k === 'v'){ CN.type = (CN.type + 1) % LINK_TYPES.length; CN.key = ''; return; }
     if (isZone(PL.kind) && (k === 'q' || k === 'e')){ ZONE.size = clamp(ZONE.size + (k === 'q' ? 1 : -1), 0, ZSIZE.length - 1); return; }   // (Q: a bigger brush, E: a smaller one)
     if (k === 'v'){   // (single mode: the next kind of home, Shift+V another look of it; otherwise another look or layout)
@@ -2697,7 +2765,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function frame(now){
     const dt = Math.min(.1, (now - last)/1000); last = now; fNo++; let q = PROF.on ? performance.now() : 0;
     updateCamera(dt); q = tk('camera', q); stream(3); q = tk('stream', q);
-    { const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.rot, DSEL ? DSEL.key : '-', GR.size, GR.style, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
+    { const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.rot, DSEL ? DSEL.key : '-', GR.size, GR.style, GR.pstyle, PL.zoneFol, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
       if (gk !== ghostKey){ ghostKey = gk;   // (the ghost is worked out again only when something it shows has changed: the raycasts and checks are the costly part)
         hlClear();
         if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'del') showDel(); else if (PL.kind === 'grass') showGrass(); else if (isZone(PL.kind) && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } }
@@ -2717,7 +2785,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, comFolGeo, COMPAL, COMKINDS, grassM,
+  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

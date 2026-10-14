@@ -268,7 +268,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       float gust = 0.3 + 0.3*sin(ph) + 0.12*sin(ph*2.3 + q.x*0.7 - q.y*0.4) + 0.75*paw*(0.75 + 0.25*crest);
       vGc = aG; vGl = paw*(0.45 + 0.55*crest)*smoothstep(0.08, 0.5, aH);   // (the tips glow, where the gust is)
       float flut = sin(wTime*4.1 + q.x*3.1 + q.y*2.3) + 0.5*sin(wTime*6.3 + q.x*5.0 - q.y*4.1);
-      float hw = aH*sc_, k = hw*hw;
+      float hw = aH*sc_, hk = min(hw, 0.8), k = hk*hk;   // (the bend tops out at a tall grass's height: a tree's crown sways, its trunk stays put)
       vec2 d = wd*(0.08 + 0.3*gust*gust)*k + vec2(-wd.y, wd.x)*flut*0.035*k;
       vec3 dl = vec3(d.x, -dot(d, d)*0.55/max(hw, 0.05), d.y);
       #ifdef USE_INSTANCING
@@ -2137,9 +2137,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       if (prev) for (let m = 0; m < 5; m++){ const m2 = (m + 1) % 5; G.tri(prev[m], ring_[m2], ring_[m]); G.tri(prev[m], prev[m2], ring_[m2]); } prev = ring_; } G.gc = gc0; }
   function comPlant(G, R, x, y, z, kind, P){
     G.gc = P.glow;
-    if (kind === 0){ const lean = R.r(.08, .2), th = R.r(.7, .85); trunkG(G, x, z, x + lean, th, .045, .03, P.bark);
-      crown(G, R, x + lean, y + th + .1, z, R.r(.42, .52), .16, R.r(.38, .48), 260, P, th - .1); crown(G, R, x + lean*.7 - .08, y + th - .08, z + .06, .26, .1, .24, 70, P, th - .3); }
-    else if (kind === 1){ const th = R.r(.5, .62); trunkG(G, x, z, x, th, .035, .028, P.bark); crown(G, R, x, y + th + .2, z, .28, .26, .28, 190, P, th); }
+    if (kind === 0){ const lean = R.r(.12, .26), th = R.r(1.35, 1.6); trunkG(G, x, z, x + lean, th, .07, .04, P.bark, 6);
+      crown(G, R, x + lean, y + th + .14, z, R.r(.58, .7), .22, R.r(.52, .64), 420, P, th - .1); crown(G, R, x + lean*.7 - .1, y + th - .12, z + .08, .36, .14, .32, 120, P, th - .35); }
+    else if (kind === 1){ const th = R.r(1.0, 1.2); trunkG(G, x, z, x, th, .05, .035, P.bark, 5); crown(G, R, x, y + th + .26, z, .38, .36, .38, 320, P, th); }
     else if (kind === 2){ const hh = R.r(.42, .55); crown(G, R, x, y + hh + .02, z, .15, hh, .15, 170, P, 0); trunkG(G, x, z, x, .08, .03, .03, P.bark, 1); }
     else if (kind === 3){ const n = R.i(5, 8);
       for (let k = 0; k < n; k++){ const a = R.r(0, 6.28), rr = R.r(0, .13), bx = x + Math.cos(a)*rr, bz = z + Math.sin(a)*rr, L = R.r(.75, 1.15), lean = R.r(.02, .1), la = R.r(0, 6.28), cane = mix3(P.acc, P.tip, R.r(0, .35));
@@ -2174,7 +2174,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function plantRec(i, j, kind){
     const k = i + ',' + j; let r = pdata.get(k); if (r !== undefined) return r;
     const R = rng((Math.imul(i, 83492791) ^ Math.imul(j, 19349663) ^ 0x5bd1) >>> 0), x = (i + R.r(.25, .75))*PC, z = (j + R.r(.25, .75))*PC, y = grassOK(x, z);
-    const roomy = y !== null && [0, 1, 2, 3].every(q => { const a = q*PI/2 + .7; return !solidAt(x + Math.cos(a)*.4, z + Math.sin(a)*.4, y - .2, y + 1.2); });   // (a crown keeps clear of walls)
+    const roomy = y !== null && [0, 1, 2, 3].every(q => { const a = q*PI/2 + .7; return !solidAt(x + Math.cos(a)*.5, z + Math.sin(a)*.5, y - .2, y + 2.1); });   // (a crown keeps clear of walls)
     if (!roomy){ pdata.set(k, null); return null; }
     const d = fbm(x*.08 - 13, z*.08 + 21) + (R.f() - .5)*.12, pal = d < .46 ? 0 : d < .56 ? 1 : 2;
     r = { x, y, z, kind, pal, v: R.i(0, PV - 1), rot: R.r(0, PI*2), s: R.r(.88, 1.12), tint: [1, 1, 1], plant: true };
@@ -2205,7 +2205,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // colors and the way its surfaces face kept apart so the light, shadows, the night and the haze still fall on it live. A
   // card shows the bake nearest the angle it's seen from, blended with the next, and sways at the top in the wind. All the
   // cards of an area are one draw.
-  const CARD = { cols: 16, rows: 4*GV + 5*3*PV, cell: 40, x0: -1.1, x1: 1.1, y0: -.6, y1: 1.6 };
+  const CARD = { cols: 16, rows: 4*GV + 5*3*PV, cell: 48, x0: -1.1, x1: 1.1, y0: -.6, y1: 2.4 };   // (tall enough for the trees)
   const cardAlb = new THREE.WebGLRenderTarget(CARD.cols*CARD.cell, CARD.rows*CARD.cell, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
   const cardNrm = new THREE.WebGLRenderTarget(CARD.cols*CARD.cell, CARD.rows*CARD.cell, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
   (function bakeCards(){

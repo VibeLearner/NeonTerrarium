@@ -329,10 +329,14 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // box the canals take up, 1 where the land is left out), read by the land and by its shadow, so the canal is a real
   // trench with the light falling into it. Made again only when the paths change.
   const CUTU = { uCut: { value: new THREE.DataTexture(new Uint8Array([0]), 1, 1, THREE.LuminanceFormat) }, uCutO: { value: new THREE.Vector2() }, uCutS: { value: new THREE.Vector2(1, 1) }, uCutOn: { value: 0 } };
-  const CUT_F = 'uniform sampler2D uCut; uniform vec2 uCutO, uCutS; uniform float uCutOn;\n', CUT_APPLY = '\n if (uCutOn > 0.5){ vec2 cu_ = (vWq.xz - uCutO)/uCutS; if (cu_.x > 0.0 && cu_.x < 1.0 && cu_.y > 0.0 && cu_.y < 1.0 && texture2D(uCut, cu_).r > 0.5) discard; }';
+  const CUT_F = 'uniform sampler2D uCut; uniform vec2 uCutO, uCutS; uniform float uCutOn;\n', CUT_APPLY = '\n#ifdef CUT\n { vec2 cu_ = (vWq.xz - uCutO)/uCutS; if (cu_.x > 0.0 && cu_.x < 1.0 && cu_.y > 0.0 && cu_.y < 1.0 && texture2D(uCut, cu_).r > 0.5) discard; }\n#endif';
+  // (only compiled in while there is a canal: a shader that can discard loses the early depth test, and the land is most
+  // of what's drawn)
+  const CUT_MATS = [];
+  function cutOn(on){ if (CUTU.uCutOn.value === (on ? 1 : 0)) return; CUTU.uCutOn.value = on ? 1 : 0; for (const m of CUT_MATS){ if (on) m.defines.CUT = ''; else delete m.defines.CUT; m.needsUpdate = true; } }
   function cutLand(m, varying){ const ob = m.onBeforeCompile, ok = m.customProgramCacheKey; m.onBeforeCompile = sh => { ob(sh); Object.assign(sh.uniforms, CUTU);
       sh.fragmentShader = CUT_F + (varying ? 'varying vec3 vWq;\n' : '') + sh.fragmentShader.replace('void main() {', 'void main() {' + CUT_APPLY); };
-    m.customProgramCacheKey = () => ok() + 'cut'; return m; }
+    m.customProgramCacheKey = () => ok() + (m.defines.CUT !== undefined ? 'cut' : ''); m.defines = m.defines || {}; CUT_MATS.push(m); return m; }
   { const ob = landDepth.onBeforeCompile; landDepth.onBeforeCompile = sh => { ob(sh);   // (a land patch's skirts are in its own mesh, marked: they cast no shadow)
       sh.vertexShader = 'attribute float skirt; varying float vSk;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vSk = skirt;');
       sh.fragmentShader = 'varying float vSk;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n if (vSk > 0.5) discard;'); };
@@ -1047,7 +1051,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     todo.sort((a, b) => a[0] - b[0]);   // (pieces just placed first, then what's missing, nearest first, then detail changes)
     const t0 = performance.now();
     for (const [, ch, lod] of todo){
-      const old = ch.mesh; ch.mesh = buildChunk(ch.i, ch.j, lod); ch.lod = lod; ch.dirty = false; SHD.dirty = true; if (PROF.on){ PROF.builds = (PROF.builds || 0) + 1; (PROF.log || (PROF.log = [])).push(ch.i + ',' + ch.j + ':' + lod); }
+      const old = ch.mesh; ch.mesh = buildChunk(ch.i, ch.j, lod); ch.lod = lod; ch.dirty = false; SHD.lazy = true; if (PROF.on){ PROF.builds = (PROF.builds || 0) + 1; (PROF.log || (PROF.log = [])).push(ch.i + ',' + ch.j + ':' + lod); }
       if (old){ scene.remove(old); old.traverse(o => o.geometry && o.geometry.dispose()); }
       if (performance.now() - t0 > budget) break;
     }
@@ -2083,7 +2087,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const fs = ps.filter(p => p.mesh.userData.fol).map(p => [p.mesh.userData.fol.geometry, p.mesh.matrixWorld]);
     if (fs.length){ const fm = new THREE.Mesh(mergeInto(fs, true), grassM); fm.receiveShadow = true; fm.matrixAutoUpdate = false; fm.raycast = () => {}; fm.userData.batch = key; fm.userData.fol = true; scene.add(fm); out.push(fm); }
     HB.map.set(key, out); SHD.dirty = true; }
-  function batchTick(){ if (!HB.dirty.size) return false; for (const k of HB.dirty) buildBatch(k); HB.dirty.clear(); return true; }
+  function batchTick(){ if (!HB.dirty.size) return false; const t0 = performance.now(); for (const k of HB.dirty){ HB.dirty.delete(k); buildBatch(k); if (performance.now() - t0 > 4) break; } return true; }   // (about 4 ms of them a frame: a big clear spread over a few frames)
   // The megaturbines' moving part (ROTORS): a nacelle turned to face into the wind (the same wind the grass bends in), and
   // three long white blades on its hub, spinning slowly; drawn on its own, outside the batches, and kept out of the cached
   // shadows (a turning shadow would mean redrawing them every frame).
@@ -2303,16 +2307,18 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     remesh(p); PIECES.push(p);
     if (!base && lv === 0){ gridAdd(p); dirtyAround(p); }
     if (ANIM.live && lv === 0) grassAround(x, z, p.r + 1);   // (the grass under a new home goes)
-    dropLinkCache(p); linksDirty = true; if (!quiet) save(); return p; }
-  function removePiece(p){   // (and everything stacked on it or built off its side)
+    dropLinkCache(p); linksDirty = true; pathsNear(p); if (!quiet) save(); return p; }
+  let pathsReady = false;   // (pieces loaded from the save come before the paths exist)
+  const pathsNear = p => { if (!pathsReady || PTH.dirty || p.level) return; const m = p.r + 2.5; for (const q of PATHS) for (const [x, z] of q.p) if (Math.abs(x - p.x) < m && Math.abs(z - p.z) < m){ PTH.dirty = true; return; } };
+  function removePiece(p, quiet = false){   // (and everything stacked on it or built off its side)
     if (!PIECES.includes(p)) return;
-    if (p.up) removePiece(p.up);
-    for (const q of PIECES.filter(q => q.host === p)) removePiece(q);
+    if (p.up) removePiece(p.up, quiet);
+    for (const q of PIECES.filter(q => q.host === p)) removePiece(q, quiet);
     scene.remove(p.mesh); if (p.rotorG){ scene.remove(p.rotorG); ROTORS.delete(p.rotorG); p.rotorG = null; } pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); PIECES.splice(PIECES.indexOf(p), 1); SHD.dirty = true; HB.dirty.add(regKey(p)); dropLinkCache(p);
     if (ULINKS.some(u => u.a === p.id || u.b === p.id)){ ULINKS = ULINKS.filter(u => u.a !== p.id && u.b !== p.id); saveLinks(); }
     if (p.base){ p.base.up = null; remesh(p.base); } else if (p.level === 0){ gridDel(p); dirtyAround(p); }
     if (p.level === 0) grassAround(p.x, p.z, p.r + 1);
-    linksDirty = true; save(); }
+    pathsNear(p); linksDirty = true; if (!quiet) save(); }
 
   // where a block of `kind` goes built off `host`'s side facing the point (wx, wz): square to the host, against its wall
   function sideSpot(host, kind, wx, wz, seed = PL.seed){
@@ -2335,6 +2341,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // joined to each other make a courtyard between them, with a fountain and a tree. Each home joins its three nearest
   // neighbors at most, and not through another home. All the links are one mesh, made again whenever a home comes or goes.
   let linksDirty = true, linksMesh = null; const RAILS = [];
+  // (the walkways' merged meshes, one per 24-unit area: an area is merged again only when its walkways change; linksMesh
+  // holds the courtyards and corbels, drawn fresh each time)
+  const LREG = new Map(); let LUID = 0;
   const hashPair = (a, b) => { let h = Math.imul(Math.min(a, b), 73856093) ^ Math.imul(Math.max(a, b), 19349663); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0)/4294967296; };
   const _sa = new THREE.Vector3(), _sb = new THREE.Vector3(), _sx = new THREE.Vector3(), _sy = new THREE.Vector3(), _sz = new THREE.Vector3(), _sm = new THREE.Matrix4();
   // a box from point a to point b (its length along them), w wide and h tall, lifted by up
@@ -2479,7 +2488,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function buildLinks(){
     linksDirty = false; SHD.dirty = true;
     RAILS.length = 0;
-    if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); for (const c of linksMesh.children) c.geometry.dispose(); linksMesh = null; }   // (merged copies only: the cached parts stay)
+    if (linksMesh){ dropMesh(linksMesh); linksMesh = null; }   // (merged copies only: the cached parts stay)
     const T = new Tris(true), pairs = [], deg = new Map(), joined = new Set(), pools = [];
     for (const q of PTH.pools) pools.push(q);   // (the paths' lamps)
     for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, IND(p.kind) ? 41.6 : LUX(p.kind) ? 51.6 : 1 + 10*shopOf(p.kind, p.seed)]);
@@ -2489,8 +2498,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (const u of ULINKS){ const A = byId.get(u.a), B = byId.get(u.b); if (!A || !B) continue; const L = pairOf(A, B); if (!L) continue;
       L.user = true; L.type = u.type; pairs.push(L); userKey.add(Math.min(A.id, B.id) + '|' + Math.max(A.id, B.id)); }
     const nUser = pairs.length;
-    for (let i = 0; i < PIECES.length; i++) for (let j = i + 1; j < PIECES.length; j++){
-      const A = PIECES[i], B = PIECES[j]; if (A.level !== B.level) continue;
+    // (neighbors found by a sweep along x: only blocks within 9 of each other are ever paired)
+    const SX = PIECES.slice().sort((a, b) => a.x - b.x);
+    for (let i = 0; i < SX.length; i++) for (let j = i + 1; j < SX.length && SX[j].x - SX[i].x <= 9; j++){
+      const A = SX[i].id < SX[j].id ? SX[i] : SX[j], B = A === SX[i] ? SX[j] : SX[i]; if (A.level !== B.level) continue;
       if (IND(A.kind) !== IND(B.kind) || LUX(A.kind) !== LUX(B.kind)) continue;   // (industry joins industry, luxury luxury)   // (industry joins only industry by itself, with its own tracks, pipes and rails)
       if (Math.abs(A.y - B.y) > (A.level ? .6 : 1.4)) continue;
       if (Math.abs(A.x - B.x) > 9 || Math.abs(A.z - B.z) > 9) continue;
@@ -2499,18 +2510,21 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       pairs.push(L); }
     const auto = pairs.splice(nUser).sort((p, q) => p.gap - q.gap); pairs.push(...auto);
     for (const v of LCACHE.values()) v.used = false;
+    // every block (stacked ones too) bucketed by 4-unit cells of its footprint, for the clear-way checks below
+    const BK = new Map(); for (const q of PIECES) if (q.bb) for (let a = Math.floor(q.bb[0]/4); a <= Math.floor(q.bb[2]/4); a++) for (let b = Math.floor(q.bb[1]/4); b <= Math.floor(q.bb[3]/4); b++){ const k = a + ',' + b; let l = BK.get(k); if (!l) BK.set(k, l = []); l.push(q); }
+    const bkNear = (x0, z0, x1, z1) => { const o = new Set(); for (let a = Math.floor(x0/4); a <= Math.floor(x1/4); a++) for (let b = Math.floor(z0/4); b <= Math.floor(z1/4); b++){ const l = BK.get(a + ',' + b); if (l) for (const q of l) o.add(q); } return o; };
     for (const L of pairs){
       const { A, B, dc, dx, dz, tA, tB } = L; if (!L.user && ((deg.get(A) || 0) >= 3 || (deg.get(B) || 0) >= 3)) continue;
       // the way between the two walls must be clear of every other block at its height, a body's width to each side
       const ly0 = Math.min(A.y, B.y) + .1, ly1 = ly0 + 1.4, ax0 = A.x + dx*tA, az0 = A.z + dz*tA, span = Math.max(0, dc - tA - tB);
       let clear = true;
-      const ex = ax0 + dx*span, ez = az0 + dz*span, near = PIECES.filter(q => q !== A && q !== B && q.bb && q.bb[0] < Math.max(ax0, ex) + .7 && q.bb[2] > Math.min(ax0, ex) - .7 && q.bb[1] < Math.max(az0, ez) + .7 && q.bb[3] > Math.min(az0, ez) - .7);
+      const ex = ax0 + dx*span, ez = az0 + dz*span, near = [...bkNear(Math.min(ax0, ex) - .7, Math.min(az0, ez) - .7, Math.max(ax0, ex) + .7, Math.max(az0, ez) + .7)].filter(q => q !== A && q !== B && q.bb[0] < Math.max(ax0, ex) + .7 && q.bb[2] > Math.min(ax0, ex) - .7 && q.bb[1] < Math.max(az0, ez) + .7 && q.bb[3] > Math.min(az0, ez) - .7);
       if (near.length) for (let u = 0; u <= span + 1e-6 && clear; u += .3) for (const s_ of [-.6, 0, .6]) if (solidAt(ax0 + dx*u - dz*s_, az0 + dz*u + dx*s_, ly0, ly1, null, near)){ clear = false; break; }
       if (!clear && IND(A.kind) && IND(B.kind)) L.blocked = true; else if (!clear && !L.user) continue;
       deg.set(A, (deg.get(A) || 0) + 1); deg.set(B, (deg.get(B) || 0) + 1); joined.add(A.id + '|' + B.id); joined.add(B.id + '|' + A.id);
       // (each connection is drawn once and kept: a rebuild after placing one home only draws the new ones)
       const ck = [A.id, B.id, L.user ? L.type : '-', L.blocked ? 'blk' : '', A.x.toFixed(2), A.z.toFixed(2), A.y.toFixed(2), B.x.toFixed(2), B.z.toFixed(2), B.y.toFixed(2), A.rot.toFixed(3), B.rot.toFixed(3), A.kind, B.kind, A.seed, B.seed, !!A.up, !!B.up].join('|');
-      let cl = LCACHE.get(ck); if (!cl){ const shopL = LUX(A.kind) && LUX(B.kind) ? 9 : COM(A.kind) && COM(B.kind) ? shopOf(A.kind, A.seed) : 0, lt = new Tris(true, shopL), lp = []; drawLink(lt, L, lp); if (shopL && shopL < 9) for (const q of lp) q[3] += 10*shopL; cl = { rail: L.rail || null, geo: lt.p.length ? lt.geo() : null, fol: folGeo(lt.fol), pools: lp, ax: (A.x + B.x)/2, az: (A.z + B.z)/2, r: L.dc/2, a: A.id, b: B.id }; LCACHE.set(ck, cl); }
+      let cl = LCACHE.get(ck); if (!cl){ const shopL = LUX(A.kind) && LUX(B.kind) ? 9 : COM(A.kind) && COM(B.kind) ? shopOf(A.kind, A.seed) : 0, lt = new Tris(true, shopL), lp = []; drawLink(lt, L, lp); if (shopL && shopL < 9) for (const q of lp) q[3] += 10*shopL; cl = { rail: L.rail || null, geo: lt.p.length ? lt.geo() : null, fol: folGeo(lt.fol), pools: lp, ax: (A.x + B.x)/2, az: (A.z + B.z)/2, r: L.dc/2, a: A.id, b: B.id }; cl.uid = ++LUID; LCACHE.set(ck, cl); }
       cl.used = true; for (const q of cl.pools) pools.push(q); if (cl.rail) RAILS.push(cl.rail);
     }
     // courtyards: three ground homes all joined to each other
@@ -2555,11 +2569,15 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       }
     }
     // (the links' parts kept from before are merged with what's new: courtyards and corbels, drawn fresh, are few)
-    const used = [...LCACHE.values()].filter(v => v.used), withGeo = used.filter(v => v.geo), gs = withGeo.map(v => [v.geo, null]), fs = used.filter(v => v.fol).map(v => [v.fol, null]);
-    if (T.p.length) gs.push([T.geo(), null]); const tf = folGeo(T.fol); if (tf) fs.push([tf, null]);
-    linkRanges = []; { let o = 0; for (const v of withGeo){ const n = v.geo.attributes.position.count; linkRanges.push([o, o + n, v.a, v.b]); o += n; } }   // (which vertices are which link: for picking one to take away)
-    if (gs.length){ linksMesh = new THREE.Mesh(mergeInto(gs, false), pieceM); linksMesh.castShadow = linksMesh.receiveShadow = true; linksMesh.customDepthMaterial = landDepth; linksMesh.matrixAutoUpdate = false; scene.add(linksMesh);
-      if (fs.length){ const f = new THREE.Mesh(mergeInto(fs, true), grassM); f.receiveShadow = true; f.frustumCulled = true; f.raycast = () => {}; f.matrixAutoUpdate = false; linksMesh.add(f); } }
+    const used = [...LCACHE.values()].filter(v => v.used), groups = new Map();
+    for (const v of used){ const k = Math.floor(v.ax/24) + ',' + Math.floor(v.az/24); let l = groups.get(k); if (!l) groups.set(k, l = []); l.push(v); }
+    for (const [k, r] of LREG) if (!groups.has(k)){ dropMesh(r.mesh); LREG.delete(k); }
+    const linkMesh = (geo, fol) => { const m = geo ? new THREE.Mesh(geo, pieceM) : new THREE.Group(); if (geo){ m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.raycast = () => {}; } m.matrixAutoUpdate = false;
+      if (fol){ const f = new THREE.Mesh(fol, grassM); f.receiveShadow = true; f.frustumCulled = true; f.raycast = () => {}; f.matrixAutoUpdate = false; f.userData.fol = true; m.add(f); } scene.add(m); return m; };
+    for (const [k, list] of groups){ const sig = list.map(v => v.uid).sort((a, b) => a - b).join(','), r = LREG.get(k); if (r && r.sig === sig) continue; if (r) dropMesh(r.mesh);
+      const gs = list.filter(v => v.geo).map(v => [v.geo, null]), fs = list.filter(v => v.fol).map(v => [v.fol, null]);
+      LREG.set(k, { sig, mesh: linkMesh(gs.length ? mergeInto(gs, false) : null, fs.length ? mergeInto(fs, true) : null) }); }
+    { const tf = folGeo(T.fol); if (T.p.length) linksMesh = linkMesh(releaseCPU(T.geo()), tf); else if (tf) linksMesh = linkMesh(null, tf); }
     buildPools(pools);
     for (const [k, v] of LCACHE) if (!v.used){ if (v.geo) v.geo.dispose(); if (v.fol) v.fol.dispose(); LCACHE.delete(k); }
   }
@@ -2617,7 +2635,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   let PLOAD = []; try { PLOAD = JSON.parse(localStorage.getItem('neonIsland.coast.plants') || '[]'); } catch (e) {}   // (the trees; taken in once their layer is made, below)
   let gSaveT = 0; const saveGrass = () => { clearTimeout(gSaveT); gSaveT = setTimeout(() => { try { localStorage.setItem(GRASS_KEY, JSON.stringify([...tufts.values()])); } catch (e) {} }, 400); };
   // can a tuft grow here: on land, back from the cliff's edge, not steep, not inside a home
-  function grassOK(x, z){ if ((coastX(z) - x)*rowCos(z) < 1.1) return null; const y = heightAt(x, z);
+  // the canal mask, kept here too: nothing grows in a canal (or right on its edge)
+  const CUTC = { L: null };
+  function inCanal(x, z, m = 0){ if (!CUTC.L) return false;
+    for (const [dx, dz] of m ? [[0, 0], [m, 0], [-m, 0], [0, m], [0, -m]] : [[0, 0]]){ const u = Math.floor((x + dx - CUTC.x0)/CUTC.pix), v = Math.floor((z + dz - CUTC.z0)/CUTC.pix);
+      if (u >= 0 && v >= 0 && u < CUTC.W && v < CUTC.H && CUTC.L[v*CUTC.W + u]) return true; } return false; }
+  function grassOK(x, z){ if ((coastX(z) - x)*rowCos(z) < 1.1) return null; if (inCanal(x, z, .14)) return null; const y = heightAt(x, z);
     if (Math.abs(heightAt(x + .35, z) - y) > .3 || Math.abs(heightAt(x, z + .35) - y) > .3) return null;
     if (solidAt(x, z, y - .2, y + .5)) return null; return y; }
   // one plant of a kind, at (x, y, z), in the colors given
@@ -2762,7 +2785,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (let i = Math.floor((cx - r)/PC); i <= Math.ceil((cx + r)/PC); i++) for (let j = Math.floor((cz - r)/PC); j <= Math.ceil((cz + r)/PC); j++){
       const d = Math.hypot((i + .5)*PC - cx, (j + .5)*PC - cz); if (d > r + PC*.3) continue; const k = i + ',' + j;
       if (erase){ if (plants.delete(k)){ pdata.delete(k); gDirty.add(pSqKey(i, j)); any = true; } continue; }
-      if (plants.has(k) || (ind !== true && hash2(i*5 + 41, j*3 + 7) > (ind === 'lux' ? .72 : .8))) continue;
+      if (plants.has(k) || (ind !== true && hash2(i*5 + 41, j*3 + 7) > (ind === 'lux' ? .72 : .8)) || inCanal((i + .5)*PC, (j + .5)*PC, .3)) continue;
       plants.set(k, [i, j, ind === 'lux' ? mixLux(i, j) : ind ? (style >= 3 ? mixInd(i, j) : NCOM + style) : style >= COMKINDS.length ? mixPlant(i, j) : style]); gDirty.add(pSqKey(i, j)); any = true; }
     if (any){ savePlants(); SHD.dirty = true; } }
   const blotGeo = (() => { const G = new GB(), gc = mul3(VBASE, .72, .6), c0 = G.v(0, .025, 0, 0, 1, 0, gc, 0), n = 9, ring_ = [];
@@ -2840,7 +2863,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (let i = Math.floor((cx - r)/GC); i <= Math.ceil((cx + r)/GC); i++) for (let j = Math.floor((cz - r)/GC); j <= Math.ceil((cz + r)/GC); j++){
       const x = (i + .5)*GC, z = (j + .5)*GC, d = Math.hypot(x - cx, z - cz); if (d > r) continue; const k = i + ',' + j;
       if (erase){ if (tufts.delete(k)){ tdata.delete(k); gDirty.add(sqKey(i, j)); any = true; } continue; }
-      if (tufts.has(k) || hash2(i*3 + 17, j*5 + 29) > .93 - .25*smooth(r*.7, r, d)) continue;   // (a little thinner at the brush's rim)
+      if (tufts.has(k) || hash2(i*3 + 17, j*5 + 29) > .93 - .25*smooth(r*.7, r, d) || inCanal(x, z, .14)) continue;   // (a little thinner at the brush's rim)
       tufts.set(k, [i, j, style === 4 ? mixStyle(i, j) : style]); gDirty.add(sqKey(i, j)); any = true; }
     if (any) saveGrass(); }
   // an area of grass: its tufts as copies, a draw for each kind and copy up close, one draw of cards far off, one of blots
@@ -3097,7 +3120,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // (saved), smoothed and resampled every .35 and laid on the ground, following it. Grass and plants under a path go.
   const PATH_KEY = 'neonIsland.coast.paths', PSTY = ['flagstones', 'promenade', 'marble walk', 'water causeway', 'mossy cobbles'], PW = [.95, 1.6, 1.2, 2.3, 1.0];
   let PATHS = []; try { PATHS = JSON.parse(localStorage.getItem(PATH_KEY) || '[]').filter(p => p && p.p && p.p.length > 1); } catch (e) {}
-  const PTH = { style: 0, cur: null, mesh: null, live: null, pools: [], dirty: true, hov: null, hk: '' };
+  const PTH = { style: 0, cur: null, mesh: null, live: null, pools: [], dirty: false, hov: null, hk: '' }; pathsReady = true;
   const savePaths = () => { try { localStorage.setItem(PATH_KEY, JSON.stringify(PATHS.map(p => ({ s: p.s, p: p.p.map(q => [+q[0].toFixed(2), +q[1].toFixed(2)]) })))); } catch (e) {} };
   function smoothPts(P){ let Q = P; for (let it = 0; it < 2; it++){ if (Q.length < 3) break; const R2 = [Q[0]]; for (let i = 0; i < Q.length - 1; i++){ const a = Q[i], b = Q[i + 1]; R2.push([a[0]*.75 + b[0]*.25, a[1]*.75 + b[1]*.25], [a[0]*.25 + b[0]*.75, a[1]*.25 + b[1]*.75]); } R2.push(Q[Q.length - 1]); Q = R2; }
     // (resampled every .35 along its length: a point each time that much more of the line has gone by)
@@ -3113,8 +3136,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const G = (i, o) => { const x = P[i][0] + N[i][0]*o, z = P[i][1] + N[i][1]*o; return [x, z]; };
     const V = (i, o, y) => { const [x, z] = G(i, o); return [x, heightAt(x, z) + y, z]; };
     const inside = (x, z) => PIECES.some(q => !q.level && q.hullW && q.bb && x > q.bb[0] && x < q.bb[2] && z > q.bb[1] && z < q.bb[3] && inHull(q.hullW, x, z));
-    const strip = (o0, o1, y, colF) => { for (let i = 0; i < n - 1; i++) flatQ(T, V(i, o0, y), V(i, o1, y), V(i + 1, o1, y), V(i + 1, o0, y), colF(i)); };
-    const kerb = (o, w, h, col) => { for (let i = 0; i < n - 1; i++){ const a = V(i, o, h/2 + .01), b = V(i + 1, o, h/2 + .01); seg(T, V3(a[0], a[1], a[2]), V3(b[0], b[1], b[2]), w, h, col); } };
+    const insideAny = (x, z) => { const l = pieceGrid.get(Math.floor(x/PCELL) + ',' + Math.floor(z/PCELL)); return !!l && l.some(q => q.hullW && q.bb && x > q.bb[0] - .05 && x < q.bb[2] + .05 && z > q.bb[1] - .05 && z < q.bb[3] + .05 && inHull(q.hullW, x, z)); };
+    const segIn = (i, o) => { const a = G(i, o), b = G(i + 1, o); return insideAny((a[0] + b[0])/2, (a[1] + b[1])/2); };   // (a piece of path that would run into a building is left out)
+    const strip = (o0, o1, y, colF) => { for (let i = 0; i < n - 1; i++){ if (segIn(i, o0) || segIn(i, o1) || segIn(i, (o0 + o1)/2)) continue; flatQ(T, V(i, o0, y), V(i, o1, y), V(i + 1, o1, y), V(i + 1, o0, y), colF(i)); } };
+    const kerb = (o, w, h, col) => { for (let i = 0; i < n - 1; i++){ if (segIn(i, o)) continue; const a = V(i, o, h/2 + .01), b = V(i + 1, o, h/2 + .01); seg(T, V3(a[0], a[1], a[2]), V3(b[0], b[1], b[2]), w, h, col); } };
     const stone = (x, z, s, col, h = .05) => { if (inside(x, z)) return; T.add(GEO.box, mat(x, heightAt(x, z) + h/2 + .01, z, 0, R.r(0, PI), 0, s*R.r(.8, 1.2), h, s*R.r(.7, 1.1)), col); };
     const lampPost = (i, o, tall = 1.2) => { const [x, z] = G(i, o); if (inside(x, z)) return; const y = heightAt(x, z); T.add(GEO.cyl5, mat(x, y + tall/2, z, 0, 0, 0, .035, tall, .035), HP.rail);
       box(T, x, y + tall + .06, z, .14, .16, .14, HP.lamp); box(T, x, y + tall + .17, z, .2, .04, .2, HP.rail); pools.push([x, z, 1.4, .8]); };
@@ -3141,26 +3166,33 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       const at = (q, y) => [q[0], y, q[2]], face = (A, B, Cc, Dd, col, nx, nz) => { const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2], vx = Cc[0] - A[0], vy = Cc[1] - A[1], vz = Cc[2] - A[2];
         if ((uy*vz - uz*vy)*nx + (ux*vy - uy*vx)*nz > 0) T.quad(A, B, Cc, Dd, col); else T.quad(A, Dd, Cc, B, col); };
       const DRY = [C(0xc4bda8), C(0xb6af9a), C(0xbdb6a1)], WET = [C(0x7aa592), C(0x70998a)], DEEP = [C(0x355a50), C(0x30544a)];
-      for (let i = 0; i < n - 1; i++){ const k = (i*7 + (i >> 1)) % 3, nx = N[i][0], nz = N[i][1], ym0 = (ys[i] + yb[i])/2, ym1 = (ys[i + 1] + yb[i + 1])/2;
-        for (const [q, s_] of [[gl, 1], [gr, -1]]){ const a = q[i], b = q[i + 1];
-          face(a, b, at(b, ys[i + 1] + .02), at(a, ys[i] + .02), DRY[k], nx*s_, nz*s_);
-          face(at(a, ys[i] + .02), at(b, ys[i + 1] + .02), at(b, ym1), at(a, ym0), WET[i % 2], nx*s_, nz*s_);
-          face(at(a, ym0), at(b, ym1), at(b, yb[i + 1]), at(a, yb[i]), DEEP[i % 2], nx*s_, nz*s_); }
-        // the bed: pale toward the middle, where the light reaches it
-        const m0 = [(gl[i][0] + gr[i][0])/2, yb[i], (gl[i][2] + gr[i][2])/2], m1 = [(gl[i + 1][0] + gr[i + 1][0])/2, yb[i + 1], (gl[i + 1][2] + gr[i + 1][2])/2];
-        flatQ(T, at(gl[i], yb[i]), m0, m1, at(gl[i + 1], yb[i + 1]), i % 2 ? C(0xb9cdb4) : C(0xb2c7ae)); flatQ(T, m0, at(gr[i], yb[i]), at(gr[i + 1], yb[i + 1]), m1, i % 2 ? C(0xc6d6bd) : C(0xbfd1b7));   // (sandy, so it reads as the bottom, below the water)
-        // the water, a little below the ground
-        flatQ(Wt, at(gl[i], ys[i]), at(gr[i], ys[i]), at(gr[i + 1], ys[i + 1]), at(gl[i + 1], ys[i + 1]), HP.pool); }
-      // the ends: walled off
-      for (const [i, sg] of [[0, 1], [n - 1, -1]]){ const ax = N[i][2]*sg, az = N[i][3]*sg, ym = (ys[i] + yb[i])/2;
-        face(gl[i], gr[i], at(gr[i], ys[i] + .02), at(gl[i], ys[i] + .02), DRY[0], ax, az); face(at(gl[i], ys[i] + .02), at(gr[i], ys[i] + .02), at(gr[i], ym), at(gl[i], ym), WET[0], ax, az); face(at(gl[i], ym), at(gr[i], ym), at(gr[i], yb[i]), at(gl[i], yb[i]), DEEP[0], ax, az); }
-      if (opt.cuts){ const ins = .02, P0 = (i, o) => G(i, o); for (let i = 0; i < n - 1; i++){ let a0 = P0(i, WL + ins), a1 = P0(i, WR - ins), b0 = P0(i + 1, WL + ins), b1 = P0(i + 1, WR - ins);
-          if (i === 0){ a0 = [a0[0] + N[0][2]*ins, a0[1] + N[0][3]*ins]; a1 = [a1[0] + N[0][2]*ins, a1[1] + N[0][3]*ins]; }
-          if (i === n - 2){ b0 = [b0[0] - N[n - 1][2]*ins, b0[1] - N[n - 1][3]*ins]; b1 = [b1[0] - N[n - 1][2]*ins, b1[1] - N[n - 1][3]*ins]; }
-          opt.cuts.push([a0, a1, b1, b0]); } }
+      // a building on the line breaks the canal: it stops short, walled off, and starts again past it (blk: a sample too
+      // near any building's footprint)
+      const blk = []; for (let i = 0; i < n; i++){ let b = false; for (const o of [WL - .15, .3, .6, .9, WR + .15]) for (const t of [-.18, 0, .18]){ const x = P[i][0] + N[i][0]*o + N[i][2]*t, z = P[i][1] + N[i][1]*o + N[i][3]*t; if (insideAny(x, z)){ b = true; break; } } blk.push(b); }
+      const runs = []; for (let i = 0; i < n;){ if (blk[i]){ i++; continue; } let e = i; while (e + 1 < n && !blk[e + 1]) e++; if (e > i) runs.push([i, e]); i = e + 1; }
+      const inRun = new Uint8Array(n); for (const [a, b] of runs) for (let i = a; i <= b; i++) inRun[i] = 1;
+      for (const [s0, e0] of runs){
+        for (let i = s0; i < e0; i++){ const k = (i*7 + (i >> 1)) % 3, nx = N[i][0], nz = N[i][1], ym0 = (ys[i] + yb[i])/2, ym1 = (ys[i + 1] + yb[i + 1])/2;
+          for (const [q, s_] of [[gl, 1], [gr, -1]]){ const a = q[i], b = q[i + 1];
+            face(a, b, at(b, ys[i + 1] + .02), at(a, ys[i] + .02), DRY[k], nx*s_, nz*s_);
+            face(at(a, ys[i] + .02), at(b, ys[i + 1] + .02), at(b, ym1), at(a, ym0), WET[i % 2], nx*s_, nz*s_);
+            face(at(a, ym0), at(b, ym1), at(b, yb[i + 1]), at(a, yb[i]), DEEP[i % 2], nx*s_, nz*s_); }
+          // the bed: pale toward the middle, where the light reaches it
+          const m0 = [(gl[i][0] + gr[i][0])/2, yb[i], (gl[i][2] + gr[i][2])/2], m1 = [(gl[i + 1][0] + gr[i + 1][0])/2, yb[i + 1], (gl[i + 1][2] + gr[i + 1][2])/2];
+          flatQ(T, at(gl[i], yb[i]), m0, m1, at(gl[i + 1], yb[i + 1]), i % 2 ? C(0xb9cdb4) : C(0xb2c7ae)); flatQ(T, m0, at(gr[i], yb[i]), at(gr[i + 1], yb[i + 1]), m1, i % 2 ? C(0xc6d6bd) : C(0xbfd1b7));   // (sandy, so it reads as the bottom, below the water)
+          // the water, a little below the ground
+          flatQ(Wt, at(gl[i], ys[i]), at(gr[i], ys[i]), at(gr[i + 1], ys[i + 1]), at(gl[i + 1], ys[i + 1]), HP.pool); }
+        // the ends: walled off, with a stone lip across the top
+        for (const [i, sg] of [[s0, 1], [e0, -1]]){ const ax = N[i][2]*sg, az = N[i][3]*sg, ym = (ys[i] + yb[i])/2;
+          face(gl[i], gr[i], at(gr[i], ys[i] + .02), at(gl[i], ys[i] + .02), DRY[0], ax, az); face(at(gl[i], ys[i] + .02), at(gr[i], ys[i] + .02), at(gr[i], ym), at(gl[i], ym), WET[0], ax, az); face(at(gl[i], ym), at(gr[i], ym), at(gr[i], yb[i]), at(gl[i], yb[i]), DEEP[0], ax, az);
+          const la = [gl[i][0] - N[i][2]*sg*.05, gl[i][1] + .07, gl[i][2] - N[i][3]*sg*.05], lb = [gr[i][0] - N[i][2]*sg*.05, gr[i][1] + .07, gr[i][2] - N[i][3]*sg*.05]; seg(T, V3(...la), V3(...lb), .1, .14, C(0xbdb29d)); }
+        if (opt.cuts){ const ins = .02; for (let i = s0; i < e0; i++){ let a0 = G(i, WL + ins), a1 = G(i, WR - ins), b0 = G(i + 1, WL + ins), b1 = G(i + 1, WR - ins);
+            if (i === s0){ a0 = [a0[0] + N[i][2]*ins, a0[1] + N[i][3]*ins]; a1 = [a1[0] + N[i][2]*ins, a1[1] + N[i][3]*ins]; }
+            if (i === e0 - 1){ b0 = [b0[0] - N[i + 1][2]*ins, b0[1] - N[i + 1][3]*ins]; b1 = [b1[0] - N[i + 1][2]*ins, b1[1] - N[i + 1][3]*ins]; }
+            opt.cuts.push([a0, a1, b1, b0]); } } }
       // the bed's pebbles and weed; koi in the water, lilies on it
       const PEB = [C(0xe6e0cd), C(0x8fa595), C(0x6f8a7c), C(0xd2cbb5)];
-      for (let i = 0; i < n; i++){ const ot = (o) => { const [x, z] = G(i, o); return [x, z]; };
+      for (let i = 0; i < n; i++){ if (!inRun[i] || (i > 0 && !inRun[i - 1] && (i + 1 >= n || !inRun[i + 1]))) continue; const ot = (o) => { const [x, z] = G(i, o); return [x, z]; };
         for (let j = 0; j < 4; j++) if (R.chance(.7)){ const [x, z] = ot(R.r(.05, 1.15)); T.add(GEO.ico, mat(x, yb[i] + .02, z, R.r(0, PI), R.r(0, PI), 0, R.r(.04, .09), R.r(.025, .045), R.r(.04, .08)), R.pick(PEB)); }
         if (R.chance(.18)){ const [x, z] = ot(R.chance(.5) ? R.r(.04, .18) : R.r(1.02, 1.16)), h = R.r(.2, .42); T.add(GEO.cone8, mat(x, yb[i] + h/2, z, R.r(-.15, .15), 0, R.r(-.15, .15), .035, h, .035), R.pick([HP.lily, HP.moss])); }
         if (R.chance(.16)){ const [x, z] = ot(R.r(.25, .95)), y = R.r((yb[i] + ys[i])/2, ys[i] - .07), a = Math.atan2(N[i][2], N[i][3]) + R.r(-.5, .5), col = R.chance(.75) ? HP.luxOrange : C(0xf4efe4);
@@ -3182,15 +3214,18 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // the mask of where the land is cut open (see CUTU): the canals' outlines filled into a canvas over the box they take up,
   // fine enough that the kerbs cover its steps
   function buildCut(cuts){
-    if (!cuts.length){ CUTU.uCutOn.value = 0; return; }
+    if (!cuts.length){ CUTC.L = null; cutOn(false); return; }
     let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const q of cuts) for (const [x, z] of q){ x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
     x0 -= .5; z0 -= .5; x1 += .5; z1 += .5; const pix = Math.max(.025, (x1 - x0)/2048, (z1 - z0)/2048), W = Math.ceil((x1 - x0)/pix), H = Math.ceil((z1 - z0)/pix);
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d', { willReadFrequently: true }); g.fillStyle = '#fff';
     for (const q of cuts){ g.beginPath(); q.forEach(([x, z], k) => { const u = (x - x0)/pix, v = (z - z0)/pix; if (k) g.lineTo(u, v); else g.moveTo(u, v); }); g.closePath(); g.fill(); }
     const rgba = g.getImageData(0, 0, W, H).data, L = new Uint8Array(W*H); for (let k = 0; k < L.length; k++) L[k] = rgba[k*4] > 127 ? 255 : 0;
+    CUTC.L = L; CUTC.W = W; CUTC.H = H; CUTC.x0 = x0; CUTC.z0 = z0; CUTC.pix = pix;
     const tx = new THREE.DataTexture(L, W, H, THREE.LuminanceFormat); tx.magFilter = tx.minFilter = THREE.NearestFilter; tx.generateMipmaps = false; tx.needsUpdate = true;
-    CUTU.uCut.value.dispose(); CUTU.uCut.value = tx; CUTU.uCutO.value.set(x0, z0); CUTU.uCutS.value.set(W*pix, H*pix); CUTU.uCutOn.value = 1; }
-  function buildPaths(){ dropMesh(PTH.mesh); PTH.pools = []; const cuts = []; PTH.mesh = pathMesh(PATHS, PTH.pools, false, cuts); buildCut(cuts); PTH.dirty = false; linksDirty = true; SHD.dirty = true; }
+    CUTU.uCut.value.dispose(); CUTU.uCut.value = tx; CUTU.uCutO.value.set(x0, z0); CUTU.uCutS.value.set(W*pix, H*pix); cutOn(true); }
+  function buildPaths(){ dropMesh(PTH.mesh); PTH.pools = []; const cuts = []; PTH.mesh = pathMesh(PATHS, PTH.pools, false, cuts); const had = !!CUTC.L; buildCut(cuts);
+    if (had || CUTC.L){ for (const [k, t] of tufts){ const x = (t[0] + .5)*GC, z = (t[1] + .5)*GC; if (had || inCanal(x, z, .5)){ if (tdata.has(k)){ tdata.delete(k); gDirty.add(sqKey(t[0], t[1])); } } }
+      for (const [k, t] of plants){ const x = (t[0] + .5)*PC, z = (t[1] + .5)*PC; if (had || inCanal(x, z, .8)){ if (pdata.has(k)){ pdata.delete(k); gDirty.add(pSqKey(t[0], t[1])); } } } } PTH.dirty = false; linksDirty = true; SHD.dirty = true; }
   function liveStroke(){ dropMesh(PTH.live); PTH.live = null; if (PTH.cur && PTH.cur.p.length > 1) PTH.live = pathMesh([PTH.cur], [], true); }   // (see-through until let go: a preview)
   // the ground under a path is cleared of grass and plants
   function clearUnder(stroke){ const w = PW[stroke.s]/2 + .1; for (const q of smoothPts(stroke.p)){ paintGrass(q[0], q[1], w, GR.style, true); paintPlants(q[0], q[1], w, 0, true); } }
@@ -3233,8 +3268,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     delLine.geometry.dispose(); delLine.geometry = new THREE.BufferGeometry(); delLine.geometry.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); delLine.visible = true;
     for (const p of PIECES) if (inDel(r, p.x, p.z)) hlPiece(p, hlDel); }
   function clearArea(r){
-    for (const p of PIECES.slice()) if (PIECES.includes(p) && inDel(r, p.x, p.z)) removePiece(p);
-    for (let u = r.u0; u <= r.u1 + .01; u += .7) for (let v = r.v0; v <= r.v1 + .01; v += .7){ const q = delAt(r, Math.min(u, r.u1), Math.min(v, r.v1)); paintGrass(q.x, q.z, .5, GR.style, true); paintPlants(q.x, q.z, .5, 0, true); }
+    for (const p of PIECES.slice()) if (PIECES.includes(p) && inDel(r, p.x, p.z)) removePiece(p, true);   // (saved once, below)
+    { let g = false, pl = false;   // (the grass and plants inside: one pass over what's there, not a brush stamped over the whole area)
+      for (const [k, t] of tufts) if (inDel(r, (t[0] + .5)*GC, (t[1] + .5)*GC)){ tufts.delete(k); tdata.delete(k); gDirty.add(sqKey(t[0], t[1])); g = true; }
+      for (const [k, t] of plants) if (inDel(r, (t[0] + .5)*PC, (t[1] + .5)*PC)){ plants.delete(k); pdata.delete(k); gDirty.add(pSqKey(t[0], t[1])); pl = true; }
+      if (g) saveGrass(); if (pl) savePlants(); }
     { let any = false; const out = []; for (const p of PATHS){ let run = []; for (const q of p.p){ if (inDel(r, q[0], q[1])){ any = true; if (run.length > 1) out.push({ s: p.s, p: run }); run = []; } else run.push(q); } if (run.length > 1) out.push({ s: p.s, p: run }); } if (any){ PATHS = out; savePaths(); buildPaths(); } }
     delLine.visible = false; save(); }
 
@@ -3311,7 +3349,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (status) status.textContent = ''; }
   // the walkway under the pointer, if it's nearer than any block there: [a id, b id]
   function linkAt(cx, cy){
-    if (!linksMesh) return null; const r = canvas.getBoundingClientRect(); _ndc.set((cx - r.left)/r.width*2 - 1, 1 - (cy - r.top)/r.height*2);
+    if (!LREG.size) return null; const r = canvas.getBoundingClientRect(); _ndc.set((cx - r.left)/r.width*2 - 1, 1 - (cy - r.top)/r.height*2);
     _ray.setFromCamera(_ndc, cam); let best = null, bd = 1e9;   // (each walkway's own bounds first, then only its triangles: testing the whole merged mesh cost ~4 ms a hover)
     for (const v of LCACHE.values()){ if (!v.used || !v.geo) continue; if (!v.geo.boundingSphere) v.geo.computeBoundingSphere(); if (!_ray.ray.intersectsSphere(v.geo.boundingSphere)) continue;
       if (!v.geo.boundingBox) v.geo.computeBoundingBox(); if (!_ray.ray.intersectsBox(v.geo.boundingBox)) continue;
@@ -3440,9 +3478,18 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // the time panel: a slider through the whole day, and the times to jump to
   const tSlider = document.getElementById('timeSlider'), tClock = document.getElementById('clock');
   const periodOf = h => h < 4.8 || h >= 21 ? 'Night' : h < 6.4 ? 'Dawn' : h < 9 ? 'Morning' : h < 12 ? 'Late morning' : h < 14 ? 'Midday' : h < 17 ? 'Afternoon' : h < 19 ? 'Golden hour' : 'Dusk';
-  function setTime(h){ setHour(h); if (tSlider){ tSlider.value = h; tSlider.style.setProperty('--p', (h/24*100).toFixed(2) + '%'); } const pe = document.getElementById('period'); if (pe) pe.textContent = periodOf(h); const ro = document.getElementById('readout'); if (ro) ro.textContent = String(Math.floor(h) % 24).padStart(2, '0') + ':' + String(Math.floor((h % 1)*60)).padStart(2, '0') + ' · ' + periodOf(h); if (tClock){ const hh = Math.floor(h) % 24, mm = Math.floor((h % 1)*60); tClock.textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); }
+  let curHour = 11;
+  function setTime(h){ curHour = h; setHour(h); if (tSlider){ tSlider.value = h; tSlider.style.setProperty('--p', (h/24*100).toFixed(2) + '%'); } const pe = document.getElementById('period'); if (pe) pe.textContent = periodOf(h); const ro = document.getElementById('readout'); if (ro) ro.textContent = String(Math.floor(h) % 24).padStart(2, '0') + ':' + String(Math.floor((h % 1)*60)).padStart(2, '0') + ' · ' + periodOf(h); if (tClock){ const hh = Math.floor(h) % 24, mm = Math.floor((h % 1)*60); tClock.textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); }
     document.querySelectorAll('[data-h]').forEach(b => b.classList.toggle('on', Math.abs(+b.dataset.h - h) < .01)); }
   if (tSlider) tSlider.addEventListener('input', () => setTime(+tSlider.value));
+  // the day cycle: time runs on by itself, a whole day in eight minutes (the light moved in small steps, four a second, so
+  // the shadows are drawn again only that often); remembered for next time
+  const DAY = { on: false, acc: 0, rate: 24/(8*60) }, dayBtn = document.getElementById('dayCycle');
+  try { DAY.on = localStorage.getItem('neonIsland.coast.dayCycle') === '1'; } catch (e) {}
+  const showDay = () => { if (dayBtn){ dayBtn.classList.toggle('on', DAY.on); dayBtn.setAttribute('aria-pressed', String(DAY.on)); } };
+  if (dayBtn) dayBtn.addEventListener('click', () => { DAY.on = !DAY.on; DAY.acc = 0; showDay(); try { localStorage.setItem('neonIsland.coast.dayCycle', DAY.on ? '1' : '0'); } catch (e) {} });
+  showDay();
+  function dayTick(dt){ if (!DAY.on) return; DAY.acc += dt; if (DAY.acc < .25) return; setTime((curHour + DAY.acc*DAY.rate) % 24); DAY.acc = 0; }
   document.querySelectorAll('[data-h]').forEach(b => b.addEventListener('click', () => setTime(+b.dataset.h)));
   // settings opens on the right, as in the sky city; the turn buttons either side of the cards
   { const dt_ = document.getElementById('deckToggle'), dk = document.getElementById('deck');
@@ -3472,7 +3519,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const hide = [sea, spray, ghost, ring, connGhost, outline, hlGroup, ...zGhosts, ...BLOOMS];
     for (const m of gSquares.values()) hide.push(m);
     if (poolMesh) hide.push(poolMesh);
-    if (linksMesh) hide.push(...linksMesh.children);
+    if (linksMesh) hide.push(...linksMesh.children); for (const r of LREG.values()) hide.push(...r.mesh.children);   // (the walkways' plants)
     for (const m of pieceMeshes){ if (m.userData.fol) hide.push(m.userData.fol); if (!nearSea(m.position.x, m.position.z, 22)) hide.push(m); }
     for (const [k, ms] of HB.map){ const [bi, bj] = k.split(',').map(Number); for (const m of ms) if (m.userData.fol || !nearSea((bi + 1)*HB.size, (bj + .5)*HB.size, 22)) hide.push(m); }
     for (const ch of chunks.values()) if (ch.mesh && ch.mesh.visible && !nearSea(ch.i*CH + CH, ch.j*CH + CH/2, 14) && !nearSea(ch.i*CH + CH, ch.j*CH, 14) && !nearSea(ch.i*CH + CH, ch.j*CH + CH, 14)) hide.push(ch.mesh);
@@ -3495,7 +3542,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // the shadow box moves with the view, or a caster comes, goes or changes (SHD.dirty, set wherever that happens)
   function shadowTick(){
     const sc = sun.shadow.camera, k = sun.position.x.toFixed(3) + ',' + sun.position.y.toFixed(3) + ',' + sun.position.z.toFixed(3) + ',' + sc.right.toFixed(2) + ',' + sc.far.toFixed(1) + ',' + sun.target.position.x.toFixed(3);
-    if (k !== SHD.key || SHD.dirty){ SHD.key = k; SHD.dirty = false; renderer.shadowMap.needsUpdate = true; } }
+    SHD.n = (SHD.n || 0) + 1; if (k !== SHD.key || SHD.dirty || (SHD.lazy && SHD.n >= 8)){ SHD.key = k; SHD.dirty = SHD.lazy = false; SHD.n = 0; renderer.shadowMap.needsUpdate = true; } }   // (lazy: land streamed in; caught up within 8 frames)
   // PROF: a test hook, time per part of the frame (CPU side; the GPU's share shows up in render)
   const tk = (name, t0_) => { if (PROF.on){ const t1 = performance.now(); PROF.acc[name] = (PROF.acc[name] || 0) + t1 - t0_; return t1; } return 0; };
   let fNo = 0, halfDt = 0, ghostKey = '', ghostVK = '', lastVK = '';
@@ -3508,8 +3555,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         hlClear(); if (PL.kind !== 'path') pathHover(null);
         if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'path') showPath(); else if (PL.kind === 'del') showDel(); else if (PL.kind === 'grass') showGrass(); else if (isZone(PL.kind) && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } lastVK = vk; }
     q = tk('ghost', q);
-    animTick(dt); rotorTick(dt); agentTick(dt); const batched = batchTick();
-    if (linksDirty && !ANIM.list.length && !batched) buildLinks();   // (not in the same frame as a batch: the two together made a hitch)
+    dayTick(dt); animTick(dt); rotorTick(dt); agentTick(dt); const batched = batchTick();
+    if (PTH.dirty && !ANIM.list.length && !batched) buildPaths();   // (sets linksDirty: the links follow next frame)
+    else if (linksDirty && !ANIM.list.length && !batched) buildLinks();   // (not in the same frame as a batch: the two together made a hitch)
     q = tk('anim+links', q);
     const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t, !(fNo & 3) || TOFF.fix !== undefined); /* (a crest's arrival is caught every fourth frame; the spray itself moves every frame) */ q = tk('spray', q); grassTick(t); q = tk('grass', q);
     halfDt += dt; if ((fNo & 1) || TOFF.fix !== undefined){ foamStep(halfDt); halfDt = 0; } q = tk('foam', q); renderRefl(); q = tk('reflection', q);   // (the foam's slow: it keeps up at half the rate)
@@ -3523,7 +3571,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { remove: p => removePiece(p), pieceHit: (x, y) => pieceHit(x, y), linkAt: (x, y) => linkAt(x, y), stirWater: (x, y) => stirWater(x, y), buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, PATHS: () => PATHS, addPath: (s, p) => { PATHS.push({ s, p }); savePaths(); buildPaths(); }, buildPaths: () => buildPaths(), AG, agentTick: dt => agentTick(dt), FIELD, inHull: (P, x, z) => inHull(P, x, z), RAILS, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
+  window.COAST = { inCanal: (x, z, m) => inCanal(x, z, m), clearRect: (a, b) => clearArea(delRect(a, b)), remove: p => removePiece(p), pieceHit: (x, y) => pieceHit(x, y), linkAt: (x, y) => linkAt(x, y), stirWater: (x, y) => stirWater(x, y), buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, PATHS: () => PATHS, addPath: (s, p) => { PATHS.push({ s, p }); savePaths(); buildPaths(); }, buildPaths: () => buildPaths(), AG, agentTick: dt => agentTick(dt), FIELD, inHull: (P, x, z) => inHull(P, x, z), RAILS, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

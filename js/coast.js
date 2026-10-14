@@ -69,6 +69,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   }
   function rocksNear(z){ const c0 = Math.floor(z/ROCK_CELL), out = []; for (let c = c0 - 1; c <= c0 + 1; c++) out.push(...rocksOf(c)); return out; }
 
+  // a mesh that is only ever drawn (never raycast, never merged again, rebuilt rather than changed) lets its CPU copy of
+  // each buffer go once it's on the GPU: three keeps every one otherwise, and in a big city that was hundreds of MB of heap
+  const _drop = function(){ this.array = null; };
+  function releaseCPU(g){ if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingBox) g.computeBoundingBox(); for (const k in g.attributes) g.attributes[k].onUpload(_drop); if (g.index) g.index.onUpload(_drop); return g; }
   /* ---------- placed pieces (they level the ground under them, so the heights need them) ---------- */
   const PIECES = [], PCELL = 16, pieceGrid = new Map();   // (the lookup buckets are only for finding pieces near a point; pieces sit anywhere)
   const pcells = (p, f) => { const m = p.r + 2; for (let a = Math.floor((p.x - m)/PCELL); a <= Math.floor((p.x + m)/PCELL); a++) for (let b = Math.floor((p.z - m)/PCELL); b <= Math.floor((p.z + m)/PCELL); b++) f(a + ',' + b); };
@@ -424,7 +428,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const ns = SK.p.length/3, NT = NV + ns, P2 = new Float32Array(NT*3), C2 = new Float32Array(NT*3), N2 = new Float32Array(NT*3), S2 = new Float32Array(NT);
     P2.set(LP); C2.set(LC); N2.set(LN); P2.set(SK.p, NV*3); C2.set(SK.c, NV*3); for (let v = NV; v < NT; v++){ N2[v*3 + 1] = 1; S2[v] = 1; }   // (skirts lit like the ground)
     const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(P2, 3)); lg.setAttribute('color', new THREE.BufferAttribute(C2, 3)); lg.setAttribute('normal', new THREE.BufferAttribute(N2, 3)); lg.setAttribute('skirt', new THREE.BufferAttribute(S2, 1));
-    const m = new THREE.Mesh(lg, landM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.matrixAutoUpdate = false; m.frustumCulled = true;
+    releaseCPU(lg); const m = new THREE.Mesh(lg, landM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.matrixAutoUpdate = false; m.frustumCulled = true;
     // (the skirts are in the land mesh itself, above)
     if (BT.p.length) m.add(BT.mesh(pieceM));
     scene.add(m); return m;
@@ -1017,13 +1021,13 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       const mx = i*CH + CH/2, mz = j*CH + CH/2, g = inRect(mx, mz, CH*.75); if (g === null) continue;
       const key = i + ',' + j; let ch = chunks.get(key);
       if (!ch){ ch = { i, j, land: chunkHasLand(i, j), mesh: null, lod: undefined, seen: 0, dirty: false }; chunks.set(key, ch); }
-      ch.seen = fcount; if (!ch.land) continue;
+      ch.seen = fcount; if (!ch.land) continue; if (ch.mesh && !ch.mesh.visible) ch.mesh.visible = true;
       const want = lodAt(g, ch.mesh ? ch.lod : undefined);
       if (!ch.mesh || ch.dirty || want !== ch.lod) todo.push([(ch.mesh ? 1e4 : 0) + (ch.dirty ? -2e4 : 0) + Math.hypot(mx - V.cx, mz - V.cz), ch, want]);
     }
     for (let c = Math.floor(z0/ROCK_CELL) - 1; c <= Math.floor(z1/ROCK_CELL) + 1; c++){
       const rs = rocksOf(c); if (!rs.some(k => inRect(k.x, k.z, 14) !== null)) continue;
-      let rc = rockMeshes.get(c); if (!rc){ rc = { mesh: buildRocks(c), seen: 0 }; rockMeshes.set(c, rc); SHD.dirty = true; } rc.seen = fcount;
+      let rc = rockMeshes.get(c); if (!rc){ rc = { mesh: buildRocks(c), seen: 0 }; rockMeshes.set(c, rc); SHD.dirty = true; } rc.seen = fcount; if (!rc.mesh.visible) rc.mesh.visible = true;
     }
     todo.sort((a, b) => a[0] - b[0]);   // (pieces just placed first, then what's missing, nearest first, then detail changes)
     const t0 = performance.now();
@@ -1034,13 +1038,16 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     }
     // drop what's long out of view (kept a while, so a turn back and forth doesn't remake it)
     if (fcount % 30 === 0){
-      for (const [k, ch] of chunks) if (fcount - ch.seen > 400 && chunks.size > 700){ if (ch.mesh){ scene.remove(ch.mesh); ch.mesh.traverse(o => o.geometry && o.geometry.dispose()); } chunks.delete(k); }
-      for (const [k, rc] of rockMeshes) if (fcount - rc.seen > 400 && rockMeshes.size > 140){ scene.remove(rc.mesh); rc.mesh.geometry.dispose(); rockMeshes.delete(k); }
+      // (out of view a moment: hidden, so the frame's culling, shadow and reflection passes don't walk them; long gone: freed)
+      for (const ch of chunks.values()) if (ch.mesh && ch.mesh.visible && fcount - ch.seen > 30) ch.mesh.visible = false;
+      for (const rc of rockMeshes.values()) if (rc.mesh.visible && fcount - rc.seen > 30) rc.mesh.visible = false;
+      for (const [k, ch] of chunks) if (fcount - ch.seen > 400 && chunks.size > 260){ if (ch.mesh){ scene.remove(ch.mesh); ch.mesh.traverse(o => o.geometry && o.geometry.dispose()); } chunks.delete(k); }
+      for (const [k, rc] of rockMeshes) if (fcount - rc.seen > 400 && rockMeshes.size > 60){ scene.remove(rc.mesh); rc.mesh.geometry.dispose(); rockMeshes.delete(k); }
       if (rockCache.size > 600) rockCache.clear();
     }
     // the depth window: centered a little ahead of the view, where most of the sea on screen is
     const ahead = Math.min(V.gH*.4, DW_*.25);
-    const tw = performance.now(); moveWindow(V.cx + V.fx*ahead, V.cz + V.fz*ahead, budget > 100 ? 1e9 : 3); if (PROF.on) PROF.win = (PROF.win || 0) + performance.now() - tw;
+    const tw = performance.now(); moveWindow(V.cx + V.fx*ahead, V.cz + V.fz*ahead, budget > 100 ? 1e9 : Math.max(1, budget - (performance.now() - t0)));   // (one budget a frame for both: the chunks first, the window what's left) if (PROF.on) PROF.win = (PROF.win || 0) + performance.now() - tw;
     seaU.box.value.set(WIN.x0*TEX, WIN.z0*TEX, DW_, DW_);
   }
 
@@ -2008,7 +2015,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
           if (R.chance(.5)) seedHead(G, top[0], top[1] - .02, top[2], R.r(.14, .22), GG.head, top[1] - y0); } } }
     return G.I.length ? G.mesh() : null; }
   const geoCache = new Map();
-  function blockOf(kind, seed, below, above){ const key = kind + ':' + seed + ':' + (below ? 1 : 0) + (above ? 1 : 0); let g = geoCache.get(key); if (g) return g;
+  function blockOf(kind, seed, below, above){ const key = kind + ':' + seed + ':' + (below ? 1 : 0) + (above ? 1 : 0); let g = geoCache.get(key); if (g){ geoCache.delete(key); geoCache.set(key, g); return g; }   // (kept in the order last used, so the cap lets go of the least used)
+    if (PROF.on) PROF.miss = (PROF.miss || 0) + 1;
     const T = new Tris(true, KINDS[kind].lux ? 9 : shopOf(kind, seed)), k = KIND_KEYS.indexOf(kind) + 1; if (KINDS[kind].ind) T.remap = IND_SHADES[indShade(seed)]; const R = rng(Math.imul(seed, 2654435761) ^ k*97), D = rng(Math.imul(seed, 1597334677) ^ k*131);
     const cx_ = { below, above }, top = KINDS[kind].build(T, R, D, cx_), cut = below ? .1 : .6, pts = [];
     let hmax = top; for (let i = 0; i < T.p.length; i += 3){ if (T.p[i + 1] > hmax) hmax = T.p[i + 1]; if (T.p[i + 1] > cut) pts.push([T.p[i], T.p[i + 2]]); }
@@ -2051,7 +2059,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       o += n; }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('color', new THREE.BufferAttribute(Cc, 3));
     g.setAttribute(indexed ? 'aH' : 'glow', new THREE.BufferAttribute(X, 1)); if (indexed){ g.setIndex(new THREE.BufferAttribute(I, 1)); g.setAttribute('aG', new THREE.BufferAttribute(GLc, 3)); }
-    g.computeBoundingSphere(); if (indexed) g.boundingSphere.radius += .6; return g; }
+    g.computeBoundingSphere(); if (indexed) g.boundingSphere.radius += .6; return releaseCPU(g); }   // (merged copies are drawn only)
   function buildBatch(key){
     const old = HB.map.get(key); if (old){ for (const m of old){ scene.remove(m); m.geometry.dispose(); } HB.map.delete(key); }
     const ps = PIECES.filter(p => !p.anim && p.mesh && regKey(p) === key); if (!ps.length) return;
@@ -2155,7 +2163,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     order.forEach((l, k) => { const vFrom = k % 2 ? -vs : vs; P(l, -vFrom, .42, 1); if (k < order.length - 1) P(order[k + 1], -vFrom, .6); });
     const vEnd = order.length % 2 ? -vs : vs; P(us, vEnd, .6); P(us, vs, .6);
     wp.push([ent.x, 0, ent.z, .6], [ox, 0, oz, .6], [hx, 0, hz, .45, 8 + R()*10]); a.wp = wp; a.field = f; }
-  const groundY = (x, z) => { let y = heightAt(x, z); for (const q of PIECES) if (!q.level && q.bb && x >= q.bb[0] && x <= q.bb[2] && z >= q.bb[1] && z <= q.bb[3] && inHull(q.hullW, x, z)) y = Math.max(y, q.y + (q.kind === 'field' ? .16 : .12)); return y; };
+  const groundY = (x, z) => { let y = heightAt(x, z); const l = pieceGrid.get(Math.floor(x/PCELL) + ',' + Math.floor(z/PCELL)); if (l) for (const q of l) if (!q.level && q.bb && x >= q.bb[0] && x <= q.bb[2] && z >= q.bb[1] && z <= q.bb[3] && inHull(q.hullW, x, z)) y = Math.max(y, q.y + (q.kind === 'field' ? .16 : .12)); return y; };
   const _am = new THREE.Matrix4(), _aq = new THREE.Quaternion(), _ae = new THREE.Euler(0, 0, 0, 'YXZ'), _ap = new THREE.Vector3(), _as = new THREE.Vector3(1, 1, 1);
   function agentTick(dt){
     dt = Math.min(dt, .1); AG.t += dt;
@@ -2168,7 +2176,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         const e = a.u*a.u*(3 - 2*a.u), x = r.ax + (r.bx - r.ax)*e, z = r.az + (r.bz - r.az)*e;
         _ae.set(0, Math.atan2(r.bx - r.ax, r.bz - r.az), 0); _am.compose(_ap.set(x, r.y, z), _aq.setFromEuler(_ae), _as.setScalar(1.35)); AGM.p.setMatrixAt(np++, _am); continue; }
       if (a.wait > 0){ a.wait -= dt; } else if (!a.wp.length){ if (a.type === 'd') planDrone(a); else planRover(a); }
-      else { const w = a.wp[0], ty = a.type === 'v' ? groundY(a.x, a.z) : w[1], dx = w[0] - a.x, dy = a.type === 'v' ? 0 : ty - a.y, dz = w[2] - a.z, d = Math.hypot(dx, dy, dz), step = w[3]*dt;
+      else { const w = a.wp[0], ty = a.type === 'v' ? 0 : w[1], dx = w[0] - a.x, dy = a.type === 'v' ? 0 : ty - a.y, dz = w[2] - a.z, d = Math.hypot(dx, dy, dz), step = w[3]*dt;
         if (d <= step){ a.x = w[0]; a.z = w[2]; if (a.type === 'd') a.y = ty; a.wp.shift(); if (w[4]) a.wait = w[4]; }
         else { a.x += dx/d*step; a.z += dz/d*step; if (a.type === 'd') a.y += dy/d*step; const h = Math.hypot(dx, dz); if (h > .01) a.yaw = Math.atan2(dx, dz); }
         a.vx = a.vx*.85 + (d > step ? dx/d*w[3] : 0)*.15; a.vz = a.vz*.85 + (d > step ? dz/d*w[3] : 0)*.15; }
@@ -2871,10 +2879,21 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // the home under the pointer, if any (its block)
   const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2();
   const _nm = new THREE.Matrix3();
-  function pieceHit(cx, cy){
+  // the nearest block along the pointer's ray: blocks whose bounds the ray meets, nearest first, and none tested past a hit
+  // (once a frame per pointer spot: the hover asks it more than once)
+  const _sph = new THREE.Sphere(), _cands = [], PRAY = { k: '', h: null };
+  function pieceRay(cx, cy){
+    const key = cx + ',' + cy + ',' + renderer.info.render.frame + ',' + PIECES.length; if (key === PRAY.k) return PRAY.h; PRAY.k = key; PRAY.h = null;
     if (!pieceMeshes.length) return null;
     const r = canvas.getBoundingClientRect(); _ndc.set((cx - r.left)/r.width*2 - 1, 1 - (cy - r.top)/r.height*2);
-    _ray.setFromCamera(_ndc, cam); const h = _ray.intersectObjects(pieceMeshes, false)[0]; if (!h) return null;
+    _ray.setFromCamera(_ndc, cam); _cands.length = 0;
+    for (const m of pieceMeshes){ const g = m.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); _sph.copy(g.boundingSphere).applyMatrix4(m.matrixWorld);
+      if (_ray.ray.intersectsSphere(_sph)) _cands.push([_ray.ray.origin.distanceTo(_sph.center) - _sph.radius, m]); }
+    _cands.sort((a, b) => a[0] - b[0]); let best = null;
+    for (const [d, m] of _cands){ if (best && d > best.distance) break; const h = _ray.intersectObject(m, false)[0]; if (h && (!best || h.distance < best.distance)) best = h; }
+    return PRAY.h = best; }
+  function pieceHit(cx, cy){
+    const h = pieceRay(cx, cy); if (!h) return null;
     const n = h.face ? h.face.normal.clone().applyMatrix3(_nm.getNormalMatrix(h.object.matrixWorld)).normalize() : new THREE.Vector3(0, 1, 0);
     return { piece: h.object.userData.piece, point: h.point, top: n.y > .6 }; }
   const pieceAt = (cx, cy) => { const h = pieceHit(cx, cy); return h ? h.piece : null; };
@@ -2905,7 +2924,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     ghost.geometry = blockOf(K, S, false, false).geo; ghost.position.set(hit.x, y, hit.z); ghost.rotation.y = PL.rot; ghost.visible = true;
     const a = ringGeo.attributes.position.array;
     for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s = Math.sin(t);
-      for (const [j, rr] of [[0, r], [1, r + .14]]){ const x = hit.x + c*rr, z = hit.z + s*rr, o = (i*2 + j)*3; a[o] = x; a[o + 1] = heightAt(x, z) + .07; a[o + 2] = z; } }
+      const hy = heightAt(hit.x + c*(r + .07), hit.z + s*(r + .07)) + .07; for (const [j, rr] of [[0, r], [1, r + .14]]){ const o = (i*2 + j)*3; a[o] = hit.x + c*rr; a[o + 1] = hy; a[o + 2] = hit.z + s*rr; } }   // (one height for both edges of the band)
     ringGeo.attributes.position.needsUpdate = true; ring.visible = true;
     ringM.color.set(ck.ok ? 0x7dffb0 : 0xff6a5a);
     say(ck.ok ? '' : ck.why, ck.ok);
@@ -2951,7 +2970,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const zHide = () => { for (const m of zGhosts) m.visible = false; };
   // where each home of the layout lands here, and whether it can go
   function zoneSpots(cx, cz){ const c = Math.cos(PL.rot), s_ = Math.sin(PL.rot);
-    return zoneLayout().map(o => { const x = cx + o.lx*c - o.lz*s_, z = cz + o.lx*s_ + o.lz*c; return Object.assign({}, o, { x, z, rot: o.rot + PL.rot, ck: check(o.kind, x, z, o.seed, o.rot + PL.rot) }); }); }
+    return zoneLayout().map(o => { const x = cx + o.lx*c - o.lz*s_, z = cz + o.lx*s_ + o.lz*c; return Object.assign({}, o, { x, z, rot: o.rot + PL.rot }); }); }   // (each spot is checked once, in planSpot)
   // How one spot of the layout goes down among the homes already built. Clear ground: as laid out. Landing on a home (the
   // spot's middle inside one): its blocks go on top of that stack, square to it, as many as fit. Not on one but bumping
   // into one: it is set against that home's wall, on the same floor as the home, and rises from there. Returns the column
@@ -2983,7 +3002,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     PL.ok = n ? { ok: true } : { ok: false, why: 'no room here' };
     const r = Math.max(ZSIZE[ZONE.size], 1.4), a = ringGeo.attributes.position.array;
     for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s_ = Math.sin(t);
-      for (const [j, rr] of [[0, r], [1, r + .18]]){ const x = hit.x + c*rr, z = hit.z + s_*rr, o = (i*2 + j)*3; a[o] = x; a[o + 1] = heightAt(x, z) + .07; a[o + 2] = z; } }
+      const hy = heightAt(hit.x + c*(r + .09), hit.z + s_*(r + .09)) + .07; for (const [j, rr] of [[0, r], [1, r + .18]]){ const o = (i*2 + j)*3; a[o] = hit.x + c*rr; a[o + 1] = hy; a[o + 2] = hit.z + s_*rr; } }
     ringGeo.attributes.position.needsUpdate = true; ring.visible = true; ringM.color.set(n ? 0x7dffb0 : 0xff6a5a);
     if (status){ status.textContent = n ? '' : 'no room here'; /* (what's in the brush shows in the ghosts; words only when nothing fits) */ status.style.color = n ? '#5c7060' : '#c0623f'; }
   }
@@ -3052,7 +3071,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // a ring round (x, z): on the ground, or at height y
   function ringAt(x, z, r, y = null, w = .14){ ringM.depthTest = true; const a = ringGeo.attributes.position.array;
     for (let i = 0; i <= RN; i++){ const t = i/RN*PI*2, c = Math.cos(t), s_ = Math.sin(t);
-      for (const [j, rr] of [[0, r], [1, r + w]]){ const px = x + c*rr, pz = z + s_*rr, o = (i*2 + j)*3; a[o] = px; a[o + 1] = (y === null ? heightAt(px, pz) : y) + .07; a[o + 2] = pz; } }
+      const hy = (y === null ? heightAt(x + c*(r + w/2), z + s_*(r + w/2)) : y) + .07; for (const [j, rr] of [[0, r], [1, r + w]]){ const o = (i*2 + j)*3; a[o] = x + c*rr; a[o + 1] = hy; a[o + 2] = z + s_*rr; } }
     ringGeo.attributes.position.needsUpdate = true; ring.visible = true; }
 
   /* ---------- paths: drawn by dragging across the ground (the Paths tool, key 7) ---------- */
@@ -3107,7 +3126,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       for (let i = 8; i < n; i += 15){ const [x, z] = G(i, (Math.floor(i/15) % 2 ? 1 : -1)*.7); if (inside(x, z)) continue; const y = heightAt(x, z); box(T, x, y + .25, z, .1, .5, .1, HP.stone); box(T, x, y + .56, z, .14, .14, .14, HP.lamp); pools.push([x, z, 1.0, .7]); } } }
   // the paths drawn: one mesh for all of them, made again when one changes; the stroke being drawn has its own
   function pathMesh(list, pools){ const T = new Tris(); for (const p of list) drawPath(T, p, pools); if (!T.p.length) return null;
-    const m = new THREE.Mesh(T.geo(), pieceM); m.receiveShadow = true; m.castShadow = false; m.matrixAutoUpdate = false; m.raycast = () => {}; scene.add(m); return m; }
+    const m = new THREE.Mesh(releaseCPU(T.geo()), pieceM); m.receiveShadow = true; m.castShadow = false; m.matrixAutoUpdate = false; m.raycast = () => {}; scene.add(m); return m; }
   function buildPaths(){ if (PTH.mesh){ scene.remove(PTH.mesh); PTH.mesh.geometry.dispose(); } PTH.pools = []; PTH.mesh = pathMesh(PATHS, PTH.pools); PTH.dirty = false; linksDirty = true; SHD.dirty = true; }
   function liveStroke(){ if (PTH.live){ scene.remove(PTH.live); PTH.live.geometry.dispose(); PTH.live = null; } if (PTH.cur && PTH.cur.p.length > 1) PTH.live = pathMesh([PTH.cur], []); }
   // the ground under a path is cleared of grass and plants
@@ -3226,9 +3245,14 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // the walkway under the pointer, if it's nearer than any block there: [a id, b id]
   function linkAt(cx, cy){
     if (!linksMesh) return null; const r = canvas.getBoundingClientRect(); _ndc.set((cx - r.left)/r.width*2 - 1, 1 - (cy - r.top)/r.height*2);
-    _ray.setFromCamera(_ndc, cam); const h = _ray.intersectObject(linksMesh, false)[0]; if (!h || !h.face) return null;
-    const ph = _ray.intersectObjects(pieceMeshes, false)[0]; if (ph && ph.distance < h.distance - .05) return null;
-    const v = h.face.a; for (const [o0, o1, a, b] of linkRanges) if (v >= o0 && v < o1) return [a, b]; return null; }
+    _ray.setFromCamera(_ndc, cam); let best = null, bd = 1e9;   // (each walkway's own bounds first, then only its triangles: testing the whole merged mesh cost ~4 ms a hover)
+    for (const v of LCACHE.values()){ if (!v.used || !v.geo) continue; if (!v.geo.boundingSphere) v.geo.computeBoundingSphere(); if (!_ray.ray.intersectsSphere(v.geo.boundingSphere)) continue;
+      if (!v.geo.boundingBox) v.geo.computeBoundingBox(); if (!_ray.ray.intersectsBox(v.geo.boundingBox)) continue;
+      _lkM.geometry = v.geo; const h = _ray.intersectObject(_lkM, false)[0]; if (h && h.distance < bd){ bd = h.distance; best = v; } }
+    if (!best) return null;
+    const ph = pieceRay(cx, cy); if (ph && ph.distance < bd - .05) return null;
+    return [best.a, best.b]; }
+  const _lkM = new THREE.Mesh(new THREE.BufferGeometry(), pieceM);
   // with no tool picked, a right click takes away what's under the pointer: a walkway (if it's in front), else a home (and
   // all above it), else the grass there
   function removeAt(cx, cy){
@@ -3278,6 +3302,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const RIP = { i: 0, x: 1e9, z: 1e9, t: 0 };
   function stirWater(cx, cy){
     const now = CURV.gTime.value; if (now - RIP.t < .07) return;
+    if (!PIECES.some(p => p.kind === 'lagoon' || p.kind === 'grotto')){ RIP.t = now; return; }   // (no pool to stir: no ray march)
     const h = pick(cx, cy); if (!h) return;
     const inPool = PIECES.some(p => p.kind === 'lagoon' ? Math.hypot(h.x - p.x, h.z - p.z) < 1.85 : p.kind === 'grotto' ? Math.hypot(h.x - (p.x - Math.sin(p.rot)*.25), h.z - (p.z - Math.cos(p.rot)*.25)) < .45 : false);
     if (!inPool || Math.hypot(h.x - RIP.x, h.z - RIP.z) < .25) return;
@@ -3383,7 +3408,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (linksMesh) hide.push(...linksMesh.children);
     for (const m of pieceMeshes){ if (m.userData.fol) hide.push(m.userData.fol); if (!nearSea(m.position.x, m.position.z, 22)) hide.push(m); }
     for (const [k, ms] of HB.map){ const [bi, bj] = k.split(',').map(Number); for (const m of ms) if (m.userData.fol || !nearSea((bi + 1)*HB.size, (bj + .5)*HB.size, 22)) hide.push(m); }
-    for (const ch of chunks.values()) if (ch.mesh && !nearSea(ch.i*CH + CH, ch.j*CH + CH/2, 14) && !nearSea(ch.i*CH + CH, ch.j*CH, 14) && !nearSea(ch.i*CH + CH, ch.j*CH + CH, 14)) hide.push(ch.mesh);
+    for (const ch of chunks.values()) if (ch.mesh && ch.mesh.visible && !nearSea(ch.i*CH + CH, ch.j*CH + CH/2, 14) && !nearSea(ch.i*CH + CH, ch.j*CH, 14) && !nearSea(ch.i*CH + CH, ch.j*CH + CH, 14)) hide.push(ch.mesh);
     const vis = hide.map(o => o.visible); for (const o of hide) o.visible = false;
     scene.overrideMaterial = reflM;
     renderer.setRenderTarget(reflRT); renderer.setClearColor(0x000000, 0); renderer.autoClear = true; renderer.render(scene, reflCam);
@@ -3406,14 +3431,15 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (k !== SHD.key || SHD.dirty){ SHD.key = k; SHD.dirty = false; renderer.shadowMap.needsUpdate = true; } }
   // PROF: a test hook, time per part of the frame (CPU side; the GPU's share shows up in render)
   const tk = (name, t0_) => { if (PROF.on){ const t1 = performance.now(); PROF.acc[name] = (PROF.acc[name] || 0) + t1 - t0_; return t1; } return 0; };
-  let fNo = 0, halfDt = 0, ghostKey = '';
+  let fNo = 0, halfDt = 0, ghostKey = '', ghostVK = '', lastVK = '';
   function frame(now){
     const dt = Math.min(.1, (now - last)/1000); last = now; fNo++; let q = PROF.on ? performance.now() : 0;
     updateCamera(dt); q = tk('camera', q); stream(3); q = tk('stream', q);
-    { const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.zkinds.izone, PL.zkinds.lzone, PL.rot, DSEL ? DSEL.key : '-', PTH.style, GR.size, GR.style, GR.pstyle, GR.istyle, PL.zoneFol, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
-      if (gk !== ghostKey){ ghostKey = gk;   // (the ghost is worked out again only when something it shows has changed: the raycasts and checks are the costly part)
+    { const vk = camT.x.toFixed(3) + ',' + camT.z.toFixed(3) + ',' + yaw.toFixed(4) + ',' + zoom.toFixed(3) + ',' + pitch.toFixed(4);
+      const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.zkinds.izone, PL.zkinds.lzone, PL.rot, DSEL ? DSEL.key : '-', PTH.style, GR.size, GR.style, GR.pstyle, GR.istyle, PL.zoneFol, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
+      if (gk !== ghostKey || (vk !== ghostVK && fNo % 3 === 0) || (vk !== ghostVK && vk === lastVK)){ ghostKey = gk; ghostVK = vk;   // (the view moving alone: every third frame, and once more when it settles)   // (the ghost is worked out again only when something it shows has changed: the raycasts and checks are the costly part)
         hlClear();
-        if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'path') showPath(); else if (PL.kind === 'del') showDel(); else if (PL.kind === 'grass') showGrass(); else if (isZone(PL.kind) && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } }
+        if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'path') showPath(); else if (PL.kind === 'del') showDel(); else if (PL.kind === 'grass') showGrass(); else if (isZone(PL.kind) && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } lastVK = vk; }
     q = tk('ghost', q);
     animTick(dt); rotorTick(dt); agentTick(dt); const batched = batchTick();
     if (linksDirty && !ANIM.list.length && !batched) buildLinks();   // (not in the same frame as a batch: the two together made a hitch)
@@ -3430,7 +3456,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, PATHS: () => PATHS, addPath: (s, p) => { PATHS.push({ s, p }); savePaths(); buildPaths(); }, buildPaths: () => buildPaths(), AG, agentTick: dt => agentTick(dt), FIELD, inHull: (P, x, z) => inHull(P, x, z), RAILS, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
+  window.COAST = { remove: p => removePiece(p), pieceHit: (x, y) => pieceHit(x, y), linkAt: (x, y) => linkAt(x, y), stirWater: (x, y) => stirWater(x, y), buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, PATHS: () => PATHS, addPath: (s, p) => { PATHS.push({ s, p }); savePaths(); buildPaths(); }, buildPaths: () => buildPaths(), AG, agentTick: dt => agentTick(dt), FIELD, inHull: (P, x, z) => inHull(P, x, z), RAILS, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

@@ -227,6 +227,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const landM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }), true, true);
   const pieceM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true }), true, false, true);   // (pieces: walls stay their own color)
   const landDepth = bent(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), false);
+  { const ob = landDepth.onBeforeCompile; landDepth.onBeforeCompile = sh => { ob(sh);   // (a land patch's skirts are in its own mesh, marked: they cast no shadow)
+      sh.vertexShader = 'attribute float skirt; varying float vSk;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vSk = skirt;');
+      sh.fragmentShader = 'varying float vSk;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n if (vSk > 0.5) discard;'); };
+    landDepth.customProgramCacheKey = () => 'bentDepthSk'; }
 
   // a growing list of flat-shaded, colored triangles; props are merged into it
   // (what glows by night is known by its color: GLOW maps a palette color to how it glows; dark window glass is lit in about
@@ -234,6 +238,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const GLOW = new Map(), LEAFC = new Set();
   class Tris {
     constructor(fol = false){ this.p = []; this.c = []; this.gl = null; this.k = 0; this.fol = fol ? [] : null; }
+    append(o){ const n0 = this.p.length/3; for (let i = 0; i < o.p.length; i++){ this.p.push(o.p[i]); this.c.push(o.c[i]); }
+      if (o.gl) for (let i = 0; i < o.gl.length; i += 3) (this.gl || (this.gl = [])).push(o.gl[i] + n0, o.gl[i + 1], o.gl[i + 2]);
+      if (o.fol && this.fol) for (const f of o.fol) this.fol.push(f); }
     glowRun(n0, col){ let v = GLOW.get(col); if (v === undefined) return;
       if (v < 0){ const P = this.p, n1 = this.p.length/3; let x = 0, y = 0, z = 0; for (let i = n0; i < n1; i++){ x += P[i*3]; y += P[i*3 + 1]; z += P[i*3 + 2]; } const k = n1 - n0;
         v = hash2(Math.round(x/k*8)*73856093 ^ Math.round(z/k*8)*19349663, Math.round(y/k*8)) < -v ? .9 : 0; }   // (lit or not by where the window is: the same window stays lit whatever else is built)
@@ -317,11 +324,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (let i = 0; i < CN; i++){ skirt(i, i + 1); skirt(CN*VN + i, CN*VN + i + 1); skirt(i*VN, (i + 1)*VN); skirt(i*VN + CN, (i + 1)*VN + CN); }
     const near = (x, z, m) => pads.some(p => Math.hypot(x - p.x, z - p.z) < p.r + m);
     // (no bushes: the land is left open for homes and painted foliage)
-    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(LP, 3)); lg.setAttribute('color', new THREE.BufferAttribute(LC, 3)); lg.setAttribute('normal', new THREE.BufferAttribute(LN, 3));
+    const ns = SK.p.length/3, NT = NV + ns, P2 = new Float32Array(NT*3), C2 = new Float32Array(NT*3), N2 = new Float32Array(NT*3), S2 = new Float32Array(NT);
+    P2.set(LP); C2.set(LC); N2.set(LN); P2.set(SK.p, NV*3); C2.set(SK.c, NV*3); for (let v = NV; v < NT; v++){ N2[v*3 + 1] = 1; S2[v] = 1; }   // (skirts lit like the ground)
+    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(P2, 3)); lg.setAttribute('color', new THREE.BufferAttribute(C2, 3)); lg.setAttribute('normal', new THREE.BufferAttribute(N2, 3)); lg.setAttribute('skirt', new THREE.BufferAttribute(S2, 1));
     const m = new THREE.Mesh(lg, landM); m.castShadow = m.receiveShadow = true; m.customDepthMaterial = landDepth; m.matrixAutoUpdate = false; m.frustumCulled = true;
-    const sk = SK.mesh(), nr = sk.geometry.attributes.normal;
-    for (let v = 0; v < nr.count; v++) nr.setXYZ(v, 0, 1, 0);   // (a skirt that shows in a crack is lit like the ground, not like a wall)
-    sk.castShadow = false; m.add(sk);
+    // (the skirts are in the land mesh itself, above)
     if (BT.p.length) m.add(BT.mesh(pieceM));
     scene.add(m); return m;
   }
@@ -826,6 +833,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const _cr = new THREE.Vector3(), _cu = new THREE.Vector3(), _cv = new THREE.Vector3(), _cs = new THREE.Vector3();
   // the shadow box: fitted around the ground on screen, seen from the sun, its texels kept still as the view pans
   const sunM = new THREE.Matrix4(), sunX = new THREE.Vector3(), sunY = new THREE.Vector3(), sunZ = new THREE.Vector3(), _o = new THREE.Vector3(), SHADOW = { size: 0 };
+  const SHFIT = { size: 0 };
   function fitShadow(){
     sunM.lookAt(sunDir, _o.set(0, 0, 0), new THREE.Vector3(0, 1, 0)); sunM.extractBasis(sunX, sunY, sunZ);
     let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9;
@@ -835,8 +843,14 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       const a = px*sunX.x + py*sunX.y + pz*sunX.z, b = px*sunY.x + py*sunY.y + pz*sunY.z, c = px*sunZ.x + py*sunZ.y + pz*sunZ.z;
       x0 = Math.min(x0, a); x1 = Math.max(x1, a); y0 = Math.min(y0, b); y1 = Math.max(y1, b); z0 = Math.min(z0, c); z1 = Math.max(z1, c);
     }
-    let size = Math.max(x1 - x0, y1 - y0)*1.04; size = Math.ceil(size/16)*16;   // (in steps, so the texel size only changes with the zoom)
-    const tex = size/sun.shadow.mapSize.x, mx = Math.round((x0 + x1)/2/tex)*tex, my = Math.round((y0 + y1)/2/tex)*tex, back = 160;
+    // (the box is fitted with a margin and kept while the view stays inside it: panning a little no longer moves it, so
+    // the cached shadow map isn't redrawn every frame of a pan; it's refitted when the view leaves it, zooms well in or
+    // out, or the sun moves)
+    const need = Math.max(x1 - x0, y1 - y0)*1.04, ncx = (x0 + x1)/2, ncy = (y0 + y1)/2, F = SHFIT, sk = sunDir.x.toFixed(4) + sunDir.y.toFixed(4) + sunDir.z.toFixed(4);
+    if (F.size && F.sun === sk && need <= F.size && need > F.size*.55 && Math.abs(ncx - F.mx) + need/2 <= F.size/2 && Math.abs(ncy - F.my) + need/2 <= F.size/2 && z1 <= F.z1 && z0 >= F.z0) return;
+    let size = Math.ceil(need*1.3/16)*16;
+    const tex = size/sun.shadow.mapSize.x, mx = Math.round(ncx/tex)*tex, my = Math.round(ncy/tex)*tex, back = 160;
+    z1 += 12; z0 -= 12; Object.assign(F, { size, mx, my, z0, z1, sun: sk });
     sun.position.copy(sunX).multiplyScalar(mx).addScaledVector(sunY, my).addScaledVector(sunZ, z1 + back);
     sun.target.position.copy(sun.position).addScaledVector(sunZ, -1);
     sun.updateMatrixWorld(); sun.target.updateMatrixWorld();
@@ -1209,10 +1223,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const hullReach = (H, ux, uz) => H.reduce((m, q) => Math.max(m, q[0]*ux + q[1]*uz), 0);
   // is anything already there: a placed block whose height range meets [y0, y1] and whose outline meets this one
   function blocked(W, y0, y1, skip){
-    for (const q of PIECES){ if (skip && skip.includes(q)) continue; if (q.y > y1 - .05 || q.y + q.h < y0 + .05) continue; if (hullsHit(W, q.hullW)) return q; }
+    let a0 = 1e9, b0 = 1e9, a1 = -1e9, b1 = -1e9; for (const w of W){ a0 = Math.min(a0, w[0]); b0 = Math.min(b0, w[1]); a1 = Math.max(a1, w[0]); b1 = Math.max(b1, w[1]); }
+    for (const q of PIECES){ if (skip && skip.includes(q)) continue; if (q.y > y1 - .05 || q.y + q.h < y0 + .05) continue; if (q.bb && (q.bb[0] > a1 || q.bb[2] < a0 || q.bb[1] > b1 || q.bb[3] < b0)) continue; if (hullsHit(W, q.hullW)) return q; }
     return null; }
   // is the point (x, z) at height y inside a block (but not those in skip)
-  const solidAt = (x, z, y0, y1, skip) => PIECES.some(q => !(skip && skip.includes(q)) && q.y < y1 && q.y + q.h > y0 && inHull(q.hullW, x, z));
+  const solidAt = (x, z, y0, y1, skip, list = PIECES) => list.some(q => q.y < y1 && q.y + q.h > y0 && (!q.bb || (x >= q.bb[0] && x <= q.bb[2] && z >= q.bb[1] && z <= q.bb[3])) && !(skip && skip.includes(q)) && inHull(q.hullW, x, z));
   /* ---------- foliage parts: blades, flowers, fern fronds, seed heads (the grass brush and the homes' plants both use them) ---------- */
   const gU = { wTime: { value: 0 } };
   const grassM = bent(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, vertexColors: true, side: THREE.DoubleSide }), true, false, false, null, gU);
@@ -1302,8 +1317,42 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (p.anim) p.anim.u.pH.value = b.h;
     const m = new THREE.Mesh(b.geo, p.anim ? p.anim.mat : pieceM); m.castShadow = !p.anim; m.receiveShadow = true; m.customDepthMaterial = landDepth; m.frustumCulled = true;
     if (b.fol){ if (!b.fol.boundingSphere){ b.fol.computeBoundingSphere(); b.fol.boundingSphere.radius += .6; } const f = new THREE.Mesh(b.fol, grassM); f.receiveShadow = true; f.frustumCulled = true; f.visible = !p.anim; f.raycast = () => {}; m.add(f); m.userData.fol = f; }   // (its plants, swaying; shown once it's painted in)
-    m.position.set(p.x, p.y, p.z); m.rotation.y = p.rot; m.matrixAutoUpdate = false; m.updateMatrix(); m.updateMatrixWorld(); m.userData.piece = p; p.top = b.top; p.h = b.h; p.hullL = b.hull; p.hullW = placeHull(b.hull, p.x, p.z, p.rot); return m; }
-  function remesh(p){ SHD.dirty = true; if (p.mesh){ scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); } p.mesh = pieceMesh(p); scene.add(p.mesh); pieceMeshes.push(p.mesh); }
+    m.position.set(p.x, p.y, p.z); m.rotation.y = p.rot; m.matrixAutoUpdate = false; m.updateMatrix(); m.updateMatrixWorld(); m.userData.piece = p; p.top = b.top; p.h = b.h; p.hullL = b.hull; p.hullW = placeHull(b.hull, p.x, p.z, p.rot);
+    p.bb = p.hullW.reduce((o, q) => [Math.min(o[0], q[0]), Math.min(o[1], q[1]), Math.max(o[2], q[0]), Math.max(o[3], q[1])], [1e9, 1e9, -1e9, -1e9]);
+    m.visible = !!p.anim;   // (a finished home is drawn in its area's batch, below; its own mesh stays for picking)
+    return m; }
+  /* ---------- homes drawn in batches: every finished home in a 24-unit area merged into one mesh, and its plants into
+     another, so a neighborhood is two draws instead of two per home (the sky city's trick for its buildings). A batch is
+     made again when a home in it comes, goes or changes. ---------- */
+  const HB = { size: 24, map: new Map(), dirty: new Set() };
+  const regKey = p => Math.floor(p.x/HB.size) + ',' + Math.floor(p.z/HB.size);
+  function mergeInto(geos, indexed){
+    let nv = 0, ni = 0; for (const [g] of geos){ nv += g.attributes.position.count; if (indexed) ni += g.index.count; }
+    const P = new Float32Array(nv*3), N = new Float32Array(nv*3), Cc = new Float32Array(nv*3), X = new Float32Array(nv), I = indexed ? new Uint32Array(ni) : null;
+    let o = 0, oi = 0;
+    for (const [g, M] of geos){ const pa = g.attributes.position.array, na = g.attributes.normal.array, ca = g.attributes.color.array, xa = indexed ? g.attributes.aH.array : g.attributes.glow ? g.attributes.glow.array : null, n = g.attributes.position.count;
+      if (!M){ P.set(pa, o*3); N.set(na, o*3); }
+      else { const e = M.elements;   // (homes are only turned about y and moved: the normals turn with the same matrix)
+        for (let k = 0, a = 0, w = o*3; k < n; k++, a += 3, w += 3){ const x = pa[a], y = pa[a + 1], z = pa[a + 2];
+          P[w] = e[0]*x + e[4]*y + e[8]*z + e[12]; P[w + 1] = e[1]*x + e[5]*y + e[9]*z + e[13]; P[w + 2] = e[2]*x + e[6]*y + e[10]*z + e[14];
+          const nx = na[a], ny = na[a + 1], nz = na[a + 2]; N[w] = e[0]*nx + e[4]*ny + e[8]*nz; N[w + 1] = e[1]*nx + e[5]*ny + e[9]*nz; N[w + 2] = e[2]*nx + e[6]*ny + e[10]*nz; } }
+      if (xa) X.set(xa, o);
+      Cc.set(ca, o*3);
+      if (indexed){ const ia = g.index.array; for (let k = 0; k < ia.length; k++) I[oi + k] = ia[k] + o; oi += ia.length; }
+      o += n; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('color', new THREE.BufferAttribute(Cc, 3));
+    g.setAttribute(indexed ? 'aH' : 'glow', new THREE.BufferAttribute(X, 1)); if (indexed) g.setIndex(new THREE.BufferAttribute(I, 1));
+    g.computeBoundingSphere(); if (indexed) g.boundingSphere.radius += .6; return g; }
+  function buildBatch(key){
+    const old = HB.map.get(key); if (old){ for (const m of old){ scene.remove(m); m.geometry.dispose(); } HB.map.delete(key); }
+    const ps = PIECES.filter(p => !p.anim && p.mesh && regKey(p) === key); if (!ps.length) return;
+    const out = [], hg = mergeInto(ps.map(p => [p.mesh.geometry, p.mesh.matrixWorld]), false);
+    const hm = new THREE.Mesh(hg, pieceM); hm.castShadow = hm.receiveShadow = true; hm.customDepthMaterial = landDepth; hm.matrixAutoUpdate = false; hm.raycast = () => {}; hm.userData.batch = key; scene.add(hm); out.push(hm);
+    const fs = ps.filter(p => p.mesh.userData.fol).map(p => [p.mesh.userData.fol.geometry, p.mesh.matrixWorld]);
+    if (fs.length){ const fm = new THREE.Mesh(mergeInto(fs, true), grassM); fm.receiveShadow = true; fm.matrixAutoUpdate = false; fm.raycast = () => {}; fm.userData.batch = key; fm.userData.fol = true; scene.add(fm); out.push(fm); }
+    HB.map.set(key, out); SHD.dirty = true; }
+  function batchTick(){ if (!HB.dirty.size) return false; for (const k of HB.dirty) buildBatch(k); HB.dirty.clear(); return true; }
+  function remesh(p){ SHD.dirty = true; HB.dirty.add(regKey(p)); if (p.mesh){ scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); } p.mesh = pieceMesh(p); scene.add(p.mesh); pieceMeshes.push(p.mesh); }
   const stackTop = p => { while (p.up) p = p.up; return p; };
   const MAXLV = 8;   // (how many floors of blocks a home can reach)
   // can a block go here on the ground? wholly on land (right up to the cliff edge is fine), on ground that isn't too steep,
@@ -1383,7 +1432,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       if (!a.bloomed){ a.bloomed = true; bloom(p); }
       const r = Math.min(a.t/.17, 1); a.u.pRise.value = 1 - Math.pow(1 - r, 2.2); a.u.pDry.value = smooth(.06, .26, a.t);
       if (r >= 1 && p.mesh && !p.mesh.castShadow){ p.mesh.castShadow = true; SHD.dirty = true; }   // (its shadow comes once the wash has reached the top)
-      if (a.t > .27){ SHD.dirty = true; p.anim = null; p.mesh.material = pieceM; p.mesh.castShadow = true; if (p.mesh.userData.fol) p.mesh.userData.fol.visible = true; freePaint(a); ANIM.list.splice(i, 1); } } }
+      if (a.t > .27){ SHD.dirty = true; p.anim = null; p.mesh.material = pieceM; p.mesh.castShadow = true; p.mesh.visible = false; HB.dirty.add(regKey(p)); if (p.mesh.userData.fol) p.mesh.userData.fol.visible = true; freePaint(a); ANIM.list.splice(i, 1); } } }
   // A block can also be built off the side of another (host), on the same floor: it hangs from the wall it's set against, on
   // a stepped plaster corbel. How far a block reaches out from anything that stands on the ground is kept (reach): past
   // SUPPORT_REACH it gets supports of its own down to the ground, in the style of the home, and they count as standing.
@@ -1399,12 +1448,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     remesh(p); PIECES.push(p);
     if (!base && lv === 0){ gridAdd(p); dirtyAround(p); }
     if (ANIM.live && lv === 0) grassAround(x, z, p.r + 1);   // (the grass under a new home goes)
-    linksDirty = true; if (!quiet) save(); return p; }
+    dropLinkCache(p); linksDirty = true; if (!quiet) save(); return p; }
   function removePiece(p){   // (and everything stacked on it or built off its side)
     if (!PIECES.includes(p)) return;
     if (p.up) removePiece(p.up);
     for (const q of PIECES.filter(q => q.host === p)) removePiece(q);
-    scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); PIECES.splice(PIECES.indexOf(p), 1); SHD.dirty = true;
+    scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); PIECES.splice(PIECES.indexOf(p), 1); SHD.dirty = true; HB.dirty.add(regKey(p)); dropLinkCache(p);
     if (ULINKS.some(u => u.a === p.id || u.b === p.id)){ ULINKS = ULINKS.filter(u => u.a !== p.id && u.b !== p.id); saveLinks(); }
     if (p.base){ p.base.up = null; remesh(p.base); } else if (p.level === 0){ gridDel(p); dirtyAround(p); }
     if (p.level === 0) grassAround(p.x, p.z, p.r + 1);
@@ -1524,7 +1573,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   }
   function buildLinks(){
     linksDirty = false; SHD.dirty = true;
-    if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); for (const c of linksMesh.children) c.geometry.dispose(); linksMesh = null; }
+    if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); for (const c of linksMesh.children) c.geometry.dispose(); linksMesh = null; }   // (merged copies only: the cached parts stay)
     const T = new Tris(true), pairs = [], deg = new Map(), joined = new Set(), pools = [];
     for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, 1]);   // (by night: the windows' light on the ground round a home)
     // the connections built with the connect brush come first, as chosen; then the ones neighbors make on their own
@@ -1535,25 +1584,33 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     for (let i = 0; i < PIECES.length; i++) for (let j = i + 1; j < PIECES.length; j++){
       const A = PIECES[i], B = PIECES[j]; if (A.level !== B.level) continue;
       if (Math.abs(A.y - B.y) > (A.level ? .6 : 1.4)) continue;
+      if (Math.abs(A.x - B.x) > 9 || Math.abs(A.z - B.z) > 9) continue;
       if (userKey.has(Math.min(A.id, B.id) + '|' + Math.max(A.id, B.id))) continue;
       const L = pairOf(A, B); if (!L || L.dc > 9 || L.gap > 3.6) continue;
       pairs.push(L); }
     const auto = pairs.splice(nUser).sort((p, q) => p.gap - q.gap); pairs.push(...auto);
+    for (const v of LCACHE.values()) v.used = false;
     for (const L of pairs){
       const { A, B, dc, dx, dz, tA, tB } = L; if (!L.user && ((deg.get(A) || 0) >= 3 || (deg.get(B) || 0) >= 3)) continue;
       // the way between the two walls must be clear of every other block at its height, a body's width to each side
       const ly0 = Math.min(A.y, B.y) + .1, ly1 = ly0 + 1.4, ax0 = A.x + dx*tA, az0 = A.z + dz*tA, span = Math.max(0, dc - tA - tB);
       let clear = true;
-      for (let u = 0; u <= span + 1e-6 && clear; u += .3) for (const s_ of [-.6, 0, .6]) if (solidAt(ax0 + dx*u - dz*s_, az0 + dz*u + dx*s_, ly0, ly1, [A, B])){ clear = false; break; }
+      const ex = ax0 + dx*span, ez = az0 + dz*span, near = PIECES.filter(q => q !== A && q !== B && q.bb && q.bb[0] < Math.max(ax0, ex) + .7 && q.bb[2] > Math.min(ax0, ex) - .7 && q.bb[1] < Math.max(az0, ez) + .7 && q.bb[3] > Math.min(az0, ez) - .7);
+      if (near.length) for (let u = 0; u <= span + 1e-6 && clear; u += .3) for (const s_ of [-.6, 0, .6]) if (solidAt(ax0 + dx*u - dz*s_, az0 + dz*u + dx*s_, ly0, ly1, null, near)){ clear = false; break; }
       if (!clear && !L.user) continue;
       deg.set(A, (deg.get(A) || 0) + 1); deg.set(B, (deg.get(B) || 0) + 1); joined.add(A.id + '|' + B.id); joined.add(B.id + '|' + A.id);
-      drawLink(T, L, pools);
+      // (each connection is drawn once and kept: a rebuild after placing one home only draws the new ones)
+      const ck = [A.id, B.id, L.user ? L.type : '-', A.x.toFixed(2), A.z.toFixed(2), A.y.toFixed(2), B.x.toFixed(2), B.z.toFixed(2), B.y.toFixed(2), A.rot.toFixed(3), B.rot.toFixed(3), A.kind, B.kind, A.seed, B.seed, !!A.up, !!B.up].join('|');
+      let cl = LCACHE.get(ck); if (!cl){ const lt = new Tris(true), lp = []; drawLink(lt, L, lp); cl = { geo: lt.p.length ? lt.geo() : null, fol: folGeo(lt.fol), pools: lp, ax: (A.x + B.x)/2, az: (A.z + B.z)/2, r: L.dc/2 }; LCACHE.set(ck, cl); }
+      cl.used = true; for (const q of cl.pools) pools.push(q);
     }
     // courtyards: three ground homes all joined to each other
-    const g0 = PIECES.filter(p => !p.level);
-    for (let i = 0; i < g0.length; i++) for (let j = i + 1; j < g0.length; j++) for (let k = j + 1; k < g0.length; k++){
-      const [A, B, C] = [g0[i], g0[j], g0[k]];
-      if (!joined.has(A.id + '|' + B.id) || !joined.has(B.id + '|' + C.id) || !joined.has(A.id + '|' + C.id)) continue;
+    // (found from each home's few links, not by trying every three homes)
+    const adj = new Map(); for (const k of joined){ const [a, b] = k.split('|').map(Number); if (a < b){ (adj.get(a) || adj.set(a, new Set()).get(a)).add(b); } }
+    const byId2 = new Map(PIECES.map(p => [p.id, p])), tris3 = [];
+    for (const [a, ns] of adj) for (const b of ns) for (const c of ns) if (c > b && adj.get(b) && adj.get(b).has(c)) tris3.push([a, b, c]);
+    for (const [ia, ib, ic] of tris3){
+      const A = byId2.get(ia), B = byId2.get(ib), C = byId2.get(ic); if (!A || !B || !C || A.level || B.level || C.level) continue;
       const cx = (A.x + B.x + C.x)/3, cz = (A.z + B.z + C.z)/3, cy = heightAt(cx, cz), R = rng(Math.imul(A.id + B.id*7 + C.id*31, 2654435761) >>> 0);
       if ([A, B, C].some(P => Math.hypot(P.x - cx, P.z - cz) < KINDS[P.kind].rb + .9)) continue;
       T.add(GEO.cyl12, mat(cx, cy + .05, cz, 0, 0, 0, 1.1, .12, 1.1), HP.stone); pools.push([cx, cz, 2.2, .8]);
@@ -1588,10 +1645,17 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         }
       }
     }
-    if (T.p.length){ linksMesh = T.mesh(pieceM); linksMesh.customDepthMaterial = landDepth; scene.add(linksMesh);
-      const fg = folGeo(T.fol); if (fg){ fg.computeBoundingSphere(); fg.boundingSphere.radius += .6; const f = new THREE.Mesh(fg, grassM); f.receiveShadow = true; f.frustumCulled = true; f.raycast = () => {}; linksMesh.add(f); } }
+    // (the links' parts kept from before are merged with what's new: courtyards and corbels, drawn fresh, are few)
+    const used = [...LCACHE.values()].filter(v => v.used), gs = used.filter(v => v.geo).map(v => [v.geo, null]), fs = used.filter(v => v.fol).map(v => [v.fol, null]);
+    if (T.p.length) gs.push([T.geo(), null]); const tf = folGeo(T.fol); if (tf) fs.push([tf, null]);
+    if (gs.length){ linksMesh = new THREE.Mesh(mergeInto(gs, false), pieceM); linksMesh.castShadow = linksMesh.receiveShadow = true; linksMesh.customDepthMaterial = landDepth; linksMesh.matrixAutoUpdate = false; scene.add(linksMesh);
+      if (fs.length){ const f = new THREE.Mesh(mergeInto(fs, true), grassM); f.receiveShadow = true; f.frustumCulled = true; f.raycast = () => {}; f.matrixAutoUpdate = false; linksMesh.add(f); } }
     buildPools(pools);
+    for (const [k, v] of LCACHE) if (!v.used){ if (v.geo) v.geo.dispose(); if (v.fol) v.fol.dispose(); LCACHE.delete(k); }
   }
+  // connections kept from earlier rebuilds; the ones near a home that comes or goes are drawn again (its pad changes the ground)
+  const LCACHE = new Map();
+  function dropLinkCache(p){ for (const [k, v] of LCACHE) if (Math.hypot(v.ax - p.x, v.az - p.z) < v.r + 8){ if (v.geo) v.geo.dispose(); if (v.fol) v.fol.dispose(); LCACHE.delete(k); } }
   // the warm light by night: a soft pool on the ground round each home, under each pergola and arcade, in each courtyard
   // (flat quads added over the ground, in a few dithered steps; only drawn when it's dark)
   const poolM = new THREE.ShaderMaterial({ uniforms: { nightK: CURV.darkK }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -1854,7 +1918,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', (b.dataset.mode === 'zone') === zone));
     if (was){ PL.kind = null; setKind(zone ? 'zone' : lastKind); } else refreshUI(); zHide(); }
   function setKind(k){
-    PL.kind = PL.kind === k ? null : k; CN.a = null; connGhost.visible = false;
+    PL.kind = PL.kind === k ? null : k; CN.a = null; connGhost.visible = false; outline.visible = false;
     if (PL.kind && KINDS[PL.kind]) lastKind = PL.kind;
     ghost.visible = ring.visible = false; zHide();
     if (!PL.kind && status) status.textContent = '';
@@ -1889,17 +1953,33 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // block, take away the connections built to it.
   const CN = { a: null, type: 0, key: '', ok: false };
   const connGhost = new THREE.Mesh(new THREE.BufferGeometry(), ghostM); connGhost.visible = false; connGhost.frustumCulled = false; connGhost.renderOrder = 5; scene.add(connGhost);
+  // the outline of the way, stretched from the first block's wall to the pointer (or to the second block): its two edges
+  // following the ground, a tick across every step, and the ends squared off
+  const outM = new THREE.LineBasicMaterial({ color: 0xffd27a, transparent: true, opacity: .95, depthTest: false });
+  const outline = new THREE.LineSegments(new THREE.BufferGeometry(), outM); outline.frustumCulled = false; outline.renderOrder = 7; outline.visible = false; scene.add(outline);
+  function drawOutline(A, tx, tz, ty, ok){
+    const dx0 = tx - A.x, dz0 = tz - A.z, dl = Math.hypot(dx0, dz0); if (dl < .3){ outline.visible = false; return; }
+    const dx = dx0/dl, dz = dz0/dl, sx = -dz, sz = dx, t0 = hullExit(A.hullW, A.x, A.z, dx, dz), L = Math.max(.2, dl - t0), n = Math.max(2, Math.ceil(L/.5));
+    const y0 = A.level ? A.y : heightAt(A.x + dx*t0, A.z + dz*t0) + .12, P = [];
+    const at = (u, s_) => { const x = A.x + dx*(t0 + L*u) + sx*s_, z = A.z + dz*(t0 + L*u) + sz*s_, yl = y0 + (ty - y0)*u; return [x, Math.max(yl, heightAt(x, z) + .1), z]; };
+    for (const s_ of [-.5, .5]) for (let k = 0; k < n; k++) P.push(...at(k/n, s_), ...at((k + 1)/n, s_));
+    for (let k = 0; k <= n; k++) P.push(...at(k/n, -.5), ...at(k/n, .5));
+    outline.geometry.dispose(); outline.geometry = new THREE.BufferGeometry(); outline.geometry.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    outM.color.set(ok ? 0x9ee6a8 : 0xffd27a); outline.visible = true; }
   function showConnect(){
     ghost.visible = false; zHide();
     const hov = PL.ptr ? pieceHit(PL.ptr.x, PL.ptr.y) : null, P = hov ? hov.piece : null, tn = LINK_TYPES[CN.type];
     const say = (t, ok) => { if (status){ status.textContent = 'walkways: ' + tn + ' (V next) ' + t; status.style.color = ok ? '#5c7060' : '#c0623f'; } };
-    if (!CN.a){ connGhost.visible = false; CN.ok = false;
+    if (!CN.a){ connGhost.visible = false; outline.visible = false; CN.ok = false;
       if (P){ ringAt(P.x, P.z, KINDS[P.kind].rb + .35, P.level ? P.y : null); ringM.color.set(0x7dffb0); } else ring.visible = false;
       say(P ? '· click to pick this one' : '· pick the first block', !!P); return; }
     const A = CN.a; ringAt(A.x, A.z, KINDS[A.kind].rb + .35, A.level ? A.y : null); ringM.color.set(0xffd27a);
-    if (!P || P === A){ connGhost.visible = false; CN.ok = false; say('· now pick the second block', false); return; }
+    if (!P || P === A){ connGhost.visible = false; CN.ok = false; const h = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null;
+      if (h) drawOutline(A, h.x, h.z, A.level ? A.y : heightAt(h.x, h.z) + .12, false); else outline.visible = false;
+      say('· now pick the second block', false); return; }
     const L = pairOf(A, P), why = !L ? 'they overlap' : L.gap < -.2 ? 'they overlap' : null;   // (no limit on how far: long spans get piers)
     CN.ok = !why;
+    { const bx = P.x - (P.x - A.x)/(L ? L.dc : 1)*(L ? L.tB : 0), bz = P.z - (P.z - A.z)/(L ? L.dc : 1)*(L ? L.tB : 0); drawOutline(A, bx, bz, P.level ? P.y : heightAt(bx, bz) + .12, !why); }
     if (why){ connGhost.visible = false; say('· ' + why, false); return; }
     const key = A.id + '|' + P.id + '|' + CN.type;
     if (key !== CN.key){ CN.key = key; const T = new Tris(); L.user = true; L.type = LINK_TYPES[CN.type]; drawLink(T, L, []); connGhost.geometry.dispose(); connGhost.geometry = T.geo(); }
@@ -1909,9 +1989,9 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (!CN.a){ if (P){ CN.a = P; CN.key = ''; } return; }
     if (!P || P === CN.a || !CN.ok) return;
     const a = CN.a.id, b = P.id; ULINKS = ULINKS.filter(u => !((u.a === a && u.b === b) || (u.a === b && u.b === a))); ULINKS.push({ a, b, type: LINK_TYPES[CN.type] });
-    saveLinks(); linksDirty = true; CN.a = null; CN.key = ''; connGhost.visible = false; }
+    saveLinks(); linksDirty = true; CN.a = null; CN.key = ''; connGhost.visible = false; outline.visible = false; }
   function unConnect(cx, cy){
-    if (CN.a){ CN.a = null; connGhost.visible = false; return; }
+    if (CN.a){ CN.a = null; connGhost.visible = false; outline.visible = false; return; }
     const P = pieceAt(cx, cy); if (!P) return; const n = ULINKS.length; ULINKS = ULINKS.filter(u => u.a !== P.id && u.b !== P.id); if (ULINKS.length !== n){ saveLinks(); linksDirty = true; } }
 
   /* ---------- the grass brush ---------- */
@@ -2023,11 +2103,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if ((reflFrame++ & 1) && !TOFF.fix) return;
     reflCam.projectionMatrix.copy(cam.projectionMatrix); reflCam.projectionMatrixInverse.copy(cam.projectionMatrixInverse);
     reflCam.matrix.multiplyMatrices(MIRROR, cam.matrixWorld); reflCam.updateMatrixWorld(true);
-    const hide = [sea, spray, ghost, ring, connGhost, ...zGhosts, ...BLOOMS];
+    const hide = [sea, spray, ghost, ring, connGhost, outline, ...zGhosts, ...BLOOMS];
     for (const m of gSquares.values()) hide.push(m);
     if (poolMesh) hide.push(poolMesh);
     if (linksMesh) hide.push(...linksMesh.children);
     for (const m of pieceMeshes){ if (m.userData.fol) hide.push(m.userData.fol); if (!nearSea(m.position.x, m.position.z, 22)) hide.push(m); }
+    for (const [k, ms] of HB.map){ const [bi, bj] = k.split(',').map(Number); for (const m of ms) if (m.userData.fol || !nearSea((bi + 1)*HB.size, (bj + .5)*HB.size, 22)) hide.push(m); }
     for (const ch of chunks.values()) if (ch.mesh && !nearSea(ch.i*CH + CH, ch.j*CH + CH/2, 14) && !nearSea(ch.i*CH + CH, ch.j*CH, 14) && !nearSea(ch.i*CH + CH, ch.j*CH + CH, 14)) hide.push(ch.mesh);
     const vis = hide.map(o => o.visible); for (const o of hide) o.visible = false;
     scene.overrideMaterial = reflM;
@@ -2058,8 +2139,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       if (gk !== ghostKey){ ghostKey = gk;   // (the ghost is worked out again only when something it shows has changed: the raycasts and checks are the costly part)
         if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'grass') showGrass(); else if (PL.kind === 'zone' && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); } }
     q = tk('ghost', q);
-    animTick(dt);
-    if (linksDirty && !ANIM.list.length) buildLinks();
+    animTick(dt); const batched = batchTick();
+    if (linksDirty && !ANIM.list.length && !batched) buildLinks();   // (not in the same frame as a batch: the two together made a hitch)
     q = tk('anim+links', q);
     const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t, !(fNo & 3) || TOFF.fix !== undefined); /* (a crest's arrival is caught every fourth frame; the spray itself moves every frame) */ q = tk('spray', q); grassTick(t); q = tk('grass', q);
     halfDt += dt; if ((fNo & 1) || TOFF.fix !== undefined){ foamStep(halfDt); halfDt = 0; } q = tk('foam', q); renderRefl(); q = tk('reflection', q);   // (the foam's slow: it keeps up at half the rate)
@@ -2071,7 +2152,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES,
+  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

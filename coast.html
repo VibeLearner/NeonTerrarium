@@ -74,7 +74,10 @@
   .ctlpanel kbd { flex: 0 0 104px; white-space: nowrap; font: 700 17px/1 'Caveat', cursive; color: var(--terra); }
   .ctlpanel .view { margin-top: 8px; padding-top: 6px; border-top: 1.5px dashed color-mix(in srgb, var(--ink) 30%, transparent); }
   .zones { display: flex; align-items: flex-end; gap: 10px; }
-  .zones .gap { width: 6px; }
+  .tools { display: flex; gap: 8px; margin-top: 2px; }
+  .card.small { width: 104px; height: 34px; flex-direction: row; gap: 6px; }
+  .card.small svg { width: 20px; height: 20px; }
+  .card.small b { font-size: 19px; }
   .card { width: 108px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; transition: transform .15s; }
   .card svg { width: 26px; height: 26px; fill: none; stroke: var(--ink); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; filter: url(#wobble); }
   .card b { font: 700 22px/1 'Caveat', cursive; }
@@ -116,10 +119,11 @@
   <div class="zones">
     <button class="rot wash" id="rotL" aria-label="Turn the view left">⟲</button>
     <button id="zoneRes" class="card wash" style="--w: var(--apricot); --w2: var(--rose)"><svg viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/><path d="M15.5 6.2V4h2v3.8"/></svg><b>Residential</b><small>zone</small></button>
-    <span class="gap"></span>
-    <button class="card wash" data-k="grass" style="--w: var(--sage); --w2: var(--ochre)"><svg viewBox="0 0 24 24"><path d="M4 20c1-4 2.5-7 5-9"/><path d="M8 20c.3-4.5 1.5-8.5 4-12"/><path d="M12 20c0-4 1-6.5 3-8.5"/><path d="M15.5 20c.5-3 2-5.5 4.5-7"/><path d="M3 20h18"/></svg><b>Grass</b><small>landscape</small></button>
-    <button class="card wash" data-k="connect" style="--w: var(--teal); --w2: var(--sky)"><svg viewBox="0 0 24 24"><path d="M2.5 15h19"/><path d="M2.5 15c3-5 6-6.5 9.5-6.5s6.5 1.5 9.5 6.5"/><path d="M6 15v-3.5M9 15v-5.6M12 15V8.5M15 15V9.4M18 15v-3.5"/><path d="M4 15v4M20 15v4"/></svg><b>Walkways</b><small>landscape</small></button>
     <button class="rot wash" id="rotR" aria-label="Turn the view right">⟳</button>
+  </div>
+  <div class="tools">
+    <button class="card small wash" data-k="grass" style="--w: var(--sage); --w2: var(--ochre)"><svg viewBox="0 0 24 24"><path d="M4 20c1-4 2.5-7 5-9"/><path d="M8 20c.3-4.5 1.5-8.5 4-12"/><path d="M12 20c0-4 1-6.5 3-8.5"/><path d="M15.5 20c.5-3 2-5.5 4.5-7"/><path d="M3 20h18"/></svg><b>Grass</b></button>
+    <button class="card small wash" data-k="connect" style="--w: var(--teal); --w2: var(--sky)"><svg viewBox="0 0 24 24"><path d="M2.5 15h19"/><path d="M2.5 15c3-5 6-6.5 9.5-6.5s6.5 1.5 9.5 6.5"/><path d="M6 15v-3.5M9 15v-5.6M12 15V8.5M15 15V9.4M18 15v-3.5"/><path d="M4 15v4M20 15v4"/></svg><b>Walkways</b></button>
   </div>
 </nav>
 

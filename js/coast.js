@@ -118,7 +118,13 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   //   lilac:   a dusky violet (gold's complement, so a market reads at a glance among the homes), lavender on the ground
   //   peach:   a lantern rose-peach, a warm market glow that stays apart from the homes' amber
   //   sunleaf: a pale green-gold, like light through new leaves; the solar one
-  const SHOPLIGHTS = { lilac: { w: [.8, .7, 1.0], h: [.78, .62, 1.0], e: [.55, .4, .9] }, peach: { w: [.92, .56, .5], h: [.95, .62, .52], e: [.86, .38, .46] }, sunleaf: { w: [.86, .96, .56], h: [.85, .95, .5], e: [.45, .75, .35] } };
+  const SHOPLIGHTS = {
+    // (warmer, richer lilacs, to compare: orchid: a saturated pink-violet; plumrose: pushed toward magenta-rose, the warmest
+    // that still isn't gold; twilight: orchid windows, the light on the ground running from peach at its heart to violet at
+    // its rim, so the warmth is in the wash; fuchsia: a warm lantern pink)
+    orchid: { w: [.88, .55, .98], h: [.9, .56, .96], e: [.68, .32, .86] }, plumrose: { w: [.96, .52, .82], h: [.98, .58, .8], e: [.78, .3, .66] },
+    twilight: { w: [.9, .6, .96], h: [1.0, .66, .58], e: [.66, .34, .86] }, fuchsia: { w: [1.0, .48, .7], h: [1.0, .56, .66], e: [.84, .3, .6] },
+    lilac: { w: [.8, .7, 1.0], h: [.78, .62, 1.0], e: [.55, .4, .9] }, peach: { w: [.92, .56, .5], h: [.95, .62, .52], e: [.86, .38, .46] }, sunleaf: { w: [.86, .96, .56], h: [.85, .95, .5], e: [.45, .75, .35] } };
   let SHOPLIGHT = 'lilac'; try { const v = localStorage.getItem('neonIsland.coast.shoplight'); if (SHOPLIGHTS[v]) SHOPLIGHT = v; } catch (e) {}
   function setShopLight(n){ const L = SHOPLIGHTS[n]; if (!L) return; SHOPLIGHT = n; CURV.uShop.value.setRGB(...L.w); CURV.uShopH.value.setRGB(...L.h); CURV.uShopE.value.setRGB(...L.e); try { localStorage.setItem('neonIsland.coast.shoplight', n); } catch (e) {} }
   setShopLight(SHOPLIGHT);  const BEND = `{ vec4 wq = vec4(transformed, 1.0);
@@ -2024,8 +2030,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // (flat quads added over the ground, in a few dithered steps; only drawn when it's dark)
   const poolM = new THREE.ShaderMaterial({ uniforms: { nightK: CURV.darkK, uShopH: CURV.uShopH, uShopE: CURV.uShopE }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     vertexShader: 'attribute vec3 aL; varying vec3 vL; varying vec2 vW; void main(){ vL = aL; vW = position.xz; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
-    // (a wash of warm light: a ragged blot, its color running wet-in-wet from gold at the heart to rose-orange at the edge,
-    // blooms where the water backed up into it, and more pigment at its rim)
+    // (a wash of warm light: soft all the way out, fading to nothing at a gently ragged edge (no rim, no step at the edge,
+    // so it never reads as a patch laid on the ground), its color running from gold at the heart to rose-orange outward)
     fragmentShader: `uniform float nightK; uniform vec3 uShopH, uShopE; varying vec3 vL; varying vec2 vW;
       float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
       float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
@@ -2035,8 +2041,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         float body = smoothstep(0.0, 0.45, e), bloom = vn(vW*1.4 + 7.0);
         float shop = step(5.0, vL.z);
         vec3 c = mix(mix(vec3(0.95, 0.42, 0.24), uShopE, shop), mix(vec3(1.0, 0.74, 0.36), uShopH, shop), body*(0.6 + 0.4*bloom));
-        float a = (0.25 + 0.5*body)*(0.75 + 0.5*smoothstep(0.35, 0.75, bloom)) + 0.45*(1.0 - smoothstep(0.0, 0.05, e));
-        a = floor(a*7.0)/7.0;
+        float a = pow(smoothstep(0.0, 0.6, e), 1.6)*(0.55 + 0.3*bloom);
+        a = floor(a*10.0 + h21(gl_FragCoord.xy)*0.999)/10.0;   // (fine steps, dithered: no bands)
         gl_FragColor = vec4(c*a*0.42*(vL.z - 10.0*shop)*nightK, 1.0); }` });
   let poolMesh = null;
   function buildPools(pools){
@@ -2405,7 +2411,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const say = (t, ok) => { if (status){ status.textContent = 'walkways: ' + tn + ' (V next) ' + t; status.style.color = ok ? '#5c7060' : '#c0623f'; } };
     if (!CN.a){ connGhost.visible = false; outline.visible = false; CN.ok = false;
       const lk = PL.ptr ? linkAt(PL.ptr.x, PL.ptr.y) : null;
-      if (lk){ ring.visible = false; hlLink(lk, hlDel); say('· right click takes away this walkway', false); return; }
+      if (lk){ ring.visible = false; hlLink(lk, hlDel); say('', false); return; }   // (the outline says it; no words)
       if (P){ ringAt(P.x, P.z, KINDS[P.kind].rb + .35, P.level ? P.y : null); ringM.color.set(0x7dffb0); hlPiece(P, hlSel, false); } else ring.visible = false;
       say(P ? '· click to pick this one' : '· pick the first block', !!P); return; }
     const A = CN.a; ringAt(A.x, A.z, KINDS[A.kind].rb + .35, A.level ? A.y : null); ringM.color.set(0xffd27a);
@@ -2442,7 +2448,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const grassNear = (x, z, r) => { for (let i = Math.floor((x - r)/GC); i <= Math.ceil((x + r)/GC); i++) for (let j = Math.floor((z - r)/GC); j <= Math.ceil((z + r)/GC); j++) if (tufts.has(i + ',' + j)) return true; return false; };
   function showRemoveHover(){
     ghost.visible = false; zHide(); connGhost.visible = false; ring.visible = false;
-    const say = t => { if (status){ status.textContent = t; status.style.color = '#c0623f'; } };
+    const say = () => { if (status) status.textContent = ''; };   // (the outline says what a right click would take; no words)
     if (!PL.ptr){ if (status) status.textContent = ''; return; }
     const { x, y } = PL.ptr, lk = linkAt(x, y);
     if (lk){ hlLink(lk, hlDel); say('Right click to take away this walkway'); return; }

@@ -253,7 +253,7 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
               X:['101','101','010','101','101'], K:['101','101','110','101','101'], Y:['101','101','010','010','010'], '-':['000','000','111','000','000'],
               M:['10001','11011','10101','10001','10001'], W:['10001','10001','10101','11011','10001'], '1':['010','110','010','010','111'],
               '5':['111','100','111','001','111'], Z:['111','001','010','100','111'], '3':['111','001','011','001','111'], V:['101','101','101','101','010'],
-              '0':['111','101','101','101','111'], '6':['111','100','111','101','111'], '7':['111','001','010','010','010'], '8':['111','101','111','101','111'], '9':['111','101','111','001','111'], '/':['001','001','010','100','100'] };
+              '0':['111','101','101','101','111'], '6':['111','100','111','101','111'], '7':['111','001','010','010','010'], '8':['111','101','111','101','111'], '9':['111','101','111','001','111'], '/':['001','001','010','100','100'], ':':['0','1','0','1','0'] };
   const make = (kind, text, col, deco) => {
     const ws = [...text].map(ch => F[ch][0].length), tw = ws.reduce((a, b) => a + b + 1, -1), pad = deco ? 5 : 3, w = tw + 2*pad, h = 9;
     const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
@@ -298,6 +298,10 @@ const MKT_SIGNS = [], MKT_GLOW = {}, MKT_GRAF = [];
   make('sign_w_neondome', 'NEON DOME', '#ff5ad0', true); make('sign_w_nightclub', 'NIGHTCLUB.OPEN 24H', '#5ae8ff');
   make('sign_w_club', 'CLUB', '#b07aff'); make('sign_w_drinks', 'DRINKS', '#b07aff'); make('sign_w_music', 'MUSIC', '#b07aff');
   make('sign_w_enter', 'ENTER', '#5af0e0'); make('sign_w_bar', 'BAR', '#7ab0ff', true); make('sign_w_snacks', 'SNACKS', '#ff6aa8');
+  make('sign_w_wirenest', 'WIRE NEST', '#5affa8', true); make('sign_w_sniffer', 'PACKET SNIFFER', '#5ae8ff'); make('sign_w_node07', 'NODE 07', '#5ae8ff');   // the Wire Nest
+  make('sign_w_osc', 'OSCILLATOR', '#e8e8e0'); make('sign_w_rxtx', 'RX/TX NODE 07', '#e8e8e0'); make('sign_w_ghost', 'SYS::NODE // GHOST', '#5affc8');
+  make('sign_w_fiber', 'FIBER', '#7ae8ff'); make('sign_w_link', 'LINK', '#7ae8ff'); make('sign_w_packet', 'PACKET', '#7ae8ff'); make('sign_w_root', 'ROOT ACCESS', '#ff5a6a', true);
+  make('sign_w_port', 'PORT 443', '#ffd060'); make('sign_w_nocarrier', 'NO CARRIER', '#ff8a5a');
   make('sign_w_satcom', 'SATCOM 12-A', '#ffd060'); make('sign_w_mlink', 'MLINK 5GHZ', '#5ae8ff'); make('sign_w_mw', 'MW 5GHZ', '#ff8a5a');
 })();
 // All sprites share one texture atlas and one material, so a whole region's plants, laundry and signs

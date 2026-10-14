@@ -453,6 +453,7 @@ const MEGA_LIFE = {
   pagoda:  { jobs: 12, fun: 10, night: .2 },  // the cloud pagoda: a luxury hotel and spa
   club:    { jobs: 10, fun: 0, night: .6 },
   spire:   { jobs: 0, fun: 0 },
+  wirenest: { jobs: 6, fun: 0, night: .7 },   // the Wire Nest: a few operators at the screens, mostly by night
   bathhouse: { jobs: 0, fun: 18, open: true },   // the onsen: people come to soak (its seats are in the pools); the front desk and tea counter are its stalls, always kept   // the Data Spire: no ordinary jobs; its archivist and guards are their own people (see syncSpireStaff)
   greenhouse: { jobs: 12, fun: 1.5, night: .35 },
   logistics: { jobs: 24, fun: 0, night: .5 },   // the logistics hub: dock hands, pickers and forklift drivers, round the clock (OPEN 24H)   // the hydroponic farm: growers round the clock, and people dropping by for fresh greens   // the Neon Dome: bar staff and DJs, mostly at night (its crowd is brought out by the night: see updateClubs)

@@ -31,6 +31,8 @@ const MEGA_TYPES = {
            colour: '#f4dcb0', build: buildBathhouse, fx: bathFx },
   logistics: { name: 'Logistics Hub', need: { ind: 80 }, after: ['foundry'], odds: 40, w: 6, h: 6, maxLevels: 1,   // 80 industrial floors and the Foundry, then a 1 in 40 chance with each build
            colour: '#ffe600', build: buildLogisticsHub, fx: logisticsFx },
+  wirenest: { name: 'Wire Nest', need: { mid: 60, high: 30 }, after: ['radio'], odds: 30, w: 4, h: 4, maxLevels: 1,   // the data sniffer: 60 commercial and 30 luxury floors and the radio station, then a 1 in 30 chance with each build
+           colour: '#5affa8', build: buildWireNest, fx: wireNestFx },
   club: { name: 'Neon Dome', need: { highPlots: 30, midPlots: 30, lowPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives once there are 30 each of luxury, commercial and residential buildings
            colour: '#c070ff', build: buildNeonDome, fx: clubFx },
 };
@@ -77,7 +79,7 @@ function maybeSpawnMegas(c){
 }
 // can a w x h block go at (i, j)? Every plot free ground or open sky, inside the world, touching the platform
 // how far some megastructures hang out past their block (measured), so a highway beside one keeps its distance
-const MEGA_OVER = { logistics: .3, square: .4, police: .8, foundry: .3, pagoda: 1.0, greenhouse: .35, spire: .35 };
+const MEGA_OVER = { wirenest: .3, logistics: .3, square: .4, police: .8, foundry: .3, pagoda: 1.0, greenhouse: .35, spire: .35 };
 // would a highway over or beside the block at (i, j) meet it? (kind: what overhang to allow for)
 function megaHwNear(i, j, w, h, kind){
   const over = (MEGA_OVER[kind] || 0) + .05, x0 = i*LOT - LOT/2 - over, x1 = (i + w - 1)*LOT + LOT/2 + over, z0 = j*LOT - LOT/2 - over, z1 = (j + h - 1)*LOT + LOT/2 + over;
@@ -357,7 +359,7 @@ const SCREEN_MAT = new THREE.ShaderMaterial({
   fragmentShader: `uniform float time; varying vec2 vUv;
     float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
     void main(){
-      float id = floor(vUv.x + 1e-4), kind = mod(id, 6.0), seed = floor(id/6.0);
+      float id = floor(vUv.x + 1e-4), kind = mod(id, 8.0), seed = floor(id/8.0);
       vec2 uv = vec2(vUv.x - id, vUv.y), res = vec2(30.0, 20.0), q = (floor(uv*res) + .5)/res;
       float t = time + seed*7.31;
       vec3 ink = mod(seed, 3.0) < 1.0 ? vec3(.35, 1.0, .55) : mod(seed, 3.0) < 2.0 ? vec3(.3, .9, 1.0) : vec3(1.0, .72, .3);
@@ -383,6 +385,22 @@ const SCREEN_MAT = new THREE.ShaderMaterial({
         if (r < .46) c += ink*.7*exp(-da*2.2);
         if (abs(r - .46) < .03 || abs(r - .25) < .02) c = max(c, ink*.45);
         vec2 cell = floor(p*6.0); if (h21(cell + seed) > .93 && r < .45) c = max(c, ink*exp(-da*.8));
+      } else if (kind > 5.5 && kind < 6.5){   // a terminal: lines of glyphs typed out left to right, a block cursor blinking at the end, the screen scrolling
+        float rows = 6.0, rate = 2.2 + mod(seed, 3.0)*.6, prog = t*rate, line = floor(prog), cur = fract(prog);
+        float r = floor((1.0 - q.y)*rows), L = line - (rows - 1.0) + r;   // (the last row is the line being typed)
+        float gx = floor(q.x*res.x/2.0), cols = res.x/2.0, used = floor((.35 + .6*h21(vec2(L, seed)))*cols);
+        float typed = r == rows - 1.0 ? floor(cur*used) : used;
+        float cy = fract((1.0 - q.y)*rows), cx = fract(q.x*res.x/2.0);
+        if (gx < typed && cy > .2 && cy < .8 && h21(vec2(gx, L) + seed) > .25 && !(gx == 1.0 && h21(vec2(L, 7.0)) > .5)) c = ink*(r == rows - 1.0 ? 1.0 : .62);
+        if (gx < 1.0 && cy > .2 && cy < .8) c = ink*.9;   // the prompt
+        if (r == rows - 1.0 && gx == typed && step(.5, fract(t*2.0)) > .5 && cy > .1 && cy < .9) c = ink;   // the cursor
+      } else if (kind > 6.5){   // a cracker: columns of hex flickering through guesses, a bar filling; when it fills, ACCESS flashes
+        float per = 6.0 + mod(seed, 4.0), ph = mod(t, per)/per, done = step(.86, ph);
+        if (q.y > .32){ float gx = floor(q.x*res.x/3.0), gy = floor(q.y*res.y/3.0), lock = step(gx/(res.x/3.0), ph*1.2);
+          vec2 f = fract(q*res/3.0);
+          if (f.x > .15 && f.x < .85 && f.y > .2 && f.y < .8 && h21(vec2(gx, gy) + floor(t*(lock > .5 ? .5 : 18.0)) + seed) > .35) c = lock > .5 ? vec3(.3, 1.0, .45) : ink*.75; }
+        else if (q.y > .12 && q.y < .24){ c = vec3(.05, .1, .07); if (q.x < ph*1.1) c = done > .5 ? vec3(.3, 1.0, .45) : vec3(1.0, .72, .3); }
+        if (done > .5 && step(.5, fract(t*3.0)) > .5) c = mix(c, vec3(.3, 1.0, .45), .35);
       } else {                 // status panel: LEDs ticking over at their own rates
         vec2 g = floor(uv*vec2(8.0, 4.0)), f = fract(uv*vec2(8.0, 4.0));
         float on = step(.45, h21(g + floor(t*(1.5 + h21(g)*7.0))));
@@ -394,10 +412,10 @@ const SCREEN_MAT = new THREE.ShaderMaterial({
 });
 mrtShader(SCREEN_MAT);   // (it writes the normal image too: core.js)
 let SCREEN_SEQ = 0;
-// a live screen on a face: F's local z points out of the face; kind 0-5 picks the program
+// a live screen on a face: F's local z points out of the face; kind 0-7 picks the program (6: a terminal typing, 7: a password cracker)
 const _scA = new THREE.Vector3(), _scB = new THREE.Vector3(), _scN = new THREE.Vector3();
 function screenQuad(F, x, y, z, w, h, kind){
-  const id = (kind % 6) + 6*(SCREEN_SEQ++ % 97);
+  const id = (kind % 8) + 8*(SCREEN_SEQ++ % 97);
   let b = buckets.get(SCREEN_MAT); if (!b){ b = { p: [], n: [], d: [], f: null, u: [] }; buckets.set(SCREEN_MAT, b); }
   const C = [[-w/2, -h/2, 0, 0], [w/2, -h/2, 1, 0], [w/2, h/2, 1, 1], [-w/2, h/2, 0, 1]];
   _scN.set(0, 0, 1).transformDirection(F);
@@ -1929,6 +1947,264 @@ function spireFx(m){
       for (const h of halos){ const wv = ph > .3 ? Math.exp(-(((h.position.y - wy)/2.6)**2)) : 0; h.material.opacity = Math.min(1, .25 + .55*thump + .8*wv); }
     },
     dispose(){ scene.remove(root); mesh.geometry.dispose(); mesh.material.dispose(); for (const h of halos) h.material.dispose(); }
+  };
+}
+
+/* ---------- the wire nest ---------- */
+// The data sniffer, after the reference: a brutalist pile of weathered concrete blocks on a 4x4 block, stacked and
+// overlapping (a podium; on it a tall tower at the back left, a tower at the right with a block cantilevered off its
+// side, a block across the back, another jutting out of the left wall), and set into the middle of it all a glass cube,
+// its frame a lattice, inside it server racks and a data core with circuit traces glowing across the floor and up the
+// walls. The roofs are railed terraces crowded with listening gear: the PACKET SNIFFER / NODE 07 hut with its door open
+// on a desk of screens and a big dish on top, oscillator cabinets with dial gauges, RX/TX boxes, racks blinking, terminal
+// desks typing away, a password cracker, Yagi masts, dishes and a lattice tower; and coax everywhere, in bundles across
+// the decks, over the edges and down the walls. Stencilled plates and glyph windows (SYS::NODE // GHOST, FIBER, LINK).
+// Live (wireNestFx): packets of light run in along the coax from the dishes and the hut, into the cube, and race along
+// its traces to the core.
+M.wnConc = toon(0x7e868e); M.wnConc2 = toon(0x707880); M.wnConc3 = toon(0x5e656c); M.wnJoint = toon(0x42484e);
+M.wnMoss = toon(0x6e7440, { flat: 1 }); M.wnMoss2 = toon(0x58602f, { flat: 1 }); M.wnStain = toon(0x635f55); M.wnRust = toon(0x7e5a3a);
+M.wnGlyph = toon(0x0c2a28, { em: 0x6affd8, kind: 'neon' }); M.wnSlit = toon(0x1e3040, { em: 0x5aa8e0, kind: 'window' }); M.wnDark = toon(0x1a1e24);
+M.wnTrace = toon(0x0e3038, { em: 0x5ae8ff, kind: 'neon' }); M.wnCore = toon(0x1a4a58, { em: 0x3ad0e0, kind: 'neon' }); M.wnFloor = toon(0x14181e);
+M.wnCase = toon(0xa9adb0); M.wnCase2 = toon(0x8e9396); M.wnDial = toon(0xece6d4); M.wnHut = toon(0x969a9d);
+M.wnGlass = new THREE.MeshBasicMaterial({ color: 0xa8dcf0, transparent: true, opacity: .14, depthWrite: false }); M.wnGlass.userData.colorOnly = true;
+M.wnGlint = new THREE.MeshBasicMaterial({ color: 0xe8fbff, transparent: true, opacity: .3, depthWrite: false }); M.wnGlint.userData.colorOnly = true;
+// glyph panel: a dark recess with rows of lit glyphs (the hacker's graffiti of the place, in light)
+function wnGlyphs(F, x, y, w, h){
+  box(M.wnDark, F, x, y, .01, w, h, .03);
+  const rows = Math.max(1, Math.round(h/.2));   // (glyphs a render pixel or two across at the least: smaller ones vanish)
+  for (let r = 0; r < rows; r++){ let t = -w/2 + .06; const yy = y - h/2 + (r + .5)*h/rows;
+    while (t < w/2 - .1){ const gw = rnd(.08, .18); if (chance(.8)) box(M.wnGlyph, F, t + gw/2, yy, .03, gw, h/rows*.62, .02); t += gw + rnd(.05, .09); } }
+  if (chance(.5)) box(M.wnGlyph, F, x, y - h/2 + .03, .035, w - .08, .025, .02);   // an underline
+}
+function wnLouvre(F, x, y, w, h){ box(M.wnJoint, F, x, y, .01, w + .06, h + .06, .03); for (let k = 0; k < 4; k++) box(M.wnConc3, F, x, y - h/2 + (k + .5)*h/4, .04, w, .03, .04, 0, -.5); }
+function wnGauge(F, x, y, z, r){
+  put(U.cyl16, M.frame, under(F, T(x, y, z - .005, 0, 2*r + .04, .03, 2*r + .04, PI/2)));
+  put(U.cyl16, M.wnDial, under(F, T(x, y, z + .012, 0, 2*r, .02, 2*r, PI/2)));
+  box(M.frame, F, x, y, z + .025, .012, r*.85, .01, 0, 0, rnd(-1.1, 1.1));
+}
+// a weathered concrete block: panel joints, a band of windows per floor (lit slits under hoods, glyph panels, louvres,
+// wall boxes), moss along its top and stains running down; skip: faces (0 front, 1 back, 2 right, 3 left) left plain
+function wnBlock(P, cx, cz, w, d, y0, h, opts = {}){
+  box(opts.mat || M.wnConc, P, cx, y0 + h/2, cz, w, h, d);
+  const floors = Math.max(1, Math.round(h/FH));
+  blockFaces(P, cx, cz, w, d).forEach(([F, len], k) => {
+    if (opts.skip && opts.skip.includes(k)) return;
+    for (let t = -len/2 + 1.15; t < len/2 - .3; t += 1.15) box(M.wnJoint, F, t, y0 + h/2, .004, .022, h - .04, .02);
+    for (let f = 1; f < floors; f++) box(M.wnJoint, F, 0, y0 + f*h/floors, .004, len - .04, .022, .02);
+    for (let f = 0; f < floors; f++){ const fy = y0 + (f + .55)*h/floors, n = Math.max(1, Math.floor(len/1.5));
+      for (let q = 0; q < n; q++){ if (!chance(opts.win ?? .6)) continue; const t = -len/2 + (q + .5)*len/n + rnd(-.12, .12), r = rnd(0, 1);
+        if (r < .42){ const ww = rnd(.5, .9); box(M.wnSlit, F, t, fy, .01, ww, .28, .03); box(M.wnConc3, F, t, fy + .18, .05, ww + .12, .06, .1); }
+        else if (r < .7) wnGlyphs(F, t, fy, rnd(.6, 1.0), rnd(.32, .44));
+        else if (r < .84) wnLouvre(F, t, fy, .42, .28);
+        else { box(M.wnCase2, F, t, fy, .06, .26, .3, .12); box(M.neonAmber, F, t + .08, fy + .08, .125, .03, .03, .01); } } }
+    for (let q = 0; q < Math.max(1, Math.round(len/1.4)); q++){ const t = rnd(-len/2 + .2, len/2 - .2);
+      box(chance(.5) ? M.wnMoss : M.wnMoss2, F, t, y0 + h - rnd(.03, .12), .016, rnd(.3, 1.1), rnd(.06, .22), .02);
+      if (chance(.65)) box(M.wnStain, F, t + rnd(-.2, .2), y0 + h - rnd(.4, 1.0), .012, rnd(.05, .12), rnd(.4, 1.3), .014); }
+  });
+  box(M.wnConc3, P, cx, y0 + h + .015, cz, w - .12, .03, d - .12);   // the deck
+  if (opts.strip) blockFaces(P, cx, cz, w, d).forEach(([F, len], k) => { if (!opts.strip.includes(k)) return; box(M.wnGlyph, F, 0, y0 + h - .28, .02, len*.7, .06, .02); glow(F, 0, y0 + h - .28, .15, 'cyan', .6); });
+  if (opts.lip !== false) for (const [fx, fz, lw, ld] of [[0, d/2 - .05, w, .1], [0, -d/2 + .05, w, .1], [w/2 - .05, 0, .1, d], [-w/2 + .05, 0, .1, d]]) box(M.wnConc2, P, cx + fx, y0 + h + .08, cz + fz, lw, .16, ld);
+  for (let k = 0; k < Math.round(w*d/5); k++) box(chance(.5) ? M.wnMoss : M.wnMoss2, P, cx + rnd(-w/2 + .3, w/2 - .3), y0 + h + .035, cz + rnd(-d/2 + .3, d/2 - .3), rnd(.2, .7), .012, rnd(.2, .6));   // moss on the deck
+  return y0 + h;
+}
+// a pipe railing along a run of points (closed: back to the first)
+function wnRail(P, pts, y, closed = false){
+  const n = pts.length, segs = closed ? n : n - 1;
+  for (let k = 0; k < segs; k++){ const [ax, az] = pts[k], [bx, bz] = pts[(k + 1) % n], L = Math.hypot(bx - ax, bz - az), m = Math.max(1, Math.round(L/.6));
+    for (let q = 0; q <= m; q++){ if (q === m && (closed || k < segs - 1)) continue; const u = q/m; box(M.metal, P, ax + (bx - ax)*u, y + .2, az + (bz - az)*u, .03, .4, .03); }
+    strut(M.metal, P, ax, y + .4, az, bx, y + .4, bz, .035); strut(M.metal, P, ax, y + .22, az, bx, y + .22, bz, .022); }
+}
+// an equipment cabinet facing F's +z: gauges, a screen, LEDs, knobs, a stencilled plate
+function wnCab(P, x, y, z, ry, w, h, d, o = {}){
+  const F0 = under(P, T(x, y, z, ry)); box(o.mat || M.wnCase, F0, 0, h/2, 0, w, h, d); box(M.wnConc3, F0, 0, h + .02, 0, w + .04, .04, d + .04);
+  const F = under(F0, T(0, 0, d/2, 0));
+  for (const s of [-1, 1]) box(M.frame, F, s*(w/2 - .02), h/2, .01, .02, h - .04, .02);
+  let yy = h - .14;
+  if (o.gauges){ const n = o.gauges, r = Math.min(.1, (w - .1)/n/2 - .02); for (let k = 0; k < n; k++) wnGauge(F, -w/2 + (k + .5)*w/n, yy - r + .04, .01, r); yy -= 2*r + .1; }
+  if (o.screen !== undefined && yy > .3){ const sh = Math.min(.26, yy - .2); box(M.metalDark, F, 0, yy - sh/2, .005, w - .1, sh + .05, .02); screenQuad(F, 0, yy - sh/2, .02, w - .16, sh, o.screen); yy -= sh + .1; }
+  if (o.leds && yy > .2){ screenQuad(F, 0, yy - .06, .015, w - .16, .1, 5); yy -= .16; }
+  for (let k = 0; k < (o.knobs ?? 3); k++) put(U.cyl16, M.metalDark, under(F, T(-w/2 + .1 + k*.12, Math.max(.12, yy - .05), .02, 0, .06, .04, .06, PI/2)));
+  if (o.label) plant(o.label, under(F, T(0, 0, .02, 0)), 0, o.labelY ?? h*.25, 0, o.labelK ?? .35, 'c', true);
+  return F;
+}
+// a CRT terminal desk: a slab on legs, two or three monitors (the terminal, the cracker, a scope), a keyboard
+function wnDesk(P, x, y, z, ry, kinds){
+  const F = under(P, T(x, y, z, ry)), w = kinds.length*.42 + .1;
+  box(M.inWood2, F, 0, .42, 0, w, .04, .45); for (const s of [-1, 1]) box(M.frame, F, s*(w/2 - .04), .2, 0, .03, .4, .4);
+  kinds.forEach((k, i) => monitor(under(F, T(-w/2 + .26 + i*.42, .44, -.08, 0)), 0, .16, .12, .3, .22, k, true));
+  box(M.metalDark, F, 0, .45, .14, w*.6, .02, .1);
+}
+// a Yagi on a mast
+function wnMast(P, x, y, z, h){ cyl(M.metal, P, x, y + h/2, z, .025, h); for (let k = 0; k < 2; k++) yagi(P, x, y + h - .1 - k*.35, z, rnd(0, TAU), rnd(.6, .9)); if (chance(.5)) beaconLight(P, x, y + h + .05, z, .05, .5); }
+function buildWireNest(m){
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
+  const S_ = m.w*LOT, P = T(m.x, 0, m.z, megaAngle(m, pick([0, PI/2, PI, -PI/2])));   // the front (entrance, the hut, the terminals) faces local +z
+  const routes = [], route = pts => { if (pts.length > 1) routes.push(pts); };   // for the packets (wireNestFx): runs of points [x, y, z]
+  const cable = (pts, n = 3, r = .028) => { coaxBundle(P, pts, n, r); route(pts.map(([x, y, z]) => [x, y + r*1.8, z])); };
+  // ---- the ground: worn slabs, puddles, a few cable trays
+  box(G.asph, P, 0, .012, 0, S_, .025, S_);
+  const n = 16, st = S_/n;
+  for (let a=0;a<n;a++) for (let b=0;b<n;b++) if (!chance(.05)) box(pick(TILES.ind), P, (a-(n-1)/2)*st, .03, (b-(n-1)/2)*st, st - .05, .045, st - .05);
+  for (let k=0; k<6; k++) box(G.puddle, P, rnd(-S_/2 + .6, S_/2 - .6), .056, rnd(S_/2 - 1.0, S_/2 - .4), rnd(.6, 1.4), .01, rnd(.2, .5));
+  // ---- the podium: three storeys, the way in at the front under the WIRE NEST board, glyph windows
+  const PW = 13.2, PD = 12.6, yA = wnBlock(P, 0, -.2, PW, PD, CURB, 3*FH + .2, { strip: [0] }), fz = -.2 + PD/2;
+  { const F = under(P, T(-1.2, 0, fz, 0));
+    box(M.wnDark, F, 0, CURB + .75, .02, 1.6, 1.4, .05); box(M.wnSlit, F, 0, CURB + .7, .045, 1.3, 1.2, .02);   // the doorway, lit inside
+    box(M.wnConc2, F, 0, CURB + 1.58, .35, 2.2, .14, .7);   // a slab canopy
+    for (const s of [-1, 1]) box(M.wnConc3, F, s*1.0, CURB + .78, .55, .12, 1.5, .12);
+    box(M.wnDark, F, 0, CURB + 2.1, .05, 2.6, .55, .08); fitSign(under(F, T(0, 0, .1, 0)), 'sign_w_wirenest', 0, CURB + 2.1, 0, 2.4, 1.2, 'cyan');
+    plant('sign_w_root', F, 1.25, CURB + 1.15, .06, .3, 'c', true); }
+  { const F = under(P, T(3.6, 0, fz, 0)); box(M.wnDark, F, 0, CURB + 1.0, .04, 3.6, .6, .06); fitSign(under(F, T(0, 0, .08, 0)), 'sign_w_ghost', 0, CURB + 1.0, 0, 3.4, 1.0, 'green'); }
+  { const F = under(P, T(-PW/2, 0, 2.0, -PI/2)); plant('sign_w_fiber', F, -1.0, CURB + .5, .02, .45, 'c', true); plant('sign_w_link', F, 1.6, CURB + .5, .02, .45, 'c', true); }
+  { const F = under(P, T(PW/2, 0, 1.0, PI/2)); plant('sign_w_packet', F, 0, CURB + .5, .02, .45, 'c', true); plant('sign_w_node07', F, -2.2, CURB + 1.4, .02, .4, 'c', true); }
+  box(M.shutter, P, PW/2 + .02, CURB + .55, -2.8, .03, 1.0, 1.6); box(M.hazard, P, PW/2 + .03, CURB + 1.1, -2.8, .03, .06, 1.7);   // a service shutter
+  // ---- the blocks stacked on it, overlapping
+  const yBB = wnBlock(P, .3, -4.4, 7.6, 3.4, yA, 4.45);                                  // across the back, up to the cube's top: its row of gear looks down over the glass
+  const yT1 = wnBlock(P, -4.5, -3.0, 3.4, 5.4, yA, 6*FH + .2, { win: .7, strip: [0, 2, 3] });              // the tall tower, back left
+  const yT2 = wnBlock(P, 4.85, -1.4, 3.1, 7.0, yA, 4*FH, { strip: [0, 2] });                                // the right tower
+  const yCR = wnBlock(P, 6.45, 2.6, 2.3, 3.0, yA + 1.1, 2*FH);                           // cantilevered off its side, out past the podium
+  for (const z of [1.5, 3.7]) strut(M.wnConc3, P, 7.2, yA - .9, z, 6.2, yA + 1.15, z, .22);   // its struts back to the wall
+  const yCL = wnBlock(P, -6.9, -.6, 1.6, 4.0, yA - 1.6, 2*FH + .6, { win: .4 });         // jutting out of the left wall
+  wnBlock(P, -4.3, 3.6, 3.6, 3.0, yA - .4, .4 + FH*.0 + .02, { lip: false, skip: [0, 1, 2, 3], win: 0 });   // (a raised pad for the hut)
+  const yHut = yA + .02;
+  // ---- the glass cube
+  const gx = .35, gz = .55, gw = 4.8, gd = 4.6, gh = 4.3, g0 = yA + .02, g1 = g0 + gh;
+  box(M.wnFloor, P, gx, g0 + .02, gz, gw - .1, .04, gd - .1);
+  // inside: two rows of racks, every face alive; a data core in the middle, ringed; traces across the floor and up the back
+  const core = [gx + .2, gz - .3];
+  for (const sx of [-1, 1]) for (let k = 0; k < 3; k++){ const rx = gx + sx*1.45, rz = gz - 1.4 + k*1.15;
+    box(M.metalDark, P, rx, g0 + .85, rz, .5, 1.7, .9); const F = under(P, T(rx - sx*.26, g0, rz, -sx*PI/2));
+    screenQuad(F, 0, 1.35, .01, .7, .22, irand(0, 4)); screenQuad(F, 0, 1.0, .01, .7, .2, 5); screenQuad(F, 0, .65, .01, .7, .18, k === 1 ? 6 : 3); glow(F, 0, 1.0, .2, k === 1 ? 'green' : 'cyan', .9); }
+  cyl(M.wnCore, P, core[0], g0 + 1.9, core[1], .24, 3.8); for (const y of [.4, 1.4, 2.4, 3.4]) cyl(M.frame, P, core[0], g0 + y, core[1], .3, .07);
+  glow(P, core[0], g0 + 2.2, core[1], 'cyan', 2.6); glow(P, core[0], g0 + .4, core[1], 'cyan', 3.0); for (const y of [1.2, 3.0]) for (const sx of [-1, 1]) glow(P, gx + sx*1.4, g0 + y, gz, 'cyan', 2.0);
+  const traceRun = pts => { for (let k = 1; k < pts.length; k++){ const [ax, ay, az] = pts[k - 1], [bx, by, bz] = pts[k]; strut(M.wnTrace, P, ax, ay, az, bx, by, bz, .035); } route(pts); };
+  for (let k = 0; k < 9; k++){   // floor traces: from the walls in, turning at right angles, to the core
+    const side = k % 4, u = rnd(-1.8, 1.8), y = g0 + .05;
+    const start = side === 0 ? [gx - gw/2 + .1, y, gz + u] : side === 1 ? [gx + gw/2 - .1, y, gz + u] : side === 2 ? [gx + u*.9, y, gz + gd/2 - .1] : [gx + u*.9, y, gz - gd/2 + .1];
+    const mid = side < 2 ? [core[0] + (start[0] < core[0] ? -.4 : .4), y, start[2]] : [start[0], y, core[1] + (start[2] < core[1] ? -.4 : .4)];
+    const mid2 = side < 2 ? [mid[0], y, core[1]] : [core[0], y, mid[2]];
+    traceRun([start, mid, mid2, [core[0], y, core[1]]]); }
+  for (let k = 0; k < 7; k++){   // up the back and side walls inside the glass: risers with steps, like a circuit board
+    const onBack = k < 4, u = onBack ? gx - 2.0 + k*1.3 : gz - 1.6 + (k - 4)*1.5, s = onBack ? 0 : (k % 2 ? 1 : -1);
+    const at = (a, y) => onBack ? [a, y, gz - gd/2 + .08] : [gx + s*(gw/2 - .08), y, a];
+    const y1 = g0 + rnd(1.4, 2.4), y2 = g0 + rnd(2.8, gh - .3), j = u + rnd(-.5, .5);
+    traceRun([at(u, g0 + .06), at(u, y1), at(j, y1 + .3), at(j, y2)]); box(M.wnTrace, P, ...at(j, y2 + .05), .1, .1, .1); glow(P, ...at(j, y2 + .05), 'cyan', .7); }
+  // the glass: a pane each face, a lattice of mullions, heavy corner posts, a glass roof on a grid
+  for (const [F, len] of blockFaces(P, gx, gz, gw, gd)){
+    box(M.wnGlass, F, 0, g0 + gh/2, 0, len, gh, .02);
+    for (const t of [-len/2, -len/6, len/6, len/2]) box(M.frame, F, t, g0 + gh/2, 0, Math.abs(t) > len/2 - .01 ? .14 : .06, gh, .08);
+    for (let q = 0; q <= 4; q++) box(M.frame, F, 0, g0 + q*gh/4, 0, len, .06, .08);
+    for (let q = 0; q < 3; q++) box(M.wnGlint, F, -len/3 + q*len/3 + rnd(-.2, .2), g0 + gh*rnd(.3, .8), .02, .06, gh*.3, .01, 0, 0, .5);   // glints
+  }
+  box(M.wnGlass, P, gx, g1, gz, gw, .02, gd);
+  for (let q = 0; q <= 3; q++){ box(M.frame, P, gx - gw/2 + q*gw/3, g1, gz, .06, .08, gd); box(M.frame, P, gx, g1, gz - gd/2 + q*gd/3, gw, .08, .06); }
+  // ---- the terraces: railings round the podium's open roof and the tops
+  wnRail(P, [[-PW/2 + .15, -.2 + PD/2 - 3.4], [-PW/2 + .15, fz - .15], [PW/2 - .15, fz - .15], [PW/2 - .15, 2.0]], yA + .02);
+  wnRail(P, [[3.3 + .1, -4.9 + .1], [3.3 + .1, 2.1 - .1], [6.4 - .1, 2.1 - .1]], yT2 + .02);
+  wnRail(P, [[-3.45, -2.75], [4.0, -2.75]], yBB + .02);
+  // ---- the PACKET SNIFFER / NODE 07 hut: door open on a desk of screens, a big dish on a tripod on its roof
+  { const hx = -4.3, hz = 3.7, hw = 2.4, hd = 1.9, hh = 1.55, Hf = under(P, T(hx, yHut, hz, 0));
+    box(M.wnHut, Hf, 0, hh/2, -hd/2 + .05, hw, hh, .1); for (const s of [-1, 1]) box(M.wnHut, Hf, s*(hw/2 - .05), hh/2, 0, .1, hh, hd);
+    box(M.wnHut, Hf, -.55, hh/2, hd/2 - .05, hw - 1.1 - .2, hh, .1); box(M.wnHut, Hf, .95, hh/2, hd/2 - .05, .5, hh, .1); box(M.wnHut, Hf, .35, hh - .15, hd/2 - .05, .7, .3, .1);
+    box(M.wnConc3, Hf, 0, hh + .05, 0, hw + .12, .1, hd + .12); box(M.wnSlit, Hf, .35, hh*.45, -hd/2 + .12, .65, hh*.8, .02);   // the roof; light from inside
+    box(M.metalDark, Hf, .7 + .34, .6, hd/2 + .3, .05, 1.2, .62, 1.1);   // the door, swung open
+    box(M.inWood2, Hf, 0, .5, -hd/2 + .4, hw - .4, .04, .45); for (const k of [0, 1, 2]) monitor(under(Hf, T(-.65 + k*.6, .52, -hd/2 + .28, 0)), 0, .17, .1, .32, .24, [0, 6, 4][k], true);
+    monitor(under(Hf, T(-hw/2 + .2, .9, 0, PI/2)), 0, 0, .02, .5, .3, 3, false);
+    glow(Hf, .35, .8, hd/2 + .1, 'cyan', 1.1);
+    const Fs = under(P, T(hx - hw/2 - .01, yHut, hz, -PI/2)); fitSign(Fs, 'sign_w_sniffer', 0, hh*.7, .02, hw - .3, .7, 'cyan'); fitSign(Fs, 'sign_w_node07', 0, hh*.42, .02, 1.0, .6, 'cyan');
+    wnCab(P, hx + .7, yHut, hz + hd/2 + .5, 0, .5, .7, .35, { gauges: 2, screen: 0, knobs: 2 });
+    const dy = yHut + hh + .1; for (const a of [0, 2.1, 4.2]) strut(M.frame, P, hx - .3, dy + .9, hz, hx - .3 + Math.cos(a)*.6, dy, hz + Math.sin(a)*.6, .04);
+    dish(P, hx - .3, dy + .7, hz, 1.15, rnd(-2.8, -2.0), .8, true);
+    wnMast(P, hx + .9, dy, hz - .6, 1.8);
+    cable([[hx + hw/2 + .05, yA + .05, hz - .2], [gx - gw/2 - .15, yA + .05, hz - .2], [gx - gw/2 - .15, yA + .05, gz + .4], [gx - gw/2 + .1, g0 + .06, gz + .4]], 4);
+    cable([[hx - .3, dy + .2, hz], [hx - .3, dy, hz - .3], [hx + hw/2 - .2, dy, hz - .3], [hx + hw/2 + .05, yA + .05, hz - .5], [gx - gw/2 - .3, yA + .05, hz - .5], [gx - gw/2 - .3, yA + .05, gz - 1.2], [gx - gw/2 + .1, g0 + .06, gz - 1.2]], 2, .024); }
+  // ---- the front terrace: terminal desks, the RX/TX node, the cracker, cable reels and junction boxes
+  wnDesk(P, -1.3, yA + .02, 4.9, 0, [6, 7, 1]);
+  wnCab(P, 1.6, yA + .02, 5.1, 0, .8, 1.1, .55, { gauges: 2, screen: 0, leds: true, label: 'sign_w_rxtx', labelY: .16, labelK: .3 });
+  wnCab(P, 3.0, yA + .02, 5.15, 0, .6, .8, .45, { gauges: 3, screen: 2, knobs: 2 });
+  wnCab(P, 4.2, yA + .02, 5.1, 0, .55, 1.0, .5, { screen: 7, leds: true, label: 'sign_w_port', labelY: .14, labelK: .26 });
+  wnCab(P, 5.4, yA + .02, 4.6, -PI/2, .7, .9, .5, { gauges: 2, screen: 1 });
+  for (const [x, z] of [[-.2, 3.6], [2.3, 3.9]]){ put(U.cyl16, M.wnRust, under(P, T(x, yA + .2, z, 0, .4, .3, .4, PI/2))); put(U.cyl16, M.coax, under(P, T(x, yA + .2, z, 0, .32, .32, .32, PI/2))); }   // cable reels
+  for (const [x, z] of [[-2.6, 2.2], [3.2, 3.2], [5.6, 3.0], [-2.4, 5.4], [.3, 5.6]]) wnCab(P, x, yA + .02, z, rnd(-.3, .3), .35, .4, .3, { knobs: 1, leds: true });
+  for (const [x, z, h] of [[-6.1, 5.4, 2.2], [6.0, 5.6, 1.8], [-2.9, 3.3, 1.5]]) wnMast(P, x, yA, z, h);
+  for (const [x, z, r] of [[5.6, 1.6, .38], [-6.0, 1.6, .3], [-.2, 5.7, .26]]) dish(P, x, yA + .02, z, r, rnd(-PI, PI), rnd(.8, 1.2), chance(.5));
+  cable([[-1.3, yA + .05, 4.55], [-1.3, yA + .05, gz + gd/2 + .25], [gx - 1.0, yA + .05, gz + gd/2 + .25], [gx - 1.0, g0 + .06, gz + gd/2 - .1]], 3);
+  cable([[1.6, yA + .05, 4.8], [1.6, yA + .05, gz + gd/2 + .4], [gx + .6, yA + .05, gz + gd/2 + .4], [gx + .6, g0 + .06, gz + gd/2 - .1]], 4);
+  cable([[3.0, yA + .05, 4.9], [3.0, yA + .05, 3.6], [gx + gw/2 + .3, yA + .05, 3.6], [gx + gw/2 + .3, yA + .05, gz + 1.2], [gx + gw/2 - .1, g0 + .06, gz + 1.2]], 3);
+  cable([[4.2, yA + .05, 4.85], [4.2, yA + .05, 3.3], [5.4, yA + .05, 3.3], [5.4, yA + .05, 4.3]], 2);
+  cable([[5.15, yA + .05, 4.6], [gx + gw/2 + .55, yA + .05, 4.6], [gx + gw/2 + .55, yA + .05, gz + .2], [gx + gw/2 - .1, g0 + .06, gz + .2]], 3);
+  // cables looping over the front edge and down the wall
+  for (const x of [-5.6, -2.9, 2.6, 5.9]){ const d = rnd(1.2, 2.4); coaxBundle(P, [[x, yA + .1, fz - .3], [x, yA + .12, fz + .08], [x + .1, yA - d*.6, fz + .12], [x + .25, yA - d, fz + .08]], 2, .022); }
+  // ---- the back block's roof: a row of racks blinking, the OSCILLATOR bench, a scope on top, masts
+  for (let k = 0; k < 5; k++) wnCab(P, -2.6 + k*.62, yBB + .02, -4.0, 0, .56, 1.15, .6, { screen: k % 2 ? 3 : 5, leds: true, knobs: 0 });
+  wnCab(P, 1.2, yBB + .02, -3.95, 0, .9, .85, .6, { gauges: 3, screen: 1, label: 'sign_w_osc', labelY: .14, labelK: .3 });
+  monitor(under(P, T(1.2, yBB + .9, -3.8, 0)), 0, .14, .1, .34, .24, 0, true);
+  wnCab(P, 2.6, yBB + .02, -4.0, 0, .7, .7, .55, { gauges: 2, screen: 4 });
+  wnCab(P, 3.6, yBB + .02, -4.1, 0, .5, .9, .5, { gauges: 2, screen: 7, leds: true });
+  wnDesk(P, -1.0, yBB + .02, -5.3, PI, [6, 0]);
+  for (let k = 0; k < 4; k++) wnCab(P, -3.0 + k*.5, yBB + .02, -5.6, PI, .42, .55, .35, { gauges: 1, leds: true, knobs: 1 });
+  for (const [x, z] of [[-3.1, -5.6], [3.6, -5.6], [.4, -5.7], [2.0, -5.6], [-2.0, -3.0]]) wnMast(P, x, yBB, z, rnd(1.6, 2.6));
+  dish(P, -.4, yBB + .02, -3.2, .32, rnd(-PI, PI), 1.0, false); dish(P, 3.6, yBB + .02, -5.2, .5, rnd(-PI, PI), .8, true);
+  dish(P, 3.2, yBB + .02, -3.2, .45, rnd(-1, 1), 1.0, true);
+  for (let k = 0; k < 5; k++) cable([[-2.6 + k*.62, yBB + .05, -3.65], [-2.6 + k*.62, yBB + .05, -2.95], [-2.6 + k*.62, g0 + .5 + k*.15, gz - gd/2 - .05]], 2, .02);
+  cable([[1.2, yBB + .05, -3.6], [1.2, yBB + .05, -2.9], [gx + 1.0, g1 - .3, gz - gd/2 - .05]], 3);
+  // ---- the tall tower: a lattice tower with Yagis, dishes round it, a beacon
+  { const { pt, pw } = latticeTower(P, -4.5, yT1 + .02, -3.2, rnd(3.0, 3.6), .4, .1);
+    for (const a of [rnd(0, TAU), rnd(0, TAU)]) hornAntenna(P, -4.5 + Math.sin(a)*pw*.7, pt + .2, -3.2 + Math.cos(a)*pw*.7, a);
+    for (const [x, z] of [[-5.6, -1.0], [-3.4, -.8]]) dish(P, x, yT1 + .02, z, .4, rnd(-PI, PI), rnd(.7, 1.1), chance(.5));
+    wnCab(P, -3.6, yT1 + .02, -5.0, PI, .6, .7, .45, { gauges: 2, leds: true });
+    for (const [x, z] of [[-5.8, -5.3], [-3.3, -2.0]]) wnMast(P, x, yT1, z, rnd(1.4, 2.2));
+    wnRail(P, [[-6.1, -.4], [-2.9, -.4], [-2.9, -5.6]], yT1 + .02);
+    cable([[-5.6, yT1 + .05, -1.2], [-4.5, yT1 + .05, -1.2], [-4.5, yT1 + .05, -2.6]], 2, .022);
+    coaxBundle(P, [[-2.85, yT1 - .1, -1.5], [-2.75, yT1 - 1.5, -1.5], [-2.75, yA + .4, -1.3], [gx - gw/2 - .05, g1 - .4, gz - 1.6]], 3, .025);
+    route([[-4.5, yT1 + 3, -3.2], [-4.5, yT1 + .1, -3.2], [-2.8, yT1 - .1, -1.5], [-2.75, yA + .45, -1.3], [gx - gw/2 - .05, g1 - .35, gz - 1.6]]); }
+  // ---- the right tower: the PACKET SNIFFER / NODE 07 cabinet, dishes and an antenna cluster
+  { const F = wnCab(P, 4.7, yT2 + .02, -3.6, 0, 1.4, 1.2, .9, { gauges: 4, screen: 0, leds: true });
+    fitSign(under(P, T(4.7, yT2 + .02, -3.6 + .46, 0)), 'sign_w_sniffer', 0, 1.08, .03, 1.3, .45, 'cyan');
+    monitor(under(P, T(4.2, yT2 + 1.24, -3.5, 0)), 0, .14, .1, .3, .22, 6, true);
+    dish(P, 5.6, yT2 + .02, -.6, .55, rnd(-1, 1), .9, true); dish(P, 3.9, yT2 + .02, .9, .35, rnd(0, TAU), 1.1, false);
+    for (const [x, z] of [[5.8, -4.6], [3.8, -4.7], [5.9, 1.3]]) wnMast(P, x, yT2, z, rnd(1.4, 2.6));
+    wnCab(P, 4.9, yT2 + .02, -1.2, PI/2, .55, .6, .4, { gauges: 2, screen: 2 });
+    for (let k = 0; k < 3; k++) wnCab(P, 3.9 + k*.5, yT2 + .02, -2.5, 0, .42, .7, .4, { gauges: 1, screen: k === 1 ? 6 : 5, knobs: 1 });
+    dish(P, 4.0, yT2 + .02, -4.6, .4, rnd(-PI, PI), .9, true);
+    cable([[4.7, yT2 + .05, -3.1], [4.7, yT2 + .05, -2.0], [3.45, yT2 + .05, -2.0], [3.35, yT2 - .4, -2.0], [gx + gw/2 + .05, g1 - .5, gz - 1.0]], 3);
+    cable([[5.6, yT2 + .25, -.6], [5.6, yT2 + .05, -1.0], [4.9, yT2 + .05, -1.0]], 2, .022);
+    for (const z of [-4.3, -.2]) coaxBundle(P, [[6.38, yT2 - .05, z], [6.45, yT2 - 1.2, z], [6.45, yA + .4, z + .2]], 2, .022); }
+  // ---- the cantilevered block: a dish and a mast; the left block: a vent stack
+  dish(P, 6.4, yCR + .02, 2.6, .5, rnd(-1, 1), .9, true); wnMast(P, 7.0, yCR, 3.6, 1.4);
+  cable([[6.2, yCR + .3, 2.6], [5.4, yCR + .05, 2.6], [5.3, yA + .05, 2.6], [gx + gw/2 + .3, yA + .05, gz + 1.8], [gx + gw/2 - .1, g0 + .06, gz + 1.8]], 2, .024);
+  for (const z of [-1.8, .6]){ cyl(M.wnConc3, P, -6.9, yCL + .3, z, .25, .6); box(M.metalDark, P, -6.9, yCL + .62, z, .6, .06, .6); }
+  // beacons at the corners of the tops
+  for (const [x, y, z] of [[-6.1, yT1, -.4], [-2.9, yT1, -5.6], [6.3, yT2, 2.0], [3.4, yT2, -4.8], [-3.4, yBB, -6.0], [4.0, yBB, -6.0]]) beaconLight(P, x, y + .1, z, .06, .6);
+  m.wn = { m: P.toArray(), routes, core: [core[0], g0 + 2, core[1]] };
+  m.solid = { m: P.toArray(), x0: -7.8, x1: 7.7, z0: -6.6, z1: 6.2, y1: yT1 + 4.5 };
+  m.roofH = yA + .2;
+  m.top = yT1 + 4.6;
+}
+// The packets: bright little streaks running along every route (in along the coax from the dishes and the hut, into the
+// cube, along its traces to the core), many at once, each at its own pace; the core breathes brighter as they arrive.
+function wireNestFx(m){
+  const d = m.wn; if (!d || !d.routes.length) return null;
+  const root = new THREE.Group(); root.matrixAutoUpdate = false; root.matrix.fromArray(d.m); root.matrixWorldNeedsUpdate = true; scene.add(root);
+  const R2 = mulberry32(hash('wnfx', m.seed)), pk = [];
+  for (const pts of d.routes){ const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1], pts[k][2] - pts[k - 1][2]));
+    const L = cum[cum.length - 1]; if (L < .2) continue; const nP = Math.max(1, Math.round(L/2.2));
+    for (let q = 0; q < nP; q++) pk.push({ pts, cum, L, v: 1.4 + R2()*1.6, o: R2()*L, col: R2() < .12 ? 0xffc04a : R2() < .5 ? 0x7affb0 : 0x7ae8ff }); }
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff }), pk.length);
+  const c = new THREE.Color(); pk.forEach((p, k) => mesh.setColorAt(k, c.set(p.col).multiplyScalar(1.4)));
+  mesh.frustumCulled = false; mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); root.add(mesh);
+  const halo = new THREE.Sprite(GLOW.cyan.clone()); halo.position.fromArray(d.core); halo.scale.set(2.6, 2.6, 1); halo.layers.set(1); root.add(halo);
+  const o = new THREE.Object3D(), A = new THREE.Vector3(), B = new THREE.Vector3(), Z = new THREE.Vector3(0, 0, 1);
+  return {
+    update(dt, t){
+      for (let k = 0; k < pk.length; k++){ const p = pk[k], s = (p.o + t*p.v) % p.L; let i = 1; while (i < p.cum.length - 1 && p.cum[i] < s) i++;
+        const a = p.pts[i - 1], b = p.pts[i], u = (s - p.cum[i - 1])/Math.max(1e-6, p.cum[i] - p.cum[i - 1]);
+        A.set(a[0], a[1], a[2]); B.set(b[0], b[1], b[2]); o.position.copy(A).lerp(B, u); o.quaternion.setFromUnitVectors(Z, B.sub(A).normalize());
+        const e = Math.min(1, s/.4, (p.L - s)/.4); o.scale.set(.07*e, .07*e, .24*e); o.updateMatrix(); mesh.setMatrixAt(k, o.matrix); }
+      megaFxDirty(mesh.instanceMatrix, m);
+      halo.material.opacity = .45 + .3*Math.sin(t*3.1) + .2*Math.sin(t*7.7);
+    },
+    dispose(){ scene.remove(root); mesh.geometry.dispose(); mesh.material.dispose(); halo.material.dispose(); }
   };
 }
 

@@ -113,7 +113,7 @@ const STORY = (() => {
     const pl = p.job && places.get(p.job); if (!pl) return null;
     if (p.courier) return 'courier';
     const k = pl.mega && pl.mega.kind;
-    if (k) return { square: 'stall-keeper', mall: 'shop-worker', market: 'shop-worker', foundry: 'industrial', logistics: 'industrial', club: 'club-staff', radio: 'radio', police: 'police', pagoda: 'hotel-spa', greenhouse: 'greenhouse', bathhouse: 'bathhouse-staff' }[k] || 'shop-worker';
+    if (k) return { square: 'stall-keeper', mall: 'shop-worker', market: 'shop-worker', foundry: 'industrial', logistics: 'industrial', club: 'club-staff', radio: 'radio', wirenest: 'radio', police: 'police', pagoda: 'hotel-spa', greenhouse: 'greenhouse', bathhouse: 'bathhouse-staff' }[k] || 'shop-worker';
     const c = pl.cell, z = c && c.sections && c.sections.length ? c.sections[c.sections.length - 1].zone : 'mid';
     return { mid: 'shop-worker', high: 'office-worker', ind: 'industrial', low: 'shop-worker' }[z] || 'shop-worker';
   }
@@ -146,7 +146,7 @@ const STORY = (() => {
   // home or workplace once a line has stated it ("her home", "his workplace"), someone else's once their name and that fact are known ("Mika's
   // building"), a landmark by its name (the signs say so), and otherwise just "a building". Open places by what they are.
   const MEGA_NAME = { square: 'the town square', mall: 'the sky mall', market: 'the market plaza', foundry: 'the foundry', logistics: 'the logistics hub', club: 'the Neon Dome',
-    radio: 'the radio station', police: 'the police station', pagoda: 'the Cloud Pagoda', greenhouse: 'the hydroponic farm', bathhouse: 'the bathhouse', spire: 'the Data Spire' };
+    radio: 'the radio station', police: 'the police station', pagoda: 'the Cloud Pagoda', greenhouse: 'the hydroponic farm', bathhouse: 'the bathhouse', spire: 'the Data Spire', wirenest: 'the Wire Nest' };
   const ASSOC = { rev: -1, m: new Map() };   // place id -> [{ who, kind: 'home' | 'work' }], from the notebook's stated facts
   function assocOf(pid){
     if (ASSOC.rev !== ST.rev){ ASSOC.rev = ST.rev; ASSOC.m.clear();

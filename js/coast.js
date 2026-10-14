@@ -2025,6 +2025,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // arcade (now and then a glass walk); in the air a planted bridge or a skywalk, the skywalk more often the longer it is
   const LINK_TYPES = ['bridge', 'skywalk', 'pergola', 'arcade', 'wall', 'random'];
   function linkType(L, R){
+    if (IND(L.A.kind) || IND(L.B.kind)){   // (industry's own: a service track or a pipeline on the ground, a drone rail when anything's in the way or it's a long or uneven span)
+      const t = L.type || 'random', hard = L.blocked || L.gap > 7 || Math.abs(L.A.y - L.B.y) > 1.2 || L.A.level || L.B.level;
+      if (t === 'bridge' || t === 'skywalk' || hard) return 'rail';
+      if (t === 'pergola') return 'pipe'; if (t === 'arcade' || t === 'wall') return 'track';
+      return R.chance(.5) ? 'track' : 'pipe'; }
     const ground = !L.A.level && !L.B.level && Math.abs(L.A.y - L.B.y) < 1.4, t = L.type || 'random';
     if (t === 'wall') return L.gap < .5 && L.A.level === L.B.level ? 'wall' : 'wing';   // (apart: an enclosed wing joins them instead of a shared wall)
     if (t === 'pergola' || t === 'arcade' || t === 'bridge' || t === 'skywalk') return t;   // (every kind, at any height: up in the air a pergola or an arcade is carried as a bridge)
@@ -2051,11 +2056,39 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     // a doorway in each wall where the walk or the bridge meets it: a dark opening in a cream frame, under a small hood
     const door = (p, q) => { const d = V3(q.x - p.x, 0, q.z - p.z).normalize(), o = p.clone().addScaledVector(d, -.02), o2 = p.clone().addScaledVector(d, .05);
       seg(T, o, o2, .66, .98, HP.cream, .49); seg(T, o, o2.clone().addScaledVector(d, .02), .5, .82, HP.glassD, .41); seg(T, o, o2.clone().addScaledVector(d, .12), .8, .06, HP.terra, 1.02); };
-    if (type !== 'wall' && type !== 'wing'){ door(a, b); door(b, a); }
+    if (type !== 'wall' && type !== 'wing' && type !== 'rail' && type !== 'pipe' && type !== 'track'){ door(a, b); door(b, a); }
     // a long span up in the air gets slim piers down to the ground, whatever it's built as
-    if (len > 3.6 && (A.level || B.level)) for (let u = 1/Math.ceil(len/3); u < .999; u += 1/Math.ceil(len/3)){ const c = at(u, 0, 0), g = heightAt(c.x, c.z);
+    if (type !== 'rail' && len > 3.6 && (A.level || B.level)) for (let u = 1/Math.ceil(len/3); u < .999; u += 1/Math.ceil(len/3)){ const c = at(u, 0, 0), g = heightAt(c.x, c.z);
       if (c.y - g > .4){ box(T, c.x, (c.y + g)/2 - .05, c.z, .16, c.y - g - .1, .16, HP.cream); box(T, c.x, g + .1, c.z, .3, .2, .3, HP.stone); } }
-    if (type === 'wall'){   // touching: a shared wall with an arched way through
+    if (type === 'track'){   // industry, on the ground: a paved service lane for the machines, edged in blue light, a dashed centre line
+      run(0, 0, .95, .1, C(0xb9b2a4), .02); for (const s_ of [-.46, .46]) run(s_, .1, .05, .03, HP.indBlue, 0, .02, .98);
+      const n = Math.max(1, Math.round(len/.5)); for (let k = 0; k < n; k++) if (k % 2 === 0){ const c0 = at((k + .2)/n, 0, .1), c1 = at((k + .8)/n, 0, .1); seg(T, c0, c1, .06, .02, HP.white); }
+      { const np = Math.max(1, Math.round(len/2.4)); for (let k = 0; k < np; k++){ const c = at((k + .5)/np, 0, 0); pools.push([c.x, c.z, 1.2, 41.4]); } }
+    } else if (type === 'pipe'){   // industry, on the ground: twin pipes (water, power) on low trestles, glowing rings at the joints
+      const n = Math.max(2, Math.round(len/.8));
+      for (let k = 0; k <= n; k++){ const c = at(k/n, 0, 0); if (solidAt(c.x, c.z, c.y, c.y + .6, [A, B])) continue;
+        for (const s_ of [-.22, .22]){ const f = at(k/n, s_*1.3, 0); seg(T, V3(f.x, f.y, f.z), V3(c.x + sx*s_*.6, c.y + .42, c.z + sz*s_*.6), .05, .05, HP.metal); }
+        box(T, c.x, c.y + .42, c.z, .6*Math.abs(sz) + .08, .05, .6*Math.abs(sx) + .08, HP.metal); }
+      run(-.14, .5, .12, .12, HP.white, 0, -.02, 1.02); run(.14, .5, .09, .09, HP.metal, 0, -.02, 1.02);
+      for (let k = 1; k < Math.max(2, Math.round(len/1.6)); k++){ const u = k/Math.max(2, Math.round(len/1.6)); seg(T, at(u - .015, -.14, .5), at(u + .015, -.14, .5), .16, .16, HP.indBlue); }
+      { const np = Math.max(1, Math.round(len/2.6)); for (let k = 0; k < np; k++){ const c = at((k + .5)/np, 0, 0); pools.push([c.x, c.z, 1.0, 41.3]); } }
+    } else if (type === 'rail'){   // industry, up in the air: a drone rail, a slim white beam on T pylons, a dashed line of blue light along each side; raised
+      // above anything between (it never cuts through a farm module), pylons only where the ground is clear
+      let top = Math.max(a.y, b.y) + 1.9;
+      for (let k = 0; k <= 24; k++){ const u = k/24, px = a.x + (b.x - a.x)*u, pz = a.z + (b.z - a.z)*u;
+        for (const q of PIECES){ if (q === A || q === B || !q.hullW || !q.bb || px < q.bb[0] - .6 || px > q.bb[2] + .6 || pz < q.bb[1] - .6 || pz > q.bb[3] + .6) continue;
+          if (inHull(q.hullW, px, pz) || [[.5, 0], [-.5, 0], [0, .5], [0, -.5]].some(([ox, oz]) => inHull(q.hullW, px + ox, pz + oz))) top = Math.max(top, q.y + q.h + .45); } }
+      const pa = V3(a.x - dx*.5, 0, a.z - dz*.5), pb = V3(b.x + dx*.5, 0, b.z + dz*.5);   // (the end pylons stand just off each building's wall)
+      const rp = u => V3(pa.x + (pb.x - pa.x)*u, top, pa.z + (pb.z - pa.z)*u), L2 = Math.hypot(pb.x - pa.x, pb.z - pa.z), nseg = Math.max(2, Math.ceil(L2/.8));
+      for (let k = 0; k < nseg; k++){ const r0 = rp(k/nseg), r1 = rp((k + 1)/nseg); seg(T, r0, r1, .26, .18, HP.white); seg(T, r0, r1, .3, .04, HP.metal, -.1);
+        if (k % 2 === 0) for (const s_ of [-.14, .14]) seg(T, V3(r0.x + sx*s_, r0.y, r0.z + sz*s_), V3(r1.x + sx*s_, r1.y, r1.z + sz*s_), .02, .04, HP.indBlue, .02); }
+      const npy = Math.max(1, Math.round(L2/2.6));
+      for (let k = 0; k <= npy; k++){ let u = k/npy, c = rp(u), ok = false;
+        for (let t = 0; t < 7 && !ok; t++){ const uu = clamp(u + (t % 2 ? 1 : -1)*Math.ceil(t/2)*.04, 0, 1), cc = rp(uu); if (!PIECES.some(q => q.hullW && inHull(q.hullW, cc.x, cc.z) && q !== A && q !== B) || uu === 0 || uu === 1){ c = cc; ok = !PIECES.some(q => q.hullW && inHull(q.hullW, cc.x, cc.z)); } }
+        if (!ok) continue; const g = heightAt(c.x, c.z);
+        box(T, c.x, (g + top)/2 - .08, c.z, .16, top - g - .16, .16, HP.white); box(T, c.x, top - .12, c.z, .5*Math.abs(sz) + .14, .08, .5*Math.abs(sx) + .14, HP.metal);
+        box(T, c.x, g + .12, c.z, .36, .24, .36, HP.stone); box(T, c.x, top - .3, c.z, .1, .06, .1, HP.indBlue); pools.push([c.x, c.z, 1.1, 41.4]); }
+    } else if (type === 'wall'){   // touching: a shared wall with an arched way through
       const a2 = at(-.15, 0, 0), b2 = at(1.15, 0, 0), wh = A.level ? .9 : 1.1, wc = R.pick([HP.cream, HP.white, HP.sand]);
       seg(T, a2, b2, 1.3, wh, wc, wh/2); seg(T, a2, b2, 1.4, .08, HP.cream, wh + .04);
       for (const s of [-.66, .66]){ const c = at(.5, s, 0); box(T, c.x, c.y + .38, c.z, .5, .6, .5, HP.glassD); }
@@ -2115,7 +2148,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const nUser = pairs.length;
     for (let i = 0; i < PIECES.length; i++) for (let j = i + 1; j < PIECES.length; j++){
       const A = PIECES[i], B = PIECES[j]; if (A.level !== B.level) continue;
-      if (IND(A.kind) || IND(B.kind)) continue;   // (industry isn't joined by itself: no pergolas between fields and turbines; the walkways brush still can)
+      if (IND(A.kind) !== IND(B.kind)) continue;   // (industry joins only industry by itself, with its own tracks, pipes and rails)
       if (Math.abs(A.y - B.y) > (A.level ? .6 : 1.4)) continue;
       if (Math.abs(A.x - B.x) > 9 || Math.abs(A.z - B.z) > 9) continue;
       if (userKey.has(Math.min(A.id, B.id) + '|' + Math.max(A.id, B.id)) || NOLINK.has(pairId(A.id, B.id))) continue;
@@ -2130,10 +2163,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       let clear = true;
       const ex = ax0 + dx*span, ez = az0 + dz*span, near = PIECES.filter(q => q !== A && q !== B && q.bb && q.bb[0] < Math.max(ax0, ex) + .7 && q.bb[2] > Math.min(ax0, ex) - .7 && q.bb[1] < Math.max(az0, ez) + .7 && q.bb[3] > Math.min(az0, ez) - .7);
       if (near.length) for (let u = 0; u <= span + 1e-6 && clear; u += .3) for (const s_ of [-.6, 0, .6]) if (solidAt(ax0 + dx*u - dz*s_, az0 + dz*u + dx*s_, ly0, ly1, null, near)){ clear = false; break; }
-      if (!clear && !L.user) continue;
+      if (!clear && IND(A.kind) && IND(B.kind)) L.blocked = true; else if (!clear && !L.user) continue;
       deg.set(A, (deg.get(A) || 0) + 1); deg.set(B, (deg.get(B) || 0) + 1); joined.add(A.id + '|' + B.id); joined.add(B.id + '|' + A.id);
       // (each connection is drawn once and kept: a rebuild after placing one home only draws the new ones)
-      const ck = [A.id, B.id, L.user ? L.type : '-', A.x.toFixed(2), A.z.toFixed(2), A.y.toFixed(2), B.x.toFixed(2), B.z.toFixed(2), B.y.toFixed(2), A.rot.toFixed(3), B.rot.toFixed(3), A.kind, B.kind, A.seed, B.seed, !!A.up, !!B.up].join('|');
+      const ck = [A.id, B.id, L.user ? L.type : '-', L.blocked ? 'blk' : '', A.x.toFixed(2), A.z.toFixed(2), A.y.toFixed(2), B.x.toFixed(2), B.z.toFixed(2), B.y.toFixed(2), A.rot.toFixed(3), B.rot.toFixed(3), A.kind, B.kind, A.seed, B.seed, !!A.up, !!B.up].join('|');
       let cl = LCACHE.get(ck); if (!cl){ const shopL = COM(A.kind) && COM(B.kind) ? shopOf(A.kind, A.seed) : 0, lt = new Tris(true, shopL), lp = []; drawLink(lt, L, lp); if (shopL) for (const q of lp) q[3] += 10*shopL; cl = { geo: lt.p.length ? lt.geo() : null, fol: folGeo(lt.fol), pools: lp, ax: (A.x + B.x)/2, az: (A.z + B.z)/2, r: L.dc/2, a: A.id, b: B.id }; LCACHE.set(ck, cl); }
       cl.used = true; for (const q of cl.pools) pools.push(q);
     }
@@ -2344,6 +2377,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // running into each other across an area.
   const PLANT_KEY = 'neonIsland.coast.plants', PC = 1.6, PV = 3, PSTYLES = [...COMKINDS, 'mix'];
   const PVAR = COMKINDS.map((_, k) => COMPALS.map((pal, pi) => [...Array(PV)].map((_, v) => { const G = new GB(); comPlant(G, rng(k*7919 + pi*104729 + v*31 + 3), 0, 0, 0, k, COMPAL[pal]); return G.mesh(); })));
+  // and the industrial zone's: sunflowers, golden grain, wildflower strips (kinds 5, 6, 7), in the harvest colors, three to a cell
+  const IPK = [1, 2, 3], IPSTYLES = ['sunflowers', 'golden grain', 'wildflower strip', 'mix'], NCOM = COMKINDS.length;
+  for (const ik of IPK) PVAR.push([[...Array(PV)].map((_, v) => { const G = new GB(); indPlant(G, rng(ik*6151 + v*37 + 9), 0, 0, 0, ik, INDPAL.harvest); return G.mesh(); })]);
+  const pRow = (kind, pal, v) => 4*GV + (kind < NCOM ? (kind*3 + pal)*PV : NCOM*3*PV + (kind - NCOM)*PV) + v;   // (its row in the card bake)
   const plants = new Map(), pdata = new Map();
   const pSqKey = (i, j) => Math.floor(i*PC/GSQ) + ',' + Math.floor(j*PC/GSQ);
   for (const [i, j, k] of PLOAD){ plants.set(i + ',' + j, [i, j, k]); gDirty.add(pSqKey(i, j)); }
@@ -2351,21 +2388,26 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // which kind grows where, in the mix: trees in groves, columns and swords along their edges, bamboo in clumps
   function mixPlant(i, j){ const x = i*PC, z = j*PC, n = fbm(x*.13 + 31, z*.13 - 8), m = fbm(x*.31 - 2, z*.31 + 17), h = hash2(i*7 + 3, j*11 + 1);
     if (n > .58) return h < .5 ? 0 : 1; if (m > .62) return 3; if (n < .36) return h < .55 ? 4 : 2; return h < .5 ? 2 : h < .8 ? 1 : 4; }
-  function plantRec(i, j, kind){
-    const k = i + ',' + j; let r = pdata.get(k); if (r !== undefined) return r;
-    const R = rng((Math.imul(i, 83492791) ^ Math.imul(j, 19349663) ^ 0x5bd1) >>> 0), x = (i + R.r(.25, .75))*PC, z = (j + R.r(.25, .75))*PC, y = grassOK(x, z);
-    const roomy = y !== null && [0, 1, 2, 3].every(q => { const a = q*PI/2 + .7; return !solidAt(x + Math.cos(a)*.5, z + Math.sin(a)*.5, y - .2, y + 2.1); });   // (a crown keeps clear of walls)
-    if (!roomy){ pdata.set(k, null); return null; }
-    const d = fbm(x*.08 - 13, z*.08 + 21) + (R.f() - .5)*.12, pal = d < .46 ? 0 : d < .56 ? 1 : 2;
-    r = { x, y, z, kind, pal, v: R.i(0, PV - 1), rot: R.r(0, PI*2), s: R.r(.88, 1.12), tint: [1, 1, 1], plant: true };
-    pdata.set(k, r); return r; }
-  function paintPlants(cx, cz, r, style, erase){
+  function plantRecs(i, j, kind){
+    const k = i + ',' + j; let L = pdata.get(k); if (L !== undefined) return L; L = [];
+    const ind = kind >= NCOM, n = ind ? 3 : 1;
+    for (let sI = 0; sI < n; sI++){
+      const R = rng((Math.imul(i, 83492791) ^ Math.imul(j, 19349663) ^ 0x5bd1 ^ Math.imul(sI + 1, 2654435761)) >>> 0), x = (i + R.r(ind ? .1 : .25, ind ? .9 : .75))*PC, z = (j + R.r(ind ? .1 : .25, ind ? .9 : .75))*PC, y = grassOK(x, z);
+      const reach = ind ? .25 : .5, hgt = ind ? 1.3 : 2.1;
+      if (y === null || ![0, 1, 2, 3].every(q => { const a = q*PI/2 + .7; return !solidAt(x + Math.cos(a)*reach, z + Math.sin(a)*reach, y - .2, y + hgt); })) continue;   // (a crown keeps clear of walls)
+      const d = fbm(x*.08 - 13, z*.08 + 21) + (R.f() - .5)*.12, pal = ind ? 0 : d < .46 ? 0 : d < .56 ? 1 : 2;
+      L.push({ x, y, z, kind, pal, v: R.i(0, PV - 1), rot: R.r(0, PI*2), s: R.r(.88, 1.12), tint: [1, 1, 1], plant: true }); }
+    pdata.set(k, L); return L; }
+  // the industrial mix: golden grain, with wildflower strips in bands across it (for the pollinators) and sunflowers in clumps
+  function mixInd(i, j){ const x = i*PC, z = j*PC, band = Math.sin(x*.42 + z*.31 + 2*fbm(x*.1, z*.1)), n = fbm(x*.21 + 5, z*.21 - 9);
+    if (Math.abs(band) < .28) return NCOM + 2; if (n > .62) return NCOM; return NCOM + 1; }
+  function paintPlants(cx, cz, r, style, erase, ind = false){
     let any = false;
     for (let i = Math.floor((cx - r)/PC); i <= Math.ceil((cx + r)/PC); i++) for (let j = Math.floor((cz - r)/PC); j <= Math.ceil((cz + r)/PC); j++){
       const d = Math.hypot((i + .5)*PC - cx, (j + .5)*PC - cz); if (d > r + PC*.3) continue; const k = i + ',' + j;
       if (erase){ if (plants.delete(k)){ pdata.delete(k); gDirty.add(pSqKey(i, j)); any = true; } continue; }
-      if (plants.has(k) || hash2(i*5 + 41, j*3 + 7) > .8) continue;
-      plants.set(k, [i, j, style >= COMKINDS.length ? mixPlant(i, j) : style]); gDirty.add(pSqKey(i, j)); any = true; }
+      if (plants.has(k) || (!ind && hash2(i*5 + 41, j*3 + 7) > .8)) continue;
+      plants.set(k, [i, j, ind ? (style >= 3 ? mixInd(i, j) : NCOM + style) : style >= COMKINDS.length ? mixPlant(i, j) : style]); gDirty.add(pSqKey(i, j)); any = true; }
     if (any){ savePlants(); SHD.dirty = true; } }
   const blotGeo = (() => { const G = new GB(), gc = mul3(VBASE, .72, .6), c0 = G.v(0, .025, 0, 0, 1, 0, gc, 0), n = 9, ring_ = [];
     for (let k = 0; k < n; k++){ const a = k/n*6.28, q = GC*(.8 + .4*hash2(k*31 + 5, k*17 + 3)); ring_.push(G.v(Math.cos(a)*q, .02, Math.sin(a)*q, 0, 1, 0, mul3(gc, 1.06), 0)); }
@@ -2385,7 +2427,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // colors and the way its surfaces face kept apart so the light, shadows, the night and the haze still fall on it live. A
   // card shows the bake nearest the angle it's seen from, blended with the next, and sways at the top in the wind. All the
   // cards of an area are one draw.
-  const CARD = { cols: 16, rows: 4*GV + 5*3*PV, cell: 48, x0: -1.1, x1: 1.1, y0: -.6, y1: 2.4 };   // (tall enough for the trees)
+  const CARD = { cols: 16, rows: 4*GV + 5*3*PV + 3*PV, cell: 48, x0: -1.1, x1: 1.1, y0: -.6, y1: 2.4 };   // (tall enough for the trees)
   const cardAlb = new THREE.WebGLRenderTarget(CARD.cols*CARD.cell, CARD.rows*CARD.cell, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
   const cardNrm = new THREE.WebGLRenderTarget(CARD.cols*CARD.cell, CARD.rows*CARD.cell, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
   (function bakeCards(){
@@ -2399,7 +2441,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       bm.material = m; rt.scissorTest = false; rt.viewport.set(0, 0, rt.width, rt.height); renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear();
       rt.scissorTest = true;
       const ROWS = []; for (let st = 0; st < 4; st++) for (let v = 0; v < GV; v++) ROWS.push([VAR[st][v], st*GV + v]);
-      for (let k = 0; k < COMKINDS.length; k++) for (let pi = 0; pi < 3; pi++) for (let v = 0; v < PV; v++) ROWS.push([PVAR[k][pi][v], 4*GV + (k*3 + pi)*PV + v]);
+      for (let k = 0; k < PVAR.length; k++) for (let pi = 0; pi < PVAR[k].length; pi++) for (let v = 0; v < PV; v++) ROWS.push([PVAR[k][pi][v], pRow(k, pi, v)]);
       for (const [geo, row] of ROWS){ bm.geometry = geo;
         for (let c = 0; c < CARD.cols; c++){ const th = c/CARD.cols*PI*2;
           bc.position.set(-Math.sin(th)*Math.cos(P)*20, Math.sin(P)*20, -Math.cos(th)*Math.cos(P)*20); bc.up.set(0, 1, 0); bc.lookAt(0, 0, 0); bc.updateMatrixWorld();
@@ -2452,7 +2494,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const [si, sj] = key.split(',').map(Number), n = GSQ/GC, recs = [];
     for (let i = si*n; i < si*n + n; i++) for (let j = sj*n; j < sj*n + n; j++){ const t = tufts.get(i + ',' + j); if (!t) continue; const r = tuftRec(i, j, t[2]); if (r) recs.push(r); }
     const pn = GSQ/PC, precs = [];
-    for (let i = si*pn; i < si*pn + pn; i++) for (let j = sj*pn; j < sj*pn + pn; j++){ const t = plants.get(i + ',' + j); if (!t) continue; const r = plantRec(i, j, t[2]); if (r) precs.push(r); }
+    for (let i = si*pn; i < si*pn + pn; i++) for (let j = sj*pn; j < sj*pn + pn; j++){ const t = plants.get(i + ',' + j); if (!t) continue; for (const r of plantRecs(i, j, t[2])) precs.push(r); }
     if (!recs.length && !precs.length) return;
     const grp = new THREE.Group(); let ylo = 1e9, yhi = -1e9;
     const put = (im, k, r) => { _gq.setFromAxisAngle(_gy, r.rot); _gm.compose(_gp.set(r.x, r.y, r.z), _gq, _gs.setScalar(r.s)); im.setMatrixAt(k, _gm); im.setColorAt(k, _gc.setRGB(r.tint[0], r.tint[1], r.tint[2])); };
@@ -2460,10 +2502,10 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       im.frustumCulled = false; im.receiveShadow = true; im.castShadow = false; im.raycast = () => {}; grp.add(im); return im; };
     for (const r of recs.concat(precs)){ ylo = Math.min(ylo, r.y); yhi = Math.max(yhi, r.y); }
     if (recs.length) mk(blotGeo, grassM, recs).userData.kind = 'blot';
-    for (let k = 0; k < COMKINDS.length; k++) for (let pi = 0; pi < 3; pi++) for (let v = 0; v < PV; v++){ const l = precs.filter(r => r.kind === k && r.pal === pi && r.v === v); if (l.length){ const im = mk(PVAR[k][pi][v], grassM, l); im.userData.kind = 'near'; im.castShadow = true; } }
+    for (let k = 0; k < PVAR.length; k++) for (let pi = 0; pi < PVAR[k].length; pi++) for (let v = 0; v < PV; v++){ const l = precs.filter(r => r.kind === k && r.pal === pi && r.v === v); if (l.length){ const im = mk(PVAR[k][pi][v], grassM, l); im.userData.kind = 'near'; im.castShadow = k < NCOM; } }
     for (let st = 0; st < 4; st++) for (let v = 0; v < GV; v++){ const l = recs.filter(r => r.st === st && r.v === v); if (l.length) mk(VAR[st][v], grassM, l).userData.kind = 'near'; }
     const all = recs.concat(precs), cg = cardGeo.clone(), ac = new Float32Array(all.length*2), agc = new Float32Array(all.length*3);
-    all.forEach((r, k) => { ac[k*2] = r.plant ? 4*GV + (r.kind*3 + r.pal)*PV + r.v : r.st*GV + r.v; ac[k*2 + 1] = r.rot; agc.set(r.plant ? COMPAL[COMPALS[r.pal]].glow : WGLOW, k*3); });
+    all.forEach((r, k) => { ac[k*2] = r.plant ? pRow(r.kind, r.pal, r.v) : r.st*GV + r.v; ac[k*2 + 1] = r.rot; agc.set(r.plant ? (r.kind < NCOM ? COMPAL[COMPALS[r.pal]].glow : INDPAL.harvest.glow) : WGLOW, k*3); });
     cg.setAttribute('aCard', new THREE.InstancedBufferAttribute(ac, 2)); cg.setAttribute('aGc', new THREE.InstancedBufferAttribute(agc, 3)); const cm = mk(cg, cardM, all); cm.userData.kind = 'far'; cm.userData.own = true;
     grp.userData = { box: new THREE.Box3(new THREE.Vector3(si*GSQ, ylo - .5, sj*GSQ), new THREE.Vector3(si*GSQ + GSQ, yhi + 2, sj*GSQ + GSQ)) };
     for (const m of grp.children) m.visible = m.userData.kind === 'blot' || (m.userData.kind === 'near') === GLOD.hi;
@@ -2634,7 +2676,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (was){ PL.kind = null; setKind(zone ? 'zone' : lastKind); } else refreshUI(); zHide(); }
   function setKind(k){
     PL.kind = PL.kind === k ? null : k; DSEL = null; delLine.visible = false;
-    if (k === 'czone' || COM(k)) PL.zoneFol = 'com'; else if (k === 'zone' || k === 'izone' || KINDS[k]) PL.zoneFol = 'res';   // (the grass tool plants what the last zone picked grows) CN.a = null; connGhost.visible = false; outline.visible = false;
+    if (k === 'czone' || COM(k)) PL.zoneFol = 'com'; else if (k === 'izone' || IND(k)) PL.zoneFol = 'ind'; else if (k === 'zone' || KINDS[k]) PL.zoneFol = 'res';   // (the grass tool plants what the last zone picked grows) CN.a = null; connGhost.visible = false; outline.visible = false;
     if (PL.kind && KINDS[PL.kind] && !COM(PL.kind) && !IND(PL.kind)) lastKind = PL.kind;
     if (PL.kind === 'czone' || PL.kind === 'izone' || COM(PL.kind) || IND(PL.kind)) PL.rot = Math.round(yaw/(PI/12))*(PI/12);   // (shops come turned to face the view: their fronts (the grotto's arch) toward the camera)
     ghost.visible = ring.visible = false; zHide();
@@ -2648,12 +2690,13 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const kinds = document.getElementById('resKinds'); if (kinds) kinds.hidden = ZONE.on;
     document.querySelectorAll('button[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === PL.kind));
     const tip = document.getElementById('ctrlTool'); if (tip) tip.innerHTML = controlsFor();
-    const gb = document.querySelector('button[data-k=grass] b'); if (gb) gb.textContent = PL.zoneFol === 'com' ? 'Trees' : 'Grass';
+    const gb = document.querySelector('button[data-k=grass] b'); if (gb) gb.textContent = PL.zoneFol === 'com' ? 'Trees' : PL.zoneFol === 'ind' ? 'Planting' : 'Grass';
     if (status) status.classList.toggle('idle', !PL.kind || PL.kind === 'del'); }
   // what the keys and the mouse do with whatever is chosen (shown when Controls is hovered)
   function controlsFor(){
     const row = (k, t) => '<div class="row"><kbd>' + k + '</kbd><span>' + t + '</span></div>';
     if (PL.kind === 'del') return '<h4>Clear an area</h4>' + row('drag', 'select an area') + row('click inside', 'clear it: buildings, walkways, grass') + row('click outside / Esc', 'let the selection go') + row('X', 'back to building');
+    if (PL.kind === 'grass' && PL.zoneFol === 'ind') return '<h4>Planting (industrial)</h4>' + row('click / drag', 'plant') + row('right drag', 'clear it (the grass stays)') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: ' + IPSTYLES.join(', ')) + '<div class="row"><span>pick Residential first for grass, which grows under it</span></div>';
     if (PL.kind === 'grass' && PL.zoneFol === 'com') return '<h4>Trees (commercial)</h4>' + row('click / drag', 'plant') + row('right drag', 'clear the trees (the grass stays)') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: ' + PSTYLES.join(', ')) + row('Alt + drag', 'turn the view') + '<div class="row"><span>pick Residential first for grass, which grows under the trees</span></div>';
     if (PL.kind === 'grass') return '<h4>Grass</h4>' + row('click / drag', 'paint') + row('right drag', 'clear') + row('Q / E', 'bigger / smaller brush') + row('V', 'next kind: meadow, wildflowers, ferns, tall grass, mix') + row('Alt + drag', 'turn the view');
     if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('click, click', 'pick two buildings to join') + row('V', 'next kind: bridge, skywalk, pergola, arcade, wall (or a wing, if they\'re apart), random') + row('right click', 'take away the walkway under it (or let go of the first pick)');
@@ -2789,18 +2832,18 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
 
   /* ---------- the grass brush ---------- */
   // Click or drag to paint foliage, right click or right drag to clear it; Q bigger, E smaller; V steps through the kinds.
-  const GR = { size: 2, style: 4, pstyle: 5, last: null }, GRS = [.6, 1.1, 1.8, 2.8, 4.2, 6];
+  const GR = { size: 2, style: 4, pstyle: 5, istyle: 3, last: null }, GRS = [.6, 1.1, 1.8, 2.8, 4.2, 6];
   function showGrass(){
     ghost.visible = false; zHide(); connGhost.visible = false;
     const hit = PL.ptr ? pick(PL.ptr.x, PL.ptr.y) : null; PL.hit = hit;
-    const com = PL.zoneFol === 'com', nm = com ? 'trees: ' + PSTYLES[GR.pstyle] : 'grass: ' + GSTYLES[GR.style];
+    const com = PL.zoneFol === 'com', ind = PL.zoneFol === 'ind', nm = com ? 'trees: ' + PSTYLES[GR.pstyle] : ind ? 'planting: ' + IPSTYLES[GR.istyle] : 'grass: ' + GSTYLES[GR.style];
     if (!hit || hit.sea){ ring.visible = false; if (status) status.textContent = nm + (hit ? ' · not on the sea' : ''); return; }
-    ringAt(hit.x, hit.z, GRS[GR.size], null, .12); ringM.color.set(com ? 0x9fd8e0 : 0xb8e08a);
+    ringAt(hit.x, hit.z, GRS[GR.size], null, .12); ringM.color.set(com ? 0x9fd8e0 : ind ? 0xf0d080 : 0xb8e08a);
     if (status){ status.textContent = nm + ' (V next) · brush ' + (GR.size + 1); status.style.color = '#33413a'; } }
   function grassStroke(cx, cy, erase, force){
     const h = pick(cx, cy); if (!h || h.sea) return; const r = GRS[GR.size];
     if (!force && GR.last && Math.hypot(h.x - GR.last[0], h.z - GR.last[1]) < r*.35) return;
-    GR.last = [h.x, h.z]; if (PL.zoneFol === 'com') paintPlants(h.x, h.z, r, GR.pstyle, erase); else paintGrass(h.x, h.z, r, GR.style, erase); }
+    GR.last = [h.x, h.z]; if (PL.zoneFol === 'com') paintPlants(h.x, h.z, r, GR.pstyle, erase); else if (PL.zoneFol === 'ind') paintPlants(h.x, h.z, r, GR.istyle, erase, true); else paintGrass(h.x, h.z, r, GR.style, erase); }
   document.querySelectorAll('button[data-k]').forEach(b => b.addEventListener('click', () => setKind(b.dataset.k)));
   setMode(true);
 
@@ -2873,7 +2916,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (e.key === '6'){ setKind('grass'); return; }
     if (k === 'x' && !e.repeat){ setKind('del'); return; }
     if (PL.kind === 'grass' && (k === 'q' || k === 'e')){ GR.size = clamp(GR.size + (k === 'q' ? 1 : -1), 0, GRS.length - 1); return; }
-    if (PL.kind === 'grass' && k === 'v'){ if (PL.zoneFol === 'com') GR.pstyle = (GR.pstyle + 1) % PSTYLES.length; else GR.style = (GR.style + 1) % GSTYLES.length; return; }
+    if (PL.kind === 'grass' && k === 'v'){ if (PL.zoneFol === 'com') GR.pstyle = (GR.pstyle + 1) % PSTYLES.length; else if (PL.zoneFol === 'ind') GR.istyle = (GR.istyle + 1) % IPSTYLES.length; else GR.style = (GR.style + 1) % GSTYLES.length; return; }
     if (PL.kind === 'connect' && k === 'v'){ CN.type = (CN.type + 1) % LINK_TYPES.length; CN.key = ''; return; }
     if (isZone(PL.kind) && (k === 'q' || k === 'e')){ ZONE.size = clamp(ZONE.size + (k === 'q' ? 1 : -1), 0, ZSIZE.length - 1); return; }   // (Q: a bigger brush, E: a smaller one)
     if (k === 'v'){   // (single mode: the next kind of home, Shift+V another look of it; otherwise another look or layout)
@@ -2949,7 +2992,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function frame(now){
     const dt = Math.min(.1, (now - last)/1000); last = now; fNo++; let q = PROF.on ? performance.now() : 0;
     updateCamera(dt); q = tk('camera', q); stream(3); q = tk('stream', q);
-    { const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.zkinds.izone, PL.rot, DSEL ? DSEL.key : '-', GR.size, GR.style, GR.pstyle, PL.zoneFol, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
+    { const gk = [PL.kind || '-', PL.ptr ? PL.ptr.x + ',' + PL.ptr.y : '-', camT.x.toFixed(3), camT.z.toFixed(3), yaw.toFixed(4), zoom.toFixed(3), pitch.toFixed(4), PIECES.length, linksDirty, ZONE.size, PL.seed, PL.zseed, PL.zkinds.zone, PL.zkinds.czone, PL.zkinds.izone, PL.rot, DSEL ? DSEL.key : '-', GR.size, GR.style, GR.pstyle, GR.istyle, PL.zoneFol, CN.type, CN.a ? CN.a.id : 0, ULINKS.length].join('|');
       if (gk !== ghostKey){ ghostKey = gk;   // (the ghost is worked out again only when something it shows has changed: the raycasts and checks are the costly part)
         hlClear();
         if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'del') showDel(); else if (PL.kind === 'grass') showGrass(); else if (isZone(PL.kind) && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } }

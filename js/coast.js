@@ -1678,7 +1678,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       for (let k = 0; k < 12; k++){ const a = k/12*PI*2; box(T, Math.sin(a)*1.25, .2, Math.cos(a)*1.25, .08, .04, .08, HP.indBlue); }
       T.add(GEO.cyl12, mat(0, y0 + H/2, 0, 0, 0, 0, .32, H, .32), HP.white); box(T, 0, y0 + .4, .33, .3, .6, .03, HP.indWhite);
       for (let k = 0; k < 4; k++){ const a = k/4*PI*2 + PI/4, lx = Math.sin(a), lz = Math.cos(a); seg(T, V3(lx*1.05, y0, lz*1.05), V3(lx*.35, y0 + H*.55, lz*.35), .08, .08, HP.metal, 0); }
-      const sy = y0 + H; T.add(GEO.cyl16, mat(0, sy, 0, 0, 0, 0, sr, .22, sr), HP.white); T.add(GEO.dome, mat(0, sy + .1, 0, 0, 0, 0, sr*.82, .55, sr*.82), HP.white);
+      const sy = y0 + H; ctx.dock = { r: sr*.7, y: sy + .1 + .55*Math.sqrt(1 - Math.pow(.7/.82, 2)) + .16 };   // (where a drone sits: on a docking port, on the dome's skin)
+      T.add(GEO.cyl16, mat(0, sy, 0, 0, 0, 0, sr, .22, sr), HP.white); T.add(GEO.dome, mat(0, sy + .1, 0, 0, 0, 0, sr*.82, .55, sr*.82), HP.white);
       T.add(GEO.dome, mat(0, sy - .1, 0, PI, 0, 0, sr*.9, .3, sr*.9), HP.mist);   // (its underside)
       T.add(GEO.ring, mat(0, sy, 0, 0, 0, 0, sr + .02, .07, sr + .02), HP.indBlue);
       for (let k = 0; k < 8; k++){ const a = k/8*PI*2; T.add(GEO.cyl8, mat(Math.sin(a)*sr*.7, sy + .32, Math.cos(a)*sr*.7, 0, 0, 0, .14, .06, .14), HP.glassD); }   // (docking ports)
@@ -1817,7 +1818,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const T = new Tris(true, shopOf(kind, seed)), k = KIND_KEYS.indexOf(kind) + 1; if (KINDS[kind].ind) T.remap = IND_SHADES[indShade(seed)]; const R = rng(Math.imul(seed, 2654435761) ^ k*97), D = rng(Math.imul(seed, 1597334677) ^ k*131);
     const cx_ = { below, above }, top = KINDS[kind].build(T, R, D, cx_), cut = below ? .1 : .6, pts = [];
     let hmax = top; for (let i = 0; i < T.p.length; i += 3){ if (T.p[i + 1] > hmax) hmax = T.p[i + 1]; if (T.p[i + 1] > cut) pts.push([T.p[i], T.p[i + 2]]); }
-    g = { geo: T.geo(), fol: folGeo(T.fol), top, hull: hull2(pts), h: hmax, hub: cx_.hub }; geoCache.set(key, g);
+    g = { geo: T.geo(), fol: folGeo(T.fol), top, hull: hull2(pts), h: hmax, hub: cx_.hub, dock: cx_.dock }; geoCache.set(key, g);
     if (geoCache.size > 400){ const k0 = geoCache.keys().next().value, o = geoCache.get(k0); o.geo.dispose(); if (o.fol) o.fol.dispose(); geoCache.delete(k0); }
     return g; }
 
@@ -1913,7 +1914,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     const work = PIECES.filter(p => p.kind === 'field' || p.kind === 'tunnels' || p.kind === 'dome');
     for (const h of PIECES.filter(p => p.kind === 'hive')){
       const near = work.filter(f => Math.hypot(f.x - h.x, f.z - h.z) < 18);
-      for (let k = 0; k < 3; k++){ const id = 'd' + h.id + ':' + k, a = old.get(id) || { id, type: 'd', x: h.x, y: h.y + h.top - .35, z: h.z, wp: [], wait: 1 + k*2.2, yaw: 0, vx: 0, vz: 0 };
+      for (let k = 0; k < 3; k++){ const id = 'd' + h.id + ':' + k; let a = old.get(id); if (!a){ a = { id, type: 'd', wp: [], wait: 1 + k*2.2, yaw: 0, vx: 0, vz: 0, home: h, port: k }; const [x, y, z] = dockOf(a); Object.assign(a, { x, y, z }); }
         a.home = h; a.port = k; a.near = near; AG.list.push(a); } }
     for (const b of PIECES.filter(p => p.kind === 'barn')){
       const near = work.filter(f => f.kind === 'field' && Math.hypot(f.x - b.x, f.z - b.z) < 18);
@@ -1921,7 +1922,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         a.home = b; a.slot = k; a.near = near; AG.list.push(a); } }
     RAILS.forEach((r, i) => { const id = 'p' + i + ':' + r.ax.toFixed(1) + ',' + r.az.toFixed(1), a = old.get(id) || { id, type: 'p', u: (i*.37) % 1, dir: 1, pause: 0 }; a.rail = r; AG.list.push(a); }); }
   // where a drone docks, and the passes it flies over a field, a tunnel or a dome
-  const dockOf = a => { const h = a.home, ang = a.port/3*PI*2 + .4; return [h.x + Math.sin(ang)*.62, h.y + h.top - .38, h.z + Math.cos(ang)*.62]; };
+  // (on one of the saucer's docking ports, k/8 round it in the hive's own frame: ports 0, 3 and 5, sitting on the dome)
+  const dockOf = a => { const h = a.home, dk = blockOf(h.kind, h.seed, false, false).dock || { r: .9, y: h.top - .3 }, ang = [0, 3, 5][a.port]/8*PI*2, [x, z] = toW(h, Math.sin(ang)*dk.r, Math.cos(ang)*dk.r); return [x, h.y + dk.y, z]; };
   // a drone's way from (x0, z0) to (x1, z1) at cruise height: high enough over everything along it, and round a turbine's
   // mast (never up through its blades) by a waypoint stepped out to the side
   function droneLeg(x0, z0, x1, z1, base, floor){
@@ -2703,7 +2705,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // stacks, the tallest toward the middle. The layout comes from a seed (V for another) and turns with R; each spot is
   // checked as a home placed alone would be, and the ones that can't go (the sea, a slope, a home already there) are left out.
   // Right click in zone mode clears the homes inside the brush.
-  const ZONE = { on: true, size: 2 }, ZSIZE = [0, 2.8, 4.2, 5.8, 7.6, 9.6, 12];
+  const ZONE = { on: true, size: 2, sizes: { zone: 2, czone: 2, izone: 5 } },   // (each zone keeps its own brush size; industry's starts big, so a stroke lays out a mix and not one field)
+  ZSIZE = [0, 2.8, 4.2, 5.8, 7.6, 9.6, 12];
   const ZW = [['townhouse', .24], ['villa', .19], ['tower', .14], ['pods', .13], ['pagoda', .12], ['terrace', .12], ['lagoon', .06]];
   const CW = [['noodle', .21], ['lantern', .21], ['kiosk', .17], ['rotunda', .14], ['viaduct', .14], ['grotto', .07], ['ringcourt', .06]];   // (the commercial zone's mix)
   const IW = [['field', .34], ['tunnels', .2], ['dome', .13], ['barn', .11], ['hive', .07], ['vfarm', .06], ['turbine', .09]];   // (fields often don't fit where smaller things do, so they're weighted up)   // (the industrial zone's mix)
@@ -2789,7 +2792,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', (b.dataset.mode === 'zone') === zone));
     if (was){ PL.kind = null; setKind(zone ? 'zone' : lastKind); } else refreshUI(); zHide(); }
   function setKind(k){
-    PL.kind = PL.kind === k ? null : k; DSEL = null; delLine.visible = false;
+    PL.kind = PL.kind === k ? null : k; DSEL = null; delLine.visible = false; if (isZone(PL.kind)) ZONE.size = ZONE.sizes[PL.kind];
     if (k === 'czone' || COM(k)) PL.zoneFol = 'com'; else if (k === 'izone' || IND(k)) PL.zoneFol = 'ind'; else if (k === 'zone' || KINDS[k]) PL.zoneFol = 'res';   // (the grass tool plants what the last zone picked grows) CN.a = null; connGhost.visible = false; outline.visible = false;
     if (PL.kind && KINDS[PL.kind] && !COM(PL.kind) && !IND(PL.kind)) lastKind = PL.kind;
     if (PL.kind === 'czone' || PL.kind === 'izone' || COM(PL.kind) || IND(PL.kind)) PL.rot = Math.round(yaw/(PI/12))*(PI/12);   // (shops come turned to face the view: their fronts (the grotto's arch) toward the camera)
@@ -3032,7 +3035,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (PL.kind === 'grass' && (k === 'q' || k === 'e')){ GR.size = clamp(GR.size + (k === 'q' ? 1 : -1), 0, GRS.length - 1); return; }
     if (PL.kind === 'grass' && k === 'v'){ if (PL.zoneFol === 'com' || PL.zoneFol === 'ind') return; else GR.style = (GR.style + 1) % GSTYLES.length; return; }
     if (PL.kind === 'connect' && k === 'v'){ CN.type = (CN.type + 1) % LINK_TYPES.length; CN.key = ''; return; }
-    if (isZone(PL.kind) && (k === 'q' || k === 'e')){ ZONE.size = clamp(ZONE.size + (k === 'q' ? 1 : -1), 0, ZSIZE.length - 1); return; }   // (Q: a bigger brush, E: a smaller one)
+    if (isZone(PL.kind) && (k === 'q' || k === 'e')){ ZONE.size = ZONE.sizes[PL.kind] = clamp(ZONE.size + (k === 'q' ? 1 : -1), 0, ZSIZE.length - 1); return; }   // (Q: a bigger brush, E: a smaller one)
     if (k === 'v'){   // (single mode: the next kind of home, Shift+V another look of it; otherwise another look or layout)
       if (oneHome()){ if (e.shiftKey) PL.zseed++; else { const KS = PL.kind === 'czone' ? COM_KEYS : PL.kind === 'izone' ? IND_KEYS : RES_KEYS; PL.zkinds[PL.kind] = KS[(KS.indexOf(PL.zkinds[PL.kind]) + 1) % KS.length]; } } else PL.seed++; return; }
     if (e.key === 'Escape' || e.key === '0'){ if (PL.kind === 'del' && DSEL){ DSEL = null; return; } if (PL.kind) setKind(PL.kind); return; }

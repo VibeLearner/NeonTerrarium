@@ -112,7 +112,11 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   const scene = new THREE.Scene();
   const CURV = { ctr: { value: new THREE.Vector2() }, fwd: { value: new THREE.Vector2(1, 0) }, curveK: { value: 0 }, g0: { value: 30 },
     hzNear: { value: 30 }, hzFar: { value: 60 }, hzMax: { value: .82 }, hazeC: { value: new THREE.Color(0xbfe4e3) }, nightK: { value: 0 }, darkK: { value: 0 } };   // (nightK: the lamps; darkK: full night only)
-  const BEND = `{ vec4 wq = modelMatrix * vec4(transformed, 1.0); float gq = dot(wq.xz - ctr, fwd); vG = gq; float gp = max(gq - g0, 0.0); transformed.y -= curveK*gp*gp; vWq = wq.xyz; }`;
+  const BEND = `{ vec4 wq = vec4(transformed, 1.0);
+    #ifdef USE_INSTANCING
+      wq = instanceMatrix * wq;   // (a copy's own place in the world: the watercolor shadow is looked up there)
+    #endif
+    wq = modelMatrix * wq; float gq = dot(wq.xz - ctr, fwd); vG = gq; float gp = max(gq - g0, 0.0); transformed.y -= curveK*gp*gp; vWq = wq.xyz; }`;
   // cliff faces are painted per pixel by height (crisp strata, a dark wet splash zone, a weed line at the water), not by
   // their few vertices: a face is any steep, not green, surface of the land
   const ROCKY = `

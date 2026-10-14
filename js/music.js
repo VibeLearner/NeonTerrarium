@@ -198,6 +198,7 @@ const music = (() => {
     else hush();
   }
   function update(dt){
+    if (held) return;
     // starts once the station has fully arrived (its arrival animation is over), and carries on if the station is
     // rebuilt in place (turned with R), which runs the build animation again
     let radio = null;
@@ -232,6 +233,17 @@ const music = (() => {
     paused = !paused; ui.setPaused(paused);
     if (paused){ if (talking) vo.pause(); }
     else { fadeIn = FADE_QUICK; if (talking){ voPlay(); if (voLore && el.src) tryPlay(); } else if (el.src) tryPlay(); else next(); }
+  }
+  // held (the Overseer's desk is up and the city has stopped): the song fades out over a moment and stops where it is,
+  // the host too; let go, it comes back in quickly from there (unless the player had paused it themselves)
+  let held = false, holdT = 0;
+  function hold(b){
+    if (b === held) return; held = b; clearInterval(holdT);
+    if (b){ const t0 = performance.now(), v0 = gain ? gain.gain.value : el.volume, vv0 = vo.volume;
+      holdT = setInterval(() => { const u = Math.min(1, (performance.now() - t0)/450), k = (1 - u)*(1 - u);
+        if (gain) gain.gain.value = v0*k; else el.volume = v0*k; vo.volume = vv0*k;
+        if (u >= 1){ clearInterval(holdT); el.pause(); vo.pause(); level = 0; } }, 30); }
+    else if (on && !paused){ level = 0; fadeIn = FADE_QUICK; if (talking){ voPlay(); if (voLore && el.src) tryPlay(); } else if (el.src) tryPlay(); }
   }
   function skip(){ if (on){ level = 0; fadeIn = FADE_QUICK; next(); } }
   function back(){ if (on){ level = 0; fadeIn = FADE_QUICK; prev(); } }
@@ -275,5 +287,5 @@ const music = (() => {
       },
     };
   })();
-  return { update, setVolume, skip, back, togglePause, rj, get cutIn(){ return cutIn; }, get talking(){ return talking; }, vo, get volume(){ return volume; }, get tracks(){ return tracks; }, get on(){ return on; }, get paused(){ return paused; }, get level(){ return level; }, el };
+  return { update, setVolume, skip, back, togglePause, hold, get held(){ return held; }, rj, get cutIn(){ return cutIn; }, get talking(){ return talking; }, vo, get volume(){ return volume; }, get tracks(){ return tracks; }, get on(){ return on; }, get paused(){ return paused; }, get level(){ return level; }, el };
 })();

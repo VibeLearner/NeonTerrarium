@@ -454,6 +454,7 @@ const OVERSEER = (() => {
     if (O.open || O.busy) return; O.busy = true; if (!built) build();
     spire = m || (typeof megas !== 'undefined' ? [...megas.values()].find(q => q.kind === 'spire') : null) || null;
     if (typeof MON !== 'undefined' && MON.close) try { MON.close(); } catch (e){}
+    if (typeof music !== 'undefined' && music.hold) music.hold(true);   // (the radio goes quiet while the desk is up)
     const city = canvas; city.classList.add('ovs-glitch');
     const bars = document.createElement('div'); bars.id = 'ovsBars'; document.body.appendChild(bars);
     setTimeout(() => curtain(650, (c) => {
@@ -471,6 +472,7 @@ const OVERSEER = (() => {
   function closeDesk(){ O.open = false; cancelAnimationFrame(raf); clearTimeout(typingT); if (keyH) removeEventListener('keydown', keyH, true); keyH = null; if (resizeH) removeEventListener('resize', resizeH); resizeH = null; base = null; }
   function no(){
     if (!O.open || O.busy) return; O.busy = true; O.hold = false;   // (the city draws again under the desk as it leaves)
+    if (typeof music !== 'undefined' && music.hold) music.hold(false);
     root.classList.add('leave'); setTimeout(() => { closeDesk(); root.remove(); root = null; O.busy = false; }, 520);
   }
   function yes(){

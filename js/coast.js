@@ -1870,6 +1870,84 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   function makeRotor(p, hub){ const rg = rotorGeo[indShade(p.seed)], g = new THREE.Group(), n = new THREE.Mesh(rg.n, pieceM), b = new THREE.Mesh(rg.b, pieceM);
     for (const m of [n, b]){ m.receiveShadow = true; m.castShadow = false; m.raycast = () => {}; g.add(m); }
     g.position.set(p.x, p.y + hub + .2, p.z); g.rotation.y = WIND_YAW; g.userData.spin = b; b.rotation.z = (p.seed % 7)*.9; return g; }
+  /* ---------- the drones and machines that work the industrial zone (AGENTS) ---------- */
+  // Drones live in the drone hives, three to a hive: one at a time they lift off a docking port, fly out at cruising height
+  // to a field, a glass tunnel or a dome nearby, sweep it low in passes, scanning with a blue light under them, then fly
+  // home and settle back in. Machines live in the solar barns, two to a barn: one rolls out of the lit bay to a field the
+  // way is clear to, drives its crop rows up and down like a harvester, and rolls home. And on every drone rail a shuttle
+  // pod glides from end to end, pausing at each. All of them are copies of one shape each (one draw per kind), moved each
+  // frame along a list of waypoints; drones carry a soft shadow under them; their lights glow by night.
+  const AG = { list: [], key: '', t: 0 };
+  const agGeo = (() => { const D = new Tris(), V = new Tris(), P = new Tris();
+    D.add(GEO.box, mat(0, 0, 0, 0, 0, 0, .2, .06, .2), HP.white); D.add(GEO.cyl8, mat(0, .04, 0, 0, 0, 0, .08, .04, .08), HP.indBlue);
+    for (const [x, z] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]){ D.add(GEO.box, mat(x*.1, 0, z*.1, 0, Math.atan2(x, z), 0, .03, .03, .2), HP.metal); D.add(GEO.cyl8, mat(x*.17, .03, z*.17, 0, 0, 0, .085, .01, .085), HP.glassD); }
+    D.add(GEO.cyl8, mat(0, -.045, 0, 0, 0, 0, .05, .03, .05), HP.indBlue); D.add(GEO.box, mat(0, 0, .11, 0, 0, 0, .05, .03, .02), HP.indWhite);
+    V.add(GEO.box, mat(0, .12, 0, 0, 0, 0, .34, .14, .5), HP.white); V.add(GEO.box, mat(0, .22, -.02, 0, 0, 0, .3, .03, .4), HP.solar);
+    for (const x of [-.19, .19]) for (const z of [-.16, .16]) V.add(GEO.cyl8, mat(x, .07, z, 0, 0, PI/2, .07, .06, .07), HP.rail);
+    V.add(GEO.box, mat(0, .1, .3, 0, 0, 0, .44, .08, .08), HP.metal); for (let k = 0; k < 5; k++) V.add(GEO.box, mat(-.18 + k*.09, .05, .34, 0, 0, 0, .02, .07, .05), HP.metal);   // (the harvester comb)
+    for (const x of [-.12, .12]) V.add(GEO.box, mat(x, .14, .255, 0, 0, 0, .05, .03, .02), HP.indWhite); V.add(GEO.box, mat(0, .17, -.26, 0, 0, 0, .2, .03, .02), HP.indBlue);
+    P.add(GEO.box, mat(0, -.14, 0, 0, 0, 0, .06, .16, .06), HP.metal); P.add(GEO.cyl8, mat(0, -.32, 0, PI/2, 0, 0, .14, .5, .14), HP.white); P.add(GEO.sph, mat(0, -.32, .25, 0, 0, 0, .14, .14, .1), HP.white); P.add(GEO.sph, mat(0, -.32, -.25, 0, 0, 0, .14, .14, .1), HP.white);
+    P.add(GEO.box, mat(0, -.3, 0, 0, 0, 0, .29, .07, .38), HP.indWhite); P.add(GEO.box, mat(0, -.46, 0, 0, 0, 0, .05, .02, .3), HP.indBlue);
+    return { d: D.geo(), v: V.geo(), p: P.geo() }; })();
+  const agMesh = (geo, n) => { const m = new THREE.InstancedMesh(geo, pieceM, n); m.count = 0; m.frustumCulled = false; m.receiveShadow = true; m.castShadow = false; m.raycast = () => {}; scene.add(m); return m; };
+  const AGM = { d: agMesh(agGeo.d, 96), v: agMesh(agGeo.v, 48), p: agMesh(agGeo.p, 48) };
+  AGM.sh = new THREE.InstancedMesh(new THREE.CircleGeometry(.16, 12).rotateX(-PI/2), new THREE.MeshBasicMaterial({ color: 0x1d2a26, transparent: true, opacity: .28, depthWrite: false }), 96);
+  AGM.sh.count = 0; AGM.sh.frustumCulled = false; AGM.sh.renderOrder = 2; AGM.sh.raycast = () => {}; scene.add(AGM.sh);
+  // a piece's own frame: from its local (u across, v front) to the world
+  const toW = (p, u, v) => { const c = Math.cos(p.rot), s_ = Math.sin(p.rot); return [p.x + u*c + v*s_, p.z - u*s_ + v*c]; };
+  const extentOf = p => { let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9; for (const [u, v] of p.hullL){ u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); } return [u0, u1, v0, v1]; };
+  function agentsRebuild(){
+    const old = new Map(AG.list.map(a => [a.id, a])); AG.list = [];
+    const work = PIECES.filter(p => p.kind === 'field' || p.kind === 'tunnels' || p.kind === 'dome');
+    for (const h of PIECES.filter(p => p.kind === 'hive')){
+      const near = work.filter(f => Math.hypot(f.x - h.x, f.z - h.z) < 18);
+      for (let k = 0; k < 3; k++){ const id = 'd' + h.id + ':' + k, a = old.get(id) || { id, type: 'd', x: h.x, y: h.y + h.top - .35, z: h.z, wp: [], wait: 1 + k*2.2, yaw: 0, vx: 0, vz: 0 };
+        a.home = h; a.port = k; a.near = near; AG.list.push(a); } }
+    for (const b of PIECES.filter(p => p.kind === 'barn')){
+      const near = work.filter(f => f.kind === 'field' && Math.hypot(f.x - b.x, f.z - b.z) < 16 && (() => { const [dx, dz] = toW(b, 0, 1.5); for (let t = .1; t < .9; t += .08){ const x = dx + (f.x - dx)*t, z = dz + (f.z - dz)*t; if (PIECES.some(q => q !== f && q !== b && q.hullW && inHull(q.hullW, x, z))) return false; } return true; })());
+      for (let k = 0; k < 2; k++){ const id = 'v' + b.id + ':' + k, [hx, hz] = toW(b, (k - .5)*.5, .4), a = old.get(id) || { id, type: 'v', x: hx, y: b.y + .14, z: hz, wp: [], wait: 2 + k*5, yaw: b.rot, vx: 0, vz: 0 };
+        a.home = b; a.slot = k; a.near = near; AG.list.push(a); } }
+    RAILS.forEach((r, i) => { const id = 'p' + i + ':' + r.ax.toFixed(1) + ',' + r.az.toFixed(1), a = old.get(id) || { id, type: 'p', u: (i*.37) % 1, dir: 1, pause: 0 }; a.rail = r; AG.list.push(a); }); }
+  // where a drone docks, and the passes it flies over a field, a tunnel or a dome
+  const dockOf = a => { const h = a.home, ang = a.port/3*PI*2 + .4; return [h.x + Math.sin(ang)*.62, h.y + h.top - .38, h.z + Math.cos(ang)*.62]; };
+  function planDrone(a){
+    const [dx, dy, dz] = dockOf(a), cruise = a.home.y + a.home.top + 1.2 + a.port*.35, R = Math.random;
+    if (!a.near.length){ const ang = R()*6.28; a.wp = [[dx, cruise, dz, 1.2], [a.home.x + Math.sin(ang)*3, cruise, a.home.z + Math.cos(ang)*3, 2.2], [dx, cruise, dz, 2.2], [dx, dy, dz, .9, 3 + R()*4]]; return; }
+    const f = a.near[Math.floor(R()*a.near.length)], [u0, u1, v0, v1] = extentOf(f), low = f.y + (f.kind === 'field' ? 1.0 : f.kind === 'tunnels' ? 1.5 : 2.4), passes = 3 + Math.floor(R()*2), wp = [[dx, cruise, dz, 1.2]];
+    const [ex, ez] = toW(f, u0 + .3, v0 + .4); wp.push([ex, cruise, ez, 2.6], [ex, low, ez, 1.0]);
+    for (let k = 0; k < passes; k++){ const v = v0 + .4 + (v1 - v0 - .8)*(k + .5)/passes, [x0, z0] = toW(f, k % 2 ? u1 - .3 : u0 + .3, v), [x1, z1] = toW(f, k % 2 ? u0 + .3 : u1 - .3, v); wp.push([x0, low, z0, .9], [x1, low, z1, .9, 0, 1]); }
+    const last = wp[wp.length - 1]; wp.push([last[0], cruise, last[2], 1.0], [dx, cruise, dz, 2.6], [dx, dy, dz, .8, 3 + R()*6]); a.wp = wp; }
+  function planRover(a){
+    const b = a.home, [hx, hz] = toW(b, (a.slot - .5)*.5, .4), [ox, oz] = toW(b, (a.slot - .5)*.5, 1.6), R = Math.random;
+    if (!a.near.length){ a.wp = [[ox, 0, oz, .5], [hx, 0, hz, .5, 6 + R()*6]]; return; }
+    const f = a.near[Math.floor(R()*a.near.length)], [u0, u1, v0, v1] = extentOf(f), rows = 3 + Math.floor(R()*2), wp = [[ox, 0, oz, .55]];
+    let best = null, bd = 1e9; for (const [u, v] of [[u0 - .2, (v0 + v1)/2], [u1 + .2, (v0 + v1)/2], [(u0 + u1)/2, v0 - .2], [(u0 + u1)/2, v1 + .2]]){ const [x, z] = toW(f, u, v), d = Math.hypot(x - ox, z - oz); if (d < bd){ bd = d; best = [x, z]; } }
+    wp.push([best[0], 0, best[1], .6]);
+    for (let k = 0; k < rows; k++){ const v = v0 + .45 + (v1 - v0 - .9)*(k + .5)/rows, [x0, z0] = toW(f, k % 2 ? u1 - .35 : u0 + .35, v), [x1, z1] = toW(f, k % 2 ? u0 + .35 : u1 - .35, v); wp.push([x0, 0, z0, .5], [x1, 0, z1, .4, 0, 1]); }
+    wp.push([best[0], 0, best[1], .6], [ox, 0, oz, .6], [hx, 0, hz, .45, 8 + R()*10]); a.wp = wp; a.field = f; }
+  const groundY = (x, z) => { let y = heightAt(x, z); for (const q of PIECES) if (!q.level && q.bb && x >= q.bb[0] && x <= q.bb[2] && z >= q.bb[1] && z <= q.bb[3] && inHull(q.hullW, x, z)) y = Math.max(y, q.y + .12 + (q.kind === 'field' ? .08 : 0)); return y; };
+  const _am = new THREE.Matrix4(), _aq = new THREE.Quaternion(), _ae = new THREE.Euler(0, 0, 0, 'YXZ'), _ap = new THREE.Vector3(), _as = new THREE.Vector3(1, 1, 1);
+  function agentTick(dt){
+    dt = Math.min(dt, .1); AG.t += dt;
+    if (AG.t > .5){ AG.t = 0; const key = PIECES.filter(p => p.kind === 'hive' || p.kind === 'barn' || p.kind === 'field' || p.kind === 'tunnels' || p.kind === 'dome').map(p => p.id + p.kind).join(',') + '|' + RAILS.map(r => r.ax.toFixed(1)).join(',');
+      if (key !== AG.key){ AG.key = key; agentsRebuild(); } }
+    let nd = 0, nv = 0, np = 0, ns = 0;
+    for (const a of AG.list){
+      if (a.type === 'p'){ const r = a.rail, L = Math.hypot(r.bx - r.ax, r.bz - r.az) || 1;
+        if (a.pause > 0) a.pause -= dt; else { a.u += a.dir*dt*1.1/L; if (a.u >= 1 || a.u <= 0){ a.u = clamp(a.u, 0, 1); a.dir *= -1; a.pause = 2 + Math.random()*2; } }
+        const e = a.u*a.u*(3 - 2*a.u), x = r.ax + (r.bx - r.ax)*e, z = r.az + (r.bz - r.az)*e;
+        _ae.set(0, Math.atan2(r.bx - r.ax, r.bz - r.az), 0); _am.compose(_ap.set(x, r.y, z), _aq.setFromEuler(_ae), _as.setScalar(1.35)); AGM.p.setMatrixAt(np++, _am); continue; }
+      if (a.wait > 0){ a.wait -= dt; } else if (!a.wp.length){ if (a.type === 'd') planDrone(a); else planRover(a); }
+      else { const w = a.wp[0], ty = a.type === 'v' ? groundY(a.x, a.z) : w[1], dx = w[0] - a.x, dy = a.type === 'v' ? 0 : ty - a.y, dz = w[2] - a.z, d = Math.hypot(dx, dy, dz), step = w[3]*dt;
+        if (d <= step){ a.x = w[0]; a.z = w[2]; if (a.type === 'd') a.y = ty; a.wp.shift(); if (w[4]) a.wait = w[4]; }
+        else { a.x += dx/d*step; a.z += dz/d*step; if (a.type === 'd') a.y += dy/d*step; const h = Math.hypot(dx, dz); if (h > .01) a.yaw = Math.atan2(dx, dz); }
+        a.vx = a.vx*.85 + (d > step ? dx/d*w[3] : 0)*.15; a.vz = a.vz*.85 + (d > step ? dz/d*w[3] : 0)*.15; }
+      if (a.type === 'v'){ a.y = groundY(a.x, a.z); _ae.set(0, a.yaw, 0); _am.compose(_ap.set(a.x, a.y, a.z), _aq.setFromEuler(_ae), _as.setScalar(1.8)); AGM.v.setMatrixAt(nv++, _am); continue; }
+      // a drone leans into its flight, and bobs a little as it hovers
+      const sp = Math.hypot(a.vx, a.vz), bob = Math.sin(performance.now()*.004 + a.port*2)*.02;
+      _ae.set(Math.min(.35, sp*.12), a.yaw, 0); _am.compose(_ap.set(a.x, a.y + bob, a.z), _aq.setFromEuler(_ae), _as.setScalar(2.1)); AGM.d.setMatrixAt(nd++, _am);
+      const g = groundY(a.x, a.z), hgt = a.y - g; if (hgt > .25){ _am.compose(_ap.set(a.x, g + .03, a.z), _aq.identity(), _as.setScalar(clamp(2.4 - hgt*.15, 1, 2.4))); AGM.sh.setMatrixAt(ns++, _am); } }
+    for (const [m, n] of [[AGM.d, nd], [AGM.v, nv], [AGM.p, np], [AGM.sh, ns]]){ m.count = n; if (n) m.instanceMatrix.needsUpdate = true; } }
   function rotorTick(dt){ for (const g of ROTORS) g.userData.spin.rotation.z -= dt*.55; }
   function remesh(p){ SHD.dirty = true; HB.dirty.add(regKey(p)); if (p.mesh){ scene.remove(p.mesh); pieceMeshes.splice(pieceMeshes.indexOf(p.mesh), 1); } p.mesh = pieceMesh(p); scene.add(p.mesh); pieceMeshes.push(p.mesh);
     if (p.rotorG){ scene.remove(p.rotorG); ROTORS.delete(p.rotorG); p.rotorG = null; }
@@ -2003,7 +2081,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   // hanging plants) or a tiled arcade between them; up in the air a planted bridge or a glass skywalk. Three ground homes
   // joined to each other make a courtyard between them, with a fountain and a tree. Each home joins its three nearest
   // neighbors at most, and not through another home. All the links are one mesh, made again whenever a home comes or goes.
-  let linksDirty = true, linksMesh = null;
+  let linksDirty = true, linksMesh = null; const RAILS = [];
   const hashPair = (a, b) => { let h = Math.imul(Math.min(a, b), 73856093) ^ Math.imul(Math.max(a, b), 19349663); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0)/4294967296; };
   const _sa = new THREE.Vector3(), _sb = new THREE.Vector3(), _sx = new THREE.Vector3(), _sy = new THREE.Vector3(), _sz = new THREE.Vector3(), _sm = new THREE.Matrix4();
   // a box from point a to point b (its length along them), w wide and h tall, lifted by up
@@ -2079,6 +2157,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         for (const q of PIECES){ if (q === A || q === B || !q.hullW || !q.bb || px < q.bb[0] - .6 || px > q.bb[2] + .6 || pz < q.bb[1] - .6 || pz > q.bb[3] + .6) continue;
           if (inHull(q.hullW, px, pz) || [[.5, 0], [-.5, 0], [0, .5], [0, -.5]].some(([ox, oz]) => inHull(q.hullW, px + ox, pz + oz))) top = Math.max(top, q.y + q.h + .45); } }
       const pa = V3(a.x - dx*.5, 0, a.z - dz*.5), pb = V3(b.x + dx*.5, 0, b.z + dz*.5);   // (the end pylons stand just off each building's wall)
+      L.rail = { ax: pa.x, az: pa.z, bx: pb.x, bz: pb.z, y: top };   // (for the shuttle pods; see AGENTS)
       const rp = u => V3(pa.x + (pb.x - pa.x)*u, top, pa.z + (pb.z - pa.z)*u), L2 = Math.hypot(pb.x - pa.x, pb.z - pa.z), nseg = Math.max(2, Math.ceil(L2/.8));
       for (let k = 0; k < nseg; k++){ const r0 = rp(k/nseg), r1 = rp((k + 1)/nseg); seg(T, r0, r1, .26, .18, HP.white); seg(T, r0, r1, .3, .04, HP.metal, -.1);
         if (k % 2 === 0) for (const s_ of [-.14, .14]) seg(T, V3(r0.x + sx*s_, r0.y, r0.z + sz*s_), V3(r1.x + sx*s_, r1.y, r1.z + sz*s_), .02, .04, HP.indBlue, .02); }
@@ -2137,6 +2216,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
   }
   function buildLinks(){
     linksDirty = false; SHD.dirty = true;
+    RAILS.length = 0;
     if (linksMesh){ scene.remove(linksMesh); linksMesh.geometry.dispose(); for (const c of linksMesh.children) c.geometry.dispose(); linksMesh = null; }   // (merged copies only: the cached parts stay)
     const T = new Tris(true), pairs = [], deg = new Map(), joined = new Set(), pools = [];
     for (const p of PIECES) if (!p.level) pools.push([p.x, p.z, KINDS[p.kind].rb*1.25 + 1.5, IND(p.kind) ? 41.6 : 1 + 10*shopOf(p.kind, p.seed)]);
@@ -2167,8 +2247,8 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
       deg.set(A, (deg.get(A) || 0) + 1); deg.set(B, (deg.get(B) || 0) + 1); joined.add(A.id + '|' + B.id); joined.add(B.id + '|' + A.id);
       // (each connection is drawn once and kept: a rebuild after placing one home only draws the new ones)
       const ck = [A.id, B.id, L.user ? L.type : '-', L.blocked ? 'blk' : '', A.x.toFixed(2), A.z.toFixed(2), A.y.toFixed(2), B.x.toFixed(2), B.z.toFixed(2), B.y.toFixed(2), A.rot.toFixed(3), B.rot.toFixed(3), A.kind, B.kind, A.seed, B.seed, !!A.up, !!B.up].join('|');
-      let cl = LCACHE.get(ck); if (!cl){ const shopL = COM(A.kind) && COM(B.kind) ? shopOf(A.kind, A.seed) : 0, lt = new Tris(true, shopL), lp = []; drawLink(lt, L, lp); if (shopL) for (const q of lp) q[3] += 10*shopL; cl = { geo: lt.p.length ? lt.geo() : null, fol: folGeo(lt.fol), pools: lp, ax: (A.x + B.x)/2, az: (A.z + B.z)/2, r: L.dc/2, a: A.id, b: B.id }; LCACHE.set(ck, cl); }
-      cl.used = true; for (const q of cl.pools) pools.push(q);
+      let cl = LCACHE.get(ck); if (!cl){ const shopL = COM(A.kind) && COM(B.kind) ? shopOf(A.kind, A.seed) : 0, lt = new Tris(true, shopL), lp = []; drawLink(lt, L, lp); if (shopL) for (const q of lp) q[3] += 10*shopL; cl = { rail: L.rail || null, geo: lt.p.length ? lt.geo() : null, fol: folGeo(lt.fol), pools: lp, ax: (A.x + B.x)/2, az: (A.z + B.z)/2, r: L.dc/2, a: A.id, b: B.id }; LCACHE.set(ck, cl); }
+      cl.used = true; for (const q of cl.pools) pools.push(q); if (cl.rail) RAILS.push(cl.rail);
     }
     // courtyards: three ground homes all joined to each other
     // (found from each home's few links, not by trying every three homes)
@@ -2997,7 +3077,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         hlClear();
         if (PL.kind === 'connect') showConnect(); else if (PL.kind === 'del') showDel(); else if (PL.kind === 'grass') showGrass(); else if (isZone(PL.kind) && !oneHome()) showZoneGhost(); else if (PL.kind) showGhost(); else showRemoveHover(); } }
     q = tk('ghost', q);
-    animTick(dt); rotorTick(dt); const batched = batchTick();
+    animTick(dt); rotorTick(dt); agentTick(dt); const batched = batchTick();
     if (linksDirty && !ANIM.list.length && !batched) buildLinks();   // (not in the same frame as a batch: the two together made a hitch)
     q = tk('anim+links', q);
     const t = TOFF.fix !== undefined ? TOFF.fix : (now - t0)/1000 + TOFF.v; seaU.time.value = t; sprayTick(dt, t, !(fNo & 3) || TOFF.fix !== undefined); /* (a crest's arrival is caught every fourth frame; the spray itself moves every frame) */ q = tk('spray', q); grassTick(t); q = tk('grass', q);
@@ -3012,7 +3092,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
+  window.COAST = { buildLinks: () => buildLinks(), batchTick: () => batchTick(), buildChunk: (i, j, l) => buildChunk(i, j, l), heightRow, coveAt, rocksNear, rowCos, PROF, seaU, TOFF, WAVE, ANIM, scene, renderer, cam, screenOf(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return [r.left + (v.x + 1)/2*r.width, r.top + (1 - v.y)/2*r.height]; }, ULINKS: () => ULINKS, paintGrass, tufts, GR, CN, buildSquare, folGeo, get t0(){ return t0; }, setHour: h => setTime(h), heightAt, coastX, pick, PIECES, CURV, AG, indFolGeo, INDKINDS, paintPlants, plants, comFolGeo, COMPAL, COMKINDS, grassM,
     get state(){ return { yaw, zoom, pitch, x: camT.x, z: camT.z, k: V.k, gH: V.gH, chunks: chunks.size, built: [...chunks.values()].filter(c => c.mesh).length }; },
     go(o){ if (o.yaw !== undefined) yaw = yawT = o.yaw; if (o.zoom !== undefined) zoom = zoomT = o.zoom; if (o.pitch !== undefined) pitch = pitchT = o.pitch;
       if (o.x !== undefined) camGoal.x = camT.x = o.x; if (o.z !== undefined) camGoal.z = camT.z = o.z; },

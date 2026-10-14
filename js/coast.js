@@ -2021,7 +2021,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     if (PL.kind === 'connect') return '<h4>Walkways</h4>' + row('click, click', 'pick two buildings to join') + row('V', 'next kind: bridge, skywalk, pergola, arcade, wall (or a wing, if they\'re apart), random') + row('right click', 'take away the walkway under it (or let go of the first pick)');
     if (PL.kind === 'zone') return '<h4>Residential: brush</h4>' + row('click', 'build the homes in the brush') + row('Q / E', 'bigger / smaller (smallest: one home)') + row('V', ZONE.size ? 'another layout' : 'next kind (Shift+V: new look)') + row('R', 'turn') + row('right click', ZONE.size ? 'clear the brush' : 'remove the home under it');
     if (PL.kind && KINDS[PL.kind]) return '<h4>Residential: one by one</h4>' + row('click', 'place (on a roof: stack; on a wall: build off it)') + row('V', 'another look') + row('R', 'turn') + row('right click', 'remove (and all above)') + row('Z', 'switch to the brush');
-    return '<h4>Pick a zone or a tool</h4>' + row('1', 'residential') + row('5', 'walkways') + row('6', 'grass');
+    return '<h4>Pick a zone or a tool</h4>' + row('right click', 'take away the walkway, home or grass under it') + row('1', 'residential') + row('5', 'walkways') + row('6', 'grass');
   }
   document.getElementById('zoneRes') && document.getElementById('zoneRes').addEventListener('click', () => setKind(resActive() ? PL.kind : 'zone'));   // (always the brush: Q/E size it, smallest is one home)
   document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode === 'zone')));
@@ -2080,6 +2080,12 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
     _ray.setFromCamera(_ndc, cam); const h = _ray.intersectObject(linksMesh, false)[0]; if (!h || !h.face) return null;
     const ph = _ray.intersectObjects(pieceMeshes, false)[0]; if (ph && ph.distance < h.distance - .05) return null;
     const v = h.face.a; for (const [o0, o1, a, b] of linkRanges) if (v >= o0 && v < o1) return [a, b]; return null; }
+  // with no tool picked, a right click takes away what's under the pointer: a walkway (if it's in front), else a home (and
+  // all above it), else the grass there
+  function removeAt(cx, cy){
+    if (linkAt(cx, cy)){ unConnect(cx, cy); return; }
+    const p = pieceAt(cx, cy); if (p){ removePiece(p); return; }
+    const h = pick(cx, cy); if (h && !h.sea) paintGrass(h.x, h.z, .9, 0, true); }
   function unConnect(cx, cy){
     if (CN.a){ CN.a = null; connGhost.visible = false; outline.visible = false; return; }
     const lk = linkAt(cx, cy);
@@ -2132,6 +2138,7 @@ const PROF = { on: false, acc: {}, n: 0, calls: 0, tris: 0 };   // (a test hook:
         else if (PL.kind === 'grass') grassStroke(e.clientX, e.clientY, false, true);
         else if (PL.kind === 'zone' && !oneHome()){ showZoneGhost(); placeZone(); } else { showGhost(); placeHere(); } }
       else if (act.b === 2 && PL.kind === 'connect') unConnect(e.clientX, e.clientY);
+      else if (act.b === 2 && !PL.kind) removeAt(e.clientX, e.clientY);   // (no tool: take away what's under the pointer)
       else if (act.b === 2){ if (PL.kind === 'zone' && !oneHome()){ const h = pick(e.clientX, e.clientY); if (h) clearZone(h.x, h.z); } else { const p = pieceAt(e.clientX, e.clientY); if (p) removePiece(p); } }
     }
     ptrs.delete(e.pointerId); if (!ptrs.size){ act = null; canvas.style.cursor = 'grab'; }

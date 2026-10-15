@@ -25,7 +25,9 @@ const WIRELOG = (() => {
     font: 10.5px/1.5 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--wl-txt); letter-spacing: .02em; }
   #wirelog[hidden] { display: none; }
   #wirelog .wl-box { background: var(--wl-bg); border: 1px solid var(--wl-line); contain: layout paint style; }
-  #wirelog header { display: flex; align-items: center; gap: 8px; height: 24px; padding: 0 6px 0 9px; border-bottom: 1px solid var(--wl-hair); }
+  #wirelog header { display: flex; align-items: center; gap: 8px; height: 24px; padding: 0 6px 0 9px; border-bottom: 1px solid var(--wl-hair); cursor: pointer; user-select: none; }
+  #wirelog header:hover .t, #wirelog header:focus-visible .t { color: #fff; } #wirelog header:focus-visible { outline: 1px solid var(--wl-line); outline-offset: -1px; }
+  #wirelog header .chev { color: var(--wl-dim); font-size: 9px; width: 8px; text-align: center; }
   #wirelog header .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--wl-head); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; white-space: nowrap; }
   #wirelog header .t .short { display: none; }
   #wirelog header .r { flex-shrink: 0; margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--wl-dim); font-size: 9px; letter-spacing: .14em; white-space: nowrap; }
@@ -37,13 +39,15 @@ const WIRELOG = (() => {
   #wirelog .wl-body { height: 178px; overflow-y: auto; overflow-x: hidden; padding: 4px 0 5px; scrollbar-width: thin; scrollbar-color: var(--wl-line) transparent; }
   #wirelog.collapsed .wl-body, #wirelog.collapsed .wl-foot { display: none; }
   #wirelog.collapsed header { border-bottom: 0; }
-  #wirelog .wl-line { display: grid; grid-template-columns: 38px 50px minmax(0,1fr); gap: 6px; padding: 0 9px; white-space: nowrap; opacity: .42; }
-  #wirelog .wl-line:nth-last-child(-n+9) { opacity: .7; } #wirelog .wl-line:nth-last-child(-n+3) { opacity: 1; }
+  #wirelog .wl-line { display: grid; grid-template-columns: 38px 50px minmax(0,1fr); gap: 6px; padding: 0 9px; white-space: nowrap; opacity: .8; }
+  #wirelog .wl-body > :nth-child(-n+4), #wirelog .wl-body > :nth-child(-n+4) .wl-line { opacity: 1; }
+  #wirelog .wl-blk { border-left: 1px solid var(--wl-hair); margin-left: 2px; } #wirelog .wl-blk .wl-line { padding-left: 7px; }
   #wirelog .wl-line > span:last-child { overflow: hidden; text-overflow: ellipsis; }
   #wirelog .wl-line .ts { color: var(--wl-dim); font-variant-numeric: tabular-nums; }
   #wirelog .wl-line .ch { letter-spacing: .1em; font-size: 9.5px; }
   #wirelog .ch-CITY .ch { color: var(--c-city); } #wirelog .ch-MESH .ch { color: var(--c-mesh); } #wirelog .ch-CORP .ch { color: var(--c-corp); } #wirelog .ch-SIGNAL .ch { color: var(--c-sig); }
   #wirelog .ch-SYS .ch { color: var(--wl-head); } #wirelog .ch-CMD .ch { color: var(--wl-head); }
+  #wirelog .opt .done { margin-left: 6px; color: var(--wl-dim); font-size: 9px; letter-spacing: .14em; }
   #wirelog .ch-CMD .tx { color: var(--c-cmd); } #wirelog .ch-SIGNAL .tx { color: #ffc2c9; }
   #wirelog .wl-line.key .tx { color: #fff; }
   #wirelog .cur { display: inline-block; width: .55em; height: 1.05em; background: var(--wl-head); vertical-align: -2px; margin-left: 1px; animation: wlBlink .8s steps(2) infinite; }
@@ -83,7 +87,9 @@ const WIRELOG = (() => {
   body.watching:has(#deck.open) #wirelog { right: calc(304px + min(340px, 100vw - 32px) + 8px); }
   body.wl-on .mon-pins { top: calc(58px + var(--wl-h, 0px) + 8px + env(safe-area-inset-top,0px)); }
   /* the prompt */
-  #wirelog .wl-in { display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-top: 1px solid var(--wl-hair); cursor: text; }
+  #wirelog .wl-in { display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-bottom: 1px solid var(--wl-hair); background: rgba(214,92,255,.03); cursor: text; }
+  #wirelog .wl-in.tr input { color: var(--c-mesh); } #wirelog .wl-in.tr .pr { color: var(--c-mesh); }
+  #wirelog .ch-TRACE .ch { color: var(--c-mesh); } #wirelog .ch-TRACE .tx { color: #c9ffe2; }
   #wirelog .wl-in .pw { max-width: 52%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; color: var(--wl-dim); font-size: 9.5px; }
   #wirelog .wl-in .pr { color: var(--wl-head); }
   #wirelog .wl-in input { flex: 1; min-width: 0; font: inherit; color: var(--c-cmd); background: transparent; border: 0; outline: none; padding: 0; caret-color: var(--wl-head); caret-shape: block; }
@@ -108,13 +114,13 @@ const WIRELOG = (() => {
   `;
 
   /* ---------- state (saved) ---------- */
-  const W = { on: false, stage: 0, st: 0, lines: [], archive: [], leak: 'none', leakT: 0, sig: 0, seed: 0, mesh: ['A'], cwd: [], probed: [], scanned: [], hist: [] };
+  const W = { on: false, stage: 0, st: 0, lines: [], archive: [], leak: 'none', leakT: 0, sig: 0, seed: 0, mesh: ['A'], cwd: [], probed: [], scanned: [], hist: [], trace: 'none', traceT: 0, gseq: 0 };
   let el = null, bodyEl = null, footEl = null, agentsEl = null, view = 'log', fast = false, stick = true;
   const load = () => { try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); if (v && typeof v === 'object') Object.assign(W, v); } catch (e) {}
     for (const k of ['cwd', 'probed', 'scanned', 'hist']) if (!Array.isArray(W[k])) W[k] = []; };
   let saveDue = false;
   const save = () => { saveDue = true; };
-  const flushSave = () => { if (!saveDue) return; saveDue = false; try { localStorage.setItem(KEY, JSON.stringify(W)); } catch (e) {} };
+  const flushSave = () => { if (!saveDue) return; saveDue = false; try { localStorage.setItem(KEY, JSON.stringify(W, (k, v) => k === 'el' ? undefined : v)); } catch (e) {} };
 
   /* ---------- small helpers ---------- */
   let rs = 1;
@@ -167,16 +173,26 @@ const WIRELOG = (() => {
     d.innerHTML = `<span class="ts">${esc(L.t)}</span><span class="ch">${L.ch === 'CMD' ? 'AGENT' : L.ch === 'OP' ? 'OPER' : L.ch === 'DOC' ? 'FILE' : esc(L.ch)}</span><span class="tx">${esc(L.x)}</span>`;
     return d;
   }
+  // the newest line sits just under the prompt; what one command prints stays together, top to bottom, in a block
+  let grp = 0;
+  function put(d, L){
+    if (!bodyEl || view !== 'log') return;
+    if (L.g){ let b = bodyEl.querySelector('.wl-blk[data-g="' + L.g + '"]'); if (!b){ b = document.createElement('div'); b.className = 'wl-blk'; b.dataset.g = L.g; bodyEl.insertBefore(b, bodyEl.firstChild); } b.appendChild(d); }
+    else bodyEl.insertBefore(d, bodyEl.firstChild);
+    trim(); toTop();
+  }
+  const keep = L => { W.lines.push(L); while (W.lines.length > MAX_LINES) W.lines.shift(); save(); };
   function add(ch, x, o = {}){
-    const L = { t: now(), ch, x }; if (o.key) L.key = 1;
+    const L = { t: now(), ch, x }; if (o.key) L.key = 1; const g = o.g === undefined ? grp : o.g; if (g) L.g = g; if (o.opt) L.opt = o.opt;
     W.lines.push(L); while (W.lines.length > MAX_LINES) W.lines.shift();
     if (o.arc) archive(o.arc.title || x, o.arc.kind || 'EVENT', o.arc.body || [x]);
     save();
-    if (bodyEl && view === 'log'){ const d = lineEl(L); bodyEl.appendChild(d); trim(); toBottom(); return d; }
+    if (bodyEl && view === 'log'){ const d = lineEl(L); L.el = d; put(d, L); return d; }
     return null;
   }
-  function trim(){ if (!bodyEl) return; while (bodyEl.querySelectorAll('.wl-line').length > MAX_LINES) bodyEl.querySelector('.wl-line').remove(); }
-  function toBottom(){ if (bodyEl && stick) bodyEl.scrollTop = bodyEl.scrollHeight; }
+  function trim(){ if (!bodyEl) return; while (bodyEl.querySelectorAll('.wl-line').length > MAX_LINES){ const last = bodyEl.lastElementChild; if (!last) break;
+    if (last.classList.contains('wl-blk')){ if (last.firstElementChild) last.firstElementChild.remove(); if (!last.childElementCount) last.remove(); } else last.remove(); } }
+  function toTop(){ if (bodyEl && stick) bodyEl.scrollTop = 0; }
   function archive(title, kind, body){
     W.archive.push({ t: now(), title, kind, body }); while (W.archive.length > MAX_ARCHIVE) W.archive.shift(); save();
     const b = el && el.querySelector('#wlArc'); if (b){ b.textContent = 'ARC ' + W.archive.length; b.classList.remove('fresh'); void b.offsetWidth; b.classList.add('fresh'); }
@@ -298,73 +314,104 @@ const WIRELOG = (() => {
     for (let i = 1; i <= text.length; i++){ if (!fast) await sleep(1/cps); node.textContent = text.slice(0, i); node.appendChild(cur); }
     cur.remove();
   }
-  async function cmd(text){   // a command typed into the log by the swarm
-    const L = { t: now(), ch: 'CMD', x: text }; const d = lineEl(L), tx = d.querySelector('.tx');
-    if (bodyEl && view === 'log'){ bodyEl.appendChild(d); toBottom(); await typeInto(tx, text); }
-    W.lines.push(L); while (W.lines.length > MAX_LINES) W.lines.shift(); trim(); save(); toBottom();
-    await sleep(.7);
+  /* ---------- Y / N under a line ---------- */
+  function optButtons(d, yes, no, labels = ['Y', 'N']){
+    if (!d) return; d.classList.add('has-opt'); const tx = d.querySelector('.tx'); const o = document.createElement('span'); o.className = 'opt';
+    o.innerHTML = `<button type="button" class="y">${labels[0]}</button><button type="button" class="n">${labels[1]}</button>`; tx.appendChild(o);
+    const off = (w) => { o.querySelectorAll('button').forEach(b => b.remove()); if (w){ const t = document.createElement('span'); t.className = 'done'; t.textContent = w; o.appendChild(t); } };
+    o.querySelector('.y').addEventListener('click', e => { e.stopPropagation(); off('approved'); yes(); });
+    o.querySelector('.n').addEventListener('click', e => { e.stopPropagation(); off('declined'); no(); });
+    d._off = off;
   }
 
-  /* ---------- the data leak (stage 2): the swarm shows how the hacking commands go ---------- */
+  /* ---------- the packet swarm: three agents scanning the leaking host's folders at once ---------- */
   const MEMO = WIREFS.MEMO;
-  function offer(){
-    W.leak = 'offered'; save();
-    add('MESH', 'Mesh A · data leak detected · 3 packets', { key: 1, arc: { title: 'Data leak · mesh A · 3 packets', kind: 'EVENT' } });
-    const d = add('SYS', 'Option · deploy agent swarm');
-    if (d) addOfferButtons(d);
-  }
-  function addOfferButtons(d){
-    d.classList.add('has-opt'); const tx = d.querySelector('.tx'); const o = document.createElement('span'); o.className = 'opt';
-    o.innerHTML = '<button type="button" class="y" aria-label="Deploy the agent swarm">Y</button><button type="button" class="n" aria-label="Ignore the leak">N</button>';
-    tx.appendChild(o);
-    o.querySelector('.y').addEventListener('click', () => { o.querySelectorAll('button').forEach(b => b.disabled = true); swarm(); });
-    o.querySelector('.n').addEventListener('click', () => { o.querySelectorAll('button').forEach(b => b.disabled = true); W.leak = 'declined'; W.leakT = 0; save(); add('SYS', 'Agent swarm · standby'); });
-  }
   function agentBox(n){
     const b = document.createElement('div'); b.className = 'ag';
-    b.innerHTML = `<div class="h"><span>AGENT ${pad(n)} · SCAN</span><span class="chip wait">WAIT</span></div><div class="b"><div class="cmd"></div><div class="res">&nbsp;</div></div>`;
+    b.innerHTML = `<div class="h"><span>SWARM ${pad(n)} · SCAN</span><span class="chip wait">WAIT</span></div><div class="b"><div class="cmd"></div><div class="res">&nbsp;</div></div>`;
     agentsEl.appendChild(b); requestAnimationFrame(() => b.classList.add('on'));
     return b;
   }
-  async function agent(n, dir, took, res, flag){
+  async function swarmAgent(n, dir, took){
     const b = agentBox(n); await sleep(.25*n);
     await typeInto(b.querySelector('.cmd'), '> -scan root/' + dir, 24);
     await sleep(took);
-    const chip = b.querySelector('.chip'); chip.className = 'chip ' + (flag ? 'flag' : 'clear'); chip.textContent = flag ? 'FLAG' : 'CLEAR';
-    b.querySelector('.res').textContent = res;
-    return b;
+    const files = WIREFS.TREE.synthcorp[dir], fl = files.filter(f => f[2].includes('f')), kb = fl.reduce((a, f) => a + f[1], 0);
+    const chip = b.querySelector('.chip'); chip.className = 'chip ' + (fl.length ? 'flag' : 'clear'); chip.textContent = fl.length ? 'FLAG' : 'CLEAR';
+    b.querySelector('.res').textContent = `${fl.length} file${fl.length === 1 ? '' : 's'} flagged${fl.length === 1 ? ' · ' + sizeTxt(kb) : ''}`;
+    if (!W.scanned.includes('synthcorp/' + dir)) W.scanned.push('synthcorp/' + dir);
+    return { b, dir, fl };
   }
   async function swarm(){
-    W.leak = 'running'; save(); fast = false;
-    add('SYS', 'Agent swarm · 3 deployed · mesh A');
-    await sleep(.6);
-    await cmd('> -probe mesha');
-    add('MESH', `Mesh A · 3 hosts · ${CORP.synth.toLowerCase()} · ${CORP.logi.toLowerCase()} · ${CORP.media.toLowerCase()}`); if (!W.probed.includes('A')) W.probed.push('A');
-    await sleep(1);
-    await cmd('> -cd mesha/synthcorp');
-    add('CORP', `${CORP.synth} · root · 4 dirs`);
-    await sleep(.8);
-    const boxes = await Promise.all([ agent(1, 'documents', 3, '3 files flagged', true), agent(2, 'reports', 4.4, '0 files flagged', false), agent(3, 'archive', 5.8, '1 file flagged · 2.1 MB', true) ]);
-    add('SYS', 'Scan complete · 4 files flagged'); for (const d of ['documents', 'reports', 'archive']) if (!W.scanned.includes('synthcorp/' + d)) W.scanned.push('synthcorp/' + d);
-    await sleep(1);
-    await cmd('> -pull root/archive/sk3_recall_memo');
-    const L = { t: now(), ch: 'MESH', x: '' }; const d = lineEl(L), tx = d.querySelector('.tx');
-    if (bodyEl && view === 'log'){ bodyEl.appendChild(d); toBottom(); }
-    const total = 14;
-    for (let s = total; s >= 0; s--){
-      const k = Math.round(10*(total - s)/total);
-      tx.innerHTML = `Transfer · 2.1 MB · 00:${pad(s)} <span class="bar">${'█'.repeat(k)}${'░'.repeat(10 - k)}</span>`;
-      if (s) await sleep(1);
-    }
-    L.x = 'Transfer · 2.1 MB · complete'; tx.textContent = L.x; W.lines.push(L); while (W.lines.length > MAX_LINES) W.lines.shift(); trim();
-    add('SYS', 'Pull complete · 1 file archived', { key: 1, arc: { title: 'sk3_recall_memo', kind: 'FILE', body: MEMO } });
-    W.leak = 'done'; W.st = 0; save();
-    await sleep(6);
-    for (const b of boxes) b.classList.add('gone');
-    await sleep(.4);
-    for (const b of boxes) b.remove();
+    W.leak = 'swarm'; save(); fast = false;
+    grp = ++W.gseq; add('TRACE', 'Packet swarm · 3 agents · synthcorp root'); grp = 0;
+    const out = await Promise.all([swarmAgent(1, 'documents', 3), swarmAgent(2, 'reports', 4.4), swarmAgent(3, 'archive', 5.8)]);
+    grp = ++W.gseq;
+    add('TRACE', `Scan complete · ${out.reduce((a, r) => a + r.fl.length, 0)} files flagged`, { key: 1 });
+    for (const r of out) for (const f of r.fl) add('SYS', `FLAG · ${r.dir}/${f[0]} · ${sizeTxt(f[1])}`);
+    grp = 0; W.leak = 'scanned'; save();
+    await sleep(6); for (const r of out) r.b.classList.add('gone'); await sleep(.4); for (const r of out) r.b.remove();
+  }
+  // the leak: found by the first probe of mesh A, whoever runs it
+  function leakFound(){
+    if (W.leak !== 'none') return; W.leak = 'found';
+    add('MESH', 'Mesh A · data leak detected · 3 packets · synthcorp', { key: 1, arc: { title: 'Data leak · mesh A · 3 packets', kind: 'EVENT' } });
+    if (W.stage < 2){ W.stage = 2; W.st = 0; } save();
   }
 
+  /* ---------- the network trace: an agent that proposes the next command, one at a time, and waits for a yes ---------- */
+  // Each step asks before it runs (a little friction, and a look at the command); approved, it types the command into the
+  // prompt itself and runs it there, so the player sees exactly what to type. If the player types it first, the step clears.
+  let P = null, tracing = false, traceWait = 2, offerT = 0;
+  const skipped = new Map(); let clock = 0;
+  const inSynth = () => W.cwd.length >= 2 && W.cwd[1] === 'synthcorp';
+  function nextStep(){
+    for (const m of ['A', 'B', 'C']) if (meshOn(m) && !W.probed.includes(m)) return { key: 'probe' + m, cmd: '-probe ' + MESHL[m], why: `Mesh ${m} · unprobed` };
+    if (W.leak === 'found' && !inSynth()) return { key: 'cdleak', cmd: '-cd /mesha/synthcorp', why: 'Leak source · synthcorp' };
+    if (W.leak === 'found') return { key: 'swarm', swarm: true, why: 'Root · 4 dirs · unscanned' };
+    if (W.leak === 'scanned' && !archived('sk3_recall_memo')) return { key: 'pull', cmd: inSynth() && W.cwd.length === 2 ? '-pull root/archive/sk3_recall_memo' : '-pull /mesha/synthcorp/root/archive/sk3_recall_memo', why: 'Flagged · 2.1 MB' };
+    return null;
+  }
+  function propose(nx){
+    const txt = nx.swarm ? `Next · deploy packet swarm · 3 agents · scan root` : `Next · ${nx.cmd}`;
+    const g = ++W.gseq; add('TRACE', nx.why, { g });
+    const d = add('TRACE', txt, { g, opt: nx.key, key: 1 });
+    P = { nx, L: W.lines[W.lines.length - 1] };
+    optButtons(d, () => approve(), () => decline());
+  }
+  function approve(){ const p = P; if (!p) return; P = null; if (p.nx.swarm) swarm(); else traceRun(p.nx.cmd); }
+  function decline(){ const p = P; if (!p) return; P = null; skipped.set(p.nx.key, clock + 90); traceWait = 4; add('TRACE', 'Step skipped · standby', { g: 0 }); }
+  async function traceRun(cmdText){
+    tracing = true;
+    while (busy || (inEl && document.activeElement === inEl)) await sleep(.25);   // (the player's own typing first)
+    if (view !== 'log') showView('log');
+    if (el.classList.contains('collapsed')) setCollapsed(false);
+    rowEl.classList.add('tr', 'has'); inEl.readOnly = true;
+    for (let i = 1; i <= cmdText.length; i++){ inEl.value = cmdText.slice(0, i); await sleep(1/24); }
+    await sleep(.35); inEl.value = ''; rowEl.classList.remove('tr', 'has'); inEl.readOnly = false;
+    await exec(cmdText, 'TRACE');
+    tracing = false; traceWait = 1.5;
+  }
+  function offerTrace(){
+    W.trace = 'offered'; save();
+    const d = add('SYS', 'Option · enable network trace agent', { g: 0, opt: 'trace', key: 1 });
+    optButtons(d, traceYes, traceNo);
+  }
+  function traceYes(){ W.trace = 'on'; save(); add('TRACE', 'Network trace · enabled · listening', { g: 0 }); if (W.stage < 1) setStage(1); traceWait = 2; }
+  function traceNo(){ W.trace = 'declined'; W.traceT = 0; save(); add('SYS', 'Network trace · standby', { g: 0 }); }
+  function traceTick(dt){
+    clock += dt;
+    if (W.trace === 'none' && (offerT += dt) > 5) offerTrace();
+    if (W.trace === 'declined' && (W.traceT += dt) > T.reoffer) offerTrace();
+    // the leak moves on when the player does the work themselves
+    if (W.leak === 'found' && ['documents', 'reports', 'archive'].every(d => W.scanned.includes('synthcorp/' + d))) W.leak = 'scanned';
+    if ((W.leak === 'scanned' || W.leak === 'found') && archived('sk3_recall_memo')){ W.leak = 'done'; W.st = 0; save(); }
+    if (P){ const nx = nextStep(); if (!nx || nx.key !== P.nx.key){ if (P.L && P.L.el && P.L.el._off) P.L.el._off('done by hand'); P = null; traceWait = 2; } return; }
+    if (W.trace !== 'on' || tracing || busy || W.leak === 'swarm') return;
+    if ((traceWait -= dt) > 0) return;
+    const nx = nextStep(); if (!nx || (skipped.get(nx.key) || 0) > clock) return;
+    propose(nx);
+  }
 
   /* ---------- the command line: the player's own -probe, -cd, -ls, -scan, -read, -pull, -deploy ---------- */
   const FS = WIREFS, MESHN = { mesha: 'A', meshb: 'B', meshc: 'C' }, MESHL = { A: 'mesha', B: 'meshb', C: 'meshc' };
@@ -407,7 +454,9 @@ const WIRELOG = (() => {
       if (!meshOn(m)) return c.say('SYS', `Mesh ${m} · no route`);
       await c.wait(1.2);
       if (!W.probed.includes(m)){ W.probed.push(m); save(); }
-      return c.say('MESH', `Mesh ${m} · ${FS.HOSTS[m].length} hosts · ${FS.HOSTS[m].join(' · ')}`, true);
+      const r = c.say('MESH', `Mesh ${m} · ${FS.HOSTS[m].length} hosts · ${FS.HOSTS[m].join(' · ')}`, true);
+      if (m === 'A') leakFound();
+      return r;
     },
     async cd(c, a){
       if (!a[0]){ c.cwd.length = 0; c.moved(); return; }
@@ -485,10 +534,10 @@ const WIRELOG = (() => {
     say(ch, x){ add(ch, x); return x; },
     wait: sec => sleep(sec),
     moved(){ W.cwd = opCtx.cwd; save(); showCwd(); },
-    live(){ const L = { t: now(), ch: 'SYS', x: '' }, d = lineEl(L), tx = d.querySelector('.tx'); let put = false;
-      return (txt, final, html) => { if (!put){ put = true; if (bodyEl && view === 'log'){ bodyEl.appendChild(d); trim(); } }
-        if (html) tx.innerHTML = txt; else tx.textContent = txt; toBottom();
-        if (final){ L.x = txt; W.lines.push(L); while (W.lines.length > MAX_LINES) W.lines.shift(); save(); } }; },
+    live(){ const L = { t: now(), ch: 'SYS', x: '' }; if (grp) L.g = grp; const d = lineEl(L), tx = d.querySelector('.tx'); let shown = false;
+      return (txt, final, html) => { if (!shown){ shown = true; put(d, L); }
+        if (html) tx.innerHTML = txt; else tx.textContent = txt;
+        if (final){ L.x = txt; keep(L); } }; },
   };
   // an agent's context: its own box beside the log; what it finds goes to the log as well
   const agentsBusy = {}, FAILS = /^(No such|Not a|Mesh . · no route|Transfer refused|Unknown|Host unlisted|Agent)|encrypted · key|too large to read|required$|already archived$/;
@@ -500,7 +549,7 @@ const WIRELOG = (() => {
     agentsEl.appendChild(b); requestAnimationFrame(() => b.classList.add('on'));
     const res = b.querySelector('.res'); let lastSay = '';
     const ctx = { cwd, agent: id,
-      say(ch, x, toLog){ res.textContent = x; lastSay = x; if (ch === 'SYS' && FAILS.test(x)) ctx.failed = true; if (toLog || ch === 'MESH') add(ch, x); return x; },
+      say(ch, x, toLog){ res.textContent = x; lastSay = x; if (ch === 'SYS' && FAILS.test(x)) ctx.failed = true; if (toLog || ch === 'MESH') add(ch, x, { g: 0 }); return x; },
       wait: sec => sleep(sec), moved(){},
       live(){ return (txt, final, html) => { if (html) res.innerHTML = txt; else res.textContent = txt.replace(/<[^>]+>/g, ''); if (final) lastSay = txt; }; },
     };
@@ -511,22 +560,23 @@ const WIRELOG = (() => {
       if (ctx.failed) out = lastSay;
       const fail = !!ctx.failed;
       const chip = b.querySelector('.chip'); chip.className = 'chip ' + (fail ? 'flag' : 'clear'); chip.textContent = fail ? 'FAIL' : 'DONE';
-      add('SYS', `Agent ${pad(id)} · ${fail ? 'failed' : 'done'} · ${out || lastSay}`);
+      add('SYS', `Agent ${pad(id)} · ${fail ? 'failed' : 'done'} · ${out || lastSay}`, { g: 0 });
       agentsBusy[id] = false;
       await sleep(6); b.classList.add('gone'); await sleep(.4); b.remove();
     })();
   }
   function showCwd(){ if (pwEl) pwEl.textContent = '‎' + (opCtx.cwd.length ? pstr(opCtx.cwd) : '/'); }
-  async function exec(raw){
+  async function exec(raw, by){
     const line = raw.trim(); if (!line) return;
     if (view !== 'log') showView('log');
     W.hist.push(line); while (W.hist.length > 30) W.hist.shift(); hi = -1; save(); lastCmd = performance.now();
-    add('OP', '> ' + line);
+    grp = ++W.gseq; stick = true;
+    add(by || 'OP', '> ' + line);
     const parts = line.split(/\s+/), verb = parts[0].replace(/^-/, '').toLowerCase();
-    if (!RUN[verb]){ add('SYS', `Unknown command · ${parts[0]}`); return; }
+    if (!RUN[verb]){ add('SYS', `Unknown command · ${parts[0]}`); grp = 0; return; }
     busy = true; rowEl.classList.add('busy'); inEl.readOnly = true;
     try { await RUN[verb](opCtx, parts.slice(1)); } catch (e) { add('SYS', 'Fault · ' + verb); }
-    busy = false; rowEl.classList.remove('busy'); inEl.readOnly = false; toBottom();
+    busy = false; grp = 0; rowEl.classList.remove('busy'); inEl.readOnly = false; toTop();
   }
   // Tab: the command, an agent number, a mesh or a path, from what's there now
   function complete(){
@@ -556,11 +606,11 @@ const WIRELOG = (() => {
     inEl.addEventListener('keydown', e => {
       e.stopPropagation();   // (the game's keys stay off while typing)
       if (e.key === 'Escape'){ e.preventDefault(); inEl.blur(); return; }
-      if (e.key === 'Tab'){ e.preventDefault(); if (!busy) complete(); return; }
+      if (e.key === 'Tab'){ e.preventDefault(); if (!busy && !tracing) complete(); return; }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown'){ e.preventDefault(); if (busy || !W.hist.length) return;
         if (hi < 0){ draft = inEl.value; hi = W.hist.length; } hi = Math.max(0, Math.min(W.hist.length, hi + (e.key === 'ArrowUp' ? -1 : 1)));
         inEl.value = hi === W.hist.length ? draft : W.hist[hi]; if (hi === W.hist.length) hi = -1; return; }
-      if (e.key === 'Enter'){ e.preventDefault(); if (busy) return; const v = inEl.value; inEl.value = ''; exec(v); }
+      if (e.key === 'Enter'){ e.preventDefault(); if (busy || tracing) return; const v = inEl.value; inEl.value = ''; exec(v); }
     });
     inEl.addEventListener('keyup', e => e.stopPropagation());
   }
@@ -585,17 +635,13 @@ const WIRELOG = (() => {
   function setStage(n){
     W.stage = n; W.st = 0; save();
     if (n === 1){ add('MESH', `Mesh A · online · ${nodes(cur ? cur.z : snap().z, 1)} nodes`); add('CORP', `${CORP.synth} · recall · SK-3 optics · batch 14-J`); }
-    if (n === 2) offer();
+    if (n === 2) leakFound();
     if (n === 3) add('SIGNAL', signalLine());
   }
   function stageTick(dt){
     W.st += dt;
     if (W.stage === 0 && W.st > T.s1) setStage(1);
-    else if (W.stage === 1 && W.st > T.s2) setStage(2);
-    else if (W.stage === 2){
-      if (W.leak === 'declined' && (W.leakT += dt) > T.reoffer){ W.leakT = 0; add('MESH', 'Mesh A · leak persists · 3 packets'); W.leak = 'offered'; const d = add('SYS', 'Option · deploy agent swarm'); if (d) addOfferButtons(d); }
-      if (W.leak === 'done' && W.st > T.s3) setStage(3);
-    }
+    else if (W.stage === 2 && W.leak === 'done' && W.st > T.s3) setStage(3);
   }
 
   /* ---------- the panel ---------- */
@@ -604,35 +650,38 @@ const WIRELOG = (() => {
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
     el = document.createElement('aside'); el.id = 'wirelog'; el.setAttribute('aria-label', 'Transmission log');
     el.innerHTML = `<div class="wl-agents" aria-hidden="true"></div><div class="wl-box">
-      <header><span class="t"><span class="full">Transmission log</span><span class="short">Log</span></span><span class="r"><span class="live" aria-hidden="true"></span><span class="nd">NODE 07</span>
-        <button type="button" id="wlArc" title="Saved events and pulled files">ARC 0</button><button type="button" id="wlFold" aria-expanded="true" title="Fold the log">–</button></span></header>
-      <div class="wl-body" role="log" aria-live="polite"></div>
+      <header tabindex="0" role="button" aria-expanded="true" title="Open or fold the log"><span class="chev" aria-hidden="true">▾</span><span class="t"><span class="full">Transmission log</span><span class="short">Log</span></span><span class="r"><span class="live" aria-hidden="true"></span><span class="nd">NODE 07</span>
+        <button type="button" id="wlArc" title="Saved events and pulled files">ARC 0</button></span></header>
       <label class="wl-in"><span class="pw"></span><span class="pr">&gt;</span><span class="cur fk" aria-hidden="true"></span><input type="text" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Command line"></label>
+      <div class="wl-body" role="log" aria-live="polite"></div>
       <div class="wl-foot"><span>RX <b id="wlRx">0</b> pkt/s</span><span>MESH <b id="wlMesh">A</b></span><span>LINES <b id="wlN">0</b>/${MAX_LINES}</span></div></div>`;
     document.body.appendChild(el);
     bodyEl = el.querySelector('.wl-body'); footEl = el.querySelector('.wl-foot'); agentsEl = el.querySelector('.wl-agents');
-    bodyEl.addEventListener('scroll', () => { stick = bodyEl.scrollTop + bodyEl.clientHeight >= bodyEl.scrollHeight - 6; });
+    bodyEl.addEventListener('scroll', () => { stick = bodyEl.scrollTop < 6; });
     bodyEl.addEventListener('click', e => { if (!e.target.closest('button')) fast = true; });   // a click hurries the swarm along
-    el.querySelector('#wlArc').addEventListener('click', () => { el.querySelector('#wlArc').classList.remove('fresh'); showView(view === 'log' ? 'arc' : 'log'); });
-    el.querySelector('#wlFold').addEventListener('click', () => setCollapsed(!el.classList.contains('collapsed')));
+    el.querySelector('#wlArc').addEventListener('click', e => { e.stopPropagation(); el.querySelector('#wlArc').classList.remove('fresh'); if (el.classList.contains('collapsed')) setCollapsed(false); showView(view === 'log' ? 'arc' : 'log'); });
+    const hd = el.querySelector('header'), fold = () => setCollapsed(!el.classList.contains('collapsed'));   // the whole header opens and folds it
+    hd.addEventListener('click', fold); hd.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === hd){ e.preventDefault(); fold(); } });
     let col = null; try { col = localStorage.getItem(COLLAPSE_KEY); } catch (e) {}
-    setCollapsed(col === null ? matchMedia('(max-width:700px)').matches : col === '1', true);
+    setCollapsed(col === '1', true);
     document.body.classList.add('wl-on');
     new ResizeObserver(() => document.body.style.setProperty('--wl-h', el.getBoundingClientRect().height + 'px')).observe(el);
     promptSetup();
     showView('log');
   }
   function setCollapsed(c, quiet){
-    el.classList.toggle('collapsed', c); const f = el.querySelector('#wlFold'); f.textContent = c ? '+' : '–'; f.setAttribute('aria-expanded', !c); f.title = c ? 'Open the log' : 'Fold the log';
+    el.classList.toggle('collapsed', c); const hd = el.querySelector('header'); hd.setAttribute('aria-expanded', !c); hd.querySelector('.chev').textContent = c ? '▸' : '▾';
     if (!quiet) try { localStorage.setItem(COLLAPSE_KEY, c ? '1' : '0'); } catch (e) {}
-    if (!c) toBottom();
+    if (!c) toTop();
   }
   function showView(v, doc){
     view = v; bodyEl.innerHTML = ''; el.querySelector('#wlArc').textContent = v === 'log' ? 'ARC ' + W.archive.length : 'LOG';
     if (v === 'log'){
-      for (const L of W.lines){ const d = lineEl(L); bodyEl.appendChild(d); }
-      if (W.leak === 'offered'){ const last = [...bodyEl.querySelectorAll('.ch-SYS')].pop(); if (last && /deploy agent swarm/.test(last.textContent)) addOfferButtons(last); }
-      stick = true; toBottom(); return;
+      for (const L of W.lines){ const d = lineEl(L); L.el = d; put(d, L); }
+      const lastOpt = k => [...W.lines].reverse().find(L => L.opt === k);
+      if (W.trace === 'offered'){ const L = lastOpt('trace'); if (L) optButtons(L.el, traceYes, traceNo); }
+      if (P){ const L = lastOpt(P.nx.key); if (L){ P.L = L; optButtons(L.el, () => approve(), () => decline()); } }
+      stick = true; toTop(); return;
     }
     if (v === 'doc'){
       const a = W.archive[doc]; const d = document.createElement('div'); d.className = 'doc';
@@ -666,14 +715,17 @@ const WIRELOG = (() => {
       if (!unlocked()) return;
       started = true; load(); rs = W.seed || 1; while (!zoneStep(1e9)); makePanel();
       if (!W.on){ W.on = true; boot(); }
-      if (W.leak === 'running') W.leak = 'offered';   // (reloaded mid-swarm: offer it again)
+      if (['offered', 'declined', 'running'].includes(W.leak)) W.leak = W.probed.includes('A') ? 'found' : 'none';   // (saves from before the trace)
+      if (W.leak === 'swarm') W.leak = 'found';   // (reloaded mid-swarm: it asks again)
+      if (W.trace === 'offered') W.trace = 'none';
       el.hidden = false; showView('log');
     }
     runWaits(dt);
     if (zIter || (snapT += dt) > 3){ if (zoneStep()){ snapT = 0; cur = snap(); events(cur); } }
     flushBuild(dt);
     stageTick(dt);
-    if (W.leak !== 'running' && !typing() && (next -= dt) <= 0){ next = T.gapLo + rnd()*(T.gapHi - T.gapLo); ambient(); }
+    traceTick(dt);
+    if (W.leak !== 'swarm' && !tracing && !typing() && (next -= dt) <= 0){ next = T.gapLo + rnd()*(T.gapHi - T.gapLo); ambient(); }
     if ((footT += dt) > 3 && cur){ footT = 0; foot(cur); }
     if ((saveT += dt) > 3){ saveT = 0; flushSave(); }
   }
@@ -681,8 +733,9 @@ const WIRELOG = (() => {
 
   const dev = {
     stage: n => { if (!started) return 'no Wire Nest yet'; setStage(n); return W.stage; },
-    fast: (k = 20) => { for (const x of ['s1', 's2', 's3', 'reoffer']) T[x] /= k; T.gapLo /= 4; T.gapHi /= 4; return T; },
-    leak: () => { if (started){ W.stage = 2; offer(); } },
+    fast: (k = 20) => { for (const x of ['s1', 's3', 'reoffer']) T[x] /= k; T.gapLo /= 4; T.gapHi /= 4; return T; },
+    leak: () => { if (started) leakFound(); },
+    trace: () => { if (started) traceYes(); },
     line: () => ambient(),
     reset: () => { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); },
     state: () => W,

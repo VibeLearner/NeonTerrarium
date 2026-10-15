@@ -40,7 +40,7 @@ const WIRELOG = (() => {
   #wirelog.collapsed .wl-body, #wirelog.collapsed .wl-foot { display: none; }
   #wirelog.collapsed header { border-bottom: 0; }
   #wirelog .wl-line { display: grid; grid-template-columns: 38px 50px minmax(0,1fr); gap: 6px; padding: 0 9px; white-space: nowrap; opacity: .8; }
-  #wirelog .wl-body > :nth-child(-n+4), #wirelog .wl-body > :nth-child(-n+4) .wl-line { opacity: 1; }
+  #wirelog .wl-body > :nth-last-child(-n+4), #wirelog .wl-body > :nth-last-child(-n+4) .wl-line { opacity: 1; }
   #wirelog .wl-blk { border-left: 1px solid var(--wl-hair); margin-left: 2px; } #wirelog .wl-blk .wl-line { padding-left: 7px; }
   #wirelog .wl-line > span:last-child { overflow: hidden; text-overflow: ellipsis; }
   #wirelog .wl-line .ts { color: var(--wl-dim); font-variant-numeric: tabular-nums; }
@@ -87,7 +87,7 @@ const WIRELOG = (() => {
   body.watching:has(#deck.open) #wirelog { right: calc(304px + min(340px, 100vw - 32px) + 8px); }
   body.wl-on .mon-pins { top: calc(58px + var(--wl-h, 0px) + 8px + env(safe-area-inset-top,0px)); }
   /* the prompt */
-  #wirelog .wl-in { display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-bottom: 1px solid var(--wl-hair); background: rgba(214,92,255,.03); cursor: text; }
+  #wirelog .wl-in { display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-top: 1px solid var(--wl-hair); background: rgba(214,92,255,.03); cursor: text; }
   #wirelog .wl-in.tr input { color: var(--c-mesh); } #wirelog .wl-in.tr .pr { color: var(--c-mesh); }
   #wirelog .ch-TRACE .ch { color: var(--c-mesh); } #wirelog .ch-TRACE .tx { color: #c9ffe2; }
   #wirelog .wl-in .pw { max-width: 52%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; color: var(--wl-dim); font-size: 9.5px; }
@@ -173,12 +173,12 @@ const WIRELOG = (() => {
     d.innerHTML = `<span class="ts">${esc(L.t)}</span><span class="ch">${L.ch === 'CMD' ? 'AGENT' : L.ch === 'OP' ? 'OPER' : L.ch === 'DOC' ? 'FILE' : esc(L.ch)}</span><span class="tx">${esc(L.x)}</span>`;
     return d;
   }
-  // the newest line sits just under the prompt; what one command prints stays together, top to bottom, in a block
+  // the newest line sits at the bottom, just above the prompt; what one command prints stays together in a block
   let grp = 0;
   function put(d, L){
     if (!bodyEl || view !== 'log') return;
-    if (L.g){ let b = bodyEl.querySelector('.wl-blk[data-g="' + L.g + '"]'); if (!b){ b = document.createElement('div'); b.className = 'wl-blk'; b.dataset.g = L.g; bodyEl.insertBefore(b, bodyEl.firstChild); } b.appendChild(d); }
-    else bodyEl.insertBefore(d, bodyEl.firstChild);
+    if (L.g){ let b = bodyEl.querySelector('.wl-blk[data-g="' + L.g + '"]'); if (!b){ b = document.createElement('div'); b.className = 'wl-blk'; b.dataset.g = L.g; bodyEl.appendChild(b); } b.appendChild(d); }
+    else bodyEl.appendChild(d);
     trim(); toTop();
   }
   const keep = L => { W.lines.push(L); while (W.lines.length > MAX_LINES) W.lines.shift(); save(); };
@@ -190,9 +190,9 @@ const WIRELOG = (() => {
     if (bodyEl && view === 'log'){ const d = lineEl(L); L.el = d; put(d, L); return d; }
     return null;
   }
-  function trim(){ if (!bodyEl) return; while (bodyEl.querySelectorAll('.wl-line').length > MAX_LINES){ const last = bodyEl.lastElementChild; if (!last) break;
-    if (last.classList.contains('wl-blk')){ if (last.firstElementChild) last.firstElementChild.remove(); if (!last.childElementCount) last.remove(); } else last.remove(); } }
-  function toTop(){ if (bodyEl && stick) bodyEl.scrollTop = 0; }
+  function trim(){ if (!bodyEl) return; while (bodyEl.querySelectorAll('.wl-line').length > MAX_LINES){ const first = bodyEl.firstElementChild; if (!first) break;
+    if (first.classList.contains('wl-blk')){ if (first.firstElementChild) first.firstElementChild.remove(); if (!first.childElementCount) first.remove(); } else first.remove(); } }
+  function toTop(){ if (bodyEl && stick) bodyEl.scrollTop = bodyEl.scrollHeight; }   // (to the newest: the bottom)
   function archive(title, kind, body){
     W.archive.push({ t: now(), title, kind, body }); while (W.archive.length > MAX_ARCHIVE) W.archive.shift(); save();
     const b = el && el.querySelector('#wlArc'); if (b){ b.textContent = 'ARC ' + W.archive.length; b.classList.remove('fresh'); void b.offsetWidth; b.classList.add('fresh'); }
@@ -652,12 +652,12 @@ const WIRELOG = (() => {
     el.innerHTML = `<div class="wl-agents" aria-hidden="true"></div><div class="wl-box">
       <header tabindex="0" role="button" aria-expanded="true" title="Open or fold the log"><span class="chev" aria-hidden="true">▾</span><span class="t"><span class="full">Transmission log</span><span class="short">Log</span></span><span class="r"><span class="live" aria-hidden="true"></span><span class="nd">NODE 07</span>
         <button type="button" id="wlArc" title="Saved events and pulled files">ARC 0</button></span></header>
-      <label class="wl-in"><span class="pw"></span><span class="pr">&gt;</span><span class="cur fk" aria-hidden="true"></span><input type="text" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Command line"></label>
       <div class="wl-body" role="log" aria-live="polite"></div>
+      <label class="wl-in"><span class="pw"></span><span class="pr">&gt;</span><span class="cur fk" aria-hidden="true"></span><input type="text" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Command line"></label>
       <div class="wl-foot"><span>RX <b id="wlRx">0</b> pkt/s</span><span>MESH <b id="wlMesh">A</b></span><span>LINES <b id="wlN">0</b>/${MAX_LINES}</span></div></div>`;
     document.body.appendChild(el);
     bodyEl = el.querySelector('.wl-body'); footEl = el.querySelector('.wl-foot'); agentsEl = el.querySelector('.wl-agents');
-    bodyEl.addEventListener('scroll', () => { stick = bodyEl.scrollTop < 6; });
+    bodyEl.addEventListener('scroll', () => { stick = bodyEl.scrollTop + bodyEl.clientHeight >= bodyEl.scrollHeight - 6; });
     bodyEl.addEventListener('click', e => { if (!e.target.closest('button')) fast = true; });   // a click hurries the swarm along
     el.querySelector('#wlArc').addEventListener('click', e => { e.stopPropagation(); el.querySelector('#wlArc').classList.remove('fresh'); if (el.classList.contains('collapsed')) setCollapsed(false); showView(view === 'log' ? 'arc' : 'log'); });
     const hd = el.querySelector('header'), fold = () => setCollapsed(!el.classList.contains('collapsed'));   // the whole header opens and folds it

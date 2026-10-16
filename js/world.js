@@ -2747,7 +2747,11 @@ function pickSlab(b, o, ox, oy, oz, ix, iy, iz, tMax){
   return t0 <= t1;
 }
 // the nearest drawn triangle of o's geometry along the ray, farther than tMin: { t, n } or null
-function pickTris(o, tMin, tMax){
+// (a plot's things out over the street, above the pavement, are looked through: a walkway, a pod's lift tower, a scaffold
+// leg, a sign hung out over the road. They belong to that plot but stand in front of, or beside, another building, and
+// clicking them used to build on the plot they belong to, behind what the pointer was on.)
+const PICK_OUT = SIDE/2 + .35;
+function pickTris(o, tMin, tMax, foot){
   const R = ray.ray, ox = R.origin.x, oy = R.origin.y, oz = R.origin.z, dx = R.direction.x, dy = R.direction.y, dz = R.direction.z;
   const ix = 1/(dx || 1e-12), iy = 1/(dy || 1e-12), iz = 1/(dz || 1e-12);
   let best = null, bt = tMax;
@@ -2768,6 +2772,7 @@ function pickTris(o, tMin, tMax){
         const inv = 1/det, tx = ox - ax, ty = oy - ay, tz = oz - az, uu = (tx*px + ty*py + tz*pz)*inv; if (uu < 0 || uu > 1) continue;
         const qx = ty*e1z - tz*e1y, qy = tz*e1x - tx*e1z, qz = tx*e1y - ty*e1x, v = (dx*qx + dy*qy + dz*qz)*inv; if (v < 0 || uu + v > 1) continue;
         const t = (e2x*qx + e2y*qy + e2z*qz)*inv; if (t <= tMin || t >= bt) continue;
+        if (foot && oy + dy*t > CURB + 2.4 && (Math.abs(ox + dx*t - foot.x) > PICK_OUT || Math.abs(oz + dz*t - foot.z) > PICK_OUT)) continue;
         bt = t; best = { t, nx: e1y*e2z - e1z*e2y, ny: e1z*e2x - e1x*e2z, nz: e1x*e2y - e1y*e2x };
       }
     }
@@ -2812,7 +2817,7 @@ function pickAt0(){
   for (const k of cand){
     if (best && k.d > best.t) break;
     const o = k.o, tMax = best ? best.t : Infinity;
-    if (o.data && o.data.geo){ const h = pickTris(o, 0, tMax); if (h) best = { t: h.t, n: h.n, o, isMega: k.isMega }; }
+    if (o.data && o.data.geo){ const h = pickTris(o, 0, tMax, k.isMega ? null : o); if (h) best = { t: h.t, n: h.n, o, isMega: k.isMega }; }
     else {   // the far fallback: what it drew, as a box
       const bb = pickBounds(o); let h = null;
       if (bb && !bb.isEmpty()) h = pickBox(bb.min.x, bb.min.y, bb.min.z, bb.max.x, bb.max.y, bb.max.z);
@@ -2934,9 +2939,10 @@ function targetOf(pk){
     if (ly !== null && ly < need) ly = null;
     if (ly !== null){ POD_HOLD = { key, ly }; return { type: 'side', c: n || null, i: c.i + a, j: c.j + b, y: ly, from: c }; }
   }
-  // nothing hangs here: at street level, the bare plot (or open sky) next door; otherwise nothing at all, rather than
-  // something away from the pointer (a wall facing a building used to stack onto that building)
-  if (pk.p.y < CURB + FH*2 && (!n || !n.sections.length)) return n ? { type: 'onto', c: n } : { type: 'empty', i: c.i + a, j: c.j + b };
+  // nothing hangs here: the pointer is on this building, so it's this building that grows, if its roof is close by (a low
+  // building, or near the top of a tall one); otherwise nothing, rather than something away from the pointer. (A low
+  // wall used to build on the plot next door, and a wall facing a building used to stack onto that building.)
+  if ((pk.kind === 'bld' || pk.kind === 'low') && (pk.p.y > top - FH*3 || top - (pk.kind === 'bld' && c.lift ? c.lift.y : CURB) < FH*4.5)) return pk.kind === 'bld' ? { type: 'up', c } : { type: 'onto', c };
   return null;
 }
 function applyTarget(t){

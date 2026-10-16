@@ -2892,9 +2892,12 @@ function pickClassify(h){
     const [a, b] = Math.abs(E.x - _box3.min.x) < e ? [-1, 0] : Math.abs(E.x - _box3.max.x) < e ? [1, 0] : Math.abs(E.z - _box3.min.z) < e ? [0, -1] : [0, 1];
     return { d: h.t, c, kind, p: new THREE.Vector3(c.x + a*SIDE/2, Math.max(base, Math.min(E.y, topY - .05)), c.z + b*SIDE/2) };
   }
-  // (the ray never comes into the column: something sticking out past it)
-  if (up && P.y >= topY - .3) return { d: h.t, c, kind, p: new THREE.Vector3(P.x, topY, P.z) };
-  const [a, b] = sideOf(c.x, c.z, false), y = Math.min(P.y, topY - .05);
+  // (the ray never comes into the column: something sticking out past it, or over its top edge)
+  if ((up && P.y >= topY - .3) || P.y >= topY - FH*.5) return { d: h.t, c, kind, p: new THREE.Vector3(P.x, topY, P.z) };
+  // a side the camera can see (two of the four face it): the one the hit is further out on. (Going by the way a ledge
+  // faced, or where it was, could pick a back side, and the pod went up behind the building.)
+  const rd = ray.ray.direction, sx = rd.x > 0 ? -1 : 1, sz = rd.z > 0 ? -1 : 1;
+  const [a, b] = (P.x - c.x)*sx >= (P.z - c.z)*sz ? [sx, 0] : [0, sz], y = Math.min(P.y, topY - .05);
   return { d: h.t, c, kind, p: new THREE.Vector3(c.x + a*SIDE/2, Math.max(base, y), c.z + b*SIDE/2) };
 }
 // turn a pick into a build target
@@ -2909,6 +2912,8 @@ function targetOf(pk){
     return pk.kind === 'gap' && pk.p.y > mid ? { type: 'podDown', c } : { type: 'belowUp', c };
   }
   const c = pk.c, top = pk.kind === 'plat' ? CURB : pk.kind === 'low' ? groundTop(c) : c.height;
+  // the pavement round a building (or a lamp or a bench at its foot): nothing. (It used to add a floor to the building's top.)
+  if (pk.kind === 'plat' && !c.mega && c.sections.length) return null;
   if (Math.abs(pk.p.y - top) < .03){
     if (c.mega){   // a megastructure's roof: another tier if it stacks, otherwise nothing builds there
       const m = megas.get(c.mega);
@@ -2939,10 +2944,11 @@ function targetOf(pk){
     if (ly !== null && ly < need) ly = null;
     if (ly !== null){ POD_HOLD = { key, ly }; return { type: 'side', c: n || null, i: c.i + a, j: c.j + b, y: ly, from: c }; }
   }
-  // nothing hangs here: the pointer is on this building, so it's this building that grows, if its roof is close by (a low
-  // building, or near the top of a tall one); otherwise nothing, rather than something away from the pointer. (A low
-  // wall used to build on the plot next door, and a wall facing a building used to stack onto that building.)
-  if ((pk.kind === 'bld' || pk.kind === 'low') && (pk.p.y > top - FH*3 || top - (pk.kind === 'bld' && c.lift ? c.lift.y : CURB) < FH*4.5)) return pk.kind === 'bld' ? { type: 'up', c } : { type: 'onto', c };
+  // nothing hangs here: near the top of the wall (its top floor and a half, and the upper half of a low building) it's this
+  // building that grows; lower down, nothing, rather than something away from the pointer. (A low wall used to build on
+  // the plot next door, and a wall facing a building used to stack onto that building.)
+  const base = pk.kind === 'bld' && c.lift ? c.lift.y : CURB;
+  if ((pk.kind === 'bld' || pk.kind === 'low') && pk.p.y > top - FH*1.5 && pk.p.y > base + (top - base)*.5) return pk.kind === 'bld' ? { type: 'up', c } : { type: 'onto', c };
   return null;
 }
 function applyTarget(t){

@@ -2839,12 +2839,17 @@ function pickAt0(){
   return { kind: 'sky', p, i: Math.round(p.x/LOT), j: Math.round(p.z/LOT) };
 }
 // a hit as the kinds targetOf reads
-let PICK_OUT = .1;   // (how far past the walls a hit must be to go by where it sticks out)
 function pickClassify(h){
   const P = ray.ray.origin.clone().addScaledVector(ray.ray.direction, h.t), N = h.n, up = N.y > .6;
-  const sideOf = (cx, cz) => { let a, b; const ex = Math.abs(P.x - cx) - SIDE/2, ez = Math.abs(P.z - cz) - SIDE/2;
-    // something sticking out past the walls (a blade sign, a balcony, an awning): the side it sticks out of, whichever way its own face turns
-    if (Math.max(ex, ez) > PICK_OUT) return ex > ez ? [Math.sign(P.x - cx), 0] : [0, Math.sign(P.z - cz)];
+  // which side a wall hit is on: where the ray enters the plot's footprint, stood up as a column (so the side is the face of
+  // the building the pointer is over on screen, whatever a sign, an eave or a balcony out on it faces); when the ray never
+  // enters it, the way the face turns, then where the hit is
+  const sideOf = (cx, cz, col = true) => {
+    if (col){ _box3.min.set(cx - SIDE/2, -1, cz - SIDE/2); _box3.max.set(cx + SIDE/2, 1e4, cz + SIDE/2);
+    if (!_box3.containsPoint(ray.ray.origin) && ray.ray.intersectBox(_box3, _hit)){
+      const e = 1e-3; if (Math.abs(_hit.x - _box3.min.x) < e) return [-1, 0]; if (Math.abs(_hit.x - _box3.max.x) < e) return [1, 0];
+      if (Math.abs(_hit.z - _box3.min.z) < e) return [0, -1]; if (Math.abs(_hit.z - _box3.max.z) < e) return [0, 1]; } }
+    let a, b;
     if (!up && Math.abs(N.y) < .9 && (Math.abs(N.x) > .3 || Math.abs(N.z) > .3)){ [a, b] = Math.abs(N.x) > Math.abs(N.z) ? [Math.sign(N.x), 0] : [0, Math.sign(N.z)]; }
     else { const dx = P.x - cx, dz = P.z - cz; [a, b] = Math.abs(dx) > Math.abs(dz) ? [Math.sign(dx) || 1, 0] : [0, Math.sign(dz) || 1]; } return [a, b]; };
   if (h.isMega){
@@ -2862,7 +2867,7 @@ function pickClassify(h){
     const q = cells.get(ckey(Math.round(P.x/LOT), Math.round(P.z/LOT))); if (q && !q.mega){ c = q; h = Object.assign({}, h, { o: q, slab: true, n: new THREE.Vector3(0, 1, 0) }); return { d: h.t, c, kind: 'plat', p: new THREE.Vector3(P.x, CURB, P.z) }; } }
   if (!h.slab && !h.gap && up && P.y < CURB + .3){ const q = cells.get(ckey(Math.round(P.x/LOT), Math.round(P.z/LOT))); if (q && !q.mega){ c = q; h = Object.assign({}, h, { o: q, slab: true }); } }
   if (h.slab || !c.sections.length){   // a lot with nothing built on it (or its slab): its top is the plot itself
-    if (h.slab && !up){ const [a, b] = sideOf(c.x, c.z); return { d: h.t, c, kind: 'plat', p: new THREE.Vector3(c.x + a*LOT/2, CURB - .2, c.z + b*LOT/2) }; }
+    if (h.slab && !up){ const [a, b] = sideOf(c.x, c.z, false); return { d: h.t, c, kind: 'plat', p: new THREE.Vector3(c.x + a*LOT/2, CURB - .2, c.z + b*LOT/2) }; }
     return { d: h.t, c, kind: 'plat', p: new THREE.Vector3(P.x, CURB, P.z) };
   }
   if (h.gap) return { d: h.t, c, kind: 'gap', p: P };

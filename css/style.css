@@ -315,9 +315,10 @@ body.deck-open:not(.watching) .mon-pins{right:304px}
 @media (max-width:700px){.ffbar{top:auto;bottom:calc(210px + env(safe-area-inset-bottom,0px))}}
 
 /* ---------- touch screens (js/touch.js sets html.touch where the main pointer is a finger) ---------- */
-.touchonly{display:none}
+.touchonly,.ctlpanel dl.touchonly{display:none}   /* (the panel's own list rule is more specific: the touch list showed on desktop) */
 html.touch .mouseonly,html.touch .kbonly{display:none}
 html.touch .touchonly{display:revert}
+html.touch .ctlpanel dl.touchonly{display:grid}
 html.touch .rot:not(.del){display:none}
 /* the dock: hint, then the menus and Controls, then the zones, all at the bottom */
 html.touch .zonebar{bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:6px;max-width:calc(100% - 16px)}

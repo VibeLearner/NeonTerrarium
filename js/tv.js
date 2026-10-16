@@ -74,12 +74,20 @@ const TV = (() => {
       staticOn('RECEIVING');
       const t0 = performance.now();
       const poll = () => { let ok = false; try { ok = !!(T.ready && T.ready()); } catch (e){}
-        if ((ok && performance.now() - t0 > 600) || performance.now() - t0 > 25000) setTimeout(T.on, 150); else setTimeout(poll, 120); };
+        if ((ok && performance.now() - t0 > 600) || performance.now() - t0 > 25000){ setTimeout(T.on, 150); try { if (typeof PERF !== 'undefined' && PERF.quiet) PERF.quiet(5000); } catch (e){} } else setTimeout(poll, 120); };
       poll();
       if (history.replaceState) history.replaceState(null, '', location.pathname + location.hash);   // (a reload is an ordinary one)
     };
     if (document.body) go(); else document.addEventListener('DOMContentLoaded', go);
   }
-  T.go = (url) => T.off(() => { location.href = url + (url.includes('?') ? '&' : '?') + 'tv=1'; });
+  // Leaving: let go of the WebGL contexts first. Otherwise the browser may keep this page frozen in memory (its back-forward
+  // cache) with all its graphics memory still held, while the next page builds its own: the sky city after a trip to the
+  // coast would share the graphics card with a frozen copy of itself and the coast.
+  function release(){ // (only the game's own view: asking an unused canvas for a context would make it a new one)
+    for (const c of document.querySelectorAll('canvas#view')){ let gl = null; try { gl = c.getContext('webgl2') || c.getContext('webgl'); } catch (e){}
+    const x = gl && gl.getExtension && gl.getExtension('WEBGL_lose_context'); if (x) try { x.loseContext(); } catch (e){} } }
+  T.go = (url) => T.off(() => { release(); location.href = url + (url.includes('?') ? '&' : '?') + 'tv=1'; });
+  // a page restored from that cache (the back button) has no graphics left: load it fresh
+  addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
   return T;
 })();

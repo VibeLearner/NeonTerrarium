@@ -1508,7 +1508,9 @@ function resize(){
 // own resolution: on a sharp laptop screen, zoomed out over a big city, four to nine times the pixels for every
 // post effect). PERF.grow is also lowered on its own while frames run slow, and raised again once they're quick (main.js).
 // Both are Settings, Render, "Optimize framerate": how far it grows (ZOOM_RES, below) and the automatic lowering (S.autoPerf).
-const PERF = { grow: Infinity, max: 1.6, ema: 16, t: 0, f: 1 };
+const PERF = { grow: Infinity, max: 1.6, ema: 16, t: 0, f: 1, quick: 0, quietUntil: 0,
+  // a moment that isn't the city's own doing (a panel opening, the Spire's curtain, a page arriving): frames in it aren't counted
+  quiet(ms){ this.quietUntil = Math.max(this.quietUntil, performance.now() + ms); this.t = 0; this.quick = 0; } };
 // Zoomed out, how far the render grows past the base (Settings, Optimize framerate, "Zoomed out"): 1 the same pixels at every zoom (a fixed render size: the
 // lightest, and the frame costs the same whatever the zoom; the detail levels in main.js simplify the fine pieces as the view pulls back), 1.6 up to 1.6 times
 // (the old "Cap zoom-out resolution"), 0 up to the screen's own resolution (the heaviest: on a sharp laptop screen four times the pixels of the base).

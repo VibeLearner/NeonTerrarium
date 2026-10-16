@@ -333,6 +333,7 @@ const OVERSEER = (() => {
     if (O.open || O.busy) return; O.busy = true; if (!built) build();
     if (typeof MON !== 'undefined' && MON.close) try { MON.close(); } catch (e){}
     if (typeof music !== 'undefined' && music.hold) music.hold(true);   // (the radio goes quiet while the view is up)
+    if (typeof PERF !== 'undefined') PERF.quiet(4000);
     const city = canvas; city.classList.add('ovs-glitch');
     const bars = document.createElement('div'); bars.id = 'ovsBars'; document.body.appendChild(bars);
     setTimeout(() => curtain(650, (c) => {
@@ -351,6 +352,7 @@ const OVERSEER = (() => {
   function close(){
     if (!O.open || O.busy) return; O.busy = true; O.hold = false;   // (the city draws again under the view as it leaves)
     if (typeof music !== 'undefined' && music.hold) music.hold(false);
+    if (typeof PERF !== 'undefined') PERF.quiet(2500);
     root.classList.add('leave'); setTimeout(() => { closeDesk(); root.remove(); root = null; O.busy = false; }, 520);
   }
   // no, the first time: the question folds away; the ledger stays, and the coast waits in its box at the side

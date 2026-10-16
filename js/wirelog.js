@@ -47,8 +47,8 @@ const WIRELOG = (() => {
   #wirelog .wl-foot b { color: var(--wl-txt); font-weight: 400; font-variant-numeric: tabular-nums; }
   /* room for it: beside the monitor or the settings when they're open; pinned people go under it */
   body.watching #wirelog { right: calc(16px + min(340px, 100vw - 32px) + 8px); }
-  body:has(#deck.open) #wirelog { right: 304px; }
-  body.watching:has(#deck.open) #wirelog { right: calc(304px + min(340px, 100vw - 32px) + 8px); }
+  body.deck-open #wirelog { right: 304px; }
+  body.watching.deck-open #wirelog { right: calc(304px + min(340px, 100vw - 32px) + 8px); }
   body.wl-on .mon-pins { top: calc(58px + var(--wl-h, 0px) + 8px + env(safe-area-inset-top,0px)); }
   @media (max-width: 700px) {
     #wirelog { width: calc(100vw - 32px); }
@@ -280,6 +280,7 @@ const WIRELOG = (() => {
     el.classList.toggle('collapsed', c); const hd = el.querySelector('header'); hd.setAttribute('aria-expanded', !c); hd.querySelector('.chev').textContent = c ? '▸' : '▾';
     if (!quiet) try { localStorage.setItem(COLLAPSE_KEY, c ? '1' : '0'); } catch (e) {}
     if (!c){ stick = true; toEnd(); }
+    if (!quiet && typeof PERF !== 'undefined' && PERF.quiet) PERF.quiet(1000);
   }
   const setTxt = (n, v) => { v = String(v); if (n && n.textContent !== v) n.textContent = v; };
   function foot(s){

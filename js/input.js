@@ -283,7 +283,8 @@ $('paint').checked = S.paint; $('paint').addEventListener('change', e => { S.pai
 $('rotBL').addEventListener('click', () => { yawT += PI/4; });
 $('rotBR').addEventListener('click', () => { yawT -= PI/4; });
 $('deckToggle').addEventListener('click', () => {
-  const open = $('deck').classList.toggle('open'); $('deckToggle').setAttribute('aria-expanded', open); $('deckToggle').textContent = open ? 'Close' : 'Settings';
+  const open = $('deck').classList.toggle('open'); document.body.classList.toggle('deck-open', open); $('deckToggle').setAttribute('aria-expanded', open); $('deckToggle').textContent = open ? 'Close' : 'Settings';
+  PERF.quiet(1500);   // (opening a panel isn't the city running slow)
 });
 
 /* ---------- the Buildings menu ---------- */

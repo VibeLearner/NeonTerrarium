@@ -2751,6 +2751,7 @@ function pickSlab(b, o, ox, oy, oz, ix, iy, iz, tMax){
 // leg, a sign hung out over the road. They belong to that plot but stand in front of, or beside, another building, and
 // clicking them used to build on the plot they belong to, behind what the pointer was on.)
 const PICK_OUT = SIDE/2 + .35;
+let PICK_ATT = Infinity;   // (the nearest of those the ray passed through, this pick)
 function pickTris(o, tMin, tMax, foot){
   const R = ray.ray, ox = R.origin.x, oy = R.origin.y, oz = R.origin.z, dx = R.direction.x, dy = R.direction.y, dz = R.direction.z;
   const ix = 1/(dx || 1e-12), iy = 1/(dy || 1e-12), iz = 1/(dz || 1e-12);
@@ -2772,7 +2773,7 @@ function pickTris(o, tMin, tMax, foot){
         const inv = 1/det, tx = ox - ax, ty = oy - ay, tz = oz - az, uu = (tx*px + ty*py + tz*pz)*inv; if (uu < 0 || uu > 1) continue;
         const qx = ty*e1z - tz*e1y, qy = tz*e1x - tx*e1z, qz = tx*e1y - ty*e1x, v = (dx*qx + dy*qy + dz*qz)*inv; if (v < 0 || uu + v > 1) continue;
         const t = (e2x*qx + e2y*qy + e2z*qz)*inv; if (t <= tMin || t >= bt) continue;
-        if (foot && oy + dy*t > CURB + 2.4 && (Math.abs(ox + dx*t - foot.x) > PICK_OUT || Math.abs(oz + dz*t - foot.z) > PICK_OUT)) continue;
+        if (foot && oy + dy*t > CURB + 2.4 && (Math.abs(ox + dx*t - foot.x) > PICK_OUT || Math.abs(oz + dz*t - foot.z) > PICK_OUT)){ if (t < PICK_ATT) PICK_ATT = t; continue; }
         bt = t; best = { t, nx: e1y*e2z - e1z*e2y, ny: e1z*e2x - e1x*e2z, nz: e1x*e2y - e1y*e2x };
       }
     }
@@ -2814,6 +2815,7 @@ function pickAt0(){
   for (const m of megas.values()) consider(m, true);
   cand.sort((a, b) => a.d - b.d);
   let best = null;   // { t, n, o, isMega, gap }
+  PICK_ATT = Infinity;
   for (const k of cand){
     if (best && k.d > best.t) break;
     const o = k.o, tMax = best ? best.t : Infinity;
@@ -2834,6 +2836,15 @@ function pickAt0(){
     if (c.lift && !c.mega && c.sections.length){ const gt = groundTop(c);
       h = pickBox(c.x - SIDE/2, gt, c.z - SIDE/2, c.x + SIDE/2, c.lift.y - .15, c.z + SIDE/2);
       if (h && (!best || h.t < best.t - 1e-4)) best = { t: h.t, n: h.n, o: c, gap: true }; }
+  }
+  // Looked through one of those things over the street: what's behind counts only if it's the building that thing stands
+  // against (its column within half a plot behind it). Otherwise nothing: through a walkway between two towers the ray
+  // used to reach a building or a plot well behind them, and that's where the pod or the floor went.
+  if (PICK_ATT < Infinity && (!best || PICK_ATT < best.t)){
+    const o = best && !best.slab && !best.gap && !best.isMega ? best.o : null;
+    if (!o || !o.sections || !o.sections.length) return null;
+    _box3.min.set(o.x - SIDE/2, -1, o.z - SIDE/2); _box3.max.set(o.x + SIDE/2, o.height, o.z + SIDE/2);
+    if (!ray.ray.intersectBox(_box3, _hit) || _hit.distanceTo(O) - PICK_ATT > LOT*.5) return null;
   }
   if (best) return pickClassify(best);
   // open sky: where the pointer ray crosses the platform height

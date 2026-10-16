@@ -1572,6 +1572,7 @@ function cellView(c){
     if (geo.userData.cut){ mesh.onBeforeRender = cutBefore; mesh.onAfterRender = cutAfter; const sm = sideMesh(mesh); sm.userData.cell = c; g.add(sm); }   // (and its walls: see sideArc)
   }
   world.add(freezeTree(g)); c.view = g;
+  pickBounds(c);   // (measured now, a plot at a time, rather than all at once on the first hover)
   markSolid(c);
 }
 // Where the pod's building meets the deck on the lift's side: a ray from the deck's edge in toward the building finds
@@ -2686,34 +2687,185 @@ function load(){
 }
 
 /* ---------- picking: what is under the pointer, and what a click there would do ---------- */
+// What you see is what you click. The pointer's ray is tested against the triangles each plot and megastructure
+// actually draws (balconies, signs, rooftop kit, the lot), nearest first, so nothing behind a building can be picked
+// through it and an overhang belongs to the building it hangs from. Plots far away whose detailed geometry has been
+// let go (the far tiers) fall back to a box the size of what they drew. The hit is then turned into the old kinds
+// (bld / low / gap / mega / plat, with a point on the box face or the roof) that targetOf reads: a roof or anything
+// on it is the top; a wall is that side, by the way the wall faces.
 const ray = new THREE.Raycaster(), _ndc = new THREE.Vector2(), _box3 = new THREE.Box3(), _hit = new THREE.Vector3();
+// the bounds of what a plot or megastructure draws (kept when its geometry goes, for the far fallback)
+function pickBounds(o){
+  const d = o.data;
+  if (d && d.geo){ if (!d._bb){ PICK_WARM.push(d); if (PICK_WARM.length === 1) pickIdle(pickWarm); const bb = new THREE.Box3(); for (const [, g] of d.geo){ if (!g.boundingBox) g.computeBoundingBox(); if (!g.boundingBox.isEmpty()) bb.union(g.boundingBox); } d._bb = bb; o._bb = bb.clone(); } return d._bb; }
+  return o._bb || null;
+}
+// A geometry's triangles in small groups, each with its own box (made the first time the pointer comes near it), so a
+// ray only tests the triangles of the groups it passes through: a ray skimming over the roofs tests almost none.
+const PICK_GROUP = 96;
+// made ahead in the browser's idle moments, a few geometries at a time, so the first hover over a part of the city isn't the one that pays
+const PICK_WARM = [];
+const pickIdle = f => window.requestIdleCallback ? requestIdleCallback(f, { timeout: 300 }) : setTimeout(f, 60);
+function pickWarm(dl){
+  const end = performance.now() + (dl && !dl.didTimeout && dl.timeRemaining ? Math.min(8, Math.max(2, dl.timeRemaining() - 1)) : 3);   // (a few ms at a time, never a hitch)
+  while (PICK_WARM.length && performance.now() < end){ const d = PICK_WARM[0]; if (!d || !d.geo){ PICK_WARM.shift(); continue; }
+    let left = false; for (const [, g] of d.geo){ if (g.userData._pick) continue; if (performance.now() >= end){ left = true; break; } pickIndex(g); }
+    if (!left) PICK_WARM.shift(); }
+  if (PICK_WARM.length) pickIdle(pickWarm);
+}
+function pickIndex(g){
+  let X = g.userData._pick; if (X) return X;
+  if (!g.boundingBox) g.computeBoundingBox();
+  const P = g.attributes.position.array, I = g.index ? g.index.array : null, total = I ? triIndexCount(g) : P.length/3, nt = Math.floor(total/3);
+  // triangles bucketed by height (half a unit a bucket), in one pass and a count: no sort (the geometry's own order keeps
+  // neighbours near each other within a bucket)
+  const yb = new Int32Array(nt), y0g = g.boundingBox ? g.boundingBox.min.y : -1;
+  let nb = 1;
+  for (let t = 0; t < nt; t++){ const k = t*3, a = (I ? I[k] : k)*3, b = (I ? I[k + 1] : k + 1)*3, c = (I ? I[k + 2] : k + 2)*3;
+    const q = Math.max(0, Math.floor(((P[a + 1] + P[b + 1] + P[c + 1])/3 - y0g)*2)); yb[t] = q; if (q + 1 > nb) nb = q + 1; }
+  const start = new Uint32Array(nb + 1); for (let t = 0; t < nt; t++) start[yb[t] + 1]++;
+  for (let q = 0; q < nb; q++) start[q + 1] += start[q];
+  const ord = new Uint32Array(nt); for (let t = 0; t < nt; t++) ord[start[yb[t]]++] = t;
+  const ng = Math.ceil(nt/PICK_GROUP), box = new Float32Array(ng*6);
+  for (let q = 0; q < ng; q++){ let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+    for (let u = q*PICK_GROUP; u < Math.min(nt, (q + 1)*PICK_GROUP); u++){ const k = ord[u]*3;
+      for (let e = 0; e < 3; e++){ const v = (I ? I[k + e] : k + e)*3; const x = P[v], y = P[v + 1], z = P[v + 2];
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; } }
+    box.set([x0, y0, z0, x1, y1, z1], q*6); }
+  X = g.userData._pick = { ord, box, ng, nt }; return X;
+}
+// does the ray pass through the box closer than tMax (slab test)
+function pickSlab(b, o, ox, oy, oz, ix, iy, iz, tMax){
+  let t0 = 0, t1 = tMax, ta, tb;
+  ta = (b[o] - ox)*ix; tb = (b[o + 3] - ox)*ix; if (ta > tb){ const s = ta; ta = tb; tb = s; } if (ta > t0) t0 = ta; if (tb < t1) t1 = tb; if (t0 > t1) return false;
+  ta = (b[o + 1] - oy)*iy; tb = (b[o + 4] - oy)*iy; if (ta > tb){ const s = ta; ta = tb; tb = s; } if (ta > t0) t0 = ta; if (tb < t1) t1 = tb; if (t0 > t1) return false;
+  ta = (b[o + 2] - oz)*iz; tb = (b[o + 5] - oz)*iz; if (ta > tb){ const s = ta; ta = tb; tb = s; } if (ta > t0) t0 = ta; if (tb < t1) t1 = tb;
+  return t0 <= t1;
+}
+// the nearest drawn triangle of o's geometry along the ray, farther than tMin: { t, n } or null
+function pickTris(o, tMin, tMax){
+  const R = ray.ray, ox = R.origin.x, oy = R.origin.y, oz = R.origin.z, dx = R.direction.x, dy = R.direction.y, dz = R.direction.z;
+  const ix = 1/(dx || 1e-12), iy = 1/(dy || 1e-12), iz = 1/(dz || 1e-12);
+  let best = null, bt = tMax;
+  for (const [, g] of o.data.geo){
+    if (!g.boundingBox) g.computeBoundingBox();
+    if (!R.intersectBox(g.boundingBox, _hit) || _hit.distanceTo(R.origin) > bt) continue;
+    const P = g.attributes.position.array, I = g.index ? g.index.array : null, X = pickIndex(g);
+    let n = I ? triIndexCount(g) : P.length/3; if (g.userData.shown !== undefined && !g.userData.full) n = Math.min(n, g.userData.shown);   // (the hidden faces aren't drawn)
+    for (let q = 0; q < X.ng; q++){
+      if (!pickSlab(X.box, q*6, ox, oy, oz, ix, iy, iz, bt)) continue;
+      for (let u = q*PICK_GROUP, ue = Math.min(X.nt, (q + 1)*PICK_GROUP); u < ue; u++){
+        const k = X.ord[u]*3; if (k + 2 >= n) continue;
+        const a = (I ? I[k] : k)*3, b = (I ? I[k + 1] : k + 1)*3, c = (I ? I[k + 2] : k + 2)*3;
+        const ax = P[a], ay = P[a + 1], az = P[a + 2];
+        const e1x = P[b] - ax, e1y = P[b + 1] - ay, e1z = P[b + 2] - az, e2x = P[c] - ax, e2y = P[c + 1] - ay, e2z = P[c + 2] - az;
+        const px = dy*e2z - dz*e2y, py = dz*e2x - dx*e2z, pz = dx*e2y - dy*e2x, det = e1x*px + e1y*py + e1z*pz;
+        if (det > -1e-9 && det < 1e-9) continue;
+        const inv = 1/det, tx = ox - ax, ty = oy - ay, tz = oz - az, uu = (tx*px + ty*py + tz*pz)*inv; if (uu < 0 || uu > 1) continue;
+        const qx = ty*e1z - tz*e1y, qy = tz*e1x - tx*e1z, qz = tx*e1y - ty*e1x, v = (dx*qx + dy*qy + dz*qz)*inv; if (v < 0 || uu + v > 1) continue;
+        const t = (e2x*qx + e2y*qy + e2z*qz)*inv; if (t <= tMin || t >= bt) continue;
+        bt = t; best = { t, nx: e1y*e2z - e1z*e2y, ny: e1z*e2x - e1x*e2z, nz: e1x*e2y - e1y*e2x };
+      }
+    }
+  }
+  if (!best) return null;
+  const l = Math.hypot(best.nx, best.ny, best.nz) || 1; let nx = best.nx/l, ny = best.ny/l, nz = best.nz/l;
+  if (nx*dx + ny*dy + nz*dz > 0){ nx = -nx; ny = -ny; nz = -nz; }   // (facing the camera)
+  return { t: best.t, n: new THREE.Vector3(nx, ny, nz) };
+}
+// the box the old picking used for a plot (the fallback, and the gap under a pod, which draws nothing)
+function pickBox(minx, miny, minz, maxx, maxy, maxz){
+  _box3.min.set(minx, miny, minz); _box3.max.set(maxx, maxy, maxz);
+  if (!ray.ray.intersectBox(_box3, _hit)) return null;
+  const p = _hit.clone(), e = 1e-3, n = new THREE.Vector3();
+  if (Math.abs(p.y - maxy) < e) n.set(0, 1, 0); else if (Math.abs(p.x - minx) < e) n.set(-1, 0, 0); else if (Math.abs(p.x - maxx) < e) n.set(1, 0, 0);
+  else if (Math.abs(p.z - minz) < e) n.set(0, 0, -1); else if (Math.abs(p.z - maxz) < e) n.set(0, 0, 1); else n.set(0, -1, 0);
+  return { t: p.distanceTo(ray.ray.origin), n, p };
+}
+let PICK_MEMO = null;
 function pickAt(cx, cy){
   const r = canvas.getBoundingClientRect();
   _ndc.set(((cx - r.left)/r.width)*2 - 1, -((cy - r.top)/r.height)*2 + 1);
   ray.setFromCamera(_ndc, cam);
-  let best = null;
-  const test = (c, kind) => {
-    if (!ray.ray.intersectBox(_box3, _hit)) return;
-    const d = _hit.distanceTo(ray.ray.origin);
-    if (!best || d < best.d) best = { d, c, kind, p: _hit.clone() };
+  // (the same pointer over the same, unchanged city: the same answer; pointer moves come faster than frames)
+  const key = cx + ',' + cy + ',' + cam.matrixWorld.elements.join(',') + ',' + SC_EDITS + ',' + cells.size + ',' + megas.size;
+  if (PICK_MEMO && PICK_MEMO.key === key) return PICK_MEMO.v;
+  const v = pickAt0(); PICK_MEMO = { key, v }; return v;
+}
+function pickAt0(){
+  const O = ray.ray.origin;
+  // what the ray could hit: each plot's and megastructure's drawn bounds, nearest first
+  const cand = [];
+  const consider = (o, isMega) => {
+    const bb = pickBounds(o);
+    if (bb && !bb.isEmpty()){ if (ray.ray.intersectBox(bb, _hit)) cand.push({ o, isMega, d: ray.ray.origin.distanceToSquared(_hit) < 1e-12 ? 0 : _hit.distanceTo(O) }); }
+    else cand.push({ o, isMega, d: 0, box: true });   // (nothing drawn to go by: the box test decides)
   };
-  for (const c of cells.values()){
-    if (c.mega){ _box3.min.set(c.x - LOT/2, CURB, c.z - LOT/2); _box3.max.set(c.x + LOT/2, c.height, c.z + LOT/2); test(c, 'mega'); }
-    else if (c.sections.length){ _box3.min.set(c.x - SIDE/2, c.lift ? c.lift.y - .15 : CURB, c.z - SIDE/2); _box3.max.set(c.x + SIDE/2, c.height, c.z + SIDE/2); test(c, 'bld');
-      if (c.lift){   // under a pod: the building on the ground (if any), and the gap up to the pod
-        const gt = groundTop(c);
-        if (gt > CURB){ _box3.min.set(c.x - SIDE/2, CURB, c.z - SIDE/2); _box3.max.set(c.x + SIDE/2, gt, c.z + SIDE/2); test(c, 'low'); }
-        _box3.min.set(c.x - SIDE/2, gt, c.z - SIDE/2); _box3.max.set(c.x + SIDE/2, c.lift.y - .15, c.z + SIDE/2); test(c, 'gap');
-      } }
-    _box3.min.set(c.x - LOT/2, -.8, c.z - LOT/2); _box3.max.set(c.x + LOT/2, CURB, c.z + LOT/2); test(c, 'plat');
+  for (const c of cells.values()) if (!c.mega) consider(c, false);
+  for (const m of megas.values()) consider(m, true);
+  cand.sort((a, b) => a.d - b.d);
+  let best = null;   // { t, n, o, isMega, gap }
+  for (const k of cand){
+    if (best && k.d > best.t) break;
+    const o = k.o, tMax = best ? best.t : Infinity;
+    if (o.data && o.data.geo){ const h = pickTris(o, 0, tMax); if (h) best = { t: h.t, n: h.n, o, isMega: k.isMega }; }
+    else {   // the far fallback: what it drew, as a box
+      const bb = pickBounds(o); let h = null;
+      if (bb && !bb.isEmpty()) h = pickBox(bb.min.x, bb.min.y, bb.min.z, bb.max.x, bb.max.y, bb.max.z);
+      else if (k.isMega){ const hx = o.w*LOT/2 - .4, hz = o.h*LOT/2 - .4; h = pickBox(o.x - hx, CURB, o.z - hz, o.x + hx, o.top || o.roofH || 2, o.z + hz); }
+      else if (o.sections.length) h = pickBox(o.x - SIDE/2, o.lift ? o.lift.y - .15 : CURB, o.z - SIDE/2, o.x + SIDE/2, o.height, o.z + SIDE/2);
+      else h = pickBox(o.x - LOT/2, -.8, o.z - LOT/2, o.x + LOT/2, CURB, o.z + LOT/2);
+      if (h && h.t < tMax) best = { t: h.t, n: h.n, o, isMega: k.isMega };
+    }
   }
-  if (best) return best;
+  // the platform under it all (the slab of every plot), and the open gap under a pod, which draws nothing but is a place to build
+  for (const c of cells.values()){
+    let h = pickBox(c.x - LOT/2, -.8, c.z - LOT/2, c.x + LOT/2, CURB, c.z + LOT/2);
+    if (h && (!best || h.t < best.t - 1e-4)) best = { t: h.t, n: h.n, o: c, slab: true };
+    if (c.lift && !c.mega && c.sections.length){ const gt = groundTop(c);
+      h = pickBox(c.x - SIDE/2, gt, c.z - SIDE/2, c.x + SIDE/2, c.lift.y - .15, c.z + SIDE/2);
+      if (h && (!best || h.t < best.t - 1e-4)) best = { t: h.t, n: h.n, o: c, gap: true }; }
+  }
+  if (best) return pickClassify(best);
   // open sky: where the pointer ray crosses the platform height
-  const o = ray.ray.origin, dir = ray.ray.direction;
+  const dir = ray.ray.direction;
   if (Math.abs(dir.y) < 1e-4) return null;
-  const t = (CURB - o.y)/dir.y; if (t < 0) return null;
-  const p = o.clone().addScaledVector(dir, t);
+  const t = (CURB - O.y)/dir.y; if (t < 0) return null;
+  const p = O.clone().addScaledVector(dir, t);
   return { kind: 'sky', p, i: Math.round(p.x/LOT), j: Math.round(p.z/LOT) };
+}
+// a hit as the kinds targetOf reads
+function pickClassify(h){
+  const P = ray.ray.origin.clone().addScaledVector(ray.ray.direction, h.t), N = h.n, up = N.y > .6;
+  const sideOf = (cx, cz) => { let a, b; if (!up && Math.abs(N.y) < .9 && (Math.abs(N.x) > .3 || Math.abs(N.z) > .3)){ [a, b] = Math.abs(N.x) > Math.abs(N.z) ? [Math.sign(N.x), 0] : [0, Math.sign(N.z)]; }
+    else { const dx = P.x - cx, dz = P.z - cz; [a, b] = Math.abs(dx) > Math.abs(dz) ? [Math.sign(dx) || 1, 0] : [0, Math.sign(dz) || 1]; } return [a, b]; };
+  if (h.isMega){
+    const m = h.o; let c = cells.get(ckey(Math.round(P.x/LOT), Math.round(P.z/LOT)));
+    if (!c || c.mega !== m.id) c = (m.cells || []).map(q => typeof q === 'string' ? cells.get(q) : q).find(q => q && q.mega === m.id) || [...cells.values()].find(q => q.mega === m.id);
+    if (!c) return null;
+    // its roof (or anything up there) is the top; a wall is a wall (targetOf builds nothing off a megastructure's side)
+    const top = up && (P.y >= c.height - 1.2 || P.y >= (m.top || Infinity) - 1.2);
+    return { d: h.t, c, kind: 'mega', p: top ? new THREE.Vector3(P.x, c.height, P.z) : new THREE.Vector3(P.x, Math.min(P.y, c.height - .2), P.z), wall: !top };
+  }
+  let c = h.o;
+  // the street level of a lot (its pavement, a lamp at its foot): the plot that ground belongs to, as its slab was
+  // (and street furniture out on the lot, beyond the building's own footprint and below a ground floor: a lamp, a bench, an awning's edge)
+  if (!h.slab && !h.gap && !up && c.sections && c.sections.length && P.y < CURB + 2.4 && (Math.abs(P.x - c.x) > SIDE/2 + .2 || Math.abs(P.z - c.z) > SIDE/2 + .2)){
+    const q = cells.get(ckey(Math.round(P.x/LOT), Math.round(P.z/LOT))); if (q && !q.mega){ c = q; h = Object.assign({}, h, { o: q, slab: true, n: new THREE.Vector3(0, 1, 0) }); return { d: h.t, c, kind: 'plat', p: new THREE.Vector3(P.x, CURB, P.z) }; } }
+  if (!h.slab && !h.gap && up && P.y < CURB + .3){ const q = cells.get(ckey(Math.round(P.x/LOT), Math.round(P.z/LOT))); if (q && !q.mega){ c = q; h = Object.assign({}, h, { o: q, slab: true }); } }
+  if (h.slab || !c.sections.length){   // a lot with nothing built on it (or its slab): its top is the plot itself
+    if (h.slab && !up){ const [a, b] = sideOf(c.x, c.z); return { d: h.t, c, kind: 'plat', p: new THREE.Vector3(c.x + a*LOT/2, CURB - .2, c.z + b*LOT/2) }; }
+    return { d: h.t, c, kind: 'plat', p: new THREE.Vector3(P.x, CURB, P.z) };
+  }
+  if (h.gap) return { d: h.t, c, kind: 'gap', p: P };
+  // a building: under a pod, its ground part; otherwise the building
+  let kind = 'bld', topY = c.height;
+  if (c.lift){ const gt = groundTop(c); if (P.y < gt - .01 && gt > CURB){ kind = 'low'; topY = gt; } else if (P.y < c.lift.y - .15) return { d: h.t, c, kind: 'gap', p: P }; }
+  // the roof, or anything standing on it (tanks, plants, antennas): the top
+  if ((up && P.y >= topY - FH*.6) || P.y >= topY + .02) return { d: h.t, c, kind, p: new THREE.Vector3(P.x, topY, P.z) };
+  // a wall (or a balcony, a sign, a ledge on it): that side, at the height the pointer is
+  const [a, b] = sideOf(c.x, c.z), y = Math.min(P.y, topY - .05);
+  return { d: h.t, c, kind, p: new THREE.Vector3(c.x + a*SIDE/2, Math.max(kind === 'low' ? CURB + .01 : (c.lift ? c.lift.y : CURB) + .01, y), c.z + b*SIDE/2) };
 }
 // turn a pick into a build target
 function targetOf(pk){
@@ -2734,6 +2886,8 @@ function targetOf(pk){
     return pk.kind === 'bld' ? { type: 'up', c } : { type: 'onto', c };
   }
   // a side face: build next door in that direction
+  if (c.mega) return null;   // (a megastructure's wall: nothing builds off it; its neighbours are clicked themselves)
+  if (!S.zone && pk.kind !== 'plat') return null;   // (no zone picked: a wall does nothing; it used to change the plot beside it)
   const dx = pk.p.x - c.x, dz = pk.p.z - c.z;
   const [a,b] = Math.abs(dx) > Math.abs(dz) ? [Math.sign(dx), 0] : [0, Math.sign(dz)];
   const n = cells.get(ckey(c.i + a, c.j + b));

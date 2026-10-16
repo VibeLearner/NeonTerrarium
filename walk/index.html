@@ -32,10 +32,12 @@ kbd{font:inherit;color:var(--ink);border:1px solid var(--line);padding:0 5px}
     <button type="button" data-look="dusk" aria-pressed="false">Dusk</button>
     <button type="button" data-look="night" aria-pressed="true">Night</button>
     <button type="button" id="rainBtn" aria-pressed="true">Rain</button>
+    <button type="button" data-turn="1" aria-label="Turn the view left">⟲ Q</button>
+    <button type="button" data-turn="-1" aria-label="Turn the view right">E ⟳</button>
   </div>
 </div>
 <div class="stage"><canvas id="view" width="1280" height="720" aria-label="Your block at street level, a person you can walk around"></canvas><p id="status">Loading</p></div>
-<div class="keys"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to walk</span><span><kbd>Shift</kbd> to run</span><span>Or hold the mouse or a finger where you want to go</span><span>720 lines · fixed camera, 32° down</span></div>
+<div class="keys"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to walk</span><span><kbd>Shift</kbd> to run</span><span><kbd>Q</kbd><kbd>E</kbd> to turn the view</span><span>Or hold the mouse or a finger where you want to go</span><span>720 lines · four fixed views, 32° down</span></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="tex.js"></script>
 <script src="detail.js"></script>

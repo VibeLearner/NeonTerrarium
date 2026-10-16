@@ -5,7 +5,10 @@
 // camera and the walker dissolves around them.
 'use strict';
 (async () => {
-  const RES = [1280, 720], ZOOM = 2.3, PITCH = 32*Math.PI/180, YAW = Math.PI/4, GROUND = .04;
+  const RES = [1280, 720], ZOOM = 2.3, PITCH = 32*Math.PI/180, GROUND = .04;
+  // four fixed views, a quarter turn apart (Q and E turn the camera)
+  let VIEW = 0; try { VIEW = (+(new URLSearchParams(location.search).get('view') || 0)) & 3; } catch (e) {}
+  let YAW = Math.PI/4 + VIEW*Math.PI/2;
   const cv = document.getElementById('view');
   const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: /still=/.test(location.search) });
   renderer.setPixelRatio(1); renderer.setSize(RES[0], RES[1], false);
@@ -25,7 +28,7 @@
   // ---- shared uniforms
   const camDirW = new THREE.Vector3(Math.sin(YAW)*Math.cos(PITCH), Math.sin(PITCH), Math.cos(YAW)*Math.cos(PITCH));
   const U = { uTime: { value: 0 }, uLights: { value: 0 }, uEmDay: { value: 0 }, uRain: { value: 0 }, uMirror: { value: 0 }, uGround: { value: GROUND },
-    uPlayer: { value: new THREE.Vector3() }, uPlayerY: { value: 0 }, uFadeR: { value: .9 }, uRes: { value: new THREE.Vector2(RES[0], RES[1]) }, uRefl: { value: null },
+    uPlayer: { value: new THREE.Vector3() }, uPlayerY: { value: 0 }, uPixOff: { value: new THREE.Vector2() }, uFadeR: { value: .9 }, uRes: { value: new THREE.Vector2(RES[0], RES[1]) }, uRefl: { value: null },
     uGrime: { value: TEX.grime }, uPuddle: { value: TEX.puddle }, uPaving: { value: TEX.paving }, uAsphalt: { value: TEX.asphalt },
     uAsph: { value: 110/TEX.asphalt.userData.n }, uPav: { value: TEXEL/TEX.paving.userData.n }, uPx: { value: 2*ZOOM/RES[1] },
     uCamDir: { value: camDirW }, uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color(1, 1, 1) }, uSky: { value: new THREE.Color(.6, .7, .9) }, uSunK: { value: 1 }, uPOM: { value: 1 } };
@@ -147,7 +150,7 @@
         .replace('#include <common>', `#include <common>
           varying float vOrd; varying vec3 vWPos; varying vec3 vWNrm; varying vec3 vView; varying vec3 vLp; varying vec3 vSz; varying float vGt;
           uniform sampler2D uTex, uGrime, uPuddle, uPaving, uAsphalt, uRefl; uniform float uScale, uTexN, uMix, uHasTex, uGrimeOn, uGroundCls, uEm, uWin, uNoFade, uCls, uAsph, uPav, uPx, uDepth, uRough, uMetal, uSunK, uPOM;
-          uniform float uTime, uLights, uEmDay, uRain, uMirror, uGround, uFadeR, uPlayerY; uniform vec3 uPlayer, uCamDir, uSunDir, uSunCol, uSky; uniform vec2 uRes;
+          uniform float uTime, uLights, uEmDay, uRain, uMirror, uGround, uFadeR, uPlayerY; uniform vec2 uPixOff; uniform vec3 uPlayer, uCamDir, uSunDir, uSunCol, uSky; uniform vec2 uRes;
           float bayer4(vec2 p){ vec2 q = mod(floor(p), 4.0); float i = q.x + q.y*4.;
             if (i < .5) return .03; if (i < 1.5) return .53; if (i < 2.5) return .16; if (i < 3.5) return .66; if (i < 4.5) return .78; if (i < 5.5) return .28; if (i < 6.5) return .91; if (i < 7.5) return .41;
             if (i < 8.5) return .22; if (i < 9.5) return .72; if (i < 10.5) return .09; if (i < 11.5) return .59; if (i < 12.5) return .97; if (i < 13.5) return .47; if (i < 14.5) return .84; return .34; }
@@ -158,7 +161,7 @@
           if (uNoFade < .5 && uMirror < .5){
             vec2 d = vView.xy - uPlayer.xy; float r = length(d*vec2(.8, 1.0));
             bool floorish = normalize(vWNrm).y > .6 && vWPos.y < uPlayerY + .55;   // (never the ground or a step he could stand on)
-            if (!floorish && vWPos.y > uPlayerY + .06 && vView.z > uPlayer.z + .35 && r < uFadeR){ float th = smoothstep(uFadeR, uFadeR*.55, r)*.92; if (bayer4(gl_FragCoord.xy) < th) discard; } }`)
+            if (!floorish && vWPos.y > uPlayerY + .06 && vView.z > uPlayer.z + .35 && r < uFadeR){ float th = smoothstep(uFadeR, uFadeR*.55, r)*.92; if (bayer4(gl_FragCoord.xy + uPixOff) < th) discard; } }`)
         .replace('#include <color_fragment>', '#include <color_fragment>\n' + (/dbg=2/.test(location.search) ? 'vec3 sN = normalize(vWNrm); bool sFlat = false; float sH = 1.; float sShadow = 0.; float sProcH = 1.; vec3 sTex = vec3(.5); bool sRoad = false;' : SURFACE + (/dbg=6/.test(location.search) ? 'diffuseColor.rgb = pow(sTex, vec3(2.2));' : /dbg=7/.test(location.search) ? 'diffuseColor.rgb = pow(diffuseColor.rgb*.8, vec3(2.2));' : /dbg=X/.test(location.search) ? DETAIL_MAIN.replace('// keep the colour', 'c = abs(c - cBase)*4.; // keep the colour') : /dbg=9/.test(location.search) ? DETAIL_MAIN.replace('else if (K == 1 || K == 2', 'else if (false && K == 1 || K == 2').replace('if (box){', 'if (box && false){') : /dbg=8/.test(location.search) ? DETAIL_MAIN.replace('// keep the colour', 'c = cBase; // keep the colour') : DETAIL_MAIN)) + `
           diffuseColor.rgb *= 1. - sShadow*.62*uSunK;
           float sWet = 0.;
@@ -242,7 +245,6 @@
 
   // ---- plants, laundry, signs
   say('Growing the plants');
-  PLANTS.build(meta);
   // plants must touch something: mark every 10 cm cell that holds a surface, then drop leaves, stems and flowers
   // with no surface within 30 cm (vines the game drew as flat sprites down the platform's edge hang in the air in 3D)
   { const r = .1, x0 = bounds.min.x - .5, y0 = bounds.min.y - .5, z0 = bounds.min.z - .5;
@@ -257,6 +259,21 @@
     const near = (x, y, z) => { const i = Math.floor((x - x0)/r), j = Math.floor((y - y0)/r), k = Math.floor((z - z0)/r);
       for (let dj = -3; dj <= 3; dj++) for (let dk = -3; dk <= 3; dk++) for (let di = -3; di <= 3; di++){ const I = i + di, J = j + dj, K = k + dk;
         if (I >= 0 && J >= 0 && K >= 0 && I < nx && J < ny && K < nz && occ[(J*nz + K)*nx + I]) return true; } return false; };
+    // the nearest surface to a point, within maxC cells (searched in growing shells)
+    const nearest = (x, y, z, maxC) => { const i = Math.floor((x - x0)/r), j = Math.floor((y - y0)/r), k = Math.floor((z - z0)/r);
+      for (let R = 1; R <= maxC; R++){ let best = null, bd = 1e9;
+        for (let dj = -R; dj <= R; dj++) for (let dk = -R; dk <= R; dk++) for (let di = -R; di <= R; di++){
+          if (Math.max(Math.abs(di), Math.abs(dj), Math.abs(dk)) !== R) continue; const I = i + di, J = j + dj, K = k + dk;
+          if (I < 0 || J < 0 || K < 0 || I >= nx || J >= ny || K >= nz || !occ[(J*nz + K)*nx + I]) continue;
+          const d = di*di + dj*dj + dk*dk; if (d < bd){ bd = d; best = [x0 + (I + .5)*r, y0 + (J + .5)*r, z0 + (K + .5)*r]; } }
+        if (best) return best; } return null; };
+    // a plant that floats is moved onto the nearest surface (up to 80 cm away); a hanging one only slides sideways, so its
+    // strands drape down the wall or the platform's edge; one with nothing near is left out
+    PLANTS.build(meta, (x, y, z, hang) => {
+      if (near(x, y, z)) return [x, y, z];
+      const p = nearest(x, y, z, 8); if (!p) return null;
+      if (hang){ const dx = p[0] - x, dz = p[2] - z, l = Math.hypot(dx, dz) || 1; return [p[0] - dx/l*.06, y, p[2] - dz/l*.06]; }
+      return [p[0], p[1] + .05, p[2]]; });
     PLANTS.prune(near); }
   world.add(PLANTS.meshes(mkMat));
 
@@ -334,11 +351,11 @@
   const rtMain = mkRT(true), rtRefl = mkRT(true); U.uRefl.value = rtRefl.texture;
   const blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1); blank.needsUpdate = true;
   const post = new THREE.ShaderMaterial({
-    uniforms: { tC: { value: rtMain.texture }, tD: { value: rtMain.depthTexture }, uRes: U.uRes, uTime: U.uTime, uRain: U.uRain, uSkyA: { value: new THREE.Color() }, uSkyB: { value: new THREE.Color() },
+    uniforms: { tC: { value: rtMain.texture }, tD: { value: rtMain.depthTexture }, uRes: U.uRes, uTime: U.uTime, uRain: U.uRain, uPixOff: { value: new THREE.Vector2() }, uSkyA: { value: new THREE.Color() }, uSkyB: { value: new THREE.Color() },
       uGrade: { value: new THREE.Vector3(1, 1, 1) }, uLine: { value: new THREE.Color(0x141420) }, uBloom: { value: .6 }, uNight: { value: 0 }, uHaze: { value: new THREE.Color() }, uExpo: { value: 1 } },
     vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = vec4(position.xy, 0., 1.); }',
     fragmentShader: `
-      uniform sampler2D tC, tD; uniform vec2 uRes; uniform float uTime, uRain, uBloom, uNight, uExpo; uniform vec3 uSkyA, uSkyB, uGrade, uLine, uHaze; varying vec2 vU;
+      uniform sampler2D tC, tD; uniform vec2 uRes, uPixOff; uniform float uTime, uRain, uBloom, uNight, uExpo; uniform vec3 uSkyA, uSkyB, uGrade, uLine, uHaze; varying vec2 vU;
       float D(vec2 o){ return texture2D(tD, vU + o/uRes).r; }
       float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)))*43758.5453); }
       vec3 bright(vec2 uv){ vec3 s = texture2D(tC, uv).rgb*uExpo; return max(s - .9, 0.); }
@@ -352,9 +369,9 @@
           c = mix(uSkyB, uSkyA, vU.y) + vec3(smoothstep(.62, .9, cl))*(1.0 - uNight)*.25;
         } else {
           c = texture2D(tC, vU).rgb;
-          // ambient occlusion from the depth around this pixel: corners, under ledges, behind clutter
+          // ambient occlusion from the depth around this pixel (its noise rides with the world, so it can't crawl): corners, under ledges, behind clutter
           float ao = 0.;
-          for (int i = 0; i < 16; i++){ float a = float(i)*2.39996 + h(vU*uRes)*6.28; float r = 1.5 + float(i)*1.1;
+          for (int i = 0; i < 16; i++){ float a = float(i)*2.39996 + h(floor(vU*uRes) + uPixOff)*6.28; float r = 1.5 + float(i)*1.1;
             float dd = D(vec2(cos(a), sin(a))*r) - d; ao += clamp(-dd*420., 0., 1.)*(1. - clamp(-dd*55., 0., 1.)); }
           ao /= 16.; c *= 1. - ao*.62;
           c = mix(c, uHaze, clamp((d - .45)*1.6, 0., 1.)*(.1 + uNight*.18));
@@ -374,7 +391,7 @@
         float lum = dot(c, vec3(.299, .587, .114)); c = mix(c, c*vec3(.9, .94, 1.1), (1. - smoothstep(.0, .4, lum))*.3); c = mix(c, c*vec3(1.06, 1.02, .93), smoothstep(.55, 1.0, lum)*.25);
         if (uRain > .01){ vec2 q = vU*uRes; q.x += q.y*.18; float col = floor(q.x/3.0); float ph = h(vec2(col, 1.0)); float y = fract((q.y/uRes.y)*6.0 + uTime*(2.4 + ph) + ph*7.0);
           float streak = step(.975, h(vec2(col, floor((q.y/uRes.y)*6.0 + uTime*(2.4 + ph) + ph*7.0)))) * smoothstep(.0, .25, y)*(1.0 - y); c = mix(c, vec3(.75, .8, 1.0), streak*.25*uRain); }
-        vec2 v = vU - .5; c *= 1.0 - dot(v, v)*.3; c += (h(vU*uRes + uTime) - .5)*.018;
+        vec2 v = vU - .5; c *= 1.0 - dot(v, v)*.3; c += (h(floor(vU*uRes) + uPixOff) - .5)*.012;
         gl_FragColor = vec4(c, 1.0);
       }`, depthTest: false, depthWrite: false });
   const postScene = new THREE.Scene(), postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -414,11 +431,21 @@
   addEventListener('blur', () => keys.clear());
   // touch / click: hold to walk toward the pointer
   let ptr = null; cv.addEventListener('pointerdown', e => { ptr = e; cv.setPointerCapture(e.pointerId); }); cv.addEventListener('pointermove', e => { if (ptr) ptr = e; }); cv.addEventListener('pointerup', () => ptr = null); cv.addEventListener('pointercancel', () => ptr = null);
-  const FW = new THREE.Vector3(-Math.sin(YAW), 0, -Math.cos(YAW)), RT = new THREE.Vector3(Math.cos(YAW), 0, -Math.sin(YAW));
+  const FW = new THREE.Vector3(), RT = new THREE.Vector3();
 
   // ---- the frame
   let last = performance.now(), phase = 0, face = Math.PI + YAW, moving = 0;
-  const camDir = new THREE.Vector3(Math.sin(YAW)*Math.cos(PITCH), Math.sin(PITCH), Math.cos(YAW)*Math.cos(PITCH));
+  const camDir = new THREE.Vector3();
+  function setView(k){
+    VIEW = ((k % 4) + 4) % 4; YAW = Math.PI/4 + VIEW*Math.PI/2;
+    camDir.set(Math.sin(YAW)*Math.cos(PITCH), Math.sin(PITCH), Math.cos(YAW)*Math.cos(PITCH)); camDirW.copy(camDir);
+    FW.set(-Math.sin(YAW), 0, -Math.cos(YAW)); RT.set(Math.cos(YAW), 0, -Math.sin(YAW));
+    world.traverse(o => { if (o.userData.billboard) o.rotation.y = YAW + (o.userData.back ? Math.PI : 0); });
+    document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.view === VIEW)));
+  }
+  setView(VIEW);
+  addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k === 'q') setView(VIEW + 1); else if (k === 'e') setView(VIEW - 1); });
+  document.querySelectorAll('[data-turn]').forEach(b => b.addEventListener('click', () => setView(VIEW + +b.dataset.turn)));
   const _v = new THREE.Vector3();
   let STILL = 0; try { STILL = +(new URLSearchParams(location.search).get('still') || 0); } catch (e) {}
   let nFrames = 0;
@@ -448,6 +475,7 @@
     const px = 2*ZOOM/RES[1], a = Math.round(tgt.dot(right)/px)*px, b = Math.round(tgt.dot(up)/px)*px, cdist = tgt.dot(camDir);
     const snapped = new THREE.Vector3().addScaledVector(right, a).addScaledVector(up, b).addScaledVector(camDir, cdist);
     cam.position.copy(snapped).addScaledVector(camDir, 60); cam.lookAt(snapped); cam.updateMatrixWorld();
+    U.uPixOff.value.set(Math.round(a/px), -Math.round(b/px)); post.uniforms.uPixOff.value.copy(U.uPixOff.value);
     const pv = new THREE.Vector3(P.x, P.y + .3, P.z).applyMatrix4(cam.matrixWorldInverse); U.uPlayer.value.copy(pv); U.uPlayerY.value = P.y;
     // steam
     for (let s = 0; s < steam.length; s++) for (let k = 0; k < 14; k++){ const i = s*14 + k; puffT[i] += dt; if (puffT[i] > 3) puffT[i] -= 3; const t = puffT[i]/3; puffPos[i*3] = steam[s].x + Math.sin(i*1.7 + t*3)*.06*t; puffPos[i*3 + 1] = steam[s].y + t*.9; puffPos[i*3 + 2] = steam[s].z + Math.cos(i*2.3)*.05*t; puffA[i] = Math.sin(t*Math.PI); }

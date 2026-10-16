@@ -146,7 +146,7 @@ const PLANTS = (() => {
   const signs = [];
 
   // ---- build from the export ----
-  function build(meta){
+  function build(meta, snap){
     LINES = meta.lines || [];
     const PX = meta.PX, out = { };
     const seen = new Set();
@@ -157,16 +157,22 @@ const PLANTS = (() => {
         const key = kind + (x*50 | 0) + ',' + (y*50 | 0) + ',' + (z*50 | 0); if (seen.has(key)) continue; seen.add(key);   // (the crossed pairs: one plant)
         const w = sz[0]/PX*sx, h = sz[1]/PX*sy;
         const base = an === 1 ? y - h : an === .5 || (an > .2 && an < .8) ? y - h*an : y;   // the bottom of the sprite
+        seed = ((Math.round(x*97)*73856093) ^ (Math.round(y*97)*19349663) ^ (Math.round(z*97)*83492791) ^ kind.length*2654435761) | 0;   // each plant grows from its own spot: the same every time, never like its neighbour
+        let x_ = x, z_ = z, base_ = base;
+        if (snap && !/^(l_|sign_|glyph_)/.test(kind)){
+          const hang = /^(h_|w_)/.test(kind) || an === 1 || kind === 'vines' || kind === 'pothos';
+          const p = snap(x, base + h*.5, z, hang); if (!p) continue;
+          x_ = p[0]; z_ = p[2]; base_ = p[1] - h*.5; }
         if (/^l_/.test(kind)) laundry(kind, x, an === 1 ? y : base + h, z, yaw, sy);
         else if (/^(sign_|glyph_)/.test(kind)) signs.push({ kind, x, y: base + h/2, z, w, h, yaw, wpx: sz[0], hpx: sz[1], fixed });
-        else if (kind === 'succulent') succulent(x, base, z, w);
-        else if (/fern/.test(kind)) fern(x, base, z, w, h);
-        else if (kind === 'bonsai') bonsai(x, base, z, w, h);
-        else if (kind === 'bamboo') bamboo(x, base, z, w, h);
-        else if (/^(h_|w_)/.test(kind) || an === 1) hanging(x, base + h, z, w, h, yaw, kind === 'h_heart' || kind === 'pothos');
-        else if (kind === 'vines' || kind === 'pothos') hanging(x, base + h, z, w*.6, h, yaw, kind === 'pothos');
-        else if (kind === 'bushFlower' || kind === 'g_flowers') bush(x, base, z, w, h, true);
-        else bush(x, base, z, w, h);
+        else if (kind === 'succulent') succulent(x_, base_, z_, w);
+        else if (/fern/.test(kind)) fern(x_, base_, z_, w, h);
+        else if (kind === 'bonsai') bonsai(x_, base_, z_, w, h);
+        else if (kind === 'bamboo') bamboo(x_, base_, z_, w, h);
+        else if (/^(h_|w_)/.test(kind) || an === 1) hanging(x_, base_ + h, z_, w, h, yaw, kind === 'h_heart' || kind === 'pothos');
+        else if (kind === 'vines' || kind === 'pothos') hanging(x_, base_ + h, z_, w*.6, h, yaw, kind === 'pothos');
+        else if (kind === 'bushFlower' || kind === 'g_flowers') bush(x_, base_, z_, w, h, true);
+        else bush(x_, base_, z_, w, h);
       }
     }
     return out;
@@ -194,8 +200,8 @@ const PLANTS = (() => {
       const { c, col } = signCanvas(s.kind, s.wpx, s.hpx), t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.encoding = THREE.sRGBEncoding;
       const m = new THREE.MeshBasicMaterial({ map: t, toneMapped: false, color: new THREE.Color(2.2, 2.2, 2.2) });
       const q = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h), m);
-      q.position.set(s.x, s.y, s.z); q.rotation.y = s.fixed ? s.yaw : Math.PI/4; q.userData.sign = col; group.add(q);
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h), new THREE.MeshBasicMaterial({ color: 0x120c1c })); back.position.copy(q.position); back.rotation.y = q.rotation.y + Math.PI; group.add(back);
+      q.position.set(s.x, s.y, s.z); q.rotation.y = s.fixed ? s.yaw : Math.PI/4; q.userData.sign = col; q.userData.billboard = !s.fixed; group.add(q);
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h), new THREE.MeshBasicMaterial({ color: 0x120c1c })); back.position.copy(q.position); back.rotation.y = q.rotation.y + Math.PI; back.userData.billboard = !s.fixed; back.userData.back = true; group.add(back);
     }
     return group;
   }

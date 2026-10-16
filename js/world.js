@@ -950,13 +950,17 @@ function* stackRunGen(c, secs, y, tag, first){
 /* ---------- side pods: a building hung off the side of a taller one ---------- */
 const LIFT_MIN = .9;   // the lowest a pod hangs (deck height above the street): room for people to walk under
 // the deck height for a click at height y on the side of building c: snapped to a floor, with the pod's top no higher than c's roof
-function liftSnap(c, y){
-  // the section the pointer is on: a pod lines up with that section's floor (its deck on the top of the one below);
-  // on the bottom section, with the floor the pointer is on, as long as it's above the ground floor
+function liftSnap(c, y, y0){
+  // the floor the pointer is on: a pod's deck lines up with that floor of the section under the pointer (counted up from
+  // the section's own base), so it hangs where the pointer is, however tall the section. (It used to snap to the bottom of
+  // the section, which on a tall tower could be eight floors under the pointer.)
   const tops = c.sectionTops || [];
   let k = tops.findIndex(t => y < t); if (k < 0) k = tops.length - 1;
-  let ly = k >= 1 ? tops[k - 1] : CURB + Math.max(1, Math.floor((y - CURB)/FH))*FH;
-  if (ly < CURB + LIFT_MIN) return null;
+  const base = k >= 1 ? tops[k - 1] + .1 : (y0 ?? CURB), top = k >= 0 ? tops[k] : c.height;
+  let ly = base + Math.max(0, Math.floor((y - base)/FH))*FH;
+  if (k >= 0 && ly > top - FH*.5) ly = Math.max(base, ly - FH);   // (a sliver of a floor at a section's top: the floor under it)
+  if (ly < CURB + LIFT_MIN) ly = CURB + FH;   // (the ground floor: the floor above it, a pod needs room under it)
+  if (y < CURB + LIFT_MIN) return null;
   if (ly > c.height - .5) ly = c.height - .5;
   return ly;
 }
@@ -2835,9 +2839,13 @@ function pickAt0(){
   return { kind: 'sky', p, i: Math.round(p.x/LOT), j: Math.round(p.z/LOT) };
 }
 // a hit as the kinds targetOf reads
+let PICK_OUT = .1;   // (how far past the walls a hit must be to go by where it sticks out)
 function pickClassify(h){
   const P = ray.ray.origin.clone().addScaledVector(ray.ray.direction, h.t), N = h.n, up = N.y > .6;
-  const sideOf = (cx, cz) => { let a, b; if (!up && Math.abs(N.y) < .9 && (Math.abs(N.x) > .3 || Math.abs(N.z) > .3)){ [a, b] = Math.abs(N.x) > Math.abs(N.z) ? [Math.sign(N.x), 0] : [0, Math.sign(N.z)]; }
+  const sideOf = (cx, cz) => { let a, b; const ex = Math.abs(P.x - cx) - SIDE/2, ez = Math.abs(P.z - cz) - SIDE/2;
+    // something sticking out past the walls (a blade sign, a balcony, an awning): the side it sticks out of, whichever way its own face turns
+    if (Math.max(ex, ez) > PICK_OUT) return ex > ez ? [Math.sign(P.x - cx), 0] : [0, Math.sign(P.z - cz)];
+    if (!up && Math.abs(N.y) < .9 && (Math.abs(N.x) > .3 || Math.abs(N.z) > .3)){ [a, b] = Math.abs(N.x) > Math.abs(N.z) ? [Math.sign(N.x), 0] : [0, Math.sign(N.z)]; }
     else { const dx = P.x - cx, dz = P.z - cz; [a, b] = Math.abs(dx) > Math.abs(dz) ? [Math.sign(dx) || 1, 0] : [0, Math.sign(dz) || 1]; } return [a, b]; };
   if (h.isMega){
     const m = h.o; let c = cells.get(ckey(Math.round(P.x/LOT), Math.round(P.z/LOT)));
@@ -2899,14 +2907,21 @@ function targetOf(pk){
   const shorter = n && n.sections.length && !n.lift && !n.mega;
   if ((S.zone === 'low' || S.zone === 'mid' || S.zone === 'ind' || S.zone === 'high') && (pk.kind === 'bld' || pk.kind === 'low') && !c.mega && (n ? !n.sections.length || shorter : inGrid) && pk.p.y > CURB + FH){
     const host = pk.kind === 'low' ? { sectionTops: c.belowTops, height: groundTop(c) } : c;
-    let ly = liftSnap(host, pk.p.y);
+    const y0 = pk.kind === 'low' || !c.lift ? CURB : c.lift.y;
+    let ly = liftSnap(host, pk.p.y, y0);
     if (ly !== null && shorter && ly < n.height + FH - .05){   // too low over the shorter building: the first floor of the tall one that clears it
-      const need = n.height + FH - .05, cand = (host.sectionTops || []).concat([...Array(40)].map((_, q) => CURB + (q + 1)*FH)).filter(v => v >= need && v <= host.height - .5).sort((a, b) => a - b);
-      ly = cand.length ? cand[0] : null;
+      const need = n.height + FH - .05; ly = liftSnap(host, need + .01, y0);
+      while (ly !== null && ly < need) ly += FH;
+      if (ly !== null && ly > host.height - .5) ly = null;
     }
     if (ly !== null) return { type: 'side', c: n || null, i: c.i + a, j: c.j + b, y: ly, from: c };
   }
-  return n ? { type: 'onto', c: n } : { type: 'empty', i: c.i + a, j: c.j + b };
+  // nothing hangs here: the plot next door, if what's built there (or its ground, if it's bare) is by the pointer.
+  // (A wall facing a taller building or a pod used to stack onto that, far from the pointer: now it does nothing.)
+  if (!n) return pk.p.y < CURB + FH*2 ? { type: 'empty', i: c.i + a, j: c.j + b } : null;
+  if (!n.sections.length) return pk.p.y < CURB + FH*2 ? { type: 'onto', c: n } : null;
+  if (!n.lift && Math.abs(pk.p.y - n.height) < FH*1.5) return { type: 'onto', c: n };
+  return null;
 }
 function applyTarget(t){
   if (!t) return null;

@@ -1410,14 +1410,23 @@ function podBrackets(c, y0){
   box(M.metalDark, F, rnd(-.5, .5), y0 - .38, rnd(-.6, .3), .1, .06, .1); glow(F, 0, y0 - .45, -.2, 'warm', .6);
   for (let k = 0; k < irand(1, 2); k++){ const x = rnd(-1, 1); sagCable(F, x, y0 - .25, rnd(-1, .5), x + rnd(-.3, .3), y0 - rnd(.6, 1.2), rnd(-1, .5), rnd(.1, .3)); }
   if (chance(.6)) plant(pick(['fern', 'succulent', 'bush']), F, gx + .3, y0 + .02, rnd(1.4, W - .3), rnd(.5, .7));
-  // the buildings beside it (left and right, across the street): a beam over to each one that rises past the deck
-  for (const sx of [-1, 1]){
-    const n = cells.get(ckey(c.i + sx*(-b), c.j + sx*a));
-    if (!n || n.mega || !n.sections.length || n.height < y0 + .4 || (n.lift && n.lift.y > y0 - .3)) continue;
-    const m = steel(), zz = rnd(-.5, .3);
-    box(m, F, sx*(1.2 + (W - 1.2)/2), y0 - .2, zz, W - 1.2 + .1, .12, .1);
-    box(M.metalDark, F, sx*W, y0 - .2, zz, .04, .28, .22);
-    strut(m, F, sx*W, y0 - rnd(1.2, 1.5), zz, sx*1.2, y0 - .26, zz, .03);
+  // the buildings round it on its other three sides (left, right and across the street from the wall it hangs off): any
+  // that reaches the deck gets beams over to its wall with a strut under each, and a gangway with a door frame when its
+  // wall rises well past the deck (so a pod hung in the gap between two buildings ties into both, and a building put up
+  // next to a pod later ties in too: a change next door rebuilds the pod, see refreshTodo)
+  for (const [sx, sz, ang] of [[-1, 0, -PI/2], [1, 0, PI/2], [0, -1, PI]]){
+    const n = cells.get(ckey(c.i + sx*(-b) - sz*a, c.j + sx*a - sz*b));
+    if (!n || n.mega || !n.sections.length || n.height < y0 - .05 || (n.lift && n.lift.y > y0 + .3)) continue;
+    const G = under(F, T(0, 0, 0, ang)), m = steel();   // (local +z: toward that building)
+    for (const bx of [-.75, .75]){
+      box(m, G, bx, y0 - .2, (W + 1.18)/2, .1, .12, W - 1.18 + .1); box(M.metalDark, G, bx, y0 - .2, W - .02, .22, .28, .04);
+      const yl = y0 - rnd(1.1, 1.5); strut(m, G, bx, yl, W, bx, y0 - .26, 1.25, .03); box(M.metalDark, G, bx, yl, W - .02, .18, .18, .04);
+    }
+    if (n.height >= y0 + 1.1){
+      for (let z = 1.2; z < W; z += .14) box(pick([M.wood, M.crate]), G, 0, y0 - .03, z + .06, .8, .05, .12);
+      for (const ex of [-.39, .39]) box(M.frame, G, ex, y0 + .5, (1.2 + W)/2, .03, .03, W - 1.2);
+      box(M.metalDark, G, 0, y0 + .5, W + .02, .66, 1.0, .06); box(pick([M.rust, M.wood]), G, 0, y0 + .45, W - .02, .48, .88, .03);
+    }
   }
 }
 function liftScaffold(c, y0){
@@ -2516,22 +2525,27 @@ function addPodDown(c, zone){
   maybeSpawnMegas(c); return c;
 }
 // a building on the ground under a pod (or a section more on it): if it reaches up to the pod, the two become one
-function addBelowUp(c, zone){
+function addBelowUp(c, zone, opt = {}){   // (opt.mf: how many floors, picked with Shift; a floor's gap is always left)
   if (!c.lift) return null;
   if ((c.below || []).length >= MAX_SECTIONS) return null;
   finishAnimsOn(c); holdRegion(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   const y0 = groundTop(c), deck = c.below && c.below.length ? .1 : 0, gapF = Math.floor((c.lift.y - y0 - deck + .02)/FH);   // whole floors of room (a section on another stands on a thin deck)
+  const keep = c.lift.v === 2 || opt.mf;   // (a bracketed pod, or a picked height: never merged, a floor's gap at least)
+  if (keep && gapF < 2) return null;
   const sec = { zone, seed: (Math.random()*1e9)|0, style: styleNow(), mf: Math.max(1, gapF >= 2 ? gapF - 1 : gapF) };
+  if (opt.mf) sec.mf = Math.min(opt.mf, gapF - 1);
+  else if (c.lift.v === 2) sec.mf = 1 + Math.floor(Math.random()*(gapF - 1));   // (a random height, under the gap)
   (c.below = c.below || []).push(sec);
   // build it; if it still reaches into the gap (a section under it can be re-rolled taller), try it a floor or two shorter
   for (let tries = 0; tries < 4; tries++){
     rebuildCell(c); disposeData(c.data); c.data = null;
-    const over = c.belowTop - (c.lift.y - GAP_MERGE);
+    const over = c.belowTop - (c.lift.y - (keep ? FH - .05 : GAP_MERGE));
     if (gapF < 2 || over <= 0 || sec.mf <= 1) break;
     sec.mf = Math.max(1, sec.mf - Math.ceil(over/FH));
   }
-  if (gapF < 2 || c.belowTop > c.lift.y - GAP_MERGE) mergePod(c);
+  if (keep){ if (c.belowTop > c.lift.y - FH + .05){ c.below.pop(); if (!c.below.length) c.below = null; rebuildCell(c); disposeData(c.data); c.data = null; } }   // (still too tall: not built)
+  else if (gapF < 2 || c.belowTop > c.lift.y - GAP_MERGE) mergePod(c);
   refresh([c]); dropView(old);
   startAnim(c, 'build', y0 - .05, c.height + 1.2, zone, SIDE, null);
   maybeSpawnMegas(c); return c;
@@ -2987,8 +3001,8 @@ function targetOf(pk){
   if (pk.kind === 'sky') return cells.has(ckey(pk.i, pk.j)) ? null : { type: 'empty', i: pk.i, j: pk.j };
   // under a pod: the top part of the gap grows the pod down; the bottom part, the ground and the roof of the building
   // under it build up from the ground
-  // (a bracketed side pod: nothing under it builds; its brackets and the open street below do nothing)
-  if (pk.c && pk.c.lift && pk.c.lift.v === 2 && (pk.kind === 'gap' || pk.kind === 'plat')) return null;
+  // (a bracketed side pod: its brackets do nothing; the ground under it builds a building there, a floor's gap kept)
+  if (pk.c && pk.c.lift && pk.c.lift.v === 2 && pk.kind === 'gap') return null;
   if (pk.c && pk.c.lift && !pk.c.mega && (pk.kind === 'gap' || pk.kind === 'plat' || (pk.kind === 'low' && Math.abs(pk.p.y - groundTop(pk.c)) < .03))){
     const c = pk.c, gt = groundTop(c), mid = (gt + c.lift.y)/2;
     return pk.kind === 'gap' && pk.p.y > mid ? { type: 'podDown', c } : { type: 'belowUp', c };

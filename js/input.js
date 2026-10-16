@@ -79,6 +79,13 @@ function hlScreenY(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), 
 function hlStart(){
   if (S.zone !== 'low' || !ptrLast || hwMode || mtMode || delMode || megaPick) return;
   const t = targetOf(pickAt(ptrLast.x, ptrLast.y)); if (!t) return;
+  // under a pod: pick how many floors the building under it is (a floor's gap always left under the pod)
+  if (t.type === 'belowUp' && t.c && t.c.lift){
+    const c = t.c, base = groundTop(c), deck = c.below && c.below.length ? .1 : 0, max = Math.floor((c.lift.y - base - deck + .02)/FH) - 1;
+    if (max < 1) return;
+    HL = { t, c, i: c.i, j: c.j, x: c.x, z: c.z, base: base + deck, under: true, max, sy: ptrLast.y, pxF: Math.max(4, hlScreenY(c.x, base, c.z) - hlScreenY(c.x, base + FH, c.z)), floors: 1 };
+    hlMove(ptrLast.x, ptrLast.y); return;
+  }
   let c = null, i, j;
   if (t.type === 'empty'){ i = t.i; j = t.j; }
   else if ((t.type === 'up' || t.type === 'onto') && t.c && !t.c.mega && !(t.type === 'onto' && t.c.sections.length)){ c = t.c; i = c.i; j = c.j; }
@@ -91,6 +98,13 @@ function hlStart(){
 function hlStop(){ HL = null; hlTip.style.display = 'none'; hover.visible = hoverFill.visible = hoverStrip.visible = false; }
 function hlMove(px, py){
   if (!HL) return;
+  if (HL.under){
+    HL.floors = clamp(1 + Math.round((HL.sy - py)/HL.pxF), 1, HL.max);
+    hoverMat.color.set(ZONES.low.col); hoverStrip.visible = false; hoverFill.visible = false;
+    hover.position.set(HL.x, HL.base + HL.floors*FH/2, HL.z); hover.scale.set(SIDE, HL.floors*FH, SIDE); hover.visible = true;
+    hlTip.textContent = HL.floors + ' floor' + (HL.floors > 1 ? 's' : '') + ' under the pod (up to ' + HL.max + ') · click to build';
+    hlTip.style.left = px + 'px'; hlTip.style.top = py + 'px'; hlTip.style.display = 'block'; return;
+  }
   HL.floors = HL.canRaise ? clamp(Math.round((HL.sy - py)/HL.pxF), 0, 40) : 0;
   const y = HL.base + HL.floors*FH;
   hoverMat.color.set(ZONES.low.col); hoverStrip.visible = false;
@@ -101,6 +115,7 @@ function hlMove(px, py){
 }
 function hlBuild(){
   const H0 = HL; hlStop(); if (!H0 || S.zone !== 'low') return;
+  if (H0.under){ addBelowUp(H0.c, 'low', { mf: H0.floors }); return; }
   if (!H0.floors){ applyTarget(H0.t); return; }
   let c = H0.c || cells.get(ckey(H0.i, H0.j)) || addPlatform(H0.i, H0.j, null); if (!c) return;
   finishAnimsOn(c); addLift(c, H0.base + H0.floors*FH, 'low');

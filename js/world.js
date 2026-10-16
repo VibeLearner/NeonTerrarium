@@ -899,7 +899,7 @@ function* buildStackGen(c){
   const y = yield* stackRunGen(c, c.sections, c.lift ? c.lift.y : CURB, '', !c.belowTop);   // a side pod's stack starts up in the air, on its scaffold
   c.height = y;
   c.walks = null; c.liftCab = null;
-  if (c.lift) liftScaffold(c, c.lift.y);
+  if (c.lift) (c.lift.v === 2 ? podBrackets(c, c.lift.y) : liftScaffold(c, c.lift.y));   // (a bracketed side pod hangs off its wall: no scaffold)
   rooftopBoard(c, y);
   steamVent(c);
 }
@@ -1369,6 +1369,55 @@ function liftPlatformLux(c, y0){
     const a = new THREE.Vector3(0, y0, z0 + .2).applyMatrix4(F), b = new THREE.Vector3(0, y0, ze - .2).applyMatrix4(F);
     const dA = new THREE.Vector3(0, 0, z0 + .05).applyMatrix4(F), dB = new THREE.Vector3(0, 0, ze - .06).applyMatrix4(F), o0 = new THREE.Vector3(0, 0, 0).applyMatrix4(F), fz = new THREE.Vector3(0, 0, 1).applyMatrix4(F), nx = fz.x - o0.x, nz = fz.z - o0.z;
     c.walks.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, y: y0 + .01, doors: [{ x: dA.x, z: dA.z, n: [nx, nz] }, { x: dB.x, z: dB.z, n: [-nx, -nz] }], col: 0xd8c8a0 });
+  }
+}
+// A bracketed side pod (residential): one home hung off the wall of the building beside it, no scaffold to the street.
+// Its deck of planks rests on two rusty steel beams, one down each side, run back across the gap and bolted into the
+// wall; a diagonal strut under each from a plate lower on the wall, and a tie rod from higher up out to each far corner.
+// A plank gangway with a rail crosses the gap to a door in the wall (the way in: through the building it hangs from).
+// Where a building beside the pod (left or right) rises past the deck, a beam runs over to its wall too, with a strut.
+function podBrackets(c, y0){
+  R = mulberry32(hash('podbr', c.i, c.j, Math.round(y0*100)));
+  const [a, b] = c.lift.d || [1, 0], F = under(T(c.x, 0, c.z), T(0, 0, 0, Math.atan2(-a, -b)));   // local +z: toward the host wall
+  const W = LOT - .85, steel = () => pick([M.rust, M.rust, M.metalDark, M.metal]);
+  // the deck: planks on a frame
+  box(M.frame, F, 0, y0 - .1, 0, 2.36, .08, 2.36);
+  for (let x = -1.12; x <= 1.13; x += .16) box(pick([M.wood, M.wood, M.crate]), F, x, y0 - .03, 0, .14, .05, 2.3);
+  // the two beams, into the wall, a plate where each goes in
+  for (const sx of [-1, 1]){
+    const x = sx*1.08, m = steel();
+    box(m, F, x, y0 - .2, (W - 1.2)/2, .1, .14, W + 1.2);
+    box(M.metalDark, F, x, y0 - .2, W - .02, .24, .3, .04);
+    // the strut from a plate lower on the wall up under the beam, a second lighter one in timber now and then
+    const yl = y0 - rnd(1.3, 1.7); strut(m, F, x, yl, W, x, y0 - .26, rnd(-.6, -.2), .035); box(M.metalDark, F, x, yl, W - .02, .2, .2, .04);
+    if (chance(.4)) strut(M.wood, F, x - sx*.12, yl + .35, W, x - sx*.12, y0 - .26, .5, .028);
+    // the tie rod from higher on the wall out to the far corner, a turnbuckle part way
+    const yt = y0 + rnd(1.5, 1.9); strut(M.metalDark, F, x, yt, W, x, y0 + .02, -1.12, .012); box(M.metalDark, F, x, yt, W - .02, .14, .14, .04);
+    box(M.metal, F, x, (yt + y0)/2, (W - 1.12)/2, .03, .1, .03);
+  }
+  // cross-ties under the deck between the beams
+  for (const z of [-.8, .1, .9]) box(steel(), F, 0, y0 - .3, z, 2.16, .06, .06);
+  // the gangway over the gap to the wall, a rail on its open side, a door frame where it meets the wall
+  const gx = rnd(-.45, .45);
+  for (let z = 1.2; z < W; z += .14) box(pick([M.wood, M.crate]), F, gx, y0 - .03, z + .06, .9, .05, .12);
+  for (const sx of [-1, 1]){ for (let z = 1.25; z < W; z += .45) box(M.frame, F, gx + sx*.44, y0 + .25, z, .03, .5, .03); box(M.frame, F, gx + sx*.44, y0 + .5, (1.2 + W)/2, .03, .03, W - 1.2); }
+  box(M.metalDark, F, gx, y0 + .5, W + .02, .7, 1.0, .06); box(pick([M.rust, M.wood]), F, gx, y0 + .45, W - .02, .5, .88, .03);
+  // rails round the deck's three outer edges
+  for (const [ex, ez, w, d] of [[0, -1.17, 2.36, .03], [-1.17, 0, .03, 2.36], [1.17, 0, .03, 2.36]]){
+    box(M.frame, F, ex, y0 + .45, ez, w, .03, d);
+    const n = 5; for (let k = 0; k <= n; k++){ const u = -1.15 + 2.3*k/n; box(M.frame, F, ex + (w > d ? u : 0), y0 + .22, ez + (w > d ? 0 : u), .03, .45, .03); } }
+  // a lamp under the deck, a cable or two hanging, a pot plant on the gangway
+  box(M.metalDark, F, rnd(-.5, .5), y0 - .38, rnd(-.6, .3), .1, .06, .1); glow(F, 0, y0 - .45, -.2, 'warm', .6);
+  for (let k = 0; k < irand(1, 2); k++){ const x = rnd(-1, 1); sagCable(F, x, y0 - .25, rnd(-1, .5), x + rnd(-.3, .3), y0 - rnd(.6, 1.2), rnd(-1, .5), rnd(.1, .3)); }
+  if (chance(.6)) plant(pick(['fern', 'succulent', 'bush']), F, gx + .3, y0 + .02, rnd(1.4, W - .3), rnd(.5, .7));
+  // the buildings beside it (left and right, across the street): a beam over to each one that rises past the deck
+  for (const sx of [-1, 1]){
+    const n = cells.get(ckey(c.i + sx*(-b), c.j + sx*a));
+    if (!n || n.mega || !n.sections.length || n.height < y0 + .4 || (n.lift && n.lift.y > y0 - .3)) continue;
+    const m = steel(), zz = rnd(-.5, .3);
+    box(m, F, sx*(1.2 + (W - 1.2)/2), y0 - .2, zz, W - 1.2 + .1, .12, .1);
+    box(M.metalDark, F, sx*W, y0 - .2, zz, .04, .28, .22);
+    strut(m, F, sx*W, y0 - rnd(1.2, 1.5), zz, sx*1.2, y0 - .26, zz, .03);
   }
 }
 function liftScaffold(c, y0){
@@ -2383,14 +2432,15 @@ function removePlatform(c){
   startAnim(c, 'remove', PLAT_BOTTOM, CURB + 1.4, null, LOT, old);
 }
 const MAX_SECTIONS = 4, MAX_HEIGHT = 24;
-function addSection(c, zone){
+function addSection(c, zone, opt = {}){   // (opt.mf: a single unit, that many floors at most: Space)
   stageFinishNear([c]);
   if (c.sections.length >= MAX_SECTIONS || c.height > MAX_HEIGHT) return;
   finishAnimsOn(c);
   const y0 = c.sections.length ? c.height : CURB;
   // under a highway: only as many floors as fit beneath it (a section that still reaches it is built a floor or two shorter)
   const cap = hwCap(c), sec = { zone, seed: (Math.random()*1e9)|0, style: styleNow() };
-  if (cap !== null){ const f = Math.floor((cap - y0 - (c.sections.length ? .1 : 0) + .02)/FH); if (f < 1) return; sec.mf = f; }
+  if (opt.mf) sec.mf = opt.mf;
+  if (cap !== null){ const f = Math.floor((cap - y0 - (c.sections.length ? .1 : 0) + .02)/FH); if (f < 1) return; sec.mf = Math.min(f, opt.mf || f); }
   holdRegion(c);
   if (cap === null && !c.lift && STAGE_ON()){
     // the piece is made in steps over the next frames; the plot keeps its old look until it is ready, then the sweep builds the new one (the edit's own frame is a few milliseconds)
@@ -2421,7 +2471,7 @@ function addSection(c, zone){
   maybeSpawnMegas(c);
 }
 // hang a pod off the side of a taller building, over the empty plot c, its deck at height y
-function addLift(c, y, zone){
+function addLift(c, y, zone, opt = {}){
   stageFinishAll();
   if (!c || c.mega || c.lift || hwAt(c.i, c.j).length || mtAt(c.i, c.j).length) return null;   // (not under a highway or the metro)
   if (c.sections.length && y < c.height + FH - .05) return null;   // over a shorter building: a floor's gap at least
@@ -2429,8 +2479,8 @@ function addLift(c, y, zone){
   holdRegion(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   if (c.sections.length){ c.below = c.sections; c.sections = []; }   // the building already there stays, under the pod
-  c.lift = { y };
-  c.sections.push({ zone, seed: (Math.random()*1e9)|0, style: styleNow() });
+  c.lift = opt.d ? { y, v: 2, d: opt.d } : { y };   // (opt.d: a bracketed side pod, hung off the wall that way back)
+  c.sections.push(Object.assign({ zone, seed: (Math.random()*1e9)|0, style: styleNow() }, opt.mf ? { mf: opt.mf } : {}));
   if (c.below){ rebuildCell(c); disposeData(c.data); c.data = null; if (c.belowTop > c.lift.y - GAP_MERGE) c.lift.y = c.belowTop + FH; }   // its roof flattened for the scaffold may sit a touch differently
   refresh([c]);
   dropView(old);
@@ -2679,7 +2729,7 @@ const SAVE_KEY = 'neonIsland.v2';
 const MEGA_SAVE_KEY = 'neonIsland.megas';
 function save(){
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some', c.lift ? c.lift.y : 0, c.lift && c.below ? c.below : 0])));
+    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some', c.lift ? c.lift.y : 0, c.lift && c.below ? c.below : 0, c.lift && c.lift.v === 2 ? c.lift.d : 0])));   // (the last: a bracketed side pod, the way to the wall it hangs from)
     localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ id: m.id, kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed, centre: m.centre || undefined, rot: m.rot, si: m.si, sj: m.sj }))));
   } catch (e) {}
   hwSave(); mtSave();
@@ -2688,7 +2738,7 @@ function load(){
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!Array.isArray(d) || !d.length) return false;
-    for (const [i,j,secs,st,gr,lf,bl] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; if (lf > 0 && c.sections.length){ c.lift = { y: lf }; if (Array.isArray(bl)){ const b2 = bl.filter(s => s && ZONES[s.zone]); if (b2.length) c.below = b2; } } cells.set(ckey(i,j), c); }
+    for (const [i,j,secs,st,gr,lf,bl,lv] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; if (lf > 0 && c.sections.length){ c.lift = Array.isArray(lv) ? { y: lf, v: 2, d: lv } : { y: lf }; if (Array.isArray(bl)){ const b2 = bl.filter(s => s && ZONES[s.zone]); if (b2.length) c.below = b2; } } cells.set(ckey(i,j), c); }
     hwLoad(); mtLoad();   // (before the plots are built: the highways' and the metro's pillars stand on them)
     try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) { const mm = placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels, m.id || null); if (mm && m.centre) mm.centre = m.centre; if (mm && Number.isInteger(m.rot)) mm.rot = ((m.rot % 4) + 4) % 4; if (mm && Number.isInteger(m.si) && Number.isInteger(m.sj)){ mm.si = m.si; mm.sj = m.sj; } } } catch (e) {}
     return true;
@@ -2989,7 +3039,10 @@ function applyTarget(t){
   if (t.type === 'podDown') return zone ? addPodDown(t.c, zone) : null;
   if (t.type === 'belowUp') return zone ? addBelowUp(t.c, zone) : null;
   if (t.type === 'onto' && t.c.lift){ return zone ? addBelowUp(t.c, zone) : null; }
-  if (t.type === 'side'){ if (!zone) return null; const c = t.c || addPlatform(t.i, t.j, null); if (c) finishAnimsOn(c); return c ? addLift(c, t.y, zone) : null; }
+  if (t.type === 'side'){ if (!zone) return null; const c = t.c || addPlatform(t.i, t.j, null); if (c) finishAnimsOn(c);
+    // residential: a single home on brackets off the wall (the other zones keep their scaffolds for now)
+    const opt = zone === 'low' && t.from ? { d: [t.i - t.from.i, t.j - t.from.j], mf: 1 } : {};
+    return c ? addLift(c, t.y, zone, opt) : null; }
   if (!zone && t.type === 'onto' && !t.c.mega && !t.c.sections.length){ cycleGreen(t.c); return t.c; }   // no zone picked: an empty plot's greenery cycles
   if (!zone || t.c.mega) return null;
   addSection(t.c, zone); return t.c;
@@ -3020,7 +3073,7 @@ function showHover(t){
   if (t.type === 'empty'){
     x = t.i*LOT; z = t.j*LOT;
     if (S.zone){ y0 = CURB; h = FH*3; w = SIDE; } else { y0 = -.6; h = .68; w = LOT; }
-  } else if (t.type === 'side'){ x = t.i*LOT; z = t.j*LOT; y0 = t.y; h = FH*2; w = SIDE; }
+  } else if (t.type === 'side'){ x = t.i*LOT; z = t.j*LOT; y0 = t.y; h = S.zone === 'low' ? FH*1.15 : FH*2; w = SIDE; }
   else if (t.type === 'podDown'){ x = t.c.x; z = t.c.z; h = Math.min(FH*2, t.c.lift.y - groundTop(t.c)); y0 = t.c.lift.y - h; w = SIDE; }
   else if (t.type === 'belowUp'){ x = t.c.x; z = t.c.z; y0 = groundTop(t.c); h = Math.min(FH*2, Math.max(.3, t.c.lift.y - y0 - .1)); w = SIDE; }
   else if (t.type === 'onto'){ x = t.c.x; z = t.c.z; y0 = t.c.sections.length ? t.c.height : CURB; h = FH*3; w = SIDE; }

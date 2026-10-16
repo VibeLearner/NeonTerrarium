@@ -597,9 +597,18 @@ function* buildNetworkGen(oldDoors, oldSpots){
     c._walkDoors = (c.lift && c.walks || []).map((w, k) => (w.doors || []).map((wd, e) => { const key = 'w:' + c.i + ',' + c.j + ':' + k + ':' + e, od = oldDoors.get(key);
       const dd = { key, wall: { x: wd.x, z: wd.z }, y: w.y - .01, n: wd.n, k: 1.3, mega: false, noDraw: false, open: od ? od.open : 0, want: false, col: w.col ?? DOOR_COLS[hash(key) % DOOR_COLS.length] };
       doorList.push(dd); doorByKey.set(key, dd); return dd; }));
-    const d = !c.liftCab || c.below ? plotDoor(c, sides, 1.75) : null;
+    const br = c.lift && c.lift.v === 2;   // (a bracketed side pod: its way in is through the building it hangs from, see below)
+    const d = (!c.liftCab && !br) || c.below ? plotDoor(c, sides, 1.75) : null;
     if (d){ const key = 'd:' + c.i + ',' + c.j; doors.push(makeDoor(key, d, false, oldDoors.get(key))); addEnd(c, { key, x: d.stand.x, z: d.stand.z, kind: 'd' }); }
     fresh.set('c:' + c.i + ',' + c.j, { id: 'c:' + c.i + ',' + c.j, cell: c, x: c.x, z: c.z, jobs, fun, night, doors, ind: night > 0 });
+  }
+  // a bracketed side pod's people come and go by the door of the building it hangs from (its gangway leads in there)
+  for (const c of cells.values()){
+    if (!c.lift || c.lift.v !== 2 || c.mega) continue;
+    const pl = fresh.get('c:' + c.i + ',' + c.j), [a, b] = c.lift.d || [0, 0], hp = fresh.get('c:' + (c.i - a) + ',' + (c.j - b));
+    if (!pl) continue;
+    if (hp && hp.doors.length) pl.doors.push(...hp.doors);
+    else if (!pl.doors.length){ const d = plotDoor(c, SIDES4, 1.75); if (d){ const key = 'd:' + c.i + ',' + c.j; pl.doors.push(makeDoor(key, d, false, oldDoors.get(key))); addEnd(c, { key, x: d.stand.x, z: d.stand.z, kind: 'd' }); } }
   }
   // benches round the city: a little place to sit for a while
   let nb = 0;

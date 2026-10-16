@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walk Mode Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: the 720-line view fills the width at 16:9, a thin control strip above it, a key strip below. */
+:root{ --bg:#0b1226; --panel:rgba(14,22,40,.9); --line:#2c3a52; --ink:#e3d6bd; --muted:#8e9bb2; --pink:#FF4FA3; --cyan:#38E8E0;
+  --pixel:"Silkscreen", ui-monospace, "Courier New", monospace; --mono:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; color-scheme:dark; }
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:12px/1.5 var(--mono);display:flex;flex-direction:column;gap:10px;
+  padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));padding-block:14px;box-sizing:border-box}
+.bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;max-width:min(100%, calc((100vh - 120px)*16/9));width:100%;margin:0 auto}
+h1{margin:0;font:400 16px/1.1 var(--pixel);letter-spacing:.1em}
+h1 span{color:var(--pink)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font:inherit;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);background:transparent;border:1px solid var(--line);padding:5px 10px;cursor:pointer}
+.chips button[aria-pressed="true"]{color:var(--pink);border-color:var(--pink);background:rgba(255,79,163,.1)}
+.chips button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.stage{position:relative;width:100%;max-width:min(100%, calc((100vh - 120px)*16/9));aspect-ratio:16/9;margin:0 auto;border:1px solid var(--line);background:#000}
+#view{width:100%;height:100%;display:block;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;cursor:pointer}
+#status{position:absolute;inset:auto 0 0 0;margin:0;padding:8px 12px;color:var(--muted);font-size:11px;letter-spacing:.1em;text-transform:uppercase;pointer-events:none}
+#status:empty{display:none}
+.keys{max-width:min(100%, calc((100vh - 120px)*16/9));width:100%;margin:0 auto;color:var(--muted);font-size:11px;display:flex;flex-wrap:wrap;gap:4px 18px}
+kbd{font:inherit;color:var(--ink);border:1px solid var(--line);padding:0 5px}
+</style>
+<div class="bar">
+  <h1>Walk mode <span>·</span> block 0,−12</h1>
+  <div class="chips" role="group" aria-label="Time of day and weather">
+    <button type="button" data-look="day" aria-pressed="false">Day</button>
+    <button type="button" data-look="dusk" aria-pressed="false">Dusk</button>
+    <button type="button" data-look="night" aria-pressed="true">Night</button>
+    <button type="button" id="rainBtn" aria-pressed="true">Rain</button>
+  </div>
+</div>
+<div class="stage"><canvas id="view" width="1280" height="720" aria-label="Your block at street level, a person you can walk around"></canvas><p id="status">Loading</p></div>
+<div class="keys"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to walk</span><span><kbd>Shift</kbd> to run</span><span>Or hold the mouse or a finger where you want to go</span><span>720 lines · fixed camera, 32° down</span></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="tex.js"></script>
+<script src="detail.js"></script>
+<script src="plants.js"></script>
+<script src="walk.js"></script>

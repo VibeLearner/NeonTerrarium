@@ -13,7 +13,7 @@ const WIRELOG = (() => {
   const KEY = 'neonIsland.wirelog', COLLAPSE_KEY = 'neonIsland.wirelog.collapsed';
   const MAX_LINES = 40, MAX_ARCHIVE = 30;
   // stage timings, real seconds with the log running (WIRELOG.dev.fast() divides them)
-  const T = { s1: 150, s2: 240, s3: 360, reoffer: 180, gapLo: 8, gapHi: 15 };
+  const T = { s1: 150, s3: 360, reoffer: 120, gapLo: 8, gapHi: 15 };
   // the corporations: SynthCorp is settled, the other three are placeholders until they get their names
   const CORP = { synth: 'SYNTHCORP', logi: 'HALVREN', media: 'MERIDIAN', civic: 'OSTRAVA' };
   const ZONE_NAME = { low: 'Zone A', mid: 'Zone B', high: 'Zone C', ind: 'Zone D' };
@@ -87,7 +87,9 @@ const WIRELOG = (() => {
   body.watching:has(#deck.open) #wirelog { right: calc(304px + min(340px, 100vw - 32px) + 8px); }
   body.wl-on .mon-pins { top: calc(58px + var(--wl-h, 0px) + 8px + env(safe-area-inset-top,0px)); }
   /* the prompt */
-  #wirelog .wl-in { display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-top: 1px solid var(--wl-hair); background: rgba(214,92,255,.03); cursor: text; }
+  #wirelog .wl-in { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; font-size: 11.5px; border-top: 1px solid var(--wl-hair); background: rgba(214,92,255,.03); cursor: text; }
+  #wirelog .wl-in input::placeholder { color: var(--c-mesh); opacity: .75; }
+  #wirelog .wl-in.ask { background: rgba(90,255,168,.08); box-shadow: inset 2px 0 var(--c-mesh); } #wirelog .wl-in.ask .pr { color: var(--c-mesh); }
   #wirelog .wl-in.tr input { color: var(--c-mesh); } #wirelog .wl-in.tr .pr { color: var(--c-mesh); }
   #wirelog .ch-TRACE .ch { color: var(--c-mesh); } #wirelog .ch-TRACE .tx { color: #c9ffe2; }
   #wirelog .wl-in .pw { max-width: 52%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; color: var(--wl-dim); font-size: 9.5px; }
@@ -114,10 +116,10 @@ const WIRELOG = (() => {
   `;
 
   /* ---------- state (saved) ---------- */
-  const W = { on: false, stage: 0, st: 0, lines: [], archive: [], leak: 'none', leakT: 0, sig: 0, seed: 0, mesh: ['A'], cwd: [], probed: [], scanned: [], hist: [], trace: 'none', traceT: 0, gseq: 0 };
+  const W = { on: false, stage: 0, st: 0, lines: [], archive: [], leak: 'none', leakT: 0, sig: 0, seed: 0, mesh: ['A'], cwd: [], probed: [], scanned: [], hist: [], trace: 'none', traceT: 0, gseq: 0, readf: [], cyc: null };
   let el = null, bodyEl = null, footEl = null, agentsEl = null, view = 'log', fast = false, stick = true;
   const load = () => { try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); if (v && typeof v === 'object') Object.assign(W, v); } catch (e) {}
-    for (const k of ['cwd', 'probed', 'scanned', 'hist']) if (!Array.isArray(W[k])) W[k] = []; };
+    for (const k of ['cwd', 'probed', 'scanned', 'hist', 'readf']) if (!Array.isArray(W[k])) W[k] = []; };
   let saveDue = false;
   const save = () => { saveDue = true; };
   const flushSave = () => { if (!saveDue) return; saveDue = false; try { localStorage.setItem(KEY, JSON.stringify(W, (k, v) => k === 'el' ? undefined : v)); } catch (e) {} };
@@ -182,7 +184,9 @@ const WIRELOG = (() => {
     trim(); toTop();
   }
   const keep = L => { W.lines.push(L); while (W.lines.length > MAX_LINES) W.lines.shift(); save(); };
+  const heldQ = [];
   function add(ch, x, o = {}){
+    if (!o.chain && !grp && !o.g && typeof holding === 'function' && started && holding()){ heldQ.push([ch, x, o]); if (heldQ.length > 8) heldQ.shift(); return null; }
     const L = { t: now(), ch, x }; if (o.key) L.key = 1; const g = o.g === undefined ? grp : o.g; if (g) L.g = g; if (o.opt) L.opt = o.opt;
     W.lines.push(L); while (W.lines.length > MAX_LINES) W.lines.shift();
     if (o.arc) archive(o.arc.title || x, o.arc.kind || 'EVENT', o.arc.body || [x]);
@@ -321,10 +325,10 @@ const WIRELOG = (() => {
     const off = (w) => { o.querySelectorAll('button').forEach(b => b.remove()); if (w){ const t = document.createElement('span'); t.className = 'done'; t.textContent = w; o.appendChild(t); } };
     o.querySelector('.y').addEventListener('click', e => { e.stopPropagation(); off('approved'); yes(); });
     o.querySelector('.n').addEventListener('click', e => { e.stopPropagation(); off('declined'); no(); });
-    d._off = off;
+    d._off = off; stick = true; toTop();   // (the buttons make the line taller: keep it in view)
   }
 
-  /* ---------- the packet swarm: three agents scanning the leaking host's folders at once ---------- */
+  /* ---------- the packet swarm: one agent per folder, scanning a host's root at once ---------- */
   const MEMO = WIREFS.MEMO;
   function agentBox(n){
     const b = document.createElement('div'); b.className = 'ag';
@@ -332,25 +336,27 @@ const WIRELOG = (() => {
     agentsEl.appendChild(b); requestAnimationFrame(() => b.classList.add('on'));
     return b;
   }
-  async function swarmAgent(n, dir, took){
+  async function swarmAgent(n, host, dir){
     const b = agentBox(n); await sleep(.25*n);
     await typeInto(b.querySelector('.cmd'), '> -scan root/' + dir, 24);
-    await sleep(took);
-    const files = WIREFS.TREE.synthcorp[dir], fl = files.filter(f => f[2].includes('f')), kb = fl.reduce((a, f) => a + f[1], 0);
+    const files = WIREFS.TREE[host][dir]; await sleep(1.6 + .55*files.length + .5*n);
+    const fl = files.filter(f => f[2].includes('f')), kb = fl.reduce((a, f) => a + f[1], 0);
     const chip = b.querySelector('.chip'); chip.className = 'chip ' + (fl.length ? 'flag' : 'clear'); chip.textContent = fl.length ? 'FLAG' : 'CLEAR';
-    b.querySelector('.res').textContent = `${fl.length} file${fl.length === 1 ? '' : 's'} flagged${fl.length === 1 ? ' · ' + sizeTxt(kb) : ''}`;
-    if (!W.scanned.includes('synthcorp/' + dir)) W.scanned.push('synthcorp/' + dir);
+    b.querySelector('.res').textContent = `${fl.length} file${fl.length === 1 ? '' : 's'} flagged${fl.length ? ' · ' + sizeTxt(kb) : ''}`;
+    if (!W.scanned.includes(host + '/' + dir)) W.scanned.push(host + '/' + dir);
     return { b, dir, fl };
   }
-  async function swarm(){
-    W.leak = 'swarm'; save(); fast = false;
-    grp = ++W.gseq; add('TRACE', 'Packet swarm · 3 agents · synthcorp root'); grp = 0;
-    const out = await Promise.all([swarmAgent(1, 'documents', 3), swarmAgent(2, 'reports', 4.4), swarmAgent(3, 'archive', 5.8)]);
+  let swarming = false;
+  async function swarm(host){
+    swarming = true; fast = false;
+    const dirs = Object.keys(WIREFS.TREE[host]).filter(d => !W.scanned.includes(host + '/' + d));
+    grp = ++W.gseq; add('TRACE', `Packet swarm · ${dirs.length} agents · ${host} root`); grp = 0;
+    const out = await Promise.all(dirs.map((d, k) => swarmAgent(k + 1, host, d)));
     grp = ++W.gseq;
     add('TRACE', `Scan complete · ${out.reduce((a, r) => a + r.fl.length, 0)} files flagged`, { key: 1 });
     for (const r of out) for (const f of r.fl) add('SYS', `FLAG · ${r.dir}/${f[0]} · ${sizeTxt(f[1])}`);
-    grp = 0; W.leak = 'scanned'; save();
-    await sleep(6); for (const r of out) r.b.classList.add('gone'); await sleep(.4); for (const r of out) r.b.remove();
+    grp = 0; save(); swarming = false;
+    (async () => { await sleep(6); for (const r of out) r.b.classList.add('gone'); await sleep(.4); for (const r of out) r.b.remove(); })();
   }
   // the leak: found by the first probe of mesh A, whoever runs it
   function leakFound(){
@@ -359,57 +365,97 @@ const WIRELOG = (() => {
     if (W.stage < 2){ W.stage = 2; W.st = 0; } save();
   }
 
-  /* ---------- the network trace: an agent that proposes the next command, one at a time, and waits for a yes ---------- */
-  // Each step asks before it runs (a little friction, and a look at the command); approved, it types the command into the
-  // prompt itself and runs it there, so the player sees exactly what to type. If the player types it first, the step clears.
+  /* ---------- the network trace: an agent that offers the next command, one at a time, and waits for a yes ---------- */
+  // Every step is offered (probe a mesh, cd into each of its hosts, deploy the packet swarm on the host's root, then read
+  // or pull each flagged file), one after another, mesh by mesh; mesh A's leaking host first. Each offer waits for the
+  // player: the Y / N on the line, or y / n typed at the prompt. Approved, the trace types the command into the prompt
+  // and runs it there. While an offer waits, and all through a host once the player has said yes (the cycle: probe, cd,
+  // swarm, files), the rest of the log holds; city events wait in a queue and come through after. A no lets the log
+  // carry on, and the same step comes back in about 2 minutes. If the player does a step by hand, its offer clears.
   let P = null, tracing = false, traceWait = 2, offerT = 0;
   const skipped = new Map(); let clock = 0;
-  const inSynth = () => W.cwd.length >= 2 && W.cwd[1] === 'synthcorp';
+  const flaggedOf = h => { const out = []; for (const d in WIREFS.TREE[h]) for (const f of WIREFS.TREE[h][d]) if (f[2].includes('f') && !f[2].includes('e')) out.push([d, f]); return out; };
+  const fileDone = (h, d, f) => f[1] > FS.READ_MAX ? archived(f[0]) : W.readf.includes(h + '/' + d + '/' + f[0]);
+  const hostScanned = h => Object.keys(WIREFS.TREE[h]).every(d => W.scanned.includes(h + '/' + d));
+  const hostDone = h => hostScanned(h) && flaggedOf(h).every(([d, f]) => fileDone(h, d, f));
+  function fileCmd(m, h, d, f){
+    const verb = f[1] > FS.READ_MAX ? '-pull' : '-read';
+    const rel = W.cwd.length === 2 && W.cwd[0] === MESHL[m] && W.cwd[1] === h;
+    return verb + ' ' + (rel ? `root/${d}/${f[0]}` : `/${MESHL[m]}/${h}/root/${d}/${f[0]}`);
+  }
   function nextStep(){
-    for (const m of ['A', 'B', 'C']) if (meshOn(m) && !W.probed.includes(m)) return { key: 'probe' + m, cmd: '-probe ' + MESHL[m], why: `Mesh ${m} · unprobed` };
-    if (W.leak === 'found' && !inSynth()) return { key: 'cdleak', cmd: '-cd /mesha/synthcorp', why: 'Leak source · synthcorp' };
-    if (W.leak === 'found') return { key: 'swarm', swarm: true, why: 'Root · 4 dirs · unscanned' };
-    if (W.leak === 'scanned' && !archived('sk3_recall_memo')) return { key: 'pull', cmd: inSynth() && W.cwd.length === 2 ? '-pull root/archive/sk3_recall_memo' : '-pull /mesha/synthcorp/root/archive/sk3_recall_memo', why: 'Flagged · 2.1 MB' };
+    for (const m of ['A', 'B', 'C']){
+      if (!meshOn(m)) continue;
+      if (!W.probed.includes(m)) return { key: 'probe' + m, cmd: '-probe ' + MESHL[m], why: `Mesh ${m} · unprobed`, host: null };
+      const hosts = FS.HOSTS[m].slice(); if (m === 'A') hosts.sort((a, b) => (b === 'synthcorp') - (a === 'synthcorp'));   // (the leak first)
+      for (const h of hosts){
+        if (hostDone(h)) continue;
+        const inH = W.cwd.length >= 2 && W.cwd[1] === h;
+        if (!inH) return { key: 'cd:' + h, cmd: `-cd /${MESHL[m]}/${h}`, why: m === 'A' && h === 'synthcorp' && W.leak === 'found' ? 'Leak source · synthcorp' : `Host ${h} · unexplored`, host: h };
+        if (!hostScanned(h)){ const n = Object.keys(WIREFS.TREE[h]).filter(d => !W.scanned.includes(h + '/' + d)).length;
+          return { key: 'swarm:' + h, swarm: h, why: `Root · ${n} dirs · unscanned`, host: h }; }
+        for (const [d, f] of flaggedOf(h)) if (!fileDone(h, d, f)) return { key: 'file:' + h + '/' + d + '/' + f[0], cmd: fileCmd(m, h, d, f), why: `Flagged · ${d}/${f[0]} · ${sizeTxt(f[1])}`, host: h };
+      }
+    }
     return null;
   }
+  // the hold: an offer waiting, a step running, or a host the player has started on and not finished
+  const holding = () => !!P || tracing || swarming || W.trace === 'offered' || W.cyc === '*probe' || (!!W.cyc && !!WIREFS.TREE[W.cyc] && !hostDone(W.cyc));
   function propose(nx){
-    const txt = nx.swarm ? `Next · deploy packet swarm · 3 agents · scan root` : `Next · ${nx.cmd}`;
-    const g = ++W.gseq; add('TRACE', nx.why, { g });
-    const d = add('TRACE', txt, { g, opt: nx.key, key: 1 });
+    const txt = nx.swarm ? `Next · deploy packet swarm · scan ${nx.swarm} root` : `Next · ${nx.cmd}`;
+    const g = ++W.gseq; add('TRACE', nx.why, { g, chain: 1 });
+    const d = add('TRACE', txt + ' · y / n', { g, opt: nx.key, key: 1, chain: 1 });
     P = { nx, L: W.lines[W.lines.length - 1] };
     optButtons(d, () => approve(), () => decline());
+    askMode(true);
   }
-  function approve(){ const p = P; if (!p) return; P = null; if (p.nx.swarm) swarm(); else traceRun(p.nx.cmd); }
-  function decline(){ const p = P; if (!p) return; P = null; skipped.set(p.nx.key, clock + 90); traceWait = 4; add('TRACE', 'Step skipped · standby', { g: 0 }); }
+  const askMode = on => { if (!rowEl) return; rowEl.classList.toggle('ask', on); inEl.placeholder = on ? 'y / n' : ''; };
+  function settle(word){ if (P && P.L && P.L.el && P.L.el._off) P.L.el._off(word); askMode(false); }
+  function approve(){ const p = P; if (!p) return; settle('approved'); P = null; if (p.nx.host) W.cyc = p.nx.host; else W.cyc = '*probe';
+    if (p.nx.swarm) swarm(p.nx.swarm).then(() => { traceWait = 1.2; }); else traceRun(p.nx.cmd); }
+  function decline(){ const p = P; if (!p) return; settle('declined'); P = null; skipped.set(p.nx.key, clock + T.reoffer); W.cyc = null; traceWait = 4; add('TRACE', 'Step declined · standby', { g: 0, chain: 1 }); }
   async function traceRun(cmdText){
     tracing = true;
-    while (busy || (inEl && document.activeElement === inEl)) await sleep(.25);   // (the player's own typing first)
+    while (busy || (inEl && document.activeElement === inEl && inEl.value)) await sleep(.25);   // (the player's own typing first)
     if (view !== 'log') showView('log');
     if (el.classList.contains('collapsed')) setCollapsed(false);
-    rowEl.classList.add('tr', 'has'); inEl.readOnly = true;
+    const draftV = inEl.value; rowEl.classList.add('tr', 'has'); inEl.readOnly = true;
     for (let i = 1; i <= cmdText.length; i++){ inEl.value = cmdText.slice(0, i); await sleep(1/24); }
-    await sleep(.35); inEl.value = ''; rowEl.classList.remove('tr', 'has'); inEl.readOnly = false;
+    await sleep(.35); inEl.value = draftV; rowEl.classList.remove('tr'); rowEl.classList.toggle('has', !!draftV); inEl.readOnly = false;
     await exec(cmdText, 'TRACE');
-    tracing = false; traceWait = 1.5;
+    tracing = false; traceWait = 1.2;
   }
   function offerTrace(){
     W.trace = 'offered'; save();
-    const d = add('SYS', 'Option · enable network trace agent', { g: 0, opt: 'trace', key: 1 });
-    optButtons(d, traceYes, traceNo);
+    const d = add('SYS', 'Option · enable network trace agent · y / n', { g: 0, opt: 'trace', key: 1, chain: 1 });
+    optButtons(d, traceYes, traceNo); askMode(true);
   }
-  function traceYes(){ W.trace = 'on'; save(); add('TRACE', 'Network trace · enabled · listening', { g: 0 }); if (W.stage < 1) setStage(1); traceWait = 2; }
-  function traceNo(){ W.trace = 'declined'; W.traceT = 0; save(); add('SYS', 'Network trace · standby', { g: 0 }); }
+  function traceSettle(word){ const L = [...W.lines].reverse().find(L => L.opt === 'trace'); if (L && L.el && L.el._off) L.el._off(word); askMode(false); }
+  function traceYes(){ if (W.trace !== 'offered') return; traceSettle('approved'); W.trace = 'on'; save(); add('TRACE', 'Network trace · enabled · listening', { g: 0, chain: 1 }); if (W.stage < 1) setStage(1); traceWait = 2; }
+  function traceNo(){ if (W.trace !== 'offered') return; traceSettle('declined'); W.trace = 'declined'; W.traceT = 0; save(); add('SYS', 'Network trace · standby', { g: 0, chain: 1 }); }
+  // y / n typed at the prompt answers whatever is waiting
+  function answer(v){
+    const a = v.trim().toLowerCase(); if (!/^(y|yes|n|no)$/.test(a)) return false;
+    const yes = a[0] === 'y';
+    if (W.trace === 'offered'){ yes ? traceYes() : traceNo(); return true; }
+    if (P){ yes ? approve() : decline(); return true; }
+    return false;
+  }
   function traceTick(dt){
     clock += dt;
     if (W.trace === 'none' && (offerT += dt) > 5) offerTrace();
     if (W.trace === 'declined' && (W.traceT += dt) > T.reoffer) offerTrace();
-    // the leak moves on when the player does the work themselves
-    if (W.leak === 'found' && ['documents', 'reports', 'archive'].every(d => W.scanned.includes('synthcorp/' + d))) W.leak = 'scanned';
+    // the leak moves on however it's done
+    if (W.leak === 'found' && hostScanned('synthcorp')) W.leak = 'scanned';
     if ((W.leak === 'scanned' || W.leak === 'found') && archived('sk3_recall_memo')){ W.leak = 'done'; W.st = 0; save(); }
-    if (P){ const nx = nextStep(); if (!nx || nx.key !== P.nx.key){ if (P.L && P.L.el && P.L.el._off) P.L.el._off('done by hand'); P = null; traceWait = 2; } return; }
-    if (W.trace !== 'on' || tracing || busy || W.leak === 'swarm') return;
+    // a host finished: the cycle ends, the log has a while to itself before the next offer
+    if (W.cyc && W.cyc !== '*probe' && (!WIREFS.TREE[W.cyc] || hostDone(W.cyc)) && !P && !tracing && !swarming){ W.cyc = null; traceWait = 40; save(); }
+    if (P){ const nx = nextStep(); if (!nx || nx.key !== P.nx.key){ settle('done by hand'); P = null; traceWait = 1.2; } return; }
+    if (W.trace !== 'on' || tracing || swarming || busy) return;
     if ((traceWait -= dt) > 0) return;
-    const nx = nextStep(); if (!nx || (skipped.get(nx.key) || 0) > clock) return;
+    const nx = nextStep(); if (!nx){ W.cyc = null; return; }
+    if ((skipped.get(nx.key) || 0) > clock){ return; }
+    if (W.cyc === '*probe') W.cyc = nx.host || null;
     propose(nx);
   }
 
@@ -496,6 +542,7 @@ const WIRELOG = (() => {
       await c.wait(.3);
       add('DOC', `${name} · ${sizeTxt(kb)} · ${n.h}`, { key: 1 });
       for (const l of body) if (l) add('DOC', l);
+      const rk = n.h + '/' + n.d + '/' + name; if (!W.readf.includes(rk)){ W.readf.push(rk); save(); }
       return `${name} · read`;
     },
     async pull(c, a){
@@ -549,7 +596,7 @@ const WIRELOG = (() => {
     agentsEl.appendChild(b); requestAnimationFrame(() => b.classList.add('on'));
     const res = b.querySelector('.res'); let lastSay = '';
     const ctx = { cwd, agent: id,
-      say(ch, x, toLog){ res.textContent = x; lastSay = x; if (ch === 'SYS' && FAILS.test(x)) ctx.failed = true; if (toLog || ch === 'MESH') add(ch, x, { g: 0 }); return x; },
+      say(ch, x, toLog){ res.textContent = x; lastSay = x; if (ch === 'SYS' && FAILS.test(x)) ctx.failed = true; if (toLog || ch === 'MESH') add(ch, x, { g: 0, chain: 1 }); return x; },
       wait: sec => sleep(sec), moved(){},
       live(){ return (txt, final, html) => { if (html) res.innerHTML = txt; else res.textContent = txt.replace(/<[^>]+>/g, ''); if (final) lastSay = txt; }; },
     };
@@ -560,7 +607,7 @@ const WIRELOG = (() => {
       if (ctx.failed) out = lastSay;
       const fail = !!ctx.failed;
       const chip = b.querySelector('.chip'); chip.className = 'chip ' + (fail ? 'flag' : 'clear'); chip.textContent = fail ? 'FAIL' : 'DONE';
-      add('SYS', `Agent ${pad(id)} · ${fail ? 'failed' : 'done'} · ${out || lastSay}`, { g: 0 });
+      add('SYS', `Agent ${pad(id)} · ${fail ? 'failed' : 'done'} · ${out || lastSay}`, { g: 0, chain: 1 });
       agentsBusy[id] = false;
       await sleep(6); b.classList.add('gone'); await sleep(.4); b.remove();
     })();
@@ -610,7 +657,7 @@ const WIRELOG = (() => {
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown'){ e.preventDefault(); if (busy || !W.hist.length) return;
         if (hi < 0){ draft = inEl.value; hi = W.hist.length; } hi = Math.max(0, Math.min(W.hist.length, hi + (e.key === 'ArrowUp' ? -1 : 1)));
         inEl.value = hi === W.hist.length ? draft : W.hist[hi]; if (hi === W.hist.length) hi = -1; return; }
-      if (e.key === 'Enter'){ e.preventDefault(); if (busy || tracing) return; const v = inEl.value; inEl.value = ''; exec(v); }
+      if (e.key === 'Enter'){ e.preventDefault(); if (busy || tracing) return; if (answer(inEl.value)){ inEl.value = ''; rowEl.classList.remove('has'); return; } const v = inEl.value; inEl.value = ''; exec(v); }
     });
     inEl.addEventListener('keyup', e => e.stopPropagation());
   }
@@ -640,8 +687,8 @@ const WIRELOG = (() => {
   }
   function stageTick(dt){
     W.st += dt;
-    if (W.stage === 0 && W.st > T.s1) setStage(1);
-    else if (W.stage === 2 && W.leak === 'done' && W.st > T.s3) setStage(3);
+    if (W.stage === 0 && W.st > T.s1 && !holding()) setStage(1);
+    else if (W.stage === 2 && W.leak === 'done' && W.st > T.s3 && !holding()) setStage(3);
   }
 
   /* ---------- the panel ---------- */
@@ -707,7 +754,7 @@ const WIRELOG = (() => {
   }
 
   /* ---------- the tick (main.js, once a frame; not while the Overseer's desk is up) ---------- */
-  let next = 4, snapT = 0, saveT = 0, footT = 0, started = false;
+  let next = 4, snapT = 0, saveT = 0, footT = 0, started = false, drainT = 0;
   const unlocked = () => safe(() => megaUnlockedKinds.has('wirenest') || megasOfKind('wirenest').length > 0, false);
   function tick(rdt){
     const dt = Math.min(rdt, .25);
@@ -716,7 +763,8 @@ const WIRELOG = (() => {
       started = true; load(); rs = W.seed || 1; while (!zoneStep(1e9)); makePanel();
       if (!W.on){ W.on = true; boot(); }
       if (['offered', 'declined', 'running'].includes(W.leak)) W.leak = W.probed.includes('A') ? 'found' : 'none';   // (saves from before the trace)
-      if (W.leak === 'swarm') W.leak = 'found';   // (reloaded mid-swarm: it asks again)
+      if (W.leak === 'swarm') W.leak = 'found';
+      W.cyc = null;   // (a reload: the offers start again from wherever things stand)
       if (W.trace === 'offered') W.trace = 'none';
       el.hidden = false; showView('log');
     }
@@ -725,7 +773,8 @@ const WIRELOG = (() => {
     flushBuild(dt);
     stageTick(dt);
     traceTick(dt);
-    if (W.leak !== 'swarm' && !tracing && !typing() && (next -= dt) <= 0){ next = T.gapLo + rnd()*(T.gapHi - T.gapLo); ambient(); }
+    if (!holding() && heldQ.length && (drainT -= dt) <= 0){ drainT = .9; const [ch, x, o] = heldQ.shift(); add(ch, x, o); }
+    if (!holding() && !typing() && (next -= dt) <= 0){ next = T.gapLo + rnd()*(T.gapHi - T.gapLo); ambient(); }
     if ((footT += dt) > 3 && cur){ footT = 0; foot(cur); }
     if ((saveT += dt) > 3){ saveT = 0; flushSave(); }
   }

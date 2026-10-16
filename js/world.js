@@ -899,7 +899,14 @@ function* buildStackGen(c){
   const y = yield* stackRunGen(c, c.sections, c.lift ? c.lift.y : CURB, '', !c.belowTop);   // a side pod's stack starts up in the air, on its scaffold
   c.height = y;
   c.walks = null; c.liftCab = null;
-  if (c.lift) (c.lift.v === 2 ? podBrackets(c, c.lift.y) : liftScaffold(c, c.lift.y));   // (a bracketed side pod hangs off its wall: no scaffold)
+  c.podBlocks = null;
+  if (c.lift && c.lift.v === 2){   // a bracketed side pod (or several up the same side): each block of homes on brackets of its own
+    const tops = c.sectionTops, bl = [];
+    c.sections.forEach((sec, k) => { const s0 = k === 0 ? c.lift.y : sec.at !== undefined && sec.at > tops[k - 1] + .01 ? sec.at : null;
+      if (s0 !== null) bl.push([s0, tops[k], k, k]); else { bl[bl.length - 1][1] = tops[k]; bl[bl.length - 1][3] = k; } });
+    c.podBlocks = bl;
+    for (const [s0] of bl) podBrackets(c, s0);
+  } else if (c.lift) liftScaffold(c, c.lift.y);
   rooftopBoard(c, y);
   steamVent(c);
 }
@@ -910,10 +917,13 @@ function* stackRunGen(c, secs, y, tag, first){
   c.sectionTops = [];
   for (let k = 0; k < secs.length; k++){ const sec = secs[k];
     R = mulberry32(hash('sec', c.i, c.j, sec.kh ?? k, sec.zone, sec.seed));   // (the same whether a building stands under a pod or not, so it keeps its look)
-    const st = STY[sec.zone], upper = k > 0, last = k === secs.length - 1;
+    // a bracketed pod's stack can have gaps: a section with .at starts up there, on brackets of its own (another pod on the same side)
+    const flo = tag === '' && sec.at !== undefined && sec.at > y + .01; if (flo) y = sec.at;
+    const nextFlo = tag === '' && k + 1 < secs.length && secs[k + 1].at !== undefined;
+    const st = STY[sec.zone], upper = k > 0 && !flo, last = k === secs.length - 1;
     LUX = sec.zone === 'high' ? luxPalette(hash('lux', c.i, c.j, k, sec.seed)) : sec.zone === 'ind' ? indPalette(hash('ind', c.i, c.j, k, sec.seed)) : null;   // each district's own light colours
     const lot = { x: c.x, z: c.z, cls: sec.zone, elev: 0, base: y, signs: 0, occupied: true, height: 0, floors: 0 };
-    lot.aloft = !upper && tag === '' && !!c.lift;   // the bottom of a side pod: it stands on a scaffold deck, not the street
+    lot.aloft = !upper && tag === '' && !!c.lift;   // (a floating section too)   // the bottom of a side pod: it stands on a scaffold deck, not the street
     lot.padOK = tag === 'b' ? (R(), false) : last && R() < .3;   // (under a pod: the same draw whatever's on top, so adding a section never re-rolls the one below it)
     if (upper){   // a deck for the new section to stand on
       box(M.concDD, T(c.x, y, c.z), 0, .05, 0, SIDE - .1, .1, SIDE - .1);
@@ -932,7 +942,7 @@ function* stackRunGen(c, secs, y, tag, first){
     // and plazas are stalls already, so they stand on the ground)
     const onStalls = !upper && !sec.mf && !lot.aloft && sec.zone === 'mid' && !STALL_TYPES.has(builder) && hash('stallbase', c.i, c.j, sec.seed) % 100 < 60;
     let P1 = P0, hb = 0;
-    NO_ROOF = !last || tag === 'b';   // (the building under a side pod: a flat roof for the scaffold to stand on)
+    NO_ROOF = (!last && !nextFlo) || tag === 'b';   // (the building under a side pod: a flat roof for the scaffold to stand on)
     try { withStyle(sec.style, () => {
       if (onStalls){ stallBase(lot, st, P0); hb = lot.height; P1 = under(P0, T(0, hb, 0)); lot.base += hb; lot.height = 0; }
       builder(lot, st, P1);
@@ -1391,9 +1401,6 @@ function podBrackets(c, y0){
     // the strut from a plate lower on the wall up under the beam, a second lighter one in timber now and then
     const yl = y0 - rnd(1.3, 1.7); strut(m, F, x, yl, W, x, y0 - .26, rnd(-.6, -.2), .035); box(M.metalDark, F, x, yl, W - .02, .2, .2, .04);
     if (chance(.4)) strut(M.wood, F, x - sx*.12, yl + .35, W, x - sx*.12, y0 - .26, .5, .028);
-    // the tie rod from higher on the wall out to the far corner, a turnbuckle part way
-    const yt = y0 + rnd(1.5, 1.9); strut(M.metalDark, F, x, yt, W, x, y0 + .02, -1.12, .012); box(M.metalDark, F, x, yt, W - .02, .14, .14, .04);
-    box(M.metal, F, x, (yt + y0)/2, (W - 1.12)/2, .03, .1, .03);
   }
   // cross-ties under the deck between the beams
   for (const z of [-.8, .1, .9]) box(steel(), F, 0, y0 - .3, z, 2.16, .06, .06);
@@ -2451,7 +2458,7 @@ function addSection(c, zone, opt = {}){   // (opt.mf: a single unit, that many f
   if (opt.mf) sec.mf = opt.mf;
   if (cap !== null){ const f = Math.floor((cap - y0 - (c.sections.length ? .1 : 0) + .02)/FH); if (f < 1) return; sec.mf = Math.min(f, opt.mf || f); }
   holdRegion(c);
-  if (cap === null && !c.lift && STAGE_ON()){
+  if (cap === null && !c.lift && STAGE_ON() && opt.after === undefined){
     // the piece is made in steps over the next frames; the plot keeps its old look until it is ready, then the sweep builds the new one (the edit's own frame is a few milliseconds)
     c.sections.push(sec);
     stageChain(c, prebuilt => {
@@ -2463,7 +2470,14 @@ function addSection(c, zone, opt = {}){   // (opt.mf: a single unit, that many f
     return;
   }
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
-  c.sections.push(sec);
+  let ya = y0;
+  if (opt.after !== undefined && opt.after < c.sections.length - 1){   // on a pod with another above it: in the gap, a floor left under that one
+    const nx = c.sections[opt.after + 1], bt = c.sectionTops[opt.after], room = Math.floor((nx.at - bt - .1 + .02)/FH) - 1;
+    if (!(nx.at > bt) || room < 1){ c.view = old.view; c.data = old.data; releaseRegion(regKey(c.i, c.j)); return; }
+    c.sections.forEach((s, k) => { if (s.kh === undefined) s.kh = k; }); sec.kh = 100 + c.sections.length + ((Math.random()*1e6)|0);
+    sec.mf = Math.min(sec.mf || room, room); ya = bt;
+    c.sections.splice(opt.after + 1, 0, sec);
+  } else c.sections.push(sec);
   if (cap !== null){
     for (let tries = 0; tries < 8; tries++){
       rebuildCell(c); disposeData(c.data); c.data = null;
@@ -2476,8 +2490,34 @@ function addSection(c, zone, opt = {}){   // (opt.mf: a single unit, that many f
   refresh([c]);
   dropView(old);   // the new look already contains everything below the new section
   if (!c.sections.includes(sec)){ releaseRegion(regKey(c.i, c.j)); return; }   // (it wouldn't fit under the highway)
-  startAnim(c, 'build', y0 - .05, c.height + 1.2, zone, SIDE, null);
+  startAnim(c, 'build', ya - .05, (ya !== y0 ? ya + FH*1.5 : c.height + 1.2), zone, SIDE, null);
   maybeSpawnMegas(c);
+}
+// another bracketed pod on a plot that has one: a single home up (or down) the same side, a floor's gap from the others
+function addFloatPod(c, y, zone){
+  if (!c.lift || c.lift.v !== 2 || c.sections.length >= MAX_SECTIONS) return null;
+  finishAnimsOn(c); holdRegion(c);
+  const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
+  c.sections.forEach((s, k) => { if (s.kh === undefined) s.kh = k; });
+  const sec = { zone, seed: (Math.random()*1e9)|0, style: styleNow(), mf: 1, kh: 100 + c.sections.length + ((Math.random()*1e6)|0) };
+  if (y < c.lift.y){ c.sections[0].at = c.lift.y; c.sections.unshift(sec); c.lift.y = y; }
+  else { let k = 0; while (k < c.sections.length && c.sectionTops[k] <= y + .01) k++; sec.at = y; c.sections.splice(k, 0, sec); }
+  refresh([c]); dropView(old);
+  startAnim(c, 'build', y - .05, y + FH*1.5, zone, SIDE, null);
+  return c;
+}
+// take one section off a bracketed pod stack: the top of the block the pointer is on (the gaps close up the way they were)
+function removePodSection(c, k){
+  finishAnimsOn(c);
+  const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
+  const y0 = k > 0 && c.sections[k].at === undefined ? c.sectionTops[k - 1] : (k === 0 ? c.lift.y : c.sections[k].at), top = c.sectionTops[k], zone = c.sections[k].zone;
+  c.sections.forEach((s, q) => { if (s.kh === undefined) s.kh = q; });
+  const gone = c.sections.splice(k, 1)[0];
+  if (gone.at !== undefined && c.sections[k] && c.sections[k].at === undefined) c.sections[k].at = gone.at;   // (the one above it now starts where it did)
+  if (k === 0 && c.sections.length){ c.lift.y = c.sections[0].at ?? c.lift.y; delete c.sections[0].at; }
+  if (!c.sections.length){ c.lift = null; if (c.below){ c.sections = c.below; c.below = null; } }
+  refresh(!c.lift ? [c, ...SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b))).filter(n => n && n.lift && !n.mega)] : [c]);
+  startAnim(c, 'remove', y0 - .05, top + 1.2, zone, SIDE, old);
 }
 // hang a pod off the side of a taller building, over the empty plot c, its deck at height y
 function addLift(c, y, zone, opt = {}){
@@ -2917,7 +2957,7 @@ function pickAt0(){
       const e = 1e-3, n = new THREE.Vector3(); if (Math.abs(_hit.y - y1) < e) n.set(0, 1, 0); else if (Math.abs(_hit.x - _box3.min.x) < e) n.set(-1, 0, 0); else if (Math.abs(_hit.x - _box3.max.x) < e) n.set(1, 0, 0); else if (Math.abs(_hit.z - _box3.min.z) < e) n.set(0, 0, -1); else n.set(0, 0, 1);
       ct = d; claim = { t: d, n, o: c }; };
     for (const c of cells.values()){ if (c.mega || !c.sections.length) continue;
-      if (c.lift){ tryCol(c, c.lift.y, c.height); if (c.below && c.below.length) tryCol(c, CURB, groundTop(c)); } else tryCol(c, CURB, c.height); }
+      if (c.lift){ if (c.podBlocks) for (const [s0, s1] of c.podBlocks) tryCol(c, s0, s1); else tryCol(c, c.lift.y, c.height); if (c.below && c.below.length) tryCol(c, CURB, groundTop(c)); } else tryCol(c, CURB, c.height); }
     if (claim && (!best || best.o !== claim.o || best.slab || best.gap)) best = claim;
   }
   // Looked through one of those things over the street: what's behind counts only if it's the building that thing stands
@@ -2972,27 +3012,33 @@ function pickClassify(h){
   if (h.gap) return { d: h.t, c, kind: 'gap', p: P };
   // a building: under a pod, its ground part; otherwise the building
   let kind = 'bld', topY = c.height;
+  if (c.lift && c.lift.v === 2 && c.podBlocks && c.podBlocks.length > 1 && P.y >= c.lift.y - .15){   // several pods up one side: the one the hit is on, its own top
+    const bl = c.podBlocks.find(([s0, s1]) => P.y >= s0 - .45 && P.y <= s1 + FH*.6);
+    if (!bl) return { d: h.t, c, kind: 'gap', p: P };
+    topY = bl[1]; if (bl !== c.podBlocks[c.podBlocks.length - 1]) var podBl = bl;
+  }
   if (c.lift){ const gt = groundTop(c); if (P.y < gt - .01 && gt > CURB){ kind = 'low'; topY = gt; } else if (P.y < c.lift.y - .15) return { d: h.t, c, kind: 'gap', p: P }; }
   // The roof or a wall, the way it looks on screen: the plot's footprint stood up as a column, capped at the roof. The ray
   // coming in through the cap is the roof; through a side, that wall, at the height where it comes in (the wall's own plane,
   // so a ledge, a planter or a sign out on the wall doesn't move it). Anything standing above the roof (tanks, plants,
   // antennas) is the roof too. (A ledge two floors down used to count as the roof and add a floor up top.)
   const base = kind === 'low' ? CURB + .01 : (c.lift ? c.lift.y : CURB) + .01;
-  if (P.y >= topY + .02) return { d: h.t, c, kind, p: new THREE.Vector3(P.x, topY, P.z) };
+  const roof = () => ({ d: h.t, c, kind, p: new THREE.Vector3(P.x, topY, P.z), top: topY, bl: podBl || null });
+  if (P.y >= topY + .02) return roof();
   _box3.min.set(c.x - SIDE/2, -1, c.z - SIDE/2); _box3.max.set(c.x + SIDE/2, topY, c.z + SIDE/2);
   if (!_box3.containsPoint(ray.ray.origin) && ray.ray.intersectBox(_box3, _hit)){
     const E = _hit, e = 1e-3;
-    if (Math.abs(E.y - topY) < e) return { d: h.t, c, kind, p: new THREE.Vector3(P.x, topY, P.z) };
+    if (Math.abs(E.y - topY) < e) return roof();
     const [a, b] = Math.abs(E.x - _box3.min.x) < e ? [-1, 0] : Math.abs(E.x - _box3.max.x) < e ? [1, 0] : Math.abs(E.z - _box3.min.z) < e ? [0, -1] : [0, 1];
-    return { d: h.t, c, kind, p: new THREE.Vector3(c.x + a*SIDE/2, Math.max(base, Math.min(E.y, topY - .05)), c.z + b*SIDE/2) };
+    return { d: h.t, c, kind, p: new THREE.Vector3(c.x + a*SIDE/2, Math.max(base, Math.min(E.y, topY - .05)), c.z + b*SIDE/2), bl: podBl || null };
   }
   // (the ray never comes into the column: something sticking out past it, or over its top edge)
-  if ((up && P.y >= topY - .3) || P.y >= topY - FH*.5) return { d: h.t, c, kind, p: new THREE.Vector3(P.x, topY, P.z) };
+  if ((up && P.y >= topY - .3) || P.y >= topY - FH*.5) return roof();
   // a side the camera can see (two of the four face it): the one the hit is further out on. (Going by the way a ledge
   // faced, or where it was, could pick a back side, and the pod went up behind the building.)
   const rd = ray.ray.direction, sx = rd.x > 0 ? -1 : 1, sz = rd.z > 0 ? -1 : 1;
   const [a, b] = (P.x - c.x)*sx >= (P.z - c.z)*sz ? [sx, 0] : [0, sz], y = Math.min(P.y, topY - .05);
-  return { d: h.t, c, kind, p: new THREE.Vector3(c.x + a*SIDE/2, Math.max(base, y), c.z + b*SIDE/2) };
+  return { d: h.t, c, kind, p: new THREE.Vector3(c.x + a*SIDE/2, Math.max(base, y), c.z + b*SIDE/2), bl: podBl || null };
 }
 // turn a pick into a build target
 let POD_HOLD = null;   // the floor a side pod is held at while the pointer stays near it
@@ -3007,7 +3053,8 @@ function targetOf(pk){
     const c = pk.c, gt = groundTop(c), mid = (gt + c.lift.y)/2;
     return pk.kind === 'gap' && pk.p.y > mid ? { type: 'podDown', c } : { type: 'belowUp', c };
   }
-  const c = pk.c, top = pk.kind === 'plat' ? CURB : pk.kind === 'low' ? groundTop(c) : c.height;
+  const c = pk.c, top = pk.top !== undefined ? pk.top : pk.kind === 'plat' ? CURB : pk.kind === 'low' ? groundTop(c) : c.height;
+  if (pk.bl && Math.abs(pk.p.y - top) < .03) return { type: 'up', c, after: pk.bl[3] };   // (the roof of a pod with another above it on the same side)
   // the pavement round a building (or a lamp or a bench at its foot): nothing. (It used to add a floor to the building's top.)
   if (pk.kind === 'plat' && !c.mega && c.sections.length) return null;
   if (Math.abs(pk.p.y - top) < .03){
@@ -3029,6 +3076,14 @@ function targetOf(pk){
   const inGrid = Math.abs(c.i + a) <= GRID_MAX && Math.abs(c.j + b) <= GRID_MAX;
   // (or over a shorter building next door, if there's a floor's gap between its roof and the pod)
   const shorter = n && n.sections.length && !n.lift && !n.mega;
+  if (S.zone === 'low' && n && n.lift && n.lift.v === 2 && !n.mega && (pk.kind === 'bld' || pk.kind === 'low') && n.podBlocks){
+    const host = pk.kind === 'low' ? { sectionTops: c.belowTops, height: groundTop(c) } : c;
+    const y0 = pk.kind === 'low' || !c.lift ? CURB : c.lift.y, key = c.i + ',' + c.j + ',' + a + ',' + b + ',' + pk.kind, H = POD_HOLD;
+    let ly = H && H.key === key && pk.p.y > H.ly - FH*.33 && pk.p.y < H.ly + FH*1.33 ? H.ly : liftSnap(host, pk.p.y, y0);
+    const fits = y => y !== null && y >= (n.belowTop ?? CURB) + FH - .05 && n.podBlocks.every(([s0, s1]) => y >= s1 + FH - .05 || y + 2*FH <= s0 + .05);
+    if (fits(ly)){ POD_HOLD = { key, ly }; return { type: 'side', c: n, i: n.i, j: n.j, y: ly, from: c }; }
+    return null;
+  }
   if ((S.zone === 'low' || S.zone === 'mid' || S.zone === 'ind' || S.zone === 'high') && (pk.kind === 'bld' || pk.kind === 'low') && !c.mega && (n ? !n.sections.length || shorter : inGrid) && pk.p.y > CURB + FH){
     const host = pk.kind === 'low' ? { sectionTops: c.belowTops, height: groundTop(c) } : c;
     const y0 = pk.kind === 'low' || !c.lift ? CURB : c.lift.y, need = shorter ? n.height + FH - .05 : -Infinity;
@@ -3057,13 +3112,14 @@ function applyTarget(t){
   if (t.type === 'onto' && t.c.lift){ return zone ? addBelowUp(t.c, zone) : null; }
   if (t.type === 'side'){ if (!zone) return null; const c = t.c || addPlatform(t.i, t.j, null); if (c) finishAnimsOn(c);
     // residential: a single home on brackets off the wall (the other zones keep their scaffolds for now)
+    if (c && c.lift && c.lift.v === 2) return addFloatPod(c, t.y, zone);
     const opt = zone === 'low' && t.from ? { d: [t.i - t.from.i, t.j - t.from.j], mf: 1 } : {};
     return c ? addLift(c, t.y, zone, opt) : null; }
   if (!zone && t.type === 'onto' && !t.c.mega && !t.c.sections.length){ cycleGreen(t.c); return t.c; }   // no zone picked: an empty plot's greenery cycles
   if (!zone || t.c.mega) return null;
-  addSection(t.c, zone); return t.c;
+  addSection(t.c, zone, t.after !== undefined ? { after: t.after } : {}); return t.c;
 }
-function removeAt(pk){ if (pk && pk.c && !pk.c.mega) stageFinishNear([pk.c, ...SIDES4.map(([a, b]) => cells.get(ckey(pk.c.i + a, pk.c.j + b)))]); else stageFinishAll(); if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMegaTier(megas.get(pk.c.mega)); if (pk.kind === 'low') return removeBelow(pk.c); removeSection(pk.c); }
+function removeAt(pk){ if (pk && pk.c && !pk.c.mega) stageFinishNear([pk.c, ...SIDES4.map(([a, b]) => cells.get(ckey(pk.c.i + a, pk.c.j + b)))]); else stageFinishAll(); if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMegaTier(megas.get(pk.c.mega)); if (pk.kind === 'low') return removeBelow(pk.c); if (pk.bl) return removePodSection(pk.c, pk.bl[3]); removeSection(pk.c); }
 
 /* ---------- hover outline showing where a click would build ---------- */
 const hoverMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85, depthTest: false });

@@ -124,7 +124,7 @@ function hlBuild(){
 function unitAt(px, py){
   const t = targetOf(pickAt(px, py)); if (!t) return false;
   if (t.type === 'empty'){ const c = addPlatform(t.i, t.j, null); if (c){ finishAnimsOn(c); addSection(c, 'low', { mf: 1 }); } return true; }
-  if ((t.type === 'up' || (t.type === 'onto' && !t.c.sections.length)) && t.c && !t.c.mega){ addSection(t.c, 'low', { mf: 1 }); return true; }
+  if ((t.type === 'up' || (t.type === 'onto' && !t.c.sections.length)) && t.c && !t.c.mega){ addSection(t.c, 'low', Object.assign({ mf: 1 }, t.after !== undefined ? { after: t.after } : {})); return true; }
   return false;
 }
 let shiftTap = null;

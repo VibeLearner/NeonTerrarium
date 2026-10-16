@@ -27,6 +27,11 @@ const RAIN_SKY = C(0x28324a), tmpC = new THREE.Color();
 // The sun stands far back (SUN_BACK) and sees deep (core.js), so tall buildings well toward the sun, whose long
 // shadows reach into view in the evening, are always in its view.
 const SUN_DIR = new THREE.Vector3(0, 1, 0), _sunC = new THREE.Vector3();
+// With the day cycle running, the sun (and so every shadow) moves in steps of a quarter hour of game time, about 40
+// seconds at normal speed, instead of creeping on every frame: the shadows stay still, then shift once. (Creeping, the
+// shadow map was redrawn and swapped twice a second, so the shadows were never still.) Set by hand, the hour is exact.
+const SUN_STEP = .25;
+const sunHour = h => S.cycle ? Math.floor(h/SUN_STEP)*SUN_STEP : h;
 const SUN_BACK = 260;
 // Stable shadows: the box only ever moves by whole shadow-map texels, measured along the sun's own view axes, so
 // when it moves and the shadows are redrawn they land on exactly the same grid as before and nothing changes on
@@ -166,7 +171,7 @@ function applyTimeOld(){
   // (18:00); after that the same light rises as the moon over the west and travels back across the night sky to be
   // the sunrise in the east. Its height follows |sin|, so it never dips below the horizon. (It used to jump straight
   // from the setting sun to the moon on the other side, flipping every shadow at about 17:48 and 6:12.)
-  const ang = ((h - 6)/12)*PI;
+  const ang = ((sunHour(h) - 6)/12)*PI;
   SUN_DIR.set(Math.cos(ang)*.9, .32 + Math.abs(Math.sin(ang))*.9, .5).normalize(); placeSun();
   sun.color.copy(cur.sun); sun.intensity = cur.si;
   hemi.color.copy(cur.hs); hemi.groundColor.copy(cur.hg); hemi.intensity = cur.hi;

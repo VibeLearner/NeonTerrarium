@@ -343,7 +343,7 @@ function lkApply(){
   cur.sun.setRGB(v.sun[0], v.sun[1], v.sun[2]); cur.hs.setRGB(v.hemiSky[0], v.hemiSky[1], v.hemiSky[2]); cur.hg.setRGB(v.hemiGnd[0], v.hemiGnd[1], v.hemiGnd[2]);
   cur.cloud.setRGB(v.cloud[0], v.cloud[1], v.cloud[2]); cur.si = v.sunI; cur.hi = v.hemiI; cur.night = night;
   // One continuous path, so shadows never flip (see applyTimeOld): the sun follows the clock whatever the look
-  const ang = ((h - 6)/12)*PI;
+  const ang = ((sunHour(h) - 6)/12)*PI;
   // (never quite as low as the old way's: the flat ground's light steps from its lit to its shaded tone where the sun's height above it crosses a third (the toon
   //  ramp's band), and the old lowest sun, near 6:00 and 18:00, crossed it, so all the ground went into shade at once at 5:49 pm and came out at 6:11 am)
   SUN_DIR.set(Math.cos(ang)*.9, .385 + Math.abs(Math.sin(ang))*.85, .5).normalize(); placeSun();

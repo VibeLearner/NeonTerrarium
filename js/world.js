@@ -1389,7 +1389,7 @@ function liftPlatformLux(c, y0){
 function podBrackets(c, y0){
   R = mulberry32(hash('podbr', c.i, c.j, Math.round(y0*100)));
   const [a, b] = c.lift.d || [1, 0], F = under(T(c.x, 0, c.z), T(0, 0, 0, Math.atan2(-a, -b)));   // local +z: toward the host wall
-  const W = LOT - .85, steel = () => pick([M.rust, M.rust, M.metalDark, M.metal]);
+  const W = LOT - .55, steel = () => pick([M.rust, M.rust, M.metalDark, M.metal]);
   // the deck: planks on a frame
   box(M.frame, F, 0, y0 - .1, 0, 2.36, .08, 2.36);
   for (let x = -1.12; x <= 1.13; x += .16) box(pick([M.wood, M.wood, M.crate]), F, x, y0 - .03, 0, .14, .05, 2.3);
@@ -1399,8 +1399,7 @@ function podBrackets(c, y0){
     box(m, F, x, y0 - .2, (W - 1.2)/2, .1, .14, W + 1.2);
     box(M.metalDark, F, x, y0 - .2, W - .02, .24, .3, .04);
     // the strut from a plate lower on the wall up under the beam, a second lighter one in timber now and then
-    const yl = y0 - rnd(1.3, 1.7); strut(m, F, x, yl, W, x, y0 - .26, rnd(-.6, -.2), .035); box(M.metalDark, F, x, yl, W - .02, .2, .2, .04);
-    if (chance(.4)) strut(M.wood, F, x - sx*.12, yl + .35, W, x - sx*.12, y0 - .26, .5, .028);
+    const yl = y0 - .9; strut(m, F, x, yl, W - .35, x, y0 - .26, 1.3, .035); box(M.metalDark, F, x, yl, W - .37, .2, .2, .04);   // (a short knee brace by the wall)
   }
   // cross-ties under the deck between the beams
   for (const z of [-.8, .1, .9]) box(steel(), F, 0, y0 - .3, z, 2.16, .06, .06);
@@ -1415,7 +1414,6 @@ function podBrackets(c, y0){
     const n = 5; for (let k = 0; k <= n; k++){ const u = -1.15 + 2.3*k/n; box(M.frame, F, ex + (w > d ? u : 0), y0 + .22, ez + (w > d ? 0 : u), .03, .45, .03); } }
   // a lamp under the deck, a cable or two hanging, a pot plant on the gangway
   box(M.metalDark, F, rnd(-.5, .5), y0 - .38, rnd(-.6, .3), .1, .06, .1); glow(F, 0, y0 - .45, -.2, 'warm', .6);
-  for (let k = 0; k < irand(1, 2); k++){ const x = rnd(-1, 1); sagCable(F, x, y0 - .25, rnd(-1, .5), x + rnd(-.3, .3), y0 - rnd(.6, 1.2), rnd(-1, .5), rnd(.1, .3)); }
   if (chance(.6)) plant(pick(['fern', 'succulent', 'bush']), F, gx + .3, y0 + .02, rnd(1.4, W - .3), rnd(.5, .7));
   // the buildings round it on its other three sides (left, right and across the street from the wall it hangs off): any
   // that reaches the deck gets beams over to its wall with a strut under each, and a gangway with a door frame when its
@@ -1427,7 +1425,7 @@ function podBrackets(c, y0){
     const G = under(F, T(0, 0, 0, ang)), m = steel();   // (local +z: toward that building)
     for (const bx of [-.75, .75]){
       box(m, G, bx, y0 - .2, (W + 1.18)/2, .1, .12, W - 1.18 + .1); box(M.metalDark, G, bx, y0 - .2, W - .02, .22, .28, .04);
-      const yl = y0 - rnd(1.1, 1.5); strut(m, G, bx, yl, W, bx, y0 - .26, 1.25, .03); box(M.metalDark, G, bx, yl, W - .02, .18, .18, .04);
+      const yl = y0 - .8; strut(m, G, bx, yl, W - .35, bx, y0 - .26, 1.6, .03); box(M.metalDark, G, bx, yl, W - .37, .18, .18, .04);
     }
     if (n.height >= y0 + 1.1){
       for (let z = 1.2; z < W; z += .14) box(pick([M.wood, M.crate]), G, 0, y0 - .03, z + .06, .8, .05, .12);
@@ -3017,7 +3015,7 @@ function pickClassify(h){
     if (!bl) return { d: h.t, c, kind: 'gap', p: P };
     topY = bl[1]; if (bl !== c.podBlocks[c.podBlocks.length - 1]) var podBl = bl;
   }
-  if (c.lift){ const gt = groundTop(c); if (P.y < gt - .01 && gt > CURB){ kind = 'low'; topY = gt; } else if (P.y < c.lift.y - .15) return { d: h.t, c, kind: 'gap', p: P }; }
+  if (c.lift){ const gt = groundTop(c); if (P.y < Math.max(gt + .3, Math.min(gt + FH*.7, c.lift.y - 1.0)) && gt > CURB){ kind = 'low'; topY = gt; } else if (P.y < c.lift.y - .15) return { d: h.t, c, kind: 'gap', p: P }; }
   // The roof or a wall, the way it looks on screen: the plot's footprint stood up as a column, capped at the roof. The ray
   // coming in through the cap is the roof; through a side, that wall, at the height where it comes in (the wall's own plane,
   // so a ledge, a planter or a sign out on the wall doesn't move it). Anything standing above the roof (tanks, plants,

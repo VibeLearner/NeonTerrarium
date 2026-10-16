@@ -1658,6 +1658,7 @@ function bucketTop(){ let m = CURB; for (const b of buckets.values()){ const p =
 // that ends in a yield (see collectGen, stackRunGen, sideLayoutGen). Run all at once it is the old rebuildCell; run by stageStep it is a few milliseconds a frame.
 function* cellBody(c){
   withStyle(c.style, () => buildPlatform(c)); yield;
+  if (!c.sections.length){ c.walks = null; c.liftCab = null; c.liftRoof = null; c.belowTop = null; c.belowTops = []; }   // (a pod taken away to the last section: its walkways and lift go with it; the people on them used to keep walking the old walkway in and out of the doors)
   if (c.sections.length){ PUT_KEEPOUT = lineKeepOut(c); if (STAGE) STAGE.keep = PUT_KEEPOUT; try { yield* buildStackGen(c); } finally { PUT_KEEPOUT = null; } }
   c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); mtFeet(c);   // (and the feet of any highway over it)
 }
@@ -2495,8 +2496,10 @@ function removeSection(c){
   if (!c.sections.length) return removePlatform(c);
   finishAnimsOn(c);
   const top = c.height, zone = c.sections[c.sections.length - 1].zone, old = { view: c.view, data: c.data }; c.view = null; c.data = null;
+  const wasPod = !!c.lift;
   c.sections.pop(); if (!c.sections.length){ c.lift = null; if (c.below){ c.sections = c.below; c.below = null; } }   // the last of a pod takes its scaffold with it (and a building under it stays)
-  refresh([c]);
+  // (a pod gone: the pods next door that had walkways over to it are rebuilt without them)
+  refresh(wasPod && !c.lift ? [c, ...SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b))).filter(n => n && n.lift && !n.mega)] : [c]);
   startAnim(c, 'remove', (c.sections.length ? c.height : CURB) - .05, top + 1.2, zone, SIDE, old);
 }
 // Delete mode: everything in a block of plots goes at once: megastructures that reach into it (whole), and every

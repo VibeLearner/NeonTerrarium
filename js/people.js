@@ -594,7 +594,7 @@ function* buildNetworkGen(oldDoors, oldSpots){
       else c._podDoor = null;
     }
     // the doors at each end of the pod's walkways, a little bigger to fill their frames
-    c._walkDoors = (c.walks || []).map((w, k) => (w.doors || []).map((wd, e) => { const key = 'w:' + c.i + ',' + c.j + ':' + k + ':' + e, od = oldDoors.get(key);
+    c._walkDoors = (c.lift && c.walks || []).map((w, k) => (w.doors || []).map((wd, e) => { const key = 'w:' + c.i + ',' + c.j + ':' + k + ':' + e, od = oldDoors.get(key);
       const dd = { key, wall: { x: wd.x, z: wd.z }, y: w.y - .01, n: wd.n, k: 1.3, mega: false, noDraw: false, open: od ? od.open : 0, want: false, col: w.col ?? DOOR_COLS[hash(key) % DOOR_COLS.length] };
       doorList.push(dd); doorByKey.set(key, dd); return dd; }));
     const d = !c.liftCab || c.below ? plotDoor(c, sides, 1.75) : null;
@@ -1692,7 +1692,7 @@ let deckFrame = 0;
 function drawDeckWalkers(emit, t, dt){
   deckFrame++;   // (each walker's record is stamped as it's seen; the unseen are dropped after)
   for (const c of cells.values()){
-    if (!c.walks || !c.walks.length) continue;
+    if (!c.lift || !c.walks || !c.walks.length) continue;   // (only a pod that still stands)
     c.walks.forEach((w, k) => {
       // how many use it, their keys and its length: fixed for this walkway, worked out once (a rebuilt plot makes new ones)
       let wc = w._deck; if (!wc || wc.i !== c.i || wc.j !== c.j || wc.k !== k){ const n = 1 + (hash('deckn', c.i, c.j, k) % 3 === 0 ? 1 : 0);

@@ -2837,6 +2837,20 @@ function pickAt0(){
       h = pickBox(c.x - SIDE/2, gt, c.z - SIDE/2, c.x + SIDE/2, c.lift.y - .15, c.z + SIDE/2);
       if (h && (!best || h.t < best.t - 1e-4)) best = { t: h.t, n: h.n, o: c, gap: true }; }
   }
+  // A building claims its own outline: a ray that comes into a building's footprint column (up to its roof) before it
+  // hits anything is on that building, even where what's drawn there is narrower (a setback, a slim top, the gap beside
+  // a sign) and the ray would slip past to a building or a plot behind it. (Pointing at the edge of a tower used to build
+  // on whatever stood behind it.)
+  {
+    let ct = best ? best.t - .05 : Infinity, claim = null;
+    const tryCol = (c, y0, y1) => { if (y1 <= y0) return; _box3.min.set(c.x - SIDE/2, y0, c.z - SIDE/2); _box3.max.set(c.x + SIDE/2, y1, c.z + SIDE/2);
+      if (_box3.containsPoint(O) || !ray.ray.intersectBox(_box3, _hit)) return; const d = _hit.distanceTo(O); if (d >= ct) return;
+      const e = 1e-3, n = new THREE.Vector3(); if (Math.abs(_hit.y - y1) < e) n.set(0, 1, 0); else if (Math.abs(_hit.x - _box3.min.x) < e) n.set(-1, 0, 0); else if (Math.abs(_hit.x - _box3.max.x) < e) n.set(1, 0, 0); else if (Math.abs(_hit.z - _box3.min.z) < e) n.set(0, 0, -1); else n.set(0, 0, 1);
+      ct = d; claim = { t: d, n, o: c }; };
+    for (const c of cells.values()){ if (c.mega || !c.sections.length) continue;
+      if (c.lift){ tryCol(c, c.lift.y, c.height); if (c.below && c.below.length) tryCol(c, CURB, groundTop(c)); } else tryCol(c, CURB, c.height); }
+    if (claim && (!best || best.o !== claim.o || best.slab || best.gap)) best = claim;
+  }
   // Looked through one of those things over the street: what's behind counts only if it's the building that thing stands
   // against (its column within half a plot behind it). Otherwise nothing: through a walkway between two towers the ray
   // used to reach a building or a plot well behind them, and that's where the pod or the floor went.

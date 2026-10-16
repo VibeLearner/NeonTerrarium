@@ -2888,7 +2888,7 @@ function pickAt0(){
   for (const c of cells.values()){
     let h = pickBox(c.x - LOT/2, -.8, c.z - LOT/2, c.x + LOT/2, CURB, c.z + LOT/2);
     if (h && (!best || h.t < best.t - 1e-4)) best = { t: h.t, n: h.n, o: c, slab: true };
-    if (c.lift && !c.mega && c.sections.length){ const gt = groundTop(c);
+    if (c.lift && c.lift.v !== 2 && !c.mega && c.sections.length){ const gt = groundTop(c);   // (not under a bracketed pod: the street runs open under it)
       h = pickBox(c.x - SIDE/2, gt, c.z - SIDE/2, c.x + SIDE/2, c.lift.y - .15, c.z + SIDE/2);
       if (h && (!best || h.t < best.t - 1e-4)) best = { t: h.t, n: h.n, o: c, gap: true }; }
   }
@@ -2987,6 +2987,8 @@ function targetOf(pk){
   if (pk.kind === 'sky') return cells.has(ckey(pk.i, pk.j)) ? null : { type: 'empty', i: pk.i, j: pk.j };
   // under a pod: the top part of the gap grows the pod down; the bottom part, the ground and the roof of the building
   // under it build up from the ground
+  // (a bracketed side pod: nothing under it builds; its brackets and the open street below do nothing)
+  if (pk.c && pk.c.lift && pk.c.lift.v === 2 && (pk.kind === 'gap' || pk.kind === 'plat')) return null;
   if (pk.c && pk.c.lift && !pk.c.mega && (pk.kind === 'gap' || pk.kind === 'plat' || (pk.kind === 'low' && Math.abs(pk.p.y - groundTop(pk.c)) < .03))){
     const c = pk.c, gt = groundTop(c), mid = (gt + c.lift.y)/2;
     return pk.kind === 'gap' && pk.p.y > mid ? { type: 'podDown', c } : { type: 'belowUp', c };

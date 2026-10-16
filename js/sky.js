@@ -1484,7 +1484,7 @@ const ZOOM_REF = 13.2;
 // How many lines the game is drawn at (Settings, Render: 240p, 480p or 720p). The choice is remembered in this browser.
 // 0 is Smooth: no pixel look, drawn at the screen's own resolution (up to SMOOTH_MAX lines).
 const RES_KEY = 'neonIsland.renderLines', RES_CHOICES = [240, 480, 720, 0], SMOOTH_MAX = 1440;
-let RENDER_LINES = (() => { try { const raw = localStorage.getItem(RES_KEY), v = raw === null ? NaN : +raw; return RES_CHOICES.includes(v) ? v : 480; } catch (e) { return 480; } })();
+let RENDER_LINES = (() => { try { const raw = localStorage.getItem(RES_KEY), v = raw === null ? NaN : +raw; return RES_CHOICES.includes(v) ? v : 720; } catch (e) { return 720; } })();   // (new players: 720p)
 SMOOTH_LOOK.value = RENDER_LINES === 0 ? 1 : 0;
 function setRenderLines(n){
   if (!RES_CHOICES.includes(n) || n === RENDER_LINES) return;   // (0 is Smooth)
@@ -1516,7 +1516,7 @@ const PERF = { grow: Infinity, max: 1.6, ema: 16, t: 0, f: 1, quick: 0, quietUnt
 // (the old "Cap zoom-out resolution"), 0 up to the screen's own resolution (the heaviest: on a sharp laptop screen four times the pixels of the base).
 const ZOOMRES_KEY = 'neonIsland.zoomRes';
 let ZOOM_RES = (() => { try { const raw = localStorage.getItem(ZOOMRES_KEY); if (raw !== null && ['1', '1.6', '0'].includes(raw)) return +raw;
-  const cap = localStorage.getItem('neonIsland.capRes'); if (cap !== null) return cap === '1' ? 1.6 : 0; } catch (e) {} return 1; })();   // (the old box's choice is kept; new players: fixed)
+  const cap = localStorage.getItem('neonIsland.capRes'); if (cap !== null) return cap === '1' ? 1.6 : 0; } catch (e) {} return 1.6; })();   // (the old box's choice is kept; new players: Sharper)
 function setZoomRes(v){ ZOOM_RES = v; try { localStorage.setItem(ZOOMRES_KEY, String(v)); } catch (e) {} applyRenderRes(zoom); }
 function applyRenderRes(z){
   let f = Math.max(1, z/ZOOM_REF);

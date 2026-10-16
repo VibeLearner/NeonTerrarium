@@ -844,7 +844,7 @@ function buildPlatformBody(c){
     if (chance(.4)){ const Pb = under(P, T(rnd(-.9,.9), .05, rnd(-.9,.9), pick([0, PI/2]))); box(M.wood, Pb, 0, .14, 0, .5, .04, .15); box(M.frame, Pb, 0, .07, 0, .42, .14, .1);
       for (const sx of [-.13, .13]) spotAt(Pb, sx, .16, 0, 'seat', null, [0, 1]); }
   }
-  const lamp = ([sx,sz]) => { const Pl = T(x + sx*(LOT/2 - .25), 0, z + sz*(LOT/2 - .25));
+  const lamp = ([sx,sz]) => { const Pl = T(x + sx*(LOT/2 - .25), 0, z + sz*(LOT/2 - .25), Math.atan2(-sz, sx));   // (its arm reaches out over the crossing)
     cyl(M.metalDark, Pl, 0, .65, 0, .03, 1.3); box(M.metalDark, Pl, .12, 1.3, 0, .26, .03, .03);
     KEEP_LIGHT = true; box(M.bulb, Pl, .24, 1.26, 0, .12, .05, .1); glow(Pl, .24, 1.2, 0, 'warm', 1.4); KEEP_LIGHT = false; };
   // part of a park (see parkCells): a tall garden lamp with a lantern globe, throwing a much wider pool of light,
@@ -855,10 +855,12 @@ function buildPlatformBody(c){
     KEEP_LIGHT = true; sph(M.bulb, Pl, 0, 2.02, 0, .13); cyl(M.metalDark, Pl, 0, 2.17, 0, .1, .04); glow(Pl, 0, 2.02, 0, 'warm', 2.3); KEEP_LIGHT = false; };
   // the park lamps stand in the middle of every other plot, on a checkerboard laid over the whole island, so
   // however the green grows they keep an even spacing (and the plots between are lit from the four around them)
+  // The street lamps: one at every other crossing, on a checkerboard laid over the whole island, so they stand at an even
+  // spacing along every street whatever gets built (each crossing's lamp belongs to the plot on its -x,-z side, on that
+  // plot's corner, its arm out over the crossing). (They used to be a coin toss per plot on a random corner: bunched up in
+  // places, missing for blocks in others, none at all along the shops.) A dark street's lamp is its failing one.
   if (!c.sections.length && c.park){ if ((c.i + c.j) % 2 === 0) parkLamp(); }
-  else if (c.sections[0] && c.sections[0].zone === 'mid'){}   // the commercial streets are lit by their shops, not lamps
-  else if (chance(.45)) lamp(pick(CORNERS));   // a street lamp on one corner
-  else if (DARK) lamp(CORNERS[hash('lamp', c.i, c.j) % 4]);   // a dark street always has its one failing lamp
+  else if (((c.i + c.j) % 2 + 2) % 2 === 0) lamp([1, 1]);
 }
 
 /* ---------- a building: a stack of sections, each a complete building from the zone's set of types ---------- */

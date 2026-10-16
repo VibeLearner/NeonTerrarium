@@ -1,110 +1,113 @@
-// Neon Terrarium: the High Overseer. Double-click the Data Spire and the city glitches, a curtain of falling glyphs closes
-// over it, and the Overseer's desk boots up, laid out after the "Overturn" rotation desk of uispace: a strip of readouts
-// across the top (the archive's integrity in amber, the clock), the city's plan in the middle, cut into 48
-// sectors and drawn as tiny extruded blocks coloured by whether each sector has turned in for the night (its residents'
-// bedtimes), the turn schedule beside it, and along the bottom the tiers (the four zones), a crossings log streaming in,
-// and the hold lever. Everything on it is read from the city as it stands. In a callout on the plan, wired to the Spire,
-// the question: whether to remember. Yes: the television switches off, and the coast comes on (coast.html). No: the
-// desk glitches away, back to the city. While the desk covers the screen the city stops drawing (OVERSEER.hold; main.js).
+// Neon Terrarium: the Data Spire's city ledger. Double-click the Data Spire and the city glitches, a curtain of falling
+// glyphs closes over it, and the Spire's view boots: a full-screen ledger of the city the player is building, in the
+// Spire's own night-ops style (warm black, bone and amber, signal red for police matters, a pale teal only for transit;
+// chamfered panels with coded tabs, ruler ticks, an angular display face). At its heart a top-down map: every plot,
+// the megastructures, highways and metro lines, where people are gathered right now (an amber heat), and where the
+// police incidents happened (numbered red pins, matched in the list beside it). Around it: population and who's awake,
+// floors by zone, growth over the days played (from the ledger, cityledger.js), the busiest places, transit, police,
+// markets and nightlife. All read from the city as it stands when the view opens (the city holds while it's open).
+// The first time, the High Overseer asks whether to remember the coast: yes ("Accessing") switches the television
+// off and the coast on (coast.html). After that first visit the question no longer pops up: the coast is a box at the
+// side, ACCESS whenever the player likes. Esc or CLOSE: back to the city. While open the city stops drawing (O.hold).
 'use strict';
 const OVERSEER = (() => {
   const O = { open: false, hold: false };
+  const ACCESS_KEY = 'neonIsland.coastAccessed';
   const css = `
-  #ovs { position: fixed; inset: 0; z-index: 60; color: #9aa29e; font: 10px/1.35 'JetBrains Mono', ui-monospace, monospace; letter-spacing: .06em; background: #040505;
-    display: grid; grid-template-columns: minmax(0, 1.62fr) minmax(320px, 1fr); grid-template-rows: 62px minmax(0, 1fr) 208px; gap: 7px; padding: 9px; overflow: hidden; user-select: none; }
-  #ovs * { box-sizing: border-box; }
-  #ovs b, #ovs .w { color: #e8ebe9; font-weight: 600; } #ovs .amb { color: #ffa834; } #ovs .red { color: #ff5a3c; } #ovs .grn { color: #59c27a; } #ovs .dim { color: #565e5a; }
-  #ovs .blink { animation: ovsBlink 1s steps(2) infinite; } @keyframes ovsBlink { 50% { opacity: .2; } }
-  #ovs .scan { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 3px); z-index: 20; }
-  /* the top strip: cells of readouts between hairlines */
-  #ovs .top { grid-column: 1 / -1; display: flex; border: 1px solid #262b28; background: #070908; min-width: 0; }
-  #ovs .top .c { padding: 7px 11px 6px; border-right: 1px solid #262b28; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; white-space: nowrap; overflow: hidden; }
-  #ovs .top .c:last-child { border-right: 0; margin-left: auto; text-align: right; } #ovs .top .c.fix { flex-shrink: 0; }
-  #ovs .top small { font-size: 8.5px; letter-spacing: .2em; color: #6b736f; } #ovs .top .v { font-size: 12.5px; color: #e8ebe9; letter-spacing: .08em; }
-  #ovs .top .big { font: 600 34px/1 'JetBrains Mono', monospace; color: #ffa834; letter-spacing: .02em; text-shadow: 0 0 18px rgba(255,168,52,.35); }
-  #ovs .top .clock { font: 600 29px/1 'JetBrains Mono', monospace; color: #e8ebe9; letter-spacing: .02em; }
-  #ovs .top .row { display: flex; align-items: center; gap: 10px; }
-  #ovs .sq { display: inline-block; width: 13px; height: 13px; background: #59c27a; box-shadow: 0 0 8px rgba(89,194,122,.5); vertical-align: -2px; }
-  #ovs .seg { display: flex; gap: 2px; height: 9px; width: 150px; } #ovs .seg i { flex: 1; background: #2a2416; } #ovs .seg i.on { background: #ffa834; } #ovs .seg i.hot { background: #ffd38a; animation: ovsBlink .8s steps(2) infinite; }
-  /* panels, lettered */
-  #ovs .pn { position: relative; border: 1px solid #262b28; background: #060807; min-height: 0; min-width: 0; overflow: hidden; }
-  #ovs .pn > header { position: relative; z-index: 3; display: flex; align-items: center; gap: 8px; height: 22px; padding: 0 8px; border-bottom: 1px solid #1c201e; font-size: 9px; letter-spacing: .22em; color: #9aa29e; background: #060807; white-space: nowrap; }
-  #ovs .k { display: inline-grid; place-items: center; width: 15px; height: 15px; border: 1px solid #a8b0ac; color: #e8ebe9; font-weight: 600; letter-spacing: 0; font-size: 9px; }
-  #ovs header .r { margin-left: auto; color: #565e5a; }
-  #ovs canvas { display: block; }
-  /* A: the plan */
-  #ovs .plan canvas.iso { position: absolute; left: 0; top: 22px; width: 100%; height: calc(100% - 22px); }
-  #ovs .legend { position: absolute; left: 10px; bottom: 10px; z-index: 4; border: 1px solid #262b28; background: rgba(4,5,5,.88); padding: 6px 9px 7px; font-size: 8.5px; letter-spacing: .16em; display: grid; grid-template-columns: auto auto; gap: 3px 14px; }
-  #ovs .legend h5 { grid-column: 1 / -1; margin: 0 0 2px; font: 600 8.5px/1 'JetBrains Mono', monospace; letter-spacing: .25em; color: #a8b0ac; }
-  #ovs .legend span { display: flex; align-items: center; gap: 6px; } #ovs .legend i { width: 9px; height: 9px; display: inline-block; }
-  #ovs .inset { position: absolute; right: 10px; top: 32px; z-index: 4; width: 196px; border: 1px solid #262b28; background: rgba(4,5,5,.9); }
-  #ovs .inset h5 { margin: 0; padding: 4px 7px; border-bottom: 1px solid #1c201e; font: 600 8.5px/1 'JetBrains Mono', monospace; letter-spacing: .2em; color: #a8b0ac; display: flex; justify-content: space-between; }
-  #ovs .inset canvas { width: 100%; height: 118px; }
-  #ovs .callout { position: absolute; z-index: 4; border: 1px solid #e5432d; background: rgba(28,6,4,.9); padding: 5px 8px; font-size: 8.5px; letter-spacing: .12em; color: #ffb3a6; white-space: nowrap; line-height: 1.5; }
-  #ovs .callout b { color: #fff; }
-  /* the question, a callout of its own wired to the Spire */
-  #ovs .ask { position: absolute; right: 10px; bottom: 10px; z-index: 5; width: 318px; border: 1px solid #ffa834; background: rgba(8,6,2,.94); box-shadow: 0 0 0 3px rgba(4,5,5,.9), 0 0 40px rgba(255,168,52,.12); }
-  #ovs .ask .hd { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-bottom: 1px solid rgba(255,168,52,.35); background: rgba(255,168,52,.1); color: #ffcf7a; font-size: 8.5px; letter-spacing: .24em; }
-  #ovs .ask .hd .k { border-color: #ffa834; color: #ffa834; }
-  #ovs .ask .bd { padding: 12px 14px 22px; }
-  #ovs .ask h1 { margin: 0 0 3px; font: 400 23px/1.05 'Silkscreen', monospace; letter-spacing: .1em; color: #f4ecd8; text-shadow: 2px 0 rgba(255,60,60,.35), -2px 0 rgba(60,255,230,.3), 0 0 18px rgba(255,168,52,.3); }
-  #ovs .ask h1.glitch { animation: ovsGl 2.8s infinite; }
-  @keyframes ovsGl { 0%, 91%, 100% { transform: none; clip-path: none; } 92% { transform: translate(-3px, 1px); clip-path: inset(10% 0 55% 0); } 94% { transform: translate(3px, -1px); clip-path: inset(50% 0 12% 0); } 96% { transform: translate(-1px, 0); clip-path: inset(30% 0 30% 0); } }
-  #ovs .ask .sub { color: #6b736f; font-size: 8.5px; letter-spacing: .26em; margin-bottom: 9px; }
-  #ovs .ask p { margin: 0 0 13px; color: #d6ddd9; font-size: 11.5px; line-height: 1.55; min-height: 4.65em; letter-spacing: .03em; }
-  #ovs .ask p .cur { display: inline-block; width: .6em; height: 1em; background: #ffa834; vertical-align: -2px; animation: ovsBlink .8s steps(2) infinite; }
-  #ovs .btns { display: flex; gap: 12px; }
-  #ovs .btn { position: relative; flex: 1; padding: 9px 12px; border: 1px solid #ffa834; background: transparent; color: #ffa834; font: 600 12px/1 'JetBrains Mono', monospace; letter-spacing: .45em; text-indent: .45em; cursor: pointer; transition: background .12s steps(2), color .12s steps(2); }
-  #ovs .btn.no { border-color: #6b736f; color: #c8d0cc; }
-  #ovs .btn:hover, #ovs .btn:focus-visible { background: #ffa834; color: #0a0703; outline: none; animation: ovsJit .25s steps(2) infinite; }
-  #ovs .btn.no:hover, #ovs .btn.no:focus-visible { background: #c8d0cc; color: #040505; }
-  #ovs .btn small { position: absolute; bottom: -15px; left: 0; right: 0; text-indent: 0; font-size: 8px; letter-spacing: .3em; color: #565e5a; }
-  @keyframes ovsJit { 50% { transform: translate(1px, -1px); } }
-  /* B: the turn schedule */
-  #ovs .sched { display: flex; flex-direction: column; }
-  #ovs .tw { position: relative; flex: 1; min-height: 0; overflow: hidden; }
-  #ovs table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  #ovs th { font-weight: 400; font-size: 8px; letter-spacing: .18em; color: #6b736f; text-align: left; padding: 5px 5px 4px; border-bottom: 1px solid #1c201e; white-space: nowrap; overflow: hidden; }
-  #ovs td { padding: 0 5px; height: 17px; border-bottom: 1px solid #111413; color: #c8d0cc; white-space: nowrap; overflow: hidden; text-overflow: clip; font-size: 9.5px; }
-  #ovs tr.next td { background: rgba(255,168,52,.17); color: #ffd9a0; } #ovs tr.next td:first-child { box-shadow: inset 2px 0 #ffa834; }
-  #ovs tr.vac td { color: #4b524e; }
-  #ovs .st { display: inline-block; min-width: 56px; text-align: center; padding: 1px 4px; font-size: 8px; letter-spacing: .14em; line-height: 11px; }
-  #ovs .st.turned { background: #8c2f1f; color: #ffd9cf; } #ovs .st.nxt { background: #ffa834; color: #140b00; font-weight: 600; } #ovs .st.stb { border: 1px solid #d9c7a0; color: #d9c7a0; }
-  #ovs .st.pend { border: 1px solid #3f8f57; color: #59c27a; } #ovs .st.vac { border: 1px dashed #333936; color: #4b524e; }
-  #ovs td.tl { position: relative; } #ovs td.tl::before { content: ''; position: absolute; left: 5px; right: 5px; top: 8px; height: 1px; background: #1c201e; }
-  #ovs td.tl i { position: absolute; top: 4px; width: 2px; height: 9px; background: #59c27a; } #ovs tr.next td.tl i { background: #ffa834; box-shadow: 0 0 6px #ffa834; } #ovs tr.turnd td.tl i { background: #c2462c; }
-  #ovs .now { position: absolute; top: 0; bottom: 0; width: 1px; background: #ffa834; box-shadow: 0 0 6px #ffa834; z-index: 2; pointer-events: none; }
-  #ovs .now span { position: absolute; top: 2px; left: 3px; font-size: 7.5px; letter-spacing: .2em; color: #140b00; background: #ffa834; padding: 0 3px; }
-  #ovs .ilk { border-top: 1px solid #1c201e; padding: 6px 8px 7px; display: flex; flex-direction: column; gap: 5px; font-size: 8.5px; letter-spacing: .16em; }
-  #ovs .ilk .bar { display: flex; gap: 2px; height: 7px; } #ovs .ilk .bar i { flex: 1; background: #3f8f57; } #ovs .ilk .bar i.r { background: #c2462c; } #ovs .ilk .bar i.off { background: #1c201e; }
-  #ovs .ilk .rd { display: flex; justify-content: space-between; }
+  #spire { --bg: #0b0907; --ink: #ebe1cc; --dim: #8d8170; --faint: #3a3127; --hair: #251f18; --amb: #f3a53a; --amb2: #ffd08a; --red: #ff5b45; --teal: #86d4c6;
+    position: fixed; inset: 0; z-index: 60; color: var(--ink); background: var(--bg); overflow: hidden; user-select: none;
+    font: 10.5px/1.4 'JetBrains Mono', ui-monospace, monospace; letter-spacing: .03em;
+    display: grid; grid-template-columns: 286px minmax(0, 1fr) 308px; grid-template-rows: 46px minmax(0, 1fr) 164px; gap: 8px; padding: 10px; }
+  #spire * { box-sizing: border-box; }
+  #spire::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(rgba(235,225,204,.05) 1px, transparent 1.2px) 0 0 / 14px 14px, radial-gradient(120% 90% at 50% 40%, transparent 50%, rgba(0,0,0,.6) 100%); }
+  #spire .hd, #spire .disp { font-family: 'Chakra Petch', 'JetBrains Mono', sans-serif; }
+  #spire .amb { color: var(--amb); } #spire .red { color: var(--red); } #spire .dim { color: var(--dim); } #spire .teal { color: var(--teal); } #spire b { color: var(--ink); font-weight: 600; }
+  #spire .blink { animation: spBlink 1.1s steps(2) infinite; } @keyframes spBlink { 50% { opacity: .25; } }
+  /* the top bar: no boxes, one rule, a hatched band under the name */
+  #spire .top { grid-column: 1 / -1; position: relative; display: flex; align-items: center; gap: 18px; padding: 0 4px; border-bottom: 1px solid var(--faint); }
+  #spire .top::after { content: ''; position: absolute; left: 0; bottom: -4px; width: 286px; height: 3px; background: repeating-linear-gradient(-45deg, var(--amb) 0 3px, transparent 3px 7px); opacity: .55; }
+  #spire .brand { display: flex; align-items: baseline; gap: 10px; }
+  #spire .brand .hd { font-size: 21px; font-weight: 600; letter-spacing: .18em; color: var(--ink); }
+  #spire .brand small { font-size: 9px; letter-spacing: .26em; color: var(--amb); }
+  #spire .top .mid { margin: 0 auto; display: flex; align-items: baseline; gap: 14px; }
+  #spire .top .clock { font-size: 26px; font-weight: 600; letter-spacing: .06em; color: var(--amb2); }
+  #spire .top .mid span { font-size: 9.5px; letter-spacing: .2em; color: var(--dim); }
+  #spire .close { font: 600 11px/1 'Chakra Petch', sans-serif; letter-spacing: .24em; color: var(--ink); background: transparent; border: 1px solid var(--faint); padding: 7px 12px; cursor: pointer;
+    clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px); }
+  #spire .close:hover, #spire .close:focus-visible { border-color: var(--amb); color: var(--amb); outline: none; }
+  /* panels: a chamfered corner, a coded tab, ruler ticks along the foot */
+  #spire .pn { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: rgba(20,16,12,.72); border: 1px solid var(--faint);
+    clip-path: polygon(12px 0, 100% 0, 100% 100%, 0 100%, 0 12px); padding: 26px 10px 12px; }
+  #spire .pn::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 5px; pointer-events: none;
+    background: repeating-linear-gradient(90deg, var(--faint) 0 1px, transparent 1px 8px), repeating-linear-gradient(90deg, var(--dim) 0 1px, transparent 1px 40px); opacity: .7; }
+  #spire .pn > .tab { position: absolute; left: 0; right: 0; top: 0; height: 20px; display: flex; align-items: center; gap: 8px; padding: 0 9px 0 16px; border-bottom: 1px solid var(--hair); }
+  #spire .pn > .tab::before { content: ''; position: absolute; left: 6px; top: 6px; width: 3px; height: 8px; background: var(--amb); }
+  #spire .pn > .tab code { font: 9px 'JetBrains Mono', monospace; color: var(--bg); background: var(--amb); padding: 0 4px; letter-spacing: .05em; }
+  #spire .pn > .tab .hd { font-size: 11px; font-weight: 600; letter-spacing: .2em; color: var(--ink); }
+  #spire .pn > .tab .m { margin-left: auto; font-size: 8.5px; letter-spacing: .16em; color: var(--dim); white-space: nowrap; }
+  #spire .col { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  #spire .col > .pn { flex: 1; }
+  #spire .big { font: 600 40px/1 'Chakra Petch', sans-serif; letter-spacing: .02em; color: var(--ink); }
+  #spire .unit { font-size: 9px; letter-spacing: .22em; color: var(--dim); margin-left: 6px; }
+  #spire .kv { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; font-size: 10px; } #spire .kv > :nth-child(odd) { color: var(--dim); letter-spacing: .1em; } #spire .kv > :nth-child(even) { text-align: right; }
+  /* a meter: blocks, filled in amber */
+  #spire .meter { display: flex; gap: 2px; height: 8px; margin: 7px 0 6px; } #spire .meter i { flex: 1; background: var(--faint); } #spire .meter i.on { background: var(--amb); } #spire .meter i.sl { background: #5a4a35; }
+  #spire .bars { display: grid; gap: 5px; }
+  #spire .bar { display: grid; grid-template-columns: 74px minmax(0, 1fr) 42px; align-items: center; gap: 8px; font-size: 9.5px; }
+  #spire .bar > span:first-child { color: var(--dim); letter-spacing: .1em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #spire .bar .tr { position: relative; height: 7px; background: repeating-linear-gradient(90deg, var(--hair) 0 1px, transparent 1px 6px); border-bottom: 1px solid var(--faint); }
+  #spire .bar .tr i { position: absolute; left: 0; top: 0; bottom: 1px; background: var(--amb); }
+  #spire .bar > span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  #spire .bar.teal .tr i { background: var(--teal); } #spire .bar.wide { grid-template-columns: 170px minmax(0, 1fr) 34px; }
+  #spire .spark { display: grid; grid-template-columns: 62px minmax(0, 1fr) 52px; align-items: center; gap: 8px; height: 26px; font-size: 9.5px; }
+  #spire .spark > span:first-child { color: var(--dim); letter-spacing: .12em; }
+  #spire .spark canvas { width: 100%; height: 22px; display: block; }
+  #spire .spark > span:last-child { text-align: right; } #spire .spark em { display: block; font-style: normal; font-size: 8.5px; color: var(--amb); }
+  /* the map */
+  #spire .map { padding: 20px 0 0; }
+  #spire .map canvas.mp { position: absolute; left: 0; top: 20px; width: 100%; height: calc(100% - 20px); }
+  #spire .legend { position: absolute; left: 10px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: 70%; font-size: 8.5px; letter-spacing: .14em; color: var(--dim); background: rgba(11,9,7,.78); padding: 5px 8px; border-left: 2px solid var(--amb); }
+  #spire .legend span { display: flex; align-items: center; gap: 5px; } #spire .legend i { display: inline-block; width: 8px; height: 8px; }
+  /* incidents */
+  #spire .inc { display: grid; gap: 0; }
+  #spire .inc .it { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 8px; align-items: start; padding: 5px 0; border-bottom: 1px dashed var(--hair); }
+  #spire .inc .n { display: grid; place-items: center; width: 17px; height: 17px; background: var(--red); color: #1a0703; font: 600 10px/1 'Chakra Petch', sans-serif; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+  #spire .inc .it.old .n { background: #7a3328; color: var(--ink); }
+  #spire .inc .t1 { color: var(--ink); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #spire .inc .t2 { color: var(--dim); font-size: 9px; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #spire .inc .w { color: var(--dim); font-size: 9px; text-align: right; white-space: nowrap; }
+  #spire .empty { color: var(--dim); font-size: 10px; line-height: 1.6; padding: 6px 0; }
   /* the bottom row */
-  #ovs .bot { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.3fr) minmax(0, .95fr); gap: 7px; min-height: 0; }
-  #ovs .tiers .rows { padding: 4px 8px; display: flex; flex-direction: column; gap: 0; }
-  #ovs .tr { display: grid; grid-template-columns: 20px 60px 36px minmax(70px, 1fr) 76px 62px; align-items: center; gap: 8px; height: 37px; border-bottom: 1px solid #111413; font-size: 9.5px; }
-  #ovs .tr.h { height: 18px; font-size: 7.5px; color: #565e5a; letter-spacing: .18em; }
-  #ovs .rn { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid currentColor; font-weight: 600; font-size: 9px; letter-spacing: 0; }
-  #ovs .hb { position: relative; height: 9px; background: repeating-linear-gradient(90deg, #1c201e 0 1px, transparent 1px 25%); border-bottom: 1px solid #262b28; }
-  #ovs .hb i { position: absolute; top: 1px; bottom: 1px; opacity: .85; } #ovs .hb u { position: absolute; top: -3px; bottom: -3px; width: 1px; background: #ffa834; }
-  #ovs .tr .aw { font-size: 9px; line-height: 1.3; } #ovs .tr .ss { font-size: 8px; letter-spacing: .14em; }
-  #ovs .log table td { height: 19px; font-size: 9px; } #ovs .log tr.alert td { background: rgba(229,67,45,.22); color: #ffc2b5; } #ovs .log tr.alert td:first-child { box-shadow: inset 2px 0 #e5432d; }
-  #ovs .log tr.in td { animation: ovsRow .6s steps(4); } @keyframes ovsRow { 0% { background: rgba(255,168,52,.35); color: #fff; } }
-  #ovs .hold .bd { display: grid; grid-template-columns: 112px 1fr; grid-template-rows: auto 1fr; gap: 4px 12px; padding: 8px 10px; height: calc(100% - 22px); }
-  #ovs .ind { grid-column: 1 / -1; display: flex; gap: 14px; font-size: 8px; letter-spacing: .16em; margin-bottom: 4px; } #ovs .ind span { display: flex; align-items: center; gap: 4px; }
-  #ovs .ind i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid #565e5a; } #ovs .ind i.g { background: #59c27a; border-color: #59c27a; box-shadow: 0 0 5px #59c27a; } #ovs .ind i.a { background: #ffa834; border-color: #ffa834; }
-  #ovs .hold svg { width: 112px; height: 104px; display: block; }
-  #ovs .kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 8.5px; letter-spacing: .14em; align-content: start; }
-  #ovs .kv span:nth-child(even) { color: #e8ebe9; text-align: right; }
-  #ovs .mimic { display: grid; grid-template-columns: repeat(8, 9px); gap: 2px; margin-top: 7px; } #ovs .mimic i { height: 9px; }
-  #ovs .mimic i.nx { animation: ovsBlink .8s steps(2) infinite; }
-  /* booting: frames draw in; leaving: it all jitters and drops away */
-  #ovs .boot { animation: ovsIn .55s cubic-bezier(.2,.8,.2,1) both; }
-  @keyframes ovsIn { 0% { clip-path: inset(50% 50% 50% 50%); opacity: 0; } 60% { clip-path: inset(0 48% 0 48%); opacity: 1; } 100% { clip-path: inset(0 0 0 0); opacity: 1; } }
-  #ovs.leave { animation: ovsOut .5s steps(6) forwards; }
-  @keyframes ovsOut { 0% { filter: none; } 30% { filter: hue-rotate(90deg) contrast(2); transform: translateX(-8px) skewX(-6deg); } 60% { clip-path: inset(40% 0 35% 0); transform: translateX(10px); } 100% { clip-path: inset(50% 0 50% 0); opacity: 0; } }
-  @media (max-width: 1420px) { #ovs .top .c.opt { display: none; } }
-  @media (max-width: 1100px) { #ovs .top .c.opt2 { display: none; } #ovs .tr { grid-template-columns: 22px 60px 42px minmax(40px, 1fr) 84px; } #ovs .tr > :nth-child(6) { display: none; } }
-  @media (max-height: 700px) { #ovs { grid-template-rows: 58px minmax(0, 1fr) 176px; } #ovs .tr { height: 29px; } #ovs .hold svg { height: 84px; } }
+  #spire .bot { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, .85fr); gap: 8px; min-height: 0; }
+  #spire .coast .disp { font-size: 15px; font-weight: 600; letter-spacing: .14em; margin: 2px 0 4px; }
+  #spire .coast p { margin: 0 0 9px; color: var(--dim); font-size: 9.5px; line-height: 1.5; }
+  #spire .acc { font: 600 12px/1 'Chakra Petch', sans-serif; letter-spacing: .3em; color: var(--bg); background: var(--amb); border: 0; padding: 9px 14px 9px 16px; cursor: pointer;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+  #spire .acc:hover, #spire .acc:focus-visible { background: var(--amb2); outline: none; }
+  /* the question (the first time) */
+  #spire .ask { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, 92%); z-index: 3; background: rgba(11,9,7,.96); border: 1px solid var(--amb);
+    clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px); padding: 18px 20px 26px; box-shadow: 0 0 0 9999px rgba(11,9,7,.45); }
+  #spire .ask .k { font-size: 9px; letter-spacing: .3em; color: var(--amb); }
+  #spire .ask h1 { margin: 6px 0 2px; font: 600 28px/1.05 'Chakra Petch', sans-serif; letter-spacing: .14em; color: var(--ink); text-shadow: 2px 0 rgba(255,91,69,.35), -2px 0 rgba(134,212,198,.3); }
+  #spire .ask h1.glitch { animation: spGl 3s infinite; }
+  @keyframes spGl { 0%, 92%, 100% { transform: none; clip-path: none; } 93% { transform: translate(-3px, 1px); clip-path: inset(10% 0 55% 0); } 95% { transform: translate(3px, -1px); clip-path: inset(50% 0 12% 0); } }
+  #spire .ask .sub { font-size: 9px; letter-spacing: .24em; color: var(--dim); margin-bottom: 14px; }
+  #spire .ask p { margin: 0 0 18px; font-size: 12px; line-height: 1.6; color: var(--ink); min-height: 4.8em; }
+  #spire .ask p .cur { display: inline-block; width: .6em; height: 1em; background: var(--amb); vertical-align: -2px; animation: spBlink .8s steps(2) infinite; }
+  #spire .ask .btns { display: flex; gap: 12px; }
+  #spire .ask button { flex: 1; position: relative; font: 600 13px/1 'Chakra Petch', sans-serif; letter-spacing: .4em; padding: 11px 0 11px .4em; cursor: pointer; background: transparent; color: var(--amb); border: 1px solid var(--amb); }
+  #spire .ask button.no { color: var(--ink); border-color: var(--faint); }
+  #spire .ask button:hover, #spire .ask button:focus-visible { background: var(--amb); color: var(--bg); outline: none; }
+  #spire .ask button.no:hover, #spire .ask button.no:focus-visible { background: var(--ink); color: var(--bg); }
+  #spire .ask button small { position: absolute; left: 0; right: 0; bottom: -15px; font: 8px 'JetBrains Mono', monospace; letter-spacing: .3em; color: var(--dim); }
+  /* in and out */
+  #spire .boot { animation: spIn .5s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes spIn { 0% { clip-path: inset(0 100% 0 0); opacity: 0; } 100% { clip-path: inset(0 0 0 0); opacity: 1; } }
+  #spire.leave { animation: spOut .5s steps(6) forwards; }
+  @keyframes spOut { 30% { filter: hue-rotate(60deg) contrast(1.8); transform: translateX(-8px) skewX(-5deg); } 60% { clip-path: inset(40% 0 35% 0); transform: translateX(10px); } 100% { clip-path: inset(50% 0 50% 0); opacity: 0; } }
+  @media (max-width: 1100px) { #spire { grid-template-columns: 240px minmax(0, 1fr) 260px; } #spire .bot { grid-template-columns: repeat(2, minmax(0, 1fr)); } #spire { grid-template-rows: 46px minmax(0, 1fr) 300px; } }
+  @media (max-width: 760px) { #spire { display: block; overflow-y: auto; } #spire > *, #spire .col, #spire .bot { display: block; margin-bottom: 8px; } #spire .pn { min-height: 150px; margin-bottom: 8px; } #spire .map { height: 60vh; } #spire .top { height: 46px; } }
   /* the city, glitching before the curtain */
   canvas.ovs-glitch { animation: ovsCity .7s steps(8) both; }
   @keyframes ovsCity { 0% { filter: none; transform: none; } 20% { filter: saturate(2.2) contrast(1.4) hue-rotate(25deg) drop-shadow(4px 0 0 rgba(255,0,70,.6)); transform: translate(-6px, 0); }
@@ -115,325 +118,201 @@ const OVERSEER = (() => {
     background: repeating-linear-gradient(0deg, rgba(255,181,71,.0) 0 18px, rgba(255,181,71,.14) 18px 20px, rgba(0,255,220,.0) 20px 46px, rgba(120,255,230,.1) 46px 47px); animation: ovsBarsMove .7s linear both; }
   @keyframes ovsBarsMove { from { background-position: 0 0; opacity: 0; } 20% { opacity: 1; } to { background-position: 0 220px; opacity: .8; } }
   `;
-  let built = false, root = null, raf = 0, last = 0, keyH = null, typingT = 0, resizeH = null, spire = null, t0 = 0;
+  let built = false, root = null, raf = 0, last = 0, keyH = null, typingT = 0, resizeH = null, t0 = 0, D = null;
   const HEX = '0123456789ABCDEF', GLY = 'アイウエオカキクケコサシスセソ01#%&*+=<>/\\[]{}';
-  const ROM = ['I', 'II', 'III', 'IV'], TIER_COL = ['#e8ebe9', '#5aa0ff', '#59c27a', '#ffa834'], TIER_NAME = ['RESIDENT', 'COMMERCE', 'LUXURY', 'INDUSTRY'], ZONE_T = { low: 0, mid: 1, high: 2, ind: 3 };
   const $ = (q) => root.querySelector(q);
-  const fmt = n => n.toLocaleString('en-US');
+  const fmt = n => Math.round(n).toLocaleString('en-US');
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const p2 = n => String(Math.floor(n)).padStart(2, '0');
   const hm = h => { h = ((h % 24) + 24) % 24; return p2(h) + ':' + p2((h % 1)*60); };
-  const hms = s => { s = Math.max(0, Math.floor(s)); return p2(s/3600) + ':' + p2((s % 3600)/60) + ':' + p2(s % 60); };
-  const hsh = (s) => { let h = 2166136261; s = String(s); for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
-  const cmean = hs => { if (!hs.length) return null; let x = 0, y = 0; for (const h of hs){ const a = h/24*Math.PI*2; x += Math.cos(a); y += Math.sin(a); } return ((Math.atan2(y, x)/(Math.PI*2)*24) + 24) % 24; };
+  const safe = (f, d) => { try { const v = f(); return v === undefined || Number.isNaN(v) ? d : v; } catch (e) { return d; } };
   const DPR = () => Math.min(2, window.devicePixelRatio || 1);
-  function build(){ const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); built = true; }
+  const accessed = () => { try { return localStorage.getItem(ACCESS_KEY); } catch (e) { return null; } };
+  function build(){
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    if (!document.querySelector('link[href*="Chakra+Petch"]')){ const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&display=swap'; document.head.appendChild(l); }
+    built = true;
+  }
 
-  /* ---------- the model: the city read into 48 sectors, the people into tiers ---------- */
-  let M = null;
-  function model(){
-    const hour = typeof S !== 'undefined' ? S.hour : 12, sleeps = typeof asleep === 'function';
-    const plots = [], megs = [], hw = new Map(), mt = new Set();
+  /* ---------- reading the city (it holds still while the view is open) ---------- */
+  function read(){
+    const hour = safe(() => S.hour, 12), day = safe(() => STORY.day() + 1, 1), sleeps = typeof asleep === 'function';
+    const plots = [], megs = [], hw = [], mt = new Set();
     let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity;
     const grow = (i, j) => { if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; };
-    if (typeof cells !== 'undefined') for (const c of cells.values()){
-      grow(c.i, c.j); if (c.mega) continue;
-      const z = {}; for (const s of c.sections) z[s.zone] = (z[s.zone] || 0) + 1;
-      plots.push({ i: c.i, j: c.j, lv: c.sections.length + (c.lift ? 3 : 0), zone: Object.keys(z).sort((a, b) => z[b] - z[a])[0] || null });
-    }
-    if (typeof megas !== 'undefined') for (const m of megas.values()){
-      const a = Math.round(m.x/LOT - (m.w - 1)/2), b = Math.round(m.z/LOT - (m.h - 1)/2);
-      megs.push({ m, i: a, j: b, w: m.w, h: m.h, lv: Math.min(26, Math.max(3, ((m.top || 12) - CURB)/(typeof FH !== 'undefined' ? FH : 2.6))) });
-      grow(a, b); grow(a + m.w - 1, b + m.h - 1);
-    }
-    if (typeof hwIndex !== 'undefined') for (const [k, arr] of hwIndex){ if (!arr || !arr.length) continue; const [i, j] = k.split(',').map(Number); grow(i, j); for (const h of arr){ let l = hw.get(h); if (!l) hw.set(h, l = []); l.push([i, j]); } }
-    if (typeof mtIndex !== 'undefined') for (const [k, arr] of mtIndex){ if (arr && arr.length){ const [i, j] = k.split(',').map(Number); grow(i, j); mt.add(k); } }
-    if (!isFinite(i0)){ i0 = j0 = -1; i1 = j1 = 1; }
+    const zf = { low: 0, mid: 0, high: 0, ind: 0 };
+    safe(() => { for (const c of cells.values()){ grow(c.i, c.j); if (c.mega) continue; const z = {}; for (const s of c.sections){ z[s.zone] = (z[s.zone] || 0) + 1; if (zf[s.zone] !== undefined) zf[s.zone]++; }
+      plots.push({ i: c.i, j: c.j, lv: c.sections.length, zone: Object.keys(z).sort((a, b) => z[b] - z[a])[0] || null }); } });
+    safe(() => { for (const m of megas.values()){ const a = Math.round(m.x/LOT - (m.w - 1)/2), b = Math.round(m.z/LOT - (m.h - 1)/2); megs.push({ m, i: a, j: b, w: m.w, h: m.h, name: (MEGA_TYPES[m.kind] || {}).name || m.kind }); grow(a, b); grow(a + m.w - 1, b + m.h - 1); } });
+    safe(() => { for (const h of highways){ const t = (h.tiles || []).map(t => Array.isArray(t) ? t : [t.i, t.j]).filter(t => isFinite(t[0])); if (t.length) hw.push(t); for (const [i, j] of t) grow(i, j); } });
+    if (!hw.length) safe(() => { const by = new Map(); for (const [k, arr] of hwIndex){ const [i, j] = k.split(',').map(Number); for (const e of arr){ const h = e.h || e; let l = by.get(h); if (!l) by.set(h, l = []); l.push([i, j]); } } for (const l of by.values()) hw.push(l); });
+    safe(() => { for (const [k, arr] of mtIndex) if (arr && arr.length){ mt.add(k); const [i, j] = k.split(',').map(Number); grow(i, j); } });
+    if (!isFinite(i0)){ i0 = j0 = -2; i1 = j1 = 2; }
+    // people
+    let awake = 0, out = 0; const pop = safe(() => pplList.length, 0);
+    safe(() => { for (const p of pplList){ const zz = sleeps ? asleep(p, hour) : (hour < 6.5 || hour > 23); if (!zz) awake++; if (p.walk || p.at !== p.home) out++; } });
+    const cr = LEDGER.crowds(), tr = LEDGER.transit(), po = LEDGER.police();
+    // markets and the dome
+    const mk = safe(() => { let tot = 0, act = 0; for (const pl of places.values()){ if (!pl.stalls) continue; for (const st of pl.stalls.values()){ tot++; if (st.keepers.some(sp => { const p = sp.by && people.get(sp.by); return p && !p.walk && p.at === pl.id; })) act++; } } return { tot, act }; }, { tot: 0, act: 0 });
+    const dome = safe(() => [...megas.values()].some(m => m.kind === 'club'), false), domeOpen = dome && safe(() => clubOpenAt(hour), false), clubbers = safe(() => pplList.filter(p => p.club && !p.walk).length, 0);
+    // the heat: people out, bucketed by plot
+    const heat = new Map(); for (const [x, z] of cr.pts){ const k = Math.round(x/LOT) + ',' + Math.round(z/LOT); heat.set(k, (heat.get(k) || 0) + 1); }
+    let hot = null; for (const [k, n] of heat) if (!hot || n > hot.n){ const [i, j] = k.split(',').map(Number); hot = { i, j, n }; }
     const ni = i1 - i0 + 1, nj = j1 - j0 + 1;
-    const secOf = (i, j) => { const c = Math.max(0, Math.min(7, Math.floor((i - i0)/ni*8))), r = Math.max(0, Math.min(5, Math.floor((j - j0)/nj*6))); return r*8 + c; };
-    // the people, by the sector and the tier of their home
-    const sec = Array.from({ length: 48 }, (_, k) => ({ k, n: k + 1, bed: [], wake: [], ppl: 0, out: 0, cops: 0, plots: 0, lv: 0 }));
-    const tier = [0, 1, 2, 3].map(t => ({ t, pop: 0, awake: 0, bed: [], wake: [] }));
-    const ppl = typeof pplList !== 'undefined' ? pplList : [], zoneAt = new Map(plots.map(p => [p.i + ',' + p.j, p.zone]));
-    let awake = 0, out = 0;
-    for (const p of ppl){
-      const pl = typeof places !== 'undefined' && places.get(p.home); if (!pl) continue;
-      const i = Math.round(pl.x/LOT), j = Math.round(pl.z/LOT), s = sec[secOf(i, j)], t = tier[ZONE_T[zoneAt.get(i + ',' + j)] ?? 1];
-      const zz = sleeps ? asleep(p, hour) : (hour < 6.5 || hour > 23);
-      s.ppl++; s.bed.push(p.bed); s.wake.push(p.wake); if (p.cop) s.cops++; if (zz) s.out++;
-      t.pop++; t.bed.push(p.bed); t.wake.push(p.wake); if (!zz){ t.awake++; awake++; } else out++;
-    }
-    for (const p of plots){ const s = sec[secOf(p.i, p.j)]; s.plots++; s.lv += p.lv; }
-    // each sector's turn: when its residents, on the whole, go to bed; turned while most of them are asleep
-    for (const s of sec){
-      s.at = cmean(s.bed); s.wk = cmean(s.wake);
-      if (s.at === null){ s.state = 'vac'; continue; }
-      s.dt = (s.at - hour + 24) % 24; s.state = s.out/s.ppl >= .5 ? 'turned' : 'pend';
-    }
-    const up = sec.filter(s => s.state === 'pend').sort((a, b) => a.dt - b.dt);
-    if (up[0]) up[0].state = 'nxt'; for (const s of up.slice(1, 4)) s.state = 'stb';
-    const order = sec.filter(s => s.at !== null).sort((a, b) => ((a.at - 18 + 24) % 24) - ((b.at - 18 + 24) % 24)).concat(sec.filter(s => s.at === null));
-    order.forEach((s, q) => { s.q = q + 1; });
-    for (const t of tier){ t.at = cmean(t.bed); t.wk = cmean(t.wake); }
-    const sp = spire && megs.find(g => g.m === spire), spSec = sp ? secOf(sp.i + (sp.w - 1)/2, sp.j + (sp.h - 1)/2) : -1;
-    // someone for the red callout: a courier if there is one out, else anyone
-    let who = null; if (ppl.length){ const cs = ppl.filter(p => p.courier && places.get(p.home)); const pool = cs.length ? cs : ppl; who = pool[(Math.random()*pool.length) | 0]; }
-    M = { hour, plots, megs, hw, mt, i0, i1, j0, j1, ni, nj, secOf, sec, order, tier, awake, asleep: out, pop: ppl.length, spSec, sp, who, turned: sec.filter(s => s.state === 'turned').length, live: sec.filter(s => s.state !== 'vac').length, next: sec.find(s => s.state === 'nxt') || null };
-    return M;
+    const sector = (i, j) => 'ABCDEFGH'[Math.max(0, Math.min(7, Math.floor((i - i0)/ni*8)))] + (Math.max(0, Math.min(5, Math.floor((j - j0)/nj*6))) + 1);
+    D = { hour, day, plots, megs, hw, mt, i0, i1, j0, j1, ni, nj, zf, pop, awake, out, cr, tr, po, mk, dome, domeOpen, clubbers, heat, hot, sector,
+      inc: LEDGER.inc().slice().reverse(), grow: LEDGER.grow(), count: LEDGER.count(), clock: safe(() => STORY.clock, 0) };
+    return D;
   }
-  const SCOL = { pend: ['#4f9a62', '#2f6a3e', '#23502f'], turned: ['#a4492f', '#6e2c1c', '#521f14'], nxt: ['#ffd08a', '#c99a4c', '#9a7334'], stb: ['#d8c59c', '#a8946c', '#7c6c4c'],
-    vac: ['#3a403d', '#2a2f2c', '#202422'], mega: ['#d0d6d2', '#8e9591', '#6a716d'] };
-  const tierOf = p => M.tier.find(t => t.t === (ZONE_T[p] ?? 1));
-  const permit = id => { const h = hsh(id); return (1 + h % 9) + '-' + String(100 + (h >>> 4) % 900) + '-' + String(100 + (h >>> 14) % 900); };
+  const whenTxt = c => { const d = Math.floor(c/1440) + 1, h = (c % 1440)/60; return 'D' + d + ' ' + hm(h); };
+  const agoTxt = c => { const m = Math.max(0, D.clock - c); return m < 60 ? Math.round(m) + ' min ago' : m < 1440 ? Math.round(m/60) + ' h ago' : Math.round(m/1440) + ' d ago'; };
 
-  /* ---------- the plan: tiny extruded blocks on an iso grid, coloured by sector state ---------- */
-  // fit: { tw, ox, oy, lz } for the tile range B into a W x H box; P(i, j, z) the screen point
-  function fit(B, W, H, pad){
-    const n = (B.i1 - B.i0 + 1) + (B.j1 - B.j0 + 1), tw = Math.min(64*DPR(), (W*(1 - pad))/(n/2), (H*(1 - pad))/(n/4 + 1.3)), th = tw/2;
-    const lz = th*.3, ox = W/2 - ((B.i1 - B.i0 + 1) - (B.j1 - B.j0 + 1))*tw/4, oy = H/2 - n*th/4 + tw*.5;
-    return { tw, th, lz, P: (i, j, z) => [ox + ((i - B.i0) - (j - B.j0))*tw/2, oy + ((i - B.i0) + (j - B.j0))*th/2 - z] };
-  }
-  function prism(g, F, i, j, w, h, z, cols, ins){
-    const a = F.P(i - .5 + ins, j - .5 + ins, z), b = F.P(i + w - .5 - ins, j - .5 + ins, z), c = F.P(i + w - .5 - ins, j + h - .5 - ins, z), d = F.P(i - .5 + ins, j + h - .5 - ins, z);
-    const bg = F.P(i + w - .5 - ins, j - .5 + ins, 0), cg = F.P(i + w - .5 - ins, j + h - .5 - ins, 0), dg = F.P(i - .5 + ins, j + h - .5 - ins, 0);
-    if (z > 0){
-      g.fillStyle = cols[2]; g.beginPath(); g.moveTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(cg[0], cg[1]); g.lineTo(bg[0], bg[1]); g.closePath(); g.fill();   // the right face
-      g.fillStyle = cols[1]; g.beginPath(); g.moveTo(d[0], d[1]); g.lineTo(c[0], c[1]); g.lineTo(cg[0], cg[1]); g.lineTo(dg[0], dg[1]); g.closePath(); g.fill();   // the left face
-    }
-    g.fillStyle = cols[0]; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fill();
-    g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = .6; g.stroke();
-    return a;
-  }
-  function sectorPoly(F, s){
-    const c = s % 8, r = (s/8) | 0, M_ = M, ia = M_.i0 - .5 + c*M_.ni/8, ib = M_.i0 - .5 + (c + 1)*M_.ni/8, ja = M_.j0 - .5 + r*M_.nj/6, jb = M_.j0 - .5 + (r + 1)*M_.nj/6;
-    return [F.P(ia, ja, 0), F.P(ib, ja, 0), F.P(ib, jb, 0), F.P(ia, jb, 0)].map(p => [p[0] + F.tw/2*0, p[1]]);
-  }
-  function polyPath(g, pts){ g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); }
-  // draws the city within B; opts.labels: sector numbers, edge letters, roads named
-  function drawCity(g, W, H, B, opts){
-    const F = fit(B, W, H, opts.pad), d = DPR(), inB = (i, j) => i >= B.i0 - .01 && i <= B.i1 + .01 && j >= B.j0 - .01 && j <= B.j1 + .01;
-    // the field of dots behind it
-    g.fillStyle = '#040505'; g.fillRect(0, 0, W, H);
-    let rs = 7; const rnd = () => (rs = (rs*16807) % 2147483647)/2147483647;
-    for (let k = 0; k < (W*H)/(900*d*d); k++){ g.fillStyle = 'rgba(160,175,168,' + (.05 + rnd()*.18) + ')'; g.fillRect(rnd()*W, rnd()*H, d*(rnd() < .1 ? 1.4 : .8), d*(rnd() < .1 ? 1.4 : .8)); }
-    // the ground of each sector, and their seams
-    if (opts.labels) for (let s = 0; s < 48; s++){ const st = M.sec[s].state; polyPath(g, sectorPoly(F, s)); g.fillStyle = st === 'vac' ? 'rgba(255,255,255,.012)' : st === 'turned' ? 'rgba(164,73,47,.07)' : 'rgba(79,154,98,.045)'; g.fill(); }
-    // the roads: highways as dark slabs, the metro as a pale line
-    for (const [h, tl] of M.hw) for (const [i, j] of tl) if (inB(i, j)) prism(g, F, i, j, 1, 1, 0, ['#151917', '#151917', '#151917'], -.02);
-    if (M.mt.size){ g.strokeStyle = 'rgba(120,170,200,.55)'; g.lineWidth = 1.4*d; g.setLineDash([3*d, 2*d]);
-      for (const k of M.mt){ const [i, j] = k.split(',').map(Number); if (!inB(i, j)) continue; const p = F.P(i, j, 0);
-        for (const [di, dj] of [[1, 0], [0, 1]]) if (M.mt.has((i + di) + ',' + (j + dj))){ const q = F.P(i + di, j + dj, 0); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); } }
-      g.setLineDash([]); }
-    if (opts.labels) for (let s = 0; s < 48; s++){ polyPath(g, sectorPoly(F, s)); g.strokeStyle = 'rgba(150,165,158,.16)'; g.lineWidth = d*.8; g.setLineDash([2*d, 3*d]); g.stroke(); g.setLineDash([]); }
-    // the blocks, back to front
-    const items = [];
-    for (const p of M.plots) if (inB(p.i, p.j)) items.push({ k: p.i + p.j, i: p.i, j: p.j, w: 1, h: 1, lv: p.lv, cols: SCOL[M.sec[M.secOf(p.i, p.j)].state] });
-    for (const m of M.megs) if (inB(m.i, m.j) || inB(m.i + m.w - 1, m.j + m.h - 1)) items.push({ k: m.i + m.j + (m.w + m.h)/2 - 1, i: m.i, j: m.j, w: m.w, h: m.h, lv: m.lv, cols: SCOL.mega, mega: m });
-    items.sort((a, b) => a.k - b.k || a.i - b.i);
-    const tops = [];
-    for (const it of items){
-      const z = Math.max(it.lv ? 2*d : 0, it.lv*F.lz*(it.mega ? .55 : 1)), a = prism(g, F, it.i, it.j, it.w, it.h, z, it.cols, it.mega ? .08 : .17);
-      if (it.mega && it.mega.m === spire) tops.push(F.P(it.i + it.w/2 - .5, it.j + it.h/2 - .5, z));
-    }
-    // the sodium lamps at the street corners
-    const lamps = [];
-    for (const p of M.plots) if (inB(p.i, p.j) && (hsh(p.i + ':' + p.j) % 3) === 0){ const q = F.P(p.i + .5, p.j + .5, 0); lamps.push(q); g.fillStyle = 'rgba(255,168,52,.18)'; g.beginPath(); g.arc(q[0], q[1], 2.6*d, 0, 7); g.fill(); g.fillStyle = '#ffb44a'; g.fillRect(q[0] - .6*d, q[1] - .6*d, 1.2*d, 1.2*d); }
-    // the Spire's sector, outlined in red; the numbers; the edges lettered; the roads named
-    if (opts.labels){
-      if (M.spSec >= 0){ polyPath(g, sectorPoly(F, M.spSec)); g.strokeStyle = '#e5432d'; g.lineWidth = 1.6*d; g.stroke(); }
-      g.font = '600 ' + (8*d) + 'px JetBrains Mono, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      for (let s = 0; s < 48; s++){ const P = sectorPoly(F, s), cx = (P[0][0] + P[2][0])/2, cy = (P[0][1] + P[2][1])/2, st = M.sec[s].state, lb = String(s + 1);
-        const bw = g.measureText(lb).width + 6*d, bh = 11*d;
-        g.fillStyle = st === 'vac' ? 'rgba(40,45,42,.85)' : M.spSec === s ? '#e5432d' : st === 'nxt' ? '#ffa834' : '#e8ebe9'; g.fillRect(cx - bw/2, cy - bh/2, bw, bh);
-        g.fillStyle = st === 'vac' ? '#6b736f' : M.spSec === s ? '#fff' : '#0a0c0b'; g.fillText(lb, cx, cy + .5*d); }
-      g.fillStyle = '#7d8581'; g.font = (8.5*d) + 'px JetBrains Mono, monospace';
-      for (let c = 0; c < 8; c++){ const p = F.P(M.i0 - .5 + (c + .5)*M.ni/8, M.j0 - 1.6, 0); g.fillText('ABCDEFGH'[c], p[0], p[1]); }
-      for (let r = 0; r < 6; r++){ const p = F.P(M.i0 - 1.6, M.j0 - .5 + (r + .5)*M.nj/6, 0); g.fillText(String(r + 1), p[0], p[1]); }
-      const used = new Set(); let q = 0;
-      for (const [h, tl] of M.hw){ if (tl.length < 3) continue; const is = tl.map(t => t[0]), js = tl.map(t => t[1]), ew = Math.max(...is) - Math.min(...is) >= Math.max(...js) - Math.min(...js);
-        let nm = 'DRIVE ' + (ew ? 'E' : 'N'); if (used.has(nm)) nm = 'DRIVE ' + (ew ? 'W' : 'S'); if (used.has(nm)) nm = 'DRIVE ' + (++q + 1); used.add(nm);
-        const [i, j] = tl[(tl.length/2) | 0], p = F.P(i, j, 0); g.font = '600 ' + (7.5*d) + 'px JetBrains Mono, monospace'; const w = g.measureText(nm).width + 6*d;
-        g.fillStyle = 'rgba(4,5,5,.85)'; g.fillRect(p[0] - w/2, p[1] - 5*d, w, 10*d); g.strokeStyle = '#3a403d'; g.lineWidth = d*.8; g.strokeRect(p[0] - w/2, p[1] - 5*d, w, 10*d); g.fillStyle = '#a8b0ac'; g.fillText(nm, p[0], p[1] + .5*d); }
-      g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-    }
-    return { F, tops, lamps };
-  }
-
-  /* ---------- the desk ---------- */
+  /* ---------- the view ---------- */
   function dom(){
-    const m = M, hr = m.hour, nx = m.next, frac = m.live ? m.turned/m.live : 0;
-    const dayN = typeof STORY !== 'undefined' && STORY.day ? STORY.day() + 1 : 1, dawn = ((6 - hr) + 24) % 24;
-    const tiersSorted = m.tier.filter(t => t.at !== null).map(t => ({ t, dt: (t.at - hr + 24) % 24 })).sort((a, b) => a.dt - b.dt);
-    const tNext = tiersSorted[0] ? ROM[tiersSorted[0].t.t] : 'I', tPrev = tiersSorted.length ? ROM[tiersSorted[tiersSorted.length - 1].t.t] : 'IV';
-    const spLbl = m.spSec >= 0 ? 'S' + (m.spSec + 1) : 'S--', segs = Array.from({ length: 24 }, (_, k) => k < Math.round(frac*24) ? 'on' : k === Math.round(frac*24) ? 'hot' : '');
-    root = document.createElement('div'); root.id = 'ovs'; root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', 'High Overseer');
+    const d = D, asl = d.pop - d.awake, first = !accessed(), tot = d.zf.low + d.zf.mid + d.zf.high + d.zf.ind || 1;
+    const meter = (f, n = 24) => Array.from({ length: n }, (_, k) => `<i class="${k < Math.round(f*n) ? 'on' : ''}"></i>`).join('');
+    const zrow = (lbl, v) => `<div class="bar"><span>${lbl}</span><span class="tr"><i style="width:${(100*v/Math.max(1, Math.max(d.zf.low, d.zf.mid, d.zf.high, d.zf.ind))).toFixed(1)}%"></i></span><span>${fmt(v)}</span></div>`;
+    const topMax = Math.max(1, ...d.cr.top.map(t => t.n));
+    const metroMax = Math.max(1, ...d.tr.metro.map(l => l.riders));
+    const incs = d.inc.slice(0, 7);
+    root = document.createElement('div'); root.id = 'spire'; root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', 'Data Spire: city ledger');
     root.innerHTML = `
-      <div class="top boot">
-        <div class="c"><small>NEON TERRARIUM</small><span class="v">OVERSEER · DESK 1</span><small>DATA SPIRE · ${spLbl}</small></div>
-        <div class="c opt"><small>PLOTS ${fmt(m.plots.length)}</small><span class="v">CITIZENS ${fmt(m.pop)}</span><small>STRUCT ${m.megs.length} · H ${hr.toFixed(2)}</small></div>
-        <div class="c"><small>TURNING</small><span class="v"><i class="sq"></i>&nbsp; TIER ${tPrev} <span class="dim">→</span> <span class="amb">${tNext}</span></span><small>&nbsp;</small></div>
-        <div class="c fix"><div class="row"><div style="display:flex;flex-direction:column;gap:3px"><small>${nx ? 'SECTOR ' + nx.n + ' NEXT' : 'ALL SECTORS'}</small><span class="v">TURN AT ${nx ? hm(nx.at) : '--:--'}</span><small>#${nx ? nx.q : '--'} / 48</small></div>
-          <div style="display:flex;flex-direction:column;gap:2px"><small class="amb">ARCHIVE · COAST.MEM</small><span class="big">63%</span></div></div></div>
-        <div class="c opt2"><small>NEXT ${nx ? 'S' + nx.n : '--'} · ${nx ? hm(nx.dt).replace(':', 'H ') + 'M' : '--'}</small><span class="v">${m.turned} / 48 TURNED</span><small>${m.live} LIVE · SLIP 0 S</small></div>
-        <div class="c"><small>TURN ${tPrev} → ${tNext} · RING ${Math.max(1, Math.ceil(frac*6))}</small><div class="seg">${segs.map(c => `<i class="${c}"></i>`).join('')}</div><small>${Math.round(frac*100)}% · ${m.turned}/${m.live || 0}</small></div>
-        <div class="c"><small>AWAKE</small><span class="v grn">${fmt(m.awake)}</span><small>ASLEEP <b>${fmt(m.asleep)}</b></small></div>
-        <div class="c opt"><small>CONTROLLER</small><span class="v">HIGH OVERSEER</span><small><span class="amb">LEVER 1 ARMED</span> · ${spLbl}</small></div>
-        <div class="c fix"><span class="clock clk">${hm(hr)}:00</span><small>DAY ${dayN} · ${dawn.toFixed(2)} H TO DAWN</small></div>
+      <div class="top boot"><div class="brand"><span class="hd">DATA SPIRE</span><small>CIVIC LEDGER · NODE 07</small></div>
+        <div class="mid"><span>DAY ${d.day}</span><span class="clock disp">${hm(d.hour)}</span><span>${esc(safe(() => phaseName(d.hour), '').toUpperCase())}${safe(() => S.rain, false) ? ' · RAIN' : ''}</span></div>
+        <button class="close" type="button">CLOSE · ESC</button></div>
+      <div class="col">
+        <div class="pn boot"><div class="tab"><code>L-01</code><span class="hd">POPULATION</span><span class="m">${fmt(d.count.plots)} PLOTS</span></div>
+          <div><span class="big">${fmt(d.pop)}</span><span class="unit">RESIDENTS</span></div>
+          <div class="meter">${Array.from({ length: 24 }, (_, k) => `<i class="${k < Math.round(d.awake/Math.max(1, d.pop)*24) ? 'on' : 'sl'}"></i>`).join('')}</div>
+          <div class="kv"><span>AWAKE</span><span class="amb">${fmt(d.awake)}</span><span>ASLEEP</span><span>${fmt(asl)}</span><span>OUT AND ABOUT</span><span>${fmt(d.out)}</span><span>AT HOME</span><span>${fmt(d.pop - d.out)}</span></div></div>
+        <div class="pn boot"><div class="tab"><code>L-02</code><span class="hd">FLOORS BY ZONE</span><span class="m">${fmt(tot)} TOTAL</span></div>
+          <div class="bars">${zrow('RESIDENTIAL', d.zf.low)}${zrow('COMMERCIAL', d.zf.mid)}${zrow('LUXURY', d.zf.high)}${zrow('INDUSTRIAL', d.zf.ind)}</div>
+          <div class="kv" style="margin-top:8px"><span>MEGASTRUCTURES</span><span>${d.megs.length}</span><span>TALLEST</span><span>${Math.max(0, ...d.plots.map(p => p.lv))} FLOORS</span></div></div>
+        <div class="pn boot"><div class="tab"><code>L-03</code><span class="hd">GROWTH</span><span class="m gm"></span></div><div class="sparks"></div></div>
       </div>
-      <div class="pn plan boot"><header><span class="k">A</span>PLAN · NEON TERRARIUM · 48 SECTORS<span class="r">${m.ni} × ${m.nj} PLOTS · N ↑</span></header>
-        <canvas class="iso"></canvas>
-        <div class="inset"><h5><span>INSET · ${spLbl} · SPIRE</span><span class="dim">UPLINK</span></h5><canvas class="ins"></canvas></div>
-        <div class="callout"></div>
-        <div class="legend"><h5>LEGEND</h5><span><i style="background:#4f9a62"></i>PENDING</span><span><i style="background:#a4492f"></i>TURNED</span><span><i style="background:#d8c59c"></i>STANDBY</span><span><i style="background:#ffa834"></i>NEXT</span>
-          <span><i style="background:#3a403d"></i>VACANT</span><span><i style="background:#d0d6d2"></i>STRUCTURE</span><span><i style="border:1.5px solid #e5432d"></i>UPLINK</span><span><i style="background:#ffb44a;border-radius:50%;transform:scale(.55)"></i>LAMP</span></div>
-        <div class="ask"><div class="hd"><span class="k">!</span>ARCHIVE REQUEST · ${spLbl} UPLINK<span style="margin-left:auto" class="blink">●</span></div>
-          <div class="bd"><h1 class="glitch">HIGH OVERSEER</h1><div class="sub">MEMORY ARCHIVE // COASTAL SECTOR // FRAGMENT 03</div>
-          <p class="say"></p>
-          <div class="btns"><button class="btn yes" type="button">YES<small>[ Y ]</small></button><button class="btn no" type="button">NO<small>[ N / ESC ]</small></button></div></div></div>
-      </div>
-      <div class="pn sched boot"><header><span class="k">B</span>TURN SCHEDULE<span class="r">${hm(hr)} · ${m.live} LIVE</span></header>
-        <div class="tw"><table><colgroup><col style="width:26px"><col style="width:44px"><col style="width:48px"><col style="width:74px"><col style="width:46px"><col style="width:46px"><col><col style="width:30px"><col style="width:42px"></colgroup>
-          <thead><tr><th>#</th><th>SECTOR</th><th>TURN AT</th><th>STATE</th><th>WAKES</th><th>BODIES</th><th>18 · 00 · 06</th><th>HOLD</th><th>CHECK</th></tr></thead><tbody></tbody></table></div>
-        <div class="ilk"><div class="bar">${Array.from({ length: 30 }, (_, k) => `<i class="${k >= 28 ? 'r' : k > 24 ? 'off' : ''}"></i>`).join('')}</div>
-          <div class="rd"><span>LOCK ERR <b>0</b></span><span>INTERLOCK <span class="grn">OK</span></span><span>SLIP <b>0 S</b></span><span>UPLINK <span class="amb blink">${spLbl}</span></span></div></div>
+      <div class="pn map boot"><div class="tab"><code>L-04</code><span class="hd">CITY PLAN</span><span class="m">${d.ni} × ${d.nj} · N ↑ · ${fmt(d.cr.out)} OUT NOW</span></div>
+        <canvas class="mp"></canvas>
+        <div class="legend"><span><i style="background:rgba(243,165,58,.8);border-radius:50%"></i>CROWDS</span><span><i style="background:var(--red);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)"></i>INCIDENTS</span>
+          <span><i style="border:1px solid var(--ink)"></i>STRUCTURES</span><span><i style="background:rgba(243,165,58,.45);height:3px"></i>SKY HIGHWAY</span><span><i style="border-top:2px dashed var(--teal);height:0"></i>METRO</span></div>
+        ${first ? `<div class="ask"><div class="k">ARCHIVE REQUEST · COASTAL SECTOR</div><h1 class="glitch">HIGH OVERSEER</h1><div class="sub">MEMORY ARCHIVE // FRAGMENT 03</div><p class="say"></p>
+          <div class="btns"><button class="yes" type="button">YES<small>Y</small></button><button class="no" type="button">NO<small>N</small></button></div></div>` : ''}</div>
+      <div class="col">
+        <div class="pn boot" style="flex:1.7"><div class="tab"><code>L-05</code><span class="hd">INCIDENTS</span><span class="m">${d.inc.length ? 'LAST ' + incs.length + ' OF ' + d.inc.length : 'NONE LOGGED'}</span></div>
+          ${incs.length ? `<div class="inc">${incs.map((x, k) => `<div class="it ${k > 2 ? 'old' : ''}"><span class="n">${k + 1}</span><div><div class="t1">${esc(x.title)}</div><div class="t2">${esc(x.kase)} · ${esc(x.place)} · ${d.sector(Math.round(x.x/LOT), Math.round(x.z/LOT))}</div></div><div class="w">${whenTxt(x.c)}<br><span class="dim">${agoTxt(x.c)}</span></div></div>`).join('')}</div>`
+            : `<div class="empty">No police matters on record yet.<br>The Spire logs each incident as it happens: where, when, and which case.${d.po.stations ? '' : '<br><span class="amb">No police station stands in the city.</span>'}</div>`}</div>
+        <div class="pn boot"><div class="tab"><code>L-06</code><span class="hd">POLICE</span><span class="m">${d.po.stations} STATION${d.po.stations === 1 ? '' : 'S'}</span></div>
+          <div class="kv"><span>OFFICERS</span><span>${fmt(d.po.officers)}</span><span>ON THE STREETS</span><span class="amb">${fmt(d.po.beat)}</span><span>OPEN CASE</span><span>${d.po.caseOpen ? esc(d.po.caseOpen) : '<span class="dim">NONE</span>'}</span>
+            ${d.po.caseDay ? `<span>CASE DAY</span><span>${d.po.caseDay} / 21</span>` : ''}<span>INCIDENTS TODAY</span><span class="red">${d.inc.filter(x => Math.floor(x.c/1440) === Math.floor(d.clock/1440)).length}</span></div></div>
       </div>
       <div class="bot">
-        <div class="pn tiers boot"><header><span class="k">C</span>TIERS<span class="r">0 — 24 H</span></header><div class="rows"></div></div>
-        <div class="pn log boot"><header><span class="k">D</span>CROSSINGS LOG<span class="r blink">REC</span></header>
-          <table><colgroup><col style="width:58px"><col style="width:80px"><col><col style="width:40px"><col style="width:40px"><col style="width:78px"></colgroup>
-          <thead><tr><th>TIME</th><th>PERMIT</th><th>TAG</th><th>SEAM</th><th>GATE</th><th>STATUS</th></tr></thead><tbody></tbody></table></div>
-        <div class="pn hold boot"><header><span class="k">E</span>HOLD<span class="r">MANUAL 9.4</span></header>
-          <div class="bd"><div class="ind"><span><i class="g"></i>ARM</span><span><i class="a"></i>GRIP</span><span><i></i>FREE</span><span class="dim" style="margin-left:auto">LEVER 1</span></div><div>
-            <svg viewBox="0 0 112 104"><path d="M14 86 A46 46 0 0 1 98 86" fill="none" stroke="#262b28" stroke-width="7"/><path d="M14 86 A46 46 0 0 1 40 46" fill="none" stroke="#3f8f57" stroke-width="7"/><path d="M74 46 A46 46 0 0 1 98 86" fill="none" stroke="#8c2f1f" stroke-width="7"/>
-              <text x="8" y="100" fill="#6b736f" font-size="7" font-family="JetBrains Mono" letter-spacing="1">NORMAL</text><text x="80" y="100" fill="#6b736f" font-size="7" font-family="JetBrains Mono" letter-spacing="1">HOLD</text>
-              <g class="lev" style="transform-origin:56px 86px"><line x1="56" y1="86" x2="56" y2="34" stroke="#e8ebe9" stroke-width="3"/><rect x="49" y="24" width="14" height="12" fill="#ffa834"/></g><circle cx="56" cy="86" r="6" fill="#0a0c0b" stroke="#a8b0ac"/></svg></div>
-            <div><div class="kv"><span>HOLD AVAILABLE</span><span class="amb">90 S</span><span>SLIP</span><span>0 S</span><span>HOLDS THIS YEAR</span><span>2</span><span>ARCHIVE</span><span class="amb">FRAGMENT 03</span><span>CIRCUIT</span><span class="grn">A · OK</span></div>
-              <div class="mimic">${m.sec.map(s => `<i class="${s.state === 'nxt' ? 'nx' : ''}" style="background:${s.k === m.spSec ? '#e5432d' : SCOL[s.state][0]}"></i>`).join('')}</div></div></div></div>
-      </div>
-      <div class="scan"></div>`;
+        <div class="pn boot"><div class="tab"><code>L-07</code><span class="hd">WHERE PEOPLE ARE</span><span class="m">${d.hot ? 'HOTSPOT ' + d.sector(d.hot.i, d.hot.j) : ''}</span></div>
+          ${d.cr.top.length ? `<div class="bars">${d.cr.top.slice(0, 5).map(t => `<div class="bar wide"><span title="${esc(t.name)}">${esc(t.name.toUpperCase())}${t.pl ? ' <span class="amb">' + d.sector(Math.round(t.pl.x/LOT), Math.round(t.pl.z/LOT)) + '</span>' : ''}</span><span class="tr"><i style="width:${(100*t.n/topMax).toFixed(1)}%"></i></span><span>${t.n}</span></div>`).join('')}</div>` : '<div class="empty">Everyone is at home.</div>'}</div>
+        <div class="pn boot"><div class="tab"><code>L-08</code><span class="hd">TRANSIT</span><span class="m">${d.tr.air} DRONES AIRBORNE</span></div>
+          <div class="kv" style="margin-bottom:7px"><span>SKY HIGHWAYS</span><span>${d.tr.hwRoutes ? d.tr.hwRoutes + ' ROUTES · <span class="amb">' + d.tr.hwCars + ' CARS</span>' : '<span class="dim">NONE BUILT</span>'}</span><span>METRO</span><span>${d.tr.metro.length ? d.tr.metro.length + ' LINES' : '<span class="dim">NONE BUILT</span>'}</span></div>
+          <div class="bars">${d.tr.metro.slice(0, 3).map(l => `<div class="bar teal"><span>LINE ${l.n}</span><span class="tr"><i style="width:${(100*l.riders/metroMax).toFixed(1)}%"></i></span><span>${l.riders}</span></div>`).join('')}</div></div>
+        <div class="pn boot"><div class="tab"><code>L-09</code><span class="hd">MARKETS · NIGHTLIFE</span><span class="m"></span></div>
+          <div class="kv"><span>STALLS OPEN</span><span>${d.mk.tot ? d.mk.act + ' / ' + d.mk.tot : '<span class="dim">NO MARKET</span>'}</span><span>NEON DOME</span><span>${d.dome ? (d.domeOpen ? '<span class="amb">OPEN</span> · ' + d.clubbers + ' INSIDE' : 'CLOSED · OPENS 19:00') : '<span class="dim">NOT BUILT</span>'}</span>
+            <span>FOOT TRAFFIC</span><span>${d.pop ? Math.round(100*d.out/d.pop) : 0}% OUT</span></div>
+          <div class="meter">${meter(d.mk.tot ? d.mk.act/d.mk.tot : 0)}</div></div>
+        <div class="pn boot coast"><div class="tab"><code>L-10</code><span class="hd">ARCHIVE</span><span class="m">${first ? 'UNOPENED' : 'FRAGMENT 03'}</span></div>
+          <div class="disp">THE COAST</div><p>A record that survives in the archive. ${first ? 'Not yet accessed.' : 'Accessed before. Incomplete.'}</p>
+          <button class="acc" type="button">ACCESS</button></div>
+      </div>`;
     document.body.appendChild(root);
-    root.querySelectorAll('.boot').forEach((el, k) => { el.style.animationDelay = (.07*k) + 's'; });
-    $('.yes').addEventListener('click', yes); $('.no').addEventListener('click', no);
-    tiersDom(); logInit();
-    // the question types itself out
-    const say = $('.say'), Q = 'A record of the coast survives in the archive. It is incomplete. Would you like to remember?'; let qi = 0;
-    const tick = () => { if (!O.open) return; if (qi < Q.length){ qi = Math.min(Q.length, qi + 2); say.innerHTML = Q.slice(0, qi) + '<span class="cur"></span>'; typingT = setTimeout(tick, 24); } };
-    typingT = setTimeout(tick, 900);
+    root.querySelectorAll('.boot').forEach((el, k) => { el.style.animationDelay = (.05*k) + 's'; });
+    $('.close').addEventListener('click', close); $('.acc').addEventListener('click', yes);
+    if (first){
+      $('.yes').addEventListener('click', yes); $('.no').addEventListener('click', dismiss);
+      const say = $('.say'), Q = 'A record of the coast survives in the archive. It is incomplete. Would you like to remember?'; let qi = 0;
+      const tick = () => { if (!O.open || !say.isConnected) return; if (qi < Q.length){ qi = Math.min(Q.length, qi + 2); say.innerHTML = esc(Q.slice(0, qi)) + '<span class="cur"></span>'; typingT = setTimeout(tick, 24); } };
+      typingT = setTimeout(tick, 800);
+    }
   }
-  // B: as many rows as fit, the NEXT one among them
-  function schedDom(){
-    const tw = $('.tw'), tb = tw.querySelector('tbody'), H = tw.clientHeight - 22, fitN = Math.max(4, Math.floor(H/18));
-    const live = M.order.filter(s => s.state !== 'vac'), ni = Math.max(0, live.findIndex(s => s.state === 'nxt'));
-    let a = Math.max(0, Math.min(ni - 4, live.length - fitN)); const rows = live.slice(a, a + fitN - (live.length > fitN ? 1 : 0));
-    if (live.length > fitN && rows[rows.length - 1] !== live[live.length - 1]) rows.push(live[live.length - 1]);
-    const word = { turned: 'TURNED', nxt: 'NEXT', stb: 'STANDBY', pend: 'PENDING', vac: 'VACANT' }, ev = h => ((h - 18 + 24) % 24);
-    const evs = rows.map(s => ev(s.at)).concat([ev(M.hour)]), lo = Math.min(...evs) - .25, hi = Math.max(...evs) + .25, pos = h => (ev(h) - lo)/(hi - lo)*100;
-    const th = tw.querySelector('thead th:nth-child(7)'); if (th) th.textContent = hm(lo + 18) + ' → ' + hm(hi + 18);
-    tb.innerHTML = rows.map(s => `<tr class="${s.state === 'nxt' ? 'next' : ''} ${s.state === 'turned' ? 'turnd' : ''}"><td>${p2(s.q)}</td><td>S${s.n} <span class="dim">${'ABCDEFGH'[s.k % 8]}${((s.k/8) | 0) + 1}</span></td><td>${hm(s.at)}</td>
-      <td><span class="st ${s.state}">${word[s.state]}</span></td><td>${s.wk !== null ? hm(s.wk) : '--'}</td><td>${fmt(s.ppl)}</td><td class="tl"><i style="left:calc(5px + (100% - 10px)*${(pos(s.at)/100).toFixed(3)})"></i></td>
-      <td>${s.k === M.spSec ? '<span class="amb">90</span>' : '<span class="dim">—</span>'}</td><td>${s.cops ? '<span class="grn">■ ' + s.cops + '</span>' : '<span class="dim">□</span>'}</td></tr>`).join('');
-    // the NOW line down the timeline column
-    const first = tb.querySelector('td.tl'); if (!first) return;
-    const r = first.getBoundingClientRect(), R = tw.getBoundingClientRect(), x = r.left - R.left + 5 + (r.width - 10)*pos(M.hour)/100;
-    const n = document.createElement('div'); n.className = 'now'; n.style.left = x + 'px'; n.innerHTML = '<span>NOW</span>'; tw.appendChild(n);
-  }
-  function tiersDom(){
-    const hb = (a, b, c) => { if (a === null || b === null) return ''; const L = h => (h/24*100).toFixed(2) + '%';
-      return b >= a ? `<i style="left:${L(a)};width:${L(b - a)};background:${c}"></i>` : `<i style="left:0;width:${L(b)};background:${c}"></i><i style="left:${L(a)};right:0;background:${c}"></i>`; };
-    const hr = M.hour;
-    $('.tiers .rows').innerHTML = `<div class="tr h"><span></span><span>TIER</span><span>POP</span><span style="display:flex;justify-content:space-between"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></span><span>AWAKE / ASLEEP</span><span>STATE</span></div>` +
-      M.tier.map(t => { const asl = t.pop - t.awake, toBed = t.at !== null ? (t.at - hr + 24) % 24 : 99, toWake = t.wk !== null ? (t.wk - hr + 24) % 24 : 99;
-        const st = !t.pop ? ['NONE', 'dim'] : toWake < 1 && asl > 0 ? ['WAKING', 'grn'] : toBed < 1 ? ['GOING UNDER', 'amb'] : asl > t.awake ? ['SEDATED', 'red'] : ['AWAKE', 'w'];
-        return `<div class="tr"><span class="rn" style="color:${TIER_COL[t.t]}">${ROM[t.t]}</span><span>${TIER_NAME[t.t]}</span><span class="w">${fmt(t.pop)}</span>
-          <span class="hb">${hb(t.wk, t.at, TIER_COL[t.t])}<u style="left:${(hr/24*100).toFixed(2)}%"></u></span><span class="aw"><span class="grn">${fmt(t.awake)}</span> <span class="dim">/</span> ${fmt(asl)}<br><span class="dim">${t.wk !== null ? hm(t.wk) + '–' + hm(t.at) : '--'}</span></span><span class="ss ${st[1]}">${st[0]}</span></div>`; }).join('');
-  }
-  // D: a row now and then: someone crossing a seam between sectors
-  let logRows = [], logT = 0;
-  function logRow(alert, ago = 0){
-    const ppl = typeof pplList !== 'undefined' ? pplList : []; if (!ppl.length) return null;
-    const p = ppl[(Math.random()*ppl.length) | 0], home = places.get(p.home), job = p.job && places.get(p.job);
-    const sh = home ? M.secOf(Math.round(home.x/LOT), Math.round(home.z/LOT)) + 1 : 1, sj = job ? M.secOf(Math.round(job.x/LOT), Math.round(job.z/LOT)) + 1 : ((hsh(p.id + 'g') % 48) + 1);
-    let tag = 'RESIDENT'; try { tag = STORY.descOf(p.id); } catch (e){}
-    tag = String(tag).replace(/^an? /, '').toUpperCase();
-    const st = alert ? ['NO PERMIT', 'red'] : p.cop ? ['PATROL', 'grn'] : p.courier ? ['COURIER', 'amb'] : Math.random() < .12 ? ['SEAM CREW', 'amb'] : ['CLEARED', 'dim'];
-    const t = M.hour*3600 + (performance.now() - t0)/1000 - ago;
-    return { alert, html: `<td>${hms(t)}</td><td>${permit(p.id)}</td><td>${esc(tag)}</td><td>S${sh}</td><td>G${sj}</td><td class="${st[1]}">${st[0]}</td>` };
-  }
-  function logInit(){
-    logRows = []; const tb = $('.log tbody'); if (!tb) return;
-    let ago = 0; for (let k = 0; k < 8; k++){ ago += 4 + Math.random()*40; const r = logRow(k === 0, ago); if (r) logRows.push(r); }
-    tb.innerHTML = logRows.map(r => `<tr class="${r.alert ? 'alert' : ''}">${r.html}</tr>`).join('');
-  }
-  function logPush(){
-    const tb = $('.log tbody'), r = logRow(Math.random() < .08); if (!tb || !r) return;
-    const tr = document.createElement('tr'); tr.className = 'in' + (r.alert ? ' alert' : ''); tr.innerHTML = r.html; tb.insertBefore(tr, tb.firstChild);
-    const H = tb.parentElement.parentElement.clientHeight - 22; while (tb.children.length > 2 && tb.offsetHeight + 22 > H) tb.lastChild.remove();
+  // growth: one small line per measure, by day (by hour while there's less than two days of record)
+  function sparks(){
+    const box = $('.sparks'), g = D.grow.concat([Object.assign({ c: D.clock }, D.count)]).sort((a, b) => a.c - b.c);
+    const byDay = new Map(); for (const s of g) byDay.set(Math.floor(s.c/1440), s);
+    let series = [...byDay.values()], unit = 'BY DAY';
+    if (series.length < 3){ series = g.slice(-48); unit = 'BY HOUR'; }
+    $('.gm').textContent = series.length > 1 ? unit + ' · ' + series.length + ' POINTS' : 'RECORDING';
+    const rows = [['PEOPLE', 'pop'], ['PLOTS', 'plots'], ['FLOORS', 'floors'], ['STRUCT', 'megas']];
+    box.innerHTML = rows.map(([lbl, k]) => { const a = series[0][k], b = series[series.length - 1][k], dlt = b - a;
+      return `<div class="spark"><span>${lbl}</span><canvas data-k="${k}"></canvas><span>${fmt(b)}<em>${series.length > 1 ? (dlt >= 0 ? '+' : '') + fmt(dlt) : '—'}</em></span></div>`; }).join('');
+    for (const cv of box.querySelectorAll('canvas')){
+      const r = cv.getBoundingClientRect(), dp = DPR(); cv.width = Math.max(1, r.width*dp); cv.height = Math.max(1, r.height*dp);
+      const c = cv.getContext('2d'), k = cv.dataset.k, v = series.map(s => s[k]), lo = Math.min(...v), hi = Math.max(...v), W = cv.width, H = cv.height;
+      c.strokeStyle = 'rgba(235,225,204,.12)'; c.lineWidth = dp; for (let x = 0; x <= 4; x++){ c.beginPath(); c.moveTo(W*x/4, H - dp); c.lineTo(W*x/4, H - 4*dp); c.stroke(); }
+      if (v.length < 2){ c.fillStyle = '#f3a53a'; c.fillRect(W - 3*dp, H/2 - dp, 3*dp, 3*dp); continue; }
+      const P = (k2) => [k2/(v.length - 1)*(W - 4*dp) + 2*dp, H - 3*dp - (hi > lo ? (v[k2] - lo)/(hi - lo) : .5)*(H - 7*dp)];
+      c.beginPath(); v.forEach((_, k2) => { const [x, y] = P(k2); k2 ? c.lineTo(x, y) : c.moveTo(x, y); });
+      c.strokeStyle = '#ebe1cc'; c.lineWidth = 1.2*dp; c.stroke();
+      c.lineTo(W - 2*dp, H); c.lineTo(2*dp, H); c.closePath(); c.fillStyle = 'rgba(243,165,58,.12)'; c.fill();
+      const [x, y] = P(v.length - 1); c.fillStyle = '#f3a53a'; c.fillRect(x - 2*dp, y - 2*dp, 4*dp, 4*dp);
+    }
   }
 
-  /* ---------- the live canvases (30 frames a second while open) ---------- */
-  let cv = {}, base = null, ins = null, streams = [];
-  function sizeCanvas(c){ const r = c.getBoundingClientRect(), d = DPR(); c.width = Math.max(1, Math.round(r.width*d)); c.height = Math.max(1, Math.round(r.height*d)); return c.getContext('2d'); }
-  function setupCanvases(){
-    cv.i = $('canvas.iso'); cv.ig = sizeCanvas(cv.i); cv.n = $('canvas.ins'); cv.ng = sizeCanvas(cv.n);
-    const d = DPR(), W = cv.i.width, H = cv.i.height, askR = $('.ask').getBoundingClientRect(), cR = cv.i.getBoundingClientRect();
-    // the plan, drawn once to its own canvas, left of the question
-    base = document.createElement('canvas'); base.width = W; base.height = H; const bg = base.getContext('2d');
-    const room = Math.max(.62, 1 - (askR.width + 20)/cR.width*.55);
-    bg.save(); const sub = document.createElement('canvas'); sub.width = Math.round(W*room); sub.height = H;
-    const r = drawCity(sub.getContext('2d'), sub.width, H, { i0: M.i0, i1: M.i1, j0: M.j0, j1: M.j1 }, { labels: true, pad: .05 });
-    const dy = H*.06; bg.fillStyle = '#040505'; bg.fillRect(0, 0, W, H); drawCity(bg, W, H, { i0: 0, i1: -1, j0: 0, j1: -1 }, { pad: 0 }); bg.drawImage(sub, 0, -dy); bg.restore();
-    const up = q => [q[0], q[1] - dy];
-    base.F = Object.assign({}, r.F, { P: (i, j, z) => up(r.F.P(i, j, z)) }); base.lamps = r.lamps.map(up); base.spire = r.tops[0] ? up(r.tops[0]) : null;
-    // the leader from the question to the Spire, and from the callout to whoever it names
-    const ax = (askR.left - cR.left)*d, ay = (askR.top - cR.top + 34)*d;
-    if (base.spire){ const [sx, sy] = base.spire; bg.strokeStyle = '#ffa834'; bg.lineWidth = d; bg.beginPath(); bg.moveTo(ax, ay); bg.lineTo(ax - 18*d, ay); bg.lineTo(sx, sy); bg.stroke();
-      bg.beginPath(); bg.arc(sx, sy, 4*d, 0, 7); bg.stroke(); bg.fillStyle = '#ffa834'; bg.fillRect(sx - 1.5*d, sy - 1.5*d, 3*d, 3*d); }
-    calloutPlace(bg, cR, d);
-    // the inset: the Spire's own few blocks, close
-    if (M.sp){ const s = M.sp; ins = drawCity(cv.ng, cv.n.width, cv.n.height, { i0: s.i - 3, i1: s.i + s.w + 2, j0: s.j - 3, j1: s.j + s.h + 2 }, { pad: .06 }); }
-    else { cv.ng.fillStyle = '#040505'; cv.ng.fillRect(0, 0, cv.n.width, cv.n.height); }
-    // the faint data streams falling over the plan (it's being read)
-    const cols = Math.floor(W/(26*d)); streams = Array.from({ length: cols }, (_, k) => ({ x: k*26*d + 6*d, y: Math.random()*H, v: (18 + Math.random()*40)*d, n: 6 + (Math.random()*10 | 0), on: Math.random() < .45, ch: Array.from({ length: 16 }, () => HEX[Math.random()*16 | 0]) }));
-    schedDom();
+  /* ---------- the plan: drawn once, then a light overlay each frame ---------- */
+  let cv = null, cg = null, base = null, F = null;
+  function setupMap(){
+    cv = $('canvas.mp'); const r = cv.getBoundingClientRect(), dp = DPR(); cv.width = Math.max(1, Math.round(r.width*dp)); cv.height = Math.max(1, Math.round(r.height*dp)); cg = cv.getContext('2d');
+    const W = cv.width, H = cv.height, pad = 30*dp, d = D;
+    const t = Math.min((W - pad*2)/d.ni, (H - pad*2 - 26*dp)/d.nj, 40*dp), ox = (W - t*d.ni)/2, oy = (H - 26*dp - t*d.nj)/2 + 4*dp;
+    F = { t, P: (i, j) => [ox + (i - d.i0 + .5)*t, oy + (j - d.j0 + .5)*t], X: x => x/LOT, dp };
+    base = document.createElement('canvas'); base.width = W; base.height = H; const g = base.getContext('2d');
+    g.fillStyle = '#0d0b08'; g.fillRect(0, 0, W, H);
+    // the survey grid and its rulers
+    g.strokeStyle = 'rgba(235,225,204,.05)'; g.lineWidth = 1;
+    for (let i = 0; i <= d.ni; i++){ const x = ox + i*t; g.beginPath(); g.moveTo(x, oy); g.lineTo(x, oy + d.nj*t); g.stroke(); }
+    for (let j = 0; j <= d.nj; j++){ const y = oy + j*t; g.beginPath(); g.moveTo(ox, y); g.lineTo(ox + d.ni*t, y); g.stroke(); }
+    g.fillStyle = '#8d8170'; g.font = (8*dp) + 'px JetBrains Mono, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let i = 0; i <= d.ni; i++){ const x = ox + i*t; g.fillRect(x, oy - 6*dp, 1, i % 5 ? 3*dp : 6*dp); if (i % 5 === 0 && i < d.ni) g.fillText(String(d.i0 + i), x + t/2, oy - 13*dp); }
+    for (let j = 0; j <= d.nj; j++){ const y = oy + j*t; g.fillRect(ox - 6*dp, y, j % 5 ? 3*dp : 6*dp, 1); if (j % 5 === 0 && j < d.nj){ g.save(); g.translate(ox - 15*dp, y + t/2); g.fillText(String(d.j0 + j), 0, 0); g.restore(); } }
+    // the plots: bone, a little warmer the taller they are; luxury rose, industry olive
+    const ZC = { low: [235, 225, 204], mid: [243, 190, 120], high: [230, 150, 130], ind: [170, 175, 140] };
+    for (const p of d.plots){ const [x, y] = F.P(p.i, p.j), c = ZC[p.zone] || [120, 110, 95], a = p.lv ? .1 + Math.min(.32, p.lv*.03) : .05, s = t*.82;
+      g.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${a})`; g.fillRect(x - s/2, y - s/2, s, s); }
+    // highways and the metro
+    g.lineCap = 'round';
+    for (const tl of d.hw){ const set = new Set(tl.map(q => q[0] + ',' + q[1])); g.strokeStyle = 'rgba(243,165,58,.42)'; g.lineWidth = Math.max(2*dp, t*.26);
+      for (const [i, j] of tl) for (const [di, dj] of [[1, 0], [0, 1]]) if (set.has((i + di) + ',' + (j + dj))){ const a = F.P(i, j), b = F.P(i + di, j + dj); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); } }
+    g.strokeStyle = 'rgba(134,212,198,.75)'; g.lineWidth = 1.5*dp; g.setLineDash([4*dp, 3*dp]);
+    for (const k of d.mt){ const [i, j] = k.split(',').map(Number); for (const [di, dj] of [[1, 0], [0, 1]]) if (d.mt.has((i + di) + ',' + (j + dj))){ const a = F.P(i, j), b = F.P(i + di, j + dj); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); } }
+    g.setLineDash([]);
+    // the crowds: an amber heat where people are right now
+    g.globalCompositeOperation = 'lighter';
+    const hmax = Math.max(1, ...d.heat.values());
+    for (const [k, n] of d.heat){ const [i, j] = k.split(',').map(Number), [x, y] = F.P(i, j), f = n/hmax, r = t*(.6 + 1.1*Math.sqrt(f)), gr = g.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, `rgba(243,165,58,${(.05 + .38*Math.pow(f, .8)).toFixed(3)})`); gr.addColorStop(1, 'rgba(243,165,58,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+    g.globalCompositeOperation = 'source-over';
+    // the megastructures: outlined, named where there's room
+    g.font = '600 ' + (8.5*dp) + 'px Chakra Petch, JetBrains Mono, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'top';
+    for (const m of d.megs){ const [x0, y0] = F.P(m.i, m.j), w = m.w*t, h = m.h*t, x = x0 - t/2 + 1.5, y = y0 - t/2 + 1.5;
+      g.fillStyle = 'rgba(11,9,7,.55)'; g.fillRect(x, y, w - 3, h - 3);
+      g.strokeStyle = m.m.kind === 'police' ? 'rgba(134,212,198,.9)' : 'rgba(235,225,204,.7)'; g.lineWidth = dp; g.strokeRect(x, y, w - 3, h - 3);
+      if (w > 46*dp){ g.fillStyle = m.m.kind === 'police' ? '#86d4c6' : 'rgba(235,225,204,.85)'; g.fillText(m.name.toUpperCase(), x + 3*dp, y + 3*dp, w - 8*dp); } }
+    // every incident on record as a faint mark; the latest seven numbered
+    for (const x of d.inc.slice(7)){ const [px, py] = F.P(x.x/LOT, x.z/LOT); g.fillStyle = 'rgba(255,91,69,.4)'; g.fillRect(px - 1.5*dp, py - 1.5*dp, 3*dp, 3*dp); }
+    d.inc.slice(0, 7).reverse().forEach((x, kk, arr) => { const k = arr.length - 1 - kk, [px, py] = F.P(x.x/LOT, x.z/LOT), s = (k < 3 ? 8 : 6)*dp;
+      g.fillStyle = k < 3 ? '#ff5b45' : '#a8473a'; g.beginPath(); g.moveTo(px, py - s); g.lineTo(px + s, py); g.lineTo(px, py + s); g.lineTo(px - s, py); g.closePath(); g.fill();
+      g.fillStyle = '#1a0703'; g.font = '600 ' + (8.5*dp) + 'px Chakra Petch, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(k + 1), px, py + .5*dp); });
+    // the hotspot
+    if (d.hot && d.hot.n > 2){ const [x, y] = F.P(d.hot.i, d.hot.j); g.strokeStyle = '#ffd08a'; g.lineWidth = dp; g.strokeRect(x - t*.9, y - t*.9, t*1.8, t*1.8);
+      g.fillStyle = '#ffd08a'; g.font = (8.5*dp) + 'px JetBrains Mono, monospace'; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText('HOTSPOT · ' + d.hot.n + ' PEOPLE', x + t, y - t); }
+    // north
+    g.fillStyle = '#8d8170'; g.font = '600 ' + (10*dp) + 'px Chakra Petch, sans-serif'; g.textAlign = 'right'; g.textBaseline = 'top'; g.fillText('N ↑', W - 10*dp, 8*dp);
   }
-  function calloutPlace(bg, cR, d){
-    const el = $('.callout'), p = M.who; if (!p){ el.style.display = 'none'; return; }
-    const home = places.get(p.home), i = Math.round(home.x/LOT), j = Math.round(home.z/LOT), sk = M.secOf(i, j), F = base.F;
-    const plot = M.plots.find(q => q.i === i && q.j === j), pt = F.P(i, j, (plot ? plot.lv : 2)*F.lz);
-    let tag = 'RESIDENT'; try { tag = STORY.descOf(p.id); } catch (e){}
-    const zone = plot && plot.zone, t = ZONE_T[zone] ?? 1, out = typeof asleep === 'function' && !asleep(p, M.hour);
-    el.innerHTML = `<b>${permit(p.id)}</b> &nbsp;${esc(String(tag).replace(/^an? /, '').toUpperCase())}<br>TIER ${ROM[t]} · ${p.cop ? 'PATROL' : p.courier ? 'COURIER' : p.job ? 'WORKER' : 'RESIDENT'} · ${p.courier && out ? 'NO PERMIT' : out ? 'OUT' : 'IN'}<br><span style="color:#c98a7e">SEEN S${sk + 1} · ${hm(M.hour)}</span>`;
-    const w = el.offsetWidth, h = el.offsetHeight, px = pt[0]/d, py = pt[1]/d + 22;
-    let x = px - w - 40, y = py - h - 46; if (x < 8) x = px + 40; if (y < 30) y = py + 40;
-    const askR = $('.ask').getBoundingClientRect(); if (x + w > askR.left - cR.left - 8 && y + h > askR.top - cR.top) y = Math.max(30, askR.top - cR.top - h - 10);
-    el.style.left = x + 'px'; el.style.top = y + 'px';
-    const ex = (x + (x < px ? w : 0))*d, ey = (y - 22 + h)*d;
-    bg.strokeStyle = '#e5432d'; bg.lineWidth = d; bg.beginPath(); bg.moveTo(ex, ey); bg.lineTo(pt[0], pt[1]); bg.stroke(); bg.beginPath(); bg.arc(pt[0], pt[1], 3.5*d, 0, 7); bg.stroke();
-  }
-  function drawPlan(t, dt){
-    const g = cv.ig, W = cv.i.width, H = cv.i.height, d = DPR(); g.drawImage(base, 0, 0);
-    // the streams
-    g.font = (9*d) + 'px JetBrains Mono, monospace';
-    for (const s of streams){ if (!s.on) continue; s.y += s.v*dt; if (s.y - s.n*11*d > H){ s.y = -Math.random()*H*.5; s.on = Math.random() < .6; }
-      if (Math.random() < .1) s.ch[(Math.random()*16) | 0] = HEX[(Math.random()*16) | 0];
-      for (let k = 0; k < s.n; k++){ g.fillStyle = k === 0 ? 'rgba(255,208,138,.55)' : 'rgba(150,190,170,' + (.16*(1 - k/s.n)) + ')'; g.fillText(s.ch[k % 16], s.x, s.y - k*11*d); } }
-    // the next sector to turn, breathing; a handful of lamps flickering
-    if (M.next){ polyPath(g, sectorPoly(base.F, M.next.k)); g.strokeStyle = 'rgba(255,168,52,' + (.35 + .45*(.5 + .5*Math.sin(t*4))) + ')'; g.lineWidth = 1.6*d; g.stroke(); }
-    for (let k = 0; k < 5 && base.lamps.length; k++){ const q = base.lamps[(Math.random()*base.lamps.length) | 0]; g.fillStyle = Math.random() < .5 ? 'rgba(0,0,0,.8)' : 'rgba(255,200,120,.9)'; g.fillRect(q[0] - d, q[1] - d, 2*d, 2*d); }
-    // the reading head drifting over the plan, and a scan line crossing it
-    const cx = W*.36 + Math.sin(t*.37)*W*.22, cy = H*.5 + Math.cos(t*.29)*H*.28;
-    g.strokeStyle = 'rgba(255,168,52,.6)'; g.lineWidth = d; g.beginPath(); g.moveTo(cx - 14*d, cy); g.lineTo(cx - 4*d, cy); g.moveTo(cx + 4*d, cy); g.lineTo(cx + 14*d, cy); g.moveTo(cx, cy - 14*d); g.lineTo(cx, cy - 4*d); g.moveTo(cx, cy + 4*d); g.lineTo(cx, cy + 14*d); g.stroke();
-    g.fillStyle = 'rgba(255,168,52,.85)'; g.fillText((cx/W*M.ni + M.i0).toFixed(2) + ' / ' + (cy/H*M.nj + M.j0).toFixed(2), cx + 16*d, cy - 8*d);
-    const sy = ((t*.12) % 1)*H; const gr = g.createLinearGradient(0, sy - 30*d, 0, sy); gr.addColorStop(0, 'rgba(255,168,52,0)'); gr.addColorStop(1, 'rgba(255,168,52,.07)'); g.fillStyle = gr; g.fillRect(0, sy - 30*d, W, 30*d);
+  function drawMap(t){
+    if (!base) return; const g = cg, W = cv.width, H = cv.height, dp = F.dp; g.drawImage(base, 0, 0);
+    // the newest incident breathes; a survey line crosses the plan
+    const x0 = D.inc[0]; if (x0){ const [px, py] = F.P(x0.x/LOT, x0.z/LOT), k = (t*.6) % 1; g.strokeStyle = `rgba(255,91,69,${.8*(1 - k)})`; g.lineWidth = 1.5*dp; g.beginPath(); g.arc(px, py, (8 + k*22)*dp, 0, 7); g.stroke(); }
+    const sx = ((t*.08) % 1)*W, gr = g.createLinearGradient(sx - 40*dp, 0, sx, 0); gr.addColorStop(0, 'rgba(243,165,58,0)'); gr.addColorStop(1, 'rgba(243,165,58,.08)'); g.fillStyle = gr; g.fillRect(sx - 40*dp, 0, 40*dp, H);
+    g.fillStyle = 'rgba(243,165,58,.5)'; g.fillRect(sx, 0, dp, H);
   }
   let lastClk = '';
   function loop(now){
     if (!O.open) return; raf = requestAnimationFrame(loop);
-    if (now - last < 33) return; const dt = last ? Math.min(.1, (now - last)/1000) : 0; last = now; const t = now/1000, el = (now - t0)/1000;
-    if (base) drawPlan(t, dt);
-    const ck = hms(M.hour*3600 + el); if (ck !== lastClk){ lastClk = ck; const c = $('.clk'); if (c) c.textContent = ck; }
-    logT += dt; if (logT > 2.4){ logT = 0; logPush(); }
-    const lv = $('.lev'); if (lv) lv.style.transform = 'rotate(' + (-38 + Math.sin(t*.8)*3) + 'deg)';
+    if (now - last < 40) return; last = now; drawMap(now/1000);
+    const c = $('.clock'); if (c){ const s = (now/500 | 0) % 2 ? hm(D.hour) : hm(D.hour).replace(':', ' '); if (s !== lastClk){ lastClk = s; c.textContent = s; } }
   }
 
   /* ---------- in and out ---------- */
@@ -444,39 +323,45 @@ const OVERSEER = (() => {
     const ts = performance.now();
     const step = (now) => { const u = Math.min(1, (now - ts)/ms); g.font = (12*dpr) + 'px JetBrains Mono, monospace';
       for (let k = 0; k < cols; k++){ const p = Math.max(0, Math.min(1.15, (u - dl[k])/(1 - dl[k]*.6)*sp[k])), y = p*c.height;
-        g.fillStyle = '#040505'; g.fillRect(k*cw, 0, cw + 1, y - 12*dpr);
+        g.fillStyle = '#0b0907'; g.fillRect(k*cw, 0, cw + 1, y - 12*dpr);
         g.fillStyle = Math.random() < .15 ? '#ffd38a' : 'rgba(255,181,71,.85)'; g.fillText(GLY[(Math.random()*GLY.length) | 0], k*cw + 2*dpr, y - 12*dpr);
-        g.fillStyle = 'rgba(170,220,200,.5)'; g.fillText(HEX[(Math.random()*16) | 0], k*cw + 2*dpr, y - 26*dpr); }
-      if (u < 1) requestAnimationFrame(step); else { g.fillStyle = '#040505'; g.fillRect(0, 0, c.width, c.height); then(c); } };
+        g.fillStyle = 'rgba(235,225,204,.5)'; g.fillText(HEX[(Math.random()*16) | 0], k*cw + 2*dpr, y - 26*dpr); }
+      if (u < 1) requestAnimationFrame(step); else { g.fillStyle = '#0b0907'; g.fillRect(0, 0, c.width, c.height); then(c); } };
     requestAnimationFrame(step);
   }
   O.show = (m) => {
     if (O.open || O.busy) return; O.busy = true; if (!built) build();
-    spire = m || (typeof megas !== 'undefined' ? [...megas.values()].find(q => q.kind === 'spire') : null) || null;
     if (typeof MON !== 'undefined' && MON.close) try { MON.close(); } catch (e){}
-    if (typeof music !== 'undefined' && music.hold) music.hold(true);   // (the radio goes quiet while the desk is up)
+    if (typeof music !== 'undefined' && music.hold) music.hold(true);   // (the radio goes quiet while the view is up)
     const city = canvas; city.classList.add('ovs-glitch');
     const bars = document.createElement('div'); bars.id = 'ovsBars'; document.body.appendChild(bars);
     setTimeout(() => curtain(650, (c) => {
-      O.open = true; O.hold = true; t0 = performance.now(); model(); dom(); last = 0;
-      // (the canvases are sized once the panels have their size: after the boot animations' first frame)
-      requestAnimationFrame(() => { if (!O.open) return; setupCanvases(); raf = requestAnimationFrame(loop); });
-      resizeH = () => { if (O.open && root){ root.querySelectorAll('.now').forEach(n => n.remove()); setupCanvases(); } }; addEventListener('resize', resizeH);
+      O.open = true; O.hold = true; t0 = performance.now(); read(); dom(); last = 0;
+      requestAnimationFrame(() => { if (!O.open) return; setupMap(); sparks(); raf = requestAnimationFrame(loop); });
+      resizeH = () => { if (O.open && root){ setupMap(); sparks(); } }; addEventListener('resize', resizeH);
       if (city) city.classList.remove('ovs-glitch'); bars.remove();
       c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 150, fill: 'forwards' }).onfinish = () => c.remove();
-      keyH = e => { if (!O.open) return; e.stopPropagation(); const k = e.key.toLowerCase(); if (k === 'y') yes(); else if (k === 'n' || k === 'escape') no(); };
+      keyH = e => { if (!O.open) return; e.stopPropagation(); const k = e.key.toLowerCase(), ask = root && root.querySelector('.ask');
+        if (ask && k === 'y') yes(); else if (ask && (k === 'n' || k === 'escape')) dismiss(); else if (k === 'escape') close(); };
       addEventListener('keydown', keyH, true);
-      setTimeout(() => { const b = $('.yes'); if (b) b.focus({ preventScroll: true }); O.busy = false; }, 700);
+      setTimeout(() => { const b = root && (root.querySelector('.ask .yes') || root.querySelector('.close')); if (b) b.focus({ preventScroll: true }); O.busy = false; }, 700);
     }), 380);
   };
   function closeDesk(){ O.open = false; cancelAnimationFrame(raf); clearTimeout(typingT); if (keyH) removeEventListener('keydown', keyH, true); keyH = null; if (resizeH) removeEventListener('resize', resizeH); resizeH = null; base = null; }
-  function no(){
-    if (!O.open || O.busy) return; O.busy = true; O.hold = false;   // (the city draws again under the desk as it leaves)
+  function close(){
+    if (!O.open || O.busy) return; O.busy = true; O.hold = false;   // (the city draws again under the view as it leaves)
     if (typeof music !== 'undefined' && music.hold) music.hold(false);
     root.classList.add('leave'); setTimeout(() => { closeDesk(); root.remove(); root = null; O.busy = false; }, 520);
   }
+  // no, the first time: the question folds away; the ledger stays, and the coast waits in its box at the side
+  function dismiss(){ const a = root && root.querySelector('.ask'); if (!a || O.busy) return; clearTimeout(typingT);
+    a.animate([{ opacity: 1, transform: 'translate(-50%, -50%)' }, { opacity: 0, transform: 'translate(-50%, -46%) scale(.97)' }], { duration: 260, easing: 'ease-in' }).onfinish = () => a.remove();
+    const b = root.querySelector('.close'); if (b) b.focus({ preventScroll: true }); }
   function yes(){
-    if (!O.open || O.busy) return; O.busy = true; $('.say').innerHTML = 'Remembering<span class="cur"></span>';
+    if (!O.open || O.busy) return; O.busy = true;
+    try { localStorage.setItem(ACCESS_KEY, String(safe(() => STORY.day() + 1, 1))); } catch (e) {}
+    const say = root.querySelector('.say'); if (say) say.innerHTML = 'Accessing<span class="cur"></span>';
+    const acc = root.querySelector('.acc'); if (acc) acc.textContent = 'ACCESSING';
     setTimeout(() => { if (typeof TV !== 'undefined') TV.go('coast.html'); else location.href = 'coast.html'; }, 350);
   }
   // a double click on the Data Spire: the pointer's ray against each spire's whole height (the plot's own pick box stops at its plinth)

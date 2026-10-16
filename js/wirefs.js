@@ -1,4 +1,5 @@
-// Neon Terrarium: what there is to find on the meshes, for the transmission log's command line (wirelog.js).
+// Neon Terrarium: what there is to find on the meshes. Not loaded for now: kept for the hacking mode later (the
+// transmission log is flavor only; the command line that used this is in git history).
 // Each corporation keeps one file system (root, four folders, a handful of dry files), reachable through whichever
 // meshes it sits on. Files are [name, size in KB, marks, body]: marks 'f' = flagged by a scan (it matters), 'e' =
 // encrypted (no key yet: the field set comes later). Up to 256 KB reads straight into the log; bigger has to be pulled.

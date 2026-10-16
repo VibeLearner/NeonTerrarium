@@ -34,9 +34,10 @@ const WIRELOG = (() => {
   #wirelog .wl-body { height: 178px; overflow-y: auto; overflow-x: hidden; padding: 4px 0 5px; scrollbar-width: thin; scrollbar-color: var(--wl-line) transparent; }
   #wirelog.collapsed .wl-body, #wirelog.collapsed .wl-foot { display: none; }
   #wirelog.collapsed header { border-bottom: 0; }
-  #wirelog .wl-line { display: grid; grid-template-columns: 38px 50px minmax(0,1fr); gap: 6px; padding: 0 9px; white-space: nowrap; opacity: .8; }
+  #wirelog .wl-line { display: grid; grid-template-columns: 38px 50px minmax(0,1fr); gap: 6px; align-items: start; padding: 1px 9px; opacity: .8; }
   #wirelog .wl-line:nth-last-child(-n+4) { opacity: 1; }
-  #wirelog .wl-line > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+  #wirelog .wl-line > span:last-child { white-space: normal; overflow-wrap: anywhere; }   /* (a long line wraps under itself; nothing is cut off) */
+  #wirelog .wl-line .ts, #wirelog .wl-line .ch { white-space: nowrap; }
   #wirelog .wl-line .ts { color: var(--wl-dim); font-variant-numeric: tabular-nums; }
   #wirelog .wl-line .ch { letter-spacing: .1em; font-size: 9.5px; }
   #wirelog .ch-CITY .ch { color: var(--c-city); } #wirelog .ch-MESH .ch { color: var(--c-mesh); } #wirelog .ch-CORP .ch { color: var(--c-corp); } #wirelog .ch-SIGNAL .ch { color: var(--c-sig); }

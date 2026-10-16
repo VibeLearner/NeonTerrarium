@@ -77,7 +77,7 @@ let HL = null;
 const hlTip = (() => { const d = document.createElement('div'); d.id = 'hlTip'; d.style.cssText = 'position:fixed;z-index:60;pointer-events:none;font:11px/1.3 "JetBrains Mono",monospace;color:#f3eadb;background:rgba(14,12,18,.82);border:1px solid rgba(255,255,255,.18);padding:3px 7px;transform:translate(14px,-50%);display:none;white-space:nowrap'; document.body.appendChild(d); return d; })();
 function hlScreenY(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam), r = canvas.getBoundingClientRect(); return r.top + (1 - (v.y*.5 + .5))*r.height; }
 function hlStart(){
-  if (S.zone !== 'low' || !ptrLast || hwMode || mtMode || delMode || megaPick) return;
+  if (!S.zone || !ptrLast || hwMode || mtMode || delMode || megaPick) return;
   const t = targetOf(pickAt(ptrLast.x, ptrLast.y)); if (!t) return;
   // under a pod: pick how many floors the building under it is (a floor's gap always left under the pod)
   if (t.type === 'belowUp' && t.c && t.c.lift){
@@ -100,32 +100,32 @@ function hlMove(px, py){
   if (!HL) return;
   if (HL.under){
     HL.floors = clamp(1 + Math.round((HL.sy - py)/HL.pxF), 1, HL.max);
-    hoverMat.color.set(ZONES.low.col); hoverStrip.visible = false; hoverFill.visible = false;
+    hoverMat.color.set(ZONES[S.zone].col); hoverStrip.visible = false; hoverFill.visible = false;
     hover.position.set(HL.x, HL.base + HL.floors*FH/2, HL.z); hover.scale.set(SIDE, HL.floors*FH, SIDE); hover.visible = true;
     hlTip.textContent = HL.floors + ' floor' + (HL.floors > 1 ? 's' : '') + ' under the pod (up to ' + HL.max + ') · click to build';
     hlTip.style.left = px + 'px'; hlTip.style.top = py + 'px'; hlTip.style.display = 'block'; return;
   }
   HL.floors = HL.canRaise ? clamp(Math.round((HL.sy - py)/HL.pxF), 0, 40) : 0;
   const y = HL.base + HL.floors*FH;
-  hoverMat.color.set(ZONES.low.col); hoverStrip.visible = false;
+  hoverMat.color.set(ZONES[S.zone].col); hoverStrip.visible = false;
   hover.position.set(HL.x, y + FH, HL.z); hover.scale.set(SIDE, FH*2, SIDE); hover.visible = true;
   if (HL.floors){ hoverFill.position.set(HL.x, (HL.base + y)/2, HL.z); hoverFill.scale.set(SIDE*.92, y - HL.base, SIDE*.92); hoverFill.visible = true; } else hoverFill.visible = false;
   hlTip.textContent = HL.floors ? 'Starts ' + HL.floors + ' floor' + (HL.floors > 1 ? 's' : '') + ' up, on a scaffold · click to build' : HL.canRaise ? 'Move up to raise it · click to build' : 'No room to raise it here · click to build';
   hlTip.style.left = px + 'px'; hlTip.style.top = py + 'px'; hlTip.style.display = 'block';
 }
 function hlBuild(){
-  const H0 = HL; hlStop(); if (!H0 || S.zone !== 'low') return;
-  if (H0.under){ addBelowUp(H0.c, 'low', { mf: H0.floors }); return; }
+  const H0 = HL; hlStop(); const zone = S.zone; if (!H0 || !zone) return;
+  if (H0.under){ addBelowUp(H0.c, zone, { mf: H0.floors }); return; }
   if (!H0.floors){ applyTarget(H0.t); return; }
   let c = H0.c || cells.get(ckey(H0.i, H0.j)) || addPlatform(H0.i, H0.j, null); if (!c) return;
-  finishAnimsOn(c); addLift(c, H0.base + H0.floors*FH, 'low');
+  finishAnimsOn(c); addLift(c, H0.base + H0.floors*FH, zone);
 }
 // Space with Residential picked: one more single home on the plot, roof or pod under the pointer (a building as tall as you like, a floor at a time)
 function unitAt(px, py){
   const t = targetOf(pickAt(px, py)); if (!t) return false;
-  if (t.type === 'empty'){ const c = addPlatform(t.i, t.j, null); if (c){ finishAnimsOn(c); addSection(c, 'low', { mf: 1 }); } return true; }
-  if (t.type === 'belowUp' && t.c && t.c.lift){ addBelowUp(t.c, 'low', { mf: 1 }); return true; }   // (under a pod: one home on the ground or on the building there, a floor's gap kept)
-  if ((t.type === 'up' || (t.type === 'onto' && !t.c.sections.length)) && t.c && !t.c.mega){ addSection(t.c, 'low', Object.assign({ mf: 1 }, t.after !== undefined ? { after: t.after } : {})); return true; }
+  if (t.type === 'empty'){ const c = addPlatform(t.i, t.j, null); if (c){ finishAnimsOn(c); addSection(c, S.zone, { mf: 1 }); } return true; }
+  if (t.type === 'belowUp' && t.c && t.c.lift){ addBelowUp(t.c, S.zone, { mf: 1 }); return true; }   // (under a pod: one home on the ground or on the building there, a floor's gap kept)
+  if ((t.type === 'up' || (t.type === 'onto' && !t.c.sections.length)) && t.c && !t.c.mega){ addSection(t.c, S.zone, Object.assign({ mf: 1 }, t.after !== undefined ? { after: t.after } : {})); return true; }
   return false;
 }
 let shiftTap = null;
@@ -223,7 +223,7 @@ addEventListener('keydown', e => {
   if (PAN_KEYS.includes(k)){ keys.add(k); MON.userPan(); e.preventDefault(); return; }
   if (k === 'h' || e.key === 'Home'){ centerView(); return; }
   if (e.key === ' '){ e.preventDefault(); if (e.repeat) return;
-    if (S.zone === 'low' && !HL && !hwMode && !mtMode && !delMode && !megaPick && !tiltMode && ptrLast && unitAt(ptrLast.x, ptrLast.y)){ showHover(targetOf(pickAt(ptrLast.x, ptrLast.y))); return; }   // (Residential: one more home; otherwise Space tilts as before)
+    if (S.zone && !HL && !hwMode && !mtMode && !delMode && !megaPick && !tiltMode && ptrLast && unitAt(ptrLast.x, ptrLast.y)){ showHover(targetOf(pickAt(ptrLast.x, ptrLast.y))); return; }   // (Residential: one more home; otherwise Space tilts as before)
     setTiltMode(!tiltMode); return; }
   if (k === 'x' && !e.repeat){ setDelMode(!delMode); return; }
   if (e.key === '5' && !e.repeat){ if (hwUnlocked()) setHwMode(!hwMode); return; }
@@ -300,7 +300,7 @@ function selectZone(z){
   if (S.zone && mtMode) setMtMode(false, true);
   document.querySelectorAll('.zone[data-zone]').forEach(b => { const on = b.dataset.zone === S.zone; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   if (megaPick || delMode || hwMode || mtMode) return;
-  $('modeHint').textContent = S.zone ? `Zone ${ZONES[S.zone].key}: click to build · click a roof to stack a section` + ' · click high on a wall to hang a pod' + (S.paint ? ' · drag to paint' : '') : 'Click the sky to grow the platform · pick a zone to build';
+  $('modeHint').textContent = S.zone ? `Zone ${ZONES[S.zone].key}: click to build · click a roof to stack a section` + ' · click a wall to hang a side building · Space adds one floor · tap Shift to pick a height' + (S.paint ? ' · drag to paint' : '') : 'Click the sky to grow the platform · pick a zone to build';
 }
 document.querySelectorAll('.zone[data-zone]').forEach(b => b.addEventListener('click', () => selectZone(b.dataset.zone)));
 // the sky highways (highway.js): the Highway button, and its height and lanes controls

@@ -905,7 +905,7 @@ function* buildStackGen(c){
     c.sections.forEach((sec, k) => { const s0 = k === 0 ? c.lift.y : sec.at !== undefined && sec.at > tops[k - 1] + .01 ? sec.at : null;
       if (s0 !== null) bl.push([s0, tops[k], k, k]); else { bl[bl.length - 1][1] = tops[k]; bl[bl.length - 1][3] = k; } });
     c.podBlocks = bl;
-    for (const [s0] of bl) podBrackets(c, s0);
+    for (const [s0, , k0] of bl) podBrackets(c, s0, c.sections[k0].zone);
   } else if (c.lift) liftScaffold(c, c.lift.y);
   rooftopBoard(c, y);
   steamVent(c);
@@ -1387,56 +1387,96 @@ function liftPlatformLux(c, y0){
 // A plank gangway with a rail crosses the gap to a door in the wall (the way in: through the building it hangs from).
 // Where a building beside the pod (left or right) rises past the deck, a beam runs over to its wall too, with a strut.
 const POD_Z1 = 1.18, POD_FAR = 2.6;   // (where a bracketed pod looks for the walls round it: from its deck's edge out to the next plot's middle)
-function podBrackets(c, y0){
+// Each zone dresses its brackets in its own kit (the shapes stay the same, so a pod reads as a pod in any district):
+// Residential: planks and rusty steel, bare bulbs. Commercial: a grated steel deck on Warren girders, hazard stripes,
+// neon along the rails, work lights. Luxury: a stone slab with a gold band on slim stone corbels, glass balustrades with
+// a gold handrail. Industrial: a riveted steel plate on deep rust girders, pipe rails, hazard edges, an amber lamp.
+function podBrackets(c, y0, zone){
+  zone = zone || (c.sections[0] && c.sections[0].zone) || 'low';
   R = mulberry32(hash('podbr', c.i, c.j, Math.round(y0*100)));
-  const [a, b] = c.lift.d || [1, 0], P = T(c.x, 0, c.z), steel = () => pick([M.rust, M.rust, M.metalDark, M.metal]);
-  // the frame for each side: local +z out toward that side's plot
+  const [a, b] = c.lift.d || [1, 0], P = T(c.x, 0, c.z);
   const toward = (da, db) => under(P, T(0, 0, 0, Math.atan2(da, db)));
-  // where the wall over there really stands at the deck (measured on what it draws: a set-back or a narrow building is
-  // further off), or null if there's no wall within reach
   const wallAt = (n, G) => { const d = wallGap(n, G, y0, POD_Z1, POD_FAR); return d > 0 ? POD_Z1 + d : null; };
-  const F = toward(-a, -b);   // toward the wall it hangs from
-  // the deck: planks on a frame, cross-ties under it
-  box(M.frame, F, 0, y0 - .1, 0, 2.36, .08, 2.36);
-  for (let x = -1.12; x <= 1.13; x += .16) box(pick([M.wood, M.wood, M.crate]), F, x, y0 - .03, 0, .14, .05, 2.3);
-  for (const z of [-.8, .1, .9]) box(steel(), F, 0, y0 - .3, z, 2.16, .06, .06);
-  // one side's ties: two beams from under the deck to the wall (just into it), a plate where each goes in and a short
-  // knee brace under it against the wall; and a plank gangway with rails to a door frame in the wall
+  const F = toward(-a, -b);
+  const Z = {
+    low: { beam: () => pick([M.rust, M.rust, M.metalDark, M.metal]), plate: M.metalDark, rail: M.frame, plank: () => pick([M.wood, M.wood, M.crate]), door: () => pick([M.rust, M.wood]), frame: M.metalDark },
+    mid: { beam: () => pick([TRUSS, TRUSS, TRUSS2]), plate: M.metalDark, rail: M.metalDark, plank: () => M.metalDark, door: () => TRUSS2, frame: TRUSS, neon: pick([M.neonCyan, M.neonPink, M.neonAmber]) },
+    high: { beam: () => LUX_STONE2, plate: M.idGold, rail: M.idGold, plank: () => LUX_STONE, door: () => LUX_STONE2, frame: M.idGold },
+    ind: { beam: () => pick([IND_RUST, IND_RUST, IND_RUST2]), plate: IND_STEEL, rail: IND_STEEL, plank: () => IND_STEEL, door: () => IND_RUST2, frame: IND_RUST },
+  }[zone] || null;
+  const K = Z || { beam: () => M.rust, plate: M.metalDark, rail: M.frame, plank: () => M.wood, door: () => M.wood, frame: M.metalDark };
+  // the deck
+  if (zone === 'high'){
+    box(LUX_STONE, F, 0, y0 - .08, 0, 2.4, .16, 2.4);
+    for (const [da, db] of SIDES4) box(M.idGold, toward(da, db), 0, y0 - .08, 1.205, 2.42, .04, .012);
+  } else if (zone === 'mid'){
+    box(TRUSS, F, 0, y0 - .12, 0, 2.38, .18, 2.38);
+    for (let x = -1.1; x <= 1.11; x += .12) box(M.metalDark, F, x, y0 - .02, 0, .03, .02, 2.3);
+    for (const [da, db] of SIDES4){ const G = toward(da, db); for (let x = -1.15; x < 1.15; x += .2) box(Math.round(x*5) % 2 ? M.hazard : M.metalDark, G, x + .1, y0 - .17, 1.195, .2, .07, .01); }
+  } else if (zone === 'ind'){
+    box(IND_STEEL, F, 0, y0 - .05, 0, 2.32, .06, 2.32);
+    for (const [da, db] of SIDES4){ const G = toward(da, db); box(IND_RUST, G, 0, y0 - .2, 1.16, 2.42, .3, .1); for (let x = -1.1; x <= 1.11; x += .22) box(M.metalDark, G, x, y0 - .2, 1.215, .03, .03, .01); }
+  } else {
+    box(M.frame, F, 0, y0 - .1, 0, 2.36, .08, 2.36);
+    for (let x = -1.12; x <= 1.13; x += .16) box(pick([M.wood, M.wood, M.crate]), F, x, y0 - .03, 0, .14, .05, 2.3);
+    for (const z of [-.8, .1, .9]) box(K.beam(), F, 0, y0 - .3, z, 2.16, .06, .06);
+  }
+  // one beam from z0 to the wall at zW, at x: each zone's own kind
+  const beam = (G, x, z0, zW) => {
+    const m = K.beam(), L = zW + .06 - z0, zc = (z0 + zW + .06)/2;
+    if (zone === 'mid') trussBeam(G, x, z0, x, zW + .06, y0 - .46, .26, m);
+    else if (zone === 'high'){ box(m, G, x, y0 - .22, zc, .12, .12, L); box(M.idGold, G, x, y0 - .155, zc, .125, .012, L); }   // a slim stone beam, a gold line along its top
+    else if (zone === 'ind'){ box(m, G, x, y0 - .3, zc, .06, .26, L); box(m, G, x, y0 - .18, zc, .16, .03, L); box(m, G, x, y0 - .43, zc, .16, .03, L);   // an I-beam, rivets on its web
+      for (let z = z0 + .15; z < zW; z += .3) box(M.metalDark, G, x + .035, y0 - .3, z, .01, .03, .03); }
+    else box(m, G, x, y0 - .2, zc, .1, .13, L);
+    box(K.plate, G, x, y0 - .22, zW - .02, zone === 'high' ? .2 : .22, zone === 'high' ? .2 : .3, .04);
+    // a knee brace against the wall under it (luxury: a stone corbel, a gold collar where it meets the wall)
+    const kz = Math.max(POD_Z1 - .1, zW - .6);
+    if (zone === 'high'){ strut(LUX_STONE2, G, x, y0 - .8, zW - .03, x, y0 - .28, kz, .07); box(M.idGold, G, x, y0 - .8, zW - .02, .16, .05, .04); }
+    else { strut(m, G, x, y0 - .75, zW - .03, x, y0 - .26, kz, zone === 'ind' ? .045 : .03); box(K.plate, G, x, y0 - .75, zW - .02, .18, .18, .04); }
+  };
+  // a rail along a deck edge or a gangway side, from z0 to z1 at x (luxury: glass panels and a gold handrail; commercial: a neon strip)
+  const railZ = (G, x, z0, z1) => {
+    const L = z1 - z0, zc = (z0 + z1)/2;
+    if (zone === 'high'){ box(LUX_GLASS, G, x, y0 + .25, zc, .02, .45, L); box(M.idGold, G, x, y0 + .49, zc, .045, .03, L); return; }
+    box(K.rail, G, x, y0 + .5, zc, .03, .03, L);
+    for (let z = z0 + .03; z < z1; z += .45) box(K.rail, G, x, y0 + .25, z, .03, .5, .03);
+    if (zone === 'mid' && Z.neon) box(Z.neon, G, x, y0 + .53, zc, .015, .015, L - .04);
+    if (zone === 'ind') box(M.hazard, G, x, y0 + .08, zc, .02, .06, L);
+  };
+  // one side's ties: two beams to the wall, and (walk) a gangway with rails to a door frame in it
   const tie = (G, zW, bx, z0, walk) => {
-    const m = steel();
-    for (const x of [-bx, bx]){
-      box(m, G, x, y0 - .2, (z0 + zW + .06)/2, .1, .13, zW + .06 - z0);
-      box(M.metalDark, G, x, y0 - .2, zW - .02, .22, .28, .04);
-      const kz = Math.max(POD_Z1 - .1, zW - .6); strut(m, G, x, y0 - .75, zW - .03, x, y0 - .26, kz, .03); box(M.metalDark, G, x, y0 - .75, zW - .02, .18, .18, .04);
-    }
+    for (const x of [-bx, bx]) beam(G, x, z0, zW);
     if (!walk) return;
     const gx = rnd(-.35, .35);
-    for (let z = POD_Z1; z < zW - .02; z += .14) box(pick([M.wood, M.crate]), G, gx, y0 - .03, Math.min(z + .06, zW - .07), .84, .05, .12);
-    for (const sx of [-1, 1]){ box(M.frame, G, gx + sx*.41, y0 + .5, (POD_Z1 + zW)/2, .03, .03, zW - POD_Z1); for (let z = POD_Z1 + .05; z < zW; z += .45) box(M.frame, G, gx + sx*.41, y0 + .25, z, .03, .5, .03); }
-    box(M.metalDark, G, gx, y0 + .5, zW + .01, .66, 1.0, .05); box(pick([M.rust, M.wood]), G, gx, y0 + .45, zW - .02, .48, .88, .03);
+    if (zone === 'high') box(LUX_STONE, G, gx, y0 - .04, (POD_Z1 + zW)/2, .86, .08, zW - POD_Z1);
+    else for (let z = POD_Z1; z < zW - .02; z += .14) box(K.plank(), G, gx, y0 - .03, Math.min(z + .06, zW - .07), .84, .05, .12);
+    if (zone === 'ind') for (const sx of [-1, 1]) box(M.hazard, G, gx + sx*.42, y0 - .02, (POD_Z1 + zW)/2, .02, .03, zW - POD_Z1);
+    for (const sx of [-1, 1]) railZ(G, gx + sx*.41, POD_Z1, zW);
+    box(K.frame, G, gx, y0 + .5, zW + .01, .66, 1.0, .05); box(K.door(), G, gx, y0 + .45, zW - .02, .48, .88, .03);
+    if (zone === 'mid' && Z.neon) box(Z.neon, G, gx, y0 + 1.02, zW - .03, .5, .03, .02);
   };
-  // the wall it hangs from (if its wall can't be found at the deck, the beams go in where a wall usually stands)
   const host = cells.get(ckey(c.i - a, c.j - b));
-  tie(F, wallAt(host, F) ?? LOT - .9, 1.08, -1.15, true);
-  // rails round the deck's other three edges, unless a gangway leaves that way
+  tie(F, wallAt(host, F) ?? LOT - .9, 1.05, -1.15, true);
   const linked = new Set();
-  // the buildings round it on its other three sides that reach the deck: ties to each (a pod hung in the gap between two
-  // buildings ties into both; a building put up next to a pod later ties in too, as a change next door rebuilds the pod)
   for (const [da, db] of SIDES4){
     if (da === -a && db === -b) continue;
     const n = cells.get(ckey(c.i + da, c.j + db));
     if (!n || n.mega || !n.sections.length || n.height < y0 + .3 || (n.lift && n.lift.y > y0 + .3)) continue;
-    const G = toward(da, db), zW = wallAt(n, G); if (zW === null) continue;   // (no wall there at this height: nothing hangs in the air)
+    const G = toward(da, db), zW = wallAt(n, G); if (zW === null) continue;
     tie(G, zW, .75, .9, n.height >= y0 + 1.1); linked.add(da + ',' + db);
   }
+  // rails round the deck's free edges (each edge seen from outside: local x along it)
   for (const [da, db] of SIDES4){
     if ((da === -a && db === -b) || linked.has(da + ',' + db)) continue;
-    const G = toward(da, db); box(M.frame, G, 0, y0 + .45, 1.17, 2.36, .03, .03);
-    for (let k = 0; k <= 5; k++) box(M.frame, G, -1.15 + 2.3*k/5, y0 + .22, 1.17, .03, .45, .03);
+    railZ(under(toward(da, db), T(0, 0, 0, PI/2)), -1.17, -1.17, 1.17);
   }
-  // a lamp under the deck, a pot plant on it
-  box(M.metalDark, F, rnd(-.5, .5), y0 - .38, rnd(-.6, .3), .1, .06, .1); glow(F, 0, y0 - .45, -.2, 'warm', .6);
-  if (chance(.6)) plant(pick(['fern', 'succulent', 'bush']), F, rnd(-.8, .8), y0 + .02, -.9, rnd(.5, .7));
+  // a light under the deck, something on it
+  if (zone === 'mid') workLight(F, rnd(-.6, .6), y0 - .3, rnd(-.8, .2));
+  else if (zone === 'ind'){ box(M.metalDark, F, rnd(-.5, .5), y0 - .4, rnd(-.6, .3), .12, .08, .12); glow(F, 0, y0 - .5, -.2, 'orange', .6); }
+  else if (zone === 'high') glow(F, 0, y0 - .2, 0, 'warm', .5);
+  else { box(M.metalDark, F, rnd(-.5, .5), y0 - .38, rnd(-.6, .3), .1, .06, .1); glow(F, 0, y0 - .45, -.2, 'warm', .6); }
+  if (chance(.6)) plant(pick(zone === 'high' ? ['bonsai', 'g_fern3'] : ['fern', 'succulent', 'bush']), F, rnd(-.8, .8), y0 + .02, -.9, rnd(.5, .7));
 }
 function liftScaffold(c, y0){
   if (c.sections[0] && c.sections[0].zone === 'mid') return liftScaffoldCom(c, y0);   // a commercial pod: the heavy steel rig
@@ -3078,7 +3118,7 @@ function targetOf(pk){
   const inGrid = Math.abs(c.i + a) <= GRID_MAX && Math.abs(c.j + b) <= GRID_MAX;
   // (or over a shorter building next door, if there's a floor's gap between its roof and the pod)
   const shorter = n && n.sections.length && !n.lift && !n.mega;
-  if (S.zone === 'low' && n && n.lift && n.lift.v === 2 && !n.mega && (pk.kind === 'bld' || pk.kind === 'low') && n.podBlocks){
+  if (S.zone && n && n.lift && n.lift.v === 2 && !n.mega && (pk.kind === 'bld' || pk.kind === 'low') && n.podBlocks){
     const host = pk.kind === 'low' ? { sectionTops: c.belowTops, height: groundTop(c) } : c;
     const y0 = pk.kind === 'low' || !c.lift ? CURB : c.lift.y, key = c.i + ',' + c.j + ',' + a + ',' + b + ',' + pk.kind, H = POD_HOLD;
     let ly = H && H.key === key && pk.p.y > H.ly - FH*.33 && pk.p.y < H.ly + FH*1.33 ? H.ly : liftSnap(host, pk.p.y, y0);
@@ -3115,7 +3155,7 @@ function applyTarget(t){
   if (t.type === 'side'){ if (!zone) return null; const c = t.c || addPlatform(t.i, t.j, null); if (c) finishAnimsOn(c);
     // residential: a single home on brackets off the wall (the other zones keep their scaffolds for now)
     if (c && c.lift && c.lift.v === 2) return addFloatPod(c, t.y, zone);
-    const opt = zone === 'low' && t.from ? { d: [t.i - t.from.i, t.j - t.from.j], mf: 1 } : {};
+    const opt = t.from ? { d: [t.i - t.from.i, t.j - t.from.j], mf: 1 } : {};   // (a single pod on brackets, every zone)
     return c ? addLift(c, t.y, zone, opt) : null; }
   if (!zone && t.type === 'onto' && !t.c.mega && !t.c.sections.length){ cycleGreen(t.c); return t.c; }   // no zone picked: an empty plot's greenery cycles
   if (!zone || t.c.mega) return null;
@@ -3147,7 +3187,7 @@ function showHover(t){
   if (t.type === 'empty'){
     x = t.i*LOT; z = t.j*LOT;
     if (S.zone){ y0 = CURB; h = FH*3; w = SIDE; } else { y0 = -.6; h = .68; w = LOT; }
-  } else if (t.type === 'side'){ x = t.i*LOT; z = t.j*LOT; y0 = t.y; h = S.zone === 'low' ? FH*1.15 : FH*2; w = SIDE; }
+  } else if (t.type === 'side'){ x = t.i*LOT; z = t.j*LOT; y0 = t.y; h = FH*1.15; w = SIDE; }
   else if (t.type === 'podDown'){ x = t.c.x; z = t.c.z; h = Math.min(FH*2, t.c.lift.y - groundTop(t.c)); y0 = t.c.lift.y - h; w = SIDE; }
   else if (t.type === 'belowUp'){ x = t.c.x; z = t.c.z; y0 = groundTop(t.c); h = Math.min(FH*2, Math.max(.3, t.c.lift.y - y0 - .1)); w = SIDE; }
   else if (t.type === 'onto'){ x = t.c.x; z = t.c.z; y0 = t.c.sections.length ? t.c.height : CURB; h = FH*3; w = SIDE; }

@@ -19,13 +19,16 @@ function recipeOf(c){
   if (air) for (const [a, b] of SIDES4) for (let l = -1; l <= 1; l++) at.push([a + (a ? 0 : l), b + (b ? 0 : l)]);
   if (at.length){ r.nbi = []; for (const [a, b] of at){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n && !r.nbi.some(e => e[0] === a && e[1] === b)) r.nbi.push([a, b, { mega: !!n.mega, sec: n.sections.length, height: n.height, liftY: n.lift ? n.lift.y : null }]); } }
   // a luxury pod's walkways ask how far the neighbor's wall really stands (wallGap): the triangles of the neighbor in the corridor, taken here from its own geometry
-  if (c.lift && c.sections[0] && c.sections[0].zone === 'high') for (const [a, b] of SIDES4){
+  // (a bracketed pod's beams too: from its deck's edge to the wall, the whole height of its stack, see podBrackets)
+  const br = c.lift && c.lift.v === 2;
+  if (c.lift && c.sections[0] && (c.sections[0].zone === 'high' || br)) for (const [a, b] of SIDES4){
     const n = cells.get(ckey(c.i + a, c.j + b)), e = n && r.nbi.find(q => q[0] === a && q[1] === b); if (!e || !n.data || !n.data.geo) continue;
-    const F = under(T(c.x, 0, c.z), T(0, 0, 0, Math.atan2(a, b))), { a: pa, b: pb } = wallCorridor(F, LOT - 1.05, 1.6), y0 = c.lift.y;
+    const F = under(T(c.x, 0, c.z), T(0, 0, 0, Math.atan2(a, b))), { a: pa, b: pb } = br ? wallCorridor(F, POD_Z1, POD_FAR) : wallCorridor(F, LOT - 1.05, 1.6), y0 = c.lift.y;
+    const by0 = br ? y0 - .2 : y0 + .2, by1 = br ? c.height + 1 : y0 + .9;
     const h = n.data.pm;
     if (h && h.out && n.data.rec && n.data.rec.r){   // (the neighbor's arrays are let go: whoever makes the pod makes the neighbor again for its triangles, see recipeGen)
-      e[2].nbrec = { r: n.data.rec.r, draws: n.data.rec.draws, cor: [pa.x, pa.z, pb.x, pb.z, y0] }; continue; }
-    const tris = corridorTris(n.data.geo, pa.x, pa.z, pb.x, pb.z, y0 + .2, y0 + .9), flat = []; for (const v of tris) flat.push(v.x, v.y, v.z);
+      e[2].nbrec = { r: n.data.rec.r, draws: n.data.rec.draws, cor: [pa.x, pa.z, pb.x, pb.z, y0, by0, by1] }; continue; }
+    const tris = corridorTris(n.data.geo, pa.x, pa.z, pb.x, pb.z, by0, by1), flat = []; for (const v of tris) flat.push(v.x, v.y, v.z);
     e[2].wt = flat;
   }
   return r;
@@ -51,8 +54,8 @@ const _nbStub = i => new Proxy({}, { get(t, k){
 // assigned (what a worker sends back besides the data)
 function recipeGen(r, world){
   if (r.nbi) for (const [, , i] of r.nbi) if (i.nbrec){   // (a neighbor's triangles for a walkway: made again here, at the corridor the page worked out)
-    const nd = recipeGen(Object.assign({}, i.nbrec.r, { draws: i.nbrec.draws }), world).data, [ax, az, bx, bz, y0] = i.nbrec.cor, flat = [];
-    for (const v of corridorTris(nd.geo, ax, az, bx, bz, y0 + .2, y0 + .9)) flat.push(v.x, v.y, v.z);
+    const nd = recipeGen(Object.assign({}, i.nbrec.r, { draws: i.nbrec.draws }), world).data, [ax, az, bx, bz, y0, by0, by1] = i.nbrec.cor, flat = [];
+    for (const v of corridorTris(nd.geo, ax, az, bx, bz, by0 ?? y0 + .2, by1 ?? y0 + .9)) flat.push(v.x, v.y, v.z);
     for (const g of nd.geo.values()) g.dispose();
     i.wt = flat; i.nbrec = null;
   }

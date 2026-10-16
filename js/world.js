@@ -2874,13 +2874,26 @@ function pickClassify(h){
   // a building: under a pod, its ground part; otherwise the building
   let kind = 'bld', topY = c.height;
   if (c.lift){ const gt = groundTop(c); if (P.y < gt - .01 && gt > CURB){ kind = 'low'; topY = gt; } else if (P.y < c.lift.y - .15) return { d: h.t, c, kind: 'gap', p: P }; }
-  // the roof, or anything standing on it (tanks, plants, antennas): the top
-  if ((up && P.y >= topY - FH*.6) || P.y >= topY + .02) return { d: h.t, c, kind, p: new THREE.Vector3(P.x, topY, P.z) };
-  // a wall (or a balcony, a sign, a ledge on it): that side, at the height the pointer is
-  const [a, b] = sideOf(c.x, c.z), y = Math.min(P.y, topY - .05);
-  return { d: h.t, c, kind, p: new THREE.Vector3(c.x + a*SIDE/2, Math.max(kind === 'low' ? CURB + .01 : (c.lift ? c.lift.y : CURB) + .01, y), c.z + b*SIDE/2) };
+  // The roof or a wall, the way it looks on screen: the plot's footprint stood up as a column, capped at the roof. The ray
+  // coming in through the cap is the roof; through a side, that wall, at the height where it comes in (the wall's own plane,
+  // so a ledge, a planter or a sign out on the wall doesn't move it). Anything standing above the roof (tanks, plants,
+  // antennas) is the roof too. (A ledge two floors down used to count as the roof and add a floor up top.)
+  const base = kind === 'low' ? CURB + .01 : (c.lift ? c.lift.y : CURB) + .01;
+  if (P.y >= topY + .02) return { d: h.t, c, kind, p: new THREE.Vector3(P.x, topY, P.z) };
+  _box3.min.set(c.x - SIDE/2, -1, c.z - SIDE/2); _box3.max.set(c.x + SIDE/2, topY, c.z + SIDE/2);
+  if (!_box3.containsPoint(ray.ray.origin) && ray.ray.intersectBox(_box3, _hit)){
+    const E = _hit, e = 1e-3;
+    if (Math.abs(E.y - topY) < e) return { d: h.t, c, kind, p: new THREE.Vector3(P.x, topY, P.z) };
+    const [a, b] = Math.abs(E.x - _box3.min.x) < e ? [-1, 0] : Math.abs(E.x - _box3.max.x) < e ? [1, 0] : Math.abs(E.z - _box3.min.z) < e ? [0, -1] : [0, 1];
+    return { d: h.t, c, kind, p: new THREE.Vector3(c.x + a*SIDE/2, Math.max(base, Math.min(E.y, topY - .05)), c.z + b*SIDE/2) };
+  }
+  // (the ray never comes into the column: something sticking out past it)
+  if (up && P.y >= topY - .3) return { d: h.t, c, kind, p: new THREE.Vector3(P.x, topY, P.z) };
+  const [a, b] = sideOf(c.x, c.z, false), y = Math.min(P.y, topY - .05);
+  return { d: h.t, c, kind, p: new THREE.Vector3(c.x + a*SIDE/2, Math.max(base, y), c.z + b*SIDE/2) };
 }
 // turn a pick into a build target
+let POD_HOLD = null;   // the floor a side pod is held at while the pointer stays near it
 function targetOf(pk){
   if (!pk) return null;
   if (pk.kind === 'sky') return cells.has(ckey(pk.i, pk.j)) ? null : { type: 'empty', i: pk.i, j: pk.j };
@@ -2912,20 +2925,18 @@ function targetOf(pk){
   const shorter = n && n.sections.length && !n.lift && !n.mega;
   if ((S.zone === 'low' || S.zone === 'mid' || S.zone === 'ind' || S.zone === 'high') && (pk.kind === 'bld' || pk.kind === 'low') && !c.mega && (n ? !n.sections.length || shorter : inGrid) && pk.p.y > CURB + FH){
     const host = pk.kind === 'low' ? { sectionTops: c.belowTops, height: groundTop(c) } : c;
-    const y0 = pk.kind === 'low' || !c.lift ? CURB : c.lift.y;
-    let ly = liftSnap(host, pk.p.y, y0);
-    if (ly !== null && shorter && ly < n.height + FH - .05){   // too low over the shorter building: the first floor of the tall one that clears it
-      const need = n.height + FH - .05; ly = liftSnap(host, need + .01, y0);
-      while (ly !== null && ly < need) ly += FH;
-      if (ly !== null && ly > host.height - .5) ly = null;
-    }
-    if (ly !== null) return { type: 'side', c: n || null, i: c.i + a, j: c.j + b, y: ly, from: c };
+    const y0 = pk.kind === 'low' || !c.lift ? CURB : c.lift.y, need = shorter ? n.height + FH - .05 : -Infinity;
+    // steady: the floor it's on holds until the pointer is well into the next one (a third of a floor past its edge), so
+    // a hand's wobble on a line between floors doesn't flick it up and down
+    const key = c.i + ',' + c.j + ',' + a + ',' + b + ',' + pk.kind, H = POD_HOLD;
+    let ly = H && H.key === key && pk.p.y > H.ly - FH*.33 && pk.p.y < H.ly + FH*1.33 ? H.ly : liftSnap(host, pk.p.y, y0);
+    // (over a shorter building next door a pod needs a floor's gap above its roof; below that nothing hangs here)
+    if (ly !== null && ly < need) ly = null;
+    if (ly !== null){ POD_HOLD = { key, ly }; return { type: 'side', c: n || null, i: c.i + a, j: c.j + b, y: ly, from: c }; }
   }
-  // nothing hangs here: the plot next door, if what's built there (or its ground, if it's bare) is by the pointer.
-  // (A wall facing a taller building or a pod used to stack onto that, far from the pointer: now it does nothing.)
-  if (!n) return pk.p.y < CURB + FH*2 ? { type: 'empty', i: c.i + a, j: c.j + b } : null;
-  if (!n.sections.length) return pk.p.y < CURB + FH*2 ? { type: 'onto', c: n } : null;
-  if (!n.lift && Math.abs(pk.p.y - n.height) < FH*1.5) return { type: 'onto', c: n };
+  // nothing hangs here: at street level, the bare plot (or open sky) next door; otherwise nothing at all, rather than
+  // something away from the pointer (a wall facing a building used to stack onto that building)
+  if (pk.p.y < CURB + FH*2 && (!n || !n.sections.length)) return n ? { type: 'onto', c: n } : { type: 'empty', i: c.i + a, j: c.j + b };
   return null;
 }
 function applyTarget(t){
@@ -2950,8 +2961,12 @@ hover.layers.set(1); hover.renderOrder = 999; hover.visible = false; scene.add(h
 // a side pod's outline is filled too (in its own pink), so it stands out against the wall it hangs from
 const hoverFill = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff5ad8, transparent: true, opacity: .22, depthTest: false, depthWrite: false }));
 hoverFill.layers.set(1); hoverFill.renderOrder = 998; hoverFill.visible = false; scene.add(hoverFill);
+// and the floor of the wall it would hang from lights up, right where the pointer is, so it's plain which floor a pod
+// lines up with even though the pod itself is drawn across the street
+const hoverStrip = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff5ad8, transparent: true, opacity: .5, depthTest: false, depthWrite: false }));
+hoverStrip.layers.set(1); hoverStrip.renderOrder = 999; hoverStrip.visible = false; scene.add(hoverStrip);
 function showHover(t){
-  hoverFill.visible = false;
+  hoverFill.visible = false; hoverStrip.visible = false;
   if (!t){ hover.visible = false; return; }
   hoverMat.color.set(t && (t.type === 'side' || t.type === 'podDown') ? '#ff5ad8' : S.zone ? ZONES[S.zone].col : '#e3d6bd');   // a side pod: its own colour
   let x, z, y0, h, w, wz;
@@ -2971,6 +2986,8 @@ function showHover(t){
   if (t.type !== 'empty' && !S.zone){ hover.visible = false; return; }
   hover.position.set(x, y0 + h/2, z); hover.scale.set(w, h, w); hover.visible = true;
   if (t.type === 'side' || t.type === 'podDown'){ hoverFill.position.copy(hover.position); hoverFill.scale.copy(hover.scale); hoverFill.visible = true; }
+  if (t.type === 'side' && t.from){ const a = Math.sign(t.i - t.from.i), b = Math.sign(t.j - t.from.j), f = t.from;
+    hoverStrip.position.set(f.x + a*(SIDE/2 + .04), t.y + FH/2, f.z + b*(SIDE/2 + .04)); hoverStrip.scale.set(a ? .04 : SIDE, FH*.92, b ? .04 : SIDE); hoverStrip.visible = true; }
 }
 
 /* ---------- placing a megastructure from the Buildings menu: its footprint follows the pointer ---------- */

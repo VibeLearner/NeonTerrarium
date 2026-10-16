@@ -830,7 +830,7 @@ function hwSetLevel(L){ hwLevel = Math.max(HW_MIN_L, Math.min(HW_MAX_L, L)); con
 function hwSetLanesUI(n){ hwSetLanes(n); const el = document.getElementById('hwLanes'); if (el) el.textContent = n + ' lanes'; if (hwLastPt) hwHover(hwLastPt.x, hwLastPt.y); }
 function setHwMode(on, quiet){
   hwMode = on;
-  if (on){ if (mtMode) setMtMode(false, true); if (S.zone) selectZone(null); if (delMode) setDelMode(false, true); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = false; showMegaGhost(null); }
+  if (on){ if (mtMode) setMtMode(false, true); if (S.zone) selectZone(null); if (delMode) setDelMode(false, true); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); }
   else { hwGhost.g.visible = false; hwHighlight(null); }
   const b = document.getElementById('hwBtn'); if (b){ b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
   const bar = document.getElementById('hwbar'); if (bar) bar.hidden = !on;

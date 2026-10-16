@@ -694,7 +694,7 @@ function mtClick(cx, cy){ const t = mtTargetAt(mtPick(cx, cy)); if (mtApply(t)) 
 function mtRightClick(cx, cy){ const pk = mtPick(cx, cy); if (pk && pk.kind === 'mtTile'){ mtCutAt(pk.l, pk.k); mtHover(cx, cy); } }
 function setMtMode(on, quiet){
   mtMode = on;
-  if (on){ if (hwMode) setHwMode(false, true); if (S.zone) selectZone(null); if (delMode) setDelMode(false, true); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = false; showMegaGhost(null); }
+  if (on){ if (hwMode) setHwMode(false, true); if (S.zone) selectZone(null); if (delMode) setDelMode(false, true); if (megaPick) selectMega(null, true); hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); }
   else { hwGhost.g.visible = false; mtHighlight(null); }
   const b = document.getElementById('mtBtn'); if (b){ b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
   $('modeHint').hidden = on; if (on) $('modeHint').textContent = '';

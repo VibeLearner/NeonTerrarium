@@ -383,6 +383,9 @@ function annex(st,f,c){
   for (const s of [-1,1]) box(M.metalDark, f.F, x+s*aw*.3, yy-ah/2-.12, ad*.35, .04, .34, .04, 0, -.75);
   if (chance(.4)) acUnit(f.F, x+aw/2+.14, yy);
 }
+// a section that doesn't stand on the street (stacked on another, or up on a pod's deck): no outside stairs, steps or
+// ramps down from it, which would only run down onto the roof below or into the air
+const raisedLot = lot => !!lot && (lot.aloft || lot.base > CURB + .05);
 function stairs(st,f,n){
   const L=f.len, run=L*.6, len=Math.hypot(run,FH), rail=pick([M.rust,M.frame,M.metal]);
   for (let k=0;k<n-1;k++){
@@ -572,8 +575,8 @@ function octoHouse(lot, st, P0){
   box(M.cream2, top[2].F, -.1, .6, .03, .18, .28, .04);   // small keypad and signs
   for (const s of [-1,1]) box(pick(LIT_ROOMS), top[3].F, s*.13, .6, .02, .14, .3, .05);
   roundVent(top[3].F, -.1, .22, .09); roundVent(top[3].F, .12, .22, .09);
-  // landing slab and stairs down (up on a scaffold deck there's no room for them: a small step and a ladder down the wall)
-  if (lot.aloft){
+  // landing slab and stairs down (not on the street: a small step and a ladder down the wall)
+  if (raisedLot(lot)){
     box(M.metalDark, df, 0, -.03, .16, .5, .05, .3);
     for (const s of [-1, 1]) box(M.metal, df, s*.15, -hb/2, .1, .03, hb, .03);
     for (let y = -hb + .15; y < -.05; y += .2) box(M.metal, df, 0, y, .1, .3, .025, .025);
@@ -621,8 +624,8 @@ function stiltFactory(lot, st, P0){
   const C = under(P, T(0, 0, -d/2-.3, 0));
   box(M.frame, C, 0, 0, 0, w, .05, .5); box(M.hazard, C, 0, .3, -.24, w, .03, .03);
   for (let x=-w/2; x<=w/2; x+=.4) box(M.frame, C, x, .15, -.24, .03, .3, .03);
-  box(M.frame, C, -w/2-.5, -lift/2, 0, Math.hypot(1, lift), .05, .4, 0, 0, Math.atan2(lift, 1));
-  box(M.hazard, C, -w/2-.5, -lift/2+.25, -.2, Math.hypot(1, lift), .03, .03, 0, 0, Math.atan2(lift, 1));
+  if (!raisedLot(lot)){ box(M.frame, C, -w/2-.5, -lift/2, 0, Math.hypot(1, lift), .05, .4, 0, 0, Math.atan2(lift, 1));
+    box(M.hazard, C, -w/2-.5, -lift/2+.25, -.2, Math.hypot(1, lift), .03, .03, 0, 0, Math.atan2(lift, 1)); }
   // roof: tilted panels on a frame, a lamp mast
   for (let x=-w/2+.4; x<w/2-.2; x+=.55){ box(M.frame, P, x, h+.15, 0, .04, .3, d*.7); box(M.corrBlue, P, x, h+.3, 0, .5, .03, d*.7, 0, .35); }
   cyl(M.frame, P, w/2-.2, h+.6, -d/2+.2, .025, 1.2); box(M.neonAmber, P, w/2-.2, h+1.22, -d/2+.2, .06, .06, .06); glow(P, w/2-.2, h+1.24, -d/2+.2, 'amber', .7);
@@ -732,7 +735,7 @@ function deckHouse(lot, st, P0){
   railingRun(P0, -(Dd+.3)/2+.05, (Dd+.3)/2-.05, (W+.3)/2-.05, tY+.12, .3, PI/2);
   // the stair: a landing at the railing gap, then real steps running down along the front face to the ground,
   // carried on two stringers with a handrail and a post under the landing (it used to be one bare slab poking out)
-  if (lot.aloft){   // up on a scaffold deck the run of steps would hang past its edge: a ladder up through the terrace instead
+  if (raisedLot(lot)){   // not on the street (on a deck, or on another building): a ladder up through the terrace instead of a run of steps
     const y1 = tY + .12, xt = (W+.3)/2 - .3, z = Math.min((Dd+.3)/2 - .12, 1.05);
     for (const s of [-1, 1]) box(M.metal, P0, xt + s*.14, y1/2, z, .03, y1 + .3, .03);
     for (let y = .15; y < y1 + .1; y += .2) box(M.metal, P0, xt, y, z, .28, .025, .025);
@@ -812,7 +815,7 @@ function platformTower(lot, st, P0){
   parkedCar(Pp, 0, .05, .05, rnd(-.3,.3));
   railingRun(Pp, -(w+.3)/2+.05, (w+.3)/2-.05, .68, .05, .25);
   // fire escape up one face
-  if (F.length) stairs(st, pick(F), Math.min(floors, 6));
+  if (F.length && !raisedLot(lot)) stairs(st, pick(F), Math.min(floors, 6));
   // open roof deck: railing, billboard, ring sign, antenna
   const Pr = under(P0, T(0, y, 0));
   box(st.trim, Pr, 0, .04, 0, w+.1, .08, d+.1);
@@ -1187,7 +1190,7 @@ function buildTenement(lot, st, P0){
     const F = decorateChunk(st,P,c,fl,lot,fl===0);
     for (const f of F) if (chance(.45)) box(pick(st.accent.concat(st.walls)), f.F, rnd(-f.len/3,f.len/3), rnd(.15,c.h-.2), .015, rnd(.25,.55), rnd(.2,.45), .03);
     if (fl>0 && chance(.5*S.clutter)) annex(st, pick(F), c);
-    if (!stairsDone && fl===0 && floors>=4 && !lot.aloft && chance(.5)){ stairs(st, pick(F), Math.min(floors,4)); stairsDone=true; }
+    if (!stairsDone && fl===0 && floors>=4 && !raisedLot(lot) && chance(.5)){ stairs(st, pick(F), Math.min(floors,4)); stairsDone=true; }
     prev = c; y += c.h; fl += nn;
   }
   // the top roof's corners (world), for a side pod's scaffold to stand on (see liftScaffold in world.js)
@@ -2610,7 +2613,7 @@ function hall(lot, st, P0){
   chimneyAt(P0, c.w/2-.3, c.h, -c.d/2+.3);
   if (chance(.5)) chimneyAt(P0, -c.w/2+.3, c.h, c.d/2-.3);
   if (!lot.aloft && chance(.6*S.clutter)) annex(st, pick(F), c);   // (up on a pod's deck: no shed or stairs off the edge)
-  if (!lot.aloft && chance(.5)) stairs(st, pick(F), 2);
+  if (!raisedLot(lot) && chance(.5)) stairs(st, pick(F), 2);
   Object.assign(lot, { height:c.h, floors:2, occupied:true });
 }
 function silos(lot, st, P0){

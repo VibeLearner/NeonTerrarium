@@ -203,14 +203,14 @@ const music = (() => {
     P.show = () => {
       if (P.open) return; P.open = true; GRIDPANEL.open = true; GRIDPANEL.hold = true;
       if (typeof MON !== 'undefined' && MON.close) try { MON.close(); } catch (e){}
-      el.classList.add('open'); addEventListener('keydown', keyH, true);
+      el.classList.add('open'); document.documentElement.classList.add('gp-open'); addEventListener('keydown', keyH, true);
       sliders().forEach(PNL.fill); P.syncPrograms();
       const b = $q('gpClose'); if (b) b.focus({ preventScroll: true });
       sizeCanvases(); addEventListener('resize', sizeCanvases);
     };
     P.hide = () => {
       if (!P.open) return; P.open = false; GRIDPANEL.open = false; GRIDPANEL.hold = false;
-      el.classList.remove('open'); removeEventListener('keydown', keyH, true); removeEventListener('resize', sizeCanvases);
+      el.classList.remove('open'); document.documentElement.classList.remove('gp-open'); removeEventListener('keydown', keyH, true); removeEventListener('resize', sizeCanvases);
     };
     $q('gpClose').addEventListener('click', () => P.hide());
     const curve = $q('gpCurve'), barsCv = $q('gpBars');

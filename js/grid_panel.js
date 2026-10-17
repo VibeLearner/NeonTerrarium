@@ -11,9 +11,11 @@ const GRIDPANEL = (() => {
   const P = { el: null, open: false };
   const css = `
   #gridPanel { --bg:#050f14; --pn:rgba(9,32,40,.62); --pn2:rgba(12,44,54,.7); --line:#2c8b92; --cy:#5fd8de; --cy2:#a6eef0; --dim:#4f8c94; --faint:#17414a; --mg:#e5379f; --yl:#e8d553; --ink:#d9f6f6;
-    position: fixed; inset: 0; z-index: 58; display: none; flex-direction: column; gap: 8px; padding: 10px 12px 8px; color: var(--ink); background: radial-gradient(120% 100% at 50% 0%, #0a2530 0%, var(--bg) 62%);
+    position: fixed; inset: 0; z-index: 80; display: none; flex-direction: column; gap: 8px; padding: 10px 12px 8px; color: var(--ink); background: radial-gradient(120% 100% at 50% 0%, #0a2530 0%, var(--bg) 62%);
     font: 10.5px/1.35 'JetBrains Mono', ui-monospace, monospace; letter-spacing: .04em; user-select: none; overflow: hidden; }
   #gridPanel.open { display: flex; }
+  /* while the panel is up the rest of the game's controls (buildings, transport, speed, monitor, logs) step out of the way, so nothing sits over it */
+  html.gp-open body > *:not(#gridPanel):not(#view):not(script):not(style):not(link):not(#tvStatic):not(#tvFlash) { visibility: hidden !important; }
   #gridPanel * { box-sizing: border-box; }
   #gridPanel::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
     background: repeating-linear-gradient(0deg, rgba(95,216,222,.035) 0 1px, transparent 1px 3px); }

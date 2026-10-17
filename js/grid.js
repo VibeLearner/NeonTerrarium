@@ -55,26 +55,55 @@ const music = (() => {
       if (o.subdiv && o.subdiv !== E.subdiv) click(`.subdiv-btn[data-subdiv="${o.subdiv}"]`, 1);
       if (o.q === false) click('#g-quantizeToggleBtn', 1);
       if (o.m === true) click('#g-markovToggleBtn', 1);
-      if (typeof o.prog === 'number' && GRID_PROGRAMS[o.prog]) prog = o.prog;
     }
     restored = true;
   }
 
   // ---------- the programs ----------
+  // The layers (Neuro-phrase, Sedation bed, Auto-governor) and the programs always agree: a program sets its layers, and
+  // flipping a layer lights the program that has that mix. Every visit starts on District hum with all three layers on.
+  // Before the sound has started once there is no audio to change, so the wanted layers are kept here and put on the
+  // engine when it first plays.
+  const layers = { lead: true, amb: true, auto: true }; let layersLive = false;   // live: the engine has been given the mix
+  const progOf = () => { const i = GRID_PROGRAMS.findIndex(p => p.lead === layers.lead && p.ambient === layers.amb); return i < 0 ? prog : i; };
+  function showLayers(){
+    const t = (id, v) => { const b = $q(id); if (b) b.classList.toggle('on', v); };
+    t('g-leadLoopBtn', layers.lead); t('g-ambientBtn', layers.amb); t('g-autopilotBtn', layers.auto);
+  }
+  function applyLayers(){
+    if (E.ctx){
+      layersLive = true;
+      if (E.ambientOn !== layers.amb) E.setAmbient(layers.amb);
+      if (E.leadOn !== layers.lead) E.setLead(layers.lead);
+      if (E.autoOn !== layers.auto) E.setAuto(layers.auto);
+    }
+    showLayers();
+  }
   function applyProgram(k, fromUser){
     prog = ((k % GRID_PROGRAMS.length) + GRID_PROGRAMS.length) % GRID_PROGRAMS.length;
     const p = GRID_PROGRAMS[prog];
-    if (E.ambientOn !== p.ambient) E.setAmbient(p.ambient);
-    if (E.leadOn !== p.lead) E.setLead(p.lead);
-    if (E.autoOn !== p.auto) E.setAuto(p.auto);
-    ui.program(); if (fromUser) save();
+    layers.lead = p.lead; layers.amb = p.ambient; layers.auto = p.auto;
+    applyLayers(); ui.program(); if (fromUser) save();
   }
+  // a layer button: before the sound exists, only the wanted mix changes (the engine never sees the click);
+  // afterwards the engine flips it and the mix is read back. Either way the matching program lights up.
+  const LAYER_BTN = { 'g-leadLoopBtn': 'lead', 'g-ambientBtn': 'amb', 'g-autopilotBtn': 'auto' };
+  PNL.el.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('#g-leadLoopBtn, #g-ambientBtn, #g-autopilotBtn'); if (!b || layersLive) return;
+    e.stopPropagation(); layers[LAYER_BTN[b.id]] = !layers[LAYER_BTN[b.id]]; showLayers();
+    prog = progOf(); ui.program(); save();
+  }, true);
+  PNL.el.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('#g-leadLoopBtn, #g-ambientBtn, #g-autopilotBtn'); if (!b || !layersLive) return;
+    layers.lead = E.leadOn; layers.amb = E.ambientOn; layers.auto = E.autoOn;
+    const k = progOf(); if (k !== prog){ prog = k; ui.program(); } save();
+  });
 
   // ---------- the engine runs while the Grid stands, is not paused, and the city isn't held ----------
   const want = () => on && !paused && !held;
   function tick(dt){
     const w = want();
-    if (w && !E.playing){ if (!E.ctx) E.initAudio(); E.toggle(); E.resume(); if (!tickProgDone){ tickProgDone = true; applyProgram(prog); } }
+    if (w && !E.playing){ if (!E.ctx) E.initAudio(); E.toggle(); E.resume(); if (!tickProgDone){ tickProgDone = true; applyLayers(); } }
     // audio can only start after a click: when it's blocked, the next click wakes it
     if (w && E.ctx && E.ctx.state === 'suspended') E.resume();
     const target = w ? 1 : 0;
@@ -319,6 +348,6 @@ const music = (() => {
   PNL.el.addEventListener('input', save, true); PNL.el.addEventListener('change', save, true); PNL.el.addEventListener('click', save, true);
 
   // start-up: the engine fills in the chart, then what the player last set is put back
-  E.init(); restore(); ui.program(); ui.text();
+  E.init(); restore(); prog = 0; applyProgram(0); ui.text();
   return { update, setVolume, skip, back, togglePause, hold, panel: PANEL, get held(){ return held; }, get volume(){ return volume; }, get on(){ return on; }, get paused(){ return paused; }, get level(){ return level; }, get program(){ return GRID_PROGRAMS[prog]; }, engine: E };
 })();

@@ -133,8 +133,15 @@ const music = (() => {
   }
   function setVolume(v){ volume = v; try { localStorage.setItem(MUSIC_VOL_KEY, String(v)); } catch (e) {} }
   function togglePause(){ if (!on) return; paused = !paused; if (!paused){ fadeIn = GRID_FADE_QUICK; level = 0; } ui.paused(paused); }
-  function skip(){ if (on) applyProgram(prog + 1, true); }
-  function back(){ if (on) applyProgram(prog - 1, true); }
+  // the deck's next and previous step through the carrier patterns (the chord progressions), not the programs
+  const progSel = () => PNL.el.querySelector('#g-progressionSelect');
+  function stepPattern(d){
+    const ps = progSel(); if (!ps || !ps.options.length) return;
+    const n = ps.options.length; ps.selectedIndex = ((ps.selectedIndex + d) % n + n) % n;
+    ps.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  function skip(){ if (on) stepPattern(1); }
+  function back(){ if (on) stepPattern(-1); }
   // held (the Overseer's desk is up): fades out fast and stops where it is; let go, it comes back in quickly
   function hold(b){ if (b === held) return; held = b; if (!b){ fadeIn = GRID_FADE_QUICK; level = 0; } }
 
@@ -203,6 +210,7 @@ const music = (() => {
     const playBtn = $q('gdPlay'), prog$ = $q('gdProg'), chord$ = $q('gdChord'), clock$ = $q('gdClock'), curve = $q('gdCurve'), barsCv = $q('gdBars');
     $q('gdPrev').addEventListener('click', () => back());
     $q('gdNext').addEventListener('click', () => skip());
+    PNL.el.querySelector('#g-progressionSelect').addEventListener('change', () => ui.pattern());
     playBtn.addEventListener('click', () => togglePause());
     $q('gdPanel').addEventListener('click', () => PANEL.show());
     let lastTxt = '';
@@ -212,7 +220,8 @@ const music = (() => {
     return {
       show(v){ deck.classList.toggle('live', v); deck.setAttribute('aria-hidden', v ? 'false' : 'true'); deck.inert = !v; document.documentElement.classList.toggle('gdeck-on', v); place(); },
       paused(p){ playBtn.classList.toggle('paused', p); playBtn.setAttribute('aria-label', p ? 'Resume broadcast' : 'Hold broadcast'); playBtn.title = p ? 'Resume' : 'Hold'; deck.classList.toggle('held', p); },
-      program(){ const p = GRID_PROGRAMS[prog]; prog$.textContent = p.name; prog$.title = p.sub; const pp = $q('gpProg'); if (pp) pp.textContent = p.name.toUpperCase(); PANEL.syncPrograms(); },
+      pattern(){ const ps = progSel(), o = ps && ps.options[ps.selectedIndex]; if (!o) return; const full = o.textContent.trim(); prog$.textContent = full.split('//').pop().trim(); prog$.title = full; },
+      program(){ const p = GRID_PROGRAMS[prog]; const pp = $q('gpProg'); if (pp) pp.textContent = p.name.toUpperCase(); PANEL.syncPrograms(); },
       text(){
         const c = E.chord, name = c ? c.name : '', mood = E.mood || '', bpm = E.bpm;
         const s = name + '|' + bpm; if (s === lastTxt) return; lastTxt = s;
@@ -348,6 +357,6 @@ const music = (() => {
   PNL.el.addEventListener('input', save, true); PNL.el.addEventListener('change', save, true); PNL.el.addEventListener('click', save, true);
 
   // start-up: the engine fills in the chart, then what the player last set is put back
-  E.init(); restore(); prog = 0; applyProgram(0); ui.text();
+  E.init(); restore(); prog = 0; applyProgram(0); ui.pattern(); ui.text();
   return { update, setVolume, skip, back, togglePause, hold, panel: PANEL, get held(){ return held; }, get volume(){ return volume; }, get on(){ return on; }, get paused(){ return paused; }, get level(){ return level; }, get program(){ return GRID_PROGRAMS[prog]; }, engine: E };
 })();

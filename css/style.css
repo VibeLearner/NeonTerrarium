@@ -120,9 +120,11 @@ input[type=range]{width:100%;accent-color:var(--cyan);margin:0}
 .gd-ctl .gd-panelbtn:hover{color:#fff;border-color:#f2c94c;box-shadow:0 0 6px rgba(242,201,76,.5)}
 #gdPlay .i-play{display:none} #gdPlay.paused .i-play{display:block} #gdPlay.paused .i-pause{display:none}
 @media (max-width:560px){.gdeck{transform-origin:top left;scale:.85}}
+/* the Buildings menu sits just under the Grid player, wherever the player ends (grid.js measures it) */
+@media (min-width:701px){html.gdeck-on:not(.touch) .bmenu{top:calc(var(--gdeck-b,182px) + 12px)}}
 
 /* the Buildings menu, down the left under the Grid player */
-.bmenu{position:fixed;left:16px;top:calc(224px + env(safe-area-inset-top,0px));width:max-content;z-index:2;display:grid;gap:6px;justify-items:start}
+.bmenu{position:fixed;left:16px;top:calc(182px + env(safe-area-inset-top,0px));width:max-content;z-index:2;display:grid;gap:6px;justify-items:start}
 .bmenu[hidden]{display:none}
 .bmenu-head{display:flex;align-items:center;justify-content:space-between;gap:8px;width:220px;padding:8px 12px;background:var(--deck);border:1px solid var(--cyan);border-radius:0;color:var(--cyan);
   font-family:var(--font-pixel);font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;

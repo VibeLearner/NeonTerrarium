@@ -177,8 +177,11 @@ const music = (() => {
     playBtn.addEventListener('click', () => togglePause());
     $q('gdPanel').addEventListener('click', () => PANEL.show());
     let lastTxt = '';
+    // the Buildings menu sits under the player: measure where the player ends
+    function place(){ requestAnimationFrame(() => { const r = deck.getBoundingClientRect(); if (r.height) document.documentElement.style.setProperty('--gdeck-b', Math.ceil(r.bottom) + 'px'); }); }
+    addEventListener('resize', place);
     return {
-      show(v){ deck.classList.toggle('live', v); deck.setAttribute('aria-hidden', v ? 'false' : 'true'); deck.inert = !v; },
+      show(v){ deck.classList.toggle('live', v); deck.setAttribute('aria-hidden', v ? 'false' : 'true'); deck.inert = !v; document.documentElement.classList.toggle('gdeck-on', v); place(); },
       paused(p){ playBtn.classList.toggle('paused', p); playBtn.setAttribute('aria-label', p ? 'Resume broadcast' : 'Hold broadcast'); playBtn.title = p ? 'Resume' : 'Hold'; deck.classList.toggle('held', p); },
       program(){ const p = GRID_PROGRAMS[prog]; prog$.textContent = p.name; prog$.title = p.sub; const pp = $q('gpProg'); if (pp) pp.textContent = p.name.toUpperCase(); PANEL.syncPrograms(); },
       text(){

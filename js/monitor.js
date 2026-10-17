@@ -18,10 +18,33 @@ const MON = (() => {
   // (one pixel), and a person counts only if they're no further away than it (a building in front is nearer). Their
   // depth is taken at the feet; a sprite standing up off the ground is a little nearer than that, hence the slack.
   let dRT = null, dMat = null, dScene = null, dCam = null; const dBuf = new Uint8Array(4), dAt = { x: NaN, y: NaN, f: -1, d: 1 };
-  function depthUnder(cx, cy){
+  // The depth is read back from the graphics card. Read at once (a click), the processor waits for the card to finish
+  // everything queued, which can be tens of milliseconds when it's busy; so hovering asks for it without waiting
+  // (a pixel-pack buffer and a fence) and uses the newest answer that has come back, a frame or two old.
+  const dec = b => (255/256)*(b[0]/255/16777216 + b[1]/255/65536 + b[2]/255/256 + b[3]/255);
+  let dPbo = null, dPend = null, dLate = null;   // dLate: { x, y, d } the newest depth that has come back
+  function depthSoon(cx, cy){
+    const glc = renderer.getContext();
+    if (!glc.fenceSync || typeof rtC === 'undefined' || !rtC || !rtC.depthTexture) return depthUnder(cx, cy);
+    if (dPend && glc.getSyncParameter(dPend.fence, glc.SYNC_STATUS) === glc.SIGNALED){
+      glc.bindBuffer(glc.PIXEL_PACK_BUFFER, dPbo); glc.getBufferSubData(glc.PIXEL_PACK_BUFFER, 0, dBuf); glc.bindBuffer(glc.PIXEL_PACK_BUFFER, null);
+      glc.deleteSync(dPend.fence); dLate = { x: dPend.x, y: dPend.y, d: dec(dBuf) }; dPend = null;
+    }
+    if (!dPend){
+      depthUnder(cx, cy, true);
+      if (!dPbo){ dPbo = glc.createBuffer(); glc.bindBuffer(glc.PIXEL_PACK_BUFFER, dPbo); glc.bufferData(glc.PIXEL_PACK_BUFFER, 4, glc.STREAM_READ); glc.bindBuffer(glc.PIXEL_PACK_BUFFER, null); }
+      const prev = renderer.getRenderTarget(); renderer.setRenderTarget(dRT);
+      glc.bindBuffer(glc.PIXEL_PACK_BUFFER, dPbo); glc.readPixels(0, 0, 1, 1, glc.RGBA, glc.UNSIGNED_BYTE, 0); glc.bindBuffer(glc.PIXEL_PACK_BUFFER, null);
+      renderer.setRenderTarget(prev);
+      dPend = { fence: glc.fenceSync(glc.SYNC_GPU_COMMANDS_COMPLETE, 0), x: cx, y: cy };
+    }
+    // the newest answer, if it was for about here; otherwise no depth test this frame (a person behind a wall may outline for a frame)
+    return dLate && Math.abs(dLate.x - cx) + Math.abs(dLate.y - cy) < 24 ? dLate.d : 1;
+  }
+  function depthUnder(cx, cy, drawOnly){
     if (typeof rtC === 'undefined' || !rtC || !rtC.depthTexture) return 1;
     const f = typeof pplFrame !== 'undefined' ? pplFrame : 0;
-    if (dAt.x === cx && dAt.y === cy && dAt.f === f) return dAt.d;
+    if (!drawOnly && dAt.x === cx && dAt.y === cy && dAt.f === f) return dAt.d;
     if (!dRT){
       dRT = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: false });
       dMat = new THREE.ShaderMaterial({ uniforms: { tD: { value: null }, uv: { value: new THREE.Vector2() } }, depthTest: false, depthWrite: false,
@@ -31,12 +54,14 @@ const MON = (() => {
     }
     const r = view.getBoundingClientRect();
     dMat.uniforms.tD.value = rtC.depthTexture; dMat.uniforms.uv.value.set((cx - r.left)/r.width, 1 - (cy - r.top)/r.height);
-    const prev = renderer.getRenderTarget(); renderer.setRenderTarget(dRT); renderer.render(dScene, dCam); renderer.readRenderTargetPixels(dRT, 0, 0, 1, 1, dBuf); renderer.setRenderTarget(prev);
-    const d = (255/256)*(dBuf[0]/255/16777216 + dBuf[1]/255/65536 + dBuf[2]/255/256 + dBuf[3]/255);
+    const prev = renderer.getRenderTarget(); renderer.setRenderTarget(dRT); renderer.render(dScene, dCam);
+    if (drawOnly){ renderer.setRenderTarget(prev); return 1; }   // (depthSoon reads it back without waiting)
+    renderer.readRenderTargetPixels(dRT, 0, 0, 1, 1, dBuf); renderer.setRenderTarget(prev);
+    const d = dec(dBuf);
     dAt.x = cx; dAt.y = cy; dAt.f = f; dAt.d = d; return d;
   }
   M.ready = () => typeof megasOfKind === 'function' && megasOfKind('police').length > 0;   // (people can be watched once the city has a police station)
-  M.pick = (cx, cy) => {
+  M.pick = (cx, cy, exact) => {   // (exact: a click, worth waiting for the card; hovering takes the depth a frame or two late)
     if (typeof pplList === 'undefined' || !M.ready()) return null;
     const r = view.getBoundingClientRect(), VP = comp.uniforms.VP.value, tall = (16/PX)/zoom*r.height/2, wide = tall*.75;
     const cands = [];
@@ -51,7 +76,7 @@ const MON = (() => {
     }
     if (!cands.length) return null;
     cands.sort((a, b) => a[0] - b[0]);
-    const sd = depthUnder(cx, cy), slack = 1.5/(FAR - NEAR);   // (a unit and a half of slack: a sprite's head is nearer than its feet)
+    const sd = exact ? depthUnder(cx, cy) : depthSoon(cx, cy), slack = 1.5/(FAR - NEAR);   // (a unit and a half of slack: a sprite's head is nearer than its feet)
     for (const [, p, pd] of cands) if (sd >= .9999 || pd <= sd + slack) return p.id;
     return null;
   };

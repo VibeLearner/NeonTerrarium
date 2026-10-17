@@ -9,7 +9,7 @@
 // tier, up to maxLevels. Right-click takes the top tier off, or removes it when only one is left; it can come back
 // once the requirement is met again.
 const MEGA_TYPES = {
-  radio: { name: 'Radio station', need: { any: 20 }, odds: 1, w: 2, h: 2, maxLevels: 1,   // arrives with the 20th building, of any zone
+  radio: { name: 'Psycho-Acoustic Grid', need: { any: 20 }, odds: 1, w: 2, h: 2, maxLevels: 1,   // arrives with the 20th building, of any zone
            colour: '#ff5a4a', sound: 'radioOn', build: buildRadioStation },
   mall:  { name: 'Sky mall', need: { high: 50, ind: 30 }, odds: 50, w: 3, h: 2, maxLevels: 3,
            colour: '#ffcf7a', build: buildSkyMall },

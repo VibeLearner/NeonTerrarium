@@ -65,10 +65,9 @@ js/main.js              start-up and the frame loop
 assets/sprites/         sprite PNGs at true pixel size (one file per sprite; the name is the sprite's id)
 assets/sprites/people.png  the people atlas: 12 characters, one 16 px row each, 6 walk + 4 idle frames of 12 px
 docs/people.md          the people system: how it works, plan and progress
-assets/audio/music/     the music library the radio plays (see the README in that folder)
-assets/ui/cassette.png  the radio's cassette (from the neon sign sheet)
-js/music.js             the radio: music while the radio station stands, the cassette with the song name, the radio host (RJ)
-assets/audio/radio/     the radio host's recordings (intros, long talks, lore drops, interrupts, the love letter) and the static bursts
+assets/audio/music/     the old radio's songs (not played now; the Grid makes its own music)
+js/grid.js, grid_panel.js, grid_engine.js   the Psycho-Acoustic Grid: live generated music while the Grid stands, its player, the Acoustic Panel, and the sound engine
+assets/audio/radio/     the old radio host's recordings (not played now)
 tools/make_playlist.py  optional: writes assets/audio/music/playlist.json (track order, nicer titles)
 tools/make_floor_decals.py, tools/make_holo_ads.py  asset generators for the floor decals and the hologram ad sheets
 assets/audio/sfx/       sound effects: place.wav (build pop), remove.wav (removal thud), radio-on.wav (radio station arrives), mega-arrive.wav (any other megastructure arrives; 4.6 s, the length of its arrival animation)
@@ -104,19 +103,21 @@ Each one arrives slowly (about four and a half seconds): its footprint is traced
 out of it, then the structure is revealed from the ground up behind a glowing scan line, and its live parts (the
 koi, the drone, the screens) switch on at the end.
 
-- **Radio station:** arrives with the 20th building, of any zone (each built plot counts once; stacking doesn't
+- **Psycho-Acoustic Grid** (the radio station: its saved kind is still `radio`, so older cities load): arrives with the 20th building, of any zone (each built plot counts once; stacking doesn't
   add to it), on free ground near that build. Right-click removes it; with 20 or
   more buildings standing, the next build brings it back.
-  While it stands, the radio plays the music in assets/audio/music/, shuffled so every song plays once before any plays again (what has played this round is remembered in this browser), fading in slowly once the station has
-  fully arrived. A neon cassette appears under the title showing the song, with previous, play/pause and next
-  buttons and an equalizer that follows the music. Removing
-  the station stops the music. Music volume is in Settings, Sound.
-  The station also has a radio host, RJ. After the first song he drops the first piece of lore over the start of
-  the next one (the music turns down underneath), and a second one a few songs later. Now and then he adds a short
-  intro, a long talk, or cuts in partway through a song (the song stops, static, the interrupt, static, the song
-  picks up where it left off). Every bit of talk is wrapped in a burst of radio static. What he has said is
-  remembered in this browser, so nothing repeats; once he has said it all it's just the music. Settings, Render has
-  a Reset radio host button. Code: `js/music.js`; recordings in `assets/audio/radio/`.
+  In the city's story the planners broadcast harmonic frequencies through streetlamps, transit hubs and apartment vents to keep the
+  population docile and productive. While the Grid stands it makes the district's music live (no recordings), fading in
+  slowly once it has fully arrived: carrier chords, soft pads, neuro-trigger melodies and drifting grain clouds, never the same twice.
+  A small player under the title shows the program, the carrier chord and mood, a live spectrum drawn from the music itself,
+  previous program / hold / next program, and an **Acoustic panel** button. Double-clicking the Grid opens the same panel: a full-screen
+  console with every control, named in the city's own terms (circadian clock rate is the tempo, carrier wave harmonics the drone chords,
+  dopamine ping rate how often melodies fire, aerosol dispersion the grain clouds, smog attenuation the high-cut filter, canyon resonance the reverb,
+  stasis field freezes the chord). A carrier chart of pads shows the chords of the current pattern (click one to jump to it).
+  Programs: District hum (the default), Night sedation, Commute loop, Carrier only. What you set is remembered in this browser.
+  Removing the Grid fades the music out and stops it. Music volume is in Settings, Sound. While the panel is open the city holds, the music plays on.
+  Code: `js/grid.js` (the player, the programs, the building hook), `js/grid_panel.js` (the panel), `js/grid_engine.js` (the sound engine, sealed in one function).
+  The old songs in `assets/audio/music/` and the host's recordings in `assets/audio/radio/` are no longer played (still in the repo).
 - **Sky mall:** a 3x2 block (either way round). Unlocks at 50 luxury and 30 industrial sections, then a 1 in 50
   chance per build. An octagonal white-and-gold mall on white columns, each side one sheet of glass looking into
   an open atrium with walkways and boutiques round a central core; the roof is mostly pool under a white canopy.
@@ -154,7 +155,7 @@ koi, the drone, the screens) switch on at the end.
   residents who are home and free come out, queue along the rope, get their ID checked by two bouncers, and dance
   on the floor or the gallery. Details in `docs/people.md`.
 - New megastructures go in `MEGA_TYPES` at the top of `js/mega.js` (requirement, odds, footprint, max tiers).
-- For testing, open the game with `#dev` at the end of the address and press **M** (radio station), **N** (sky mall), **B** (town square), **V** (foundry), **C** (police station), **K** (market mall), **P** (cloud pagoda) or **J** (Neon Dome)
+- For testing, open the game with `#dev` at the end of the address and press **M** (Psycho-Acoustic Grid), **N** (sky mall), **B** (town square), **V** (foundry), **C** (police station), **K** (market mall), **P** (cloud pagoda) or **J** (Neon Dome)
   to bring it in, or remove it, next to the plot under the pointer, skipping the requirement and the odds.
 
 ## Lawns and parks

@@ -97,40 +97,32 @@ input[type=range]{width:100%;accent-color:var(--cyan);margin:0}
 }
 
 /* the radio: a neon cassette with the song beside it, top left under the title; fades in with the radio station */
-.tapedeck{position:fixed;left:16px;top:calc(62px + env(safe-area-inset-top,0px));display:flex;align-items:center;gap:10px;padding:8px 12px 8px 8px;
-  background:rgba(14,10,24,.82);border:1px solid rgba(214,92,255,.55);border-radius:4px;color:var(--ink);font:inherit;text-align:left;
-  box-shadow:0 0 12px rgba(190,70,255,.25),inset 0 0 10px rgba(190,70,255,.12);
+/* the Psycho-Acoustic Grid's player: a small analysis readout in the corner (grid.js draws the two traces from the music itself) */
+.gdeck{position:fixed;left:16px;top:calc(62px + env(safe-area-inset-top,0px));width:300px;display:grid;gap:5px;padding:8px 10px 9px;
+  background:rgba(10,22,38,.88);border:1px solid #1f3a58;border-radius:2px;color:#cfe3f1;font:inherit;text-align:left;
+  box-shadow:0 0 14px rgba(70,150,200,.14),inset 0 0 12px rgba(70,150,200,.06);
   opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity 2.5s ease,transform 2.5s ease,border-color .2s}
-.tapedeck.live{opacity:1;transform:none;pointer-events:auto}
-.tape{position:relative;width:118px;height:88px;flex:none}
-.tape img{display:block;width:118px;height:88px;image-rendering:pixelated;filter:drop-shadow(0 0 3px rgba(222,100,255,.9)) drop-shadow(0 0 9px rgba(190,70,255,.55))}
-/* the reels' spokes turn while a song plays */
-.reel{position:absolute;top:35px;width:8px;height:8px;animation:reelspin 1.4s steps(8) infinite;animation-play-state:paused}
-.reel.l{left:30px}.reel.r{left:79px}
-.reel::before,.reel::after{content:"";position:absolute;left:3px;top:0;width:2px;height:8px;background:#f2a6ff;box-shadow:0 0 3px #d35cff}
-.reel::after{transform:rotate(90deg)}
-.tapedeck.playing .reel{animation-play-state:running}
-@keyframes reelspin{to{transform:rotate(360deg)}}
-.tapeinfo{display:grid;gap:4px;min-width:0}
-.tapeinfo small{font-family:var(--font-pixel);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#ff6fb8;text-shadow:0 0 6px rgba(255,79,163,.7)}
-.tapeline{display:block;width:170px;overflow:hidden;white-space:nowrap}
-.tapeline b{display:inline-block;font-family:var(--font-pixel);font-weight:400;font-size:12px;letter-spacing:.04em;color:#f6d6ff;text-shadow:0 0 6px rgba(214,92,255,.85)}
-.tapeline b.scroll{animation:tapescroll 14s ease-in-out infinite}
-@keyframes tapescroll{0%,15%{transform:translateX(0)}50%,65%{transform:translateX(var(--scroll))}100%{transform:translateX(0)}}
-.tapectl{display:flex;align-items:center;gap:5px}
-.tapectl button{width:24px;height:20px;padding:0;display:grid;place-items:center;color:#f2a6ff;background:rgba(214,92,255,.08);border:1px solid rgba(214,92,255,.5);border-radius:2px;transition:border-color .15s,box-shadow .15s,color .15s}
-.tapectl button svg{fill:currentColor;filter:drop-shadow(0 0 2px rgba(222,100,255,.8))}
-.tapectl button:hover{color:#fff;border-color:#e78bff;box-shadow:0 0 6px rgba(214,92,255,.6)}
-.tapectl button:active{transform:translateY(1px)}
-#tapePlay .i-play{display:none} #tapePlay.paused .i-play{display:block} #tapePlay.paused .i-pause{display:none}
-/* the equalizer: a dozen bars driven by the music's spectrum (see music.js) */
-.eq{display:flex;align-items:flex-end;gap:2px;height:14px;margin-left:6px}
-.eq i{width:3px;height:2px;background:#38E8E0;box-shadow:0 0 4px rgba(56,232,224,.7)}
-@media (max-width:560px){.tapedeck{transform-origin:top left;scale:.85}.tapeline{width:150px}}
-@media (prefers-reduced-motion:reduce){.reel,.tapeline b.scroll{animation:none}}
+.gdeck.live{opacity:1;transform:none;pointer-events:auto}
+.gd-head{display:flex;justify-content:space-between;align-items:center;font-family:var(--font-pixel);font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;color:#6fb4d6}
+.gd-head i{font-style:normal;color:#45708c;margin:0 3px}
+.gd-live{color:#f2c94c}.gdeck.held .gd-live{color:#d9453d}.gdeck.held .gd-live::after{content:" held"}
+.gd-main{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.gd-prog{font-family:'Chakra Petch',var(--font-mono);font-weight:600;font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:#e4f1fa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gd-clock{font-family:'Chakra Petch',var(--font-mono);font-weight:600;font-size:19px;color:#f2c94c;letter-spacing:.04em;text-shadow:0 0 8px rgba(242,201,76,.45)}
+.gd-chord{font-size:9.5px;letter-spacing:.1em;color:#6fb4d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:12px}
+.gd-cv{display:block;width:100%;background:#0b1a2c;border:1px solid #17304a;image-rendering:auto}
+.gd-ctl{display:flex;align-items:center;gap:5px}
+.gd-ctl button{height:21px;padding:0 8px;min-width:26px;display:grid;place-items:center;color:#8fc7e3;background:rgba(80,160,210,.08);border:1px solid #2a5173;border-radius:0;transition:border-color .15s,box-shadow .15s,color .15s}
+.gd-ctl button svg{fill:currentColor}
+.gd-ctl button:hover{color:#fff;border-color:#6fb4d6;box-shadow:0 0 6px rgba(90,174,209,.5)}
+.gd-ctl button:active{transform:translateY(1px)}
+.gd-ctl .gd-panelbtn{margin-left:auto;font-family:var(--font-pixel);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:#f2c94c;border-color:#6d5d24;background:rgba(242,201,76,.07)}
+.gd-ctl .gd-panelbtn:hover{color:#fff;border-color:#f2c94c;box-shadow:0 0 6px rgba(242,201,76,.5)}
+#gdPlay .i-play{display:none} #gdPlay.paused .i-play{display:block} #gdPlay.paused .i-pause{display:none}
+@media (max-width:560px){.gdeck{transform-origin:top left;scale:.85}}
 
-/* the Buildings menu, down the left under the radio */
-.bmenu{position:fixed;left:16px;top:calc(182px + env(safe-area-inset-top,0px));width:max-content;z-index:2;display:grid;gap:6px;justify-items:start}
+/* the Buildings menu, down the left under the Grid player */
+.bmenu{position:fixed;left:16px;top:calc(224px + env(safe-area-inset-top,0px));width:max-content;z-index:2;display:grid;gap:6px;justify-items:start}
 .bmenu[hidden]{display:none}
 .bmenu-head{display:flex;align-items:center;justify-content:space-between;gap:8px;width:220px;padding:8px 12px;background:var(--deck);border:1px solid var(--cyan);border-radius:0;color:var(--cyan);
   font-family:var(--font-pixel);font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
@@ -353,7 +345,7 @@ html.touch .ctlpanel dl.touchonly{display:grid;padding:0 12px;gap:7px 14px;font-
 /* the highway and metro instructions sit up top, clear of the dock */
 html.touch .hwhelp{top:calc(60px + env(safe-area-inset-top,0px));bottom:auto;right:8px;aspect-ratio:auto;max-height:calc(100vh - 260px)}
 /* the top: the radio smaller; on a narrow screen the speed buttons go under Settings */
-html.touch .tapedeck{transform-origin:top left;scale:.8}
+html.touch .gdeck{transform-origin:top left;scale:.8}
 html.touch .ffbar{top:calc(16px + env(safe-area-inset-top,0px));bottom:auto}
-@media (max-width:600px){html.touch .tapedeck{scale:.72}html.touch .ffbar{left:16px;right:auto;transform:none;top:calc(136px + env(safe-area-inset-top,0px))}}
-@media (max-height:480px){html.touch .tapedeck{scale:.66}html.touch .bmenu-list,html.touch .ctlpanel{max-height:calc(100vh - 190px)}}
+@media (max-width:600px){html.touch .gdeck{scale:.72}html.touch .ffbar{left:16px;right:auto;transform:none;top:calc(136px + env(safe-area-inset-top,0px))}}
+@media (max-height:480px){html.touch .gdeck{scale:.66}html.touch .bmenu-list,html.touch .ctlpanel{max-height:calc(100vh - 190px)}}

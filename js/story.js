@@ -118,12 +118,12 @@ const STORY = (() => {
     return { mid: 'shop-worker', high: 'office-worker', ind: 'industrial', low: 'shop-worker' }[z] || 'shop-worker';
   }
   const JOB_WORD = { 'stall-keeper': 'stall keeper', 'shop-worker': 'shop assistant', 'office-worker': 'office clerk', industrial: 'line worker', courier: 'courier', 'club-staff': 'door staff',
-    radio: 'radio crew', police: 'officer', 'hotel-spa': 'hotel staff', greenhouse: 'grower', 'bathhouse-staff': 'bathhouse attendant' };
+    radio: 'grid technician', police: 'officer', 'hotel-spa': 'hotel staff', greenhouse: 'grower', 'bathhouse-staff': 'bathhouse attendant' };
   const SHOPS = ['Okada Repair', 'Tanaka Grocers', 'Lantern Tea House', 'Harbor Records', 'Clear Water Clinic', 'Swift Parcel', 'Kiln and Forge', 'Blue Heron Noodles', 'Moth Light Optics', 'Sato Hardware', 'Copperline Print', 'Little Ox Laundry'];
   function employerName(p){
     const pl = p.job && places.get(p.job); if (!pl) return 'a local firm';
     const k = pl.mega && pl.mega.kind;
-    if (k) return { square: 'the night market', mall: 'the mall', market: 'the market mall', foundry: 'Foundry No. ' + (1 + H(pl.id) % 9), logistics: 'the logistics hub', club: 'the Neon Dome', radio: 'Radio Kowloon',
+    if (k) return { square: 'the night market', mall: 'the mall', market: 'the market mall', foundry: 'Foundry No. ' + (1 + H(pl.id) % 9), logistics: 'the logistics hub', club: 'the Neon Dome', radio: 'the Psycho-Acoustic Grid',
       police: 'the precinct', pagoda: 'the Cloud Pagoda', greenhouse: 'the greenhouse farm', bathhouse: 'the bathhouse' }[k] || 'the ' + k;
     return pick(SHOPS, pl.id, 'shop');
   }
@@ -146,7 +146,7 @@ const STORY = (() => {
   // home or workplace once a line has stated it ("her home", "his workplace"), someone else's once their name and that fact are known ("Mika's
   // building"), a landmark by its name (the signs say so), and otherwise just "a building". Open places by what they are.
   const MEGA_NAME = { square: 'the town square', mall: 'the sky mall', market: 'the market plaza', foundry: 'the foundry', logistics: 'the logistics hub', club: 'the Neon Dome',
-    radio: 'the radio station', police: 'the police station', pagoda: 'the Cloud Pagoda', greenhouse: 'the hydroponic farm', bathhouse: 'the bathhouse', spire: 'the Data Spire', wirenest: 'the Wire Nest', emitter: 'the Emitter Core' };
+    radio: 'the Psycho-Acoustic Grid', police: 'the police station', pagoda: 'the Cloud Pagoda', greenhouse: 'the hydroponic farm', bathhouse: 'the bathhouse', spire: 'the Data Spire', wirenest: 'the Wire Nest', emitter: 'the Emitter Core' };
   const ASSOC = { rev: -1, m: new Map() };   // place id -> [{ who, kind: 'home' | 'work' }], from the notebook's stated facts
   function assocOf(pid){
     if (ASSOC.rev !== ST.rev){ ASSOC.rev = ST.rev; ASSOC.m.clear();

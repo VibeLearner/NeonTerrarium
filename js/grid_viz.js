@@ -8,8 +8,8 @@
 //    bold the shape is, foundation hum the glowing core, hold time how slowly it turns; it morphs when the chord changes;
 //  - the dispersion cloud: density is how many grains; Mosaic snaps them to tiles, Haze lets them drift as soft blobs,
 //    Glitch-arp bursts them out on the beat; acid-rain static is the speckle and the falling streaks;
-//  - the ping field: ping rate is how often the faint ticks along the line come round, trigger depth how big each ping's
-//    ring opens; a fired ping opens magenta rings, lamp chimes small yellow ones;
+//  - the ping field: ping rate is how often the faint ticks along the line come round, trigger depth how big each ping
+//    draws; every ping pattern has its own picture (see PINGS), and a ping waiting for the beat gathers in the middle;
 //  - the district state, in the middle: all of it at once, the chord's shape ringed by the live spectrum as rays, echo
 //    rings from the resonance, the colour warmed or cooled by the smog, a halo of grains, turning with the clock.
 // The knobs: every range input of the panel gets a dial over it (grid_panel.js marks them .gk); dragging up or down
@@ -37,12 +37,25 @@ const GRIDVIZ = (() => {
 
   // ---------- what the broadcast is doing: the beat, pings, the chord ----------
   let beat = 0, beatN = 1, lastBeatT = 0;
-  const sparks = [];   // { t, kind: 'ping' | 'chime' }
+  const sparks = [];   // { t, kind }: one per ping that played, kind = which pattern (see PINGS)
+  // Each ping pattern has its own picture in the ping field, and its colour on the clock and district state:
+  //  gutter cascade = drops stepping down and splashing; rivet triplet = three hard bursts punched in a row;
+  //  lamp-post chimes = small rings on four lamp heads; twin neon = two tubes flickering on together;
+  //  busker riff = a wavering line running across; last train home = a lit train sliding past with its headlight.
+  const PINGS = {
+    gutter: { style: 'TAPPED', col: CY2, name: 'GUTTER CASCADE' }, rivet: { style: 'HAMMER', col: INK, name: 'RIVET TRIPLET' },
+    chime: { style: 'BELLS', col: YL, name: 'LAMP-POST CHIMES' }, twin: { style: 'DOUBLESTOP', col: MG, name: 'TWIN NEON' },
+    busker: { style: 'LEAD', col: MG, name: 'BUSKER RIFF' }, train: { style: 'HOMEBOUND', col: CY, name: 'LAST TRAIN HOME' },
+    ping: { style: 'MIXED', col: MG, name: "PLANNERS' CHOICE" }
+  };
+  const kindOfText = x => /GUTTER/.test(x) ? 'gutter' : /RIVET/.test(x) ? 'rivet' : /CHIME|BELL|HARMONIC/.test(x) ? 'chime' : /TWIN/.test(x) ? 'twin' : /BUSKER/.test(x) ? 'busker' : /TRAIN/.test(x) ? 'train' : 'ping';
+  const kindOfStyle = st => { for (const k in PINGS) if (PINGS[k].style === st) return k; return 'ping'; };
+  const colOf = k => (PINGS[k] || PINGS.ping).col;
   function watch(){
     const badge = $('g-beatCounterBadge');
     if (badge) new MutationObserver(() => { beat = 1; beatN = parseInt(badge.textContent) || 1; lastBeatT = performance.now(); }).observe(badge, { childList: true, characterData: true, subtree: true });
     const led = $('g-motifLed'), st = $('g-motifStatusText');
-    if (led) new MutationObserver(() => { if (/cyan/.test(led.className)) sparks.push({ t: performance.now(), kind: st && /BELL|CHIME|HARMONIC/i.test(st.textContent) ? 'chime' : 'ping' }); }).observe(led, { attributes: true, attributeFilter: ['class'] });
+    if (led) new MutationObserver(() => { if (/cyan/.test(led.className)) sparks.push({ t: performance.now(), kind: kindOfText(st ? st.textContent : '') }); }).observe(led, { attributes: true, attributeFilter: ['class'] });
     // (Fire and Chimes light up through the LED too, when their phrase actually plays)
   }
   const PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -82,7 +95,7 @@ const GRIDVIZ = (() => {
     // pings as sparks thrown off the ring
     const now = performance.now();
     for (const s of sparks){ const age = (now - s.t)/1000; if (age > 1.2) continue; const a = (s.t/37 % 1)*Math.PI*2;
-      g.fillStyle = rgba(s.kind === 'chime' ? YL : MG, 1 - age/1.2); g.beginPath(); g.arc(cx + Math.cos(a)*(R + age*10), cy + Math.sin(a)*(R + age*10), 3, 0, Math.PI*2); g.fill(); }
+      g.fillStyle = rgba(colOf(s.kind), 1 - age/1.2); g.beginPath(); g.arc(cx + Math.cos(a)*(R + age*10), cy + Math.sin(a)*(R + age*10), 3, 0, Math.PI*2); g.fill(); }
   }
 
   // ---------- the atmosphere coil ----------
@@ -152,6 +165,54 @@ const GRIDVIZ = (() => {
   }
 
   // ---------- the ping field ----------
+  let pendT = null;
+  function drawPing(g, W, H, mid, R, s, u){
+    const k = s.kind, c = colOf(k), fade = 1 - u, seed = (s.t*.37) % 1;
+    if (k === 'gutter'){   // five drops stepping down a staircase of gutters, a ripple where each lands
+      for (let i = 0; i < 5; i++){
+        const d = u*2.2 - i*.22; if (d < 0) continue; const x = W*(.18 + i*.16), y0 = mid - R*.9 + i*R*.28;
+        const fall = Math.min(1, d*2), y = y0 + fall*R*.35;
+        g.strokeStyle = rgba(c, .35*fade); g.lineWidth = 1; g.beginPath(); g.moveTo(x - 12, y0 + R*.35); g.lineTo(x + 12, y0 + R*.35); g.stroke();
+        if (fall < 1){ g.fillStyle = rgba(c, fade); g.beginPath(); g.ellipse(x, y, 2.2, 4, 0, 0, Math.PI*2); g.fill(); }
+        else { const rp = Math.min(1, (d - .5)*1.6); g.strokeStyle = rgba(c, (1 - rp)*fade); g.lineWidth = 1.5; g.beginPath(); g.ellipse(x, y, 4 + rp*14, 1.5 + rp*4, 0, 0, Math.PI*2); g.stroke(); }
+      }
+    } else if (k === 'rivet'){   // three hard bursts punched left to right, quick
+      for (let i = 0; i < 3; i++){
+        const d = u*3 - i*.35; if (d < 0 || d > 1.4) continue; const x = W*(.3 + i*.2), a = Math.max(0, 1 - d/1.4), r = R*.18 + d*R*.35;
+        g.strokeStyle = rgba(c, a); g.lineWidth = 2;
+        g.beginPath(); for (let q = 0; q < 8; q++){ const an = q*Math.PI/4 + .4; g.moveTo(x + Math.cos(an)*r*.35, mid + Math.sin(an)*r*.35); g.lineTo(x + Math.cos(an)*r, mid + Math.sin(an)*r); } g.stroke();
+        g.fillStyle = rgba(c, a); g.fillRect(x - 3, mid - 3, 6, 6);
+      }
+    } else if (k === 'chime'){   // small rings on four lamp heads
+      for (let q = 0; q < 4; q++){
+        const x = W*(.2 + q*.2), y = mid - R*.25 - Math.sin(q*1.7 + 1)*R*.25, d = Math.max(0, u*1.4 - q*.1);
+        g.strokeStyle = rgba(c, .3*fade); g.lineWidth = 1; g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x, H - 18); g.stroke();
+        g.fillStyle = rgba(c, fade); g.beginPath(); g.arc(x, y, 2.5, 0, Math.PI*2); g.fill();
+        for (let m = 0; m < 2; m++){ const rr = R*.35*Math.max(0, d - m*.25); if (rr <= 0) continue; g.strokeStyle = rgba(c, fade*(1 - m*.4)); g.lineWidth = 1.5; g.beginPath(); g.arc(x, y, rr, 0, Math.PI*2); g.stroke(); }
+      }
+    } else if (k === 'twin'){   // two neon tubes flicker on together, magenta and cyan, then fade
+      const on = u < .15 ? (Math.sin(u*180) > 0 ? 1 : .2) : fade, len = W*.55;
+      [[MG, -R*.28], [CY, R*.28]].forEach(([cc, dy]) => {
+        g.strokeStyle = rgba(cc, on); g.lineWidth = 5; g.lineCap = 'round'; g.shadowColor = cc; g.shadowBlur = 12*on;
+        g.beginPath(); g.moveTo(W/2 - len/2, mid + dy); g.lineTo(W/2 + len/2, mid + dy); g.stroke(); g.shadowBlur = 0; g.lineCap = 'butt';
+      });
+    } else if (k === 'busker'){   // a wavering line runs across, like a riff on a street corner
+      const head = u*1.3*W; g.strokeStyle = rgba(c, fade); g.lineWidth = 2; g.beginPath();
+      for (let x = Math.max(0, head - W*.6); x <= Math.min(W, head); x += 3){ const y = mid + Math.sin(x*.07 + seed*9)*R*.35*Math.sin(x*.013 + 1); x === Math.max(0, head - W*.6) ? g.moveTo(x, y) : g.lineTo(x, y); }
+      g.stroke(); if (head < W){ g.fillStyle = rgba(c, fade); g.beginPath(); g.arc(head, mid + Math.sin(head*.07 + seed*9)*R*.35*Math.sin(head*.013 + 1), 3, 0, Math.PI*2); g.fill(); }
+    } else if (k === 'train'){   // a lit train slides past, left to right, headlight first
+      const x0 = W*.1 + u*W*1.3, cars = 4, cw = W*.12, ch = R*.35;
+      for (let i = 0; i < cars; i++){
+        const x = x0 - i*(cw + 4); g.strokeStyle = rgba(c, .85); g.lineWidth = 1.5; g.strokeRect(x - cw, mid - ch/2, cw, ch);
+        for (let w = 0; w < 3; w++){ g.fillStyle = rgba(YL, .55 + .3*Math.sin(i*2 + w)); g.fillRect(x - cw + 4 + w*cw/3, mid - ch/2 + 4, cw/3 - 6, ch*.35); }
+      }
+      const grd = g.createRadialGradient(x0 + 4, mid, 0, x0 + 4, mid, R*.6); grd.addColorStop(0, rgba(YL, .7)); grd.addColorStop(1, rgba(YL, 0));
+      g.fillStyle = grd; g.beginPath(); g.arc(x0 + 4, mid, R*.6, 0, Math.PI*2); g.fill();
+    } else {   // planners' choice before it's known: plain magenta rings
+      const x = W*.5 + (seed - .5)*W*.5;
+      for (let q = 0; q < 3; q++){ const rr = R*Math.min(1, u*1.6 - q*.2); if (rr <= 0) continue; g.strokeStyle = rgba(c, fade*(1 - q*.25)); g.lineWidth = 2 - q*.5; g.beginPath(); g.arc(x, mid, rr, 0, Math.PI*2); g.stroke(); }
+    }
+  }
   function pingField(t, dt, L){
     const o = ctxOf('gvPing'); if (!o) return; const { g, W, H } = o;
     const rate = norm('g-motifSparsitySlider', .45), depth = norm('g-motifLevelSlider', .7), mid = H/2;
@@ -160,12 +221,23 @@ const GRIDVIZ = (() => {
     const gap = lerp(70, 12, rate), off = (t*30) % gap;
     g.fillStyle = rgba(MG, .55); for (let x = -off; x < W; x += gap) g.fillRect(x, mid - 3, 2, 6);
     const now = performance.now(), R = Math.min(H*.45, W*.3)*lerp(.35, 1, depth);
-    for (const s of sparks){
-      const age = (now - s.t)/1000; if (age > 1.6) continue; const u = age/1.6, x = W*.5 + ((s.t*.37) % 1 - .5)*W*.5;
-      if (s.kind === 'chime') for (let k = 0; k < 4; k++){ const xx = x + (k - 1.5)*R*.35, rr = R*.35*u; g.strokeStyle = rgba(YL, (1 - u)*.9); g.lineWidth = 1.5; g.beginPath(); g.arc(xx, mid - Math.sin(k*1.7)*R*.3, rr, 0, Math.PI*2); g.stroke(); }
-      else for (let k = 0; k < 3; k++){ const rr = R*Math.min(1, u*1.6 - k*.2); if (rr <= 0) continue; g.strokeStyle = rgba(MG, (1 - u)*(1 - k*.25)); g.lineWidth = 2 - k*.5; g.beginPath(); g.arc(x, mid, rr, 0, Math.PI*2); g.stroke(); }
-    }
-    lab(g, W, H, 'TICKS = PING RATE', 'RING SIZE = DEPTH');
+    for (const s of sparks){ const age = (now - s.t)/1000; if (age > 1.8) continue; drawPing(g, W, H, mid, R, s, age/1.8); }
+    // a ping waiting for the beat: its colour gathers in the middle as a dashed ring closing in, with an arc filling
+    // up to the beat it will land on and its name beside it
+    const E = music.engine, pend = E && E.pendingPing;
+    if (pend){
+      if (!pendT || pendT.style !== pend) pendT = { style: pend, t: now };
+      const k = kindOfStyle(pend), c = colOf(k), beatMs = 60000/((E && E.bpm) || 82);
+      const into = lastBeatT ? ((now - lastBeatT) % beatMs)/beatMs : ((now - pendT.t) % beatMs)/beatMs;
+      const cx = W/2, rr = R*(1.25 - .6*into);
+      g.save(); g.setLineDash([4, 5]); g.lineDashOffset = -t*30; g.strokeStyle = rgba(c, .5 + .4*into); g.lineWidth = 1.5;
+      g.beginPath(); g.arc(cx, mid, rr, 0, Math.PI*2); g.stroke(); g.restore();
+      g.strokeStyle = rgba(c, .95); g.lineWidth = 3; g.beginPath(); g.arc(cx, mid, R*.38, -Math.PI/2, -Math.PI/2 + into*Math.PI*2); g.stroke();
+      g.fillStyle = rgba(c, .35 + .5*into); g.beginPath(); g.arc(cx, mid, 3 + 3*into, 0, Math.PI*2); g.fill();
+      g.font = '10.5px "JetBrains Mono", monospace'; g.textBaseline = 'middle'; const txt = (PINGS[k] || PINGS.ping).name + ' · ON THE BEAT';
+      const tw = g.measureText(txt).width; g.fillStyle = 'rgba(3,12,16,.82)'; g.fillRect(cx - tw/2 - 3, 4, tw + 6, 14); g.fillStyle = rgba(c, 1); g.fillText(txt, cx - tw/2, 11);
+    } else pendT = null;
+    lab(g, W, H, 'TICKS = PING RATE', 'SIZE = DEPTH');
   }
 
   // ---------- the district state ----------
@@ -199,7 +271,7 @@ const GRIDVIZ = (() => {
     // pings: sparks off the rim
     const now = performance.now();
     for (const s of sparks){ const age = (now - s.t)/1000; if (age > 1.4) continue; const a = (s.t*.0137 % 1)*Math.PI*2, r = R*(.9 + age*.15);
-      g.fillStyle = rgba(s.kind === 'chime' ? YL : MG, 1 - age/1.4); g.beginPath(); g.arc(cx + Math.cos(a)*r, cy + Math.sin(a)*r, 3.5, 0, Math.PI*2); g.fill(); }
+      g.fillStyle = rgba(colOf(s.kind), 1 - age/1.4); g.beginPath(); g.arc(cx + Math.cos(a)*r, cy + Math.sin(a)*r, 3.5, 0, Math.PI*2); g.fill(); }
   }
   // a block's key, in its corners: what to look for in the shape
   function lab(g, W, H, a, b){

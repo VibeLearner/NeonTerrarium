@@ -31,25 +31,24 @@ const GRIDPANEL = (() => {
   #gridPanel .gname { margin-left: auto; font: 600 15.5px 'Chakra Petch', sans-serif; letter-spacing: .26em; color: var(--cy2); padding-right: 10px; }
   #gridPanel .gx { font: 600 13.5px 'Chakra Petch', sans-serif; letter-spacing: .22em; color: var(--ink); background: transparent; border: 1px solid var(--line); padding: 5px 12px; cursor: pointer; border-radius: 0; }
   #gridPanel .gx:hover, #gridPanel .gx:focus-visible { background: var(--cy); color: var(--bg); outline: none; }
-  /* the console: four columns and three rows that fill the screen, like a lab rig (no scrolling on a desktop screen) */
+  /* the console: four columns and three rows that fill the screen, like a lab rig. Each setting has a shape (grid_viz.js)
+     and a knob beside it; the district state in the middle shows all of it at once. */
   #gridPanel .gmain { flex: 1; min-height: 0; display: grid; gap: 10px; padding: 4px 2px 6px;
-    grid-template-columns: minmax(250px, 1fr) minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(250px, 1fr);
-    grid-template-rows: minmax(0, .9fr) minmax(0, 1.1fr) minmax(0, auto);
-    grid-template-areas: "clock signal signal prog" "clock chart chart prog" "carrier mixer mixer ping"; }
-  #gridPanel .a-clock { grid-area: clock; } #gridPanel .a-signal { grid-area: signal; } #gridPanel .a-prog { grid-area: prog; }
-  #gridPanel .a-chart { grid-area: chart; } #gridPanel .a-carrier { grid-area: carrier; } #gridPanel .a-mixer { grid-area: mixer; } #gridPanel .a-ping { grid-area: ping; }
-  #gridPanel .gp { min-height: 0; min-width: 0; overflow: auto; scrollbar-width: none; display: flex; flex-direction: column; }
+    grid-template-columns: minmax(250px, 1fr) minmax(0, 1.25fr) minmax(0, 1.25fr) minmax(250px, 1fr);
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    grid-template-areas: "clock state state prog" "atmos state state harm" "disp chart chart ping"; }
+  #gridPanel .a-clock { grid-area: clock; } #gridPanel .a-state { grid-area: state; } #gridPanel .a-prog { grid-area: prog; } #gridPanel .a-atmos { grid-area: atmos; }
+  #gridPanel .a-harm { grid-area: harm; } #gridPanel .a-disp { grid-area: disp; } #gridPanel .a-chart { grid-area: chart; } #gridPanel .a-ping { grid-area: ping; }
+  #gridPanel .gp { min-height: 0; min-width: 0; overflow: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 6px; }
   #gridPanel .gp::-webkit-scrollbar { display: none; }
-  /* a smaller screen: the panels flow into columns and the page scrolls */
+  #gridPanel .gv { flex: 1 1 0; min-height: 70px; width: 100%; display: block; background: rgba(3,12,16,.55); border: 1px solid var(--faint); }
   @media (max-width: 1100px), (max-height: 780px) {
-    #gridPanel .gmain { overflow: auto; grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr)); grid-template-rows: none; grid-template-areas: none; align-items: start; }
+    #gridPanel .gmain { overflow: auto; grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr)); grid-template-rows: none; grid-template-areas: none; align-items: stretch; }
     #gridPanel .gmain > .gp { grid-area: auto; overflow: visible; min-height: auto; }
-    #gridPanel .a-signal canvas { flex: none; }
-    #gridPanel .ghint { display: none; }
-    #gridPanel .a-mixer .gmix { grid-template-columns: minmax(0, 1fr); }
+    #gridPanel .gv { flex: none; height: 130px; } #gridPanel .a-state .gv { height: 260px; }
   }
   /* a panel: corner brackets, a bracketed title on top, a code at the foot */
-  #gridPanel .gp { position: relative; padding: 30px 16px 26px; background-color: var(--pn);
+  #gridPanel .gp { position: relative; padding: 28px 14px 14px; background-color: var(--pn);
     --b: var(--line);
     background-image:
       linear-gradient(var(--b), var(--b)), linear-gradient(var(--b), var(--b)), linear-gradient(var(--b), var(--b)), linear-gradient(var(--b), var(--b)),
@@ -58,7 +57,7 @@ const GRIDPANEL = (() => {
     background-position: 0 0, 0 0, 100% 0, 100% 0, 0 100%, 0 100%, 100% 100%, 100% 100%; background-repeat: no-repeat; }
   #gridPanel .gp > h3 { position: absolute; left: 20px; top: 5px; margin: 0; font: 400 12.5px 'JetBrains Mono', monospace; letter-spacing: .18em; color: var(--cy); text-transform: uppercase; white-space: nowrap; }
   #gridPanel .gp > h3::before { content: '[ '; color: var(--dim); } #gridPanel .gp > h3::after { content: ' ]'; color: var(--dim); }
-  #gridPanel .gp > .gcode { position: absolute; left: 20px; bottom: 5px; font-size: 11px; letter-spacing: .16em; color: var(--dim); }
+  #gridPanel .gp > .gcode { display: none; position: absolute; left: 20px; bottom: 5px; font-size: 11px; letter-spacing: .16em; color: var(--dim); }
   #gridPanel .gp > .gcode::before { content: '[ '; } #gridPanel .gp > .gcode::after { content: ' ]'; }
   #gridPanel .gp > .gtag { position: absolute; right: 20px; top: 6px; font-size: 11px; letter-spacing: .14em; color: var(--dim); }
   #gridPanel .gp.hot { --b: var(--mg); }
@@ -128,6 +127,45 @@ const GRIDPANEL = (() => {
   #gridPanel .a-clock .gring { width: min(150px, 52%); height: auto; aspect-ratio: 1; }
   #gridPanel .ghint { color: var(--dim); font-size: 11px; letter-spacing: .08em; }
 
+  /* a knob: a dial (drag up or down, wheel, double-click resets; the keys work on the hidden input), its value, its name */
+  #gridPanel .gknobs { display: flex; align-items: flex-start; justify-content: space-around; gap: 6px; flex: none; }
+  #gridPanel .gk { position: relative; display: grid; justify-items: center; gap: 1px; min-width: 64px; cursor: default; }
+  #gridPanel .gk svg { width: 48px; height: 48px; cursor: ns-resize; touch-action: none; }
+  #gridPanel .gk .kt { fill: none; stroke: var(--faint); stroke-width: 4; stroke-linecap: butt; }
+  #gridPanel .gk .kv { fill: none; stroke: var(--cy); stroke-width: 4; filter: drop-shadow(0 0 3px rgba(95,216,222,.6)); }
+  #gridPanel .gk .kc { fill: rgba(5,22,29,.95); stroke: var(--line); stroke-width: 1; }
+  #gridPanel .gk .kp { stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; }
+  #gridPanel .gk:hover .kc { stroke: var(--cy); } #gridPanel .gk:hover .kv { stroke: var(--cy2); }
+  #gridPanel .gk.drag .kv, #gridPanel .gk:focus-within .kv { stroke: var(--yl); filter: drop-shadow(0 0 4px rgba(232,213,83,.7)); }
+  #gridPanel .gk > input[type=range] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  #gridPanel .gk > output { color: var(--yl); font-size: 13px; letter-spacing: .03em; line-height: 1.1; white-space: nowrap; }
+  #gridPanel .gk > span { color: var(--cy2); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; text-align: center; line-height: 1.15; white-space: nowrap; }
+  #gridPanel .gk.mg .kv { stroke: var(--mg); filter: drop-shadow(0 0 3px rgba(229,55,159,.6)); }
+  #gridPanel .gtrig { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1; }
+  #gridPanel .gtrig .gb { margin: 0; min-height: 48px; display: grid; place-items: center; font-size: 12.5px; letter-spacing: .14em; background: rgba(229,55,159,.12); border-color: rgba(229,55,159,.55); color: #ffb3dd; }
+  #gridPanel .gtrig .gb:hover { background: rgba(229,55,159,.28); border-color: var(--mg); }
+  #gridPanel .gtrig .gb:active { background: var(--mg); color: #fff; }
+  #gridPanel .gprogs .gb { text-align: left; padding: 7px 10px; margin: 0 0 4px; letter-spacing: .14em; } #gridPanel .gprogs .gb small { display: none; }
+  #gridPanel .glayers { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; } #gridPanel .glayers .gb { margin: 0; padding: 7px 4px; font-size: 12px; letter-spacing: .1em; }
+  #gridPanel .grow, #gridPanel .gb, #gridPanel select, #gridPanel .glbl { flex: none; }
+  #gridPanel .grow, #gridPanel .gb, #gridPanel select { margin-bottom: 0; }
+  #gridPanel .glbl { margin: 2px 0 0; }
+  #gridPanel .gclock { display: flex; gap: 10px; align-items: center; flex: 1 1 0; min-height: 100px; }
+  #gridPanel .gorb { position: relative; flex: 1 1 0; align-self: stretch; min-width: 0; }
+  #gridPanel .gorb canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #gridPanel .gorb > div { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; pointer-events: none; }
+  #gridPanel .gorb b { font: 600 30px 'Chakra Petch', sans-serif; color: var(--ink); line-height: 1; } #gridPanel .gorb small { color: var(--dim); font-size: 10px; letter-spacing: .1em; }
+  #gridPanel .gside { display: grid; gap: 6px; width: 46%; } #gridPanel .gside .gb { padding: 6px 4px; font-size: 11.5px; letter-spacing: .12em; }
+  #gridPanel .gchartbar { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 6px; align-items: stretch; }
+  #gridPanel .gchartbar .gb { padding: 5px 6px; font-size: 11.5px; letter-spacing: .1em; } #gridPanel .gchartbar .gb small { font-size: 10px; }
+  #gridPanel .a-state .gcurve { flex: none; height: 46px; }
+  #gridPanel .a-chart .gchord { margin: 0; } #gridPanel .a-chart .gchord b { font-size: 24px; }
+  #gridPanel .a-chart .gpads { min-height: 70px; grid-auto-rows: minmax(30px, 1fr); margin-bottom: 0; }
+  #gridPanel .gprogs .gb { padding: 4px 10px; margin-bottom: 3px; } #gridPanel .glayers .gb { padding: 4px 4px; } #gridPanel .a-prog { gap: 4px; }
+  #gridPanel .gkey { flex: none; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--dim); font-size: 11px; letter-spacing: .08em; }
+  #gridPanel .gkey b { font-weight: 400; color: var(--cy2); }
+  #gridPanel .gmini { display: flex; gap: 8px; align-items: center; flex: none; }
+
   /* opening: the city glitches, a curtain of falling glyphs closes over it, then the panel's blocks come up one by one */
   #view.gp-glitch { animation: gpGl .6s steps(2) 1; }
   @keyframes gpGl { 0% { transform: translate(0); } 18% { transform: translate(-7px, 2px); filter: hue-rotate(50deg) contrast(1.35); } 38% { transform: translate(6px, -3px); filter: saturate(2.2); }
@@ -137,7 +175,7 @@ const GRIDPANEL = (() => {
   @keyframes gpBoot { 0% { opacity: 0; clip-path: inset(0 100% 0 0); filter: brightness(2.4) saturate(1.6); } 55% { opacity: 1; filter: brightness(1.6); } 100% { opacity: 1; clip-path: inset(0 0 0 0); filter: none; } }
   @media (prefers-reduced-motion: reduce) { #view.gp-glitch, #gridPanel.boot .gtop, #gridPanel.boot .gbot, #gridPanel.boot .gp { animation: none; } }
   `;
-  const slider = (id, name, min, max, step, val, tip) => `<label class="gs" title="${tip}"><span>${name}</span><input type="range" id="g-${id}" min="${min}" max="${max}" step="${step}" value="${val}"><output id="g-${id.replace(/Slider$/, '')}Val"></output></label>`;
+  const knob = (id, name, min, max, step, val, tip, cls = '', out = true) => `<label class="gk ${cls}" title="${tip} (drag up or down, scroll, double-click to reset)"><svg viewBox="0 0 48 48" aria-hidden="true"></svg><input type="range" id="g-${id}" min="${min}" max="${max}" step="${step}" value="${val}" aria-label="${name}"><output${out ? ` id="g-${id.replace(/Slider$/, '')}Val"` : ''}></output><span>${name}</span></label>`;
   const html = `
   <div class="gtop">
     <span class="gchip live" id="gpLive"><i></i><span id="gpLiveT">BROADCAST LIVE</span></span>
@@ -149,71 +187,78 @@ const GRIDPANEL = (() => {
     <button class="gx" id="gpClose" title="Close the panel (Esc)">CLOSE</button>
   </div>
   <div class="gmain">
-    <section class="gp a-clock"><h3>Circadian clock</h3><span class="gtag" id="g-beatCounterBadge">1/4</span>
-      <div class="gring"><svg viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="46"/><circle class="fg" id="gpRing" cx="50" cy="50" r="46"/></svg><div><b id="g-bpmReadout">82</b><small>CYCLES<br>PER MIN</small></div></div>
-      ${slider('bpmSlider', 'Clock rate', 55, 140, 1, 82, "Sets the metabolic pacing of the sector's population.").replace('<output id="g-bpmVal"></output>', '<output></output>')}
-      <button class="gb" id="g-tapTempoBtn" title="Tap the pulse and the whole district falls in step">Pulse sync (tap)</button>
-      <div class="glbl">Footfall cadence</div>
-      <div class="grow" title="How finely each beat is cut: the rhythm of the footsteps the broadcast matches.">
+    <section class="gp a-clock"><h3>Circadian clock</h3><span class="gtag" id="g-beatCounterBadge">1/4</span><span id="g-tempoSyncLed" hidden></span>
+      <div class="gclock">
+        <div class="gorb" title="The dots ride round once a bar, as many as the footfall cadence; the beat flashes the ring"><canvas id="gvOrbit"></canvas><div><b id="g-bpmReadout">82</b><small>CYCLES/MIN</small></div></div>
+        <div class="gside">
+          ${knob('bpmSlider', 'Clock rate', 55, 140, 1, 82, "Sets the metabolic pacing of the sector's population.", '', false)}
+          <button class="gb" id="g-tapTempoBtn" title="Tap the pulse and the whole district falls in step">Tap pulse</button>
+        </div>
+      </div>
+      <div class="grow" title="Footfall cadence: how finely each beat is cut, the rhythm of the footsteps the broadcast matches.">
         <button class="gb subdiv-btn" data-subdiv="1/4">1/4</button><button class="gb subdiv-btn" data-subdiv="1/8.">1/8.</button><button class="gb subdiv-btn on" data-subdiv="1/8">1/8</button><button class="gb subdiv-btn" data-subdiv="1/8T">1/8T</button><button class="gb subdiv-btn" data-subdiv="1/16">1/16</button>
       </div>
       <button class="gb on" id="g-quantizeToggleBtn" title="Melodic pings snap to the cadence so they land with the crowd's footsteps"><span>Grid lock: </span><span id="g-quantizeStateText">ON (GRID)</span></button>
-      <div class="gst dim" id="g-delaySyncReadout"></div><div class="gst dim" id="g-subdivRatioLabel"></div>
+      <div class="gst dim" id="g-delaySyncReadout"></div><div class="gst dim" id="g-subdivRatioLabel" hidden></div>
       <span class="gcode">A1</span></section>
-    <section class="gp a-signal"><h3>Signal</h3><span class="gtag">LIVE SPECTRUM</span>
-      <canvas id="gpCurve" height="86"></canvas><div style="height:8px;flex:none"></div><canvas id="gpBars" height="104"></canvas>
+    <section class="gp a-state"><h3>District state</h3><span class="gtag">THE WHOLE BROADCAST</span>
+      <canvas class="gv" id="gvState" title="Everything at once: the chord's shape, the live spectrum as rays, echo rings from the resonance, a halo of grains"></canvas>
+      <div class="gkey"><span><b>SHAPE</b> carrier chord</span><span><b>RAYS</b> live spectrum (warm = smog open)</span><span><b>RINGS</b> canyon resonance</span><span><b>HALO</b> dispersion</span><span><b>SPIN</b> clock</span></div>
+      <canvas class="gv gcurve" id="gpCurve" height="46"></canvas>
       <span class="gcode">B1</span></section>
     <section class="gp a-prog"><h3>Broadcast programs</h3>
-      <div class="gprogs" id="gpPrograms" title="What the grid is broadcasting: pick a program, or mix your own"></div>
+      <div class="gprogs" id="gpPrograms"></div>
       <div class="glbl">Layers</div>
       <div class="glayers">
         <button class="gb" id="g-leadLoopBtn" title="A neuro-phrase that improvises over the carrier without stopping">Neuro-phrase</button>
-        <button class="gb on" id="g-autopilotBtn" title="Lets the grid steer its own clock, cadence, dispersion mode and sliders as the mood changes">Auto-governor</button>
+        <button class="gb on" id="g-autopilotBtn" title="Lets the grid steer its own clock, cadence, dispersion mode and knobs as the mood changes">Auto-governor</button>
         <button class="gb" id="g-ambientBtn" title="Slow, soft pads in place of the heavy drone">Sedation bed</button>
         <button class="gb" id="g-engageSwitch" title="Hold or resume the whole broadcast"><span class="gled" id="g-engageLed"></span>Hold</button>
       </div>
       <div class="gst dim" id="g-engageStatusText"></div>
       <span class="gcode">D1</span></section>
+    <section class="gp a-atmos"><h3>Atmosphere</h3><span class="gtag" id="g-spaceWarmthVal"></span>
+      <canvas class="gv" id="gvCoil" title="Canyon resonance loosens the coil and trails echoes; smog attenuation dims its upper rings into fog"></canvas>
+      <div class="gknobs">
+        ${knob('warmthFilterSlider', 'Smog', 600, 5800, 50, 2500, 'A high-cut that dampens harsh industrial frequencies. Lower values simulate heavy acid rain and fog.')}
+        ${knob('spaceReverbSlider', 'Resonance', 0.1, 1, 0.02, 0.84, 'Acoustic reflection depth across the vertical shafts of the city.')}
+      </div>
+      <span class="gcode">D2</span></section>
+    <section class="gp a-harm"><h3>Carrier harmonics</h3>
+      <canvas class="gv" id="gvPoly" title="The chord's notes as points round a circle: output is how bold the shape is, the hum its glowing core, hold time how slowly it turns"></canvas>
+      <div class="gknobs">
+        ${knob('droneLevelSlider', 'Output', 0.1, 1, 0.02, 0.8, 'How loud the carrier wave rides under everything else.')}
+        ${knob('subAnchorSlider', 'Hum', 0, 1, 0.02, 0.65, 'The sub-audible weight that the megablocks sit on.', 'mg')}
+        ${knob('chordHoldSlider', 'Hold', 5, 24, 1, 10, 'How long a carrier chord holds before the planners change it.')}
+      </div>
+      <span class="gcode">C1</span></section>
+    <section class="gp a-disp"><h3>Aerosol dispersion</h3>
+      <div class="grow"><button class="gb micro-mode-btn on" data-mode="MOSAIC" title="Tiled echoes of the melody an octave up">Mosaic</button><button class="gb micro-mode-btn" data-mode="HAZE" title="Long soft clouds that bloom out of held notes">Haze</button><button class="gb micro-mode-btn" data-mode="ARP" title="Short stuttering ratchets on strong beats">Glitch</button></div>
+      <canvas class="gv" id="gvCloud" title="Density is how many grains; the mode is how they move; static is the speckle and rain"></canvas>
+      <div class="gknobs">
+        ${knob('granularMixSlider', 'Density', 0, 1, 0.02, 0.62, 'Density of micro-acoustic scattering across upper-level walkways.')}
+        ${knob('lofiTextureSlider', 'Static', 0, 1, 0.02, 0.38, 'Hiss and dust: the sound of acid rain on the vents.')}
+      </div>
+      <div class="gst dim" id="g-granularSyncTelemetry"></div>
+      <span class="gcode">A2</span></section>
     <section class="gp a-chart"><h3>District carrier chart</h3><span class="gtag">TAP A PAD TO JUMP</span>
+      <div class="gchartbar">
+        <select id="g-progressionSelect" title="Which carrier pattern the planners are running through the district"></select>
+        <button class="gb" id="g-freezeSwitch" title="Suspends the current acoustic atmosphere in a localized time-loop"><span class="gled" id="g-freezeLed"></span>Stasis<small id="g-freezeStatusText">STASIS FIELD: OFF</small></button>
+        <button class="gb" id="g-markovToggleBtn" title="Lets the carrier wander to neighboring chords instead of marching in order"><span>Drift: </span><span id="g-markovStateText">ORDERED</span></button>
+      </div>
       <div class="gchord"><b id="g-activeChordBadge">Fmaj9</b><span id="g-activeMoodTag"></span></div>
       <div class="gpads" id="g-chordTimelineGrid"></div>
-      <div class="glbl">Harmonic stack</div>
-      <div class="gpills" id="g-voicingPillsContainer"></div>
+      <div class="gpills" id="g-voicingPillsContainer" title="The notes of the chord now sounding"></div>
       <span class="gcode">B2</span></section>
-    <section class="gp a-carrier"><h3>Carrier wave</h3>
-      <div class="glbl" style="margin-top:0">District carrier pattern</div>
-      <select id="g-progressionSelect" title="Which carrier pattern the planners are running through the district"></select>
-      <button class="gb" id="g-freezeSwitch" title="Suspends the current acoustic atmosphere in a localized time-loop"><span class="gled" id="g-freezeLed"></span>Stasis field<small id="g-freezeStatusText">STASIS FIELD: OFF</small></button>
-      <button class="gb" id="g-markovToggleBtn" title="Lets the carrier wander to neighboring chords instead of marching in order"><span>Drift: </span><span id="g-markovStateText">ORDERED</span></button>
-      <span class="gcode">C1</span></section>
-    <section class="gp a-mixer"><h3>Mixing desk</h3><span class="gtag ghint">SCROLL OVER A FADER TO NUDGE · DOUBLE-CLICK TO RESET</span>
-      <div class="gmix">
-        <div>
-          <div class="glbl">Carrier wave harmonics</div>
-          ${slider('droneLevelSlider', 'Carrier output', 0.1, 1, 0.02, 0.8, 'How loud the carrier wave rides under everything else.')}
-          ${slider('subAnchorSlider', 'Foundation hum', 0, 1, 0.02, 0.65, 'The sub-audible weight that the megablocks sit on.')}
-          ${slider('chordHoldSlider', 'Hold time', 5, 24, 1, 10, 'How long a carrier chord holds before the planners change it. Some change fast, some are held for a long while.')}
-          <div class="glbl">Atmosphere</div>
-          ${slider('warmthFilterSlider', 'Smog filter', 600, 5800, 50, 2500, 'A high-cut that dampens harsh industrial frequencies. Lower values simulate heavy acid rain and fog.')}
-          ${slider('spaceReverbSlider', 'Canyon reverb', 0.1, 1, 0.02, 0.84, 'Acoustic reflection depth across the vertical shafts of the city.')}
-          <div class="gst" id="g-spaceWarmthVal"></div>
-        </div>
-        <div>
-          <div class="glbl">Aerosol dispersion</div>
-          <div class="grow"><button class="gb micro-mode-btn on" data-mode="MOSAIC" title="Tiled echoes of the melody an octave up">Mosaic</button><button class="gb micro-mode-btn" data-mode="HAZE" title="Long soft clouds that bloom out of held notes">Haze</button><button class="gb micro-mode-btn" data-mode="ARP" title="Short stuttering ratchets on strong beats">Glitch-arp</button></div>
-          ${slider('granularMixSlider', 'Density', 0, 1, 0.02, 0.62, 'Density of micro-acoustic scattering across upper-level walkways.')}
-          ${slider('lofiTextureSlider', 'Rain static', 0, 1, 0.02, 0.38, 'Hiss and dust: the sound of acid rain on the vents.')}
-          <div class="gst dim" id="g-granularSyncTelemetry"></div>
-          <div class="glbl">Dopamine ping</div>
-          ${slider('motifSparsitySlider', 'Ping rate', 0.05, 0.95, 0.05, 0.45, 'How often melodic neuro-triggers fire. Higher means more frequent.')}
-          ${slider('motifLevelSlider', 'Trigger depth', 0, 1, 0.02, 0.68, 'How strongly each ping is felt: its level in the broadcast.')}
-        </div>
-      </div>
-      <span class="gcode">M1</span></section>
     <section class="gp hot a-ping"><h3>Dopamine ping</h3>
-      <div class="gtrig"><button class="gb mg" id="g-manualMotifBtn" title="Fire one ping now">Fire ping</button><button class="gb mg" id="g-manualBellBtn" title="A cluster of high resonant tones, like harmonics rung on the lamp posts">Lamp chimes</button></div>
-      <div class="glbl">Trigger pattern</div>
-      <select id="g-motifStyleSelect" title="The shape of the soothing neural phrase"></select>
+      <canvas class="gv" id="gvPing" title="Ticks: how often pings come round; a fired ping opens magenta rings (as big as its depth), lamp chimes small yellow ones"></canvas>
+      <div class="gmini">
+        ${knob('motifSparsitySlider', 'Rate', 0.05, 0.95, 0.05, 0.45, 'How often melodic neuro-triggers fire. Higher means more frequent.', 'mg')}
+        ${knob('motifLevelSlider', 'Depth', 0, 1, 0.02, 0.68, 'How strongly each ping is felt: its level in the broadcast.', 'mg')}
+        <div class="gtrig"><button class="gb mg" id="g-manualMotifBtn" title="Fire one ping now">Fire</button><button class="gb mg" id="g-manualBellBtn" title="A cluster of high resonant tones, like harmonics rung on the lamp posts">Chimes</button></div>
+      </div>
+      <select id="g-motifStyleSelect" title="Trigger pattern: the shape of the soothing neural phrase"></select>
       <div class="gst" id="g-motifStatusText">PING STANDBY</div><span class="gled" id="g-motifLed" style="display:none"></span>
       <span class="gcode">C2</span></section>
   </div>
@@ -237,9 +282,9 @@ const GRIDPANEL = (() => {
     el.querySelectorAll('input[type=range]').forEach(r => { fill(r); r.dataset.def = r.value; });
     const set = (r, v) => { const st = +r.step || 1, lo = +r.min, hi = +r.max; v = Math.min(hi, Math.max(lo, Math.round((v - lo)/st)*st + lo));
       if (+r.value === v) return; r.value = String(+v.toFixed(4)); r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); };
-    el.addEventListener('wheel', e => { const r = e.target.closest && e.target.closest('.gs') && e.target.closest('.gs').querySelector('input[type=range]'); if (!r) return;
+    el.addEventListener('wheel', e => { const r = e.target.closest && e.target.closest('.gs, .gk') && e.target.closest('.gs, .gk').querySelector('input[type=range]'); if (!r) return;
       e.preventDefault(); const st = +r.step || 1, n = Math.max(1, Math.round((+r.max - +r.min)/st/50)); set(r, +r.value + (e.deltaY < 0 ? 1 : -1)*st*n*(e.shiftKey ? 4 : 1)); }, { passive: false });
-    el.addEventListener('dblclick', e => { const r = e.target.closest && e.target.closest('.gs') && e.target.closest('.gs').querySelector('input[type=range]'); if (r && r.dataset.def !== undefined) set(r, +r.dataset.def); });
+    el.addEventListener('dblclick', e => { const r = e.target.closest && e.target.closest('.gs, .gk') && e.target.closest('.gs, .gk').querySelector('input[type=range]'); if (r && r.dataset.def !== undefined) set(r, +r.dataset.def); });
     return el;
   }
   P.build = build; P.fill = r => { const lo = +r.min, hi = +r.max; r.style.setProperty('--p', (hi > lo ? (+r.value - lo)/(hi - lo)*100 : 0) + '%'); };

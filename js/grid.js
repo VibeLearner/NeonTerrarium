@@ -263,7 +263,7 @@ const music = (() => {
     };
     $q('gpClose').addEventListener('click', () => P.hide());
     const curve = $q('gpCurve'), barsCv = $q('gpBars');
-    function sizeCanvases(){ for (const c of [curve, barsCv]){ const w = Math.max(200, Math.floor(c.clientWidth)), h = Math.floor(c.clientHeight); if (c.width !== w) c.width = w; if (h >= 40 && c.height !== h) c.height = h; } }   // (the panel's layout sets their size: they fill their block)
+    function sizeCanvases(){ for (const c of [curve, barsCv]){ if (!c) continue; const w = Math.max(200, Math.floor(c.clientWidth)), h = Math.floor(c.clientHeight); if (c.width !== w) c.width = w; if (h >= 40 && c.height !== h) c.height = h; } }   // (the panel's layout sets their size: they fill their block)
     // what the panel says about the broadcast, a few times a second
     let slow = 0;
     P.draw = (t, dt) => {
@@ -279,7 +279,7 @@ const music = (() => {
       $q('gpFrq').textContent = c ? Math.round(440*Math.pow(2, (noteMidi(c.notes[0]) - 69)/12)*10)/10 + 'HZ' : '0';
       $q('gpAmp').textContent = (level*volume).toFixed(2);
       $q('gpClk').textContent = E.bpm; $q('gpCad').textContent = E.subdiv; $q('gpMod').textContent = E.mode; $q('gpSt').textContent = E.frozen ? 'ON' : 'OFF';
-      $q('gpRing').style.strokeDashoffset = String(289*(1 - gridClamp((E.bpm - 55)/(140 - 55), 0, 1)));
+      if ($q('gpRing')) $q('gpRing').style.strokeDashoffset = String(289*(1 - gridClamp((E.bpm - 55)/(140 - 55), 0, 1)));
     };
     $q('gpClose').title = 'Close the panel (Esc)';
     return P;
@@ -295,7 +295,7 @@ const music = (() => {
     if (accD < 1/30) return;   // 30 frames a second is plenty for a trace
     const d = accD; accD = 0; rt = (now - t0)/1000;
     readBands(d);
-    ui.draw(rt, d); PANEL.draw(rt, d);
+    ui.draw(rt, d); PANEL.draw(rt, d); if (PANEL.open && typeof GRIDVIZ !== 'undefined') GRIDVIZ.draw(rt, d, bands, on && !paused ? level : 0);
     textT -= d; if (textT <= 0){ textT = .25; ui.text(); }
   }
   requestAnimationFrame(loop);

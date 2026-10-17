@@ -248,7 +248,7 @@ const music = (() => {
       // no black fill: translucent tear bars and scanlines flicker over the live city, the panel cuts in mid-glitch, then the bars fade
       const dpr = Math.min(2, devicePixelRatio || 1), c = document.createElement('canvas'); c.width = Math.ceil(innerWidth*dpr); c.height = Math.ceil(innerHeight*dpr);
       c.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:90;pointer-events:all'; document.body.appendChild(c);
-      const g = c.getContext('2d'), ts = performance.now(), cut = .62; let fired = false;
+      const g = c.getContext('2d'), ts = performance.now(), cut = .55; let fired = false;
       const COL = ['rgba(95,216,222,', 'rgba(229,55,159,', 'rgba(217,246,246,'];
       const step = now => {
         const u = Math.min(1, (now - ts)/ms), amp = u < cut ? .35 + u/cut*.65 : Math.max(0, 1 - (u - cut)/(1 - cut));
@@ -282,13 +282,13 @@ const music = (() => {
       if (P.open || busy) return; busy = true;
       const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (reduce){ openNow(); busy = false; const b = $q('gpClose'); if (b) b.focus({ preventScroll: true }); return; }
-      canvas.classList.add('gp-glitch'); setTimeout(() => canvas.classList.remove('gp-glitch'), 650);
+      canvas.classList.add('gp-glitch'); setTimeout(() => canvas.classList.remove('gp-glitch'), 340);
       addEventListener('keydown', swallow, true);
-      curtain(900, c => {
+      curtain(420, c => {   // (the panel cuts in a quarter second after the click)
         openNow();
         el.querySelectorAll('.gp').forEach((n, k) => n.style.setProperty('--i', String(k)));
-        el.classList.add('boot'); setTimeout(() => el.classList.remove('boot'), 1500);
-        el.querySelectorAll('.gp > h3, .gname, .gchip span:last-child').forEach(h => decode(h, 650));
+        el.classList.add('boot'); setTimeout(() => el.classList.remove('boot'), 800);
+        el.querySelectorAll('.gp > h3, .gname, .gchip span:last-child').forEach(h => decode(h, 320));
         removeEventListener('keydown', swallow, true); busy = false;
         const b = $q('gpClose'); if (b) b.focus({ preventScroll: true });
       });

@@ -167,11 +167,11 @@ const GRIDPANEL = (() => {
   #gridPanel .gmini { display: flex; gap: 8px; align-items: center; flex: none; }
 
   /* opening: the city glitches, a curtain of falling glyphs closes over it, then the panel's blocks come up one by one */
-  #view.gp-glitch { animation: gpGl .6s steps(2) 1; }
+  #view.gp-glitch { animation: gpGl .32s steps(2) 1; }
   @keyframes gpGl { 0% { transform: translate(0); } 18% { transform: translate(-7px, 2px); filter: hue-rotate(50deg) contrast(1.35); } 38% { transform: translate(6px, -3px); filter: saturate(2.2); }
     58% { transform: translate(-3px, 1px); filter: hue-rotate(-40deg); } 100% { transform: none; filter: none; } }
-  #gridPanel.boot .gtop, #gridPanel.boot .gbot { animation: gpBoot .5s ease-out both; }
-  #gridPanel.boot .gp { animation: gpBoot .62s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 70ms + 120ms); }
+  #gridPanel.boot .gtop, #gridPanel.boot .gbot { animation: gpBoot .26s ease-out both; }
+  #gridPanel.boot .gp { animation: gpBoot .32s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 30ms + 40ms); }
   @keyframes gpBoot { 0% { opacity: 0; clip-path: inset(0 100% 0 0); filter: brightness(2.4) saturate(1.6); } 55% { opacity: 1; filter: brightness(1.6); } 100% { opacity: 1; clip-path: inset(0 0 0 0); filter: none; } }
   @media (prefers-reduced-motion: reduce) { #view.gp-glitch, #gridPanel.boot .gtop, #gridPanel.boot .gbot, #gridPanel.boot .gp { animation: none; } }
   `;

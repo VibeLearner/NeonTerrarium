@@ -263,7 +263,7 @@ let nextTickTime = 0;
 let masterClockTimer = null;
 let lastBeatPulseAlpha = 0;
 let lastBeatIsDownbeat = false;
-let queuedMotifRequest = null;
+let queuedMotifRequest = null, ideaStatus = '';
 let lastChordChangeAt = 0;
 
 let currentProgIdx = 0;
@@ -787,7 +787,7 @@ function setAmbient(on) {
   } else {
     ambVoices.forEach(v => { v.g.gain.cancelScheduledValues(now); v.g.gain.setTargetAtTime(0.0001, now, 1.5); v.nodes.forEach(n => { try { n.stop(now + 8); } catch (e) {} }); });
     ambVoices = [];
-    if (isPlaying) $g('motifStatusText').textContent = 'MOTIF: BREATHING SPACE...';
+    if (isPlaying) $g('motifStatusText').textContent = 'PING: QUIET STREETS';
   }
 }
 
@@ -2240,10 +2240,9 @@ function conductBar(barStart) {
   if (role === 'open' || role === 'close') bassPart(barStart, 'pedal', E);
   else if (median >= 69) bassPart(barStart, role.startsWith('bridge') ? 'half' : G.bass, E);
 
-  const statusEl = $g('motifStatusText');
-  if (statusEl) {
+  {   // the conductor's own notes on the idea: kept for debugging (GRID_ENGINE.ideaStatus), not shown on the panel
     const gs = P.palette.map(x => GENRES[x].label).join(' + ');
-    statusEl.textContent = `IDEA ${cd.no} · "${P.title}" · ${ms.name.toUpperCase()}${ms.n > 1 ? ' (' + (ms.i + 1) + '/' + ms.n + ')' : ''} · ${FORM_LABELS[P.form]} · ${gs} · ${sectionName(pos)} ${pos + 1}/16 · PACE ${Math.round(cd.paceNow * 100)}% · ${label}`;
+    ideaStatus = `IDEA ${cd.no} · "${P.title}" · ${ms.name.toUpperCase()}${ms.n > 1 ? ' (' + (ms.i + 1) + '/' + ms.n + ')' : ''} · ${FORM_LABELS[P.form]} · ${gs} · ${sectionName(pos)} ${pos + 1}/16 · PACE ${Math.round(cd.paceNow * 100)}% · ${label}`;
   }
   cd.bar++;
 }
@@ -2343,8 +2342,8 @@ function setLeadLoop(on) {
   const btn = $g('leadLoopBtn');
   btn.classList.toggle('on', on);
   const statusEl = $g('motifStatusText');
-  if (on) statusEl.textContent = 'LEAD LOOP: A NEW PREMISE STARTS ON THE NEXT BAR LINE';
-  else if (isPlaying) statusEl.textContent = 'MOTIF: BREATHING SPACE...';
+  if (on) statusEl.textContent = 'NEURO-PHRASE: ON';
+  else if (isPlaying) statusEl.textContent = 'PING: QUIET STREETS';
 }
 
 // --- HOMEBOUND RUN: MOTIFS FROM THE FIRST FIVE SECONDS OF A REFERENCE RECORDING ---
@@ -2415,7 +2414,7 @@ function startSoloIdea() {
     : extended ? ['call', 'resp-1', 'call-dev', 'resp-2'] : [pos < 8 ? 'call' : 'call-dev', leadPick(['resp-1', 'resp-2'])];
   soloBars = cd.forceRoles.length;
   const st = $g('motifStatusText');
-  if (st) st.textContent = 'AUTO-MIXED: A NEW EXCHANGE STARTS ON THE NEXT BAR LINE';
+  if (st) st.textContent = 'PING: ON THE NEXT BAR';
 }
 
 // The harmonic chimes (12th-fret harmonics) come from the drone itself: four tones spread across the harmonic register,
@@ -2434,11 +2433,12 @@ function chimeNotes(chord) {
   return chord[ck];
 }
 
-function requestMelodicMotif(forcedStyle = null, auto = false) {
+function requestMelodicMotif(forcedStyle = null, auto = false, manual = false) {
   if (!ctx) initAudio();
   if (ctx.state === 'suspended') ctx.resume();
-  if (leadLoopOn) { conductorRequest(forcedStyle || $g('motifStyleSelect').value); return; }   // the conductor places it
-  if ((forcedStyle || $g('motifStyleSelect').value) === 'MIXED') { startSoloIdea(); return; }
+  if (!manual && leadLoopOn) { conductorRequest(forcedStyle || $g('motifStyleSelect').value); return; }   // the conductor places it
+  if (!manual && (forcedStyle || $g('motifStyleSelect').value) === 'MIXED') { startSoloIdea(); return; }
+  // a pressed button always sounds: Fire and Chimes play their own phrase on the next beat, over whatever else is going on
 
   // a phrase that starts on its own waits until the previous chord has mostly faded out of the crossfade
   const settle = lastChordChangeAt + 1.0 - ctx.currentTime;
@@ -2450,7 +2450,7 @@ function requestMelodicMotif(forcedStyle = null, auto = false) {
   if (isPlaying && quantizeMotifs && masterClockTimer) {
     queuedMotifRequest = { style: forcedStyle };
     const statusEl = $g('motifStatusText');
-    if (statusEl) statusEl.textContent = `MOTIF: SYNCING TO ${currentSubdiv} GRID...`;
+    if (statusEl) statusEl.textContent = 'PING: WAITING FOR THE BEAT';
   } else {
     triggerMelodicMotifPhrase(forcedStyle, ctx.currentTime);
   }
@@ -2477,7 +2477,7 @@ function triggerMelodicMotifPhrase(forcedStyle = null, startTime = null) {
   ledEl.className = 'w-2 h-2 rounded-full bg-cyan-300 shadow-[0_0_8px_#22d3ee]';
 
   if (style === 'TAPPED') {
-    statusEl.textContent = `MOTIF: TAPPED CASCADE (${currentSubdiv} @ ${masterBpm} BPM)`;
+    statusEl.textContent = 'PING: GUTTER CASCADE';
     const stepTime = Math.min(times.primary, times.quarter * 0.5);
     const count = 5;
 
@@ -2496,7 +2496,7 @@ function triggerMelodicMotifPhrase(forcedStyle = null, startTime = null) {
     spawnMicrocosmCloud(n2f(motifNotes[2]), now + stepTime * 2, chord, 1.0);
 
   } else if (style === 'HAMMER') {
-    statusEl.textContent = `MOTIF: PULL-OFF TRIPLET (${masterBpm} BPM)`;
+    statusEl.textContent = 'PING: RIVET TRIPLET';
     const n1 = motifNotes[1];
     const n2 = motifNotes[3];
     const n3 = motifNotes[2];
@@ -2510,7 +2510,7 @@ function triggerMelodicMotifPhrase(forcedStyle = null, startTime = null) {
     spawnMicrocosmCloud(n2f(n2), now + times.primary, chord, 1.0);
 
   } else if (style === 'BELLS') {
-    statusEl.textContent = `MOTIF: HARMONIC CHIMES (${currentSubdiv} SYNC)`;
+    statusEl.textContent = 'PING: LAMP-POST CHIMES';
     const bellSpacing = leadLoopOn ? Math.max(times.sixteenth * 2, Math.round(times.primary / times.sixteenth) * times.sixteenth) : times.primary;
     for (let i = 0; i < 3; i++) {
       const noteName = motifNotes[(motifNotes.length - 1 - i) % motifNotes.length];
@@ -2525,7 +2525,7 @@ function triggerMelodicMotifPhrase(forcedStyle = null, startTime = null) {
     spawnMicrocosmCloud(n2f(motifNotes[3]), now + bellSpacing, chord, 1.0);
 
   } else if (style === 'DOUBLESTOP') {
-    statusEl.textContent = `MOTIF: LO-FI DOUBLE-STOP (${masterBpm} BPM)`;
+    statusEl.textContent = 'PING: TWIN NEON';
     const lowA = n2f(motifNotes[0]);
     const highA = n2f(motifNotes[2]);
     const lowB = n2f(motifNotes[1]);
@@ -2540,7 +2540,7 @@ function triggerMelodicMotifPhrase(forcedStyle = null, startTime = null) {
     spawnMicrocosmCloud(highB, secondHitTime + times.primary, chord, 0.85);
 
   } else if (style === 'LEAD') {
-    statusEl.textContent = `MOTIF: LEAD RIFF (${currentSubdiv} @ ${masterBpm} BPM)`;
+    statusEl.textContent = 'PING: BUSKER RIFF';
     const u = times.primary;
     // simple riffs over the fitted chord tones. 'to' marks a note that can slide in from the one before.
     const RIFFS = [
@@ -2561,7 +2561,7 @@ function triggerMelodicMotifPhrase(forcedStyle = null, startTime = null) {
     playLeadRiff(events, 0.12);
     spawnMicrocosmCloud(n2f(motifNotes[2]), now + u * 2, chord, 0.7);
   } else if (style === 'HOMEBOUND') {
-    statusEl.textContent = `MOTIF: HOMEBOUND RUN (16THS @ ${masterBpm} BPM)`;
+    statusEl.textContent = 'PING: LAST TRAIN HOME';
     ensureLeadLoopBus();
     const u = getQuarterNoteSec() * 0.25;
     const events = planHomeboundRun(buildHomeboundPool(chord), now, u, chord);
@@ -2577,7 +2577,7 @@ function triggerMelodicMotifPhrase(forcedStyle = null, startTime = null) {
 
   setTimeout(() => {
     if (isPlaying) {
-      statusEl.textContent = 'MOTIF: BREATHING SPACE...';
+      statusEl.textContent = 'PING: QUIET STREETS';
       ledEl.className = 'w-2 h-2 rounded-full bg-violet-400';
     }
   }, Math.max(1200, times.half * 1000));
@@ -3024,11 +3024,11 @@ $g('leadLoopBtn').addEventListener('click', () => setLeadLoop(!leadLoopOn));
 $g('ambientBtn').addEventListener('click', () => setAmbient(!ambientOn));
 
 $g('manualMotifBtn').addEventListener('click', () => {
-  requestMelodicMotif();
+  requestMelodicMotif(null, false, true);
 });
 
 $g('manualBellBtn').addEventListener('click', () => {
-  requestMelodicMotif('BELLS');
+  requestMelodicMotif('BELLS', false, true);
 });
 
 $g('finishBtn').addEventListener('click', () => {
@@ -3223,7 +3223,7 @@ return {
   get leadOn(){ return leadLoopOn; }, get ambientOn(){ return ambientOn; }, get autoOn(){ return AUTO.on; },
   get bpm(){ return masterBpm; }, get mode(){ return microcosmMode; }, get subdiv(){ return currentSubdiv; },
   get chord(){ return getActiveChord(); }, get progIdx(){ return currentProgIdx; }, get chordIdx(){ return currentChordIdx; },
-  get mood(){ return (cd && cd.ms && cd.ms.name) || ''; }, get idea(){ return (cd && cd.prem && cd.prem.title) || ''; },
+  get mood(){ return (cd && cd.ms && cd.ms.name) || ''; }, get idea(){ return (cd && cd.prem && cd.prem.title) || ''; }, get ideaStatus(){ return ideaStatus; },
   toggle: toggleSoundscapeEngine, setLead: setLeadLoop, setAmbient, setAuto(on){ if (AUTO.on !== on) $g('autopilotBtn').click(); },
   initAudio, resume(){ if (ctx) ctx.resume(); },
 };

@@ -274,7 +274,7 @@ const GRIDPANEL = (() => {
     ['Sector 01 // Shift change dusk', 'Sector 02 // Archive hall murmur', 'Sector 03 // Billboard haze', 'Sector 04 // Rail yard static', 'Sector 05 // Night school hum', 'Sector 06 // Skyline lull', 'Sector 07 // Rooftop garden calm', 'Sector 08 // Vent chorus', 'Sector 09 // Greenhouse sunrise', 'Sector 10 // Stairwell light loop', 'Sector 11 // Full sector sweep']
       .forEach((t, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = t; prog.appendChild(o); });
     const sty = el.querySelector('#g-motifStyleSelect');
-    [['MIXED', 'Auto-mixed'], ['TAPPED', 'Tapped cascade'], ['HAMMER', 'Pull-off triplet'], ['BELLS', 'Lamp-post harmonics'], ['DOUBLESTOP', 'Double-stops'], ['LEAD', 'Lead riff'], ['HOMEBOUND', 'Homebound run']]
+    [['MIXED', "Planners' choice"], ['TAPPED', 'Gutter cascade'], ['HAMMER', 'Rivet triplet'], ['BELLS', 'Lamp-post chimes'], ['DOUBLESTOP', 'Twin neon'], ['LEAD', 'Busker riff'], ['HOMEBOUND', 'Last train home']]
       .forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sty.appendChild(o); });
     // the track fill follows the handle
     const fill = r => { const lo = +r.min, hi = +r.max; r.style.setProperty('--p', (hi > lo ? (+r.value - lo)/(hi - lo)*100 : 0) + '%'); };

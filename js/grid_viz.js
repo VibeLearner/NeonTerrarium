@@ -43,9 +43,7 @@ const GRIDVIZ = (() => {
     if (badge) new MutationObserver(() => { beat = 1; beatN = parseInt(badge.textContent) || 1; lastBeatT = performance.now(); }).observe(badge, { childList: true, characterData: true, subtree: true });
     const led = $('g-motifLed'), st = $('g-motifStatusText');
     if (led) new MutationObserver(() => { if (/cyan/.test(led.className)) sparks.push({ t: performance.now(), kind: st && /BELL|CHIME|HARMONIC/i.test(st.textContent) ? 'chime' : 'ping' }); }).observe(led, { attributes: true, attributeFilter: ['class'] });
-    const fb = $('g-manualMotifBtn'), cb = $('g-manualBellBtn');
-    if (fb) fb.addEventListener('click', () => sparks.push({ t: performance.now(), kind: 'ping' }));
-    if (cb) cb.addEventListener('click', () => sparks.push({ t: performance.now(), kind: 'chime' }));
+    // (Fire and Chimes light up through the LED too, when their phrase actually plays)
   }
   const PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
   const noteOf = n => { const m = /^([A-G])([b#]?)(-?\d+)$/.exec(n || ''); if (!m) return null; return { pc: (PC[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + 12) % 12, oct: +m[3] }; };

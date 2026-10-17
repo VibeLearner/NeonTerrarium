@@ -95,7 +95,7 @@ const GRIDPANEL = (() => {
   #gridPanel .gled.on-cyan { background: var(--cy); } #gridPanel .gled.on-rose, #gridPanel .gled.on-amber { background: var(--mg); }
 
   /* opening: the city glitches, a curtain of falling glyphs closes over it, then the panel's blocks come up one by one */
-  #view.gp-glitch { animation: gpGl .45s steps(2) 1; }
+  #view.gp-glitch { animation: gpGl .6s steps(2) 1; }
   @keyframes gpGl { 0% { transform: translate(0); } 18% { transform: translate(-7px, 2px); filter: hue-rotate(50deg) contrast(1.35); } 38% { transform: translate(6px, -3px); filter: saturate(2.2); }
     58% { transform: translate(-3px, 1px); filter: hue-rotate(-40deg); } 100% { transform: none; filter: none; } }
   #gridPanel.boot .gtop, #gridPanel.boot .gbot { animation: gpBoot .5s ease-out both; }

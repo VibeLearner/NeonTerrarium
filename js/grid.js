@@ -203,22 +203,26 @@ const music = (() => {
     });
     P.syncPrograms = () => { programs.querySelectorAll('.gb').forEach(b => b.classList.toggle('on', +b.dataset.prog === prog)); };
     const keyH = e => { if (!P.open) return; e.stopPropagation(); if (e.key === 'Escape'){ e.preventDefault(); P.hide(); } };
-    // the hack: the city glitches, a curtain of falling glyphs closes over it, the panel is put up behind the curtain, which then lifts
+    // the hack: the city glitches, translucent glitch bars flicker over it (no black screen), the panel cuts in mid-glitch
     // and the panel's blocks come up one by one with their titles decoding
     const GLY = '0123456789ABCDEF<>[]{}/\\=+*#%$';
     function curtain(ms, done){
+      // no black fill: translucent tear bars and scanlines flicker over the live city, the panel cuts in mid-glitch, then the bars fade
       const dpr = Math.min(2, devicePixelRatio || 1), c = document.createElement('canvas'); c.width = Math.ceil(innerWidth*dpr); c.height = Math.ceil(innerHeight*dpr);
       c.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:90;pointer-events:all'; document.body.appendChild(c);
-      const g = c.getContext('2d'), cw = 16*dpr, cols = Math.ceil(c.width/cw), sp = Array.from({ length: cols }, () => .55 + Math.random()*.9), dl = Array.from({ length: cols }, () => Math.random()*.45), ts = performance.now();
+      const g = c.getContext('2d'), ts = performance.now(), cut = .62; let fired = false;
+      const COL = ['rgba(95,216,222,', 'rgba(229,55,159,', 'rgba(217,246,246,'];
       const step = now => {
-        const u = Math.min(1, (now - ts)/ms); g.font = (13*dpr) + 'px JetBrains Mono, monospace';
-        for (let k = 0; k < cols; k++){
-          const p = Math.max(0, Math.min(1.15, (u - dl[k])/(1 - dl[k]*.6)*sp[k])), y = p*c.height;
-          g.fillStyle = '#050f14'; g.fillRect(k*cw, 0, cw + 1, y - 12*dpr);
-          g.fillStyle = Math.random() < .12 ? '#e5379f' : Math.random() < .2 ? '#d9f6f6' : 'rgba(95,216,222,.9)'; g.fillText(GLY[(Math.random()*GLY.length) | 0], k*cw + 2*dpr, y - 12*dpr);
-          g.fillStyle = 'rgba(95,216,222,.4)'; g.fillText(GLY[(Math.random()*GLY.length) | 0], k*cw + 2*dpr, y - 28*dpr);
+        const u = Math.min(1, (now - ts)/ms), amp = u < cut ? .35 + u/cut*.65 : Math.max(0, 1 - (u - cut)/(1 - cut));
+        g.clearRect(0, 0, c.width, c.height);
+        const n = Math.round(4 + amp*16);
+        for (let k = 0; k < n; k++){
+          const y = Math.random()*c.height, h = (2 + Math.random()*Math.random()*70)*dpr, x = (Math.random() - .3)*c.width*.3, col = COL[(Math.random()*3) | 0];
+          g.fillStyle = col + (.1 + Math.random()*.28*amp) + ')'; g.fillRect(Math.max(0, x), y, c.width*(.25 + Math.random()*.75), h);
         }
-        if (u < 1) requestAnimationFrame(step); else { g.fillStyle = '#050f14'; g.fillRect(0, 0, c.width, c.height); done(c); }
+        g.fillStyle = 'rgba(5,15,20,' + (.16*amp) + ')'; for (let y = 0; y < c.height; y += 4*dpr) g.fillRect(0, y, c.width, dpr);
+        if (!fired && u >= cut){ fired = true; done(c); }
+        if (u < 1) requestAnimationFrame(step); else c.remove();
       };
       requestAnimationFrame(step);
     }
@@ -240,14 +244,13 @@ const music = (() => {
       if (P.open || busy) return; busy = true;
       const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (reduce){ openNow(); busy = false; const b = $q('gpClose'); if (b) b.focus({ preventScroll: true }); return; }
-      canvas.classList.add('gp-glitch'); setTimeout(() => canvas.classList.remove('gp-glitch'), 500);
+      canvas.classList.add('gp-glitch'); setTimeout(() => canvas.classList.remove('gp-glitch'), 650);
       addEventListener('keydown', swallow, true);
-      curtain(640, c => {
+      curtain(900, c => {
         openNow();
         el.querySelectorAll('.gp').forEach((n, k) => n.style.setProperty('--i', String(k)));
         el.classList.add('boot'); setTimeout(() => el.classList.remove('boot'), 1500);
         el.querySelectorAll('.gp > h3, .gname, .gchip span:last-child').forEach(h => decode(h, 650));
-        c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 380, delay: 120, fill: 'forwards' }).onfinish = () => c.remove();
         removeEventListener('keydown', swallow, true); busy = false;
         const b = $q('gpClose'); if (b) b.focus({ preventScroll: true });
       });

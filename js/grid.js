@@ -149,7 +149,7 @@ const music = (() => {
       };
       trace(-1, .7, pal.dim, 1.2); trace(1, 1, pal.line, 2, pal.glow);
       g.strokeStyle = pal.mark; g.lineWidth = 1; const X = Math.round(centroid[key]*w) + .5; g.beginPath(); g.moveTo(X, 0); g.lineTo(X, h); g.stroke();
-      if (h >= 70){ g.fillStyle = pal.tick; g.font = '9px JetBrains Mono, monospace'; g.fillText('100', 6, h - 4); g.fillText('1K', w*.31, h - 4); g.fillText('10K Hz', w - 44, h - 4); }
+      if (h >= 70){ g.fillStyle = pal.tick; g.font = '11px JetBrains Mono, monospace'; g.fillText('100', 6, h - 4); g.fillText('1K', w*.31, h - 4); g.fillText('10K Hz', w - 44, h - 4); }
     }
     if (barsCv){
       const g = barsCv.getContext('2d'), w = barsCv.width, h = barsCv.height, nb = Math.min(NB, Math.floor(w/5)), bw = w/nb, mid = h*.5;
@@ -203,14 +203,57 @@ const music = (() => {
     });
     P.syncPrograms = () => { programs.querySelectorAll('.gb').forEach(b => b.classList.toggle('on', +b.dataset.prog === prog)); };
     const keyH = e => { if (!P.open) return; e.stopPropagation(); if (e.key === 'Escape'){ e.preventDefault(); P.hide(); } };
-    P.show = () => {
-      if (P.open) return; P.open = true; GRIDPANEL.open = true; GRIDPANEL.hold = true;
+    // the hack: the city glitches, a curtain of falling glyphs closes over it, the panel is put up behind the curtain, which then lifts
+    // and the panel's blocks come up one by one with their titles decoding
+    const GLY = '0123456789ABCDEF<>[]{}/\\=+*#%$';
+    function curtain(ms, done){
+      const dpr = Math.min(2, devicePixelRatio || 1), c = document.createElement('canvas'); c.width = Math.ceil(innerWidth*dpr); c.height = Math.ceil(innerHeight*dpr);
+      c.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:90;pointer-events:all'; document.body.appendChild(c);
+      const g = c.getContext('2d'), cw = 16*dpr, cols = Math.ceil(c.width/cw), sp = Array.from({ length: cols }, () => .55 + Math.random()*.9), dl = Array.from({ length: cols }, () => Math.random()*.45), ts = performance.now();
+      const step = now => {
+        const u = Math.min(1, (now - ts)/ms); g.font = (13*dpr) + 'px JetBrains Mono, monospace';
+        for (let k = 0; k < cols; k++){
+          const p = Math.max(0, Math.min(1.15, (u - dl[k])/(1 - dl[k]*.6)*sp[k])), y = p*c.height;
+          g.fillStyle = '#050f14'; g.fillRect(k*cw, 0, cw + 1, y - 12*dpr);
+          g.fillStyle = Math.random() < .12 ? '#e5379f' : Math.random() < .2 ? '#d9f6f6' : 'rgba(95,216,222,.9)'; g.fillText(GLY[(Math.random()*GLY.length) | 0], k*cw + 2*dpr, y - 12*dpr);
+          g.fillStyle = 'rgba(95,216,222,.4)'; g.fillText(GLY[(Math.random()*GLY.length) | 0], k*cw + 2*dpr, y - 28*dpr);
+        }
+        if (u < 1) requestAnimationFrame(step); else { g.fillStyle = '#050f14'; g.fillRect(0, 0, c.width, c.height); done(c); }
+      };
+      requestAnimationFrame(step);
+    }
+    function decode(el, ms){
+      const text = el.dataset.t || (el.dataset.t = el.textContent), t0 = performance.now();
+      const tick = () => { const u = Math.min(1, (performance.now() - t0)/ms), n = Math.floor(u*text.length);
+        el.textContent = text.slice(0, n) + [...text.slice(n)].map(ch => ch === ' ' ? ' ' : GLY[(Math.random()*GLY.length) | 0]).join(''); if (u < 1) requestAnimationFrame(tick); else el.textContent = text; };
+      tick();
+    }
+    let busy = false;
+    function openNow(){
+      P.open = true; GRIDPANEL.open = true; GRIDPANEL.hold = true;
       if (typeof MON !== 'undefined' && MON.close) try { MON.close(); } catch (e){}
       el.classList.add('open'); document.documentElement.classList.add('gp-open'); addEventListener('keydown', keyH, true);
       sliders().forEach(PNL.fill); P.syncPrograms();
-      const b = $q('gpClose'); if (b) b.focus({ preventScroll: true });
       sizeCanvases(); addEventListener('resize', sizeCanvases);
+    }
+    P.show = () => {
+      if (P.open || busy) return; busy = true;
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce){ openNow(); busy = false; const b = $q('gpClose'); if (b) b.focus({ preventScroll: true }); return; }
+      canvas.classList.add('gp-glitch'); setTimeout(() => canvas.classList.remove('gp-glitch'), 500);
+      addEventListener('keydown', swallow, true);
+      curtain(640, c => {
+        openNow();
+        el.querySelectorAll('.gp').forEach((n, k) => n.style.setProperty('--i', String(k)));
+        el.classList.add('boot'); setTimeout(() => el.classList.remove('boot'), 1500);
+        el.querySelectorAll('.gp > h3, .gname, .gchip span:last-child').forEach(h => decode(h, 650));
+        c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 380, delay: 120, fill: 'forwards' }).onfinish = () => c.remove();
+        removeEventListener('keydown', swallow, true); busy = false;
+        const b = $q('gpClose'); if (b) b.focus({ preventScroll: true });
+      });
     };
+    // while the curtain is falling, keys do nothing (so the city doesn't get nudged)
+    const swallow = e => { e.stopPropagation(); };
     P.hide = () => {
       if (!P.open) return; P.open = false; GRIDPANEL.open = false; GRIDPANEL.hold = false;
       el.classList.remove('open'); document.documentElement.classList.remove('gp-open'); removeEventListener('keydown', keyH, true); removeEventListener('resize', sizeCanvases);

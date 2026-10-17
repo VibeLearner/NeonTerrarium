@@ -12,7 +12,7 @@ const GRIDPANEL = (() => {
   const css = `
   #gridPanel { --bg:#050f14; --pn:rgba(9,32,40,.62); --pn2:rgba(12,44,54,.7); --line:#2c8b92; --cy:#5fd8de; --cy2:#a6eef0; --dim:#4f8c94; --faint:#17414a; --mg:#e5379f; --yl:#e8d553; --ink:#d9f6f6;
     position: fixed; inset: 0; z-index: 80; display: none; flex-direction: column; gap: 8px; padding: 10px 12px 8px; color: var(--ink); background: radial-gradient(120% 100% at 50% 0%, #0a2530 0%, var(--bg) 62%);
-    font: 10.5px/1.35 'JetBrains Mono', ui-monospace, monospace; letter-spacing: .04em; user-select: none; overflow: hidden; }
+    font: 13.5px/1.35 'JetBrains Mono', ui-monospace, monospace; letter-spacing: .04em; user-select: none; overflow: hidden; }
   #gridPanel.open { display: flex; }
   /* while the panel is up the rest of the game's controls (buildings, transport, speed, monitor, logs) step out of the way, so nothing sits over it */
   html.gp-open body > *:not(#gridPanel):not(#view):not(script):not(style):not(link):not(#tvStatic):not(#tvFlash) { visibility: hidden !important; }
@@ -22,37 +22,37 @@ const GRIDPANEL = (() => {
   #gridPanel > * { position: relative; z-index: 1; }
   #gridPanel .gtop, #gridPanel .gbot { display: flex; align-items: center; gap: 6px; flex: none; white-space: nowrap; overflow: hidden; }
   #gridPanel .gtop { border-bottom: 1px solid var(--faint); padding-bottom: 6px; }
-  #gridPanel .gbot { border-top: 1px solid var(--faint); padding-top: 6px; color: var(--dim); font-size: 10px; gap: 14px; }
+  #gridPanel .gbot { border-top: 1px solid var(--faint); padding-top: 6px; color: var(--dim); font-size: 13px; gap: 14px; }
   #gridPanel .gbot b { color: var(--cy2); font-weight: 400; margin-left: 5px; }
-  #gridPanel .gchip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border: 1px solid var(--faint); background: rgba(5,18,23,.8); color: var(--cy2); font-size: 10px; letter-spacing: .08em; }
+  #gridPanel .gchip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border: 1px solid var(--faint); background: rgba(5,18,23,.8); color: var(--cy2); font-size: 13px; letter-spacing: .08em; }
   #gridPanel .gchip i { width: 6px; height: 6px; background: var(--cy); display: inline-block; }
   #gridPanel .gchip.mg i { background: var(--mg); } #gridPanel .gchip.yl i { background: var(--yl); } #gridPanel .gchip.mg { color: #ff9fd6; } #gridPanel .gchip.yl { color: var(--yl); }
   #gridPanel .gchip.live i { animation: gpBlink 1.2s steps(2) infinite; } @keyframes gpBlink { 50% { opacity: .2; } }
-  #gridPanel .gname { margin-left: auto; font: 600 12px 'Chakra Petch', sans-serif; letter-spacing: .26em; color: var(--cy2); padding-right: 10px; }
-  #gridPanel .gx { font: 600 10.5px 'Chakra Petch', sans-serif; letter-spacing: .22em; color: var(--ink); background: transparent; border: 1px solid var(--line); padding: 5px 12px; cursor: pointer; border-radius: 0; }
+  #gridPanel .gname { margin-left: auto; font: 600 15.5px 'Chakra Petch', sans-serif; letter-spacing: .26em; color: var(--cy2); padding-right: 10px; }
+  #gridPanel .gx { font: 600 13.5px 'Chakra Petch', sans-serif; letter-spacing: .22em; color: var(--ink); background: transparent; border: 1px solid var(--line); padding: 5px 12px; cursor: pointer; border-radius: 0; }
   #gridPanel .gx:hover, #gridPanel .gx:focus-visible { background: var(--cy); color: var(--bg); outline: none; }
-  #gridPanel .gmain { flex: 1; min-height: 0; overflow: auto; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(290px, 100%), 1fr)); align-items: start; padding: 4px 2px 8px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  #gridPanel .gmain { flex: 1; min-height: 0; overflow: auto; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); align-items: start; padding: 4px 2px 8px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   /* a panel: corner brackets, a bracketed title on top, a code at the foot */
-  #gridPanel .gp { position: relative; padding: 24px 14px 22px; background-color: var(--pn);
+  #gridPanel .gp { position: relative; padding: 30px 16px 26px; background-color: var(--pn);
     --b: var(--line);
     background-image:
       linear-gradient(var(--b), var(--b)), linear-gradient(var(--b), var(--b)), linear-gradient(var(--b), var(--b)), linear-gradient(var(--b), var(--b)),
       linear-gradient(var(--b), var(--b)), linear-gradient(var(--b), var(--b)), linear-gradient(var(--b), var(--b)), linear-gradient(var(--b), var(--b));
     background-size: 16px 2px, 2px 16px, 16px 2px, 2px 16px, 16px 2px, 2px 16px, 16px 2px, 2px 16px;
     background-position: 0 0, 0 0, 100% 0, 100% 0, 0 100%, 0 100%, 100% 100%, 100% 100%; background-repeat: no-repeat; }
-  #gridPanel .gp > h3 { position: absolute; left: 20px; top: 6px; margin: 0; font: 400 9.5px 'JetBrains Mono', monospace; letter-spacing: .18em; color: var(--cy); text-transform: uppercase; white-space: nowrap; }
+  #gridPanel .gp > h3 { position: absolute; left: 20px; top: 5px; margin: 0; font: 400 12.5px 'JetBrains Mono', monospace; letter-spacing: .18em; color: var(--cy); text-transform: uppercase; white-space: nowrap; }
   #gridPanel .gp > h3::before { content: '[ '; color: var(--dim); } #gridPanel .gp > h3::after { content: ' ]'; color: var(--dim); }
-  #gridPanel .gp > .gcode { position: absolute; left: 20px; bottom: 5px; font-size: 8.5px; letter-spacing: .16em; color: var(--dim); }
+  #gridPanel .gp > .gcode { position: absolute; left: 20px; bottom: 5px; font-size: 11px; letter-spacing: .16em; color: var(--dim); }
   #gridPanel .gp > .gcode::before { content: '[ '; } #gridPanel .gp > .gcode::after { content: ' ]'; }
-  #gridPanel .gp > .gtag { position: absolute; right: 20px; top: 6px; font-size: 8.5px; letter-spacing: .14em; color: var(--dim); }
+  #gridPanel .gp > .gtag { position: absolute; right: 20px; top: 6px; font-size: 11px; letter-spacing: .14em; color: var(--dim); }
   #gridPanel .gp.hot { --b: var(--mg); }
     #gridPanel .gcol { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-content: start; min-width: 0; }
   @media (max-width: 640px) { #gridPanel .gname { display: none; } }
-  #gridPanel .gnote { color: var(--dim); font-size: 9.5px; line-height: 1.4; margin: 0 0 8px; letter-spacing: .03em; }
+  #gridPanel .gnote { color: var(--dim); font-size: 12.5px; line-height: 1.4; margin: 0 0 8px; letter-spacing: .03em; }
   /* a slider: name, hairline track filled in cyan, a square handle, the value */
-  #gridPanel .gs { display: grid; grid-template-columns: minmax(96px, 1.1fr) minmax(70px, 1.5fr) 44px; align-items: center; gap: 9px; margin: 0 0 9px; cursor: default; }
-  #gridPanel .gs > span { color: var(--cy2); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; line-height: 1.2; }
-  #gridPanel .gs > output { text-align: right; color: var(--yl); font-size: 10px; letter-spacing: .04em; white-space: nowrap; }
+  #gridPanel .gs { display: grid; grid-template-columns: minmax(118px, 1.2fr) minmax(70px, 1.4fr) 52px; align-items: center; gap: 9px; margin: 0 0 9px; cursor: default; }
+  #gridPanel .gs > span { color: var(--cy2); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; line-height: 1.2; }
+  #gridPanel .gs > output { text-align: right; color: var(--yl); font-size: 13px; letter-spacing: .04em; white-space: nowrap; }
   #gridPanel input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 14px; margin: 0; background: transparent; cursor: pointer; --p: 50%; }
   #gridPanel input[type=range]::-webkit-slider-runnable-track { height: 3px; background: linear-gradient(90deg, var(--cy) var(--p), var(--faint) var(--p)); }
   #gridPanel input[type=range]::-moz-range-track { height: 3px; background: linear-gradient(90deg, var(--cy) var(--p), var(--faint) var(--p)); }
@@ -60,39 +60,48 @@ const GRIDPANEL = (() => {
   #gridPanel input[type=range]::-moz-range-thumb { width: 7px; height: 13px; background: var(--ink); border: 0; border-radius: 0; }
   #gridPanel input[type=range]:focus-visible { outline: 1px solid var(--cy); outline-offset: 2px; }
   /* buttons: stacked bars like a selector list, the live one filled */
-  #gridPanel .gb { display: block; width: 100%; padding: 6px 10px; margin: 0 0 5px; font: 400 10px 'JetBrains Mono', monospace; letter-spacing: .2em; text-align: center; text-transform: uppercase; color: var(--cy2); background: rgba(5,22,29,.85); border: 1px solid var(--faint); border-radius: 0; cursor: pointer; }
+  #gridPanel .gb { display: block; width: 100%; padding: 6px 10px; margin: 0 0 5px; font: 400 13px 'JetBrains Mono', monospace; letter-spacing: .2em; text-align: center; text-transform: uppercase; color: var(--cy2); background: rgba(5,22,29,.85); border: 1px solid var(--faint); border-radius: 0; cursor: pointer; }
   #gridPanel .gb:hover { border-color: var(--cy); } #gridPanel .gb:focus-visible { outline: 1px solid var(--cy); outline-offset: 1px; }
   #gridPanel .gb.on { background: var(--cy); color: var(--bg); border-color: var(--cy); font-weight: 600; }
   #gridPanel .gb.mg.on { background: var(--mg); border-color: var(--mg); color: #fff; }
-  #gridPanel .gb small { display: block; margin-top: 2px; font-size: 8.5px; letter-spacing: .1em; opacity: .75; text-transform: none; }
+  #gridPanel .gb small { display: block; margin-top: 2px; font-size: 11px; letter-spacing: .1em; opacity: .75; text-transform: none; }
   #gridPanel .grow { display: flex; gap: 5px; margin: 0 0 8px; } #gridPanel .grow .gb { margin: 0; flex: 1; padding: 6px 4px; letter-spacing: .1em; }
-  #gridPanel .glbl { color: var(--dim); font-size: 9px; letter-spacing: .18em; margin: 8px 0 5px; text-transform: uppercase; }
-  #gridPanel select { width: 100%; margin: 0 0 8px; padding: 6px 8px; font: 400 10px 'JetBrains Mono', monospace; letter-spacing: .06em; color: var(--cy2); background: rgba(5,22,29,.95); border: 1px solid var(--line); border-radius: 0; }
+  #gridPanel .glbl { color: var(--dim); font-size: 11.5px; letter-spacing: .18em; margin: 8px 0 5px; text-transform: uppercase; }
+  #gridPanel select { width: 100%; margin: 0 0 8px; padding: 6px 8px; font: 400 13px 'JetBrains Mono', monospace; letter-spacing: .06em; color: var(--cy2); background: rgba(5,22,29,.95); border: 1px solid var(--line); border-radius: 0; }
   #gridPanel select:focus-visible { outline: 1px solid var(--cy); }
-  #gridPanel .gst { color: var(--yl); font-size: 9.5px; letter-spacing: .06em; min-height: 13px; margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #gridPanel .gst { color: var(--yl); font-size: 12.5px; letter-spacing: .06em; min-height: 13px; margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #gridPanel .gst.dim { color: var(--dim); }
   /* the clock: a ring with the tempo in it */
   #gridPanel .gring { position: relative; width: 112px; height: 112px; margin: 0 auto 8px; }
   #gridPanel .gring svg { width: 100%; height: 100%; } #gridPanel .gring circle { fill: none; stroke-width: 5; }
   #gridPanel .gring .bg { stroke: var(--faint); } #gridPanel .gring .fg { stroke: var(--cy); stroke-dasharray: 289; stroke-dashoffset: 289; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset .3s; }
   #gridPanel .gring div { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; text-align: center; }
-  #gridPanel .gring b { font: 600 26px 'Chakra Petch', sans-serif; color: var(--ink); letter-spacing: .02em; } #gridPanel .gring small { color: var(--dim); font-size: 8.5px; letter-spacing: .2em; }
-  #gridPanel .gbeat { position: absolute; right: 18px; top: 24px; color: var(--mg); font-size: 11px; }
+  #gridPanel .gring b { font: 600 34px 'Chakra Petch', sans-serif; color: var(--ink); letter-spacing: .02em; } #gridPanel .gring small { color: var(--dim); font-size: 11px; letter-spacing: .2em; }
+  #gridPanel .gbeat { position: absolute; right: 18px; top: 24px; color: var(--mg); font-size: 14.5px; }
   /* the pad grid: one tile per chord of the carrier pattern */
   #gridPanel .gpads { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; max-height: 232px; overflow: auto; margin-bottom: 8px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-  #gridPanel .gpad { position: relative; overflow: hidden; text-align: left; padding: 6px 7px 9px; min-height: 52px; color: #bfeef0; background: rgba(48,150,158,.5); border: 0; border-radius: 0; cursor: pointer; font: 400 10px 'JetBrains Mono', monospace; }
-  #gridPanel .gpad small { display: block; font-size: 8px; color: rgba(5,15,20,.7); letter-spacing: .12em; } #gridPanel .gpad b { display: block; font-weight: 600; color: #04161b; font-size: 10.5px; margin-top: 2px; letter-spacing: 0; word-break: break-word; }
+  #gridPanel .gpad { position: relative; overflow: hidden; text-align: left; padding: 6px 7px 9px; min-height: 52px; color: #bfeef0; background: rgba(48,150,158,.5); border: 0; border-radius: 0; cursor: pointer; font: 400 13px 'JetBrains Mono', monospace; }
+  #gridPanel .gpad small { display: block; font-size: 10.5px; color: rgba(5,15,20,.7); letter-spacing: .12em; } #gridPanel .gpad b { display: block; font-weight: 600; color: #04161b; font-size: 13.5px; margin-top: 2px; letter-spacing: 0; word-break: break-word; }
   #gridPanel .gpad i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--ink); }
   #gridPanel .gpad:hover { filter: brightness(1.2); } #gridPanel .gpad:focus-visible { outline: 1px solid var(--ink); }
   #gridPanel .gpad.cur { background: var(--yl); } #gridPanel .gpad.cur b, #gridPanel .gpad.cur small { color: #1d1a02; }
   #gridPanel .gpills { display: flex; flex-wrap: wrap; gap: 4px; }
-  #gridPanel .gpill { padding: 3px 7px; font: 400 10px 'JetBrains Mono', monospace; color: var(--cy2); background: rgba(5,22,29,.9); border: 1px solid var(--line); border-radius: 0; cursor: pointer; }
+  #gridPanel .gpill { padding: 3px 7px; font: 400 13px 'JetBrains Mono', monospace; color: var(--cy2); background: rgba(5,22,29,.9); border: 1px solid var(--line); border-radius: 0; cursor: pointer; }
   #gridPanel .gpill.ext { color: #ff9fd6; border-color: var(--mg); } #gridPanel .gpill:hover { background: var(--cy); color: var(--bg); }
   #gridPanel .gchord { display: flex; align-items: baseline; gap: 10px; margin: 0 0 8px; }
-  #gridPanel .gchord b { font: 600 22px 'Chakra Petch', sans-serif; color: var(--yl); letter-spacing: .02em; } #gridPanel .gchord span { color: var(--cy2); font-size: 10px; letter-spacing: .1em; }
+  #gridPanel .gchord b { font: 600 28.5px 'Chakra Petch', sans-serif; color: var(--yl); letter-spacing: .02em; } #gridPanel .gchord span { color: var(--cy2); font-size: 13px; letter-spacing: .1em; }
   #gridPanel canvas { display: block; width: 100%; max-width: 100%; background: rgba(3,12,16,.8); border: 1px solid var(--faint); }
   #gridPanel .gled { display: inline-block; width: 7px; height: 7px; margin-right: 7px; background: var(--faint); vertical-align: 1px; } #gridPanel .gled.on-emerald { background: var(--cy); box-shadow: 0 0 6px var(--cy); }
   #gridPanel .gled.on-cyan { background: var(--cy); } #gridPanel .gled.on-rose, #gridPanel .gled.on-amber { background: var(--mg); }
+
+  /* opening: the city glitches, a curtain of falling glyphs closes over it, then the panel's blocks come up one by one */
+  #view.gp-glitch { animation: gpGl .45s steps(2) 1; }
+  @keyframes gpGl { 0% { transform: translate(0); } 18% { transform: translate(-7px, 2px); filter: hue-rotate(50deg) contrast(1.35); } 38% { transform: translate(6px, -3px); filter: saturate(2.2); }
+    58% { transform: translate(-3px, 1px); filter: hue-rotate(-40deg); } 100% { transform: none; filter: none; } }
+  #gridPanel.boot .gtop, #gridPanel.boot .gbot { animation: gpBoot .5s ease-out both; }
+  #gridPanel.boot .gp { animation: gpBoot .62s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 70ms + 120ms); }
+  @keyframes gpBoot { 0% { opacity: 0; clip-path: inset(0 100% 0 0); filter: brightness(2.4) saturate(1.6); } 55% { opacity: 1; filter: brightness(1.6); } 100% { opacity: 1; clip-path: inset(0 0 0 0); filter: none; } }
+  @media (prefers-reduced-motion: reduce) { #view.gp-glitch, #gridPanel.boot .gtop, #gridPanel.boot .gbot, #gridPanel.boot .gp { animation: none; } }
   `;
   const slider = (id, name, min, max, step, val, tip) => `<label class="gs" title="${tip}"><span>${name}</span><input type="range" id="g-${id}" min="${min}" max="${max}" step="${step}" value="${val}"><output id="g-${id.replace(/Slider$/, '')}Val"></output></label>`;
   const html = `

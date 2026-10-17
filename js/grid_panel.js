@@ -72,11 +72,11 @@ const GRIDPANEL = (() => {
   #gridPanel .gst { color: var(--yl); font-size: 12.5px; letter-spacing: .06em; min-height: 13px; margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #gridPanel .gst.dim { color: var(--dim); }
   /* the clock: a ring with the tempo in it */
-  #gridPanel .gring { position: relative; width: 112px; height: 112px; margin: 0 auto 8px; }
+  #gridPanel .gring { position: relative; width: 150px; height: 150px; margin: 0 auto 8px; }
   #gridPanel .gring svg { width: 100%; height: 100%; } #gridPanel .gring circle { fill: none; stroke-width: 5; }
   #gridPanel .gring .bg { stroke: var(--faint); } #gridPanel .gring .fg { stroke: var(--cy); stroke-dasharray: 289; stroke-dashoffset: 289; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset .3s; }
   #gridPanel .gring div { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; text-align: center; }
-  #gridPanel .gring b { font: 600 34px 'Chakra Petch', sans-serif; color: var(--ink); letter-spacing: .02em; } #gridPanel .gring small { color: var(--dim); font-size: 11px; letter-spacing: .2em; }
+  #gridPanel .gring b { font: 600 34px 'Chakra Petch', sans-serif; color: var(--ink); letter-spacing: .02em; } #gridPanel .gring small { display: block; max-width: 96px; color: var(--dim); font-size: 10.5px; letter-spacing: .08em; line-height: 1.1; }
   #gridPanel .gbeat { position: absolute; right: 18px; top: 24px; color: var(--mg); font-size: 14.5px; }
   /* the pad grid: one tile per chord of the carrier pattern */
   #gridPanel .gpads { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; max-height: 232px; overflow: auto; margin-bottom: 8px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
@@ -117,7 +117,7 @@ const GRIDPANEL = (() => {
   <div class="gmain">
     <div class="gcol">
     <section class="gp"><h3>Circadian clock</h3><span class="gtag" id="g-beatCounterBadge">1/4</span>
-      <div class="gring"><svg viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="46"/><circle class="fg" id="gpRing" cx="50" cy="50" r="46"/></svg><div><b id="g-bpmReadout">82</b><small>CYCLES / MIN</small></div></div>
+      <div class="gring"><svg viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="46"/><circle class="fg" id="gpRing" cx="50" cy="50" r="46"/></svg><div><b id="g-bpmReadout">82</b><small>CYCLES<br>PER MIN</small></div></div>
       ${slider('bpmSlider', 'Circadian clock rate', 55, 140, 1, 82, "Sets the metabolic pacing of the sector's population.").replace('<output id="g-bpmVal"></output>', '<output></output>')}
       <button class="gb" id="g-tapTempoBtn" title="Tap the pulse and the whole district falls in step">Pulse sync (tap)</button>
       <div class="glbl">Footfall cadence</div>

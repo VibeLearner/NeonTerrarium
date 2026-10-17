@@ -263,7 +263,7 @@ const music = (() => {
     };
     $q('gpClose').addEventListener('click', () => P.hide());
     const curve = $q('gpCurve'), barsCv = $q('gpBars');
-    function sizeCanvases(){ for (const c of [curve, barsCv]){ const w = Math.max(200, Math.floor(c.clientWidth)); if (c.width !== w) c.width = w; } }
+    function sizeCanvases(){ for (const c of [curve, barsCv]){ const w = Math.max(200, Math.floor(c.clientWidth)), h = Math.floor(c.clientHeight); if (c.width !== w) c.width = w; if (h >= 40 && c.height !== h) c.height = h; } }   // (the panel's layout sets their size: they fill their block)
     // what the panel says about the broadcast, a few times a second
     let slow = 0;
     P.draw = (t, dt) => {

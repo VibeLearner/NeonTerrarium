@@ -12,7 +12,7 @@
 //  - the programs (a program is a set of layers: the neuro-phrase feed, the sedation bed, the auto-governor);
 //  - the volume (Settings, Sound), the hold while the Overseer's desk is up, and what the player last set.
 // The old object `music` is kept (volume, hold, update) so the rest of the game talks to the Grid the way it did the radio.
-const MUSIC_VOL_KEY = 'neonIsland.musicVolume', GRID_KEY = 'neonIsland.gridSettings';
+const MUSIC_VOL_KEY = 'neonIsland.musicVolume', GRID_KEY = 'neonIsland.gridSettings2';   // (2: the defaults changed, so settings saved before them start over)
 const GRID_FADE_IN = 8, GRID_FADE_QUICK = .6, GRID_FADE_OUT = 1.5;   // seconds
 // the programs: what the Grid broadcasts. Each is a set of layers switched on together.
 const GRID_PROGRAMS = [
@@ -46,6 +46,8 @@ const music = (() => {
     let o = null; try { o = JSON.parse(localStorage.getItem(GRID_KEY) || 'null'); } catch (e) {}
     if (o && o.s) sliders().forEach(r => { const v = o.s[r.id.slice(2)]; if (v !== undefined){ r.value = v; r.dispatchEvent(new Event('input')); } });
     else sliders().forEach(r => r.dispatchEvent(new Event('input')));   // fills in the readouts
+    // a first build starts as: District hum (ambient chords, the lead loop and the autopilot all on), on Sector 01, Midwest Sunset
+    if (!o){ const ps = PNL.el.querySelector('#g-progressionSelect'); ps.value = '0'; ps.dispatchEvent(new Event('change')); prog = 0; }
     if (o && o.sel) PNL.el.querySelectorAll('select').forEach(s => { const v = o.sel[s.id.slice(2)]; if (v !== undefined){ s.value = v; s.dispatchEvent(new Event('change')); } });
     const click = (sel, want) => { const b = PNL.el.querySelector(sel); if (b && want) b.click(); };
     if (o){

@@ -181,8 +181,8 @@ const music = (() => {
       program(){ const p = GRID_PROGRAMS[prog]; prog$.textContent = p.name; prog$.title = p.sub; const pp = $q('gpProg'); if (pp) pp.textContent = p.name.toUpperCase(); PANEL.syncPrograms(); },
       text(){
         const c = E.chord, name = c ? c.name : '', mood = E.mood || '', bpm = E.bpm;
-        const s = name + '|' + mood + '|' + bpm; if (s === lastTxt) return; lastTxt = s;
-        chord$.textContent = name + (c && c.mood ? ' · ' + c.mood : ''); clock$.textContent = String(bpm);
+        const s = name + '|' + bpm; if (s === lastTxt) return; lastTxt = s;
+        chord$.textContent = name ? 'Carrier ' + name : ''; clock$.textContent = String(bpm);
       },
       draw(t, dt){ if (!deck.classList.contains('live')) return; drawSignal(curve, barsCv, 'deck', PAL_DECK, t, dt); },
     };

@@ -130,7 +130,7 @@ const GRIDPANEL = (() => {
       ${slider('subAnchorSlider', 'Foundation hum', 0, 1, 0.02, 0.65, 'The sub-audible weight that the megablocks sit on.')}
       ${slider('chordHoldSlider', 'Carrier hold time', 5, 24, 1, 10, 'How long a carrier chord holds before the planners change it. Some change fast, some are held for a long while.')}
       <div class="glbl">District carrier pattern</div>
-      <select id="g-progressionSelect" title="Which set of chords the grid cycles through"></select>
+      <select id="g-progressionSelect" title="Which carrier pattern the planners are running through the district"></select>
       <button class="gb" id="g-freezeSwitch" title="Suspends the current acoustic atmosphere in a localized time-loop"><span class="gled" id="g-freezeLed"></span>Stasis field (cryo-loop)<small id="g-freezeStatusText">STASIS FIELD: OFF</small></button>
       <button class="gb" id="g-markovToggleBtn" title="Lets the carrier wander to neighboring chords instead of marching in order"><span>Carrier drift: </span><span id="g-markovStateText">ORDERED</span></button>
       <span class="gcode">C1</span></section>
@@ -165,10 +165,10 @@ const GRIDPANEL = (() => {
       <span class="gcode">D1</span></section>
     </div>
     <div class="gcol">
-    <section class="gp"><h3>Carrier chart</h3>
+    <section class="gp"><h3>District carrier chart</h3>
       <div class="gchord"><b id="g-activeChordBadge">Fmaj9</b><span id="g-activeMoodTag"></span></div>
       <div class="gpads" id="g-chordTimelineGrid"></div>
-      <div class="glbl">Voicing</div>
+      <div class="glbl">Harmonic stack</div>
       <div class="gpills" id="g-voicingPillsContainer"></div>
       <span class="gcode">B2</span></section>
     <section class="gp"><h3>Signal</h3><span class="gtag">LIVE SPECTRUM</span>
@@ -185,7 +185,7 @@ const GRIDPANEL = (() => {
     P.el = el;
     // the two pick lists: the same sets the engine knows (it relabels the progressions for its major starts when it starts)
     const prog = el.querySelector('#g-progressionSelect');
-    ['01 // Midwest Sunset (Fmaj9 > C6/9 > Dm11 > Bbmaj7#11)', '02 // Tape Memories (Ebmaj9 > Dm7b5 > Cm11 > Bbmaj13)', '03 // Holographic Drift (Dmaj9#11 > Aadd9/C# > Bm11 > Gmaj13#11)', '04 // Autumn Static (Am11 > Fmaj9#11 > Cmaj9/G > Em7add11)', '05 // Midnight Study (Fm9 > Bb13sus4 > Ebmaj9 > C7alt)', '06 // Starlight Cascades (Gbmaj9 > Fm11 > Ebm11 > Dbmaj9)', '07 // Suburban Stargazing (Cmaj9 > Am11 > Fmaj7#11 > G6add9)', '08 // Cassette Nebula (Bmaj9#11 > F#add9/A# > G#m11 > Emaj9#11)', '09 // Solar Canopy (Amaj9 > F#m9 > Dmaj7#11 > E6/9)', '10 // Porch Light Loop (Gmaj9 > Em9 > Cmaj9 > D6/9)', '11 // Grand Tour (every chord, linked by the smoothest voice-leading)']
+    ['Sector 01 // Shift change dusk', 'Sector 02 // Archive hall murmur', 'Sector 03 // Billboard haze', 'Sector 04 // Rail yard static', 'Sector 05 // Night school hum', 'Sector 06 // Skyline lull', 'Sector 07 // Rooftop garden calm', 'Sector 08 // Vent chorus', 'Sector 09 // Greenhouse sunrise', 'Sector 10 // Stairwell light loop', 'Sector 11 // Full sector sweep']
       .forEach((t, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = t; prog.appendChild(o); });
     const sty = el.querySelector('#g-motifStyleSelect');
     [['MIXED', 'Auto-mixed'], ['TAPPED', 'Tapped cascade'], ['HAMMER', 'Pull-off triplet'], ['BELLS', 'Lamp-post harmonics'], ['DOUBLESTOP', 'Double-stops'], ['LEAD', 'Lead riff'], ['HOMEBOUND', 'Homebound run']]

@@ -24,15 +24,20 @@ def main():
     srv = http.server.ThreadingHTTPServer(('127.0.0.1', PORT), handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     with sync_playwright() as p:
-        if sys.platform == 'darwin':   # a Mac: the real graphics card, through your installed Chrome (a window opens while it bakes)
-            try: b = p.chromium.launch(channel='chrome', headless=False, args=['--use-angle=metal', '--ignore-gpu-blocklist'])
-            except Exception: b = p.chromium.launch(headless=False, args=['--use-angle=metal', '--ignore-gpu-blocklist'])
-        else:   # no graphics card (a cloud machine): software rendering, slow
-            b = p.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'])
-        pg = b.new_page()
-        pg.on('console', lambda m: print('page:', m.text) if m.type in ('error', 'warning') else None)
-        pg.on('pageerror', lambda e: print('page error:', e))
         opt = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
+        mode = os.environ.get('BAKE_GL', 'metal' if sys.platform == 'darwin' else 'software')
+        if mode == 'software':   # no graphics card (a cloud machine): slow
+            b = p.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'])
+        else:   # the real graphics card through Chrome (a window opens while it bakes; leave it alone)
+            args = ['--ignore-gpu-blocklist'] + (['--use-angle=metal'] if mode == 'metal' else [])
+            try: b = p.chromium.launch(channel='chrome', headless=False, args=args)
+            except Exception: b = p.chromium.launch(headless=False, args=args)
+        print('baking with:', mode, flush=True)
+        pg = b.new_page(); pg.set_default_timeout(0)
+        pg.on('crash', lambda *_: print('THE PAGE CRASHED (usually the graphics driver running out of memory). Try: BAKE_GL=default python3 tools/title/bake.py', flush=True))
+        pg.on('close', lambda *_: print('the bake window closed', flush=True))
+        pg.on('console', lambda m: print('page:', m.text) if m.type in ('error', 'warning') and 'favicon' not in m.text and 'Feedback loop' not in m.text and '404' not in m.text else (print('progress:', m.text[5:], flush=True) if m.text.startswith('BAKE ') else None))
+        pg.on('pageerror', lambda e: print('page error:', e))
         pg.goto('http://127.0.0.1:%d/tools/title/bake.html?scene=%s' % (PORT, opt.get('scene', 'kitchen')))
         res = pg.evaluate('o => BAKE(o)', opt)
         out = opt.get('out', OUT); os.makedirs(out, exist_ok=True)

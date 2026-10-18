@@ -277,7 +277,7 @@ window.BAKE = async (opt = {}) => {
   for (const t of times){
     const info = ROOM.setTime(t); post.material.uniforms.sunCol.value.setRGB(...info.sunCol); if (info.grade){ post.material.uniforms.gradeHi.value.set(...info.grade[0]); post.material.uniforms.gradeLo.value.set(...info.grade[1]); } ROOM.setSun(0); scene.updateMatrixWorld(true);
     { const keep = []; scene.traverse(o => { if (o.material && o.material.envMap === crt.texture){ keep.push(o.material); o.material.envMap = null; } }); cc.update(renderer, scene); for (const m of keep) m.envMap = crt.texture; }   // (no reflections while the reflections are taken: a texture can't be read and drawn at once)
-    for (const k of views){ res[k] = res[k] || {}; res[k][t] = (k === 'wide' || k === 'tall') ? await bakeTimes(k, info, heads) : await bake(k); }
+    for (const k of views){ console.log('BAKE ' + t + ' ' + k); res[k] = res[k] || {}; res[k][t] = (k === 'wide' || k === 'tall') ? await bakeTimes(k, info, heads) : await bake(k); }
   }
   return res;
 };

@@ -25,7 +25,8 @@ function frame(now){
   if (typeof GRIDPANEL !== 'undefined' && GRIDPANEL.hold) return;   // (so does the Acoustic Panel; the broadcast plays on)
   if (typeof TITLE !== 'undefined' && TITLE.on && TITLE.cityHalf && TITLE.cityHalf()){ TITLE_SKIP = !TITLE_SKIP; if (TITLE_SKIP) return; }   // (under the title only the porthole shows the city: half the frames do)
   if (idleNow(now)){ IDLE_SKIP = !IDLE_SKIP; if (IDLE_SKIP) return; } else IDLE_SKIP = false;
-  try { frameBody(now); }
+  const TP = window.TPERF; if (TP && TP.off.has('city')) return;
+  try { if (TP){ const t0 = performance.now(); frameBody(now); if (TP.sync) TP.finish(renderer); TP.add('city', performance.now() - t0); } else frameBody(now); }
   catch (e){ FRAME_ERR.n++; FRAME_ERR.last = String(e && e.stack || e).slice(0, 400);
     if (FRAME_ERR.n <= 5 || FRAME_ERR.n % 600 === 0) console.error('frame error #' + FRAME_ERR.n + ' (the game goes on):', e);
     scene.overrideMaterial = null; renderer.autoClear = true; try { PH.abort(); } catch (e2){} }

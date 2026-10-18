@@ -14,7 +14,7 @@ varying vec2 vUv;
 uniform sampler2D tCol, tNrm, tDep, tMat, tGlow, tBar, tBounce, tStat, sunMap, sunDyn, lampMap;
 uniform mat4 camWorld, sunMat, lampMat;
 uniform vec2 projXY, res;
-uniform float far, open, barOn, lampsK, density, exposure, bounceK, time, sunOn;
+uniform float shafts, far, open, barOn, lampsK, density, exposure, bounceK, time, sunOn;
 uniform vec3 sunDir, sunCol, skyCol, skyPos, hemiSky, hemiGround, ambCol, fillDir, fillCol, gradeHi, gradeLo, scatCol;
 uniform vec3 pucks[3]; uniform vec3 downPos, pendPos, barPos, b5Pos, puckCol, downCol, pendCol, barCol, b5Col;
 float dep(vec2 uv){ vec3 p = texture2D(tDep, uv).rgb; return dot(p, vec3(1., 1./255., 1./65025.))*far; }
@@ -36,7 +36,7 @@ void main(){
   // light shafts: march from the eye to the surface (or the glass) through the sun's shadow map
   vec3 dir = normalize(P - camP); float len = min(length(P - camP), 14.); float acc = 0.;
   float jit = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)))*43758.5453);
-  if (sunOn > 0.){ for (int i = 0; i < 24; i++){ float t = (float(i) + jit)/24.*len; acc += shadow1(camP + dir*t); } acc /= 24.; }
+  if (sunOn > 0. && shafts > 0.){ for (int i = 0; i < 24; i++){ float t = (float(i) + jit)/24.*len; acc += shadow1(camP + dir*t); } acc /= 24.; }
   float mu = dot(dir, -sunDir), g = .6, hg = (1. - g*g)/pow(1. + g*g - 2.*g*mu, 1.5)/12.566;
   vec3 scat = scatCol*acc*density*(.3 + 3.6*hg)*len*.12*sunOn;
   if (col.a < .5){ vec3 h = pow(aces(scat), vec3(1./2.2)); float l = dot(h, vec3(.3, .55, .15)); gl_FragColor = vec4(h/max(1e-3, l), clamp(l*1.1, 0., .85)); return; }
@@ -95,7 +95,7 @@ void main(){
     const quad = new C.Mesh(new C.PlaneGeometry(2, 2)), qScene = new C.Scene(), qCam = new C.OrthographicCamera(-1, 1, 1, -1, 0, 1); quad.frustumCulled = false; qScene.add(quad);
     const U = { tCol: { value: null }, tNrm: { value: null }, tDep: { value: null }, tMat: { value: null }, tGlow: { value: null }, tBar: { value: null }, tBounce: { value: null }, tStat: { value: null }, sunDyn: { value: null }, sunMap: { value: null }, lampMap: { value: null },
       camWorld: { value: new C.Matrix4() }, sunMat: { value: new C.Matrix4() }, lampMat: { value: new C.Matrix4() }, projXY: { value: new C.Vector2() }, res: { value: new C.Vector2() },
-      far: { value: 24 }, open: { value: 0 }, barOn: { value: 1 }, lampsK: { value: 0 }, density: { value: .3 }, exposure: { value: 1 }, bounceK: { value: .6 }, time: { value: 0 }, sunOn: { value: 1 },
+      shafts: { value: 1 }, far: { value: 24 }, open: { value: 0 }, barOn: { value: 1 }, lampsK: { value: 0 }, density: { value: .3 }, exposure: { value: 1 }, bounceK: { value: .6 }, time: { value: 0 }, sunOn: { value: 1 },
       sunDir: { value: new C.Vector3(0, -1, 0) }, sunCol: { value: new C.Color() }, skyCol: { value: new C.Color() }, skyPos: { value: new C.Vector3() }, hemiSky: { value: new C.Color() }, hemiGround: { value: new C.Color() }, ambCol: { value: new C.Color() },
       fillDir: { value: new C.Vector3(0, 1, 0) }, fillCol: { value: new C.Color() }, gradeHi: { value: new C.Vector3(1, 1, 1) }, gradeLo: { value: new C.Vector3(1, 1, 1) }, scatCol: { value: new C.Color() },
       pucks: { value: [new C.Vector3(), new C.Vector3(), new C.Vector3()] }, downPos: { value: new C.Vector3() }, pendPos: { value: new C.Vector3() }, barPos: { value: new C.Vector3() }, b5Pos: { value: new C.Vector3() },
@@ -115,7 +115,7 @@ void main(){
     const drawDepth = (cam, rt, mask) => { const m0 = cam.layers.mask; if (mask) cam.layers.mask = mask; const ov = scene.overrideMaterial, bg = scene.background; scene.overrideMaterial = depthMat; scene.background = null; r.setRenderTarget(rt); r.setClearColor(0xffffff, 1); r.clear(); r.render(scene, cam); r.setClearColor(0x000000, 0); r.setRenderTarget(null); scene.overrideMaterial = ov; scene.background = bg; cam.layers.mask = m0; };
     let main = null, bA = null, bB = null, view = null, cam = new C.PerspectiveCamera(), lastSun = null, frame = 0;
     let api = null; api = {
-      ok: true,
+      ok: true, renderer: r, off: new Set(),   // (off: the profiler switching parts off: shafts, bloom, sunShadow, lampShadow)
       loaded: false,
       view(v){ view = v; const m = meta[v]; api.loaded = false; r.setPixelRatio(1); r.setSize(m.w, m.h, false);
         for (const [u, k, s] of [['tCol', 'color', 1], ['tNrm', 'normal', 0], ['tDep', 'depth', 0], ['tMat', 'mat', 0], ['tGlow', 'glow', 1], ['tBar', 'bar', 1], ['tBounce', 'bounce', 1]]) U[u].value = tex(k, v, s);
@@ -130,14 +130,15 @@ void main(){
         if (!statDone && api.loaded){ statDone = true; quad.material = stat; r.setRenderTarget(statRT); r.render(qScene, qCam); r.setRenderTarget(null); }
         U.tStat.value = statRT.texture;
         const moving = p.open < 1;   // (the shutter's plates are in the room's map: keep it fresh while they turn)
-        if (p.sunOn > 0 || !lastSun){
+        U.shafts.value = api.off.has('shafts') ? 0 : 1;
+        if ((p.sunOn > 0 || !lastSun) && !api.off.has('sunShadow')){
           if (!lastSun || lastSun.angleTo(p.sunDir) > .006 || (moving && frame % 4 === 0)){ lastSun = p.sunDir.clone();
             sunCam.position.copy(wc).addScaledVector(p.sunDir, -12); sunCam.lookAt(wc.clone().addScaledVector(p.sunDir, 2)); sunCam.updateMatrixWorld(); drawDepth(sunCam, sunRT, (1 << 1) | (1 << 3)); drawDepth(sunCam, dynRT, 1);
             U.sunMat.value.multiplyMatrices(bias, sunCam.projectionMatrix).multiply(sunCam.matrixWorldInverse); }
           else if (frame % 2 === 0) drawDepth(sunCam, dynRT, 1); }
         U.sunMap.value = sunRT.texture; U.sunDyn.value = dynRT.texture;
         const bulb = ROOM.bulbAt ? ROOM.bulbAt() : null;
-        if (p.lampsK > 0 && bulb){ lampCam.position.copy(bulb).add(new C.Vector3(0, -.06, 0)); lampCam.lookAt(bulb.x, 0, bulb.z); lampCam.updateMatrixWorld(); if (frame % 3 === 0) drawDepth(lampCam, lampRT); U.lampMat.value.multiplyMatrices(bias, lampCam.projectionMatrix).multiply(lampCam.matrixWorldInverse); U.lampMap.value = lampRT.texture; U.pendPos.value.copy(bulb); }
+        if (p.lampsK > 0 && bulb && !api.off.has('lampShadow')){ lampCam.position.copy(bulb).add(new C.Vector3(0, -.06, 0)); lampCam.lookAt(bulb.x, 0, bulb.z); lampCam.updateMatrixWorld(); if (frame % 3 === 0) drawDepth(lampCam, lampRT); U.lampMat.value.multiplyMatrices(bias, lampCam.projectionMatrix).multiply(lampCam.matrixWorldInverse); U.lampMap.value = lampRT.texture; U.pendPos.value.copy(bulb); }
         else U.lampMap.value = sunRT.texture;
         const L = ROOM.L;
         U.sunCol.value.set(p.sunCol).multiplyScalar(p.sunI); U.scatCol.value.set(p.sunCol); U.sunOn.value = p.sunOn;
@@ -147,8 +148,8 @@ void main(){
         U.gradeHi.value.set(...p.grade[0]); U.gradeLo.value.set(...p.grade[1]); U.density.value = p.density; U.lampsK.value = p.lampsK; U.open.value = p.open; U.barOn.value = p.barOn; U.bounceK.value = p.bounceK;
         L.lamps.slice(0, 3).forEach(([l], i) => U.pucks.value[i].copy(l.position)); U.downPos.value.copy(L.lamps[3][0].position); if (ROOM.barLight) ROOM.barLight.getWorldPosition(U.barPos.value); U.b5Pos.value.copy(L.b5.position);
         quad.material = light; r.setRenderTarget(main); r.clear(); r.render(qScene, qCam);
-        quad.material = bright; bright.uniforms.t.value = main.texture; r.setRenderTarget(bA); r.render(qScene, qCam);
-        quad.material = blur; for (let k = 0; k < 2; k++){ blur.uniforms.t.value = bA.texture; blur.uniforms.d.value.set(1.5/bA.width, 0); r.setRenderTarget(bB); r.render(qScene, qCam); blur.uniforms.t.value = bB.texture; blur.uniforms.d.value.set(0, 1.5/bA.height); r.setRenderTarget(bA); r.render(qScene, qCam); }
+        if (!api.off.has('bloom')){ quad.material = bright; bright.uniforms.t.value = main.texture; r.setRenderTarget(bA); r.render(qScene, qCam);
+        quad.material = blur; for (let k = 0; k < 2; k++){ blur.uniforms.t.value = bA.texture; blur.uniforms.d.value.set(1.5/bA.width, 0); r.setRenderTarget(bB); r.render(qScene, qCam); blur.uniforms.t.value = bB.texture; blur.uniforms.d.value.set(0, 1.5/bA.height); r.setRenderTarget(bA); r.render(qScene, qCam); } }
         quad.material = fin; fin.uniforms.t.value = main.texture; fin.uniforms.b.value = bA.texture; r.setRenderTarget(null); r.clear(); r.render(qScene, qCam);
       }
     };

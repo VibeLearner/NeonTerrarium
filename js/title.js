@@ -9,6 +9,11 @@
 'use strict';
 const TITLE = (() => {
   const T = { on: false };
+  // ?perf: the profiler's hooks (tools/title/perf.py): time each part of a frame, or switch parts off, to find what costs
+  const TP = window.TPERF = /[?&]perf\b/.test(location.search) ? { off: new Set(), sync: false, t: {}, n: {}, gl: [],
+    add(k, ms){ this.t[k] = (this.t[k] || 0) + ms; this.n[k] = (this.n[k] || 0) + 1; }, reset(){ this.t = {}; this.n = {}; },
+    finish(r){ try { const gl = r.getContext(), px = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); } catch (e) {} },   // (wait for the graphics card: so the time includes its work)
+    time(k, fn, r){ if (this.off.has(k)) return; const t0 = performance.now(); fn(); if (this.sync && r) this.finish(r); this.add(k, performance.now() - t0); } } : null;
   const root = document.getElementById('title'); if (!root) return T;
   const $t = id => document.getElementById(id);
   const stage = $t('tStage'), imRoom = $t('tRoom'), imGlass = $t('tGlass'), imOff = $t('tSignOff'), cvDust = $t('tDust'), glow = $t('tSignGlow'), cvSky = $t('tSky'), cvPl = $t('tPlants');
@@ -16,7 +21,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18s';
+  const VER = '2026-10-18t';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -114,7 +119,10 @@ const TITLE = (() => {
           shutR.setPixelRatio(1); shutR.setSize(a.w*2, a.h*2, false); shutCam.fov = cam.fov; shutCam.aspect = cam.aspect; shutCam.position.copy(cam.position); shutCam.quaternion.copy(cam.quaternion); shutCam.updateProjectionMatrix(); },
         time(){ ROOM.setTime(TOD); const k = { morning: 1.1, day: 1.3, evening: .9, night: .7 }[TOD] || 1; ROOM.shutterLight.lt.intensity = 1.2*k; ROOM.shutterLight.hm.intensity = .45*k; },
         at(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam); return [(v.x + 1)/2, (1 - v.y)/2]; },
-        draw(t){ tick(reduced ? 0 : t); if (RT && RTMODE) RT.draw(lightParams()); ROOM.aimSun(sunW > 0 ? sunH*Math.PI/180*SUNSGN : null); ROOM.L.sun.intensity *= .6*sunW; r.render(scene, cam); }
+        draw(t){ tick(reduced ? 0 : t);
+          if (TP){ if (RT && RTMODE) TP.time('rt', () => RT.draw(lightParams()), RT.renderer); TP.time('live', () => { ROOM.aimSun(sunW > 0 ? sunH*Math.PI/180*SUNSGN : null); ROOM.L.sun.intensity *= .6*sunW; r.render(scene, cam); }, r); return; }
+          if (RT && RTMODE) RT.draw(lightParams()); ROOM.aimSun(sunW > 0 ? sunH*Math.PI/180*SUNSGN : null); ROOM.L.sun.intensity *= .6*sunW; r.render(scene, cam); },
+        renderer: r
       };
       if (view) live.view(view);
     }).catch(e => { try { console.warn('title live layer:', e); } catch (_) {} });
@@ -136,7 +144,7 @@ const TITLE = (() => {
       barOn: BAR_ON, bounceK: (.25 + .75*sunW)*.45*OPEN*(sunI > 0 ? Math.min(1, sunI/5) : .3) };
   }
   let BAR_ON = 1;
-  function drawLive(now){ if (!live || now - liveAt < 33) return; liveAt = now; live.draw(now/1000); drawPool(); }
+  function drawLive(now){ if (!live || now - liveAt < (TP && TP.every != null ? TP.every : 33)) return; liveAt = now; live.draw(now/1000); drawPool(); }
   // the pendant's light on the table at evening and night: a warm pool under the bulb, moving as the lamp swings
   const poolCv = document.createElement('canvas'), gPo = poolCv.getContext('2d'); poolCv.className = 't-layer t-sun'; poolCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(poolCv, cvDust);
   function drawPool(){ if (RTMODE){ poolCv.hidden = true; return; }
@@ -176,6 +184,17 @@ const TITLE = (() => {
     gB.save(); gB.translate(cx, cy); gB.scale(1, .7); gB.translate(-cx, -cy); gB.fillStyle = g; gB.fillRect(cx - rad, cy - rad, 2*rad, 2*rad); gB.restore();
   }
   T.cityHalf = () => OPEN >= 1 && !T.cutting && !root.classList.contains('leaving');
+  T._perf = () => { const out = { renderers: {}, canvases: [] };
+    const info = (k, r) => { if (!r) return; const i = r.info, gl = r.getContext(), c = r.domElement; let gpu = ''; try { const d = gl.getExtension('WEBGL_debug_renderer_info'); gpu = d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); } catch (e) {}
+      out.renderers[k] = { calls: i.render.calls, triangles: i.render.triangles, geometries: i.memory.geometries, textures: i.memory.textures, programs: i.programs ? i.programs.length : null, canvas: [c.width, c.height], css: [c.clientWidth, c.clientHeight], pixelRatio: r.getPixelRatio(), webgl2: r.capabilities.isWebGL2, gpu, antialias: gl.getContextAttributes().antialias }; };
+    try { info('game', typeof renderer !== 'undefined' ? renderer : null); } catch (e) {}
+    info('live', live && live.renderer); info('shutter', shutR); info('rt', RT && RT.renderer);
+    let tris = 0, meshes = 0; try { shutScene.traverse(o => { if (o.isMesh){ meshes++; const g = o.geometry; tris += (g.index ? g.index.count : g.attributes.position.count)/3; } }); } catch (e) {} out.roomMeshes = meshes; out.roomTriangles = Math.round(tris);
+    for (const c of document.querySelectorAll('canvas')){ const cs = getComputedStyle(c); if (c.offsetParent === null && cs.position !== 'fixed') continue; out.canvases.push({ cls: c.className || c.id, size: [c.width, c.height], css: [c.clientWidth, c.clientHeight], filter: cs.filter, blend: cs.mixBlendMode, hidden: c.hidden, display: cs.display }); }
+    const st = getComputedStyle(stage); out.stage = { transform: st.transform, translate: st.translate, rotate: st.rotate, scale: st.scale, filter: st.filter, willChange: st.willChange };
+    out.state = { OPEN, RTMODE, HOUR, sunH, sunW, view, dpr: devicePixelRatio, inner: [innerWidth, innerHeight], cityWiden: (document.getElementById('view') || {}).style ? document.getElementById('view').style.transform : null };
+    return out; };
+  T._rt = () => RT;
   T._hold = () => { shownAt = 1e15; openFrom = null; };
   T._open = () => { openFrom = -1e9; }; T._hour = h => { HOUR = h; }; T._dbg = () => ({ OPEN, sunH, sunW, RTMODE, rt: !!RT, p: RT && ROOM ? lightParams() : null });   // (testing: keep the shutter shut)
   const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady); } catch (e) { return true; } };
@@ -186,7 +205,7 @@ const TITLE = (() => {
     // the room is dark while it's shut (only what light leaks in, and its own lamps), and the daylight comes up with the plates
     const lit = .3 + .7*Math.pow(OPEN, .8); DIM = lit; if (Math.abs(lit - (drawShutter.lit || 0)) > .004){ drawShutter.lit = lit; const f = lit >= .999 ? '' : 'brightness(' + lit.toFixed(3) + ') saturate(' + (.7 + .3*lit).toFixed(3) + ')'; for (const el of (RTMODE ? [shutCv, stage.querySelector('.t-live')] : [imRoom, imGlass, imOff, shutCv, stage.querySelector('.t-live')])) if (el) el.style.filter = f; }
     if (!shutR) return; shutCv.hidden = OPEN >= 1; if (OPEN >= 1){ if (drawShutter.last !== 1){ ROOM.setShutter(1); drawShutter.last = 1; } return; } drawShutter.last = OPEN;
-    ROOM.setShutter(OPEN); shutR.render(shutScene, shutCam);
+    ROOM.setShutter(OPEN); if (!(TP && TP.off.has('shutterGL'))) shutR.render(shutScene, shutCam);
   }
   /* ---------- steam from the mug ---------- */
   let steam = [], steamAt = 0;
@@ -268,7 +287,8 @@ const TITLE = (() => {
     const dt = last ? Math.min(.1, (now - last)/1000) : 0; last = now;
     try { if (typeof yawT !== 'undefined' && !reduced) yawT += dt*.02; if (yaw0 === null) yaw0 = yaw; } catch (e) {}
     aimCity();
-    if (A && view){ drawShutter(now); drawSun(); drawSway(now); drawLive(now); drawDust(now, dt); drawSteam(now, dt); drawClouds(dt); }
+    if (A && view){ if (TP){ TP.time('shutter', () => drawShutter(now), shutR); drawSun(); TP.time('sway', () => drawSway(now)); drawLive(now); TP.time('fx', () => { drawDust(now, dt); drawSteam(now, dt); drawClouds(dt); }); }
+      else { drawShutter(now); drawSun(); drawSway(now); drawLive(now); drawDust(now, dt); drawSteam(now, dt); drawClouds(dt); } }
     // the light bar: steady, and now and then it blinks: a stutter of two or three, or one slow dip
     if (!reduced && now > flickNext){ flick = []; let t = now;
       if (Math.random() < .35){ flick.push([t, t + 500 + Math.random()*400]); t += 900; }

@@ -20,7 +20,7 @@ const SCENE = new URLSearchParams(location.search).get('scene') || 'room';
 const VIEWS = SCENE === 'kitchen' ? {
   ref: { w: 600, h: 750, pos: [2.0, 2.33, 1.01], look: [-1.79, 1.28, -8.18], fov: 57.5 },
   wide: { w: 960, h: 540, pos: [2.0, 2.33, 1.01], look: [-1.79, 1.28, -8.18], fov: 45.9 },   // (the owner's camera, wider: the porthole left, the kitchen and the sign right)
-  tall: { w: 540, h: 1170, pos: [2.0, 2.33, 1.01], look: [-.07, 1.28, -8.72], fov: 74 },
+  tall: { w: 540, h: 1170, pos: [2.0, 2.33, 1.01], look: [-1.75, 1.28, -8.2], fov: 86 },
   hi: { w: 1200, h: 1500, pos: [2.0, 2.33, 1.01], look: [-1.79, 1.28, -8.18], fov: 57.5 },   // (checking views: the reference at twice the size, and close-ups)
   counter: { w: 960, h: 600, pos: [.56, 1.55, -2.98], look: [1.23, 1.15, -4.86], fov: 50 },
   table: { w: 800, h: 600, pos: [.9, 1.85, -1.0], look: [-.45, 1.1, -2.27], fov: 48 },
@@ -172,8 +172,16 @@ function finish(room, glass, A){
   const g = room.getContext('2d'), w = room.width, h = room.height;
   const br = document.createElement('canvas'); br.width = w; br.height = h; const gb = br.getContext('2d');
   gb.filter = 'brightness(.9) contrast(2.6) saturate(1.3)'; gb.drawImage(room, 0, 0); gb.filter = 'none';
-  const bl = document.createElement('canvas'); bl.width = w; bl.height = h; const gl = bl.getContext('2d'); gl.filter = 'blur(' + Math.round(h/80) + 'px)'; gl.drawImage(br, 0, 0);
-  g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = .12; g.drawImage(bl, 0, 0); g.restore();
+  const blur = (src, px, f = '') => { const c = document.createElement('canvas'); c.width = w; c.height = h; const cg = c.getContext('2d'); cg.filter = 'blur(' + Math.max(1, Math.round(px)) + 'px)' + f; cg.drawImage(src, 0, 0); return c; };
+  // bloom in two sizes: a tight glow on the brightest things, a wide soft one that lifts the sunlit side of the room
+  const bl = blur(br, h/80), bw = blur(br, h/22);
+  // halation: film's red-orange fringe round bright edges (the light scattering back through the base); small and warm
+  const ha = blur(br, h/140, ' sepia(1) saturate(4) hue-rotate(-28deg) brightness(.8)');
+  // diffusion: the whole picture softly over itself, like a mist filter: the dreamy part, kept light
+  const df = blur(room, h/60);
+  g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = .13; g.drawImage(bl, 0, 0); g.globalAlpha = .09; g.drawImage(bw, 0, 0); g.globalAlpha = .1; g.drawImage(ha, 0, 0);
+  g.globalCompositeOperation = 'screen'; g.globalAlpha = .1; g.drawImage(df, 0, 0); g.restore();
+  finish.glow = bw;
   const im = g.getImageData(0, 0, w, h), d = im.data, B = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], q = 8;
   let s = 99; const rn = () => (s = (s*16807) % 2147483647)/2147483647;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){ const i = (y*w + x)*4; if (!d[i + 3]) continue; const t = (B[(y & 3)*4 + (x & 3)]/16 - .5)*q + (rn() - .5)*7;
@@ -189,6 +197,7 @@ function finish(room, glass, A){
   gm.restore();
   gm.strokeStyle = 'rgba(255,250,235,.3)'; gm.lineWidth = Math.max(1, r*.02); gm.beginPath(); gm.ellipse(cx, cy, r*.985, r*.985, 0, Math.PI*.95, Math.PI*1.55); gm.stroke();
   for (let i = 0; i < 70; i++){ const a = rn()*7, rr = rn()*r*.95; gm.fillStyle = 'rgba(255,255,255,' + (.05 + rn()*.08) + ')'; const z = 1 + rn()*2; gm.fillRect(cx + Math.cos(a)*rr, cy + Math.sin(a)*rr, z, z); }
+  gm.save(); gm.globalCompositeOperation = 'lighter'; gm.globalAlpha = .35; gm.drawImage(finish.glow, 0, 0); gm.restore();   // (the sunlit tunnel's glow spilling over the glass, onto the city)
   gm.globalCompositeOperation = 'destination-out'; gm.drawImage(room, 0, 0);
   gg.drawImage(mask, 0, 0);
 }

@@ -16,7 +16,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18f';
+  const VER = '2026-10-18g';
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
 
@@ -110,6 +110,7 @@ const TITLE = (() => {
     if (!T.on) return; raf = requestAnimationFrame(loop);
     const dt = last ? Math.min(.1, (now - last)/1000) : 0; last = now;
     try { if (typeof yawT !== 'undefined' && !reduced) yawT += dt*.02; } catch (e) {}
+    aimCity();
     if (A && view){ drawDust(now, dt); drawClouds(dt); drawPlants(now); }
     // the light bar: steady, and now and then it blinks: a stutter of two or three, or one slow dip
     if (!reduced && now > flickNext){ flick = []; let t = now;
@@ -134,13 +135,30 @@ const TITLE = (() => {
       was = { hour: S.hour, cycle: S.cycle, wx: typeof LK !== 'undefined' ? { mode: LK.wx.mode, set: LK.wx.set } : null, zoomT };
       S.cycle = false; S.hour = 8.6;   // (the room's morning: the city outside matches it)
       if (typeof LK !== 'undefined' && LK.setWeather) LK.setWeather('clear', true, true); else S.rain = false;
-      zoomT = Math.max(7, Math.min(zoomT, 10.5));
+      was.cam = { goal: camGoal.clone(), pitchT };
+      // the player's city, for framing it in the window: the middle of everything built, and how far it reaches
+      let x = 0, z = 0, n = 0; for (const c of cells.values()){ x += c.x; z += c.z; n++; } x = n ? x/n : 0; z = n ? z/n : 0;
+      let r = 0; for (const c of cells.values()) r = Math.max(r, Math.hypot(c.x - x, c.z - z)); CITY = { x, z, r: r + LOT*.8 };
+    } catch (e) { CITY = null; }
+  }
+  // Each frame while the title is up: the camera dropped to a low, looking-out angle and slid so the city sits in the
+  // round window (the picture is placed over the screen, so the window's middle isn't the screen's), zoomed to fill it.
+  let CITY = null;
+  function aimCity(){
+    if (!CITY || !A || !view || root.classList.contains('leaving')) return;
+    try {
+      const a = A[view], wx = OX + a.win[0]*a.w*S0, wy = OY + a.win[1]*a.h*S0, wr = a.winR*S0;
+      const P = 24*Math.PI/180; pitchT = P;
+      zoomT = Math.max(5, Math.min(40, CITY.r*H/(2*.82*Math.max(60, wr))));
+      const k = 2*zoomT/H, ox = (wx - W/2)*k, oy = -(wy - H/2)*k, sy = Math.sin(yaw), cy = Math.cos(yaw);
+      const d = oy/Math.sin(P) - CITY.r*.15;   // (a touch past the middle, so the near edge of the city sits on the sill)
+      camGoal.set(CITY.x - cy*ox + sy*d, TARGET_Y, CITY.z + sy*ox + cy*d);
     } catch (e) {}
   }
   function restoreScene(){
     if (!was) return;
     try {
-      S.hour = was.hour; S.cycle = was.cycle; zoomT = was.zoomT;
+      S.hour = was.hour; S.cycle = was.cycle; zoomT = was.zoomT; if (was.cam){ camGoal.copy(was.cam.goal); pitchT = was.cam.pitchT; }
       if (was.wx && typeof LK !== 'undefined'){ if (was.wx.mode === 'auto') LK.setAutoWeather(true, true); else LK.setWeather(was.wx.set, false, true); }
     } catch (e) {}
     was = null;
@@ -149,7 +167,7 @@ const TITLE = (() => {
     if (T.on) return; T.on = true; document.documentElement.classList.add('title-on'); root.hidden = false; root.classList.remove('leaving');
     setScene(); A = A || await anchorsP;
     if (!A){ T.hide(true); return; }   // (the pictures couldn't be had: straight into the city)
-    layout(); last = 0; raf = requestAnimationFrame(loop); fillNote();
+    layout(); aimCity(); try { camT.copy(camGoal); } catch (e) {} last = 0; raf = requestAnimationFrame(loop); fillNote();
     setTimeout(() => { const c = menu.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }, 60);
   };
   T.hide = (instant) => {
@@ -157,7 +175,7 @@ const TITLE = (() => {
     closePanel(); setDeck(false);
     if (instant || reduced){ finish(); return; }
     root.classList.add('leaving');
-    try { zoomT = Math.max(6, zoomT*.8); } catch (e) {}
+    try { if (was && was.cam){ camGoal.copy(was.cam.goal); pitchT = was.cam.pitchT; zoomT = was.zoomT; } } catch (e) {}
     setTimeout(finish, 1500);
   };
   function finish(){ T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} }

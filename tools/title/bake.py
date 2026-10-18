@@ -27,8 +27,8 @@ def main():
         pg = b.new_page()
         pg.on('console', lambda m: print('page:', m.text) if m.type in ('error', 'warning') else None)
         pg.on('pageerror', lambda e: print('page error:', e))
-        pg.goto('http://127.0.0.1:%d/tools/title/bake.html' % PORT)
         opt = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
+        pg.goto('http://127.0.0.1:%d/tools/title/bake.html?scene=%s' % (PORT, opt.get('scene', 'kitchen')))
         res = pg.evaluate('o => BAKE(o)', opt)
         out = opt.get('out', OUT); os.makedirs(out, exist_ok=True)
         anchors = {}

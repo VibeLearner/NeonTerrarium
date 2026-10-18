@@ -457,23 +457,23 @@ const BOOTH = (() => {
   }
 
   // the loop picture: bars and chords along the top, the layers, the autopilot, the take being recorded, the playhead
-  function drawRoll(c = $('bRoll'), sel = null){
+  function drawRoll(c = $('bRoll'), sel = null, view = null){
     if (!c || !c.clientWidth) return;
     const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(c.clientWidth*dpr), h = Math.round(c.clientHeight*dpr);
     if (c.width !== w || c.height !== h){ c.width = w; c.height = h; }
     const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); const W = w/dpr, H = h/dpr; g.clearRect(0, 0, W, H);
-    const Lb = L(), top = 24, X = b => b/Lb*W, Y = i => H - 6 - (i + 1)*(H - top - 10)/AP, rowH = (H - top - 10)/AP;
+    const Lb = L(), b0 = view ? view.b0 : 0, span = view ? view.span : Lb, top = 24, X = b => (b - b0)/span*W, Xd = d => d/span*W, lo = view ? view.lo : 0, nRows = view ? view.hi - view.lo + 1 : AP, rowH = (H - top - 10)/nRows, Y = i => H - 6 - (i - lo + 1)*rowH;
     const nb = nowBeat(), lb = playing && nb >= 0 ? nb % Lb : -1, bar = lb >= 0 ? Math.floor(lb/4) : -1;
     g.font = '11.5px "JetBrains Mono", monospace'; g.textBaseline = 'middle';
     for (let k = 0; k < S.len; k++){
-      const x0 = X(k*4), x1 = X(k*4 + 4);
+      const x0 = X(k*4), x1 = X(k*4 + 4); if (x1 < 0 || x0 > W) continue;
       g.fillStyle = k === bar ? 'rgba(232,213,83,.16)' : k % 2 ? 'rgba(95,216,222,.05)' : 'rgba(95,216,222,.09)'; g.fillRect(x0, 0, x1 - x0, H);
-      g.fillStyle = k === bar ? '#e8d553' : '#a6eef0'; g.fillText(chordOf(k).name, x0 + 6, 12);
-      g.fillStyle = 'rgba(23,65,74,.9)'; for (let q = 1; q < 4; q++) g.fillRect(X(k*4 + q), top, 1, H - top);
+      g.fillStyle = k === bar ? '#e8d553' : '#a6eef0'; g.fillText(chordOf(k).name, Math.max(x0, 0) + 6, 12);
+      for (let q = 1; q < 4*(view && view.span < Lb/2 ? 4 : 1); q++){ const sub = view && view.span < Lb/2 ? .25 : 1, x = X(k*4 + q*sub); g.fillStyle = (q*sub) % 1 ? 'rgba(23,65,74,.45)' : 'rgba(23,65,74,.9)'; g.fillRect(x, top, 1, H - top); }
       g.fillStyle = '#2c8b92'; g.fillRect(x0, 0, 1, H);
     }
-    g.fillStyle = 'rgba(23,65,74,.6)'; g.fillRect(0, Y(NP - 1) - 1, W, 1);   // (above this line: only the autopilot reaches)
-    const box = (n, col, a) => { g.fillStyle = col.replace('A', a); g.fillRect(X(n.b) + 1, Y(n.i) + Math.min(1, rowH*.15), Math.max(2, X(n.d) - 2), Math.max(3, rowH - 1)); };
+    g.fillStyle = 'rgba(23,65,74,.6)'; if (NP - 1 >= lo && NP - 1 < lo + nRows) g.fillRect(0, Y(NP - 1) - 1, W, 1);   // (above this line: only the autopilot reaches)
+    const box = (n, col, a) => { if (n.i < lo || n.i >= lo + nRows) return; g.fillStyle = col.replace('A', a); g.fillRect(X(n.b) + 1, Y(n.i) + Math.min(1, rowH*.15), Math.max(2, Xd(n.d) - 2), Math.max(3, rowH - 1)); };
     S.layers.forEach((layer, li) => { const a = .55 + .4*(li === S.layers.length - 1 ? 1 : .5); for (const n of layer) box(n, n === sel ? 'rgba(232,213,83,A)' : (bc && bc.mode === 'rewire' && !n.o) ? 'rgba(150,240,190,A)' : 'rgba(95,216,222,A)', a); });
     if (S.ap && S.layers.length && playing && nb >= 0){ const part = apCache.get(Math.floor(nb/Lb)); if (part) for (const n of part) box(n, 'rgba(229,55,159,A)', .8); }
     if (rec && rec.live){ g.fillStyle = 'rgba(229,55,159,.1)'; g.fillRect(0, top, W, H - top);
@@ -566,7 +566,7 @@ const BOOTH = (() => {
     if (mode !== 'booth') music.setBooth(false);
   };
   B.isPlaying = () => playing; B.pause = p => { if (!bc) return; if (p) stop(); else start(false); };   // (held: the loop stops where it is and picks up from bar one)
-  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._move = () => moveSection(); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
+  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._move = () => moveSection(); B._sv = () => stripView(); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
   const layerOn = id => { const b = $(id); return !!(b && b.classList.contains('on')); };   // (the Console's layer buttons: what the player asked for, whether or not the engine has started)
   // once a pass (from the second): the governor drifts the Console's own settings, as the auto-governor does for the
   // planners' patterns; a rewired copy also takes a little of the autopilot's answer into itself and moves a note
@@ -695,30 +695,64 @@ const BOOTH = (() => {
       $('gStripHint').textContent = rw ? 'Cyan: your notes · green: changed by you or the Grid · drag, stretch, click to add, double-click to remove' : 'As recorded · Neuro-phrase on: the Grid answers · Auto-governor on: the settings drift';
       $('gStripCv').title = rw ? 'Drag a note to move it, drag its right end to stretch it, click an empty spot to add one, double-click (or Delete) to remove it. With the Neuro-phrase on, the Grid drifts it somewhere new. The shelf copy stays as it was.'
         : 'Your notes as recorded. Turn on the Neuro-phrase layer and the Grid answers them; with the auto-governor on, the settings drift as it plays.';
+      stripZ = 1; stripB0 = 0; syncZoom();
       if (!stripRaf) stripRaf = requestAnimationFrame(stripFrame); }
   }
-  let stripRaf = 0;
-  function stripFrame(){ stripRaf = 0; if (!bc) return; if (GRIDPANEL.open && mode === 'console') drawRoll($('gStripCv'), bc.sel); stripRaf = requestAnimationFrame(stripFrame); }
+  let stripRaf = 0, stripZ = 1, stripB0 = 0;
+  let stripRows = { lo: 0, hi: AP - 1 }, stripDrag = false;
+  const stripView = () => { const span = L()/stripZ; stripB0 = clamp(stripB0, 0, Math.max(0, L() - span));
+    if (!stripDrag && bc){ const ns = S.layers[0] || [];   // (from the loop's own notes, with room above for the autopilot, which plays a little higher)
+      let lo = ns.length ? Math.min(...ns.map(n => n.i)) - 1 : 0, hi = ns.length ? Math.max(...ns.map(n => n.i)) + 3 : NP - 1;
+      lo = clamp(lo, 0, AP - 1); hi = clamp(hi, 0, AP - 1); while (hi - lo < 5){ if (lo > 0) lo--; if (hi - lo < 5 && hi < AP - 1) hi++; if (lo === 0 && hi === AP - 1) break; }
+      stripRows = { lo, hi }; }
+    return { b0: stripB0, span, lo: stripRows.lo, hi: stripRows.hi }; };
+  function setStripB0(b){ stripB0 = b; const v = stripView(), sc = $('gStripScroll'); if (sc){ sc.value = String(v.b0); } }
+  function syncZoom(){ const sc = $('gStripScroll'), v = stripView(); if (!sc) return; sc.hidden = stripZ <= 1; sc.max = String(Math.max(0, L() - v.span)); sc.step = '0.25'; sc.value = String(v.b0);
+    $('gZoomOut').disabled = stripZ <= 1; $('gZoomIn').disabled = stripZ >= 8; $('gZoomFit').disabled = stripZ <= 1; $('gZoomLvl').textContent = stripZ + '×'; }
+  function stripFrame(){ stripRaf = 0; if (!bc) return; if (GRIDPANEL.open && mode === 'console') drawRoll($('gStripCv'), bc.sel, stripView()); stripRaf = requestAnimationFrame(stripFrame); }
   { // editing
     const cv = $('gStripCv'); let drag = null;
-    const at2 = e => { const r = cv.getBoundingClientRect(), top = 24, H = r.height, rowH = (H - top - 10)/AP;
-      return { b: clamp((e.clientX - r.left)/r.width*L(), 0, L() - .01), i: clamp(Math.floor((H - 6 - (e.clientY - r.top))/rowH), 0, AP - 1), px: e.clientX - r.left, W: r.width }; };
-    const hit = p => { const lay = S.layers[0] || []; for (let k = lay.length - 1; k >= 0; k--){ const n = lay[k]; if (n.i === p.i && p.b >= n.b && p.b <= n.b + n.d) return n; } return null; };
+    const at2 = e => { const r = cv.getBoundingClientRect(), top = 24, H = r.height, v = stripView(), rowH = (H - top - 10)/(v.hi - v.lo + 1);
+      return { b: clamp(v.b0 + (e.clientX - r.left)/r.width*v.span, 0, L() - .01), i: clamp(v.lo + Math.floor((H - 6 - (e.clientY - r.top))/rowH), 0, AP - 1), px: e.clientX - r.left, W: r.width, v }; };
+    const xOf = (p, b) => (b - p.v.b0)/p.v.span*p.W;
+    // what's under the pointer: a note, and which part of it (an end to stretch, or the middle to move it). The end zones are
+    // a third of the note at most, eight pixels at most, so even a short note keeps a middle to grab (zoom in for tiny ones).
+    const hit = p => { const lay = S.layers[0] || [];
+      for (let k = lay.length - 1; k >= 0; k--){ const n = lay[k]; if (n.i !== p.i) continue; const x0 = xOf(p, n.b), x1 = xOf(p, n.b + n.d);
+        if (p.px < x0 - 2 || p.px > x1 + 2) continue;
+        const zone = Math.min(8, (x1 - x0)*.3); return { n, part: p.px >= x1 - zone ? 'end' : (p.px <= x0 + zone && x1 - x0 > 12) ? 'start' : 'move' }; }
+      return null; };
     const fit = n => { n.b = clamp(Math.round(n.b*4)/4, 0, L() - .25); const barEnd = Math.floor(n.b/4)*4 + 4; n.d = clamp(Math.round(n.d*4)/4, .25, barEnd - n.b); };
+    const CUR = { end: 'ew-resize', start: 'ew-resize', move: 'grab' };
     cv.addEventListener('pointerdown', e => {
-      if (!bc || bc.mode !== 'rewire') return; e.preventDefault(); cv.setPointerCapture(e.pointerId);
+      if (!bc || bc.mode !== 'rewire' || e.button === 2) return; e.preventDefault(); cv.setPointerCapture(e.pointerId);
       if (!S.layers.length) S.layers.push([]);
-      const p = at2(e), n = hit(p);
-      if (n){ const edge = (n.b + n.d)/L()*p.W - p.px < 7; drag = { n, kind: edge ? 'size' : 'move', db: p.b - n.b, di: p.i - n.i }; bc.sel = n; }
-      else { const nn = { b: Math.floor(p.b*4)/4, d: 1, i: p.i, v: .8 }; fit(nn); S.layers[0].push(nn); drag = { n: nn, kind: 'size' }; bc.sel = nn; }
+      const p = at2(e), h = hit(p); stripDrag = true;
+      if (h){ const n = h.n; drag = { n, kind: h.part, db: p.b - n.b, di: p.i - n.i, end: n.b + n.d }; bc.sel = n; cv.style.cursor = h.part === 'move' ? 'grabbing' : 'ew-resize'; }
+      else { const nn = { b: Math.floor(p.b*4)/4, d: 1, i: p.i, v: .8 }; fit(nn); S.layers[0].push(nn); drag = { n: nn, kind: 'end' }; bc.sel = nn; cv.style.cursor = 'ew-resize'; }
       apCache.clear();
     });
-    cv.addEventListener('pointermove', e => { if (!drag) return; const p = at2(e), n = drag.n;
-      if (drag.kind === 'move'){ n.b = p.b - drag.db; n.i = clamp(p.i - drag.di, 0, AP - 1); } else n.d = Math.max(.25, p.b - n.b);
+    cv.addEventListener('pointermove', e => {
+      if (!drag){ if (bc && bc.mode === 'rewire'){ const h = hit(at2(e)); cv.style.cursor = h ? CUR[h.part] : 'crosshair'; } else cv.style.cursor = 'default'; return; }
+      const p = at2(e), n = drag.n;
+      if (drag.kind === 'move'){ n.b = p.b - drag.db; n.i = clamp(p.i - drag.di, 0, AP - 1); }
+      else if (drag.kind === 'start'){ const nb = clamp(Math.round(p.b*4)/4, Math.floor((drag.end - .01)/4)*4, drag.end - .25); n.b = nb; n.d = drag.end - nb; }
+      else n.d = Math.max(.25, p.b - n.b);
       delete n.o;
-      fit(n); });
-    const end = () => { if (!drag) return; drag = null; S.layers[0].sort((a, b) => a.b - b.b); apCache.clear(); };
+      fit(n);
+      if (stripZ > 1){ const r = cv.getBoundingClientRect(), v = stripView(); if (e.clientX > r.right - 12) setStripB0(v.b0 + .25); else if (e.clientX < r.left + 12) setStripB0(v.b0 - .25); }   // (dragging past an edge scrolls)
+    });
+    const end = () => { stripDrag = false; if (!drag) return; drag = null; S.layers[0].sort((a, b) => a.b - b.b); apCache.clear(); cv.style.cursor = 'crosshair'; };
     cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+    // zoom: buttons on the side (and Ctrl + wheel), a scrollbar under the strip (and the wheel) to move along the loop
+    const zoomTo = (z, centre) => { const v = stripView(), c = centre ?? v.b0 + v.span/2; stripZ = clamp(z, 1, 8); const sp = L()/stripZ; setStripB0(c - sp/2); syncZoom(); };
+    $('gZoomIn').addEventListener('click', () => zoomTo(stripZ*2));
+    $('gZoomOut').addEventListener('click', () => zoomTo(stripZ/2));
+    $('gZoomFit').addEventListener('click', () => zoomTo(1));
+    $('gStripScroll').addEventListener('input', e => setStripB0(+e.target.value));
+    cv.addEventListener('wheel', e => { if (!bc) return; e.preventDefault();
+      if (e.ctrlKey){ const p = at2(e); zoomTo(stripZ*(e.deltaY < 0 ? 2 : .5), p.b); return; }
+      if (stripZ > 1) setStripB0(stripView().b0 + Math.sign(e.deltaY || e.deltaX)*stripView().span*.15); }, { passive: false });
     const del = n => { const lay = S.layers[0] || [], k = lay.indexOf(n); if (k >= 0){ lay.splice(k, 1); apCache.clear(); } if (bc) bc.sel = null; };
     cv.addEventListener('dblclick', e => { if (!bc || bc.mode !== 'rewire') return; const n = hit(at2(e)); if (n) del(n); });
     cv.addEventListener('contextmenu', e => { if (!bc || bc.mode !== 'rewire') return; e.preventDefault(); const n = hit(at2(e)); if (n) del(n); });

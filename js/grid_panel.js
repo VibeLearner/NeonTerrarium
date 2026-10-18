@@ -170,7 +170,14 @@ const GRIDPANEL = (() => {
   #gridPanel .gstrip { display: flex; flex-direction: column; gap: 6px; flex: 1 1 0; min-height: 0; } #gridPanel .gstrip[hidden], #gridPanel .a-chart [hidden] { display: none; }
   #gridPanel .gstripbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; } #gridPanel .gstripbar b { color: var(--yl); font-weight: 400; letter-spacing: .12em; margin-right: auto; font-size: 12.5px; }
   #gridPanel .gstripbar .gb { width: auto; margin: 0; padding: 5px 9px; font-size: 11.5px; letter-spacing: .1em; }
-  #gridPanel .gstrip .gv { flex: 1 1 0; min-height: 110px; cursor: crosshair; } #gridPanel .gstrip .ghint2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #gridPanel .gstripwrap { display: flex; gap: 6px; flex: 1 1 0; min-height: 110px; } #gridPanel .gstripwrap .gv { flex: 1 1 0; min-width: 0; height: auto; cursor: crosshair; }
+  #gridPanel .gzoom { display: flex; flex-direction: column; gap: 4px; width: 38px; align-items: stretch; } #gridPanel .gzoom .gb { margin: 0; width: auto; padding: 4px 0; font-size: 15px; letter-spacing: 0; line-height: 1; }
+  #gridPanel .gzoom #gZoomFit { font-size: 10.5px; letter-spacing: .06em; } #gridPanel .gzoom b { text-align: center; color: var(--yl); font-weight: 400; font-size: 11px; } #gridPanel .gzoom .gb:disabled { opacity: .35; cursor: default; }
+  #gridPanel .gscroll { -webkit-appearance: none; appearance: none; width: calc(100% - 44px); height: 12px; margin: 0; background: rgba(5,22,29,.9); border: 1px solid var(--faint); }
+  #gridPanel .gscroll[hidden] { display: none; }
+  #gridPanel input.gscroll::-webkit-slider-thumb { -webkit-appearance: none; width: 44px; height: 10px; margin-top: 0; background: var(--line); border: 0; border-radius: 0; box-shadow: none; cursor: grab; } #gridPanel input.gscroll::-moz-range-thumb { width: 44px; height: 10px; background: var(--line); border: 0; border-radius: 0; }
+  #gridPanel input.gscroll::-webkit-slider-runnable-track { height: 10px; background: transparent; border: 0; }
+  #gridPanel input.gscroll:hover::-webkit-slider-thumb { background: var(--cy); } #gridPanel .gstrip .ghint2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #gridPanel .a-chart:has(.gstrip:not([hidden])) .gtag { visibility: hidden; }
   #gridPanel .gdlg { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(3,12,16,.72); }
   #gridPanel .gdlg[hidden] { display: none; }
@@ -332,7 +339,9 @@ const GRIDPANEL = (() => {
       <div class="gpills" id="g-voicingPillsContainer" title="The notes of the chord now sounding"></div>
       <div class="gstrip" id="gStrip" hidden>
         <div class="gstripbar"><b id="gStripMode"></b><button class="gb" id="gStripSave" hidden title="Put this rewired version on the Booth shelf as a new loop (the original stays as it was)">Keep as a new loop</button><button class="gb" id="gStripEnd" title="Go back to the planners' carrier pattern">Back to the planners</button></div>
-        <canvas class="gv" id="gStripCv" title="The loop on the broadcast: chords along the top, its notes in cyan, the Grid's answers in pink"></canvas>
+        <div class="gstripwrap"><canvas class="gv" id="gStripCv" title="The loop on the broadcast: chords along the top, its notes in cyan, the Grid's answers in pink"></canvas>
+          <div class="gzoom"><button class="gb" id="gZoomIn" title="Zoom in (or Ctrl + scroll)">+</button><b id="gZoomLvl">1×</b><button class="gb" id="gZoomOut" title="Zoom out">−</button><button class="gb" id="gZoomFit" title="Show the whole loop">Fit</button></div></div>
+        <input type="range" id="gStripScroll" class="gscroll" min="0" max="0" step="0.25" value="0" hidden aria-label="Move along the loop">
         <div class="ghint2" id="gStripHint"></div>
       </div>
       <span class="gcode">B2</span></section>

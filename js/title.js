@@ -21,7 +21,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18u';
+  const VER = '2026-10-18v';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -144,7 +144,7 @@ const TITLE = (() => {
       barOn: BAR_ON, bounceK: (.25 + .75*sunW)*.45*OPEN*(sunI > 0 ? Math.min(1, sunI/5) : .3) };
   }
   let BAR_ON = 1;
-  function drawLive(now){ if (!live || now - liveAt < (TP && TP.every != null ? TP.every : 33)) return; liveAt = now; live.draw(now/1000); drawPool(); }
+  function drawLive(now){ if (!live || now - liveAt < (TP && TP.every != null ? TP.every : 0)) return; liveAt = now; live.draw(now/1000); drawPool(); }
   // the pendant's light on the table at evening and night: a warm pool under the bulb, moving as the lamp swings
   const poolCv = document.createElement('canvas'), gPo = poolCv.getContext('2d'); poolCv.className = 't-layer t-sun'; poolCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(poolCv, cvDust);
   function drawPool(){ if (RTMODE){ poolCv.hidden = true; return; }
@@ -354,7 +354,7 @@ const TITLE = (() => {
     if (boot){ const ready = () => (RTMODE ? RT && RT.loaded : imRoom.complete && imRoom.naturalWidth) && shutR, t0 = performance.now();
       (function wait(){ if (ready() || performance.now() - t0 > 9000){ shownAt = performance.now(); setTimeout(() => document.documentElement.classList.remove('title-boot'), 120); } else setTimeout(wait, 100); })(); }
     startLive().then(() => { if (live){ live.time(); if (view) live.view(view); } });
-    layout(); aimCity(); try { camT.copy(camGoal); } catch (e) {} last = 0; raf = requestAnimationFrame(loop); fillNote();
+    layout(); aimCity(); try { camT.copy(camGoal); } catch (e) {} try { applyRenderRes(zoom); } catch (e) {} last = 0; raf = requestAnimationFrame(loop); fillNote();
     setTimeout(() => { const c = menu.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }, 60);
   };
   T.hide = (instant) => {
@@ -382,7 +382,7 @@ const TITLE = (() => {
   function unwiden(){ const v = document.getElementById('view'); if (v){ v.style.transition = 'transform 1.2s ease-in-out'; v.style.transform = ''; setTimeout(() => { v.style.transition = ''; }, 1300); } }
   // the pictures for an hour, fetched ahead (they're cached, so the room shows at once when it's needed)
   function preload(t){ const v = innerWidth/innerHeight < .85 ? 'tall' : 'wide'; for (const k of ['room', 'glass', 'signoff']){ const im = new Image(); im.src = 'assets/title/' + k + '-' + v + '-' + t + '.png?v=' + VER; (preload.keep = preload.keep || []).push(im); } }
-  function finish(){ unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} }
+  function finish(){ unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} try { applyRenderRes(zoom); } catch (e) {} }
 
   /* ---------- the menu ---------- */
   function setDeck(on){

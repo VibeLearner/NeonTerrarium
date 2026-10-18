@@ -52,7 +52,7 @@ void main(){
   L += pointL(P, N, A, b5Pos, .3, 3.5, 2.)*b5Col;
   if (lampsK > 0.){ for (int i = 0; i < 3; i++) L += pointL(P, N, A, pucks[i], .7*lampsK, 1.9, 2.)*puckCol;
     vec3 dd = P - downPos; float cs = dot(normalize(dd), vec3(0., -1., 0.)); L += pointL(P, N, A, downPos, 2.2*lampsK, 7., 1.6)*smoothstep(cos(.9), cos(.9*.2), cs)*downCol;
-    float ls = shadowAt(lampMap, lampMat, P + N*.01, .003, 1./512.); L += pointL(P, N, A, pendPos, 1.6*lampsK, 3.2, 2.)*ls*pendCol; }
+    float ls = shadowAt(lampMap, lampMat, P + N*.01, .003, 1./1024.); L += pointL(P, N, A, pendPos, 1.6*lampsK, 3.2, 2.)*ls*pendCol; }
   L += pointL(P, N, A, barPos, .55*barOn, 1.6, 2.)*barCol;
   vec3 c = L*ao + toLin(texture2D(tBounce, vUv).rgb)*bounceK*ao + toLin(texture2D(tGlow, vUv).rgb)*1.4 + toLin(texture2D(tBar, vUv).rgb)*vec3(1., .82, .55)*1.6*barOn;
   // outlines: where the depth jumps
@@ -108,7 +108,7 @@ void main(){
     // shadow maps: the room (layer 3), the plants and lamp (0) and the shutter (1), drawn from the sun and from the pendant's bulb
     const depthMat = new C.MeshDepthMaterial({ depthPacking: C.RGBADepthPacking, side: C.DoubleSide });
     // the sun's shadow in two: the room itself (big, still: redrawn only when the sun has moved a little) and the plants and the lamp (small, moving: every other frame)
-    const sunRT = new C.WebGLRenderTarget(2048, 2048), dynRT = new C.WebGLRenderTarget(1024, 1024), lampRT = new C.WebGLRenderTarget(512, 512);
+    const sunRT = new C.WebGLRenderTarget(2048, 2048), dynRT = new C.WebGLRenderTarget(1024, 1024), lampRT = new C.WebGLRenderTarget(1024, 1024);
     const sunCam = new C.OrthographicCamera(-6, 6, 6, -6, .5, 30), lampCam = new C.PerspectiveCamera(150, 1, .05, 6);
     for (const c of [sunCam, lampCam]){ c.layers.enable(0); c.layers.enable(1); c.layers.enable(3); }
     const bias = new C.Matrix4().set(.5, 0, 0, .5, 0, .5, 0, .5, 0, 0, .5, .5, 0, 0, 0, 1);
@@ -132,13 +132,13 @@ void main(){
         const moving = p.open < 1;   // (the shutter's plates are in the room's map: keep it fresh while they turn)
         U.shafts.value = api.off.has('shafts') ? 0 : 1;
         if ((p.sunOn > 0 || !lastSun) && !api.off.has('sunShadow')){
-          if (!lastSun || lastSun.angleTo(p.sunDir) > .006 || (moving && frame % 4 === 0)){ lastSun = p.sunDir.clone();
+          if (!lastSun || lastSun.angleTo(p.sunDir) > .0005 || (moving && frame % 2 === 0)){ lastSun = p.sunDir.clone();
             sunCam.position.copy(wc).addScaledVector(p.sunDir, -12); sunCam.lookAt(wc.clone().addScaledVector(p.sunDir, 2)); sunCam.updateMatrixWorld(); drawDepth(sunCam, sunRT, (1 << 1) | (1 << 3)); drawDepth(sunCam, dynRT, 1);
             U.sunMat.value.multiplyMatrices(bias, sunCam.projectionMatrix).multiply(sunCam.matrixWorldInverse); }
-          else if (frame % 2 === 0) drawDepth(sunCam, dynRT, 1); }
+          else drawDepth(sunCam, dynRT, 1); }
         U.sunMap.value = sunRT.texture; U.sunDyn.value = dynRT.texture;
         const bulb = ROOM.bulbAt ? ROOM.bulbAt() : null;
-        if (p.lampsK > 0 && bulb && !api.off.has('lampShadow')){ lampCam.position.copy(bulb).add(new C.Vector3(0, -.06, 0)); lampCam.lookAt(bulb.x, 0, bulb.z); lampCam.updateMatrixWorld(); if (frame % 3 === 0) drawDepth(lampCam, lampRT); U.lampMat.value.multiplyMatrices(bias, lampCam.projectionMatrix).multiply(lampCam.matrixWorldInverse); U.lampMap.value = lampRT.texture; U.pendPos.value.copy(bulb); }
+        if (p.lampsK > 0 && bulb && !api.off.has('lampShadow')){ lampCam.position.copy(bulb).add(new C.Vector3(0, -.06, 0)); lampCam.lookAt(bulb.x, 0, bulb.z); lampCam.updateMatrixWorld(); drawDepth(lampCam, lampRT, 1 | (1 << 6)); /* (the plants and lamp, and the room near the pendant: kitchen.js layer 6) */ U.lampMat.value.multiplyMatrices(bias, lampCam.projectionMatrix).multiply(lampCam.matrixWorldInverse); U.lampMap.value = lampRT.texture; U.pendPos.value.copy(bulb); }
         else U.lampMap.value = sunRT.texture;
         const L = ROOM.L;
         U.sunCol.value.set(p.sunCol).multiplyScalar(p.sunI); U.scatCol.value.set(p.sunCol); U.sunOn.value = p.sunOn;

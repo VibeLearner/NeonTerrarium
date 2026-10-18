@@ -16,7 +16,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18h';
+  const VER = '2026-10-18i';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -60,7 +60,7 @@ const TITLE = (() => {
     const p = a.patches || [], sgn = p.length > 1 && p[p.length - 1][0] > p[0][0] ? -1 : 1;
     let d = ((sgn*(yaw - yaw0)*180/Math.PI + hs[0]) % 360 + 540) % 360 - 180;   // (degrees, -180..180; starts with the sun just coming in)
     sunH = d;
-    const lo = hs[0], hi = hs[hs.length - 1], fade = Math.max(0, Math.min(1, 1 - (Math.max(lo - d, d - hi, 0))/25));
+    const lo = hs[0], hi = hs[hs.length - 1]; let fade = Math.max(0, Math.min(1, 1 - (Math.max(lo - d, d - hi, 0))/25));
     sunW = fade; if (fade <= 0) return; fade *= .8;
     const c = Math.max(lo, Math.min(hi, d)), f = (c - lo)/(hi - lo)*(hs.length - 1), i = Math.min(hs.length - 2, Math.floor(f)), t = f - i;
     gSun.globalCompositeOperation = 'lighter';
@@ -186,10 +186,10 @@ const TITLE = (() => {
     if (!CITY || !A || !view || root.classList.contains('leaving')) return;
     try {
       const a = A[view], wx = OX + a.win[0]*a.w*S0, wy = OY + a.win[1]*a.h*S0, wr = a.winR*S0;
-      const P = 14*Math.PI/180; pitchT = P;   // (low: out of a window you look across the city, not down on it)
-      zoomT = Math.max(5, Math.min(40, CITY.r*H/(2*1.05*Math.max(60, wr))));
+      const P = 50*Math.PI/180; pitchT = P;   // (high, a bird's-eye look down on the city from the floating pod)
+      zoomT = 60;   // (well out: the whole city small below, the island's edge and the water round it)
       const k = 2*zoomT/H, ox = (wx - W/2)*k, oy = -(wy - H/2)*k, sy = Math.sin(yaw), cy = Math.cos(yaw);
-      const d = (oy + wr*.28*k)/Math.sin(P);   // (the city's middle a little below the window's: sky and clouds above it)
+      const d = oy/Math.sin(P);   // (the city's middle in the window's middle)
       camGoal.set(CITY.x - cy*ox + sy*d, TARGET_Y, CITY.z + sy*ox + cy*d);
     } catch (e) {}
   }

@@ -3215,8 +3215,48 @@ function gridInit() {
   syncAudioNodesToTempo();
 }
 
+// ---------- the Booth (booth.js): the player plays over a carrier pattern, so the broadcast steps aside ----------
+// The engine's clocks stop and its drone, grains and pads fade out, but the audio keeps running and the Booth's own
+// sounds go through the same filter, echoes and reverb (two buses: the Booth's lead voices and its carrier chords).
+let boothLead = null, boothPad = null, boothHeld = false, boothWas = false;
+function boothBuses() {
+  if (!ctx) initAudio();
+  if (!boothLead) {
+    boothLead = ctx.createGain(); boothLead.gain.value = 1;
+    boothLead.connect(warmthFilter);
+    const dSend = ctx.createGain(); dSend.gain.value = 0.22; boothLead.connect(dSend); dSend.connect(crossDelayL);
+    const rSend = ctx.createGain(); rSend.gain.value = 0.38; boothLead.connect(rSend); rSend.connect(reverbConvolver);
+    boothPad = ctx.createGain(); boothPad.gain.value = 1;
+    boothPad.connect(warmthFilter);
+    const pSend = ctx.createGain(); pSend.gain.value = 0.5; boothPad.connect(pSend); pSend.connect(reverbConvolver);
+  }
+  return { lead: boothLead, pad: boothPad };
+}
+function setBoothHold(on) {
+  if (on === boothHeld) return;
+  if (!ctx) initAudio();
+  boothHeld = on;
+  const t = ctx.currentTime;
+  if (on) {
+    boothWas = isPlaying;
+    if (isPlaying) {
+      isPlaying = false; transition = null; activeChordOverride = null;
+      stopMasterClock(); clearInterval(chordCycleInterval); clearTimeout(motifSchedulerTimeout); clearTimeout(dustPopTimeout);
+    }
+    droneMasterBus.gain.setTargetAtTime(0.0001, t, 0.3);
+    granularBus.gain.setTargetAtTime(0.0001, t, 0.3);
+    ctx.resume();
+  } else {
+    droneMasterBus.gain.setTargetAtTime(parseFloat($g('droneLevelSlider').value), t, 0.4);
+    granularBus.gain.setTargetAtTime(parseFloat($g('granularMixSlider').value), t, 0.4);
+    if (boothWas && !isPlaying) toggleSoundscapeEngine();
+  }
+}
+
 return {
   init: gridInit,
+  progressions: PROGRESSIONS, n2f, boothBuses, boothHold: setBoothHold, get boothHeld(){ return boothHeld; },
+  pluck(freq, t, dur, vel, pan, dest) { playPluckNote(freq, Math.max(ctx.currentTime, t), dur, vel, pan, false, dest, 0.6); },
   get ctx(){ return ctx; }, get analyser(){ return analyser; }, get out(){ return gridOut; },
   set volume(v){ gridVol = v; },
   get playing(){ return isPlaying; }, get frozen(){ return isFrozen; },

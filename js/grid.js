@@ -100,10 +100,12 @@ const music = (() => {
   });
 
   // ---------- the engine runs while the Grid stands, is not paused, and the city isn't held ----------
-  const want = () => on && !paused && !held;
+  // (the Booth, booth.js: the engine's own music steps aside while the player plays, but the sound stays up even if the broadcast was on hold)
+  let booth = false;
+  const want = () => on && (booth || (!paused && !held));
   function tick(dt){
     const w = want();
-    if (w && !E.playing){ if (!E.ctx) E.initAudio(); E.toggle(); E.resume(); if (!tickProgDone){ tickProgDone = true; applyLayers(); } }
+    if (!booth && w && !E.playing){ if (!E.ctx) E.initAudio(); E.toggle(); E.resume(); if (!tickProgDone){ tickProgDone = true; applyLayers(); } }
     // audio can only start after a click: when it's blocked, the next click wakes it
     if (w && E.ctx && E.ctx.state === 'suspended') E.resume();
     const target = w ? 1 : 0;
@@ -111,7 +113,7 @@ const music = (() => {
     if (level >= 1) fadeIn = GRID_FADE_QUICK;
     const v = level*level*volume;
     if (E.out && E.ctx) E.out.gain.setTargetAtTime(v, E.ctx.currentTime, .05); else E.volume = v;
-    if (!w && level <= 0.001 && E.playing) E.toggle();   // faded out: stop the engine (it holds where it is)
+    if (!booth && !w && level <= 0.001 && E.playing) E.toggle();   // faded out: stop the engine (it holds where it is)
   }
   let tickProgDone = false, lastT = performance.now();
   setInterval(() => { const n = performance.now(), dt = Math.min(.25, (n - lastT)/1000); lastT = n; tick(dt); }, 50);
@@ -276,6 +278,7 @@ const music = (() => {
       if (typeof MON !== 'undefined' && MON.close) try { MON.close(); } catch (e){}
       el.classList.add('open'); document.documentElement.classList.add('gp-open'); addEventListener('keydown', keyH, true);
       sliders().forEach(PNL.fill); P.syncPrograms();
+      if (typeof BOOTH !== 'undefined') BOOTH.panelOpened();
       sizeCanvases(); addEventListener('resize', sizeCanvases);
     }
     P.show = () => {
@@ -297,6 +300,7 @@ const music = (() => {
     const swallow = e => { e.stopPropagation(); };
     P.hide = () => {
       if (!P.open) return; P.open = false; GRIDPANEL.open = false; GRIDPANEL.hold = false;
+      if (typeof BOOTH !== 'undefined') BOOTH.panelClosed();
       el.classList.remove('open'); document.documentElement.classList.remove('gp-open'); removeEventListener('keydown', keyH, true); removeEventListener('resize', sizeCanvases);
     };
     $q('gpClose').addEventListener('click', () => P.hide());
@@ -358,5 +362,6 @@ const music = (() => {
 
   // start-up: the engine fills in the chart, then what the player last set is put back
   E.init(); restore(); prog = 0; applyProgram(0); ui.pattern(); ui.text();
-  return { update, setVolume, skip, back, togglePause, hold, panel: PANEL, get held(){ return held; }, get volume(){ return volume; }, get on(){ return on; }, get paused(){ return paused; }, get level(){ return level; }, get program(){ return GRID_PROGRAMS[prog]; }, engine: E };
+  function setBooth(v){ v = !!v; if (v === booth) return; booth = v; if (!E.ctx) E.initAudio(); E.boothHold(v); if (v){ E.resume(); if (level < .2){ level = .2; fadeIn = GRID_FADE_QUICK; } } }
+  return { setBooth, get booth(){ return booth; }, update, setVolume, skip, back, togglePause, hold, panel: PANEL, get held(){ return held; }, get volume(){ return volume; }, get on(){ return on; }, get paused(){ return paused; }, get level(){ return level; }, get program(){ return GRID_PROGRAMS[prog]; }, engine: E };
 })();

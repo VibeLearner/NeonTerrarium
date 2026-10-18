@@ -27,7 +27,7 @@ const GRIDVIZ = (() => {
   // ---------- canvases: sized to their box, sharp on any screen ----------
   const cvs = {};
   function ctxOf(id){
-    const c = $(id); if (!c) return null;
+    const c = $(id); if (!c || c.clientWidth < 20 || c.clientHeight < 20) return null;   // (hidden: the Booth is showing)
     const dpr = Math.min(2, devicePixelRatio || 1), w = Math.max(10, Math.floor(c.clientWidth*dpr)), h = Math.max(10, Math.floor(c.clientHeight*dpr));
     if (c.width !== w || c.height !== h){ c.width = w; c.height = h; }
     const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);

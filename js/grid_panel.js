@@ -166,6 +166,50 @@ const GRIDPANEL = (() => {
   #gridPanel .gkey b { font-weight: 400; color: var(--cy2); }
   #gridPanel .gmini { display: flex; gap: 8px; align-items: center; flex: none; }
 
+  /* the mode tabs */
+  #gridPanel .gtabs { display: flex; gap: 0; margin-left: 10px; border: 1px solid var(--line); }
+  #gridPanel .gtab { background: none; border: 0; color: var(--cy2); font: inherit; font-size: 12.5px; letter-spacing: .2em; text-transform: uppercase; padding: 6px 14px; cursor: pointer; }
+  #gridPanel .gtab:hover { background: rgba(95,216,222,.14); } #gridPanel .gtab.on { background: var(--cy); color: #04141a; }
+  #gridPanel .gtab:focus-visible { outline: 2px solid var(--yl); outline-offset: -2px; }
+  /* the Booth: setup on the left, the loop and the magic keys in the middle, the shelf on the right */
+  #gridPanel .gbooth { flex: 1; min-height: 0; display: grid; gap: 10px; padding: 4px 2px 6px;
+    grid-template-columns: minmax(250px, .8fr) minmax(0, 2.6fr) minmax(250px, .9fr); grid-template-rows: minmax(0, 1fr) minmax(0, auto);
+    grid-template-areas: "setup roll shelf" "setup keys shelf"; }
+  #gridPanel .gbooth[hidden], #gridPanel .gmain[hidden] { display: none; }
+  #gridPanel .b-setup { grid-area: setup; } #gridPanel .b-roll { grid-area: roll; } #gridPanel .b-keys { grid-area: keys; } #gridPanel .b-shelf { grid-area: shelf; }
+  #gridPanel .bvoices { display: grid; gap: 4px; } #gridPanel .bvoices .gb { margin: 0; text-align: left; padding: 6px 10px; font-size: 12px; letter-spacing: .12em; }
+  #gridPanel .bvoices .gb small { display: block; color: var(--dim); font-size: 10.5px; letter-spacing: .04em; text-transform: none; margin-top: 1px; } #gridPanel .bvoices .gb.on small { color: #0b3a40; }
+  #gridPanel .btrans { display: flex; gap: 6px; flex-wrap: wrap; flex: none; } #gridPanel .btrans .gb { margin: 0; flex: 1 1 auto; width: auto; padding: 8px 10px; }
+  #gridPanel .brec.armed { background: rgba(229,55,159,.3); border-color: var(--mg); color: #fff; } #gridPanel .brec.live { background: var(--mg); border-color: var(--mg); color: #fff; }
+  #gridPanel .bap.on { background: var(--mg); border-color: var(--mg); color: #fff; }
+  #gridPanel .b-roll .gv { flex: 1 1 0; min-height: 120px; }
+  #gridPanel .bkeys { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; height: 128px; }
+  #gridPanel .bkey { position: relative; border: 1px solid var(--line); background: rgba(10,40,48,.75); color: var(--ink); cursor: pointer; display: grid; align-content: end; justify-items: center; padding: 6px 2px; font: inherit; touch-action: none; transition: background .08s, transform .05s; }
+  #gridPanel .bkey b { font: 600 17px 'Chakra Petch', sans-serif; letter-spacing: .02em; } #gridPanel .bkey small { color: var(--dim); font-size: 11px; }
+  #gridPanel .bkey.core { border-color: var(--cy); background: rgba(95,216,222,.16); }
+  #gridPanel .bkey.root b { color: var(--yl); }
+  #gridPanel .bkey:hover { background: rgba(95,216,222,.26); }
+  #gridPanel .bkey.down { background: var(--cy); color: #04141a; transform: translateY(2px); } #gridPanel .bkey.down small { color: #0b3a40; }
+  #gridPanel .bkey.ap { box-shadow: inset 0 0 0 2px var(--mg); } #gridPanel .bkey.pl { box-shadow: inset 0 -5px 0 var(--cy2); }
+  #gridPanel .bkey.retune { animation: bRet .35s ease-out; } @keyframes bRet { 0% { filter: brightness(1.8); } 100% { filter: none; } }
+  #gridPanel .bkey:focus-visible { outline: 2px solid var(--yl); outline-offset: 2px; }
+  #gridPanel .ghint2 { color: var(--dim); font-size: 11.5px; letter-spacing: .04em; }
+  #gridPanel .bsave { display: flex; gap: 6px; } #gridPanel .bsave input { flex: 1; min-width: 0; background: rgba(4,18,24,.9); border: 1px solid var(--line); color: var(--ink); font: inherit; padding: 7px 8px; }
+  #gridPanel .bsave input:focus { outline: 2px solid var(--yl); outline-offset: 1px; } #gridPanel .bsave .gb { margin: 0; width: auto; }
+  #gridPanel .blist { display: grid; gap: 6px; overflow: auto; min-height: 0; flex: 1; align-content: start; }
+  #gridPanel .bitem { border: 1px solid var(--faint); background: rgba(6,24,30,.7); padding: 7px 8px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; }
+  #gridPanel .b-setup .grow .gb { letter-spacing: .1em; padding: 6px 4px; white-space: nowrap; }
+  #gridPanel .bitem.on { border-color: var(--yl); }
+  #gridPanel .bitem .bt { color: var(--ink); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } #gridPanel .bitem .bm { color: var(--dim); font-size: 11px; }
+  #gridPanel .bitem .br { display: flex; gap: 4px; flex-wrap: wrap; } #gridPanel .bitem .br .gb { margin: 0; width: auto; padding: 4px 7px; font-size: 11px; letter-spacing: .08em; }
+  #gridPanel .bitem input { background: rgba(4,18,24,.9); border: 1px solid var(--yl); color: var(--ink); font: inherit; padding: 3px 6px; width: 100%; }
+  #gridPanel .bempty { color: var(--dim); font-size: 12px; line-height: 1.5; }
+  @media (max-width: 1100px), (max-height: 780px) {
+    #gridPanel .gbooth { overflow: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "keys" "roll" "setup" "shelf"; align-items: start; }
+    #gridPanel .gbooth > .gp { overflow: visible; min-height: auto; } #gridPanel .b-roll .gv { flex: none; height: 180px; }
+    #gridPanel .bkeys { grid-template-columns: repeat(6, minmax(0, 1fr)); height: auto; } #gridPanel .bkey { min-height: 64px; }
+  }
+
   /* opening: the city glitches, a curtain of falling glyphs closes over it, then the panel's blocks come up one by one */
   #view.gp-glitch { animation: gpGl .32s steps(2) 1; }
   @keyframes gpGl { 0% { transform: translate(0); } 18% { transform: translate(-7px, 2px); filter: hue-rotate(50deg) contrast(1.35); } 38% { transform: translate(6px, -3px); filter: saturate(2.2); }
@@ -183,6 +227,7 @@ const GRIDPANEL = (() => {
     <span class="gchip yl"><i></i><span id="gpChord">CARRIER</span></span>
     <span class="gchip"><i></i><span id="gpMood">MOOD</span></span>
     <span class="gchip"><i></i><span id="gpClock">CLOCK</span></span>
+    <span class="gtabs" role="tablist"><button class="gtab on" data-mode="console" role="tab" title="The broadcast's controls and shapes">Console</button><button class="gtab" data-mode="booth" role="tab" title="Play over a carrier pattern, record loops and keep them (the city's broadcast steps aside)">Booth</button></span>
     <span class="gname">PSYCHO-ACOUSTIC GRID</span>
     <button class="gx" id="gpClose" title="Close the panel (Esc)">CLOSE</button>
   </div>
@@ -261,6 +306,40 @@ const GRIDPANEL = (() => {
       <select id="g-motifStyleSelect" title="Trigger pattern: the shape of the soothing neural phrase"></select>
       <div class="gst" id="g-motifStatusText">PING STANDBY</div><span class="gled" id="g-motifLed" style="display:none"></span>
       <span class="gcode">C2</span></section>
+  </div>
+  <div class="gbooth" id="gBooth" hidden>
+    <section class="gp b-setup"><h3>Booth setup</h3>
+      <div class="glbl">Carrier pattern</div>
+      <select id="g-boothProg" title="The chords you'll play over: one chord a bar"></select>
+      <div class="glbl">Length</div>
+      <div class="grow" id="bLen"><button class="gb" data-len="4" title="The first four chords">4 bars</button><button class="gb on" data-len="8" title="All eight chords">8 bars</button></div>
+      <div class="glbl">Voice</div>
+      <div class="bvoices" id="bVoices"></div>
+      <div class="gknobs">${knob('boothBpmSlider', 'Clock', 60, 132, 1, 84, 'How fast the loop runs, in beats a minute.')}${knob('boothApSlider', 'Answer', 0, 1, 0.02, 0.55, 'How much the autopilot plays when it answers you.', 'mg')}</div>
+      <div class="glbl">Tidy timing</div>
+      <div class="grow" id="bTidy" title="How much recorded notes are pulled onto the beat grid (sixteenths)"><button class="gb" data-tidy="0">Off</button><button class="gb on" data-tidy="0.5">Gentle</button><button class="gb" data-tidy="1">Full</button></div>
+      <div class="glbl">Click</div>
+      <div class="grow" id="bClick" title="A soft tick on the beat"><button class="gb on" data-click="count">Count-in</button><button class="gb" data-click="all">Always</button><button class="gb" data-click="off">Off</button></div>
+    </section>
+    <section class="gp b-roll"><h3>Loop</h3><span class="gtag" id="bStatus">PRESS PLAY, THEN PLAY THE PADS</span>
+      <div class="btrans">
+        <button class="gb" id="bPlay" title="Start or stop the loop (Space)">Play</button>
+        <button class="gb brec" id="bRec" title="Record one pass of the loop, after a bar of count-in (Enter). Each take is a new layer on top.">Record</button>
+        <button class="gb" id="bUndo" title="Take off the last layer you recorded">Undo layer</button>
+        <button class="gb" id="bClear" title="Clear every layer">Clear</button>
+        <button class="gb bap" id="bAuto" title="The autopilot takes your recording as its theme and plays along: answers in your gaps, echoes, harmonies under long notes. It never plays over your notes.">Autopilot</button>
+      </div>
+      <canvas class="gv" id="bRoll" title="The loop: chords along the top, your notes in cyan, the autopilot's in pink, the playhead in yellow"></canvas>
+      <div class="gkey"><span><b>CYAN</b> your layers</span><span><b>PINK</b> the autopilot</span><span><b>HIGHER</b> higher pads</span><span><b>RED</b> recording</span></div>
+    </section>
+    <section class="gp b-keys"><h3>Magic keys</h3><span class="gtag" id="bChordTag"></span>
+      <div class="bkeys" id="bKeys"></div>
+      <div class="ghint2">Every pad is a note that fits the chord playing now; they retune when the chord changes. Keys Q W E R T Y U I O P [ ] play them too.</div>
+    </section>
+    <section class="gp b-shelf"><h3>Loop shelf</h3><span class="gtag">THIS CITY</span>
+      <div class="bsave"><input id="bName" maxlength="40" placeholder="Name this loop" aria-label="Loop name"><button class="gb" id="bSave" title="Keep the loop on the shelf: pattern, voice, clock, layers and autopilot">Save</button></div>
+      <div class="blist" id="bList"></div>
+    </section>
   </div>
   <div class="gbot"><span>FRQ<b id="gpFrq">0</b></span><span>AMP<b id="gpAmp">0.00</b></span><span>CLK<b id="gpClk">82</b></span><span>CAD<b id="gpCad">1/8</b></span><span>MOD<b id="gpMod">MOSAIC</b></span><span>STASIS<b id="gpSt">OFF</b></span><span style="margin-left:auto">GRID V1 · SECTOR BROADCAST · CITY PLANNING OFFICE</span></div>`;
 

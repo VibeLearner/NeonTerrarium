@@ -16,7 +16,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18l';
+  const VER = '2026-10-18m';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -43,7 +43,11 @@ const TITLE = (() => {
     stage.style.setProperty('--px', S0 + 'px');
     stage.style.transformOrigin = (a.win[0]*100) + '% ' + (a.win[1]*100) + '%';
     seedMotes();
+    // the city seen through the window is widened round the window's middle: through an opening seen from the side,
+    // at its own proportions it read as squeezed in from the sides
+    const vw_ = document.getElementById('view'); if (vw_){ vw_.style.transformOrigin = (OX + a.win[0]*sw) + 'px ' + (OY + a.win[1]*sh) + 'px'; vw_.style.transform = 'scaleX(' + CITY_WIDEN + ')'; }
   }
+  const CITY_WIDEN = 1.3;
 
   /* ---------- the pod turning: the sun swinging round, and a slow sway ---------- */
   // The city outside turns because the pod does, so the sun's beam moves too: the bake has what the sun adds at nine
@@ -295,7 +299,7 @@ const TITLE = (() => {
     if (!T.on) return;
     closePanel(); setDeck(false);
     if (instant || reduced){ finish(); return; }
-    root.classList.add('leaving');
+    root.classList.add('leaving'); unwiden();
     try { if (was && was.cam){ camGoal.copy(was.cam.goal); pitchT = was.cam.pitchT; zoomT = was.zoomT; } } catch (e) {}
     setTimeout(finish, 1500);
   };
@@ -311,7 +315,8 @@ const TITLE = (() => {
     setTimeout(() => { on = false; document.documentElement.classList.remove('cctv-out'); ov.remove();
       const fade = document.createElement('div'); fade.id = 'cctvFade'; document.body.appendChild(fade); T.show(); setTimeout(() => fade.remove(), 900); T.cutting = false; }, 1150);
   };
-  function finish(){ T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} }
+  function unwiden(){ const v = document.getElementById('view'); if (v){ v.style.transition = 'transform 1.2s ease-in-out'; v.style.transform = ''; setTimeout(() => { v.style.transition = ''; }, 1300); } }
+  function finish(){ unwiden(); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} }
 
   /* ---------- the menu ---------- */
   function setDeck(on){

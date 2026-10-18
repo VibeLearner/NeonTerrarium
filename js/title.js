@@ -21,7 +21,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18t';
+  const VER = '2026-10-18u';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);

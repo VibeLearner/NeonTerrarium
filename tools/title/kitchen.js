@@ -755,6 +755,24 @@ const ROOM = (() => {
     const mm = new Map(); for (const m of keep){ const o = m.material; if (!mm.has(o)) mm.set(o, new C.MeshLambertMaterial({ color: o.color ? o.color.clone().multiplyScalar(.85) : 0xffffff, map: o.map || null, side: o.side, emissive: o.emissive || 0x000000, emissiveIntensity: o.emissiveIntensity ?? 1 })); m.material = mm.get(o); }
     R.liveMats = mm;
     const lampG = new C.Group(); lampG.position.copy(R.lampPivot); sc.add(lampG); lampG.updateMatrixWorld(true); for (const m of LAMP) lampG.attach(m);
+    // fewer draw calls: every leaf and twig was its own object (thousands, each a separate request to the graphics card);
+    // merge each plant's pieces into one per material, the lamp's too, and the still room into a single shape for the shadows
+    const BGU = C.BufferGeometryUtils, inv = new C.Matrix4(), rel = new C.Matrix4();
+    const indexed = g => { if (!g.index){ const n = g.attributes.position.count, ix = new (n > 65535 ? Uint32Array : Uint16Array)(n); for (let i = 0; i < n; i++) ix[i] = i; g.setIndex(new C.BufferAttribute(ix, 1)); } g.clearGroups(); return g; };
+    const mergeInto = (root, meshes) => { root.updateMatrixWorld(true); inv.copy(root.matrixWorld).invert(); const by = new Map();
+      for (const m of meshes){ m.updateMatrixWorld(true); let g = m.geometry.clone(); rel.multiplyMatrices(inv, m.matrixWorld); g.applyMatrix4(rel); indexed(g);
+        for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k); if (!g.attributes.uv) g.setAttribute('uv', new C.BufferAttribute(new Float32Array(g.attributes.position.count*2), 2));
+        if (!g.attributes.normal) g.computeVertexNormals(); g.morphAttributes = {};
+        const key = m.material; if (!by.has(key)) by.set(key, []); by.get(key).push(g); if (m.parent) m.parent.remove(m); }
+      const out = []; for (const [mat, gs] of by){ const g = gs.length === 1 ? gs[0] : BGU.mergeBufferGeometries(gs, false); if (gs.length > 1) gs.forEach(x => x.dispose()); if (!g) continue; g.computeBoundingSphere();
+        const mm = new C.Mesh(g, mat); mm.castShadow = true; mm.receiveShadow = true; root.add(mm); out.push(mm); } return out; };
+    if (BGU && BGU.mergeBufferGeometries){ try {
+      const inPlant = new Set(); for (const P of PLANTS){ const ms = []; P.g.traverse(o => { if (o.isMesh && keep.has(o)) ms.push(o); }); ms.forEach(m => inPlant.add(m)); mergeInto(P.g, ms); }
+      const lampMs = []; lampG.traverse(o => { if (o.isMesh) lampMs.push(o); }); mergeInto(lampG, lampMs);
+      // the room, for shadows only: one shape, positions only (the originals go to layer 5, which nothing draws)
+      sc.updateMatrixWorld(true); const gs = []; sc.traverse(o => { if (o.isMesh && o.layers.mask === 1 << 3){ let g = new C.BufferGeometry(); g.setAttribute('position', o.geometry.attributes.position.clone()); if (o.geometry.index) g.setIndex(o.geometry.index.clone()); g.applyMatrix4(o.matrixWorld); gs.push(indexed(g)); o.layers.set(5); } });
+      if (gs.length){ const g = BGU.mergeBufferGeometries(gs, false); gs.forEach(x => x.dispose()); g.computeBoundingSphere(); const room = new C.Mesh(g, new C.MeshBasicMaterial()); room.layers.set(3); room.matrixAutoUpdate = false; room.frustumCulled = false; sc.add(room); }
+    } catch (e){ try { console.warn('title: merging the room failed (it still works, just slower):', e); } catch (_) {} } }
     const bends = PLANTS.map(P => ({ g: P.g, k: (P.kind === 'trail' ? .05 : P.kind === 'succulent' || P.kind === 'cactus' ? .008 : .035)/Math.max(.6, P.s), ph: P.g.position.x*3.1 + P.g.position.z*2.3 }));
     const bulb = new C.Vector3(); R.bulbAt = () => bulb.set(0, -(CEIL - 1.77), 0).applyMatrix4(lampG.matrixWorld);
     return t => {

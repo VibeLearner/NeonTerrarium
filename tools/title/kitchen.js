@@ -761,6 +761,29 @@ const ROOM = (() => {
       lampG.updateMatrixWorld(true);
     };
   };
+  // The porthole's shutter, for the title screen: an iris of ten curved plates of the hull's own plating (bump and
+  // parallax texture, bevelled edges, rivets, a dark seam where they overlap), on their own layer so the title can draw
+  // them on a canvas under the room's picture (the sleeve hides what lies outside the glass). R.setShutter(0..1) opens it.
+  R.shutter = sc => {
+    const N = 10, Rg = WIN.r2, Rp = Rg*1.06, L = Rp*1.06, z0 = -WIN.depth + .07, blades = [], mat = withBump(hullT, { roughness: .55, metalness: .35, color: 0xd8ccb0 }, .015), edge = std({ color: 0x2a241c, roughness: .6, metalness: .4 });
+    pom(mat, .004);
+    const sh = new C.Shape(); sh.moveTo(0, 0); sh.lineTo(L, -.08*L); sh.quadraticCurveTo(L*1.12, .42*L, .62*L, .78*L); sh.lineTo(-.05*L, .62*L); sh.lineTo(0, 0);
+    const geo = new C.ExtrudeGeometry(sh, { depth: .012, bevelEnabled: true, bevelThickness: .004, bevelSize: .006, bevelSegments: 3, curveSegments: 24 });
+    { const uv = geo.attributes.uv, p = geo.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, p.getX(i)/1.3, p.getY(i)/1.3); }
+    for (let i = 0; i < N; i++){
+      const th = i/N*Math.PI*2, piv = new C.Group(); piv.position.set(Math.cos(th)*Rp, WC.y + Math.sin(th)*Rp, z0 + i*.0035); hull.add(piv);
+      const b = new C.Mesh(geo, mat); piv.add(b);
+      for (const [u, v] of [[.12, .04], [.45, .02], [.8, -.02], [.3, .35]]){ const r = new C.Mesh(new C.CylinderGeometry(.012, .012, .008, 12), M.steel); r.rotation.x = Math.PI/2; r.position.set(u*L, v*L, .018); b.add(r); }
+      const sm = new C.Mesh(new C.BoxGeometry(L*.9, .012, .004), edge); sm.position.set(L*.48, -.03*L, .017); sm.rotation.z = -.08; b.add(sm);
+      piv.traverse(o => o.layers.set(1)); blades.push({ piv, th });
+    }
+    // its own light: the room's light falling on it from inside (it's on its layer only)
+    const lt = new C.PointLight(0xffe2c0, 1.2, 6, 1.6), hm = new C.HemisphereLight(0xd8e0e8, 0x403830, .45);
+    lt.position.copy(R.winCenter()).addScaledVector(R.winNormal(), 1.6).add(new C.Vector3(0, .6, 0)); lt.layers.set(1); hm.layers.set(1); sc.add(lt, hm);
+    R.shutterLight = { lt, hm };
+    R.setShutter = open => { for (const B of blades) B.piv.rotation.z = B.th + Math.PI + open*1.3; hull.updateMatrixWorld(true); };
+    R.setShutter(0);
+  };
   R.setSun = theta => {
     const L = R.L, wc = R.winCenter(), out = R.winNormal().negate();
     for (const b of bounce) SC_.remove(b); bounce = [];

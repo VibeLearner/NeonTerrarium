@@ -458,3 +458,5 @@ html.cctv-out body{animation:cctvOff 1.15s forwards;transform-origin:50% 50%;ove
 @keyframes cctvOv{0%{opacity:0}10%{opacity:1}55%{opacity:1}62%{opacity:0}100%{opacity:0}}
 #cctvFade{position:fixed;inset:0;z-index:9998;background:#000;pointer-events:none;animation:cctvUp .9s ease-out forwards}
 @keyframes cctvUp{0%{opacity:1}100%{opacity:0}}
+/* first load: dark until the title's room is ready (the city builds behind it) */
+html.title-boot::after{content:"";position:fixed;inset:0;z-index:10000;background:#0b0a09;pointer-events:none}

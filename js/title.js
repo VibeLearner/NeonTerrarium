@@ -16,7 +16,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18m';
+  const VER = '2026-10-18n';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -76,7 +76,7 @@ const TITLE = (() => {
   function drawSway(now){
     if (reduced) return; const t = now/1000;
     const x = Math.sin(t*.21)*2.2 + Math.sin(t*.53 + 1)*.8, y = Math.sin(t*.17 + 2)*2.6 + Math.sin(t*.41)*.9, r = Math.sin(t*.13 + .5)*.16 + Math.sin(t*.37)*.05;
-    stage.style.translate = (x*S0/2).toFixed(2) + 'px ' + (y*S0/2).toFixed(2) + 'px'; stage.style.rotate = r.toFixed(3) + 'deg';
+    stage.style.translate = (x*S0/2).toFixed(2) + 'px ' + (y*S0/2).toFixed(2) + 'px'; stage.style.rotate = r.toFixed(3) + 'deg'; stage.style.scale = '1.03';
   }
   // the hour: the city's own, in four looks
   function pickTime(h){ return h >= 5.5 && h < 10 ? 'morning' : h >= 10 && h < 16.5 ? 'day' : h >= 16.5 && h < 19.5 ? 'evening' : 'night'; }
@@ -96,10 +96,14 @@ const TITLE = (() => {
       const r = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: false }); { const gl = r.getContext(), src = gl.shaderSource.bind(gl); if (r.capabilities.isWebGL2) gl.shaderSource = (sh, t) => src(sh, t.replace('out highp vec4 pc_fragColor;', 'layout(location = 0) out highp vec4 pc_fragColor;\nlayout(location = 1) out highp vec4 pc_fragNormal;')); }   // (the game's shader pieces also write a second image, the normals: declare it here too)
       r.outputEncoding = THREE.sRGBEncoding; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = .72; r.setClearColor(0x000000, 0);   // (a little under: the bake's own grade and shading sit lower)
       const scene = new THREE.Scene(), tick = ROOM.movers(scene); ROOM.setTime(TOD); const cam = new THREE.PerspectiveCamera(45, 1, .05, 40);
+      ROOM.shutter(scene); shutScene = scene; shutCam = new THREE.PerspectiveCamera(45, 1, .05, 40); shutCam.layers.set(1);
+      shutR = new THREE.WebGLRenderer({ canvas: shutCv, alpha: true, antialias: true }); { const gl = shutR.getContext(), src = gl.shaderSource.bind(gl); if (shutR.capabilities.isWebGL2) gl.shaderSource = (sh, t) => src(sh, t.replace('out highp vec4 pc_fragColor;', 'layout(location = 0) out highp vec4 pc_fragColor;\nlayout(location = 1) out highp vec4 pc_fragNormal;')); }
+      shutR.outputEncoding = THREE.sRGBEncoding; shutR.toneMapping = THREE.ACESFilmicToneMapping; shutR.toneMappingExposure = .8; shutR.setClearColor(0x000000, 0);
       let vw = null;
       live = {
-        view(v){ vw = v; const a = A[v], c = a.cam || CAMS[v]; r.setPixelRatio(1); r.setSize(a.w, a.h, false); cam.fov = c.fov; cam.aspect = a.w/a.h; cam.position.set(...c.pos); cam.lookAt(...c.look); cam.updateProjectionMatrix(); },
-        time(){ ROOM.setTime(TOD); },
+        view(v){ vw = v; const a = A[v], c = a.cam || CAMS[v]; r.setPixelRatio(1); r.setSize(a.w, a.h, false); cam.fov = c.fov; cam.aspect = a.w/a.h; cam.position.set(...c.pos); cam.lookAt(...c.look); cam.updateProjectionMatrix();
+          shutR.setPixelRatio(1); shutR.setSize(a.w*2, a.h*2, false); shutCam.fov = cam.fov; shutCam.aspect = cam.aspect; shutCam.position.copy(cam.position); shutCam.quaternion.copy(cam.quaternion); shutCam.updateProjectionMatrix(); },
+        time(){ ROOM.setTime(TOD); const k = { morning: 1.1, day: 1.3, evening: .9, night: .7 }[TOD] || 1; ROOM.shutterLight.lt.intensity = 1.2*k; ROOM.shutterLight.hm.intensity = .45*k; },
         at(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam); return [(v.x + 1)/2, (1 - v.y)/2]; },
         draw(t){ tick(reduced ? 0 : t); ROOM.aimSun(sunW > 0 ? sunH*Math.PI/180*SUNSGN : null); ROOM.L.sun.intensity *= .6*sunW; r.render(scene, cam); }
       };
@@ -127,31 +131,19 @@ const TITLE = (() => {
   /* ---------- the shutter on the porthole ---------- */
   // An iris of curved plates closes the window while the city loads (it streams in round the camera, nothing to look
   // at); once it's all there the plates swing back into the frame and the sun comes in with them.
-  const shutCv = document.createElement('canvas'), gSh = shutCv.getContext('2d'); shutCv.className = 't-layer'; shutCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(shutCv, imRoom);
+  const shutCv = document.createElement('canvas'); shutCv.className = 't-layer'; shutCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(shutCv, imRoom);
   let OPEN = 0, openFrom = null, shownAt = 0;
   T._hold = () => { shownAt = 1e15; openFrom = null; };   // (testing: keep the shutter shut)
   const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady); } catch (e) { return true; } };
+  let shutR = null, shutCam = null, shutScene = null;
   function drawShutter(now){
-    if (openFrom === null && now - shownAt > 900 && cityReady()) openFrom = now + 300;
-    const tt = openFrom === null ? 0 : Math.max(0, Math.min(1, (now - openFrom)/2800)); OPEN = reduced ? (openFrom === null ? 0 : 1) : tt*tt*(3 - 2*tt);
-    const w = shutCv.width = cvDust.width, h = shutCv.height = cvDust.height; if (OPEN >= 1) return;
-    const a = A[view], cx = a.win[0]*w, cy = a.win[1]*h, R0 = a.winR*1.18, N = 10;
-    for (let i = 0; i < N; i++){
-      const th = i/N*Math.PI*2, swing = OPEN*1.25;   // each plate pivots on the rim and swings out of the opening
-      const pvx = cx + Math.cos(th)*R0, pvy = cy + Math.sin(th)*R0;
-      gSh.save(); gSh.translate(pvx, pvy); gSh.rotate(th + Math.PI + swing);
-      // a plate: from its pivot on the rim across past the middle, its leading edge a gentle curve
-      gSh.beginPath(); gSh.moveTo(0, 0); gSh.lineTo(R0*1.05, -R0*.08); gSh.quadraticCurveTo(R0*1.15, R0*.42, R0*.62, R0*.78); gSh.lineTo(-R0*.05, R0*.62); gSh.closePath();
-      const gr = gSh.createLinearGradient(0, 0, R0, R0*.6); gr.addColorStop(0, '#8a8068'); gr.addColorStop(.5, '#6f6652'); gr.addColorStop(1, '#4a4436');
-      gSh.fillStyle = gr; gSh.fill(); gSh.strokeStyle = 'rgba(40,32,22,.85)'; gSh.lineWidth = 1.5; gSh.stroke();
-      gSh.strokeStyle = 'rgba(255,240,210,.22)'; gSh.lineWidth = 1; gSh.beginPath(); gSh.moveTo(R0*.15, R0*.02); gSh.lineTo(R0*.95, -R0*.04); gSh.stroke();
-      gSh.fillStyle = 'rgba(60,50,35,.9)'; for (const [u, v] of [[R0*.12, R0*.05], [R0*.5, R0*.05], [R0*.85, R0*.02]]){ gSh.beginPath(); gSh.arc(u, v, 1.4, 0, 7); gSh.fill(); }
-      gSh.restore();
-    }
-    // a little light leaking round the plates as they part
-    if (OPEN > 0){ const g = gSh.createRadialGradient(cx, cy, 0, cx, cy, R0*OPEN); g.addColorStop(0, 'rgba(255,240,210,' + (.35*(1 - OPEN)).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,240,210,0)'); gSh.fillStyle = g; gSh.fillRect(0, 0, w, h); }
+    if (openFrom === null && shutR && now - shownAt > 900 && (cityReady() || now - shownAt > 15000)) openFrom = now + 300;   // (15 s at most: never stuck shut)
+    const tt = openFrom === null ? 0 : Math.max(0, Math.min(1, (now - openFrom)/3200)); OPEN = reduced ? (openFrom === null ? 0 : 1) : tt*tt*(3 - 2*tt);
+    // the room is dark while it's shut (only what light leaks in, and its own lamps), and the daylight comes up with the plates
+    const lit = .3 + .7*Math.pow(OPEN, .8); if (Math.abs(lit - (drawShutter.lit || 0)) > .004){ drawShutter.lit = lit; stage.style.filter = lit >= .999 ? '' : 'brightness(' + lit.toFixed(3) + ') saturate(' + (.7 + .3*lit).toFixed(3) + ')'; }
+    if (!shutR) return; shutCv.hidden = OPEN >= 1; if (OPEN >= 1) return;
+    ROOM.setShutter(OPEN); shutR.render(shutScene, shutCam);
   }
-
   /* ---------- steam from the mug ---------- */
   let steam = [], steamAt = 0;
   function drawSteam(now, dt){
@@ -291,6 +283,9 @@ const TITLE = (() => {
     if (!RAW){ T.hide(true); return; }   // (the pictures couldn't be had: straight into the city)
     A = {}; for (const v of ['wide', 'tall']) A[v] = RAW[v][TOD] || RAW[v].morning; view = null;
     OPEN = 0; openFrom = null; shownAt = performance.now();
+    const boot = document.documentElement.classList.contains('title-boot');
+    if (boot){ const ready = () => imRoom.complete && imRoom.naturalWidth && shutR, t0 = performance.now();
+      (function wait(){ if (ready() || performance.now() - t0 > 9000){ shownAt = performance.now(); setTimeout(() => document.documentElement.classList.remove('title-boot'), 120); } else setTimeout(wait, 100); })(); }
     startLive().then(() => { if (live){ live.time(); if (view) live.view(view); } });
     layout(); aimCity(); try { camT.copy(camGoal); } catch (e) {} last = 0; raf = requestAnimationFrame(loop); fillNote();
     setTimeout(() => { const c = menu.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }, 60);
@@ -316,7 +311,7 @@ const TITLE = (() => {
       const fade = document.createElement('div'); fade.id = 'cctvFade'; document.body.appendChild(fade); T.show(); setTimeout(() => fade.remove(), 900); T.cutting = false; }, 1150);
   };
   function unwiden(){ const v = document.getElementById('view'); if (v){ v.style.transition = 'transform 1.2s ease-in-out'; v.style.transform = ''; setTimeout(() => { v.style.transition = ''; }, 1300); } }
-  function finish(){ unwiden(); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} }
+  function finish(){ unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} }
 
   /* ---------- the menu ---------- */
   function setDeck(on){

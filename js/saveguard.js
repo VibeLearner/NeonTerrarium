@@ -24,5 +24,5 @@ Storage.prototype.removeItem = function (k){ if (NT_SAVE_LOCK && this === window
   if (/[?&](notitle|tv=1)\b/.test(location.search) || navigator.webdriver) skip = true;   // (tests and the tools/ harnesses go straight in, and so does a return from the coast)
   if (/[?&]title\b/.test(location.search)) skip = false;   // (?title: show it anyway, for looking at it under a test browser)
   window.NT_TITLE = !skip;
-  if (!skip) document.documentElement.classList.add('title-on');
+  if (!skip) document.documentElement.classList.add('title-on', 'title-boot');   // (title-boot: a dark cover until the room's picture is in, so the city never shows loading first)
 })();

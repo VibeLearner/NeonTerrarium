@@ -211,8 +211,8 @@ const TITLE = (() => {
   }
   function drawDust(now, dt){
     const a = A[view], w = cvDust.width, h = cvDust.height; gD.clearRect(0, 0, w, h);
-    if (!a.patch) return;
-    const x0 = a.win[0]*w, y0 = a.win[1]*h, x1 = Math.min(a.patch[0], 1.05)*w, y1 = Math.min(a.patch[1], 1.0)*h, r = a.winR*.8;
+    const pt = a.patches && a.patches.length ? a.patches[a.patches.length >> 1] : a.patch; if (!pt) return;   // (the straight-in heading's sunlit patch)
+    const x0 = a.win[0]*w, y0 = a.win[1]*h, x1 = Math.min(pt[0], 1.05)*w, y1 = Math.min(pt[1], 1.0)*h, r = a.winR*.8;
     for (const m of motes){
       m.t += m.sp*dt; if (m.t > 1){ m.t = 0; m.o = Math.random()*2 - 1; }
       const t = m.t, bx = x0 + (x1 - x0)*t, by = y0 + (y1 - y0)*t, spread = r*(.8 + t*1.2);

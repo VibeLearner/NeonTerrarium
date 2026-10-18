@@ -226,6 +226,11 @@ const BOOTH = (() => {
 
   // ---------- the loop's clock: beats counted from t0 (bar 0 of the first pass); the count-in is beats -4 to -1 ----------
   let playing = false, t0 = 0, schedTo = 0, lastBar = null, apCache = new Map();
+  // Stasis (the Console's switch) on a shelf loop: from the next bar line the loop stays in the bar that's playing, its
+  // chord, chops and notes over and over, until Stasis is let go; then it carries on from the bar after. The loop's place
+  // is the clock's beat plus bOff, or inside the held bar while stz is set.
+  let stz = null, bOff = 0, lastEff = 0;
+  const effBeat = b => stz && b >= stz.from ? stz.bar*4 + ((b - stz.from) % 4) : b + (stz && b < stz.from ? stz.off : bOff);
   const beatSec = () => 60/S.bpm, L = () => S.len*4;
   const nowBeat = () => playing ? (ctx.currentTime - t0)/beatSec() : 0;
   const tOf = beat => t0 + beat*beatSec();
@@ -233,7 +238,7 @@ const BOOTH = (() => {
   function at(t, fn){ scheduled.push({ t, fn }); }
   function start(countIn){
     audio(); if (playing) return;
-    playing = true; t0 = ctx.currentTime + .08 + (countIn ? 4*beatSec() : 0); schedTo = countIn ? -4 : 0; lastBar = null; apCache.clear();
+    playing = true; t0 = ctx.currentTime + .08 + (countIn ? 4*beatSec() : 0); schedTo = countIn ? -4 : 0; lastBar = null; apCache.clear(); stz = null; bOff = 0; lastEff = 0;
     $('bPlay').textContent = 'Stop'; $('bPlay').classList.add('on');
   }
   function stop(){
@@ -253,7 +258,10 @@ const BOOTH = (() => {
     while (schedTo < until){
       const b = schedTo, t = tOf(b), Lb = L();
       if (b < 0){ click(t, b === -4); schedTo++; continue; }
-      const cyc = Math.floor(b/Lb), lb = b - cyc*Lb;
+      if (b % 4 === 0){ const fz = !!(bc && E.frozen);
+        if (fz && !stz) stz = { bar: Math.floor((((lastEff % Lb) + Lb) % Lb)/4), from: b, off: bOff };
+        else if (!fz && stz){ bOff = (stz.bar + 1)*4 - b; stz = null; } }
+      const eb = effBeat(b), cyc = Math.floor(eb/Lb), lb = eb - cyc*Lb; lastEff = eb;
       if (S.click === 'all' || (S.click === 'count' && rec && rec.armed && b >= rec.from - 4 && b < rec.from)) click(t, lb % 4 === 0);
       if (bc && lb === 0) prepDrift(cyc);
       if (lb % 4 === 0){ const ch = chordOf(lb/4); if (ch !== padCh || lastBar === null) padTo(ch, t); lastBar = lb/4; at(t, () => retune(ch, t, lb/4));
@@ -261,9 +269,9 @@ const BOOTH = (() => {
         if (bc && S.song && songSounds && songSounds.chops.length) voiceOn('chops', 60, t, .32*(S.padLvl ?? 1), 0, bus.pad, 4, lb/4).off(t + 4*beatSec());   // (the song's own chord under the bar)
         if (bc && lb === 0) at(t, () => bcPass(cyc)); }
       // the layers and the autopilot's part, for the notes that start in this beat
-      for (const layer of S.layers) for (const n of layer) if (n.b >= lb && n.b < lb + 1) playNote(n, cyc*Lb + n.b, false);
+      for (const layer of S.layers) for (const n of layer) if (n.b >= lb && n.b < lb + 1) playNote(n, b + n.b - lb, false);
       if (S.ap && S.layers.length){ let part = apCache.get(cyc); if (!part){ part = improvise(cyc); apCache.set(cyc, part); if (apCache.size > 3) apCache.delete(Math.min(...apCache.keys())); }
-        for (const n of part) if (n.b >= lb && n.b < lb + 1) playNote(n, cyc*Lb + n.b, true); }
+        for (const n of part) if (n.b >= lb && n.b < lb + 1) playNote(n, b + n.b - lb, true); }
       schedTo++;
     }
     if (rec){
@@ -299,7 +307,7 @@ const BOOTH = (() => {
 
   // ---------- playing the pads ----------
   const held = new Map();   // pad -> { h, m, from (beat), note (in the take, if recording) }
-  const curBar = () => playing && nowBeat() >= 0 ? Math.floor((nowBeat() % L())/4) : 0;
+  const curBar = () => playing && nowBeat() >= 0 ? Math.floor((((effBeat(nowBeat()) % L()) + L()) % L())/4) : 0;
   function noteDown(i, vel = .85){
     audio(); if (held.has(i)) return;
     const ch = chordOf(curBar()), m = padMidi(ch, i), h = voiceOn(S.voice, m, ctx.currentTime, vel, -.1, null, i, curBar());
@@ -546,7 +554,7 @@ const BOOTH = (() => {
     if (c.width !== w || c.height !== h){ c.width = w; c.height = h; }
     const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); const W = w/dpr, H = h/dpr; g.clearRect(0, 0, W, H);
     const Lb = L(), b0 = view ? view.b0 : 0, span = view ? view.span : Lb, top = 24, X = b => (b - b0)/span*W, Xd = d => d/span*W, lo = view ? view.lo : 0, nRows = view ? view.hi - view.lo + 1 : AP, rowH = (H - top - 10)/nRows, Y = i => H - 6 - (i - lo + 1)*rowH;
-    const nb = nowBeat(), lb = playing && nb >= 0 ? nb % Lb : -1, bar = lb >= 0 ? Math.floor(lb/4) : -1;
+    const nb = nowBeat(), eb = nb >= 0 ? effBeat(nb) : nb, lb = playing && nb >= 0 ? ((eb % Lb) + Lb) % Lb : -1, bar = lb >= 0 ? Math.floor(lb/4) : -1, hb = bc && stz && nb >= stz.from ? stz.bar : -1;
     g.font = '11.5px "JetBrains Mono", monospace'; g.textBaseline = 'middle';
     for (let k = 0; k < S.len; k++){
       const x0 = X(k*4), x1 = X(k*4 + 4); if (x1 < 0 || x0 > W) continue;
@@ -558,10 +566,19 @@ const BOOTH = (() => {
     g.fillStyle = 'rgba(23,65,74,.6)'; if (NP - 1 >= lo && NP - 1 < lo + nRows) g.fillRect(0, Y(NP - 1) - 1, W, 1);   // (above this line: only the autopilot reaches)
     const box = (n, col, a) => { if (n.i < lo || n.i >= lo + nRows) return; g.fillStyle = col.replace('A', a); g.fillRect(X(n.b) + 1, Y(n.i) + Math.min(1, rowH*.15), Math.max(2, Xd(n.d) - 2), Math.max(3, rowH - 1)); };
     S.layers.forEach((layer, li) => { const a = .55 + .4*(li === S.layers.length - 1 ? 1 : .5); for (const n of layer) box(n, n === sel ? 'rgba(232,213,83,A)' : (bc && bc.mode === 'rewire' && !n.o) ? 'rgba(150,240,190,A)' : 'rgba(95,216,222,A)', a); });
-    if (S.ap && S.layers.length && playing && nb >= 0){ const part = apCache.get(Math.floor(nb/Lb)); if (part) for (const n of part) box(n, 'rgba(229,55,159,A)', .8); }
+    if (S.ap && S.layers.length && playing && nb >= 0){ const part = apCache.get(Math.floor(eb/Lb)); if (part) for (const n of part) box(n, 'rgba(229,55,159,A)', .8); }
     if (rec && rec.live){ g.fillStyle = 'rgba(229,55,159,.1)'; g.fillRect(0, top, W, H - top);
       for (const n of rec.take){ const d = n.d || Math.max(.1, ((nb % Lb) - n.b + Lb) % Lb); box({ b: n.b, d, i: n.i }, 'rgba(255,120,150,A)', .95); } }
-    if (lb >= 0){ g.fillStyle = '#e8d553'; g.fillRect(X(lb) - 1, 0, 2, H); }
+    if (hb >= 0){   // Stasis: the held bar frosted over and looping, the rest of the loop dimmed and waiting
+      const x0 = X(hb*4), x1 = X(hb*4 + 4), tm = performance.now()/1000;
+      g.fillStyle = 'rgba(3,12,16,.55)'; g.fillRect(0, 0, Math.max(0, x0), H); g.fillRect(x1, 0, W - x1, H);
+      g.fillStyle = 'rgba(127,233,255,.13)'; g.fillRect(x0, 0, x1 - x0, H);
+      g.save(); g.beginPath(); g.rect(x0, 0, x1 - x0, H); g.clip(); g.strokeStyle = 'rgba(127,233,255,.16)'; g.lineWidth = 1;
+      const sh = (tm*14) % 14; for (let x = x0 - H + sh; x < x1; x += 14){ g.beginPath(); g.moveTo(x, H); g.lineTo(x + H, 0); g.stroke(); } g.restore();
+      g.strokeStyle = '#7fe9ff'; g.lineWidth = 2; g.shadowColor = '#7fe9ff'; g.shadowBlur = 10 + 4*Math.sin(tm*3); g.strokeRect(x0 + 1, 1, x1 - x0 - 2, H - 2); g.shadowBlur = 0;
+      g.fillStyle = '#7fe9ff'; g.font = '600 12px "Chakra Petch", sans-serif'; g.textAlign = 'right'; g.fillText('STASIS · BAR ' + (hb + 1) + ' ON A LOOP', W - 8, H - 12); g.textAlign = 'left';
+    }
+    if (lb >= 0){ g.fillStyle = hb >= 0 ? '#7fe9ff' : '#e8d553'; g.fillRect(X(lb) - 1, 0, 2, H); }
     if (playing && nb < 0){ g.fillStyle = 'rgba(3,12,16,.6)'; g.fillRect(0, 0, W, H); g.fillStyle = '#e8d553'; g.font = '600 46px "Chakra Petch", sans-serif'; g.textAlign = 'center'; g.fillText(String(Math.ceil(-nb)), W/2, H/2); g.textAlign = 'left'; }
     else if (rec && rec.armed && playing){ const left = rec.from - nb; g.fillStyle = '#e5379f'; g.font = '600 20px "Chakra Petch", sans-serif'; g.textAlign = 'right'; g.fillText('REC IN ' + Math.ceil(left), W - 10, H - 18); g.textAlign = 'left'; }
     if (!S.layers.length && !rec && !playing){ g.fillStyle = '#4f8c94'; g.font = '13px "JetBrains Mono", monospace'; g.textAlign = 'center'; g.fillText('Press Play and try the pads, then Record to keep a take.', W/2, (H + top)/2); g.textAlign = 'left'; }
@@ -649,7 +666,7 @@ const BOOTH = (() => {
     if (mode !== 'booth') music.setBooth(false);
   };
   B.isPlaying = () => playing; B.pause = p => { if (!bc) return; if (p) stop(); else start(false); };   // (held: the loop stops where it is and picks up from bar one)
-  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._move = () => moveSection(); B._sv = () => stripView(); B._mv = () => ({ mv, loaded: [...mvSounds.keys()] }); B._mvoice = (...a) => motifVoice(...a); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
+  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._move = () => moveSection(); B._sv = () => stripView(); B._bar = () => curBar(); B._mv = () => ({ mv, loaded: [...mvSounds.keys()] }); B._mvoice = (...a) => motifVoice(...a); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
   const layerOn = id => { const b = $(id); return !!(b && b.classList.contains('on')); };   // (the Console's layer buttons: what the player asked for, whether or not the engine has started)
   // once a pass (from the second): the governor drifts the Console's own settings, as the auto-governor does for the
   // planners' patterns; a rewired copy also takes a little of the autopilot's answer into itself and moves a note

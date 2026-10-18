@@ -3258,7 +3258,7 @@ document.querySelectorAll('.micro-mode-btn').forEach(btn => {
 $g('droneLevelSlider').addEventListener('input', (e) => {
   const val = parseFloat(e.target.value);
   $g('droneLevelVal').textContent = `${Math.round(val * 100)}%`;
-  if (droneMasterBus && ctx) droneMasterBus.gain.setTargetAtTime(val, ctx.currentTime, 0.08);
+  if (droneMasterBus && ctx && !boothHeld) droneMasterBus.gain.setTargetAtTime(val, ctx.currentTime, 0.08);
 });
 
 $g('subAnchorSlider').addEventListener('input', (e) => {
@@ -3285,7 +3285,7 @@ $g('motifLevelSlider').addEventListener('input', (e) => {
 $g('granularMixSlider').addEventListener('input', (e) => {
   const val = parseFloat(e.target.value);
   $g('granularMixVal').textContent = `${Math.round(val * 100)}%`;
-  if (granularBus && ctx) granularBus.gain.setTargetAtTime(val, ctx.currentTime, 0.08);
+  if (granularBus && ctx && !boothHeld) granularBus.gain.setTargetAtTime(val, ctx.currentTime, 0.08);
 });
 
 $g('lofiTextureSlider').addEventListener('input', (e) => {
@@ -3353,10 +3353,14 @@ function setBoothHold(on) {
     }
     droneMasterBus.gain.setTargetAtTime(0.0001, t, 0.3);
     granularBus.gain.setTargetAtTime(0.0001, t, 0.3);
+    // the soft chords of the sedation bed also feed the reverb on their own, so they're quieted at the source (they
+    // used to keep ringing the planners' chord under a Booth loop, and on in the Booth with nothing playing)
+    if (ambBus) ambBus.gain.setTargetAtTime(0.0001, t, 0.3);
     ctx.resume();
   } else {
     droneMasterBus.gain.setTargetAtTime(parseFloat($g('droneLevelSlider').value), t, 0.4);
     granularBus.gain.setTargetAtTime(parseFloat($g('granularMixSlider').value), t, 0.4);
+    if (ambBus) ambBus.gain.setTargetAtTime(1, t, 0.4);
     if (boothWas && !isPlaying) toggleSoundscapeEngine();
   }
 }

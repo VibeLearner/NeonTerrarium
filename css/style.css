@@ -394,7 +394,7 @@ html.title-on #view{cursor:default}
 .t-panel header{display:flex;align-items:center;justify-content:space-between}
 .t-panel h2,.t-panel h3{margin:0;font-family:var(--font-pixel);font-weight:400;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan)}
 .t-panel h3{font-size:11px}
-.tlist{list-style:none;margin:0;padding:0 2px 0 0;display:grid;gap:8px;align-content:start;flex:1 1 auto;min-height:90px;overflow:auto}
+.tlist{list-style:none;margin:0;padding:0 2px 0 0;display:grid;gap:8px;align-content:start;flex:1 1 auto;min-height:150px;overflow:auto}
 .t-panel > :not(.tlist){flex:none}
 .tcity{display:grid;grid-template-columns:112px 1fr;gap:6px 10px;padding:8px;border:1px solid var(--line);background:rgba(20,28,46,.6)}
 .tcity.active{border-color:var(--pink)}

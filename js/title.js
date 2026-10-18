@@ -42,7 +42,7 @@ const TITLE = (() => {
     note.style.right = Math.round(W - nx - (W - nx)*.62) + 'px'; note.style.top = Math.round(ny - H*.2) + 'px';
     const [cx] = px(s.mx + s.tb, 0), [cx1] = px(s.x1, 0), [, cy] = px(0, s.ty + s.tb);
     panel.style.left = Math.round(cx + 12) + 'px'; panel.style.width = Math.max(300, Math.round(cx1 - cx - 24)) + 'px';
-    panel.style.top = Math.round(cy + 10) + 'px'; panel.style.maxHeight = Math.round(by - cy - 20) + 'px';
+    panel.style.top = Math.round(cy + 10) + 'px'; panel.style.maxHeight = Math.round(H - cy - 26) + 'px';   // (it may hang down over the sill: the list needs the room)
   }
 
   /* ---------- the frame, sill, plant, lamp (pixels) ---------- */

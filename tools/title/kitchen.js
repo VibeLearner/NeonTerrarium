@@ -685,6 +685,7 @@ const ROOM = (() => {
     const put = (g, x, y, z, turn, size) => { g.position.set(x, y, z); g.rotation.y = turn*Math.PI/180; g.scale.setScalar(size); g.updateMatrixWorld(true); };
     put(G.chair, -.4, .11, -1.39, 135.5, 1); put(G.cabinet, 2.95, 0, -2.6, -11.5, 1.31); put(G.rug, .12, 0, -4.18, 129.5, 1.05);
     if (R.L) R.reaim();
+    for (const m of LAMP) m.castShadow = false;   // (it swings: a baked shadow of it would sit still on the table)
     R.parts = { kitchen: kit, window: hull, table: G.table, chair: G.chair, cabinet: G.cabinet, rug: G.rug };
     box(16, 6, .3, M.dark, 0, 2, -8.5);   // (the shell outside: the sun only comes in by the window)
     // a pendant lamp over the table: a cord from the ceiling, a brass cap, a cream dome shade, a bulb (lit in the evening and at night)

@@ -16,7 +16,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18p';
+  const VER = '2026-10-18q';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -347,7 +347,11 @@ const TITLE = (() => {
   menu.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     const act = b.dataset.act;
-    if (act === 'continue') T.hide();
+    if (act === 'continue'){
+      // still loading (the shutter's shut): say so, and go when it has opened
+      if (OPEN < 1 && !reduced){ if (b.dataset.wait) return; b.dataset.wait = '1'; const lab = b.innerHTML; b.textContent = 'Loading…'; b.setAttribute('aria-busy', 'true');
+        (function wait(){ if (!T.on){ b.innerHTML = lab; delete b.dataset.wait; b.removeAttribute('aria-busy'); return; } if (OPEN >= 1){ setTimeout(() => { b.innerHTML = lab; delete b.dataset.wait; b.removeAttribute('aria-busy'); T.hide(); }, 400); } else setTimeout(wait, 100); })(); }
+      else T.hide(); }
     else if (act === 'new') openPanel(true);
     else if (act === 'cities') openPanel(false);
     else if (act === 'settings'){ const on = !document.documentElement.classList.contains('title-deck'); if (on) closePanel(); setDeck(on); }

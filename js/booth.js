@@ -541,7 +541,7 @@ const BOOTH = (() => {
       $('bLen').querySelectorAll('.gb').forEach(b => b.classList.toggle('on', +b.dataset.len === S.len));
       songOption(); $('g-boothProg').value = 'song'; padCache.clear(); apCache.clear(); voiceAvail(); setVoice(r.nSamples ? 'sampler' : 'chops');
       loadedId = null; drawKeys(chordOf(0)); songInfo(); store(); renderShelf();
-    } catch (e){ say("Couldn't read that file as a song. Try an MP3, WAV, M4A or OGG."); console.warn(e); }
+    } catch (e){ say(e && e.decode ? "Couldn't read that file as a song. Try an MP3, WAV, M4A or OGG." : "Something went wrong while listening to that song (" + ((e && e.message) || 'unknown') + "). Try it again, or tell Claude this message."); console.warn(e); }
     status();
     btn.disabled = false; songBusy = false;
   }

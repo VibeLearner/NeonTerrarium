@@ -184,22 +184,23 @@ const BOOTHSONG = (() => {
     const es = fr.map(v => v.e).sort((p, q) => p - q), eMed = es[es.length >> 1] || 1e-9, rs = fr.map(v => v.ratio).sort((p, q) => p - q), rq = q => rs[Math.floor(q*(rs.length - 1))] || 0;
     const dt = hop/sr;
     const pass = (rMin, eMin, minDur, gapMax, loose) => {
-      const segs = []; let run = [], note = -1, gap = 0;
+      const segs = []; let run = [], note = -1, gap = 0, tail = 0;   // (gap: frames in a row off the note, skipped or not; tail: how many of them were kept on the run)
       const close = () => {
         if (run.length*dt >= minDur){
           const ms = run.filter(v => v.m === note).map(v => v.mf).filter(v => isFinite(v) && Math.abs(v - note) < .7).sort((p, q) => p - q), mm = ms.length ? ms[ms.length >> 1] : note;
           const own = run.filter(v => v.m === note), ratio = own.reduce((s2, v) => s2 + v.ratio, 0)/Math.max(1, own.length), loud = Math.min(2, run.reduce((s2, v) => s2 + v.e, 0)/run.length/eMed);
           segs.push({ t0: run[0].t - N/2/sr, t1: run[run.length - 1].t + N/2/sr, midi: mm, score: (run.length*dt)*ratio*(.4 + loud)*(own.length/run.length), loose });
         }
-        run = []; note = -1; gap = 0;
+        run = []; note = -1; gap = 0; tail = 0;
       };
       for (const v of fr){
         const ok = v.ratio > rMin && v.e > eMed*eMin;
         if (!ok){ if (run.length && gap < gapMax){ gap++; continue; } close(); continue; }
         if (note < 0){ note = v.m; run.push(v); continue; }
-        if (v.m === note){ run.push(v); gap = 0; continue; }
-        if (gap < gapMax){ gap++; run.push(v); continue; }   // (a frame or two on another note: still the same held note)
-        const keep = gap ? run.slice(-gap) : []; run.length -= gap; close(); for (const k of keep) if (k.m === v.m) run.push(k); note = v.m; run.push(v);
+        if (v.m === note){ run.push(v); gap = 0; tail = 0; continue; }
+        if (gap < gapMax){ gap++; tail++; run.push(v); continue; }   // (a frame or two on another note: still the same held note)
+        const keep = tail ? run.splice(run.length - tail, tail) : [];
+        close(); for (const k of keep) if (k.m === v.m) run.push(k); note = v.m; run.push(v);
       }
       close();
       return segs;
@@ -279,7 +280,7 @@ const BOOTHSONG = (() => {
   // returns { key (for the store), name, bpm, keyName, cs (the key's chords), list (a chord a bar, whole song), start, len, sounds }
   Q.analyze = async (file, ctx, say) => {
     say('Reading the song…', 0);
-    const buf = await ctx.decodeAudioData(await file.arrayBuffer());
+    let buf; try { buf = await ctx.decodeAudioData(await file.arrayBuffer()); } catch (e){ const er = new Error('decode'); er.decode = true; throw er; }
     const sr = buf.sampleRate, x = mono(buf), f = Math.max(1, Math.round(sr/11025)), xs = down(x, f), sr2 = sr/f;
     const id = 'song:' + file.name + ':' + file.size + ':' + Math.round(buf.duration);
     say('Finding the beat…', .05); await later();
@@ -288,10 +289,11 @@ const BOOTHSONG = (() => {
     const frames = await chroma(xs, sr2, p => say('Listening for the key and chords… ' + Math.round(p*100) + '%', .1 + p*.45));
     const key = keyOf(frames), bb = bars(frames, key, tp.bpm, tp.phase, buf.duration), sec = section(bb.list);
     say('Looking for clean held notes…', .55);
-    const segs = await heldNotes(xs, sr2, p => say('Looking for clean held notes… ' + Math.round(p*100) + '%', .55 + p*.25));
-    const roots = chooseRoots(segs);
+    // (the held notes are a bonus: if the search trips on something, the song still loads, with its chops)
+    let roots = [];
+    try { roots = chooseRoots(await heldNotes(xs, sr2, p => say('Looking for clean held notes… ' + Math.round(p*100) + '%', .55 + p*.25))); } catch (e){ console.warn('held notes', e); }
     say('Taking the drums out of the samples…', .82); await later();
-    const samples = []; for (const s of roots){ samples.push(makeSample(x, sr, s)); await later(); }
+    const samples = []; for (const s of roots){ try { samples.push(makeSample(x, sr, s)); } catch (e){ console.warn('sample', e); } await later(); }
     say('Cutting the chops…', .9); await later();
     const bs = 60/tp.bpm, chops = makeChops(x, sr, bb.t0 + sec.start*4*bs, bs, sec.len);
     // (the whole song kept too, at half rate, so the chops can be cut from another section in a later visit)
@@ -336,6 +338,6 @@ const BOOTHSONG = (() => {
     const x = f32(p.mono), c = makeChops(x, p.monoSr, p.bar0 + start*4*p.bs, p.bs, len);
     p.chops = c.map(b => b.map(v => v ? i16(v) : null)); p.chopSr = p.monoSr; await put(key, p); return toBuffers(ctx, p).chops;
   };
-  Q.hpss = hpss; Q.tempo = tempo; Q._held = heldNotes; Q._sample = makeSample;   // (for checking)
+  Q.hpss = hpss; Q.tempo = tempo; Q._held = heldNotes; Q._find = findHeld; Q._sample = makeSample;   // (for checking)
   return Q;
 })();

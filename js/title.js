@@ -16,7 +16,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18k';
+  const VER = '2026-10-18l';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -60,7 +60,7 @@ const TITLE = (() => {
     let d = ((sgn*(yaw - yaw0)*180/Math.PI + hs[0]) % 360 + 540) % 360 - 180;   // (degrees, -180..180; starts with the sun just coming in)
     sunH = d;
     const lo = hs[0], hi = hs[hs.length - 1]; let fade = Math.max(0, Math.min(1, 1 - (Math.max(lo - d, d - hi, 0))/25));
-    sunW = fade; if (fade <= 0) return; fade *= .8;
+    fade *= OPEN; sunW = fade; if (fade <= 0) return; fade *= .8;
     const c = Math.max(lo, Math.min(hi, d)), f = (c - lo)/(hi - lo)*(hs.length - 1), i = Math.min(hs.length - 2, Math.floor(f)), t = f - i;
     gSun.globalCompositeOperation = 'lighter';
     if (SUNS[i].complete){ gSun.globalAlpha = (1 - t)*fade; gSun.drawImage(SUNS[i], 0, 0, w, h); }
@@ -96,14 +96,67 @@ const TITLE = (() => {
       live = {
         view(v){ vw = v; const a = A[v], c = a.cam || CAMS[v]; r.setPixelRatio(1); r.setSize(a.w, a.h, false); cam.fov = c.fov; cam.aspect = a.w/a.h; cam.position.set(...c.pos); cam.lookAt(...c.look); cam.updateProjectionMatrix(); },
         time(){ ROOM.setTime(TOD); },
+        at(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam); return [(v.x + 1)/2, (1 - v.y)/2]; },
         draw(t){ tick(reduced ? 0 : t); ROOM.aimSun(sunW > 0 ? sunH*Math.PI/180*SUNSGN : null); ROOM.L.sun.intensity *= .6*sunW; r.render(scene, cam); }
       };
       if (view) live.view(view);
-    }).catch(() => {});
+    }).catch(e => { try { console.warn('title live layer:', e); } catch (_) {} });
     return liveP;
   }
   let SUNSGN = 1;
-  function drawLive(now){ if (!live || now - liveAt < 33) return; liveAt = now; live.draw(now/1000); }
+  function drawLive(now){ if (!live || now - liveAt < 33) return; liveAt = now; live.draw(now/1000); drawPool(); }
+  // the pendant's light on the table at evening and night: a warm pool under the bulb, moving as the lamp swings
+  const poolCv = document.createElement('canvas'), gPo = poolCv.getContext('2d'); poolCv.className = 't-layer t-sun'; poolCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(poolCv, cvDust);
+  function drawPool(){
+    const w = poolCv.width = cvDust.width, h = poolCv.height = cvDust.height, k = typeof ROOM !== 'undefined' ? ROOM.lampsK || 0 : 0;
+    if (!live || !k || !ROOM.bulbAt) return;
+    const b = ROOM.bulbAt(), y = 1.145, c = live.at(b.x, y, b.z), px = [live.at(b.x + .55, y, b.z), live.at(b.x - .55, y, b.z), live.at(b.x, y, b.z + .55), live.at(b.x, y, b.z - .55)];
+    const rx = Math.max(...px.map(p => Math.abs(p[0] - c[0])))*w, ry = Math.max(...px.map(p => Math.abs(p[1] - c[1])))*h;
+    gPo.save(); gPo.translate(c[0]*w, c[1]*h); gPo.scale(1, ry/Math.max(1, rx)); const g = gPo.createRadialGradient(0, 0, 0, 0, 0, rx);
+    g.addColorStop(0, 'rgba(255,196,120,' + (.55*k).toFixed(3) + ')'); g.addColorStop(.5, 'rgba(255,170,90,' + (.22*k).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,150,70,0)');
+    gPo.fillStyle = g; gPo.fillRect(-rx, -rx, 2*rx, 2*rx); gPo.restore();
+    // the bulb's own glow round the shade's mouth
+    const bc = live.at(b.x, b.y - .02, b.z), br = rx*.35; const g2 = gPo.createRadialGradient(bc[0]*w, bc[1]*h, 0, bc[0]*w, bc[1]*h, br); g2.addColorStop(0, 'rgba(255,220,160,' + (.6*k).toFixed(3) + ')'); g2.addColorStop(1, 'rgba(255,200,120,0)'); gPo.fillStyle = g2; gPo.fillRect(0, 0, w, h);
+    if (imRoom.complete){ gPo.globalCompositeOperation = 'destination-in'; gPo.drawImage(imRoom, 0, 0, w, h); gPo.globalCompositeOperation = 'source-over'; }
+  }
+
+  /* ---------- the shutter on the porthole ---------- */
+  // An iris of curved plates closes the window while the city loads (it streams in round the camera, nothing to look
+  // at); once it's all there the plates swing back into the frame and the sun comes in with them.
+  const shutCv = document.createElement('canvas'), gSh = shutCv.getContext('2d'); shutCv.className = 't-layer'; shutCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(shutCv, imRoom);
+  let OPEN = 0, openFrom = null, shownAt = 0;
+  T._hold = () => { shownAt = 1e15; openFrom = null; };   // (testing: keep the shutter shut)
+  const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady); } catch (e) { return true; } };
+  function drawShutter(now){
+    if (openFrom === null && now - shownAt > 900 && cityReady()) openFrom = now + 300;
+    const tt = openFrom === null ? 0 : Math.max(0, Math.min(1, (now - openFrom)/2800)); OPEN = reduced ? (openFrom === null ? 0 : 1) : tt*tt*(3 - 2*tt);
+    const w = shutCv.width = cvDust.width, h = shutCv.height = cvDust.height; if (OPEN >= 1) return;
+    const a = A[view], cx = a.win[0]*w, cy = a.win[1]*h, R0 = a.winR*1.18, N = 10;
+    for (let i = 0; i < N; i++){
+      const th = i/N*Math.PI*2, swing = OPEN*1.25;   // each plate pivots on the rim and swings out of the opening
+      const pvx = cx + Math.cos(th)*R0, pvy = cy + Math.sin(th)*R0;
+      gSh.save(); gSh.translate(pvx, pvy); gSh.rotate(th + Math.PI + swing);
+      // a plate: from its pivot on the rim across past the middle, its leading edge a gentle curve
+      gSh.beginPath(); gSh.moveTo(0, 0); gSh.lineTo(R0*1.05, -R0*.08); gSh.quadraticCurveTo(R0*1.15, R0*.42, R0*.62, R0*.78); gSh.lineTo(-R0*.05, R0*.62); gSh.closePath();
+      const gr = gSh.createLinearGradient(0, 0, R0, R0*.6); gr.addColorStop(0, '#8a8068'); gr.addColorStop(.5, '#6f6652'); gr.addColorStop(1, '#4a4436');
+      gSh.fillStyle = gr; gSh.fill(); gSh.strokeStyle = 'rgba(40,32,22,.85)'; gSh.lineWidth = 1.5; gSh.stroke();
+      gSh.strokeStyle = 'rgba(255,240,210,.22)'; gSh.lineWidth = 1; gSh.beginPath(); gSh.moveTo(R0*.15, R0*.02); gSh.lineTo(R0*.95, -R0*.04); gSh.stroke();
+      gSh.fillStyle = 'rgba(60,50,35,.9)'; for (const [u, v] of [[R0*.12, R0*.05], [R0*.5, R0*.05], [R0*.85, R0*.02]]){ gSh.beginPath(); gSh.arc(u, v, 1.4, 0, 7); gSh.fill(); }
+      gSh.restore();
+    }
+    // a little light leaking round the plates as they part
+    if (OPEN > 0){ const g = gSh.createRadialGradient(cx, cy, 0, cx, cy, R0*OPEN); g.addColorStop(0, 'rgba(255,240,210,' + (.35*(1 - OPEN)).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,240,210,0)'); gSh.fillStyle = g; gSh.fillRect(0, 0, w, h); }
+  }
+
+  /* ---------- steam from the mug ---------- */
+  let steam = [], steamAt = 0;
+  function drawSteam(now, dt){
+    const a = A[view]; if (!a.mug || reduced) return; const w = cvDust.width, h = cvDust.height, mx = a.mug[0]*w, my = a.mug[1]*h, sc = h/540;
+    if (now - steamAt > 140){ steamAt = now; steam.push({ t: 0, ph: Math.random()*6.3, x: (Math.random() - .5)*3*sc }); }
+    for (const p of steam) p.t += dt/3.2; steam = steam.filter(p => p.t < 1);
+    for (const p of steam){ const y = my - p.t*46*sc, x = mx + p.x + Math.sin(p.t*5 + p.ph)*4*sc*p.t, r = (1 + p.t*4)*sc, al = Math.sin(Math.PI*Math.min(1, p.t*1.4))*.16*(1 - p.t);
+      gD.fillStyle = 'rgba(245,240,232,' + al.toFixed(3) + ')'; gD.beginPath(); gD.arc(x, y, r, 0, 7); gD.fill(); }
+  }
 
   /* ---------- the plants on the sill, swaying (old: from a baked cut-out) ---------- */
   // their picture is sheared a pixel or two, more toward the tips: each column measured from its lowest leaf (the pot's rim)
@@ -175,7 +228,7 @@ const TITLE = (() => {
     const dt = last ? Math.min(.1, (now - last)/1000) : 0; last = now;
     try { if (typeof yawT !== 'undefined' && !reduced) yawT += dt*.02; if (yaw0 === null) yaw0 = yaw; } catch (e) {}
     aimCity();
-    if (A && view){ drawSun(); drawSway(now); drawLive(now); drawDust(now, dt); drawClouds(dt); }
+    if (A && view){ drawShutter(now); drawSun(); drawSway(now); drawLive(now); drawDust(now, dt); drawSteam(now, dt); drawClouds(dt); }
     // the light bar: steady, and now and then it blinks: a stutter of two or three, or one slow dip
     if (!reduced && now > flickNext){ flick = []; let t = now;
       if (Math.random() < .35){ flick.push([t, t + 500 + Math.random()*400]); t += 900; }
@@ -233,6 +286,7 @@ const TITLE = (() => {
     setScene(); RAW = RAW || await anchorsP;
     if (!RAW){ T.hide(true); return; }   // (the pictures couldn't be had: straight into the city)
     A = {}; for (const v of ['wide', 'tall']) A[v] = RAW[v][TOD] || RAW[v].morning; view = null;
+    OPEN = 0; openFrom = null; shownAt = performance.now();
     startLive().then(() => { if (live){ live.time(); if (view) live.view(view); } });
     layout(); aimCity(); try { camT.copy(camGoal); } catch (e) {} last = 0; raf = requestAnimationFrame(loop); fillNote();
     setTimeout(() => { const c = menu.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }, 60);
@@ -244,6 +298,18 @@ const TITLE = (() => {
     root.classList.add('leaving');
     try { if (was && was.cam){ camGoal.copy(was.cam.goal); pitchT = was.cam.pitchT; zoomT = was.zoomT; } } catch (e) {}
     setTimeout(finish, 1500);
+  };
+  // From the game back to the title: the city's picture turns into a security feed (grey, scanlines, a REC mark, a
+  // timestamp), jitters, then the tube switches off (it collapses to a bright line, then a dot), and the room fades up.
+  T.fromGame = () => {
+    if (T.on || T.cutting) return; if (reduced){ T.show(); return; } T.cutting = true;
+    const ov = document.createElement('div'); ov.id = 'cctv'; const d = new Date(), pad = n => String(n).padStart(2, '0');
+    ov.innerHTML = '<span class="cc-rec">\u25CF REC</span><span class="cc-cam">CAM 04 \u00B7 DISTRICT</span><span class="cc-time">' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) + '</span><canvas class="cc-noise"></canvas>';
+    document.documentElement.appendChild(ov); const nz = ov.querySelector('canvas'), gN = nz.getContext('2d'); nz.width = 200; nz.height = 120;
+    let on = true; (function noise(){ if (!on) return; const im = gN.createImageData(200, 120); for (let i = 0; i < im.data.length; i += 4){ const v = Math.random()*255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } gN.putImageData(im, 0, 0); requestAnimationFrame(noise); })();
+    document.documentElement.classList.add('cctv-out');
+    setTimeout(() => { on = false; document.documentElement.classList.remove('cctv-out'); ov.remove();
+      const fade = document.createElement('div'); fade.id = 'cctvFade'; document.body.appendChild(fade); T.show(); setTimeout(() => fade.remove(), 900); T.cutting = false; }, 1150);
   };
   function finish(){ T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} }
 

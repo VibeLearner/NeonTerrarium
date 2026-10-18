@@ -435,4 +435,26 @@ html.title-on.title-deck #deckToggle{visibility:visible!important;pointer-events
 
 .deck .to-title{margin:0 0 14px}
 html.title-on #toTitle{display:none}
-.t-live{filter:saturate(.85) contrast(.92) sepia(.12)}
+.t-live{filter:saturate(.8) contrast(.92) sepia(.05) brightness(.92)}
+/* back to the title: the city's picture as a CCTV feed cutting out */
+html.cctv-out{background:#000}
+html.cctv-out body{animation:cctvOff 1.15s forwards;transform-origin:50% 50%;overflow:hidden}
+@keyframes cctvOff{
+  0%{filter:none;transform:none}
+  14%{filter:grayscale(1) contrast(1.6) brightness(1.05) sepia(.25)}
+  26%{transform:translateX(-7px) skewX(2deg);filter:grayscale(1) contrast(1.6) brightness(1.2)}
+  30%{transform:translateX(5px) skewX(-1deg)}
+  34%{transform:none;filter:grayscale(1) contrast(1.6) brightness(1.05)}
+  62%{transform:scaleY(.012);filter:grayscale(1) brightness(4)}
+  80%{transform:scale(.004,.012);filter:grayscale(1) brightness(7)}
+  100%{transform:scale(0,0);filter:brightness(7)}
+}
+#cctv{position:fixed;inset:0;z-index:9999;pointer-events:none;font:12px Silkscreen,monospace;color:#e8f0e8;text-shadow:0 0 3px rgba(0,0,0,.8);animation:cctvOv 1.15s forwards}
+#cctv::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 1px,transparent 1px 3px)}
+#cctv .cc-noise{position:absolute;inset:0;width:100%;height:100%;opacity:.12;mix-blend-mode:screen;image-rendering:pixelated}
+#cctv .cc-rec{position:absolute;left:max(18px,env(safe-area-inset-left));top:16px;color:#ff4a4a}
+#cctv .cc-cam{position:absolute;right:max(18px,env(safe-area-inset-right));top:16px}
+#cctv .cc-time{position:absolute;left:max(18px,env(safe-area-inset-left));bottom:16px}
+@keyframes cctvOv{0%{opacity:0}10%{opacity:1}55%{opacity:1}62%{opacity:0}100%{opacity:0}}
+#cctvFade{position:fixed;inset:0;z-index:9998;background:#000;pointer-events:none;animation:cctvUp .9s ease-out forwards}
+@keyframes cctvUp{0%{opacity:1}100%{opacity:0}}

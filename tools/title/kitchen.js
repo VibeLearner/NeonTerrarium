@@ -266,7 +266,11 @@ const ROOM = (() => {
   // foliage goes on layer 1: it casts shadows into the room but is baked as its own picture, so the title screen can sway it
   let FOL = 0, LAMPF = 0; const FOLIAGE = R.foliage = [], LAMP = R.lamp = [];
   let PB = null;
-  function plant(x, y, z, s, kind, potMat){ if (potMat !== null) pot(x, y, z, s, potMat || M.pot); FOL++; const pb0 = PB; if (!FOL || FOL === 1) PB = { y: y + .27*s, s }; try { plantBody(x, y, z, s, kind); } finally { FOL--; PB = pb0; } }
+  const PLANTS = R.plants = [];
+  function plant(x, y, z, s, kind, potMat){ if (potMat !== null) pot(x, y, z, s, potMat || M.pot); FOL++; const pb0 = PB, top = FOL === 1;
+    let g = null, op = parent; if (top){ PB = { y: y + .27*s, s }; g = new C.Group(); g.position.set(x, y + .27*s, z); (parent || scene).add(g); parent = g; }
+    try { plantBody(x, y, z, s, kind); } finally { FOL--; PB = pb0;
+      if (top){ parent = op; for (const c of g.children){ c.position.x -= x; c.position.y -= y + .27*s; c.position.z -= z; } PLANTS.push({ g, s, kind }); } } }
   function plantBody(x, y, z, s, kind){ const potMat = null;
     const top0 = y + .27*s;
     if (kind === 'succulent'){ for (let ring = 0; ring < 3; ring++) for (let k = 0; k < 9 - ring*2; k++){ const a = k/(9 - ring*2)*Math.PI*2 + ring*.3, l = (.09 - ring*.022)*s*2.2;
@@ -381,23 +385,22 @@ const ROOM = (() => {
     lathe([[0, .02], [.07, .02], [.065, .1], [.05, .18], [.055, .3], [.07, .36], [.05, .42], [.045, T.y - .3], [.06, T.y - .22], [.05, T.y - .14], [.1, T.y - .1], [.16, T.y - .07]], M.darkWood, T.x, 0, T.z, { seg: 64 });
     for (let k = 0; k < 4; k++){ const a = k/4*Math.PI*2 + .4, pts = []; for (let i = 0; i <= 8; i++){ const t = i/8; pts.push([T.x + Math.cos(a)*(.05 + t*.3), .2 - Math.sin(t*1.6)*.17, T.z + Math.sin(a)*(.05 + t*.3)]); } pipe(pts, .028, M.darkWood); cyl(.035, .03, .02, M.darkWood, T.x + Math.cos(a)*.35, .01, T.z + Math.sin(a)*.35, { seg: 24 }); }
     const TY = T.y + .035;
-    const croissant = (x, y, z, ry) => { const c = add(new C.TorusGeometry(.04, .022, 8, 14, 2.5), M.bread, x, y + .02, z, { rx: Math.PI/2, cast: false }); c.rotation.z = ry; c.scale.set(1, 1, .75); for (let k = 0; k < 4; k++) add(new C.TorusGeometry(.024, .004, 4, 10), std({ color: 0x9a5a28, roughness: .7 }), x + Math.cos(ry + .4 + k*.5)*.04, y + .02, z + Math.sin(ry + .4 + k*.5)*.04, { ry: -(ry + .4 + k*.5), cast: false }); };
-    const juice = (x, y, z) => { lathe([[0, 0], [.028, 0], [.032, .11], [.03, .11]], M.glass, x, y, z, { cast: false }); cyl(.026, .028, .075, M.juice, x, y + .04, z, { cast: false }); };
-    for (const a of [-.5, .75, 2.05]){ const px = T.x + Math.cos(a)*.4, pz = T.z + Math.sin(a)*.4, ta = a + Math.PI/2;
-      box(.2, .004, .16, std({ color: pick([0xd8c9a0, 0x9fb6b0, 0xe6dccb]), roughness: .95 }), px, TY + .002, pz, { ry: -a, cast: false });   // a placemat
-      plate(px, TY + .005, pz, .1); croissant(px, TY + .02, pz, rnd()*6);
-      for (const sd of [-1, 1]) box(.012, .004, .14, M.steel, px + Math.cos(ta)*sd*.13, TY + .007, pz + Math.sin(ta)*sd*.13, { ry: -a, cast: false });
-      juice(px + Math.cos(a - .5)*.16, TY, pz + Math.sin(a - .5)*.16); box(.07, .01, .07, std({ color: 0xf4efe2, roughness: .95 }), px + Math.cos(ta)*-.2, TY + .005, pz + Math.sin(ta)*-.2, { ry: .3 }); }
-    bowl(T.x + .05, TY, T.z + .02, .14, 0, M.glazeTeal); { const K = ['orange', 'apple', 'orange', 'redpear', 'orange', 'apple', 'pomegranate', 'orange', 'lemon']; for (let i = 0; i < 9; i++){ const a = i/9*6.3, d = i < 6 ? .075 : .02; fruit(T.x + .05 + Math.cos(a)*d, TY + .03 + (i < 6 ? 0 : .055), T.z + .02 + Math.sin(a)*d, .036, K[i]); } }
-    lathe([[0, 0], [.1, 0], [.13, .07], [.135, .08]], M.basket, T.x - .2, TY, T.z + .2); for (let i = 0; i < 3; i++) bread(T.x - .2 + rr(-.05, .05), TY + .03, T.z + .2 + rr(-.05, .05), .11); croissant(T.x - .17, TY + .05, T.z + .16, 1);
-    jar(T.x + .3, TY, T.z - .05, .08, .03, M.jam); add(rbox(.11, .03, .07, .01), M.glazeWhite, T.x + .22, TY + .015, T.z + .2); box(.07, .025, .045, M.butter, T.x + .22, TY + .042, T.z + .2, { cast: false });
-    lathe([[0, 0], [.025, 0], [.03, .05], [.015, .1], [.017, .11]], M.glass, T.x + .12, TY, T.z - .2, { cast: false }); for (let k = 0; k < 4; k++){ const fx = T.x + .12 + rr(-.04, .04), fz = T.z - .2 + rr(-.04, .04), fy = TY + rr(.16, .22); pipe([[T.x + .12, TY + .08, T.z - .2], [fx, fy, fz]], .002, M.leafs[0]); for (let q = 0; q < 5; q++){ const qa = q/5*6.3; add(new C.SphereGeometry(.009, 6, 4), M.petal[k % 2 ? 1 : 3], fx + Math.cos(qa)*.01, fy, fz + Math.sin(qa)*.01, { cast: false }); } }
-    lathe([[0, 0], [.07, 0], [.09, .06], [.085, .14], [.055, .2], [.05, .24], [.065, .27], [.06, .28]], M.copper, T.x - .25, TY, T.z - .35); pipe([[T.x - .25 - .085, TY + .22, T.z - .35], [T.x - .25 - .14, TY + .2, T.z - .35], [T.x - .25 - .14, TY + .1, T.z - .35], [T.x - .25 - .085, TY + .06, T.z - .35]], .011, M.copper); add(new C.ConeGeometry(.025, .05, 8, 1, true), M.copper, T.x - .25 + .07, TY + .265, T.z - .35, { rz: -1.2, cast: false });
-    lathe([[0, 0], [.04, 0], [.045, .05], [.035, .1], [.04, .11]], M.glazeWhite, T.x + .36, TY, T.z - .25); pipe([[T.x + .36 + .04, TY + .08, T.z - .25], [T.x + .36 + .07, TY + .07, T.z - .25], [T.x + .36 + .04, TY + .03, T.z - .25]], .006, M.glazeWhite);
-    { const tc = new C.PlaneGeometry(.42, .98); tc.rotateX(-Math.PI/2); add(tc, std({ color: 0xd9cfb4, roughness: .95, side: C.DoubleSide }), T.x + .05, TY + .003, T.z, { cast: false, ry: .3 });   // a linen runner
-      lathe([[0, 0], [.07, 0], [.09, .05], [.085, .11], [.05, .14], [.02, .15], [.025, .16]], M.ceramic, T.x - .1, TY, T.z - .3); pipe([[T.x - .02, TY + .07, T.z - .3], [T.x + .06, TY + .12, T.z - .3], [T.x + .1, TY + .14, T.z - .3]], .012, M.ceramic); pipe([[T.x - .18, TY + .12, T.z - .3], [T.x - .24, TY + .1, T.z - .3], [T.x - .23, TY + .04, T.z - .3], [T.x - .18, TY + .03, T.z - .3]], .01, M.ceramic); add(new C.SphereGeometry(.015, 8, 6), M.ceramic, T.x - .1, TY + .165, T.z - .3);   // a teapot with a lid knob and a handle
-      for (const [dx, dz] of [[.25, .1], [-.3, .25], [.1, .35]]){ lathe([[0, 0], [.035, 0], [.04, .09], [.037, .09]], std({ color: pick([0xf1ebdc, 0x3f6f7a, 0xc94f3b]), roughness: .3 }), T.x + dx, TY, T.z + dz); add(new C.TorusGeometry(.02, .006, 6, 12), M.ceramic, T.x + dx + .045, TY + .045, T.z + dz, { cast: false }); }
-      add(rbox(.32, .025, .2, .01), M.wood, T.x + .2, TY + .012, T.z - .15); bread(T.x + .2, TY + .025, T.z - .15, .2); box(.3, .012, .22, std({ color: 0xe8e0c8, roughness: .9 }), T.x - .28, TY + .006, T.z + .02, { ry: .5, cast: false }); }
+    // cleared: the linen runner, three paper placemats, a folded newspaper, one teal mug (steam rises from it on the title
+    // screen), and a vase of flowers at the table's left, in front of the window
+    { const tc = new C.PlaneGeometry(.42, .98); tc.rotateX(-Math.PI/2); add(tc, std({ color: 0xd9cfb4, roughness: .95, side: C.DoubleSide }), T.x + .05, TY + .003, T.z, { cast: false, ry: .3 }); }
+    for (const a of [-.5, .75, 2.05]){ const px = T.x + Math.cos(a)*.4, pz = T.z + Math.sin(a)*.4; box(.2, .004, .16, std({ color: pick([0xd8c9a0, 0xe6dccb, 0xece4d0]), roughness: .95 }), px, TY + .005, pz, { ry: -a, cast: false }); }
+    box(.3, .012, .22, std({ color: 0xe8e0c8, roughness: .9 }), T.x - .05, TY + .008, T.z + .28, { ry: .5, cast: false }); for (let k = 0; k < 6; k++) box(.24, .001, .006, M.dark, T.x - .05 + Math.sin(.5)*(k - 2.5)*.025, TY + .015, T.z + .28 + Math.cos(.5)*(k - 2.5)*.025, { ry: .5, cast: false });
+    { const mx = T.x + .26, mz = T.z + .1; lathe([[0, 0], [.035, 0], [.037, .004], [.04, .09], [.042, .095], [.037, .095], [.034, .012], [0, .012]], M.glazeTeal, mx, TY, mz);
+      cyl(.035, .035, .004, std({ color: 0x3a2414, roughness: .2 }), mx, TY + .08, mz, { seg: 24, cast: false }); add(new C.TorusGeometry(.022, .006, 8, 16), M.glazeTeal, mx + .045, TY + .05, mz, { cast: false });
+      R.mugTop = new C.Vector3(mx, TY + .1, mz); }
+    { const vx = T.x - .3, vz = T.z - .06;   // the vase: a tall glazed bottle, stems of different heights, blooms and leaves
+      lathe([[0, 0], [.05, 0], [.06, .03], [.065, .12], [.05, .2], [.025, .26], [.022, .3], [.03, .31]], std({ color: 0x2f5a62, roughness: .15 }), vx, TY, vz);
+      for (let k = 0; k < 9; k++){ const a = k/9*6.3 + rr(-.3, .3), lean = rr(.05, .22), h = rr(.32, .62), tip = [vx + Math.cos(a)*lean*h, TY + .28 + h, vz + Math.sin(a)*lean*h];
+        pipe([[vx, TY + .2, vz], [vx + Math.cos(a)*lean*h*.4, TY + .3 + h*.5, vz + Math.sin(a)*lean*h*.4], tip], .003, M.leafs[0]);
+        for (let q = 0; q < 2; q++){ const lf = add(LEAF[3], M.leafs[1], vx + Math.cos(a)*lean*h*.5, TY + .32 + h*(.3 + q*.25), vz + Math.sin(a)*lean*h*.5, { s: .7, cast: false }); lf.rotation.set(-1, a + q*2, 0); }
+        const col = [M.petal[0], M.petal[1], M.petal[3], M.petal[0], M.petal[2]][k % 5], n = k % 3 === 0 ? 8 : 6;
+        for (let q = 0; q < n; q++){ const qa = q/n*6.3; const pe = add(new C.SphereGeometry(.018, 10, 8), col, tip[0] + Math.cos(qa)*.02, tip[1], tip[2] + Math.sin(qa)*.02, { cast: true }); pe.scale.set(1, .45, 1); }
+        add(new C.SphereGeometry(.01, 8, 6), M.petal[2], tip[0], tip[1] + .006, tip[2], { cast: false }); } }
     parent = null;
   }
 
@@ -464,10 +467,6 @@ const ROOM = (() => {
     { const ux = .68, uz = .5; lathe([[0, 0], [.055, 0], [.06, .005], [.062, .16], [.066, .17], [.058, .17], [.054, .012], [0, .012]], M.glazeTeal, ux, TT, uz);
       for (let k = 0; k < 6; k++){ const a = k/6*6.3, tx = ux + Math.cos(a)*.03, tz = uz + Math.sin(a)*.03; pipe([[tx, TT + .05, tz], [tx + Math.cos(a)*.03, TT + .3, tz + Math.sin(a)*.03]], .006, k % 2 ? M.wood : M.steel);
         if (k % 2) add(rbox(.04, .06, .008, .006), M.wood, tx + Math.cos(a)*.035, TT + .33, tz + Math.sin(a)*.035, { ry: -a, cast: false }); else add(new C.SphereGeometry(.024, 24, 12, 0, 6.3, 0, 1.6), M.steel, tx + Math.cos(a)*.035, TT + .33, tz + Math.sin(a)*.035, { rx: Math.PI, cast: false }); } }
-    { const cx = .93, cz = .28, cy = TT;   // the grain canister: glass, chrome lid with a knob, a clip handle
-      lathe([[0, 0], [.17, 0], [.18, .02], [.18, .05]], M.chrome, cx, cy, cz); lathe([[.175, .05], [.175, .4]], M.glass, cx, cy, cz, { cast: false, seg: 64 });
-      cyl(.165, .165, .27, std({ color: 0xa8763a, roughness: .9, bumpMap: dimpleT.bump, bumpScale: .03 }), cx, cy + .185, cz, { cast: false, seg: 64 });
-      lathe([[.185, .4], [.185, .43], [.15, .47], [.05, .5], [.05, .53], [.03, .55], [0, .55]], M.chrome, cx, cy, cz); for (const k of [.05, .28, .4]) add(new C.TorusGeometry(.18, .006, 8, 64), M.chrome, cx, cy + k, cz, { rx: Math.PI/2, cast: false }); }
     { const hx = 1.33, hz = .34;   // the hob over the oven: black glass, two burner rings with grates, the kettle and a pan on them
       add(rbox(.6, .012, .5, .02), M.blackGlass, hx, TT + .006, hz); add(rbox(.62, .008, .52, .02), M.chrome, hx, TT + .001, hz);
       for (const [bx, r] of [[hx - .15, .085], [hx + .15, .07]]){ for (const rr2 of [r, r*.6]) add(new C.TorusGeometry(rr2, .004, 6, 48), std({ color: 0x5a1a10, emissive: 0x401008, roughness: .4 }), bx, TT + .013, hz, { rx: Math.PI/2, cast: false });
@@ -484,8 +483,6 @@ const ROOM = (() => {
     { const bx = 2.08, bz = .38; add(rbox(.44, .025, .28, .012), M.wood, bx, TT + .012, bz, { ry: .12 });    // the bread board: a loaf, a slice, a knife, crumbs
       box(.1, .012, .08, M.crumb, bx + .14, TT + .03, bz + .05, { ry: .3 }); box(.22, .003, .028, M.steel, bx + .06, TT + .03, bz + .1, { ry: .45 }); add(rbox(.09, .018, .024, .006), M.darkWood, bx - .1, TT + .033, bz + .14, { ry: .45 });
       for (let i = 0; i < 14; i++) box(.006, .004, .006, M.crumb, bx + rr(-.18, .2), TT + .027, bz + rr(-.1, .12), { cast: false }); }
-    { bowl(2.38, TT, .56, .12, 0, M.glazeWhite); { const K = ['orange', 'apple', 'pear', 'orange', 'mango', 'lemon', 'orange', 'apple']; for (let i = 0; i < 8; i++){ const a = i/8*6.3, d = i < 5 ? .065 : .015; fruit(2.38 + Math.cos(a)*d, TT + .02 + (i < 5 ? 0 : .05), .56 + Math.sin(a)*d, .036, K[i]); } }
-      fruit(2.2, TT, .62, .036, 'apple'); fruit(2.28, TT, .67, .032, 'lemon'); fruit(2.62, TT, .6, .04, 'pomegranate'); }
     { const rx = 3.45, rz = .32;   // the dish rack: a wire frame, plates on edge, a mug upside down, cutlery in a cup
       for (const dz of [-.12, .12]) pipe([[rx - .22, TT + .005, rz + dz], [rx - .22, TT + .1, rz + dz], [rx + .22, TT + .1, rz + dz], [rx + .22, TT + .005, rz + dz]], .004, M.steel);
       for (let k = 0; k < 9; k++) pipe([[rx - .2 + k*.05, TT + .01, rz - .12], [rx - .2 + k*.05, TT + .06, rz], [rx - .2 + k*.05, TT + .01, rz + .12]], .003, M.steel);
@@ -493,7 +490,6 @@ const ROOM = (() => {
       lathe([[0, 0], [.04, 0], [.042, .09], [.04, .095]], M.glazeTeal, rx + .14, TT + .1, rz + .02).rotation.x = Math.PI; }
     for (let k = 0; k < 3; k++){ const tx = 3.82 + k*.1; cyl(.042, .042, .13 - k*.02, M.steel, tx, TT + .065 - k*.01, .16, { seg: 40 }); cyl(.043, .043, .06, std({ color: [0xd6573b, 0x3f6f7a, 0xe0c27a][k], roughness: .5 }), tx, TT + .06 - k*.01, .16, { seg: 40, cast: false }); add(new C.TorusGeometry(.042, .004, 6, 40), M.steel, tx, TT + .13 - k*.02, .16, { rx: Math.PI/2, cast: false }); }
     for (let k = 0; k < 3; k++) lathe([[0, 0], [.04, 0], [.07, .045], [.072, .05], [.068, .05], [.038, .006], [0, .006]], M.glazeWhite, 4.05, TT + k*.032, .4);
-    fruitPlate(3.85, TT, .56, .12, 5);
     add(rbox(.24, .025, .16, .01), M.towel, 4.05, TT + .012, .6, { ry: -.2 });
     // the capsule appliance (after the reference): a horizontal cream cylinder squashed front to back with a rounded left cap,
     // seam rings between its sections, a recessed light bar with three glowing panes, the oven window in a chrome bezel with a
@@ -584,7 +580,12 @@ const ROOM = (() => {
     parent = G.cabinet;
     { const bx = 2.15, bz = -3.0; add(rbox(.8, .86, .7, .03), M.brownCab, bx, .43, bz); box(.74, .025, .64, M.wood, bx, .87, bz); for (let k = 0; k < 3; k++){ add(rbox(.02, .24, .62, .01), M.brownCab, bx - .41, .18 + k*.27, bz); box(.03, .02, .2, M.chrome, bx - .43, .26 + k*.27, bz); }
       for (let k = 0; k < 3; k++) box(.02, .02, .55, M.dark, bx - .41, .2 + k*.22, bz, { cast: false });
-      bowl(bx - .05, .88, bz + .05, .2, 11, M.wood); }
+      { const fx = bx - .05, fy = .88, fz = bz + .05;   // a wicker basket of fruit, the only fruit in the room
+        lathe([[0, 0], [.13, 0], [.17, .04], [.2, .1], [.21, .12], [.2, .125], [.16, .05], [.12, .015], [0, .015]], M.basket, fx, fy, fz, { seg: 48 });
+        for (let k = 0; k < 14; k++) add(new C.TorusGeometry(.13 + k*.0055, .004, 4, 48), std({ color: 0x8a6a3a, roughness: 1 }), fx, fy + .015 + k*.0075, fz, { rx: Math.PI/2, cast: false });
+        add(new C.TorusGeometry(.19, .01, 8, 32, Math.PI), M.basket, fx, fy + .12, fz, { ry: .4 });
+        const K = ['orange', 'apple', 'pear', 'orange', 'redpear', 'apple', 'lemon', 'orange', 'pomegranate', 'mango', 'apple'];
+        for (let i = 0; i < K.length; i++){ const a = i/7*6.3, d = i < 7 ? .11 : .04; fruit(fx + Math.cos(a)*d, fy + .02 + (i < 7 ? 0 : .06), fz + Math.sin(a)*d, .04, K[i]); } } }
     parent = null;
     // the title sign (outside the reference's frame; seen in the wide view): on the kitchen wall past the capsule
     // the sign is off the wall for now (R.noSign): it is still made, so the bake's on/off swap has something to hold
@@ -627,7 +628,6 @@ const ROOM = (() => {
     for (const x of [-.36, .36]) box(.05, .05, .6, M.dark, cx + x, .02, cz, { cast: false }); }
     parent = kit;
     box(4.18, .015, .015, M.chrome, 2.11, .87, .7, { cast: false }); box(4.18, .02, .02, M.chrome, 2.11, .09, .66, { cast: false });
-    for (const [x, z] of [[.15, .4], [1.65, .3], [2.3, .58], [3.6, .45], [4.0, .55]]) fruitPlate(x, .945, z, .13, 8);
     parent = null;
   }
 
@@ -727,7 +727,7 @@ const ROOM = (() => {
     kit.updateMatrixWorld(true); R.L.lamps = [];
     for (const x of [1.0, 2.0, 3.0]){ const l = new C.PointLight(0xffc888, 0, 1.9, 2); l.position.copy(new C.Vector3(x, 1.58, .4).applyMatrix4(kit.matrixWorld)); sc.add(l); R.L.lamps.push([l, .7]); }
     { const l = new C.SpotLight(0xffc890, 0, 7, .9, .8, 1.6); l.position.copy(toWorld(-2.1, CEIL - .72, .95)); l.target.position.copy(l.position).add(new C.Vector3(0, -3, 0)); l.castShadow = true; l.shadow.mapSize.set(1024, 1024); l.shadow.bias = -.0006; sc.add(l, l.target); R.L.lamps.push([l, 2.2]); }
-    { const p = G.table.position; const l = new C.PointLight(0xffb870, 0, 3.2, 2); l.position.set(p.x, 1.72, p.z); l.castShadow = true; l.shadow.mapSize.set(1024, 1024); l.shadow.bias = -.001; sc.add(l); R.L.lamps.push([l, 1.4]); }
+    { const p = G.table.position; const l = new C.PointLight(0xffb870, 0, 3.2, 2); l.position.set(p.x, 1.72, p.z); l.castShadow = true; l.shadow.mapSize.set(1024, 1024); l.shadow.bias = -.001; sc.add(l); R.L.lamps.push([l, 1.4]); R.L.pendant = l; }
     R.setTime('morning'); R.setSun(0);
     return sun;
   };
@@ -736,7 +736,7 @@ const ROOM = (() => {
     L.sun.color.set(T.sunC); for (const sp of L.sky){ sp.color.set(T.sky); sp.intensity = T.skyI; }
     L.hemi.color.set(T.hemi[0]); L.hemi.groundColor.set(T.hemi[1]); L.hemi.intensity = T.hemi[2]; L.amb.intensity = T.amb; L.b5.intensity = T.b5;
     L.fill.color.set(T.fill[0]); L.fill.intensity = T.fill[1];
-    for (const [l, k] of L.lamps) l.intensity = k*T.lamps; M.pendant.emissiveIntensity = T.lamps*1.6; if (R.liveMats && R.liveMats.has(M.pendant)) R.liveMats.get(M.pendant).emissiveIntensity = T.lamps*1.6; M.downlight.color.set(T.lamps ? 0xffe8c0 : 0x8a8070);
+    for (const [l, k] of L.lamps) l.intensity = k*T.lamps; if (R.bakeNoPendant) L.pendant.intensity = 0; R.lampsK = T.lamps; M.pendant.emissiveIntensity = T.lamps*1.6; if (R.liveMats && R.liveMats.has(M.pendant)) R.liveMats.get(M.pendant).emissiveIntensity = T.lamps*1.6; M.downlight.color.set(T.lamps ? 0xffe8c0 : 0x8a8070);
     return { sunCol: T.post, density: T.density, sunny: T.sunI > 0, grade: T.grade };
   };
   // theta: the sun's heading round from the window's outward normal (radians), at the hour's height; null: no sun
@@ -752,11 +752,13 @@ const ROOM = (() => {
     const mm = new Map(); for (const m of keep){ const o = m.material; if (!mm.has(o)) mm.set(o, new C.MeshLambertMaterial({ color: o.color ? o.color.clone().multiplyScalar(.85) : 0xffffff, map: o.map || null, side: o.side, emissive: o.emissive || 0x000000, emissiveIntensity: o.emissiveIntensity ?? 1 })); m.material = mm.get(o); }
     R.liveMats = mm;
     const lampG = new C.Group(); lampG.position.copy(R.lampPivot); sc.add(lampG); lampG.updateMatrixWorld(true); for (const m of LAMP) lampG.attach(m);
-    const leaves = FOLIAGE.filter(m => m.userData.pb).map(m => ({ m, p: m.position.clone(), h: Math.max(0, m.position.y - m.userData.pb.y), s: m.userData.pb.s, ph: m.position.x*3.1 + m.position.z*2.3 }));
+    const bends = PLANTS.map(P => ({ g: P.g, k: (P.kind === 'trail' ? .05 : P.kind === 'succulent' || P.kind === 'cactus' ? .008 : .035)/Math.max(.6, P.s), ph: P.g.position.x*3.1 + P.g.position.z*2.3 }));
+    const bulb = new C.Vector3(); R.bulbAt = () => bulb.set(0, -(CEIL - 1.77), 0).applyMatrix4(lampG.matrixWorld);
     return t => {
       lampG.rotation.set(Math.sin(t*1.9)*.038 + Math.sin(t*.7 + 1)*.014, 0, Math.sin(t*1.9 + 1.4)*.03 + Math.sin(t*.5)*.01);
       const gust = .6 + .4*Math.sin(t*.23)*Math.sin(t*.11 + 1.3);
-      for (const L of leaves){ const k = L.h*.022*gust/Math.max(.25, L.s); L.m.position.set(L.p.x + Math.sin(t*1.3 + L.ph)*k, L.p.y, L.p.z + Math.sin(t*1.7 + L.ph*1.3)*k*.6); }
+      for (const B of bends){ B.g.rotation.set(Math.sin(t*1.1 + B.ph)*B.k*gust, 0, Math.sin(t*1.4 + B.ph*1.3)*B.k*gust); }
+      lampG.updateMatrixWorld(true);
     };
   };
   R.setSun = theta => {

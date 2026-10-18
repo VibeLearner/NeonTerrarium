@@ -176,7 +176,7 @@ async function bakeTimes(name, info, heads){
   const cam = new THREE.PerspectiveCamera(V.fov, w/h, .05, 40); cam.position.set(...V.pos); cam.lookAt(...V.look); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
   const at = v => { const p = v.clone().project(cam); return [+((p.x + 1)/2).toFixed(4), +((1 - p.y)/2).toFixed(4)]; };
   const wcv = ROOM.winCenter(), wtv = ROOM.winTop(), rim = at(wtv), ctr = at(wcv);
-  const A = { cam: { pos: V.pos, look: V.look, fov: V.fov }, w, h, win: ctr, winR: +Math.hypot((rim[0] - ctr[0])*w, (rim[1] - ctr[1])*h).toFixed(1), heads: info.sunny ? heads : [] };
+  const A = { cam: { pos: V.pos, look: V.look, fov: V.fov }, mug: ROOM.mugTop ? at(ROOM.mugTop) : null, lamps: ROOM.lampsK || 0, w, h, win: ctr, winR: +Math.hypot((rim[0] - ctr[0])*w, (rim[1] - ctr[1])*h).toFixed(1), heads: info.sunny ? heads : [] };
   const HIDE = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, side: THREE.DoubleSide });
   const hideSet = (set, on) => { for (const m of set){ if (on){ m.userData.mat = m.material; m.material = HIDE; } else if (m.userData.mat) m.material = m.userData.mat; } };
   const hideFol = on => { hideSet(ROOM.foliage, on); hideSet(ROOM.lamp || [], on); };
@@ -250,6 +250,7 @@ window.BAKE = async (opt = {}) => {
   if (opt.density !== undefined) post.material.uniforms.density.value = opt.density;
   if (opt.dbg !== undefined) post.material.uniforms.dbg.value = opt.dbg;
   await fontReady; await document.fonts.ready;
+  ROOM.bakeNoPendant = true;   // (the pendant's own light is drawn live on the title screen, swinging with it)
   ROOM.build(scene); sun = ROOM.light(scene);
   scene.updateMatrixWorld(true);
   renderer.setRenderTarget(null); renderer.setSize(64, 64); renderer.render(scene, new THREE.PerspectiveCamera());

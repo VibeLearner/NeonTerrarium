@@ -85,9 +85,9 @@ void main(){
     vec3 c = col.rgb*ao*(1. - smoothstep(.05, .14, e)*edgeK) + scat*col.a;
     // the grade: warm highlights, cool green-teal in the shadows, more colour, a touch more contrast, a soft vignette
     float lm = dot(c, vec3(.3, .55, .15));
-    c *= mix(vec3(.9, .96, .95), vec3(1.14, 1.0, .78), smoothstep(.1, .8, lm));
-    c = mix(vec3(lm), c, 1.12);
-    c = (c - .5)*1.1 + .5;
+    c *= mix(vec3(.8, .95, .97), vec3(1.07, 1.0, .86), smoothstep(.08, .75, lm));
+    c = mix(vec3(lm), c, 1.15);
+    c = (c - .42)*1.24 + .42;
     vec2 q = vUv - .5; c *= 1. - dot(q, q)*.85;
     gl_FragColor = vec4(clamp(c, 0., 1.), col.a);
   } else {
@@ -99,7 +99,7 @@ const postScene = new THREE.Scene(), postCam = new THREE.OrthographicCamera(-1, 
 const post = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ vertexShader: POST_VS, fragmentShader: POST_FS, extensions: { derivatives: true }, uniforms: {
   tColor: { value: null }, tDepth: { value: null }, shadowMap: { value: null }, shadowMatrix: { value: new THREE.Matrix4() }, projInv: { value: new THREE.Matrix4() }, viewInv: { value: new THREE.Matrix4() },
   camPos: { value: new THREE.Vector3() }, sunDir: { value: new THREE.Vector3() }, sunCol: { value: new THREE.Color(1, .82, .56) }, res: { value: new THREE.Vector2() },
-  mode: { value: 0 }, dbg: { value: 0 }, density: { value: .26 }, edgeK: { value: .34 }, pxPerM: { value: 500 }, aoK: { value: 2.2 } }, depthTest: false, depthWrite: false }));
+  mode: { value: 0 }, dbg: { value: 0 }, density: { value: .17 }, edgeK: { value: .34 }, pxPerM: { value: 500 }, aoK: { value: 2.2 } }, depthTest: false, depthWrite: false }));
 postScene.add(post);
 
 let sun = null;

@@ -14,7 +14,7 @@ const TITLE = (() => {
   const menu = root.querySelector('.t-menu'), panel = $t('tCities');
   const gD = cvDust.getContext('2d');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18d';
+  const VER = '2026-10-18e';
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
 

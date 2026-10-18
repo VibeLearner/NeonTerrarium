@@ -3374,6 +3374,7 @@ return {
   setMotifVoicer(fn){ motifVoicer = fn || null; },
   setLiveChord(ch, t){ liveChord = ch && ch.notes ? ch : null; if (ctx && liveChord && liveChord !== liveSeen) { liveSeen = liveChord; retuneLive(liveChord, Math.max(ctx.currentTime, t == null ? 0 : t)); } },
   _live(){ return liveNotes.map(L => Math.round(L.sh.offset.value)); },
+  ping(style, t){ if (!ctx) return; triggerMelodicMotifPhrase(style, Math.max(ctx.currentTime, t)); },
   preview(style){ if (!ctx) initAudio(); if (ctx.state === 'suspended') ctx.resume(); triggerMelodicMotifPhrase(style, ctx.currentTime + 0.05); }, get boothHeld(){ return boothHeld; },
   pluck(freq, t, dur, vel, pan, dest) { playPluckNote(freq, Math.max(ctx.currentTime, t), dur, vel, pan, false, dest, 0.6); },
   get ctx(){ return ctx; }, get analyser(){ return analyser; }, get out(){ return gridOut; },

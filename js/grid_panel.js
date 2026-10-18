@@ -175,6 +175,10 @@ const GRIDPANEL = (() => {
   #gridPanel .gzoom #gZoomFit { font-size: 10.5px; letter-spacing: .06em; } #gridPanel .gzoom b { text-align: center; color: var(--yl); font-weight: 400; font-size: 11px; } #gridPanel .gzoom .gb:disabled { opacity: .35; cursor: default; }
   #gridPanel .gscroll { -webkit-appearance: none; appearance: none; width: calc(100% - 44px); height: 12px; margin: 0; background: rgba(5,22,29,.9); border: 1px solid var(--faint); }
   #gridPanel .gscroll[hidden] { display: none; }
+  #gridPanel .gfeel { display: flex; gap: 8px; align-items: center; } #gridPanel .gfeel span { color: var(--cy2); font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; }
+  #gridPanel .gfeel small { color: var(--faint2, #4f8c94); font-size: 11px; } #gridPanel .gfeel b { color: var(--yl); font-weight: 400; font-size: 11.5px; letter-spacing: .1em; min-width: 5.5em; }
+  #gridPanel .gfeel .gact { flex: 1 1 auto; width: auto; min-width: 80px; } #gridPanel input.gscroll.gact::-webkit-slider-thumb { width: 18px; background: var(--cy); } #gridPanel input.gscroll.gact::-moz-range-thumb { width: 18px; background: var(--cy); }
+  #gridPanel .gfeel .gb { width: auto; margin: 0 0 0 auto; padding: 5px 9px; font-size: 11.5px; letter-spacing: .1em; white-space: nowrap; } #gridPanel .gfeel .gb.on { background: rgba(229,55,159,.22); border-color: var(--mg); color: #ffd0ea; }
   #gridPanel input.gscroll::-webkit-slider-thumb { -webkit-appearance: none; width: 44px; height: 10px; margin-top: 0; background: var(--line); border: 0; border-radius: 0; box-shadow: none; cursor: grab; } #gridPanel input.gscroll::-moz-range-thumb { width: 44px; height: 10px; background: var(--line); border: 0; border-radius: 0; }
   #gridPanel input.gscroll::-webkit-slider-runnable-track { height: 10px; background: transparent; border: 0; }
   #gridPanel input.gscroll:hover::-webkit-slider-thumb { background: var(--cy); } #gridPanel .gstrip .ghint2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -349,6 +353,8 @@ const GRIDPANEL = (() => {
       <div class="gpills" id="g-voicingPillsContainer" title="The notes of the chord now sounding"></div>
       <div class="gstrip" id="gStrip" hidden>
         <div class="gstripbar"><b id="gStripMode"></b><button class="gb" id="gStripSave" hidden title="Put this rewired version on the Booth shelf as a new loop (the original stays as it was)">Keep as a new loop</button><button class="gb" id="gStripEnd" title="Go back to the planners' carrier pattern">Back to the planners</button></div>
+        <div class="gfeel"><span>Activity</span><small>Minimal</small><input type="range" class="gscroll gact" id="gAct" min="0" max="1" step="0.05" value="0.3" aria-label="How busy the loop is, from minimal to busy" title="Minimal leaves the chords room to breathe: fewer notes (yours too), fewer answers and echoes, now and then a bar for the chord alone. Busy plays more, but never piles notes up on each other."><small>Busy</small><b id="gActLbl"></b>
+          <button class="gb" id="gPings" title="Now and then the autopilot plays a ping in this song's own voice, in tune with the loop's chords">Autopilot pings: on</button></div>
         <div class="gstripwrap"><canvas class="gv" id="gStripCv" title="The loop on the broadcast: chords along the top, its notes in cyan, the Grid's answers in pink"></canvas>
           <div class="gzoom"><button class="gb" id="gZoomIn" title="Zoom in (or Ctrl + scroll)">+</button><b id="gZoomLvl">1×</b><button class="gb" id="gZoomOut" title="Zoom out">−</button><button class="gb" id="gZoomFit" title="Show the whole loop">Fit</button></div></div>
         <input type="range" id="gStripScroll" class="gscroll" min="0" max="0" step="0.25" value="0" hidden aria-label="Move along the loop">

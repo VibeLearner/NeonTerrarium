@@ -79,7 +79,7 @@ const BOOTH = (() => {
   }
   function mvSave(){ try { localStorage.setItem(MV_KEY, JSON.stringify(mv)); } catch (e){} Object.values(mv).forEach(k => { if (E.ctx) mvLoad(k); }); xformLabel(); }
   function motifVoice(style, freq, t, dur, vel, pan, dest, bell){
-    const key = mv[style]; if (!key) return false;
+    const key = forceKey || mv[style]; if (!key) return false;
     const snd = mvSounds.get(key); if (!snd){ mvLoad(key); return false; }   // (the first ping after a reload: the usual voice while the song comes back)
     if (!snd.samples.length) return false;
     const c = E.ctx, midi = 69 + 12*Math.log2(freq/440);
@@ -101,6 +101,7 @@ const BOOTH = (() => {
     return true;
   }
   if (E.setMotifVoicer) E.setMotifVoicer(motifVoice);
+  let forceKey = null;   // (the autopilot's pings on a song loop: the song's own voice, whatever the Transform choices)
   // the songs to pick from: the ones kept on this computer, the Booth's own, and any a shelf loop was made with
   async function songList(){
     const out = [], seen = new Set(), add = (key, name, n) => { if (!key || seen.has(key)) return; seen.add(key); out.push({ key, name: name || 'A song', n: n ?? 1 }); };
@@ -153,6 +154,62 @@ const BOOTH = (() => {
     mvSounds.delete(key);
     if (songKey === key){ songKey = null; await ensureSong(); songInfo(); }
     return n;
+  }
+
+  // ---------- the feel of a loop on the broadcast (the Console strip): how busy it is, and the autopilot's pings ----------
+  // Activity runs from minimal (0) to busy (1). The broadcast is an ambient soundscape, so it starts on the minimal side.
+  // Below the middle, a loop's notes are thinned each pass (the player's too: on a rewired copy the extra notes are
+  // deleted, as logged they're left out), the longest notes and those on the beat kept, never two starting close
+  // together, and at the very minimal end every other pass leaves one bar to the chord alone. The Grid's answers, the
+  // echoes and the pings follow the same dial, and however busy it gets only a few answer or echo voices sound at once.
+  const FEEL_KEY = 'neonIsland.loopFeel';
+  const feel = { act: .3, pings: true }; try { Object.assign(feel, JSON.parse(localStorage.getItem(FEEL_KEY) || '{}')); } catch (e){}
+  const feelSave = () => { try { localStorage.setItem(FEEL_KEY, JSON.stringify(feel)); } catch (e){} };
+  const act = () => bc ? feel.act : .5;   // (the Booth itself plays as it always has)
+  let thinC = { cyc: null, a: null, n: -1, set: null };
+  function thinFor(cyc){
+    const a = act(); if (a >= .5 || !bc) return null;
+    const all = S.layers.flat();
+    if (thinC.cyc === cyc && thinC.a === a && thinC.n === all.length) return thinC.set;
+    const R = rng(cyc*4093 + 17 + all.length*31), Lb = L(), keepN = Math.max(1, Math.ceil(all.length*(.3 + 1.4*a))), gap = (.5 - a)*3;
+    const ranked = all.map(n => [n, n.d*1.5 + (Math.abs(n.b - Math.round(n.b)) < .01 ? 1 : 0) + (n.b % 4 < .01 ? 1.5 : 0) + R()*.8]).sort((x, y) => y[1] - x[1]).map(x => x[0]);
+    const rest = a < .25 && cyc % 2 === 1 ? Math.floor(cyc/2) % S.len : -1, kept = [];
+    for (const n of ranked){
+      if (kept.length >= keepN) break;
+      if (Math.floor(n.b/4) === rest) continue;
+      if (kept.some(k => { const dd = Math.abs(k.b - n.b); return Math.min(dd, Lb - dd) < gap; })) continue;
+      kept.push(n);
+    }
+    const set = new Set(all.filter(n => !kept.includes(n)));
+    thinC = { cyc, a, n: all.length, set }; return set;
+  }
+  // a few voices at once for the Grid's answers and the echoes (the player's own notes always sound)
+  let voicesOn = [];
+  function room(t, end, mine){
+    voicesOn = voicesOn.filter(v => v[1] > ctx.currentTime);
+    if (!mine && bc){ const cap = 2 + Math.round(act()*2); if (voicesOn.filter(v => v[0] < end && v[1] > t).length >= cap) return false; }
+    voicesOn.push([t, end]); return true;
+  }
+  const actName = a => a < .15 ? 'Sparse' : a < .35 ? 'Minimal' : a < .5 ? 'Light' : a < .75 ? 'Lively' : 'Busy';
+  function feelUI(){
+    const r = $('gAct'), l = $('gActLbl'), p = $('gPings'); if (!r) return;
+    r.value = String(feel.act); l.textContent = actName(feel.act);
+    const song = !!(S.prog === 'song' && S.song); p.hidden = !song;
+    p.textContent = 'Autopilot pings: ' + (feel.pings ? 'on' : 'off'); p.classList.toggle('on', feel.pings);
+  }
+  // the autopilot's pings on a song loop: now and then at a bar line, a ping in the song's own voice (its held notes),
+  // fitted to the loop's chord; more often the busier the dial, and not over a bar already full of notes
+  let lastPing = -99;
+  function maybePing(absBar, lbBar, t, cyc){
+    if (!bc || !feel.pings || S.prog !== 'song' || !S.song || absBar - lastPing < 2 || absBar < 1) return;
+    const a = act(), skip = thinFor(cyc), inBar = S.layers.flat().filter(n => Math.floor(n.b/4) === lbBar && !(skip && skip.has(n))).length;
+    if (inBar > 4 + 4*a || Math.random() > .1 + .3*a) return;
+    lastPing = absBar;
+    const pool = a < .5 ? ['BELLS', 'BELLS', 'TAPPED', 'DOUBLESTOP', 'HOMEBOUND'] : ['BELLS', 'TAPPED', 'HAMMER', 'DOUBLESTOP', 'LEAD', 'HOMEBOUND'];
+    const style = pool[Math.floor(Math.random()*pool.length)], key = S.song.key;
+    mvLoad(key);
+    at(t, () => { if (!bc || !feel.pings) return; forceKey = songSounds && songSounds.samples.length && songKey === key ? key : null; if (forceKey) mvSounds.set(key, songSounds);
+      try { if (E.ping) E.ping(style, t); } finally { forceKey = null; } });
   }
 
   const padCache = new Map();
@@ -290,7 +347,9 @@ const BOOTH = (() => {
         if (bc && S.song && songSounds && songSounds.chops.length) voiceOn('chops', 60, t, .32*(S.padLvl ?? 1), 0, bus.pad, 4, lb/4).off(t + 4*beatSec());   // (the song's own chord under the bar)
         if (bc && lb === 0) at(t, () => bcPass(cyc)); }
       // the layers and the autopilot's part, for the notes that start in this beat
-      for (const layer of S.layers) for (const n of layer) if (n.b >= lb && n.b < lb + 1) playNote(n, b + n.b - lb, false);
+      const skip = thinFor(cyc);
+      if (lb % 4 === 0) maybePing(Math.floor(b/4), lb/4, t, cyc);
+      for (const layer of S.layers) for (const n of layer) if (n.b >= lb && n.b < lb + 1 && !(skip && skip.has(n))) playNote(n, b + n.b - lb, false);
       if (S.ap && S.layers.length){ let part = apCache.get(cyc); if (!part){ part = improvise(cyc); apCache.set(cyc, part); if (apCache.size > 3) apCache.delete(Math.min(...apCache.keys())); }
         for (const n of part) if (n.b >= lb && n.b < lb + 1) playNote(n, b + n.b - lb, true); }
       schedTo++;
@@ -310,6 +369,7 @@ const BOOTH = (() => {
   }
   function playNote(n, absBeat, isAp){
     const bar = Math.floor((absBeat % L())/4), ch = chordOf(bar), m = padMidi(ch, n.i), t = tOf(absBeat), vo = voiceFor(n, isAp);
+    if (!room(t, t + Math.max(.12, n.d*beatSec()), !isAp)) return;   // (busy: an answer waits its turn rather than piling up)
     const h = voiceOn(vo, m, t, (n.v || .8)*(isAp ? .72 : 1), isAp ? .35 : -.1, null, n.i, bar);
     h.off(t + Math.max(.12, n.d*beatSec()));
     if (bc) echo(n, absBeat, vo, ch, bar);
@@ -319,10 +379,10 @@ const BOOTH = (() => {
   // the broadcast's dispersion on the loop's notes: Mosaic echoes an octave up on the off-beat, Haze lets a soft long copy
   // bloom after, Glitch stutters strong-beat notes; how often, by the Console's density
   function echo(n, absBeat, vo, ch, bar){
-    const den = +(($('g-granularMixSlider') || {}).value || .5), mode = E.mode, t = tOf(absBeat), bs = beatSec(), m = padMidi(ch, n.i), barEnd = tOf(Math.floor(absBeat/4)*4 + 4) - .03;
-    if (mode === 'MOSAIC' && Math.random() < den*.6){ const t2 = t + bs*({ '1/4': 1, '1/8.': .75, '1/8': .5, '1/8T': 1/3, '1/16': .25 }[E.subdiv] || .5); if (t2 < barEnd) voiceOn(vo, m + 12, t2, .22, .5, null, Math.min(AP - 1, n.i + 4), bar).off(Math.min(barEnd, t2 + bs*.4)); }
-    else if (mode === 'HAZE' && Math.random() < den*.5){ const t2 = t + bs*.5; if (t2 < barEnd) voiceOn(vo, m, t2, .16, -.5, null, n.i, bar).off(Math.min(barEnd, t2 + Math.max(1, n.d*2)*bs)); }
-    else if (mode === 'ARP' && Math.abs(n.b - Math.round(n.b)) < .01 && Math.random() < den*.55){ for (let k = 1; k <= 3; k++){ const t2 = t + k*bs/8; if (t2 < barEnd) voiceOn(vo, m, t2, .3*(1 - k/4), (k % 2 ? .4 : -.4), null, n.i, bar).off(t2 + bs/10); } }
+    const den = +(($('g-granularMixSlider') || {}).value || .5)*(.3 + 1.2*act()), mode = E.mode, t = tOf(absBeat), bs = beatSec(), m = padMidi(ch, n.i), barEnd = tOf(Math.floor(absBeat/4)*4 + 4) - .03;
+    if (mode === 'MOSAIC' && Math.random() < den*.6){ const t2 = t + bs*({ '1/4': 1, '1/8.': .75, '1/8': .5, '1/8T': 1/3, '1/16': .25 }[E.subdiv] || .5); if (t2 < barEnd && room(t2, t2 + bs*.6)) voiceOn(vo, m + 12, t2, .22, .5, null, Math.min(AP - 1, n.i + 4), bar).off(Math.min(barEnd, t2 + bs*.4)); }
+    else if (mode === 'HAZE' && Math.random() < den*.5){ const t2 = t + bs*.5; if (t2 < barEnd && room(t2, t2 + bs*1.5)) voiceOn(vo, m, t2, .16, -.5, null, n.i, bar).off(Math.min(barEnd, t2 + Math.max(1, n.d*2)*bs)); }
+    else if (mode === 'ARP' && Math.abs(n.b - Math.round(n.b)) < .01 && Math.random() < den*.55 && room(t + bs/8, t + bs/2)){ for (let k = 1; k <= 3; k++){ const t2 = t + k*bs/8; if (t2 < barEnd) voiceOn(vo, m, t2, .3*(1 - k/4), (k % 2 ? .4 : -.4), null, n.i, bar).off(t2 + bs/10); } }
   }
   function light(i, isAp, on){ const k = keysEl[i]; if (k) k.classList.toggle(isAp ? 'ap' : 'pl', on); }
 
@@ -382,7 +442,7 @@ const BOOTH = (() => {
   function improvise(cyc){
     const Lb = L(), core = S.layers.flat().slice().sort((a, b) => a.b - b.b); if (!core.length) return [];
     const R = rng(cyc*7919 + core.length*104729 + Math.round(core[0].b*97) + (typeof S.prog === 'number' ? S.prog : 97)*31);
-    const shape = [.55, .8, 1, .9, .7, .5][cyc % 6], e = clamp(S.apAmt*shape*1.25, 0, 1.2);
+    const shape = [.55, .8, 1, .9, .7, .5][cyc % 6], e = clamp(S.apAmt*shape*1.25*(bc ? .25 + 1.5*act() : 1), 0, 1.4);
     const busy = (b0, b1) => core.some(n => n.b < b1 - .02 && n.b + n.d > b0 + .02);
     // the gaps you leave (half a beat or more)
     const gaps = []; let end = 0;
@@ -429,7 +489,12 @@ const BOOTH = (() => {
       const i = n.i >= 2 ? n.i - 2 : n.i + 2, d = Math.min(n.d*.9, Math.ceil((n.b + .001)/4)*4 - n.b - .04);
       if (d >= .25 && !line.some(x => x.b < n.b + d && x.b + x.d > n.b)) line.push({ b: n.b + .02, d, i, v: .45 });
     }
-    return line.sort((a, b) => a.b - b.b);
+    line.sort((a, b) => a.b - b.b);
+    if (!bc) return line;
+    // on the broadcast, the activity dial sets how many answers a bar can hold (one at the minimal end, six when busy),
+    // and at the minimal end every other bar is left to the chord
+    const cap = Math.max(1, Math.round(1 + act()*5)), per = new Map();
+    return line.filter(n => { const k = Math.floor(n.b/4); if (act() < .2 && (k + cyc) % 2) return false; const c = per.get(k) || 0; if (c >= cap) return false; per.set(k, c + 1); return true; });
   }
 
   // ---------- the panel: tabs, setup, keys, the loop picture, the shelf ----------
@@ -586,7 +651,8 @@ const BOOTH = (() => {
     }
     g.fillStyle = 'rgba(23,65,74,.6)'; if (NP - 1 >= lo && NP - 1 < lo + nRows) g.fillRect(0, Y(NP - 1) - 1, W, 1);   // (above this line: only the autopilot reaches)
     const box = (n, col, a) => { if (n.i < lo || n.i >= lo + nRows) return; g.fillStyle = col.replace('A', a); g.fillRect(X(n.b) + 1, Y(n.i) + Math.min(1, rowH*.15), Math.max(2, Xd(n.d) - 2), Math.max(3, rowH - 1)); };
-    S.layers.forEach((layer, li) => { const a = .55 + .4*(li === S.layers.length - 1 ? 1 : .5); for (const n of layer) box(n, n === sel ? 'rgba(232,213,83,A)' : (bc && bc.mode === 'rewire' && !n.o) ? 'rgba(150,240,190,A)' : 'rgba(95,216,222,A)', a); });
+    const sk = bc && playing && nb >= 0 ? thinFor(Math.floor(eb/Lb)) : null;
+    S.layers.forEach((layer, li) => { const a = .55 + .4*(li === S.layers.length - 1 ? 1 : .5); for (const n of layer) if (sk && sk.has(n)) box(n, 'rgba(95,216,222,A)', .14); else box(n, n === sel ? 'rgba(232,213,83,A)' : (bc && bc.mode === 'rewire' && !n.o) ? 'rgba(150,240,190,A)' : 'rgba(95,216,222,A)', a); });
     if (S.ap && S.layers.length && playing && nb >= 0){ const part = apCache.get(Math.floor(eb/Lb)); if (part) for (const n of part) box(n, 'rgba(229,55,159,A)', .8); }
     if (rec && rec.live){ g.fillStyle = 'rgba(229,55,159,.1)'; g.fillRect(0, top, W, H - top);
       for (const n of rec.take){ const d = n.d || Math.max(.1, ((nb % Lb) - n.b + Lb) % Lb); box({ b: n.b, d, i: n.i }, 'rgba(255,120,150,A)', .95); } }
@@ -687,7 +753,7 @@ const BOOTH = (() => {
     if (mode !== 'booth') music.setBooth(false);
   };
   B.isPlaying = () => playing; B.pause = p => { if (!bc) return; if (p) stop(); else start(false); };   // (held: the loop stops where it is and picks up from bar one)
-  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._move = () => moveSection(); B._sv = () => stripView(); B._bar = () => curBar(); B._mv = () => ({ mv, loaded: [...mvSounds.keys()] }); B._mvoice = (...a) => motifVoice(...a); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
+  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._move = () => moveSection(); B._sv = () => stripView(); B._bar = () => curBar(); B._thin = c => { const s = thinFor(c); return s ? s.size : 0; }; B._feel = feel; B._mv = () => ({ mv, loaded: [...mvSounds.keys()] }); B._mvoice = (...a) => motifVoice(...a); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
   const layerOn = id => { const b = $(id); return !!(b && b.classList.contains('on')); };   // (the Console's layer buttons: what the player asked for, whether or not the engine has started)
   // once a pass (from the second): the governor drifts the Console's own settings, as the auto-governor does for the
   // planners' patterns; a rewired copy also takes a little of the autopilot's answer into itself and moves a note
@@ -718,6 +784,9 @@ const BOOTH = (() => {
       }
     }
     if (bc.mode === 'rewire' && S.ap) evolve(S.layers[0], apCache.get(cyc - 1) || []);
+    // minimal on a rewired copy: the notes it left out are deleted, one a pass (the shortest first), until it's down to what the dial keeps
+    if (bc.mode === 'rewire' && act() < .5 && S.layers[0] && S.layers[0].length > 1){ const sk = thinFor(cyc), out = S.layers[0].filter(n => sk && sk.has(n)).sort((p, q) => p.d - q.d)[0];
+      if (out){ S.layers[0].splice(S.layers[0].indexOf(out), 1); apCache.clear(); } }
     if (layerOn('g-autopilotBtn') && S.prog === 'song' && S.song && cyc % 8 === 5 && gR() < .7) moveSection();
   }
   // For a song loop, the governor now and then takes the loop's chords and chops from another part of the song: a section
@@ -816,7 +885,7 @@ const BOOTH = (() => {
       $('gStripHint').textContent = rw ? 'Cyan: your notes · green: changed by you or the Grid · drag, stretch, click to add, double-click to remove' : 'As recorded · Neuro-phrase on: the Grid answers · Auto-governor on: the settings drift';
       $('gStripCv').title = rw ? 'Drag a note to move it, drag its right end to stretch it, click an empty spot to add one, double-click (or Delete) to remove it. With the Neuro-phrase on, the Grid drifts it somewhere new. The shelf copy stays as it was.'
         : 'Your notes as recorded. Turn on the Neuro-phrase layer and the Grid answers them; with the auto-governor on, the settings drift as it plays.';
-      stripZ = 1; stripB0 = 0; syncZoom();
+      stripZ = 1; stripB0 = 0; syncZoom(); feelUI(); lastPing = -99;
       if (!stripRaf) stripRaf = requestAnimationFrame(stripFrame); }
   }
   let stripRaf = 0, stripZ = 1, stripB0 = 0;
@@ -868,6 +937,10 @@ const BOOTH = (() => {
     // zoom: buttons on the side (and Ctrl + wheel), a scrollbar under the strip (and the wheel) to move along the loop
     const zoomTo = (z, centre) => { const v = stripView(), c = centre ?? v.b0 + v.span/2; stripZ = clamp(z, 1, 8); const sp = L()/stripZ; setStripB0(c - sp/2); syncZoom(); };
     $('gZoomIn').addEventListener('click', () => zoomTo(stripZ*2));
+    $('gAct').addEventListener('input', e => { feel.act = +e.target.value; apCache.clear(); feelUI(); feelSave(); });
+    $('gAct').addEventListener('keydown', e => e.stopPropagation());
+    $('gPings').addEventListener('click', () => { feel.pings = !feel.pings; feelUI(); feelSave(); });
+    feelUI();
     $('gZoomOut').addEventListener('click', () => zoomTo(stripZ/2));
     $('gZoomFit').addEventListener('click', () => zoomTo(1));
     $('gStripScroll').addEventListener('input', e => setStripB0(+e.target.value));

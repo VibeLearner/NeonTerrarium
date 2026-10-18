@@ -61,6 +61,79 @@ const BOOTH = (() => {
     if (!songSounds){ flash("This song's samples aren't on this computer: load the song again for its sound"); if (VOICES.find(v => v.id === S.voice).song) setVoice('glass'); }
     voiceAvail(); return !!songSounds;
   }
+  // ---------- Transform: the Console's pings in the voice of the player's songs ----------
+  // Each ping pattern can take the held notes of one of the songs listened to in the Booth (any song, whatever pattern or
+  // loop is on); the engine asks motifVoice for each of that pattern's notes and keeps them in tune with the chord.
+  const MV_KEY = 'neonIsland.motifVoices';
+  const PINGS = [['TAPPED', 'Gutter cascade'], ['HAMMER', 'Rivet triplet'], ['BELLS', 'Lamp-post chimes'], ['DOUBLESTOP', 'Twin neon'], ['LEAD', 'Busker riff'], ['HOMEBOUND', 'Last train home']];
+  let mv = {}; try { mv = JSON.parse(localStorage.getItem(MV_KEY) || '{}') || {}; } catch (e){}
+  const mvSounds = new Map(), mvLoads = new Map();
+  function mvLoad(key){
+    if (!key) return Promise.resolve(null);
+    if (mvSounds.has(key)) return Promise.resolve(mvSounds.get(key));
+    if (songKey === key && songSounds){ mvSounds.set(key, songSounds); return Promise.resolve(songSounds); }
+    if (!E.ctx) E.initAudio();
+    if (!mvLoads.has(key)) mvLoads.set(key, BOOTHSONG.sounds(E.ctx, key).then(x => { mvSounds.set(key, x); mvLoads.delete(key); return x; }, () => { mvLoads.delete(key); return null; }));
+    return mvLoads.get(key);
+  }
+  function mvSave(){ try { localStorage.setItem(MV_KEY, JSON.stringify(mv)); } catch (e){} Object.values(mv).forEach(k => { if (E.ctx) mvLoad(k); }); xformLabel(); }
+  function motifVoice(style, freq, t, dur, vel, pan, dest, bell){
+    const key = mv[style]; if (!key) return false;
+    const snd = mvSounds.get(key); if (!snd){ mvLoad(key); return false; }   // (the first ping after a reload: the usual voice while the song comes back)
+    if (!snd.samples.length) return false;
+    const c = E.ctx, midi = 69 + 12*Math.log2(freq/440);
+    let s = snd.samples[0]; for (const x of snd.samples) if (Math.abs(x.root - midi) < Math.abs(s.root - midi)) s = x;
+    const sustained = style === 'LEAD' || style === 'HOMEBOUND', pk = vel*(sustained ? 1.9 : bell ? 2.4 : 2.3);
+    const g = c.createGain(), pn = c.createStereoPanner(); pn.pan.value = clamp(pan, -.9, .9);
+    g.gain.setValueAtTime(0.0001, t);
+    let end;
+    if (bell){ g.gain.linearRampToValueAtTime(pk, t + .006); end = t + Math.max(.6, dur*1.6); g.gain.exponentialRampToValueAtTime(0.0001, end); }
+    else if (sustained){ const d = Math.max(.1, dur); g.gain.linearRampToValueAtTime(pk, t + .025); g.gain.setTargetAtTime(pk*.75, t + .08, .25); g.gain.setTargetAtTime(0.0001, t + d, .12); end = t + d + .7; }
+    else { const d = Math.max(.08, dur); g.gain.linearRampToValueAtTime(pk, t + .005); g.gain.setTargetAtTime(pk*.5, t + .03, .18); g.gain.setTargetAtTime(0.0001, t + d, .09); end = t + d + .5; }
+    // a chime rings its octave too, quieter (the lamp posts' harmonic)
+    for (const [mul, lvl] of bell ? [[1, 1], [2, .3]] : [[1, 1]]){
+      const src = c.createBufferSource(); src.buffer = s.buf; src.playbackRate.value = mul*Math.pow(2, (midi - s.root)/12); src.loop = true; src.loopStart = s.ls; src.loopEnd = s.le;
+      let o = src; if (lvl < 1){ const h = c.createGain(); h.gain.value = lvl; src.connect(h); o = h; }
+      o.connect(g); src.start(t); src.stop(end + .05);
+    }
+    g.connect(pn); pn.connect(dest);
+    return true;
+  }
+  if (E.setMotifVoicer) E.setMotifVoicer(motifVoice);
+  // the songs to pick from: the ones kept on this computer, the Booth's own, and any a shelf loop was made with
+  async function songList(){
+    const out = [], seen = new Set(), add = (key, name, n) => { if (!key || seen.has(key)) return; seen.add(key); out.push({ key, name: name || 'A song', n: n ?? 1 }); };
+    try { (await BOOTHSONG.list()).forEach(x => add(x.key, x.name, x.n)); } catch (e){}
+    const own = bc ? bc.stash.song : S.song; if (own) add(own.key, own.name, own.nSamples);
+    loops.forEach(l => { if (l.song) add(l.song.key, l.song.name, l.song.nSamples); });
+    Object.values(mv).forEach(k => add(k, 'A song no longer on this computer', 0));
+    return out;
+  }
+  let xList = [];
+  function xformLabel(){
+    const b = $('g-motifXform'); if (!b) return;
+    const n = PINGS.filter(([st]) => mv[st]).length;
+    b.textContent = n ? 'Transform ' + n + '/' + PINGS.length : 'Transform'; b.classList.toggle('on', n > 0);
+    b.title = n ? 'Some pings sing with your songs\' voices: click to change them or restore the planners\' voices' : "Give the pings the voice of one of your songs (all of them, or pattern by pattern)";
+  }
+  function xformRows(){
+    const box = $('mRows'); if (!box) return;
+    const opts = sel => '<option value="">Planners\' voice</option>' + xList.map(x => `<option value="${x.key.replace(/"/g, '&quot;')}"${x.n ? '' : ' disabled'}${sel === x.key ? ' selected' : ''}>${esc(x.name)}${x.n ? '' : ' (no held notes)'}</option>`).join('');
+    box.innerHTML = PINGS.map(([st, nm]) => `<div class="mrow"><span>${nm}</span><select data-st="${st}" aria-label="${nm}'s voice">${opts(mv[st] || '')}</select><button class="gb" data-try="${st}" title="Hear ${nm} now">▶</button></div>`).join('');
+    const all = $('mAll'), keep = all.value;
+    all.innerHTML = '<option value="">Pick a song…</option>' + xList.map(x => `<option value="${x.key.replace(/"/g, '&quot;')}"${x.n ? '' : ' disabled'}>${esc(x.name)}${x.n ? '' : ' (no held notes)'}</option>`).join('');
+    if (keep) all.value = keep;
+    const n = PINGS.filter(([st]) => mv[st]).length, names = [...new Set(PINGS.map(([st]) => mv[st]).filter(Boolean))].map(k => (xList.find(x => x.key === k) || { name: 'a song' }).name);
+    $('mSt').textContent = !xList.length ? 'No songs yet: load one in the Booth (the Booth tab, then Load a song) and it shows up here.'
+      : n ? `${n} of ${PINGS.length} pings use the voice of ${names.length > 1 ? 'your songs' : esc(names[0])}${n < PINGS.length ? "; the rest keep the planners' voices" : ''}. Every ping follows the chords in play either way.`
+      : "Every ping has the planners' voice. Every ping follows the chords in play either way.";
+  }
+  const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+  async function openXform(){
+    xList = await songList(); xformRows(); $('mDlg').hidden = false;
+    Object.values(mv).forEach(k => mvLoad(k));
+  }
+
   const padCache = new Map();
   function padsFor(ch){
     let v = padCache.get(ch); if (v) return v;
@@ -167,7 +240,7 @@ const BOOTH = (() => {
     if (!playing) return; playing = false;
     if (rec) endRec(true);
     for (const k of [...held.keys()]) noteUp(k);
-    padTo(null, ctx.currentTime); scheduled.length = 0; lastBar = null;
+    padTo(null, ctx.currentTime); scheduled.length = 0; lastBar = null; if (E.setLiveChord) E.setLiveChord(null);
     root.querySelectorAll('.bkey.pl, .bkey.ap').forEach(k => k.classList.remove('pl', 'ap'));
     $('bPlay').textContent = 'Play'; $('bPlay').classList.remove('on'); status();
   }
@@ -184,6 +257,7 @@ const BOOTH = (() => {
       if (S.click === 'all' || (S.click === 'count' && rec && rec.armed && b >= rec.from - 4 && b < rec.from)) click(t, lb % 4 === 0);
       if (bc && lb === 0) prepDrift(cyc);
       if (lb % 4 === 0){ const ch = chordOf(lb/4); if (ch !== padCh || lastBar === null) padTo(ch, t); lastBar = lb/4; at(t, () => retune(ch, t, lb/4));
+        if (E.setLiveChord) E.setLiveChord(ch, t);   // (the Console's pings follow the loop's chords)
         if (bc && S.song && songSounds && songSounds.chops.length) voiceOn('chops', 60, t, .32*(S.padLvl ?? 1), 0, bus.pad, 4, lb/4).off(t + 4*beatSec());   // (the song's own chord under the bar)
         if (bc && lb === 0) at(t, () => bcPass(cyc)); }
       // the layers and the autopilot's part, for the notes that start in this beat
@@ -344,6 +418,15 @@ const BOOTH = (() => {
     $('bSongBtn').addEventListener('click', () => { if (unsaved()) askClear(null); else $('bSongFile').click(); });
     $('bSongClear').addEventListener('click', () => { const f = pendingFile; $('bDlg').hidden = true; pendingFile = null; if (f) loadSong(f); else $('bSongFile').click(); });
     $('bSongKeep').addEventListener('click', () => { $('bDlg').hidden = true; pendingFile = null; });
+    // Transform (the Dopamine ping block): one song for every ping, or a song (or the planners' voice) for each
+    $('g-motifXform').addEventListener('click', openXform);
+    $('mAllGo').addEventListener('click', () => { const k = $('mAll').value; if (!k){ $('mAll').focus(); return; } PINGS.forEach(([st]) => { mv[st] = k; }); mvSave(); xformRows(); });
+    $('mRestore').addEventListener('click', () => { mv = {}; mvSave(); xformRows(); });
+    $('mDone').addEventListener('click', () => { $('mDlg').hidden = true; });
+    $('mDlg').addEventListener('click', e => { if (e.target.id === 'mDlg') $('mDlg').hidden = true; });
+    $('mRows').addEventListener('change', e => { const st = e.target.dataset && e.target.dataset.st; if (!st) return; if (e.target.value) mv[st] = e.target.value; else delete mv[st]; mvSave(); xformRows(); });
+    $('mRows').addEventListener('click', async e => { const b = e.target.closest('[data-try]'); if (!b) return; const st = b.dataset.try; if (mv[st]) await mvLoad(mv[st]); E.preview(st); });
+    xformLabel();
     $('bDlg').addEventListener('keydown', e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); $('bDlg').hidden = true; pendingFile = null; } });
     $('bSongBack').addEventListener('click', () => { if (S.song && S.song.start0 !== undefined) nudge(S.song.start0 - S.song.start); });
     const pk = $('g-boothPadSlider'); if (pk){ pk.value = String(S.padLvl ?? 1); pk.dataset.def = '1';
@@ -566,7 +649,7 @@ const BOOTH = (() => {
     if (mode !== 'booth') music.setBooth(false);
   };
   B.isPlaying = () => playing; B.pause = p => { if (!bc) return; if (p) stop(); else start(false); };   // (held: the loop stops where it is and picks up from bar one)
-  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._move = () => moveSection(); B._sv = () => stripView(); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
+  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._move = () => moveSection(); B._sv = () => stripView(); B._mv = () => ({ mv, loaded: [...mvSounds.keys()] }); B._mvoice = (...a) => motifVoice(...a); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
   const layerOn = id => { const b = $(id); return !!(b && b.classList.contains('on')); };   // (the Console's layer buttons: what the player asked for, whether or not the engine has started)
   // once a pass (from the second): the governor drifts the Console's own settings, as the auto-governor does for the
   // planners' patterns; a rewired copy also takes a little of the autopilot's answer into itself and moves a note

@@ -257,12 +257,25 @@ const BOOTHSONG = (() => {
     // (the whole song kept too, at half rate, so the chops can be cut from another section in a later visit)
     const f22 = Math.max(1, Math.round(sr/22050));
     const pack = { mono: i16(down(x, f22)), monoSr: sr/f22, bar0: bb.t0, bs, name: file.name.replace(/\.[^.]+$/, ''), sr, samples: samples.map(s => ({ root: s.root, ls: s.ls, le: s.le, sr: s.sr, data: i16(s.data) })), chops: chops.map(b => b.map(c => c ? i16(c) : null)) };
-    await put(id, pack);
+    await put(id, pack); idxAdd(id, pack.name, samples.length);
     say('Done', 1);
     const NM = key.flats ? FL : SH;
     // moving the section later or earlier: the chops are cut again from the song (while it's still loaded)
     const recut = async (start, len) => { const c = makeChops(x, sr, bb.t0 + start*4*bs, bs, len); pack.chops = c.map(b => b.map(v => v ? i16(v) : null)); pack.chopSr = sr; await put(id, pack); return toBuffers(ctx, pack).chops; };
     return { recut, key: id, name: pack.name, bpm: tp.bpm, keyName: NM[key.root] + ' ' + key.q, cs: bb.cs.map(c => ({ name: c.name, notes: c.notes, motif: c.motif })), list: bb.list, start: sec.start, len: sec.len, sounds: toBuffers(ctx, pack), nSamples: samples.length };
+  };
+  // the songs kept on this computer, as { key, name, n (its held notes) }: a small index beside the store (built from the
+  // store itself the first time, for songs listened to before there was one)
+  const IDX = 'neonIsland.boothSongIndex';
+  const idxGet = () => { try { return JSON.parse(localStorage.getItem(IDX) || 'null'); } catch (e){ return null; } };
+  const idxSet = a => { try { localStorage.setItem(IDX, JSON.stringify(a)); } catch (e){} };
+  function idxAdd(key, name, n){ const a = idxGet() || [], i = a.findIndex(x => x.key === key), e = { key, name, n }; if (i >= 0) a[i] = e; else a.push(e); idxSet(a); }
+  Q.list = async () => {
+    let a = idxGet(); if (a) return a;
+    a = [];
+    try { const d = await db(); await new Promise(res => { const r = d.transaction('songs').objectStore('songs').openCursor();
+      r.onsuccess = () => { const c = r.result; if (!c) return res(); a.push({ key: c.key, name: c.value.name, n: (c.value.samples || []).length }); c.continue(); }; r.onerror = () => res(); }); } catch (e){}
+    idxSet(a); return a;
   };
   // a song listened to before: its samples back from the store (null if they're gone)
   Q.sounds = async (ctx, key) => { const p = await get(key); return p ? toBuffers(ctx, p) : null; };

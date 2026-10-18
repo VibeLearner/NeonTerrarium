@@ -865,6 +865,85 @@ function makePluckBuffer(freq, seconds, soft) {
   return buf;
 }
 
+// --- 5b. MOTIF VOICES: A SONG'S VOICE FOR THE PINGS, AND EVERY PING IN TUNE WITH THE CHORD UNDER IT ---
+// While a ping is played, motifStyleNow names its pattern. The Booth's Transform hands the engine a voicer: for a pattern
+// the player gave a song's voice, it plays the note with a held note from that song (and says so by returning true).
+let motifStyleNow = null, motifVoicer = null, liveScope = false, liveChord = null, partTag = null;
+// (a chord with fewer than four motif notes, as a song's chords have, is given its fitted notes as its motif: the grain clouds and
+// the phrase builders read four)
+const fullCache = new WeakMap();
+const fullChord = c => { if (!c || (c.motif && c.motif.length >= 4)) return c; let f = fullCache.get(c); if (!f) { f = { ...c, motif: fitOf(c) }; f.fit = f.motif; fullCache.set(c, f); } return f; };
+const motifChord = () => fullChord(liveChord || getActiveChord());
+const hzMidi = f => 69 + 12 * Math.log2(f / 440);
+function sampledMotif(freq, t, dur, vel, pan, dest, bell) {
+  if (!motifStyleNow || !motifVoicer) return false;
+  try { return !!motifVoicer(motifStyleNow, freq, Math.max(ctx.currentTime, t), dur, vel, pan || 0, dest || motifMasterBus, !!bell); } catch (e) { return false; }
+}
+// A chord that came without four motif notes (a song's chords) gets its fitted ping notes worked out the same way, from a
+// typical ping shape.
+const fitCache = new WeakMap();
+function fitOf(chord) {
+  if (chord.fit) return chord.fit;
+  let f = fitCache.get(chord);
+  if (!f) {
+    const m = (chord.motif || []).slice(0, 4), shape = ['A4', 'C5', 'E5', 'D5'];
+    while (m.length < 4) m.push(shape[m.length]);
+    f = fitMotifToDrone({ notes: chord.notes, motif: m }); fitCache.set(chord, f);
+  }
+  return f;
+}
+// Every melodic note is kept on a list while it rings, with a shift (in cents) wired into the pitch of each of its sound
+// sources. When the chord moves on, a note still to come whose pitch isn't in the new chord (its tones, or the motif tones
+// written for it) moves to the nearest one that is, and a note already ringing bends there, the way a player follows a change.
+const liveNotes = [];
+let liveWatch = null, liveSeen = null;
+function voiced(segs, fn) {
+  if (liveScope || !ctx.createConstantSource) { fn(); return; }
+  const cap = [], oO = ctx.createOscillator, oB = ctx.createBufferSource;
+  ctx.createOscillator = function () { const n = oO.call(ctx); cap.push(n); return n; };
+  ctx.createBufferSource = function () { const n = oB.call(ctx); cap.push(n); return n; };
+  liveScope = true;
+  try { fn(); } finally { liveScope = false; delete ctx.createOscillator; delete ctx.createBufferSource; }
+  if (!cap.length || !segs.length) return;
+  const now = ctx.currentTime, t1 = Math.max(...segs.map(x => x.t1));
+  const sh = ctx.createConstantSource(); sh.offset.value = 0;
+  cap.forEach(n => { if (n.detune) sh.connect(n.detune); });
+  sh.start(now); sh.stop(Math.max(now, t1) + 4);
+  liveNotes.push({ sh, segs, end: t1 + 4 });
+  if (!liveWatch) { liveSeen = motifChord(); liveWatch = setInterval(watchLive, 40); }
+}
+function watchLive() {
+  const now = ctx.currentTime;
+  for (let i = liveNotes.length - 1; i >= 0; i--) if (liveNotes[i].end < now) liveNotes.splice(i, 1);
+  if (!liveNotes.length) { clearInterval(liveWatch); liveWatch = null; return; }
+  const c = motifChord();
+  if (c !== liveSeen) { liveSeen = c; retuneLive(c, now + 0.01); }
+}
+function retuneLive(chord, T) {
+  if (!chord || !chord.notes || !liveNotes.length) return;
+  const pc = m => ((Math.round(m) % 12) + 12) % 12;
+  const tones = new Set(chord.notes.map(n => pc(noteToMidi(n)))), safe = new Set(tones);
+  (chord.motif || []).forEach(n => safe.add(pc(noteToMidi(n))));
+  const near = m => {
+    const r = Math.round(m); let best = r, bd = 99;
+    for (let d = 0; d <= 6; d++) for (const x of d ? [-d, d] : [0]) {
+      if (!safe.has(pc(r + x))) continue;
+      const cost = d - (tones.has(pc(r + x)) ? 0.25 : 0);
+      if (cost < bd) { bd = cost; best = r + x; }
+    }
+    return best;
+  };
+  for (const L of liveNotes) {
+    const segs = L.segs.filter(x => x.t1 > T); if (!segs.length) continue;
+    const p = L.sh.offset;
+    p.cancelScheduledValues(T);
+    segs.forEach(x => {
+      const cents = (near(x.midi) - Math.round(x.midi)) * 100;
+      if (x.t0 >= T) p.setValueAtTime(cents, x.t0); else p.setTargetAtTime(cents, T, 0.035);
+    });
+  }
+}
+
 function playPluckNote(freq, safeTime, duration, velocity, pan, soft, dest, minRing) {
   const ringTime = Math.max(minRing || 0.5, duration * 1.1);
   const src = ctx.createBufferSource();
@@ -897,6 +976,8 @@ function playExpressiveMotifNote(freq, startTime, duration, options = {}) {
   } = options;
 
   const safeTime = Math.max(ctx.currentTime, startTime);
+  if (!liveScope) { voiced([{ midi: hzMidi(freq), t0: safeTime, t1: safeTime + duration }], () => playExpressiveMotifNote(freq, startTime, duration, options)); return; }
+  if (sampledMotif(freq, safeTime, duration, velocity, pan, null, isBell)) { queueConstellationNode(freq, safeTime, pan, isBell, noteLabel); return; }
   if (!isBell) {
     // legato notes (hammer-ons, pull-offs, the upper double-stop note) are played softer with no pitch swoop
     playPluckNote(freq, safeTime, duration, velocity, pan, !!slideFromFreq);
@@ -961,6 +1042,8 @@ const foldSynthMidi = m => { while (m > SYNTH_CEIL_MIDI) m -= 12; return m; };
 const foldSynthHz = f => { while (f > SYNTH_CEIL_HZ * 1.001) f *= 0.5; return f; };
 function playLeadRiff(events, pan, dest) {
   if (!events.length) return;
+  if (!liveScope) { voiced(events.map(e => ({ midi: hzMidi(foldSynthHz(e.freq)), t0: e.time, t1: e.time + e.dur })), () => playLeadRiff(events, pan, dest)); return; }
+  if (motifStyleNow && motifVoicer && events.every(e => sampledMotif(foldSynthHz(e.freq), e.time, e.dur, e.vel, pan, dest, false))) return;
   events = events.map(e => ({ ...e, freq: foldSynthHz(e.freq) }));
   const t0 = events[0].time;
   const last = events[events.length - 1];
@@ -1117,6 +1200,8 @@ function leadWaves() {
 }
 
 function playLeadVoice(freq, t, dur, vel, pan, dest, bright, soft) {
+  if (!liveScope) { voiced([{ midi: hzMidi(freq), t0: t, t1: t + dur }], () => playLeadVoice(freq, t, dur, vel, pan, dest, bright, soft)); return; }
+  if (sampledMotif(freq, t, dur, vel, pan, dest, false)) return;
   leadWaves();
   const end = t + Math.max(dur, 0.12);
   const stopAt = end + 0.6;
@@ -1164,6 +1249,8 @@ function ensureJazzDelay() {
   merger.connect(leadLoopBus);
 }
 function playJazzLeadVoice(freq, t, dur, vel, dest, bright, body = 0) {
+  if (!liveScope) { voiced([{ midi: hzMidi(freq), t0: t, t1: t + dur }], () => playJazzLeadVoice(freq, t, dur, vel, dest, bright, body)); return; }
+  if (sampledMotif(freq, t, dur, vel, 0, dest, false)) return;
   ensureJazzDelay();
   if (jazzDelayL) {
     const q = getQuarterNoteSec();
@@ -1199,7 +1286,7 @@ function playJazzLeadVoice(freq, t, dur, vel, dest, bright, body = 0) {
 // Each chord (and the progression it belongs to) carries its own register. The lead pools slide up or down so the line
 // sits where that chord's voicing sings, instead of one fixed window for everything.
 let regBase = null;
-const chordMotifMean = c => { const m = (c.motif || c.notes.slice(-4)).map(noteToMidi); return m.reduce((a, b) => a + b, 0) / m.length; };
+const chordMotifMean = c => { const m = (c.motif && c.motif.length ? c.motif : c.notes.slice(-4)).map(noteToMidi); return m.reduce((a, b) => a + b, 0) / m.length; };
 function registerShift(chord) {
   if (regBase == null) {
     const all = []; PROGRESSIONS.forEach(pr => pr.chords.forEach(c => all.push(chordMotifMean(c))));
@@ -1433,6 +1520,7 @@ const SUBDIV_GRID = { '1/4': [4, 2], '1/8.': [3, 1.5], '1/8': [2, 1], '1/8T': [4
 const snapToGrid = (p, L) => Math.floor(p / L + 0.5 - 1e-9) * L;
 function addEv(step, ev) {
   ev.src = getActiveChord();                      // the chord this note was written against
+  if (partTag && ev.kind !== 'bass' && ev.kind !== 'cloud') ev.st = partTag;   // (a ping pattern's notes, for its voice)
   if (!ev.q && cd && ev.kind !== 'cloud') {
     const g = SUBDIV_GRID[currentSubdiv] || SUBDIV_GRID['1/8'];
     const q = getQuarterNoteSec();
@@ -1590,6 +1678,12 @@ function bridgePart(barStart, style, soft, nextDeg) {
   setMemo(target);
 }
 
+// the conductor's ping patterns tag their notes with the pattern they belong to (so a Transformed pattern keeps its song voice here too)
+const tagPart = (fn, st) => function (...a) { const was = partTag; partTag = typeof st === 'function' ? st(...a) : st; try { return fn.apply(this, a); } finally { partTag = was; } };
+bellsPart = tagPart(bellsPart, 'BELLS');
+tappedPart = tagPart(tappedPart, 'TAPPED');
+homeboundPart = tagPart(homeboundPart, 'HOMEBOUND');
+bridgePart = tagPart(bridgePart, (bs, style) => (style === 'DOUBLESTOP' || style === 'HAMMER') ? style : null);
 function leadPart(barStart, riffArr, build, o = {}) {
   const pool = o.pool || leadLoopPool, n = pool.length, chord = getActiveChord();
   let riff = riffArr.slice();
@@ -2267,6 +2361,10 @@ function settleAfterChange(when) {
   return (lastChordChangeAt > 0 && x >= 0 && x < 0.45) ? when + 0.3 * (1 - x / 0.45) : when;
 }
 function playConductorEvent(ev, t, sixteenth) {
+  motifStyleNow = ev.st || null;
+  try { playConductorEvent0(ev, t, sixteenth); } finally { motifStyleNow = null; }
+}
+function playConductorEvent0(ev, t, sixteenth) {
   const midi = (ev.kind === 'lead' || ev.kind === 'hb') ? foldSynthMidi(ev.midi) : ev.midi;
   const freq = 440 * Math.pow(2, (midi - 69) / 12);
   let when = Math.max(ctx.currentTime, t + (ev.nudge || 0));
@@ -2466,7 +2564,7 @@ function triggerMelodicMotifPhrase(forcedStyle = null, startTime = null) {
   if (!ctx) initAudio();
   if (ctx.state === 'suspended') ctx.resume();
 
-  const chord = getActiveChord();
+  const chord = motifChord();   // (on a Booth loop, the loop's chord)
   const now = startTime !== null ? Math.max(ctx.currentTime, startTime) : ctx.currentTime;
   const times = getSubdivSeconds(currentSubdiv);
 
@@ -2476,7 +2574,11 @@ function triggerMelodicMotifPhrase(forcedStyle = null, startTime = null) {
     style = styles[Math.floor(Math.random() * styles.length)];
   }
   // harmonics keep the original voicing; the picked and tapped phrases use notes re-voiced to the drone
-  const motifNotes = style === 'BELLS' ? chimeNotes(chord) : chord.fit;
+  const motifNotes = style === 'BELLS' ? chimeNotes(chord) : fitOf(chord);
+  motifStyleNow = style;
+  try { playMotifStyle(style, chord, motifNotes, now, times); } finally { motifStyleNow = null; }
+}
+function playMotifStyle(style, chord, motifNotes, now, times) {
 
   const statusEl = $g('motifStatusText');
   const ledEl = $g('motifLed');
@@ -3263,7 +3365,12 @@ return {
   init: gridInit,
   progressions: PROGRESSIONS, n2f, boothBuses, boothHold: setBoothHold,
   // the Booth hands the broadcast back on this chord: the drone comes in on it and the next pattern change walks from it (buildTransition)
-  handOff(chord){ if (chord && chord.notes) activeChordOverride = chord; }, get boothHeld(){ return boothHeld; },
+  handOff(chord){ if (chord && chord.notes) activeChordOverride = chord; },
+  // the Booth's Transform: a voicer for the ping patterns; the chord a Booth loop is on (the pings follow it); a ping to hear now
+  setMotifVoicer(fn){ motifVoicer = fn || null; },
+  setLiveChord(ch, t){ liveChord = ch && ch.notes ? ch : null; if (ctx && liveChord && liveChord !== liveSeen) { liveSeen = liveChord; retuneLive(liveChord, Math.max(ctx.currentTime, t == null ? 0 : t)); } },
+  _live(){ return liveNotes.map(L => Math.round(L.sh.offset.value)); },
+  preview(style){ if (!ctx) initAudio(); if (ctx.state === 'suspended') ctx.resume(); triggerMelodicMotifPhrase(style, ctx.currentTime + 0.05); }, get boothHeld(){ return boothHeld; },
   pluck(freq, t, dur, vel, pan, dest) { playPluckNote(freq, Math.max(ctx.currentTime, t), dur, vel, pan, false, dest, 0.6); },
   get ctx(){ return ctx; }, get analyser(){ return analyser; }, get out(){ return gridOut; },
   set volume(v){ gridVol = v; },

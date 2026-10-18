@@ -187,6 +187,16 @@ const GRIDPANEL = (() => {
   #gridPanel .gdlgp { margin: 0 0 4px; color: var(--cy2); font-size: 12.5px; line-height: 1.5; }
   #gridPanel .gdlgopt { text-align: left; padding: 12px 14px; margin: 0; letter-spacing: .06em; text-transform: none; display: grid; gap: 4px; }
   #gridPanel .gdlgopt b { font: 500 14px 'Chakra Petch', sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--cy); }
+  #gridPanel .gxrow { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: start; }
+  #gridPanel .gxrow .gb { margin: 0; padding: 6px 8px; font-size: 11.5px; letter-spacing: .06em; white-space: nowrap; background: rgba(229,55,159,.1); border-color: rgba(229,55,159,.5); color: #ffb3dd; }
+  #gridPanel .gxrow .gb.on { background: rgba(229,55,159,.3); border-color: var(--mg); color: #fff; box-shadow: 0 0 10px rgba(229,55,159,.35); }
+  #gridPanel .mall { display: grid; grid-template-columns: 1fr auto; gap: 6px; } #gridPanel .mall select, #gridPanel .mrow select { margin: 0; }
+  #gridPanel .mall .gb { margin: 0; }
+  #gridPanel .mrows { display: grid; gap: 5px; max-height: 46vh; overflow: auto; }
+  #gridPanel .mrow { display: grid; grid-template-columns: 9.5em 1fr auto; gap: 6px; align-items: center; } #gridPanel .mrow span { color: var(--ink); font-size: 12.5px; letter-spacing: .06em; }
+  #gridPanel .mrow .gb { margin: 0; padding: 5px 9px; }
+  #gridPanel .mst { color: var(--yl); min-height: 1.5em; }
+  #gridPanel .mfoot { display: grid; grid-template-columns: 1fr auto; gap: 8px; } #gridPanel .mfoot .gb { margin: 0; width: auto; padding-left: 18px; padding-right: 18px; }
   #gridPanel .gdlgopt small { color: var(--cy2); font-size: 12px; line-height: 1.45; } #gridPanel .gdlgopt:hover b { color: var(--yl); }
   #gridPanel .gchk { display: flex; align-items: center; gap: 7px; cursor: pointer; color: var(--cy2); font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; }
   #gridPanel .gchk input { appearance: none; width: 15px; height: 15px; margin: 0; border: 1px solid var(--line); background: rgba(5,22,29,.9); display: grid; place-items: center; cursor: pointer; }
@@ -352,7 +362,7 @@ const GRIDPANEL = (() => {
         ${knob('motifLevelSlider', 'Depth', 0, 1, 0.02, 0.68, 'How strongly each ping is felt: its level in the broadcast.', 'mg')}
         <div class="gtrig"><button class="gb mg" id="g-manualMotifBtn" title="Fire one ping now">Fire</button><button class="gb mg" id="g-manualBellBtn" title="A cluster of high resonant tones, like harmonics rung on the lamp posts">Chimes</button></div>
       </div>
-      <select id="g-motifStyleSelect" title="Trigger pattern: the shape of the soothing neural phrase"></select>
+      <div class="gxrow"><select id="g-motifStyleSelect" title="Trigger pattern: the shape of the soothing neural phrase"></select><button class="gb mg" id="g-motifXform">Transform</button></div>
       <div class="gst" id="g-motifStatusText">PING STANDBY</div><span class="gled" id="g-motifLed" style="display:none"></span>
       <span class="gcode">C2</span></section>
   </div>
@@ -402,6 +412,18 @@ const GRIDPANEL = (() => {
       <p class="gdlgp">A new song starts the Booth on a clean deck. Takes you haven't put on the shelf will be lost. Loops already on the shelf are safe.</p>
       <button class="gb gdlgopt" id="bSongClear"><b>Wipe the deck and load</b><small>Clear the unsaved takes and pick the new song.</small></button>
       <button class="gb" id="bSongKeep">Keep my takes (save them first)</button>
+    </div>
+  </div>
+  <div class="gdlg" id="mDlg" hidden role="dialog" aria-modal="true" aria-labelledby="mDlgT">
+    <div class="gdlgbox"><span class="gtag">DOPAMINE PING // TRANSFORM</span>
+      <h4 id="mDlgT">Give the pings a song's voice</h4>
+      <p class="gdlgp">The held notes the Booth sampled from your songs become the pings' instrument, played in tune with whatever chords are on: the planners' patterns or a Booth loop.</p>
+      <div class="glbl">Every ping from one song</div>
+      <div class="mall"><select id="mAll" aria-label="The song for every ping"></select><button class="gb mg" id="mAllGo">Transform all</button></div>
+      <div class="glbl">Or mix and match, ping by ping</div>
+      <div class="mrows" id="mRows"></div>
+      <p class="gdlgp mst" id="mSt"></p>
+      <div class="mfoot"><button class="gb" id="mRestore" title="Every ping back to its usual voice">Restore the planners' voices</button><button class="gb" id="mDone">Done</button></div>
     </div>
   </div>
   <div class="gdlg" id="gDlg" hidden role="dialog" aria-modal="true" aria-labelledby="gDlgT">

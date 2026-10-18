@@ -45,7 +45,8 @@ const BOOTH = (() => {
 
   // ---------- the chords and their pads ----------
   const PROGS = E.progressions;
-  const chordOf = bar => {
+  const chordOf = bar => { const k = ((bar % S.len) + S.len) % S.len; return (bc && driftSeq && driftSeq[k]) || baseChord(k); };
+  const baseChord = bar => {
     const k = ((bar % S.len) + S.len) % S.len;
     if (S.prog === 'song' && S.song){ const L0 = S.song.list; return S.song.cs[L0[Math.min(L0.length - 1, S.song.start + k)]] || S.song.cs[0]; }
     const p = PROGS[S.prog] || PROGS[0]; return p.chords[k % p.chords.length];
@@ -180,6 +181,7 @@ const BOOTH = (() => {
       if (b < 0){ click(t, b === -4); schedTo++; continue; }
       const cyc = Math.floor(b/Lb), lb = b - cyc*Lb;
       if (S.click === 'all' || (S.click === 'count' && rec && rec.armed && b >= rec.from - 4 && b < rec.from)) click(t, lb % 4 === 0);
+      if (bc && lb === 0) prepDrift(cyc);
       if (lb % 4 === 0){ const ch = chordOf(lb/4); if (ch !== padCh || lastBar === null) padTo(ch, t); lastBar = lb/4; at(t, () => retune(ch, t, lb/4));
         if (bc && S.song && songSounds && songSounds.chops.length) voiceOn('chops', 60, t, .32*(S.padLvl ?? 1), 0, bus.pad, 4, lb/4).off(t + 4*beatSec());   // (the song's own chord under the bar)
         if (bc && lb === 0) at(t, () => bcPass(cyc)); }
@@ -207,13 +209,14 @@ const BOOTH = (() => {
     const h = voiceOn(vo, m, t, (n.v || .8)*(isAp ? .72 : 1), isAp ? .35 : -.1, null, n.i, bar);
     h.off(t + Math.max(.12, n.d*beatSec()));
     if (bc) echo(n, absBeat, vo, ch, bar);
+    if (bc && bus){ const ml = +(($('g-motifLevelSlider') || {}).value || .68), dl = +(($('g-droneLevelSlider') || {}).value || .8); bus.lead.gain.setTargetAtTime(ml/.68, t, .2); bus.pad.gain.setTargetAtTime(dl/.8, t, .2); }
     if (n.i < NP){ at(t, () => light(n.i, isAp, true)); at(t + Math.max(.12, n.d*beatSec()), () => light(n.i, isAp, false)); }
   }
   // the broadcast's dispersion on the loop's notes: Mosaic echoes an octave up on the off-beat, Haze lets a soft long copy
   // bloom after, Glitch stutters strong-beat notes; how often, by the Console's density
   function echo(n, absBeat, vo, ch, bar){
     const den = +(($('g-granularMixSlider') || {}).value || .5), mode = E.mode, t = tOf(absBeat), bs = beatSec(), m = padMidi(ch, n.i), barEnd = tOf(Math.floor(absBeat/4)*4 + 4) - .03;
-    if (mode === 'MOSAIC' && Math.random() < den*.6){ const t2 = t + bs/2; if (t2 < barEnd) voiceOn(vo, m + 12, t2, .22, .5, null, Math.min(AP - 1, n.i + 4), bar).off(Math.min(barEnd, t2 + bs*.4)); }
+    if (mode === 'MOSAIC' && Math.random() < den*.6){ const t2 = t + bs*({ '1/4': 1, '1/8.': .75, '1/8': .5, '1/8T': 1/3, '1/16': .25 }[E.subdiv] || .5); if (t2 < barEnd) voiceOn(vo, m + 12, t2, .22, .5, null, Math.min(AP - 1, n.i + 4), bar).off(Math.min(barEnd, t2 + bs*.4)); }
     else if (mode === 'HAZE' && Math.random() < den*.5){ const t2 = t + bs*.5; if (t2 < barEnd) voiceOn(vo, m, t2, .16, -.5, null, n.i, bar).off(Math.min(barEnd, t2 + Math.max(1, n.d*2)*bs)); }
     else if (mode === 'ARP' && Math.abs(n.b - Math.round(n.b)) < .01 && Math.random() < den*.55){ for (let k = 1; k <= 3; k++){ const t2 = t + k*bs/8; if (t2 < barEnd) voiceOn(vo, m, t2, .3*(1 - k/4), (k % 2 ? .4 : -.4), null, n.i, bar).off(t2 + bs/10); } }
   }
@@ -549,28 +552,63 @@ const BOOTH = (() => {
     if (!bc) return;
     const here = playing ? chordOf(curBar()) : null; if (here && E.handOff) E.handOff(here);   // (the planners' pattern bridges over from the chord playing now)
     stop();
-    const st = bc.stash; bc = null; Object.keys(S).forEach(k => { if (!(k in st)) delete S[k]; }); Object.assign(S, st);
+    const st = bc.stash; bc = null; driftSeq = null; if (bus && ctx){ bus.lead.gain.setTargetAtTime(1, ctx.currentTime, .2); bus.pad.gain.setTargetAtTime(1, ctx.currentTime, .2); } Object.keys(S).forEach(k => { if (!(k in st)) delete S[k]; }); Object.assign(S, st);
     if (S.song) ensureSong(); padCache.clear(); apCache.clear(); stripShow(false);
     if (mode !== 'booth') music.setBooth(false);
   };
-  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part);
+  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
   const layerOn = id => { const b = $(id); return !!(b && b.classList.contains('on')); };   // (the Console's layer buttons: what the player asked for, whether or not the engine has started)
   // once a pass (from the second): the governor drifts the Console's own settings, as the auto-governor does for the
   // planners' patterns; a rewired copy also takes a little of the autopilot's answer into itself and moves a note
   const gR = rng(Date.now() & 0xffff);
+  // The governor on a shelf loop drifts what the auto-governor drifts for the planners' patterns: the clock (with the same
+  // hovering: it settles on a tempo for one to two minutes before it's free to move, and Lock tempo keeps it still), the
+  // footfall cadence, the dispersion mode, and the panel's knobs (shimmer, expression, output, resonance, smog, static, hum),
+  // each easing a little a pass toward a target it picks every few passes.
+  const GOV = [['g-granularMixSlider', .3, .8, .06], ['g-motifLevelSlider', .45, .9, .04], ['g-droneLevelSlider', .6, .95, .03], ['g-spaceReverbSlider', .45, .92, .03],
+    ['g-warmthFilterSlider', 1600, 4800, 250], ['g-lofiTextureSlider', .2, .5, .03], ['g-subAnchorSlider', .5, .85, .04]];
   function bcPass(cyc){
     if (!bc || cyc < 1) return;
     if (layerOn('g-autopilotBtn')){
-      if (cyc % 2 === 1){
-        const rv = $('g-spaceReverbSlider'), wf = $('g-warmthFilterSlider'), gm = $('g-granularMixSlider');
-        if (rv) setSlider('g-spaceReverbSlider', clamp(+rv.value + (gR() - .5)*.24, .35, .92));
-        if (wf) setSlider('g-warmthFilterSlider', clamp(+wf.value + (gR() - .5)*1400, 1400, 5200));
-        if (gm) setSlider('g-granularMixSlider', clamp(+gm.value + (gR() - .5)*.3, .25, .85));
+      const gv = bc.gov || (bc.gov = {}), now = performance.now();
+      for (const [id, lo, hi, st] of GOV){
+        const r = $(id); if (!r) continue;
+        if (cyc % 4 === 1 || gv[id] === undefined) gv[id] = lo + gR()*(hi - lo);
+        setSlider(id, +r.value + clamp(gv[id] - +r.value, -st, st));
       }
       if (cyc % 4 === 2){ const modes = ['MOSAIC', 'HAZE', 'ARP'].filter(x => x !== E.mode), b = root.querySelector(`.micro-mode-btn[data-mode="${modes[Math.floor(gR()*modes.length)]}"]`); if (b) b.click(); }
-      if (cyc % 4 === 0) setSlider('g-bpmSlider', clamp(Math.round(bc.base*(1 + (gR() - .5)*.16)), 60, 132));
+      if (cyc % 4 === 0){ const subs = ['1/8.', '1/8', '1/8', '1/8T', '1/16'].filter(x => x !== E.subdiv), b = root.querySelector(`.subdiv-btn[data-subdiv="${subs[Math.floor(gR()*subs.length)]}"]`); if (b) b.click(); }
+      const lk = $('g-tempoLock');
+      if (!(lk && lk.checked)){
+        const T = bc.tempo || (bc.tempo = { target: S.bpm, until: now + 60000 + gR()*60000 });
+        if (now > T.until){ T.target = clamp(Math.round(bc.base*(1 + [-.06, -.03, 0, 0, .03, .06][Math.floor(gR()*6)])), 60, 132); T.until = now + 60000 + gR()*60000; }
+        const hover = T.target + Math.round(Math.sin(now/23000)*1.2), cur = +($('g-bpmSlider') || { value: S.bpm }).value;
+        setSlider('g-bpmSlider', cur + clamp(hover - cur, -2, 2));
+      }
     }
     if (bc.mode === 'rewire' && S.ap) evolve(S.layers[0], apCache.get(cyc - 1) || []);
+  }
+  // Drift (the Console's Drift switch) on a shelf loop: each pass, the chords may wander from the loop's order, taking the
+  // steps the music itself takes. For a song, the chord changes the song makes (how often each chord follows each other one,
+  // counted over the whole song, with now and then a step to another chord the song uses); for a pattern, its own order with a step to a neighbor. Bar one stays home; the notes
+  // follow, since they're stored as pads.
+  let driftSeq = null;
+  function prepDrift(cyc){
+    driftSeq = null;
+    if (!bc || !layerOn('g-markovToggleBtn') || cyc < 1) return;
+    const n = S.len, home = [...Array(n)].map((_, k) => baseChord(k));
+    let pool, next;
+    if (S.prog === 'song' && S.song){
+      const L0 = S.song.list, T = new Map();
+      for (let k = 1; k < L0.length; k++){ if (L0[k] === L0[k - 1]) continue; const m = T.get(L0[k - 1]) || new Map(); m.set(L0[k], (m.get(L0[k]) || 0) + 1); T.set(L0[k - 1], m); }
+      const used = [...new Set(L0)].map(k => S.song.cs[k]);   // (a song that only ever takes one road still drifts: now and then to another chord it uses)
+      pool = S.song.cs; next = c => { const m = T.get(pool.indexOf(c)); if (!m || !m.size || gR() < .3){ const o = used.filter(x => x !== c); return o.length ? o[Math.floor(gR()*o.length)] : null; } let t = gR()*[...m.values()].reduce((a, b) => a + b, 0); for (const [k, w] of m){ t -= w; if (t <= 0) return pool[k]; } return null; };
+    } else {
+      pool = (PROGS[S.prog] || PROGS[0]).chords; next = c => { const k = pool.indexOf(c); return pool[(k + (gR() < .7 ? 1 : gR() < .5 ? -1 : 2) + pool.length) % pool.length]; };
+    }
+    const seq = [home[0]];
+    for (let k = 1; k < n; k++) seq.push(gR() < .55 ? home[k] : (next(seq[k - 1]) || home[k]));
+    driftSeq = seq;
   }
   // A rewired copy drifts: most passes the autopilot makes one or two changes to it, the player's own notes included. It takes
   // in a note of its own answer, deletes a note (the player's first, more often than not), moves one, retunes one, stretches

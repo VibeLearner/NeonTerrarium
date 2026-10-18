@@ -35,7 +35,7 @@ const music = (() => {
     clearTimeout(saveT);
     saveT = setTimeout(() => {
       try {
-        const o = { prog, s: {}, sel: {}, mode: E.mode, subdiv: E.subdiv, q: PNL.el.querySelector('#g-quantizeToggleBtn').classList.contains('on'), m: PNL.el.querySelector('#g-markovToggleBtn').classList.contains('on'), lead: E.leadOn, amb: E.ambientOn, auto: E.autoOn };
+        const o = { prog, s: {}, sel: {}, mode: E.mode, subdiv: E.subdiv, q: PNL.el.querySelector('#g-quantizeToggleBtn').classList.contains('on'), m: PNL.el.querySelector('#g-markovToggleBtn').classList.contains('on'), lead: E.leadOn, amb: E.ambientOn, auto: E.autoOn, lock: !!(PNL.el.querySelector('#g-tempoLock') || {}).checked };
         sliders().forEach(r => { o.s[r.id.slice(2)] = r.value; });
         PNL.el.querySelectorAll('select').forEach(s => { if (!s.value.startsWith('loop:')) o.sel[s.id.slice(2)] = s.value; });   // (a Booth shelf loop isn't kept as the pattern)
         localStorage.setItem(GRID_KEY, JSON.stringify(o));
@@ -55,6 +55,7 @@ const music = (() => {
       if (o.subdiv && o.subdiv !== E.subdiv) click(`.subdiv-btn[data-subdiv="${o.subdiv}"]`, 1);
       if (o.q === false) click('#g-quantizeToggleBtn', 1);
       if (o.m === true) click('#g-markovToggleBtn', 1);
+      if (o.lock){ const lk = PNL.el.querySelector('#g-tempoLock'); if (lk && !lk.checked){ lk.checked = true; lk.dispatchEvent(new Event('change')); } }
     }
     restored = true;
   }

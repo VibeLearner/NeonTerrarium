@@ -2089,7 +2089,7 @@ document.addEventListener('input', e => {
   if (!e.isTrusted || !e.target || !e.target.id || e.target.id.indexOf('g-') !== 0) return;
   const id = e.target.id.slice(2);
   AUTO.hold[id] = performance.now() + AUTO_HOLD_MS;
-  if (id === 'bpmSlider') AUTO.anchor = parseFloat(e.target.value);
+  if (id === 'bpmSlider'){ AUTO.anchor = parseFloat(e.target.value); AUTO.tempo = { target: AUTO.anchor, until: performance.now() + 60000 + Math.random() * 60000 }; }
 }, true);
 document.addEventListener('click', e => {
   if (!e.isTrusted || !e.target || !e.target.closest || !e.target.closest('#gridPanel')) return;
@@ -2097,6 +2097,9 @@ document.addEventListener('click', e => {
   if (e.target.closest('.subdiv-btn')) AUTO.hold.subdiv = performance.now() + AUTO_HOLD_MS;
   if (e.target.closest('#g-tapTempoBtn')) { AUTO.hold.bpmSlider = performance.now() + AUTO_HOLD_MS; setTimeout(() => { AUTO.anchor = masterBpm; }, 50); }
 }, true);
+const tempoLocked = () => !!($g('tempoLock') && $g('tempoLock').checked);
+// locking the tempo keeps the one playing now as home; unlocking lets the governor plan from it
+$g('tempoLock').addEventListener('change', () => { AUTO.anchor = masterBpm; AUTO.tempo = { target: masterBpm, until: performance.now() + 60000 + Math.random() * 60000 }; });
 function autoSlide(id, target, maxStep) {
   if (AUTO.hold[id] > performance.now()) return;
   const el = $g(id); if (!el) return;
@@ -2111,17 +2114,19 @@ function autopilot(P, pos, ms, E) {
   if (!AUTO.on || !leadLoopOn || !ctx) return;
   const now = performance.now(), free = k => !(AUTO.hold[k] > now);
   const arc = P.arc[pos], en = ms.energy, form = P.form;
-  // tempo: a home tempo, and a gentle shape around it
+  // tempo: a home tempo (the anchor), and a tempo it settles on and hovers round for one to two minutes (a beat a
+  // minute or so either side) before it's free to move up, down or stay; the move itself is gentle, two at most a bar.
+  // The Lock tempo box on the panel keeps it where it is.
   if (AUTO.anchor == null) AUTO.anchor = masterBpm;
-  if (free('bpmSlider')) {
-    let f;
-    if (form === 'BUILD') f = pos < 8 ? 0.1 * (pos / 8) : 0.1 - 0.12 * ((pos - 8) / 8);
-    else if (form === 'DRIFT') f = -0.06 + 0.03 * Math.sin(pos / 16 * 6.283);
-    else if (form === 'GROOVE') f = 0.02 * Math.sin(pos / 16 * 12.566);
-    else f = 0.05 * (arc - 0.5);
-    if (pos >= 13) f -= 0.04 * ((pos - 12) / 3);                              // every idea eases into its close
-    const target = leadClamp(AUTO.anchor * (1 + f), AUTO.anchor * 0.88, AUTO.anchor * 1.1);
-    const step = Math.round(leadClamp(target - masterBpm, -2, 2));
+  if (free('bpmSlider') && !tempoLocked()) {
+    const T = AUTO.tempo || (AUTO.tempo = { target: masterBpm, until: now + 60000 + Math.random() * 60000 });
+    if (now > T.until) {
+      const f = form === 'BUILD' ? leadPick([0.04, 0.07, 0]) : form === 'DRIFT' ? leadPick([-0.06, -0.03, 0]) : leadPick([-0.05, -0.02, 0, 0, 0.02, 0.05]);
+      T.target = Math.round(leadClamp(AUTO.anchor * (1 + f), AUTO.anchor * 0.88, AUTO.anchor * 1.1));
+      T.until = now + 60000 + Math.random() * 60000;
+    }
+    const hover = T.target + Math.round(Math.sin(now / 23000) * 1.2);   // (a gentle sway round it while it hovers)
+    const step = Math.round(leadClamp(hover - masterBpm, -2, 2));
     if (step) setMasterBpm(masterBpm + step);
   }
   // subdivision follows the mood, changed twice per idea
@@ -2145,6 +2150,7 @@ function autopilot(P, pos, ms, E) {
   if (pos === 0 && free('chordHoldSlider')) autoSlide('chordHoldSlider', (ambientOn ? 1.4 : 1) * { DRIFT: 16, BUILD: 8, GROOVE: 12, EXCHANGE: 10 }[form] + Math.round((Math.random() - 0.5) * 4), 24);
 }
 function releaseTempo() {
+  if (tempoLocked()) return;
   if (AUTO.anchor != null && !(AUTO.hold.bpmSlider > performance.now()) && isPlaying) setMasterBpm(AUTO.anchor);
 }
 $g('autopilotBtn').addEventListener('click', () => {

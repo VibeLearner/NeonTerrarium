@@ -181,6 +181,10 @@ const GRIDPANEL = (() => {
   #gridPanel .gdlgopt { text-align: left; padding: 12px 14px; margin: 0; letter-spacing: .06em; text-transform: none; display: grid; gap: 4px; }
   #gridPanel .gdlgopt b { font: 500 14px 'Chakra Petch', sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--cy); }
   #gridPanel .gdlgopt small { color: var(--cy2); font-size: 12px; line-height: 1.45; } #gridPanel .gdlgopt:hover b { color: var(--yl); }
+  #gridPanel .gchk { display: flex; align-items: center; gap: 7px; cursor: pointer; color: var(--cy2); font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; }
+  #gridPanel .gchk input { appearance: none; width: 15px; height: 15px; margin: 0; border: 1px solid var(--line); background: rgba(5,22,29,.9); display: grid; place-items: center; cursor: pointer; }
+  #gridPanel .gchk input:checked { background: var(--yl); border-color: var(--yl); } #gridPanel .gchk input:checked::after { content: ''; width: 7px; height: 4px; border: 2px solid #04141a; border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
+  #gridPanel .gchk input:focus-visible { outline: 2px solid var(--yl); outline-offset: 2px; }
   /* the mode tabs */
   #gridPanel .gtabs { display: flex; gap: 0; margin-left: 10px; border: 1px solid var(--line); }
   #gridPanel .gtab { background: none; border: 0; color: var(--cy2); font: inherit; font-size: 12.5px; letter-spacing: .2em; text-transform: uppercase; padding: 6px 14px; cursor: pointer; }
@@ -268,6 +272,7 @@ const GRIDPANEL = (() => {
         <div class="gside">
           ${knob('bpmSlider', 'Clock rate', 55, 140, 1, 82, "Sets the metabolic pacing of the sector's population.", '', false)}
           <button class="gb" id="g-tapTempoBtn" title="Tap the pulse and the whole district falls in step">Tap pulse</button>
+          <label class="gchk" title="The auto-governor leaves the clock where it is (it still drifts everything else)"><input type="checkbox" id="g-tempoLock"><span>Lock tempo</span></label>
         </div>
       </div>
       <div class="grow" title="Footfall cadence: how finely each beat is cut, the rhythm of the footsteps the broadcast matches.">

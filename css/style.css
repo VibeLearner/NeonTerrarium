@@ -352,45 +352,47 @@ html.touch .ffbar{top:calc(16px + env(safe-area-inset-top,0px));bottom:auto}
 @media (max-width:600px){html.touch .gdeck{scale:.72}html.touch .ffbar{left:16px;right:auto;transform:none;top:calc(136px + env(safe-area-inset-top,0px))}}
 @media (max-height:480px){html.touch .gdeck{scale:.66}html.touch .bmenu-list,html.touch .ctlpanel{max-height:calc(100vh - 190px)}}
 
-/* ---------- the title screen: the city through a rainy window (title.js) ---------- */
+/* ---------- the title screen: a flat on a bright morning, the city through its round window (title.js) ---------- */
 .sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-html.title-on body > *:not(#view):not(#title):not(script){visibility:hidden!important;pointer-events:none!important}
-html.title-on.title-deck #deck,html.title-on.title-deck #deckToggle{visibility:visible!important;pointer-events:auto!important}
-html.title-on.title-deck #deckToggle{z-index:31}
-html.title-on.title-deck #deck{z-index:31}
+html.title-on body > :where(:not(#view):not(#title):not(script)){visibility:hidden!important;pointer-events:none!important}
+html.title-on.title-deck #deck{visibility:visible!important;pointer-events:auto!important;z-index:31}
 html.title-on #view{cursor:default}
-.title{position:fixed;inset:0;z-index:30;overflow:hidden;cursor:default;--warm:#ffcf9a;--glass-ink:#efe4cf}
+.title{position:fixed;inset:0;z-index:30;overflow:hidden;cursor:default}
 .title[hidden]{display:none}
-.title canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-#tSign{image-rendering:auto}
-#tFog{image-rendering:auto;opacity:.62}
-#tGlow{mix-blend-mode:screen;opacity:1}
-#tFrame{image-rendering:pixelated;image-rendering:crisp-edges}
-/* the menu: written in the fog with a finger (the clear strokes are drawn in the fog itself); the words light up warm under the pointer */
-.t-menu{position:absolute;display:grid;justify-items:start;gap:clamp(6px,1.2vh,14px)}
-.t-menu button{font-family:var(--font-pixel);font-size:clamp(20px,2.6vw,40px);letter-spacing:.04em;line-height:1;text-transform:uppercase;
-  color:rgba(6,9,18,.86);text-shadow:0 1px 0 rgba(255,226,190,.42),0 0 6px rgba(255,214,170,.28);background:none;border:0;border-radius:0;padding:4px 2px;cursor:pointer;position:relative;
-  transition:color .25s ease,text-shadow .25s ease,transform .25s ease}
-.t-menu button:first-child{font-size:clamp(28px,3.6vw,56px)}
-.t-menu button::before{content:'';position:absolute;left:-1.1em;top:50%;width:.45em;height:.45em;margin-top:-.25em;background:var(--warm);opacity:0;transition:opacity .2s;
-  clip-path:polygon(0 0,100% 50%,0 100%);filter:drop-shadow(0 0 6px rgba(255,180,100,.8))}
-.t-menu button:hover,.t-menu button:focus-visible{color:var(--glass-ink);text-shadow:0 0 1px #000,0 0 10px rgba(255,190,120,.7),0 0 26px rgba(255,150,70,.4);transform:translateX(4px)}
+.t-stage{position:absolute;transition:transform 1.4s cubic-bezier(.6,0,.75,.35),opacity 1.1s ease-in 0.2s}
+.t-layer{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none}
+#tGlass{opacity:.9}
+.title.leaving .t-stage{transform:scale(3.2);opacity:0}
+/* the neon sign's own light, live over the baked one: a hum and the odd stutter */
+.t-signglow{position:absolute;width:calc(var(--px)*230);height:calc(var(--px)*110);transform:translate(-50%,-50%);pointer-events:none;mix-blend-mode:screen;
+  background:radial-gradient(closest-side,rgba(255,79,163,.34),rgba(255,79,163,.1) 55%,transparent),radial-gradient(closest-side at 50% 70%,rgba(43,220,108,.22),transparent 70%);
+  opacity:.75;transition:opacity .05s}
+.t-signglow.dip{opacity:.15}
+/* the sign's dark state, baked: swapped in for a moment when the tubes stutter */
+.t-signoff{position:absolute;image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none;opacity:0}
+.t-signoff.on{opacity:1}
+/* the menu: at the side, over a soft shade so it reads on the room */
+.t-side{position:absolute;left:0;top:0;bottom:0;width:clamp(260px,30vw,440px);display:flex;flex-direction:column;justify-content:flex-end;gap:18px;box-sizing:border-box;
+  padding:0 0 clamp(40px,11vh,110px) clamp(24px,4.5vw,72px);background:linear-gradient(to right,rgba(16,20,18,.62),rgba(16,20,18,.32) 60%,transparent);pointer-events:none}
+.t-side > *{pointer-events:auto}
+.t-cityline{margin:0;display:grid;gap:3px;color:#efe6d2;text-shadow:0 1px 0 rgba(0,0,0,.6)}
+.t-cityline b{font-family:var(--font-pixel);font-weight:400;font-size:13px;letter-spacing:.12em;text-transform:uppercase}
+.t-cityline span{font-family:var(--font-mono);font-size:12px;opacity:.85}
+.t-menu{display:grid;justify-items:start;gap:6px}
+.t-menu button{font-family:var(--font-pixel);font-size:clamp(17px,1.6vw,24px);letter-spacing:.08em;line-height:1.15;text-transform:uppercase;color:#efe6d2;
+  background:none;border:0;border-radius:0;padding:4px 0 4px 22px;cursor:pointer;position:relative;text-shadow:0 2px 0 rgba(0,0,0,.55);transition:color .15s,transform .15s}
+.t-menu button:first-child{font-size:clamp(22px,2.3vw,34px)}
+.t-menu button::before{content:'';position:absolute;left:2px;top:50%;width:9px;height:9px;margin-top:-5px;background:#ff6fb8;opacity:0;clip-path:polygon(0 0,100% 50%,0 100%);filter:drop-shadow(0 0 4px rgba(255,79,163,.8))}
+.t-menu button:hover,.t-menu button:focus-visible{color:#ffd0ea;transform:translateX(4px);outline:none}
 .t-menu button:hover::before,.t-menu button:focus-visible::before{opacity:1}
-.t-menu button:focus-visible{outline:none}
-/* a paper note taped to the frame: which city, how far along */
-.t-note{position:absolute;display:grid;gap:2px;padding:8px 12px 9px;background:#e6d9bf;color:#2a2018;font-family:var(--font-mono);font-size:clamp(10px,.85vw,13px);
-  transform:rotate(-3deg);box-shadow:0 2px 0 rgba(0,0,0,.35),0 6px 18px rgba(0,0,0,.45);max-width:220px}
-.t-note::before{content:'';position:absolute;left:50%;top:-7px;width:44px;height:14px;margin-left:-22px;background:rgba(210,200,160,.75);transform:rotate(4deg)}
-.t-note b{font-family:var(--font-pixel);font-weight:400;font-size:1.15em;letter-spacing:.04em}
-.title.leaving #tFrame,.title.leaving .t-note,.title.leaving .t-menu{transform:scale(1.5);opacity:0;transition:transform 1.2s cubic-bezier(.55,0,.75,.4),opacity 1.1s ease-in}
-.title.leaving #tSign,.title.leaving #tGlow{opacity:0;transition:opacity .9s ease-in .2s}
-.title.leaving #tFog{opacity:0;transition:opacity 1s ease}
+/* Settings: the game's own deck and its Close button, where they always are */
+html.title-on.title-deck #deckToggle{visibility:visible!important;pointer-events:auto!important;z-index:31}
+/* Cities: a panel on the right, in the game's deck style */
+.t-panel{position:fixed;top:calc(16px + env(safe-area-inset-top,0px));right:16px;max-height:calc(100% - 32px);
+  background:rgba(12,19,35,.95);border:1px solid var(--line);clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
 /* the cities panel: on the right pane, in the game's own deck style */
-.t-panel{position:absolute;display:flex;flex-direction:column;gap:10px;padding:14px;box-sizing:border-box;overflow:hidden;
-  background:rgba(10,15,28,.94);border:1px solid var(--line);color:var(--ink);font-family:var(--font-mono);font-size:12px;
-  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);box-shadow:0 0 0 1px rgba(56,232,224,.08)}
+.t-panel{display:flex;flex-direction:column;gap:10px;padding:14px;box-sizing:border-box;overflow:hidden;width:min(500px,calc(100vw - 32px));font-family:var(--font-mono);font-size:12px;z-index:2}
 .t-panel[hidden]{display:none}
-.title:has(.t-panel:not([hidden])) .t-note{display:none}
 .t-panel header{display:flex;align-items:center;justify-content:space-between}
 .t-panel h2,.t-panel h3{margin:0;font-family:var(--font-pixel);font-weight:400;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan)}
 .t-panel h3{font-size:11px}
@@ -422,8 +424,8 @@ html.title-on #view{cursor:default}
 .tmsg.bad{color:#ff8aa8}
 .trename{display:flex;gap:6px;margin-top:4px}
 @media (max-width:700px){
-  .t-menu button{font-size:19px}.t-menu button:first-child{font-size:25px}
-  .t-panel{left:12px!important;right:12px;width:auto!important;top:12px!important;max-height:calc(100% - 24px)!important;z-index:2}
-  .t-note{display:none}
+  .t-side{width:100%;background:linear-gradient(to top,rgba(16,20,18,.7),rgba(16,20,18,.3) 45%,transparent 70%);padding:0 0 calc(28px + env(safe-area-inset-bottom,0px)) 24px}
+  .t-panel{left:12px;right:12px;width:auto}
 }
-@media (prefers-reduced-motion:reduce){.title.leaving *{transition:none!important}}
+}
+@media (prefers-reduced-motion:reduce){.title *,.title{transition:none!important;animation:none!important}}

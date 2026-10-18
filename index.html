@@ -11,26 +11,31 @@
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&family=Chakra+Petch:wght@500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="data:,">
 <script src="js/touch.js?v=2026-10-14a"></script>
-<link rel="stylesheet" href="css/style.css?v=2026-10-18a">
+<link rel="stylesheet" href="css/style.css?v=2026-10-18c">
 </head>
 <body>
 
 <canvas id="view" aria-label="Rotating pixel-art view of a floating cyberpunk district"></canvas>
 
-<!-- the title screen: your city through a rainy window (title.js); cities and the cloud (slots.js) -->
+<!-- the title screen: a flat on a bright morning, your city through its window (title.js, the room baked by tools/title/bake.py); cities and the cloud (slots.js) -->
 <div id="title" class="title" role="region" aria-label="Neon Terrarium title screen">
   <h1 class="sr-only">Neon Terrarium</h1>
-  <canvas id="tSign" aria-hidden="true"></canvas>
-  <canvas id="tFog" aria-hidden="true"></canvas>
-  <canvas id="tGlow" aria-hidden="true"></canvas>
-  <canvas id="tFrame" aria-hidden="true"></canvas>
-  <nav class="t-menu" aria-label="Main menu">
-    <button data-act="continue"><span>Continue</span></button>
-    <button data-act="new"><span>New city</span></button>
-    <button data-act="cities"><span>Cities</span></button>
-    <button data-act="settings"><span>Settings</span></button>
-  </nav>
-  <div class="t-note" id="tNote" aria-live="polite"><b id="tNoteName">My city</b><span id="tNoteLine">Day 1</span></div>
+  <div id="tStage" class="t-stage">
+    <img id="tGlass" class="t-layer" alt="" aria-hidden="true">
+    <img id="tRoom" class="t-layer" alt="" aria-hidden="true">
+    <img id="tSignOff" class="t-signoff" alt="" aria-hidden="true">
+    <canvas id="tDust" class="t-layer" aria-hidden="true"></canvas>
+    <i id="tSignGlow" class="t-signglow" aria-hidden="true"></i>
+  </div>
+  <div class="t-side">
+    <p class="t-cityline"><b id="tHoloName">My city</b><span id="tHoloLine">Day 1</span></p>
+    <nav class="t-menu" aria-label="Main menu">
+      <button data-act="continue"><span>Continue</span></button>
+      <button data-act="new"><span>New city</span></button>
+      <button data-act="cities"><span>Cities</span></button>
+      <button data-act="settings"><span>Settings</span></button>
+    </nav>
+  </div>
   <section class="t-panel" id="tCities" hidden aria-label="Cities">
     <header><h2>Cities</h2><button id="tClose" aria-label="Close">Close</button></header>
     <ul id="tList" class="tlist"></ul>
@@ -333,7 +338,7 @@
 <script src="js/overseer.js?v=2026-10-16p"></script>
 <script src="js/wirelog.js?v=2026-10-16q"></script>
 <script src="js/slots.js?v=2026-10-18a"></script>
-<script src="js/title.js?v=2026-10-18a"></script>
+<script src="js/title.js?v=2026-10-18c"></script>
 <script>document.getElementById('toTitle').addEventListener('click', () => { const tg = document.getElementById('deckToggle'); if (document.getElementById('deck').classList.contains('open')) tg.click(); TITLE.show(); });</script>
 </body>
 </html>

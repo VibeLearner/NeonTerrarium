@@ -1,0 +1,178 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Title room bake</title>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#222}canvas{display:block}</style></head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="room.js"></script>
+<script>
+// Bakes the title screen's room (room.js) with real light: a sun through the porthole with soft shadows, reflections
+// from a cube capture of the room on the glossy things, light shafts marched against the sun's shadow map, ambient
+// occlusion from the depth, the game's outlines, a warm grade, then the game's pixel look (stepped colour, ordered dither).
+// Outputs, per view (wide, tall):
+//   room    - the room, the glass cut out (alpha 0)
+//   glass   - what is on the glass: the haze in front of it, reflections, a faint tint (alpha)
+//   signoff - the sign's patch of the room with the tubes dark (the title flickers between the two)
+//   anchors - where the window, the sign and the sunlit patch land on the picture
+// bake.py drives this page and writes the files to assets/title/.
+'use strict';
+const VIEWS = {
+  wide: { w: 960, h: 540, pos: [1.7, 1.42, 2.35], look: [-.75, 1.5, -2], fov: 64 },
+  tall: { w: 540, h: 1170, pos: [-.45, 1.4, 2.8], look: [-.7, 1.62, -2], fov: 82 },
+};
+const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true, alpha: true });
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+
+const POST_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }';
+const POST_FS = `
+#include <packing>
+varying vec2 vUv;
+uniform sampler2D tColor, tDepth, shadowMap;
+uniform mat4 shadowMatrix, projInv, viewInv;
+uniform vec3 camPos, sunDir, sunCol;
+uniform vec2 res;
+uniform float mode, density, edgeK, dbg, pxPerM, aoK;
+float bayer(vec2 p){ vec2 q = mod(floor(p), 4.); int i = int(q.x) + int(q.y)*4;
+  float b[16]; b[0]=0.;b[1]=8.;b[2]=2.;b[3]=10.;b[4]=12.;b[5]=4.;b[6]=14.;b[7]=6.;b[8]=3.;b[9]=11.;b[10]=1.;b[11]=9.;b[12]=15.;b[13]=7.;b[14]=13.;b[15]=5.;
+  for (int k = 0; k < 16; k++) if (k == i) return b[k]/16.; return 0.; }
+vec3 worldAt(vec2 uv, float d){ vec4 v = projInv*vec4(uv*2. - 1., d*2. - 1., 1.); v /= v.w; return (viewInv*v).xyz; }
+float lin(float d){ vec4 v = projInv*vec4(0., 0., d*2. - 1., 1.); return -v.z/v.w; }
+void main(){
+  vec4 col = texture2D(tColor, vUv);
+  float d = texture2D(tDepth, vUv).x;
+  vec3 end = d < 1. ? worldAt(vUv, d) : camPos + normalize(worldAt(vUv, .999) - camPos)*9.;
+  vec3 dir = end - camPos; float len = length(dir); dir /= len;
+  // in-scattering: march from the eye to the surface (or the glass), counting the steps the sun reaches
+  const int N = 80; float acc = 0.; float j = bayer(gl_FragCoord.xy);
+  for (int i = 0; i < N; i++){
+    float t = (float(i) + j)/float(N); vec3 p = camPos + dir*len*t;
+    vec4 sc = shadowMatrix*vec4(p, 1.); sc.xyz /= sc.w;
+    if (sc.x > 0. && sc.x < 1. && sc.y > 0. && sc.y < 1. && sc.z < 1.){
+      float sd = unpackRGBAToDepth(texture2D(shadowMap, sc.xy));
+      if (sc.z - .0015 < sd) acc += 1.;
+    }
+  }
+  acc *= len/float(N);
+  float mu = dot(dir, -sunDir), g = .6, hg = (1. - g*g)/pow(1. + g*g - 2.*g*mu, 1.5)/12.566;
+  vec3 scat = sunCol*acc*density*(.3 + 3.6*hg) + vec3(.55, .62, .55)*len*.004;
+  if (dbg > .5){ gl_FragColor = vec4(vec3(acc/len), 1.); return; }
+  if (mode < .5){
+    // ambient occlusion: how much of the hemisphere over the surface the nearby depth closes off
+    vec3 P = end, Nn = normalize(cross(dFdx(P), dFdy(P)));
+    float l0 = lin(d), rpx = clamp(.32*pxPerM/max(l0, .3), 3., 60.), occ = 0.;
+    for (int i = 0; i < 16; i++){
+      float a = float(i)*2.39996 + j*6.283, r = sqrt((float(i) + .5)/16.)*rpx;
+      vec2 o = vec2(cos(a), sin(a))*r/res; float dq = texture2D(tDepth, vUv + o).x; if (dq >= 1.) continue;
+      vec3 v = worldAt(vUv + o, dq) - P; float vl = length(v);
+      occ += max(0., dot(Nn, v/vl) - .12)*(1. - smoothstep(.12, .45, vl));
+    }
+    float ao = 1. - clamp(occ/16.*aoK, 0., .75);
+    // the game's outlines where depth jumps
+    float e = 0.;
+    for (int k = 0; k < 4; k++){ vec2 o = vec2(k == 0 ? 1. : k == 1 ? -1. : 0., k == 2 ? 1. : k == 3 ? -1. : 0.)/res;
+      float l1 = lin(texture2D(tDepth, vUv + o).x); e = max(e, (l1 - l0)/l0); }
+    vec3 c = col.rgb*ao*(1. - smoothstep(.05, .14, e)*edgeK) + scat*col.a;
+    // the grade: warm highlights, cool green-teal in the shadows, more colour, a touch more contrast, a soft vignette
+    float lm = dot(c, vec3(.3, .55, .15));
+    c *= mix(vec3(.92, .98, 1.0), vec3(1.1, 1.0, .84), smoothstep(.15, .85, lm));
+    c = mix(vec3(lm), c, 1.12);
+    c = (c - .5)*1.1 + .5;
+    vec2 q = vUv - .5; c *= 1. - dot(q, q)*.55;
+    gl_FragColor = vec4(clamp(c, 0., 1.), col.a);
+  } else {
+    float a = 1. - col.a; float lum = dot(scat, vec3(.3, .55, .15));
+    gl_FragColor = vec4(scat/max(lum, 1e-3), clamp(lum*1.1, 0., .85)*a);
+  }
+}`;
+const postScene = new THREE.Scene(), postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const post = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ vertexShader: POST_VS, fragmentShader: POST_FS, extensions: { derivatives: true }, uniforms: {
+  tColor: { value: null }, tDepth: { value: null }, shadowMap: { value: null }, shadowMatrix: { value: new THREE.Matrix4() }, projInv: { value: new THREE.Matrix4() }, viewInv: { value: new THREE.Matrix4() },
+  camPos: { value: new THREE.Vector3() }, sunDir: { value: new THREE.Vector3() }, sunCol: { value: new THREE.Color(1, .82, .56) }, res: { value: new THREE.Vector2() },
+  mode: { value: 0 }, dbg: { value: 0 }, density: { value: .26 }, edgeK: { value: .34 }, pxPerM: { value: 500 }, aoK: { value: 2.2 } }, depthTest: false, depthWrite: false }));
+postScene.add(post);
+
+let sun = null;
+function renderPass(V, cam, w, h){
+  const rt = new THREE.WebGLRenderTarget(w, h, { depthBuffer: true }); rt.depthTexture = new THREE.DepthTexture(w, h); rt.depthTexture.type = THREE.UnsignedIntType;
+  rt.texture.encoding = THREE.sRGBEncoding;
+  renderer.setClearColor(0x000000, 0); renderer.setRenderTarget(rt); renderer.render(scene, cam);
+  const out = new THREE.WebGLRenderTarget(w, h); out.texture.encoding = THREE.sRGBEncoding;
+  const u = post.material.uniforms;
+  u.tColor.value = rt.texture; u.tDepth.value = rt.depthTexture; u.shadowMap.value = sun.shadow.map.texture; u.shadowMatrix.value.copy(sun.shadow.matrix);
+  u.projInv.value.copy(cam.projectionMatrixInverse); u.viewInv.value.copy(cam.matrixWorld); u.camPos.value.copy(cam.position);
+  u.sunDir.value.copy(sun.target.position).sub(sun.position).normalize(); u.res.value.set(w, h); u.pxPerM.value = h/(2*Math.tan(V.fov*Math.PI/360));
+  const read = mode => { u.mode.value = mode; renderer.setRenderTarget(out); renderer.toneMapping = THREE.NoToneMapping; renderer.render(postScene, postCam); renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    const px = new Uint8Array(w*h*4); renderer.readRenderTargetPixels(out, 0, 0, w, h, px);
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'), im = g.createImageData(w, h);
+    for (let y = 0; y < h; y++) im.data.set(px.subarray((h - 1 - y)*w*4, (h - y)*w*4), y*w*4);
+    g.putImageData(im, 0, 0); return c; };
+  return { room: read(0), glass: read(1) };
+}
+async function bake(name){
+  const V = VIEWS[name], w = V.w, h = V.h;
+  renderer.setPixelRatio(1); renderer.setSize(w, h);
+  const cam = new THREE.PerspectiveCamera(V.fov, w/h, .05, 40); cam.position.set(...V.pos); cam.lookAt(...V.look); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
+  const on = renderPass(V, cam, w, h);
+  // the sign dark: its tubes off, its light off
+  ROOM.signMesh.material.map = ROOM.signOff; ROOM.signMesh.material.needsUpdate = true; for (const l of ROOM.signLights) l.visible = false;
+  const off = renderPass(V, cam, w, h);
+  ROOM.signMesh.material.map = ROOM.signOn; ROOM.signMesh.material.needsUpdate = true; for (const l of ROOM.signLights) l.visible = true;
+  const at = v => { const p = v.clone().project(cam); return [+((p.x + 1)/2).toFixed(4), +((1 - p.y)/2).toFixed(4)]; };
+  const W = ROOM.WIN, S = ROOM.SIGN, rim = at(new THREE.Vector3(W.x, W.y + W.r, ROOM.BACK - ROOM.WALL_T)), ctr = at(new THREE.Vector3(W.x, W.y, ROOM.BACK - ROOM.WALL_T));
+  const sd = post.material.uniforms.sunDir.value, wc = new THREE.Vector3(W.x, W.y, ROOM.BACK), k = -wc.y/sd.y, patch = wc.clone().addScaledVector(sd, k);
+  // the sign's patch on the picture (with room for its glow), in pixels
+  const cs = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => at(new THREE.Vector3(S.x + a*(S.w/2 + .35), S.y + b*(S.h/2 + .35), S.z)));
+  const sx0 = Math.max(0, Math.floor(Math.min(...cs.map(c => c[0]))*w)), sy0 = Math.max(0, Math.floor(Math.min(...cs.map(c => c[1]))*h));
+  const sx1 = Math.min(w, Math.ceil(Math.max(...cs.map(c => c[0]))*w)), sy1 = Math.min(h, Math.ceil(Math.max(...cs.map(c => c[1]))*h));
+  const anchors = { w, h, win: ctr, winR: +Math.hypot((rim[0] - ctr[0])*w, (rim[1] - ctr[1])*h).toFixed(1), sign: at(new THREE.Vector3(S.x, S.y, S.z)), patch: at(patch), signRect: [sx0, sy0, sx1 - sx0, sy1 - sy0] };
+  if (!post.material.uniforms.dbg.value){ finish(on.room, on.glass, anchors); finish(off.room, null, anchors); }
+  let signoff = null;
+  if (sx1 > sx0 && sy1 > sy0){ const c = document.createElement('canvas'); c.width = sx1 - sx0; c.height = sy1 - sy0; c.getContext('2d').drawImage(off.room, sx0, sy0, c.width, c.height, 0, 0, c.width, c.height); signoff = c.toDataURL('image/png'); }
+  return { room: on.room.toDataURL('image/png'), glass: on.glass.toDataURL('image/png'), signoff, anchors };
+}
+// after the render: a soft bloom on what's bright, light film grain, the colours stepped with an ordered dither (the
+// game's look); the glass given reflections: soft diagonal sheens, a bright rim where the sleeve meets it, a faint tint
+function finish(room, glass, A){
+  const g = room.getContext('2d'), w = room.width, h = room.height;
+  const br = document.createElement('canvas'); br.width = w; br.height = h; const gb = br.getContext('2d');
+  gb.filter = 'brightness(.9) contrast(2.6) saturate(1.3)'; gb.drawImage(room, 0, 0); gb.filter = 'none';
+  const bl = document.createElement('canvas'); bl.width = w; bl.height = h; const gl = bl.getContext('2d'); gl.filter = 'blur(' + Math.round(h/80) + 'px)'; gl.drawImage(br, 0, 0);
+  g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = .12; g.drawImage(bl, 0, 0); g.restore();
+  const im = g.getImageData(0, 0, w, h), d = im.data, B = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], q = 8;
+  let s = 99; const rn = () => (s = (s*16807) % 2147483647)/2147483647;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){ const i = (y*w + x)*4; if (!d[i + 3]) continue; const t = (B[(y & 3)*4 + (x & 3)]/16 - .5)*q + (rn() - .5)*7;
+    for (let k = 0; k < 3; k++) d[i + k] = Math.max(0, Math.min(255, Math.round((d[i + k] + t)/q)*q)); d[i + 3] = d[i + 3] > 127 ? 255 : 0; }
+  g.putImageData(im, 0, 0);
+  if (!glass) return;
+  const gg = glass.getContext('2d'), cx = A.win[0]*w, cy = A.win[1]*h, r = A.winR;
+  const mask = document.createElement('canvas'); mask.width = w; mask.height = h; const gm = mask.getContext('2d');
+  gm.fillStyle = 'rgba(215,236,226,.06)'; gm.fillRect(0, 0, w, h);
+  gm.save(); gm.translate(cx, cy); gm.rotate(-.6);
+  const sheen = (off, wd, a) => { const lg = gm.createLinearGradient(-r, 0, r, 0); lg.addColorStop(Math.max(0, .5 + off - wd), 'rgba(255,255,255,0)'); lg.addColorStop(.5 + off, 'rgba(255,255,255,' + a + ')'); lg.addColorStop(Math.min(1, .5 + off + wd), 'rgba(255,255,255,0)'); gm.fillStyle = lg; gm.fillRect(-r*1.2, -r*1.2, r*2.4, r*2.4); };
+  sheen(-.22, .09, .14); sheen(-.08, .03, .1); sheen(.3, .05, .06);
+  gm.restore();
+  gm.strokeStyle = 'rgba(255,250,235,.3)'; gm.lineWidth = Math.max(1, r*.02); gm.beginPath(); gm.ellipse(cx, cy, r*.985, r*.985, 0, Math.PI*.95, Math.PI*1.55); gm.stroke();
+  for (let i = 0; i < 70; i++){ const a = rn()*7, rr = rn()*r*.95; gm.fillStyle = 'rgba(255,255,255,' + (.05 + rn()*.08) + ')'; const z = 1 + rn()*2; gm.fillRect(cx + Math.cos(a)*rr, cy + Math.sin(a)*rr, z, z); }
+  gm.globalCompositeOperation = 'destination-out'; gm.drawImage(room, 0, 0);
+  gg.drawImage(mask, 0, 0);
+}
+let fontReady = document.fonts.load('150px Silkscreen');
+window.BAKE = async (opt = {}) => {
+  if (opt.density !== undefined) post.material.uniforms.density.value = opt.density;
+  if (opt.dbg !== undefined) post.material.uniforms.dbg.value = opt.dbg;
+  await fontReady; await document.fonts.ready;
+  ROOM.build(scene); sun = ROOM.light(scene);
+  scene.updateMatrixWorld(true);
+  renderer.setRenderTarget(null); renderer.setSize(64, 64); renderer.render(scene, new THREE.PerspectiveCamera());
+  // reflections: the room seen from the middle of it, on everything glossy
+  const crt = new THREE.WebGLCubeRenderTarget(256, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter }); crt.texture.encoding = THREE.sRGBEncoding;
+  const cc = new THREE.CubeCamera(.05, 30, crt); cc.position.set(-.6, 1.1, .2); scene.add(cc); cc.update(renderer, scene);
+  const M = ROOM.M; for (const [m, k] of [[M.stone, .9], [M.chrome, 1], [M.steel, .8], [M.glass, 1], [M.enamel, .5], [M.ceramic, .6], [M.floor, .25], [M.cream, .35], [M.copper, .8], [M.flex, .5]]){ m.envMap = crt.texture; m.envMapIntensity = k; m.needsUpdate = true; }
+  const res = {}; for (const k of (opt.views || Object.keys(VIEWS))) res[k] = await bake(k);
+  return res;
+};
+</script>
+</body></html>

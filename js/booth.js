@@ -347,6 +347,7 @@ const BOOTH = (() => {
         if (bc && S.song && songSounds && songSounds.chops.length) voiceOn('chops', 60, t, .32*(S.padLvl ?? 1), 0, bus.pad, 4, lb/4).off(t + 4*beatSec());   // (the song's own chord under the bar)
         if (bc && lb === 0) at(t, () => bcPass(cyc)); }
       // the layers and the autopilot's part, for the notes that start in this beat
+      if (bc){ const bn = (lb % 4) + 1; at(t, () => { E.beat = bn; }); }   // (the Console's clock and beat pictures keep time with the loop)
       const skip = thinFor(cyc);
       if (lb % 4 === 0) maybePing(Math.floor(b/4), lb/4, t, cyc);
       for (const layer of S.layers) for (const n of layer) if (n.b >= lb && n.b < lb + 1 && !(skip && skip.has(n))) playNote(n, b + n.b - lb, false);

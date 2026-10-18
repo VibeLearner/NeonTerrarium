@@ -2684,7 +2684,7 @@ function playMotifStyle(style, chord, motifNotes, now, times) {
   }
 
   setTimeout(() => {
-    if (isPlaying) {
+    if (isPlaying || boothHeld) {   // (on a Booth loop too: the LED goes back, so the next ping lights it again)
       statusEl.textContent = 'PING: QUIET STREETS';
       ledEl.className = 'w-2 h-2 rounded-full bg-violet-400';
     }
@@ -3382,7 +3382,8 @@ return {
   get playing(){ return isPlaying; }, get frozen(){ return isFrozen; },
   get leadOn(){ return leadLoopOn; }, get ambientOn(){ return ambientOn; }, get autoOn(){ return AUTO.on; },
   get bpm(){ return masterBpm; }, get mode(){ return microcosmMode; }, get subdiv(){ return currentSubdiv; },
-  get chord(){ return getActiveChord(); }, get progIdx(){ return currentProgIdx; }, get chordIdx(){ return currentChordIdx; },
+  get chord(){ return liveChord || getActiveChord(); },   // (on a Booth loop, the loop's chord: the panel's pictures follow it)
+  set beat(n){ const b = $g('beatCounterBadge'); if (b) b.textContent = `${n}/4`; }, get progIdx(){ return currentProgIdx; }, get chordIdx(){ return currentChordIdx; },
   get mood(){ return (cd && cd.ms && cd.ms.name) || ''; }, get idea(){ return (cd && cd.prem && cd.prem.title) || ''; }, get ideaStatus(){ return ideaStatus; }, get pendingPing(){ return queuedMotifRequest ? (queuedMotifRequest.style || $g('motifStyleSelect').value) : null; },
   toggle: toggleSoundscapeEngine, setLead: setLeadLoop, setAmbient, setAuto(on){ if (AUTO.on !== on) $g('autopilotBtn').click(); },
   initAudio, resume(){ if (ctx) ctx.resume(); },

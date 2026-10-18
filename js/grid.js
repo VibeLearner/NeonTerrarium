@@ -316,7 +316,7 @@ const music = (() => {
       if (!P.open) return;
       drawSignal(curve, barsCv, 'panel', PAL_PANEL, t, dt);
       slow -= dt; if (slow > 0) return; slow = .2;
-      const c = E.chord, p = GRID_PROGRAMS[prog], live = E.playing && !paused;
+      const c = E.chord, p = GRID_PROGRAMS[prog], live = (E.playing || (bcasting() && BOOTH.isPlaying())) && !paused;
       $q('gpLiveT').textContent = held ? 'HELD' : paused ? 'BROADCAST HELD' : live ? 'BROADCAST LIVE' : 'STANDBY';
       $q('gpChord').textContent = c ? c.name.toUpperCase() : 'CARRIER';
       $q('gpMood').textContent = (E.mood || (c && c.mood) || 'MOOD').toUpperCase();

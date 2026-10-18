@@ -16,7 +16,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18o';
+  const VER = '2026-10-18p';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -132,7 +132,25 @@ const TITLE = (() => {
   // An iris of curved plates closes the window while the city loads (it streams in round the camera, nothing to look
   // at); once it's all there the plates swing back into the frame and the sun comes in with them.
   const shutCv = document.createElement('canvas'); shutCv.className = 't-layer'; shutCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(shutCv, imRoom);
-  let OPEN = 0, openFrom = null, shownAt = 0;
+  let OPEN = 0, openFrom = null, shownAt = 0, DIM = 1;
+  // the light bar's own light, kept bright while the room is dim: its glowing pixels (where the lit picture differs from
+  // the one with the bar dark) drawn undimmed over the room, with a soft glow round it, both blinking with it
+  const barCv = document.createElement('canvas'), gB = barCv.getContext('2d'); barCv.className = 't-layer t-sun'; barCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(barCv, cvDust);
+  let barImg = null, barFor = '';
+  function makeBar(){
+    const a = A[view], r = a && a.signRect, key = imRoom.src + '|' + imOff.src; if (!r || !imRoom.complete || !imOff.complete || !imOff.naturalWidth || barFor === key) return; barFor = key;
+    const c = document.createElement('canvas'); c.width = r[2]; c.height = r[3]; const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(imRoom, r[0], r[1], r[2], r[3], 0, 0, r[2], r[3]); const on = g.getImageData(0, 0, r[2], r[3]); g.clearRect(0, 0, r[2], r[3]); g.drawImage(imOff, 0, 0); const off = g.getImageData(0, 0, r[2], r[3]);
+    for (let i = 0; i < on.data.length; i += 4){ const d = on.data[i] + on.data[i + 1] + on.data[i + 2] - off.data[i] - off.data[i + 1] - off.data[i + 2]; if (d < 60) on.data[i + 3] = 0; }
+    g.putImageData(on, 0, 0); barImg = c;
+  }
+  function drawBar(dark){
+    const w = barCv.width = cvDust.width, h = barCv.height = cvDust.height; makeBar(); const a = A[view], r = a.signRect; if (!barImg || !r || DIM >= .999 || dark) return;
+    const k = 1 - DIM; gB.globalAlpha = Math.min(1, k*1.6); gB.drawImage(barImg, r[0], r[1]); gB.globalAlpha = 1;
+    const cx = r[0] + r[2]/2, cy = r[1] + r[3]/2, rad = r[2]*1.4, g = gB.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    g.addColorStop(0, 'rgba(255,214,150,' + (.4*k).toFixed(3) + ')'); g.addColorStop(.4, 'rgba(255,190,120,' + (.14*k).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,180,110,0)');
+    gB.save(); gB.translate(cx, cy); gB.scale(1, .7); gB.translate(-cx, -cy); gB.fillStyle = g; gB.fillRect(cx - rad, cy - rad, 2*rad, 2*rad); gB.restore();
+  }
   T._hold = () => { shownAt = 1e15; openFrom = null; };   // (testing: keep the shutter shut)
   const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady); } catch (e) { return true; } };
   let shutR = null, shutCam = null, shutScene = null;
@@ -140,7 +158,7 @@ const TITLE = (() => {
     if (openFrom === null && shutR && now - shownAt > 900 && (cityReady() || now - shownAt > 15000)) openFrom = now + 300;   // (15 s at most: never stuck shut)
     const tt = openFrom === null ? 0 : Math.max(0, Math.min(1, (now - openFrom)/3200)); OPEN = reduced ? (openFrom === null ? 0 : 1) : tt*tt*(3 - 2*tt);
     // the room is dark while it's shut (only what light leaks in, and its own lamps), and the daylight comes up with the plates
-    const lit = .3 + .7*Math.pow(OPEN, .8); if (Math.abs(lit - (drawShutter.lit || 0)) > .004){ drawShutter.lit = lit; stage.style.filter = lit >= .999 ? '' : 'brightness(' + lit.toFixed(3) + ') saturate(' + (.7 + .3*lit).toFixed(3) + ')'; }
+    const lit = .3 + .7*Math.pow(OPEN, .8); DIM = lit; if (Math.abs(lit - (drawShutter.lit || 0)) > .004){ drawShutter.lit = lit; const f = lit >= .999 ? '' : 'brightness(' + lit.toFixed(3) + ') saturate(' + (.7 + .3*lit).toFixed(3) + ')'; for (const el of [imRoom, imGlass, imOff, shutCv, stage.querySelector('.t-live')]) if (el) el.style.filter = f; }
     if (!shutR) return; shutCv.hidden = OPEN >= 1; if (OPEN >= 1) return;
     ROOM.setShutter(OPEN); shutR.render(shutScene, shutCam);
   }
@@ -231,7 +249,7 @@ const TITLE = (() => {
       else for (let k = 0, n = 2 + Math.floor(Math.random()*2); k < n; k++){ const d = 60 + Math.random()*120; flick.push([t, t + d]); t += d + 60 + Math.random()*140; }
       flickNext = t + 4000 + Math.random()*6000; }
     const dark = flick.some(([a, b]) => now >= a && now < b);
-    glow.classList.toggle('dip', dark); imOff.classList.toggle('on', dark);
+    glow.classList.toggle('dip', dark); imOff.classList.toggle('on', dark); if (A && view) drawBar(dark);
     if (now - noteAt > 1500){ noteAt = now; fillNote(); }
   }
   let noteAt = 0;
@@ -283,6 +301,8 @@ const TITLE = (() => {
     if (!RAW){ T.hide(true); return; }   // (the pictures couldn't be had: straight into the city)
     A = {}; for (const v of ['wide', 'tall']) A[v] = RAW[v][TOD] || RAW[v].morning; view = null;
     OPEN = 0; openFrom = null; shownAt = performance.now();
+    stage.style.visibility = 'hidden';
+    T.ready = new Promise(res => { const t0 = performance.now(); (function wait(){ if ((imRoom.complete && imRoom.naturalWidth && shutR && view) || performance.now() - t0 > 9000){ stage.style.visibility = ''; shownAt = performance.now(); res(); } else setTimeout(wait, 60); })(); });
     const boot = document.documentElement.classList.contains('title-boot');
     if (boot){ const ready = () => imRoom.complete && imRoom.naturalWidth && shutR, t0 = performance.now();
       (function wait(){ if (ready() || performance.now() - t0 > 9000){ shownAt = performance.now(); setTimeout(() => document.documentElement.classList.remove('title-boot'), 120); } else setTimeout(wait, 100); })(); }
@@ -302,15 +322,19 @@ const TITLE = (() => {
   // timestamp), jitters, then the tube switches off (it collapses to a bright line, then a dot), and the room fades up.
   T.fromGame = () => {
     if (T.on || T.cutting) return; if (reduced){ T.show(); return; } T.cutting = true;
+    preload(pickTime(S.hour));
     const ov = document.createElement('div'); ov.id = 'cctv'; const d = new Date(), pad = n => String(n).padStart(2, '0');
     ov.innerHTML = '<span class="cc-rec">\u25CF REC</span><span class="cc-cam">CAM 04 \u00B7 DISTRICT</span><span class="cc-time">' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) + '</span><canvas class="cc-noise"></canvas>';
     document.documentElement.appendChild(ov); const nz = ov.querySelector('canvas'), gN = nz.getContext('2d'); nz.width = 200; nz.height = 120;
     let on = true; (function noise(){ if (!on) return; const im = gN.createImageData(200, 120); for (let i = 0; i < im.data.length; i += 4){ const v = Math.random()*255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } gN.putImageData(im, 0, 0); requestAnimationFrame(noise); })();
     document.documentElement.classList.add('cctv-out');
     setTimeout(() => { on = false; document.documentElement.classList.remove('cctv-out'); ov.remove();
-      const fade = document.createElement('div'); fade.id = 'cctvFade'; document.body.appendChild(fade); T.show(); setTimeout(() => fade.remove(), 900); T.cutting = false; }, 1150);
+      const fade = document.createElement('div'); fade.id = 'cctvFade'; fade.className = 'hold'; document.body.appendChild(fade);
+      Promise.resolve(T.show()).then(() => T.ready).then(() => { fade.className = ''; setTimeout(() => fade.remove(), 900); }); T.cutting = false; }, 1150);
   };
   function unwiden(){ const v = document.getElementById('view'); if (v){ v.style.transition = 'transform 1.2s ease-in-out'; v.style.transform = ''; setTimeout(() => { v.style.transition = ''; }, 1300); } }
+  // the pictures for an hour, fetched ahead (they're cached, so the room shows at once when it's needed)
+  function preload(t){ const v = innerWidth/innerHeight < .85 ? 'tall' : 'wide'; for (const k of ['room', 'glass', 'signoff']){ const im = new Image(); im.src = 'assets/title/' + k + '-' + v + '-' + t + '.png?v=' + VER; (preload.keep = preload.keep || []).push(im); } }
   function finish(){ unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} }
 
   /* ---------- the menu ---------- */

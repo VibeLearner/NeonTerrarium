@@ -21,8 +21,10 @@
 <div id="title" class="title" role="region" aria-label="Neon Terrarium title screen">
   <h1 class="sr-only">Neon Terrarium</h1>
   <div id="tStage" class="t-stage">
+    <canvas id="tSky" class="t-layer" aria-hidden="true"></canvas>
     <img id="tGlass" class="t-layer" alt="" aria-hidden="true">
     <img id="tRoom" class="t-layer" alt="" aria-hidden="true">
+    <canvas id="tPlants" class="t-plants" aria-hidden="true"></canvas>
     <img id="tSignOff" class="t-signoff" alt="" aria-hidden="true">
     <canvas id="tDust" class="t-layer" aria-hidden="true"></canvas>
     <i id="tSignGlow" class="t-signglow" aria-hidden="true"></i>
@@ -338,7 +340,7 @@
 <script src="js/overseer.js?v=2026-10-16p"></script>
 <script src="js/wirelog.js?v=2026-10-16q"></script>
 <script src="js/slots.js?v=2026-10-18a"></script>
-<script src="js/title.js?v=2026-10-18c"></script>
+<script src="js/title.js?v=2026-10-18f"></script>
 <script>document.getElementById('toTitle').addEventListener('click', () => { const tg = document.getElementById('deckToggle'); if (document.getElementById('deck').classList.contains('open')) tg.click(); TITLE.show(); });</script>
 </body>
 </html>

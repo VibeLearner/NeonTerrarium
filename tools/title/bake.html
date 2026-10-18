@@ -128,25 +128,43 @@ async function bake(name){
   const V = VIEWS[name], w = V.w, h = V.h;
   renderer.setPixelRatio(1); renderer.setSize(w, h);
   const cam = new THREE.PerspectiveCamera(V.fov, w/h, .05, 40); cam.position.set(...V.pos); cam.lookAt(...V.look); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
-  const on = renderPass(V, cam, w, h);
-  // the sign dark: its tubes off, its light off
-  ROOM.signMesh.material.map = ROOM.signOff; ROOM.signMesh.material.needsUpdate = true; for (const l of ROOM.signLights) l.visible = false;
-  const off = ROOM.noSign ? on : renderPass(V, cam, w, h);
-  ROOM.signMesh.material.map = ROOM.signOn; ROOM.signMesh.material.needsUpdate = true; for (const l of ROOM.signLights) l.visible = true;
   const at = v => { const p = v.clone().project(cam); return [+((p.x + 1)/2).toFixed(4), +((1 - p.y)/2).toFixed(4)]; };
   const W = ROOM.WIN, S = ROOM.SIGN;
   const wcv = ROOM.winCenter ? ROOM.winCenter() : new THREE.Vector3(W.x, W.y, ROOM.BACK - ROOM.WALL_T), wtv = ROOM.winTop ? ROOM.winTop() : new THREE.Vector3(W.x, W.y + W.r, ROOM.BACK - ROOM.WALL_T);
   const rim = at(wtv), ctr = at(wcv);
   const sd = post.material.uniforms.sunDir.value, wc = wcv.clone(), k = -wc.y/sd.y, patch = wc.clone().addScaledVector(sd, k);
-  // the sign's patch on the picture (with room for its glow), in pixels
-  const cs = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => at(new THREE.Vector3(S.x + a*(S.w/2 + .35), S.y + b*(S.h/2 + .35), S.z)));
+  const anchors = { w, h, win: ctr, winR: +Math.hypot((rim[0] - ctr[0])*w, (rim[1] - ctr[1])*h).toFixed(1), patch: at(patch), sign: null, signRect: null, glow: !ROOM.flicker };
+  const split = ROOM.flicker && (name === 'wide' || name === 'tall');
+  if (!split && ROOM.flicker){ const on = renderPass(V, cam, w, h); anchors.patch = at(wc.clone().addScaledVector(post.material.uniforms.sunDir.value, -wc.y/post.material.uniforms.sunDir.value.y)); if (!post.material.uniforms.dbg.value) finish(on.room, on.glass, anchors); return { room: on.room.toDataURL('image/png'), glass: on.glass.toDataURL('image/png'), anchors }; }
+  // what flickers: the kitchen's light bar, or the old room's sign
+  const fl = ROOM.flicker || { off(){ ROOM.signMesh.material.map = ROOM.signOff; ROOM.signMesh.material.needsUpdate = true; for (const l of ROOM.signLights) l.visible = false; },
+    on(){ ROOM.signMesh.material.map = ROOM.signOn; ROOM.signMesh.material.needsUpdate = true; for (const l of ROOM.signLights) l.visible = true; },
+    corners: [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => new THREE.Vector3(S.x + a*(S.w/2 + .35), S.y + b*(S.h/2 + .35), S.z)), center: new THREE.Vector3(S.x, S.y, S.z) };
+  let full = null;
+  // the foliage, when baked apart: still casting its shadows, but drawing nothing (no colour, no depth) in the room's picture
+  const HIDE = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, side: THREE.DoubleSide });
+  const hideFol = on => { for (const m of ROOM.foliage || []){ if (on){ m.userData.mat = m.material; m.material = HIDE; } else if (m.userData.mat) m.material = m.userData.mat; } };
+  if (split){ full = renderPass(V, cam, w, h); hideFol(true); }
+  const on = renderPass(V, cam, w, h);
+  fl.off(); const off = (ROOM.noSign && !ROOM.flicker) ? on : renderPass(V, cam, w, h); fl.on();
+  // the flickering patch on the picture, in pixels
+  const cs = fl.corners.map(at);
   const sx0 = Math.max(0, Math.floor(Math.min(...cs.map(c => c[0]))*w)), sy0 = Math.max(0, Math.floor(Math.min(...cs.map(c => c[1]))*h));
   const sx1 = Math.min(w, Math.ceil(Math.max(...cs.map(c => c[0]))*w)), sy1 = Math.min(h, Math.ceil(Math.max(...cs.map(c => c[1]))*h));
-  const anchors = { w, h, win: ctr, winR: +Math.hypot((rim[0] - ctr[0])*w, (rim[1] - ctr[1])*h).toFixed(1), sign: ROOM.noSign ? null : at(new THREE.Vector3(S.x, S.y, S.z)), patch: at(patch), signRect: ROOM.noSign ? null : [sx0, sy0, sx1 - sx0, sy1 - sy0] };
-  if (!post.material.uniforms.dbg.value){ finish(on.room, on.glass, anchors); if (off !== on) finish(off.room, null, anchors); }
-  let signoff = null;
-  if (!ROOM.noSign && sx1 > sx0 && sy1 > sy0){ const c = document.createElement('canvas'); c.width = sx1 - sx0; c.height = sy1 - sy0; c.getContext('2d').drawImage(off.room, sx0, sy0, c.width, c.height, 0, 0, c.width, c.height); signoff = c.toDataURL('image/png'); }
-  return { room: on.room.toDataURL('image/png'), glass: on.glass.toDataURL('image/png'), signoff, anchors };
+  if (off !== on && sx1 > sx0 && sy1 > sy0){ anchors.sign = at(fl.center); anchors.signRect = [sx0, sy0, sx1 - sx0, sy1 - sy0]; }
+  // the foliage: where the full picture differs from the one without it (taken before the dither, which is the same in both)
+  let mask = null;
+  if (full){ const a = full.room.getContext('2d').getImageData(0, 0, w, h).data, b = on.room.getContext('2d').getImageData(0, 0, w, h).data; mask = new Uint8Array(w*h);
+    for (let i = 0; i < w*h; i++){ const j = i*4; if (Math.abs(a[j] - b[j]) + Math.abs(a[j + 1] - b[j + 1]) + Math.abs(a[j + 2] - b[j + 2]) + Math.abs(a[j + 3] - b[j + 3]) > 48) mask[i] = 1; } }
+  if (!post.material.uniforms.dbg.value){ finish(on.room, on.glass, anchors); if (off !== on) finish(off.room, null, anchors); if (full) finish(full.room, null, anchors); }
+  let signoff = null, plants = null;
+  if (anchors.signRect){ const c = document.createElement('canvas'); c.width = sx1 - sx0; c.height = sy1 - sy0; c.getContext('2d').drawImage(off.room, sx0, sy0, c.width, c.height, 0, 0, c.width, c.height); signoff = c.toDataURL('image/png'); }
+  if (mask){ let x0 = w, y0 = h, x1 = -1, y1 = -1; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (mask[y*w + x]){ if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 >= x0){ const pw = x1 - x0 + 1, ph = y1 - y0 + 1, src = full.room.getContext('2d').getImageData(x0, y0, pw, ph), d = src.data;
+      for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) if (!mask[(y + y0)*w + x + x0]) d[(y*pw + x)*4 + 3] = 0;
+      const c = document.createElement('canvas'); c.width = pw; c.height = ph; c.getContext('2d').putImageData(src, 0, 0); plants = c.toDataURL('image/png'); anchors.plantRect = [x0, y0, pw, ph]; } }
+  hideFol(false); anchors.patch = at(wc.clone().addScaledVector(post.material.uniforms.sunDir.value, -wc.y/post.material.uniforms.sunDir.value.y));
+  return { room: on.room.toDataURL('image/png'), glass: on.glass.toDataURL('image/png'), signoff, plants, anchors };
 }
 // after the render: a soft bloom on what's bright, light film grain, the colours stepped with an ordered dither (the
 // game's look); the glass given reflections: soft diagonal sheens, a bright rim where the sleeve meets it, a faint tint

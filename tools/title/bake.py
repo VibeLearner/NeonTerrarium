@@ -33,7 +33,7 @@ def main():
         out = opt.get('out', OUT); os.makedirs(out, exist_ok=True)
         anchors = {}
         for view, r in res.items():
-            for kind in ('room', 'glass', 'signoff'):
+            for kind in ('room', 'glass', 'signoff', 'plants'):
                 if not r.get(kind): continue
                 with open(os.path.join(out, '%s-%s.png' % (kind, view)), 'wb') as f:
                     f.write(base64.b64decode(r[kind].split(',', 1)[1]))

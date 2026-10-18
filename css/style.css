@@ -369,6 +369,7 @@ html.title-on #view{cursor:default}
   opacity:.75;transition:opacity .05s}
 .t-signglow.dip{opacity:.15}
 /* the sign's dark state, baked: swapped in for a moment when the tubes stutter */
+.t-plants{position:absolute;image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none}
 .t-signoff{position:absolute;image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none;opacity:0}
 .t-signoff.on{opacity:1}
 /* the menu: at the side, over a soft shade so it reads on the room */

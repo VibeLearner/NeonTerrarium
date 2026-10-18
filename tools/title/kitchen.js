@@ -238,7 +238,7 @@ const ROOM = (() => {
   const add = (geo, mat, x, y, z, o = {}) => {
     const m = new C.Mesh(geo, mat); m.position.set(x, y, z);
     if (o.rx) m.rotation.x = o.rx; if (o.ry) m.rotation.y = o.ry; if (o.rz) m.rotation.z = o.rz; if (o.s) m.scale.setScalar(o.s);
-    m.castShadow = o.cast !== false; m.receiveShadow = true; (o.p || parent || scene).add(m); return m;
+    m.castShadow = o.cast !== false; m.receiveShadow = true; if (FOL) FOLIAGE.push(m); (o.p || parent || scene).add(m); return m;
   };
   const box = (w, h, d, mat, x, y, z, o) => add(new C.BoxGeometry(w, h, d), mat, x, y, z, o);
   const cyl = (r0, r1, h, mat, x, y, z, o = {}) => add(new C.CylinderGeometry(r0, r1, h, o.seg || 48, 1, !!o.open), mat, x, y, z, o);
@@ -262,8 +262,10 @@ const ROOM = (() => {
   const LEAF = [leafGeo(.07, .035), leafGeo(.1, .045), leafGeo(.05, .028), leafGeo(.14, .05)];
   function pot(x, y, z, s, mat){ lathe([[0, 0], [.13*s, 0], [.15*s, .02*s], [.17*s, .22*s], [.19*s, .24*s], [.19*s, .28*s], [.165*s, .28*s]], mat, x, y, z); cyl(.165*s, .165*s, .01, M.soil, x, y + .27*s, z, { cast: false }); }
   // a leafy plant: many short twigs ending in clusters of small leaves (the kitchen's bushes and herbs), or long trailing vines
-  function plant(x, y, z, s, kind, potMat){
-    if (potMat !== null) pot(x, y, z, s, potMat || M.pot);
+  // foliage goes on layer 1: it casts shadows into the room but is baked as its own picture, so the title screen can sway it
+  let FOL = 0; const FOLIAGE = R.foliage = [];
+  function plant(x, y, z, s, kind, potMat){ if (potMat !== null) pot(x, y, z, s, potMat || M.pot); FOL++; try { plantBody(x, y, z, s, kind); } finally { FOL--; } }
+  function plantBody(x, y, z, s, kind){ const potMat = null;
     const top0 = y + .27*s;
     if (kind === 'succulent'){ for (let ring = 0; ring < 3; ring++) for (let k = 0; k < 9 - ring*2; k++){ const a = k/(9 - ring*2)*Math.PI*2 + ring*.3, l = (.09 - ring*.022)*s*2.2;
         const lf = add(new C.SphereGeometry(1, 10, 8), M.succ, x + Math.cos(a)*l*.45, top0 + .01 + ring*.012*s, z + Math.sin(a)*l*.45, { cast: true }); lf.scale.set(l*.5, l*.16, l*.22); lf.rotation.set(0, -a, .35 + ring*.3); } return; }
@@ -504,6 +506,10 @@ const ROOM = (() => {
       box(1.04, .085, .03, M.dark, 1.45, y, z - .005, { rx: -th, cast: false }); for (const x of [.92, 1.98]) box(.03, .095, .04, M.chrome, x, y, z, { rx: -th, cast: false });
       for (const [x0, x1] of [[.97, 1.3], [1.34, 1.5], [1.54, 1.93]]) box(x1 - x0, .05, .02, M.barGlow, (x0 + x1)/2, y, z + .004, { rx: -th, cast: false });
       const l = new C.PointLight(0xffc878, .35, 1.4, 2); l.position.set(1.45, y + .02, z + .2); kit.add(l);
+      // the bar can go dark (the title screen blinks it): its panes dim, its light off; the patch of picture it touches
+      const lit = M.barGlow.color.clone(); kit.updateMatrixWorld(true);
+      R.flicker = { off(){ M.barGlow.color.set(0x2a2016); l.visible = false; }, on(){ M.barGlow.color.copy(lit); l.visible = true; },
+        corners: [[.75, y - .22, z], [2.15, y - .22, z], [.75, y + .2, z], [2.15, y + .2, z]].map(p => new C.Vector3(...p).applyMatrix4(kit.matrixWorld)), center: new C.Vector3(1.45, y, z).applyMatrix4(kit.matrixWorld) };
       const lb = new C.Mesh(new C.PlaneGeometry(.62, .075), M.label); lb.position.set(1.32, ACY + .265, zf(.265) + .004); lb.rotation.x = -tilt(.265); kit.add(lb); }
     { const wx = 1.42, wy = ACY - .08, z = zf(-.08) - .01;
       add(rbox(1.2, .6, .06, .05), M.chrome, wx, wy, z); add(rbox(1.1, .5, .06, .045), M.blackGlass, wx, wy, z + .012);

@@ -1,8 +1,9 @@
 // Neon Terrarium: the title screen. A lived-in flat on a bright morning, the player's own city outside the round
 // window. The room is built in 3D and lit for real (a sun through the porthole, soft shadows, reflections, light shafts
 // in the air), then baked to pictures (tools/title/bake.py -> assets/title/); here they're laid over the live city,
-// with the glass cut out so the city shows through it. Live on top: dust turning in the sunbeam and the NEON TERRARIUM
-// sign on the wall flickering (its baked dark state swapped in for a moment). The menu sits at the side; Settings and
+// with the glass cut out so the city shows through it. Live on top: clouds drifting past the window, the plants on the
+// sill swaying a little (baked apart as their own picture), dust turning in the sunbeam, and the capsule's light bar
+// blinking now and then (its baked dark state swapped in for a moment). The menu sits at the side; Settings and
 // Cities open where they normally do. Continue pushes the view through the window into the city.
 // Plan: project doc claude/title-screen-plan.md.
 'use strict';
@@ -10,11 +11,12 @@ const TITLE = (() => {
   const T = { on: false };
   const root = document.getElementById('title'); if (!root) return T;
   const $t = id => document.getElementById(id);
-  const stage = $t('tStage'), imRoom = $t('tRoom'), imGlass = $t('tGlass'), imOff = $t('tSignOff'), cvDust = $t('tDust'), glow = $t('tSignGlow');
+  const stage = $t('tStage'), imRoom = $t('tRoom'), imGlass = $t('tGlass'), imOff = $t('tSignOff'), cvDust = $t('tDust'), glow = $t('tSignGlow'), cvSky = $t('tSky'), cvPl = $t('tPlants');
   const menu = root.querySelector('.t-menu'), panel = $t('tCities');
-  const gD = cvDust.getContext('2d');
+  const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
+  let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18e';
+  const VER = '2026-10-18f';
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
 
@@ -24,7 +26,7 @@ const TITLE = (() => {
     if (!A) return;
     W = innerWidth; H = innerHeight;
     const v = W/H < .85 ? 'tall' : 'wide';
-    if (v !== view){ view = v; imRoom.src = 'assets/title/room-' + v + '.png?v=' + VER; imGlass.src = 'assets/title/glass-' + v + '.png?v=' + VER; if (A[v].signRect) imOff.src = 'assets/title/signoff-' + v + '.png?v=' + VER; }
+    if (v !== view){ view = v; imRoom.src = 'assets/title/room-' + v + '.png?v=' + VER; imGlass.src = 'assets/title/glass-' + v + '.png?v=' + VER; if (A[v].signRect) imOff.src = 'assets/title/signoff-' + v + '.png?v=' + VER; loadPlants(v); }
     const a = A[v], iw = a.w, ih = a.h; S0 = Math.max(W/iw, H/ih);
     const sw = iw*S0, sh = ih*S0;
     OX = Math.min(0, Math.max(W - sw, W*.5 - a.win[0]*sw)); OY = Math.min(0, Math.max(H - sh, H*.5 - a.win[1]*sh));
@@ -32,11 +34,57 @@ const TITLE = (() => {
     Object.assign(stage.style, { left: OX + 'px', top: OY + 'px', width: sw + 'px', height: sh + 'px' });
     cvDust.width = Math.round(sw/S0); cvDust.height = Math.round(sh/S0);   // (dust at the picture's own pixels: it scales up crisp with it)
     const P = (k, el, dx = 0, dy = 0) => { el.style.left = (a[k][0]*100 + dx) + '%'; el.style.top = (a[k][1]*100 + dy) + '%'; };
-    const r = a.signRect; imOff.hidden = glow.hidden = !r;   // (no sign on the wall for now: the bake leaves it out)
+    const pr = a.plantRect; cvPl.hidden = !pr; if (pr) Object.assign(cvPl.style, { left: pr[0]/iw*100 + '%', top: pr[1]/ih*100 + '%', width: pr[2]/iw*100 + '%', height: pr[3]/ih*100 + '%' });
+    cvSky.width = cvDust.width; cvSky.height = cvDust.height; seedClouds();
+    const r = a.signRect; imOff.hidden = !r; glow.hidden = !r || a.glow === false;
     if (r){ P('sign', glow); Object.assign(imOff.style, { left: r[0]/iw*100 + '%', top: r[1]/ih*100 + '%', width: r[2]/iw*100 + '%', height: r[3]/ih*100 + '%' }); }
     stage.style.setProperty('--px', S0 + 'px');
     stage.style.transformOrigin = (a.win[0]*100) + '% ' + (a.win[1]*100) + '%';
     seedMotes();
+  }
+
+  /* ---------- the plants on the sill, swaying ---------- */
+  // their picture is sheared a pixel or two, more toward the tips: each column measured from its lowest leaf (the pot's rim)
+  function loadPlants(v){
+    plSrc = null; const a = A[v]; if (!a.plantRect) return;
+    const im = new Image(); im.onload = () => { if (view !== v) return;
+      plW = cvPl.width = im.width; plH = cvPl.height = im.height; gP.clearRect(0, 0, plW, plH); gP.drawImage(im, 0, 0);
+      const d = gP.getImageData(0, 0, plW, plH); plSrc = new Uint32Array(d.data.buffer.slice(0)); plOut = d; plBase = new Int16Array(plW).fill(-1);
+      for (let x = 0; x < plW; x++) for (let y = plH - 1; y >= 0; y--) if (plSrc[y*plW + x] >>> 24){ plBase[x] = y; break; } };
+    im.src = 'assets/title/plants-' + v + '.png?v=' + VER;
+  }
+  function drawPlants(now){
+    if (!plSrc || reduced || now - plantAt < 33) return; plantAt = now;
+    const t = now/1000, out = new Uint32Array(plOut.data.buffer); out.fill(0);
+    const gust = .6 + .4*Math.sin(t*.23)*Math.sin(t*.11 + 1.3);
+    for (let x = 0; x < plW; x++){ const b = plBase[x]; if (b < 0) continue;
+      const ph = Math.sin(t*.9 + x*.03)*.7 + Math.sin(t*2.1 + x*.08)*.3;
+      for (let y = 0; y <= b; y++){ const hgt = b - y, dx = Math.round(Math.min(2.4, hgt/45*2.4)*ph*gust), sx = x - dx;
+        if (sx >= 0 && sx < plW) out[y*plW + x] = plSrc[y*plW + sx]; } }
+    gP.putImageData(plOut, 0, 0);
+  }
+
+  /* ---------- clouds past the window ---------- */
+  // a few soft pixel clouds drifting slowly across the upper half of the glass, over the city's sky
+  function seedClouds(){
+    clouds = []; if (reduced || !A || !view) return; const a = A[view], r = a.winR;
+    for (let i = 0; i < 6; i++){ const puffs = [], n = 5 + Math.floor(Math.random()*6), sz = r*(.08 + Math.random()*.08);
+      for (let k = 0; k < n; k++){ const m = 1 - Math.abs(k - (n - 1)/2)/(n/2); puffs.push([(k - n/2)*sz*1.1 + (Math.random() - .5)*sz*.4, -m*sz*.7 - Math.random()*sz*.3, sz*(.5 + m*.5 + Math.random()*.2)]); }
+      clouds.push({ x: (Math.random()*2.4 - 1.2)*r, y: -r*(.3 + Math.random()*.55), base: sz*.35, puffs, sp: r*(.004 + Math.random()*.005), a: .22 + Math.random()*.18 }); }
+  }
+  function drawClouds(dt){
+    const w = cvSky.width, h = cvSky.height; gS.clearRect(0, 0, w, h); if (!clouds.length) return;
+    const a = A[view], cx = a.win[0]*w, cy = a.win[1]*h, r = a.winR;
+    gS.save(); gS.beginPath(); gS.arc(cx, cy, r, 0, Math.PI*2); gS.clip();
+    for (const c of clouds){ c.x += c.sp*dt; if (c.x > r*1.4) c.x = -r*1.4;
+      const by = Math.round(cy + c.y + c.base), fade = Math.max(0, Math.min(1, (cy + r*.1 - by)/(r*.4))); if (fade <= 0) continue;
+      gS.save(); gS.beginPath(); gS.rect(0, 0, w, by); gS.clip();   // (a flat underside, like real fair-weather clouds)
+      for (const [dx, dy, pr] of c.puffs){ const x = Math.round(cx + c.x + dx), y = Math.round(cy + c.y + dy);
+        gS.fillStyle = 'rgba(214,200,190,' + (c.a*.8*fade).toFixed(3) + ')'; gS.beginPath(); gS.ellipse(x, y + pr*.18, pr*1.7, pr*.75, 0, 0, Math.PI*2); gS.fill(); }
+      for (const [dx, dy, pr] of c.puffs){ const x = Math.round(cx + c.x + dx), y = Math.round(cy + c.y + dy);
+        gS.fillStyle = 'rgba(255,247,232,' + (c.a*fade).toFixed(3) + ')'; gS.beginPath(); gS.ellipse(x, y - pr*.08, pr*1.45, pr*.6, 0, 0, Math.PI*2); gS.fill(); }
+      gS.restore(); }
+    gS.restore();
   }
 
   /* ---------- dust in the sunbeam ---------- */
@@ -62,9 +110,12 @@ const TITLE = (() => {
     if (!T.on) return; raf = requestAnimationFrame(loop);
     const dt = last ? Math.min(.1, (now - last)/1000) : 0; last = now;
     try { if (typeof yawT !== 'undefined' && !reduced) yawT += dt*.02; } catch (e) {}
-    if (A && view) drawDust(now, dt);
-    // the sign: a steady hum, and now and then the tubes stutter (two or three blinks, like a tired transformer)
-    if (!reduced && now > flickNext){ flick = []; let t = now; for (let k = 0, n = 1 + Math.floor(Math.random()*3); k < n; k++){ const d = 50 + Math.random()*140; flick.push([t, t + d]); t += d + 40 + Math.random()*120; } flickNext = t + 3000 + Math.random()*7000; }
+    if (A && view){ drawDust(now, dt); drawClouds(dt); drawPlants(now); }
+    // the light bar: steady, and now and then it blinks: a stutter of two or three, or one slow dip
+    if (!reduced && now > flickNext){ flick = []; let t = now;
+      if (Math.random() < .35){ flick.push([t, t + 500 + Math.random()*400]); t += 900; }
+      else for (let k = 0, n = 2 + Math.floor(Math.random()*2); k < n; k++){ const d = 60 + Math.random()*120; flick.push([t, t + d]); t += d + 60 + Math.random()*140; }
+      flickNext = t + 4000 + Math.random()*6000; }
     const dark = flick.some(([a, b]) => now >= a && now < b);
     glow.classList.toggle('dip', dark); imOff.classList.toggle('on', dark);
     if (now - noteAt > 1500){ noteAt = now; fillNote(); }

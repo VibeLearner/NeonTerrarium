@@ -4,7 +4,8 @@ assets/title/room-{wide,tall}.png, glass-*.png, signoff-*.png and anchors.json. 
 
   python3 tools/title/bake.py
 
-Slow on purpose (real shadows and 72-step light shafts on a software GPU): about a minute.
+On a Mac it uses the graphics card through Chrome (a window opens while it bakes; leave it alone): a few minutes.
+On a machine without one it renders in software: about an hour. Needs: pip3 install playwright pillow.
 """
 import base64, functools, http.server, json, os, sys, threading
 from playwright.sync_api import sync_playwright
@@ -23,7 +24,11 @@ def main():
     srv = http.server.ThreadingHTTPServer(('127.0.0.1', PORT), handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     with sync_playwright() as p:
-        b = p.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'])
+        if sys.platform == 'darwin':   # a Mac: the real graphics card, through your installed Chrome (a window opens while it bakes)
+            try: b = p.chromium.launch(channel='chrome', headless=False, args=['--use-angle=metal', '--ignore-gpu-blocklist'])
+            except Exception: b = p.chromium.launch(headless=False, args=['--use-angle=metal', '--ignore-gpu-blocklist'])
+        else:   # no graphics card (a cloud machine): software rendering, slow
+            b = p.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'])
         pg = b.new_page()
         pg.on('console', lambda m: print('page:', m.text) if m.type in ('error', 'warning') else None)
         pg.on('pageerror', lambda e: print('page error:', e))

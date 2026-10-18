@@ -166,6 +166,20 @@ const GRIDPANEL = (() => {
   #gridPanel .gkey b { font-weight: 400; color: var(--cy2); }
   #gridPanel .gmini { display: flex; gap: 8px; align-items: center; flex: none; }
 
+  /* a shelf loop on the broadcast: the note strip in the carrier chart, and the pop-up that asks how */
+  #gridPanel .gstrip { display: flex; flex-direction: column; gap: 6px; flex: 1 1 0; min-height: 0; } #gridPanel .gstrip[hidden], #gridPanel .a-chart [hidden] { display: none; }
+  #gridPanel .gstripbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; } #gridPanel .gstripbar b { color: var(--yl); font-weight: 400; letter-spacing: .12em; margin-right: auto; font-size: 12.5px; }
+  #gridPanel .gstripbar .gb { width: auto; margin: 0; padding: 5px 9px; font-size: 11.5px; letter-spacing: .1em; }
+  #gridPanel .gstrip .gv { flex: 1 1 0; min-height: 110px; cursor: crosshair; } #gridPanel .gstrip .ghint2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #gridPanel .a-chart:has(.gstrip:not([hidden])) .gtag { visibility: hidden; }
+  #gridPanel .gdlg { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(3,12,16,.72); }
+  #gridPanel .gdlg[hidden] { display: none; }
+  #gridPanel .gdlgbox { position: relative; width: min(560px, 92%); border: 1px solid var(--cy); background: #071a21; padding: 30px 20px 18px; display: grid; gap: 10px; box-shadow: 0 0 40px rgba(95,216,222,.18); }
+  #gridPanel .gdlgbox .gtag { position: absolute; top: 9px; left: 20px; color: var(--mg); }
+  #gridPanel .gdlgbox h4 { margin: 0 0 4px; font: 500 15px 'Chakra Petch', sans-serif; letter-spacing: .1em; color: var(--ink); text-transform: uppercase; } #gridPanel .gdlgbox h4 b { color: var(--yl); font-weight: 500; }
+  #gridPanel .gdlgopt { text-align: left; padding: 12px 14px; margin: 0; letter-spacing: .06em; text-transform: none; display: grid; gap: 4px; }
+  #gridPanel .gdlgopt b { font: 500 14px 'Chakra Petch', sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--cy); }
+  #gridPanel .gdlgopt small { color: var(--cy2); font-size: 12px; line-height: 1.45; } #gridPanel .gdlgopt:hover b { color: var(--yl); }
   /* the mode tabs */
   #gridPanel .gtabs { display: flex; gap: 0; margin-left: 10px; border: 1px solid var(--line); }
   #gridPanel .gtab { background: none; border: 0; color: var(--cy2); font: inherit; font-size: 12.5px; letter-spacing: .2em; text-transform: uppercase; padding: 6px 14px; cursor: pointer; }
@@ -298,6 +312,11 @@ const GRIDPANEL = (() => {
       <div class="gchord"><b id="g-activeChordBadge">Fmaj9</b><span id="g-activeMoodTag"></span></div>
       <div class="gpads" id="g-chordTimelineGrid"></div>
       <div class="gpills" id="g-voicingPillsContainer" title="The notes of the chord now sounding"></div>
+      <div class="gstrip" id="gStrip" hidden>
+        <div class="gstripbar"><b id="gStripMode"></b><button class="gb" id="gStripSave" hidden title="Put this rewired version on the Booth shelf as a new loop (the original stays as it was)">Keep as a new loop</button><button class="gb" id="gStripEnd" title="Go back to the planners' carrier pattern">Back to the planners</button></div>
+        <canvas class="gv" id="gStripCv" title="The loop on the broadcast: chords along the top, its notes in cyan, the Grid's answers in pink"></canvas>
+        <div class="ghint2" id="gStripHint"></div>
+      </div>
       <span class="gcode">B2</span></section>
     <section class="gp hot a-ping"><h3>Dopamine ping</h3>
       <canvas class="gv" id="gvPing" title="Ticks: how often pings come round; a fired ping opens magenta rings (as big as its depth), lamp chimes small yellow ones"></canvas>
@@ -346,6 +365,14 @@ const GRIDPANEL = (() => {
       <div class="bsave"><input id="bName" maxlength="40" placeholder="Name this loop" aria-label="Loop name"><button class="gb" id="bSave" title="Keep the loop on the shelf: pattern, voice, clock, layers and autopilot">Save</button></div>
       <div class="blist" id="bList"></div>
     </section>
+  </div>
+  <div class="gdlg" id="gDlg" hidden role="dialog" aria-modal="true" aria-labelledby="gDlgT">
+    <div class="gdlgbox"><span class="gtag">BOOTH SHELF // TAPE</span>
+      <h4 id="gDlgT">Putting <b id="gDlgName"></b> on the broadcast</h4>
+      <button class="gb gdlgopt" id="gDlgLogged"><b>Broadcast as logged</b><small>Your notes go out exactly as you recorded them. With the Neuro-phrase on, the Grid answers you, the way it does in the Booth.</small></button>
+      <button class="gb gdlgopt" id="gDlgRewire"><b>Rewire the signal</b><small>A working copy on the carrier chart: move, stretch, add or delete notes, and the Grid drifts it somewhere new. The shelf copy stays as it was.</small></button>
+      <button class="gb" id="gDlgCancel">Keep the planners' pattern</button>
+    </div>
   </div>
   <div class="gbot"><span>FRQ<b id="gpFrq">0</b></span><span>AMP<b id="gpAmp">0.00</b></span><span>CLK<b id="gpClk">82</b></span><span>CAD<b id="gpCad">1/8</b></span><span>MOD<b id="gpMod">MOSAIC</b></span><span>STASIS<b id="gpSt">OFF</b></span><span style="margin-left:auto">GRID V1 · SECTOR BROADCAST · CITY PLANNING OFFICE</span></div>`;
 

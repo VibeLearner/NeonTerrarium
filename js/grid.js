@@ -37,7 +37,7 @@ const music = (() => {
       try {
         const o = { prog, s: {}, sel: {}, mode: E.mode, subdiv: E.subdiv, q: PNL.el.querySelector('#g-quantizeToggleBtn').classList.contains('on'), m: PNL.el.querySelector('#g-markovToggleBtn').classList.contains('on'), lead: E.leadOn, amb: E.ambientOn, auto: E.autoOn };
         sliders().forEach(r => { o.s[r.id.slice(2)] = r.value; });
-        PNL.el.querySelectorAll('select').forEach(s => { o.sel[s.id.slice(2)] = s.value; });
+        PNL.el.querySelectorAll('select').forEach(s => { if (!s.value.startsWith('loop:')) o.sel[s.id.slice(2)] = s.value; });   // (a Booth shelf loop isn't kept as the pattern)
         localStorage.setItem(GRID_KEY, JSON.stringify(o));
       } catch (e) {}
     }, 500);

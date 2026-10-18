@@ -40,7 +40,8 @@ const BOOTH = (() => {
   try { const o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (o){ if (o.set) Object.assign(S, o.set); if (Array.isArray(o.loops)) loops = o.loops; } } catch (e){}
   S.layers = Array.isArray(S.layers) ? S.layers : [];
   let saveT = 0;
-  const store = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify({ set: S, loops })); } catch (e){} }, 300); };
+  let bc = null;   // a shelf loop on the broadcast (the Console): { id, mode: 'logged' | 'rewire', stash: the Booth's own setup, base bpm }
+  const store = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify({ set: bc ? bc.stash : S, loops })); } catch (e){} }, 300); };
 
   // ---------- the chords and their pads ----------
   const PROGS = E.progressions;
@@ -173,12 +174,15 @@ const BOOTH = (() => {
     if (!playing || !ctx) return;
     const now = ctx.currentTime, until = (now + .14 - t0)/beatSec();
     for (let i = scheduled.length - 1; i >= 0; i--) if (scheduled[i].t <= now + .01){ const s = scheduled[i]; scheduled.splice(i, 1); try { s.fn(); } catch (e){} }
+    if (bc){ S.ap = layerOn('g-leadLoopBtn'); const v = +($('g-bpmSlider') || { value: S.bpm }).value; if (v && v !== S.bpm) setBpm(v); }
     while (schedTo < until){
       const b = schedTo, t = tOf(b), Lb = L();
       if (b < 0){ click(t, b === -4); schedTo++; continue; }
       const cyc = Math.floor(b/Lb), lb = b - cyc*Lb;
       if (S.click === 'all' || (S.click === 'count' && rec && rec.armed && b >= rec.from - 4 && b < rec.from)) click(t, lb % 4 === 0);
-      if (lb % 4 === 0){ const ch = chordOf(lb/4); if (ch !== padCh || lastBar === null) padTo(ch, t); lastBar = lb/4; at(t, () => retune(ch, t, lb/4)); }
+      if (lb % 4 === 0){ const ch = chordOf(lb/4); if (ch !== padCh || lastBar === null) padTo(ch, t); lastBar = lb/4; at(t, () => retune(ch, t, lb/4));
+        if (bc && S.song && songSounds && songSounds.chops.length) voiceOn('chops', 60, t, .32, 0, bus.pad, 4, lb/4).off(t + 4*beatSec());   // (the song's own chord under the bar)
+        if (bc && lb === 0) at(t, () => bcPass(cyc)); }
       // the layers and the autopilot's part, for the notes that start in this beat
       for (const layer of S.layers) for (const n of layer) if (n.b >= lb && n.b < lb + 1) playNote(n, cyc*Lb + n.b, false);
       if (S.ap && S.layers.length){ let part = apCache.get(cyc); if (!part){ part = improvise(cyc); apCache.set(cyc, part); if (apCache.size > 3) apCache.delete(Math.min(...apCache.keys())); }
@@ -192,11 +196,26 @@ const BOOTH = (() => {
     }
   }
   setInterval(tick, 25);
+  const songVoice = () => songSounds && songSounds.samples.length ? 'sampler' : 'chops';
+  function voiceFor(n, isAp){
+    if (!(bc && S.prog === 'song' && songSounds)) return S.voice;
+    if (!isAp) return (VOICES.find(v => v.id === S.voice) || {}).song ? S.voice : songVoice();
+    return songSounds.chops.length && Math.abs(n.b - Math.round(n.b)) < .01 && n.b % 2 < .01 ? 'chops' : songVoice();   // (the autopilot: chops on the strong beats, held notes between)
+  }
   function playNote(n, absBeat, isAp){
-    const bar = Math.floor((absBeat % L())/4), ch = chordOf(bar), m = padMidi(ch, n.i), t = tOf(absBeat);
-    const h = voiceOn(S.voice, m, t, (n.v || .8)*(isAp ? .72 : 1), isAp ? .35 : -.1, null, n.i, bar);
+    const bar = Math.floor((absBeat % L())/4), ch = chordOf(bar), m = padMidi(ch, n.i), t = tOf(absBeat), vo = voiceFor(n, isAp);
+    const h = voiceOn(vo, m, t, (n.v || .8)*(isAp ? .72 : 1), isAp ? .35 : -.1, null, n.i, bar);
     h.off(t + Math.max(.12, n.d*beatSec()));
+    if (bc) echo(n, absBeat, vo, ch, bar);
     if (n.i < NP){ at(t, () => light(n.i, isAp, true)); at(t + Math.max(.12, n.d*beatSec()), () => light(n.i, isAp, false)); }
+  }
+  // the broadcast's dispersion on the loop's notes: Mosaic echoes an octave up on the off-beat, Haze lets a soft long copy
+  // bloom after, Glitch stutters strong-beat notes; how often, by the Console's density
+  function echo(n, absBeat, vo, ch, bar){
+    const den = +(($('g-granularMixSlider') || {}).value || .5), mode = E.mode, t = tOf(absBeat), bs = beatSec(), m = padMidi(ch, n.i), barEnd = tOf(Math.floor(absBeat/4)*4 + 4) - .03;
+    if (mode === 'MOSAIC' && Math.random() < den*.6){ const t2 = t + bs/2; if (t2 < barEnd) voiceOn(vo, m + 12, t2, .22, .5, null, Math.min(AP - 1, n.i + 4), bar).off(Math.min(barEnd, t2 + bs*.4)); }
+    else if (mode === 'HAZE' && Math.random() < den*.5){ const t2 = t + bs*.5; if (t2 < barEnd) voiceOn(vo, m, t2, .16, -.5, null, n.i, bar).off(Math.min(barEnd, t2 + Math.max(1, n.d*2)*bs)); }
+    else if (mode === 'ARP' && Math.abs(n.b - Math.round(n.b)) < .01 && Math.random() < den*.55){ for (let k = 1; k <= 3; k++){ const t2 = t + k*bs/8; if (t2 < barEnd) voiceOn(vo, m, t2, .3*(1 - k/4), (k % 2 ? .4 : -.4), null, n.i, bar).off(t2 + bs/10); } }
   }
   function light(i, isAp, on){ const k = keysEl[i]; if (k) k.classList.toggle(isAp ? 'ap' : 'pl', on); }
 
@@ -409,8 +428,8 @@ const BOOTH = (() => {
   }
 
   // the loop picture: bars and chords along the top, the layers, the autopilot, the take being recorded, the playhead
-  function drawRoll(){
-    const c = $('bRoll'); if (!c || !c.clientWidth) return;
+  function drawRoll(c = $('bRoll'), sel = null){
+    if (!c || !c.clientWidth) return;
     const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(c.clientWidth*dpr), h = Math.round(c.clientHeight*dpr);
     if (c.width !== w || c.height !== h){ c.width = w; c.height = h; }
     const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); const W = w/dpr, H = h/dpr; g.clearRect(0, 0, W, H);
@@ -425,8 +444,8 @@ const BOOTH = (() => {
       g.fillStyle = '#2c8b92'; g.fillRect(x0, 0, 1, H);
     }
     g.fillStyle = 'rgba(23,65,74,.6)'; g.fillRect(0, Y(NP - 1) - 1, W, 1);   // (above this line: only the autopilot reaches)
-    const box = (n, col, a) => { g.fillStyle = col.replace('A', a); g.fillRect(X(n.b) + 1, Y(n.i) + 1, Math.max(2, X(n.d) - 2), Math.max(2, rowH - 2)); };
-    S.layers.forEach((layer, li) => { const a = .55 + .4*(li === S.layers.length - 1 ? 1 : .5); for (const n of layer) box(n, 'rgba(95,216,222,A)', a); });
+    const box = (n, col, a) => { g.fillStyle = col.replace('A', a); g.fillRect(X(n.b) + 1, Y(n.i) + Math.min(1, rowH*.15), Math.max(2, X(n.d) - 2), Math.max(3, rowH - 1)); };
+    S.layers.forEach((layer, li) => { const a = .55 + .4*(li === S.layers.length - 1 ? 1 : .5); for (const n of layer) box(n, n === sel ? 'rgba(232,213,83,A)' : 'rgba(95,216,222,A)', a); });
     if (S.ap && S.layers.length && playing && nb >= 0){ const part = apCache.get(Math.floor(nb/Lb)); if (part) for (const n of part) box(n, 'rgba(229,55,159,A)', .8); }
     if (rec && rec.live){ g.fillStyle = 'rgba(229,55,159,.1)'; g.fillRect(0, top, W, H - top);
       for (const n of rec.take){ const d = n.d || Math.max(.1, nb - rec.from - n.b); box({ b: n.b, d, i: n.i }, 'rgba(255,120,150,A)', .95); } }
@@ -467,6 +486,7 @@ const BOOTH = (() => {
     $('bAuto').classList.toggle('on', S.ap); apCache.clear(); drawKeys(chordOf(0)); store(); renderShelf(); start(false); status();
   }
   function renderShelf(){
+    syncConsole();
     const box = $('bList'); if (!box) return; box.textContent = '';
     if (!loops.length){ const p = document.createElement('div'); p.className = 'bempty'; p.textContent = 'Nothing kept yet. Record a take, name it above and press Save. Loops stay with this city.'; box.appendChild(p); return; }
     for (const l of loops){
@@ -489,12 +509,139 @@ const BOOTH = (() => {
     }
   }
 
+  // ---------- shelf loops on the broadcast (the Console) ----------
+  const setSlider = (id, v) => { const r = $(id); if (!r) return; const lo = +r.min, hi = +r.max, st = +r.step || 1; v = clamp(Math.round((v - lo)/st)*st + lo, lo, hi); if (Math.abs(+r.value - v) < st/2) return;
+    r.value = String(+v.toFixed(4)); r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); };
+  B.broadcast = async (id, how) => {
+    const l = loops.find(x => x.id === id); if (!l) return false;
+    if (playing) stop();
+    if (!bc) bc = { stash: JSON.parse(JSON.stringify(S)) };
+    Object.assign(bc, { id, mode: how, base: l.bpm, name: l.name, sel: null });
+    const cp = JSON.parse(JSON.stringify(l));
+    Object.assign(S, { prog: cp.prog, len: cp.len, voice: cp.voice, bpm: cp.bpm, ap: !!cp.ap, apAmt: cp.apAmt ?? .55, song: cp.song || S.song,
+      layers: how === 'rewire' ? [cp.layers.flat().map(n => ({ ...n }))] : cp.layers });
+    if (cp.song){ S.song = cp.song; await ensureSong(); }
+    apCache.clear(); padCh = null; lastBar = null;
+    music.setBooth(true); setSlider('g-bpmSlider', S.bpm);
+    start(false); stripShow(true);
+    const dp = $('gdProg'); if (dp){ dp.textContent = 'Booth: ' + l.name; dp.title = how === 'rewire' ? 'A rewired copy of a Booth loop' : 'A Booth loop, as logged'; }
+    return true;
+  };
+  B.endBroadcast = () => {
+    if (!bc) return; stop();
+    const st = bc.stash; bc = null; Object.keys(S).forEach(k => { if (!(k in st)) delete S[k]; }); Object.assign(S, st);
+    if (S.song) ensureSong(); padCache.clear(); apCache.clear(); stripShow(false);
+    if (mode !== 'booth') music.setBooth(false);
+  };
+  B.broadcasting = () => !!bc;
+  const layerOn = id => { const b = $(id); return !!(b && b.classList.contains('on')); };   // (the Console's layer buttons: what the player asked for, whether or not the engine has started)
+  // once a pass (from the second): the governor drifts the Console's own settings, as the auto-governor does for the
+  // planners' patterns; a rewired copy also takes a little of the autopilot's answer into itself and moves a note
+  const gR = rng(Date.now() & 0xffff);
+  function bcPass(cyc){
+    if (!bc || cyc < 1) return;
+    if (layerOn('g-autopilotBtn')){
+      if (cyc % 2 === 1){
+        const rv = $('g-spaceReverbSlider'), wf = $('g-warmthFilterSlider'), gm = $('g-granularMixSlider');
+        if (rv) setSlider('g-spaceReverbSlider', clamp(+rv.value + (gR() - .5)*.24, .35, .92));
+        if (wf) setSlider('g-warmthFilterSlider', clamp(+wf.value + (gR() - .5)*1400, 1400, 5200));
+        if (gm) setSlider('g-granularMixSlider', clamp(+gm.value + (gR() - .5)*.3, .25, .85));
+      }
+      if (cyc % 4 === 2){ const modes = ['MOSAIC', 'HAZE', 'ARP'].filter(x => x !== E.mode), b = root.querySelector(`.micro-mode-btn[data-mode="${modes[Math.floor(gR()*modes.length)]}"]`); if (b) b.click(); }
+      if (cyc % 4 === 0) setSlider('g-bpmSlider', clamp(Math.round(bc.base*(1 + (gR() - .5)*.16)), 60, 132));
+    }
+    if (bc.mode === 'rewire' && S.ap && cyc % 2 === 0){
+      const lay = S.layers[0], part = apCache.get(cyc - 1) || [];
+      const free = (b, d, skip) => !lay.some(x => x !== skip && x.b < b + d - .02 && x.b + x.d > b + .02);
+      const take = part.filter(n => n.v >= .5 && free(n.b, n.d)).slice(0, 2);
+      for (const n of take) if (lay.length < 48) lay.push({ b: n.b, d: Math.max(.25, Math.round(n.d*4)/4), i: Math.min(AP - 1, n.i), v: .75 });
+      if (lay.length){ const n = lay[Math.floor(gR()*lay.length)], di = gR() < .5 ? 1 : -1;
+        if (gR() < .5) n.i = clamp(n.i + di, 0, AP - 1); else { const nb = n.b + di*.5; if (nb >= 0 && nb + n.d <= L() && Math.floor(nb/4) === Math.floor((nb + n.d - .01)/4) && free(nb, n.d, n)) n.b = nb; } }
+      lay.sort((a, b) => a.b - b.b); apCache.clear();
+    }
+  }
+  // the Console's carrier pattern list carries the shelf too
+  function syncConsole(){
+    const sel = $('g-progressionSelect'); if (!sel) return; const was = sel.value;
+    sel.querySelectorAll('optgroup.bshelf').forEach(o => o.remove());
+    if (loops.length){ const og = document.createElement('optgroup'); og.className = 'bshelf'; og.label = 'Booth shelf';
+      for (const l of loops){ const o = document.createElement('option'); o.value = 'loop:' + l.id; o.textContent = 'Booth // ' + l.name + (l.song ? ' (song)' : ''); og.appendChild(o); }
+      sel.appendChild(og); }
+    if ([...sel.options].some(o => o.value === was)) sel.value = was;
+  }
+  let lastPattern = '0', askFor = null;
+  root.addEventListener('change', e => {
+    const sel = e.target; if (!sel || sel.id !== 'g-progressionSelect') return;
+    if (sel.value.startsWith('loop:')){
+      e.stopPropagation();   // (the engine knows only its own patterns)
+      const id = sel.value.slice(5);
+      if (GRIDPANEL.open && mode === 'console') ask(id); else B.broadcast(id, 'logged');   // (stepped to from the deck: as logged)
+    } else { lastPattern = sel.value; if (bc) B.endBroadcast(); }
+  }, true);
+  function ask(id){
+    const l = loops.find(x => x.id === id); if (!l) return; askFor = id;
+    $('gDlgName').textContent = l.name; $('gDlg').hidden = false; $('gDlgLogged').focus({ preventScroll: true });
+  }
+  function closeAsk(choice){
+    $('gDlg').hidden = true; const id = askFor; askFor = null;
+    if (choice) B.broadcast(id, choice);
+    else { const sel = $('g-progressionSelect'); sel.value = bc ? 'loop:' + bc.id : lastPattern; }
+  }
+  // the note strip on the Console's carrier chart, while a shelf loop is on the broadcast; a rewired copy can be reshaped on it
+  function stripShow(on){
+    const st = $('gStrip'); if (!st) return; st.hidden = !on;
+    root.querySelectorAll('.a-chart .gchord, .a-chart .gpads, .a-chart .gpills').forEach(e => { e.hidden = on; });
+    if (on){ const rw = bc && bc.mode === 'rewire';
+      $('gStripMode').textContent = (rw ? 'REWIRED // ' : 'AS LOGGED // ') + (bc ? bc.name : '');
+      $('gStripSave').hidden = !rw;
+      $('gStripHint').textContent = rw ? 'Drag to move · drag the right end to stretch · click empty space to add · double-click or Delete to remove' : 'As recorded · Neuro-phrase on: the Grid answers · Auto-governor on: the settings drift';
+      $('gStripCv').title = rw ? 'Drag a note to move it, drag its right end to stretch it, click an empty spot to add one, double-click (or Delete) to remove it. With the Neuro-phrase on, the Grid drifts it somewhere new. The shelf copy stays as it was.'
+        : 'Your notes as recorded. Turn on the Neuro-phrase layer and the Grid answers them; with the auto-governor on, the settings drift as it plays.';
+      if (!stripRaf) stripRaf = requestAnimationFrame(stripFrame); }
+  }
+  let stripRaf = 0;
+  function stripFrame(){ stripRaf = 0; if (!bc) return; if (GRIDPANEL.open && mode === 'console') drawRoll($('gStripCv'), bc.sel); stripRaf = requestAnimationFrame(stripFrame); }
+  { // editing
+    const cv = $('gStripCv'); let drag = null;
+    const at2 = e => { const r = cv.getBoundingClientRect(), top = 24, H = r.height, rowH = (H - top - 10)/AP;
+      return { b: clamp((e.clientX - r.left)/r.width*L(), 0, L() - .01), i: clamp(Math.floor((H - 6 - (e.clientY - r.top))/rowH), 0, AP - 1), px: e.clientX - r.left, W: r.width }; };
+    const hit = p => { const lay = S.layers[0] || []; for (let k = lay.length - 1; k >= 0; k--){ const n = lay[k]; if (n.i === p.i && p.b >= n.b && p.b <= n.b + n.d) return n; } return null; };
+    const fit = n => { n.b = clamp(Math.round(n.b*4)/4, 0, L() - .25); const barEnd = Math.floor(n.b/4)*4 + 4; n.d = clamp(Math.round(n.d*4)/4, .25, barEnd - n.b); };
+    cv.addEventListener('pointerdown', e => {
+      if (!bc || bc.mode !== 'rewire') return; e.preventDefault(); cv.setPointerCapture(e.pointerId);
+      if (!S.layers.length) S.layers.push([]);
+      const p = at2(e), n = hit(p);
+      if (n){ const edge = (n.b + n.d)/L()*p.W - p.px < 7; drag = { n, kind: edge ? 'size' : 'move', db: p.b - n.b, di: p.i - n.i }; bc.sel = n; }
+      else { const nn = { b: Math.floor(p.b*4)/4, d: 1, i: p.i, v: .8 }; fit(nn); S.layers[0].push(nn); drag = { n: nn, kind: 'size' }; bc.sel = nn; }
+      apCache.clear();
+    });
+    cv.addEventListener('pointermove', e => { if (!drag) return; const p = at2(e), n = drag.n;
+      if (drag.kind === 'move'){ n.b = p.b - drag.db; n.i = clamp(p.i - drag.di, 0, AP - 1); } else n.d = Math.max(.25, p.b - n.b);
+      fit(n); });
+    const end = () => { if (!drag) return; drag = null; S.layers[0].sort((a, b) => a.b - b.b); apCache.clear(); };
+    cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+    const del = n => { const lay = S.layers[0] || [], k = lay.indexOf(n); if (k >= 0){ lay.splice(k, 1); apCache.clear(); } if (bc) bc.sel = null; };
+    cv.addEventListener('dblclick', e => { if (!bc || bc.mode !== 'rewire') return; const n = hit(at2(e)); if (n) del(n); });
+    cv.addEventListener('contextmenu', e => { if (!bc || bc.mode !== 'rewire') return; e.preventDefault(); const n = hit(at2(e)); if (n) del(n); });
+    addEventListener('keydown', e => { if (bc && bc.mode === 'rewire' && bc.sel && GRIDPANEL.open && mode === 'console' && (e.key === 'Delete' || e.key === 'Backspace') && !(e.target && e.target.tagName === 'INPUT')){ e.preventDefault(); del(bc.sel); } }, true);
+    $('gStripEnd').addEventListener('click', () => { const sel = $('g-progressionSelect'); sel.value = lastPattern; sel.dispatchEvent(new Event('change', { bubbles: true })); });
+    $('gStripSave').addEventListener('click', () => {
+      if (!bc) return; const src = loops.find(x => x.id === bc.id); if (!src) return;
+      const nl = { ...JSON.parse(JSON.stringify(src)), id: 'L' + Date.now().toString(36), name: src.name + ' (rewired)', layers: JSON.parse(JSON.stringify(S.layers)), bpm: S.bpm, at: Date.now() };
+      loops.splice(loops.indexOf(src) + 1, 0, nl); store(); renderShelf(); const b = $('gStripSave'); b.textContent = 'Kept on the shelf'; setTimeout(() => { b.textContent = 'Keep as a new loop'; }, 1800);
+    });
+    $('gDlgLogged').addEventListener('click', () => closeAsk('logged'));
+    $('gDlgRewire').addEventListener('click', () => closeAsk('rewire'));
+    $('gDlgCancel').addEventListener('click', () => closeAsk(null));
+    $('gDlg').addEventListener('keydown', e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); closeAsk(null); } });
+  }
+
   // ---------- modes: the Console (the broadcast) or the Booth ----------
   function setMode(m){
     mode = m; root.querySelectorAll('.gtab').forEach(t => { const on = t.dataset.mode === m; t.classList.toggle('on', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
     const main = root.querySelector('.gmain'), bo = $('gBooth');
     main.hidden = m === 'booth'; bo.hidden = m !== 'booth';
-    if (m === 'booth'){ music.setBooth(true); audio(); if (S.song) ensureSong(); drawKeys(chordOf(curBar())); if (!raf) raf = requestAnimationFrame(frame); }
+    if (m === 'booth'){ if (bc){ const sel = $('g-progressionSelect'); sel.value = lastPattern; sel.dispatchEvent(new Event('change', { bubbles: true })); } music.setBooth(true); audio(); if (S.song) ensureSong(); drawKeys(chordOf(curBar())); if (!raf) raf = requestAnimationFrame(frame); }
     else { stop(); music.setBooth(false); }
   }
   B.panelOpened = () => { if (mode === 'booth') setMode('booth'); };

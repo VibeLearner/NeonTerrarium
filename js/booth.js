@@ -565,6 +565,7 @@ const BOOTH = (() => {
     if (S.song) ensureSong(); padCache.clear(); apCache.clear(); stripShow(false);
     if (mode !== 'booth') music.setBooth(false);
   };
+  B.isPlaying = () => playing; B.pause = p => { if (!bc) return; if (p) stop(); else start(false); };   // (held: the loop stops where it is and picks up from bar one)
   B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._move = () => moveSection(); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
   const layerOn = id => { const b = $(id); return !!(b && b.classList.contains('on')); };   // (the Console's layer buttons: what the player asked for, whether or not the engine has started)
   // once a pass (from the second): the governor drifts the Console's own settings, as the auto-governor does for the

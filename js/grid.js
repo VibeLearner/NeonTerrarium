@@ -103,7 +103,9 @@ const music = (() => {
   // ---------- the engine runs while the Grid stands, is not paused, and the city isn't held ----------
   // (the Booth, booth.js: the engine's own music steps aside while the player plays, but the sound stays up even if the broadcast was on hold)
   let booth = false;
-  const want = () => on && (booth || (!paused && !held));
+  // (a Booth loop on the broadcast holds like any broadcast: only the Booth tab itself plays through a hold)
+  const bcasting = () => typeof BOOTH !== 'undefined' && BOOTH.broadcasting();
+  const want = () => on && ((booth && !(paused && bcasting())) || (!paused && !held));
   function tick(dt){
     const w = want();
     if (!booth && w && !E.playing){ if (!E.ctx) E.initAudio(); E.toggle(); E.resume(); if (!tickProgDone){ tickProgDone = true; applyLayers(); } }
@@ -135,7 +137,7 @@ const music = (() => {
     setOn(!!grid);
   }
   function setVolume(v){ volume = v; try { localStorage.setItem(MUSIC_VOL_KEY, String(v)); } catch (e) {} }
-  function togglePause(){ if (!on) return; paused = !paused; if (!paused){ fadeIn = GRID_FADE_QUICK; level = 0; } ui.paused(paused); }
+  function togglePause(){ if (!on) return; paused = !paused; if (!paused){ fadeIn = GRID_FADE_QUICK; level = 0; } ui.paused(paused); if (bcasting()) BOOTH.pause(paused); }
   // the deck's next and previous step through the carrier patterns (the chord progressions), not the programs
   const progSel = () => PNL.el.querySelector('#g-progressionSelect');
   function stepPattern(d){
@@ -222,7 +224,8 @@ const music = (() => {
     addEventListener('resize', place);
     return {
       show(v){ deck.classList.toggle('live', v); deck.setAttribute('aria-hidden', v ? 'false' : 'true'); deck.inert = !v; document.documentElement.classList.toggle('gdeck-on', v); place(); },
-      paused(p){ playBtn.classList.toggle('paused', p); playBtn.setAttribute('aria-label', p ? 'Resume broadcast' : 'Hold broadcast'); playBtn.title = p ? 'Resume' : 'Hold'; deck.classList.toggle('held', p); },
+      paused(p){ const eb = $q('g-engageSwitch'), el = $q('g-engageLed'); if (eb){ eb.classList.toggle('on', p); eb.lastChild.textContent = p ? 'Resume' : 'Hold'; } if (el) el.classList.toggle('on-emerald', !p);
+        playBtn.classList.toggle('paused', p); playBtn.setAttribute('aria-label', p ? 'Resume broadcast' : 'Hold broadcast'); playBtn.title = p ? 'Resume' : 'Hold'; deck.classList.toggle('held', p); },
       pattern(){ const ps = progSel(), o = ps && ps.options[ps.selectedIndex]; if (!o) return; const full = o.textContent.trim(); prog$.textContent = full.split('//').pop().trim(); prog$.title = full; },
       program(){ const p = GRID_PROGRAMS[prog]; const pp = $q('gpProg'); if (pp) pp.textContent = p.name.toUpperCase(); PANEL.syncPrograms(); },
       text(){
@@ -358,6 +361,8 @@ const music = (() => {
     if (gridAt(e.clientX, e.clientY)){ e.preventDefault(); PANEL.show(); }
   });
 
+  // the panel's Hold is the same hold as the player's: for the planners' patterns and for a Booth loop alike (the engine never sees the click)
+  PNL.el.addEventListener('click', e => { if (e.target.closest && e.target.closest('#g-engageSwitch')){ e.stopPropagation(); togglePause(); } }, true);
   // the panel remembers what the player set
   PNL.el.addEventListener('input', save, true); PNL.el.addEventListener('change', save, true); PNL.el.addEventListener('click', save, true);
 

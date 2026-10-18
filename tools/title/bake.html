@@ -269,5 +269,69 @@ window.BAKE = async (opt = {}) => {
   }
   return res;
 };
+
+// ---------- the surface bake (for the title's real-time lighting) ----------
+// Instead of finished lighting, each view gets what the title screen needs to light the room itself, live:
+//   gb-color   the surfaces' own colours, unlit (alpha 0 where the glass is: the city shows there)
+//   gb-normal  which way each pixel faces (bumps included), in view space, packed 0..1
+//   gb-depth   how far each pixel is from the camera (metres/24, packed into 24 bits of RGB)
+//   gb-mat     R roughness, G metalness, B how mirror-like (for the reflections term)
+//   gb-glow    what glows by itself (lamps, screens, buttons), the light bar left out
+//   gb-bar     the light bar's panes alone (white), so it can blink and light the room
+//   gb-bounce  the light the lit room throws back onto itself (from a reflection capture at midday), unlit otherwise
+// The plants and the lamp are left out (the title draws them in 3D). gbuf.json: the camera and the window per view.
+window.BAKE_GBUF = async (opt = {}) => {
+  await fontReady; await document.fonts.ready;
+  ROOM.bakeNoPendant = true; ROOM.build(scene); sun = ROOM.light(scene); ROOM.setTime('day'); ROOM.setSun(0); scene.updateMatrixWorld(true);
+  renderer.setRenderTarget(null); renderer.setSize(64, 64); renderer.render(scene, new THREE.PerspectiveCamera());
+  const crt = new THREE.WebGLCubeRenderTarget(256, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter }); crt.texture.encoding = THREE.sRGBEncoding;
+  const cc = new THREE.CubeCamera(.05, 30, crt); cc.position.set(...(ROOM.cubeAt || [-.6, 1.1, .2])); scene.add(cc); cc.update(renderer, scene);
+  const M = ROOM.M, REFL = new Map([[M.chrome, 1], [M.steel, .8], [M.glass, 1], [M.enamel, .9], [M.ceramic, .6], [M.cream, .35], [M.copper, .8], [M.app, .4], [M.blackGlass, 1], [M.brass, .8], [M.splash, .5], [M.counterTop, .6], [M.skin, .3], [M.gold, .8], [M.wood, .05]]);
+  for (const [m, k] of REFL) if (m){ m.envMap = crt.texture; m.envMapIntensity = k; m.needsUpdate = true; }
+  const skip = new Set([...(ROOM.foliage || []), ...(ROOM.lamp || [])]), meshes = []; scene.traverse(o => { if (o.isMesh) meshes.push(o); });
+  const orig = new Map(meshes.map(m => [m, m.material]));
+  const HIDE = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+  const isGlow = m => m.isMeshBasicMaterial && m.colorWrite !== false, isBar = m => m === M.barGlow;
+  const cache = new Map(); const swap = (key, f) => { for (const o of meshes){ const m = orig.get(o); if (skip.has(o)){ o.material = HIDE; continue; } const k = key + '|' + m.uuid; if (!cache.has(k)) cache.set(k, f(m)); o.material = cache.get(k); } };
+  const restore = () => { for (const o of meshes) o.material = orig.get(o); };
+  const DEPTH_FS = 'varying float vZ; void main(){ float d = clamp(vZ/24., 0., 1.); vec3 p = fract(d*vec3(1., 255., 65025.)); p -= p.yzz*vec3(1./255., 1./255., 0.); gl_FragColor = vec4(p, 1.); }';
+  const DEPTH_VS = 'varying float vZ; void main(){ vec4 mv = modelViewMatrix*vec4(position, 1.); vZ = -mv.z; gl_Position = projectionMatrix*mv; }';
+  const read = (cam, w, h, linear) => { const rt = new THREE.WebGLRenderTarget(w, h, { depthBuffer: true }); if (!linear) rt.texture.encoding = THREE.sRGBEncoding;
+    renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(scene, cam); const px = new Uint8Array(w*h*4); renderer.readRenderTargetPixels(rt, 0, 0, w, h, px); renderer.setRenderTarget(null); rt.dispose();
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'), im = g.createImageData(w, h); for (let y = 0; y < h; y++) im.data.set(px.subarray((h - 1 - y)*w*4, (h - y)*w*4), y*w*4); g.putImageData(im, 0, 0); return c.toDataURL('image/png'); };
+  const res = {};
+  for (const name of (opt.views || ['wide', 'tall'])){
+    const V = VIEWS[name], w = V.w, h = V.h; renderer.setPixelRatio(1); renderer.setSize(w, h);
+    const cam = new THREE.PerspectiveCamera(V.fov, w/h, .05, 40); cam.position.set(...V.pos); cam.lookAt(...V.look); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
+    const at = v => { const p = v.clone().project(cam); return [+((p.x + 1)/2).toFixed(4), +((1 - p.y)/2).toFixed(4)]; };
+    renderer.toneMapping = THREE.NoToneMapping; renderer.shadowMap.enabled = false; console.log('BAKE surfaces ' + name);
+    const out = {};
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    swap('color', m => m.colorWrite === false ? m : isGlow(m) ? new THREE.MeshBasicMaterial({ color: 0x000000, side: m.side }) : new THREE.MeshBasicMaterial({ color: m.color ? m.color.clone() : 0xffffff, map: m.map || null, side: m.side, transparent: !!m.transparent, opacity: m.opacity ?? 1 }));
+    out.color = read(cam, w, h);
+    renderer.outputEncoding = THREE.LinearEncoding;
+    swap('normal', m => m.colorWrite === false ? m : new THREE.MeshNormalMaterial({ bumpMap: m.bumpMap || null, bumpScale: m.bumpScale ?? 1, side: m.side }));
+    out.normal = read(cam, w, h, true);
+    swap('depth', m => new THREE.ShaderMaterial({ vertexShader: DEPTH_VS, fragmentShader: DEPTH_FS, side: m.side }));
+    out.depth = read(cam, w, h, true);
+    swap('mat', m => m.colorWrite === false ? m : new THREE.MeshBasicMaterial({ color: new THREE.Color(m.roughness ?? 1, m.metalness ?? 0, REFL.get(m) ?? 0), side: m.side }));
+    out.mat = read(cam, w, h, true);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    swap('glow', m => m.colorWrite === false ? m : isBar(m) ? new THREE.MeshBasicMaterial({ color: 0x000000, side: m.side }) : isGlow(m) ? new THREE.MeshBasicMaterial({ color: m.color.clone(), map: m.map || null, side: m.side })
+      : m.emissive && (m.emissiveIntensity || 0) > 0 && m.emissive.getHex() ? new THREE.MeshBasicMaterial({ color: m.emissive.clone().multiplyScalar(m.emissiveIntensity), side: m.side }) : new THREE.MeshBasicMaterial({ color: 0x000000, side: m.side }));
+    out.glow = read(cam, w, h);
+    swap('bar', m => m.colorWrite === false ? m : new THREE.MeshBasicMaterial({ color: isBar(m) ? 0xffffff : 0x000000, side: m.side }));
+    out.bar = read(cam, w, h);
+    // the bounce: the real materials, every light off, only the midday reflection capture lighting them
+    restore(); for (const o of meshes){ const m = o.material; if (m.isMeshStandardMaterial && !m.envMap){ m.envMap = crt.texture; m.envMapIntensity = .7; m.needsUpdate = true; } }   // (every surface takes the room's light, not only the shiny ones)
+    for (const o of skip) o.material = HIDE; const lit = []; scene.traverse(o => { if (o.isLight && o.visible){ lit.push(o); o.visible = false; } });
+    renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.NoToneMapping; out.bounce = read(cam, w, h); for (const l of lit) l.visible = true; restore();
+    const W = ROOM.WIN, wcv = ROOM.winCenter(), wtv = ROOM.winTop(), rim = at(wtv), ctr = at(wcv), bar = ROOM.flicker ? ROOM.flicker.center : null;
+    out.anchors = { w, h, cam: { pos: V.pos, look: V.look, fov: V.fov }, win: ctr, winR: +Math.hypot((rim[0] - ctr[0])*w, (rim[1] - ctr[1])*h).toFixed(1), mug: ROOM.mugTop ? at(ROOM.mugTop) : null, depthFar: 24 };
+    res[name] = out;
+  }
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.shadowMap.enabled = true;
+  return res;
+};
 </script>
 </body></html>

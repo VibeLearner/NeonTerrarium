@@ -16,10 +16,12 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18q';
+  const VER = '2026-10-18r';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
+  const gbufP = fetch('assets/title/gbuf.json?v=' + VER).then(r => r.ok ? r.json() : null).catch(() => null);   // (the surface bake: the room lit live)
+  let GB = null, RTMODE = false, RT = null, rtCv = null, HOUR = 8;
 
   /* ---------- the picture, fitted to the screen ---------- */
   // the baked room covers the screen; it's placed so the window stays in view whatever the screen's shape
@@ -28,7 +30,7 @@ const TITLE = (() => {
     W = innerWidth; H = innerHeight;
     const v = W/H < .85 ? 'tall' : 'wide';
     if (v !== view){ view = v; const f = k => 'assets/title/' + k + '-' + v + '-' + TOD + '.png?v=' + VER;
-      imRoom.src = f('room'); imGlass.src = f('glass'); if (A[v].signRect) imOff.src = f('signoff'); cvPl.hidden = true; live && live.view(v);
+      if (!RTMODE){ imRoom.src = f('room'); imGlass.src = f('glass'); if (A[v].signRect) imOff.src = f('signoff'); } imRoom.hidden = imGlass.hidden = RTMODE; cvPl.hidden = true; live && live.view(v);
       SUNS = (A[v].heads || []).map((h, i) => { const im = new Image(); im.src = 'assets/title/sun-' + v + '-' + TOD + '-' + i + '.jpg?v=' + VER; return im; }); }
     const a = A[v], iw = a.w, ih = a.h; S0 = Math.max(W/iw, H/ih);
     const sw = iw*S0, sh = ih*S0;
@@ -56,6 +58,7 @@ const TITLE = (() => {
   sunCv = document.createElement('canvas'); sunCv.className = 't-layer t-sun'; sunCv.setAttribute('aria-hidden', 'true'); gSun = sunCv.getContext('2d');
   stage.insertBefore(sunCv, cvDust);
   function drawSun(){
+    if (RTMODE){ sunCv.hidden = true; const d = T._sunH != null ? T._sunH : (((yaw - yaw0)*180/Math.PI - 60) % 360 + 540) % 360 - 180; sunH = d; sunW = Math.max(0, Math.min(1, 1 - Math.max(Math.abs(d) - 62, 0)/25))*OPEN; return; }
     const a = A[view], hs = a.heads || [], w = sunCv.width, h = sunCv.height; gSun.clearRect(0, 0, w, h); sunW = 0;
     if (!hs.length || !SUNS.length) return;
     // which way the beam moves as the city turns: the far side of the city drifts the way the sun does, so the patch on
@@ -90,7 +93,7 @@ const TITLE = (() => {
   let live = null, liveP = null, liveAt = 0;
   function startLive(){
     if (liveP) return liveP;
-    liveP = new Promise(res => { const sc = document.createElement('script'); sc.src = 'tools/title/kitchen.js?v=' + VER; sc.onload = res; sc.onerror = () => res(); document.head.appendChild(sc); }).then(() => {
+    liveP = new Promise(res => { const sc = document.createElement('script'); sc.src = 'tools/title/kitchen.js?v=' + VER; sc.onload = res; sc.onerror = () => res(); document.head.appendChild(sc); }).then(async () => {
       if (typeof ROOM === 'undefined' || !ROOM.movers) return;
       const cv = document.createElement('canvas'); cv.className = 't-layer t-live'; cv.setAttribute('aria-hidden', 'true'); stage.insertBefore(cv, cvDust);
       const r = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: false }); { const gl = r.getContext(), src = gl.shaderSource.bind(gl); if (r.capabilities.isWebGL2) gl.shaderSource = (sh, t) => src(sh, t.replace('out highp vec4 pc_fragColor;', 'layout(location = 0) out highp vec4 pc_fragColor;\nlayout(location = 1) out highp vec4 pc_fragNormal;')); }   // (the game's shader pieces also write a second image, the normals: declare it here too)
@@ -99,23 +102,44 @@ const TITLE = (() => {
       ROOM.shutter(scene); shutScene = scene; shutCam = new THREE.PerspectiveCamera(45, 1, .05, 40); shutCam.layers.set(1);
       shutR = new THREE.WebGLRenderer({ canvas: shutCv, alpha: true, antialias: true }); { const gl = shutR.getContext(), src = gl.shaderSource.bind(gl); if (shutR.capabilities.isWebGL2) gl.shaderSource = (sh, t) => src(sh, t.replace('out highp vec4 pc_fragColor;', 'layout(location = 0) out highp vec4 pc_fragColor;\nlayout(location = 1) out highp vec4 pc_fragNormal;')); }
       shutR.outputEncoding = THREE.sRGBEncoding; shutR.toneMapping = THREE.ACESFilmicToneMapping; shutR.toneMappingExposure = .8; shutR.setClearColor(0x000000, 0);
+      // the room lit live, when the surface bake is there (else the baked pictures, as before)
+      if (GB) await new Promise(res => { const sc = document.createElement('script'); sc.src = 'tools/title/realtime.js?v=' + VER; sc.onload = res; sc.onerror = () => res(); document.head.appendChild(sc); });
+      if (GB && typeof TITLE_RT !== 'undefined'){ try { rtCv = document.createElement('canvas'); rtCv.className = 't-layer t-rt'; rtCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(rtCv, imRoom);
+        RT = TITLE_RT.create(rtCv, scene, ROOM, 'assets/title/', GB); } catch (e){ try { console.warn('title lighting:', e); } catch (_) {} RT = null; if (rtCv){ rtCv.remove(); rtCv = null; } } }
+      if (!RT && RTMODE){ RTMODE = false; A = {}; for (const v of ['wide', 'tall']) A[v] = RAW[v][TOD] || RAW[v].morning; view = null; layout(); }
       let vw = null;
       live = {
         view(v){ vw = v; const a = A[v], c = a.cam || CAMS[v]; r.setPixelRatio(1); r.setSize(a.w, a.h, false); cam.fov = c.fov; cam.aspect = a.w/a.h; cam.position.set(...c.pos); cam.lookAt(...c.look); cam.updateProjectionMatrix();
+          if (RT) RT.view(v);
           shutR.setPixelRatio(1); shutR.setSize(a.w*2, a.h*2, false); shutCam.fov = cam.fov; shutCam.aspect = cam.aspect; shutCam.position.copy(cam.position); shutCam.quaternion.copy(cam.quaternion); shutCam.updateProjectionMatrix(); },
         time(){ ROOM.setTime(TOD); const k = { morning: 1.1, day: 1.3, evening: .9, night: .7 }[TOD] || 1; ROOM.shutterLight.lt.intensity = 1.2*k; ROOM.shutterLight.hm.intensity = .45*k; },
         at(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam); return [(v.x + 1)/2, (1 - v.y)/2]; },
-        draw(t){ tick(reduced ? 0 : t); ROOM.aimSun(sunW > 0 ? sunH*Math.PI/180*SUNSGN : null); ROOM.L.sun.intensity *= .6*sunW; r.render(scene, cam); }
+        draw(t){ tick(reduced ? 0 : t); if (RT && RTMODE) RT.draw(lightParams()); ROOM.aimSun(sunW > 0 ? sunH*Math.PI/180*SUNSGN : null); ROOM.L.sun.intensity *= .6*sunW; r.render(scene, cam); }
       };
       if (view) live.view(view);
     }).catch(e => { try { console.warn('title live layer:', e); } catch (_) {} });
     return liveP;
   }
   let SUNSGN = 1;
+  // the room's light at the city's hour: the four looks the bake knew, blended through the day
+  const KEYS = [[-3, 'night'], [5, 'night'], [8, 'morning'], [13, 'day'], [18, 'evening'], [21, 'night'], [29, 'night'], [32, 'morning']];
+  function lightParams(){
+    const T = ROOM.TIMESDATA, h = ((HOUR % 24) + 24) % 24; let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1][0] <= h) i++;
+    const [h0, k0] = KEYS[i], [h1, k1] = KEYS[i + 1], f = h1 > h0 ? (h - h0)/(h1 - h0) : 0, a = T[k0], b = T[k1];
+    const L = (x, y) => x + (y - x)*f, Cl = (x, y) => new THREE.Color(x).lerp(new THREE.Color(y), f);
+    const e = L(a.elev, b.elev)*Math.PI/180, th = sunH*Math.PI/180, out = ROOM.winNormal().negate(), c = Math.cos(th), s_ = Math.sin(th);
+    const toSun = new THREE.Vector3(out.x*c - out.z*s_, 0, out.x*s_ + out.z*c).multiplyScalar(Math.cos(e)); toSun.y = Math.sin(e);
+    const dimK = .35 + .65*OPEN, sunI = L(a.sunI, b.sunI);
+    return { sunDir: toSun.negate(), sunCol: Cl(a.sunC, b.sunC), sunI, sunOn: sunW*(sunI > 0 ? 1 : 0), sky: Cl(a.sky, b.sky), skyI: L(a.skyI, b.skyI),
+      hemi: [Cl(a.hemi[0], b.hemi[0]), Cl(a.hemi[1], b.hemi[1]), L(a.hemi[2], b.hemi[2])*dimK], amb: L(a.amb, b.amb)*dimK, fill: [Cl(a.fill[0], b.fill[0]), L(a.fill[1], b.fill[1])*dimK],
+      density: L(a.density, b.density), lampsK: L(a.lamps, b.lamps), grade: [0, 1].map(j => [0, 1, 2].map(k => L(a.grade[j][k], b.grade[j][k]))), open: OPEN,
+      barOn: BAR_ON, bounceK: (.25 + .75*sunW)*.45*OPEN*(sunI > 0 ? Math.min(1, sunI/5) : .3) };
+  }
+  let BAR_ON = 1;
   function drawLive(now){ if (!live || now - liveAt < 33) return; liveAt = now; live.draw(now/1000); drawPool(); }
   // the pendant's light on the table at evening and night: a warm pool under the bulb, moving as the lamp swings
   const poolCv = document.createElement('canvas'), gPo = poolCv.getContext('2d'); poolCv.className = 't-layer t-sun'; poolCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(poolCv, cvDust);
-  function drawPool(){
+  function drawPool(){ if (RTMODE){ poolCv.hidden = true; return; }
     const w = poolCv.width = cvDust.width, h = poolCv.height = cvDust.height, k = typeof ROOM !== 'undefined' ? ROOM.lampsK || 0 : 0;
     if (!live || !k || !ROOM.bulbAt) return;
     const b = ROOM.bulbAt(), y = 1.145, c = live.at(b.x, y, b.z), px = [live.at(b.x + .55, y, b.z), live.at(b.x - .55, y, b.z), live.at(b.x, y, b.z + .55), live.at(b.x, y, b.z - .55)];
@@ -144,22 +168,23 @@ const TITLE = (() => {
     for (let i = 0; i < on.data.length; i += 4){ const d = on.data[i] + on.data[i + 1] + on.data[i + 2] - off.data[i] - off.data[i + 1] - off.data[i + 2]; if (d < 60) on.data[i + 3] = 0; }
     g.putImageData(on, 0, 0); barImg = c;
   }
-  function drawBar(dark){
+  function drawBar(dark){ if (RTMODE){ barCv.hidden = true; return; }
     const w = barCv.width = cvDust.width, h = barCv.height = cvDust.height; makeBar(); const a = A[view], r = a.signRect; if (!barImg || !r || DIM >= .999 || dark) return;
     const k = 1 - DIM; gB.globalAlpha = Math.min(1, k*1.6); gB.drawImage(barImg, r[0], r[1]); gB.globalAlpha = 1;
     const cx = r[0] + r[2]/2, cy = r[1] + r[3]/2, rad = r[2]*1.4, g = gB.createRadialGradient(cx, cy, 0, cx, cy, rad);
     g.addColorStop(0, 'rgba(255,214,150,' + (.4*k).toFixed(3) + ')'); g.addColorStop(.4, 'rgba(255,190,120,' + (.14*k).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,180,110,0)');
     gB.save(); gB.translate(cx, cy); gB.scale(1, .7); gB.translate(-cx, -cy); gB.fillStyle = g; gB.fillRect(cx - rad, cy - rad, 2*rad, 2*rad); gB.restore();
   }
-  T._hold = () => { shownAt = 1e15; openFrom = null; };   // (testing: keep the shutter shut)
+  T._hold = () => { shownAt = 1e15; openFrom = null; };
+  T._open = () => { openFrom = -1e9; }; T._hour = h => { HOUR = h; }; T._dbg = () => ({ OPEN, sunH, sunW, RTMODE, rt: !!RT, p: RT && ROOM ? lightParams() : null });   // (testing: keep the shutter shut)
   const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady); } catch (e) { return true; } };
   let shutR = null, shutCam = null, shutScene = null;
   function drawShutter(now){
     if (openFrom === null && shutR && now - shownAt > 900 && (cityReady() || now - shownAt > 15000)) openFrom = now + 300;   // (15 s at most: never stuck shut)
     const tt = openFrom === null ? 0 : Math.max(0, Math.min(1, (now - openFrom)/3200)); OPEN = reduced ? (openFrom === null ? 0 : 1) : tt*tt*(3 - 2*tt);
     // the room is dark while it's shut (only what light leaks in, and its own lamps), and the daylight comes up with the plates
-    const lit = .3 + .7*Math.pow(OPEN, .8); DIM = lit; if (Math.abs(lit - (drawShutter.lit || 0)) > .004){ drawShutter.lit = lit; const f = lit >= .999 ? '' : 'brightness(' + lit.toFixed(3) + ') saturate(' + (.7 + .3*lit).toFixed(3) + ')'; for (const el of [imRoom, imGlass, imOff, shutCv, stage.querySelector('.t-live')]) if (el) el.style.filter = f; }
-    if (!shutR) return; shutCv.hidden = OPEN >= 1; if (OPEN >= 1) return;
+    const lit = .3 + .7*Math.pow(OPEN, .8); DIM = lit; if (Math.abs(lit - (drawShutter.lit || 0)) > .004){ drawShutter.lit = lit; const f = lit >= .999 ? '' : 'brightness(' + lit.toFixed(3) + ') saturate(' + (.7 + .3*lit).toFixed(3) + ')'; for (const el of (RTMODE ? [shutCv, stage.querySelector('.t-live')] : [imRoom, imGlass, imOff, shutCv, stage.querySelector('.t-live')])) if (el) el.style.filter = f; }
+    if (!shutR) return; shutCv.hidden = OPEN >= 1; if (OPEN >= 1){ if (drawShutter.last !== 1){ ROOM.setShutter(1); drawShutter.last = 1; } return; } drawShutter.last = OPEN;
     ROOM.setShutter(OPEN); shutR.render(shutScene, shutCam);
   }
   /* ---------- steam from the mug ---------- */
@@ -249,7 +274,7 @@ const TITLE = (() => {
       else for (let k = 0, n = 2 + Math.floor(Math.random()*2); k < n; k++){ const d = 60 + Math.random()*120; flick.push([t, t + d]); t += d + 60 + Math.random()*140; }
       flickNext = t + 4000 + Math.random()*6000; }
     const dark = flick.some(([a, b]) => now >= a && now < b);
-    glow.classList.toggle('dip', dark); imOff.classList.toggle('on', dark); if (A && view) drawBar(dark);
+    glow.classList.toggle('dip', dark); imOff.classList.toggle('on', dark && !RTMODE); BAR_ON = dark ? 0 : 1; if (A && view) drawBar(dark);
     if (now - noteAt > 1500){ noteAt = now; fillNote(); }
   }
   let noteAt = 0;
@@ -299,12 +324,13 @@ const TITLE = (() => {
     if (T.on) return; T.on = true; document.documentElement.classList.add('title-on'); root.hidden = false; root.classList.remove('leaving');
     setScene(); RAW = RAW || await anchorsP;
     if (!RAW){ T.hide(true); return; }   // (the pictures couldn't be had: straight into the city)
-    A = {}; for (const v of ['wide', 'tall']) A[v] = RAW[v][TOD] || RAW[v].morning; view = null;
+    GB = GB || await gbufP; HOUR = was ? was.hour : S.hour; RTMODE = !!GB && (!liveP || !!RT);
+    A = {}; for (const v of ['wide', 'tall']) A[v] = RTMODE ? GB[v] : (RAW[v][TOD] || RAW[v].morning); view = null;
     OPEN = 0; openFrom = null; shownAt = performance.now();
     stage.style.visibility = 'hidden';
-    T.ready = new Promise(res => { const t0 = performance.now(); (function wait(){ if ((imRoom.complete && imRoom.naturalWidth && shutR && view) || performance.now() - t0 > 9000){ stage.style.visibility = ''; shownAt = performance.now(); res(); } else setTimeout(wait, 60); })(); });
+    T.ready = new Promise(res => { const t0 = performance.now(); (function wait(){ if (((RTMODE ? RT && RT.loaded : imRoom.complete && imRoom.naturalWidth) && shutR && view) || performance.now() - t0 > 9000){ stage.style.visibility = ''; shownAt = performance.now(); res(); } else setTimeout(wait, 60); })(); });
     const boot = document.documentElement.classList.contains('title-boot');
-    if (boot){ const ready = () => imRoom.complete && imRoom.naturalWidth && shutR, t0 = performance.now();
+    if (boot){ const ready = () => (RTMODE ? RT && RT.loaded : imRoom.complete && imRoom.naturalWidth) && shutR, t0 = performance.now();
       (function wait(){ if (ready() || performance.now() - t0 > 9000){ shownAt = performance.now(); setTimeout(() => document.documentElement.classList.remove('title-boot'), 120); } else setTimeout(wait, 100); })(); }
     startLive().then(() => { if (live){ live.time(); if (view) live.view(view); } });
     layout(); aimCity(); try { camT.copy(camGoal); } catch (e) {} last = 0; raf = requestAnimationFrame(loop); fillNote();

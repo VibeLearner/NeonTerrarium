@@ -503,7 +503,7 @@ const ROOM = (() => {
     { const dy = .36, y = ACY + dy, z = zf(dy), th = tilt(dy);
       box(1.04, .085, .03, M.dark, 1.45, y, z - .005, { rx: -th, cast: false }); for (const x of [.92, 1.98]) box(.03, .095, .04, M.chrome, x, y, z, { rx: -th, cast: false });
       for (const [x0, x1] of [[.97, 1.3], [1.34, 1.5], [1.54, 1.93]]) box(x1 - x0, .05, .02, M.barGlow, (x0 + x1)/2, y, z + .004, { rx: -th, cast: false });
-      const l = new C.PointLight(0xffc878, .35, 1.4, 2); l.position.set(1.45, y + .02, z + .2); kit.add(l);
+      const l = new C.PointLight(0xffc878, .35, 1.4, 2); l.position.set(1.45, y + .02, z + .2); kit.add(l); R.barLight = l;
       // the bar can go dark (the title screen blinks it): its panes dim, its light off; the patch of picture it touches
       const lit = M.barGlow.color.clone(); kit.updateMatrixWorld(true);
       R.flicker = { off(){ M.barGlow.color.set(0x2a2016); l.visible = false; }, on(){ M.barGlow.color.copy(lit); l.visible = true; },
@@ -710,6 +710,7 @@ const ROOM = (() => {
     night: { sunC: 0x7086c9, sunI: 2.0, elev: 40, sky: 0x34507a, skyI: .14, hemi: [0x34507a, 0x1a1f2e, .05], amb: .012, b5: .12, fill: [0x34507a, .05], post: [.44, .53, .79], density: .1, lamps: 1, grade: [[.98, .96, 1.0], [.82, .9, 1.08]] },
   };
   R.TIMES = Object.keys(TIMES);
+  R.TIMESDATA = TIMES;
   R.light = sc => {
     SC_ = sc;
     const sun = new C.DirectionalLight(0xffc27c, 5.6);
@@ -748,7 +749,8 @@ const ROOM = (() => {
   // hidden but the plants and the lamp; those are drawn live over the baked picture and move. Returns a tick(t) to call.
   R.movers = sc => {
     R.build(sc); R.light(sc); for (const b of bounce) b.visible = false;
-    const keep = new Set([...FOLIAGE, ...LAMP]); sc.traverse(o => { if (o.isMesh && !keep.has(o)) o.visible = false; if (o.isLight && o.castShadow) o.castShadow = false; });
+    const keep = new Set([...FOLIAGE, ...LAMP]); sc.traverse(o => { if (o.isMesh && !keep.has(o)) o.layers.set(3); if (o.isLight && o.castShadow) o.castShadow = false; });   // (layer 3: the room itself, only for casting shadows in the title's live lighting)
+    sc.traverse(o => { if (o.isMesh && o.material && o.material.colorWrite === false) o.layers.set(4); });   // (the glass's depth stand-in: it must not shade the sun)
     // matte shading for the live things (the bake's grade and banding aren't there to tame a glossy sheen on small leaves)
     const mm = new Map(); for (const m of keep){ const o = m.material; if (!mm.has(o)) mm.set(o, new C.MeshLambertMaterial({ color: o.color ? o.color.clone().multiplyScalar(.85) : 0xffffff, map: o.map || null, side: o.side, emissive: o.emissive || 0x000000, emissiveIntensity: o.emissiveIntensity ?? 1 })); m.material = mm.get(o); }
     R.liveMats = mm;

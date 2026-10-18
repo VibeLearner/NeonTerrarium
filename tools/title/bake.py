@@ -39,6 +39,18 @@ def main():
         pg.on('console', lambda m: print('page:', m.text) if m.type in ('error', 'warning') and 'favicon' not in m.text and 'Feedback loop' not in m.text and '404' not in m.text else (print('progress:', m.text[5:], flush=True) if m.text.startswith('BAKE ') else None))
         pg.on('pageerror', lambda e: print('page error:', e))
         pg.goto('http://127.0.0.1:%d/tools/title/bake.html?scene=%s' % (PORT, opt.get('scene', 'kitchen')))
+        if not opt.get('legacy') and opt.get('scene', 'kitchen') == 'kitchen' and not any(v not in ('wide', 'tall') for v in opt.get('views', [])):
+            # the surface bake for the real-time title (the default): a handful of flat renders per view
+            res = pg.evaluate('o => BAKE_GBUF(o)', opt)
+            out = opt.get('out', OUT); os.makedirs(out, exist_ok=True); meta = {}
+            for view, r in res.items():
+                for kind in ('color', 'normal', 'depth', 'mat', 'glow', 'bar', 'bounce'):
+                    with open(os.path.join(out, 'gb-%s-%s.png' % (kind, view)), 'wb') as f:
+                        f.write(base64.b64decode(r[kind].split(',', 1)[1]))
+                meta[view] = r['anchors']
+            with open(os.path.join(out, 'gbuf.json'), 'w') as f:
+                json.dump(meta, f, indent=1)
+            print(json.dumps(meta)); b.close(); srv.shutdown(); return
         res = pg.evaluate('o => BAKE(o)', opt)
         out = opt.get('out', OUT); os.makedirs(out, exist_ok=True)
         anchors = {}

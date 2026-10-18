@@ -3255,7 +3255,9 @@ function setBoothHold(on) {
 
 return {
   init: gridInit,
-  progressions: PROGRESSIONS, n2f, boothBuses, boothHold: setBoothHold, get boothHeld(){ return boothHeld; },
+  progressions: PROGRESSIONS, n2f, boothBuses, boothHold: setBoothHold,
+  // the Booth hands the broadcast back on this chord: the drone comes in on it and the next pattern change walks from it (buildTransition)
+  handOff(chord){ if (chord && chord.notes) activeChordOverride = chord; }, get boothHeld(){ return boothHeld; },
   pluck(freq, t, dur, vel, pan, dest) { playPluckNote(freq, Math.max(ctx.currentTime, t), dur, vel, pan, false, dest, 0.6); },
   get ctx(){ return ctx; }, get analyser(){ return analyser; }, get out(){ return gridOut; },
   set volume(v){ gridVol = v; },

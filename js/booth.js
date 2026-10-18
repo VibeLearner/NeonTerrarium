@@ -463,7 +463,7 @@ const BOOTH = (() => {
     }
     g.fillStyle = 'rgba(23,65,74,.6)'; g.fillRect(0, Y(NP - 1) - 1, W, 1);   // (above this line: only the autopilot reaches)
     const box = (n, col, a) => { g.fillStyle = col.replace('A', a); g.fillRect(X(n.b) + 1, Y(n.i) + Math.min(1, rowH*.15), Math.max(2, X(n.d) - 2), Math.max(3, rowH - 1)); };
-    S.layers.forEach((layer, li) => { const a = .55 + .4*(li === S.layers.length - 1 ? 1 : .5); for (const n of layer) box(n, n === sel ? 'rgba(232,213,83,A)' : 'rgba(95,216,222,A)', a); });
+    S.layers.forEach((layer, li) => { const a = .55 + .4*(li === S.layers.length - 1 ? 1 : .5); for (const n of layer) box(n, n === sel ? 'rgba(232,213,83,A)' : (bc && bc.mode === 'rewire' && !n.o) ? 'rgba(150,240,190,A)' : 'rgba(95,216,222,A)', a); });
     if (S.ap && S.layers.length && playing && nb >= 0){ const part = apCache.get(Math.floor(nb/Lb)); if (part) for (const n of part) box(n, 'rgba(229,55,159,A)', .8); }
     if (rec && rec.live){ g.fillStyle = 'rgba(229,55,159,.1)'; g.fillRect(0, top, W, H - top);
       for (const n of rec.take){ const d = n.d || Math.max(.1, ((nb % Lb) - n.b + Lb) % Lb); box({ b: n.b, d, i: n.i }, 'rgba(255,120,150,A)', .95); } }
@@ -537,7 +537,7 @@ const BOOTH = (() => {
     Object.assign(bc, { id, mode: how, base: l.bpm, name: l.name, sel: null });
     const cp = JSON.parse(JSON.stringify(l));
     Object.assign(S, { prog: cp.prog, len: cp.len, voice: cp.voice, bpm: cp.bpm, ap: !!cp.ap, apAmt: cp.apAmt ?? .55, song: cp.song || S.song,
-      layers: how === 'rewire' ? [cp.layers.flat().map(n => ({ ...n }))] : cp.layers });
+      layers: how === 'rewire' ? [cp.layers.flat().map(n => ({ ...n, o: 1 }))] : cp.layers });
     if (cp.song){ S.song = cp.song; await ensureSong(); }
     apCache.clear(); padCh = null; lastBar = null;
     music.setBooth(true); setSlider('g-bpmSlider', S.bpm);
@@ -546,12 +546,14 @@ const BOOTH = (() => {
     return true;
   };
   B.endBroadcast = () => {
-    if (!bc) return; stop();
+    if (!bc) return;
+    const here = playing ? chordOf(curBar()) : null; if (here && E.handOff) E.handOff(here);   // (the planners' pattern bridges over from the chord playing now)
+    stop();
     const st = bc.stash; bc = null; Object.keys(S).forEach(k => { if (!(k in st)) delete S[k]; }); Object.assign(S, st);
     if (S.song) ensureSong(); padCache.clear(); apCache.clear(); stripShow(false);
     if (mode !== 'booth') music.setBooth(false);
   };
-  B.broadcasting = () => !!bc;
+  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part);
   const layerOn = id => { const b = $(id); return !!(b && b.classList.contains('on')); };   // (the Console's layer buttons: what the player asked for, whether or not the engine has started)
   // once a pass (from the second): the governor drifts the Console's own settings, as the auto-governor does for the
   // planners' patterns; a rewired copy also takes a little of the autopilot's answer into itself and moves a note
@@ -568,15 +570,31 @@ const BOOTH = (() => {
       if (cyc % 4 === 2){ const modes = ['MOSAIC', 'HAZE', 'ARP'].filter(x => x !== E.mode), b = root.querySelector(`.micro-mode-btn[data-mode="${modes[Math.floor(gR()*modes.length)]}"]`); if (b) b.click(); }
       if (cyc % 4 === 0) setSlider('g-bpmSlider', clamp(Math.round(bc.base*(1 + (gR() - .5)*.16)), 60, 132));
     }
-    if (bc.mode === 'rewire' && S.ap && cyc % 2 === 0){
-      const lay = S.layers[0], part = apCache.get(cyc - 1) || [];
-      const free = (b, d, skip) => !lay.some(x => x !== skip && x.b < b + d - .02 && x.b + x.d > b + .02);
-      const take = part.filter(n => n.v >= .5 && free(n.b, n.d)).slice(0, 2);
-      for (const n of take) if (lay.length < 48) lay.push({ b: n.b, d: Math.max(.25, Math.round(n.d*4)/4), i: Math.min(AP - 1, n.i), v: .75 });
-      if (lay.length){ const n = lay[Math.floor(gR()*lay.length)], di = gR() < .5 ? 1 : -1;
-        if (gR() < .5) n.i = clamp(n.i + di, 0, AP - 1); else { const nb = n.b + di*.5; if (nb >= 0 && nb + n.d <= L() && Math.floor(nb/4) === Math.floor((nb + n.d - .01)/4) && free(nb, n.d, n)) n.b = nb; } }
-      lay.sort((a, b) => a.b - b.b); apCache.clear();
+    if (bc.mode === 'rewire' && S.ap) evolve(S.layers[0], apCache.get(cyc - 1) || []);
+  }
+  // A rewired copy drifts: most passes the autopilot makes one or two changes to it, the player's own notes included. It takes
+  // in a note of its own answer, deletes a note (the player's first, more often than not), moves one, retunes one, stretches
+  // or shortens one, or splits one in two. Over enough passes none of the original notes may be left: they were where it started.
+  // A note stays inside its bar (its pitch is the bar's chord) and the line never piles notes on one another.
+  function evolve(lay, part){
+    if (!lay) return;
+    const Lb = L(), bar = b => Math.floor(b/4);
+    const free = (b, d, skip) => b >= 0 && b + d <= Lb + .001 && bar(b) === bar(b + d - .01) && !lay.some(x => x !== skip && x.b < b + d - .02 && x.b + x.d > b + .02);
+    const pickNote = () => { const orig = lay.filter(n => n.o); return orig.length && gR() < .4 ? orig[Math.floor(gR()*orig.length)] : lay[Math.floor(gR()*lay.length)]; };
+    if (gR() < .3) return;   // (some passes it leaves alone)
+    const ops = gR() < .6 ? 1 : 2;
+    for (let k = 0; k < ops; k++){
+      const r = gR();
+      if (r < .22 || !lay.length){   // take in a note of the autopilot's answer
+        const c = part.filter(n => n.v >= .5 && free(Math.round(n.b*4)/4, Math.max(.25, Math.round(n.d*4)/4)));
+        if (c.length && lay.length < 40){ const n = c[Math.floor(gR()*c.length)]; lay.push({ b: Math.round(n.b*4)/4, d: Math.max(.25, Math.round(n.d*4)/4), i: clamp(n.i, 0, AP - 1), v: .78 }); }
+      } else if (r < .42){ if (lay.length > 4){ const n = pickNote(); lay.splice(lay.indexOf(n), 1); } }   // delete one
+      else if (r < .62){ const n = pickNote(), nb = n.b + (gR() < .5 ? -1 : 1)*(gR() < .6 ? .5 : 1); if (free(nb, n.d, n)){ n.b = nb; delete n.o; } }   // move one
+      else if (r < .78){ const n = pickNote(); n.i = clamp(n.i + (gR() < .5 ? -1 : 1)*(gR() < .7 ? 1 : 2), 0, AP - 1); delete n.o; }   // retune one
+      else if (r < .9){ const n = pickNote(), nd = Math.max(.25, Math.round(n.d*(gR() < .5 ? .5 : 1.5)*4)/4); if (free(n.b, nd, n)){ n.d = nd; delete n.o; } }   // stretch or shorten one
+      else { const n = pickNote(); if (n.d >= 1 && lay.length < 40){ const h = Math.round(n.d*2)/4; n.d = h; delete n.o; lay.push({ b: n.b + h, d: h, i: clamp(n.i + (gR() < .5 ? -1 : 1), 0, AP - 1), v: n.v || .78 }); } }   // split one
     }
+    lay.sort((a, b) => a.b - b.b); apCache.clear();
   }
   // the Console's carrier pattern list carries the shelf too
   function syncConsole(){
@@ -612,7 +630,7 @@ const BOOTH = (() => {
     if (on){ const rw = bc && bc.mode === 'rewire';
       $('gStripMode').textContent = (rw ? 'REWIRED // ' : 'AS LOGGED // ') + (bc ? bc.name : '');
       $('gStripSave').hidden = !rw;
-      $('gStripHint').textContent = rw ? 'Drag to move · drag the right end to stretch · click empty space to add · double-click or Delete to remove' : 'As recorded · Neuro-phrase on: the Grid answers · Auto-governor on: the settings drift';
+      $('gStripHint').textContent = rw ? 'Cyan: your notes · green: changed by you or the Grid · drag, stretch, click to add, double-click to remove' : 'As recorded · Neuro-phrase on: the Grid answers · Auto-governor on: the settings drift';
       $('gStripCv').title = rw ? 'Drag a note to move it, drag its right end to stretch it, click an empty spot to add one, double-click (or Delete) to remove it. With the Neuro-phrase on, the Grid drifts it somewhere new. The shelf copy stays as it was.'
         : 'Your notes as recorded. Turn on the Neuro-phrase layer and the Grid answers them; with the auto-governor on, the settings drift as it plays.';
       if (!stripRaf) stripRaf = requestAnimationFrame(stripFrame); }
@@ -635,6 +653,7 @@ const BOOTH = (() => {
     });
     cv.addEventListener('pointermove', e => { if (!drag) return; const p = at2(e), n = drag.n;
       if (drag.kind === 'move'){ n.b = p.b - drag.db; n.i = clamp(p.i - drag.di, 0, AP - 1); } else n.d = Math.max(.25, p.b - n.b);
+      delete n.o;
       fit(n); });
     const end = () => { if (!drag) return; drag = null; S.layers[0].sort((a, b) => a.b - b.b); apCache.clear(); };
     cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);

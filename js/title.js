@@ -29,7 +29,7 @@ const TITLE = (() => {
     const v = W/H < .85 ? 'tall' : 'wide';
     if (v !== view){ view = v; const f = k => 'assets/title/' + k + '-' + v + '-' + TOD + '.png?v=' + VER;
       imRoom.src = f('room'); imGlass.src = f('glass'); if (A[v].signRect) imOff.src = f('signoff'); loadPlants(v);
-      SUNS = (A[v].heads || []).map((h, i) => { const im = new Image(); im.src = 'assets/title/sun-' + v + '-' + TOD + '-' + i + '.png?v=' + VER; return im; }); }
+      SUNS = (A[v].heads || []).map((h, i) => { const im = new Image(); im.src = 'assets/title/sun-' + v + '-' + TOD + '-' + i + '.jpg?v=' + VER; return im; }); }
     const a = A[v], iw = a.w, ih = a.h; S0 = Math.max(W/iw, H/ih);
     const sw = iw*S0, sh = ih*S0;
     OX = Math.min(0, Math.max(W - sw, W*.5 - a.win[0]*sw)); OY = Math.min(0, Math.max(H - sh, H*.5 - a.win[1]*sh));
@@ -40,7 +40,7 @@ const TITLE = (() => {
     const pr = a.plantRect; cvPl.hidden = !pr; if (pr) Object.assign(cvPl.style, { left: pr[0]/iw*100 + '%', top: pr[1]/ih*100 + '%', width: pr[2]/iw*100 + '%', height: pr[3]/ih*100 + '%' });
     cvSky.width = cvDust.width; cvSky.height = cvDust.height; seedClouds();
     const r = a.signRect; imOff.hidden = !r; glow.hidden = !r || a.glow === false;
-    if (r){ P('sign', glow); Object.assign(imOff.style, { left: r[0]/iw*100 + '%', top: r[1]/ih*100 + '%', width: r[2]/iw*100 + '%', height: r[3]/ih*100 + '%' }); }
+    if (r){ if (a.sign) P('sign', glow); Object.assign(imOff.style, { left: r[0]/iw*100 + '%', top: r[1]/ih*100 + '%', width: r[2]/iw*100 + '%', height: r[3]/ih*100 + '%' }); }
     stage.style.setProperty('--px', S0 + 'px');
     stage.style.transformOrigin = (a.win[0]*100) + '% ' + (a.win[1]*100) + '%';
     seedMotes();
@@ -61,12 +61,13 @@ const TITLE = (() => {
     let d = ((sgn*(yaw - yaw0)*180/Math.PI + hs[0]) % 360 + 540) % 360 - 180;   // (degrees, -180..180; starts with the sun just coming in)
     sunH = d;
     const lo = hs[0], hi = hs[hs.length - 1], fade = Math.max(0, Math.min(1, 1 - (Math.max(lo - d, d - hi, 0))/25));
-    sunW = fade; if (fade <= 0) return;
+    sunW = fade; if (fade <= 0) return; fade *= .8;
     const c = Math.max(lo, Math.min(hi, d)), f = (c - lo)/(hi - lo)*(hs.length - 1), i = Math.min(hs.length - 2, Math.floor(f)), t = f - i;
     gSun.globalCompositeOperation = 'lighter';
     if (SUNS[i].complete){ gSun.globalAlpha = (1 - t)*fade; gSun.drawImage(SUNS[i], 0, 0, w, h); }
     if (SUNS[i + 1].complete){ gSun.globalAlpha = t*fade; gSun.drawImage(SUNS[i + 1], 0, 0, w, h); }
-    gSun.globalAlpha = 1;
+    gSun.globalAlpha = 1; if (imRoom.complete){ gSun.globalCompositeOperation = 'destination-in'; gSun.drawImage(imRoom, 0, 0, w, h); }   // (only over the room: where the glass is, black would hide the city)
+    gSun.globalCompositeOperation = 'source-over';
   }
   // the pod is afloat: it drifts a few pixels and leans a fraction of a degree, slowly, never quite repeating
   function drawSway(now){

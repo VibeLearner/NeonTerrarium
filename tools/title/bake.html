@@ -265,7 +265,8 @@ window.BAKE = async (opt = {}) => {
   // the kitchen: every hour asked for, and for the title's views every sun heading (opt.times, opt.headings in degrees)
   const res = {}, times = opt.times || ROOM.TIMES, heads = opt.headings || [-60, -45, -30, -15, 0, 15, 30, 45, 60];
   for (const t of times){
-    const info = ROOM.setTime(t); post.material.uniforms.sunCol.value.setRGB(...info.sunCol); ROOM.setSun(0); scene.updateMatrixWorld(true); cc.update(renderer, scene);
+    const info = ROOM.setTime(t); post.material.uniforms.sunCol.value.setRGB(...info.sunCol); ROOM.setSun(0); scene.updateMatrixWorld(true);
+    { const keep = []; scene.traverse(o => { if (o.material && o.material.envMap === crt.texture){ keep.push(o.material); o.material.envMap = null; } }); cc.update(renderer, scene); for (const m of keep) m.envMap = crt.texture; }   // (no reflections while the reflections are taken: a texture can't be read and drawn at once)
     for (const k of views){ res[k] = res[k] || {}; res[k][t] = (k === 'wide' || k === 'tall') ? await bakeTimes(k, info, heads) : await bake(k); }
   }
   return res;

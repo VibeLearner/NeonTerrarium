@@ -47,7 +47,10 @@ def main():
                     anchors.setdefault(view, {})[t] = rt['anchors']; continue
                 for kind in ('room', 'glass', 'signoff', 'plants'):
                     if rt.get(kind): save('%s-%s-%s.png' % (kind, view, t), rt[kind])
-                for i, d in enumerate(rt['suns']): save('sun-%s-%s-%d.png' % (view, t, i), d)
+                for i, d in enumerate(rt['suns']):   # (what the sun adds: mostly black, so a JPEG; the faint haze trimmed off)
+                    save('sun.tmp.png', d); from PIL import Image
+                    Image.open(os.path.join(out, 'sun.tmp.png')).convert('RGB').point([max(0, min(255, int((v - 14)*.95))) for v in range(256)]*3).save(os.path.join(out, 'sun-%s-%s-%d.jpg' % (view, t, i)), quality=82)
+                    os.remove(os.path.join(out, 'sun.tmp.png'))
                 anchors.setdefault(view, {})[t] = rt['anchors']
         with open(os.path.join(out, 'anchors.json'), 'w') as f:
             json.dump(anchors, f, indent=1)

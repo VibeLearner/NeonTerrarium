@@ -239,7 +239,7 @@ const ROOM = (() => {
   const add = (geo, mat, x, y, z, o = {}) => {
     const m = new C.Mesh(geo, mat); m.position.set(x, y, z);
     if (o.rx) m.rotation.x = o.rx; if (o.ry) m.rotation.y = o.ry; if (o.rz) m.rotation.z = o.rz; if (o.s) m.scale.setScalar(o.s);
-    m.castShadow = o.cast !== false; m.receiveShadow = true; if (FOL) FOLIAGE.push(m); (o.p || parent || scene).add(m); return m;
+    m.castShadow = o.cast !== false; m.receiveShadow = true; if (FOL) FOLIAGE.push(m); if (LAMPF) LAMP.push(m); (o.p || parent || scene).add(m); return m;
   };
   const box = (w, h, d, mat, x, y, z, o) => add(new C.BoxGeometry(w, h, d), mat, x, y, z, o);
   const cyl = (r0, r1, h, mat, x, y, z, o = {}) => add(new C.CylinderGeometry(r0, r1, h, o.seg || 48, 1, !!o.open), mat, x, y, z, o);
@@ -264,7 +264,7 @@ const ROOM = (() => {
   function pot(x, y, z, s, mat){ lathe([[0, 0], [.13*s, 0], [.15*s, .02*s], [.17*s, .22*s], [.19*s, .24*s], [.19*s, .28*s], [.165*s, .28*s]], mat, x, y, z); cyl(.165*s, .165*s, .01, M.soil, x, y + .27*s, z, { cast: false }); }
   // a leafy plant: many short twigs ending in clusters of small leaves (the kitchen's bushes and herbs), or long trailing vines
   // foliage goes on layer 1: it casts shadows into the room but is baked as its own picture, so the title screen can sway it
-  let FOL = 0; const FOLIAGE = R.foliage = [];
+  let FOL = 0, LAMPF = 0; const FOLIAGE = R.foliage = [], LAMP = R.lamp = [];
   function plant(x, y, z, s, kind, potMat){ if (potMat !== null) pot(x, y, z, s, potMat || M.pot); FOL++; try { plantBody(x, y, z, s, kind); } finally { FOL--; } }
   function plantBody(x, y, z, s, kind){ const potMat = null;
     const top0 = y + .27*s;
@@ -687,9 +687,9 @@ const ROOM = (() => {
     R.parts = { kitchen: kit, window: hull, table: G.table, chair: G.chair, cabinet: G.cabinet, rug: G.rug };
     box(16, 6, .3, M.dark, 0, 2, -8.5);   // (the shell outside: the sun only comes in by the window)
     // a pendant lamp over the table: a cord from the ceiling, a brass cap, a cream dome shade, a bulb (lit in the evening and at night)
-    { const p = G.table.position; cyl(.004, .004, CEIL - 1.95, M.dark, p.x, (CEIL + 1.95)/2, p.z, { seg: 6, cast: false }); cyl(.03, .04, .06, M.brass, p.x, 1.95, p.z, { seg: 24 });
+    LAMPF = 1; { const p = G.table.position; R.lampPivot = new C.Vector3(p.x, CEIL, p.z); cyl(.004, .004, CEIL - 1.95, M.dark, p.x, (CEIL + 1.95)/2, p.z, { seg: 6, cast: false }); cyl(.03, .04, .06, M.brass, p.x, 1.95, p.z, { seg: 24 });
       lathe([[.03, 0], [.06, -.02], [.17, -.12], [.2, -.17], [.205, -.18], [.19, -.18], [.16, -.13], [.05, -.03]], M.cream, p.x, 1.92, p.z, { seg: 64 });
-      add(new C.SphereGeometry(.045, 24, 16), M.pendant, p.x, 1.77, p.z, { cast: false }); }
+      add(new C.SphereGeometry(.045, 24, 16), M.pendant, p.x, 1.77, p.z, { cast: false }); } LAMPF = 0;
   };
 
   /* ---------- light ---------- */
@@ -699,11 +699,13 @@ const ROOM = (() => {
      the lamps at night); R.setSun(theta) puts the sun theta radians round from straight out of the window (null: none),
      and lays the first bounce for it. The bake renders a few headings and the title screen blends between them. */
   let SC_ = null, bounce = [], TIME = null;
+  // the city's own light at each hour (sampled from the game's looks: its sun, its sky and ground fill), so the pod and
+  // the city outside are lit by the same sky. grade: the picture's highlight and shadow tints, from the sun and the sky.
   const TIMES = {
-    morning: { sunC: 0xffc27c, sunI: 5.6, elev: 26, sky: 0xffe2bc, skyI: .32, hemi: [0xffe0b0, 0x3a3428, .04], amb: .02, b5: .3, fill: [0xd8c8b0, .1], post: [1, .82, .56], density: .3, lamps: 0 },
-    day: { sunC: 0xfff0d8, sunI: 5.2, elev: 48, sky: 0xeef4ff, skyI: .45, hemi: [0xf0f0e8, 0x3a3a34, .07], amb: .03, b5: .25, fill: [0xe0e4e8, .14], post: [1, .96, .86], density: .22, lamps: 0 },
-    evening: { sunC: 0xff8a40, sunI: 5.0, elev: 11, sky: 0xffa888, skyI: .26, hemi: [0xffb890, 0x34282a, .035], amb: .015, b5: .3, fill: [0xc8a8a8, .08], post: [1, .6, .34], density: .36, lamps: .45 },
-    night: { sunC: 0x8aa8e0, sunI: 0, elev: 35, sky: 0x6a88c8, skyI: .1, hemi: [0x30405a, 0x161414, .03], amb: .01, b5: .15, fill: [0x6070a0, .04], post: [.55, .65, .9], density: .05, lamps: 1 },
+    morning: { sunC: 0xfed9b0, sunI: 5.6, elev: 34, sky: 0xb4cce4, skyI: .38, hemi: [0xb4cce4, 0x7a6a5a, .06], amb: .02, b5: .25, fill: [0xb4cce4, .1], post: [1, .85, .69], density: .28, lamps: 0, grade: [[1.06, 1.0, .9], [.88, .95, 1.02]] },
+    day: { sunC: 0xfef0d4, sunI: 5.4, elev: 52, sky: 0xc4dcf0, skyI: .48, hemi: [0xc4dcf0, 0x8a7a66, .08], amb: .03, b5: .2, fill: [0xc4dcf0, .14], post: [1, .94, .83], density: .2, lamps: 0, grade: [[1.03, 1.0, .95], [.9, .97, 1.03]] },
+    evening: { sunC: 0xfeb468, sunI: 5.2, elev: 16, sky: 0xb8979a, skyI: .3, hemi: [0xb8979a, 0x5a3a30, .05], amb: .015, b5: .3, fill: [0xb8979a, .08], post: [1, .7, .41], density: .34, lamps: .45, grade: [[1.1, .98, .82], [.92, .86, .92]] },
+    night: { sunC: 0x7086c9, sunI: 2.0, elev: 40, sky: 0x34507a, skyI: .14, hemi: [0x34507a, 0x1a1f2e, .05], amb: .012, b5: .12, fill: [0x34507a, .05], post: [.44, .53, .79], density: .1, lamps: 1, grade: [[.98, .96, 1.0], [.82, .9, 1.08]] },
   };
   R.TIMES = Object.keys(TIMES);
   R.light = sc => {
@@ -734,7 +736,7 @@ const ROOM = (() => {
     L.hemi.color.set(T.hemi[0]); L.hemi.groundColor.set(T.hemi[1]); L.hemi.intensity = T.hemi[2]; L.amb.intensity = T.amb; L.b5.intensity = T.b5;
     L.fill.color.set(T.fill[0]); L.fill.intensity = T.fill[1];
     for (const [l, k] of L.lamps) l.intensity = k*T.lamps; M.pendant.emissiveIntensity = T.lamps*1.6; M.downlight.color.set(T.lamps ? 0xffe8c0 : 0x8a8070);
-    return { sunCol: T.post, density: T.density, sunny: T.sunI > 0 };
+    return { sunCol: T.post, density: T.density, sunny: T.sunI > 0, grade: T.grade };
   };
   // theta: the sun's heading round from the window's outward normal (radians), at the hour's height; null: no sun
   R.setSun = theta => {

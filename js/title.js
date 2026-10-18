@@ -16,7 +16,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18i';
+  const VER = '2026-10-18j';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -29,6 +29,7 @@ const TITLE = (() => {
     const v = W/H < .85 ? 'tall' : 'wide';
     if (v !== view){ view = v; const f = k => 'assets/title/' + k + '-' + v + '-' + TOD + '.png?v=' + VER;
       imRoom.src = f('room'); imGlass.src = f('glass'); if (A[v].signRect) imOff.src = f('signoff'); loadPlants(v);
+      lampIm.src = A[v].lampRect ? f('lamp') : '';
       SUNS = (A[v].heads || []).map((h, i) => { const im = new Image(); im.src = 'assets/title/sun-' + v + '-' + TOD + '-' + i + '.jpg?v=' + VER; return im; }); }
     const a = A[v], iw = a.w, ih = a.h; S0 = Math.max(W/iw, H/ih);
     const sw = iw*S0, sh = ih*S0;
@@ -52,6 +53,14 @@ const TITLE = (() => {
   // the sun has gone round the hull and the beam fades out until it comes round again.
   sunCv = document.createElement('canvas'); sunCv.className = 't-layer t-sun'; sunCv.setAttribute('aria-hidden', 'true'); gSun = sunCv.getContext('2d');
   stage.insertBefore(sunCv, cvPl);
+  // the pendant over the table, baked apart: it swings gently from its cord, a slow pendulum with a little wobble
+  const lampCv = document.createElement('canvas'), gL = lampCv.getContext('2d'), lampIm = new Image(); lampCv.className = 't-layer'; lampCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(lampCv, cvPl.nextSibling);   // (in front of the sill's plants: it hangs nearer)
+  function drawLamp(now){
+    const a = A[view], w = lampCv.width = cvDust.width, h = lampCv.height = cvDust.height; gL.clearRect(0, 0, w, h);
+    if (!a.lampRect || !lampIm.complete || !lampIm.naturalWidth) return;
+    const t = now/1000, ang = reduced ? 0 : (Math.sin(t*1.9)*2.2 + Math.sin(t*.7 + 1)*.9)*Math.PI/180, r = a.lampRect, px = a.lampPivot[0]*w, py = a.lampPivot[1]*h;
+    gL.save(); gL.translate(px, py); gL.rotate(ang); gL.translate(-px, -py); gL.drawImage(lampIm, r[0], r[1]); gL.restore();
+  }
   function drawSun(){
     const a = A[view], hs = a.heads || [], w = sunCv.width, h = sunCv.height; gSun.clearRect(0, 0, w, h); sunW = 0;
     if (!hs.length || !SUNS.length) return;
@@ -148,7 +157,7 @@ const TITLE = (() => {
     const dt = last ? Math.min(.1, (now - last)/1000) : 0; last = now;
     try { if (typeof yawT !== 'undefined' && !reduced) yawT += dt*.02; if (yaw0 === null) yaw0 = yaw; } catch (e) {}
     aimCity();
-    if (A && view){ drawSun(); drawSway(now); drawDust(now, dt); drawClouds(dt); drawPlants(now); }
+    if (A && view){ drawSun(); drawSway(now); drawLamp(now); drawDust(now, dt); drawClouds(dt); drawPlants(now); }
     // the light bar: steady, and now and then it blinks: a stutter of two or three, or one slow dip
     if (!reduced && now > flickNext){ flick = []; let t = now;
       if (Math.random() < .35){ flick.push([t, t + 500 + Math.random()*400]); t += 900; }

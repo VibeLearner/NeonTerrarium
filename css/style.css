@@ -432,3 +432,6 @@ html.title-on.title-deck #deckToggle{visibility:visible!important;pointer-events
 }
 }
 @media (prefers-reduced-motion:reduce){.title *,.title{transition:none!important;animation:none!important}}
+
+.deck .to-title{margin:0 0 14px}
+html.title-on #toTitle{display:none}

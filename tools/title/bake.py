@@ -45,7 +45,7 @@ def main():
                     for kind in ('room', 'glass'):
                         if rt.get(kind): save('%s-%s-%s.png' % (kind, view, t), rt[kind])
                     anchors.setdefault(view, {})[t] = rt['anchors']; continue
-                for kind in ('room', 'glass', 'signoff', 'plants'):
+                for kind in ('room', 'glass', 'signoff', 'plants', 'lamp'):
                     if rt.get(kind): save('%s-%s-%s.png' % (kind, view, t), rt[kind])
                 for i, d in enumerate(rt['suns']):   # (what the sun adds: mostly black, so a JPEG; the faint haze trimmed off)
                     save('sun.tmp.png', d); from PIL import Image

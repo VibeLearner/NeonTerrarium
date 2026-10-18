@@ -11,7 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&family=Chakra+Petch:wght@500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="data:,">
 <script src="js/touch.js?v=2026-10-14a"></script>
-<link rel="stylesheet" href="css/style.css?v=2026-10-18h">
+<link rel="stylesheet" href="css/style.css?v=2026-10-18j">
 </head>
 <body>
 
@@ -192,6 +192,7 @@
 </nav>
 
 <aside id="deck" class="deck" aria-label="Playground controls">
+  <button id="toTitle" class="wide to-title">Back to the title screen</button>
   <section>
     <h2>Time of day</h2>
     <div class="clock"><output id="clock">15:30</output><span id="phase">Day</span></div>
@@ -277,7 +278,6 @@
     </section>
   </details>
 
-  <button id="toTitle" class="wide">Title screen and cities</button>
   <p class="foot">Your city saves automatically in this browser. Cities, files and cloud saves are on the title screen.</p>
 </aside>
 
@@ -340,7 +340,7 @@
 <script src="js/overseer.js?v=2026-10-16p"></script>
 <script src="js/wirelog.js?v=2026-10-16q"></script>
 <script src="js/slots.js?v=2026-10-18a"></script>
-<script src="js/title.js?v=2026-10-18i"></script>
+<script src="js/title.js?v=2026-10-18j"></script>
 <script>document.getElementById('toTitle').addEventListener('click', () => { const tg = document.getElementById('deckToggle'); if (document.getElementById('deck').classList.contains('open')) tg.click(); TITLE.show(); });</script>
 </body>
 </html>

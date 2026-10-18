@@ -21,7 +21,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18v';
+  const VER = '2026-10-18w';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -183,7 +183,7 @@ const TITLE = (() => {
     g.addColorStop(0, 'rgba(255,214,150,' + (.4*k).toFixed(3) + ')'); g.addColorStop(.4, 'rgba(255,190,120,' + (.14*k).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,180,110,0)');
     gB.save(); gB.translate(cx, cy); gB.scale(1, .7); gB.translate(-cx, -cy); gB.fillStyle = g; gB.fillRect(cx - rad, cy - rad, 2*rad, 2*rad); gB.restore();
   }
-  T.cityHalf = () => OPEN >= 1 && !T.cutting && !root.classList.contains('leaving');
+  T.cityHalf = () => false;   // (it drew every other frame behind the porthole: the city stepped against the room's sway)
   T._perf = () => { const out = { renderers: {}, canvases: [] };
     const info = (k, r) => { if (!r) return; const i = r.info, gl = r.getContext(), c = r.domElement; let gpu = ''; try { const d = gl.getExtension('WEBGL_debug_renderer_info'); gpu = d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); } catch (e) {}
       out.renderers[k] = { calls: i.render.calls, triangles: i.render.triangles, geometries: i.memory.geometries, textures: i.memory.textures, programs: i.programs ? i.programs.length : null, canvas: [c.width, c.height], css: [c.clientWidth, c.clientHeight], pixelRatio: r.getPixelRatio(), webgl2: r.capabilities.isWebGL2, gpu, antialias: gl.getContextAttributes().antialias }; };
@@ -287,8 +287,9 @@ const TITLE = (() => {
     const dt = last ? Math.min(.1, (now - last)/1000) : 0; last = now;
     try { if (typeof yawT !== 'undefined' && !reduced) yawT += dt*.02; if (yaw0 === null) yaw0 = yaw; } catch (e) {}
     aimCity();
-    if (A && view){ if (TP){ TP.time('shutter', () => drawShutter(now), shutR); drawSun(); TP.time('sway', () => drawSway(now)); drawLive(now); TP.time('fx', () => { drawDust(now, dt); drawSteam(now, dt); drawClouds(dt); }); }
-      else { drawShutter(now); drawSun(); drawSway(now); drawLive(now); drawDust(now, dt); drawSteam(now, dt); drawClouds(dt); } }
+    if (T.leaving && A && view) flight();
+    if (A && view){ if (TP){ TP.time('shutter', () => drawShutter(now), shutR); drawSun(); if (!T.leaving) TP.time('sway', () => drawSway(now)); drawLive(now); TP.time('fx', () => { drawDust(now, dt); drawSteam(now, dt); drawClouds(dt); }); }
+      else { drawShutter(now); drawSun(); if (!T.leaving) drawSway(now); drawLive(now); drawDust(now, dt); drawSteam(now, dt); drawClouds(dt); } }
     // the light bar: steady, and now and then it blinks: a stutter of two or three, or one slow dip
     if (!reduced && now > flickNext){ flick = []; let t = now;
       if (Math.random() < .35){ flick.push([t, t + 500 + Math.random()*400]); t += 900; }
@@ -336,7 +337,7 @@ const TITLE = (() => {
   function restoreScene(){
     if (!was) return;
     try {
-      S.hour = was.hour; S.cycle = was.cycle; zoomT = was.zoomT; if (was.cam){ camGoal.copy(was.cam.goal); pitchT = was.cam.pitchT; }
+      S.hour = was.hour; S.cycle = was.cycle;   // (the camera stays where the title left it: the window's view, now the game's)
       if (was.wx && typeof LK !== 'undefined'){ if (was.wx.mode === 'auto') LK.setAutoWeather(true, true); else LK.setWeather(was.wx.set, false, true); }
     } catch (e) {}
     was = null;
@@ -361,9 +362,14 @@ const TITLE = (() => {
     if (!T.on) return;
     closePanel(); setDeck(false);
     if (instant || reduced){ finish(); return; }
-    root.classList.add('leaving'); unwiden();
-    try { if (was && was.cam){ camGoal.copy(was.cam.goal); pitchT = was.cam.pitchT; zoomT = was.zoomT; } } catch (e) {}
-    setTimeout(finish, 1500);
+    root.classList.add('leaving'); T.leaving = true; leaveAt = performance.now(); crossed = false;
+    try { applyRenderRes(zoom); } catch (e) {}   // (the city at its full size again: it's about to fill the screen)
+    const a = A && view && A[view];
+    if (!a){ finish(); return; }
+    // how far the stage must grow round the window's middle for the round window to cover the whole screen
+    const wx = OX + a.win[0]*a.w*S0, wy = OY + a.win[1]*a.h*S0, far = Math.max(Math.hypot(wx, wy), Math.hypot(W - wx, wy), Math.hypot(wx, H - wy), Math.hypot(W - wx, H - wy));
+    flightTo = Math.max(2, far/(a.winR*S0*1.03))*1.2; flightC = [wx/W, 1 - wy/H];
+    sway0 = { t: stage.style.translate, r: parseFloat(stage.style.rotate) || 0 };
   };
   // From the game back to the title: the city's picture turns into a security feed (grey, scanlines, a REC mark, a
   // timestamp), jitters, then the tube switches off (it collapses to a bright line, then a dot), and the room fades up.
@@ -379,10 +385,25 @@ const TITLE = (() => {
       const fade = document.createElement('div'); fade.id = 'cctvFade'; fade.className = 'hold'; document.body.appendChild(fade);
       Promise.resolve(T.show()).then(() => T.ready).then(() => { fade.className = ''; setTimeout(() => fade.remove(), 900); }); T.cutting = false; }, 1150);
   };
+  // Leaving for the city: the view drifts towards the porthole and through it. The room grows round the window's middle
+  // (the city behind stays put: it's far off, so it hardly changes as you near the glass), the glass bends the city as you
+  // pass it (a lens ripple in the game's last pass, sky.js), and the city is then the game's own view at the same zoom.
+  let leaveAt = 0, flightTo = 4, flightC = [.5, .5], sway0 = null, crossed = false; const FLIGHT = 2600;
+  function flight(){
+    const t = Math.min(1, (performance.now() - leaveAt)/FLIGHT), e = t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2.2)/2;   // (slow away, then on through)
+    const s = Math.pow(flightTo, e), ec = Math.log(flightTo/1.2)/Math.log(flightTo);   // (ec: where the window's rim passes the screen's edges: the glass)
+    stage.style.scale = (1.03*s).toFixed(4); stage.style.rotate = (sway0.r*(1 - e)).toFixed(3) + 'deg';
+    stage.style.opacity = String(Math.max(0, Math.min(1, 1 - (e - ec)/(1 - ec)*1.4)));
+    const vw_ = document.getElementById('view'); if (vw_) vw_.style.transform = 'scaleX(' + (1 + (CITY_WIDEN - 1)*(1 - e)).toFixed(4) + ')';
+    try { const w = Math.exp(-Math.pow((e - ec)/.1, 2)); WARP.k.value = w > .01 ? w : 0; WARP.c.value.set(flightC[0], flightC[1]); } catch (_) {}
+    // past the glass: carry on a little into the city and let it settle in the middle of the screen (the game's own easing)
+    if (!crossed && e > ec){ crossed = true; try { if (CITY) camGoal.set(CITY.x, TARGET_Y, CITY.z); zoomT = 52; } catch (_) {} }
+    if (t >= 1) finish();
+  }
   function unwiden(){ const v = document.getElementById('view'); if (v){ v.style.transition = 'transform 1.2s ease-in-out'; v.style.transform = ''; setTimeout(() => { v.style.transition = ''; }, 1300); } }
   // the pictures for an hour, fetched ahead (they're cached, so the room shows at once when it's needed)
   function preload(t){ const v = innerWidth/innerHeight < .85 ? 'tall' : 'wide'; for (const k of ['room', 'glass', 'signoff']){ const im = new Image(); im.src = 'assets/title/' + k + '-' + v + '-' + t + '.png?v=' + VER; (preload.keep = preload.keep || []).push(im); } }
-  function finish(){ unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} try { applyRenderRes(zoom); } catch (e) {} }
+  function finish(){ T.leaving = false; try { WARP.k.value = 0; } catch (e) {} stage.style.opacity = ''; stage.style.scale = ''; unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} try { applyRenderRes(zoom); } catch (e) {} }
 
   /* ---------- the menu ---------- */
   function setDeck(on){

@@ -1258,7 +1258,7 @@ function glowPass(mat, target, name){ PH.begin(name, true); glowQuad.material = 
 // is drawn straight onto the screen instead: one whole-screen pass fewer, the same pixels (the copy at scale 1 reads each texel exactly). GLOW_DIRECT tells main.js.
 let GLOW_DIRECT = false;
 function renderGlow(){
-  GLOW_DIRECT = W === DW && H === DH && !PH.tests.noDirect && !window.__NO_DIRECT;
+  GLOW_DIRECT = W === DW && H === DH && !PH.tests.noDirect && !window.__NO_DIRECT && !(WARP.k.value > 0);
   const fin = GLOW_DIRECT ? null : rtFinal;
   glowMix.uniforms.res.value.set(W, H); glowMix.uniforms.tD.value = comp.uniforms.tDepth.value;   // (the depth the composite read: the lens flare hides behind the city)
   if (typeof LK !== 'undefined' && !LK.old && !window.__OLD_GRADES) lkGlow();   // (the looks' lens and film values: looks.js)
@@ -1465,17 +1465,30 @@ function* makeSteamMapGen(vents, lifts = []){
 // square, and where the scale isn't a whole number only the one-screen-pixel seam between two render pixels is
 // blended. So pixels are all the same size (no ripple when things move) at any zoom.
 let rtOut = null;
+// WARP: the title's flight through the porthole (title.js): k how strong (0 off), c the window's middle on the screen
+const WARP = { k: { value: 0 }, c: { value: new THREE.Vector2(.5, .5) } };
 const upMat = new THREE.ShaderMaterial({
-  uniforms: { t:{ value:null }, srcRes:{ value:new THREE.Vector2(1,1) }, dstRes:{ value:new THREE.Vector2(1,1) } },
+  uniforms: { t:{ value:null }, srcRes:{ value:new THREE.Vector2(1,1) }, dstRes:{ value:new THREE.Vector2(1,1) }, warp: WARP.k, warpC: WARP.c },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-  fragmentShader: `uniform sampler2D t; uniform vec2 srcRes; uniform vec2 dstRes; varying vec2 vUv;
-    void main(){
-      vec2 texel = vUv*srcRes, base = floor(texel), s = texel - base;
+  fragmentShader: `uniform sampler2D t; uniform vec2 srcRes; uniform vec2 dstRes; uniform float warp; uniform vec2 warpC; varying vec2 vUv;
+    vec4 sharp(vec2 uv){
+      vec2 texel = uv*srcRes, base = floor(texel), s = texel - base;
       float scale = max(1.0, dstRes.y/srcRes.y);
       float range = 0.5 - 0.5/scale;
       vec2 cd = s - 0.5;
       vec2 f = (cd - clamp(cd, -range, range))*scale + 0.5;
-      gl_FragColor = texture2D(t, (base + f)/srcRes);
+      return texture2D(t, (base + f)/srcRes);
+    }
+    void main(){
+      if (warp <= 0.0){ gl_FragColor = sharp(vUv); return; }
+      // through the glass: a lens bulge round the window's middle, a ripple running out, and the colours parting a little
+      float asp = dstRes.x/dstRes.y; vec2 d = vUv - warpC; d.x *= asp; float r = length(d);
+      vec2 n = d/max(r, 1e-4); float bulge = warp*.22*exp(-r*r*2.5), ring = sin(r*30.0 - warp*9.0)*.008*warp*smoothstep(.0, .25, r);
+      vec2 o = n*(bulge*r + ring); o.x /= asp;
+      vec2 uv = vUv - o, ca = o*.35 + (vUv - warpC)*.006*warp;
+      vec3 c = vec3(sharp(uv + ca).r, sharp(uv).g, sharp(uv - ca).b);
+      c += vec3(.75, .85, 1.0)*warp*.1*exp(-r*r*4.0);   // (a glint off the pane)
+      gl_FragColor = vec4(c, 1.0);
     }`,
   depthTest:false, depthWrite:false,
 });
@@ -1527,7 +1540,7 @@ function applyRenderRes(z){
   let f = Math.max(1, z/ZOOM_REF);
   if (ZOOM_RES > 0) f = Math.min(f, ZOOM_RES);
   if (S.autoPerf !== false) f = Math.min(f, PERF.grow);
-  const behindTitle = typeof TITLE !== 'undefined' && TITLE.on;   // (under the title screen only the porthole shows the city: fewer pixels)
+  const behindTitle = typeof TITLE !== 'undefined' && TITLE.on && !TITLE.leaving;   // (under the title screen only the porthole shows the city: fewer pixels)
   if (behindTitle) f = .75;
   PERF.f = f;
   const step = Math.round(Math.log(f)/Math.log(1.04));   // 4% steps, so targets aren't remade every frame

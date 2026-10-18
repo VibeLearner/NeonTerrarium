@@ -168,7 +168,7 @@ function pointerMove(e){
   const dx = e.clientX - p.x, dy = e.clientY - p.y, tilt = () => { if (tiltMode) pitchT = clamp(pitchT + dy*.006, PITCH_MIN, PITCH_MAX); };
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!act) return;
-  if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), 5, 30);
+  if (act.kind === 'pinch'){ if (ptrs.size === 2){ zoomT = clamp(zoom0*pinch0/pdist(), 5, 60);
     if (act.touch){ const a = pang(), m = pmid(); let da = a - act.ang; if (da > PI) da -= 2*PI; if (da < -PI) da += 2*PI; yawT += da; act.ang = a; touchPan(m.x - act.mid.x, m.y - act.mid.y); act.mid = m; }   // (twist turns, the pair together pans)
     else { const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } } return; }
   if (act.kind === 'rotate'){ yawT -= dx*.008; tilt(); return; }
@@ -208,7 +208,7 @@ function endPtr0(e){
 }
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
 canvas.addEventListener('pointerleave', () => { MON.hoverAt(null); if (!ptrs.size){ hover.visible = hoverFill.visible = hoverStrip.visible = false; showMegaGhost(null); hwGhost.g.visible = false; hwHighlight(null); } });
-canvas.addEventListener('wheel', e => { e.preventDefault(); zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 30); }, { passive:false });
+canvas.addEventListener('wheel', e => { e.preventDefault(); zoomT = clamp(zoomT*(1+Math.sign(e.deltaY)*.1), 5, 60); }, { passive:false });
 const PAN_KEYS = ['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'];
 let LAST_INPUT = performance.now();   // (rest when idle: main.js)
 for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown', 'touchstart']) addEventListener(ev, () => { LAST_INPUT = performance.now(); }, { passive: true, capture: true });
@@ -240,8 +240,8 @@ addEventListener('keydown', e => {
   // Q / E: the camera swings round the spot it looks at, to its own left (Q) or right (E), the way A / D and the arrows move it
   if (k === 'q') yawT -= PI/4;
   else if (k === 'e') yawT += PI/4;
-  else if (e.key === '+' || e.key === '=') zoomT = clamp(zoomT*.9,5,30);
-  else if (e.key === '-') zoomT = clamp(zoomT*1.1,5,30);
+  else if (e.key === '+' || e.key === '=') zoomT = clamp(zoomT*.9,5,60);
+  else if (e.key === '-') zoomT = clamp(zoomT*1.1,5,60);
   else if ('1234'.includes(e.key) && e.key.length === 1) selectZone(['low','mid','high','ind'][+e.key - 1]);
   else if (e.key === 'Escape' && !$('hwHelp').hidden) setHwHelp(false);
   else if (e.key === 'Escape' && !$('mtHelp').hidden) setMtHelp(false);

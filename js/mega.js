@@ -10,7 +10,7 @@
 // once the requirement is met again.
 const MEGA_TYPES = {
   radio: { name: 'Psycho-Acoustic Grid', need: { any: 20 }, odds: 1, w: 2, h: 2, maxLevels: 1,   // arrives with the 20th building, of any zone
-           colour: '#ff5a4a', sound: 'radioOn', build: buildRadioStation },
+           colour: '#5ae8ff', sound: 'radioOn', build: buildRadioStation, fx: gridFx },
   mall:  { name: 'Sky mall', need: { high: 50, ind: 30 }, odds: 50, w: 3, h: 2, maxLevels: 3,
            colour: '#ffcf7a', build: buildSkyMall },
   square: { name: 'Town square', need: { lowPlots: 50 }, odds: 1, w: 5, h: 5, maxLevels: 1,   // arrives with the 50th residential building
@@ -555,115 +555,186 @@ function buildRelay(R0, bw, bd){
   coaxBundle(R0, [[ix, y + .05, iz + .5], [ix, y + .05, iz + .9]], 2, .025);
 }
 
-/* ---------- the radio station ---------- */
-// A three-storey broadcast house with a dish farm on its roof, a lower wing carrying the two big dishes, and a
-// lattice radio mast at the far corner, linked by a catwalk. Red lights blink all over it, chasing up the mast.
+/* ---------- the Psycho-Acoustic Grid (the old radio station's slot: kind 'radio') ---------- */
+// After the owner's reference: a low, rounded civic block whose sides are wrapped in curved shells that overlap like
+// layers, with one slender tower rising from the middle of the roof. Two-tone, so it sits in the night city: pale,
+// weathered shells (rain-streaked) over a dark inner block banded with glass, cyan neon tracing the shells' edges.
+// On the roof: glass tanks with glowing coils, camera pods on posts, and the tower's emitter rings. Live (gridFx):
+// when the broadcast plays, rings pulse out from the tower's emitters and from the street lamps around it on the beat.
+M.gdShell = toon(0xd2d5cf); M.gdShell2 = toon(0xb3b8b3); M.gdStreak = toon(0x9ea39f);
+M.gdCore = toon(0x2a2f37); M.gdCore2 = toon(0x3b424c);
+M.gdGlass = toon(0x182531, { em:0x1e5468, kind:'window' });
+M.gdNeon = toon(0x103a40, { em:0x6af0ff, kind:'neon' }); M.gdCoil = toon(0x0d3540, { em:0x9af6ff, kind:'neon' });
+M.gdLens = toon(0x0b0e13);
+// a rounded rectangle (w by d, corner radius r) stood up h tall; with wall > 0 only a band of that thickness round its edge
+const gdGeo = new Map();
+function rrPath(p, w, h, r){
+  r = Math.max(.001, Math.min(r, w/2 - .001, h/2 - .001));
+  p.moveTo(-w/2 + r, -h/2); p.lineTo(w/2 - r, -h/2); p.absarc(w/2 - r, -h/2 + r, r, -PI/2, 0, false);
+  p.lineTo(w/2, h/2 - r); p.absarc(w/2 - r, h/2 - r, r, 0, PI/2, false); p.lineTo(-w/2 + r, h/2);
+  p.absarc(-w/2 + r, h/2 - r, r, PI/2, PI, false); p.lineTo(-w/2, -h/2 + r); p.absarc(-w/2 + r, -h/2 + r, r, PI, PI*1.5, false); return p;
+}
+function rrSlab(mat, P, x, y, z, w, d, h, r, wall = 0, ry = 0){
+  const key = 's' + [w, d, r, wall].map(v => v.toFixed(3)).join(',');
+  let g = gdGeo.get(key);
+  if (!g){
+    const sh = rrPath(new THREE.Shape(), w, d, r);
+    if (wall > 0) sh.holes.push(rrPath(new THREE.Path(), w - 2*wall, d - 2*wall, Math.max(.01, r - wall)));
+    g = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false, curveSegments: 7 }); g.rotateX(-PI/2); g = g.toNonIndexed(); gdGeo.set(key, g);
+  }
+  put(g, mat, under(P, T(x, y, z, ry, 1, h, 1)));
+}
+// a rounded panel standing upright (a window, a door), facing +z, t thick
+function rrPanel(mat, P, x, y, z, w, h, r, t = .04, ry = 0){
+  const key = 'p' + [w, h, r].map(v => v.toFixed(3)).join(',');
+  let g = gdGeo.get(key);
+  if (!g){ g = new THREE.ExtrudeGeometry(rrPath(new THREE.Shape(), w, h, r), { depth: 1, bevelEnabled: false, curveSegments: 6 }); g.translate(0, 0, -.5); g = g.toNonIndexed(); gdGeo.set(key, g); }
+  put(g, mat, under(P, T(x, y, z, ry, 1, 1, t)));
+}
+U.gdRing = (() => { const g = new THREE.TorusGeometry(1, .035, 5, 40); g.rotateX(PI/2); return g.toNonIndexed(); })();
+U.gdCoil = (() => { const pts = []; for (let k = 0; k <= 7*20; k++){ const a = k/20*TAU; pts.push(new THREE.Vector3(Math.cos(a)*.5, k/(7*20) - .5, Math.sin(a)*.5)); }
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 7*20, .045, 5, false).toNonIndexed(); })();
+function gdTaper(mat, P, x, y, z, rb, rt, h){
+  const key = 't' + (rt/rb).toFixed(3); let g = gdGeo.get(key);
+  if (!g){ g = new THREE.CylinderGeometry(rt/rb, 1, 1, 18).toNonIndexed(); gdGeo.set(key, g); }
+  put(g, mat, under(P, T(x, y + h/2, z, 0, rb, h, rb)));
+}
+function coilTank(P, x, y, z, s = 1){
+  rrSlab(M.gdShell2, P, x, y, z, .74*s, .74*s, .12, .37*s);                                  // the base
+  put(U.gdCoil, M.gdCoil, under(P, T(x, y + .58*s, z, 0, .42*s, .78*s, .42*s)));               // the coil
+  cyl(M.gdCore2, P, x, y + .58*s, z, .05*s, .86*s);                                           // its core rod
+  put(U.cyl16, M.mallGlass, under(P, T(x, y + .58*s, z, 0, .64*s, .92*s, .64*s)));             // the glass
+  rrSlab(M.gdShell, P, x, y + 1.04*s, z, .7*s, .7*s, .08, .35*s);                              // the cap
+  put(U.gdRing, M.gdNeon, under(P, T(x, y + 1.03*s, z, 0, .35*s, 1, .35*s)));
+  glow(P, x, y + .6*s, z, 'cyan', 1.5*s);
+}
+function cameraPod(P, x, y, z, yaw, post = .35){
+  const F = under(P, T(x, y, z, yaw));
+  cyl(M.gdCore2, F, 0, post/2, 0, .025, post);
+  box(M.gdShell, F, 0, post + .07, .04, .14, .12, .24); box(M.gdShell2, F, 0, post + .14, .03, .16, .03, .28);   // the body and its hood
+  cyl(M.gdLens, F, 0, post + .07, .17, .045, .04, PI/2); box(M.blink, F, .05, post + .1, .05, .025, .025, .025);
+}
 function buildRadioStation(m){
   R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
   const P = T(m.x, 0, m.z, megaAngle(m, pick([0, PI/2, PI, -PI/2]))), S2 = 2*LOT;
-  // ground: one paved compound across all four plots, with a darker service apron round the mast
+  // ground: one paved compound across the four plots
   box(G.asph, P, 0, .012, 0, S2, .025, S2);
   const n = 14, st = S2/n;
-  for (let a=0;a<n;a++) for (let b=0;b<n;b++) if (!chance(.035)) box(pick(TILES.ind), P, (a-(n-1)/2)*st, .03, (b-(n-1)/2)*st, st - .05, .045, st - .05);
-  box(M.hazard, P, 2.2, .058, 2.2, 2.9, .012, 2.9); box(M.concDD, P, 2.2, .062, 2.2, 2.7, .014, 2.7);
+  for (let a=0;a<n;a++) for (let b=0;b<n;b++) if (!chance(.035)) box(pick(TILES.mid), P, (a-(n-1)/2)*st, .03, (b-(n-1)/2)*st, st - .05, .045, st - .05);
 
-  // ---- main building
-  const bx = -1.05, bz = -.55, bw = 4.6, bd = 4.2, floors = 3 + hash('floors', m.seed) % 3, h = floors*FH + .25, y0 = CURB, roof = y0 + h;   // three to five storeys
-  box(M.concM, P, bx, y0 + h/2, bz, bw, h, bd);
-  for (let f=0; f<=floors; f++) box(M.concD, P, bx, y0 + f*FH + .02, bz, bw + .1, .09, bd + .1);          // floor ledges
-  for (let f=0; f<floors; f++){
-    const wy = y0 + f*FH + .52;
-    for (const [fx, fz, len, ry] of [[0, bd/2, bw, 0], [0, -bd/2, bw, PI], [bw/2, 0, bd, PI/2], [-bw/2, 0, bd, -PI/2]]){
-      const F = under(P, T(bx + fx, 0, bz + fz, ry));
-      box(f % 2 ? M.interiorCool : M.winLit, F, 0, wy, .02, len - .5, .34, .04);                        // a band of lit studio windows
-      for (let t = -len/2 + .45; t < len/2 - .3; t += .42) box(M.frame, F, t, wy, .05, .04, .36, .03);    // mullions
-    }
+  // ---- the dark inner block, banded with glass a floor at a time
+  const cx = -.15, cz = -.25, cw = 5.3, cd = 4.5, cr = 1.0, floors = 3 + hash('floors', m.seed) % 2, H = floors*FH + .3, y0 = CURB, roof = y0 + H;
+  rrSlab(M.gdCore, P, cx, y0, cz, cw, cd, H, cr);
+  for (let f = 0; f < floors; f++){
+    rrSlab(M.gdGlass, P, cx, y0 + f*FH + .34, cz, cw + .06, cd + .06, .4, cr + .03, .04);
+    rrSlab(M.gdCore2, P, cx, y0 + f*FH + .8, cz, cw + .1, cd + .1, .07, cr + .05, .06);       // a ledge under the next floor
   }
-  box(M.concDD, P, bx, roof + .01, bz, bw - .1, .04, bd - .1);                                          // roof deck
-  for (const [fx, fz, w, d] of [[0, bd/2, bw + .14, .05], [0, -bd/2, bw + .14, .05], [bw/2, 0, .05, bd + .14], [-bw/2, 0, .05, bd + .14]])
-    box(M.trimCyan, P, bx + fx, roof - .06, bz + fz, w, .05, d);                                       // cyan trim round the roof edge
-  for (const [fx, fz, w, d] of [[0, bd/2, bw, .12], [0, -bd/2, bw, .12], [bw/2, 0, .12, bd], [-bw/2, 0, .12, bd]])
-    box(M.concD, P, bx + fx, roof + .14, bz + fz, w, .28, d);                                            // parapet
-  // entrance: glass doors, an awning, and the ON AIR sign
-  const E = under(P, T(bx, 0, bz + bd/2, 0));
-  box(M.glassDark, E, -.6, y0 + .38, .03, .9, .7, .05); box(M.frame, E, -.6, y0 + .38, .06, .04, .7, .02);
-  box(M.awn1, E, -.6, y0 + .82, .3, 1.2, .05, .6);
-  plant('sign_onair', E, .55, y0 + .62, .08, 1.0, 'c', true); glow(E, .55, y0 + .62, .35, 'red', 1.8);
-  plant('sign_onair', under(P, T(bx - bw/2, 0, bz, -PI/2)), .5, roof - .45, .06, 1.0, 'c', true);
-  // a vertical neon strip down one corner
-  box(M.neonPink, P, bx + bw/2 + .05, y0 + h/2, bz + bd/2 + .05, .05, h - .2, .05);
-  for (const [cx, cz] of [[-1,-1],[1,-1],[-1,1],[1,1]]) beaconLight(P, bx + cx*(bw/2 - .06), roof + .33, bz + cz*(bd/2 - .06));
-  for (let t = -bw/2 + 1.15; t < bw/2 - .8; t += 1.15){ beaconLight(P, bx + t, roof + .32, bz + bd/2, .06, .6); beaconLight(P, bx + t, roof + .32, bz - bd/2, .06, .6); }
-  buildRelay(under(P, T(bx, roof, bz)), bw, bd);
+  rrSlab(M.gdCore2, P, cx, roof, cz, cw - .1, cd - .1, .04, cr - .05);                      // the roof deck
 
-  // ---- the wing: one storey, two big dishes on top
-  const wx = 2.15, wz = -1.55, ww = 2.9, wd = 3.6, wh = FH + .35, wroof = y0 + wh;
-  box(M.concL, P, wx, y0 + wh/2, wz, ww, wh, wd);
-  box(M.shutter, P, wx + ww/2 + .01, y0 + .42, wz, .03, .8, 1.4);
-  box(M.hazard, P, wx + ww/2 + .02, y0 + .86, wz, .03, .06, 1.5);
-  box(M.concDD, P, wx, wroof + .01, wz, ww - .08, .04, wd - .08);                                      // roof deck
-  for (const [fx, fz, w, d] of [[0, wd/2, ww + .08, .05], [0, -wd/2, ww + .08, .05], [ww/2, 0, .05, wd + .08], [-ww/2, 0, .05, wd + .08]])
-    box(M.trimCyan, P, wx + fx, wroof - .05, wz + fz, w, .05, d);                                       // cyan trim round the wing's roof
-  // the wing's roof: the relay's solar trickle-charge field, in two tilted rows, and the battery cabinets
-  { const W = under(P, T(wx, wroof, wz)); for (const z of [-1.05, .15]) solarRow(W, 0, z, ww - .5, 1.0);
-    for (let k=0; k<3; k++){ box(M.white2, W, -ww/2 + .45 + k*.42, .3, wd/2 - .45, .36, .6, .3); box(M.neonAmber, W, -ww/2 + .45 + k*.42, .5, wd/2 - .29, .05, .05, MIN_T); }
-    coaxBundle(W, [[-ww/2 + .9, .03, wd/2 - .45], [-ww/2 + .15, .03, wd/2 - .45], [-ww/2 + .15, .03, -wd/2 + .2], [-ww/2 - .02, .03, -wd/2 + .2]], 2, .025); }
-  for (const [cx, cz] of [[-1,-1],[1,-1],[1,1]]) beaconLight(P, wx + cx*(ww/2 - .05), wroof + .06, wz + cz*(wd/2 - .05));
+  // ---- the shells: pale, curved, overlapping. A low one wraps the left side, a raised one the right, and a thin belt runs round all of it.
+  const A = { x: cx - 1.3, w: 3.2, d: cd + .7, r: .95, y: y0, h: H*.68 }, B = { x: cx + 1.25, w: 3.3, d: cd + .5, r: 1.05, y: y0 + H*.34, h: H*.66 + .32 };
+  for (const sh of [A, B]){
+    rrSlab(M.gdShell, P, sh.x, sh.y, cz, sh.w, sh.d, sh.h, sh.r);
+    rrSlab(M.gdNeon, P, sh.x, sh.y + sh.h - .02, cz, sh.w + .03, sh.d + .03, .045, sh.r + .015, .035);   // neon along the top edge
+    rrSlab(M.gdShell, P, sh.x, sh.y + sh.h, cz, sh.w - .12, sh.d - .12, .04, sh.r - .06);                 // (its top)
+  }
+  rrSlab(M.gdShell2, P, B.x, B.y - .06, cz, B.w + .02, B.d + .02, .08, B.r + .01);                     // the raised shell's underside
+  rrSlab(M.gdNeon, P, B.x, B.y - .08, cz, B.w + .04, B.d + .04, .035, B.r + .02, .03);
+  rrSlab(M.gdShell2, P, cx, y0 + FH - .05, cz, cw + .7, cd + .55, .2, cr + .3, .28);                  // the belt
+  // rounded windows set into the shells (front, back and the outer long sides), and rain streaks running down from them
+  for (const sz of [1, -1]){
+    const F = under(P, T(A.x, 0, cz + sz*(A.d/2 + .005), sz > 0 ? 0 : PI)), G2 = under(P, T(B.x, 0, cz + sz*(B.d/2 + .005), sz > 0 ? 0 : PI));
+    rrPanel(M.gdShell2, F, 0, y0 + H*.42, -.01, 1.32, .64, .3, .03); rrPanel(M.gdGlass, F, 0, y0 + H*.42, 0, 1.18, .5, .23, .03);
+    rrPanel(M.gdShell2, G2, 0, B.y + B.h*.6, -.01, 1.22, .62, .3, .03); rrPanel(M.gdGlass, G2, 0, B.y + B.h*.6, 0, 1.08, .48, .23, .03);
+    for (let k = 0; k < 3; k++) box(M.gdStreak, F, rnd(-.6, .6), y0 + H*.42 - .32 - .15, .012, .025, rnd(.2, .45), .01);
+    for (let k = 0; k < 2; k++) box(M.gdStreak, G2, rnd(-.5, .5), B.y + B.h*.6 - .3 - .12, .012, .025, rnd(.15, .35), .01);
+  }
+  { const SA = under(P, T(A.x - A.w/2 - .005, 0, cz, -PI/2)), SB = under(P, T(B.x + B.w/2 + .005, 0, cz, PI/2));
+    for (const zz of [-.95, .95]){ rrPanel(M.gdGlass, SA, zz, y0 + H*.42, 0, 1.35, .5, .23, .03); rrPanel(M.gdGlass, SB, zz, B.y + B.h*.6, 0, 1.3, .48, .23, .03); }
+    for (let k = 0; k < 5; k++){ box(M.gdStreak, SA, rnd(-1.8, 1.8), y0 + H*.2, .012, .025, rnd(.25, .5), .01); box(M.gdStreak, SB, rnd(-1.8, 1.8), B.y + B.h*.3, .012, .025, rnd(.2, .4), .01); } }
+  // a waveform in neon across the raised shell's front, under its window
+  { const F = under(P, T(B.x, 0, cz + B.d/2 + .02, 0)), wy = B.y + B.h*.25; let px = -.6, py = 0;
+    for (let k = 1; k <= 10; k++){ const x2 = -.6 + k*.12, y2 = (k % 2 ? 1 : -1)*(.04 + .1*Math.sin(k*1.3)**2)*(k > 1 && k < 9 ? 1 : .4);
+      strut(M.gdNeon, F, px, wy + py, 0, x2, wy + y2, 0, .022); px = x2; py = y2; }
+    glow(F, 0, wy, .1, 'cyan', 1.2); }
+  { const E = under(P, T(cx + 1.25, 0, cz + cd/2, 0));
+    rrPanel(M.gdGlass, E, 0, y0 + .42, .03, 1.1, .8, .12, .04); box(M.frame, E, 0, y0 + .42, .06, .03, .78, .02);
+    rrSlab(M.gdShell, E, 0, y0 + .9, .35, 1.7, .75, .06, .3); rrSlab(M.gdNeon, E, 0, y0 + .89, .35, 1.72, .77, .03, .31, .03);
+    glow(E, 0, y0 + .7, .3, 'cyan', 1.1); }
 
-  // ---- the mast: a square lattice tower, tapering, with platforms, panel antennas and a whip on top
-  const tx = 2.2, tz = 2.2, Ht = rnd(17, 20.5), b0 = .85, b1 = .2, seg = 1.25;
-  const half = y => b0 + (b1 - b0)*(y/Ht);
-  const legs = [[1,1],[1,-1],[-1,-1],[-1,1]];
-  for (const [sx, sz] of legs) strut(M.red2, P, tx + sx*b0, y0, tz + sz*b0, tx + sx*b1, y0 + Ht, tz + sz*b1, .1);
-  box(M.concD, P, tx, y0 + .12, tz, 2*b0 + .5, .24, 2*b0 + .5);                                          // footing
-  let lvl = 0;
-  for (let y = 0; y < Ht - .01; y += seg, lvl++){
-    const y2 = Math.min(Ht, y + seg), w1 = half(y), w2 = half(y2), mat = lvl % 2 ? M.white2 : M.red2;   // painted in red and white bands
-    for (let k=0; k<4; k++){
-      const [ax, az] = legs[k], [cx2, cz2] = legs[(k+1)%4];
-      strut(mat, P, tx + ax*w2, y0 + y2, tz + az*w2, tx + cx2*w2, y0 + y2, tz + cz2*w2, .05);                // ring
-      strut(M.frame, P, tx + ax*w1, y0 + y, tz + az*w1, tx + cx2*w2, y0 + y2, tz + cz2*w2, .03);           // X bracing
-      strut(M.frame, P, tx + cx2*w1, y0 + y, tz + cz2*w1, tx + ax*w2, y0 + y2, tz + az*w2, .03);
-    }
-    if (lvl % 2 === 1) for (const [sx, sz] of legs) if (chance(.6)) beaconLight(P, tx + sx*(w2 + .04), y0 + y2, tz + sz*(w2 + .04), .07, .7);
-  }
-  for (const f of [.38, .7]){
-    const py = y0 + Ht*f, pw = half(Ht*f) + .35;
-    box(M.metalDark, P, tx, py, tz, 2*pw, .06, 2*pw);
-    for (const [sx, sz] of legs) cyl(M.frame, P, tx + sx*pw, py + .18, tz + sz*pw, .02, .36);
-    for (let k=0; k<4; k++){                                                                              // panel antennas round the deck
-      const a = k*PI/2 + rnd(-.2, .2), F = under(P, T(tx + Math.sin(a)*(pw - .08), py, tz + Math.cos(a)*(pw - .08), a));
-      box(M.white2, F, 0, .45, 0, .22, .8, .08);
-    }
-    for (let k=0; k<3; k++){ const a = k*TAU/3 + rnd(0, 1), F = under(P, T(tx + Math.sin(a)*(pw - .2), py, tz + Math.cos(a)*(pw - .2), a)); dish(F, 0, .03, .15, rnd(.22, .32), rnd(-.6, .6), rnd(.6, 1.3), chance(.5)); }
-    if (chance(.8)){ const a = rnd(0, TAU), F = under(P, T(tx + Math.sin(a)*pw, py, tz + Math.cos(a)*pw, a));   // a microwave drum
-      put(U.cyl16, M.white2, under(F, T(0, .45, .12, 0, .6, .22, .6, PI/2))); box(M.frame, F, 0, .45, -.02, .08, .5, .05); }
-    beaconLight(P, tx + pw, py + .1, tz + pw, .08, .9); beaconLight(P, tx - pw, py + .1, tz - pw, .08, .9);
-  }
-  const top = y0 + Ht;
-  cyl(M.white2, P, tx, top + 1.3, tz, .05, 2.6); cyl(M.red2, P, tx, top + 2.0, tz, .07, .2);           // the whip
-  for (const a of [0, PI/2, PI, -PI/2]) strut(M.frame, P, tx, top + .9, tz, tx + Math.sin(a)*.45, top + .5, tz + Math.cos(a)*.45, .02);
-  beaconLight(P, tx, top + 2.7, tz, .12, 1.6);                                                               // the beacon
-  beaconLight(P, tx + b1, top + .06, tz + b1, .08, .9); beaconLight(P, tx - b1, top + .06, tz - b1, .08, .9);
-  // guy wires out to anchor blocks
-  for (const [gx, gz] of [[3.5, .2], [.2, 3.55], [3.55, 3.55]]){
-    box(M.concD, P, gx, y0 + .08, gz, .3, .16, .3);
-    strut(M.frame, P, gx, y0 + .16, gz, tx, y0 + Ht*.62, tz, .015);
-  }
-  // a catwalk from the main roof across to the mast
-  const cy = roof + .05, ex = tx - half(roof - y0) - .05;
-  strut(M.metalDark, P, bx + bw/2 - .1, cy, bz + bd/2 - .5, ex, cy, tz, .32);
-  strut(M.frame, P, bx + bw/2 - .1, cy + .3, bz + bd/2 - .65, ex, cy + .3, tz - .15, .03);
-  // ground: equipment cabinets by the mast, a fence round the footing, planters, a lamp
-  for (let k=0; k<3; k++) box(pick([M.metal, M.white2, M.metalDark]), P, 3.3 - k*.45, y0 + .25, .9, .35, .5, .3);
-  for (const [sx, sz] of legs){ cyl(M.frame, P, tx + sx*1.3, y0 + .3, tz + sz*1.3, .025, .6); }
-  for (const [ax, az, bxx, bzz] of [[1,1,1,-1],[1,-1,-1,-1],[-1,-1,-1,1],[-1,1,1,1]]) strut(M.frame, P, tx + ax*1.3, y0 + .55, tz + az*1.3, tx + bxx*1.3, y0 + .55, tz + bzz*1.3, .025);
-  for (let k=0; k<5; k++) plant(pick(['bush','bushFlower','bonsai','g_spread1','g_fern3']), P, rnd(-3.4, -.2), .05, rnd(2.0, 3.4), rnd(.7, .95));
-  for (let k=0; k<3; k++) plant(hangKind(), under(P, T(bx, 0, bz - bd/2, PI)), rnd(-1.8, 1.8), roof + .2, .1, rnd(.8, 1.1), 't', true);
+  // ---- the roof: the tower in the middle, coil tanks, camera pods
+  const tx = cx - .2, tz = cz;
+  rrSlab(M.gdShell, P, tx, roof, tz, 1.7, 1.7, .5, .85);                                          // the tower's drum
+  rrSlab(M.gdNeon, P, tx, roof + .48, tz, 1.72, 1.72, .04, .86, .04);
+  const Ht = 13 + (hash('tower', m.seed) % 3), segs = [[.46, .4, .3], [.4, .34, .27], [.34, .27, .22], [.27, .2, .16], [.2, .13, .05]];
+  let ty = roof + .5;
+  segs.forEach(([rb, rt, f], k) => { const h = Ht*f*.7; gdTaper(k % 2 ? M.gdCore2 : M.gdShell, P, tx, ty, tz, rb, rt, h); ty += h;
+    rrSlab(k % 2 ? M.gdShell : M.gdCore2, P, tx, ty - .06, tz, 2*rt + .1, 2*rt + .1, .08, rt + .05); });
+  const rings = [[roof + .5 + Ht*.18, 1.05], [roof + .5 + Ht*.36, .82], [roof + .5 + Ht*.53, .62], [ty - .5, .42]];   // the emitter rings
+  for (const [y, rr] of rings){ put(U.gdRing, M.gdNeon, under(P, T(tx, y, tz, 0, rr, 1, rr)));
+    for (let k = 0; k < 4; k++){ const a = k*PI/2 + PI/4; strut(M.gdCore2, P, tx + Math.cos(a)*.15, y, tz + Math.sin(a)*.15, tx + Math.cos(a)*rr, y, tz + Math.sin(a)*rr, .025); }
+    glow(P, tx + rr, y, tz, 'cyan', .9); glow(P, tx - rr, y, tz, 'cyan', .9); }
+  cyl(M.gdShell, P, tx, ty + 1.0, tz, .035, 2.0); beaconLight(P, tx, ty + 2.05, tz, .1, 1.4);   // the needle and its beacon
+  coilTank(P, cx - 2.0, A.y + A.h + .04, cz - 1.25, .9); coilTank(P, cx - 2.0, A.y + A.h + .04, cz + 1.2, .9);
+  coilTank(P, B.x + .55, B.y + B.h + .04, cz - 1.1); coilTank(P, B.x + .55, B.y + B.h + .04, cz + 1.05, .85);
+  cameraPod(P, B.x + 1.25, B.y + B.h + .04, cz + B.d/2 - .55, .5); cameraPod(P, cx - 2.6, A.y + A.h + .04, cz + A.d/2 - .6, -.4);
+  cameraPod(P, cx + cw/2 - .15, y0 + .9, cz + cd/2 + .1, .3, .2); cameraPod(P, cx - cw/2 + .2, roof + .02, cz - cd/2 + .5, PI + .3);
+  coaxBundle(P, [[tx + .7, roof + .05, tz], [B.x - .3, roof + .05, tz], [B.x - .3, B.y + B.h + .05, tz], [B.x + .3, B.y + B.h + .05, cz - 1.1]], 3);
+  coaxBundle(P, [[tx - .7, roof + .05, tz], [cx - 1.7, roof + .05, tz], [cx - 2.0, A.y + A.h + .05, cz - .6]], 2);
+  for (const [px, pz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) beaconLight(P, cx + px*(cw/2 - .3), roof + .08, cz + pz*(cd/2 - .3), .06, .7);
+
+  // ---- the ground: planters along the front, a bench, a lamp
+  for (let k=0; k<6; k++) plant(pick(['bush','bushFlower','bonsai','g_spread1','g_fern3']), P, rnd(-3.4, 3.4), .05, rnd(2.75, 3.5), rnd(.7, .95));
+  for (let k=0; k<3; k++) plant(hangKind(), under(P, T(A.x, 0, cz - A.d/2, PI)), rnd(-1, 1), A.y + A.h, .05, rnd(.8, 1.1), 't', true);
   cyl(M.metalDark, P, -3.3, .65, 3.3, .03, 1.3); box(M.bulb, P, -3.18, 1.26, 3.3, .12, .05, .1); glow(P, -3.18, 1.2, 3.3, 'warm', 1.4);
 
-  m.roofH = roof + .3;
-  m.top = top + 2.8;
+  m.gd = { m: P.toArray(), tower: [tx, tz], rings: rings.map(([y, r]) => [y, r]) };
+  m.roofH = B.y + B.h + .3;
+  m.top = ty + 2.2;
+}
+// The broadcast made visible: while the Grid plays, a ring pulses out from the tower's emitters on every beat (the
+// emitters take turns, bottom to top, a bar at a time), and from the street lamps round the building on the off
+// beats, fainter the further they stand. The rings fade with the music's own level, so a held broadcast stops them.
+function gridFx(m){
+  const g = m.gd; if (!g) return null;
+  const root = new THREE.Group(); root.matrixAutoUpdate = false; root.matrix.fromArray(g.m); root.matrixWorldNeedsUpdate = true; scene.add(root);
+  const world = new THREE.Group(); scene.add(world);   // (the lamp rings are placed in the city's own coordinates)
+  const geo = new THREE.RingGeometry(.94, 1, 48); geo.rotateX(-PI/2);
+  const pool = [];
+  for (let k = 0; k < 28; k++){ const mt = new THREE.MeshBasicMaterial({ color: 0x7af2ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const o = new THREE.Mesh(geo, mt); o.layers.set(1); o.renderOrder = 2; o.visible = false; o.frustumCulled = false; pool.push({ o, t: -1, life: 1, r0: 1, r1: 2, a: 1, par: null }); }
+  // the street lamps near the Grid: every other crossing has one, on its plot's +x,+z corner (see the plot builder in world.js)
+  const lamps = [];
+  if (typeof cells !== 'undefined') for (const c of cells.values()){
+    if (c.mega || ((c.i + c.j) % 2 + 2) % 2 !== 0 || (!c.sections.length && c.park)) continue;
+    const x = c.x + (LOT/2 - .25), z = c.z + (LOT/2 - .25), d = Math.hypot(x - m.x, z - m.z);
+    if (d < 15) lamps.push({ x, z, d });
+  }
+  lamps.sort((a, b) => a.d - b.d); lamps.length = Math.min(lamps.length, 10);
+  const fire = (par, x, y, z, r0, r1, life, a, col) => {
+    const p = pool.find(q => q.t < 0) || pool.reduce((a2, b2) => (a2.t/a2.life > b2.t/b2.life ? a2 : b2));
+    if (p.par !== par){ if (p.par) p.par.remove(p.o); par.add(p.o); p.par = par; }
+    p.o.position.set(x, y, z); p.t = 0; p.life = life; p.r0 = r0; p.r1 = r1; p.a = a; p.o.material.color.setHex(col); p.o.visible = true;
+  };
+  let lastBeat = -1, emit = 0;
+  return {
+    update(dt, t){
+      const mu = typeof music !== 'undefined' ? music : null, E = mu && mu.engine, lvl = mu ? Math.min(1, mu.level*(mu.booth ? 1 : (E && E.playing ? 1 : 0))) : 0;
+      if (lvl > .05){
+        const bpm = (E && E.bpm) || 82, beat = Math.floor(t*bpm/60);
+        if (beat !== lastBeat){
+          lastBeat = beat;
+          const [y, r] = g.rings[emit % g.rings.length]; if (beat % 4 === 3) emit++;
+          fire(root, g.tower[0], y, g.tower[1], r, r*3.6, 1.7, .85*lvl, beat % 4 === 0 ? 0xff6ad5 : 0x7af2ff);
+          if (beat % 2 === 1 && lamps.length){ const L = lamps[(beat >> 1) % lamps.length]; fire(world, L.x, 1.18, L.z, .15, 1.3, 1.3, (.75 - L.d/30)*lvl, 0x7af2ff); }
+        }
+      }
+      for (const p of pool){ if (p.t < 0) continue; p.t += dt; const u = p.t/p.life;
+        if (u >= 1){ p.t = -1; p.o.visible = false; continue; }
+        const r = p.r0 + (p.r1 - p.r0)*(1 - (1 - u)*(1 - u)); p.o.scale.set(r, 1, r); p.o.material.opacity = p.a*(1 - u)*(1 - u*.3); }
+    },
+    dispose(){ scene.remove(root); scene.remove(world); geo.dispose(); for (const p of pool) p.o.material.dispose(); }
+  };
 }
 
 // for trying things out: open the game with #dev in the address and every megastructure is already in the Buildings

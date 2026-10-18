@@ -201,10 +201,11 @@ const GRIDPANEL = (() => {
   #gridPanel .bsonginfo dt { color: var(--dim); letter-spacing: .12em; text-transform: uppercase; font-size: 10.5px; align-self: center; }
   #gridPanel .bsonginfo dd { margin: 0; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #gridPanel .bsonginfo dd:first-of-type { color: var(--yl); }
+  #gridPanel .bnudge[hidden], #gridPanel .bsonginfo[hidden], #gridPanel .bsongst[hidden] { display: none; }
   #gridPanel .bnudge { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } #gridPanel .bnudge .gb { margin: 0; padding: 5px 4px; font-size: 10.5px; letter-spacing: .06em; white-space: normal; line-height: 1.25; }
   #gridPanel .bnudge #bSongBack { grid-column: 1 / -1; } #gridPanel .bnudge .gb:disabled { opacity: .4; cursor: default; }
   #gridPanel .gbooth .b-setup { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } #gridPanel .gbooth .b-setup::-webkit-scrollbar { display: block; width: 6px; } #gridPanel .gbooth .b-setup::-webkit-scrollbar-thumb { background: var(--line); }
-  #gridPanel .b-setup .gknobs .gk { min-width: 56px; }
+  #gridPanel .b-setup .gknobs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 4px; } #gridPanel .b-setup .gknobs .gk { min-width: 0; }
   #gridPanel .bvoices .gb.dis { opacity: .45; }
   #gridPanel .bvoices { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } #gridPanel .bvoices .gb { margin: 0; text-align: left; padding: 5px 7px; font-size: 11.5px; letter-spacing: .08em; }
   #gridPanel .bvoices .gb small { display: block; color: var(--dim); font-size: 10px; line-height: 1.2; letter-spacing: .04em; text-transform: none; margin-top: 1px; } #gridPanel .bvoices .gb.on small { color: #0b3a40; }
@@ -355,7 +356,7 @@ const GRIDPANEL = (() => {
       <div class="grow" id="bLen"><button class="gb" data-len="4" title="The first four chords">4 bars</button><button class="gb on" data-len="8" title="All eight chords">8 bars</button></div>
       <div class="glbl">Voice</div>
       <div class="bvoices" id="bVoices"></div>
-      <div class="gknobs">${knob('boothChopSlider', 'Song level', 0, 2, 0.05, 1, 'How loud the song sampler and the chops play, from silent to twice as loud.')}${knob('boothBpmSlider', 'Clock', 60, 132, 1, 84, 'How fast the loop runs, in beats a minute.')}${knob('boothApSlider', 'Answer', 0, 1, 0.02, 0.55, 'How much the autopilot plays when it answers you.', 'mg')}</div>
+      <div class="gknobs">${knob('boothChopSlider', 'Song level', 0, 4, 0.05, 1, 'How loud the song sampler and the chops play, from silent to four times as loud.')}${knob('boothPadSlider', 'Chords', 0, 2, 0.05, 1, 'How loud the carrier chords under the loop play, from silent to twice as loud.')}${knob('boothBpmSlider', 'Clock', 60, 132, 1, 84, 'How fast the loop runs, in beats a minute.')}${knob('boothApSlider', 'Answer', 0, 1, 0.02, 0.55, 'How much the autopilot plays when it answers you.', 'mg')}</div>
       <div class="glbl">Tidy timing</div>
       <div class="grow" id="bTidy" title="How much recorded notes are pulled onto the beat grid (sixteenths)"><button class="gb" data-tidy="0">Off</button><button class="gb on" data-tidy="0.5">Gentle</button><button class="gb" data-tidy="1">Full</button></div>
       <div class="glbl">Click</div>
@@ -364,7 +365,7 @@ const GRIDPANEL = (() => {
     <section class="gp b-roll"><h3>Loop</h3><span class="gtag" id="bStatus">PRESS PLAY, THEN PLAY THE PADS</span>
       <div class="btrans">
         <button class="gb" id="bPlay" title="Start or stop the loop (Space)">Play</button>
-        <button class="gb brec" id="bRec" title="Record one pass of the loop, after a bar of count-in (Enter). Each take is a new layer on top.">Record</button>
+        <button class="gb brec" id="bRec" title="Record one full pass of the loop, starting at the next bar (or after a bar of count-in when stopped) (Enter). Each take is a new layer on top.">Record</button>
         <button class="gb" id="bUndo" title="Take off the last layer you recorded">Undo layer</button>
         <button class="gb" id="bClear" title="Clear every layer">Clear</button>
         <button class="gb bap" id="bAuto" title="The autopilot takes your recording as its theme and plays along: answers in your gaps, echoes, harmonies under long notes. It never plays over your notes.">Autopilot</button>

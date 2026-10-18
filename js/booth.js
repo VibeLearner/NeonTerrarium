@@ -35,7 +35,7 @@ const BOOTH = (() => {
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   // ---------- what's set, and the shelf (both kept with the city) ----------
-  const S = { chopLvl: 1, song: null, prog: 0, len: 8, voice: 'glass', bpm: 84, tidy: .5, click: 'count', ap: false, apAmt: .55, layers: [] };
+  const S = { padLvl: 1, chopLvl: 1, song: null, prog: 0, len: 8, voice: 'glass', bpm: 84, tidy: .5, click: 'count', ap: false, apAmt: .55, layers: [] };
   let loops = [], loadedId = null, mode = 'console';
   try { const o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (o){ if (o.set) Object.assign(S, o.set); if (Array.isArray(o.loops)) loops = o.loops; } } catch (e){}
   S.layers = Array.isArray(S.layers) ? S.layers : [];
@@ -136,7 +136,7 @@ const BOOTH = (() => {
     if (padV){ const old = padV; old.g.gain.cancelScheduledValues(t); old.g.gain.setTargetAtTime(0.0001, t, .25); old.o.forEach(o => { try { o.stop(t + 2); } catch (e){} }); }
     padV = null; padCh = ch; if (!ch) return;
     const g = ctx.createGain(), lp = ctx.createBiquadFilter(), o = []; lp.type = 'lowpass'; lp.frequency.value = 1050; lp.Q.value = .5;
-    g.gain.setValueAtTime(0.0001, t); g.gain.setTargetAtTime(1, t, .2); lp.connect(g); g.connect(bus.pad);
+    g.gain.setValueAtTime(0.0001, t); g.gain.setTargetAtTime(S.padLvl ?? 1, t, .2); lp.connect(g); g.connect(bus.pad);
     ch.notes.forEach((n, k) => { const pm = parse(n); if (!pm) return; [-6, 6].forEach(dt => { const os = ctx.createOscillator(), og = ctx.createGain(); os.type = k % 2 ? 'triangle' : 'sawtooth'; os.frequency.value = mf(pm.midi); os.detune.value = dt; og.gain.value = .018; os.connect(og); og.connect(lp); os.start(t); o.push(os); }); });
     const r = parse(ch.notes[0]); if (r){ const s = ctx.createOscillator(), sg = ctx.createGain(); let fr = mf(r.midi); if (fr > 95) fr /= 2; s.frequency.value = fr; sg.gain.value = .14; s.connect(sg); sg.connect(g); s.start(t); o.push(s); }
     padV = { g, o };
@@ -181,7 +181,7 @@ const BOOTH = (() => {
       const cyc = Math.floor(b/Lb), lb = b - cyc*Lb;
       if (S.click === 'all' || (S.click === 'count' && rec && rec.armed && b >= rec.from - 4 && b < rec.from)) click(t, lb % 4 === 0);
       if (lb % 4 === 0){ const ch = chordOf(lb/4); if (ch !== padCh || lastBar === null) padTo(ch, t); lastBar = lb/4; at(t, () => retune(ch, t, lb/4));
-        if (bc && S.song && songSounds && songSounds.chops.length) voiceOn('chops', 60, t, .32, 0, bus.pad, 4, lb/4).off(t + 4*beatSec());   // (the song's own chord under the bar)
+        if (bc && S.song && songSounds && songSounds.chops.length) voiceOn('chops', 60, t, .32*(S.padLvl ?? 1), 0, bus.pad, 4, lb/4).off(t + 4*beatSec());   // (the song's own chord under the bar)
         if (bc && lb === 0) at(t, () => bcPass(cyc)); }
       // the layers and the autopilot's part, for the notes that start in this beat
       for (const layer of S.layers) for (const n of layer) if (n.b >= lb && n.b < lb + 1) playNote(n, cyc*Lb + n.b, false);
@@ -226,7 +226,7 @@ const BOOTH = (() => {
     audio(); if (held.has(i)) return;
     const ch = chordOf(curBar()), m = padMidi(ch, i), h = voiceOn(S.voice, m, ctx.currentTime, vel, -.1, null, i, curBar());
     const e = { h, m, vel, note: null }; held.set(i, e);
-    if (rec && rec.live){ const b = Math.max(0, nowBeat() - rec.from); if (b < L()){ e.note = { b, d: 0, i, v: vel }; e.from = nowBeat(); rec.take.push(e.note); } }
+    if (rec && rec.live){ e.note = { b: recPos(), d: 0, i, v: vel }; e.from = Math.max(nowBeat(), rec.from); rec.take.push(e.note); }
     keysEl[i] && keysEl[i].classList.add('down');
   }
   function noteUp(i){
@@ -241,17 +241,18 @@ const BOOTH = (() => {
     for (const [i, e] of held){
       const m = padMidi(ch, i); if (m === e.m) continue;
       e.h.off(t); e.h = voiceOn(S.voice, m, t, e.vel*.75, -.1, null, i, bar); e.m = m;
-      if (e.note){ e.note.d = Math.max(.1, nowBeat() - e.from); if (rec && rec.live){ const b = Math.max(0, nowBeat() - rec.from); if (b < L() - .1){ e.note = { b, d: 0, i, v: e.vel*.75 }; e.from = nowBeat(); rec.take.push(e.note); } else e.note = null; } else e.note = null; }
+      if (e.note){ e.note.d = Math.max(.1, nowBeat() - e.from); if (rec && rec.live && nowBeat() < rec.from + L() - .1){ e.note = { b: recPos(), d: 0, i, v: e.vel*.75 }; e.from = nowBeat(); rec.take.push(e.note); } else e.note = null; }
     }
   }
 
   // ---------- recording: one pass of the loop; each take becomes a layer ----------
   let rec = null;   // { from (beat the take starts), armed, live, take: [] }
+  const recPos = () => { const nb = Math.max(nowBeat(), rec.from); return ((nb % L()) + L()) % L(); };   // (a press a hair early counts from the bar line)
   function record(){
     audio();
     if (rec){ endRec(true); return; }   // pressed again: cancel
     if (!playing){ start(true); rec = { from: 0, armed: true, live: false, take: [] }; }
-    else { const nb = nowBeat(); rec = { from: Math.max(0, Math.ceil((nb + .5)/L())*L()), armed: true, live: false, take: [] }; }
+    else { const nb = nowBeat(); rec = { from: Math.max(0, Math.ceil((nb + .5)/4)*4), armed: true, live: false, take: [] }; }   // (from the next bar line, for one full pass)
     status();
   }
   function endRec(cancel){
@@ -341,6 +342,8 @@ const BOOTH = (() => {
     $('bSongKeep').addEventListener('click', () => { $('bDlg').hidden = true; pendingFile = null; });
     $('bDlg').addEventListener('keydown', e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); $('bDlg').hidden = true; pendingFile = null; } });
     $('bSongBack').addEventListener('click', () => { if (S.song && S.song.start0 !== undefined) nudge(S.song.start0 - S.song.start); });
+    const pk = $('g-boothPadSlider'); if (pk){ pk.value = String(S.padLvl ?? 1); pk.dataset.def = '1';
+      pk.addEventListener('input', () => { S.padLvl = +pk.value; const o = $('g-boothPadVal'); if (o) o.textContent = Math.round(S.padLvl*100) + '%'; if (padV && ctx) padV.g.gain.setTargetAtTime(Math.max(.0001, S.padLvl), ctx.currentTime, .08); store(); }); pk.dispatchEvent(new Event('input')); }
     const ck = $('g-boothChopSlider'); if (ck){ ck.value = String(S.chopLvl ?? 1); ck.dataset.def = '1'; ck.addEventListener('input', () => { S.chopLvl = +ck.value; const o = $('g-boothChopVal'); if (o) o.textContent = Math.round(S.chopLvl*100) + '%'; store(); }); ck.dispatchEvent(new Event('input')); }
     $('bSongFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadSong(f); });
     $('gBooth').addEventListener('dragover', e => { if ([...(e.dataTransfer.types || [])].includes('Files')) e.preventDefault(); });
@@ -437,7 +440,7 @@ const BOOTH = (() => {
     const s = $('bStatus'), r = $('bRec'); if (!s) return;
     r.classList.toggle('armed', !!(rec && rec.armed)); r.classList.toggle('live', !!(rec && rec.live)); r.textContent = rec ? (rec.live ? 'Recording' : 'Cancel') : 'Record';
     const nl = S.layers.length;
-    s.textContent = rec ? (rec.live ? 'RECORDING ONE PASS · LAYER ' + (nl + 1) : 'RECORDING STARTS AT BAR 1') :
+    s.textContent = rec ? (rec.live ? 'RECORDING ONE PASS · LAYER ' + (nl + 1) : (playing ? 'RECORDING FROM THE NEXT BAR' : 'RECORDING AFTER THE COUNT-IN')) :
       !playing ? (nl ? nl + (nl > 1 ? ' LAYERS' : ' LAYER') + ' · PRESS PLAY' : 'PRESS PLAY, THEN PLAY THE PADS') :
       (nl ? nl + (nl > 1 ? ' LAYERS LOOPING' : ' LAYER LOOPING') + (S.ap ? ' · AUTOPILOT ANSWERING' : '') : 'PLAYING · PRESS RECORD TO KEEP A TAKE');
   }
@@ -463,7 +466,7 @@ const BOOTH = (() => {
     S.layers.forEach((layer, li) => { const a = .55 + .4*(li === S.layers.length - 1 ? 1 : .5); for (const n of layer) box(n, n === sel ? 'rgba(232,213,83,A)' : 'rgba(95,216,222,A)', a); });
     if (S.ap && S.layers.length && playing && nb >= 0){ const part = apCache.get(Math.floor(nb/Lb)); if (part) for (const n of part) box(n, 'rgba(229,55,159,A)', .8); }
     if (rec && rec.live){ g.fillStyle = 'rgba(229,55,159,.1)'; g.fillRect(0, top, W, H - top);
-      for (const n of rec.take){ const d = n.d || Math.max(.1, nb - rec.from - n.b); box({ b: n.b, d, i: n.i }, 'rgba(255,120,150,A)', .95); } }
+      for (const n of rec.take){ const d = n.d || Math.max(.1, ((nb % Lb) - n.b + Lb) % Lb); box({ b: n.b, d, i: n.i }, 'rgba(255,120,150,A)', .95); } }
     if (lb >= 0){ g.fillStyle = '#e8d553'; g.fillRect(X(lb) - 1, 0, 2, H); }
     if (playing && nb < 0){ g.fillStyle = 'rgba(3,12,16,.6)'; g.fillRect(0, 0, W, H); g.fillStyle = '#e8d553'; g.font = '600 46px "Chakra Petch", sans-serif'; g.textAlign = 'center'; g.fillText(String(Math.ceil(-nb)), W/2, H/2); g.textAlign = 'left'; }
     else if (rec && rec.armed && playing){ const left = rec.from - nb; g.fillStyle = '#e5379f'; g.font = '600 20px "Chakra Petch", sans-serif'; g.textAlign = 'right'; g.fillText('REC IN ' + Math.ceil(left), W - 10, H - 18); g.textAlign = 'left'; }

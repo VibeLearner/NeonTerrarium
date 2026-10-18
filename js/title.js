@@ -14,7 +14,7 @@ const TITLE = (() => {
   const menu = root.querySelector('.t-menu'), panel = $t('tCities');
   const gD = cvDust.getContext('2d');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18c';
+  const VER = '2026-10-18d';
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
 
@@ -24,7 +24,7 @@ const TITLE = (() => {
     if (!A) return;
     W = innerWidth; H = innerHeight;
     const v = W/H < .85 ? 'tall' : 'wide';
-    if (v !== view){ view = v; imRoom.src = 'assets/title/room-' + v + '.png?v=' + VER; imGlass.src = 'assets/title/glass-' + v + '.png?v=' + VER; imOff.src = 'assets/title/signoff-' + v + '.png?v=' + VER; }
+    if (v !== view){ view = v; imRoom.src = 'assets/title/room-' + v + '.png?v=' + VER; imGlass.src = 'assets/title/glass-' + v + '.png?v=' + VER; if (A[v].signRect) imOff.src = 'assets/title/signoff-' + v + '.png?v=' + VER; }
     const a = A[v], iw = a.w, ih = a.h; S0 = Math.max(W/iw, H/ih);
     const sw = iw*S0, sh = ih*S0;
     OX = Math.min(0, Math.max(W - sw, W*.5 - a.win[0]*sw)); OY = Math.min(0, Math.max(H - sh, H*.5 - a.win[1]*sh));
@@ -32,8 +32,8 @@ const TITLE = (() => {
     Object.assign(stage.style, { left: OX + 'px', top: OY + 'px', width: sw + 'px', height: sh + 'px' });
     cvDust.width = Math.round(sw/S0); cvDust.height = Math.round(sh/S0);   // (dust at the picture's own pixels: it scales up crisp with it)
     const P = (k, el, dx = 0, dy = 0) => { el.style.left = (a[k][0]*100 + dx) + '%'; el.style.top = (a[k][1]*100 + dy) + '%'; };
-    P('sign', glow);
-    const r = a.signRect; Object.assign(imOff.style, { left: r[0]/iw*100 + '%', top: r[1]/ih*100 + '%', width: r[2]/iw*100 + '%', height: r[3]/ih*100 + '%' });
+    const r = a.signRect; imOff.hidden = glow.hidden = !r;   // (no sign on the wall for now: the bake leaves it out)
+    if (r){ P('sign', glow); Object.assign(imOff.style, { left: r[0]/iw*100 + '%', top: r[1]/ih*100 + '%', width: r[2]/iw*100 + '%', height: r[3]/ih*100 + '%' }); }
     stage.style.setProperty('--px', S0 + 'px');
     stage.style.transformOrigin = (a.win[0]*100) + '% ' + (a.win[1]*100) + '%';
     seedMotes();

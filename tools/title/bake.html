@@ -89,7 +89,7 @@ void main(){
     vec3 c = col.rgb*ao*(1. - smoothstep(.05, .14, e)*edgeK) + scat*col.a;
     // the grade: warm highlights, cool green-teal in the shadows, more colour, a touch more contrast, a soft vignette
     float lm = dot(c, vec3(.3, .55, .15));
-    c *= mix(vec3(.8, .95, .97), vec3(1.07, 1.0, .86), smoothstep(.08, .75, lm));
+    c *= mix(vec3(.94, .93, .9), vec3(1.1, 1.0, .82), smoothstep(.06, .7, lm));
     c = mix(vec3(lm), c, 1.15);
     c = (c - .42)*1.24 + .42;
     vec2 q = vUv - .5; c *= 1. - dot(q, q)*.85;
@@ -103,7 +103,7 @@ const postScene = new THREE.Scene(), postCam = new THREE.OrthographicCamera(-1, 
 const post = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ vertexShader: POST_VS, fragmentShader: POST_FS, extensions: { derivatives: true }, uniforms: {
   tColor: { value: null }, tDepth: { value: null }, shadowMap: { value: null }, shadowMatrix: { value: new THREE.Matrix4() }, projInv: { value: new THREE.Matrix4() }, viewInv: { value: new THREE.Matrix4() },
   camPos: { value: new THREE.Vector3() }, sunDir: { value: new THREE.Vector3() }, sunCol: { value: new THREE.Color(1, .82, .56) }, res: { value: new THREE.Vector2() },
-  mode: { value: 0 }, dbg: { value: 0 }, density: { value: .17 }, edgeK: { value: .34 }, pxPerM: { value: 500 }, aoK: { value: 2.2 } }, depthTest: false, depthWrite: false }));
+  mode: { value: 0 }, dbg: { value: 0 }, density: { value: .3 }, edgeK: { value: .34 }, pxPerM: { value: 500 }, aoK: { value: 2.2 } }, depthTest: false, depthWrite: false }));
 postScene.add(post);
 
 let sun = null;
@@ -130,7 +130,7 @@ async function bake(name){
   const on = renderPass(V, cam, w, h);
   // the sign dark: its tubes off, its light off
   ROOM.signMesh.material.map = ROOM.signOff; ROOM.signMesh.material.needsUpdate = true; for (const l of ROOM.signLights) l.visible = false;
-  const off = renderPass(V, cam, w, h);
+  const off = ROOM.noSign ? on : renderPass(V, cam, w, h);
   ROOM.signMesh.material.map = ROOM.signOn; ROOM.signMesh.material.needsUpdate = true; for (const l of ROOM.signLights) l.visible = true;
   const at = v => { const p = v.clone().project(cam); return [+((p.x + 1)/2).toFixed(4), +((1 - p.y)/2).toFixed(4)]; };
   const W = ROOM.WIN, S = ROOM.SIGN;
@@ -141,10 +141,10 @@ async function bake(name){
   const cs = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => at(new THREE.Vector3(S.x + a*(S.w/2 + .35), S.y + b*(S.h/2 + .35), S.z)));
   const sx0 = Math.max(0, Math.floor(Math.min(...cs.map(c => c[0]))*w)), sy0 = Math.max(0, Math.floor(Math.min(...cs.map(c => c[1]))*h));
   const sx1 = Math.min(w, Math.ceil(Math.max(...cs.map(c => c[0]))*w)), sy1 = Math.min(h, Math.ceil(Math.max(...cs.map(c => c[1]))*h));
-  const anchors = { w, h, win: ctr, winR: +Math.hypot((rim[0] - ctr[0])*w, (rim[1] - ctr[1])*h).toFixed(1), sign: at(new THREE.Vector3(S.x, S.y, S.z)), patch: at(patch), signRect: [sx0, sy0, sx1 - sx0, sy1 - sy0] };
-  if (!post.material.uniforms.dbg.value){ finish(on.room, on.glass, anchors); finish(off.room, null, anchors); }
+  const anchors = { w, h, win: ctr, winR: +Math.hypot((rim[0] - ctr[0])*w, (rim[1] - ctr[1])*h).toFixed(1), sign: ROOM.noSign ? null : at(new THREE.Vector3(S.x, S.y, S.z)), patch: at(patch), signRect: ROOM.noSign ? null : [sx0, sy0, sx1 - sx0, sy1 - sy0] };
+  if (!post.material.uniforms.dbg.value){ finish(on.room, on.glass, anchors); if (off !== on) finish(off.room, null, anchors); }
   let signoff = null;
-  if (sx1 > sx0 && sy1 > sy0){ const c = document.createElement('canvas'); c.width = sx1 - sx0; c.height = sy1 - sy0; c.getContext('2d').drawImage(off.room, sx0, sy0, c.width, c.height, 0, 0, c.width, c.height); signoff = c.toDataURL('image/png'); }
+  if (!ROOM.noSign && sx1 > sx0 && sy1 > sy0){ const c = document.createElement('canvas'); c.width = sx1 - sx0; c.height = sy1 - sy0; c.getContext('2d').drawImage(off.room, sx0, sy0, c.width, c.height, 0, 0, c.width, c.height); signoff = c.toDataURL('image/png'); }
   return { room: on.room.toDataURL('image/png'), glass: on.glass.toDataURL('image/png'), signoff, anchors };
 }
 // after the render: a soft bloom on what's bright, light film grain, the colours stepped with an ordered dither (the
@@ -184,7 +184,7 @@ window.BAKE = async (opt = {}) => {
   // reflections: the room seen from the middle of it, on everything glossy
   const crt = new THREE.WebGLCubeRenderTarget(256, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter }); crt.texture.encoding = THREE.sRGBEncoding;
   const cc = new THREE.CubeCamera(.05, 30, crt); cc.position.set(...(ROOM.cubeAt || [-.6, 1.1, .2])); scene.add(cc); cc.update(renderer, scene);
-  const M = ROOM.M; for (const [m, k] of [[M.stone, .9], [M.chrome, 1], [M.steel, .8], [M.glass, 1], [M.enamel, .9], [M.ceramic, .6], [M.floor, 0], [M.cream, .35], [M.copper, .8], [M.flex, .5], [M.app, .4], [M.blackGlass, 1], [M.brass, .8], [M.wood, .12], [M.splash, .5]]){ if (!m) continue; m.envMap = crt.texture; m.envMapIntensity = k; m.needsUpdate = true; }
+  const M = ROOM.M; for (const [m, k] of [[M.stone, .9], [M.chrome, 1], [M.steel, .8], [M.glass, 1], [M.enamel, .9], [M.ceramic, .6], [M.floor, 0], [M.cream, .35], [M.copper, .8], [M.flex, .5], [M.app, .4], [M.blackGlass, 1], [M.brass, .8], [M.wood, .05], [M.splash, .5], [M.tableWood, .03], [M.darkWood, .05], [M.counterTop, .6], [M.skin, .3], [M.gold, .8]]){ if (!m) continue; m.envMap = crt.texture; m.envMapIntensity = k; m.needsUpdate = true; }
   const res = {}; for (const k of (opt.views || ['wide', 'tall'])) res[k] = await bake(k);
   return res;
 };

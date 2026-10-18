@@ -63,7 +63,7 @@ const ROOM = (() => {
     specks(g, w, h, 1800, ['rgba(110,85,50,.35)', 'rgba(255,255,250,.35)'], .8, 2.5); scratches(g, w, h, 80, 'rgba(150,125,90,.35)');
     for (let i = 0; i < 60; i++){ g.fillStyle = 'rgba(100,75,45,.6)'; g.beginPath(); g.arc(rnd()*w, rnd()*h, rr(1, 3.5), 0, 7); g.fill(); }
     for (let k = 0; k <= 8; k++){ const x = k/8*w; seam(g, gh, x, 0, x, h, 2, 'rgba(120,100,70,.5)'); }
-    for (let k = 0; k < 8; k++){ const x = (k + .5)/8*w; g.fillStyle = 'rgba(70,60,45,.65)'; g.fillRect(x - 18, h*.42, 36, 10); gh.fillStyle = '#404040'; gh.fillRect(x - 18, h*.42, 36, 10); rivet(g, gh, x - 40, 14, 3, 'rgba(120,100,70,.8)'); rivet(g, gh, x + 40, h - 14, 3, 'rgba(120,100,70,.8)'); }
+    for (let k = 0; k < 8; k++){ const x = (k + .5)/8*w; rivet(g, gh, x - 40, 14, 3, 'rgba(120,100,70,.8)'); rivet(g, gh, x + 40, h - 14, 3, 'rgba(120,100,70,.8)'); }
   }, [1, 1]);
   const enamelT = texSet(512, 512, (g, gh, w, h) => {
     g.fillStyle = '#ebe5d4'; g.fillRect(0, 0, w, h); stains(g, w, h, 18, 'rgba(160,130,90,.14)'); specks(g, w, h, 500, ['rgba(110,90,60,.4)', 'rgba(255,255,255,.4)'], .8, 2.2); scratches(g, w, h, 30, 'rgba(150,130,100,.3)');
@@ -80,9 +80,9 @@ const ROOM = (() => {
     for (let x = 160; x < 860; x += 70){ rivet(g, gh, x, 470, 3, 'rgba(120,100,70,.8)'); }
   }, [1, 1]);
   const floorT = texSet(1024, 1024, (g, gh, w, h) => {
-    g.fillStyle = '#3e4f4b'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#2a2d2b'; g.fillRect(0, 0, w, h);
     for (let y = 0; y < h; y += 170){ let x = (y/170) % 2 ? -110 : 0; while (x < w){ const tw = pick([170, 230, 290, 340]);
-      g.fillStyle = pick(['#668a84', '#5b7d77', '#71918a', '#557570', '#688681']); g.fillRect(x + 4, y + 4, tw - 8, 162);
+      g.fillStyle = pick(['#6b716c', '#62695f', '#757a72', '#5c625c', '#6e7468', '#666b63']); g.fillRect(x + 4, y + 4, tw - 8, 162);
       const gr = g.createLinearGradient(x, y, x + tw, y + 170); gr.addColorStop(0, 'rgba(255,255,240,.08)'); gr.addColorStop(1, 'rgba(10,20,20,.12)'); g.fillStyle = gr; g.fillRect(x + 4, y + 4, tw - 8, 162);
       gh.fillStyle = '#909090'; gh.fillRect(x + 4, y + 4, tw - 8, 162); x += tw; } }
     specks(g, w, h, 9000, ['rgba(20,30,28,.3)', 'rgba(230,240,230,.14)', 'rgba(120,100,70,.16)'], 1, 2.6); stains(g, w, h, 70, 'rgba(30,25,15,.2)', 20, 110); stains(g, w, h, 30, 'rgba(90,70,40,.15)', 10, 40); scratches(g, w, h, 140, 'rgba(220,235,225,.22)');
@@ -211,9 +211,7 @@ const ROOM = (() => {
     { const uv = s1.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i)*4, uv.getY(i)); }
     add(s1, std({ map: creamT.map, bumpMap: creamT.bump, bumpScale: .015, roughness: .36, metalness: .25, side: C.BackSide }), 0, Y, -d1/2 + .02);
     for (let k = 0; k < 32; k++){ const a = k/32*Math.PI*2, c = Math.cos(a), sn = Math.sin(a);
-      pipe([[c*(RF - .02), Y + sn*(RF - .02), .0], [c*(rb - .015), Y + sn*(rb - .015), -d1 + .04]], .016, M.creamPlain);
-      if (k % 4 === 1){ const z = -d1*.45, r = rAt(z) - .006; const sl = box(.12, .008, .2, M.dark, Math.cos(a + .05)*r, Y + Math.sin(a + .05)*r, z, { cast: false }); sl.rotation.z = a; }
-      if (k % 8 === 5){ const z = -d1*.75, r = rAt(z) - .008; const lt = box(.07, .01, .1, M.lampGlow, Math.cos(a + .05)*r, Y + Math.sin(a + .05)*r, z, { cast: false }); lt.rotation.z = a; } }
+      pipe([[c*(RF - .02), Y + sn*(RF - .02), .0], [c*(rb - .015), Y + sn*(rb - .015), -d1 + .04]], .016, M.creamPlain); }
     const d2 = W.depth - d1;
     { const st = new C.RingGeometry(W.r2, rb + .01, 160, 1); add(st, M.creamPlain, 0, Y, -d1 + .02, { cast: false }); }
     add(new C.TorusGeometry(W.r2 + .015, .02, 8, 160), M.chrome, 0, Y, -d1 + .025, { cast: false });
@@ -361,9 +359,6 @@ const ROOM = (() => {
     }
     add(new C.TorusGeometry(RF + .66, .025, 8, 220), M.chrome, 0, Y, .06, { cast: false });
     add(new C.TorusGeometry(RF + .36, .02, 8, 220), M.dark, 0, Y, .2, { cast: false });
-    // more of the sleeve's furniture: recessed dark slots and cream brackets between the ribs
-    for (let k = 0; k < 32; k++){ if (k % 2) continue; const a = (k + .5)/32*Math.PI*2, z = -W.depth*.3, r = RF + (W.r2 - RF)*.3/.8*.8 - .01;
-      const p = box(.14, .012, .16, k % 6 === 0 ? M.lampGlow : M.dark, Math.cos(a)*r, Y + Math.sin(a)*r, z, { cast: false }); p.rotation.z = a + Math.PI/2; }
     // the wall over the capsule: olive plates with seams, a cream housing along the top, vents, risers and a cable run
     parent = kit;
     for (let y = 2.95, row = 0; y < CEIL - .2; y += .62, row++) for (let x = -.25 + (row % 2)*.45; x < 4.8; x += .92){
@@ -394,17 +389,26 @@ const ROOM = (() => {
     const W = WIN, Y = WC.y, RF = W.rf, L0 = -6, L1 = RF + 1.4;
     parent = hull;
     box(L1 - L0, .05, .75, M.hull, (L0 + L1)/2, CEIL - .26, .26, { cast: false, rx: -Math.PI/4 }); box(L1 - L0, .03, .03, M.dark, (L0 + L1)/2, CEIL - .53, .02, { cast: false });   // (a chamfered soffit where the wall meets the ceiling)
-    // along the wall's top: one big ribbed vent duct, two service pipes under it, hung on brackets from the soffit
-    { const y = CEIL - .7, z = .55;
-      pipe([[L0, y, z], [L1, y, z]], .17, M.hull, 0); for (let x = L0 + .3; x < L1; x += .42) add(new C.TorusGeometry(.172, .022, 8, 24), M.darkMetal, x, y, z, { ry: Math.PI/2, cast: false });
-      for (let x = L0 + .5; x < L1; x += 1.4){ box(.08, .5, .06, M.darkMetal, x, y + .2, z - .2); add(new C.TorusGeometry(.19, .03, 6, 20, Math.PI), M.darkMetal, x, y, z, { ry: Math.PI/2, cast: false }); }
-      pipe([[L0, y - .28, z - .12], [L1, y - .28, z - .12]], .05, M.copper, 8); pipe([[L0, y - .36, z + .02], [L1, y - .36, z + .02]], .035, M.steel, 8); }
-    // a vent duct arching round the ring's upper half: thick, ribbed, bolted to the wall, ending in junction boxes
-    { const ra = RF + .82, a0 = .45, a1 = Math.PI - .45, pts = []; for (let k = 0; k <= 30; k++){ const a = a0 + k/30*(a1 - a0); pts.push([Math.cos(a)*ra, Y + Math.sin(a)*ra, .22]); }
-      pipe(pts, .13, M.cream, 0);
-      for (let k = 0; k <= 12; k++){ const a = a0 + k/12*(a1 - a0); add(new C.TorusGeometry(.135, .02, 6, 18), M.darkMetal, Math.cos(a)*ra, Y + Math.sin(a)*ra, .22, { cast: false }).rotation.set(Math.PI/2, 0, a);
-        if (k % 3 === 0){ const br = box(.06, .06, .2, M.darkMetal, Math.cos(a)*(ra + .12), Y + Math.sin(a)*(ra + .12), .1); br.rotation.z = a; } }
-      for (const a of [a0, a1]){ const bx = add(rbox(.34, .34, .3, .03), M.darkMetal, Math.cos(a)*ra, Y + Math.sin(a)*ra, .2); bx.rotation.z = a; box(.14, .04, .02, M.lampGlow, Math.cos(a)*ra, Y + Math.sin(a)*ra, .36, { cast: false }); } }
+    // the run over the window (after the reference): bolted cream housings, a ribbed bellows joint between flanged
+    // couplings, a grille, drop brackets carrying a lower bar, a round downlight can, a thin conduit down the wall
+    { const y = CEIL - .62, z = 1.0, dk = std({ color: 0x5a4a32, roughness: .5, metalness: .4 });
+      const housing = (x0, x1, grille) => { const w = x1 - x0, cx = (x0 + x1)/2;
+        add(rbox(w, .34, .62, .05), M.cream, cx, y, z);
+        for (let x = x0 + .08; x < x1 - .2; x += .48){ add(rbox(.4, .02, .44, .02), M.creamPlain, x + .2, y - .175, z); for (const [dx, dz] of [[.03, .03], [.37, .03], [.03, .41], [.37, .41]]) cyl(.012, .012, .01, M.dark, x + dx, y - .188, z - .22 + dz, { seg: 6, cast: false }); }
+        box(w, .03, .03, dk, cx, y - .12, z + .32, { cast: false }); box(w, .03, .03, dk, cx, y - .12, z - .32, { cast: false });
+        if (grille) for (let i = 0; i < 9; i++) box(.025, .2, .02, M.dark, x1 - .5 + i*.05, y, z + .315, { cast: false });
+      };
+      const coupling = x => { cyl(.21, .21, .07, dk, x, y, z, { rz: Math.PI/2, seg: 28 }); for (let k = 0; k < 8; k++){ const a = k/8*Math.PI*2; cyl(.012, .012, .09, M.steel, x, y + Math.cos(a)*.18, z + Math.sin(a)*.18, { rz: Math.PI/2, seg: 6, cast: false }); } };
+      housing(-1.6, .75, false); coupling(.79);
+      cyl(.13, .13, .9, M.steel, 1.25, y, z, { rz: Math.PI/2, seg: 24 }); for (let x = .85; x <= 1.65; x += .055) add(new C.TorusGeometry(.15, .022, 8, 24), M.chrome, x, y, z, { ry: Math.PI/2, cast: false });
+      coupling(1.71); housing(1.75, 2.95, true); coupling(2.99);
+      pipe([[3.0, y, z], [3.3, y + .1, z + .3], [3.4, y + .3, z + .9]], .12, M.hull, 0); for (const x of [3.15, 3.3]) add(new C.TorusGeometry(.125, .02, 6, 20), dk, x, y + .03, z - .15, { ry: Math.PI/2, cast: false });
+      for (const x of [-1.0, .3, 2.1, 2.7]){ box(.06, .5, .05, dk, x, y + .3, z - .2); box(.66, .05, .07, dk, x, y + .19, z, { cast: false }); }   // (hangers up to the ceiling, straps round the housing)
+      
+      cyl(.26, .26, .22, M.cream, -2.1, y + .05, z - .05, { seg: 32 }); add(new C.TorusGeometry(.2, .03, 8, 32), M.chrome, -2.1, y - .07, z - .05, { rx: Math.PI/2, cast: false }); cyl(.17, .17, .02, M.lampGlow, -2.1, y - .05, z - .05, { cast: false, seg: 24 });
+      pipe([[2.85, y - .1, z - .3], [2.6, y - .45, .2], [2.68, 3.2, .09], [2.72, 2.0, .08], [2.75, 1.0, .08]], .022, M.steel, 6); }
+    // more grooves on the olive bulge round the ring
+    for (const r of [RF + .46, RF + .56]) add(new C.TorusGeometry(r, .012, 6, 220), M.dark, 0, Y, .15, { cast: false });
     for (const [x, w] of [[-2.9, .5], [2.75, .42], [-4.2, .36]]){ add(rbox(w, .34, .26, .03), M.darkMetal, x, CEIL - .95, .18); box(w*.6, .04, .02, M.lampGlow, x, CEIL - .86, .32, { cast: false }); }
     // coffers: ribs from the porthole wall across the room, panels and vents between them
     for (let x = -5.2; x < L1 + .4; x += .95){ box(.14, .22, 6.2, M.hull, x, CEIL - .11, 3.6, { cast: false }); box(.18, .03, 6.2, M.dark, x, CEIL - .235, 3.6, { cast: false }); }

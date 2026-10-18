@@ -375,8 +375,8 @@ const GRIDPANEL = (() => {
         <button class="gb" id="bClear" title="Clear every layer">Clear</button>
         <button class="gb bap" id="bAuto" title="The autopilot takes your recording as its theme and plays along: answers in your gaps, echoes, harmonies under long notes. It never plays over your notes.">Autopilot</button>
       </div>
-      <canvas class="gv" id="bRoll" title="The loop: chords along the top, your notes in cyan, the autopilot's in pink, the playhead in yellow"></canvas>
-      <div class="gkey"><span><b>CYAN</b> your layers</span><span><b>PINK</b> the autopilot</span><span><b>HIGHER</b> higher pads</span><span><b>RED</b> recording</span></div>
+      <canvas class="gv" id="bRoll" title="The loop: chords along the top, your notes in cyan, the autopilot's in pink, the playhead in yellow. Right-click a note to delete it."></canvas>
+      <div class="gkey"><span><b>CYAN</b> your layers</span><span><b>PINK</b> the autopilot</span><span><b>HIGHER</b> higher pads</span><span><b>RED</b> recording</span><span><b>RIGHT-CLICK</b> a note to delete it</span></div>
     </section>
     <section class="gp b-keys"><h3>Magic keys</h3><span class="gtag" id="bChordTag"></span>
       <div class="bkeys" id="bKeys"></div>

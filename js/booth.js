@@ -370,6 +370,13 @@ const BOOTH = (() => {
       const up = () => noteUp(i); k.addEventListener('pointerup', up); k.addEventListener('pointercancel', up); k.addEventListener('lostpointercapture', up);
       kb.appendChild(k); keysEl.push(k);
     }
+    // right-click a note on the loop picture to delete it (from whichever layer it's in)
+    $('bRoll').addEventListener('contextmenu', e => {
+      e.preventDefault(); const c = $('bRoll'), r = c.getBoundingClientRect(), H = r.height, rowH = (H - 24 - 10)/AP;
+      const b = (e.clientX - r.left)/r.width*L(), i = Math.floor((H - 6 - (e.clientY - r.top))/rowH);
+      for (let li = S.layers.length - 1; li >= 0; li--){ const lay = S.layers[li], k = lay.findIndex(n => n.i === i && b >= n.b - .05 && b <= n.b + n.d + .05);
+        if (k >= 0){ lay.splice(k, 1); if (!lay.length) S.layers.splice(li, 1); apCache.clear(); store(); status(); return; } }
+    });
     $('bPlay').addEventListener('click', () => playing ? stop() : start(false));
     $('bRec').addEventListener('click', record);
     $('bUndo').addEventListener('click', () => { if (S.layers.length){ S.layers.pop(); apCache.clear(); store(); status(); } });

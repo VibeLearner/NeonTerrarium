@@ -93,6 +93,16 @@ const ROOM = (() => {
       g.fillStyle = 'rgba(255,245,215,.07)'; g.fillRect(x + 3, y + 3, 56, 5); gh.fillStyle = '#a0a0a0'; gh.fillRect(x + 2, y + 2, 60, 28); }
     stains(g, w, h, 20, 'rgba(120,90,50,.15)'); specks(g, w, h, 900, ['rgba(220,200,160,.15)', 'rgba(0,0,0,.2)'], .8, 2);
   }, [1, 1]);
+  const skinT = texSet(1024, 512, (g, gh, w, h) => {   // the capsule's skin: cream enamel, grime in the seams, chips, fine scratches
+    g.fillStyle = '#e2d8bd'; g.fillRect(0, 0, w, h); stains(g, w, h, 50, 'rgba(150,115,70,.13)', 10, 80); stains(g, w, h, 20, 'rgba(255,252,240,.18)', 20, 90);
+    specks(g, w, h, 2500, ['rgba(110,85,50,.3)', 'rgba(255,255,250,.35)'], .6, 1.8); scratches(g, w, h, 120, 'rgba(140,115,80,.3)');
+    for (let i = 0; i < 40; i++){ g.fillStyle = 'rgba(95,75,50,.55)'; g.beginPath(); g.arc(rnd()*w, rnd()*h, rr(.8, 2.4), 0, 7); g.fill(); }
+    drips(g, w, h, 18, 'rgba(120,90,50,.14)');
+  }, [1, 3]);
+  const dimpleT = texSet(128, 128, (g, gh, w, h) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); for (let i = 0; i < 900; i++){ const x = rnd()*w, y = rnd()*h; g.fillStyle = 'rgba(200,160,120,.25)'; g.fillRect(x, y, 1.4, 1.4); gh.fillStyle = '#606060'; gh.fillRect(x, y, 1.5, 1.5); } }, [2, 2]);
+  const labelT = (() => { const c = document.createElement('canvas'); c.width = 512; c.height = 64; const g = c.getContext('2d');
+    glyphs(g, 10, 14, 5, 34, 'rgba(60,52,44,.9)'); fineText(g, 220, 18, 120, 2, 'rgba(60,52,44,.8)', 5); g.fillStyle = 'rgba(60,52,44,.9)'; g.fillRect(380, 22, 40, 4); glyphs(g, 430, 14, 2, 30, 'rgba(60,52,44,.9)');
+    const t = new C.CanvasTexture(c); t.encoding = C.sRGBEncoding; return t; })();
   const rugT = texSet(512, 512, (g, gh, w, h) => {
     const cols = ['#ead7a8', '#d9a84a', '#ead7a8', '#c8742e', '#f0e2bc', '#7a4a24'];
     for (let y = 0, k = 0; y < h; k++){ const sw = pick([22, 30, 14, 36]); g.fillStyle = cols[k % cols.length]; g.fillRect(0, y, w, sw); y += sw; }
@@ -136,6 +146,14 @@ const ROOM = (() => {
     leafs: [0x3f6f3a, 0x557f3c, 0x2e5a30, 0x6f9a4a, 0x4d7a3a, 0x86a65a].map(c => std({ color: c, roughness: .55, side: C.DoubleSide })),
     fruit: [0xf08a24, 0xf2a62a, 0xd8432a, 0xe8c547, 0xe07a2a, 0xb84a2a].map(c => std({ color: c, roughness: .38 })),
     bread: std({ color: 0xc88a45, roughness: .7 }),
+    skin: withBump(skinT, { roughness: .42, metalness: .12 }, .004),
+    orange: std({ color: 0xf07a18, roughness: .55, bumpMap: dimpleT.bump, bumpScale: .004 }), lemon: std({ color: 0xf0c935, roughness: .5, bumpMap: dimpleT.bump, bumpScale: .004 }),
+    juice: std({ color: 0xf59a1e, roughness: .2, transparent: true, opacity: .9 }), jam: std({ color: 0x8e1f1a, roughness: .2 }), butter: std({ color: 0xf3df9a, roughness: .6 }),
+    glazeTeal: std({ color: 0x3f6f7a, roughness: .25 }), glazeWhite: std({ color: 0xece6d6, roughness: .2 }), glazeOchre: std({ color: 0xc58a3a, roughness: .3 }),
+    barGlow: new C.MeshBasicMaterial({ color: 0xffd896, toneMapped: false }), dimAmber: new C.MeshBasicMaterial({ color: 0x8a5a20, toneMapped: false }), dimGreen: new C.MeshBasicMaterial({ color: 0x3f7a4a, toneMapped: false }),
+    label: new C.MeshBasicMaterial({ map: labelT, transparent: true, depthWrite: false }),
+    succ: std({ color: 0x8fae94, roughness: .5 }), snake: std({ color: 0x3d6a3c, roughness: .45, side: C.DoubleSide }), cactus: std({ color: 0x5f8a50, roughness: .6 }),
+    petal: [0xf2a7b8, 0xf6f0e2, 0xf2c94c, 0xd8573c].map(c => std({ color: c, roughness: .6 })),
   };
   R.M = M;
 
@@ -170,6 +188,22 @@ const ROOM = (() => {
   // a leafy plant: many short twigs ending in clusters of small leaves (the kitchen's bushes and herbs), or long trailing vines
   function plant(x, y, z, s, kind, potMat){
     if (potMat !== null) pot(x, y, z, s, potMat || M.pot);
+    const top0 = y + .27*s;
+    if (kind === 'succulent'){ for (let ring = 0; ring < 3; ring++) for (let k = 0; k < 9 - ring*2; k++){ const a = k/(9 - ring*2)*Math.PI*2 + ring*.3, l = (.09 - ring*.022)*s*2.2;
+        const lf = add(new C.SphereGeometry(1, 10, 8), M.succ, x + Math.cos(a)*l*.45, top0 + .01 + ring*.012*s, z + Math.sin(a)*l*.45, { cast: true }); lf.scale.set(l*.5, l*.16, l*.22); lf.rotation.set(0, -a, .35 + ring*.3); } return; }
+    if (kind === 'snake'){ for (let k = 0; k < 9; k++){ const a = rnd()*6.3, d = rr(0, .05)*s, hgt = rr(.35, .6)*s, g = new C.PlaneGeometry(.045*s, hgt, 1, 6); g.translate(0, hgt/2, 0);
+        const p = g.attributes.position; for (let i = 0; i < p.count; i++){ const t = p.getY(i)/hgt; p.setX(i, p.getX(i)*(1 - t*.85)); p.setZ(i, t*t*.04*s); } g.computeVertexNormals();
+        add(g, M.snake, x + Math.cos(a)*d, top0, z + Math.sin(a)*d, { ry: rnd()*6.3, cast: true }).rotation.z = rr(-.12, .12); } return; }
+    if (kind === 'cactus'){ const cg = new C.CylinderGeometry(.06*s, .07*s, .32*s, 12, 4); const p = cg.attributes.position; for (let i = 0; i < p.count; i++){ const a = Math.atan2(p.getZ(i), p.getX(i)), k = 1 + .08*Math.cos(a*6); p.setX(i, p.getX(i)*k); p.setZ(i, p.getZ(i)*k); } cg.computeVertexNormals();
+      add(cg, M.cactus, x, top0 + .16*s, z); add(new C.SphereGeometry(.06*s, 12, 8, 0, 6.3, 0, 1.6), M.cactus, x, top0 + .32*s, z, { cast: false });
+      const arm = add(new C.CylinderGeometry(.035*s, .04*s, .14*s, 10), M.cactus, x + .08*s, top0 + .2*s, z); arm.rotation.z = -.5; cyl(.012*s, .012*s, .01, M.petal[0], x, top0 + .38*s, z, { cast: false }); return; }
+    if (kind === 'fern'){ for (let k = 0; k < 11; k++){ const a = k/11*Math.PI*2 + rr(-.2, .2), len = rr(.28, .42)*s, pts = [];
+        for (let i = 0; i <= 8; i++){ const t = i/8; pts.push(new C.Vector3(x + Math.cos(a)*t*len*.9, top0 + Math.sin(t*2.2)*len*.45 - t*t*len*.35, z + Math.sin(a)*t*len*.9)); }
+        const cv = new C.CatmullRomCurve3(pts); add(new C.TubeGeometry(cv, 10, .003*s, 4), M.leafs[3], 0, 0, 0, { cast: false });
+        for (let i = 2; i <= 15; i++){ const t = i/16, pp = cv.getPoint(t), tg = cv.getTangent(t); for (const sd of [-1, 1]){ const lf = add(LEAF[2], M.leafs[3], pp.x, pp.y, pp.z, { s: s*(1.1 - t*.7), cast: false }); lf.rotation.set(-1.2, Math.atan2(tg.x, tg.z) + sd*1.4, 0); } } } return; }
+    if (kind === 'flower'){ plant(x, y, z, s, 'herb', null); for (let k = 0; k < 9; k++){ const a = rnd()*6.3, d = rr(.02, .1)*s, py = top0 + rr(.12, .3)*s, col = pick(M.petal);
+        for (let q = 0; q < 5; q++){ const qa = q/5*6.3; add(new C.SphereGeometry(.011*s, 6, 4), col, x + Math.cos(a)*d + Math.cos(qa)*.012*s, py, z + Math.sin(a)*d + Math.sin(qa)*.012*s, { cast: false }); }
+        add(new C.SphereGeometry(.007*s, 6, 4), M.petal[2], x + Math.cos(a)*d, py + .004, z + Math.sin(a)*d, { cast: false }); } return; }
     const top = y + .27*s, stems = kind === 'tree' ? 18 : kind === 'trail' ? 10 : 16;
     for (let k = 0; k < stems; k++){
       const a = rnd()*Math.PI*2, lean = kind === 'trail' ? rr(.7, 1.2) : rr(.15, .6), len = (kind === 'tree' ? rr(.5, 1.2) : kind === 'trail' ? rr(.5, 1.3) : rr(.2, .5))*s;
@@ -183,7 +217,8 @@ const ROOM = (() => {
     }
   }
   function jar(x, y, z, h, r, fill, o = {}){ lathe([[0, 0], [r, 0], [r, h*.85], [r*.8, h*.92], [r*.8, h]], M.glass, x, y, z, Object.assign({ cast: false }, o)); if (fill) cyl(r*.9, r*.9, h*.6, fill, x, y + h*.3, z, Object.assign({ cast: false }, o)); cyl(r*.82, r*.82, .02, M.steel, x, y + h + .01, z, o); }
-  function fruit(x, y, z, r, mat, o = {}){ return add(new C.SphereGeometry(r, 12, 10), mat || pick(M.fruit), x, y + r, z, o); }
+  function fruit(x, y, z, r, mat, o = {}){ const m = mat || pick([M.orange, M.orange, M.orange, M.orange, M.lemon, M.fruit[2]]); const f = add(new C.SphereGeometry(r, 16, 12), m, x, y + r, z, o);
+    if (m === M.lemon) f.scale.set(1, .85, 1.25); else if (m === M.orange && rnd() < .5) cyl(.003, .003, .008, M.leafs[0], x, y + 2*r, z, { seg: 5, cast: false }); return f; }
   function plate(x, y, z, r, o = {}){ lathe([[0, 0], [r*.7, 0], [r, r*.12], [r*1.02, r*.13]], M.ceramic, x, y, z, Object.assign({ cast: false }, o)); }
   function fruitPlate(x, y, z, r, n, o = {}){ plate(x, y, z, r, o); for (let i = 0; i < n; i++){ const a = rnd()*7, d = rnd()*r*.55; fruit(x + Math.cos(a)*d, y + .012, z + Math.sin(a)*d, rr(.025, .04), null, o); } }
   function bowl(x, y, z, r, n, mat, o = {}){ lathe([[0, 0], [r*.5, 0], [r, r*.5], [r*1.03, r*.53]], mat || M.ceramic, x, y, z, o); for (let i = 0; i < n; i++){ const a = rnd()*7, d = rnd()*r*.55; fruit(x + Math.cos(a)*d, y + r*.25 + rr(0, .03), z + Math.sin(a)*d, rr(.028, .042), null, o); } }
@@ -223,7 +258,8 @@ const ROOM = (() => {
     // plants in the window's foot and climbing the sleeve
     // a flat sill across the funnel's foot, a chrome lip on it, and the pots standing on it
     { const sy = Y - 1.0; box(1.36, .05, .92, M.creamPlain, 0, sy - .025, -.42); box(1.36, .03, .03, M.chrome, 0, sy - .01, .03, { cast: false }); box(1.3, .14, .03, M.cream, 0, sy - .12, .02, { cast: false });
-      plant(-.4, sy, -.4, .42, 'herb'); plant(.32, sy, -.42, .4, 'herb'); plant(-.02, sy, -.22, .34, 'herb', M.steel); plant(.5, sy, -.12, .3, 'herb'); plant(-.52, sy, -.08, .3, 'herb', M.steel); }
+      plant(-.5, sy, -.42, .36, 'snake', M.glazeWhite); plant(-.15, sy, -.5, .4, 'fern', M.pot); plant(.22, sy, -.46, .34, 'flower', M.glazeTeal); plant(.52, sy, -.3, .3, 'cactus', M.glazeOchre);
+      plant(-.38, sy, -.1, .26, 'succulent', M.steel); plant(.05, sy, -.16, .24, 'succulent', M.pot); plant(.36, sy, -.06, .3, 'trail', M.glazeWhite); plant(-.6, sy, -.12, .26, 'herb', M.basket); }
     for (let k = 0; k < 0; k++){ const a = Math.PI*(1.1 + k*.045); const lz = -rr(.05, .45), lr = rAt(lz) - .05; const lf = add(pick(LEAF), pick(M.leafs), Math.cos(a)*lr, Y + Math.sin(a)*lr, lz, { s: rr(1, 1.8) }); lf.rotation.set(rnd()*6, rnd()*6, rnd()*6); }
     // the hull's foot below the window: a cream apron bulging out, chrome pipes with grab handles along it, a latch
     { const ap = new C.CylinderGeometry(.6, .6, 4.2, 28, 1, true, 0, Math.PI/2); ap.rotateZ(Math.PI/2); ap.rotateX(Math.PI/2); add(ap, M.cream, -.6, .02, -.02, { cast: false }); }
@@ -237,9 +273,17 @@ const ROOM = (() => {
     lathe([[0, -.05], [T.r, -.05], [T.r + .025, -.02], [T.r + .025, .02], [T.r, .035], [0, .035]], M.wood, T.x, T.y, T.z, { seg: 56 });
     lathe([[0, 0], [.26, 0], [.28, .05], [.07, .14], [.06, T.y - .14], [.1, T.y - .06], [.14, T.y - .04]], M.dark, T.x, 0, T.z, { seg: 28 });
     const TY = T.y + .035;
-    for (let i = 0; i < 34; i++){ const a = rnd()*Math.PI*2, d = Math.sqrt(rnd())*T.r*.86, x = T.x + Math.cos(a)*d, z = T.z + Math.sin(a)*d, k = rnd();
-      if (k < .26) fruitPlate(x, TY, z, rr(.09, .13), 5); else if (k < .42) bowl(x, TY, z, rr(.07, .1), 6); else if (k < .58){ plate(x, TY, z, .11); bread(x, TY + .012, z, rr(.08, .12)); bread(x + .03, TY + .03, z + .02, rr(.06, .09)); }
-      else if (k < .68) cup(x, TY, z); else if (k < .82) fruit(x, TY, z, rr(.028, .04)); else box(rr(.1, .16), .008, rr(.07, .11), std({ color: pick([0x3f6f7a, 0xd9c9a2, 0x2e2a26, 0xb0884e]) }), x, TY + .004, z, { ry: rnd()*3 }); }
+    const croissant = (x, y, z, ry) => { const c = add(new C.TorusGeometry(.04, .022, 8, 14, 2.5), M.bread, x, y + .02, z, { rx: Math.PI/2, cast: false }); c.rotation.z = ry; c.scale.set(1, 1, .75); for (let k = 0; k < 4; k++) add(new C.TorusGeometry(.024, .004, 4, 10), std({ color: 0x9a5a28, roughness: .7 }), x + Math.cos(ry + .4 + k*.5)*.04, y + .02, z + Math.sin(ry + .4 + k*.5)*.04, { ry: -(ry + .4 + k*.5), cast: false }); };
+    const juice = (x, y, z) => { lathe([[0, 0], [.028, 0], [.032, .11], [.03, .11]], M.glass, x, y, z, { cast: false }); cyl(.026, .028, .075, M.juice, x, y + .04, z, { cast: false }); };
+    for (const a of [-.5, .75, 2.05]){ const px = T.x + Math.cos(a)*.4, pz = T.z + Math.sin(a)*.4, ta = a + Math.PI/2;
+      box(.2, .004, .16, std({ color: pick([0xd8c9a0, 0x9fb6b0, 0xe6dccb]), roughness: .95 }), px, TY + .002, pz, { ry: -a, cast: false });   // a placemat
+      plate(px, TY + .005, pz, .1); croissant(px, TY + .02, pz, rnd()*6);
+      for (const sd of [-1, 1]) box(.012, .004, .14, M.steel, px + Math.cos(ta)*sd*.13, TY + .007, pz + Math.sin(ta)*sd*.13, { ry: -a, cast: false });
+      juice(px + Math.cos(a - .5)*.16, TY, pz + Math.sin(a - .5)*.16); box(.07, .01, .07, std({ color: 0xf4efe2, roughness: .95 }), px + Math.cos(ta)*-.2, TY + .005, pz + Math.sin(ta)*-.2, { ry: .3 }); }
+    bowl(T.x + .05, TY, T.z + .02, .14, 0, M.glazeTeal); for (let i = 0; i < 9; i++){ const a = i/9*6.3, d = i < 6 ? .07 : .02; fruit(T.x + .05 + Math.cos(a)*d, TY + .045 + (i < 6 ? 0 : .04), T.z + .02 + Math.sin(a)*d, .036, i % 4 === 3 ? M.lemon : M.orange); }
+    lathe([[0, 0], [.1, 0], [.13, .07], [.135, .08]], M.basket, T.x - .2, TY, T.z + .2); for (let i = 0; i < 3; i++) bread(T.x - .2 + rr(-.05, .05), TY + .03, T.z + .2 + rr(-.05, .05), .11); croissant(T.x - .17, TY + .05, T.z + .16, 1);
+    jar(T.x + .3, TY, T.z - .05, .08, .03, M.jam); add(rbox(.11, .03, .07, .01), M.glazeWhite, T.x + .22, TY + .015, T.z + .2); box(.07, .025, .045, M.butter, T.x + .22, TY + .042, T.z + .2, { cast: false });
+    lathe([[0, 0], [.025, 0], [.03, .05], [.015, .1], [.017, .11]], M.glass, T.x + .12, TY, T.z - .2, { cast: false }); for (let k = 0; k < 4; k++){ const fx = T.x + .12 + rr(-.04, .04), fz = T.z - .2 + rr(-.04, .04), fy = TY + rr(.16, .22); pipe([[T.x + .12, TY + .08, T.z - .2], [fx, fy, fz]], .002, M.leafs[0]); for (let q = 0; q < 5; q++){ const qa = q/5*6.3; add(new C.SphereGeometry(.009, 6, 4), M.petal[k % 2 ? 1 : 3], fx + Math.cos(qa)*.01, fy, fz + Math.sin(qa)*.01, { cast: false }); } }
     lathe([[0, 0], [.1, 0], [.13, .09], [.11, .2], [.07, .27], [.08, .29]], M.copper, T.x - .25, TY, T.z - .35);
     lathe([[0, 0], [.09, 0], [.11, .07], [.09, .15], [.035, .17]], M.ceramic, T.x + .32, TY, T.z - .25);
     { const tc = new C.PlaneGeometry(.5, 1.25); tc.rotateX(-Math.PI/2); add(tc, std({ color: 0xd9cfb4, roughness: .95, side: C.DoubleSide }), T.x + .05, TY + .003, T.z, { cast: false, ry: .3 });   // a linen runner
@@ -288,30 +332,52 @@ const ROOM = (() => {
     for (const x of [.78, 3.66]) cyl(.012, .012, .7, M.steel, x, TOP + .37, .04, { seg: 8 });
     // on the counter: the herb pot in a basket, the big chrome canister, jars, fruit plates, cups, a pan
     plant(.62, TOP + .02, .3, .95, 'herb', M.basket); plant(.62, TOP + .02, .3, .9, 'tree', null); plant(.62, TOP + .02, .3, 1.1, 'herb', null);
-    lathe([[0, 0], [.22, 0], [.235, .02], [.235, .44], [.21, .5], [.1, .56], [.1, .6], [.12, .62]], M.chrome, 1.4, TOP + .02, .32); cyl(.18, .18, .3, std({ color: 0xc07a3a, roughness: .5 }), 1.4, TOP + .2, .32, { cast: false });
+    { const cx = 1.4, cz = .32, cy = TOP + .02;
+      lathe([[0, 0], [.2, 0], [.21, .02], [.21, .06]], M.chrome, cx, cy, cz); lathe([[.205, .06], [.205, .44]], M.glass, cx, cy, cz, { cast: false, seg: 40 });
+      cyl(.19, .19, .3, std({ color: 0xb8742e, roughness: .85, bumpMap: dimpleT.bump, bumpScale: .02 }), cx, cy + .2, cz, { cast: false });
+      lathe([[.215, .44], [.215, .47], [.17, .52], [.06, .55], [.06, .58], [.03, .6], [0, .6]], M.chrome, cx, cy, cz); for (const k of [.06, .3, .44]) add(new C.TorusGeometry(.212, .008, 6, 40), M.chrome, cx, cy + k, cz, { rx: Math.PI/2, cast: false });
+      add(new C.TorusGeometry(.09, .014, 8, 20, Math.PI), M.chrome, cx + .2, cy + .32, cz, { ry: Math.PI/2, rz: -Math.PI/2 }); }
     pipe([[1.57, TOP + .38, .3], [1.68, TOP + .36, .3], [1.66, TOP + .16, .3]], .014, M.chrome);
-    jar(1.0, TOP + .02, .2, .4, .13, std({ color: 0xb06a30 })); jar(1.18, TOP + .02, .14, .28, .09, std({ color: 0x8a5a2a })); jar(1.8, TOP + .02, .18, .22, .08, M.fruit[1]); jar(1.97, TOP + .02, .16, .18, .06, null);
+    jar(1.0, TOP + .02, .2, .4, .13, std({ color: 0xc89a55, roughness: .9, bumpMap: dimpleT.bump, bumpScale: .03 })); jar(1.18, TOP + .02, .14, .28, .09, std({ color: 0x8a5a2a })); jar(1.8, TOP + .02, .18, .22, .08, M.fruit[1]); jar(1.97, TOP + .02, .16, .18, .06, null);
     for (const [x, z] of [[.3, .52], [.75, .55], [1.2, .58], [2.6, .5], [3.3, .5], [1.9, .6], [.95, .6]]) fruitPlate(x, TOP + .025, z, .15, 9);
     for (let i = 0; i < 6; i++) lathe([[0, 0], [.03, 0], [.03, .16], [.013, .22], [.013, .25]], std({ color: pick([0x3f6f7a, 0xc94f3b, 0xe0c27a, 0x6a8a3a]), roughness: .12, transparent: true, opacity: .85 }), 2.7 + i*.08, TOP + .025, .16 + (i % 2)*.07);
     bowl(1.62, TOP + .025, .55, .09, 7); bowl(2.95, TOP + .025, .58, .11, 8, M.wood); fruitPlate(.5, TOP + .025, .25, .1, 4);
+    add(rbox(.42, .025, .26, .01), M.wood, 3.05, TOP + .037, .3, { ry: .15 }); bread(3.0, TOP + .05, .3, .26); box(.2, .003, .03, M.steel, 3.2, TOP + .052, .42, { ry: .5 }); box(.1, .02, .025, M.dark, 3.07, TOP + .06, .47, { ry: .5 });
+    lathe([[0, 0], [.03, 0], [.03, .12], [.022, .15], [.03, .18], [.012, .2]], M.wood, 2.55, TOP + .025, .2); lathe([[0, 0], [.035, 0], [.035, .16], [.012, .2], [.012, .24], [.015, .25]], M.glass, 2.62, TOP + .025, .14, { cast: false }); cyl(.03, .03, .12, std({ color: 0xc9a43a, roughness: .2, transparent: true, opacity: .85 }), 2.62, TOP + .09, .14, { cast: false });
+    for (let k = 0; k < 3; k++) lathe([[0, 0], [.04, 0], [.07, .045], [.072, .05]], M.glazeWhite, 3.7, TOP + .025 + k*.03, .28);
     bowl(2.15, TOP + .025, .45, .1, 0, M.steel); cup(2.0, TOP + .025, .5); cup(2.08, TOP + .025, .56); lathe([[0, 0], [.05, 0], [.05, .12], [.045, .13]], M.steel, 2.35, TOP + .025, .32);
-    // the capsule appliance: a big rounded cream body, a dark window in a chrome bezel, controls, the orange light strip
-    const AY = 1.65, AH = 1.13, AD = .62, AX0 = .4, AX1 = 4.4;
-    add(rbox(AX1 - AX0, AH, AD, .4, 8), M.app, (AX0 + AX1)/2, AY + AH/2, AD/2 + .02);
-    const az = AD + .02;
-    { const wx = 1.14, wy = AY + .42; add(rbox(1.05, .6, .05, .06), M.chrome, wx, wy, az); add(rbox(.96, .5, .05, .05), M.blackGlass, wx, wy, az + .015);
-      box(.3, .42, .01, std({ color: 0x1a1915, roughness: .3 }), wx + .3, wy, az + .045, { cast: false });
-      for (let k = 0; k < 8; k++) box(.055, .03, .01, M.ceramic, wx + .23 + (k % 2)*.1, wy + .14 - Math.floor(k/2)*.07, az + .05, { cast: false });
-      box(.42, .08, .02, M.steel, wx, AY + .06, az + .02); }
-    add(rbox(1.35, .1, .03, .03), M.chrome, 1.4, AY + .9, az + .005); box(1.25, .055, .02, M.lampGlow, 1.4, AY + .9, az + .02, { cast: false }); for (let k = 0; k < 3; k++) box(.012, .06, .03, M.dark, 1.0 + k*.42, AY + .9, az + .025, { cast: false });
-    add(rbox(.9, .14, .03, .04), M.creamPlain, 1.3, AY + AH - .08, az - .12); box(3.6, .012, .01, M.dark, 2.4, AY + .2, az + .005, { cast: false }); box(.012, AH*.8, .01, M.dark, .78, AY + AH/2, az + .005, { cast: false }); box(.012, AH*.8, .01, M.dark, 3.2, AY + AH/2, az + .005, { cast: false });
-    { const l = new C.PointLight(0xffa850, .6, 2.2, 2); l.position.set(1.4, AY + .85, az + .3); kit.add(l); }
-    for (let k = 0; k < 7; k++) box(.2, .012, .02, M.dark, .66, AY + .55 + k*.035, az + .002, { cast: false });
-    add(rbox(2.2, .16, .03, .05), M.app, 2.5, AY + AH - .2, az + .005); for (let k = 0; k < 9; k++) cyl(.012, .012, .02, M.chrome, 1.5 + k*.22, AY + AH - .2, az + .025, { rx: Math.PI/2, seg: 8, cast: false });
-    box(.2, .08, .01, std({ color: 0x14130f, emissive: 0xff9a3a, emissiveIntensity: .35 }), 2.0, AY + .5, az + .01, { cast: false }); for (let k = 0; k < 3; k++) cyl(.03, .03, .03, M.dark, 2.0 + (k - 1)*.09, AY + .36, az + .01, { rx: Math.PI/2, seg: 12 });
-    box(.14, .1, .005, std({ color: 0xd6573b }), 2.85, AY + .7, az + .005, { cast: false }); box(.18, .06, .005, std({ color: 0x3f6f7a }), 2.85, AY + .58, az + .005, { cast: false });
-    for (let k = 0; k < 4; k++) cyl(.028, .028, .03, k === 3 ? std({ color: 0xd6573b }) : M.chrome, .62, AY + .25 + k*.13, az + .01, { rx: Math.PI/2, seg: 14 });
-    cyl(.045, .045, .03, M.chrome, 2.45, AY + .5, az + .01, { rx: Math.PI/2 }); box(.14, .05, .015, std({ color: 0xf08a24, emissive: 0xf08a24, emissiveIntensity: .5 }), .7, AY + .1, az + .01, { cast: false });
+    // the capsule appliance (after the reference): a horizontal cream cylinder squashed front to back with a rounded left cap,
+    // seam rings between its sections, a recessed light bar with three glowing panes, the oven window in a chrome bezel with a
+    // screen and a column of buttons, controls and lamps on the left end, a dark slot along the belly, a printed label
+    const AY = 1.65, AH = 1.13, AD = .62, AX0 = .4, AX1 = 4.4, AR = AH/2, ACY = AY + AR, AZ = AD/2 + .02, SZ = AD/AH;
+    const zf = dy => AZ + SZ*Math.sqrt(Math.max(0, AR*AR - dy*dy)), tilt = dy => Math.atan(dy/Math.sqrt(Math.max(.001, AR*AR - dy*dy))*SZ);
+    { const g = new C.CylinderGeometry(AR, AR, AX1 - AX0 - .3, 72, 1, true); g.rotateZ(Math.PI/2); add(g, M.skin, (AX0 + .3 + AX1)/2, ACY, AZ).scale.z = SZ;
+      const e = add(new C.SphereGeometry(AR, 48, 32), M.skin, AX0 + .3, ACY, AZ); e.scale.set(.55, 1, SZ);
+      for (const x of [.95, 2.15, 3.35]){ const t = new C.TorusGeometry(AR + .002, .009, 6, 72); t.rotateY(Math.PI/2); add(t, M.dark, x, ACY, AZ, { cast: false }).scale.z = SZ; }
+      for (const x of [.98, 2.18, 3.38]){ const t = new C.TorusGeometry(AR + .004, .006, 6, 72); t.rotateY(Math.PI/2); add(t, M.creamPlain, x, ACY, AZ, { cast: false }).scale.z = SZ; } }
+    { const dy = .31, y = ACY + dy, z = zf(dy), th = tilt(dy);
+      box(1.72, .085, .03, M.dark, 1.75, y, z - .005, { rx: -th, cast: false });
+      for (const [x0, x1] of [[.94, 1.38], [1.42, 1.66], [1.7, 2.56]]) box(x1 - x0, .05, .02, M.barGlow, (x0 + x1)/2, y, z + .004, { rx: -th, cast: false });
+      const l = new C.PointLight(0xffc878, .35, 1.4, 2); l.position.set(1.75, y + .02, z + .2); kit.add(l);
+      const lb = new C.Mesh(new C.PlaneGeometry(.9, .11), M.label); lb.position.set(1.6, ACY + .17, zf(.17) + .004); lb.rotation.x = -tilt(.17); kit.add(lb); }
+    { const wx = 1.42, wy = ACY - .08, z = zf(-.08) - .01;
+      add(rbox(1.2, .6, .06, .05), M.chrome, wx, wy, z); add(rbox(1.1, .5, .06, .045), M.blackGlass, wx, wy, z + .012);
+      box(.72, .36, .01, std({ color: 0x0f0e0b, roughness: .25 }), wx - .14, wy, z + .045, { cast: false });
+      for (let k = 0; k < 6; k++) box(rr(.05, .18), .012, .004, k % 3 ? M.dimAmber : M.dimGreen, wx - .4 + rr(0, .4), wy + .13 - k*.045, z + .05, { cast: false });
+      box(.22, .42, .012, std({ color: 0x1c1a16, roughness: .4 }), wx + .38, wy, z + .045, { cast: false });
+      for (let k = 0; k < 14; k++){ const bx = wx + .33 + (k % 2)*.1, by = wy + .16 - Math.floor(k/2)*.05; box(.07, .03, .01, k === 3 || k === 8 ? M.lampGlow : M.creamPlain, bx, by, z + .052, { cast: false }); } }
+    { const z = zf(0) - .02;
+      for (let k = 0; k < 9; k++) box(.05, .022, .012, k % 4 === 1 ? M.dimAmber : M.creamPlain, .74, ACY + .3 - k*.045, z, { cast: false });
+      for (let k = 0; k < 3; k++) cyl(.026, .026, .03, M.chrome, .66, ACY - .05 - k*.1, z - .01, { rx: Math.PI/2, seg: 16 });
+      for (const [y, c] of [[ACY - .36, 0xf08a24], [ACY - .36, 0xf0b040]]) box(.07, .04, .02, std({ color: c, emissive: c, emissiveIntensity: .8 }), c === 0xf08a24 ? .7 : .8, y, zf(-.36) - .015, { rx: tilt(-.36), cast: false });
+      for (let k = 0; k < 6; k++) box(.12, .008, .01, M.dark, .9, ACY - .25 - k*.025, zf(-.3) - .01, { rx: tilt(-.3), cast: false }); }
+    { const dy = -.43, z = zf(dy); box(2.5, .05, .03, M.dark, 1.95, ACY + dy, z - .01, { rx: tilt(dy), cast: false }); box(2.3, .012, .01, M.steel, 1.95, ACY + dy + .035, z, { rx: tilt(dy), cast: false }); }
+    for (const [x, y, w, h, c] of [[3.7, ACY + .22, .18, .1, 0xd6573b], [3.95, ACY + .2, .12, .07, 0x3f6f7a], [3.75, ACY + .05, .25, .04, 0x2c2a26], [4.1, ACY - .1, .1, .1, 0xe0c27a]]){ const dy = y - ACY; box(w, h, .004, std({ color: c, roughness: .5 }), x, y, zf(dy) + .002, { rx: -tilt(dy), cast: false }); }
+    { const z = zf(.05); add(rbox(.32, .22, .03, .03), M.creamPlain, 3.0, ACY + .05, z - .005); for (let k = 0; k < 3; k++) cyl(.022, .022, .025, M.dark, 2.9 + k*.1, ACY + .02, z + .012, { rx: Math.PI/2, seg: 12 }); box(.18, .04, .01, M.dimAmber, 3.0, ACY + .11, z + .012, { cast: false }); }
+    // the wall beside the capsule, between it and the porthole: olive plates, a conduit with clamps, a cable, a small control box
+    for (let y = .98; y < CEIL - .6; y += .56) add(rbox(.62, .52, .03, .02), rnd() < .25 ? M.darkMetal : M.hull, .02, y + .26, .03, { cast: false });
+    pipe([[.14, TOP, .12], [.14, 2.4, .12], [.16, 3.4, .14], [.2, CEIL - .7, .3]], .028, M.steel, 7); pipe([[.26, TOP + .2, .07], [.24, 2.0, .09], [.3, 3.6, .1]], .012, M.rubber, 3);
+    add(rbox(.2, .3, .08, .02), M.creamPlain, -.04, 2.05, .1); box(.12, .07, .01, M.dimGreen, -.04, 2.13, .145, { cast: false }); for (let k = 0; k < 3; k++) box(.03, .03, .012, k === 1 ? M.lampGlow : M.dark, -.09 + k*.05, 2.0, .145, { cast: false });
     // above it: the hull's ceiling of machinery, tanks and conduits, a box with a vent, a tube light toward the front
     parent = null;
     // the ceiling plane, conduits running toward the camera, the tube light
@@ -455,7 +521,7 @@ const ROOM = (() => {
     const b2 = new C.PointLight(0xffd090, .35, 3, 2); b2.position.copy(wc).addScaledVector(n, 1.2).add(new C.Vector3(0, -.7, 0)); sc.add(b2); R.L.b2 = b2;
     const b3 = new C.SpotLight(0xffc888, .9, 7, .5, .9, 2); R.L.b3 = b3; b3.position.copy(wc).addScaledVector(n, .6); b3.target.position.set(1.92, 1.0, -4.51); sc.add(b3, b3.target);
     const b4 = new C.PointLight(0xffb870, .35, 3, 2); b4.position.copy(wc).addScaledVector(n, .5).add(new C.Vector3(0, 1.4, 0)); sc.add(b4); R.L.b4 = b4;
-    const b5 = new C.PointLight(0xffb070, .9, 3.2, 2); b5.position.set(.8, 4.25, -3.6); b5.intensity = .55; b5.distance = 3.5; sc.add(b5);
+    const b5 = new C.PointLight(0xffb070, .9, 3.2, 2); b5.position.set(.8, 4.25, -3.6); b5.intensity = .3; b5.distance = 3.5; sc.add(b5);
     // the sunlit room's bounce onto the kitchen's front (it faces away from the window, so the sun never reaches it directly)
     const fill = new C.DirectionalLight(0xbcd2d0, .22); fill.position.set(-3, 3.2, -1.5); fill.target.position.set(2, .9, -6); sc.add(fill, fill.target);
     R.reaim(); b1.position.set(G.rug.position.x, .3, G.rug.position.z);

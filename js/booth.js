@@ -57,6 +57,7 @@ const BOOTH = (() => {
     if (!S.song || songKey === S.song.key) return !!songSounds;
     songKey = S.song.key; songSounds = null; songRecut = null; audio();
     songSounds = await BOOTHSONG.sounds(ctx, S.song.key);
+    { const key = S.song.key; songRecut = (start, len) => BOOTHSONG.recutFor(ctx, key, start, len); }
     if (!songSounds){ flash("This song's samples aren't on this computer: load the song again for its sound"); if (VOICES.find(v => v.id === S.voice).song) setVoice('glass'); }
     voiceAvail(); return !!songSounds;
   }
@@ -435,7 +436,7 @@ const BOOTH = (() => {
   async function nudge(d){
     if (!S.song) return; const ns = clamp(S.song.start + d, 0, Math.max(0, S.song.list.length - S.len)); if (ns === S.song.start) return;
     S.song.start = ns; apCache.clear(); if (playing){ lastBar = null; padCh = null; } drawKeys(chordOf(curBar())); songInfo(); store();
-    if (songRecut && songSounds && songKey === S.song.key) songSounds.chops = await songRecut(ns, S.len);
+    if (songRecut && songSounds && songKey === S.song.key){ const c = await songRecut(ns, S.len); if (c) songSounds.chops = c; }
   }
   function drawKeys(ch){
     const P = padsFor(ch);
@@ -559,11 +560,12 @@ const BOOTH = (() => {
     if (!bc) return;
     const here = playing ? chordOf(curBar()) : null; if (here && E.handOff) E.handOff(here);   // (the planners' pattern bridges over from the chord playing now)
     stop();
-    const st = bc.stash; bc = null; driftSeq = null; if (bus && ctx){ bus.lead.gain.setTargetAtTime(1, ctx.currentTime, .2); bus.pad.gain.setTargetAtTime(1, ctx.currentTime, .2); } Object.keys(S).forEach(k => { if (!(k in st)) delete S[k]; }); Object.assign(S, st);
+    const st = bc.stash, moved = bc.moved; bc = null; driftSeq = null;
+    if (moved && st.song && songRecut && songSounds && st.song.key === songKey) songRecut(st.song.start, st.len).then(c => { if (c && !bc) songSounds.chops = c; }); if (bus && ctx){ bus.lead.gain.setTargetAtTime(1, ctx.currentTime, .2); bus.pad.gain.setTargetAtTime(1, ctx.currentTime, .2); } Object.keys(S).forEach(k => { if (!(k in st)) delete S[k]; }); Object.assign(S, st);
     if (S.song) ensureSong(); padCache.clear(); apCache.clear(); stripShow(false);
     if (mode !== 'booth') music.setBooth(false);
   };
-  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
+  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._move = () => moveSection(); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
   const layerOn = id => { const b = $(id); return !!(b && b.classList.contains('on')); };   // (the Console's layer buttons: what the player asked for, whether or not the engine has started)
   // once a pass (from the second): the governor drifts the Console's own settings, as the auto-governor does for the
   // planners' patterns; a rewired copy also takes a little of the autopilot's answer into itself and moves a note
@@ -594,6 +596,20 @@ const BOOTH = (() => {
       }
     }
     if (bc.mode === 'rewire' && S.ap) evolve(S.layers[0], apCache.get(cyc - 1) || []);
+    if (layerOn('g-autopilotBtn') && S.prog === 'song' && S.song && cyc % 8 === 5 && gR() < .7) moveSection();
+  }
+  // For a song loop, the governor now and then takes the loop's chords and chops from another part of the song: a section
+  // the song plays more than once if it has one (a verse, a chorus), otherwise any stretch with a chord change in it. Only
+  // the broadcast's copy moves; the Booth's own section is put back when the broadcast ends.
+  async function moveSection(){
+    const L0 = S.song.list, n = S.len, cands = [], key = s0 => L0.slice(s0, s0 + n).join(',');
+    for (let s0 = 0; s0 + n <= L0.length; s0++){ if (s0 === S.song.start || new Set(L0.slice(s0, s0 + n)).size < 2) continue;
+      let rep2 = 0; for (let t = 0; t + n <= L0.length; t++) if (key(t) === key(s0)) rep2++; cands.push([s0, rep2]); }
+    if (!cands.length) return;
+    const pool = cands.filter(c => c[1] > 1).length ? cands.filter(c => c[1] > 1) : cands, pick = pool[Math.floor(gR()*pool.length)][0];
+    if (key(pick) === key(S.song.start) && pool.length > 1 && gR() < .7) return;   // (the same chords elsewhere: mostly not worth a move)
+    S.song.start = pick; if (bc) bc.moved = true; apCache.clear(); padCh = null; stripShow(true);
+    if (songRecut && songSounds){ const c = await songRecut(pick, n); if (c && bc) songSounds.chops = c; }
   }
   // Drift (the Console's Drift switch) on a shelf loop: each pass, the chords may wander from the loop's order, taking the
   // steps the music itself takes. For a song, the chord changes the song makes (how often each chord follows each other one,
@@ -673,7 +689,7 @@ const BOOTH = (() => {
     const st = $('gStrip'); if (!st) return; st.hidden = !on;
     root.querySelectorAll('.a-chart .gchord, .a-chart .gpads, .a-chart .gpills').forEach(e => { e.hidden = on; });
     if (on){ const rw = bc && bc.mode === 'rewire';
-      $('gStripMode').textContent = (rw ? 'REWIRED // ' : 'AS LOGGED // ') + (bc ? bc.name : '');
+      $('gStripMode').textContent = (rw ? 'REWIRED // ' : 'AS LOGGED // ') + (bc ? bc.name : '') + (S.prog === 'song' && S.song ? ` // BARS ${S.song.start + 1}-${S.song.start + S.len}` : '');
       $('gStripSave').hidden = !rw;
       $('gStripHint').textContent = rw ? 'Cyan: your notes · green: changed by you or the Grid · drag, stretch, click to add, double-click to remove' : 'As recorded · Neuro-phrase on: the Grid answers · Auto-governor on: the settings drift';
       $('gStripCv').title = rw ? 'Drag a note to move it, drag its right end to stretch it, click an empty spot to add one, double-click (or Delete) to remove it. With the Neuro-phrase on, the Grid drifts it somewhere new. The shelf copy stays as it was.'

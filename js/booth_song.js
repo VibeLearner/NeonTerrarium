@@ -232,7 +232,7 @@ const BOOTHSONG = (() => {
   // the samples as sounds the Booth can play
   function toBuffers(ctx, pack){
     const mk = (data, sr) => { const b = ctx.createBuffer(1, data.length, sr); b.getChannelData(0).set(data instanceof Float32Array ? data : f32(data)); return b; };
-    return { samples: pack.samples.map(s => ({ root: s.root, ls: s.ls, le: s.le, buf: mk(s.data, s.sr) })), chops: pack.chops.map(bar => bar.map(c => c ? mk(c, pack.sr) : null)) };
+    return { samples: pack.samples.map(s => ({ root: s.root, ls: s.ls, le: s.le, buf: mk(s.data, s.sr) })), chops: pack.chops.map(bar => bar.map(c => c ? mk(c, pack.chopSr || pack.sr) : null)) };
   }
 
   // ---------- the whole listen ----------
@@ -254,16 +254,24 @@ const BOOTHSONG = (() => {
     const samples = []; for (const s of roots){ samples.push(makeSample(x, sr, s)); await later(); }
     say('Cutting the chops…', .9); await later();
     const bs = 60/tp.bpm, chops = makeChops(x, sr, bb.t0 + sec.start*4*bs, bs, sec.len);
-    const pack = { name: file.name.replace(/\.[^.]+$/, ''), sr, samples: samples.map(s => ({ root: s.root, ls: s.ls, le: s.le, sr: s.sr, data: i16(s.data) })), chops: chops.map(b => b.map(c => c ? i16(c) : null)) };
+    // (the whole song kept too, at half rate, so the chops can be cut from another section in a later visit)
+    const f22 = Math.max(1, Math.round(sr/22050));
+    const pack = { mono: i16(down(x, f22)), monoSr: sr/f22, bar0: bb.t0, bs, name: file.name.replace(/\.[^.]+$/, ''), sr, samples: samples.map(s => ({ root: s.root, ls: s.ls, le: s.le, sr: s.sr, data: i16(s.data) })), chops: chops.map(b => b.map(c => c ? i16(c) : null)) };
     await put(id, pack);
     say('Done', 1);
     const NM = key.flats ? FL : SH;
     // moving the section later or earlier: the chops are cut again from the song (while it's still loaded)
-    const recut = async (start, len) => { const c = makeChops(x, sr, bb.t0 + start*4*bs, bs, len); pack.chops = c.map(b => b.map(v => v ? i16(v) : null)); await put(id, pack); return toBuffers(ctx, pack).chops; };
+    const recut = async (start, len) => { const c = makeChops(x, sr, bb.t0 + start*4*bs, bs, len); pack.chops = c.map(b => b.map(v => v ? i16(v) : null)); pack.chopSr = sr; await put(id, pack); return toBuffers(ctx, pack).chops; };
     return { recut, key: id, name: pack.name, bpm: tp.bpm, keyName: NM[key.root] + ' ' + key.q, cs: bb.cs.map(c => ({ name: c.name, notes: c.notes, motif: c.motif })), list: bb.list, start: sec.start, len: sec.len, sounds: toBuffers(ctx, pack), nSamples: samples.length };
   };
   // a song listened to before: its samples back from the store (null if they're gone)
   Q.sounds = async (ctx, key) => { const p = await get(key); return p ? toBuffers(ctx, p) : null; };
+  // cut the chops again from another section of a song listened to before (from the copy kept with its samples)
+  Q.recutFor = async (ctx, key, start, len) => {
+    const p = await get(key); if (!p || !p.mono) return null;
+    const x = f32(p.mono), c = makeChops(x, p.monoSr, p.bar0 + start*4*p.bs, p.bs, len);
+    p.chops = c.map(b => b.map(v => v ? i16(v) : null)); p.chopSr = p.monoSr; await put(key, p); return toBuffers(ctx, p).chops;
+  };
   Q.hpss = hpss; Q.tempo = tempo; Q._held = heldNotes; Q._sample = makeSample;   // (for checking)
   return Q;
 })();

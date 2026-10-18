@@ -59,6 +59,7 @@ const BOOTH = (() => {
     songSounds = await BOOTHSONG.sounds(ctx, S.song.key);
     { const key = S.song.key; songRecut = (start, len) => BOOTHSONG.recutFor(ctx, key, start, len); }
     if (!songSounds){ flash("This song's samples aren't on this computer: load the song again for its sound"); if (VOICES.find(v => v.id === S.voice).song) setVoice('glass'); }
+    else if (!songSounds.samples.length) heldAgain(S.song.key);   // (a song that came away with no held notes: listened to again, more loosely)
     voiceAvail(); return !!songSounds;
   }
   // ---------- Transform: the Console's pings in the voice of the player's songs ----------
@@ -132,6 +133,26 @@ const BOOTH = (() => {
   async function openXform(){
     xList = await songList(); xformRows(); $('mDlg').hidden = false;
     Object.values(mv).forEach(k => mvLoad(k));
+    for (const x of xList.filter(x => !x.n && !heldTried.has(x.key))){   // (songs with no held notes yet: a second, looser listen)
+      const st = $('mSt'), nm = esc(x.name);
+      const n = await heldAgain(x.key, q => { st.textContent = `Listening to ${nm} again for held notes… ${Math.round(q*100)}%`; });
+      xList = await songList(); xformRows();
+      if (n) st.textContent = `Found ${n} held note${n > 1 ? 's' : ''} in ${nm}: it can voice the pings now.`;
+    }
+  }
+
+  // Songs listened to before the looser held-note search: listened to again for their held notes (from the copy of the
+  // song kept on this computer), once each, and everything that knows the song is told how many it has now.
+  const heldTried = new Set();
+  async function heldAgain(key, say){
+    if (!key || heldTried.has(key)) return 0; heldTried.add(key);
+    let n = 0; try { n = await BOOTHSONG.redoHeld(key, say); } catch (e){}
+    if (!n) return 0;
+    const fix = sg => { if (sg && sg.key === key) sg.nSamples = n; };
+    fix(S.song); if (bc) fix(bc.stash.song); loops.forEach(l => fix(l.song)); store();
+    mvSounds.delete(key);
+    if (songKey === key){ songKey = null; await ensureSong(); songInfo(); }
+    return n;
   }
 
   const padCache = new Map();

@@ -173,21 +173,61 @@ const BOOTHSONG = (() => {
       fr.push({ t: (f*hop + N/2)/sr, m: bm, mf: 69 + 12*Math.log2((kf*sr/N)/440), ratio: tot > 0 ? best/tot : 0, e: tot });
       if (f % 300 === 299){ prog(f/n); await later(); }
     }
-    const es = fr.map(v => v.e).sort((p, q) => p - q), eMed = es[es.length >> 1] || 1e-9, segs = [];
-    let run = [];
-    const close = () => { if (run.length*hop/sr >= .4){ const ms = run.map(v => v.mf).filter(v => isFinite(v) && Math.abs(v - run[0].m) < .7).sort((p, q) => p - q); const mm = ms.length ? ms[ms.length >> 1] : run[0].m;
-      const ratio = run.reduce((s2, v) => s2 + v.ratio, 0)/run.length, loud = Math.min(2, run.reduce((s2, v) => s2 + v.e, 0)/run.length/eMed);
-      segs.push({ t0: run[0].t - N/2/sr, t1: run[run.length - 1].t + N/2/sr, midi: mm, score: (run.length*hop/sr)*ratio*(.4 + loud) }); } run = []; };
-    for (const v of fr){
-      const ok = v.ratio > .09 && v.e > eMed*.4;
-      if (ok && run.length && v.m !== run[0].m) close();
-      if (ok) run.push(v); else close();
+    return findHeld(fr, hop, N, sr);
+  }
+  // From the frames, the held notes in three passes, each only if the one before found fewer than three different notes:
+  // strict (a clear note standing out of the mix for .4 s), looser (a note that leads the mix for .3 s, riding over a
+  // frame or two where another chord tone pokes above it: vibrato, a passing note, the chord under a voice), and last the
+  // steadiest stretches there are (for each of the notes the song leans on most, its best third of a second, even if a
+  // little noisy). Every segment says which pass found it (loose 0, 1 or 2).
+  function findHeld(fr, hop, N, sr){
+    const es = fr.map(v => v.e).sort((p, q) => p - q), eMed = es[es.length >> 1] || 1e-9, rs = fr.map(v => v.ratio).sort((p, q) => p - q), rq = q => rs[Math.floor(q*(rs.length - 1))] || 0;
+    const dt = hop/sr;
+    const pass = (rMin, eMin, minDur, gapMax, loose) => {
+      const segs = []; let run = [], note = -1, gap = 0;
+      const close = () => {
+        if (run.length*dt >= minDur){
+          const ms = run.filter(v => v.m === note).map(v => v.mf).filter(v => isFinite(v) && Math.abs(v - note) < .7).sort((p, q) => p - q), mm = ms.length ? ms[ms.length >> 1] : note;
+          const own = run.filter(v => v.m === note), ratio = own.reduce((s2, v) => s2 + v.ratio, 0)/Math.max(1, own.length), loud = Math.min(2, run.reduce((s2, v) => s2 + v.e, 0)/run.length/eMed);
+          segs.push({ t0: run[0].t - N/2/sr, t1: run[run.length - 1].t + N/2/sr, midi: mm, score: (run.length*dt)*ratio*(.4 + loud)*(own.length/run.length), loose });
+        }
+        run = []; note = -1; gap = 0;
+      };
+      for (const v of fr){
+        const ok = v.ratio > rMin && v.e > eMed*eMin;
+        if (!ok){ if (run.length && gap < gapMax){ gap++; continue; } close(); continue; }
+        if (note < 0){ note = v.m; run.push(v); continue; }
+        if (v.m === note){ run.push(v); gap = 0; continue; }
+        if (gap < gapMax){ gap++; run.push(v); continue; }   // (a frame or two on another note: still the same held note)
+        const keep = gap ? run.slice(-gap) : []; run.length -= gap; close(); for (const k of keep) if (k.m === v.m) run.push(k); note = v.m; run.push(v);
+      }
+      close();
+      return segs;
+    };
+    const distinct = segs => new Set(segs.filter(x => x.midi >= 45 && x.midi <= 86).map(x => Math.round(x.midi))).size;
+    let segs = pass(.09, .4, .4, 0, 0);
+    if (distinct(segs) < 3) segs = segs.concat(pass(Math.min(.09, rq(.5)), .25, .3, 2, 1));
+    if (distinct(segs) < 3){
+      // the steadiest third of a second for each of the notes that most often lead the mix
+      const w = Math.max(3, Math.round(.3/dt)), counts = new Map();
+      fr.forEach(v => { if (v.e > eMed*.2) counts.set(v.m, (counts.get(v.m) || 0) + 1); });
+      const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(e => e[0]);
+      for (const m of top){
+        let best = null;
+        for (let i = 0; i + w <= fr.length; i += 2){
+          let hit = 0, r = 0, e = 0; for (let k = i; k < i + w; k++){ const v = fr[k]; if (v.m === m){ hit++; r += v.ratio; } e += v.e; }
+          if (hit < w*.6 || e/w < eMed*.2) continue;
+          const sc = (hit/w)*(r/hit)*Math.min(2, e/w/eMed);
+          if (!best || sc > best.sc) best = { sc, i };
+        }
+        if (best){ const run = fr.slice(best.i, best.i + w).filter(v => v.m === m), ms = run.map(v => v.mf).filter(v => isFinite(v) && Math.abs(v - m) < .7).sort((p, q) => p - q);
+          segs.push({ t0: fr[best.i].t - N/2/sr, t1: fr[best.i + w - 1].t + N/2/sr, midi: ms.length ? ms[ms.length >> 1] : m, score: best.sc*.01, loose: 2 }); }
+      }
     }
-    close();
     return segs;
   }
   function chooseRoots(segs){
-    const c = segs.filter(s => s.midi >= 45 && s.midi <= 86).sort((a, b) => b.score - a.score), out = [];
+    const c = segs.filter(s => s.midi >= 45 && s.midi <= 86).sort((a, b) => (a.loose || 0) - (b.loose || 0) || b.score - a.score), out = [];
     for (const s of c){ if (out.length >= 5) break; if (out.every(o => Math.abs(o.midi - s.midi) >= 3)) out.push(s); }
     return out.sort((a, b) => a.midi - b.midi);
   }
@@ -276,6 +316,17 @@ const BOOTHSONG = (() => {
     try { const d = await db(); await new Promise(res => { const r = d.transaction('songs').objectStore('songs').openCursor();
       r.onsuccess = () => { const c = r.result; if (!c) return res(); a.push({ key: c.key, name: c.value.name, n: (c.value.samples || []).length }); c.continue(); }; r.onerror = () => res(); }); } catch (e){}
     idxSet(a); return a;
+  };
+  // a song listened to before that came away with no held notes: listened to again for them, from the copy kept with its
+  // samples, with the looser passes (findHeld). Returns how many it found (0 if still none, or the song isn't kept).
+  Q.redoHeld = async (key, say = () => {}) => {
+    const p = await get(key); if (!p || !p.mono) return 0;
+    if (p.samples && p.samples.length) return p.samples.length;
+    const x = f32(p.mono), sr = p.monoSr, f = Math.max(1, Math.round(sr/11025)), xs = down(x, f);
+    const segs = await heldNotes(xs, sr/f, q => say(q)), roots = chooseRoots(segs), samples = [];
+    for (const r of roots){ const sm = makeSample(x, sr, r); samples.push({ root: sm.root, ls: sm.ls, le: sm.le, sr: sm.sr, data: i16(sm.data) }); await later(); }
+    p.samples = samples; await put(key, p); idxAdd(key, p.name, samples.length);
+    return samples.length;
   };
   // a song listened to before: its samples back from the store (null if they're gone)
   Q.sounds = async (ctx, key) => { const p = await get(key); return p ? toBuffers(ctx, p) : null; };

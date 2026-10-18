@@ -35,7 +35,7 @@ const BOOTH = (() => {
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   // ---------- what's set, and the shelf (both kept with the city) ----------
-  const S = { song: null, prog: 0, len: 8, voice: 'glass', bpm: 84, tidy: .5, click: 'count', ap: false, apAmt: .55, layers: [] };
+  const S = { chopLvl: 1, song: null, prog: 0, len: 8, voice: 'glass', bpm: 84, tidy: .5, click: 'count', ap: false, apAmt: .55, layers: [] };
   let loops = [], loadedId = null, mode = 'console';
   try { const o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (o){ if (o.set) Object.assign(S, o.set); if (Array.isArray(o.loops)) loops = o.loops; } } catch (e){}
   S.layers = Array.isArray(S.layers) ? S.layers : [];
@@ -84,14 +84,14 @@ const BOOTH = (() => {
     audio(); t = Math.max(ctx.currentTime, t); dest = dest || bus.lead;
     if (voice === 'sampler' && songSounds && songSounds.samples.length){   // the nearest held note from the song, played at this pitch and looped while held
       let s = songSounds.samples[0]; for (const x of songSounds.samples) if (Math.abs(x.root - midi) < Math.abs(s.root - midi)) s = x;
-      const src = ctx.createBufferSource(), g = env(t, .55*vel, .008), pn = ctx.createStereoPanner(); pn.pan.value = clamp(pan || 0, -.9, .9);
+      const src = ctx.createBufferSource(), g = env(t, .55*vel*(S.chopLvl ?? 1), .008), pn = ctx.createStereoPanner(); pn.pan.value = clamp(pan || 0, -.9, .9);
       src.buffer = s.buf; src.playbackRate.value = Math.pow(2, (midi - s.root)/12); src.loop = true; src.loopStart = s.ls; src.loopEnd = s.le;
       src.connect(g); g.connect(pn); pn.connect(dest); src.start(t);
       return { off(t2){ release(g, Math.max(t2, t + .03), .3, [src]); } };
     }
     if (voice === 'chops' && songSounds && songSounds.chops.length){   // the song's own chord at this bar: a beat of it, pads in four columns of beats and three octaves
       const bc = songSounds.chops[((bar % songSounds.chops.length) + songSounds.chops.length) % songSounds.chops.length] || [], c = bc[pad % 4] || bc.find(Boolean);
-      if (c){ const src = ctx.createBufferSource(), g = env(t, .7*vel, .004), pn = ctx.createStereoPanner(); pn.pan.value = clamp(pan || 0, -.9, .9);
+      if (c){ const src = ctx.createBufferSource(), g = env(t, .7*vel*(S.chopLvl ?? 1), .004), pn = ctx.createStereoPanner(); pn.pan.value = clamp(pan || 0, -.9, .9);
         src.buffer = c; src.playbackRate.value = [.5, 1, 2, 2][Math.min(3, Math.floor(pad/4))]; src.connect(g); g.connect(pn); pn.connect(dest); src.start(t);
         return { off(t2){ release(g, Math.max(t2, t + .12), .12, [src]); } }; }
     }
@@ -336,11 +336,16 @@ const BOOTH = (() => {
     VOICES.forEach(v => { const b = document.createElement('button'); b.className = 'gb' + (v.id === S.voice ? ' on' : '') + (v.song ? ' bsongv' : ''); b.dataset.v = v.id; b.innerHTML = v.name + '<small>' + v.sub + '</small>';
       b.addEventListener('click', () => { if (v.song && !songSounds){ flash('Load a song first (above) for this voice'); return; } setVoice(v.id); noteDown(5, .7); setTimeout(() => noteUp(5), 350); }); vb.appendChild(b); });
     voiceAvail();
-    $('bSongBtn').addEventListener('click', () => $('bSongFile').click());
+    $('bSongBtn').addEventListener('click', () => { if (unsaved()) askClear(null); else $('bSongFile').click(); });
+    $('bSongClear').addEventListener('click', () => { const f = pendingFile; $('bDlg').hidden = true; pendingFile = null; if (f) loadSong(f); else $('bSongFile').click(); });
+    $('bSongKeep').addEventListener('click', () => { $('bDlg').hidden = true; pendingFile = null; });
+    $('bDlg').addEventListener('keydown', e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); $('bDlg').hidden = true; pendingFile = null; } });
+    $('bSongBack').addEventListener('click', () => { if (S.song && S.song.start0 !== undefined) nudge(S.song.start0 - S.song.start); });
+    const ck = $('g-boothChopSlider'); if (ck){ ck.value = String(S.chopLvl ?? 1); ck.dataset.def = '1'; ck.addEventListener('input', () => { S.chopLvl = +ck.value; const o = $('g-boothChopVal'); if (o) o.textContent = Math.round(S.chopLvl*100) + '%'; store(); }); ck.dispatchEvent(new Event('input')); }
     $('bSongFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadSong(f); });
     $('gBooth').addEventListener('dragover', e => { if ([...(e.dataTransfer.types || [])].includes('Files')) e.preventDefault(); });
-    $('gBooth').addEventListener('drop', e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f && /^audio\//.test(f.type || 'audio/')){ e.preventDefault(); loadSong(f); } });
-    $('bSongNudge').querySelectorAll('.gb').forEach(b => b.addEventListener('click', () => nudge(+b.dataset.d)));
+    $('gBooth').addEventListener('drop', e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f && /^audio\//.test(f.type || 'audio/')){ e.preventDefault(); if (unsaved()) askClear(f); else loadSong(f); } });
+    $('bSongNudge').querySelectorAll('.gb[data-d]').forEach(b => b.addEventListener('click', () => nudge(+b.dataset.d)));
     songInfo();
     const row = (id, attr, val, fn) => { const r = $(id); r.querySelectorAll('.gb').forEach(b => { b.classList.toggle('on', String(b.dataset[attr]) === String(val)); b.addEventListener('click', () => { r.querySelectorAll('.gb').forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset[attr]); store(); }); }); };
     row('bLen', 'len', S.len, v => { S.len = +v; apCache.clear(); });
@@ -381,20 +386,27 @@ const BOOTH = (() => {
     if (!o){ o = document.createElement('option'); o.value = 'song'; sel.insertBefore(o, sel.firstChild); }
     o.textContent = 'From your song: ' + S.song.name;
   }
+  // takes on the loop deck that aren't on the shelf as they are now
+  let pendingFile = null;
+  function unsaved(){ if (!S.layers.length) return false; const l = loadedId && loops.find(x => x.id === loadedId); return !(l && JSON.stringify(l.layers) === JSON.stringify(S.layers)); }
+  function askClear(f){ pendingFile = f; $('bDlg').hidden = false; $('bSongKeep').focus({ preventScroll: true }); }
   function songInfo(){
-    const st = $('bSongSt'), nd = $('bSongNudge'); if (!st) return;
-    if (!S.song){ st.textContent = 'Use your own song: its chords become the pattern and its sound plays on the pads.'; nd.hidden = true; return; }
-    st.textContent = `${S.song.name}: ${S.song.keyName}, about ${Math.round(S.song.bpm)} beats a minute, bars ${S.song.start + 1} to ${S.song.start + S.len} of ${S.song.list.length}` + (S.song.nSamples ? ` · ${S.song.nSamples} held note${S.song.nSamples > 1 ? 's' : ''} sampled` : ' · no clean held notes found (chops only)');
-    nd.hidden = false;
+    const box = $('bSongInfo'), nd = $('bSongNudge'), msg = $('bSongSt'); if (!box) return;
+    if (!S.song){ box.hidden = true; nd.hidden = true; msg.hidden = false; msg.textContent = 'Use your own song: its chords become the pattern and its sound plays on the pads.'; return; }
+    msg.hidden = true; box.hidden = false; nd.hidden = false;
+    const rows = [['Song', S.song.name], ['Key', S.song.keyName], ['Tempo', Math.round(S.song.bpm) + ' BPM'], ['Section', `bars ${S.song.start + 1} to ${S.song.start + S.len} of ${S.song.list.length}`],
+      ['Samples', S.song.nSamples ? S.song.nSamples + ' held note' + (S.song.nSamples > 1 ? 's' : '') + ' · chops' : 'chops only (no clean held notes)']];
+    box.textContent = ''; for (const [k, v] of rows){ const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; box.append(dt, dd); }
+    $('bSongBack').disabled = S.song.start0 === undefined || S.song.start === S.song.start0;
   }
   let songBusy = false;
   async function loadSong(f){
     if (songBusy) return; songBusy = true; audio(); const btn = $('bSongBtn'); btn.disabled = true;
-    const say = t => { $('bSongSt').textContent = t; };
+    const say = t => { const m = $('bSongSt'); m.hidden = false; m.textContent = t; $('bSongInfo').hidden = true; };
     try {
       const r = await BOOTHSONG.analyze(f, ctx, say);
-      stop(); S.layers.length && flash('Your layers now play over the song\'s chords');
-      S.song = { key: r.key, name: r.name, bpm: r.bpm, keyName: r.keyName, cs: r.cs, list: r.list, start: r.start, nSamples: r.nSamples };
+      stop(); S.layers = []; apCache.clear();   // (a new song starts a clean loop deck)
+      S.song = { key: r.key, name: r.name, bpm: r.bpm, keyName: r.keyName, cs: r.cs, list: r.list, start: r.start, start0: r.start, nSamples: r.nSamples };
       songKey = r.key; songSounds = r.sounds; songRecut = r.recut;
       S.prog = 'song'; S.len = r.len; let bpm = Math.round(r.bpm); while (bpm > 132) bpm = Math.round(bpm/2); while (bpm < 60) bpm *= 2;
       const bk = $('g-boothBpmSlider'); bk.value = String(bpm); bk.dispatchEvent(new Event('input'));
@@ -402,6 +414,7 @@ const BOOTH = (() => {
       songOption(); $('g-boothProg').value = 'song'; padCache.clear(); apCache.clear(); voiceAvail(); setVoice(r.nSamples ? 'sampler' : 'chops');
       loadedId = null; drawKeys(chordOf(0)); songInfo(); store(); renderShelf();
     } catch (e){ say("Couldn't read that file as a song. Try an MP3, WAV, M4A or OGG."); console.warn(e); }
+    status();
     btn.disabled = false; songBusy = false;
   }
   async function nudge(d){

@@ -177,6 +177,7 @@ const GRIDPANEL = (() => {
   #gridPanel .gdlgbox { position: relative; width: min(560px, 92%); border: 1px solid var(--cy); background: #071a21; padding: 30px 20px 18px; display: grid; gap: 10px; box-shadow: 0 0 40px rgba(95,216,222,.18); }
   #gridPanel .gdlgbox .gtag { position: absolute; top: 9px; left: 20px; color: var(--mg); }
   #gridPanel .gdlgbox h4 { margin: 0 0 4px; font: 500 15px 'Chakra Petch', sans-serif; letter-spacing: .1em; color: var(--ink); text-transform: uppercase; } #gridPanel .gdlgbox h4 b { color: var(--yl); font-weight: 500; }
+  #gridPanel .gdlgp { margin: 0 0 4px; color: var(--cy2); font-size: 12.5px; line-height: 1.5; }
   #gridPanel .gdlgopt { text-align: left; padding: 12px 14px; margin: 0; letter-spacing: .06em; text-transform: none; display: grid; gap: 4px; }
   #gridPanel .gdlgopt b { font: 500 14px 'Chakra Petch', sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--cy); }
   #gridPanel .gdlgopt small { color: var(--cy2); font-size: 12px; line-height: 1.45; } #gridPanel .gdlgopt:hover b { color: var(--yl); }
@@ -193,6 +194,14 @@ const GRIDPANEL = (() => {
   #gridPanel .b-setup { grid-area: setup; } #gridPanel .b-roll { grid-area: roll; } #gridPanel .b-keys { grid-area: keys; } #gridPanel .b-shelf { grid-area: shelf; }
   #gridPanel .bsong { display: grid; gap: 5px; border: 1px dashed var(--line); padding: 7px; } #gridPanel .bsong .gb { margin: 0; }
   #gridPanel .bsongst { color: var(--cy2); font-size: 11.5px; line-height: 1.4; letter-spacing: .03em; }
+  #gridPanel .bsonginfo { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; margin: 0; font-size: 11.5px; }
+  #gridPanel .bsonginfo dt { color: var(--dim); letter-spacing: .12em; text-transform: uppercase; font-size: 10.5px; align-self: center; }
+  #gridPanel .bsonginfo dd { margin: 0; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #gridPanel .bsonginfo dd:first-of-type { color: var(--yl); }
+  #gridPanel .bnudge { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } #gridPanel .bnudge .gb { margin: 0; padding: 5px 4px; font-size: 10.5px; letter-spacing: .06em; white-space: normal; line-height: 1.25; }
+  #gridPanel .bnudge #bSongBack { grid-column: 1 / -1; } #gridPanel .bnudge .gb:disabled { opacity: .4; cursor: default; }
+  #gridPanel .gbooth .b-setup { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } #gridPanel .gbooth .b-setup::-webkit-scrollbar { display: block; width: 6px; } #gridPanel .gbooth .b-setup::-webkit-scrollbar-thumb { background: var(--line); }
+  #gridPanel .b-setup .gknobs .gk { min-width: 56px; }
   #gridPanel .bvoices .gb.dis { opacity: .45; }
   #gridPanel .bvoices { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } #gridPanel .bvoices .gb { margin: 0; text-align: left; padding: 5px 7px; font-size: 11.5px; letter-spacing: .08em; }
   #gridPanel .bvoices .gb small { display: block; color: var(--dim); font-size: 10px; line-height: 1.2; letter-spacing: .04em; text-transform: none; margin-top: 1px; } #gridPanel .bvoices .gb.on small { color: #0b3a40; }
@@ -334,13 +343,16 @@ const GRIDPANEL = (() => {
       <div class="glbl">Carrier pattern</div>
       <select id="g-boothProg" title="The chords you'll play over: one chord a bar"></select>
       <div class="bsong"><button class="gb" id="bSongBtn" title="Pick a song from your computer (or drop it on the Booth). It's analyzed here and never leaves your computer.">Load a song</button><input type="file" id="bSongFile" accept="audio/*" hidden>
-        <div class="bsongst" id="bSongSt"></div>
-        <div class="grow" id="bSongNudge" hidden title="Move the section the pattern is taken from, a bar at a time"><button class="gb" data-d="-1">◀ Earlier</button><button class="gb" data-d="1">Later ▶</button></div></div>
+        <div class="bsongst" id="bSongSt"></div><dl class="bsonginfo" id="bSongInfo" hidden></dl>
+        <div class="bnudge" id="bSongNudge" hidden title="Which part of the song the pattern and the chops come from, a bar at a time">
+          <button class="gb" data-d="-1">◀ Sample an earlier section</button><button class="gb" data-d="1">Sample a later section ▶</button>
+          <button class="gb" id="bSongBack" title="Back to the section the Booth picked when it listened">Return to the original sample</button></div>
+</div>
       <div class="glbl">Length</div>
       <div class="grow" id="bLen"><button class="gb" data-len="4" title="The first four chords">4 bars</button><button class="gb on" data-len="8" title="All eight chords">8 bars</button></div>
       <div class="glbl">Voice</div>
       <div class="bvoices" id="bVoices"></div>
-      <div class="gknobs">${knob('boothBpmSlider', 'Clock', 60, 132, 1, 84, 'How fast the loop runs, in beats a minute.')}${knob('boothApSlider', 'Answer', 0, 1, 0.02, 0.55, 'How much the autopilot plays when it answers you.', 'mg')}</div>
+      <div class="gknobs">${knob('boothChopSlider', 'Song level', 0, 2, 0.05, 1, 'How loud the song sampler and the chops play, from silent to twice as loud.')}${knob('boothBpmSlider', 'Clock', 60, 132, 1, 84, 'How fast the loop runs, in beats a minute.')}${knob('boothApSlider', 'Answer', 0, 1, 0.02, 0.55, 'How much the autopilot plays when it answers you.', 'mg')}</div>
       <div class="glbl">Tidy timing</div>
       <div class="grow" id="bTidy" title="How much recorded notes are pulled onto the beat grid (sixteenths)"><button class="gb" data-tidy="0">Off</button><button class="gb on" data-tidy="0.5">Gentle</button><button class="gb" data-tidy="1">Full</button></div>
       <div class="glbl">Click</div>
@@ -365,6 +377,14 @@ const GRIDPANEL = (() => {
       <div class="bsave"><input id="bName" maxlength="40" placeholder="Name this loop" aria-label="Loop name"><button class="gb" id="bSave" title="Keep the loop on the shelf: pattern, voice, clock, layers and autopilot">Save</button></div>
       <div class="blist" id="bList"></div>
     </section>
+  </div>
+  <div class="gdlg" id="bDlg" hidden role="dialog" aria-modal="true" aria-labelledby="bDlgT">
+    <div class="gdlgbox"><span class="gtag">BOOTH // NEW SONG</span>
+      <h4 id="bDlgT">Wipe the loop deck?</h4>
+      <p class="gdlgp">A new song starts the Booth on a clean deck. Takes you haven't put on the shelf will be lost. Loops already on the shelf are safe.</p>
+      <button class="gb gdlgopt" id="bSongClear"><b>Wipe the deck and load</b><small>Clear the unsaved takes and pick the new song.</small></button>
+      <button class="gb" id="bSongKeep">Keep my takes (save them first)</button>
+    </div>
   </div>
   <div class="gdlg" id="gDlg" hidden role="dialog" aria-modal="true" aria-labelledby="gDlgT">
     <div class="gdlgbox"><span class="gtag">BOOTH SHELF // TAPE</span>

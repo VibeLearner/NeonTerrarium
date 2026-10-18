@@ -1540,11 +1540,9 @@ function applyRenderRes(z){
   let f = Math.max(1, z/ZOOM_REF);
   if (ZOOM_RES > 0) f = Math.min(f, ZOOM_RES);
   if (S.autoPerf !== false) f = Math.min(f, PERF.grow);
-  const behindTitle = typeof TITLE !== 'undefined' && TITLE.on && !TITLE.leaving;   // (under the title screen only the porthole shows the city: fewer pixels)
-  if (behindTitle) f = .75;
   PERF.f = f;
   const step = Math.round(Math.log(f)/Math.log(1.04));   // 4% steps, so targets aren't remade every frame
-  const h = Math.min(DH, Math.round(BASE_H*(behindTitle ? f : Math.pow(1.04, step))));
+  const h = Math.min(DH, Math.round(BASE_H*Math.pow(1.04, step)));
   if (h === H) return;
   H = h; W = Math.max(1, Math.round(h*DW/DH)); pxK = BASE_H/H;
   FOL_UNI.res.value.set(W, H); comp.uniforms.pxK.value = pxK;

@@ -16,7 +16,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18j';
+  const VER = '2026-10-18k';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -28,8 +28,7 @@ const TITLE = (() => {
     W = innerWidth; H = innerHeight;
     const v = W/H < .85 ? 'tall' : 'wide';
     if (v !== view){ view = v; const f = k => 'assets/title/' + k + '-' + v + '-' + TOD + '.png?v=' + VER;
-      imRoom.src = f('room'); imGlass.src = f('glass'); if (A[v].signRect) imOff.src = f('signoff'); loadPlants(v);
-      lampIm.src = A[v].lampRect ? f('lamp') : '';
+      imRoom.src = f('room'); imGlass.src = f('glass'); if (A[v].signRect) imOff.src = f('signoff'); cvPl.hidden = true; live && live.view(v);
       SUNS = (A[v].heads || []).map((h, i) => { const im = new Image(); im.src = 'assets/title/sun-' + v + '-' + TOD + '-' + i + '.jpg?v=' + VER; return im; }); }
     const a = A[v], iw = a.w, ih = a.h; S0 = Math.max(W/iw, H/ih);
     const sw = iw*S0, sh = ih*S0;
@@ -38,7 +37,6 @@ const TITLE = (() => {
     Object.assign(stage.style, { left: OX + 'px', top: OY + 'px', width: sw + 'px', height: sh + 'px' });
     cvDust.width = Math.round(sw/S0); cvDust.height = Math.round(sh/S0); sunCv.width = cvDust.width; sunCv.height = cvDust.height;   // (dust at the picture's own pixels: it scales up crisp with it)
     const P = (k, el, dx = 0, dy = 0) => { el.style.left = (a[k][0]*100 + dx) + '%'; el.style.top = (a[k][1]*100 + dy) + '%'; };
-    const pr = a.plantRect; cvPl.hidden = !pr; if (pr) Object.assign(cvPl.style, { left: pr[0]/iw*100 + '%', top: pr[1]/ih*100 + '%', width: pr[2]/iw*100 + '%', height: pr[3]/ih*100 + '%' });
     cvSky.width = cvDust.width; cvSky.height = cvDust.height; seedClouds();
     const r = a.signRect; imOff.hidden = !r; glow.hidden = !r || a.glow === false;
     if (r){ if (a.sign) P('sign', glow); Object.assign(imOff.style, { left: r[0]/iw*100 + '%', top: r[1]/ih*100 + '%', width: r[2]/iw*100 + '%', height: r[3]/ih*100 + '%' }); }
@@ -52,21 +50,13 @@ const TITLE = (() => {
   // headings (60 degrees either side of straight in); the two nearest are blended and added over the room. Past those,
   // the sun has gone round the hull and the beam fades out until it comes round again.
   sunCv = document.createElement('canvas'); sunCv.className = 't-layer t-sun'; sunCv.setAttribute('aria-hidden', 'true'); gSun = sunCv.getContext('2d');
-  stage.insertBefore(sunCv, cvPl);
-  // the pendant over the table, baked apart: it swings gently from its cord, a slow pendulum with a little wobble
-  const lampCv = document.createElement('canvas'), gL = lampCv.getContext('2d'), lampIm = new Image(); lampCv.className = 't-layer'; lampCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(lampCv, cvPl.nextSibling);   // (in front of the sill's plants: it hangs nearer)
-  function drawLamp(now){
-    const a = A[view], w = lampCv.width = cvDust.width, h = lampCv.height = cvDust.height; gL.clearRect(0, 0, w, h);
-    if (!a.lampRect || !lampIm.complete || !lampIm.naturalWidth) return;
-    const t = now/1000, ang = reduced ? 0 : (Math.sin(t*1.9)*2.2 + Math.sin(t*.7 + 1)*.9)*Math.PI/180, r = a.lampRect, px = a.lampPivot[0]*w, py = a.lampPivot[1]*h;
-    gL.save(); gL.translate(px, py); gL.rotate(ang); gL.translate(-px, -py); gL.drawImage(lampIm, r[0], r[1]); gL.restore();
-  }
+  stage.insertBefore(sunCv, cvDust);
   function drawSun(){
     const a = A[view], hs = a.heads || [], w = sunCv.width, h = sunCv.height; gSun.clearRect(0, 0, w, h); sunW = 0;
     if (!hs.length || !SUNS.length) return;
     // which way the beam moves as the city turns: the far side of the city drifts the way the sun does, so the patch on
     // the floor moves against it (the bake's patches tell us which heading moves it which way on the picture)
-    const p = a.patches || [], sgn = p.length > 1 && p[p.length - 1][0] > p[0][0] ? -1 : 1;
+    const p = a.patches || [], sgn = p.length > 1 && p[p.length - 1][0] > p[0][0] ? -1 : 1; SUNSGN = 1;
     let d = ((sgn*(yaw - yaw0)*180/Math.PI + hs[0]) % 360 + 540) % 360 - 180;   // (degrees, -180..180; starts with the sun just coming in)
     sunH = d;
     const lo = hs[0], hi = hs[hs.length - 1]; let fade = Math.max(0, Math.min(1, 1 - (Math.max(lo - d, d - hi, 0))/25));
@@ -87,7 +77,35 @@ const TITLE = (() => {
   // the hour: the city's own, in four looks
   function pickTime(h){ return h >= 5.5 && h < 10 ? 'morning' : h >= 10 && h < 16.5 ? 'day' : h >= 16.5 && h < 19.5 ? 'evening' : 'night'; }
 
-  /* ---------- the plants on the sill, swaying ---------- */
+  /* ---------- the things that move, drawn live ---------- */
+  // The bake leaves out the plants and the lamp (their shadows stay in it). Here the room's own model is built once
+  // (tools/title/kitchen.js, the same one the bake uses, so every leaf matches), everything but those hidden, and they're
+  // drawn each frame from the bake's camera on a canvas over the picture: the lamp swings, the leaves stir, the sun
+  // turns with the city.
+  const CAMS = { wide: { pos: [2.0, 2.33, 1.01], look: [-1.79, 1.28, -8.18], fov: 45.9 }, tall: { pos: [2.0, 2.33, 1.01], look: [-1.75, 1.28, -8.2], fov: 86 } };
+  let live = null, liveP = null, liveAt = 0;
+  function startLive(){
+    if (liveP) return liveP;
+    liveP = new Promise(res => { const sc = document.createElement('script'); sc.src = 'tools/title/kitchen.js?v=' + VER; sc.onload = res; sc.onerror = () => res(); document.head.appendChild(sc); }).then(() => {
+      if (typeof ROOM === 'undefined' || !ROOM.movers) return;
+      const cv = document.createElement('canvas'); cv.className = 't-layer t-live'; cv.setAttribute('aria-hidden', 'true'); stage.insertBefore(cv, cvDust);
+      const r = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: false }); { const gl = r.getContext(), src = gl.shaderSource.bind(gl); if (r.capabilities.isWebGL2) gl.shaderSource = (sh, t) => src(sh, t.replace('out highp vec4 pc_fragColor;', 'layout(location = 0) out highp vec4 pc_fragColor;\nlayout(location = 1) out highp vec4 pc_fragNormal;')); }   // (the game's shader pieces also write a second image, the normals: declare it here too)
+      r.outputEncoding = THREE.sRGBEncoding; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = .72; r.setClearColor(0x000000, 0);   // (a little under: the bake's own grade and shading sit lower)
+      const scene = new THREE.Scene(), tick = ROOM.movers(scene); ROOM.setTime(TOD); const cam = new THREE.PerspectiveCamera(45, 1, .05, 40);
+      let vw = null;
+      live = {
+        view(v){ vw = v; const a = A[v], c = a.cam || CAMS[v]; r.setPixelRatio(1); r.setSize(a.w, a.h, false); cam.fov = c.fov; cam.aspect = a.w/a.h; cam.position.set(...c.pos); cam.lookAt(...c.look); cam.updateProjectionMatrix(); },
+        time(){ ROOM.setTime(TOD); },
+        draw(t){ tick(reduced ? 0 : t); ROOM.aimSun(sunW > 0 ? sunH*Math.PI/180*SUNSGN : null); ROOM.L.sun.intensity *= .6*sunW; r.render(scene, cam); }
+      };
+      if (view) live.view(view);
+    }).catch(() => {});
+    return liveP;
+  }
+  let SUNSGN = 1;
+  function drawLive(now){ if (!live || now - liveAt < 33) return; liveAt = now; live.draw(now/1000); }
+
+  /* ---------- the plants on the sill, swaying (old: from a baked cut-out) ---------- */
   // their picture is sheared a pixel or two, more toward the tips: each column measured from its lowest leaf (the pot's rim)
   function loadPlants(v){
     plSrc = null; const a = A[v]; if (!a.plantRect) return;
@@ -157,7 +175,7 @@ const TITLE = (() => {
     const dt = last ? Math.min(.1, (now - last)/1000) : 0; last = now;
     try { if (typeof yawT !== 'undefined' && !reduced) yawT += dt*.02; if (yaw0 === null) yaw0 = yaw; } catch (e) {}
     aimCity();
-    if (A && view){ drawSun(); drawSway(now); drawLamp(now); drawDust(now, dt); drawClouds(dt); drawPlants(now); }
+    if (A && view){ drawSun(); drawSway(now); drawLive(now); drawDust(now, dt); drawClouds(dt); }
     // the light bar: steady, and now and then it blinks: a stutter of two or three, or one slow dip
     if (!reduced && now > flickNext){ flick = []; let t = now;
       if (Math.random() < .35){ flick.push([t, t + 500 + Math.random()*400]); t += 900; }
@@ -215,6 +233,7 @@ const TITLE = (() => {
     setScene(); RAW = RAW || await anchorsP;
     if (!RAW){ T.hide(true); return; }   // (the pictures couldn't be had: straight into the city)
     A = {}; for (const v of ['wide', 'tall']) A[v] = RAW[v][TOD] || RAW[v].morning; view = null;
+    startLive().then(() => { if (live){ live.time(); if (view) live.view(view); } });
     layout(); aimCity(); try { camT.copy(camGoal); } catch (e) {} last = 0; raf = requestAnimationFrame(loop); fillNote();
     setTimeout(() => { const c = menu.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }, 60);
   };

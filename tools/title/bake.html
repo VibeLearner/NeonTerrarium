@@ -176,7 +176,7 @@ async function bakeTimes(name, info, heads){
   const cam = new THREE.PerspectiveCamera(V.fov, w/h, .05, 40); cam.position.set(...V.pos); cam.lookAt(...V.look); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
   const at = v => { const p = v.clone().project(cam); return [+((p.x + 1)/2).toFixed(4), +((1 - p.y)/2).toFixed(4)]; };
   const wcv = ROOM.winCenter(), wtv = ROOM.winTop(), rim = at(wtv), ctr = at(wcv);
-  const A = { w, h, win: ctr, winR: +Math.hypot((rim[0] - ctr[0])*w, (rim[1] - ctr[1])*h).toFixed(1), heads: info.sunny ? heads : [] };
+  const A = { cam: { pos: V.pos, look: V.look, fov: V.fov }, w, h, win: ctr, winR: +Math.hypot((rim[0] - ctr[0])*w, (rim[1] - ctr[1])*h).toFixed(1), heads: info.sunny ? heads : [] };
   const HIDE = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, side: THREE.DoubleSide });
   const hideSet = (set, on) => { for (const m of set){ if (on){ m.userData.mat = m.material; m.material = HIDE; } else if (m.userData.mat) m.material = m.userData.mat; } };
   const hideFol = on => { hideSet(ROOM.foliage, on); hideSet(ROOM.lamp || [], on); };
@@ -198,23 +198,10 @@ async function bakeTimes(name, info, heads){
     g.globalCompositeOperation = 'lighter'; g.globalAlpha = .3; g.drawImage(bl, 0, 0); gb.filter = 'blur(' + Math.round(h/160) + 'px) sepia(1) saturate(4) hue-rotate(-28deg)'; gb.clearRect(0, 0, w, h); gb.drawImage(c, 0, 0); g.globalAlpha = .12; g.drawImage(bl, 0, 0);
     suns.push(c.toDataURL('image/png')); }
   // the foliage: with the sun straight in (or the moon), against the same without it
-  ROOM.setSun(0); const noF = renderPass(V, cam, w, h);
-  // the lamp over the table, apart (it swings on the title screen): with it, against without; and where it hangs from
-  let lamp = null; if (ROOM.lamp){ hideSet(ROOM.lamp, false); const wl = renderPass(V, cam, w, h); const a = px(wl.room), b = px(noF.room); let x0 = w, y0 = h, x1 = -1, y1 = -1; const mk = new Uint8Array(w*h);
-    for (let i = 0; i < w*h; i++){ const j = i*4; if (Math.abs(a[j] - b[j]) + Math.abs(a[j + 1] - b[j + 1]) + Math.abs(a[j + 2] - b[j + 2]) + Math.abs(a[j + 3] - b[j + 3]) > 40){ mk[i] = 1; const x = i % w, y = (i - x)/w; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
-    finish(wl.room, null, A);
-    if (x1 >= x0){ const pw = x1 - x0 + 1, ph = y1 - y0 + 1, src = wl.room.getContext('2d').getImageData(x0, y0, pw, ph), d = src.data;
-      for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) if (!mk[(y + y0)*w + x + x0]) d[(y*pw + x)*4 + 3] = 0;
-      const c = document.createElement('canvas'); c.width = pw; c.height = ph; c.getContext('2d').putImageData(src, 0, 0); lamp = c.toDataURL('image/png'); A.lampRect = [x0, y0, pw, ph]; A.lampPivot = at(ROOM.lampPivot); }
-    hideSet(ROOM.lamp, true); }
-  hideSet(ROOM.foliage, false); const full = renderPass(V, cam, w, h);
-  const sd = u.sunDir.value; A.patch = info.sunny ? at(wcv.clone().addScaledVector(sd, -wcv.y/sd.y)) : null;
-  let plants = null; { const a = px(full.room), b = px(noF.room), mask = new Uint8Array(w*h); let x0 = w, y0 = h, x1 = -1, y1 = -1;
-    for (let i = 0; i < w*h; i++){ const j = i*4; if (Math.abs(a[j] - b[j]) + Math.abs(a[j + 1] - b[j + 1]) + Math.abs(a[j + 2] - b[j + 2]) + Math.abs(a[j + 3] - b[j + 3]) > 48){ mask[i] = 1; const x = i % w, y = (i - x)/w; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
-    finish(full.room, null, A);
-    if (x1 >= x0){ const pw = x1 - x0 + 1, ph = y1 - y0 + 1, src = full.room.getContext('2d').getImageData(x0, y0, pw, ph), d = src.data;
-      for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) if (!mask[(y + y0)*w + x + x0]) d[(y*pw + x)*4 + 3] = 0;
-      const c = document.createElement('canvas'); c.width = pw; c.height = ph; c.getContext('2d').putImageData(src, 0, 0); plants = c.toDataURL('image/png'); A.plantRect = [x0, y0, pw, ph]; } }
+  // (the plants and the lamp are left out of the picture altogether: the title screen draws them live, moving; they
+  // still cast their shadows here)
+  ROOM.setSun(0); const sd = u.sunDir.value; A.patch = info.sunny ? at(wcv.clone().addScaledVector(sd, -wcv.y/sd.y)) : null;
+  let plants = null, lamp = null;
   // the light bar's patch
   const cs = fl.corners.map(at), sx0 = Math.max(0, Math.floor(Math.min(...cs.map(c => c[0]))*w)), sy0 = Math.max(0, Math.floor(Math.min(...cs.map(c => c[1]))*h));
   const sx1 = Math.min(w, Math.ceil(Math.max(...cs.map(c => c[0]))*w)), sy1 = Math.min(h, Math.ceil(Math.max(...cs.map(c => c[1]))*h));

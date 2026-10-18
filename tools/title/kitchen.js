@@ -239,7 +239,7 @@ const ROOM = (() => {
   const add = (geo, mat, x, y, z, o = {}) => {
     const m = new C.Mesh(geo, mat); m.position.set(x, y, z);
     if (o.rx) m.rotation.x = o.rx; if (o.ry) m.rotation.y = o.ry; if (o.rz) m.rotation.z = o.rz; if (o.s) m.scale.setScalar(o.s);
-    m.castShadow = o.cast !== false; m.receiveShadow = true; if (FOL) FOLIAGE.push(m); if (LAMPF) LAMP.push(m); (o.p || parent || scene).add(m); return m;
+    m.castShadow = o.cast !== false; m.receiveShadow = true; if (FOL){ FOLIAGE.push(m); m.userData.pb = PB; } if (LAMPF) LAMP.push(m); (o.p || parent || scene).add(m); return m;
   };
   const box = (w, h, d, mat, x, y, z, o) => add(new C.BoxGeometry(w, h, d), mat, x, y, z, o);
   const cyl = (r0, r1, h, mat, x, y, z, o = {}) => add(new C.CylinderGeometry(r0, r1, h, o.seg || 48, 1, !!o.open), mat, x, y, z, o);
@@ -265,7 +265,8 @@ const ROOM = (() => {
   // a leafy plant: many short twigs ending in clusters of small leaves (the kitchen's bushes and herbs), or long trailing vines
   // foliage goes on layer 1: it casts shadows into the room but is baked as its own picture, so the title screen can sway it
   let FOL = 0, LAMPF = 0; const FOLIAGE = R.foliage = [], LAMP = R.lamp = [];
-  function plant(x, y, z, s, kind, potMat){ if (potMat !== null) pot(x, y, z, s, potMat || M.pot); FOL++; try { plantBody(x, y, z, s, kind); } finally { FOL--; } }
+  let PB = null;
+  function plant(x, y, z, s, kind, potMat){ if (potMat !== null) pot(x, y, z, s, potMat || M.pot); FOL++; const pb0 = PB; if (!FOL || FOL === 1) PB = { y: y + .27*s, s }; try { plantBody(x, y, z, s, kind); } finally { FOL--; PB = pb0; } }
   function plantBody(x, y, z, s, kind){ const potMat = null;
     const top0 = y + .27*s;
     if (kind === 'succulent'){ for (let ring = 0; ring < 3; ring++) for (let k = 0; k < 9 - ring*2; k++){ const a = k/(9 - ring*2)*Math.PI*2 + ring*.3, l = (.09 - ring*.022)*s*2.2;
@@ -480,7 +481,7 @@ const ROOM = (() => {
       pipe([[px + .08, ky + .06, kz], [px + .2, ky + .08, kz + .06], [px + .26, ky + .09, kz + .09]], .009, M.dark); }
     for (const [x, z, h, c] of [[1.72, .12, .26, 0xc9a43a], [1.8, .16, .2, 0x6a3a2a]]){ lathe([[0, 0], [.03, 0], [.032, .006], [.032, h*.7], [.012, h*.85], [.011, h], [.014, h + .01]], M.glass, x, TT, z, { cast: false }); cyl(.028, .028, h*.6, std({ color: c, roughness: .2, transparent: true, opacity: .85 }), x, TT + h*.33, z, { cast: false }); cyl(.013, .013, .02, M.wood, x, TT + h + .02, z, { seg: 16 }); }
     lathe([[0, 0], [.03, 0], [.032, .1], [.022, .13], [.032, .16], [.03, .18], [.012, .2], [.006, .21]], M.darkWood, 1.88, TT, .18);   // pepper mill
-    { const bx = 2.08, bz = .38; add(rbox(.44, .025, .28, .012), M.wood, bx, TT + .012, bz, { ry: .12 }); bread(bx - .04, TT + .025, bz - .02, .26);   // the bread board: a loaf, a slice, a knife, crumbs
+    { const bx = 2.08, bz = .38; add(rbox(.44, .025, .28, .012), M.wood, bx, TT + .012, bz, { ry: .12 });    // the bread board: a loaf, a slice, a knife, crumbs
       box(.1, .012, .08, M.crumb, bx + .14, TT + .03, bz + .05, { ry: .3 }); box(.22, .003, .028, M.steel, bx + .06, TT + .03, bz + .1, { ry: .45 }); add(rbox(.09, .018, .024, .006), M.darkWood, bx - .1, TT + .033, bz + .14, { ry: .45 });
       for (let i = 0; i < 14; i++) box(.006, .004, .006, M.crumb, bx + rr(-.18, .2), TT + .027, bz + rr(-.1, .12), { cast: false }); }
     { bowl(2.38, TT, .56, .12, 0, M.glazeWhite); { const K = ['orange', 'apple', 'pear', 'orange', 'mango', 'lemon', 'orange', 'apple']; for (let i = 0; i < 8; i++){ const a = i/8*6.3, d = i < 5 ? .065 : .015; fruit(2.38 + Math.cos(a)*d, TT + .02 + (i < 5 ? 0 : .05), .56 + Math.sin(a)*d, .036, K[i]); } }
@@ -735,10 +736,29 @@ const ROOM = (() => {
     L.sun.color.set(T.sunC); for (const sp of L.sky){ sp.color.set(T.sky); sp.intensity = T.skyI; }
     L.hemi.color.set(T.hemi[0]); L.hemi.groundColor.set(T.hemi[1]); L.hemi.intensity = T.hemi[2]; L.amb.intensity = T.amb; L.b5.intensity = T.b5;
     L.fill.color.set(T.fill[0]); L.fill.intensity = T.fill[1];
-    for (const [l, k] of L.lamps) l.intensity = k*T.lamps; M.pendant.emissiveIntensity = T.lamps*1.6; M.downlight.color.set(T.lamps ? 0xffe8c0 : 0x8a8070);
+    for (const [l, k] of L.lamps) l.intensity = k*T.lamps; M.pendant.emissiveIntensity = T.lamps*1.6; if (R.liveMats && R.liveMats.has(M.pendant)) R.liveMats.get(M.pendant).emissiveIntensity = T.lamps*1.6; M.downlight.color.set(T.lamps ? 0xffe8c0 : 0x8a8070);
     return { sunCol: T.post, density: T.density, sunny: T.sunI > 0, grade: T.grade };
   };
   // theta: the sun's heading round from the window's outward normal (radians), at the hour's height; null: no sun
+  R.aimSun = theta => { const L = R.L, wc = R.winCenter(), out = R.winNormal().negate(), e = TIME.elev*Math.PI/180, c = Math.cos(theta || 0), s_ = Math.sin(theta || 0);
+    const dir = new C.Vector3(out.x*c - out.z*s_, 0, out.x*s_ + out.z*c).multiplyScalar(Math.cos(e)); dir.y = Math.sin(e);
+    L.sun.position.copy(wc).addScaledVector(dir, 9); L.sun.target.position.copy(wc).addScaledVector(dir, -3); L.sun.target.updateMatrixWorld(); L.sun.updateMatrixWorld(); L.sun.intensity = theta === null ? 0 : TIME.sunI; };
+  // The title screen's live layer: the whole room built (so every leaf comes out the same as in the bake), then all of it
+  // hidden but the plants and the lamp; those are drawn live over the baked picture and move. Returns a tick(t) to call.
+  R.movers = sc => {
+    R.build(sc); R.light(sc); for (const b of bounce) b.visible = false;
+    const keep = new Set([...FOLIAGE, ...LAMP]); sc.traverse(o => { if (o.isMesh && !keep.has(o)) o.visible = false; if (o.isLight && o.castShadow) o.castShadow = false; });
+    // matte shading for the live things (the bake's grade and banding aren't there to tame a glossy sheen on small leaves)
+    const mm = new Map(); for (const m of keep){ const o = m.material; if (!mm.has(o)) mm.set(o, new C.MeshLambertMaterial({ color: o.color ? o.color.clone().multiplyScalar(.85) : 0xffffff, map: o.map || null, side: o.side, emissive: o.emissive || 0x000000, emissiveIntensity: o.emissiveIntensity ?? 1 })); m.material = mm.get(o); }
+    R.liveMats = mm;
+    const lampG = new C.Group(); lampG.position.copy(R.lampPivot); sc.add(lampG); lampG.updateMatrixWorld(true); for (const m of LAMP) lampG.attach(m);
+    const leaves = FOLIAGE.filter(m => m.userData.pb).map(m => ({ m, p: m.position.clone(), h: Math.max(0, m.position.y - m.userData.pb.y), s: m.userData.pb.s, ph: m.position.x*3.1 + m.position.z*2.3 }));
+    return t => {
+      lampG.rotation.set(Math.sin(t*1.9)*.038 + Math.sin(t*.7 + 1)*.014, 0, Math.sin(t*1.9 + 1.4)*.03 + Math.sin(t*.5)*.01);
+      const gust = .6 + .4*Math.sin(t*.23)*Math.sin(t*.11 + 1.3);
+      for (const L of leaves){ const k = L.h*.022*gust/Math.max(.25, L.s); L.m.position.set(L.p.x + Math.sin(t*1.3 + L.ph)*k, L.p.y, L.p.z + Math.sin(t*1.7 + L.ph*1.3)*k*.6); }
+    };
+  };
   R.setSun = theta => {
     const L = R.L, wc = R.winCenter(), out = R.winNormal().negate();
     for (const b of bounce) SC_.remove(b); bounce = [];

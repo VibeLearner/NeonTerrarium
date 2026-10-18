@@ -166,22 +166,28 @@ const BOOTH = (() => {
   const feel = { act: .3, pings: true }; try { Object.assign(feel, JSON.parse(localStorage.getItem(FEEL_KEY) || '{}')); } catch (e){}
   const feelSave = () => { try { localStorage.setItem(FEEL_KEY, JSON.stringify(feel)); } catch (e){} };
   const act = () => bc ? feel.act : .5;   // (the Booth itself plays as it always has)
-  let thinC = { cyc: null, a: null, n: -1, set: null };
+  let thinC = { cyc: null, a: null, n: -1, set: null, pv: -1 };
+  // A note the player has just added, moved or stretched on the strip is pinned (n.pin: the last pass it's kept for): it
+  // plays, untouched, for the rest of this pass and one whole pass after, whatever the dial or the autopilot would do.
+  let pinVer = 0, passNow = 0;
+  const pinned = (n, cyc) => n.pin != null && n.pin >= cyc;
+  function pin(n){ const sb = playing ? Math.max(schedTo, 0) : 0; n.pin = Math.floor(effBeat(sb)/L()) + 1; pinVer++; thinC.pv = -1; }
   function thinFor(cyc){
     const a = act(); if (a >= .5 || !bc) return null;
     const all = S.layers.flat();
-    if (thinC.cyc === cyc && thinC.a === a && thinC.n === all.length) return thinC.set;
+    if (thinC.cyc === cyc && thinC.a === a && thinC.n === all.length && thinC.pv === pinVer) return thinC.set;
     const R = rng(cyc*4093 + 17 + all.length*31), Lb = L(), keepN = Math.max(1, Math.ceil(all.length*(.3 + 1.4*a))), gap = (.5 - a)*3;
     const ranked = all.map(n => [n, n.d*1.5 + (Math.abs(n.b - Math.round(n.b)) < .01 ? 1 : 0) + (n.b % 4 < .01 ? 1.5 : 0) + R()*.8]).sort((x, y) => y[1] - x[1]).map(x => x[0]);
-    const rest = a < .25 && cyc % 2 === 1 ? Math.floor(cyc/2) % S.len : -1, kept = [];
+    const rest = a < .25 && cyc % 2 === 1 ? Math.floor(cyc/2) % S.len : -1, kept = all.filter(n => pinned(n, cyc));
     for (const n of ranked){
+      if (kept.includes(n)) continue;
       if (kept.length >= keepN) break;
       if (Math.floor(n.b/4) === rest) continue;
       if (kept.some(k => { const dd = Math.abs(k.b - n.b); return Math.min(dd, Lb - dd) < gap; })) continue;
       kept.push(n);
     }
     const set = new Set(all.filter(n => !kept.includes(n)));
-    thinC = { cyc, a, n: all.length, set }; return set;
+    thinC = { cyc, a, n: all.length, set, pv: pinVer }; return set;
   }
   // a few voices at once for the Grid's answers and the echoes (the player's own notes always sound)
   let voicesOn = [];
@@ -754,7 +760,7 @@ const BOOTH = (() => {
     if (mode !== 'booth') music.setBooth(false);
   };
   B.isPlaying = () => playing; B.pause = p => { if (!bc) return; if (p) stop(); else start(false); };   // (held: the loop stops where it is and picks up from bar one)
-  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._move = () => moveSection(); B._sv = () => stripView(); B._bar = () => curBar(); B._thin = c => { const s = thinFor(c); return s ? s.size : 0; }; B._feel = feel; B._mv = () => ({ mv, loaded: [...mvSounds.keys()] }); B._mvoice = (...a) => motifVoice(...a); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
+  B.broadcasting = () => !!bc; B._evolve = (lay, part) => evolve(lay, part); B._move = () => moveSection(); B._sv = () => stripView(); B._bar = () => curBar(); B._pin = n => pin(n); B._skips = (c, n) => { const s = thinFor(c); return !!(s && s.has(n)); }; B._passNow = () => Math.floor(effBeat(Math.max(schedTo, 0))/L()); B._thin = c => { const s = thinFor(c); return s ? s.size : 0; }; B._feel = feel; B._mv = () => ({ mv, loaded: [...mvSounds.keys()] }); B._mvoice = (...a) => motifVoice(...a); B._chords = () => [...Array(S.len)].map((_, k) => chordOf(k).name).join(" ");
   const layerOn = id => { const b = $(id); return !!(b && b.classList.contains('on')); };   // (the Console's layer buttons: what the player asked for, whether or not the engine has started)
   // once a pass (from the second): the governor drifts the Console's own settings, as the auto-governor does for the
   // planners' patterns; a rewired copy also takes a little of the autopilot's answer into itself and moves a note
@@ -766,6 +772,7 @@ const BOOTH = (() => {
   const GOV = [['g-granularMixSlider', .3, .8, .06], ['g-motifLevelSlider', .45, .9, .04], ['g-droneLevelSlider', .6, .95, .03], ['g-spaceReverbSlider', .45, .92, .03],
     ['g-warmthFilterSlider', 1600, 4800, 250], ['g-lofiTextureSlider', .2, .5, .03], ['g-subAnchorSlider', .5, .85, .04]];
   function bcPass(cyc){
+    passNow = cyc;
     if (!bc || cyc < 1) return;
     if (layerOn('g-autopilotBtn')){
       const gv = bc.gov || (bc.gov = {}), now = performance.now();
@@ -833,7 +840,8 @@ const BOOTH = (() => {
     if (!lay) return;
     const Lb = L(), bar = b => Math.floor(b/4);
     const free = (b, d, skip) => b >= 0 && b + d <= Lb + .001 && bar(b) === bar(b + d - .01) && !lay.some(x => x !== skip && x.b < b + d - .02 && x.b + x.d > b + .02);
-    const pickNote = () => { const orig = lay.filter(n => n.o); return orig.length && gR() < .4 ? orig[Math.floor(gR()*orig.length)] : lay[Math.floor(gR()*lay.length)]; };
+    const open = lay.filter(n => !pinned(n, passNow)); if (!open.length) return;   // (a note the player just placed is left alone)
+    const pickNote = () => { const orig = open.filter(n => n.o); return orig.length && gR() < .4 ? orig[Math.floor(gR()*orig.length)] : open[Math.floor(gR()*open.length)]; };
     if (gR() < .3) return;   // (some passes it leaves alone)
     const ops = gR() < .6 ? 1 : 2;
     for (let k = 0; k < ops; k++){
@@ -919,8 +927,8 @@ const BOOTH = (() => {
       if (!bc || bc.mode !== 'rewire' || e.button === 2) return; e.preventDefault(); cv.setPointerCapture(e.pointerId);
       if (!S.layers.length) S.layers.push([]);
       const p = at2(e), h = hit(p); stripDrag = true;
-      if (h){ const n = h.n; drag = { n, kind: h.part, db: p.b - n.b, di: p.i - n.i, end: n.b + n.d }; bc.sel = n; cv.style.cursor = h.part === 'move' ? 'grabbing' : 'ew-resize'; }
-      else { const nn = { b: Math.floor(p.b*4)/4, d: 1, i: p.i, v: .8 }; fit(nn); S.layers[0].push(nn); drag = { n: nn, kind: 'end' }; bc.sel = nn; cv.style.cursor = 'ew-resize'; }
+      if (h){ const n = h.n; pin(n); drag = { n, kind: h.part, db: p.b - n.b, di: p.i - n.i, end: n.b + n.d }; bc.sel = n; cv.style.cursor = h.part === 'move' ? 'grabbing' : 'ew-resize'; }
+      else { const nn = { b: Math.floor(p.b*4)/4, d: 1, i: p.i, v: .8 }; fit(nn); pin(nn); S.layers[0].push(nn); drag = { n: nn, kind: 'end' }; bc.sel = nn; cv.style.cursor = 'ew-resize'; }
       apCache.clear();
     });
     cv.addEventListener('pointermove', e => {
@@ -933,7 +941,7 @@ const BOOTH = (() => {
       fit(n);
       if (stripZ > 1){ const r = cv.getBoundingClientRect(), v = stripView(); if (e.clientX > r.right - 12) setStripB0(v.b0 + .25); else if (e.clientX < r.left + 12) setStripB0(v.b0 - .25); }   // (dragging past an edge scrolls)
     });
-    const end = () => { stripDrag = false; if (!drag) return; drag = null; S.layers[0].sort((a, b) => a.b - b.b); apCache.clear(); cv.style.cursor = 'crosshair'; };
+    const end = () => { stripDrag = false; if (!drag) return; pin(drag.n); drag = null; S.layers[0].sort((a, b) => a.b - b.b); apCache.clear(); cv.style.cursor = 'crosshair'; };
     cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
     // zoom: buttons on the side (and Ctrl + wheel), a scrollbar under the strip (and the wheel) to move along the loop
     const zoomTo = (z, centre) => { const v = stripView(), c = centre ?? v.b0 + v.span/2; stripZ = clamp(z, 1, 8); const sp = L()/stripZ; setStripB0(c - sp/2); syncZoom(); };

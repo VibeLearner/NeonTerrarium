@@ -25,6 +25,8 @@ const BOOTH = (() => {
     { id: 'bell', name: 'Lamp-post bell', sub: 'ringing chime' },
     { id: 'lead', name: 'Neuro lead', sub: 'smooth held synth' },
     { id: 'choir', name: 'Rooftop choir', sub: 'breathy sung pad' },
+    { id: 'sampler', name: 'Song sampler', sub: 'held notes from your song', song: true },
+    { id: 'chops', name: 'Song chops', sub: "your song's own chords, as stabs", song: true },
   ];
   const PCN = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
   const parse = n => { const m = /^([A-G])([b#]?)(-?\d+)$/.exec(n || ''); if (!m) return null; const pc = (PCN[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + 12) % 12; return { pc, midi: (parseInt(m[3], 10) + 1)*12 + PCN[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) }; };
@@ -33,7 +35,7 @@ const BOOTH = (() => {
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   // ---------- what's set, and the shelf (both kept with the city) ----------
-  const S = { prog: 0, len: 8, voice: 'glass', bpm: 84, tidy: .5, click: 'count', ap: false, apAmt: .55, layers: [] };
+  const S = { song: null, prog: 0, len: 8, voice: 'glass', bpm: 84, tidy: .5, click: 'count', ap: false, apAmt: .55, layers: [] };
   let loops = [], loadedId = null, mode = 'console';
   try { const o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (o){ if (o.set) Object.assign(S, o.set); if (Array.isArray(o.loops)) loops = o.loops; } } catch (e){}
   S.layers = Array.isArray(S.layers) ? S.layers : [];
@@ -42,7 +44,20 @@ const BOOTH = (() => {
 
   // ---------- the chords and their pads ----------
   const PROGS = E.progressions;
-  const chordOf = bar => { const p = PROGS[S.prog] || PROGS[0]; return p.chords[((bar % S.len) + S.len) % S.len % p.chords.length]; };
+  const chordOf = bar => {
+    const k = ((bar % S.len) + S.len) % S.len;
+    if (S.prog === 'song' && S.song){ const L0 = S.song.list; return S.song.cs[L0[Math.min(L0.length - 1, S.song.start + k)]] || S.song.cs[0]; }
+    const p = PROGS[S.prog] || PROGS[0]; return p.chords[k % p.chords.length];
+  };
+  // a song's sounds (booth_song.js): the sampler's held notes and the bars' chops; kept in IndexedDB, back when needed
+  let songSounds = null, songKey = null, songRecut = null;
+  async function ensureSong(){
+    if (!S.song || songKey === S.song.key) return !!songSounds;
+    songKey = S.song.key; songSounds = null; songRecut = null; audio();
+    songSounds = await BOOTHSONG.sounds(ctx, S.song.key);
+    if (!songSounds){ flash("This song's samples aren't on this computer: load the song again for its sound"); if (VOICES.find(v => v.id === S.voice).song) setVoice('glass'); }
+    voiceAvail(); return !!songSounds;
+  }
   const padCache = new Map();
   function padsFor(ch){
     let v = padCache.get(ch); if (v) return v;
@@ -64,8 +79,22 @@ const BOOTH = (() => {
     const p = g.gain; if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(t); else p.cancelScheduledValues(t);
     p.setTargetAtTime(0.0001, t, rel/3); nodes.forEach(o => { try { o.stop(t + rel*2 + .05); } catch (e){} });
   }
-  function voiceOn(voice, midi, t, vel, pan, dest){
+  function voiceOn(voice, midi, t, vel, pan, dest, pad = 5, bar = 0){
     audio(); t = Math.max(ctx.currentTime, t); dest = dest || bus.lead;
+    if (voice === 'sampler' && songSounds && songSounds.samples.length){   // the nearest held note from the song, played at this pitch and looped while held
+      let s = songSounds.samples[0]; for (const x of songSounds.samples) if (Math.abs(x.root - midi) < Math.abs(s.root - midi)) s = x;
+      const src = ctx.createBufferSource(), g = env(t, .55*vel, .008), pn = ctx.createStereoPanner(); pn.pan.value = clamp(pan || 0, -.9, .9);
+      src.buffer = s.buf; src.playbackRate.value = Math.pow(2, (midi - s.root)/12); src.loop = true; src.loopStart = s.ls; src.loopEnd = s.le;
+      src.connect(g); g.connect(pn); pn.connect(dest); src.start(t);
+      return { off(t2){ release(g, Math.max(t2, t + .03), .3, [src]); } };
+    }
+    if (voice === 'chops' && songSounds && songSounds.chops.length){   // the song's own chord at this bar: a beat of it, pads in four columns of beats and three octaves
+      const bc = songSounds.chops[((bar % songSounds.chops.length) + songSounds.chops.length) % songSounds.chops.length] || [], c = bc[pad % 4] || bc.find(Boolean);
+      if (c){ const src = ctx.createBufferSource(), g = env(t, .7*vel, .004), pn = ctx.createStereoPanner(); pn.pan.value = clamp(pan || 0, -.9, .9);
+        src.buffer = c; src.playbackRate.value = [.5, 1, 2, 2][Math.min(3, Math.floor(pad/4))]; src.connect(g); g.connect(pn); pn.connect(dest); src.start(t);
+        return { off(t2){ release(g, Math.max(t2, t + .12), .12, [src]); } }; }
+    }
+    if (voice === 'sampler' || voice === 'chops') voice = 'glass';   // (no song sounds: a stand-in)
     const f = mf(midi), pn = ctx.createStereoPanner(); pn.pan.value = clamp(pan || 0, -.9, .9); pn.connect(dest);
     if (voice === 'pluck'){ E.pluck(f, t, 1.2, .55*vel, pan || 0, dest); return { off(){} }; }
     if (voice === 'glass'){   // FM electric piano: a sine carrier, a modulator at the same pitch whose depth falls away, a quick tine on top
@@ -149,7 +178,7 @@ const BOOTH = (() => {
       if (b < 0){ click(t, b === -4); schedTo++; continue; }
       const cyc = Math.floor(b/Lb), lb = b - cyc*Lb;
       if (S.click === 'all' || (S.click === 'count' && rec && rec.armed && b >= rec.from - 4 && b < rec.from)) click(t, lb % 4 === 0);
-      if (lb % 4 === 0){ const ch = chordOf(lb/4); if (ch !== padCh || lastBar === null) padTo(ch, t); lastBar = lb/4; at(t, () => retune(ch, t)); }
+      if (lb % 4 === 0){ const ch = chordOf(lb/4); if (ch !== padCh || lastBar === null) padTo(ch, t); lastBar = lb/4; at(t, () => retune(ch, t, lb/4)); }
       // the layers and the autopilot's part, for the notes that start in this beat
       for (const layer of S.layers) for (const n of layer) if (n.b >= lb && n.b < lb + 1) playNote(n, cyc*Lb + n.b, false);
       if (S.ap && S.layers.length){ let part = apCache.get(cyc); if (!part){ part = improvise(cyc); apCache.set(cyc, part); if (apCache.size > 3) apCache.delete(Math.min(...apCache.keys())); }
@@ -165,7 +194,7 @@ const BOOTH = (() => {
   setInterval(tick, 25);
   function playNote(n, absBeat, isAp){
     const bar = Math.floor((absBeat % L())/4), ch = chordOf(bar), m = padMidi(ch, n.i), t = tOf(absBeat);
-    const h = voiceOn(S.voice, m, t, (n.v || .8)*(isAp ? .72 : 1), isAp ? .35 : -.1);
+    const h = voiceOn(S.voice, m, t, (n.v || .8)*(isAp ? .72 : 1), isAp ? .35 : -.1, null, n.i, bar);
     h.off(t + Math.max(.12, n.d*beatSec()));
     if (n.i < NP){ at(t, () => light(n.i, isAp, true)); at(t + Math.max(.12, n.d*beatSec()), () => light(n.i, isAp, false)); }
   }
@@ -176,7 +205,7 @@ const BOOTH = (() => {
   const curBar = () => playing && nowBeat() >= 0 ? Math.floor((nowBeat() % L())/4) : 0;
   function noteDown(i, vel = .85){
     audio(); if (held.has(i)) return;
-    const ch = chordOf(curBar()), m = padMidi(ch, i), h = voiceOn(S.voice, m, ctx.currentTime, vel, -.1);
+    const ch = chordOf(curBar()), m = padMidi(ch, i), h = voiceOn(S.voice, m, ctx.currentTime, vel, -.1, null, i, curBar());
     const e = { h, m, vel, note: null }; held.set(i, e);
     if (rec && rec.live){ const b = Math.max(0, nowBeat() - rec.from); if (b < L()){ e.note = { b, d: 0, i, v: vel }; e.from = nowBeat(); rec.take.push(e.note); } }
     keysEl[i] && keysEl[i].classList.add('down');
@@ -188,11 +217,11 @@ const BOOTH = (() => {
     keysEl[i] && keysEl[i].classList.remove('down');
   }
   // a chord change: the pads take the new chord's notes; a held note moves to its pad's new note (and a take records the move)
-  function retune(ch, t){
+  function retune(ch, t, bar = 0){
     drawKeys(ch);
     for (const [i, e] of held){
       const m = padMidi(ch, i); if (m === e.m) continue;
-      e.h.off(t); e.h = voiceOn(S.voice, m, t, e.vel*.75, -.1); e.m = m;
+      e.h.off(t); e.h = voiceOn(S.voice, m, t, e.vel*.75, -.1, null, i, bar); e.m = m;
       if (e.note){ e.note.d = Math.max(.1, nowBeat() - e.from); if (rec && rec.live){ const b = Math.max(0, nowBeat() - rec.from); if (b < L() - .1){ e.note = { b, d: 0, i, v: e.vel*.75 }; e.from = nowBeat(); rec.take.push(e.note); } else e.note = null; } else e.note = null; }
     }
   }
@@ -225,7 +254,7 @@ const BOOTH = (() => {
   function rng(seed){ let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s/4294967296; }; }
   function improvise(cyc){
     const Lb = L(), core = S.layers.flat().slice().sort((a, b) => a.b - b.b); if (!core.length) return [];
-    const R = rng(cyc*7919 + core.length*104729 + Math.round(core[0].b*97) + S.prog*31);
+    const R = rng(cyc*7919 + core.length*104729 + Math.round(core[0].b*97) + (typeof S.prog === 'number' ? S.prog : 97)*31);
     const shape = [.55, .8, 1, .9, .7, .5][cyc % 6], e = clamp(S.apAmt*shape*1.25, 0, 1.2);
     const busy = (b0, b1) => core.some(n => n.b < b1 - .02 && n.b + n.d > b0 + .02);
     // the gaps you leave (half a beat or more)
@@ -282,11 +311,18 @@ const BOOTH = (() => {
     const sel = $('g-boothProg'), src = $('g-progressionSelect');
     const n = Math.min(PROGS.length, src ? src.options.length : PROGS.length);
     for (let i = 0; i < n; i++){ const o = document.createElement('option'); o.value = String(i); o.textContent = src && src.options[i] ? src.options[i].textContent : 'Pattern ' + (i + 1); sel.appendChild(o); }
-    sel.value = String(S.prog);
-    sel.addEventListener('change', () => { S.prog = +sel.value; apCache.clear(); if (playing){ lastBar = null; padCh = null; } drawKeys(chordOf(curBar())); store(); });
+    songOption(); sel.value = String(S.prog);
+    sel.addEventListener('change', () => { S.prog = sel.value === 'song' ? 'song' : +sel.value; if (S.prog === 'song') ensureSong(); apCache.clear(); if (playing){ lastBar = null; padCh = null; } drawKeys(chordOf(curBar())); store(); });
     const vb = $('bVoices');
-    VOICES.forEach(v => { const b = document.createElement('button'); b.className = 'gb' + (v.id === S.voice ? ' on' : ''); b.dataset.v = v.id; b.innerHTML = v.name + '<small>' + v.sub + '</small>';
-      b.addEventListener('click', () => { S.voice = v.id; vb.querySelectorAll('.gb').forEach(x => x.classList.toggle('on', x === b)); store(); noteDown(5, .7); setTimeout(() => noteUp(5), 350); }); vb.appendChild(b); });
+    VOICES.forEach(v => { const b = document.createElement('button'); b.className = 'gb' + (v.id === S.voice ? ' on' : '') + (v.song ? ' bsongv' : ''); b.dataset.v = v.id; b.innerHTML = v.name + '<small>' + v.sub + '</small>';
+      b.addEventListener('click', () => { if (v.song && !songSounds){ flash('Load a song first (above) for this voice'); return; } setVoice(v.id); noteDown(5, .7); setTimeout(() => noteUp(5), 350); }); vb.appendChild(b); });
+    voiceAvail();
+    $('bSongBtn').addEventListener('click', () => $('bSongFile').click());
+    $('bSongFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadSong(f); });
+    $('gBooth').addEventListener('dragover', e => { if ([...(e.dataTransfer.types || [])].includes('Files')) e.preventDefault(); });
+    $('gBooth').addEventListener('drop', e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f && /^audio\//.test(f.type || 'audio/')){ e.preventDefault(); loadSong(f); } });
+    $('bSongNudge').querySelectorAll('.gb').forEach(b => b.addEventListener('click', () => nudge(+b.dataset.d)));
+    songInfo();
     const row = (id, attr, val, fn) => { const r = $(id); r.querySelectorAll('.gb').forEach(b => { b.classList.toggle('on', String(b.dataset[attr]) === String(val)); b.addEventListener('click', () => { r.querySelectorAll('.gb').forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset[attr]); store(); }); }); };
     row('bLen', 'len', S.len, v => { S.len = +v; apCache.clear(); });
     row('bTidy', 'tidy', S.tidy, v => { S.tidy = +v; });
@@ -317,6 +353,42 @@ const BOOTH = (() => {
     $('bName').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); saveLoop(); } });
     root.querySelectorAll('.gtab').forEach(t => t.addEventListener('click', () => setMode(t.dataset.mode)));
     drawKeys(chordOf(0)); renderShelf(); status();
+  }
+  function setVoice(id){ S.voice = id; $('bVoices').querySelectorAll('.gb').forEach(x => x.classList.toggle('on', x.dataset.v === id)); store(); }
+  function voiceAvail(){ $('bVoices').querySelectorAll('.bsongv').forEach(b => { b.classList.toggle('dis', !songSounds); b.title = songSounds ? '' : 'Load a song first'; }); }
+  function songOption(){
+    const sel = $('g-boothProg'); let o = sel.querySelector('option[value="song"]');
+    if (!S.song){ if (o) o.remove(); return; }
+    if (!o){ o = document.createElement('option'); o.value = 'song'; sel.insertBefore(o, sel.firstChild); }
+    o.textContent = 'From your song: ' + S.song.name;
+  }
+  function songInfo(){
+    const st = $('bSongSt'), nd = $('bSongNudge'); if (!st) return;
+    if (!S.song){ st.textContent = 'Use your own song: its chords become the pattern and its sound plays on the pads.'; nd.hidden = true; return; }
+    st.textContent = `${S.song.name}: ${S.song.keyName}, about ${Math.round(S.song.bpm)} beats a minute, bars ${S.song.start + 1} to ${S.song.start + S.len} of ${S.song.list.length}` + (S.song.nSamples ? ` · ${S.song.nSamples} held note${S.song.nSamples > 1 ? 's' : ''} sampled` : ' · no clean held notes found (chops only)');
+    nd.hidden = false;
+  }
+  let songBusy = false;
+  async function loadSong(f){
+    if (songBusy) return; songBusy = true; audio(); const btn = $('bSongBtn'); btn.disabled = true;
+    const say = t => { $('bSongSt').textContent = t; };
+    try {
+      const r = await BOOTHSONG.analyze(f, ctx, say);
+      stop(); S.layers.length && flash('Your layers now play over the song\'s chords');
+      S.song = { key: r.key, name: r.name, bpm: r.bpm, keyName: r.keyName, cs: r.cs, list: r.list, start: r.start, nSamples: r.nSamples };
+      songKey = r.key; songSounds = r.sounds; songRecut = r.recut;
+      S.prog = 'song'; S.len = r.len; let bpm = Math.round(r.bpm); while (bpm > 132) bpm = Math.round(bpm/2); while (bpm < 60) bpm *= 2;
+      const bk = $('g-boothBpmSlider'); bk.value = String(bpm); bk.dispatchEvent(new Event('input'));
+      $('bLen').querySelectorAll('.gb').forEach(b => b.classList.toggle('on', +b.dataset.len === S.len));
+      songOption(); $('g-boothProg').value = 'song'; padCache.clear(); apCache.clear(); voiceAvail(); setVoice(r.nSamples ? 'sampler' : 'chops');
+      loadedId = null; drawKeys(chordOf(0)); songInfo(); store(); renderShelf();
+    } catch (e){ say("Couldn't read that file as a song. Try an MP3, WAV, M4A or OGG."); console.warn(e); }
+    btn.disabled = false; songBusy = false;
+  }
+  async function nudge(d){
+    if (!S.song) return; const ns = clamp(S.song.start + d, 0, Math.max(0, S.song.list.length - S.len)); if (ns === S.song.start) return;
+    S.song.start = ns; apCache.clear(); if (playing){ lastBar = null; padCh = null; } drawKeys(chordOf(curBar())); songInfo(); store();
+    if (songRecut && songSounds && songKey === S.song.key) songSounds.chops = await songRecut(ns, S.len);
   }
   function drawKeys(ch){
     const P = padsFor(ch);
@@ -374,18 +446,19 @@ const BOOTH = (() => {
   }
 
   // ---------- the shelf ----------
-  const progName = i => { const o = $('g-boothProg') && $('g-boothProg').options[i]; return o ? o.textContent.split('//').pop().trim() : 'Pattern ' + (i + 1); };
+  const progName = i => { if (i === 'song') return 'Your song'; const o = $('g-boothProg') && $('g-boothProg').options[i]; return o ? o.textContent.split('//').pop().trim() : 'Pattern ' + (i + 1); };
   function saveLoop(){
     if (!S.layers.length){ flash('Record a take first'); return; }
     const inp = $('bName'), nm = (inp.value || '').trim() || 'Loop ' + (loops.length + 1);
-    const data = { name: nm, prog: S.prog, len: S.len, voice: S.voice, bpm: S.bpm, ap: S.ap, apAmt: S.apAmt, layers: JSON.parse(JSON.stringify(S.layers)), at: Date.now() };
+    const data = { song: S.prog === 'song' && S.song ? JSON.parse(JSON.stringify(S.song)) : null, name: nm, prog: S.prog, len: S.len, voice: S.voice, bpm: S.bpm, ap: S.ap, apAmt: S.apAmt, layers: JSON.parse(JSON.stringify(S.layers)), at: Date.now() };
     const same = loadedId && loops.find(l => l.id === loadedId && l.name === nm);
     if (same) Object.assign(same, data); else { const id = 'L' + Date.now().toString(36); loops.unshift({ id, ...data }); loadedId = id; }
     inp.value = ''; store(); renderShelf(); flash('Saved "' + nm + '"');
   }
   function flash(t){ const s = $('bStatus'); if (!s) return; s.textContent = t.toUpperCase(); setTimeout(status, 1800); }
   function loadLoop(l){
-    stop(); Object.assign(S, { prog: l.prog, len: l.len, voice: l.voice, bpm: l.bpm, ap: !!l.ap, apAmt: l.apAmt ?? .55, layers: JSON.parse(JSON.stringify(l.layers)) });
+    stop(); if (l.song){ S.song = JSON.parse(JSON.stringify(l.song)); songOption(); padCache.clear(); ensureSong().then(() => songInfo()); }
+    Object.assign(S, { prog: l.prog, len: l.len, voice: l.voice, bpm: l.bpm, ap: !!l.ap, apAmt: l.apAmt ?? .55, layers: JSON.parse(JSON.stringify(l.layers)) });
     loadedId = l.id; $('g-boothProg').value = String(S.prog);
     const sync = (id, attr, v) => $(id).querySelectorAll('.gb').forEach(b => b.classList.toggle('on', String(b.dataset[attr]) === String(v)));
     sync('bLen', 'len', S.len); $('bVoices').querySelectorAll('.gb').forEach(b => b.classList.toggle('on', b.dataset.v === S.voice));
@@ -421,7 +494,7 @@ const BOOTH = (() => {
     mode = m; root.querySelectorAll('.gtab').forEach(t => { const on = t.dataset.mode === m; t.classList.toggle('on', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
     const main = root.querySelector('.gmain'), bo = $('gBooth');
     main.hidden = m === 'booth'; bo.hidden = m !== 'booth';
-    if (m === 'booth'){ music.setBooth(true); audio(); drawKeys(chordOf(curBar())); if (!raf) raf = requestAnimationFrame(frame); }
+    if (m === 'booth'){ music.setBooth(true); audio(); if (S.song) ensureSong(); drawKeys(chordOf(curBar())); if (!raf) raf = requestAnimationFrame(frame); }
     else { stop(); music.setBooth(false); }
   }
   B.panelOpened = () => { if (mode === 'booth') setMode('booth'); };

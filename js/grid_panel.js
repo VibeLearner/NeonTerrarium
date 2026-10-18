@@ -177,8 +177,11 @@ const GRIDPANEL = (() => {
     grid-template-areas: "setup roll shelf" "setup keys shelf"; }
   #gridPanel .gbooth[hidden], #gridPanel .gmain[hidden] { display: none; }
   #gridPanel .b-setup { grid-area: setup; } #gridPanel .b-roll { grid-area: roll; } #gridPanel .b-keys { grid-area: keys; } #gridPanel .b-shelf { grid-area: shelf; }
-  #gridPanel .bvoices { display: grid; gap: 4px; } #gridPanel .bvoices .gb { margin: 0; text-align: left; padding: 6px 10px; font-size: 12px; letter-spacing: .12em; }
-  #gridPanel .bvoices .gb small { display: block; color: var(--dim); font-size: 10.5px; letter-spacing: .04em; text-transform: none; margin-top: 1px; } #gridPanel .bvoices .gb.on small { color: #0b3a40; }
+  #gridPanel .bsong { display: grid; gap: 5px; border: 1px dashed var(--line); padding: 7px; } #gridPanel .bsong .gb { margin: 0; }
+  #gridPanel .bsongst { color: var(--cy2); font-size: 11.5px; line-height: 1.4; letter-spacing: .03em; }
+  #gridPanel .bvoices .gb.dis { opacity: .45; }
+  #gridPanel .bvoices { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } #gridPanel .bvoices .gb { margin: 0; text-align: left; padding: 5px 7px; font-size: 11.5px; letter-spacing: .08em; }
+  #gridPanel .bvoices .gb small { display: block; color: var(--dim); font-size: 10px; line-height: 1.2; letter-spacing: .04em; text-transform: none; margin-top: 1px; } #gridPanel .bvoices .gb.on small { color: #0b3a40; }
   #gridPanel .btrans { display: flex; gap: 6px; flex-wrap: wrap; flex: none; } #gridPanel .btrans .gb { margin: 0; flex: 1 1 auto; width: auto; padding: 8px 10px; }
   #gridPanel .brec.armed { background: rgba(229,55,159,.3); border-color: var(--mg); color: #fff; } #gridPanel .brec.live { background: var(--mg); border-color: var(--mg); color: #fff; }
   #gridPanel .bap.on { background: var(--mg); border-color: var(--mg); color: #fff; }
@@ -311,6 +314,9 @@ const GRIDPANEL = (() => {
     <section class="gp b-setup"><h3>Booth setup</h3>
       <div class="glbl">Carrier pattern</div>
       <select id="g-boothProg" title="The chords you'll play over: one chord a bar"></select>
+      <div class="bsong"><button class="gb" id="bSongBtn" title="Pick a song from your computer (or drop it on the Booth). It's analyzed here and never leaves your computer.">Load a song</button><input type="file" id="bSongFile" accept="audio/*" hidden>
+        <div class="bsongst" id="bSongSt"></div>
+        <div class="grow" id="bSongNudge" hidden title="Move the section the pattern is taken from, a bar at a time"><button class="gb" data-d="-1">◀ Earlier</button><button class="gb" data-d="1">Later ▶</button></div></div>
       <div class="glbl">Length</div>
       <div class="grow" id="bLen"><button class="gb" data-len="4" title="The first four chords">4 bars</button><button class="gb on" data-len="8" title="All eight chords">8 bars</button></div>
       <div class="glbl">Voice</div>

@@ -781,7 +781,7 @@ const ROOM = (() => {
     const lt = new C.PointLight(0xffe2c0, 1.2, 6, 1.6), hm = new C.HemisphereLight(0xd8e0e8, 0x403830, .45);
     lt.position.copy(R.winCenter()).addScaledVector(R.winNormal(), 1.6).add(new C.Vector3(0, .6, 0)); lt.layers.set(1); hm.layers.set(1); sc.add(lt, hm);
     R.shutterLight = { lt, hm };
-    R.setShutter = open => { for (const B of blades) B.piv.rotation.z = B.th + Math.PI + open*1.3; hull.updateMatrixWorld(true); };
+    R.setShutter = open => { for (const B of blades) B.piv.rotation.z = B.th + Math.PI + open*1.6; hull.updateMatrixWorld(true); };
     R.setShutter(0);
   };
   R.setSun = theta => {

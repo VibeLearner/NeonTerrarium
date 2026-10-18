@@ -21,7 +21,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18y';
+  const VER = '2026-10-18z';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -138,7 +138,10 @@ const TITLE = (() => {
     const e = L(a.elev, b.elev)*Math.PI/180, th = sunH*Math.PI/180, out = ROOM.winNormal().negate(), c = Math.cos(th), s_ = Math.sin(th);
     const toSun = new THREE.Vector3(out.x*c - out.z*s_, 0, out.x*s_ + out.z*c).multiplyScalar(Math.cos(e)); toSun.y = Math.sin(e);
     const dimK = .35 + .65*OPEN, sunI = L(a.sunI, b.sunI);
-    return { sunDir: toSun.negate(), sunCol: Cl(a.sunC, b.sunC), sunI, sunOn: sunW*(sunI > 0 ? 1 : 0), sky: Cl(a.sky, b.sky), skyI: L(a.skyI, b.skyI),
+    // at night the city's neon drifts the light slowly between blue and purple (how much night there is: the lamps' weight)
+    const nk = Math.min(1, L(a.lamps, b.lamps)), ph = performance.now()/1000, drift = .5 + .5*Math.sin(ph*.45) *Math.sin(ph*.17 + 1);
+    const neon = c => nk > 0 ? c.lerp(new THREE.Color(drift > .5 ? 0xb04cff : 0x4c7bff), nk*.35*Math.abs(drift - .5)*2) : c;
+    return { sunDir: toSun.negate(), sunCol: neon(Cl(a.sunC, b.sunC)), sunI, sunOn: sunW*(sunI > 0 ? 1 : 0), sky: neon(Cl(a.sky, b.sky)), skyI: L(a.skyI, b.skyI),
       hemi: [Cl(a.hemi[0], b.hemi[0]), Cl(a.hemi[1], b.hemi[1]), L(a.hemi[2], b.hemi[2])*dimK], amb: L(a.amb, b.amb)*dimK, fill: [Cl(a.fill[0], b.fill[0]), L(a.fill[1], b.fill[1])*dimK],
       density: L(a.density, b.density), lampsK: L(a.lamps, b.lamps), grade: [0, 1].map(j => [0, 1, 2].map(k => L(a.grade[j][k], b.grade[j][k]))), open: OPEN,
       barOn: BAR_ON, bounceK: (.25 + .75*sunW)*.45*OPEN*(sunI > 0 ? Math.min(1, sunI/5) : .3) };

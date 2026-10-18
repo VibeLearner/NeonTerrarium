@@ -707,7 +707,7 @@ const ROOM = (() => {
     morning: { sunC: 0xfed9b0, sunI: 5.6, elev: 34, sky: 0xb4cce4, skyI: .38, hemi: [0xb4cce4, 0x7a6a5a, .06], amb: .02, b5: .25, fill: [0xb4cce4, .1], post: [1, .85, .69], density: .28, lamps: 0, grade: [[1.06, 1.0, .9], [.88, .95, 1.02]] },
     day: { sunC: 0xfef0d4, sunI: 5.4, elev: 52, sky: 0xc4dcf0, skyI: .48, hemi: [0xc4dcf0, 0x8a7a66, .08], amb: .03, b5: .2, fill: [0xc4dcf0, .14], post: [1, .94, .83], density: .2, lamps: 0, grade: [[1.03, 1.0, .95], [.9, .97, 1.03]] },
     evening: { sunC: 0xfeb468, sunI: 5.2, elev: 16, sky: 0xb8979a, skyI: .3, hemi: [0xb8979a, 0x5a3a30, .05], amb: .015, b5: .3, fill: [0xb8979a, .08], post: [1, .7, .41], density: .34, lamps: .45, grade: [[1.1, .98, .82], [.92, .86, .92]] },
-    night: { sunC: 0x7086c9, sunI: 2.0, elev: 40, sky: 0x34507a, skyI: .14, hemi: [0x34507a, 0x1a1f2e, .05], amb: .012, b5: .12, fill: [0x34507a, .05], post: [.44, .53, .79], density: .1, lamps: 1, grade: [[.98, .96, 1.0], [.82, .9, 1.08]] },
+    night: { sunC: 0x7a6cff, sunI: 2.0, elev: 40, sky: 0x8a48d8, skyI: .13, hemi: [0x4a3896, 0x18142a, .05], amb: .012, b5: .12, fill: [0x6a4ad0, .06], post: [.5, .42, 1.0], density: .14, lamps: 1, grade: [[.98, .94, 1.04], [.86, .8, 1.12]] },   // (the city's neon: a blue-violet beam, a purple glow off the sky)
   };
   R.TIMES = Object.keys(TIMES);
   R.TIMESDATA = TIMES;

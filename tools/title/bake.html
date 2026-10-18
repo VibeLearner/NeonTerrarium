@@ -19,8 +19,12 @@
 const SCENE = new URLSearchParams(location.search).get('scene') || 'room';
 const VIEWS = SCENE === 'kitchen' ? {
   ref: { w: 600, h: 750, pos: [2.0, 2.33, 1.01], look: [-1.79, 1.28, -8.18], fov: 57.5 },
-  wide: { w: 960, h: 540, pos: [0, 1.68, -2.02], look: [0, 1.68, -12], fov: 60 },
-  tall: { w: 540, h: 1170, pos: [0, 1.68, -2.02], look: [-.3, 1.68, -12], fov: 82 },
+  wide: { w: 960, h: 540, pos: [2.0, 2.33, 1.01], look: [-1.79, 1.28, -8.18], fov: 45.9 },   // (the owner's camera, wider: the porthole left, the kitchen and the sign right)
+  tall: { w: 540, h: 1170, pos: [2.0, 2.33, 1.01], look: [-.07, 1.28, -8.72], fov: 74 },
+  hi: { w: 1200, h: 1500, pos: [2.0, 2.33, 1.01], look: [-1.79, 1.28, -8.18], fov: 57.5 },   // (checking views: the reference at twice the size, and close-ups)
+  counter: { w: 960, h: 600, pos: [.56, 1.55, -2.98], look: [1.23, 1.15, -4.86], fov: 50 },
+  table: { w: 800, h: 600, pos: [.9, 1.85, -1.0], look: [-.45, 1.1, -2.27], fov: 48 },
+  sill: { w: 800, h: 600, pos: [.4, 2.0, -2.5], look: [-1.43, 1.45, -3.54], fov: 46 },
 } : {
   wide: { w: 960, h: 540, pos: [1.7, 1.42, 2.35], look: [-.75, 1.5, -2], fov: 64 },
   tall: { w: 540, h: 1170, pos: [-.45, 1.4, 2.8], look: [-.7, 1.62, -2], fov: 82 },
@@ -181,7 +185,7 @@ window.BAKE = async (opt = {}) => {
   const crt = new THREE.WebGLCubeRenderTarget(256, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter }); crt.texture.encoding = THREE.sRGBEncoding;
   const cc = new THREE.CubeCamera(.05, 30, crt); cc.position.set(...(ROOM.cubeAt || [-.6, 1.1, .2])); scene.add(cc); cc.update(renderer, scene);
   const M = ROOM.M; for (const [m, k] of [[M.stone, .9], [M.chrome, 1], [M.steel, .8], [M.glass, 1], [M.enamel, .9], [M.ceramic, .6], [M.floor, 0], [M.cream, .35], [M.copper, .8], [M.flex, .5], [M.app, .4], [M.blackGlass, 1], [M.brass, .8], [M.wood, .12], [M.splash, .5]]){ if (!m) continue; m.envMap = crt.texture; m.envMapIntensity = k; m.needsUpdate = true; }
-  const res = {}; for (const k of (opt.views || Object.keys(VIEWS))) res[k] = await bake(k);
+  const res = {}; for (const k of (opt.views || ['wide', 'tall'])) res[k] = await bake(k);
   return res;
 };
 </script>

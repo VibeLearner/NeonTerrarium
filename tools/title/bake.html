@@ -166,6 +166,53 @@ async function bake(name){
   hideFol(false); anchors.patch = at(wc.clone().addScaledVector(post.material.uniforms.sunDir.value, -wc.y/post.material.uniforms.sunDir.value.y));
   return { room: on.room.toDataURL('image/png'), glass: on.glass.toDataURL('image/png'), signoff, plants, anchors };
 }
+// The title's views of the kitchen, at one hour. Everything is rendered without the foliage (it still casts its
+// shadows), then: the room with no sun (the base the title screen always shows); the light bar dark; for each sun
+// heading, what the sun adds (that render minus the base, kept as light to add on top, with its own soft bloom);
+// and once with the foliage and the sun straight in, for the foliage's own picture.
+async function bakeTimes(name, info, heads){
+  const V = VIEWS[name], w = V.w, h = V.h, u = post.material.uniforms, dens = u.density.value = info.density;
+  renderer.setPixelRatio(1); renderer.setSize(w, h);
+  const cam = new THREE.PerspectiveCamera(V.fov, w/h, .05, 40); cam.position.set(...V.pos); cam.lookAt(...V.look); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
+  const at = v => { const p = v.clone().project(cam); return [+((p.x + 1)/2).toFixed(4), +((1 - p.y)/2).toFixed(4)]; };
+  const wcv = ROOM.winCenter(), wtv = ROOM.winTop(), rim = at(wtv), ctr = at(wcv);
+  const A = { w, h, win: ctr, winR: +Math.hypot((rim[0] - ctr[0])*w, (rim[1] - ctr[1])*h).toFixed(1), heads: info.sunny ? heads : [] };
+  const HIDE = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, side: THREE.DoubleSide });
+  const hideFol = on => { for (const m of ROOM.foliage){ if (on){ m.userData.mat = m.material; m.material = HIDE; } else if (m.userData.mat) m.material = m.userData.mat; } };
+  const px = c => c.getContext('2d').getImageData(0, 0, w, h).data;
+  hideFol(true);
+  // the base: no sun (at night the moon stays, faint)
+  if (info.sunny){ ROOM.setSun(null); u.density.value = 0; } else ROOM.setSun(0);
+  const base = renderPass(V, cam, w, h);
+  const fl = ROOM.flicker; fl.off(); const off = renderPass(V, cam, w, h); fl.on();
+  u.density.value = dens;
+  // the sun, heading by heading
+  const suns = [], B = px(base.room);
+  A.patches = [];
+  if (info.sunny) for (const hd of heads){ ROOM.setSun(hd*Math.PI/180); const r = renderPass(V, cam, w, h), P = px(r.room); { const sd = u.sunDir.value; A.patches.push(at(wcv.clone().addScaledVector(sd, -wcv.y/sd.y))); }
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'), im = g.createImageData(w, h), d = im.data;
+    for (let i = 0; i < w*h*4; i += 4){ for (let k = 0; k < 3; k++) d[i + k] = Math.max(0, P[i + k] - B[i + k]); d[i + 3] = 255; }
+    g.putImageData(im, 0, 0);
+    const bl = document.createElement('canvas'); bl.width = w; bl.height = h; const gb = bl.getContext('2d'); gb.filter = 'blur(' + Math.round(h/40) + 'px)'; gb.drawImage(c, 0, 0);
+    g.globalCompositeOperation = 'lighter'; g.globalAlpha = .3; g.drawImage(bl, 0, 0); gb.filter = 'blur(' + Math.round(h/160) + 'px) sepia(1) saturate(4) hue-rotate(-28deg)'; gb.clearRect(0, 0, w, h); gb.drawImage(c, 0, 0); g.globalAlpha = .12; g.drawImage(bl, 0, 0);
+    suns.push(c.toDataURL('image/png')); }
+  // the foliage: with the sun straight in (or the moon), against the same without it
+  ROOM.setSun(info.sunny ? 0 : 0); const noF = renderPass(V, cam, w, h); hideFol(false); const full = renderPass(V, cam, w, h);
+  const sd = u.sunDir.value; A.patch = info.sunny ? at(wcv.clone().addScaledVector(sd, -wcv.y/sd.y)) : null;
+  let plants = null; { const a = px(full.room), b = px(noF.room), mask = new Uint8Array(w*h); let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let i = 0; i < w*h; i++){ const j = i*4; if (Math.abs(a[j] - b[j]) + Math.abs(a[j + 1] - b[j + 1]) + Math.abs(a[j + 2] - b[j + 2]) + Math.abs(a[j + 3] - b[j + 3]) > 48){ mask[i] = 1; const x = i % w, y = (i - x)/w; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
+    finish(full.room, null, A);
+    if (x1 >= x0){ const pw = x1 - x0 + 1, ph = y1 - y0 + 1, src = full.room.getContext('2d').getImageData(x0, y0, pw, ph), d = src.data;
+      for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) if (!mask[(y + y0)*w + x + x0]) d[(y*pw + x)*4 + 3] = 0;
+      const c = document.createElement('canvas'); c.width = pw; c.height = ph; c.getContext('2d').putImageData(src, 0, 0); plants = c.toDataURL('image/png'); A.plantRect = [x0, y0, pw, ph]; } }
+  // the light bar's patch
+  const cs = fl.corners.map(at), sx0 = Math.max(0, Math.floor(Math.min(...cs.map(c => c[0]))*w)), sy0 = Math.max(0, Math.floor(Math.min(...cs.map(c => c[1]))*h));
+  const sx1 = Math.min(w, Math.ceil(Math.max(...cs.map(c => c[0]))*w)), sy1 = Math.min(h, Math.ceil(Math.max(...cs.map(c => c[1]))*h));
+  finish(base.room, base.glass, A); finish(off.room, null, A);
+  let signoff = null; if (sx1 > sx0 && sy1 > sy0){ A.signRect = [sx0, sy0, sx1 - sx0, sy1 - sy0]; const c = document.createElement('canvas'); c.width = sx1 - sx0; c.height = sy1 - sy0; c.getContext('2d').drawImage(off.room, sx0, sy0, c.width, c.height, 0, 0, c.width, c.height); signoff = c.toDataURL('image/png'); }
+  hideFol(false); ROOM.setSun(0);
+  return { room: base.room.toDataURL('image/png'), glass: base.glass.toDataURL('image/png'), signoff, plants, suns, anchors: A };
+}
 // after the render: a soft bloom on what's bright, light film grain, the colours stepped with an ordered dither (the
 // game's look); the glass given reflections: soft diagonal sheens, a bright rim where the sleeve meets it, a faint tint
 function finish(room, glass, A){
@@ -213,7 +260,14 @@ window.BAKE = async (opt = {}) => {
   const crt = new THREE.WebGLCubeRenderTarget(256, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter }); crt.texture.encoding = THREE.sRGBEncoding;
   const cc = new THREE.CubeCamera(.05, 30, crt); cc.position.set(...(ROOM.cubeAt || [-.6, 1.1, .2])); scene.add(cc); cc.update(renderer, scene);
   const M = ROOM.M; for (const [m, k] of [[M.stone, .9], [M.chrome, 1], [M.steel, .8], [M.glass, 1], [M.enamel, .9], [M.ceramic, .6], [M.floor, 0], [M.cream, .35], [M.copper, .8], [M.flex, .5], [M.app, .4], [M.blackGlass, 1], [M.brass, .8], [M.wood, .05], [M.splash, .5], [M.tableWood, .03], [M.darkWood, .05], [M.counterTop, .6], [M.skin, .3], [M.gold, .8]]){ if (!m) continue; m.envMap = crt.texture; m.envMapIntensity = k; m.needsUpdate = true; }
-  const res = {}; for (const k of (opt.views || ['wide', 'tall'])) res[k] = await bake(k);
+  const views = opt.views || ['wide', 'tall'];
+  if (!ROOM.setTime){ const res = {}; for (const k of views) res[k] = await bake(k); return res; }
+  // the kitchen: every hour asked for, and for the title's views every sun heading (opt.times, opt.headings in degrees)
+  const res = {}, times = opt.times || ROOM.TIMES, heads = opt.headings || [-60, -45, -30, -15, 0, 15, 30, 45, 60];
+  for (const t of times){
+    const info = ROOM.setTime(t); post.material.uniforms.sunCol.value.setRGB(...info.sunCol); ROOM.setSun(0); scene.updateMatrixWorld(true); cc.update(renderer, scene);
+    for (const k of views){ res[k] = res[k] || {}; res[k][t] = (k === 'wide' || k === 'tall') ? await bakeTimes(k, info, heads) : await bake(k); }
+  }
   return res;
 };
 </script>

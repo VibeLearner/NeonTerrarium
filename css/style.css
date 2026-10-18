@@ -369,6 +369,8 @@ html.title-on #view{cursor:default}
   opacity:.75;transition:opacity .05s}
 .t-signglow.dip{opacity:.15}
 /* the sign's dark state, baked: swapped in for a moment when the tubes stutter */
+.t-sun{mix-blend-mode:screen}
+@supports (mix-blend-mode:plus-lighter){.t-sun{mix-blend-mode:plus-lighter}}
 .t-plants{position:absolute;image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none}
 .t-signoff{position:absolute;image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none;opacity:0}
 .t-signoff.on{opacity:1}

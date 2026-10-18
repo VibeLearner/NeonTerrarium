@@ -217,6 +217,7 @@ const ROOM = (() => {
     lampGlow: new C.MeshBasicMaterial({ color: 0xffc06a, toneMapped: false }), tubeGlow: new C.MeshBasicMaterial({ color: 0xfff6e0, toneMapped: false }),
     leafs: [0x3f6f3a, 0x557f3c, 0x2e5a30, 0x6f9a4a, 0x4d7a3a, 0x86a65a].map(c => std({ color: c, roughness: .55, side: C.DoubleSide })),
     fruit: [0xf08a24, 0xf2a62a, 0xd8432a, 0xe8c547, 0xe07a2a, 0xb84a2a].map(c => std({ color: c, roughness: .38 })),
+    pendant: std({ color: 0xfff0d0, emissive: 0xffc070, emissiveIntensity: 0, roughness: .4 }), downlight: new C.MeshBasicMaterial({ color: 0x8a8070, toneMapped: false }),
     bread: std({ color: 0xc07a3a, roughness: .75 }), crumb: std({ color: 0xead2a0, roughness: .9 }), calyx: std({ color: 0x5a6a2a, roughness: .8 }), gold: std({ color: 0xc8a050, roughness: .3, metalness: .8 }),
     tableWood: std({ map: planksT.map, bumpMap: planksT.bump, bumpScale: .006, roughness: .74, metalness: 0 }), darkWood: std({ map: woodT.map, color: 0x6a5048, roughness: .7, metalness: 0 }),
     counterTop: std({ map: topT.map, roughness: .28, metalness: 0 }), lcd: new C.MeshBasicMaterial({ map: lcdT, toneMapped: false, color: 0xd8d8d8 }),
@@ -651,7 +652,7 @@ const ROOM = (() => {
       pipe([[3.0, y, z], [3.3, y + .1, z + .3], [3.4, y + .3, z + .9]], .12, M.hull, 0); for (const x of [3.15, 3.3]) add(new C.TorusGeometry(.125, .02, 6, 20), dk, x, y + .03, z - .15, { ry: Math.PI/2, cast: false });
       for (const x of [-1.0, .3, 2.1, 2.7]){ box(.06, .5, .05, dk, x, y + .3, z - .2); box(.66, .05, .07, dk, x, y + .19, z, { cast: false }); }   // (hangers up to the ceiling, straps round the housing)
       
-      cyl(.26, .26, .22, M.cream, -2.1, y + .05, z - .05, { seg: 32 }); add(new C.TorusGeometry(.2, .03, 8, 32), M.chrome, -2.1, y - .07, z - .05, { rx: Math.PI/2, cast: false }); cyl(.17, .17, .02, M.lampGlow, -2.1, y - .05, z - .05, { cast: false, seg: 24 });
+      cyl(.26, .26, .22, M.cream, -2.1, y + .05, z - .05, { seg: 32 }); add(new C.TorusGeometry(.2, .03, 8, 32), M.chrome, -2.1, y - .07, z - .05, { rx: Math.PI/2, cast: false }); cyl(.17, .17, .02, M.downlight, -2.1, y - .05, z - .05, { cast: false, seg: 24 });
       pipe([[2.85, y - .1, z - .3], [2.6, y - .45, .2], [2.68, 3.2, .09], [2.72, 2.0, .08], [2.75, 1.0, .08]], .022, M.steel, 6); }
     // more grooves on the olive bulge round the ring
     for (const r of [RF + .46, RF + .56]) add(new C.TorusGeometry(r, .012, 6, 220), M.dark, 0, Y, .15, { cast: false });
@@ -685,48 +686,78 @@ const ROOM = (() => {
     if (R.L) R.reaim();
     R.parts = { kitchen: kit, window: hull, table: G.table, chair: G.chair, cabinet: G.cabinet, rug: G.rug };
     box(16, 6, .3, M.dark, 0, 2, -8.5);   // (the shell outside: the sun only comes in by the window)
+    // a pendant lamp over the table: a cord from the ceiling, a brass cap, a cream dome shade, a bulb (lit in the evening and at night)
+    { const p = G.table.position; cyl(.004, .004, CEIL - 1.95, M.dark, p.x, (CEIL + 1.95)/2, p.z, { seg: 6, cast: false }); cyl(.03, .04, .06, M.brass, p.x, 1.95, p.z, { seg: 24 });
+      lathe([[.03, 0], [.06, -.02], [.17, -.12], [.2, -.17], [.205, -.18], [.19, -.18], [.16, -.13], [.05, -.03]], M.cream, p.x, 1.92, p.z, { seg: 64 });
+      add(new C.SphereGeometry(.045, 24, 16), M.pendant, p.x, 1.77, p.z, { cast: false }); }
   };
 
   /* ---------- light ---------- */
+  /* ---------- light ----------
+     The room turns slowly (the title screen spins the city outside), so the sun comes in at a different angle as it goes.
+     R.light makes the lights once; R.setTime picks the hour (morning, day, evening, night: colours, how high the sun is,
+     the lamps at night); R.setSun(theta) puts the sun theta radians round from straight out of the window (null: none),
+     and lays the first bounce for it. The bake renders a few headings and the title screen blends between them. */
+  let SC_ = null, bounce = [], TIME = null;
+  const TIMES = {
+    morning: { sunC: 0xffc27c, sunI: 5.6, elev: 26, sky: 0xffe2bc, skyI: .32, hemi: [0xffe0b0, 0x3a3428, .04], amb: .02, b5: .3, fill: [0xd8c8b0, .1], post: [1, .82, .56], density: .3, lamps: 0 },
+    day: { sunC: 0xfff0d8, sunI: 5.2, elev: 48, sky: 0xeef4ff, skyI: .45, hemi: [0xf0f0e8, 0x3a3a34, .07], amb: .03, b5: .25, fill: [0xe0e4e8, .14], post: [1, .96, .86], density: .22, lamps: 0 },
+    evening: { sunC: 0xff8a40, sunI: 5.0, elev: 11, sky: 0xffa888, skyI: .26, hemi: [0xffb890, 0x34282a, .035], amb: .015, b5: .3, fill: [0xc8a8a8, .08], post: [1, .6, .34], density: .36, lamps: .45 },
+    night: { sunC: 0x8aa8e0, sunI: 0, elev: 35, sky: 0x6a88c8, skyI: .1, hemi: [0x30405a, 0x161414, .03], amb: .01, b5: .15, fill: [0x6070a0, .04], post: [.55, .65, .9], density: .05, lamps: 1 },
+  };
+  R.TIMES = Object.keys(TIMES);
   R.light = sc => {
-    const wc = R.winCenter(), n = R.winNormal();
-    // the sun: one warm beam through the porthole
+    SC_ = sc;
     const sun = new C.DirectionalLight(0xffc27c, 5.6);
-    sun.target.position.set(.5, 0, -2.8); sun.position.copy(wc).add(wc.clone().sub(sun.target.position).normalize().multiplyScalar(9));
     sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -.0004; sun.shadow.normalBias = .012;
     Object.assign(sun.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: .5, far: 30 });
     sc.add(sun, sun.target); R.L = { sun };
     // the sky through the glass: three soft shadowed spots spread over the disc, pointing in
-    hull.updateMatrixWorld(true); R.L.sky = [];
+    hull.updateMatrixWorld(true); R.L.sky = []; const n = R.winNormal();
     for (const [lx, ly] of [[-.45, .35], [.45, .35], [0, -.4]]){ const sp = new C.SpotLight(0xffe2bc, .32, 10, 1.25, 1, 1.4);
       sp.position.copy(new C.Vector3(lx, WC.y + ly, -WIN.depth + .08).applyMatrix4(hull.matrixWorld)); sp.target.position.copy(sp.position).addScaledVector(n, 4).add(new C.Vector3(0, -1.2, 0));
       sp.castShadow = true; sp.shadow.mapSize.set(1024, 1024); sp.shadow.bias = -.0006; sp.shadow.normalBias = .02; sc.add(sp, sp.target); R.L.sky.push(sp); }
-    sc.add(new C.HemisphereLight(0xffe0b0, 0x3a3428, .04)); sc.add(new C.AmbientLight(0x5a4a3a, .02));
-    const b5 = new C.PointLight(0xffb070, .3, 3.5, 2); b5.position.set(.8, 4.25, -3.6); sc.add(b5);
-    const b3 = new C.SpotLight(0xffc888, 0, 7, .5, .9, 2); R.L.b3 = b3; sc.add(b3, b3.target);
-    const b2 = new C.PointLight(0xffd090, 0, 3, 2), b4 = new C.PointLight(0xffb870, 0, 3, 2); sc.add(b2, b4); R.L.b2 = b2; R.L.b4 = b4;
-    R.reaim();
-    // the first bounce: shoot the sun's beam through the glass, and where it lands put a dim light the colour of that surface
-    // (instant radiosity: the sunlit rug, counter and sill throw warm light back into the room)
-    sc.updateMatrixWorld(true);
-    const sd = sun.position.clone().sub(sun.target.position).normalize(), rc = new C.Raycaster(), hits = [];
-    const solids = []; sc.traverse(o => { if (o.isMesh && o.material && o.material.colorWrite !== false && !o.material.transparent && o.visible) solids.push(o); });
-    for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++){ const u = (i + .5)/7*2 - 1, v = (j + .5)/7*2 - 1; if (u*u + v*v > 1) continue;
-      const o = new C.Vector3(u*WIN.r2*.95, WC.y + v*WIN.r2*.95, -WIN.depth - .05).applyMatrix4(hull.matrixWorld).addScaledVector(sd, .02);
-      rc.set(o, sd.clone().negate()); const h = rc.intersectObjects(solids, false)[0]; if (h && h.distance < 12) hits.push(h); }
-    const sunC = new C.Color(0xffc684);
-    for (const h of hits){ const m = h.object.material, alb = (m.color ? m.color.clone() : new C.Color(1, 1, 1)); if (m.map) alb.multiplyScalar(.75);
-      const nrm = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : new C.Vector3(0, 1, 0);
-      const l = new C.PointLight(alb.multiply(sunC), 1.6/Math.max(8, hits.length)*8*.22, 3.2, 2); l.position.copy(h.point).addScaledVector(nrm, .18); sc.add(l); }
-    const fill = new C.DirectionalLight(0xd8c8b0, .1); fill.position.set(-3, 3.2, -1.5); fill.target.position.set(2, .9, -6); sc.add(fill, fill.target);
+    R.L.hemi = new C.HemisphereLight(0xffe0b0, 0x3a3428, .04); R.L.amb = new C.AmbientLight(0x5a4a3a, .02); sc.add(R.L.hemi, R.L.amb);
+    R.L.b5 = new C.PointLight(0xffb070, .3, 3.5, 2); R.L.b5.position.set(.8, 4.25, -3.6); sc.add(R.L.b5);
+    R.L.fill = new C.DirectionalLight(0xd8c8b0, .1); R.L.fill.position.set(-3, 3.2, -1.5); R.L.fill.target.position.set(2, .9, -6); sc.add(R.L.fill, R.L.fill.target);
+    // the lamps, for the evening and the night: the puck lights under the capsule, the ceiling downlight, the pendant over the table
+    kit.updateMatrixWorld(true); R.L.lamps = [];
+    for (const x of [1.0, 2.0, 3.0]){ const l = new C.PointLight(0xffc888, 0, 1.9, 2); l.position.copy(new C.Vector3(x, 1.58, .4).applyMatrix4(kit.matrixWorld)); sc.add(l); R.L.lamps.push([l, .7]); }
+    { const l = new C.SpotLight(0xffc890, 0, 7, .9, .8, 1.6); l.position.copy(toWorld(-2.1, CEIL - .72, .95)); l.target.position.copy(l.position).add(new C.Vector3(0, -3, 0)); l.castShadow = true; l.shadow.mapSize.set(1024, 1024); l.shadow.bias = -.0006; sc.add(l, l.target); R.L.lamps.push([l, 2.2]); }
+    { const p = G.table.position; const l = new C.PointLight(0xffb870, 0, 3.2, 2); l.position.set(p.x, 1.72, p.z); l.castShadow = true; l.shadow.mapSize.set(1024, 1024); l.shadow.bias = -.001; sc.add(l); R.L.lamps.push([l, 1.4]); }
+    R.setTime('morning'); R.setSun(0);
     return sun;
   };
-  R.reaim = () => {
-    if (!R.L) return; const wc = R.winCenter(), n = R.winNormal(), L = R.L;
-    kit.updateMatrixWorld(true); L.sun.target.position.copy(new C.Vector3(.3, .55, .95).applyMatrix4(kit.matrixWorld)); L.sun.position.copy(wc).add(wc.clone().sub(L.sun.target.position).normalize().multiplyScalar(9));
-    L.b2.position.copy(wc).addScaledVector(n, 1.2).add(new C.Vector3(0, -.7, 0)); L.b4.position.copy(wc).addScaledVector(n, .5).add(new C.Vector3(0, 1.4, 0));
-    L.b3.position.copy(wc).addScaledVector(n, .6); kit.updateMatrixWorld(true); L.b3.target.position.copy(new C.Vector3(2, 1, .68).applyMatrix4(kit.matrixWorld));
+  R.setTime = t => {
+    const T = TIMES[t]; TIME = T; const L = R.L;
+    L.sun.color.set(T.sunC); for (const sp of L.sky){ sp.color.set(T.sky); sp.intensity = T.skyI; }
+    L.hemi.color.set(T.hemi[0]); L.hemi.groundColor.set(T.hemi[1]); L.hemi.intensity = T.hemi[2]; L.amb.intensity = T.amb; L.b5.intensity = T.b5;
+    L.fill.color.set(T.fill[0]); L.fill.intensity = T.fill[1];
+    for (const [l, k] of L.lamps) l.intensity = k*T.lamps; M.pendant.emissiveIntensity = T.lamps*1.6; M.downlight.color.set(T.lamps ? 0xffe8c0 : 0x8a8070);
+    return { sunCol: T.post, density: T.density, sunny: T.sunI > 0 };
   };
+  // theta: the sun's heading round from the window's outward normal (radians), at the hour's height; null: no sun
+  R.setSun = theta => {
+    const L = R.L, wc = R.winCenter(), out = R.winNormal().negate();
+    for (const b of bounce) SC_.remove(b); bounce = [];
+    const e = TIME.elev*Math.PI/180, th = theta ?? 0, c = Math.cos(th), s_ = Math.sin(th);
+    const dir = new C.Vector3(out.x*c - out.z*s_, 0, out.x*s_ + out.z*c).multiplyScalar(Math.cos(e)); dir.y = Math.sin(e);
+    L.sun.position.copy(wc).addScaledVector(dir, 9); L.sun.target.position.copy(wc).addScaledVector(dir, -3); L.sun.target.updateMatrixWorld(); L.sun.updateMatrixWorld();
+    L.sun.intensity = theta === null ? 0 : TIME.sunI;
+    if (theta === null || !TIME.sunI) return;
+    // the first bounce: shoot the sun's beam through the glass, and where it lands put a dim light the colour of that surface
+    // (instant radiosity: whatever the beam lights throws warm light back into the room)
+    SC_.updateMatrixWorld(true);
+    const rc = new C.Raycaster(), hits = [], solids = []; SC_.traverse(o => { if (o.isMesh && o.material && o.material.colorWrite !== false && !o.material.transparent && o.visible) solids.push(o); });
+    for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++){ const u = (i + .5)/7*2 - 1, v = (j + .5)/7*2 - 1; if (u*u + v*v > 1) continue;
+      const o = new C.Vector3(u*WIN.r2*.95, WC.y + v*WIN.r2*.95, -WIN.depth - .05).applyMatrix4(hull.matrixWorld).addScaledVector(dir, .02);
+      rc.set(o, dir.clone().negate()); const h = rc.intersectObjects(solids, false)[0]; if (h && h.distance < 12) hits.push(h); }
+    const sunC = new C.Color(TIME.sunC);
+    for (const h of hits){ const m = h.object.material, alb = (m.color ? m.color.clone() : new C.Color(1, 1, 1)); if (m.map) alb.multiplyScalar(.75);
+      const nrm = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : new C.Vector3(0, 1, 0);
+      const l = new C.PointLight(alb.multiply(sunC), 1.6/Math.max(8, hits.length)*8*.22*TIME.sunI/5.6, 3.2, 2); l.position.copy(h.point).addScaledVector(nrm, .18); SC_.add(l); bounce.push(l); }
+  };
+  R.reaim = () => { if (R.L) R.setSun(0); };
   R.cubeAt = [.6, 1.4, -3.4];
   return R;
 })();

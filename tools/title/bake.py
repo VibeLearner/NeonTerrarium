@@ -32,12 +32,23 @@ def main():
         res = pg.evaluate('o => BAKE(o)', opt)
         out = opt.get('out', OUT); os.makedirs(out, exist_ok=True)
         anchors = {}
+        def save(name, data):
+            with open(os.path.join(out, name), 'wb') as f:
+                f.write(base64.b64decode(data.split(',', 1)[1]))
         for view, r in res.items():
-            for kind in ('room', 'glass', 'signoff', 'plants'):
-                if not r.get(kind): continue
-                with open(os.path.join(out, '%s-%s.png' % (kind, view)), 'wb') as f:
-                    f.write(base64.b64decode(r[kind].split(',', 1)[1]))
-            anchors[view] = r['anchors']
+            if 'anchors' in r:   # one picture set for the view (the old room, or a checking view)
+                for kind in ('room', 'glass', 'signoff', 'plants'):
+                    if r.get(kind): save('%s-%s.png' % (kind, view), r[kind])
+                anchors[view] = r['anchors']; continue
+            for t, rt in r.items():   # the kitchen's title views: a set per hour, and the sun's headings
+                if 'suns' not in rt:
+                    for kind in ('room', 'glass'):
+                        if rt.get(kind): save('%s-%s-%s.png' % (kind, view, t), rt[kind])
+                    anchors.setdefault(view, {})[t] = rt['anchors']; continue
+                for kind in ('room', 'glass', 'signoff', 'plants'):
+                    if rt.get(kind): save('%s-%s-%s.png' % (kind, view, t), rt[kind])
+                for i, d in enumerate(rt['suns']): save('sun-%s-%s-%d.png' % (view, t, i), d)
+                anchors.setdefault(view, {})[t] = rt['anchors']
         with open(os.path.join(out, 'anchors.json'), 'w') as f:
             json.dump(anchors, f, indent=1)
         print(json.dumps(anchors))

@@ -16,7 +16,8 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18g';
+  const VER = '2026-10-18h';
+  let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
 
@@ -26,13 +27,15 @@ const TITLE = (() => {
     if (!A) return;
     W = innerWidth; H = innerHeight;
     const v = W/H < .85 ? 'tall' : 'wide';
-    if (v !== view){ view = v; imRoom.src = 'assets/title/room-' + v + '.png?v=' + VER; imGlass.src = 'assets/title/glass-' + v + '.png?v=' + VER; if (A[v].signRect) imOff.src = 'assets/title/signoff-' + v + '.png?v=' + VER; loadPlants(v); }
+    if (v !== view){ view = v; const f = k => 'assets/title/' + k + '-' + v + '-' + TOD + '.png?v=' + VER;
+      imRoom.src = f('room'); imGlass.src = f('glass'); if (A[v].signRect) imOff.src = f('signoff'); loadPlants(v);
+      SUNS = (A[v].heads || []).map((h, i) => { const im = new Image(); im.src = 'assets/title/sun-' + v + '-' + TOD + '-' + i + '.png?v=' + VER; return im; }); }
     const a = A[v], iw = a.w, ih = a.h; S0 = Math.max(W/iw, H/ih);
     const sw = iw*S0, sh = ih*S0;
     OX = Math.min(0, Math.max(W - sw, W*.5 - a.win[0]*sw)); OY = Math.min(0, Math.max(H - sh, H*.5 - a.win[1]*sh));
     if (v === 'wide') OX = Math.min(0, Math.max(W - sw, (W - sw)/2));   // (wide: centred; the window sits right of centre by design)
     Object.assign(stage.style, { left: OX + 'px', top: OY + 'px', width: sw + 'px', height: sh + 'px' });
-    cvDust.width = Math.round(sw/S0); cvDust.height = Math.round(sh/S0);   // (dust at the picture's own pixels: it scales up crisp with it)
+    cvDust.width = Math.round(sw/S0); cvDust.height = Math.round(sh/S0); sunCv.width = cvDust.width; sunCv.height = cvDust.height;   // (dust at the picture's own pixels: it scales up crisp with it)
     const P = (k, el, dx = 0, dy = 0) => { el.style.left = (a[k][0]*100 + dx) + '%'; el.style.top = (a[k][1]*100 + dy) + '%'; };
     const pr = a.plantRect; cvPl.hidden = !pr; if (pr) Object.assign(cvPl.style, { left: pr[0]/iw*100 + '%', top: pr[1]/ih*100 + '%', width: pr[2]/iw*100 + '%', height: pr[3]/ih*100 + '%' });
     cvSky.width = cvDust.width; cvSky.height = cvDust.height; seedClouds();
@@ -43,6 +46,37 @@ const TITLE = (() => {
     seedMotes();
   }
 
+  /* ---------- the pod turning: the sun swinging round, and a slow sway ---------- */
+  // The city outside turns because the pod does, so the sun's beam moves too: the bake has what the sun adds at nine
+  // headings (60 degrees either side of straight in); the two nearest are blended and added over the room. Past those,
+  // the sun has gone round the hull and the beam fades out until it comes round again.
+  sunCv = document.createElement('canvas'); sunCv.className = 't-layer t-sun'; sunCv.setAttribute('aria-hidden', 'true'); gSun = sunCv.getContext('2d');
+  stage.insertBefore(sunCv, cvPl);
+  function drawSun(){
+    const a = A[view], hs = a.heads || [], w = sunCv.width, h = sunCv.height; gSun.clearRect(0, 0, w, h); sunW = 0;
+    if (!hs.length || !SUNS.length) return;
+    // which way the beam moves as the city turns: the far side of the city drifts the way the sun does, so the patch on
+    // the floor moves against it (the bake's patches tell us which heading moves it which way on the picture)
+    const p = a.patches || [], sgn = p.length > 1 && p[p.length - 1][0] > p[0][0] ? -1 : 1;
+    let d = ((sgn*(yaw - yaw0)*180/Math.PI + hs[0]) % 360 + 540) % 360 - 180;   // (degrees, -180..180; starts with the sun just coming in)
+    sunH = d;
+    const lo = hs[0], hi = hs[hs.length - 1], fade = Math.max(0, Math.min(1, 1 - (Math.max(lo - d, d - hi, 0))/25));
+    sunW = fade; if (fade <= 0) return;
+    const c = Math.max(lo, Math.min(hi, d)), f = (c - lo)/(hi - lo)*(hs.length - 1), i = Math.min(hs.length - 2, Math.floor(f)), t = f - i;
+    gSun.globalCompositeOperation = 'lighter';
+    if (SUNS[i].complete){ gSun.globalAlpha = (1 - t)*fade; gSun.drawImage(SUNS[i], 0, 0, w, h); }
+    if (SUNS[i + 1].complete){ gSun.globalAlpha = t*fade; gSun.drawImage(SUNS[i + 1], 0, 0, w, h); }
+    gSun.globalAlpha = 1;
+  }
+  // the pod is afloat: it drifts a few pixels and leans a fraction of a degree, slowly, never quite repeating
+  function drawSway(now){
+    if (reduced) return; const t = now/1000;
+    const x = Math.sin(t*.21)*2.2 + Math.sin(t*.53 + 1)*.8, y = Math.sin(t*.17 + 2)*2.6 + Math.sin(t*.41)*.9, r = Math.sin(t*.13 + .5)*.16 + Math.sin(t*.37)*.05;
+    stage.style.translate = (x*S0/2).toFixed(2) + 'px ' + (y*S0/2).toFixed(2) + 'px'; stage.style.rotate = r.toFixed(3) + 'deg';
+  }
+  // the hour: the city's own, in four looks
+  function pickTime(h){ return h >= 5.5 && h < 10 ? 'morning' : h >= 10 && h < 16.5 ? 'day' : h >= 16.5 && h < 19.5 ? 'evening' : 'night'; }
+
   /* ---------- the plants on the sill, swaying ---------- */
   // their picture is sheared a pixel or two, more toward the tips: each column measured from its lowest leaf (the pot's rim)
   function loadPlants(v){
@@ -51,7 +85,7 @@ const TITLE = (() => {
       plW = cvPl.width = im.width; plH = cvPl.height = im.height; gP.clearRect(0, 0, plW, plH); gP.drawImage(im, 0, 0);
       const d = gP.getImageData(0, 0, plW, plH); plSrc = new Uint32Array(d.data.buffer.slice(0)); plOut = d; plBase = new Int16Array(plW).fill(-1);
       for (let x = 0; x < plW; x++) for (let y = plH - 1; y >= 0; y--) if (plSrc[y*plW + x] >>> 24){ plBase[x] = y; break; } };
-    im.src = 'assets/title/plants-' + v + '.png?v=' + VER;
+    im.src = 'assets/title/plants-' + v + '-' + TOD + '.png?v=' + VER;
   }
   function drawPlants(now){
     if (!plSrc || reduced || now - plantAt < 33) return; plantAt = now;
@@ -66,6 +100,7 @@ const TITLE = (() => {
 
   /* ---------- clouds past the window ---------- */
   // a few soft pixel clouds drifting slowly across the upper half of the glass, over the city's sky
+  const CLOUD = { morning: ['214,200,190', '255,247,232', 1], day: ['200,208,218', '255,255,255', 1], evening: ['170,110,120', '255,190,150', 1], night: ['40,48,70', '90,100,130', .7] };
   function seedClouds(){
     clouds = []; if (reduced || !A || !view) return; const a = A[view], r = a.winR;
     for (let i = 0; i < 6; i++){ const puffs = [], n = 5 + Math.floor(Math.random()*6), sz = r*(.08 + Math.random()*.08);
@@ -80,9 +115,9 @@ const TITLE = (() => {
       const by = Math.round(cy + c.y + c.base), fade = Math.max(0, Math.min(1, (cy + r*.1 - by)/(r*.4))); if (fade <= 0) continue;
       gS.save(); gS.beginPath(); gS.rect(0, 0, w, by); gS.clip();   // (a flat underside, like real fair-weather clouds)
       for (const [dx, dy, pr] of c.puffs){ const x = Math.round(cx + c.x + dx), y = Math.round(cy + c.y + dy);
-        gS.fillStyle = 'rgba(214,200,190,' + (c.a*.8*fade).toFixed(3) + ')'; gS.beginPath(); gS.ellipse(x, y + pr*.18, pr*1.7, pr*.75, 0, 0, Math.PI*2); gS.fill(); }
+        const CC = CLOUD[TOD]; gS.fillStyle = 'rgba(' + CC[0] + ',' + (c.a*.8*fade*CC[2]).toFixed(3) + ')'; gS.beginPath(); gS.ellipse(x, y + pr*.18, pr*1.7, pr*.75, 0, 0, Math.PI*2); gS.fill(); }
       for (const [dx, dy, pr] of c.puffs){ const x = Math.round(cx + c.x + dx), y = Math.round(cy + c.y + dy);
-        gS.fillStyle = 'rgba(255,247,232,' + (c.a*fade).toFixed(3) + ')'; gS.beginPath(); gS.ellipse(x, y - pr*.08, pr*1.45, pr*.6, 0, 0, Math.PI*2); gS.fill(); }
+        gS.fillStyle = 'rgba(' + CLOUD[TOD][1] + ',' + (c.a*fade*CLOUD[TOD][2]).toFixed(3) + ')'; gS.beginPath(); gS.ellipse(x, y - pr*.08, pr*1.45, pr*.6, 0, 0, Math.PI*2); gS.fill(); }
       gS.restore(); }
     gS.restore();
   }
@@ -95,12 +130,13 @@ const TITLE = (() => {
   }
   function drawDust(now, dt){
     const a = A[view], w = cvDust.width, h = cvDust.height; gD.clearRect(0, 0, w, h);
+    if (!a.patch) return;
     const x0 = a.win[0]*w, y0 = a.win[1]*h, x1 = Math.min(a.patch[0], 1.05)*w, y1 = Math.min(a.patch[1], 1.0)*h, r = a.winR*.8;
     for (const m of motes){
       m.t += m.sp*dt; if (m.t > 1){ m.t = 0; m.o = Math.random()*2 - 1; }
       const t = m.t, bx = x0 + (x1 - x0)*t, by = y0 + (y1 - y0)*t, spread = r*(.8 + t*1.2);
       const x = bx + m.o*spread + Math.sin(now/1700 + m.ph)*6, y = by + Math.cos(now/2100 + m.ph)*5 - m.o*spread*.3;
-      const tw = .45 + .55*Math.max(0, Math.sin(now/600 + m.ph*3)), al = tw*(1 - Math.abs(m.o))*Math.sin(Math.PI*t)*.9;
+      const tw = .45 + .55*Math.max(0, Math.sin(now/600 + m.ph*3)), al = tw*(1 - Math.abs(m.o))*Math.sin(Math.PI*t)*.9*sunW;
       if (al < .05) continue;
       gD.fillStyle = 'rgba(255,244,214,' + al.toFixed(2) + ')'; gD.fillRect(Math.round(x), Math.round(y), m.z > .8 ? 2 : 1, m.z > .8 ? 2 : 1);
     }
@@ -109,9 +145,9 @@ const TITLE = (() => {
   function loop(now){
     if (!T.on) return; raf = requestAnimationFrame(loop);
     const dt = last ? Math.min(.1, (now - last)/1000) : 0; last = now;
-    try { if (typeof yawT !== 'undefined' && !reduced) yawT += dt*.02; } catch (e) {}
+    try { if (typeof yawT !== 'undefined' && !reduced) yawT += dt*.02; if (yaw0 === null) yaw0 = yaw; } catch (e) {}
     aimCity();
-    if (A && view){ drawDust(now, dt); drawClouds(dt); drawPlants(now); }
+    if (A && view){ drawSun(); drawSway(now); drawDust(now, dt); drawClouds(dt); drawPlants(now); }
     // the light bar: steady, and now and then it blinks: a stutter of two or three, or one slow dip
     if (!reduced && now > flickNext){ flick = []; let t = now;
       if (Math.random() < .35){ flick.push([t, t + 500 + Math.random()*400]); t += 900; }
@@ -133,8 +169,9 @@ const TITLE = (() => {
   function setScene(){
     try {
       was = { hour: S.hour, cycle: S.cycle, wx: typeof LK !== 'undefined' ? { mode: LK.wx.mode, set: LK.wx.set } : null, zoomT };
-      S.cycle = false; S.hour = 8.6;   // (the room's morning: the city outside matches it)
+      S.cycle = false; TOD = pickTime(S.hour);   // (the city's own hour, held still; the room's light matches it)
       if (typeof LK !== 'undefined' && LK.setWeather) LK.setWeather('clear', true, true); else S.rain = false;
+      yaw0 = null;
       was.cam = { goal: camGoal.clone(), pitchT };
       // the player's city, for framing it in the window: the middle of everything built, and how far it reaches
       let x = 0, z = 0, n = 0; for (const c of cells.values()){ x += c.x; z += c.z; n++; } x = n ? x/n : 0; z = n ? z/n : 0;
@@ -148,10 +185,10 @@ const TITLE = (() => {
     if (!CITY || !A || !view || root.classList.contains('leaving')) return;
     try {
       const a = A[view], wx = OX + a.win[0]*a.w*S0, wy = OY + a.win[1]*a.h*S0, wr = a.winR*S0;
-      const P = 24*Math.PI/180; pitchT = P;
-      zoomT = Math.max(5, Math.min(40, CITY.r*H/(2*.82*Math.max(60, wr))));
+      const P = 14*Math.PI/180; pitchT = P;   // (low: out of a window you look across the city, not down on it)
+      zoomT = Math.max(5, Math.min(40, CITY.r*H/(2*1.05*Math.max(60, wr))));
       const k = 2*zoomT/H, ox = (wx - W/2)*k, oy = -(wy - H/2)*k, sy = Math.sin(yaw), cy = Math.cos(yaw);
-      const d = oy/Math.sin(P) - CITY.r*.15;   // (a touch past the middle, so the near edge of the city sits on the sill)
+      const d = (oy + wr*.28*k)/Math.sin(P);   // (the city's middle a little below the window's: sky and clouds above it)
       camGoal.set(CITY.x - cy*ox + sy*d, TARGET_Y, CITY.z + sy*ox + cy*d);
     } catch (e) {}
   }
@@ -165,8 +202,9 @@ const TITLE = (() => {
   }
   T.show = async () => {
     if (T.on) return; T.on = true; document.documentElement.classList.add('title-on'); root.hidden = false; root.classList.remove('leaving');
-    setScene(); A = A || await anchorsP;
-    if (!A){ T.hide(true); return; }   // (the pictures couldn't be had: straight into the city)
+    setScene(); RAW = RAW || await anchorsP;
+    if (!RAW){ T.hide(true); return; }   // (the pictures couldn't be had: straight into the city)
+    A = {}; for (const v of ['wide', 'tall']) A[v] = RAW[v][TOD] || RAW[v].morning; view = null;
     layout(); aimCity(); try { camT.copy(camGoal); } catch (e) {} last = 0; raf = requestAnimationFrame(loop); fillNote();
     setTimeout(() => { const c = menu.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }, 60);
   };

@@ -376,6 +376,8 @@ const BOOTH = (() => {
     $('bSave').addEventListener('click', saveLoop);
     $('bName').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); saveLoop(); } });
     root.querySelectorAll('.gtab').forEach(t => t.addEventListener('click', () => setMode(t.dataset.mode)));
+    { let seen = false; try { seen = localStorage.getItem('neonIsland.boothSeen') === '1'; } catch (e){}   // (the Booth tab flashes green until the player has been in once)
+      if (!seen){ const bt = root.querySelector('.gtab[data-mode="booth"]'); if (bt) bt.classList.add('beckon'); } }
     drawKeys(chordOf(0)); renderShelf(); status();
   }
   function setVoice(id){ S.voice = id; $('bVoices').querySelectorAll('.gb').forEach(x => x.classList.toggle('on', x.dataset.v === id)); store(); }
@@ -654,7 +656,8 @@ const BOOTH = (() => {
     mode = m; root.querySelectorAll('.gtab').forEach(t => { const on = t.dataset.mode === m; t.classList.toggle('on', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
     const main = root.querySelector('.gmain'), bo = $('gBooth');
     main.hidden = m === 'booth'; bo.hidden = m !== 'booth';
-    if (m === 'booth'){ if (bc){ const sel = $('g-progressionSelect'); sel.value = lastPattern; sel.dispatchEvent(new Event('change', { bubbles: true })); } music.setBooth(true); audio(); if (S.song) ensureSong(); drawKeys(chordOf(curBar())); if (!raf) raf = requestAnimationFrame(frame); }
+    if (m === 'booth'){ const bt = root.querySelector('.gtab.beckon'); if (bt){ bt.classList.remove('beckon'); try { localStorage.setItem('neonIsland.boothSeen', '1'); } catch (e){} }
+      if (bc){ const sel = $('g-progressionSelect'); sel.value = lastPattern; sel.dispatchEvent(new Event('change', { bubbles: true })); } music.setBooth(true); audio(); if (S.song) ensureSong(); drawKeys(chordOf(curBar())); if (!raf) raf = requestAnimationFrame(frame); }
     else { stop(); music.setBooth(false); }
   }
   B.panelOpened = () => { if (mode === 'booth') setMode('booth'); };

@@ -185,6 +185,9 @@ const GRIDPANEL = (() => {
   #gridPanel .gtabs { display: flex; gap: 0; margin-left: 10px; border: 1px solid var(--line); }
   #gridPanel .gtab { background: none; border: 0; color: var(--cy2); font: inherit; font-size: 12.5px; letter-spacing: .2em; text-transform: uppercase; padding: 6px 14px; cursor: pointer; }
   #gridPanel .gtab:hover { background: rgba(95,216,222,.14); } #gridPanel .gtab.on { background: var(--cy); color: #04141a; }
+  #gridPanel .gtab.beckon:not(.on) { animation: gtBeckon 2.4s ease-in-out infinite; }   /* the Booth tab, until the player first opens it */
+  @keyframes gtBeckon { 0%, 100% { background: transparent; color: var(--cy2); box-shadow: none; } 50% { background: rgba(80,240,140,.28); color: #b8ffd2; box-shadow: 0 0 14px rgba(80,240,140,.55), inset 0 0 0 1px #5df09a; } }
+  @media (prefers-reduced-motion: reduce) { #gridPanel .gtab.beckon:not(.on) { animation: none; background: rgba(80,240,140,.22); color: #b8ffd2; } }
   #gridPanel .gtab:focus-visible { outline: 2px solid var(--yl); outline-offset: -2px; }
   /* the Booth: setup on the left, the loop and the magic keys in the middle, the shelf on the right */
   #gridPanel .gbooth { flex: 1; min-height: 0; display: grid; gap: 10px; padding: 4px 2px 6px;
@@ -391,7 +394,7 @@ const GRIDPANEL = (() => {
       <h4 id="gDlgT">Putting <b id="gDlgName"></b> on the broadcast</h4>
       <button class="gb gdlgopt" id="gDlgLogged"><b>Broadcast as logged</b><small>Your notes go out exactly as you recorded them. With the Neuro-phrase on, the Grid answers you, the way it does in the Booth.</small></button>
       <button class="gb gdlgopt" id="gDlgRewire"><b>Rewire the signal</b><small>A working copy on the carrier chart: move, stretch, add or delete notes, and the Grid drifts it somewhere new. The shelf copy stays as it was.</small></button>
-      <button class="gb" id="gDlgCancel">Keep the planners' pattern</button>
+      <button class="gb" id="gDlgCancel">Return to Console</button>
     </div>
   </div>
   <div class="gbot"><span>FRQ<b id="gpFrq">0</b></span><span>AMP<b id="gpAmp">0.00</b></span><span>CLK<b id="gpClk">82</b></span><span>CAD<b id="gpCad">1/8</b></span><span>MOD<b id="gpMod">MOSAIC</b></span><span>STASIS<b id="gpSt">OFF</b></span><span style="margin-left:auto">GRID V1 · SECTOR BROADCAST · CITY PLANNING OFFICE</span></div>`;

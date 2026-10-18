@@ -354,7 +354,7 @@ html.touch .ffbar{top:calc(16px + env(safe-area-inset-top,0px));bottom:auto}
 
 /* ---------- the title screen: a flat on a bright morning, the city through its round window (title.js) ---------- */
 .sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-html.title-on body > :where(:not(#view):not(#title):not(script)){visibility:hidden!important;pointer-events:none!important}
+html.title-on body > :where(:not(#view):not(#title):not(#cctvFade):not(script)){visibility:hidden!important;pointer-events:none!important}
 html.title-on.title-deck #deck{visibility:visible!important;pointer-events:auto!important;z-index:31}
 html.title-on #view{cursor:default}
 .title{position:fixed;inset:0;z-index:30;overflow:hidden;cursor:default}

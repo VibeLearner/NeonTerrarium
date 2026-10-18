@@ -40,7 +40,9 @@ function updateCamera(dt){
   // pixels crawling. (Motion along the view direction changes nothing in an orthographic view.)
   const px = 2*zoom/H, sy = Math.sin(yaw), cy = Math.cos(yaw), sp_ = Math.sin(PITCH), cp_ = Math.cos(PITCH);
   _cr.set(cy, 0, -sy); _cv.set(-sy*cp_, -sp_, -cy*cp_); _cu.crossVectors(_cr, _cv);
-  const a = Math.round(camT.dot(_cr)/px)*px, b = Math.round(camT.dot(_cu)/px)*px, cTrue = camT.dot(_cv), c = SC.pin(cTrue);   // (the static cache keeps the camera's place along the view fixed for as long as it can: see staticcache.js)
+  // (under the title screen the camera slides a hair every frame to keep the city in the turning pod's window: whole-pixel steps showed as a jitter)
+  const smooth = typeof TITLE !== 'undefined' && TITLE.on, snapPx = v => smooth ? v : Math.round(v/px)*px;
+  const a = snapPx(camT.dot(_cr)), b = snapPx(camT.dot(_cu)), cTrue = camT.dot(_cv), c = SC.pin(cTrue);   // (the static cache keeps the camera's place along the view fixed for as long as it can: see staticcache.js)
   camPix.set(a/px, b/px);
   _cs.copy(_cr).multiplyScalar(a).addScaledVector(_cu, b).addScaledVector(_cv, cTrue);
   camPosTrue.set(_cs.x + sy*cp_*CAM_DIST, _cs.y + sp_*CAM_DIST, _cs.z + cy*cp_*CAM_DIST);   // (where the camera really is)

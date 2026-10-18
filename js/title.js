@@ -21,7 +21,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18w';
+  const VER = '2026-10-18x';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -343,7 +343,8 @@ const TITLE = (() => {
     was = null;
   }
   T.show = async () => {
-    if (T.on) return; T.on = true; document.documentElement.classList.add('title-on'); root.hidden = false; root.classList.remove('leaving');
+    if (T.on) return; T.on = true; try { if (scWas === null){ scWas = SC.mode; SC.mode = 'off'; } } catch (e) {}   // (the city's still-parts cache: it held frames while the pod turned slowly, so the city stepped)
+    document.documentElement.classList.add('title-on'); root.hidden = false; root.classList.remove('leaving');
     setScene(); RAW = RAW || await anchorsP;
     if (!RAW){ T.hide(true); return; }   // (the pictures couldn't be had: straight into the city)
     GB = GB || await gbufP; HOUR = was ? was.hour : S.hour; RTMODE = !!GB && (!liveP || !!RT);
@@ -388,7 +389,7 @@ const TITLE = (() => {
   // Leaving for the city: the view drifts towards the porthole and through it. The room grows round the window's middle
   // (the city behind stays put: it's far off, so it hardly changes as you near the glass), the glass bends the city as you
   // pass it (a lens ripple in the game's last pass, sky.js), and the city is then the game's own view at the same zoom.
-  let leaveAt = 0, flightTo = 4, flightC = [.5, .5], sway0 = null, crossed = false; const FLIGHT = 2600;
+  let scWas = null, leaveAt = 0, flightTo = 4, flightC = [.5, .5], sway0 = null, crossed = false; const FLIGHT = 2600;
   function flight(){
     const t = Math.min(1, (performance.now() - leaveAt)/FLIGHT), e = t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2.2)/2;   // (slow away, then on through)
     const s = Math.pow(flightTo, e), ec = Math.log(flightTo/1.2)/Math.log(flightTo);   // (ec: where the window's rim passes the screen's edges: the glass)
@@ -403,7 +404,7 @@ const TITLE = (() => {
   function unwiden(){ const v = document.getElementById('view'); if (v){ v.style.transition = 'transform 1.2s ease-in-out'; v.style.transform = ''; setTimeout(() => { v.style.transition = ''; }, 1300); } }
   // the pictures for an hour, fetched ahead (they're cached, so the room shows at once when it's needed)
   function preload(t){ const v = innerWidth/innerHeight < .85 ? 'tall' : 'wide'; for (const k of ['room', 'glass', 'signoff']){ const im = new Image(); im.src = 'assets/title/' + k + '-' + v + '-' + t + '.png?v=' + VER; (preload.keep = preload.keep || []).push(im); } }
-  function finish(){ T.leaving = false; try { WARP.k.value = 0; } catch (e) {} stage.style.opacity = ''; stage.style.scale = ''; unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} try { applyRenderRes(zoom); } catch (e) {} }
+  function finish(){ T.leaving = false; try { if (scWas !== null){ SC.mode = scWas; scWas = null; } } catch (e) {} try { WARP.k.value = 0; } catch (e) {} stage.style.opacity = ''; stage.style.scale = ''; unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} try { applyRenderRes(zoom); } catch (e) {} }
 
   /* ---------- the menu ---------- */
   function setDeck(on){

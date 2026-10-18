@@ -11,7 +11,7 @@ const TITLE_RT = (() => {
   const FS = `
 #include <packing>
 varying vec2 vUv;
-uniform sampler2D tCol, tNrm, tDep, tMat, tGlow, tBar, tBounce, sunMap, lampMap;
+uniform sampler2D tCol, tNrm, tDep, tMat, tGlow, tBar, tBounce, tStat, sunMap, sunDyn, lampMap;
 uniform mat4 camWorld, sunMat, lampMat;
 uniform vec2 projXY, res;
 uniform float far, open, barOn, lampsK, density, exposure, bounceK, time, sunOn;
@@ -22,8 +22,8 @@ vec3 vpos(vec2 uv){ float z = dep(uv); vec2 n = uv*2. - 1.; return vec3(n.x*z/pr
 vec3 wpos(vec3 v){ return (camWorld*vec4(v, 1.)).xyz; }
 float shadowAt(sampler2D m, mat4 M, vec3 p, float bias, float texel){
   vec4 s = M*vec4(p, 1.); s.xyz /= s.w; if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.;
-  float sh = 0.; for (int x = -1; x <= 1; x++) for (int y = -1; y <= 1; y++){ float d = unpackRGBAToDepth(texture2D(m, s.xy + vec2(float(x), float(y))*texel)); sh += s.z - bias > d ? 0. : 1.; }
-  return sh/9.;
+  float sh = 0.; for (int k = 0; k < 5; k++){ vec2 o = k == 0 ? vec2(0.) : k == 1 ? vec2(1., 0.) : k == 2 ? vec2(-1., 0.) : k == 3 ? vec2(0., 1.) : vec2(0., -1.); float d = unpackRGBAToDepth(texture2D(m, s.xy + o*texel)); sh += s.z - bias > d ? 0. : 1.; }
+  return sh/5.;
 }
 float shadow1(vec3 p){ vec4 s = sunMat*vec4(p, 1.); s.xyz /= s.w; if (s.x < 0. || s.x > 1. || s.y < 0. || s.y > 1. || s.z > 1.) return 1.; return s.z - .002 > unpackRGBAToDepth(texture2D(sunMap, s.xy)) ? 0. : 1.; }
 float band(float x){ return .12*smoothstep(.0, .06, x) + .38*smoothstep(.18, .26, x) + .5*smoothstep(.5, .58, x); }
@@ -36,18 +36,15 @@ void main(){
   // light shafts: march from the eye to the surface (or the glass) through the sun's shadow map
   vec3 dir = normalize(P - camP); float len = min(length(P - camP), 14.); float acc = 0.;
   float jit = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)))*43758.5453);
-  if (sunOn > 0.){ for (int i = 0; i < 40; i++){ float t = (float(i) + jit)/40.*len; acc += shadow1(camP + dir*t); } acc /= 40.; }
+  if (sunOn > 0.){ for (int i = 0; i < 24; i++){ float t = (float(i) + jit)/24.*len; acc += shadow1(camP + dir*t); } acc /= 24.; }
   float mu = dot(dir, -sunDir), g = .6, hg = (1. - g*g)/pow(1. + g*g - 2.*g*mu, 1.5)/12.566;
   vec3 scat = scatCol*acc*density*(.3 + 3.6*hg)*len*.12*sunOn;
   if (col.a < .5){ vec3 h = pow(aces(scat), vec3(1./2.2)); float l = dot(h, vec3(.3, .55, .15)); gl_FragColor = vec4(h/max(1e-3, l), clamp(l*1.1, 0., .85)); return; }
   vec3 A = toLin(col.rgb), N = normalize(mat3(camWorld)*(texture2D(tNrm, vUv).rgb*2. - 1.)); vec4 mt = texture2D(tMat, vUv);
   // ambient occlusion from the depth round each pixel
-  float occ = 0.; vec3 Nv = normalize(texture2D(tNrm, vUv).rgb*2. - 1.);
-  for (int i = 0; i < 12; i++){ float a = float(i)*2.39996 + jit*6.28, r = (float(i) + .5)/12.; vec2 o = vec2(cos(a), sin(a))*r*18./res; vec3 q = vpos(vUv + o) - Vp; float d = length(q);
-    occ += max(0., dot(Nv, q/max(d, 1e-4)) - .1)*smoothstep(.6, .05, d); }
-  float ao = 1. - clamp(occ/12.*2.2, 0., .75);
+  vec2 st = texture2D(tStat, vUv).rg; float ao = st.r;   // (ambient occlusion and the outlines never change: worked out once, see STAT)
   // the lights
-  float sh = sunOn > 0. ? shadowAt(sunMap, sunMat, P + N*.01, .0015, 1./2048.) : 0.;
+  float sh = sunOn > 0. ? min(shadowAt(sunMap, sunMat, P + N*.01, .0015, 1./2048.), shadowAt(sunDyn, sunMat, P + N*.01, .0015, 1./1024.)) : 0.;
   vec3 L = A*band(max(dot(N, -sunDir), 0.))*sunCol*sh;
   vec3 H = normalize(-sunDir - dir); L += sunCol*sh*pow(max(dot(N, H), 0.), mix(80., 6., mt.r))*(1. - mt.r)*.6*step(0., dot(N, -sunDir));
   vec3 toSky = skyPos - P; float rs = length(toSky); L += A*skyCol*max(dot(N, toSky/rs), 0.)*pow(clamp(1. - rs/10., 0., 1.), 1.4)*open;
@@ -55,17 +52,29 @@ void main(){
   L += pointL(P, N, A, b5Pos, .3, 3.5, 2.)*b5Col;
   if (lampsK > 0.){ for (int i = 0; i < 3; i++) L += pointL(P, N, A, pucks[i], .7*lampsK, 1.9, 2.)*puckCol;
     vec3 dd = P - downPos; float cs = dot(normalize(dd), vec3(0., -1., 0.)); L += pointL(P, N, A, downPos, 2.2*lampsK, 7., 1.6)*smoothstep(cos(.9), cos(.9*.2), cs)*downCol;
-    float ls = shadowAt(lampMap, lampMat, P + N*.01, .003, 1./1024.); L += pointL(P, N, A, pendPos, 1.6*lampsK, 3.2, 2.)*ls*pendCol; }
+    float ls = shadowAt(lampMap, lampMat, P + N*.01, .003, 1./512.); L += pointL(P, N, A, pendPos, 1.6*lampsK, 3.2, 2.)*ls*pendCol; }
   L += pointL(P, N, A, barPos, .55*barOn, 1.6, 2.)*barCol;
   vec3 c = L*ao + toLin(texture2D(tBounce, vUv).rgb)*bounceK*ao + toLin(texture2D(tGlow, vUv).rgb)*1.4 + toLin(texture2D(tBar, vUv).rgb)*vec3(1., .82, .55)*1.6*barOn;
   // outlines: where the depth jumps
-  float e = 0., l0 = dep(vUv); for (int k = 0; k < 4; k++){ vec2 o = vec2(k == 0 ? 1. : k == 1 ? -1. : 0., k == 2 ? 1. : k == 3 ? -1. : 0.)/res; e = max(e, (dep(vUv + o) - l0)/l0); }
-  c = c*(1. - smoothstep(.05, .14, e)*.34) + scat;
+  c = c*(1. - st.g*.34) + scat;
   c = pow(aces(c), vec3(1./2.2));
   // the grade: the hour's highlight and shadow tints, a little more colour and contrast, a soft vignette
   float lm = dot(c, vec3(.3, .55, .15)); c *= mix(gradeLo, gradeHi, smoothstep(.06, .7, lm)); c = mix(vec3(lm), c, 1.15); c = (c - .42)*1.24 + .42;
   vec2 q = vUv - .5; c *= 1. - dot(q, q)*.85;
   gl_FragColor = vec4(clamp(c, 0., 1.), 1.);
+}`;
+  // the parts that only depend on the baked surfaces, drawn once per view: occlusion (r) and the outlines (g)
+  const STAT = `
+varying vec2 vUv; uniform sampler2D tNrm, tDep; uniform vec2 projXY, res; uniform float far;
+float dep(vec2 uv){ vec3 p = texture2D(tDep, uv).rgb; return dot(p, vec3(1., 1./255., 1./65025.))*far; }
+vec3 vpos(vec2 uv){ float z = dep(uv); vec2 n = uv*2. - 1.; return vec3(n.x*z/projXY.x, n.y*z/projXY.y, -z); }
+void main(){
+  vec3 Vp = vpos(vUv), Nv = normalize(texture2D(tNrm, vUv).rgb*2. - 1.); float occ = 0.;
+  for (int j = 0; j < 4; j++) for (int i = 0; i < 12; i++){ float a = float(i)*2.39996 + float(j)*1.57, r = (float(i) + .25 + float(j)*.25)/12.; vec2 o = vec2(cos(a), sin(a))*r*18./res; vec3 q = vpos(vUv + o) - Vp; float d = length(q);
+    occ += max(0., dot(Nv, q/max(d, 1e-4)) - .1)*smoothstep(.6, .05, d); }
+  float ao = 1. - clamp(occ/48.*2.2, 0., .75);
+  float e = 0., l0 = dep(vUv); for (int k = 0; k < 4; k++){ vec2 o = vec2(k == 0 ? 1. : k == 1 ? -1. : 0., k == 2 ? 1. : k == 3 ? -1. : 0.)/res; e = max(e, (dep(vUv + o) - l0)/l0); }
+  gl_FragColor = vec4(ao, smoothstep(.05, .14, e), 0., 1.);
 }`;
   const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }';
   // bloom: the bright parts blurred small, added back with a warm halation fringe; then the pixel look
@@ -84,23 +93,26 @@ void main(){
     r.setClearColor(0x000000, 0); r.autoClear = true;
     const mgr = new C.LoadingManager(), TL = new C.TextureLoader(mgr); mgr.onLoad = () => { api.loaded = true; }; const tex = (k, v, srgb) => { const t = TL.load(base + 'gb-' + k + '-' + v + '.png'); t.minFilter = t.magFilter = C.NearestFilter; t.generateMipmaps = false; return t; };
     const quad = new C.Mesh(new C.PlaneGeometry(2, 2)), qScene = new C.Scene(), qCam = new C.OrthographicCamera(-1, 1, 1, -1, 0, 1); quad.frustumCulled = false; qScene.add(quad);
-    const U = { tCol: { value: null }, tNrm: { value: null }, tDep: { value: null }, tMat: { value: null }, tGlow: { value: null }, tBar: { value: null }, tBounce: { value: null }, sunMap: { value: null }, lampMap: { value: null },
+    const U = { tCol: { value: null }, tNrm: { value: null }, tDep: { value: null }, tMat: { value: null }, tGlow: { value: null }, tBar: { value: null }, tBounce: { value: null }, tStat: { value: null }, sunDyn: { value: null }, sunMap: { value: null }, lampMap: { value: null },
       camWorld: { value: new C.Matrix4() }, sunMat: { value: new C.Matrix4() }, lampMat: { value: new C.Matrix4() }, projXY: { value: new C.Vector2() }, res: { value: new C.Vector2() },
       far: { value: 24 }, open: { value: 0 }, barOn: { value: 1 }, lampsK: { value: 0 }, density: { value: .3 }, exposure: { value: 1 }, bounceK: { value: .6 }, time: { value: 0 }, sunOn: { value: 1 },
       sunDir: { value: new C.Vector3(0, -1, 0) }, sunCol: { value: new C.Color() }, skyCol: { value: new C.Color() }, skyPos: { value: new C.Vector3() }, hemiSky: { value: new C.Color() }, hemiGround: { value: new C.Color() }, ambCol: { value: new C.Color() },
       fillDir: { value: new C.Vector3(0, 1, 0) }, fillCol: { value: new C.Color() }, gradeHi: { value: new C.Vector3(1, 1, 1) }, gradeLo: { value: new C.Vector3(1, 1, 1) }, scatCol: { value: new C.Color() },
       pucks: { value: [new C.Vector3(), new C.Vector3(), new C.Vector3()] }, downPos: { value: new C.Vector3() }, pendPos: { value: new C.Vector3() }, barPos: { value: new C.Vector3() }, b5Pos: { value: new C.Vector3() },
       puckCol: { value: new C.Color(0xffc888) }, downCol: { value: new C.Color(0xffc890) }, pendCol: { value: new C.Color(0xffb870) }, barCol: { value: new C.Color(0xffd296) }, b5Col: { value: new C.Color(0xffb070) } };
+    const statU = { tNrm: U.tNrm, tDep: U.tDep, projXY: U.projXY, res: U.res, far: U.far };
+    const stat = new C.ShaderMaterial({ vertexShader: VS, fragmentShader: STAT, uniforms: statU, depthTest: false, depthWrite: false }); let statRT = null, statDone = false;
     const light = new C.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: U, depthTest: false, depthWrite: false });
     const bright = new C.ShaderMaterial({ vertexShader: VS, fragmentShader: BRIGHT, uniforms: { t: { value: null } } }), blur = new C.ShaderMaterial({ vertexShader: VS, fragmentShader: BLUR, uniforms: { t: { value: null }, d: { value: new C.Vector2() } } });
     const fin = new C.ShaderMaterial({ vertexShader: VS, fragmentShader: FIN, uniforms: { t: { value: null }, b: { value: null }, res: { value: new C.Vector2() } }, transparent: true });
     // shadow maps: the room (layer 3), the plants and lamp (0) and the shutter (1), drawn from the sun and from the pendant's bulb
     const depthMat = new C.MeshDepthMaterial({ depthPacking: C.RGBADepthPacking, side: C.DoubleSide });
-    const sunRT = new C.WebGLRenderTarget(2048, 2048), lampRT = new C.WebGLRenderTarget(1024, 1024);
+    // the sun's shadow in two: the room itself (big, still: redrawn only when the sun has moved a little) and the plants and the lamp (small, moving: every other frame)
+    const sunRT = new C.WebGLRenderTarget(2048, 2048), dynRT = new C.WebGLRenderTarget(1024, 1024), lampRT = new C.WebGLRenderTarget(512, 512);
     const sunCam = new C.OrthographicCamera(-6, 6, 6, -6, .5, 30), lampCam = new C.PerspectiveCamera(150, 1, .05, 6);
     for (const c of [sunCam, lampCam]){ c.layers.enable(0); c.layers.enable(1); c.layers.enable(3); }
     const bias = new C.Matrix4().set(.5, 0, 0, .5, 0, .5, 0, .5, 0, 0, .5, .5, 0, 0, 0, 1);
-    const drawDepth = (cam, rt) => { const ov = scene.overrideMaterial, bg = scene.background; scene.overrideMaterial = depthMat; scene.background = null; r.setRenderTarget(rt); r.setClearColor(0xffffff, 1); r.clear(); r.render(scene, cam); r.setClearColor(0x000000, 0); r.setRenderTarget(null); scene.overrideMaterial = ov; scene.background = bg; };
+    const drawDepth = (cam, rt, mask) => { const m0 = cam.layers.mask; if (mask) cam.layers.mask = mask; const ov = scene.overrideMaterial, bg = scene.background; scene.overrideMaterial = depthMat; scene.background = null; r.setRenderTarget(rt); r.setClearColor(0xffffff, 1); r.clear(); r.render(scene, cam); r.setClearColor(0x000000, 0); r.setRenderTarget(null); scene.overrideMaterial = ov; scene.background = bg; cam.layers.mask = m0; };
     let main = null, bA = null, bB = null, view = null, cam = new C.PerspectiveCamera(), lastSun = null, frame = 0;
     let api = null; api = {
       ok: true,
@@ -109,18 +121,23 @@ void main(){
         for (const [u, k, s] of [['tCol', 'color', 1], ['tNrm', 'normal', 0], ['tDep', 'depth', 0], ['tMat', 'mat', 0], ['tGlow', 'glow', 1], ['tBar', 'bar', 1], ['tBounce', 'bounce', 1]]) U[u].value = tex(k, v, s);
         cam.fov = m.cam.fov; cam.aspect = m.w/m.h; cam.near = .05; cam.far = 40; cam.position.set(...m.cam.pos); cam.lookAt(...m.cam.look); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
         U.camWorld.value.copy(cam.matrixWorld); U.projXY.value.set(cam.projectionMatrix.elements[0], cam.projectionMatrix.elements[5]); U.res.value.set(m.w, m.h); U.far.value = m.depthFar || 24;
-        for (const t of [main, bA, bB]) if (t) t.dispose(); main = new C.WebGLRenderTarget(m.w, m.h); bA = new C.WebGLRenderTarget(m.w >> 2, m.h >> 2); bB = new C.WebGLRenderTarget(m.w >> 2, m.h >> 2);
+        for (const t of [main, bA, bB, statRT]) if (t) t.dispose(); statRT = new C.WebGLRenderTarget(m.w, m.h); statDone = false; main = new C.WebGLRenderTarget(m.w, m.h); bA = new C.WebGLRenderTarget(m.w >> 2, m.h >> 2); bB = new C.WebGLRenderTarget(m.w >> 2, m.h >> 2);
         fin.uniforms.res.value.set(m.w, m.h); lastSun = null; },
       // p: { sunDir (towards the room), sunCol, sunI, sky, skyI, hemi, amb, fill, density, lampsK, grade, open, barOn, bounceK, sunOn }
       draw(p){
         if (!view) return; frame++;
         U.sunDir.value.copy(p.sunDir); const wc = ROOM.winCenter();
-        if (!lastSun || lastSun.angleTo(p.sunDir) > .002 || frame % 8 === 0){ lastSun = p.sunDir.clone();
-          sunCam.position.copy(wc).addScaledVector(p.sunDir, -12); sunCam.lookAt(wc.clone().addScaledVector(p.sunDir, 2)); sunCam.updateMatrixWorld(); drawDepth(sunCam, sunRT);
-          U.sunMat.value.multiplyMatrices(bias, sunCam.projectionMatrix).multiply(sunCam.matrixWorldInverse); }
-        U.sunMap.value = sunRT.texture;
+        if (!statDone && api.loaded){ statDone = true; quad.material = stat; r.setRenderTarget(statRT); r.render(qScene, qCam); r.setRenderTarget(null); }
+        U.tStat.value = statRT.texture;
+        const moving = p.open < 1;   // (the shutter's plates are in the room's map: keep it fresh while they turn)
+        if (p.sunOn > 0 || !lastSun){
+          if (!lastSun || lastSun.angleTo(p.sunDir) > .006 || (moving && frame % 4 === 0)){ lastSun = p.sunDir.clone();
+            sunCam.position.copy(wc).addScaledVector(p.sunDir, -12); sunCam.lookAt(wc.clone().addScaledVector(p.sunDir, 2)); sunCam.updateMatrixWorld(); drawDepth(sunCam, sunRT, (1 << 1) | (1 << 3)); drawDepth(sunCam, dynRT, 1);
+            U.sunMat.value.multiplyMatrices(bias, sunCam.projectionMatrix).multiply(sunCam.matrixWorldInverse); }
+          else if (frame % 2 === 0) drawDepth(sunCam, dynRT, 1); }
+        U.sunMap.value = sunRT.texture; U.sunDyn.value = dynRT.texture;
         const bulb = ROOM.bulbAt ? ROOM.bulbAt() : null;
-        if (p.lampsK > 0 && bulb){ lampCam.position.copy(bulb).add(new C.Vector3(0, -.06, 0)); lampCam.lookAt(bulb.x, 0, bulb.z); lampCam.updateMatrixWorld(); if (frame % 2 === 0) drawDepth(lampCam, lampRT); U.lampMat.value.multiplyMatrices(bias, lampCam.projectionMatrix).multiply(lampCam.matrixWorldInverse); U.lampMap.value = lampRT.texture; U.pendPos.value.copy(bulb); }
+        if (p.lampsK > 0 && bulb){ lampCam.position.copy(bulb).add(new C.Vector3(0, -.06, 0)); lampCam.lookAt(bulb.x, 0, bulb.z); lampCam.updateMatrixWorld(); if (frame % 3 === 0) drawDepth(lampCam, lampRT); U.lampMat.value.multiplyMatrices(bias, lampCam.projectionMatrix).multiply(lampCam.matrixWorldInverse); U.lampMap.value = lampRT.texture; U.pendPos.value.copy(bulb); }
         else U.lampMap.value = sunRT.texture;
         const L = ROOM.L;
         U.sunCol.value.set(p.sunCol).multiplyScalar(p.sunI); U.scatCol.value.set(p.sunCol); U.sunOn.value = p.sunOn;

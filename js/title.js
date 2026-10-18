@@ -16,7 +16,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18r';
+  const VER = '2026-10-18s';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -175,6 +175,7 @@ const TITLE = (() => {
     g.addColorStop(0, 'rgba(255,214,150,' + (.4*k).toFixed(3) + ')'); g.addColorStop(.4, 'rgba(255,190,120,' + (.14*k).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,180,110,0)');
     gB.save(); gB.translate(cx, cy); gB.scale(1, .7); gB.translate(-cx, -cy); gB.fillStyle = g; gB.fillRect(cx - rad, cy - rad, 2*rad, 2*rad); gB.restore();
   }
+  T.cityHalf = () => OPEN >= 1 && !T.cutting && !root.classList.contains('leaving');
   T._hold = () => { shownAt = 1e15; openFrom = null; };
   T._open = () => { openFrom = -1e9; }; T._hour = h => { HOUR = h; }; T._dbg = () => ({ OPEN, sunH, sunW, RTMODE, rt: !!RT, p: RT && ROOM ? lightParams() : null });   // (testing: keep the shutter shut)
   const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady); } catch (e) { return true; } };

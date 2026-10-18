@@ -13,7 +13,7 @@ let last = performance.now();
 const FRAME_ERR = { n: 0, last: '' };
 // Rest when idle (Settings, Optimize framerate): after 10 s without any input, with the view still and nothing being built, every other frame is skipped, so a
 // fanless laptop runs cooler (sustained full load makes it slow itself down after a few minutes, which shows as frames that come and go). Any input ends it at once.
-let IDLE_SKIP = false;
+let IDLE_SKIP = false, TITLE_SKIP = false;
 const idleNow = now => S.idleRest && !PH.on && now - LAST_INPUT > 10000 && !dragging && !keys.size && Math.abs(yawT - yaw) < 1e-3 && Math.abs(zoomT - zoom) < 1e-3 && camT.distanceTo(camGoal) < 1e-3 && !anims.length && !STAGE_Q.length && !STAGE_READY.length && !STAGE_CHAINS.size;
 // what the hitch catcher (perfhud.js) notes with each frame: the cache, how fast the view turned, the speed classes, the shadow map, merges and tiers
 PH.state = () => 'cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + '; turned ' + (SD.dYaw*180/Math.PI).toFixed(2) + ' deg, speed classes ' + SD.hist.slice(0, 4).join('/') + ' (fastest ' + SD.top.toFixed(0) + ' px)'
@@ -23,6 +23,7 @@ function frame(now){
   requestAnimationFrame(frame);
   if (typeof OVERSEER !== 'undefined' && OVERSEER.hold) return;   // (the Overseer's desk covers the screen: the city waits)
   if (typeof GRIDPANEL !== 'undefined' && GRIDPANEL.hold) return;   // (so does the Acoustic Panel; the broadcast plays on)
+  if (typeof TITLE !== 'undefined' && TITLE.on && TITLE.cityHalf && TITLE.cityHalf()){ TITLE_SKIP = !TITLE_SKIP; if (TITLE_SKIP) return; }   // (under the title only the porthole shows the city: half the frames do)
   if (idleNow(now)){ IDLE_SKIP = !IDLE_SKIP; if (IDLE_SKIP) return; } else IDLE_SKIP = false;
   try { frameBody(now); }
   catch (e){ FRAME_ERR.n++; FRAME_ERR.last = String(e && e.stack || e).slice(0, 400);

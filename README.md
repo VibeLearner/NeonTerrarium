@@ -43,6 +43,8 @@ glows are smooth gradients. It is the heaviest. The plants, signs, people and dr
 the browser. The picture is drawn at whole screen pixels where it can be, so on some screens two choices land close
 together (on a 1080 screen 480p is 540 lines).
 
+The game opens on a title screen: your city through a rainy window. Continue goes in; New city and Cities manage several cities in this browser (each a save slot: `js/slots.js`), export or import a city as a `.neoncity` file, and a placeholder cloud save keeps cities under a username (not secure: anyone with the same username sees them). Settings, Title screen and cities comes back to it. Add `?notitle` to the address to skip it.
+
 Your city saves automatically in the browser (plots, megastructures and the style sliders). The time of day, weather, wind, render options and camera are not saved and reset on reload.
 
 ## Project layout

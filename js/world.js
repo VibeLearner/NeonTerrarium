@@ -735,7 +735,9 @@ const GRASS_MAT = (() => {
   const cvF = document.createElement('canvas'); cvF.width = 48; cvF.height = 16; const gF = cvF.getContext('2d');
   const tF = new THREE.CanvasTexture(cvF); tF.magFilter = tF.minFilter = THREE.NearestFilter; tF.generateMipmaps = false;
   if (!window.IN_RECIPE_WORKER && SG.has('grassFar')){ SG.blit(gF, SG.draw('grassFar', 48, 16, 0), 0, 0); tF.needsUpdate = true; }
-  const m = toon(0xffffff); m.map = t; m.userData.noCast = true;
+  // (the ground under the tufts, tinted to the tufts' own rendered green: drawn by the ground shading it came out lighter, and showed through as the tufts thin out zoomed out;
+  //  matched on screen: a fully thinned lawn averaged 82, 118, 59 against 81, 119, 58 unthinned)
+  const m = toon(0xffffff); m.color.setRGB(.66, .7, .72); m.map = t; m.userData.noCast = true;
   m.userData.far = on => { m.map = on && SG.has('grassFar') ? tF : t; };
   return m; })();   // tinted down a little to sit with the city's palette
 const _gq = new THREE.Vector3();

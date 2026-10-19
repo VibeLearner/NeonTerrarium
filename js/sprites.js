@@ -597,7 +597,9 @@ function folMesh(LIST, isLawn){
 function folFar(loss){
   const was = FOL_FAR.lawn;
   // (the flat far lawn from loss 2 (the owner approved the swap at loss 2.27, zoom 30 with the render fixed; at 1.35 it popped in plain view), back at 1.85)
-  FOL_FAR.lawn = window.__FOL_LOD_OFF ? false : loss > 2.0 ? true : loss < 1.85 ? false : was;
+  // (off: the flat far tile read as a flat, lighter green from zoom 30 out to 60; the tufts themselves are one draw and thin out gently with LOD.plants instead.
+  //  window.__FOL_FAR_ON brings the old swap back for comparing)
+  FOL_FAR.lawn = window.__FOL_FAR_ON ? (loss > 2.0 ? true : loss < 1.85 ? false : was) : false;
   if (FOL_FAR.lawn !== was && typeof GRASS_MAT !== 'undefined') GRASS_MAT.userData.far(FOL_FAR.lawn);
 }
 // While a piece is being generated, glows are collected as plain numbers; the region then draws each colour

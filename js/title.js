@@ -21,7 +21,7 @@ const TITLE = (() => {
   const gD = cvDust.getContext('2d'), gS = cvSky.getContext('2d'), gP = cvPl.getContext('2d');
   let plSrc = null, plOut = null, plBase = null, plW = 0, plH = 0, clouds = [], plantAt = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const VER = '2026-10-18z';
+  const VER = '2026-10-19b';
   let RAW = null, TOD = 'morning', SUNS = [], sunCv = null, gSun = null, sunH = 0, yaw0 = null, sunW = 1, sway = { x: 0, y: 0, r: 0 };
   let A = null, view = null, W = 0, H = 0, S0 = 1, OX = 0, OY = 0, raf = 0, last = 0, motes = [];
   const anchorsP = fetch('assets/title/anchors.json?v=' + VER).then(r => r.json()).catch(() => null);
@@ -402,7 +402,22 @@ const TITLE = (() => {
     try { const w = Math.exp(-Math.pow((e - ec)/.1, 2)); WARP.k.value = w > .01 ? w : 0; WARP.c.value.set(flightC[0], flightC[1]); } catch (_) {}
     // past the glass: carry on a little into the city and let it settle in the middle of the screen (the game's own easing)
     if (!crossed && e > ec){ crossed = true; try { if (CITY) camGoal.set(CITY.x, TARGET_Y, CITY.z); zoomT = 52; } catch (_) {} }
-    if (t >= 1) finish();
+    if (t >= 1){ finish(); settle(); }
+  }
+  // Over the city: the camera eases from the title's high look down to the game's own: its usual tilt (PITCH0) and the nearest of its
+  // eight headings (0.7 radians plus a multiple of 45 degrees, as Q and E turn it). Any input from the player stops it where it is.
+  function settle(){
+    try {
+      const p0 = PITCH, y0 = yaw, step = Math.PI/4, y1 = .7 + Math.round((y0 - .7)/step)*step, t0 = performance.now(), D = 2600;
+      let stop = false; const halt = () => { stop = true; }; const evs = ['pointerdown', 'wheel', 'keydown'];
+      for (const ev of evs) addEventListener(ev, halt, { once: true, capture: true });
+      (function step_(){
+        if (stop || T.on){ for (const ev of evs) removeEventListener(ev, halt, { capture: true }); return; }
+        const k = Math.min(1, (performance.now() - t0)/D), e = k*k*(3 - 2*k);
+        pitchT = p0 + (PITCH0 - p0)*e; yawT = y0 + (y1 - y0)*e;
+        if (k < 1) requestAnimationFrame(step_); else for (const ev of evs) removeEventListener(ev, halt, { capture: true });
+      })();
+    } catch (e) {}
   }
   function unwiden(){ const v = document.getElementById('view'); if (v){ v.style.transition = 'transform 1.2s ease-in-out'; v.style.transform = ''; setTimeout(() => { v.style.transition = ''; }, 1300); } }
   // the pictures for an hour, fetched ahead (they're cached, so the room shows at once when it's needed)

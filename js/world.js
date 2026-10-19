@@ -3176,6 +3176,35 @@ hoverFill.layers.set(1); hoverFill.renderOrder = 998; hoverFill.visible = false;
 // lines up with even though the pod itself is drawn across the street
 const hoverStrip = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff5ad8, transparent: true, opacity: .5, depthTest: false, depthWrite: false }));
 hoverStrip.layers.set(1); hoverStrip.renderOrder = 999; hoverStrip.visible = false; scene.add(hoverStrip);
+// The outline drawn bold: WebGL draws lines one pixel wide whatever is asked, so the box's twelve edges are also laid as thin bars about
+// three render pixels thick at any zoom, with a soft fill of the same colour inside; both breathe a little so the spot reads against busy
+// buildings. They follow the outline (its place, size, colour and whether it shows) every frame, whatever set it.
+const hoverBold = (() => {
+  const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .95, depthTest: false, depthWrite: false });
+  const fillM = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .14, depthTest: false, depthWrite: false });
+  const g = new THREE.Group(), bars = [], geo = new THREE.BoxGeometry(1, 1, 1);
+  for (let k = 0; k < 12; k++){ const m = new THREE.Mesh(geo, mat); m.layers.set(1); m.renderOrder = 1000; g.add(m); bars.push(m); }
+  const fill = new THREE.Mesh(geo, fillM); fill.layers.set(1); fill.renderOrder = 997; g.add(fill);
+  g.visible = false; scene.add(g);
+  let shown = false; Object.defineProperty(hover, 'visible', { configurable: true, get(){ return shown; }, set(v){ shown = v; g.visible = v; } });
+  hoverMat.opacity = 1;
+  function tick(now){
+    requestAnimationFrame(tick);
+    if (!shown) return;
+    const px = typeof zoom !== 'undefined' && H ? 2*zoom/H : .05, t = px*3, p = hover.position, sc = hover.scale, hx = sc.x/2, hy = sc.y/2, hz = sc.z/2;
+    const pulse = .5 + .5*Math.sin(now/260);
+    mat.color.copy(hoverMat.color); fillM.color.copy(hoverMat.color); mat.opacity = .8 + .2*pulse; fillM.opacity = hoverFill.visible ? 0 : .08 + .08*pulse;
+    let k = 0; const bar = (x, y, z, sx, sy, sz) => { const m = bars[k++]; m.position.set(p.x + x, p.y + y, p.z + z); m.scale.set(sx, sy, sz); };
+    for (const a of [-1, 1]) for (const b of [-1, 1]){
+      bar(0, a*hy, b*hz, sc.x + t, t, t);   // the edges along x
+      bar(a*hx, 0, b*hz, t, sc.y + t, t);   // along y
+      bar(a*hx, b*hy, 0, t, t, sc.z + t);   // along z
+    }
+    fill.position.copy(p); fill.scale.copy(sc);
+  }
+  requestAnimationFrame(tick);
+  return g;
+})();
 function showHover(t){
   hoverFill.visible = false; hoverStrip.visible = false;
   if (!t){ hover.visible = false; return; }

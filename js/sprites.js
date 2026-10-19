@@ -382,6 +382,7 @@ const FOL_SHADER = new THREE.ShaderMaterial({
           float sx = length(instanceMatrix[0].xyz), sy = length(instanceMatrix[1].xyz);
           vec2 ap = floor((a.xy*0.5 + 0.5)*res + 0.5);
           vec2 off = floor(vec2(projectionMatrix[0][0], projectionMatrix[1][1]) * local * vec2(sx, sy) * 0.5 * res + 0.5);
+          off = mix(off, max(off, vec2(1.0)), step(vec2(1e-4), local));   // (at least a render pixel across: far out, small tufts rounded to nothing and the grass went)
           gl_Position = vec4((ap + off)/res*2.0 - 1.0, a.z, 1.0);
         }
         // zoomed out: thin the plants and laundry (small sprites go first); lit signs always stay

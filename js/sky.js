@@ -1539,7 +1539,7 @@ function setZoomRes(v){ ZOOM_RES = v; try { localStorage.setItem(ZOOMRES_KEY, St
 function applyRenderRes(z){
   let f = Math.max(1, z/ZOOM_REF);
   if (ZOOM_RES > 0) f = Math.min(f, ZOOM_RES);
-  if (z > 30) f = Math.max(1, f*Math.pow(30/z, .75));   // (past zoom 30, out to 60: fewer pixels again, eased, so the far view doesn't outrun the card; the detail levels in main.js follow)
+  if (z > 30) f = Math.max(1, f*Math.pow(30/z, .3));   // (past zoom 30, out to 60: a little fewer pixels, eased (1.6 down to 1.3 times the base), so the far view doesn't outrun the card; much lower and the grass tufts went under a render pixel)
   if (S.autoPerf !== false) f = Math.min(f, PERF.grow);
   PERF.f = f;
   const step = Math.round(Math.log(f)/Math.log(1.04));   // 4% steps, so targets aren't remade every frame

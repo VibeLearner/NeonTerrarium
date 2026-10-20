@@ -3999,6 +3999,16 @@ function policeBikes(m, crew){
   return api;
 }
 const _bkR = new THREE.Vector3(), _bkF = new THREE.Vector3();
+// for the monitor's feed (monitor.js), which has a camera of its own: each bike shows the view of it that camera sees, put back after
+const _bfR = new THREE.Vector3(), _bfF = new THREE.Vector3();
+function bikeFeedPre(fc){
+  _bfR.set(1, 0, 0).applyQuaternion(fc.quaternion); _bfF.set(0, 0, -1).applyQuaternion(fc.quaternion); _bfF.y = 0; _bfF.normalize();
+  for (const b of POLICE_BIKES){ if (!b.spr || !b.mat || b.hx === undefined || b._feed) continue;
+    const N = PBIKE_N, ax = b.hx*_bfR.x + b.hz*_bfR.z, az = b.hx*_bfF.x + b.hz*_bfF.z, oct = ((Math.round(Math.atan2(ax, az)/(Math.PI*2/N)) % N) + N) % N, [w, h] = PBIKE_SIZE[PBIKE_VIEWS[oct]];
+    b._feed = { map: b.mat.map, sx: b.spr.scale.x, sy: b.spr.scale.y };
+    b.mat.map = PBIKE_TEX[oct]; b.spr.scale.set(w/PX*BIKE_K, h/PX*BIKE_K, 1); }
+}
+function bikeFeedPost(){ for (const b of POLICE_BIKES){ const s = b._feed; if (!s) continue; b.mat.map = s.map; b.spr.scale.set(s.sx, s.sy, 1); b._feed = null; } }
 // Every police station standing: people.js calls policeDroneAlert at a mugging, and the nearest station answers.
 // Each station's drones patrol the crossings nearer to it than to any other station.
 const POLICE_STATIONS = [];

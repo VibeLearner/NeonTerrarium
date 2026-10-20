@@ -37,10 +37,14 @@ const PPL_SPEED = .55;        // walking speed, world units a second (a block ta
 function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMaterial({   // (mrtShader: writes its flat normal too, core.js)
   uniforms: { map: { value: tex }, res: FOL_UNI.res, tint: FOL_UNI.tint, normalMode: FOL_UNI.normalMode,
               sheet: { value: new THREE.Vector4(W, H, cw, ch) }, size: { value: new THREE.Vector2(cw/PX, ch/PX) },
-              rowsM1: { value: rows - 1 }, pal: { value: tex }, palRows: { value: 1 }, usePal: { value: 0 } },   // (the palette lookup is off for the drones, and for the old people sheet; the sampler holds the sheet itself until the generator makes a palette texture, so no texture is added)
-  vertexShader: `uniform vec2 res; uniform vec2 size; attribute vec3 aPos; attribute vec4 aSpr;
+              rowsM1: { value: rows - 1 }, feedFace: { value: 0 }, pal: { value: tex }, palRows: { value: 1 }, usePal: { value: 0 } },   // (the palette lookup is off for the drones, and for the old people sheet; the sampler holds the sheet itself until the generator makes a palette texture, so no texture is added)
+  vertexShader: `uniform vec2 res; uniform vec2 size; uniform float feedFace; attribute vec3 aPos; attribute vec4 aSpr; attribute vec2 aFace;
     varying vec2 vUv; varying vec4 vSpr;
     void main(){
+      // which way they face: aSpr.z was worked out for the main view; the monitor's feed has a camera of its own, so there the
+      // facing is decided again from the way they're really headed in the world (aFace) against this camera's right
+      float fl = aSpr.z;
+      if (feedFace > 0.5){ float sd = aFace.x*viewMatrix[0][0] + aFace.y*viewMatrix[2][0]; if (abs(sd) > 1e-3) fl = sd < 0.0 ? -1.0 : 1.0; }
       // stands upright facing the screen, feet on aPos, anchor and corners snapped to whole render pixels (as the plants)
       vec4 a = projectionMatrix * modelViewMatrix * vec4(aPos, 1.0);
       vec2 local = vec2(position.x, position.y + 0.5) * size;
@@ -51,7 +55,7 @@ function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMa
       // camera higher up, cut through their upper body: people seemed to walk into buildings at the corners.)
       vec4 up = projectionMatrix * modelViewMatrix * vec4(aPos + vec3(0.0, local.y, 0.0), 1.0);
       gl_Position = vec4((ap + off)/res*2.0 - 1.0, up.z, 1.0);
-      vUv = vec2(aSpr.z < 0.0 ? 1.0 - uv.x : uv.x, uv.y);
+      vUv = vec2(fl < 0.0 ? 1.0 - uv.x : uv.x, uv.y);
       vSpr = aSpr;
     }`,
   fragmentShader: `uniform sampler2D map; uniform vec4 sheet; uniform vec3 tint; uniform float normalMode; uniform float rowsM1; uniform sampler2D pal; uniform float palRows; uniform float usePal;
@@ -89,6 +93,7 @@ function spriteBatch(mat, max){
   geo.index = q.index; geo.setAttribute('position', q.attributes.position); geo.setAttribute('uv', q.attributes.uv);
   geo.setAttribute('aPos', new THREE.InstancedBufferAttribute(new Float32Array(max*3), 3).setUsage(THREE.DynamicDrawUsage));
   geo.setAttribute('aSpr', new THREE.InstancedBufferAttribute(new Float32Array(max*4), 4).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('aFace', new THREE.InstancedBufferAttribute(new Float32Array(max*2), 2).setUsage(THREE.DynamicDrawUsage));   // (the way each one faces in the world: for the monitor's feed)
   geo.instanceCount = 0;
   const m = new THREE.Mesh(geo, mat);
   m.frustumCulled = false; m.layers.set(2);   // drawn with the plants: colour pass and the flat-normal outline pass
@@ -1180,6 +1185,33 @@ let pplFrame = 0, pplGoneN = 0;   // (pplGoneN: people marked gone and not yet r
 const _op = new THREE.Vector3();
 // the monitor's own camera (monitor.js): people round the person it watches count as on screen, so they are stepped at full rate and drawn into its view
 const MON_FOCUS = { on: false, x: 0, z: 0, r: 7 };
+// The monitor's feed (monitor.js) draws the street from a camera of its own, at any angle. Everything here that depends on
+// the camera was worked out for the main view, so for the feed's frame: people face by their real heading (the shader, from
+// aFace), a rider sits nudged toward the feed's camera (so they stay in front of the bike), and a delivery drone shows the
+// view of it the feed's camera sees. Put back right after.
+const PPL_FEED = { ride: [], dd: [], on: false };
+const _pfR = new THREE.Vector3(), _pfF = new THREE.Vector3();
+function pplFeedPre(fc){
+  if (PPL_FEED.on) return; PPL_FEED.on = true;
+  PPL_MAT.uniforms.feedFace.value = 1;
+  _pfR.set(1, 0, 0).applyQuaternion(fc.quaternion); _pfF.set(0, 0, -1).applyQuaternion(fc.quaternion); _pfF.y = 0; _pfF.normalize();
+  const pa = pplMesh.geometry.attributes.aPos, P = pa.array;
+  for (const r of PPL_FEED.ride){ r.ox = P[r.i*3]; r.oz = P[r.i*3 + 2]; P[r.i*3] += (r.fx - _pfF.x)*r.k; P[r.i*3 + 2] += (r.fz - _pfF.z)*r.k; }
+  if (PPL_FEED.ride.length) pa.needsUpdate = true;
+  const da = ddMesh.geometry.attributes.aSpr, D = da.array;
+  for (const d of PPL_FEED.dd){ d.v0 = D[d.i*4 + 1]; const ax = d.dx*_pfR.x + d.dz*_pfR.z, az = d.dx*_pfF.x + d.dz*_pfF.z; D[d.i*4 + 1] = ((Math.round(Math.atan2(ax, az)/(PI/4)) % 8) + 8) % 8; }
+  if (PPL_FEED.dd.length) da.needsUpdate = true;
+}
+function pplFeedPost(){
+  if (!PPL_FEED.on) return; PPL_FEED.on = false;
+  PPL_MAT.uniforms.feedFace.value = 0;
+  const pa = pplMesh.geometry.attributes.aPos, P = pa.array;
+  for (const r of PPL_FEED.ride) if (r.ox !== undefined){ P[r.i*3] = r.ox; P[r.i*3 + 2] = r.oz; r.ox = undefined; }
+  if (PPL_FEED.ride.length) pa.needsUpdate = true;
+  const da = ddMesh.geometry.attributes.aSpr, D = da.array;
+  for (const d of PPL_FEED.dd) if (d.v0 !== undefined){ D[d.i*4 + 1] = d.v0; d.v0 = undefined; }
+  if (PPL_FEED.dd.length) da.needsUpdate = true;
+}
 const nearFocus = (x, z) => MON_FOCUS.on && Math.abs(x - MON_FOCUS.x) < MON_FOCUS.r && Math.abs(z - MON_FOCUS.z) < MON_FOCUS.r;
 // is a ground point well off the screen from any height people can be at (screen x doesn't depend on height; y does)
 function offScreen(x, z){
@@ -2068,17 +2100,24 @@ function updatePeople(dt, t){
   PH.sub('people: bumps');
   // fill the draw batch with everyone on show
   const pos = pplMesh.geometry.attributes.aPos, spr = pplMesh.geometry.attributes.aSpr, P = pos.array, Q = spr.array;
+  const fce = pplMesh.geometry.attributes.aFace, FA = fce.array;
+  PPL_FEED.ride.length = 0; PPL_FEED.dd.length = 0;
   const VP = comp.uniforms.VP.value;
   let i = 0;
   const ve = VP.elements;
   const newLook = PG.live();   // (the generated sheet, or the old Craftpix one: a look code is old row | shape << 5 | palette << 12, see peoplegen.js)
-  const emit = (x, y, z, row, frame, flip, alpha, raw) => {
+  // fx, fz: the way they face in the world, when it's known (the feed turns it into a facing for its own camera); without it, the
+  // side they face in the main view stands in (so from the far side the feed still mirrors them), and emote bubbles never mirror
+  const emit = (x, y, z, row, frame, flip, alpha, raw, fx, fz) => {
     if (i >= PPL_MAX) return false;
     // (Vector3.applyMatrix4's arithmetic, written out; only the screen position is needed)
     const w = 1/(ve[3]*x + ve[7]*y + ve[11]*z + ve[15]), sx = (ve[0]*x + ve[4]*y + ve[8]*z + ve[12])*w, sy = (ve[1]*x + ve[5]*y + ve[9]*z + ve[13])*w;
     if ((sx < -1.1 || sx > 1.1 || sy < -1.15 || sy > 1.1) && !nearFocus(x, z)) return false;
     P[i*3] = x; P[i*3 + 1] = y; P[i*3 + 2] = z;
     Q[i*4] = raw ? row : newLook ? PG.shapeOf(row) : row & 31; Q[i*4 + 1] = frame; Q[i*4 + 2] = flip; Q[i*4 + 3] = alpha;
+    if (fx !== undefined && (fx || fz)){ FA[i*2] = fx; FA[i*2 + 1] = fz; }
+    else if (alpha < 1.5){ FA[i*2] = flip*_camR.x; FA[i*2 + 1] = flip*_camR.z; }
+    else FA[i*2] = FA[i*2 + 1] = 0;
     i++; return true;
   };
   // the umbrella: a second sprite in the same batch, its foot at the person's hand (set where the frame is chosen below)
@@ -2087,9 +2126,9 @@ function updatePeople(dt, t){
   const emitHeld = (p, x, y, z, frame, alpha) => {
     if (!p.held || !newLook || alpha < .99 || !heldFrame(frame)) return; const code = PG.heldCode(p.held); if (code < 0) return;
     const h = PG.heldHand(PG.shapeOf(p.row) & 127, frame), g = PG.heldGrip, dx = (h[0] - g[0])*PG_PXW*p.flip;
-    emit(x + _camR.x*dx, y + (g[1] - h[1])*PG_PXW, z + _camR.z*dx, code, 0, p.flip, alpha, true); };
+    emit(x + _camR.x*dx, y + (g[1] - h[1])*PG_PXW, z + _camR.z*dx, code, 0, p.flip, alpha, true, p._fx, p._fz); };
   const emitUm = (p, x, y, z, alpha) => { const u = p.um; if (!u || !u.on || p.club) return;
-    const k = u.dx*PG_PXW*p.flip; emit(x + _camR.x*k, y + u.dy*PG_PXW, z + _camR.z*k, PG.umbShape(u.v) | ((PG.shapeOf(p.row) >> 7) << 7), u.f, p.flip, alpha, true); };
+    const k = u.dx*PG_PXW*p.flip; emit(x + _camR.x*k, y + u.dy*PG_PXW, z + _camR.z*k, PG.umbShape(u.v) | ((PG.shapeOf(p.row) >> 7) << 7), u.f, p.flip, alpha, true, p._fx, p._fz); };
   const rainK = newLook && typeof LK !== 'undefined' && LK.rainNow ? LK.rainNow() : 0;
   if (rainK > .35 && !pplRaining){ pplRaining = true; pplRainEpoch++; } else if (rainK < .12) pplRaining = false;
   // which stalls are being served, and who's queueing where
@@ -2133,14 +2172,14 @@ function updatePeople(dt, t){
       if (Nn > 1 && (pplFrame + idx) % Nn){
         p.acc = (p.acc || 0) + dt0;
         if (p._ec){   // drawn every frame from what the last step left
-          emit(p.x, p._ey, p.z, p._er, p._ef, p.flip, p._ea); emitUm(p, p.x, p._ey, p.z, p._ea); emitHeld(p, p.x, p._ey, p.z, p._ef, p._ea);
+          emit(p.x, p._ey, p.z, p._er, p._ef, p.flip, p._ea, false, p._fx, p._fz); emitUm(p, p.x, p._ey, p.z, p._ea); emitHeld(p, p.x, p._ey, p.z, p._ef, p._ea);
           if (p._eoOn && p.emoUntil > t) emit(p.x, p._ey + p._eo, p.z, ROW_EMO, p.emo, 1, 2); }
         if (p._holo) holoOn.push(p._holo);
         if (p._pic) picOn.add(p._pic);
         continue; }
     }
     const dt = dt0 + (p.acc || 0); p.acc = 0;
-    p._ec = 0; p._holo = null; p._pic = null;
+    p._ec = 0; p._holo = null; p._pic = null; p._fx = p._fz = undefined;
     let alpha = 1, walking = false, y = CURB, frame = 0;
     const paused = p.pause > t;
     if (p.ride){ const r = liftRide(p, dt, t); if (r){ emit(r.x, r.y, r.z, p.row, r.frame, p.flip, r.alpha); continue; } }
@@ -2162,6 +2201,7 @@ function updatePeople(dt, t){
           p.x += -p.dz/L*o; p.z += p.dx/L*o; }
         const sd = p.dx*_camR.x + p.dz*_camR.z;
         if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
+        p._fx = p.dx; p._fz = p.dz;
         // through the doorway: dissolving in from the hallway, or out as they step inside
         if (w.doorA && !w.doorA.lift && !w.doorA.open3d) alpha = Math.min(alpha, (w.s - .05)/.3);   // (open3d: a way in you can see into, like a metro station's lift: no fading there)
         if (w.doorB && !w.doorB.lift && !w.doorB.open3d) alpha = Math.min(alpha, (w.len - w.s - .05)/.3);
@@ -2208,7 +2248,7 @@ function updatePeople(dt, t){
           frame = gest ? F_SPEC + Math.floor(t*6 + p.phase) % 6 : F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;
           if (newLook && p.eating === sp && !gest) frame = F_EAT + Math.floor(t*1.6 + p.phase) % 4;   // standing at the counter with the bowl
         }
-        if (face){ const sd = face[0]*_camR.x + face[1]*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }
+        if (face){ const sd = face[0]*_camR.x + face[1]*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; p._fx = face[0]; p._fz = face[1]; }
       }
     }
     if (walking) frame = paused ? F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle : Math.floor(t*9*p.speed/PPL_SPEED*(p.rush ? 2 : p.hurry ? 1.5 : 1) + p.phase) % PPL.walk;
@@ -2220,6 +2260,7 @@ function updatePeople(dt, t){
     if (walking && paused && p.walk.puke && p.walk.puke.t0 && t - p.walk.puke.t0 < 3.6){
       const u = t - p.walk.puke.t0; frame = F_SPEC + Math.floor(u*5) % 6;   // doubled over, heaving
       const sd = (p.walk.puke.x - p.x)*_camR.x + (p.walk.puke.z - p.z)*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
+      p._fx = p.walk.puke.x - p.x; p._fz = p.walk.puke.z - p.z;
       if (u > .8 && !p.walk.puke.left){ p.walk.puke.left = true; pukes.push({ x: p.walk.puke.x, z: p.walk.puke.z, t0: t, sx: p.x, sz: p.z }); } }
     if (newLook && !p.cop && !p.club && !p.archivist){   // the umbrella: who carries one, and when it opens and closes, by hash and the weather (states: 0 none, 1 waiting to open, 2 opening, 3 open, 4 closing)
       let u = p.um;
@@ -2245,7 +2286,7 @@ function updatePeople(dt, t){
     if (p.cop && p.angry > t) frame = F_ANGRY + Math.min(5, Math.floor((t - p.angry + .9)*7));
     if ((p.row & 31) === ROW_HOOD && frame >= F_SPEC) frame = F_IDLE + (frame % 4);   // (the archivist has walk and idle frames only)
     p._ec = 1; p._ey = y; p._er = p.cop ? p.copRow || ROW_COP : p.row; p._ef = frame; p._ea = Math.max(0, alpha); p._eo = frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8; p._eoOn = alpha > .9;   // (what a frame between steps draws again)
-    if (!emit(p.x, y, p.z, p.cop ? p.copRow || ROW_COP : p.row, frame, p.flip, Math.max(0, alpha))) continue;
+    if (!emit(p.x, y, p.z, p.cop ? p.copRow || ROW_COP : p.row, frame, p.flip, Math.max(0, alpha), false, p._fx, p._fz)) continue;
     emitUm(p, p.x, y, p.z, Math.max(0, alpha)); emitHeld(p, p.x, y, p.z, frame, Math.max(0, alpha));
     if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
   }
@@ -2260,7 +2301,7 @@ function updatePeople(dt, t){
     if (L.dx !== undefined){ const sd = L.dx*_camR.x + L.dz*_camR.z; if (Math.abs(sd) > 1e-3) L.flip = sd < 0 ? -1 : 1; }
     const fr = L.state === 'strike' || L.state === 'flee' ? (newLook ? F_RUN + Math.floor(t*11 + L.phase) % PPL.walk : Math.floor(t*16 + L.phase) % PPL.walk)
              : L.state === 'rob' ? F_SPEC + Math.floor(t*7) % 6 : F_IDLE + Math.floor(t*2 + L.phase) % PPL.idle;
-    emit(L.x, CURB, L.z, L.row, fr, L.flip, L.fade >= 1 ? 1 : L.fade*.98);
+    emit(L.x, CURB, L.z, L.row, fr, L.flip, L.fade >= 1 ? 1 : L.fade*.98, false, L.dx, L.dz);
   }
   // the police hoverbikes: the officer astride, and anyone they've picked up on the pillion behind
   if (typeof POLICE_BIKES !== 'undefined') for (const b of POLICE_BIKES){
@@ -2269,16 +2310,17 @@ function updatePeople(dt, t){
     if (b.walkIn){   // off the bike and walking into the station, the officer leading the mugger by the arm
       const W = b.walkIn, dx = W.x1 - W.x0, dz = W.z1 - W.z0, l = Math.hypot(dx, dz) || 1, x = W.x0 + dx*W.u, z = W.z0 + dz*W.u;
       const sd = dx*_camR.x + dz*_camR.z, fl = Math.abs(sd) > 1e-3 ? (sd < 0 ? -1 : 1) : 1, fr = Math.floor(t*9) % PPL.walk;
-      emit(x, CURB, z, b.cop ? b.cop.copRow || ROW_COP : ROW_COP, fr, fl, a0); bikeCopAt(b, x, CURB, z, a0);
-      if (b.passenger) emit(x - dx/l*.32, CURB, z - dz/l*.32, b.passenger.row, (fr + 3) % PPL.walk, fl, a0);
+      emit(x, CURB, z, b.cop ? b.cop.copRow || ROW_COP : ROW_COP, fr, fl, a0, false, dx, dz); bikeCopAt(b, x, CURB, z, a0);
+      if (b.passenger) emit(x - dx/l*.32, CURB, z - dz/l*.32, b.passenger.row, (fr + 3) % PPL.walk, fl, a0, false, dx, dz);
       continue;
     }
     const sd = b.hx*_camR.x + b.hz*_camR.z; if (Math.abs(sd) > .15) b.flip = sd < 0 ? -1 : 1;
     const ox = -_bkF.x*.06, oz = -_bkF.z*.06;   // a touch nearer the camera than the bike sprite
     const y = b.ry + BIKE_SEAT, a = a0;
     if (b.passenger){ const L = b.passenger;
-      emit(b.x - b.hx*.24 - _bkF.x*.03, y + .03, b.z - b.hz*.24 - _bkF.z*.03, L.row, F_SIT, b.flip || 1, a); }
-    emit(b.x + b.hx*.06 + ox, y, b.z + b.hz*.06 + oz, b.cop ? b.cop.copRow || ROW_COP : ROW_COP, F_SIT, b.flip || 1, a); bikeCopAt(b, b.x + b.hx*.06 + ox, y, b.z + b.hz*.06 + oz, a);
+      if (emit(b.x - b.hx*.24 - _bkF.x*.03, y + .03, b.z - b.hz*.24 - _bkF.z*.03, L.row, F_SIT, b.flip || 1, a, false, b.hx, b.hz)) PPL_FEED.ride.push({ i: i - 1, k: .03, fx: _bkF.x, fz: _bkF.z }); }
+    if (emit(b.x + b.hx*.06 + ox, y, b.z + b.hz*.06 + oz, b.cop ? b.cop.copRow || ROW_COP : ROW_COP, F_SIT, b.flip || 1, a, false, b.hx, b.hz)) PPL_FEED.ride.push({ i: i - 1, k: .06, fx: _bkF.x, fz: _bkF.z });   // (nudged toward the camera: the feed moves it toward its own)
+    bikeCopAt(b, b.x + b.hx*.06 + ox, y, b.z + b.hz*.06 + oz, a);
   }
   // delivery drones and their parcels, in their own batch
   _camFw.set(0, 0, -1).applyQuaternion(cam.quaternion); _camFw.y = 0; _camFw.normalize();
@@ -2305,7 +2347,8 @@ function updatePeople(dt, t){
     if (b.dx !== undefined && (b.dx || b.dz)){ const ax = b.dx*_camR.x + b.dz*_camR.z, az = b.dx*_camFw.x + b.dz*_camFw.z;
       view = b.view = ((Math.round(Math.atan2(ax, az)/(PI/4)) % 8) + 8) % 8; }
     const y = (b.state === 'lift' || b.state === 'drop' ? b.by ?? CURB : CURB) + lift + .03*Math.sin(t*3 + b.phase);
-    if (emitD(b.x, y, b.z, view, Math.max(0, alpha)) && b.emoUntil > t) emit(b.x, y + .75, b.z, ROW_EMO, b.emo, 1, 2);
+    const shown = emitD(b.x, y, b.z, view, Math.max(0, alpha)); if (shown && b.dx !== undefined && (b.dx || b.dz)) PPL_FEED.dd.push({ i: di - 1, dx: b.dx, dz: b.dz });
+    if (shown && b.emoUntil > t) emit(b.x, y + .75, b.z, ROW_EMO, b.emo, 1, 2);
     // the parcel on the doorstep, until it's taken in
     if (b.cap && t - b.t0 > 1.3){ const u = t - b.t0; emitD(b.cap.x, b.cap.y ?? CURB, b.cap.z, DD.parcel, u > 3 ? Math.max(0, (3.6 - u)/.6) : 1); }
   }
@@ -2315,7 +2358,7 @@ function updatePeople(dt, t){
     emitD(k.x, CURB - .02, k.z, DD.puddle, u > 32 ? Math.max(0, 1 - (u - 32)/8) : Math.min(1, u/1.2)); }
   ddMesh.geometry.instanceCount = di; dpos.needsUpdate = dspr.needsUpdate = true;
   pplMesh.geometry.instanceCount = i;
-  pos.needsUpdate = spr.needsUpdate = true;
+  pos.needsUpdate = spr.needsUpdate = fce.needsUpdate = true;
   updateDoors(dt);
 }
 // for the dev overlay and tests

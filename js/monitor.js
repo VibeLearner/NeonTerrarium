@@ -205,6 +205,7 @@ const MON = (() => {
     try {
       FOL_UNI.res.value.set(RW, RH); SIDE_ARC.all = true;   // (every wall, whichever way it faces: the feed turns on its own)
       cullFrame(fcam); CULL.lvl = -1; CULL.sd = false;
+      if (typeof pplFeedPre === 'function') pplFeedPre(fcam); if (typeof bikeFeedPre === 'function') bikeFeedPre(fcam);   // (people, bikes and drones turned to face this camera, not the main view's)
       renderer.setRenderTarget(rt); renderer.setClearColor(0x05080f, 1); renderer.autoClear = true;
       renderer.render(scene, fcam);
       if (pbo && !FC.fence){
@@ -212,6 +213,7 @@ const MON = (() => {
         FC.fence = glc.fenceSync(glc.SYNC_GPU_COMMANDS_COMPLETE, 0); glc.flush();
       } else if (!pbo){ glc.readPixels(0, 0, RW, RH, glc.RGBA, glc.UNSIGNED_BYTE, pix); FC.ready = true; }
     } finally {
+      if (typeof pplFeedPost === 'function') pplFeedPost(); if (typeof bikeFeedPost === 'function') bikeFeedPost();
       FOL_UNI.res.value.copy(res0); SIDE_ARC.all = all0; renderer.autoClear = ac; renderer.setRenderTarget(rt0); sideArc(); cullFrame();   // (the main view's culling back as it was)
     }
   }

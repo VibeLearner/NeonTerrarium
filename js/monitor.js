@@ -252,7 +252,12 @@ const MON = (() => {
     g.font = '10px "Silkscreen", monospace'; g.textBaseline = 'top';
     g.fillStyle = Math.floor(now/600) % 2 ? '#ff4f6a' : 'rgba(255,79,106,.25)'; g.fillRect(8, 9, 6, 6);
     g.fillStyle = '#e3d6bd'; g.fillText('REC', 18, 7);
-    g.textAlign = 'right'; g.fillText('CAM ' + String(1 + (hash(M.id) % 48)).padStart(2, '0'), W - 8, 7); g.textAlign = 'left';
+    // a thread nearing its payoff (pacing.js): the CAM label starts to flicker and a faint signal meter fills under it. Visual only, and quiet.
+    const hint = window.PACE && PACE.hint ? PACE.hint(M.id) : -1;
+    const flick = hint > .55 && rnd() < (hint - .55)*.35;
+    g.textAlign = 'right'; if (!flick) g.fillText('CAM ' + String(1 + (hash(M.id) % 48)).padStart(2, '0'), W - 8, 7); g.textAlign = 'left';
+    if (hint >= 0){ const bars = Math.min(4, 1 + Math.floor(hint*4));
+      for (let k = 0; k < 4; k++){ g.fillStyle = k < bars ? 'rgba(138,216,224,' + (.28 + .4*hint).toFixed(2) + ')' : 'rgba(138,216,224,.1)'; g.fillRect(W - 30 + k*6, 24 - (k + 1)*2, 4, (k + 1)*2); } }
     if (window.STORY) g.fillText(clockText(STORY.clock), 8, H - 16);
     if (!p){ g.textAlign = 'center'; g.fillStyle = '#ffb347'; g.fillText('SUBJECT NOT FOUND', W/2, H/2 - 5); g.textAlign = 'left'; }
     else if (at && at.inside){ g.textAlign = 'center'; g.fillStyle = '#ffb347'; g.fillText('SIGNAL LOST', W/2, H/2 - 5); g.fillStyle = '#8e9bb2'; g.fillText('watching the door', W/2, H/2 + 8); g.textAlign = 'left'; }

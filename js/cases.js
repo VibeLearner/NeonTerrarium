@@ -232,6 +232,10 @@ const CASES = (() => {
     const L = {}, cast = {};
     m.people.forEach((id, k) => { if (ids[k] && Object.keys(cast).length < 6 && !Object.values(cast).includes(ids[k])){ const l = LETTERS[Object.keys(cast).length]; L[id] = l; cast[l] = ids[k]; } });
     if (!cast.A) return 'nobody';
+    // the officer being watched, if they aren't on the case: near enough and free, they come as backup (a small part: there, never a role in its lines)
+    let backup = null;
+    { const w = STORY.watch, wp = w && pOf(w);
+      if (wp && !Object.values(cast).includes(w) && Object.keys(cast).length < 6 && typeof PACE !== 'undefined' && PACE.on() && PACE.backupOk(wp, ancXZ(anc0))){ backup = LETTERS[Object.keys(cast).length]; cast[backup] = w; } }
     // someone waiting up on a platform takes the lift back down for it (on the train itself: they're gone till the next stop)
     for (const id of Object.values(cast)){ const p = pOf(id), M = p && p.metro;
       if (M && !M.ambient && (M.st === 'wait' || M.st === 'toSpot') && M.l && M.l.stn){ const st = M.l.stn.get(M.k); if (st && places.has(st.id)){ if (M.st === 'wait' && M.l._wait) M.l._wait.set(M.k, Math.max(0, (M.l._wait.get(M.k) || 1) - 1)); p.metro = null; p.at = st.id; p.until = 0; p.x = places.get(st.id).x; p.z = places.get(st.id).z; } } }
@@ -243,6 +247,7 @@ const CASES = (() => {
     const fresh = () => Object.assign({}, anc0, { spot: anc0.spot, fixed: anc0.fixed });   // (each step its own anchor: the spots it takes are its own)
     m.steps.forEach((st, j) => {
       const who = st.who.filter(id => L[id]).map(id => L[id]), wit = st.with.filter(id => L[id]).map(id => L[id]);
+      if (backup && !AWAY.has(st.do) && st.do !== 'escort' && st.do !== 'enter') wit.push(backup);
       if (!who.length) return;
       const line = (st.line || '').replace(/\bOfficer \{/g, '{').replace(/\{([a-z0-9:-]+)((?:\.(?:he|him|his))?)\}/g, (x, id, pr) => L[id] ? '{' + L[id] + pr + '}' : 'someone');
       const b = { id: 'b' + j, who, with: wit, at: 'case', do: st.do, held: st.held, hold: st.stay ? 16 + U(m.id, j)*6 : undefined };
@@ -260,7 +265,9 @@ const CASES = (() => {
     const s = { id: 'case.' + arc + '.' + m.id, beats, log, roles: {}, effects: {}, next: null, tier: 'case', prio: m.prio ?? 1 };
     const sc = STORY.startScene(s, cast, { done: (sc, why) => { delete run.at[m.id]; if (played){ note('end', m.id, why); const n = run.tries[m.id] = (run.tries[m.id] || 0) + 1; if (why === 'done' || why === 'stopped' || n >= 3) played(why); else if (C.run && C.run.sim){ const e = C.run.sim.q.find(x => x.mom && x.wait); if (e) e.wait = false; } save(); } else finish(run, arc, row, m, why); } });
     if (!sc) return 'could not start';
-    run.at[m.id] = true; note('stage', arc, m.id, JSON.stringify(cast)); return null;
+    run.at[m.id] = true; note('stage', arc, m.id, JSON.stringify(cast));
+    if (backup) PACE.backupCalled(cast[backup], anc0);
+    return null;
   }
   function finish(run, arc, row, m, why){
     note('end', m.id, why);

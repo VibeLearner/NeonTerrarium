@@ -41,7 +41,7 @@ const STORY = (() => {
   const mix = h => { h ^= h >>> 16; h = Math.imul(h, 0x7feb352d); h ^= h >>> 15; h = Math.imul(h, 0x846ca68b); h ^= h >>> 16; return h >>> 0; };
   const H = (...a) => mix(hash(a.join('|')));
   const U = (...a) => H(...a)/4294967296;
-  const pick = (arr, ...a) => arr[H(...a) % arr.length];
+  const pick = (arr, ...a) => arr[H(...a) % arr.length], STORY_PICK = pick;
   const roll = (p, ...a) => U(...a) < p;
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const day = () => Math.floor(ST.clock/1440);
@@ -399,8 +399,10 @@ const STORY = (() => {
     const e = Object.assign({ t: ST.clock, tmpl, cast: Object.assign({}, cast), ctx: Object.assign({}, ctx || {}), kind, subject: sub }, extra || {});
     e.first = render(e);
     const L = LOGS.get(sub) || LOGS.set(sub, []).get(sub); L.push(e); if (L.length > 400) L.splice(0, L.length - 400);
-    ST.rev++; return e;
+    ST.rev++; for (const f of ST.logHooks) try { f(e); } catch (er){ console.warn('log hook', er); }
+    return e;
   }
+  ST.logHooks = [];   // (pacing.js listens: what counts as something happening)
   function note(who, e){ const n = NOTES.get(who) || NOTES.set(who, []).get(who); n.push(e); if (n.length > 120) n.splice(0, n.length - 120); ST.rev++; }
 
   /* ---------- scenes: storylets played on the street ---------- */
@@ -572,6 +574,7 @@ const STORY = (() => {
     }
     SC.add(sc); return sc;
   }
+  ST.finishHooks = [];   // (pacing.js: what happened to whom while nobody watched)
   ST.endStats = {};   // (how moments end, by kind: for the stress test, tools/stress)
   function endScene(sc, why){
     { const k = (sc.s.tier === 'case' ? 'case' : (sc.s.category || 'story')) + ' ' + String(why || '').split(' ')[0]; ST.endStats[k] = (ST.endStats[k] || 0) + 1; }
@@ -785,6 +788,7 @@ const STORY = (() => {
     if (s.tier === 'notable') NOTABLE[day()] = (NOTABLE[day()] || 0) + 1;
     if (s.ambiguous && s.fairPlay){ const tr = Object.entries(s.fairPlay.truths).filter(([, id]) => D.byId.has(id) && D.byId.get(id).game); if (tr.length){ const [truth] = tr[H(sc.id, 'truth') % tr.length]; PENDING[s.id + '|' + sc.cast.A] = { truth, B: sc.cast[s.fairPlay.subject] }; } }
     if (s.resolves) delete PENDING[s.resolves.setup + '|' + sc.cast.A];
+    for (const f of ST.finishHooks) try { f(sc); } catch (er){ console.warn('finish hook', er); }
     endScene(sc, 'done');
   }
 
@@ -936,18 +940,16 @@ const STORY = (() => {
     if (s.tier === 'notable' && (NOTABLE[day()] || 0) >= 8) return false;
     return true;
   }
-  // the director: for the person being watched, now and then, a moment of their life (or of someone's life that they're part of)
+  // the director: for the person being watched, now and then, a moment of their life (or of someone's life that they're part of).
+  // With pacing on (pacing.js) this is only the fallback: pacing decides when, and asks choose() for what.
   let dirNext = 0;
-  function director(){
-    const sub = ST.watch, p = sub && pOf(sub); if (!p || !D || p.scene){ DBG.why = !p ? 'no subject' : p.scene ? 'in a scene' : 'no data'; return; }
-    if (ST.clock < dirNext) return;
-    dirNext = ST.clock + 20 + U(sub, ST.clock, 'dir')*30;
-    if (!free(p) || (p.walk && !p.walk.scene && p.walk.s < .5)){ DBG.why = 'busy'; return; }
+  // the storylets that fit this person right now, each with a cast and a weight ([] and DBG.why when none do)
+  function choose(sub){
+    const p = sub && pOf(sub); if (!p || !D || p.scene){ DBG.why = !p ? 'no subject' : p.scene ? 'in a scene' : 'no data'; return []; }
+    if (!free(p) || (p.walk && !p.walk.scene && p.walk.s < .5)){ DBG.why = 'busy'; return []; }
     const h = hourNow(), A = spOf(p), nowH = Math.floor(ST.clock/60);
-    if (asleep(p, h) && !ST.isSick(p.id)){ DBG.why = 'asleep'; return; }
+    if (asleep(p, h) && !ST.isSick(p.id)){ DBG.why = 'asleep'; return []; }
     const atWork = p.job && working(p, h) && p.at === p.job;
-    // a parcel on its way: often when they're sick at home (medicine, broth), now and then on an ordinary day
-    if (p.at === p.home && !p.walk && DELIV.get(sub) !== day() && roll(ST.isSick(sub) ? .6 : .12, sub, ST.clock, 'drone') && sendDrone(p.home)){ DELIV.set(sub, day()); DBG.why = 'drone sent'; return; }
     const opts = []; NEAR = new Map();
     const consider = (s, a, fixed) => {
       const As = spOf(a); if (!As || !eligibleWhen(s, As, nowH, h)) return;
@@ -963,16 +965,37 @@ const STORY = (() => {
     const others = A.rels.map(r => pOf(r.who)).filter(q => q && free(q) && (([x, z]) => Math.hypot(x - px0, z - pz0) < 22)(posOf(q))).slice(0, 10);
     for (const q of others) for (const s of D.stories){ if (!s.game || !s.roles.B || !s.roles.B.rel) continue; const [, T] = s.roles.B.rel.split(':'); if (T !== 'A') continue; consider(s, q, { B: p.id }); }
     DBG.runs++; DBG.opts = opts.length; DBG.top = opts.slice().sort((a, b) => b.w - a.w).slice(0, 5).map(o => o.s.id);
-    if (!opts.length){ DBG.why = 'nothing fits'; return; }
+    if (!opts.length) DBG.why = 'nothing fits';
+    return opts;
+  }
+  const pickOpt = (opts, salt) => { const tot = opts.reduce((a, o) => a + o.w, 0); let x = U(salt, ST.clock, 'pick')*tot, ch = opts[opts.length - 1]; for (const o of opts){ if (x < o.w){ ch = o; break; } x -= o.w; } return ch; };
+  function startOpt(ch){
+    const ids = {}; for (const [r, s] of Object.entries(ch.cast)){ if (r.startsWith('_lazy')){ extraRels.push(s); const [a, k, b] = s; addRel(SPM.get(a), k, SPM.get(b)); continue; } ids[r] = s.id; }
+    const sc = startScene(ch.s, ids); DBG.why = sc ? 'started ' + ch.s.id : 'could not start ' + ch.s.id; return sc;
+  }
+  // a parcel on its way to their door (false: not now)
+  function tryDrone(sub){ const p = pOf(sub); if (!p || p.at !== p.home || p.walk || DELIV.get(sub) === day()) return false; if (!sendDrone(p.home)) return false; DELIV.set(sub, day()); DBG.why = 'drone sent'; return true; }
+  function director(){
+    if (typeof PACE !== 'undefined' && PACE.on()){ DBG.why = 'paced (pacing.js)'; return; }
+    const sub = ST.watch, p = sub && pOf(sub); if (!p || !D || p.scene){ DBG.why = !p ? 'no subject' : p.scene ? 'in a scene' : 'no data'; return; }
+    if (ST.clock < dirNext) return;
+    dirNext = ST.clock + 20 + U(sub, ST.clock, 'dir')*30;
+    if (!free(p) || (p.walk && !p.walk.scene && p.walk.s < .5)){ DBG.why = 'busy'; return; }
+    if (asleep(p, hourNow()) && !ST.isSick(p.id)){ DBG.why = 'asleep'; return; }
+    // a parcel on its way: often when they're sick at home (medicine, broth), now and then on an ordinary day
+    if (p.at === p.home && !p.walk && DELIV.get(sub) !== day() && roll(ST.isSick(sub) ? .6 : .12, sub, ST.clock, 'drone') && tryDrone(sub)) return;
+    const opts = choose(sub); if (!opts.length) return;
     // the quiet stretches are real: often nothing happens
     if (!roll(.55, sub, ST.clock, 'go')) return;
-    const tot = opts.reduce((a, o) => a + o.w, 0); let x = U(sub, ST.clock, 'pick')*tot, ch = opts[opts.length - 1];
-    for (const o of opts){ if (x < o.w){ ch = o; break; } x -= o.w; }
-    const ids = {}; for (const [r, s] of Object.entries(ch.cast)){ if (r.startsWith('_lazy')){ extraRels.push(s); const [a, k, b] = s; addRel(SPM.get(a), k, SPM.get(b)); continue; } ids[r] = s.id; }
-    const sc = startScene(ch.s, ids); DBG.why = sc ? 'started ' + ch.s.id : 'could not start ' + ch.s.id;
+    startOpt(pickOpt(opts, sub));
   }
+  ST.choose = choose; ST.pickOpt = pickOpt; ST.startOpt = startOpt; ST.tryDrone = tryDrone;
   const DBG = { runs: 0, opts: 0, why: '', top: [] };
   ST.startScene = startScene; ST.endScene = endScene; ST.openPlaceNear = openPlaceNear; ST.nearestNode = nearestNode; ST.streetDoor = streetDoor; ST.shopNear = shopNear; ST.H = H; ST.U = U;
+  // (for pacing.js: the pieces a fragment is made of)
+  ST.logLine = logLine; ST.note = note; ST.learnFrom = learnFrom; ST.free = free; ST.jobKind = jobKind; ST.JOB_WORD = JOB_WORD; ST.employerName = employerName;
+  ST.seenDays = seenDays; ST.seenKeys = id => SEEN.get(id) || new Map(); ST.departures = id => DEP.get(id) || new Map(); ST.news = () => NEWS; ST.raining = raining; ST.data = () => D;
+  ST.hourNow = hourNow; ST.relWord = relWord; ST.pick = pick;
   ST.dbg = DBG; ST._dir = () => { dirNext = 0; director(); return DBG; };   // (for tests: a director pass now)
 
   /* ---------- names in passing, and gossip ---------- */
@@ -1050,6 +1073,8 @@ const STORY = (() => {
     if (state === subPrev) return;
     const prev = subPrev; subPrev = state;
     const A = { A: sub };
+    if (typeof PACE !== 'undefined' && PACE.on()) PACE.transition(sub, p, prev, state);   // (fragments that happen at a door: pacing.js)
+    const pick = (list, ...salt) => (typeof PACE !== 'undefined' && PACE.on() && PACE.routine(sub, p, list, salt)) || STORY_PICK(list, ...salt);   // (pacing: varied, and never the same line twice running)
     if (state === 'metro'){ logLine(pick(E.metro, sub, ST.clock, 'mt'), A, {}, 'live'); return; }
     if (prev === 'metro'){ logLine(pick(E.metroOff, sub, ST.clock, 'mo'), A, {}, 'live'); return; }
     if (state.startsWith('post:')){ if (prev === 'beat' && roll(.35, sub, ST.clock, 'pt') && E.patrol) logLine(pick(E.patrol, sub, ST.clock, 'pt'), A, {}, 'live'); return; }
@@ -1169,6 +1194,7 @@ const STORY = (() => {
     }
     if (typeof CASES !== 'undefined') try { CASES.tick(); } catch (e){ console.warn('cases', e); }
     director(); watchRoutine(); watchAbsence(); scanNews();
+    if (typeof PACE !== 'undefined') try { PACE.tick(rdt); } catch (e){ console.warn('pacing', e); }
     if (ST.clockReal - savedAt > 10){ savedAt = ST.clockReal; save(); }
   };
   // indoors beats of a delivery scene: a post on the mesh is still readable from outside
@@ -1185,7 +1211,8 @@ const STORY = (() => {
       const logs = [...LOGS.entries()].slice(-30).map(([k, L]) => [k, L.slice(-200).map(e => ({ t: e.t, tmpl: e.tmpl, cast: e.cast, ctx: e.ctx, kind: e.kind, first: e.first, channel: e.channel }))]);
       const data = { v: 1, clock: ST.clock, known: [...KN.entries()], logs, notes: [...NOTES.entries()].map(([k, n]) => [k, n.slice(-80)]), idents,
         flags: [...SPM.values()].filter(s => Object.keys(s.flags).length || Object.keys(s.counts).length).map(s => [s.id, s.flags, s.counts]), pair: PAIR, last: LAST, citylast: CITYLAST, pending: PENDING, extra: extraRels.slice(-200),
-        seen: [...SEEN.entries()].map(([id, m]) => [id, [...m.entries()].map(([k, s]) => [k, [...s].slice(-14)])]), dep: [...DEP.entries()].map(([id, m]) => [id, [...m.entries()].slice(-14)]) };
+        seen: [...SEEN.entries()].map(([id, m]) => [id, [...m.entries()].map(([k, s]) => [k, [...s].slice(-14)])]), dep: [...DEP.entries()].map(([id, m]) => [id, [...m.entries()].slice(-14)]),
+        pace: typeof PACE !== 'undefined' && PACE.saveData ? PACE.saveData() : ST.paceSaved || null };
       localStorage.setItem(KEY, JSON.stringify(data));
     } catch (e){}
   }
@@ -1202,6 +1229,7 @@ const STORY = (() => {
       extraRels.push(...(d.extra || []));
       for (const [id, m] of d.seen || []) SEEN.set(id, new Map(m.map(([k, s]) => [k, new Set(s)])));
       for (const [id, m] of d.dep || []) DEP.set(id, new Map(m));
+      ST.paceSaved = d.pace || null;   // (pacing.js picks it up)
     } catch (e){}
   }
   addEventListener('beforeunload', save);

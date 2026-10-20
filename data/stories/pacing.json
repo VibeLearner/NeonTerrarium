@@ -1,0 +1,388 @@
+{
+  "_about": "Pacing (js/pacing.js): the lines the pacing layer composes. Surveillance-terse, like the transmission log. Every line states only what is true of the city at that moment. Placeholders as in the storylets: {A} the subject, {B.desc} someone near, {A.first}/{A.full}/{A.nick} teach that name, {B.rel}/{B.addr} state a relation, {place} a building or open place by id, {when} a clock time, {n} a count, {S} and {L} short phrases filled in by the code.",
+  "greet": {
+    "morning": [
+      "Morning",
+      "Early one"
+    ],
+    "day": [
+      "Afternoon",
+      "Hey"
+    ],
+    "evening": [
+      "Evening",
+      "Hey"
+    ],
+    "night": [
+      "Late one",
+      "You're out late"
+    ]
+  },
+  "name": {
+    "keeper": [
+      "Overheard: the keeper to {A}: \"The usual, {A.first}?\"",
+      "Overheard: the keeper, already reaching for a bowl: \"{A.first}. Same again?\"",
+      "Overheard: the keeper calls {A} up by name: \"{A.first}, you're next.\""
+    ],
+    "neighbor": [
+      "Overheard: {B.desc} to {A}, passing: \"{S}, {A.first}.\"",
+      "Overheard: {B.desc} to {A}: \"{A.first}. {S}.\" {A} nods back.",
+      "Overheard: {B.desc}, from a few steps off: \"{A.first}! {S}.\""
+    ],
+    "coworker": [
+      "Overheard: {B.desc} to {A}: \"{A.first}. See you in there.\"",
+      "Overheard: {B.desc} to {A}: \"{S}, {A.first}. Long shift?\"",
+      "Overheard: {B.desc} falls in beside {A}: \"{A.first}. Walk with me.\""
+    ],
+    "friend": [
+      "Overheard: {B.desc} to {A}: \"{A.first}! There you are.\"",
+      "Overheard: {B.desc} catches {A}'s arm: \"{A.first}. Hey.\"",
+      "Overheard: {B.desc}: \"{A.first}, wait up.\""
+    ],
+    "household": [
+      "Overheard: {B.desc} to {A}: \"{A.first}, did you lock up?\"",
+      "Overheard: {B.desc} to {A}: \"{A.first}. Keys.\" {A} checks a pocket.",
+      "Overheard: {B.desc}: \"Slow down, {A.first}.\""
+    ],
+    "any": [
+      "Overheard: {B.desc} to {A}: \"{S}, {A.first}.\"",
+      "Overheard: {B.desc} says \"{A.first}\" and {A} looks around.",
+      "Overheard: {B.desc}: \"{A.first}. Good to see you.\""
+    ],
+    "nick": [
+      "Overheard: {B.desc} to {A}: \"{A.nick}! {S}.\"",
+      "Overheard: {B.desc} calls {A} \"{A.nick}\". {A} answers to it."
+    ],
+    "tag": [
+      "Name tag on {A}: \"{A.first}.\"",
+      "Staff tag, clipped on: {A.first}.",
+      "Tag at {A.his} collar, readable at this range: {A.first}."
+    ],
+    "comm": [
+      "Comm, one side: {A} answers. \"{A.first}.\" Listens.",
+      "Comm, one side: \"{A.first} here. Go ahead.\"",
+      "Comm, one side: \"Yes, this is {A.first}.\" A pause. \"Now?\"",
+      "Comm, one side: {A}: \"It's {A.first}. I'm on my way.\""
+    ],
+    "radio": [
+      "Radio: \"{A.first}, check in.\" {A} keys the handset. \"Checking in.\"",
+      "Dispatch, on the radio: \"{A.first}, copy?\" {A}: \"Copy.\"",
+      "Radio: \"Unit {n}, {A.first}, what's your location?\" {A} gives a cross street."
+    ],
+    "partner": [
+      "Overheard: {B.desc} to {A}: \"{A.first}. Coffee after this?\"",
+      "Overheard: {B.desc}, across the corner: \"{A.first}, you see anything?\" {A} shakes {A.his} head.",
+      "Overheard: {B.desc} to {A}: \"Quiet one, {A.first}.\""
+    ]
+  },
+  "employer": [
+    "Lanyard on {A}: {A.employer}.",
+    "Staff pass at {A.his} belt: {A.employer}.",
+    "Logo on {A}'s jacket: {A.employer}."
+  ],
+  "job": [
+    "Badge clipped to {A.his} jacket: {A.job}.",
+    "Work ID on {A}, held up at the door: {A.job}."
+  ],
+  "home": [
+    "{A} keys open {place}. Door plate: {A.full}.",
+    "Door plate at {place}: {A.full}. {A}'s print opens the lock.",
+    "Lock at {place} reads {A}'s print. Name on the plate: {A.full}."
+  ],
+  "household": [
+    "Inside {place}: {B.desc}, already home.",
+    "Someone already home at {place}: {B.desc}."
+  ],
+  "together": [
+    "{A} and {B.desc} come out of {place} together.",
+    "{A} and {B.desc} leave {place} side by side."
+  ],
+  "regular": [
+    "{A} at {place} again. Seen there on {seen} separate days.",
+    "{place}, again. {seen} days on record for {A} here."
+  ],
+  "habit": [
+    "{A} out of {place} at {when}. Same hour, give or take, {seen} days running.",
+    "{when}. {A} leaves {place}. {seen} days, same window."
+  ],
+  "intro": [
+    "Overheard: {A} to someone at the counter: \"This is {B.first}. My {B.rel}.\"",
+    "Overheard: {A} introduces {B.desc}: \"My {B.rel}, {B.first}.\"",
+    "Overheard: {A} to a passerby: \"Have you met {B.first}? My {B.rel}.\""
+  ],
+  "catchup": {
+    "sick": [
+      "Overheard: {B.desc} to {A}: \"You're up. Feeling better?\" {A}: \"Mostly.\"",
+      "Comm, one side: {A}: \"I'm fine now. Yes. Back at it.\""
+    ],
+    "parcel": [
+      "Overheard: {B.desc} to {A}: \"Saw a drone at your door. Anything good?\"",
+      "Overheard: {B.desc}: \"You got that parcel?\" {A} nods."
+    ],
+    "friends": [
+      "Overheard: {B.desc} to {A}: \"Good seeing you the other day.\"",
+      "Overheard: {B.desc} to {A}: \"Same again soon?\""
+    ],
+    "romance": [
+      "Overheard: {B.desc} to {A}: \"So? How did it go?\" {A} doesn't answer. Smiles.",
+      "Overheard: {B.desc} to {A}: \"You look happy. Don't tell me, then.\""
+    ],
+    "work": [
+      "Overheard: {B.desc} to {A}: \"Heard about work. You all right?\"",
+      "Overheard: {B.desc}: \"Rough week at work, I heard.\" {A} shrugs."
+    ],
+    "family": [
+      "Overheard: {B.desc} to {A}: \"How's the family?\" {A}: \"Same as ever.\"",
+      "Comm, one side: {A}: \"I know. I'll come by again soon.\""
+    ],
+    "home": [
+      "Overheard: {B.desc} to {A}: \"All sorted at home?\" {A}: \"Getting there.\""
+    ],
+    "neighbors": [
+      "Overheard: {B.desc} to {A}: \"Thanks again for the other day.\""
+    ],
+    "any": [
+      "Overheard: {B.desc} to {A}: \"Haven't seen you in a while. Busy?\"",
+      "Overheard: {B.desc} to {A}: \"Where have you been hiding?\""
+    ]
+  },
+  "cues": {
+    "approach": [
+      "Figure across the street. Facing {A}.",
+      "{B.desc} up the block, headed this way.",
+      "Someone a few meters off, watching {A}."
+    ],
+    "comm": [
+      "{A}'s comm lights up. Ignored.",
+      "Comm buzzes twice. {A} checks it, puts it away.",
+      "{A} glances at the comm. Doesn't answer. Not yet."
+    ],
+    "drone": [
+      "Drone traffic overhead. One drops lower.",
+      "A delivery drone holds above the block."
+    ],
+    "radio": [
+      "Radio chatter on {A}'s shoulder. Not for this unit.",
+      "Radio: static, a unit number, static.",
+      "Radio: a call two districts over. {A} listens anyway."
+    ],
+    "resident": [
+      "{B.desc} watching {A} from a few meters off.",
+      "{B.desc} hovering near {A}. Hands in pockets."
+    ],
+    "generic": [
+      "{A} slows. Looks up the street.",
+      "{A} checks the time.",
+      "{A} stops at the curb. Waits a moment longer than the light.",
+      "{A} looks back once.",
+      "{A} pauses. Turns a half step, then walks on."
+    ]
+  },
+  "amb": {
+    "heading": [
+      "{A}, on foot, {S}.",
+      "On foot. {S}. Steady pace.",
+      "{A} heading {S}."
+    ],
+    "early": [
+      "{A} out of {place} at {when}. Earlier than usual.",
+      "{when}. {A} leaves {place}. Ahead of the usual hour."
+    ],
+    "late": [
+      "{A} out of {place} at {when}. Later than usual.",
+      "{when}. {A} leaves {place}. Behind the usual hour."
+    ],
+    "newplace": [
+      "First sighting of {A} at {place}.",
+      "No prior record of {A} at {place}."
+    ],
+    "rain": [
+      "Rain. {A} without an umbrella.",
+      "Rain on the lens. {A} walking in it, no umbrella."
+    ],
+    "run": [
+      "{A} breaks into a run. Rain.",
+      "{A} running now. Rain coming down harder."
+    ],
+    "umbrella": [
+      "Umbrella up. {A} keeps walking.",
+      "{A} under an umbrella. Pace unchanged."
+    ],
+    "crowd": [
+      "Crowded stretch. {n} people within a few meters of {A}.",
+      "{n} people close by. {A} moving through them."
+    ],
+    "empty": [
+      "Street empty. {A} alone on it.",
+      "Nobody else on this stretch. {A} walking."
+    ],
+    "pass": [
+      "{A} passes {B} without stopping.",
+      "{A} and {B} pass each other. Neither stops."
+    ],
+    "cop": [
+      "Patrol officer a few meters off. {A} walks on.",
+      "Officer on the corner. {A} passes within a few meters."
+    ],
+    "latehour": [
+      "{when}. {A} still out.",
+      "{when}. Most doors shut. {A} on foot."
+    ],
+    "linger": [
+      "{A} still at {place}. {n} minutes now.",
+      "{n} minutes at {place}. {A} hasn't moved on."
+    ],
+    "neon": [
+      "Neon on wet pavement. {A} crossing it.",
+      "Puddles take the signs. {A} walks through them."
+    ],
+    "usual": [
+      "{A} headed for {place}. A usual stop.",
+      "Route matches earlier days: {A} toward {place}."
+    ],
+    "homeward": [
+      "{A} turns toward {place}.",
+      "{A} on the way back to {place}."
+    ],
+    "carry": [
+      "{A} carrying something. Both hands.",
+      "{A} walking with something in hand."
+    ],
+    "hurry": [
+      "{A} walking fast.",
+      "{A} picks up the pace."
+    ],
+    "clock": [
+      "{when}. {A} on foot.",
+      "{when}. {A} still moving."
+    ],
+    "passby": [
+      "{A} passes {B.desc}.",
+      "{B.desc} goes by {A}. No exchange."
+    ],
+    "sitting": [
+      "{A} sitting at {place}.",
+      "{A} on a seat at {place}. Not moving on yet."
+    ],
+    "queue": [
+      "{A} waiting in line at {place}.",
+      "Line at {place}. {A} in it."
+    ]
+  },
+  "tails": {
+    "rain": [
+      "Rain.",
+      "Wet street."
+    ],
+    "night": [
+      "Streetlights on.",
+      "Late."
+    ],
+    "empty": [
+      "Nobody else about.",
+      "Quiet stretch."
+    ],
+    "crowd": [
+      "Busy street.",
+      "Crowd on the walk."
+    ],
+    "morning": [
+      "Early light.",
+      "Morning traffic."
+    ]
+  },
+  "call": {
+    "kinds": {
+      "noise": {
+        "hours": [
+          20,
+          4
+        ],
+        "say": [
+          "Overheard: \"Music through the wall. Every night this week.\"",
+          "Overheard: \"Shouting upstairs. Hours of it.\""
+        ]
+      },
+      "stranger": {
+        "hours": [
+          19,
+          3
+        ],
+        "say": [
+          "Overheard: \"Someone keeps trying the door downstairs.\"",
+          "Overheard: \"Same person at the corner three nights now. Just standing.\""
+        ]
+      },
+      "parcel": {
+        "hours": [
+          8,
+          20
+        ],
+        "say": [
+          "Overheard: \"A drone left my parcel. Now it's gone.\"",
+          "Overheard: \"Third delivery this month that never reached the door.\""
+        ]
+      },
+      "stall": {
+        "hours": [
+          9,
+          22
+        ],
+        "say": [
+          "Overheard: \"The stall next to mine is on my pitch again.\"",
+          "Overheard: \"Someone took a crate off my stall. Right off the front.\""
+        ]
+      },
+      "lost": {
+        "hours": [
+          7,
+          23
+        ],
+        "say": [
+          "Overheard: \"I lost my comm. Somewhere between here and the station.\"",
+          "Overheard: \"Dropped my keys. Have any been handed in?\""
+        ]
+      },
+      "directions": {
+        "hours": [
+          6,
+          24
+        ],
+        "say": [
+          "Overheard: \"Which way to the metro? The lift's out.\"",
+          "Overheard: \"I'm looking for the clinic. Is it near?\""
+        ]
+      },
+      "thanks": {
+        "hours": [
+          8,
+          21
+        ],
+        "say": [
+          "Overheard: \"You were here last week. With the mugging. Thank you.\"",
+          "Overheard: \"Just wanted to say thanks. For the other night.\""
+        ]
+      }
+    },
+    "b1": [
+      "{B.desc} waves {A} over.",
+      "{B.desc} flags down {A}."
+    ],
+    "b2": [
+      "{B.desc} talks fast. {A} listens, takes it down.",
+      "{B.desc} explains. {A} nods along."
+    ],
+    "id": [
+      "{A} takes details. ID: {B.full}.",
+      "{A} logs the report. Name on the ID: {B.full}."
+    ],
+    "b4": [
+      "{A} heads off to check it.",
+      "{A} moves off. Radio up."
+    ]
+  },
+  "backup": [
+    "Radio: unit requested at {place}. {A} responds.",
+    "Radio: \"Any unit near {place}.\" {A}: \"On my way.\""
+  ]
+}

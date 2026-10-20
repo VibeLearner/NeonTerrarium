@@ -1031,7 +1031,11 @@ function playExpressiveMotifNote(freq, startTime, duration, options = {}) {
   queueConstellationNode(freq, safeTime, pan, isBell, noteLabel);
 }
 
-function queueConstellationNode() {}   // (the standalone version drew each note as a star; the game's player shows the spectrum)
+let pingHook = null;   // the game's panel draws each melodic note (every trigger pattern) as a marker, at the moment it sounds
+function queueConstellationNode(freq, safeTime, pan, isBell) {
+  if (!pingHook || !ctx) return;
+  setTimeout(() => { try { pingHook(freq, pan, isBell); } catch (e) {} }, Math.max(0, (safeTime - ctx.currentTime) * 1000));
+}
 
 // Lead riff voice: one soft monosynth voice per riff (sine plus a little triangle through a gentle low-pass).
 // Each note is struck cleanly at its own pitch; there are no slides.
@@ -3379,6 +3383,7 @@ return {
   pluck(freq, t, dur, vel, pan, dest) { playPluckNote(freq, Math.max(ctx.currentTime, t), dur, vel, pan, false, dest, 0.6); },
   get ctx(){ return ctx; }, get analyser(){ return analyser; }, get out(){ return gridOut; },
   set volume(v){ gridVol = v; },
+  set onPing(f){ pingHook = f; },
   get playing(){ return isPlaying; }, get frozen(){ return isFrozen; },
   get leadOn(){ return leadLoopOn; }, get ambientOn(){ return ambientOn; }, get autoOn(){ return AUTO.on; },
   get bpm(){ return masterBpm; }, get mode(){ return microcosmMode; }, get subdiv(){ return currentSubdiv; },

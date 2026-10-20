@@ -151,9 +151,6 @@ const music = (() => {
   function hold(b){ if (b === held) return; held = b; if (!b){ fadeIn = GRID_FADE_QUICK; level = 0; } }
 
   // ---------- drawing: the spectrum, as curves and bars ----------
-  // every melodic ping (whatever trigger pattern or voice made it) shows as a ring on the carrier chart: pitch across, strength by size
-  const pings = [];
-  E.onPing = (freq, pan, bell) => { pings.push({ t: performance.now(), x: Math.min(1, Math.max(0, Math.log(freq/110)/Math.log(10))), bell }); if (pings.length > 24) pings.shift(); };
   const NB = 56, sm = { deck: new Float32Array(NB), panel: new Float32Array(NB) }, centroid = { deck: .5, panel: .5 };
   let bins = null, bands = new Float32Array(NB);
   function readBands(dt){
@@ -192,13 +189,6 @@ const music = (() => {
         g.stroke(); g.shadowBlur = 0;
       };
       trace(-1, .7, pal.dim, 1.2); trace(1, 1, pal.line, 2, pal.glow);
-      const nowMs = performance.now();
-      for (const pg of pings){
-        const u = (nowMs - pg.t)/900; if (u < 0 || u > 1) continue;
-        const px = pg.x*w, py = h*.5, r = (4 + u*h*.32)*(pg.bell ? 1.25 : 1);
-        g.strokeStyle = (pg.bell ? 'rgba(229,55,159,' : 'rgba(217,246,246,') + (1 - u)*.9 + ')'; g.lineWidth = 2; g.beginPath(); g.arc(px, py, r, 0, 6.2832); g.stroke();
-        g.fillStyle = (pg.bell ? 'rgba(229,55,159,' : 'rgba(217,246,246,') + (1 - u) + ')'; g.fillRect(px - 2, py - 2, 4, 4);
-      }
       g.strokeStyle = pal.mark; g.lineWidth = 1; const X = Math.round(centroid[key]*w) + .5; g.beginPath(); g.moveTo(X, 0); g.lineTo(X, h); g.stroke();
       if (h >= 70){ g.fillStyle = pal.tick; g.font = '11px JetBrains Mono, monospace'; g.fillText('100', 6, h - 4); g.fillText('1K', w*.31, h - 4); g.fillText('10K Hz', w - 44, h - 4); }
     }

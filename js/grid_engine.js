@@ -1031,11 +1031,7 @@ function playExpressiveMotifNote(freq, startTime, duration, options = {}) {
   queueConstellationNode(freq, safeTime, pan, isBell, noteLabel);
 }
 
-let pingHook = null;   // the game's panel draws each melodic note (every trigger pattern) as a marker, at the moment it sounds
-function queueConstellationNode(freq, safeTime, pan, isBell) {
-  if (!pingHook || !ctx) return;
-  setTimeout(() => { try { pingHook(freq, pan, isBell); } catch (e) {} }, Math.max(0, (safeTime - ctx.currentTime) * 1000));
-}
+function queueConstellationNode() {}   // (the standalone version drew each note as a star; the game's player shows the spectrum)
 
 // Lead riff voice: one soft monosynth voice per riff (sine plus a little triangle through a gentle low-pass).
 // Each note is struck cleanly at its own pitch; there are no slides.
@@ -2364,8 +2360,24 @@ function settleAfterChange(when) {
   const x = when - lastChordChangeAt;
   return (lastChordChangeAt > 0 && x >= 0 && x < 0.45) ? when + 0.3 * (1 - x / 0.45) : when;
 }
+// A ping the conductor places (lead loop and autopilot on, or a Transformed song voice) lights the same LED and status line as one
+// fired by hand, at the moment it sounds, so the console's ping field shows it whatever its voice. One flash per pattern per half second.
+const PING_NAMES = { TAPPED: 'GUTTER CASCADE', HAMMER: 'RIVET TRIPLET', BELLS: 'LAMP-POST CHIMES', DOUBLESTOP: 'TWIN NEON', LEAD: 'BUSKER RIFF', HOMEBOUND: 'LAST TRAIN HOME' };
+const lastPingFlash = {};
+function flashPing(style, when) {
+  const name = PING_NAMES[style]; if (!name || !ctx) return;
+  const at = Math.max(when, ctx.currentTime);
+  if (at - (lastPingFlash[style] || -9) < 0.5) return;
+  lastPingFlash[style] = at;
+  setTimeout(() => {
+    const st = $g('motifStatusText'), led = $g('motifLed');
+    if (st) st.textContent = 'PING: ' + name;
+    if (led) led.className = 'w-2 h-2 rounded-full bg-cyan-300 shadow-[0_0_8px_#22d3ee]';
+  }, Math.max(0, (at - ctx.currentTime) * 1000));
+}
 function playConductorEvent(ev, t, sixteenth) {
   motifStyleNow = ev.st || null;
+  if (ev.st && ev.kind !== 'bass' && ev.kind !== 'cloud') flashPing(ev.st, Math.max(ctx.currentTime, t + (ev.nudge || 0)));
   try { playConductorEvent0(ev, t, sixteenth); } finally { motifStyleNow = null; }
 }
 function playConductorEvent0(ev, t, sixteenth) {
@@ -3383,7 +3395,6 @@ return {
   pluck(freq, t, dur, vel, pan, dest) { playPluckNote(freq, Math.max(ctx.currentTime, t), dur, vel, pan, false, dest, 0.6); },
   get ctx(){ return ctx; }, get analyser(){ return analyser; }, get out(){ return gridOut; },
   set volume(v){ gridVol = v; },
-  set onPing(f){ pingHook = f; },
   get playing(){ return isPlaying; }, get frozen(){ return isFrozen; },
   get leadOn(){ return leadLoopOn; }, get ambientOn(){ return ambientOn; }, get autoOn(){ return AUTO.on; },
   get bpm(){ return masterBpm; }, get mode(){ return microcosmMode; }, get subdiv(){ return currentSubdiv; },

@@ -31,7 +31,12 @@ const PPL_GEN = PG.live();
 const PPL_TEX = PPL_GEN ? new THREE.CanvasTexture(PG.sheet.cv) : new THREE.TextureLoader().load('assets/sprites/people_v2.png');
 PPL_TEX.magFilter = PPL_TEX.minFilter = THREE.NearestFilter; PPL_TEX.generateMipmaps = false;
 const PPL_MAX = PPL_GEN ? 1000 : 700;          // most people drawn at once (the nearest win if more are out)
-const PPL_SPEED = .55;        // walking speed, world units a second (a block takes about 7 s)
+// People's size. The doorways they walk through (doorFrame below) open .715 high; a citizen sprite is 13 to 16 sprite pixels
+// tall (mostly 15: .83 units at PX 18), which stood taller than the doors. Drawn at PPL_S they are about 85 to 90% of a door
+// (15 px: .63, 88%; 14 px: .59; 16 px: .68), with everything that hangs off their size scaled to match (the emote bubble over
+// the head, the seat, the stride and so the walking speed, the monitor's pick box).
+const PPL_S = .76;
+const PPL_SPEED = .55*PPL_S;  // walking speed, world units a second (the same stride for a shorter person: a block takes about 9 s)
 
 // a batch of upright pixel sprites cut from one sheet (rows of equal cells): people, and the delivery drones
 function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMaterial({   // (mrtShader: writes its flat normal too, core.js)
@@ -86,6 +91,7 @@ function spriteMat(tex, W, H, cw, ch, rows){ return mrtShader(new THREE.ShaderMa
     }`,
 }), 'vec4(0.5, 0.5, 1.0, 1.0)', true); }
 const PPL_MAT = spriteMat(PPL_TEX, PPL_GEN ? PG.sheet.W : PPL.W, PPL_GEN ? PG.sheet.H : PPL.H, PPL.cw, PPL.ch, PPL_GEN ? PG.sheet.rows : PPL.rows);
+PPL_MAT.uniforms.size.value.multiplyScalar(PPL_S);   // (people a little shorter than the doors they go through: see PPL_S)
 if (PPL_GEN){ PPL_MAT.uniforms.pal.value = PG.palTexture(); PPL_MAT.uniforms.palRows.value = 4096; PPL_MAT.uniforms.usePal.value = 1; }
 function spriteBatch(mat, max){
   const geo = new THREE.InstancedBufferGeometry();
@@ -2265,7 +2271,7 @@ function updatePeople(dt, t){
         const sp = p.spot; if (!sp) continue;
         p.x = sp.x; p.z = sp.z; y = sp.y;
         let face = sp.face, gest = false;
-        if (sp.kind === 'seat'){ y = sp.y - .09; frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4;
+        if (sp.kind === 'seat'){ y = sp.y - .09*PPL_S; frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4;
           if (newLook && (p.eating === sp || sp.act === 'eat') && Math.floor(t*.22 + p.phase) % 3 > (p.eating === sp ? 0 : 1)) frame = F_SITEAT + Math.floor(t*1.6 + p.phase) % 4;   // eating what they ordered (and at a picnic, now and then)
           if (sp.act === 'holo'){ face = [sp.hx - sp.x, sp.hz - sp.z]; holoOn.push(p._holo = sp);   // watching the show
             if (!(p.emoUntil > t) && pplRand() < dt*.03) emote(p, pplRand() < .5 ? 'bang' : 'note', 2); }
@@ -2323,10 +2329,10 @@ function updatePeople(dt, t){
     }
     if (p.cop && p.angry > t) frame = F_ANGRY + Math.min(5, Math.floor((t - p.angry + .9)*7));
     if ((p.row & 31) === ROW_HOOD && frame >= F_SPEC) frame = F_IDLE + (frame % 4);   // (the archivist has walk and idle frames only)
-    p._ec = 1; p._ey = y; p._er = p.cop ? p.copRow || ROW_COP : p.row; p._ef = frame; p._ea = Math.max(0, alpha); p._eo = frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8; p._eoOn = alpha > .9;   // (what a frame between steps draws again)
+    p._ec = 1; p._ey = y; p._er = p.cop ? p.copRow || ROW_COP : p.row; p._ef = frame; p._ea = Math.max(0, alpha); p._eo = (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8)*PPL_S; p._eoOn = alpha > .9;   // (what a frame between steps draws again)
     if (!emit(p.x, y, p.z, p.cop ? p.copRow || ROW_COP : p.row, frame, p.flip, Math.max(0, alpha), false, p._fx, p._fz)) continue;
     emitUm(p, p.x, y, p.z, Math.max(0, alpha)); emitHeld(p, p.x, y, p.z, frame, Math.max(0, alpha));
-    if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8), p.z, ROW_EMO, p.emo, 1, 2);
+    if (p.emoUntil > t && alpha > .9) emit(p.x, y + (frame >= F_SIT && frame < F_SIT + 4 && !p.cop ? .6 : .8)*PPL_S, p.z, ROW_EMO, p.emo, 1, 2);
   }
   PH.sub('people: the loop over everyone');
   drawBouncers(emit, t, dt);
@@ -2386,7 +2392,7 @@ function updatePeople(dt, t){
       view = b.view = ((Math.round(Math.atan2(ax, az)/(PI/4)) % 8) + 8) % 8; }
     const y = (b.state === 'lift' || b.state === 'drop' ? b.by ?? CURB : CURB) + lift + .03*Math.sin(t*3 + b.phase);
     const shown = emitD(b.x, y, b.z, view, Math.max(0, alpha)); if (shown && b.dx !== undefined && (b.dx || b.dz)) PPL_FEED.dd.push({ i: di - 1, dx: b.dx, dz: b.dz });
-    if (shown && b.emoUntil > t) emit(b.x, y + .75, b.z, ROW_EMO, b.emo, 1, 2);
+    if (shown && b.emoUntil > t) emit(b.x, y + .75*PPL_S, b.z, ROW_EMO, b.emo, 1, 2);
     // the parcel on the doorstep, until it's taken in
     if (b.cap && t - b.t0 > 1.3){ const u = t - b.t0; emitD(b.cap.x, b.cap.y ?? CURB, b.cap.z, DD.parcel, u > 3 ? Math.max(0, (3.6 - u)/.6) : 1); }
   }

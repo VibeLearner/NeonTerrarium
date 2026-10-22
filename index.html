@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Neon Terrarium</title>
-<script src="js/saveguard.js?v=2026-10-18n"></script>
+<script src="js/saveguard.js?v=2026-10-22f"></script>
 <script src="js/tv.js?v=2026-10-16p"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=JetBrains+Mono:wght@400;600&family=Chakra+Petch:wght@500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="data:,">
 <script src="js/touch.js?v=2026-10-14a"></script>
-<link rel="stylesheet" href="css/style.css?v=2026-10-18x">
+<link rel="stylesheet" href="css/style.css?v=2026-10-22f">
 </head>
 <body>
 
@@ -175,6 +175,7 @@
         <dt>Click</dt><dd>Build</dd>
         <dt>Right-click</dt><dd>Remove a section</dd>
         <dt>X</dt><dd>Delete mode</dd>
+        <dt>Furnish pod</dt><dd>Pick a floor (scroll or Up / Down), click to do the apartment up</dd>
         <dt>H</dt><dd>Center the view</dd>
         <dt>Esc</dt><dd>Stop what you're doing</dd>
       </dl>
@@ -188,6 +189,7 @@
     <button class="zone" data-zone="ind"  style="--z:#E8E03A" aria-pressed="false"><span class="zin"><b>ZONE D</b><small>Industrial</small></span></button>
     <button class="rot" id="rotBR" aria-label="Rotate view right">⟳</button>
     <button class="rot del" id="delBtn" aria-label="Delete mode" aria-pressed="false" title="Delete mode (X)">✕</button>
+    <button class="furnbtn" id="furnBtn" aria-pressed="false" title="Pick a floor of a residential or luxury building, or a lifted pod, and do the apartment up">Furnish pod</button>
   </div>
 </nav>
 
@@ -281,6 +283,11 @@
   <p class="foot">Your city saves automatically in this browser. Cities, files and cloud saves are on the title screen.</p>
 </aside>
 
+<!-- Furnish pod: the Pod Furniture Lab's Build mode over the city, in its own page (furnish.html) so its three.js never meets the game's (furnish.js) -->
+<section id="furnish" class="furnish" hidden aria-label="Furnish pod">
+  <div class="furnish-wait"><b>Furnish pod</b><p id="furnishMsg" role="status">Gathering the city</p><div class="furnish-prog"><i id="furnishBar"></i></div><button id="furnishCancel">Cancel</button></div>
+</section>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
 <!-- ?v= makes browsers fetch fresh copies after an update; change it with every release -->
@@ -333,10 +340,11 @@
 <script src="js/booth_song.js?v=2026-10-18g"></script>
 <script src="js/booth.js?v=2026-10-18x"></script>
 <script src="js/input.js?v=2026-10-18x"></script>
+<script src="js/furnish.js?v=2026-10-22f"></script>
 <script src="js/perfhud.js?v=2026-10-13l"></script>
 <script src="js/staticcache.js?v=2026-10-13l"></script>
 <script src="js/neverseen.js?v=2026-10-13l"></script>
-<script src="js/main.js?v=2026-10-18t"></script>
+<script src="js/main.js?v=2026-10-22f"></script>
 <script src="js/cityledger.js?v=2026-10-16a"></script>
 <script src="js/overseer.js?v=2026-10-16p"></script>
 <script src="js/wirelog.js?v=2026-10-16q"></script>

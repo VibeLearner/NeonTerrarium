@@ -478,8 +478,8 @@ function updateCars(t){
 const STEAM_PER = 6;
 let steamPts = null, steamLife = null, steamWob = null, steamSrc = [];
 const steamMat = new THREE.ShaderMaterial({
-  uniforms: { map:{ value: glowTex }, color:{ value: new THREE.Color(0xeef0ee) }, scale: GLOW_PTS_UNI.scale, aK:{ value: 1 } },
-  vertexShader: 'attribute float size; attribute float alpha; varying float vA; uniform float scale; void main(){ vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale; }',
+  uniforms: { map:{ value: glowTex }, color:{ value: new THREE.Color(0xeef0ee) }, scale: GLOW_PTS_UNI.scale, aK:{ value: 1 }, sK:{ value: 1 } },
+  vertexShader: 'attribute float size; attribute float alpha; varying float vA; uniform float scale; uniform float sK; void main(){ vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale * sK; }',
   fragmentShader: 'uniform sampler2D map; uniform vec3 color; uniform float aK; varying float vA; void main(){ float a = texture2D(map, gl_PointCoord).a * vA * aK; if (a < .01) discard; gl_FragColor = vec4(color, a); }',
   transparent: true, depthWrite: false,
 });
@@ -512,14 +512,14 @@ function setupSteam(){
   steamPts = new THREE.Points(g, steamMat); steamPts.layers.set(1); steamPts.frustumCulled = false; scene.add(steamPts);
   updateSteam(0, comp.uniforms.night.value);   // (positions, sizes and fades filled in now: an edit's upkeep can run after this frame's steam update)
 }
-const steamCol = new THREE.Color(), STEAM_DAY = .78;
+const steamCol = new THREE.Color(), STEAM_DAY = .62;
 function updateSteam(dt, night){
   if (!steamPts) return;
   // by day a matte puff in the air's own mist color, kept under the bloom's threshold (pure white puffs flared in the morning look's bloom and halation); at night as before
   const mt = comp.uniforms.mistTint.value;
   const tr = .65 + .35*mt.r, tg = .65 + .35*mt.g, tb = .65 + .35*mt.b;   // (a pale white-grey with a touch of the air's own tint: pale is what the day bloom leaves alone)
   steamMat.uniforms.color.value.setRGB(STEAM_DAY*tr, STEAM_DAY*tg, STEAM_DAY*tb).lerp(steamCol.set(0x6a7596), night);
-  steamMat.uniforms.aK.value = .9 + .1*night;
+  steamMat.uniforms.aK.value = .5 + .5*night; steamMat.uniforms.sK.value = 1.25 - .25*night;   // (the puffs are small sprites that snap from pixel to pixel as the view turns, which glittered: by day fewer, bigger, softer ones, and the street steam carries the look)
   const P = steamPts.geometry.attributes.position.array, Sz = steamPts.geometry.attributes.size.array, A = steamPts.geometry.attributes.alpha.array;
   if (PH.tests.steamFull || window.__STEAM_FULL){   // (the first way: three sine and cosine calls for every puff)
   for (let i=0;i<steamLife.length;i++){

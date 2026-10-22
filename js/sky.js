@@ -283,7 +283,7 @@ const comp = new THREE.ShaderMaterial({
     // map: the low morning sun made it a glare the bloom and halation spread over the buildings, and it jumped as the view turned and the
     // shadow map's reach and redrawn strips moved over the vents.) At night (mistNight 1) it changes nothing: the lamps and neon light it.
     vec3 mistDay(vec3 c, float T){
-      float a = clamp((1.0 - T*T*T)*1.1, 0.0, .62)*(1.0 - mistNight);   // (real cover where the steam is thick: about 1 - e^-od)
+      float a = clamp((1.0 - T*T*T*T)*1.3, 0.0, .72)*(1.0 - mistNight);   // (real cover where the steam is thick: about 1 - e^-1.4od)
       vec3 m = mix(vec3(1.0), mistTint, .35)*.8;   // soft white-grey: pale, so the bloom leaves it be by day, and under its threshold
       return mix(c, m, a);
     }
@@ -624,11 +624,11 @@ const comp = new THREE.ShaderMaterial({
           const int MS = 8;
           float dt = (tb - ta)/float(MS), T = 1.0; vec3 acc = vec3(0.0);
           for (int i = 0; i < MS; i++){
-            vec3 p = ro + rdir*(ta + (float(i) + dith)*dt);
+            vec3 p = ro + rdir*(ta + (float(i) + mix(.5, dith, mistNight))*dt);   // (by day the steps sit at fixed places along the ray: a dither tied to the screen's pixels made the steam swim as the view turned)
             float hy = clamp(p.y/4.5, 0.0, 1.0);
             vec2 sm = texture2D(tSteam, p.xz/(2.0*steamExt) + .5).rg;
             float w = mix(sm.r*1.6, sm.g, smoothstep(.0, .55, hy))*.95;
-            float dens = mistI*w*(1.0 - hy)*(1.0 - hy)*(.55 + .45*vnoise(vec3(p.xz*1.3, p.y*1.5 - time*.6)))*.9;
+            float dens = mistI*w*(1.0 - hy)*(1.0 - hy)*mix(.75 + .25*vnoise(vec3(p.xz*.42, p.y*.6 - time*.25)), .55 + .45*vnoise(vec3(p.xz*1.3, p.y*1.5 - time*.6)), mistNight)*mix(1.6, .9, mistNight);   // (by day broad slow wisps, a little denser: the fine grain, sampled by a few steps a pixel, sparkled as the view turned)
             acc += T*dens*dt*(amb*mistNight + glowN);   // (only the night's light is added: by day the steam is a matte haze laid over the picture, mistDay below)
             T *= exp(-dens*dt*.35);   // light extinction: steam scatters light, hides little
           }
@@ -828,11 +828,11 @@ const SOFT_MIST = SOFT_HEAD + `
       const int MS = 8;
       float dt = (tb - ta)/float(MS), T = 1.0; vec3 acc = vec3(0.0);
       for (int i = 0; i < MS; i++){
-        vec3 p = ro + rdir*(ta + (float(i) + dith)*dt);
+        vec3 p = ro + rdir*(ta + (float(i) + mix(.5, dith, mistNight))*dt);   // (by day the steps sit at fixed places along the ray: a dither tied to the screen's pixels made the steam swim as the view turned)
         float hy = clamp(p.y/4.5, 0.0, 1.0);
         vec2 sm = texture2D(tSteam, p.xz/(2.0*steamExt) + .5).rg;
         float w = mix(sm.r*1.6, sm.g, smoothstep(.0, .55, hy))*.95;
-        float dens = mistI*w*(1.0 - hy)*(1.0 - hy)*(.55 + .45*vnoise(vec3(p.xz*1.3, p.y*1.5 - time*.6)))*.9;
+        float dens = mistI*w*(1.0 - hy)*(1.0 - hy)*mix(.75 + .25*vnoise(vec3(p.xz*.42, p.y*.6 - time*.25)), .55 + .45*vnoise(vec3(p.xz*1.3, p.y*1.5 - time*.6)), mistNight)*mix(1.6, .9, mistNight);   // (by day broad slow wisps, a little denser: the fine grain, sampled by a few steps a pixel, sparkled as the view turned)
         acc += T*dens*dt*(amb*mistNight + glowN);   // (only the night's light is added: by day the steam is a matte haze laid over the picture, mistDay below)
         T *= exp(-dens*dt*.35);
       }

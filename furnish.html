@@ -195,7 +195,8 @@ body[data-embed] header.bar,body[data-embed] .cat-only,body[data-embed] .pod-onl
 .bbar .ico{font-family:var(--font-mono);font-size:15px;line-height:1;width:30px;padding:0}
 @media (max-width:1200px){.bbar .lbl{display:none}.bbar{max-width:calc(100% - 480px)}}
 /* left: the catalog rail, five groups and two tools, cut-corner buttons */
-.brail{position:absolute;left:16px;top:96px;z-index:4;display:grid;gap:6px;width:72px}
+.brail{position:absolute;left:16px;top:calc(var(--btlB,88px) + 10px);z-index:4;display:grid;gap:6px;width:72px;align-content:start;max-height:calc(100% - var(--btlB,88px) - 70px);overflow-y:auto;overflow-x:hidden;scrollbar-width:none}.brail::-webkit-scrollbar{display:none}
+#bTier{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;flex-wrap:nowrap}#bTier button{min-width:0;padding-left:4px;padding-right:4px;white-space:nowrap;text-align:center}#bTier button[hidden]{display:none}
 .brail .sep{height:1px;background:var(--line);margin:2px 8px}
 .rb{--m:var(--cyan);display:grid;justify-items:center;gap:3px;width:72px;min-height:58px;padding:8px 2px 6px!important;background:var(--deck2)!important;border:1px solid color-mix(in srgb,var(--m) 45%,transparent)!important;border-radius:0!important;
   clip-path:var(--cutp);color:var(--m)!important;font-family:var(--font-pixel)!important;font-size:8px!important;letter-spacing:.06em;text-transform:uppercase;line-height:1.15;text-align:center}
@@ -203,7 +204,7 @@ body[data-embed] header.bar,body[data-embed] .cat-only,body[data-embed] .pod-onl
 .rb:hover{border-color:var(--m)!important;color:#fff!important}
 .rb[aria-pressed="true"]{background:linear-gradient(180deg,color-mix(in srgb,var(--m) 25%,#0a1020),rgba(10,16,32,.92))!important;border-color:var(--m)!important;box-shadow:0 0 8px color-mix(in srgb,var(--m) 60%,transparent);color:#fff!important}
 /* the flyout: the group's category tabs, search, families and styles, then a grid of tiles that scrolls inside itself */
-.bfly{position:absolute;left:100px;top:96px;bottom:56px;width:340px;z-index:5;display:flex;flex-direction:column;background:var(--deck);border:1px solid var(--cyan);border-radius:0;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);transition:opacity .18s}
+.bfly{position:absolute;left:100px;top:calc(var(--btlB,88px) + 10px);bottom:56px;width:340px;z-index:5;display:flex;flex-direction:column;background:var(--deck);border:1px solid var(--cyan);border-radius:0;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);transition:opacity .18s}
 .bfly header{display:grid;gap:8px;padding:12px 12px 10px;border-bottom:1px solid rgba(56,232,224,.35);flex:none}
 .bfly .fh{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .bfly .fh h2{font-size:12px}.bfly .fh small{font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:0;text-transform:none;margin-left:8px}
@@ -14351,6 +14352,7 @@ function initRenderer(){if(B.dr)return;const c=$('bCanvas');const dr=new T.WebGL
 function resize(){const st=$('bStage');const w=Math.max(2,st.clientWidth),h=Math.max(2,st.clientHeight);if(w===B.cw&&h===B.ch&&B.dr._sized)return;cancelAnimationFrame(skyT);skyT=requestAnimationFrame(drawSky);B.cw=w;B.ch=h;if(B.dr){B.dr.setSize(w,h,false);B.dr._sized=true}prCall('resize',w,h);B.camDirty=true;B.needs=true}
 // the toast lane sits above the hint, however many lines the hint wraps to
 {const hw=document.querySelector('.bhintw');if(hw&&'ResizeObserver' in window)new ResizeObserver(()=>document.documentElement.style.setProperty('--bhintH',hw.offsetHeight+'px')).observe(hw)}
+{const tl=document.querySelector('.bstage .btl');if(tl){const f=()=>document.documentElement.style.setProperty('--btlB',(tl.offsetTop+tl.offsetHeight)+'px');if('ResizeObserver' in window)new ResizeObserver(f).observe(tl);f()}}
 {const hb=document.querySelector('header.bar');if(hb&&'ResizeObserver' in window)new ResizeObserver(()=>document.documentElement.style.setProperty('--hdr',hb.offsetHeight+'px')).observe(hb)}
 
 // a recipe's home -> a plan the Pods shell builder understands (rooms, doorways, entry door); finishes are applied by the builder

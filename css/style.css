@@ -478,5 +478,7 @@ body.furnishing #view{cursor:pointer}
 .furnish-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;opacity:0;transition:opacity .25s}
 .furnish.live .furnish-frame{opacity:1}
 .furnish.live{cursor:auto}
+.furnish.pre{pointer-events:none;cursor:auto}   /* (the page kept loaded and warm, out of sight: clicks go to the city) */
+.furnish.pre .furnish-frame{opacity:0;pointer-events:none;transition:none}
 body.furnish-open .zonebar,body.furnish-open .deck-toggle,body.furnish-open .hud{visibility:hidden}
 @media (max-width:700px){.furnbtn{height:34px;padding:0 10px;font-size:10px}}

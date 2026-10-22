@@ -186,3 +186,11 @@ Rough numbers on a 7x7 test island (half plazas): 89 people; at 12:30 up to 57 w
 The character sheets are Craftpix assets (see https://craftpix.net/file-licenses/). Their terms allow use in
 games but generally not redistributing the raw files, so the untouched source sheets
 (`assets/sprites/originals/people/`) are kept out of the repo by `.gitignore`; only the packed atlas ships.
+
+## Pods
+
+Residents of residential and luxury sections are shared out over the section's pods: the stacked blocks Furnish pod picks.
+Households are one to four people, and some pods are vacant. A person's pod is `p.pod`, and `POD_HH` maps each pod to its
+household. Ids and counts are the same as before, so nothing that knows people by id changes. See `docs/furnish.md`, "Who
+lives there".
+

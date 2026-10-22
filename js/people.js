@@ -804,25 +804,63 @@ function makePerson(id, home, zone){
            guard: undefined, guardShift: undefined, nightWorker: undefined, ws: undefined, wlen: undefined, walkedFor: undefined, chain: undefined, _taste: null, _tasteE: -1, _tasteD: -1,
            patrol: undefined, metro: undefined, metroPlan: undefined, ride: undefined, club: undefined, clubbing: undefined, rush: undefined,
            hurry: undefined, callout: undefined, gh: undefined, ghWalk: undefined, gy: undefined, dx: undefined, dz: undefined, pause: undefined,
-           bumpCD: undefined, zone, um: undefined, umW: undefined, rainRun: undefined, noRun: undefined, emo: undefined, emoUntil: undefined, angry: undefined, copShift: undefined, copRow: undefined, custody: undefined, offDuty: undefined, onBike: undefined, fed: undefined, eating: undefined, held: undefined, tries: undefined, gone: undefined };
+           bumpCD: undefined, zone, pod: null, um: undefined, umW: undefined, rainRun: undefined, noRun: undefined, emo: undefined, emoUntil: undefined, angry: undefined, copShift: undefined, copRow: undefined, custody: undefined, offDuty: undefined, onBike: undefined, fed: undefined, eating: undefined, held: undefined, tries: undefined, gone: undefined };
+}
+// Households live in pods. A residential or luxury section's people (as many as ever, with the same ids, so stories, cases and
+// the ledger know them as before) are shared out over the section's pods: the pods in an order of their own (seeded), each
+// taking a household of one to four until the people run out, so some pods stand vacant; any left over join the smallest
+// households (up to four; past that they live in the building without a pod of their own, as everyone used to). The pods are the ones Furnish pod picks (furnish.js homesOf, from the blocks the builders stacked). Everything
+// follows from the city's own saved data, so it is the same on every load. A person's pod is p.pod (the key Furnish pod saves
+// apartments under, 'i,j|section|floor'); POD_HH holds each pod's household (vacant pods have none). Commercial sections' few
+// residents live over the shops, in the building as before (p.pod null).
+const POD_HH = new Map();
+function podHomesOf(c, k){
+  if (typeof FURN === 'undefined' || !FURN.homesOf) return [];
+  try { return FURN.homesOf(c).filter(h => h.section === k || (k === 0 && h.section === -1)); } catch (e) { return []; }
+}
+const podKeyOf = h => h.cell[0] + ',' + h.cell[1] + '|' + h.section + '|' + h.floor;
+function sharePods(c, k, s, ids){
+  const rows = podHomesOf(c, k); if (!rows.length) return;
+  const order = rows.map(h => ({ h, u: u01('podorder', c.i, c.j, k, s.seed, h.floor) })).sort((a, b) => a.u - b.u).map(x => x.h);
+  const hh = []; let q = 0;
+  for (const h of order){ if (q >= ids.length) break;
+    const u = u01('hhsize', c.i, c.j, k, s.seed, h.floor), size = Math.min(ids.length - q, u < .4 ? 1 : u < .8 ? 2 : u < .95 ? 3 : 4);
+    hh.push({ key: podKeyOf(h), h, members: ids.slice(q, q + size) }); q += size; }
+  while (q < ids.length && hh.length){ const t = hh.reduce((a, b) => b.members.length < a.members.length ? b : a); if (t.members.length >= 4) break; t.members.push(ids[q++]); }   // (at most four to a pod: anyone left over lives in the building, as before)
+  for (const x of hh){ POD_HH.set(x.key, { key: x.key, zone: s.zone, row: x.h, members: x.members }); for (const id of x.members){ const p = people.get(id); if (p) p.pod = x.key; } }
+}
+// one plot's households again, from its pods as they stand now (its blocks are only known once it is built: Furnish pod asks
+// for this before it opens a pod, so the household always matches the pod picked)
+function podsResync(c){
+  if (!c || !c.sections || c.mega) return;
+  for (const [key, x] of [...POD_HH]) if (x.row.cell[0] === c.i && x.row.cell[1] === c.j) POD_HH.delete(key);
+  c.sections.forEach((s, k) => {
+    const L = ZONE_LIFE[s.zone]; if (!L || (s.zone !== 'low' && s.zone !== 'high')) return;
+    const n = Math.round(span(u01('res', c.i, c.j, k, s.seed), L.res[0], L.res[1] + .99) - .49), ids = [];
+    for (let q = 0; q < n; q++){ const id = c.i + ',' + c.j + ',' + k + ',' + s.seed + ',' + q; ids.push(id); const p = people.get(id); if (p) p.pod = null; }
+    sharePods(c, k, s, ids);
+  });
 }
 function syncResidents(){
   const keep = new Set();
+  POD_HH.clear();
   for (const c of cells.values()){
     if (!c.sections.length || c.mega) continue;
     const home = 'c:' + c.i + ',' + c.j;
     c.sections.forEach((s, k) => {
       const L = ZONE_LIFE[s.zone]; if (!L) return;
-      const n = Math.round(span(u01('res', c.i, c.j, k, s.seed), L.res[0], L.res[1] + .99) - .49);
+      const n = Math.round(span(u01('res', c.i, c.j, k, s.seed), L.res[0], L.res[1] + .99) - .49), ids = [];
       for (let q = 0; q < n; q++){
         const id = c.i + ',' + c.j + ',' + k + ',' + s.seed + ',' + q;
-        keep.add(id);
+        keep.add(id); ids.push(id);
         if (!people.has(id)){
           const p = makePerson(id, home, s.zone);
           p.fresh = true;   // placed once jobs are handed out (see syncPeople)
           people.set(id, p);
         }
+        people.get(id).pod = null;
       }
+      if (s.zone === 'low' || s.zone === 'high') sharePods(c, k, s, ids);
     });
   }
   syncSpireStaff(keep);

@@ -8,7 +8,7 @@
 'use strict';
 const FURN = (() => {
   const F = { pick: false, open: false, hold: false, busy: false, hov: null, fl: 0, userFloor: false, frame: null, home: null };
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-22t';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-24q';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
 
@@ -106,7 +106,7 @@ const FURN = (() => {
     if (!c){ F.hov = null; showPick(null, x, y); return; }
     const rows = homesOf(c);
     if (!rows.length){ F.hov = { c, rows }; showPick(F.hov, x, y); return; }
-    if (!F.hov || F.hov.c !== c){ F.hov = { c, rows }; F.userFloor = false; }
+    if (!F.hov || F.hov.c !== c){ F.hov = { c, rows }; F.userFloor = false; try { if (typeof podsResync === 'function') podsResync(c); } catch (e) {} }
     else F.hov.rows = rows;
     if (!F.userFloor){ const py = pk.p ? pk.p.y : rows[0].y; let k = 0; for (let i = 0; i < rows.length; i++) if (rows[i].y <= py + .02) k = i; F.fl = k; }   // (the pod the pointer is on)
     F.fl = clamp(F.fl, 0, rows.length - 1);
@@ -135,7 +135,8 @@ const FURN = (() => {
     hover.position.set(r.x, r.y + h/2, r.z); hover.scale.set(ex, h, ez); hover.visible = true;
     hoverFill.material.color.set(col); hoverFill.position.copy(hover.position); hoverFill.scale.set(ex - .04, h - .04, ez - .04); hoverFill.visible = true;
     const saved = !!getRecipe(r);
-    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + (saved ? ' · furnished' : '') + ' · click to ' + (saved ? 'open' : 'furnish');
+    const hh = typeof POD_HH !== 'undefined' ? POD_HH.get(keyOf(r)) : null, nres = hh ? hh.members.length : 0;
+    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + ' · ' + (nres ? nres + (nres > 1 ? ' residents' : ' resident') : 'vacant') + (saved ? ' · furnished' : '') + ' · click to ' + (saved ? 'open' : 'furnish');
     placeTip(px, py);
   }
   function placeTip(px, py){ if (px == null){ tip.hidden = true; return; } tip.style.left = px + 'px'; tip.style.top = py + 'px'; tip.hidden = false; }
@@ -357,35 +358,112 @@ const FURN = (() => {
     return st;
   }
 
+  /* ---------- who lives there: the pod's household, as the lab's furnisher knows households ---------- */
+  // people.js shares each section's residents over its pods (POD_HH); this turns a pod's people into the lab's household
+  // model (members with an age band, a job from its list, a shift, temperament and hobbies, and how they're related) and
+  // into the lines of the Residents card. Everything comes from the people themselves (story.js gives their names, ages
+  // and temper), so a pod's household is the same every time it is opened.
+  const LAB_JOB = { 'stall-keeper': 'stall cook', 'shop-worker': 'shop worker', 'office-worker': 'mall clerk', courier: 'courier', 'club-staff': 'club staff', radio: 'radio host',
+    police: 'police officer', 'hotel-spa': 'mall clerk', greenhouse: 'shop worker', 'bathhouse-staff': 'cafe cook' };
+  const REG_HOBBY = { club: 'music', lawn: 'plants', stall: 'cooking', 'bar-kiosk': 'film', bench: 'reading', square: 'collecting', bathhouse: 'fitness', metro: 'gaming' };
+  const HOBBY_WORD = { hacking: 'electronics' };
+  function householdFor(h){
+    const c = cells.get(ckey(h.cell[0], h.cell[1]));
+    try { if (typeof podsResync === 'function') podsResync(c); } catch (e) {}
+    const x = typeof POD_HH !== 'undefined' ? POD_HH.get(keyOf(h)) : null;
+    const ps = x ? x.members.map(id => people.get(id)).filter(Boolean) : [];
+    if (!ps.length) return { vacant: true, household: null, residents: [] };
+    const U = (id, k) => { let v = 2166136261; const s = id + ':' + k; for (let i = 0; i < s.length; i++){ v ^= s.charCodeAt(i); v = Math.imul(v, 16777619); } return (v >>> 0)/4294967296; };
+    const members = [], residents = [];
+    ps.forEach((p, i) => {
+      let sp = null; try { sp = STORY.sp(p); } catch (e) {}
+      const ageN = sp && sp.age || 22 + Math.floor(U(p.id, 'age')*50), age = ageN < 30 ? 'young' : ageN < 60 ? 'adult' : 'older';
+      let jk = null; try { jk = STORY.jobKind(p); } catch (e) {}
+      const job = jk === 'industrial' ? (U(p.id, 'ind') < .5 ? 'foundry worker' : 'industrial tech') : jk ? LAB_JOB[jk] || 'shop worker' : age === 'older' ? 'retired' : 'unemployed';
+      const shift = job === 'retired' || job === 'unemployed' ? 'none' : p.nightWorker || (p.nightShift > .85 && ['club staff', 'radio host', 'police officer', 'foundry worker', 'industrial tech'].includes(job)) ? 'night' : 'day';
+      const tm = sp && sp.temper ? { outgoing: +sp.temper.outgoing.toFixed(2), careful: +sp.temper.careful.toFixed(2), warm: +sp.temper.warm.toFixed(2) } : { outgoing: +U(p.id, 'o').toFixed(2), careful: +U(p.id, 'c').toFixed(2), warm: +U(p.id, 'w').toFixed(2) };
+      const hob = []; for (const r of (sp && sp.regulars) || []) if (REG_HOBBY[r] && !hob.includes(REG_HOBBY[r]) && hob.length < 2) hob.push(REG_HOBBY[r]);
+      if (!hob.length && U(p.id, 'hob') < .6) hob.push(['gaming', 'plants', 'music', 'cooking', 'reading', 'art', 'tinkering', 'film'][Math.floor(U(p.id, 'hk')*8)]);
+      members.push({ id: 'm' + (i + 1), age, job, shift, temperament: tm, hobbies: hob });
+      const tr = []; if (tm.outgoing > .65) tr.push('outgoing'); else if (tm.outgoing < .3) tr.push('private');
+      if (tm.careful > .65) tr.push('tidy'); else if (tm.careful < .3) tr.push('messy'); if (tm.warm > .7) tr.push('warm');
+      if (shift === 'night') tr.push('night shift'); for (const hb of hob) tr.push(HOBBY_WORD[hb] || hb);
+      const jw = jk ? (STORY.JOB_WORD && STORY.JOB_WORD[jk]) || job : job === 'retired' ? 'retired' : 'between jobs';
+      residents.push({ name: sp ? sp.first + ' ' + sp.last : 'Resident ' + (i + 1), age: ageN, job: jw, traits: tr });
+    });
+    const n = members.length, u = U(x.key, 'rel');
+    const relation = n === 1 ? 'single' : n === 2 ? (u < .6 ? 'couple' : u < .85 ? 'roommates' : 'siblings') : n === 3 ? (u < .35 ? 'couple+roommate' : u < .55 ? 'siblings' : 'roommates') : 'roommates';
+    const rel = { single: 'Single', couple: 'Couple', roommates: n + ' roommates', siblings: n + ' siblings', 'couple+roommate': 'Couple + roommate' }[relation];
+    const seed = Math.floor(U(x.key, 'seed')*1e9);
+    return { vacant: false, household: { seed, label: rel + ': ' + members.map(m => m.job).join(' + '), relation, members, pod: null }, residents };
+  }
+  F.householdFor = householdFor;
+
   /* ---------- the overlay ---------- */
   const ov = document.getElementById('furnish');
   const nightNow = () => { try { return comp.uniforms.night.value > .5 ? 'night' : 'day'; } catch (e) { return S.hour < 6.5 || S.hour >= 19 ? 'night' : 'day'; } };
-  // a click opens the apartment's page straight away over the city as it stands (the picked floor still lit); the lab's hologram starts from this view
-  // as soon as it has the head, and the plots follow while it plays
+  // The page is made once and kept. It is loaded and warmed (its scripts, the furniture library, its worker, every shader program)
+  // in the background while the title screen shows, or in idle time after the city loads when the title is skipped, hidden
+  // and letting clicks through. A click then shows it at once and sends it the home: no page load, no shader compiles. Exit
+  // hides it again; the lab lets go of the home and the city context but keeps its programs and library for the next visit.
+  // (A lab without PodBuilder.unload can't be reused: the page is made again for each visit, as before.)
+  const STATS = () => (F.lastStats = F.lastStats || {});
+  function makeFrame(){
+    const fr = document.createElement('iframe'); fr.className = 'furnish-frame'; fr.title = 'Furnish pod'; fr.setAttribute('allow', 'fullscreen');
+    fr.setAttribute('aria-hidden', 'true'); fr.tabIndex = -1;
+    F.frame = fr; F.ready = false; F.reusable = false; F.loadT = performance.now(); fr.src = PAGE + '#build';
+    ov.hidden = false; ov.classList.add('pre'); ov.appendChild(fr);
+    return fr;
+  }
+  function preload(){
+    if (F.frame || F.open) return;
+    makeFrame(); F.preloading = true;
+  }
+  F.preload = preload;
+  // when to start: as soon as the title screen is up (it doesn't draw the city at full rate), else once the city has loaded and things are quiet
+  (function whenIdle(){
+    const ok = () => !F.frame && !F.open && (typeof TITLE !== 'undefined' && TITLE.on ? true : !(typeof LOADP !== 'undefined' && LOADP.on));
+    const tick = () => { if (F.frame || F.open) return; if (ok()) (window.requestIdleCallback ? requestIdleCallback(() => { if (ok()) preload(); else setTimeout(tick, 1000); }, { timeout: 3000 }) : preload()); else setTimeout(tick, 1000); };
+    setTimeout(tick, 1500);
+  })();
+  // the open's timing, all from the click: when the page shows the hologram, when the home has resolved, and the longest stretch
+  // the page's thread was busy in between (the gap between two frames: the furnish page runs on the same thread)
+  function watchOpen(){
+    const st = F.lastStats = { click: performance.now(), clickToLive: null, clickToResolve: null, longestBlock: 0, preloaded: !!F.ready, reused: F.visits > 0 };
+    let last = st.click; const run = F.run;
+    (function g(){ const t = performance.now(); st.longestBlock = Math.max(st.longestBlock, Math.round(t - last)); last = t;
+      if (F.run === run && F.open && st.clickToResolve == null && t - st.click < 120000) requestAnimationFrame(g); })();
+  }
+  // a click shows the page over the city as it stands (the picked pod still lit underneath until the hologram has the screen)
   function openHome(h){
     if (F.busy || F.open) return;
     F.busy = true; F.home = h; F.open = true; F.hold = true; F.dirty = false; F.run = (F.run || 0) + 1;
-    ov.hidden = false; ov.classList.remove('live'); document.body.classList.add('furnish-open');
-    const fr = document.createElement('iframe'); fr.className = 'furnish-frame'; fr.title = 'Furnish pod'; fr.setAttribute('allow', 'fullscreen');
-    F.frame = fr; fr.src = PAGE + '#build'; ov.appendChild(fr);
+    watchOpen();
+    ov.hidden = false; ov.classList.remove('live', 'pre'); document.body.classList.add('furnish-open');
+    if (!F.frame) makeFrame(), ov.classList.remove('pre');
+    F.frame.removeAttribute('aria-hidden'); F.frame.tabIndex = 0;
     F.openT = performance.now();
+    if (F.ready){ F.busy = false; begin(F.frame, h); }   // (warm and waiting: straight in)
   }
   async function begin(fr, h){
     const run = F.run, alive = () => F.open && F.run === run && F.frame === fr;
     const post = (m, x) => { try { fr.contentWindow.postMessage(m, location.origin, x || []); } catch (e) { console.error('Furnish pod: could not send', m.type, e); } };
+    try { fr.contentWindow.postMessage({ type: 'furnish:wake' }, location.origin); } catch (e) {}
     const t0 = performance.now(), hd = head(h);
-    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: null, time: nightNow(), label: label(h) + ' · pod ' + h.pod + ' of ' + h.pods });
+    let who = { vacant: false, household: null, residents: [] }; try { who = householdFor(h); } catch (e) { console.warn('Furnish pod: no household for this pod', e); }
+    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: null, time: nightNow(), label: label(h) + ' · pod ' + h.pod + ' of ' + h.pods, household: who.household, residents: who.residents, vacant: who.vacant });
     const headMs = performance.now() - t0;
     let st = null;
     try { st = await stream(h, (plots, em, k, done, x) => post({ type: 'furnish:plots', plots, em, k, done }, x), alive); }
     catch (e) { console.error('Furnish pod: gathering the city failed', e); post({ type: 'furnish:plots', plots: [], em: [[0, 0, 0, 0]], k: 1, done: true }); }
-    if (st){ st.headMs = Math.round(headMs); st.sinceClick = Math.round(performance.now() - F.openT); F.lastStats = st;
+    if (st){ st.headMs = Math.round(headMs); st.sinceClick = Math.round(performance.now() - F.openT); STATS().gather = st;
       console.log('Furnish pod: city sent', JSON.stringify(st)); }
   }
   function close(){
     F.busy = false; F.hold = false; F.open = false;
-    if (F.frame){ F.frame.remove(); F.frame = null; }
-    ov.hidden = true; ov.classList.remove('live'); document.body.classList.remove('furnish-open');
+    if (F.frame && !F.reusable){ F.frame.remove(); F.frame = null; F.ready = false; }   // (a lab that can't be reused: made again next time)
+    if (F.frame){ ov.hidden = false; ov.classList.add('pre'); F.frame.setAttribute('aria-hidden', 'true'); F.frame.tabIndex = -1; try { F.frame.blur(); } catch (e) {} } else ov.hidden = true;
+    ov.classList.remove('live'); document.body.classList.remove('furnish-open');
     hover.visible = false; hoverStrip.visible = false; hoverFill.visible = false; hoverStrip.material.color.set(0xff5ad8); hoverFill.material.color.set(0xff5ad8);
     try { canvas.focus(); } catch (e) {} LAST_INPUT = performance.now();
   }
@@ -394,8 +472,17 @@ const FURN = (() => {
   addEventListener('message', e => {
     const fr = F.frame; if (!fr || e.source !== fr.contentWindow || e.origin !== location.origin) return;
     const m = e.data || {}, h = F.home;
-    if (m.type === 'furnish:ready'){ if (F.busy){ F.busy = false; begin(fr, h); } }
-    else if (m.type === 'furnish:live'){ ov.classList.add('live'); hover.visible = false; hoverStrip.visible = false; try { fr.focus(); } catch (err) {} }   // (the hologram has the screen: the paused city under it can go)
+    if (m.type === 'furnish:ready'){
+      F.ready = true; F.reusable = !!m.reusable; F.loadMs = Math.round(performance.now() - F.loadT);
+      if (F.open){ if (F.busy){ F.busy = false; begin(fr, h); } }
+      else { fr.contentWindow.postMessage({ type: 'furnish:warm' }, location.origin); }   // (preloaded: warm everything up, then sleep until a pod is opened)
+    }
+    else if (m.type === 'furnish:warmed'){ F.warmMs = m.ms; F.preloading = false; }
+    else if (!F.open) return;
+    else if (m.type === 'furnish:live'){ const st = STATS(); if (st.clickToLive == null) st.clickToLive = Math.round(performance.now() - st.click);
+      ov.classList.add('live'); hover.visible = false; hoverStrip.visible = false; hoverFill.visible = false; try { fr.focus(); } catch (err) {} }   // (the hologram has the screen: the paused city under it can go)
+    else if (m.type === 'furnish:done'){ const st = STATS(); if (st.clickToResolve == null){ st.clickToResolve = Math.round(performance.now() - st.click); st.lab = m.lab || null; st.pageLoadMs = F.loadMs; st.warmMs = F.warmMs;
+      F.visits = (F.visits || 0) + 1; console.log('Furnish pod: open timing', JSON.stringify(st)); } }
     else if (m.type === 'furnish:save'){
       const ok = putRecipe(h, m.recipe); try { save(); } catch (err) {}
       fr.contentWindow.postMessage({ type: 'furnish:saved', ok }, location.origin);

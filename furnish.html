@@ -149,6 +149,14 @@ body[data-view="build"] main.wrap{max-width:none;padding:0}
 .bhead i{font-style:normal}.bhead i::after{content:'+'}.bhead[aria-expanded="true"] i::after{content:'\2212'}
 .bhead:hover{color:#fff!important;border-color:#fff!important}
 .breadout{margin:0;font-size:11px;color:var(--ink);text-shadow:0 1px 0 rgba(0,0,0,.6);font-variant-numeric:tabular-nums;opacity:.9;max-width:300px}
+.bres{width:212px;box-sizing:border-box;background:var(--deck);border:1px solid var(--line);padding:7px 10px;font-size:11px;color:var(--ink);clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);max-height:40vh;overflow-y:auto;scrollbar-width:thin}
+.bres summary{font-family:var(--font-pixel);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.bres summary::-webkit-details-marker{display:none}.bres summary::after{content:'+';color:var(--muted)}.bres details[open] summary::after{content:'\2212'}.bres summary span{color:var(--muted);margin-left:auto;margin-right:8px}
+.bres summary:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.bres ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}.bres li{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;padding-top:6px;border-top:1px solid var(--line)}.bres li:first-child{border-top:0;padding-top:0}
+.bres .nm{color:#fff}.bres .ag{color:var(--muted);font-variant-numeric:tabular-nums}.bres .jb{flex-basis:100%;color:var(--muted)}
+.bres .tr{flex-basis:100%;display:flex;flex-wrap:wrap;gap:3px}.bres .tr i{font-style:normal;font-size:9.5px;line-height:15px;padding:0 5px;border:1px solid var(--line);color:var(--cyan)}
+.bresv{margin:0;color:var(--muted)}.bresv b{font-family:var(--font-pixel);font-weight:400;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
 .breadout b{font-family:var(--font-pixel);font-weight:400;color:var(--amber);letter-spacing:.06em}
 /* panels: Home (left, under its head) and Settings (right) */
 .bpanel{position:absolute;z-index:6;background:var(--deck);border:1px solid var(--line);border-radius:4px;padding:14px;display:grid;gap:14px;align-content:start;overflow:auto;scrollbar-width:thin;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -389,6 +397,7 @@ body[data-view="build"] .toast{font-family:"JetBrains Mono",ui-monospace,monospa
       <div class="btl">
         <button class="bhead" id="bHomeBtn" aria-expanded="false" aria-controls="bHome" title="Home: new home, save, load, clear a room, share (Ctrl+S saves)"><span>Home</span><i aria-hidden="true"></i></button>
         <p class="breadout" id="bStatus" aria-live="polite"></p>
+        <div class="bres" id="bRes" hidden aria-label="Residents"></div>
       </div>
       <section class="bpanel bhome" id="bHome" hidden aria-label="Home">
         <section id="bThisHome"><h2>This home</h2>
@@ -13789,11 +13798,12 @@ function stageClutter(ctx){const P=ctx.P,t=ctx.tr;
   if(t.careful>.6)P.evid.push([2,'everything squared to the walls']);else if(t.messy>.7)P.evid.push([2,'nothing quite straight'])}
 
 const ROOM_RESTARTS={bed:6,living:8,kitchen:6,den:5,hall:4};
-function furnish(hh,lseed){lseed=lseed||1;let best=null;
-  for(let a=0;a<3;a++){const P=furnishOnce(hh,a?lseed*1000+a:lseed);const m=validate(P).metrics;const sc=(m.bath?200:0)+(m.beds?200:0)+Object.values(m).filter(Boolean).length*10-P.unmet.length-P.breaks.reduce((s,b)=>s+b.step,0)*.1;if(!best||sc>best.sc)best={P,sc};if(Object.values(m).every(Boolean))break}
+function furnish(hh,lseed,opt){lseed=lseed||1;let best=null;
+  for(let a=0;a<3;a++){const P=furnishOnce(hh,a?lseed*1000+a:lseed,opt);const m=validate(P).metrics;const sc=(m.bath?200:0)+(m.beds?200:0)+Object.values(m).filter(Boolean).length*10-P.unmet.length-P.breaks.reduce((s,b)=>s+b.step,0)*.1;if(!best||sc>best.sc)best={P,sc};if(Object.values(m).every(Boolean))break}
   best.P.lseed=lseed;return best.P}
-function furnishOnce(hh,lseed){const t0=performance.now();const ctx=newPlan(hh,lseed||1);const P=ctx.P;
-  assignSets(ctx);reserve(ctx);stageWindows(ctx);stageBath(ctx);
+function furnishOnce(hh,lseed,opt){const t0=performance.now();const ctx=newPlan(hh,lseed||1);const P=ctx.P;
+  // opt.windows(ctx): the builder's hook for a real building's windows (placeFixedWall per window) in place of the planner's own facade windows
+  assignSets(ctx);reserve(ctx);if(opt&&typeof opt.windows==='function')opt.windows(ctx);else stageWindows(ctx);stageBath(ctx);
   for(const R of P.rooms.filter(r=>r.kind==='bed'))runRoom(ctx,R,ROOM_RESTARTS.bed,progBedroom);
   stageSleepCollapse(ctx);
   const KR=KITR(P),LR=LIV(P);if(KR!==LR)runRoom(ctx,KR,ROOM_RESTARTS.kitchen,progKitchen);runRoom(ctx,LR,ROOM_RESTARTS.living,progLiving);
@@ -13950,6 +13960,14 @@ const centroid=(P,R)=>{let x=0,z=0;for(const k of R.cells){x+=(k%P.W+.5)*TILE;z+
 const pcC=pc=>pc.kind==='floor'||pc.kind==='ceiling'?[(pc.x0+pc.fw/2)*TILE,(pc.z0+pc.fd/2)*TILE]:[pc.xf.px,pc.xf.pz];
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 const doorXY=P=>[(P.door.k%P.W+.5)*TILE,(((P.door.k/P.W)|0)+.5)*TILE];
+// a wall piece at a fixed spot (the builder's facade windows): line N|S|W|E, a = its center along the line in meters, wh = raise in meters.
+// It takes its span on the line like any planned wall piece, so furniture and other wall pieces keep clear of it.
+function placeFixedWall(ctx,o){const P=ctx.P,p=pr(o.arch,o.seed),g=LGEO[o.line];if(!g||!p)return null;const X=g.X,f=g.f,wh=o.wh||0;
+  const xf={px:X?o.a:(o.line==='W'?0:P.W*TILE),pz:X?(o.line==='N'?0:P.D*TILE):o.a,ry:RY[f],ox:-p.center[0],oz:-p.minZ};const A=aabb(xf,fullBox(p));
+  const span={line:o.line,a0:X?A.x0:A.z0,a1:X?A.x1:A.z1,y0:p.box.minY+wh,y1:p.box.maxY+wh,depth:p.box.maxZ-p.box.minZ};const n=X?P.W:P.D;
+  const s0=Math.max(0,Math.min(n-1,Math.floor(span.a0/TILE+.02))),tw=Math.max(1,Math.min(n-s0,Math.ceil(span.a1/TILE-.02)-s0));const room=P.g.room[lineCell(P,o.line,Math.min(n-1,Math.floor((span.a0+span.a1)/2/TILE)))];
+  const id=P.pieces.length;const pc={id,arch:o.arch,seed:o.seed,p,room,kind:'wall',line:o.line,f,s0,tw,xf,a:A,need:'window',role:'need',cells:[],wh};
+  P.lines[o.line].push(Object.assign({id},span));P.pieces.push(pc);const R=P.rooms[room];if(R&&!R.window)R.window=pc;return pc}
 function need(ctx,id,label,met,note){ctx.P.needs.push({id,label,met:!!met,note:met?'':note})}
 function assignSets(ctx){const P=ctx.P,t=ctx.tr,r=ctx.rng;
   const kitchenDialect=sb=>{const careful=t.careful>.55||t.anyOlder||t.hc.cooking;if(careful)return r.chance(sb)?'cream':'showa';return r.chance(sb)?(r.chance(.6)?'nighthab':'cream'):(r.chance(.6)?'showa':'tenement')};
@@ -14173,6 +14191,56 @@ function fitCam(s,az,aspect,zoom,pitch){const pv=s.pitch;s.pitch=pitch||PITCH0;i
   let u0=1e9,u1=-1e9,v0=1e9,v1=-1e9;for(const p of pts){const u=p.dot(right),v=p.dot(up);u0=Math.min(u0,u);u1=Math.max(u1,u);v0=Math.min(v0,v);v1=Math.max(v1,v)}
   const m=1.03,hw=(u1-u0)/2*m,hh=(v1-v0)/2*m,half=Math.max(hw/aspect,hh)/(zoom||1);const tg=right.clone().multiplyScalar((u0+u1)/2).add(up.clone().multiplyScalar((v0+v1)/2));return podCam(aspect,half,az,el,tg)}
 
+/* ======================= 9b. a real building's windows (the builder's facade spec) =======================
+   Shared by the Build view (new homes, setWindows) and the furnish worker (furnish(hh, lseed, {windows})), so both place them identically. */
+const fwClamp=(v,a,b)=>Math.max(a,Math.min(b,v)),fwR4=v=>Math.round(v*1e4)/1e4,fwNorm=a=>{a%=2*PI;return a<0?a+2*PI:a};
+const itemSeed=(k,i)=>100000+hashStr('build:'+k+':'+i)%900000;// the Build catalog's seeds
+let WINC=null;
+function winCands(){if(WINC)return WINC;const out=[];
+  for(const k of Object.keys(TG)){const t=TG[k];if(!t.has('window')||t.has('m:blackout')||!ARCHS[k]||TG[k].has('none'))continue;const seen=new Set();
+    for(let i=0;i<6;i++){const seed=itemSeed(k,i);let p;try{p=pr(k,seed)}catch(e){continue}if(!p||!p.box)continue;const W=(p.box.maxX-p.box.minX)||p.W;if(!(W>.1))continue;
+      const key=W.toFixed(2)+'/'+p.box.minY.toFixed(2)+'/'+p.box.maxY.toFixed(2);if(seen.has(key))continue;seen.add(key);out.push({arch:k,seed,W,y0:p.box.minY,y1:p.box.maxY,small:t.has('window:small')})}}
+  if(out.length)WINC=out;return out}
+const WSIDE={N:{X:true,fix:P=>0,ry:0},S:{X:true,fix:P=>P.D,ry:PI},W:{X:false,fix:P=>0,ry:PI/2},E:{X:false,fix:P=>P.W,ry:-PI/2}};
+const isBand=pk=>!!pk&&(pk.kind==='lift'||pk.section<0);
+// window recs (no ids) for a plan and its wall runs: one style for the home (best total fit), the best seed of it per window, tiled into a band when a span is
+// much wider than one piece (always for lifted pods), centered on the facade span, kept inside one exterior run (not over a door or a partition), snapped to 25 cm
+function facadeWindows(spec,P,runs,pk){const C=winCands();if(!C.length||!spec||!Array.isArray(spec.faces))return null;const band=isBand(pk)||spec.band===true;const wins=[];
+  for(const f of spec.faces){const g=WSIDE[f.side];if(!g||f.exterior===false||!Array.isArray(f.windows))continue;const L0=(g.X?P.W:P.D)*TILE;
+    for(const w of f.windows){const t0=fwClamp(Math.min(w.t0,w.t1),0,1),t1=fwClamp(Math.max(w.t0,w.t1),0,1);if(!(t1>t0))continue;const sill=Number.isFinite(w.sill)?w.sill:.9,head=Number.isFinite(w.head)?w.head:2.1;
+      wins.push({side:f.side,g,a:(t0+t1)/2*L0,span:Math.max(.3,(t1-t0)*L0),sill,head,L0})}}
+  if(!wins.length)return [];
+  const cost=(c,w)=>{const n=band?Math.max(1,Math.round(w.span/c.W)):1;return Math.abs(c.W*n-w.span)+(c.W*n>w.span+.25?.6:0)+.6*Math.abs((c.y1-c.y0)-(w.head-w.sill))};
+  const byArch=new Map();for(const c of C){if(band&&c.small)continue;(byArch.get(c.arch)||byArch.set(c.arch,[]).get(c.arch)).push(c)}if(!byArch.size)for(const c of C)(byArch.get(c.arch)||byArch.set(c.arch,[]).get(c.arch)).push(c);
+  let best=null,bc=1e9;for(const [k,cs] of byArch){let tot=0;for(const w of wins)tot+=Math.min(...cs.map(c=>cost(c,w)));if(band)tot-=Math.max(...cs.map(c=>c.W))*.5;if(tot<bc){bc=tot;best=k}}
+  const cs=byArch.get(best).slice().sort((a,b)=>a.W-b.W),used={N:[],S:[],E:[],W:[]},out=[];
+  const segs=side=>{const g=WSIDE[side],fx=g.fix(P);return runs.filter(r=>r.axis===(g.X?'x':'z')&&r.fix===fx&&(r.ra<0||r.rb<0)&&!r.door).map(r=>[r.a0*TILE,r.a1*TILE])};
+  wins.sort((a,b)=>b.span-a.span);
+  for(const w of wins){let pick=null,pc=1e9;for(const c of cs){const k=cost(c,w);if(k<pc){pc=k;pick=c}}
+    const S=segs(w.side),U=used[w.side];let place=null;
+    const tryC=c=>{const n=band||w.span>=1.7*c.W?fwClamp(Math.round(w.span/c.W),1,6):1,tw=n*c.W;let bp=null,bd=1e9;
+      for(const [s0,s1] of S){const lo=s0+tw/2+.05,hi=s1-tw/2-.05;if(hi<lo)continue;for(const raw of [w.a,Math.round(w.a/.25)*.25]){let x=fwClamp(raw,lo,hi);const sx=Math.round(x/.25)*.25;if(sx>=lo&&sx<=hi)x=sx;
+          for(const u of U){if(x+tw/2>u[0]-.12&&x-tw/2<u[1]+.12){const r=u[1]+.12+tw/2,l=u[0]-.12-tw/2;x=Math.abs(r-w.a)<Math.abs(l-w.a)&&r<=hi?r:l>=lo?l:r}}
+          if(x<lo-.001||x>hi+.001||U.some(u=>x+tw/2>u[0]-.11&&x-tw/2<u[1]+.11))continue;const d=Math.abs(x-w.a);if(d<bd){bd=d;bp={c,n,tw,x}}}}return bp};
+    place=tryC(pick);if(!place)for(const c of cs){if(c===pick)continue;place=tryC(c);if(place)break}
+    if(!place){const c=cs[0];place={c,n:1,tw:c.W,x:fwClamp(w.a,c.W/2+.05,w.L0-c.W/2-.05)}}
+    const c=place.c;U.push([place.x-place.tw/2,place.x+place.tw/2]);let wh=fwClamp(w.sill-c.y0,.05-c.y0,WALL_H-.03-c.y1);wh=Math.round(wh/.05)*.05;if(c.y1+wh>WALL_H-.02)wh-=.05;
+    const fx=w.g.fix(P)*TILE;for(let i=0;i<place.n;i++){const a=place.x-place.tw/2+(i+.5)*c.W;out.push({arch:c.arch,seed:c.seed,x:fwR4(w.g.X?a:fx),y:0,z:fwR4(w.g.X?fx:a),ry:fwR4(fwNorm(w.g.ry)),wh:fwR4(wh),anc:'b',parent:0,colors:{},light:null,fside:w.side})}}
+  return out}
+
+// the furnisher's window stage for a real building: its facade windows at fixed spots (furnish(hh, lseed, facadeHook(spec, pk)))
+function facadeHook(spec,pk){return spec&&Array.isArray(spec.faces)?{windows:ctx=>{const recs=facadeWindows(spec,ctx.P,wallRunsOf(ctx.P),pk)||[];
+  for(const r of recs)placeFixedWall(ctx,{arch:r.arch,seed:r.seed,line:r.fside,a:r.fside==='N'||r.fside==='S'?r.x:r.z,wh:r.wh})}}:null}
+// an empty home of a tier (the Build view's New home): walls, doors, windows (the planner's, or a real building's through opt.windows) and default finishes
+const EMPTY_HH={small:20261021,medium:20261022,large:20261023};
+function emptyHome(tier,opt){const hh=makeHousehold(EMPTY_HH[tier]||1);hh.pod=tier;hh.members.forEach(m=>{m.shift='day'});const ctx=newPlan(hh,1);
+  assignSets(ctx);reserve(ctx);if(opt&&typeof opt.windows==='function')opt.windows(ctx);else stageWindows(ctx);stageFinishes(ctx);const P=ctx.P;P.pieces=P.pieces.filter(q=>!q.removed);P.pieces.forEach((q,i)=>q.id=i);return P}
+// a plan reduced to what a build recipe needs (posted by the furnish worker; the Build view's planToRecipe reads it like a full plan)
+function compactPlan(P){return {type:P.type,W:P.W,D:P.D,room:Array.from(P.room),rooms:P.rooms.map(R=>({id:R.id,kind:R.kind,label:R.label,floor:R.floor?{arch:R.floor.arch,seed:R.floor.seed}:null,wall:R.wall?{arch:R.wall.arch,seed:R.wall.seed}:null})),
+  doorways:[...P.doorways],door:{k:P.door.k,side:P.door.side},tr:{night:!!(P.tr&&P.tr.night),messy:P.tr?P.tr.messy:0},hh:{seed:P.hh.seed},variant:P.variant||'',
+  pieces:P.pieces.map(q=>({id:q.id,kind:q.kind,arch:q.arch,seed:q.seed,xf:q.xf?{px:q.xf.px,pz:q.xf.pz,ry:q.xf.ry}:null,jit:q.jit||0,wh:q.wh||0,snap:!!q.snap,host:q.host,lx:q.lx,y:q.y,lz:q.lz})),
+  setMix:P.setMix||'',cardNotes:(P.cardNotes||[]).slice(),ms:P.ms||0}}
+
 /* ======================= 10. the Pods view ======================= */
 const $=id=>document.getElementById(id);const CW=1200,CH=800;let RR=null;
 function renderer(){if(!RR){RR=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});RR.setPixelRatio(1);RR.setSize(CW,CH,false);RR.shadowMap.enabled=true;RR.shadowMap.type=T.PCFSoftShadowMap;RR.outputEncoding=T.sRGBEncoding;RR.toneMapping=T.ACESFilmicToneMapping;RR.toneMappingExposure=1.1}return RR}
@@ -14261,7 +14329,7 @@ window.addEventListener('podbuilder:room',e=>{const PB=window.PodBuilder,B=PB&&P
   setCutFocus(s,f,d.wallRun!==undefined?{raise:(d.placing||d.moving)?d.wallRun:-1}:{})});
 window.__pods={tallStats,setWalls:m=>setWalls(m),orbit,setCutFocus:(x,z,o)=>setCutFocus(activeCut(),x==null?null:(z==null?x:{x,z}),o),cutState:()=>activeCut()?cutState(activeCut()):null,wallRunsOf,probeCount:()=>PC.size,setProbe:m=>{PROBE=m;PC.clear()},makeHousehold,furnish,validate,checkBatch,setView,newHouseholds,buildPod,S,TAGS:TAG_SRC,UNTAGGED,UNPLACEABLE,PODS,STEP_NAMES};
 // shell API for the Build view: reuses the home shell, camera and wall modes (no fork)
-window.__pods.shell={buildPod,wallTargets,applyWalls,fitCam,setCutFocus,roomAt,centerRoom,cutState,CUT_DWELL,wallRunsOf,makeHousehold,newPlan,assignSets,reserve,stageWindows,stageFinishes,furnish,TG,PODS,AZ0,PITCH0,PITCH_MIN,PITCH_MAX,ROT_S,WALL_S,TILE,WALL_H,LOW_H,PART_H,PT,WMODES};
+window.__pods.shell={placeFixedWall,facadeWindows,winCands,facadeHook,emptyHome,compactPlan,buildPod,wallTargets,applyWalls,fitCam,setCutFocus,roomAt,centerRoom,cutState,CUT_DWELL,wallRunsOf,makeHousehold,newPlan,assignSets,reserve,stageWindows,stageFinishes,furnish,TG,PODS,AZ0,PITCH0,PITCH_MIN,PITCH_MAX,ROT_S,WALL_S,TILE,WALL_H,LOW_H,PART_H,PT,WMODES};
 window.__pods._int={newPlan,assignSets,reserve,stageWindows,stageBath,kitchenRun,sofaGroup,diningGroup,placeBed,placeDesk,fits,cands,order,pr,limits,aabb,fullBox,nudge,xform,TG,pclass};
 })();
 
@@ -14281,6 +14349,155 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const clone=o=>JSON.parse(JSON.stringify(o));
 const frame=()=>new Promise(r=>requestAnimationFrame(()=>r()));
 const idle=()=>new Promise(r=>setTimeout(r,0));// yields to input and rendering without waiting a whole frame
+/* ======================= 7b. the furnish worker, slicing and timing (furnish perf round) =======================
+   The planner (pods.js furnish, emptyHome, facade windows) and the piece builders (sections/*.js through the lab kit's generate) run in a
+   Web Worker built at runtime from this page's own scripts: three.js (importScripts of the page's URL), every section script, the lab kit
+   up to its thumbnail renderer and pods.js up to its Pods view, with window/document shims (canvases are OffscreenCanvas). Nothing is
+   duplicated in the HTML and the section files are loaded unchanged. The worker posts the plan, then each piece as BufferGeometry arrays,
+   material parameters and textures as ImageBitmaps (transferred); the main thread only assembles meshes, a few per slice (about 6 ms).
+   Same code, same seeds: the plan and the geometry are identical to in-page furnishing. Canvas text uses the page's Google fonts, loaded
+   into the worker at start. Without Worker or OffscreenCanvas, or if the worker fails, everything runs in the page as before. */
+function podWorkerMain(){
+'use strict';
+const L=self.__podlab,S=self.__podsW,now=()=>performance.now();let REG=null;const CANCEL=new Set();
+function reg(job){if(!REG||REG.job!==job)REG={job,geo:new Map(),mat:new Map(),tex:new Map(),n:0};return REG}
+let acv=null;
+function avgOf(img){try{if(!acv)acv=new OffscreenCanvas(48,48);const x=acv.getContext('2d',{willReadFrequently:true});x.imageSmoothingQuality='high';x.clearRect(0,0,48,48);x.drawImage(img,0,0,48,48);
+  const d=x.getImageData(0,0,48,48).data;let R=0,G=0,B=0;const N=48*48;for(let i=0;i<N*4;i+=4){R+=d[i];G+=d[i+1];B+=d[i+2]}R/=N/16;G/=N/16;B/=N/16;
+  const lin=v=>{v/=16*255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)};const q=v=>Math.min(7,Math.round(v/16/32));return [Math.max(.02,lin(R)),Math.max(.02,lin(G)),Math.max(.02,lin(B)),''+q(R)+q(G)+q(B)]}catch(e){return null}}
+async function bitmap(img,flip,pm){const p=pm?'premultiply':'none';for(const o of [flip?'flipY':'from-image',flip?'flipY':'none',null]){try{return await createImageBitmap(img,o?{imageOrientation:o,premultiplyAlpha:p}:{premultiplyAlpha:p})}catch(e){}}return createImageBitmap(img)}
+const TEXK=['wrapS','wrapT','magFilter','minFilter','anisotropy','encoding','generateMipmaps','premultiplyAlpha','unpackAlignment','format','type','mapping','rotation','matrixAutoUpdate','name'];
+function texDef(t,X){const R=X.R;let id=R.tex.get(t);if(id!=null)return id;id=++R.n;R.tex.set(t,id);const d={k:'t',id,p:{},rep:t.repeat.toArray(),off:t.offset.toArray(),cen:t.center.toArray(),flipY:!!t.flipY};
+  for(const k of TEXK)if(t[k]!==undefined)d.p[k]=t[k];const img=t.image;
+  if(img&&img.width&&img.height&&(typeof img.getContext==='function'||(typeof ImageBitmap!=='undefined'&&img instanceof ImageBitmap))){d.w=img.width;d.h=img.height;d.avg=avgOf(img);
+    X.wait.push(bitmap(img,!!t.flipY,!!t.premultiplyAlpha).then(b=>{d.bm=b;X.tr.push(b)}))}
+  else if(img&&img.data&&img.width){const a=img.data.slice();d.raw=[a,img.width,img.height];X.tr.push(a.buffer)}
+  X.defs.push(d);return id}
+function matDef(m,X){if(!m)return 0;const R=X.R;let id=R.mat.get(m);if(id!=null)return id;id=++R.n;R.mat.set(m,id);const d={k:'m',id,ty:m.type,p:{}};
+  for(const k of Object.keys(m)){if(k==='uuid'||k==='type'||k==='version'||k==='_listeners'||/^is[A-Z]/.test(k))continue;const v=m[k];if(v==null||typeof v==='function')continue;const ty=typeof v;
+    if(ty==='number'||ty==='boolean'||ty==='string')d.p[k]=v;else if(v.isColor)d.p[k]={c:[v.r,v.g,v.b]};else if(v.isTexture)d.p[k]={t:texDef(v,X)};else if(v.isVector2)d.p[k]={v2:[v.x,v.y]};
+    else if(k==='userData'||k==='defines'){try{d.p[k]={j:JSON.parse(JSON.stringify(v))}}catch(e){}}}
+  X.defs.push(d);return id}
+function geoDef(g,X){const R=X.R;let id=R.geo.get(g);if(id!=null)return id;id=++R.n;R.geo.set(g,id);const d={k:'g',id,a:{},gr:g.groups.map(x=>[x.start,x.count,x.materialIndex||0])};
+  if(g.index){const a=g.index.array.slice();d.i=a;X.tr.push(a.buffer)}
+  for(const n in g.attributes){const at=g.attributes[n],sz=at.itemSize;let a;if(at.isInterleavedBufferAttribute){a=new Float32Array(at.count*sz);const gs=[at.getX,at.getY,at.getZ,at.getW];for(let i=0;i<at.count;i++)for(let c=0;c<sz;c++)a[i*sz+c]=gs[c].call(at,i)}else a=at.array.slice();
+    d.a[n]=[a,sz,!!at.normalized];X.tr.push(a.buffer)}
+  if(g.drawRange&&(g.drawRange.start||g.drawRange.count!==Infinity))d.dr=[g.drawRange.start,g.drawRange.count];if(g.name)d.n=g.name;X.defs.push(d);return id}
+function nodeOf(o,X){const n={t:o.isPointLight?'P':o.isLineSegments?'LS':o.isLine?'L':o.isMesh?'M':o.isGroup?'G':'O',n:o.name||'',p:o.position.toArray(),q:o.quaternion.toArray(),s:o.scale.toArray()};
+  if(!o.visible)n.v=0;if(o.castShadow)n.cs=1;if(o.receiveShadow)n.rs=1;if(!o.frustumCulled)n.fc=0;if(o.renderOrder)n.ro=o.renderOrder;if(!o.matrixAutoUpdate){n.mau=0;n.mx=o.matrix.toArray()}if(o.layers&&o.layers.mask!==1)n.ly=o.layers.mask;
+  if(o.userData&&Object.keys(o.userData).length){try{n.ud=JSON.parse(JSON.stringify(o.userData))}catch(e){}}
+  if(o.isMesh||o.isLine){n.g=geoDef(o.geometry,X);n.m=Array.isArray(o.material)?o.material.map(m=>matDef(m,X)):matDef(o.material,X)}
+  if(o.isLight){n.lc=[o.color.r,o.color.g,o.color.b];n.li=o.intensity;if(o.distance!==undefined)n.ld=o.distance;if(o.decay!==undefined)n.lde=o.decay;
+    if(o.shadow){const sh=o.shadow;n.sh=[sh.mapSize.x,sh.mapSize.y,sh.bias,sh.normalBias,sh.radius,sh.camera.near,sh.camera.far]}}
+  if(o.children.length)n.c=o.children.map(c=>nodeOf(c,X));return n}
+const plain=v=>{try{return JSON.parse(JSON.stringify(v))}catch(e){return null}};
+function itemOf(it,info,X){const b=info.b,mb=b.markBox;
+  const out={key:it.arch+'#'+it.seed,root:nodeOf(b.g,X),mb:mb&&!mb.isEmpty()?[mb.min.toArray(),mb.max.toArray()]:null,surf:plain(b.surfaces||[])||[],
+    f:plain({center:info.center,minZ:info.minZ,wall:!!info.wall,wallOnly:!!info.wallOnly,ceiling:!!info.ceiling,finish:info.finish||null,W:info.W,D:info.D,H:info.H,name:info.name,key:info.key,tiles:info.tiles,box:info.box,role:info.role||'',seats:info.seats||0,cat:info.cat||''})};
+  if(info.floorMat)out.fm=matDef(info.floorMat,X);if(info.wallMat)out.wm=matDef(info.wallMat,X);return out}
+async function gen(job,items){const R=reg(job),t0=now();let X={R,defs:[],tr:[],wait:[],items:[]},bt=now();
+  const flush=async()=>{if(!X.items.length)return;await Promise.all(X.wait);postMessage({type:'pieces',job,defs:X.defs,items:X.items},X.tr);X={R,defs:[],tr:[],wait:[],items:[]};bt=now()};
+  for(const it of items){if(CANCEL.has(job))break;let out;try{const info=L.generate({arch:it.arch,seed:it.seed},{dressOn:false});out=itemOf(it,info,X)}catch(e){out={key:it.arch+'#'+it.seed,err:String(e&&e.message||e)}}
+    X.items.push(out);if(now()-bt>12||X.items.length>=6)await flush()}
+  await flush();postMessage({type:'genDone',job,ms:now()-t0,n:items.length,cancelled:CANCEL.has(job)});CANCEL.delete(job);if(REG&&REG.job===job)REG=null}
+function itemsOfPlan(cp){const out=[],seen=new Set(),add=(a,s)=>{if(!a)return;const k=a+'#'+s;if(seen.has(k))return;seen.add(k);out.push({arch:a,seed:s})};
+  for(const R of cp.rooms){if(R.floor)add(R.floor.arch,R.floor.seed);if(R.wall)add(R.wall.arch,R.wall.seed)}for(const q of cp.pieces)if(q.kind!=='top')add(q.arch,q.seed);for(const q of cp.pieces)if(q.kind==='top')add(q.arch,q.seed);return out}
+async function fonts(list,ms){if(!list||!list.length||!self.fonts||typeof FontFace==='undefined')return 0;let n=0;
+  await Promise.race([Promise.all(list.map(f=>{try{const ff=new FontFace(f.family,f.src,f.desc||{});self.fonts.add(ff);return ff.load().then(()=>{n++}).catch(()=>{})}catch(e){return null}})),new Promise(r=>setTimeout(r,ms||4000))]);return n}
+self.onmessage=async e=>{const m=e.data||{};try{
+  if(m.type==='init'){const t0=now();const nf=await fonts(m.fonts,m.fontWait);postMessage({type:'ready',bootMs:self.__bootMs,fontMs:now()-t0,fonts:nf,archs:Object.keys(L.ARCHS).length,sectionErrors:(L.SECTION_ERRORS||[]).length})}
+  else if(m.type==='plan'||m.type==='empty'){const t0=now();const opt=m.facade?S.facadeHook(m.facade,m.pk):null;const P=m.type==='plan'?S.furnish(m.hh,m.lseed||1,opt):S.emptyHome(m.tier,opt);const cp=S.compactPlan(P);
+    postMessage({type:'plan',id:m.id,job:m.job,plan:cp,ms:now()-t0});if(m.job)await gen(m.job,itemsOfPlan(cp))}
+  else if(m.type==='gen')await gen(m.job,m.items)
+  // every probe the planner can ask for (each placeable style x its 40-seed pool), so a new household plans warm (a cache only: results unchanged)
+  else if(m.type==='prewarm'){const t0=now();let n=0,st=now();for(const k of S.ALLK){for(let j=0;j<S.POOL;j++){try{S.pr(k,100000+S.hashStr(k+':pool:'+j)%900000)}catch(e){}n++}if(now()-st>40){await new Promise(r=>setTimeout(r,0));st=now()}}postMessage({type:'prewarmed',id:m.id,n,ms:now()-t0})}
+  else if(m.type==='cancel')CANCEL.add(m.job)
+  else if(m.type==='reset'){REG=null;CANCEL.clear()}}
+  catch(err){postMessage({type:'error',id:m.id,job:m.job,msg:String(err&&err.stack||err)})}};
+}
+// the worker's source: shims, three.js, the section scripts, the lab kit and the planner, cut where their page UI starts, then podWorkerMain
+function workerSource(){const sc=[...document.scripts];const three=sc.find(s=>s.src&&/three(\.min)?\.js(\?|$)/.test(s.src))||sc.find(s=>!s.src&&/REVISION\s*=\s*['"]149/.test(s.textContent.slice(0,4000)));
+  const KM='/* ---------- thumbnails ---------- */',PM='/* ======================= 10. the Pods view ======================= */';
+  const secs=sc.filter(s=>!s.src&&/^\s*\/\* section: /.test(s.textContent)),kit=sc.find(s=>!s.src&&s.textContent.includes(KM)&&s.textContent.includes('function generate(')),pods=sc.find(s=>!s.src&&s.textContent.includes('/* pods: household furnisher */')&&s.textContent.includes(PM));
+  if(!three||!kit||!pods||!secs.length)throw new Error('worker bundle: page scripts not found');const kt=kit.textContent,pt=pods.textContent;
+  const shim=`self.__bootT0=performance.now();self.window=self;self.global=self;(function(){const inert=()=>new Proxy(function(){},{get:(t,k)=>k===Symbol.toPrimitive?(()=>''):k==='style'||k==='dataset'||k==='classList'?inert():inert(),apply:()=>inert(),set:()=>true});
+self.document={createElement:t=>String(t).toLowerCase()==='canvas'?new OffscreenCanvas(1,1):inert(),createElementNS:(n,t)=>String(t).toLowerCase()==='canvas'?new OffscreenCanvas(1,1):inert(),getElementById:()=>null,querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){},removeEventListener(){},body:inert(),documentElement:inert(),head:inert(),fonts:self.fonts};
+if(!self.CanvasRenderingContext2D&&self.OffscreenCanvasRenderingContext2D)self.CanvasRenderingContext2D=self.OffscreenCanvasRenderingContext2D;self.addEventListener=self.addEventListener||function(){};self.requestAnimationFrame=self.requestAnimationFrame||(f=>setTimeout(()=>f(performance.now()),16));self.localStorage={getItem:()=>null,setItem(){},removeItem(){}};self.location=self.location||{hash:'',search:''};})();\n`;
+  return [shim,three.src?'importScripts('+JSON.stringify(three.src)+');\n':three.textContent,...secs.map(s=>s.textContent),
+    kt.slice(0,kt.indexOf(KM))+'\nself.__podlab={SECTION_ERRORS,KIT,ARCHS,CATS,generate,dryKey,probe,freeGroup};})();\n',
+    pt.slice(0,pt.indexOf(PM))+'\nself.__podsW={furnish,validate,makeHousehold,emptyHome,facadeHook,compactPlan,wallRunsOf,placeFixedWall,facadeWindows,pr,ALLK,POOL,hashStr};})();\n',
+    'self.__bootMs=performance.now()-self.__bootT0;\n('+podWorkerMain.toString()+')();\n'].join('\n')}
+// the page's Google fonts (Chakra Petch, IBM Plex: the kit's canvas text), latin subset, for the worker's FontFaceSet
+async function fontList(){const out=[];try{for(const l of document.querySelectorAll('link[rel="stylesheet"][href*="fonts.googleapis.com"]')){const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),3000);let css='';try{css=await (await fetch(l.href,{signal:ctl.signal})).text()}catch(e){}clearTimeout(tm);
+    for(const blk of css.split('@font-face').slice(1)){const g=re=>{const m=re.exec(blk);return m?m[1].trim():null};const fam=g(/font-family:\s*'?([^;']+)'?;/),src=g(/src:\s*([^;]+);/),wt=g(/font-weight:\s*([^;]+);/),st=g(/font-style:\s*([^;]+);/),ur=g(/unicode-range:\s*([^;]+);/);
+      if(!fam||!src||!/Chakra Petch|IBM Plex/.test(fam))continue;if(ur&&!/U\+0000-00FF/i.test(ur))continue;out.push({family:fam,src,desc:{weight:wt||'400',style:st||'normal'}})}}}catch(e){}return out}
+const WK={w:null,ok:false,failed:null,readyP:null,seq:0,jobs:new Map(),reqs:new Map(),info:null,url:null};
+function wkStart(){if(WK.readyP)return WK.readyP;
+  WK.readyP=new Promise(res=>{const fail=why=>{if(WK.ok)return;WK.failed=why;console.warn('builder: furnish worker off ('+why+'); building in the page');try{WK.w&&WK.w.terminate()}catch(e){}WK.w=null;res(false)};
+    if(B.noWorker||window.PODLAB_NOWORKER||/[?&]noworker\b/.test(location.search)||typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined'||typeof createImageBitmap!=='function'){fail('Worker, OffscreenCanvas or createImageBitmap missing');return}
+    let src;try{src=workerSource()}catch(e){fail(e.message);return}
+    try{WK.url=URL.createObjectURL(new Blob([src],{type:'text/javascript'}));WK.w=new Worker(WK.url)}catch(e){fail('worker: '+e.message);return}
+    const to=setTimeout(()=>fail('no answer in 30 s'),30000);
+    WK.w.onmessage=e=>{const d=e.data||{};if(d.type==='ready'){clearTimeout(to);WK.ok=true;WK.info=d;res(true);return}wkMsg(d)};
+    WK.w.onerror=e=>{e.preventDefault&&e.preventDefault();const why='worker error: '+(e.message||'load failed');if(!WK.ok){clearTimeout(to);fail(why)}else{console.error('builder: '+why);wkLost(why)}};
+    fontList().then(fonts=>{if(WK.w)WK.w.postMessage({type:'init',fonts,fontWait:4000})})});return WK.readyP}
+function wkLost(why){WK.ok=false;WK.failed=why;for(const [,r] of WK.reqs)r.rej(new Error(why));WK.reqs.clear();for(const [,j] of WK.jobs)j.finish();try{WK.w.terminate()}catch(e){}WK.w=null;WK.readyP=null}
+// one open's stream of pieces: defs (geometry, materials, textures by id) and items by arch#seed; the main thread assembles them on demand
+function newJob(){const j={id:++WK.seq,defs:new Map(),objs:new Map(),items:new Map(),waiters:new Map(),done:false,workerMs:null,bytes:0,
+  has:k=>j.items.has(k),wait(k,ms){if(j.items.has(k)||j.done)return Promise.resolve();return new Promise(r=>{const a=j.waiters.get(k)||[];a.push(r);j.waiters.set(k,a);if(ms)setTimeout(r,ms)})},
+  waitAll(keys,ms){return Promise.all(keys.map(k=>j.wait(k,ms)))},
+  finish(){j.done=true;for(const [,a] of j.waiters)a.forEach(r=>r());j.waiters.clear()},
+  release(){for(const [,d] of j.defs)if(d.bm&&!d.used)try{d.bm.close()}catch(e){}j.defs.clear();j.items.clear();j.objs.clear();WK.jobs.delete(j.id);if(!j.done&&WK.w)WK.w.postMessage({type:'cancel',job:j.id});j.finish()}};
+  WK.jobs.set(j.id,j);return j}
+function wkMsg(d){if(d.type==='pieces'){const j=WK.jobs.get(d.job);if(!j){for(const x of d.defs)if(x.bm)try{x.bm.close()}catch(e){}return}for(const x of d.defs)j.defs.set(x.id,x);
+    for(const it of d.items){j.items.set(it.key,it);const a=j.waiters.get(it.key);if(a){j.waiters.delete(it.key);a.forEach(r=>r())}}}
+  else if(d.type==='genDone'){const j=WK.jobs.get(d.job);if(j){j.workerMs=d.ms;j.finish()}}
+  else if(d.type==='prewarmed'){const r=WK.reqs.get(d.id);if(r){WK.reqs.delete(d.id);r.res(d)}}
+  else if(d.type==='plan'){const r=WK.reqs.get(d.id);if(r){WK.reqs.delete(d.id);r.res(d)}}
+  else if(d.type==='error'){console.error('builder worker:',d.msg);const r=WK.reqs.get(d.id);if(r){WK.reqs.delete(d.id);r.rej(new Error(d.msg))}const j=WK.jobs.get(d.job);if(j)j.finish()}}
+function wkPlan(msg){const id=++WK.seq,job=newJob();return new Promise((res,rej)=>{WK.reqs.set(id,{res:d=>res({plan:d.plan,ms:d.ms,job}),rej:e=>{job.release();rej(e)}});WK.w.postMessage(Object.assign({id,job:job.id},msg))})}
+const facadeMsg=f=>f&&Array.isArray(f.faces)?JSON.parse(JSON.stringify({faces:f.faces,main:f.main,tier:f.tier,band:f.band})):null;
+function wkGen(items){const job=newJob();WK.w.postMessage({type:'gen',job:job.id,items});return job}
+function itemsOfRecipe(rc,list){const out=[],seen=new Set(),add=(a,s)=>{if(!a||!ARCHS[a])return;const k=a+'#'+s;if(seen.has(k))return;seen.add(k);out.push({arch:a,seed:s})};
+  const fin=rc.fin||{};for(const g of ['floor','wall','seg'])for(const k in (fin[g]||{})){const f=fin[g][k];if(f)add(f.arch,f.seed)}for(const r of list)add(r.arch,r.seed);return out}
+const finishKeys=rc=>{const out=new Set(),fin=rc.fin||{};for(const g of ['floor','wall','seg'])for(const k in (fin[g]||{})){const f=fin[g][k];if(f&&ARCHS[f.arch])out.add(f.arch+'#'+f.seed)}return [...out]};
+// a piece's info from the current open's worker stream (meshes assembled here; geometry and textures shared by copies of the same item, materials fresh per copy), else built in the page
+function genInfo(arch,seed){const J=B.job,it=J&&J.items.get(arch+'#'+seed);if(it&&!it.err){const a=performance.now();try{return assemble(J,it)}catch(e){console.error('builder: assembling '+arch+' failed, building in the page',e)}finally{if(PF.cur)PF.cur.assemblyMs+=performance.now()-a}}
+  const a=performance.now();const info=L.generate({arch,seed},{dressOn:false});if(PF.cur){PF.cur.inPageGenMs+=performance.now()-a;PF.cur.inPageGen++}return info}
+function assemble(J,it){const mats=new Map();
+  const tex=id=>{let t=J.objs.get(id);if(t)return t;const d=J.defs.get(id);if(d.bm){t=new T.Texture(d.bm);d.used=true}else if(d.raw)t=new T.DataTexture(d.raw[0],d.raw[1],d.raw[2]);else t=new T.Texture();
+    for(const k in d.p)t[k]=d.p[k];t.repeat.fromArray(d.rep);t.offset.fromArray(d.off);t.center.fromArray(d.cen);t.flipY=d.bm?false:d.flipY;if(d.avg)t.userData.avg=d.avg;t.needsUpdate=!!(d.bm||d.raw);J.objs.set(id,t);return t};
+  const mat=id=>{if(!id)return null;let m=mats.get(id);if(m)return m;const d=J.defs.get(id);const C=T[d.ty];m=C?new C():new T.MeshStandardMaterial();
+    for(const k in d.p){const v=d.p[k];if(v&&typeof v==='object'){if(v.c){if(m[k]&&m[k].isColor)m[k].setRGB(v.c[0],v.c[1],v.c[2]);else m[k]=new T.Color(v.c[0],v.c[1],v.c[2])}else if(v.t!=null)m[k]=tex(v.t);else if(v.v2){if(m[k]&&m[k].isVector2)m[k].set(v.v2[0],v.v2[1])}else if(v.j!==undefined)m[k]=JSON.parse(JSON.stringify(v.j))}
+      else if(k[0]==='_'&&(k.slice(1) in m))m[k.slice(1)]=v;else m[k]=v}mats.set(id,m);return m};
+  const geo=id=>{let g=J.objs.get(id);if(g)return g;const d=J.defs.get(id);g=new T.BufferGeometry();if(d.i)g.setIndex(new T.BufferAttribute(d.i,1));for(const n in d.a){const [a,s,nm]=d.a[n];g.setAttribute(n,new T.BufferAttribute(a,s,nm))}
+    for(const [s,c,mi] of d.gr)g.addGroup(s,c,mi);if(d.dr)g.setDrawRange(d.dr[0],d.dr[1]);if(d.n)g.name=d.n;J.objs.set(id,g);return g};
+  const node=n=>{let o;const ms=()=>Array.isArray(n.m)?n.m.map(mat):mat(n.m);
+    if(n.t==='M')o=new T.Mesh(geo(n.g),ms());else if(n.t==='LS')o=new T.LineSegments(geo(n.g),ms());else if(n.t==='L')o=new T.Line(geo(n.g),ms());else if(n.t==='P')o=new T.PointLight();else if(n.t==='G')o=new T.Group();else o=new T.Object3D();
+    o.name=n.n;o.position.fromArray(n.p);o.quaternion.fromArray(n.q);o.scale.fromArray(n.s);if(n.v===0)o.visible=false;if(n.cs)o.castShadow=true;if(n.rs)o.receiveShadow=true;if(n.fc===0)o.frustumCulled=false;if(n.ro)o.renderOrder=n.ro;
+    if(n.mau===0){o.matrixAutoUpdate=false;o.matrix.fromArray(n.mx)}if(n.ly)o.layers.mask=n.ly;if(n.ud)o.userData=JSON.parse(JSON.stringify(n.ud));
+    if(n.lc){o.color.setRGB(n.lc[0],n.lc[1],n.lc[2]);o.intensity=n.li;if(n.ld!==undefined)o.distance=n.ld;if(n.lde!==undefined)o.decay=n.lde;if(n.sh&&o.shadow){const s=o.shadow;s.mapSize.set(n.sh[0],n.sh[1]);s.bias=n.sh[2];s.normalBias=n.sh[3];s.radius=n.sh[4];s.camera.near=n.sh[5];s.camera.far=n.sh[6]}}
+    if(n.c)for(const c of n.c)o.add(node(c));return o};
+  const g=node(it.root),mb=new T.Box3();if(it.mb)mb.set(new T.Vector3().fromArray(it.mb[0]),new T.Vector3().fromArray(it.mb[1]));
+  const info=Object.assign({},JSON.parse(JSON.stringify(it.f)),{b:{g,markBox:mb,surfaces:JSON.parse(JSON.stringify(it.surf))},fromWorker:true});if(it.fm)info.floorMat=mat(it.fm);if(it.wm)info.wallMat=mat(it.wm);return info}
+
+/* slices and timing: every main-thread step of an open yields after about 6 ms (a macrotask, so it also runs while the page is hidden);
+   PodBuilder.perf() and the open's result carry the stage times and the longest slice */
+const YQ=[],YMC=new MessageChannel();YMC.port1.onmessage=()=>{const r=YQ.shift();if(r)r()};
+const yieldTask=()=>new Promise(r=>{YQ.push(r);YMC.port2.postMessage(0)});
+const SLICE=6,SL={t:performance.now()},PF={cur:null,last:null};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function sOut(){const p=PF.cur;if(!p)return;const d=performance.now()-SL.t;p.slices++;if(d>p.longestSlice){p.longestSlice=d;p.longestAt=p.stage}}
+function sIn(){SL.t=performance.now()}
+async function yslice(budget){if(performance.now()-SL.t<(budget==null?SLICE:budget))return;sOut();await yieldTask();sIn()}
+async function pwait(pr){sOut();try{return await pr}finally{sIn()}}
+function pfStart(kind){if(PF.cur)return PF.cur;const p={kind,t0:performance.now(),stage:'start',worker:!!WK.ok,facadeMs:0,workerPlanMs:null,workerPiecesMs:null,planWaitMs:0,inPagePlanMs:0,disposeMs:0,shellMs:0,
+    assemblyMs:0,piecesMainMs:0,inPageGenMs:0,inPageGen:0,attachMs:0,pieces:0,slices:0,longestSlice:0,longestAt:'',longTask:0,firstFrameMs:null,earlyTransition:false};PF.cur=p;
+  try{if(window.PerformanceObserver&&PerformanceObserver.supportedEntryTypes&&PerformanceObserver.supportedEntryTypes.includes('longtask')){p.obs=new PerformanceObserver(l=>{for(const e of l.getEntries())p.longTask=Math.max(p.longTask,e.duration)});p.obs.observe({entryTypes:['longtask']})}}catch(e){}
+  return p}
+function pfEnd(p){if(!p||PF.cur!==p)return p?PF.last:null;sOut();p.totalMs=performance.now()-p.t0;const ob=p.obs;delete p.obs;setTimeout(()=>{try{ob&&ob.disconnect()}catch(e){}},0);
+  const out={};for(const k in p){const v=p[k];out[k]=typeof v==='number'?Math.round(v*10)/10:v}delete out.t0;delete out.stage;PF.last=out;PF.cur=null;return out}
+const pfStage=s=>{if(PF.cur)PF.cur.stage=s};
 const LS_SLOTS='podlab.build.slots.v1',LS_AUTO='podlab.build.auto.v1',LS_PREV='podlab.build.prev.v1';
 const lsGet=k=>{if(EMBED0)return null;try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}};
 const EMBED0=!!window.PODLAB_EMBED||/[?&]embed\b/.test(location.search);// embedded in the game: the host owns saving, so nothing goes to localStorage
@@ -14365,7 +14582,7 @@ function planToRecipe(P){const home={tier:P.type,W:P.W,D:P.D,room:Array.from(P.r
   const fin={floor:{},wall:{},seg:{}};for(const R of P.rooms){if(R.floor)fin.floor[R.id]={arch:R.floor.arch,seed:R.floor.seed};if(R.wall)fin.wall[R.id]={arch:R.wall.arch,seed:R.wall.seed}}
   const pieces=[],map=new Map();let id=1;const messy=P.tr&&P.tr.messy>.6;
   for(const q of P.pieces){if(q.kind==='top'||!q.xf)continue;const anc=(q.kind==='wall'||(q.kind==='floor'&&q.snap))?'b':'c';map.set(q.id,id);
-    pieces.push({id:id++,arch:q.arch,seed:q.seed,x:r4(q.xf.px),y:0,z:r4(q.xf.pz),ry:r4(normA(q.xf.ry+(q.jit||0))),wh:0,anc,parent:0,colors:{},light:null})}
+    pieces.push({id:id++,arch:q.arch,seed:q.seed,x:r4(q.xf.px),y:0,z:r4(q.xf.pz),ry:r4(normA(q.xf.ry+(q.jit||0))),wh:q.kind==='wall'&&q.wh?r4(q.wh):0,anc,parent:0,colors:{},light:null})}
   for(const q of P.pieces){if(q.kind!=='top')continue;const h=map.get(q.host);if(!h)continue;const jr=messy?(K.hashStr(q.arch+q.seed)%100/100-.5)*.5:0;
     pieces.push({id:id++,arch:q.arch,seed:q.seed,x:r4(q.lx),y:r4(q.y),z:r4(q.lz),ry:r4(normA(jr)),wh:0,anc:'c',parent:h,colors:{},light:null})}
   return {v:1,app:'podlab-build',home,walls:B.walls,fin,pieces}}
@@ -14380,23 +14597,43 @@ const isLux=p=>p.kind==='luxury'||p.zone==='high';
 const podText=p=>!p?'':p.cell?(p.kind==='lift'||p.section<0?'Lifted pod':isLux(p)?'Luxury':'Residential')+' · floor '+p.floor+' · '+p.cell[0]+','+p.cell[1]:DLABEL[p.district]+' · floor '+p.floor+' · faces '+SLABEL[p.side].toLowerCase();
 B.podSel={district:'high',floor:18,side:'E',seed:0};
 // an empty home of a tier: walls, doors, windows on the facade and a default floor and wall finish (the furnisher's own stages)
-const EMPTY_HH={small:20261021,medium:20261022,large:20261023};
-function emptyPlan(tier,lseed){const hh=SH.makeHousehold(EMPTY_HH[tier]||1);hh.pod=tier;hh.members.forEach(m=>{m.shift='day'});const ctx=SH.newPlan(hh,lseed||1);
-  SH.assignSets(ctx);SH.reserve(ctx);SH.stageWindows(ctx);SH.stageFinishes(ctx);const P=ctx.P;P.pieces=P.pieces.filter(q=>!q.removed);P.pieces.forEach((q,i)=>q.id=i);return P}
+function emptyPlan(tier,opt){return SH.emptyHome(tier,opt||null)}// pods.js emptyHome: shared with the furnish worker
 
-function disposeHome(){if(!B.sc)return;if(B.env&&B.env.g.parent)B.env.g.parent.remove(B.env.g);prCall('detach');B.prOn=false;for(const [,m] of B.finCache)m.dispose();for(const [,m] of B.finBase)m.dispose();B.finCache.clear();B.finBase.clear();
-  for(const it of B.inst.values()){for(const k of it.cmap.keys())k.dispose();for(const e of it.tints.values())e.tex.dispose()}L.disposeScene(B.sc);B.sc=null;B.root=null;B.s=null;B.inst.clear();B.recs.clear();OV.made=false}
-// build a home from a recipe: shell first, then pieces spread over frames (parents before children)
-async function loadRecipe(rc,o){o=o||{};if(!rc||!rc.home||!rc.pieces)throw new Error('Not a build recipe');while(B.loading)await frame();B.loading=true;cancelPlace(true);select(null);setBusy('Building the home…');await frame();
-  try{disposeHome();const P=shellPlan(rc.home);B.home=clone(rc.home);B.home.pod=podOK(B.home.pod)||podFrom(B.home.hh||B.home.room);B.P=P;const s=SH.buildPod(P);B.s=s;B.sc=s.sc;B.root=s.root;B.fin=clone(rc.fin||{floor:{},wall:{},seg:{}});B.fin.seg=B.fin.seg||{};
+// the current home's GPU and memory out, in slices; the renderer, the stage scene, kept programs and the worker stay
+async function disposeHome(){const pf=PF.cur,a=performance.now();if(B.job&&!B.loading){}if(!B.sc){relJob();return}if(B.env&&B.env.g.parent)B.env.g.parent.remove(B.env.g);prCall('detach');B.prOn=false;
+  const geos=new Set(),mats=new Set(),texs=new Set();const addM=m=>{if(!m)return;if(!KEEP.mats.has(m))mats.add(m);for(const k of ['map','emissiveMap','alphaMap','normalMap','roughnessMap','metalnessMap','bumpMap','aoMap','lightMap'])if(m[k]&&m[k].isTexture)texs.add(m[k])};
+  for(const [,m] of B.finCache)addM(m);for(const [,m] of B.finBase)addM(m);B.finCache.clear();B.finBase.clear();
+  for(const it of B.inst.values()){for(const k of it.cmap.keys())addM(k);for(const e of it.tints.values())texs.add(e.tex)}
+  const sc=B.sc;sc.traverse(o=>{if(o.geometry)geos.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(addM)});
+  if(sc===B.stage){while(sc.children.length)sc.remove(sc.children[0])}
+  B.sc=null;B.root=null;B.s=null;B.inst.clear();B.recs.clear();OV.made=false;relJob();
+  let n=0;for(const set of [geos,mats,texs])for(const x of set){try{x.dispose();if(x.isTexture&&x.image&&typeof x.image.close==='function')x.image.close()}catch(e){}if(++n%40===0)await yslice()}
+  if(pf)pf.disposeMs+=performance.now()-a}
+function relJob(){if(B.job){B.job.release();B.job=null}}
+// the stage: one scene for every home, so PodContext can hook it at the click before the home exists
+function stageScene(){if(!B.stage){B.stage=new T.Scene();B.stage.background=null;B.stage.userData.transparentBackground=true}return B.stage}
+function intoStage(s){const st=stageScene();while(s.sc.children.length)st.add(s.sc.children[0]);st.fog=s.sc.fog||null;st.environment=s.sc.environment||null;s.sc=st;return st}
+// build a home from a recipe: shell first, then pieces in slices of about 6 ms (parents before children), their meshes streamed from the worker
+async function loadRecipe(rc,o){o=o||{};if(!rc||!rc.home||!rc.pieces)throw new Error('Not a build recipe');if(!PF.cur)sIn();const pf=pfStart('load'),own=pf.kind==='load';
+  try{while(B.loading)await pwait(sleep(16));B.loading=true;cancelPlace(true);select(null);if(!o.early&&!B.trans)setBusy('Building the home…');
+    const list=rc.pieces.slice().sort((a,b)=>depth(rc.pieces,a)-depth(rc.pieces,b));
+    let job=o.job||null;if(!job&&WK.ok){try{job=wkGen(itemsOfRecipe(rc,list))}catch(e){job=null}}
+    pfStage('dispose');await disposeHome();B.job=job;await yslice();
+    pfStage('shell');let a=performance.now();const P=shellPlan(rc.home);B.home=clone(rc.home);B.home.pod=podOK(B.home.pod)||podFrom(B.home.hh||B.home.room);B.P=P;const s=SH.buildPod(P);intoStage(s);B.s=s;B.sc=s.sc;B.root=s.root;B.fin=clone(rc.fin||{floor:{},wall:{},seg:{}});B.fin.seg=B.fin.seg||{};
     B.defFloor=new T.MeshStandardMaterial({color:'#2a2731',roughness:.9});B.defWall=new T.MeshStandardMaterial({color:'#2a2633',roughness:.9});
-    s.sc.background=null;s.sc.userData.transparentBackground=true;tagWork(s);s.wallBoxes=wallBoxes(s);makeOverlays();applyFinishes();B.walls=rc.walls||B.walls||'cutaway';syncWallChips();B.tx=B.tz=0;B.zoom=1;B.az=SH.AZ0;
-    SH.wallTargets(s,B.walls,B.az,null);SH.applyWalls(s);B.camDirty=true;updateCam();
-    const list=rc.pieces.slice().sort((a,b)=>depth(rc.pieces,a)-depth(rc.pieces,b));let t0=performance.now(),i=0;B.nextId=1;
-    for(const rec of list){addRec(clone(rec),true);B.nextId=Math.max(B.nextId,rec.id+1);i++;if(performance.now()-t0>30){setBusy('Building the home… '+i+' / '+list.length);await frame();t0=performance.now()}}
-    syncTime();applyTime();applyWork();attachRenderer();if(!o.keepUndo){B.undo.length=0;B.redo.length=0}syncUndo();syncTier();B.dirty=false;B.fresh=!!o.fresh;status()}
-  finally{B.loading=false;setBusy(null);B.needs=true}
-  syncPod();ctxEnter();if(!o.noAuto)autosave(true);return true}
+    s.sc.background=null;s.sc.userData.transparentBackground=true;tagWork(s);s.wallBoxes=wallBoxes(s);makeOverlays();pf.shellMs+=performance.now()-a;await yslice();
+    if(job){pfStage('finishes wait');await pwait(job.waitAll(finishKeys(rc),10000))}
+    pfStage('finishes');a=performance.now();applyFinishes();B.walls=rc.walls||B.walls||'cutaway';syncWallChips();B.tx=B.tz=0;B.zoom=1;B.az=SH.AZ0;
+    SH.wallTargets(s,B.walls,B.az,null);SH.applyWalls(s);B.camDirty=true;updateCam();pf.shellMs+=performance.now()-a;
+    if(o.early&&B.ctxPending)ctxSetHome();await yslice();
+    pfStage('pieces');let i=0;B.nextId=1;
+    for(const rec of list){if(job&&!job.has(rec.arch+'#'+rec.seed)&&!job.done){pfStage('pieces wait');await pwait(job.wait(rec.arch+'#'+rec.seed,10000));pfStage('pieces')}
+      a=performance.now();addRec(clone(rec),true);pf.piecesMainMs+=performance.now()-a;pf.pieces++;B.nextId=Math.max(B.nextId,rec.id+1);i++;
+      if(performance.now()-SL.t>SLICE){if(!B.trans)setBusy('Building the home… '+i+' / '+list.length);await yslice()}}
+    if(job&&job.workerMs!=null)pf.workerPiecesMs=job.workerMs;
+    pfStage('attach');a=performance.now();syncTime();applyTime();applyWork();attachRenderer();pf.attachMs+=performance.now()-a;if(!o.keepUndo){B.undo.length=0;B.redo.length=0}syncUndo();syncTier();B.dirty=false;B.fresh=!!o.fresh;status()}
+  finally{B.loading=false;setBusy(null);B.needs=true;if(own)pfEnd(pf)}
+  syncPod();if(o.early){ctxSetHome();B.ctxPending=null}else if(!o.noCtx)ctxEnter();if(!o.noAuto)autosave(true);return true}
 function depth(list,r){let d=0,p=r.parent;while(p&&d<8){const q=list.find(x=>x.id===p);if(!q)break;p=q.parent;d++}return d}
 function setBusy(t){const b=$('bBusy');if(!b)return;b.hidden=!t;if(t)b.textContent=t}
 function attachRenderer(){const R=window.PodRender;B.prOn=false;if(B.noPR||!R||typeof R.attach!=='function'||!B.sc){envOn(true);return}
@@ -14425,7 +14662,7 @@ B.work=(()=>{try{return localStorage.getItem('podlab.build.work')!=='0'}catch(e)
 function tagWork(s){s.sc.traverse(o=>{if(o.isLight){o.userData.workLight=true;o.userData.wl0=o.intensity}})}
 function applyWork(){if(!B.sc)return;B.sc.traverse(o=>{if(o.isLight&&o.userData.workLight)o.intensity=B.work?o.userData.wl0:0});const c=$('bWork');if(c)c.setAttribute('aria-pressed',B.work);prCall('setOptions',{workLight:B.work});notify('light',null)}
 function setWork(on){B.work=!!on;if(!EMBED0)try{localStorage.setItem('podlab.build.work',B.work?'1':'0')}catch(e){}applyWork();L.toast(B.work?'Work light on':'Work light off: lamps, '+(B.home&&B.home.night?'city light':'sunlight')+' and glow only')}
-const timeName=()=>B.home&&B.home.night?'night':'day';
+const timeName=()=>B.home?(B.home.night?'night':'day'):(B.hostT||'day');
 /* ---------- PodContext calls and the transition ----------
    During the transition the stage carries .trans: the chrome fades out and ignores the pointer, hover and ghosts pause, and any click,
    wheel or key skips it (and never reaches placement). Ends on the promise, onDone, PodContext.transitioning going false, or 15 s. */
@@ -14459,7 +14696,7 @@ function applyTime(){const e=envMake(),n=timeName()==='night';if(n){e.h.color.se
   e.d.position.set(n?-5:-6,n?3:8,n?-6:-5);e.d.target.position.set(0,0,0);e.d.updateMatrixWorld();e.d.target.updateMatrixWorld();prCall('setOptions',{time:timeName()});notify('light',null)}
 function envOn(on){if(!B.sc)return;const e=envMake();if(on&&e.g.parent!==B.sc){B.sc.add(e.g);applyTime()}else if(!on&&e.g.parent)e.g.parent.remove(e.g);B.needs=true}
 function syncTime(){document.querySelectorAll('#bTime button').forEach(c=>c.setAttribute('aria-pressed',c.dataset.time===timeName()));drawSky()}
-function hostTime(t){if(!B.home)return;B.home.night=t==='night';syncTime();applyTime();ctxCall('update',{time:timeName()})}
+function hostTime(t){B.hostT=t==='night'?'night':'day';if(!B.home)return;B.home.night=t==='night';syncTime();applyTime();ctxCall('update',{time:timeName()})}
 function setTime(t,quiet){if(!B.home)return;const nv=t==='night';if(!!B.home.night===nv){syncTime();return}const apply=v=>{B.home.night=v;syncTime();applyTime();ctxCall('update',{time:timeName()});markDirty()};
   apply(nv);if(!quiet)pushCmd({label:nv?'Night':'Day',do:()=>apply(nv),undo:()=>apply(!nv)})}
 
@@ -14512,7 +14749,7 @@ function baseFootprint(g,lb,fp){const h=lb.max.y-lb.min.y,leafy=o=>(Array.isArra
     if(!_bb.isEmpty())return {cx:(_bb.min.x+_bb.max.x)/2,cz:(_bb.min.z+_bb.max.z)/2,hx:Math.max(.02,(_bb.max.x-_bb.min.x)/2),hz:Math.max(.02,(_bb.max.z-_bb.min.z)/2)}}
   return {cx:fp.cx,cz:fp.cz,hx:Math.max(.02,fp.hx*.4),hz:Math.max(.02,fp.hz*.4)}}
 function kindOf(info,arch){return info.wallOnly?'wall':info.ceiling?'ceiling':(TG[arch]&&TG[arch].has('rug'))?'rug':'floor'}
-function makeInst(rec){const info=L.generate({arch:rec.arch,seed:rec.seed},{dressOn:false});const g=info.b.g,pivot=new T.Group();pivot.name='piece:'+rec.arch;pivot.userData.bid=rec.id;pivot.userData.piece=true;if(TG[rec.arch]&&TG[rec.arch].has('window')){pivot.userData.window=true;if(TG[rec.arch].has('m:blackout'))pivot.userData.blackout=true}
+function makeInst(rec){const info=genInfo(rec.arch,rec.seed);const g=info.b.g,pivot=new T.Group();pivot.name='piece:'+rec.arch;pivot.userData.bid=rec.id;pivot.userData.piece=true;if(TG[rec.arch]&&TG[rec.arch].has('window')){pivot.userData.window=true;if(TG[rec.arch].has('m:blackout'))pivot.userData.blackout=true}
   if(!rec.anc)rec.anc=(info.wall||info.wallOnly)?'b':'c';g.position.set(-info.center[0],0,rec.anc==='b'?-info.minZ:-info.center[1]);pivot.add(g);pivot.updateMatrixWorld(true);
   const lbox=new T.Box3().setFromObject(g);if(lbox.isEmpty())lbox.set(new T.Vector3(-.2,0,-.2),new T.Vector3(.2,.4,.2));
   const mb=info.b.markBox;let fx0,fx1,fz0,fz1;if(mb&&!mb.isEmpty()){fx0=mb.min.x+g.position.x;fx1=mb.max.x+g.position.x;fz0=mb.min.z+g.position.z;fz1=mb.max.z+g.position.z}else{fx0=lbox.min.x;fx1=lbox.max.x;fz0=lbox.min.z;fz1=lbox.max.z}
@@ -14533,7 +14770,7 @@ function makeInst(rec){const info=L.generate({arch:rec.arch,seed:rec.seed},{dres
     obb:mkOBB(),wsp:{run:-1,rid:-1,a0:0,a1:0,y0:0,y1:0},run:-1,inv:new T.Matrix4(),wbox:new T.Box3(),bver:0,arch:rec.arch,seed:rec.seed,name:info.name}}
 // average color of a canvas texture (48 x 48 downsample), linear, for tinting textured materials to a target color
 const ONE=[1,1,1,''],_c=new T.Color(),TAVG=new WeakMap();let tcv=null;
-function texAvg(t){if(TAVG.has(t))return TAVG.get(t);let r=null;try{const img=t.image;if(img&&(img.width||img.videoWidth)){if(!tcv){tcv=document.createElement('canvas');tcv.width=tcv.height=48}const x=tcv.getContext('2d',{willReadFrequently:true});x.imageSmoothingQuality='high';x.clearRect(0,0,48,48);x.drawImage(img,0,0,48,48);const d=x.getImageData(0,0,48,48).data;let R=0,G=0,Bc=0;const N=48*48;for(let i=0;i<N*4;i+=4){R+=d[i];G+=d[i+1];Bc+=d[i+2]}R/=N/16;G/=N/16;Bc/=N/16;
+function texAvg(t){if(t.userData&&t.userData.avg)return t.userData.avg;if(TAVG.has(t))return TAVG.get(t);let r=null;try{const img=t.image;if(img&&(img.width||img.videoWidth)){if(!tcv){tcv=document.createElement('canvas');tcv.width=tcv.height=48}const x=tcv.getContext('2d',{willReadFrequently:true});x.imageSmoothingQuality='high';x.clearRect(0,0,48,48);x.drawImage(img,0,0,48,48);const d=x.getImageData(0,0,48,48).data;let R=0,G=0,Bc=0;const N=48*48;for(let i=0;i<N*4;i+=4){R+=d[i];G+=d[i+1];Bc+=d[i+2]}R/=N/16;G/=N/16;Bc/=N/16;
     const lin=v=>{v/=16*255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)};const q=v=>Math.min(7,Math.round(v/16/32));r=[Math.max(.02,lin(R)),Math.max(.02,lin(G)),Math.max(.02,lin(Bc)),''+q(R)+q(G)+q(Bc)]}}catch(e){r=null}TAVG.set(t,r);return r}
 // recolor a textured material: a copy of its texture with the same pattern and shading (relative luminance, softened) in the new color
 const SRGB2LIN=new Float32Array(256);for(let i=0;i<256;i++){const v=i/255;SRGB2LIN[i]=v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)}
@@ -14604,7 +14841,7 @@ let autoT=0;function markDirty(){B.dirty=true;B.needs=true;status();if(!B.loadin
 function autosave(now){if(!B.home||B.loading)return;lsSet(LS_AUTO,{at:new Date().toISOString(),recipe:recipe()})}
 
 /* ======================= 6. finishes ======================= */
-function finBase(kind,arch,seed){const k=kind+'|'+arch+'|'+seed;let m=B.finBase.get(k);if(m)return m;const info=L.generate({arch,seed},{dressOn:false});m=(kind==='floor'?info.floorMat:info.wallMat)||(kind==='floor'?B.defFloor:B.defWall).clone();
+function finBase(kind,arch,seed){const k=kind+'|'+arch+'|'+seed;let m=B.finBase.get(k);if(m)return m;const info=genInfo(arch,seed);m=(kind==='floor'?info.floorMat:info.wallMat)||(kind==='floor'?B.defFloor:B.defWall).clone();
   B.finBase.set(k,m);return m}
 function finMat(kind,f){const k=kind+'|'+f.arch+'|'+f.seed+'|'+(f.tint||'');let m=B.finCache.get(k);if(m)return m;const base=finBase(kind,f.arch,f.seed);m=base.clone();if(f.tint)m.color.set(f.tint);B.finCache.set(k,m);return m}
 function wallSpec(rid,run){return B.fin.seg[run+':'+rid]||B.fin.wall[rid]||null}
@@ -14818,11 +15055,18 @@ async function loadSlot(name){const e=name==='__auto'?lsGet(LS_AUTO):name==='__p
 function keepPrev(){if(B.home&&B.recs.size)lsSet(LS_PREV,{at:new Date().toISOString(),tier:B.home.tier,n:B.recs.size,recipe:recipe()})}
 // tier: 'small'|'medium'|'large' is the player's (or host's) explicit pick; null or 'auto' takes the tier the real building suggests (facade), else small.
 // A new home in a real building (pod.cell) gets the building's windows: PodContext.facade() -> setWindows, applied to the recipe before it loads (no undo step).
-async function newHome(tier,pod,o){o=o||{};const auto=!tier||tier==='auto';if(!o.auto)keepPrev();const pk=podOK(pod||realPick()||B.podSel)||podFrom(Date.now());
-  if(!pk.cell&&!pk.seed)pk.seed=100000+Math.floor(Math.random()*900000);let f=null;if(pk.cell){try{f=await facadeFor(pk,auto?null:tier)}catch(e){console.warn('builder: facade failed',e);f=null}}
-  if(auto)tier=f&&TIER_M[f.tier]?f.tier:(B.home&&o.auto?B.home.tier:'small');const P=emptyPlan(tier,1);const rc=planToRecipe(P);rc.home.pod=pk;
-  if(f){const n=facadeRecipe(rc,P,f,pk);if(n<0)f=null}await loadRecipe(rc,{fresh:true});B.slotName=null;
+async function newHome(tier,pod,o){o=o||{};sIn();const pf=pfStart('newHome'),own=PF.cur===pf&&pf.kind==='newHome',otok=B.openTok|0;try{
+  const auto=!tier||tier==='auto';if(!o.auto)keepPrev();const pk=podOK(pod||realPick()||B.podSel)||podFrom(Date.now());if(!pk.cell&&!pk.seed)pk.seed=100000+Math.floor(Math.random()*900000);
+  while(B.loading)await pwait(sleep(16));const early=o.noCtx?false:ctxEarly(pk,auto?null:tier);
+  let f=null;if(pk.cell){pfStage('facade');const a=performance.now();try{f=await pwait(facadeFor(pk,auto?null:tier))}catch(e){console.warn('builder: facade failed',e);f=null}pf.facadeMs+=performance.now()-a}
+  if(auto)tier=f&&TIER_M[f.tier]?f.tier:(B.home&&o.auto?B.home.tier:'small');if(!TIER_M[tier])tier='small';
+  pfStage('plan');let P,job=null;if(await pwait(wkStart())){const a=performance.now();try{const r=await pwait(wkPlan({type:'empty',tier,facade:facadeMsg(f),pk}));P=r.plan;job=r.job;pf.workerPlanMs=r.ms}catch(e){console.warn('builder: worker plan failed, planning in the page',e);P=null}pf.planWaitMs+=performance.now()-a}
+  if(!P){const a=performance.now();P=emptyPlan(tier,f?SH.facadeHook(f,pk):null);pf.inPagePlanMs+=performance.now()-a}
+  const rc=planToRecipe(P);rc.home.pod=pk;if(f)rc.home.facade=facadeSummary(f,pk);if(B.hostT)rc.home.night=B.hostT==='night';
+  if(otok!==(B.openTok|0)){if(job)job.release();return null}// unloaded meanwhile
+  await loadRecipe(rc,{fresh:true,job,early,noCtx:o.noCtx});B.slotName=null;
   if(!o.quiet)L.toast('New empty '+tier+' home'+(f?', windows from the building':'')+'.'+(lsGet(LS_PREV)?' Your last home is under Load.':''));return tier}
+  finally{if(own)pfEnd(pf)}}
 /* ---------- facade windows: the real building's windows on the home's exterior walls ----------
    spec (PodContext.facade): {main, tier, unit, faces:[{side:'N'|'E'|'S'|'W', exterior, length, windows:[{t0,t1,u0,u1,sill,head}]}]}. Lab sides: N = -z (z 0), S = +z, W = -x (x 0), E = +x.
    t runs 0..1 from the west end on N/S walls and from the north end on E/W walls. Non-exterior (party) faces get no windows. */
@@ -14830,45 +15074,49 @@ const TIER_M={small:[6.5,5],medium:[8,6],large:[10,7.5]};
 async function facadeFor(pk,tier){const C=window.PodContext;if(!C||typeof C.facade!=='function')return null;const row={podCell:pk.cell.slice(),cell:pk.cell.slice(),section:pk.section,floor:pk.floor,kind:pk.kind,zone:pk.zone};
   const to=p=>Promise.race([Promise.resolve(p),new Promise(r=>setTimeout(()=>r(null),6000))]);
   if(!tier){const f0=await to(C.facade(row,{main:'N'}));if(!f0)return null;tier=TIER_M[f0.tier]?f0.tier:'small'}
-  const P=emptyPlan(tier,1);const f=await to(C.facade(row,{W:P.W*TILE,D:P.D*TILE,main:'N'}));return f&&Array.isArray(f.faces)?f:null}
-let WINC=null;
-function winCands(){if(WINC)return WINC;const I=window.__pods&&window.__pods._int;const pr=I&&I.pr?I.pr:(a,sd)=>L.probe({arch:a,seed:sd},'stub');const out=[];
-  for(const k of Object.keys(TG)){const t=TG[k];if(!t.has('window')||t.has('m:blackout')||!ARCHS[k]||excluded(k))continue;const seen=new Set();
-    for(let i=0;i<6;i++){const seed=itemSeed(k,i);let p;try{p=pr(k,seed)}catch(e){continue}if(!p||!p.box)continue;const W=(p.box.maxX-p.box.minX)||p.W;if(!(W>.1))continue;
-      const key=W.toFixed(2)+'/'+p.box.minY.toFixed(2)+'/'+p.box.maxY.toFixed(2);if(seen.has(key))continue;seen.add(key);out.push({arch:k,seed,W,y0:p.box.minY,y1:p.box.maxY,small:t.has('window:small')})}}
-  if(out.length)WINC=out;return out}
-const WSIDE={N:{X:true,fix:P=>0,ry:0},S:{X:true,fix:P=>P.D,ry:PI},W:{X:false,fix:P=>0,ry:PI/2},E:{X:false,fix:P=>P.W,ry:-PI/2}};
+  const PD=SH.PODS[tier]||SH.PODS.small;const f=await to(C.facade(row,{W:PD.W*TILE,D:PD.D*TILE,main:'N'}));return f&&Array.isArray(f.faces)?f:null}
+// facade window placement lives in pods.js (the planner and the furnish worker share it)
 const isBand=pk=>!!pk&&(pk.kind==='lift'||pk.section<0);
-// window recs (no ids) for a plan and its wall runs: one style for the home (best total fit), the best seed of it per window, tiled into a band when a span is
-// much wider than one piece (always for lifted pods), centered on the facade span, kept inside one exterior run (not over a door or a partition), snapped to 25 cm
-function facadeWindows(spec,P,runs,pk){const C=winCands();if(!C.length||!spec||!Array.isArray(spec.faces))return null;const band=isBand(pk)||spec.band===true;const wins=[];
-  for(const f of spec.faces){const g=WSIDE[f.side];if(!g||f.exterior===false||!Array.isArray(f.windows))continue;const L0=(g.X?P.W:P.D)*TILE;
-    for(const w of f.windows){const t0=clamp(Math.min(w.t0,w.t1),0,1),t1=clamp(Math.max(w.t0,w.t1),0,1);if(!(t1>t0))continue;const sill=Number.isFinite(w.sill)?w.sill:.9,head=Number.isFinite(w.head)?w.head:2.1;
-      wins.push({side:f.side,g,a:(t0+t1)/2*L0,span:Math.max(.3,(t1-t0)*L0),sill,head,L0})}}
-  if(!wins.length)return [];
-  const cost=(c,w)=>{const n=band?Math.max(1,Math.round(w.span/c.W)):1;return Math.abs(c.W*n-w.span)+(c.W*n>w.span+.25?.6:0)+.6*Math.abs((c.y1-c.y0)-(w.head-w.sill))};
-  const byArch=new Map();for(const c of C){if(band&&c.small)continue;(byArch.get(c.arch)||byArch.set(c.arch,[]).get(c.arch)).push(c)}if(!byArch.size)for(const c of C)(byArch.get(c.arch)||byArch.set(c.arch,[]).get(c.arch)).push(c);
-  let best=null,bc=1e9;for(const [k,cs] of byArch){let tot=0;for(const w of wins)tot+=Math.min(...cs.map(c=>cost(c,w)));if(band)tot-=Math.max(...cs.map(c=>c.W))*.5;if(tot<bc){bc=tot;best=k}}
-  const cs=byArch.get(best).slice().sort((a,b)=>a.W-b.W),used={N:[],S:[],E:[],W:[]},out=[];
-  const segs=side=>{const g=WSIDE[side],fx=g.fix(P);return runs.filter(r=>r.axis===(g.X?'x':'z')&&r.fix===fx&&(r.ra<0||r.rb<0)&&!r.door).map(r=>[r.a0*TILE,r.a1*TILE])};
-  wins.sort((a,b)=>b.span-a.span);
-  for(const w of wins){let pick=null,pc=1e9;for(const c of cs){const k=cost(c,w);if(k<pc){pc=k;pick=c}}
-    const S=segs(w.side),U=used[w.side];let place=null;
-    const tryC=c=>{const n=band||w.span>=1.7*c.W?clamp(Math.round(w.span/c.W),1,6):1,tw=n*c.W;let bp=null,bd=1e9;
-      for(const [s0,s1] of S){const lo=s0+tw/2+.05,hi=s1-tw/2-.05;if(hi<lo)continue;for(const raw of [w.a,Math.round(w.a/.25)*.25]){let x=clamp(raw,lo,hi);const sx=Math.round(x/.25)*.25;if(sx>=lo&&sx<=hi)x=sx;
-          for(const u of U){if(x+tw/2>u[0]-.12&&x-tw/2<u[1]+.12){const r=u[1]+.12+tw/2,l=u[0]-.12-tw/2;x=Math.abs(r-w.a)<Math.abs(l-w.a)&&r<=hi?r:l>=lo?l:r}}
-          if(x<lo-.001||x>hi+.001||U.some(u=>x+tw/2>u[0]-.11&&x-tw/2<u[1]+.11))continue;const d=Math.abs(x-w.a);if(d<bd){bd=d;bp={c,n,tw,x}}}}return bp};
-    place=tryC(pick);if(!place)for(const c of cs){if(c===pick)continue;place=tryC(c);if(place)break}
-    if(!place){const c=cs[0];place={c,n:1,tw:c.W,x:clamp(w.a,c.W/2+.05,w.L0-c.W/2-.05)}}
-    const c=place.c;U.push([place.x-place.tw/2,place.x+place.tw/2]);let wh=clamp(w.sill-c.y0,.05-c.y0,WALL_H-.03-c.y1);wh=Math.round(wh/.05)*.05;if(c.y1+wh>WALL_H-.02)wh-=.05;
-    const fx=w.g.fix(P)*TILE;for(let i=0;i<place.n;i++){const a=place.x-place.tw/2+(i+.5)*c.W;out.push({arch:c.arch,seed:c.seed,x:r4(w.g.X?a:fx),y:0,z:r4(w.g.X?fx:a),ry:r4(normA(w.g.ry)),wh:r4(wh),anc:'b',parent:0,colors:{},light:null,fside:w.side})}}
-  return out}
+const facadeWindows=(spec,P,runs,pk)=>SH.facadeWindows(spec,P,runs,pk);
 const facadeSummary=(spec,pk)=>({main:spec.main||'N',tier:spec.tier||null,band:isBand(pk),faces:spec.faces.map(f=>({side:f.side,exterior:f.exterior!==false,n:f.exterior===false||!Array.isArray(f.windows)?0:f.windows.length}))});
 const isWinArch=k=>!!(TG[k]&&TG[k].has('window'));
 // the facade applied to a recipe before it loads: starter windows (and anything stacked on them) out, facade windows in
 function facadeRecipe(rc,P,spec,pk){const recs=facadeWindows(spec,P,SH.wallRunsOf(P),pk);if(!recs)return -1;const drop=new Set(rc.pieces.filter(q=>!q.parent&&isWinArch(q.arch)).map(q=>q.id));
   let grew=true;while(grew){grew=false;for(const q of rc.pieces)if(q.parent&&drop.has(q.parent)&&!drop.has(q.id)){drop.add(q.id);grew=true}}
   rc.pieces=rc.pieces.filter(q=>!drop.has(q.id));let id=rc.pieces.reduce((m,q)=>Math.max(m,q.id),0)+1;for(const r of recs){delete r.fside;r.id=id++;rc.pieces.push(r)}rc.home.facade=facadeSummary(spec,pk);return recs.length}
+/* ---------- a home furnished for its household: the lab's furnisher (layout engine, rule-break ladder, mixed sets, lived-in clutter) run for a
+   makeHousehold-shaped household, with the real building's windows placed first (the planner keeps furniture clear of them), loaded as an ordinary
+   editable recipe. tier null or 'auto': the building's tier (else household.pod, else small). Deterministic for the same household, pod and facade. */
+const HH_REL=['single','couple','roommates','siblings','couple+roommate'],HH_AGE=['young','adult','older'],HH_SHIFT=['day','night','none'];
+function hhClean(h){const ms=(Array.isArray(h.members)?h.members:[]).slice(0,6).map((m,i)=>{const t=m&&m.temperament||{};const c01=v=>Number.isFinite(+v)?clamp(+v,0,1):.5;
+    return {id:m&&m.id||'m'+(i+1),age:HH_AGE.includes(m&&m.age)?m.age:'adult',job:m&&m.job?String(m.job):'unemployed',shift:HH_SHIFT.includes(m&&m.shift)?m.shift:'day',
+      temperament:{outgoing:c01(t.outgoing),careful:c01(t.careful),warm:c01(t.warm)},hobbies:Array.isArray(m&&m.hobbies)?m.hobbies.map(String):[]}});
+  if(!ms.length)throw new Error('furnishFor: the household needs at least one member');const n=ms.length;
+  const r0=h.relation,fits=r0==='single'?n===1:r0==='couple'?n===2:r0==='couple+roommate'?n===3:(r0==='roommates'||r0==='siblings')&&n>=2;const relation=fits?r0:n===1?'single':n===2?'couple':'roommates';
+  return {seed:h.seed!=null?h.seed:1,label:h.label?String(h.label):'Household',relation,pod:TIER_M[h.pod]?h.pod:null,members:ms}}
+async function furnishFor(h,o){o=o||{};sIn();const pf=pfStart('furnishFor'),own=PF.cur===pf&&pf.kind==='furnishFor',otok=B.openTok|0;try{
+  const hh=hhClean(h||{});while(B.loading)await pwait(sleep(16));const pk=podOK(o.pod)||podFrom(hh.seed);
+  let tier=o.tier||null;const auto=!tier||tier==='auto';const early=o.noCtx?false:ctxEarly(pk,auto?null:tier);
+  let f=null;if(pk.cell){pfStage('facade');const a=performance.now();try{f=await pwait(facadeFor(pk,auto?null:tier))}catch(e){console.warn('builder: facade failed',e);f=null}pf.facadeMs+=performance.now()-a}
+  if(auto)tier=f&&TIER_M[f.tier]?f.tier:(hh.pod||'small');if(!TIER_M[tier])tier='small';hh.pod=tier;
+  if(!early)setBusy('Furnishing the home for '+(hh.members.length===1?'its resident':'its '+hh.members.length+' residents')+'…');
+  pfStage('plan');let P=null,job=null,ms=0;
+  if(await pwait(wkStart())){const a=performance.now();try{const r=await pwait(wkPlan({type:'plan',hh,lseed:1,facade:facadeMsg(f),pk}));P=r.plan;job=r.job;ms=r.ms;pf.workerPlanMs=r.ms}catch(e){console.warn('builder: worker plan failed, planning in the page',e);P=null}pf.planWaitMs+=performance.now()-a}
+  if(!P){await yslice(0);const a=performance.now();try{P=SH.furnish(hh,1,f?SH.facadeHook(f,pk):null)}catch(e){setBusy(null);throw e}ms=performance.now()-a;pf.inPagePlanMs+=ms}
+  if(!o.auto)keepPrev();const rc=planToRecipe(P);rc.home.pod=pk;if(f)rc.home.facade=facadeSummary(f,pk);rc.home.household={seed:hh.seed,label:hh.label,relation:hh.relation,n:hh.members.length};if(B.hostT)rc.home.night=B.hostT==='night';
+  if(otok!==(B.openTok|0)){if(job)job.release();return null}// unloaded meanwhile
+  await loadRecipe(rc,{job,early,noCtx:o.noCtx});B.slotName=null;if(!o.quiet)L.toast('Furnished for '+hh.label+'.');
+  const res={tier,pieces:B.recs.size,ms:Math.round(ms),facade:!!f,setMix:P.setMix||'',notes:(P.cardNotes||[]).slice()};if(own)res.perf=pfEnd(pf);return res}
+  finally{if(own&&PF.cur===pf)pfEnd(pf)}}
+// the Residents card under the Home readout: [{name, age, job, traits}], {vacant:true} with an empty list for a vacant pod, null hides it
+function setResidents(list,o){o=o||{};const el=$('bRes');if(!el)return;const L0=Array.isArray(list)?list.filter(Boolean).slice(0,8):[];
+  if(list==null&&!o.vacant){el.hidden=true;el.innerHTML='';B.residents=null;return}const vac=!L0.length&&!!o.vacant;B.residents={list:clone(L0),vacant:vac};
+  if(vac)el.innerHTML='<p class="bresv"><b>Vacant</b>: nobody lives here yet</p>';
+  else if(!L0.length){el.hidden=true;el.innerHTML='';return}
+  else{const open=el.dataset.open!=='0';el.innerHTML=`<details${open?' open':''}><summary>Residents <span>${L0.length}</span></summary><ul>${L0.map(r=>{const tr=Array.isArray(r.traits)?r.traits.slice(0,5):[];
+      return `<li><span class="nm">${esc(String(r.name||'Resident'))}</span>${Number.isFinite(+r.age)&&r.age!==''&&r.age!=null?`<span class="ag">${Math.round(+r.age)}</span>`:''}${r.job?`<span class="jb">${esc(String(r.job))}</span>`:''}${tr.length?`<span class="tr">${tr.map(t=>`<i>${esc(String(t))}</i>`).join('')}</span>`:''}</li>`}).join('')}</ul></details>`;
+    const d=el.querySelector('details');d.addEventListener('toggle',()=>{el.dataset.open=d.open?'1':'0'})}
+  el.hidden=false}
 // public: replace the home's top-level windows with a facade spec's. o.history false applies it without an undo step (a new home); default is one undoable step.
 function setWindows(spec,o){o=o||{};if(!B.s||!B.P||B.loading)return -1;const recs=facadeWindows(spec,B.P,B.s.runs,B.home.pod);if(!recs)return -1;
   const old=[...B.recs.values()].filter(r=>!r.parent&&isWinArch(r.arch)).map(r=>r.id);const all=new Set();old.forEach(id=>descendants(id).forEach(d=>all.add(d)));const oldRecs=[...all].map(id=>clone(B.recs.get(id)));
@@ -15104,14 +15352,14 @@ function onPointerFrame(){if(B.trans)return;const t0=performance.now();setRay();
 /* ======================= 13. frame loop, HUD ======================= */
 function setHud(on){B.hud=on;$('bHud').checked=on;prCall('setOptions',{hud:on});syncLightUI();B.needs=true}
 const SORT=new Float32Array(240);
-function loop(now){if(!B.on){B.raf=0;return}B.raf=requestAnimationFrame(loop);const dt=B.last?Math.min(.1,(now-B.last)/1000):0;if(B.last){B.ft[B.fti]=now-B.last;B.fti=(B.fti+1)%240;if(B.ftn<240)B.ftn++}B.last=now;if(!B.s||B.loading)return;
+function loop(now){if(!B.on){B.raf=0;return}B.raf=requestAnimationFrame(loop);const dt=B.last?Math.min(.1,(now-B.last)/1000):0;if(B.last){B.ft[B.fti]=now-B.last;B.fti=(B.fti+1)%240;if(B.ftn<240)B.ftn++}B.last=now;if(B.warming)return;if(!B.s||B.loading){pendingFrame(dt);return}
   if(B.tw){const k=Math.min(1,(now-B.tw.t0)/(SH.ROT_S*1000)),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;B.az=B.tw.a0+(B.tw.a1-B.tw.a0)*e;if(k>=1)B.tw=null;B.camDirty=true}
   if(B.camDirty)updateCam();if(B.wallsMoving){B.wallsMoving=SH.applyWalls(B.s,dt);B.needs=true;notify('walls',null);if(!B.wallsMoving){showSelHi();if(B.sel&&B.sel.t==='piece')updateRing()}}
   if(B.ptr.dirty){B.ptr.dirty=false;onPointerFrame()}
   if(window.PodContext&&typeof window.PodContext.frame==='function')ctxCall('frame',dt);
   const R=B.prOn?window.PodRender:null;const cont=R||B.trans||(B.hud&&!$('bHudBox').hidden);
   if(B.paused){if(B.needs){B.needs=false;B.sc.updateMatrixWorld()}}
-  else if(B.needs||cont){B.needs=false;const t0=performance.now();if(R&&prCall('render',dt)!==false&&B.prOn){}else B.dr.render(B.sc,B.cam);B.rms=performance.now()-t0;B.rendered++}
+  else if(B.needs||cont){B.needs=false;const t0=performance.now();if(R&&prCall('render',dt)!==false&&B.prOn){}else B.dr.render(B.sc,B.cam);B.rms=performance.now()-t0;B.rendered++;if(B.firstFrameT0!=null&&B.trans){const d=performance.now()-B.firstFrameT0;B.firstFrameT0=null;if(PF.cur)PF.cur.firstFrameMs=d}}
   if(now-B.hudT>250){B.hudT=now;hud()}}
 function frameStats(){const n=B.ftn;if(!n)return {fps:0,ms:0,low1:0};let s=0;for(let i=0;i<n;i++){SORT[i]=B.ft[i];s+=B.ft[i]}const a=SORT.subarray(0,n);a.sort();const p99=a[Math.min(n-1,Math.floor(n*.99))];const ms=s/n;return {fps:1000/ms,ms,low1:1000/p99}}
 // keep the inspector clear of the renderer's own HUD (top right of the canvas)
@@ -15156,6 +15404,55 @@ async function onView(){const on=document.body.dataset.view==='build';if(on===B.
 new MutationObserver(onView).observe(document.body,{attributes:true,attributeFilter:['data-view']});
 // world point (home root space) -> client pixel, for tests
 function screenOf(x,y,z){_v1.set(x,y,z).add(B.root.position).project(B.cam);const r=$('bCanvas').getBoundingClientRect();return {x:r.left+(_v1.x+1)/2*r.width,y:r.top+(1-_v1.y)/2*r.height}}
+/* ---------- the open at the click: PodContext's hologram starts at once on the stage scene (enter {pending:true}); setHome when the shell exists ---------- */
+function pendCam(W,D){if(B.s||!B.cam)return;try{const c=SH.fitCam({Wm:W,Dm:D,runs:[]},B.az==null?SH.AZ0:B.az,(B.cw||1)/(B.ch||1),1,B.pitch||SH.PITCH0);B.cam.copy(c,false);B.cam.updateProjectionMatrix();B.cam.updateMatrixWorld(true)}catch(e){}}
+function ctxEarly(pk,tier){const C=window.PodContext;if(!C||typeof C.setHome!=='function'||typeof C.enter!=='function'||!B.on||B.warming||!B.dr||!B.cam)return false;
+  const PDm=SH.PODS[tier||'medium']||SH.PODS.medium,W=PDm.W*TILE,D=PDm.D*TILE;stageScene();pendCam(W,D);
+  const tok=++ctxTok;B.ctxPending={tok};B.ctxAuto=!(pk&&pk.cell);let done=false;const end=()=>{if(done||tok!==ctxTok)return;done=true;if(B.ctxPending&&B.ctxPending.tok===tok)B.ctxPending=null;transEnd()};
+  transStart();if(PF.cur)PF.cur.earlyTransition=true;B.firstFrameT0=PF.cur?PF.cur.t0:performance.now();B.needs=true;
+  const r=ctxCall('enter',Object.assign({time:timeName(),renderer:B.dr,scene:B.stage,camera:B.cam,canvas:$('bCanvas'),pending:true,home:{W,D},onDone:end},pk,pk.cell?{podCell:pk.cell,district:isLux(pk)?'high':'low'}:{}));
+  if(r&&typeof r.then==='function')r.then(end,end);const t0=performance.now();
+  const poll=()=>{if(done||tok!==ctxTok)return;if(performance.now()-t0>60000){end();return}requestAnimationFrame(poll)};requestAnimationFrame(poll);syncCover();return true}
+function ctxSetHome(){if(!B.s||!B.home)return;ctxCall('setHome',{root:B.root,rooms:roomInfo(),home:{W:B.home.W*TILE,D:B.home.D*TILE}})}
+// while a home loads under the hologram: the stage is drawn with the home hidden (no program compiles on the main thread), the context draws over it
+function pendingFrame(dt){if(!B.trans||!B.stage||!B.dr||!B.cam||B.paused)return;const C=window.PodContext;if(C&&typeof C.frame==='function')ctxCall('frame',dt);
+  const rv=B.root?B.root.visible:true;if(B.root)B.root.visible=false;try{B.dr.render(B.stage,B.cam)}catch(e){console.error(e)}finally{if(B.root)B.root.visible=rv}
+  if(B.firstFrameT0!=null){const d=performance.now()-B.firstFrameT0;B.firstFrameT0=null;if(PF.cur)PF.cur.firstFrameMs=d}}
+/* ---------- one iframe across opens: unload, kept programs, warm-up ---------- */
+const KEEP={mats:new Set(),progs:new Set()};
+// one material per linked program stays alive (never disposed, its textures are), so three keeps the program for the next home
+function keepPrograms(){if(!B.sc||!B.dr)return 0;let n=0;B.sc.traverse(o=>{if(!o.material)return;for(const m of (Array.isArray(o.material)?o.material:[o.material])){if(!m||KEEP.mats.has(m))continue;
+    const p=B.dr.properties.get(m),pr=p&&p.currentProgram;if(pr&&!KEEP.progs.has(pr)){KEEP.progs.add(pr);KEEP.mats.add(m);n++}}});return n}
+async function unload(){sIn();ctxTok++;B.openTok=(B.openTok|0)+1;B.ctxPending=null;B.firstFrameT0=null;if(B.trans)transEnd();while(B.loading)await sleep(16);cancelPlace(true);select(null);closePop();
+  keepPrograms();await disposeHome();for(const m of [B.defFloor,B.defWall])if(m&&!KEEP.mats.has(m))m.dispose();B.defFloor=B.defWall=null;
+  B.home=null;B.P=null;B.fin={floor:{},wall:{},seg:{}};B.undo.length=0;B.redo.length=0;syncUndo();B.dirty=false;B.fresh=false;B.slotName=null;setResidents(null);B.hover=0;
+  if(WK.w)WK.w.postMessage({type:'reset'});const st=$('bStatus');if(st)st.textContent='';if(B.dr){B.dr.setRenderTarget(null);B.dr.clear()}B.needs=true;return true}
+const WARM_HH={seed:917201,label:'Warm-up household',relation:'couple',pod:'medium',members:[{id:'m1',age:'adult',job:'nurse',shift:'night',temperament:{outgoing:.4,careful:.6,warm:.7},hobbies:['plants','reading']},{id:'m2',age:'young',job:'courier',shift:'day',temperament:{outgoing:.7,careful:.4,warm:.5},hobbies:['gaming','music']}]};
+let WARMP=null;
+// boots everything that needs no home while the game's title shows: the renderer, the worker and its bundle, PodContext's targets and
+// programs, then a sample home through the whole open path (worker plan, streamed pieces, slices), compiled in the background and unloaded
+// with its programs kept. Every step yields; the WebGL context creation is the one step that cannot be split.
+function warm(){if(WARMP)return WARMP;WARMP=(async()=>{const t0=performance.now(),r={};const T0=()=>performance.now();
+  await yieldTask();let a=T0();if(!B.dr)initRenderer();r.rendererMs=T0()-a;await yieldTask();
+  a=T0();r.worker=await wkStart();r.workerMs=T0()-a;r.workerInfo=WK.info||{failed:WK.failed};
+  let pw=null;if(r.worker){const id=++WK.seq;pw=new Promise(res=>{WK.reqs.set(id,{res,rej:()=>res(null)})});WK.w.postMessage({type:'prewarm',id})}
+  const C=window.PodContext;if(C&&typeof C.warm==='function'){a=T0();try{await C.warm({renderer:B.dr})}catch(e){console.warn('builder: PodContext.warm',e)}r.contextMs=T0()-a}
+  if(!B.s&&!B.loading){B.warming=true;try{a=T0();await furnishFor(WARM_HH,{tier:'medium',pod:{district:'mid',floor:8,side:'N',seed:4242},quiet:true,auto:true,noCtx:true});r.sampleMs=T0()-a;r.samplePerf=PF.last;
+      a=T0();const R=window.PodRender;if(B.prOn&&R&&typeof R.compileAsync==='function'){try{await R.compileAsync(B.sc,B.cam)}catch(e){console.warn('builder: compileAsync',e)}}r.compileMs=T0()-a;r.kept=keepPrograms();await unload()}
+    catch(e){console.warn('builder: warm-up sample failed',e);r.error=String(e&&e.message||e)}finally{B.warming=false}}else r.sample='skipped: a home is open';
+  if(pw){a=T0();const p=await pw;r.probes=p?p.n:0;r.probeMs=p?p.ms:null;r.probeWaitMs=T0()-a}r.programs=B.dr?B.dr.info.programs.length:0;r.totalMs=T0()-t0;for(const k in r)if(typeof r[k]==='number')r[k]=Math.round(r[k]*10)/10;B.warmInfo=r;return r})();return WARMP}
+// test aids: the worker's plan against the page's for one household, and worker-built pieces against page-built ones
+async function comparePlan(h,o){o=o||{};const hh=hhClean(h);hh.pod=TIER_M[o.tier]?o.tier:(hh.pod||'small');const pk=podOK(o.pod)||podFrom(hh.seed);const f=o.facade||null;
+  if(!await wkStart())return {worker:false,why:WK.failed};const r=await wkPlan({type:'plan',hh,lseed:1,facade:facadeMsg(f),pk});r.job.release();
+  const a=performance.now();const P=SH.compactPlan(SH.furnish(hh,1,f?SH.facadeHook(f,pk):null));const pageMs=performance.now()-a;const strip=x=>JSON.stringify(Object.assign({},x,{ms:0}));
+  return {worker:true,same:strip(r.plan)===strip(P),workerMs:Math.round(r.ms),pageMs:Math.round(pageMs),pieces:[r.plan.pieces.length,P.pieces.length]}}
+async function compareGen(items){if(!await wkStart())return {worker:false,why:WK.failed};const job=wkGen(items);await job.waitAll(items.map(i=>i.arch+'#'+i.seed),30000);const out=[];
+  const sig=g=>{const r={meshes:0,verts:0,pos:0,mats:[],tex:0};g.updateMatrixWorld(true);g.traverse(o=>{if(!o.isMesh&&!o.isLine)return;r.meshes++;const p=o.geometry.attributes.position;r.verts+=p.count;for(let i=0;i<p.array.length;i+=7)r.pos+=p.array[i]*(1+i%5);
+    for(const m of (Array.isArray(o.material)?o.material:[o.material])){r.mats.push(m.type+':'+(m.color?m.color.getHexString():'')+':'+(m.emissive?m.emissive.getHexString():'')+':'+(+m.roughness||0).toFixed(3)+':'+!!m.transparent+':'+m.side);if(m.map)r.tex++}});r.pos=+r.pos.toFixed(4);r.mats=r.mats.join('|');return r};
+  for(const it of items){const w=job.items.get(it.arch+'#'+it.seed);if(!w||w.err){out.push({key:it.arch+'#'+it.seed,error:w?w.err:'missing'});continue}const A=assemble(job,w),Bp=L.generate(it,{dressOn:false});
+    const sa=sig(A.b.g),sb=sig(Bp.b.g);const fa=JSON.stringify([A.center,A.minZ,A.wall,A.wallOnly,A.W,A.D,A.H]),fb=JSON.stringify([Bp.center,Bp.minZ,!!Bp.wall,!!Bp.wallOnly,Bp.W,Bp.D,Bp.H]);
+    out.push({key:it.arch+'#'+it.seed,same:JSON.stringify(sa)===JSON.stringify(sb)&&fa===fb,worker:sa,page:sb});L.freeGroup(Bp.b.g)}
+  job.release();return {worker:true,n:out.length,mismatches:out.filter(x=>!x.same),ok:out.every(x=>x.same)}}
 window.PodBuilder={version:1,enter:enterView,editPlan,newHome,load:rc=>loadRecipe(rc),recipe,save:saveSlot,loadSlot,slots,undo,redo,setWalls,rotateView,setPitch,select:id=>select(id?{t:'piece',id}:null),
   pieces:()=>[...B.recs.values()].map(r=>clone(r)),piece:id=>{const i=B.inst.get(id);return i?{rec:clone(i.rec),kind:i.kind,name:i.name,slots:i.slots.map(s=>({key:s.key,kind:s.kind,orig:s.orig})),lights:i.lights.length,visible:i.pivot.visible,run:i.run}:null},
   openCat,closeFly,items:k=>loadItems(k),itemsDone:k=>!!(ITEMS[k]&&ITEMS[k].done),startPlace:(arch,seed)=>startPlace({id:arch+'#'+seed,arch,seed}),cancel:()=>cancelPlace(),setTool,
@@ -15167,7 +15464,7 @@ window.PodBuilder={version:1,enter:enterView,editPlan,newHome,load:rc=>loadRecip
   surfaces:id=>{const i=B.inst.get(id);if(!i)return [];i.g.updateMatrixWorld(true);return i.surfaces.map(q=>{_v1.set(q.x,q.y,q.z).applyMatrix4(i.g.matrixWorld).sub(B.root.position);return {x:_v1.x,y:_v1.y,z:_v1.z,w:q.round?q.r*2:q.w,d:q.round?q.r*2:q.d}})},
   wallSpans:run=>[...B.inst.values()].filter(i=>i.kind==='wall'&&!i.rec.parent&&i.wsp.run===run).map(i=>({a0:i.wsp.a0,a1:i.wsp.a1,y0:i.wsp.y0,y1:i.wsp.y1,rid:i.wsp.rid})),
   lighting:()=>{let ws=0;if(B.sc)B.sc.traverse(o=>{if(o.isLight&&o.userData.workLight)ws+=o.intensity});return {work:B.work,time:timeName(),workIntensity:ws,fallback:!!(B.env&&B.env.g.parent)}},setWork,setTime:(t,o)=>o&&o.host?hostTime(t):setTime(t),onChange:fn=>{changeFns.add(fn);return ()=>changeFns.delete(fn)},onSave:fn=>{saveFns.add(fn);return ()=>saveFns.delete(fn)},
-  setWindows:(spec,o)=>setWindows(spec,o),facadeOf:()=>B.home&&B.home.facade?clone(B.home.facade):null,facade:pk=>facadeFor(podOK(pk)||B.home&&B.home.pod,B.home&&B.home.tier),
+  setWindows:(spec,o)=>setWindows(spec,o),warm:()=>warm(),unload:()=>unload(),perf:()=>PF.last?JSON.parse(JSON.stringify(PF.last)):null,warmInfo:()=>B.warmInfo||null,worker:()=>({ok:WK.ok,failed:WK.failed,info:WK.info}),comparePlan,compareGen,furnishFor:(hh,o)=>furnishFor(hh,o),setResidents:(l,o)=>setResidents(l,o),residents:()=>B.residents?clone(B.residents):null,household:()=>B.home&&B.home.household?clone(B.home.household):null,facadeOf:()=>B.home&&B.home.facade?clone(B.home.facade):null,facade:pk=>facadeFor(podOK(pk)||B.home&&B.home.pod,B.home&&B.home.tier),
   // window pieces grouped per lab wall side; pieces that abut (gap under 10 cm) count as one window (a band)
   windowsBySide:()=>{const P=B.P;if(!P)return null;const Wm=P.W*TILE,Dm=P.D*TILE,out={N:[],S:[],E:[],W:[]};for(const i of B.inst.values()){if(!i.pivot.userData.window||i.rec.parent)continue;const r=i.rec,w=i.lbox.max.x-i.lbox.min.x;
       const d={N:Math.abs(r.z),S:Math.abs(r.z-Dm),W:Math.abs(r.x),E:Math.abs(r.x-Wm)};const sd=Object.keys(d).sort((a,b)=>d[a]-d[b])[0];if(d[sd]>.12)continue;const a=sd==='N'||sd==='S'?r.x:r.z;out[sd].push([a-w/2,a+w/2,i.lbox.min.y+(r.wh||0),i.lbox.max.y+(r.wh||0)])}
@@ -15405,9 +15702,15 @@ function setTime(t){if(!C||!C.city)return;C.time=t==='day'?'day':'night';const K
 
 /* ---------------- render targets and the bake ---------------- */
 function rt(w,h,o){const r=new T.WebGLRenderTarget(Math.max(1,w|0),Math.max(1,h|0),Object.assign({type:T.HalfFloatType,depthBuffer:false,minFilter:T.LinearFilter,magFilter:T.LinearFilter},o||{}));r.texture.generateMipmaps=false;return r}
-function targets(R){const s=R.getDrawingBufferSize(new T.Vector2());const w=s.x>>1,h=s.y>>1,key=w+'x'+h;if(C.tk===key)return;C.tk=key;if(C.T)for(const k in C.T)C.T[k].dispose();
-  const dt=new T.DepthTexture(w,h);dt.type=T.UnsignedIntType;const dm=new T.DepthTexture(w>>1,h>>1);dm.type=T.UnsignedIntType;const dl=new T.DepthTexture(Math.max(1,w>>2),Math.max(1,h>>2));dl.type=T.UnsignedIntType;C.T={al:rt(w/4,h/4,{depthBuffer:true,depthTexture:dl}),am:rt(w/2,h/2,{depthBuffer:true,depthTexture:dm}),a:rt(w,h,{depthBuffer:true,depthTexture:dt}),b:rt(w/2,h/2),bt:rt(w/2,h/2),c:rt(w/4,h/4),ct:rt(w/4,h/4),d:rt(w/8,h/8),dt2:rt(w/8,h/8),
-    pres:rt(w,h,{type:T.UnsignedByteType}),next:rt(w,h,{type:T.UnsignedByteType}),prev:rt(w,h,{type:T.UnsignedByteType}),show:rt(w,h,{type:T.UnsignedByteType}),holo:rt(s.x,s.y,{type:T.UnsignedByteType})};C.shown=false;C.dirty=true}
+function targets(R){const s=R.getDrawingBufferSize(new T.Vector2());const w=s.x>>1,h=s.y>>1,key=w+'x'+h;if(KIT.tk===key&&KIT.T){if(C)C.T=KIT.T;return}KIT.tk=key;if(KIT.T)for(const k in KIT.T)KIT.T[k].dispose();const CX=CC();
+  const dt=new T.DepthTexture(w,h);dt.type=T.UnsignedIntType;const dm=new T.DepthTexture(w>>1,h>>1);dm.type=T.UnsignedIntType;const dl=new T.DepthTexture(Math.max(1,w>>2),Math.max(1,h>>2));dl.type=T.UnsignedIntType;CX.T={al:rt(w/4,h/4,{depthBuffer:true,depthTexture:dl}),am:rt(w/2,h/2,{depthBuffer:true,depthTexture:dm}),a:rt(w,h,{depthBuffer:true,depthTexture:dt}),b:rt(w/2,h/2),bt:rt(w/2,h/2),c:rt(w/4,h/4),ct:rt(w/4,h/4),d:rt(w/8,h/8),dt2:rt(w/8,h/8),
+    pres:rt(w,h,{type:T.UnsignedByteType}),next:rt(w,h,{type:T.UnsignedByteType}),prev:rt(w,h,{type:T.UnsignedByteType}),show:rt(w,h,{type:T.UnsignedByteType}),holo:rt(s.x,s.y,{type:T.UnsignedByteType})};KIT.T=CX.T;CX.shown=false;CX.dirty=true}
+const CC=()=>C||{};
+// what survives between opens: the passes (their programs), the quad scene, the blank texture and the render targets
+const KIT={T:null,tk:null,P:null,qs:null,qc:null,qm:null,blank:null};
+function kit(){if(!KIT.P){KIT.P=passes();KIT.qs=new T.Scene();KIT.qc=new T.OrthographicCamera(-1,1,1,-1,0,1);KIT.qm=new T.Mesh(new T.PlaneGeometry(2,2));KIT.qm.frustumCulled=false;KIT.qs.add(KIT.qm);
+  KIT.blank=new T.DataTexture(new Uint8Array([10,15,36,255]),1,1);KIT.blank.needsUpdate=true}return KIT}
+function disposeKit(){if(KIT.T)for(const k in KIT.T)KIT.T[k].dispose();if(KIT.P)for(const k in KIT.P)KIT.P[k].dispose();if(KIT.qm)KIT.qm.geometry.dispose();if(KIT.blank)KIT.blank.dispose();for(const k in KIT)KIT[k]=null}
 function quad(R,mat,target){R.setRenderTarget(target);C.qm.material=mat;R.render(C.qs,C.qc)}
 function blurInto(R,src,tmp,dst,scale){const P=C.P;P.down.uniforms.t.value=src.texture;P.down.uniforms.px.value.set(1/src.width,1/src.height);quad(R,P.down,dst);
   for(const [a,b,dx,dy] of [[dst,tmp,1,0],[tmp,dst,0,1]]){P.blur.uniforms.t.value=a.texture;P.blur.uniforms.dir.value.set(dx*scale/a.width,dy*scale/a.height);quad(R,P.blur,b)}}
@@ -15480,10 +15783,10 @@ function flyCam(cam,t){const c=camFor(cam),h=C.city,g=ease(ph(t,'glide')),gz=ph(
   c.updateMatrixWorld(true);return c}
 // the transition's own clock: it runs freely through the city phase, then holds there (a slow drift) until the city is ready, then plays on
 const HOLD=.6,tNow=tr=>tr.hold!=null?tr.hold:tr.vt;
-function advance(tr){const t=now(),dt=Math.min(.1,(t-tr.last)/1000);tr.last=t;const ready=C.ready&&C.shown;
-  if(tr.gate&&(ready||t-tr.t0>25000)){tr.gate=false;C.tl.resolveStart=Math.round(t-C.tl.t0)}if(tr.hold==null)tr.vt=tr.gate?Math.min(tr.vt+dt,HOLD):tr.vt+dt;tr.drift+=dt}
+function advance(tr){const t=now(),dt=Math.min(.1,(t-tr.last)/1000);tr.last=t;const ready=C.ready&&C.shown&&!C.pendingHome;
+  if(tr.gate&&(ready||t-tr.t0>25000)){tr.gate=false;C.tl.resolveStart=C.tl.resolve=Math.round(t-C.tl.t0)}if(tr.hold==null)tr.vt=tr.gate?Math.min(tr.vt+dt,HOLD):tr.vt+dt;tr.drift+=dt}
 function loadFrac(){const src=CITY.state==='ready'?1:CITY.k||0;return clamp(.45*src+.35*(C.prog.build||0)+.15*(C.prog.warm||0)+.05*(C.shown?1:0),0,1)}
-function overlay(R,cam){if(!C||!C.trans||!cam)return;const a0=now(),tr=C.trans;advance(tr);const t=tNow(tr);targets(R);
+function overlay(R,cam){if(!C||!C.trans||!cam)return;const a0=now(),tr=C.trans;advance(tr);if(C.tl.firstHoloFrame==null)C.tl.firstHoloFrame=Math.round(a0-C.tl.t0);const t=tNow(tr);targets(R);
   const P=C.P.over.uniforms;P.uProg.value=loadFrac();P.uShow.value=tr.gate&&now()-tr.t0>6000?1:0;   // a thin progress line inside the hologram only when loading runs long
   if(tr.rm){if(tr.gate){drawOver(R,null,1,0);tr.frames.push(now());return}tr.rmT=tr.rmT||now();const a=1-clamp((now()-tr.rmT)/1000/DUR_RM,0,1);if(a<=0)return endTrans();drawOver(R,null,a,0);tr.frames.push(now());return}
   if(t>=DUR)return endTrans();const h=C.city;if(!h||(h.real&&!h.M)){drawOver(R,null,1,0);tr.frames.push(now());return}   // nothing to show yet: the hologram's dark field
@@ -15497,7 +15800,7 @@ function drawOver(R,tex,a,ca){const P=C.P;P.over.uniforms.t.value=tex||C.blank;P
 // while the hologram fully covers the frame PodRender skips drawing the home
 function paused(){if(!C||!C.trans)return false;return C.trans.rm?C.trans.gate:tNow(C.trans)<TL.resolve[0]-.15}
 function endTrans(){if(!C||!C.trans)return;const tr=C.trans;C.trans=null;api.transitioning=false;removeSkip();const f=tr.frames,d=[];for(let i=1;i<f.length;i++)d.push(f[i]-f[i-1]);d.sort((x,y)=>x-y);
-  C.tl.end=Math.round(now()-C.tl.t0);C.lastTrans={timeline:Object.assign({},C.tl,{t0:undefined}),frames:f.length,ms:+(now()-tr.t0).toFixed(0),medianMs:d.length?+d[d.length>>1].toFixed(2):null,worstMs:d.length?+d[d.length-1].toFixed(2):null,skipped:!!tr.skipped,reducedMotion:!!tr.rm,path:api._prDriving()?'PodRender':'plain'};
+  C.tl.end=Math.round(now()-C.tl.t0);C.tl.longestTaskMs=Math.round(C.longTask||0);C.tl.longestSliceMs=+Math.max(C.slice||0,C.ovMax||0).toFixed(1);C.lastTrans={timeline:Object.assign({},C.tl,{t0:undefined}),frames:f.length,ms:+(now()-tr.t0).toFixed(0),medianMs:d.length?+d[d.length>>1].toFixed(2):null,worstMs:d.length?+d[d.length-1].toFixed(2):null,skipped:!!tr.skipped,reducedMotion:!!tr.rm,path:api._prDriving()?'PodRender':'plain'};
   try{tr.onDone&&tr.onDone()}catch(e){console.warn(e)}tr.resolve(C.lastTrans);wantDraw();if(C.swapAfter){C.swapAfter=false;setTimeout(lateSwap,0)}}
 function lateSwap(){if(!C||!C.swapLater||C.city&&C.city.real)return;if(api.transitioning){C.swapAfter=true;return}const dh=defaultHome();if(!dh)return;
   const o=Object.assign({},C.opts,{podCell:dh.cell,section:dh.section,floor:dh.floor,zone:dh.zone,kind:dh.kind,district:dh.zone,transition:false,onDone:null});try{window.dispatchEvent(new CustomEvent('podcontext:home',{detail:dh}))}catch(e){}enter(o)}
@@ -15506,8 +15809,35 @@ function addSkip(){_keyH=e=>{if(e.key==='Escape'||e.key===' '||e.key==='Enter')a
 function removeSkip(){if(_keyH)window.removeEventListener('keydown',_keyH,true);if(_ptrH)window.removeEventListener('pointerdown',_ptrH,true);_keyH=_ptrH=null}
 
 /* ---------------- shader warmup ---------------- */
+// three r149 reads a program's uniforms right after linking it, which blocks until the link is done; while compiling here that read is
+// answered 'no uniforms' for programs still linking, and once each has linked its uniform table is built for real (as PodRender does)
+function asyncCompile(R,scene,cam,target){const gl=R.getContext(),ext=gl.getExtension('KHR_parallel_shader_compile');
+  const go=()=>{R.setRenderTarget(target||null);R.compile(scene,cam);R.setRenderTarget(null)};if(!ext){go();return Promise.resolve()}
+  const pend=new Set(),orig=gl.getProgramParameter,cse=R.debug.checkShaderErrors;R.debug.checkShaderErrors=false;
+  gl.getProgramParameter=function(p,pn){if(pn===gl.ACTIVE_UNIFORMS&&!orig.call(gl,p,ext.COMPLETION_STATUS_KHR)){pend.add(p);return 0}return orig.call(gl,p,pn)};
+  try{go()}finally{gl.getProgramParameter=orig;R.debug.checkShaderErrors=cse}
+  const mats=[];scene.traverse(o=>{if(o.material)for(const m of [].concat(o.material))mats.push(m)});
+  const fix=p=>{const pr=R.info.programs.find(x=>x.program===p);if(pr){const WU=pr.getUniforms().constructor;let c=null;pr.getUniforms=()=>c||(c=new WU(gl,p))}if(!gl.getProgramParameter(p,gl.LINK_STATUS))console.error('PodContext: link failed',gl.getProgramInfoLog(p))};
+  return new Promise(res=>{const t0=now();const step=()=>{for(const p of [...pend])if(!gl.isProgram(p))pend.delete(p);else if(orig.call(gl,p,ext.COMPLETION_STATUS_KHR)||now()-t0>4000){fix(p);pend.delete(p);if(now()-t0<=4000)break}
+      if(pend.size)return setTimeout(step,16);for(const m of mats){const mp=R.properties.get(m),pr=mp.currentProgram;if(pr&&mp.uniforms){const u=pr.getUniforms();mp.uniformsList=u.constructor.seqWithValue(u.seq,mp.uniforms)}}res(true)};setTimeout(step,16)})}
+const idle=()=>new Promise(r=>window.requestIdleCallback?requestIdleCallback(()=>r(),{timeout:200}):setTimeout(r,16));
+// PodContext.warm(): before any home (the title screen), compile every program an open will use, against the targets it will draw into, and
+// allocate those targets, in idle slices; the first open then pays nothing for shaders. (PodRender compiles its own on attach.)
+let _warmP=null;
+function prewarm(o){if(_warmP)return _warmP;o=o||{};const BB=window.PodBuilder&&PodBuilder._B,R=o.renderer||(BB&&BB.dr);if(!R)return Promise.resolve(false);
+  _warmP=(async()=>{const t0=now();kit();targets(R);const cam=new T.OrthographicCamera(-10,10,10,-10,-100,100);cam.position.set(0,10,10);cam.lookAt(0,0,0);cam.updateMatrixWorld(true);
+    for(const k in KIT.T){const t=KIT.T[k];R.setRenderTarget(t);R.clear();R.setRenderTarget(null);await idle()}   // allocate the targets, one per slice
+    const tri=(attrs)=>{const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(new Float32Array([0,0,0,1,0,0,0,0,1]),3));g.setAttribute('normal',new T.BufferAttribute(new Float32Array([0,1,0,0,1,0,0,1,0]),3));
+      for(const a of attrs)g.setAttribute(a,new T.BufferAttribute(new Float32Array(9),3));g.setIndex([0,1,2]);return g};
+    const city=new T.Scene();city.fog=new T.Fog(0x808080,260,520);city.add(new T.HemisphereLight(0xffffff,0x333333,.6));const sun=new T.DirectionalLight(0xffffff,1);city.add(sun,sun.target);
+    const mats=[toonE(),new T.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:.4,depthWrite:false,toneMapped:false})];city.add(new T.Mesh(tri(['color','aE']),mats[0]),new T.Mesh(tri(['color']),mats[1]));
+    const holo=new T.Scene(),dn=new T.ShaderMaterial({vertexShader:DNV,fragmentShader:DNF,uniforms:{uBack:{value:1200}},side:T.DoubleSide,toneMapped:false});holo.add(new T.Mesh(tri(['aE']),dn));
+    const lines=new T.Scene(),PL=podLines(new T.Box3(new T.Vector3(-1,0,-1),new T.Vector3(1,2,1)),0,null);lines.add(PL.ls);
+    const pass=new T.Scene();for(const k in KIT.P)if(k!=='over')pass.add(new T.Mesh(KIT.qm.geometry,KIT.P[k]));const scr=new T.Scene();scr.add(new T.Mesh(KIT.qm.geometry,KIT.P.over));
+    for(const [sc,tg] of [[city,KIT.T.a],[holo,KIT.T.a],[lines,KIT.T.holo],[pass,KIT.T.show],[scr,null]]){await asyncCompile(R,sc,cam,tg);await idle()}
+    for(const m of mats.concat([dn,PL.lm]))m.dispose();PL.lg.dispose();KIT.warmMs=Math.round(now()-t0);return true})().catch(e=>{console.warn('PodContext.warm',e);return false});return _warmP}
 function warm(R,cam){const c=camFor(cam);targets(R);const PR=window.PodRender,async=!!(PR&&PR.compileAsync&&PR.stats&&PR.stats());
-  const comp=(scene,target)=>async?PR.compileAsync(scene,c,target):(R.setRenderTarget(target),R.compile(scene,c),R.setRenderTarget(null),Promise.resolve(true));
+  const comp=(scene,target)=>async?PR.compileAsync(scene,c,target):asyncCompile(R,scene,c,target);
   const ps=new T.Scene();for(const k in C.P){const m=new T.Mesh(C.qm.geometry,C.P[k]);m.frustumCulled=false;ps.add(m)}const sc2=new T.Scene();sc2.add(new T.Mesh(C.qm.geometry,C.P.over));
   const h=C.city,J=[comp(h.sc,C.T.a),comp(h.hs,h.real?C.T.a:C.T.holo),comp(ps,C.T.show),comp(sc2,null)];if(h.ls)J.push(comp(h.ls,C.T.holo));
   return Promise.all(J).then(()=>upload(R,c))}
@@ -15569,7 +15899,15 @@ async function decodePlot(rec,full){const I=CITY.index;const dz=x=>x&&Object.val
   if(full){const p=CITY.packs[rec.pack];return decodeBlocks(await gunzip(p.subarray(rec.off,rec.off+rec.len)),rec.cls,rec.box,I.Q)}
   return rec.clen?decodeBlocks(CITY.coarse.subarray(rec.coff,rec.coff+rec.clen),rec.coarse,rec.box,I.Q):{}}
 // cut the slice lo < y < hi out of a block: triangles inside go, triangles across are clipped (the parts below lo and above hi stay)
-function clipSlice(b,lo,hi){const P=b.pos,I=b.idx,keep=[],np=[],nc=[],ne=[];let n=b.n;
+function clipBelow(b,lo){const P=b.pos,I=b.idx,NR=b.nrm&&b.nrm.length===b.n*3?b.nrm:null;let keep=new Uint32Array(I.length+1024),nk=0,np=[],nc=[],ne=[],nn=[],n=b.n;const grow=()=>{const k2=new Uint32Array(keep.length*2);k2.set(keep);keep=k2};
+  for(let t=0;t<I.length;t+=3){const a=I[t],c=I[t+1],d=I[t+2],ya=P[a*3+1],yc=P[c*3+1],yd=P[d*3+1];
+    if(ya<=lo&&yc<=lo&&yd<=lo){if(nk+3>keep.length)grow();keep[nk++]=a;keep[nk++]=c;keep[nk++]=d;continue}if(ya>=lo&&yc>=lo&&yd>=lo)continue;
+    const v=[a,c,d],out=[];for(let k=0;k<3;k++){const p=v[k],q=v[(k+1)%3],yp=P[p*3+1],yq=P[q*3+1];if(yp<=lo)out.push(p);
+      if((yp<=lo)!==(yq<=lo)){const tt=(lo-yp)/(yq-yp),src=yp<=lo?p:q;np.push(P[p*3]+(P[q*3]-P[p*3])*tt,lo,P[p*3+2]+(P[q*3+2]-P[p*3+2])*tt);nc.push(b.col[src*3],b.col[src*3+1],b.col[src*3+2]);ne.push(b.em[src]);if(NR)nn.push(NR[src*3],NR[src*3+1],NR[src*3+2]);out.push(n++)}}
+    for(let k=1;k+1<out.length;k++){if(nk+3>keep.length)grow();keep[nk++]=out[0];keep[nk++]=out[k];keep[nk++]=out[k+1]}}
+  const pos=new Float32Array(n*3);pos.set(P);pos.set(np,b.n*3);const col=new Uint8Array(n*3);col.set(b.col);col.set(nc,b.n*3);const em=new Uint8Array(n);em.set(b.em);em.set(ne,b.n);
+  const o={pos,col,em,idx:keep.slice(0,nk),n};if(NR){const N2=new Float32Array(n*3);N2.set(NR);N2.set(nn,b.n*3);o.nrm=N2}return o}
+function clipSlice(b,lo,hi){if(hi===Infinity)return clipBelow(b,lo);const P=b.pos,I=b.idx,keep=[],np=[],nc=[],ne=[];let n=b.n;
   const cut=(poly,below)=>{const out=[];for(let i=0;i<poly.length;i++){const a=poly[i],c=poly[(i+1)%poly.length],ina=below?a.p[1]<=lo:a.p[1]>=hi,inc=below?c.p[1]<=lo:c.p[1]>=hi;
       if(ina)out.push(a);if(ina!==inc){const y=below?lo:hi,t=(y-a.p[1])/(c.p[1]-a.p[1]);out.push({p:[a.p[0]+(c.p[0]-a.p[0])*t,y,a.p[2]+(c.p[2]-a.p[2])*t],s:ina?a.s:c.s})}}return out};
   for(let t=0;t<I.length;t+=3){const v=[I[t],I[t+1],I[t+2]],ys=v.map(i=>P[i*3+1]);const mn=Math.min(...ys),mx=Math.max(...ys);
@@ -15581,8 +15919,8 @@ function clipSlice(b,lo,hi){const P=b.pos,I=b.idx,keep=[],np=[],nc=[],ne=[];let 
 const LIN=(()=>{const a=new Float32Array(256);for(let i=0;i<256;i++){const c=i/255;a[i]=c<.04045?c/12.92:Math.pow((c+.055)/1.055,2.4)}return a})();
 const NLIN=(()=>{const c=new T.Color(0x1a1f2e).convertSRGBToLinear();return [c.r,c.g,c.b]})();
 // day and night colors and emission from the base color and the emission index (flags 1-2 rooms and windows, 3 neon, 4-6 lamps and trims)
-function recolor(g,day){const u=g.userData.base,E=CITY.index?CITY.index.em:[[0,0,0,0]],ca=g.getAttribute('color'),ea=g.getAttribute('aE'),c=ca.array,e=ea?ea.array:null,n=u.em.length,glass=!!g.userData.glass;
-  for(let i=0;i<n;i++){let r=LIN[u.col[i*3]],gg=LIN[u.col[i*3+1]],bb=LIN[u.col[i*3+2]],er=0,eg=0,eb=0;const m=u.em[i];
+function recolor(g,day,i0,i1){const u=g.userData.base,E=CITY.index?CITY.index.em:[[0,0,0,0]],ca=g.getAttribute('color'),ea=g.getAttribute('aE'),c=ca.array,e=ea?ea.array:null,n=u.em.length,glass=!!g.userData.glass;
+  for(let i=i0||0,ie=i1==null?n:Math.min(n,i1);i<ie;i++){let r=LIN[u.col[i*3]],gg=LIN[u.col[i*3+1]],bb=LIN[u.col[i*3+2]],er=0,eg=0,eb=0;const m=u.em[i];
     if(glass){const k=day?.9:.28;r*=k;gg*=k;bb*=k}
     else if(m){const q=E[m]||E[0],f=q[3],cr=LIN[q[0]],cg=LIN[q[1]],cb=LIN[q[2]];
       if(day){if(f<=2){r=.022;gg=.035;bb=.075}else{r=cr*.55;gg=cg*.55;bb=cb*.55;er=cr*.18;eg=cg*.18;eb=cb*.18}}
@@ -15617,10 +15955,12 @@ function podLines(b,y0,rooms){const lp=[],x0=b.min.x,x1=b.max.x,z0=b.min.z,z1=b.
   for(const [x,z] of [[x0,z0],[x1,z0],[x1,z1],[x0,z1]])lp.push(x,y0,z,x,yh,z);if(rooms)for(const R of rooms)if(R&&R.box){const a=R.box.min,c=R.box.max;lp.push(a[0],y0+.02,a[2],c[0],y0+.02,a[2],c[0],y0+.02,a[2],c[0],y0+.02,c[2],c[0],y0+.02,c[2],a[0],y0+.02,c[2],a[0],y0+.02,c[2],a[0],y0+.02,a[2])}
   const lm=maxBlend(new T.ShaderMaterial({vertexShader:LV,fragmentShader:LF,uniforms:{uBuild:{value:0},uA:{value:0},uY0:{value:y0},uY1:{value:yh}},toneMapped:false}));
   const lg=new T.BufferGeometry();lg.setAttribute('position',new T.Float32BufferAttribute(lp,3));const ls=new T.LineSegments(lg,lm);ls.frustumCulled=false;return {lm,lg,ls}}
-const yieldFrame=()=>new Promise(r=>setTimeout(r,0));
+const yieldFrame=()=>new Promise(r=>setTimeout(r,0)),nextFrame=()=>new Promise(r=>typeof requestAnimationFrame==='function'?requestAnimationFrame(()=>r()):setTimeout(r,16));
+const SLICE=5,CHUNK=100000;
+const sliceEnd=(t,w)=>{const d=now()-t;if(C&&d>8&&(C.sl=C.sl||[]).length<20)C.sl.push([w,+d.toFixed(1),C.dbgI]);if(C&&d>(C.slice||0)){C.slice=d;C.sliceAt=w}};
 function blockNormals(b){const P=b.pos,I=b.idx,N=new Float32Array(b.n*3);for(let t=0;t<I.length;t+=3){const a=I[t]*3,c=I[t+1]*3,d=I[t+2]*3;
     const ux=P[c]-P[a],uy=P[c+1]-P[a+1],uz=P[c+2]-P[a+2],vx=P[d]-P[a],vy=P[d+1]-P[a+1],vz=P[d+2]-P[a+2],nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
-    for(const k of [a,c,d]){N[k]+=nx;N[k+1]+=ny;N[k+2]+=nz}}
+    N[a]+=nx;N[a+1]+=ny;N[a+2]+=nz;N[c]+=nx;N[c+1]+=ny;N[c+2]+=nz;N[d]+=nx;N[d+1]+=ny;N[d+2]+=nz}
   // a vertex whose faces cancel (both sides of a thin wall, merged corners of the stand-in) gets 'up', never a zero normal: normalize(0) is NaN in the
   // shader, and one NaN pixel spreads through the blur pyramid into black blocks (round 20)
   for(let i=0;i<N.length;i+=3){const l=Math.hypot(N[i],N[i+1],N[i+2]);if(l>1e-12){N[i]/=l;N[i+1]/=l;N[i+2]/=l}else{N[i]=0;N[i+1]=1;N[i+2]=0}}b.nrm=N;return b}
@@ -15636,8 +15976,8 @@ const WGLASS=new Set([0x2c3a52,0x2b4a55,0x3a4252]);
 function unitOf(e,hp){const I=CITY.index,K=I.consts,FH=K.FH||.95,LOT=K.LOT||3.8,cell=CITY.cells.get(e.cell[0]+','+e.cell[1])||{x:e.x,z:e.z,h:10,i:e.cell[0],j:e.cell[1]};
   // a home row may carry its pod's real extent (round 24, from the game: y1 = the pod's top, fp = its block footprint {w, d, ry} at x, z); else one FH
   const y0g=e.y,y1g=e.y1!=null&&e.y1>e.y?e.y1:e.y+(e.kind==='lift'?FH*1.15:FH),ym=(y0g+Math.min(y1g,y0g+FH))/2,pts=[],seen=new Set();
-  for(const k in hp){if(k==='fx')continue;const P=hp[k].pos;for(let i=0;i<P.length;i+=3)if(Math.abs(P[i+1]-ym)<FH*.42){const x=P[i],z=P[i+2];if(Math.abs(x-cell.x)>LOT*.62||Math.abs(z-cell.z)>LOT*.62)continue;
-      const key=Math.round(x*40)+','+Math.round(z*40);if(!seen.has(key)){seen.add(key);pts.push([x,z])}}}
+  if(!(e.fp&&e.fp.w>.3))for(const k in hp){if(k==='fx')continue;const P=hp[k].pos;for(let i=0;i<P.length;i+=3)if(Math.abs(P[i+1]-ym)<FH*.42){const x=P[i],z=P[i+2];if(Math.abs(x-cell.x)>LOT*.62||Math.abs(z-cell.z)>LOT*.62)continue;
+      const key=Math.round(x*40)*1048576+Math.round(z*40);if(!seen.has(key)){seen.add(key);pts.push([x,z])}}}
   let a=0,cx=cell.x,cz=cell.z,hw=LOT*.42,hd=LOT*.42;
   if(e.fp&&e.fp.w>.3&&e.fp.d>.3&&e.x!=null){cx=e.x;cz=e.z;hw=e.fp.w/2;hd=e.fp.d/2;a=-(e.fp.ry||0);while(a>Math.PI/4){a-=Math.PI/2;const t=hw;hw=hd;hd=t}while(a<=-Math.PI/4){a+=Math.PI/2;const t=hw;hw=hd;hd=t}}
   else if(pts.length>=6){const H=hull2(pts);let best=1e18;for(let i=0;i<H.length;i++){const p=H[i],q=H[(i+1)%H.length],ang=Math.atan2(q[1]-p[1],q[0]-p[0]),c=Math.cos(ang),s=Math.sin(ang);let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;
@@ -15651,10 +15991,10 @@ function unitOf(e,hp){const I=CITY.index,K=I.consts,FH=K.FH||.95,LOT=K.LOT||3.8,
     f.exterior=!nb||!nb.zone||!(nb.h>y0g+FH*.5);f.hits=[]}
   const E=I.em||[];for(const k of ['solid','glass']){const B=hp[k];if(!B)continue;const P=B.pos,X=B.idx;
     for(let t=0;t<X.length;t+=3){const v=[X[t],X[t+1],X[t+2]];if(k!=='glass'){const m=B.em[v[0]];const q=m&&E[m];const i0=v[0]*3,ck=B.col[i0]<<16|B.col[i0+1]<<8|B.col[i0+2];if(!(q&&q[3]>=1&&q[3]<=2)&&!WGLASS.has(ck))continue}
-      let yc=0,lxs=[],lzs=[],ys=[];for(const i of v){const x=P[i*3]-cx,z=P[i*3+2]-cz,y=P[i*3+1];lxs.push(x*c+z*s);lzs.push(-x*s+z*c);ys.push(y);yc+=y/3}
-      if(yc<y0g+.1||yc>y1g-.06)continue;const mx=(lxs[0]+lxs[1]+lxs[2])/3,mz=(lzs[0]+lzs[1]+lzs[2])/3;let bf=null,bd=.3;
-      for(const f of F){const coord=f.ax?mz:mx,dd=Math.abs(coord*f.sg-f.d);if(dd<bd){bd=dd;bf=f}}if(!bf)continue;const al=bf.ax?lxs:lzs;
-      bf.hits.push([Math.min(...al),Math.max(...al),Math.min(...ys)-y0g,Math.max(...ys)-y0g])}}
+      const i0=v[0]*3,i1=v[1]*3,i2=v[2]*3,y0=P[i0+1],y1=P[i1+1],y2=P[i2+1],yc=(y0+y1+y2)/3;if(yc<y0g+.1||yc>y1g-.06)continue;
+      const x0=P[i0]-cx,z0=P[i0+2]-cz,x1=P[i1]-cx,z1=P[i1+2]-cz,x2=P[i2]-cx,z2=P[i2+2]-cz,lx0=x0*c+z0*s,lx1=x1*c+z1*s,lx2=x2*c+z2*s,lz0=-x0*s+z0*c,lz1=-x1*s+z1*c,lz2=-x2*s+z2*c;
+      const mx=(lx0+lx1+lx2)/3,mz=(lz0+lz1+lz2)/3;let bf=null,bd=.3;for(const f of F){const coord=f.ax?mz:mx,dd=Math.abs(coord*f.sg-f.d);if(dd<bd){bd=dd;bf=f}}if(!bf)continue;
+      const a0=bf.ax?lx0:lz0,a1=bf.ax?lx1:lz1,a2=bf.ax?lx2:lz2;bf.hits.push([Math.min(a0,a1,a2),Math.max(a0,a1,a2),Math.min(y0,y1,y2)-y0g,Math.max(y0,y1,y2)-y0g])}}
   for(const f of F){f.hits.sort((p,q)=>p[0]-q[0]);const W=[];for(const h of f.hits){const w=W[W.length-1];if(w&&h[0]<=w[1]+.06){w[1]=Math.max(w[1],h[1]);w[2]=Math.min(w[2],h[2]);w[3]=Math.max(w[3],h[3])}else W.push(h.slice())}
     f.windows=W.filter(w=>w[1]-w[0]>.1&&w[3]-w[2]>.12).map(w=>({a0:Math.max(-f.hl,w[0]),a1:Math.min(f.hl,w[1]),y0:Math.max(0,w[2]),y1:Math.min(y1g-y0g,w[3])}));f.wlen=f.windows.reduce((s,w)=>s+w.a1-w.a0,0);delete f.hits}
   const ext=F.filter(f=>f.exterior),front=(ext.length?ext:F).slice().sort((p,q)=>q.wlen-p.wlen)[0];
@@ -15685,7 +16025,7 @@ async function facade(home,dims){if(CITY.state==='idle')loadCity();if(CITY.state
 async function streamReal(o,e,my){const t0=now(),K=CITY.index.consts,FH=K.FH||.95,hb=homeBox(o),b=hb.b,y0=b.min.y,key=e.cell[0]+','+e.cell[1];
   let hrec;while(!(hrec=CITY.plotOf.get(key))&&streaming()){await cityTick();if(C!==my)return null}
   const hp=hrec?await decodePlot(hrec,true):{};if(C!==my)return null;
-  const u=unitOf(e,hp),cell=u.cell,y0g=u.y0g,y1g=u.y1g,{M,th}=unitMatrix(u,b,o.main),fac=facadeLab(u,b,o.main),toLab=(x,y,z)=>new T.Vector3(x,y,z).applyMatrix4(M),LOT=K.LOT||3.8,I=CITY.index;
+  await yieldFrame();if(C!==my)return null;const u=unitOf(e,hp),cell=u.cell,y0g=u.y0g,y1g=u.y1g,{M,th}=unitMatrix(u,b,o.main),fac=facadeLab(u,b,o.main),toLab=(x,y,z)=>new T.Vector3(x,y,z).applyMatrix4(M),LOT=K.LOT||3.8,I=CITY.index;
   const sc=new T.Scene(),hs=new T.Scene(),mb=toonE(),mg=new T.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:.4,depthWrite:false,toneMapped:false});
   const hemi=new T.HemisphereLight(0xffffff,0x333333,.6),sun=new T.DirectionalLight(0xffffff,1);sun.position.set(-.45,1,.35);sc.add(hemi,sun,sun.target);
   const dn=new T.ShaderMaterial({vertexShader:DNV,fragmentShader:DNF,uniforms:{uBack:{value:1200}},side:T.DoubleSide,toneMapped:false});const PL=podLines(b,y0,o.rooms),ls=new T.Scene();ls.add(PL.ls);
@@ -15695,28 +16035,29 @@ async function streamReal(o,e,my){const t0=now(),K=CITY.index.consts,FH=K.FH||.9
   const city={real:true,sc,hs,ls,mb,mg,dn,lm:PL.lm,lg:PL.lg,geos:[],full:[],low:[],hemi,sun,box:b,y0,street:toLab(u.cx,0,u.cz).y,top:toLab(u.cx,(cell.h||y1g+2),u.cz).y,
     center:new T.Vector3((b.min.x+b.max.x)/2,y0+1.2,(b.min.z+b.max.z)/2),streetDir:new T.Vector3(0,0,1),SW:12,holoStart:{tg:goal,dir:fwd,w:(2*ext+LOT*2)*SCALE},camBack:1200,near:-2600,far:2600,
     cellR,FHm:(y1g-y0g)*SCALE,home:e,M,unit:u,facade:fac,nearPlots:0,farPlots:0,verts:0,tris:0,chunks:0,building:true};
-  C.city=city;setTime(C.time||o.time||'night');C.tl.skeleton=Math.round(now()-C.tl.t0);
+  C.city=city;setTime(C.time||o.time||'night');C.tl.skeleton=Math.round(now()-C.tl.t0);await yieldFrame();if(C!==my)return null;
   const cs=Math.cos(th),sn=Math.sin(th),m=M.elements;
   const geo=async(list,glass)=>{let n=0,ni=0;for(const p of list){n+=p.b.n;ni+=p.b.idx.length}if(!n)return null;const pos=new Float32Array(n*3),nrm=new Float32Array(n*3),col=new Uint8Array(n*3),em=new Uint8Array(n),idx=new Uint32Array(ni);let o2=0,oi=0,lt=now();
-    for(const p of list){const P=p.b.pos,Nn=p.b.nrm;for(let i=0;i<p.b.n;i++){const x=P[i*3],y=P[i*3+1],z=P[i*3+2],j=(o2+i)*3;pos[j]=m[0]*x+m[4]*y+m[8]*z+m[12];pos[j+1]=m[1]*x+m[5]*y+m[9]*z+m[13];pos[j+2]=m[2]*x+m[6]*y+m[10]*z+m[14];
-        const a=Nn[i*3],c=Nn[i*3+2];nrm[j]=a*cs+c*sn;nrm[j+1]=Nn[i*3+1];nrm[j+2]=-a*sn+c*cs}
-      col.set(p.b.col,o2*3);em.set(p.b.em,o2);const I2=p.b.idx;for(let t=0;t<I2.length;t++)idx[oi+t]=I2[t]+o2;o2+=p.b.n;oi+=I2.length;if(now()-lt>8){await yieldFrame();lt=now()}}
+    for(const p of list){const P=p.b.pos,Nn=p.b.nrm,nv=p.b.n;for(let i0=0;i0<nv;i0+=16384){const i1=Math.min(nv,i0+16384);for(let i=i0;i<i1;i++){const x=P[i*3],y=P[i*3+1],z=P[i*3+2],j=(o2+i)*3;pos[j]=m[0]*x+m[4]*y+m[8]*z+m[12];pos[j+1]=m[1]*x+m[5]*y+m[9]*z+m[13];pos[j+2]=m[2]*x+m[6]*y+m[10]*z+m[14];
+        const a=Nn[i*3],c=Nn[i*3+2];nrm[j]=a*cs+c*sn;nrm[j+1]=Nn[i*3+1];nrm[j+2]=-a*sn+c*cs}if(now()-lt>SLICE){sliceEnd(lt,'merge');await yieldFrame();lt=now()}}
+      col.set(p.b.col,o2*3);em.set(p.b.em,o2);const I2=p.b.idx;for(let t=0;t<I2.length;t++)idx[oi+t]=I2[t]+o2;o2+=nv;oi+=I2.length;if(now()-lt>SLICE){sliceEnd(lt,'merge');await yieldFrame();lt=now()}}
     const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(pos,3));g.setAttribute('normal',new T.BufferAttribute(nrm,3));g.setIndex(new T.BufferAttribute(idx,1));
     g.setAttribute('color',new T.BufferAttribute(new Float32Array(n*3),3));if(!glass)g.setAttribute('aE',new T.BufferAttribute(new Float32Array(n*3),3));g.userData.base={col,em};g.userData.glass=glass;
     g.computeBoundingSphere();g.boundingSphere.radius+=15;   // generous culling: a chunk is drawn well before it reaches the frame edge
     return g};
-  const add=(g,glass)=>{if(!g)return;city.geos.push(g);recolor(g,C.time==='day');const m1=new T.Mesh(g,glass?mg:mb);if(glass)m1.renderOrder=1;sc.add(m1);city.full.push(m1);
+  const add=async(g,glass)=>{if(!g)return;const n=g.getAttribute('position').count;let ta=now();const day=C.time==='day';for(let i=0;i<n;i+=20000){recolor(g,day,i,i+20000);if(now()-ta>SLICE){sliceEnd(ta,'recolor');await yieldFrame();ta=now();if(!C)return}}sliceEnd(ta,'recolor');
+    if(C.time==='day'!==day)recolor(g,C.time==='day');city.geos.push(g);const m1=new T.Mesh(g,glass?mg:mb);if(glass)m1.renderOrder=1;sc.add(m1);city.full.push(m1);
     if(!glass){const m2=new T.Mesh(g,dn);hs.add(m2)}city.verts+=g.getAttribute('position').count;city.tris+=g.index.count/3;city.chunks++;C.dirty=true};
   // plots in arrival order (the pack: its order; a stream: nearest first); the home's cell is cut from its deck up
   const cut=B=>{const o2={};for(const k in B)o2[k]=clipSlice(B[k],y0g+.02,Infinity);return o2};let i=0,grp=[],gv=0,last=now();const glassParts=[],est=Math.max(1,I.cells.length+(I.megas||[]).length);
   while(true){if(C!==my)return null;const L=I.plots;
-    if(i<L.length){const rec=L[i++],bx=rec.box,cx=(bx[0]+bx[3])/2,cz=(bx[2]+bx[5])/2,near=Math.hypot(cx-u.cx,cz-u.cz)<NEAR_R+Math.max(bx[3]-bx[0],bx[5]-bx[2])/2;
-      const B=rec===hrec?cut(hp):await decodePlot(rec,near);if(near)city.nearPlots++;else city.farPlots++;
-      for(const k in B){const bl=B[k];if(!bl||!bl.n)continue;const p={k,b:bl.nrm&&bl.nrm.length===bl.n*3?bl:blockNormals(bl)};if(k==='glass')glassParts.push(p);else{grp.push(p);gv+=bl.n}}
-      if(gv>160000){const g=await geo(grp,false);grp=[];gv=0;if(C!==my)return null;add(g,false)}
-      C.prog.build=Math.min(.99,i/est);if(now()-last>8){await yieldFrame();last=now()}}
+    if(i<L.length){C.dbgI=i;const rec=L[i++],bx=rec.box,cx=(bx[0]+bx[3])/2,cz=(bx[2]+bx[5])/2,near=Math.hypot(cx-u.cx,cz-u.cz)<NEAR_R+Math.max(bx[3]-bx[0],bx[5]-bx[2])/2;
+      const mine=rec===hrec,B=mine?cut(hp):await decodePlot(rec,near);if(near)city.nearPlots++;else city.farPlots++;if(mine||now()-last>SLICE){sliceEnd(last,mine?'home cut':'plots');await yieldFrame();last=now()}
+      for(const k in B){const bl=B[k];if(!bl||!bl.n)continue;const p={k,b:bl.nrm&&bl.nrm.length===bl.n*3?bl:blockNormals(bl)};if(k==='glass')glassParts.push(p);else{grp.push(p);gv+=bl.n}if(now()-last>SLICE){sliceEnd(last,'normals');await yieldFrame();last=now()}}
+      if(gv>CHUNK){sliceEnd(last,'plots');const g=await geo(grp,false);grp=[];gv=0;if(C!==my)return null;await add(g,false);await nextFrame();last=now()}
+      C.prog.build=Math.min(.99,i/est);if(now()-last>SLICE){sliceEnd(last,'plots');await yieldFrame();last=now()}}
     else if(streaming())await cityTick();else break}
-  if(grp.length)add(await geo(grp,false),false);if(C!==my)return null;if(glassParts.length)add(await geo(glassParts,true),true);
+  if(grp.length){await add(await geo(grp,false),false);await nextFrame()}if(C!==my)return null;if(glassParts.length)await add(await geo(glassParts,true),true);
   city.building=false;city.buildMs=Math.round(now()-t0);C.prog.build=1;return city}
 function overlayReal(R,c,t,h){const s0=R.getDrawingBufferSize(new T.Vector2());if(!C.T.dn||C.T.dn.width!==s0.x||C.T.dn.height!==s0.y){if(C.T.dn)C.T.dn.dispose();C.T.dn=rt(s0.x,s0.y,{depthBuffer:true,minFilter:T.NearestFilter,magFilter:T.NearestFilter})}
   const U=C.P.edge.uniforms,sp=ph(t,'sweep');U.tDN.value=C.T.dn.texture;U.px.value.set(1/s0.x,1/s0.y);U.pInv.value.copy(c.projectionMatrixInverse);U.camW.value.copy(c.matrixWorld);U.uBack.value=h.camBack;h.dn.uniforms.uBack.value=h.camBack;
@@ -15731,9 +16072,10 @@ function overlayReal(R,c,t,h){const s0=R.getDrawingBufferSize(new T.Vector2());i
    glide in, sweep and resolve. Progress: the source's own (addPlots/progress, or the pack's), then build, warm, first bake. */
 function enter(o){o=o||{};if(C)exit();const BB=window.PodBuilder&&PodBuilder._B;const R=o.renderer||(BB&&BB.dr),cam=o.camera||(BB&&BB.cam),root=o.root||(BB&&BB.root),scene=o.scene||(BB&&BB.sc);
   const my=C={mv:{n:0,sum:0,max:0},age:{n:0,sum:0,max:0},fr:[],up:[],mvF:[],lite:0,opts:o,R,cam,frameN:0,bakes:0,bakeMs:0,bakeMax:0,callMax:0,ovMax:0,longCalls:[],fade:1,moved:0,ck:null,dirty:true,shown:false,trans:null,hooked:null,acR:null,
-    prog:{build:0,warm:0},tl:{t0:now()}};api.covers=false;
-  const qs=new T.Scene(),qc=new T.OrthographicCamera(-1,1,1,-1,0,1),qm=new T.Mesh(new T.PlaneGeometry(2,2));qm.frustumCulled=false;qs.add(qm);C.qs=qs;C.qc=qc;C.qm=qm;C.P=passes();
-  C.blank=new T.DataTexture(new Uint8Array([10,15,36,255]),1,1);C.blank.needsUpdate=true;if(scene)hookScene(scene);C.time=o.time==='day'?'day':'night';
+    prog:{build:0,warm:0},tl:{t0:now()},pendingHome:!!o.pending};api.covers=false;
+  const K2=kit();C.qs=K2.qs;C.qc=K2.qc;C.qm=K2.qm;C.P=K2.P;C.blank=K2.blank;if(KIT.T)C.T=KIT.T;if(scene)hookScene(scene);
+  // the longest main-thread task during the open (all of the page, the game's too when it shares the thread)
+  C.longTask=0;C.slice=0;try{if(window.PerformanceObserver&&PerformanceObserver.supportedEntryTypes&&PerformanceObserver.supportedEntryTypes.includes('longtask')){C.obs=new PerformanceObserver(l=>{for(const e of l.getEntries())if(C&&C.trans)C.longTask=Math.max(C.longTask,e.duration)});C.obs.observe({entryTypes:['longtask']})}}catch(e){}C.time=o.time==='day'?'day':'night';
   let cellKey=o.podCell||o.cell;const rm=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches),a=now();const mark=k=>{if(C===my)C.tl[k]=Math.round(now()-C.tl.t0)};
   return new Promise(res=>{
     if(R&&cam&&o.transition===false){try{o.onDone&&o.onDone()}catch(e){}res({skipped:true,reason:'no transition'})}   // (a late swap: the backdrop just fades in when ready)
@@ -15752,22 +16094,32 @@ function enter(o){o=o||{};if(C)exit();const BB=window.PodBuilder&&PodBuilder._B;
         if(e){try{city=await streamReal(Object.assign({},o,{root}),e,my);if(!city&&C===my)why='build interrupted'}catch(err){console.error('PodContext: the real city failed, using the stand-in',err);why=String(err&&err.message||err)}if(C!==my)return;if(city)C.home=e}}
       if(!city){const sd=cellKey?((cellKey[0]*73856093)^(cellKey[1]*19349663))>>>0:o.seed||1;C.pod={district:o.district||(o.zone==='high'?'high':'low'),floor:o.floor||8,side:o.side||'S',seed:sd};
         city=build(Object.assign({},C.pod,{root,rooms:o.rooms,home:o.home}));C.fallback=why;C.city=city;setTime(C.time)}
-      mark('built');C.buildMs=+(now()-a).toFixed(1);wantDraw();
+      mark('built');mark('cityBuilt');C.buildMs=+(now()-a).toFixed(1);wantDraw();
       if(!R||!cam){C.ready=true;try{o.onDone&&o.onDone()}catch(e){}return res({skipped:true,reason:'no renderer'})}if(C.prog)C.prog.build=1;
       // programs and GPU uploads before the first bake (the transition keeps its city phase meanwhile)
       try{await warm(R,cam)}catch(e){console.warn('PodContext warmup',e)}if(C!==my)return;C.prog.warm=1;C.warmMs=+(now()-a).toFixed(0);mark('warm');C.ready=true;C.dirty=true;wantDraw();
       if(!C.trans)return}   // skipped meanwhile: the backdrop still bakes, nothing else to do
     )().catch(err=>{console.error('PodContext.enter failed',err);if(C===my){C.ready=true;if(C.trans)endTrans();else{api.transitioning=false;try{o.onDone&&o.onDone()}catch(e){}res({skipped:true,reason:String(err)})}}});
     if(!R||!cam)return;})}
+// the home arrives after enter({pending:true}) (round 26, with the builder): until then the city is framed on home:{W,D} centered at the
+// origin, floor at 0 (where the builder puts the home); setHome moves the city by the difference, redraws the outline, and lets the
+// transition resolve
+function setHome(h){if(!C||!h)return;Object.assign(C.opts,h);const c=C.city;C.pendingHome=false;if(C.tl)C.tl.homeSet=Math.round(now()-C.tl.t0);if(!c)return;
+  const nb=homeBox(Object.assign({},C.opts,{root:h.root||C.opts.root,rooms:h.rooms||C.opts.rooms,home:h.home||C.opts.home})).b,ob=c.box;
+  const d=new T.Vector3((nb.min.x+nb.max.x-ob.min.x-ob.max.x)/2,nb.min.y-ob.min.y,(nb.min.z+nb.max.z-ob.min.z-ob.max.z)/2);
+  if(c.real&&d.lengthSq()>1e-8){for(const sc of [c.sc,c.hs])sc.position.add(d),sc.updateMatrixWorld(true);c.center.add(d);c.y0+=d.y;c.street+=d.y;c.top+=d.y;if(c.cellR){c.cellR[0]+=d.x;c.cellR[1]+=d.z;c.cellR[2]+=d.x;c.cellR[3]+=d.z}
+    if(c.holoStart)c.holoStart.tg.add(d)}
+  c.box=nb.clone();if(c.ls&&c.lm){c.ls.remove(c.ls.children[0]);c.lg.dispose();c.lm.dispose();const PL=podLines(nb,nb.min.y,h.rooms||C.opts.rooms);c.ls.add(PL.ls);c.lm=PL.lm;c.lg=PL.lg}
+  C.dirty=true;wantDraw()}
 function update(x){if(!C)return;if(x&&x.isCamera){C.cam=x;return}if(x&&x.time)setTime(x.time)}
 // skip: ends the transition at any point (the city keeps loading and the backdrop appears when it is ready)
 function skip(){if(!C)return;if(C.trans){C.trans.skipped=true;endTrans()}}
 function exit(){if(!C)return;if(C.trans)endTrans();else if(C.pendingStart)skip();unhook();const c=C.city;C.building=null;if(c){for(const g of c.geos)g.dispose();c.lg.dispose();for(const m of [c.mb,c.mw,c.mn,c.hm,c.lm,c.mg,c.dn])if(m)m.dispose()}
-  if(C.T)for(const k in C.T)C.T[k].dispose();for(const k in C.P)C.P[k].dispose();C.qm.geometry.dispose();C.blank.dispose();C=null;api.covers=false;api.transitioning=false;try{window.dispatchEvent(new Event('podcontext:gone'))}catch(e){}}
+  if(C.obs)try{C.obs.disconnect()}catch(e){}C=null;api.covers=false;api.transitioning=false;try{window.dispatchEvent(new Event('podcontext:gone'))}catch(e){}}
 function liveRates(){if(!C)return {};const t=now(),f=C.fr.filter(x=>t-x<=1000).length,u=C.up.filter(x=>t-x<=1000).length,moving=C.ck!=null&&t-C.moved<=180;
-  const G=window.PodRender&&PodRender._debug&&PodRender._debug.GT,gs=G&&G.samp&&G.samp.backdrop;
+  const G=window.PodRender&&window.PodRender._debug&&window.PodRender._debug.GT,gs=G&&G.samp&&G.samp.backdrop;
   return {moving,fps:f,backdropUpdatesPerSec:u,backdropCpuMs:C.mv.n?+(C.mv.sum/C.mv.n).toFixed(2):null,backdropGpuMs:gs&&gs.length?+(gs.reduce((a,b)=>a+b,0)/gs.length).toFixed(2):null,liteRadiusM:C.lite||0}}
-function stats(){return C?{active:true,...liveRates(),movingBakes:{n:C.mv.n,avgMs:C.mv.n?+(C.mv.sum/C.mv.n).toFixed(2):null,maxMs:+C.mv.max.toFixed(2)},warp:{frames:C.age.n,bakeAgeAvgDeg:C.age.n?+(C.age.sum/C.age.n).toFixed(2):null,bakeAgeMaxDeg:+C.age.max.toFixed(2)},unit:C.city&&C.city.unit?{W:C.city.facade.unit.W,D:C.city.facade.unit.D,angleDeg:C.city.facade.unit.angleDeg,front:C.city.unit.front.key}:null,city:cityStats(),home:C.home||null,fallback:C.fallback||null,real:!!(C.city&&C.city.real),plots:C.city&&C.city.real?{near:C.city.nearPlots,far:C.city.farPlots,verts:C.city.verts,tris:C.city.tris,chunks:C.city.chunks,building:!!C.city.building,buildMs:C.city.buildMs}:null,loading:C.trans?{fraction:+loadFrac().toFixed(3),gate:C.trans.gate}:null,timeline:Object.assign({},C.tl,{t0:undefined}),ready:!!C.ready,pod:C.pod||null,time:C.time,buildMs:C.buildMs,warmMs:C.warmMs||null,bakes:C.bakes,bakeMs:C.bakeMs,bakeMaxMs:C.bakeMax,callMaxMs:+C.callMax.toFixed(1),overlayMaxMs:+C.ovMax.toFixed(1),longCalls:C.longCalls.slice(-6),
+function stats(){return C?{active:true,...liveRates(),movingBakes:{n:C.mv.n,avgMs:C.mv.n?+(C.mv.sum/C.mv.n).toFixed(2):null,maxMs:+C.mv.max.toFixed(2)},warp:{frames:C.age.n,bakeAgeAvgDeg:C.age.n?+(C.age.sum/C.age.n).toFixed(2):null,bakeAgeMaxDeg:+C.age.max.toFixed(2)},unit:C.city&&C.city.unit?{W:C.city.facade.unit.W,D:C.city.facade.unit.D,angleDeg:C.city.facade.unit.angleDeg,front:C.city.unit.front.key}:null,city:cityStats(),home:C.home||null,fallback:C.fallback||null,real:!!(C.city&&C.city.real),plots:C.city&&C.city.real?{near:C.city.nearPlots,far:C.city.farPlots,verts:C.city.verts,tris:C.city.tris,chunks:C.city.chunks,building:!!C.city.building,buildMs:C.city.buildMs}:null,loading:C.trans?{fraction:+loadFrac().toFixed(3),gate:C.trans.gate}:null,timeline:Object.assign({},C.tl,{t0:undefined,longestTaskMs:Math.round(C.longTask||0),longestSliceMs:+Math.max(C.slice||0,C.ovMax||0).toFixed(1),longestSliceIn:(C.ovMax||0)>(C.slice||0)?'overlay':C.sliceAt||null,slicesOver8ms:(C.sl||[]).slice()}),ready:!!C.ready,warmedAtTitle:KIT.warmMs!=null?KIT.warmMs:null,pod:C.pod||null,time:C.time,buildMs:C.buildMs,warmMs:C.warmMs||null,bakes:C.bakes,bakeMs:C.bakeMs,bakeMaxMs:C.bakeMax,callMaxMs:+C.callMax.toFixed(1),overlayMaxMs:+C.ovMax.toFixed(1),longCalls:C.longCalls.slice(-6),
   covers:api.covers,transitioning:api.transitioning,lastTransition:C.lastTrans||null,path:api._prDriving()?'PodRender':'plain',triangles:C.city?C.city.geos.slice(0,3).reduce((s,g)=>s+g.index.count/3,0):0,street:C.city?+C.city.street.toFixed(1):null}:{active:false,city:cityStats()}}
 function cityStats(){return {state:CITY.state,loadMs:CITY.loadMs||null,MB:CITY.bytes?+(CITY.bytes/1048576).toFixed(1):null,error:CITY.err,homes:CITY.index?CITY.index.homes.length:0}}
 // test aid: structure in the backdrop around the home. Edge density (mean Sobel gradient of luma, 0..1, and the share of pixels with a clear edge)
@@ -15806,8 +16158,8 @@ function warpError(deg){if(!C||!C.shown||!C.R||!C.cam)return null;const R=C.R,ca
 // test aid: is the backdrop really there? mean luma (0..1) and the share of pixels that are not black, read back from the shown backdrop
 function backdropCheck(){if(!C||!C.shown||!C.R)return {shown:false};const t=C.T.show,w=t.width,h=t.height,px=new Uint8Array(w*h*4);C.R.readRenderTargetPixels(t,0,0,w,h,px);let s=0,nb=0,n=0;
   for(let i=0;i<px.length;i+=16){const l=(px[i]*.2126+px[i+1]*.7152+px[i+2]*.0722)/255;s+=l;if(l>.02)nb++;n++}return {shown:true,meanLuma:+(s/n).toFixed(4),nonBlack:+(nb/n).toFixed(3),res:[w,h],bakes:C.bakes,ready:!!C.ready}}
-const api={enter,update,skip,exit,dispose:exit,frame,stats,homes,towers,pods,cityMap,defaultHome,facade,setCitySource,addPlots,progress,cityDone,load:loadCity,backdrop,overlay,paused,covers:false,transitioning:false,active:()=>!!C,_pr:false,_prSeen:0,_prDriving:()=>now()-api._prSeen<250,
-  _debug:{warpError,resetWarp(){if(C){C.age={n:0,sum:0,max:0};C.mv={n:0,sum:0,max:0}}const G=window.PodRender&&PodRender._debug&&PodRender._debug.GT;if(G&&G.samp)G.samp.backdrop=[]},backdropCheck,hold(t){if(C&&C.trans)C.trans.hold=t==null?null:t},state:()=>C,metrics,DUR}};
+const api={enter,setHome,update,skip,exit,dispose(){exit();disposeKit()},warm:prewarm,frame,stats,homes,towers,pods,cityMap,defaultHome,facade,setCitySource,addPlots,progress,cityDone,load:loadCity,backdrop,overlay,paused,covers:false,transitioning:false,active:()=>!!C,_pr:false,_prSeen:0,_prDriving:()=>now()-api._prSeen<250,
+  _debug:{warpError,resetWarp(){if(C){C.age={n:0,sum:0,max:0};C.mv={n:0,sum:0,max:0}}const G=window.PodRender&&window.PodRender._debug&&window.PodRender._debug.GT;if(G&&G.samp)G.samp.backdrop=[]},backdropCheck,hold(t){if(C&&C.trans)C.trans.hold=t==null?null:t},state:()=>C,metrics,DUR}};
 window.PodContext=api;
 // the pack starts loading shortly after the page settles (25 MB); homes() and enter() start it earlier when asked
 setTimeout(()=>{if(CITY.state==='idle')loadCity()},1500)})();
@@ -16806,4 +17158,4 @@ window.PodRender=api})();
 </script>
 <!-- Neon Terrarium: the game side (tools/furnish/build.py) -->
 <link rel="stylesheet" href="furnish/bridge.css?v=9aa2454540">
-<script src="furnish/bridge.js?v=cab8339ae3"></script>
+<script src="furnish/bridge.js?v=2665923a09"></script>

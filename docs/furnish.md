@@ -60,6 +60,32 @@ A home with a saved recipe is loaded with `PodBuilder.load(recipe)` (its `home.p
 `PodBuilder.newHome(null, pod)`: the lab picks the size from the building and takes the windows from its real facade. The
 game's day or night is set with `PodBuilder.setTime(time, {host: true})`.
 
+### Kept loaded, and timed
+
+The page is made once and kept for the whole session.
+- **Preloaded.** While the title screen shows, or in idle time after the city loads when the title is skipped, `js/furnish.js`
+  makes the page hidden, letting clicks through to the city (`.furnish.pre`). On `furnish:ready` it sends `furnish:warm`. The
+  bridge then calls `PodBuilder.warm()` (the furniture library, the furnishing worker, the build view's programs) and
+  `PodContext.warm()` (every render target and the city, hologram and pass programs, compiled in idle slices with parallel
+  shader compile), and the page sleeps (`PodBuilder.pauseRender`).
+- **Instant open.** A click shows the page at once and sends `furnish:begin`: no page load and no shader compiles. The
+  lab's hologram draws from its first frame, and the work behind it (the city's plots, the furnisher in its worker, the
+  meshes, the uploads) runs in slices of a few milliseconds.
+- **Reused.** Exit, or Esc while it opens, hides the page again. The bridge lets go of the home and the city
+  (`PodBuilder.unload()`, `PodContext.exit()`) and keeps the programs, library and worker for the next visit. A lab without
+  `PodBuilder.unload` can't be reused, so the page is made again for each visit, as before.
+
+Every open is timed from the click. `FURN.lastStats` in the game page's console holds:
+- `clickToLive`: the hologram has the screen, from `furnish:live`;
+- `clickToResolve`: the home is in, the city has all come and the hologram has resolved, from `furnish:done`;
+- `longestBlock`: the longest gap between two frames on the shared thread during the open;
+- `gather`: the city stream's own numbers;
+- `lab`: the lab's `PodContext.stats().timeline` (firstHoloFrame, cityBuilt, warm, firstBake, resolve, longestTaskMs,
+  slicesOver8ms) and `PodBuilder.perf()` (worker plan and pieces, main-thread assembly, longest slice);
+- `pageLoadMs` and `warmMs` from the preload.
+
+A console line, "Furnish pod: open timing", prints the same.
+
 ### Who lives there
 
 Residents live in pods. `syncResidents` (`js/people.js`) still makes each residential or luxury section's people as before:
@@ -94,10 +120,14 @@ Opening a pod with no saved apartment furnishes it for its household:
 
 | From | Message | Meaning |
 |---|---|---|
-| furnish.html | `furnish:ready` | PodBuilder is up |
+| furnish.html | `furnish:ready` `{reusable}` | PodBuilder is up (reusable: it can be kept for the next visit) |
+| game | `furnish:warm` | preloaded: warm everything up, then sleep |
+| furnish.html | `furnish:warmed` `{ms}` | warmed up |
+| game | `furnish:wake` | a visit is starting |
 | game | `furnish:begin` `{head, home, recipe, tier, time, label, household, residents, vacant}` | the head of the city, the home, its saved recipe, who lives there |
 | game | `furnish:plots` `{plots, em, k, done}` | a batch of plots, progress 0 to 1, and whether it is the last |
 | furnish.html | `furnish:live` | the hologram has the screen: show the page |
+| furnish.html | `furnish:done` `{lab}` | the open has resolved, with the lab's timings |
 | furnish.html | `furnish:save` `{recipe}` | Save (or Ctrl+S): keep it with the city |
 | game | `furnish:saved` `{ok}` | stored (or the storage is full) |
 | furnish.html | `furnish:exit` `{recipe or null}` | Exit to city; the recipe when there are unsaved changes. Esc while the apartment is still coming in sends it with no recipe (cancel) |

@@ -340,9 +340,15 @@ function roofItems(st,P,w,d,lot){
 
 /* ---------- building helpers ---------- */
 // a chunk is one stacked block: {w,d,h,y,ox,oz,ry} in plot coordinates
+// While a plot's sections are built (world.js stackRunGen), every block a building is made of is noted in POD_LOG: the
+// homes are these blocks (a tower's stacked pods), so Furnish pod picks and cuts a whole pod (furnish.js homesOf).
+let POD_LOG = null, POD_SEC = null;
+const _pdO = new THREE.Vector3(), _pdA = new THREE.Vector3();
 function chunkBox(P0,c,mat,radius){
   const P = under(P0, T(c.ox, c.y + c.h/2, c.oz, c.ry));
   put(roundedBox(c.w,c.h,c.d,radius), mat, P);
+  if (POD_LOG && POD_SEC){ _pdO.set(0, 0, 0).applyMatrix4(P); _pdA.set(1, 0, 0).applyMatrix4(P).sub(_pdO);
+    POD_LOG.push({ k: POD_SEC.k, t: POD_SEC.t, x: +_pdO.x.toFixed(3), z: +_pdO.z.toFixed(3), y0: +(_pdO.y - c.h/2).toFixed(3), y1: +(_pdO.y + c.h/2).toFixed(3), w: +c.w.toFixed(3), d: +c.d.toFixed(3), ry: +Math.atan2(-_pdA.z, _pdA.x).toFixed(4) }); }
   return P;
 }
 function decorateChunk(st,P,c,floorBase,lot,first){

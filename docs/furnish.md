@@ -1,11 +1,11 @@
 # Furnish pod
 
-Do up any floor of a residential (`low`) or luxury (`high`) building, or a lifted pod, in the Pod Furniture Lab's Build mode,
+Do up any pod of a residential (`low`) or luxury (`high`) building, or a lifted pod, in the Pod Furniture Lab's Build mode,
 from inside the game.
 
 ## How it fits together
 
-- **js/furnish.js** (the game, three.js r128): the Furnish pod button, picking a floor, gathering the city, the overlay, saving.
+- **js/furnish.js** (the game, three.js r128): the Furnish pod button, picking a pod, gathering the city, the overlay, saving.
 - **furnish.html** (generated, committed): the lab built with `--embed` (Build only, boots straight into Build, writes nothing
   to localStorage), plus `window.PODCITY_NOPACK = true` (the city comes from the game, never from `city/*.wasm`) and the two
   files below. It runs three.js r149 from the CDN inside an iframe, so the two versions never meet.
@@ -16,15 +16,26 @@ from inside the game.
 
 Pick mode takes the pointer, the wheel and a few keys before the building controls (capture listeners on the canvas and the
 window), so no zone, delete, transport or tilt action fires while picking; dragging still turns the view, and W A S D still
-move it. The homes of a building are worked out from the cell the same way the lab's city pack does (`homesOf`): every whole
-floor (`FH`) of each residential or luxury section, counted from the section's base (a lifted pod's sections start at
-`lift.y`, an upper section 0.1 above the one below it, a bracketed pod section at its own `at`), plus the floors of a building
-standing under a pod (sections numbered from 100). The bottom floor of a lifted pod is the pod itself (`section: -1`,
-`kind: 'lift'`), whatever its zone, as in the lab.
+move it. The homes of a building are its **pods**, the blocks its builder stacked. While a plot's sections are built,
+`chunkBox` (`js/buildings.js`) notes each block it makes (its section, height range, centre and footprint) in `c._pods`. The
+list is made afresh with each build and comes back from the plot worker like the plot's other fields. `homesOf` turns them
+into homes for each residential or luxury section:
+- blocks side by side at one height are one pod;
+- a block more than about three floors tall is split into pods of about two floors;
+- a section with no blocks noted falls back to pods of two floors.
+
+The building under a lifted pod counts too (its sections are numbered from 100). The bottom pod of a lifted stack is the pod
+itself (`section: -1`, `kind: 'lift'`), whatever its zone, as in the lab. A home row carries:
+- `floor`: the floor number at the pod's bottom, unique within its section, and used in the save key;
+- `y` and `y1`: the deck (the pod's bottom) and its top;
+- `x`, `z` and `fp: {w, d, ry}`: the block's centre and footprint;
+- `pod` and `pods`: "pod N of M".
+
+Picking outlines the pod in its zone's neon, hugging the block, with a light fill. Scrolling or Up / Down steps pod by pod.
 
 ### What the lab gets, and when
 
-A click opens furnish.html at once over the city as it stands (the game holds its frame loop from that moment; the picked floor
+A click opens furnish.html at once over the city as it stands (the game holds its frame loop from that moment; the picked pod
 stays lit underneath) and the page fades in as soon as the lab's hologram has the screen. The loading is folded into the
 hologram: the game sends a **head** first and then the **plots** in small batches while the hologram plays, and the lab paces
 the hologram on that progress (`PodContext.progress`).
@@ -87,7 +98,7 @@ It runs the lab's `build.py --embed` in the lab's folder and writes `furnish.htm
 
 ## Known gaps
 
-- Furnished floors aren't marked in the city yet.
+- Furnished pods aren't marked in the city yet.
 - A building removed or rebuilt keeps its old recipes under the same cell, section and floor.
 - The first visit in a big city takes longer while plots whose arrays were let go are made again; the hologram waits for them.
 - The gathering runs on the game's thread, which the page shares, in short slices: a heavy first visit can make the hologram's first second less smooth.

@@ -15351,7 +15351,6 @@ function passes(){const P={};
   P.present=SM(`uniform sampler2D tS;uniform sampler2D tD;uniform mat4 bVP;uniform mat4 bPInv;uniform mat4 bCamW;uniform mat4 cVP;uniform mat4 cIVP;uniform float pz;varying vec2 vUv;
    vec2 toUv(vec4 c){return c.xy/c.w*.5+.5;}
    void main(){vec2 ndc=vUv*2.-1.;vec4 w=cIVP*vec4(ndc,pz,1.);w/=w.w;vec2 uv=toUv(bVP*w);
-    for(int i=0;i<3;i++){vec2 u=clamp(uv,0.,1.);float d=texture(tD,u).r;if(d>=1.)break;vec4 v=bPInv*vec4(u*2.-1.,d*2.-1.,1.);v/=v.w;vec4 W=bCamW*vec4(v.xyz,1.);uv+=vUv-toUv(cVP*W);}
     gl_FragColor=vec4(texture(tS,clamp(uv,.001,.999)).rgb,1.);}`,{tS:{value:null},tD:{value:null},bVP:{value:new T.Matrix4()},bPInv:{value:new T.Matrix4()},bCamW:{value:new T.Matrix4()},cVP:{value:new T.Matrix4()},cIVP:{value:new T.Matrix4()},pz:{value:0}});
   P.mix=SM('uniform sampler2D a;uniform sampler2D b;uniform float k;varying vec2 vUv;void main(){gl_FragColor=mix(texture(a,vUv),texture(b,vUv),k);}',{a:{value:null},b:{value:null},k:{value:0}});
   P.copy=SM('uniform sampler2D t;varying vec2 vUv;void main(){gl_FragColor=texture(t,vUv);}',{t:{value:null}});
@@ -15438,11 +15437,13 @@ function backdrop(R,cam){if(!C||!C.city||!cam)return null;if(!C.ready)return C.s
   const a=now();targets(R);const t=now(),k=camKey(cam);
   if(C.ck==null||Math.abs(k-C.ck)>1e-4*(1+Math.abs(k))){C.ck=k;C.moved=t}const settled=t-C.moved>180;
   if(C.dirty||(settled&&C.bakedK!==C.ck)){bake(R,cam,C.shown);C.bakedK=C.ck}
-  else if(!settled&&(C.frameN++%3===0||bakeAge(cam)>6)){bake(R,cam,false,true);C.bakedK=null}   // moving: a quarter-resolution bake every third frame (or when the camera turned more than 6 degrees); the settled bake fades in
+  else if(!settled&&(C.frameN++%2===0||bakeAge(cam)>2)){bake(R,cam,false,true);C.bakedK=null}   // moving: a quarter-resolution bake every second frame (or as soon as the camera turned 2 degrees); the settled bake fades in
   if(C.fade<1){C.fade=Math.min(1,C.fade+(t-(C.ft||t))/400);const m=C.P.mix.uniforms;m.a.value=C.T.prev.texture;m.b.value=C.T.next.texture;m.k.value=ease(C.fade);const s=R.getRenderTarget();quad(R,C.P.mix,C.T.show);R.setRenderTarget(s)}
   C.ft=t;const out=C.shown?present(R,cam):null;const ms=now()-a;C.callMax=Math.max(C.callMax,ms);if(ms>30)C.longCalls.push({ms:+ms.toFixed(1),bake:C.bakeMs,at:Math.round(t)});return out}
-// round 23: the last bake is warped to the current camera every frame, so the backdrop moves in lockstep with the home (the bake itself runs
-// at a lower rate). Inverse warp: start from the pivot plane, then three fixed-point steps on the bake's depth (parallax-correct for small turns).
+// rounds 23-24: the last bake is warped to the current camera every frame, so the backdrop moves in lockstep with the home (the bake itself
+// runs every second frame while moving). The warp is planar, about the plane through the home: smooth everywhere. Round 23 also stepped on
+// the bake's depth, which tore the image: the depth is sharp and at bake resolution while the colors are blurred by depth, so the steps
+// snapped blurred color to depth-texel edges (blocky stairs) and found two solutions at every disocclusion (doubled shapes).
 const _vp=new T.Matrix4(),_ivp=new T.Matrix4(),_pv=new T.Vector3();
 function bakeAge(cam){if(!C.bk)return 999;const d=cam.getWorldDirection(_pv);return Math.acos(clamp(d.dot(C.bk.dir),-1,1))*180/Math.PI}
 function present(R,cam){if(!C.bk)return C.T.show.texture;const U=C.P.present.uniforms;cam.updateMatrixWorld();_vp.multiplyMatrices(cam.projectionMatrix,cam.matrixWorldInverse);_ivp.copy(_vp).invert();
@@ -15627,11 +15628,13 @@ function hull2(P){P=P.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(o,a,b)
 // the game's window glass (dark glass, teal glass, dark tint): an unlit window is a plain toon card in one of these
 const WGLASS=new Set([0x2c3a52,0x2b4a55,0x3a4252]);
 function unitOf(e,hp){const I=CITY.index,K=I.consts,FH=K.FH||.95,LOT=K.LOT||3.8,cell=CITY.cells.get(e.cell[0]+','+e.cell[1])||{x:e.x,z:e.z,h:10,i:e.cell[0],j:e.cell[1]};
-  const y0g=e.y,y1g=e.y+(e.kind==='lift'?FH*1.15:FH),ym=(y0g+y1g)/2,pts=[],seen=new Set();
+  // a home row may carry its pod's real extent (round 24, from the game: y1 = the pod's top, fp = its block footprint {w, d, ry} at x, z); else one FH
+  const y0g=e.y,y1g=e.y1!=null&&e.y1>e.y?e.y1:e.y+(e.kind==='lift'?FH*1.15:FH),ym=(y0g+Math.min(y1g,y0g+FH))/2,pts=[],seen=new Set();
   for(const k in hp){if(k==='fx')continue;const P=hp[k].pos;for(let i=0;i<P.length;i+=3)if(Math.abs(P[i+1]-ym)<FH*.42){const x=P[i],z=P[i+2];if(Math.abs(x-cell.x)>LOT*.62||Math.abs(z-cell.z)>LOT*.62)continue;
       const key=Math.round(x*40)+','+Math.round(z*40);if(!seen.has(key)){seen.add(key);pts.push([x,z])}}}
   let a=0,cx=cell.x,cz=cell.z,hw=LOT*.42,hd=LOT*.42;
-  if(pts.length>=6){const H=hull2(pts);let best=1e18;for(let i=0;i<H.length;i++){const p=H[i],q=H[(i+1)%H.length],ang=Math.atan2(q[1]-p[1],q[0]-p[0]),c=Math.cos(ang),s=Math.sin(ang);let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;
+  if(e.fp&&e.fp.w>.3&&e.fp.d>.3&&e.x!=null){cx=e.x;cz=e.z;hw=e.fp.w/2;hd=e.fp.d/2;a=-(e.fp.ry||0);while(a>Math.PI/4){a-=Math.PI/2;const t=hw;hw=hd;hd=t}while(a<=-Math.PI/4){a+=Math.PI/2;const t=hw;hw=hd;hd=t}}
+  else if(pts.length>=6){const H=hull2(pts);let best=1e18;for(let i=0;i<H.length;i++){const p=H[i],q=H[(i+1)%H.length],ang=Math.atan2(q[1]-p[1],q[0]-p[0]),c=Math.cos(ang),s=Math.sin(ang);let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;
       for(const r of H){const lx=r[0]*c+r[1]*s,lz=-r[0]*s+r[1]*c;if(lx<x0)x0=lx;if(lx>x1)x1=lx;if(lz<z0)z0=lz;if(lz>z1)z1=lz}const ar=(x1-x0)*(z1-z0);
       if(ar<best-1e-6){best=ar;a=ang;const mx=(x0+x1)/2,mz=(z0+z1)/2;cx=mx*c-mz*s;cz=mx*s+mz*c;hw=(x1-x0)/2;hd=(z1-z0)/2}}
     while(a>Math.PI/4){a-=Math.PI/2;const t=hw;hw=hd;hd=t}while(a<=-Math.PI/4){a+=Math.PI/2;const t=hw;hw=hd;hd=t}
@@ -15739,7 +15742,7 @@ function enter(o){o=o||{};if(C)exit();const BB=window.PodBuilder&&PodBuilder._B;
           try{window.dispatchEvent(new CustomEvent('podcontext:home',{detail:dh}))}catch(e){}}else C.swapLater=true}
       // the owner's city: a home on a floor of a residential or luxury building, or a lifted pod (a stream is built as it arrives)
       if(cellKey){if(CITY.state==='loading')await Promise.race([CITY.promise,new Promise(r=>setTimeout(r,20000))]);if(C!==my)return;mark('source');
-        const e=CITY.index&&(CITY.state==='ready'||streaming())?findHome(o):null;why=!CITY.index?'city '+CITY.state+(CITY.err?' ('+CITY.err+')':''):!e?'no home at that cell and floor':null;
+        let e=CITY.index&&(CITY.state==='ready'||streaming())?findHome(o):null;if(e&&(o.fp||o.y1!=null))e=Object.assign({},e,{y:o.y!=null?o.y:e.y,y1:o.y1,fp:o.fp,x:o.x!=null?o.x:e.x,z:o.z!=null?o.z:e.z});/* a pod row passed in whole */why=!CITY.index?'city '+CITY.state+(CITY.err?' ('+CITY.err+')':''):!e?'no home at that cell and floor':null;
         if(e){try{city=await streamReal(Object.assign({},o,{root}),e,my);if(!city&&C===my)why='build interrupted'}catch(err){console.error('PodContext: the real city failed, using the stand-in',err);why=String(err&&err.message||err)}if(C!==my)return;if(city)C.home=e}}
       if(!city){const sd=cellKey?((cellKey[0]*73856093)^(cellKey[1]*19349663))>>>0:o.seed||1;C.pod={district:o.district||(o.zone==='high'?'high':'low'),floor:o.floor||8,side:o.side||'S',seed:sd};
         city=build(Object.assign({},C.pod,{root,rooms:o.rooms,home:o.home}));C.fallback=why;C.city=city;setTime(C.time)}
@@ -15783,7 +15786,9 @@ function cityMap(){if(CITY.state==='idle')loadCity();const I=CITY.index;if(!I)re
 // unwarped old bake (what round 22 showed between bakes) are each compared with a fresh bake at the turned camera: mean absolute luma
 // difference (0..1) and the share of pixels off by more than 0.05.
 function warpError(deg){if(!C||!C.shown||!C.R||!C.cam)return null;const R=C.R,cam0=C.cam,t=C.T.pres,w=t.width,h=t.height,read=()=>{const px=new Uint8Array(w*h*4);R.readRenderTargetPixels(t,0,0,w,h,px);return px};
-  const cmp=(A,B)=>{let s=0,n=0,big=0;for(let i=0;i<A.length;i+=16){const l=k=>(k[i]*.2126+k[i+1]*.7152+k[i+2]*.0722)/255,d=Math.abs(l(A)-l(B));s+=d;if(d>.05)big++;n++}return {meanAbs:+(s/n).toFixed(4),offShare:+(big/n).toFixed(3)}};
+  // meanAbs and offShare: how far off; tear: the error's local gradient (blocky steps, tears and doubled edges show here, a smooth offset does not)
+  const cmp=(A,B)=>{const L=(k,i)=>(k[i]*.2126+k[i+1]*.7152+k[i+2]*.0722)/255;let s=0,n=0,big=0,tr=0;for(let y=1;y<h;y+=2)for(let x=1;x<w;x+=2){const i=(y*w+x)*4,d=L(A,i)-L(B,i);s+=Math.abs(d);if(Math.abs(d)>.05)big++;
+      tr+=Math.abs(d-(L(A,i-4)-L(B,i-4)))+Math.abs(d-(L(A,i-w*4)-L(B,i-w*4)));n++}return {meanAbs:+(s/n).toFixed(4),offShare:+(big/n).toFixed(3),tear:+(tr/n).toFixed(4)}};
   const out={};for(const d of [].concat(deg||[2,4,6])){const cam1=cam0.clone(),ctr=C.city.center,q=new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),d*Math.PI/180);
     cam1.position.sub(ctr).applyQuaternion(q).add(ctr);cam1.quaternion.premultiply(q);cam1.updateMatrixWorld(true);
     bake(R,cam0,false,true);present(R,cam0);const unwarped=read();present(R,cam1);const warped=read();bake(R,cam1,false,true);present(R,cam1);const truth=read();

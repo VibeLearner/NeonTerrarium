@@ -1,4 +1,4 @@
-// Neon Terrarium: Furnish pod. Pick a floor of a residential or luxury building (or a lifted pod) and do the apartment up in the
+// Neon Terrarium: Furnish pod. Pick a pod of a residential or luxury building (or a lifted pod) and do the apartment up in the
 // Pod Furniture Lab's Build mode, which runs full screen in an iframe (furnish.html: three.js r149, so it never mixes with the game's r128).
 // The game sends the lab the city round the home (every plot's geometry: full detail near the home, a clustered stand-in further out),
 // the home, the camera and the time of day; the lab sends the apartment's recipe back on Save and on Exit, and it is kept with the city
@@ -27,29 +27,50 @@ const FURN = (() => {
   const DIRS = [[0, 1, 'S'], [1, 0, 'E'], [0, -1, 'N'], [-1, 0, 'W']];
   const exposed = (c, y) => DIRS.filter(([a, b]) => { const n = cells.get(ckey(c.i + a, c.j + b)); return !n || !((n.height || 0) > y + FH*.5); }).map(d => d[2]);
   const homeZone = z => z === 'low' || z === 'high';
+  // A building's homes are its pods: the blocks its builder stacked (noted while it was made, c._pods from buildings.js chunkBox).
+  // Blocks side by side at one height are one pod; a block more than about three floors tall is split into pods of about two.
+  // A section with no blocks noted (a plot made before this) falls back to pods of two floors. Each home: its section, the floor
+  // number at its bottom (unique in the section), deck y and top y1, the block's centre and footprint, and which pod of how many.
+  function podsOf(c, k, tag, base, top){
+    const B = (c._pods || []).filter(b => b.k === k && b.t === tag && b.y1 - b.y0 >= FH*.6 && b.y1 > base - .05 && b.y0 < top + .05).sort((a, b) => a.y0 - b.y0);
+    const P = [];
+    for (const b of B){
+      const last = P[P.length - 1];
+      if (last && Math.min(last.y1, b.y1) - Math.max(last.y0, b.y0) > .5*Math.min(last.y1 - last.y0, b.y1 - b.y0)){   // (same storey: one pod)
+        if (b.w*b.d > last.b.w*last.b.d) last.b = b; last.y0 = Math.min(last.y0, b.y0); last.y1 = Math.max(last.y1, b.y1); continue; }
+      if (last && b.y0 < last.y1 - .05) continue;   // (a block inside one already counted: a setback or an annex)
+      P.push({ y0: b.y0, y1: b.y1, b });
+    }
+    if (!P.length){ const n = Math.max(1, Math.floor((top - base)/FH + .15)); for (let f = 0; f < n; f += 2){ const y0 = base + f*FH, y1 = Math.min(top, y0 + 2*FH); if (y1 - y0 >= FH*.6) P.push({ y0, y1, b: null }); } return P; }
+    const out = [];
+    for (const p of P){ const h = p.y1 - p.y0, n = h > FH*3.3 ? Math.max(2, Math.round(h/(2*FH))) : 1;
+      for (let q = 0; q < n; q++) out.push({ y0: p.y0 + h*q/n, y1: p.y0 + h*(q + 1)/n, b: p.b }); }
+    return out;
+  }
   function homesOf(c){
     const H = [];
     if (!c || c.mega || !c.sections || !c.sections.length) return H;
-    const run = (secs, tops, base0, idBase, isLift) => {
+    const run = (secs, tops, base0, idBase, tag, isLift) => {
       for (let k = 0; k < secs.length; k++){
         const sec = secs[k], top = tops[k]; if (top === undefined) break;
         const base = k === 0 ? base0 : sec.at !== undefined && sec.at > tops[k - 1] + .01 ? sec.at : tops[k - 1] + .1;
-        const pod = isLift && k === 0;
-        if (!pod && !homeZone(sec.zone)) continue;
-        const n = Math.max(1, Math.floor((top - base)/FH + .15));
-        for (let f = 0; f < n; f++){
-          const y = base + f*FH, y1 = Math.min(top, y + FH); if (y1 - y < FH*.6) break;
-          const row = { cell: [c.i, c.j], section: idBase + k, floor: Math.round((y - CURB)/FH) + 1, sf: f, y: +y.toFixed(3), y1: +y1.toFixed(3),
-            zone: sec.zone === 'high' ? 'high' : 'low', kind: sec.zone === 'high' ? 'luxury' : 'tower', x: c.x, z: c.z, sides: exposed(c, y), v: 1, d: null, top, base };
-          if (pod && f === 0){ const L = c.lift; Object.assign(row, { section: -1, kind: 'lift', v: L.v || 1, d: L.d || null, y1: +Math.min(top, y + FH*1.15).toFixed(3),
-            sides: L.d ? [L.d[0] > 0 ? 'E' : L.d[0] < 0 ? 'W' : L.d[1] > 0 ? 'S' : 'N'] : exposed(c, y) }); }
-          else if (pod && !homeZone(sec.zone)) break;
+        const liftPod = isLift && k === 0;
+        if (!liftPod && !homeZone(sec.zone)) continue;
+        const pods = podsOf(c, k, tag, base, top);
+        pods.forEach((p, f) => {
+          if (liftPod && f > 0 && !homeZone(sec.zone)) return;
+          const b = p.b, row = { cell: [c.i, c.j], section: idBase + k, floor: Math.round((p.y0 - CURB)/FH) + 1, sf: f, y: +p.y0.toFixed(3), y1: +p.y1.toFixed(3),
+            zone: sec.zone === 'high' ? 'high' : 'low', kind: sec.zone === 'high' ? 'luxury' : 'tower', x: b ? b.x : c.x, z: b ? b.z : c.z,
+            fp: b ? { w: b.w, d: b.d, ry: b.ry } : { w: SIDE, d: SIDE, ry: 0 }, sides: exposed(c, p.y0), v: 1, d: null, top, base };
+          if (liftPod && f === 0){ const L = c.lift; Object.assign(row, { section: -1, kind: 'lift', v: L.v || 1, d: L.d || null,
+            sides: L.d ? [L.d[0] > 0 ? 'E' : L.d[0] < 0 ? 'W' : L.d[1] > 0 ? 'S' : 'N'] : exposed(c, p.y0) }); }
           H.push(row);
-        }
+        });
       }
     };
-    if (c.lift && c.below && c.below.length && c.belowTops) run(c.below, c.belowTops, CURB, 100, false);
-    run(c.sections, c.sectionTops || [], c.lift ? c.lift.y : CURB, 0, !!c.lift);
+    if (c.lift && c.below && c.below.length && c.belowTops) run(c.below, c.belowTops, CURB, 100, 'b', false);
+    run(c.sections, c.sectionTops || [], c.lift ? c.lift.y : CURB, 0, '', !!c.lift);
+    H.forEach((r, i) => { r.pod = i + 1; r.pods = H.length; });
     return H;
   }
   F.homesOf = homesOf;
@@ -71,10 +92,10 @@ const FURN = (() => {
       if (mtMode) setMtMode(false, true);
       if (HL) hlStop();
       if (MON.id) MON.close();
-      hint.textContent = 'Furnish pod: point at a residential or luxury building · scroll or Up / Down picks the floor · click to furnish · Esc to cancel';
+      hint.textContent = 'Furnish pod: point at a residential or luxury building · scroll or Up / Down picks the pod · click to furnish · Esc to cancel';
       if (ptrLast) hoverAt(ptrLast.x, ptrLast.y);
       warmStart();   // (the far city's stand-ins made while the player picks)
-    } else { hoverStrip.material.color.set(0xff5ad8); tip.hidden = true; selectZone(null); }   // (the strip's own pink back, for the side pods)
+    } else { hoverStrip.material.color.set(0xff5ad8); hoverFill.material.color.set(0xff5ad8); hoverFill.visible = false; tip.hidden = true; selectZone(null); }   // (the strip's and fill's own pink back, for the side pods)
   }
   F.setPick = setPick;
   function flash(msg){ hint.textContent = msg; clearTimeout(flash.t); flash.t = setTimeout(() => { if (!F.pick) selectZone(S.zone || null); }, 3500); }
@@ -87,7 +108,7 @@ const FURN = (() => {
     if (!rows.length){ F.hov = { c, rows }; showPick(F.hov, x, y); return; }
     if (!F.hov || F.hov.c !== c){ F.hov = { c, rows }; F.userFloor = false; }
     else F.hov.rows = rows;
-    if (!F.userFloor){ const py = pk.p ? pk.p.y : rows[0].y; let k = 0; for (let i = 0; i < rows.length; i++) if (rows[i].y <= py + .05) k = i; F.fl = k; }
+    if (!F.userFloor){ const py = pk.p ? pk.p.y : rows[0].y; let k = 0; for (let i = 0; i < rows.length; i++) if (rows[i].y <= py + .02) k = i; F.fl = k; }   // (the pod the pointer is on)
     F.fl = clamp(F.fl, 0, rows.length - 1);
     showPick(F.hov, x, y);
   }
@@ -96,7 +117,7 @@ const FURN = (() => {
     F.fl = clamp(F.fl + d, 0, F.hov.rows.length - 1); F.userFloor = true;
     showPick(F.hov, ptrLast ? ptrLast.x : null, ptrLast ? ptrLast.y : null);
   }
-  // the building outlined, the floor as a bright band round it (a lifted pod: just the pod)
+  // the picked pod in a bold neon outline hugging its block, with a light fill; the rest of the building stays as it is
   function showPick(hv, px, py){
     hoverFill.visible = false; hoverStrip.visible = false;
     if (!hv){ hover.visible = false; tip.hidden = true; return; }
@@ -104,21 +125,17 @@ const FURN = (() => {
     if (!hv.rows.length){
       hover.visible = false;
       const z = c.sections[c.sections.length - 1].zone;
-      tip.textContent = (ZONES[z] ? ZONES[z].name : 'This building') + ': only residential and luxury floors can be furnished';
+      tip.textContent = (ZONES[z] ? ZONES[z].name : 'This building') + ': only residential and luxury homes can be furnished';
       tip.classList.add('no'); placeTip(px, py); return;
     }
     tip.classList.remove('no');
-    const r = hv.rows[F.fl], col = zoneCol(r.zone);
-    let y0, y1;
-    if (r.kind === 'lift' || (c.lift && r.section >= 0 && r.section < 100)){ y0 = c.lift.y; y1 = c.height;
-      if (c.podBlocks) for (const [s0, s1] of c.podBlocks) if (r.y >= s0 - .05 && r.y <= s1){ y0 = s0; y1 = s1; } }
-    else { const same = hv.rows.filter(q => q.section >= 100 === r.section >= 100); y0 = Math.min(...same.map(q => q.base)); y1 = Math.max(...same.map(q => q.top)); }
+    const r = hv.rows[F.fl], col = zoneCol(r.zone), fp = r.fp || { w: SIDE, d: SIDE, ry: 0 };
+    const cs = Math.abs(Math.cos(fp.ry)), sn = Math.abs(Math.sin(fp.ry)), ex = fp.w*cs + fp.d*sn + .08, ez = fp.w*sn + fp.d*cs + .08, h = Math.max(.2, r.y1 - r.y);   // (the block's box across the ground: it may be turned a little)
     hoverMat.color.set(col);
-    hover.position.set(c.x, (y0 + y1)/2, c.z); hover.scale.set(SIDE + .1, Math.max(.2, y1 - y0), SIDE + .1); hover.visible = true;
-    hoverStrip.material.color.set(col);
-    hoverStrip.position.set(c.x, (r.y + r.y1)/2, c.z); hoverStrip.scale.set(SIDE + .3, (r.y1 - r.y)*.94, SIDE + .3); hoverStrip.visible = true;
+    hover.position.set(r.x, r.y + h/2, r.z); hover.scale.set(ex, h, ez); hover.visible = true;
+    hoverFill.material.color.set(col); hoverFill.position.copy(hover.position); hoverFill.scale.set(ex - .04, h - .04, ez - .04); hoverFill.visible = true;
     const saved = !!getRecipe(r);
-    tip.textContent = label(r) + ' · floor ' + r.floor + (r.kind === 'lift' ? '' : ' (' + (F.fl + 1) + ' of ' + hv.rows.length + ')') + (saved ? ' · furnished' : '') + ' · click to ' + (saved ? 'open' : 'furnish');
+    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + (saved ? ' · furnished' : '') + ' · click to ' + (saved ? 'open' : 'furnish');
     placeTip(px, py);
   }
   function placeTip(px, py){ if (px == null){ tip.hidden = true; return; } tip.style.left = px + 'px'; tip.style.top = py + 'px'; tip.hidden = false; }
@@ -163,9 +180,9 @@ const FURN = (() => {
   function confirm(){
     if (!F.hov || !F.hov.rows.length || F.busy) return;
     const h = Object.assign({}, F.hov.rows[F.fl]); delete h.top; delete h.base;
-    const keepHov = hover.visible, keepStrip = hoverStrip.visible;
+    const keepHov = hover.visible, keepFill = hoverFill.visible;
     setPick(false); tip.hidden = true;
-    hover.visible = keepHov; hoverStrip.visible = keepStrip; if (keepStrip) hoverStrip.material.color.set(zoneCol(h.zone));   // (the picked floor stays lit under the opening page)
+    hover.visible = keepHov; hoverFill.visible = keepFill; if (keepFill) hoverFill.material.color.set(zoneCol(h.zone));   // (the picked pod stays lit under the opening page)
     openHome(h);
   }
 
@@ -282,9 +299,9 @@ const FURN = (() => {
       if (secs.length) o.sections = secs.map(s => ({ zone: s.zone, seed: s.seed })); if (c.sectionTops) o.tops = c.sectionTops.map(v => +v.toFixed(3));
       if (c.lift) o.lift = Object.assign({}, c.lift); if (c.mega) o.mega = c.mega; if (c.park) o.park = 1; if (c.firstFloors) o.ff = c.firstFloors; try { if (isDarkPlot(c)) o.dark = 1; } catch (e) {}
       cellsOut.push(o);
-      const H = homesOf(c); for (const h of H){ const r = Object.assign({}, h); delete r.top; delete r.base; delete r.y1; homes.push(r); }
+      const H = homesOf(c); for (const h of H){ const r = Object.assign({}, h); delete r.top; delete r.base; homes.push(r); }
       const bySec = new Map(); for (const h of H){ if (h.kind === 'lift') continue; const L = bySec.get(h.section) || []; L.push(h); bySec.set(h.section, L); }
-      for (const [s, L] of bySec) towers.push({ cell: [c.i, c.j], section: s, zone: L[0].zone, kind: L[0].kind, floors: [L[0].floor, L[L.length - 1].floor], base: +L[0].base.toFixed(3), top: +L[0].top.toFixed(3), x: c.x, z: c.z });
+      for (const [s, L] of bySec) towers.push({ cell: [c.i, c.j], section: s, zone: L[0].zone, kind: L[0].kind, floors: [L[0].floor, L[L.length - 1].floor], pods: L.length, base: +L[0].base.toFixed(3), top: +L[0].top.toFixed(3), x: c.x, z: c.z });
     }
     const MK = ['id', 'kind', 'i', 'j', 'w', 'h', 'x', 'z', 'top', 'roofH', 'rot', 'levels', 'seed', 'si', 'sj'];   // (the plain fields only: a megastructure also holds its meshes and parts)
     const megasOut = []; for (const m of megas.values()){ const r = {}; for (const k of MK){ const v = m[k]; if (typeof v === 'number' || typeof v === 'string') r[k] = v; } megasOut.push(r); }
@@ -357,7 +374,7 @@ const FURN = (() => {
     const run = F.run, alive = () => F.open && F.run === run && F.frame === fr;
     const post = (m, x) => { try { fr.contentWindow.postMessage(m, location.origin, x || []); } catch (e) { console.error('Furnish pod: could not send', m.type, e); } };
     const t0 = performance.now(), hd = head(h);
-    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: null, time: nightNow(), label: label(h) + ' · floor ' + h.floor });
+    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: null, time: nightNow(), label: label(h) + ' · pod ' + h.pod + ' of ' + h.pods });
     const headMs = performance.now() - t0;
     let st = null;
     try { st = await stream(h, (plots, em, k, done, x) => post({ type: 'furnish:plots', plots, em, k, done }, x), alive); }
@@ -369,7 +386,7 @@ const FURN = (() => {
     F.busy = false; F.hold = false; F.open = false;
     if (F.frame){ F.frame.remove(); F.frame = null; }
     ov.hidden = true; ov.classList.remove('live'); document.body.classList.remove('furnish-open');
-    hover.visible = false; hoverStrip.visible = false; hoverStrip.material.color.set(0xff5ad8);
+    hover.visible = false; hoverStrip.visible = false; hoverFill.visible = false; hoverStrip.material.color.set(0xff5ad8); hoverFill.material.color.set(0xff5ad8);
     try { canvas.focus(); } catch (e) {} LAST_INPUT = performance.now();
   }
   F.close = close;

@@ -478,9 +478,9 @@ function updateCars(t){
 const STEAM_PER = 6;
 let steamPts = null, steamLife = null, steamWob = null, steamSrc = [];
 const steamMat = new THREE.ShaderMaterial({
-  uniforms: { map:{ value: glowTex }, color:{ value: new THREE.Color(0xeef0ee) }, scale: GLOW_PTS_UNI.scale },
+  uniforms: { map:{ value: glowTex }, color:{ value: new THREE.Color(0xeef0ee) }, scale: GLOW_PTS_UNI.scale, aK:{ value: 1 } },
   vertexShader: 'attribute float size; attribute float alpha; varying float vA; uniform float scale; void main(){ vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale; }',
-  fragmentShader: 'uniform sampler2D map; uniform vec3 color; varying float vA; void main(){ float a = texture2D(map, gl_PointCoord).a * vA; if (a < .01) discard; gl_FragColor = vec4(color, a); }',
+  fragmentShader: 'uniform sampler2D map; uniform vec3 color; uniform float aK; varying float vA; void main(){ float a = texture2D(map, gl_PointCoord).a * vA * aK; if (a < .01) discard; gl_FragColor = vec4(color, a); }',
   transparent: true, depthWrite: false,
 });
 let steamCeil = null;
@@ -512,12 +512,13 @@ function setupSteam(){
   steamPts = new THREE.Points(g, steamMat); steamPts.layers.set(1); steamPts.frustumCulled = false; scene.add(steamPts);
   updateSteam(0, comp.uniforms.night.value);   // (positions, sizes and fades filled in now: an edit's upkeep can run after this frame's steam update)
 }
-const steamCol = new THREE.Color(), STEAM_DAY = .74;
+const steamCol = new THREE.Color(), STEAM_DAY = .62;
 function updateSteam(dt, night){
   if (!steamPts) return;
   // by day a matte puff in the air's own mist color, kept under the bloom's threshold (pure white puffs flared in the morning look's bloom and halation); at night as before
   const mt = comp.uniforms.mistTint.value;
   steamMat.uniforms.color.value.setRGB(STEAM_DAY*mt.r, STEAM_DAY*mt.g, STEAM_DAY*mt.b).lerp(steamCol.set(0x6a7596), night);
+  steamMat.uniforms.aK.value = .6 + .4*night;   // (and thinner by day: overlapping puffs built up to a bright patch; at night as before)
   const P = steamPts.geometry.attributes.position.array, Sz = steamPts.geometry.attributes.size.array, A = steamPts.geometry.attributes.alpha.array;
   if (PH.tests.steamFull || window.__STEAM_FULL){   // (the first way: three sine and cosine calls for every puff)
   for (let i=0;i<steamLife.length;i++){

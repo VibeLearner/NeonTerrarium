@@ -363,6 +363,7 @@ html.title-on #view{cursor:default}
 .t-layer{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none}
 #tGlass{opacity:.9}
 .title.leaving .t-side,.title.leaving .t-panel{opacity:0;transition:opacity .5s;pointer-events:none}
+.title.leaving .t-stage{transition:none}   /* (the flight sets its scale and fade every frame: a transition here made the room lag on screen after the glass) */
 /* the neon sign's own light, live over the baked one: a hum and the odd stutter */
 .t-signglow{position:absolute;width:calc(var(--px)*230);height:calc(var(--px)*110);transform:translate(-50%,-50%);pointer-events:none;mix-blend-mode:screen;
   background:radial-gradient(closest-side,rgba(255,79,163,.34),rgba(255,79,163,.1) 55%,transparent),radial-gradient(closest-side at 50% 70%,rgba(43,220,108,.22),transparent 70%);

@@ -1,0 +1,13 @@
+/* Neon Terrarium: furnish.html in the game's own colors and type (css/style.css); hides the lab's Home menu, the game owns saving */
+#bHomeBtn,#bHome,[data-lab]{display:none!important}
+.nt-bar{display:flex;align-items:center;gap:8px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px}
+.nt-bar button{height:34px;padding:0 14px;font-family:"Silkscreen",ui-monospace,monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:rgba(10,16,32,.92);border:1px solid #38E8E0;border-radius:0;color:#38E8E0;cursor:pointer;
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+.nt-bar button:hover:not(:disabled){color:#fff;border-color:#fff}
+.nt-bar .nt-exit{border-color:#FF4FA3;color:#FF4FA3}
+.nt-bar .nt-save:disabled{border-color:#2c3a52;color:#8e9bb2;cursor:default}
+.nt-bar .nt-save.on{background:rgba(56,232,224,.22);box-shadow:0 0 8px rgba(56,232,224,.5);color:#fff}
+.nt-bar button:focus-visible{outline:2px solid #38E8E0;outline-offset:2px}
+.nt-toast{position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:20;font:11px/1.4 "JetBrains Mono",ui-monospace,monospace;color:#fff;background:rgba(10,16,32,.94);border:1px solid #38E8E0;padding:5px 14px}
+.nt-toast[hidden]{display:none}
+@media (max-width:700px){.nt-bar button{height:32px;padding:0 10px;font-size:10px}}

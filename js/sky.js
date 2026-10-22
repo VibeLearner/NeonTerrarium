@@ -611,7 +611,7 @@ const comp = new THREE.ShaderMaterial({
         if (hit.y > -0.6 && tb > ta && max(max(sA.g, sB.g), sM.g) > .004){   // skip lines of sight with no steam near them
           vec3 nl = (texture2D(tLight, vUv).rgb*.5 + texture2D(tLight, vUv + vec2(4.0, 0.0)*px).rgb*.25 + texture2D(tLight, vUv - vec2(4.0, 0.0)*px).rgb*.25);
           vec3 amb = mix(mix(skyBot, skyTop, .4)*.35, vec3(.03, .04, .08), mistNight);
-          vec3 sunS = sunCol*mistSun*(1.0 - mistNight);
+          vec3 sunS = min(sunCol, vec3(1.0))*mistSun*(1.0 - mistNight)*.6;   // (daylight through the steam: soft and matte, not a glare for the bloom to catch; nothing changes at night)
           vec3 glowN = (nl*2.4 + cityGlow*.03)*mistNight;
           const int MS = 8;
           float dt = (tb - ta)/float(MS), T = 1.0; vec3 acc = vec3(0.0);
@@ -624,7 +624,7 @@ const comp = new THREE.ShaderMaterial({
             acc += T*dens*dt*(amb + sunS*litAt(p) + glowN);
             T *= exp(-dens*dt*.35);   // light extinction: steam scatters light, hides little
           }
-          acc = min(acc, vec3(.4));
+          acc = min(acc, vec3(mix(.2, .4, mistNight)));   // (by day the steam's light is capped lower, so a low morning sun can't push it past the bloom's threshold)
           acc = smoothLook > .5 ? acc : floor(acc*20.0 + dith)/20.0;   // stepped, to stay pixel art
           col = col*mix(1.0, T, .6) + acc*mistTint;
         }
@@ -816,7 +816,7 @@ const SOFT_MIST = SOFT_HEAD + `
       vec2 px = 1.0/res;
       vec3 nl = (texture2D(tLight, uvR).rgb*.5 + texture2D(tLight, uvR + vec2(4.0, 0.0)*px).rgb*.25 + texture2D(tLight, uvR - vec2(4.0, 0.0)*px).rgb*.25);
       vec3 amb = mix(mix(skyBot, skyTop, .4)*.35, vec3(.03, .04, .08), mistNight);
-      vec3 sunS = sunCol*mistSun*(1.0 - mistNight);
+      vec3 sunS = min(sunCol, vec3(1.0))*mistSun*(1.0 - mistNight)*.6;   // (daylight through the steam: soft and matte, not a glare for the bloom to catch; nothing changes at night)
       vec3 glowN = (nl*2.4 + cityGlow*.03)*mistNight;
       const int MS = 8;
       float dt = (tb - ta)/float(MS), T = 1.0; vec3 acc = vec3(0.0);
@@ -829,7 +829,7 @@ const SOFT_MIST = SOFT_HEAD + `
         acc += T*dens*dt*(amb + sunS*litAt(p) + glowN);
         T *= exp(-dens*dt*.35);
       }
-      acc = min(acc, vec3(.4));
+      acc = min(acc, vec3(mix(.2, .4, mistNight)));   // (by day the steam's light is capped lower, so a low morning sun can't push it past the bloom's threshold)
       outv = vec4(acc*2.5, T);
     }
   }

@@ -512,10 +512,12 @@ function setupSteam(){
   steamPts = new THREE.Points(g, steamMat); steamPts.layers.set(1); steamPts.frustumCulled = false; scene.add(steamPts);
   updateSteam(0, comp.uniforms.night.value);   // (positions, sizes and fades filled in now: an edit's upkeep can run after this frame's steam update)
 }
-const steamCol = new THREE.Color();
+const steamCol = new THREE.Color(), STEAM_DAY = .74;
 function updateSteam(dt, night){
   if (!steamPts) return;
-  steamMat.uniforms.color.value.setRGB(1,1,1).lerp(steamCol.set(0x6a7596), night);
+  // by day a matte puff in the air's own mist color, kept under the bloom's threshold (pure white puffs flared in the morning look's bloom and halation); at night as before
+  const mt = comp.uniforms.mistTint.value;
+  steamMat.uniforms.color.value.setRGB(STEAM_DAY*mt.r, STEAM_DAY*mt.g, STEAM_DAY*mt.b).lerp(steamCol.set(0x6a7596), night);
   const P = steamPts.geometry.attributes.position.array, Sz = steamPts.geometry.attributes.size.array, A = steamPts.geometry.attributes.alpha.array;
   if (PH.tests.steamFull || window.__STEAM_FULL){   // (the first way: three sine and cosine calls for every puff)
   for (let i=0;i<steamLife.length;i++){

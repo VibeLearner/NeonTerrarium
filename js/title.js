@@ -397,7 +397,13 @@ const TITLE = (() => {
     const t = Math.min(1, (performance.now() - leaveAt)/FLIGHT), e = t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2.2)/2;   // (slow away, then on through)
     const s = Math.pow(flightTo, e), ec = Math.log(flightTo/1.2)/Math.log(flightTo);   // (ec: where the window's rim passes the screen's edges: the glass)
     stage.style.scale = (1.03*s).toFixed(4); stage.style.rotate = (sway0.r*(1 - e)).toFixed(3) + 'deg';
-    stage.style.opacity = String(Math.max(0, Math.min(1, 1 - (e - ec)/(1 - ec)*1.4)));
+    // The camera passes the window: the room is all nearer than the glass, so it is gone by the time the rim leaves the screen. The room
+    // grows as one picture round the window's middle (every piece keeps its place: the cord on its lamp, the plant in its pot) and the
+    // whole of it fades over the last stretch before the glass, then stops drawing. (The fade used to start only after the glass and ran
+    // through the stage's CSS transition, a second behind: the cord and a plant, which hang over the window's middle where the zoom never
+    // pushes them off screen, were still there once the view was outside.)
+    const pass = Math.max(0, Math.min(1, (e - (ec - .14))/.15));
+    stage.style.opacity = String(1 - pass*pass*(3 - 2*pass)); stage.style.visibility = pass >= 1 ? 'hidden' : '';
     const vw_ = document.getElementById('view'); if (vw_) vw_.style.transform = 'scaleX(' + (1 + (CITY_WIDEN - 1)*(1 - e)).toFixed(4) + ')';
     try { const w = Math.exp(-Math.pow((e - ec)/.1, 2)); WARP.k.value = w > .01 ? w : 0; WARP.c.value.set(flightC[0], flightC[1]); } catch (_) {}
     // past the glass: carry on a little into the city and let it settle in the middle of the screen (the game's own easing)
@@ -422,7 +428,7 @@ const TITLE = (() => {
   function unwiden(){ const v = document.getElementById('view'); if (v){ v.style.transition = 'transform 1.2s ease-in-out'; v.style.transform = ''; setTimeout(() => { v.style.transition = ''; }, 1300); } }
   // the pictures for an hour, fetched ahead (they're cached, so the room shows at once when it's needed)
   function preload(t){ const v = innerWidth/innerHeight < .85 ? 'tall' : 'wide'; for (const k of ['room', 'glass', 'signoff']){ const im = new Image(); im.src = 'assets/title/' + k + '-' + v + '-' + t + '.png?v=' + VER; (preload.keep = preload.keep || []).push(im); } }
-  function finish(){ T.leaving = false; try { if (scWas !== null){ SC.mode = scWas; scWas = null; } } catch (e) {} try { WARP.k.value = 0; } catch (e) {} stage.style.opacity = ''; stage.style.scale = ''; unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} try { applyRenderRes(zoom); } catch (e) {} }
+  function finish(){ T.leaving = false; try { if (scWas !== null){ SC.mode = scWas; scWas = null; } } catch (e) {} try { WARP.k.value = 0; } catch (e) {} stage.style.opacity = ''; stage.style.scale = ''; stage.style.visibility = ''; unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} try { applyRenderRes(zoom); } catch (e) {} }
 
   /* ---------- the menu ---------- */
   function setDeck(on){

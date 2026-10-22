@@ -278,13 +278,13 @@ const comp = new THREE.ShaderMaterial({
       if (sc.x < 0.0 || sc.x > 1.0 || sc.y < 0.0 || sc.y > 1.0 || sc.z > 1.0) return 1.0;
       return step(sc.z - 0.003, unpackRGBAToDepth(texture2D(shadowMap, sc.xy)));
     }
-    // By day the vents' steam is a soft matte haze: the picture fades a little toward a muted mist colour where the steam is thick (T: the light
-    // that gets through), never brighter than the sky's haze and lit by nothing. (It used to add the sun it scattered, read through the shadow
+    // By day the vents' steam is soft matte white-grey wisps: the picture is covered toward a pale grey where the steam is thick (T: the light
+    // that gets through), lit by nothing and kept under the bloom's threshold. (It used to add the sun it scattered, read through the shadow
     // map: the low morning sun made it a glare the bloom and halation spread over the buildings, and it jumped as the view turned and the
     // shadow map's reach and redrawn strips moved over the vents.) At night (mistNight 1) it changes nothing: the lamps and neon light it.
     vec3 mistDay(vec3 c, float T){
-      float a = clamp((1.0 - T)*2.2, 0.0, .42)*(1.0 - mistNight);
-      vec3 m = mistTint*clamp(dot(skyBot, vec3(.3, .59, .11))*.8, .35, .68);
+      float a = clamp((1.0 - T*T*T)*1.1, 0.0, .62)*(1.0 - mistNight);   // (real cover where the steam is thick: about 1 - e^-od)
+      vec3 m = mix(vec3(1.0), mistTint, .35)*.8;   // soft white-grey: pale, so the bloom leaves it be by day, and under its threshold
       return mix(c, m, a);
     }
     float rawD(vec2 uv){ return texture2D(tDepth, uv).x; }

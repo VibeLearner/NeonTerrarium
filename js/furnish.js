@@ -8,7 +8,7 @@
 'use strict';
 const FURN = (() => {
   const F = { pick: false, open: false, hold: false, busy: false, hov: null, fl: 0, userFloor: false, frame: null, home: null };
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-22a';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-22t';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
 
@@ -53,7 +53,7 @@ const FURN = (() => {
     return H;
   }
   F.homesOf = homesOf;
-  F._gather = (h, p) => gather(h, p || (() => {}));   // (for checks: the payload openHome sends)
+  F._stream = (h, send) => stream(h, send, () => true);   // (for checks: the batches the lab gets)
 
   /* ---------- pick mode ---------- */
   const zoneCol = z => ZONES[z] ? ZONES[z].col : '#e3d6bd';
@@ -73,6 +73,7 @@ const FURN = (() => {
       if (MON.id) MON.close();
       hint.textContent = 'Furnish pod: point at a residential or luxury building · scroll or Up / Down picks the floor · click to furnish · Esc to cancel';
       if (ptrLast) hoverAt(ptrLast.x, ptrLast.y);
+      warmStart();   // (the far city's stand-ins made while the player picks)
     } else { hoverStrip.material.color.set(0xff5ad8); tip.hidden = true; selectZone(null); }   // (the strip's own pink back, for the side pods)
   }
   F.setPick = setPick;
@@ -146,7 +147,7 @@ const FURN = (() => {
   canvas.addEventListener('pointerup', endP, { capture: true });
   canvas.addEventListener('wheel', e => { if (!F.pick || !F.hov || !F.hov.rows.length) return; e.preventDefault(); e.stopImmediatePropagation(); stepFloor(e.deltaY < 0 ? 1 : -1); }, { capture: true, passive: false });
   addEventListener('keydown', e => {
-    if (F.open){ e.preventDefault(); e.stopImmediatePropagation(); return; }   // (the apartment has the keys: none reach the city under it)
+    if (F.open){ e.preventDefault(); e.stopImmediatePropagation(); if (e.key === 'Escape' && !ov.classList.contains('live')) close(); return; }   // (the apartment has the keys; Esc before it shows cancels)   // (the apartment has the keys: none reach the city under it)
     if (!F.pick || (e.target.closest && e.target.closest('input,select,textarea'))) return;
     const k = e.key;
     if (k === 'Escape'){ setPick(false); }
@@ -162,106 +163,118 @@ const FURN = (() => {
   function confirm(){
     if (!F.hov || !F.hov.rows.length || F.busy) return;
     const h = Object.assign({}, F.hov.rows[F.fl]); delete h.top; delete h.base;
-    setPick(false);
+    const keepHov = hover.visible, keepStrip = hoverStrip.visible;
+    setPick(false); tip.hidden = true;
+    hover.visible = keepHov; hoverStrip.visible = keepStrip; if (keepStrip) hoverStrip.material.color.set(zoneCol(h.zone));   // (the picked floor stays lit under the opening page)
     openHome(h);
   }
 
-  /* ---------- the city for the lab ---------- */
+  /* ---------- the city for the lab: a head at once, then the plots streamed nearest first ---------- */
+  // The lab's hologram starts as soon as it has the head (cells, homes, camera: no geometry, a few ms) and paces itself on the
+  // progress sent with each batch of plots. The home's own plot goes first, then the ring round it at full detail (with its
+  // normals), then the rest of the city clustered: kept from earlier visits, then made from
+  // arrays the game still holds, and last the plots whose arrays were let go (pmEnsure asks the worker for them).
   const ownArr = a => { const d = a && Object.getOwnPropertyDescriptor(a, 'array'); return d && 'value' in d ? d.value : null; };   // (a getter: the arrays are let go)
   function emTable(){
     const E = [[0, 0, 0, 0]], map = new Map([['0,0,0,0', 0]]);
-    return { E, at(r, g, b, f){ const k = r + ',' + g + ',' + b + ',' + f; let v = map.get(k); if (v !== undefined) return v;
-      if (E.length >= 255){ let best = 1, bd = 1e9; for (let i = 1; i < E.length; i++){ const q = E[i], d = Math.abs(q[0] - r) + Math.abs(q[1] - g) + Math.abs(q[2] - b) + (q[3] === f ? 0 : 500); if (d < bd){ bd = d; best = i; } } return best; }
+    return { E, at(r, g, b, f){ const k = (((r*256 + g)*256 + b)*256) + f; let v = map.get(k); if (v !== undefined) return v;
+      if (E.length >= 255){ let best = 1, bd = 1e9; for (let i = 1; i < E.length; i++){ const q = E[i], d = Math.abs(q[0] - r) + Math.abs(q[1] - g) + Math.abs(q[2] - b) + (q[3] === f ? 0 : 500); if (d < bd){ bd = d; best = i; } } map.set(k, best); return best; }
       v = E.length; E.push([r, g, b, f]); map.set(k, v); return v; } };
   }
-  // one plot (or megastructure): its parts by class (solid, glass, fx) as plain arrays, or null when its arrays are let go
-  function readPlot(o, EM){
+  // one geometry as plain arrays (copies: they are transferred to the lab), or null when its arrays are let go
+  function readGeo(m, g, EM, box, withN){
+    const P = g.attributes.position, pa = ownArr(P); if (!P) return {}; if (!pa || pa.length < P.count*3) return null;
+    const n = P.count; if (!n) return {};
+    const cls = m && m.transparent ? 'glass' : m && m.type === 'ShaderMaterial' ? 'fx' : 'solid';
+    const CA = g.attributes.color, ca = CA ? ownArr(CA) : null; if (CA && !ca) return null;
+    const EA = g.attributes.aEm, ea = EA ? ownArr(EA) : null; if (EA && !ea) return null;
+    const pos = pa.length === n*3 ? pa.slice() : pa.slice(0, n*3);
+    const NA = withN ? g.attributes.normal : null, na = NA ? ownArr(NA) : null; if (NA && !na) return null;   // (near plots: the normals too, which saves the lab working them out)
+    for (let i = 0; i < n*3; i += 3){ const x = pos[i], y = pos[i + 1], z = pos[i + 2];
+      if (x < box[0]) box[0] = x; if (x > box[3]) box[3] = x; if (y < box[1]) box[1] = y; if (y > box[4]) box[4] = y; if (z < box[2]) box[2] = z; if (z > box[5]) box[5] = z; }
+    const mc = m && m.color ? m.color : null, white = !mc || (mc.r === 1 && mc.g === 1 && mc.b === 1);
+    let col;
+    if (ca && CA.normalized && ca instanceof Uint8Array && CA.itemSize === 3 && white) col = ca.slice(0, n*3);   // (the atlas: rgb bytes as they are)
+    else { col = new Uint8Array(n*3); const base = m && !m.vertexColors && mc ? [mc.r*255, mc.g*255, mc.b*255] : !mc ? [159, 184, 200] : null, mk = mc ? [mc.r, mc.g, mc.b] : [1, 1, 1];
+      const s = CA ? CA.itemSize : 3, sc = CA && CA.normalized && ca instanceof Uint8Array ? 1 : 255;
+      for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++){ let v = base ? base[k] : ca ? ca[i*s + k]*sc*mk[k] : 255*mk[k]; col[i*3 + k] = v < 0 ? 0 : v > 255 ? 255 : v + .5; } }
+    const em = new Uint8Array(n);
+    if (ea){ const s = EA.itemSize, sc = EA.normalized && ea instanceof Uint8Array ? 1 : 255; let lk = -1, lv = 0;
+      for (let i = 0; i < n; i++){ const o2 = i*s, r = ea[o2]*sc + .5 | 0, gg = ea[o2 + 1]*sc + .5 | 0, b = ea[o2 + 2]*sc + .5 | 0; if (!(r | gg | b)) continue;
+        const f = s > 3 ? ea[o2 + 3]*sc + .5 | 0 : 1, key = ((r*256 + gg)*256 + b)*256 + f; if (key !== lk){ lk = key; lv = EM.at(r, gg, b, f); } em[i] = lv; } }
+    if (cls === 'fx') for (let i = 0; i < n; i++) if (!em[i]) em[i] = EM.at(col[i*3], col[i*3 + 1], col[i*3 + 2], 3);
+    let idx; if (g.index){ const ia = g.index.array; idx = ia instanceof Uint32Array ? ia.slice() : Uint32Array.from(ia); } else { idx = new Uint32Array(n); for (let i = 0; i < n; i++) idx[i] = i; }
+    const part = { pos, col, em, idx, n }; if (na && NA.itemSize === 3){ const sc = !NA.normalized || na instanceof Float32Array ? 1 : na instanceof Int8Array ? 1/127 : na instanceof Int16Array ? 1/32767 : 0;
+      if (sc === 1 && na instanceof Float32Array) part.nrm = na.slice(0, n*3); else if (sc){ const f = new Float32Array(n*3); for (let i = 0; i < n*3; i++) f[i] = Math.max(-1, na[i]*sc); part.nrm = f; } }
+    return { cls, part };
+  }
+  const joinParts = L => { if (L.length === 1) return L[0]; let n = 0, ni = 0; for (const p of L){ n += p.n; ni += p.idx.length; }
+    const pos = new Float32Array(n*3), col = new Uint8Array(n*3), em = new Uint8Array(n), idx = new Uint32Array(ni); let o2 = 0, oi = 0;
+    for (const p of L){ pos.set(p.pos, o2*3); col.set(p.col, o2*3); em.set(p.em, o2); for (let t = 0; t < p.idx.length; t++) idx[oi + t] = p.idx[t] + o2; o2 += p.n; oi += p.idx.length; }
+    const out = { pos, col, em, idx, n };
+    if (L.every(p => p.nrm)){ const nrm = new Float32Array(n*3); let o3 = 0; for (const p of L){ nrm.set(p.nrm, o3); o3 += p.n*3; } out.nrm = nrm; }
+    return out; };
+  // a plot's geometries by class. far: solid only, and the stand-in tier when the game holds one (fewer corners to cluster)
+  function readPlot(o, EM, far){
     const d = o.data; if (!d || !d.geo) return {};
     const C = {}, box = [1e9, 1e9, 1e9, -1e9, -1e9, -1e9];
-    for (const [m, g] of d.geo){
-      const P = g.attributes.position, pa = ownArr(P); if (!P) continue; if (!pa || pa.length < P.count*3) return null;
-      const n = P.count; if (!n) continue;
-      const cls = m && m.transparent ? 'glass' : m && m.type === 'ShaderMaterial' ? 'fx' : 'solid';
-      const CA = g.attributes.color, ca = CA ? ownArr(CA) : null; if (CA && !ca) return null;
-      const EA = g.attributes.aEm, ea = EA ? ownArr(EA) : null; if (EA && !ea) return null;
-      const mc = m && m.color ? m.color : null, white = !mc || (mc.r === 1 && mc.g === 1 && mc.b === 1), byte = CA && CA.normalized && ca instanceof Uint8Array;
-      const base = m && !m.vertexColors && mc ? [mc.r*255, mc.g*255, mc.b*255] : !mc ? [159, 184, 200] : null;
-      const pos = new Float32Array(n*3), col = new Uint8Array(n*3), em = new Uint8Array(n);
-      for (let i = 0; i < n*3; i++){ const v = pa[i]; pos[i] = v; const k = i % 3; if (v < box[k]) box[k] = v; if (v > box[k + 3]) box[k + 3] = v; }
-      for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++){
-        let v = base ? base[k] : ca ? (byte ? ca[i*CA.itemSize + k] : ca[i*CA.itemSize + k]*255) : 255;
-        if (!base && !white) v *= mc.getComponent ? mc.getComponent(k) : [mc.r, mc.g, mc.b][k];
-        col[i*3 + k] = v < 0 ? 0 : v > 255 ? 255 : Math.round(v); }
-      if (ea){ const s = EA.itemSize, sc = EA.normalized && ea instanceof Uint8Array ? 1 : 255;
-        for (let i = 0; i < n; i++){ const o2 = i*s, r = Math.round(ea[o2]*sc), gg = Math.round(ea[o2 + 1]*sc), b = Math.round(ea[o2 + 2]*sc), f = s > 3 ? Math.round(ea[o2 + 3]*sc) : 1; if (r | gg | b) em[i] = EM.at(r, gg, b, f); } }
-      if (cls === 'fx') for (let i = 0; i < n; i++) if (!em[i]) em[i] = EM.at(col[i*3], col[i*3 + 1], col[i*3 + 2], 3);
-      let idx; if (g.index){ const ia = g.index.array; idx = new Uint32Array(ia.length); idx.set(ia); } else { idx = new Uint32Array(n); for (let i = 0; i < n; i++) idx[i] = i; }
-      (C[cls] || (C[cls] = [])).push({ pos, col, em, idx, n });
+    const sg = far && d.sgeo && ownArr(d.sgeo.attributes.position) ? d.sgeo : null;
+    for (const [m, g0] of d.geo){
+      const g = sg && m === ATLAS ? sg : g0;
+      if (far && m && (m.transparent || m.type === 'ShaderMaterial')) continue;
+      const r = readGeo(m, g, EM, box, !far); if (r === null) return null; if (!r.cls) continue;
+      (C[r.cls] || (C[r.cls] = [])).push(r.part);
     }
-    const out = {};
-    for (const k in C){ const L = C[k]; if (L.length === 1){ out[k] = L[0]; continue; }
-      let n = 0, ni = 0; for (const p of L){ n += p.n; ni += p.idx.length; }
-      const pos = new Float32Array(n*3), col = new Uint8Array(n*3), em = new Uint8Array(n), idx = new Uint32Array(ni); let o2 = 0, oi = 0;
-      for (const p of L){ pos.set(p.pos, o2*3); col.set(p.col, o2*3); em.set(p.em, o2); for (let t = 0; t < p.idx.length; t++) idx[oi + t] = p.idx[t] + o2; o2 += p.n; oi += p.idx.length; }
-      out[k] = { pos, col, em, idx, n }; }
-    out._box = box.map(v => +v.toFixed(4));
+    const out = {}; for (const k in C) out[k] = joinParts(C[k]);
+    out._box = box[0] > box[3] ? [o.x || 0, 0, o.z || 0, o.x || 0, 0, o.z || 0] : box.map(v => +v.toFixed(4));
     return out;
   }
   // the clustered stand-in of a part (vertices merged on a CG grid, as the lab's own city pack does)
   function cluster(c){
-    const n = c.n, id = new Int32Array(n), m = new Map(), P = [], Co = [], E = [], cnt = [];
+    const n = c.n, id = new Int32Array(n), m = new Map(), P = new Float64Array(n*3), Co = new Uint8Array(n*3), E = new Uint8Array(n), cnt = new Uint32Array(n); let nc = 0;
+    const pos = c.pos, col = c.col, ce = c.em;
     for (let i = 0; i < n; i++){
-      const key = ((Math.round(c.pos[i*3]/CG) + 32768)*65536 + (Math.round(c.pos[i*3 + 1]/CG) + 32768))*65536 + (Math.round(c.pos[i*3 + 2]/CG) + 32768);
+      const x = pos[i*3], y = pos[i*3 + 1], z = pos[i*3 + 2];
+      const key = ((Math.round(x/CG) + 32768)*65536 + (Math.round(y/CG) + 32768))*65536 + (Math.round(z/CG) + 32768);
       let v = m.get(key);
-      if (v === undefined){ v = cnt.length; m.set(key, v); P.push(0, 0, 0); Co.push(c.col[i*3], c.col[i*3 + 1], c.col[i*3 + 2]); E.push(c.em[i]); cnt.push(0); }
-      id[i] = v; P[v*3] += c.pos[i*3]; P[v*3 + 1] += c.pos[i*3 + 1]; P[v*3 + 2] += c.pos[i*3 + 2]; cnt[v]++; if (c.em[i]) E[v] = c.em[i];
+      if (v === undefined){ v = nc++; m.set(key, v); Co[v*3] = col[i*3]; Co[v*3 + 1] = col[i*3 + 1]; Co[v*3 + 2] = col[i*3 + 2]; }
+      id[i] = v; P[v*3] += x; P[v*3 + 1] += y; P[v*3 + 2] += z; cnt[v]++; if (ce[i]) E[v] = ce[i];
     }
-    const I = []; for (let t = 0; t < c.idx.length; t += 3){ const a = id[c.idx[t]], b = id[c.idx[t + 1]], d = id[c.idx[t + 2]]; if (a !== b && b !== d && a !== d) I.push(a, b, d); }
-    const used = new Int32Array(cnt.length).fill(-1); let u = 0; for (const v of I) if (used[v] < 0) used[v] = u++;
-    const pos = new Float32Array(u*3), col = new Uint8Array(u*3), em = new Uint8Array(u);
-    for (let v = 0; v < cnt.length; v++){ const w = used[v]; if (w < 0) continue; for (let k = 0; k < 3; k++){ pos[w*3 + k] = P[v*3 + k]/cnt[v]; col[w*3 + k] = Co[v*3 + k]; } em[w] = E[v]; }
-    const idx = new Uint32Array(I.length); for (let t = 0; t < I.length; t++) idx[t] = used[I[t]];
-    return { pos, col, em, idx, n: u };
+    const src = c.idx, I = new Uint32Array(src.length); let ni = 0;
+    for (let t = 0; t < src.length; t += 3){ const a = id[src[t]], b = id[src[t + 1]], d = id[src[t + 2]]; if (a !== b && b !== d && a !== d){ I[ni++] = a; I[ni++] = b; I[ni++] = d; } }
+    const used = new Int32Array(nc).fill(-1); let u = 0; for (let t = 0; t < ni; t++) if (used[I[t]] < 0) used[I[t]] = u++;
+    const op = new Float32Array(u*3), oc = new Uint8Array(u*3), oe = new Uint8Array(u);
+    for (let v = 0; v < nc; v++){ const w = used[v]; if (w < 0) continue; const k = cnt[v]; op[w*3] = P[v*3]/k; op[w*3 + 1] = P[v*3 + 1]/k; op[w*3 + 2] = P[v*3 + 2]/k; oc[w*3] = Co[v*3]; oc[w*3 + 1] = Co[v*3 + 1]; oc[w*3 + 2] = Co[v*3 + 2]; oe[w] = E[v]; }
+    const idx = new Uint32Array(ni); for (let t = 0; t < ni; t++) idx[t] = used[I[t]];
+    return { pos: op, col: oc, em: oe, idx, n: u };
   }
-  // the stand-ins are kept between visits while the plot is unchanged (same data object), so a second visit is quick
+  // clustered stand-ins are kept while the plot is unchanged (same data object): a second visit, or the warm-up while picking, makes it quick.
+  // (emission kept as rgba rows, not as one visit's table indices)
   const COARSE = new WeakMap();
-  const yieldNow = () => new Promise(r => setTimeout(r, 0));
-  async function gather(home, progress){
-    const EM = emTable(), plots = [], missing = [], xfer = [];
-    const todo = [];
-    for (const c of cells.values()) if (c.data && c.data.geo) todo.push({ o: c, kind: 'cell', id: [c.i, c.j], cell: c });
-    for (const m of megas.values()) if (m.data && m.data.geo) todo.push({ o: m, kind: 'mega', id: m.id });
-    const nearOf = t => { const bb = t.o._bb || (t.o.data && t.o.data._bb); const cx = bb ? (bb.min.x + bb.max.x)/2 : t.o.x, cz = bb ? (bb.min.z + bb.max.z)/2 : t.o.z, r = bb ? Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z)/2 : LOT;
-      return Math.hypot(cx - home.x, cz - home.z) < NEAR + r; };
-    const emCache = new Map();   // (the coarse caches hold emission as rgba, not as this visit's table indices)
-    const fromCache = (t, ce) => { const out = {}; for (const k in ce.parts){ const p = ce.parts[k], em = new Uint8Array(p.n); for (let i = 0; i < p.n; i++){ const q = p.e4[i]; em[i] = q ? EM.at(q[0], q[1], q[2], q[3]) : 0; }
-      out[k] = { pos: p.pos.slice(), col: p.col.slice(), em, idx: p.idx.slice(), n: p.n }; } return out; };
-    const t0 = performance.now(); let pending = todo, done = 0, last = performance.now();
-    while (pending.length && performance.now() - t0 < 60000){
-      const next = [];
-      for (const t of pending){
-        const near = nearOf(t), cached = !near && COARSE.get(t.o.data);
-        if (cached){ plots.push({ kind: t.kind, id: t.id, box: cached.box, coarse: fromCache(t, cached) }); done++; continue; }
-        let ready = true; if (t.cell){ try { ready = pmEnsure(t.cell, 'full'); } catch (e) { ready = true; } }
-        const B = ready ? readPlot(t.o, EM) : null;
-        if (!B){ next.push(t); continue; }
-        const box = B._box; delete B._box;
-        if (near) plots.push({ kind: t.kind, id: t.id, box, full: B });
-        else {
-          const co = {}, keep = { box, parts: {} };
-          for (const k in B){ if (k === 'glass') continue; const cc = cluster(B[k]); if (!cc.n) continue; co[k] = cc;
-            keep.parts[k] = { pos: cc.pos.slice(), col: cc.col.slice(), idx: cc.idx.slice(), n: cc.n, e4: Array.from(cc.em, v => v ? EM.E[v] : null) }; }
-          COARSE.set(t.o.data, keep); plots.push({ kind: t.kind, id: t.id, box, coarse: co });
-        }
-        done++;
-        if (performance.now() - last > 14){ progress(done/todo.length); await yieldNow(); last = performance.now(); if (!F.busy) return null; }
-      }
-      pending = next;
-      if (pending.length){ progress(done/todo.length); await new Promise(r => setTimeout(r, 120)); if (!F.busy) return null; }
-    }
-    for (const t of pending) missing.push({ kind: t.kind, id: t.id });
-    for (const p of plots) for (const tier of ['full', 'coarse']) if (p[tier]) for (const k in p[tier]){ const q = p[tier][k]; xfer.push(q.pos.buffer, q.col.buffer, q.em.buffer, q.idx.buffer); }
-    // the cells and megastructures, as the lab's city pack lists them
+  function coarseOf(B, EM){
+    const co = {}, keep = { parts: {} };
+    for (const k in B){ if (k === 'glass' || k === '_box') continue; const cc = cluster(B[k]); if (!cc.n) continue; co[k] = cc;
+      keep.parts[k] = { pos: cc.pos.slice(), col: cc.col.slice(), idx: cc.idx.slice(), n: cc.n, e4: Array.from(cc.em, v => v ? EM.E[v] : null) }; }
+    keep.box = B._box; return { co, keep };
+  }
+  function fromCache(ce, EM){ const out = {}; for (const k in ce.parts){ const p = ce.parts[k], em = new Uint8Array(p.n); for (let i = 0; i < p.n; i++){ const q = p.e4[i]; if (q) em[i] = EM.at(q[0], q[1], q[2], q[3]); }
+    out[k] = { pos: p.pos.slice(), col: p.col.slice(), em, idx: p.idx.slice(), n: p.n }; } return out; }
+  // While picking, the stand-ins of plots whose arrays the game still holds are made in idle moments (a few ms at a time)
+  const WARM = { q: null, EM: emTable() };
+  function warmStart(){
+    if (!WARM.pre){ WARM.pre = true; const l = document.createElement('link'); l.rel = 'prefetch'; l.href = PAGE; document.head.appendChild(l); }   // (the page itself fetched ahead, so a click opens it from the cache)
+    if (WARM.q) return; WARM.q = []; for (const c of cells.values()) if (c.data && c.data.geo) WARM.q.push(c); for (const m of megas.values()) if (m.data && m.data.geo) WARM.q.push(m); pickIdle(warmStep); }
+  function warmStep(dl){
+    if (!WARM.q || F.open) { WARM.q = null; return; }
+    const end = performance.now() + (dl && dl.timeRemaining ? Math.min(10, Math.max(3, dl.timeRemaining() - 1)) : 4);
+    while (WARM.q.length && performance.now() < end){ const o = WARM.q.pop(); if (!o.data || COARSE.has(o.data)) continue;
+      const B = readPlot(o, WARM.EM, true); if (!B) continue;   // (let go: made on the visit, if it's far)
+      COARSE.set(o.data, coarseOf(B, WARM.EM).keep); }
+    if (WARM.q.length) pickIdle(warmStep); else WARM.q = null;
+  }
+  F.warmStart = warmStart;
+
+  function head(home){
     const cellsOut = [], towers = [], homes = [];
     for (const c of cells.values()){
       const secs = c.sections || [];
@@ -273,33 +286,90 @@ const FURN = (() => {
       const bySec = new Map(); for (const h of H){ if (h.kind === 'lift') continue; const L = bySec.get(h.section) || []; L.push(h); bySec.set(h.section, L); }
       for (const [s, L] of bySec) towers.push({ cell: [c.i, c.j], section: s, zone: L[0].zone, kind: L[0].kind, floors: [L[0].floor, L[L.length - 1].floor], base: +L[0].base.toFixed(3), top: +L[0].top.toFixed(3), x: c.x, z: c.z });
     }
-    const megasOut = []; for (const m of megas.values()){ const r = {}; for (const k in m){ const v = m[k]; if (v == null || typeof v === 'function' || (typeof v === 'object' && (v.isObject3D || v.isBufferGeometry || v.isMaterial || v instanceof Map || v instanceof Set || ArrayBuffer.isView(v)))) continue; try { r[k] = JSON.parse(JSON.stringify(v)); } catch (e) {} } megasOut.push(r); }
+    const MK = ['id', 'kind', 'i', 'j', 'w', 'h', 'x', 'z', 'top', 'roofH', 'rot', 'levels', 'seed', 'si', 'sj'];   // (the plain fields only: a megastructure also holds its meshes and parts)
+    const megasOut = []; for (const m of megas.values()){ const r = {}; for (const k of MK){ const v = m[k]; if (typeof v === 'number' || typeof v === 'string') r[k] = v; } megasOut.push(r); }
     const camera = { pos: cam.position.toArray(), quat: cam.quaternion.toArray(), zoom: cam.zoom, type: cam.type, left: cam.left, right: cam.right, top: cam.top, bottom: cam.bottom, goal: [camGoal.x, camGoal.y || 0, camGoal.z] };
     const consts = { LOT, FH, CURB, ISL_R, SIDE }; for (const n of ['POD_Z1', 'POD_FAR', 'MAX_HEIGHT', 'MAX_SECTIONS', 'PLAT_BOTTOM']){ try { const v = (0, eval)(n); if (typeof v === 'number') consts[n] = v; } catch (e) {} }
-    return { city: { v: 1, source: { live: true, at: new Date().toISOString(), missing: missing.length }, consts, Q: null, camera, cells: cellsOut, megas: megasOut, em: EM.E, homes, towers, plots }, xfer };
+    return { v: 1, source: { live: true, streaming: true, at: new Date().toISOString() }, consts, Q: null, camera, cells: cellsOut, megas: megasOut, em: [[0, 0, 0, 0]], homes, towers, plots: [] };
+  }
+  const tick = () => new Promise(r => setTimeout(r, 0)), nap = ms => new Promise(r => setTimeout(r, ms));
+  // the plots, in batches: send(plots, em, k, done, xfer) for each; returns stats, or null when cancelled
+  async function stream(home, send, alive){
+    const EM = emTable(), st = { t0: performance.now(), plots: 0, near: 0, cached: 0, made: 0, ensured: 0, missing: 0, verts: 0, bytes: 0, batches: 0, firstMs: 0 };
+    const all = [];
+    for (const c of cells.values()) if (c.data && c.data.geo) all.push({ o: c, kind: 'cell', id: [c.i, c.j], cell: c });
+    for (const m of megas.values()) if (m.data && m.data.geo) all.push({ o: m, kind: 'mega', id: m.id });
+    for (const t of all){ const bb = t.o._bb || (t.o.data && t.o.data._bb), cx = bb ? (bb.min.x + bb.max.x)/2 : t.o.x, cz = bb ? (bb.min.z + bb.max.z)/2 : t.o.z, r = bb ? Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z)/2 : LOT;
+      t.d = Math.hypot(cx - home.x, cz - home.z); t.near = t.d < NEAR + r; t.home = t.cell && t.cell.i === home.cell[0] && t.cell.j === home.cell[1]; }
+    all.sort((a, b) => (b.home - a.home) || (b.near - a.near) || a.d - b.d);
+    const N = all.length || 1; let out = [], xfer = [], last = performance.now(), done = 0;
+    const flush = (fin) => { if (!out.length && !fin) return; send(out, EM.E.slice(), done/N, !!fin, xfer); st.batches++; if (!st.firstMs) st.firstMs = performance.now() - st.t0; out = []; xfer = []; };
+    const emit = p => { out.push(p); st.plots++; done++;
+      for (const tier of ['full', 'coarse']) if (p[tier]) for (const k in p[tier]){ const q = p[tier][k]; xfer.push(q.pos.buffer, q.col.buffer, q.em.buffer, q.idx.buffer); if (q.nrm) xfer.push(q.nrm.buffer); st.verts += q.n; st.bytes += q.pos.byteLength + q.col.byteLength + q.em.byteLength + q.idx.byteLength + (q.nrm ? q.nrm.byteLength : 0); } };
+    const one = t => {   // true when it went out
+      if (!t.near){ const ce = COARSE.get(t.o.data); if (ce){ emit({ kind: t.kind, id: t.id, box: ce.box, coarse: fromCache(ce, EM) }); st.cached++; return true; } }
+      const B = readPlot(t.o, EM, !t.near); if (!B) return false;
+      const box = B._box;
+      if (t.near){ delete B._box; emit({ kind: t.kind, id: t.id, box, full: B }); st.near++; }
+      else { const { co, keep } = coarseOf(B, EM); COARSE.set(t.o.data, keep); emit({ kind: t.kind, id: t.id, box, coarse: co }); st.made++; }
+      return true;
+    };
+    const ensure = t => { if (!t.cell) return true; try { return pmEnsure(t.cell, t.near ? 'full' : 'stand'); } catch (e) { return true; } };
+    const slice = async () => { if (performance.now() - last > 6){ flush(); await tick(); last = performance.now(); } return alive(); };
+    // 1. the home and the ring round it (any let go are asked for at once, so the worker makes them while the rest goes out)
+    const nearL = all.filter(t => t.near), farL = all.filter(t => !t.near);
+    let wait = [];
+    for (const t of nearL){ if (t.home ? (ensure(t) && one(t)) : one(t)){ if (t.home) flush(); } else { ensure(t); wait.push(t); } if (!await slice()) return null; }
+    // 2. the far plots the game holds (or kept from before)
+    const later = [];
+    for (const t of farL){ if (!one(t)) later.push(t); if (!await slice()) return null; }
+    // 3. what's let go: the near ones first, then the far ones, asked for a handful at a time
+    const t1 = performance.now(); let q = wait.concat(later), asked = new Set();
+    while (q.length && performance.now() - t1 < 45000){
+      const next = []; let n = 0;
+      for (const t of q){
+        if (!asked.has(t) && n < 24 && !t.near) asked.add(t);
+        const ok = (t.near || asked.has(t)) && ensure(t) && one(t);
+        if (ok) st.ensured++; else { next.push(t); if (asked.has(t)) n++; }
+        if (!await slice()) return null;
+      }
+      q = next; if (q.length){ flush(); await nap(25); if (!alive()) return null; }
+    }
+    st.missing = q.length; done = N; flush(true);
+    st.ms = Math.round(performance.now() - st.t0); st.firstMs = Math.round(st.firstMs); st.MB = +(st.bytes/1048576).toFixed(1);
+    return st;
   }
 
   /* ---------- the overlay ---------- */
-  const ov = document.getElementById('furnish'), ovMsg = document.getElementById('furnishMsg'), ovBar = document.getElementById('furnishBar');
+  const ov = document.getElementById('furnish');
   const nightNow = () => { try { return comp.uniforms.night.value > .5 ? 'night' : 'day'; } catch (e) { return S.hour < 6.5 || S.hour >= 19 ? 'night' : 'day'; } };
-  function status(t, k){ ovMsg.textContent = t; ovBar.style.width = k == null ? '0' : Math.round(k*100) + '%'; ovBar.parentNode.hidden = k == null; }
-  async function openHome(h){
+  // a click opens the apartment's page straight away over the city as it stands (the picked floor still lit); the lab's hologram starts from this view
+  // as soon as it has the head, and the plots follow while it plays
+  function openHome(h){
     if (F.busy || F.open) return;
-    F.busy = true; F.home = h; F.open = true; ov.hidden = false; document.body.classList.add('furnish-open'); ov.classList.remove('live');
-    status('Gathering the city around ' + label(h).toLowerCase() + ', floor ' + h.floor, 0);
-    let g = null; try { g = await gather(h, k => status(ovMsg.textContent, k)); } catch (e) { console.error('Furnish pod: gathering the city failed', e); }
-    if (!F.busy) return;
-    if (!g){ status('The city could not be gathered. Try again.', null); setTimeout(close, 2500); return; }
-    status('Opening the apartment', 1);
-    F.hold = true;   // (the city waits under the apartment: main.js)
+    F.busy = true; F.home = h; F.open = true; F.hold = true; F.dirty = false; F.run = (F.run || 0) + 1;
+    ov.hidden = false; ov.classList.remove('live'); document.body.classList.add('furnish-open');
     const fr = document.createElement('iframe'); fr.className = 'furnish-frame'; fr.title = 'Furnish pod'; fr.setAttribute('allow', 'fullscreen');
-    F.frame = fr; F.payload = g; F.dirty = false;
-    fr.src = PAGE + '#build'; ov.appendChild(fr);
+    F.frame = fr; fr.src = PAGE + '#build'; ov.appendChild(fr);
+    F.openT = performance.now();
+  }
+  async function begin(fr, h){
+    const run = F.run, alive = () => F.open && F.run === run && F.frame === fr;
+    const post = (m, x) => { try { fr.contentWindow.postMessage(m, location.origin, x || []); } catch (e) { console.error('Furnish pod: could not send', m.type, e); } };
+    const t0 = performance.now(), hd = head(h);
+    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: null, time: nightNow(), label: label(h) + ' · floor ' + h.floor });
+    const headMs = performance.now() - t0;
+    let st = null;
+    try { st = await stream(h, (plots, em, k, done, x) => post({ type: 'furnish:plots', plots, em, k, done }, x), alive); }
+    catch (e) { console.error('Furnish pod: gathering the city failed', e); post({ type: 'furnish:plots', plots: [], em: [[0, 0, 0, 0]], k: 1, done: true }); }
+    if (st){ st.headMs = Math.round(headMs); st.sinceClick = Math.round(performance.now() - F.openT); F.lastStats = st;
+      console.log('Furnish pod: city sent', JSON.stringify(st)); }
   }
   function close(){
-    F.busy = false; F.hold = false; F.open = false; F.payload = null;
+    F.busy = false; F.hold = false; F.open = false;
     if (F.frame){ F.frame.remove(); F.frame = null; }
     ov.hidden = true; ov.classList.remove('live'); document.body.classList.remove('furnish-open');
+    hover.visible = false; hoverStrip.visible = false; hoverStrip.material.color.set(0xff5ad8);
     try { canvas.focus(); } catch (e) {} LAST_INPUT = performance.now();
   }
   F.close = close;
@@ -307,21 +377,15 @@ const FURN = (() => {
   addEventListener('message', e => {
     const fr = F.frame; if (!fr || e.source !== fr.contentWindow || e.origin !== location.origin) return;
     const m = e.data || {}, h = F.home;
-    if (m.type === 'furnish:ready' && F.payload){
-      const g = F.payload; F.payload = null;
-      const tier = null;   // (a new home: the building picks its size, and its windows come from the real facade)
-      fr.contentWindow.postMessage({ type: 'furnish:open', city: g.city, home: h, recipe: getRecipe(h), tier, time: nightNow(), label: label(h) + ' · floor ' + h.floor }, location.origin, g.xfer);
-      ov.classList.add('live'); F.busy = false; try { fr.focus(); } catch (err) {}
-    } else if (m.type === 'furnish:save'){
+    if (m.type === 'furnish:ready'){ if (F.busy){ F.busy = false; begin(fr, h); } }
+    else if (m.type === 'furnish:live'){ ov.classList.add('live'); hover.visible = false; hoverStrip.visible = false; try { fr.focus(); } catch (err) {} }   // (the hologram has the screen: the paused city under it can go)
+    else if (m.type === 'furnish:save'){
       const ok = putRecipe(h, m.recipe); try { save(); } catch (err) {}
       fr.contentWindow.postMessage({ type: 'furnish:saved', ok }, location.origin);
     } else if (m.type === 'furnish:exit'){
       if (m.recipe) putRecipe(h, m.recipe);
       close();
-    } else if (m.type === 'furnish:error'){
-      console.warn('Furnish pod:', m.message); status(m.message || 'The apartment could not be opened.', null); setTimeout(close, 3000);
-    }
+    } else if (m.type === 'furnish:error'){ console.warn('Furnish pod:', m.message); close(); flash(m.message || 'The apartment could not be opened.'); }
   });
-  document.getElementById('furnishCancel').addEventListener('click', close);
   return F;
 })();

@@ -15351,8 +15351,8 @@ function passes(){const P={};
   P.mix=SM('uniform sampler2D a;uniform sampler2D b;uniform float k;varying vec2 vUv;void main(){gl_FragColor=mix(texture(a,vUv),texture(b,vUv),k);}',{a:{value:null},b:{value:null},k:{value:0}});
   P.copy=SM('uniform sampler2D t;varying vec2 vUv;void main(){gl_FragColor=texture(t,vUv);}',{t:{value:null}});
   // the hologram overlay on the canvas: premultiplied; a chromatic edge only toward the frame edges (subtle); faint scanlines
-  P.over=SM(`uniform sampler2D t;uniform float a;uniform float ca;varying vec2 vUv;void main(){vec2 q=vUv-.5;vec2 d=q*ca*dot(q,q)*4.;vec3 c=vec3(texture(t,vUv+d).r,texture(t,vUv).g,texture(t,vUv-d).b);
-    c*=1.-.05*step(.5,fract(gl_FragCoord.y/3.));gl_FragColor=vec4(c*a,a);}`,{t:{value:null},a:{value:1},ca:{value:.003}});
+  P.over=SM(`uniform sampler2D t;uniform float a;uniform float ca;uniform float uProg;uniform float uShow;varying vec2 vUv;void main(){vec2 q=vUv-.5;vec2 d=q*ca*dot(q,q)*4.;vec3 c=vec3(texture(t,vUv+d).r,texture(t,vUv).g,texture(t,vUv-d).b);
+    c*=1.-.05*step(.5,fract(gl_FragCoord.y/3.));if(uShow>.5&&vUv.y>.06&&vUv.y<.0625&&vUv.x>.3&&vUv.x<.7)c=max(c,(vUv.x-.3)/.4<uProg?vec3(.22,.91,.88)*.7:vec3(.22,.91,.88)*.12);gl_FragColor=vec4(c*a,a);}`,{t:{value:null},a:{value:1},ca:{value:.003},uProg:{value:0},uShow:{value:0}});
   P.over.transparent=true;P.over.blending=T.CustomBlending;P.over.blendSrc=T.OneFactor;P.over.blendDst=T.OneMinusSrcAlphaFactor;P.over.blendSrcAlpha=T.OneFactor;P.over.blendDstAlpha=T.OneMinusSrcAlphaFactor;
   P.back=SM('uniform sampler2D t;varying vec2 vUv;void main(){gl_FragColor=vec4(texture(t,vUv).rgb,1.);}',{t:{value:null}});
   P.edge=SM(EDGEF,{tDN:{value:null},px:{value:new T.Vector2()},pInv:{value:new T.Matrix4()},camW:{value:new T.Matrix4()},uBack:{value:1200},uSweep:{value:-1e4},uFloor:{value:0},uFH:{value:3},uFloorK:{value:0},
@@ -15418,7 +15418,7 @@ function bake(R,cam,fade,moving){const a=now(),Tg=C.T,P=C.P,city=C.city;const c=
     d.kMin.value=moving?1.25:.55;   // settled: blurred enough that the moving and settled bakes look alike
     if(fade&&C.shown){P.copy.uniforms.t.value=Tg.show.texture;quad(R,P.copy,Tg.prev);quad(R,P.dof,Tg.next);C.fade=0}else{quad(R,P.dof,Tg.show);C.fade=1}
   }finally{setLOD(city,false);R.setRenderTarget(save.rt);R.autoClear=save.ac;R.setClearColor(save.cc,save.ca)}
-  const ms=now()-a;C.shown=true;C.dirty=false;C.bakes++;if(moving){C.mv.n++;C.mv.sum+=ms;C.mv.max=Math.max(C.mv.max,ms)}else{C.bakeMs=+ms.toFixed(2);C.bakeMax=Math.max(C.bakeMax,C.bakeMs)}
+  const ms=now()-a;if(!C.shown&&C.tl)C.tl.firstBake=Math.round(now()-C.tl.t0);C.shown=true;C.dirty=false;C.bakes++;if(moving){C.mv.n++;C.mv.sum+=ms;C.mv.max=Math.max(C.mv.max,ms)}else{C.bakeMs=+ms.toFixed(2);C.bakeMax=Math.max(C.bakeMax,C.bakeMs)}
   if(!api.covers){api.covers=true;try{window.dispatchEvent(new Event('podcontext:ready'))}catch(e){}}}
 const camKey=c=>{const a=c.matrixWorld.elements,b=c.projectionMatrix.elements;let h=0;for(let i=0;i<16;i++)h+=a[i]*(i+1.3)+b[i]*(i+7.1);return h};
 
@@ -15447,15 +15447,21 @@ const _q=new T.Quaternion(),_y=new T.Vector3(0,1,0);
 function flyCam(cam,t){const c=camFor(cam),h=C.city,g=ease(ph(t,'glide')),gz=ph(t,'glide');
   const fwd=new T.Vector3();cam.getWorldDirection(fwd);const p1=new T.Vector3().setFromMatrixPosition(cam.matrixWorld),tg1=p1.clone().addScaledVector(fwd,h.center.clone().sub(p1).dot(fwd));
   const S0=h.holoStart,mid=S0?S0.tg.clone():new T.Vector3(h.center.x,(h.street+h.top)*.5,h.center.z).addScaledVector(h.streetDir,8),tg=mid.lerp(tg1,ease(Math.min(1,gz*1.15)));
-  let f;if(S0)f=S0.dir.clone().lerp(fwd,g).normalize();else{f=fwd.clone().applyQuaternion(_q.setFromAxisAngle(_y,-.6*(1-g)));f.y=lerp(Math.min(f.y,-.75),f.y,g);f.normalize()}
+  let f;if(S0){f=S0.dir.clone().lerp(fwd,g).normalize();const dr=C.trans?C.trans.drift:0;if(dr)f.applyQuaternion(_q.setFromAxisAngle(_y,.12*Math.sin(dr*.35)*(1-g)))}else{f=fwd.clone().applyQuaternion(_q.setFromAxisAngle(_y,-.6*(1-g)));f.y=lerp(Math.min(f.y,-.75),f.y,g);f.normalize()}
   c.position.copy(tg).addScaledVector(f,-(h.camBack||300));c.up.set(0,1,0);c.lookAt(tg);
   if(c.isOrthographicCamera){const w1=(cam.right-cam.left)/cam.zoom,w0=S0?Math.max(S0.w,w1*8):Math.max(220,w1*8),wk=Math.exp(lerp(Math.log(w0),Math.log(w1),ease(gz)*.25+gz*.75));c.zoom=(cam.right-cam.left)/wk;c.updateProjectionMatrix()}
   else{c.fov=lerp(Math.min(80,cam.fov*3),cam.fov,g);c.position.copy(tg).addScaledVector(f,-lerp(260,cam.position.distanceTo(tg1),g));c.updateProjectionMatrix()}
   c.updateMatrixWorld(true);return c}
-const tNow=tr=>tr.hold!=null?tr.hold:(now()-tr.t0)/1000;
-function overlay(R,cam){if(!C||!C.trans||!cam)return;const a0=now(),tr=C.trans,t=tNow(tr);targets(R);
-  if(tr.rm){const a=1-clamp(t/DUR_RM,0,1);if(a<=0)return endTrans();drawOver(R,null,a,0);tr.frames.push(now());return}
-  if(t>=DUR)return endTrans();const c=flyCam(cam,t),h=C.city;
+// the transition's own clock: it runs freely through the city phase, then holds there (a slow drift) until the city is ready, then plays on
+const HOLD=.6,tNow=tr=>tr.hold!=null?tr.hold:tr.vt;
+function advance(tr){const t=now(),dt=Math.min(.1,(t-tr.last)/1000);tr.last=t;const ready=C.ready&&C.shown;
+  if(tr.gate&&(ready||t-tr.t0>25000)){tr.gate=false;C.tl.resolveStart=Math.round(t-C.tl.t0)}if(tr.hold==null)tr.vt=tr.gate?Math.min(tr.vt+dt,HOLD):tr.vt+dt;tr.drift+=dt}
+function loadFrac(){const src=CITY.state==='ready'?1:CITY.k||0;return clamp(.45*src+.35*(C.prog.build||0)+.15*(C.prog.warm||0)+.05*(C.shown?1:0),0,1)}
+function overlay(R,cam){if(!C||!C.trans||!cam)return;const a0=now(),tr=C.trans;advance(tr);const t=tNow(tr);targets(R);
+  const P=C.P.over.uniforms;P.uProg.value=loadFrac();P.uShow.value=tr.gate&&now()-tr.t0>6000?1:0;   // a thin progress line inside the hologram only when loading runs long
+  if(tr.rm){if(tr.gate){drawOver(R,null,1,0);tr.frames.push(now());return}tr.rmT=tr.rmT||now();const a=1-clamp((now()-tr.rmT)/1000/DUR_RM,0,1);if(a<=0)return endTrans();drawOver(R,null,a,0);tr.frames.push(now());return}
+  if(t>=DUR)return endTrans();const h=C.city;if(!h||(h.real&&!h.M)){drawOver(R,null,1,0);tr.frames.push(now());return}   // nothing to show yet: the hologram's dark field
+  const c=flyCam(cam,t);
   if(!h.real){const U=h.hm.uniforms,sp=ph(t,'sweep');U.uSweep.value=sp>0&&sp<1?lerp(h.top,h.y0+1.2,ease(sp)):-1e4;U.uFloorK.value=sp>=1?1:0;U.uPod.value=ph(t,'pod');U.uTop.value=1-ph(t,'top');U.uK.value=1-.5*ph(t,'resolve');
   h.lm.uniforms.uA.value=ph(t,'pod');h.lm.uniforms.uBuild.value=ph(t,'build')}
   const s={rt:R.getRenderTarget(),ac:R.autoClear,cc:R.getClearColor(new T.Color()),ca:R.getClearAlpha()};
@@ -15463,9 +15469,9 @@ function overlay(R,cam){if(!C||!C.trans||!cam)return;const a0=now(),tr=C.trans,t
   drawOver(R,C.T.holo.texture,1-ease(ph(t,'resolve')),.003);tr.frames.push(now());C.ovMax=Math.max(C.ovMax,now()-a0)}
 function drawOver(R,tex,a,ca){const P=C.P;P.over.uniforms.t.value=tex||C.blank;P.over.uniforms.a.value=a;P.over.uniforms.ca.value=ca;const ac=R.autoClear;R.autoClear=false;try{quad(R,P.over,null)}finally{R.autoClear=ac}}
 // while the hologram fully covers the frame PodRender skips drawing the home
-function paused(){if(!C||!C.trans)return false;return !C.trans.rm&&tNow(C.trans)<TL.resolve[0]-.15}
+function paused(){if(!C||!C.trans)return false;return C.trans.rm?C.trans.gate:tNow(C.trans)<TL.resolve[0]-.15}
 function endTrans(){if(!C||!C.trans)return;const tr=C.trans;C.trans=null;api.transitioning=false;removeSkip();const f=tr.frames,d=[];for(let i=1;i<f.length;i++)d.push(f[i]-f[i-1]);d.sort((x,y)=>x-y);
-  C.lastTrans={frames:f.length,ms:+(now()-tr.t0).toFixed(0),medianMs:d.length?+d[d.length>>1].toFixed(2):null,worstMs:d.length?+d[d.length-1].toFixed(2):null,skipped:!!tr.skipped,reducedMotion:!!tr.rm,path:api._prDriving()?'PodRender':'plain'};
+  C.tl.end=Math.round(now()-C.tl.t0);C.lastTrans={timeline:Object.assign({},C.tl,{t0:undefined}),frames:f.length,ms:+(now()-tr.t0).toFixed(0),medianMs:d.length?+d[d.length>>1].toFixed(2):null,worstMs:d.length?+d[d.length-1].toFixed(2):null,skipped:!!tr.skipped,reducedMotion:!!tr.rm,path:api._prDriving()?'PodRender':'plain'};
   try{tr.onDone&&tr.onDone()}catch(e){console.warn(e)}tr.resolve(C.lastTrans);wantDraw();if(C.swapAfter){C.swapAfter=false;setTimeout(lateSwap,0)}}
 function lateSwap(){if(!C||!C.swapLater||C.city&&C.city.real)return;if(api.transitioning){C.swapAfter=true;return}const dh=defaultHome();if(!dh)return;
   const o=Object.assign({},C.opts,{podCell:dh.cell,section:dh.section,floor:dh.floor,zone:dh.zone,kind:dh.kind,district:dh.zone,transition:false,onDone:null});try{window.dispatchEvent(new CustomEvent('podcontext:home',{detail:dh}))}catch(e){}enter(o)}
@@ -15499,17 +15505,31 @@ async function gunzip(u8){if(typeof DecompressionStream==='undefined')throw new 
 // a live city instead of the pack (round 21, for the game): src has the shape of city/index.json with the plots already decoded,
 // plots[k].full / .coarse = {solid, glass, fx: {pos Float32Array (world, game units), col Uint8Array rgb, em Uint8Array (index into src.em), idx Uint32Array, n}}.
 // src may be an object, a function returning one, or a Promise. It wins over the pack, before or after the pack started loading.
-function setCitySource(src){const t0=now();CITY.state='loading';CITY.err=null;CITY.live=true;
+// a live city instead of the pack (rounds 21 and 22, for the game). src has the shape of city/index.json with the plots already decoded:
+// plots[k].full / .coarse = {solid, glass, fx: {pos Float32Array (world, game units), col Uint8Array rgb, em Uint8Array (index into src.em), idx, n, nrm?}}.
+// One shot: setCitySource(src) (an object, a function returning one, or a Promise). Streaming: setCitySource(head, {streaming:true}) with
+// head = everything but the plots (cells, homes, towers, camera usable at once), then addPlots(plots, em) as they arrive (home's plot first,
+// then nearest first), progress(k), and cityDone(). The source wins over the pack. While streaming, the city is built as plots arrive.
+const waiters=[];const tick=()=>{const w=waiters.splice(0);for(const f of w)f()};const cityTick=ms=>new Promise(r=>{waiters.push(r);setTimeout(r,ms||250)});
+function adopt(I){I.homes=I.homes||[];I.towers=I.towers||[];I.em=I.em||[[0,0,0,0]];I.consts=I.consts||{};I.plots=I.plots||[];CITY.packs=null;CITY.coarse=null;
+  CITY.cells=new Map(I.cells.map(c=>[c.i+','+c.j,c]));CITY.plotOf=new Map();for(const p of I.plots)if(p.kind==='cell')CITY.plotOf.set(p.id[0]+','+p.id[1],p);CITY.index=I}
+function setCitySource(src,opt){const t0=now();CITY.err=null;CITY.live=true;CITY.k=0;
+  if(opt&&opt.streaming){if(!src||!src.cells)throw new Error('a streaming city head needs cells');adopt(src);CITY.state='streaming';CITY.t0=t0;
+    CITY.promise=new Promise(r=>{CITY.doneResolve=r});fire('podcontext:homes');fire('podcontext:pods');fire('podcontext:city');tick();lateSwap();return CITY.promise}
+  CITY.state='loading';
   CITY.promise=(async()=>{try{let I=typeof src==='function'?src():src;I=await I;if(!I||!I.plots||!I.cells)throw new Error('a city source needs cells and plots');
-      I.homes=I.homes||[];I.towers=I.towers||[];I.em=I.em||[[0,0,0,0]];I.consts=I.consts||{};CITY.packs=null;CITY.coarse=null;CITY.cells=new Map(I.cells.map(c=>[c.i+','+c.j,c]));
-      CITY.plotOf=new Map();for(const p of I.plots)if(p.kind==='cell')CITY.plotOf.set(p.id[0]+','+p.id[1],p);CITY.index=I;CITY.state='ready';CITY.loadMs=Math.round(now()-t0);CITY.bytes=0;
-      fire('podcontext:homes');fire('podcontext:pods');fire('podcontext:city');lateSwap()}catch(e){CITY.state='missing';CITY.err=String(e&&e.message||e);console.warn('PodContext: the city source failed ('+CITY.err+')')}})();return CITY.promise}
+      adopt(I);CITY.state='ready';CITY.k=1;CITY.loadMs=Math.round(now()-t0);CITY.bytes=0;fire('podcontext:homes');fire('podcontext:pods');fire('podcontext:city');tick();lateSwap()}
+    catch(e){CITY.state='missing';CITY.err=String(e&&e.message||e);console.warn('PodContext: the city source failed ('+CITY.err+')');tick()}})();return CITY.promise}
+function addPlots(plots,em){const I=CITY.index;if(!I||!plots)return;if(em)I.em=em;for(const p of plots){I.plots.push(p);if(p.kind==='cell')CITY.plotOf.set(p.id[0]+','+p.id[1],p)}tick()}
+function progress(k){CITY.k=clamp(+k||0,0,1);tick()}
+function cityDone(){if(CITY.state!=='streaming')return;CITY.state='ready';CITY.k=1;CITY.loadMs=Math.round(now()-(CITY.t0||now()));if(CITY.doneResolve)CITY.doneResolve();fire('podcontext:city');tick()}
+const streaming=()=>CITY.state==='streaming';
 function loadCity(){if(CITY.promise)return CITY.promise;if(window.PODCITY_NOPACK){CITY.state='missing';CITY.err='no pack (PODCITY_NOPACK)';return CITY.promise=Promise.resolve()}CITY.state='loading';const t0=now();
   CITY.promise=(async()=>{try{const base=cityBase(),get=async(f,json)=>{const r=await fetch(base+f);if(!r.ok)throw new Error(f+': HTTP '+r.status);return json?r.json():new Uint8Array(await r.arrayBuffer())};
       const I=await get('index.json',true);const [packs,cz]=await Promise.all([Promise.all(I.packs.map(f=>get(f))),get(I.coarse.file)]);
       if(CITY.live)return;CITY.coarse=await gunzip(cz);CITY.packs=packs;CITY.cells=new Map(I.cells.map(c=>[c.i+','+c.j,c]));CITY.plotOf=new Map();for(const p of I.plots)if(p.kind==='cell')CITY.plotOf.set(p.id[0]+','+p.id[1],p);
-      CITY.index=I;CITY.state='ready';CITY.loadMs=Math.round(now()-t0);CITY.bytes=packs.reduce((s,p)=>s+p.length,0)+cz.length;fire('podcontext:homes');fire('podcontext:pods');fire('podcontext:city');lateSwap()}
-    catch(e){if(CITY.live)return;CITY.state='missing';CITY.err=String(e&&e.message||e);console.warn('PodContext: no city pack ('+CITY.err+'); the stand-in city is used')}})();return CITY.promise}
+      CITY.index=I;CITY.state='ready';CITY.k=1;CITY.loadMs=Math.round(now()-t0);tick();CITY.bytes=packs.reduce((s,p)=>s+p.length,0)+cz.length;fire('podcontext:homes');fire('podcontext:pods');fire('podcontext:city');lateSwap()}
+    catch(e){if(CITY.live)return;CITY.state='missing';CITY.err=String(e&&e.message||e);tick();console.warn('PodContext: no city pack ('+CITY.err+'); the stand-in city is used')}})();return CITY.promise}
 const CLS=['solid','glass','fx'];
 // one plot's streams (see city/pack.js): zigzag-delta positions in the plot box, rgb, emission index, high-water-mark varint indices
 function decodeBlocks(u8,map,box,Q){const out={};let o=0;const s=[box[3]-box[0],box[4]-box[1],box[5]-box[2]];
@@ -15624,51 +15644,52 @@ function facadeLab(u,b,main){main=main||'N';const {M,th}=unitMatrix(u,b,main),cs
     return {side,exterior:f.exterior,length:+len.toFixed(3),windows}});
   const W=mxx-mnx,D=mxz-mnz;return {main,unit:{W:+W.toFixed(3),D:+D.toFixed(3),angleDeg:+(u.a*180/Math.PI).toFixed(2)},faces,tier:Math.max(W,D)>=9.2?'large':Math.max(W,D)>=7.4?'medium':'small'}}
 // PodContext.facade(home[, {W,D}]): the real building's walls and windows at that floor, for a new home there (async; null without the city)
-async function facade(home,dims){if(CITY.state==='idle')loadCity();if(CITY.state==='loading')await CITY.promise;if(CITY.state!=='ready')return null;
-  const e=home&&home.cell&&home.y!=null?home:findHome(home||{});if(!e)return null;const rec=CITY.plotOf.get(e.cell[0]+','+e.cell[1]);const hp=rec?await decodePlot(rec,true):{};const u=unitOf(e,hp);
+async function facade(home,dims){if(CITY.state==='idle')loadCity();if(CITY.state==='loading')await CITY.promise;if(CITY.state!=='ready'&&!streaming())return null;
+  const e=home&&home.cell&&home.y!=null?home:findHome(home||{});if(!e)return null;let rec;const t0=now();while(!(rec=CITY.plotOf.get(e.cell[0]+','+e.cell[1]))&&streaming()&&now()-t0<15000)await cityTick();const hp=rec?await decodePlot(rec,true):{};const u=unitOf(e,hp);
   const W=dims&&dims.W||2*u.hw*SCALE,D=dims&&dims.D||2*u.hd*SCALE,b=new T.Box3(new T.Vector3(-W/2,0,-D/2),new T.Vector3(W/2,2.3,D/2));const r=facadeLab(u,b,dims&&dims.main);r.home={cell:e.cell,section:e.section,floor:e.floor,kind:e.kind};return r}
 
-// a cheap stand-in of a full-detail plot: only its triangles larger than about 0.2 square meters
-function bigFaces(B){const o={};for(const k in B){const b=B[k];if(!b||!b.n||k==='glass')continue;const P=b.pos,I=b.idx,keep=[];for(let t=0;t<I.length;t+=3){const a=I[t]*3,c=I[t+1]*3,d=I[t+2]*3;
-    const ux=P[c]-P[a],uy=P[c+1]-P[a+1],uz=P[c+2]-P[a+2],vx=P[d]-P[a],vy=P[d+1]-P[a+1],vz=P[d+2]-P[a+2];if(Math.hypot(uy*vz-uz*vy,uz*vx-ux*vz,ux*vy-uy*vx)>.04)keep.push(I[t],I[t+1],I[t+2])}
-    o[k]={pos:b.pos,col:b.col,em:b.em,idx:Uint32Array.from(keep),n:b.n,nrm:b.nrm}}return o}
-// group blocks by 4x4-lot tiles, then into chunks of at most ~160k vertices: each chunk is a mesh with its own bounds, so the camera's frustum culls them
-function chunked(parts,LOT){const tiles=new Map();for(const p of parts){const k=Math.floor(p.cx/(LOT*4))+','+Math.floor(p.cz/(LOT*4));let t=tiles.get(k);if(!t)tiles.set(k,t=[]);t.push(p)}
-  const out=[];let grp=[],gv=0;for(const t of tiles.values()){for(const p of t){if(gv+p.b.n>160000&&grp.length){out.push(grp);grp=[];gv=0}grp.push(p);gv+=p.b.n}if(gv>60000){out.push(grp);grp=[];gv=0}}if(grp.length)out.push(grp);return out}
-async function buildReal(o,e,tok){const t0=now(),I=CITY.index,K=I.consts,FH=K.FH||.95,LOT=K.LOT||3.8,hb=homeBox(o),b=hb.b,y0=b.min.y;
-  const hrec=CITY.plotOf.get(e.cell[0]+','+e.cell[1]);const hp=hrec?await decodePlot(hrec,true):{};
-  // the home is that floor: the unit's frame from the real building, the home centered on it with its front face toward the camera
-  const u=unitOf(e,hp),cell=u.cell,y0g=u.y0g,y1g=u.y1g,{M,th}=unitMatrix(u,b,o.main),fac=facadeLab(u,b,o.main);const toLab=(x,y,z)=>new T.Vector3(x,y,z).applyMatrix4(M);
-  // every plot: full detail near the home and the stand-in further out (the settled bake), and the stand-in everywhere (the moving bake);
-  // in the home's own cell everything from the deck up is cut away, so the home is that floor and nothing of its building stands above it
-  const parts=[],lo=[];let nearN=0,farN=0,last=now();const cut=B=>{const o2={};for(const k in B)o2[k]=clipSlice(B[k],y0g+.02,Infinity);return o2};
-  for(const rec of I.plots){const bx=rec.box,cx=(bx[0]+bx[3])/2,cz=(bx[2]+bx[5])/2,near=Math.hypot(cx-u.cx,cz-u.cz)<NEAR_R+Math.max(bx[3]-bx[0],bx[5]-bx[2])/2,mine=rec===hrec;
-    let B=mine?cut(hp):await decodePlot(rec,near);if(near)nearN++;else farN++;for(const k in B)if(B[k].n)parts.push({k,cx,cz,b:blockNormals(B[k])});
-    let Lb=near?await decodePlot(rec,false):B;if(near&&Lb===(rec.full||null))Lb=bigFaces(Lb);if(near&&mine)Lb=cut(Lb);/* a live source may send near plots in full only: their big faces stand in */for(const k in Lb)if(k!=='glass'&&Lb[k].n)lo.push({k,cx,cz,b:Lb[k].nrm?Lb[k]:blockNormals(Lb[k])});
-    if(now()-last>12){await yieldFrame();last=now();if(!C||C.building!==tok)return null}}
-  const geo=async(list,glass)=>{let n=0,ni=0;for(const p of list){n+=p.b.n;ni+=p.b.idx.length}if(!n)return null;const pos=new Float32Array(n*3),nrm=new Float32Array(n*3),col=new Uint8Array(n*3),em=new Uint8Array(n),idx=new Uint32Array(ni),m=M.elements,cs=Math.cos(th),sn=Math.sin(th);let o2=0,oi=0,lt=now();
+/* Build the real city around the home (round 22: one geometry set, built as plots arrive).
+   The same set serves the moving and the settled bakes, so detail never changes on screen: only resolution and blur do (the round 21
+   pop-in came from swapping between a whole-city stand-in while moving and near plots in full detail when settled, plus chunks culled at the
+   frame edges). Chunks of at most ~160k vertices are made in arrival order, recolored for the time of day, added to the backdrop and the
+   hologram at once (the hologram shows the city filling in while it plays, and draws each chunk once, which uploads it), and get a
+   generous culling margin. The city skeleton (frame, matrix, scenes) exists as soon as the home's plot is in, so the hologram can start. */
+async function streamReal(o,e,my){const t0=now(),K=CITY.index.consts,FH=K.FH||.95,hb=homeBox(o),b=hb.b,y0=b.min.y,key=e.cell[0]+','+e.cell[1];
+  let hrec;while(!(hrec=CITY.plotOf.get(key))&&streaming()){await cityTick();if(C!==my)return null}
+  const hp=hrec?await decodePlot(hrec,true):{};if(C!==my)return null;
+  const u=unitOf(e,hp),cell=u.cell,y0g=u.y0g,y1g=u.y1g,{M,th}=unitMatrix(u,b,o.main),fac=facadeLab(u,b,o.main),toLab=(x,y,z)=>new T.Vector3(x,y,z).applyMatrix4(M),LOT=K.LOT||3.8,I=CITY.index;
+  const sc=new T.Scene(),hs=new T.Scene(),mb=toonE(),mg=new T.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:.4,depthWrite:false,toneMapped:false});
+  const hemi=new T.HemisphereLight(0xffffff,0x333333,.6),sun=new T.DirectionalLight(0xffffff,1);sun.position.set(-.45,1,.35);sc.add(hemi,sun,sun.target);
+  const dn=new T.ShaderMaterial({vertexShader:DNV,fragmentShader:DNF,uniforms:{uBack:{value:1200}},side:T.DoubleSide,toneMapped:false});const PL=podLines(b,y0,o.rooms),ls=new T.Scene();ls.add(PL.ls);
+  const cc=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([p,q])=>toLab(cell.x+p*LOT/2,0,cell.z+q*LOT/2)),cellR=[Math.min(...cc.map(v=>v.x)),Math.min(...cc.map(v=>v.z)),Math.max(...cc.map(v=>v.x)),Math.max(...cc.map(v=>v.z))];
+  const gc=I.camera||{},fwd=new T.Vector3(0,0,-1);if(gc.quat)fwd.applyQuaternion(new T.Quaternion().fromArray(gc.quat));fwd.applyMatrix4(new T.Matrix4().makeRotationY(th)).normalize();
+  const goal=gc.goal?toLab(gc.goal[0],gc.goal[1],gc.goal[2]):toLab(0,0,0);let ext=0;for(const c of I.cells)ext=Math.max(ext,Math.abs(c.x),Math.abs(c.z));
+  const city={real:true,sc,hs,ls,mb,mg,dn,lm:PL.lm,lg:PL.lg,geos:[],full:[],low:[],hemi,sun,box:b,y0,street:toLab(u.cx,0,u.cz).y,top:toLab(u.cx,(cell.h||y1g+2),u.cz).y,
+    center:new T.Vector3((b.min.x+b.max.x)/2,y0+1.2,(b.min.z+b.max.z)/2),streetDir:new T.Vector3(0,0,1),SW:12,holoStart:{tg:goal,dir:fwd,w:(2*ext+LOT*2)*SCALE},camBack:1200,near:-2600,far:2600,
+    cellR,FHm:(y1g-y0g)*SCALE,home:e,M,unit:u,facade:fac,nearPlots:0,farPlots:0,verts:0,tris:0,chunks:0,building:true};
+  C.city=city;setTime(C.time||o.time||'night');C.tl.skeleton=Math.round(now()-C.tl.t0);
+  const cs=Math.cos(th),sn=Math.sin(th),m=M.elements;
+  const geo=async(list,glass)=>{let n=0,ni=0;for(const p of list){n+=p.b.n;ni+=p.b.idx.length}if(!n)return null;const pos=new Float32Array(n*3),nrm=new Float32Array(n*3),col=new Uint8Array(n*3),em=new Uint8Array(n),idx=new Uint32Array(ni);let o2=0,oi=0,lt=now();
     for(const p of list){const P=p.b.pos,Nn=p.b.nrm;for(let i=0;i<p.b.n;i++){const x=P[i*3],y=P[i*3+1],z=P[i*3+2],j=(o2+i)*3;pos[j]=m[0]*x+m[4]*y+m[8]*z+m[12];pos[j+1]=m[1]*x+m[5]*y+m[9]*z+m[13];pos[j+2]=m[2]*x+m[6]*y+m[10]*z+m[14];
         const a=Nn[i*3],c=Nn[i*3+2];nrm[j]=a*cs+c*sn;nrm[j+1]=Nn[i*3+1];nrm[j+2]=-a*sn+c*cs}
-      col.set(p.b.col,o2*3);em.set(p.b.em,o2);const I2=p.b.idx;for(let t=0;t<I2.length;t++)idx[oi+t]=I2[t]+o2;o2+=p.b.n;oi+=I2.length;if(now()-lt>10){await yieldFrame();lt=now()}}
+      col.set(p.b.col,o2*3);em.set(p.b.em,o2);const I2=p.b.idx;for(let t=0;t<I2.length;t++)idx[oi+t]=I2[t]+o2;o2+=p.b.n;oi+=I2.length;if(now()-lt>8){await yieldFrame();lt=now()}}
     const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(pos,3));g.setAttribute('normal',new T.BufferAttribute(nrm,3));g.setIndex(new T.BufferAttribute(idx,1));
-    g.setAttribute('color',new T.BufferAttribute(new Float32Array(n*3),3));if(!glass)g.setAttribute('aE',new T.BufferAttribute(new Float32Array(n*3),3));g.userData.base={col,em};g.userData.glass=glass;g.computeBoundingSphere();g.computeBoundingBox();return g};
-  const bodies=[],lows=[];for(const g of chunked(parts.filter(p=>p.k!=='glass'),LOT)){const x=await geo(g,false);if(!C||C.building!==tok)return null;if(x)bodies.push(x)}
-  for(const g of chunked(lo,LOT)){const x=await geo(g,false);if(!C||C.building!==tok)return null;if(x)lows.push(x)}
-  const gl=await geo(parts.filter(p=>p.k==='glass'),true);if(!C||C.building!==tok)return null;
-  const sc=new T.Scene(),hs=new T.Scene(),mb=toonE(),mg=new T.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:.4,depthWrite:false,toneMapped:false});const geos=[],full=[],low=[];
-  for(const g of bodies){geos.push(g);const m=new T.Mesh(g,mb);sc.add(m);full.push(m)}if(gl){geos.push(gl);const m=new T.Mesh(gl,mg);m.renderOrder=1;sc.add(m);full.push(m)}
-  for(const g of lows){geos.push(g);const m=new T.Mesh(g,mb);m.visible=false;sc.add(m);low.push(m)}
-  const hemi=new T.HemisphereLight(0xffffff,0x333333,.6),sun=new T.DirectionalLight(0xffffff,1);sun.position.set(-.45,1,.35);sc.add(hemi,sun,sun.target);
-  const dn=new T.ShaderMaterial({vertexShader:DNV,fragmentShader:DNF,uniforms:{uBack:{value:1200}},side:T.DoubleSide,toneMapped:false});for(const g of bodies){const m=new T.Mesh(g,dn);hs.add(m)}
-  const PL=podLines(b,y0,o.rooms),ls=new T.Scene();ls.add(PL.ls);
-  const cc=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([p,q])=>toLab(cell.x+p*LOT/2,0,cell.z+q*LOT/2)),cellR=[Math.min(...cc.map(v=>v.x)),Math.min(...cc.map(v=>v.z)),Math.max(...cc.map(v=>v.x)),Math.max(...cc.map(v=>v.z))];
-  // the hologram starts from the owner's game camera (its direction and goal), wide enough for the whole city
-  const gc=I.camera||{},rot=new T.Matrix4().makeRotationY(th),fwd=new T.Vector3(0,0,-1);if(gc.quat)fwd.applyQuaternion(new T.Quaternion().fromArray(gc.quat));fwd.applyMatrix4(rot).normalize();
-  const goal=gc.goal?toLab(gc.goal[0],gc.goal[1],gc.goal[2]):toLab(0,0,0);let ext=0;for(const c of I.cells)ext=Math.max(ext,Math.abs(c.x),Math.abs(c.z));
-  const street=toLab(u.cx,0,u.cz).y,top=toLab(u.cx,(cell.h||y1g+2),u.cz).y;
-  return {real:true,sc,hs,ls,mb,mg,dn,lm:PL.lm,lg:PL.lg,geos,full,low,hemi,sun,box:b,y0,street,top,center:new T.Vector3((b.min.x+b.max.x)/2,y0+1.2,(b.min.z+b.max.z)/2),streetDir:new T.Vector3(0,0,1),SW:12,
-    holoStart:{tg:goal,dir:fwd,w:(2*ext+LOT*2)*SCALE},camBack:1200,near:-2600,far:2600,cellR,FHm:(y1g-y0g)*SCALE,home:e,M,unit:u,facade:fac,nearPlots:nearN,farPlots:farN,
-    verts:bodies.concat(gl?[gl]:[]).reduce((s,g)=>s+g.getAttribute('position').count,0),tris:bodies.concat(gl?[gl]:[]).reduce((s,g)=>s+g.index.count/3,0),lowTris:lows.reduce((s,g)=>s+g.index.count/3,0),chunks:bodies.length,buildMs:Math.round(now()-t0)}}
+    g.setAttribute('color',new T.BufferAttribute(new Float32Array(n*3),3));if(!glass)g.setAttribute('aE',new T.BufferAttribute(new Float32Array(n*3),3));g.userData.base={col,em};g.userData.glass=glass;
+    g.computeBoundingSphere();g.boundingSphere.radius+=15;   // generous culling: a chunk is drawn well before it reaches the frame edge
+    return g};
+  const add=(g,glass)=>{if(!g)return;city.geos.push(g);recolor(g,C.time==='day');const m1=new T.Mesh(g,glass?mg:mb);if(glass)m1.renderOrder=1;sc.add(m1);city.full.push(m1);
+    if(!glass){const m2=new T.Mesh(g,dn);hs.add(m2)}city.verts+=g.getAttribute('position').count;city.tris+=g.index.count/3;city.chunks++;C.dirty=true};
+  // plots in arrival order (the pack: its order; a stream: nearest first); the home's cell is cut from its deck up
+  const cut=B=>{const o2={};for(const k in B)o2[k]=clipSlice(B[k],y0g+.02,Infinity);return o2};let i=0,grp=[],gv=0,last=now();const glassParts=[],est=Math.max(1,I.cells.length+(I.megas||[]).length);
+  while(true){if(C!==my)return null;const L=I.plots;
+    if(i<L.length){const rec=L[i++],bx=rec.box,cx=(bx[0]+bx[3])/2,cz=(bx[2]+bx[5])/2,near=Math.hypot(cx-u.cx,cz-u.cz)<NEAR_R+Math.max(bx[3]-bx[0],bx[5]-bx[2])/2;
+      const B=rec===hrec?cut(hp):await decodePlot(rec,near);if(near)city.nearPlots++;else city.farPlots++;
+      for(const k in B){const bl=B[k];if(!bl||!bl.n)continue;const p={k,b:bl.nrm&&bl.nrm.length===bl.n*3?bl:blockNormals(bl)};if(k==='glass')glassParts.push(p);else{grp.push(p);gv+=bl.n}}
+      if(gv>160000){const g=await geo(grp,false);grp=[];gv=0;if(C!==my)return null;add(g,false)}
+      C.prog.build=Math.min(.99,i/est);if(now()-last>8){await yieldFrame();last=now()}}
+    else if(streaming())await cityTick();else break}
+  if(grp.length)add(await geo(grp,false),false);if(C!==my)return null;if(glassParts.length)add(await geo(glassParts,true),true);
+  city.building=false;city.buildMs=Math.round(now()-t0);C.prog.build=1;return city}
 function overlayReal(R,c,t,h){const s0=R.getDrawingBufferSize(new T.Vector2());if(!C.T.dn||C.T.dn.width!==s0.x||C.T.dn.height!==s0.y){if(C.T.dn)C.T.dn.dispose();C.T.dn=rt(s0.x,s0.y,{depthBuffer:true,minFilter:T.NearestFilter,magFilter:T.NearestFilter})}
   const U=C.P.edge.uniforms,sp=ph(t,'sweep');U.tDN.value=C.T.dn.texture;U.px.value.set(1/s0.x,1/s0.y);U.pInv.value.copy(c.projectionMatrixInverse);U.camW.value.copy(c.matrixWorld);U.uBack.value=h.camBack;h.dn.uniforms.uBack.value=h.camBack;
   U.uSweep.value=sp>0&&sp<1?lerp(h.top,h.y0+1.2,ease(sp)):-1e4;U.uFloor.value=h.y0;U.uFH.value=h.FHm;U.uFloorK.value=sp>=1?1:0;U.uPod.value=ph(t,'pod');U.uTop.value=1-ph(t,'top');U.uK.value=1-.5*ph(t,'resolve');
@@ -15677,36 +15698,45 @@ function overlayReal(R,c,t,h){const s0=R.getDrawingBufferSize(new T.Vector2());i
   R.setClearColor(0x000000,0);R.setRenderTarget(C.T.dn);R.clear();R.render(h.hs,c);quad(R,C.P.edge,C.T.holo);R.autoClear=false;R.setRenderTarget(C.T.holo);R.render(h.ls,c);R.autoClear=true}
 
 /* ---------------- API ---------------- */
+/* enter (round 22): the hologram starts at once and paces itself on loading. It shows the city phase (and the city filling in as plots arrive)
+   while the source loads, the city is built, its shaders link, its chunks go up to the GPU and the first backdrop bakes; only then does it
+   glide in, sweep and resolve. Progress: the source's own (addPlots/progress, or the pack's), then build, warm, first bake. */
 function enter(o){o=o||{};if(C)exit();const BB=window.PodBuilder&&PodBuilder._B;const R=o.renderer||(BB&&BB.dr),cam=o.camera||(BB&&BB.cam),root=o.root||(BB&&BB.root),scene=o.scene||(BB&&BB.sc);
-  const my=C={mv:{n:0,sum:0,max:0,tris:0},opts:o,R,cam,frameN:0,bakes:0,bakeMs:0,bakeMax:0,callMax:0,ovMax:0,longCalls:[],fade:1,moved:0,ck:null,dirty:true,shown:false,trans:null,hooked:null,acR:null,building:o};api.covers=false;
+  const my=C={mv:{n:0,sum:0,max:0},opts:o,R,cam,frameN:0,bakes:0,bakeMs:0,bakeMax:0,callMax:0,ovMax:0,longCalls:[],fade:1,moved:0,ck:null,dirty:true,shown:false,trans:null,hooked:null,acR:null,
+    prog:{build:0,warm:0},tl:{t0:now()}};api.covers=false;
   const qs=new T.Scene(),qc=new T.OrthographicCamera(-1,1,1,-1,0,1),qm=new T.Mesh(new T.PlaneGeometry(2,2));qm.frustumCulled=false;qs.add(qm);C.qs=qs;C.qc=qc;C.qm=qm;C.P=passes();
-  C.blank=new T.DataTexture(new Uint8Array([10,15,36,255]),1,1);C.blank.needsUpdate=true;if(scene)hookScene(scene);
-  let cellKey=o.podCell||o.cell;const rm=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)||o.transition===false,a=now();
-  if(R&&cam)api.transitioning=true;
-  return new Promise(res=>{C.pendingStart={res,onDone:o.onDone};
+  C.blank=new T.DataTexture(new Uint8Array([10,15,36,255]),1,1);C.blank.needsUpdate=true;if(scene)hookScene(scene);C.time=o.time==='day'?'day':'night';
+  let cellKey=o.podCell||o.cell;const rm=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches),a=now();const mark=k=>{if(C===my)C.tl[k]=Math.round(now()-C.tl.t0)};
+  return new Promise(res=>{
+    if(R&&cam&&o.transition===false){try{o.onDone&&o.onDone()}catch(e){}res({skipped:true,reason:'no transition'})}   // (a late swap: the backdrop just fades in when ready)
+    else if(R&&cam){api.transitioning=true;C.trans={t0:now(),vt:0,last:now(),drift:0,gate:true,rm,frames:[],onDone:o.onDone,resolve:res,skipped:false};addSkip();wantDraw();
+      const tr=C.trans;setTimeout(()=>{if(C&&C.trans===tr&&!tr.frames.length)endTrans()},4000)}   // (a renderer that never draws)
     (async()=>{let city=null,why=null;
-      // no cell (the first home, an old synthetic pod): wait up to 4 s for the pack, then use a residential tower near the city center and tell
-      // the builder ('podcontext:home', detail = the homes() row) so it can store it as home.pod (round 20)
-      if(!cellKey&&!o.synthetic&&R&&cam){if(CITY.state==='idle')loadCity();if(CITY.state==='loading')await Promise.race([CITY.promise,new Promise(r=>setTimeout(r,4000))]);if(C!==my)return res({skipped:true,reason:'replaced'});
-        const dh=CITY.state==='ready'?defaultHome():null;if(dh){o=Object.assign({},o,{podCell:dh.cell,section:dh.section,floor:dh.floor,zone:dh.zone,kind:dh.kind,district:dh.zone});cellKey=dh.cell;C.defaulted=dh;
+      // no cell (the first home, an old synthetic pod): wait up to 4 s for the city, then use a residential tower near the city center and tell
+      // the builder ('podcontext:home', detail = the homes() row) so it can store it as home.pod
+      if(CITY.state==='idle')loadCity();
+      if(!cellKey&&!o.synthetic&&R&&cam){if(CITY.state==='loading')await Promise.race([CITY.promise,new Promise(r=>setTimeout(r,4000))]);if(C!==my)return;
+        const dh=CITY.index&&(CITY.state==='ready'||streaming())?defaultHome():null;if(dh){o=Object.assign({},o,{podCell:dh.cell,section:dh.section,floor:dh.floor,zone:dh.zone,kind:dh.kind,district:dh.zone});cellKey=dh.cell;C.defaulted=dh;
           try{window.dispatchEvent(new CustomEvent('podcontext:home',{detail:dh}))}catch(e){}}else C.swapLater=true}
-      // the owner's city: a home on a floor of a residential or luxury building, or a lifted pod
-      if(cellKey){if(CITY.state==='idle')loadCity();if(CITY.state==='loading')await Promise.race([CITY.promise,new Promise(r=>setTimeout(r,20000))]);if(C!==my)return res({skipped:true,reason:'replaced'});
-        const e=CITY.state==='ready'?findHome(o):null;why=CITY.state!=='ready'?'city pack '+CITY.state+(CITY.err?' ('+CITY.err+')':''):!e?'no home at that cell and floor':null;
-        if(e){try{city=await buildReal(Object.assign({},o,{root}),e,o);if(!city&&C===my)why='build interrupted'}catch(err){console.error('PodContext: the real city failed, using the stand-in',err);why=String(err&&err.message||err)}if(C!==my)return res({skipped:true,reason:'replaced'});if(city)C.home=e}}
+      // the owner's city: a home on a floor of a residential or luxury building, or a lifted pod (a stream is built as it arrives)
+      if(cellKey){if(CITY.state==='loading')await Promise.race([CITY.promise,new Promise(r=>setTimeout(r,20000))]);if(C!==my)return;mark('source');
+        const e=CITY.index&&(CITY.state==='ready'||streaming())?findHome(o):null;why=!CITY.index?'city '+CITY.state+(CITY.err?' ('+CITY.err+')':''):!e?'no home at that cell and floor':null;
+        if(e){try{city=await streamReal(Object.assign({},o,{root}),e,my);if(!city&&C===my)why='build interrupted'}catch(err){console.error('PodContext: the real city failed, using the stand-in',err);why=String(err&&err.message||err)}if(C!==my)return;if(city)C.home=e}}
       if(!city){const sd=cellKey?((cellKey[0]*73856093)^(cellKey[1]*19349663))>>>0:o.seed||1;C.pod={district:o.district||(o.zone==='high'?'high':'low'),floor:o.floor||8,side:o.side||'S',seed:sd};
-        city=build(Object.assign({},C.pod,{root,rooms:o.rooms,home:o.home}));C.fallback=why}
-      C.city=city;C.buildMs=+(now()-a).toFixed(1);C.building=null;setTime(o.time||'night');wantDraw();
-      if(!R||!cam){api.transitioning=false;C.pendingStart=null;try{o.onDone&&o.onDone()}catch(e){}return res({skipped:true,reason:'no renderer'})}
-      if(!api.transitioning){warm(R,cam).then(()=>{if(C===my){C.ready=true;C.dirty=true;wantDraw()}},()=>{if(C===my)C.ready=true});return}   // skipped while the city was being built: skip() already answered; the backdrop still waits for its programs
-      const go=()=>{if(C!==my||!api.transitioning)return;C.pendingStart=null;C.trans={t0:now(),rm,frames:[],onDone:o.onDone,resolve:res,skipped:false};addSkip();wantDraw();const tr=C.trans;setTimeout(()=>{if(C&&C.trans===tr&&!tr.frames.length)endTrans()},2000)};
-      let done=false;const fin=()=>{if(!done){done=true;if(C===my)C.warmMs=+(now()-a).toFixed(0);go()}};const ok=()=>{if(C===my){C.ready=true;C.dirty=true;wantDraw()}fin()};warm(R,cam).then(ok,e=>{console.warn('PodContext warmup',e);ok()});setTimeout(fin,2500)})().catch(err=>{console.error('PodContext.enter failed',err);if(C===my){api.transitioning=false;C.pendingStart=null}try{o.onDone&&o.onDone()}catch(e){}res({skipped:true,reason:String(err)})})})}
+        city=build(Object.assign({},C.pod,{root,rooms:o.rooms,home:o.home}));C.fallback=why;C.city=city;setTime(C.time)}
+      mark('built');C.buildMs=+(now()-a).toFixed(1);wantDraw();
+      if(!R||!cam){C.ready=true;try{o.onDone&&o.onDone()}catch(e){}return res({skipped:true,reason:'no renderer'})}if(C.prog)C.prog.build=1;
+      // programs and GPU uploads before the first bake (the transition keeps its city phase meanwhile)
+      try{await warm(R,cam)}catch(e){console.warn('PodContext warmup',e)}if(C!==my)return;C.prog.warm=1;C.warmMs=+(now()-a).toFixed(0);mark('warm');C.ready=true;C.dirty=true;wantDraw();
+      if(!C.trans)return}   // skipped meanwhile: the backdrop still bakes, nothing else to do
+    )().catch(err=>{console.error('PodContext.enter failed',err);if(C===my){C.ready=true;if(C.trans)endTrans();else{api.transitioning=false;try{o.onDone&&o.onDone()}catch(e){}res({skipped:true,reason:String(err)})}}});
+    if(!R||!cam)return;})}
 function update(x){if(!C)return;if(x&&x.isCamera){C.cam=x;return}if(x&&x.time)setTime(x.time)}
-// skip works from the first moment: during the shader warmup too (the transition then never starts)
-function skip(){if(!C)return;if(C.trans){C.trans.skipped=true;endTrans()}else if(api.transitioning&&C.pendingStart){const p=C.pendingStart;C.pendingStart=null;api.transitioning=false;C.lastTrans={skipped:true,beforeStart:true};try{p.onDone&&p.onDone()}catch(e){}p.res(C.lastTrans)}}
+// skip: ends the transition at any point (the city keeps loading and the backdrop appears when it is ready)
+function skip(){if(!C)return;if(C.trans){C.trans.skipped=true;endTrans()}}
 function exit(){if(!C)return;if(C.trans)endTrans();else if(C.pendingStart)skip();unhook();const c=C.city;C.building=null;if(c){for(const g of c.geos)g.dispose();c.lg.dispose();for(const m of [c.mb,c.mw,c.mn,c.hm,c.lm,c.mg,c.dn])if(m)m.dispose()}
   if(C.T)for(const k in C.T)C.T[k].dispose();for(const k in C.P)C.P[k].dispose();C.qm.geometry.dispose();C.blank.dispose();C=null;api.covers=false;api.transitioning=false;try{window.dispatchEvent(new Event('podcontext:gone'))}catch(e){}}
-function stats(){return C?{active:true,movingBakes:{n:C.mv.n,avgMs:C.mv.n?+(C.mv.sum/C.mv.n).toFixed(2):null,maxMs:+C.mv.max.toFixed(2)},unit:C.city&&C.city.unit?{W:C.city.facade.unit.W,D:C.city.facade.unit.D,angleDeg:C.city.facade.unit.angleDeg,front:C.city.unit.front.key}:null,city:cityStats(),home:C.home||null,fallback:C.fallback||null,real:!!(C.city&&C.city.real),plots:C.city&&C.city.real?{near:C.city.nearPlots,far:C.city.farPlots,verts:C.city.verts,tris:C.city.tris,movingTris:C.city.lowTris,chunks:C.city.chunks,buildMs:C.city.buildMs}:null,pod:C.pod||null,time:C.time,buildMs:C.buildMs,warmMs:C.warmMs||null,bakes:C.bakes,bakeMs:C.bakeMs,bakeMaxMs:C.bakeMax,callMaxMs:+C.callMax.toFixed(1),overlayMaxMs:+C.ovMax.toFixed(1),longCalls:C.longCalls.slice(-6),
+function stats(){return C?{active:true,movingBakes:{n:C.mv.n,avgMs:C.mv.n?+(C.mv.sum/C.mv.n).toFixed(2):null,maxMs:+C.mv.max.toFixed(2)},unit:C.city&&C.city.unit?{W:C.city.facade.unit.W,D:C.city.facade.unit.D,angleDeg:C.city.facade.unit.angleDeg,front:C.city.unit.front.key}:null,city:cityStats(),home:C.home||null,fallback:C.fallback||null,real:!!(C.city&&C.city.real),plots:C.city&&C.city.real?{near:C.city.nearPlots,far:C.city.farPlots,verts:C.city.verts,tris:C.city.tris,chunks:C.city.chunks,building:!!C.city.building,buildMs:C.city.buildMs}:null,loading:C.trans?{fraction:+loadFrac().toFixed(3),gate:C.trans.gate}:null,timeline:Object.assign({},C.tl,{t0:undefined}),ready:!!C.ready,pod:C.pod||null,time:C.time,buildMs:C.buildMs,warmMs:C.warmMs||null,bakes:C.bakes,bakeMs:C.bakeMs,bakeMaxMs:C.bakeMax,callMaxMs:+C.callMax.toFixed(1),overlayMaxMs:+C.ovMax.toFixed(1),longCalls:C.longCalls.slice(-6),
   covers:api.covers,transitioning:api.transitioning,lastTransition:C.lastTrans||null,path:api._prDriving()?'PodRender':'plain',triangles:C.city?C.city.geos.slice(0,3).reduce((s,g)=>s+g.index.count/3,0):0,street:C.city?+C.city.street.toFixed(1):null}:{active:false,city:cityStats()}}
 function cityStats(){return {state:CITY.state,loadMs:CITY.loadMs||null,MB:CITY.bytes?+(CITY.bytes/1048576).toFixed(1):null,error:CITY.err,homes:CITY.index?CITY.index.homes.length:0}}
 // test aid: structure in the backdrop around the home. Edge density (mean Sobel gradient of luma, 0..1, and the share of pixels with a clear edge)
@@ -15733,7 +15763,7 @@ function cityMap(){if(CITY.state==='idle')loadCity();const I=CITY.index;if(!I)re
 // test aid: is the backdrop really there? mean luma (0..1) and the share of pixels that are not black, read back from the shown backdrop
 function backdropCheck(){if(!C||!C.shown||!C.R)return {shown:false};const t=C.T.show,w=t.width,h=t.height,px=new Uint8Array(w*h*4);C.R.readRenderTargetPixels(t,0,0,w,h,px);let s=0,nb=0,n=0;
   for(let i=0;i<px.length;i+=16){const l=(px[i]*.2126+px[i+1]*.7152+px[i+2]*.0722)/255;s+=l;if(l>.02)nb++;n++}return {shown:true,meanLuma:+(s/n).toFixed(4),nonBlack:+(nb/n).toFixed(3),res:[w,h],bakes:C.bakes,ready:!!C.ready}}
-const api={enter,update,skip,exit,dispose:exit,frame,stats,homes,towers,pods,cityMap,defaultHome,facade,setCitySource,load:loadCity,backdrop,overlay,paused,covers:false,transitioning:false,active:()=>!!C,_pr:false,_prSeen:0,_prDriving:()=>now()-api._prSeen<250,
+const api={enter,update,skip,exit,dispose:exit,frame,stats,homes,towers,pods,cityMap,defaultHome,facade,setCitySource,addPlots,progress,cityDone,load:loadCity,backdrop,overlay,paused,covers:false,transitioning:false,active:()=>!!C,_pr:false,_prSeen:0,_prDriving:()=>now()-api._prSeen<250,
   _debug:{backdropCheck,hold(t){if(C&&C.trans)C.trans.hold=t==null?null:t},state:()=>C,metrics,DUR}};
 window.PodContext=api;
 // the pack starts loading shortly after the page settles (25 MB); homes() and enter() start it earlier when asked
@@ -16730,4 +16760,4 @@ window.PodRender=api})();
 </script>
 <!-- Neon Terrarium: the game side (tools/furnish/build.py) -->
 <link rel="stylesheet" href="furnish/bridge.css?v=9aa2454540">
-<script src="furnish/bridge.js?v=3700e19857"></script>
+<script src="furnish/bridge.js?v=cab8339ae3"></script>

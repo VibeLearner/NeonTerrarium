@@ -36,7 +36,9 @@
     (async () => {
       try {
         if (m.recipe && m.recipe.home && Array.isArray(m.recipe.pieces)){ const rc = m.recipe; rc.home.pod = pod; await PB().load(rc); }
-        else await PB().newHome(m.tier || null, pod);   // (null: the building's own tier and windows)
+        else if (m.household && PB().furnishFor) await PB().furnishFor(m.household, { tier: m.tier || null, pod });   // (lived in: furnished for the household that lives there)
+        else await PB().newHome(m.tier || null, pod);   // (vacant, or an older lab: empty; null: the building's own tier and windows)
+        try { if (PB().setResidents) PB().setResidents(m.vacant ? [] : (m.residents || []), { vacant: !!m.vacant }); } catch (e) {}
         try { PB().setTime(m.time === 'day' ? 'day' : 'night', { host: true }); } catch (e) {}
         S.dirty = false; S.ready = true; sync();
         if (PB().onChange) PB().onChange(() => { S.dirty = true; sync(); });

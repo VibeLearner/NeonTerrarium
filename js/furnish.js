@@ -8,7 +8,7 @@
 'use strict';
 const FURN = (() => {
   const F = { pick: false, open: false, hold: false, busy: false, hov: null, fl: 0, userFloor: false, frame: null, home: null };
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-22t';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-24b';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
 
@@ -106,7 +106,7 @@ const FURN = (() => {
     if (!c){ F.hov = null; showPick(null, x, y); return; }
     const rows = homesOf(c);
     if (!rows.length){ F.hov = { c, rows }; showPick(F.hov, x, y); return; }
-    if (!F.hov || F.hov.c !== c){ F.hov = { c, rows }; F.userFloor = false; }
+    if (!F.hov || F.hov.c !== c){ F.hov = { c, rows }; F.userFloor = false; try { if (typeof podsResync === 'function') podsResync(c); } catch (e) {} }
     else F.hov.rows = rows;
     if (!F.userFloor){ const py = pk.p ? pk.p.y : rows[0].y; let k = 0; for (let i = 0; i < rows.length; i++) if (rows[i].y <= py + .02) k = i; F.fl = k; }   // (the pod the pointer is on)
     F.fl = clamp(F.fl, 0, rows.length - 1);
@@ -135,7 +135,8 @@ const FURN = (() => {
     hover.position.set(r.x, r.y + h/2, r.z); hover.scale.set(ex, h, ez); hover.visible = true;
     hoverFill.material.color.set(col); hoverFill.position.copy(hover.position); hoverFill.scale.set(ex - .04, h - .04, ez - .04); hoverFill.visible = true;
     const saved = !!getRecipe(r);
-    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + (saved ? ' · furnished' : '') + ' · click to ' + (saved ? 'open' : 'furnish');
+    const hh = typeof POD_HH !== 'undefined' ? POD_HH.get(keyOf(r)) : null, nres = hh ? hh.members.length : 0;
+    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + ' · ' + (nres ? nres + (nres > 1 ? ' residents' : ' resident') : 'vacant') + (saved ? ' · furnished' : '') + ' · click to ' + (saved ? 'open' : 'furnish');
     placeTip(px, py);
   }
   function placeTip(px, py){ if (px == null){ tip.hidden = true; return; } tip.style.left = px + 'px'; tip.style.top = py + 'px'; tip.hidden = false; }
@@ -357,6 +358,47 @@ const FURN = (() => {
     return st;
   }
 
+  /* ---------- who lives there: the pod's household, as the lab's furnisher knows households ---------- */
+  // people.js shares each section's residents over its pods (POD_HH); this turns a pod's people into the lab's household
+  // model (members with an age band, a job from its list, a shift, temperament and hobbies, and how they're related) and
+  // into the lines of the Residents card. Everything comes from the people themselves (story.js gives their names, ages
+  // and temper), so a pod's household is the same every time it is opened.
+  const LAB_JOB = { 'stall-keeper': 'stall cook', 'shop-worker': 'shop worker', 'office-worker': 'mall clerk', courier: 'courier', 'club-staff': 'club staff', radio: 'radio host',
+    police: 'police officer', 'hotel-spa': 'mall clerk', greenhouse: 'shop worker', 'bathhouse-staff': 'cafe cook' };
+  const REG_HOBBY = { club: 'music', lawn: 'plants', stall: 'cooking', 'bar-kiosk': 'film', bench: 'reading', square: 'collecting', bathhouse: 'fitness', metro: 'gaming' };
+  const HOBBY_WORD = { hacking: 'electronics' };
+  function householdFor(h){
+    const c = cells.get(ckey(h.cell[0], h.cell[1]));
+    try { if (typeof podsResync === 'function') podsResync(c); } catch (e) {}
+    const x = typeof POD_HH !== 'undefined' ? POD_HH.get(keyOf(h)) : null;
+    const ps = x ? x.members.map(id => people.get(id)).filter(Boolean) : [];
+    if (!ps.length) return { vacant: true, household: null, residents: [] };
+    const U = (id, k) => { let v = 2166136261; const s = id + ':' + k; for (let i = 0; i < s.length; i++){ v ^= s.charCodeAt(i); v = Math.imul(v, 16777619); } return (v >>> 0)/4294967296; };
+    const members = [], residents = [];
+    ps.forEach((p, i) => {
+      let sp = null; try { sp = STORY.sp(p); } catch (e) {}
+      const ageN = sp && sp.age || 22 + Math.floor(U(p.id, 'age')*50), age = ageN < 30 ? 'young' : ageN < 60 ? 'adult' : 'older';
+      let jk = null; try { jk = STORY.jobKind(p); } catch (e) {}
+      const job = jk === 'industrial' ? (U(p.id, 'ind') < .5 ? 'foundry worker' : 'industrial tech') : jk ? LAB_JOB[jk] || 'shop worker' : age === 'older' ? 'retired' : 'unemployed';
+      const shift = job === 'retired' || job === 'unemployed' ? 'none' : p.nightWorker || (p.nightShift > .85 && ['club staff', 'radio host', 'police officer', 'foundry worker', 'industrial tech'].includes(job)) ? 'night' : 'day';
+      const tm = sp && sp.temper ? { outgoing: +sp.temper.outgoing.toFixed(2), careful: +sp.temper.careful.toFixed(2), warm: +sp.temper.warm.toFixed(2) } : { outgoing: +U(p.id, 'o').toFixed(2), careful: +U(p.id, 'c').toFixed(2), warm: +U(p.id, 'w').toFixed(2) };
+      const hob = []; for (const r of (sp && sp.regulars) || []) if (REG_HOBBY[r] && !hob.includes(REG_HOBBY[r]) && hob.length < 2) hob.push(REG_HOBBY[r]);
+      if (!hob.length && U(p.id, 'hob') < .6) hob.push(['gaming', 'plants', 'music', 'cooking', 'reading', 'art', 'tinkering', 'film'][Math.floor(U(p.id, 'hk')*8)]);
+      members.push({ id: 'm' + (i + 1), age, job, shift, temperament: tm, hobbies: hob });
+      const tr = []; if (tm.outgoing > .65) tr.push('outgoing'); else if (tm.outgoing < .3) tr.push('private');
+      if (tm.careful > .65) tr.push('tidy'); else if (tm.careful < .3) tr.push('messy'); if (tm.warm > .7) tr.push('warm');
+      if (shift === 'night') tr.push('night shift'); for (const hb of hob) tr.push(HOBBY_WORD[hb] || hb);
+      const jw = jk ? (STORY.JOB_WORD && STORY.JOB_WORD[jk]) || job : job === 'retired' ? 'retired' : 'between jobs';
+      residents.push({ name: sp ? sp.first + ' ' + sp.last : 'Resident ' + (i + 1), age: ageN, job: jw, traits: tr });
+    });
+    const n = members.length, u = U(x.key, 'rel');
+    const relation = n === 1 ? 'single' : n === 2 ? (u < .6 ? 'couple' : u < .85 ? 'roommates' : 'siblings') : n === 3 ? (u < .35 ? 'couple+roommate' : u < .55 ? 'siblings' : 'roommates') : 'roommates';
+    const rel = { single: 'Single', couple: 'Couple', roommates: n + ' roommates', siblings: n + ' siblings', 'couple+roommate': 'Couple + roommate' }[relation];
+    const seed = Math.floor(U(x.key, 'seed')*1e9);
+    return { vacant: false, household: { seed, label: rel + ': ' + members.map(m => m.job).join(' + '), relation, members, pod: null }, residents };
+  }
+  F.householdFor = householdFor;
+
   /* ---------- the overlay ---------- */
   const ov = document.getElementById('furnish');
   const nightNow = () => { try { return comp.uniforms.night.value > .5 ? 'night' : 'day'; } catch (e) { return S.hour < 6.5 || S.hour >= 19 ? 'night' : 'day'; } };
@@ -374,7 +416,8 @@ const FURN = (() => {
     const run = F.run, alive = () => F.open && F.run === run && F.frame === fr;
     const post = (m, x) => { try { fr.contentWindow.postMessage(m, location.origin, x || []); } catch (e) { console.error('Furnish pod: could not send', m.type, e); } };
     const t0 = performance.now(), hd = head(h);
-    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: null, time: nightNow(), label: label(h) + ' · pod ' + h.pod + ' of ' + h.pods });
+    let who = { vacant: false, household: null, residents: [] }; try { who = householdFor(h); } catch (e) { console.warn('Furnish pod: no household for this pod', e); }
+    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: null, time: nightNow(), label: label(h) + ' · pod ' + h.pod + ' of ' + h.pods, household: who.household, residents: who.residents, vacant: who.vacant });
     const headMs = performance.now() - t0;
     let st = null;
     try { st = await stream(h, (plots, em, k, done, x) => post({ type: 'furnish:plots', plots, em, k, done }, x), alive); }

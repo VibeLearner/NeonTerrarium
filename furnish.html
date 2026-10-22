@@ -149,6 +149,14 @@ body[data-view="build"] main.wrap{max-width:none;padding:0}
 .bhead i{font-style:normal}.bhead i::after{content:'+'}.bhead[aria-expanded="true"] i::after{content:'\2212'}
 .bhead:hover{color:#fff!important;border-color:#fff!important}
 .breadout{margin:0;font-size:11px;color:var(--ink);text-shadow:0 1px 0 rgba(0,0,0,.6);font-variant-numeric:tabular-nums;opacity:.9;max-width:300px}
+.bres{width:212px;box-sizing:border-box;background:var(--deck);border:1px solid var(--line);padding:7px 10px;font-size:11px;color:var(--ink);clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);max-height:40vh;overflow-y:auto;scrollbar-width:thin}
+.bres summary{font-family:var(--font-pixel);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.bres summary::-webkit-details-marker{display:none}.bres summary::after{content:'+';color:var(--muted)}.bres details[open] summary::after{content:'\2212'}.bres summary span{color:var(--muted);margin-left:auto;margin-right:8px}
+.bres summary:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.bres ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}.bres li{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;padding-top:6px;border-top:1px solid var(--line)}.bres li:first-child{border-top:0;padding-top:0}
+.bres .nm{color:#fff}.bres .ag{color:var(--muted);font-variant-numeric:tabular-nums}.bres .jb{flex-basis:100%;color:var(--muted)}
+.bres .tr{flex-basis:100%;display:flex;flex-wrap:wrap;gap:3px}.bres .tr i{font-style:normal;font-size:9.5px;line-height:15px;padding:0 5px;border:1px solid var(--line);color:var(--cyan)}
+.bresv{margin:0;color:var(--muted)}.bresv b{font-family:var(--font-pixel);font-weight:400;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
 .breadout b{font-family:var(--font-pixel);font-weight:400;color:var(--amber);letter-spacing:.06em}
 /* panels: Home (left, under its head) and Settings (right) */
 .bpanel{position:absolute;z-index:6;background:var(--deck);border:1px solid var(--line);border-radius:4px;padding:14px;display:grid;gap:14px;align-content:start;overflow:auto;scrollbar-width:thin;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -389,6 +397,7 @@ body[data-view="build"] .toast{font-family:"JetBrains Mono",ui-monospace,monospa
       <div class="btl">
         <button class="bhead" id="bHomeBtn" aria-expanded="false" aria-controls="bHome" title="Home: new home, save, load, clear a room, share (Ctrl+S saves)"><span>Home</span><i aria-hidden="true"></i></button>
         <p class="breadout" id="bStatus" aria-live="polite"></p>
+        <div class="bres" id="bRes" hidden aria-label="Residents"></div>
       </div>
       <section class="bpanel bhome" id="bHome" hidden aria-label="Home">
         <section id="bThisHome"><h2>This home</h2>
@@ -13789,11 +13798,12 @@ function stageClutter(ctx){const P=ctx.P,t=ctx.tr;
   if(t.careful>.6)P.evid.push([2,'everything squared to the walls']);else if(t.messy>.7)P.evid.push([2,'nothing quite straight'])}
 
 const ROOM_RESTARTS={bed:6,living:8,kitchen:6,den:5,hall:4};
-function furnish(hh,lseed){lseed=lseed||1;let best=null;
-  for(let a=0;a<3;a++){const P=furnishOnce(hh,a?lseed*1000+a:lseed);const m=validate(P).metrics;const sc=(m.bath?200:0)+(m.beds?200:0)+Object.values(m).filter(Boolean).length*10-P.unmet.length-P.breaks.reduce((s,b)=>s+b.step,0)*.1;if(!best||sc>best.sc)best={P,sc};if(Object.values(m).every(Boolean))break}
+function furnish(hh,lseed,opt){lseed=lseed||1;let best=null;
+  for(let a=0;a<3;a++){const P=furnishOnce(hh,a?lseed*1000+a:lseed,opt);const m=validate(P).metrics;const sc=(m.bath?200:0)+(m.beds?200:0)+Object.values(m).filter(Boolean).length*10-P.unmet.length-P.breaks.reduce((s,b)=>s+b.step,0)*.1;if(!best||sc>best.sc)best={P,sc};if(Object.values(m).every(Boolean))break}
   best.P.lseed=lseed;return best.P}
-function furnishOnce(hh,lseed){const t0=performance.now();const ctx=newPlan(hh,lseed||1);const P=ctx.P;
-  assignSets(ctx);reserve(ctx);stageWindows(ctx);stageBath(ctx);
+function furnishOnce(hh,lseed,opt){const t0=performance.now();const ctx=newPlan(hh,lseed||1);const P=ctx.P;
+  // opt.windows(ctx): the builder's hook for a real building's windows (placeFixedWall per window) in place of the planner's own facade windows
+  assignSets(ctx);reserve(ctx);if(opt&&typeof opt.windows==='function')opt.windows(ctx);else stageWindows(ctx);stageBath(ctx);
   for(const R of P.rooms.filter(r=>r.kind==='bed'))runRoom(ctx,R,ROOM_RESTARTS.bed,progBedroom);
   stageSleepCollapse(ctx);
   const KR=KITR(P),LR=LIV(P);if(KR!==LR)runRoom(ctx,KR,ROOM_RESTARTS.kitchen,progKitchen);runRoom(ctx,LR,ROOM_RESTARTS.living,progLiving);
@@ -13950,6 +13960,14 @@ const centroid=(P,R)=>{let x=0,z=0;for(const k of R.cells){x+=(k%P.W+.5)*TILE;z+
 const pcC=pc=>pc.kind==='floor'||pc.kind==='ceiling'?[(pc.x0+pc.fw/2)*TILE,(pc.z0+pc.fd/2)*TILE]:[pc.xf.px,pc.xf.pz];
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 const doorXY=P=>[(P.door.k%P.W+.5)*TILE,(((P.door.k/P.W)|0)+.5)*TILE];
+// a wall piece at a fixed spot (the builder's facade windows): line N|S|W|E, a = its center along the line in meters, wh = raise in meters.
+// It takes its span on the line like any planned wall piece, so furniture and other wall pieces keep clear of it.
+function placeFixedWall(ctx,o){const P=ctx.P,p=pr(o.arch,o.seed),g=LGEO[o.line];if(!g||!p)return null;const X=g.X,f=g.f,wh=o.wh||0;
+  const xf={px:X?o.a:(o.line==='W'?0:P.W*TILE),pz:X?(o.line==='N'?0:P.D*TILE):o.a,ry:RY[f],ox:-p.center[0],oz:-p.minZ};const A=aabb(xf,fullBox(p));
+  const span={line:o.line,a0:X?A.x0:A.z0,a1:X?A.x1:A.z1,y0:p.box.minY+wh,y1:p.box.maxY+wh,depth:p.box.maxZ-p.box.minZ};const n=X?P.W:P.D;
+  const s0=Math.max(0,Math.min(n-1,Math.floor(span.a0/TILE+.02))),tw=Math.max(1,Math.min(n-s0,Math.ceil(span.a1/TILE-.02)-s0));const room=P.g.room[lineCell(P,o.line,Math.min(n-1,Math.floor((span.a0+span.a1)/2/TILE)))];
+  const id=P.pieces.length;const pc={id,arch:o.arch,seed:o.seed,p,room,kind:'wall',line:o.line,f,s0,tw,xf,a:A,need:'window',role:'need',cells:[],wh};
+  P.lines[o.line].push(Object.assign({id},span));P.pieces.push(pc);const R=P.rooms[room];if(R&&!R.window)R.window=pc;return pc}
 function need(ctx,id,label,met,note){ctx.P.needs.push({id,label,met:!!met,note:met?'':note})}
 function assignSets(ctx){const P=ctx.P,t=ctx.tr,r=ctx.rng;
   const kitchenDialect=sb=>{const careful=t.careful>.55||t.anyOlder||t.hc.cooking;if(careful)return r.chance(sb)?'cream':'showa';return r.chance(sb)?(r.chance(.6)?'nighthab':'cream'):(r.chance(.6)?'showa':'tenement')};
@@ -14261,7 +14279,7 @@ window.addEventListener('podbuilder:room',e=>{const PB=window.PodBuilder,B=PB&&P
   setCutFocus(s,f,d.wallRun!==undefined?{raise:(d.placing||d.moving)?d.wallRun:-1}:{})});
 window.__pods={tallStats,setWalls:m=>setWalls(m),orbit,setCutFocus:(x,z,o)=>setCutFocus(activeCut(),x==null?null:(z==null?x:{x,z}),o),cutState:()=>activeCut()?cutState(activeCut()):null,wallRunsOf,probeCount:()=>PC.size,setProbe:m=>{PROBE=m;PC.clear()},makeHousehold,furnish,validate,checkBatch,setView,newHouseholds,buildPod,S,TAGS:TAG_SRC,UNTAGGED,UNPLACEABLE,PODS,STEP_NAMES};
 // shell API for the Build view: reuses the home shell, camera and wall modes (no fork)
-window.__pods.shell={buildPod,wallTargets,applyWalls,fitCam,setCutFocus,roomAt,centerRoom,cutState,CUT_DWELL,wallRunsOf,makeHousehold,newPlan,assignSets,reserve,stageWindows,stageFinishes,furnish,TG,PODS,AZ0,PITCH0,PITCH_MIN,PITCH_MAX,ROT_S,WALL_S,TILE,WALL_H,LOW_H,PART_H,PT,WMODES};
+window.__pods.shell={placeFixedWall,buildPod,wallTargets,applyWalls,fitCam,setCutFocus,roomAt,centerRoom,cutState,CUT_DWELL,wallRunsOf,makeHousehold,newPlan,assignSets,reserve,stageWindows,stageFinishes,furnish,TG,PODS,AZ0,PITCH0,PITCH_MIN,PITCH_MAX,ROT_S,WALL_S,TILE,WALL_H,LOW_H,PART_H,PT,WMODES};
 window.__pods._int={newPlan,assignSets,reserve,stageWindows,stageBath,kitchenRun,sofaGroup,diningGroup,placeBed,placeDesk,fits,cands,order,pr,limits,aabb,fullBox,nudge,xform,TG,pclass};
 })();
 
@@ -14365,7 +14383,7 @@ function planToRecipe(P){const home={tier:P.type,W:P.W,D:P.D,room:Array.from(P.r
   const fin={floor:{},wall:{},seg:{}};for(const R of P.rooms){if(R.floor)fin.floor[R.id]={arch:R.floor.arch,seed:R.floor.seed};if(R.wall)fin.wall[R.id]={arch:R.wall.arch,seed:R.wall.seed}}
   const pieces=[],map=new Map();let id=1;const messy=P.tr&&P.tr.messy>.6;
   for(const q of P.pieces){if(q.kind==='top'||!q.xf)continue;const anc=(q.kind==='wall'||(q.kind==='floor'&&q.snap))?'b':'c';map.set(q.id,id);
-    pieces.push({id:id++,arch:q.arch,seed:q.seed,x:r4(q.xf.px),y:0,z:r4(q.xf.pz),ry:r4(normA(q.xf.ry+(q.jit||0))),wh:0,anc,parent:0,colors:{},light:null})}
+    pieces.push({id:id++,arch:q.arch,seed:q.seed,x:r4(q.xf.px),y:0,z:r4(q.xf.pz),ry:r4(normA(q.xf.ry+(q.jit||0))),wh:q.kind==='wall'&&q.wh?r4(q.wh):0,anc,parent:0,colors:{},light:null})}
   for(const q of P.pieces){if(q.kind!=='top')continue;const h=map.get(q.host);if(!h)continue;const jr=messy?(K.hashStr(q.arch+q.seed)%100/100-.5)*.5:0;
     pieces.push({id:id++,arch:q.arch,seed:q.seed,x:r4(q.lx),y:r4(q.y),z:r4(q.lz),ry:r4(normA(jr)),wh:0,anc:'c',parent:h,colors:{},light:null})}
   return {v:1,app:'podlab-build',home,walls:B.walls,fin,pieces}}
@@ -14869,6 +14887,34 @@ const isWinArch=k=>!!(TG[k]&&TG[k].has('window'));
 function facadeRecipe(rc,P,spec,pk){const recs=facadeWindows(spec,P,SH.wallRunsOf(P),pk);if(!recs)return -1;const drop=new Set(rc.pieces.filter(q=>!q.parent&&isWinArch(q.arch)).map(q=>q.id));
   let grew=true;while(grew){grew=false;for(const q of rc.pieces)if(q.parent&&drop.has(q.parent)&&!drop.has(q.id)){drop.add(q.id);grew=true}}
   rc.pieces=rc.pieces.filter(q=>!drop.has(q.id));let id=rc.pieces.reduce((m,q)=>Math.max(m,q.id),0)+1;for(const r of recs){delete r.fside;r.id=id++;rc.pieces.push(r)}rc.home.facade=facadeSummary(spec,pk);return recs.length}
+/* ---------- a home furnished for its household: the lab's furnisher (layout engine, rule-break ladder, mixed sets, lived-in clutter) run for a
+   makeHousehold-shaped household, with the real building's windows placed first (the planner keeps furniture clear of them), loaded as an ordinary
+   editable recipe. tier null or 'auto': the building's tier (else household.pod, else small). Deterministic for the same household, pod and facade. */
+const HH_REL=['single','couple','roommates','siblings','couple+roommate'],HH_AGE=['young','adult','older'],HH_SHIFT=['day','night','none'];
+function hhClean(h){const ms=(Array.isArray(h.members)?h.members:[]).slice(0,6).map((m,i)=>{const t=m&&m.temperament||{};const c01=v=>Number.isFinite(+v)?clamp(+v,0,1):.5;
+    return {id:m&&m.id||'m'+(i+1),age:HH_AGE.includes(m&&m.age)?m.age:'adult',job:m&&m.job?String(m.job):'unemployed',shift:HH_SHIFT.includes(m&&m.shift)?m.shift:'day',
+      temperament:{outgoing:c01(t.outgoing),careful:c01(t.careful),warm:c01(t.warm)},hobbies:Array.isArray(m&&m.hobbies)?m.hobbies.map(String):[]}});
+  if(!ms.length)throw new Error('furnishFor: the household needs at least one member');const n=ms.length;
+  const r0=h.relation,fits=r0==='single'?n===1:r0==='couple'?n===2:r0==='couple+roommate'?n===3:(r0==='roommates'||r0==='siblings')&&n>=2;const relation=fits?r0:n===1?'single':n===2?'couple':'roommates';
+  return {seed:h.seed!=null?h.seed:1,label:h.label?String(h.label):'Household',relation,pod:TIER_M[h.pod]?h.pod:null,members:ms}}
+async function furnishFor(h,o){o=o||{};const hh=hhClean(h||{});while(B.loading)await frame();const pk=podOK(o.pod)||podFrom(hh.seed);
+  let tier=o.tier||null;const auto=!tier||tier==='auto';let f=null;if(pk.cell){try{f=await facadeFor(pk,auto?null:tier)}catch(e){console.warn('builder: facade failed',e);f=null}}
+  if(auto)tier=f&&TIER_M[f.tier]?f.tier:(hh.pod||'small');if(!TIER_M[tier])tier='small';hh.pod=tier;
+  setBusy('Furnishing the home for '+(hh.members.length===1?'its resident':'its '+hh.members.length+' residents')+'…');await frame();await frame();
+  const opt=f?{windows:ctx=>{const recs=facadeWindows(f,ctx.P,SH.wallRunsOf(ctx.P),pk)||[];for(const r of recs)SH.placeFixedWall(ctx,{arch:r.arch,seed:r.seed,line:r.fside,a:r.fside==='N'||r.fside==='S'?r.x:r.z,wh:r.wh})}}:null;
+  const t0=performance.now();let P;try{P=SH.furnish(hh,1,opt)}catch(e){setBusy(null);throw e}const ms=Math.round(performance.now()-t0);
+  if(!o.auto)keepPrev();const rc=planToRecipe(P);rc.home.pod=pk;if(f)rc.home.facade=facadeSummary(f,pk);rc.home.household={seed:hh.seed,label:hh.label,relation:hh.relation,n:hh.members.length};
+  await loadRecipe(rc);B.slotName=null;if(!o.quiet)L.toast('Furnished for '+hh.label+'.');
+  return {tier,pieces:B.recs.size,ms,facade:!!f,setMix:P.setMix||'',notes:(P.cardNotes||[]).slice()}}
+// the Residents card under the Home readout: [{name, age, job, traits}], {vacant:true} with an empty list for a vacant pod, null hides it
+function setResidents(list,o){o=o||{};const el=$('bRes');if(!el)return;const L0=Array.isArray(list)?list.filter(Boolean).slice(0,8):[];
+  if(list==null&&!o.vacant){el.hidden=true;el.innerHTML='';B.residents=null;return}const vac=!L0.length&&!!o.vacant;B.residents={list:clone(L0),vacant:vac};
+  if(vac)el.innerHTML='<p class="bresv"><b>Vacant</b>: nobody lives here yet</p>';
+  else if(!L0.length){el.hidden=true;el.innerHTML='';return}
+  else{const open=el.dataset.open!=='0';el.innerHTML=`<details${open?' open':''}><summary>Residents <span>${L0.length}</span></summary><ul>${L0.map(r=>{const tr=Array.isArray(r.traits)?r.traits.slice(0,5):[];
+      return `<li><span class="nm">${esc(String(r.name||'Resident'))}</span>${Number.isFinite(+r.age)&&r.age!==''&&r.age!=null?`<span class="ag">${Math.round(+r.age)}</span>`:''}${r.job?`<span class="jb">${esc(String(r.job))}</span>`:''}${tr.length?`<span class="tr">${tr.map(t=>`<i>${esc(String(t))}</i>`).join('')}</span>`:''}</li>`}).join('')}</ul></details>`;
+    const d=el.querySelector('details');d.addEventListener('toggle',()=>{el.dataset.open=d.open?'1':'0'})}
+  el.hidden=false}
 // public: replace the home's top-level windows with a facade spec's. o.history false applies it without an undo step (a new home); default is one undoable step.
 function setWindows(spec,o){o=o||{};if(!B.s||!B.P||B.loading)return -1;const recs=facadeWindows(spec,B.P,B.s.runs,B.home.pod);if(!recs)return -1;
   const old=[...B.recs.values()].filter(r=>!r.parent&&isWinArch(r.arch)).map(r=>r.id);const all=new Set();old.forEach(id=>descendants(id).forEach(d=>all.add(d)));const oldRecs=[...all].map(id=>clone(B.recs.get(id)));
@@ -15167,7 +15213,7 @@ window.PodBuilder={version:1,enter:enterView,editPlan,newHome,load:rc=>loadRecip
   surfaces:id=>{const i=B.inst.get(id);if(!i)return [];i.g.updateMatrixWorld(true);return i.surfaces.map(q=>{_v1.set(q.x,q.y,q.z).applyMatrix4(i.g.matrixWorld).sub(B.root.position);return {x:_v1.x,y:_v1.y,z:_v1.z,w:q.round?q.r*2:q.w,d:q.round?q.r*2:q.d}})},
   wallSpans:run=>[...B.inst.values()].filter(i=>i.kind==='wall'&&!i.rec.parent&&i.wsp.run===run).map(i=>({a0:i.wsp.a0,a1:i.wsp.a1,y0:i.wsp.y0,y1:i.wsp.y1,rid:i.wsp.rid})),
   lighting:()=>{let ws=0;if(B.sc)B.sc.traverse(o=>{if(o.isLight&&o.userData.workLight)ws+=o.intensity});return {work:B.work,time:timeName(),workIntensity:ws,fallback:!!(B.env&&B.env.g.parent)}},setWork,setTime:(t,o)=>o&&o.host?hostTime(t):setTime(t),onChange:fn=>{changeFns.add(fn);return ()=>changeFns.delete(fn)},onSave:fn=>{saveFns.add(fn);return ()=>saveFns.delete(fn)},
-  setWindows:(spec,o)=>setWindows(spec,o),facadeOf:()=>B.home&&B.home.facade?clone(B.home.facade):null,facade:pk=>facadeFor(podOK(pk)||B.home&&B.home.pod,B.home&&B.home.tier),
+  setWindows:(spec,o)=>setWindows(spec,o),furnishFor:(hh,o)=>furnishFor(hh,o),setResidents:(l,o)=>setResidents(l,o),residents:()=>B.residents?clone(B.residents):null,household:()=>B.home&&B.home.household?clone(B.home.household):null,facadeOf:()=>B.home&&B.home.facade?clone(B.home.facade):null,facade:pk=>facadeFor(podOK(pk)||B.home&&B.home.pod,B.home&&B.home.tier),
   // window pieces grouped per lab wall side; pieces that abut (gap under 10 cm) count as one window (a band)
   windowsBySide:()=>{const P=B.P;if(!P)return null;const Wm=P.W*TILE,Dm=P.D*TILE,out={N:[],S:[],E:[],W:[]};for(const i of B.inst.values()){if(!i.pivot.userData.window||i.rec.parent)continue;const r=i.rec,w=i.lbox.max.x-i.lbox.min.x;
       const d={N:Math.abs(r.z),S:Math.abs(r.z-Dm),W:Math.abs(r.x),E:Math.abs(r.x-Wm)};const sd=Object.keys(d).sort((a,b)=>d[a]-d[b])[0];if(d[sd]>.12)continue;const a=sd==='N'||sd==='S'?r.x:r.z;out[sd].push([a-w/2,a+w/2,i.lbox.min.y+(r.wh||0),i.lbox.max.y+(r.wh||0)])}
@@ -16806,4 +16852,4 @@ window.PodRender=api})();
 </script>
 <!-- Neon Terrarium: the game side (tools/furnish/build.py) -->
 <link rel="stylesheet" href="furnish/bridge.css?v=9aa2454540">
-<script src="furnish/bridge.js?v=cab8339ae3"></script>
+<script src="furnish/bridge.js?v=34be445deb"></script>

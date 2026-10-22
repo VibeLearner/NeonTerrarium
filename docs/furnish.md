@@ -60,12 +60,42 @@ A home with a saved recipe is loaded with `PodBuilder.load(recipe)` (its `home.p
 `PodBuilder.newHome(null, pod)`: the lab picks the size from the building and takes the windows from its real facade. The
 game's day or night is set with `PodBuilder.setTime(time, {host: true})`.
 
+### Who lives there
+
+Residents live in pods. `syncResidents` (`js/people.js`) still makes each residential or luxury section's people as before:
+the same number, with the same ids, so stories, cases, the ledger and the residents count are unchanged. It then shares them
+out over that section's pods:
+- the pods are visited in a seeded order of their own;
+- each pod takes a household of one to four until the people run out, so some pods stand vacant;
+- anyone left over joins the smallest households, up to four;
+- past that they live in the building without a pod, as everyone used to.
+
+Each person's pod is `p.pod` (the save key `'i,j|section|floor'`), and `POD_HH` holds each pod's household.
+`podsResync(c)` redoes one plot from its pods as they stand. Furnish pod calls it when you hover a building and before it
+opens a pod, because a plot's blocks are only known once it has been built. Everything follows from the city's saved data,
+so households are the same on every load.
+
+Opening a pod with no saved apartment furnishes it for its household:
+- `householdFor` (`js/furnish.js`) turns the pod's people into the lab's household model:
+  - an age band from their age (`story.js`);
+  - a job from the lab's list, from what they do (`STORY.jobKind`);
+  - the shift;
+  - their temperament (outgoing, careful, warm);
+  - hobbies from the places they keep going to;
+  - how they're related (single, couple, roommates, siblings, couple and roommate).
+- The lab's `PodBuilder.furnishFor(household, {tier: null, pod})` takes the pod's real windows first, runs the household
+  furnisher (mixed sets, lived-in clutter, the layout engine with its rule-break ladder) and loads the result as an
+  ordinary editable home.
+- The Residents card (`PodBuilder.setResidents`) names them, with their age, job and traits.
+- A vacant pod opens empty with "Vacant: nobody lives here yet".
+- The pick tip says how many live in the pod, or "vacant".
+
 ### Messages
 
 | From | Message | Meaning |
 |---|---|---|
 | furnish.html | `furnish:ready` | PodBuilder is up |
-| game | `furnish:begin` `{head, home, recipe, tier, time, label}` | the head of the city, the home, its saved recipe |
+| game | `furnish:begin` `{head, home, recipe, tier, time, label, household, residents, vacant}` | the head of the city, the home, its saved recipe, who lives there |
 | game | `furnish:plots` `{plots, em, k, done}` | a batch of plots, progress 0 to 1, and whether it is the last |
 | furnish.html | `furnish:live` | the hologram has the screen: show the page |
 | furnish.html | `furnish:save` `{recipe}` | Save (or Ctrl+S): keep it with the city |

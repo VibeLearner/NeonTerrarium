@@ -32,6 +32,7 @@ then open http://localhost:8000.
 | Delete mode | X, or the delete button by the zones: drag to select a block of plots, click inside it to delete everything there (buildings, platform and any megastructure reaching into it), click outside to drop the selection. X or Esc to leave | Delete button |
 | Place a megastructure | Pick it in the Buildings menu, click to put it down, R turns it, right-click or Esc cancels | Tap |
 | Turn a megastructure | With the pointer over a standing megastructure, press R: it turns a quarter, or the next facing that fits (a 3 x 2 swaps to 2 x 3 if the plots beside it are free), flashing red if none does. Turning keeps everything going: the police drones and bikes, the club's night and crowd, the square's stall keepers and visitors | |
+| Furnish an apartment | The Furnish pod button by the zones: point at a residential or luxury building (or a lifted pod), scroll or Up / Down to pick the pod (the building's stacked homes, outlined as you go), click to open it in Build mode; Esc or right-click cancels. Inside, Save keeps it with the city and Exit to city goes back (keeping any changes) | Tap a pod to light it, tap it again to open it |
 | Move around | W A S D or the arrow keys (Shift for faster), H or Home to jump back to the middle | |
 | Rotate | Drag, or Q / E (45 degree steps) | Two-finger twist |
 | Zoom | Scroll wheel, or + / - | Pinch |
@@ -64,6 +65,9 @@ js/people.js            people: residents, jobs, daily routines, the sidewalk ne
 js/world.js             the game world: cells, building stacks, batching, edits, build and remove animations, saving
 js/input.js             camera, mouse / touch / keyboard, settings panel
 js/main.js              start-up and the frame loop
+js/furnish.js           Furnish pod: picking a pod, gathering the city round it, the apartment overlay, saving its recipe with the city
+furnish.html            the Pod Furniture Lab's Build mode for Furnish pod (generated: tools/furnish/build.py, see docs/furnish.md)
+furnish/                bridge.js and bridge.css, the game's side of furnish.html (its Exit to city and Save bar, the messages)
 assets/sprites/         sprite PNGs at true pixel size (one file per sprite; the name is the sprite's id)
 assets/sprites/people.png  the people atlas: 12 characters, one 16 px row each, 6 walk + 4 idle frames of 12 px
 docs/people.md          the people system: how it works, plan and progress
@@ -77,6 +81,19 @@ assets/audio/sfx/originals/  the untouched source recordings, for re-editing
 ```
 
 The scripts are ordinary (non-module) scripts that share one scope, so the order in `index.html` matters.
+
+## Furnish pod
+
+Any pod of a residential or luxury building (the stacked homes it is built from), and any lifted pod, can be done up as an apartment. The **Furnish pod** button
+by the zones starts picking: the pod under the pointer gets a bold outline in its zone's neon (scroll or Up / Down for the pod
+above or below, "pod 3 of 5"), and a click opens that apartment in the Pod Furniture Lab's Build mode, full screen over the city, with the real city
+round it and a hologram fly-in from your camera. Commercial and industrial buildings can't be picked. The city waits while you
+are inside. **Save** keeps the apartment with the city (it goes into the save slot, city files and cloud saves with everything
+else); **Exit to city** goes back and keeps any changes. Opening the same floor again brings it back.
+
+The Build page is `furnish.html`, made from the lab (it runs its own three.js, r149, in a frame so it never mixes with the
+game's r128). To make it again after the lab changes: `python3 tools/furnish/build.py path/to/podlab`. How it fits together:
+`docs/furnish.md`.
 
 ## Industrial yards
 

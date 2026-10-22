@@ -23,6 +23,7 @@ function frame(now){
   requestAnimationFrame(frame);
   if (typeof OVERSEER !== 'undefined' && OVERSEER.hold) return;   // (the Overseer's desk covers the screen: the city waits)
   if (typeof GRIDPANEL !== 'undefined' && GRIDPANEL.hold) return;   // (so does the Acoustic Panel; the broadcast plays on)
+  if (typeof FURN !== 'undefined' && FURN.hold) return;   // (and the apartment being furnished: furnish.js)
   if (typeof TITLE !== 'undefined' && TITLE.on && TITLE.cityHalf && TITLE.cityHalf()){ TITLE_SKIP = !TITLE_SKIP; if (TITLE_SKIP) return; }   // (under the title only the porthole shows the city: half the frames do)
   if (idleNow(now)){ IDLE_SKIP = !IDLE_SKIP; if (IDLE_SKIP) return; } else IDLE_SKIP = false;
   const TP = window.TPERF; if (TP && TP.off.has('city')) return;

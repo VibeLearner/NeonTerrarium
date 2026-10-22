@@ -892,6 +892,7 @@ const STALL_TYPES = new Set([stallMarket, foodDeck, foodTower, foodPlaza, billbo
 // ground, and c.sections, the pod hanging over it on its scaffold (from c.lift.y), with a gap between them.
 function buildStack(c){ drain(buildStackGen(c)); }
 function* buildStackGen(c){
+  c._pods = [];   // (the blocks each section is made of: the homes Furnish pod picks, buildings.js chunkBox)
   c.belowTop = null; c.belowTops = [];
   c.liftRoof = null;
   if (c.lift && c.below && c.below.length){
@@ -945,10 +946,11 @@ function* stackRunGen(c, secs, y, tag, first){
     const onStalls = !upper && !sec.mf && !lot.aloft && sec.zone === 'mid' && !STALL_TYPES.has(builder) && hash('stallbase', c.i, c.j, sec.seed) % 100 < 60;
     let P1 = P0, hb = 0;
     NO_ROOF = (!last && !nextFlo) || tag === 'b';   // (the building under a side pod: a flat roof for the scaffold to stand on)
+    POD_LOG = c._pods || (c._pods = []); POD_SEC = { k, t: tag };
     try { withStyle(sec.style, () => {
       if (onStalls){ stallBase(lot, st, P0); hb = lot.height; P1 = under(P0, T(0, hb, 0)); lot.base += hb; lot.height = 0; }
       builder(lot, st, P1);
-    }); } finally { LUX = null; }
+    }); } finally { LUX = null; POD_LOG = null; POD_SEC = null; }
     NO_ROOF = false;
     if (onStalls){ lot.base -= hb; lot.height += hb; }
     prevWhite = !!lot.white; prevDeck = builder === foodDeck || builder === foodTower;

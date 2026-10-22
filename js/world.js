@@ -893,6 +893,7 @@ const STALL_TYPES = new Set([stallMarket, foodDeck, foodTower, foodPlaza, billbo
 function buildStack(c){ drain(buildStackGen(c)); }
 function* buildStackGen(c){
   c._pods = [];   // (the blocks each section is made of: the homes Furnish pod picks, buildings.js chunkBox)
+  c._signRes = [];   // (each build of the plot starts with no signs reserved, so the main thread and the worker place the same ones)
   c.belowTop = null; c.belowTops = [];
   c.liftRoof = null;
   if (c.lift && c.below && c.below.length){
@@ -947,10 +948,11 @@ function* stackRunGen(c, secs, y, tag, first){
     let P1 = P0, hb = 0;
     NO_ROOF = (!last && !nextFlo) || tag === 'b';   // (the building under a side pod: a flat roof for the scaffold to stand on)
     POD_LOG = c._pods || (c._pods = []); POD_SEC = { k, t: tag };
+    SIGN_RES = c._signRes || (c._signRes = []);   // (the plot's signs so far: a new one never goes where it would cut into one: buildings.js signFree)
     try { withStyle(sec.style, () => {
       if (onStalls){ stallBase(lot, st, P0); hb = lot.height; P1 = under(P0, T(0, hb, 0)); lot.base += hb; lot.height = 0; }
       builder(lot, st, P1);
-    }); } finally { LUX = null; POD_LOG = null; POD_SEC = null; }
+    }); } finally { LUX = null; POD_LOG = null; POD_SEC = null; SIGN_RES = null; }
     NO_ROOF = false;
     if (onStalls){ lot.base -= hb; lot.height += hb; }
     prevWhite = !!lot.white; prevDeck = builder === foodDeck || builder === foodTower;

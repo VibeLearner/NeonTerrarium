@@ -201,10 +201,58 @@ function faceCables(F,L,h){
 }
 
 /* ---------- lit box signs with pixel lettering (drawn in code, see genGlyphSigns) ---------- */
+// Sign room on a plot. Every sign a building puts up (a blade sticking out from the wall, or a panel flat on it) takes the box
+// it fills, in the plot's own space, and a new one that would cut into one already there (or come within SIGN_GAP of it) moves
+// along its wall to a free spot, or is left out when there is none. Two blades at the same corner from its two faces used to cross, and two on one face could land in the same
+// spot at overlapping heights. SIGN_RES is the plot's list while its sections are built (world.js stackRunGen); the list is
+// made afresh with each build, in the same order, so the page and the plot worker put up the same signs. Signs put up
+// with no list (outside a plot's build) are placed as before.
+let SIGN_RES = null, SIGN_FACE = null;
+const SIGN_GAP = .06, _sgO = new THREE.Vector3(), _sgA = new THREE.Vector3(), _sgB = new THREE.Vector3();
+// a sign's box as the wall holds it (walls only ever turn about the vertical): its centre and two unit axes across the ground,
+// half sizes along them, and its height range; b is the box round it, kept for the checks
+function signBox(F, x0, x1, y0, y1, z0, z1){
+  _sgO.set(0, 0, 0).applyMatrix4(F); _sgA.set(1, 0, 0).applyMatrix4(F).sub(_sgO); _sgB.set(0, 0, 1).applyMatrix4(F).sub(_sgO);
+  const la = Math.hypot(_sgA.x, _sgA.z) || 1, lb = Math.hypot(_sgB.x, _sgB.z) || 1, ax = [_sgA.x/la, _sgA.z/la], az = [_sgB.x/lb, _sgB.z/lb];
+  const mx = (x0 + x1)/2*la, mz = (z0 + z1)/2*lb, hx = (x1 - x0)/2*la, hz = (z1 - z0)/2*lb;
+  const cx = _sgO.x + ax[0]*mx + az[0]*mz, cz = _sgO.z + ax[1]*mx + az[1]*mz;
+  const ex = Math.abs(ax[0])*hx + Math.abs(az[0])*hz, ez = Math.abs(ax[1])*hx + Math.abs(az[1])*hz;
+  return { c: [cx, cz], ax, az, hx, hz, y0: _sgO.y + y0, y1: _sgO.y + y1, b: [cx - ex, _sgO.y + y0, cz - ez, cx + ex, _sgO.y + y1, cz + ez] };
+}
+// do two sign boxes come within g of each other? (heights, then the two footprints by separating axes)
+function signsMeet(A, B, g){
+  if (A.y0 >= B.y1 + g || B.y0 >= A.y1 + g) return false;
+  const dx = B.c[0] - A.c[0], dz = B.c[1] - A.c[1];
+  for (const u of [A.ax, A.az, B.ax, B.az]){
+    const ra = A.hx*Math.abs(u[0]*A.ax[0] + u[1]*A.ax[1]) + A.hz*Math.abs(u[0]*A.az[0] + u[1]*A.az[1]);
+    const rb = B.hx*Math.abs(u[0]*B.ax[0] + u[1]*B.ax[1]) + B.hz*Math.abs(u[0]*B.az[0] + u[1]*B.az[1]);
+    if (Math.abs(dx*u[0] + dz*u[1]) >= ra + rb + g) return false;
+  }
+  return true;
+}
+// Where this sign can go (local box on frame F): [x, y], reserved, or null when there's no room. projecting: a blade out from
+// the wall (x across it, z out to `out`). On a wall face (SIGN_FACE, set by faceExtras) a sign that doesn't fit tries the
+// other corner or the middle (a panel: also the quarters), a sign's height or two up or down, within the wall: a fixed
+// order, so the same city gets the same signs.
+function signFree(F, x, y, w, h, projecting, out){
+  const off = !SIGN_RES || (typeof window !== 'undefined' && window.__SIGN_RES_OFF);
+  const boxAt = (x, y) => projecting ? signBox(F, x - .05, x + .05, y - h/2 - .02, y + h/2 + .06, 0, out) : signBox(F, x - w/2, x + w/2, y - h/2, y + h/2, 0, .14);
+  const log = (s, p) => { if (typeof window !== 'undefined' && window.__SIGN_LOG) window.__SIGN_LOG.push({ s, blade: !!projecting, plot: p }); };
+  if (off){ log(boxAt(x, y), SIGN_RES); return [x, y]; }
+  const cand = [[x, y]], Fc = SIGN_FACE;
+  if (Fc){ const dy = h + .12, hw = projecting ? .1 : w/2 + .05;
+    const xs = projecting ? [x, -x, 0] : [x, -x, 0, Fc.L/4, -Fc.L/4];
+    for (const yy of [y, y + dy, y - dy, y + 2*dy, y - 2*dy]) for (const xx of xs){ if (xx === x && yy === y) continue;
+      if (Math.abs(xx) + hw > Fc.L/2 + .01 || yy - h/2 < .55 || yy + h/2 > Fc.h - .05) continue; cand.push([xx, yy]); } }
+  for (const [cx, cy] of cand){ const sb = boxAt(cx, cy); if (SIGN_RES.every(r => !signsMeet(sb, r, SIGN_GAP))){ SIGN_RES.push(sb); log(sb, SIGN_RES); return [cx, cy]; } }
+  return null;
+}
 function glyphSign(F,x,y,vertical,projecting){
   if (LUX) return;   // the luxury towers keep to their own gold and ivory lights
   const kind = pick(vertical ? GLYPH_V : GLYPH_H);
   const w = SPR.size[kind][0]/PX, h = SPR.size[kind][1]/PX, col = GLYPH_GLOW[kind];
+  const at = signFree(F, x, y, w, h, projecting, w + .2); if (!at) return;   // (no room: another sign is there)
+  x = at[0]; y = at[1];
   if (projecting){
     const Q = under(F, T(x, y, w/2+.1, PI/2));
     plant(kind, Q, 0, 0, 0, 1, 'c', true);
@@ -227,6 +275,7 @@ function faceExtras(st,F,L,h,lot,firstChunk){
   if (chance(.08*S.green)) plant('w_tangle',F,rnd(-L/3,L/3),rnd(.6,h-.4),.055,rnd(.6,.85),'c',true);
   // signs: blades on the corners, flat panels on the wall
   const nSigns = Math.round((st.glyphs||0)*S.neon*rnd(.4,1.2));
+  SIGN_FACE = { L, h };   // (a sign that doesn't fit where it was rolled may move along this wall: signFree)
   for (let k=0; k<nSigns && lot.signs<7; k++){
     if (h < 1.3) break;
     lot.signs++;
@@ -235,6 +284,7 @@ function faceExtras(st,F,L,h,lot,firstChunk){
     else if (r < .7 && L > 1.1) glyphSign(F, rnd(-L/3,L/3), rnd(1.1,h-.4), chance(.4), false);
     else if (L > 1.1) iconSign(st, F, rnd(-L/4,L/4), rnd(1.2,h-.45), chance(.4));
   }
+  SIGN_FACE = null;
   if (chance(st.strips||0)){
     const m = pick(st.neonMats);
     box(m, F, 0, h-.03, .07, L+.06, .035, .035);

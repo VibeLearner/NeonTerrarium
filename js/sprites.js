@@ -533,6 +533,7 @@ const NEON_NAME = new Map([[M.neonPink,'pink'],[M.neonCyan,'cyan'],[M.neonAmber,
 function iconSign(st, F, x, y, projecting, k=.62){
   const color = LUX ? 'amber' : NEON_NAME.get(pick(st.neonMats)), kind = `sign_${pick(ICONS[st.cls])}_${color}`;
   const w = SPR.size[kind][0]/PX*k;
+  if (typeof signFree === 'function'){ const at = signFree(F, x, y, w, SPR.size[kind][1]/PX*k, projecting, w + .16); if (!at) return; x = at[0]; y = at[1]; }   // (no room: another sign is there, or it moved along the wall: buildings.js)
   if (projecting){
     const Q = under(F, T(x, y, w/2+.08, PI/2));
     box(M.metalDark, F, x, y+SPR.size[kind][1]/PX*k/2+.03, w/2+.05, .04, .04, w+.12);

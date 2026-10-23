@@ -104,10 +104,12 @@ const FURN = (() => {
     const pk = pickAt(x, y);
     const c = pk && pk.c && !pk.c.mega && pk.kind !== 'plat' && pk.kind !== 'sky' ? pk.c : null;
     if (!c){ F.hov = null; showPick(null, x, y); return; }
-    const rows = homesOf(c);
-    if (!rows.length){ F.hov = { c, rows }; showPick(F.hov, x, y); return; }
-    if (!F.hov || F.hov.c !== c){ F.hov = { c, rows }; F.userFloor = false; try { if (typeof podsResync === 'function') podsResync(c); } catch (e) {} }
-    else F.hov.rows = rows;
+    // (the pod boxes of the building under the pointer are kept for 400 ms: the pointer moves many times a frame over one building)
+    const t = performance.now(), same = F.hov && F.hov.c === c && F.hov.t && t - F.hov.t < 400;
+    const rows = same ? F.hov.rows : homesOf(c);
+    if (!rows.length){ F.hov = { c, rows, t }; showPick(F.hov, x, y); return; }
+    if (!F.hov || F.hov.c !== c){ F.hov = { c, rows, t }; F.userFloor = false; try { if (typeof podsResync === 'function') podsResync(c); } catch (e) {} }
+    else if (!same){ F.hov.rows = rows; F.hov.t = t; }
     if (!F.userFloor){ const py = pk.p ? pk.p.y : rows[0].y; let k = 0; for (let i = 0; i < rows.length; i++) if (rows[i].y <= py + .02) k = i; F.fl = k; }   // (the pod the pointer is on)
     F.fl = clamp(F.fl, 0, rows.length - 1);
     showPick(F.hov, x, y);
@@ -148,9 +150,14 @@ const FURN = (() => {
     canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); dragging = true;
     act = e.button === 0 || e.pointerType === 'touch' ? { kind: e.pointerType === 'touch' ? 'touch' : 'sky', x: e.clientX, y: e.clientY, moved: false, furn: true, done: new Set() } : e.button === 2 ? { kind: 'right', x: e.clientX, y: e.clientY, moved: false, furn: true } : { kind: 'rotate' };
   }, { capture: true });
+  let hoverRaf = 0;
   canvas.addEventListener('pointermove', e => {
     if (!F.pick) return;
-    if (!ptrs.has(e.pointerId)){ e.stopImmediatePropagation(); ptrLast = { x: e.clientX, y: e.clientY }; hoverAt(e.clientX, e.clientY); }
+    if (!ptrs.has(e.pointerId)){
+      e.stopImmediatePropagation(); ptrLast = { x: e.clientX, y: e.clientY };
+      // (one pick per frame: several pointer moves land in one frame, and each pick raycasts the city)
+      if (!hoverRaf) hoverRaf = requestAnimationFrame(() => { hoverRaf = 0; if (F.pick && ptrLast) hoverAt(ptrLast.x, ptrLast.y); });
+    }
   }, { capture: true });
   const endP = e => {
     if (!F.pick || !act || !act.furn || !ptrs.has(e.pointerId)) return;

@@ -200,10 +200,12 @@ const TITLE = (() => {
   T._rt = () => RT;
   T._hold = () => { shownAt = 1e15; openFrom = null; };
   T._open = () => { openFrom = -1e9; }; T._hour = h => { HOUR = h; }; T._dbg = () => ({ OPEN, sunH, sunW, RTMODE, rt: !!RT, p: RT && ROOM ? lightParams() : null });   // (testing: keep the shutter shut)
+  const furnReady = () => { try { return typeof FURN === 'undefined' || !FURN.warmed || FURN.warmed(); } catch (e) { return true; } };
   const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady); } catch (e) { return true; } };
   let shutR = null, shutCam = null, shutScene = null;
   function drawShutter(now){
-    if (openFrom === null && shutR && now - shownAt > 900 && (cityReady() || now - shownAt > 15000)) openFrom = now + 300;   // (15 s at most: never stuck shut)
+    // the shutter is the loading screen: it opens once the city has loaded and the Furnish page is warm (its shaders compiled), so neither costs anything later
+    if (openFrom === null && shutR && now - shownAt > 900 && ((cityReady() && furnReady()) || now - shownAt > (cityReady() ? 60000 : 15000))) openFrom = now + 300;   // (never stuck shut: 15 s for the city, 60 s with the Furnish warm-up)
     const tt = openFrom === null ? 0 : Math.max(0, Math.min(1, (now - openFrom)/3200)); OPEN = reduced ? (openFrom === null ? 0 : 1) : tt*tt*(3 - 2*tt);
     // the room is dark while it's shut (only what light leaks in, and its own lamps), and the daylight comes up with the plates
     const lit = .3 + .7*Math.pow(OPEN, .8); DIM = lit; if (Math.abs(lit - (drawShutter.lit || 0)) > .004){ drawShutter.lit = lit; const f = lit >= .999 ? '' : 'brightness(' + lit.toFixed(3) + ') saturate(' + (.7 + .3*lit).toFixed(3) + ')'; for (const el of (RTMODE ? [shutCv, stage.querySelector('.t-live')] : [imRoom, imGlass, imOff, shutCv, stage.querySelector('.t-live')])) if (el) el.style.filter = f; }

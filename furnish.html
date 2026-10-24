@@ -14365,12 +14365,20 @@ let acv=null;
 function avgOf(img){try{if(!acv)acv=new OffscreenCanvas(48,48);const x=acv.getContext('2d',{willReadFrequently:true});x.imageSmoothingQuality='high';x.clearRect(0,0,48,48);x.drawImage(img,0,0,48,48);
   const d=x.getImageData(0,0,48,48).data;let R=0,G=0,B=0;const N=48*48;for(let i=0;i<N*4;i+=4){R+=d[i];G+=d[i+1];B+=d[i+2]}R/=N/16;G/=N/16;B/=N/16;
   const lin=v=>{v/=16*255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)};const q=v=>Math.min(7,Math.round(v/16/32));return [Math.max(.02,lin(R)),Math.max(.02,lin(G)),Math.max(.02,lin(B)),''+q(R)+q(G)+q(B)]}catch(e){return null}}
-async function bitmap(img,flip,pm){const p=pm?'premultiply':'none';for(const o of [flip?'flipY':'from-image',flip?'flipY':'none',null]){try{return await createImageBitmap(img,o?{imageOrientation:o,premultiplyAlpha:p}:{premultiplyAlpha:p})}catch(e){}}return createImageBitmap(img)}
+// at most 3 bitmaps are made at once (a whole flush of them used to ask for all that memory together: 'The ImageBitmap could not be allocated'),
+// a failed allocation is retried after a short wait, then tried at half size; a texture that still fails is sent without an image (the flush never throws)
+let bmBusy=0;const bmQ=[];
+async function bitmap(img,flip,pm){if(bmBusy>=3)await new Promise(r=>bmQ.push(r));bmBusy++;
+  try{const p=pm?'premultiply':'none';
+    for(let at=0;at<3;at++){for(const o of [flip?'flipY':'from-image',flip?'flipY':'none',null]){try{return await createImageBitmap(img,o?{imageOrientation:o,premultiplyAlpha:p}:{premultiplyAlpha:p})}catch(e){}}await new Promise(r=>setTimeout(r,40*(at+1)))}
+    for(const o of [flip?'flipY':'from-image',null]){try{return await createImageBitmap(img,Object.assign({resizeWidth:Math.max(1,img.width>>1),resizeHeight:Math.max(1,img.height>>1),resizeQuality:'low',premultiplyAlpha:p},o?{imageOrientation:o}:{}))}catch(e){}}
+    return null}
+  finally{bmBusy--;const r=bmQ.shift();if(r)r()}}
 const TEXK=['wrapS','wrapT','magFilter','minFilter','anisotropy','encoding','generateMipmaps','premultiplyAlpha','unpackAlignment','format','type','mapping','rotation','matrixAutoUpdate','name'];
 function texDef(t,X){const R=X.R;let id=R.tex.get(t);if(id!=null)return id;id=++R.n;R.tex.set(t,id);const d={k:'t',id,p:{},rep:t.repeat.toArray(),off:t.offset.toArray(),cen:t.center.toArray(),flipY:!!t.flipY};
   for(const k of TEXK)if(t[k]!==undefined)d.p[k]=t[k];const img=t.image;
   if(img&&img.width&&img.height&&(typeof img.getContext==='function'||(typeof ImageBitmap!=='undefined'&&img instanceof ImageBitmap))){d.w=img.width;d.h=img.height;d.avg=avgOf(img);
-    X.wait.push(bitmap(img,!!t.flipY,!!t.premultiplyAlpha).then(b=>{d.bm=b;X.tr.push(b)}))}
+    X.wait.push(bitmap(img,!!t.flipY,!!t.premultiplyAlpha).then(b=>{if(b){d.bm=b;X.tr.push(b)}}))}
   else if(img&&img.data&&img.width){const a=img.data.slice();d.raw=[a,img.width,img.height];X.tr.push(a.buffer)}
   X.defs.push(d);return id}
 function matDef(m,X){if(!m)return 0;const R=X.R;let id=R.mat.get(m);if(id!=null)return id;id=++R.n;R.mat.set(m,id);const d={k:'m',id,ty:m.type,p:{}};
@@ -14392,7 +14400,7 @@ function nodeOf(o,X){const n={t:o.isPointLight?'P':o.isLineSegments?'LS':o.isLin
   if(o.children.length)n.c=o.children.map(c=>nodeOf(c,X));return n}
 const plain=v=>{try{return JSON.parse(JSON.stringify(v))}catch(e){return null}};
 function itemOf(it,info,X){const b=info.b,mb=b.markBox;
-  const out={key:it.arch+'#'+it.seed,root:nodeOf(b.g,X),mb:mb&&!mb.isEmpty()?[mb.min.toArray(),mb.max.toArray()]:null,surf:plain(b.surfaces||[])||[],
+  const out={key:it.arch+'#'+it.seed,rootJ:JSON.stringify(nodeOf(b.g,X)),mb:mb&&!mb.isEmpty()?[mb.min.toArray(),mb.max.toArray()]:null,surf:plain(b.surfaces||[])||[],
     f:plain({center:info.center,minZ:info.minZ,wall:!!info.wall,wallOnly:!!info.wallOnly,ceiling:!!info.ceiling,finish:info.finish||null,W:info.W,D:info.D,H:info.H,name:info.name,key:info.key,tiles:info.tiles,box:info.box,role:info.role||'',seats:info.seats||0,cat:info.cat||''})};
   if(info.floorMat)out.fm=matDef(info.floorMat,X);if(info.wallMat)out.wm=matDef(info.wallMat,X);return out}
 async function gen(job,items){const R=reg(job),t0=now();let X={R,defs:[],tr:[],wait:[],items:[]},bt=now();
@@ -14478,7 +14486,7 @@ function assemble(J,it){const mats=new Map();
     if(n.mau===0){o.matrixAutoUpdate=false;o.matrix.fromArray(n.mx)}if(n.ly)o.layers.mask=n.ly;if(n.ud)o.userData=JSON.parse(JSON.stringify(n.ud));
     if(n.lc){o.color.setRGB(n.lc[0],n.lc[1],n.lc[2]);o.intensity=n.li;if(n.ld!==undefined)o.distance=n.ld;if(n.lde!==undefined)o.decay=n.lde;if(n.sh&&o.shadow){const s=o.shadow;s.mapSize.set(n.sh[0],n.sh[1]);s.bias=n.sh[2];s.normalBias=n.sh[3];s.radius=n.sh[4];s.camera.near=n.sh[5];s.camera.far=n.sh[6]}}
     if(n.c)for(const c of n.c)o.add(node(c));return o};
-  const g=node(it.root),mb=new T.Box3();if(it.mb)mb.set(new T.Vector3().fromArray(it.mb[0]),new T.Vector3().fromArray(it.mb[1]));
+  const g=node(it.root||JSON.parse(it.rootJ)),mb=new T.Box3();if(it.mb)mb.set(new T.Vector3().fromArray(it.mb[0]),new T.Vector3().fromArray(it.mb[1]));
   const info=Object.assign({},JSON.parse(JSON.stringify(it.f)),{b:{g,markBox:mb,surfaces:JSON.parse(JSON.stringify(it.surf))},fromWorker:true});if(it.fm)info.floorMat=mat(it.fm);if(it.wm)info.wallMat=mat(it.wm);return info}
 
 /* slices and timing: every main-thread step of an open yields after about 6 ms (a macrotask, so it also runs while the page is hidden);
@@ -14615,7 +14623,7 @@ function stageScene(){if(!B.stage){B.stage=new T.Scene();B.stage.background=null
 function intoStage(s){const st=stageScene();while(s.sc.children.length)st.add(s.sc.children[0]);st.fog=s.sc.fog||null;st.environment=s.sc.environment||null;s.sc=st;return st}
 // build a home from a recipe: shell first, then pieces in slices of about 6 ms (parents before children), their meshes streamed from the worker
 async function loadRecipe(rc,o){o=o||{};if(!rc||!rc.home||!rc.pieces)throw new Error('Not a build recipe');if(!PF.cur)sIn();const pf=pfStart('load'),own=pf.kind==='load';
-  try{while(B.loading)await pwait(sleep(16));B.loading=true;cancelPlace(true);select(null);if(!o.early&&!B.trans)setBusy('Building the home…');
+  try{while(B.loading)await pwait(sleep(16));B.loading=true;cancelPlace(true);select(null);if(o.openEarly&&!o.early&&!o.noCtx){try{o.early=ctxEarly(podOK(rc.home.pod)||podFrom(rc.home.seed||1),rc.home.tier||null)}catch(e){o.early=false}}if(!o.early&&!B.trans)setBusy('Building the home…');
     const list=rc.pieces.slice().sort((a,b)=>depth(rc.pieces,a)-depth(rc.pieces,b));
     let job=o.job||null;if(!job&&WK.ok){try{job=wkGen(itemsOfRecipe(rc,list))}catch(e){job=null}}
     pfStage('dispose');await disposeHome();B.job=job;await yslice();
@@ -15387,7 +15395,7 @@ const EMBED=EMBED0;const EMB={parent:window.parent&&window.parent!==window?windo
 if(EMBED)document.body.dataset.embed='1';
 function post(type,data){if(!EMBED||!EMB.parent)return;try{EMB.parent.postMessage(Object.assign({type,source:'podlab'},data||{}),'*')}catch(e){console.warn('builder: postMessage failed',e)}}
 async function openFromParent(m){clearTimeout(EMB.wait);enterView();while(!started)await frame();if(m.city)ctxCall('setCitySource',m.city);
-  const pod=podOK(m.home);if(m.recipe&&m.recipe.home&&Array.isArray(m.recipe.pieces)){const rc=clone(m.recipe);if(pod)rc.home.pod=pod;await loadRecipe(rc)}else await newHome(m.tier||null,pod||undefined);
+  const pod=podOK(m.home);if(m.recipe&&m.recipe.home&&Array.isArray(m.recipe.pieces)){const rc=clone(m.recipe);if(pod)rc.home.pod=pod;await loadRecipe(rc,{openEarly:true})}else await newHome(m.tier||null,pod||undefined);
   if(m.time==='day'||m.time==='night')hostTime(m.time);if(m.name)B.slotName=String(m.name).slice(0,60);B.dirty=false;status();post('podlab:opened',{pod:B.home.pod})}
 function exitToCity(){post('podlab:exit',{recipe:recipe(),dirty:B.dirty,name:B.slotName||null});B.dirty=false;status()}
 if(EMBED)window.addEventListener('message',e=>{if(!EMB.parent||e.source!==EMB.parent)return;const m=e.data||{};if(typeof m!=='object'||!m.type)return;
@@ -15453,7 +15461,7 @@ async function compareGen(items){if(!await wkStart())return {worker:false,why:WK
     const sa=sig(A.b.g),sb=sig(Bp.b.g);const fa=JSON.stringify([A.center,A.minZ,A.wall,A.wallOnly,A.W,A.D,A.H]),fb=JSON.stringify([Bp.center,Bp.minZ,!!Bp.wall,!!Bp.wallOnly,Bp.W,Bp.D,Bp.H]);
     out.push({key:it.arch+'#'+it.seed,same:JSON.stringify(sa)===JSON.stringify(sb)&&fa===fb,worker:sa,page:sb});L.freeGroup(Bp.b.g)}
   job.release();return {worker:true,n:out.length,mismatches:out.filter(x=>!x.same),ok:out.every(x=>x.same)}}
-window.PodBuilder={version:1,enter:enterView,editPlan,newHome,load:rc=>loadRecipe(rc),recipe,save:saveSlot,loadSlot,slots,undo,redo,setWalls,rotateView,setPitch,select:id=>select(id?{t:'piece',id}:null),
+window.PodBuilder={version:1,enter:enterView,editPlan,newHome,load:(rc,o)=>loadRecipe(rc,o),recipe,save:saveSlot,loadSlot,slots,undo,redo,setWalls,rotateView,setPitch,select:id=>select(id?{t:'piece',id}:null),
   pieces:()=>[...B.recs.values()].map(r=>clone(r)),piece:id=>{const i=B.inst.get(id);return i?{rec:clone(i.rec),kind:i.kind,name:i.name,slots:i.slots.map(s=>({key:s.key,kind:s.kind,orig:s.orig})),lights:i.lights.length,visible:i.pivot.visible,run:i.run}:null},
   openCat,closeFly,items:k=>loadItems(k),itemsDone:k=>!!(ITEMS[k]&&ITEMS[k].done),startPlace:(arch,seed)=>startPlace({id:arch+'#'+seed,arch,seed}),cancel:()=>cancelPlace(),setTool,
   setColor:(id,key,hex)=>{const i=B.inst.get(id);if(!i)return false;const b=pick(i.rec,F_ALL);i.rec.colors[key]=hex;applyColors(i);applyLight(i);pushCmd(cmdUpdate(id,b,pick(i.rec,F_ALL),'Recolor '+i.name));return true},
@@ -15783,12 +15791,20 @@ function flyCam(cam,t){const c=camFor(cam),h=C.city,g=ease(ph(t,'glide')),gz=ph(
   c.updateMatrixWorld(true);return c}
 // the transition's own clock: it runs freely through the city phase, then holds there (a slow drift) until the city is ready, then plays on
 const HOLD=.6,tNow=tr=>tr.hold!=null?tr.hold:tr.vt;
+// lighting hold: from the pod build phase on, while PodRender is still baking the room's light (live bake, then the other work-light state),
+// the hologram plays at a fifth of its speed and, if needed, waits just before the room fades in. The room is drawn under a fully opaque
+// hologram there, so the bake can run flat out without anything showing. Capped so a slow machine never waits more than LCAP.
+const LCAP=5000,LSLOW=.15;
+function lightHold(tr){if(tr.lhDone||tr.skipped)return false;const P=window.PodRender;let w=false;try{w=!!(P&&P.lightPending&&api._prDriving&&api._prDriving()&&P.lightPending())}catch(e){w=false}
+  const t=now();if(!w||(tr.lh0!=null&&t-tr.lh0>LCAP)){if(tr.lh0!=null&&C){C.tl.lightHoldMs=Math.round(t-tr.lh0);C.tl.lightHoldCapped=w}tr.lhDone=true;tr.holding=false;return false}
+  if(tr.lh0==null)tr.lh0=t;tr.holding=true;return true}
 function advance(tr){const t=now(),dt=Math.min(.1,(t-tr.last)/1000);tr.last=t;const ready=C.ready&&C.shown&&!C.pendingHome;
-  if(tr.gate&&(ready||t-tr.t0>25000)){tr.gate=false;C.tl.resolveStart=C.tl.resolve=Math.round(t-C.tl.t0)}if(tr.hold==null)tr.vt=tr.gate?Math.min(tr.vt+dt,HOLD):tr.vt+dt;tr.drift+=dt}
+  if(tr.gate&&(ready||t-tr.t0>25000)){tr.gate=false;C.tl.resolveStart=C.tl.resolve=Math.round(t-C.tl.t0)}if(tr.hold==null)tr.vt=tr.gate?Math.min(tr.vt+dt,HOLD):tr.vt+dt;tr.drift+=dt;
+  if(!tr.rm&&!tr.gate&&tr.hold==null&&!tr.lhDone&&tr.vt>=TL.build[0]&&lightHold(tr))tr.vt=Math.min(tr.vt-dt*(1-LSLOW),TL.resolve[0])}
 function loadFrac(){const src=CITY.state==='ready'?1:CITY.k||0;return clamp(.45*src+.35*(C.prog.build||0)+.15*(C.prog.warm||0)+.05*(C.shown?1:0),0,1)}
 function overlay(R,cam){if(!C||!C.trans||!cam)return;const a0=now(),tr=C.trans;advance(tr);if(C.tl.firstHoloFrame==null)C.tl.firstHoloFrame=Math.round(a0-C.tl.t0);const t=tNow(tr);targets(R);
   const P=C.P.over.uniforms;P.uProg.value=loadFrac();P.uShow.value=tr.gate&&now()-tr.t0>6000?1:0;   // a thin progress line inside the hologram only when loading runs long
-  if(tr.rm){if(tr.gate){drawOver(R,null,1,0);tr.frames.push(now());return}tr.rmT=tr.rmT||now();const a=1-clamp((now()-tr.rmT)/1000/DUR_RM,0,1);if(a<=0)return endTrans();drawOver(R,null,a,0);tr.frames.push(now());return}
+  if(tr.rm){if(tr.gate||lightHold(tr)){drawOver(R,null,1,0);tr.frames.push(now());return}tr.rmT=tr.rmT||now();const a=1-clamp((now()-tr.rmT)/1000/DUR_RM,0,1);if(a<=0)return endTrans();drawOver(R,null,a,0);tr.frames.push(now());return}
   if(t>=DUR)return endTrans();const h=C.city;if(!h||(h.real&&!h.M)){drawOver(R,null,1,0);tr.frames.push(now());return}   // nothing to show yet: the hologram's dark field
   const c=flyCam(cam,t);
   if(!h.real){const U=h.hm.uniforms,sp=ph(t,'sweep');U.uSweep.value=sp>0&&sp<1?lerp(h.top,h.y0+1.2,ease(sp)):-1e4;U.uFloorK.value=sp>=1?1:0;U.uPod.value=ph(t,'pod');U.uTop.value=1-ph(t,'top');U.uK.value=1-.5*ph(t,'resolve');
@@ -15798,7 +15814,7 @@ function overlay(R,cam){if(!C||!C.trans||!cam)return;const a0=now(),tr=C.trans;a
   drawOver(R,C.T.holo.texture,1-ease(ph(t,'resolve')),.003);tr.frames.push(now());C.ovMax=Math.max(C.ovMax,now()-a0)}
 function drawOver(R,tex,a,ca){const P=C.P;P.over.uniforms.t.value=tex||C.blank;P.over.uniforms.a.value=a;P.over.uniforms.ca.value=ca;const ac=R.autoClear;R.autoClear=false;try{quad(R,P.over,null)}finally{R.autoClear=ac}}
 // while the hologram fully covers the frame PodRender skips drawing the home
-function paused(){if(!C||!C.trans)return false;return C.trans.rm?C.trans.gate:tNow(C.trans)<TL.resolve[0]-.15}
+function paused(){if(!C||!C.trans)return false;if(C.trans.holding)return false;return C.trans.rm?C.trans.gate:tNow(C.trans)<TL.resolve[0]-.15}
 function endTrans(){if(!C||!C.trans)return;const tr=C.trans;C.trans=null;api.transitioning=false;removeSkip();const f=tr.frames,d=[];for(let i=1;i<f.length;i++)d.push(f[i]-f[i-1]);d.sort((x,y)=>x-y);
   C.tl.end=Math.round(now()-C.tl.t0);C.tl.longestTaskMs=Math.round(C.longTask||0);C.tl.longestSliceMs=+Math.max(C.slice||0,C.ovMax||0).toFixed(1);C.lastTrans={timeline:Object.assign({},C.tl,{t0:undefined}),frames:f.length,ms:+(now()-tr.t0).toFixed(0),medianMs:d.length?+d[d.length>>1].toFixed(2):null,worstMs:d.length?+d[d.length-1].toFixed(2):null,skipped:!!tr.skipped,reducedMotion:!!tr.rm,path:api._prDriving()?'PodRender':'plain'};
   try{tr.onDone&&tr.onDone()}catch(e){console.warn(e)}tr.resolve(C.lastTrans);wantDraw();if(C.swapAfter){C.swapAfter=false;setTimeout(lateSwap,0)}}
@@ -15895,9 +15911,17 @@ function decodeBlocks(u8,map,box,Q){const out={};let o=0;const s=[box[3]-box[0],
     const col=u8.subarray(o,o+n*3);o+=n*3;const em=u8.subarray(o,o+n);o+=n;const idx=new Uint32Array(ni),end=o+ib;let hw=0;
     for(let t=0;t<ni;t++){let v=0,sh=0,b;do{b=u8[o++];v+=(b&127)*Math.pow(2,sh);sh+=7}while(b&128);idx[t]=v===0?hw++:hw-v}o=end;out[k]={pos,col,em,idx,n}}
   return out}
-async function decodePlot(rec,full){const I=CITY.index;const dz=x=>x&&Object.values(x).some(v=>v&&v.pos);if(dz(rec.full)||dz(rec.coarse)){const F=dz(rec.full)?rec.full:null,Cc=dz(rec.coarse)?rec.coarse:null;return full?(F||Cc||{}):(Cc||F||{})}/* a live source's decoded plot */
-  if(full){const p=CITY.packs[rec.pack];return decodeBlocks(await gunzip(p.subarray(rec.off,rec.off+rec.len)),rec.cls,rec.box,I.Q)}
-  return rec.clen?decodeBlocks(CITY.coarse.subarray(rec.coff,rec.coff+rec.clen),rec.coarse,rec.box,I.Q):{}}
+// the same decode as decodeBlocks, yielding to the frame loop every 8192 vertices / 16384 index values (one big plot used to hold the thread 25 to 30 ms)
+async function decodeBlocksA(u8,map,box,Q,tick){const out={};let o=0;const s=[box[3]-box[0],box[4]-box[1],box[5]-box[2]];
+  for(const k of CLS){const m=map&&map[k];if(!m)continue;const n=m[0],ni=m[1],ib=m[2],pos=new Float32Array(n*3);let q0=0,q1=0,q2=0;
+    for(let i=0;i<n;i++){let z=u8[o]|u8[o+1]<<8;q0+=z&1?-((z+1)>>1):z>>1;z=u8[o+2]|u8[o+3]<<8;q1+=z&1?-((z+1)>>1):z>>1;z=u8[o+4]|u8[o+5]<<8;q2+=z&1?-((z+1)>>1):z>>1;o+=6;
+      pos[i*3]=box[0]+q0/Q*s[0];pos[i*3+1]=box[1]+q1/Q*s[1];pos[i*3+2]=box[2]+q2/Q*s[2];if((i&8191)===8191)await tick()}
+    const col=u8.subarray(o,o+n*3);o+=n*3;const em=u8.subarray(o,o+n);o+=n;const idx=new Uint32Array(ni),end=o+ib;let hw=0;
+    for(let t=0;t<ni;t++){let v=0,sh=0,b;do{b=u8[o++];v+=(b&127)*Math.pow(2,sh);sh+=7}while(b&128);idx[t]=v===0?hw++:hw-v;if((t&16383)===16383)await tick()}o=end;out[k]={pos,col,em,idx,n}}
+  return out}
+async function decodePlot(rec,full,tick){const I=CITY.index;const dz=x=>x&&Object.values(x).some(v=>v&&v.pos);if(dz(rec.full)||dz(rec.coarse)){const F=dz(rec.full)?rec.full:null,Cc=dz(rec.coarse)?rec.coarse:null;return full?(F||Cc||{}):(Cc||F||{})}/* a live source's decoded plot */
+  if(full){const p=CITY.packs[rec.pack];const u=await gunzip(p.subarray(rec.off,rec.off+rec.len));return tick?decodeBlocksA(u,rec.cls,rec.box,I.Q,tick):decodeBlocks(u,rec.cls,rec.box,I.Q)}
+  return rec.clen?(tick?decodeBlocksA:decodeBlocks)(CITY.coarse.subarray(rec.coff,rec.coff+rec.clen),rec.coarse,rec.box,I.Q,tick):{}}
 // cut the slice lo < y < hi out of a block: triangles inside go, triangles across are clipped (the parts below lo and above hi stay)
 function clipBelow(b,lo){const P=b.pos,I=b.idx,NR=b.nrm&&b.nrm.length===b.n*3?b.nrm:null;let keep=new Uint32Array(I.length+1024),nk=0,np=[],nc=[],ne=[],nn=[],n=b.n;const grow=()=>{const k2=new Uint32Array(keep.length*2);k2.set(keep);keep=k2};
   for(let t=0;t<I.length;t+=3){const a=I[t],c=I[t+1],d=I[t+2],ya=P[a*3+1],yc=P[c*3+1],yd=P[d*3+1];
@@ -15964,6 +15988,13 @@ function blockNormals(b){const P=b.pos,I=b.idx,N=new Float32Array(b.n*3);for(let
   // a vertex whose faces cancel (both sides of a thin wall, merged corners of the stand-in) gets 'up', never a zero normal: normalize(0) is NaN in the
   // shader, and one NaN pixel spreads through the blur pyramid into black blocks (round 20)
   for(let i=0;i<N.length;i+=3){const l=Math.hypot(N[i],N[i+1],N[i+2]);if(l>1e-12){N[i]/=l;N[i+1]/=l;N[i+2]/=l}else{N[i]=0;N[i+1]=1;N[i+2]=0}}b.nrm=N;return b}
+// the same normals in pieces of 4096 triangles / 16384 vertices, calling tick() between them so a big plot never holds the thread (round 26)
+async function blockNormalsA(b,tick){const P=b.pos,I=b.idx,N=new Float32Array(b.n*3);
+  for(let t0=0;t0<I.length;t0+=12288){const t1=Math.min(I.length,t0+12288);for(let t=t0;t<t1;t+=3){const a=I[t]*3,c=I[t+1]*3,d=I[t+2]*3;
+    const ux=P[c]-P[a],uy=P[c+1]-P[a+1],uz=P[c+2]-P[a+2],vx=P[d]-P[a],vy=P[d+1]-P[a+1],vz=P[d+2]-P[a+2],nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
+    N[a]+=nx;N[a+1]+=ny;N[a+2]+=nz;N[c]+=nx;N[c+1]+=ny;N[c+2]+=nz;N[d]+=nx;N[d+1]+=ny;N[d+2]+=nz}await tick()}
+  for(let i0=0;i0<N.length;i0+=49152){const i1=Math.min(N.length,i0+49152);for(let i=i0;i<i1;i+=3){const l=Math.hypot(N[i],N[i+1],N[i+2]);if(l>1e-12){N[i]/=l;N[i+1]/=l;N[i+2]/=l}else{N[i]=0;N[i+1]=1;N[i+2]=0}}await tick()}
+  b.nrm=N;return b}
 // 2D convex hull (monotone chain)
 function hull2(P){P=P.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);const lo=[],up=[];
   for(const p of P){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p)}for(let i=P.length-1;i>=0;i--){const p=P[i];while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p)}return lo.slice(0,-1).concat(up.slice(0,-1))}
@@ -16052,8 +16083,8 @@ async function streamReal(o,e,my){const t0=now(),K=CITY.index.consts,FH=K.FH||.9
   const cut=B=>{const o2={};for(const k in B)o2[k]=clipSlice(B[k],y0g+.02,Infinity);return o2};let i=0,grp=[],gv=0,last=now();const glassParts=[],est=Math.max(1,I.cells.length+(I.megas||[]).length);
   while(true){if(C!==my)return null;const L=I.plots;
     if(i<L.length){C.dbgI=i;const rec=L[i++],bx=rec.box,cx=(bx[0]+bx[3])/2,cz=(bx[2]+bx[5])/2,near=Math.hypot(cx-u.cx,cz-u.cz)<NEAR_R+Math.max(bx[3]-bx[0],bx[5]-bx[2])/2;
-      const mine=rec===hrec,B=mine?cut(hp):await decodePlot(rec,near);if(near)city.nearPlots++;else city.farPlots++;if(mine||now()-last>SLICE){sliceEnd(last,mine?'home cut':'plots');await yieldFrame();last=now()}
-      for(const k in B){const bl=B[k];if(!bl||!bl.n)continue;const p={k,b:bl.nrm&&bl.nrm.length===bl.n*3?bl:blockNormals(bl)};if(k==='glass')glassParts.push(p);else{grp.push(p);gv+=bl.n}if(now()-last>SLICE){sliceEnd(last,'normals');await yieldFrame();last=now()}}
+      const mine=rec===hrec,B=mine?cut(hp):await decodePlot(rec,near,async()=>{if(now()-last>SLICE){sliceEnd(last,'decode');await yieldFrame();last=now()}});if(C!==my)return null;if(near)city.nearPlots++;else city.farPlots++;if(mine||now()-last>SLICE){sliceEnd(last,mine?'home cut':'plots');await yieldFrame();last=now()}
+      for(const k in B){const bl=B[k];if(!bl||!bl.n)continue;const nb=bl.nrm&&bl.nrm.length===bl.n*3?bl:await blockNormalsA(bl,async()=>{if(now()-last>SLICE){sliceEnd(last,'normals');await yieldFrame();last=now()}});if(C!==my)return null;const p={k,b:nb};if(k==='glass')glassParts.push(p);else{grp.push(p);gv+=bl.n}if(now()-last>SLICE){sliceEnd(last,'normals');await yieldFrame();last=now()}}
       if(gv>CHUNK){sliceEnd(last,'plots');const g=await geo(grp,false);grp=[];gv=0;if(C!==my)return null;await add(g,false);await nextFrame();last=now()}
       C.prog.build=Math.min(.99,i/est);if(now()-last>SLICE){sliceEnd(last,'plots');await yieldFrame();last=now()}}
     else if(streaming())await cityTick();else break}
@@ -16160,6 +16191,7 @@ function backdropCheck(){if(!C||!C.shown||!C.R)return {shown:false};const t=C.T.
   for(let i=0;i<px.length;i+=16){const l=(px[i]*.2126+px[i+1]*.7152+px[i+2]*.0722)/255;s+=l;if(l>.02)nb++;n++}return {shown:true,meanLuma:+(s/n).toFixed(4),nonBlack:+(nb/n).toFixed(3),res:[w,h],bakes:C.bakes,ready:!!C.ready}}
 const api={enter,setHome,update,skip,exit,dispose(){exit();disposeKit()},warm:prewarm,frame,stats,homes,towers,pods,cityMap,defaultHome,facade,setCitySource,addPlots,progress,cityDone,load:loadCity,backdrop,overlay,paused,covers:false,transitioning:false,active:()=>!!C,_pr:false,_prSeen:0,_prDriving:()=>now()-api._prSeen<250,
   _debug:{warpError,resetWarp(){if(C){C.age={n:0,sum:0,max:0};C.mv={n:0,sum:0,max:0}}const G=window.PodRender&&window.PodRender._debug&&window.PodRender._debug.GT;if(G&&G.samp)G.samp.backdrop=[]},backdropCheck,hold(t){if(C&&C.trans)C.trans.hold=t==null?null:t},state:()=>C,metrics,DUR}};
+api.lightHolding=()=>!!(C&&C.trans&&C.trans.holding);   // PodRender bakes behind the hologram while this is true
 window.PodContext=api;
 // the pack starts loading shortly after the page settles (25 MB); homes() and enter() start it earlier when asked
 setTimeout(()=>{if(CITY.state==='idle')loadCity()},1500)})();
@@ -16181,7 +16213,7 @@ setTimeout(()=>{if(CITY.state==='idle')loadCity()},1500)})();
    format) before the lit view is shown; point lights go through a fixed-size light pool so the light count (and so every shader) never
    changes; shadow maps re-render per light only when something in its reach moves; every rebake is one small slice per frame.
    UI contract: render(dt[,camera]); overlays flagged userData.ui or userData.prHelper stay out of lighting and are drawn on top; picking(true)
-   pauses rebakes; pieces (userData.piece) are merged by material on placement (optimize, sliced) and re-merged on sceneChanged;
+   pauses rebakes; pieces (userData.piece) are merged by material on placement (optimize, sliced) and re-merged on sceneChanged (plain opaque materials that differ only in color become one vertex-colored mesh and one shared material; __prAB.vcMerge=false turns that off);
    setOptions({rung:1..3|'auto', hud, debug:'classes'|null, optimize, time:'day'|'night', workLight, windows, animate}). photo is accepted and
    ignored. Window light: pivots tagged userData.window (userData.blackout optional) get sunlight by day and city spill by night. No WebGL2 or no float targets: classes
    and shadow caps only, drawn with renderer.render. */
@@ -16335,10 +16367,14 @@ function patchB(m,proxy){if(!isPatchable(m))return;if(!proxy){PATCHED.add(m);S.p
    text so the default program cache key (onBeforeCompile.toString()) is unchanged. ---------------- */
 const _snap=new WeakMap();
 function onBuild(m,sh){if(!S)return;const sn={};for(const k in sh){const v=sh[k];if(/Shader$|^uniforms$|^customProgramCacheKey$/.test(k))continue;if(v===null||(typeof v!=='object'&&typeof v!=='function'))sn[k]=v}
-  const tk=m.type+(PATCHED.has(m)?'*':'');const ref=_snap.get(m)||S.lastSnap[tk];_snap.set(m,sn);S.lastSnap[tk]=sn;S.builds++;if(S.inWarm)return;
+  const tk=m.type+(PATCHED.has(m)?'*':'');const ref=_snap.get(m)||S.lastSnap[tk];_snap.set(m,sn);S.lastSnap[tk]=sn;S.builds++;if(S.inWarm&&m.isLineBasicMaterial){const L=S.lineWS||(S.lineWS=[]);if(L.length<60)L.push(sn)}{const k=(S.inWarm?'W:':'')+(S.stage||'?');const b=S.bsF||(S.bsF={});b[k]=(b[k]||0)+1}if(S.inWarm)return;S.buildsPlay=(S.buildsPlay||0)+1;
   const diff=[];if(ref)for(const k in sn)if(ref[k]!==sn[k]&&diff.length<10)diff.push(k+':'+ref[k]+'>'+sn[k]);
-  const ob=S.curObj;const e={frame:S.frame,stage:S.stage||'?',type:m.type,name:m.name||'',cls:m.userData.prClass||'',patched:PATCHED.has(m),object:ob?(ob.name||ob.type)+(ob.parent?' in '+(ob.parent.name||ob.parent.type):'')+' layers '+ob.layers.mask:'',diff:ref?diff.join(' '):'(first build of this type)'};S.syncBuilds.push(e);if(S.syncBuilds.length>40)S.syncBuilds.shift()}
+  const ob=S.curObj;const e={frame:S.frame,stage:S.stage||'?',type:m.type,name:m.name||'',cls:m.userData.prClass||'',patched:PATCHED.has(m),unpatchedSet:S.unpatched?S.unpatched.has(m):null,matReady:!!S.matReady,objWait:ob?!!ob.userData.prWait:null,objUI:ob?S.uiSet.has(ob):null,objVis:ob?ob.visible:null,object:ob?(ob.name||ob.type)+(ob.parent?' in '+(ob.parent.name||ob.parent.type):'')+' layers '+ob.layers.mask:'',diff:ref?diff.join(' '):'(first build of this type)'};if(m.isLineBasicMaterial&&S.lineWS&&S.lineWS.length){let best=null;for(const w of S.lineWS){const d=[];for(const k in sn)if(w[k]!==sn[k])d.push(k+':'+w[k]+'>'+sn[k]);if(!best||d.length<best.length)best=d}e.closestWarm=best.join(' ')}S.syncBuilds.push(e);if(S.syncBuilds.length>40)S.syncBuilds.shift()}
 let _protoOBC=null,_protoOBR=null;
+const GLT=['bufferData','bufferSubData','texImage2D','texSubImage2D','texImage3D','texSubImage3D','readPixels','getProgramParameter','getShaderParameter','getUniformLocation','getActiveUniform','getActiveAttrib','getAttribLocation','finish','flush','getError','isProgram','linkProgram','compileShader','useProgram','bindFramebuffer','clientWaitSync','getSyncParameter','getQueryParameter','copyTexSubImage2D','blitFramebuffer','generateMipmap','drawElements','drawArrays','drawElementsInstanced','drawBuffers','invalidateFramebuffer','framebufferTexture2D','checkFramebufferStatus','getBufferSubData','createProgram','deleteProgram','createTexture','createBuffer'];
+// every GL call that takes more than 4 ms is recorded with its name and the stage it ran in (a call that waits on the GPU process shows up here), reported with each slow frame
+function glTrace(on){const gl=S.gl;if(on){S.glSlow=[];S.glAcc={};S.glWrap=[];for(const n of GLT){const f=gl[n];if(typeof f!=='function'||Object.prototype.hasOwnProperty.call(gl,n))continue;const w=function(){const a=performance.now();const r=f.apply(gl,arguments);const d=performance.now()-a;if(S){const q=S.glAcc;q[n]=(q[n]||0)+d;if(d>4&&S.glSlow.length<10){const o=S.curObj,m=o&&o.material?(Array.isArray(o.material)?o.material[0]:o.material):null;S.glSlow.push([n,+d.toFixed(1),S.stage||'?',o?(o.name||o.type)+'<'+(o.parent?(o.parent.name||o.parent.type):''):'',m?m.type+(PATCHED.has(m)?'*':'')+(o.userData&&o.userData.prWait?' wait':'')+' vis'+(o.visible?1:0)+' L'+o.layers.mask:''])}}return r};gl[n]=w;S.glWrap.push(n)}}
+  else if(S.glWrap){for(const n of S.glWrap)if(gl[n]&&Object.prototype.hasOwnProperty.call(gl,n))delete gl[n];S.glWrap=null}}
 function hookBuilds(on){const P=TH.Material.prototype,O=TH.Object3D.prototype;if(on&&!_protoOBC){_protoOBC=P.onBeforeCompile;const src=_protoOBC.toString();const f=function(sh){onBuild(this,sh)};f.toString=()=>src;f._pr=true;f._proto=true;P.onBeforeCompile=f;
     _protoOBR=O.onBeforeRender;O.onBeforeRender=function(){if(S)S.curObj=this}}
   else if(!on&&_protoOBC){P.onBeforeCompile=_protoOBC;_protoOBC=null;O.onBeforeRender=_protoOBR;_protoOBR=null}}
@@ -16538,6 +16574,8 @@ function layoutProbes(){const P=[];const boxes=[];S.scene.traverse(o=>{if(o.isMe
     for(let j=0;j<nz;j++)for(let i=0;i<nx;i++){const x=R.min[0]+(i+.5)*w/nx,z=R.min[2]+(j+.5)*d/nz;let y=1.1;for(const yy of [1.1,1.75,.55,1.95])if(!inside(x,yy,z)){y=yy;break}if(P.length<MAXPROBES)P.push({x,y,z,room:ri})}});
   S.probes=P;const n=Math.max(1,P.length);S.atlas=new TH.WebGLRenderTarget(6*F,F*n,{type:S.hdrType,depthBuffer:true,minFilter:TH.NearestFilter,magFilter:TH.NearestFilter});S.atlas.scissorTest=true;clearRT(S.atlas);
   const shrt=()=>rt(9,n,{type:TH.FloatType,minFilter:TH.NearestFilter,magFilter:TH.NearestFilter});S.shT=shrt();S.shA=shrt();S.shB=shrt();U.uPRSH.value=S.shA.texture;
+  if(S.spare){for(const x of [S.spare.atlas,S.spare.shT].concat(S.spare.pm||[]))disposeRT(x)}
+  {const a=new TH.WebGLRenderTarget(6*F,F*n,{type:S.hdrType,depthBuffer:true,minFilter:TH.NearestFilter,magFilter:TH.NearestFilter});a.scissorTest=true;clearRT(a);S.spare={atlas:a,shT:shrt(),pm:null,valid:false,state:null,baked:false};S.altJob=null}
   {const d=ROOMT.image.data;d.fill(0);S.rooms.forEach((R,i)=>{if(i>=MAXR)return;d.set([R.min[0],R.min[1],R.min[2],0],(i*3)*4);d.set([R.max[0],R.max[1],R.max[2],0],(i*3+1)*4);d.set([R.grid[0],R.grid[1],R.grid[2],0],(i*3+2)*4)});ROOMT.needsUpdate=true}
   U.uPRNR.value=Math.min(MAXR,S.rooms.length);S.pcam=new TH.PerspectiveCamera(90,1,.05,30);S.pcam.layers.set(LAYER);
   const pr=S.M.proj.uniforms;pr.fF.value=[];pr.fX.value=[];pr.fY.value=[];for(const f of FACES){const Fv=new TH.Vector3(f[0],f[1],f[2]),Uv=new TH.Vector3(f[3],f[4],f[5]),X=new TH.Vector3().crossVectors(Fv,Uv).normalize(),Y=new TH.Vector3().crossVectors(X,Fv).normalize();pr.fF.value.push(Fv);pr.fX.value.push(X);pr.fY.value.push(Y)}
@@ -16547,9 +16585,9 @@ function probeFace(){const q=S.pq[0];if(!q)return false;const p=S.probes[q.i],f=
   c.position.set(p.x,p.y,p.z);c.up.set(f[3],f[4],f[5]);c.lookAt(p.x+f[0],p.y+f[1],p.z+f[2]);c.updateMatrixWorld(true);
   S.atlas.viewport.set(q.f*F,q.i*F,F,F);S.atlas.scissor.set(q.f*F,q.i*F,F,F);S.R.setRenderTarget(S.atlas);S.R.render(S.scene,c);
   if(++q.f>=6){S.pq.shift();S.pqSet.delete(q.i);S.projNeeded=true}return true}
-function project(){const pr=S.M.proj.uniforms;pr.tA.value=S.atlas.texture;quad(S.M.proj,S.shT);S.projNeeded=false;S.lerpN=S.probeFirst&&!S.pq.length?1:30;
-  if(!S.pq.length&&S.probeFirst){S.probeFirst=false;S.probesReady=true}return true}
-function lerpSH(){const k=S.lerpN===1?1:.18;const l=S.M.lerp.uniforms;l.a.value=S.shA.texture;l.b.value=S.shT.texture;l.k.value=k;quad(S.M.lerp,S.shB);const t=S.shA;S.shA=S.shB;S.shB=t;U.uPRSH.value=S.shA.texture;S.lerpN--}
+function project(){const pr=S.M.proj.uniforms;pr.tA.value=S.atlas.texture;quad(S.M.proj,S.shT);S.projNeeded=false;S.lerpK=0;S.lerpN=S.probeFirst&&!S.pq.length?1:30;
+  if(!S.pq.length&&S.probeFirst){S.probeFirst=false;S.probesReady=true;if(!S.liveKey||S.liveKey==='stale')S.liveKey=keyNow()}return true}
+function lerpSH(){const k=S.lerpN===1?1:(S.lerpK||.18);const l=S.M.lerp.uniforms;l.a.value=S.shA.texture;l.b.value=S.shT.texture;l.k.value=k;quad(S.M.lerp,S.shB);const t=S.shA;S.shA=S.shB;S.shB=t;U.uPRSH.value=S.shA.texture;S.lerpN--}
 
 /* ---------------- reflection cubes, one per room, prefiltered by an explicit PMREM slice ---------------- */
 function makeCubes(){S.pmGen=new TH.PMREMGenerator(S.R);S.cubes=S.rooms.map(R=>{const r=new TH.WebGLCubeRenderTarget(64,{type:S.hdrType,generateMipmaps:false,minFilter:TH.LinearFilter});
@@ -16579,14 +16617,15 @@ function texAvg(t){if(!t||!t.image)return [1,1,1];const im=t.image;if(_avg.has(i
 /* ---------------- dirtiness: GI rebakes are sliced; shadows re-render per light, only when something in its reach moved ---------------- */
 function lightsNear(box,r,fn){for(let i=0;i<S.poolN;i++){const p=S.pool[i];if(!p.userData.src)continue;const reach=Math.max(r,p.distance||6);if(!box||box.distanceToPoint(p.position)<reach)fn(p)}}
 function dirtyLight(p,moved){if(moved&&p.castShadow)p.shadow.needsUpdate=true}
-function dirtyBox(box,r,shadowsToo){if(!S.probes)return;
+function dirtyBox(box,r,shadowsToo,noSpare){if(!S.probes)return;const sp=S.spare;if(!box)S.liveKey=keyNow();
+  if(sp&&!noSpare){if(!box||(sp.dd&&sp.dd.length>48)){sp.have=false;sp.valid=false;S.altJob=null;sp.dd=[];S.pendSwap=null}else(sp.dd||(sp.dd=[])).push([box.clone(),r,shadowsToo])}   // a local edit keeps the spare bake and is replayed on the live probes when it swaps in; a global one (time of day, ambient light) makes it unusable
   S.probes.forEach((p,i)=>{if(!box||box.distanceToPoint(_v.set(p.x,p.y,p.z))<r)queueProbe(i)});
   S.cubes.forEach((c2,i)=>{const R=S.rooms[i];if(!box||(box.max.x>R.min[0]-1&&box.min.x<R.max[0]+1&&box.max.z>R.min[2]-1&&box.min.z<R.max[2]+1)){c2.dirty=true;c2.f=0}});
   if(shadowsToo){lightsNear(box,0,p=>{if(p.castShadow)p.shadow.needsUpdate=true});if(S.key&&S.key.castShadow)S.key.shadow.needsUpdate=true}
   S.editT=now();S.photoN=0}
 // color and intensity edits relight GI (sliced) but never re-render shadow maps; position or visibility edits do both
 function lightHash(l){return l.color.r*3.1+l.color.g*5.3+l.color.b*7.7+((l.isHemisphereLight||l.isAmbientLight)&&l.userData.prOrig!=null?l.userData.prOrig:l.intensity)*11.3+(l.visible?23:0)+(l.distance||0)*.7}
-function checkLights(){let changed=false;const all=S.lightSet;for(const l of all){const h=lightHash(l);if(l.userData.__prH!==h){if(l.userData.__prH!==undefined){changed=true;
+function checkLights(){let changed=false;const all=S.lightSet;for(const l of all){const h=lightHash(l);if(l.userData.__prH!==h){if(l.userData.__prH!==undefined&&l.userData.workLight&&S.frame<=(S.altQuiet||0)){l.userData.__prH=h;S.glowDirty=true;continue}if(l.userData.__prH!==undefined){changed=true;
       if(l.isPointLight){l.getWorldPosition(_v);_b.set(_v,_v);dirtyBox(_b,Math.max(2.5,l.distance||5),false)}else dirtyBox(null,0,false)}l.userData.__prH=h}}
   if(changed)S.glowDirty=true;return changed}
 
@@ -16615,7 +16654,7 @@ function warmInit(){const W={ext:S.gl.getExtension('KHR_parallel_shader_compile'
   W.passes=new TH.Scene();W.passesScreen=new TH.Scene();for(const k in S.M){const mesh=new TH.Mesh(QM.geometry,S.M[k]);mesh.visible=false;(k==='comp'||k==='copy'?W.passesScreen:W.passes).add(mesh)}
   W.shCam=new TH.PerspectiveCamera(60,1,.1,10);W.shCam.position.set(0,0,3);W.tiny=new TH.WebGLRenderTarget(1,1);
   W.zScene=new TH.Scene();W.zScene.fog=S.scene.fog;W.zGroup=new TH.Group();W.zScene.add(W.zGroup);W.zAll=[];W.zSigs=new Set();W.zDone=new Set();W.zWait=new Map();
-  W.realQ=new Set();W.queue.push('pmrem','pass','sh0','sh1','sh2','sh3','sh4','sh5','shadow','z');S.scene.traverse(o=>{if(o.isMesh&&!isUI(o))zMark(o)});W.want=ptsFor(RUNGS[G.rung]);W.queue.push('real')}
+  W.realQ=new Set();W.queue.push('pmrem','pass','sh0','sh1','sh2','sh3','sh4','sh5','shadow','z','lines');S.scene.traverse(o=>{if(o.isMesh&&!isUI(o))zMark(o)});W.want=ptsFor(RUNGS[G.rung]);W.queue.push('real')}
 function warmAddSig(o){const W=S.warm;if(o.userData.prZMesh)return false;for(const m of (Array.isArray(o.material)?o.material:[o.material])){if(!m||!m.isMaterial||m.isShaderMaterial)continue;const std=m.isMeshStandardMaterial;if(std&&!m.userData.prClass)classMat(m,hintOf(o));
     const k=matSig(o,m);if(W.sigs.has(k))continue;W.sigs.add(k);const c=m.clone();c.userData=Object.assign({},m.userData);if(std){c.envMap=envFor(m,o)||null;if(c.envMap)c.envMapIntensity=CLASSES[m.userData.prClass].env}if(isPatchable(m))patch(c,true);
     const px=new TH.Mesh(o.geometry,c);px.frustumCulled=false;W.all.push(px);return true}return false}
@@ -16633,18 +16672,18 @@ function warmFix(p){const R=S.R,gl=S.gl;const prog=R.info.programs.find(x=>x.pro
 function progName(p){const x=S.R.info.programs.find(q=>q.program===p);return x?x.name+' '+String(x.cacheKey).slice(0,80):'(released)'}
 function warmStep(){const W=S.warm;if(!W)return;const gl=S.gl,t=now();
   if(W.tex.length){let k=0;while(W.tex.length&&(k<1||now()-t<3)){const tx=W.tex.pop();const pp=S.R.properties.get(tx);if(!pp.__webglInit){S.R.initTexture(tx);k++}}if(k)ev('upload '+k+' tex '+(now()-t).toFixed(1)+'ms')}
-  let fixed=0;for(const p of [...W.pend]){if(!gl.isProgram(p)){W.pend.delete(p);W.pendT.delete(p);W.notes.push('released before link');continue}
-    const age=t-(W.pendT.get(p)||t);let done=W.ext?gl.getProgramParameter(p,W.ext.COMPLETION_STATUS_KHR):false;
+  let fixed=0;const chk=[];const liveP=W.pend.size?new Set(S.R.info.programs.map(x=>x.program)):null;for(const p of [...W.pend]){const c0=now();const isP=liveP.has(p);const c1=now();if(!isP){W.pend.delete(p);W.pendT.delete(p);W.notes.push('released before link');continue}
+    const age=t-(W.pendT.get(p)||t);let done=W.ext?gl.getProgramParameter(p,W.ext.COMPLETION_STATUS_KHR):false;if(chk.length<8)chk.push([+(c1-c0).toFixed(1),+(now()-c1).toFixed(1),done?1:0]);
     if(!done&&fixed<1&&(!W.ext||age>4000)){if(W.ext){const n='forced after '+Math.round(age)+' ms: '+progName(p);W.notes.push(n);console.warn('PodRender warmup: '+n)}done=true}
     if(!done)continue;const a=now();warmFix(p);W.pend.delete(p);W.pendT.delete(p);fixed++;W.log.push(+(now()-a).toFixed(1));ev('link '+(now()-a).toFixed(1)+'ms')}
-  if(W.pend.size)return;
-  if(W.cur&&W.cur.chunk!=null){warmChunk();return}
-  if(W.cur&&W.cur.real){realChunk();return}
+  S.wsec={pend:+(now()-t).toFixed(1),pending:W.pend.size,chk};if(W.pend.size)return;
+  if(W.cur&&W.cur.chunk!=null){const b=now();warmChunk();S.wsec.chunkMs=+(now()-b).toFixed(1);return}
+  if(W.cur&&W.cur.real){const b=now();S.wsec.phase=W.cur.phase||'compile';realChunk();S.wsec.realMs=+(now()-b).toFixed(1);return}
   if(W.cur){W.done[W.cur.job]=true;const zb=W.cur.zb,mg=W.cur.merges,jd=W.cur.job;W.cur=null;
     if(zb)for(const k of zb){W.zDone.add(k);const ws=W.zWait.get(k);if(ws){W.zWait.delete(k);for(const o of ws)if(o.parent)zMark(o)}}
     if(mg){const a=now();for(const e of mg)swapMerge(e);ev('merge swap '+mg.length+' '+(now()-a).toFixed(1)+'ms')}
     if(jd==='pass')fixLists(Object.values(S.M));if(jd==='pmrem')fixLists([S.pmGen._blurMaterial,S.pmGen._cubemapMaterial]);if(jd==='z')fixLists(S.zAll)}
-  const job=W.queue.shift();if(!job){if(!W.finished){W.finished=true;W.ms=now()-W.t0}return}W.cur={job};ev('warm '+job);
+  const job=W.queue.shift();if(!job){if(!W.finished){W.finished=true;W.ms=now()-W.t0}return}W.cur={job};ev('warm '+job);S.wsec.job=job;
   if(job==='real'){const a=now();const underUI=o=>{for(let q=o;q;q=q.parent)if(isUI(q))return true;return false};S.scene.traverse(o=>{if((o.isMesh||o.isLine)&&!o.userData.prZMesh&&!underUI(o))for(const m of matsOf(o))if(m&&isPatchable(m)&&!PATCHED.has(m)){if(m.isMeshStandardMaterial)applyEnv(m,o);patch(m)}});S.unpatched.clear();W.patchMs=+(now()-a).toFixed(1);S.realPend=true;
     const list=[];S.scene.traverse(o=>{if(o.material&&!o.userData.prZMesh)list.push(o)});const ns=[W.want].concat([2,1,0].filter(n=>n!==W.want));S.glow&&list.indexOf(S.glow)<0&&list.push(S.glow);
     realJob(list,ns,()=>{S.matReady=true;S.realPend=false;for(const p of S.pool)if(p.castShadow)p.shadow.needsUpdate=true;if(S.key)S.key.shadow.needsUpdate=true;ev('materials ready')},true)}
@@ -16657,6 +16696,13 @@ function warmStep(){const W=S.warm;if(!W)return;const gl=S.gl,t=now();
   else if(job==='merge'){const list=S.mergeQ.splice(0);W.cur.merges=list;const n=ptsFor(S.cfg),P=S.poolN;warmLights(n,P);W.group.clear();
     for(const e of list)for(const mm of e){const m=mm.material,c=m.clone();c.userData=Object.assign({},m.userData);c.envMap=m.envMap;c.envMapIntensity=m.envMapIntensity;if(PATCHED.has(m))patch(c,true);const px=new TH.Mesh(mm.geometry,c);px.frustumCulled=false;W.keep.push(px);W.group.add(px)}
     W.group.visible=false;warmCompile(()=>{S.R.setRenderTarget(S.hdr);S.R.compile(W.scene,S.camera)});W.group.clear()}
+  else if(job==='lines'){ // plain line programs (window grilles, rails, bunk frames): their keys carry the light and shadow counts, so each shadow-count variant is compiled with the real lights
+    if(!W.lineGeo){const g=new TH.BufferGeometry();g.setAttribute('position',new TH.Float32BufferAttribute([0,0,0,1,0,0],3));g.setAttribute('color',new TH.Float32BufferAttribute([1,1,1,1,1,1],3));W.lineGeo=g}
+    const P=S.poolN,cur=ptsFor(S.cfg),ns=[cur].concat([2,1,0].filter(n=>n!==cur));W.group.clear();
+    for(const o of [{},{vertexColors:true},{transparent:true,opacity:.5},{vertexColors:true,transparent:true,opacity:.5}]){const l=new TH.LineSegments(W.lineGeo,new TH.LineBasicMaterial(o));l.frustumCulled=false;W.keep.push(l);W.group.add(l)}
+    W.group.visible=false;
+    for(const n of ns){warmLights(n,P);warmCompile(()=>{S.R.setRenderTarget(S.hdr);S.R.compile(W.scene,S.camera);S.R.setRenderTarget(null);S.R.compile(W.scene,S.camera)})}
+    warmLights(cur,P);W.group.clear()}
   else if(job==='pass'){warmCompile(()=>{S.R.setRenderTarget(S.hdr);S.R.compile(W.passes,QC);S.R.setRenderTarget(null);S.R.compile(W.passesScreen,QC)})}
   else if(/^sh\d$/.test(job)){const i=+job[2],R=S.R,sc=new TH.Scene(),side=[TH.FrontSide,TH.DoubleSide,TH.BackSide][i%3];const m=new TH.Mesh(QM.geometry,new TH.MeshBasicMaterial({side}));m.castShadow=true;sc.add(m);
     const l=i<3?new TH.PointLight(0xffffff,1,5):new TH.DirectionalLight(0xffffff,1);l.castShadow=true;l.shadow.mapSize.set(16,16);l.position.set(0,0,2);sc.add(l);if(l.target)sc.add(l.target);S.inWarm=true;try{R.setRenderTarget(W.tiny);R.render(sc,W.shCam)}finally{S.inWarm=false;R.setRenderTarget(null)}W.keep.push(m)}
@@ -16682,20 +16728,23 @@ function realChunk(){const W=S.warm,c=W.cur;
   if(c.phase==='pso'){if(c.j<c.real.length){psoBatch(c);return}psoZ();c.phase='done'}
   if(c.phase!=='done'){if(c.i<c.real.length){compileBatch(c);return}fixLists(c.mats);if(c.pso&&c.onFirst){c.phase='pso';c.j=0;psoInit();return}}
   W.done['n'+c.n]=true;if(c.onFirst){const f=c.onFirst;c.onFirst=null;f()}c.phase=null;if(!c.ns.length){c.real=null;return}c.n=c.ns.shift();c.i=0;c.mats=new Set()}
-function compileBatch(c){const R=S.R;const end=Math.min(c.real.length,c.i+120),keep=new Set(c.real.slice(c.i,end));c.i=end;for(const o of keep)for(const m of matsOf(o))if(m)c.mats.add(m);
+// the batch size follows the time the last one took (target about 8 ms a frame): many new programs in one batch used to cost 50 to 80 ms
+function adaptSize(c,key,t0,lo,hi){const dt=now()-t0,n=c[key];c[key]=dt>11?Math.max(lo,n>>1):dt<4?Math.min(hi,Math.ceil(n*1.5)):n;ev('batch '+key+' '+n+' took '+dt.toFixed(1)+'ms')}
+function compileBatch(c){const R=S.R,t0=now();if(!c.csz)c.csz=40;const end=Math.min(c.real.length,c.i+c.csz),keep=new Set(c.real.slice(c.i,end));c.i=end;for(const o of keep)for(const m of matsOf(o))if(m)c.mats.add(m);
   const stash=[];S.scene.traverse(o=>{if(o.material&&!keep.has(o)){stash.push(o,o.material);o.material=null}});
   try{batchState(c,()=>{warmCompile(()=>{R.setRenderTarget(S.hdr);R.compile(S.scene,S.camera)});
       // overlays draw straight to the canvas (sRGB output, tone mapped): their materials are compiled for that target too
       const ui=new Set([...keep].filter(underUI));if(ui.size){for(const o of keep)if(!ui.has(o)){stash.push(o,o.material);o.material=null}warmCompile(()=>{R.setRenderTarget(null);R.compile(S.scene,S.camera)})}})}
-  finally{for(let i=stash.length-2;i>=0;i-=2)stash[i].material=stash[i+1]}}
+  finally{for(let i=stash.length-2;i>=0;i-=2)stash[i].material=stash[i+1];adaptSize(c,'csz',t0,4,120)}}
 function psoInit(){const W=S.warm;if(W.psoRT)return;const c8=!!S.ab.hdr8;
   W.psoRT=[new TH.WebGLRenderTarget(8,8,{type:c8?TH.UnsignedByteType:S.hdrType,encoding:c8?TH.sRGBEncoding:TH.LinearEncoding,samples:S.msaa,depthBuffer:true}),
     new TH.WebGLRenderTarget(8,8,{type:S.hdrType,depthBuffer:true}),new TH.WebGLCubeRenderTarget(4,{type:S.hdrType,generateMipmaps:false})];W.psoCam=new TH.PerspectiveCamera(90,1,.01,100)}
-function psoBatch(c){const R=S.R,W=S.warm;const end=Math.min(c.real.length,c.j+40),keep=new Set(c.real.slice(c.j,end));c.j=end;
+function psoBatch(c){const R=S.R,W=S.warm,t0=now();if(!c.psz)c.psz=12;const end=Math.min(c.real.length,c.j+c.psz),keep=new Set(c.real.slice(c.j,end));c.j=end;
   const hid=[],fc=[];S.scene.traverse(o=>{if(o.material&&!keep.has(o)&&o.visible){o.visible=false;hid.push(o)}});for(const o of keep)if(o.frustumCulled){o.frustumCulled=false;fc.push(o)}
   const m=W.psoCam.layers.mask;S.inWarm=true;S.stage='pipelines';
+  const gk=S.glow&&keep.has(S.glow)?[S.glow.visible,S.glow.geometry.instanceCount]:null;if(gk){S.glow.visible=true;S.glow.geometry.instanceCount=1}   // with no instances nothing is drawn, so the glow pipeline was first built by a real frame (a 40 ms useProgram)
   try{batchState(c,()=>{for(const t of W.psoRT){if(t.isWebGLCubeRenderTarget){W.psoCam.layers.set(LAYER);R.setRenderTarget(t,0)}else{W.psoCam.layers.mask=t===W.psoRT[1]?(1<<LAYER):S.camera.layers.mask;R.setRenderTarget(t)}R.render(S.scene,W.psoCam)}})}
-  finally{S.inWarm=false;W.psoCam.layers.mask=m;R.setRenderTarget(null);for(const o of hid)o.visible=true;for(const o of fc)o.frustumCulled=true}}
+  finally{if(gk){S.glow.visible=gk[0];S.glow.geometry.instanceCount=gk[1]}S.inWarm=false;W.psoCam.layers.mask=m;R.setRenderTarget(null);for(const o of hid)o.visible=true;for(const o of fc)o.frustumCulled=true;adaptSize(c,'psz',t0,2,40)}}
 function psoZ(){const W=S.warm,R=S.R;if(!W.zProxAll||!W.zProxAll.length||!W.psoRT)return;const t=new TH.WebGLRenderTarget(8,8,{format:TH.RedFormat,type:TH.UnsignedByteType,depthBuffer:true});
   W.zGroup.clear();for(const p of W.zProxAll)W.zGroup.add(p);W.zGroup.visible=true;S.inWarm=true;
   try{for(const x of [t,W.psoRT[0]]){R.setRenderTarget(x);R.render(W.zScene,W.psoCam)}}finally{S.inWarm=false;R.setRenderTarget(null);W.zGroup.clear();t.dispose()}}
@@ -16708,27 +16757,45 @@ function clearRT(t){const R=S.R,prev=R.getRenderTarget(),pa=R.getActiveCubeFace(
 function matKey(m){const t=x=>x?x.uuid:'-',h=c=>c?c.getHexString():'-';return [m.type,h(m.color),h(m.emissive),m.emissiveIntensity,m.roughness,m.metalness,t(m.map),t(m.emissiveMap),t(m.normalMap),t(m.roughnessMap),t(m.alphaMap),m.side,m.flatShading,m.vertexColors,m.opacity,m.envMap?t(m.envMap):'-',m.onBeforeCompile&&!m.onBeforeCompile._pr?m.uuid:''].join('|')}
 function attrSig(g){return Object.keys(g.attributes).sort().map(k=>k+g.attributes[k].itemSize).join(',')}
 const isPiece=o=>!!(o.userData&&(o.userData.piece||o.userData.prPieceRoot));
+// vertex-color merging: opaque standard materials with no textures that differ only in color become ONE mesh with a per-vertex color and ONE shared
+// white material (a draw call and a material switch per color is what the GPU process pays for). The key holds everything that shades differently
+// except the color; the shared material per key lives in S.vcMats so a re-merge never creates a new program.
+function vcKey(c){if(S&&S.ab&&S.ab.vcMerge===false)return null;const m=c.material,g=c.geometry;
+  if(m.type!=='MeshStandardMaterial'||m.map||m.emissiveMap||m.normalMap||m.roughnessMap||m.metalnessMap||m.alphaMap||m.aoMap||m.lightMap||m.bumpMap||m.displacementMap||m.vertexColors||m.alphaTest>0||m.wireframe||
+     !m.depthWrite||!m.depthTest||m.polygonOffset||m.blending!==TH.NormalBlending||g.attributes.color||(m.onBeforeCompile&&!m.onBeforeCompile._pr&&m.onBeforeCompile!==TH.Material.prototype.onBeforeCompile))return null;
+  return ['VC',m.userData.prClass||'',m.userData.prHint||'',m.emissive?m.emissive.getHexString():'',m.emissiveIntensity,m.roughness,m.metalness,m.side,m.flatShading,m.opacity,m.fog,m.toneMapped,m.dithering,m.envMap?m.envMap.uuid:'',m.envMapIntensity,
+    S&&S.rooms&&S.rooms.length&&m.userData.prSpecW>0?(bbOf(c).getCenter(_v),roomOfPoint(_v.x,_v.y,_v.z)):'',   // reflective classes take their room's reflection cube, so they never share a material across rooms
+    attrSig(g),c.castShadow,c.receiveShadow,c.layers.mask].join('|')}
+const NOS={};   // (optimize also runs without an attached renderer, in the tests)
+function vcMaterial(key,sample){const H=S||NOS,M=H.vcMats||(H.vcMats=new Map());let vm=M.get(key);if(vm)return vm;vm=sample.clone();vm.color.setRGB(1,1,1);vm.vertexColors=true;vm.userData=Object.assign({},sample.userData);vm.name='prVC';vm.envMap=sample.envMap;vm.envMapIntensity=sample.envMapIntensity;
+  if(S&&PATCHED.has(sample))patch(vm);M.set(key,vm);return vm}
 function optimize(root,immediate){if(!root)return null;if(root.userData.prMerged)unoptimize(root);root.userData.prPieceRoot=true;root.updateMatrixWorld(true);
   const inv=new TH.Matrix4().copy(root.matrixWorld).invert(),groups=new Map();let before=0;
   (function rec(o){for(const c of o.children){if(isPiece(c)||c.userData.prKeep||isUI(c)||!c.visible)continue;
     if(c.isMesh&&!c.isInstancedMesh&&!c.isSkinnedMesh&&!Array.isArray(c.material)&&c.material&&c.geometry&&c.geometry.attributes.position&&c.geometry.attributes.normal&&!c.geometry.morphAttributes.position&&
-       c.material.userData.prClass!=='emissive'&&!c.material.transparent&&!c.children.length){before++;const k=matKey(c.material)+'#'+attrSig(c.geometry)+'#'+c.castShadow;let a=groups.get(k);if(!a)groups.set(k,a=[]);a.push(c)}
+       c.material.userData.prClass!=='emissive'&&!c.material.transparent&&!c.children.length){before++;const vk=vcKey(c);const k=vk?vk:matKey(c.material)+'#'+attrSig(c.geometry)+'#'+c.castShadow;let a=groups.get(k);if(!a)groups.set(k,a=[]);a.push(c)}
     rec(c)}})(root);
   const merged=[];const M=new TH.Matrix4(),N=new TH.Matrix3(),v=new TH.Vector3();
-  for(const list of groups.values()){if(list.length<2)continue;const g0=list[0].geometry,keys=Object.keys(g0.attributes);let nv=0,ni=0;
+  for(const [gk,list] of groups){const vc=gk.startsWith('VC|');if(list.length<2&&!(vc&&S&&S.l2&&S.ab.l2Merge!==false))continue;const g0=list[0].geometry,keys=Object.keys(g0.attributes);let nv=0,ni=0;
     for(const m of list){nv+=m.geometry.attributes.position.count;ni+=m.geometry.index?m.geometry.index.count:m.geometry.attributes.position.count}
-    const geo=new TH.BufferGeometry(),arrs={};for(const k of keys){const s=g0.attributes[k].itemSize;arrs[k]=new Float32Array(nv*s)}const index=nv>65535?new Uint32Array(ni):new Uint16Array(ni);let vo=0,io=0;
+    const geo=new TH.BufferGeometry(),arrs={};for(const k of keys){const s=g0.attributes[k].itemSize;arrs[k]=new Float32Array(nv*s)}if(vc)arrs.color=new Float32Array(nv*3);const index=nv>65535?new Uint32Array(ni):new Uint16Array(ni);let vo=0,io=0;
     for(const m of list){const g=m.geometry,pc=g.attributes.position.count;M.multiplyMatrices(inv,m.matrixWorld);N.getNormalMatrix(M);
+      if(vc){const cl=m.material.color,ca=arrs.color;for(let i=0;i<pc;i++){const q=(vo+i)*3;ca[q]=cl.r;ca[q+1]=cl.g;ca[q+2]=cl.b}}
       for(const k of keys){const at=g.attributes[k],s=at.itemSize,dst=arrs[k];for(let i=0;i<pc;i++){if(k==='position'){v.fromBufferAttribute(at,i).applyMatrix4(M);dst[(vo+i)*3]=v.x;dst[(vo+i)*3+1]=v.y;dst[(vo+i)*3+2]=v.z}
         else if(k==='normal'){v.fromBufferAttribute(at,i).applyMatrix3(N).normalize();dst[(vo+i)*3]=v.x;dst[(vo+i)*3+1]=v.y;dst[(vo+i)*3+2]=v.z}else{dst[(vo+i)*s]=at.getX(i);if(s>1)dst[(vo+i)*s+1]=at.getY(i);if(s>2)dst[(vo+i)*s+2]=at.getZ(i);if(s>3)dst[(vo+i)*s+3]=at.getW(i)}}}
       if(g.index)for(let i=0;i<g.index.count;i++)index[io++]=g.index.getX(i)+vo;else for(let i=0;i<pc;i++)index[io++]=vo+i;vo+=pc}
-    for(const k of keys)geo.setAttribute(k,new TH.BufferAttribute(arrs[k],g0.attributes[k].itemSize));geo.setIndex(new TH.BufferAttribute(index,1));geo.computeBoundingSphere();geo.computeBoundingBox();
-    const mm=new TH.Mesh(geo,list[0].material);mm.castShadow=list[0].castShadow;mm.receiveShadow=list.some(m=>m.receiveShadow);mm.layers.mask=list[0].layers.mask&~(1<<L_Z);mm.userData.prSources=list;mm.userData.prMergedMesh=true;mm.name='prMerged';
+    for(const k of keys)geo.setAttribute(k,new TH.BufferAttribute(arrs[k],g0.attributes[k].itemSize));if(vc)geo.setAttribute('color',new TH.BufferAttribute(arrs.color,3));geo.setIndex(new TH.BufferAttribute(index,1));geo.computeBoundingSphere();geo.computeBoundingBox();
+    const mm=new TH.Mesh(geo,vc?vcMaterial(gk,list[0].material):list[0].material);mm.castShadow=list[0].castShadow;mm.receiveShadow=list.some(m=>m.receiveShadow);mm.layers.mask=list[0].layers.mask&~(1<<L_Z);mm.userData.prSources=list;mm.userData.prMergedMesh=true;mm.name='prMerged';
     mm.userData.prBig=true;mm.visible=false;root.add(mm);mm.updateMatrixWorld(true);merged.push(mm)}
   // staged: the merged meshes stay hidden until their programs are known to exist (warmed in the background), then swap in one step
-  root.userData.prMerged=merged;if(merged.length){if(!immediate&&S&&S.matReady&&S.warm){S.mergeQ.push(merged);if(!S.warm.queue.includes('merge'))S.warm.queue.push('merge')}else swapMerge(merged)}return {meshes:before,merged:merged.length,removed:merged.reduce((a,m)=>a+m.userData.prSources.length,0)-merged.length}}
-function swapMerge(merged){for(const mm of merged){if(!mm.parent)continue;mm.visible=true;for(const m of mm.userData.prSources){m.visible=false;m.userData.prMergedInto=mm}}if(S)S.plDirty=true}
-function unoptimize(root){if(S&&S.mergeQ)S.mergeQ=S.mergeQ.filter(e=>e!==root.userData.prMerged);for(const mm of root.userData.prMerged||[]){for(const m of mm.userData.prSources){m.visible=true;delete m.userData.prMergedInto}if(mm.parent)mm.parent.remove(mm);mm.geometry.dispose()}delete root.userData.prMerged}
+  root.userData.prMerged=merged;if(merged.length){if(!immediate&&S&&S.matReady&&S.warm){
+    // a vertex-color material seen for the first time gets all its shadow-count variants compiled (the 'realx' job) before its merged meshes swap in
+    let vcNew=false;for(const mm of merged){const vm=mm.material;if(vm.name==='prVC'&&!vm.userData.prVCW){vm.userData.prVCW=true;S.warm.realQ.add(mm);vcNew=true}}
+    if(vcNew){const q=S.warm.queue;if(!q.includes('realx')){const i=q.indexOf('merge');q.splice(i>=0?i:q.length,0,'realx')}}
+    S.mergeQ.push(merged);if(!S.warm.queue.includes('merge'))S.warm.queue.push('merge')}else swapMerge(merged)}l2Invalidate(null,'optimize');return {meshes:before,merged:merged.length,removed:merged.reduce((a,m)=>a+m.userData.prSources.length,0)-merged.length}}
+function swapMerge(merged){for(const mm of merged){if(!mm.parent||mm.userData.prL2Mesh)continue;   // room merges ride the same warm job but swap in through l2Step
+    mm.visible=true;for(const m of mm.userData.prSources){m.visible=false;m.userData.prMergedInto=mm}}l2Invalidate(null,'swap');if(S)S.plDirty=true}
+function unoptimize(root){if(S&&S.mergeQ)S.mergeQ=S.mergeQ.filter(e=>e!==root.userData.prMerged);for(const mm of root.userData.prMerged||[]){for(const m of mm.userData.prSources){m.visible=true;delete m.userData.prMergedInto}if(mm.parent)mm.parent.remove(mm);mm.geometry.dispose()}delete root.userData.prMerged;l2Invalidate(null,'unoptimize')}
 function pieceOf(o){for(let p=o;p&&p!==S.scene;p=p.parent)if(isPiece(p))return p;return null}
 function queueOpt(o){if(!S||S.noOpt||!o||!isPiece(o))return;if(!S.optQ.includes(o))S.optQ.push(o)}
 function optStep(immediate){if(S.picking)return false;let n=0;while(S.optQ.length&&n<3){const o=S.optQ.shift();if(inScene(o)&&o.visible!==undefined){optimize(o,immediate);walk(o,false,false,null)}n++}return n>0}
@@ -16736,12 +16803,25 @@ function allPieces(){const out=[];S.root.traverse(o=>{if(o.userData&&o.userData.
 /* ---------------- governor: coarser lighting buffers first, then a lower rung; slow, thermally tolerant hysteresis ----------------
    Down: two consecutive slow 1-second windows (median over 17.5 ms or p95 over 28 ms), at most once per 2 s. Up: GPU under 11.5 ms (or median
    under 14 ms without timers) for a waiting time that doubles (up to 2 minutes) whenever a step up had to be undone within 4 s. */
-const G={rung:1,sub:0,win:[],winT:0,lastChange:0,stable:0,slowN:0,upWait:[0,8e3,8e3,8e3],lastUp:null,ints:new Float32Array(240),ni:0,nInts:0};
-function govern(dt){G.ints[G.ni]=dt;G.ni=(G.ni+1)%G.ints.length;G.nInts=Math.min(G.nInts+1,G.ints.length);if(S.fixed||!S.matReady)return;G.win.push(dt);G.winT+=dt;if(G.winT<1000||G.win.length<10)return;
+const G={settle:0,cpuBound:false,med:0,gpuOk:true,rung:1,sub:0,win:[],winT:0,lastChange:0,stable:0,slowN:0,upWait:[0,8e3,8e3,8e3],lastUp:null,ints:new Float32Array(240),ni:0,nInts:0};
+// The GPU timer on Apple (ANGLE/Metal) spans whole command buffers and picks up waiting time, so it can read far above the real frame interval
+// (22.8 ms at a steady 60 fps). A GPU cannot average more than the frame interval while the rate holds, so such a reading is ignored.
+function gpuTrusted(med){if(GT.total==null)return null;const iv=Math.max(med||0,16.7);return GT.total<=iv*1.1?GT.total:null}
+function govern(dt){G.ints[G.ni]=dt;G.ni=(G.ni+1)%G.ints.length;G.nInts=Math.min(G.nInts+1,G.ints.length);if(S.fixed||!S.matReady)return;
+  // frames while the open, the warm-up or a rebake is still working say nothing about steady cost: no window counts until 3 s after the last of them
+  if((S.warm&&!S.warm.finished)||(S.altT&&now()-S.altT<600)||ctxBusy()||ctxHold()||S.pq.length||S.cubes.some(c=>c.dirty)||S.pmQ.length||S.optQ.length||S.projNeeded||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid))){G.win=[];G.winT=0;G.slowN=0;G.settle=now()+3000;return}
+  if(now()<G.settle){G.win=[];G.winT=0;return}
+  G.win.push(dt);G.winT+=dt;if(G.winT<1000||G.win.length<10)return;
   const w=G.win.sort((a,b)=>a-b),med=w[w.length>>1],p95=w[Math.min(w.length-1,Math.floor(w.length*.95))];G.win=[];G.winT=0;const t=now();
-  if(med>17.5||p95>28){G.slowN++;G.stable=t;if(G.slowN>=2&&t-G.lastChange>2000){G.slowN=0;if(G.lastUp&&t-G.lastUp.t<4000)G.upWait[G.lastUp.to]=Math.min(12e4,G.upWait[G.lastUp.to]*2);G.lastUp=null;
+  if(med>17.5||p95>28){
+    // CPU-bound (draw submission): lighting quality does not buy frame time, so keep it; the CPU side is cut elsewhere (merges, glow cards)
+    const gpu=gpuTrusted(med);G.med=med;G.gpuOk=gpu!=null||GT.total==null;G.cpuBound=!!(S.cpu>10&&(gpu==null||gpu<S.cpu));if(G.cpuBound){G.slowN=0;return}
+    G.slowN++;G.stable=t;if(G.slowN>=2&&t-G.lastChange>2000){G.slowN=0;if(G.lastUp&&t-G.lastUp.t<4000)G.upWait[G.lastUp.to]=Math.min(12e4,G.upWait[G.lastUp.to]*2);G.lastUp=null;
       if(G.sub===0&&RUNGS[G.rung].ts<8){G.sub=1;G.lastChange=t}else if(G.rung<NR){G.sub=0;setRung(G.rung+1)}}return}
-  G.slowN=0;const head=GT.total!=null?GT.total<11.5:med<14;
+  G.slowN=0;G.med=med;const gpu=gpuTrusted(med);G.gpuOk=gpu!=null||GT.total==null;
+  // trusted timer: real headroom. No usable timer (missing, or reading above the frame interval): a frame rate that holds is the cue for a trial step up;
+  // the undo logic below doubles the wait whenever a step has to be taken back, so a wrong trial costs one slow second at most.
+  const head=gpu!=null?gpu<11.5:med<=17.5;
   if(head&&t-G.stable>G.upWait[Math.max(1,G.rung-1)]&&t-G.lastChange>4000){if(G.sub===1){G.sub=0;G.lastChange=t;G.stable=t}else if(G.rung>1&&rungReady(G.rung-1)){G.lastUp={t,to:G.rung-1};setRung(G.rung-1);G.sub=1;G.stable=t}}}
 function setRung(r){r=clamp(r|0,1,NR);if(G.rung!==r){G.rung=r;G.lastChange=now()}}
 const scaleOf=(C,k)=>Math.min(8,C[k]*(G.sub?2:1));
@@ -16822,8 +16902,8 @@ function zMark(o){const W=S.warm;let on=false;if(zOK(o)&&W){const r=o.userData.p
 function zNeedSig(k,geo,mat){const W=S.warm;if(W&&!W.zSigs.has(k)){W.zSigs.add(k);const px=new TH.Mesh(geo,mat);px.frustumCulled=false;W.zAll.push({k,mesh:px});if(!W.queue.includes('z'))W.queue.push('z')}}
 // per-room depth merges: static geometry of each room (pieces, floors and walls; not tiny props) as ONE position-only mesh per face side,
 // rebuilt in the background (2 ms slices) after edits; until a room's merge is valid its objects draw individually
-function zRoomsInit(){S.zRooms=S.rooms.map((R,i)=>({i,valid:false,meshes:[],srcs:[],job:null,chk:0}));S.wallSet=new Set();for(const R of S.rooms)for(const w of R.walls)w.traverse(x=>S.wallSet.add(x))}
-function zRoomInvalidate(i){const Z=S.zRooms;if(!Z)return;for(const r of (i==null?Z:[Z[i]])){if(!r)continue;r.valid=false;r.job=null;for(const s of r.srcs)if(r.meshes.includes(s.o.userData.prZIn))delete s.o.userData.prZIn;r.srcs=[]}}
+function zRoomsInit(){S.zDiag={inv:{},blk:{},steps:0,done:0};S.zRooms=S.rooms.map((R,i)=>({i,valid:false,meshes:[],srcs:[],job:null,chk:0}));S.wallSet=new Set();for(const R of S.rooms)for(const w of R.walls)w.traverse(x=>S.wallSet.add(x))}
+function zRoomInvalidate(i,why){const Z=S.zRooms;if(!Z)return;const D=S.zDiag,w=why||'?';for(const r of (i==null?Z:[Z[i]])){if(!r)continue;if(D)D.inv[w]=(D.inv[w]||0)+1;r.why=w;r.whyT=now();r.valid=false;r.job=null;for(const s of r.srcs)if(r.meshes.includes(s.o.userData.prZIn))delete s.o.userData.prZIn;r.srcs=[]}}
 function zRoomCand(o){if(!o.isMesh||o.isInstancedMesh||o.isSkinnedMesh||Array.isArray(o.material)||o.userData.prZMesh||o.userData.prGlow||!zMatOK(o.material)||o.material.alphaTest>0)return false;
   const g=o.geometry;if(!g||!g.attributes.position||g.morphAttributes.position)return false;return !!o.userData.prBig||S.wallSet.has(o)||meshRadius(o)>=ZMERGE}
 function zRoomsBusy(){return !!(S.zRooms&&!S.picking&&(S.flushing||now()-S.editT>400)&&S.zRooms.some(r=>!r.valid))}
@@ -16840,9 +16920,46 @@ function zRoomStep(){const r=S.zRooms.find(x=>!x.valid);if(!r)return null;const 
   for(const s in J.by){const B=J.by[s];const geo=new TH.BufferGeometry();geo.setAttribute('position',new TH.BufferAttribute(B.pos,3));geo.setIndex(new TH.BufferAttribute(B.idx,1));geo.computeBoundingSphere();
     const side=+s,mat=S.zM[side]||(S.zM[side]=mkZ({side}));const zm=new TH.Mesh(geo,mat);zm.layers.set(L_Z);zm.userData.prZMesh=true;zm.userData.prZSig=side+'|00000';zm.visible=false;zm.matrixAutoUpdate=false;zm.name='prDepthRoom'+r.i;
     S.scene.add(zm);zm.updateMatrixWorld(true);r.meshes.push(zm);zNeedSig(zm.userData.prZSig,geo,mat)}
-  r.srcs=J.list.map(o=>{o.userData.prZIn=r.meshes.find(m=>m.material.side===o.material.side);return {o,k:mwKey(o)}});r.valid=true;r.job=null;return 'depth merge done'}
+  r.srcs=J.list.map(o=>{o.userData.prZIn=r.meshes.find(m=>m.material.side===o.material.side);return {o,k:mwKey(o)}});r.valid=true;r.job=null;S.zDiag.done++;return 'depth merge done'}
 // a few merged sources per frame are re-checked: anything moved or hidden without a sceneChanged makes its room draw per object until rebuilt
-function zRoomCheck(){const Z=S.zRooms;if(!Z)return;for(const r of Z){if(!r.valid||!r.srcs.length)continue;for(let n=0;n<16;n++){r.chk=(r.chk+1)%r.srcs.length;const s=r.srcs[r.chk];if(!s.o.parent||!effVisible(s.o)||Math.abs(mwKey(s.o)-s.k)>1e-4){zRoomInvalidate(r.i);break}}}}
+function zRoomCheck(){const Z=S.zRooms;if(!Z)return;for(const r of Z){if(!r.valid||!r.srcs.length)continue;for(let n=0;n<16;n++){r.chk=(r.chk+1)%r.srcs.length;const s=r.srcs[r.chk];if(!s.o.parent||!effVisible(s.o)||Math.abs(mwKey(s.o)-s.k)>1e-4){zRoomInvalidate(r.i,!s.o.parent?'check:orphan':!effVisible(s.o)?'check:hidden':'check:moved');break}}}}
+// room merges (level 2): the vertex-colored meshes of all pieces in a room that share one material become ONE world-space mesh per room (hundreds of
+// draw calls fewer). They use the same shared materials, so no program is built. Any scene change drops the room merges at once (the pieces' own merged
+// meshes show again) and they are rebuilt in 2 ms slices after the scene has been quiet; a piece that was ever seen hidden (wall cut-aways) stays out.
+const _n3=new TH.Matrix3();
+function l2Init(){S.l2=S.rooms.map((R,i)=>({i,valid:false,meshes:[],srcs:[],job:null,chk:0,stage:null}));S.l2T=now();S.l2Diag={built:0,drops:{}}}
+function l2Drop(r){for(const m of r.meshes){if(m.parent)m.parent.remove(m);m.geometry.dispose()}for(const x of r.srcs){if(x.o.userData.prL2Hid){x.o.visible=true;delete x.o.userData.prL2Hid}}r.meshes=[];r.srcs=[];r.valid=false;r.job=null;r.stage=null}
+function l2Invalidate(i,why){if(!S||!S.l2)return;S.l2T=now();let any=false;for(const r of (i==null?S.l2:[S.l2[i]])){if(!r||!(r.valid||r.job||r.stage))continue;any=true;l2Drop(r)}
+  if(any){const D=S.l2Diag.drops,w=why||'?';D[w]=(D[w]||0)+1;zRoomInvalidate(null,'l2')}}
+const l2Cand=o=>o.isMesh&&o.userData.prMergedMesh&&o.material&&o.material.name==='prVC'&&!o.userData.prL2Hid&&!underUI(o);
+const l2Key=o=>[o.material.uuid,attrSig(o.geometry),o.castShadow,o.receiveShadow,o.layers.mask].join('|');
+function l2Ready(r){return r.stage!=='warm'||!!(S.warm&&!S.mergeQ.length&&!S.warm.queue.includes('merge')&&S.warm.pend.size===0)}
+const l2Todo=r=>!r.valid&&l2Ready(r);
+function l2Busy(){return !!(S.l2&&S.ab.l2Merge!==false&&S.matReady&&S.warm&&S.warm.finished&&!S.picking&&!S.optQ.length&&!S.mergeQ.length&&(S.flushing||(now()-S.editT>1500&&now()-S.l2T>700))&&S.l2.some(l2Todo))}
+function l2Step(){const r=S.l2.find(l2Todo);if(!r)return null;const t0=now();
+  if(r.stage==='warm'){for(const mm of r.meshes)mm.visible=true;for(const x of r.srcs){x.o.userData.prL2Hid=true;x.o.visible=false}r.stage=null;r.valid=true;S.l2Diag.built++;S.plDirty=true;zRoomInvalidate(null,'l2swap');return 'room merge done'}
+  if(!r.job){const list=[];S.scene.traverseVisible(o=>{if(!l2Cand(o))return;const pc=pieceOf(o);if(pc&&pc.userData.prFlaky)return;bbOf(o).getCenter(_v);if(roomOfPoint(_v.x,_v.y,_v.z)===r.i)list.push(o)});
+    const G=new Map();for(const o of list){const k=l2Key(o);let g=G.get(k);if(!g)G.set(k,g={list:[],nv:0,ni:0});const ga=o.geometry;g.list.push(o);g.nv+=ga.attributes.position.count;g.ni+=ga.index?ga.index.count:ga.attributes.position.count}
+    for(const [k,g] of [...G]){if(g.list.length<2){G.delete(k);continue}const g0=g.list[0].geometry;g.keys=Object.keys(g0.attributes);g.arr={};for(const a of g.keys)g.arr[a]=new Float32Array(g.nv*g0.attributes[a].itemSize);g.idx=g.nv>65535?new Uint32Array(g.ni):new Uint16Array(g.ni);g.vo=0;g.io=0}
+    S.root.updateMatrixWorld(true);r.job={groups:[...G.values()],gi:0,li:0,inv:new TH.Matrix4().copy(S.root.matrixWorld).invert()};return 'room merge gather'}
+  const J=r.job;
+  while(J.gi<J.groups.length&&now()-t0<2){const g=J.groups[J.gi];if(J.li>=g.list.length){J.gi++;J.li=0;continue}const o=g.list[J.li++],geo=o.geometry,pc=geo.attributes.position.count;
+    _m4.multiplyMatrices(J.inv,o.matrixWorld);_n3.getNormalMatrix(_m4);const e=_m4.elements,n=_n3.elements;
+    for(const a of g.keys){const at=geo.attributes[a],sz=at.itemSize,dst=g.arr[a],base=g.vo*sz;
+      if(a==='position'){for(let i=0;i<pc;i++){const x=at.getX(i),y=at.getY(i),z=at.getZ(i),q=base+i*3;dst[q]=e[0]*x+e[4]*y+e[8]*z+e[12];dst[q+1]=e[1]*x+e[5]*y+e[9]*z+e[13];dst[q+2]=e[2]*x+e[6]*y+e[10]*z+e[14]}}
+      else if(a==='normal'){for(let i=0;i<pc;i++){const x=at.getX(i),y=at.getY(i),z=at.getZ(i),q=base+i*3;let nx=n[0]*x+n[3]*y+n[6]*z,ny=n[1]*x+n[4]*y+n[7]*z,nz=n[2]*x+n[5]*y+n[8]*z;const l=Math.hypot(nx,ny,nz)||1;dst[q]=nx/l;dst[q+1]=ny/l;dst[q+2]=nz/l}}
+      else dst.set(at.array,base)}
+    if(geo.index){const ix=geo.index;for(let i=0;i<ix.count;i++)g.idx[g.io++]=ix.getX(i)+g.vo}else for(let i=0;i<pc;i++)g.idx[g.io++]=g.vo+i;g.vo+=pc}
+  if(J.gi<J.groups.length)return 'room merge';
+  const srcs=[];for(const g of J.groups){const o0=g.list[0],geo=new TH.BufferGeometry();for(const a of g.keys)geo.setAttribute(a,new TH.BufferAttribute(g.arr[a],o0.geometry.attributes[a].itemSize));geo.setIndex(new TH.BufferAttribute(g.idx,1));geo.computeBoundingSphere();geo.computeBoundingBox();
+    const mm=new TH.Mesh(geo,o0.material);mm.castShadow=o0.castShadow;mm.receiveShadow=o0.receiveShadow;mm.layers.mask=o0.layers.mask;mm.userData.prBig=true;mm.userData.prL2Mesh=true;if(o0.material.userData.prClass)mm.userData.prHint=o0.material.userData.prClass;
+    mm.name='prRoomMerge'+r.i;mm.raycast=()=>{};mm.visible=false;S.root.add(mm);mm.updateMatrixWorld(true);r.meshes.push(mm);
+    for(const o of g.list)srcs.push({o,k:mwKey(o)})}
+  // the merged meshes sit hidden while the merge warm job compiles their programs; the swap happens once that is finished, so no frame ever pays a shader build
+  r.srcs=srcs;r.job=null;r.stage='warm';S.mergeQ.push(r.meshes.slice());if(!S.warm.queue.includes('merge'))S.warm.queue.push('merge');return 'room merge built'}
+// a few sources per frame are re-checked: a piece hidden (wall cut-away), moved or removed without a sceneChanged drops its room's merge, and a hidden piece stays out of later ones
+function l2Check(){const Z=S.l2;if(!Z)return;for(const r of Z){if(!r.valid||!r.srcs.length)continue;for(let n=0;n<8;n++){r.chk=(r.chk+1)%r.srcs.length;const s=r.srcs[r.chk],o=s.o;
+  if(!o.parent){l2Invalidate(r.i,'orphan');break}if(!effVisible(o.parent)){const pc=pieceOf(o);if(pc)pc.userData.prFlaky=1;l2Invalidate(r.i,'hidden');break}if(Math.abs(mwKey(o)-s.k)>1e-4){l2Invalidate(r.i,'moved');break}}}}
 function zPass(early){const R=S.R,cam=S.camera,sc=S.scene;const m=cam.layers.mask,bg=sc.background,ac=R.autoClear;S.stage=early?'prepass':'depth';
   for(const z of S.zAll)z.polygonOffset=early;
   const W=S.warm,zr=S.zRooms||[];for(const r of zr)for(const zm of r.meshes)zm.visible=r.valid&&!!(W&&W.zDone.has(zm.userData.prZSig));
@@ -16954,22 +17071,105 @@ function windowUniforms(){const day=S.time==='day',W=S.windows||[];U.uPRWN.value
     U.uPRWP.value[i].set(w.blackout?1:0,day?.08:.35,w.blackout?.1:1,w.blackout?.6:1)})}
 function windowFrame(dt){if(S.wAnim)U.uPRWT.value=(U.uPRWT.value+Math.min(.1,(dt||16)/1000))%1e4;
   if(S.winDirty&&(S.winRebake||!S.windows||now()-S.editT>300)){windowsScan();S.winRebake=true}
-  if(S.winRebake){S.winRebake=false;windowUniforms();if(S.probes)dirtyBox(null,0,false);S.glowDirty=true;S.histReset=true}}
+  if(S.winRebake){S.winRebake=false;windowUniforms();if(S.probes){const stale=!!S.winStale,why=S.relightWhy;S.winStale=false;S.relightWhy=null;const sp0=S.spare;
+    let how;if(altCan()&&S.ab.deferRelight!==false)how=relight(stale);else{dirtyBox(null,0,false);how='SLOW relight (first bake not finished)'}
+    if(why){S.tog={t:now(),how,why};console.log('[PodRender] '+(why==='time'?'day/night':why==='both'?'day/night + work light':'work light')+' switch: '+how,JSON.stringify({want:keyNow(),onScreen:S.liveKey,spare:sp0&&sp0.have?sp0.key:null,baking:S.altJob?S.altJob.key:null,pq:S.pq.length}))}}S.glowDirty=true;S.histReset=true}}
+
+/* ---------------- instant work light: a spare set of baked lighting for the other state ----------------
+   The probes (SH irradiance) and room reflection cubes are linear in the lights, so each work light state has its own complete bake. The live set is
+   S.atlas/S.shT/S.pmrem; the spare is S.spare (probe atlas, SH target, per-room reflection targets, which state it holds, valid flag). Once the room is
+   idle the spare is baked in the background for the OTHER state (the work-light lamps forced to that state for the capture only), one slice every few
+   frames. Toggling then swaps the atlas and SH target pointers and crossfades the reflection targets over 8 frames, so the walls are lit in about
+   a tenth of a second. Any lighting edit (dirtyBox) invalidates the spare; without a valid spare the toggle falls back to the old sliced rebake. */
+function mkPM(){const t=new TH.WebGLRenderTarget(3*Math.max(64,112),4*64,{magFilter:TH.LinearFilter,minFilter:TH.LinearFilter,generateMipmaps:false,type:TH.HalfFloatType,format:TH.RGBAFormat,encoding:TH.LinearEncoding,depthBuffer:false});
+  t.texture.mapping=TH.CubeUVReflectionMapping;t.texture.name='PMREM.cubeUv';clearRT(t);return t}
+function copyRT(src,dst){const c=S.M.copy.uniforms;c.t.value=src.texture;dst.scissorTest=false;dst.viewport.set(0,0,dst.width,dst.height);quad(S.M.copy,dst)}
+function liveBusy(){return !!(S.pq.length||S.cubes.some(c=>c.dirty||!c.done)||S.pmQ.length||S.pmFade.some(n=>n>0)||S.optQ.length||S.projNeeded||S.lerpN>0||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid)))}
+function altNeed(){const sp=S.spare;if(!altCan()||!S.warm||!S.warm.done.pmrem)return false;const tkey=S.pendSwap?S.pendSwap.key:keyOf(S.time,!S.workLight);return !(sp.have&&sp.key===tkey)}
+// asked by PodContext while its transition covers the room: is the lighting (live bake, then the spare for the other work-light state) still being built?
+function lightPending(){if(!S||!S.post||S.broken||S.ab.lightGate===false)return false;if(!S.matReady)return true;return liveBusy()||!S.probesReady||altNeed()||!!S.pendSwap}
+// behind the hologram nothing is on screen, so the bake runs flat out: up to 6 slices or about 10 ms a frame
+function bakeHidden(){const t0=now(),fr=S.frame;const sl=(kind,fn)=>{const a=now();const r=cw(kind,fn);if(r){const ms=+(now()-a).toFixed(2);ev((typeof r==='string'?r:kind)+' '+ms+'ms');S.slices.push({kind:typeof r==='string'?r:kind,ms,frame:fr});if(S.slices.length>600)S.slices.shift()}return r};
+  let n=0;while(n<6&&now()-t0<10){if(liveBusy()){S.flushing=true;try{work()}finally{S.flushing=false}n++;continue}
+    if(!altNeed()&&!S.pendSwap)break;const k=S.altN||0;altWork(true,sl,true);if((S.altN||0)===k)break;n++}S.hidN=(S.hidN||0)+n}
+function liveSettled(){return !S.pq.length&&!S.cubes.some(c=>c.dirty||!c.done)&&!S.pmQ.length&&!S.projNeeded&&S.lerpN<=0&&!S.pmFade.some(n=>n>0)}
+// A lighting state is a key: time of day plus work light ('night|1'). S.liveKey is what the room shows, sp.key what the spare holds (usable when sp.have).
+const keyOf=(time,work)=>time+'|'+(work?1:0),timeOf=k=>k?k.split('|')[0]:null;
+// a bake already running for the right time of day is kept even when the work light changed since: it swaps in first (the time of day is the
+// bigger difference), then a one-pass bake fixes the work light. Restarting on every switch could otherwise starve it while someone keeps switching.
+function keepNear(A){return !!(A&&timeOf(A.key)===S.time&&timeOf(S.liveKey)!==S.time&&A.key!==S.liveKey)}
+function keyNow(){return keyOf(S.time,S.workLight)}
+// swap the spare in when it holds the wanted state. The live bake is parked in its place (it becomes the spare) when it is complete; a reflection
+// fade still blending it in does not count against that: its target (pmStage) is the finished live reflection.
+function altSwap(near){const sp=S.spare;if(S.ab.altWork===false||!sp||!S.probesReady||!S.post||!S.pmrem||!sp.have||!sp.key||(sp.key!==keyNow()&&!(near&&timeOf(sp.key)===S.time))||!sp.pm||S.altJob)return false;
+  const baked=!S.pq.length&&!S.projNeeded&&!S.pmQ.length&&!S.cubes.some(c=>c.dirty||!c.done)&&S.liveKey!=null&&S.liveKey!=='stale';
+  for(let i=0;i<S.pmrem.length;i++){const fading=S.pmFade[i]>0,old=S.pmStage[i];S.pmStage[i]=sp.pm[i];sp.pm[i]=old;if(baked&&!fading)copyRT(S.pmrem[i],old);S.pmFade[i]=8}   // the spare reflections become the fade target; the live ones are parked
+  {const a=S.atlas;S.atlas=sp.atlas;sp.atlas=a;const t=S.shT;S.shT=sp.shT;sp.shT=t}
+  const oldKey=S.liveKey;S.liveKey=sp.key;sp.key=baked?oldKey:null;sp.shTime=oldKey&&oldKey!=='stale'?oldKey.split('|')[0]:null;sp.state=!!(oldKey&&oldKey.endsWith('|1'));
+  S.lerpN=Math.max(S.lerpN,10);S.lerpK=.35;sp.valid=baked;sp.have=baked;S.altJob=null;{const dd=sp.dd||[];sp.dd=[];for(const e of dd)dirtyBox(e[0],e[1],e[2],true)}S.altQuiet=S.frame+8;S.altSwaps=(S.altSwaps||0)+1;S.glowDirty=true;S.histReset=true;S.lastSwap=now();return true}
+// every light the work toggle owns (builder.js tags them), forced to one state while a spare slice renders
+// bounce light in a spare slice: 'spare' = the spare's own previous bake (same time of day), 'seed' = the live bounce (same time of day, a toggle is waiting),
+// 'cold' = none on the first pass (a new time of day or a first bake), then the spare's own first pass
+function altCapture(A,pos,fn){const sp=S.spare,on=A.state,L=A.lights,sv=L.map(l=>l.intensity),hs=S.probesReady?.55:1;
+  for(const l of L)l.intensity=l.isHemisphereLight?(on?l.userData.wl0*hs:l.userData.wl0*.06):(on?l.userData.wl0:0);
+  captureMode(true,pos);const sh=U.uPRSH.value;if(A.mode==='spare'||(A.mode==='cold'&&A.pass>0))U.uPRSH.value=sp.shT.texture;else if(A.mode==='cold')U.uPRGI.value=0;
+  const k=ptsFor(S.cfg),ps=[];for(let i=0;i<k;i++){const p=S.pool[i],src=p.userData.src;if(src&&src.userData.workLight){ps.push([p,p.intensity]);p.intensity=on?src.userData.wl0:0}}
+  try{return fn()}finally{for(const e of ps)e[0].intensity=e[1];for(let i=0;i<L.length;i++)L[i].intensity=sv[i];U.uPRSH.value=sh;captureMode(false)}}
+function altCan(){const sp=S.spare;return !!(sp&&S.ab.altWork!==false&&S.probesReady&&S.matReady&&S.post&&S.pmrem)}
+// One decision for every lighting switch (work light, time of day, windows or geometry): what is wanted against what is on screen, in the spare and baking now.
+// Nothing ever rebakes the visible lighting piece by piece here: on screen already -> nothing; in the spare -> instant swap; baking -> keep going; else bake it off screen.
+function relight(stale){const sp=S.spare,want=keyNow(),a=S.altJob;let how;
+  if(stale){dirtyBox(null,0,false);how='REBAKE (furniture or windows changed)'}   // edits keep the live rebake they always had; the spare is dropped
+  else if(want===S.liveKey){S.pendSwap=null;how='BACK (already on screen)'}
+  else if(sp.have&&sp.key===want&&!a&&altSwap()){S.pendSwap=null;how='INSTANT swap'}
+  else{const same=!!(a&&a.key===want),near=!same&&keepNear(a);if(a&&!same&&!near)S.altJob=null;S.pendSwap={to:S.workLight,key:want};how=same?'DEFERRED (already baking)':near?'DEFERRED (finishing the bake for this time of day first)':'DEFERRED (baking off screen)'}
+  ev('relight '+how);return how}
+function finishPend(){const P=S.pendSwap;if(!P)return;S.pendSwap=null;if(P.key!==keyNow())return;
+  if(altSwap())ev('deferred swap '+Math.round(now()-(S.tog?S.tog.t:now()))+'ms');else dirtyBox(null,0,false)}   // could not swap: fall back to a live rebake
+function altWork(idle,sl,force){const sp=S.spare;if(!sp||S.ab.altWork===false||!S.probesReady||!S.matReady||!S.post||S.picking||(S.flushing&&!force)||(!idle&&!force))return;
+  if(!force&&now()-(S.camMoved||0)<(S.pendSwap?500:800))return;   // each probe or cube face is a whole extra scene render: the spare bake only runs while the view is still (a hitch is invisible then)
+  if(S.pq.length||S.projNeeded||S.lerpN>0||S.pmQ.length||S.optQ.length||S.aoDirty||S.cubes.some(c=>c.dirty||!c.done)||S.pmFade.some(n=>n>0)||!S.warm||!S.warm.done.pmrem)return;   // not gated on the whole warm-up (about 29 s): the spare bake changes light intensities only, so it reuses the programs the live bake already built
+  const tw=S.pendSwap?S.pendSwap.to:!S.workLight,tkey=S.pendSwap?S.pendSwap.key:keyOf(S.time,!S.workLight);
+  if(sp.have&&sp.key===tkey){if(S.pendSwap)finishPend();return}
+  const every=S.pendSwap?1:Math.max((S.cpu||0)<8?1:(S.cpu||0)<12?2:4,S.warm.finished?1:2);if(!force&&S.frame%every)return;   // slower where the CPU is already the limit; a waiting switch runs every frame
+  S.altT=now();S.altN=(S.altN||0)+1;let A=S.altJob;
+  if(!A||(A.key!==tkey&&!keepNear(A))){const lights=[];S.scene.traverse(o=>{if(o.isLight&&o.userData.workLight&&o.userData.wl0!=null)lights.push(o)});
+    if(!sp.pm)sp.pm=S.cubes.map(()=>mkPM());if(!S.altCube){S.altCube=new TH.WebGLCubeRenderTarget(64,{type:S.hdrType,generateMipmaps:false,minFilter:TH.LinearFilter});clearRT(S.altCube);S.altCC=new TH.CubeCamera(.05,30,S.altCube);S.altCC.children.forEach(c=>c.layers.set(LAYER))}
+    const liveT=!!(S.liveKey&&S.liveKey!=='stale'&&S.liveKey.split('|')[0]===S.time),mode=sp.baked&&sp.shTime===S.time?'spare':S.pendSwap&&liveT?'seed':'cold';
+    sp.valid=false;sp.have=false;sp.dd=[];sp.key=tkey;sp.state=tw;S.altJob=A={state:tw,key:tkey,lights,mode,phase:0,pass:0,passes:mode==='cold'?2:1,pi:0,f:0,ci:0,cf:0,t0:now()};ev('alt bake start '+tkey+' ('+mode+')');return}
+  if(A.phase===0){const p=S.probes[A.pi];_v2.set(p.x,p.y,p.z);
+    sl('alt probe face',()=>altCapture(A,_v2.clone(),()=>{const f=FACES[A.f],c=S.pcam;c.position.set(p.x,p.y,p.z);c.up.set(f[3],f[4],f[5]);c.lookAt(p.x+f[0],p.y+f[1],p.z+f[2]);c.updateMatrixWorld(true);
+      sp.atlas.viewport.set(A.f*F,A.pi*F,F,F);sp.atlas.scissor.set(A.f*F,A.pi*F,F,F);S.R.setRenderTarget(sp.atlas);S.R.render(S.scene,c);return true}));
+    if(++A.f>=6){A.f=0;if(++A.pi>=S.probes.length){A.pi=0;A.phase=1}}return}
+  if(A.phase===1){sl('alt SH project',()=>{const pr=S.M.proj.uniforms;pr.tA.value=sp.atlas.texture;quad(S.M.proj,sp.shT);return true});sp.baked=true;sp.shTime=A.key.split('|')[0];
+    if(++A.pass<A.passes){A.phase=0}else A.phase=2;return}
+  if(A.phase===2){const c=S.cubes[A.ci];S.altCC.position.copy(c.cam.position);S.altCC.updateMatrixWorld(true);
+    sl('alt cube face',()=>altCapture(A,c.cam.position.clone(),()=>{S.R.setRenderTarget(S.altCube,A.cf);S.R.render(S.scene,S.altCC.children[A.cf]);return true}));
+    if(++A.cf>=6){A.cf=0;A.phase=3}return}
+  if(A.phase===3){sl('alt PMREM',()=>{S.pmGen.fromCubemap(S.altCube.texture,sp.pm[A.ci]);return true});
+    if(++A.ci>=S.cubes.length){sp.valid=true;sp.have=true;S.altJob=null;S.altBakeMs=+(now()-A.t0).toFixed(0);ev('alt bake done '+S.altBakeMs+'ms');if(S.pendSwap){if(sp.key===S.pendSwap.key)finishPend();else if(timeOf(sp.key)===S.time&&timeOf(S.liveKey)!==S.time&&altSwap(true))ev('near swap '+S.liveKey)}}else A.phase=2}}
 
 /* ---------------- frame ---------------- */
 function camKey(c){const a=c.matrixWorld.elements,b=c.projectionMatrix.elements;let h=0;for(let i=0;i<16;i++)h+=a[i]*(i+1.3)+b[i]*(i+7.1);return h}
 // at most one heavy slice per frame (a probe face, a cube face, a PMREM, the contact texture, a depth-merge batch), plus cheap SH passes
-function ctxBusy(){const p=window.PodContext;if(!p||!p.active||!p.active())return false;if(p.transitioning){S.ctxT=now();return true}return S.ctxT&&now()-S.ctxT<500}
-function work(){if(S.picking&&!S.flushing)return;if(!S.flushing&&ctxBusy())return; // probe, cube and PMREM rebakes wait for the PodContext transition (round 19)
+function ctxHold(){const p=window.PodContext;return !!(p&&p.active&&p.active()&&p.lightHolding&&p.lightHolding())}
+function ctxBusy(){const p=window.PodContext;if(!p||!p.active||!p.active())return false;if(p.transitioning){if(ctxHold())return false;S.ctxT=now();return true}return S.ctxT&&now()-S.ctxT<500}
+function zBlk(k){const D=S.zDiag;if(D&&S.zRooms&&S.zRooms.some(r=>!r.valid))D.blk[k]=(D.blk[k]||0)+1}
+function work(){if(S.tog&&!S.tog.done&&!S.pendSwap&&now()-S.tog.t>150&&liveSettled()){S.tog.done=true;console.log('[PodRender] lighting settled after '+Math.round(now()-S.tog.t)+' ms ('+S.tog.how+')')}
+  if(S.picking&&!S.flushing){zBlk('work:picking');return}if(!S.flushing&&ctxBusy()){zBlk('work:ctxBusy');return} // probe, cube and PMREM rebakes wait for the PodContext transition (round 19)
   const C=S.cfg,fr=S.frame,idle=now()-S.editT>1500;
   const sl=(kind,fn)=>{const a=now();const r=cw(kind,fn);if(r){const ms=+(now()-a).toFixed(2);ev((typeof r==='string'?r:kind)+' '+ms+'ms');S.slices.push({kind:typeof r==='string'?r:kind,ms,frame:fr});if(S.slices.length>600)S.slices.shift()}return r};
   if(S.projNeeded)sl('SH project',project);if(S.lerpN>0)lerpSH();
   pmremFade();if(S.pmQ.length&&S.warm&&S.warm.done.pmrem){sl('PMREM',pmremStep);return}
   if(S.aoDirty&&(S.flushing||now()-S.editT>300)){sl('contact AO',aoBake);return}
-  if(zRoomsBusy()){sl('depth merge',zRoomStep);return}
-  const probeOK=!C.static||S.probeFirst||idle;
+  if(l2Busy()){sl('room merge',l2Step);return}
+  if(zRoomsBusy()){S.zDiag.steps++;sl('depth merge',zRoomStep);return}
+  if(S.zRooms&&S.zRooms.some(r=>!r.valid))zBlk(S.picking?'busy:picking':!(S.flushing||now()-S.editT>400)?'busy:editRecent':'busy:other');
+  const still=S.flushing||now()-(S.camMoved||0)>=500;   // a probe or cube face is a whole extra scene render (20 to 25 ms): after the first bake they wait for a still camera, where one long frame is invisible
+  const probeOK=(!C.static||S.probeFirst||idle)&&(S.probeFirst||still);
   if(S.pq.length&&probeOK&&(S.flushing||fr%C.probeEvery===0)){const pp=S.probes[S.pq[0].i];_v2.set(pp.x,pp.y,pp.z);captureMode(true,_v2.clone());sl('probe face',probeFace);captureMode(false);return}
-  if(S.cubes.some(c=>c.dirty)&&(!C.static||idle||S.cubes.some(c=>!c.done))&&(S.flushing||fr%C.cubeEvery===0)){captureMode(true,S.cubes.find(c=>c.dirty).cam.position.clone());sl('cube face',cubeFace);captureMode(false)}}
+  if(S.cubes.some(c=>c.dirty)){if((!C.static||idle||S.cubes.some(c=>!c.done))&&still&&(S.flushing||fr%C.cubeEvery===0)){captureMode(true,S.cubes.find(c=>c.dirty).cam.position.clone());sl('cube face',cubeFace);captureMode(false)}return}
+  altWork(idle,sl)}
 // plain frames while shaders compile use the builder's own lamps (not the light pool), so every program drawn is one the builder compiled
 // before PodRender attached (the pool's 6-light variant of the unpatched materials was a burst of synchronous compiles). Once materials are
 // patched (linear HDR out), a plain frame goes through the composite for tone mapping.
@@ -16980,6 +17180,11 @@ function plainFrame(){const R=S.R;S.stage='plain';if(S.realPend)return; // mater
     try{R.setRenderTarget(S.hdr);R.render(S.scene,S.camera)}finally{U.uPRC8.value=0}
     const cu=S.M.comp.uniforms;cu.tS.value=S.hdr.texture;cu.useL.value=0;cu.useAO.value=0;cu.tB.value=S.blk.texture;cu.bloomK.value=0;cu.tD.value=S.hdr.depthTexture||S.blk.texture;
     cu.tmode.value=[0,1,2,3,4].includes(R.toneMapping)?R.toneMapping:0;cu.uExpo.value=R.toneMappingExposure;cu.srgb.value=R.outputEncoding===TH.sRGBEncoding?1:0;cu.tbg.value=S.scene.background?0:1;backU(cu);quad(S.M.comp,null);return}
+  // the first plain draw of a freshly furnished home built a dozen programs in one frame (a 2 s freeze): they are compiled in the background
+  // (parallel compile) first, and nothing is drawn until they have linked (the page keeps showing what was on screen, the hologram)
+  const W=S.warm;
+  if(W&&!S.plainC){S.plainC=true;plainLights(true);try{warmCompile(()=>{R.setRenderTarget(null);R.compile(S.scene,S.camera)})}finally{plainLights(false)}}
+  if(W&&W.pend.size)return;
   plainLights(true);try{R.setRenderTarget(null);R.render(S.scene,S.camera)}finally{plainLights(false)}}
 const _VP=new TH.Matrix4(),_pInv=new TH.Matrix4(),_scat=[];
 function taa(cur,hist,outRT,pVP,pV,blend,aIsZ,dT){const u=S.M.taa.uniforms;u.tD.value=dT;u.pInv.value.copy(_pInv);u.camW.value.copy(S.camera.matrixWorld);u.res.value.set(S.W,S.H);
@@ -17002,7 +17207,7 @@ function lighting(L,pre){const R=S.R,cam=S.camera,C=L.C,W=S.W,H=S.H,ts=L.ts,ls=L
     S.lbVP.copy(_VP);S.lbV.copy(cam.matrixWorldInverse);S.lbOK=ls}else S.lbOK=0;S.histReset=false;
   S.lres={lb,useL,aoN}}
 function frame(dt){const R=S.R,P=S.prof;S.frame++;matCheck();S.stage='warm';
-  let t=now();warmStep();P.warm=now()-t;sweep();checkLights();zRoomCheck();
+  let t=now();warmStep();P.warm=now()-t;sweep();checkLights();zRoomCheck();l2Check();
   if(S.optQ.length&&!S.picking){const a=now();S.stage='merge';cw('merge',optStep);ev('merge '+(now()-a).toFixed(1)+'ms')}
   let eff=G.rung;while(eff<=NR&&!rungReady(eff))eff++;S.preparing=eff!==G.rung?RUNGS[G.rung].name:null;
   if(eff>NR){S.eff=0;poolSync();if(S.hold)return;t=now();plainFrame();P.main=now()-t;return}
@@ -17016,7 +17221,7 @@ function frame(dt){const R=S.R,P=S.prof;S.frame++;matCheck();S.stage='warm';
   poolSync();
   if(S.picking&&S.frame%4===0&&S.key&&S.key.castShadow)S.key.shadow.needsUpdate=true; // dragged pieces move without sceneChanged: key shadow follows; lamp shadows update on drop
   ensureTargets();const single=A.depth==='single'&&!!S.zRT,c8=!!A.hdr8;
-  t=now();S.stage='shadow maps';cw('shadow pass',shadowPass);S.stage='rebake';if(!S.off.rebake)work();P.work=now()-t;
+  t=now();S.stage='shadow maps';cw('shadow pass',shadowPass);S.stage='rebake';if(!S.off.rebake){if(ctxHold()){if(S.matReady)bakeHidden()}else work()}P.work=now()-t;
   const tmode=S.probesReady?3:0;const ts=scaleOf(C,'ts'),ls=scaleOf(C,'ls');
   U.uPRDbg.value=S.debug==='classes'?1:0;U.uPRGIFb.value=A.fb===false?0:1;U.uPRCheap.value=A.cheap===false?0:1;U.uPRDec.value=c8?1:0;U.uPRNearest.value=C.static?1:0;U.uPRFOK.value=S.aoReady&&!S.off.contact?.6:0;
   S.c8bg=null;if(c8&&S.scene.background&&S.scene.background.isColor){const b=S.scene.background;S.c8bg=(S._c8c||(S._c8c=new TH.Color())).setRGB(b.r/(1+b.r),b.g/(1+b.g),b.b/(1+b.b))}
@@ -17028,9 +17233,9 @@ function frame(dt){const R=S.R,P=S.prof;S.frame++;matCheck();S.stage='warm';
   const bok=S.bufOK===3&&tmode>0;U.uPRGI.value=bok?1:S.probesReady?3:0;U.uPRGIk.value=S.probesReady?1:0;
   glowUpdate(single);
   // main pass (after a depth-only prepass of the big occluders into the same multisampled depth); the glow cards draw last in it
-  t=now();U.uPRC8.value=c8?1:0;const bg=S.scene.background,ac=R.autoClear;if(S.glow)S.glow.visible=S.glowN>0;
-  try{if(A.prepass&&S.warm&&S.warm.done.z){zPass(true);S.scene.background=null;R.autoClear=false}else if(S.c8bg)S.scene.background=S.c8bg;
-    S.stage='main';R.setRenderTarget(S.hdr);cw('main pass',()=>R.render(S.scene,cam))}finally{S.scene.background=bg;R.autoClear=ac;U.uPRC8.value=0;if(S.glow)S.glow.visible=false}
+  t=now();U.uPRC8.value=c8?1:0;const bg=S.scene.background,ac=R.autoClear;if(S.glow)S.glow.visible=S.glowN>0&&!(S.warm&&S.warm.pend.size>0);   // the glow card program is rebuilt per light variant: drawing it while a warm-up link is in flight waited for that link (a 40 to 65 ms useProgram)
+  try{S.mz=0;if(A.prepass&&S.warm&&S.warm.done.z){const zt=now();zPass(true);S.mz=now()-zt;S.scene.background=null;R.autoClear=false}else if(S.c8bg)S.scene.background=S.c8bg;
+    S.stage='main';R.setRenderTarget(S.hdr);const rt=now(),h0=performance.memory?performance.memory.usedJSHeapSize:0;cw('main pass',()=>R.render(S.scene,cam));S.mr=now()-rt;S.mh=performance.memory?+((performance.memory.usedJSHeapSize-h0)/1048576).toFixed(2):0;S.mc=R.info.render.calls;S.mtri=R.info.render.triangles}finally{S.scene.background=bg;R.autoClear=ac;U.uPRC8.value=0;if(S.glow)S.glow.visible=false}
   P.main=now()-t;t=now();
   if(!single)lighting(L,false);
   // bloom: threshold + 4x4 average into 1/4 res in one pass, then 1/8 (and 1/16), upsampled additively; the composite adds it
@@ -17049,6 +17254,12 @@ function drawOverlays(){const hid=S.uiHidden;if(!hid||!hid.length)return;const R
   gtBegin('overlay');try{cw('overlay',()=>R.render(sc,cam))}finally{gtEnd();cam.layers.mask=m;sc.background=bg;R.autoClear=ac;for(const x of on)x.layers.disable(L_UI);hid.length=0}}
 
 /* ---------------- stats ---------------- */
+// where the draw calls come from (visible meshes by class, merged or not, and the pieces with the most): for deciding what to merge next
+function drawMix(){if(!S||!S.scene)return null;const cls={},pieces={};let n=0,merged=0,trans=0,lines=0,shadowCast=0,vcm=0,rmm=0;
+  S.scene.traverseVisible(o=>{if(!(o.isMesh||o.isLine||o.isPoints)||o.userData.prZMesh||(S.uiSet&&S.uiSet.has(o)))return;n++;if(o.isLine)lines++;if(o.userData.prSources)merged++;const m=Array.isArray(o.material)?o.material[0]:o.material;
+    if(m&&m.name==='prVC')vcm++;if(o.userData.prL2Mesh)rmm++;if(m&&m.transparent)trans++;if(o.castShadow)shadowCast++;const c=(m&&m.userData&&m.userData.prClass)||(m&&m.type)||'?';cls[c]=(cls[c]||0)+1;
+    let p=o;while(p&&p!==S.scene&&!(p.name&&p.name.startsWith('piece:')))p=p.parent;const k=p&&p.name?p.name:'(other)';pieces[k]=(pieces[k]||0)+1});
+  return {visibleDraws:n,mergedMeshes:merged,vertexColorMeshes:vcm,roomMergeMeshes:rmm,roomMerges:S.l2?{valid:S.l2.filter(r=>r.valid).length,of:S.l2.length,built:S.l2Diag.built,drops:S.l2Diag.drops}:null,vcMaterials:S.vcMats?S.vcMats.size:0,transparent:trans,lines,castShadow:shadowCast,byClass:cls,topPieces:Object.entries(pieces).sort((a,b)=>b[1]-a[1]).slice(0,12)}}
 function techniques(){const C=S.cfg,t=[];
   if(!S.post)return ['classes','shadow cap '+ptsFor(C),'plain draw'];if(!S.eff)return ['plain draw while shaders compile'];const ts=scaleOf(C,'ts'),ls=scaleOf(C,'ls');
   t.push(U.uPRGI.value===1?'SH probes 1/'+ts:U.uPRGI.value===3?'SH probes':'GI warming');t.push('reflection cubes');t.push('shadow maps x'+(ptsFor(C)+(S.key&&S.key.castShadow?1:0)));
@@ -17056,11 +17267,11 @@ function techniques(){const C=S.cfg,t=[];
   if(S.ab.prepass)t.push('depth prepass');if(S.ab.depth==='single')t.push('single-sample depth');if(S.ab.hdr8)t.push('8-bit main');if(S.debug)t.push('debug '+S.debug);return t}
 function stats(){if(!S)return null;const n=G.nInts;let sum=0;const arr=[];for(let i=0;i<n;i++){const v=G.ints[(G.ni-1-i+G.ints.length)%G.ints.length];if(i<120){sum+=v;arr.push(v)}}const avg=arr.length?sum/arr.length:0;arr.sort((a,b)=>a-b);const p99=arr.length?arr[Math.min(arr.length-1,Math.floor(arr.length*.99))]:0;
   const r1=x=>+(x||0).toFixed(2),P=S.prof,gp=gtMeans();
-  return {fps:avg?1000/avg:0,ms:avg,low1:p99?1000/p99:0,quality:RUNGS[G.rung].name,rung:G.rung,coarse:!!G.sub,effectiveRung:S.eff||0,preparing:S.preparing,techniques:techniques(),drawCalls:S.calls||0,triangles:S.tris||0,cpuMs:S.cpu||0,gpuMs:GT.total,gpuPasses:gp,
+  return {fps:avg?1000/avg:0,ms:avg,low1:p99?1000/p99:0,quality:RUNGS[G.rung].name,rung:G.rung,coarse:!!G.sub,cpuBound:G.cpuBound,gpuTimerTrusted:G.gpuOk,effectiveRung:S.eff||0,preparing:S.preparing,techniques:techniques(),drawCalls:S.calls||0,triangles:S.tris||0,cpuMs:S.cpu||0,gpuMs:GT.total,gpuPasses:gp,
     profile:{warm:r1(P.warm),work:r1(P.work),pre:r1(P.pre),main:r1(P.main),post:r1(P.post)},lightPool:S.poolN,
     warm:S.warm?{proxies:S.warm.all.length,pending:S.warm.pend.size,queue:S.warm.queue.length,done:Object.keys(S.warm.done),parallelExt:!!S.warm.ext,ms:S.warm.ms||null,patchMs:S.warm.patchMs||null,fixMaxMs:S.warm.log.length?Math.max(...S.warm.log):0}:null,
-    ab:Object.assign({},S.ab),syncBuilds:S.syncBuilds.slice(-20),programBuilds:S.builds,drawCheck:S.dc?{checks:S.dc.n,issues:S.dc.issues.slice(-10)}:null,
-    lightBudget:S.cfg?{realtime:Math.min(budget(),POOL),lamps:S.liveCount||0,shadowMaps:ptsFor(S.cfg)}:null,compiles:S.compiles.slice(-10),slowFrames:S.slow.slice(-12),samplerIssues:(S.sampIssues||[]).slice(-10),gpuTimer:gtMeans(),warmNotes:S.warm?S.warm.notes.slice(-10):[],queue:{probes:S.pq?S.pq.length:0,cubes:S.cubes?S.cubes.filter(c=>c.dirty).length:0,voxel:false,depth:S.zRooms?S.zRooms.filter(r=>!r.valid).length:0,merge:S.optQ?S.optQ.length:0},probesReady:!!S.probesReady,post:!!S.post,zRooms:S.zRooms?S.zRooms.map(r=>({valid:r.valid,meshes:r.meshes.length,sources:r.srcs.length})):null,glowCards:S.glowN||0,contactAO:!!S.aoReady,time:S.time,workLight:S.workLight,windows:(S.windows||[]).map(w=>({room:w.room,blackout:w.blackout,w:+(w.r.length()*2/.85).toFixed(2),h:+(w.u.length()*2/.85).toFixed(2)})),rep:Object.assign({},S.rep)}}
+    ab:Object.assign({},S.ab),syncBuilds:S.syncBuilds.slice(-20),programBuilds:S.builds,programBuildsOutsideWarm:S.buildsPlay||0,drawCheck:S.dc?{checks:S.dc.n,issues:S.dc.issues.slice(-10)}:null,
+    lightBudget:S.cfg?{realtime:Math.min(budget(),POOL),lamps:S.liveCount||0,shadowMaps:ptsFor(S.cfg)}:null,compiles:S.compiles.slice(-10),slowFrames:S.slow.slice(-12),samplerIssues:(S.sampIssues||[]).slice(-10),gpuTimer:gtMeans(),warmNotes:S.warm?S.warm.notes.slice(-10):[],queue:{probes:S.pq?S.pq.length:0,cubes:S.cubes?S.cubes.filter(c=>c.dirty).length:0,voxel:false,depth:S.zRooms?S.zRooms.filter(r=>!r.valid).length:0,merge:S.optQ?S.optQ.length:0},probesReady:!!S.probesReady,post:!!S.post,zRooms:S.zRooms?S.zRooms.map(r=>({valid:r.valid,meshes:r.meshes.length,sources:r.srcs.length,why:r.why||null,ageMs:r.whyT?Math.round(now()-r.whyT):null,job:r.job?r.job.i+'/'+r.job.list.length:null})):null,zDiag:S.zDiag||null,drawMix:drawMix(),alt:S.spare?{valid:S.spare.valid,holds:S.spare.state==null?null:(S.spare.state?'work light on':'work light off'),job:S.altJob?{phase:S.altJob.phase,pass:S.altJob.pass+'/'+S.altJob.passes,probe:S.altJob.pi,room:S.altJob.ci}:null,swaps:S.altSwaps||0,lastBakeMs:S.altBakeMs||null}:null,editAgeMs:Math.round(now()-S.editT),picking:!!S.picking,glowCards:S.glowN||0,contactAO:!!S.aoReady,time:S.time,workLight:S.workLight,windows:(S.windows||[]).map(w=>({room:w.room,blackout:w.blackout,w:+(w.r.length()*2/.85).toFixed(2),h:+(w.u.length()*2/.85).toFixed(2)})),rep:Object.assign({},S.rep)}}
 
 /* ---------------- API ---------------- */
 function attach(o){if(S)detach();const R=o.renderer;const gl=R.getContext();
@@ -17068,7 +17279,7 @@ function attach(o){if(S)detach();const R=o.renderer;const gl=R.getContext();
     compiles:[],slow:[],ev:[],editT:now(),camMoved:now(),hudOn:false,fixed:false,picking:false,glowK:{l:.012,e:.06},bloomK:.15,rep:{},emSet:new Set(),lastT:0,pq:[],cubes:[],pmQ:[],optQ:[],budget:1.5,prof:{},unpatched:new Set(),matReady:false,eff:0,hold:!!o.holdWhilePreparing,noOpt:o.optimize===false,
     ab:Object.assign({prepass:true,depth:'single',hdr8:false,lights:0,fb:true,cheap:true,ptShadows:true,cones:true,reflBuf:true,vshadow:true},o.ab||window.__prAB||{}),
     zList:new Set(),zMerged:[],lbVP:new TH.Matrix4(),lbV:new TH.Matrix4(),lbOK:0,histReset:true,zM:{},zTw:new WeakMap(),zAll:[],patchedList:[],lastSnap:{},syncBuilds:[],builds:0,mergeQ:[],prevVP:new TH.Matrix4(),lres:null,stage:''};
-  hookBuilds(true);S.gl2=!!R.capabilities.isWebGL2;S.f32=R.extensions.has('EXT_color_buffer_float');S.post=S.gl2&&(R.extensions.has('EXT_color_buffer_float')||R.extensions.has('EXT_color_buffer_half_float'));S.hdrType=TH.HalfFloatType;
+  hookBuilds(true);glTrace(true);S.gl2=!!R.capabilities.isWebGL2;S.f32=R.extensions.has('EXT_color_buffer_float');S.post=S.gl2&&(R.extensions.has('EXT_color_buffer_float')||R.extensions.has('EXT_color_buffer_half_float'));S.hdrType=TH.HalfFloatType;
   S.msaa=o.msaa!=null?o.msaa:S.post&&gl.getContextAttributes&&gl.getContextAttributes().antialias?4:0;
   S.rooms=(o.rooms||[]).map(r=>({id:r.id,min:r.box.min.slice(),max:r.box.max.slice(),floor:r.floorMesh||null,walls:r.wallMeshes||[]}));
   if(!S.rooms.length){_b.setFromObject(S.root);S.rooms=[{id:0,min:_b.min.toArray(),max:[_b.max.x,Math.max(_b.max.y,2.3),_b.max.z],walls:[]}]}
@@ -17080,17 +17291,18 @@ function attach(o){if(S)detach();const R=o.renderer;const gl=R.getContext();
   poolBuild();
   if(!QS){QS=new TH.Scene();QC=new TH.OrthographicCamera(-1,1,1,-1,0,1);QM=new TH.Mesh(new TH.PlaneGeometry(2,2));QM.frustumCulled=false;QS.add(QM)}
   S.M=makeShaders();makeCubes();
-  zRoomsInit();fullScan(null,true);if(!S.noOpt)for(const p of allPieces())queueOpt(p);layoutProbes();aoInit();glowInit();S.time=o.time||(o.night!=null?(o.night?'night':'day'):homeNight()?'night':'day');S.workLight=o.workLight!==false;S.winDirty=true;S.wAnim=true;S.homeTime=S.time;
+  zRoomsInit();l2Init();fullScan(null,true);if(!S.noOpt)for(const p of allPieces())queueOpt(p);layoutProbes();aoInit();glowInit();S.time=o.time||(o.night!=null?(o.night?'night':'day'):homeNight()?'night':'day');S.workLight=o.workLight!==false;S.winDirty=true;S.wAnim=true;S.homeTime=S.time;
   GT.ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');GT.samp={};GT.q.length=0;GT.cur=null;R.shadowMap.autoUpdate=true;R.setOpaqueSort(opaqueSort);ensureTargets();warmInit();if(window.__prDrawCheck)drawCheck(true);
   return api}
 function detach(){if(!S)return;const R=S.R;try{for(const [l,c,m,au] of S.saved.cast){l.castShadow=c;if(l.shadow){if(m)setMap(l,m);l.shadow.autoUpdate=au}}R.shadowMap.autoUpdate=S.saved.autoUpdate;R.shadowMap.needsUpdate=true;R.setOpaqueSort(null);matUnfreeze();
   S.scene.traverse(o=>{if(o.isMesh&&o.userData.prCast!=null){o.castShadow=o.userData.prCast;delete o.userData.prCast}if(o.isLight&&o.userData.prMask!=null){o.layers.mask=o.userData.prMask;delete o.userData.prMask}});
-  for(const p of S.pool)if(p.parent)p.parent.remove(p);for(const p of allPieces())if(p.userData.prMerged)unoptimize(p);
+  for(const p of S.pool)if(p.parent)p.parent.remove(p);for(const r of S.l2||[])l2Drop(r);S.l2=null;for(const p of allPieces())if(p.userData.prMerged)unoptimize(p);
   for(const m of S.patchedList){if(m.userData.prEI!=null){m.emissiveIntensity=m.userData.prEI;delete m.userData.prEI}if(m.userData.prTM!=null){m.toneMapped=m.userData.prTM;delete m.userData.prTM;m.needsUpdate=true}}for(const o of S.zList)o.layers.disable(L_Z);if(S.dc)drawCheck(false);
   for(const h of S.hemis)if(h.userData.prOrig!=null)h.intensity=h.userData.prOrig;U.uPRGI.value=0;U.uPRGIk.value=0;U.uPRDbg.value=0;U.uPRFOK.value=0;if(S.glow&&S.glow.parent)S.glow.parent.remove(S.glow);for(const r of S.zRooms||[])for(const m of r.meshes)if(m.parent)m.parent.remove(m);
-  if(S.hudEl)S.hudEl.remove();if(S.post){freeTargets();for(const c of S.cubes)c.rt.dispose();for(const p of (S.pmrem||[]).concat(S.pmStage||[],S.pmTmp?[S.pmTmp]:[]))p.dispose();if(S.pmGen)S.pmGen.dispose();for(const k of ['atlas','shT','shA','shB'])disposeRT(S[k]);if(S.warm&&S.warm.psoRT)S.warm.psoRT.forEach(disposeRT)}}catch(e){console.warn(e)}
-  for(const e of GT.q)S.gl.deleteQuery(e.q);GT.q.length=0;GT.cur=null;hookBuilds(false);S=null}
-function sceneChanged(kind,obj){if(!S)return;S.photoN=0;if(kind==='geometry')S.winDirty=true;if(kind!=='camera')S.histReset=true;if(kind==='camera'){if(obj&&obj.isCamera)S.camera=obj;S.camMoved=now();return}if(kind==='walls'){S.editT=now();S.aoDirty=true;zRoomInvalidate();return}
+  if(S.hudEl)S.hudEl.remove();if(S.post){freeTargets();for(const c of S.cubes)c.rt.dispose();for(const p of (S.pmrem||[]).concat(S.pmStage||[],S.pmTmp?[S.pmTmp]:[]))p.dispose();if(S.pmGen)S.pmGen.dispose();for(const k of ['atlas','shT','shA','shB'])disposeRT(S[k]);if(S.spare){for(const x of [S.spare.atlas,S.spare.shT].concat(S.spare.pm||[]))disposeRT(x)}disposeRT(S.altCube);if(S.warm&&S.warm.psoRT)S.warm.psoRT.forEach(disposeRT)}}catch(e){console.warn(e)}
+  if(S.vcMats){for(const m of S.vcMats.values())m.dispose();S.vcMats=null}
+  for(const e of GT.q)S.gl.deleteQuery(e.q);GT.q.length=0;GT.cur=null;hookBuilds(false);glTrace(false);S=null}
+function sceneChanged(kind,obj){if(!S)return;S.photoN=0;if(kind!=='camera'&&kind!=='light')l2Invalidate(null,'sc:'+kind);if(kind==='geometry'){S.winDirty=true;S.winStale=true}if(kind!=='camera')S.histReset=true;if(kind==='camera'){if(obj&&obj.isCamera)S.camera=obj;S.camMoved=now();return}if(kind==='walls'){S.editT=now();S.aoDirty=true;zRoomInvalidate(null,'sc:walls');return}
   if(!S.post){return}
   if(kind==='geometry'||kind==='material'){if(obj){const pc=pieceOf(obj)||(isPiece(obj)?obj:null);if(pc)queueOpt(pc);walk(obj,false,kind==='geometry',null)}
     else if(kind==='geometry'){for(const p of allPieces())if(!p.userData.prMerged)queueOpt(p);sweepAll()}if(kind==='geometry')S.plDirty=true}
@@ -17098,7 +17310,7 @@ function sceneChanged(kind,obj){if(!S)return;S.photoN=0;if(kind==='geometry')S.w
   let box=null;if(obj){box=new TH.Box3().setFromObject(obj);if(box.isEmpty())box=null}
   if(S.probes)dirtyBox(box,3,kind==='geometry');
   if(kind==='geometry')S.aoDirty=true;S.glowDirty=true;
-  if(kind==='geometry'||kind==='material'){if(box&&S.zRooms)S.rooms.forEach((R,i)=>{if(box.max.x>R.min[0]-.5&&box.min.x<R.max[0]+.5&&box.max.z>R.min[2]-.5&&box.min.z<R.max[2]+.5)zRoomInvalidate(i)});else zRoomInvalidate()}}
+  if(kind==='geometry'||kind==='material'){if(box&&S.zRooms)S.rooms.forEach((R,i)=>{if(box.max.x>R.min[0]-.5&&box.min.x<R.max[0]+.5&&box.max.z>R.min[2]-.5&&box.min.z<R.max[2]+.5)zRoomInvalidate(i,'sc:'+kind)});else zRoomInvalidate(null,'sc:'+kind+'-all')}}
 function sweepAll(){walk(S.scene,false,false,null);lightLists()}
 // PodContext (builder/context.js, round 17): the pod's blurred surroundings are composited behind the home; they are drawn by
 // PodContext into its own targets with its own scene and lights, so probes, cubes, shadows and exposure never see them
@@ -17115,7 +17327,7 @@ function compileAsync(scene,cam,target){if(!S||!S.warm||!S.post){const R=S?S.R:n
     if(mine.some(p=>W.pend.has(p))){setTimeout(step,16);return}fixLists(mats);res(true)};setTimeout(step,16)})}
 function render(dt,cam){if(!S)return;if(cam&&cam.isCamera)S.camera=cam;const R=S.R,t=now();const iv=S.lastT?t-S.lastT:16.7;S.lastT=t;S.heap0=performance.memory?performance.memory.usedJSHeapSize:0;const gr=G.rung,gs=G.sub;if(iv<250)govern(iv);if(gr!==G.rung||gs!==G.sub)ev('governor '+gr+(gs?'c':'')+'>'+G.rung+(G.sub?'c':''));
   const ar=R.info.autoReset;R.info.autoReset=false;R.info.reset();const ac=R.autoClear;R.autoClear=true;const prevRT=R.getRenderTarget();
-  S.ev=[];const tex0=R.info.memory.textures,prog0=R.info.programs.length;
+  S.ev=[];S.bsF={};S.wsec=null;if(S.glSlow){S.glSlow.length=0;for(const k in S.glAcc)S.glAcc[k]=0}const tex0=R.info.memory.textures,prog0=R.info.programs.length;
   // the PodContext backdrop runs before the frame's GPU timer; every third frame it gets a timer of its own (GT.samp.backdrop, round 25)
   const pc=S.post&&!S.broken?PCX():null;S.backTex=null;if(pc){pc._pr=true;pc._prSeen=now()}
   if(pc){const gl=S.gl,tq=GT.ext&&!GT.cur&&GT.q.length<6&&GT.fr%3===0?gl.createQuery():null;if(tq)gl.beginQuery(GT.ext.TIME_ELAPSED_EXT,tq);
@@ -17128,34 +17340,35 @@ function render(dt,cam){if(!S)return;if(cam&&cam.isCamera)S.camera=cam;const R=S
   if(S.post){gtFrameEnd();gtPoll()}
   S.calls=R.info.render.calls;S.tris=R.info.render.triangles;R.info.autoReset=ar;R.autoClear=ac;R.setRenderTarget(prevRT);const c=now()-t;S.cpu=S.cpu?S.cpu*.9+c*.1:c;S.lastCpu=c;
   {const pg=R.info.programs.length-prog0;for(let i=S.syncBuilds.length-1;i>=0&&S.syncBuilds[i].frame===S.frame;i--)S.syncBuilds[i].newProgramsThisFrame=pg}S.curObj=null;
-  if(c>50&&S.post){const tx=R.info.memory.textures-tex0,pg=R.info.programs.length-prog0,P=S.prof,r1=x=>+(x||0).toFixed(1);const hp=performance.memory?performance.memory.usedJSHeapSize:0;const e={frame:S.frame,ms:+c.toFixed(1),eff:S.eff,events:S.ev.slice(),newTextures:tx,newPrograms:pg,cpuStages:{warm:r1(P.warm),work:r1(P.work),pre:r1(P.pre),main:r1(P.main),post:r1(P.post),overlay:r1(S.ovMs),hud:r1(S.hudMs)},heapMB:hp?+(hp/1048576).toFixed(1):null,heapDeltaMB:hp&&S.heap0?+((hp-S.heap0)/1048576).toFixed(1):null};S.slow.push(e);if(S.slow.length>30)S.slow.shift();console.warn('PodRender slow frame '+e.ms+' ms: '+JSON.stringify(e))}
+  if(c>50&&S.post){const tx=R.info.memory.textures-tex0,pg=R.info.programs.length-prog0,P=S.prof,r1=x=>+(x||0).toFixed(1);const hp=performance.memory?performance.memory.usedJSHeapSize:0;const e={frame:S.frame,ms:+c.toFixed(1),eff:S.eff,events:S.ev.slice(),newTextures:tx,newPrograms:pg,cpuStages:{warm:r1(P.warm),work:r1(P.work),pre:r1(P.pre),main:r1(P.main),post:r1(P.post),overlay:r1(S.ovMs),hud:r1(S.hudMs)},heapMB:hp?+(hp/1048576).toFixed(1):null,heapDeltaMB:hp&&S.heap0?+((hp-S.heap0)/1048576).toFixed(1):null,warmSec:S.wsec,glSlow:(S.glSlow||[]).slice(),glTop:Object.entries(S.glAcc||{}).filter(x=>x[1]>.5).sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>[x[0],+x[1].toFixed(1)]),mainSec:{z:+(S.mz||0).toFixed(1),render:+(S.mr||0).toFixed(1),calls:S.mc||0,tris:S.mtri||0,heapMain:S.mh||0,glowN:S.glowN||0,pool:S.pool.filter(q=>q.userData.src).length},buildsByStage:Object.assign({},S.bsF),progs:R.info.programs.slice(prog0,prog0+12).map(q=>q.name+' '+String(q.cacheKey).slice(0,90))};S.slow.push(e);if(S.slow.length>30)S.slow.shift();console.warn('PodRender slow frame '+e.ms+' ms: '+JSON.stringify(e))}
   if(S.checkSamplers)samplerCheck();{const a=now();hud();S.hudMs=now()-a}}
 function resize(){if(S&&S.post){S.W=0;ensureTargets()}}
 function summary(cnt){const out={meshes:cnt._meshes||0,tiny:cnt._tiny||0,classes:{},areaM2:{},reflectiveAreaPct:0};let tot=0,refl=0;
   for(const k in cnt)if(k[0]!=='_')out.classes[k]=cnt[k];for(const k in (cnt._area||{})){const a=cnt._area[k];out.areaM2[k]=+a.toFixed(2);tot+=a;if(CLASSES[k].tier==='reflective')refl+=a}
   out.reflectiveAreaPct=tot?+(100*refl/tot).toFixed(1):0;return out}
 function classify(root){const cnt={};if(!S){root.traverse(x=>{if(!x.isMesh)return;(Array.isArray(x.material)?x.material:[x.material]).forEach(m=>{if(m){classMat(m,hintOf(x));cnt[m.userData.prClass]=(cnt[m.userData.prClass]||0)+1}})});return {classes:cnt}}
-  root.updateMatrixWorld(true);walk(root,false,true,cnt);lightLists();S.plDirty=true;if(S.post){if(S.probes){const b=new TH.Box3().setFromObject(root);dirtyBox(b.isEmpty()?null:b,3,true)}S.aoDirty=true;S.glowDirty=true;zRoomInvalidate();queueOpt(root);}return summary(cnt)}
+  root.updateMatrixWorld(true);walk(root,false,true,cnt);lightLists();S.plDirty=true;if(S.post){if(S.probes){const b=new TH.Box3().setFromObject(root);dirtyBox(b.isEmpty()?null:b,3,true)}S.aoDirty=true;S.glowDirty=true;zRoomInvalidate(null,'classify');queueOpt(root);}return summary(cnt)}
 function setOptions(o){if(!S)return;o=o||{};if(o.quality!=null||o.rung!=null){const q=o.rung!=null?o.rung:o.quality;if(q==='auto'){S.fixed=false}else{S.fixed=true;G.sub=0;setRung(typeof q==='number'?q:QMAP[q]||+q||1)}}
   // time of day and the builder's work light (round 16): window light and probes follow (probes and cubes rebake in slices)
-  if(o.time&&o.time!==S.time){S.time=o.time==='day'?'day':'night';S.winDirty=true;S.winRebake=true}if(o.workLight!=null&&!!o.workLight!==S.workLight){S.workLight=!!o.workLight;S.winRebake=true}
-  if(o.windows!==undefined){S.winList=o.windows;S.winDirty=true;S.winRebake=true}if(o.animate!=null)S.wAnim=!!o.animate;
+  if(o.time&&o.time!==S.time){S.time=o.time==='day'?'day':'night';S.winDirty=true;S.winRebake=true;S.relightWhy=S.relightWhy==='work'?'both':'time'}
+  if(o.workLight!=null&&!!o.workLight!==S.workLight){S.workLight=!!o.workLight;S.winRebake=true;S.altQuiet=S.frame+8;S.relightWhy=S.relightWhy==='time'||S.relightWhy==='both'?'both':'work'}
+  if(o.windows!==undefined){S.winList=o.windows;S.winDirty=true;S.winRebake=true;S.winStale=true}if(o.animate!=null)S.wAnim=!!o.animate;
   if(o.glow){Object.assign(S.glowK,o.glow);S.glowDirty=true}if(o.rep)S.rep=Object.assign({},o.rep);if(o.hud!=null){S.hudOn=!!o.hud;hud()}if(o.off)Object.assign(S.off,o.off);if(o.debug!==undefined)S.debug=o.debug||null;if(o.checkSamplers!=null)S.checkSamplers=!!o.checkSamplers;if(o.freeze!=null){S.noFreeze=!o.freeze;if(S.noFreeze)matUnfreeze()}
   // A/B options (fps test): {prepass, depth:'resolve'|'single', hdr8, lights:4|6, fb, cheap, ptShadows, cones, reflBuf, vshadow}
   if(o.ab){const old=Object.assign({},S.ab);Object.assign(S.ab,o.ab);if(old.lights!==S.ab.lights||old.ptShadows!==S.ab.ptShadows){S.assignT=0;if(S.cfg)shadows()}if(old.depth!==S.ab.depth||old.hdr8!==S.ab.hdr8)S.bufOK=0}
   if(o.drawCheck!=null)drawCheck(!!o.drawCheck);
   if(o.optimize!=null){S.noOpt=!o.optimize;if(S.noOpt){for(const p of allPieces())if(p.userData.prMerged)unoptimize(p)}else for(const p of allPieces())queueOpt(p)}}
-function picking(on){if(!S)return;S.picking=!!on;if(on){S.sweepI=1e9;zRoomInvalidate()}else{S.editT=now();S.aoDirty=true}}
+function picking(on){if(!S)return;S.picking=!!on;if(on){S.sweepI=1e9;l2Invalidate(null,'picking');zRoomInvalidate(null,'picking')}else{S.editT=now();S.aoDirty=true}}
 function gpuSync(){const gl=S.gl,px=new Uint8Array(4);S.R.setRenderTarget(null);gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px)}
 // test aid: runs pending rebakes now, one ordinary slice per iteration (so each slice is timed exactly as in play)
 function flush(maxIter,only){if(!S||!S.post)return 0;S.flushing=true;let n=0;const busy=()=>S.pq.length||S.cubes.some(c=>c.dirty)||S.pmQ.length||S.optQ.length||S.projNeeded||S.lerpN>0||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid));
   try{while(n<(maxIter||5000)&&busy()){if(S.syncSlices)gpuSync();S.frame++;if(S.optQ.length)optStep(true);work();n++}}
   finally{S.flushing=false;S.R.setRenderTarget(null)}return n}
-const api={caps:{alpha:true,context:true},attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
-  _debug:{flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
+const api={caps:{alpha:true,context:true},lightPending:()=>{try{return lightPending()}catch(e){return false}},attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
+  _debug:{altRun:n=>{let k=0;const sl=(kind,fn)=>cw(kind,fn);for(;k<(n||5000);k++){const c=S.altN||0;altWork(true,sl,true);if((S.altN||0)===c)break}return k},winStep:()=>windowFrame(16),keys:()=>({want:keyNow(),live:S.liveKey,spare:S.spare&&S.spare.have?S.spare.key:null,baking:S.altJob?S.altJob.key:null,pend:S.pendSwap?S.pendSwap.key:null,mode:S.altJob?S.altJob.mode:null}),l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
 window.PodRender=api})();
 
 </script>
 <!-- Neon Terrarium: the game side (tools/furnish/build.py) -->
 <link rel="stylesheet" href="furnish/bridge.css?v=9aa2454540">
-<script src="furnish/bridge.js?v=2665923a09"></script>
+<script src="furnish/bridge.js?v=c1a2aba7ae"></script>

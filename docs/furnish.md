@@ -162,3 +162,9 @@ It runs the lab's `build.py --embed` in the lab's folder and writes `furnish.htm
 - A building removed or rebuilt keeps its old recipes under the same cell, section and floor.
 - The first visit in a big city takes longer while plots whose arrays were let go are made again; the hologram waits for them.
 - The gathering runs on the game's thread, which the page shares, in short slices: a heavy first visit can make the hologram's first second less smooth.
+
+## Open-path performance notes (round: open hitches)
+- While picking, the stand-ins of every plot are kept for the visit. Plots the game has let go of are asked for from its worker eight at a time (`warmLater`), so the click no longer waits for hundreds of them.
+- Resting the pointer on a building for 300 ms asks for the full-detail ring round it (`nearWarm`, up to 40 plots, once per 15 s per building).
+- The hover pick runs once per frame, and a building's pod boxes are kept for 400 ms.
+- In the lab: the governor ignores a GPU timer reading above the frame interval (Apple's timer over-reads) and tries a step up when the rate holds; plain line programs are compiled in the title warm-up; the Work light keeps a spare lighting bake for the other state (baked when the room is idle) and swaps to it on toggle; the city's normals are computed in 4096-triangle pieces.

@@ -14392,7 +14392,7 @@ function nodeOf(o,X){const n={t:o.isPointLight?'P':o.isLineSegments?'LS':o.isLin
   if(o.children.length)n.c=o.children.map(c=>nodeOf(c,X));return n}
 const plain=v=>{try{return JSON.parse(JSON.stringify(v))}catch(e){return null}};
 function itemOf(it,info,X){const b=info.b,mb=b.markBox;
-  const out={key:it.arch+'#'+it.seed,root:nodeOf(b.g,X),mb:mb&&!mb.isEmpty()?[mb.min.toArray(),mb.max.toArray()]:null,surf:plain(b.surfaces||[])||[],
+  const out={key:it.arch+'#'+it.seed,rootJ:JSON.stringify(nodeOf(b.g,X)),mb:mb&&!mb.isEmpty()?[mb.min.toArray(),mb.max.toArray()]:null,surf:plain(b.surfaces||[])||[],
     f:plain({center:info.center,minZ:info.minZ,wall:!!info.wall,wallOnly:!!info.wallOnly,ceiling:!!info.ceiling,finish:info.finish||null,W:info.W,D:info.D,H:info.H,name:info.name,key:info.key,tiles:info.tiles,box:info.box,role:info.role||'',seats:info.seats||0,cat:info.cat||''})};
   if(info.floorMat)out.fm=matDef(info.floorMat,X);if(info.wallMat)out.wm=matDef(info.wallMat,X);return out}
 async function gen(job,items){const R=reg(job),t0=now();let X={R,defs:[],tr:[],wait:[],items:[]},bt=now();
@@ -14478,7 +14478,7 @@ function assemble(J,it){const mats=new Map();
     if(n.mau===0){o.matrixAutoUpdate=false;o.matrix.fromArray(n.mx)}if(n.ly)o.layers.mask=n.ly;if(n.ud)o.userData=JSON.parse(JSON.stringify(n.ud));
     if(n.lc){o.color.setRGB(n.lc[0],n.lc[1],n.lc[2]);o.intensity=n.li;if(n.ld!==undefined)o.distance=n.ld;if(n.lde!==undefined)o.decay=n.lde;if(n.sh&&o.shadow){const s=o.shadow;s.mapSize.set(n.sh[0],n.sh[1]);s.bias=n.sh[2];s.normalBias=n.sh[3];s.radius=n.sh[4];s.camera.near=n.sh[5];s.camera.far=n.sh[6]}}
     if(n.c)for(const c of n.c)o.add(node(c));return o};
-  const g=node(it.root),mb=new T.Box3();if(it.mb)mb.set(new T.Vector3().fromArray(it.mb[0]),new T.Vector3().fromArray(it.mb[1]));
+  const g=node(it.root||JSON.parse(it.rootJ)),mb=new T.Box3();if(it.mb)mb.set(new T.Vector3().fromArray(it.mb[0]),new T.Vector3().fromArray(it.mb[1]));
   const info=Object.assign({},JSON.parse(JSON.stringify(it.f)),{b:{g,markBox:mb,surfaces:JSON.parse(JSON.stringify(it.surf))},fromWorker:true});if(it.fm)info.floorMat=mat(it.fm);if(it.wm)info.wallMat=mat(it.wm);return info}
 
 /* slices and timing: every main-thread step of an open yields after about 6 ms (a macrotask, so it also runs while the page is hidden);
@@ -16698,20 +16698,22 @@ function realChunk(){const W=S.warm,c=W.cur;
   if(c.phase==='pso'){if(c.j<c.real.length){psoBatch(c);return}psoZ();c.phase='done'}
   if(c.phase!=='done'){if(c.i<c.real.length){compileBatch(c);return}fixLists(c.mats);if(c.pso&&c.onFirst){c.phase='pso';c.j=0;psoInit();return}}
   W.done['n'+c.n]=true;if(c.onFirst){const f=c.onFirst;c.onFirst=null;f()}c.phase=null;if(!c.ns.length){c.real=null;return}c.n=c.ns.shift();c.i=0;c.mats=new Set()}
-function compileBatch(c){const R=S.R;const end=Math.min(c.real.length,c.i+120),keep=new Set(c.real.slice(c.i,end));c.i=end;for(const o of keep)for(const m of matsOf(o))if(m)c.mats.add(m);
+// the batch size follows the time the last one took (target about 8 ms a frame): many new programs in one batch used to cost 50 to 80 ms
+function adaptSize(c,key,t0,lo,hi){const dt=now()-t0,n=c[key];c[key]=dt>11?Math.max(lo,n>>1):dt<4?Math.min(hi,Math.ceil(n*1.5)):n;ev('batch '+key+' '+n+' took '+dt.toFixed(1)+'ms')}
+function compileBatch(c){const R=S.R,t0=now();if(!c.csz)c.csz=40;const end=Math.min(c.real.length,c.i+c.csz),keep=new Set(c.real.slice(c.i,end));c.i=end;for(const o of keep)for(const m of matsOf(o))if(m)c.mats.add(m);
   const stash=[];S.scene.traverse(o=>{if(o.material&&!keep.has(o)){stash.push(o,o.material);o.material=null}});
   try{batchState(c,()=>{warmCompile(()=>{R.setRenderTarget(S.hdr);R.compile(S.scene,S.camera)});
       // overlays draw straight to the canvas (sRGB output, tone mapped): their materials are compiled for that target too
       const ui=new Set([...keep].filter(underUI));if(ui.size){for(const o of keep)if(!ui.has(o)){stash.push(o,o.material);o.material=null}warmCompile(()=>{R.setRenderTarget(null);R.compile(S.scene,S.camera)})}})}
-  finally{for(let i=stash.length-2;i>=0;i-=2)stash[i].material=stash[i+1]}}
+  finally{for(let i=stash.length-2;i>=0;i-=2)stash[i].material=stash[i+1];adaptSize(c,'csz',t0,4,120)}}
 function psoInit(){const W=S.warm;if(W.psoRT)return;const c8=!!S.ab.hdr8;
   W.psoRT=[new TH.WebGLRenderTarget(8,8,{type:c8?TH.UnsignedByteType:S.hdrType,encoding:c8?TH.sRGBEncoding:TH.LinearEncoding,samples:S.msaa,depthBuffer:true}),
     new TH.WebGLRenderTarget(8,8,{type:S.hdrType,depthBuffer:true}),new TH.WebGLCubeRenderTarget(4,{type:S.hdrType,generateMipmaps:false})];W.psoCam=new TH.PerspectiveCamera(90,1,.01,100)}
-function psoBatch(c){const R=S.R,W=S.warm;const end=Math.min(c.real.length,c.j+40),keep=new Set(c.real.slice(c.j,end));c.j=end;
+function psoBatch(c){const R=S.R,W=S.warm,t0=now();if(!c.psz)c.psz=12;const end=Math.min(c.real.length,c.j+c.psz),keep=new Set(c.real.slice(c.j,end));c.j=end;
   const hid=[],fc=[];S.scene.traverse(o=>{if(o.material&&!keep.has(o)&&o.visible){o.visible=false;hid.push(o)}});for(const o of keep)if(o.frustumCulled){o.frustumCulled=false;fc.push(o)}
   const m=W.psoCam.layers.mask;S.inWarm=true;S.stage='pipelines';
   try{batchState(c,()=>{for(const t of W.psoRT){if(t.isWebGLCubeRenderTarget){W.psoCam.layers.set(LAYER);R.setRenderTarget(t,0)}else{W.psoCam.layers.mask=t===W.psoRT[1]?(1<<LAYER):S.camera.layers.mask;R.setRenderTarget(t)}R.render(S.scene,W.psoCam)}})}
-  finally{S.inWarm=false;W.psoCam.layers.mask=m;R.setRenderTarget(null);for(const o of hid)o.visible=true;for(const o of fc)o.frustumCulled=true}}
+  finally{S.inWarm=false;W.psoCam.layers.mask=m;R.setRenderTarget(null);for(const o of hid)o.visible=true;for(const o of fc)o.frustumCulled=true;adaptSize(c,'psz',t0,2,40)}}
 function psoZ(){const W=S.warm,R=S.R;if(!W.zProxAll||!W.zProxAll.length||!W.psoRT)return;const t=new TH.WebGLRenderTarget(8,8,{format:TH.RedFormat,type:TH.UnsignedByteType,depthBuffer:true});
   W.zGroup.clear();for(const p of W.zProxAll)W.zGroup.add(p);W.zGroup.visible=true;S.inWarm=true;
   try{for(const x of [t,W.psoRT[0]]){R.setRenderTarget(x);R.render(W.zScene,W.psoCam)}}finally{S.inWarm=false;R.setRenderTarget(null);W.zGroup.clear();t.dispose()}}
@@ -17053,6 +17055,11 @@ function plainFrame(){const R=S.R;S.stage='plain';if(S.realPend)return; // mater
     try{R.setRenderTarget(S.hdr);R.render(S.scene,S.camera)}finally{U.uPRC8.value=0}
     const cu=S.M.comp.uniforms;cu.tS.value=S.hdr.texture;cu.useL.value=0;cu.useAO.value=0;cu.tB.value=S.blk.texture;cu.bloomK.value=0;cu.tD.value=S.hdr.depthTexture||S.blk.texture;
     cu.tmode.value=[0,1,2,3,4].includes(R.toneMapping)?R.toneMapping:0;cu.uExpo.value=R.toneMappingExposure;cu.srgb.value=R.outputEncoding===TH.sRGBEncoding?1:0;cu.tbg.value=S.scene.background?0:1;backU(cu);quad(S.M.comp,null);return}
+  // the first plain draw of a freshly furnished home built a dozen programs in one frame (a 2 s freeze): they are compiled in the background
+  // (parallel compile) first, and nothing is drawn until they have linked (the page keeps showing what was on screen, the hologram)
+  const W=S.warm;
+  if(W&&!S.plainC){S.plainC=true;plainLights(true);try{warmCompile(()=>{R.setRenderTarget(null);R.compile(S.scene,S.camera)})}finally{plainLights(false)}}
+  if(W&&W.pend.size)return;
   plainLights(true);try{R.setRenderTarget(null);R.render(S.scene,S.camera)}finally{plainLights(false)}}
 const _VP=new TH.Matrix4(),_pInv=new TH.Matrix4(),_scat=[];
 function taa(cur,hist,outRT,pVP,pV,blend,aIsZ,dT){const u=S.M.taa.uniforms;u.tD.value=dT;u.pInv.value.copy(_pInv);u.camW.value.copy(S.camera.matrixWorld);u.res.value.set(S.W,S.H);
@@ -17122,6 +17129,12 @@ function drawOverlays(){const hid=S.uiHidden;if(!hid||!hid.length)return;const R
   gtBegin('overlay');try{cw('overlay',()=>R.render(sc,cam))}finally{gtEnd();cam.layers.mask=m;sc.background=bg;R.autoClear=ac;for(const x of on)x.layers.disable(L_UI);hid.length=0}}
 
 /* ---------------- stats ---------------- */
+// where the draw calls come from (visible meshes by class, merged or not, and the pieces with the most): for deciding what to merge next
+function drawMix(){if(!S||!S.scene)return null;const cls={},pieces={};let n=0,merged=0,trans=0,lines=0,shadowCast=0;
+  S.scene.traverseVisible(o=>{if(!(o.isMesh||o.isLine||o.isPoints)||o.userData.prZMesh||(S.uiSet&&S.uiSet.has(o)))return;n++;if(o.isLine)lines++;if(o.userData.prSources)merged++;const m=Array.isArray(o.material)?o.material[0]:o.material;
+    if(m&&m.transparent)trans++;if(o.castShadow)shadowCast++;const c=(m&&m.userData&&m.userData.prClass)||(m&&m.type)||'?';cls[c]=(cls[c]||0)+1;
+    let p=o;while(p&&p!==S.scene&&!(p.name&&p.name.startsWith('piece:')))p=p.parent;const k=p&&p.name?p.name:'(other)';pieces[k]=(pieces[k]||0)+1});
+  return {visibleDraws:n,mergedMeshes:merged,transparent:trans,lines,castShadow:shadowCast,byClass:cls,topPieces:Object.entries(pieces).sort((a,b)=>b[1]-a[1]).slice(0,12)}}
 function techniques(){const C=S.cfg,t=[];
   if(!S.post)return ['classes','shadow cap '+ptsFor(C),'plain draw'];if(!S.eff)return ['plain draw while shaders compile'];const ts=scaleOf(C,'ts'),ls=scaleOf(C,'ls');
   t.push(U.uPRGI.value===1?'SH probes 1/'+ts:U.uPRGI.value===3?'SH probes':'GI warming');t.push('reflection cubes');t.push('shadow maps x'+(ptsFor(C)+(S.key&&S.key.castShadow?1:0)));
@@ -17133,7 +17146,7 @@ function stats(){if(!S)return null;const n=G.nInts;let sum=0;const arr=[];for(le
     profile:{warm:r1(P.warm),work:r1(P.work),pre:r1(P.pre),main:r1(P.main),post:r1(P.post)},lightPool:S.poolN,
     warm:S.warm?{proxies:S.warm.all.length,pending:S.warm.pend.size,queue:S.warm.queue.length,done:Object.keys(S.warm.done),parallelExt:!!S.warm.ext,ms:S.warm.ms||null,patchMs:S.warm.patchMs||null,fixMaxMs:S.warm.log.length?Math.max(...S.warm.log):0}:null,
     ab:Object.assign({},S.ab),syncBuilds:S.syncBuilds.slice(-20),programBuilds:S.builds,programBuildsOutsideWarm:S.buildsPlay||0,drawCheck:S.dc?{checks:S.dc.n,issues:S.dc.issues.slice(-10)}:null,
-    lightBudget:S.cfg?{realtime:Math.min(budget(),POOL),lamps:S.liveCount||0,shadowMaps:ptsFor(S.cfg)}:null,compiles:S.compiles.slice(-10),slowFrames:S.slow.slice(-12),samplerIssues:(S.sampIssues||[]).slice(-10),gpuTimer:gtMeans(),warmNotes:S.warm?S.warm.notes.slice(-10):[],queue:{probes:S.pq?S.pq.length:0,cubes:S.cubes?S.cubes.filter(c=>c.dirty).length:0,voxel:false,depth:S.zRooms?S.zRooms.filter(r=>!r.valid).length:0,merge:S.optQ?S.optQ.length:0},probesReady:!!S.probesReady,post:!!S.post,zRooms:S.zRooms?S.zRooms.map(r=>({valid:r.valid,meshes:r.meshes.length,sources:r.srcs.length,why:r.why||null,ageMs:r.whyT?Math.round(now()-r.whyT):null,job:r.job?r.job.i+'/'+r.job.list.length:null})):null,zDiag:S.zDiag||null,alt:S.spare?{valid:S.spare.valid,holds:S.spare.state==null?null:(S.spare.state?'work light on':'work light off'),job:S.altJob?{phase:S.altJob.phase,pass:S.altJob.pass+'/'+S.altJob.passes,probe:S.altJob.pi,room:S.altJob.ci}:null,swaps:S.altSwaps||0,lastBakeMs:S.altBakeMs||null}:null,editAgeMs:Math.round(now()-S.editT),picking:!!S.picking,glowCards:S.glowN||0,contactAO:!!S.aoReady,time:S.time,workLight:S.workLight,windows:(S.windows||[]).map(w=>({room:w.room,blackout:w.blackout,w:+(w.r.length()*2/.85).toFixed(2),h:+(w.u.length()*2/.85).toFixed(2)})),rep:Object.assign({},S.rep)}}
+    lightBudget:S.cfg?{realtime:Math.min(budget(),POOL),lamps:S.liveCount||0,shadowMaps:ptsFor(S.cfg)}:null,compiles:S.compiles.slice(-10),slowFrames:S.slow.slice(-12),samplerIssues:(S.sampIssues||[]).slice(-10),gpuTimer:gtMeans(),warmNotes:S.warm?S.warm.notes.slice(-10):[],queue:{probes:S.pq?S.pq.length:0,cubes:S.cubes?S.cubes.filter(c=>c.dirty).length:0,voxel:false,depth:S.zRooms?S.zRooms.filter(r=>!r.valid).length:0,merge:S.optQ?S.optQ.length:0},probesReady:!!S.probesReady,post:!!S.post,zRooms:S.zRooms?S.zRooms.map(r=>({valid:r.valid,meshes:r.meshes.length,sources:r.srcs.length,why:r.why||null,ageMs:r.whyT?Math.round(now()-r.whyT):null,job:r.job?r.job.i+'/'+r.job.list.length:null})):null,zDiag:S.zDiag||null,drawMix:drawMix(),alt:S.spare?{valid:S.spare.valid,holds:S.spare.state==null?null:(S.spare.state?'work light on':'work light off'),job:S.altJob?{phase:S.altJob.phase,pass:S.altJob.pass+'/'+S.altJob.passes,probe:S.altJob.pi,room:S.altJob.ci}:null,swaps:S.altSwaps||0,lastBakeMs:S.altBakeMs||null}:null,editAgeMs:Math.round(now()-S.editT),picking:!!S.picking,glowCards:S.glowN||0,contactAO:!!S.aoReady,time:S.time,workLight:S.workLight,windows:(S.windows||[]).map(w=>({room:w.room,blackout:w.blackout,w:+(w.r.length()*2/.85).toFixed(2),h:+(w.u.length()*2/.85).toFixed(2)})),rep:Object.assign({},S.rep)}}
 
 /* ---------------- API ---------------- */
 function attach(o){if(S)detach();const R=o.renderer;const gl=R.getContext();

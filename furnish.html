@@ -14643,9 +14643,11 @@ async function loadRecipe(rc,o){o=o||{};if(!rc||!rc.home||!rc.pieces)throw new E
   finally{B.loading=false;setBusy(null);B.needs=true;if(own)pfEnd(pf)}
   syncPod();if(o.early){ctxSetHome();B.ctxPending=null}else if(!o.noCtx)ctxEnter();if(!o.noAuto)autosave(true);return true}
 function depth(list,r){let d=0,p=r.parent;while(p&&d<8){const q=list.find(x=>x.id===p);if(!q)break;p=q.parent;d++}return d}
+// the home as far as its baked light goes (PodRender keeps a bake per home and lighting state): the recipe without the day/night flag and the wall display mode
+function bakeKey(){if(!B.home)return null;const r=recipe(),h=Object.assign({},r.home);delete h.night;const s=JSON.stringify([h,r.fin,r.pieces]);let x=2166136261;for(let i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619)}return (x>>>0).toString(36)+'.'+s.length}
 function setBusy(t){const b=$('bBusy');if(!b)return;b.hidden=!t;if(t)b.textContent=t}
 function attachRenderer(){const R=window.PodRender;B.prOn=false;if(B.noPR||!R||typeof R.attach!=='function'||!B.sc){envOn(true);return}
-  try{R.attach({renderer:B.dr,scene:B.sc,camera:B.cam,root:B.root,rooms:roomInfo(),canvas:$('bCanvas'),time:timeName(),workLight:B.work});B.prOn=true;B.prErr=false}catch(e){console.error('PodRender.attach failed; using the plain renderer',e);B.prOn=false;B.prErr=true}
+  try{R.attach({renderer:B.dr,scene:B.sc,camera:B.cam,root:B.root,rooms:roomInfo(),canvas:$('bCanvas'),time:timeName(),workLight:B.work,bakeKey});B.prOn=true;B.prErr=false}catch(e){console.error('PodRender.attach failed; using the plain renderer',e);B.prOn=false;B.prErr=true}
   envOn(!B.prOn);skyMode();if(B.prOn){prCall('resize',B.cw,B.ch);prCall('setOptions',{hud:B.hud,workLight:B.work,time:timeName()});prCall('classify',B.root)}syncLightUI()}
 function roomInfo(){const s=B.s,P=B.P,hx=s.Wm/2,hz=s.Dm/2;return P.rooms.map(R=>{const fl=s.floors.filter(m=>m.userData.room===R.id);
   return {id:R.id,kind:R.kind,label:R.label,box:{min:[R.x0*TILE-hx,0,R.z0*TILE-hz],max:[R.x1*TILE-hx,WALL_H,R.z1*TILE-hz]},floorMesh:fl[0]||null,floorMeshes:fl,wallMeshes:s.faces.filter(m=>m.userData.wallRoom===R.id)}})}
@@ -17146,6 +17148,44 @@ function windowFrame(dt){if(S.wAnim)U.uPRWT.value=(U.uPRWT.value+Math.min(.1,(dt
    a tenth of a second. Any lighting edit (dirtyBox) invalidates the spare; without a valid spare the toggle falls back to the old sliced rebake. */
 function mkPM(){const t=new TH.WebGLRenderTarget(3*Math.max(64,112),4*64,{magFilter:TH.LinearFilter,minFilter:TH.LinearFilter,generateMipmaps:false,type:TH.HalfFloatType,format:TH.RGBAFormat,encoding:TH.LinearEncoding,depthBuffer:false});
   t.texture.mapping=TH.CubeUVReflectionMapping;t.texture.name='PMREM.cubeUv';clearRT(t);return t}
+/* ---------------- baked lighting cache (round 30): a home's bake is kept per lighting state and reused on the next visit ----------------
+   What is kept: the probe atlas, the projected bounce light (SH) and every room's reflections, for the live state and the spare. The key is the
+   home (its recipe, from the builder's bakeKey), the lighting state (time of day + work light), the quality rung, the probe count and this format. */
+const BK={ver:'bk1',max:16,dbP:null};
+function bkDB(){if(BK.dbP)return BK.dbP;BK.dbP=new Promise(res=>{try{const q=indexedDB.open('podrender-bakes',1);q.onupgradeneeded=()=>{const d=q.result;if(!d.objectStoreNames.contains('b'))d.createObjectStore('b');if(!d.objectStoreNames.contains('i'))d.createObjectStore('i')};q.onsuccess=()=>res(q.result);q.onerror=()=>res(null);q.onblocked=()=>res(null)}catch(e){res(null)}});return BK.dbP}
+function bkGet(k){return bkDB().then(d=>d?new Promise(res=>{try{const t=d.transaction('b','readonly').objectStore('b').get(k);t.onsuccess=()=>res(t.result||null);t.onerror=()=>res(null)}catch(e){res(null)}}):null)}
+function bkPut(k,v){return bkDB().then(d=>{if(!d)return false;return new Promise(res=>{try{const tx=d.transaction(['b','i'],'readwrite'),b=tx.objectStore('b'),ix=tx.objectStore('i');b.put(v,k);
+  const g=ix.get('lru');g.onsuccess=()=>{let L=(g.result||[]).filter(x=>x!==k);L.push(k);while(L.length>BK.max){const old=L.shift();b.delete(old)}ix.put(L,'lru')};tx.oncomplete=()=>res(true);tx.onerror=()=>res(false);tx.onabort=()=>res(false)}catch(e){res(false)}})})}
+function bkScene(){try{return S&&S.bakeKeyFn?String(S.bakeKeyFn()):null}catch(e){return null}}
+function bkFull(scene,light){return [BK.ver,scene,light,'r'+G.rung,'p'+(S.probes?S.probes.length:0),'c'+S.cubes.length].join('|')}
+function bkRead(rt){const w=rt.width,h=rt.height,f=new Float32Array(w*h*4),R=S.R,prev=R.getRenderTarget();R.setRenderTarget(rt);S.gl.readPixels(0,0,w,h,S.gl.RGBA,S.gl.FLOAT,f);R.setRenderTarget(prev);
+  const u=new Uint16Array(f.length),H=TH.DataUtils.toHalfFloat;for(let i=0;i<f.length;i++)u[i]=H(f[i]);return {w,h,d:u}}   // (half floats: half the size, the targets are half float anyway)
+function bkWrite(rec,rt){if(!rec||rec.w!==rt.width||rec.h!==rt.height)return false;const t=new TH.DataTexture(rec.d,rec.w,rec.h,TH.RGBAFormat,TH.HalfFloatType);t.minFilter=t.magFilter=TH.NearestFilter;t.generateMipmaps=false;t.flipY=false;t.needsUpdate=true;
+  const sc=rt.scissorTest;copyRT({texture:t},rt);rt.scissorTest=sc;t.dispose();return true}
+// a settled bake is read back one target a frame while the view is still (each read waits for the GPU once), then stored
+function bkSaveStep(idle,force){if(!S.bakeKeyFn||!S.f32||S.ab.bakeCache===false||!S.probesReady||(!force&&(S.eff!==G.rung||!idle||now()-(S.camMoved||0)<800)))return false;
+  let J=S.bkJob;const sp=S.spare;
+  if(J&&(J.live?(S.liveKey!==J.light||!liveSettled()):(!sp||!sp.have||sp.key!==J.light||S.altJob))){S.bkJob=J=null}
+  if(!J){if(S.pendSwap||!liveSettled())return false;const sig=S.liveKey+'|'+(sp&&sp.have?sp.key:'')+'|'+S.editT;if(sig===S.bkSig)return false;   // (checked already, nothing changed since: no recipe hash every frame)
+    const scene=bkScene();if(!scene)return false;const sv=S.bkSaved||(S.bkSaved=new Set());
+    const cand=[];if(S.liveKey&&S.liveKey!=='stale')cand.push({live:true,light:S.liveKey});if(sp&&sp.have&&sp.key&&!S.altJob&&sp.pm)cand.push({live:false,light:sp.key});
+    for(const c of cand){const full=bkFull(scene,c.light);if(sv.has(full))continue;const tg=c.live?[['atlas',S.atlas],['sh',S.shT]].concat(S.pmrem.map((p,i)=>['pm'+i,p])):[['atlas',sp.atlas],['sh',sp.shT]].concat(sp.pm.map((p,i)=>['pm'+i,p]));
+      S.bkJob=J={full,live:c.live,light:c.light,tg,i:0,out:{v:BK.ver,t:Date.now()}};break}
+    if(!J){S.bkSig=sig;return false}}
+  const [name,rt]=J.tg[J.i];J.out[name]=bkRead(rt);J.i++;
+  if(J.i>=J.tg.length){S.bkJob=null;S.bkSaved.add(J.full);const full=J.full;bkPut(full,J.out).then(ok=>{if(S)ev(ok?'bake stored':'bake not stored')})}
+  return true}
+// on attach: a stored bake for the home's state (and its spare) replaces the first bake, if it arrives before that bake has finished
+function bkRestore(){if(!S.bakeKeyFn||!S.f32||S.ab.bakeCache===false||typeof indexedDB==='undefined')return;const scene=bkScene();if(!scene)return;const my=S,live=keyNow(),other=keyOf(S.time,!S.workLight);
+  const t0=now();Promise.all([bkGet(bkFull(scene,live)),bkGet(bkFull(scene,other))]).then(([a,b])=>{if(S!==my)return;S.bkRestoreMs=Math.round(now()-t0);
+    const sv=S.bkSaved||(S.bkSaved=new Set());let got=[];
+    if(a&&keyNow()===live&&!S.probesReady&&a.atlas&&a.sh&&S.pmrem.every((p,i)=>a['pm'+i])){
+      if(bkWrite(a.atlas,S.atlas)&&bkWrite(a.sh,S.shT)){copyRT(S.shT,S.shA);copyRT(S.shT,S.shB);S.pmrem.forEach((p,i)=>{bkWrite(a['pm'+i],p);bkWrite(a['pm'+i],S.pmStage[i])});
+        S.pq=[];S.pqSet=new Set();for(const c of S.cubes){c.dirty=false;c.done=true;c.baked=true;c.f=0}S.pmQ=[];S.pmFade.fill(0);S.projNeeded=false;S.lerpN=0;S.probesReady=true;S.probeFirst=false;S.liveKey=live;U.uPRSH.value=S.shA.texture;
+        sv.add(bkFull(scene,live));got.push('live')}}
+    const sp=S.spare;if(b&&sp&&b.atlas&&b.sh&&S.probesReady&&!S.altJob&&!sp.have){if(!sp.pm)sp.pm=S.cubes.map(()=>mkPM());
+      if(bkWrite(b.atlas,sp.atlas)&&bkWrite(b.sh,sp.shT)&&sp.pm.every((p,i)=>bkWrite(b['pm'+i],p))){sp.have=true;sp.valid=true;sp.key=other;sp.state=!S.workLight;sp.baked=true;sp.shTime=S.time;sp.dd=[];sv.add(bkFull(scene,other));got.push('spare')}}
+    S.bkRestored=got;ev('bake cache: '+(got.length?got.join('+'):'miss')+' '+S.bkRestoreMs+'ms');if(got.length)console.log('[PodRender] baked lighting from cache: '+got.join(' + ')+' ('+S.bkRestoreMs+' ms)')}).catch(()=>{})}
 function copyRT(src,dst){const c=S.M.copy.uniforms;c.t.value=src.texture;dst.scissorTest=false;dst.viewport.set(0,0,dst.width,dst.height);quad(S.M.copy,dst)}
 function liveBusy(){return !!(S.pq.length||S.cubes.some(c=>c.dirty||!c.done)||S.pmQ.length||S.pmFade.some(n=>n>0)||S.optQ.length||S.projNeeded||S.lerpN>0||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid)))}
 function altNeed(){const sp=S.spare;if(!altCan()||!S.warm||!S.warm.done.pmrem)return false;const tkey=S.pendSwap?S.pendSwap.key:keyOf(S.time,!S.workLight);return !(sp.have&&sp.key===tkey)}
@@ -17183,7 +17223,7 @@ function altCapture(A,pos,fn){const sp=S.spare,on=A.state,L=A.lights,sv=L.map(l=
   captureMode(true,pos);const sh=U.uPRSH.value;if(A.mode==='spare'||(A.mode==='cold'&&A.pass>0))U.uPRSH.value=sp.shT.texture;else if(A.mode==='cold')U.uPRGI.value=0;
   const k=ptsFor(S.cfg),ps=[];for(let i=0;i<k;i++){const p=S.pool[i],src=p.userData.src;if(src&&src.userData.workLight){ps.push([p,p.intensity]);p.intensity=on?src.userData.wl0:0}}
   try{return fn()}finally{for(const e of ps)e[0].intensity=e[1];for(let i=0;i<L.length;i++)L[i].intensity=sv[i];U.uPRSH.value=sh;captureMode(false)}}
-function altCan(){const sp=S.spare;return !!(sp&&S.ab.altWork!==false&&S.probesReady&&S.matReady&&S.post&&S.pmrem)}
+function altCan(){const sp=S.spare;return !!(sp&&S.ab.altWork!==false&&S.probesReady&&S.post&&S.pmrem)}   // (no wait for the shader warm-up here: a swap is texture copies, and the spare bake checks it itself)
 // One decision for every lighting switch (work light, time of day, windows or geometry): what is wanted against what is on screen, in the spare and baking now.
 // Nothing ever rebakes the visible lighting piece by piece here: on screen already -> nothing; in the spare -> instant swap; baking -> keep going; else bake it off screen.
 function relight(stale){const sp=S.spare,want=keyNow(),a=S.altJob;let how;
@@ -17237,7 +17277,7 @@ function work(){if(S.tog&&!S.tog.done&&!S.pendSwap&&now()-S.tog.t>150&&liveSettl
   const probeOK=(!C.static||S.probeFirst||idle)&&(S.probeFirst||still);
   if(S.pq.length&&probeOK&&(S.flushing||fr%C.probeEvery===0)){const pp=S.probes[S.pq[0].i];_v2.set(pp.x,pp.y,pp.z);captureMode(true,_v2.clone());sl('probe face',probeFace);captureMode(false);return}
   if(S.cubes.some(c=>c.dirty)){if((!C.static||idle||S.cubes.some(c=>!c.done))&&still&&(S.flushing||fr%C.cubeEvery===0)){captureMode(true,S.cubes.find(c=>c.dirty).cam.position.clone());sl('cube face',cubeFace);captureMode(false)}return}
-  altWork(idle,sl)}
+  altWork(idle,sl);if(!S.altJob&&!S.pendSwap)sl('bake store',()=>bkSaveStep(idle))}
 // plain frames while shaders compile use the builder's own lamps (not the light pool), so every program drawn is one the builder compiled
 // before PodRender attached (the pool's 6-light variant of the unpatched materials was a burst of synchronous compiles). Once materials are
 // patched (linear HDR out), a plain frame goes through the composite for tone mapping.
@@ -17366,6 +17406,7 @@ function attach(o){if(S)detach();const R=o.renderer;const gl=R.getContext();
   S.M=makeShaders();makeCubes();
   zRoomsInit();l2Init();fullScan(null,true);if(!S.noOpt)for(const p of allPieces())queueOpt(p);layoutProbes();aoInit();glowInit();S.time=o.time||(o.night!=null?(o.night?'night':'day'):homeNight()?'night':'day');S.workLight=o.workLight!==false;S.winDirty=true;S.wAnim=true;S.homeTime=S.time;
   GT.ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');GT.samp={};GT.q.length=0;GT.cur=null;R.shadowMap.autoUpdate=true;R.setOpaqueSort(opaqueSort);ensureTargets();warmInit();if(window.__prDrawCheck)drawCheck(true);
+  S.bakeKeyFn=typeof o.bakeKey==='function'?o.bakeKey:null;bkRestore();
   return api}
 function detach(){if(!S)return;const R=S.R;try{for(const [l,c,m,au] of S.saved.cast){l.castShadow=c;if(l.shadow){if(m)setMap(l,m);l.shadow.autoUpdate=au}}R.shadowMap.autoUpdate=S.saved.autoUpdate;R.shadowMap.needsUpdate=true;R.setOpaqueSort(null);matUnfreeze();
   S.scene.traverse(o=>{if(o.isMesh&&o.userData.prCast!=null){o.castShadow=o.userData.prCast;delete o.userData.prCast}if(o.isLight&&o.userData.prMask!=null){o.layers.mask=o.userData.prMask;delete o.userData.prMask}});
@@ -17438,7 +17479,7 @@ function flush(maxIter,only){if(!S||!S.post)return 0;S.flushing=true;let n=0;con
   try{while(n<(maxIter||5000)&&busy()){if(S.syncSlices)gpuSync();S.frame++;if(S.optQ.length)optStep(true);work();n++}}
   finally{S.flushing=false;S.R.setRenderTarget(null)}return n}
 const api={caps:{alpha:true,context:true},lightPending:()=>{try{return lightPending()}catch(e){return false}},lightProgress:()=>{try{return lightProgress()}catch(e){return 1}},warmState:()=>S&&S.warm?{finished:!!S.warm.finished,queue:S.warm.queue.length,matReady:!!S.matReady,broken:!!S.broken}:null,attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
-  _debug:{patchOne:m=>{patch(m);return PATCHED.has(m)},vtFlush:()=>{if(S){S.vtDirty=true;vtFlush()}return S&&S.vtRegs?[...S.vtRegs.values()].map(r=>({size:r.w+'x'+r.h,layers:r.tex.length})):null},altRun:n=>{let k=0;const sl=(kind,fn)=>cw(kind,fn);for(;k<(n||5000);k++){const c=S.altN||0;altWork(true,sl,true);if((S.altN||0)===c)break}return k},winStep:()=>windowFrame(16),keys:()=>({want:keyNow(),live:S.liveKey,spare:S.spare&&S.spare.have?S.spare.key:null,baking:S.altJob?S.altJob.key:null,pend:S.pendSwap?S.pendSwap.key:null,mode:S.altJob?S.altJob.mode:null}),l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
+  _debug:{bkSaveAll:async()=>{let n=0;S.bkSig=null;while(n<60&&bkSaveStep(true,true))n++;await new Promise(r=>setTimeout(r,500));return n},bkRead:name=>{const rt=name==='sh'?S.shA:name==='atlas'?S.atlas:S.pmrem[+name.slice(2)];return Array.from(bkRead(rt).d.slice(0,4096))},patchOne:m=>{patch(m);return PATCHED.has(m)},vtFlush:()=>{if(S){S.vtDirty=true;vtFlush()}return S&&S.vtRegs?[...S.vtRegs.values()].map(r=>({size:r.w+'x'+r.h,layers:r.tex.length})):null},altRun:n=>{let k=0;const sl=(kind,fn)=>cw(kind,fn);for(;k<(n||5000);k++){const c=S.altN||0;altWork(true,sl,true);if((S.altN||0)===c)break}return k},winStep:()=>windowFrame(16),keys:()=>({want:keyNow(),live:S.liveKey,spare:S.spare&&S.spare.have?S.spare.key:null,baking:S.altJob?S.altJob.key:null,pend:S.pendSwap?S.pendSwap.key:null,mode:S.altJob?S.altJob.mode:null}),l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
 window.PodRender=api})();
 
 </script>

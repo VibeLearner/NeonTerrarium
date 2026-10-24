@@ -16196,7 +16196,7 @@ setTimeout(()=>{if(CITY.state==='idle')loadCity()},1500)})();
    format) before the lit view is shown; point lights go through a fixed-size light pool so the light count (and so every shader) never
    changes; shadow maps re-render per light only when something in its reach moves; every rebake is one small slice per frame.
    UI contract: render(dt[,camera]); overlays flagged userData.ui or userData.prHelper stay out of lighting and are drawn on top; picking(true)
-   pauses rebakes; pieces (userData.piece) are merged by material on placement (optimize, sliced) and re-merged on sceneChanged;
+   pauses rebakes; pieces (userData.piece) are merged by material on placement (optimize, sliced) and re-merged on sceneChanged (plain opaque materials that differ only in color become one vertex-colored mesh and one shared material; __prAB.vcMerge=false turns that off);
    setOptions({rung:1..3|'auto', hud, debug:'classes'|null, optimize, time:'day'|'night', workLight, windows, animate}). photo is accepted and
    ignored. Window light: pivots tagged userData.window (userData.blackout optional) get sunlight by day and city spill by night. No WebGL2 or no float targets: classes
    and shadow caps only, drawn with renderer.render. */
@@ -16738,25 +16738,42 @@ function clearRT(t){const R=S.R,prev=R.getRenderTarget(),pa=R.getActiveCubeFace(
 function matKey(m){const t=x=>x?x.uuid:'-',h=c=>c?c.getHexString():'-';return [m.type,h(m.color),h(m.emissive),m.emissiveIntensity,m.roughness,m.metalness,t(m.map),t(m.emissiveMap),t(m.normalMap),t(m.roughnessMap),t(m.alphaMap),m.side,m.flatShading,m.vertexColors,m.opacity,m.envMap?t(m.envMap):'-',m.onBeforeCompile&&!m.onBeforeCompile._pr?m.uuid:''].join('|')}
 function attrSig(g){return Object.keys(g.attributes).sort().map(k=>k+g.attributes[k].itemSize).join(',')}
 const isPiece=o=>!!(o.userData&&(o.userData.piece||o.userData.prPieceRoot));
+// vertex-color merging: opaque standard materials with no textures that differ only in color become ONE mesh with a per-vertex color and ONE shared
+// white material (a draw call and a material switch per color is what the GPU process pays for). The key holds everything that shades differently
+// except the color; the shared material per key lives in S.vcMats so a re-merge never creates a new program.
+function vcKey(c){if(S&&S.ab&&S.ab.vcMerge===false)return null;const m=c.material,g=c.geometry;
+  if(m.type!=='MeshStandardMaterial'||m.map||m.emissiveMap||m.normalMap||m.roughnessMap||m.metalnessMap||m.alphaMap||m.aoMap||m.lightMap||m.bumpMap||m.displacementMap||m.vertexColors||m.alphaTest>0||m.wireframe||
+     !m.depthWrite||!m.depthTest||m.polygonOffset||m.blending!==TH.NormalBlending||g.attributes.color||(m.onBeforeCompile&&!m.onBeforeCompile._pr&&m.onBeforeCompile!==TH.Material.prototype.onBeforeCompile))return null;
+  return ['VC',m.userData.prClass||'',m.userData.prHint||'',m.emissive?m.emissive.getHexString():'',m.emissiveIntensity,m.roughness,m.metalness,m.side,m.flatShading,m.opacity,m.fog,m.toneMapped,m.dithering,m.envMap?m.envMap.uuid:'',m.envMapIntensity,
+    S&&S.rooms&&S.rooms.length&&m.userData.prSpecW>0?(bbOf(c).getCenter(_v),roomOfPoint(_v.x,_v.y,_v.z)):'',   // reflective classes take their room's reflection cube, so they never share a material across rooms
+    attrSig(g),c.castShadow,c.receiveShadow,c.layers.mask].join('|')}
+const NOS={};   // (optimize also runs without an attached renderer, in the tests)
+function vcMaterial(key,sample){const H=S||NOS,M=H.vcMats||(H.vcMats=new Map());let vm=M.get(key);if(vm)return vm;vm=sample.clone();vm.color.setRGB(1,1,1);vm.vertexColors=true;vm.userData=Object.assign({},sample.userData);vm.name='prVC';vm.envMap=sample.envMap;vm.envMapIntensity=sample.envMapIntensity;
+  if(S&&PATCHED.has(sample))patch(vm);M.set(key,vm);return vm}
 function optimize(root,immediate){if(!root)return null;if(root.userData.prMerged)unoptimize(root);root.userData.prPieceRoot=true;root.updateMatrixWorld(true);
   const inv=new TH.Matrix4().copy(root.matrixWorld).invert(),groups=new Map();let before=0;
   (function rec(o){for(const c of o.children){if(isPiece(c)||c.userData.prKeep||isUI(c)||!c.visible)continue;
     if(c.isMesh&&!c.isInstancedMesh&&!c.isSkinnedMesh&&!Array.isArray(c.material)&&c.material&&c.geometry&&c.geometry.attributes.position&&c.geometry.attributes.normal&&!c.geometry.morphAttributes.position&&
-       c.material.userData.prClass!=='emissive'&&!c.material.transparent&&!c.children.length){before++;const k=matKey(c.material)+'#'+attrSig(c.geometry)+'#'+c.castShadow;let a=groups.get(k);if(!a)groups.set(k,a=[]);a.push(c)}
+       c.material.userData.prClass!=='emissive'&&!c.material.transparent&&!c.children.length){before++;const vk=vcKey(c);const k=vk?vk:matKey(c.material)+'#'+attrSig(c.geometry)+'#'+c.castShadow;let a=groups.get(k);if(!a)groups.set(k,a=[]);a.push(c)}
     rec(c)}})(root);
   const merged=[];const M=new TH.Matrix4(),N=new TH.Matrix3(),v=new TH.Vector3();
-  for(const list of groups.values()){if(list.length<2)continue;const g0=list[0].geometry,keys=Object.keys(g0.attributes);let nv=0,ni=0;
+  for(const [gk,list] of groups){if(list.length<2)continue;const vc=gk.startsWith('VC|');const g0=list[0].geometry,keys=Object.keys(g0.attributes);let nv=0,ni=0;
     for(const m of list){nv+=m.geometry.attributes.position.count;ni+=m.geometry.index?m.geometry.index.count:m.geometry.attributes.position.count}
-    const geo=new TH.BufferGeometry(),arrs={};for(const k of keys){const s=g0.attributes[k].itemSize;arrs[k]=new Float32Array(nv*s)}const index=nv>65535?new Uint32Array(ni):new Uint16Array(ni);let vo=0,io=0;
+    const geo=new TH.BufferGeometry(),arrs={};for(const k of keys){const s=g0.attributes[k].itemSize;arrs[k]=new Float32Array(nv*s)}if(vc)arrs.color=new Float32Array(nv*3);const index=nv>65535?new Uint32Array(ni):new Uint16Array(ni);let vo=0,io=0;
     for(const m of list){const g=m.geometry,pc=g.attributes.position.count;M.multiplyMatrices(inv,m.matrixWorld);N.getNormalMatrix(M);
+      if(vc){const cl=m.material.color,ca=arrs.color;for(let i=0;i<pc;i++){const q=(vo+i)*3;ca[q]=cl.r;ca[q+1]=cl.g;ca[q+2]=cl.b}}
       for(const k of keys){const at=g.attributes[k],s=at.itemSize,dst=arrs[k];for(let i=0;i<pc;i++){if(k==='position'){v.fromBufferAttribute(at,i).applyMatrix4(M);dst[(vo+i)*3]=v.x;dst[(vo+i)*3+1]=v.y;dst[(vo+i)*3+2]=v.z}
         else if(k==='normal'){v.fromBufferAttribute(at,i).applyMatrix3(N).normalize();dst[(vo+i)*3]=v.x;dst[(vo+i)*3+1]=v.y;dst[(vo+i)*3+2]=v.z}else{dst[(vo+i)*s]=at.getX(i);if(s>1)dst[(vo+i)*s+1]=at.getY(i);if(s>2)dst[(vo+i)*s+2]=at.getZ(i);if(s>3)dst[(vo+i)*s+3]=at.getW(i)}}}
       if(g.index)for(let i=0;i<g.index.count;i++)index[io++]=g.index.getX(i)+vo;else for(let i=0;i<pc;i++)index[io++]=vo+i;vo+=pc}
-    for(const k of keys)geo.setAttribute(k,new TH.BufferAttribute(arrs[k],g0.attributes[k].itemSize));geo.setIndex(new TH.BufferAttribute(index,1));geo.computeBoundingSphere();geo.computeBoundingBox();
-    const mm=new TH.Mesh(geo,list[0].material);mm.castShadow=list[0].castShadow;mm.receiveShadow=list.some(m=>m.receiveShadow);mm.layers.mask=list[0].layers.mask&~(1<<L_Z);mm.userData.prSources=list;mm.userData.prMergedMesh=true;mm.name='prMerged';
+    for(const k of keys)geo.setAttribute(k,new TH.BufferAttribute(arrs[k],g0.attributes[k].itemSize));if(vc)geo.setAttribute('color',new TH.BufferAttribute(arrs.color,3));geo.setIndex(new TH.BufferAttribute(index,1));geo.computeBoundingSphere();geo.computeBoundingBox();
+    const mm=new TH.Mesh(geo,vc?vcMaterial(gk,list[0].material):list[0].material);mm.castShadow=list[0].castShadow;mm.receiveShadow=list.some(m=>m.receiveShadow);mm.layers.mask=list[0].layers.mask&~(1<<L_Z);mm.userData.prSources=list;mm.userData.prMergedMesh=true;mm.name='prMerged';
     mm.userData.prBig=true;mm.visible=false;root.add(mm);mm.updateMatrixWorld(true);merged.push(mm)}
   // staged: the merged meshes stay hidden until their programs are known to exist (warmed in the background), then swap in one step
-  root.userData.prMerged=merged;if(merged.length){if(!immediate&&S&&S.matReady&&S.warm){S.mergeQ.push(merged);if(!S.warm.queue.includes('merge'))S.warm.queue.push('merge')}else swapMerge(merged)}return {meshes:before,merged:merged.length,removed:merged.reduce((a,m)=>a+m.userData.prSources.length,0)-merged.length}}
+  root.userData.prMerged=merged;if(merged.length){if(!immediate&&S&&S.matReady&&S.warm){
+    // a vertex-color material seen for the first time gets all its shadow-count variants compiled (the 'realx' job) before its merged meshes swap in
+    let vcNew=false;for(const mm of merged){const vm=mm.material;if(vm.name==='prVC'&&!vm.userData.prVCW){vm.userData.prVCW=true;S.warm.realQ.add(mm);vcNew=true}}
+    if(vcNew){const q=S.warm.queue;if(!q.includes('realx')){const i=q.indexOf('merge');q.splice(i>=0?i:q.length,0,'realx')}}
+    S.mergeQ.push(merged);if(!S.warm.queue.includes('merge'))S.warm.queue.push('merge')}else swapMerge(merged)}return {meshes:before,merged:merged.length,removed:merged.reduce((a,m)=>a+m.userData.prSources.length,0)-merged.length}}
 function swapMerge(merged){for(const mm of merged){if(!mm.parent)continue;mm.visible=true;for(const m of mm.userData.prSources){m.visible=false;m.userData.prMergedInto=mm}}if(S)S.plDirty=true}
 function unoptimize(root){if(S&&S.mergeQ)S.mergeQ=S.mergeQ.filter(e=>e!==root.userData.prMerged);for(const mm of root.userData.prMerged||[]){for(const m of mm.userData.prSources){m.visible=true;delete m.userData.prMergedInto}if(mm.parent)mm.parent.remove(mm);mm.geometry.dispose()}delete root.userData.prMerged}
 function pieceOf(o){for(let p=o;p&&p!==S.scene;p=p.parent)if(isPiece(p))return p;return null}
@@ -17143,11 +17160,11 @@ function drawOverlays(){const hid=S.uiHidden;if(!hid||!hid.length)return;const R
 
 /* ---------------- stats ---------------- */
 // where the draw calls come from (visible meshes by class, merged or not, and the pieces with the most): for deciding what to merge next
-function drawMix(){if(!S||!S.scene)return null;const cls={},pieces={};let n=0,merged=0,trans=0,lines=0,shadowCast=0;
+function drawMix(){if(!S||!S.scene)return null;const cls={},pieces={};let n=0,merged=0,trans=0,lines=0,shadowCast=0,vcm=0;
   S.scene.traverseVisible(o=>{if(!(o.isMesh||o.isLine||o.isPoints)||o.userData.prZMesh||(S.uiSet&&S.uiSet.has(o)))return;n++;if(o.isLine)lines++;if(o.userData.prSources)merged++;const m=Array.isArray(o.material)?o.material[0]:o.material;
-    if(m&&m.transparent)trans++;if(o.castShadow)shadowCast++;const c=(m&&m.userData&&m.userData.prClass)||(m&&m.type)||'?';cls[c]=(cls[c]||0)+1;
+    if(m&&m.name==='prVC')vcm++;if(m&&m.transparent)trans++;if(o.castShadow)shadowCast++;const c=(m&&m.userData&&m.userData.prClass)||(m&&m.type)||'?';cls[c]=(cls[c]||0)+1;
     let p=o;while(p&&p!==S.scene&&!(p.name&&p.name.startsWith('piece:')))p=p.parent;const k=p&&p.name?p.name:'(other)';pieces[k]=(pieces[k]||0)+1});
-  return {visibleDraws:n,mergedMeshes:merged,transparent:trans,lines,castShadow:shadowCast,byClass:cls,topPieces:Object.entries(pieces).sort((a,b)=>b[1]-a[1]).slice(0,12)}}
+  return {visibleDraws:n,mergedMeshes:merged,vertexColorMeshes:vcm,vcMaterials:S.vcMats?S.vcMats.size:0,transparent:trans,lines,castShadow:shadowCast,byClass:cls,topPieces:Object.entries(pieces).sort((a,b)=>b[1]-a[1]).slice(0,12)}}
 function techniques(){const C=S.cfg,t=[];
   if(!S.post)return ['classes','shadow cap '+ptsFor(C),'plain draw'];if(!S.eff)return ['plain draw while shaders compile'];const ts=scaleOf(C,'ts'),ls=scaleOf(C,'ls');
   t.push(U.uPRGI.value===1?'SH probes 1/'+ts:U.uPRGI.value===3?'SH probes':'GI warming');t.push('reflection cubes');t.push('shadow maps x'+(ptsFor(C)+(S.key&&S.key.castShadow?1:0)));
@@ -17188,6 +17205,7 @@ function detach(){if(!S)return;const R=S.R;try{for(const [l,c,m,au] of S.saved.c
   for(const m of S.patchedList){if(m.userData.prEI!=null){m.emissiveIntensity=m.userData.prEI;delete m.userData.prEI}if(m.userData.prTM!=null){m.toneMapped=m.userData.prTM;delete m.userData.prTM;m.needsUpdate=true}}for(const o of S.zList)o.layers.disable(L_Z);if(S.dc)drawCheck(false);
   for(const h of S.hemis)if(h.userData.prOrig!=null)h.intensity=h.userData.prOrig;U.uPRGI.value=0;U.uPRGIk.value=0;U.uPRDbg.value=0;U.uPRFOK.value=0;if(S.glow&&S.glow.parent)S.glow.parent.remove(S.glow);for(const r of S.zRooms||[])for(const m of r.meshes)if(m.parent)m.parent.remove(m);
   if(S.hudEl)S.hudEl.remove();if(S.post){freeTargets();for(const c of S.cubes)c.rt.dispose();for(const p of (S.pmrem||[]).concat(S.pmStage||[],S.pmTmp?[S.pmTmp]:[]))p.dispose();if(S.pmGen)S.pmGen.dispose();for(const k of ['atlas','shT','shA','shB'])disposeRT(S[k]);if(S.spare){for(const x of [S.spare.atlas,S.spare.shT].concat(S.spare.pm||[]))disposeRT(x)}disposeRT(S.altCube);if(S.warm&&S.warm.psoRT)S.warm.psoRT.forEach(disposeRT)}}catch(e){console.warn(e)}
+  if(S.vcMats){for(const m of S.vcMats.values())m.dispose();S.vcMats=null}
   for(const e of GT.q)S.gl.deleteQuery(e.q);GT.q.length=0;GT.cur=null;hookBuilds(false);glTrace(false);S=null}
 function sceneChanged(kind,obj){if(!S)return;S.photoN=0;if(kind==='geometry')S.winDirty=true;if(kind!=='camera')S.histReset=true;if(kind==='camera'){if(obj&&obj.isCamera)S.camera=obj;S.camMoved=now();return}if(kind==='walls'){S.editT=now();S.aoDirty=true;zRoomInvalidate(null,'sc:walls');return}
   if(!S.post){return}

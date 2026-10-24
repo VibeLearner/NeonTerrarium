@@ -16609,7 +16609,7 @@ function texAvg(t){if(!t||!t.image)return [1,1,1];const im=t.image;if(_avg.has(i
 function lightsNear(box,r,fn){for(let i=0;i<S.poolN;i++){const p=S.pool[i];if(!p.userData.src)continue;const reach=Math.max(r,p.distance||6);if(!box||box.distanceToPoint(p.position)<reach)fn(p)}}
 function dirtyLight(p,moved){if(moved&&p.castShadow)p.shadow.needsUpdate=true}
 function dirtyBox(box,r,shadowsToo,noSpare){if(!S.probes)return;const sp=S.spare;
-  if(sp&&!noSpare){if(!box||(sp.dd&&sp.dd.length>48)){sp.have=false;sp.valid=false;S.altJob=null;sp.dd=[]}else(sp.dd||(sp.dd=[])).push([box.clone(),r,shadowsToo])}   // a local edit keeps the spare bake and is replayed on the live probes when it swaps in; a global one (time of day, ambient light) makes it unusable
+  if(sp&&!noSpare){if(!box||(sp.dd&&sp.dd.length>48)){sp.have=false;sp.valid=false;S.altJob=null;sp.dd=[];S.pendSwap=null}else(sp.dd||(sp.dd=[])).push([box.clone(),r,shadowsToo])}   // a local edit keeps the spare bake and is replayed on the live probes when it swaps in; a global one (time of day, ambient light) makes it unusable
   S.probes.forEach((p,i)=>{if(!box||box.distanceToPoint(_v.set(p.x,p.y,p.z))<r)queueProbe(i)});
   S.cubes.forEach((c2,i)=>{const R=S.rooms[i];if(!box||(box.max.x>R.min[0]-1&&box.min.x<R.max[0]+1&&box.max.z>R.min[2]-1&&box.min.z<R.max[2]+1)){c2.dirty=true;c2.f=0}});
   if(shadowsToo){lightsNear(box,0,p=>{if(p.castShadow)p.shadow.needsUpdate=true});if(S.key&&S.key.castShadow)S.key.shadow.needsUpdate=true}
@@ -16800,7 +16800,7 @@ const G={settle:0,cpuBound:false,med:0,gpuOk:true,rung:1,sub:0,win:[],winT:0,las
 function gpuTrusted(med){if(GT.total==null)return null;const iv=Math.max(med||0,16.7);return GT.total<=iv*1.1?GT.total:null}
 function govern(dt){G.ints[G.ni]=dt;G.ni=(G.ni+1)%G.ints.length;G.nInts=Math.min(G.nInts+1,G.ints.length);if(S.fixed||!S.matReady)return;
   // frames while the open, the warm-up or a rebake is still working say nothing about steady cost: no window counts until 3 s after the last of them
-  if((S.warm&&!S.warm.finished)||ctxBusy()||S.pq.length||S.cubes.some(c=>c.dirty)||S.pmQ.length||S.optQ.length||S.projNeeded||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid))){G.win=[];G.winT=0;G.slowN=0;G.settle=now()+3000;return}
+  if((S.warm&&!S.warm.finished)||(S.altT&&now()-S.altT<600)||ctxBusy()||S.pq.length||S.cubes.some(c=>c.dirty)||S.pmQ.length||S.optQ.length||S.projNeeded||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid))){G.win=[];G.winT=0;G.slowN=0;G.settle=now()+3000;return}
   if(now()<G.settle){G.win=[];G.winT=0;return}
   G.win.push(dt);G.winT+=dt;if(G.winT<1000||G.win.length<10)return;
   const w=G.win.sort((a,b)=>a-b),med=w[w.length>>1],p95=w[Math.min(w.length-1,Math.floor(w.length*.95))];G.win=[];G.winT=0;const t=now();
@@ -17082,18 +17082,21 @@ function altSwap(was,now2){const sp=S.spare;if(S.ab.altWork===false||!sp||!S.pro
 // every light the work toggle owns (builder.js tags them), forced to one state while a spare slice renders
 function altCapture(A,pos,fn){const sp=S.spare,on=A.state,L=A.lights,sv=L.map(l=>l.intensity),hs=S.probesReady?.55:1;
   for(const l of L)l.intensity=l.isHemisphereLight?(on?l.userData.wl0*hs:l.userData.wl0*.06):(on?l.userData.wl0:0);
-  captureMode(true,pos);const gi=U.uPRGI.value,sh=U.uPRSH.value;if(!sp.baked&&A.pass===0)U.uPRGI.value=0;else U.uPRSH.value=sp.shT.texture;   // bounce light comes from the spare's own previous bake, never the live state's
+  captureMode(true,pos);const gi=U.uPRGI.value,sh=U.uPRSH.value;if(!sp.baked&&A.pass===0){if(!A.seed)U.uPRGI.value=0}else U.uPRSH.value=sp.shT.texture;   // bounce light comes from the spare's own previous bake, never the live state's
   const k=ptsFor(S.cfg),ps=[];for(let i=0;i<k;i++){const p=S.pool[i],src=p.userData.src;if(src&&src.userData.workLight){ps.push([p,p.intensity]);p.intensity=on?src.userData.wl0:0}}
   try{return fn()}finally{for(const e of ps)e[0].intensity=e[1];for(let i=0;i<L.length;i++)L[i].intensity=sv[i];U.uPRSH.value=sh;captureMode(false)}}
+function altCan(){const sp=S.spare;return !!(sp&&S.ab.altWork!==false&&S.probesReady&&S.matReady&&S.post&&S.pmrem)}
+function finishPend(){const P=S.pendSwap;S.pendSwap=null;if(!P)return;if(altSwap(P.was,P.to)){S.altSkip=false;ev('deferred swap '+Math.round(now()-(S.tog?S.tog.t:now()))+'ms')}else dirtyBox(null,0,false)}   // could not swap: fall back to a live rebake
 function altWork(idle,sl){const sp=S.spare;if(!sp||S.ab.altWork===false||!S.probesReady||!S.matReady||!S.post||S.picking||S.flushing||!idle)return;
-  if(now()-(S.camMoved||0)<800)return;   // each probe or cube face is a whole extra scene render: the spare bake only runs while the view is still (a hitch is invisible then)
+  if(now()-(S.camMoved||0)<(S.pendSwap?500:800))return;   // each probe or cube face is a whole extra scene render: the spare bake only runs while the view is still (a hitch is invisible then)
   if(S.pq.length||S.projNeeded||S.lerpN>0||S.pmQ.length||S.optQ.length||S.aoDirty||S.cubes.some(c=>c.dirty||!c.done)||S.pmFade.some(n=>n>0)||!S.warm||!S.warm.done.pmrem)return;   // not gated on the whole warm-up (about 29 s): the spare bake changes light intensities only, so it reuses the programs the live bake already built
-  if(sp.have&&sp.state===!S.workLight)return;
-  const every=Math.max((S.cpu||0)<8?1:(S.cpu||0)<12?2:4,S.warm.finished?1:2);if(S.frame%every)return;   // slower where the CPU is already the limit
-  let A=S.altJob;
-  if(!A||A.state!==!S.workLight){const lights=[];S.scene.traverse(o=>{if(o.isLight&&o.userData.workLight&&o.userData.wl0!=null)lights.push(o)});
+  const tgt=S.pendSwap?S.pendSwap.to:!S.workLight;
+  if(sp.have&&sp.state===tgt){if(S.pendSwap)finishPend();return}
+  const every=S.pendSwap?1:Math.max((S.cpu||0)<8?1:(S.cpu||0)<12?2:4,S.warm.finished?1:2);if(S.frame%every)return;   // slower where the CPU is already the limit; a waiting toggle runs every frame
+  S.altT=now();let A=S.altJob;
+  if(!A||A.state!==tgt){const lights=[];S.scene.traverse(o=>{if(o.isLight&&o.userData.workLight&&o.userData.wl0!=null)lights.push(o)});
     if(!sp.pm)sp.pm=S.cubes.map(()=>mkPM());if(!S.altCube){S.altCube=new TH.WebGLCubeRenderTarget(64,{type:S.hdrType,generateMipmaps:false,minFilter:TH.LinearFilter});clearRT(S.altCube);S.altCC=new TH.CubeCamera(.05,30,S.altCube);S.altCC.children.forEach(c=>c.layers.set(LAYER))}
-    sp.valid=false;sp.have=false;sp.dd=[];sp.state=!S.workLight;S.altJob=A={state:!S.workLight,lights,phase:0,pass:0,passes:sp.baked?1:2,pi:0,f:0,ci:0,cf:0,t0:now()};ev('alt bake start '+(A.state?'work light on':'work light off'));return}
+    const seed=!sp.baked&&!!S.pendSwap;sp.valid=false;sp.have=false;sp.dd=[];sp.state=tgt;S.altJob=A={state:tgt,lights,seed,phase:0,pass:0,passes:(sp.baked||seed)?1:2,pi:0,f:0,ci:0,cf:0,t0:now()};ev('alt bake start '+(A.state?'work light on':'work light off'));return}
   if(A.phase===0){const p=S.probes[A.pi];_v2.set(p.x,p.y,p.z);
     sl('alt probe face',()=>altCapture(A,_v2.clone(),()=>{const f=FACES[A.f],c=S.pcam;c.position.set(p.x,p.y,p.z);c.up.set(f[3],f[4],f[5]);c.lookAt(p.x+f[0],p.y+f[1],p.z+f[2]);c.updateMatrixWorld(true);
       sp.atlas.viewport.set(A.f*F,A.pi*F,F,F);sp.atlas.scissor.set(A.f*F,A.pi*F,F,F);S.R.setRenderTarget(sp.atlas);S.R.render(S.scene,c);return true}));
@@ -17104,15 +17107,14 @@ function altWork(idle,sl){const sp=S.spare;if(!sp||S.ab.altWork===false||!S.prob
     sl('alt cube face',()=>altCapture(A,c.cam.position.clone(),()=>{S.R.setRenderTarget(S.altCube,A.cf);S.R.render(S.scene,S.altCC.children[A.cf]);return true}));
     if(++A.cf>=6){A.cf=0;A.phase=3}return}
   if(A.phase===3){sl('alt PMREM',()=>{S.pmGen.fromCubemap(S.altCube.texture,sp.pm[A.ci]);return true});
-    if(++A.ci>=S.cubes.length){sp.valid=true;sp.have=true;S.altJob=null;S.altBakeMs=+(now()-A.t0).toFixed(0);ev('alt bake done '+S.altBakeMs+'ms')}else A.phase=2}}
+    if(++A.ci>=S.cubes.length){sp.valid=true;sp.have=true;S.altJob=null;S.altBakeMs=+(now()-A.t0).toFixed(0);ev('alt bake done '+S.altBakeMs+'ms');if(S.pendSwap)finishPend()}else A.phase=2}}
 
 /* ---------------- frame ---------------- */
 function camKey(c){const a=c.matrixWorld.elements,b=c.projectionMatrix.elements;let h=0;for(let i=0;i<16;i++)h+=a[i]*(i+1.3)+b[i]*(i+7.1);return h}
 // at most one heavy slice per frame (a probe face, a cube face, a PMREM, the contact texture, a depth-merge batch), plus cheap SH passes
 function ctxBusy(){const p=window.PodContext;if(!p||!p.active||!p.active())return false;if(p.transitioning){S.ctxT=now();return true}return S.ctxT&&now()-S.ctxT<500}
 function zBlk(k){const D=S.zDiag;if(D&&S.zRooms&&S.zRooms.some(r=>!r.valid))D.blk[k]=(D.blk[k]||0)+1}
-function burstK(){const B=S.burst||(S.burst={k:2,t:0,used:false});B.used=true;return B.k}
-function work(){if(S.tog&&!S.tog.done&&now()-S.tog.t>150&&liveSettled()){S.tog.done=true;console.log('[PodRender] work light settled after '+Math.round(now()-S.tog.t)+' ms '+(S.tog.hit?'(swap)':'(rebake)')+', faces per frame now '+(S.burst?S.burst.k:1))}
+function work(){if(S.tog&&!S.tog.done&&!S.pendSwap&&now()-S.tog.t>150&&liveSettled()){S.tog.done=true;console.log('[PodRender] work light settled after '+Math.round(now()-S.tog.t)+' ms '+(S.tog.hit?'(instant swap)':S.tog.pend?'(deferred swap)':'(rebake)'))}
   if(S.picking&&!S.flushing){zBlk('work:picking');return}if(!S.flushing&&ctxBusy()){zBlk('work:ctxBusy');return} // probe, cube and PMREM rebakes wait for the PodContext transition (round 19)
   const C=S.cfg,fr=S.frame,idle=now()-S.editT>1500;
   const sl=(kind,fn)=>{const a=now();const r=cw(kind,fn);if(r){const ms=+(now()-a).toFixed(2);ev((typeof r==='string'?r:kind)+' '+ms+'ms');S.slices.push({kind:typeof r==='string'?r:kind,ms,frame:fr});if(S.slices.length>600)S.slices.shift()}return r};
@@ -17123,11 +17125,9 @@ function work(){if(S.tog&&!S.tog.done&&now()-S.tog.t>150&&liveSettled()){S.tog.d
   if(zRoomsBusy()){S.zDiag.steps++;sl('depth merge',zRoomStep);return}
   if(S.zRooms&&S.zRooms.some(r=>!r.valid))zBlk(S.picking?'busy:picking':!(S.flushing||now()-S.editT>400)?'busy:editRecent':'busy:other');
   const still=S.flushing||now()-(S.camMoved||0)>=500;   // a probe or cube face is a whole extra scene render (20 to 25 ms): after the first bake they wait for a still camera, where one long frame is invisible
-  // a pending Work-light relight (or the first bake) is in a hurry: several faces per frame, as many as keep the frame near 60 fps (burst count adapts each frame)
-  const hurryT=!S.flushing&&!!(S.tog&&!S.tog.done),hurry=hurryT||(!S.flushing&&S.probeFirst);
-  const probeOK=hurryT||((!C.static||S.probeFirst||idle)&&(S.probeFirst||still));
-  if(S.pq.length&&probeOK&&(S.flushing||hurry||fr%C.probeEvery===0)){let k=hurry?burstK():1;while(k-->0&&S.pq.length){const pp=S.probes[S.pq[0].i];_v2.set(pp.x,pp.y,pp.z);captureMode(true,_v2.clone());sl('probe face',probeFace);captureMode(false)}return}
-  if(S.cubes.some(c=>c.dirty)){if((hurryT||!C.static||idle||S.cubes.some(c=>!c.done))&&(still||hurryT)&&(S.flushing||hurryT||fr%C.cubeEvery===0)){let k=hurryT?Math.max(1,burstK()>>1):1;while(k-->0&&S.cubes.some(c=>c.dirty)){captureMode(true,S.cubes.find(c=>c.dirty).cam.position.clone());sl('cube face',cubeFace);captureMode(false)}}return}
+  const probeOK=(!C.static||S.probeFirst||idle)&&(S.probeFirst||still);
+  if(S.pq.length&&probeOK&&(S.flushing||fr%C.probeEvery===0)){const pp=S.probes[S.pq[0].i];_v2.set(pp.x,pp.y,pp.z);captureMode(true,_v2.clone());sl('probe face',probeFace);captureMode(false);return}
+  if(S.cubes.some(c=>c.dirty)){if((!C.static||idle||S.cubes.some(c=>!c.done))&&still&&(S.flushing||fr%C.cubeEvery===0)){captureMode(true,S.cubes.find(c=>c.dirty).cam.position.clone());sl('cube face',cubeFace);captureMode(false)}return}
   altWork(idle,sl)}
 // plain frames while shaders compile use the builder's own lamps (not the light pool), so every program drawn is one the builder compiled
 // before PodRender attached (the pool's 6-light variant of the unpatched materials was a burst of synchronous compiles). Once materials are
@@ -17298,7 +17298,6 @@ function render(dt,cam){if(!S)return;if(cam&&cam.isCamera)S.camera=cam;const R=S
   if(pc)pc._pr=false;
   if(S.post){gtFrameEnd();gtPoll()}
   S.calls=R.info.render.calls;S.tris=R.info.render.triangles;R.info.autoReset=ar;R.autoClear=ac;R.setRenderTarget(prevRT);const c=now()-t;S.cpu=S.cpu?S.cpu*.9+c*.1:c;S.lastCpu=c;
-  {const B=S.burst;if(B){const w=now()-(B.t||now());B.t=now();if(B.used){if(w<20&&c<12)B.k=Math.min(B.k+1,8);else if(w>32||c>24)B.k=Math.max(1,B.k-1);B.used=false}}}   // wall time between frames carries the GPU back-pressure of last frame's extra faces
   {const pg=R.info.programs.length-prog0;for(let i=S.syncBuilds.length-1;i>=0&&S.syncBuilds[i].frame===S.frame;i--)S.syncBuilds[i].newProgramsThisFrame=pg}S.curObj=null;
   if(c>50&&S.post){const tx=R.info.memory.textures-tex0,pg=R.info.programs.length-prog0,P=S.prof,r1=x=>+(x||0).toFixed(1);const hp=performance.memory?performance.memory.usedJSHeapSize:0;const e={frame:S.frame,ms:+c.toFixed(1),eff:S.eff,events:S.ev.slice(),newTextures:tx,newPrograms:pg,cpuStages:{warm:r1(P.warm),work:r1(P.work),pre:r1(P.pre),main:r1(P.main),post:r1(P.post),overlay:r1(S.ovMs),hud:r1(S.hudMs)},heapMB:hp?+(hp/1048576).toFixed(1):null,heapDeltaMB:hp&&S.heap0?+((hp-S.heap0)/1048576).toFixed(1):null,warmSec:S.wsec,glSlow:(S.glSlow||[]).slice(),glTop:Object.entries(S.glAcc||{}).filter(x=>x[1]>.5).sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>[x[0],+x[1].toFixed(1)]),mainSec:{z:+(S.mz||0).toFixed(1),render:+(S.mr||0).toFixed(1),calls:S.mc||0,tris:S.mtri||0,heapMain:S.mh||0,glowN:S.glowN||0,pool:S.pool.filter(q=>q.userData.src).length},buildsByStage:Object.assign({},S.bsF),progs:R.info.programs.slice(prog0,prog0+12).map(q=>q.name+' '+String(q.cacheKey).slice(0,90))};S.slow.push(e);if(S.slow.length>30)S.slow.shift();console.warn('PodRender slow frame '+e.ms+' ms: '+JSON.stringify(e))}
   if(S.checkSamplers)samplerCheck();{const a=now();hud();S.hudMs=now()-a}}
@@ -17310,7 +17309,10 @@ function classify(root){const cnt={};if(!S){root.traverse(x=>{if(!x.isMesh)retur
   root.updateMatrixWorld(true);walk(root,false,true,cnt);lightLists();S.plDirty=true;if(S.post){if(S.probes){const b=new TH.Box3().setFromObject(root);dirtyBox(b.isEmpty()?null:b,3,true)}S.aoDirty=true;S.glowDirty=true;zRoomInvalidate(null,'classify');queueOpt(root);}return summary(cnt)}
 function setOptions(o){if(!S)return;o=o||{};if(o.quality!=null||o.rung!=null){const q=o.rung!=null?o.rung:o.quality;if(q==='auto'){S.fixed=false}else{S.fixed=true;G.sub=0;setRung(typeof q==='number'?q:QMAP[q]||+q||1)}}
   // time of day and the builder's work light (round 16): window light and probes follow (probes and cubes rebake in slices)
-  if(o.time&&o.time!==S.time){S.time=o.time==='day'?'day':'night';S.winDirty=true;S.winRebake=true}if(o.workLight!=null&&!!o.workLight!==S.workLight){const was=S.workLight,fresh=!S.winRebake;S.workLight=!!o.workLight;S.winRebake=true;const hit=!!(fresh&&altSwap(was,S.workLight));if(hit)S.altSkip=true;const sp0=S.spare;S.tog={t:now(),hit,fresh,why:hit?'':!sp0?'no spare':S.ab.altWork===false?'disabled':!S.probesReady?'probes not ready':!sp0.have?(S.altJob?'spare still baking (phase '+S.altJob.phase+')':'spare not baked'):sp0.state!==S.workLight?'spare is the wrong state':S.altJob?'bake running':!fresh?'time change in flight':'other'};console.log('[PodRender] work light toggle',hit?'INSTANT swap':'SLOW relight',S.tog.why,JSON.stringify({warmDone:!!(S.warm&&S.warm.finished),altPhase:S.altJob?S.altJob.phase:null,pq:S.pq.length,dirtyCubes:S.cubes.filter(c=>c.dirty||!c.done).length,pmQ:S.pmQ.length,spareStale:sp0&&sp0.dd?sp0.dd.length:0}))}
+  if(o.time&&o.time!==S.time){S.time=o.time==='day'?'day':'night';S.winDirty=true;S.winRebake=true}if(o.workLight!=null&&!!o.workLight!==S.workLight){const was=S.workLight,fresh=!S.winRebake;S.workLight=!!o.workLight;S.winRebake=true;const hit=!!(fresh&&altSwap(was,S.workLight));if(hit)S.altSkip=true;const sp0=S.spare;
+    let pend=false;if(!hit&&fresh&&altCan()){pend=true;S.altSkip=true;S.altQuiet=S.frame+8;   // the live probes are left alone (no rebake in pieces); direct light and shadows switch now, bounce light and reflections follow in one fade
+      if(S.pendSwap)S.pendSwap=null;   // toggled back before the bake finished: the live bounce light is already the right state, the running bake becomes the spare
+      else{S.pendSwap={was,to:S.workLight};if(S.altJob&&S.altJob.state!==S.workLight){S.altJob=null;sp0.have=false;sp0.valid=false}}}S.tog={t:now(),hit,pend,fresh,why:hit?'':pend?(S.pendSwap?'new state baking off screen'+(S.altJob?' (phase '+S.altJob.phase+')':''):'toggled back, live light already right'):!sp0?'no spare':S.ab.altWork===false?'disabled':!S.probesReady?'probes not ready':!sp0.have?(S.altJob?'spare still baking (phase '+S.altJob.phase+')':'spare not baked'):sp0.state!==S.workLight?'spare is the wrong state':S.altJob?'bake running':!fresh?'time change in flight':'other'};console.log('[PodRender] work light toggle',hit?'INSTANT swap':pend?'DEFERRED swap':'SLOW relight',S.tog.why,JSON.stringify({warmDone:!!(S.warm&&S.warm.finished),altPhase:S.altJob?S.altJob.phase:null,pq:S.pq.length,dirtyCubes:S.cubes.filter(c=>c.dirty||!c.done).length,pmQ:S.pmQ.length,spareStale:sp0&&sp0.dd?sp0.dd.length:0}))}
   if(o.windows!==undefined){S.winList=o.windows;S.winDirty=true;S.winRebake=true}if(o.animate!=null)S.wAnim=!!o.animate;
   if(o.glow){Object.assign(S.glowK,o.glow);S.glowDirty=true}if(o.rep)S.rep=Object.assign({},o.rep);if(o.hud!=null){S.hudOn=!!o.hud;hud()}if(o.off)Object.assign(S.off,o.off);if(o.debug!==undefined)S.debug=o.debug||null;if(o.checkSamplers!=null)S.checkSamplers=!!o.checkSamplers;if(o.freeze!=null){S.noFreeze=!o.freeze;if(S.noFreeze)matUnfreeze()}
   // A/B options (fps test): {prepass, depth:'resolve'|'single', hdr8, lights:4|6, fb, cheap, ptShadows, cones, reflBuf, vshadow}

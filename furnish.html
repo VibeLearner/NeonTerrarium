@@ -15791,12 +15791,20 @@ function flyCam(cam,t){const c=camFor(cam),h=C.city,g=ease(ph(t,'glide')),gz=ph(
   c.updateMatrixWorld(true);return c}
 // the transition's own clock: it runs freely through the city phase, then holds there (a slow drift) until the city is ready, then plays on
 const HOLD=.6,tNow=tr=>tr.hold!=null?tr.hold:tr.vt;
+// lighting hold: from the pod build phase on, while PodRender is still baking the room's light (live bake, then the other work-light state),
+// the hologram plays at a fifth of its speed and, if needed, waits just before the room fades in. The room is drawn under a fully opaque
+// hologram there, so the bake can run flat out without anything showing. Capped so a slow machine never waits more than LCAP.
+const LCAP=5000,LSLOW=.15;
+function lightHold(tr){if(tr.lhDone||tr.skipped)return false;const P=window.PodRender;let w=false;try{w=!!(P&&P.lightPending&&api._prDriving&&api._prDriving()&&P.lightPending())}catch(e){w=false}
+  const t=now();if(!w||(tr.lh0!=null&&t-tr.lh0>LCAP)){if(tr.lh0!=null&&C){C.tl.lightHoldMs=Math.round(t-tr.lh0);C.tl.lightHoldCapped=w}tr.lhDone=true;tr.holding=false;return false}
+  if(tr.lh0==null)tr.lh0=t;tr.holding=true;return true}
 function advance(tr){const t=now(),dt=Math.min(.1,(t-tr.last)/1000);tr.last=t;const ready=C.ready&&C.shown&&!C.pendingHome;
-  if(tr.gate&&(ready||t-tr.t0>25000)){tr.gate=false;C.tl.resolveStart=C.tl.resolve=Math.round(t-C.tl.t0)}if(tr.hold==null)tr.vt=tr.gate?Math.min(tr.vt+dt,HOLD):tr.vt+dt;tr.drift+=dt}
+  if(tr.gate&&(ready||t-tr.t0>25000)){tr.gate=false;C.tl.resolveStart=C.tl.resolve=Math.round(t-C.tl.t0)}if(tr.hold==null)tr.vt=tr.gate?Math.min(tr.vt+dt,HOLD):tr.vt+dt;tr.drift+=dt;
+  if(!tr.rm&&!tr.gate&&tr.hold==null&&!tr.lhDone&&tr.vt>=TL.build[0]&&lightHold(tr))tr.vt=Math.min(tr.vt-dt*(1-LSLOW),TL.resolve[0])}
 function loadFrac(){const src=CITY.state==='ready'?1:CITY.k||0;return clamp(.45*src+.35*(C.prog.build||0)+.15*(C.prog.warm||0)+.05*(C.shown?1:0),0,1)}
 function overlay(R,cam){if(!C||!C.trans||!cam)return;const a0=now(),tr=C.trans;advance(tr);if(C.tl.firstHoloFrame==null)C.tl.firstHoloFrame=Math.round(a0-C.tl.t0);const t=tNow(tr);targets(R);
   const P=C.P.over.uniforms;P.uProg.value=loadFrac();P.uShow.value=tr.gate&&now()-tr.t0>6000?1:0;   // a thin progress line inside the hologram only when loading runs long
-  if(tr.rm){if(tr.gate){drawOver(R,null,1,0);tr.frames.push(now());return}tr.rmT=tr.rmT||now();const a=1-clamp((now()-tr.rmT)/1000/DUR_RM,0,1);if(a<=0)return endTrans();drawOver(R,null,a,0);tr.frames.push(now());return}
+  if(tr.rm){if(tr.gate||lightHold(tr)){drawOver(R,null,1,0);tr.frames.push(now());return}tr.rmT=tr.rmT||now();const a=1-clamp((now()-tr.rmT)/1000/DUR_RM,0,1);if(a<=0)return endTrans();drawOver(R,null,a,0);tr.frames.push(now());return}
   if(t>=DUR)return endTrans();const h=C.city;if(!h||(h.real&&!h.M)){drawOver(R,null,1,0);tr.frames.push(now());return}   // nothing to show yet: the hologram's dark field
   const c=flyCam(cam,t);
   if(!h.real){const U=h.hm.uniforms,sp=ph(t,'sweep');U.uSweep.value=sp>0&&sp<1?lerp(h.top,h.y0+1.2,ease(sp)):-1e4;U.uFloorK.value=sp>=1?1:0;U.uPod.value=ph(t,'pod');U.uTop.value=1-ph(t,'top');U.uK.value=1-.5*ph(t,'resolve');
@@ -15806,7 +15814,7 @@ function overlay(R,cam){if(!C||!C.trans||!cam)return;const a0=now(),tr=C.trans;a
   drawOver(R,C.T.holo.texture,1-ease(ph(t,'resolve')),.003);tr.frames.push(now());C.ovMax=Math.max(C.ovMax,now()-a0)}
 function drawOver(R,tex,a,ca){const P=C.P;P.over.uniforms.t.value=tex||C.blank;P.over.uniforms.a.value=a;P.over.uniforms.ca.value=ca;const ac=R.autoClear;R.autoClear=false;try{quad(R,P.over,null)}finally{R.autoClear=ac}}
 // while the hologram fully covers the frame PodRender skips drawing the home
-function paused(){if(!C||!C.trans)return false;return C.trans.rm?C.trans.gate:tNow(C.trans)<TL.resolve[0]-.15}
+function paused(){if(!C||!C.trans)return false;if(C.trans.holding)return false;return C.trans.rm?C.trans.gate:tNow(C.trans)<TL.resolve[0]-.15}
 function endTrans(){if(!C||!C.trans)return;const tr=C.trans;C.trans=null;api.transitioning=false;removeSkip();const f=tr.frames,d=[];for(let i=1;i<f.length;i++)d.push(f[i]-f[i-1]);d.sort((x,y)=>x-y);
   C.tl.end=Math.round(now()-C.tl.t0);C.tl.longestTaskMs=Math.round(C.longTask||0);C.tl.longestSliceMs=+Math.max(C.slice||0,C.ovMax||0).toFixed(1);C.lastTrans={timeline:Object.assign({},C.tl,{t0:undefined}),frames:f.length,ms:+(now()-tr.t0).toFixed(0),medianMs:d.length?+d[d.length>>1].toFixed(2):null,worstMs:d.length?+d[d.length-1].toFixed(2):null,skipped:!!tr.skipped,reducedMotion:!!tr.rm,path:api._prDriving()?'PodRender':'plain'};
   try{tr.onDone&&tr.onDone()}catch(e){console.warn(e)}tr.resolve(C.lastTrans);wantDraw();if(C.swapAfter){C.swapAfter=false;setTimeout(lateSwap,0)}}
@@ -16183,6 +16191,7 @@ function backdropCheck(){if(!C||!C.shown||!C.R)return {shown:false};const t=C.T.
   for(let i=0;i<px.length;i+=16){const l=(px[i]*.2126+px[i+1]*.7152+px[i+2]*.0722)/255;s+=l;if(l>.02)nb++;n++}return {shown:true,meanLuma:+(s/n).toFixed(4),nonBlack:+(nb/n).toFixed(3),res:[w,h],bakes:C.bakes,ready:!!C.ready}}
 const api={enter,setHome,update,skip,exit,dispose(){exit();disposeKit()},warm:prewarm,frame,stats,homes,towers,pods,cityMap,defaultHome,facade,setCitySource,addPlots,progress,cityDone,load:loadCity,backdrop,overlay,paused,covers:false,transitioning:false,active:()=>!!C,_pr:false,_prSeen:0,_prDriving:()=>now()-api._prSeen<250,
   _debug:{warpError,resetWarp(){if(C){C.age={n:0,sum:0,max:0};C.mv={n:0,sum:0,max:0}}const G=window.PodRender&&window.PodRender._debug&&window.PodRender._debug.GT;if(G&&G.samp)G.samp.backdrop=[]},backdropCheck,hold(t){if(C&&C.trans)C.trans.hold=t==null?null:t},state:()=>C,metrics,DUR}};
+api.lightHolding=()=>!!(C&&C.trans&&C.trans.holding);   // PodRender bakes behind the hologram while this is true
 window.PodContext=api;
 // the pack starts loading shortly after the page settles (25 MB); homes() and enter() start it earlier when asked
 setTimeout(()=>{if(CITY.state==='idle')loadCity()},1500)})();
@@ -16800,7 +16809,7 @@ const G={settle:0,cpuBound:false,med:0,gpuOk:true,rung:1,sub:0,win:[],winT:0,las
 function gpuTrusted(med){if(GT.total==null)return null;const iv=Math.max(med||0,16.7);return GT.total<=iv*1.1?GT.total:null}
 function govern(dt){G.ints[G.ni]=dt;G.ni=(G.ni+1)%G.ints.length;G.nInts=Math.min(G.nInts+1,G.ints.length);if(S.fixed||!S.matReady)return;
   // frames while the open, the warm-up or a rebake is still working say nothing about steady cost: no window counts until 3 s after the last of them
-  if((S.warm&&!S.warm.finished)||(S.altT&&now()-S.altT<600)||ctxBusy()||S.pq.length||S.cubes.some(c=>c.dirty)||S.pmQ.length||S.optQ.length||S.projNeeded||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid))){G.win=[];G.winT=0;G.slowN=0;G.settle=now()+3000;return}
+  if((S.warm&&!S.warm.finished)||(S.altT&&now()-S.altT<600)||ctxBusy()||ctxHold()||S.pq.length||S.cubes.some(c=>c.dirty)||S.pmQ.length||S.optQ.length||S.projNeeded||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid))){G.win=[];G.winT=0;G.slowN=0;G.settle=now()+3000;return}
   if(now()<G.settle){G.win=[];G.winT=0;return}
   G.win.push(dt);G.winT+=dt;if(G.winT<1000||G.win.length<10)return;
   const w=G.win.sort((a,b)=>a-b),med=w[w.length>>1],p95=w[Math.min(w.length-1,Math.floor(w.length*.95))];G.win=[];G.winT=0;const t=now();
@@ -17062,7 +17071,7 @@ function windowUniforms(){const day=S.time==='day',W=S.windows||[];U.uPRWN.value
     U.uPRWP.value[i].set(w.blackout?1:0,day?.08:.35,w.blackout?.1:1,w.blackout?.6:1)})}
 function windowFrame(dt){if(S.wAnim)U.uPRWT.value=(U.uPRWT.value+Math.min(.1,(dt||16)/1000))%1e4;
   if(S.winDirty&&(S.winRebake||!S.windows||now()-S.editT>300)){windowsScan();S.winRebake=true}
-  if(S.winRebake){S.winRebake=false;windowUniforms();if(S.probes&&!S.altSkip)dirtyBox(null,0,false);S.altSkip=false;S.glowDirty=true;S.histReset=true}}
+  if(S.winRebake){S.winRebake=false;windowUniforms();if(S.probes&&!S.altSkip){if(altCan()&&S.ab.deferRelight!==false)deferRelight();else dirtyBox(null,0,false)}S.altSkip=false;S.glowDirty=true;S.histReset=true}}
 
 /* ---------------- instant work light: a spare set of baked lighting for the other state ----------------
    The probes (SH irradiance) and room reflection cubes are linear in the lights, so each work light state has its own complete bake. The live set is
@@ -17073,6 +17082,14 @@ function windowFrame(dt){if(S.wAnim)U.uPRWT.value=(U.uPRWT.value+Math.min(.1,(dt
 function mkPM(){const t=new TH.WebGLRenderTarget(3*Math.max(64,112),4*64,{magFilter:TH.LinearFilter,minFilter:TH.LinearFilter,generateMipmaps:false,type:TH.HalfFloatType,format:TH.RGBAFormat,encoding:TH.LinearEncoding,depthBuffer:false});
   t.texture.mapping=TH.CubeUVReflectionMapping;t.texture.name='PMREM.cubeUv';clearRT(t);return t}
 function copyRT(src,dst){const c=S.M.copy.uniforms;c.t.value=src.texture;dst.scissorTest=false;dst.viewport.set(0,0,dst.width,dst.height);quad(S.M.copy,dst)}
+function liveBusy(){return !!(S.pq.length||S.cubes.some(c=>c.dirty||!c.done)||S.pmQ.length||S.pmFade.some(n=>n>0)||S.optQ.length||S.projNeeded||S.lerpN>0||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid)))}
+function altNeed(){const sp=S.spare;if(!altCan()||!S.warm||!S.warm.done.pmrem)return false;const tgt=S.pendSwap?S.pendSwap.to:!S.workLight;return !(sp.have&&sp.state===tgt)}
+// asked by PodContext while its transition covers the room: is the lighting (live bake, then the spare for the other work-light state) still being built?
+function lightPending(){if(!S||!S.post||S.broken||S.ab.lightGate===false)return false;if(!S.matReady)return true;return liveBusy()||!S.probesReady||altNeed()||!!S.pendSwap}
+// behind the hologram nothing is on screen, so the bake runs flat out: up to 6 slices or about 10 ms a frame
+function bakeHidden(){const t0=now(),fr=S.frame;const sl=(kind,fn)=>{const a=now();const r=cw(kind,fn);if(r){const ms=+(now()-a).toFixed(2);ev((typeof r==='string'?r:kind)+' '+ms+'ms');S.slices.push({kind:typeof r==='string'?r:kind,ms,frame:fr});if(S.slices.length>600)S.slices.shift()}return r};
+  let n=0;while(n<6&&now()-t0<10){if(liveBusy()){S.flushing=true;try{work()}finally{S.flushing=false}n++;continue}
+    if(!altNeed()&&!S.pendSwap)break;const k=S.altN||0;altWork(true,sl,true);if((S.altN||0)===k)break;n++}S.hidN=(S.hidN||0)+n}
 function liveSettled(){return !S.pq.length&&!S.cubes.some(c=>c.dirty||!c.done)&&!S.pmQ.length&&!S.projNeeded&&S.lerpN<=0&&!S.pmFade.some(n=>n>0)}
 function altSwap(was,now2){const sp=S.spare;if(S.ab.altWork===false||!sp||!S.probesReady||!S.post||!S.pmrem||!sp.have||sp.state!==now2||!sp.pm||S.altJob)return false;
   const settled=liveSettled();
@@ -17082,21 +17099,22 @@ function altSwap(was,now2){const sp=S.spare;if(S.ab.altWork===false||!sp||!S.pro
 // every light the work toggle owns (builder.js tags them), forced to one state while a spare slice renders
 function altCapture(A,pos,fn){const sp=S.spare,on=A.state,L=A.lights,sv=L.map(l=>l.intensity),hs=S.probesReady?.55:1;
   for(const l of L)l.intensity=l.isHemisphereLight?(on?l.userData.wl0*hs:l.userData.wl0*.06):(on?l.userData.wl0:0);
-  captureMode(true,pos);const gi=U.uPRGI.value,sh=U.uPRSH.value;if(!sp.baked&&A.pass===0){if(!A.seed)U.uPRGI.value=0}else U.uPRSH.value=sp.shT.texture;   // bounce light comes from the spare's own previous bake, never the live state's
+  captureMode(true,pos);const gi=U.uPRGI.value,sh=U.uPRSH.value;if((!sp.baked||A.noGI0)&&A.pass===0){if(!A.seed)U.uPRGI.value=0}else U.uPRSH.value=sp.shT.texture;   // bounce light comes from the spare's own previous bake, never the live state's
   const k=ptsFor(S.cfg),ps=[];for(let i=0;i<k;i++){const p=S.pool[i],src=p.userData.src;if(src&&src.userData.workLight){ps.push([p,p.intensity]);p.intensity=on?src.userData.wl0:0}}
   try{return fn()}finally{for(const e of ps)e[0].intensity=e[1];for(let i=0;i<L.length;i++)L[i].intensity=sv[i];U.uPRSH.value=sh;captureMode(false)}}
+function deferRelight(){const sp=S.spare;sp.dd=[];sp.have=false;sp.valid=false;S.altJob=null;S.pendSwap={was:S.workLight,to:S.workLight,kind:'scene',t:now()};S.altQuiet=S.frame+8;ev('relight deferred')}
 function altCan(){const sp=S.spare;return !!(sp&&S.ab.altWork!==false&&S.probesReady&&S.matReady&&S.post&&S.pmrem)}
-function finishPend(){const P=S.pendSwap;S.pendSwap=null;if(!P)return;if(altSwap(P.was,P.to)){S.altSkip=false;ev('deferred swap '+Math.round(now()-(S.tog?S.tog.t:now()))+'ms')}else dirtyBox(null,0,false)}   // could not swap: fall back to a live rebake
-function altWork(idle,sl){const sp=S.spare;if(!sp||S.ab.altWork===false||!S.probesReady||!S.matReady||!S.post||S.picking||S.flushing||!idle)return;
-  if(now()-(S.camMoved||0)<(S.pendSwap?500:800))return;   // each probe or cube face is a whole extra scene render: the spare bake only runs while the view is still (a hitch is invisible then)
+function finishPend(){const P=S.pendSwap;S.pendSwap=null;if(!P)return;if(altSwap(P.was,P.to)){S.altSkip=false;if(P.kind==='scene'){S.spare.have=false;S.spare.valid=false;S.spare.baked=false}/* the parked state belongs to the old time of day: the next spare bake starts from scratch (two passes) */ev('deferred swap '+Math.round(now()-(S.tog?S.tog.t:now()))+'ms')}else dirtyBox(null,0,false)}   // could not swap: fall back to a live rebake
+function altWork(idle,sl,force){const sp=S.spare;if(!sp||S.ab.altWork===false||!S.probesReady||!S.matReady||!S.post||S.picking||(S.flushing&&!force)||(!idle&&!force))return;
+  if(!force&&now()-(S.camMoved||0)<(S.pendSwap?500:800))return;   // each probe or cube face is a whole extra scene render: the spare bake only runs while the view is still (a hitch is invisible then)
   if(S.pq.length||S.projNeeded||S.lerpN>0||S.pmQ.length||S.optQ.length||S.aoDirty||S.cubes.some(c=>c.dirty||!c.done)||S.pmFade.some(n=>n>0)||!S.warm||!S.warm.done.pmrem)return;   // not gated on the whole warm-up (about 29 s): the spare bake changes light intensities only, so it reuses the programs the live bake already built
   const tgt=S.pendSwap?S.pendSwap.to:!S.workLight;
   if(sp.have&&sp.state===tgt){if(S.pendSwap)finishPend();return}
-  const every=S.pendSwap?1:Math.max((S.cpu||0)<8?1:(S.cpu||0)<12?2:4,S.warm.finished?1:2);if(S.frame%every)return;   // slower where the CPU is already the limit; a waiting toggle runs every frame
-  S.altT=now();let A=S.altJob;
+  const every=S.pendSwap?1:Math.max((S.cpu||0)<8?1:(S.cpu||0)<12?2:4,S.warm.finished?1:2);if(!force&&S.frame%every)return;   // slower where the CPU is already the limit; a waiting toggle runs every frame
+  S.altT=now();S.altN=(S.altN||0)+1;let A=S.altJob;
   if(!A||A.state!==tgt){const lights=[];S.scene.traverse(o=>{if(o.isLight&&o.userData.workLight&&o.userData.wl0!=null)lights.push(o)});
     if(!sp.pm)sp.pm=S.cubes.map(()=>mkPM());if(!S.altCube){S.altCube=new TH.WebGLCubeRenderTarget(64,{type:S.hdrType,generateMipmaps:false,minFilter:TH.LinearFilter});clearRT(S.altCube);S.altCC=new TH.CubeCamera(.05,30,S.altCube);S.altCC.children.forEach(c=>c.layers.set(LAYER))}
-    const seed=!sp.baked&&!!S.pendSwap;sp.valid=false;sp.have=false;sp.dd=[];sp.state=tgt;S.altJob=A={state:tgt,lights,seed,phase:0,pass:0,passes:(sp.baked||seed)?1:2,pi:0,f:0,ci:0,cf:0,t0:now()};ev('alt bake start '+(A.state?'work light on':'work light off'));return}
+    const scene=!!(S.pendSwap&&S.pendSwap.kind==='scene'),seed=!scene&&!sp.baked&&!!S.pendSwap;sp.valid=false;sp.have=false;sp.dd=[];sp.state=tgt;S.altJob=A={state:tgt,lights,seed,noGI0:scene,phase:0,pass:0,passes:scene?2:(sp.baked||seed)?1:2,pi:0,f:0,ci:0,cf:0,t0:now()};ev('alt bake start '+(A.state?'work light on':'work light off'));return}
   if(A.phase===0){const p=S.probes[A.pi];_v2.set(p.x,p.y,p.z);
     sl('alt probe face',()=>altCapture(A,_v2.clone(),()=>{const f=FACES[A.f],c=S.pcam;c.position.set(p.x,p.y,p.z);c.up.set(f[3],f[4],f[5]);c.lookAt(p.x+f[0],p.y+f[1],p.z+f[2]);c.updateMatrixWorld(true);
       sp.atlas.viewport.set(A.f*F,A.pi*F,F,F);sp.atlas.scissor.set(A.f*F,A.pi*F,F,F);S.R.setRenderTarget(sp.atlas);S.R.render(S.scene,c);return true}));
@@ -17112,7 +17130,8 @@ function altWork(idle,sl){const sp=S.spare;if(!sp||S.ab.altWork===false||!S.prob
 /* ---------------- frame ---------------- */
 function camKey(c){const a=c.matrixWorld.elements,b=c.projectionMatrix.elements;let h=0;for(let i=0;i<16;i++)h+=a[i]*(i+1.3)+b[i]*(i+7.1);return h}
 // at most one heavy slice per frame (a probe face, a cube face, a PMREM, the contact texture, a depth-merge batch), plus cheap SH passes
-function ctxBusy(){const p=window.PodContext;if(!p||!p.active||!p.active())return false;if(p.transitioning){S.ctxT=now();return true}return S.ctxT&&now()-S.ctxT<500}
+function ctxHold(){const p=window.PodContext;return !!(p&&p.active&&p.active()&&p.lightHolding&&p.lightHolding())}
+function ctxBusy(){const p=window.PodContext;if(!p||!p.active||!p.active())return false;if(p.transitioning){if(ctxHold())return false;S.ctxT=now();return true}return S.ctxT&&now()-S.ctxT<500}
 function zBlk(k){const D=S.zDiag;if(D&&S.zRooms&&S.zRooms.some(r=>!r.valid))D.blk[k]=(D.blk[k]||0)+1}
 function work(){if(S.tog&&!S.tog.done&&!S.pendSwap&&now()-S.tog.t>150&&liveSettled()){S.tog.done=true;console.log('[PodRender] work light settled after '+Math.round(now()-S.tog.t)+' ms '+(S.tog.hit?'(instant swap)':S.tog.pend?'(deferred swap)':'(rebake)'))}
   if(S.picking&&!S.flushing){zBlk('work:picking');return}if(!S.flushing&&ctxBusy()){zBlk('work:ctxBusy');return} // probe, cube and PMREM rebakes wait for the PodContext transition (round 19)
@@ -17180,7 +17199,7 @@ function frame(dt){const R=S.R,P=S.prof;S.frame++;matCheck();S.stage='warm';
   poolSync();
   if(S.picking&&S.frame%4===0&&S.key&&S.key.castShadow)S.key.shadow.needsUpdate=true; // dragged pieces move without sceneChanged: key shadow follows; lamp shadows update on drop
   ensureTargets();const single=A.depth==='single'&&!!S.zRT,c8=!!A.hdr8;
-  t=now();S.stage='shadow maps';cw('shadow pass',shadowPass);S.stage='rebake';if(!S.off.rebake)work();P.work=now()-t;
+  t=now();S.stage='shadow maps';cw('shadow pass',shadowPass);S.stage='rebake';if(!S.off.rebake){if(ctxHold()){if(S.matReady)bakeHidden()}else work()}P.work=now()-t;
   const tmode=S.probesReady?3:0;const ts=scaleOf(C,'ts'),ls=scaleOf(C,'ls');
   U.uPRDbg.value=S.debug==='classes'?1:0;U.uPRGIFb.value=A.fb===false?0:1;U.uPRCheap.value=A.cheap===false?0:1;U.uPRDec.value=c8?1:0;U.uPRNearest.value=C.static?1:0;U.uPRFOK.value=S.aoReady&&!S.off.contact?.6:0;
   S.c8bg=null;if(c8&&S.scene.background&&S.scene.background.isColor){const b=S.scene.background;S.c8bg=(S._c8c||(S._c8c=new TH.Color())).setRGB(b.r/(1+b.r),b.g/(1+b.g),b.b/(1+b.b))}
@@ -17311,8 +17330,9 @@ function setOptions(o){if(!S)return;o=o||{};if(o.quality!=null||o.rung!=null){co
   // time of day and the builder's work light (round 16): window light and probes follow (probes and cubes rebake in slices)
   if(o.time&&o.time!==S.time){S.time=o.time==='day'?'day':'night';S.winDirty=true;S.winRebake=true}if(o.workLight!=null&&!!o.workLight!==S.workLight){const was=S.workLight,fresh=!S.winRebake;S.workLight=!!o.workLight;S.winRebake=true;const hit=!!(fresh&&altSwap(was,S.workLight));if(hit)S.altSkip=true;const sp0=S.spare;
     let pend=false;if(!hit&&fresh&&altCan()){pend=true;S.altSkip=true;S.altQuiet=S.frame+8;   // the live probes are left alone (no rebake in pieces); direct light and shadows switch now, bounce light and reflections follow in one fade
-      if(S.pendSwap)S.pendSwap=null;   // toggled back before the bake finished: the live bounce light is already the right state, the running bake becomes the spare
-      else{S.pendSwap={was,to:S.workLight};if(S.altJob&&S.altJob.state!==S.workLight){S.altJob=null;sp0.have=false;sp0.valid=false}}}S.tog={t:now(),hit,pend,fresh,why:hit?'':pend?(S.pendSwap?'new state baking off screen'+(S.altJob?' (phase '+S.altJob.phase+')':''):'toggled back, live light already right'):!sp0?'no spare':S.ab.altWork===false?'disabled':!S.probesReady?'probes not ready':!sp0.have?(S.altJob?'spare still baking (phase '+S.altJob.phase+')':'spare not baked'):sp0.state!==S.workLight?'spare is the wrong state':S.altJob?'bake running':!fresh?'time change in flight':'other'};console.log('[PodRender] work light toggle',hit?'INSTANT swap':pend?'DEFERRED swap':'SLOW relight',S.tog.why,JSON.stringify({warmDone:!!(S.warm&&S.warm.finished),altPhase:S.altJob?S.altJob.phase:null,pq:S.pq.length,dirtyCubes:S.cubes.filter(c=>c.dirty||!c.done).length,pmQ:S.pmQ.length,spareStale:sp0&&sp0.dd?sp0.dd.length:0}))}
+      if(S.pendSwap&&S.pendSwap.kind==='scene'){S.pendSwap.to=S.workLight;if(S.altJob&&S.altJob.state!==S.workLight){S.altJob=null;sp0.have=false;sp0.valid=false}}
+      else if(S.pendSwap)S.pendSwap=null;   // toggled back before the bake finished: the live bounce light is already the right state, the running bake becomes the spare
+      else{S.pendSwap={was,to:S.workLight};if(S.altJob&&S.altJob.state!==S.workLight){S.altJob=null;sp0.have=false;sp0.valid=false}}}S.tog={t:now(),hit,pend,fresh,why:hit?'':!fresh?'time or windows change in the same step: the whole relight is deferred':pend?(S.pendSwap?'new state baking off screen'+(S.altJob?' (phase '+S.altJob.phase+')':''):'toggled back, live light already right'):!sp0?'no spare':S.ab.altWork===false?'disabled':!S.probesReady?'probes not ready':!sp0.have?(S.altJob?'spare still baking (phase '+S.altJob.phase+')':'spare not baked'):sp0.state!==S.workLight?'spare is the wrong state':S.altJob?'bake running':!fresh?'time change in flight':'other'};console.log('[PodRender] work light toggle',hit?'INSTANT swap':(pend||(!fresh&&altCan()))?'DEFERRED swap':'SLOW relight',S.tog.why,JSON.stringify({warmDone:!!(S.warm&&S.warm.finished),altPhase:S.altJob?S.altJob.phase:null,pq:S.pq.length,dirtyCubes:S.cubes.filter(c=>c.dirty||!c.done).length,pmQ:S.pmQ.length,spareStale:sp0&&sp0.dd?sp0.dd.length:0}))}
   if(o.windows!==undefined){S.winList=o.windows;S.winDirty=true;S.winRebake=true}if(o.animate!=null)S.wAnim=!!o.animate;
   if(o.glow){Object.assign(S.glowK,o.glow);S.glowDirty=true}if(o.rep)S.rep=Object.assign({},o.rep);if(o.hud!=null){S.hudOn=!!o.hud;hud()}if(o.off)Object.assign(S.off,o.off);if(o.debug!==undefined)S.debug=o.debug||null;if(o.checkSamplers!=null)S.checkSamplers=!!o.checkSamplers;if(o.freeze!=null){S.noFreeze=!o.freeze;if(S.noFreeze)matUnfreeze()}
   // A/B options (fps test): {prepass, depth:'resolve'|'single', hdr8, lights:4|6, fb, cheap, ptShadows, cones, reflBuf, vshadow}
@@ -17325,7 +17345,7 @@ function gpuSync(){const gl=S.gl,px=new Uint8Array(4);S.R.setRenderTarget(null);
 function flush(maxIter,only){if(!S||!S.post)return 0;S.flushing=true;let n=0;const busy=()=>S.pq.length||S.cubes.some(c=>c.dirty)||S.pmQ.length||S.optQ.length||S.projNeeded||S.lerpN>0||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid));
   try{while(n<(maxIter||5000)&&busy()){if(S.syncSlices)gpuSync();S.frame++;if(S.optQ.length)optStep(true);work();n++}}
   finally{S.flushing=false;S.R.setRenderTarget(null)}return n}
-const api={caps:{alpha:true,context:true},attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
+const api={caps:{alpha:true,context:true},lightPending:()=>{try{return lightPending()}catch(e){return false}},attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
   _debug:{l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
 window.PodRender=api})();
 

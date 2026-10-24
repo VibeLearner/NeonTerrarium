@@ -8,7 +8,7 @@
 'use strict';
 const FURN = (() => {
   const F = { pick: false, open: false, hold: false, busy: false, hov: null, fl: 0, userFloor: false, frame: null, home: null };
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-24aq';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-24ar';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
 
@@ -459,12 +459,14 @@ const FURN = (() => {
     makeFrame(); F.preloading = true;
   }
   F.preload = preload;
-  // when to start: as soon as the title screen is up (it doesn't draw the city at full rate), else once the city has loaded and things are quiet
-  (function whenIdle(){
-    const ok = () => !F.frame && !F.open && (typeof TITLE !== 'undefined' && TITLE.on ? true : !(typeof LOADP !== 'undefined' && LOADP.on));
-    const tick = () => { if (F.frame || F.open) return; if (ok()) (window.requestIdleCallback ? requestIdleCallback(() => { if (ok()) preload(); else setTimeout(tick, 1000); }, { timeout: 3000 }) : preload()); else setTimeout(tick, 1000); };
-    setTimeout(tick, 1500);
+  // when to start: only while the title screen's loading shutter is up, straight away (the shutter stays shut until it's warm, see title.js).
+  // A session that never shows the title loads the page on the first Furnish click instead.
+  (function whenTitle(){
+    const ok = () => !F.frame && !F.open && typeof TITLE !== 'undefined' && TITLE.on;
+    const tick = () => { if (F.frame || F.open) return; if (ok()) preload(); else setTimeout(tick, 250); };
+    setTimeout(tick, 0);
   })();
+  F.warmed = () => F.warmMs != null || F.warmFailed === true;   // (title.js: the shutter waits for this)
   // the open's timing, all from the click: when the page shows the hologram, when the home has resolved, and the longest stretch
   // the page's thread was busy in between (the gap between two frames: the furnish page runs on the same thread)
   function watchOpen(){

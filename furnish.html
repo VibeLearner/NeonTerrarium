@@ -15446,7 +15446,10 @@ function warm(){if(WARMP)return WARMP;WARMP=(async()=>{const t0=performance.now(
   let pw=null;if(r.worker){const id=++WK.seq;pw=new Promise(res=>{WK.reqs.set(id,{res,rej:()=>res(null)})});WK.w.postMessage({type:'prewarm',id})}
   const C=window.PodContext;if(C&&typeof C.warm==='function'){a=T0();try{await C.warm({renderer:B.dr})}catch(e){console.warn('builder: PodContext.warm',e)}r.contextMs=T0()-a}
   if(!B.s&&!B.loading){B.warming=true;try{a=T0();await furnishFor(WARM_HH,{tier:'medium',pod:{district:'mid',floor:8,side:'N',seed:4242},quiet:true,auto:true,noCtx:true});r.sampleMs=T0()-a;r.samplePerf=PF.last;
-      a=T0();const R=window.PodRender;if(B.prOn&&R&&typeof R.compileAsync==='function'){try{await R.compileAsync(B.sc,B.cam)}catch(e){console.warn('builder: compileAsync',e)}}r.compileMs=T0()-a;r.kept=keepPrograms();await unload()}
+      a=T0();const R=window.PodRender;if(B.prOn&&R&&typeof R.compileAsync==='function'){try{await R.compileAsync(B.sc,B.cam)}catch(e){console.warn('builder: compileAsync',e)}}r.compileMs=T0()-a;
+      // PodRender's own warm-up (every shader variant a room needs: about 30 s on a cold page) advances one job a frame, and the loop is idle while warming: drive it here, so a visit never pays it
+      a=T0();if(B.prOn&&R&&typeof R.warmState==='function'){const until=T0()+90000;let w=null;while(T0()<until){try{w=R.warmState()}catch(e){w=null}if(!w||w.finished||w.broken)break;await new Promise(res=>requestAnimationFrame(()=>res()));try{prCall('render',1/60)}catch(e){break}}r.renderWarmDone=!!(w&&w.finished)}r.renderWarmMs=T0()-a;
+      r.kept=keepPrograms();await unload()}
     catch(e){console.warn('builder: warm-up sample failed',e);r.error=String(e&&e.message||e)}finally{B.warming=false}}else r.sample='skipped: a home is open';
   if(pw){a=T0();const p=await pw;r.probes=p?p.n:0;r.probeMs=p?p.ms:null;r.probeWaitMs=T0()-a}r.programs=B.dr?B.dr.info.programs.length:0;r.totalMs=T0()-t0;for(const k in r)if(typeof r[k]==='number')r[k]=Math.round(r[k]*10)/10;B.warmInfo=r;return r})();return WARMP}
 // test aids: the worker's plan against the page's for one household, and worker-built pieces against page-built ones
@@ -17375,7 +17378,7 @@ function gpuSync(){const gl=S.gl,px=new Uint8Array(4);S.R.setRenderTarget(null);
 function flush(maxIter,only){if(!S||!S.post)return 0;S.flushing=true;let n=0;const busy=()=>S.pq.length||S.cubes.some(c=>c.dirty)||S.pmQ.length||S.optQ.length||S.projNeeded||S.lerpN>0||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid));
   try{while(n<(maxIter||5000)&&busy()){if(S.syncSlices)gpuSync();S.frame++;if(S.optQ.length)optStep(true);work();n++}}
   finally{S.flushing=false;S.R.setRenderTarget(null)}return n}
-const api={caps:{alpha:true,context:true},lightPending:()=>{try{return lightPending()}catch(e){return false}},lightProgress:()=>{try{return lightProgress()}catch(e){return 1}},attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
+const api={caps:{alpha:true,context:true},lightPending:()=>{try{return lightPending()}catch(e){return false}},lightProgress:()=>{try{return lightProgress()}catch(e){return 1}},warmState:()=>S&&S.warm?{finished:!!S.warm.finished,queue:S.warm.queue.length,matReady:!!S.matReady,broken:!!S.broken}:null,attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
   _debug:{altRun:n=>{let k=0;const sl=(kind,fn)=>cw(kind,fn);for(;k<(n||5000);k++){const c=S.altN||0;altWork(true,sl,true);if((S.altN||0)===c)break}return k},winStep:()=>windowFrame(16),keys:()=>({want:keyNow(),live:S.liveKey,spare:S.spare&&S.spare.have?S.spare.key:null,baking:S.altJob?S.altJob.key:null,pend:S.pendSwap?S.pendSwap.key:null,mode:S.altJob?S.altJob.mode:null}),l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
 window.PodRender=api})();
 

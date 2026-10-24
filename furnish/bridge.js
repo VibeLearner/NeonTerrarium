@@ -55,7 +55,7 @@
     S.home = h; const visit = S.visit; liveWatch(visit); doneWatch(visit);
     (async () => {
       try {
-        if (m.recipe && m.recipe.home && Array.isArray(m.recipe.pieces)){ const rc = m.recipe; rc.home.pod = pod; await PB().load(rc); }
+        if (m.recipe && m.recipe.home && Array.isArray(m.recipe.pieces)){ const rc = m.recipe; rc.home.pod = pod; await PB().load(rc, { openEarly: true }); }   // (openEarly: the hologram starts at the click, as for a new home)
         else if (m.household && PB().furnishFor) await PB().furnishFor(m.household, { tier: m.tier || null, pod });   // (lived in: furnished for the household that lives there)
         else await PB().newHome(m.tier || null, pod);   // (vacant, or an older lab: empty; null: the building's own tier and windows)
         if (S.visit !== visit) return;

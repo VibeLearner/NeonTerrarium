@@ -15453,7 +15453,7 @@ async function compareGen(items){if(!await wkStart())return {worker:false,why:WK
     const sa=sig(A.b.g),sb=sig(Bp.b.g);const fa=JSON.stringify([A.center,A.minZ,A.wall,A.wallOnly,A.W,A.D,A.H]),fb=JSON.stringify([Bp.center,Bp.minZ,!!Bp.wall,!!Bp.wallOnly,Bp.W,Bp.D,Bp.H]);
     out.push({key:it.arch+'#'+it.seed,same:JSON.stringify(sa)===JSON.stringify(sb)&&fa===fb,worker:sa,page:sb});L.freeGroup(Bp.b.g)}
   job.release();return {worker:true,n:out.length,mismatches:out.filter(x=>!x.same),ok:out.every(x=>x.same)}}
-window.PodBuilder={version:1,enter:enterView,editPlan,newHome,load:rc=>loadRecipe(rc),recipe,save:saveSlot,loadSlot,slots,undo,redo,setWalls,rotateView,setPitch,select:id=>select(id?{t:'piece',id}:null),
+window.PodBuilder={version:1,enter:enterView,editPlan,newHome,load:(rc,o)=>loadRecipe(rc,o),recipe,save:saveSlot,loadSlot,slots,undo,redo,setWalls,rotateView,setPitch,select:id=>select(id?{t:'piece',id}:null),
   pieces:()=>[...B.recs.values()].map(r=>clone(r)),piece:id=>{const i=B.inst.get(id);return i?{rec:clone(i.rec),kind:i.kind,name:i.name,slots:i.slots.map(s=>({key:s.key,kind:s.kind,orig:s.orig})),lights:i.lights.length,visible:i.pivot.visible,run:i.run}:null},
   openCat,closeFly,items:k=>loadItems(k),itemsDone:k=>!!(ITEMS[k]&&ITEMS[k].done),startPlace:(arch,seed)=>startPlace({id:arch+'#'+seed,arch,seed}),cancel:()=>cancelPlace(),setTool,
   setColor:(id,key,hex)=>{const i=B.inst.get(id);if(!i)return false;const b=pick(i.rec,F_ALL);i.rec.colors[key]=hex;applyColors(i);applyLight(i);pushCmd(cmdUpdate(id,b,pick(i.rec,F_ALL),'Recolor '+i.name));return true},
@@ -17256,4 +17256,4 @@ window.PodRender=api})();
 </script>
 <!-- Neon Terrarium: the game side (tools/furnish/build.py) -->
 <link rel="stylesheet" href="furnish/bridge.css?v=9aa2454540">
-<script src="furnish/bridge.js?v=2665923a09"></script>
+<script src="furnish/bridge.js?v=c1a2aba7ae"></script>

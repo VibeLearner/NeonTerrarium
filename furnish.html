@@ -16724,8 +16724,9 @@ function psoInit(){const W=S.warm;if(W.psoRT)return;const c8=!!S.ab.hdr8;
 function psoBatch(c){const R=S.R,W=S.warm,t0=now();if(!c.psz)c.psz=12;const end=Math.min(c.real.length,c.j+c.psz),keep=new Set(c.real.slice(c.j,end));c.j=end;
   const hid=[],fc=[];S.scene.traverse(o=>{if(o.material&&!keep.has(o)&&o.visible){o.visible=false;hid.push(o)}});for(const o of keep)if(o.frustumCulled){o.frustumCulled=false;fc.push(o)}
   const m=W.psoCam.layers.mask;S.inWarm=true;S.stage='pipelines';
+  const gk=S.glow&&keep.has(S.glow)?[S.glow.visible,S.glow.geometry.instanceCount]:null;if(gk){S.glow.visible=true;S.glow.geometry.instanceCount=1}   // with no instances nothing is drawn, so the glow pipeline was first built by a real frame (a 40 ms useProgram)
   try{batchState(c,()=>{for(const t of W.psoRT){if(t.isWebGLCubeRenderTarget){W.psoCam.layers.set(LAYER);R.setRenderTarget(t,0)}else{W.psoCam.layers.mask=t===W.psoRT[1]?(1<<LAYER):S.camera.layers.mask;R.setRenderTarget(t)}R.render(S.scene,W.psoCam)}})}
-  finally{S.inWarm=false;W.psoCam.layers.mask=m;R.setRenderTarget(null);for(const o of hid)o.visible=true;for(const o of fc)o.frustumCulled=true;adaptSize(c,'psz',t0,2,40)}}
+  finally{if(gk){S.glow.visible=gk[0];S.glow.geometry.instanceCount=gk[1]}S.inWarm=false;W.psoCam.layers.mask=m;R.setRenderTarget(null);for(const o of hid)o.visible=true;for(const o of fc)o.frustumCulled=true;adaptSize(c,'psz',t0,2,40)}}
 function psoZ(){const W=S.warm,R=S.R;if(!W.zProxAll||!W.zProxAll.length||!W.psoRT)return;const t=new TH.WebGLRenderTarget(8,8,{format:TH.RedFormat,type:TH.UnsignedByteType,depthBuffer:true});
   W.zGroup.clear();for(const p of W.zProxAll)W.zGroup.add(p);W.zGroup.visible=true;S.inWarm=true;
   try{for(const x of [t,W.psoRT[0]]){R.setRenderTarget(x);R.render(W.zScene,W.psoCam)}}finally{S.inWarm=false;R.setRenderTarget(null);W.zGroup.clear();t.dispose()}}
@@ -17071,9 +17072,10 @@ function work(){if(S.picking&&!S.flushing){zBlk('work:picking');return}if(!S.flu
   if(S.aoDirty&&(S.flushing||now()-S.editT>300)){sl('contact AO',aoBake);return}
   if(zRoomsBusy()){S.zDiag.steps++;sl('depth merge',zRoomStep);return}
   if(S.zRooms&&S.zRooms.some(r=>!r.valid))zBlk(S.picking?'busy:picking':!(S.flushing||now()-S.editT>400)?'busy:editRecent':'busy:other');
-  const probeOK=!C.static||S.probeFirst||idle;
+  const still=S.flushing||now()-(S.camMoved||0)>=500;   // a probe or cube face is a whole extra scene render (20 to 25 ms): after the first bake they wait for a still camera, where one long frame is invisible
+  const probeOK=(!C.static||S.probeFirst||idle)&&(S.probeFirst||still);
   if(S.pq.length&&probeOK&&(S.flushing||fr%C.probeEvery===0)){const pp=S.probes[S.pq[0].i];_v2.set(pp.x,pp.y,pp.z);captureMode(true,_v2.clone());sl('probe face',probeFace);captureMode(false);return}
-  if(S.cubes.some(c=>c.dirty)){if((!C.static||idle||S.cubes.some(c=>!c.done))&&(S.flushing||fr%C.cubeEvery===0)){captureMode(true,S.cubes.find(c=>c.dirty).cam.position.clone());sl('cube face',cubeFace);captureMode(false)}return}
+  if(S.cubes.some(c=>c.dirty)){if((!C.static||idle||S.cubes.some(c=>!c.done))&&still&&(S.flushing||fr%C.cubeEvery===0)){captureMode(true,S.cubes.find(c=>c.dirty).cam.position.clone());sl('cube face',cubeFace);captureMode(false)}return}
   altWork(idle,sl)}
 // plain frames while shaders compile use the builder's own lamps (not the light pool), so every program drawn is one the builder compiled
 // before PodRender attached (the pool's 6-light variant of the unpatched materials was a burst of synchronous compiles). Once materials are

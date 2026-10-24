@@ -14615,7 +14615,7 @@ function stageScene(){if(!B.stage){B.stage=new T.Scene();B.stage.background=null
 function intoStage(s){const st=stageScene();while(s.sc.children.length)st.add(s.sc.children[0]);st.fog=s.sc.fog||null;st.environment=s.sc.environment||null;s.sc=st;return st}
 // build a home from a recipe: shell first, then pieces in slices of about 6 ms (parents before children), their meshes streamed from the worker
 async function loadRecipe(rc,o){o=o||{};if(!rc||!rc.home||!rc.pieces)throw new Error('Not a build recipe');if(!PF.cur)sIn();const pf=pfStart('load'),own=pf.kind==='load';
-  try{while(B.loading)await pwait(sleep(16));B.loading=true;cancelPlace(true);select(null);if(!o.early&&!B.trans)setBusy('Building the home…');
+  try{while(B.loading)await pwait(sleep(16));B.loading=true;cancelPlace(true);select(null);if(o.openEarly&&!o.early&&!o.noCtx){try{o.early=ctxEarly(podOK(rc.home.pod)||podFrom(rc.home.seed||1),rc.home.tier||null)}catch(e){o.early=false}}if(!o.early&&!B.trans)setBusy('Building the home…');
     const list=rc.pieces.slice().sort((a,b)=>depth(rc.pieces,a)-depth(rc.pieces,b));
     let job=o.job||null;if(!job&&WK.ok){try{job=wkGen(itemsOfRecipe(rc,list))}catch(e){job=null}}
     pfStage('dispose');await disposeHome();B.job=job;await yslice();
@@ -15387,7 +15387,7 @@ const EMBED=EMBED0;const EMB={parent:window.parent&&window.parent!==window?windo
 if(EMBED)document.body.dataset.embed='1';
 function post(type,data){if(!EMBED||!EMB.parent)return;try{EMB.parent.postMessage(Object.assign({type,source:'podlab'},data||{}),'*')}catch(e){console.warn('builder: postMessage failed',e)}}
 async function openFromParent(m){clearTimeout(EMB.wait);enterView();while(!started)await frame();if(m.city)ctxCall('setCitySource',m.city);
-  const pod=podOK(m.home);if(m.recipe&&m.recipe.home&&Array.isArray(m.recipe.pieces)){const rc=clone(m.recipe);if(pod)rc.home.pod=pod;await loadRecipe(rc)}else await newHome(m.tier||null,pod||undefined);
+  const pod=podOK(m.home);if(m.recipe&&m.recipe.home&&Array.isArray(m.recipe.pieces)){const rc=clone(m.recipe);if(pod)rc.home.pod=pod;await loadRecipe(rc,{openEarly:true})}else await newHome(m.tier||null,pod||undefined);
   if(m.time==='day'||m.time==='night')hostTime(m.time);if(m.name)B.slotName=String(m.name).slice(0,60);B.dirty=false;status();post('podlab:opened',{pod:B.home.pod})}
 function exitToCity(){post('podlab:exit',{recipe:recipe(),dirty:B.dirty,name:B.slotName||null});B.dirty=false;status()}
 if(EMBED)window.addEventListener('message',e=>{if(!EMB.parent||e.source!==EMB.parent)return;const m=e.data||{};if(typeof m!=='object'||!m.type)return;
@@ -16356,7 +16356,7 @@ function onBuild(m,sh){if(!S)return;const sn={};for(const k in sh){const v=sh[k]
 let _protoOBC=null,_protoOBR=null;
 const GLT=['bufferData','bufferSubData','texImage2D','texSubImage2D','texImage3D','texSubImage3D','readPixels','getProgramParameter','getShaderParameter','getUniformLocation','getActiveUniform','getActiveAttrib','getAttribLocation','finish','flush','getError','isProgram','linkProgram','compileShader','useProgram','bindFramebuffer','clientWaitSync','getSyncParameter','getQueryParameter','copyTexSubImage2D','blitFramebuffer','generateMipmap','drawElements','drawArrays','drawElementsInstanced','drawBuffers','invalidateFramebuffer','framebufferTexture2D','checkFramebufferStatus','getBufferSubData','createProgram','deleteProgram','createTexture','createBuffer'];
 // every GL call that takes more than 4 ms is recorded with its name and the stage it ran in (a call that waits on the GPU process shows up here), reported with each slow frame
-function glTrace(on){const gl=S.gl;if(on){S.glSlow=[];S.glWrap=[];for(const n of GLT){const f=gl[n];if(typeof f!=='function'||Object.prototype.hasOwnProperty.call(gl,n))continue;const w=function(){const a=performance.now();const r=f.apply(gl,arguments);const d=performance.now()-a;if(d>4&&S&&S.glSlow.length<10)S.glSlow.push([n,+d.toFixed(1),S.stage||'?']);return r};gl[n]=w;S.glWrap.push(n)}}
+function glTrace(on){const gl=S.gl;if(on){S.glSlow=[];S.glAcc={};S.glWrap=[];for(const n of GLT){const f=gl[n];if(typeof f!=='function'||Object.prototype.hasOwnProperty.call(gl,n))continue;const w=function(){const a=performance.now();const r=f.apply(gl,arguments);const d=performance.now()-a;if(S){const q=S.glAcc;q[n]=(q[n]||0)+d;if(d>4&&S.glSlow.length<10)S.glSlow.push([n,+d.toFixed(1),S.stage||'?'])}return r};gl[n]=w;S.glWrap.push(n)}}
   else if(S.glWrap){for(const n of S.glWrap)if(gl[n]&&Object.prototype.hasOwnProperty.call(gl,n))delete gl[n];S.glWrap=null}}
 function hookBuilds(on){const P=TH.Material.prototype,O=TH.Object3D.prototype;if(on&&!_protoOBC){_protoOBC=P.onBeforeCompile;const src=_protoOBC.toString();const f=function(sh){onBuild(this,sh)};f.toString=()=>src;f._pr=true;f._proto=true;P.onBeforeCompile=f;
     _protoOBR=O.onBeforeRender;O.onBeforeRender=function(){if(S)S.curObj=this}}
@@ -17122,7 +17122,7 @@ function frame(dt){const R=S.R,P=S.prof;S.frame++;matCheck();S.stage='warm';
   // main pass (after a depth-only prepass of the big occluders into the same multisampled depth); the glow cards draw last in it
   t=now();U.uPRC8.value=c8?1:0;const bg=S.scene.background,ac=R.autoClear;if(S.glow)S.glow.visible=S.glowN>0;
   try{S.mz=0;if(A.prepass&&S.warm&&S.warm.done.z){const zt=now();zPass(true);S.mz=now()-zt;S.scene.background=null;R.autoClear=false}else if(S.c8bg)S.scene.background=S.c8bg;
-    S.stage='main';R.setRenderTarget(S.hdr);const rt=now();cw('main pass',()=>R.render(S.scene,cam));S.mr=now()-rt;S.mc=R.info.render.calls;S.mtri=R.info.render.triangles}finally{S.scene.background=bg;R.autoClear=ac;U.uPRC8.value=0;if(S.glow)S.glow.visible=false}
+    S.stage='main';R.setRenderTarget(S.hdr);const rt=now(),h0=performance.memory?performance.memory.usedJSHeapSize:0;cw('main pass',()=>R.render(S.scene,cam));S.mr=now()-rt;S.mh=performance.memory?+((performance.memory.usedJSHeapSize-h0)/1048576).toFixed(2):0;S.mc=R.info.render.calls;S.mtri=R.info.render.triangles}finally{S.scene.background=bg;R.autoClear=ac;U.uPRC8.value=0;if(S.glow)S.glow.visible=false}
   P.main=now()-t;t=now();
   if(!single)lighting(L,false);
   // bloom: threshold + 4x4 average into 1/4 res in one pass, then 1/8 (and 1/16), upsampled additively; the composite adds it
@@ -17213,7 +17213,7 @@ function compileAsync(scene,cam,target){if(!S||!S.warm||!S.post){const R=S?S.R:n
     if(mine.some(p=>W.pend.has(p))){setTimeout(step,16);return}fixLists(mats);res(true)};setTimeout(step,16)})}
 function render(dt,cam){if(!S)return;if(cam&&cam.isCamera)S.camera=cam;const R=S.R,t=now();const iv=S.lastT?t-S.lastT:16.7;S.lastT=t;S.heap0=performance.memory?performance.memory.usedJSHeapSize:0;const gr=G.rung,gs=G.sub;if(iv<250)govern(iv);if(gr!==G.rung||gs!==G.sub)ev('governor '+gr+(gs?'c':'')+'>'+G.rung+(G.sub?'c':''));
   const ar=R.info.autoReset;R.info.autoReset=false;R.info.reset();const ac=R.autoClear;R.autoClear=true;const prevRT=R.getRenderTarget();
-  S.ev=[];S.bsF={};S.wsec=null;if(S.glSlow)S.glSlow.length=0;const tex0=R.info.memory.textures,prog0=R.info.programs.length;
+  S.ev=[];S.bsF={};S.wsec=null;if(S.glSlow){S.glSlow.length=0;for(const k in S.glAcc)S.glAcc[k]=0}const tex0=R.info.memory.textures,prog0=R.info.programs.length;
   // the PodContext backdrop runs before the frame's GPU timer; every third frame it gets a timer of its own (GT.samp.backdrop, round 25)
   const pc=S.post&&!S.broken?PCX():null;S.backTex=null;if(pc){pc._pr=true;pc._prSeen=now()}
   if(pc){const gl=S.gl,tq=GT.ext&&!GT.cur&&GT.q.length<6&&GT.fr%3===0?gl.createQuery():null;if(tq)gl.beginQuery(GT.ext.TIME_ELAPSED_EXT,tq);
@@ -17226,7 +17226,7 @@ function render(dt,cam){if(!S)return;if(cam&&cam.isCamera)S.camera=cam;const R=S
   if(S.post){gtFrameEnd();gtPoll()}
   S.calls=R.info.render.calls;S.tris=R.info.render.triangles;R.info.autoReset=ar;R.autoClear=ac;R.setRenderTarget(prevRT);const c=now()-t;S.cpu=S.cpu?S.cpu*.9+c*.1:c;S.lastCpu=c;
   {const pg=R.info.programs.length-prog0;for(let i=S.syncBuilds.length-1;i>=0&&S.syncBuilds[i].frame===S.frame;i--)S.syncBuilds[i].newProgramsThisFrame=pg}S.curObj=null;
-  if(c>50&&S.post){const tx=R.info.memory.textures-tex0,pg=R.info.programs.length-prog0,P=S.prof,r1=x=>+(x||0).toFixed(1);const hp=performance.memory?performance.memory.usedJSHeapSize:0;const e={frame:S.frame,ms:+c.toFixed(1),eff:S.eff,events:S.ev.slice(),newTextures:tx,newPrograms:pg,cpuStages:{warm:r1(P.warm),work:r1(P.work),pre:r1(P.pre),main:r1(P.main),post:r1(P.post),overlay:r1(S.ovMs),hud:r1(S.hudMs)},heapMB:hp?+(hp/1048576).toFixed(1):null,heapDeltaMB:hp&&S.heap0?+((hp-S.heap0)/1048576).toFixed(1):null,warmSec:S.wsec,glSlow:(S.glSlow||[]).slice(),mainSec:{z:+(S.mz||0).toFixed(1),render:+(S.mr||0).toFixed(1),calls:S.mc||0,tris:S.mtri||0,glowN:S.glowN||0,pool:S.pool.filter(q=>q.userData.src).length},buildsByStage:Object.assign({},S.bsF),progs:R.info.programs.slice(prog0,prog0+12).map(q=>q.name+' '+String(q.cacheKey).slice(0,90))};S.slow.push(e);if(S.slow.length>30)S.slow.shift();console.warn('PodRender slow frame '+e.ms+' ms: '+JSON.stringify(e))}
+  if(c>50&&S.post){const tx=R.info.memory.textures-tex0,pg=R.info.programs.length-prog0,P=S.prof,r1=x=>+(x||0).toFixed(1);const hp=performance.memory?performance.memory.usedJSHeapSize:0;const e={frame:S.frame,ms:+c.toFixed(1),eff:S.eff,events:S.ev.slice(),newTextures:tx,newPrograms:pg,cpuStages:{warm:r1(P.warm),work:r1(P.work),pre:r1(P.pre),main:r1(P.main),post:r1(P.post),overlay:r1(S.ovMs),hud:r1(S.hudMs)},heapMB:hp?+(hp/1048576).toFixed(1):null,heapDeltaMB:hp&&S.heap0?+((hp-S.heap0)/1048576).toFixed(1):null,warmSec:S.wsec,glSlow:(S.glSlow||[]).slice(),glTop:Object.entries(S.glAcc||{}).filter(x=>x[1]>.5).sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>[x[0],+x[1].toFixed(1)]),mainSec:{z:+(S.mz||0).toFixed(1),render:+(S.mr||0).toFixed(1),calls:S.mc||0,tris:S.mtri||0,heapMain:S.mh||0,glowN:S.glowN||0,pool:S.pool.filter(q=>q.userData.src).length},buildsByStage:Object.assign({},S.bsF),progs:R.info.programs.slice(prog0,prog0+12).map(q=>q.name+' '+String(q.cacheKey).slice(0,90))};S.slow.push(e);if(S.slow.length>30)S.slow.shift();console.warn('PodRender slow frame '+e.ms+' ms: '+JSON.stringify(e))}
   if(S.checkSamplers)samplerCheck();{const a=now();hud();S.hudMs=now()-a}}
 function resize(){if(S&&S.post){S.W=0;ensureTargets()}}
 function summary(cnt){const out={meshes:cnt._meshes||0,tiny:cnt._tiny||0,classes:{},areaM2:{},reflectiveAreaPct:0};let tot=0,refl=0;

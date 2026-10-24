@@ -14867,8 +14867,10 @@ const OV={made:false};const noRay=()=>{};
 const C_OK=new T.Color('#4fe3f2'),C_BAD=new T.Color('#ff4d6d');
 function uiObj(o){o.userData.ui=true;o.raycast=noRay;o.castShadow=false;o.receiveShadow=false;o.renderOrder=990;return o}
 function makeOverlays(){const eg=new T.EdgesGeometry(new T.BoxGeometry(1,1,1));
-  OV.sel=uiObj(new T.LineSegments(eg,new T.LineBasicMaterial({color:'#ffb347',transparent:true,opacity:.95,depthTest:false})));
-  OV.hov=uiObj(new T.LineSegments(eg,new T.LineBasicMaterial({color:'#4fe3f2',transparent:true,opacity:.6,depthTest:false})));
+  // hover and selection: solid beams a fixed number of pixels wide plus a faint fill, not tone mapped (ACES washed thin cyan lines to white)
+  const ovMats=(c,fa)=>[new T.MeshBasicMaterial({color:c,transparent:true,opacity:1,depthTest:false,depthWrite:false,toneMapped:false,side:T.DoubleSide}),new T.MeshBasicMaterial({color:c,transparent:true,opacity:fa,depthTest:false,depthWrite:false,toneMapped:false,side:T.DoubleSide})];
+  OV.sel=uiObj(new T.Mesh(new T.BufferGeometry(),ovMats('#ffa630',.10)));OV.sel.userData.px=3;
+  OV.hov=uiObj(new T.Mesh(new T.BufferGeometry(),ovMats('#2ff3ff',.08)));OV.hov.userData.px=2.5;
   for(const k of ['sel','hov']){const o=OV[k];o.matrixAutoUpdate=false;o.matrixWorldAutoUpdate=false;o.visible=false;o.userData.inst=null;B.sc.add(o)}
   OV.ovl=[0,1,2].map(()=>uiObj(new T.LineSegments(eg,new T.LineBasicMaterial({color:'#ffcf8a',transparent:true,opacity:.45,depthTest:false}))));
   {const sg=new T.PlaneGeometry(1,1);sg.rotateX(-PI/2);OV.surf=uiObj(new T.LineSegments(new T.EdgesGeometry(sg),new T.LineBasicMaterial({color:'#a6ff4d',transparent:true,opacity:.7,depthTest:false})))}
@@ -14885,8 +14887,17 @@ function boxOn(ov,inst,pad){const lb=inst.lbox;ov.position.set((lb.min.x+lb.max.
 // still pieces) never refreshed a box parented to it, so the box sat on the previous piece, and a newly parented box waited for the
 // renderer's sliced sweep to be recognized as an overlay. Both made hover feel slow to register.
 const OVc=new T.Vector3(),OVs=new T.Vector3(),OVq=new T.Quaternion(),OVm=new T.Matrix4();
+// 12 edge beams (group 0) and the six faces (group 1) of a box sx*sy*sz centered on the origin, beams t thick
+function ovGeo(sx,sy,sz,t){const P=[],I=[],F=[];const hx=sx/2,hy=sy/2,hz=sz/2;
+  const cube=(cx,cy,cz,ax,ay,az,out)=>{const b=P.length/3;for(let i=0;i<8;i++)P.push(cx+(i&1?ax:-ax),cy+(i&2?ay:-ay),cz+(i&4?az:-az));for(const f of [0,1,3,0,3,2,4,6,7,4,7,5,0,4,5,0,5,1,2,3,7,2,7,6,0,2,6,0,6,4,1,5,7,1,7,3])out.push(b+f)};
+  const h=t/2;for(const a of [-1,1])for(const c of [-1,1]){cube(0,a*hy,c*hz,hx+h,h,h,I);cube(a*hx,0,c*hz,h,hy+h,h,I);cube(a*hx,c*hy,0,h,h,hz+h,I)}
+  cube(0,0,0,hx,hy,hz,F);const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(P,3));g.setIndex([...I,...F]);g.addGroup(0,I.length,0);g.addGroup(I.length,F.length,1);return g}
 function ovSync(ov){const inst=ov.userData.inst;if(!inst||!ov.visible)return;const pv=inst.pivot;if(!pv.parent||B.inst.get(pv.userData.bid)!==inst){ovHide(ov);return}
-  pv.updateWorldMatrix(true,false);const lb=inst.lbox,p=ov.userData.pad;OVc.set((lb.min.x+lb.max.x)/2,(lb.min.y+lb.max.y)/2,(lb.min.z+lb.max.z)/2);OVs.set(lb.max.x-lb.min.x+p,lb.max.y-lb.min.y+p,lb.max.z-lb.min.z+p);
+  pv.updateWorldMatrix(true,false);const lb=inst.lbox,p=ov.userData.pad,c=B.cam;
+  const wpp=c&&c.isOrthographicCamera?(c.top-c.bottom)/(c.zoom||1)/Math.max(1,B.ch||$('bCanvas').clientHeight||600):.01,t=+(wpp*ov.userData.px).toPrecision(2);
+  const sx=lb.max.x-lb.min.x+p,sy=lb.max.y-lb.min.y+p,sz=lb.max.z-lb.min.z+p,k=sx.toFixed(3)+'|'+sy.toFixed(3)+'|'+sz.toFixed(3)+'|'+t;
+  if(ov.userData.gk!==k){ov.userData.gk=k;ov.geometry.dispose();ov.geometry=ovGeo(sx,sy,sz,t)}
+  OVc.set((lb.min.x+lb.max.x)/2,(lb.min.y+lb.max.y)/2,(lb.min.z+lb.max.z)/2);OVs.set(1,1,1);
   OVm.compose(OVc,OVq,OVs);ov.matrix.multiplyMatrices(pv.matrixWorld,OVm);ov.matrixWorld.copy(ov.matrix)}
 function ovShow(ov,inst,pad){ov.userData.inst=inst;ov.userData.pad=pad;ov.visible=true;ovSync(ov)}
 function ovHide(ov){ov.visible=false;ov.userData.inst=null}

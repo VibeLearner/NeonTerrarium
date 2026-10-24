@@ -15102,7 +15102,7 @@ function hhClean(h){const ms=(Array.isArray(h.members)?h.members:[]).slice(0,6).
   if(!ms.length)throw new Error('furnishFor: the household needs at least one member');const n=ms.length;
   const r0=h.relation,fits=r0==='single'?n===1:r0==='couple'?n===2:r0==='couple+roommate'?n===3:(r0==='roommates'||r0==='siblings')&&n>=2;const relation=fits?r0:n===1?'single':n===2?'couple':'roommates';
   return {seed:h.seed!=null?h.seed:1,label:h.label?String(h.label):'Household',relation,pod:TIER_M[h.pod]?h.pod:null,members:ms}}
-async function furnishFor(h,o){o=o||{};sIn();const pf=pfStart('furnishFor'),own=PF.cur===pf&&pf.kind==='furnishFor',otok=B.openTok|0;try{
+async function furnishFor(h,o){o=o||{};sIn();const pf=pfStart('furnishFor'),own=PF.cur===pf&&pf.kind==='furnishFor',otok=B.openTok|0;B.furnishing=(B.furnishing|0)+1;try{
   const hh=hhClean(h||{});while(B.loading)await pwait(sleep(16));const pk=podOK(o.pod)||podFrom(hh.seed);
   let tier=o.tier||null;const auto=!tier||tier==='auto';const early=o.noCtx?false:ctxEarly(pk,auto?null:tier);
   let f=null;if(pk.cell){pfStage('facade');const a=performance.now();try{f=await pwait(facadeFor(pk,auto?null:tier))}catch(e){console.warn('builder: facade failed',e);f=null}pf.facadeMs+=performance.now()-a}
@@ -15115,7 +15115,7 @@ async function furnishFor(h,o){o=o||{};sIn();const pf=pfStart('furnishFor'),own=
   if(otok!==(B.openTok|0)){if(job)job.release();return null}// unloaded meanwhile
   await loadRecipe(rc,{job,early,noCtx:o.noCtx});B.slotName=null;if(!o.quiet)L.toast('Furnished for '+hh.label+'.');
   const res={tier,pieces:B.recs.size,ms:Math.round(ms),facade:!!f,setMix:P.setMix||'',notes:(P.cardNotes||[]).slice()};if(own)res.perf=pfEnd(pf);return res}
-  finally{if(own&&PF.cur===pf)pfEnd(pf)}}
+  finally{B.furnishing=Math.max(0,(B.furnishing|0)-1);if(own&&PF.cur===pf)pfEnd(pf)}}
 // the Residents card under the Home readout: [{name, age, job, traits}], {vacant:true} with an empty list for a vacant pod, null hides it
 function setResidents(list,o){o=o||{};const el=$('bRes');if(!el)return;const L0=Array.isArray(list)?list.filter(Boolean).slice(0,8):[];
   if(list==null&&!o.vacant){el.hidden=true;el.innerHTML='';B.residents=null;return}const vac=!L0.length&&!!o.vacant;B.residents={list:clone(L0),vacant:vac};
@@ -15493,7 +15493,8 @@ window.PodBuilder={version:1,enter:enterView,editPlan,newHome,load:(rc,o)=>loadR
   runs:()=>B.s?B.s.runs.map(r=>({idx:r.idx,axis:r.axis,fix:r.fix*TILE,a0:r.a0*TILE,a1:r.a1*TILE,type:r.type,door:!!r.door,up:r.target>.5,ra:r.ra,rb:r.rb})):[],
   pauseRender:on=>{B.paused=!!on;B.needs=true},// tests on software GL: keep matrices current but skip drawing between screenshots
   usePodRender:on=>{B.noPR=!on;if(on)attachRenderer();else{prCall('detach');B.prOn=false;envOn(true);skyMode();syncLightUI()}B.needs=true;return B.prOn},
-  ready:()=>!!B.s&&!B.loading&&(!firstHome||true),busy:()=>B.loading,mods:B.mods,_B:B};
+  ready:()=>!!B.s&&!B.loading&&(!firstHome||true),busy:()=>B.loading,homePending:()=>!!(B.loading||(B.furnishing|0)>0),prOn:()=>!!B.prOn,   // (PodContext holds its transition while a home is being planned or built)
+  mods:B.mods,_B:B};
 if(EMBED||/^#build/.test(location.hash||''))setTimeout(()=>Q.setView('build'),0);
 })();
 
@@ -15795,7 +15796,11 @@ const HOLD=.6,tNow=tr=>tr.hold!=null?tr.hold:tr.vt;
 // the hologram plays at a fifth of its speed and, if needed, waits just before the room fades in. The room is drawn under a fully opaque
 // hologram there, so the bake can run flat out without anything showing. Capped so a slow machine never waits more than LCAP.
 const LCAP=15000,LSLOW=.15;   // a cold first open also waits for the shader warm-up here (the room would otherwise show blank, then unlit)
-function lightHold(tr){if(tr.lhDone||tr.skipped)return false;const P=window.PodRender;let w=false;try{w=!!(P&&P.lightPending&&api._prDriving&&api._prDriving()&&P.lightPending())}catch(e){w=false}
+function lightHold(tr){if(tr.lhDone||tr.skipped)return false;const P=window.PodRender,PB=window.PodBuilder;let w=false;
+  try{const building=!!(PB&&PB.homePending&&PB.homePending()),prOn=!!(PB&&PB.prOn&&PB.prOn()),driving=!!(api._prDriving&&api._prDriving());
+    tr.holdBuild=building;if(building)w=true;   // the furnished home is still being planned or built: the room is not there yet
+    else if(prOn)w=driving?!!(P&&P.lightPending&&P.lightPending()):true;   // built and PodRender attached: wait until it draws, then for its light (a frame or two before it draws)
+    else w=false}catch(e){w=false}   // (PodRender off: the plain renderer has nothing to wait for)
   const t=now();if(!w||(tr.lh0!=null&&t-tr.lh0>LCAP)){if(tr.lh0!=null&&C){C.tl.lightHoldMs=Math.round(t-tr.lh0);C.tl.lightHoldCapped=w}tr.lhDone=true;tr.holding=false;return false}
   if(tr.lh0==null)tr.lh0=t;tr.holding=true;return true}
 function advance(tr){const t=now(),dt=Math.min(.1,(t-tr.last)/1000);tr.last=t;const ready=C.ready&&C.shown&&!C.pendingHome;
@@ -15814,7 +15819,8 @@ function overlay(R,cam){if(!C||!C.trans||!cam)return;const a0=now(),tr=C.trans;a
   drawOver(R,C.T.holo.texture,1-ease(ph(t,'resolve')),.003);tr.frames.push(now());C.ovMax=Math.max(C.ovMax,now()-a0)}
 function drawOver(R,tex,a,ca){const P=C.P;P.over.uniforms.t.value=tex||C.blank;P.over.uniforms.a.value=a;P.over.uniforms.ca.value=ca;const ac=R.autoClear;R.autoClear=false;try{quad(R,P.over,null)}finally{R.autoClear=ac}}
 // while the hologram fully covers the frame PodRender skips drawing the home
-function paused(){if(!C||!C.trans)return false;if(C.trans.holding)return false;return C.trans.rm?C.trans.gate:tNow(C.trans)<TL.resolve[0]-.15}
+function paused(){if(!C||!C.trans)return false;if(C.trans.holding)return !!C.trans.holdBuild;   // (holding: the room is drawn under the hologram once it is built, so the bake can run; not while it is still being built)
+  return C.trans.rm?C.trans.gate:tNow(C.trans)<TL.resolve[0]-.15}
 function endTrans(){if(!C||!C.trans)return;const tr=C.trans;C.trans=null;api.transitioning=false;removeSkip();const f=tr.frames,d=[];for(let i=1;i<f.length;i++)d.push(f[i]-f[i-1]);d.sort((x,y)=>x-y);
   C.tl.end=Math.round(now()-C.tl.t0);C.tl.longestTaskMs=Math.round(C.longTask||0);C.tl.longestSliceMs=+Math.max(C.slice||0,C.ovMax||0).toFixed(1);C.lastTrans={timeline:Object.assign({},C.tl,{t0:undefined}),frames:f.length,ms:+(now()-tr.t0).toFixed(0),medianMs:d.length?+d[d.length>>1].toFixed(2):null,worstMs:d.length?+d[d.length-1].toFixed(2):null,skipped:!!tr.skipped,reducedMotion:!!tr.rm,path:api._prDriving()?'PodRender':'plain'};
   try{tr.onDone&&tr.onDone()}catch(e){console.warn(e)}tr.resolve(C.lastTrans);wantDraw();if(C.swapAfter){C.swapAfter=false;setTimeout(lateSwap,0)}}

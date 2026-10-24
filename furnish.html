@@ -17148,7 +17148,7 @@ function frame(dt){const R=S.R,P=S.prof;S.frame++;matCheck();S.stage='warm';
   const bok=S.bufOK===3&&tmode>0;U.uPRGI.value=bok?1:S.probesReady?3:0;U.uPRGIk.value=S.probesReady?1:0;
   glowUpdate(single);
   // main pass (after a depth-only prepass of the big occluders into the same multisampled depth); the glow cards draw last in it
-  t=now();U.uPRC8.value=c8?1:0;const bg=S.scene.background,ac=R.autoClear;if(S.glow)S.glow.visible=S.glowN>0;
+  t=now();U.uPRC8.value=c8?1:0;const bg=S.scene.background,ac=R.autoClear;if(S.glow)S.glow.visible=S.glowN>0&&!(S.warm&&S.warm.pend.size>0);   // the glow card program is rebuilt per light variant: drawing it while a warm-up link is in flight waited for that link (a 40 to 65 ms useProgram)
   try{S.mz=0;if(A.prepass&&S.warm&&S.warm.done.z){const zt=now();zPass(true);S.mz=now()-zt;S.scene.background=null;R.autoClear=false}else if(S.c8bg)S.scene.background=S.c8bg;
     S.stage='main';R.setRenderTarget(S.hdr);const rt=now(),h0=performance.memory?performance.memory.usedJSHeapSize:0;cw('main pass',()=>R.render(S.scene,cam));S.mr=now()-rt;S.mh=performance.memory?+((performance.memory.usedJSHeapSize-h0)/1048576).toFixed(2):0;S.mc=R.info.render.calls;S.mtri=R.info.render.triangles}finally{S.scene.background=bg;R.autoClear=ac;U.uPRC8.value=0;if(S.glow)S.glow.visible=false}
   P.main=now()-t;t=now();

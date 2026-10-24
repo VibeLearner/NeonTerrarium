@@ -8,7 +8,7 @@
 'use strict';
 const FURN = (() => {
   const F = { pick: false, open: false, hold: false, busy: false, hov: null, fl: 0, userFloor: false, frame: null, home: null };
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-24av';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-24aw';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
 
@@ -480,7 +480,7 @@ const FURN = (() => {
     if (F.busy || F.open) return;
     F.busy = true; F.home = h; F.open = true; F.hold = true; F.dirty = false; F.run = (F.run || 0) + 1;
     watchOpen();
-    ov.hidden = false; ov.classList.remove('live', 'pre'); document.body.classList.add('furnish-open');
+    clearTimeout(F.derezT); ov.hidden = false; ov.classList.remove('live', 'pre', 'derez'); document.body.classList.add('furnish-open');
     if (!F.frame) makeFrame(), ov.classList.remove('pre');
     F.frame.removeAttribute('aria-hidden'); F.frame.tabIndex = 0;
     F.openT = performance.now();
@@ -500,13 +500,24 @@ const FURN = (() => {
     if (st){ st.headMs = Math.round(headMs); st.sinceClick = Math.round(performance.now() - F.openT); STATS().gather = st;
       console.log('Furnish pod: city sent', JSON.stringify(st)); }
   }
+  // leaving: when the apartment was on screen, a short hologram power-down plays over its last frame (furnish/bridge.js stops drawing
+  // it and lets the home go after) while the city wakes up underneath; reduced motion gets a plain quick fade (css: .furnish.derez)
+  const DEREZ_MS = matchMedia('(prefers-reduced-motion: reduce)').matches ? 220 : 560;
   function close(){
+    const shown = !!(F.frame && ov.classList.contains('live'));
     F.busy = false; F.hold = false; F.open = false;
-    if (F.frame && !F.reusable){ F.frame.remove(); F.frame = null; F.ready = false; }   // (a lab that can't be reused: made again next time)
-    if (F.frame){ ov.hidden = false; ov.classList.add('pre'); F.frame.setAttribute('aria-hidden', 'true'); F.frame.tabIndex = -1; try { F.frame.blur(); } catch (e) {} } else ov.hidden = true;
-    ov.classList.remove('live'); document.body.classList.remove('furnish-open');
+    clearTimeout(F.derezT); ov.classList.remove('derez');
+    const hide = () => {
+      if (F.frame && !F.reusable){ F.frame.remove(); F.frame = null; F.ready = false; }   // (a lab that can't be reused: made again next time)
+      if (F.frame){ ov.hidden = false; ov.classList.add('pre'); F.frame.setAttribute('aria-hidden', 'true'); F.frame.tabIndex = -1; } else ov.hidden = true;
+      ov.classList.remove('live', 'derez');
+    };
+    if (F.frame) try { F.frame.blur(); } catch (e) {}
+    document.body.classList.remove('furnish-open');
     hover.visible = false; hoverStrip.visible = false; hoverFill.visible = false; hoverStrip.material.color.set(0xff5ad8); hoverFill.material.color.set(0xff5ad8);
     try { canvas.focus(); } catch (e) {} LAST_INPUT = performance.now();
+    if (shown){ void ov.offsetWidth; ov.classList.add('derez'); const run = F.run; F.derezT = setTimeout(() => { if (!F.open && F.run === run) hide(); }, DEREZ_MS); }
+    else hide();
   }
   F.close = close;
   F._open = openHome;   // (for checks: open a home row from homesOf)

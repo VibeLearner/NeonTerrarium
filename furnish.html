@@ -14869,6 +14869,7 @@ function uiObj(o){o.userData.ui=true;o.raycast=noRay;o.castShadow=false;o.receiv
 function makeOverlays(){const eg=new T.EdgesGeometry(new T.BoxGeometry(1,1,1));
   OV.sel=uiObj(new T.LineSegments(eg,new T.LineBasicMaterial({color:'#ffb347',transparent:true,opacity:.95,depthTest:false})));
   OV.hov=uiObj(new T.LineSegments(eg,new T.LineBasicMaterial({color:'#4fe3f2',transparent:true,opacity:.6,depthTest:false})));
+  for(const k of ['sel','hov']){const o=OV[k];o.matrixAutoUpdate=false;o.matrixWorldAutoUpdate=false;o.visible=false;o.userData.inst=null;B.sc.add(o)}
   OV.ovl=[0,1,2].map(()=>uiObj(new T.LineSegments(eg,new T.LineBasicMaterial({color:'#ffcf8a',transparent:true,opacity:.45,depthTest:false}))));
   {const sg=new T.PlaneGeometry(1,1);sg.rotateX(-PI/2);OV.surf=uiObj(new T.LineSegments(new T.EdgesGeometry(sg),new T.LineBasicMaterial({color:'#a6ff4d',transparent:true,opacity:.7,depthTest:false})))}
   OV.gbox=uiObj(new T.LineSegments(eg,new T.LineBasicMaterial({color:'#4fe3f2',transparent:true,opacity:.9,depthTest:false})));
@@ -14880,8 +14881,17 @@ function makeOverlays(){const eg=new T.EdgesGeometry(new T.BoxGeometry(1,1,1));
   OV.hiS=new T.MeshBasicMaterial({color:'#ffb347',transparent:true,opacity:.2,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3,side:T.DoubleSide});
   OV.hi=[];for(let i=0;i<72;i++){const m=uiObj(new T.Mesh(pg,OV.hiM));m.matrixAutoUpdate=false;m.visible=false;B.sc.add(m);OV.hi.push(m)}OV.hiN=0;OV.made=true}
 function boxOn(ov,inst,pad){const lb=inst.lbox;ov.position.set((lb.min.x+lb.max.x)/2,(lb.min.y+lb.max.y)/2,(lb.min.z+lb.max.z)/2);ov.scale.set(lb.max.x-lb.min.x+pad,lb.max.y-lb.min.y+pad,lb.max.z-lb.min.z+pad);if(ov.parent!==inst.pivot)inst.pivot.add(ov)}
+// hover and selection boxes live at scene level and copy the piece's world matrix: a frozen piece (PodRender stops auto matrix updates on
+// still pieces) never refreshed a box parented to it, so the box sat on the previous piece, and a newly parented box waited for the
+// renderer's sliced sweep to be recognized as an overlay. Both made hover feel slow to register.
+const OVc=new T.Vector3(),OVs=new T.Vector3(),OVq=new T.Quaternion(),OVm=new T.Matrix4();
+function ovSync(ov){const inst=ov.userData.inst;if(!inst||!ov.visible)return;const pv=inst.pivot;if(!pv.parent||B.inst.get(pv.userData.bid)!==inst){ovHide(ov);return}
+  pv.updateWorldMatrix(true,false);const lb=inst.lbox,p=ov.userData.pad;OVc.set((lb.min.x+lb.max.x)/2,(lb.min.y+lb.max.y)/2,(lb.min.z+lb.max.z)/2);OVs.set(lb.max.x-lb.min.x+p,lb.max.y-lb.min.y+p,lb.max.z-lb.min.z+p);
+  OVm.compose(OVc,OVq,OVs);ov.matrix.multiplyMatrices(pv.matrixWorld,OVm);ov.matrixWorld.copy(ov.matrix)}
+function ovShow(ov,inst,pad){ov.userData.inst=inst;ov.userData.pad=pad;ov.visible=true;ovSync(ov)}
+function ovHide(ov){ov.visible=false;ov.userData.inst=null}
 function detachOverlays(pv){for(const k of ['sel','hov','gbox','foot','surf'])if(OV[k]&&OV[k].parent===pv)pv.remove(OV[k]);if(OV.ovl)for(const o of OV.ovl)if(o.parent===pv)pv.remove(o)}
-function setHover(id){if(B.hover===id)return;B.hover=id;const inst=id?B.inst.get(id):null;if(OV.hov.parent)OV.hov.parent.remove(OV.hov);if(inst&&!(B.sel&&B.sel.id===id))boxOn(OV.hov,inst,.03);
+function setHover(id){if(B.hover===id)return;B.hover=id;const inst=id?B.inst.get(id):null;ovHide(OV.hov);if(inst&&!(B.sel&&B.sel.id===id))ovShow(OV.hov,inst,.03);
   $('bStage').dataset.cur=id?'hand':'';B.needs=true}
 function updateRing(){if(!OV.made)return;const inst=B.sel&&B.sel.t==='piece'?B.inst.get(B.sel.id):null;if(!inst||inst.kind==='wall'||B.mode!=='select'){OV.ring.visible=false;return}
   const R=Math.hypot(inst.fp.hx,inst.fp.hz)+.16;if(Math.abs(R-OV.ringR)>.01){OV.ring.geometry.dispose();OV.ring.geometry=new T.RingGeometry(R-.022,R+.022,72).rotateX(-PI/2);OV.ringR=R}
@@ -15014,7 +15024,7 @@ function blocked(why){L.toast('Blocked: it would go '+(why||'somewhere it cannot
 function beginMove(id){const inst=B.inst.get(id);if(!inst)return;const rec=inst.rec;const before=pick(rec,F_ALL);const ctx=itemCtx(inst,id);ctx.desc=new Set(descendants(id));ctx.ry=worldRy(inst);ctx.wh=rec.wh||0;
   inst.pivot.getWorldPosition(_v1);_v1.sub(B.root.position);unregister(inst);B.root.add(inst.pivot);inst.pivot.position.copy(_v1);inst.pivot.rotation.set(0,ctx.ry,0);
   if(inst.kind!=='wall'&&!rec.parent&&ground(0,_v2)){const c=Math.cos(ctx.ry),s=Math.sin(ctx.ry);ctx.offX=_v1.x+inst.fp.cx*c+inst.fp.cz*s-_v2.x;ctx.offZ=_v1.z-inst.fp.cx*s+inst.fp.cz*c-_v2.z}
-  if(OV.sel.parent)OV.sel.parent.remove(OV.sel);OV.ring.visible=false;attachFloatOverlays(inst);B.drag={type:'move',id,before,ctx};prCall('picking',true);$('bStage').dataset.cur='move'}
+  ovHide(OV.sel);OV.ring.visible=false;attachFloatOverlays(inst);B.drag={type:'move',id,before,ctx};prCall('picking',true);$('bStage').dataset.cur='move'}
 function endMove(){const D=B.drag;B.drag=null;showOverlaps(null);showSurf(null);prCall('picking',false);const inst=B.inst.get(D.id);if(!inst)return;detachOverlays(inst.pivot);const ctx=D.ctx;
   if(!ctx.hit||(!ctx.valid&&!B.mods.alt)){if(ctx.hit)blocked(ctx.why);Object.assign(inst.rec,clone(D.before));syncInst(D.id)}
   else{const after=Object.assign(pick(inst.rec,F_ALL),ctxFields(ctx));Object.assign(inst.rec,clone(after));syncInst(D.id);if(JSON.stringify(after)!==JSON.stringify(D.before))pushCmd(cmdUpdate(D.id,D.before,after,'Move '+inst.name))}
@@ -15027,8 +15037,8 @@ function selInst(){return B.sel&&B.sel.t==='piece'?B.inst.get(B.sel.id):null}
 
 /* ======================= 9. selection, actions ======================= */
 function select(s){if(B.sel&&s&&B.sel.t===s.t&&B.sel.id===s.id&&B.sel.rid===s.rid&&B.sel.run===s.run){refreshInspector();return}
-  if(OV.made){if(OV.sel.parent)OV.sel.parent.remove(OV.sel);hiClear()}B.sel=s;B.edit=null;
-  if(s&&s.t==='piece'){const inst=B.inst.get(s.id);if(!inst){B.sel=null}else{boxOn(OV.sel,inst,.04);if(B.hover===s.id&&OV.hov.parent)OV.hov.parent.remove(OV.hov)}}
+  if(OV.made){ovHide(OV.sel);hiClear()}B.sel=s;B.edit=null;
+  if(s&&s.t==='piece'){const inst=B.inst.get(s.id);if(!inst){B.sel=null}else{ovShow(OV.sel,inst,.04);if(B.hover===s.id)ovHide(OV.hov)}}
   showSelHi();updateRing();buildInspector();hint();B.needs=true;if(B.s){setRay();cursorRoomTick(true)}}
 function showSelHi(){if(!OV.made)return;hiClear();const s=B.sel;if(!s||!B.s)return;if(s.t==='floor'){for(const m of B.s.floors)if(m.userData.room===s.rid)hiAdd(m,OV.hiS)}else if(s.t==='wall'){for(const m of B.s.faces)if(m.userData.wallRoom===s.rid&&m.userData.run===s.run&&visibleChain(m))hiAdd(m,OV.hiS)}}
 function delSel(){const inst=selInst();if(!inst)return;run(cmdRemove([inst.rec.id],'Delete '+inst.name))}
@@ -15366,6 +15376,7 @@ function loop(now){if(!B.on){B.raf=0;return}B.raf=requestAnimationFrame(loop);co
   if(B.tw){const k=Math.min(1,(now-B.tw.t0)/(SH.ROT_S*1000)),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;B.az=B.tw.a0+(B.tw.a1-B.tw.a0)*e;if(k>=1)B.tw=null;B.camDirty=true}
   if(B.camDirty)updateCam();if(B.wallsMoving){B.wallsMoving=SH.applyWalls(B.s,dt);B.needs=true;notify('walls',null);if(!B.wallsMoving){showSelHi();if(B.sel&&B.sel.t==='piece')updateRing()}}
   if(B.ptr.dirty){B.ptr.dirty=false;onPointerFrame()}
+  if(OV.made){ovSync(OV.hov);ovSync(OV.sel)}
   if(window.PodContext&&typeof window.PodContext.frame==='function')ctxCall('frame',dt);
   const R=B.prOn?window.PodRender:null;const cont=R||B.trans||(B.hud&&!$('bHudBox').hidden);
   if(B.paused){if(B.needs){B.needs=false;B.sc.updateMatrixWorld()}}
@@ -15496,6 +15507,7 @@ window.PodBuilder={version:1,enter:enterView,editPlan,newHome,load:(rc,o)=>loadR
   screenOf,stats:()=>Object.assign(frameStats(),{uiMs:B.uiMs,renderMs:B.rms||0,calls:B.dr?B.dr.info.render.calls:0,triangles:B.dr?B.dr.info.render.triangles:0,pieces:B.recs.size,renderer:B.prOn?'PodRender':'plain',undo:B.undo.length,redo:B.redo.length,mode:B.mode,sel:B.sel?clone(B.sel):null}),
   home:()=>B.home?clone(B.home):null,rooms:()=>B.P?B.P.rooms.map(R=>Object.assign({id:R.id,kind:R.kind,label:R.label,x0:R.x0*TILE,z0:R.z0*TILE,x1:R.x1*TILE,z1:R.z1*TILE},roomSpot(R))):[],
   runs:()=>B.s?B.s.runs.map(r=>({idx:r.idx,axis:r.axis,fix:r.fix*TILE,a0:r.a0*TILE,a1:r.a1*TILE,type:r.type,door:!!r.door,up:r.target>.5,ra:r.ra,rb:r.rb})):[],
+  hoverId:()=>B.hover,
   pauseRender:on=>{B.paused=!!on;B.needs=true},// tests on software GL: keep matrices current but skip drawing between screenshots
   usePodRender:on=>{B.noPR=!on;if(on)attachRenderer();else{prCall('detach');B.prOn=false;envOn(true);skyMode();syncLightUI()}B.needs=true;return B.prOn},
   ready:()=>!!B.s&&!B.loading&&(!firstHome||true),busy:()=>B.loading,homePending:()=>!!(B.loading||(B.furnishing|0)>0),prOn:()=>!!B.prOn,   // (PodContext holds its transition while a home is being planned or built)
@@ -17498,4 +17510,4 @@ window.PodRender=api})();
 </script>
 <!-- Neon Terrarium: the game side (tools/furnish/build.py) -->
 <link rel="stylesheet" href="furnish/bridge.css?v=9aa2454540">
-<script src="furnish/bridge.js?v=c1a2aba7ae"></script>
+<script src="furnish/bridge.js?v=9d981c77c8"></script>

@@ -480,5 +480,16 @@ body.furnishing #view{cursor:pointer}
 .furnish.live{cursor:auto}
 .furnish.pre{pointer-events:none;cursor:auto}   /* (the page kept loaded and warm, out of sight: clicks go to the city) */
 .furnish.pre .furnish-frame{opacity:0;pointer-events:none;transition:none}
+/* leaving an apartment: the hologram powers down over its last frame (flicker, scanlines, collapse to a line, the line goes out) */
+.furnish.derez{pointer-events:none;cursor:auto}
+.furnish.derez .furnish-frame{animation:derez-frame .56s cubic-bezier(.55,0,.35,1) forwards}
+.furnish.derez::before,.furnish.derez::after{content:"";position:absolute;z-index:1;pointer-events:none}
+.furnish.derez::before{inset:0;background:repeating-linear-gradient(to bottom,rgba(56,232,224,0) 0 2px,rgba(56,232,224,.16) 2px 3px),linear-gradient(rgba(56,232,224,.10),rgba(255,79,163,.06));mix-blend-mode:screen;animation:derez-scan .56s cubic-bezier(.55,0,.35,1) forwards}
+.furnish.derez::after{inset:0;border-top:1px solid var(--cyan);border-bottom:1px solid var(--cyan);box-shadow:0 0 14px rgba(56,232,224,.75),inset 0 0 10px rgba(56,232,224,.35);opacity:0;animation:derez-edge .56s cubic-bezier(.55,0,.35,1) forwards}
+@keyframes derez-frame{0%{clip-path:inset(0);filter:none;opacity:1}8%{opacity:.55;filter:brightness(1.6) saturate(.5)}16%{opacity:1;filter:brightness(1.1) saturate(.85)}24%{opacity:.8}
+  68%{clip-path:inset(49.5% 0 49.5% 0);filter:brightness(2.2) saturate(.2);opacity:1}100%{clip-path:inset(49.5% 50% 49.5% 50%);filter:brightness(2.2) saturate(.2);opacity:0}}
+@keyframes derez-scan{0%{inset:0;opacity:0}10%{opacity:1}68%{inset:49.5% 0 49.5% 0;opacity:1}100%{inset:49.5% 50% 49.5% 50%;opacity:0}}
+@keyframes derez-edge{0%{inset:0;opacity:0}18%{opacity:.9}68%{inset:calc(50% - 1px) 0 calc(50% - 1px) 0;opacity:1}100%{inset:calc(50% - 1px) 50% calc(50% - 1px) 50%;opacity:0}}
+@media (prefers-reduced-motion:reduce){.furnish.derez .furnish-frame{animation:none;opacity:0;transition:opacity .2s}.furnish.derez::before,.furnish.derez::after{display:none}}
 body.furnish-open .zonebar,body.furnish-open .deck-toggle,body.furnish-open .hud{visibility:hidden}
 @media (max-width:700px){.furnbtn{height:34px;padding:0 10px;font-size:10px}}

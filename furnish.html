@@ -16608,7 +16608,8 @@ function texAvg(t){if(!t||!t.image)return [1,1,1];const im=t.image;if(_avg.has(i
 /* ---------------- dirtiness: GI rebakes are sliced; shadows re-render per light, only when something in its reach moved ---------------- */
 function lightsNear(box,r,fn){for(let i=0;i<S.poolN;i++){const p=S.pool[i];if(!p.userData.src)continue;const reach=Math.max(r,p.distance||6);if(!box||box.distanceToPoint(p.position)<reach)fn(p)}}
 function dirtyLight(p,moved){if(moved&&p.castShadow)p.shadow.needsUpdate=true}
-function dirtyBox(box,r,shadowsToo){if(!S.probes)return;if(S.spare){S.spare.valid=false;S.altJob=null}
+function dirtyBox(box,r,shadowsToo,noSpare){if(!S.probes)return;const sp=S.spare;
+  if(sp&&!noSpare){if(!box||(sp.dd&&sp.dd.length>48)){sp.have=false;sp.valid=false;S.altJob=null;sp.dd=[]}else(sp.dd||(sp.dd=[])).push([box.clone(),r,shadowsToo])}   // a local edit keeps the spare bake and is replayed on the live probes when it swaps in; a global one (time of day, ambient light) makes it unusable
   S.probes.forEach((p,i)=>{if(!box||box.distanceToPoint(_v.set(p.x,p.y,p.z))<r)queueProbe(i)});
   S.cubes.forEach((c2,i)=>{const R=S.rooms[i];if(!box||(box.max.x>R.min[0]-1&&box.min.x<R.max[0]+1&&box.max.z>R.min[2]-1&&box.min.z<R.max[2]+1)){c2.dirty=true;c2.f=0}});
   if(shadowsToo){lightsNear(box,0,p=>{if(p.castShadow)p.shadow.needsUpdate=true});if(S.key&&S.key.castShadow)S.key.shadow.needsUpdate=true}
@@ -16916,14 +16917,17 @@ function zRoomCheck(){const Z=S.zRooms;if(!Z)return;for(const r of Z){if(!r.vali
 // draw calls fewer). They use the same shared materials, so no program is built. Any scene change drops the room merges at once (the pieces' own merged
 // meshes show again) and they are rebuilt in 2 ms slices after the scene has been quiet; a piece that was ever seen hidden (wall cut-aways) stays out.
 const _n3=new TH.Matrix3();
-function l2Init(){S.l2=S.rooms.map((R,i)=>({i,valid:false,meshes:[],srcs:[],job:null,chk:0}));S.l2T=now();S.l2Diag={built:0,drops:{}}}
-function l2Drop(r){for(const m of r.meshes){if(m.parent)m.parent.remove(m);m.geometry.dispose()}for(const x of r.srcs){if(x.o.userData.prL2Hid){x.o.visible=true;delete x.o.userData.prL2Hid}}r.meshes=[];r.srcs=[];r.valid=false;r.job=null}
-function l2Invalidate(i,why){if(!S||!S.l2)return;S.l2T=now();let any=false;for(const r of (i==null?S.l2:[S.l2[i]])){if(!r||!(r.valid||r.job))continue;any=true;l2Drop(r)}
+function l2Init(){S.l2=S.rooms.map((R,i)=>({i,valid:false,meshes:[],srcs:[],job:null,chk:0,stage:null}));S.l2T=now();S.l2Diag={built:0,drops:{}}}
+function l2Drop(r){for(const m of r.meshes){if(m.parent)m.parent.remove(m);m.geometry.dispose()}for(const x of r.srcs){if(x.o.userData.prL2Hid){x.o.visible=true;delete x.o.userData.prL2Hid}}r.meshes=[];r.srcs=[];r.valid=false;r.job=null;r.stage=null}
+function l2Invalidate(i,why){if(!S||!S.l2)return;S.l2T=now();let any=false;for(const r of (i==null?S.l2:[S.l2[i]])){if(!r||!(r.valid||r.job||r.stage))continue;any=true;l2Drop(r)}
   if(any){const D=S.l2Diag.drops,w=why||'?';D[w]=(D[w]||0)+1;zRoomInvalidate(null,'l2')}}
 const l2Cand=o=>o.isMesh&&o.userData.prMergedMesh&&o.material&&o.material.name==='prVC'&&!o.userData.prL2Hid&&!underUI(o);
 const l2Key=o=>[o.material.uuid,attrSig(o.geometry),o.castShadow,o.receiveShadow,o.layers.mask].join('|');
-function l2Busy(){return !!(S.l2&&S.ab.l2Merge!==false&&S.matReady&&S.warm&&S.warm.finished&&!S.picking&&!S.optQ.length&&!S.mergeQ.length&&(S.flushing||(now()-S.editT>1500&&now()-S.l2T>700))&&S.l2.some(r=>!r.valid))}
-function l2Step(){const r=S.l2.find(x=>!x.valid);if(!r)return null;const t0=now();
+function l2Ready(r){return r.stage!=='warm'||!!(S.warm&&!S.mergeQ.length&&!S.warm.queue.includes('merge')&&S.warm.pend.size===0)}
+const l2Todo=r=>!r.valid&&l2Ready(r);
+function l2Busy(){return !!(S.l2&&S.ab.l2Merge!==false&&S.matReady&&S.warm&&S.warm.finished&&!S.picking&&!S.optQ.length&&!S.mergeQ.length&&(S.flushing||(now()-S.editT>1500&&now()-S.l2T>700))&&S.l2.some(l2Todo))}
+function l2Step(){const r=S.l2.find(l2Todo);if(!r)return null;const t0=now();
+  if(r.stage==='warm'){for(const mm of r.meshes)mm.visible=true;for(const x of r.srcs){x.o.userData.prL2Hid=true;x.o.visible=false}r.stage=null;r.valid=true;S.l2Diag.built++;S.plDirty=true;zRoomInvalidate(null,'l2swap');return 'room merge done'}
   if(!r.job){const list=[];S.scene.traverseVisible(o=>{if(!l2Cand(o))return;const pc=pieceOf(o);if(pc&&pc.userData.prFlaky)return;bbOf(o).getCenter(_v);if(roomOfPoint(_v.x,_v.y,_v.z)===r.i)list.push(o)});
     const G=new Map();for(const o of list){const k=l2Key(o);let g=G.get(k);if(!g)G.set(k,g={list:[],nv:0,ni:0});const ga=o.geometry;g.list.push(o);g.nv+=ga.attributes.position.count;g.ni+=ga.index?ga.index.count:ga.attributes.position.count}
     for(const [k,g] of [...G]){if(g.list.length<2){G.delete(k);continue}const g0=g.list[0].geometry;g.keys=Object.keys(g0.attributes);g.arr={};for(const a of g.keys)g.arr[a]=new Float32Array(g.nv*g0.attributes[a].itemSize);g.idx=g.nv>65535?new Uint32Array(g.ni):new Uint16Array(g.ni);g.vo=0;g.io=0}
@@ -16939,9 +16943,10 @@ function l2Step(){const r=S.l2.find(x=>!x.valid);if(!r)return null;const t0=now(
   if(J.gi<J.groups.length)return 'room merge';
   const srcs=[];for(const g of J.groups){const o0=g.list[0],geo=new TH.BufferGeometry();for(const a of g.keys)geo.setAttribute(a,new TH.BufferAttribute(g.arr[a],o0.geometry.attributes[a].itemSize));geo.setIndex(new TH.BufferAttribute(g.idx,1));geo.computeBoundingSphere();geo.computeBoundingBox();
     const mm=new TH.Mesh(geo,o0.material);mm.castShadow=o0.castShadow;mm.receiveShadow=o0.receiveShadow;mm.layers.mask=o0.layers.mask;mm.userData.prBig=true;mm.userData.prL2Mesh=true;if(o0.material.userData.prClass)mm.userData.prHint=o0.material.userData.prClass;
-    mm.name='prRoomMerge'+r.i;mm.raycast=()=>{};S.root.add(mm);mm.updateMatrixWorld(true);r.meshes.push(mm);
-    for(const o of g.list){o.userData.prL2Hid=true;o.visible=false;srcs.push({o,k:mwKey(o)})}}
-  r.srcs=srcs;r.valid=true;r.job=null;S.l2Diag.built++;S.plDirty=true;zRoomInvalidate(null,'l2swap');return 'room merge done'}
+    mm.name='prRoomMerge'+r.i;mm.raycast=()=>{};mm.visible=false;S.root.add(mm);mm.updateMatrixWorld(true);r.meshes.push(mm);
+    for(const o of g.list)srcs.push({o,k:mwKey(o)})}
+  // the merged meshes sit hidden while the merge warm job compiles their programs; the swap happens once that is finished, so no frame ever pays a shader build
+  r.srcs=srcs;r.job=null;r.stage='warm';S.mergeQ.push(r.meshes.slice());if(!S.warm.queue.includes('merge'))S.warm.queue.push('merge');return 'room merge built'}
 // a few sources per frame are re-checked: a piece hidden (wall cut-away), moved or removed without a sceneChanged drops its room's merge, and a hidden piece stays out of later ones
 function l2Check(){const Z=S.l2;if(!Z)return;for(const r of Z){if(!r.valid||!r.srcs.length)continue;for(let n=0;n<8;n++){r.chk=(r.chk+1)%r.srcs.length;const s=r.srcs[r.chk],o=s.o;
   if(!o.parent){l2Invalidate(r.i,'orphan');break}if(!effVisible(o.parent)){const pc=pieceOf(o);if(pc)pc.userData.prFlaky=1;l2Invalidate(r.i,'hidden');break}if(Math.abs(mwKey(o)-s.k)>1e-4){l2Invalidate(r.i,'moved');break}}}}
@@ -17068,11 +17073,11 @@ function mkPM(){const t=new TH.WebGLRenderTarget(3*Math.max(64,112),4*64,{magFil
   t.texture.mapping=TH.CubeUVReflectionMapping;t.texture.name='PMREM.cubeUv';clearRT(t);return t}
 function copyRT(src,dst){const c=S.M.copy.uniforms;c.t.value=src.texture;dst.scissorTest=false;dst.viewport.set(0,0,dst.width,dst.height);quad(S.M.copy,dst)}
 function liveSettled(){return !S.pq.length&&!S.cubes.some(c=>c.dirty||!c.done)&&!S.pmQ.length&&!S.projNeeded&&S.lerpN<=0&&!S.pmFade.some(n=>n>0)}
-function altSwap(was,now2){const sp=S.spare;if(S.ab.altWork===false||!sp||!S.probesReady||!S.post||!S.pmrem||!sp.valid||sp.state!==now2||!sp.pm||S.altJob)return false;
+function altSwap(was,now2){const sp=S.spare;if(S.ab.altWork===false||!sp||!S.probesReady||!S.post||!S.pmrem||!sp.have||sp.state!==now2||!sp.pm||S.altJob)return false;
   const settled=liveSettled();
   for(let i=0;i<S.pmrem.length;i++){copyRT(sp.pm[i],S.pmStage[i]);S.pmFade[i]=8;if(settled)copyRT(S.pmrem[i],sp.pm[i])}   // load the spare reflections first, then park the live ones in its place
   {const a=S.atlas;S.atlas=sp.atlas;sp.atlas=a;const t=S.shT;S.shT=sp.shT;sp.shT=t}
-  S.lerpN=Math.max(S.lerpN,10);S.lerpK=.35;sp.state=was;sp.valid=settled;S.altJob=null;S.altQuiet=S.frame+8;S.altSwaps=(S.altSwaps||0)+1;S.glowDirty=true;S.histReset=true;S.lastSwap=now();return true}
+  S.lerpN=Math.max(S.lerpN,10);S.lerpK=.35;sp.state=was;sp.valid=settled;sp.have=settled;S.altJob=null;{const dd=sp.dd||[];sp.dd=[];for(const e of dd)dirtyBox(e[0],e[1],e[2],true)}S.altQuiet=S.frame+8;S.altSwaps=(S.altSwaps||0)+1;S.glowDirty=true;S.histReset=true;S.lastSwap=now();return true}
 // every light the work toggle owns (builder.js tags them), forced to one state while a spare slice renders
 function altCapture(A,pos,fn){const sp=S.spare,on=A.state,L=A.lights,sv=L.map(l=>l.intensity),hs=S.probesReady?.55:1;
   for(const l of L)l.intensity=l.isHemisphereLight?(on?l.userData.wl0*hs:l.userData.wl0*.06):(on?l.userData.wl0:0);
@@ -17082,12 +17087,12 @@ function altCapture(A,pos,fn){const sp=S.spare,on=A.state,L=A.lights,sv=L.map(l=
 function altWork(idle,sl){const sp=S.spare;if(!sp||S.ab.altWork===false||!S.probesReady||!S.matReady||!S.post||S.picking||S.flushing||!idle)return;
   if(now()-(S.camMoved||0)<800)return;   // each probe or cube face is a whole extra scene render: the spare bake only runs while the view is still (a hitch is invisible then)
   if(S.pq.length||S.projNeeded||S.lerpN>0||S.pmQ.length||S.optQ.length||S.aoDirty||S.cubes.some(c=>c.dirty||!c.done)||S.pmFade.some(n=>n>0)||!S.warm||!S.warm.finished||!S.warm.done.pmrem)return;
-  if(sp.valid&&sp.state===!S.workLight)return;
+  if(sp.have&&sp.state===!S.workLight)return;
   const every=(S.cpu||0)<8?1:(S.cpu||0)<12?2:4;if(S.frame%every)return;   // slower where the CPU is already the limit
   let A=S.altJob;
   if(!A||A.state!==!S.workLight){const lights=[];S.scene.traverse(o=>{if(o.isLight&&o.userData.workLight&&o.userData.wl0!=null)lights.push(o)});
     if(!sp.pm)sp.pm=S.cubes.map(()=>mkPM());if(!S.altCube){S.altCube=new TH.WebGLCubeRenderTarget(64,{type:S.hdrType,generateMipmaps:false,minFilter:TH.LinearFilter});clearRT(S.altCube);S.altCC=new TH.CubeCamera(.05,30,S.altCube);S.altCC.children.forEach(c=>c.layers.set(LAYER))}
-    sp.valid=false;sp.state=!S.workLight;S.altJob=A={state:!S.workLight,lights,phase:0,pass:0,passes:sp.baked?1:2,pi:0,f:0,ci:0,cf:0,t0:now()};ev('alt bake start '+(A.state?'work light on':'work light off'));return}
+    sp.valid=false;sp.have=false;sp.dd=[];sp.state=!S.workLight;S.altJob=A={state:!S.workLight,lights,phase:0,pass:0,passes:sp.baked?1:2,pi:0,f:0,ci:0,cf:0,t0:now()};ev('alt bake start '+(A.state?'work light on':'work light off'));return}
   if(A.phase===0){const p=S.probes[A.pi];_v2.set(p.x,p.y,p.z);
     sl('alt probe face',()=>altCapture(A,_v2.clone(),()=>{const f=FACES[A.f],c=S.pcam;c.position.set(p.x,p.y,p.z);c.up.set(f[3],f[4],f[5]);c.lookAt(p.x+f[0],p.y+f[1],p.z+f[2]);c.updateMatrixWorld(true);
       sp.atlas.viewport.set(A.f*F,A.pi*F,F,F);sp.atlas.scissor.set(A.f*F,A.pi*F,F,F);S.R.setRenderTarget(sp.atlas);S.R.render(S.scene,c);return true}));
@@ -17098,14 +17103,15 @@ function altWork(idle,sl){const sp=S.spare;if(!sp||S.ab.altWork===false||!S.prob
     sl('alt cube face',()=>altCapture(A,c.cam.position.clone(),()=>{S.R.setRenderTarget(S.altCube,A.cf);S.R.render(S.scene,S.altCC.children[A.cf]);return true}));
     if(++A.cf>=6){A.cf=0;A.phase=3}return}
   if(A.phase===3){sl('alt PMREM',()=>{S.pmGen.fromCubemap(S.altCube.texture,sp.pm[A.ci]);return true});
-    if(++A.ci>=S.cubes.length){sp.valid=true;S.altJob=null;S.altBakeMs=+(now()-A.t0).toFixed(0);ev('alt bake done '+S.altBakeMs+'ms')}else A.phase=2}}
+    if(++A.ci>=S.cubes.length){sp.valid=true;sp.have=true;S.altJob=null;S.altBakeMs=+(now()-A.t0).toFixed(0);ev('alt bake done '+S.altBakeMs+'ms')}else A.phase=2}}
 
 /* ---------------- frame ---------------- */
 function camKey(c){const a=c.matrixWorld.elements,b=c.projectionMatrix.elements;let h=0;for(let i=0;i<16;i++)h+=a[i]*(i+1.3)+b[i]*(i+7.1);return h}
 // at most one heavy slice per frame (a probe face, a cube face, a PMREM, the contact texture, a depth-merge batch), plus cheap SH passes
 function ctxBusy(){const p=window.PodContext;if(!p||!p.active||!p.active())return false;if(p.transitioning){S.ctxT=now();return true}return S.ctxT&&now()-S.ctxT<500}
 function zBlk(k){const D=S.zDiag;if(D&&S.zRooms&&S.zRooms.some(r=>!r.valid))D.blk[k]=(D.blk[k]||0)+1}
-function work(){if(S.picking&&!S.flushing){zBlk('work:picking');return}if(!S.flushing&&ctxBusy()){zBlk('work:ctxBusy');return} // probe, cube and PMREM rebakes wait for the PodContext transition (round 19)
+function work(){if(S.tog&&!S.tog.done&&now()-S.tog.t>150&&liveSettled()){S.tog.done=true;console.log('[PodRender] work light settled after',Math.round(now()-S.tog.t),'ms',S.tog.hit?'(swap)':'(rebake)')}
+  if(S.picking&&!S.flushing){zBlk('work:picking');return}if(!S.flushing&&ctxBusy()){zBlk('work:ctxBusy');return} // probe, cube and PMREM rebakes wait for the PodContext transition (round 19)
   const C=S.cfg,fr=S.frame,idle=now()-S.editT>1500;
   const sl=(kind,fn)=>{const a=now();const r=cw(kind,fn);if(r){const ms=+(now()-a).toFixed(2);ev((typeof r==='string'?r:kind)+' '+ms+'ms');S.slices.push({kind:typeof r==='string'?r:kind,ms,frame:fr});if(S.slices.length>600)S.slices.shift()}return r};
   if(S.projNeeded)sl('SH project',project);if(S.lerpN>0)lerpSH();
@@ -17299,7 +17305,7 @@ function classify(root){const cnt={};if(!S){root.traverse(x=>{if(!x.isMesh)retur
   root.updateMatrixWorld(true);walk(root,false,true,cnt);lightLists();S.plDirty=true;if(S.post){if(S.probes){const b=new TH.Box3().setFromObject(root);dirtyBox(b.isEmpty()?null:b,3,true)}S.aoDirty=true;S.glowDirty=true;zRoomInvalidate(null,'classify');queueOpt(root);}return summary(cnt)}
 function setOptions(o){if(!S)return;o=o||{};if(o.quality!=null||o.rung!=null){const q=o.rung!=null?o.rung:o.quality;if(q==='auto'){S.fixed=false}else{S.fixed=true;G.sub=0;setRung(typeof q==='number'?q:QMAP[q]||+q||1)}}
   // time of day and the builder's work light (round 16): window light and probes follow (probes and cubes rebake in slices)
-  if(o.time&&o.time!==S.time){S.time=o.time==='day'?'day':'night';S.winDirty=true;S.winRebake=true}if(o.workLight!=null&&!!o.workLight!==S.workLight){const was=S.workLight,fresh=!S.winRebake;S.workLight=!!o.workLight;S.winRebake=true;if(fresh&&altSwap(was,S.workLight))S.altSkip=true}
+  if(o.time&&o.time!==S.time){S.time=o.time==='day'?'day':'night';S.winDirty=true;S.winRebake=true}if(o.workLight!=null&&!!o.workLight!==S.workLight){const was=S.workLight,fresh=!S.winRebake;S.workLight=!!o.workLight;S.winRebake=true;const hit=!!(fresh&&altSwap(was,S.workLight));if(hit)S.altSkip=true;const sp0=S.spare;S.tog={t:now(),hit,fresh,why:hit?'':!sp0?'no spare':S.ab.altWork===false?'disabled':!S.probesReady?'probes not ready':!sp0.have?(S.altJob?'spare still baking (phase '+S.altJob.phase+')':'spare not baked'):sp0.state!==S.workLight?'spare is the wrong state':S.altJob?'bake running':!fresh?'time change in flight':'other'};console.log('[PodRender] work light toggle',hit?'INSTANT swap':'SLOW relight',S.tog.why,{pq:S.pq.length,dirtyCubes:S.cubes.filter(c=>c.dirty||!c.done).length,pmQ:S.pmQ.length,spareStale:sp0&&sp0.dd?sp0.dd.length:0})}
   if(o.windows!==undefined){S.winList=o.windows;S.winDirty=true;S.winRebake=true}if(o.animate!=null)S.wAnim=!!o.animate;
   if(o.glow){Object.assign(S.glowK,o.glow);S.glowDirty=true}if(o.rep)S.rep=Object.assign({},o.rep);if(o.hud!=null){S.hudOn=!!o.hud;hud()}if(o.off)Object.assign(S.off,o.off);if(o.debug!==undefined)S.debug=o.debug||null;if(o.checkSamplers!=null)S.checkSamplers=!!o.checkSamplers;if(o.freeze!=null){S.noFreeze=!o.freeze;if(S.noFreeze)matUnfreeze()}
   // A/B options (fps test): {prepass, depth:'resolve'|'single', hdr8, lights:4|6, fb, cheap, ptShadows, cones, reflBuf, vshadow}

@@ -15464,15 +15464,16 @@ let WARMP=null;
 // boots everything that needs no home while the game's title shows: the renderer, the worker and its bundle, PodContext's targets and
 // programs, then a sample home through the whole open path (worker plan, streamed pieces, slices), compiled in the background and unloaded
 // with its programs kept. Every step yields; the WebGL context creation is the one step that cannot be split.
-function warm(){if(WARMP)return WARMP;WARMP=(async()=>{const t0=performance.now(),r={};const T0=()=>performance.now();
+// warmStop(): a real visit started while the title-screen warm-up still runs: skip what is left of it (the sample home is let go at once) so the visit never waits on it
+function warm(){if(WARMP)return WARMP;B.warmStop=false;WARMP=(async()=>{const t0=performance.now(),r={};const T0=()=>performance.now();
   await yieldTask();let a=T0();if(!B.dr)initRenderer();r.rendererMs=T0()-a;await yieldTask();
   a=T0();r.worker=await wkStart();r.workerMs=T0()-a;r.workerInfo=WK.info||{failed:WK.failed};
   let pw=null;if(r.worker){const id=++WK.seq;pw=new Promise(res=>{WK.reqs.set(id,{res,rej:()=>res(null)})});WK.w.postMessage({type:'prewarm',id})}
   const C=window.PodContext;if(C&&typeof C.warm==='function'){a=T0();try{await C.warm({renderer:B.dr})}catch(e){console.warn('builder: PodContext.warm',e)}r.contextMs=T0()-a}
-  if(!B.s&&!B.loading){B.warming=true;try{a=T0();await furnishFor(WARM_HH,{tier:'medium',pod:{district:'mid',floor:8,side:'N',seed:4242},quiet:true,auto:true,noCtx:true});r.sampleMs=T0()-a;r.samplePerf=PF.last;
-      a=T0();const R=window.PodRender;if(B.prOn&&R&&typeof R.compileAsync==='function'){try{await R.compileAsync(B.sc,B.cam)}catch(e){console.warn('builder: compileAsync',e)}}r.compileMs=T0()-a;
+  if(!B.s&&!B.loading&&!B.warmStop){B.warming=true;try{a=T0();await furnishFor(WARM_HH,{tier:'medium',pod:{district:'mid',floor:8,side:'N',seed:4242},quiet:true,auto:true,noCtx:true});r.sampleMs=T0()-a;r.samplePerf=PF.last;
+      a=T0();const R=window.PodRender;if(!B.warmStop&&B.prOn&&R&&typeof R.compileAsync==='function'){try{await R.compileAsync(B.sc,B.cam)}catch(e){console.warn('builder: compileAsync',e)}}r.compileMs=T0()-a;
       // PodRender's own warm-up (every shader variant a room needs: about 30 s on a cold page) advances one job a frame, and the loop is idle while warming: drive it here, so a visit never pays it
-      a=T0();if(B.prOn&&R&&typeof R.warmState==='function'){const until=T0()+90000;let w=null;while(T0()<until){try{w=R.warmState()}catch(e){w=null}if(!w||w.finished||w.broken)break;await new Promise(res=>requestAnimationFrame(()=>res()));try{prCall('render',1/60)}catch(e){break}}r.renderWarmDone=!!(w&&w.finished)}r.renderWarmMs=T0()-a;
+      a=T0();if(!B.warmStop&&B.prOn&&R&&typeof R.warmState==='function'){const until=T0()+90000;let w=null;while(T0()<until&&!B.warmStop){try{w=R.warmState()}catch(e){w=null}if(!w||w.finished||w.broken)break;await new Promise(res=>requestAnimationFrame(()=>res()));try{prCall('render',1/60)}catch(e){break}}r.renderWarmDone=!!(w&&w.finished)}r.renderWarmMs=T0()-a;r.stopped=!!B.warmStop;
       r.kept=keepPrograms();await unload()}
     catch(e){console.warn('builder: warm-up sample failed',e);r.error=String(e&&e.message||e)}finally{B.warming=false}}else r.sample='skipped: a home is open';
   if(pw){a=T0();const p=await pw;r.probes=p?p.n:0;r.probeMs=p?p.ms:null;r.probeWaitMs=T0()-a}r.programs=B.dr?B.dr.info.programs.length:0;r.totalMs=T0()-t0;for(const k in r)if(typeof r[k]==='number')r[k]=Math.round(r[k]*10)/10;B.warmInfo=r;return r})();return WARMP}
@@ -15499,7 +15500,7 @@ window.PodBuilder={version:1,enter:enterView,editPlan,newHome,load:(rc,o)=>loadR
   surfaces:id=>{const i=B.inst.get(id);if(!i)return [];i.g.updateMatrixWorld(true);return i.surfaces.map(q=>{_v1.set(q.x,q.y,q.z).applyMatrix4(i.g.matrixWorld).sub(B.root.position);return {x:_v1.x,y:_v1.y,z:_v1.z,w:q.round?q.r*2:q.w,d:q.round?q.r*2:q.d}})},
   wallSpans:run=>[...B.inst.values()].filter(i=>i.kind==='wall'&&!i.rec.parent&&i.wsp.run===run).map(i=>({a0:i.wsp.a0,a1:i.wsp.a1,y0:i.wsp.y0,y1:i.wsp.y1,rid:i.wsp.rid})),
   lighting:()=>{let ws=0;if(B.sc)B.sc.traverse(o=>{if(o.isLight&&o.userData.workLight)ws+=o.intensity});return {work:B.work,time:timeName(),workIntensity:ws,fallback:!!(B.env&&B.env.g.parent)}},setWork,setTime:(t,o)=>o&&o.host?hostTime(t):setTime(t),onChange:fn=>{changeFns.add(fn);return ()=>changeFns.delete(fn)},onSave:fn=>{saveFns.add(fn);return ()=>saveFns.delete(fn)},
-  setWindows:(spec,o)=>setWindows(spec,o),warm:()=>warm(),unload:()=>unload(),perf:()=>PF.last?JSON.parse(JSON.stringify(PF.last)):null,warmInfo:()=>B.warmInfo||null,worker:()=>({ok:WK.ok,failed:WK.failed,info:WK.info}),comparePlan,compareGen,furnishFor:(hh,o)=>furnishFor(hh,o),setResidents:(l,o)=>setResidents(l,o),residents:()=>B.residents?clone(B.residents):null,household:()=>B.home&&B.home.household?clone(B.home.household):null,facadeOf:()=>B.home&&B.home.facade?clone(B.home.facade):null,facade:pk=>facadeFor(podOK(pk)||B.home&&B.home.pod,B.home&&B.home.tier),
+  setWindows:(spec,o)=>setWindows(spec,o),warm:()=>warm(),warmStop:()=>{B.warmStop=true;return new Promise(res=>{const t0=performance.now();(function w(){if(!B.warming||performance.now()-t0>20000)res(true);else setTimeout(w,16)})()})},unload:()=>unload(),perf:()=>PF.last?JSON.parse(JSON.stringify(PF.last)):null,warmInfo:()=>B.warmInfo||null,worker:()=>({ok:WK.ok,failed:WK.failed,info:WK.info}),comparePlan,compareGen,furnishFor:(hh,o)=>furnishFor(hh,o),setResidents:(l,o)=>setResidents(l,o),residents:()=>B.residents?clone(B.residents):null,household:()=>B.home&&B.home.household?clone(B.home.household):null,facadeOf:()=>B.home&&B.home.facade?clone(B.home.facade):null,facade:pk=>facadeFor(podOK(pk)||B.home&&B.home.pod,B.home&&B.home.tier),
   // window pieces grouped per lab wall side; pieces that abut (gap under 10 cm) count as one window (a band)
   windowsBySide:()=>{const P=B.P;if(!P)return null;const Wm=P.W*TILE,Dm=P.D*TILE,out={N:[],S:[],E:[],W:[]};for(const i of B.inst.values()){if(!i.pivot.userData.window||i.rec.parent)continue;const r=i.rec,w=i.lbox.max.x-i.lbox.min.x;
       const d={N:Math.abs(r.z),S:Math.abs(r.z-Dm),W:Math.abs(r.x),E:Math.abs(r.x-Wm)};const sd=Object.keys(d).sort((a,b)=>d[a]-d[b])[0];if(d[sd]>.12)continue;const a=sd==='N'||sd==='S'?r.x:r.z;out[sd].push([a-w/2,a+w/2,i.lbox.min.y+(r.wh||0),i.lbox.max.y+(r.wh||0)])}
@@ -17521,4 +17522,4 @@ window.PodRender=api})();
 </script>
 <!-- Neon Terrarium: the game side (tools/furnish/build.py) -->
 <link rel="stylesheet" href="furnish/bridge.css?v=9aa2454540">
-<script src="furnish/bridge.js?v=9d981c77c8"></script>
+<script src="furnish/bridge.js?v=e519d6331b"></script>

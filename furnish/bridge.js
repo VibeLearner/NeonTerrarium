@@ -64,6 +64,7 @@
     S.home = h; const visit = S.visit; liveWatch(visit); doneWatch(visit);
     (async () => {
       try {
+        if (warming){ try { if (PB().warmStop) await PB().warmStop(); else await warming; } catch (e) {} if (S.visit !== visit) return; sleep(false); }
         if (m.recipe && m.recipe.home && Array.isArray(m.recipe.pieces)){ const rc = m.recipe; rc.home.pod = pod; await PB().load(rc, { openEarly: true }); }   // (openEarly: the hologram starts at the click, as for a new home)
         else if (m.household && PB().furnishFor) await PB().furnishFor(m.household, { tier: m.tier || null, pod });   // (lived in: furnished for the household that lives there)
         else await PB().newHome(m.tier || null, pod);   // (vacant, or an older lab: empty; null: the building's own tier and windows)
@@ -99,11 +100,15 @@
     requestAnimationFrame(look);
   }
   // furnish:warm: while the title screen shows, everything that doesn't need a home is made ready (the library, the worker, the programs)
+  // A visit can start before this finishes (the title screen lets go after a cap): the visit stops the builder's part (warmStop) and
+  // waits for it to let go of its sample home, and the page is only put to sleep here when no visit has started meanwhile.
+  let warming = null;
   async function warm(){
     const t0 = performance.now();
-    try { if (PB().warm) await PB().warm(); } catch (e) { console.warn('furnish: builder warm-up', e); }
-    try { if (PC() && PC().warm) await PC().warm(); } catch (e) { console.warn('furnish: context warm-up', e); }
-    sleep(true);
+    warming = (async () => { try { if (PB().warm) await PB().warm(); } catch (e) { console.warn('furnish: builder warm-up', e); } })();
+    await warming; warming = null;
+    if (!S.home && !S.opening) try { if (PC() && PC().warm) await PC().warm(); } catch (e) { console.warn('furnish: context warm-up', e); }
+    if (!S.home && !S.opening) sleep(true);
     send({ type: 'furnish:warmed', ms: Math.round(performance.now() - t0) });
   }
   addEventListener('message', e => {

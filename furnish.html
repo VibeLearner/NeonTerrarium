@@ -16650,11 +16650,11 @@ function warmFix(p){const R=S.R,gl=S.gl;const prog=R.info.programs.find(x=>x.pro
 function progName(p){const x=S.R.info.programs.find(q=>q.program===p);return x?x.name+' '+String(x.cacheKey).slice(0,80):'(released)'}
 function warmStep(){const W=S.warm;if(!W)return;const gl=S.gl,t=now();
   if(W.tex.length){let k=0;while(W.tex.length&&(k<1||now()-t<3)){const tx=W.tex.pop();const pp=S.R.properties.get(tx);if(!pp.__webglInit){S.R.initTexture(tx);k++}}if(k)ev('upload '+k+' tex '+(now()-t).toFixed(1)+'ms')}
-  let fixed=0;for(const p of [...W.pend]){if(!gl.isProgram(p)){W.pend.delete(p);W.pendT.delete(p);W.notes.push('released before link');continue}
-    const age=t-(W.pendT.get(p)||t);let done=W.ext?gl.getProgramParameter(p,W.ext.COMPLETION_STATUS_KHR):false;
+  let fixed=0;const chk=[];for(const p of [...W.pend]){const c0=now();const isP=gl.isProgram(p);const c1=now();if(!isP){W.pend.delete(p);W.pendT.delete(p);W.notes.push('released before link');continue}
+    const age=t-(W.pendT.get(p)||t);let done=W.ext?gl.getProgramParameter(p,W.ext.COMPLETION_STATUS_KHR):false;if(chk.length<8)chk.push([+(c1-c0).toFixed(1),+(now()-c1).toFixed(1),done?1:0]);
     if(!done&&fixed<1&&(!W.ext||age>4000)){if(W.ext){const n='forced after '+Math.round(age)+' ms: '+progName(p);W.notes.push(n);console.warn('PodRender warmup: '+n)}done=true}
     if(!done)continue;const a=now();warmFix(p);W.pend.delete(p);W.pendT.delete(p);fixed++;W.log.push(+(now()-a).toFixed(1));ev('link '+(now()-a).toFixed(1)+'ms')}
-  S.wsec={pend:+(now()-t).toFixed(1),pending:W.pend.size};if(W.pend.size)return;
+  S.wsec={pend:+(now()-t).toFixed(1),pending:W.pend.size,chk};if(W.pend.size)return;
   if(W.cur&&W.cur.chunk!=null){const b=now();warmChunk();S.wsec.chunkMs=+(now()-b).toFixed(1);return}
   if(W.cur&&W.cur.real){const b=now();S.wsec.phase=W.cur.phase||'compile';realChunk();S.wsec.realMs=+(now()-b).toFixed(1);return}
   if(W.cur){W.done[W.cur.job]=true;const zb=W.cur.zb,mg=W.cur.merges,jd=W.cur.job;W.cur=null;

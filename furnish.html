@@ -16559,7 +16559,7 @@ function poolBuild(){S.pool=[];for(let i=0;i<POOL;i++){const p=new TH.PointLight
     for(const l of [LAYER,L_UI,L_SH])p.layers.enable(l);p.userData.prPM=p.layers.mask;p.name='prPoolLight';S.scene.add(p);S.pool.push(p)}S.poolN=POOL;S.reals=new Set()}
 function poolAdopt(l){S.lightSet.add(l);S.reals.add(l);if(l.userData.prMask==null)l.userData.prMask=l.layers.mask;l.layers.mask=0;S.assignT=0}
 const lightScore=l=>l.intensity*lumC(l.color)*(l.distance>0?Math.min(1,l.distance/4):1);
-function budget(){return Math.max(2,Math.min(S.ab.lights||POOL,S.cfg.lights||POOL)-(G.sub?2:0))}
+function budget(){return Math.max(2,Math.min(S.ab.lights||POOL,S.cfg.lights||POOL)-(G.sub&&S.ab.subLights===true?2:0))}   // (round 31: the governor's first step coarsens buffers only; dropping 2 lamps made lit rooms flicker as it stepped back and forth)
 // choose which lamps are real-time (every 15 frames, with hysteresis so slots rarely change)
 // sticky: lamps already in the pool (and lamps already holding a shadow slot) score 30% higher, and a shadow-slot holder that stays in the top
 // k keeps its slot, so near-equal lamps never trade places (each trade re-renders shadow maps and pops the lighting)
@@ -16884,13 +16884,13 @@ function govern(dt){G.ints[G.ni]=dt;G.ni=(G.ni+1)%G.ints.length;G.nInts=Math.min
     // CPU-bound (draw submission): lighting quality does not buy frame time, so keep it; the CPU side is cut elsewhere (merges, glow cards)
     const gpu=gpuTrusted(med);G.med=med;G.gpuOk=gpu!=null||GT.total==null;G.cpuBound=!!(S.cpu>10&&(gpu==null||gpu<S.cpu));if(G.cpuBound){G.slowN=0;return}
     G.slowN++;G.stable=t;if(G.slowN>=2&&t-G.lastChange>2000){G.slowN=0;if(G.lastUp&&t-G.lastUp.t<4000)G.upWait[G.lastUp.to]=Math.min(12e4,G.upWait[G.lastUp.to]*2);G.lastUp=null;
-      if(G.sub===0&&RUNGS[G.rung].ts<8){G.sub=1;G.lastChange=t}else if(G.rung<NR){G.sub=0;setRung(G.rung+1)}}return}
+      if(G.sub===0&&RUNGS[G.rung].ts<8){G.sub=1;G.lastChange=t;console.log('[PodRender] quality: coarser lighting buffers (median '+med.toFixed(1)+' ms, p95 '+p95.toFixed(1)+' ms)')}else if(G.rung<NR){G.sub=0;setRung(G.rung+1)}}return}
   G.slowN=0;G.med=med;const gpu=gpuTrusted(med);G.gpuOk=gpu!=null||GT.total==null;
   // trusted timer: real headroom. No usable timer (missing, or reading above the frame interval): a frame rate that holds is the cue for a trial step up;
   // the undo logic below doubles the wait whenever a step has to be taken back, so a wrong trial costs one slow second at most.
   const head=gpu!=null?gpu<11.5:med<=17.5;
-  if(head&&t-G.stable>G.upWait[Math.max(1,G.rung-1)]&&t-G.lastChange>4000){if(G.sub===1){G.sub=0;G.lastChange=t;G.stable=t}else if(G.rung>1&&rungReady(G.rung-1)){G.lastUp={t,to:G.rung-1};setRung(G.rung-1);G.sub=1;G.stable=t}}}
-function setRung(r){r=clamp(r|0,1,NR);if(G.rung!==r){G.rung=r;G.lastChange=now()}}
+  if(head&&t-G.stable>G.upWait[Math.max(1,G.rung-1)]&&t-G.lastChange>4000){if(G.sub===1){G.sub=0;G.lastChange=t;G.stable=t;console.log('[PodRender] quality: full lighting buffers again')}else if(G.rung>1&&rungReady(G.rung-1)){G.lastUp={t,to:G.rung-1};setRung(G.rung-1);G.sub=1;G.stable=t}}}
+function setRung(r){r=clamp(r|0,1,NR);if(G.rung!==r){console.log('[PodRender] quality rung '+G.rung+' -> '+r+' ('+(RUNGS[r]&&RUNGS[r].name)+': '+(RUNGS[r]?RUNGS[r].lights+' lights, '+RUNGS[r].pts+' lamp shadows':'')+')');G.rung=r;G.lastChange=now()}}
 const scaleOf=(C,k)=>Math.min(8,C[k]*(G.sub?2:1));
 
 /* ---------------- per-pass GPU timing (EXT_disjoint_timer_query_webgl2), sequential queries, read back a few frames later ---------------- */
@@ -17162,21 +17162,30 @@ function bkScene(){try{return S&&S.bakeKeyFn?String(S.bakeKeyFn()):null}catch(e)
 function bkFull(scene,light){return [BK.ver,scene,light,'r'+G.rung,'p'+(S.probes?S.probes.length:0),'c'+S.cubes.length].join('|')}
 function bkRead(rt){const w=rt.width,h=rt.height,f=new Float32Array(w*h*4),R=S.R,prev=R.getRenderTarget();R.setRenderTarget(rt);S.gl.readPixels(0,0,w,h,S.gl.RGBA,S.gl.FLOAT,f);R.setRenderTarget(prev);
   const u=new Uint16Array(f.length),H=TH.DataUtils.toHalfFloat;for(let i=0;i<f.length;i++)u[i]=H(f[i]);return {w,h,d:u}}   // (half floats: half the size, the targets are half float anyway)
+// asynchronous read-back (round 31): a read into a pixel buffer with a fence, collected once the GPU has done it. A plain readPixels waits for
+// everything queued on the GPU (the city backdrop too): 90-110 ms stalls on the Mac, and longer when the GPU is busy
+function bkReadStart(rt){const gl=S.gl,w=rt.width,h=rt.height,b=gl.createBuffer();gl.bindBuffer(gl.PIXEL_PACK_BUFFER,b);gl.bufferData(gl.PIXEL_PACK_BUFFER,w*h*16,gl.STREAM_READ);
+  const R=S.R,prev=R.getRenderTarget();R.setRenderTarget(rt);gl.readPixels(0,0,w,h,gl.RGBA,gl.FLOAT,0);R.setRenderTarget(prev);gl.bindBuffer(gl.PIXEL_PACK_BUFFER,null);
+  const f=gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE,0);gl.flush();return {b,f,w,h}}
+function bkReadPoll(q){const gl=S.gl;if(gl.getSyncParameter(q.f,gl.SYNC_STATUS)!==gl.SIGNALED)return null;gl.deleteSync(q.f);q.f=null;
+  const f=new Float32Array(q.w*q.h*4);gl.bindBuffer(gl.PIXEL_PACK_BUFFER,q.b);gl.getBufferSubData(gl.PIXEL_PACK_BUFFER,0,f);gl.bindBuffer(gl.PIXEL_PACK_BUFFER,null);gl.deleteBuffer(q.b);q.b=null;
+  const u=new Uint16Array(f.length),H=TH.DataUtils.toHalfFloat;for(let i=0;i<f.length;i++)u[i]=H(f[i]);return {w:q.w,h:q.h,d:u}}
+function bkReadDrop(q){if(!q||!S)return;const gl=S.gl;try{if(q.f)gl.deleteSync(q.f);if(q.b)gl.deleteBuffer(q.b)}catch(e){}}
 function bkWrite(rec,rt){if(!rec||rec.w!==rt.width||rec.h!==rt.height)return false;const t=new TH.DataTexture(rec.d,rec.w,rec.h,TH.RGBAFormat,TH.HalfFloatType);t.minFilter=t.magFilter=TH.NearestFilter;t.generateMipmaps=false;t.flipY=false;t.needsUpdate=true;
   const sc=rt.scissorTest;copyRT({texture:t},rt);rt.scissorTest=sc;t.dispose();return true}
 // a settled bake is read back one target a frame while the view is still (each read waits for the GPU once), then stored
 function bkSaveStep(idle,force){if(!S.bakeKeyFn||!S.f32||S.ab.bakeCache===false||!S.probesReady||(!force&&(S.eff!==G.rung||!idle||now()-(S.camMoved||0)<800)))return false;
   let J=S.bkJob;const sp=S.spare;
-  if(J&&(J.live?(S.liveKey!==J.light||!liveSettled()):(!sp||!sp.have||sp.key!==J.light||S.altJob))){S.bkJob=J=null}
+  if(J&&(J.live?(S.liveKey!==J.light||!liveSettled()):(!sp||!sp.have||sp.key!==J.light||S.altJob))){bkReadDrop(J.q);S.bkJob=J=null}
   if(!J){if(S.pendSwap||!liveSettled())return false;const sig=S.liveKey+'|'+(sp&&sp.have?sp.key:'')+'|'+S.editT;if(sig===S.bkSig)return false;   // (checked already, nothing changed since: no recipe hash every frame)
     const scene=bkScene();if(!scene)return false;const sv=S.bkSaved||(S.bkSaved=new Set());
     const cand=[];if(S.liveKey&&S.liveKey!=='stale')cand.push({live:true,light:S.liveKey});if(sp&&sp.have&&sp.key&&!S.altJob&&sp.pm)cand.push({live:false,light:sp.key});
     for(const c of cand){const full=bkFull(scene,c.light);if(sv.has(full))continue;const tg=c.live?[['atlas',S.atlas],['sh',S.shT]].concat(S.pmrem.map((p,i)=>['pm'+i,p])):[['atlas',sp.atlas],['sh',sp.shT]].concat(sp.pm.map((p,i)=>['pm'+i,p]));
       S.bkJob=J={full,live:c.live,light:c.light,tg,i:0,out:{v:BK.ver,t:Date.now()}};break}
     if(!J){S.bkSig=sig;return false}}
-  const [name,rt]=J.tg[J.i];J.out[name]=bkRead(rt);J.i++;
-  if(J.i>=J.tg.length){S.bkJob=null;S.bkSaved.add(J.full);const full=J.full;bkPut(full,J.out).then(ok=>{if(S)ev(ok?'bake stored':'bake not stored')})}
-  return true}
+  if(J.q){const r=bkReadPoll(J.q);if(!r)return false;J.out[J.tg[J.i][0]]=r;J.q=null;J.i++;   // (not back yet: nothing to do this frame)
+    if(J.i>=J.tg.length){S.bkJob=null;S.bkSaved.add(J.full);const full=J.full;bkPut(full,J.out).then(ok=>{if(S)ev(ok?'bake stored':'bake not stored')})}return true}
+  J.q=bkReadStart(J.tg[J.i][1]);return true}
 // on attach: a stored bake for the home's state (and its spare) replaces the first bake, if it arrives before that bake has finished
 function bkRestore(){if(!S.bakeKeyFn||!S.f32||S.ab.bakeCache===false||typeof indexedDB==='undefined')return;const scene=bkScene();if(!scene)return;const my=S,live=keyNow(),other=keyOf(S.time,!S.workLight);
   const t0=now();Promise.all([bkGet(bkFull(scene,live)),bkGet(bkFull(scene,other))]).then(([a,b])=>{if(S!==my)return;S.bkRestoreMs=Math.round(now()-t0);
@@ -17195,8 +17204,8 @@ function altNeed(){const sp=S.spare;if(!altCan()||!S.warm||!S.warm.done.pmrem)re
 // the full pipeline is live at the rung it wants: until then frames take the plain fallback, which shows nothing while its programs compile and has no baked light
 function pipeLive(){return !!(S.matReady&&S.eff>0&&S.eff===G.rung)}
 // what the hologram is still waiting for (diagnostics for the open timing line)
-function lightWhy(){if(!S||!S.post)return 'no renderer';const w=[];if(!S.matReady)w.push('shaders warming');else if(!pipeLive())w.push('quality rung '+S.eff+' not '+G.rung);if(!S.probesReady)w.push('first bake');if(S.pq.length)w.push('probes '+S.pq.length);if(S.cubes.some(c=>c.dirty||!c.done))w.push('reflections');if(S.pmQ.length)w.push('reflection filter');if(S.pmFade.some(n=>n>0))w.push('reflection fade');if(S.optQ.length)w.push('merges '+S.optQ.length);if(S.projNeeded||S.lerpN>0)w.push('bounce light');if(S.aoDirty)w.push('contact shadows');if(S.zRooms&&S.zRooms.some(r=>!r.valid))w.push('depth merge');if(altNeed())w.push('other light state'+(S.altJob?' (phase '+S.altJob.phase+')':''));if(S.pendSwap)w.push('swap');return w.join(', ')||'nothing'}
-function lightPending(){if(!S||!S.post||S.broken||S.ab.lightGate===false)return false;if(!pipeLive())return true;return liveBusy()||!S.probesReady||altNeed()||!!S.pendSwap}
+function lightWhy(){if(!S||!S.post)return 'no renderer';const w=[];if(!S.matReady)w.push('shaders warming');else if(!pipeLive())w.push('quality rung '+S.eff+' not '+G.rung);if(!S.probesReady)w.push('first bake');if(S.pq.length)w.push('probes '+S.pq.length);if(S.cubes.some(c=>c.dirty||!c.done))w.push('reflections');if(S.pmQ.length)w.push('reflection filter');if(S.pmFade.some(n=>n>0))w.push('reflection fade');if(S.optQ.length)w.push('merges '+S.optQ.length);if(S.projNeeded||S.lerpN>0)w.push('bounce light');if(S.aoDirty)w.push('contact shadows');if(S.zRooms&&S.zRooms.some(r=>!r.valid))w.push('depth merge');if(S.ab.holdSpare===true&&altNeed())w.push('other light state'+(S.altJob?' (phase '+S.altJob.phase+')':''));if(S.pendSwap)w.push('swap');return w.join(', ')||'nothing'}
+function lightPending(){if(!S||!S.post||S.broken||S.ab.lightGate===false)return false;if(!pipeLive())return true;return liveBusy()||!S.probesReady||!!S.pendSwap||(S.ab.holdSpare===true&&altNeed())}   // (the other work-light state bakes once the room shows: it cost 1.3-1.9 s of every open)
 // rough 0..1 for the hologram's progress line while it holds: shader warm-up, then the live bake, then the spare
 function lightProgress(){if(!S||!S.post)return 1;const W=S.warm;let w=1;if(!pipeLive()){const d=W?Object.keys(W.done).length:0,q=W?W.queue.length:0;w=d+q?Math.min(.95,d/(d+q)):0}
   const np=S.probes&&S.probes.length?S.probes.length:1,b=S.probesReady?1:Math.max(0,Math.min(1,1-S.pq.length/np)),a=altNeed()||S.pendSwap?(S.altJob?.5:0):1;return +(.45*w+.4*b+.15*a).toFixed(3)}
@@ -17419,7 +17428,7 @@ function detach(){if(!S)return;const R=S.R;try{for(const [l,c,m,au] of S.saved.c
   for(const h of S.hemis)if(h.userData.prOrig!=null)h.intensity=h.userData.prOrig;U.uPRGI.value=0;U.uPRGIk.value=0;U.uPRDbg.value=0;U.uPRFOK.value=0;if(S.glow&&S.glow.parent)S.glow.parent.remove(S.glow);for(const r of S.zRooms||[])for(const m of r.meshes)if(m.parent)m.parent.remove(m);
   if(S.hudEl)S.hudEl.remove();if(S.post){freeTargets();for(const c of S.cubes)c.rt.dispose();for(const p of (S.pmrem||[]).concat(S.pmStage||[],S.pmTmp?[S.pmTmp]:[]))p.dispose();if(S.pmGen)S.pmGen.dispose();for(const k of ['atlas','shT','shA','shB'])disposeRT(S[k]);if(S.spare){for(const x of [S.spare.atlas,S.spare.shT].concat(S.spare.pm||[]))disposeRT(x)}disposeRT(S.altCube);if(S.warm&&S.warm.psoRT)S.warm.psoRT.forEach(disposeRT)}}catch(e){console.warn(e)}
   if(S.vcMats){for(const m of S.vcMats.values())m.dispose();S.vcMats=null}if(S.vtRegs){for(const r of S.vtRegs.values())if(r.arr)r.arr.dispose();S.vtRegs=null}
-  for(const e of GT.q)S.gl.deleteQuery(e.q);GT.q.length=0;GT.cur=null;hookBuilds(false);glTrace(false);S=null}
+  if(S.bkJob)bkReadDrop(S.bkJob.q);for(const e of GT.q)S.gl.deleteQuery(e.q);GT.q.length=0;GT.cur=null;hookBuilds(false);glTrace(false);S=null}
 function sceneChanged(kind,obj){if(!S)return;S.photoN=0;if(kind!=='camera'&&kind!=='light')l2Invalidate(null,'sc:'+kind);if(kind==='geometry'){S.winDirty=true;S.winStale=true}if(kind!=='camera')S.histReset=true;if(kind==='camera'){if(obj&&obj.isCamera)S.camera=obj;S.camMoved=now();return}if(kind==='walls'){S.editT=now();S.aoDirty=true;zRoomInvalidate(null,'sc:walls');return}
   if(!S.post){return}
   if(kind==='geometry'||kind==='material'){if(obj){const pc=pieceOf(obj)||(isPiece(obj)?obj:null);if(pc)queueOpt(pc);walk(obj,false,kind==='geometry',null)}
@@ -17483,7 +17492,7 @@ function flush(maxIter,only){if(!S||!S.post)return 0;S.flushing=true;let n=0;con
   try{while(n<(maxIter||5000)&&busy()){if(S.syncSlices)gpuSync();S.frame++;if(S.optQ.length)optStep(true);work();n++}}
   finally{S.flushing=false;S.R.setRenderTarget(null)}return n}
 const api={caps:{alpha:true,context:true},lightPending:()=>{try{return lightPending()}catch(e){return false}},lightProgress:()=>{try{return lightProgress()}catch(e){return 1}},lightWhy:()=>{try{return lightWhy()}catch(e){return 'error'}},warmState:()=>S&&S.warm?{finished:!!S.warm.finished,queue:S.warm.queue.length,matReady:!!S.matReady,broken:!!S.broken}:null,attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
-  _debug:{bkSaveAll:async()=>{let n=0;S.bkSig=null;while(n<60&&bkSaveStep(true,true))n++;await new Promise(r=>setTimeout(r,500));return n},bkRead:name=>{const rt=name==='sh'?S.shA:name==='atlas'?S.atlas:S.pmrem[+name.slice(2)];return Array.from(bkRead(rt).d.slice(0,4096))},patchOne:m=>{patch(m);return PATCHED.has(m)},vtFlush:()=>{if(S){S.vtDirty=true;vtFlush()}return S&&S.vtRegs?[...S.vtRegs.values()].map(r=>({size:r.w+'x'+r.h,layers:r.tex.length})):null},altRun:n=>{let k=0;const sl=(kind,fn)=>cw(kind,fn);for(;k<(n||5000);k++){const c=S.altN||0;altWork(true,sl,true);if((S.altN||0)===c)break}return k},winStep:()=>windowFrame(16),keys:()=>({want:keyNow(),live:S.liveKey,spare:S.spare&&S.spare.have?S.spare.key:null,baking:S.altJob?S.altJob.key:null,pend:S.pendSwap?S.pendSwap.key:null,mode:S.altJob?S.altJob.mode:null}),l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
+  _debug:{bkSaveAll:async()=>{let n=0;S.bkSig=null;for(let k=0;k<600;k++){if(bkSaveStep(true,true))n++;else if(!S.bkJob&&k>2)break;await new Promise(r=>setTimeout(r,16))}await new Promise(r=>setTimeout(r,500));return n},bkRead:name=>{const rt=name==='sh'?S.shA:name==='atlas'?S.atlas:S.pmrem[+name.slice(2)];return Array.from(bkRead(rt).d.slice(0,4096))},patchOne:m=>{patch(m);return PATCHED.has(m)},vtFlush:()=>{if(S){S.vtDirty=true;vtFlush()}return S&&S.vtRegs?[...S.vtRegs.values()].map(r=>({size:r.w+'x'+r.h,layers:r.tex.length})):null},altRun:n=>{let k=0;const sl=(kind,fn)=>cw(kind,fn);for(;k<(n||5000);k++){const c=S.altN||0;altWork(true,sl,true);if((S.altN||0)===c)break}return k},winStep:()=>windowFrame(16),keys:()=>({want:keyNow(),live:S.liveKey,spare:S.spare&&S.spare.have?S.spare.key:null,baking:S.altJob?S.altJob.key:null,pend:S.pendSwap?S.pendSwap.key:null,mode:S.altJob?S.altJob.mode:null}),l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
 window.PodRender=api})();
 
 </script>

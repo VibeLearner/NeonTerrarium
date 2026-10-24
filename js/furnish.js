@@ -8,7 +8,7 @@
 'use strict';
 const FURN = (() => {
   const F = { pick: false, open: false, hold: false, busy: false, hov: null, fl: 0, userFloor: false, frame: null, home: null };
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-24q';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-24r';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
 
@@ -108,7 +108,7 @@ const FURN = (() => {
     const t = performance.now(), same = F.hov && F.hov.c === c && F.hov.t && t - F.hov.t < 400;
     const rows = same ? F.hov.rows : homesOf(c);
     if (!rows.length){ F.hov = { c, rows, t }; showPick(F.hov, x, y); return; }
-    if (!F.hov || F.hov.c !== c){ F.hov = { c, rows, t }; F.userFloor = false; try { if (typeof podsResync === 'function') podsResync(c); } catch (e) {} }
+    if (!F.hov || F.hov.c !== c){ F.hov = { c, rows, t }; F.userFloor = false; try { if (typeof podsResync === 'function') podsResync(c); } catch (e) {} nearWarm(c); }
     else if (!same){ F.hov.rows = rows; F.hov.t = t; }
     if (!F.userFloor){ const py = pk.p ? pk.p.y : rows[0].y; let k = 0; for (let i = 0; i < rows.length; i++) if (rows[i].y <= py + .02) k = i; F.fl = k; }   // (the pod the pointer is on)
     F.fl = clamp(F.fl, 0, rows.length - 1);
@@ -285,17 +285,49 @@ const FURN = (() => {
   function fromCache(ce, EM){ const out = {}; for (const k in ce.parts){ const p = ce.parts[k], em = new Uint8Array(p.n); for (let i = 0; i < p.n; i++){ const q = p.e4[i]; if (q) em[i] = EM.at(q[0], q[1], q[2], q[3]); }
     out[k] = { pos: p.pos.slice(), col: p.col.slice(), em, idx: p.idx.slice(), n: p.n }; } return out; }
   // While picking, the stand-ins of plots whose arrays the game still holds are made in idle moments (a few ms at a time)
-  const WARM = { q: null, EM: emTable() };
+  const WARM = { q: null, EM: emTable(), later: [], asked: new Map(), t0: 0 };
+  // true when the game's worker can make plots again (otherwise pmEnsure would rebuild them here, in one go on the main thread)
+  const workerOK = () => { try { return typeof RW !== 'undefined' && RW.usable && RW.usable(); } catch (e) { return false; } };
   function warmStart(){
     if (!WARM.pre){ WARM.pre = true; const l = document.createElement('link'); l.rel = 'prefetch'; l.href = PAGE; document.head.appendChild(l); }   // (the page itself fetched ahead, so a click opens it from the cache)
-    if (WARM.q) return; WARM.q = []; for (const c of cells.values()) if (c.data && c.data.geo) WARM.q.push(c); for (const m of megas.values()) if (m.data && m.data.geo) WARM.q.push(m); pickIdle(warmStep); }
+    if (WARM.q) return; WARM.q = []; WARM.later = []; WARM.asked.clear(); WARM.t0 = performance.now(); for (const c of cells.values()) if (c.data && c.data.geo) WARM.q.push(c); for (const m of megas.values()) if (m.data && m.data.geo) WARM.q.push(m); pickIdle(warmStep); }
   function warmStep(dl){
     if (!WARM.q || F.open) { WARM.q = null; return; }
     const end = performance.now() + (dl && dl.timeRemaining ? Math.min(10, Math.max(3, dl.timeRemaining() - 1)) : 4);
     while (WARM.q.length && performance.now() < end){ const o = WARM.q.pop(); if (!o.data || COARSE.has(o.data)) continue;
-      const B = readPlot(o, WARM.EM, true); if (!B) continue;   // (let go: made on the visit, if it's far)
+      const B = readPlot(o, WARM.EM, true); if (!B){ if (cells.get(ckey(o.i, o.j)) === o) WARM.later.push(o); continue; }   // (let go: asked for below)
       COARSE.set(o.data, coarseOf(B, WARM.EM).keep); }
-    if (WARM.q.length) pickIdle(warmStep); else WARM.q = null;
+    if (WARM.q.length){ pickIdle(warmStep); return; }
+    if (WARM.later.length && F.pick && !F.open && workerOK() && performance.now() - WARM.t0 < 60000){ warmLater(end); setTimeout(() => pickIdle(warmStep), 80); return; }
+    WARM.q = null; WARM.later = []; WARM.asked.clear();
+  }
+  // The plots whose arrays the game let go: asked for from its worker eight at a time while the player is choosing a pod, and their
+  // stand-ins kept as the others are, so the visit doesn't wait for hundreds of them (that was about three seconds after the click).
+  function warmLater(end){
+    const t = performance.now(), keep = []; let n = WARM.asked.size;
+    for (const c of WARM.later){
+      if (!c.data || COARSE.has(c.data)){ WARM.asked.delete(c); continue; }
+      if (performance.now() > end){ keep.push(c); continue; }
+      const at = WARM.asked.get(c);
+      if (at === undefined){ if (n >= 8){ keep.push(c); continue; } WARM.asked.set(c, t); n++; }
+      else if (t - at > 8000){ WARM.asked.delete(c); n--; continue; }   // (not coming: the visit will ask for it)
+      let ok = false; try { ok = pmEnsure(c, 'stand'); } catch (e) {}
+      const B = ok ? readPlot(c, WARM.EM, true) : null;
+      if (B){ COARSE.set(c.data, coarseOf(B, WARM.EM).keep); WARM.asked.delete(c); n--; } else keep.push(c);
+    }
+    WARM.later = keep;
+  }
+  // The ring round a building the pointer has rested on is asked for in full detail before the click, so the worker makes it while the player decides.
+  let nwT = 0;
+  function nearWarm(c){
+    clearTimeout(nwT);
+    nwT = setTimeout(() => {
+      if (!F.pick || F.open || !c.data || !workerOK()) return;
+      const now = performance.now(); if (c._nwAt && now - c._nwAt < 15000) return; c._nwAt = now;
+      const list = []; for (const k of cells.values()){ if (!k.data || !k.data.geo) continue; const d = Math.hypot(k.x - c.x, k.z - c.z); if (d < NEAR + LOT) list.push([d, k]); }
+      list.sort((a, b) => a[0] - b[0]);
+      for (let i = 0; i < list.length && i < 40; i++){ try { pmEnsure(list[i][1], 'full'); } catch (e) {} }
+    }, 300);
   }
   F.warmStart = warmStart;
 

@@ -14365,12 +14365,20 @@ let acv=null;
 function avgOf(img){try{if(!acv)acv=new OffscreenCanvas(48,48);const x=acv.getContext('2d',{willReadFrequently:true});x.imageSmoothingQuality='high';x.clearRect(0,0,48,48);x.drawImage(img,0,0,48,48);
   const d=x.getImageData(0,0,48,48).data;let R=0,G=0,B=0;const N=48*48;for(let i=0;i<N*4;i+=4){R+=d[i];G+=d[i+1];B+=d[i+2]}R/=N/16;G/=N/16;B/=N/16;
   const lin=v=>{v/=16*255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)};const q=v=>Math.min(7,Math.round(v/16/32));return [Math.max(.02,lin(R)),Math.max(.02,lin(G)),Math.max(.02,lin(B)),''+q(R)+q(G)+q(B)]}catch(e){return null}}
-async function bitmap(img,flip,pm){const p=pm?'premultiply':'none';for(const o of [flip?'flipY':'from-image',flip?'flipY':'none',null]){try{return await createImageBitmap(img,o?{imageOrientation:o,premultiplyAlpha:p}:{premultiplyAlpha:p})}catch(e){}}return createImageBitmap(img)}
+// at most 3 bitmaps are made at once (a whole flush of them used to ask for all that memory together: 'The ImageBitmap could not be allocated'),
+// a failed allocation is retried after a short wait, then tried at half size; a texture that still fails is sent without an image (the flush never throws)
+let bmBusy=0;const bmQ=[];
+async function bitmap(img,flip,pm){if(bmBusy>=3)await new Promise(r=>bmQ.push(r));bmBusy++;
+  try{const p=pm?'premultiply':'none';
+    for(let at=0;at<3;at++){for(const o of [flip?'flipY':'from-image',flip?'flipY':'none',null]){try{return await createImageBitmap(img,o?{imageOrientation:o,premultiplyAlpha:p}:{premultiplyAlpha:p})}catch(e){}}await new Promise(r=>setTimeout(r,40*(at+1)))}
+    for(const o of [flip?'flipY':'from-image',null]){try{return await createImageBitmap(img,Object.assign({resizeWidth:Math.max(1,img.width>>1),resizeHeight:Math.max(1,img.height>>1),resizeQuality:'low',premultiplyAlpha:p},o?{imageOrientation:o}:{}))}catch(e){}}
+    return null}
+  finally{bmBusy--;const r=bmQ.shift();if(r)r()}}
 const TEXK=['wrapS','wrapT','magFilter','minFilter','anisotropy','encoding','generateMipmaps','premultiplyAlpha','unpackAlignment','format','type','mapping','rotation','matrixAutoUpdate','name'];
 function texDef(t,X){const R=X.R;let id=R.tex.get(t);if(id!=null)return id;id=++R.n;R.tex.set(t,id);const d={k:'t',id,p:{},rep:t.repeat.toArray(),off:t.offset.toArray(),cen:t.center.toArray(),flipY:!!t.flipY};
   for(const k of TEXK)if(t[k]!==undefined)d.p[k]=t[k];const img=t.image;
   if(img&&img.width&&img.height&&(typeof img.getContext==='function'||(typeof ImageBitmap!=='undefined'&&img instanceof ImageBitmap))){d.w=img.width;d.h=img.height;d.avg=avgOf(img);
-    X.wait.push(bitmap(img,!!t.flipY,!!t.premultiplyAlpha).then(b=>{d.bm=b;X.tr.push(b)}))}
+    X.wait.push(bitmap(img,!!t.flipY,!!t.premultiplyAlpha).then(b=>{if(b){d.bm=b;X.tr.push(b)}}))}
   else if(img&&img.data&&img.width){const a=img.data.slice();d.raw=[a,img.width,img.height];X.tr.push(a.buffer)}
   X.defs.push(d);return id}
 function matDef(m,X){if(!m)return 0;const R=X.R;let id=R.mat.get(m);if(id!=null)return id;id=++R.n;R.mat.set(m,id);const d={k:'m',id,ty:m.type,p:{}};

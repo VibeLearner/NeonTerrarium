@@ -15895,9 +15895,17 @@ function decodeBlocks(u8,map,box,Q){const out={};let o=0;const s=[box[3]-box[0],
     const col=u8.subarray(o,o+n*3);o+=n*3;const em=u8.subarray(o,o+n);o+=n;const idx=new Uint32Array(ni),end=o+ib;let hw=0;
     for(let t=0;t<ni;t++){let v=0,sh=0,b;do{b=u8[o++];v+=(b&127)*Math.pow(2,sh);sh+=7}while(b&128);idx[t]=v===0?hw++:hw-v}o=end;out[k]={pos,col,em,idx,n}}
   return out}
-async function decodePlot(rec,full){const I=CITY.index;const dz=x=>x&&Object.values(x).some(v=>v&&v.pos);if(dz(rec.full)||dz(rec.coarse)){const F=dz(rec.full)?rec.full:null,Cc=dz(rec.coarse)?rec.coarse:null;return full?(F||Cc||{}):(Cc||F||{})}/* a live source's decoded plot */
-  if(full){const p=CITY.packs[rec.pack];return decodeBlocks(await gunzip(p.subarray(rec.off,rec.off+rec.len)),rec.cls,rec.box,I.Q)}
-  return rec.clen?decodeBlocks(CITY.coarse.subarray(rec.coff,rec.coff+rec.clen),rec.coarse,rec.box,I.Q):{}}
+// the same decode as decodeBlocks, yielding to the frame loop every 8192 vertices / 16384 index values (one big plot used to hold the thread 25 to 30 ms)
+async function decodeBlocksA(u8,map,box,Q,tick){const out={};let o=0;const s=[box[3]-box[0],box[4]-box[1],box[5]-box[2]];
+  for(const k of CLS){const m=map&&map[k];if(!m)continue;const n=m[0],ni=m[1],ib=m[2],pos=new Float32Array(n*3);let q0=0,q1=0,q2=0;
+    for(let i=0;i<n;i++){let z=u8[o]|u8[o+1]<<8;q0+=z&1?-((z+1)>>1):z>>1;z=u8[o+2]|u8[o+3]<<8;q1+=z&1?-((z+1)>>1):z>>1;z=u8[o+4]|u8[o+5]<<8;q2+=z&1?-((z+1)>>1):z>>1;o+=6;
+      pos[i*3]=box[0]+q0/Q*s[0];pos[i*3+1]=box[1]+q1/Q*s[1];pos[i*3+2]=box[2]+q2/Q*s[2];if((i&8191)===8191)await tick()}
+    const col=u8.subarray(o,o+n*3);o+=n*3;const em=u8.subarray(o,o+n);o+=n;const idx=new Uint32Array(ni),end=o+ib;let hw=0;
+    for(let t=0;t<ni;t++){let v=0,sh=0,b;do{b=u8[o++];v+=(b&127)*Math.pow(2,sh);sh+=7}while(b&128);idx[t]=v===0?hw++:hw-v;if((t&16383)===16383)await tick()}o=end;out[k]={pos,col,em,idx,n}}
+  return out}
+async function decodePlot(rec,full,tick){const I=CITY.index;const dz=x=>x&&Object.values(x).some(v=>v&&v.pos);if(dz(rec.full)||dz(rec.coarse)){const F=dz(rec.full)?rec.full:null,Cc=dz(rec.coarse)?rec.coarse:null;return full?(F||Cc||{}):(Cc||F||{})}/* a live source's decoded plot */
+  if(full){const p=CITY.packs[rec.pack];const u=await gunzip(p.subarray(rec.off,rec.off+rec.len));return tick?decodeBlocksA(u,rec.cls,rec.box,I.Q,tick):decodeBlocks(u,rec.cls,rec.box,I.Q)}
+  return rec.clen?(tick?decodeBlocksA:decodeBlocks)(CITY.coarse.subarray(rec.coff,rec.coff+rec.clen),rec.coarse,rec.box,I.Q,tick):{}}
 // cut the slice lo < y < hi out of a block: triangles inside go, triangles across are clipped (the parts below lo and above hi stay)
 function clipBelow(b,lo){const P=b.pos,I=b.idx,NR=b.nrm&&b.nrm.length===b.n*3?b.nrm:null;let keep=new Uint32Array(I.length+1024),nk=0,np=[],nc=[],ne=[],nn=[],n=b.n;const grow=()=>{const k2=new Uint32Array(keep.length*2);k2.set(keep);keep=k2};
   for(let t=0;t<I.length;t+=3){const a=I[t],c=I[t+1],d=I[t+2],ya=P[a*3+1],yc=P[c*3+1],yd=P[d*3+1];
@@ -16059,7 +16067,7 @@ async function streamReal(o,e,my){const t0=now(),K=CITY.index.consts,FH=K.FH||.9
   const cut=B=>{const o2={};for(const k in B)o2[k]=clipSlice(B[k],y0g+.02,Infinity);return o2};let i=0,grp=[],gv=0,last=now();const glassParts=[],est=Math.max(1,I.cells.length+(I.megas||[]).length);
   while(true){if(C!==my)return null;const L=I.plots;
     if(i<L.length){C.dbgI=i;const rec=L[i++],bx=rec.box,cx=(bx[0]+bx[3])/2,cz=(bx[2]+bx[5])/2,near=Math.hypot(cx-u.cx,cz-u.cz)<NEAR_R+Math.max(bx[3]-bx[0],bx[5]-bx[2])/2;
-      const mine=rec===hrec,B=mine?cut(hp):await decodePlot(rec,near);if(near)city.nearPlots++;else city.farPlots++;if(mine||now()-last>SLICE){sliceEnd(last,mine?'home cut':'plots');await yieldFrame();last=now()}
+      const mine=rec===hrec,B=mine?cut(hp):await decodePlot(rec,near,async()=>{if(now()-last>SLICE){sliceEnd(last,'decode');await yieldFrame();last=now()}});if(C!==my)return null;if(near)city.nearPlots++;else city.farPlots++;if(mine||now()-last>SLICE){sliceEnd(last,mine?'home cut':'plots');await yieldFrame();last=now()}
       for(const k in B){const bl=B[k];if(!bl||!bl.n)continue;const nb=bl.nrm&&bl.nrm.length===bl.n*3?bl:await blockNormalsA(bl,async()=>{if(now()-last>SLICE){sliceEnd(last,'normals');await yieldFrame();last=now()}});if(C!==my)return null;const p={k,b:nb};if(k==='glass')glassParts.push(p);else{grp.push(p);gv+=bl.n}if(now()-last>SLICE){sliceEnd(last,'normals');await yieldFrame();last=now()}}
       if(gv>CHUNK){sliceEnd(last,'plots');const g=await geo(grp,false);grp=[];gv=0;if(C!==my)return null;await add(g,false);await nextFrame();last=now()}
       C.prog.build=Math.min(.99,i/est);if(now()-last>SLICE){sliceEnd(last,'plots');await yieldFrame();last=now()}}

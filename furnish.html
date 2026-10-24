@@ -16348,11 +16348,25 @@ if(uPRWN>0)reflectedLight.directDiffuse+=prWindow(vPRW,prWN)*BRDF_Lambert(materi
 const DBGF='\nif(uPRDbg==1)gl_FragColor.rgb=uPRClsCol*(.3+.7*max(dot(normal,vec3(0.,0.,1.)),0.));\n';
 const MU=['uPRWN','uPRWMode','uPRWT','uPRWCol','uPRWSky','uPRWC','uPRWR','uPRWU','uPRWNi','uPRWD','uPRWMin','uPRWMax','uPRWP','uPRFull','uPRC8','uPRGIFb','uPRCheap','uPRDbg','uPRGI','uPRGIk','uPRGIT','uPRBVP','uPRBV','uPRBRes','uPRSH','uPRNR','uPRRoom','uPRNearest','uPRFO','uPRFOB','uPRFOK','uPRFOY'];
 const PATCHED=new WeakSet();
-function patchShader(sh,spec,cls){for(const k of MU)sh.uniforms[k]=U[k];sh.uniforms.uPRSpecK=spec;sh.uniforms.uPRClsCol=cls;
+function patchShader(sh,spec,cls,refl,mat){for(const k of MU)sh.uniforms[k]=U[k];sh.uniforms.uPRSpecK=spec;sh.uniforms.uPRClsCol=cls;
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>'+VPARS).replace('#include <project_vertex>','#include <project_vertex>'+VMAIN);
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\n'+PARS).replace('#include <lights_fragment_begin>',lightsBegin())
     .replace('#include <lights_fragment_end>','#if defined( RE_IndirectDiffuse )\nirradiance*=prFO;\n#endif\n#include <lights_fragment_end>').replace('#include <aomap_fragment>',GIF+'#include <aomap_fragment>')
-    .replace('#include <dithering_fragment>',DBGF+'#include <dithering_fragment>'+C8F).replace('#include <lights_physical_pars_fragment>','#include <lights_physical_pars_fragment>\n'+CHEAP).replace('#include <lights_pars_begin>',lightsPars())}
+    .replace('#include <dithering_fragment>',DBGF+'#include <dithering_fragment>'+C8F).replace('#include <lights_physical_pars_fragment>','#include <lights_physical_pars_fragment>\n'+CHEAP).replace('#include <lights_pars_begin>',lightsPars());
+  if(sh.defines&&sh.defines.PR_ATTR!==undefined)attrShader(sh,mat)}
+// the shared furniture material (PR_ATTR): roughness, metalness, reflection strength, specular weight and glow come per vertex (prPBR, prEm)
+// instead of from the material, so plain furniture in a room shares one material and merges into a few draws
+function attrShader(sh,mat){
+  sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute vec4 prPBR;\nattribute vec3 prEm;\nvarying vec4 vPRPBR;\nvarying vec3 vPREm;').replace('#include <begin_vertex>','#include <begin_vertex>\nvPRPBR=prPBR;vPREm=prEm;');
+  sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec4 vPRPBR;\nvarying vec3 vPREm;').replace('uniform float uPRSpecK;','uniform float uPRSpecK;\n#define uPRSpecK vPRPBR.w')
+    .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=vPRPBR.x;').replace('#include <metalnessmap_fragment>','#include <metalnessmap_fragment>\nmetalnessFactor=vPRPBR.y;')
+    .replace('vec3 totalEmissiveRadiance = emissive;','vec3 totalEmissiveRadiance = vPREm;').replace('#include <envmap_physical_pars_fragment>',TH.ShaderChunk.envmap_physical_pars_fragment.split('envMapIntensity').join('vPRPBR.z'));
+  // textured furniture (PR_TEXARR): its texture is a layer of the room's texture array (prTex.x; prTex.y the glow texture's layer, or -1)
+  if(sh.defines.PR_TEXARR!==undefined){const k=mat&&mat.userData&&mat.userData.prVTKey,r=k&&S&&S.vtRegs?S.vtRegs.get(k):null;sh.uniforms.prArr=r?r.U:{value:null};
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute vec2 prTex;\nvarying vec2 vPRUv;\nvarying vec2 vPRTex;').replace('#include <begin_vertex>','#include <begin_vertex>\nvPRUv=uv;vPRTex=prTex;');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform highp sampler2DArray prArr;\nvarying vec2 vPRUv;\nvarying vec2 vPRTex;')
+      .replace('#include <map_fragment>','#include <map_fragment>\n{vec4 prTx=texture(prArr,vec3(vPRUv,vPRTex.x));diffuseColor*=prTx;}')
+      .replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\nif(vPRTex.y>-.5){vec4 prEt=texture(prArr,vec3(vPRUv,vPRTex.y));totalEmissiveRadiance*=prEt.rgb;}')}}
 const isRefl=m=>CLASSES[m.userData.prClass||'matte'].tier==='reflective';
 // proxy=true patches a hidden warmup clone (same program cache key as the real material once patched)
 const PK=new Map();function pkOf(m){const k=[m.type,!!m.map,!!m.emissiveMap,!!m.normalMap,!!m.roughnessMap,!!m.alphaMap,m.transparent,m.side,!!m.envMap,m.alphaTest>0,m.vertexColors,m.flatShading,m.userData.prClass&&isRefl(m)].join('|');let v=PK.get(k);if(v==null){v=PK.size+1;PK.set(k,v)}return v}
@@ -16362,7 +16376,7 @@ function opaqueSort(a,b){return a.groupOrder-b.groupOrder||a.renderOrder-b.rende
 function patch(m,proxy){if(!m||(!proxy&&PATCHED.has(m))||!S||!S.gl2)return;if(!m.isMeshStandardMaterial){patchB(m,proxy);return}if(!proxy){PATCHED.add(m);S.patchedList.push(m)}
   m.userData.prSpec={value:m.userData.prSpecW!=null?m.userData.prSpecW:0};m.userData.prCls={value:new TH.Color(CLASSES[m.userData.prClass||'matte'].col)};if(!proxy&&m.emissive&&lumC(m.emissive)>0){if(m.userData.prEI==null)m.userData.prEI=m.emissiveIntensity==null?1:m.emissiveIntensity;m.emissiveIntensity=Math.min(m.userData.prEI,EMAX)}if(m.userData.prTM==null)m.userData.prTM=m.toneMapped;m.toneMapped=false;
   const prev=m.onBeforeCompile&&!m.onBeforeCompile._pr&&m.onBeforeCompile!==TH.Material.prototype.onBeforeCompile?m.onBeforeCompile:null;if(!proxy)m.userData.prForeign=!!prev;const spec=m.userData.prSpec,cls=m.userData.prCls,refl=isRefl(m);
-  const f=function(sh,r){onBuild(this,sh);if(prev)prev.call(this,sh,r);patchShader(sh,spec,cls,refl)};f._pr=true;m.onBeforeCompile=f;
+  const f=function(sh,r){onBuild(this,sh);if(prev)prev.call(this,sh,r);patchShader(sh,spec,cls,refl,this)};f._pr=true;m.onBeforeCompile=f;
   const ck=prev&&m.customProgramCacheKey!==TH.Material.prototype.customProgramCacheKey?m.customProgramCacheKey.bind(m):null;m.customProgramCacheKey=()=>'podrender4'+(ck?ck():'');m.userData.prPK=pkOf(m);m.needsUpdate=true}
 // basic and line materials in the lit scene (neon sign faces, light cones): linear HDR out, plus the optional 8-bit compression
 const isPatchable=m=>!!(m&&(m.isMeshStandardMaterial||m.isMeshBasicMaterial||m.isLineBasicMaterial)&&!m.isShaderMaterial&&!m.userData.prZ);
@@ -16504,12 +16518,12 @@ function geoArea(g){if(_area.has(g))return _area.get(g);let a=0;const p=g.attrib
     for(let t=0;t<T;t++){A.fromBufferAttribute(p,idx?idx.getX(t*3):t*3);B.fromBufferAttribute(p,idx?idx.getX(t*3+1):t*3+1);C.fromBufferAttribute(p,idx?idx.getX(t*3+2):t*3+2);a+=B.sub(A).cross(C.sub(A)).length()*.5}}
   _area.set(g,a);return a}
 function meshRadius(o){const g=o.geometry;if(!g||!g.attributes||!g.attributes.position)return 0;if(!g.boundingSphere)g.computeBoundingSphere();return g.boundingSphere.radius*o.matrixWorld.getMaxScaleOnAxis()}
-function classMat(m,hint){if(!m.userData.prOrigPBR)m.userData.prOrigPBR=[m.roughness==null?.7:m.roughness,m.metalness||0];const O=m.userData.prOrigPBR;m.roughness=O[0];m.metalness=O[1];
+function classMat(m,hint){if(m.userData.prAttr)return;if(!m.userData.prOrigPBR)m.userData.prOrigPBR=[m.roughness==null?.7:m.roughness,m.metalness||0];const O=m.userData.prOrigPBR;m.roughness=O[0];m.metalness=O[1];
   const cls=classOf(m,hint),C=CLASSES[cls];m.userData.prClass=cls;
   if(C.r)m.roughness=clamp(m.roughness,C.r[0],C.r[1]);if(C.tier==='never'){m.metalness=Math.min(m.metalness,C.mt||0);m.envMapIntensity=0}
   if(C.tier==='emissive')m.envMapIntensity=0;if(cls==='mirror')m.metalness=1;
   m.userData.prSpecW=specW(cls);if(m.userData.prSpec)m.userData.prSpec.value=m.userData.prSpecW;if(m.userData.prCls&&m.userData.prCls.value&&m.userData.prCls.value.setHex)m.userData.prCls.value.setHex(C.col)}
-function envFor(m,o){if(!S.pmrem||!S.pmrem.length||!(m.userData.prSpecW>0))return null;_b.setFromObject(o);_b.getCenter(_v);return S.pmrem[roomOfPoint(_v.x,_v.y,_v.z)].texture}
+function envFor(m,o){if(!S.pmrem||!S.pmrem.length||!(m.userData.prSpecW>0))return null;if(m.userData.prRoom!=null&&S.pmrem[m.userData.prRoom])return S.pmrem[m.userData.prRoom].texture;_b.setFromObject(o);_b.getCenter(_v);return S.pmrem[roomOfPoint(_v.x,_v.y,_v.z)].texture}
 function applyEnv(m,o){const t=envFor(m,o);if(t){if(m.envMap!==t){m.envMap=t;m.envMapIntensity=CLASSES[m.userData.prClass].env}}else if(m.envMap&&S.pmrem&&S.pmrem.some(p=>p.texture===m.envMap))m.envMap=null}
 // walk: classify, mark tiny meshes, keep overlays out of lighting, collect lights; patch at once when shaders are warm (the program is already cached)
 function walk(o,helper,force,cnt){if(o.userData.prZMesh||o.userData.prGlow)return;const h0=helper;helper=helper||isUI(o);if(helper&&!h0)S.uiSet.add(o);
@@ -16776,25 +16790,65 @@ function vcKey(c){if(S&&S.ab&&S.ab.vcMerge===false)return null;const m=c.materia
     S&&S.rooms&&S.rooms.length&&m.userData.prSpecW>0?(bbOf(c).getCenter(_v),roomOfPoint(_v.x,_v.y,_v.z)):'',   // reflective classes take their room's reflection cube, so they never share a material across rooms
     attrSig(g),c.castShadow,c.receiveShadow,c.layers.mask].join('|')}
 const NOS={};   // (optimize also runs without an attached renderer, in the tests)
+// shared-material key: everything that changes the program or the draw; colors and PBR values travel per vertex
+function vaKey(c){if(!S||!S.ab||S.ab.attrMerge===false||(S.scene&&S.scene.environment))return null;if(!vcKey(c))return null;const m=c.material;
+  if(m.envMap&&!(S.pmrem&&S.pmrem.some(p=>p.texture===m.envMap)))return null;
+  const room=S.rooms&&S.rooms.length?(bbOf(c).getCenter(_v),roomOfPoint(_v.x,_v.y,_v.z)):0;
+  return ['VA',m.side,m.flatShading,m.fog,m.dithering,room,attrSig(c.geometry),c.castShadow,c.receiveShadow,c.layers.mask].join('|')}
+// textured furniture: every texture of a room and size class becomes one layer of a texture array (in WebGL2 each layer tiles on its own).
+// Each side is only ever scaled up, to the next power of two (a power-of-two texture goes in as it is), so nothing loses detail and proportions keep their mip levels.
+const p2=x=>{let z=16;while(z<x)z*=2;return z};
+function vtClassOf(t){const im=t&&t.image;if(!im||!im.width||!im.height||im.width>1024||im.height>1024)return null;return [p2(im.width),p2(im.height)]}
+function vtKey(c){if(!S||!S.ab||S.ab.texArray===false||!S.gl2||(S.scene&&S.scene.environment))return null;const m=c.material,g=c.geometry;
+  if(m.type!=='MeshStandardMaterial'||!m.map||m.normalMap||m.roughnessMap||m.metalnessMap||m.alphaMap||m.aoMap||m.lightMap||m.bumpMap||m.displacementMap||m.vertexColors||m.alphaTest>0||m.transparent||m.wireframe||
+     !m.depthWrite||!m.depthTest||m.polygonOffset||m.blending!==TH.NormalBlending||g.attributes.color||!g.attributes.uv||(m.onBeforeCompile&&!m.onBeforeCompile._pr&&m.onBeforeCompile!==TH.Material.prototype.onBeforeCompile))return null;
+  const t=m.map,e=m.emissiveMap;if(t.isVideoTexture||t.isCompressedTexture||t.isDataArrayTexture||t.isCubeTexture||t.isData3DTexture)return null;
+  if(e&&(e.isVideoTexture||e.isCompressedTexture||e.encoding!==t.encoding||e.wrapS!==t.wrapS||e.wrapT!==t.wrapT||!vtClassOf(e)))return null;
+  const zt=vtClassOf(t);if(!zt)return null;const ze=e?vtClassOf(e):null;const z=ze?Math.max(zt[0],ze[0])+'x'+Math.max(zt[1],ze[1]):zt[0]+'x'+zt[1];
+  if(m.envMap&&!(S.pmrem&&S.pmrem.some(p=>p.texture===m.envMap)))return null;
+  const room=S.rooms&&S.rooms.length?(bbOf(c).getCenter(_v),roomOfPoint(_v.x,_v.y,_v.z)):0;
+  return ['VT',m.side,m.flatShading,m.fog,m.dithering,room,attrSig(g),c.castShadow,c.receiveShadow,c.layers.mask,z,t.encoding,t.magFilter,t.minFilter,t.wrapS,t.wrapT].join('|')}
+function vtReg(key){const M=S.vtRegs||(S.vtRegs=new Map());let r=M.get(key);if(!r){const p=key.split('|');r={key,w:+p[10].split('x')[0],h:+p[10].split('x')[1],enc:+p[11],mag:+p[12],min:+p[13],ws:+p[14],wt:+p[15],tex:[],idx:new Map(),U:{value:null},arr:null,dirty:false,aniso:1};M.set(key,r)}return r}
+function vtLayer(r,t){let i=r.idx.get(t);if(i==null){i=r.tex.length;r.tex.push(t);r.idx.set(t,i);r.dirty=true;S.vtDirty=true;r.aniso=Math.max(r.aniso,t.anisotropy||1)}return i}
+function vtBuild(r){const W=r.w,H=r.h,n=Math.max(1,r.tex.length),data=new Uint8Array(W*H*4*n);const cv=S.vtCv||(S.vtCv=document.createElement('canvas'));cv.width=W;cv.height=H;const g=cv.getContext('2d',{willReadFrequently:true});const row=W*4;
+  for(let i=0;i<r.tex.length;i++){const t=r.tex[i],im=t.image;g.clearRect(0,0,W,H);try{g.drawImage(im,0,0,W,H)}catch(e){continue}const px=g.getImageData(0,0,W,H).data,o=i*W*H*4;
+    if(t.flipY!==false){for(let y=0;y<H;y++)data.set(px.subarray((H-1-y)*row,(H-y)*row),o+y*row)}else data.set(px,o)}   // (an image texture is flipped on upload; array layers are not)
+  const a=new TH.DataArrayTexture(data,W,H,n);a.format=TH.RGBAFormat;a.type=TH.UnsignedByteType;a.encoding=r.enc;a.wrapS=r.ws;a.wrapT=r.wt;a.magFilter=r.mag;a.minFilter=r.min;
+  a.generateMipmaps=r.min!==TH.NearestFilter&&r.min!==TH.LinearFilter;a.anisotropy=r.aniso;a.onUpdate=()=>{a.image.data=null};a.needsUpdate=true;   // (the pixels live on the GPU once uploaded: the page's copy is let go, it can be 100 MB on a large home)
+  if(r.arr)r.arr.dispose();r.arr=a;r.U.value=a;r.dirty=false;r.builtN=r.tex.length}
+function vtFlush(){if(!S.vtDirty||!S.vtRegs)return;S.vtDirty=false;const a=now();let n=0,L=0;for(const r of S.vtRegs.values())if(r.dirty){vtBuild(r);n++;L+=r.tex.length}if(n)ev('texture arrays '+n+' ('+L+' layers) '+(now()-a).toFixed(1)+'ms')}
+function vtMaterial(key,sample){const M=S.vcMats||(S.vcMats=new Map());let vm=M.get(key);if(vm)return vm;const room=+key.split('|')[5]||0;vtReg(key);
+  vm=new TH.MeshStandardMaterial({color:0xffffff,roughness:1,metalness:1,vertexColors:true,side:sample.side,flatShading:sample.flatShading,fog:sample.fog,dithering:sample.dithering});
+  vm.defines=Object.assign({},vm.defines,{PR_ATTR:'',PR_TEXARR:''});vm.name='prVC';vm.userData={prClass:'satin',prAttr:true,prSpecW:1,prRoom:room,prOrigPBR:[1,1],prVTKey:key};vm.envMapIntensity=1;
+  if(S.pmrem&&S.pmrem[room])vm.envMap=S.pmrem[room].texture;if(PATCHED.has(sample))patch(vm);M.set(key,vm);return vm}
+function vaMaterial(key,sample){const M=S.vcMats||(S.vcMats=new Map());let vm=M.get(key);if(vm)return vm;const room=+key.split('|')[5]||0;
+  vm=new TH.MeshStandardMaterial({color:0xffffff,roughness:1,metalness:1,vertexColors:true,side:sample.side,flatShading:sample.flatShading,fog:sample.fog,dithering:sample.dithering});
+  vm.defines=Object.assign({},vm.defines,{PR_ATTR:''});vm.name='prVC';vm.userData={prClass:'satin',prAttr:true,prSpecW:1,prRoom:room,prOrigPBR:[1,1]};vm.envMapIntensity=1;
+  if(S.pmrem&&S.pmrem[room])vm.envMap=S.pmrem[room].texture;if(PATCHED.has(sample))patch(vm);M.set(key,vm);return vm}
 function vcMaterial(key,sample){const H=S||NOS,M=H.vcMats||(H.vcMats=new Map());let vm=M.get(key);if(vm)return vm;vm=sample.clone();vm.color.setRGB(1,1,1);vm.vertexColors=true;vm.userData=Object.assign({},sample.userData);vm.name='prVC';vm.envMap=sample.envMap;vm.envMapIntensity=sample.envMapIntensity;
   if(S&&PATCHED.has(sample))patch(vm);M.set(key,vm);return vm}
 function optimize(root,immediate){if(!root)return null;if(root.userData.prMerged)unoptimize(root);root.userData.prPieceRoot=true;root.updateMatrixWorld(true);
   const inv=new TH.Matrix4().copy(root.matrixWorld).invert(),groups=new Map();let before=0;
   (function rec(o){for(const c of o.children){if(isPiece(c)||c.userData.prKeep||isUI(c)||!c.visible)continue;
     if(c.isMesh&&!c.isInstancedMesh&&!c.isSkinnedMesh&&!Array.isArray(c.material)&&c.material&&c.geometry&&c.geometry.attributes.position&&c.geometry.attributes.normal&&!c.geometry.morphAttributes.position&&
-       c.material.userData.prClass!=='emissive'&&!c.material.transparent&&!c.children.length){before++;const vk=vcKey(c);const k=vk?vk:matKey(c.material)+'#'+attrSig(c.geometry)+'#'+c.castShadow;let a=groups.get(k);if(!a)groups.set(k,a=[]);a.push(c)}
+       c.material.userData.prClass!=='emissive'&&!c.material.transparent&&!c.children.length){before++;const vk=vtKey(c)||vaKey(c)||vcKey(c);const k=vk?vk:matKey(c.material)+'#'+attrSig(c.geometry)+'#'+c.castShadow;let a=groups.get(k);if(!a)groups.set(k,a=[]);a.push(c)}
     rec(c)}})(root);
   const merged=[];const M=new TH.Matrix4(),N=new TH.Matrix3(),v=new TH.Vector3();
-  for(const [gk,list] of groups){const vc=gk.startsWith('VC|');if(list.length<2&&!(vc&&S&&S.l2&&S.ab.l2Merge!==false))continue;const g0=list[0].geometry,keys=Object.keys(g0.attributes);let nv=0,ni=0;
+  for(const [gk,list] of groups){const vt=gk.startsWith('VT|'),va=vt||gk.startsWith('VA|'),vc=va||gk.startsWith('VC|'),vtR=vt?vtReg(gk):null;if(list.length<2&&!(vc&&S&&S.l2&&S.ab.l2Merge!==false))continue;const g0=list[0].geometry,keys=Object.keys(g0.attributes);let nv=0,ni=0;
     for(const m of list){nv+=m.geometry.attributes.position.count;ni+=m.geometry.index?m.geometry.index.count:m.geometry.attributes.position.count}
-    const geo=new TH.BufferGeometry(),arrs={};for(const k of keys){const s=g0.attributes[k].itemSize;arrs[k]=new Float32Array(nv*s)}if(vc)arrs.color=new Float32Array(nv*3);const index=nv>65535?new Uint32Array(ni):new Uint16Array(ni);let vo=0,io=0;
+    const geo=new TH.BufferGeometry(),arrs={};for(const k of keys){const s=g0.attributes[k].itemSize;arrs[k]=new Float32Array(nv*s)}if(vc)arrs.color=new Float32Array(nv*3);if(va){arrs.prPBR=new Float32Array(nv*4);arrs.prEm=new Float32Array(nv*3)}if(vt)arrs.prTex=new Float32Array(nv*2);const index=nv>65535?new Uint32Array(ni):new Uint16Array(ni);let vo=0,io=0;
     for(const m of list){const g=m.geometry,pc=g.attributes.position.count;M.multiplyMatrices(inv,m.matrixWorld);N.getNormalMatrix(M);
       if(vc){const cl=m.material.color,ca=arrs.color;for(let i=0;i<pc;i++){const q=(vo+i)*3;ca[q]=cl.r;ca[q+1]=cl.g;ca[q+2]=cl.b}}
+      if(va){const mt=m.material,C=CLASSES[mt.userData.prClass||'matte']||CLASSES.matte,sw=mt.userData.prSpecW||0,envI=sw>0?(C.env||0):0,ei=mt.emissive?Math.min(mt.emissiveIntensity==null?1:mt.emissiveIntensity,EMAX):0,
+          r=mt.roughness==null?1:mt.roughness,mtl=mt.metalness||0,er=mt.emissive?mt.emissive.r*ei:0,eg=mt.emissive?mt.emissive.g*ei:0,eb=mt.emissive?mt.emissive.b*ei:0,pb=arrs.prPBR,pe=arrs.prEm;
+        for(let i=0;i<pc;i++){const q=(vo+i)*4,e=(vo+i)*3;pb[q]=r;pb[q+1]=mtl;pb[q+2]=envI;pb[q+3]=sw;pe[e]=er;pe[e+1]=eg;pe[e+2]=eb}}
       for(const k of keys){const at=g.attributes[k],s=at.itemSize,dst=arrs[k];for(let i=0;i<pc;i++){if(k==='position'){v.fromBufferAttribute(at,i).applyMatrix4(M);dst[(vo+i)*3]=v.x;dst[(vo+i)*3+1]=v.y;dst[(vo+i)*3+2]=v.z}
         else if(k==='normal'){v.fromBufferAttribute(at,i).applyMatrix3(N).normalize();dst[(vo+i)*3]=v.x;dst[(vo+i)*3+1]=v.y;dst[(vo+i)*3+2]=v.z}else{dst[(vo+i)*s]=at.getX(i);if(s>1)dst[(vo+i)*s+1]=at.getY(i);if(s>2)dst[(vo+i)*s+2]=at.getZ(i);if(s>3)dst[(vo+i)*s+3]=at.getW(i)}}}
+      if(vt){const mt=m.material,t=mt.map,lm=vtLayer(vtR,t),le=mt.emissiveMap?vtLayer(vtR,mt.emissiveMap):-1,pt=arrs.prTex,ua=arrs.uv;if(t.matrixAutoUpdate)t.updateMatrix();const e=t.matrix.elements;
+        for(let i=0;i<pc;i++){const q=(vo+i)*2;pt[q]=lm;pt[q+1]=le;const u=ua[q],w=ua[q+1];ua[q]=e[0]*u+e[3]*w+e[6];ua[q+1]=e[1]*u+e[4]*w+e[7]}}   // (the map's offset, repeat and rotation baked into the coordinates)
       if(g.index)for(let i=0;i<g.index.count;i++)index[io++]=g.index.getX(i)+vo;else for(let i=0;i<pc;i++)index[io++]=vo+i;vo+=pc}
-    for(const k of keys)geo.setAttribute(k,new TH.BufferAttribute(arrs[k],g0.attributes[k].itemSize));if(vc)geo.setAttribute('color',new TH.BufferAttribute(arrs.color,3));geo.setIndex(new TH.BufferAttribute(index,1));geo.computeBoundingSphere();geo.computeBoundingBox();
-    const mm=new TH.Mesh(geo,vc?vcMaterial(gk,list[0].material):list[0].material);mm.castShadow=list[0].castShadow;mm.receiveShadow=list.some(m=>m.receiveShadow);mm.layers.mask=list[0].layers.mask&~(1<<L_Z);mm.userData.prSources=list;mm.userData.prMergedMesh=true;mm.name='prMerged';
+    for(const k of keys)geo.setAttribute(k,new TH.BufferAttribute(arrs[k],g0.attributes[k].itemSize));if(vc)geo.setAttribute('color',new TH.BufferAttribute(arrs.color,3));if(va){geo.setAttribute('prPBR',new TH.BufferAttribute(arrs.prPBR,4));geo.setAttribute('prEm',new TH.BufferAttribute(arrs.prEm,3))}if(vt)geo.setAttribute('prTex',new TH.BufferAttribute(arrs.prTex,2));geo.setIndex(new TH.BufferAttribute(index,1));geo.computeBoundingSphere();geo.computeBoundingBox();
+    const mm=new TH.Mesh(geo,vt?vtMaterial(gk,list[0].material):va?vaMaterial(gk,list[0].material):vc?vcMaterial(gk,list[0].material):list[0].material);mm.castShadow=list[0].castShadow;mm.receiveShadow=list.some(m=>m.receiveShadow);mm.layers.mask=list[0].layers.mask&~(1<<L_Z);mm.userData.prSources=list;mm.userData.prMergedMesh=true;mm.name='prMerged';
     mm.userData.prBig=true;mm.visible=false;root.add(mm);mm.updateMatrixWorld(true);merged.push(mm)}
   // staged: the merged meshes stay hidden until their programs are known to exist (warmed in the background), then swap in one step
   root.userData.prMerged=merged;if(merged.length){if(!immediate&&S&&S.matReady&&S.warm){
@@ -17188,7 +17242,11 @@ function work(){if(S.tog&&!S.tog.done&&!S.pendSwap&&now()-S.tog.t>150&&liveSettl
 // before PodRender attached (the pool's 6-light variant of the unpatched materials was a burst of synchronous compiles). Once materials are
 // patched (linear HDR out), a plain frame goes through the composite for tone mapping.
 function plainLights(on){for(const l of S.reals){if(l.userData.prMask!=null)l.layers.mask=on?l.userData.prMask:0}for(const p of S.pool)p.layers.mask=on?0:p.userData.prPM}
+function plainCovered(){const pc=window.PodContext,PB=window.PodBuilder;try{if(pc&&pc.active&&pc.active()&&pc.transitioning)return true;if(PB&&PB._B&&PB._B.warming)return true}catch(e){}return false}
 function plainFrame(){const R=S.R;S.stage='plain';if(S.realPend)return; // materials are switching to their compiled-in-background programs: keep the last image (no draw, no stall)
+  // under the hologram, or while the furnish page warms up out of sight, nobody sees the plain fallback: draw and compile nothing. Its programs are keyed by
+  // the home's own lamp count (a full new set for every home: hundreds of builds and 400 ms stalls on an open), and the full pipeline is warming meanwhile.
+  if(S.ab.plainCovered!==false&&plainCovered()){S.plainSkips=(S.plainSkips||0)+1;return}
 
   if(S.matReady&&S.M){ensureTargets();const c8=!!S.ab.hdr8;U.uPRGI.value=0;U.uPRC8.value=c8?1:0;U.uPRDec.value=c8?1:0;
     try{R.setRenderTarget(S.hdr);R.render(S.scene,S.camera)}finally{U.uPRC8.value=0}
@@ -17223,6 +17281,7 @@ function lighting(L,pre){const R=S.R,cam=S.camera,C=L.C,W=S.W,H=S.H,ts=L.ts,ls=L
 function frame(dt){const R=S.R,P=S.prof;S.frame++;matCheck();S.stage='warm';
   let t=now();warmStep();P.warm=now()-t;sweep();checkLights();zRoomCheck();l2Check();
   if(S.optQ.length&&!S.picking){const a=now();S.stage='merge';cw('merge',optStep);ev('merge '+(now()-a).toFixed(1)+'ms')}
+  if(S.vtDirty)cw('texture arrays',vtFlush);
   let eff=G.rung;while(eff<=NR&&!rungReady(eff))eff++;S.preparing=eff!==G.rung?RUNGS[G.rung].name:null;
   if(eff>NR){S.eff=0;poolSync();if(S.hold)return;t=now();plainFrame();P.main=now()-t;return}
   S.uiHidden.length=0;for(const o of S.uiSet)if(o.visible&&o.parent){o.visible=false;S.uiHidden.push(o)}
@@ -17314,7 +17373,7 @@ function detach(){if(!S)return;const R=S.R;try{for(const [l,c,m,au] of S.saved.c
   for(const m of S.patchedList){if(m.userData.prEI!=null){m.emissiveIntensity=m.userData.prEI;delete m.userData.prEI}if(m.userData.prTM!=null){m.toneMapped=m.userData.prTM;delete m.userData.prTM;m.needsUpdate=true}}for(const o of S.zList)o.layers.disable(L_Z);if(S.dc)drawCheck(false);
   for(const h of S.hemis)if(h.userData.prOrig!=null)h.intensity=h.userData.prOrig;U.uPRGI.value=0;U.uPRGIk.value=0;U.uPRDbg.value=0;U.uPRFOK.value=0;if(S.glow&&S.glow.parent)S.glow.parent.remove(S.glow);for(const r of S.zRooms||[])for(const m of r.meshes)if(m.parent)m.parent.remove(m);
   if(S.hudEl)S.hudEl.remove();if(S.post){freeTargets();for(const c of S.cubes)c.rt.dispose();for(const p of (S.pmrem||[]).concat(S.pmStage||[],S.pmTmp?[S.pmTmp]:[]))p.dispose();if(S.pmGen)S.pmGen.dispose();for(const k of ['atlas','shT','shA','shB'])disposeRT(S[k]);if(S.spare){for(const x of [S.spare.atlas,S.spare.shT].concat(S.spare.pm||[]))disposeRT(x)}disposeRT(S.altCube);if(S.warm&&S.warm.psoRT)S.warm.psoRT.forEach(disposeRT)}}catch(e){console.warn(e)}
-  if(S.vcMats){for(const m of S.vcMats.values())m.dispose();S.vcMats=null}
+  if(S.vcMats){for(const m of S.vcMats.values())m.dispose();S.vcMats=null}if(S.vtRegs){for(const r of S.vtRegs.values())if(r.arr)r.arr.dispose();S.vtRegs=null}
   for(const e of GT.q)S.gl.deleteQuery(e.q);GT.q.length=0;GT.cur=null;hookBuilds(false);glTrace(false);S=null}
 function sceneChanged(kind,obj){if(!S)return;S.photoN=0;if(kind!=='camera'&&kind!=='light')l2Invalidate(null,'sc:'+kind);if(kind==='geometry'){S.winDirty=true;S.winStale=true}if(kind!=='camera')S.histReset=true;if(kind==='camera'){if(obj&&obj.isCamera)S.camera=obj;S.camMoved=now();return}if(kind==='walls'){S.editT=now();S.aoDirty=true;zRoomInvalidate(null,'sc:walls');return}
   if(!S.post){return}
@@ -17331,7 +17390,7 @@ function sweepAll(){walk(S.scene,false,false,null);lightLists()}
 const PCX=()=>{const p=window.PodContext;return p&&p.active&&p.active()?p:null};
 function backU(cu){const b=S.backTex;cu.tBack.value=b||S.blk.texture;cu.useBack.value=b?1:0}
 // while the hologram covers the whole frame the home is not drawn; shader linking, merges and rebakes keep going underneath
-function pausedFrame(){S.frame++;matCheck();S.stage='warm';warmStep();if(S.optQ.length&&!S.picking)optStep()}
+function pausedFrame(){S.frame++;matCheck();S.stage='warm';warmStep();if(S.optQ.length&&!S.picking)optStep();if(S.vtDirty)vtFlush()}
 // compiles a scene's programs in the background (parallel compile); resolves once every program linked and uniform lists are rebuilt
 function compileAsync(scene,cam,target){if(!S||!S.warm||!S.post){const R=S?S.R:null;if(R){R.setRenderTarget(target||null);R.compile(scene,cam);R.setRenderTarget(null)}return Promise.resolve(true)}
   const W=S.warm,gl=S.gl,before=new Set(W.pend),mats=[];scene.traverse(o=>{if(o.material)for(const m of matsOf(o))mats.push(m)});
@@ -17379,7 +17438,7 @@ function flush(maxIter,only){if(!S||!S.post)return 0;S.flushing=true;let n=0;con
   try{while(n<(maxIter||5000)&&busy()){if(S.syncSlices)gpuSync();S.frame++;if(S.optQ.length)optStep(true);work();n++}}
   finally{S.flushing=false;S.R.setRenderTarget(null)}return n}
 const api={caps:{alpha:true,context:true},lightPending:()=>{try{return lightPending()}catch(e){return false}},lightProgress:()=>{try{return lightProgress()}catch(e){return 1}},warmState:()=>S&&S.warm?{finished:!!S.warm.finished,queue:S.warm.queue.length,matReady:!!S.matReady,broken:!!S.broken}:null,attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
-  _debug:{altRun:n=>{let k=0;const sl=(kind,fn)=>cw(kind,fn);for(;k<(n||5000);k++){const c=S.altN||0;altWork(true,sl,true);if((S.altN||0)===c)break}return k},winStep:()=>windowFrame(16),keys:()=>({want:keyNow(),live:S.liveKey,spare:S.spare&&S.spare.have?S.spare.key:null,baking:S.altJob?S.altJob.key:null,pend:S.pendSwap?S.pendSwap.key:null,mode:S.altJob?S.altJob.mode:null}),l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
+  _debug:{patchOne:m=>{patch(m);return PATCHED.has(m)},vtFlush:()=>{if(S){S.vtDirty=true;vtFlush()}return S&&S.vtRegs?[...S.vtRegs.values()].map(r=>({size:r.w+'x'+r.h,layers:r.tex.length})):null},altRun:n=>{let k=0;const sl=(kind,fn)=>cw(kind,fn);for(;k<(n||5000);k++){const c=S.altN||0;altWork(true,sl,true);if((S.altN||0)===c)break}return k},winStep:()=>windowFrame(16),keys:()=>({want:keyNow(),live:S.liveKey,spare:S.spare&&S.spare.have?S.spare.key:null,baking:S.altJob?S.altJob.key:null,pend:S.pendSwap?S.pendSwap.key:null,mode:S.altJob?S.altJob.mode:null}),l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
 window.PodRender=api})();
 
 </script>

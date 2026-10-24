@@ -16666,10 +16666,13 @@ function warmStep(){const W=S.warm;if(!W)return;const gl=S.gl,t=now();
   else if(job==='merge'){const list=S.mergeQ.splice(0);W.cur.merges=list;const n=ptsFor(S.cfg),P=S.poolN;warmLights(n,P);W.group.clear();
     for(const e of list)for(const mm of e){const m=mm.material,c=m.clone();c.userData=Object.assign({},m.userData);c.envMap=m.envMap;c.envMapIntensity=m.envMapIntensity;if(PATCHED.has(m))patch(c,true);const px=new TH.Mesh(mm.geometry,c);px.frustumCulled=false;W.keep.push(px);W.group.add(px)}
     W.group.visible=false;warmCompile(()=>{S.R.setRenderTarget(S.hdr);S.R.compile(W.scene,S.camera)});W.group.clear()}
-  else if(job==='lines'){ // plain line programs (window grilles, rails): a bare LineBasicMaterial first drawn during play cost a 54 ms compile
-    if(!W.lineScene){W.lineScene=new TH.Scene();W.lineScene.fog=S.scene.fog;const g=new TH.BufferGeometry();g.setAttribute('position',new TH.Float32BufferAttribute([0,0,0,1,0,0],3));g.setAttribute('color',new TH.Float32BufferAttribute([1,1,1,1,1,1],3));
-      for(const o of [{},{vertexColors:true},{transparent:true,opacity:.5},{vertexColors:true,transparent:true,opacity:.5}]){const m=new TH.LineBasicMaterial(o);const l=new TH.LineSegments(g,m);l.frustumCulled=false;W.lineScene.add(l);W.keep.push(l)}}
-    warmCompile(()=>{S.R.setRenderTarget(S.hdr);S.R.compile(W.lineScene,S.camera);S.R.setRenderTarget(null);S.R.compile(W.lineScene,S.camera)})}
+  else if(job==='lines'){ // plain line programs (window grilles, rails, bunk frames): their keys carry the light and shadow counts, so each shadow-count variant is compiled with the real lights
+    if(!W.lineGeo){const g=new TH.BufferGeometry();g.setAttribute('position',new TH.Float32BufferAttribute([0,0,0,1,0,0],3));g.setAttribute('color',new TH.Float32BufferAttribute([1,1,1,1,1,1],3));W.lineGeo=g}
+    const P=S.poolN,cur=ptsFor(S.cfg),ns=[cur].concat([2,1,0].filter(n=>n!==cur));W.group.clear();
+    for(const o of [{},{vertexColors:true}]){const l=new TH.LineSegments(W.lineGeo,new TH.LineBasicMaterial(o));l.frustumCulled=false;W.keep.push(l);W.group.add(l)}
+    W.group.visible=false;
+    for(const n of ns){warmLights(n,P);warmCompile(()=>{S.R.setRenderTarget(S.hdr);S.R.compile(W.scene,S.camera);S.R.setRenderTarget(null);S.R.compile(W.scene,S.camera)})}
+    warmLights(cur,P);W.group.clear()}
   else if(job==='pass'){warmCompile(()=>{S.R.setRenderTarget(S.hdr);S.R.compile(W.passes,QC);S.R.setRenderTarget(null);S.R.compile(W.passesScreen,QC)})}
   else if(/^sh\d$/.test(job)){const i=+job[2],R=S.R,sc=new TH.Scene(),side=[TH.FrontSide,TH.DoubleSide,TH.BackSide][i%3];const m=new TH.Mesh(QM.geometry,new TH.MeshBasicMaterial({side}));m.castShadow=true;sc.add(m);
     const l=i<3?new TH.PointLight(0xffffff,1,5):new TH.DirectionalLight(0xffffff,1);l.castShadow=true;l.shadow.mapSize.set(16,16);l.position.set(0,0,2);sc.add(l);if(l.target)sc.add(l.target);S.inWarm=true;try{R.setRenderTarget(W.tiny);R.render(sc,W.shCam)}finally{S.inWarm=false;R.setRenderTarget(null)}W.keep.push(m)}
@@ -17006,7 +17009,7 @@ function altCapture(A,pos,fn){const sp=S.spare,on=A.state,L=A.lights,sv=L.map(l=
 function altWork(idle,sl){const sp=S.spare;if(!sp||S.ab.altWork===false||!S.probesReady||!S.matReady||!S.post||S.picking||S.flushing||!idle)return;
   if(S.pq.length||S.projNeeded||S.lerpN>0||S.pmQ.length||S.optQ.length||S.aoDirty||S.cubes.some(c=>c.dirty||!c.done)||S.pmFade.some(n=>n>0)||!S.warm||!S.warm.finished||!S.warm.done.pmrem)return;
   if(sp.valid&&sp.state===!S.workLight)return;
-  const every=(S.cpu||0)<8?2:(S.cpu||0)<12?4:8;if(S.frame%every)return;   // slower where the CPU is already the limit
+  const every=(S.cpu||0)<8?1:(S.cpu||0)<12?2:4;if(S.frame%every)return;   // slower where the CPU is already the limit
   let A=S.altJob;
   if(!A||A.state!==!S.workLight){const lights=[];S.scene.traverse(o=>{if(o.isLight&&o.userData.workLight&&o.userData.wl0!=null)lights.push(o)});
     if(!sp.pm)sp.pm=S.cubes.map(()=>mkPM());if(!S.altCube){S.altCube=new TH.WebGLCubeRenderTarget(64,{type:S.hdrType,generateMipmaps:false,minFilter:TH.LinearFilter});clearRT(S.altCube);S.altCC=new TH.CubeCamera(.05,30,S.altCube);S.altCC.children.forEach(c=>c.layers.set(LAYER))}

@@ -8,7 +8,10 @@
 'use strict';
 const FURN = (() => {
   const F = { pick: false, open: false, hold: false, busy: false, hov: null, fl: 0, userFloor: false, frame: null, home: null };
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 46, CG = .22, PAGE = 'furnish.html?v=2026-10-24ay';
+  // detail by distance from the home, in game units (x3.16 in the lab). The lab's backdrop is sharp only within about 45 m (14 units):
+  // full detail to NEAR, clustered on a CG grid to MID, simple blocks (the clustered stand-in clustered again on a CG_FAR grid) beyond.
+  // F.lightCity = false sends the city as before (full detail to 46, clustered beyond) to compare.
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-24az';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
 
@@ -255,12 +258,12 @@ const FURN = (() => {
     return out;
   }
   // the clustered stand-in of a part (vertices merged on a CG grid, as the lab's own city pack does)
-  function cluster(c){
-    const n = c.n, id = new Int32Array(n), m = new Map(), P = new Float64Array(n*3), Co = new Uint8Array(n*3), E = new Uint8Array(n), cnt = new Uint32Array(n); let nc = 0;
+  function cluster(c, cg){
+    const G = cg || CG, n = c.n, id = new Int32Array(n), m = new Map(), P = new Float64Array(n*3), Co = new Uint8Array(n*3), E = new Uint8Array(n), cnt = new Uint32Array(n); let nc = 0;
     const pos = c.pos, col = c.col, ce = c.em;
     for (let i = 0; i < n; i++){
       const x = pos[i*3], y = pos[i*3 + 1], z = pos[i*3 + 2];
-      const key = ((Math.round(x/CG) + 32768)*65536 + (Math.round(y/CG) + 32768))*65536 + (Math.round(z/CG) + 32768);
+      const key = ((Math.round(x/G) + 32768)*65536 + (Math.round(y/G) + 32768))*65536 + (Math.round(z/G) + 32768);
       let v = m.get(key);
       if (v === undefined){ v = nc++; m.set(key, v); Co[v*3] = col[i*3]; Co[v*3 + 1] = col[i*3 + 1]; Co[v*3 + 2] = col[i*3 + 2]; }
       id[i] = v; P[v*3] += x; P[v*3 + 1] += y; P[v*3 + 2] += z; cnt[v]++; if (ce[i]) E[v] = ce[i];
@@ -275,7 +278,14 @@ const FURN = (() => {
   }
   // clustered stand-ins are kept while the plot is unchanged (same data object): a second visit, or the warm-up while picking, makes it quick.
   // (emission kept as rgba rows, not as one visit's table indices)
-  const COARSE = new WeakMap();
+  const COARSE = new WeakMap(), BLOCKS = new WeakMap();
+  // the far tier: the stand-in's parts clustered again on the coarse grid (kept like the stand-ins, per plot data)
+  function blocksOf(co, EM){
+    const out = {}, keep = { parts: {} };
+    for (const k in co){ const cc = cluster(co[k], CG_FAR); if (!cc.n) continue; out[k] = cc;
+      keep.parts[k] = { pos: cc.pos.slice(), col: cc.col.slice(), idx: cc.idx.slice(), n: cc.n, e4: Array.from(cc.em, v => v ? EM.E[v] : null) }; }
+    return { co: out, keep };
+  }
   function coarseOf(B, EM){
     const co = {}, keep = { parts: {} };
     for (const k in B){ if (k === 'glass' || k === '_box') continue; const cc = cluster(B[k]); if (!cc.n) continue; co[k] = cc;
@@ -352,23 +362,25 @@ const FURN = (() => {
   const tick = () => new Promise(r => setTimeout(r, 0)), nap = ms => new Promise(r => setTimeout(r, ms));
   // the plots, in batches: send(plots, em, k, done, xfer) for each; returns stats, or null when cancelled
   async function stream(home, send, alive){
-    const EM = emTable(), st = { t0: performance.now(), plots: 0, near: 0, cached: 0, made: 0, ensured: 0, missing: 0, verts: 0, bytes: 0, batches: 0, firstMs: 0 };
+    const EM = emTable(), st = { t0: performance.now(), plots: 0, near: 0, blocks: 0, nearVerts: 0, farVerts: 0, cached: 0, made: 0, ensured: 0, missing: 0, verts: 0, bytes: 0, batches: 0, firstMs: 0 };
     const all = [];
     for (const c of cells.values()) if (c.data && c.data.geo) all.push({ o: c, kind: 'cell', id: [c.i, c.j], cell: c });
     for (const m of megas.values()) if (m.data && m.data.geo) all.push({ o: m, kind: 'mega', id: m.id });
     for (const t of all){ const bb = t.o._bb || (t.o.data && t.o.data._bb), cx = bb ? (bb.min.x + bb.max.x)/2 : t.o.x, cz = bb ? (bb.min.z + bb.max.z)/2 : t.o.z, r = bb ? Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z)/2 : LOT;
-      t.d = Math.hypot(cx - home.x, cz - home.z); t.near = t.d < NEAR + r; t.home = t.cell && t.cell.i === home.cell[0] && t.cell.j === home.cell[1]; }
+      t.d = Math.hypot(cx - home.x, cz - home.z); const lc = F.lightCity !== false; t.near = t.d < (lc ? NEAR : 46) + r; t.far = lc && t.d > MID + r; t.home = t.cell && t.cell.i === home.cell[0] && t.cell.j === home.cell[1]; }
     all.sort((a, b) => (b.home - a.home) || (b.near - a.near) || a.d - b.d);
     const N = all.length || 1; let out = [], xfer = [], last = performance.now(), done = 0;
     const flush = (fin) => { if (!out.length && !fin) return; send(out, EM.E.slice(), done/N, !!fin, xfer); st.batches++; if (!st.firstMs) st.firstMs = performance.now() - st.t0; out = []; xfer = []; };
     const emit = p => { out.push(p); st.plots++; done++;
-      for (const tier of ['full', 'coarse']) if (p[tier]) for (const k in p[tier]){ const q = p[tier][k]; xfer.push(q.pos.buffer, q.col.buffer, q.em.buffer, q.idx.buffer); if (q.nrm) xfer.push(q.nrm.buffer); st.verts += q.n; st.bytes += q.pos.byteLength + q.col.byteLength + q.em.byteLength + q.idx.byteLength + (q.nrm ? q.nrm.byteLength : 0); } };
+      for (const tier of ['full', 'coarse']) if (p[tier]) for (const k in p[tier]){ const q = p[tier][k]; xfer.push(q.pos.buffer, q.col.buffer, q.em.buffer, q.idx.buffer); if (q.nrm) xfer.push(q.nrm.buffer); st.verts += q.n; if (tier === 'full') st.nearVerts += q.n; else st.farVerts += q.n; st.bytes += q.pos.byteLength + q.col.byteLength + q.em.byteLength + q.idx.byteLength + (q.nrm ? q.nrm.byteLength : 0); } };
     const one = t => {   // true when it went out
-      if (!t.near){ const ce = COARSE.get(t.o.data); if (ce){ emit({ kind: t.kind, id: t.id, box: ce.box, coarse: fromCache(ce, EM) }); st.cached++; return true; } }
+      const out = (box, co) => { if (t.far){ const be = BLOCKS.get(t.o.data); let bo; if (be) bo = fromCache(be, EM); else { const r = blocksOf(co, EM); BLOCKS.set(t.o.data, r.keep); bo = r.co; } co = bo; st.blocks++; }
+        emit({ kind: t.kind, id: t.id, box, coarse: co }); };
+      if (!t.near){ const ce = COARSE.get(t.o.data); if (ce){ out(ce.box, fromCache(ce, EM)); st.cached++; return true; } }
       const B = readPlot(t.o, EM, !t.near); if (!B) return false;
       const box = B._box;
       if (t.near){ delete B._box; emit({ kind: t.kind, id: t.id, box, full: B }); st.near++; }
-      else { const { co, keep } = coarseOf(B, EM); COARSE.set(t.o.data, keep); emit({ kind: t.kind, id: t.id, box, coarse: co }); st.made++; }
+      else { const { co, keep } = coarseOf(B, EM); COARSE.set(t.o.data, keep); out(box, co); st.made++; }
       return true;
     };
     const ensure = t => { if (!t.cell) return true; try { return pmEnsure(t.cell, t.near ? 'full' : 'stand'); } catch (e) { return true; } };

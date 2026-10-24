@@ -16669,7 +16669,7 @@ function warmStep(){const W=S.warm;if(!W)return;const gl=S.gl,t=now();
   else if(job==='lines'){ // plain line programs (window grilles, rails, bunk frames): their keys carry the light and shadow counts, so each shadow-count variant is compiled with the real lights
     if(!W.lineGeo){const g=new TH.BufferGeometry();g.setAttribute('position',new TH.Float32BufferAttribute([0,0,0,1,0,0],3));g.setAttribute('color',new TH.Float32BufferAttribute([1,1,1,1,1,1],3));W.lineGeo=g}
     const P=S.poolN,cur=ptsFor(S.cfg),ns=[cur].concat([2,1,0].filter(n=>n!==cur));W.group.clear();
-    for(const o of [{},{vertexColors:true}]){const l=new TH.LineSegments(W.lineGeo,new TH.LineBasicMaterial(o));l.frustumCulled=false;W.keep.push(l);W.group.add(l)}
+    for(const o of [{},{vertexColors:true},{transparent:true,opacity:.5},{vertexColors:true,transparent:true,opacity:.5}]){const l=new TH.LineSegments(W.lineGeo,new TH.LineBasicMaterial(o));l.frustumCulled=false;W.keep.push(l);W.group.add(l)}
     W.group.visible=false;
     for(const n of ns){warmLights(n,P);warmCompile(()=>{S.R.setRenderTarget(S.hdr);S.R.compile(W.scene,S.camera);S.R.setRenderTarget(null);S.R.compile(W.scene,S.camera)})}
     warmLights(cur,P);W.group.clear()}

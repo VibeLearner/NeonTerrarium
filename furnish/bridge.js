@@ -28,17 +28,25 @@
   function recipe(){ try { return PB().recipe(); } catch (e) { return null; } }
   function save(){ if (!S.ready) return; const rc = recipe(); if (!rc) return; send({ type: 'furnish:save', recipe: rc }); }
   // the end of a visit: the game hides the page; here the home and the city context are let go, the programs and the library stay
+  // The page stops drawing at once (the last frame stays on screen) so the game can play its hologram exit over it while the
+  // city wakes up underneath; the home is let go after that (FADE ms), or straight away when another visit starts first.
+  const FADE = 700;
+  let pendingLeave = null;
+  function flushLeave(){ const f = pendingLeave; pendingLeave = null; if (f) f(); }
   function leave(withRecipe){
     if (S.sent) return; S.sent = true;
-    send({ type: 'furnish:exit', recipe: withRecipe && S.ready && S.dirty ? recipe() : null });
+    const rc = withRecipe && S.ready && S.dirty ? recipe() : null;
+    sleep(true);
+    send({ type: 'furnish:exit', recipe: rc });
     const v = S.visit;
-    setTimeout(() => { if (S.visit !== v) return;
+    const go = () => { if (pendingLeave === go) pendingLeave = null; if (S.visit !== v) return;
       for (const off of S.offs) try { off(); } catch (e) {}
       try { if (PC() && PC().exit) PC().exit(); } catch (e) {}
       try { if (PB().setResidents) PB().setResidents(null); } catch (e) {}
       try { if (PB().unload) PB().unload(); } catch (e) { console.warn('furnish: unload', e); }
       S = fresh(); S.visit = v; sync(); sleep(true);
-    }, 0);
+    };
+    pendingLeave = go; setTimeout(() => { if (pendingLeave === go) flushLeave(); }, FADE);
   }
   function exit(){ leave(true); }
   // furnish:begin: the head of the city (cells, homes, camera) and the home. The city source is set at once and the home opened, so
@@ -46,6 +54,7 @@
   let stream = null;
   function begin(m){
     if (S.opening) return;
+    flushLeave();   // (a quick reopen: the last home goes first)
     S = fresh(); S.opening = true; S.visit = ++visits; S.t0 = performance.now(); sleep(false);
     const h = m.home, pod = { cell: h.cell.slice(), section: h.section, floor: h.floor, zone: h.zone, kind: h.kind }, C = PC();
     if (C && C.addPlots && C.cityDone){ C.setCitySource(m.head, { streaming: true }); stream = { live: true }; }

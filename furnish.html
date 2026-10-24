@@ -17117,8 +17117,8 @@ function frame(dt){const R=S.R,P=S.prof;S.frame++;matCheck();S.stage='warm';
   glowUpdate(single);
   // main pass (after a depth-only prepass of the big occluders into the same multisampled depth); the glow cards draw last in it
   t=now();U.uPRC8.value=c8?1:0;const bg=S.scene.background,ac=R.autoClear;if(S.glow)S.glow.visible=S.glowN>0;
-  try{if(A.prepass&&S.warm&&S.warm.done.z){zPass(true);S.scene.background=null;R.autoClear=false}else if(S.c8bg)S.scene.background=S.c8bg;
-    S.stage='main';R.setRenderTarget(S.hdr);cw('main pass',()=>R.render(S.scene,cam))}finally{S.scene.background=bg;R.autoClear=ac;U.uPRC8.value=0;if(S.glow)S.glow.visible=false}
+  try{S.mz=0;if(A.prepass&&S.warm&&S.warm.done.z){const zt=now();zPass(true);S.mz=now()-zt;S.scene.background=null;R.autoClear=false}else if(S.c8bg)S.scene.background=S.c8bg;
+    S.stage='main';R.setRenderTarget(S.hdr);const rt=now();cw('main pass',()=>R.render(S.scene,cam));S.mr=now()-rt;S.mc=R.info.render.calls;S.mtri=R.info.render.triangles}finally{S.scene.background=bg;R.autoClear=ac;U.uPRC8.value=0;if(S.glow)S.glow.visible=false}
   P.main=now()-t;t=now();
   if(!single)lighting(L,false);
   // bloom: threshold + 4x4 average into 1/4 res in one pass, then 1/8 (and 1/16), upsampled additively; the composite adds it
@@ -17222,7 +17222,7 @@ function render(dt,cam){if(!S)return;if(cam&&cam.isCamera)S.camera=cam;const R=S
   if(S.post){gtFrameEnd();gtPoll()}
   S.calls=R.info.render.calls;S.tris=R.info.render.triangles;R.info.autoReset=ar;R.autoClear=ac;R.setRenderTarget(prevRT);const c=now()-t;S.cpu=S.cpu?S.cpu*.9+c*.1:c;S.lastCpu=c;
   {const pg=R.info.programs.length-prog0;for(let i=S.syncBuilds.length-1;i>=0&&S.syncBuilds[i].frame===S.frame;i--)S.syncBuilds[i].newProgramsThisFrame=pg}S.curObj=null;
-  if(c>50&&S.post){const tx=R.info.memory.textures-tex0,pg=R.info.programs.length-prog0,P=S.prof,r1=x=>+(x||0).toFixed(1);const hp=performance.memory?performance.memory.usedJSHeapSize:0;const e={frame:S.frame,ms:+c.toFixed(1),eff:S.eff,events:S.ev.slice(),newTextures:tx,newPrograms:pg,cpuStages:{warm:r1(P.warm),work:r1(P.work),pre:r1(P.pre),main:r1(P.main),post:r1(P.post),overlay:r1(S.ovMs),hud:r1(S.hudMs)},heapMB:hp?+(hp/1048576).toFixed(1):null,heapDeltaMB:hp&&S.heap0?+((hp-S.heap0)/1048576).toFixed(1):null,warmSec:S.wsec,buildsByStage:Object.assign({},S.bsF),progs:R.info.programs.slice(prog0,prog0+12).map(q=>q.name+' '+String(q.cacheKey).slice(0,90))};S.slow.push(e);if(S.slow.length>30)S.slow.shift();console.warn('PodRender slow frame '+e.ms+' ms: '+JSON.stringify(e))}
+  if(c>50&&S.post){const tx=R.info.memory.textures-tex0,pg=R.info.programs.length-prog0,P=S.prof,r1=x=>+(x||0).toFixed(1);const hp=performance.memory?performance.memory.usedJSHeapSize:0;const e={frame:S.frame,ms:+c.toFixed(1),eff:S.eff,events:S.ev.slice(),newTextures:tx,newPrograms:pg,cpuStages:{warm:r1(P.warm),work:r1(P.work),pre:r1(P.pre),main:r1(P.main),post:r1(P.post),overlay:r1(S.ovMs),hud:r1(S.hudMs)},heapMB:hp?+(hp/1048576).toFixed(1):null,heapDeltaMB:hp&&S.heap0?+((hp-S.heap0)/1048576).toFixed(1):null,warmSec:S.wsec,mainSec:{z:+(S.mz||0).toFixed(1),render:+(S.mr||0).toFixed(1),calls:S.mc||0,tris:S.mtri||0,glowN:S.glowN||0,pool:S.pool.filter(q=>q.userData.src).length},buildsByStage:Object.assign({},S.bsF),progs:R.info.programs.slice(prog0,prog0+12).map(q=>q.name+' '+String(q.cacheKey).slice(0,90))};S.slow.push(e);if(S.slow.length>30)S.slow.shift();console.warn('PodRender slow frame '+e.ms+' ms: '+JSON.stringify(e))}
   if(S.checkSamplers)samplerCheck();{const a=now();hud();S.hudMs=now()-a}}
 function resize(){if(S&&S.post){S.W=0;ensureTargets()}}
 function summary(cnt){const out={meshes:cnt._meshes||0,tiny:cnt._tiny||0,classes:{},areaM2:{},reflectiveAreaPct:0};let tot=0,refl=0;

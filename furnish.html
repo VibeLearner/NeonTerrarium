@@ -16586,7 +16586,7 @@ function probeFace(){const q=S.pq[0];if(!q)return false;const p=S.probes[q.i],f=
   S.atlas.viewport.set(q.f*F,q.i*F,F,F);S.atlas.scissor.set(q.f*F,q.i*F,F,F);S.R.setRenderTarget(S.atlas);S.R.render(S.scene,c);
   if(++q.f>=6){S.pq.shift();S.pqSet.delete(q.i);S.projNeeded=true}return true}
 function project(){const pr=S.M.proj.uniforms;pr.tA.value=S.atlas.texture;quad(S.M.proj,S.shT);S.projNeeded=false;S.lerpK=0;S.lerpN=S.probeFirst&&!S.pq.length?1:30;
-  if(!S.pq.length&&S.probeFirst){S.probeFirst=false;S.probesReady=true}return true}
+  if(!S.pq.length&&S.probeFirst){S.probeFirst=false;S.probesReady=true;if(!S.liveKey||S.liveKey==='stale')S.liveKey=keyNow()}return true}
 function lerpSH(){const k=S.lerpN===1?1:(S.lerpK||.18);const l=S.M.lerp.uniforms;l.a.value=S.shA.texture;l.b.value=S.shT.texture;l.k.value=k;quad(S.M.lerp,S.shB);const t=S.shA;S.shA=S.shB;S.shB=t;U.uPRSH.value=S.shA.texture;S.lerpN--}
 
 /* ---------------- reflection cubes, one per room, prefiltered by an explicit PMREM slice ---------------- */
@@ -16617,7 +16617,7 @@ function texAvg(t){if(!t||!t.image)return [1,1,1];const im=t.image;if(_avg.has(i
 /* ---------------- dirtiness: GI rebakes are sliced; shadows re-render per light, only when something in its reach moved ---------------- */
 function lightsNear(box,r,fn){for(let i=0;i<S.poolN;i++){const p=S.pool[i];if(!p.userData.src)continue;const reach=Math.max(r,p.distance||6);if(!box||box.distanceToPoint(p.position)<reach)fn(p)}}
 function dirtyLight(p,moved){if(moved&&p.castShadow)p.shadow.needsUpdate=true}
-function dirtyBox(box,r,shadowsToo,noSpare){if(!S.probes)return;const sp=S.spare;
+function dirtyBox(box,r,shadowsToo,noSpare){if(!S.probes)return;const sp=S.spare;if(!box)S.liveKey=keyNow();
   if(sp&&!noSpare){if(!box||(sp.dd&&sp.dd.length>48)){sp.have=false;sp.valid=false;S.altJob=null;sp.dd=[];S.pendSwap=null}else(sp.dd||(sp.dd=[])).push([box.clone(),r,shadowsToo])}   // a local edit keeps the spare bake and is replayed on the live probes when it swaps in; a global one (time of day, ambient light) makes it unusable
   S.probes.forEach((p,i)=>{if(!box||box.distanceToPoint(_v.set(p.x,p.y,p.z))<r)queueProbe(i)});
   S.cubes.forEach((c2,i)=>{const R=S.rooms[i];if(!box||(box.max.x>R.min[0]-1&&box.min.x<R.max[0]+1&&box.max.z>R.min[2]-1&&box.min.z<R.max[2]+1)){c2.dirty=true;c2.f=0}});
@@ -17071,7 +17071,9 @@ function windowUniforms(){const day=S.time==='day',W=S.windows||[];U.uPRWN.value
     U.uPRWP.value[i].set(w.blackout?1:0,day?.08:.35,w.blackout?.1:1,w.blackout?.6:1)})}
 function windowFrame(dt){if(S.wAnim)U.uPRWT.value=(U.uPRWT.value+Math.min(.1,(dt||16)/1000))%1e4;
   if(S.winDirty&&(S.winRebake||!S.windows||now()-S.editT>300)){windowsScan();S.winRebake=true}
-  if(S.winRebake){S.winRebake=false;windowUniforms();if(S.probes&&!S.altSkip){if(altCan()&&S.ab.deferRelight!==false)deferRelight();else dirtyBox(null,0,false)}S.altSkip=false;S.glowDirty=true;S.histReset=true}}
+  if(S.winRebake){S.winRebake=false;windowUniforms();if(S.probes){const stale=!!S.winStale,why=S.relightWhy;S.winStale=false;S.relightWhy=null;const sp0=S.spare;
+    let how;if(altCan()&&S.ab.deferRelight!==false)how=relight(stale);else{dirtyBox(null,0,false);how='SLOW relight (first bake not finished)'}
+    if(why){S.tog={t:now(),how,why};console.log('[PodRender] '+(why==='time'?'day/night':why==='both'?'day/night + work light':'work light')+' switch: '+how,JSON.stringify({want:keyNow(),onScreen:S.liveKey,spare:sp0&&sp0.have?sp0.key:null,baking:S.altJob?S.altJob.key:null,pq:S.pq.length}))}}S.glowDirty=true;S.histReset=true}}
 
 /* ---------------- instant work light: a spare set of baked lighting for the other state ----------------
    The probes (SH irradiance) and room reflection cubes are linear in the lights, so each work light state has its own complete bake. The live set is
@@ -17083,7 +17085,7 @@ function mkPM(){const t=new TH.WebGLRenderTarget(3*Math.max(64,112),4*64,{magFil
   t.texture.mapping=TH.CubeUVReflectionMapping;t.texture.name='PMREM.cubeUv';clearRT(t);return t}
 function copyRT(src,dst){const c=S.M.copy.uniforms;c.t.value=src.texture;dst.scissorTest=false;dst.viewport.set(0,0,dst.width,dst.height);quad(S.M.copy,dst)}
 function liveBusy(){return !!(S.pq.length||S.cubes.some(c=>c.dirty||!c.done)||S.pmQ.length||S.pmFade.some(n=>n>0)||S.optQ.length||S.projNeeded||S.lerpN>0||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid)))}
-function altNeed(){const sp=S.spare;if(!altCan()||!S.warm||!S.warm.done.pmrem)return false;const tgt=S.pendSwap?S.pendSwap.to:!S.workLight;return !(sp.have&&sp.state===tgt)}
+function altNeed(){const sp=S.spare;if(!altCan()||!S.warm||!S.warm.done.pmrem)return false;const tkey=S.pendSwap?S.pendSwap.key:keyOf(S.time,!S.workLight);return !(sp.have&&sp.key===tkey)}
 // asked by PodContext while its transition covers the room: is the lighting (live bake, then the spare for the other work-light state) still being built?
 function lightPending(){if(!S||!S.post||S.broken||S.ab.lightGate===false)return false;if(!S.matReady)return true;return liveBusy()||!S.probesReady||altNeed()||!!S.pendSwap}
 // behind the hologram nothing is on screen, so the bake runs flat out: up to 6 slices or about 10 ms a frame
@@ -17091,41 +17093,61 @@ function bakeHidden(){const t0=now(),fr=S.frame;const sl=(kind,fn)=>{const a=now
   let n=0;while(n<6&&now()-t0<10){if(liveBusy()){S.flushing=true;try{work()}finally{S.flushing=false}n++;continue}
     if(!altNeed()&&!S.pendSwap)break;const k=S.altN||0;altWork(true,sl,true);if((S.altN||0)===k)break;n++}S.hidN=(S.hidN||0)+n}
 function liveSettled(){return !S.pq.length&&!S.cubes.some(c=>c.dirty||!c.done)&&!S.pmQ.length&&!S.projNeeded&&S.lerpN<=0&&!S.pmFade.some(n=>n>0)}
-function altSwap(was,now2){const sp=S.spare;if(S.ab.altWork===false||!sp||!S.probesReady||!S.post||!S.pmrem||!sp.have||sp.state!==now2||!sp.pm||S.altJob)return false;
-  const settled=liveSettled();
-  for(let i=0;i<S.pmrem.length;i++){copyRT(sp.pm[i],S.pmStage[i]);S.pmFade[i]=8;if(settled)copyRT(S.pmrem[i],sp.pm[i])}   // load the spare reflections first, then park the live ones in its place
+// A lighting state is a key: time of day plus work light ('night|1'). S.liveKey is what the room shows, sp.key what the spare holds (usable when sp.have).
+const keyOf=(time,work)=>time+'|'+(work?1:0),timeOf=k=>k?k.split('|')[0]:null;
+// a bake already running for the right time of day is kept even when the work light changed since: it swaps in first (the time of day is the
+// bigger difference), then a one-pass bake fixes the work light. Restarting on every switch could otherwise starve it while someone keeps switching.
+function keepNear(A){return !!(A&&timeOf(A.key)===S.time&&timeOf(S.liveKey)!==S.time&&A.key!==S.liveKey)}
+function keyNow(){return keyOf(S.time,S.workLight)}
+// swap the spare in when it holds the wanted state. The live bake is parked in its place (it becomes the spare) when it is complete; a reflection
+// fade still blending it in does not count against that: its target (pmStage) is the finished live reflection.
+function altSwap(near){const sp=S.spare;if(S.ab.altWork===false||!sp||!S.probesReady||!S.post||!S.pmrem||!sp.have||!sp.key||(sp.key!==keyNow()&&!(near&&timeOf(sp.key)===S.time))||!sp.pm||S.altJob)return false;
+  const baked=!S.pq.length&&!S.projNeeded&&!S.pmQ.length&&!S.cubes.some(c=>c.dirty||!c.done)&&S.liveKey!=null&&S.liveKey!=='stale';
+  for(let i=0;i<S.pmrem.length;i++){const fading=S.pmFade[i]>0,old=S.pmStage[i];S.pmStage[i]=sp.pm[i];sp.pm[i]=old;if(baked&&!fading)copyRT(S.pmrem[i],old);S.pmFade[i]=8}   // the spare reflections become the fade target; the live ones are parked
   {const a=S.atlas;S.atlas=sp.atlas;sp.atlas=a;const t=S.shT;S.shT=sp.shT;sp.shT=t}
-  S.lerpN=Math.max(S.lerpN,10);S.lerpK=.35;sp.state=was;sp.valid=settled;sp.have=settled;S.altJob=null;{const dd=sp.dd||[];sp.dd=[];for(const e of dd)dirtyBox(e[0],e[1],e[2],true)}S.altQuiet=S.frame+8;S.altSwaps=(S.altSwaps||0)+1;S.glowDirty=true;S.histReset=true;S.lastSwap=now();return true}
+  const oldKey=S.liveKey;S.liveKey=sp.key;sp.key=baked?oldKey:null;sp.shTime=oldKey&&oldKey!=='stale'?oldKey.split('|')[0]:null;sp.state=!!(oldKey&&oldKey.endsWith('|1'));
+  S.lerpN=Math.max(S.lerpN,10);S.lerpK=.35;sp.valid=baked;sp.have=baked;S.altJob=null;{const dd=sp.dd||[];sp.dd=[];for(const e of dd)dirtyBox(e[0],e[1],e[2],true)}S.altQuiet=S.frame+8;S.altSwaps=(S.altSwaps||0)+1;S.glowDirty=true;S.histReset=true;S.lastSwap=now();return true}
 // every light the work toggle owns (builder.js tags them), forced to one state while a spare slice renders
+// bounce light in a spare slice: 'spare' = the spare's own previous bake (same time of day), 'seed' = the live bounce (same time of day, a toggle is waiting),
+// 'cold' = none on the first pass (a new time of day or a first bake), then the spare's own first pass
 function altCapture(A,pos,fn){const sp=S.spare,on=A.state,L=A.lights,sv=L.map(l=>l.intensity),hs=S.probesReady?.55:1;
   for(const l of L)l.intensity=l.isHemisphereLight?(on?l.userData.wl0*hs:l.userData.wl0*.06):(on?l.userData.wl0:0);
-  captureMode(true,pos);const gi=U.uPRGI.value,sh=U.uPRSH.value;if((!sp.baked||A.noGI0)&&A.pass===0){if(!A.seed)U.uPRGI.value=0}else U.uPRSH.value=sp.shT.texture;   // bounce light comes from the spare's own previous bake, never the live state's
+  captureMode(true,pos);const sh=U.uPRSH.value;if(A.mode==='spare'||(A.mode==='cold'&&A.pass>0))U.uPRSH.value=sp.shT.texture;else if(A.mode==='cold')U.uPRGI.value=0;
   const k=ptsFor(S.cfg),ps=[];for(let i=0;i<k;i++){const p=S.pool[i],src=p.userData.src;if(src&&src.userData.workLight){ps.push([p,p.intensity]);p.intensity=on?src.userData.wl0:0}}
   try{return fn()}finally{for(const e of ps)e[0].intensity=e[1];for(let i=0;i<L.length;i++)L[i].intensity=sv[i];U.uPRSH.value=sh;captureMode(false)}}
-function deferRelight(){const sp=S.spare;sp.dd=[];sp.have=false;sp.valid=false;S.altJob=null;S.pendSwap={was:S.workLight,to:S.workLight,kind:'scene',t:now()};S.altQuiet=S.frame+8;ev('relight deferred')}
 function altCan(){const sp=S.spare;return !!(sp&&S.ab.altWork!==false&&S.probesReady&&S.matReady&&S.post&&S.pmrem)}
-function finishPend(){const P=S.pendSwap;S.pendSwap=null;if(!P)return;if(altSwap(P.was,P.to)){S.altSkip=false;if(P.kind==='scene'){S.spare.have=false;S.spare.valid=false;S.spare.baked=false}/* the parked state belongs to the old time of day: the next spare bake starts from scratch (two passes) */ev('deferred swap '+Math.round(now()-(S.tog?S.tog.t:now()))+'ms')}else dirtyBox(null,0,false)}   // could not swap: fall back to a live rebake
+// One decision for every lighting switch (work light, time of day, windows or geometry): what is wanted against what is on screen, in the spare and baking now.
+// Nothing ever rebakes the visible lighting piece by piece here: on screen already -> nothing; in the spare -> instant swap; baking -> keep going; else bake it off screen.
+function relight(stale){const sp=S.spare,want=keyNow(),a=S.altJob;let how;
+  if(stale){dirtyBox(null,0,false);how='REBAKE (furniture or windows changed)'}   // edits keep the live rebake they always had; the spare is dropped
+  else if(want===S.liveKey){S.pendSwap=null;how='BACK (already on screen)'}
+  else if(sp.have&&sp.key===want&&!a&&altSwap()){S.pendSwap=null;how='INSTANT swap'}
+  else{const same=!!(a&&a.key===want),near=!same&&keepNear(a);if(a&&!same&&!near)S.altJob=null;S.pendSwap={to:S.workLight,key:want};how=same?'DEFERRED (already baking)':near?'DEFERRED (finishing the bake for this time of day first)':'DEFERRED (baking off screen)'}
+  ev('relight '+how);return how}
+function finishPend(){const P=S.pendSwap;if(!P)return;S.pendSwap=null;if(P.key!==keyNow())return;
+  if(altSwap())ev('deferred swap '+Math.round(now()-(S.tog?S.tog.t:now()))+'ms');else dirtyBox(null,0,false)}   // could not swap: fall back to a live rebake
 function altWork(idle,sl,force){const sp=S.spare;if(!sp||S.ab.altWork===false||!S.probesReady||!S.matReady||!S.post||S.picking||(S.flushing&&!force)||(!idle&&!force))return;
   if(!force&&now()-(S.camMoved||0)<(S.pendSwap?500:800))return;   // each probe or cube face is a whole extra scene render: the spare bake only runs while the view is still (a hitch is invisible then)
   if(S.pq.length||S.projNeeded||S.lerpN>0||S.pmQ.length||S.optQ.length||S.aoDirty||S.cubes.some(c=>c.dirty||!c.done)||S.pmFade.some(n=>n>0)||!S.warm||!S.warm.done.pmrem)return;   // not gated on the whole warm-up (about 29 s): the spare bake changes light intensities only, so it reuses the programs the live bake already built
-  const tgt=S.pendSwap?S.pendSwap.to:!S.workLight;
-  if(sp.have&&sp.state===tgt){if(S.pendSwap)finishPend();return}
-  const every=S.pendSwap?1:Math.max((S.cpu||0)<8?1:(S.cpu||0)<12?2:4,S.warm.finished?1:2);if(!force&&S.frame%every)return;   // slower where the CPU is already the limit; a waiting toggle runs every frame
+  const tw=S.pendSwap?S.pendSwap.to:!S.workLight,tkey=S.pendSwap?S.pendSwap.key:keyOf(S.time,!S.workLight);
+  if(sp.have&&sp.key===tkey){if(S.pendSwap)finishPend();return}
+  const every=S.pendSwap?1:Math.max((S.cpu||0)<8?1:(S.cpu||0)<12?2:4,S.warm.finished?1:2);if(!force&&S.frame%every)return;   // slower where the CPU is already the limit; a waiting switch runs every frame
   S.altT=now();S.altN=(S.altN||0)+1;let A=S.altJob;
-  if(!A||A.state!==tgt){const lights=[];S.scene.traverse(o=>{if(o.isLight&&o.userData.workLight&&o.userData.wl0!=null)lights.push(o)});
+  if(!A||(A.key!==tkey&&!keepNear(A))){const lights=[];S.scene.traverse(o=>{if(o.isLight&&o.userData.workLight&&o.userData.wl0!=null)lights.push(o)});
     if(!sp.pm)sp.pm=S.cubes.map(()=>mkPM());if(!S.altCube){S.altCube=new TH.WebGLCubeRenderTarget(64,{type:S.hdrType,generateMipmaps:false,minFilter:TH.LinearFilter});clearRT(S.altCube);S.altCC=new TH.CubeCamera(.05,30,S.altCube);S.altCC.children.forEach(c=>c.layers.set(LAYER))}
-    const scene=!!(S.pendSwap&&S.pendSwap.kind==='scene'),seed=!scene&&!sp.baked&&!!S.pendSwap;sp.valid=false;sp.have=false;sp.dd=[];sp.state=tgt;S.altJob=A={state:tgt,lights,seed,noGI0:scene,phase:0,pass:0,passes:scene?2:(sp.baked||seed)?1:2,pi:0,f:0,ci:0,cf:0,t0:now()};ev('alt bake start '+(A.state?'work light on':'work light off'));return}
+    const liveT=!!(S.liveKey&&S.liveKey!=='stale'&&S.liveKey.split('|')[0]===S.time),mode=sp.baked&&sp.shTime===S.time?'spare':S.pendSwap&&liveT?'seed':'cold';
+    sp.valid=false;sp.have=false;sp.dd=[];sp.key=tkey;sp.state=tw;S.altJob=A={state:tw,key:tkey,lights,mode,phase:0,pass:0,passes:mode==='cold'?2:1,pi:0,f:0,ci:0,cf:0,t0:now()};ev('alt bake start '+tkey+' ('+mode+')');return}
   if(A.phase===0){const p=S.probes[A.pi];_v2.set(p.x,p.y,p.z);
     sl('alt probe face',()=>altCapture(A,_v2.clone(),()=>{const f=FACES[A.f],c=S.pcam;c.position.set(p.x,p.y,p.z);c.up.set(f[3],f[4],f[5]);c.lookAt(p.x+f[0],p.y+f[1],p.z+f[2]);c.updateMatrixWorld(true);
       sp.atlas.viewport.set(A.f*F,A.pi*F,F,F);sp.atlas.scissor.set(A.f*F,A.pi*F,F,F);S.R.setRenderTarget(sp.atlas);S.R.render(S.scene,c);return true}));
     if(++A.f>=6){A.f=0;if(++A.pi>=S.probes.length){A.pi=0;A.phase=1}}return}
-  if(A.phase===1){sl('alt SH project',()=>{const pr=S.M.proj.uniforms;pr.tA.value=sp.atlas.texture;quad(S.M.proj,sp.shT);return true});sp.baked=true;
+  if(A.phase===1){sl('alt SH project',()=>{const pr=S.M.proj.uniforms;pr.tA.value=sp.atlas.texture;quad(S.M.proj,sp.shT);return true});sp.baked=true;sp.shTime=A.key.split('|')[0];
     if(++A.pass<A.passes){A.phase=0}else A.phase=2;return}
   if(A.phase===2){const c=S.cubes[A.ci];S.altCC.position.copy(c.cam.position);S.altCC.updateMatrixWorld(true);
     sl('alt cube face',()=>altCapture(A,c.cam.position.clone(),()=>{S.R.setRenderTarget(S.altCube,A.cf);S.R.render(S.scene,S.altCC.children[A.cf]);return true}));
     if(++A.cf>=6){A.cf=0;A.phase=3}return}
   if(A.phase===3){sl('alt PMREM',()=>{S.pmGen.fromCubemap(S.altCube.texture,sp.pm[A.ci]);return true});
-    if(++A.ci>=S.cubes.length){sp.valid=true;sp.have=true;S.altJob=null;S.altBakeMs=+(now()-A.t0).toFixed(0);ev('alt bake done '+S.altBakeMs+'ms');if(S.pendSwap)finishPend()}else A.phase=2}}
+    if(++A.ci>=S.cubes.length){sp.valid=true;sp.have=true;S.altJob=null;S.altBakeMs=+(now()-A.t0).toFixed(0);ev('alt bake done '+S.altBakeMs+'ms');if(S.pendSwap){if(sp.key===S.pendSwap.key)finishPend();else if(timeOf(sp.key)===S.time&&timeOf(S.liveKey)!==S.time&&altSwap(true))ev('near swap '+S.liveKey)}}else A.phase=2}}
 
 /* ---------------- frame ---------------- */
 function camKey(c){const a=c.matrixWorld.elements,b=c.projectionMatrix.elements;let h=0;for(let i=0;i<16;i++)h+=a[i]*(i+1.3)+b[i]*(i+7.1);return h}
@@ -17133,7 +17155,7 @@ function camKey(c){const a=c.matrixWorld.elements,b=c.projectionMatrix.elements;
 function ctxHold(){const p=window.PodContext;return !!(p&&p.active&&p.active()&&p.lightHolding&&p.lightHolding())}
 function ctxBusy(){const p=window.PodContext;if(!p||!p.active||!p.active())return false;if(p.transitioning){if(ctxHold())return false;S.ctxT=now();return true}return S.ctxT&&now()-S.ctxT<500}
 function zBlk(k){const D=S.zDiag;if(D&&S.zRooms&&S.zRooms.some(r=>!r.valid))D.blk[k]=(D.blk[k]||0)+1}
-function work(){if(S.tog&&!S.tog.done&&!S.pendSwap&&now()-S.tog.t>150&&liveSettled()){S.tog.done=true;console.log('[PodRender] work light settled after '+Math.round(now()-S.tog.t)+' ms '+(S.tog.hit?'(instant swap)':S.tog.pend?'(deferred swap)':'(rebake)'))}
+function work(){if(S.tog&&!S.tog.done&&!S.pendSwap&&now()-S.tog.t>150&&liveSettled()){S.tog.done=true;console.log('[PodRender] lighting settled after '+Math.round(now()-S.tog.t)+' ms ('+S.tog.how+')')}
   if(S.picking&&!S.flushing){zBlk('work:picking');return}if(!S.flushing&&ctxBusy()){zBlk('work:ctxBusy');return} // probe, cube and PMREM rebakes wait for the PodContext transition (round 19)
   const C=S.cfg,fr=S.frame,idle=now()-S.editT>1500;
   const sl=(kind,fn)=>{const a=now();const r=cw(kind,fn);if(r){const ms=+(now()-a).toFixed(2);ev((typeof r==='string'?r:kind)+' '+ms+'ms');S.slices.push({kind:typeof r==='string'?r:kind,ms,frame:fr});if(S.slices.length>600)S.slices.shift()}return r};
@@ -17280,7 +17302,7 @@ function detach(){if(!S)return;const R=S.R;try{for(const [l,c,m,au] of S.saved.c
   if(S.hudEl)S.hudEl.remove();if(S.post){freeTargets();for(const c of S.cubes)c.rt.dispose();for(const p of (S.pmrem||[]).concat(S.pmStage||[],S.pmTmp?[S.pmTmp]:[]))p.dispose();if(S.pmGen)S.pmGen.dispose();for(const k of ['atlas','shT','shA','shB'])disposeRT(S[k]);if(S.spare){for(const x of [S.spare.atlas,S.spare.shT].concat(S.spare.pm||[]))disposeRT(x)}disposeRT(S.altCube);if(S.warm&&S.warm.psoRT)S.warm.psoRT.forEach(disposeRT)}}catch(e){console.warn(e)}
   if(S.vcMats){for(const m of S.vcMats.values())m.dispose();S.vcMats=null}
   for(const e of GT.q)S.gl.deleteQuery(e.q);GT.q.length=0;GT.cur=null;hookBuilds(false);glTrace(false);S=null}
-function sceneChanged(kind,obj){if(!S)return;S.photoN=0;if(kind!=='camera'&&kind!=='light')l2Invalidate(null,'sc:'+kind);if(kind==='geometry')S.winDirty=true;if(kind!=='camera')S.histReset=true;if(kind==='camera'){if(obj&&obj.isCamera)S.camera=obj;S.camMoved=now();return}if(kind==='walls'){S.editT=now();S.aoDirty=true;zRoomInvalidate(null,'sc:walls');return}
+function sceneChanged(kind,obj){if(!S)return;S.photoN=0;if(kind!=='camera'&&kind!=='light')l2Invalidate(null,'sc:'+kind);if(kind==='geometry'){S.winDirty=true;S.winStale=true}if(kind!=='camera')S.histReset=true;if(kind==='camera'){if(obj&&obj.isCamera)S.camera=obj;S.camMoved=now();return}if(kind==='walls'){S.editT=now();S.aoDirty=true;zRoomInvalidate(null,'sc:walls');return}
   if(!S.post){return}
   if(kind==='geometry'||kind==='material'){if(obj){const pc=pieceOf(obj)||(isPiece(obj)?obj:null);if(pc)queueOpt(pc);walk(obj,false,kind==='geometry',null)}
     else if(kind==='geometry'){for(const p of allPieces())if(!p.userData.prMerged)queueOpt(p);sweepAll()}if(kind==='geometry')S.plDirty=true}
@@ -17328,12 +17350,9 @@ function classify(root){const cnt={};if(!S){root.traverse(x=>{if(!x.isMesh)retur
   root.updateMatrixWorld(true);walk(root,false,true,cnt);lightLists();S.plDirty=true;if(S.post){if(S.probes){const b=new TH.Box3().setFromObject(root);dirtyBox(b.isEmpty()?null:b,3,true)}S.aoDirty=true;S.glowDirty=true;zRoomInvalidate(null,'classify');queueOpt(root);}return summary(cnt)}
 function setOptions(o){if(!S)return;o=o||{};if(o.quality!=null||o.rung!=null){const q=o.rung!=null?o.rung:o.quality;if(q==='auto'){S.fixed=false}else{S.fixed=true;G.sub=0;setRung(typeof q==='number'?q:QMAP[q]||+q||1)}}
   // time of day and the builder's work light (round 16): window light and probes follow (probes and cubes rebake in slices)
-  if(o.time&&o.time!==S.time){S.time=o.time==='day'?'day':'night';S.winDirty=true;S.winRebake=true}if(o.workLight!=null&&!!o.workLight!==S.workLight){const was=S.workLight,fresh=!S.winRebake;S.workLight=!!o.workLight;S.winRebake=true;const hit=!!(fresh&&altSwap(was,S.workLight));if(hit)S.altSkip=true;const sp0=S.spare;
-    let pend=false;if(!hit&&fresh&&altCan()){pend=true;S.altSkip=true;S.altQuiet=S.frame+8;   // the live probes are left alone (no rebake in pieces); direct light and shadows switch now, bounce light and reflections follow in one fade
-      if(S.pendSwap&&S.pendSwap.kind==='scene'){S.pendSwap.to=S.workLight;if(S.altJob&&S.altJob.state!==S.workLight){S.altJob=null;sp0.have=false;sp0.valid=false}}
-      else if(S.pendSwap)S.pendSwap=null;   // toggled back before the bake finished: the live bounce light is already the right state, the running bake becomes the spare
-      else{S.pendSwap={was,to:S.workLight};if(S.altJob&&S.altJob.state!==S.workLight){S.altJob=null;sp0.have=false;sp0.valid=false}}}S.tog={t:now(),hit,pend,fresh,why:hit?'':!fresh?'time or windows change in the same step: the whole relight is deferred':pend?(S.pendSwap?'new state baking off screen'+(S.altJob?' (phase '+S.altJob.phase+')':''):'toggled back, live light already right'):!sp0?'no spare':S.ab.altWork===false?'disabled':!S.probesReady?'probes not ready':!sp0.have?(S.altJob?'spare still baking (phase '+S.altJob.phase+')':'spare not baked'):sp0.state!==S.workLight?'spare is the wrong state':S.altJob?'bake running':!fresh?'time change in flight':'other'};console.log('[PodRender] work light toggle',hit?'INSTANT swap':(pend||(!fresh&&altCan()))?'DEFERRED swap':'SLOW relight',S.tog.why,JSON.stringify({warmDone:!!(S.warm&&S.warm.finished),altPhase:S.altJob?S.altJob.phase:null,pq:S.pq.length,dirtyCubes:S.cubes.filter(c=>c.dirty||!c.done).length,pmQ:S.pmQ.length,spareStale:sp0&&sp0.dd?sp0.dd.length:0}))}
-  if(o.windows!==undefined){S.winList=o.windows;S.winDirty=true;S.winRebake=true}if(o.animate!=null)S.wAnim=!!o.animate;
+  if(o.time&&o.time!==S.time){S.time=o.time==='day'?'day':'night';S.winDirty=true;S.winRebake=true;S.relightWhy=S.relightWhy==='work'?'both':'time'}
+  if(o.workLight!=null&&!!o.workLight!==S.workLight){S.workLight=!!o.workLight;S.winRebake=true;S.altQuiet=S.frame+8;S.relightWhy=S.relightWhy==='time'||S.relightWhy==='both'?'both':'work'}
+  if(o.windows!==undefined){S.winList=o.windows;S.winDirty=true;S.winRebake=true;S.winStale=true}if(o.animate!=null)S.wAnim=!!o.animate;
   if(o.glow){Object.assign(S.glowK,o.glow);S.glowDirty=true}if(o.rep)S.rep=Object.assign({},o.rep);if(o.hud!=null){S.hudOn=!!o.hud;hud()}if(o.off)Object.assign(S.off,o.off);if(o.debug!==undefined)S.debug=o.debug||null;if(o.checkSamplers!=null)S.checkSamplers=!!o.checkSamplers;if(o.freeze!=null){S.noFreeze=!o.freeze;if(S.noFreeze)matUnfreeze()}
   // A/B options (fps test): {prepass, depth:'resolve'|'single', hdr8, lights:4|6, fb, cheap, ptShadows, cones, reflBuf, vshadow}
   if(o.ab){const old=Object.assign({},S.ab);Object.assign(S.ab,o.ab);if(old.lights!==S.ab.lights||old.ptShadows!==S.ab.ptShadows){S.assignT=0;if(S.cfg)shadows()}if(old.depth!==S.ab.depth||old.hdr8!==S.ab.hdr8)S.bufOK=0}
@@ -17346,7 +17365,7 @@ function flush(maxIter,only){if(!S||!S.post)return 0;S.flushing=true;let n=0;con
   try{while(n<(maxIter||5000)&&busy()){if(S.syncSlices)gpuSync();S.frame++;if(S.optQ.length)optStep(true);work();n++}}
   finally{S.flushing=false;S.R.setRenderTarget(null)}return n}
 const api={caps:{alpha:true,context:true},lightPending:()=>{try{return lightPending()}catch(e){return false}},attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
-  _debug:{l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
+  _debug:{altRun:n=>{let k=0;const sl=(kind,fn)=>cw(kind,fn);for(;k<(n||5000);k++){const c=S.altN||0;altWork(true,sl,true);if((S.altN||0)===c)break}return k},winStep:()=>windowFrame(16),keys:()=>({want:keyNow(),live:S.liveKey,spare:S.spare&&S.spare.have?S.spare.key:null,baking:S.altJob?S.altJob.key:null,pend:S.pendSwap?S.pendSwap.key:null,mode:S.altJob?S.altJob.mode:null}),l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
 window.PodRender=api})();
 
 </script>

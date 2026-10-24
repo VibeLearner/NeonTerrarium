@@ -16766,7 +16766,7 @@ function optimize(root,immediate){if(!root)return null;if(root.userData.prMerged
        c.material.userData.prClass!=='emissive'&&!c.material.transparent&&!c.children.length){before++;const vk=vcKey(c);const k=vk?vk:matKey(c.material)+'#'+attrSig(c.geometry)+'#'+c.castShadow;let a=groups.get(k);if(!a)groups.set(k,a=[]);a.push(c)}
     rec(c)}})(root);
   const merged=[];const M=new TH.Matrix4(),N=new TH.Matrix3(),v=new TH.Vector3();
-  for(const [gk,list] of groups){if(list.length<2)continue;const vc=gk.startsWith('VC|');const g0=list[0].geometry,keys=Object.keys(g0.attributes);let nv=0,ni=0;
+  for(const [gk,list] of groups){const vc=gk.startsWith('VC|');if(list.length<2&&!(vc&&S&&S.l2&&S.ab.l2Merge!==false))continue;const g0=list[0].geometry,keys=Object.keys(g0.attributes);let nv=0,ni=0;
     for(const m of list){nv+=m.geometry.attributes.position.count;ni+=m.geometry.index?m.geometry.index.count:m.geometry.attributes.position.count}
     const geo=new TH.BufferGeometry(),arrs={};for(const k of keys){const s=g0.attributes[k].itemSize;arrs[k]=new Float32Array(nv*s)}if(vc)arrs.color=new Float32Array(nv*3);const index=nv>65535?new Uint32Array(ni):new Uint16Array(ni);let vo=0,io=0;
     for(const m of list){const g=m.geometry,pc=g.attributes.position.count;M.multiplyMatrices(inv,m.matrixWorld);N.getNormalMatrix(M);
@@ -16782,9 +16782,9 @@ function optimize(root,immediate){if(!root)return null;if(root.userData.prMerged
     // a vertex-color material seen for the first time gets all its shadow-count variants compiled (the 'realx' job) before its merged meshes swap in
     let vcNew=false;for(const mm of merged){const vm=mm.material;if(vm.name==='prVC'&&!vm.userData.prVCW){vm.userData.prVCW=true;S.warm.realQ.add(mm);vcNew=true}}
     if(vcNew){const q=S.warm.queue;if(!q.includes('realx')){const i=q.indexOf('merge');q.splice(i>=0?i:q.length,0,'realx')}}
-    S.mergeQ.push(merged);if(!S.warm.queue.includes('merge'))S.warm.queue.push('merge')}else swapMerge(merged)}return {meshes:before,merged:merged.length,removed:merged.reduce((a,m)=>a+m.userData.prSources.length,0)-merged.length}}
-function swapMerge(merged){for(const mm of merged){if(!mm.parent)continue;mm.visible=true;for(const m of mm.userData.prSources){m.visible=false;m.userData.prMergedInto=mm}}if(S)S.plDirty=true}
-function unoptimize(root){if(S&&S.mergeQ)S.mergeQ=S.mergeQ.filter(e=>e!==root.userData.prMerged);for(const mm of root.userData.prMerged||[]){for(const m of mm.userData.prSources){m.visible=true;delete m.userData.prMergedInto}if(mm.parent)mm.parent.remove(mm);mm.geometry.dispose()}delete root.userData.prMerged}
+    S.mergeQ.push(merged);if(!S.warm.queue.includes('merge'))S.warm.queue.push('merge')}else swapMerge(merged)}l2Invalidate(null,'optimize');return {meshes:before,merged:merged.length,removed:merged.reduce((a,m)=>a+m.userData.prSources.length,0)-merged.length}}
+function swapMerge(merged){for(const mm of merged){if(!mm.parent)continue;mm.visible=true;for(const m of mm.userData.prSources){m.visible=false;m.userData.prMergedInto=mm}}l2Invalidate(null,'swap');if(S)S.plDirty=true}
+function unoptimize(root){if(S&&S.mergeQ)S.mergeQ=S.mergeQ.filter(e=>e!==root.userData.prMerged);for(const mm of root.userData.prMerged||[]){for(const m of mm.userData.prSources){m.visible=true;delete m.userData.prMergedInto}if(mm.parent)mm.parent.remove(mm);mm.geometry.dispose()}delete root.userData.prMerged;l2Invalidate(null,'unoptimize')}
 function pieceOf(o){for(let p=o;p&&p!==S.scene;p=p.parent)if(isPiece(p))return p;return null}
 function queueOpt(o){if(!S||S.noOpt||!o||!isPiece(o))return;if(!S.optQ.includes(o))S.optQ.push(o)}
 function optStep(immediate){if(S.picking)return false;let n=0;while(S.optQ.length&&n<3){const o=S.optQ.shift();if(inScene(o)&&o.visible!==undefined){optimize(o,immediate);walk(o,false,false,null)}n++}return n>0}
@@ -16912,6 +16912,39 @@ function zRoomStep(){const r=S.zRooms.find(x=>!x.valid);if(!r)return null;const 
   r.srcs=J.list.map(o=>{o.userData.prZIn=r.meshes.find(m=>m.material.side===o.material.side);return {o,k:mwKey(o)}});r.valid=true;r.job=null;S.zDiag.done++;return 'depth merge done'}
 // a few merged sources per frame are re-checked: anything moved or hidden without a sceneChanged makes its room draw per object until rebuilt
 function zRoomCheck(){const Z=S.zRooms;if(!Z)return;for(const r of Z){if(!r.valid||!r.srcs.length)continue;for(let n=0;n<16;n++){r.chk=(r.chk+1)%r.srcs.length;const s=r.srcs[r.chk];if(!s.o.parent||!effVisible(s.o)||Math.abs(mwKey(s.o)-s.k)>1e-4){zRoomInvalidate(r.i,!s.o.parent?'check:orphan':!effVisible(s.o)?'check:hidden':'check:moved');break}}}}
+// room merges (level 2): the vertex-colored meshes of all pieces in a room that share one material become ONE world-space mesh per room (hundreds of
+// draw calls fewer). They use the same shared materials, so no program is built. Any scene change drops the room merges at once (the pieces' own merged
+// meshes show again) and they are rebuilt in 2 ms slices after the scene has been quiet; a piece that was ever seen hidden (wall cut-aways) stays out.
+const _n3=new TH.Matrix3();
+function l2Init(){S.l2=S.rooms.map((R,i)=>({i,valid:false,meshes:[],srcs:[],job:null,chk:0}));S.l2T=now();S.l2Diag={built:0,drops:{}}}
+function l2Drop(r){for(const m of r.meshes){if(m.parent)m.parent.remove(m);m.geometry.dispose()}for(const x of r.srcs){if(x.o.userData.prL2Hid){x.o.visible=true;delete x.o.userData.prL2Hid}}r.meshes=[];r.srcs=[];r.valid=false;r.job=null}
+function l2Invalidate(i,why){if(!S||!S.l2)return;S.l2T=now();let any=false;for(const r of (i==null?S.l2:[S.l2[i]])){if(!r||!(r.valid||r.job))continue;any=true;l2Drop(r)}
+  if(any){const D=S.l2Diag.drops,w=why||'?';D[w]=(D[w]||0)+1;zRoomInvalidate(null,'l2')}}
+const l2Cand=o=>o.isMesh&&o.userData.prMergedMesh&&o.material&&o.material.name==='prVC'&&!o.userData.prL2Hid&&!underUI(o);
+const l2Key=o=>[o.material.uuid,attrSig(o.geometry),o.castShadow,o.receiveShadow,o.layers.mask].join('|');
+function l2Busy(){return !!(S.l2&&S.ab.l2Merge!==false&&S.matReady&&S.warm&&S.warm.finished&&!S.picking&&!S.optQ.length&&!S.mergeQ.length&&(S.flushing||(now()-S.editT>1500&&now()-S.l2T>700))&&S.l2.some(r=>!r.valid))}
+function l2Step(){const r=S.l2.find(x=>!x.valid);if(!r)return null;const t0=now();
+  if(!r.job){const list=[];S.scene.traverseVisible(o=>{if(!l2Cand(o))return;const pc=pieceOf(o);if(pc&&pc.userData.prFlaky)return;bbOf(o).getCenter(_v);if(roomOfPoint(_v.x,_v.y,_v.z)===r.i)list.push(o)});
+    const G=new Map();for(const o of list){const k=l2Key(o);let g=G.get(k);if(!g)G.set(k,g={list:[],nv:0,ni:0});const ga=o.geometry;g.list.push(o);g.nv+=ga.attributes.position.count;g.ni+=ga.index?ga.index.count:ga.attributes.position.count}
+    for(const [k,g] of [...G]){if(g.list.length<2){G.delete(k);continue}const g0=g.list[0].geometry;g.keys=Object.keys(g0.attributes);g.arr={};for(const a of g.keys)g.arr[a]=new Float32Array(g.nv*g0.attributes[a].itemSize);g.idx=g.nv>65535?new Uint32Array(g.ni):new Uint16Array(g.ni);g.vo=0;g.io=0}
+    S.root.updateMatrixWorld(true);r.job={groups:[...G.values()],gi:0,li:0,inv:new TH.Matrix4().copy(S.root.matrixWorld).invert()};return 'room merge gather'}
+  const J=r.job;
+  while(J.gi<J.groups.length&&now()-t0<2){const g=J.groups[J.gi];if(J.li>=g.list.length){J.gi++;J.li=0;continue}const o=g.list[J.li++],geo=o.geometry,pc=geo.attributes.position.count;
+    _m4.multiplyMatrices(J.inv,o.matrixWorld);_n3.getNormalMatrix(_m4);const e=_m4.elements,n=_n3.elements;
+    for(const a of g.keys){const at=geo.attributes[a],sz=at.itemSize,dst=g.arr[a],base=g.vo*sz;
+      if(a==='position'){for(let i=0;i<pc;i++){const x=at.getX(i),y=at.getY(i),z=at.getZ(i),q=base+i*3;dst[q]=e[0]*x+e[4]*y+e[8]*z+e[12];dst[q+1]=e[1]*x+e[5]*y+e[9]*z+e[13];dst[q+2]=e[2]*x+e[6]*y+e[10]*z+e[14]}}
+      else if(a==='normal'){for(let i=0;i<pc;i++){const x=at.getX(i),y=at.getY(i),z=at.getZ(i),q=base+i*3;let nx=n[0]*x+n[3]*y+n[6]*z,ny=n[1]*x+n[4]*y+n[7]*z,nz=n[2]*x+n[5]*y+n[8]*z;const l=Math.hypot(nx,ny,nz)||1;dst[q]=nx/l;dst[q+1]=ny/l;dst[q+2]=nz/l}}
+      else dst.set(at.array,base)}
+    if(geo.index){const ix=geo.index;for(let i=0;i<ix.count;i++)g.idx[g.io++]=ix.getX(i)+g.vo}else for(let i=0;i<pc;i++)g.idx[g.io++]=g.vo+i;g.vo+=pc}
+  if(J.gi<J.groups.length)return 'room merge';
+  const srcs=[];for(const g of J.groups){const o0=g.list[0],geo=new TH.BufferGeometry();for(const a of g.keys)geo.setAttribute(a,new TH.BufferAttribute(g.arr[a],o0.geometry.attributes[a].itemSize));geo.setIndex(new TH.BufferAttribute(g.idx,1));geo.computeBoundingSphere();geo.computeBoundingBox();
+    const mm=new TH.Mesh(geo,o0.material);mm.castShadow=o0.castShadow;mm.receiveShadow=o0.receiveShadow;mm.layers.mask=o0.layers.mask;mm.userData.prBig=true;mm.userData.prL2Mesh=true;if(o0.material.userData.prClass)mm.userData.prHint=o0.material.userData.prClass;
+    mm.name='prRoomMerge'+r.i;mm.raycast=()=>{};S.root.add(mm);mm.updateMatrixWorld(true);r.meshes.push(mm);
+    for(const o of g.list){o.userData.prL2Hid=true;o.visible=false;srcs.push({o,k:mwKey(o)})}}
+  r.srcs=srcs;r.valid=true;r.job=null;S.l2Diag.built++;S.plDirty=true;zRoomInvalidate(null,'l2swap');return 'room merge done'}
+// a few sources per frame are re-checked: a piece hidden (wall cut-away), moved or removed without a sceneChanged drops its room's merge, and a hidden piece stays out of later ones
+function l2Check(){const Z=S.l2;if(!Z)return;for(const r of Z){if(!r.valid||!r.srcs.length)continue;for(let n=0;n<8;n++){r.chk=(r.chk+1)%r.srcs.length;const s=r.srcs[r.chk],o=s.o;
+  if(!o.parent){l2Invalidate(r.i,'orphan');break}if(!effVisible(o.parent)){const pc=pieceOf(o);if(pc)pc.userData.prFlaky=1;l2Invalidate(r.i,'hidden');break}if(Math.abs(mwKey(o)-s.k)>1e-4){l2Invalidate(r.i,'moved');break}}}}
 function zPass(early){const R=S.R,cam=S.camera,sc=S.scene;const m=cam.layers.mask,bg=sc.background,ac=R.autoClear;S.stage=early?'prepass':'depth';
   for(const z of S.zAll)z.polygonOffset=early;
   const W=S.warm,zr=S.zRooms||[];for(const r of zr)for(const zm of r.meshes)zm.visible=r.valid&&!!(W&&W.zDone.has(zm.userData.prZSig));
@@ -17078,6 +17111,7 @@ function work(){if(S.picking&&!S.flushing){zBlk('work:picking');return}if(!S.flu
   if(S.projNeeded)sl('SH project',project);if(S.lerpN>0)lerpSH();
   pmremFade();if(S.pmQ.length&&S.warm&&S.warm.done.pmrem){sl('PMREM',pmremStep);return}
   if(S.aoDirty&&(S.flushing||now()-S.editT>300)){sl('contact AO',aoBake);return}
+  if(l2Busy()){sl('room merge',l2Step);return}
   if(zRoomsBusy()){S.zDiag.steps++;sl('depth merge',zRoomStep);return}
   if(S.zRooms&&S.zRooms.some(r=>!r.valid))zBlk(S.picking?'busy:picking':!(S.flushing||now()-S.editT>400)?'busy:editRecent':'busy:other');
   const still=S.flushing||now()-(S.camMoved||0)>=500;   // a probe or cube face is a whole extra scene render (20 to 25 ms): after the first bake they wait for a still camera, where one long frame is invisible
@@ -17122,7 +17156,7 @@ function lighting(L,pre){const R=S.R,cam=S.camera,C=L.C,W=S.W,H=S.H,ts=L.ts,ls=L
     S.lbVP.copy(_VP);S.lbV.copy(cam.matrixWorldInverse);S.lbOK=ls}else S.lbOK=0;S.histReset=false;
   S.lres={lb,useL,aoN}}
 function frame(dt){const R=S.R,P=S.prof;S.frame++;matCheck();S.stage='warm';
-  let t=now();warmStep();P.warm=now()-t;sweep();checkLights();zRoomCheck();
+  let t=now();warmStep();P.warm=now()-t;sweep();checkLights();zRoomCheck();l2Check();
   if(S.optQ.length&&!S.picking){const a=now();S.stage='merge';cw('merge',optStep);ev('merge '+(now()-a).toFixed(1)+'ms')}
   let eff=G.rung;while(eff<=NR&&!rungReady(eff))eff++;S.preparing=eff!==G.rung?RUNGS[G.rung].name:null;
   if(eff>NR){S.eff=0;poolSync();if(S.hold)return;t=now();plainFrame();P.main=now()-t;return}
@@ -17170,11 +17204,11 @@ function drawOverlays(){const hid=S.uiHidden;if(!hid||!hid.length)return;const R
 
 /* ---------------- stats ---------------- */
 // where the draw calls come from (visible meshes by class, merged or not, and the pieces with the most): for deciding what to merge next
-function drawMix(){if(!S||!S.scene)return null;const cls={},pieces={};let n=0,merged=0,trans=0,lines=0,shadowCast=0,vcm=0;
+function drawMix(){if(!S||!S.scene)return null;const cls={},pieces={};let n=0,merged=0,trans=0,lines=0,shadowCast=0,vcm=0,rmm=0;
   S.scene.traverseVisible(o=>{if(!(o.isMesh||o.isLine||o.isPoints)||o.userData.prZMesh||(S.uiSet&&S.uiSet.has(o)))return;n++;if(o.isLine)lines++;if(o.userData.prSources)merged++;const m=Array.isArray(o.material)?o.material[0]:o.material;
-    if(m&&m.name==='prVC')vcm++;if(m&&m.transparent)trans++;if(o.castShadow)shadowCast++;const c=(m&&m.userData&&m.userData.prClass)||(m&&m.type)||'?';cls[c]=(cls[c]||0)+1;
+    if(m&&m.name==='prVC')vcm++;if(o.userData.prL2Mesh)rmm++;if(m&&m.transparent)trans++;if(o.castShadow)shadowCast++;const c=(m&&m.userData&&m.userData.prClass)||(m&&m.type)||'?';cls[c]=(cls[c]||0)+1;
     let p=o;while(p&&p!==S.scene&&!(p.name&&p.name.startsWith('piece:')))p=p.parent;const k=p&&p.name?p.name:'(other)';pieces[k]=(pieces[k]||0)+1});
-  return {visibleDraws:n,mergedMeshes:merged,vertexColorMeshes:vcm,vcMaterials:S.vcMats?S.vcMats.size:0,transparent:trans,lines,castShadow:shadowCast,byClass:cls,topPieces:Object.entries(pieces).sort((a,b)=>b[1]-a[1]).slice(0,12)}}
+  return {visibleDraws:n,mergedMeshes:merged,vertexColorMeshes:vcm,roomMergeMeshes:rmm,roomMerges:S.l2?{valid:S.l2.filter(r=>r.valid).length,of:S.l2.length,built:S.l2Diag.built,drops:S.l2Diag.drops}:null,vcMaterials:S.vcMats?S.vcMats.size:0,transparent:trans,lines,castShadow:shadowCast,byClass:cls,topPieces:Object.entries(pieces).sort((a,b)=>b[1]-a[1]).slice(0,12)}}
 function techniques(){const C=S.cfg,t=[];
   if(!S.post)return ['classes','shadow cap '+ptsFor(C),'plain draw'];if(!S.eff)return ['plain draw while shaders compile'];const ts=scaleOf(C,'ts'),ls=scaleOf(C,'ls');
   t.push(U.uPRGI.value===1?'SH probes 1/'+ts:U.uPRGI.value===3?'SH probes':'GI warming');t.push('reflection cubes');t.push('shadow maps x'+(ptsFor(C)+(S.key&&S.key.castShadow?1:0)));
@@ -17206,18 +17240,18 @@ function attach(o){if(S)detach();const R=o.renderer;const gl=R.getContext();
   poolBuild();
   if(!QS){QS=new TH.Scene();QC=new TH.OrthographicCamera(-1,1,1,-1,0,1);QM=new TH.Mesh(new TH.PlaneGeometry(2,2));QM.frustumCulled=false;QS.add(QM)}
   S.M=makeShaders();makeCubes();
-  zRoomsInit();fullScan(null,true);if(!S.noOpt)for(const p of allPieces())queueOpt(p);layoutProbes();aoInit();glowInit();S.time=o.time||(o.night!=null?(o.night?'night':'day'):homeNight()?'night':'day');S.workLight=o.workLight!==false;S.winDirty=true;S.wAnim=true;S.homeTime=S.time;
+  zRoomsInit();l2Init();fullScan(null,true);if(!S.noOpt)for(const p of allPieces())queueOpt(p);layoutProbes();aoInit();glowInit();S.time=o.time||(o.night!=null?(o.night?'night':'day'):homeNight()?'night':'day');S.workLight=o.workLight!==false;S.winDirty=true;S.wAnim=true;S.homeTime=S.time;
   GT.ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');GT.samp={};GT.q.length=0;GT.cur=null;R.shadowMap.autoUpdate=true;R.setOpaqueSort(opaqueSort);ensureTargets();warmInit();if(window.__prDrawCheck)drawCheck(true);
   return api}
 function detach(){if(!S)return;const R=S.R;try{for(const [l,c,m,au] of S.saved.cast){l.castShadow=c;if(l.shadow){if(m)setMap(l,m);l.shadow.autoUpdate=au}}R.shadowMap.autoUpdate=S.saved.autoUpdate;R.shadowMap.needsUpdate=true;R.setOpaqueSort(null);matUnfreeze();
   S.scene.traverse(o=>{if(o.isMesh&&o.userData.prCast!=null){o.castShadow=o.userData.prCast;delete o.userData.prCast}if(o.isLight&&o.userData.prMask!=null){o.layers.mask=o.userData.prMask;delete o.userData.prMask}});
-  for(const p of S.pool)if(p.parent)p.parent.remove(p);for(const p of allPieces())if(p.userData.prMerged)unoptimize(p);
+  for(const p of S.pool)if(p.parent)p.parent.remove(p);for(const r of S.l2||[])l2Drop(r);S.l2=null;for(const p of allPieces())if(p.userData.prMerged)unoptimize(p);
   for(const m of S.patchedList){if(m.userData.prEI!=null){m.emissiveIntensity=m.userData.prEI;delete m.userData.prEI}if(m.userData.prTM!=null){m.toneMapped=m.userData.prTM;delete m.userData.prTM;m.needsUpdate=true}}for(const o of S.zList)o.layers.disable(L_Z);if(S.dc)drawCheck(false);
   for(const h of S.hemis)if(h.userData.prOrig!=null)h.intensity=h.userData.prOrig;U.uPRGI.value=0;U.uPRGIk.value=0;U.uPRDbg.value=0;U.uPRFOK.value=0;if(S.glow&&S.glow.parent)S.glow.parent.remove(S.glow);for(const r of S.zRooms||[])for(const m of r.meshes)if(m.parent)m.parent.remove(m);
   if(S.hudEl)S.hudEl.remove();if(S.post){freeTargets();for(const c of S.cubes)c.rt.dispose();for(const p of (S.pmrem||[]).concat(S.pmStage||[],S.pmTmp?[S.pmTmp]:[]))p.dispose();if(S.pmGen)S.pmGen.dispose();for(const k of ['atlas','shT','shA','shB'])disposeRT(S[k]);if(S.spare){for(const x of [S.spare.atlas,S.spare.shT].concat(S.spare.pm||[]))disposeRT(x)}disposeRT(S.altCube);if(S.warm&&S.warm.psoRT)S.warm.psoRT.forEach(disposeRT)}}catch(e){console.warn(e)}
   if(S.vcMats){for(const m of S.vcMats.values())m.dispose();S.vcMats=null}
   for(const e of GT.q)S.gl.deleteQuery(e.q);GT.q.length=0;GT.cur=null;hookBuilds(false);glTrace(false);S=null}
-function sceneChanged(kind,obj){if(!S)return;S.photoN=0;if(kind==='geometry')S.winDirty=true;if(kind!=='camera')S.histReset=true;if(kind==='camera'){if(obj&&obj.isCamera)S.camera=obj;S.camMoved=now();return}if(kind==='walls'){S.editT=now();S.aoDirty=true;zRoomInvalidate(null,'sc:walls');return}
+function sceneChanged(kind,obj){if(!S)return;S.photoN=0;if(kind!=='camera'&&kind!=='light')l2Invalidate(null,'sc:'+kind);if(kind==='geometry')S.winDirty=true;if(kind!=='camera')S.histReset=true;if(kind==='camera'){if(obj&&obj.isCamera)S.camera=obj;S.camMoved=now();return}if(kind==='walls'){S.editT=now();S.aoDirty=true;zRoomInvalidate(null,'sc:walls');return}
   if(!S.post){return}
   if(kind==='geometry'||kind==='material'){if(obj){const pc=pieceOf(obj)||(isPiece(obj)?obj:null);if(pc)queueOpt(pc);walk(obj,false,kind==='geometry',null)}
     else if(kind==='geometry'){for(const p of allPieces())if(!p.userData.prMerged)queueOpt(p);sweepAll()}if(kind==='geometry')S.plDirty=true}
@@ -17272,14 +17306,14 @@ function setOptions(o){if(!S)return;o=o||{};if(o.quality!=null||o.rung!=null){co
   if(o.ab){const old=Object.assign({},S.ab);Object.assign(S.ab,o.ab);if(old.lights!==S.ab.lights||old.ptShadows!==S.ab.ptShadows){S.assignT=0;if(S.cfg)shadows()}if(old.depth!==S.ab.depth||old.hdr8!==S.ab.hdr8)S.bufOK=0}
   if(o.drawCheck!=null)drawCheck(!!o.drawCheck);
   if(o.optimize!=null){S.noOpt=!o.optimize;if(S.noOpt){for(const p of allPieces())if(p.userData.prMerged)unoptimize(p)}else for(const p of allPieces())queueOpt(p)}}
-function picking(on){if(!S)return;S.picking=!!on;if(on){S.sweepI=1e9;zRoomInvalidate(null,'picking')}else{S.editT=now();S.aoDirty=true}}
+function picking(on){if(!S)return;S.picking=!!on;if(on){S.sweepI=1e9;l2Invalidate(null,'picking');zRoomInvalidate(null,'picking')}else{S.editT=now();S.aoDirty=true}}
 function gpuSync(){const gl=S.gl,px=new Uint8Array(4);S.R.setRenderTarget(null);gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px)}
 // test aid: runs pending rebakes now, one ordinary slice per iteration (so each slice is timed exactly as in play)
 function flush(maxIter,only){if(!S||!S.post)return 0;S.flushing=true;let n=0;const busy=()=>S.pq.length||S.cubes.some(c=>c.dirty)||S.pmQ.length||S.optQ.length||S.projNeeded||S.lerpN>0||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid));
   try{while(n<(maxIter||5000)&&busy()){if(S.syncSlices)gpuSync();S.frame++;if(S.optQ.length)optStep(true);work();n++}}
   finally{S.flushing=false;S.R.setRenderTarget(null)}return n}
 const api={caps:{alpha:true,context:true},attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
-  _debug:{flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
+  _debug:{l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
 window.PodRender=api})();
 
 </script>

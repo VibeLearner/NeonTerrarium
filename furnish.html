@@ -16784,7 +16784,8 @@ function optimize(root,immediate){if(!root)return null;if(root.userData.prMerged
     let vcNew=false;for(const mm of merged){const vm=mm.material;if(vm.name==='prVC'&&!vm.userData.prVCW){vm.userData.prVCW=true;S.warm.realQ.add(mm);vcNew=true}}
     if(vcNew){const q=S.warm.queue;if(!q.includes('realx')){const i=q.indexOf('merge');q.splice(i>=0?i:q.length,0,'realx')}}
     S.mergeQ.push(merged);if(!S.warm.queue.includes('merge'))S.warm.queue.push('merge')}else swapMerge(merged)}l2Invalidate(null,'optimize');return {meshes:before,merged:merged.length,removed:merged.reduce((a,m)=>a+m.userData.prSources.length,0)-merged.length}}
-function swapMerge(merged){for(const mm of merged){if(!mm.parent)continue;mm.visible=true;for(const m of mm.userData.prSources){m.visible=false;m.userData.prMergedInto=mm}}l2Invalidate(null,'swap');if(S)S.plDirty=true}
+function swapMerge(merged){for(const mm of merged){if(!mm.parent||mm.userData.prL2Mesh)continue;   // room merges ride the same warm job but swap in through l2Step
+    mm.visible=true;for(const m of mm.userData.prSources){m.visible=false;m.userData.prMergedInto=mm}}l2Invalidate(null,'swap');if(S)S.plDirty=true}
 function unoptimize(root){if(S&&S.mergeQ)S.mergeQ=S.mergeQ.filter(e=>e!==root.userData.prMerged);for(const mm of root.userData.prMerged||[]){for(const m of mm.userData.prSources){m.visible=true;delete m.userData.prMergedInto}if(mm.parent)mm.parent.remove(mm);mm.geometry.dispose()}delete root.userData.prMerged;l2Invalidate(null,'unoptimize')}
 function pieceOf(o){for(let p=o;p&&p!==S.scene;p=p.parent)if(isPiece(p))return p;return null}
 function queueOpt(o){if(!S||S.noOpt||!o||!isPiece(o))return;if(!S.optQ.includes(o))S.optQ.push(o)}

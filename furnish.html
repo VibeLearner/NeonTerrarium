@@ -16342,9 +16342,9 @@ function patchB(m,proxy){if(!isPatchable(m))return;if(!proxy){PATCHED.add(m);S.p
    text so the default program cache key (onBeforeCompile.toString()) is unchanged. ---------------- */
 const _snap=new WeakMap();
 function onBuild(m,sh){if(!S)return;const sn={};for(const k in sh){const v=sh[k];if(/Shader$|^uniforms$|^customProgramCacheKey$/.test(k))continue;if(v===null||(typeof v!=='object'&&typeof v!=='function'))sn[k]=v}
-  const tk=m.type+(PATCHED.has(m)?'*':'');const ref=_snap.get(m)||S.lastSnap[tk];_snap.set(m,sn);S.lastSnap[tk]=sn;S.builds++;if(S.inWarm)return;S.buildsPlay=(S.buildsPlay||0)+1;
+  const tk=m.type+(PATCHED.has(m)?'*':'');const ref=_snap.get(m)||S.lastSnap[tk];_snap.set(m,sn);S.lastSnap[tk]=sn;S.builds++;if(S.inWarm&&m.isLineBasicMaterial){const L=S.lineWS||(S.lineWS=[]);if(L.length<60)L.push(sn)}{const k=(S.inWarm?'W:':'')+(S.stage||'?');const b=S.bsF||(S.bsF={});b[k]=(b[k]||0)+1}if(S.inWarm)return;S.buildsPlay=(S.buildsPlay||0)+1;
   const diff=[];if(ref)for(const k in sn)if(ref[k]!==sn[k]&&diff.length<10)diff.push(k+':'+ref[k]+'>'+sn[k]);
-  const ob=S.curObj;const e={frame:S.frame,stage:S.stage||'?',type:m.type,name:m.name||'',cls:m.userData.prClass||'',patched:PATCHED.has(m),unpatchedSet:S.unpatched?S.unpatched.has(m):null,matReady:!!S.matReady,objWait:ob?!!ob.userData.prWait:null,objUI:ob?S.uiSet.has(ob):null,objVis:ob?ob.visible:null,object:ob?(ob.name||ob.type)+(ob.parent?' in '+(ob.parent.name||ob.parent.type):'')+' layers '+ob.layers.mask:'',diff:ref?diff.join(' '):'(first build of this type)'};S.syncBuilds.push(e);if(S.syncBuilds.length>40)S.syncBuilds.shift()}
+  const ob=S.curObj;const e={frame:S.frame,stage:S.stage||'?',type:m.type,name:m.name||'',cls:m.userData.prClass||'',patched:PATCHED.has(m),unpatchedSet:S.unpatched?S.unpatched.has(m):null,matReady:!!S.matReady,objWait:ob?!!ob.userData.prWait:null,objUI:ob?S.uiSet.has(ob):null,objVis:ob?ob.visible:null,object:ob?(ob.name||ob.type)+(ob.parent?' in '+(ob.parent.name||ob.parent.type):'')+' layers '+ob.layers.mask:'',diff:ref?diff.join(' '):'(first build of this type)'};if(m.isLineBasicMaterial&&S.lineWS&&S.lineWS.length){let best=null;for(const w of S.lineWS){const d=[];for(const k in sn)if(w[k]!==sn[k])d.push(k+':'+w[k]+'>'+sn[k]);if(!best||d.length<best.length)best=d}e.closestWarm=best.join(' ')}S.syncBuilds.push(e);if(S.syncBuilds.length>40)S.syncBuilds.shift()}
 let _protoOBC=null,_protoOBR=null;
 function hookBuilds(on){const P=TH.Material.prototype,O=TH.Object3D.prototype;if(on&&!_protoOBC){_protoOBC=P.onBeforeCompile;const src=_protoOBC.toString();const f=function(sh){onBuild(this,sh)};f.toString=()=>src;f._pr=true;f._proto=true;P.onBeforeCompile=f;
     _protoOBR=O.onBeforeRender;O.onBeforeRender=function(){if(S)S.curObj=this}}
@@ -16646,14 +16646,14 @@ function warmStep(){const W=S.warm;if(!W)return;const gl=S.gl,t=now();
     const age=t-(W.pendT.get(p)||t);let done=W.ext?gl.getProgramParameter(p,W.ext.COMPLETION_STATUS_KHR):false;
     if(!done&&fixed<1&&(!W.ext||age>4000)){if(W.ext){const n='forced after '+Math.round(age)+' ms: '+progName(p);W.notes.push(n);console.warn('PodRender warmup: '+n)}done=true}
     if(!done)continue;const a=now();warmFix(p);W.pend.delete(p);W.pendT.delete(p);fixed++;W.log.push(+(now()-a).toFixed(1));ev('link '+(now()-a).toFixed(1)+'ms')}
-  if(W.pend.size)return;
-  if(W.cur&&W.cur.chunk!=null){warmChunk();return}
-  if(W.cur&&W.cur.real){realChunk();return}
+  S.wsec={pend:+(now()-t).toFixed(1),pending:W.pend.size};if(W.pend.size)return;
+  if(W.cur&&W.cur.chunk!=null){const b=now();warmChunk();S.wsec.chunkMs=+(now()-b).toFixed(1);return}
+  if(W.cur&&W.cur.real){const b=now();S.wsec.phase=W.cur.phase||'compile';realChunk();S.wsec.realMs=+(now()-b).toFixed(1);return}
   if(W.cur){W.done[W.cur.job]=true;const zb=W.cur.zb,mg=W.cur.merges,jd=W.cur.job;W.cur=null;
     if(zb)for(const k of zb){W.zDone.add(k);const ws=W.zWait.get(k);if(ws){W.zWait.delete(k);for(const o of ws)if(o.parent)zMark(o)}}
     if(mg){const a=now();for(const e of mg)swapMerge(e);ev('merge swap '+mg.length+' '+(now()-a).toFixed(1)+'ms')}
     if(jd==='pass')fixLists(Object.values(S.M));if(jd==='pmrem')fixLists([S.pmGen._blurMaterial,S.pmGen._cubemapMaterial]);if(jd==='z')fixLists(S.zAll)}
-  const job=W.queue.shift();if(!job){if(!W.finished){W.finished=true;W.ms=now()-W.t0}return}W.cur={job};ev('warm '+job);
+  const job=W.queue.shift();if(!job){if(!W.finished){W.finished=true;W.ms=now()-W.t0}return}W.cur={job};ev('warm '+job);S.wsec.job=job;
   if(job==='real'){const a=now();const underUI=o=>{for(let q=o;q;q=q.parent)if(isUI(q))return true;return false};S.scene.traverse(o=>{if((o.isMesh||o.isLine)&&!o.userData.prZMesh&&!underUI(o))for(const m of matsOf(o))if(m&&isPatchable(m)&&!PATCHED.has(m)){if(m.isMeshStandardMaterial)applyEnv(m,o);patch(m)}});S.unpatched.clear();W.patchMs=+(now()-a).toFixed(1);S.realPend=true;
     const list=[];S.scene.traverse(o=>{if(o.material&&!o.userData.prZMesh)list.push(o)});const ns=[W.want].concat([2,1,0].filter(n=>n!==W.want));S.glow&&list.indexOf(S.glow)<0&&list.push(S.glow);
     realJob(list,ns,()=>{S.matReady=true;S.realPend=false;for(const p of S.pool)if(p.castShadow)p.shadow.needsUpdate=true;if(S.key)S.key.shadow.needsUpdate=true;ev('materials ready')},true)}
@@ -17201,7 +17201,7 @@ function compileAsync(scene,cam,target){if(!S||!S.warm||!S.post){const R=S?S.R:n
     if(mine.some(p=>W.pend.has(p))){setTimeout(step,16);return}fixLists(mats);res(true)};setTimeout(step,16)})}
 function render(dt,cam){if(!S)return;if(cam&&cam.isCamera)S.camera=cam;const R=S.R,t=now();const iv=S.lastT?t-S.lastT:16.7;S.lastT=t;S.heap0=performance.memory?performance.memory.usedJSHeapSize:0;const gr=G.rung,gs=G.sub;if(iv<250)govern(iv);if(gr!==G.rung||gs!==G.sub)ev('governor '+gr+(gs?'c':'')+'>'+G.rung+(G.sub?'c':''));
   const ar=R.info.autoReset;R.info.autoReset=false;R.info.reset();const ac=R.autoClear;R.autoClear=true;const prevRT=R.getRenderTarget();
-  S.ev=[];const tex0=R.info.memory.textures,prog0=R.info.programs.length;
+  S.ev=[];S.bsF={};S.wsec=null;const tex0=R.info.memory.textures,prog0=R.info.programs.length;
   // the PodContext backdrop runs before the frame's GPU timer; every third frame it gets a timer of its own (GT.samp.backdrop, round 25)
   const pc=S.post&&!S.broken?PCX():null;S.backTex=null;if(pc){pc._pr=true;pc._prSeen=now()}
   if(pc){const gl=S.gl,tq=GT.ext&&!GT.cur&&GT.q.length<6&&GT.fr%3===0?gl.createQuery():null;if(tq)gl.beginQuery(GT.ext.TIME_ELAPSED_EXT,tq);
@@ -17214,7 +17214,7 @@ function render(dt,cam){if(!S)return;if(cam&&cam.isCamera)S.camera=cam;const R=S
   if(S.post){gtFrameEnd();gtPoll()}
   S.calls=R.info.render.calls;S.tris=R.info.render.triangles;R.info.autoReset=ar;R.autoClear=ac;R.setRenderTarget(prevRT);const c=now()-t;S.cpu=S.cpu?S.cpu*.9+c*.1:c;S.lastCpu=c;
   {const pg=R.info.programs.length-prog0;for(let i=S.syncBuilds.length-1;i>=0&&S.syncBuilds[i].frame===S.frame;i--)S.syncBuilds[i].newProgramsThisFrame=pg}S.curObj=null;
-  if(c>50&&S.post){const tx=R.info.memory.textures-tex0,pg=R.info.programs.length-prog0,P=S.prof,r1=x=>+(x||0).toFixed(1);const hp=performance.memory?performance.memory.usedJSHeapSize:0;const e={frame:S.frame,ms:+c.toFixed(1),eff:S.eff,events:S.ev.slice(),newTextures:tx,newPrograms:pg,cpuStages:{warm:r1(P.warm),work:r1(P.work),pre:r1(P.pre),main:r1(P.main),post:r1(P.post),overlay:r1(S.ovMs),hud:r1(S.hudMs)},heapMB:hp?+(hp/1048576).toFixed(1):null,heapDeltaMB:hp&&S.heap0?+((hp-S.heap0)/1048576).toFixed(1):null};S.slow.push(e);if(S.slow.length>30)S.slow.shift();console.warn('PodRender slow frame '+e.ms+' ms: '+JSON.stringify(e))}
+  if(c>50&&S.post){const tx=R.info.memory.textures-tex0,pg=R.info.programs.length-prog0,P=S.prof,r1=x=>+(x||0).toFixed(1);const hp=performance.memory?performance.memory.usedJSHeapSize:0;const e={frame:S.frame,ms:+c.toFixed(1),eff:S.eff,events:S.ev.slice(),newTextures:tx,newPrograms:pg,cpuStages:{warm:r1(P.warm),work:r1(P.work),pre:r1(P.pre),main:r1(P.main),post:r1(P.post),overlay:r1(S.ovMs),hud:r1(S.hudMs)},heapMB:hp?+(hp/1048576).toFixed(1):null,heapDeltaMB:hp&&S.heap0?+((hp-S.heap0)/1048576).toFixed(1):null,warmSec:S.wsec,buildsByStage:Object.assign({},S.bsF),progs:R.info.programs.slice(prog0,prog0+12).map(q=>q.name+' '+String(q.cacheKey).slice(0,90))};S.slow.push(e);if(S.slow.length>30)S.slow.shift();console.warn('PodRender slow frame '+e.ms+' ms: '+JSON.stringify(e))}
   if(S.checkSamplers)samplerCheck();{const a=now();hud();S.hudMs=now()-a}}
 function resize(){if(S&&S.post){S.W=0;ensureTargets()}}
 function summary(cnt){const out={meshes:cnt._meshes||0,tiny:cnt._tiny||0,classes:{},areaM2:{},reflectiveAreaPct:0};let tot=0,refl=0;

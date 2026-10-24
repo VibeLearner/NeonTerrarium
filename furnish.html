@@ -15794,7 +15794,7 @@ const HOLD=.6,tNow=tr=>tr.hold!=null?tr.hold:tr.vt;
 // lighting hold: from the pod build phase on, while PodRender is still baking the room's light (live bake, then the other work-light state),
 // the hologram plays at a fifth of its speed and, if needed, waits just before the room fades in. The room is drawn under a fully opaque
 // hologram there, so the bake can run flat out without anything showing. Capped so a slow machine never waits more than LCAP.
-const LCAP=5000,LSLOW=.15;
+const LCAP=15000,LSLOW=.15;   // a cold first open also waits for the shader warm-up here (the room would otherwise show blank, then unlit)
 function lightHold(tr){if(tr.lhDone||tr.skipped)return false;const P=window.PodRender;let w=false;try{w=!!(P&&P.lightPending&&api._prDriving&&api._prDriving()&&P.lightPending())}catch(e){w=false}
   const t=now();if(!w||(tr.lh0!=null&&t-tr.lh0>LCAP)){if(tr.lh0!=null&&C){C.tl.lightHoldMs=Math.round(t-tr.lh0);C.tl.lightHoldCapped=w}tr.lhDone=true;tr.holding=false;return false}
   if(tr.lh0==null)tr.lh0=t;tr.holding=true;return true}
@@ -15803,7 +15803,7 @@ function advance(tr){const t=now(),dt=Math.min(.1,(t-tr.last)/1000);tr.last=t;co
   if(!tr.rm&&!tr.gate&&tr.hold==null&&!tr.lhDone&&tr.vt>=TL.build[0]&&lightHold(tr))tr.vt=Math.min(tr.vt-dt*(1-LSLOW),TL.resolve[0])}
 function loadFrac(){const src=CITY.state==='ready'?1:CITY.k||0;return clamp(.45*src+.35*(C.prog.build||0)+.15*(C.prog.warm||0)+.05*(C.shown?1:0),0,1)}
 function overlay(R,cam){if(!C||!C.trans||!cam)return;const a0=now(),tr=C.trans;advance(tr);if(C.tl.firstHoloFrame==null)C.tl.firstHoloFrame=Math.round(a0-C.tl.t0);const t=tNow(tr);targets(R);
-  const P=C.P.over.uniforms;P.uProg.value=loadFrac();P.uShow.value=tr.gate&&now()-tr.t0>6000?1:0;   // a thin progress line inside the hologram only when loading runs long
+  const P=C.P.over.uniforms;P.uProg.value=loadFrac();P.uShow.value=tr.gate&&now()-tr.t0>6000?1:0;if(tr.holding&&tr.lh0!=null&&now()-tr.lh0>1200){let k=1;try{k=window.PodRender&&PodRender.lightProgress?PodRender.lightProgress():1}catch(e){}P.uProg.value=k;P.uShow.value=1}   // a thin progress line inside the hologram when loading runs long, and while it waits for the room's light
   if(tr.rm){if(tr.gate||lightHold(tr)){drawOver(R,null,1,0);tr.frames.push(now());return}tr.rmT=tr.rmT||now();const a=1-clamp((now()-tr.rmT)/1000/DUR_RM,0,1);if(a<=0)return endTrans();drawOver(R,null,a,0);tr.frames.push(now());return}
   if(t>=DUR)return endTrans();const h=C.city;if(!h||(h.real&&!h.M)){drawOver(R,null,1,0);tr.frames.push(now());return}   // nothing to show yet: the hologram's dark field
   const c=flyCam(cam,t);
@@ -17087,7 +17087,12 @@ function copyRT(src,dst){const c=S.M.copy.uniforms;c.t.value=src.texture;dst.sci
 function liveBusy(){return !!(S.pq.length||S.cubes.some(c=>c.dirty||!c.done)||S.pmQ.length||S.pmFade.some(n=>n>0)||S.optQ.length||S.projNeeded||S.lerpN>0||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid)))}
 function altNeed(){const sp=S.spare;if(!altCan()||!S.warm||!S.warm.done.pmrem)return false;const tkey=S.pendSwap?S.pendSwap.key:keyOf(S.time,!S.workLight);return !(sp.have&&sp.key===tkey)}
 // asked by PodContext while its transition covers the room: is the lighting (live bake, then the spare for the other work-light state) still being built?
-function lightPending(){if(!S||!S.post||S.broken||S.ab.lightGate===false)return false;if(!S.matReady)return true;return liveBusy()||!S.probesReady||altNeed()||!!S.pendSwap}
+// the full pipeline is live at the rung it wants: until then frames take the plain fallback, which shows nothing while its programs compile and has no baked light
+function pipeLive(){return !!(S.matReady&&S.eff>0&&S.eff===G.rung)}
+function lightPending(){if(!S||!S.post||S.broken||S.ab.lightGate===false)return false;if(!pipeLive())return true;return liveBusy()||!S.probesReady||altNeed()||!!S.pendSwap}
+// rough 0..1 for the hologram's progress line while it holds: shader warm-up, then the live bake, then the spare
+function lightProgress(){if(!S||!S.post)return 1;const W=S.warm;let w=1;if(!pipeLive()){const d=W?Object.keys(W.done).length:0,q=W?W.queue.length:0;w=d+q?Math.min(.95,d/(d+q)):0}
+  const np=S.probes&&S.probes.length?S.probes.length:1,b=S.probesReady?1:Math.max(0,Math.min(1,1-S.pq.length/np)),a=altNeed()||S.pendSwap?(S.altJob?.5:0):1;return +(.45*w+.4*b+.15*a).toFixed(3)}
 // behind the hologram nothing is on screen, so the bake runs flat out: up to 6 slices or about 10 ms a frame
 function bakeHidden(){const t0=now(),fr=S.frame;const sl=(kind,fn)=>{const a=now();const r=cw(kind,fn);if(r){const ms=+(now()-a).toFixed(2);ev((typeof r==='string'?r:kind)+' '+ms+'ms');S.slices.push({kind:typeof r==='string'?r:kind,ms,frame:fr});if(S.slices.length>600)S.slices.shift()}return r};
   let n=0;while(n<6&&now()-t0<10){if(liveBusy()){S.flushing=true;try{work()}finally{S.flushing=false}n++;continue}
@@ -17364,7 +17369,7 @@ function gpuSync(){const gl=S.gl,px=new Uint8Array(4);S.R.setRenderTarget(null);
 function flush(maxIter,only){if(!S||!S.post)return 0;S.flushing=true;let n=0;const busy=()=>S.pq.length||S.cubes.some(c=>c.dirty)||S.pmQ.length||S.optQ.length||S.projNeeded||S.lerpN>0||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid));
   try{while(n<(maxIter||5000)&&busy()){if(S.syncSlices)gpuSync();S.frame++;if(S.optQ.length)optStep(true);work();n++}}
   finally{S.flushing=false;S.R.setRenderTarget(null)}return n}
-const api={caps:{alpha:true,context:true},lightPending:()=>{try{return lightPending()}catch(e){return false}},attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
+const api={caps:{alpha:true,context:true},lightPending:()=>{try{return lightPending()}catch(e){return false}},lightProgress:()=>{try{return lightProgress()}catch(e){return 1}},attach,detach,sceneChanged,render,resize,compileAsync,classify,optimize,unoptimize,setOptions,stats,picking,RUNGS:RUNGS.slice(1).map(r=>({id:r.id,name:r.name})),CLASSES,
   _debug:{altRun:n=>{let k=0;const sl=(kind,fn)=>cw(kind,fn);for(;k<(n||5000);k++){const c=S.altN||0;altWork(true,sl,true);if((S.altN||0)===c)break}return k},winStep:()=>windowFrame(16),keys:()=>({want:keyNow(),live:S.liveKey,spare:S.spare&&S.spare.have?S.spare.key:null,baking:S.altJob?S.altJob.key:null,pend:S.pendSwap?S.pendSwap.key:null,mode:S.altJob?S.altJob.mode:null}),l2Build:()=>{let n=0;while(S.l2&&S.l2.some(r=>!r.valid)&&n++<4000)l2Step();return n},flush,overdraw,dumpStages,slices:()=>S?S.slices.slice():[],state:()=>S,G,GT,summary:()=>{const cnt={};walk(S.scene,false,false,cnt);return summary(cnt)}}};
 window.PodRender=api})();
 

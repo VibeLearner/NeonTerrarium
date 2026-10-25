@@ -2468,6 +2468,9 @@ function refreshTodo(list, megaList = []){
   }
   // a side pod's walkways go to the neighbours tall enough to reach: a change next door rebuilds the pod, after the neighbour
   for (const c of [...list]) if (c) for (const [a, b] of SIDES4){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n && n.lift) list.push(n); }
+  // a perimeter wall beside a plot that changed: its free end may now run on to a building there, or stop short (perimeter.js wallRuns)
+  for (const c of [...list]) if (c && !c.wall) for (const [a, b] of SIDES4){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n && n.wall && !n.mega) list.push(n); }
+  for (const m of megaList) for (const q of (m.cells || [])) for (const [a, b] of SIDES4){ const n = cells.get(ckey(q.i + a, q.j + b)); if (n && n.wall && !n.mega) list.push(n); }
   return [...new Set(list)].filter(Boolean).sort((p, q) => (p.lift ? 1 : 0) - (q.lift ? 1 : 0));
 }
 function refresh(list, megaList = [], prebuilt = null){

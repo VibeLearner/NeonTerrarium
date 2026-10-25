@@ -12,7 +12,7 @@ const WALL_ZONES = { low: 'Residential', mid: 'Commercial', high: 'Luxury', ind:
 // which neighbors (in SIDES4 order: +x, -x, +z, -z) are walls, and how high it may go under a highway or the metro: worked out on the page
 // for each build (recipeOf calls this), so the plot worker builds from the recipe alone
 function wallPrep(c){
-  if (!c.wall){ delete c.wallN; delete c.wallG; delete c.wallB; delete c.wallR; delete c.wallCap; return; }
+  if (!c.wall){ delete c.wallN; delete c.wallG; delete c.wallB; delete c.wallR; delete c.wallRL; delete c.wallCap; return; }
   const nb = SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b)));
   c.wallN = nb.map(n => n && n.wall && !n.mega ? 1 : 0);
   c.wallG = nb.map(n => n && n.wall && n.wall.gate && !n.mega ? 1 : 0);
@@ -20,20 +20,26 @@ function wallPrep(c){
   // how far it can run toward each: up to the first thing of that building in the wall's way (its walls, balconies, signs, awnings), measured
   // on the building's own geometry, never into it (a wall cut through a tower's overhang); kept from the last time when the arrays were let go
   const top = wallTopOf(c) + .6, hw = WALL_T/2 + .45;   // (the wall's width and its dressing: a gate's canopy, a planter)
-  c.wallR = nb.map((n, k) => {
-    if (!c.wallB[k]) return 0;
-    const src = n.mega ? (megas.get(n.mega) || {}).data : n.data, old = c.wallR && c.wallR[k];
-    if (!src || !src.geo || (src.pm && src.pm.out)) return old || LOT/2;
+  // (and how far at the foot: under an awning or a balcony the building's face is further on, so a lower stretch of wall runs on under it to
+  // meet the face, as high as the overhang allows; wallRL: [reach at the foot, the overhang's underside])
+  const R2 = nb.map((n, k) => {
+    if (!c.wallB[k]) return null;
+    const src = n.mega ? (megas.get(n.mega) || {}).data : n.data, old = c.wallR && c.wallR[k] ? [c.wallR[k], c.wallRL && c.wallRL[k]] : null;
+    if (!src || !src.geo || (src.pm && src.pm.out)) return old || [LOT/2, null];
     const [a, b] = SIDES4[k], x0 = c.x + a*LOT/2, z0 = c.z + b*LOT/2, x1 = c.x + a*LOT, z1 = c.z + b*LOT;
-    let best = WALL_REACH;
-    try { const tris = corridorTris(src.geo, x0 - (b ? hw : 0), z0 - (a ? hw : 0), x1 + (b ? hw : 0), z1 + (a ? hw : 0), CURB + .05, top, 0);
+    const P = [];   // [along, y] of every bit of the building inside the wall's band
+    try { const tris = corridorTris(src.geo, x0 - (b ? hw : 0), z0 - (a ? hw : 0), x1 + (b ? hw : 0), z1 + (a ? hw : 0), CURB + .28, top, 0);
       for (let q = 0; q < tris.length; q += 3){ const T3 = [tris[q], tris[q + 1], tris[q + 2]];
-        // (the triangle's reach into the band across the wall's line: the nearest of its corners, and of where its edges cross the band's sides)
+        // (the triangle's reach into the band across the wall's line: its corners, and where its edges cross the band's sides)
         const pts = T3.slice(); for (let e = 0; e < 3; e++){ const P0 = T3[e], P1 = T3[(e + 1) % 3]; for (const lim of [-hw, hw]){ const p0 = b ? P0.x - c.x : P0.z - c.z, p1 = b ? P1.x - c.x : P1.z - c.z; if ((p0 - lim)*(p1 - lim) < 0){ const u = (lim - p0)/(p1 - p0); pts.push(new THREE.Vector3(P0.x + (P1.x - P0.x)*u, P0.y + (P1.y - P0.y)*u, P0.z + (P1.z - P0.z)*u)); } } }
-        for (const P of pts){ const perp = b ? P.x - c.x : P.z - c.z, along = (P.x - c.x)*a + (P.z - c.z)*b; if (Math.abs(perp) <= hw + 1e-3 && P.y >= CURB + .05 && P.y <= top && along >= LOT/2 - .01 && along < best) best = along; } }
-    } catch (e){ return old || LOT/2; }
-    return +Math.max(LOT/2, best - .04).toFixed(3);
-  });   // (a gate next door: the two open into one wide gate)
+        for (const Q of pts){ const perp = b ? Q.x - c.x : Q.z - c.z, along = (Q.x - c.x)*a + (Q.z - c.z)*b; if (Math.abs(perp) <= hw + 1e-3 && Q.y >= CURB + .28 && Q.y <= top && along >= LOT/2 - .01) P.push([along, Q.y]); } }   // (not the paving, kerbs and the like at its foot)
+    } catch (e){ return old || [LOT/2, null]; }
+    let best = WALL_REACH, low = WALL_REACH; for (const [al, y] of P){ if (al < best) best = al; if (y <= CURB + .9 && al < low) low = al; }
+    let clr = Infinity; for (const [al, y] of P) if (al < low - .02 && y < clr) clr = y;
+    const reach = +Math.max(LOT/2, best - .04).toFixed(3), foot = +Math.max(reach, low - .03).toFixed(3);
+    return [reach, foot > reach + .05 && isFinite(clr) ? [foot, +clr.toFixed(3)] : null];
+  });
+  c.wallR = R2.map(r => r ? r[0] : 0); c.wallRL = R2.map(r => r ? r[1] : null);
   const cap = typeof hwCap === 'function' ? hwCap(c) : null; if (cap === null) delete c.wallCap; else c.wallCap = cap;
 }
 const wallHeight = w => WALL_BASE + (w.n || 0)*WALL_TIER;
@@ -66,7 +72,7 @@ function gateSpan(c){
 function wallsBeside(c){
   if (self.IN_RECIPE_WORKER || typeof cells === 'undefined') return;
   for (const [a, b] of SIDES4){ const n = cells.get(ckey(c.i + a, c.j + b)); if (!n || !n.wall || n.mega) continue;
-    const was = JSON.stringify([n.wallB, n.wallR]); wallPrep(n); if (JSON.stringify([n.wallB, n.wallR]) === was) continue;
+    const was = JSON.stringify([n.wallB, n.wallR, n.wallRL]); wallPrep(n); if (JSON.stringify([n.wallB, n.wallR, n.wallRL]) === was) continue;
     setTimeout(() => { if (cells.get(ckey(n.i, n.j)) === n && n.wall){ try { refresh([n]); } catch (e) {} } }, 0); }
 }
 const wallGateable = c => { const k = wallRuns(c.wallN || [0, 0, 0, 0], c.wallB, c.wallR).kind; return k === 'post' || k === 'end' || k === 'line'; };
@@ -235,6 +241,11 @@ function buildPerimeter(c){
       if ((kind === 'post' || kind === 'end') && !ja) wallPost(st, F, z0 + .1, y0, h);
       if (kind === 'post' && !jb) wallPost(st, F, z1 - .1, y0, h); }
   }
+  // under an overhang, the lower stretch on to the building's face (its foot)
+  if ((kind === 'post' || kind === 'end') && c.wallRL){ const [ry, z0, z1] = runs[0], F = under(P, T(0, 0, 0, ry)), dx = Math.round(Math.sin(ry)), dz = Math.round(Math.cos(ry));
+    for (const [joined, sgn, zEnd] of [[ja, -1, z0], [jb, 1, z1]]){ if (!joined) continue; const k = SIDES4.findIndex(([a, b]) => a === sgn*dx && b === sgn*dz), L2 = k >= 0 && c.wallRL[k]; if (!L2) continue;
+      const hh = Math.min(h, L2[1] - CURB - .04); if (hh < .45) continue;
+      if (sgn > 0) wallBody(st, F, zEnd - .02, L2[0], y0, hh, _wallGreen); else wallBody(st, F, -L2[0], zEnd + .02, y0, hh, _wallGreen); } }
   if (kind === 'corner' || kind === 'tee' || kind === 'cross') wallPost(st, P, 0, y0, h);
   _wallGreen = true;
 }
@@ -306,7 +317,7 @@ function removeWallTier(c){
   const top = wallTopOf(c), zone = c.wall.zone, old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   let nb = [];
   if (c.wall.n > 0) c.wall.n--;
-  else { nb = wallNbrs(c); delete c.wall; delete c.wallN; delete c.wallG; delete c.wallB; delete c.wallR; delete c.wallCap; }
+  else { nb = wallNbrs(c); delete c.wall; delete c.wallN; delete c.wallG; delete c.wallB; delete c.wallR; delete c.wallRL; delete c.wallCap; }
   refresh([c, ...nb]);
   startAnim(c, 'remove', c.wall ? wallTopOf(c) - .05 : CURB - .05, top + 1.2, zone, LOT, old);
   perimDirty();

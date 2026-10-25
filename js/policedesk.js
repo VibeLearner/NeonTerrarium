@@ -159,7 +159,8 @@ const PRECINCT = (() => {
     const closed = today.filter(c => c.st !== 'open' && c.st !== 'LOGGED').length;
     const arrToday = today.filter(c => c.st === 'ARREST').length;
     const last = calls.find(c => c.pri <= 2 && c.src !== 'case') || calls[0] || null;
-    return { now, calls, today, recent, hot, byHour, ofc, dr, stn, lidar, closed, arrToday, last, cs: cases(), hour: (now % 1440)/60, day: day0 + 1,
+    const pts = safe(() => LEDGER.crowds().pts, []);
+    return { pts, now, calls, today, recent, hot, byHour, ofc, dr, stn, lidar, closed, arrToday, last, cs: cases(), hour: (now % 1440)/60, day: day0 + 1,
       bikes: safe(() => POLICE_BIKES.map(b => ({ x: b.x, z: b.z, path: b.path && b.mode !== 'park' ? b.path.pts : null })), []) };
   }
 
@@ -188,7 +189,7 @@ const PRECINCT = (() => {
   #prec .lg { position:absolute; left:8px; bottom:6px; display:flex; flex-wrap:wrap; gap:3px 12px; font-size:8.5px; letter-spacing:.12em; color:var(--dim); background:rgba(3,8,5,.8); padding:3px 6px; border:1px solid var(--hair); }
   #prec .lg i { display:inline-block; width:8px; height:8px; margin-right:4px; vertical-align:-1px; }
   #prec .rt { display:grid; min-height:0; }
-  #prec .bt { grid-column:1/-1; display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1.45fr); gap:6px; min-height:0; }
+  #prec .bt { grid-column:1/-1; display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr) minmax(0,1.25fr) minmax(0,1.25fr); gap:6px; min-height:0; }
   #prec table { width:100%; border-collapse:collapse; table-layout:fixed; font-variant-numeric:tabular-nums; }
   #prec th { text-align:left; font-weight:400; color:var(--dim); font-size:8.5px; letter-spacing:.12em; padding:1px 4px 3px; border-bottom:1px solid var(--hair); white-space:nowrap; }
   #prec td { padding:1px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-bottom:1px solid rgba(27,51,33,.4); }
@@ -211,6 +212,22 @@ const PRECINCT = (() => {
   #prec .tick span.k { background:var(--ink); color:var(--bg); padding:0 6px; margin-right:10px; letter-spacing:.14em; height:100%; display:flex; align-items:center; }
   #prec .tick .run { display:inline-block; padding-left:100%; animation:pdTick 60s linear infinite; } @keyframes pdTick { to { transform:translateX(-100%); } }
   #prec .empty { color:var(--dim); padding:6px 2px; line-height:1.6; }
+  #prec .rt { grid-template-rows:minmax(0,1.5fr) minmax(0,1fr); gap:6px; }
+  #prec canvas.ch { display:block; width:100%; }
+  #prec .act { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:10px; height:100%; }
+  #prec .act .c1, #prec .act .c2 { display:flex; flex-direction:column; min-height:0; gap:4px; }
+  #prec .act .lbl { font-size:8.5px; letter-spacing:.14em; color:var(--dim); display:flex; justify-content:space-between; }
+  #prec .act canvas { flex:1; min-height:0; }
+  #prec .mb { display:inline-block; height:5px; background:var(--ink); vertical-align:1px; } #prec .mb.o { background:var(--amb); }
+  #prec .sig { display:inline-flex; gap:1px; align-items:flex-end; height:9px; vertical-align:-1px; } #prec .sig i { width:3px; background:var(--faint); } #prec .sig i.on { background:var(--ink); } #prec .sig.r i.on { background:var(--red); }
+  #prec .secs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); grid-template-rows:repeat(2,minmax(0,1fr)); gap:6px; height:100%; }
+  #prec .sc { position:relative; border:1px solid var(--hair); min-height:0; display:flex; flex-direction:column; cursor:pointer; }
+  #prec .sc:hover { border-color:var(--dim); }
+  #prec .sc .t { display:flex; justify-content:space-between; padding:1px 4px; font-size:9px; } #prec .sc .t b { color:var(--hi); font-weight:500; }
+  #prec .sc canvas { flex:1; min-height:0; width:100%; }
+  #prec .sc .f { padding:0 4px 2px; font-size:8.5px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #prec .dro { display:grid; grid-template-rows:auto minmax(0,1fr); height:100%; gap:4px; }
+  #prec .top .bigv { font-size:22px; color:var(--hi); letter-spacing:.04em; line-height:1; } #prec .top .bigv small { font-size:9px; margin-left:4px; }
   #prec.in > * { animation:pdIn .5s steps(6) both; } @keyframes pdIn { from { opacity:0; clip-path:inset(0 0 100% 0); } to { opacity:1; clip-path:inset(0); } }
   #prec.out { animation:pdOut .35s steps(4) both; } @keyframes pdOut { to { opacity:0; clip-path:inset(48% 0 48% 0); } }
   @media (max-width:1000px){ #prec { grid-template-columns:1fr; grid-template-rows:42px 52vh auto auto auto 22px; overflow:auto; } #prec .map { grid-row:auto; height:52vh; } #prec .bt { grid-template-columns:1fr; } }
@@ -218,11 +235,12 @@ const PRECINCT = (() => {
   let root = null, cv = null, g = null, D = null, raf = 0, keyH = null, resH = null, sel = null, hov = null, F = null, base = null;
   const $ = q => root.querySelector(q);
   function build(){ if (document.getElementById('precCss')) return; const st = document.createElement('style'); st.id = 'precCss'; st.textContent = css; document.head.appendChild(st); }
+  const SIGL = { RESPONDING: 4, 'ON BEAT': 4, 'EN ROUTE': 3, 'AT STATION': 2, REPORTING: 2, 'GOING HOME': 1, 'OFF SHIFT': 0, 'STOOD DOWN': 0 };
   function dom(){
     const d = D, onDuty = d.ofc.filter(o => o.st !== 'OFF SHIFT' && o.st !== 'STOOD DOWN' && o.st !== 'GOING HOME').length, beat = d.ofc.filter(o => o.st === 'ON BEAT' || o.st === 'RESPONDING' || o.st === 'EN ROUTE').length;
     const air = d.dr.list.filter(x => x.mode !== 'REST').length, openCalls = d.calls.filter(c => c.st === 'open').length;
-    const callRows = d.calls.slice(0, 60).map(c => `<tr class="click" data-call="${c.id}"><td>${String(c.id).padStart(5, '0')}</td><td>${tc(c.c)}</td><td class="pri${c.pri}">P${c.pri}</td><td>${esc(c.kind)}${c.file ? ' <span class="amb">' + c.file + '</span>' : ''}</td><td>${c.sec}</td><td>${c.unit ? badge(c.unit) : '<span class="dim">----</span>'}</td><td class="st-${c.st}">${c.st === 'open' ? 'OPEN' : c.st}</td></tr>`).join('');
-    const ofRows = d.ofc.map(o => `<tr class="click" data-cop="${esc(o.id)}"><td class="hi">${o.b}</td><td>${o.unit}</td><td>${o.shift}</td><td class="${o.st === 'RESPONDING' ? 'red' : o.st === 'ON BEAT' ? 'hi' : o.st === 'OFF SHIFT' || o.st === 'STOOD DOWN' || o.st === 'GOING HOME' ? 'dim' : ''}">${o.st}</td><td>${o.sec}</td></tr>`).join('');
+    const callRows = d.calls.slice(0, 60).map(c => `<tr class="click" data-call="${c.id}"><td>${String(c.id).padStart(5, '0')}</td><td>${tc(c.c)}</td><td class="pri${c.pri}">P${c.pri}</td><td>${esc(c.kind)}${c.file ? ' <span class="amb">' + c.file + '</span>' : ''}</td><td>${c.sec}</td><td>${c.unit ? badge(c.unit) : '<span class="dim">----</span>'}</td><td>${c.st === 'open' ? `<span class="mb o" style="width:${Math.min(40, 4 + (d.now - c.c)/90*40).toFixed(0)}px"></span>` : c.done ? `<span class="mb" style="width:${Math.min(40, 2 + (c.done - c.c)/90*40).toFixed(0)}px"></span> <span class="dim">${Math.round(c.done - c.c)}m</span>` : ''}</td><td class="st-${c.st}">${c.st === 'open' ? 'OPEN' : c.st}</td></tr>`).join('');
+    const ofRows = d.ofc.map(o => `<tr class="click" data-cop="${esc(o.id)}"><td class="hi">${o.b}</td><td>${o.unit}</td><td>${o.shift}</td><td class="${o.st === 'RESPONDING' ? 'red' : o.st === 'ON BEAT' ? 'hi' : o.st === 'OFF SHIFT' || o.st === 'STOOD DOWN' || o.st === 'GOING HOME' ? 'dim' : ''}">${o.st}</td><td>${o.sec}</td><td><span class="sig ${o.st === 'RESPONDING' ? 'r' : ''}">${[3, 5, 7, 9].map((h, q) => `<i class="${q < SIGL[o.st] ? 'on' : ''}" style="height:${h}px"></i>`).join('')}</span></td></tr>`).join('');
     const drRows = d.dr.list.map(x => `<tr class="click" data-drone="${x.id}"><td class="hi">${x.id}</td><td>STN-${p2(x.stn + 1)}</td><td class="${x.mode === 'CHASE' ? 'red' : x.mode === 'REST' ? 'dim' : ''}">${x.mode === 'REST' ? 'DOCKED' : x.mode === 'CHASE' ? 'PURSUIT' : x.mode === 'FLY' ? 'SWEEP' : x.mode === 'HOME' ? 'RTB' : x.mode}</td><td>${x.way.length}</td><td>${x.sec}</td></tr>`).join('');
     const maxH = Math.max(1, ...d.byHour), hNow = Math.floor(d.hour);
     const maxS = Math.max(1, ...d.hot.map(h => h[1]));
@@ -235,6 +253,7 @@ const PRECINCT = (() => {
     root.innerHTML = `
       <div class="top"><div><small>PRECINCT</small><b>OPERATIONS DESK</b></div><div><small>STATIONS ${d.stn.length}</small><b>${d.stn.map(s => 'STN-' + p2(s.n)).join(' · ') || 'NONE'}</b></div>
         <div><small>DAY ${d.day} · CITY TIME</small><span class="clk">${hm(d.now)}</span></div>
+        <div><small>CALLS · LAST 72 H</small><span class="bigv">${d.recent.length}<small class="dim">${d.recent.length && d.hot.length ? 'PEAK ' + d.hot[0][0] : ''}</small></span></div>
         <div><small>UNITS ON DUTY · OUT</small><b>${onDuty} · ${beat}</b></div><div><small>CALLS TODAY · OPEN</small><b>${d.today.length} · <span class="${openCalls ? 'warn' : ''}">${openCalls}</span></b></div>
         <div><small>ARRESTS TODAY · TOTAL</small><b>${d.arrToday} · ${R.arrests}</b></div><div><small>DRONES UP · POINTS SCANNED</small><b>${air}/${d.dr.list.length} · ${d.dr.scans}</b></div>
         <div><small>LIDAR COVER</small><b>${Math.round(d.lidar*100)}%</b></div><div class="sp"></div><button class="close" type="button">CLOSE · ESC</button></div>
@@ -243,22 +262,28 @@ const PRECINCT = (() => {
           <span><i style="background:var(--amb);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)"></i>CASE</span><span><i style="background:var(--ink);clip-path:polygon(0 40%,100% 40%,100% 60%,0 60%)"></i>CALL</span><span><i style="background:rgba(255,93,74,.4)"></i>HOTSPOT</span><span><i style="border:1px dashed var(--dim);border-radius:50%"></i>LIDAR</span></div></div>
       <div class="rt">
         <div class="pn"><div class="h"><b>B · CALL LOG</b><span>LAST ${Math.min(60, d.calls.length)} OF ${d.calls.length}</span><span class="r">LAST P1-P2: ${d.last ? esc(d.last.kind) + ' · ' + d.last.sec + ' · ' + tc(d.last.c) : 'NONE'}</span></div>
-          <div class="tw">${d.calls.length ? `<table><colgroup><col style="width:46px"><col style="width:76px"><col style="width:26px"><col><col style="width:30px"><col style="width:46px"><col style="width:72px"></colgroup>
-            <tr><th>ID</th><th>TIME</th><th>PRI</th><th>TYPE</th><th>SEC</th><th>UNIT</th><th>STATUS</th></tr>${callRows}</table>` : `<div class="empty">No calls on record yet.${d.stn.length ? '' : ' A police station has to stand in the city.'}</div>`}</div></div>
+          <div class="tw">${d.calls.length ? `<table><colgroup><col style="width:46px"><col style="width:76px"><col style="width:26px"><col><col style="width:30px"><col style="width:46px"><col style="width:72px"><col style="width:70px"></colgroup>
+            <tr><th>ID</th><th>TIME</th><th>PRI</th><th>TYPE</th><th>SEC</th><th>UNIT</th><th>RESPONSE</th><th>STATUS</th></tr>${callRows}</table>` : `<div class="empty">No calls on record yet.${d.stn.length ? '' : ' A police station has to stand in the city.'}</div>`}</div></div>
+        <div class="pn"><div class="h"><b>E · ACTIVITY</b><span>CALLS VS TIME · 72 H</span><span class="r">${d.recent.length} CALLS · ${d.recent.filter(c => c.st === 'ARREST').length} ARRESTS · ${d.hot.length ? 'HOTTEST ' + d.hot[0][0] : ''}</span></div>
+          <div class="act"><div class="c1"><div class="lbl"><span>CALLS PER 3 H</span><span>— CALLS · ▲ ARREST · ◆ CASE</span></div><canvas class="ch" data-ch="line"></canvas>
+            <div class="lbl"><span>BY HOUR OF DAY</span><span>NOW ${p2(hNow)}:00</span></div><canvas class="ch" data-ch="hist"></canvas></div>
+            <div class="c2"><div class="lbl"><span>BY TYPE</span><span>72 H</span></div><canvas class="ch" data-ch="types"></canvas></div></div></div>
       </div>
       <div class="bt">
           <div class="pn"><div class="h"><b>C · UNITS</b><span>${d.ofc.length} SWORN</span><span class="r">CLICK TO FOLLOW</span></div>
-            <div class="tw"><table><colgroup><col style="width:46px"><col style="width:60px"><col style="width:46px"><col><col style="width:28px"></colgroup><tr><th>BADGE</th><th>CALLSIGN</th><th>SHIFT</th><th>STATUS</th><th>SEC</th></tr>${ofRows}</table></div></div>
+            <div class="tw"><table><colgroup><col style="width:46px"><col style="width:60px"><col style="width:46px"><col><col style="width:28px"><col style="width:26px"></colgroup><tr><th>BADGE</th><th>CALLSIGN</th><th>SHIFT</th><th>STATUS</th><th>SEC</th><th>SIG</th></tr>${ofRows}</table></div></div>
           <div class="pn"><div class="h"><b>D · DRONE OPS</b><span>COVER ${Math.round(d.dr.cov*100)}%</span><span class="r">${d.dr.pts.length} PTS / 10 MIN</span></div>
-            <div class="tw"><table><colgroup><col style="width:44px"><col style="width:52px"><col><col style="width:26px"><col style="width:28px"></colgroup><tr><th>ID</th><th>BASE</th><th>MODE</th><th>WPT</th><th>SEC</th></tr>${drRows}</table>
-            <div class="kv" style="margin-top:6px">${d.stn.map(s => `<span>STN-${p2(s.n)} · ${s.sec}</span><span>${s.staff} STAFF · ${s.out} OUT · ${s.drones} DRN</span>`).join('')}</div></div></div>
+            <div class="dro"><div><table><colgroup><col style="width:44px"><col style="width:52px"><col><col style="width:26px"><col style="width:28px"></colgroup><tr><th>ID</th><th>BASE</th><th>MODE</th><th>WPT</th><th>SEC</th></tr>${drRows}</table>
+            <div class="kv" style="margin-top:4px">${d.stn.map(s => `<span>STN-${p2(s.n)} · ${s.sec}</span><span>${s.staff} STAFF · ${s.out} OUT · ${s.drones} DRN</span>`).join('')}</div></div>
+            <canvas class="ch" data-ch="drones"></canvas></div></div>
         </div>
       <div class="tick"><span class="k">COMMS</span><span class="run">${esc(tickTxt)}</span></div>`;
     // the bottom right: hotspots and case files share the lower right (under the call log)
     const bt = root.querySelector('.bt');
-    const hp = document.createElement('div'); hp.className = 'pn'; hp.innerHTML = `<div class="h"><b>E · HOTSPOTS</b><span>72 H</span><span class="r">BY HOUR · NOW ${p2(hNow)}:00</span></div>
-      ${d.hot.length ? d.hot.map(([s, n]) => `<div style="display:grid;grid-template-columns:28px 1fr 22px;gap:6px;align-items:center"><span class="hi">${s}</span><span><span class="bar" style="width:${(100*n/maxS).toFixed(0)}%"></span></span><span style="text-align:right">${n}</span></div>`).join('') : '<div class="empty">NO CALLS IN 72 H</div>'}
-      <div class="hist">${d.byHour.map((n, h) => `<i class="${h === hNow ? 'now' : ''}" style="height:${(100*n/maxH).toFixed(0)}%"></i>`).join('')}</div><div class="hx"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>`;
+    const hp = document.createElement('div'); hp.className = 'pn';
+    const secs = secPick(d);
+    hp.innerHTML = `<div class="h"><b>G · SECTOR SCANS</b><span>${secs.length} HOTTEST · 72 H</span><span class="r">CLICK TO GO · LOOKING DOWN</span></div>
+      <div class="secs">${secs.map(q => `<div class="sc" data-sec="${q.name}"><div class="t"><b>${q.name}</b><span>${q.n} CALLS · ${q.units} UNIT${q.units === 1 ? '' : 'S'}</span></div><canvas></canvas><div class="f">${q.last ? esc(q.last.kind) + ' · ' + hm(q.last.c) : 'QUIET'}</div></div>`).join('') || '<div class="empty">NO SECTORS YET</div>'}</div>`;
     const cp = document.createElement('div'); cp.className = 'pn'; cp.innerHTML = `<div class="h"><b>F · CASE FILES</b><span>${d.cs.open ? 'CASE DAY ' + d.cs.day + ' / 21' : 'NONE ACTIVE'}</span><span class="r">${d.cs.heat !== null && d.cs.heat !== undefined ? 'PRESSURE ' + Math.round(d.cs.heat*100) + '%' : ''}</span></div>
       <div class="tw">${cfs || '<div class="empty">No case files open. When a case opens, its file shows here: coded, with its stage, the last logged activity and the next lead.</div>'}</div>`;
     bt.appendChild(hp); bt.appendChild(cp);
@@ -266,17 +291,99 @@ const PRECINCT = (() => {
     $('.close').addEventListener('click', close);
     root.addEventListener('click', e => {
       const w = e.target.closest('[data-watch]'); if (w){ follow(w.dataset.watch); return; }
+      const sc = e.target.closest('.sc[data-sec]'); if (sc){ const q = SECS.find(x => x.name === sc.dataset.sec); if (q) goTo(q.cx, q.cz); return; }
       const r = e.target.closest('tr.click'); if (!r) return;
       if (r.dataset.cop) follow(r.dataset.cop);
       else if (r.dataset.call){ const c = R.calls.find(q => q.id === +r.dataset.call); if (c) goTo(c.x, c.z); }
       else if (r.dataset.drone){ sel = sel === r.dataset.drone ? null : r.dataset.drone; root.querySelectorAll('tr[data-drone]').forEach(t => t.classList.toggle('sel', t.dataset.drone === sel)); drawBase(); }
     });
   }
+  // the sectors worth a close look: the six with the most calls in 72 hours (or with the most plots, a quiet city)
+  let SECS = [];
+  function secBox(name){ const a = 'ABCDEFGH'.indexOf(name[0]), b = +name.slice(1) - 1; return { i0: B.i0 + Math.floor(a*B.ni/8), i1: B.i0 + Math.ceil((a + 1)*B.ni/8) - 1, j0: B.j0 + Math.floor(b*B.nj/6), j1: B.j0 + Math.ceil((b + 1)*B.nj/6) - 1 }; }
+  function secPick(d){
+    const m = new Map(); for (const c of d.recent){ const q = m.get(c.sec) || { n: 0, last: null, byH: new Array(24).fill(0) }; q.n++; if (!q.last || c.c > q.last.c) q.last = c; q.byH[Math.floor((c.c % 1440)/60)]++; m.set(c.sec, q); }
+    if (m.size < 6) safe(() => { for (const c of cells.values()){ if (!c.sections.length) continue; const k = sector(c.x, c.z); if (!m.has(k)) m.set(k, { n: 0, last: null, byH: new Array(24).fill(0) }); if (m.size >= 6) break; } });
+    SECS = [...m.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 6).map(([name, q]) => { const bx = secBox(name); return Object.assign({ name, units: d.ofc.filter(o => o.sec === name && o.st !== 'OFF SHIFT' && o.st !== 'STOOD DOWN' && o.st !== 'GOING HOME').length,
+      cx: (bx.i0 + bx.i1)/2*LOT, cz: (bx.j0 + bx.j1)/2*LOT, bx }, q); });
+    return SECS;
+  }
+  const GR = { ink: '#8fdc95', hi: '#d6ffd2', dim: 'rgba(143,220,149,.45)', faint: 'rgba(143,220,149,.14)', amb: '#ffb03a', red: '#ff5d4a' };
+  function fitCanvas(c){ const r = c.getBoundingClientRect(), dp = Math.min(2, devicePixelRatio || 1); c.width = Math.max(4, r.width*dp); c.height = Math.max(4, r.height*dp); const x = c.getContext('2d'); x.font = (8.5*dp) + 'px JetBrains Mono, monospace'; return [x, c.width, c.height, dp]; }
+  function axes(x, W, H, dp, L, Rr, T, Bm, ny){
+    x.strokeStyle = GR.faint; x.lineWidth = dp; for (let k = 0; k <= ny; k++){ const y = T + (H - T - Bm)*k/ny; x.beginPath(); x.setLineDash([2*dp, 3*dp]); x.moveTo(L, y); x.lineTo(W - Rr, y); x.stroke(); } x.setLineDash([]);
+    x.strokeStyle = GR.dim; x.beginPath(); x.moveTo(L, T); x.lineTo(L, H - Bm); x.lineTo(W - Rr, H - Bm); x.stroke();
+  }
+  function charts(){
+    const d = D;
+    for (const c of root.querySelectorAll('canvas.ch')){
+      const [x, W, H, dp] = fitCanvas(c), kind = c.dataset.ch;
+      if (kind === 'line'){   // calls per 3 hours over 72 hours: a profile line with its area, arrests and case activity marked
+        const n = 24, bins = new Array(n).fill(0), arr = new Array(n).fill(0), cas = new Array(n).fill(0), t0 = d.now - 72*60;
+        for (const q of d.recent){ const k = Math.min(n - 1, Math.max(0, Math.floor((q.c - t0)/180))); bins[k]++; if (q.st === 'ARREST') arr[k]++; if (q.src === 'case') cas[k]++; }
+        const mx = Math.max(2, ...bins), L = 22*dp, Rr = 6*dp, T = 6*dp, Bm = 12*dp, X = k => L + (W - L - Rr)*k/(n - 1), Y = v => H - Bm - (H - T - Bm)*v/mx;
+        axes(x, W, H, dp, L, Rr, T, Bm, 4);
+        x.fillStyle = GR.dim; x.textAlign = 'right'; x.fillText(String(mx), L - 4*dp, T + 6*dp); x.fillText('0', L - 4*dp, H - Bm);
+        x.textAlign = 'center'; for (const [k, lb] of [[0, '-72H'], [8, '-48H'], [16, '-24H'], [23, 'NOW']]) x.fillText(lb, X(k), H - 2*dp);
+        const gr = x.createLinearGradient(0, T, 0, H - Bm); gr.addColorStop(0, 'rgba(143,220,149,.28)'); gr.addColorStop(1, 'rgba(143,220,149,.02)');
+        x.beginPath(); bins.forEach((v, k) => k ? x.lineTo(X(k), Y(v)) : x.moveTo(X(k), Y(v))); x.lineTo(X(n - 1), H - Bm); x.lineTo(X(0), H - Bm); x.closePath(); x.fillStyle = gr; x.fill();
+        x.beginPath(); bins.forEach((v, k) => k ? x.lineTo(X(k), Y(v)) : x.moveTo(X(k), Y(v))); x.strokeStyle = GR.hi; x.lineWidth = 1.4*dp; x.stroke();
+        bins.forEach((v, k) => { x.fillStyle = GR.ink; x.fillRect(X(k) - 1.5*dp, Y(v) - 1.5*dp, 3*dp, 3*dp);
+          if (arr[k]){ x.fillStyle = GR.hi; x.beginPath(); x.moveTo(X(k), Y(v) - 9*dp); x.lineTo(X(k) + 3.5*dp, Y(v) - 4*dp); x.lineTo(X(k) - 3.5*dp, Y(v) - 4*dp); x.fill(); }
+          if (cas[k]){ x.fillStyle = GR.amb; x.beginPath(); x.moveTo(X(k), H - Bm - 7*dp); x.lineTo(X(k) + 3*dp, H - Bm - 4*dp); x.lineTo(X(k), H - Bm - 1*dp); x.lineTo(X(k) - 3*dp, H - Bm - 4*dp); x.fill(); } });
+        x.strokeStyle = GR.amb; x.setLineDash([3*dp, 3*dp]); x.beginPath(); x.moveTo(X(n - 1), T); x.lineTo(X(n - 1), H - Bm); x.stroke(); x.setLineDash([]);
+      } else if (kind === 'hist'){   // by hour of the day
+        const L = 4*dp, Bm = 11*dp, mx = Math.max(1, ...d.byHour), bw = (W - 2*L)/24, hn = Math.floor(d.hour);
+        d.byHour.forEach((v, h) => { const bh = (H - Bm - 3*dp)*v/mx; x.fillStyle = h === hn ? GR.amb : v ? GR.ink : GR.faint; x.fillRect(L + h*bw + dp, H - Bm - Math.max(dp, bh), bw - 2*dp, Math.max(dp, bh)); });
+        x.fillStyle = GR.dim; x.textAlign = 'left'; for (const h of [0, 6, 12, 18]) x.fillText(p2(h), L + h*bw, H - 1*dp); x.textAlign = 'right'; x.fillText('23', W - L, H - 1*dp);
+        x.strokeStyle = GR.dim; x.beginPath(); x.moveTo(L, H - Bm); x.lineTo(W - L, H - Bm); x.stroke();
+      } else if (kind === 'types'){   // calls by type: horizontal bars, arrests inside
+        const m = new Map(); for (const q of d.recent){ const k = q.kind.split(' · ')[0]; const e = m.get(k) || [0, 0]; e[0]++; if (q.st === 'ARREST') e[1]++; m.set(k, e); }
+        const rows = [...m.entries()].sort((a, b) => b[1][0] - a[1][0]).slice(0, 8), mx = Math.max(1, ...rows.map(r => r[1][0])), rh = Math.min(16*dp, H/Math.max(4, rows.length)), L = W*.52;
+        rows.forEach(([k, [n, a]], q) => { const y = q*rh + 2*dp, bw = (W - L - 22*dp)*n/mx;
+          x.fillStyle = GR.dim; x.textAlign = 'left'; x.fillText(k.slice(0, 18), 0, y + rh*.62);
+          x.fillStyle = GR.faint; x.fillRect(L, y + rh*.28, W - L - 22*dp, rh*.42); x.fillStyle = GR.ink; x.fillRect(L, y + rh*.28, bw, rh*.42);
+          if (a){ x.fillStyle = GR.hi; x.fillRect(L, y + rh*.28, (W - L - 22*dp)*a/mx, rh*.42); }
+          x.fillStyle = GR.hi; x.textAlign = 'right'; x.fillText(String(n), W, y + rh*.62); });
+        if (!rows.length){ x.fillStyle = GR.dim; x.fillText('NO CALLS', 0, 12*dp); }
+      } else if (kind === 'drones'){   // waypoints left per drone as bars, and the patrol coverage as a ring gauge
+        const list = d.dr.list, L = 18*dp, Bm = 12*dp, T = 6*dp, gw = Math.min(H*.9, W*.32), cw = W - gw - 8*dp, mx = Math.max(5, ...list.map(q => q.way.length));
+        axes(x, cw, H, dp, L, 4*dp, T, Bm, 3);
+        const bw = (cw - L - 6*dp)/Math.max(1, list.length);
+        list.forEach((q, k) => { const bh = (H - T - Bm)*q.way.length/mx, X0 = L + k*bw + bw*.2; x.fillStyle = q.mode === 'CHASE' ? GR.red : q.way.length ? GR.ink : GR.faint; x.fillRect(X0, H - Bm - Math.max(dp, bh), bw*.6, Math.max(dp, bh));
+          x.fillStyle = GR.dim; x.textAlign = 'center'; x.fillText(q.id.slice(-2), X0 + bw*.3, H - 2*dp); });
+        x.textAlign = 'right'; x.fillStyle = GR.dim; x.fillText(String(mx), L - 3*dp, T + 6*dp); x.save(); x.translate(6*dp, H/2); x.rotate(-Math.PI/2); x.textAlign = 'center'; x.fillText('WPT', 0, 0); x.restore();
+        const cx = W - gw/2, cy = H/2, r = gw/2 - 6*dp, f = d.dr.cov;
+        x.strokeStyle = GR.faint; x.lineWidth = 5*dp; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.stroke();
+        x.strokeStyle = GR.hi; x.beginPath(); x.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + f*Math.PI*2); x.stroke(); x.lineWidth = dp;
+        for (let k = 0; k < 24; k++){ const a = k/24*Math.PI*2; x.strokeStyle = GR.dim; x.beginPath(); x.moveTo(cx + Math.cos(a)*(r + 5*dp), cy + Math.sin(a)*(r + 5*dp)); x.lineTo(cx + Math.cos(a)*(r + (k % 6 ? 7 : 10)*dp), cy + Math.sin(a)*(r + (k % 6 ? 7 : 10)*dp)); x.stroke(); }
+        x.fillStyle = GR.hi; x.textAlign = 'center'; x.font = (13*dp) + 'px JetBrains Mono, monospace'; x.fillText(Math.round(f*100) + '%', cx, cy + 3*dp); x.font = (7.5*dp) + 'px JetBrains Mono, monospace'; x.fillStyle = GR.dim; x.fillText('COVER 5 MIN', cx, cy + 14*dp);
+      }
+    }
+    for (const el of root.querySelectorAll('.sc canvas')){ const q = SECS.find(s2 => s2.name === el.parentNode.dataset.sec); if (q) el._sec = q; }
+  }
+  // a sector card: its plots seen from above inside a scan ring, its calls and units, the scan sweeping round; a bar of its calls by hour under it
+  function drawSec(el, t){
+    const q = el._sec; if (!q) return; if (!el._fit){ el._fit = fitCanvas(el); } const [x, W, H, dp] = el._fit; x.clearRect(0, 0, W, H);
+    const bx = q.bx, ni = bx.i1 - bx.i0 + 1, nj = bx.j1 - bx.j0 + 1, hb = 10*dp, s = Math.min((W - 8*dp)/(ni*LOT), (H - hb - 8*dp)/(nj*LOT)), ox = W/2 - (bx.i0 + bx.i1)/2*LOT*s, oz = (H - hb)/2 - (bx.j0 + bx.j1)/2*LOT*s, P = (a, b) => [ox + a*s, oz + b*s];
+    const cx = W/2, cy = (H - hb)/2, rr = Math.min(W, H - hb)/2 - 3*dp;
+    x.strokeStyle = GR.faint; x.lineWidth = dp; x.beginPath(); x.arc(cx, cy, rr, 0, 7); x.stroke(); x.beginPath(); x.arc(cx, cy, rr*.5, 0, 7); x.stroke();
+    x.beginPath(); x.moveTo(cx - rr, cy); x.lineTo(cx + rr, cy); x.moveTo(cx, cy - rr); x.lineTo(cx, cy + rr); x.stroke();
+    safe(() => { for (let i = bx.i0; i <= bx.i1; i++) for (let j = bx.j0; j <= bx.j1; j++){ const c = cells.get(ckey(i, j)); if (!c) continue; const [a, b] = P(c.x - LOT/2 + .3, c.z - LOT/2 + .3), w = (LOT - .6)*s, lv = c.mega ? 3 : c.sections.length;
+      x.fillStyle = `rgba(143,220,149,${(.06 + .08*Math.min(4, lv)).toFixed(2)})`; x.fillRect(a, b, w, w); if (lv){ x.strokeStyle = 'rgba(143,220,149,.4)'; x.strokeRect(a + .5, b + .5, w - 1, w - 1); } } });
+    // the sweep
+    const ang = (t*1.3 + q.name.charCodeAt(0)) % (Math.PI*2), gr = x.createConicGradient ? x.createConicGradient(ang - .9, cx, cy) : null;
+    if (gr){ gr.addColorStop(0, 'rgba(143,220,149,0)'); gr.addColorStop(.14, 'rgba(143,220,149,.22)'); gr.addColorStop(.145, 'rgba(143,220,149,0)'); x.fillStyle = gr; x.beginPath(); x.arc(cx, cy, rr, 0, 7); x.fill(); }
+    x.strokeStyle = GR.ink; x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx + Math.cos(ang)*rr, cy + Math.sin(ang)*rr); x.stroke();
+    for (const c of D.recent){ if (c.sec !== q.name) continue; const [a, b] = P(c.x, c.z); x.strokeStyle = c.st === 'open' ? GR.red : c.src === 'case' ? GR.amb : GR.hi; x.lineWidth = 1.2*dp; x.beginPath(); x.moveTo(a - 3*dp, b - 3*dp); x.lineTo(a + 3*dp, b + 3*dp); x.moveTo(a + 3*dp, b - 3*dp); x.lineTo(a - 3*dp, b + 3*dp); x.stroke(); }
+    for (const o of D.ofc){ if (o.sec !== q.name || !isFinite(o.x) || o.st === 'OFF SHIFT' || o.st === 'STOOD DOWN') continue; const [a, b] = P(o.x, o.z); x.fillStyle = o.st === 'RESPONDING' ? GR.red : GR.hi; x.beginPath(); x.arc(a, b, 2*dp, 0, 7); x.fill(); }
+    const mx = Math.max(1, ...q.byH), bw = W/24; q.byH.forEach((v, h) => { const bh = (hb - 3*dp)*v/mx; x.fillStyle = v ? GR.ink : GR.faint; x.fillRect(h*bw + .5*dp, H - Math.max(dp, bh), bw - dp, Math.max(dp, bh)); });
+  }
   /* the plan */
   function setup(){
     cv = $('.map canvas'); const r = cv.getBoundingClientRect(), dp = Math.min(2, devicePixelRatio || 1); cv.width = Math.max(10, r.width*dp); cv.height = Math.max(10, r.height*dp); g = cv.getContext('2d');
     const W = cv.width, H = cv.height, pad = 26*dp, s = Math.min((W - 2*pad)/(B.ni*LOT), (H - 2*pad)/(B.nj*LOT)), ox = (W - B.ni*LOT*s)/2 - (B.i0 - .5)*LOT*s, oz = (H - B.nj*LOT*s)/2 - (B.j0 - .5)*LOT*s;
-    F = { dp, s, P: (x, z) => [ox + x*s, oz + z*s] }; drawBase();
+    F = { dp, s, P: (x, z) => [ox + x*s, oz + z*s] }; drawBase(); charts(); for (const el of root.querySelectorAll('.sc canvas')) el._fit = null;
     cv.addEventListener('mousemove', e => { const rr = cv.getBoundingClientRect(); hov = pickMap((e.clientX - rr.left)*F.dp, (e.clientY - rr.top)*F.dp); const tip = $('.tip');
       if (hov){ tip.style.display = 'block'; tip.style.left = (e.clientX - rr.left + 12) + 'px'; tip.style.top = (e.clientY - rr.top + 26) + 'px'; tip.textContent = hov.label; } else tip.style.display = 'none'; });
     cv.addEventListener('mouseleave', () => { hov = null; $('.tip').style.display = 'none'; });
@@ -303,6 +410,12 @@ const PRECINCT = (() => {
     safe(() => { for (const m of megas.values()){ const [x, y] = P(m.x - m.w*LOT/2 + .15, m.z - m.h*LOT/2 + .15), w = (m.w*LOT - .3)*s, h = (m.h*LOT - .3)*s, pol = m.kind === 'police';
       b.fillStyle = pol ? 'rgba(214,255,210,.18)' : 'rgba(143,220,149,.08)'; b.fillRect(x, y, w, h); b.strokeStyle = pol ? '#d6ffd2' : 'rgba(143,220,149,.45)'; b.lineWidth = (pol ? 1.6 : 1)*dp; b.strokeRect(x, y, w, h);
       if (pol){ const k = D.stn.findIndex(q => q.m === m); b.fillStyle = '#d6ffd2'; b.font = '600 ' + (10*dp) + 'px JetBrains Mono, monospace'; b.fillText('STN-' + p2(k + 1), x + 4*dp, y + 12*dp); } } });
+    // the people out and about: a fine point cloud, a few returns each
+    b.fillStyle = 'rgba(143,220,149,.38)'; D.pts.forEach(([x0, z0], k) => { for (let q = 0; q < 3; q++){ const u = hsh(k + ':' + q), [x, y] = P(x0 + ((u % 100)/100 - .5)*.9, z0 + (((u >> 8) % 100)/100 - .5)*.9); b.fillRect(x, y, dp, dp); } });
+    // each station's range rings
+    b.setLineDash([2*dp, 4*dp]); b.lineWidth = dp; b.font = (8*dp) + 'px JetBrains Mono, monospace';
+    for (const st of D.stn){ const [x, y] = P(st.m.x, st.m.z); for (const n of [5, 10, 15]){ b.strokeStyle = 'rgba(143,220,149,.16)'; b.beginPath(); b.arc(x, y, n*LOT*s, 0, 7); b.stroke(); b.fillStyle = 'rgba(143,220,149,.4)'; b.fillText(n + ' PL', x + n*LOT*s*.71 + 3*dp, y - n*LOT*s*.71); } }
+    b.setLineDash([]);
     // the sky highways and the metro, faint
     safe(() => { b.strokeStyle = 'rgba(143,220,149,.18)'; b.lineWidth = 2*dp; for (const h of highways){ b.beginPath(); h.tiles.forEach((t, k) => { const [x, y] = P(t.i*LOT, t.j*LOT); k ? b.lineTo(x, y) : b.moveTo(x, y); }); b.stroke(); } });
     // LIDAR range
@@ -325,6 +438,35 @@ const PRECINCT = (() => {
     for (const o of D.ofc){ if (!isFinite(o.x) || o.st === 'OFF SHIFT' || o.st === 'STOOD DOWN') continue; const [x, y] = P(o.x, o.z); b.fillStyle = o.st === 'RESPONDING' ? '#ff5d4a' : o.st === 'AT STATION' ? 'rgba(143,220,149,.5)' : '#d6ffd2'; b.beginPath(); b.arc(x, y, 2.6*dp, 0, 7); b.fill(); }
     for (const d of D.dr.list){ const [x, y] = P(d.x, d.z); b.strokeStyle = d.mode === 'CHASE' ? '#ff5d4a' : '#d6ffd2'; b.lineWidth = 1.4*dp; b.strokeRect(x - 4*dp, y - 4*dp, 8*dp, 8*dp); b.fillStyle = '#d6ffd2'; b.font = (8*dp) + 'px JetBrains Mono, monospace'; b.fillText(d.id, x + 6*dp, y - 5*dp); }
     b.fillStyle = 'rgba(143,220,149,.55)'; b.font = (9*dp) + 'px JetBrains Mono, monospace'; b.textAlign = 'right'; b.fillText('N ↑', W - 8*dp, 14*dp); b.textAlign = 'left';
+    // callouts: boxed labels on leader lines, as on a survey plot
+    const placed = [];   // (the boxes already drawn: a new one moves down past any it would cover)
+    const callout = (x0, z0, lines, dx, dy, col) => { const [x, y] = P(x0, z0), tx = Math.max(6*dp, Math.min(W - 160*dp, x + dx*dp)); let ty = Math.max(30*dp, Math.min(H - 60*dp, y + dy*dp));
+      b.font = (9*dp) + 'px JetBrains Mono, monospace'; const w = Math.max(...lines.map(l => b.measureText(l).width)) + 10*dp, h = lines.length*12*dp + 4*dp;
+      for (let k = 0; k < 12 && placed.some(r => tx < r[0] + r[2] + 4*dp && tx + w > r[0] - 4*dp && ty - 4*dp < r[1] + r[3] + 4*dp && ty - 4*dp + h > r[1] - 4*dp); k++) ty += h + 6*dp;
+      placed.push([tx, ty - 4*dp, w, h]);
+      b.strokeStyle = col; b.lineWidth = dp; b.beginPath(); b.moveTo(x, y); b.lineTo(tx, ty + 6*dp); b.stroke(); b.beginPath(); b.arc(x, y, 3*dp, 0, 7); b.stroke();
+      b.fillStyle = 'rgba(3,8,5,.88)'; b.fillRect(tx, ty - 4*dp, w, h); b.strokeRect(tx, ty - 4*dp, w, h);
+      lines.forEach((l, k) => { b.fillStyle = k ? 'rgba(143,220,149,.85)' : '#d6ffd2'; b.fillText(l, tx + 5*dp, ty + 7*dp + k*12*dp); }); };
+    if (D.hot.length){ const q = secBox(D.hot[0][0]); callout((q.i0 + q.i1)/2*LOT, (q.j0 + q.j1)/2*LOT, ['HOTSPOT ' + D.hot[0][0], D.hot[0][1] + ' CALLS · 72 H'], 70, -60, 'rgba(255,93,74,.8)'); }
+    if (D.last) callout(D.last.x, D.last.z, ['LAST P' + D.last.pri + ' · ' + D.last.kind, tc(D.last.c) + ' · ' + D.last.sec + (D.last.unit ? ' · ' + badge(D.last.unit) : '')], -150, 50, 'rgba(255,176,58,.85)');
+    for (const st of D.stn){ callout(st.m.x, st.m.z, ['STN-' + p2(st.n) + ' · ' + st.sec, st.staff + ' STAFF · ' + st.out + ' OUT · ' + st.drones + ' DRONES'], 60, 60, 'rgba(214,255,210,.7)'); }
+    const sd = sel && D.dr.list.find(q => q.id === sel); if (sd) callout(sd.x, sd.z, [sd.id + ' · ' + sd.mode, sd.way.length + ' WAYPOINTS · ' + sd.sec], 40, -50, '#d6ffd2');
+    // the compass rose and a scale bar
+    { const cx = 34*dp, cy = H - 70*dp, r = 20*dp; b.strokeStyle = 'rgba(143,220,149,.5)'; b.beginPath(); b.arc(cx, cy, r, 0, 7); b.stroke();
+      for (let k = 0; k < 16; k++){ const a = k/16*Math.PI*2, l = k % 4 ? 3 : 6; b.beginPath(); b.moveTo(cx + Math.sin(a)*r, cy - Math.cos(a)*r); b.lineTo(cx + Math.sin(a)*(r - l*dp), cy - Math.cos(a)*(r - l*dp)); b.stroke(); }
+      b.fillStyle = '#d6ffd2'; b.beginPath(); b.moveTo(cx, cy - r + 2*dp); b.lineTo(cx + 4*dp, cy); b.lineTo(cx - 4*dp, cy); b.fill(); b.fillStyle = 'rgba(143,220,149,.6)'; b.textAlign = 'center';
+      for (const [l, a] of [['N', 0], ['E', 1], ['S', 2], ['W', 3]]){ const aa = a*Math.PI/2; b.fillText(l, cx + Math.sin(aa)*(r + 8*dp), cy - Math.cos(aa)*(r + 8*dp) + 3*dp); } b.textAlign = 'left'; }
+    { const L = 5*LOT*s, x1 = W - 12*dp, x0 = x1 - L, y = H - 14*dp; b.strokeStyle = 'rgba(143,220,149,.7)'; b.beginPath(); b.moveTo(x0, y); b.lineTo(x1, y); for (let k = 0; k <= 5; k++){ const x = x0 + L*k/5; b.moveTo(x, y); b.lineTo(x, y - (k % 5 ? 3 : 6)*dp); } b.stroke();
+      b.fillStyle = 'rgba(143,220,149,.7)'; b.textAlign = 'right'; b.fillText('5 PLOTS', x1, y - 8*dp); b.textAlign = 'left'; }
+    // an inset plan: the calls around the first station, by bearing and distance
+    if (D.stn.length){ const st = D.stn[0].m, r = Math.min(70*dp, H*.16), cx = W - r - 14*dp, cy = r + 34*dp;
+      b.fillStyle = 'rgba(3,8,5,.85)'; b.fillRect(cx - r - 8*dp, cy - r - 18*dp, 2*r + 16*dp, 2*r + 26*dp); b.strokeStyle = 'rgba(143,220,149,.35)'; b.strokeRect(cx - r - 8*dp, cy - r - 18*dp, 2*r + 16*dp, 2*r + 26*dp);
+      b.fillStyle = 'rgba(143,220,149,.7)'; b.fillText('PLAN · STN-01 AT CENTRE', cx - r - 4*dp, cy - r - 7*dp);
+      for (const f of [1, .66, .33]){ b.strokeStyle = 'rgba(143,220,149,.25)'; b.beginPath(); b.arc(cx, cy, r*f, 0, 7); b.stroke(); }
+      b.beginPath(); b.moveTo(cx - r, cy); b.lineTo(cx + r, cy); b.moveTo(cx, cy - r); b.lineTo(cx, cy + r); b.stroke();
+      const far = Math.max(LOT*6, ...D.recent.map(c => Math.hypot(c.x - st.x, c.z - st.z)));
+      for (const c of D.recent){ const dx = (c.x - st.x)/far*r, dz = (c.z - st.z)/far*r; b.fillStyle = c.src === 'case' ? '#ffb03a' : c.st === 'open' ? '#ff5d4a' : '#8fdc95'; b.fillRect(cx + dx - 1.5*dp, cy + dz - 1.5*dp, 3*dp, 3*dp); }
+      b.fillStyle = 'rgba(143,220,149,.55)'; b.textAlign = 'right'; b.fillText(Math.round(far/LOT) + ' PL', cx + r, cy + r + 6*dp); b.textAlign = 'left'; }
   }
   function pickMap(px, py){
     if (!F) return null; const P = F.P, r = 9*F.dp; let best = null, bd = r*r;
@@ -342,6 +484,7 @@ const PRECINCT = (() => {
     const sx = ((t*.07) % 1)*W, gr = g.createLinearGradient(sx - 60*dp, 0, sx, 0); gr.addColorStop(0, 'rgba(143,220,149,0)'); gr.addColorStop(1, 'rgba(143,220,149,.07)'); g.fillStyle = gr; g.fillRect(sx - 60*dp, 0, 60*dp, H); g.fillStyle = 'rgba(143,220,149,.35)'; g.fillRect(sx, 0, dp, H);
     const k = (t*.7) % 1; for (const c of D.recent) if (c.st === 'open'){ const [x, y] = F.P(c.x, c.z); g.strokeStyle = `rgba(255,93,74,${(.8*(1 - k)).toFixed(2)})`; g.lineWidth = 1.3*dp; g.beginPath(); g.arc(x, y, (5 + k*16)*dp, 0, 7); g.stroke(); }
     if (hov){ const o = hov.cop ? D.ofc.find(q => q.id === hov.cop) : hov.drone ? D.dr.list.find(q => q.id === hov.drone) : hov.call; if (o){ const [x, y] = F.P(o.x, o.z); g.strokeStyle = '#d6ffd2'; g.lineWidth = dp; g.strokeRect(x - 8*dp, y - 8*dp, 16*dp, 16*dp); } }
+    for (const el of root.querySelectorAll('.sc canvas')) drawSec(el, t);
     const c = $('.clk'); if (c){ const s2 = (now/500 | 0) % 2 ? hm(D.now) : hm(D.now).replace(':', ' '); if (c.textContent !== s2) c.textContent = s2; }
   }
   /* ---------- in and out ---------- */

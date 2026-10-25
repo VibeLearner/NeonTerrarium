@@ -14576,10 +14576,16 @@ function notify(kind,obj){B.needs=true;prCall('sceneChanged',kind,obj||null)}
 
 /* ======================= 3. renderer, home shell, camera ======================= */
 function initRenderer(){if(B.dr)return;const c=$('bCanvas');const dr=new T.WebGLRenderer({canvas:c,antialias:true,alpha:true,premultipliedAlpha:true,powerPreference:'high-performance'});dr.setClearColor(0x000000,0);
-  dr.setPixelRatio(window.devicePixelRatio||1);// native pixel ratio, never lowered (the renderer holds 60 fps by changing the lighting technique only)
+  dr.setPixelRatio(prFor(Math.max(2,$('bStage').clientWidth),Math.max(2,$('bStage').clientHeight)));// (see prFor: the screen's own ratio, up to PR_PIX pixels in all)
   dr.shadowMap.enabled=true;dr.shadowMap.type=T.PCFSoftShadowMap;dr.outputEncoding=T.sRGBEncoding;dr.toneMapping=T.ACESFilmicToneMapping;dr.toneMappingExposure=1.1;B.dr=dr;
   new ResizeObserver(()=>resize()).observe($('bStage'));resize()}
-function resize(){const st=$('bStage');const w=Math.max(2,st.clientWidth),h=Math.max(2,st.clientHeight);if(w===B.cw&&h===B.ch&&B.dr._sized)return;cancelAnimationFrame(skyT);skyT=requestAnimationFrame(drawSky);B.cw=w;B.ch=h;if(B.dr){B.dr.setSize(w,h,false);B.dr._sized=true}prCall('resize',w,h);B.camDirty=true;B.needs=true}
+// The room is drawn at the screen's own pixel ratio, but never at more than PR_PIX pixels in all. The ratio used to be the screen's always ("the
+// renderer holds 60 fps by changing the lighting technique only"), and on a sharp laptop screen (3420 x 1640, 5.6 million pixels) that was 22 to 25 fps
+// with every lighting rung: the card couldn't fill that many pixels with shadows, SSAO and glow (owner's M2, Oct 25: 2.2 million gave 54 fps, 1.4 million
+// a steady 60). Owner decision Oct 25: a pixel cap. A 1080p screen at ratio 1 is under it and unchanged
+const PR_PIX=2.2e6;
+function prFor(w,h){const d=window.devicePixelRatio||1;return Math.max(Math.min(1,d),Math.min(d,Math.sqrt(PR_PIX/Math.max(1,w*h))))}
+function resize(){const st=$('bStage');const w=Math.max(2,st.clientWidth),h=Math.max(2,st.clientHeight);if(w===B.cw&&h===B.ch&&B.dr._sized)return;cancelAnimationFrame(skyT);skyT=requestAnimationFrame(drawSky);B.cw=w;B.ch=h;if(B.dr){B.dr.setPixelRatio(prFor(w,h));B.dr.setSize(w,h,false);B.dr._sized=true}prCall('resize',w,h);B.camDirty=true;B.needs=true}
 // the toast lane sits above the hint, however many lines the hint wraps to
 {const hw=document.querySelector('.bhintw');if(hw&&'ResizeObserver' in window)new ResizeObserver(()=>document.documentElement.style.setProperty('--bhintH',hw.offsetHeight+'px')).observe(hw)}
 {const tl=document.querySelector('.bstage .btl');if(tl){const f=()=>document.documentElement.style.setProperty('--btlB',(tl.offsetTop+tl.offsetHeight)+'px');if('ResizeObserver' in window)new ResizeObserver(f).observe(tl);f()}}
@@ -15471,8 +15477,9 @@ let WARMP=null;
 // programs, then a sample home through the whole open path (worker plan, streamed pieces, slices), compiled in the background and unloaded
 // with its programs kept. Every step yields; the WebGL context creation is the one step that cannot be split.
 // warmStop(): a real visit started while the title-screen warm-up still runs: skip what is left of it (the sample home is let go at once) so the visit never waits on it
-// warmHold(on): the game asks the warm-up to wait while the player moves the city's view (the page draws a sample home behind the city, on the same graphics card)
-const warmHeld=async()=>{while(B.warmHold&&!B.warmStop)await new Promise(res=>setTimeout(res,120))};
+// warmHold(on): the game asks the warm-up to wait while the player moves the city's view (the page draws a sample home behind the city, on the same graphics card).
+// The shader jobs at the end still go on, one every 0.4 s: stopped outright, a visit soon after compiled what was left as the room resolved (a 1.2 s freeze, Oct 25)
+const warmHeld=async max=>{const t=performance.now();while(B.warmHold&&!B.warmStop&&!(max&&performance.now()-t>=max))await new Promise(res=>setTimeout(res,60))};
 function warm(){if(WARMP)return WARMP;B.warmStop=false;WARMP=(async()=>{const t0=performance.now(),r={};const T0=()=>performance.now();
   await yieldTask();let a=T0();if(!B.dr)initRenderer();r.rendererMs=T0()-a;await yieldTask();
   a=T0();r.worker=await wkStart();r.workerMs=T0()-a;r.workerInfo=WK.info||{failed:WK.failed};
@@ -15481,7 +15488,7 @@ function warm(){if(WARMP)return WARMP;B.warmStop=false;WARMP=(async()=>{const t0
   await warmHeld();if(!B.s&&!B.loading&&!B.warmStop){B.warming=true;try{a=T0();await furnishFor(WARM_HH,{tier:'medium',pod:{district:'mid',floor:8,side:'N',seed:4242},quiet:true,auto:true,noCtx:true});r.sampleMs=T0()-a;r.samplePerf=PF.last;
       await warmHeld();a=T0();const R=window.PodRender;if(!B.warmStop&&B.prOn&&R&&typeof R.compileAsync==='function'){try{await R.compileAsync(B.sc,B.cam)}catch(e){console.warn('builder: compileAsync',e)}}r.compileMs=T0()-a;
       // PodRender's own warm-up (every shader variant a room needs: about 30 s on a cold page) advances one job a frame, and the loop is idle while warming: drive it here, so a visit never pays it
-      a=T0();if(!B.warmStop&&B.prOn&&R&&typeof R.warmState==='function'){const until=T0()+90000;let w=null;while(T0()<until&&!B.warmStop){try{w=R.warmState()}catch(e){w=null}if(!w||w.finished||w.broken)break;await warmHeld();if(B.warmStop)break;await new Promise(res=>requestAnimationFrame(()=>res()));try{prCall('render',1/60)}catch(e){break}}r.renderWarmDone=!!(w&&w.finished)}r.renderWarmMs=T0()-a;r.stopped=!!B.warmStop;
+      a=T0();if(!B.warmStop&&B.prOn&&R&&typeof R.warmState==='function'){const until=T0()+90000;let w=null;while(T0()<until&&!B.warmStop){try{w=R.warmState()}catch(e){w=null}if(!w||w.finished||w.broken)break;await warmHeld(400);if(B.warmStop)break;await new Promise(res=>requestAnimationFrame(()=>res()));try{prCall('render',1/60)}catch(e){break}}r.renderWarmDone=!!(w&&w.finished)}r.renderWarmMs=T0()-a;r.stopped=!!B.warmStop;
       r.kept=keepPrograms();await unload()}
     catch(e){console.warn('builder: warm-up sample failed',e);r.error=String(e&&e.message||e)}finally{B.warming=false}}else r.sample='skipped: a home is open';
   if(pw){a=T0();const p=await pw;r.probes=p?p.n:0;r.probeMs=p?p.ms:null;r.probeWaitMs=T0()-a}r.programs=B.dr?B.dr.info.programs.length:0;r.totalMs=T0()-t0;for(const k in r)if(typeof r[k]==='number')r[k]=Math.round(r[k]*10)/10;B.warmInfo=r;return r})();return WARMP}
@@ -16916,14 +16923,23 @@ const G={settle:0,cpuBound:false,med:0,gpuOk:true,rung:1,sub:0,win:[],winT:0,las
 function gpuTrusted(med){if(GT.total==null)return null;const iv=Math.max(med||0,16.7);return GT.total<=iv*1.1?GT.total:null}
 function govern(dt){G.ints[G.ni]=dt;G.ni=(G.ni+1)%G.ints.length;G.nInts=Math.min(G.nInts+1,G.ints.length);if(S.fixed||!S.matReady)return;
   // frames while the open, the warm-up or a rebake is still working say nothing about steady cost: no window counts until 3 s after the last of them
-  if((S.warm&&!S.warm.finished)||(S.altT&&now()-S.altT<600)||ctxBusy()||ctxHold()||S.pq.length||S.cubes.some(c=>c.dirty)||S.pmQ.length||S.optQ.length||S.projNeeded||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid))){G.win=[];G.winT=0;G.slowN=0;G.settle=now()+3000;return}
-  if(now()<G.settle){G.win=[];G.winT=0;return}
+  // ...but not for ever: the background rebakes (the spare light set, the city backdrop) can run for a whole visit, and the governor never judged a
+  // window at all (22 fps for a minute at the top rung, owner's M2, Oct 25). After 8 s of it, windows count anyway
+  const busy=(S.warm&&!S.warm.finished)||(S.altT&&now()-S.altT<600)||ctxBusy()||ctxHold()||S.pq.length||S.cubes.some(c=>c.dirty)||S.pmQ.length||S.optQ.length||S.projNeeded||S.aoDirty||(S.zRooms&&S.zRooms.some(r=>!r.valid));
+  if(busy){if(!G.busySince)G.busySince=now();if(now()-G.busySince<8000||ctxHold()||(S.warm&&!S.warm.finished)){G.win=[];G.winT=0;G.slowN=0;G.settle=now()+3000;return}}else G.busySince=0;
+  if(now()<G.settle&&!busy){G.win=[];G.winT=0;return}
   G.win.push(dt);G.winT+=dt;if(G.winT<1000||G.win.length<10)return;
   const w=G.win.sort((a,b)=>a-b),med=w[w.length>>1],p95=w[Math.min(w.length-1,Math.floor(w.length*.95))];G.win=[];G.winT=0;const t=now();
+  if(G.trial&&t-G.trial.t>2500){const tr=G.trial;G.trial=null;if(med>tr.med*.88){G.rung=tr.rung;G.sub=tr.sub;G.lastChange=t;G.noHelp=t+6e4;console.log('[PodRender] quality: the step down did not help (median '+tr.med.toFixed(1)+' -> '+med.toFixed(1)+' ms): taken back')}}
   if(med>17.5||p95>28){
     // CPU-bound (draw submission): lighting quality does not buy frame time, so keep it; the CPU side is cut elsewhere (merges, glow cards)
-    const gpu=gpuTrusted(med);G.med=med;G.gpuOk=gpu!=null||GT.total==null;G.cpuBound=!!(S.cpu>10&&(gpu==null||gpu<S.cpu));if(G.cpuBound){G.slowN=0;return}
+    // Without a trusted timer the CPU time can't tell the two apart: on Apple a card that's behind makes the draw calls themselves wait (useProgram
+    // 35 ms, render() 30 to 50 ms a frame at 22 fps), which read as CPU-bound and the quality was never lowered. So there a step down is tried, and
+    // if the next windows aren't quicker it's taken back and the frames count as CPU-bound for a minute
+    const gpu=gpuTrusted(med);G.med=med;G.gpuOk=gpu!=null||GT.total==null;
+    G.cpuBound=gpu!=null?!!(S.cpu>10&&gpu<S.cpu):!!(S.cpu>10&&t<(G.noHelp||0));if(G.cpuBound){G.slowN=0;return}
     G.slowN++;G.stable=t;if(G.slowN>=2&&t-G.lastChange>2000){G.slowN=0;if(G.lastUp&&t-G.lastUp.t<4000)G.upWait[G.lastUp.to]=Math.min(12e4,G.upWait[G.lastUp.to]*2);G.lastUp=null;
+      if(gpu==null&&S.cpu>10)G.trial={t,med,rung:G.rung,sub:G.sub};
       if(G.sub===0&&RUNGS[G.rung].ts<8){G.sub=1;G.lastChange=t;console.log('[PodRender] quality: coarser lighting buffers (median '+med.toFixed(1)+' ms, p95 '+p95.toFixed(1)+' ms)')}else if(G.rung<NR){G.sub=0;setRung(G.rung+1)}}return}
   G.slowN=0;G.med=med;const gpu=gpuTrusted(med);G.gpuOk=gpu!=null||GT.total==null;
   // trusted timer: real headroom. No usable timer (missing, or reading above the frame interval): a frame rate that holds is the cue for a trial step up;

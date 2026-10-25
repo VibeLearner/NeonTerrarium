@@ -11,7 +11,7 @@ const FURN = (() => {
   // detail by distance from the home, in game units (x3.16 in the lab). The lab's backdrop is sharp only within about 45 m (14 units):
   // full detail to NEAR, clustered on a CG grid to MID, simple blocks (the clustered stand-in clustered again on a CG_FAR grid) beyond.
   // F.lightCity = false sends the city as before (full detail to 46, clustered beyond) to compare.
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-25d';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-25e';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
 
@@ -479,6 +479,21 @@ const FURN = (() => {
     const ok = () => !F.frame && !F.open && typeof TITLE !== 'undefined' && TITLE.on;
     const tick = () => { if (F.frame || F.open) return; if (ok()) preload(); else setTimeout(tick, 250); };
     setTimeout(tick, 0);
+  })();
+  // the warm-up goes on behind the city when the title screen lets go before it's done (it has a cap): it furnishes a sample home, compiles its
+  // programs and draws it every frame at full size for its lighting, and the city and it share the one graphics card. In the first ten seconds
+  // after Continue the city ran at 17 to 35 fps (Oct 25, owner's M2). Now it's held while the view moves (and for two seconds after) and goes on
+  // only while the player is still
+  (function warmHold(){
+    let held = false, last = 0, p = null;
+    const tell = on => { held = on; try { F.frame.contentWindow.postMessage({ type: 'furnish:hold', on }, location.origin); } catch (e) {} };
+    setInterval(() => {
+      if (!F.frame || !F.preloading || F.open){ if (held && F.frame) tell(false); p = null; return; }
+      const v = [yaw, zoom, PITCH, camT.x, camT.z], t = performance.now();
+      if (!p || v.some((x, i) => Math.abs(x - p[i]) > 1e-3)) last = t; p = v;
+      const want = !(typeof TITLE !== 'undefined' && TITLE.on) && t - last < 2000;
+      if (want !== held) tell(want);
+    }, 200);
   })();
   F.warmed = () => F.warmMs != null || F.warmFailed === true;   // (title.js: the shutter waits for this)
   // the open's timing, all from the click: when the page shows the hologram, when the home has resolved, and the longest stretch

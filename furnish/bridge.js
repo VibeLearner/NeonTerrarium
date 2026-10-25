@@ -10,7 +10,7 @@
   if (!host || host === window) return;   // (opened on its own: the plain embedded lab, nothing to talk to)
   const send = (m, xfer) => host.postMessage(m, ORIGIN, xfer || []);
   const fresh = () => ({ home: null, dirty: false, opening: false, sent: false, ready: false, cityDone: false, t0: 0, visit: 0, offs: [] });
-  let S = fresh(), visits = 0;
+  let S = fresh(), visits = 0, HOLD = false;   // (HOLD: the game asks the warm-up to wait while the player moves the view)
   // the bar: Exit to city and Save, top left where the lab's Home menu sits
   const bar = document.createElement('div'); bar.className = 'nt-bar'; bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', 'Furnish pod');
   bar.innerHTML = '<button class="nt-exit" id="ntExit" title="Back to the city (your changes are kept)">Exit to city</button><button class="nt-save" id="ntSave" title="Save this apartment with the city (Ctrl+S)" disabled>Save</button>';
@@ -107,6 +107,7 @@
     const t0 = performance.now();
     warming = (async () => { try { if (PB().warm) await PB().warm(); } catch (e) { console.warn('furnish: builder warm-up', e); } })();
     await warming; warming = null;
+    while (HOLD && !S.home && !S.opening) await new Promise(r => setTimeout(r, 150));   // (held while the player moves the city's view: the game, furnish.js)
     if (!S.home && !S.opening) try { if (PC() && PC().warm) await PC().warm(); } catch (e) { console.warn('furnish: context warm-up', e); }
     if (!S.home && !S.opening) sleep(true);
     send({ type: 'furnish:warmed', ms: Math.round(performance.now() - t0) });
@@ -118,6 +119,7 @@
       if (m.type === 'furnish:begin') begin(m);
       else if (m.type === 'furnish:plots') plots(m);
       else if (m.type === 'furnish:warm') warm();
+      else if (m.type === 'furnish:hold'){ HOLD = !!m.on; try { if (PB().warmHold) PB().warmHold(HOLD); } catch (e) {} }
       else if (m.type === 'furnish:wake') sleep(false);
       else if (m.type === 'furnish:saved'){ if (m.ok){ S.dirty = false; sync(); say('Saved with the city'); } else say('Could not save: the browser storage is full or blocked'); }
     } catch (err) { console.error('furnish: ' + m.type + ' failed', err); if (m.type === 'furnish:begin') send({ type: 'furnish:error', message: 'The apartment could not be opened: ' + (err && err.message || err) }); }

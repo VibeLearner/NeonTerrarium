@@ -2054,7 +2054,7 @@ function gpuUpload(mesh, geo){
 // (the nearest to the middle of the view); a block goes back to the stand-in once it has been out of that for TIER.hold frames. When the view is farther than TIER.zs everything is a stand-in.
 // A block changes tier by being merged again from the other geometry; the old merge stays drawn until the new one is made, which waits for the worker to send the arrays it needs (recipe.js).
 // Tests: "full detail everywhere (as before)" (tierOff), "stand-in tier everywhere (to measure)" (tierAll), "show tiers (stand-ins tinted)" (tierShow).
-Object.assign(TIER, { zs: 24, margin: 12, maxFull: 36, hold: 180, holdS: 60, zsOut: 32, nearMax: 36, near: false, of: new Map(), sig: '', since: new Map(), changes: 0, nFull: 0, nStand: 0 });
+Object.assign(TIER, { zs: 24, margin: 12, maxFull: 36, hold: 180, holdS: 60, zsOut: 32, nearMax: 36, near: false, promoEvery: 2, promoAt: -1e9, of: new Map(), sig: '', since: new Map(), changes: 0, nFull: 0, nStand: 0 });
 TIER.on = () => S.tiers !== false && !(PH.tests.tierOff || window.__TIER_OFF);   // (S.tiers: the 'Detail tiers' box in the render menu, remembered in this browser)
 TIER.all = () => !!(PH.tests.tierAll || window.__TIER_ALL);
 TIER.show = () => !!(PH.tests.tierShow || window.__TIER_SHOW);
@@ -2117,10 +2117,15 @@ function tierTick(){
   // came in waves, measured on the owner's city Oct 25)
   if (near) for (const b of blocks.values()){ const k = b.k, d = Math.hypot(b.x - camGoal.x, b.z - camGoal.z); if (d <= r || _tfr.intersectsBox(b.box)) wantFull.push([d, k]); }
   wantFull.sort((p, q) => p[0] - q[0]); const keep = new Set(wantFull.slice(0, TIER.nearMax).map(e => e[1]));
+  // stand-ins back to full detail one block every TIER.promoEvery frames, nearest the view's middle first: the first zoom-in made about twenty blocks
+  // full in one frame (20 merges and some 165 plots made again by the worker within a tenth of a second, a 45 ms hitch). The stand-ins show meanwhile
+  let promo = TIER.rush || PM.frame - TIER.promoAt >= TIER.promoEvery ? (TIER.rush ? Infinity : 1) : 0;
+  for (const e of wantFull){ if (!keep.has(e[1])) break; const k = e[1];
+    if (TIER.of.get(k) === 'stand' && promo > 0){ TIER.of.delete(k); tierMark(k); promo--; TIER.promoAt = PM.frame; } }
   let nFull = 0, nStand = 0;
   for (const k of blocks.keys()){
     const cur = TIER.of.get(k) || 'full';
-    if (keep.has(k)){ TIER.since.delete(k); if (cur === 'stand'){ TIER.of.delete(k); tierMark(k); } }
+    if (keep.has(k)) TIER.since.delete(k);
     else if (cur === 'full'){ const t0 = TIER.since.get(k); if (t0 === undefined && !TIER.rush) TIER.since.set(k, PM.frame); else if (TIER.rush || PM.frame - t0 >= pmSec(TIER.holdS)){ TIER.of.set(k, 'stand'); TIER.since.delete(k); tierMark(k); } }
     if ((TIER.of.get(k) || 'full') === 'full') nFull++; else nStand++;
   }

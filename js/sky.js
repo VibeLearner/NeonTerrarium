@@ -1111,7 +1111,9 @@ function makeTargets(){
   if (rtCloud) rtCloud.dispose();
   const q = S.cloudQ || 2;
   // (Smooth: the clouds are drawn smaller than the frame and stretched with a blend, so their edges aren't stair-steps)
-  rtCloud = new THREE.WebGLRenderTarget(Math.ceil(W/q), Math.ceil(H/q), SMOOTH_LOOK.value ? Object.assign({}, opt, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }) : opt);
+  // (at the base resolution whatever the zoom: zoomed out, the frame grows up to 1.6 times its lines but the clouds needn't, and they were the
+  //  third-dearest pass, about as much as the whole composite)
+  rtCloud = new THREE.WebGLRenderTarget(Math.ceil(W*pxK/q), Math.ceil(H*pxK/q), SMOOTH_LOOK.value ? Object.assign({}, opt, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }) : opt);
   comp.uniforms.tCloud.value = rtCloud.texture; cloudMat.uniforms.tDepth.value = rtC.depthTexture;
   if (rtOut) rtOut.dispose();
   rtOut = new THREE.WebGLRenderTarget(W, H, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat });
@@ -1517,6 +1519,7 @@ function setRenderLines(n){
   resize();
 }
 let DW = 1, DH = 1, BASE_H = 270, pxK = 1;
+const PIX_MAX = 2.1e6;   // the most pixels the city is drawn at (applyRenderRes): a 1080p screen never reaches it, a sharp laptop screen zoomed out does
 function resize(){
   const dpr = devicePixelRatio || 1;
   DW = Math.max(1, Math.round(innerWidth*dpr)); DH = Math.max(1, Math.round(innerHeight*dpr));
@@ -1533,7 +1536,7 @@ function resize(){
 // own resolution: on a sharp laptop screen, zoomed out over a big city, four to nine times the pixels for every
 // post effect). PERF.grow is also lowered on its own while frames run slow, and raised again once they're quick (main.js).
 // Both are Settings, Render, "Optimize framerate": how far it grows (ZOOM_RES, below) and the automatic lowering (S.autoPerf).
-const PERF = { grow: Infinity, max: 1.6, ema: 16, t: 0, f: 1, quick: 0, quietUntil: 0,
+const PERF = { grow: Infinity, max: 1.6, ema: 16, t: 0, f: 1, quick: 0, quietUntil: 0, vs: 16.7, ceil: Infinity, ceilUntil: 0, upAt: -1e9,
   // a moment that isn't the city's own doing (a panel opening, the Spire's curtain, a page arriving): frames in it aren't counted
   quiet(ms){ this.quietUntil = Math.max(this.quietUntil, performance.now() + ms); this.t = 0; this.quick = 0; } };
 // Zoomed out, how far the render grows past the base (Settings, Optimize framerate, "Zoomed out"): 1 the same pixels at every zoom (a fixed render size: the
@@ -1550,8 +1553,15 @@ function applyRenderRes(z){
   if (S.autoPerf !== false) f = Math.min(f, PERF.grow);
   PERF.f = f;
   const step = Math.round(Math.log(f)/Math.log(1.04));   // 4% steps, so targets aren't remade every frame
-  const h = Math.min(DH, Math.round(BASE_H*Math.pow(1.04, step)));
+  let h = Math.min(DH, Math.round(BASE_H*Math.pow(1.04, step)));
+  // and never more than PIX_MAX pixels in all, whatever the zoom: on a sharp laptop screen (3420 x 1640) the 1.6 times above came to 3.6 million pixels
+  // for the color pass and every post effect, more than the card could draw in a 60 Hz frame. Between zoom 21 and 40 one frame in four or five came in
+  // late, the judder that came and went with the zoom (measured on the owner's M2, Oct 25: 52 fps at 1.6 times, a steady 60 at the base). Never under the base
+  h = Math.min(h, Math.max(BASE_H, Math.floor(Math.sqrt(PIX_MAX*DH/DW))));
   if (h === H) return;
+  // while the zoom is still gliding, small steps wait: each step remakes every render target (the frame, the depth, the glow, the clouds), and a turn
+  // of the wheel crossed a dozen of them in half a second. A big step goes at once (the picture mustn't blur), the rest when the zoom settles
+  if (H && typeof zoomT !== 'undefined' && Math.abs(zoomT - z) > .02*z && Math.abs(h - H) < H*.12) return;
   H = h; W = Math.max(1, Math.round(h*DW/DH)); pxK = BASE_H/H;
   FOL_UNI.res.value.set(W, H); comp.uniforms.pxK.value = pxK;
   makeTargets();

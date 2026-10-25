@@ -183,7 +183,7 @@ function frameBody(now){
     comp.uniforms.rayI.value = (1-nt)*(0.45 + 1.1*(1-el)) + nt*.12; }
   clouds.visible = !S.vclouds;
   PH.lap('pass setup');
-  if (S.vclouds){ PH.begin('clouds'); renderer.setRenderTarget(rtCloud); renderer.render(cloudScene, compCam); PH.end(); }
+  if (S.vclouds){ PH.begin('clouds'); if (S.cloudVol){ renderer.setRenderTarget(rtCloud); renderer.render(cloudScene, compCam); } else CLOUDM.draw(); PH.end(); }   // (the mesh clouds, unless S.cloudVol: sky.js)
   compVariant();   // (sky.js)
   PH.begin('soft effects (half resolution)'); softEffects(Math.round(camPix.x), Math.round(camPix.y)); PH.end();   // the wet-ground reflections, mist and light shafts, 2 x 2 pixels at a time (sky.js)
   PH.begin('composite'); renderer.setRenderTarget(rtOut); renderer.render(compScene, compCam); PH.end();

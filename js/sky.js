@@ -1065,6 +1065,96 @@ const cloudMat = new THREE.ShaderMaterial({
   depthTest:false, depthWrite:false,
 });
 const cloudScene = new THREE.Scene(); cloudScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), cloudMat));
+/* ---------- the clouds as meshes (the default; S.cloudVol: the marched ones above) ----------
+   The sea of clouds round and under the island, as low-poly puffs instead of a 22-step march through two baked volumes for every pixel of sky. Each
+   puff is a 80-triangle ball drawn round: its normal is worked out per pixel from the puff's own middle, so the shading is smooth whatever the facets,
+   and cut flat underneath at its cluster's base, the way cumulus are. Lit with the marched clouds' own six-colour pastel ramp (sun and sky colours,
+   pink and lavender between, the neon glow on the undersides at night), banded in the pixel look and blended in Smooth. A 80 x 80 tile of clusters
+   repeats; the puffs wrap round a 480-wide window that follows the view and drift with the wind (cloudOff, main.js). The looks' cover shows more or
+   fewer of them. Drawn into the cloud image at the frame's own size (it's cheap now: one draw, about 260 thousand small triangles and a short shader),
+   so they're no longer soft when zoomed out. */
+const CLOUDM = (() => {
+  const TILE = 80, REP = 6, rr = mulberry32(4242);
+  const base = new THREE.IcosahedronGeometry(1, 1);
+  const pos = [], scl = [], info = [], clo = [], cls = [];
+  const cl = [];   // [puff x, y, z, sx, sy, sz], cluster base, top, seed, cluster middle [x, y, z], cluster half-size [x, y, z]
+  const cluster = (x, z, b, R, n, sizeK, rise, flat) => {
+    const ps = []; let top = b;
+    for (let k = 0; k < n; k++){
+      const a = rr()*TAU, d = Math.sqrt(rr())*R*.8, s = sizeK*(.7 + rr()*.6)*(1 - .4*d/R);
+      const y = b + s*(.3 + rr()*.35)*flat + (1 - d/R)*rr()*rise;
+      ps.push([x + Math.cos(a)*d, y, z + Math.sin(a)*d, s*1.2, s*.8*flat, s*1.2]); top = Math.max(top, y + s*.8*flat);
+    }
+    const seed = rr(), mid = [x, (b + top)/2, z], half = [R + sizeK*.9, Math.max(.6, (top - b)/2 + .2), R + sizeK*.9];
+    for (const q of ps) cl.push([q, b, top, seed, mid, half]);
+  };
+  // the puffs: heaped clusters, a few towering ones; and the low, wide banks the marched clouds' sea made between them
+  for (let c = 0; c < 58; c++){ const tall = rr() < .22; cluster(rr()*TILE, rr()*TILE, tall ? -9.5 - rr()*3 : -13 - rr()*2.5, 3 + rr()*4.5, 7 + Math.floor(rr()*7), tall ? 2.6 : 2.1, tall ? 5 : 1.8, 1); }
+  for (let c = 0; c < 22; c++) cluster(rr()*TILE, rr()*TILE, -15.3 - rr()*.7, 6 + rr()*6, 8 + Math.floor(rr()*5), 3.2, .6, .45);
+  for (let i = 0; i < REP; i++) for (let j = 0; j < REP; j++) for (const [q, b, top, seed, mid, half] of cl){
+    pos.push(q[0] + i*TILE, q[1], q[2] + j*TILE); scl.push(q[3], q[4], q[5]); info.push(b, top, seed);
+    clo.push(mid[0] - q[0], mid[1] - q[1], mid[2] - q[2]); cls.push(half[0], half[1], half[2]); }
+  const g = new THREE.InstancedBufferGeometry(); g.index = base.index; g.setAttribute('position', base.getAttribute('position'));
+  const ia = (n, v) => g.setAttribute(n, new THREE.InstancedBufferAttribute(new Float32Array(v), 3));
+  ia('iPos', pos); ia('iScl', scl); ia('iInfo', info); ia('iClo', clo); ia('iCls', cls);
+  g.instanceCount = pos.length/3;
+  const U = cloudMat.uniforms;
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { cloudOff: U.cloudOff, sunDir: U.sunDir, sunCol: U.sunCol, skyTop: U.skyTop, skyBot: U.skyBot, night: U.night, smoothLook: U.smoothLook,
+      cityGlow: U.cityGlow, glowC: U.glowC, rainDark: U.rainDark, cover: U.cover, cloudAmt: U.cloudAmt, cloudCol: U.cloudCol,
+      camC: { value: new THREE.Vector2() }, span: { value: TILE*REP }, viewDir: { value: new THREE.Vector3(0, -1, 0) } },
+    vertexShader: `attribute vec3 iPos; attribute vec3 iScl; attribute vec3 iInfo; attribute vec3 iClo; attribute vec3 iCls;
+      uniform vec2 cloudOff; uniform vec2 camC; uniform float span; uniform float cover;
+      varying vec3 vW; varying vec3 vC; varying vec3 vS; varying vec3 vI; varying vec3 vK; varying vec3 vKs;
+      void main(){
+        float show = step(iInfo.z, .62 + (cover - .5)*.9);   // (the looks' cover: more or fewer of the clusters)
+        vec2 w = iPos.xz - cloudOff; w = camC + mod(w - camC + span*.5, span) - span*.5;
+        vec3 c = vec3(w.x, iPos.y, w.y), wp = c + position*iScl*show;
+        wp.y = max(wp.y, iInfo.x);   // flat underneath, at the cluster's base
+        vW = wp; vC = c; vS = iScl; vI = iInfo; vK = c + iClo; vKs = iCls;
+        gl_Position = projectionMatrix*viewMatrix*vec4(wp, 1.0);
+      }`,
+    fragmentShader: CLOUD_NOISE + `
+      uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 cityGlow; uniform vec2 glowC;
+      uniform float night; uniform float smoothLook; uniform float rainDark; uniform float cloudAmt; uniform vec3 cloudCol; uniform vec3 viewDir;
+      varying vec3 vW; varying vec3 vC; varying vec3 vS; varying vec3 vI; varying vec3 vK; varying vec3 vKs;
+      void main(){
+        bool under = vW.y <= vI.x + .02;
+        // two normals: the puff's own (its lumps) and its whole cluster's (one heap), so the light falls on the heap and the puffs only dent it,
+        // the way the marched field merged them, instead of every ball getting an outline of its own
+        vec3 np = normalize((vW - vC)/(vS*vS)), nk = normalize((vW - vK)/(vKs*vKs));
+        vec3 n = under ? vec3(0.0, -1.0, 0.0) : normalize(np*.45 + nk*.55);
+        float dith = bayer(gl_FragCoord.xy);
+        float pastel = (1.0 - 0.85*night)*(1.0 - 0.6*rainDark);
+        vec3 shade = mix(mix(skyBot, skyTop, 0.35)*0.55, mix(skyTop, vec3(0.48, 0.52, 0.86), 0.6)*0.92, pastel)*(1.0 - 0.35*rainDark);
+        vec3 litC = sunCol*1.05 + skyTop*0.25;
+        litC = mix(litC, cloudCol, cloudAmt); shade = mix(shade, cloudCol*0.62, cloudAmt);
+        vec3 P0 = shade*(0.8 + 0.1*pastel), P1 = shade + vec3(0.03, 0.02, 0.07)*pastel, P2 = mix(shade, litC, 0.36) + vec3(0.07, 0.0, 0.07)*pastel,
+             P3 = mix(shade, litC, 0.58) + vec3(0.09, -0.01, 0.03)*pastel, P4 = mix(shade, litC, 0.8) + vec3(0.06, 0.01, -0.03)*pastel, P5 = litC*1.02 + vec3(0.02, 0.02, -0.01)*pastel;
+        // lower in its heap, darker (the marched clouds looked toward the sun for the puff in the way; this guesses it from the height), and
+        // toward the heap's outline the pink and lavender rim
+        float occl = clamp((vI.y - vW.y)/max(vI.y - vI.x, 1.0), 0.0, 1.0);
+        float rim = under ? 1.0 : 1.0 - abs(dot(nk, viewDir));
+        float light = dot(n, sunDir)*0.42 + 0.5 + 0.22*smoothstep(-15.0, -8.0, vW.y) - 0.12 - 0.22*occl - 0.24*rim*rim + (vnoise(vW*1.7) - 0.5)*0.12;
+        float band = clamp(floor(clamp(light, 0.0, 0.999)*6.0 + (dith - 0.5)*0.12), 0.0, 5.0);
+        vec3 cc = band < 0.5 ? P0 : band < 1.5 ? P1 : band < 2.5 ? P2 : band < 3.5 ? P3 : band < 4.5 ? P4 : P5;
+        if (smoothLook > .5){ float bf = clamp(light, 0.0, 0.999)*5.0;
+          cc = bf < 1.0 ? mix(P0, P1, bf) : bf < 2.0 ? mix(P1, P2, bf - 1.0) : bf < 3.0 ? mix(P2, P3, bf - 2.0) : bf < 4.0 ? mix(P3, P4, bf - 3.0) : mix(P4, P5, bf - 4.0); }
+        cc += cityGlow*night*0.55*exp(-length(vW.xz - glowC)/9.0)*smoothstep(-11.0, -6.0, vW.y)*(n.y < 0.2 ? 1.0 : 0.4);   // neon on the undersides at night
+        gl_FragColor = vec4(cc, 1.0);
+      }`,
+  });
+  const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false;
+  const scene = new THREE.Scene(); scene.add(mesh);
+  const camC = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  return { scene, mat, mesh,
+    draw(){   // into rtCloud, with the view's own camera (its far plane pushed out: the sea lies past the city's)
+      camC.copy(cam); camC.far = cam.far + 600; camC.updateProjectionMatrix();
+      mat.uniforms.camC.value.set(camT.x, camT.z); camC.getWorldDirection(mat.uniforms.viewDir.value);
+      const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha(), ac = renderer.autoClear;
+      renderer.setRenderTarget(rtCloud); renderer.setClearColor(0x000000, 0); renderer.autoClear = true; renderer.render(scene, camC);
+      renderer.setClearColor(cc, ca); renderer.autoClear = ac; } };
+})();
 let rtCloud = null;
 
 let rtC = null, rtN = null, W = 480, H = 270;
@@ -1109,11 +1199,11 @@ function makeTargets(){
   comp.uniforms.tColor.value = rtC.texture; comp.uniforms.tDepth.value = rtC.depthTexture; comp.uniforms.tNormal.value = rtN.texture;
   comp.uniforms.res.value.set(W,H);
   if (rtCloud) rtCloud.dispose();
-  const q = (S.cloudQ || 2) + (FARV.far ? 1 : 0);   // (a size smaller zoomed out: the sharp view, below)
+  const q = S.cloudVol ? (S.cloudQ || 2) + (FARV.far ? 1 : 0) : 1;   // (the mesh clouds: the frame's own size, they're cheap; the marched ones a size smaller zoomed out)
   // (Smooth: the clouds are drawn smaller than the frame and stretched with a blend, so their edges aren't stair-steps)
   // (at the base resolution whatever the zoom: zoomed out, the frame grows up to 1.6 times its lines but the clouds needn't, and they were the
   //  third-dearest pass, about as much as the whole composite)
-  rtCloud = new THREE.WebGLRenderTarget(Math.ceil(W*Math.min(1, pxK)/q), Math.ceil(H*Math.min(1, pxK)/q), SMOOTH_LOOK.value ? Object.assign({}, opt, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }) : opt);
+  rtCloud = new THREE.WebGLRenderTarget(S.cloudVol ? Math.ceil(W*Math.min(1, pxK)/q) : W, S.cloudVol ? Math.ceil(H*Math.min(1, pxK)/q) : H, SMOOTH_LOOK.value ? Object.assign({}, opt, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }) : opt);
   comp.uniforms.tCloud.value = rtCloud.texture; cloudMat.uniforms.tDepth.value = rtC.depthTexture;
   if (rtOut) rtOut.dispose();
   rtOut = new THREE.WebGLRenderTarget(W, H, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat });

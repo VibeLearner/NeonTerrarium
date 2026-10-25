@@ -2401,7 +2401,7 @@ function emitterFx(m){
 // with vent stacks; on the roof, satellite dishes, cabinets and pipe bundles feeding a heavy drum, and out of the drum a
 // lattice tower round a core banded in cyan light, up to a railed platform carrying the sensor head under a white dome.
 // Live (lidarFx): the head turns, throwing a thin fan of light, and every few seconds a scan ring leaves the tower and
-// spreads out over the rooftops to the edge of its range (LIDAR_R), where a faint ring marks how far it reaches. The homes
+// spreads out over the rooftops to the edge of its range (LIDAR_R), a ring marks how far it reaches while picking. The homes
 // inside that range can be scanned, and so furnished (furnish.js): the array is what unlocks Furnish pod.
 const LIDAR_R = 15*LOT;   // how far an array scans, in world units (15 plots)
 const lidarCovers = (x, z) => megasOfKind('lidar').some(m => Math.hypot(m.x - x, m.z - z) <= LIDAR_R);
@@ -2498,8 +2498,8 @@ function buildLidarArray(m){
   m.top = dy + 2;
 }
 // The sensor head turns: a dark drum with a cyan lens throwing a thin fan of light. Every few seconds a scan ring leaves the
-// tower above the rooftops and spreads to the edge of the array's range, bright at its front and fading behind; a faint ring
-// stays at the range's edge (brighter while Furnish pod is picking, so the player can see which homes it reaches).
+// tower above the rooftops and spreads to the edge of the array's range, bright at its front and fading behind; a ring marks
+// the range's edge while Scan pod is picking, so the player can see which homes it reaches.
 const LIDAR_RING = new THREE.ShaderMaterial({
   uniforms: { uIn: { value: .9 }, uA: { value: 1 }, uRim: { value: 0 } },
   vertexShader: 'varying vec2 vP; void main(){ vP = position.xz; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
@@ -2544,7 +2544,7 @@ function lidarFx(m){
         q.material.uniforms.uA.value = (1 - ph)*(1 - ph)*(picking ? 1.5 : .9)*Math.min(1, ph*12);
         q.material.uniforms.uIn.value = Math.max(.86, 1 - 2.6/r);   // (a band a couple of units wide, wherever it has got to)
       }
-      edgeMat.uniforms.uA.value = picking ? .55 + .15*Math.sin(t*3) : .16;
+      edge.visible = picking; if (picking) edgeMat.uniforms.uA.value = .55 + .15*Math.sin(t*3);   // (the range's edge only while picking a pod)
       bandHalos.forEach((h, k) => { const u = ((t + off)*.6 - k*.25) % 1; h.material.opacity = .25 + .6*Math.max(0, 1 - Math.abs(u - .5)*4); });
     },
     dispose(){ scene.remove(root); for (const g of [drum.geometry, cap.geometry, lensM.geometry, fanGeo, geo, edgeGeo]) g.dispose(); for (const mt of [dark, lens, fanMat, edgeMat, halo.material, ...pulses.map(q => q.material), ...bandHalos.map(h => h.material)]) mt.dispose(); }

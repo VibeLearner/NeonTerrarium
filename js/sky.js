@@ -1083,7 +1083,7 @@ const cloudScene = new THREE.Scene(); cloudScene.add(new THREE.Mesh(new THREE.Pl
 // Carrying over is exact for a pan, a zoom and the wind (the view is orthographic: every height moves the same on screen), but not for a turn or a
 // tilt, where the higher and lower clouds slide apart. So while the view turns, every pixel is marched, at half size as the clouds always were
 // before, and once it stops the full-size image builds up again from that one, a share a frame
-const CLOUDT = { reset: true, i: 0, slot: 0, VP: new THREE.Matrix4(), drift: new THREE.Vector2(), cover: -1, prev: null, yaw: null, pitch: null };
+const CLOUDT = { reset: true, i: 0, slot: 0, VP: new THREE.Matrix4(), drift: new THREE.Vector2(), cover: -1, prev: null, yaw: null, pitch: null, old: null };
 function cloudFrame(){
   const U = cloudMat.uniforms, n = S.cloudQ === 1 ? 4 : S.cloudQ === 3 ? 16 : 8;   // (Settings, cloud quality: sharp, balanced, fast; all at the frame's own size)
   if (Math.abs(U.cover.value - CLOUDT.cover) > .02){ CLOUDT.cover = U.cover.value; CLOUDT.reset = true; }   // (a look's change of cover: everything at once)
@@ -1101,6 +1101,7 @@ function cloudFrame(){
   renderer.setRenderTarget(dst); renderer.render(cloudScene, compCam);
   rtCloud = dst; comp.uniforms.tCloud.value = dst.texture; CLOUDT.prev = dst.texture; if (dst !== rtClHalf) CLOUDT.i = 1 - CLOUDT.i;
   CLOUDT.VP.copy(comp.uniforms.VP.value); CLOUDT.drift.copy(U.cloudOff.value); CLOUDT.reset = false;
+  if (CLOUDT.old){ for (const r of CLOUDT.old) if (r) r.dispose(); CLOUDT.old = null; }
 }
 let rtCloud = null, rtCl = [null, null], rtClHalf = null;
 
@@ -1147,9 +1148,9 @@ function makeTargets(){
   comp.uniforms.res.value.set(W,H);
   // the clouds at the frame's own size, two images taking turns: each frame marches only every CLOUDT.n-th pixel and carries the rest over from the
   // last frame, moved with the view and the wind (cloudFrame, below)
-  for (const r of rtCl) if (r) r.dispose();
+  if (CLOUDT.old){ for (const r of rtCl) if (r) r.dispose(); } else CLOUDT.old = rtCl.slice();   // (made twice before a cloud frame: the in-between ones were never drawn into)   // (freed after the next cloud frame, which carries their picture over: a resize no longer marches every pixel at once)
   const lin = Object.assign({}, opt, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
-  rtCl = [0, 1].map(() => new THREE.WebGLRenderTarget(W, H, lin)); rtCloud = rtCl[0]; CLOUDT.reset = true; CLOUDT.prev = null;
+  rtCl = [0, 1].map(() => new THREE.WebGLRenderTarget(W, H, lin)); rtCloud = rtCl[0];
   comp.uniforms.tCloud.value = rtCloud.texture; cloudMat.uniforms.tDepth.value = rtC.depthTexture;
   if (rtOut) rtOut.dispose();
   rtOut = new THREE.WebGLRenderTarget(W, H, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat });
@@ -1596,15 +1597,21 @@ function setZoomRes(v){ ZOOM_RES = v; try { localStorage.setItem(ZOOMRES_KEY, St
 // a size smaller out there. (The wet ground, mist and light shafts were measured too: switching them off far out bought nothing.)
 const FARV_KEY = 'neonIsland.farView';
 const FARV = { on: (() => { try { return localStorage.getItem(FARV_KEY) !== '0'; } catch (e) { return true; } })(), inZ: 40, outZ: 36, far: false, sharp: false,
-  lastMove: 0, p: null, pix: 4.4e6, ema: 16.7, t: 0, quick: 0, cut: 0 };
+  lastMove: 0, p: null, pix: 4.4e6, ema: 16.7, t: 0, quick: 0, cut: 0, k: 0, up: 0, v0: .25 };   // (k: how far the sharp view has come in, 0 to 1; v0: the speed below which it starts)
 function setFarView(on){ FARV.on = !!on; try { localStorage.setItem(FARV_KEY, FARV.on ? '1' : '0'); } catch (e) {} }
 function farTrack(now){
-  const v = [yaw, zoom, PITCH, camT.x, camT.z];
-  if (!FARV.p || v.some((x, i) => Math.abs(x - FARV.p[i]) > 1e-4) || Math.abs(zoomT - zoom) > .01 || Math.abs(yawT - yaw) > 1e-3) FARV.lastMove = now;
+  const v = [yaw, zoom, PITCH, camT.x, camT.z], p = FARV.p, dtF = Math.max(1, now - (FARV.lt || now));
+  // how fast the view is moving, per second (a turn in radians, a zoom or a pan as a share of the view)
+  const sp = p ? Math.max(Math.abs(v[0] - p[0]), Math.abs(v[1] - p[1])/v[1], Math.abs(v[2] - p[2])*2, Math.hypot(v[3] - p[3], v[4] - p[4])/v[1])*1000/dtF : 1;
   FARV.p = v;
   const title = typeof TITLE !== 'undefined' && TITLE.on;
   if (!FARV.on || title) FARV.far = false; else if (zoom >= FARV.inZ) FARV.far = true; else if (zoom <= FARV.outZ) FARV.far = false;
-  const wasSharp = FARV.sharp; FARV.sharp = FARV.far && now - FARV.lastMove > 250;
+  // The sharp view comes in as the view slows, not when it has stopped: every move ends in a glide (input.js eases the camera onto its target), and
+  // over that glide's last stretch the resolution steps up a quarter at a time, so the picture sharpens with the slowing instead of snapping when it
+  // settles (owner, Oct 25). Down at once when the view speeds up again; up no faster than a step every third frame
+  const kT = FARV.far ? Math.round((1 - Math.min(1, sp/FARV.v0))*4)/4 : 0;
+  if (kT < FARV.k) FARV.k = kT; else if (kT > FARV.k && ++FARV.up >= 3){ FARV.k = Math.min(kT, FARV.k + .25); FARV.up = 0; }
+  const wasSharp = FARV.sharp; FARV.sharp = FARV.k >= 1;
   const sm = RENDER_LINES === 0 || FARV.far ? 1 : 0;
   if (SMOOTH_LOOK.value !== sm){ SMOOTH_LOOK.value = sm; H = 0; }   // (the clouds' target filters with the look: made again)
   // how the sharp view keeps up: frames while it's on, against the screen's refresh (PERF.vs, main.js)
@@ -1628,11 +1635,11 @@ function applyRenderRes(z){
   // for the color pass and every post effect, more than the card could draw in a 60 Hz frame. Between zoom 21 and 40 one frame in four or five came in
   // late, the judder that came and went with the zoom (measured on the owner's M2, Oct 25: 52 fps at 1.6 times, a steady 60 at the base). Never under the base
   h = Math.min(h, Math.max(BASE_H, Math.floor(Math.sqrt(PIX_MAX*DH/DW))));   // ("Cap at 720p" is the apartments' only, owner's choice Oct 25: the city keeps its sharpness)
-  if (FARV.sharp) h = Math.max(h, Math.min(DH, SMOOTH_MAX, Math.floor(Math.sqrt(FARV.pix*DH/DW))));   // (zoomed out and still: the sharp view, above)
+  if (FARV.k > 0) h = Math.max(h, Math.round(h + (Math.min(DH, SMOOTH_MAX, Math.floor(Math.sqrt(FARV.pix*DH/DW))) - h)*FARV.k));   // (zoomed out and slowing or still: the sharp view, above)
   if (h === H) return;
   // while the zoom is still gliding, small steps wait: each step remakes every render target (the frame, the depth, the glow, the clouds), and a turn
   // of the wheel crossed a dozen of them in half a second. A big step goes at once (the picture mustn't blur), the rest when the zoom settles
-  if (H && typeof zoomT !== 'undefined' && Math.abs(zoomT - z) > .02*z && Math.abs(h - H) < H*.12) return;
+  if (H && !FARV.far && typeof zoomT !== 'undefined' && Math.abs(zoomT - z) > .02*z && Math.abs(h - H) < H*.12) return;   // (zoomed out the sharp view steps in quarters as the view slows: those go through)
   H = h; W = Math.max(1, Math.round(h*DW/DH)); pxK = BASE_H/H;
   FOL_UNI.res.value.set(W, H); comp.uniforms.pxK.value = pxK;
   makeTargets();

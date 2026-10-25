@@ -1066,64 +1066,31 @@ const cloudMat = new THREE.ShaderMaterial({
 });
 const cloudScene = new THREE.Scene(); cloudScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), cloudMat));
 /* ---------- the clouds as meshes (the default; S.cloudVol: the marched ones above) ----------
-   The sea of clouds round and under the island, as low-poly puffs instead of a 22-step march through two baked volumes for every pixel of sky. Each
-   puff is a 80-triangle ball drawn round: its normal is worked out per pixel from the puff's own middle, so the shading is smooth whatever the facets,
-   and cut flat underneath at its cluster's base, the way cumulus are. Lit with the marched clouds' own six-colour pastel ramp (sun and sky colours,
-   pink and lavender between, the neon glow on the undersides at night), banded in the pixel look and blended in Smooth. A 80 x 80 tile of clusters
-   repeats; the puffs wrap round a 480-wide window that follows the view and drift with the wind (cloudOff, main.js). The looks' cover shows more or
-   fewer of them. Drawn into the cloud image at the frame's own size (it's cheap now: one draw, about 260 thousand small triangles and a short shader),
-   so they're no longer soft when zoomed out. */
+   The marched clouds come from a density field (cloudBakeMat: puffs on flat bases clustered on a grid with gaps, cumulus-like, frayed by fbm noise;
+   the same recipe as the real-time cloudscape renderers, Schneider's for Horizon Zero Dawn: a coverage map of cells, a height profile with flat
+   bottoms, noise eroding the edges). These are that same field turned into a surface once, at load: read back from its two baked atlases, combined
+   exactly as the march combines them (the sea under the island below y -6, the ring round it), and meshed where the density crosses the level the
+   march's light stops at (surface nets on a 64 x 16 x 64 grid over the 80 x 80 tile: about 1.25 units a cell, so low poly, but every puff the march
+   draws is there). Each vertex keeps the field's own normal (the puff's) and an occlusion, how much cloud lies above it and toward the sun's side
+   of the sky (the march looked toward the sun for the puff in the way; this is that, worked out once). Lit with the march's six-colour pastel ramp,
+   banded in the pixel look and blended in Smooth. The tile repeats: each frame only the copies in view are drawn, offset by the wind's drift
+   (cloudOff, main.js). The looks' cover moves the level, and the surface is made again when it changes. One draw, a short shader, at the frame's
+   own size, so the clouds are no longer soft zoomed out. */
 const CLOUDM = (() => {
-  const TILE = 80, REP = 6, rr = mulberry32(4242);
-  const base = new THREE.IcosahedronGeometry(1, 1);
-  const pos = [], scl = [], info = [], clo = [], cls = [];
-  const cl = [];   // [puff x, y, z, sx, sy, sz], cluster base, top, seed, cluster middle [x, y, z], cluster half-size [x, y, z]
-  const cluster = (x, z, b, R, n, sizeK, rise, flat) => {
-    const ps = []; let top = b;
-    for (let k = 0; k < n; k++){
-      const a = rr()*TAU, d = Math.sqrt(rr())*R*.8, s = sizeK*(.7 + rr()*.6)*(1 - .4*d/R);
-      const y = b + s*(.3 + rr()*.35)*flat + (1 - d/R)*rr()*rise;
-      ps.push([x + Math.cos(a)*d, y, z + Math.sin(a)*d, s*1.2, s*.8*flat, s*1.2]); top = Math.max(top, y + s*.8*flat);
-    }
-    const seed = rr(), mid = [x, (b + top)/2, z], half = [R + sizeK*.9, Math.max(.6, (top - b)/2 + .2), R + sizeK*.9];
-    for (const q of ps) cl.push([q, b, top, seed, mid, half]);
-  };
-  // the puffs: heaped clusters, a few towering ones; and the low, wide banks the marched clouds' sea made between them
-  for (let c = 0; c < 58; c++){ const tall = rr() < .22; cluster(rr()*TILE, rr()*TILE, tall ? -9.5 - rr()*3 : -13 - rr()*2.5, 3 + rr()*4.5, 7 + Math.floor(rr()*7), tall ? 2.6 : 2.1, tall ? 5 : 1.8, 1); }
-  for (let c = 0; c < 22; c++) cluster(rr()*TILE, rr()*TILE, -15.3 - rr()*.7, 6 + rr()*6, 8 + Math.floor(rr()*5), 3.2, .6, .45);
-  for (let i = 0; i < REP; i++) for (let j = 0; j < REP; j++) for (const [q, b, top, seed, mid, half] of cl){
-    pos.push(q[0] + i*TILE, q[1], q[2] + j*TILE); scl.push(q[3], q[4], q[5]); info.push(b, top, seed);
-    clo.push(mid[0] - q[0], mid[1] - q[1], mid[2] - q[2]); cls.push(half[0], half[1], half[2]); }
-  const g = new THREE.InstancedBufferGeometry(); g.index = base.index; g.setAttribute('position', base.getAttribute('position'));
-  const ia = (n, v) => g.setAttribute(n, new THREE.InstancedBufferAttribute(new Float32Array(v), 3));
-  ia('iPos', pos); ia('iScl', scl); ia('iInfo', info); ia('iClo', clo); ia('iCls', cls);
-  g.instanceCount = pos.length/3;
+  const TILE = 80, NX = 64, NY = 16, NZ = 64, SX = 2, SY = 2;   // (grid: every second texel across, every second slice up)
   const U = cloudMat.uniforms;
   const mat = new THREE.ShaderMaterial({
-    uniforms: { cloudOff: U.cloudOff, sunDir: U.sunDir, sunCol: U.sunCol, skyTop: U.skyTop, skyBot: U.skyBot, night: U.night, smoothLook: U.smoothLook,
-      cityGlow: U.cityGlow, glowC: U.glowC, rainDark: U.rainDark, cover: U.cover, cloudAmt: U.cloudAmt, cloudCol: U.cloudCol,
-      camC: { value: new THREE.Vector2() }, span: { value: TILE*REP }, viewDir: { value: new THREE.Vector3(0, -1, 0) } },
-    vertexShader: `attribute vec3 iPos; attribute vec3 iScl; attribute vec3 iInfo; attribute vec3 iClo; attribute vec3 iCls;
-      uniform vec2 cloudOff; uniform vec2 camC; uniform float span; uniform float cover;
-      varying vec3 vW; varying vec3 vC; varying vec3 vS; varying vec3 vI; varying vec3 vK; varying vec3 vKs;
-      void main(){
-        float show = step(iInfo.z, .62 + (cover - .5)*.9);   // (the looks' cover: more or fewer of the clusters)
-        vec2 w = iPos.xz - cloudOff; w = camC + mod(w - camC + span*.5, span) - span*.5;
-        vec3 c = vec3(w.x, iPos.y, w.y), wp = c + position*iScl*show;
-        wp.y = max(wp.y, iInfo.x);   // flat underneath, at the cluster's base
-        vW = wp; vC = c; vS = iScl; vI = iInfo; vK = c + iClo; vKs = iCls;
-        gl_Position = projectionMatrix*viewMatrix*vec4(wp, 1.0);
-      }`,
+    uniforms: { sunDir: U.sunDir, sunCol: U.sunCol, skyTop: U.skyTop, skyBot: U.skyBot, night: U.night, smoothLook: U.smoothLook,
+      cityGlow: U.cityGlow, glowC: U.glowC, rainDark: U.rainDark, cloudAmt: U.cloudAmt, cloudCol: U.cloudCol },
+    vertexShader: `attribute vec3 iOff; attribute vec3 aN; attribute float aO;
+      varying vec3 vW; varying vec3 vN; varying float vO;
+      void main(){ vec3 wp = position + iOff; vW = wp; vN = aN; vO = aO; gl_Position = projectionMatrix*viewMatrix*vec4(wp, 1.0); }`,
     fragmentShader: CLOUD_NOISE + `
       uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 cityGlow; uniform vec2 glowC;
-      uniform float night; uniform float smoothLook; uniform float rainDark; uniform float cloudAmt; uniform vec3 cloudCol; uniform vec3 viewDir;
-      varying vec3 vW; varying vec3 vC; varying vec3 vS; varying vec3 vI; varying vec3 vK; varying vec3 vKs;
+      uniform float night; uniform float smoothLook; uniform float rainDark; uniform float cloudAmt; uniform vec3 cloudCol;
+      varying vec3 vW; varying vec3 vN; varying float vO;
       void main(){
-        bool under = vW.y <= vI.x + .02;
-        // two normals: the puff's own (its lumps) and its whole cluster's (one heap), so the light falls on the heap and the puffs only dent it,
-        // the way the marched field merged them, instead of every ball getting an outline of its own
-        vec3 np = normalize((vW - vC)/(vS*vS)), nk = normalize((vW - vK)/(vKs*vKs));
-        vec3 n = under ? vec3(0.0, -1.0, 0.0) : normalize(np*.45 + nk*.55);
+        vec3 n = normalize(vN);
         float dith = bayer(gl_FragCoord.xy);
         float pastel = (1.0 - 0.85*night)*(1.0 - 0.6*rainDark);
         vec3 shade = mix(mix(skyBot, skyTop, 0.35)*0.55, mix(skyTop, vec3(0.48, 0.52, 0.86), 0.6)*0.92, pastel)*(1.0 - 0.35*rainDark);
@@ -1131,26 +1098,108 @@ const CLOUDM = (() => {
         litC = mix(litC, cloudCol, cloudAmt); shade = mix(shade, cloudCol*0.62, cloudAmt);
         vec3 P0 = shade*(0.8 + 0.1*pastel), P1 = shade + vec3(0.03, 0.02, 0.07)*pastel, P2 = mix(shade, litC, 0.36) + vec3(0.07, 0.0, 0.07)*pastel,
              P3 = mix(shade, litC, 0.58) + vec3(0.09, -0.01, 0.03)*pastel, P4 = mix(shade, litC, 0.8) + vec3(0.06, 0.01, -0.03)*pastel, P5 = litC*1.02 + vec3(0.02, 0.02, -0.01)*pastel;
-        // lower in its heap, darker (the marched clouds looked toward the sun for the puff in the way; this guesses it from the height), and
-        // toward the heap's outline the pink and lavender rim
-        float occl = clamp((vI.y - vW.y)/max(vI.y - vI.x, 1.0), 0.0, 1.0);
-        float rim = under ? 1.0 : 1.0 - abs(dot(nk, viewDir));
-        float light = dot(n, sunDir)*0.42 + 0.5 + 0.22*smoothstep(-15.0, -8.0, vW.y) - 0.12 - 0.22*occl - 0.24*rim*rim + (vnoise(vW*1.7) - 0.5)*0.12;
+        // the march's own light: facing the sun, brighter toward the tops, darker where cloud lies between the point and the sky
+        float light = dot(n, sunDir)*0.42 + 0.5 + 0.22*smoothstep(-15.0, -8.0, vW.y) - 0.12 - 0.32*vO;
         float band = clamp(floor(clamp(light, 0.0, 0.999)*6.0 + (dith - 0.5)*0.12), 0.0, 5.0);
         vec3 cc = band < 0.5 ? P0 : band < 1.5 ? P1 : band < 2.5 ? P2 : band < 3.5 ? P3 : band < 4.5 ? P4 : P5;
         if (smoothLook > .5){ float bf = clamp(light, 0.0, 0.999)*5.0;
           cc = bf < 1.0 ? mix(P0, P1, bf) : bf < 2.0 ? mix(P1, P2, bf - 1.0) : bf < 3.0 ? mix(P2, P3, bf - 2.0) : bf < 4.0 ? mix(P3, P4, bf - 3.0) : mix(P4, P5, bf - 4.0); }
-        cc += cityGlow*night*0.55*exp(-length(vW.xz - glowC)/9.0)*smoothstep(-11.0, -6.0, vW.y)*(n.y < 0.2 ? 1.0 : 0.4);   // neon on the undersides at night
+        cc += cityGlow*night*0.55*exp(-length(vW.xz - glowC)/9.0)*smoothstep(-11.0, -6.0, vW.y);   // neon on the undersides at night
         gl_FragColor = vec4(cc, 1.0);
       }`,
+    side: THREE.DoubleSide,
   });
-  const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false;
-  const scene = new THREE.Scene(); scene.add(mesh);
-  const camC = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  return { scene, mat, mesh,
+  const geo = new THREE.InstancedBufferGeometry(), offs = new Float32Array(3*64), offAttr = new THREE.InstancedBufferAttribute(offs, 3);
+  offAttr.setUsage(THREE.DynamicDrawUsage); geo.setAttribute('iOff', offAttr); geo.instanceCount = 0;
+  const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false;
+  // and the march's low mist: soft banks under the puffs, where slow noise rises above a level, between y -16 and -10. The march summed it over
+  // about eight steps through that layer; here it's one sheet in the middle of it whose opacity is about that sum, 1 - (1 - .5 m)^6 (a little lighter: one sheet reads heavier than a layer)
+  const mistMat = new THREE.ShaderMaterial({
+    uniforms: { cloudOff: U.cloudOff, sunDir: U.sunDir, sunCol: U.sunCol, skyTop: U.skyTop, skyBot: U.skyBot, night: U.night, smoothLook: U.smoothLook,
+      rainDark: U.rainDark, cloudAmt: U.cloudAmt, cloudCol: U.cloudCol },
+    vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix*vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }',
+    fragmentShader: CLOUD_NOISE + `
+      uniform vec2 cloudOff; uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 skyTop; uniform vec3 skyBot;
+      uniform float night; uniform float smoothLook; uniform float rainDark; uniform float cloudAmt; uniform vec3 cloudCol;
+      varying vec3 vW;
+      void main(){
+        vec3 q = vW + vec3(cloudOff.x, 0.0, cloudOff.y);
+        float m = clamp((vnoise(q*0.07) - 0.55)*2.2, 0.0, 1.0);
+        float a = 1.0 - pow(1.0 - 0.5*m, 6.0);
+        if (a < 0.004) discard;
+        float pastel = (1.0 - 0.85*night)*(1.0 - 0.6*rainDark);
+        vec3 shade = mix(mix(skyBot, skyTop, 0.35)*0.55, mix(skyTop, vec3(0.48, 0.52, 0.86), 0.6)*0.92, pastel)*(1.0 - 0.35*rainDark);
+        vec3 litC = sunCol*1.05 + skyTop*0.25; litC = mix(litC, cloudCol, cloudAmt); shade = mix(shade, cloudCol*0.62, cloudAmt);
+        float light = sunDir.y*0.42 + 0.5 + 0.22*smoothstep(-15.0, -8.0, vW.y) - 0.12 - 0.06*(1.0 - m);
+        float bf = clamp(light, 0.0, 0.999);
+        vec3 cc = smoothLook > .5 ? mix(shade, litC, bf) : mix(shade, litC, floor(bf*6.0)/5.0);
+        gl_FragColor = vec4(cc*a, a);   // (premultiplied, as the march wrote it)
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+    blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
+  });
+  const mist = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI/2), mistMat); mist.frustumCulled = false; mist.renderOrder = 1; mist.position.y = -12.75;
+  const scene = new THREE.Scene(); scene.add(mesh); scene.add(mist);
+  const camC = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), fr = new THREE.Frustum(), pm = new THREE.Matrix4(), bx = new THREE.Box3();
+  let A = null, builtCover = null, builtAt = 0, tris = 0;
+  // the two baked fields, read back once (1024 x 512 each: 32 slices of 128 x 128)
+  function readField(){ A = [0, 1].map(m => { const b = new Uint8Array(1024*512*4); renderer.readRenderTargetPixels(cloudAtlas[m], 0, 0, 1024, 512, b); return b; }); }
+  const tex = (b, x, y, z) => { x = ((x % 128) + 128) % 128; z = ((z % 128) + 128) % 128; y = Math.max(0, Math.min(31, y)); return (((y >> 3)*128 + z)*1024 + (y & 7)*128 + x)*4; };
+  // the march's field at a texel: the sea under the island only below y -6, the ring everywhere (the march also kept the ring away from the
+  // island's middle, which the island itself now covers), and the looks' cover
+  function fAt(x, y, z, cov){ const yw = -16 + (y + .5)*.5, i0 = tex(A[0], x, y, z), f0 = yw < -6 ? A[0][i0]/255*2 - 1 : -1, f1 = A[1][i0]/255*2 - 1;
+    return Math.max(f0, f1) + (cov - .5)*.9; }
+  function nAt(x, y, z, cov){ const yw = -16 + (y + .5)*.5, i = tex(null, x, y, z), f0 = yw < -6 ? A[0][i]/255*2 - 1 : -1, f1 = A[1][i]/255*2 - 1, B = f0 >= f1 ? A[0] : A[1];
+    return [B[i + 1]/127.5 - 1, B[i + 2]/127.5 - 1, B[i + 3]/127.5 - 1]; }
+  function build(cov){
+    if (!A) readField();
+    const ISO = .03, W1 = NX + 1, D1 = NZ + 1, val = new Float32Array((NX + 2)*(NY + 1)*(NZ + 2)), vid = new Int32Array(W1*NY*D1).fill(-1);
+    const V = (i, j, k) => val[(j*(NZ + 2) + k)*(NX + 2) + i];
+    for (let j = 0; j <= NY; j++) for (let k = 0; k <= NZ + 1; k++) for (let i = 0; i <= NX + 1; i++)
+      val[(j*(NZ + 2) + k)*(NX + 2) + i] = fAt(i*SX, Math.min(31, j*SY), k*SX, cov) - ISO;
+    const wx = i => -40 + (i*SX + .5)*80/128, wy = j => -16 + (Math.min(31, j*SY) + .5)*.5;
+    const P = [], N = [], O = [], I = [];
+    const C = [[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1],[1,0,1],[0,1,1],[1,1,1]], E = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+    // surface nets: a vertex in every cell the surface passes through, at the mean of where it crosses the cell's edges
+    for (let j = 0; j < NY; j++) for (let k = 0; k <= NZ; k++) for (let i = 0; i <= NX; i++){
+      const v = C.map(c => V(i + c[0], j + c[1], k + c[2]));
+      let m = 0; for (let q = 0; q < 8; q++) if (v[q] > 0) m |= 1 << q;
+      if (m === 0 || m === 255) continue;
+      let sx = 0, sy = 0, sz = 0, n = 0;
+      for (const [a, b] of E){ if ((v[a] > 0) === (v[b] > 0)) continue; const t = v[a]/(v[a] - v[b]), ca = C[a], cb = C[b];
+        sx += ca[0] + (cb[0] - ca[0])*t; sy += ca[1] + (cb[1] - ca[1])*t; sz += ca[2] + (cb[2] - ca[2])*t; n++; }
+      const fx = i + sx/n, fy = j + sy/n, fz = k + sz/n;
+      const px = wx(0) + fx*SX*80/128, py = wy(0) + fy*SY*.5, pz = wx(0) + fz*SX*80/128;
+      vid[(j*D1 + k)*W1 + i] = P.length/3; P.push(px, py, pz);
+      const tx = Math.round(fx*SX), ty = Math.round(Math.min(31, fy*SY)), tz = Math.round(fz*SX), nn = nAt(tx, ty, tz, cov), l = Math.hypot(nn[0], nn[1], nn[2]) || 1;
+      N.push(nn[0]/l, nn[1]/l, nn[2]/l);
+      // how much cloud lies above and toward the sky round this point (a handful of looks, about 1.3 units out, as the march's one look sunward)
+      let o = 0; for (const d of [[0, 3, 0], [2, 2, 0], [-2, 2, 0], [0, 2, 2], [0, 2, -2]]){ const f = fAt(tx + d[0]*1, ty + d[1], tz + d[2]*1, cov); o += Math.min(1, Math.max(0, (f + .05)/.35)); }
+      O.push(o/5);
+    }
+    // a quad for every grid edge the surface crosses, from the four cells round it, wound to face out of the cloud
+    const id = (i, j, k) => (i < 0 || j < 0 || k < 0 || i > NX || j >= NY || k > NZ) ? -1 : vid[(j*D1 + k)*W1 + i];
+    const quad = (a, b, c, d, flip) => { if (a < 0 || b < 0 || c < 0 || d < 0) return; if (flip) I.push(a, c, b, a, d, c); else I.push(a, b, c, a, c, d); };
+    for (let j = 0; j < NY; j++) for (let k = 1; k <= NZ; k++) for (let i = 1; i <= NX; i++){
+      const v0 = V(i, j, k) > 0;
+      if (j > 0 && v0 !== (V(i + 1, j, k) > 0)) quad(id(i, j - 1, k - 1), id(i, j, k - 1), id(i, j, k), id(i, j - 1, k), !v0);   // the edge along x
+      if (v0 !== (V(i, j + 1, k) > 0)) quad(id(i - 1, j, k - 1), id(i - 1, j, k), id(i, j, k), id(i, j, k - 1), v0);   // along y
+      if (j > 0 && v0 !== (V(i, j, k + 1) > 0)) quad(id(i - 1, j - 1, k), id(i, j - 1, k), id(i, j, k), id(i - 1, j, k), v0);   // along z
+    }
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute('aN', new THREE.Float32BufferAttribute(N, 3));
+    geo.setAttribute('aO', new THREE.Float32BufferAttribute(O, 1)); geo.setIndex(I.length > 65535*3 ? new THREE.Uint32BufferAttribute(I, 1) : new THREE.Uint32BufferAttribute(I, 1));
+    tris = I.length/3; builtCover = cov; builtAt = performance.now();
+  }
+  return { scene, mat, mesh, get tris(){ return tris; }, build,
     draw(){   // into rtCloud, with the view's own camera (its far plane pushed out: the sea lies past the city's)
-      camC.copy(cam); camC.far = cam.far + 600; camC.updateProjectionMatrix();
-      mat.uniforms.camC.value.set(camT.x, camT.z); camC.getWorldDirection(mat.uniforms.viewDir.value);
+      const cov = U.cover.value;
+      if (builtCover === null || (Math.abs(cov - builtCover) > .06 && performance.now() - builtAt > 2000)) build(cov);
+      camC.copy(cam); camC.layers.enableAll(); camC.far = cam.far + 600; camC.updateProjectionMatrix(); camC.updateMatrixWorld();   // (all layers: the night lights' pass leaves the view's camera on one of its own)
+      pm.multiplyMatrices(camC.projectionMatrix, camC.matrixWorldInverse); fr.setFromProjectionMatrix(pm);
+      const d = U.cloudOff.value, k0x = Math.round((camT.x + d.x)/TILE), k0z = Math.round((camT.z + d.y)/TILE); let n = 0;
+      for (let a = -4; a <= 4; a++) for (let b = -4; b <= 4; b++){ const ox = (k0x + a)*TILE - d.x, oz = (k0z + b)*TILE - d.y;
+        bx.min.set(ox - 41, -16.5, oz - 41); bx.max.set(ox + 43, .5, oz + 43); if (n < 64 && fr.intersectsBox(bx)){ offs[n*3] = ox; offs[n*3 + 1] = 0; offs[n*3 + 2] = oz; n++; } }
+      geo.instanceCount = n; offAttr.needsUpdate = true; mist.position.x = camT.x; mist.position.z = camT.z; mist.updateMatrixWorld();
       const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha(), ac = renderer.autoClear;
       renderer.setRenderTarget(rtCloud); renderer.setClearColor(0x000000, 0); renderer.autoClear = true; renderer.render(scene, camC);
       renderer.setClearColor(cc, ca); renderer.autoClear = ac; } };

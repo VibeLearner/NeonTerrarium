@@ -1,0 +1,81 @@
+/* Neon Terrarium: the player's interface (js/playerui.js). Only on the normal page: everything is under html.pui, which #dev never gets. */
+
+/* ---------- Settings: a dialog in the middle ---------- */
+html.pui .deck{top:50%!important;left:50%!important;right:auto!important;bottom:auto!important;transform:translate(-50%,-50%);width:min(560px,calc(100vw - 32px));
+  max-height:min(640px,calc(100vh - 48px));padding:0;gap:0;display:flex;flex-direction:column;overflow:hidden;z-index:40;
+  border:1px solid var(--cyan);border-radius:0;background:rgba(10,16,32,.97);box-shadow:0 0 0 1px rgba(56,232,224,.15),0 18px 60px rgba(0,0,0,.6),0 0 24px rgba(56,232,224,.18);
+  clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
+html.pui .deck:not(.open){display:none}
+html.pui .pu-backdrop{position:fixed;inset:0;background:rgba(4,7,16,.55);backdrop-filter:blur(2px);z-index:39;display:none}
+html.pui body.deck-open .pu-backdrop{display:block}
+html.pui.title-on.title-deck .pu-backdrop{display:block;z-index:30}
+html.pui.title-on.title-deck #deck{z-index:31}
+html.pui .deck-toggle{z-index:3}
+html.pui body.deck-open .deck-toggle{visibility:hidden}
+
+.pu-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px 10px}
+.pu-head h2{margin:0;font-family:var(--font-pixel);font-weight:400;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+.pu-x{width:30px;height:30px;padding:0;border-radius:0;border-color:var(--line);color:var(--muted);font-size:13px;line-height:1}
+.pu-x:hover{border-color:var(--pink);color:var(--pink)}
+.pu-tabs{display:flex;gap:2px;padding:0 16px;border-bottom:1px solid var(--line)}
+.pu-tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 12px 7px;font-family:var(--font-pixel);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);background:none;margin-bottom:-1px}
+.pu-tabs button:hover{color:var(--ink)}
+.pu-tabs button.on{color:var(--pink);border-bottom-color:var(--pink);background:none}
+.pu-pane{padding:14px 16px 18px;overflow:auto;display:grid;gap:18px;align-content:start}
+html.pui .deck .pu-pane{flex:1;min-height:0}
+.pu-pane[hidden]{display:none}
+.pu-group{display:grid;gap:9px}
+.pu-group > h3{margin:0;font-family:var(--font-pixel);font-weight:400;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+.pu-group section{display:grid;gap:9px}
+.pu-group .chips{display:flex;flex-wrap:wrap;gap:6px}
+.pu-group .chips button{flex:1 1 0;min-width:0;padding:7px 8px}
+.pu-group .togs{display:grid;gap:8px}
+.pu-group .togs.pu-cols{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.pu-group .tog{display:flex;align-items:center;gap:8px;color:var(--ink);width:auto;max-width:none;white-space:normal}
+
+/* the presets: four cards */
+.pu-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.pu-presets button{display:grid;gap:3px;text-align:left;padding:10px 10px 9px;border-radius:0;border-color:var(--line);background:rgba(255,255,255,.02);
+  clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
+.pu-presets button b{font-family:var(--font-pixel);font-weight:400;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink)}
+.pu-presets button small{font-size:10px;line-height:1.35;color:var(--muted)}
+.pu-presets button:hover{border-color:var(--cyan)}
+.pu-presets button.on{border-color:var(--pink);background:rgba(255,79,163,.1)}
+.pu-presets button.on b{color:var(--pink)}
+.pu-custom{color:var(--amber)}
+.pu-save b{color:var(--ink);font-weight:600}
+html.pui #toTitle{margin:0}
+@media (max-width:560px){.pu-presets{grid-template-columns:repeat(2,1fr)}}
+
+/* ---------- City settings: next to "Hover for controls" ---------- */
+.pu-ctlrow{display:flex;align-items:center;gap:6px}
+.pu-citybtn{cursor:pointer;border:1px solid rgba(56,232,224,.45);border-radius:0;color:var(--cyan);padding:3px 12px;font:inherit;font-size:11px}
+.pu-citybtn:hover,.pu-citybtn.on{border-color:var(--cyan);color:#fff;background:rgba(56,232,224,.14)}
+.pu-city{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);width:min(380px,calc(100vw - 24px));max-height:min(560px,calc(100vh - 200px));
+  display:flex;flex-direction:column;overflow:hidden;z-index:6;background:rgba(10,16,32,.97);border:1px solid var(--cyan);box-shadow:0 12px 40px rgba(0,0,0,.55),0 0 18px rgba(56,232,224,.16);
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+.pu-city[hidden]{display:none}
+.pu-city .pu-head{padding:11px 14px 8px}
+.pu-city .pu-head h2{font-size:12px}
+.pu-city .pu-tabs{padding:0 14px}
+.pu-city .pu-pane{padding:12px 14px 14px;gap:16px;flex:1;min-height:0}
+.pu-city .clock{display:flex;align-items:baseline;gap:8px}
+.pu-city .clock output{font-size:18px}
+.pu-city .slider.stack{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
+.pu-city .slider.stack output{color:var(--amber);font-size:11px;min-width:56px;text-align:right}
+
+/* ---------- the music player folds away ---------- */
+.pu-fold{margin-left:8px;width:18px;height:16px;padding:0;line-height:1;font-size:12px;border-radius:0;border-color:#2a5173;color:#8fc7e3;background:rgba(80,160,210,.08)}
+.pu-fold:hover{border-color:#6fb4d6;color:#fff}
+html.pui .gd-head{gap:6px}
+html.pui .gd-head > span:first-child{margin-right:auto}
+.gdeck.pu-min{width:auto;min-width:210px}
+.gdeck.pu-min .gd-chord,.gdeck.pu-min .gd-cv,.gdeck.pu-min .gd-panelbtn{display:none}
+.gdeck.pu-min .gd-main{display:none}
+
+/* ---------- the controls, short ---------- */
+html.pui .ctlpanel{min-width:240px}
+html.pui .ctlpanel dl{gap:4px 14px}
+/* (the same size whichever tab is open, so it doesn't jump) */
+html.pui .deck{height:min(600px,calc(100vh - 48px))}
+html.pui #reseed{border-color:var(--pink);color:var(--pink)}

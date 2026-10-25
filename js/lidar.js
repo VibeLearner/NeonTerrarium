@@ -110,7 +110,7 @@ const DOSSIER = (() => {
     for (const o of list){
       const b = boxOf(o.r), ln = new THREE.LineSegments(edges, lineMat.clone()); ln.position.set(o.r.x, o.r.y + b.h/2, o.r.z); ln.scale.set(b.ex, b.h, b.ez); ln.renderOrder = 5; ln.frustumCulled = false;
       scene.add(ln); T.objs.push(ln); o.line = ln;
-      const lb = document.createElement('button'); lb.className = 'lid-tag'; lb.textContent = o.pct + '%'; lb.title = 'Furnish this pod'; lb.addEventListener('click', () => choose(o)); document.body.appendChild(lb); T.labels.push(lb); o.tag = lb;
+      const lb = document.createElement('button'); lb.className = 'lid-tag'; lb.textContent = o.pct + '%'; lb.title = 'Scan this pod'; lb.addEventListener('click', () => choose(o)); document.body.appendChild(lb); T.labels.push(lb); o.tag = lb;
     }
     // the clue: a window in the right pod lights up a few seconds after they go in
     const sd = (tr.sides && tr.sides[0]) || 'S', dir = { S: [0, 1], E: [1, 0], N: [0, -1], W: [-1, 0] }[sd] || [0, 1], b = boxOf(tr);
@@ -118,7 +118,7 @@ const DOSSIER = (() => {
     const g = new THREE.Sprite(GLOW.warm.clone()); g.position.copy(w.position); g.position.x += dir[0]*.1; g.position.z += dir[1]*.1; g.scale.set(1.4, 1.4, 1); g.material.opacity = 0; g.layers.set(1);
     scene.add(w); scene.add(g); T.objs.push(w, g); T.win = w; T.glow = g; T.litAt = 2500 + Math.random()*3500;
     const bName = (tr.kind === 'luxury' ? 'a luxury tower' : tr.kind === 'lift' ? 'a lifted pod' : 'a residential tower');
-    panel.innerHTML = '<b>Signal lost</b> · entered ' + bName + '. <span>LIDAR returns ' + list.length + (list.length === 1 ? ' pod' : ' pods') + ': watch the windows, then pick one to furnish.</span><div class="lid-c">' +
+    panel.innerHTML = '<b>Signal lost</b> · entered ' + bName + '. <span>LIDAR returns ' + list.length + (list.length === 1 ? ' pod' : ' pods') + '.</span><div class="lid-c">' +
       list.map((o, k) => '<button data-k="' + k + '">Pod ' + o.r.pod + ' <i>' + o.pct + '%</i></button>').join('') + '</div>';
     panel.querySelectorAll('.lid-c button').forEach(bt => bt.addEventListener('click', () => choose(list[+bt.dataset.k])));
     panel.querySelectorAll('.lid-c button').forEach((bt, k) => { bt.addEventListener('mouseenter', () => hi(list[k], true)); bt.addEventListener('mouseleave', () => hi(list[k], false)); });

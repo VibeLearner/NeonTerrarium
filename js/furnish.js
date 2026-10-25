@@ -11,7 +11,7 @@ const FURN = (() => {
   // detail by distance from the home, in game units (x3.16 in the lab). The lab's backdrop is sharp only within about 45 m (14 units):
   // full detail to NEAR, clustered on a CG grid to MID, simple blocks (the clustered stand-in clustered again on a CG_FAR grid) beyond.
   // F.lightCity = false sends the city as before (full detail to 46, clustered beyond) to compare.
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-25h';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-25t';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   // The LIDAR Array unlocks Furnish pod (mega.js): the button shows once one has arrived, and only the homes in an array's range
   // can be picked. What the card shows of who lives there is what has been learned (lidar.js: the scan, the person cam, a trace
@@ -22,7 +22,12 @@ const FURN = (() => {
   (function gate(){
     const show = () => { const on = DEV || (typeof megaUnlockedKinds !== 'undefined' && megaUnlockedKinds.has('lidar')) || hasArray(); if (btn.hidden === on) btn.hidden = !on; };
     show(); setInterval(show, 1000);
+    if (!DEV){   // (the player's page: it's a scan of the pod, and the apartment a reconstruction from it)
+      btn.textContent = 'Scan pod'; btn.title = 'Scan a pod of a residential or luxury building in LIDAR range, and do up the apartment the scan reconstructs';
+      for (const dt of document.querySelectorAll('dt')) if (dt.textContent === 'Furnish pod'){ dt.textContent = 'Scan pod'; if (dt.nextElementSibling) dt.nextElementSibling.textContent = 'Pick a pod (scroll or Up / Down), click to scan it'; }
+    }
   })();
+  const VERB = DEV ? 'furnish' : 'scan';
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
 
   /* ---------- the saved homes ---------- */
@@ -96,7 +101,7 @@ const FURN = (() => {
     if (on === F.pick) return;
     F.pick = on; F.hov = null; showPick(null);
     btn.classList.toggle('on', on); btn.setAttribute('aria-pressed', on); document.body.classList.toggle('furnishing', on);
-    if (on && !hasArray()){ F.pick = false; btn.classList.remove('on'); btn.setAttribute('aria-pressed', false); document.body.classList.remove('furnishing'); flash('Furnish pod needs a LIDAR Array standing: place one from the Buildings menu.'); return; }
+    if (on && !hasArray()){ F.pick = false; btn.classList.remove('on'); btn.setAttribute('aria-pressed', false); document.body.classList.remove('furnishing'); flash((DEV ? 'Furnish pod' : 'Scanning a pod') + ' needs a LIDAR Array standing: place one from the Buildings menu.'); return; }
     if (on){
       if (typeof LOADP !== 'undefined' && LOADP.on){ F.pick = false; btn.classList.remove('on'); btn.setAttribute('aria-pressed', false); document.body.classList.remove('furnishing'); flash('The city is still loading. Try again in a moment.'); return; }
       if (S.zone) selectZone(null);
@@ -106,7 +111,7 @@ const FURN = (() => {
       if (mtMode) setMtMode(false, true);
       if (HL) hlStop();
       if (MON.id) MON.close();
-      hint.textContent = 'Furnish pod: point at a residential or luxury building in LIDAR range · scroll or Up / Down picks the pod · click to furnish · Esc to cancel';
+      hint.textContent = (DEV ? 'Furnish pod' : 'Scan pod') + ': point at a residential or luxury building in LIDAR range · scroll or Up / Down picks the pod · click to ' + VERB + ' · Esc to cancel';
       if (ptrLast) hoverAt(ptrLast.x, ptrLast.y);
       warmStart();   // (the far city's stand-ins made while the player picks)
     } else { hoverStrip.material.color.set(0xff5ad8); hoverFill.material.color.set(0xff5ad8); hoverFill.visible = false; tip.hidden = true; selectZone(null); }   // (the strip's and fill's own pink back, for the side pods)
@@ -154,7 +159,7 @@ const FURN = (() => {
     hoverFill.material.color.set(col); hoverFill.position.copy(hover.position); hoverFill.scale.set(ex - .04, h - .04, ez - .04); hoverFill.visible = true;
     const saved = !!getRecipe(r);
     const hh = typeof POD_HH !== 'undefined' ? POD_HH.get(keyOf(r)) : null, nres = hh ? hh.members.length : 0;
-    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + ' · ' + (nres ? 'occupied · ' + nres + (nres > 1 ? ' residents' : ' resident') : 'vacant') + (saved ? ' · furnished' : '') + ' · click to ' + (saved ? 'open' : 'furnish');
+    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + ' · ' + (nres ? 'occupied · ' + nres + (nres > 1 ? ' residents' : ' resident') : 'vacant') + (saved ? ' · furnished' : '') + ' · click to ' + (saved ? 'open' : VERB);
     placeTip(px, py);
   }
   function placeTip(px, py){ if (px == null){ tip.hidden = true; return; } tip.style.left = px + 'px'; tip.style.top = py + 'px'; tip.hidden = false; }
@@ -552,7 +557,7 @@ const FURN = (() => {
     try { fr.contentWindow.postMessage({ type: 'furnish:wake' }, location.origin); } catch (e) {}
     const t0 = performance.now(), hd = head(h);
     let who = { vacant: false, household: null, residents: [] }; try { who = householdFor(h); } catch (e) { console.warn('Furnish pod: no household for this pod', e); }
-    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: null, time: nightNow(), label: label(h) + ' · pod ' + h.pod + ' of ' + h.pods, household: who.household, residents: who.residents, vacant: who.vacant });
+    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: null, time: nightNow(), label: label(h) + ' · pod ' + h.pod + ' of ' + h.pods, household: who.household, residents: who.residents, vacant: who.vacant, sim: !DEV });
     const headMs = performance.now() - t0;
     let st = null;
     try { st = await stream(h, (plots, em, k, done, x) => post({ type: 'furnish:plots', plots, em, k, done }, x), alive); }

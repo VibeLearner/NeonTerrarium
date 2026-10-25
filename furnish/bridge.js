@@ -14,11 +14,14 @@
   // the bar: Exit to city and Save, top left where the lab's Home menu sits
   const bar = document.createElement('div'); bar.className = 'nt-bar'; bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', 'Furnish pod');
   bar.innerHTML = '<button class="nt-exit" id="ntExit" title="Back to the city (your changes are kept)">Exit to city</button><button class="nt-save" id="ntSave" title="Save this apartment with the city (Ctrl+S)" disabled>Save</button>';
+  // the player's page: the apartment is the LIDAR Array's reconstruction of the pod, which is why nobody is in it (sim, from js/furnish.js)
+  const sim = document.createElement('div'); sim.className = 'nt-sim'; sim.hidden = true; sim.setAttribute('role', 'note');
+  sim.innerHTML = '<b>LIDAR reconstruction</b><span>Simulated apartment, rebuilt from the scan. People don\'t show up in a reconstruction.</span>';
   const toast = document.createElement('div'); toast.className = 'nt-toast'; toast.hidden = true; toast.setAttribute('role', 'status');
   function say(t){ toast.textContent = t; toast.hidden = false; clearTimeout(say.t); say.t = setTimeout(() => { toast.hidden = true; }, 2200); }
   function mount(){
     const tl = document.querySelector('.btl'); if (tl) tl.insertBefore(bar, tl.firstChild); else document.body.appendChild(bar);
-    document.body.appendChild(toast);
+    document.body.appendChild(toast); document.body.appendChild(sim);
   }
   const $ = id => document.getElementById(id);
   function sync(){ $('ntSave').disabled = !S.ready || !S.dirty; $('ntSave').classList.toggle('on', S.dirty); }
@@ -61,6 +64,7 @@
     else if (C && C.setCitySource){   // (an older lab: the whole city once it is all here)
       let res; const pr = new Promise(r => { res = r; }); stream = { live: false, head: m.head, plots: [], em: m.head.em, res }; C.setCitySource(pr); }
     else console.warn('furnish: this lab build has no PodContext.setCitySource; the stand-in city is shown');
+    sim.hidden = !m.sim; sim.classList.remove('in'); if (m.sim){ void sim.offsetWidth; sim.classList.add('in'); }
     S.home = h; const visit = S.visit; liveWatch(visit); doneWatch(visit);
     (async () => {
       try {

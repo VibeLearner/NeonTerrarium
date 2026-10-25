@@ -17,6 +17,13 @@
   // the player's page: the apartment is the LIDAR Array's reconstruction of the pod, which is why nobody is in it (sim, from js/furnish.js)
   const sim = document.createElement('div'); sim.className = 'nt-sim'; sim.hidden = true; sim.setAttribute('role', 'note');
   sim.innerHTML = '<b>LIDAR reconstruction</b><span>Simulated apartment, rebuilt from the scan.</span>';
+  // (it sits just under the lab's toolbar at the top, whatever its height; the toast goes under it)
+  function placeSim(){
+    const bb = document.querySelector('.bbar'), r = bb && bb.getBoundingClientRect();
+    const top = r && r.height ? Math.round(r.bottom + 8) : 64; sim.style.top = top + 'px';
+    toast.style.top = (sim.hidden ? top : top + (sim.offsetHeight || 40) + 6) + 'px';
+  }
+  addEventListener('resize', () => { if (!sim.hidden) placeSim(); });
   const toast = document.createElement('div'); toast.className = 'nt-toast'; toast.hidden = true; toast.setAttribute('role', 'status');
   function say(t){ toast.textContent = t; toast.hidden = false; clearTimeout(say.t); say.t = setTimeout(() => { toast.hidden = true; }, 2200); }
   function mount(){
@@ -64,7 +71,7 @@
     else if (C && C.setCitySource){   // (an older lab: the whole city once it is all here)
       let res; const pr = new Promise(r => { res = r; }); stream = { live: false, head: m.head, plots: [], em: m.head.em, res }; C.setCitySource(pr); }
     else console.warn('furnish: this lab build has no PodContext.setCitySource; the stand-in city is shown');
-    sim.hidden = !m.sim; sim.classList.remove('in'); if (m.sim){ void sim.offsetWidth; sim.classList.add('in'); }
+    sim.hidden = !m.sim; sim.classList.remove('in'); if (m.sim){ placeSim(); void sim.offsetWidth; sim.classList.add('in'); for (const ms of [400, 1500, 4000]) setTimeout(() => { if (!sim.hidden) placeSim(); }, ms); }
     S.home = h; const visit = S.visit; liveWatch(visit); doneWatch(visit);
     (async () => {
       try {

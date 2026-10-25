@@ -22,7 +22,7 @@ PH.state = () => 'cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + ';
 function frame(now){
   requestAnimationFrame(frame);
   if (typeof OVERSEER !== 'undefined' && OVERSEER.hold) return;   // (the Overseer's desk covers the screen: the city waits)
-  if (typeof PRECINCT !== 'undefined' && PRECINCT.hold) return;   // (and the Precinct desk: policedesk.js)
+  if (typeof PRECINCT !== 'undefined' && PRECINCT.hold){ if (PRECINCT.live) try { simBody(now); } catch (e){ console.warn('desk sim', e); } return; }   // (and the Precinct desk: the city goes on under it undrawn, so its plan is live, policedesk.js)
   if (typeof GRIDPANEL !== 'undefined' && GRIDPANEL.hold) return;   // (so does the Acoustic Panel; the broadcast plays on)
   if (typeof FURN !== 'undefined' && FURN.hold) return;   // (and the apartment being furnished: furnish.js)
   if (typeof TITLE !== 'undefined' && TITLE.on && TITLE.cityHalf && TITLE.cityHalf()){ TITLE_SKIP = !TITLE_SKIP; if (TITLE_SKIP) return; }   // (under the title only the porthole shows the city: half the frames do)
@@ -32,6 +32,19 @@ function frame(now){
   catch (e){ FRAME_ERR.n++; FRAME_ERR.last = String(e && e.stack || e).slice(0, 400);
     if (FRAME_ERR.n <= 5 || FRAME_ERR.n % 600 === 0) console.error('frame error #' + FRAME_ERR.n + ' (the game goes on):', e);
     scene.overrideMaterial = null; renderer.autoClear = true; try { PH.abort(); } catch (e2){} }
+}
+// the city's own life without a picture: under the Precinct desk its people walk, its police drones and bikes go about their rounds and the
+// clock runs, but nothing is drawn (the desk covers the screen), so it costs a few milliseconds a frame instead of a whole render
+function simBody(now){
+  const dt = Math.min(.05, (now - last)/1000), rdt = Math.min(1, (now - last)/1000);
+  if (S.cycle) S.hour = (S.hour + rdt*24/3600*FF.clock) % 24;
+  last = now;
+  updateTrips(dt, now/1000);
+  updateMegaFx(dt, now/1000);
+  updatePeople(dt*FF.ppl, FF.peopleTime(rdt, now/1000));
+  STORY.tick(rdt);
+  if (typeof WIRELOG !== 'undefined') WIRELOG.tick(rdt);
+  runLater();
 }
 function frameBody(now){
   PH.frameStart(now);   // (the performance overlay, F3: perfhud.js)

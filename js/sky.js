@@ -1615,7 +1615,7 @@ function setZoomRes(v){ ZOOM_RES = v; try { localStorage.setItem(ZOOMRES_KEY, St
 // a size smaller out there. (The wet ground, mist and light shafts were measured too: switching them off far out bought nothing.)
 const FARV_KEY = 'neonIsland.farView';
 const FARV = { on: (() => { try { return localStorage.getItem(FARV_KEY) !== '0'; } catch (e) { return true; } })(), inZ: 40, outZ: 36, far: false, sharp: false,
-  lastMove: 0, p: null, pix: 4.4e6, ema: 16.7, t: 0, quick: 0, cut: 0, k: 0, up: 0, v0: .25 };   // (k: how far the sharp view has come in, 0 to 1; v0: the speed below which it starts)
+  lastMove: 0, p: null, pix: 4.4e6, ema: 16.7, t: 0, quick: 0, cut: 0, k: 0, up: 0, v0: .25, below: 0, above: 0, since: 99 };   // (k: how far the sharp view has come in, 0 to 1; v0: the speed below which it starts)
 function setFarView(on){ FARV.on = !!on; try { localStorage.setItem(FARV_KEY, FARV.on ? '1' : '0'); } catch (e) {} }
 function farTrack(now){
   const v = [yaw, zoom, PITCH, camT.x, camT.z], p = FARV.p, dtF = Math.max(1, now - (FARV.lt || now));
@@ -1627,10 +1627,16 @@ function farTrack(now){
   // The sharp view comes in as the view slows, not when it has stopped: every move ends in a glide (input.js eases the camera onto its target), and
   // over that glide's last stretch the resolution steps up a quarter at a time, so the picture sharpens with the slowing instead of snapping when it
   // settles (owner, Oct 25). Down at once when the view speeds up again; up no faster than a step every third frame
-  const kT = FARV.far ? Math.round((1 - Math.min(1, sp/FARV.v0))*4)/4 : 0;
-  // (down only for a clear speed-up, half a step at least or past the start speed: a glide hovering about one step's edge flipped it every few frames,
-  //  each flip remaking every render target, 30 of them in the first three seconds after Continue)
-  if (kT < FARV.k){ if (FARV.k - kT >= .5 || sp > FARV.v0){ FARV.k = kT; FARV.up = 0; } } else if (kT > FARV.k && ++FARV.up >= 3){ FARV.k = Math.min(kT, FARV.k + .25); FARV.up = 0; }
+  // In two steps, not four, and each held for a while: every step remakes every render target and redraws the still-city cache whole, a hitch each,
+  // and real hands don't glide smoothly: the speed crossed the start back and forth, 106 changes of resolution in a minute of play, 71 of them followed
+  // by a late frame (owner's K recording, Oct 25). Up a step only after the view has been slow for 8 frames and the last change is 10 frames old;
+  // down to the usual size only once it has been fast for 3 frames running
+  const slow = FARV.far && sp < FARV.v0;
+  FARV.below = slow ? FARV.below + 1 : 0; FARV.above = FARV.far && !slow ? FARV.above + 1 : 0; FARV.since++;
+  const kT = FARV.far ? (sp < FARV.v0*.3 ? 1 : .5) : 0;
+  if (!FARV.far) FARV.k = 0;
+  else if (FARV.k > 0 && FARV.above >= 3){ FARV.k = 0; FARV.since = 0; }
+  else if (kT > FARV.k && FARV.below >= 8 && FARV.since >= 10){ FARV.k = Math.min(kT, FARV.k + .5); FARV.since = 0; }
   const wasSharp = FARV.sharp; FARV.sharp = FARV.k >= 1;
   const sm = RENDER_LINES === 0 || FARV.far ? 1 : 0;
   if (SMOOTH_LOOK.value !== sm){ SMOOTH_LOOK.value = sm; H = 0; }   // (the clouds' target filters with the look: made again)

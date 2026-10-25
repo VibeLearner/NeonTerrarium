@@ -2913,7 +2913,15 @@ function pickTris(o, tMin, tMax, foot){
   const R = ray.ray, ox = R.origin.x, oy = R.origin.y, oz = R.origin.z, dx = R.direction.x, dy = R.direction.y, dz = R.direction.z;
   const ix = 1/(dx || 1e-12), iy = 1/(dy || 1e-12), iz = 1/(dz || 1e-12);
   let best = null, bt = tMax;
-  for (const [, g] of o.data.geo){
+  for (const [m, g] of o.data.geo){
+    // hovering over a plot whose full arrays were let go (to save memory) used to make the whole plot again here, at once (tens of ms
+    // a plot: the lag that came on a while after building, Oct 25 trace). A hover now asks the worker for them and goes by the
+    // geometry's box meanwhile; a click still waits for the real triangles.
+    if (PICK_SOFT && m === ATLAS && o.data.pm && o.data.pm.out){ try { pmEnsure(o, 'full'); } catch (e) {}
+      if (g.boundingBox && R.intersectBox(g.boundingBox, _hit)){ const t = _hit.distanceTo(R.origin); if (t > tMin && t < bt){ const bb = g.boundingBox, e = 1e-3;
+        const nx = Math.abs(_hit.x - bb.min.x) < e ? -1 : Math.abs(_hit.x - bb.max.x) < e ? 1 : 0, nz = !nx && Math.abs(_hit.z - bb.min.z) < e ? -1 : !nx && Math.abs(_hit.z - bb.max.z) < e ? 1 : 0;
+        bt = t; best = { t, nx, ny: nx || nz ? 0 : 1, nz }; } }
+      continue; }
     if (!g.boundingBox) g.computeBoundingBox();
     if (!R.intersectBox(g.boundingBox, _hit) || _hit.distanceTo(R.origin) > bt) continue;
     const P = g.attributes.position.array, I = g.index ? g.index.array : null, X = pickIndex(g);
@@ -2949,13 +2957,15 @@ function pickBox(minx, miny, minz, maxx, maxy, maxz){
   else if (Math.abs(p.z - minz) < e) n.set(0, 0, -1); else if (Math.abs(p.z - maxz) < e) n.set(0, 0, 1); else n.set(0, -1, 0);
   return { t: p.distanceTo(ray.ray.origin), n, p };
 }
-let PICK_MEMO = null;
+let PICK_MEMO = null, PICK_SOFT = false;
+// the same pick for hovering: never waits for a plot to be made again (see pickTris)
+function pickAtSoft(cx, cy){ PICK_SOFT = true; try { return pickAt(cx, cy); } finally { PICK_SOFT = false; } }
 function pickAt(cx, cy){
   const r = canvas.getBoundingClientRect();
   _ndc.set(((cx - r.left)/r.width)*2 - 1, -((cy - r.top)/r.height)*2 + 1);
   ray.setFromCamera(_ndc, cam);
   // (the same pointer over the same, unchanged city: the same answer; pointer moves come faster than frames)
-  const key = cx + ',' + cy + ',' + cam.matrixWorld.elements.join(',') + ',' + SC_EDITS + ',' + cells.size + ',' + megas.size;
+  const key = cx + ',' + cy + ',' + cam.matrixWorld.elements.join(',') + ',' + SC_EDITS + ',' + cells.size + ',' + megas.size + (PICK_SOFT ? ',soft' : '');
   if (PICK_MEMO && PICK_MEMO.key === key) return PICK_MEMO.v;
   const v = pickAt0(); PICK_MEMO = { key, v }; return v;
 }

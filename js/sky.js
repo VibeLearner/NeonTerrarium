@@ -1615,7 +1615,7 @@ function setZoomRes(v){ ZOOM_RES = v; try { localStorage.setItem(ZOOMRES_KEY, St
 // a size smaller out there. (The wet ground, mist and light shafts were measured too: switching them off far out bought nothing.)
 const FARV_KEY = 'neonIsland.farView';
 const FARV = { on: (() => { try { return localStorage.getItem(FARV_KEY) !== '0'; } catch (e) { return true; } })(), inZ: 40, outZ: 36, far: false, sharp: false,
-  lastMove: 0, p: null, pix: 4.4e6, ema: 16.7, t: 0, quick: 0, cut: 0, k: 0, up: 0, v0: .25, below: 0, above: 0, since: 99 };   // (k: how far the sharp view has come in, 0 to 1; v0: the speed below which it starts)
+  lastMove: 0, p: null, pix: 3e6, ema: 16.7, t: 0, quick: 0, cut: 0, k: 0, up: 0, v0: .25, below: 0, above: 0, since: 99 };   // (k: how far the sharp view has come in, 0 to 1; v0: the speed below which it starts)
 function setFarView(on){ FARV.on = !!on; try { localStorage.setItem(FARV_KEY, FARV.on ? '1' : '0'); } catch (e) {} }
 function farTrack(now){
   const v = [yaw, zoom, PITCH, camT.x, camT.z], p = FARV.p, dtF = Math.max(1, now - (FARV.lt || now));
@@ -1643,7 +1643,7 @@ function farTrack(now){
   // how the sharp view keeps up: frames while it's on, against the screen's refresh (PERF.vs, main.js)
   if (FARV.sharp && wasSharp){ const ms = now - (FARV.lt || now); if (ms > 0 && ms < 250){ FARV.ema += (ms - FARV.ema)*.08; FARV.t += ms; }
     if (FARV.t > 1500){ FARV.t = 0;
-      if (FARV.ema > PERF.vs*1.2 && FARV.pix > PIX_MAX){ FARV.pix = Math.max(PIX_MAX, FARV.pix*.85); FARV.quick = 0; FARV.cut = now; }
+      if (FARV.ema > PERF.vs*1.08 && FARV.pix > PIX_MAX){ FARV.pix = Math.max(PIX_MAX, FARV.pix*.85); FARV.quick = 0; FARV.cut = now; }   // (from 3 million, and at the first late frames: it started at 4.4 and waited for 20% late, 21 late frames in 4 s still at zoom 55)
       else if (FARV.ema < PERF.vs*1.06 && FARV.pix < 4.4e6 && ++FARV.quick >= 8 && now - FARV.cut > 30000){ FARV.pix = Math.min(4.4e6, FARV.pix*1.08); FARV.quick = 0; }
       else if (FARV.ema >= PERF.vs*1.06) FARV.quick = 0; } }
   else { FARV.t = 0; FARV.ema = PERF.vs; }

@@ -7,13 +7,15 @@
 // shared clock, and lit only while people are near (checked once a second).
 // All game scripts share one scope and load in order (see index.html); this one loads after world.js, and the plot worker loads it too (recipe.js).
 'use strict';
-const WALL_BASE = 4*FH, WALL_TIER = 2*FH, WALL_T = .44, GATE_W = 1.3, GATE_H = 2.05, WALL_MOD = LOT/4;   // (WALL_MOD: decoration repeats on a grid that meets the next plot's)
+const WALL_BASE = 4*FH, WALL_TIER = 2*FH, WALL_T = .44, GATE_H = 2.35, GATE_PIL = .42, WALL_MOD = LOT/4;   // (GATE_PIL: a gate's pillar, at a side with no gate next door)   // (WALL_MOD: decoration repeats on a grid that meets the next plot's)
 const WALL_ZONES = { low: 'Residential', mid: 'Commercial', high: 'Luxury', ind: 'Industrial' };
 // which neighbors (in SIDES4 order: +x, -x, +z, -z) are walls, and how high it may go under a highway or the metro: worked out on the page
 // for each build (recipeOf calls this), so the plot worker builds from the recipe alone
 function wallPrep(c){
-  if (!c.wall){ delete c.wallN; delete c.wallCap; return; }
-  c.wallN = SIDES4.map(([a, b]) => { const n = cells.get(ckey(c.i + a, c.j + b)); return n && n.wall && !n.mega ? 1 : 0; });
+  if (!c.wall){ delete c.wallN; delete c.wallG; delete c.wallCap; return; }
+  const nb = SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b)));
+  c.wallN = nb.map(n => n && n.wall && !n.mega ? 1 : 0);
+  c.wallG = nb.map(n => n && n.wall && n.wall.gate && !n.mega ? 1 : 0);   // (a gate next door: the two open into one wide gate)
   const cap = typeof hwCap === 'function' ? hwCap(c) : null; if (cap === null) delete c.wallCap; else c.wallCap = cap;
 }
 const wallHeight = w => WALL_BASE + (w.n || 0)*WALL_TIER;
@@ -26,6 +28,15 @@ function wallRuns(L){
   if (n === 2 && L[0] && L[1]) return { kind: 'line', runs: [[PI/2, -H2, H2]] };
   if (n === 2 && L[2] && L[3]) return { kind: 'line', runs: [[0, -H2, H2]] };
   return { kind: n === 2 ? 'corner' : n === 3 ? 'tee' : 'cross', runs: SIDES4.map(([a, b], k) => L[k] ? [Math.atan2(a, b), -WALL_T/2, H2] : null).filter(Boolean) };
+}
+// a gate's opening along its run: from za to zb in the run's frame, a pillar at each side that has no gate next door (jm, jp: there is one)
+function gateSpan(c){
+  const L = c.wallN || [0, 0, 0, 0], Gn = c.wallG || [0, 0, 0, 0], k = wallRuns(L);
+  if (k.kind !== 'post' && k.kind !== 'end' && k.kind !== 'line') return null;
+  const [ry, z0, z1] = k.runs[0], dx = Math.round(Math.sin(ry)), dz = Math.round(Math.cos(ry));
+  const ip = SIDES4.findIndex(([a, b]) => a === dx && b === dz), im = SIDES4.findIndex(([a, b]) => a === -dx && b === -dz);
+  const jp = !!(L[ip] && Gn[ip]), jm = !!(L[im] && Gn[im]);
+  return { ry, z0, z1, za: jm ? z0 : z0 + GATE_PIL, zb: jp ? z1 : z1 - GATE_PIL, jm, jp, kind: k.kind };
 }
 const wallGateable = c => { const k = wallRuns(c.wallN || [0, 0, 0, 0]).kind; return k === 'post' || k === 'end' || k === 'line'; };
 
@@ -84,47 +95,110 @@ function wallPost(st, F, z, y0, h){
   else if (st === 'mid'){ box(M.pcPlinth, F, 0, y0 + h/2 + .05, z, t, h + .1, t); box(M.pcLed, F, t/2 + .005, y0 + 1.4, z, .02, .5, .26); box(M.neonAmber, F, 0, y0 + h + .14, z, .1, .1, .1); glow(F, 0, y0 + h + .16, z, 'amber', .8); }
   else { box(M.plMarble2, F, 0, y0 + h/2 + .05, z, t, h + .1, t); box(M.plGold, F, 0, y0 + h + .12, z, t + .08, .08, t + .08); box(M.plHolo, F, t/2 + .005, y0 + 1.2, z, .02, .3, .2); glow(F, t/2 + .1, y0 + 1.2, z, 'platinum', .9); }
 }
-// the gate: an opening GATE_W wide and GATE_H high in the middle of the run, its pillars, the wall over it, and the zone's dressing
-function wallGate(st, F, y0, h){
-  const gw = GATE_W, pw = .3, t = WALL_T + .16, top = y0 + GATE_H, x = gw/2 + pw/2;
+// the gate: an opening across nearly the whole plot (sp: gateSpan), GATE_H high; a pillar at each side with no gate next door (with one, the
+// opening runs on into it: a wider gate); the wall over it, and the zone's dressing
+function wallGate(st, F, y0, h, sp){
+  const { za, zb, jm, jp } = sp, zc = (za + zb)/2, gw = zb - za, t = WALL_T + .16, top = y0 + GATE_H, pw = GATE_PIL;
   const pil = st === 'low' ? M.pmPost : st === 'ind' ? M.piSteel : st === 'mid' ? M.pcPlinth : M.plMarble2;
-  for (const s of [-1, 1]) box(pil, F, 0, y0 + h/2 + .03, s*x, t, h + .06, pw);
+  const sides = []; if (!jm) sides.push([za - pw/2, -1]); if (!jp) sides.push([zb + pw/2, 1]);   // [pillar centre, which way the opening is from it: -1 it's on the +z side]
+  for (const [z] of sides) box(pil, F, 0, y0 + h/2 + .03, z, t, h + .06, pw);
   const fill = st === 'low' ? M.pmWood2 : st === 'ind' ? M.piSteel2 : st === 'mid' ? M.pcPanel : M.plGlass;
-  if (h > GATE_H + .2) box(fill, F, 0, (top + .2 + y0 + h)/2, 0, st === 'high' ? WALL_T*.5 : WALL_T, y0 + h - top - .2, gw);
+  if (h > GATE_H + .3) box(fill, F, 0, (top + .26 + y0 + h)/2, zc, st === 'high' ? WALL_T*.5 : WALL_T, y0 + h - top - .26, gw);
+  const scanner = (z, mat, gk) => { for (const s of [-1, 1]){ box(st === 'low' ? M.metalDark : st === 'ind' ? M.piDark : st === 'mid' ? M.pcPlinth : M.plGold, F, s*(t/2 + .05), y0 + 1.1, z, .08, .32, .22); box(mat, F, s*(t/2 + .095), y0 + 1.12, z, .01, .2, .15); glow(F, s*(t/2 + .15), y0 + 1.12, z, gk, .8); } };
   if (st === 'low'){
-    box(M.pmPost, F, 0, top + .1, 0, t + .04, .2, gw + 2*pw);
-    box(M.pmSolar, F, 0, Math.min(y0 + h, top + .2) + .14, 0, t + .7, .04, gw + 2*pw + .3, 0, .22, 0); box(M.frame, F, 0, Math.min(y0 + h, top + .2) + .12, 0, t + .74, .02, gw + 2*pw + .34, 0, .22, 0);
-    for (const s of [-1, 1]){ box(M.metalDark, F, s*(t/2 + .05), y0 + 1.05, x, .08, .3, .22); box(M.pmBio, F, s*(t/2 + .095), y0 + 1.07, x, .01, .18, .15); glow(F, s*(t/2 + .15), y0 + 1.07, x, 'green', .9); }
+    box(M.pmPost, F, 0, top + .13, zc, t + .04, .26, gw + (jm ? 0 : pw) + (jp ? 0 : pw));
+    const cy = Math.min(y0 + h, top + .26) + .16; box(M.pmSolar, F, 0, cy, zc, t + .8, .04, gw + .1, 0, .2, 0); box(M.frame, F, 0, cy - .02, zc, t + .84, .02, gw + .14, 0, .2, 0);
+    for (let z = za + .45; z < zb - .2; z += .9) strut(M.pmPost, F, 0, top + .26, z, 0, cy - .03, z, .05);
+    if (_wallGreen) for (const [z] of sides) plant(hangKind(), F, t/2 + .02, top + .2, z, rnd(.7, .9), 't', true);
+    for (const [z, d] of sides) scanner(z, M.pmBio, 'green');
   } else if (st === 'ind'){
-    box(M.piSteel, F, 0, top + .14, 0, t + .1, .28, gw + 2*pw + .1); for (const s of [-1, 1]) box(M.hazard, F, s*(t/2 + .06), top + .14, 0, .02, .12, gw + 2*pw);
-    for (const s of [-1, 1]) for (const zz of [-x - pw/2 - .06, x + pw/2 + .06]) cyl(M.metalDark, F, s*(t/2 - .05), y0 + h/2, zz, .06, h);
-    for (const s of [-1, 1]){ box(M.piDark, F, s*(t/2 + .05), y0 + 1.1, -x, .08, .34, .2); box(M.piNeon, F, s*(t/2 + .095), y0 + 1.12, -x, .01, .2, .13); glow(F, s*(t/2 + .15), y0 + 1.12, -x, 'orange', .8); }
-    box(M.piNeon, F, 0, top + .34, 0, .14, .14, .14); glow(F, 0, top + .38, 0, 'amber', 1.0);
+    box(M.piSteel, F, 0, top + .16, zc, t + .1, .32, gw + (jm ? 0 : pw) + (jp ? 0 : pw)); for (const s of [-1, 1]) for (let z = za + .12; z < zb - .1; z += .36) box(M.hazard, F, s*(t/2 + .06), top + .16, z + .09, .02, .14, .17);
+    for (const [z] of sides) for (const s of [-1, 1]) cyl(M.metalDark, F, s*(t/2 - .02), y0 + h/2, z + (z < zc ? -1 : 1)*(pw/2 - .06), .07, h);
+    for (const [z] of sides) scanner(z, M.piNeon, 'orange');
+    box(M.piNeon, F, 0, top + .4, zc, .14, .14, .14); glow(F, 0, top + .44, zc, 'amber', 1.0);
+    for (let z = za + .3; z < zb - .2; z += .6) box(M.piDark, F, 0, top + .01, z, t - .1, .02, .3);   // the rail of a shutter rolled up
   } else if (st === 'mid'){
-    box(M.pcPanel2, F, 0, top + .13, 0, t + .06, .26, gw + 2*pw); for (const s of [-1, 1]) box(M.pcLed, F, s*(t/2 + .04), top + .13, 0, .02, .06, gw + 2*pw - .1);
-    for (const s of [-1, 1]){ box(M.pcPlinth, F, s*(t/2 + .05), y0 + 1.1, x, .08, .3, .18); box(M.pcLed, F, s*(t/2 + .095), y0 + 1.12, x, .01, .16, .12); glow(F, s*(t/2 + .15), y0 + 1.12, x, 'cyan', .8); }
+    box(M.pcPanel2, F, 0, top + .15, zc, t + .06, .3, gw + (jm ? 0 : pw) + (jp ? 0 : pw)); for (const s of [-1, 1]) box(M.pcLed, F, s*(t/2 + .04), top + .15, zc, .02, .07, gw - .1);
+    box(M.pcLed, F, 0, top - .005, zc, t - .1, .02, gw - .1);   // a strip of light along the underside
+    for (const [z] of sides) scanner(z, M.pcLed, 'cyan');
   } else {
-    box(M.plGold, F, 0, top + .06, 0, t + .04, .12, gw + 2*pw);
-    for (let k = 0; k < 6; k++){ const a0 = PI*k/6, a1 = PI*(k + 1)/6, r = gw/2 + .05; strut(M.plGold, F, 0, top - .45 + Math.sin(a0)*.45, -Math.cos(a0)*r, 0, top - .45 + Math.sin(a1)*.45, -Math.cos(a1)*r, .07); }
-    for (const s of [-1, 1]) box(M.plGold, F, 0, y0 + h + .08, s*x, t + .06, .1, pw + .06);
-    box(M.plGold, F, 0, top + .38, 0, .1, .34, .5); box(M.plHolo, F, .055, top + .38, 0, .01, .26, .42); box(M.plHolo, F, -.055, top + .38, 0, .01, .26, .42); glow(F, 0, top + .38, 0, 'platinum', 1.2);
+    box(M.plGold, F, 0, top + .08, zc, t + .04, .14, gw + (jm ? 0 : pw) + (jp ? 0 : pw));
+    if (!jm && !jp){ const r = gw/2 - .02, ar = Math.min(.7, r*.5); for (let k = 0; k < 10; k++){ const a0 = PI*k/10, a1 = PI*(k + 1)/10;
+      strut(M.plGold, F, 0, top - ar + Math.sin(a0)*ar, zc - Math.cos(a0)*r, 0, top - ar + Math.sin(a1)*ar, zc - Math.cos(a1)*r, .07); } }
+    else for (let z = za + .2; z < zb - .1; z += .4) box(M.plGold, F, 0, top - .1, z, .06, .2, .03);   // a fringe of filigree along a wide one
+    for (const [z] of sides) box(M.plGold, F, 0, y0 + h + .08, z, t + .06, .1, pw + .06);
+    box(M.plGold, F, 0, top + .44, zc, .1, .36, .6); box(M.plHolo, F, .055, top + .44, zc, .01, .28, .52); box(M.plHolo, F, -.055, top + .44, zc, .01, .28, .52); glow(F, 0, top + .44, zc, 'platinum', 1.2);
+    for (const [z] of sides) scanner(z, M.plHolo, 'platinum');
   }
 }
-// the wall on a plot (cellBody): its runs from the joining neighbors, posts at the joints and free ends, a gate if it is one
+let _wallGreen = true;   // (the plot's greenery setting, while its wall is built)
+// The ground of a wall's plot: no street, the plot paved edge to edge in the zone's way, with what holds the wall up on either side of it
+// (timber braces in a gravel garden, steel shores on a concrete apron, lit fins on slate, a stepped marble plinth). A band of it at each
+// side's outer edge is left clear to walk, and a gate's opening has a path through it, with nothing in the way.
+M.pgGravel = toon(0x8b8270); M.pgStone = toon(0xa69e8a); M.igConc = toon(0x6c7074); M.igConc2 = toon(0x606468); M.cgSlate = toon(0x384252); M.cgSlate2 = toon(0x45506a);
+function wallGround(st, P, c, runs, sp, h){
+  const H2 = LOT/2, green = _wallGreen, y = CURB;
+  const base = st === 'low' ? M.pgGravel : st === 'ind' ? M.igConc : st === 'mid' ? M.cgSlate : M.plMarble2;
+  box(base, P, 0, y/2, 0, LOT + .01, y, LOT + .01);
+  // the surface: stepping stones and gravel; poured slabs with hazard edging; slate tiles; marble with gold inlay
+  if (st === 'low'){ for (let k = 0; k < 18; k++) box(M.pgStone, P, rnd(-H2 + .2, H2 - .2), y + .006, rnd(-H2 + .2, H2 - .2), rnd(.2, .38), .012, rnd(.16, .3), rnd(0, PI));
+    for (const [a, b] of SIDES4) box(M.pmPost, P, a*(H2 - .05), y + .02, b*(H2 - .05), a ? .08 : LOT, .04, b ? .08 : LOT);
+    if (green) for (let k = 0; k < 5; k++) floorBig(P, rnd(-H2 + .3, H2 - .3), y + .02, rnd(-H2 + .3, H2 - .3), rnd(.7, 1)); }
+  else if (st === 'ind'){ const n = 4, s = LOT/n; for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) box((a + b) % 2 ? M.igConc : M.igConc2, P, (a - (n - 1)/2)*s, y + .005, (b - (n - 1)/2)*s, s - .04, .01, s - .04);
+    for (const [a, b] of SIDES4) for (let t = -H2 + .15; t < H2; t += .4) box(M.hazard, P, a*(H2 - .07) + (a ? 0 : t), y + .012, b*(H2 - .07) + (b ? 0 : t), a ? .1 : .2, .012, b ? .1 : .2); }
+  else if (st === 'mid'){ const n = 7, s = LOT/n; for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) if (!chance(.04)) box(chance(.5) ? M.cgSlate2 : M.cgSlate, P, (a - (n - 1)/2)*s, y + .006, (b - (n - 1)/2)*s, s - .04, .012, s - .04);
+    for (const [a, b] of SIDES4) box(M.pcLed, P, a*(H2 - .04), y + .01, b*(H2 - .04), a ? .03 : LOT - .1, .012, b ? .03 : LOT - .1); }
+  else { const n = 5, s = LOT/n; for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) box((a + b) % 2 ? M.plMarble : M.plMarble2, P, (a - (n - 1)/2)*s, y + .006, (b - (n - 1)/2)*s, s - .03, .012, s - .03);
+    for (let k = 1; k < n; k++){ const q = -H2 + k*s; box(M.plGold, P, q, y + .013, 0, .02, .006, LOT - .1); box(M.plGold, P, 0, y + .013, q, LOT - .1, .006, .02); } }
+  // what holds the wall up: along each run, on both sides (a gate's run: its path instead)
+  const t = WALL_T;
+  for (const [ry, z0, z1] of runs){
+    const F = under(P, T(0, 0, 0, ry)), len = z1 - z0, zc = (z0 + z1)/2;
+    const gate = sp && Math.abs(ry - sp.ry) < 1e-6;
+    if (gate){   // the path through: a band of paving across the plot the width of the opening
+      const pm = st === 'low' ? M.pgStone : st === 'ind' ? M.igConc2 : st === 'mid' ? M.cgSlate2 : M.plMarble;   // (never asphalt-dark: it must not read as a road)
+      box(pm, F, 0, y + .016, (sp.za + sp.zb)/2, LOT - .2, .01, sp.zb - sp.za - .1);
+      if (st === 'ind') for (const z of [sp.za + .08, sp.zb - .08]) for (let x = -H2 + .2; x < H2 - .1; x += .34) box(M.hazard, F, x, y + .022, z, .17, .008, .06);   // (hazard-striped kerbs either side of the way through)
+      if (st === 'mid') for (const z of [sp.za + .06, sp.zb - .06]) box(M.pcLed, F, 0, y + .022, z, LOT - .3, .008, .03);
+      continue;
+    }
+    const mods = []; for (let k = Math.ceil(z0/WALL_MOD - .5); (k + .5)*WALL_MOD < z1; k++){ const z = (k + .5)*WALL_MOD; if (z > z0 + .1 && z < z1 - .1 && Math.abs(z) > .6) mods.push(z); }
+    const alt = z => Math.round(z/WALL_MOD - .5) % 2 === 0;
+    if (st === 'low'){
+      box(M.pmPost, F, 0, y + .05, zc, t + .3, .1, len);   // a timber footing
+      for (const z of mods) if (alt(z)) { const s = -1; box(M.pmPost, F, s*(t/2 + .85), y + .05, z, .22, .1, .22); strut(M.pmWood2, F, s*(t/2 + .85), y + .08, z, s*(t/2 + .02), y + Math.min(h*.6, 1.7), z, .1); }
+      for (const z of mods) if (!alt(z) && green) plant(pick(['bush', 'fern', 'g_fern3']), F, -(t/2 + .55), y + .02, z, rnd(.55, .75));
+    } else if (st === 'ind'){
+      box(M.piDark, F, 0, y + .06, zc, t + .36, .12, len); for (const s of [-1, 1]) box(M.hazard, F, s*(t/2 + .17), y + .125, zc, .04, .01, len - .04);
+      for (const z of mods) if (alt(z)) for (const s of [-1, 1]){ box(M.piDark, F, s*(t/2 + .9), y + .03, z, .34, .06, .34); strut(M.piSteel, F, s*(t/2 + .9), y + .06, z, s*(t/2 + .03), y + Math.min(h*.7, 2.2), z, .11);
+        strut(M.piSteel2, F, s*(t/2 + .9), y + .08, z, s*(t/2 + .03), y + .5, z, .06); }
+    } else if (st === 'mid'){
+      box(M.pcPlinth, F, 0, y + .06, zc, t + .4, .12, len);
+      for (const z of mods) if (alt(z)) for (const s of [-1, 1]){ box(M.pcPlinth, F, s*(t/2 + .3), y + .55, z, .6, 1.1, .08); box(M.pcLed, F, s*(t/2 + .6), y + .55, z, .02, 1.0, .09); box(M.pcPanel2, F, s*(t/2 + .3), y + 1.12, z, .64, .04, .12); }
+    } else {
+      for (const s of [-1, 1]){ box(M.plMarble2, F, s*(t/2 + .35), y + .06, zc, .44, .12, len); box(M.plMarble, F, s*(t/2 + .26), y + .17, zc, .26, .1, len); box(M.plGold, F, s*(t/2 + .57), y + .125, zc, .02, .01, len); }
+      for (const z of mods) if (alt(z)) for (const s of [-1, 1]){ box(M.plMarble2, F, s*(t/2 + .14), y + Math.min(h*.45, 1.6), z, .26, Math.min(h*.9, 3.2), .3); box(M.plGold, F, s*(t/2 + .14), y + Math.min(h*.9, 3.2) + .05, z, .3, .05, .34); }
+      if (green) for (const z of mods) if (!alt(z)) plant('bonsai', F, (chance(.5) ? 1 : -1)*(t/2 + .4), y + .22, z, rnd(.55, .7));
+    }
+  }
+}
+// the wall on a plot (cellBody): the ground, its runs from the joining neighbors, posts at the joints and free ends, a gate if it is one
 function buildPerimeter(c){
   const w = c.wall; if (!w || !WALL_ZONES[w.zone]) return;
   R = mulberry32(hash('wall', c.i, c.j, w.seed || 0));
-  const st = w.zone, P = T(c.x, 0, c.z), y0 = CURB, h = wallTopOf(c) - CURB, green = c.green !== 'none';
+  const st = w.zone, P = T(c.x, 0, c.z), y0 = CURB, h = wallTopOf(c) - CURB; _wallGreen = c.green !== 'none';
   const { kind, runs } = wallRuns(c.wallN || [0, 0, 0, 0]);
-  const gate = !!w.gate && (kind === 'post' || kind === 'end' || kind === 'line') && h > GATE_H + .3;
+  const sp = w.gate && h > GATE_H + .3 ? gateSpan(c) : null;
+  wallGround(st, P, c, runs, sp, h);
   for (const [ry, z0, z1] of runs){
     const F = under(P, T(0, 0, 0, ry));
-    if (gate){ const e = GATE_W/2 + .3; wallBody(st, F, Math.min(z0, -e - .25), -e, y0, h, green); wallBody(st, F, e, z1, y0, h, green); wallGate(st, F, y0, h); }
-    else wallBody(st, F, z0, z1, y0, h, green);
-    if (kind === 'post' || kind === 'end') wallPost(st, F, z0 + (kind === 'post' || !gate ? .1 : -.15), y0, h);
-    if (kind === 'post') wallPost(st, F, z1 - .1, y0, h);
+    if (sp){ if (!sp.jm && sp.za - GATE_PIL > z0 + .05) wallBody(st, F, z0, sp.za - GATE_PIL, y0, h, _wallGreen); if (!sp.jp && sp.zb + GATE_PIL < z1 - .05) wallBody(st, F, sp.zb + GATE_PIL, z1, y0, h, _wallGreen); wallGate(st, F, y0, h, sp); }
+    else { wallBody(st, F, z0, z1, y0, h, _wallGreen);
+      if (kind === 'post' || kind === 'end') wallPost(st, F, z0 + .1, y0, h);
+      if (kind === 'post') wallPost(st, F, z1 - .1, y0, h); }
   }
   if (kind === 'corner' || kind === 'tee' || kind === 'cross') wallPost(st, P, 0, y0, h);
+  _wallGreen = true;
 }
 
 /* ---------- on the page: placing, stacking, gates, and the gates' scans ---------- */
@@ -183,7 +257,7 @@ function toggleGate(c){
   finishAnimsOn(c); holdRegion(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   c.wall.gate = !c.wall.gate;
-  refresh([c]); dropView(old);
+  refresh([c, ...wallNbrs(c)]); dropView(old);   // (the walls next door too: a gate beside a gate opens into it)
   startAnim(c, 'build', CURB - .05, Math.min(wallTopOf(c), CURB + GATE_H + .6) + .4, c.wall.zone, LOT, null);
   perimDirty();
   return c;
@@ -194,7 +268,7 @@ function removeWallTier(c){
   const top = wallTopOf(c), zone = c.wall.zone, old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   let nb = [];
   if (c.wall.n > 0) c.wall.n--;
-  else { nb = wallNbrs(c); delete c.wall; delete c.wallN; delete c.wallCap; }
+  else { nb = wallNbrs(c); delete c.wall; delete c.wallN; delete c.wallG; delete c.wallCap; }
   refresh([c, ...nb]);
   startAnim(c, 'remove', c.wall ? wallTopOf(c) - .05 : CURB - .05, top + 1.2, zone, LOT, old);
   perimDirty();
@@ -204,8 +278,8 @@ function perimHover(t){
   const col = ZONES[PERIM] ? ZONES[PERIM].col : '#e3d6bd'; hoverMat.color.set(col); hoverFill.visible = false; hoverStrip.visible = false;
   if (t.type === 'wallNew'){ const x = t.i*LOT, z = t.j*LOT; hover.position.set(x, CURB + WALL_BASE/2, z); hover.scale.set(LOT*.72, WALL_BASE, LOT*.72); }
   else if (t.type === 'wallUp'){ const c = t.c, top = wallTopOf(c); hover.position.set(c.x, top + WALL_TIER/2, c.z); hover.scale.set(LOT*.72, WALL_TIER, LOT*.72); }
-  else { const c = t.c, along = wallRuns(c.wallN || [0, 0, 0, 0]).runs[0][0], ax = Math.abs(Math.sin(along)) > .5;
-    hover.position.set(c.x, CURB + GATE_H/2, c.z); hover.scale.set(ax ? GATE_W : WALL_T + .3, GATE_H, ax ? WALL_T + .3 : GATE_W); }
+  else { const c = t.c; wallPrep(c); const g = gateSpan(c) || { ry: wallRuns(c.wallN || [0, 0, 0, 0]).runs[0][0], za: -1.3, zb: 1.3 }, ax = Math.abs(Math.sin(g.ry)) > .5, zc = (g.za + g.zb)/2, w = g.zb - g.za;
+    hover.position.set(c.x + Math.sin(g.ry)*zc, CURB + GATE_H/2, c.z + Math.cos(g.ry)*zc); hover.scale.set(ax ? w : WALL_T + .3, GATE_H, ax ? WALL_T + .3 : w); }
   hover.visible = true;
 }
 
@@ -221,29 +295,30 @@ if (!self.IN_RECIPE_WORKER){
     vertexShader: 'attribute vec3 aG; varying vec3 vG; varying vec2 vUv; void main(){ vG = aG; vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
     fragmentShader: `uniform float time; varying vec3 vG; varying vec2 vUv;
       void main(){
-        float z = vG.x, sd = vG.y, act = vG.z, u = vUv.x, v = vUv.y, t = time + sd*7.0; vec3 col; float a;
+        float zf = vG.x, z = mod(zf, 4.0), ea = mod(floor(zf/4.0), 2.0), eb = floor(zf/8.0), sd = vG.y, act = vG.z, u = vUv.x, v = vUv.y, t = time + sd*7.0; vec3 col; float a;
         if (z < .5){ float y = .5 + .48*sin(t*1.7); a = exp(-pow((v - y)/.035, 2.0)) + .1*step(.5, fract(u*6.0 + v*3.0 - t*.4))*.4; col = vec3(.4, 1.0, .55); }
         else if (z < 1.5){ float x = fract(t*.45); a = exp(-pow((u - x)/.025, 2.0)) + .55*step(.93, fract(v*4.0))*(.6 + .4*step(.5, fract(t*3.0))); col = vec3(1.0, .55, .15); }
         else if (z < 2.5){ float g = max(step(.9, fract(u*7.0)), step(.9, fract(v*9.0 - t*.8))); float y = fract(t*.35); a = g*.45 + exp(-pow((v - y)/.05, 2.0)); col = vec3(.35, .8, 1.0); }
         else { float r = pow(.5 + .5*sin(v*26.0 - t*3.0 + sin(u*6.0)*1.5), 6.0); a = r*.7 + .12; col = mix(vec3(1.0, .78, .4), vec3(.85, .6, 1.0), .5 + .5*sin(t*.7 + u*3.0)); }
-        float edge = smoothstep(0.0, .06, u)*smoothstep(1.0, .94, u)*smoothstep(1.0, .9, v);
+        float edge = mix(1.0, smoothstep(0.0, .05, u), ea)*mix(1.0, smoothstep(1.0, .95, u), eb)*smoothstep(1.0, .9, v);
         gl_FragColor = vec4(col*a*edge*(.12 + .88*act), 1.0); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   }); m.userData.colorOnly = true; return m; };
   const G = { mesh: null, sig: '', gates: [], at: new Map(), act: null };
   function rebuild(){
     const list = [];
-    for (const c of cells.values()) if (c.wall && c.wall.gate && !c.mega){ const L = c.wallN || [0, 0, 0, 0], k = wallRuns(L); if ((k.kind === 'post' || k.kind === 'end' || k.kind === 'line') && wallTopOf(c) - CURB > GATE_H + .3) list.push({ c, ry: k.runs[0][0] }); }
-    const sig = list.map(g => g.c.i + ',' + g.c.j + ':' + g.c.wall.zone + ':' + g.ry.toFixed(2)).join('|');
+    for (const c of cells.values()) if (c.wall && c.wall.gate && !c.mega && wallTopOf(c) - CURB > GATE_H + .3){ const sp = gateSpan(c); if (sp) list.push({ c, sp }); }
+    const sig = list.map(g => g.c.i + ',' + g.c.j + ':' + g.c.wall.zone + ':' + g.sp.ry.toFixed(2) + ':' + g.sp.za.toFixed(2) + ':' + g.sp.zb.toFixed(2)).join('|');
     if (sig === G.sig) return; G.sig = sig;
     if (G.mesh){ scene.remove(G.mesh); G.mesh.geometry.dispose(); G.mesh = null; }
     G.gates = list; G.at = new Map(list.map((g, k) => [ckey(g.c.i, g.c.j), k]));
     if (!list.length) return;
     const n = list.length, P = new Float32Array(n*12), UV = new Float32Array(n*8), A = new Float32Array(n*12), I = [];
     list.forEach((g, k) => {
-      const dx = Math.sin(g.ry), dz = Math.cos(g.ry), w = GATE_W/2 - .02, y0 = CURB + .02, y1 = CURB + GATE_H - .05, sd = (hash('gate', g.c.i, g.c.j) % 1000)/1000;
-      const pts = [[-w, y0], [w, y0], [w, y1], [-w, y1]];
-      pts.forEach(([s, y], q) => { P.set([g.c.x + dx*s, y, g.c.z + dz*s], (k*4 + q)*3); UV.set([q === 1 || q === 2 ? 1 : 0, q >= 2 ? 1 : 0], (k*4 + q)*2); A.set([ZI[g.c.wall.zone] || 0, sd, 0], (k*4 + q)*3); });
+      const sp = g.sp, dx = Math.sin(sp.ry), dz = Math.cos(sp.ry), y0 = CURB + .02, y1 = CURB + GATE_H - .05, sd = (hash('gate', g.c.i, g.c.j) % 1000)/1000;
+      const ea = sp.jm ? 0 : 1, eb = sp.jp ? 0 : 1;   // (the edge fades only at a pillar: across a wide gate the sweeps run on into each other)
+      const pts = [[sp.za, y0], [sp.zb, y0], [sp.zb, y1], [sp.za, y1]];
+      pts.forEach(([s, y], q) => { P.set([g.c.x + dx*s, y, g.c.z + dz*s], (k*4 + q)*3); UV.set([q === 1 || q === 2 ? 1 : 0, q >= 2 ? 1 : 0], (k*4 + q)*2); A.set([(ZI[g.c.wall.zone] || 0) + ea*4 + eb*8, sd, 0], (k*4 + q)*3); });
       I.push(k*4, k*4 + 1, k*4 + 2, k*4, k*4 + 2, k*4 + 3);
     });
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(P, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
@@ -258,7 +333,7 @@ if (!self.IN_RECIPE_WORKER){
     if (!G.mesh || typeof pplList === 'undefined') return;
     const near = new Set();
     for (const p of pplList){ if (p.x === undefined || !(p._ea > .3)) continue; const k = G.at.get(ckey(Math.round(p.x/LOT), Math.round(p.z/LOT))); if (k === undefined) continue;
-      const g = G.gates[k]; if (Math.hypot(p.x - g.c.x, p.z - g.c.z) < 1.4) near.add(k); }
+      const g = G.gates[k]; if (Math.hypot(p.x - g.c.x, p.z - g.c.z) < 1.9) near.add(k); }
     let ch = false;
     for (let k = 0; k < G.gates.length; k++){
       let h = hold.get(k) || 0; h = near.has(k) || G.force ? 3 : Math.max(0, h - 1); hold.set(k, h);   // (G.force: every gate lit, for checks)

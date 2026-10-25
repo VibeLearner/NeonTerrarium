@@ -829,7 +829,8 @@ function buildPlatformBody(c){
   }
   if (c.mega) return;   // a megastructure lays its own ground across its plots
   // surface: sidewalk and street round a building, or a small paved plaza when the spot is empty
-  if (c.sections.length || c.wall) groundLot({ x, z, cls: c.sections.length ? c.sections[0].zone : c.wall.zone, elev: 0, base: CURB, deck: false, cross: cells.has(ckey(c.i, c.j + 1)) });   // (a perimeter wall's plot is paved as its zone's)
+  if (c.wall && !c.sections.length){}   // (a perimeter wall's plot: no street, its own ground, laid with the wall: perimeter.js wallGround)
+  else if (c.sections.length) groundLot({ x, z, cls: c.sections[0].zone, elev: 0, base: CURB, deck: false, cross: cells.has(ckey(c.i, c.j + 1)) });
   else {
     box(G.asph, P, 0, .012, 0, LOT, .025, LOT);
     if (c.green === 'grass'){   // laid to lawn, edge to edge, with grass growing up out of it

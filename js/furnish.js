@@ -11,7 +11,7 @@ const FURN = (() => {
   // detail by distance from the home, in game units (x3.16 in the lab). The lab's backdrop is sharp only within about 45 m (14 units):
   // full detail to NEAR, clustered on a CG grid to MID, simple blocks (the clustered stand-in clustered again on a CG_FAR grid) beyond.
   // F.lightCity = false sends the city as before (full detail to 46, clustered beyond) to compare.
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-24az';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-25a';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
 
@@ -302,11 +302,11 @@ const FURN = (() => {
     if (!WARM.pre){ WARM.pre = true; const l = document.createElement('link'); l.rel = 'prefetch'; l.href = PAGE; document.head.appendChild(l); }   // (the page itself fetched ahead, so a click opens it from the cache)
     if (WARM.q) return; WARM.q = []; WARM.later = []; WARM.asked.clear(); WARM.t0 = performance.now(); for (const c of cells.values()) if (c.data && c.data.geo) WARM.q.push(c); for (const m of megas.values()) if (m.data && m.data.geo) WARM.q.push(m); pickIdle(warmStep); }
   function warmStep(dl){
-    if (!WARM.q || F.open) { WARM.q = null; return; }
+    if (!WARM.q || F.open || !(F.pick || (typeof TITLE !== 'undefined' && TITLE.on))) { WARM.q = null; return; }   // (only behind the title screen or while picking: a plot can take 20 ms, a hitch in the game)
     const end = performance.now() + (dl && dl.timeRemaining ? Math.min(10, Math.max(3, dl.timeRemaining() - 1)) : 4);
     while (WARM.q.length && performance.now() < end){ const o = WARM.q.pop(); if (!o.data || COARSE.has(o.data)) continue;
       const B = readPlot(o, WARM.EM, true); if (!B){ if (cells.get(ckey(o.i, o.j)) === o) WARM.later.push(o); continue; }   // (let go: asked for below)
-      COARSE.set(o.data, coarseOf(B, WARM.EM).keep); }
+      const cr = coarseOf(B, WARM.EM); COARSE.set(o.data, cr.keep); if (!BLOCKS.has(o.data)) BLOCKS.set(o.data, blocksOf(cr.co, WARM.EM).keep); }
     if (WARM.q.length){ pickIdle(warmStep); return; }
     if (WARM.later.length && F.pick && !F.open && workerOK() && performance.now() - WARM.t0 < 60000){ warmLater(end); setTimeout(() => pickIdle(warmStep), 80); return; }
     WARM.q = null; WARM.later = []; WARM.asked.clear();
@@ -380,11 +380,13 @@ const FURN = (() => {
       const B = readPlot(t.o, EM, !t.near); if (!B) return false;
       const box = B._box;
       if (t.near){ delete B._box; emit({ kind: t.kind, id: t.id, box, full: B }); st.near++; }
-      else { const { co, keep } = coarseOf(B, EM); COARSE.set(t.o.data, keep); out(box, co); st.made++; }
+      else { const { co, keep } = coarseOf(B, EM); COARSE.set(t.o.data, keep); out(box, co); st.made++; cold = true; }
       return true;
     };
     const ensure = t => { if (!t.cell) return true; try { return pmEnsure(t.cell, t.near ? 'full' : 'stand'); } catch (e) { return true; } };
-    const slice = async () => { if (performance.now() - last > 6){ flush(); await tick(); last = performance.now(); } return alive(); };
+    // a stand-in made here (none kept from before) can take 20 ms or more and runs on the thread the hologram draws on: one per frame at most
+    let cold = false;
+    const slice = async () => { if (cold || performance.now() - last > 6){ cold = false; flush(); await tick(); last = performance.now(); } return alive(); };
     // 1. the home and the ring round it (any let go are asked for at once, so the worker makes them while the rest goes out)
     const nearL = all.filter(t => t.near), farL = all.filter(t => !t.near);
     let wait = [];
@@ -541,7 +543,7 @@ const FURN = (() => {
       if (F.open){ if (F.busy){ F.busy = false; begin(fr, h); } }
       else { fr.contentWindow.postMessage({ type: 'furnish:warm' }, location.origin); }   // (preloaded: warm everything up, then sleep until a pod is opened)
     }
-    else if (m.type === 'furnish:warmed'){ F.warmMs = m.ms; F.preloading = false; }
+    else if (m.type === 'furnish:warmed'){ F.warmMs = m.ms; F.preloading = false; try { warmStart(); } catch (err) {} }   // (the far city's stand-ins made now, while the title screen still covers the game, so the first visit finds them ready)
     else if (!F.open) return;
     else if (m.type === 'furnish:live'){ const st = STATS(); if (st.clickToLive == null) st.clickToLive = Math.round(performance.now() - st.click);
       ov.classList.add('live'); hover.visible = false; hoverStrip.visible = false; hoverFill.visible = false; try { fr.focus(); } catch (err) {} }   // (the hologram has the screen: the paused city under it can go)

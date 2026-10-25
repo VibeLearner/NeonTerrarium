@@ -15733,9 +15733,12 @@ function build(o){const hb=homeBox(o),b=hb.b,W=b.max.x-b.min.x,D=b.max.z-b.min.z
   const lg=new T.BufferGeometry();lg.setAttribute('position',new T.Float32BufferAttribute(lp,3));const ls=new T.LineSegments(lg,lm);ls.frustumCulled=false;hs.add(ls);lm.uniforms.uY1.value=yh;
   const ctr=new T.Vector3(cx,y0+1.2,cz),sv=new T.Vector3(side==='E'?1:side==='W'?-1:0,0,side==='S'?1:side==='N'?-1:0);
   return {sc,hs,mb,mw,mn,hm,lm,geos,lg,hemi,sun,box:b,y0,street:lay.street+y0,top:y0+lay.top,center:ctr,streetDir:sv,SW:lay.SW}}
+// recolor city chunks a slice at a time (skipped when the time changes again before it is done)
+async function recolorLater(list,day){const my=C,tok=(C.rcTok=(C.rcTok||0)+1);for(const g of list){let ta=now();const n=g.getAttribute('position').count;for(let i=0;i<n;i+=20000){if(C!==my||C.rcTok!==tok)return;recolor(g,day,i,i+20000);if(now()-ta>SLICE){await yieldFrame();ta=now()}}g.userData.tm=day;if(C===my){C.dirty=true;wantDraw()}}}
 function setTime(t){if(!C||!C.city)return;C.time=t==='day'?'day':'night';const K=SKY[C.time],c=C.city;c.hemi.color.setHex(K.hs);c.hemi.groundColor.setHex(K.hg);c.hemi.intensity=K.hi;c.sun.color.setHex(K.sun);c.sun.intensity=K.si;
   c.hazeC=new T.Color(K.haze).convertSRGBToLinear();c.hazeK=K.hazeK;c.sc.fog=new T.Fog(c.hazeC,260,520);c.fogHex=c.hazeC;
-  for(const g of c.geos){if(g.userData.base){recolor(g,C.time==='day');continue}const a=g.getAttribute('color');a.array.set(C.time==='day'?g.userData.cd:g.userData.cn);a.needsUpdate=true}
+  const day=C.time==='day',slow=[];for(const g of c.geos){if(g.userData.base){if(g.userData.tm!==day)slow.push(g);continue}const a=g.getAttribute('color');a.array.set(day?g.userData.cd:g.userData.cn);a.needsUpdate=true}
+  if(slow.length)recolorLater(slow,day);   // (a home open sets the time once the city is up: recoloring every chunk at once was a 30 to 70 ms freeze in the hologram, Oct 25 trace)
   if(c.mn)c.mn.color.setScalar(C.time==='day'?.6:1.7);if(c.mw)c.mw.color.setScalar(C.time==='day'?1:1.35);C.dirty=true;wantDraw()}
 
 /* ---------------- render targets and the bake ---------------- */
@@ -16018,7 +16021,7 @@ function podLines(b,y0,rooms){const lp=[],x0=b.min.x,x1=b.max.x,z0=b.min.z,z1=b.
   const lm=maxBlend(new T.ShaderMaterial({vertexShader:LV,fragmentShader:LF,uniforms:{uBuild:{value:0},uA:{value:0},uY0:{value:y0},uY1:{value:yh}},toneMapped:false}));
   const lg=new T.BufferGeometry();lg.setAttribute('position',new T.Float32BufferAttribute(lp,3));const ls=new T.LineSegments(lg,lm);ls.frustumCulled=false;return {lm,lg,ls}}
 const yieldFrame=()=>new Promise(r=>setTimeout(r,0)),nextFrame=()=>new Promise(r=>typeof requestAnimationFrame==='function'?requestAnimationFrame(()=>r()):setTimeout(r,16));
-const SLICE=5,CHUNK=100000;
+const SLICE=5,CHUNK=40000;
 const sliceEnd=(t,w)=>{const d=now()-t;if(C&&d>8&&(C.sl=C.sl||[]).length<20)C.sl.push([w,+d.toFixed(1),C.dbgI]);if(C&&d>(C.slice||0)){C.slice=d;C.sliceAt=w}};
 function blockNormals(b){const P=b.pos,I=b.idx,N=new Float32Array(b.n*3);for(let t=0;t<I.length;t+=3){const a=I[t]*3,c=I[t+1]*3,d=I[t+2]*3;
     const ux=P[c]-P[a],uy=P[c+1]-P[a+1],uz=P[c+2]-P[a+2],vx=P[d]-P[a],vy=P[d+1]-P[a+1],vz=P[d+2]-P[a+2],nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
@@ -16115,7 +16118,7 @@ async function streamReal(o,e,my){const t0=now(),K=CITY.index.consts,FH=K.FH||.9
     g.computeBoundingSphere();g.boundingSphere.radius+=15;   // generous culling: a chunk is drawn well before it reaches the frame edge
     return g};
   const add=async(g,glass)=>{if(!g)return;const n=g.getAttribute('position').count;let ta=now();const day=C.time==='day';for(let i=0;i<n;i+=20000){recolor(g,day,i,i+20000);if(now()-ta>SLICE){sliceEnd(ta,'recolor');await yieldFrame();ta=now();if(!C)return}}sliceEnd(ta,'recolor');
-    if(C.time==='day'!==day)recolor(g,C.time==='day');city.geos.push(g);const m1=new T.Mesh(g,glass?mg:mb);if(glass)m1.renderOrder=1;sc.add(m1);city.full.push(m1);
+    if(C.time==='day'!==day)recolor(g,C.time==='day');g.userData.tm=C.time==='day';city.geos.push(g);const m1=new T.Mesh(g,glass?mg:mb);if(glass)m1.renderOrder=1;sc.add(m1);city.full.push(m1);
     if(!glass){const m2=new T.Mesh(g,dn);hs.add(m2)}city.verts+=g.getAttribute('position').count;city.tris+=g.index.count/3;city.chunks++;C.dirty=true};
   // plots in arrival order (the pack: its order; a stream: nearest first); the home's cell is cut from its deck up
   const cut=B=>{const o2={};for(const k in B)o2[k]=clipSlice(B[k],y0g+.02,Infinity);return o2};let i=0,grp=[],gv=0,last=now();const glassParts=[],est=Math.max(1,I.cells.length+(I.megas||[]).length);
@@ -16129,9 +16132,9 @@ async function streamReal(o,e,my){const t0=now(),K=CITY.index.consts,FH=K.FH||.9
   if(grp.length){await add(await geo(grp,false),false);await nextFrame()}if(C!==my)return null;if(glassParts.length)await add(await geo(glassParts,true),true);
   city.building=false;city.buildMs=Math.round(now()-t0);C.prog.build=1;return city}
 function overlayReal(R,c,t,h){const s0=R.getDrawingBufferSize(new T.Vector2());if(!C.T.dn||C.T.dn.width!==s0.x||C.T.dn.height!==s0.y){if(C.T.dn)C.T.dn.dispose();C.T.dn=rt(s0.x,s0.y,{depthBuffer:true,minFilter:T.NearestFilter,magFilter:T.NearestFilter});C.dnFresh=true}
-  // while the hologram holds for the room's light it plays at 0.15 speed: the city's depth (the whole city drawn) is redrawn every third
-  // frame there and the edges use the camera it was drawn with, which leaves the light bake most of the frame
-  const reuse=!!(C.trans&&C.trans.holding&&C.dnCam&&!C.dnFresh&&(C.dnN=(C.dnN||0)+1)%3!==0&&api._holdCity!==false);C.dnFresh=false;
+  // (off by default: redrawing the city's depth only every third frame during the hold made the slow motion choppy, Oct 25;
+  // PodContext._holdCity = true turns it on)
+  const reuse=!!(C.trans&&C.trans.holding&&C.dnCam&&!C.dnFresh&&(C.dnN=(C.dnN||0)+1)%3!==0&&api._holdCity===true);C.dnFresh=false;
   const U=C.P.edge.uniforms,sp=ph(t,'sweep'),dc=reuse?C.dnCam:c;U.tDN.value=C.T.dn.texture;U.px.value.set(1/s0.x,1/s0.y);U.pInv.value.copy(dc.projectionMatrixInverse);U.camW.value.copy(dc.matrixWorld);U.uBack.value=h.camBack;h.dn.uniforms.uBack.value=h.camBack;
   U.uSweep.value=sp>0&&sp<1?lerp(h.top,h.y0+1.2,ease(sp)):-1e4;U.uFloor.value=h.y0;U.uFH.value=h.FHm;U.uFloorK.value=sp>=1?1:0;U.uPod.value=ph(t,'pod');U.uTop.value=1-ph(t,'top');U.uK.value=1-.5*ph(t,'resolve');
   U.uPodMin.value.set(h.box.min.x,h.y0-.1,h.box.min.z);U.uPodMax.value.set(h.box.max.x,h.y0+2.6,h.box.max.z);U.uCell.value.set(h.cellR[0],h.cellR[1],h.cellR[2],h.cellR[3]);
@@ -16848,7 +16851,8 @@ function vtBuild(r){const W=r.w,H=r.h,n=Math.max(1,r.tex.length),data=new Uint8A
   const a=new TH.DataArrayTexture(data,W,H,n);a.format=TH.RGBAFormat;a.type=TH.UnsignedByteType;a.encoding=r.enc;a.wrapS=r.ws;a.wrapT=r.wt;a.magFilter=r.mag;a.minFilter=r.min;
   a.generateMipmaps=r.min!==TH.NearestFilter&&r.min!==TH.LinearFilter;a.anisotropy=r.aniso;a.onUpdate=()=>{a.image.data=null};a.needsUpdate=true;   // (the pixels live on the GPU once uploaded: the page's copy is let go, it can be 100 MB on a large home)
   if(r.arr)r.arr.dispose();r.arr=a;r.U.value=a;r.dirty=false;r.builtN=r.tex.length}
-function vtFlush(){if(!S.vtDirty||!S.vtRegs)return;S.vtDirty=false;const a=now();let n=0,L=0;for(const r of S.vtRegs.values())if(r.dirty){vtBuild(r);n++;L+=r.tex.length}if(n)ev('texture arrays '+n+' ('+L+' layers) '+(now()-a).toFixed(1)+'ms')}
+function vtFlush(){if(!S.vtDirty||!S.vtRegs)return;S.vtDirty=false;const a=now();let n=0,L=0;for(const r of S.vtRegs.values())if(r.dirty){if(n&&now()-a>4){S.vtDirty=true;break}vtBuild(r);n++;L+=r.tex.length}   // (a few arrays per frame: all at once was 20 to 60 ms under the hologram)
+if(n)ev('texture arrays '+n+' ('+L+' layers) '+(now()-a).toFixed(1)+'ms')}
 function vtMaterial(key,sample){const M=S.vcMats||(S.vcMats=new Map());let vm=M.get(key);if(vm)return vm;const room=+key.split('|')[5]||0;vtReg(key);
   vm=new TH.MeshStandardMaterial({color:0xffffff,roughness:1,metalness:1,vertexColors:true,side:sample.side,flatShading:sample.flatShading,fog:sample.fog,dithering:sample.dithering});
   vm.defines=Object.assign({},vm.defines,{PR_ATTR:'',PR_TEXARR:''});vm.name='prVC';vm.userData={prClass:'satin',prAttr:true,prSpecW:1,prRoom:room,prOrigPBR:[1,1],prVTKey:key};vm.envMapIntensity=1;
@@ -16893,7 +16897,7 @@ function swapMerge(merged){for(const mm of merged){if(!mm.parent||mm.userData.pr
 function unoptimize(root){if(S&&S.mergeQ)S.mergeQ=S.mergeQ.filter(e=>e!==root.userData.prMerged);for(const mm of root.userData.prMerged||[]){for(const m of mm.userData.prSources){m.visible=true;delete m.userData.prMergedInto}if(mm.parent)mm.parent.remove(mm);mm.geometry.dispose()}delete root.userData.prMerged;l2Invalidate(null,'unoptimize')}
 function pieceOf(o){for(let p=o;p&&p!==S.scene;p=p.parent)if(isPiece(p))return p;return null}
 function queueOpt(o){if(!S||S.noOpt||!o||!isPiece(o))return;if(!S.optQ.includes(o))S.optQ.push(o)}
-function optStep(immediate){if(S.picking)return false;let n=0;while(S.optQ.length&&n<3){const o=S.optQ.shift();if(inScene(o)&&o.visible!==undefined){optimize(o,immediate);walk(o,false,false,null)}n++}return n>0}
+function optStep(immediate){if(S.picking)return false;let n=0;const t0=now();while(S.optQ.length&&n<3&&(n===0||now()-t0<4)){const o=S.optQ.shift();if(inScene(o)&&o.visible!==undefined){optimize(o,immediate);walk(o,false,false,null)}n++}return n>0}
 function allPieces(){const out=[];S.root.traverse(o=>{if(o.userData&&o.userData.piece&&!isUI(o))out.push(o)});return out}
 /* ---------------- governor: coarser lighting buffers first, then a lower rung; slow, thermally tolerant hysteresis ----------------
    Down: two consecutive slow 1-second windows (median over 17.5 ms or p95 over 28 ms), at most once per 2 s. Up: GPU under 11.5 ms (or median
@@ -17233,14 +17237,15 @@ function altNeed(){const sp=S.spare;if(!altCan()||!S.warm||!S.warm.done.pmrem)re
 function pipeLive(){return !!(S.matReady&&S.eff>0&&S.eff===G.rung)}
 // what the hologram is still waiting for (diagnostics for the open timing line)
 function lightWhy(){if(!S||!S.post)return 'no renderer';const w=[];if(!S.matReady)w.push('shaders warming');else if(!pipeLive())w.push('quality rung '+S.eff+' not '+G.rung);if(!S.probesReady)w.push('first bake');if(S.pq.length)w.push('probes '+S.pq.length);if(S.cubes.some(c=>c.dirty||!c.done))w.push('reflections');if(S.pmQ.length)w.push('reflection filter');if(S.pmFade.some(n=>n>0))w.push('reflection fade');if(S.optQ.length)w.push('merges '+S.optQ.length);if(S.projNeeded||S.lerpN>0)w.push('bounce light');if(S.aoDirty)w.push('contact shadows');if(S.zRooms&&S.zRooms.some(r=>!r.valid))w.push('depth merge');if(S.ab.holdSpare===true&&altNeed())w.push('other light state'+(S.altJob?' (phase '+S.altJob.phase+')':''));if(S.pendSwap)w.push('swap');return w.join(', ')||'nothing'}
-function liveShown(){return !!(S.pq.length||S.cubes.some(c=>c.dirty||!c.done)||S.pmQ.length||S.pmFade.some(n=>n>0)||S.optQ.length||S.projNeeded||S.lerpN>0||S.aoDirty)}   // liveBusy without the depth merge: what changes the picture
+function liveShown(){return !!(S.vtDirty||S.pq.length||S.cubes.some(c=>c.dirty||!c.done)||S.pmQ.length||S.pmFade.some(n=>n>0)||S.optQ.length||S.projNeeded||S.lerpN>0||S.aoDirty)}   // liveBusy without the depth merge: what changes the picture
 function lightPending(){if(!S||!S.post||S.broken||S.ab.lightGate===false)return false;if(!pipeLive())return true;return (S.ab.lightFirst===false?liveBusy():liveShown())||!S.probesReady||!!S.pendSwap||(S.ab.holdSpare===true&&altNeed())}   // (the other work-light state bakes once the room shows: it cost 1.3-1.9 s of every open)
 // rough 0..1 for the hologram's progress line while it holds: shader warm-up, then the live bake, then the spare
 function lightProgress(){if(!S||!S.post)return 1;const W=S.warm;let w=1;if(!pipeLive()){const d=W?Object.keys(W.done).length:0,q=W?W.queue.length:0;w=d+q?Math.min(.95,d/(d+q)):0}
   const np=S.probes&&S.probes.length?S.probes.length:1,b=S.probesReady?1:Math.max(0,Math.min(1,1-S.pq.length/np)),a=altNeed()||S.pendSwap?(S.altJob?.5:0):1;return +(.45*w+.4*b+.15*a).toFixed(3)}
 // behind the hologram nothing is on screen, so the bake runs flat out: up to 6 slices or about 10 ms a frame
 function bakeHidden(){const t0=now(),fr=S.frame;const sl=(kind,fn)=>{const a=now();const r=cw(kind,fn);if(r){const ms=+(now()-a).toFixed(2);ev((typeof r==='string'?r:kind)+' '+ms+'ms');S.slices.push({kind:typeof r==='string'?r:kind,ms,frame:fr});if(S.slices.length>600)S.slices.shift()}return r};
-  const cheap=S.ab.holdDraw!==false&&!S.probesReady;let n=0;while(n<(cheap?12:6)&&now()-t0<(cheap?14:10)){if(liveBusy()){S.flushing=true;try{work()}finally{S.flushing=false}n++;continue}
+  let n=0;while(n<6&&now()-t0<8){   // (a bigger share made the hologram's slow motion choppy, Oct 25)
+if(liveBusy()){S.flushing=true;try{work()}finally{S.flushing=false}n++;continue}
     if(!altNeed()&&!S.pendSwap)break;const k=S.altN||0;altWork(true,sl,true);if((S.altN||0)===k)break;n++}S.hidN=(S.hidN||0)+n}
 function liveSettled(){return !S.pq.length&&!S.cubes.some(c=>c.dirty||!c.done)&&!S.pmQ.length&&!S.projNeeded&&S.lerpN<=0&&!S.pmFade.some(n=>n>0)}
 // A lighting state is a key: time of day plus work light ('night|1'). S.liveKey is what the room shows, sp.key what the spare holds (usable when sp.have).
@@ -17276,7 +17281,7 @@ function relight(stale){const sp=S.spare,want=keyNow(),a=S.altJob;let how;
   ev('relight '+how);return how}
 function finishPend(){const P=S.pendSwap;if(!P)return;S.pendSwap=null;if(P.key!==keyNow())return;
   if(altSwap())ev('deferred swap '+Math.round(now()-(S.tog?S.tog.t:now()))+'ms');else dirtyBox(null,0,false)}   // could not swap: fall back to a live rebake
-function altWork(idle,sl,force){const sp=S.spare;if(!sp||S.ab.altWork===false||!S.probesReady||!S.matReady||!S.post||S.picking||(S.flushing&&!force)||(!idle&&!force))return;
+function altWork(idle,sl,force){const sp=S.spare;if(S.vtDirty||!sp||S.ab.altWork===false||!S.probesReady||!S.matReady||!S.post||S.picking||(S.flushing&&!force)||(!idle&&!force))return;
   if(!force&&now()-(S.camMoved||0)<(S.pendSwap?500:800))return;   // each probe or cube face is a whole extra scene render: the spare bake only runs while the view is still (a hitch is invisible then)
   if(S.pq.length||S.projNeeded||S.lerpN>0||S.pmQ.length||S.optQ.length||S.aoDirty||S.cubes.some(c=>c.dirty||!c.done)||S.pmFade.some(n=>n>0)||!S.warm||!S.warm.done.pmrem)return;   // not gated on the whole warm-up (about 29 s): the spare bake changes light intensities only, so it reuses the programs the live bake already built
   const tw=S.pendSwap?S.pendSwap.to:!S.workLight,tkey=S.pendSwap?S.pendSwap.key:keyOf(S.time,!S.workLight);
@@ -17306,6 +17311,7 @@ function ctxHold(){const p=window.PodContext;return !!(p&&p.active&&p.active()&&
 function ctxBusy(){const p=window.PodContext;if(!p||!p.active||!p.active())return false;if(p.transitioning){if(ctxHold())return false;S.ctxT=now();return true}return S.ctxT&&now()-S.ctxT<500}
 function zBlk(k){const D=S.zDiag;if(D&&S.zRooms&&S.zRooms.some(r=>!r.valid))D.blk[k]=(D.blk[k]||0)+1}
 function work(){if(S.tog&&!S.tog.done&&!S.pendSwap&&now()-S.tog.t>150&&liveSettled()){S.tog.done=true;console.log('[PodRender] lighting settled after '+Math.round(now()-S.tog.t)+' ms ('+S.tog.how+')')}
+  if(S.vtDirty)return;   // (texture arrays still being built a few per frame: nothing is baked with them missing)
   if(S.picking&&!S.flushing){zBlk('work:picking');return}if(!S.flushing&&ctxBusy()){zBlk('work:ctxBusy');return} // probe, cube and PMREM rebakes wait for the PodContext transition (round 19)
   const C=S.cfg,fr=S.frame,idle=now()-S.editT>1500;
   const sl=(kind,fn)=>{const a=now();const r=cw(kind,fn);if(r){const ms=+(now()-a).toFixed(2);ev((typeof r==='string'?r:kind)+' '+ms+'ms');S.slices.push({kind:typeof r==='string'?r:kind,ms,frame:fr});if(S.slices.length>600)S.slices.shift()}return r};
@@ -17313,7 +17319,8 @@ function work(){if(S.tog&&!S.tog.done&&!S.pendSwap&&now()-S.tog.t>150&&liveSettl
   pmremFade();if(S.pmQ.length&&S.warm&&S.warm.done.pmrem){sl('PMREM',pmremStep);return}
   // the first bake under the hologram (flushing): the light itself goes first. Room and depth merges only cut draw calls (the picture is the
   // same without them) and used to come first here: when they were rebuilt again and again the probes waited the whole hold (Oct 24 log).
-  if(S.flushing&&!S.probesReady&&S.ab.lightFirst!==false){
+  if(S.flushing&&S.ab.lightFirst!==false){   // (all of the hold, not just until the probes are done: on Oct 25 a home's reflections then waited 12 s behind the depth merge)
+   
     if(S.pq.length){const pp=S.probes[S.pq[0].i];_v2.set(pp.x,pp.y,pp.z);captureMode(true,_v2.clone());sl('probe face',probeFace);captureMode(false);return}
     if(S.cubes.some(c=>c.dirty)){captureMode(true,S.cubes.find(c=>c.dirty).cam.position.clone());sl('cube face',cubeFace);captureMode(false);return}}
   if(S.aoDirty&&(S.flushing||now()-S.editT>300)){sl('contact AO',aoBake);return}
@@ -17384,7 +17391,7 @@ function frame(dt){const R=S.R,P=S.prof;S.frame++;matCheck();S.stage='warm';
   t=now();S.stage='shadow maps';cw('shadow pass',shadowPass);S.stage='rebake';if(!S.off.rebake){if(ctxHold()){if(S.matReady)bakeHidden()}else work()}P.work=now()-t;
   // under the opaque hologram while the first bake runs nobody sees the room: draw it only every 8th frame (keeps its programs and buffers
   // warm for the reveal) and give the rest of the frame to the bake (Oct 24: the full room was drawn under the hologram every frame)
-  if(ctxHold()&&!S.probesReady&&S.ab.holdDraw!==false&&S.frame%8!==0){S.histReset=true;S.holdSkips=(S.holdSkips||0)+1;return}
+  if(ctxHold()&&S.ab.holdDraw!==false&&S.frame%8!==0){S.histReset=true;S.holdSkips=(S.holdSkips||0)+1;return}
   const tmode=S.probesReady?3:0;const ts=scaleOf(C,'ts'),ls=scaleOf(C,'ls');
   U.uPRDbg.value=S.debug==='classes'?1:0;U.uPRGIFb.value=A.fb===false?0:1;U.uPRCheap.value=A.cheap===false?0:1;U.uPRDec.value=c8?1:0;U.uPRNearest.value=C.static?1:0;U.uPRFOK.value=S.aoReady&&!S.off.contact?.6:0;
   S.c8bg=null;if(c8&&S.scene.background&&S.scene.background.isColor){const b=S.scene.background;S.c8bg=(S._c8c||(S._c8c=new TH.Color())).setRGB(b.r/(1+b.r),b.g/(1+b.g),b.b/(1+b.b))}

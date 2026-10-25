@@ -22,6 +22,7 @@ PH.state = () => 'cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + ';
 function frame(now){
   requestAnimationFrame(frame);
   if (typeof OVERSEER !== 'undefined' && OVERSEER.hold) return;   // (the Overseer's desk covers the screen: the city waits)
+  if (typeof PRECINCT !== 'undefined' && PRECINCT.hold) return;   // (and the Precinct desk: policedesk.js)
   if (typeof GRIDPANEL !== 'undefined' && GRIDPANEL.hold) return;   // (so does the Acoustic Panel; the broadcast plays on)
   if (typeof FURN !== 'undefined' && FURN.hold) return;   // (and the apartment being furnished: furnish.js)
   if (typeof TITLE !== 'undefined' && TITLE.on && TITLE.cityHalf && TITLE.cityHalf()){ TITLE_SKIP = !TITLE_SKIP; if (TITLE_SKIP) return; }   // (under the title only the porthole shows the city: half the frames do)

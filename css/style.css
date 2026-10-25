@@ -89,6 +89,16 @@ input[type=range]{width:100%;accent-color:var(--cyan);margin:0}
 .zone.on{transform:translateY(-3px);filter:drop-shadow(0 0 6px var(--z))}
 .zone.on .zin{background:linear-gradient(180deg, color-mix(in srgb, var(--z) 22%, #0a1020), rgba(10,16,32,.92))}
 .zone:focus-visible{outline:none;filter:drop-shadow(0 0 0 var(--z)) drop-shadow(0 0 4px #fff)}
+/* the thin Perimeter button under each zone button (perimeter.js) */
+.zcol{display:flex;flex-direction:column;gap:4px}
+.zcol .zone{width:100%}
+.perim{height:17px;padding:0 6px;border:1px solid color-mix(in srgb, var(--z) 55%, transparent);border-radius:0;background:rgba(10,16,32,.88);color:color-mix(in srgb, var(--z) 75%, #8e9bb2);
+  font-family:var(--font-pixel);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;line-height:1;cursor:pointer;
+  clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px)}
+.perim:hover{border-color:var(--z);color:#fff}
+.perim.on{border-color:var(--z);color:#fff;background:color-mix(in srgb, var(--z) 28%, #0a1020);box-shadow:0 0 8px color-mix(in srgb, var(--z) 60%, transparent)}
+html.touch .zcol{gap:3px}
+html.touch .perim{height:15px;font-size:7.5px;letter-spacing:.08em}
 @media (max-width:700px){
   .deck{left:16px;right:16px;width:auto;max-height:60%}
   .hint{display:none}

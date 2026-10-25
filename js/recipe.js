@@ -4,10 +4,11 @@
 // settings) is global and not part of the recipe: see tools/perf/recipe_proof.py for how that was checked.
 // recipeGen(r) makes the plot from the recipe alone, on a stand-in cell in a map holding only the plot and stand-ins for its four neighbors that throw when read,
 // so a builder reading any neighbor field fails loudly. Same steps as rebuildCell, nothing of the live city changed.
-const RECIPE_IN = ['i', 'j', 'x', 'z', 'green', 'style', 'mega', 'park', 'sections', 'below', 'lift'];
+const RECIPE_IN = ['i', 'j', 'x', 'z', 'green', 'style', 'mega', 'park', 'sections', 'below', 'lift', 'wall', 'wallN', 'wallCap'];   // (wall: a perimeter, with its neighbors and any highway cap worked out here: perimeter.js wallPrep)
 // a plot that may throw the air-filter hologram (rooftopBoard picks it from the plot alone; whether there is room is decided by the neighbors' heights)
 function recipeIsAir(c){ const key = c.i + ',' + c.j; return window.AIR_FORCE === key || (!(window.WALL_FORCE === key || hash('wallholo', c.i, c.j) % WALL_HOLO_ODDS === 0) && hash('airholo', c.i, c.j) % AIR_HOLO_ODDS === 0); }
 function recipeOf(c){
+  wallPrep(c);
   const r = { nb: SIDES4.map(([a, b]) => cells.has(ckey(c.i + a, c.j + b)) ? 1 : 0), dark: isDarkPlot(c) };
   for (const k of RECIPE_IN) if (c[k] !== undefined) r[k] = structuredClone(c[k]);
   // two builders look at the plots around beyond the four edges. A pod on a scaffold (liftSupports) asks of each side what its neighbor rises to: whether it is
@@ -198,7 +199,7 @@ RW.start = () => {
   if (window.__realNow && !window.__GEN_WORKER) return;
   const scripts = [...document.scripts].map(s => s.src).filter(Boolean);
   const three = scripts.find(u => /three(\.min)?\.js/.test(u)), bgu = scripts.find(u => /BufferGeometryUtils/.test(u));
-  const names = ['matreg', 'core', 'spritegen', 'artgen', 'peoplegen', 'sprites', 'buildings', 'ground', 'vehicles', 'sky', 'audio', 'world', 'mega', 'people', 'highway', 'metro', 'recipe'];
+  const names = ['matreg', 'core', 'spritegen', 'artgen', 'peoplegen', 'sprites', 'buildings', 'ground', 'vehicles', 'sky', 'audio', 'world', 'perimeter', 'mega', 'people', 'highway', 'metro', 'recipe'];
   const urls = names.map(n => scripts.find(u => u.includes('/js/' + n + '.js'))); if (!three || urls.some(u => !u)) return;
   RW.state = 'loading';
   try { RW.w = new Worker(RW.src.replace('recipe.js', 'recipeworker.js')); } catch (e){ RW.state = 'failed'; RW.error = String(e); return; }

@@ -294,6 +294,7 @@ for (const k of ['clutter','green','neon']){
 $('reseed').addEventListener('click', () => { if ($('reseed').dataset.armed){ clearIsland(); delete $('reseed').dataset.armed; $('reseed').textContent = 'Clear island'; }
   else { $('reseed').dataset.armed = '1'; $('reseed').textContent = 'Click again to clear'; setTimeout(() => { delete $('reseed').dataset.armed; $('reseed').textContent = 'Clear island'; }, 2500); } });
 function selectZone(z){
+  if (PERIM){ PERIM = null; document.querySelectorAll('.perim[data-perim]').forEach(b => { b.classList.remove('on'); b.setAttribute('aria-pressed', false); }); }   // (a zone and Perimeter are never both picked: perimeter.js)
   S.zone = (z && S.zone !== z) ? z : null;
   if (S.zone && delMode) setDelMode(false, true);
   if (S.zone && megaPick) selectMega(null, true);

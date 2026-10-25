@@ -11,7 +11,7 @@ const FURN = (() => {
   // detail by distance from the home, in game units (x3.16 in the lab). The lab's backdrop is sharp only within about 45 m (14 units):
   // full detail to NEAR, clustered on a CG grid to MID, simple blocks (the clustered stand-in clustered again on a CG_FAR grid) beyond.
   // F.lightCity = false sends the city as before (full detail to 46, clustered beyond) to compare.
-  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-25u';
+  const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-25v';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
   // The LIDAR Array unlocks Furnish pod (mega.js): the button shows once one has arrived, and only the homes in an array's range
   // can be picked. What the card shows of who lives there is what has been learned (lidar.js: the scan, the person cam, a trace
@@ -22,12 +22,12 @@ const FURN = (() => {
   (function gate(){
     const show = () => { const on = DEV || (typeof megaUnlockedKinds !== 'undefined' && megaUnlockedKinds.has('lidar')) || hasArray(); if (btn.hidden === on) btn.hidden = !on; };
     show(); setInterval(show, 1000);
-    if (!DEV){   // (the player's page: it's a scan of the pod, and the apartment a reconstruction from it)
+    {   // (it's a scan of the pod, and the apartment a reconstruction from it; #dev too, which only skips needing an array in range)
       btn.textContent = 'Scan pod'; btn.title = 'Scan a pod of a residential or luxury building in LIDAR range, and do up the apartment the scan reconstructs';
       for (const dt of document.querySelectorAll('dt')) if (dt.textContent === 'Furnish pod'){ dt.textContent = 'Scan pod'; if (dt.nextElementSibling) dt.nextElementSibling.textContent = 'Pick a pod (scroll or Up / Down), click to scan it'; }
     }
   })();
-  const VERB = DEV ? 'furnish' : 'scan';
+  const VERB = 'scan';
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
 
   /* ---------- the saved homes ---------- */
@@ -101,7 +101,7 @@ const FURN = (() => {
     if (on === F.pick) return;
     F.pick = on; F.hov = null; showPick(null);
     btn.classList.toggle('on', on); btn.setAttribute('aria-pressed', on); document.body.classList.toggle('furnishing', on);
-    if (on && !hasArray()){ F.pick = false; btn.classList.remove('on'); btn.setAttribute('aria-pressed', false); document.body.classList.remove('furnishing'); flash((DEV ? 'Furnish pod' : 'Scanning a pod') + ' needs a LIDAR Array standing: place one from the Buildings menu.'); return; }
+    if (on && !hasArray()){ F.pick = false; btn.classList.remove('on'); btn.setAttribute('aria-pressed', false); document.body.classList.remove('furnishing'); flash('Scanning a pod needs a LIDAR Array standing: place one from the Buildings menu.'); return; }
     if (on){
       if (typeof LOADP !== 'undefined' && LOADP.on){ F.pick = false; btn.classList.remove('on'); btn.setAttribute('aria-pressed', false); document.body.classList.remove('furnishing'); flash('The city is still loading. Try again in a moment.'); return; }
       if (S.zone) selectZone(null);
@@ -111,7 +111,7 @@ const FURN = (() => {
       if (mtMode) setMtMode(false, true);
       if (HL) hlStop();
       if (MON.id) MON.close();
-      hint.textContent = (DEV ? 'Furnish pod' : 'Scan pod') + ': point at a residential or luxury building in LIDAR range · scroll or Up / Down picks the pod · click to ' + VERB + ' · Esc to cancel';
+      hint.textContent = 'Scan pod' + ': point at a residential or luxury building in LIDAR range · scroll or Up / Down picks the pod · click to ' + VERB + ' · Esc to cancel';
       if (ptrLast) hoverAt(ptrLast.x, ptrLast.y);
       warmStart();   // (the far city's stand-ins made while the player picks)
     } else { hoverStrip.material.color.set(0xff5ad8); hoverFill.material.color.set(0xff5ad8); hoverFill.visible = false; tip.hidden = true; selectZone(null); }   // (the strip's and fill's own pink back, for the side pods)
@@ -461,7 +461,7 @@ const FURN = (() => {
       if (shift === 'night') tr.push('night shift'); for (const hb of hob) tr.push(HOBBY_WORD[hb] || hb);
       const jw = jk ? (STORY.JOB_WORD && STORY.JOB_WORD[jk]) || job : job === 'retired' ? 'retired' : 'between jobs';
       const full = { name: sp ? sp.first + ' ' + sp.last : 'Resident ' + (i + 1), age: ageN, job: jw, traits: tr };
-      residents.push(DEV || typeof DOSSIER === 'undefined' ? full : DOSSIER.card(p, full, i));   // (what has been learned of them: lidar.js)
+      residents.push(typeof DOSSIER === 'undefined' ? full : DOSSIER.card(p, full, i));   // (what has been learned of them: lidar.js)
     });
     const n = members.length, u = U(x.key, 'rel');
     const relation = n === 1 ? 'single' : n === 2 ? (u < .6 ? 'couple' : u < .85 ? 'roommates' : 'siblings') : n === 3 ? (u < .35 ? 'couple+roommate' : u < .55 ? 'siblings' : 'roommates') : 'roommates';
@@ -557,7 +557,7 @@ const FURN = (() => {
     try { fr.contentWindow.postMessage({ type: 'furnish:wake' }, location.origin); } catch (e) {}
     const t0 = performance.now(), hd = head(h);
     let who = { vacant: false, household: null, residents: [] }; try { who = householdFor(h); } catch (e) { console.warn('Furnish pod: no household for this pod', e); }
-    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: null, time: nightNow(), label: label(h) + ' · pod ' + h.pod + ' of ' + h.pods, household: who.household, residents: who.residents, vacant: who.vacant, sim: !DEV });
+    post({ type: 'furnish:begin', head: hd, home: h, recipe: getRecipe(h), tier: null, time: nightNow(), label: label(h) + ' · pod ' + h.pod + ' of ' + h.pods, household: who.household, residents: who.residents, vacant: who.vacant, sim: true });
     const headMs = performance.now() - t0;
     let st = null;
     try { st = await stream(h, (plots, em, k, done, x) => post({ type: 'furnish:plots', plots, em, k, done }, x), alive); }

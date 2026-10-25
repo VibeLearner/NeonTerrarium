@@ -2535,27 +2535,45 @@ function lidarFx(m){
   const off = (m.seed % 17)*.37;
   // the rings fly clear over everything in range: just above the tallest building or structure there (a ring cutting through towers looked
   // wrong), looked at again every few seconds as the city grows
-  let skyT = -1;
-  const skyline = () => { let top = d.ringY;
+  let skyT = -1, skyTop = d.ringY;
+  // the beam: a soft column of light with a bright core, up from the dome to the height the rings fly at; a ring at its top where they leave
+  const beamMat = new THREE.ShaderMaterial({ uniforms: { time: FOL_UNI.time, uA: { value: 1 } },
+    vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
+    fragmentShader: `uniform float time, uA; varying vec2 vU; void main(){ float s = 1.0 - abs(vU.x*2.0 - 1.0); float run = .55 + .45*smoothstep(.2, 1.0, fract(vU.y*3.0 - time*1.6));
+      float fade = smoothstep(0.0, .08, vU.y)*(.55 + .45*vU.y); gl_FragColor = vec4(vec3(.35, .9, 1.0)*pow(s, 1.6)*run*fade*.55*uA, 1.0); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  beamMat.userData.colorOnly = true;
+  const beamGeo = new THREE.CylinderGeometry(.34, .34, 1, 16, 1, true), coreGeo = new THREE.CylinderGeometry(.07, .07, 1, 8, 1, true);
+  const beam = new THREE.Mesh(beamGeo, beamMat), core = new THREE.Mesh(coreGeo, new THREE.MeshBasicMaterial({ color: 0xbff8ff, transparent: true, opacity: .85, depthWrite: false, blending: THREE.AdditiveBlending }));
+  for (const q of [beam, core]){ q.frustumCulled = false; q.raycast = () => {}; q.renderOrder = 3; root.add(q); }
+  const emitGeo = new THREE.RingGeometry(.5, 1.0, 40, 1); emitGeo.rotateX(-PI/2);
+  const emit = new THREE.Mesh(emitGeo, new THREE.MeshBasicMaterial({ color: 0x8af4ff, transparent: true, opacity: .7, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); emit.raycast = () => {}; root.add(emit);
+  const flare = new THREE.Sprite(GLOW.cyan.clone()); flare.scale.set(3, 3, 1); flare.layers.set(1); root.add(flare);
+  const skyline = () => { let top = Math.max(d.ringY, d.dy + 6);   // (never under its own dome: the beam always shows)
     for (const c of cells.values()){ if (Math.hypot(c.x - m.x, c.z - m.z) > LIDAR_R + LOT) continue; const h = c.mega ? 0 : Math.max(c.height || 0, c.topY || 0); if (h + 1.2 > top) top = h + 1.2; }
     for (const q of megas.values()){ if (q === m || Math.hypot(q.x - m.x, q.z - m.z) > LIDAR_R + q.w*LOT) continue; const h = q.top || q.roofH || 0; if (h + 1.2 > top) top = h + 1.2; }
-    for (const q of pulses) q.position.y = top; edge.position.y = top; };
+    for (const q of pulses) q.position.y = top; edge.position.y = top;
+    // the beam the rings come from: from the dome straight up to where they spread, an emitter ring at its top
+    const y0 = d.dy + 1.8, len = Math.max(.5, top - y0); beam.position.y = y0 + len/2; beam.scale.set(1, len, 1); core.position.y = beam.position.y; core.scale.set(1, len, 1);
+    emit.position.y = top; flare.position.y = top; skyTop = top; };
   return {
     update(dt, t){
       if (t - skyT > 5 || skyT < 0){ skyT = t; skyline(); }
       head.rotation.y = (t + off)*1.4;
+      { const ph = ((t + off)/PER*N) % 1, kick = Math.exp(-ph*7);   // (each ring leaving the top flares the emitter)
+        emit.scale.setScalar(1 + ph*1.6); emit.material.opacity = .25 + .6*kick; flare.material.opacity = .45 + .55*kick; core.material.opacity = .55 + .4*kick; beamMat.uniforms.uA.value = .8 + .5*kick; }
       fanMat.opacity = .1 + .08*Math.sin(t*9.0 + off);
       const picking = typeof FURN !== 'undefined' && FURN.pick;
       for (let k = 0; k < N; k++){
-        const ph = ((t + off)/PER + k/N) % 1, r = 2 + ph*(LIDAR_R - 2), q = pulses[k];
+        const ph = ((t + off)/PER + k/N) % 1, r = .8 + ph*(LIDAR_R - .8), q = pulses[k];
         q.scale.setScalar(r); q.visible = ph > .01;
         q.material.uniforms.uA.value = (1 - ph)*(1 - ph)*(picking ? 1.5 : .9)*Math.min(1, ph*12);
-        q.material.uniforms.uIn.value = Math.max(.86, 1 - 2.6/r);   // (a band a couple of units wide, wherever it has got to)
+        q.material.uniforms.uIn.value = Math.max(.86, 1 - 2.6/r);   // (a band a couple of units wide, wherever it has got to)   // (a band a couple of units wide, wherever it has got to)
       }
       edge.visible = picking; if (picking) edgeMat.uniforms.uA.value = .55 + .15*Math.sin(t*3);   // (the range's edge only while picking a pod)
       bandHalos.forEach((h, k) => { const u = ((t + off)*.6 - k*.25) % 1; h.material.opacity = .25 + .6*Math.max(0, 1 - Math.abs(u - .5)*4); });
     },
-    dispose(){ scene.remove(root); for (const g of [drum.geometry, cap.geometry, lensM.geometry, fanGeo, geo, edgeGeo]) g.dispose(); for (const mt of [dark, lens, fanMat, edgeMat, halo.material, ...pulses.map(q => q.material), ...bandHalos.map(h => h.material)]) mt.dispose(); }
+    dispose(){ scene.remove(root); for (const g of [drum.geometry, cap.geometry, lensM.geometry, fanGeo, geo, edgeGeo, beamGeo, coreGeo, emitGeo]) g.dispose(); for (const mt of [dark, lens, fanMat, edgeMat, halo.material, beamMat, core.material, emit.material, flare.material, ...pulses.map(q => q.material), ...bandHalos.map(h => h.material)]) mt.dispose(); }
   };
 }
 

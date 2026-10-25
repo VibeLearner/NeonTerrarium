@@ -89,8 +89,7 @@ const autoLab = relabel('autoPerf', 'Lower the resolution automatically when the
 T.panes.gfx.append(
   group('Preset', presetRow, customNote),
   group('Pixel style', resBox),
-  group('Clouds', cloudBox),
-  group('Distant view', el('div', { class: 'togs' }, farLab, autoLab)));
+  group('Clouds', cloudBox));
 
 // --- Sound: the game's own section
 if (soundSec){ const h = soundSec.querySelector('h2'); if (h) h.remove(); T.panes.sound.append(group(null, soundSec)); }
@@ -114,7 +113,7 @@ const perfTogs = el('div', { class: 'togs pu-cols' },
   relabel('tiers', 'Simplify distant blocks', 'Blocks far from the view are drawn with fewer small details: less memory, smoother turning'),
   relabel('idleRest', 'Save power when idle', 'After 10 seconds without input, draw at 30 frames a second; any input brings it straight back'),
   relabel('cap720', 'Limit apartments to 720p', 'Inside an apartment, never draw more pixels than a 720p screen: softer on a sharp screen, much lighter'));
-T.panes.adv.append(group('Effects', fxTogs), group('Zoomed-out resolution', zoomBox), group('Performance', perfTogs));
+T.panes.adv.append(group('Effects', fxTogs), group('Distant view', el('div', { class: 'togs' }, farLab, autoLab)), group('Zoomed-out resolution', zoomBox), group('Performance', perfTogs));
 
 // the rest of the deck goes: the playground's render fold (emptied above), its footnote
 if (renderFold) renderFold.remove();

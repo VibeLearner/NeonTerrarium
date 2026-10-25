@@ -12,33 +12,39 @@ const WALL_ZONES = { low: 'Residential', mid: 'Commercial', high: 'Luxury', ind:
 // which neighbors (in SIDES4 order: +x, -x, +z, -z) are walls, and how high it may go under a highway or the metro: worked out on the page
 // for each build (recipeOf calls this), so the plot worker builds from the recipe alone
 function wallPrep(c){
-  if (!c.wall){ delete c.wallN; delete c.wallG; delete c.wallCap; return; }
+  if (!c.wall){ delete c.wallN; delete c.wallG; delete c.wallB; delete c.wallCap; return; }
   const nb = SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b)));
   c.wallN = nb.map(n => n && n.wall && !n.mega ? 1 : 0);
-  c.wallG = nb.map(n => n && n.wall && n.wall.gate && !n.mega ? 1 : 0);   // (a gate next door: the two open into one wide gate)
+  c.wallG = nb.map(n => n && n.wall && n.wall.gate && !n.mega ? 1 : 0);
+  c.wallB = nb.map(n => n && !n.wall && (n.mega || (n.sections && n.sections.length)) ? 1 : 0);   // (a building beside it: a free end along its line runs on to meet it)   // (a gate next door: the two open into one wide gate)
   const cap = typeof hwCap === 'function' ? hwCap(c) : null; if (cap === null) delete c.wallCap; else c.wallCap = cap;
 }
 const wallHeight = w => WALL_BASE + (w.n || 0)*WALL_TIER;
 const wallTopOf = c => { let h = CURB + wallHeight(c.wall); if (c.wallCap !== undefined) h = Math.min(h, c.wallCap - .05); return Math.max(CURB + .6, h); };
 // the runs a plot's wall is made of, each in a frame whose +z runs along it: [ry, z0, z1, gateable]
-function wallRuns(L){
-  const n = L[0] + L[1] + L[2] + L[3], H2 = LOT/2;
-  if (n === 0) return { kind: 'post', runs: [[PI/2, -1.35, 1.35]] };
-  if (n === 1){ const [a, b] = SIDES4[L.indexOf(1)]; return { kind: 'end', runs: [[Math.atan2(a, b), -1.2, H2]] }; }
+// A free end with a building beside it, along the wall's own line (never in front of it or behind it), runs on over the street to meet the
+// building's face (Bd: which neighbors are buildings, wallPrep): ja, jb say an end is joined like that, so it has no end post.
+const WALL_REACH = LOT/2 + (LOT - SIDE)/2 - .03;
+function wallRuns(L, Bd){
+  const n = L[0] + L[1] + L[2] + L[3], H2 = LOT/2; Bd = Bd || [0, 0, 0, 0];
+  if (n === 0){ const zx = !(Bd[2] || Bd[3]) || Bd[0] || Bd[1];   // (a post on its own: along whichever line has a building on it, x first)
+    const [ip, im] = zx ? [0, 1] : [2, 3];
+    return { kind: 'post', runs: [[zx ? PI/2 : 0, Bd[im] ? -WALL_REACH : -1.35, Bd[ip] ? WALL_REACH : 1.35]], ja: !!Bd[im], jb: !!Bd[ip] }; }
+  if (n === 1){ const k = L.indexOf(1), [a, b] = SIDES4[k], o = k ^ 1; return { kind: 'end', runs: [[Math.atan2(a, b), Bd[o] ? -WALL_REACH : -1.2, H2]], ja: !!Bd[o] }; }
   if (n === 2 && L[0] && L[1]) return { kind: 'line', runs: [[PI/2, -H2, H2]] };
   if (n === 2 && L[2] && L[3]) return { kind: 'line', runs: [[0, -H2, H2]] };
   return { kind: n === 2 ? 'corner' : n === 3 ? 'tee' : 'cross', runs: SIDES4.map(([a, b], k) => L[k] ? [Math.atan2(a, b), -WALL_T/2, H2] : null).filter(Boolean) };
 }
 // a gate's opening along its run: from za to zb in the run's frame, a pillar at each side that has no gate next door (jm, jp: there is one)
 function gateSpan(c){
-  const L = c.wallN || [0, 0, 0, 0], Gn = c.wallG || [0, 0, 0, 0], k = wallRuns(L);
+  const L = c.wallN || [0, 0, 0, 0], Gn = c.wallG || [0, 0, 0, 0], k = wallRuns(L, c.wallB);
   if (k.kind !== 'post' && k.kind !== 'end' && k.kind !== 'line') return null;
   const [ry, z0, z1] = k.runs[0], dx = Math.round(Math.sin(ry)), dz = Math.round(Math.cos(ry));
   const ip = SIDES4.findIndex(([a, b]) => a === dx && b === dz), im = SIDES4.findIndex(([a, b]) => a === -dx && b === -dz);
   const jp = !!(L[ip] && Gn[ip]), jm = !!(L[im] && Gn[im]);
   return { ry, z0, z1, za: jm ? z0 : z0 + GATE_PIL, zb: jp ? z1 : z1 - GATE_PIL, jm, jp, kind: k.kind };
 }
-const wallGateable = c => { const k = wallRuns(c.wallN || [0, 0, 0, 0]).kind; return k === 'post' || k === 'end' || k === 'line'; };
+const wallGateable = c => { const k = wallRuns(c.wallN || [0, 0, 0, 0], c.wallB).kind; return k === 'post' || k === 'end' || k === 'line'; };
 
 /* ---------- the four styles, after the reference sheet ---------- */
 // Residential, solarpunk: recycled timber planks between posts, photovoltaic panels along the top, a moss planter at its foot; the gate two
@@ -194,15 +200,15 @@ function buildPerimeter(c){
   const w = c.wall; if (!w || !WALL_ZONES[w.zone]) return;
   R = mulberry32(hash('wall', c.i, c.j, w.seed || 0));
   const st = w.zone, P = T(c.x, 0, c.z), y0 = CURB, h = wallTopOf(c) - CURB; _wallGreen = c.green !== 'none';
-  const { kind, runs } = wallRuns(c.wallN || [0, 0, 0, 0]);
+  const { kind, runs, ja, jb } = wallRuns(c.wallN || [0, 0, 0, 0], c.wallB);
   const sp = w.gate && h > GATE_H + .3 ? gateSpan(c) : null;
   wallGround(st, P, c, runs, sp, h);
   for (const [ry, z0, z1] of runs){
     const F = under(P, T(0, 0, 0, ry));
     if (sp){ if (!sp.jm && sp.za - GATE_PIL > z0 + .05) wallBody(st, F, z0, sp.za - GATE_PIL, y0, h, _wallGreen); if (!sp.jp && sp.zb + GATE_PIL < z1 - .05) wallBody(st, F, sp.zb + GATE_PIL, z1, y0, h, _wallGreen); wallGate(st, F, y0, h, sp); }
     else { wallBody(st, F, z0, z1, y0, h, _wallGreen);
-      if (kind === 'post' || kind === 'end') wallPost(st, F, z0 + .1, y0, h);
-      if (kind === 'post') wallPost(st, F, z1 - .1, y0, h); }
+      if ((kind === 'post' || kind === 'end') && !ja) wallPost(st, F, z0 + .1, y0, h);
+      if (kind === 'post' && !jb) wallPost(st, F, z1 - .1, y0, h); }
   }
   if (kind === 'corner' || kind === 'tee' || kind === 'cross') wallPost(st, P, 0, y0, h);
   _wallGreen = true;
@@ -275,7 +281,7 @@ function removeWallTier(c){
   const top = wallTopOf(c), zone = c.wall.zone, old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   let nb = [];
   if (c.wall.n > 0) c.wall.n--;
-  else { nb = wallNbrs(c); delete c.wall; delete c.wallN; delete c.wallG; delete c.wallCap; }
+  else { nb = wallNbrs(c); delete c.wall; delete c.wallN; delete c.wallG; delete c.wallB; delete c.wallCap; }
   refresh([c, ...nb]);
   startAnim(c, 'remove', c.wall ? wallTopOf(c) - .05 : CURB - .05, top + 1.2, zone, LOT, old);
   perimDirty();
@@ -285,7 +291,7 @@ function perimHover(t){
   const col = ZONES[PERIM] ? ZONES[PERIM].col : '#e3d6bd'; hoverMat.color.set(col); hoverFill.visible = false; hoverStrip.visible = false;
   if (t.type === 'wallNew'){ const x = t.i*LOT, z = t.j*LOT; hover.position.set(x, CURB + WALL_BASE/2, z); hover.scale.set(LOT*.72, WALL_BASE, LOT*.72); }
   else if (t.type === 'wallUp'){ const c = t.c, top = wallTopOf(c); hover.position.set(c.x, top + WALL_TIER/2, c.z); hover.scale.set(LOT*.72, WALL_TIER, LOT*.72); }
-  else { const c = t.c; wallPrep(c); const g = gateSpan(c) || { ry: wallRuns(c.wallN || [0, 0, 0, 0]).runs[0][0], za: -1.3, zb: 1.3 }, ax = Math.abs(Math.sin(g.ry)) > .5, zc = (g.za + g.zb)/2, w = g.zb - g.za;
+  else { const c = t.c; wallPrep(c); const g = gateSpan(c) || { ry: wallRuns(c.wallN || [0, 0, 0, 0], c.wallB).runs[0][0], za: -1.3, zb: 1.3 }, ax = Math.abs(Math.sin(g.ry)) > .5, zc = (g.za + g.zb)/2, w = g.zb - g.za;
     hover.position.set(c.x + Math.sin(g.ry)*zc, CURB + GATE_H/2, c.z + Math.cos(g.ry)*zc); hover.scale.set(ax ? w : WALL_T + .3, GATE_H, ax ? WALL_T + .3 : w); }
   hover.visible = true;
 }

@@ -2533,8 +2533,16 @@ function lidarFx(m){
   const edge = new THREE.Mesh(edgeGeo, edgeMat); edge.position.y = d.ringY; edge.scale.setScalar(LIDAR_R); edge.frustumCulled = false; edge.raycast = () => {}; root.add(edge);
   const bandHalos = d.bands.filter((_, k) => k % 2 === 0).map(y => { const sp = new THREE.Sprite(GLOW.cyan.clone()); sp.position.set(0, y, 0); sp.scale.set(1.3, 1.3, 1); sp.layers.set(1); root.add(sp); return sp; });
   const off = (m.seed % 17)*.37;
+  // the rings fly clear over everything in range: just above the tallest building or structure there (a ring cutting through towers looked
+  // wrong), looked at again every few seconds as the city grows
+  let skyT = -1;
+  const skyline = () => { let top = d.ringY;
+    for (const c of cells.values()){ if (Math.hypot(c.x - m.x, c.z - m.z) > LIDAR_R + LOT) continue; const h = c.mega ? 0 : Math.max(c.height || 0, c.topY || 0); if (h + 1.2 > top) top = h + 1.2; }
+    for (const q of megas.values()){ if (q === m || Math.hypot(q.x - m.x, q.z - m.z) > LIDAR_R + q.w*LOT) continue; const h = q.top || q.roofH || 0; if (h + 1.2 > top) top = h + 1.2; }
+    for (const q of pulses) q.position.y = top; edge.position.y = top; };
   return {
     update(dt, t){
+      if (t - skyT > 5 || skyT < 0){ skyT = t; skyline(); }
       head.rotation.y = (t + off)*1.4;
       fanMat.opacity = .1 + .08*Math.sin(t*9.0 + off);
       const picking = typeof FURN !== 'undefined' && FURN.pick;

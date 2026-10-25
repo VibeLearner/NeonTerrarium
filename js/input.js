@@ -320,6 +320,7 @@ document.querySelectorAll('#zoomResChips button').forEach(b => {
   b.classList.toggle('on', +b.dataset.f === ZOOM_RES);
   b.addEventListener('click', () => { setZoomRes(+b.dataset.f); document.querySelectorAll('#zoomResChips button').forEach(x => x.classList.toggle('on', x === b)); });
 });
+$('farView').checked = FARV.on; $('farView').addEventListener('change', e => setFarView(e.target.checked));   // (sky.js)
 $('cap720').checked = CAP720; $('cap720').addEventListener('change', e => setCap720(e.target.checked));   // (sky.js)
 for (const id of ['idleRest', 'autoPerf']){
   try { const v = localStorage.getItem('neonIsland.' + id); if (v !== null){ S[id] = v === '1'; $(id).checked = S[id]; } } catch (e) {}

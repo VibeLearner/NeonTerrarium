@@ -90,7 +90,7 @@ function frameBody(now){
   clouds.rotation.y += dt*.008*cDrift;
   comp.uniforms.windR.value = windNow; comp.uniforms.rainT.value = (comp.uniforms.rainT.value + dt*(0.9 + windNow*0.12)) % 3600; clouds.position.set(camT.x, 0, camT.z); rain.position.set(camT.x, 0, camT.z);
   comp.uniforms.glowC.value.set(camT.x, camT.z);
-  applyRenderRes(zoom);
+  farTrack(now); applyRenderRes(zoom);   // (zoomed out and still: the sharp view, sky.js)
   updateCamera(dt);
   comp.uniforms.camDist.value = CAM_DIST + SC.dc;   // (depth is measured from the pinned camera: see staticcache.js)
   comp.uniforms.outlines.value = S.outlines ? 1 : 0;

@@ -37,11 +37,19 @@ function frameBody(now){
   const dt = Math.min(.05, (now-last)/1000);
   // auto performance: a running average of the frame time; slow for a couple of seconds and the zoomed-out render
   // resolution steps down, quick again and it steps back up (a hidden tab's long gap is ignored)
-  { const ms = now - last; if (ms < 250 && now >= PERF.quietUntil){ PERF.ema += (ms - PERF.ema)*.05; PERF.t += ms; }
+  // Against the screen's own refresh (PERF.vs, learned from the frames that come on time: 16.7 ms at 60 Hz, 8.3 at 120), not fixed numbers: "quick"
+  // used to mean under 15 ms, which a 60 Hz screen never shows, so once lowered it never came back. Back up a step at a time, and a step that
+  // brings the slowness back is the ceiling for the next two minutes, so it no longer swings between sharp-and-slow and soft-and-smooth
+  { const ms = now - last; if (ms < 250 && now >= PERF.quietUntil){ PERF.ema += (ms - PERF.ema)*.05; PERF.t += ms; if (ms > 4 && ms < PERF.vs*1.3) PERF.vs += (ms - PERF.vs)*.02; }
     if (PERF.t > 2000){ PERF.t = 0;
+      const slowMs = Math.max(PERF.vs*1.35, 21), quickMs = PERF.vs*1.1 + .5;
+      if (now > PERF.ceilUntil) PERF.ceil = Infinity;
       if (S.autoPerf === false) PERF.grow = Infinity;
-      else if (PERF.ema > 26 && PERF.f > 1) PERF.grow = Math.max(1, Math.min(PERF.grow, PERF.f) - .2);   // slow: a step under what's drawn now
-      else if (PERF.ema < 15 && PERF.grow < Infinity){ if (++PERF.quick >= 3){ PERF.grow = Infinity; PERF.quick = 0; } }   // quick again for six seconds: straight back up, in one step (each step remakes the render targets: a hitch each)
+      else if (PERF.ema > slowMs && PERF.f > 1){ const was = Math.min(PERF.grow, PERF.f);
+        if (now - PERF.upAt < 10000){ PERF.ceil = Math.max(1, was - .1); PERF.ceilUntil = now + 120000; }   // (it was raised a moment ago: that step was one too many)
+        PERF.grow = Math.max(1, was - .2); PERF.quick = 0; }   // slow: a step under what's drawn now
+      else if (PERF.ema < quickMs && PERF.grow < Infinity){ if (++PERF.quick >= 3){ PERF.quick = 0;   // quick for six seconds: a step back up (each step remakes the render targets: a hitch each)
+          const up = Math.min(PERF.ceil, PERF.grow + .1); if (up > PERF.grow){ PERF.grow = up >= PERF.max ? Infinity : up; PERF.upAt = now; } } }
       else PERF.quick = 0; } }
   // day and night cycle: 24 game hours per real hour. Real elapsed time (up to a second, so a slow frame rate
   // doesn't slow the day), and none while the tab is hidden.

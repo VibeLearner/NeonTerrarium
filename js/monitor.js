@@ -13,7 +13,7 @@ const MON = (() => {
   const clockText = t => { const d = Math.floor(t/1440) + 1, m = Math.floor(t % 1440); return 'D' + d + ' ' + String(Math.floor(m/60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 
   /* ---------- picking someone ---------- */
-  const _v = new THREE.Vector3();
+  const _v = new THREE.Vector3(), _w = new THREE.Vector3();
   // Only someone the player can actually see: what's drawn under the cursor is read back from the depth of the last frame
   // (one pixel), and a person counts only if they're no further away than it (a building in front is nearer). Their
   // depth is taken at the feet; a sprite standing up off the ground is a little nearer than that, hence the slack.
@@ -76,8 +76,16 @@ const MON = (() => {
     }
     if (!cands.length) return null;
     cands.sort((a, b) => a[0] - b[0]);
-    const sd = exact ? depthUnder(cx, cy) : depthSoon(cx, cy), slack = 1.5/(FAR - NEAR);   // (a unit and a half of slack: a sprite's head is nearer than its feet)
-    for (const [, p, pd] of cands) if (sd >= .9999 || pd <= sd + slack) return p.id;
+    if (exact){   // a click: the depth of what's drawn there, read back from the card (worth the wait once)
+      const sd = depthUnder(cx, cy), slack = 1.5/(FAR - NEAR);   // (a unit and a half of slack: a sprite's head is nearer than its feet)
+      for (const [, p, pd] of cands) if (sd >= .9999 || pd <= sd + slack) return p.id;
+      return null;
+    }
+    // hovering: the city's own pick along the same ray says how far the nearest building is. Reading the depth back from the card
+    // every frame stalled the game on each read (a sixth of the main thread in the Oct 25 trace) and was where its WebGL errors came from.
+    let tc = Infinity;
+    if (typeof pickAtSoft === 'function'){ const pk = pickAtSoft(cx, cy); if (pk && pk.kind !== 'sky') tc = typeof pk.d === 'number' ? pk.d : pk.p ? _w.copy(pk.p).sub(ray.ray.origin).dot(ray.ray.direction) : Infinity; }
+    for (const [, p] of cands){ const tp = _w.set(p.x, p._ey ?? CURB, p.z).sub(ray.ray.origin).dot(ray.ray.direction); if (tp <= tc + 1.5) return p.id; }
     return null;
   };
 

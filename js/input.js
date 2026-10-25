@@ -166,7 +166,7 @@ function pointerMove(e){
     if (hwMode){ hwHover(e.clientX, e.clientY); return; }
     if (mtMode){ mtHover(e.clientX, e.clientY); return; }
     if (HL){ hlMove(e.clientX, e.clientY); return; }
-    if (megaPick) showMegaGhost(megaPick, groundCellAt(e.clientX, e.clientY), megaTurn); else showHover(targetOf(pickAt(e.clientX, e.clientY))); return; }
+    if (megaPick) showMegaGhost(megaPick, groundCellAt(e.clientX, e.clientY), megaTurn); else showHover(targetOf(pickAtSoft(e.clientX, e.clientY))); return; }
   const dx = e.clientX - p.x, dy = e.clientY - p.y, tilt = () => { if (tiltMode) pitchT = clamp(pitchT + dy*.006, PITCH_MIN, PITCH_MAX); };
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!act) return;

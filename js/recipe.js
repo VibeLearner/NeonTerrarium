@@ -381,7 +381,7 @@ function pmFill(h, nd, which, src = 'page'){
     }
   }
   if (pd){ for (const x of pd.geo.values()) if (!g || x !== g) x.dispose(); }   // (the page's copy: its arrays now belong to the plot; the geometry objects themselves go)
-  h.wait = null; h.due = PM.frame + 90;   // (let go again if nothing keeps asking)
+  h.wait = null; h.due = PM.frame + pmSec(20);   // (let go again if nothing keeps asking for 20 s: 90 frames was under a second on a 120 Hz screen, and hovering or turning the view kept asking for them back)
   if (!h.queued && !d.pmKeep){ h.queued = true; PM.queue.push(h); }
   if (bad && src === 'worker') RW.recheck(h, bad);
 }
@@ -414,8 +414,11 @@ function pmSchedule(c, delay = 0){
   h.due = PM.frame + delay; if (!h.queued){ h.queued = true; PM.queue.push(h); }
 }
 // each frame: let go of the plots whose time is up (not while something is working on them)
+// frames in a number of seconds, at the screen's own rate (a 120 Hz screen runs the frame counts twice as fast)
+function pmSec(s){ return Math.round(s*Math.max(30, Math.min(240, PM.fps || 60))); }
 function pmTick(){
   PM.frame++;
+  { const t = performance.now(); if (PM.t){ const d = t - PM.t; if (d > 2 && d < 100) PM.fps = (PM.fps || 60) + (1000/d - (PM.fps || 60))*.02; } PM.t = t; }
   if (typeof TIER !== 'undefined' && TIER.rush) return;   // (while the Detail tiers setting is being switched, nothing is let go: the blocks waiting their turn would lose the arrays just made for them)
   for (let i = 0; i < PM.queue.length; i++){ const h = PM.queue[i];
     if (h.due >= 0 && PM.frame >= h.due){ PM.queue.splice(i--, 1); h.queued = false; if (h.c.data === h.d){ if (pmBusy(h.c)){ h.due = PM.frame + 30; h.queued = true; PM.queue.push(h); } else pmDrop(h.c); } } else if (h.c.data !== h.d){ PM.queue.splice(i--, 1); h.queued = false; } }
@@ -434,7 +437,7 @@ function pmBlockReady(key){
   for (let i = a*MREG; i < a*MREG + MREG; i++) for (let j = b*MREG; j < b*MREG + MREG; j++){
     const c = cells.get(ckey(i, j)); if (!c || !c.data || !c.data.rec) continue;
     const h = pmHolder(c);
-    if (pmNeeds(h, which)){ if (!pmEnsure(c, which)) ok = false; } else if (h.queued) h.due = Math.max(h.due, PM.frame + 600);
+    if (pmNeeds(h, which)){ if (!pmEnsure(c, which)) ok = false; } else if (h.queued) h.due = Math.max(h.due, PM.frame + pmSec(20));
   }
   return ok;
 }

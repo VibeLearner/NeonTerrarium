@@ -52,7 +52,7 @@ const MON = (() => {
         fragmentShader: '#include <packing>\nuniform sampler2D tD; uniform vec2 uv; void main(){ gl_FragColor = packDepthToRGBA(texture2D(tD, uv).x); }' });
       dScene = new THREE.Scene(); const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), dMat); q.frustumCulled = false; dScene.add(q); dCam = new THREE.Camera();
     }
-    const r = view.getBoundingClientRect();
+    const r = viewRect();
     dMat.uniforms.tD.value = rtC.depthTexture; dMat.uniforms.uv.value.set((cx - r.left)/r.width, 1 - (cy - r.top)/r.height);
     const prev = renderer.getRenderTarget(); renderer.setRenderTarget(dRT); renderer.render(dScene, dCam);
     if (drawOnly){ renderer.setRenderTarget(prev); return 1; }   // (depthSoon reads it back without waiting)
@@ -63,7 +63,7 @@ const MON = (() => {
   M.ready = () => typeof megasOfKind === 'function' && megasOfKind('police').length > 0;   // (people can be watched once the city has a police station)
   M.pick = (cx, cy, exact) => {   // (exact: a click, worth waiting for the card; hovering takes the depth a frame or two late)
     if (typeof pplList === 'undefined' || !M.ready()) return null;
-    const r = view.getBoundingClientRect(), VP = comp.uniforms.VP.value, tall = (16/PX)*PPL_S/zoom*r.height/2, wide = tall*.75;
+    const r = viewRect(), VP = comp.uniforms.VP.value, tall = (16/PX)*PPL_S/zoom*r.height/2, wide = tall*.75;
     const cands = [];
     for (const p of pplList){
       if (!p._ec || !(p._ea > .5) || p.x === undefined) continue;
@@ -97,7 +97,7 @@ const MON = (() => {
   const sel = document.createElement('div'); sel.id = 'npcSel'; sel.className = 'npc-hover watched'; sel.hidden = true; document.body.appendChild(sel);
   function bracket(box, p){
     if (!p || p.x === undefined || !p._ec || !(p._ea > .3)){ if (!box.hidden) box.hidden = true; return false; }   // (not drawn: indoors, or away)
-    const r = view.getBoundingClientRect(), tall = (16/PX)*PPL_S/zoom*r.height/2, wide = tall*.75;
+    const r = viewRect(), tall = (16/PX)*PPL_S/zoom*r.height/2, wide = tall*.75;
     _v.set(p.x, p._ey ?? CURB, p.z).applyMatrix4(comp.uniforms.VP.value);
     if (_v.x < -1.2 || _v.x > 1.2 || _v.y < -1.2 || _v.y > 1.2){ if (!box.hidden) box.hidden = true; return false; }
     const fx = r.left + (_v.x*.5 + .5)*r.width, fy = r.top + (1 - (_v.y*.5 + .5))*r.height, pad = 3;

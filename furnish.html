@@ -15388,7 +15388,8 @@ function onPointerFrame(){if(B.trans)return;const t0=performance.now();setRay();
 /* ======================= 13. frame loop, HUD ======================= */
 function setHud(on){B.hud=on;$('bHud').checked=on;prCall('setOptions',{hud:on});syncLightUI();B.needs=true}
 const SORT=new Float32Array(240);
-function loop(now){if(!B.on){B.raf=0;return}B.raf=requestAnimationFrame(loop);const dt=B.last?Math.min(.1,(now-B.last)/1000):0;if(B.last){B.ft[B.fti]=now-B.last;B.fti=(B.fti+1)%240;if(B.ftn<240)B.ftn++}B.last=now;if(B.warming)return;if(!B.s||B.loading){pendingFrame(dt);return}
+// asleep in the game (the furnish page kept loaded between visits): no frame loop at all until pauseRender(false); it still ran every frame (2.5% of the game's main thread, Oct 25 trace)
+function loop(now){if(!B.on){B.raf=0;return}if(B.paused&&EMBED&&!B.warming&&!B.trans&&!B.needs){B.raf=0;B.last=0;return}B.raf=requestAnimationFrame(loop);const dt=B.last?Math.min(.1,(now-B.last)/1000):0;if(B.last){B.ft[B.fti]=now-B.last;B.fti=(B.fti+1)%240;if(B.ftn<240)B.ftn++}B.last=now;if(B.warming)return;if(!B.s||B.loading){pendingFrame(dt);return}
   if(B.tw){const k=Math.min(1,(now-B.tw.t0)/(SH.ROT_S*1000)),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;B.az=B.tw.a0+(B.tw.a1-B.tw.a0)*e;if(k>=1)B.tw=null;B.camDirty=true}
   if(B.camDirty)updateCam();if(B.wallsMoving){B.wallsMoving=SH.applyWalls(B.s,dt);B.needs=true;notify('walls',null);if(!B.wallsMoving){showSelHi();if(B.sel&&B.sel.t==='piece')updateRing()}}
   if(B.ptr.dirty){B.ptr.dirty=false;onPointerFrame()}
@@ -15525,7 +15526,7 @@ window.PodBuilder={version:1,enter:enterView,editPlan,newHome,load:(rc,o)=>loadR
   home:()=>B.home?clone(B.home):null,rooms:()=>B.P?B.P.rooms.map(R=>Object.assign({id:R.id,kind:R.kind,label:R.label,x0:R.x0*TILE,z0:R.z0*TILE,x1:R.x1*TILE,z1:R.z1*TILE},roomSpot(R))):[],
   runs:()=>B.s?B.s.runs.map(r=>({idx:r.idx,axis:r.axis,fix:r.fix*TILE,a0:r.a0*TILE,a1:r.a1*TILE,type:r.type,door:!!r.door,up:r.target>.5,ra:r.ra,rb:r.rb})):[],
   hoverId:()=>B.hover,
-  pauseRender:on=>{B.paused=!!on;B.needs=true},// tests on software GL: keep matrices current but skip drawing between screenshots
+  pauseRender:on=>{B.paused=!!on;B.needs=true;if(B.on&&!B.raf)B.raf=requestAnimationFrame(loop)},// tests on software GL: keep matrices current but skip drawing between screenshots
   usePodRender:on=>{B.noPR=!on;if(on)attachRenderer();else{prCall('detach');B.prOn=false;envOn(true);skyMode();syncLightUI()}B.needs=true;return B.prOn},
   ready:()=>!!B.s&&!B.loading&&(!firstHome||true),busy:()=>B.loading,homePending:()=>!!(B.loading||(B.furnishing|0)>0),prOn:()=>!!B.prOn,   // (PodContext holds its transition while a home is being planned or built)
   mods:B.mods,_B:B};

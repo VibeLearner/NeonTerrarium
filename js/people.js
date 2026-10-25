@@ -2197,7 +2197,7 @@ function updatePeople(dt, t){
   const nTyp = full ? 1 : Math.max(1, Math.min(PPL_NMAX, Math.floor(reach/PPL_SPEED)));
   PPLRATE.n = nTyp; PPLRATE.hist.fill(0);
   let cux = NaN, cuy = NaN;
-  if (!full && nTyp > 1 && ptrLast){ const r = canvas.getBoundingClientRect(); cux = ((ptrLast.x - r.left)/r.width)*2 - 1; cuy = -((ptrLast.y - r.top)/r.height)*2 + 1; }
+  if (!full && nTyp > 1 && ptrLast){ const r = viewRect(); cux = ((ptrLast.x - r.left)/r.width)*2 - 1; cuy = -((ptrLast.y - r.top)/r.height)*2 + 1; }
   const ve2 = comp.uniforms.VP.value.elements, curR2 = (PPL_CURSOR_PX/(H/2))**2;   // (the cursor's radius in clip units of the height)
   const aspect = W/H;
   for (const p of pplList){

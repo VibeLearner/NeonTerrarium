@@ -34,6 +34,10 @@ function frame(now){
 }
 function frameBody(now){
   PH.frameStart(now);   // (the performance overlay, F3: perfhud.js)
+  // the canvas's place on the page, looked up again each frame: the title screen widens the view with a CSS transform (title.js), which neither a
+  // resize nor the ResizeObserver reports, and a place cached under it put every pick off to one side after Continue (hovering one building lit
+  // another, Oct 25). Between frames the pointer's many events still share one lookup (core.js)
+  VIEW_RECT = null;
   const dt = Math.min(.05, (now-last)/1000);
   // auto performance: a running average of the frame time; slow for a couple of seconds and the zoomed-out render
   // resolution steps down, quick again and it steps back up (a hidden tab's long gap is ignored)

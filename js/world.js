@@ -1938,7 +1938,7 @@ function flushSolid(){
   disposeTick();
   flushSuper();
   if (SYNC_NOW()){ solidFinish(); if (solidDirty.size){ for (const k of solidDirty){ try { rebuildSolid(k); } catch (e){ SOLID_FAIL.n++; if (SOLID_FAIL.n <= 3) console.warn('merging block ' + k + ' failed; its old merge stays drawn.', e); } } solidDirty.clear(); } }
-  else { solidRetry(); if (SOLID_JOB || solidDirty.size) solidStep(TIER.rush ? 14 : Math.max(1, 4 - FRAME_WORK)); }
+  else { solidRetry(); if (SOLID_JOB || solidDirty.size) solidStep(TIER.rush ? 14 : Math.max(1, Math.min(4, 250/Math.max(30, (typeof PM !== 'undefined' && PM.fps) || 60)) - FRAME_WORK));   /* (a quarter of a frame at most: 4 ms was half a frame on a 120 Hz screen) */ }
   tierRushDone();   // (a block's merge in steps over the frames, after the frame's other spread work)
   ovFlush();
 }
@@ -2054,7 +2054,7 @@ function gpuUpload(mesh, geo){
 // (the nearest to the middle of the view); a block goes back to the stand-in once it has been out of that for TIER.hold frames. When the view is farther than TIER.zs everything is a stand-in.
 // A block changes tier by being merged again from the other geometry; the old merge stays drawn until the new one is made, which waits for the worker to send the arrays it needs (recipe.js).
 // Tests: "full detail everywhere (as before)" (tierOff), "stand-in tier everywhere (to measure)" (tierAll), "show tiers (stand-ins tinted)" (tierShow).
-Object.assign(TIER, { zs: 24, margin: 12, maxFull: 36, hold: 180, holdS: 6, of: new Map(), sig: '', since: new Map(), changes: 0, nFull: 0, nStand: 0 });
+Object.assign(TIER, { zs: 24, margin: 12, maxFull: 36, hold: 180, holdS: 6, ringMax: 72, of: new Map(), sig: '', since: new Map(), changes: 0, nFull: 0, nStand: 0 });
 TIER.on = () => S.tiers !== false && !(PH.tests.tierOff || window.__TIER_OFF);   // (S.tiers: the 'Detail tiers' box in the render menu, remembered in this browser)
 TIER.all = () => !!(PH.tests.tierAll || window.__TIER_ALL);
 TIER.show = () => !!(PH.tests.tierShow || window.__TIER_SHOW);
@@ -2112,7 +2112,10 @@ function tierTick(){
   if (near) for (const b of blocks.values()){ const k = b.k, d = Math.hypot(b.x - camGoal.x, b.z - camGoal.z); if (_tfr.intersectsBox(b.box)) onScreen.add(k); else if (d <= r) wantFull.push([d, k]); }
   // (closer than TIER.zs every block on screen is full, however many: a big or high-resolution screen shows more than TIER.maxFull of them, which used to put stand-ins in view;
   //  the cap is only for the ring of blocks just off screen kept full for turning and panning)
-  wantFull.sort((p, q) => p[0] - q[0]); const keep = new Set([...onScreen, ...wantFull.slice(0, Math.max(0, TIER.maxFull - onScreen.size)).map(e => e[1])]);
+  // the ring off screen is every block within reach of the view's middle (up to TIER.ringMax), not just enough to make up TIER.maxFull: that cap
+  // made which blocks were full depend on which way the view faced, so turning on the spot kept merging blocks again (the lag that came and went
+  // while turning, Oct 25 10:09 trace). Within reach, turning changes nothing now.
+  wantFull.sort((p, q) => p[0] - q[0]); const keep = new Set([...onScreen, ...wantFull.slice(0, Math.max(0, (TIER.ringMax || 72) - onScreen.size)).map(e => e[1])]);
   let nFull = 0, nStand = 0;
   for (const k of blocks.keys()){
     const cur = TIER.of.get(k) || 'full';

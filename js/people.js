@@ -184,9 +184,25 @@ function rasterize(data, x0, z0, nx, nz){
   return { solid, soft, high, mid, nx, nz };
 }
 // a plot's maps: footprint (solid geometry, soft sprites) and the walking map, where free means a person fits
+// A perimeter wall next door can run on into this plot, over the street to the building here (perimeter.js wallRuns): that stretch is its
+// geometry, not this plot's, so it is stamped onto this plot's maps here, or people walked round the wall's end through the gap.
+function wallStamps(c){
+  if (typeof wallRuns !== 'function' || self.IN_RECIPE_WORKER) return null; let out = null;
+  for (const [a, b] of SIDES4){ const n = cells.get(ckey(c.i + a, c.j + b)); if (!n || !n.wall || n.mega || !n.wallR) continue;
+    const r = wallRuns(n.wallN || [0, 0, 0, 0], n.wallB, n.wallR);
+    for (const [ry, z0, z1] of r.runs){ const dx = Math.round(Math.sin(ry)), dz = Math.round(Math.cos(ry));
+      let ext = 0, joined = false; if (dx === -a && dz === -b){ ext = z1 - LOT/2; joined = !!r.jb; } else if (dx === a && dz === b){ ext = -z0 - LOT/2; joined = !!r.ja; }   // (its run, pointing at this plot, past the line between)
+      if (joined) ext = Math.max(ext, .02);   // (joined to this plot's building: closed off up to it, however short the wall itself stops)
+      // (to the building's face at its foot, under any overhang: the lower stretch of wall reaches there, perimeter.js wallRL)
+      const k = SIDES4.findIndex(([p, q]) => p === -a && q === -b), foot = n.wallRL && k >= 0 && n.wallRL[k] ? n.wallRL[k][0] - LOT/2 : 0;
+      ext = Math.max(ext, foot);
+      if (ext > .01) (out || (out = [])).push([a, b, ext + .08]); } }   // ([a, b]: the side of this plot it comes in from)
+  return out;
+}
 function cellGrid(c){
   const m = c.mega ? megas.get(c.mega) : null, src = m ? m.data : c.data;
-  if (c._pg && c._pg.src === src) return c._pg;
+  const st = wallStamps(c), ws = st ? JSON.stringify(st) : '';
+  if (c._pg && c._pg.data === src && c._pg.ws === ws) return c._pg;
   let r;
   if (m){
     if (!m._pr || m._pr.src !== src) m._pr = { src, r: src ? rasterize(src, m.i*LOT - LOT/2, m.j*LOT - LOT/2, m.w*GN, m.h*GN) : null };
@@ -201,7 +217,24 @@ function cellGrid(c){
     for (let j = 0; j < GN; j++) for (let i = 0; i < GN; i++){ const q = (oj + j)*r.nx + oi + i; solid[j*GN + i] = r.solid[q]; soft[j*GN + i] = r.soft[q]; high[j*GN + i] = r.high[q]; mid[j*GN + i] = r.mid[q]; }
     free = freeMap(solid, soft);
   } else ({ solid, soft, high, mid, free } = plotMaps(c.x, c.z, src));
-  return (c._pg = { src, solid, soft, high, mid, free, doors, x0: c.x - LOT/2, z0: c.z - LOT/2 });
+  if (st){   // (a fresh grid: copies, so a plot worker's maps kept elsewhere aren't touched)
+    solid = solid.slice(); free = free.slice();
+    for (const [a, b, d0] of st){   // the wall comes in from the side at (a, b), WALL_T wide, along the plot's middle line
+      const hw = WALL_T/2 + .06;
+      // closed off all the way to the building's own footprint at the foot: from the plot's edge in until most of the band is solid (whatever is
+      // there, a wall, a planter, a shopfront), so nobody slips round the wall's end, under an awning or past a sign
+      let d = d0;
+      for (let t = .02; t < LOT/2 - .2; t += GR){ const along = LOT/2 - t; let n = 0, k = 0;
+        for (let p = -hw; p <= hw; p += GR){ const x = a ? along*a : p, z = a ? p : along*b, i = Math.floor((x + LOT/2)/GR), j = Math.floor((z + LOT/2)/GR); if (i < 0 || j < 0 || i >= GN || j >= GN) continue; n++; if (solid[j*GN + i]) k++; }
+        if (n && k >= n*.6){ d = Math.max(d0, t + GR); break; } if (t > d0 + 1.2) break; }
+      const inR = (x, z) => { const along = x*a + z*b, perp = a ? z : x; return along >= LOT/2 - d && Math.abs(perp) <= hw; };
+      for (let j = 0; j < GN; j++) for (let i = 0; i < GN; i++) if (inR(-LOT/2 + (i + .5)*GR, -LOT/2 + (j + .5)*GR)) solid[j*GN + i] = 1;
+      const hc = hw + CLEAR, inC = (x, z) => { const along = x*a + z*b, perp = a ? z : x; return along >= LOT/2 - d - CLEAR && Math.abs(perp) <= hc; };
+      for (let j = 0; j < PN; j++) for (let i = 0; i < PN; i++) if (inC(-LOT/2 + (i + .5)*PR, -LOT/2 + (j + .5)*PR)) free[j*PN + i] = 0;
+    }
+  }
+  // (src: a new identity whenever the maps change, so what is kept from them, crossings and paths, is found again)
+  return (c._pg = { src: st ? { of: src, ws } : src, data: src, ws, solid, soft, high, mid, free, doors, x0: c.x - LOT/2, z0: c.z - LOT/2 });
 }
 // a plot's footprint maps from its generated data alone (what the plot worker makes with the plot)
 function plotMaps(x, z, src){

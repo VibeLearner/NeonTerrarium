@@ -94,11 +94,16 @@ function shAim(m, k = -1){
   else { const K = m.K; c.bottom = -HF + 2*HF*k/K; c.top = -HF + 2*HF*(k + 1)/K; sh._viewports[0].set(0, k/K, 1, 1/K); }
   c.updateProjectionMatrix(); sh.map = m.rt;
 }
-const shPrevDir = new THREE.Vector3(); let shHavePrev = false, LIGHT_JUMP = false;   // (LIGHT_JUMP: the sun jumped this frame; the static cache is drawn again whole, not in strips)
+const shPrevDir = new THREE.Vector3(); let shHavePrev = false, LIGHT_JUMP = false, shDragN = 0;   // (LIGHT_JUMP: the sun jumped this frame; the static cache is drawn again whole, not in strips)
 function shadowFrame(){
   const sh = sun.shadow;
   // the sun jumped (the hour set from Settings, a saved time loaded): the shadow map is drawn again at once, in this frame, with the sky and the lighting that have already switched; only the running day cycle's creep goes by background strips
-  const jump = shHavePrev && shPrevDir.distanceToSquared(shNeed.dir) > SH_SUN && !(PH.tests.slowShadowJump || window.__SLOW_SHADOW_JUMP); shPrevDir.copy(shNeed.dir); shHavePrev = true; LIGHT_JUMP = jump;
+  // While the hour slider is being dragged the sun jumps every frame, and every frame drew the whole shadow map again (30 fps while scrubbing, owner's M2,
+  // Oct 25): then only every fourth frame does, and the sun's direction for the others waits for it
+  const drag = performance.now() - (window.HOUR_DRAG_AT || -1e9) < 250;
+  let jump = shHavePrev && shPrevDir.distanceToSquared(shNeed.dir) > SH_SUN && !(PH.tests.slowShadowJump || window.__SLOW_SHADOW_JUMP);
+  let held = false; if (jump && drag && ++shDragN % 4 !== 0){ jump = false; held = true; } else if (jump) shDragN = 0;
+  if (!held) shPrevDir.copy(shNeed.dir); shHavePrev = true; LIGHT_JUMP = jump;   // (held: measured from the last map drawn, so the next frame still counts as a jump)
   let now = shadowDirty || jump || !shFront || shSlack(shFront) < 0; shadowDirty = false;
   if (!now){
     // time to start the next map? (the sun moved, the box size changed, or the view has used up 40% of the room; a map
@@ -1015,7 +1020,9 @@ const cloudMat = new THREE.ShaderMaterial({
       // is marched one frame in slotN, and the others take last frame's cloud from where that bit of sky was then: the point where this pixel's ray
       // crosses the middle of the cloud layer (y -10), moved back by the wind since, through last frame's camera. Off the edge of last frame's
       // picture (a pan or a zoom out shows new sky), it's marched now
-      vec2 pc = floor(gl_FragCoord.xy);
+      // (by blocks of 8 x 8 pixels, not single pixels: the card runs pixels in groups, and a group with one marched pixel in it waits for that
+      //  march, so one pixel in eight cost as much as all of them, 10 ms a frame on the owner's M2; a whole block marches or none of it does)
+      vec2 pc = floor(gl_FragCoord.xy/8.0);
       float sl = mod(pc.x, 4.0) + 4.0*mod(pc.y, 2.0); sl = slotN > 8.5 ? mod(pc.x, 4.0) + 4.0*mod(pc.y, 4.0) : slotN < 4.5 ? mod(pc.x, 2.0) + 2.0*mod(pc.y, 2.0) : sl;
       if (reset < 0.5 && abs(sl - slot) > 0.5 && abs(rdir.y) > 0.01){
         vec3 pm = ro + rdir*((-10.0 - ro.y)/rdir.y); pm.xz += dDrift;

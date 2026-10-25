@@ -268,7 +268,7 @@ function syncTimeUI(){
   if (document.activeElement !== $('hour')) $('hour').value = S.hour;
 }
 function setPresetActive(btn){ document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', b === btn)); }
-$('hour').addEventListener('input', e => { S.hour = +e.target.value; setPresetActive(null); lastLabel=''; });
+$('hour').addEventListener('input', e => { S.hour = +e.target.value; setPresetActive(null); lastLabel=''; window.HOUR_DRAG_AT = performance.now(); });   // (HOUR_DRAG_AT: the shadows keep up every few frames while it's dragged, sky.js)
 document.querySelectorAll('#presets button').forEach(b => b.addEventListener('click', () => {
   S.hour = +b.dataset.h;   // time only: rain stays however the Rain box is set
   $('hour').value = S.hour; setPresetActive(b); lastLabel='';

@@ -17032,9 +17032,10 @@ function zRoomCheck(){const Z=S.zRooms;if(!Z)return;for(const r of Z){if(!r.vali
 // meshes show again) and they are rebuilt in 2 ms slices after the scene has been quiet; a piece that was ever seen hidden (wall cut-aways) stays out.
 const _n3=new TH.Matrix3();
 function l2Init(){S.l2=S.rooms.map((R,i)=>({i,valid:false,meshes:[],srcs:[],job:null,chk:0,stage:null}));S.l2T=now();S.l2Diag={built:0,drops:{}}}
-function l2Drop(r){r.wait=null;for(const m of r.meshes){if(m.parent)m.parent.remove(m);m.geometry.dispose()}for(const x of r.srcs){if(x.o.userData.prL2Hid){x.o.visible=true;delete x.o.userData.prL2Hid}}r.meshes=[];r.srcs=[];r.valid=false;r.job=null;r.stage=null}
+function l2Drop(r){r.wait=null;r.parts=null;r.pi=0;for(const m of r.meshes){if(m.parent)m.parent.remove(m);m.geometry.dispose()}for(const x of r.srcs){if(x.o.userData.prL2Hid){x.o.visible=true;delete x.o.userData.prL2Hid}}r.meshes=[];r.srcs=[];r.valid=false;r.job=null;r.stage=null}
 function l2Invalidate(i,why){if(!S||!S.l2)return;S.l2T=now();let any=false;for(const r of (i==null?S.l2:[S.l2[i]])){if(!r||!(r.valid||r.job||r.stage))continue;any=true;l2Drop(r)}
   if(any){const D=S.l2Diag.drops,w=why||'?';D[w]=(D[w]||0)+1;zRoomInvalidate(null,'l2')}}
+const L2CAP=40000;
 const l2Cand=o=>o.isMesh&&o.userData.prMergedMesh&&o.material&&o.material.name==='prVC'&&!o.userData.prL2Hid&&!underUI(o);
 const l2Key=o=>[o.material.uuid,attrSig(o.geometry),o.castShadow,o.receiveShadow,o.layers.mask].join('|');
 function l2Ready(r){if(r.stage!=='warm')return true;if(r.wait)return !!S.warm&&r.wait.every(p=>!S.warm.pend.has(p));return !!(S.warm&&!S.mergeQ.length&&!S.warm.queue.includes('merge')&&S.warm.pend.size===0)}
@@ -17043,9 +17044,11 @@ const l2Todo=r=>!r.valid&&l2Ready(r);
 // then a room drew hundreds of separate meshes, Oct 25 trace)
 function l2Busy(){return !!(S.l2&&S.ab.l2Merge!==false&&S.matReady&&S.warm&&(S.warm.finished||(S.ab.l2Early!==false&&(S.probesReady||S.ab.l2Early===true)))&&!S.picking&&!S.optQ.length&&!S.mergeQ.length&&(S.flushing||(now()-S.editT>1500&&now()-S.l2T>700))&&S.l2.some(l2Todo))}
 function l2Step(){const r=S.l2.find(l2Todo);if(!r)return null;const t0=now();
-  if(r.stage==='warm'){for(const mm of r.meshes)mm.visible=true;for(const x of r.srcs){x.o.userData.prL2Hid=true;x.o.visible=false}r.stage=null;r.valid=true;S.l2Diag.built++;S.plDirty=true;zRoomInvalidate(S.zRooms&&S.zRooms[r.i]?r.i:null,'l2swap');return 'room merge done'}
+  if(r.stage==='warm'&&r.parts&&(r.pi|0)<r.parts.length-1){const P=r.parts[r.pi=(r.pi|0)]; r.pi++;P.mm.visible=true;for(const o of P.list){o.userData.prL2Hid=true;o.visible=false}return 'room merge swap part'}   // (one merged mesh a frame: each first draw uploads its buffers)
+  if(r.stage==='warm'){for(const mm of r.meshes)mm.visible=true;for(const x of r.srcs){x.o.userData.prL2Hid=true;x.o.visible=false}r.stage=null;r.valid=true;r.parts=null;r.pi=0;S.l2Diag.built++;S.plDirty=true;zRoomInvalidate(S.zRooms&&S.zRooms[r.i]?r.i:null,'l2swap');return 'room merge done'}
   if(!r.job){const list=[];S.scene.traverseVisible(o=>{if(!l2Cand(o))return;const pc=pieceOf(o);if(pc&&pc.userData.prFlaky)return;bbOf(o).getCenter(_v);if(roomOfPoint(_v.x,_v.y,_v.z)===r.i)list.push(o)});
-    const G=new Map();for(const o of list){const k=l2Key(o);let g=G.get(k);if(!g)G.set(k,g={list:[],nv:0,ni:0});const ga=o.geometry;g.list.push(o);g.nv+=ga.attributes.position.count;g.ni+=ga.index?ga.index.count:ga.attributes.position.count}
+    // at most L2CAP vertices a merged mesh: a whole room in one buffer was a 26 to 45 ms upload in the frame it appeared (Oct 25 log)
+    const G=new Map();for(const o of list){const ga=o.geometry,nv=ga.attributes.position.count,k0=l2Key(o);let part=0,k=k0+'#0',g=G.get(k);while(g&&g.nv+nv>L2CAP&&g.list.length){part++;k=k0+'#'+part;g=G.get(k)}if(!g)G.set(k,g={list:[],nv:0,ni:0});g.list.push(o);g.nv+=nv;g.ni+=ga.index?ga.index.count:nv}
     for(const [k,g] of [...G]){if(g.list.length<2){G.delete(k);continue}const g0=g.list[0].geometry;g.keys=Object.keys(g0.attributes);g.arr={};for(const a of g.keys)g.arr[a]=new Float32Array(g.nv*g0.attributes[a].itemSize);g.idx=g.nv>65535?new Uint32Array(g.ni):new Uint16Array(g.ni);g.vo=0;g.io=0}
     S.root.updateMatrixWorld(true);r.job={groups:[...G.values()],gi:0,li:0,inv:new TH.Matrix4().copy(S.root.matrixWorld).invert()};return 'room merge gather'}
   const J=r.job;
@@ -17057,9 +17060,9 @@ function l2Step(){const r=S.l2.find(l2Todo);if(!r)return null;const t0=now();
       else dst.set(at.array,base)}
     if(geo.index){const ix=geo.index;for(let i=0;i<ix.count;i++)g.idx[g.io++]=ix.getX(i)+g.vo}else for(let i=0;i<pc;i++)g.idx[g.io++]=g.vo+i;g.vo+=pc}
   if(J.gi<J.groups.length)return 'room merge';
-  const srcs=[];for(const g of J.groups){const o0=g.list[0],geo=new TH.BufferGeometry();for(const a of g.keys)geo.setAttribute(a,new TH.BufferAttribute(g.arr[a],o0.geometry.attributes[a].itemSize));geo.setIndex(new TH.BufferAttribute(g.idx,1));geo.computeBoundingSphere();geo.computeBoundingBox();
+  const srcs=[];r.parts=[];r.pi=0;for(const g of J.groups){const o0=g.list[0],geo=new TH.BufferGeometry();for(const a of g.keys)geo.setAttribute(a,new TH.BufferAttribute(g.arr[a],o0.geometry.attributes[a].itemSize));geo.setIndex(new TH.BufferAttribute(g.idx,1));geo.computeBoundingSphere();geo.computeBoundingBox();
     const mm=new TH.Mesh(geo,o0.material);mm.castShadow=o0.castShadow;mm.receiveShadow=o0.receiveShadow;mm.layers.mask=o0.layers.mask;mm.userData.prBig=true;mm.userData.prL2Mesh=true;if(o0.material.userData.prClass)mm.userData.prHint=o0.material.userData.prClass;
-    mm.name='prRoomMerge'+r.i;mm.raycast=()=>{};mm.visible=false;S.root.add(mm);mm.updateMatrixWorld(true);r.meshes.push(mm);
+    mm.name='prRoomMerge'+r.i;mm.raycast=()=>{};mm.visible=false;S.root.add(mm);mm.updateMatrixWorld(true);r.meshes.push(mm);(r.parts||(r.parts=[])).push({mm,list:g.list});
     for(const o of g.list)srcs.push({o,k:mwKey(o)})}
   // the merged meshes sit hidden while the merge warm job compiles their programs; the swap happens once that is finished, so no frame ever pays a shader build
   r.srcs=srcs;r.job=null;r.stage='warm';
@@ -17207,13 +17210,18 @@ function bkRead(rt){const w=rt.width,h=rt.height,f=new Float32Array(w*h*4),R=S.R
   const u=new Uint16Array(f.length),H=TH.DataUtils.toHalfFloat;for(let i=0;i<f.length;i++)u[i]=H(f[i]);return {w,h,d:u}}   // (half floats: half the size, the targets are half float anyway)
 // asynchronous read-back (round 31): a read into a pixel buffer with a fence, collected once the GPU has done it. A plain readPixels waits for
 // everything queued on the GPU (the city backdrop too): 90-110 ms stalls on the Mac, and longer when the GPU is busy
-function bkReadStart(rt){const gl=S.gl,w=rt.width,h=rt.height,b=gl.createBuffer();gl.bindBuffer(gl.PIXEL_PACK_BUFFER,b);gl.bufferData(gl.PIXEL_PACK_BUFFER,w*h*16,gl.STREAM_READ);
-  const R=S.R,prev=R.getRenderTarget();R.setRenderTarget(rt);gl.readPixels(0,0,w,h,gl.RGBA,gl.FLOAT,0);R.setRenderTarget(prev);gl.bindBuffer(gl.PIXEL_PACK_BUFFER,null);
-  const f=gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE,0);gl.flush();return {b,f,w,h}}
-function bkReadPoll(q){const gl=S.gl;if(gl.getSyncParameter(q.f,gl.SYNC_STATUS)!==gl.SIGNALED)return null;gl.deleteSync(q.f);q.f=null;
-  const f=new Float32Array(q.w*q.h*4);gl.bindBuffer(gl.PIXEL_PACK_BUFFER,q.b);gl.getBufferSubData(gl.PIXEL_PACK_BUFFER,0,f);gl.bindBuffer(gl.PIXEL_PACK_BUFFER,null);gl.deleteBuffer(q.b);q.b=null;
-  const u=new Uint16Array(f.length),H=TH.DataUtils.toHalfFloat;for(let i=0;i<f.length;i++)u[i]=H(f[i]);return {w:q.w,h:q.h,d:u}}
-function bkReadDrop(q){if(!q||!S)return;const gl=S.gl;try{if(q.f)gl.deleteSync(q.f);if(q.b)gl.deleteBuffer(q.b)}catch(e){}}
+// the read is split in bands of about 512 KB, each in its own buffer: Chrome often reads a buffer back synchronously anyway (its shadow
+// copy gets dropped), and one 12 MB reflection target was a 50 to 100 ms frame, again and again while the room sat still (Oct 25 log).
+// All bands are queued at once; then one band a frame is copied out and turned to half floats.
+function bkReadStart(rt){const gl=S.gl,w=rt.width,h=rt.height,rows=Math.max(1,Math.floor(524288/(w*16))),bands=[];
+  const R=S.R,prev=R.getRenderTarget();R.setRenderTarget(rt);
+  for(let y=0;y<h;y+=rows){const n=Math.min(rows,h-y),b=gl.createBuffer();gl.bindBuffer(gl.PIXEL_PACK_BUFFER,b);gl.bufferData(gl.PIXEL_PACK_BUFFER,w*n*16,gl.STREAM_READ);gl.readPixels(0,y,w,n,gl.RGBA,gl.FLOAT,0);bands.push({b,y,n})}
+  R.setRenderTarget(prev);gl.bindBuffer(gl.PIXEL_PACK_BUFFER,null);const f=gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE,0);gl.flush();return {f,w,h,bands,bi:0,u:new Uint16Array(w*h*4)}}
+function bkReadPoll(q){const gl=S.gl;if(q.f){if(gl.getSyncParameter(q.f,gl.SYNC_STATUS)!==gl.SIGNALED)return null;gl.deleteSync(q.f);q.f=null}
+  const B=q.bands[q.bi++],f=new Float32Array(q.w*B.n*4);gl.bindBuffer(gl.PIXEL_PACK_BUFFER,B.b);gl.getBufferSubData(gl.PIXEL_PACK_BUFFER,0,f);gl.bindBuffer(gl.PIXEL_PACK_BUFFER,null);gl.deleteBuffer(B.b);B.b=null;
+  const H=TH.DataUtils.toHalfFloat,u=q.u,o=B.y*q.w*4;for(let i=0;i<f.length;i++)u[o+i]=H(f[i]);
+  if(q.bi<q.bands.length)return null;return {w:q.w,h:q.h,d:u}}
+function bkReadDrop(q){if(!q||!S)return;const gl=S.gl;try{if(q.f)gl.deleteSync(q.f);if(q.bands)for(const B of q.bands)if(B.b)gl.deleteBuffer(B.b)}catch(e){}}
 function bkWrite(rec,rt){if(!rec||rec.w!==rt.width||rec.h!==rt.height)return false;const t=new TH.DataTexture(rec.d,rec.w,rec.h,TH.RGBAFormat,TH.HalfFloatType);t.minFilter=t.magFilter=TH.NearestFilter;t.generateMipmaps=false;t.flipY=false;t.needsUpdate=true;
   const sc=rt.scissorTest;copyRT({texture:t},rt);rt.scissorTest=sc;t.dispose();return true}
 // a settled bake is read back one target a frame while the view is still (each read waits for the GPU once), then stored

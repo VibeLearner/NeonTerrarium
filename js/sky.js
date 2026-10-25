@@ -1520,10 +1520,10 @@ function setRenderLines(n){
 }
 let DW = 1, DH = 1, BASE_H = 270, pxK = 1;
 const PIX_MAX = 2.1e6;
-// Settings, Optimize framerate, "Cap at 720p": never more pixels than 1280 x 720, below the base lines too (the apartment page reads the same key: builder.js)
+// Settings, Optimize framerate, "Cap apartments at 720p": the apartment page reads this key (builder.js) and never draws more than 1280 x 720; the city is unchanged
 const CAP720_KEY = 'neonIsland.cap720', PIX_720 = 1280*720;
 let CAP720 = (() => { try { return localStorage.getItem(CAP720_KEY) === '1'; } catch (e) { return false; } })();
-function setCap720(on){ CAP720 = !!on; try { localStorage.setItem(CAP720_KEY, CAP720 ? '1' : '0'); } catch (e) {} H = 0; applyRenderRes(zoom);
+function setCap720(on){ CAP720 = !!on; try { localStorage.setItem(CAP720_KEY, CAP720 ? '1' : '0'); } catch (e) {}
   try { const f = document.querySelector('iframe.furnish-frame'); if (f) f.contentWindow.postMessage({ type: 'furnish:pixcap' }, location.origin); } catch (e) {} }   // the most pixels the city is drawn at (applyRenderRes): a 1080p screen never reaches it, a sharp laptop screen zoomed out does
 function resize(){
   const dpr = devicePixelRatio || 1;
@@ -1591,7 +1591,7 @@ function applyRenderRes(z){
   // and never more than PIX_MAX pixels in all, whatever the zoom: on a sharp laptop screen (3420 x 1640) the 1.6 times above came to 3.6 million pixels
   // for the color pass and every post effect, more than the card could draw in a 60 Hz frame. Between zoom 21 and 40 one frame in four or five came in
   // late, the judder that came and went with the zoom (measured on the owner's M2, Oct 25: 52 fps at 1.6 times, a steady 60 at the base). Never under the base
-  h = CAP720 ? Math.min(h, Math.floor(Math.sqrt(PIX_720*DH/DW))) : Math.min(h, Math.max(BASE_H, Math.floor(Math.sqrt(PIX_MAX*DH/DW))));
+  h = Math.min(h, Math.max(BASE_H, Math.floor(Math.sqrt(PIX_MAX*DH/DW))));   // ("Cap at 720p" is the apartments' only, owner's choice Oct 25: the city keeps its sharpness)
   if (FARV.sharp) h = Math.max(h, Math.min(DH, SMOOTH_MAX, Math.floor(Math.sqrt(FARV.pix*DH/DW))));   // (zoomed out and still: the sharp view, above)
   if (h === H) return;
   // while the zoom is still gliding, small steps wait: each step remakes every render target (the frame, the depth, the glow, the clouds), and a turn

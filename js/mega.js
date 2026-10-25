@@ -3792,7 +3792,7 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
     },
     // sent to a mugging: true if it's free to go (not already on one)
     scramble(L){ if (st.chase) return false; st.chase = { L, t: 25 }; if (st.mode === 'down' || st.mode === 'home'){ st.mode = 'fly'; st.target = null; st.climb = null; st.via = null; } return true; },
-    get busy(){ return !!st.chase; }, get pos(){ return g.position; },
+    get busy(){ return !!st.chase; }, get pos(){ return g.position; }, get way(){ return st.way; }, get mode(){ return st.chase ? 'chase' : st.mode; }, idx,   // (way, mode: the Precinct desk's map, policedesk.js)
     update(_dt, time){
       const now = performance.now(), dt = Math.min(1, (now - st.last)/1000); st.last = now;
       const on = st.mode !== 'rest';
@@ -3954,7 +3954,7 @@ function policeBike(m, idx, pad){
   // the siren: a red and blue glow that swaps over while they're on a call
   const siren = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff2030, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
   siren.layers.set(1); siren.scale.set(.7, .7, 1); scene.add(siren);
-  const b = { idx, pad, x: pad.x, z: pad.z, y: CURB + .08, hx: pad.fx, hz: pad.fz, mode: 'park', timer: 40 + idx*25 + Math.random()*60,
+  const b = { m, idx, pad, x: pad.x, z: pad.z, y: CURB + .08, hx: pad.fx, hz: pad.fz, mode: 'park', timer: 40 + idx*25 + Math.random()*60,
               path: null, s: 0, speed: 1.6, rider: false, passenger: null, alpha: 1, target: null, until: 0, spr, hum, siren, mat };
   // follow a path of [x, z] points
   b.go = (pts, speed) => { const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1])); b.path = { pts, cum, len: cum[cum.length - 1] }; b.s = 0; b.speed = speed; };
@@ -4239,7 +4239,8 @@ function policeFx(m){
       while (pickd.length){ let bi = 0, bd = Infinity; pickd.forEach((c, i) => { const d = (c.x - x)**2 + (c.z - z)**2; if (d < bd){ bd = d; bi = i; } }); const c = pickd.splice(bi, 1)[0]; way.push(c); x = c.x; z = c.z; }
       return way;
     },
-    visited(c){ visits.set(c.key, performance.now()); },
+    visited(c){ visits.set(c.key, performance.now()); this.scans = (this.scans || 0) + 1; },
+    visits,   // (the Precinct desk's scan map: policedesk.js)
     // the share of crossings a drone has hovered over in the last few minutes
     coverage(win = 300000){ const nodes = typeof patrolNodes !== 'undefined' ? patrolNodes : [], now = performance.now(); if (!nodes.length) return 0; return nodes.filter(c => now - (visits.get(c.key) || -1e9) < win).length/nodes.length; },
   };
@@ -4258,7 +4259,7 @@ function policeFx(m){
     if (sent) bikes.alert(L);   // and two bikes come to the spot
     return sent;
   };
-  const station = { m, crew, alert };
+  const station = { m, crew, alert, drones };
   POLICE_STATIONS.push(station); policeWire();
   const drone = drones[0];
   return {

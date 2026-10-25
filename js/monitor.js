@@ -123,6 +123,7 @@ const MON = (() => {
     render(true); drawPins(true);
   };
   M.close = () => { M.id = null; sel.hidden = true; el.hidden = true; document.body.classList.remove('watching'); MON_FOCUS.on = false; if (window.STORY) STORY.setWatch(null); };
+  M.refresh = () => { if (M.id) render(false); };
   M.userPan = () => {};   // (the main view is the player's own: the feed has its own camera)
 
   /* ---------- pins: people kept a click away (a star by the name; chips by the monitor; a chip glows while its person is in a story moment) ---------- */
@@ -260,6 +261,7 @@ const MON = (() => {
     g.font = '10px "Silkscreen", monospace'; g.textBaseline = 'top';
     g.fillStyle = Math.floor(now/600) % 2 ? '#ff4f6a' : 'rgba(255,79,106,.25)'; g.fillRect(8, 9, 6, 6);
     g.fillStyle = '#e3d6bd'; g.fillText('REC', 18, 7);
+    { const nt = typeof DOSSIER !== 'undefined' && DOSSIER.lastNote(); if (nt && nt.id === M.id){ g.fillStyle = '#5ae8ff'; g.fillText('NOTED: ' + nt.t.toUpperCase(), 8, 21); g.fillStyle = '#e3d6bd'; } }   // (a habit the cam just picked up: lidar.js)
     // a thread nearing its payoff (pacing.js): the CAM label starts to flicker and a faint signal meter fills under it. Visual only, and quiet.
     const hint = window.PACE && PACE.hint ? PACE.hint(M.id) : -1;
     const flick = hint > .55 && rnd() < (hint - .55)*.35;
@@ -305,6 +307,7 @@ const MON = (() => {
     for (const n of N){ const f = (n.fact || '').split('.').slice(1).join('.'); if (n.who === M.id && (n.channel === 'document' || n.channel === 'introduction') && DETAIL[f]) det.push(row(DETAIL[f], STORY.render(n), n)); }
     for (const f of ['Job', 'Home', 'Lives with']) if (!det.some(d => d.includes('>' + f + '<'))) det.push(row(f, null, null));
     parts.push('<h4>Details</h4>' + det.join(''));
+    if (typeof DOSSIER !== 'undefined'){ try { const h = DOSSIER.notebook(M.id); if (h) parts.push(h); } catch (e) {} }   // (what the person cam and the LIDAR Array have learned: lidar.js)
     const around = STORY.peopleAround(M.id);
     parts.push('<h4>People around them</h4>' + (around.length ? around.map(id => { const kk = STORY.known(id) || {}, I = STORY.identOf(id);
       const nm = kk.first ? kk.first + (kk.last ? ' ' + kk.last : '') : STORY.descOf(id).replace(/^an? /, '').replace(/^\w/, c => c.toUpperCase()), rl = STORY.relLabel(kk);

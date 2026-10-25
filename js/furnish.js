@@ -13,6 +13,16 @@ const FURN = (() => {
   // F.lightCity = false sends the city as before (full detail to 46, clustered beyond) to compare.
   const SAVE_KEY = 'neonIsland.furnish', NEAR = 18, MID = 60, CG = .22, CG_FAR = .9, PAGE = 'furnish.html?v=2026-10-25h';
   const btn = document.getElementById('furnBtn'), hint = document.getElementById('modeHint');
+  // The LIDAR Array unlocks Furnish pod (mega.js): the button shows once one has arrived, and only the homes in an array's range
+  // can be picked. What the card shows of who lives there is what has been learned (lidar.js: the scan, the person cam, a trace
+  // home). #dev keeps it as it was: always there, every pod, the whole household.
+  const DEV = location.hash.includes('dev');
+  const hasArray = () => DEV || (typeof megasOfKind === 'function' && megasOfKind('lidar').length > 0);
+  const inRange = r => DEV || (typeof lidarCovers === 'function' && lidarCovers(r.x, r.z));
+  (function gate(){
+    const show = () => { const on = DEV || (typeof megaUnlockedKinds !== 'undefined' && megaUnlockedKinds.has('lidar')) || hasArray(); if (btn.hidden === on) btn.hidden = !on; };
+    show(); setInterval(show, 1000);
+  })();
   const tip = document.createElement('div'); tip.className = 'furn-tip'; tip.hidden = true; document.body.appendChild(tip);
 
   /* ---------- the saved homes ---------- */
@@ -86,6 +96,7 @@ const FURN = (() => {
     if (on === F.pick) return;
     F.pick = on; F.hov = null; showPick(null);
     btn.classList.toggle('on', on); btn.setAttribute('aria-pressed', on); document.body.classList.toggle('furnishing', on);
+    if (on && !hasArray()){ F.pick = false; btn.classList.remove('on'); btn.setAttribute('aria-pressed', false); document.body.classList.remove('furnishing'); flash('Furnish pod needs a LIDAR Array standing: place one from the Buildings menu.'); return; }
     if (on){
       if (typeof LOADP !== 'undefined' && LOADP.on){ F.pick = false; btn.classList.remove('on'); btn.setAttribute('aria-pressed', false); document.body.classList.remove('furnishing'); flash('The city is still loading. Try again in a moment.'); return; }
       if (S.zone) selectZone(null);
@@ -95,7 +106,7 @@ const FURN = (() => {
       if (mtMode) setMtMode(false, true);
       if (HL) hlStop();
       if (MON.id) MON.close();
-      hint.textContent = 'Furnish pod: point at a residential or luxury building · scroll or Up / Down picks the pod · click to furnish · Esc to cancel';
+      hint.textContent = 'Furnish pod: point at a residential or luxury building in LIDAR range · scroll or Up / Down picks the pod · click to furnish · Esc to cancel';
       if (ptrLast) hoverAt(ptrLast.x, ptrLast.y);
       warmStart();   // (the far city's stand-ins made while the player picks)
     } else { hoverStrip.material.color.set(0xff5ad8); hoverFill.material.color.set(0xff5ad8); hoverFill.visible = false; tip.hidden = true; selectZone(null); }   // (the strip's and fill's own pink back, for the side pods)
@@ -134,14 +145,16 @@ const FURN = (() => {
       tip.classList.add('no'); placeTip(px, py); return;
     }
     tip.classList.remove('no');
-    const r = hv.rows[F.fl], col = zoneCol(r.zone), fp = r.fp || { w: SIDE, d: SIDE, ry: 0 };
+    const r = hv.rows[F.fl]; hv.out = !inRange(r);
+    if (hv.out){ hover.visible = false; tip.textContent = 'Out of LIDAR range: a LIDAR Array nearer would reach it'; tip.classList.add('no'); placeTip(px, py); return; }
+    const col = zoneCol(r.zone), fp = r.fp || { w: SIDE, d: SIDE, ry: 0 };
     const cs = Math.abs(Math.cos(fp.ry)), sn = Math.abs(Math.sin(fp.ry)), ex = fp.w*cs + fp.d*sn + .08, ez = fp.w*sn + fp.d*cs + .08, h = Math.max(.2, r.y1 - r.y);   // (the block's box across the ground: it may be turned a little)
     hoverMat.color.set(col);
     hover.position.set(r.x, r.y + h/2, r.z); hover.scale.set(ex, h, ez); hover.visible = true;
     hoverFill.material.color.set(col); hoverFill.position.copy(hover.position); hoverFill.scale.set(ex - .04, h - .04, ez - .04); hoverFill.visible = true;
     const saved = !!getRecipe(r);
     const hh = typeof POD_HH !== 'undefined' ? POD_HH.get(keyOf(r)) : null, nres = hh ? hh.members.length : 0;
-    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + ' · ' + (nres ? nres + (nres > 1 ? ' residents' : ' resident') : 'vacant') + (saved ? ' · furnished' : '') + ' · click to ' + (saved ? 'open' : 'furnish');
+    tip.textContent = label(r) + ' · pod ' + r.pod + ' of ' + r.pods + ' · ' + (nres ? 'occupied · ' + nres + (nres > 1 ? ' residents' : ' resident') : 'vacant') + (saved ? ' · furnished' : '') + ' · click to ' + (saved ? 'open' : 'furnish');
     placeTip(px, py);
   }
   function placeTip(px, py){ if (px == null){ tip.hidden = true; return; } tip.style.left = px + 'px'; tip.style.top = py + 'px'; tip.hidden = false; }
@@ -189,7 +202,7 @@ const FURN = (() => {
   btn.addEventListener('click', () => setPick(!F.pick));
 
   function confirm(){
-    if (!F.hov || !F.hov.rows.length || F.busy) return;
+    if (!F.hov || !F.hov.rows.length || F.busy || F.hov.out) return;
     const h = Object.assign({}, F.hov.rows[F.fl]); delete h.top; delete h.base;
     const keepHov = hover.visible, keepFill = hoverFill.visible;
     setPick(false); tip.hidden = true;
@@ -442,7 +455,8 @@ const FURN = (() => {
       if (tm.careful > .65) tr.push('tidy'); else if (tm.careful < .3) tr.push('messy'); if (tm.warm > .7) tr.push('warm');
       if (shift === 'night') tr.push('night shift'); for (const hb of hob) tr.push(HOBBY_WORD[hb] || hb);
       const jw = jk ? (STORY.JOB_WORD && STORY.JOB_WORD[jk]) || job : job === 'retired' ? 'retired' : 'between jobs';
-      residents.push({ name: sp ? sp.first + ' ' + sp.last : 'Resident ' + (i + 1), age: ageN, job: jw, traits: tr });
+      const full = { name: sp ? sp.first + ' ' + sp.last : 'Resident ' + (i + 1), age: ageN, job: jw, traits: tr };
+      residents.push(DEV || typeof DOSSIER === 'undefined' ? full : DOSSIER.card(p, full, i));   // (what has been learned of them: lidar.js)
     });
     const n = members.length, u = U(x.key, 'rel');
     const relation = n === 1 ? 'single' : n === 2 ? (u < .6 ? 'couple' : u < .85 ? 'roommates' : 'siblings') : n === 3 ? (u < .35 ? 'couple+roommate' : u < .55 ? 'siblings' : 'roommates') : 'roommates';
@@ -451,6 +465,23 @@ const FURN = (() => {
     return { vacant: false, household: { seed, label: rel + ': ' + members.map(m => m.job).join(' + '), relation, members, pod: null }, residents };
   }
   F.householdFor = householdFor;
+  // one person's whole profile, as the Residents card would show it with nothing hidden (lidar.js reveals it a trait at a time)
+  F.profileOf = id => {
+    const p = people.get(id), x = p && p.pod && POD_HH.get(p.pod); if (!x) return null;
+    const k = x.members.filter(m => people.has(m)).indexOf(id); if (k < 0) return null;
+    const D = typeof DOSSIER !== 'undefined' ? DOSSIER : null, was = D && D.raw; if (D) D.raw = true;
+    try { return householdFor(x.row).residents[k] || null; } catch (e) { return null; } finally { if (D) D.raw = was; }
+  };
+  // open a pod by its key (a trace home from the person cam: lidar.js)
+  F.openKey = (key, o) => {
+    if (F.busy || F.open || !key) return false;
+    const ci = key.split('|')[0].split(',').map(Number), c = cells.get(ckey(ci[0], ci[1])); if (!c) return false;
+    try { if (typeof podsResync === 'function') podsResync(c); } catch (e) {}
+    const r = homesOf(c).find(h => keyOf(h) === key); if (!r) return false;
+    if (F.pick) setPick(false);
+    const h = Object.assign({}, r); delete h.top; delete h.base; F.trace = o || null;
+    openHome(h); return true;
+  };
 
   /* ---------- the overlay ---------- */
   const ov = document.getElementById('furnish');

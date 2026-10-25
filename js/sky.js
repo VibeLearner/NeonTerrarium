@@ -1094,12 +1094,23 @@ const CLOUDT = { reset: true, i: 0, slot: 0, VP: new THREE.Matrix4(), drift: new
 function cloudFrame(){
   const U = cloudMat.uniforms, n = S.cloudQ === 1 ? 4 : S.cloudQ === 3 ? 16 : 8;   // (Settings, cloud quality: sharp, balanced, fast; all at the frame's own size)
   if (Math.abs(U.cover.value - CLOUDT.cover) > .02){ CLOUDT.cover = U.cover.value; CLOUDT.reset = true; }   // (a look's change of cover: everything at once)
+  // a picture from another view altogether can't be carried over: coming in from the title screen (its window's view of the city), the sky went black for
+  // about eight frames (owner, Oct 25), one block in eight coming right each frame. Leaving or entering the title, or a sudden big zoom: everything at once
+  const ttl = typeof TITLE !== 'undefined' && TITLE.on ? 1 : 0;
+  if (CLOUDT.ttl !== undefined && CLOUDT.ttl !== ttl) CLOUDT.reset = true; CLOUDT.ttl = ttl;
+  if (CLOUDT.zoom && Math.abs(Math.log(zoom/CLOUDT.zoom)) > .2) CLOUDT.reset = true; CLOUDT.zoom = zoom;
   const turning = CLOUDT.yaw !== null && (Math.abs(yaw - CLOUDT.yaw) > 1e-4 || Math.abs(PITCH - CLOUDT.pitch) > 1e-5); CLOUDT.yaw = yaw; CLOUDT.pitch = PITCH;
   let dst;
   if (turning || (CLOUDT.reset && !CLOUDT.prev)){
-    if (!rtClHalf || rtClHalf.width !== Math.ceil(W/2) || rtClHalf.height !== Math.ceil(H/2)){ if (rtClHalf) rtClHalf.dispose();
-      rtClHalf = new THREE.WebGLRenderTarget(Math.ceil(W/2), Math.ceil(H/2), { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, depthBuffer: false }); }
+    // (the size the clouds always had before: half the base resolution, a third zoomed out; half of the frame's own size marched two to three times the
+    //  pixels while turning, and a turn at zoom 60 fell to 30 fps)
+    const q = (S.cloudQ || 2) + (FARV.far ? 1 : 0), hw = Math.ceil(W*Math.min(1, pxK)/q), hh = Math.ceil(H*Math.min(1, pxK)/q);
+    if (!rtClHalf || rtClHalf.width !== hw || rtClHalf.height !== hh){ if (rtClHalf) rtClHalf.dispose();
+      rtClHalf = new THREE.WebGLRenderTarget(hw, hh, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, depthBuffer: false }); }
     dst = rtClHalf; U.reset.value = 1;
+    // (and the last picture unbound: it may be this very image, and a target read and drawn into at once draws nothing, only its clear: the sky went
+    //  black for a few frames coming in from the title screen, owner Oct 25)
+    U.tPrev.value = null;
   } else {
     dst = rtCl[CLOUDT.i]; if (CLOUDT.prev === dst.texture) dst = rtCl[CLOUDT.i = 1 - CLOUDT.i];
     U.tPrev.value = CLOUDT.prev; U.prevVP.value.copy(CLOUDT.VP); U.dDrift.value.set(U.cloudOff.value.x - CLOUDT.drift.x, U.cloudOff.value.y - CLOUDT.drift.y);
@@ -1562,7 +1573,7 @@ function setRenderLines(n){
   RENDER_LINES = n; SMOOTH_LOOK.value = n === 0 ? 1 : 0; try { localStorage.setItem(RES_KEY, String(n)); } catch (e) {}
   resize();
 }
-let DW = 1, DH = 1, BASE_H = 270, pxK = 1;
+let DW = 1, DH = 1, BASE_H = 270, pxK = 1, H_LOD = 0;
 const PIX_MAX = 2.1e6;
 // Settings, Optimize framerate, "Cap apartments at 720p": the apartment page reads this key (builder.js) and never draws more than 1280 x 720; the city is unchanged
 const CAP720_KEY = 'neonIsland.cap720', PIX_720 = 1280*720;
@@ -1617,7 +1628,9 @@ function farTrack(now){
   // over that glide's last stretch the resolution steps up a quarter at a time, so the picture sharpens with the slowing instead of snapping when it
   // settles (owner, Oct 25). Down at once when the view speeds up again; up no faster than a step every third frame
   const kT = FARV.far ? Math.round((1 - Math.min(1, sp/FARV.v0))*4)/4 : 0;
-  if (kT < FARV.k) FARV.k = kT; else if (kT > FARV.k && ++FARV.up >= 3){ FARV.k = Math.min(kT, FARV.k + .25); FARV.up = 0; }
+  // (down only for a clear speed-up, half a step at least or past the start speed: a glide hovering about one step's edge flipped it every few frames,
+  //  each flip remaking every render target, 30 of them in the first three seconds after Continue)
+  if (kT < FARV.k){ if (FARV.k - kT >= .5 || sp > FARV.v0){ FARV.k = kT; FARV.up = 0; } } else if (kT > FARV.k && ++FARV.up >= 3){ FARV.k = Math.min(kT, FARV.k + .25); FARV.up = 0; }
   const wasSharp = FARV.sharp; FARV.sharp = FARV.k >= 1;
   const sm = RENDER_LINES === 0 || FARV.far ? 1 : 0;
   if (SMOOTH_LOOK.value !== sm){ SMOOTH_LOOK.value = sm; H = 0; }   // (the clouds' target filters with the look: made again)
@@ -1642,6 +1655,7 @@ function applyRenderRes(z){
   // for the color pass and every post effect, more than the card could draw in a 60 Hz frame. Between zoom 21 and 40 one frame in four or five came in
   // late, the judder that came and went with the zoom (measured on the owner's M2, Oct 25: 52 fps at 1.6 times, a steady 60 at the base). Never under the base
   h = Math.min(h, Math.max(BASE_H, Math.floor(Math.sqrt(PIX_MAX*DH/DW))));   // ("Cap at 720p" is the apartments' only, owner's choice Oct 25: the city keeps its sharpness)
+  H_LOD = h;   // (the detail levels go by this, the size without the sharp view: main.js)
   if (FARV.k > 0) h = Math.max(h, Math.round(h + (Math.min(DH, SMOOTH_MAX, Math.floor(Math.sqrt(FARV.pix*DH/DW))) - h)*FARV.k));   // (zoomed out and slowing or still: the sharp view, above)
   if (h === H) return;
   // while the zoom is still gliding, small steps wait: each step remakes every render target (the frame, the depth, the glow, the clouds), and a turn

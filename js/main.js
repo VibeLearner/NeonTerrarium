@@ -102,7 +102,9 @@ function frameBody(now){
   // shadows are redrawn only after an edit or once the sun has visibly moved
   GLOW_PTS_UNI.scale.value = H/(2*zoom);
   { // detail levels: only needed once zooming out outruns the screen's resolution (see applyRenderRes)
-    const loss = (zoom/ZOOM_REF)*(BASE_H/H);   // 1 = every building keeps all its pixels
+    // (by the size without the sharp view's extra lines: as the view settled and the resolution stepped up, the plants and fine pieces came back, and
+    //  went again as soon as it moved: foliage popping in and out when turning zoomed out, owner Oct 25. Now they stay as they are while moving)
+    const loss = (zoom/ZOOM_REF)*(BASE_H/(H_LOD || H));   // 1 = every building keeps all its pixels
     const t = clamp((loss - 1.15)/1.0, 0, 1), e = t*t*(3 - 2*t);
     // (plants thin later and more gently than the fine pieces: they are a few percent of a frame (tools/procfol/MEASURE.md), and tufts vanishing while
     //  still a pixel tall showed as pop-in with the render fixed; from loss 1.6, fully thinned only by 3.2)

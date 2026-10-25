@@ -131,6 +131,9 @@ const _sdVec = new THREE.Vector3(), _sdMat = new THREE.Matrix4();
 function sdApply(){   // for a frame drawn the old way: each plot's extra size classes, from how fast it moves
   CULL.sd = false;
   if (!SD.on || PH.tests.noSpeed || PH.tests.noSmall) return;
+  // (not zoomed out, in the sharp view's range: the small pieces it left out while turning, the plants above all, went and came back with every turn,
+  //  which showed far out (owner, Oct 25), and there it bought nothing: a turn at zoom 60 measured the same with it off, a little quicker even)
+  if (typeof FARV !== 'undefined' && FARV.far){ for (const P of SD.list || []) if (P.xlOn){ P.xl.fill(0); P.xlOn = 0; } SD.moving = false; return; }
   if (SD.stamp !== SC_EDITS){ SD.list = []; const seen = new Set(); world.traverse(o => { const g = o.isMesh && o.geometry, P = g && g.userData.pcs; if (P && !seen.has(P)){ seen.add(P); SD.list.push(P); } }); SD.stamp = SC_EDITS; }
   const w = Math.abs(SD.dYaw), tz = Math.abs(SD.dZoom), tp = Math.abs(SD.dPitch);
   SD.moving = w + tz + tp > 1e-6; SD.hist.fill(0); SD.top = 0; SD.pieces = 0;

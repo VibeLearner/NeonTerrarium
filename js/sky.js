@@ -1109,7 +1109,7 @@ function makeTargets(){
   comp.uniforms.tColor.value = rtC.texture; comp.uniforms.tDepth.value = rtC.depthTexture; comp.uniforms.tNormal.value = rtN.texture;
   comp.uniforms.res.value.set(W,H);
   if (rtCloud) rtCloud.dispose();
-  const q = S.cloudQ || 2;
+  const q = (S.cloudQ || 2) + (FARV.far ? 1 : 0);   // (a size smaller zoomed out: the sharp view, below)
   // (Smooth: the clouds are drawn smaller than the frame and stretched with a blend, so their edges aren't stair-steps)
   // (at the base resolution whatever the zoom: zoomed out, the frame grows up to 1.6 times its lines but the clouds needn't, and they were the
   //  third-dearest pass, about as much as the whole composite)
@@ -1551,6 +1551,35 @@ const ZOOMRES_KEY = 'neonIsland.zoomRes';
 let ZOOM_RES = (() => { try { const raw = localStorage.getItem(ZOOMRES_KEY); if (raw !== null && ['1', '1.6', '0'].includes(raw)) return +raw;
   const cap = localStorage.getItem('neonIsland.capRes'); if (cap !== null) return cap === '1' ? 1.6 : 0; } catch (e) {} return 1.6; })();   // (the old box's choice is kept; new players: Sharper)
 function setZoomRes(v){ ZOOM_RES = v; try { localStorage.setItem(ZOOMRES_KEY, String(v)); } catch (e) {} applyRenderRes(zoom); }
+// The sharp view when zoomed out (Settings, Optimize framerate, "Sharp view when zoomed out"). Far out each building is a few pixels wide and at the
+// game's usual resolution they run together; the owner's "Smooth" and "Sharpest" made them read as separate buildings, but cost the whole frame at
+// every zoom. So past FARV.inZ the look is smooth, and once the view has been still for a moment it's drawn at up to the screen's own resolution
+// (SMOOTH_MAX lines). While the view moves it's drawn at the usual size, so turning and zooming stay at 60 fps, and it sharpens again as it settles.
+// Up close nothing changes. FARV.pix, the sharp view's pixels, is lowered on its own while still frames come in late (on the owner's M2 the screen's
+// full 4.3 million pixels ran at about 45 fps zoomed out, 2.1 million at a steady 60) and raised again after a while of quick frames. Clouds are drawn
+// a size smaller out there. (The wet ground, mist and light shafts were measured too: switching them off far out bought nothing.)
+const FARV_KEY = 'neonIsland.farView';
+const FARV = { on: (() => { try { return localStorage.getItem(FARV_KEY) !== '0'; } catch (e) { return true; } })(), inZ: 40, outZ: 36, far: false, sharp: false,
+  lastMove: 0, p: null, pix: 4.4e6, ema: 16.7, t: 0, quick: 0, cut: 0 };
+function setFarView(on){ FARV.on = !!on; try { localStorage.setItem(FARV_KEY, FARV.on ? '1' : '0'); } catch (e) {} }
+function farTrack(now){
+  const v = [yaw, zoom, PITCH, camT.x, camT.z];
+  if (!FARV.p || v.some((x, i) => Math.abs(x - FARV.p[i]) > 1e-4) || Math.abs(zoomT - zoom) > .01 || Math.abs(yawT - yaw) > 1e-3) FARV.lastMove = now;
+  FARV.p = v;
+  const title = typeof TITLE !== 'undefined' && TITLE.on;
+  if (!FARV.on || title) FARV.far = false; else if (zoom >= FARV.inZ) FARV.far = true; else if (zoom <= FARV.outZ) FARV.far = false;
+  const wasSharp = FARV.sharp; FARV.sharp = FARV.far && now - FARV.lastMove > 250;
+  const sm = RENDER_LINES === 0 || FARV.far ? 1 : 0;
+  if (SMOOTH_LOOK.value !== sm){ SMOOTH_LOOK.value = sm; H = 0; }   // (the clouds' target filters with the look: made again)
+  // how the sharp view keeps up: frames while it's on, against the screen's refresh (PERF.vs, main.js)
+  if (FARV.sharp && wasSharp){ const ms = now - (FARV.lt || now); if (ms > 0 && ms < 250){ FARV.ema += (ms - FARV.ema)*.08; FARV.t += ms; }
+    if (FARV.t > 1500){ FARV.t = 0;
+      if (FARV.ema > PERF.vs*1.2 && FARV.pix > PIX_MAX){ FARV.pix = Math.max(PIX_MAX, FARV.pix*.85); FARV.quick = 0; FARV.cut = now; }
+      else if (FARV.ema < PERF.vs*1.06 && FARV.pix < 4.4e6 && ++FARV.quick >= 8 && now - FARV.cut > 30000){ FARV.pix = Math.min(4.4e6, FARV.pix*1.08); FARV.quick = 0; }
+      else if (FARV.ema >= PERF.vs*1.06) FARV.quick = 0; } }
+  else { FARV.t = 0; FARV.ema = PERF.vs; }
+  FARV.lt = now;
+}
 function applyRenderRes(z){
   let f = Math.max(1, z/ZOOM_REF);
   if (ZOOM_RES > 0) f = Math.min(f, ZOOM_RES);
@@ -1563,6 +1592,7 @@ function applyRenderRes(z){
   // for the color pass and every post effect, more than the card could draw in a 60 Hz frame. Between zoom 21 and 40 one frame in four or five came in
   // late, the judder that came and went with the zoom (measured on the owner's M2, Oct 25: 52 fps at 1.6 times, a steady 60 at the base). Never under the base
   h = Math.min(h, Math.max(BASE_H, Math.floor(Math.sqrt(PIX_MAX*DH/DW))));   // ("Cap at 720p" is the apartments' only, owner's choice Oct 25: the city keeps its sharpness)
+  if (FARV.sharp) h = Math.max(h, Math.min(DH, SMOOTH_MAX, Math.floor(Math.sqrt(FARV.pix*DH/DW))));   // (zoomed out and still: the sharp view, above)
   if (h === H) return;
   // while the zoom is still gliding, small steps wait: each step remakes every render target (the frame, the depth, the glow, the clouds), and a turn
   // of the wheel crossed a dozen of them in half a second. A big step goes at once (the picture mustn't blur), the rest when the zoom settles

@@ -988,6 +988,7 @@ const cloudMat = new THREE.ShaderMaterial({
     sunDir:comp.uniforms.sunDir, sunCol:comp.uniforms.sunCol, skyTop:comp.uniforms.skyTop, skyBot:comp.uniforms.skyBot,
     night:comp.uniforms.night, smoothLook: SMOOTH_LOOK, cityGlow:comp.uniforms.cityGlow, glowC:comp.uniforms.glowC, rainDark:comp.uniforms.rainDark,
     cover:{value:.5}, cloudAmt:{value:0}, cloudCol:{value:new THREE.Color(1, 1, 1)},   // (the looks: how much sky the clouds fill, and the color they lean toward)
+    tPrev:{value:null}, prevVP:{value:new THREE.Matrix4()}, dDrift:{value:new THREE.Vector2()}, slotN:{value:8}, slot:{value:0}, reset:{value:1},   // (carrying the last frame over: cloudFrame)
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: CLOUD_NOISE + `
@@ -995,6 +996,7 @@ const cloudMat = new THREE.ShaderMaterial({
     uniform sampler2D texSea; uniform sampler2D texRing;
     uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 skyTop; uniform vec3 skyBot; uniform vec3 cityGlow; uniform vec2 glowC;
     uniform float night; uniform float smoothLook; uniform float rainDark; uniform float cover; uniform float cloudAmt; uniform vec3 cloudCol;
+    uniform sampler2D tPrev; uniform mat4 prevVP; uniform vec2 dDrift; uniform float slotN; uniform float slot; uniform float reset;
     varying vec2 vUv;
     vec2 tileUV(float s, vec2 xz){ vec2 inner = clamp(xz, 0.5/128.0, 1.0 - 0.5/128.0); return (vec2(mod(s, 8.0), floor(s/8.0)) + inner)/vec2(8.0, 4.0); }
     vec4 atl(sampler2D t, vec3 q){
@@ -1003,11 +1005,23 @@ const cloudMat = new THREE.ShaderMaterial({
       return mix(texture2D(t, tileUV(s0, xz)), texture2D(t, tileUV(s0 + 1.0, xz)), sl - s0);
     }
     void main(){
-      float rd = texture2D(tDepth, vUv).x;
       vec2 ndc = vUv*2.0 - 1.0;
       vec4 pn = invVP * vec4(ndc, -1.0, 1.0); pn /= pn.w;
-      vec4 pf = invVP * vec4(ndc, rd*2.0 - 1.0, 1.0); pf /= pf.w;
-      vec3 ro = pn.xyz, seg = pf.xyz - pn.xyz; float tEnd = length(seg); vec3 rdir = seg/tEnd;
+      vec4 pf = invVP * vec4(ndc, 1.0, 1.0); pf /= pf.w;
+      // marched through the whole sky, not only up to what's drawn (the composite shows the clouds only where the sky shows anyway), so a pixel
+      // carried over from the last frame is right wherever it lands
+      vec3 ro = pn.xyz, seg = pf.xyz - pn.xyz; float tEnd = 1e6; vec3 rdir = normalize(seg);
+      // Most pixels aren't marched this frame: like the real-time cloudscapes (Horizon Zero Dawn marches one pixel in sixteen a frame), each pixel
+      // is marched one frame in slotN, and the others take last frame's cloud from where that bit of sky was then: the point where this pixel's ray
+      // crosses the middle of the cloud layer (y -10), moved back by the wind since, through last frame's camera. Off the edge of last frame's
+      // picture (a pan or a zoom out shows new sky), it's marched now
+      vec2 pc = floor(gl_FragCoord.xy);
+      float sl = mod(pc.x, 4.0) + 4.0*mod(pc.y, 2.0); sl = slotN > 8.5 ? mod(pc.x, 4.0) + 4.0*mod(pc.y, 4.0) : slotN < 4.5 ? mod(pc.x, 2.0) + 2.0*mod(pc.y, 2.0) : sl;
+      if (reset < 0.5 && abs(sl - slot) > 0.5 && abs(rdir.y) > 0.01){
+        vec3 pm = ro + rdir*((-10.0 - ro.y)/rdir.y); pm.xz += dDrift;
+        vec4 cp = prevVP*vec4(pm, 1.0); vec2 puv = cp.xy/cp.w*0.5 + 0.5;
+        if (puv.x > 0.001 && puv.y > 0.001 && puv.x < 0.999 && puv.y < 0.999){ gl_FragColor = texture2D(tPrev, puv); return; }
+      }
       float dith = bayer(gl_FragCoord.xy);
       vec3 acc = vec3(0.0); float T = 1.0;
       if (rdir.y < -0.01){
@@ -1065,7 +1079,30 @@ const cloudMat = new THREE.ShaderMaterial({
   depthTest:false, depthWrite:false,
 });
 const cloudScene = new THREE.Scene(); cloudScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), cloudMat));
-let rtCloud = null;
+// the clouds' frame (main.js): march this frame's share of the pixels into one image, the rest carried over from the last (see the shader above).
+// Carrying over is exact for a pan, a zoom and the wind (the view is orthographic: every height moves the same on screen), but not for a turn or a
+// tilt, where the higher and lower clouds slide apart. So while the view turns, every pixel is marched, at half size as the clouds always were
+// before, and once it stops the full-size image builds up again from that one, a share a frame
+const CLOUDT = { reset: true, i: 0, slot: 0, VP: new THREE.Matrix4(), drift: new THREE.Vector2(), cover: -1, prev: null, yaw: null, pitch: null };
+function cloudFrame(){
+  const U = cloudMat.uniforms, n = S.cloudQ === 1 ? 4 : S.cloudQ === 3 ? 16 : 8;   // (Settings, cloud quality: sharp, balanced, fast; all at the frame's own size)
+  if (Math.abs(U.cover.value - CLOUDT.cover) > .02){ CLOUDT.cover = U.cover.value; CLOUDT.reset = true; }   // (a look's change of cover: everything at once)
+  const turning = CLOUDT.yaw !== null && (Math.abs(yaw - CLOUDT.yaw) > 1e-4 || Math.abs(PITCH - CLOUDT.pitch) > 1e-5); CLOUDT.yaw = yaw; CLOUDT.pitch = PITCH;
+  let dst;
+  if (turning || (CLOUDT.reset && !CLOUDT.prev)){
+    if (!rtClHalf || rtClHalf.width !== Math.ceil(W/2) || rtClHalf.height !== Math.ceil(H/2)){ if (rtClHalf) rtClHalf.dispose();
+      rtClHalf = new THREE.WebGLRenderTarget(Math.ceil(W/2), Math.ceil(H/2), { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, depthBuffer: false }); }
+    dst = rtClHalf; U.reset.value = 1;
+  } else {
+    dst = rtCl[CLOUDT.i]; if (CLOUDT.prev === dst.texture) dst = rtCl[CLOUDT.i = 1 - CLOUDT.i];
+    U.tPrev.value = CLOUDT.prev; U.prevVP.value.copy(CLOUDT.VP); U.dDrift.value.set(U.cloudOff.value.x - CLOUDT.drift.x, U.cloudOff.value.y - CLOUDT.drift.y);
+    U.slotN.value = n; CLOUDT.slot = (CLOUDT.slot + (n === 16 ? 7 : n === 8 ? 3 : 1)) % n; U.slot.value = CLOUDT.slot; U.reset.value = CLOUDT.reset ? 1 : 0;
+  }
+  renderer.setRenderTarget(dst); renderer.render(cloudScene, compCam);
+  rtCloud = dst; comp.uniforms.tCloud.value = dst.texture; CLOUDT.prev = dst.texture; if (dst !== rtClHalf) CLOUDT.i = 1 - CLOUDT.i;
+  CLOUDT.VP.copy(comp.uniforms.VP.value); CLOUDT.drift.copy(U.cloudOff.value); CLOUDT.reset = false;
+}
+let rtCloud = null, rtCl = [null, null], rtClHalf = null;
 
 let rtC = null, rtN = null, W = 480, H = 270;
 // Drawing the city once (core.js): the normal image (rtN's texture) is the color target's second image, and each draw
@@ -1108,12 +1145,11 @@ function makeTargets(){
   rtN = new THREE.WebGLRenderTarget(W,H, MRT ? Object.assign({ depthBuffer: false }, opt) : opt);   // (drawn by the color pass, core.js: no depth of its own)
   comp.uniforms.tColor.value = rtC.texture; comp.uniforms.tDepth.value = rtC.depthTexture; comp.uniforms.tNormal.value = rtN.texture;
   comp.uniforms.res.value.set(W,H);
-  if (rtCloud) rtCloud.dispose();
-  const q = (S.cloudQ || 2) + (FARV.far ? 1 : 0);   // (a size smaller zoomed out: the sharp view, below)
-  // (Smooth: the clouds are drawn smaller than the frame and stretched with a blend, so their edges aren't stair-steps)
-  // (at the base resolution whatever the zoom: zoomed out, the frame grows up to 1.6 times its lines but the clouds needn't, and they were the
-  //  third-dearest pass, about as much as the whole composite)
-  rtCloud = new THREE.WebGLRenderTarget(Math.ceil(W*Math.min(1, pxK)/q), Math.ceil(H*Math.min(1, pxK)/q), SMOOTH_LOOK.value ? Object.assign({}, opt, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }) : opt);
+  // the clouds at the frame's own size, two images taking turns: each frame marches only every CLOUDT.n-th pixel and carries the rest over from the
+  // last frame, moved with the view and the wind (cloudFrame, below)
+  for (const r of rtCl) if (r) r.dispose();
+  const lin = Object.assign({}, opt, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
+  rtCl = [0, 1].map(() => new THREE.WebGLRenderTarget(W, H, lin)); rtCloud = rtCl[0]; CLOUDT.reset = true; CLOUDT.prev = null;
   comp.uniforms.tCloud.value = rtCloud.texture; cloudMat.uniforms.tDepth.value = rtC.depthTexture;
   if (rtOut) rtOut.dispose();
   rtOut = new THREE.WebGLRenderTarget(W, H, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat });

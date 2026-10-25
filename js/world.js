@@ -1938,7 +1938,7 @@ function flushSolid(){
   disposeTick();
   flushSuper();
   if (SYNC_NOW()){ solidFinish(); if (solidDirty.size){ for (const k of solidDirty){ try { rebuildSolid(k); } catch (e){ SOLID_FAIL.n++; if (SOLID_FAIL.n <= 3) console.warn('merging block ' + k + ' failed; its old merge stays drawn.', e); } } solidDirty.clear(); } }
-  else { solidRetry(); if (SOLID_JOB || solidDirty.size) solidStep(TIER.rush ? 14 : Math.max(1, Math.min(4, 250/Math.max(30, (typeof PM !== 'undefined' && PM.fps) || 60)) - FRAME_WORK));   // (a quarter of a frame at most: 4 ms was half a frame on a 120 Hz screen) }
+  else { solidRetry(); if (SOLID_JOB || solidDirty.size) solidStep(TIER.rush ? 14 : Math.max(1, Math.min(4, 250/Math.max(30, (typeof PM !== 'undefined' && PM.fps) || 60)) - FRAME_WORK));   /* (a quarter of a frame at most: 4 ms was half a frame on a 120 Hz screen) */ }
   tierRushDone();   // (a block's merge in steps over the frames, after the frame's other spread work)
   ovFlush();
 }

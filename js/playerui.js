@@ -45,7 +45,7 @@ const T = tabs([['gfx', 'Graphics'], ['sound', 'Sound'], ['general', 'General'],
 const PRESETS = {
   performance: { name: 'Performance', note: 'Smoothest on laptops and older machines', lines: 480, cloudQ: 3, zoomRes: 1, farView: false, autoPerf: true, cap720: true, tiers: true,
     fx: { outlines: true, vclouds: true, rays: false, bloom: true, rim: true, grade: true, lights: true, ao: false, mist: false, wet: false } },
-  balanced: { name: 'Balanced', note: 'Recommended', lines: 720, cloudQ: 2, zoomRes: 1.6, farView: true, autoPerf: true, cap720: true, tiers: true,
+  balanced: { name: 'Balanced', note: 'Recommended', lines: 720, cloudQ: 2, zoomRes: 1, farView: true, autoPerf: true, cap720: true, tiers: true,
     fx: { outlines: true, vclouds: true, rays: true, bloom: true, rim: true, grade: true, lights: true, ao: true, mist: true, wet: true } },
   quality: { name: 'Quality', note: 'Sharper clouds and lighting for a fast graphics card', lines: 720, cloudQ: 1, zoomRes: 1.6, farView: true, autoPerf: false, cap720: false, tiers: true,
     fx: { outlines: true, vclouds: true, rays: true, bloom: true, rim: true, grade: true, lights: true, ao: true, mist: true, wet: true } },
@@ -166,6 +166,10 @@ if (wx) wx.addEventListener('click', () => lsSet(K + 'wxset', '1'));
 { const fx = (() => { try { return JSON.parse(lsGet(K + 'fx') || 'null'); } catch (e) { return null; } })();
   if (!lsGet(K + 'preset') && !fx) applyPreset('balanced');
   else if (fx){ applying = true; for (const f of FX) if (f in fx) setBox(f, !!fx[f]); applying = false; }
+  // (Balanced changed on Oct 25: the same resolution at every zoom, "Standard". Measured on the owner's M2 close in, 1.6 times was 54 fps and the
+  //  same pixels a steady 60. Anyone on the old Balanced moves to the new one once)
+  if (lsGet(K + 'preset') === 'balanced' && lsGet(K + 'v') !== '2') applyPreset('balanced');
+  lsSet(K + 'v', '2');
   markPreset(); }
 
 /* ---------- no fast forward (the day count stays) ---------- */

@@ -465,6 +465,7 @@ const MEGA_LIFE = {
   club:    { jobs: 10, fun: 0, night: .6 },
   spire:   { jobs: 0, fun: 0 },
   wirenest: { jobs: 6, fun: 0, night: .7 },
+  lidar: { jobs: 0, fun: 0 },   // the LIDAR array: unmanned
   emitter: { jobs: 0, fun: 0 },   // the emitter core: unmanned   // the Wire Nest: a few operators at the screens, mostly by night
   bathhouse: { jobs: 0, fun: 18, open: true },   // the onsen: people come to soak (its seats are in the pools); the front desk and tea counter are its stalls, always kept   // the Data Spire: no ordinary jobs; its archivist and guards are their own people (see syncSpireStaff)
   greenhouse: { jobs: 12, fun: 1.5, night: .35 },

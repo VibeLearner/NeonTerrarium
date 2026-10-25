@@ -241,8 +241,21 @@ body.deleting #view{cursor:crosshair}
 .lookswrow .sws{width:100%;height:8px}
 
 /* ---------- the monitor (monitor.js): a surveillance feed on whoever was clicked, top right ---------- */
-.monitor{position:fixed;top:calc(58px + env(safe-area-inset-top,0px));right:16px;width:min(340px,calc(100vw - 32px));max-height:calc(100% - 74px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));display:grid;grid-template-rows:auto auto auto minmax(0,1fr);background:var(--deck);border:1px solid var(--line);border-radius:4px;box-sizing:border-box;z-index:3;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 0 0 1px rgba(56,232,224,.08),0 8px 24px rgba(0,0,0,.45)}
+.monitor{position:fixed;top:calc(58px + env(safe-area-inset-top,0px));right:16px;width:min(340px,calc(100vw - 32px));max-height:calc(100% - 74px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));display:grid;grid-template-rows:auto auto auto auto minmax(0,1fr);background:var(--deck);border:1px solid var(--line);border-radius:4px;box-sizing:border-box;z-index:3;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 0 0 1px rgba(56,232,224,.08),0 8px 24px rgba(0,0,0,.45)}
 .monitor[hidden]{display:none}
+/* tracing someone home (lidar.js): SIGNAL LOST and the LIDAR Array's guesses at their pod, under the feed; the guesses' tags over the city */
+.mon-trace{height:0;overflow:hidden;font:11px/1.4 var(--font-mono);color:var(--ink)}
+.mon-trace.on{height:auto;padding:8px 10px 9px;border-top:1px solid rgba(255,179,71,.35);background:rgba(255,179,71,.06)}
+.mon-trace b{color:#ffb347;font-family:var(--font-pixel);font-weight:400;font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.mon-trace span{color:var(--muted)}
+.mon-trace .lid-c{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.mon-trace .lid-c button{flex:1 1 0;min-width:0;padding:5px 6px;border:1px solid rgba(90,232,255,.5);border-radius:0;background:rgba(90,232,255,.07);color:var(--ink);font:inherit;cursor:pointer}
+.mon-trace .lid-c button i{font-style:normal;color:#5ae8ff;margin-left:4px}
+.mon-trace .lid-c button:hover{border-color:#fff;background:rgba(90,232,255,.2)}
+.lid-tag{position:fixed;z-index:3;transform:translate(-50%,-100%);padding:2px 7px;border:1px solid #5ae8ff;border-radius:0;background:rgba(6,14,26,.88);color:#5ae8ff;font:11px/1.3 var(--font-mono);cursor:pointer;box-shadow:0 0 8px rgba(90,232,255,.35)}
+.lid-tag:hover,.lid-tag.hot{color:#fff;border-color:#fff}
+.lid-tag[hidden]{display:none}
+.mon-lidar{font-family:var(--font-mono);font-size:9px;letter-spacing:0;text-transform:none;color:var(--muted);margin-left:6px}
 body.deck-open .monitor{right:304px}
 .monitor header{display:flex;align-items:center;gap:6px;padding:8px 10px 6px}
 .mon-title{flex:1;min-width:0;display:grid}

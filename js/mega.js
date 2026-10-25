@@ -35,6 +35,8 @@ const MEGA_TYPES = {
            colour: '#5affa8', build: buildWireNest, fx: wireNestFx },
   emitter: { name: 'Emitter Core', need: { any: 120 }, after: ['spire'], odds: 25, w: 2, h: 2, maxLevels: 1,   // the forcefield emitter: 120 buildings and the Data Spire, then a 1 in 25 chance with each build; more can be placed from the menu (their fields join)
            colour: '#7ab8ff', build: buildEmitterCore, fx: emitterFx },
+  lidar: { name: 'LIDAR Array', need: { lowPlots: 12 }, after: ['police'], odds: 6, w: 3, h: 3, maxLevels: 1,   // the scanner: 12 residential buildings and the police station, then a 1 in 6 chance with each build; it unlocks Furnish pod for the homes in its range (furnish.js)
+           colour: '#46d4ee', build: buildLidarArray, fx: lidarFx },
   club: { name: 'Neon Dome', need: { highPlots: 30, midPlots: 30, lowPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives once there are 30 each of luxury, commercial and residential buildings
            colour: '#c070ff', build: buildNeonDome, fx: clubFx },
 };
@@ -2390,6 +2392,162 @@ function emitterFx(m){
       halos.forEach((h, k) => { h.material.opacity = .35 + .65*pulse*(.8 + .2*Math.sin(t*3 + k)); });
     },
     dispose(){ scene.remove(root); geo.dispose(); geo2.dispose(); heart.material.dispose(); aura.material.dispose(); for (const h of halos) h.material.dispose(); }
+  };
+}
+
+/* ---------- the LIDAR array ---------- */
+// The city's scanner, on a 3x3 block, after the reference: a massive square base of dark plated steel, every face cut with
+// three tall bays lit cyan from inside, pipes climbing its walls and running round its foot, a taller block at each corner
+// with vent stacks; on the roof, satellite dishes, cabinets and pipe bundles feeding a heavy drum, and out of the drum a
+// lattice tower round a core banded in cyan light, up to a railed platform carrying the sensor head under a white dome.
+// Live (lidarFx): the head turns, throwing a thin fan of light, and every few seconds a scan ring leaves the tower and
+// spreads out over the rooftops to the edge of its range (LIDAR_R), where a faint ring marks how far it reaches. The homes
+// inside that range can be scanned, and so furnished (furnish.js): the array is what unlocks Furnish pod.
+const LIDAR_R = 15*LOT;   // how far an array scans, in world units (15 plots)
+const lidarCovers = (x, z) => megasOfKind('lidar').some(m => Math.hypot(m.x - x, m.z - z) <= LIDAR_R);
+M.laSteel = toon(0x48505a); M.laSteel2 = toon(0x3a4049); M.laSteel3 = toon(0x5c646e); M.laSeam = toon(0x23272d); M.laDeck = toon(0x30353c);
+M.laPipe = toon(0x6c737c); M.laPipe2 = toon(0x585048); M.laWhite = toon(0xd2d6da);
+M.laBay = toon(0x0c2a34, { em: 0x46d4ee, kind: 'window' }); M.laSlit = toon(0x10303a, { em: 0x3ab4cc, kind: 'window' }); M.laNeon = toon(0x10343c, { em: 0x5ae8ff, kind: 'neon' });
+function buildLidarArray(m){
+  R = mulberry32(hash('mega', m.kind, m.si ?? m.i, m.sj ?? m.j, m.seed));
+  const S_ = m.w*LOT, P = T(m.x, 0, m.z, megaAngle(m, pick([0, PI/2, PI, -PI/2])));
+  const ring = (mat, r, y, t, n = 20) => { for (let k = 0; k < n; k++){ const a0 = k*TAU/n, a1 = a0 + TAU/n; strut(mat, P, Math.sin(a0)*r, y, Math.cos(a0)*r, Math.sin(a1)*r, y, Math.cos(a1)*r, t); } };
+  // ---- the ground: industrial slabs, puddles
+  box(G.asph, P, 0, .012, 0, S_, .025, S_);
+  const n = 14, st = S_/n;
+  for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) if (!chance(.05)) box(pick(TILES.ind), P, (a - (n - 1)/2)*st, .03, (b - (n - 1)/2)*st, st - .05, .045, st - .05);
+  for (let k = 0; k < 7; k++) box(G.puddle, P, rnd(-S_/2 + .5, S_/2 - .5), .056, rnd(-S_/2 + .5, S_/2 - .5), rnd(.5, 1.4), .01, rnd(.3, .6));
+  // ---- the base: a plated block with a heavy plinth and cornice
+  const bw = 8.2, bh = 3.1, b0 = CURB, top0 = b0 + bh;
+  box(M.laSteel2, P, 0, b0 + .22, 0, bw + .34, .44, bw + .34);
+  box(M.laSteel, P, 0, b0 + bh/2, 0, bw, bh, bw);
+  box(M.laSteel3, P, 0, top0 + .09, 0, bw + .22, .18, bw + .22);
+  for (const [F, len] of blockFaces(P, 0, 0, bw, bw)){
+    for (let t = -len/2 + 1.03; t < len/2 - .2; t += 1.03) box(M.laSeam, F, t, b0 + bh/2, .006, .025, bh - .1, .02);   // plate seams
+    box(M.laSeam, F, 0, b0 + 2.2, .006, len - .05, .025, .02);
+    // three tall bays, lit from inside, a strip of light over each
+    for (const t of [-2.55, 0, 2.55]){
+      box(M.laSeam, F, t, b0 + 1.0, .02, 1.5, 1.86, .05);
+      box(M.laBay, F, t, b0 + .95, .04, 1.28, 1.62, .02); glow(F, t, b0 + .95, .3, 'cyan', 1.1);
+      for (let q = 1; q < 4; q++) box(M.laSeam, F, t - .64 + q*.32, b0 + .95, .055, .03, 1.62, .02);   // the bay's mullions
+      box(M.laNeon, F, t, b0 + 1.98, .06, 1.4, .05, .03);
+    }
+    // a band of slit windows under the cornice
+    for (let t = -len/2 + .5; t < len/2 - .3; t += .62) if (chance(.75)) box(M.laSlit, F, t, b0 + 2.62, .02, .38, .12, .02);
+    // pipes: two climbing the wall between the bays, a run along the foot
+    for (const t of [-1.28, 1.28]){ cyl(M.laPipe, F, t, b0 + bh/2 + .1, .2, .075, bh + .1); for (let y = b0 + .6; y < top0; y += .9) box(M.laSeam, F, t, y, .12, .2, .05, .14); }
+    strut(M.laPipe, F, -len/2 + .25, b0 + .62, .28, len/2 - .25, b0 + .62, .28, .14);
+    strut(M.laPipe2, F, -len/2 + .25, b0 + .38, .3, len/2 - .25, b0 + .38, .3, .1);
+    if (chance(.6)){ const t = pick([-3.6, 3.6]); box(M.laSteel3, F, t, b0 + .45, .35, .5, .7, .4); box(M.neonAmber, F, t + .14, b0 + .66, .555, .05, .05, .01); }   // a junction box
+  }
+  // ---- the corner blocks: taller, with vent stacks and a warning light
+  for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]){
+    const cx = sx*(bw/2 - .55), cz = sz*(bw/2 - .55), ch = 4.3;
+    box(M.laSteel2, P, cx, b0 + ch/2, cz, 1.5, ch, 1.5); box(M.laSteel3, P, cx, b0 + ch + .07, cz, 1.62, .14, 1.62);
+    for (const [F, len] of blockFaces(P, cx, cz, 1.5, 1.5)){ box(M.laSlit, F, 0, b0 + ch - .55, .01, .9, .1, .02); for (let k = 0; k < 3; k++) box(M.laSeam, F, 0, b0 + 3.35 + k*.14, .03, len*.6, .04, .04, 0, -.5); }
+    for (let k = 0; k < 2; k++){ const vx = cx - sx*.3*k, vz = cz + sz*.3*(1 - k); cyl(M.laSteel3, P, vx, b0 + ch + .45, vz, .1, .8); cyl(M.laSeam, P, vx, b0 + ch + .87, vz, .12, .05); emitters.push(new THREE.Vector3(vx, b0 + ch + .95, vz).applyMatrix4(P)); }
+    beaconLight(P, cx + sx*.5, b0 + ch + .2, cz + sz*.5, .07, .6);
+  }
+  // ---- the roof: a deck with a railing, dishes, cabinets and pipe bundles running in to the drum
+  const ry = top0 + .18;
+  box(M.laDeck, P, 0, ry - .005, 0, bw - .3, .02, bw - .3);
+  wnRail(P, [[-bw/2 + 1.4, bw/2 - .2], [bw/2 - 1.4, bw/2 - .2]], ry); wnRail(P, [[-bw/2 + 1.4, -bw/2 + .2], [bw/2 - 1.4, -bw/2 + .2]], ry);
+  wnRail(P, [[bw/2 - .2, -bw/2 + 1.4], [bw/2 - .2, bw/2 - 1.4]], ry); wnRail(P, [[-bw/2 + .2, -bw/2 + 1.4], [-bw/2 + .2, bw/2 - 1.4]], ry);
+  for (const [x, z, r, yw] of [[2.55, 2.0, .85, PI*.25], [-2.6, 2.4, .7, -PI*.2], [-2.3, -2.6, .9, -PI*.75], [2.7, -2.3, .65, PI*.8]]) dish(P, x, ry, z, r, yw, -.7 + rnd(-.15, .15), chance(.5));
+  for (const [x, z, ryw] of [[0, 3.1, 0], [3.2, 0, PI/2], [-3.2, .3, -PI/2], [.4, -3.15, PI]]){
+    const F = under(P, T(x, ry, z, ryw)); box(M.laSteel3, F, 0, .4, 0, 1.1, .8, .5); box(M.laSeam, F, 0, .82, 0, 1.16, .04, .56);
+    screenQuad(F, -.18, .5, .255, .5, .3, 3 + (x > 0 ? 1 : 0)); box(M.laNeon, F, .38, .62, .255, .06, .06, .01); box(M.neonAmber, F, .38, .48, .255, .06, .06, .01);
+  }
+  for (const [ax, az] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]){   // pipe bundles from the corner blocks in to the drum
+    for (let q = 0; q < 3; q++){ const o = (q - 1)*.16, nx = -az, nz = ax, L = Math.SQRT1_2;
+      strut(q === 1 ? M.laPipe2 : M.laPipe, P, ax*(bw/2 - 1.35) + nx*o*L, ry + .14, az*(bw/2 - 1.35) + nz*o*L, ax*1.75 + nx*o*L, ry + .14, az*1.75 + nz*o*L, .1); }
+    box(M.laSeam, P, ax*2.5, ry + .07, az*2.5, .5, .14, .5, PI/4); }
+  // ---- the drum: a heavy cylinder on the roof, slit windows and two bands of light round it
+  const dr = 1.75, dh = 2.3, d0 = ry;
+  put(U.cyl16, M.laSteel3, under(P, T(0, d0 + dh/2, 0, 0, 2*dr, dh, 2*dr)));
+  put(U.cyl16, M.laSteel2, under(P, T(0, d0 + dh + .1, 0, 0, 2*dr + .2, .2, 2*dr + .2)));
+  put(U.cyl16, M.laSteel2, under(P, T(0, d0 + .15, 0, 0, 2*dr + .25, .3, 2*dr + .25)));
+  ring(M.laNeon, dr + .02, d0 + .55, .05, 24); ring(M.laNeon, dr + .02, d0 + dh - .3, .05, 24);
+  for (let k = 0; k < 12; k++){ const a = k*TAU/12 + .13, F = under(P, T(Math.sin(a)*(dr + .005), 0, Math.cos(a)*(dr + .005), a)); box(M.laSlit, F, 0, d0 + 1.25, 0, .3, .5, .03); box(M.laSeam, F, 0, d0 + 1.25, .02, .02, .5, .02); }
+  // ---- the tower: four legs leaning in, braced every stage, round a core banded with light
+  const y0 = d0 + dh + .2, y1 = y0 + 15.5, r0 = 1.3, r1 = .62, stages = 9;
+  const leg = (k, y) => { const u = (y - y0)/(y1 - y0), r = r0 + (r1 - r0)*u, a = PI/4 + k*PI/2; return [Math.sin(a)*r, y, Math.cos(a)*r]; };
+  for (let k = 0; k < 4; k++){ const [ax, ay, az] = leg(k, y0), [bx, by, bz] = leg(k, y1); strut(M.laSteel3, P, ax, ay, az, bx, by, bz, .13); }
+  for (let s = 0; s <= stages; s++){ const ya = y0 + s*(y1 - y0)/stages, yb = y0 + (s + 1)*(y1 - y0)/stages;
+    for (let k = 0; k < 4; k++){ const A = leg(k, ya), B = leg((k + 1) % 4, ya); strut(M.laSteel, P, A[0], ya, A[2], B[0], ya, B[2], .07);
+      if (s < stages){ const C = leg(k, yb), D = leg((k + 1) % 4, yb); strut(M.laSteel, P, A[0], ya, A[2], D[0], yb, D[2], .04); strut(M.laSteel, P, B[0], ya, B[2], C[0], yb, C[2], .04); } } }
+  put(U.cyl16, M.laSteel2, under(P, T(0, (y0 + y1)/2, 0, 0, .7, y1 - y0, .7)));
+  const bands = []; for (let y = y0 + 1.6; y < y1 - .6; y += 1.9){ put(U.cyl16, M.laNeon, under(P, T(0, y, 0, 0, .76, .1, .76))); bands.push(y); }
+  for (let k = 0; k < 2; k++){ const a = k*PI + .4; strut(M.laPipe, P, Math.sin(a)*.42, y0, Math.cos(a)*.42, Math.sin(a)*.42, y1, Math.cos(a)*.42, .06); }   // cable risers up the core
+  // ---- the head: a railed platform, the sensor drum (it turns: see lidarFx), the dome over it, a mast with a light
+  put(U.cyl16, M.laSteel3, under(P, T(0, y1 + .1, 0, 0, 2.7, .22, 2.7)));
+  for (let k = 0; k < 16; k++){ const a = k*TAU/16; cyl(M.metal, P, Math.sin(a)*1.3, y1 + .42, Math.cos(a)*1.3, .02, .42); }
+  ring(M.metal, 1.3, y1 + .62, .03, 16);
+  for (let k = 0; k < 4; k++){ const a = PI/4 + k*PI/2; strut(M.laSteel, P, Math.sin(a)*r1, y1 - 1.2, Math.cos(a)*r1, Math.sin(a)*1.25, y1, Math.cos(a)*1.25, .06); }   // brackets under it
+  const hy = y1 + .25;   // (the head sits from here: lidarFx)
+  put(U.cyl16, M.laSteel2, under(P, T(0, hy + .08, 0, 0, 1.2, .16, 1.2)));
+  const dy = hy + 1.25;
+  put(U.cyl16, M.laSteel3, under(P, T(0, dy - .05, 0, 0, 1.9, .14, 1.9)));
+  ring(M.laNeon, .96, dy + .04, .05, 20);
+  put(U.lxDome, M.laWhite, under(P, T(0, dy, 0, 0, .92, .82, .92)));
+  cyl(M.metal, P, 0, dy + 1.25, 0, .03, .9); beaconLight(P, 0, dy + 1.72, 0, .08, .9);
+  yagi(P, .95, y1 + .22, .3, rnd(0, TAU), .7);
+  m.la = { m: P.toArray(), hy, ringY: top0 + 7.5, bands, dy };
+  m.solid = { m: P.toArray(), x0: -4.4, x1: 4.4, z0: -4.4, z1: 4.4, y1: dy + 2 };   // (what flying things keep out of: see droneDetour)
+  m.roofH = ry;
+  m.top = dy + 2;
+}
+// The sensor head turns: a dark drum with a cyan lens throwing a thin fan of light. Every few seconds a scan ring leaves the
+// tower above the rooftops and spreads to the edge of the array's range, bright at its front and fading behind; a faint ring
+// stays at the range's edge (brighter while Furnish pod is picking, so the player can see which homes it reaches).
+const LIDAR_RING = new THREE.ShaderMaterial({
+  uniforms: { uIn: { value: .9 }, uA: { value: 1 }, uRim: { value: 0 } },
+  vertexShader: 'varying vec2 vP; void main(){ vP = position.xz; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
+  fragmentShader: `uniform float uIn, uA, uRim; varying vec2 vP;
+    void main(){ float t = clamp((length(vP) - uIn)/(1.0 - uIn), 0.0, 1.0);
+      float a = mix(pow(t, 4.0)*.3 + smoothstep(.88, 1.0, t)*.8, 1.0 - abs(t - .5)*2.0, uRim);
+      gl_FragColor = vec4(vec3(.35, .9, 1.0)*a*uA, 1.0); }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+});
+LIDAR_RING.userData.colorOnly = true;
+function lidarFx(m){
+  const d = m.la; if (!d) return null;
+  const root = new THREE.Group(); root.matrixAutoUpdate = false; root.matrix.fromArray(d.m); root.matrixWorldNeedsUpdate = true; scene.add(root);
+  // the head
+  const head = new THREE.Group(); head.position.set(0, d.hy, 0); root.add(head);
+  const dark = new THREE.MeshLambertMaterial({ color: 0x2c3138 }), lens = new THREE.MeshBasicMaterial({ color: 0x8af4ff });
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(.42, .42, .9, 12), dark); drum.position.y = .6; head.add(drum);
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(1.0, .16, .5), dark); cap.position.y = 1.08; head.add(cap);
+  const lensM = new THREE.Mesh(new THREE.BoxGeometry(.2, .55, .06), lens); lensM.position.set(0, .6, .43); head.add(lensM);
+  const fanMat = new THREE.MeshBasicMaterial({ color: 0x5ae8ff, transparent: true, opacity: .16, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  const fanGeo = new THREE.PlaneGeometry(1, 1); fanGeo.translate(0, 0, 0); fanGeo.rotateY(PI/2); fanGeo.translate(0, 0, .5);   // (a vertical sheet out along +z)
+  const fan = new THREE.Mesh(fanGeo, fanMat); fan.position.set(0, .6, .46); fan.scale.set(1, .5, 9); head.add(fan);
+  for (const q of [drum, cap, lensM, fan]) q.raycast = () => {};
+  const halo = new THREE.Sprite(GLOW.cyan.clone()); halo.position.set(0, .6, .5); halo.scale.set(1.2, 1.2, 1); halo.layers.set(1); head.add(halo);
+  // the rings: three pulses a period apart, and the edge of the range
+  const geo = new THREE.RingGeometry(.86, 1, 96, 1); geo.rotateX(-PI/2);
+  const PER = 6.5, N = 3, pulses = [];
+  for (let k = 0; k < N; k++){ const mat = LIDAR_RING.clone(); mat.uniforms.uIn.value = .86; const q = new THREE.Mesh(geo, mat); q.position.y = d.ringY - d.hy*0; q.frustumCulled = false; q.raycast = () => {}; q.renderOrder = 3; root.add(q); pulses.push(q); }
+  const edgeGeo = new THREE.RingGeometry(.994, 1, 128, 1); edgeGeo.rotateX(-PI/2);
+  const edgeMat = LIDAR_RING.clone(); edgeMat.uniforms.uIn.value = .994; edgeMat.uniforms.uRim.value = 1;
+  const edge = new THREE.Mesh(edgeGeo, edgeMat); edge.position.y = d.ringY; edge.scale.setScalar(LIDAR_R); edge.frustumCulled = false; edge.raycast = () => {}; root.add(edge);
+  const bandHalos = d.bands.filter((_, k) => k % 2 === 0).map(y => { const sp = new THREE.Sprite(GLOW.cyan.clone()); sp.position.set(0, y, 0); sp.scale.set(1.3, 1.3, 1); sp.layers.set(1); root.add(sp); return sp; });
+  const off = (m.seed % 17)*.37;
+  return {
+    update(dt, t){
+      head.rotation.y = (t + off)*1.4;
+      fanMat.opacity = .1 + .08*Math.sin(t*9.0 + off);
+      const picking = typeof FURN !== 'undefined' && FURN.pick;
+      for (let k = 0; k < N; k++){
+        const ph = ((t + off)/PER + k/N) % 1, r = 2 + ph*(LIDAR_R - 2), q = pulses[k];
+        q.scale.setScalar(r); q.visible = ph > .01;
+        q.material.uniforms.uA.value = (1 - ph)*(1 - ph)*(picking ? 1.5 : .9)*Math.min(1, ph*12);
+        q.material.uniforms.uIn.value = Math.max(.86, 1 - 2.6/r);   // (a band a couple of units wide, wherever it has got to)
+      }
+      edgeMat.uniforms.uA.value = picking ? .55 + .15*Math.sin(t*3) : .16;
+      bandHalos.forEach((h, k) => { const u = ((t + off)*.6 - k*.25) % 1; h.material.opacity = .25 + .6*Math.max(0, 1 - Math.abs(u - .5)*4); });
+    },
+    dispose(){ scene.remove(root); for (const g of [drum.geometry, cap.geometry, lensM.geometry, fanGeo, geo, edgeGeo]) g.dispose(); for (const mt of [dark, lens, fanMat, edgeMat, halo.material, ...pulses.map(q => q.material), ...bandHalos.map(h => h.material)]) mt.dispose(); }
   };
 }
 

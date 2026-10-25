@@ -11,7 +11,7 @@
 'use strict';
 const NT_CITY_KEYS = ['neonIsland.v2', 'neonIsland.megas', 'neonIsland.highways', 'neonIsland.metros', 'neonIsland.megaUnlocked',
   'neonIsland.style', 'neonIsland.stories', 'neonIsland.cases', 'neonIsland.ledger', 'neonIsland.wirelog', 'neonIsland.pins',
-  'neonIsland.coastAccessed', 'neonIsland.booth', 'neonIsland.furnish'];   // (furnish: the apartments done up with Furnish pod, furnish.js)
+  'neonIsland.coastAccessed', 'neonIsland.booth', 'neonIsland.furnish', 'neonIsland.dossier'];   // (furnish: the apartments done up with Furnish pod, furnish.js)
 const NT_CITY_PREFIX = 'neonIsland.coast.', NT_NOT_CITY = new Set(['neonIsland.coast.dayCycle']);
 function NT_isCityKey(k){ return typeof k === 'string' && !NT_NOT_CITY.has(k) && (NT_CITY_KEYS.includes(k) || k.startsWith(NT_CITY_PREFIX)); }
 let NT_SAVE_LOCK = false;

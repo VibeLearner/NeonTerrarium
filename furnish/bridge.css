@@ -11,3 +11,11 @@
 .nt-toast{position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:20;font:11px/1.4 "JetBrains Mono",ui-monospace,monospace;color:#fff;background:rgba(10,16,32,.94);border:1px solid #38E8E0;padding:5px 14px}
 .nt-toast[hidden]{display:none}
 @media (max-width:700px){.nt-bar button{height:32px;padding:0 10px;font-size:10px}}
+.nt-sim{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:19;display:grid;gap:2px;justify-items:center;padding:6px 16px 7px;pointer-events:none;text-align:center;
+  background:rgba(6,14,26,.86);border:1px solid rgba(90,232,255,.55);box-shadow:0 0 14px rgba(90,232,255,.22);font:11px/1.35 "JetBrains Mono",ui-monospace,monospace;color:#8e9bb2;
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+.nt-sim b{font-family:"Silkscreen",ui-monospace,monospace;font-weight:400;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#5ae8ff}
+.nt-sim[hidden]{display:none}
+.nt-sim.in{animation:ntSim 1.6s steps(1) 1}
+@keyframes ntSim{0%{opacity:0}10%{opacity:1}18%{opacity:.3}26%{opacity:1}40%{opacity:.6}48%{opacity:1}}
+@media (max-width:700px){.nt-sim{top:auto;bottom:12px;font-size:10px}}

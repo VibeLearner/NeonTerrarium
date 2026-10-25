@@ -155,11 +155,18 @@ function wallGround(st, P, c, runs, sp, h){
   for (const [ry, z0, z1] of runs){
     const F = under(P, T(0, 0, 0, ry)), len = z1 - z0, zc = (z0 + z1)/2;
     const gate = sp && Math.abs(ry - sp.ry) < 1e-6;
-    if (gate){   // the path through: a band of paving across the plot the width of the opening
-      const pm = st === 'low' ? M.pgStone : st === 'ind' ? M.igConc2 : st === 'mid' ? M.cgSlate2 : M.plMarble;   // (never asphalt-dark: it must not read as a road)
-      box(pm, F, 0, y + .016, (sp.za + sp.zb)/2, LOT - .2, .01, sp.zb - sp.za - .1);
-      if (st === 'ind') for (const z of [sp.za + .08, sp.zb - .08]) for (let x = -H2 + .2; x < H2 - .1; x += .34) box(M.hazard, F, x, y + .022, z, .17, .008, .06);   // (hazard-striped kerbs either side of the way through)
-      if (st === 'mid') for (const z of [sp.za + .06, sp.zb - .06]) box(M.pcLed, F, 0, y + .022, z, LOT - .3, .008, .03);
+    if (gate){   // the way through: a floor across the plot the width of the opening, in the zone's way (never a road)
+      const zc = (sp.za + sp.zb)/2, gw = sp.zb - sp.za - .1;
+      if (st === 'ind'){   // steel deck plates on the concrete, drain grates set in them, hazard chevrons only at the threshold
+        const nx = 6, nz = Math.max(2, Math.round(gw/.62)), dxp = (LOT - .2)/nx, dzp = gw/nz;
+        for (let a = 0; a < nx; a++) for (let q = 0; q < nz; q++) box((a + q) % 2 ? M.piSteel : M.metal, F, -H2 + .1 + (a + .5)*dxp, y + .012, sp.za + .05 + (q + .5)*dzp, dxp - .05, .012, dzp - .05);
+        for (const x of [-1.25, 1.25]) for (let q = 0; q < nz; q += 2){ const zq = sp.za + .05 + (q + .5)*dzp; box(M.piDark, F, x, y + .02, zq, .5, .006, .34); for (let k = -2; k <= 2; k++) box(M.piSteel2, F, x + k*.09, y + .024, zq, .03, .006, .32); }
+        for (const x of [-(WALL_T/2 + .12), WALL_T/2 + .12]) for (let z = sp.za + .12; z < sp.zb - .1; z += .3) box(M.hazard, F, x, y + .022, z, .06, .006, .15);
+      } else {
+        const pm = st === 'low' ? M.pgStone : st === 'mid' ? M.cgSlate2 : M.plMarble;
+        box(pm, F, 0, y + .016, zc, LOT - .2, .01, gw);
+        if (st === 'mid') for (const z of [sp.za + .06, sp.zb - .06]) box(M.pcLed, F, 0, y + .022, z, LOT - .3, .008, .03);
+      }
       continue;
     }
     const mods = []; for (let k = Math.ceil(z0/WALL_MOD - .5); (k + .5)*WALL_MOD < z1; k++){ const z = (k + .5)*WALL_MOD; if (z > z0 + .1 && z < z1 - .1 && Math.abs(z) > .6) mods.push(z); }
@@ -283,25 +290,47 @@ function perimHover(t){
   hover.visible = true;
 }
 
-// The gates' scans: a quad in each gate's opening, all of them in one mesh with one material (one draw for the city). The shader draws each
-// zone's sweep from the shared clock: residential a green biometric band, industrial amber laser lines, commercial a cyan grid, luxury gold
-// holo ripples. A faint idle glow, brighter while people are at the gate (looked at once a second, from the people already being moved).
-let perimDirty = () => {}, PERIM_G = null;   // (PERIM_G: the gates' scan mesh, for checks)
+// The gates' scans, after the references: a scanner head under each gate's lintel throws a beam down over the way through, its foot sweeping
+// out in front of the gate and back through it to the other side, with a bright line where it meets the floor; the opening's edges are
+// traced in neon and a curtain of light hangs in it. Each zone its own: residential a soft green biometric wash dotted with light,
+// industrial a hard amber security fan of laser lines, commercial a cyan grid like the turnstiles' readers, luxury a gold and violet holo
+// shimmer. The gates along one line sweep together, so a wide gate reads as one. All of it is one mesh with one material for the whole city
+// (one draw), moved and drawn on the graphics card from the shared clock: nothing per frame here. Dim at rest, bright while people are at the
+// gate (looked at once a second, from the people already being moved).
+let perimDirty = () => {}, PERIM_G = null;   // (PERIM_G: the gates' scans, for checks)
 if (!self.IN_RECIPE_WORKER){
-  const ZI = { low: 0, ind: 1, mid: 2, high: 3 };
+  const ZI = { low: 0, ind: 1, mid: 2, high: 3 }, NV = 40;   // (vertices a gate: curtain 4, beam 8, floor line 4, edge strips 24)
   // (made the first time a gate needs it, after the material registry has closed: the plot worker makes no such material, and the two lists must match: matreg.js)
   let mat = null; const makeMat = () => { const m = new THREE.ShaderMaterial({
     uniforms: { time: FOL_UNI.time },
-    vertexShader: 'attribute vec3 aG; varying vec3 vG; varying vec2 vUv; void main(){ vG = aG; vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }',
-    fragmentShader: `uniform float time; varying vec3 vG; varying vec2 vUv;
+    vertexShader: `attribute vec2 aN; attribute float aM; attribute vec3 aR; attribute vec3 aG; uniform float time;
+      varying vec3 vR; varying vec3 vG; varying float vS;
+      void main(){ vR = aR; vG = aG; float z = mod(aG.x, 4.0), sp = z < .5 ? .55 : z < 1.5 ? .9 : z < 2.5 ? .7 : .45;
+        float sw = sin(time*sp + aG.y*6.2832); vS = sw;
+        vec3 p = position + vec3(aN.x, 0.0, aN.y)*aM*sw*1.45;
+        gl_Position = projectionMatrix*modelViewMatrix*vec4(p, 1.0); }`,
+    fragmentShader: `uniform float time; varying vec3 vR; varying vec3 vG; varying float vS;
       void main(){
-        float zf = vG.x, z = mod(zf, 4.0), ea = mod(floor(zf/4.0), 2.0), eb = floor(zf/8.0), sd = vG.y, act = vG.z, u = vUv.x, v = vUv.y, t = time + sd*7.0; vec3 col; float a;
-        if (z < .5){ float y = .5 + .48*sin(t*1.7); a = exp(-pow((v - y)/.035, 2.0)) + .1*step(.5, fract(u*6.0 + v*3.0 - t*.4))*.4; col = vec3(.4, 1.0, .55); }
-        else if (z < 1.5){ float x = fract(t*.45); a = exp(-pow((u - x)/.025, 2.0)) + .55*step(.93, fract(v*4.0))*(.6 + .4*step(.5, fract(t*3.0))); col = vec3(1.0, .55, .15); }
-        else if (z < 2.5){ float g = max(step(.9, fract(u*7.0)), step(.9, fract(v*9.0 - t*.8))); float y = fract(t*.35); a = g*.45 + exp(-pow((v - y)/.05, 2.0)); col = vec3(.35, .8, 1.0); }
-        else { float r = pow(.5 + .5*sin(v*26.0 - t*3.0 + sin(u*6.0)*1.5), 6.0); a = r*.7 + .12; col = mix(vec3(1.0, .78, .4), vec3(.85, .6, 1.0), .5 + .5*sin(t*.7 + u*3.0)); }
-        float edge = mix(1.0, smoothstep(0.0, .05, u), ea)*mix(1.0, smoothstep(1.0, .95, u), eb)*smoothstep(1.0, .9, v);
-        gl_FragColor = vec4(col*a*edge*(.12 + .88*act), 1.0); }`,
+        float k = vR.x, u = vR.y, v = vR.z, zf = vG.x, z = mod(zf, 4.0), ea = mod(floor(zf/4.0), 2.0), eb = floor(zf/8.0), act = vG.z, t = time + vG.y*7.0;
+        vec3 col = z < .5 ? vec3(.4, 1.0, .55) : z < 1.5 ? vec3(1.0, .5, .12) : z < 2.5 ? vec3(.35, .82, 1.0) : mix(vec3(1.0, .78, .4), vec3(.8, .55, 1.0), .5 + .5*sin(t*.8 + u*4.0));
+        float a = 0.0;
+        if (k < .5){   // the curtain in the opening
+          float e = mix(1.0, smoothstep(0.0, .04, u), ea)*mix(1.0, smoothstep(1.0, .96, u), eb)*smoothstep(1.0, .88, v);
+          float pat = z < .5 ? step(.82, fract(u*9.0 + sin(v*7.0 + t)*.3))*.5 : z < 1.5 ? step(.9, fract(v*8.0 - t*1.5)) : z < 2.5 ? max(step(.92, fract(u*10.0)), step(.92, fract(v*10.0 - t*.7))) : pow(.5 + .5*sin(v*22.0 - t*2.5 + sin(u*7.0)*1.4), 5.0);
+          a = (.06 + .5*pat)*e;
+        } else if (k < 1.5){   // the beam: brighter toward its foot, fading toward the edges of its width
+          float e = smoothstep(0.0, .18, u)*smoothstep(1.0, .82, u);
+          float pat = z < .5 ? .6 + .4*step(.9, fract(u*13.0 + v*5.0 - t*.6)) : z < 1.5 ? .35 + .9*step(.78, fract(v*14.0 + t*3.0)) : z < 2.5 ? .45 + .7*max(step(.9, fract(u*12.0)), step(.9, fract(v*10.0 + t))) : .5 + .6*pow(.5 + .5*sin(u*18.0 + v*9.0 - t*3.0), 4.0);
+          a = .3*pat*e*(.25 + .75*(1.0 - v));
+        } else if (k < 2.5){   // where it meets the floor
+          float line = exp(-pow((v - .5)/.16, 2.0)), e = smoothstep(0.0, .1, u)*smoothstep(1.0, .9, u);
+          float pat = z < .5 ? .5 + .6*step(.6, fract(u*16.0)) : z < 1.5 ? .4 + .8*step(.5, fract(u*12.0 - t*4.0)) : z < 2.5 ? .6 + .6*step(.85, fract(u*20.0)) : .6 + .5*sin(u*40.0 + t*6.0);
+          a = .9*line*pat*e;
+        } else {   // the opening's edges, traced in neon, breathing
+          a = .55 + .3*sin(t*2.2) + .15*step(.5, fract(u*3.0 - t*.5));
+          a *= .8;
+        }
+        gl_FragColor = vec4(col*a*(.16 + .84*act), 1.0); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   }); m.userData.colorOnly = true; return m; };
   const G = { mesh: null, sig: '', gates: [], at: new Map(), act: null };
@@ -313,16 +342,37 @@ if (!self.IN_RECIPE_WORKER){
     if (G.mesh){ scene.remove(G.mesh); G.mesh.geometry.dispose(); G.mesh = null; }
     G.gates = list; G.at = new Map(list.map((g, k) => [ckey(g.c.i, g.c.j), k]));
     if (!list.length) return;
-    const n = list.length, P = new Float32Array(n*12), UV = new Float32Array(n*8), A = new Float32Array(n*12), I = [];
-    list.forEach((g, k) => {
-      const sp = g.sp, dx = Math.sin(sp.ry), dz = Math.cos(sp.ry), y0 = CURB + .02, y1 = CURB + GATE_H - .05, sd = (hash('gate', g.c.i, g.c.j) % 1000)/1000;
-      const ea = sp.jm ? 0 : 1, eb = sp.jp ? 0 : 1;   // (the edge fades only at a pillar: across a wide gate the sweeps run on into each other)
-      const pts = [[sp.za, y0], [sp.zb, y0], [sp.zb, y1], [sp.za, y1]];
-      pts.forEach(([s, y], q) => { P.set([g.c.x + dx*s, y, g.c.z + dz*s], (k*4 + q)*3); UV.set([q === 1 || q === 2 ? 1 : 0, q >= 2 ? 1 : 0], (k*4 + q)*2); A.set([(ZI[g.c.wall.zone] || 0) + ea*4 + eb*8, sd, 0], (k*4 + q)*3); });
-      I.push(k*4, k*4 + 1, k*4 + 2, k*4, k*4 + 2, k*4 + 3);
+    const n = list.length, P = new Float32Array(n*NV*3), AN = new Float32Array(n*NV*2), AM = new Float32Array(n*NV), AR = new Float32Array(n*NV*3), AG = new Float32Array(n*NV*3), I = [];
+    let vi = 0;
+    list.forEach((g, gk) => {
+      const sp = g.sp, ax = Math.sin(sp.ry), az = Math.cos(sp.ry), nx = az, nz = -ax;   // (A: along the wall; N: across it, the way through)
+      const zc = (sp.za + sp.zb)/2, hw = (sp.zb - sp.za)/2, ox = g.c.x + ax*zc, oz = g.c.z + az*zc, H = GATE_H - .06, y0 = CURB + .03;
+      // the gates of one line sweep together (a wide gate is one beam): seeded by the line, not the plot
+      const line = Math.abs(ax) > .5 ? 'x' + g.c.j : 'z' + g.c.i, sd = (hash('gateline', line) % 1000)/1000;
+      const zcode = (ZI[g.c.wall.zone] || 0) + (sp.jm ? 0 : 4) + (sp.jp ? 0 : 8);
+      const V = (a, y, nOff, m, kind, u, v) => { P.set([ox + ax*a + nx*nOff, y, oz + az*a + nz*nOff], vi*3); AN.set([nx, nz], vi*2); AM[vi] = m; AR.set([kind, u, v], vi*3); AG.set([zcode, sd, 0], vi*3); return vi++; };
+      const quad = (q) => { I.push(q[0], q[1], q[2], q[0], q[2], q[3]); };
+      // the curtain in the opening
+      quad([V(-hw, y0, 0, 0, 0, 0, 0), V(hw, y0, 0, 0, 0, 1, 0), V(hw, y0 + H, 0, 0, 0, 1, 1), V(-hw, y0 + H, 0, 0, 0, 0, 1)]);
+      // the beam: two sheets from the scanner head under the lintel down to the floor either side of its sweeping foot
+      const fw = .32, top = hw*.35, hy = y0 + H - .12;
+      for (const d of [-fw, fw]) quad([V(-hw*.96, y0 + .01, d, 1, 1, 0, 0), V(hw*.96, y0 + .01, d, 1, 1, 1, 0), V(top, hy, 0, 0, 1, .82, 1), V(-top, hy, 0, 0, 1, .18, 1)]);
+      // its line on the floor
+      quad([V(-hw, y0 + .015, -fw*1.15, 1, 2, 0, 0), V(hw, y0 + .015, -fw*1.15, 1, 2, 1, 0), V(hw, y0 + .015, fw*1.15, 1, 2, 1, 1), V(-hw, y0 + .015, fw*1.15, 1, 2, 0, 1)]);
+      // the opening's edges on both faces of the wall: the lintel's underside edge, and each side that has a pillar
+      const th = .05, off = WALL_T/2 + .1;
+      for (const s of [-1, 1]){
+        quad([V(-hw, y0 + H - th, s*off, 0, 3, 0, 0), V(hw, y0 + H - th, s*off, 0, 3, 1, 0), V(hw, y0 + H, s*off, 0, 3, 1, 1), V(-hw, y0 + H, s*off, 0, 3, 0, 1)]);
+        for (const [e, x] of [[!sp.jm, -hw], [!sp.jp, hw]]){ const x0 = x + (x < 0 ? 0 : -th), x1 = x0 + th;
+          if (e) quad([V(x0, y0, s*off, 0, 3, 0, 0), V(x1, y0, s*off, 0, 3, 1, 0), V(x1, y0 + H, s*off, 0, 3, 1, 1), V(x0, y0 + H, s*off, 0, 3, 0, 1)]);
+          else { for (let q = 0; q < 4; q++) V(0, -50, 0, 0, 3, 0, 0); } }   // (no pillar on that side: its strip is left out, its vertices unused)
+      }
+      while (vi < (gk + 1)*NV) V(0, -50, 0, 0, 3, 0, 0);
     });
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(P, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
-    G.act = new THREE.BufferAttribute(A, 3); G.act.setUsage(THREE.DynamicDrawUsage); geo.setAttribute('aG', G.act); geo.setIndex(I); geo.computeBoundingSphere();
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(P, 3));
+    geo.setAttribute('aN', new THREE.BufferAttribute(AN, 2)); geo.setAttribute('aM', new THREE.BufferAttribute(AM, 1)); geo.setAttribute('aR', new THREE.BufferAttribute(AR, 3));
+    G.act = new THREE.BufferAttribute(AG, 3); G.act.setUsage(THREE.DynamicDrawUsage); geo.setAttribute('aG', G.act); geo.setIndex(I);
+    geo.computeBoundingSphere(); geo.boundingSphere.radius += 2;   // (the beams' feet sweep out up to a metre and a half)
     G.mesh = new THREE.Mesh(geo, mat || (mat = makeMat())); G.mesh.layers.set(1); G.mesh.renderOrder = 3; G.mesh.raycast = () => {}; G.mesh.matrixAutoUpdate = false; scene.add(G.mesh);
   }
   let pend = true; perimDirty = () => { pend = true; };
@@ -337,7 +387,7 @@ if (!self.IN_RECIPE_WORKER){
     let ch = false;
     for (let k = 0; k < G.gates.length; k++){
       let h = hold.get(k) || 0; h = near.has(k) || G.force ? 3 : Math.max(0, h - 1); hold.set(k, h);   // (G.force: every gate lit, for checks)
-      const a = h > 0 ? 1 : 0; if (G.act.array[k*12 + 2] !== a){ for (let q = 0; q < 4; q++) G.act.array[k*12 + q*3 + 2] = a; ch = true; }
+      const a = h > 0 ? 1 : 0; if (G.act.array[k*NV*3 + 2] !== a){ for (let q = 0; q < NV; q++) G.act.array[(k*NV + q)*3 + 2] = a; ch = true; }
     }
     if (ch) G.act.needsUpdate = true;
   }, 1000);

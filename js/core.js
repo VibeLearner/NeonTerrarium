@@ -19,6 +19,12 @@ const irand = (a,b) => Math.floor(rnd(a, b+1));
 
 /* ---------- renderer ---------- */
 const canvas = document.getElementById('view');
+// the view's place on the page, read once and kept until the window changes: asking every frame (hover, people, picking) made the
+// browser lay the page out again whenever a hover bracket had just moved (Oct 25 trace)
+let VIEW_RECT = null;
+const viewRect = () => VIEW_RECT || (VIEW_RECT = canvas.getBoundingClientRect());
+addEventListener('resize', () => { VIEW_RECT = null; }); addEventListener('scroll', () => { VIEW_RECT = null; }, true);
+try { new ResizeObserver(() => { VIEW_RECT = null; }).observe(canvas); } catch (e) {}
 // alpha: false: every pixel the game puts on the screen is opaque (the grade and the copy to the screen write alpha 1), so the canvas says so, and the browser
 // doesn't blend the whole frame onto the page behind it every frame (a pass over every screen pixel that the overlay never saw); the picture is the same
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, alpha: !!window.__CANVAS_ALPHA, powerPreference:'high-performance' });   // (window.__CANVAS_ALPHA: the see-through canvas as before, for measuring: tools/perf/fps_check.py)

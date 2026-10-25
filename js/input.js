@@ -138,7 +138,8 @@ canvas.addEventListener('pointerdown', e => {
   if (ptrs.size === 2){ if (act && act.timer) clearTimeout(act.timer); act = { kind: 'pinch', touch: e.pointerType === 'touch', ang: pang(), mid: pmid() }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); hover.visible = hoverFill.visible = hoverStrip.visible = false; return; }
   if (delMode && e.button === 0){ act = { kind: 'del', x: e.clientX, y: e.clientY, moved: false, from: groundCellAt(e.clientX, e.clientY) }; return; }   // delete mode: drag selects
   if ((e.button === 0 || e.pointerType === 'touch') && !hwMode && !mtMode && !megaPick){   // someone in the street under the pointer: a click opens the monitor on them (monitor.js)
-    const who = MON.pick(e.clientX, e.clientY, true); if (who){ act = { kind: 'npc', id: who, x: e.clientX, y: e.clientY, moved: false }; return; } }
+    // (the quick test here; the exact one, which waits for the graphics card, only once it's a click: a press that starts turning the view never waits for it)
+    const who = MON.pick(e.clientX, e.clientY); if (who){ act = { kind: 'npc', id: who, x: e.clientX, y: e.clientY, moved: false }; return; } }
   if (e.pointerType === 'touch'){
     // tap builds, drag paints, press and hold removes
     act = { kind: 'touch', x: e.clientX, y: e.clientY, moved: false, done: new Set() };
@@ -147,8 +148,10 @@ canvas.addEventListener('pointerdown', e => {
   }
   if (e.button === 0 && (hwMode || mtMode)){ act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false }; return; }   // highway or metro mode: a click builds, a drag turns the view
   if (e.button === 0){
-    const pk = pickAt(e.clientX, e.clientY);
     // a click (no drag) builds; a drag rotates the view. With "Drag to paint" on, a drag that starts on the city paints instead.
+    // (the city is only picked here when painting is on: the click itself picks on release, and a press that starts turning the
+    // view used to pick at once, which could make a plot again on the spot: a 50 to 170 ms freeze, Oct 25 trace)
+    const pk = S.paint && !megaPick ? pickAt(e.clientX, e.clientY) : null;
     if (!pk || pk.kind === 'sky' || !S.paint || megaPick) act = { kind: 'sky', x: e.clientX, y: e.clientY, moved: false };
     else { act = { kind: 'paint', done: new Set() }; paintAt(e.clientX, e.clientY); }
   }
@@ -194,7 +197,7 @@ const endPtr = e => { const _t0 = performance.now(); try { endPtr0(e); } finally
 function endPtr0(e){
   if (act && typeof LOADP !== 'undefined' && LOADP.on) act.moved = true;   // (a city is still being loaded from its recipes: a click edits nothing yet)
   if (act && ptrs.has(e.pointerId)){
-    if (act.kind === 'npc' && !act.moved) MON.open(act.id);
+    if (act.kind === 'npc' && !act.moved){ const who = MON.pick(e.clientX, e.clientY, true); if (who) MON.open(who); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }   // (the exact test now; nobody there after all: a click on the city)
     if (act.kind === 'del' && !act.moved){   // a click: inside the selection deletes it, anywhere else clears it
       const c = groundCellAt(e.clientX, e.clientY);
       if (delSel && c && c.i >= delSel.i0 && c.i <= delSel.i1 && c.j >= delSel.j0 && c.j <= delSel.j1) removeArea(delSel);

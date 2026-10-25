@@ -140,7 +140,7 @@ function sdApply(){   // for a frame drawn the old way: each plot's extra size c
   if (!SD.moving){ for (const P of SD.list) if (P.xlOn){ P.xl.fill(0); P.xlOn = 0; } return; }   // (a still view is never reduced)
   cam.updateMatrixWorld(); const e = cam.matrixWorld.elements, upp = H/(2*zoom), sp = Math.sin(PITCH), cp = Math.cos(PITCH);
   const rx = e[0], rz = e[2], hr = Math.hypot(e[8], e[10]) || 1, fx = -e[8]/hr, fz = -e[10]/hr;
-  const rr = renderer.domElement.getBoundingClientRect(), cur = typeof ptrLast !== 'undefined' && ptrLast ? [((ptrLast.x - rr.left)/rr.width)*2 - 1, -(((ptrLast.y - rr.top)/rr.height)*2 - 1)] : null;
+  const rr = viewRect(), cur = typeof ptrLast !== 'undefined' && ptrLast ? [((ptrLast.x - rr.left)/rr.width)*2 - 1, -(((ptrLast.y - rr.top)/rr.height)*2 - 1)] : null;
   const VPm = _sdMat.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
   for (const P of SD.list){
     if (!P.xl) P.xl = new Int8Array(P.n);
@@ -2054,7 +2054,7 @@ function gpuUpload(mesh, geo){
 // (the nearest to the middle of the view); a block goes back to the stand-in once it has been out of that for TIER.hold frames. When the view is farther than TIER.zs everything is a stand-in.
 // A block changes tier by being merged again from the other geometry; the old merge stays drawn until the new one is made, which waits for the worker to send the arrays it needs (recipe.js).
 // Tests: "full detail everywhere (as before)" (tierOff), "stand-in tier everywhere (to measure)" (tierAll), "show tiers (stand-ins tinted)" (tierShow).
-Object.assign(TIER, { zs: 24, margin: 12, maxFull: 36, hold: 180, of: new Map(), sig: '', since: new Map(), changes: 0, nFull: 0, nStand: 0 });
+Object.assign(TIER, { zs: 24, margin: 12, maxFull: 36, hold: 180, holdS: 6, of: new Map(), sig: '', since: new Map(), changes: 0, nFull: 0, nStand: 0 });
 TIER.on = () => S.tiers !== false && !(PH.tests.tierOff || window.__TIER_OFF);   // (S.tiers: the 'Detail tiers' box in the render menu, remembered in this browser)
 TIER.all = () => !!(PH.tests.tierAll || window.__TIER_ALL);
 TIER.show = () => !!(PH.tests.tierShow || window.__TIER_SHOW);
@@ -2117,7 +2117,7 @@ function tierTick(){
   for (const k of blocks.keys()){
     const cur = TIER.of.get(k) || 'full';
     if (keep.has(k)){ TIER.since.delete(k); if (cur === 'stand'){ TIER.of.delete(k); tierMark(k); } }
-    else if (cur === 'full'){ const t0 = TIER.since.get(k); if (t0 === undefined && !TIER.rush) TIER.since.set(k, PM.frame); else if (TIER.rush || PM.frame - t0 >= TIER.hold){ TIER.of.set(k, 'stand'); TIER.since.delete(k); tierMark(k); } }
+    else if (cur === 'full'){ const t0 = TIER.since.get(k); if (t0 === undefined && !TIER.rush) TIER.since.set(k, PM.frame); else if (TIER.rush || PM.frame - t0 >= pmSec(TIER.holdS)){ TIER.of.set(k, 'stand'); TIER.since.delete(k); tierMark(k); } }
     if ((TIER.of.get(k) || 'full') === 'full') nFull++; else nStand++;
   }
   TIER.nFull = nFull; TIER.nStand = nStand;
@@ -2858,7 +2858,7 @@ const ray = new THREE.Raycaster(), _ndc = new THREE.Vector2(), _box3 = new THREE
 // the bounds of what a plot or megastructure draws (kept when its geometry goes, for the far fallback)
 function pickBounds(o){
   const d = o.data;
-  if (d && d.geo){ if (!d._bb){ PICK_WARM.push(d); if (PICK_WARM.length === 1) pickIdle(pickWarm); const bb = new THREE.Box3(); for (const [, g] of d.geo){ if (!g.boundingBox) g.computeBoundingBox(); if (!g.boundingBox.isEmpty()) bb.union(g.boundingBox); } d._bb = bb; o._bb = bb.clone(); } return d._bb; }
+  if (d && d.geo){ if (!d._bb){ PICK_WARM.push(d); if (PICK_WARM.length === 1) pickIdle(pickWarm); const bb = new THREE.Box3(); for (const [m, g] of d.geo){ if (!g.boundingBox){ if (m === ATLAS && d.pm && d.pm.out) continue; g.computeBoundingBox(); } if (!g.boundingBox.isEmpty()) bb.union(g.boundingBox); } d._bb = bb; o._bb = bb.clone(); } return d._bb; }
   return o._bb || null;
 }
 // A geometry's triangles in small groups, each with its own box (made the first time the pointer comes near it), so a
@@ -2870,7 +2870,8 @@ const pickIdle = f => window.requestIdleCallback ? requestIdleCallback(f, { time
 function pickWarm(dl){
   const end = performance.now() + (dl && !dl.didTimeout && dl.timeRemaining ? Math.min(8, Math.max(2, dl.timeRemaining() - 1)) : 3);   // (a few ms at a time, never a hitch)
   while (PICK_WARM.length && performance.now() < end){ const d = PICK_WARM[0]; if (!d || !d.geo){ PICK_WARM.shift(); continue; }
-    let left = false; for (const [, g] of d.geo){ if (g.userData._pick) continue; if (performance.now() >= end){ left = true; break; } pickIndex(g); }
+    // (a plot whose full arrays were let go is skipped: reading them made the whole plot again here, in an idle moment that then ran 20 to 170 ms)
+    let left = false; for (const [m, g] of d.geo){ if (g.userData._pick || (m === ATLAS && d.pm && d.pm.out)) continue; if (performance.now() >= end){ left = true; break; } pickIndex(g); }
     if (!left) PICK_WARM.shift(); }
   if (PICK_WARM.length) pickIdle(pickWarm);
 }
@@ -2961,7 +2962,7 @@ let PICK_MEMO = null, PICK_SOFT = false;
 // the same pick for hovering: never waits for a plot to be made again (see pickTris)
 function pickAtSoft(cx, cy){ PICK_SOFT = true; try { return pickAt(cx, cy); } finally { PICK_SOFT = false; } }
 function pickAt(cx, cy){
-  const r = canvas.getBoundingClientRect();
+  const r = viewRect();
   _ndc.set(((cx - r.left)/r.width)*2 - 1, -((cy - r.top)/r.height)*2 + 1);
   ray.setFromCamera(_ndc, cam);
   // (the same pointer over the same, unchanged city: the same answer; pointer moves come faster than frames)
@@ -3247,7 +3248,7 @@ function showHover(t){
 /* ---------- placing a megastructure from the Buildings menu: its footprint follows the pointer ---------- */
 // the plot under the pointer at street level (ignores what stands there, so tall buildings don't get in the way)
 function groundCellAt(cx, cy){
-  const r = canvas.getBoundingClientRect();
+  const r = viewRect();
   _ndc.set(((cx - r.left)/r.width)*2 - 1, -((cy - r.top)/r.height)*2 + 1);
   ray.setFromCamera(_ndc, cam);
   const o = ray.ray.origin, dir = ray.ray.direction; if (Math.abs(dir.y) < 1e-4) return null;

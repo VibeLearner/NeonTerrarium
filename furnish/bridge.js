@@ -16,7 +16,7 @@
   bar.innerHTML = '<button class="nt-exit" id="ntExit" title="Back to the city (your changes are kept)">Exit to city</button><button class="nt-save" id="ntSave" title="Save this apartment with the city (Ctrl+S)" disabled>Save</button>';
   // the player's page: the apartment is the LIDAR Array's reconstruction of the pod, which is why nobody is in it (sim, from js/furnish.js)
   const sim = document.createElement('div'); sim.className = 'nt-sim'; sim.hidden = true; sim.setAttribute('role', 'note');
-  sim.innerHTML = '<b>LIDAR reconstruction</b><span>Simulated apartment, rebuilt from the scan. People don\'t show up in a reconstruction.</span>';
+  sim.innerHTML = '<b>LIDAR reconstruction</b><span>Simulated apartment, rebuilt from the scan.</span>';
   const toast = document.createElement('div'); toast.className = 'nt-toast'; toast.hidden = true; toast.setAttribute('role', 'status');
   function say(t){ toast.textContent = t; toast.hidden = false; clearTimeout(say.t); say.t = setTimeout(() => { toast.hidden = true; }, 2200); }
   function mount(){

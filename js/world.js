@@ -2054,7 +2054,7 @@ function gpuUpload(mesh, geo){
 // (the nearest to the middle of the view); a block goes back to the stand-in once it has been out of that for TIER.hold frames. When the view is farther than TIER.zs everything is a stand-in.
 // A block changes tier by being merged again from the other geometry; the old merge stays drawn until the new one is made, which waits for the worker to send the arrays it needs (recipe.js).
 // Tests: "full detail everywhere (as before)" (tierOff), "stand-in tier everywhere (to measure)" (tierAll), "show tiers (stand-ins tinted)" (tierShow).
-Object.assign(TIER, { zs: 24, margin: 12, maxFull: 36, hold: 180, holdS: 6, ringMax: 72, of: new Map(), sig: '', since: new Map(), changes: 0, nFull: 0, nStand: 0 });
+Object.assign(TIER, { zs: 24, margin: 12, maxFull: 36, hold: 180, holdS: 60, zsOut: 32, nearMax: 36, near: false, of: new Map(), sig: '', since: new Map(), changes: 0, nFull: 0, nStand: 0 });
 TIER.on = () => S.tiers !== false && !(PH.tests.tierOff || window.__TIER_OFF);   // (S.tiers: the 'Detail tiers' box in the render menu, remembered in this browser)
 TIER.all = () => !!(PH.tests.tierAll || window.__TIER_ALL);
 TIER.show = () => !!(PH.tests.tierShow || window.__TIER_SHOW);
@@ -2102,20 +2102,21 @@ function tierTick(){
   if (TIER.stash.size && PM.frame >= TIER.compareUntil && !TIER.rush) for (const k of [...TIER.stash.keys()]) tierStashDrop(k);   // (the comparison is over: the other merges go)
   if (SYNC_NOW() || (typeof LOADP !== 'undefined' && LOADP.on)) return;   // (not while a city is loading, nor in the first second of play, when merges are made at once: a tier change waits for the worker)
   if (!TIER.on() || TIER.all()){ if (TIER.of.size){ const ks = [...TIER.of.keys()]; TIER.of.clear(); for (const k of ks) tierMark(k); } TIER.sig = ''; return; }
-  const sig = (zoomT <= TIER.zs ? 'n' : 'f') + (camGoal.x/LOT).toFixed(0) + ',' + (camGoal.z/LOT).toFixed(0) + ',' + zoomT.toFixed(1) + ',' + yawT.toFixed(1) + ',' + cells.size + ',' + PM.frame % 30;
+  const sig = (TIER.near ? 'n' : 'f') + (zoomT <= TIER.zs ? 'i' : zoomT >= TIER.zsOut ? 'o' : 'm') + (camGoal.x/LOT).toFixed(0) + ',' + (camGoal.z/LOT).toFixed(0) + ',' + zoomT.toFixed(1) + ',' + yawT.toFixed(1) + ',' + cells.size + ',' + PM.frame % 30;
   if (sig === TIER.sig) return; TIER.sig = sig;
-  const near = zoomT <= TIER.zs, r = near ? Math.hypot(zoomT*(W/H), zoomT/Math.sin(Math.max(.15, PITCH)))*1.05 + TIER.margin : -1;
+  // near and far with a gap between them (in at TIER.zs, out at TIER.zsOut), so zooming about the switch point changes nothing
+  if (zoomT <= TIER.zs) TIER.near = true; else if (zoomT >= TIER.zsOut) TIER.near = false;
+  const near = TIER.near, r = near ? Math.hypot(zoomT*(W/H), zoomT/Math.sin(Math.max(.15, PITCH)))*1.05 + TIER.margin : -1;
   const blocks = tierBlocks();   // (the blocks' middles and boxes, made again only when the plots change: during a turn this ran every frame and made a map, an object per block and a split key per test)
   const wantFull = [];
   const onScreen = new Set();
   if (near){ cam.updateMatrixWorld(); _tmx.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _tfr.setFromProjectionMatrix(_tmx); }
-  if (near) for (const b of blocks.values()){ const k = b.k, d = Math.hypot(b.x - camGoal.x, b.z - camGoal.z); if (_tfr.intersectsBox(b.box)) onScreen.add(k); else if (d <= r) wantFull.push([d, k]); }
-  // (closer than TIER.zs every block on screen is full, however many: a big or high-resolution screen shows more than TIER.maxFull of them, which used to put stand-ins in view;
-  //  the cap is only for the ring of blocks just off screen kept full for turning and panning)
-  // the ring off screen is every block within reach of the view's middle (up to TIER.ringMax), not just enough to make up TIER.maxFull: that cap
-  // made which blocks were full depend on which way the view faced, so turning on the spot kept merging blocks again (the lag that came and went
-  // while turning, Oct 25 10:09 trace). Within reach, turning changes nothing now.
-  wantFull.sort((p, q) => p[0] - q[0]); const keep = new Set([...onScreen, ...wantFull.slice(0, Math.max(0, (TIER.ringMax || 72) - onScreen.size)).map(e => e[1])]);
+  // full detail: the TIER.nearMax blocks nearest the view's middle, of those on screen or within reach. By distance only, so turning changes
+  // nothing; and capped, so zooming in until the whole city fits on screen no longer made every block full at once (109 blocks merged again
+  // and about a thousand plots made again by the worker in a few seconds, then all of them back to stand-ins a little later: the lag that
+  // came in waves, measured on the owner's city Oct 25)
+  if (near) for (const b of blocks.values()){ const k = b.k, d = Math.hypot(b.x - camGoal.x, b.z - camGoal.z); if (d <= r || _tfr.intersectsBox(b.box)) wantFull.push([d, k]); }
+  wantFull.sort((p, q) => p[0] - q[0]); const keep = new Set(wantFull.slice(0, TIER.nearMax).map(e => e[1]));
   let nFull = 0, nStand = 0;
   for (const k of blocks.keys()){
     const cur = TIER.of.get(k) || 'full';

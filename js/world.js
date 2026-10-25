@@ -829,7 +829,8 @@ function buildPlatformBody(c){
   }
   if (c.mega) return;   // a megastructure lays its own ground across its plots
   // surface: sidewalk and street round a building, or a small paved plaza when the spot is empty
-  if (c.sections.length) groundLot({ x, z, cls: c.sections[0].zone, elev: 0, base: CURB, deck: false, cross: cells.has(ckey(c.i, c.j + 1)) });
+  if (c.wall && !c.sections.length){}   // (a perimeter wall's plot: no street, its own ground, laid with the wall: perimeter.js wallGround)
+  else if (c.sections.length) groundLot({ x, z, cls: c.sections[0].zone, elev: 0, base: CURB, deck: false, cross: cells.has(ckey(c.i, c.j + 1)) });
   else {
     box(G.asph, P, 0, .012, 0, LOT, .025, LOT);
     if (c.green === 'grass'){   // laid to lawn, edge to edge, with grass growing up out of it
@@ -1778,7 +1779,8 @@ function* cellBody(c){
   withStyle(c.style, () => buildPlatform(c)); yield;
   if (!c.sections.length){ c.walks = null; c.liftCab = null; c.liftRoof = null; c.belowTop = null; c.belowTops = []; }   // (a pod taken away to the last section: its walkways and lift go with it; the people on them used to keep walking the old walkway in and out of the doors)
   if (c.sections.length){ PUT_KEEPOUT = lineKeepOut(c); if (STAGE) STAGE.keep = PUT_KEEPOUT; try { yield* buildStackGen(c); } finally { PUT_KEEPOUT = null; } }
-  c.topY = c.sections.length ? bucketTop() : CURB; hwFeet(c); mtFeet(c);   // (and the feet of any highway over it)
+  if (c.wall) buildPerimeter(c);   // (a perimeter wall: perimeter.js)
+  c.topY = c.sections.length ? bucketTop() : c.wall ? wallTopOf(c) : CURB; hwFeet(c); mtFeet(c);   // (and the feet of any highway over it)
 }
 function rebuildCell(c){
   stageFinishNear([c]);   // (a plot still being built in steps, if it is this one or near it, is finished first)
@@ -2446,7 +2448,7 @@ function parkCells(){
   const changed = [], seen = new Set();
   for (const c of cells.values()){
     if (seen.has(c)) continue;
-    const lawnish = q => q && !q.mega && !q.sections.length && q.green === 'grass';
+    const lawnish = q => q && !q.mega && !q.sections.length && !q.wall && q.green === 'grass';
     if (!lawnish(c)){ seen.add(c); if (c.park){ c.park = false; changed.push(c); } continue; }
     const group = [c], stack = [c]; seen.add(c);
     while (stack.length){ const q = stack.pop(); for (const [a, b] of SIDES4){ const n = cells.get(ckey(q.i + a, q.j + b)); if (n && !seen.has(n) && lawnish(n)){ seen.add(n); group.push(n); stack.push(n); } } }
@@ -2582,7 +2584,7 @@ function removePodSection(c, k){
 // hang a pod off the side of a taller building, over the empty plot c, its deck at height y
 function addLift(c, y, zone, opt = {}){
   stageFinishAll();
-  if (!c || c.mega || c.lift || hwAt(c.i, c.j).length || mtAt(c.i, c.j).length) return null;   // (not under a highway or the metro)
+  if (!c || c.mega || c.lift || c.wall || hwAt(c.i, c.j).length || mtAt(c.i, c.j).length) return null;   // (not under a highway or the metro)
   if (c.sections.length && y < c.height + FH - .05) return null;   // over a shorter building: a floor's gap at least
   finishAnimsOn(c);
   holdRegion(c);
@@ -2843,7 +2845,7 @@ const SAVE_KEY = 'neonIsland.v2';
 const MEGA_SAVE_KEY = 'neonIsland.megas';
 function save(){
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some', c.lift ? c.lift.y : 0, c.lift && c.below ? c.below : 0, c.lift && c.lift.v === 2 ? c.lift.d : 0])));   // (the last: a bracketed side pod, the way to the wall it hangs from)
+    localStorage.setItem(SAVE_KEY, JSON.stringify([...cells.values()].map(c => [c.i, c.j, c.sections, c.style || DEFAULT_STYLE, c.green || 'some', c.lift ? c.lift.y : 0, c.lift && c.below ? c.below : 0, c.lift && c.lift.v === 2 ? c.lift.d : 0, c.wall ? { z: c.wall.zone, n: c.wall.n || 0, g: c.wall.gate ? 1 : 0, s: c.wall.seed } : 0])));   // (the last: a bracketed side pod, the way to the wall it hangs from)
     localStorage.setItem(MEGA_SAVE_KEY, JSON.stringify([...megas.values()].map(m => ({ id: m.id, kind: m.kind, i: m.i, j: m.j, w: m.w, h: m.h, levels: m.levels, seed: m.seed, centre: m.centre || undefined, rot: m.rot, si: m.si, sj: m.sj }))));
   } catch (e) {}
   hwSave(); mtSave();
@@ -2852,7 +2854,7 @@ function load(){
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!Array.isArray(d) || !d.length) return false;
-    for (const [i,j,secs,st,gr,lf,bl,lv] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; if (lf > 0 && c.sections.length){ c.lift = Array.isArray(lv) ? { y: lf, v: 2, d: lv } : { y: lf }; if (Array.isArray(bl)){ const b2 = bl.filter(s => s && ZONES[s.zone]); if (b2.length) c.below = b2; } } cells.set(ckey(i,j), c); }
+    for (const [i,j,secs,st,gr,lf,bl,lv,wl] of d){ const c = newCell(i, j, (secs || []).filter(s => s && ZONES[s.zone])); c.style = st || DEFAULT_STYLE; c.green = GREEN_MODES.includes(gr) ? gr : 'some'; if (lf > 0 && c.sections.length){ c.lift = Array.isArray(lv) ? { y: lf, v: 2, d: lv } : { y: lf }; if (Array.isArray(bl)){ const b2 = bl.filter(s => s && ZONES[s.zone]); if (b2.length) c.below = b2; } } if (wl && wl.z && ZONES[wl.z] && !c.sections.length) c.wall = { zone: wl.z, n: Math.max(0, wl.n | 0), gate: !!wl.g, seed: wl.s | 0 }; cells.set(ckey(i,j), c); }
     hwLoad(); mtLoad();   // (before the plots are built: the highways' and the metro's pillars stand on them)
     try { for (const m of JSON.parse(localStorage.getItem(MEGA_SAVE_KEY) || '[]')) { const mm = placeMega(m.kind, m.i, m.j, m.seed, m.w, m.h, m.levels, m.id || null); if (mm && m.centre) mm.centre = m.centre; if (mm && Number.isInteger(m.rot)) mm.rot = ((m.rot % 4) + 4) % 4; if (mm && Number.isInteger(m.si) && Number.isInteger(m.sj)){ mm.si = m.si; mm.sj = m.sj; } } } catch (e) {}
     return true;
@@ -3076,6 +3078,7 @@ function pickClassify(h){
   if (!h.slab && !h.gap && !up && c.sections && c.sections.length && P.y < CURB + 2.4 && (Math.abs(P.x - c.x) > SIDE/2 + .2 || Math.abs(P.z - c.z) > SIDE/2 + .2)){
     const q = cells.get(ckey(Math.round(P.x/LOT), Math.round(P.z/LOT))); if (q && !q.mega){ c = q; h = Object.assign({}, h, { o: q, slab: true, n: new THREE.Vector3(0, 1, 0) }); return { d: h.t, c, kind: 'plat', p: new THREE.Vector3(P.x, CURB, P.z) }; } }
   if (!h.slab && !h.gap && up && P.y < CURB + .3){ const q = cells.get(ckey(Math.round(P.x/LOT), Math.round(P.z/LOT))); if (q && !q.mega){ c = q; h = Object.assign({}, h, { o: q, slab: true }); } }
+  if (!h.slab && c.wall && !c.sections.length) return { d: h.t, c, kind: 'wall', p: P, top: wallTopOf(c) };   // (a perimeter wall: perimeter.js)
   if (h.slab || !c.sections.length){   // a lot with nothing built on it (or its slab): its top is the plot itself
     if (h.slab && !up){ const [a, b] = sideOf(c.x, c.z, false); return { d: h.t, c, kind: 'plat', p: new THREE.Vector3(c.x + a*LOT/2, CURB - .2, c.z + b*LOT/2) }; }
     return { d: h.t, c, kind: 'plat', p: new THREE.Vector3(P.x, CURB, P.z) };
@@ -3115,6 +3118,8 @@ function pickClassify(h){
 let POD_HOLD = null;   // the floor a side pod is held at while the pointer stays near it
 function targetOf(pk){
   if (!pk) return null;
+  if (PERIM) return perimTarget(pk);   // (Perimeter picked: perimeter.js)
+  if (pk.kind === 'wall') return null;
   if (pk.kind === 'sky') return cells.has(ckey(pk.i, pk.j)) ? null : { type: 'empty', i: pk.i, j: pk.j };
   // under a pod: the top part of the gap grows the pod down; the bottom part, the ground and the roof of the building
   // under it build up from the ground
@@ -3141,7 +3146,7 @@ function targetOf(pk){
   const dx = pk.p.x - c.x, dz = pk.p.z - c.z;
   const [a,b] = Math.abs(dx) > Math.abs(dz) ? [Math.sign(dx), 0] : [0, Math.sign(dz)];
   const n = cells.get(ckey(c.i + a, c.j + b));
-  if (n && n.mega) return null;
+  if (n && (n.mega || n.wall)) return null;
   // high up the side of a building, with any zone picked and an empty plot next to it: hang a pod there
   // (open sky next door too: the platform grows under it)
   const inGrid = Math.abs(c.i + a) <= GRID_MAX && Math.abs(c.j + b) <= GRID_MAX;
@@ -3175,6 +3180,7 @@ function targetOf(pk){
 }
 function applyTarget(t){
   if (!t) return null;
+  if (t.type === 'wallNew' || t.type === 'wallUp' || t.type === 'wallGate') return perimApply(t);
   const zone = S.zone;
   if (t.type === 'empty') return addPlatform(t.i, t.j, zone);
   if (t.type === 'megaUp'){ if (zone) addMegaTier(t.m); return null; }
@@ -3190,7 +3196,7 @@ function applyTarget(t){
   if (!zone || t.c.mega) return null;
   addSection(t.c, zone, t.after !== undefined ? { after: t.after } : {}); return t.c;
 }
-function removeAt(pk){ if (pk && pk.c && !pk.c.mega) stageFinishNear([pk.c, ...SIDES4.map(([a, b]) => cells.get(ckey(pk.c.i + a, pk.c.j + b)))]); else stageFinishAll(); if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMegaTier(megas.get(pk.c.mega)); if (pk.kind === 'low') return removeBelow(pk.c); if (pk.bl) return removePodSection(pk.c, pk.bl[3]); removeSection(pk.c); }
+function removeAt(pk){ if (pk && pk.c && pk.c.wall && !pk.c.mega && !pk.c.sections.length && pk.kind !== 'sky'){ stageFinishAll(); return removeWallTier(pk.c); } if (pk && pk.c && !pk.c.mega) stageFinishNear([pk.c, ...SIDES4.map(([a, b]) => cells.get(ckey(pk.c.i + a, pk.c.j + b)))]); else stageFinishAll(); if (!pk || pk.kind === 'sky') return; if (pk.c.mega) return removeMegaTier(megas.get(pk.c.mega)); if (pk.kind === 'low') return removeBelow(pk.c); if (pk.bl) return removePodSection(pk.c, pk.bl[3]); removeSection(pk.c); }
 
 /* ---------- hover outline showing where a click would build ---------- */
 const hoverMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85, depthTest: false });
@@ -3235,6 +3241,7 @@ const hoverBold = (() => {
 function showHover(t){
   hoverFill.visible = false; hoverStrip.visible = false;
   if (!t){ hover.visible = false; return; }
+  if (t.type === 'wallNew' || t.type === 'wallUp' || t.type === 'wallGate') return perimHover(t);
   hoverMat.color.set(t && (t.type === 'side' || t.type === 'podDown') ? '#ff5ad8' : S.zone ? ZONES[S.zone].col : '#e3d6bd');   // a side pod: its own colour
   let x, z, y0, h, w, wz;
   if (t.type === 'megaUp'){

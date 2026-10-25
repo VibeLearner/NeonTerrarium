@@ -107,7 +107,7 @@ function megaBlockOk(i, j, w, h, own = null, kind = null){   // own: the plots o
   if (Math.abs(i) > GRID_MAX || Math.abs(j) > GRID_MAX || Math.abs(i + w - 1) > GRID_MAX || Math.abs(j + h - 1) > GRID_MAX) return false;
   if (megaHwNear(i, j, w, h, kind)) return false;
   let missing = 0;
-  for (let a = 0; a < w; a++) for (let b = 0; b < h; b++){ const c = cells.get(ckey(i + a, j + b)); if (!c){ missing++; continue; } if ((c.mega && !(own && own.has(c))) || c.sections.length) return false; }
+  for (let a = 0; a < w; a++) for (let b = 0; b < h; b++){ const c = cells.get(ckey(i + a, j + b)); if (!c){ missing++; continue; } if ((c.mega && !(own && own.has(c))) || c.sections.length || c.wall) return false; }
   if (missing < w*h) return true;
   for (let a = -1; a <= w; a++) for (let q = -1; q <= h; q++){
     if (a >= 0 && a < w && q >= 0 && q < h) continue;

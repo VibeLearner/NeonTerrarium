@@ -1113,7 +1113,7 @@ function makeTargets(){
   // (Smooth: the clouds are drawn smaller than the frame and stretched with a blend, so their edges aren't stair-steps)
   // (at the base resolution whatever the zoom: zoomed out, the frame grows up to 1.6 times its lines but the clouds needn't, and they were the
   //  third-dearest pass, about as much as the whole composite)
-  rtCloud = new THREE.WebGLRenderTarget(Math.ceil(W*pxK/q), Math.ceil(H*pxK/q), SMOOTH_LOOK.value ? Object.assign({}, opt, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }) : opt);
+  rtCloud = new THREE.WebGLRenderTarget(Math.ceil(W*Math.min(1, pxK)/q), Math.ceil(H*Math.min(1, pxK)/q), SMOOTH_LOOK.value ? Object.assign({}, opt, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }) : opt);
   comp.uniforms.tCloud.value = rtCloud.texture; cloudMat.uniforms.tDepth.value = rtC.depthTexture;
   if (rtOut) rtOut.dispose();
   rtOut = new THREE.WebGLRenderTarget(W, H, { minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat });
@@ -1519,7 +1519,12 @@ function setRenderLines(n){
   resize();
 }
 let DW = 1, DH = 1, BASE_H = 270, pxK = 1;
-const PIX_MAX = 2.1e6;   // the most pixels the city is drawn at (applyRenderRes): a 1080p screen never reaches it, a sharp laptop screen zoomed out does
+const PIX_MAX = 2.1e6;
+// Settings, Optimize framerate, "Cap at 720p": never more pixels than 1280 x 720, below the base lines too (the apartment page reads the same key: builder.js)
+const CAP720_KEY = 'neonIsland.cap720', PIX_720 = 1280*720;
+let CAP720 = (() => { try { return localStorage.getItem(CAP720_KEY) === '1'; } catch (e) { return false; } })();
+function setCap720(on){ CAP720 = !!on; try { localStorage.setItem(CAP720_KEY, CAP720 ? '1' : '0'); } catch (e) {} H = 0; applyRenderRes(zoom);
+  try { const f = document.querySelector('iframe.furnish-frame'); if (f) f.contentWindow.postMessage({ type: 'furnish:pixcap' }, location.origin); } catch (e) {} }   // the most pixels the city is drawn at (applyRenderRes): a 1080p screen never reaches it, a sharp laptop screen zoomed out does
 function resize(){
   const dpr = devicePixelRatio || 1;
   DW = Math.max(1, Math.round(innerWidth*dpr)); DH = Math.max(1, Math.round(innerHeight*dpr));
@@ -1557,7 +1562,7 @@ function applyRenderRes(z){
   // and never more than PIX_MAX pixels in all, whatever the zoom: on a sharp laptop screen (3420 x 1640) the 1.6 times above came to 3.6 million pixels
   // for the color pass and every post effect, more than the card could draw in a 60 Hz frame. Between zoom 21 and 40 one frame in four or five came in
   // late, the judder that came and went with the zoom (measured on the owner's M2, Oct 25: 52 fps at 1.6 times, a steady 60 at the base). Never under the base
-  h = Math.min(h, Math.max(BASE_H, Math.floor(Math.sqrt(PIX_MAX*DH/DW))));
+  h = CAP720 ? Math.min(h, Math.floor(Math.sqrt(PIX_720*DH/DW))) : Math.min(h, Math.max(BASE_H, Math.floor(Math.sqrt(PIX_MAX*DH/DW))));
   if (h === H) return;
   // while the zoom is still gliding, small steps wait: each step remakes every render target (the frame, the depth, the glow, the clouds), and a turn
   // of the wheel crossed a dozen of them in half a second. A big step goes at once (the picture mustn't blur), the rest when the zoom settles

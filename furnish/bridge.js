@@ -119,6 +119,7 @@
       if (m.type === 'furnish:begin') begin(m);
       else if (m.type === 'furnish:plots') plots(m);
       else if (m.type === 'furnish:warm') warm();
+      else if (m.type === 'furnish:pixcap'){ try { if (PB().pixCap) PB().pixCap(); } catch (e) {} }
       else if (m.type === 'furnish:hold'){ HOLD = !!m.on; try { if (PB().warmHold) PB().warmHold(HOLD); } catch (e) {} }
       else if (m.type === 'furnish:wake') sleep(false);
       else if (m.type === 'furnish:saved'){ if (m.ok){ S.dirty = false; sync(); say('Saved with the city'); } else say('Could not save: the browser storage is full or blocked'); }

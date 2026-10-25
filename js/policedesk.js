@@ -212,6 +212,14 @@ const PRECINCT = (() => {
   #prec .tick span.k { background:var(--ink); color:var(--bg); padding:0 6px; margin-right:10px; letter-spacing:.14em; height:100%; display:flex; align-items:center; }
   #prec .tick .run { display:inline-block; padding-left:100%; animation:pdTick 60s linear infinite; } @keyframes pdTick { to { transform:translateX(-100%); } }
   #prec .empty { color:var(--dim); padding:6px 2px; line-height:1.6; }
+  #prec .det { position:absolute; right:8px; top:26px; width:min(300px,42%); background:rgba(3,8,5,.9); border:1px solid var(--ink); padding:8px 10px 10px; z-index:2; }
+  #prec .det[hidden] { display:none; }
+  #prec .det h4 { margin:0 0 2px; font-weight:500; color:var(--hi); letter-spacing:.14em; font-size:11px; } #prec .det .s { color:var(--dim); font-size:9px; letter-spacing:.12em; margin-bottom:6px; }
+  #prec .det .kv { margin:4px 0 8px; } #prec .det .row { display:flex; gap:6px; flex-wrap:wrap; }
+  #prec .det button { background:transparent; border:1px solid var(--ink); color:var(--hi); font:inherit; font-size:9px; letter-spacing:.14em; padding:3px 8px; cursor:pointer; } #prec .det button:hover { background:rgba(143,220,149,.15); }
+  #prec .det button.back { border-color:var(--dim); color:var(--ink); }
+  #prec .det .tl { display:flex; align-items:center; gap:0; margin:6px 0; } #prec .det .tl i { flex:1; height:2px; background:var(--faint); } #prec .det .tl b { width:8px; height:8px; border:1px solid var(--ink); background:var(--bg); } #prec .det .tl b.on { background:var(--ink); }
+  #prec .det .tlx { display:flex; justify-content:space-between; color:var(--dim); font-size:8.5px; }
   #prec .rt { grid-template-rows:minmax(0,1.5fr) minmax(0,1fr); gap:6px; }
   #prec canvas.ch { display:block; width:100%; }
   #prec .act { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:10px; height:100%; }
@@ -257,7 +265,7 @@ const PRECINCT = (() => {
         <div><small>UNITS ON DUTY · OUT</small><b>${onDuty} · ${beat}</b></div><div><small>CALLS TODAY · OPEN</small><b>${d.today.length} · <span class="${openCalls ? 'warn' : ''}">${openCalls}</span></b></div>
         <div><small>ARRESTS TODAY · TOTAL</small><b>${d.arrToday} · ${R.arrests}</b></div><div><small>DRONES UP · POINTS SCANNED</small><b>${air}/${d.dr.list.length} · ${d.dr.scans}</b></div>
         <div><small>LIDAR COVER</small><b>${Math.round(d.lidar*100)}%</b></div><div class="sp"></div><button class="close" type="button">CLOSE · ESC</button></div>
-      <div class="pn map"><div class="h"><b>A · CITY PLAN</b><span>CALLS 72 H · UNITS · DRONE ROUTES · HOTSPOTS</span><span class="r">${B.ni} × ${B.nj} PLOTS · N ↑ · CLICK A UNIT TO FOLLOW · A CALL TO GO THERE</span></div><canvas></canvas><div class="tip"></div>
+      <div class="pn map"><div class="h"><b>A · CITY PLAN</b><span>CALLS 72 H · UNITS · DRONE ROUTES · HOTSPOTS</span><span class="r">${B.ni} × ${B.nj} PLOTS · N ↑ · CLICK ANYTHING FOR A CLOSE SCAN</span></div><canvas></canvas><div class="tip"></div><div class="det" hidden></div>
         <div class="lg"><span><i style="background:var(--hi);border-radius:50%"></i>OFFICER</span><span><i style="background:var(--red);border-radius:50%"></i>RESPONDING</span><span><i style="border:1px solid var(--ink)"></i>DRONE · ROUTE</span>
           <span><i style="background:var(--amb);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)"></i>CASE</span><span><i style="background:var(--ink);clip-path:polygon(0 40%,100% 40%,100% 60%,0 60%)"></i>CALL</span><span><i style="background:rgba(255,93,74,.4)"></i>HOTSPOT</span><span><i style="border:1px dashed var(--dim);border-radius:50%"></i>LIDAR</span></div></div>
       <div class="rt">
@@ -270,7 +278,7 @@ const PRECINCT = (() => {
             <div class="c2"><div class="lbl"><span>BY TYPE</span><span>72 H</span></div><canvas class="ch" data-ch="types"></canvas></div></div></div>
       </div>
       <div class="bt">
-          <div class="pn"><div class="h"><b>C · UNITS</b><span>${d.ofc.length} SWORN</span><span class="r">CLICK TO FOLLOW</span></div>
+          <div class="pn"><div class="h"><b>C · UNITS</b><span>${d.ofc.length} SWORN</span><span class="r">CLICK FOR A CLOSE SCAN</span></div>
             <div class="tw"><table><colgroup><col style="width:46px"><col style="width:60px"><col style="width:46px"><col><col style="width:28px"><col style="width:26px"></colgroup><tr><th>BADGE</th><th>CALLSIGN</th><th>SHIFT</th><th>STATUS</th><th>SEC</th><th>SIG</th></tr>${ofRows}</table></div></div>
           <div class="pn"><div class="h"><b>D · DRONE OPS</b><span>COVER ${Math.round(d.dr.cov*100)}%</span><span class="r">${d.dr.pts.length} PTS / 10 MIN</span></div>
             <div class="dro"><div><table><colgroup><col style="width:44px"><col style="width:52px"><col><col style="width:26px"><col style="width:28px"></colgroup><tr><th>ID</th><th>BASE</th><th>MODE</th><th>WPT</th><th>SEC</th></tr>${drRows}</table>
@@ -282,7 +290,7 @@ const PRECINCT = (() => {
     const bt = root.querySelector('.bt');
     const hp = document.createElement('div'); hp.className = 'pn';
     const secs = secPick(d);
-    hp.innerHTML = `<div class="h"><b>G · SECTOR SCANS</b><span>${secs.length} HOTTEST · 72 H</span><span class="r">CLICK TO GO · LOOKING DOWN</span></div>
+    hp.innerHTML = `<div class="h"><b>G · SECTOR SCANS</b><span>${secs.length} HOTTEST · 72 H</span><span class="r">CLICK FOR A CLOSE SCAN</span></div>
       <div class="secs">${secs.map(q => `<div class="sc" data-sec="${q.name}"><div class="t"><b>${q.name}</b><span>${q.n} CALLS · ${q.units} UNIT${q.units === 1 ? '' : 'S'}</span></div><canvas></canvas><div class="f">${q.last ? esc(q.last.kind) + ' · ' + hm(q.last.c) : 'QUIET'}</div></div>`).join('') || '<div class="empty">NO SECTORS YET</div>'}</div>`;
     const cp = document.createElement('div'); cp.className = 'pn'; cp.innerHTML = `<div class="h"><b>F · CASE FILES</b><span>${d.cs.open ? 'CASE DAY ' + d.cs.day + ' / 21' : 'NONE ACTIVE'}</span><span class="r">${d.cs.heat !== null && d.cs.heat !== undefined ? 'PRESSURE ' + Math.round(d.cs.heat*100) + '%' : ''}</span></div>
       <div class="tw">${cfs || '<div class="empty">No case files open. When a case opens, its file shows here: coded, with its stage, the last logged activity and the next lead.</div>'}</div>`;
@@ -290,12 +298,14 @@ const PRECINCT = (() => {
     document.body.appendChild(root);
     $('.close').addEventListener('click', close);
     root.addEventListener('click', e => {
-      const w = e.target.closest('[data-watch]'); if (w){ follow(w.dataset.watch); return; }
-      const sc = e.target.closest('.sc[data-sec]'); if (sc){ const q = SECS.find(x => x.name === sc.dataset.sec); if (q) goTo(q.cx, q.cz); return; }
+      const fb = e.target.closest('[data-follow]'); if (fb){ follow(fb.dataset.follow); return; }
+      if (e.target.closest('.back')){ view(null); return; }
+      const w = e.target.closest('[data-watch]'); if (w){ view({ type: 'person', id: w.dataset.watch }); return; }
+      const sc = e.target.closest('.sc[data-sec]'); if (sc){ const q = SECS.find(x => x.name === sc.dataset.sec); if (q) view({ type: 'sector', q }); return; }
       const r = e.target.closest('tr.click'); if (!r) return;
-      if (r.dataset.cop) follow(r.dataset.cop);
-      else if (r.dataset.call){ const c = R.calls.find(q => q.id === +r.dataset.call); if (c) goTo(c.x, c.z); }
-      else if (r.dataset.drone){ sel = sel === r.dataset.drone ? null : r.dataset.drone; root.querySelectorAll('tr[data-drone]').forEach(t => t.classList.toggle('sel', t.dataset.drone === sel)); drawBase(); }
+      if (r.dataset.cop) view({ type: 'cop', id: r.dataset.cop });
+      else if (r.dataset.call){ const c = R.calls.find(q => q.id === +r.dataset.call); if (c) view({ type: 'call', c }); }
+      else if (r.dataset.drone){ sel = sel === r.dataset.drone ? null : r.dataset.drone; root.querySelectorAll('tr[data-drone]').forEach(t => t.classList.toggle('sel', t.dataset.drone === sel)); drawBase(); if (sel) view({ type: 'drone', id: sel }); }
     });
   }
   // the sectors worth a close look: the six with the most calls in 72 hours (or with the most plots, a quiet city)
@@ -384,10 +394,10 @@ const PRECINCT = (() => {
     cv = $('.map canvas'); const r = cv.getBoundingClientRect(), dp = Math.min(2, devicePixelRatio || 1); cv.width = Math.max(10, r.width*dp); cv.height = Math.max(10, r.height*dp); g = cv.getContext('2d');
     const W = cv.width, H = cv.height, pad = 26*dp, s = Math.min((W - 2*pad)/(B.ni*LOT), (H - 2*pad)/(B.nj*LOT)), ox = (W - B.ni*LOT*s)/2 - (B.i0 - .5)*LOT*s, oz = (H - B.nj*LOT*s)/2 - (B.j0 - .5)*LOT*s;
     F = { dp, s, P: (x, z) => [ox + x*s, oz + z*s] }; drawBase(); charts(); for (const el of root.querySelectorAll('.sc canvas')) el._fit = null;
-    cv.addEventListener('mousemove', e => { const rr = cv.getBoundingClientRect(); hov = pickMap((e.clientX - rr.left)*F.dp, (e.clientY - rr.top)*F.dp); const tip = $('.tip');
+    cv.addEventListener('mousemove', e => { if (VIEW){ hov = null; $('.tip').style.display = 'none'; return; } const rr = cv.getBoundingClientRect(); hov = pickMap((e.clientX - rr.left)*F.dp, (e.clientY - rr.top)*F.dp); const tip = $('.tip');
       if (hov){ tip.style.display = 'block'; tip.style.left = (e.clientX - rr.left + 12) + 'px'; tip.style.top = (e.clientY - rr.top + 26) + 'px'; tip.textContent = hov.label; } else tip.style.display = 'none'; });
     cv.addEventListener('mouseleave', () => { hov = null; $('.tip').style.display = 'none'; });
-    cv.addEventListener('click', () => { if (!hov) return; if (hov.cop) follow(hov.cop); else if (hov.call) goTo(hov.call.x, hov.call.z); else if (hov.drone){ sel = sel === hov.drone ? null : hov.drone; root.querySelectorAll('tr[data-drone]').forEach(t => t.classList.toggle('sel', t.dataset.drone === sel)); drawBase(); } });
+    cv.addEventListener('click', () => { if (VIEW || !hov) return; if (hov.cop) view({ type: 'cop', id: hov.cop }); else if (hov.call) view({ type: 'call', c: hov.call }); else if (hov.drone){ sel = hov.drone; root.querySelectorAll('tr[data-drone]').forEach(t => t.classList.toggle('sel', t.dataset.drone === sel)); drawBase(); view({ type: 'drone', id: sel }); } });
   }
   function drawBase(){
     const W = cv.width, H = cv.height, dp = F.dp, s = F.s, P = F.P;
@@ -479,13 +489,108 @@ const PRECINCT = (() => {
   function loop(now){
     if (!PD.open) return; raf = requestAnimationFrame(loop);
     if (!base || !g) return; if (loop.t && now - loop.t < 50) return; loop.t = now;
-    const W = cv.width, H = cv.height, dp = F.dp, t = now/1000; g.drawImage(base, 0, 0);
+    const W = cv.width, H = cv.height, dp = F.dp, t = now/1000;
+    for (const el of root.querySelectorAll('.sc canvas')) drawSec(el, t);
+    if (VIEW){ drawView(t); return; }
+    g.drawImage(base, 0, 0);
     // a sweep across the plan, and the open calls pulsing
     const sx = ((t*.07) % 1)*W, gr = g.createLinearGradient(sx - 60*dp, 0, sx, 0); gr.addColorStop(0, 'rgba(143,220,149,0)'); gr.addColorStop(1, 'rgba(143,220,149,.07)'); g.fillStyle = gr; g.fillRect(sx - 60*dp, 0, 60*dp, H); g.fillStyle = 'rgba(143,220,149,.35)'; g.fillRect(sx, 0, dp, H);
     const k = (t*.7) % 1; for (const c of D.recent) if (c.st === 'open'){ const [x, y] = F.P(c.x, c.z); g.strokeStyle = `rgba(255,93,74,${(.8*(1 - k)).toFixed(2)})`; g.lineWidth = 1.3*dp; g.beginPath(); g.arc(x, y, (5 + k*16)*dp, 0, 7); g.stroke(); }
     if (hov){ const o = hov.cop ? D.ofc.find(q => q.id === hov.cop) : hov.drone ? D.dr.list.find(q => q.id === hov.drone) : hov.call; if (o){ const [x, y] = F.P(o.x, o.z); g.strokeStyle = '#d6ffd2'; g.lineWidth = dp; g.strokeRect(x - 8*dp, y - 8*dp, 16*dp, 16*dp); } }
-    for (const el of root.querySelectorAll('.sc canvas')) drawSec(el, t);
     const c = $('.clk'); if (c){ const s2 = (now/500 | 0) % 2 ? hm(D.now) : hm(D.now).replace(':', ' '); if (c.textContent !== s2) c.textContent = s2; }
+  }
+  /* ---------- the close scan: the map panel turns into a scan of the place itself ---------- */
+  // Click anything (a unit, a call, a drone, a sector, a case lead) and the plan gives way to a scan of that spot: the city itself, drawn once
+  // from a camera of its own above it (as the person cam draws its feed), turned to green phosphor with its edges traced bright, a reticle on
+  // the subject and what the desk knows about it beside. Nothing takes you out of the desk; FOLLOW ON CAM does, when you ask.
+  let VIEW = null, SNAP = null, srt = null, scam = null;
+  const SW = 760, SH = 470;
+  function snap(x, y, z, half){
+    if (!srt){ srt = new THREE.WebGLRenderTarget(SW, SH, { format: THREE.RGBAFormat }); scam = new THREE.OrthographicCamera(-1, 1, 1, -1, NEAR, FAR); scam.layers.enableAll(); scam.layers.disable(6); }
+    const asp = SW/SH; scam.left = -half*asp; scam.right = half*asp; scam.top = half; scam.bottom = -half; scam.updateProjectionMatrix();
+    const pt = 52*PI/180, yw = safe(() => yaw, .7), cp = Math.cos(pt);
+    scam.position.set(x + Math.sin(yw)*cp*CAM_DIST, y + Math.sin(pt)*CAM_DIST, z + Math.cos(yw)*cp*CAM_DIST); scam.lookAt(x, y, z); scam.updateMatrixWorld();
+    const res0 = FOL_UNI.res.value.clone(), rt0 = renderer.getRenderTarget(), all0 = SIDE_ARC.all, ac = renderer.autoClear, buf = new Uint8Array(SW*SH*4);
+    try {
+      FOL_UNI.res.value.set(SW, SH); SIDE_ARC.all = true; cullFrame(scam); CULL.lvl = -1; CULL.sd = false;
+      if (typeof pplFeedPre === 'function') pplFeedPre(scam); if (typeof bikeFeedPre === 'function') bikeFeedPre(scam);
+      renderer.setRenderTarget(srt); renderer.setClearColor(0x020604, 1); renderer.autoClear = true; renderer.render(scene, scam);
+      renderer.readRenderTargetPixels(srt, 0, 0, SW, SH, buf);
+    } catch (e){ console.warn('precinct: scan', e); }
+    finally { if (typeof pplFeedPost === 'function') pplFeedPost(); if (typeof bikeFeedPost === 'function') bikeFeedPost();
+      FOL_UNI.res.value.copy(res0); SIDE_ARC.all = all0; renderer.autoClear = ac; renderer.setRenderTarget(rt0); safe(() => { sideArc(); cullFrame(); }); }
+    // to phosphor: luminance stretched to the scene's own range, its edges traced bright, scan lines over it
+    const L = new Float32Array(SW*SH); for (let y2 = 0; y2 < SH; y2++) for (let x2 = 0; x2 < SW; x2++){ const q = ((SH - 1 - y2)*SW + x2)*4; L[y2*SW + x2] = .3*buf[q] + .59*buf[q + 1] + .11*buf[q + 2]; }
+    const hs = new Uint32Array(256); for (const v of L) hs[v | 0]++; let lo = 0, hi = 255, acc = 0; for (let k = 0; k < 256; k++){ acc += hs[k]; if (acc < L.length*.02) lo = k; if (acc < L.length*.985) hi = k; }
+    const cvs = document.createElement('canvas'); cvs.width = SW; cvs.height = SH; const cx = cvs.getContext('2d'), im = cx.createImageData(SW, SH), D2 = im.data, span = Math.max(20, hi - lo);
+    for (let y2 = 1; y2 < SH - 1; y2++) for (let x2 = 1; x2 < SW - 1; x2++){ const k = y2*SW + x2, l = Math.max(0, Math.min(1, (L[k] - lo)/span));
+      const ed = Math.min(1, (Math.abs(L[k + 1] - L[k - 1]) + Math.abs(L[k + SW] - L[k - SW]))/span*1.6);
+      let v = .08 + .55*Math.pow(l, .9) + .55*ed; if (y2 % 3 === 0) v *= .72; v = Math.min(1, v);
+      const o = k*4; D2[o] = 40*v + 150*ed*v; D2[o + 1] = 230*v; D2[o + 2] = 70*v + 120*ed*v; D2[o + 3] = 255; }
+    cx.putImageData(im, 0, 0);
+    const V = new THREE.Vector3(), P = (wx, wy, wz) => { V.set(wx, wy, wz).project(scam); return [(V.x*.5 + .5)*SW, (1 - (V.y*.5 + .5))*SH]; };
+    return { img: cvs, P };
+  }
+  function viewTarget(v){
+    if (v.type === 'cop' || v.type === 'person'){ const p = safe(() => people.get(v.id), null); if (!p) return null; const pl = safe(() => places.get(p.at), null), x = p.walk || !pl ? p.x : pl.x, z = p.walk || !pl ? p.z : pl.z; return isFinite(x) ? { x, y: CURB, z, half: 6 } : null; }
+    if (v.type === 'call') return { x: v.c.x, y: CURB, z: v.c.z, half: 7 };
+    if (v.type === 'drone'){ const d = D.dr.list.find(q => q.id === v.id); return d ? { x: d.x, y: CURB, z: d.z, half: 10 } : null; }
+    if (v.type === 'sector') return { x: v.q.cx, y: CURB, z: v.q.cz, half: Math.max(8, (v.q.bx.i1 - v.q.bx.i0 + 1)*LOT*.65) };
+    return null;
+  }
+  function view(v){
+    VIEW = v; SNAP = null; const det = $('.det');
+    const lg = $('.lg'); if (lg) lg.style.display = v ? 'none' : '';
+    if (!v){ det.hidden = true; return; }
+    const t = viewTarget(v); if (!t){ VIEW = null; det.hidden = true; return; }
+    SNAP = Object.assign(snap(t.x, t.y, t.z, t.half), { t, at: performance.now() });
+    det.innerHTML = detailHtml(v); det.hidden = false;
+  }
+  function detailHtml(v){
+    const back = '<button class="back" type="button">◂ BACK TO PLAN · ESC</button>';
+    if (v.type === 'cop'){ const o = D.ofc.find(q => q.id === v.id) || {}, mine = D.calls.filter(c => c.unit === v.id), last = mine[0];
+      return `<h4>UNIT ${o.b || ''}</h4><div class="s">${o.unit || ''} · ${o.shift || ''} SHIFT · STN-${p2((o.stn ?? 0) + 1)}</div>
+        <div class="kv"><span>STATUS</span><span class="${o.st === 'RESPONDING' ? 'red' : ''}">${o.st || ''}</span><span>SECTOR</span><span>${o.sec || ''}</span><span>CALLS TAKEN · 72 H</span><span>${mine.filter(c => D.now - c.c < 4320).length}</span>
+          <span>ARRESTS</span><span>${mine.filter(c => c.st === 'ARREST').length}</span><span>LAST CALL</span><span>${last ? esc(last.kind) + ' · ' + hm(last.c) : 'NONE'}</span></div>
+        <div class="row"><button type="button" data-follow="${esc(v.id)}">FOLLOW ON CAM ▸</button>${back}</div>`; }
+    if (v.type === 'person'){ const desc = safe(() => STORY.descOf(v.id), 'subject');
+      return `<h4>SUBJECT</h4><div class="s">${esc(String(desc).toUpperCase())}</div><div class="kv"><span>SECTOR</span><span>${SNAP ? sector(SNAP.t.x, SNAP.t.z) : ''}</span><span>STATUS</span><span>UNDER OBSERVATION</span></div>
+        <div class="row"><button type="button" data-follow="${esc(v.id)}">FOLLOW ON CAM ▸</button>${back}</div>`; }
+    if (v.type === 'call'){ const c = v.c, done = c.st !== 'open' && c.st !== 'LOGGED';
+      return `<h4>CALL ${String(c.id).padStart(5, '0')}</h4><div class="s">P${c.pri} · ${esc(c.kind)}${c.file ? ' · ' + c.file : ''}</div>
+        <div class="tl"><b class="on"></b><i></i><b class="${c.unit ? 'on' : ''}"></b><i></i><b class="${done ? 'on' : ''}"></b></div><div class="tlx"><span>LOGGED ${hm(c.c)}</span><span>UNIT</span><span>${done ? c.st + ' ' + hm(c.done ?? c.c) : 'OPEN'}</span></div>
+        <div class="kv"><span>SECTOR</span><span>${c.sec}</span><span>UNIT</span><span>${c.unit ? badge(c.unit) : '—'}</span><span>SOURCE</span><span>${c.src === 'real' ? 'STREET REPORT' : c.src === 'case' ? 'CASE FILE' : 'CALLER'}</span></div>
+        <div class="row">${c.unit ? `<button type="button" data-follow="${esc(c.unit)}">FOLLOW UNIT ▸</button>` : ''}${back}</div>`; }
+    if (v.type === 'drone'){ const d = D.dr.list.find(q => q.id === v.id) || { way: [] };
+      return `<h4>DRONE ${v.id}</h4><div class="s">STN-${p2((d.stn ?? 0) + 1)} · ${d.mode || ''}</div><div class="kv"><span>SECTOR</span><span>${d.sec || ''}</span><span>WAYPOINTS LEFT</span><span>${d.way.length}</span><span>ROUTE</span><span>${d.way.length ? d.way.slice(0, 5).map(w => sector(w[0], w[1])).join(' › ') + (d.way.length > 5 ? ' …' : '') : 'DOCKED'}</span></div><div class="row">${back}</div>`; }
+    if (v.type === 'sector'){ const q = v.q;
+      return `<h4>SECTOR ${q.name}</h4><div class="s">CLOSE SCAN · LOOKING DOWN</div><div class="kv"><span>CALLS · 72 H</span><span>${q.n}</span><span>UNITS IN SECTOR</span><span>${q.units}</span><span>LAST</span><span>${q.last ? esc(q.last.kind) + ' · ' + hm(q.last.c) : 'QUIET'}</span></div><div class="row">${back}</div>`; }
+    return back;
+  }
+  function drawView(t){
+    const W = cv.width, H = cv.height, dp = F.dp, S = SNAP; if (!S) return;
+    g.fillStyle = '#020604'; g.fillRect(0, 0, W, H);
+    const k = Math.min(W/SW, H/SH), w = SW*k, h = SH*k, ox = (W - w)/2, oy = (H - h)/2, Q = (x, y, z) => { const [a, b] = S.P(x, y, z); return [ox + a*k, oy + b*k]; };
+    // the scan builds up line by line the first moment, then holds, a band of light running down it
+    const u = Math.min(1, (performance.now() - S.at)/700); g.save(); g.beginPath(); g.rect(ox, oy, w, h*u); g.clip(); g.drawImage(S.img, ox, oy, w, h); g.restore();
+    const by = oy + ((t*.12) % 1)*h; const gr = g.createLinearGradient(0, by - 30*dp, 0, by); gr.addColorStop(0, 'rgba(143,220,149,0)'); gr.addColorStop(1, 'rgba(143,220,149,.12)'); g.fillStyle = gr; g.fillRect(ox, by - 30*dp, w, 30*dp);
+    g.strokeStyle = 'rgba(143,220,149,.35)'; g.lineWidth = dp; g.strokeRect(ox + .5, oy + .5, w - 1, h - 1);
+    for (const [x0, y0, sx, sy] of [[ox, oy, 1, 1], [ox + w, oy, -1, 1], [ox, oy + h, 1, -1], [ox + w, oy + h, -1, -1]]){ g.strokeStyle = '#d6ffd2'; g.beginPath(); g.moveTo(x0 + sx*18*dp, y0); g.lineTo(x0, y0); g.lineTo(x0, y0 + sy*18*dp); g.stroke(); }
+    const v = VIEW, T = S.t, [cx, cy] = Q(T.x, T.y + .5, T.z), rr = (16 + 3*Math.sin(t*4))*dp;
+    // what's around: route, unit, sector box
+    if (v.type === 'drone'){ const d = D.dr.list.find(q => q.id === v.id); if (d && d.way.length){ g.strokeStyle = '#d6ffd2'; g.setLineDash([6*dp, 4*dp]); g.beginPath(); let [a, b] = Q(d.x, CURB + 6, d.z); g.moveTo(a, b); for (const [x0, z0] of d.way){ [a, b] = Q(x0, CURB, z0); g.lineTo(a, b); } g.stroke(); g.setLineDash([]);
+      d.way.forEach(([x0, z0], q) => { const [a2, b2] = Q(x0, CURB, z0); g.strokeRect(a2 - 4*dp, b2 - 4*dp, 8*dp, 8*dp); g.fillStyle = '#d6ffd2'; g.font = (9*dp) + 'px JetBrains Mono, monospace'; g.fillText('W' + (q + 1), a2 + 6*dp, b2 - 4*dp); }); } }
+    if (v.type === 'call' && v.c.unit){ const o = D.ofc.find(q => q.id === v.c.unit); if (o && isFinite(o.x)){ const [a, b] = Q(o.x, CURB + .5, o.z); g.strokeStyle = 'rgba(255,176,58,.9)'; g.setLineDash([4*dp, 4*dp]); g.beginPath(); g.moveTo(a, b); g.lineTo(cx, cy); g.stroke(); g.setLineDash([]); g.fillStyle = '#ffb03a'; g.beginPath(); g.arc(a, b, 4*dp, 0, 7); g.fill(); g.font = (9*dp) + 'px JetBrains Mono, monospace'; g.fillText(o.b, a + 7*dp, b - 5*dp); } }
+    if (v.type === 'sector'){ const bx = v.q.bx, cs = [[bx.i0 - .5, bx.j0 - .5], [bx.i1 + .5, bx.j0 - .5], [bx.i1 + .5, bx.j1 + .5], [bx.i0 - .5, bx.j1 + .5]].map(([i, j]) => Q(i*LOT, CURB, j*LOT));
+      g.strokeStyle = '#d6ffd2'; g.setLineDash([5*dp, 4*dp]); g.beginPath(); cs.forEach(([a, b], q) => q ? g.lineTo(a, b) : g.moveTo(a, b)); g.closePath(); g.stroke(); g.setLineDash([]);
+      for (const c of D.recent) if (c.sec === v.q.name){ const [a, b] = Q(c.x, CURB, c.z); g.strokeStyle = c.st === 'open' ? '#ff5d4a' : '#ffb03a'; g.beginPath(); g.moveTo(a - 5*dp, b - 5*dp); g.lineTo(a + 5*dp, b + 5*dp); g.moveTo(a + 5*dp, b - 5*dp); g.lineTo(a - 5*dp, b + 5*dp); g.stroke(); } }
+    // the reticle on the subject
+    if (v.type !== 'sector'){ g.strokeStyle = v.type === 'call' ? '#ff5d4a' : '#d6ffd2'; g.lineWidth = 1.4*dp; g.beginPath(); g.arc(cx, cy, rr, 0, 7); g.stroke();
+      for (let q = 0; q < 4; q++){ const a = q*Math.PI/2 + t*.6; g.beginPath(); g.moveTo(cx + Math.cos(a)*(rr + 4*dp), cy + Math.sin(a)*(rr + 4*dp)); g.lineTo(cx + Math.cos(a)*(rr + 12*dp), cy + Math.sin(a)*(rr + 12*dp)); g.stroke(); }
+      g.lineWidth = dp; g.setLineDash([2*dp, 4*dp]); g.beginPath(); g.moveTo(ox, cy); g.lineTo(cx - rr - 14*dp, cy); g.moveTo(cx + rr + 14*dp, cy); g.lineTo(ox + w, cy); g.moveTo(cx, oy); g.lineTo(cx, cy - rr - 14*dp); g.moveTo(cx, cy + rr + 14*dp); g.lineTo(cx, oy + h); g.stroke(); g.setLineDash([]); }
+    g.fillStyle = 'rgba(214,255,210,.85)'; g.font = (9.5*dp) + 'px JetBrains Mono, monospace';
+    g.fillText('CLOSE SCAN · ' + sector(T.x, T.z) + ' · ' + (T.x/LOT).toFixed(1) + ', ' + (T.z/LOT).toFixed(1) + ' · ' + Math.round(T.half*2/LOT) + ' PLOTS ACROSS', ox + 10*dp, oy + h - 10*dp);
+    g.fillText('REC ' + hm(D.now), ox + 10*dp, oy + 16*dp); if ((t*2 | 0) % 2){ g.fillStyle = '#ff5d4a'; g.beginPath(); g.arc(ox + 80*dp, oy + 12*dp, 3.5*dp, 0, 7); g.fill(); }
   }
   /* ---------- in and out ---------- */
   function follow(id){ close(() => { try { if (MON.ready()) MON.open(id); } catch (e){ console.warn('precinct: follow', e); } }); }
@@ -493,15 +598,15 @@ const PRECINCT = (() => {
   PD.show = m => {
     if (PD.open || PD.busy) return; PD.busy = true; build(); tick();
     safe(() => { if (MON.id) MON.close(); }); safe(() => music.hold && music.hold(true)); safe(() => PERF.quiet(4000));
-    PD.open = true; PD.hold = true; sel = null; hov = null; D = read(); dom();
+    PD.open = true; PD.hold = true; sel = null; hov = null; VIEW = null; SNAP = null; D = read(); dom();
     requestAnimationFrame(() => { if (!PD.open) return; setup(); raf = requestAnimationFrame(loop); PD.busy = false; });
-    keyH = e => { if (!PD.open) return; e.stopPropagation(); if (e.key === 'Escape') close(); }; addEventListener('keydown', keyH, true);
+    keyH = e => { if (!PD.open) return; e.stopPropagation(); if (e.key === 'Escape'){ if (VIEW) view(null); else close(); } }; addEventListener('keydown', keyH, true);
     resH = () => { if (PD.open && root) setup(); }; addEventListener('resize', resH);
   };
   function close(then){
     if (!PD.open) return; PD.hold = false; safe(() => music.hold && music.hold(false)); safe(() => PERF.quiet(2500));
     cancelAnimationFrame(raf); if (keyH) removeEventListener('keydown', keyH, true); keyH = null; if (resH) removeEventListener('resize', resH); resH = null;
-    const r = root; root = null; base = null; g = null; F = null; PD.open = false;
+    const r = root; root = null; base = null; g = null; F = null; PD.open = false; VIEW = null; SNAP = null; if (srt){ srt.dispose(); srt = null; }
     if (r){ r.classList.remove('in'); r.classList.add('out'); setTimeout(() => r.remove(), 360); }
     if (typeof then === 'function') setTimeout(then, 60);
   }

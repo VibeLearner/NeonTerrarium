@@ -1805,6 +1805,7 @@ function rebuildCellPost(c){
   // the shadows again, now that it stands: a plot built in steps or by the worker arrives frames after the edit that asked for it (which already redrew them), so a neighbor's
   // old railing, gone since, kept its shadow on the paving until the view moved or something else was built (seen as a dashed line on a still view)
   if (!(typeof LOADP !== 'undefined' && LOADP.on)) shadowDirty = true;
+  if (!c.wall && typeof wallsBeside === 'function') wallsBeside(c);   // (a building finished beside a perimeter wall: the wall runs up to it again, perimeter.js)
 }
 // ---- plots built in steps (round 8, item 2). One job at a time; between its steps the globals the builders write into are put back as they were, so nothing else that builds
 // (a megastructure, a sync edit) can see or spoil a half-made piece. A job that is still running when another edit starts is finished at once (stageFinishAll). ----

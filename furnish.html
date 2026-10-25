@@ -14084,18 +14084,23 @@ function buildPod(P,opt){opt=opt||{};const sc=new T.Scene();sc.background=new T.
   const face=(grp,rid,len,y0,y1,x,z,ry,gy,alongFn)=>{const h=y1-y0;if(h<=.001)return;const g=new T.PlaneGeometry(len,h);const m=new T.Mesh(g,fin[rid].wall);m.position.set(x,(y0+y1)/2-gy,z);m.rotation.y=ry;m.receiveShadow=true;m.updateMatrix();
     const pos=g.attributes.position,uv=g.attributes.uv;const v=new T.Vector3();for(let i=0;i<pos.count;i++){v.set(pos.getX(i),pos.getY(i),pos.getZ(i)).applyMatrix4(m.matrix);uv.setXY(i,alongFn(v)/2.5,(v.y+gy)/2.3)}uv.needsUpdate=true;grp.add(m);return m};
   const runs=wallRunsOf(P);const faceList=[];runs.forEach((r,i)=>r.idx=i);
+  const lowBodies=[];   // the lower wall bodies never move or hide: one mesh for all of them (was one draw per run)
   // builder hook: every wall face mesh is tagged with its room and run (Build view applies wall finishes per segment)
   const tagF=(m,rid,r,up)=>{if(!m)return;m.userData.wallRoom=rid;m.userData.run=r.idx;m.userData.upper=up;faceList.push(m)};
   for(const r of runs){const bnd=r.ra<0||r.rb<0;const t=bnd?.06:PT,X=r.axis==='x';
     const len=(r.a1-r.a0)*TILE+(bnd?.12:PT),mid=(r.a0+r.a1)/2*TILE,off=bnd?(r.fix===0?-.03:r.fix*TILE+.03):r.fix*TILE;const cx=X?mid:off,cz=X?off:mid;
     r.c=[cx,cz];r.L=r.type==='part'?PART_H:LOW_H;r.n=X?[0,1]:[1,0];
-    const box=(grp,h,y)=>{if(h<=.001)return;const o=new T.Mesh(X?new T.BoxGeometry(len,h,t):new T.BoxGeometry(t,h,len),body);o.position.set(cx,y+h/2,cz);o.castShadow=true;o.receiveShadow=true;grp.add(o)};
+    const box=(grp,h,y)=>{if(h<=.001)return;const g=X?new T.BoxGeometry(len,h,t):new T.BoxGeometry(t,h,len);if(grp===root){g.translate(cx,y+h/2,cz);lowBodies.push(g);return}const o=new T.Mesh(g,body);o.position.set(cx,y+h/2,cz);o.castShadow=true;o.receiveShadow=true;grp.add(o)};
     const faces=(grp,y0,y1,gy)=>{const along=v=>X?v.x:v.z;if(r.ra>=0)tagF(face(grp,r.ra,len,y0,y1,X?cx:cx-t/2-.001,X?cz-t/2-.001:cz,X?PI:-PI/2,gy,along),r.ra,r,grp!==root);if(r.rb>=0)tagF(face(grp,r.rb,len,y0,y1,X?cx:cx+t/2+.001,X?cz+t/2+.001:cz,X?0:PI/2,gy,along),r.rb,r,grp!==root)};
     if(!r.door){box(root,r.L,0);faces(root,0,r.L,0)}
     const up=new T.Group();up.position.y=r.L;root.add(up);const y0=r.door?2.05:r.L;box(up,WALL_H-y0,y0-r.L);faces(up,y0,WALL_H,r.L);
     const capTop=new T.Mesh(X?new T.BoxGeometry(len,.014,t+.004):new T.BoxGeometry(t+.004,.014,len),r.type==='back'?capB:capM);capTop.position.set(cx,WALL_H-r.L+.007,cz);up.add(capTop);
     let cut=null;if(!r.door){cut=new T.Mesh(X?new T.BoxGeometry(len,.03,t+.02):new T.BoxGeometry(t+.02,.03,len),r.type==='part'?partCap:cutCap);cut.position.set(cx,r.L+.015,cz);cut.castShadow=false;root.add(cut)}
     Object.assign(r,{up,cut,pieces:[],cur:1,target:1})}
+  if(lowBodies.length){let nv=0,ni=0;for(const g of lowBodies){nv+=g.attributes.position.count;ni+=g.index.count}const pos=new Float32Array(nv*3),nrm=new Float32Array(nv*3),uv=new Float32Array(nv*2),idx=nv>65535?new Uint32Array(ni):new Uint16Array(ni);let vo=0,io=0;
+    for(const g of lowBodies){pos.set(g.attributes.position.array,vo*3);nrm.set(g.attributes.normal.array,vo*3);uv.set(g.attributes.uv.array,vo*2);const I=g.index.array;for(let i=0;i<I.length;i++)idx[io++]=I[i]+vo;vo+=g.attributes.position.count;g.dispose()}
+    const mg=new T.BufferGeometry();mg.setAttribute('position',new T.BufferAttribute(pos,3));mg.setAttribute('normal',new T.BufferAttribute(nrm,3));mg.setAttribute('uv',new T.BufferAttribute(uv,2));mg.setIndex(new T.BufferAttribute(idx,1));mg.computeBoundingSphere();
+    const o=new T.Mesh(mg,body);o.castShadow=true;o.receiveShadow=true;o.name='wallBodies';root.add(o)}
   // entry door marked on the floor: threshold strip and the door's swing
   {const amber=new T.MeshStandardMaterial({color:'#000',emissive:'#ffb347',emissiveIntensity:1.6,side:T.DoubleSide});const k=P.door.k,i=k%W,j=(k/W)|0;const S=P.door.side==='S';
     const th=mk(S?new T.BoxGeometry(TILE,.012,.06):new T.BoxGeometry(.06,.012,TILE),amber,S?(i+.5)*TILE:Wm+.03,0,S?Dm+.03:(j+.5)*TILE);th.castShadow=false;
@@ -17027,16 +17032,18 @@ function zRoomCheck(){const Z=S.zRooms;if(!Z)return;for(const r of Z){if(!r.vali
 // meshes show again) and they are rebuilt in 2 ms slices after the scene has been quiet; a piece that was ever seen hidden (wall cut-aways) stays out.
 const _n3=new TH.Matrix3();
 function l2Init(){S.l2=S.rooms.map((R,i)=>({i,valid:false,meshes:[],srcs:[],job:null,chk:0,stage:null}));S.l2T=now();S.l2Diag={built:0,drops:{}}}
-function l2Drop(r){for(const m of r.meshes){if(m.parent)m.parent.remove(m);m.geometry.dispose()}for(const x of r.srcs){if(x.o.userData.prL2Hid){x.o.visible=true;delete x.o.userData.prL2Hid}}r.meshes=[];r.srcs=[];r.valid=false;r.job=null;r.stage=null}
+function l2Drop(r){r.wait=null;for(const m of r.meshes){if(m.parent)m.parent.remove(m);m.geometry.dispose()}for(const x of r.srcs){if(x.o.userData.prL2Hid){x.o.visible=true;delete x.o.userData.prL2Hid}}r.meshes=[];r.srcs=[];r.valid=false;r.job=null;r.stage=null}
 function l2Invalidate(i,why){if(!S||!S.l2)return;S.l2T=now();let any=false;for(const r of (i==null?S.l2:[S.l2[i]])){if(!r||!(r.valid||r.job||r.stage))continue;any=true;l2Drop(r)}
   if(any){const D=S.l2Diag.drops,w=why||'?';D[w]=(D[w]||0)+1;zRoomInvalidate(null,'l2')}}
 const l2Cand=o=>o.isMesh&&o.userData.prMergedMesh&&o.material&&o.material.name==='prVC'&&!o.userData.prL2Hid&&!underUI(o);
 const l2Key=o=>[o.material.uuid,attrSig(o.geometry),o.castShadow,o.receiveShadow,o.layers.mask].join('|');
-function l2Ready(r){return r.stage!=='warm'||!!(S.warm&&!S.mergeQ.length&&!S.warm.queue.includes('merge')&&S.warm.pend.size===0)}
+function l2Ready(r){if(r.stage!=='warm')return true;if(r.wait)return !!S.warm&&r.wait.every(p=>!S.warm.pend.has(p));return !!(S.warm&&!S.mergeQ.length&&!S.warm.queue.includes('merge')&&S.warm.pend.size===0)}
 const l2Todo=r=>!r.valid&&l2Ready(r);
-function l2Busy(){return !!(S.l2&&S.ab.l2Merge!==false&&S.matReady&&S.warm&&S.warm.finished&&!S.picking&&!S.optQ.length&&!S.mergeQ.length&&(S.flushing||(now()-S.editT>1500&&now()-S.l2T>700))&&S.l2.some(l2Todo))}
+// room merges once the first bake is done, not after the whole shader warm-up (its other shadow-count variants can take a minute, and until
+// then a room drew hundreds of separate meshes, Oct 25 trace)
+function l2Busy(){return !!(S.l2&&S.ab.l2Merge!==false&&S.matReady&&S.warm&&(S.warm.finished||(S.ab.l2Early!==false&&(S.probesReady||S.ab.l2Early===true)))&&!S.picking&&!S.optQ.length&&!S.mergeQ.length&&(S.flushing||(now()-S.editT>1500&&now()-S.l2T>700))&&S.l2.some(l2Todo))}
 function l2Step(){const r=S.l2.find(l2Todo);if(!r)return null;const t0=now();
-  if(r.stage==='warm'){for(const mm of r.meshes)mm.visible=true;for(const x of r.srcs){x.o.userData.prL2Hid=true;x.o.visible=false}r.stage=null;r.valid=true;S.l2Diag.built++;S.plDirty=true;zRoomInvalidate(null,'l2swap');return 'room merge done'}
+  if(r.stage==='warm'){for(const mm of r.meshes)mm.visible=true;for(const x of r.srcs){x.o.userData.prL2Hid=true;x.o.visible=false}r.stage=null;r.valid=true;S.l2Diag.built++;S.plDirty=true;zRoomInvalidate(S.zRooms&&S.zRooms[r.i]?r.i:null,'l2swap');return 'room merge done'}
   if(!r.job){const list=[];S.scene.traverseVisible(o=>{if(!l2Cand(o))return;const pc=pieceOf(o);if(pc&&pc.userData.prFlaky)return;bbOf(o).getCenter(_v);if(roomOfPoint(_v.x,_v.y,_v.z)===r.i)list.push(o)});
     const G=new Map();for(const o of list){const k=l2Key(o);let g=G.get(k);if(!g)G.set(k,g={list:[],nv:0,ni:0});const ga=o.geometry;g.list.push(o);g.nv+=ga.attributes.position.count;g.ni+=ga.index?ga.index.count:ga.attributes.position.count}
     for(const [k,g] of [...G]){if(g.list.length<2){G.delete(k);continue}const g0=g.list[0].geometry;g.keys=Object.keys(g0.attributes);g.arr={};for(const a of g.keys)g.arr[a]=new Float32Array(g.nv*g0.attributes[a].itemSize);g.idx=g.nv>65535?new Uint32Array(g.ni):new Uint16Array(g.ni);g.vo=0;g.io=0}
@@ -17055,7 +17062,11 @@ function l2Step(){const r=S.l2.find(l2Todo);if(!r)return null;const t0=now();
     mm.name='prRoomMerge'+r.i;mm.raycast=()=>{};mm.visible=false;S.root.add(mm);mm.updateMatrixWorld(true);r.meshes.push(mm);
     for(const o of g.list)srcs.push({o,k:mwKey(o)})}
   // the merged meshes sit hidden while the merge warm job compiles their programs; the swap happens once that is finished, so no frame ever pays a shader build
-  r.srcs=srcs;r.job=null;r.stage='warm';S.mergeQ.push(r.meshes.slice());if(!S.warm.queue.includes('merge'))S.warm.queue.push('merge');return 'room merge built'}
+  r.srcs=srcs;r.job=null;r.stage='warm';
+  if(S.ab.l2Early!==false){   // its programs compiled now, in the background, and the swap waits for just those (not behind the rest of the warm-up queue)
+    const W=S.warm,before=new Set(W.pend);W.group.clear();for(const mm of r.meshes){const m=mm.material,c=m.clone();c.userData=Object.assign({},m.userData);c.envMap=m.envMap;c.envMapIntensity=m.envMapIntensity;if(PATCHED.has(m))patch(c,true);const px=new TH.Mesh(mm.geometry,c);px.frustumCulled=false;W.keep.push(px);W.group.add(px)}
+    W.group.visible=false;warmCompile(()=>{S.R.setRenderTarget(S.hdr);S.R.compile(W.scene,S.camera)});S.R.setRenderTarget(null);W.group.clear();r.wait=[...W.pend].filter(p=>!before.has(p));return 'room merge built'}
+  S.mergeQ.push(r.meshes.slice());if(!S.warm.queue.includes('merge'))S.warm.queue.push('merge');return 'room merge built'}
 // a few sources per frame are re-checked: a piece hidden (wall cut-away), moved or removed without a sceneChanged drops its room's merge, and a hidden piece stays out of later ones
 function l2Check(){const Z=S.l2;if(!Z)return;for(const r of Z){if(!r.valid||!r.srcs.length)continue;for(let n=0;n<8;n++){r.chk=(r.chk+1)%r.srcs.length;const s=r.srcs[r.chk],o=s.o;
   if(!o.parent){l2Invalidate(r.i,'orphan');break}if(!effVisible(o.parent)){const pc=pieceOf(o);if(pc)pc.userData.prFlaky=1;l2Invalidate(r.i,'hidden');break}if(Math.abs(mwKey(o)-s.k)>1e-4){l2Invalidate(r.i,'moved');break}}}}

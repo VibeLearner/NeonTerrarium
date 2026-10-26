@@ -238,13 +238,16 @@ function nvFree(job){ if (job.ig) job.ig.dispose(); if (job.rtId) job.rtId.dispo
 // ---- the layout again with some triangles moved to H (the order inside each list stays as it was, so the sizes stay sorted). Done for the plot's own order and for its second one (sideLayoutGen's far),
 // a triangle being the same one by its three corners. ----
 const nvKey = (a, b, c) => a < b ? (b < c ? a + '|' + b + '|' + c : (a < c ? a + '|' + c + '|' + b : c + '|' + a + '|' + b)) : (a < c ? b + '|' + a + '|' + c : (b < c ? b + '|' + c + '|' + a : c + '|' + b + '|' + a));
-function nvRelayoutOne(g, I, cut, hide){
+// a triangle as one number, from its three corners whatever their order (the vertex count cubed stays under 2^53 up to 2^17 corners; above that the
+// string as before). Strings for every triangle made a plot's apply 50 to 120 ms and megabytes of garbage on a big plot: seen as hitches (Oct 26)
+const nvKeyFn = n => n <= 131072 ? (a, b, c) => { let t; if (a > b){ t = a; a = b; b = t; } if (b > c){ t = b; b = c; c = t; } if (a > b){ t = a; a = b; b = t; } return (a*n + b)*n + c; } : nvKey;
+function nvRelayoutOne(g, I, cut, hide, key = nvKey){
   const P = g.attributes.position.array, far = !!cut.offT;
   const edge = k => { const a = I[k]*3, b = I[k + 1]*3, c = I[k + 2]*3; return Math.max(Math.hypot(P[b] - P[a], P[b + 1] - P[a + 1], P[b + 2] - P[a + 2]), Math.hypot(P[c] - P[a], P[c + 1] - P[a + 1], P[c + 2] - P[a + 2]), Math.hypot(P[c] - P[b], P[c + 1] - P[b + 1], P[c + 2] - P[b + 2])); };
   const Al = [], Hl = [], Sl = Array.from({ length: SIDE_K }, () => []), Tl = Array.from({ length: SIDE_K }, () => []), cls = new Int32Array(cut.cls.length);
   for (let k = cut.A; k < cut.A + cut.H; k++) Hl.push(I[k]);
   const take = (from, to, dst, row) => { const E = [];
-    for (let k = from; k < to; k += 3){ if (hide.has(nvKey(I[k], I[k + 1], I[k + 2]))){ Hl.push(I[k], I[k + 1], I[k + 2]); continue; } dst.push(I[k], I[k + 1], I[k + 2]); E.push(edge(k)); }
+    for (let k = from; k < to; k += 3){ if (hide.has(key(I[k], I[k + 1], I[k + 2]))){ Hl.push(I[k], I[k + 1], I[k + 2]); continue; } dst.push(I[k], I[k + 1], I[k + 2]); E.push(edge(k)); }
     for (let q = 0; q < SMALL_N; q++){ let n = 0; while (n < E.length && E[n] >= SMALL_E[q]) n++; cls[row*SMALL_N + q] = n*3; } };
   take(0, cut.A, Al, 0);
   const sb = cut.A + cut.H;
@@ -259,8 +262,8 @@ function nvRelayoutOne(g, I, cut, hide){
   return { ix, cut: far ? { A: Al.length, H: Hl.length, S: nS + nT, off, offT, cls, far: true } : { A: Al.length, H: Hl.length, S: nS, off, cls } };
 }
 function nvApply(c, g, tri, never){
-  const I = g.index.array, hide = new Set(); for (let t = 0; t < tri.length; t++) if (never[t]){ const k = tri[t]; hide.add(nvKey(I[k], I[k + 1], I[k + 2])); }
-  const L = nvRelayoutOne(g, I, g.userData.cut, hide), F = g.userData.far ? nvRelayoutOne(g, g.userData.far.ix, g.userData.far.cut, hide) : null;
+  const I = g.index.array, key = nvKeyFn(g.attributes.position.count), hide = new Set(); for (let t = 0; t < tri.length; t++) if (never[t]){ const k = tri[t]; hide.add(key(I[k], I[k + 1], I[k + 2])); }
+  const L = nvRelayoutOne(g, I, g.userData.cut, hide, key), F = g.userData.far ? nvRelayoutOne(g, g.userData.far.ix, g.userData.far.cut, hide, key) : null;
   if (!g.userData.nvOrig) g.userData.nvOrig = { index: g.index, cut: g.userData.cut, far: g.userData.far };
   g.userData.nvNew = { index: new THREE.BufferAttribute(L.ix, 1), cut: L.cut, far: F };
   c._nvGeo = g; NV.stats.plots++; NV.stats.removed += never.reduce((a, b) => a + b, 0); NV.stats.drawn += tri.length;
@@ -310,7 +313,7 @@ function nvTick(){
     if (NV.queue.length > 1 && idle) NV.queue.sort((a, b) => Math.hypot(a.x - camT.x, a.z - camT.z) - Math.hypot(b.x - camT.x, b.z - camT.z));   // (the plots nearest the view first)
     while (NV.queue.length){ const c = NV.queue.shift(), g = nvNeeds(c); if (!g) continue;
       const tri = nvTriangles(g), bits = nvLookup(c, g, tri);
-      if (bits){ nvApply(c, g, tri, nvFromBits(bits, tri.length)); NV.stats.fromStore++; break; }   // (one plot a frame)
+      if (bits){ if (NV.still < 10){ NV.queue.unshift(c); break; } nvApply(c, g, tri, nvFromBits(bits, tri.length)); NV.stats.fromStore++; break; }   // (one plot a frame, and only with the view still: it re-lays the plot's triangles, a few milliseconds on a big one, and the merge after it)
       if (!c._nvFresh && !(PH.tests.nvBackfill || window.__NV_BACKFILL)){ c._nvGeo = g; continue; }   // (plots that were there at load are not worked out unless the test "never-seen backfill" is on; a stored result above still applies)
       if (!idle || window.__NV_NO_COMPUTE) { NV.queue.unshift(c); break; }
       NV.job = nvStart(c); break; }

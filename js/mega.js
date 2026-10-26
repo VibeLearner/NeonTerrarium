@@ -301,7 +301,7 @@ function megaFx(m){
   if (m.carryFx){ const fx = m.carryFx; m.carryFx = null; fx.rebase(m); m.fx = m.keptFx = fx; return; }   // turned: the same live parts, set down in the new layout
   const t = MEGA_TYPES[m.kind]; if (t.fx) m.fx = t.fx(m) || null;
 }
-function updateMegaFx(dt, time){ for (const m of megas.values()) if (m.fx) m.fx.update(dt, time); fieldTick(dt); }
+function updateMegaFx(dt, time){ PH.subBegin(); for (const m of megas.values()) if (m.fx){ m.fx.update(dt, time); PH.sub('megastructure: ' + m.kind); } fieldTick(dt); PH.sub('megastructure: forcefield'); }   // (each one timed in the hitch report, F3)
 // The effects' instance buffers (belts, crates, the spire's light) change every frame, but only go up to the graphics card
 // while their megastructure is on screen (none of them casts a shadow, so off screen they show nowhere); a change made off
 // screen waits and goes up the frame it comes into view. megaFxFlush runs once the frame's view is known (main.js).

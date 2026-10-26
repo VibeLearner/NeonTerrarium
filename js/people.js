@@ -1523,7 +1523,7 @@ function lurkVictim(L, t){
   return null;
 }
 function updateLurkers(dt, t){
-  const night = isNight(S.hour);
+  const night = isNight(S.hour) && !(typeof STORY !== 'undefined' && STORY.engine === false);   // (no street crime while the storylet engine is off: story.js)
   for (const L of lurkers.values()){
     switch (L.state){
       case 'away':      // not out (daytime, or lying low after a job)

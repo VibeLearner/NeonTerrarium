@@ -156,6 +156,7 @@ const DOSSIER = (() => {
   let lastT = performance.now();
   setInterval(() => {
     const now = performance.now(), dt = Math.min(1, (now - lastT)/1000); lastT = now;
+    if (window.STORY && STORY.engine === false){ if (T.id || T.cands){ clearTrace(); T.id = null; } return; }   // (the storylet engine is off: the array learns nothing and traces no one: story.js)
     try { watch(dt); } catch (e) {}
     const id = typeof MON !== 'undefined' && MON.id;
     if (!panel) return;

@@ -516,3 +516,6 @@ body.furnishing #view{cursor:pointer}
 @media (prefers-reduced-motion:reduce){.furnish.derez .furnish-frame{animation:none;opacity:0;transition:opacity .2s}.furnish.derez::before,.furnish.derez::after{display:none}}
 body.furnish-open .zonebar,body.furnish-open .deck-toggle,body.furnish-open .hud{visibility:hidden}
 @media (max-width:700px){.furnbtn{height:34px;padding:0 10px;font-size:10px}}
+/* the storylet engine on: the time can't be set (story.js lockTime) */
+#hour:disabled,#presets button:disabled,#cycle:disabled,#ffbar button:disabled{opacity:.38;cursor:not-allowed}
+label.tog:has(#cycle:disabled){opacity:.55;cursor:not-allowed}

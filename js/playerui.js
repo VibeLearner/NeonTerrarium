@@ -137,11 +137,12 @@ addEventListener('pointerdown', e => { if (!cityPanel.hidden && !cityPanel.conta
 // time and weather
 if (timeSec){ const h = timeSec.querySelector('h2'); if (h) h.textContent = 'Time and weather'; }
 const cycleLab = relabel('cycle', 'Day and night cycle', 'The clock runs by itself: a whole day in an hour');
+const engineLab = relabel('storyEngine', 'Storylet engine', typeof STORY !== 'undefined' && STORY.engineTip || '');
 const wx = looksSec ? looksSec.querySelector('#wxChips') : null, autoWxLab = $('autoWeather') ? $('autoWeather').closest('label') : null, wxStatus = $('lookStatus');
 if (autoWxLab){ for (const n of [...autoWxLab.childNodes]) if (n.nodeType === 3) n.remove(); autoWxLab.append(document.createTextNode(' Weather changes by itself')); }
 if (timeSec){ const togs = timeSec.querySelector('.togs'), wind = $('wind') && $('wind').closest('.slider');
   const timeKids = [...timeSec.children].filter(n => n.tagName !== 'H2' && n !== togs && n !== wind);
-  C.panes.city.append(group('Time', el('div', { class: 'togs' }, cycleLab), ...timeKids), group('Weather', el('div', { class: 'togs' }, autoWxLab), wx, wind));
+  C.panes.city.append(group('Time', el('div', { class: 'togs' }, engineLab, cycleLab), ...timeKids), group('Weather', el('div', { class: 'togs' }, autoWxLab), wx, wind));
   if (togs){ togs.style.display = 'none'; cityPanel.append(togs); } }   // (the old Rain box stays in the page, hidden: the looks read it)
 if (buildSec){ const h = buildSec.querySelector('h2'); if (h) h.remove(); C.panes.city.append(group('New buildings', ...buildSec.children)); }
 // Advanced: the look (a colour mood for the whole city) and its editor

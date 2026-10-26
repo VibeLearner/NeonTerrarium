@@ -238,7 +238,11 @@ const TRAILER = (() => {
       w.requestAnimationFrame = fn => { if (CO.paused){ CO.pend = fn; return 0; } return CO.raf(fn); };
       CO.paused = false;   // (a few frames to build its first view, then it rests)
       setTimeout(() => { CO.paused = true; }, 1500);
-      const mute = () => { const m = w.COASTMUSIC; if (m && m.el){ m.el.muted = true; try { m.el.pause(); } catch (e) {} } };
+      // the coast's own soundtrack stays silent: the trailer has Bytes and its own waves. (COASTMUSIC is a top-level const in the frame, not a
+      // window property, so it is reached through the frame's eval; and every later play() in that page is turned into a silent no-op)
+      w.HTMLMediaElement.prototype.play = function (){ this.muted = true; try { this.pause(); } catch (e) {} return Promise.resolve(); };
+      const mute = () => { try { const el = w.eval('typeof COASTMUSIC !== "undefined" && COASTMUSIC.el'); if (el){ el.muted = true; el.volume = 0; el.pause(); } } catch (e) {}
+        for (const m of w.document.querySelectorAll('audio,video')){ m.muted = true; try { m.pause(); } catch (e) {} } };
       mute(); CO.muteT = setInterval(mute, 250);
       w.COAST.setHour(8.4);
       const s = w.COAST.state; CO.yaw = s.yaw - .35; CO.zoom = 21;

@@ -527,6 +527,6 @@ label.tog:has(#cycle:disabled){opacity:.55;cursor:not-allowed}
 .eng-tip p{margin:0 0 6px}
 .eng-tip em{font-style:normal;display:inline-block;min-width:30px;color:#ff5fae;font-weight:600}
 .eng-tip ul{margin:0 0 6px;padding-left:16px} .eng-tip li{margin:1px 0}
-.eng-tip p:last-child{margin:0;color:#9aa0b8}
+.eng-tip p:last-child{margin:0}
 .eng-tip p.k{display:grid;grid-template-columns:34px 1fr}
 .eng-tip ul{padding-left:50px}

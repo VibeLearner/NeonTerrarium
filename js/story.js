@@ -1301,9 +1301,8 @@ STORY.load();
 { const box = document.getElementById('storyEngine'); if (box){ box.addEventListener('change', () => STORY.setEngine(box.checked));
   const lab = box.closest('label'), tip = document.createElement('div'); tip.className = 'eng-tip'; tip.setAttribute('role', 'tooltip'); tip.id = 'engTip'; tip.hidden = true;
   tip.innerHTML = '<b>Storylet engine</b>'
-    + '<p class="k"><em>On</em><span>Days pass and the clock runs by itself. The time can\'t be changed.</span></p>'
-    + '<p class="k"><em>Off</em><span>Pauses:</span></p><ul><li>Storylets and case moments</li><li>Street crime and police calls</li><li>LIDAR learning</li></ul>'
-    + '<p>The day stops counting and you can set the time freely. Switched back on, it picks up from the moment it was paused.</p>';
+    + '<p class="k"><em>On</em><span>Time runs on its own and days pass.</span></p>'
+    + '<p class="k"><em>Off</em><span>Stories, cases, crime and learning about residents pause. The day stays put, and you can set any time.</span></p>';
   document.body.appendChild(tip);
   if (lab){ lab.removeAttribute('title'); lab.setAttribute('aria-describedby', 'engTip');
     const show = () => { tip.hidden = false; const r = lab.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;

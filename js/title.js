@@ -120,8 +120,8 @@ const TITLE = (() => {
         time(){ ROOM.setTime(TOD); const k = { morning: 1.1, day: 1.3, evening: .9, night: .7 }[TOD] || 1; ROOM.shutterLight.lt.intensity = 1.2*k; ROOM.shutterLight.hm.intensity = .45*k; },
         at(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam); return [(v.x + 1)/2, (1 - v.y)/2]; },
         draw(t){ tick(reduced ? 0 : t);
-          if (TP){ if (RT && RTMODE) TP.time('rt', () => RT.draw(lightParams()), RT.renderer); TP.time('live', () => { ROOM.aimSun(sunW > 0 ? sunH*Math.PI/180*SUNSGN : null); ROOM.L.sun.intensity *= .6*sunW; r.render(scene, cam); }, r); return; }
-          if (RT && RTMODE) RT.draw(lightParams()); ROOM.aimSun(sunW > 0 ? sunH*Math.PI/180*SUNSGN : null); ROOM.L.sun.intensity *= .6*sunW; r.render(scene, cam); },
+          if (TP){ if (RT && RTMODE) TP.time('rt', () => RT.draw(lightParams()), RT.renderer); TP.time('live', () => { liveSun(); r.render(scene, cam); }, r); return; }
+          if (RT && RTMODE) RT.draw(lightParams()); liveSun(); r.render(scene, cam); },
         renderer: r
       };
       if (view) live.view(view);
@@ -129,8 +129,33 @@ const TITLE = (() => {
     return liveP;
   }
   let SUNSGN = 1;
+  // the live layer's sun (the plants and the lamp drawn over the room): the same light as the room's, the city's at night
+  function liveSun(){
+    const G = cityGlow(), nK = G.nK || 0; ROOM.aimSun(sunW > 0 || nK > 0 ? sunH*Math.PI/180*SUNSGN : null);
+    const Ls = ROOM.L.sun;
+    if (nK > 0){ const wc = ROOM.winCenter(), d = Ls.position.clone().sub(wc).normalize().lerp(G.toCity, nK).normalize();
+      Ls.position.copy(wc).addScaledVector(d, 9); Ls.target.position.copy(wc).addScaledVector(d, -3); Ls.target.updateMatrixWorld(); Ls.updateMatrixWorld();
+      Ls.color.set(ROOM.TIMESDATA[TOD].sunC).lerp(G.col, nK*.85); Ls.intensity *= 1 - nK + nK*.85*G.fl; }
+    Ls.intensity *= .6*(sunW*(1 - nK) + OPEN*nK);
+  }
   // the room's light at the city's hour: the four looks the bake knew, blended through the day
   const KEYS = [[-3, 'night'], [5, 'night'], [8, 'morning'], [13, 'day'], [18, 'evening'], [21, 'night'], [29, 'night'], [32, 'morning']];
+  // At night the light in the window isn't a sun's: it's the city's, coming up from the streets far below and spread all round, so it lights the
+  // ceiling and the undersides rather than the floor, whichever way the pod faces. It takes the signs' colours, drifting slowly between
+  // magenta, cyan, violet and amber, and now and then it buzzes, as a failing tube does. Its direction stays put (the shadow map is only
+  // drawn again when the light moves: realtime.js), only its colour and strength change
+  let NEONC = null;
+  function cityGlow(){
+    const h = ((HOUR % 24) + 24) % 24; let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1][0] <= h) i++;
+    const [h0, k0] = KEYS[i], [h1, k1] = KEYS[i + 1], f = h1 > h0 ? (h - h0)/(h1 - h0) : 0, nK = (k0 === 'night' ? 1 - f : 0) + (k1 === 'night' ? f : 0);
+    if (nK <= 0) return { nK: 0 };
+    NEONC = NEONC || [0xff3fd0, 0x2fd8ff, 0x8a5cff, 0xffa040].map(c => new THREE.Color(c));
+    const ph = performance.now()/1000, out = ROOM.winNormal().negate(), e = -26*Math.PI/180;
+    const toCity = new THREE.Vector3(out.x, 0, out.z).normalize().multiplyScalar(Math.cos(e)); toCity.y = Math.sin(e);
+    const u = (ph*.045) % NEONC.length, k = Math.floor(u), fr = u - k, sm = fr*fr*(3 - 2*fr), col = NEONC[k].clone().lerp(NEONC[(k + 1) % NEONC.length], sm);
+    const d = Math.max(0, Math.sin(ph*1.3)*Math.sin(ph*.53 + 2) - .72)/.28, fl = 1 - .45*d*(.5 + .5*Math.sin(ph*37));
+    return { nK, toCity, col, fl };
+  }
   function lightParams(){
     const T = ROOM.TIMESDATA, h = ((HOUR % 24) + 24) % 24; let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1][0] <= h) i++;
     const [h0, k0] = KEYS[i], [h1, k1] = KEYS[i + 1], f = h1 > h0 ? (h - h0)/(h1 - h0) : 0, a = T[k0], b = T[k1];
@@ -141,10 +166,12 @@ const TITLE = (() => {
     // at night the city's neon drifts the light slowly between blue and purple (how much night there is: the lamps' weight)
     const nk = Math.min(1, L(a.lamps, b.lamps)), ph = performance.now()/1000, drift = .5 + .5*Math.sin(ph*.45) *Math.sin(ph*.17 + 1);
     const neon = c => nk > 0 ? c.lerp(new THREE.Color(drift > .5 ? 0xb04cff : 0x4c7bff), nk*.35*Math.abs(drift - .5)*2) : c;
-    return { sunDir: toSun.negate(), sunCol: neon(Cl(a.sunC, b.sunC)), sunI, sunOn: sunW*(sunI > 0 ? 1 : 0), sky: neon(Cl(a.sky, b.sky)), skyI: L(a.skyI, b.skyI),
+    const G = cityGlow(), nK = G.nK; let sunC = Cl(a.sunC, b.sunC), sI = sunI, on = sunW;
+    if (nK > 0){ toSun.lerp(G.toCity, nK).normalize(); sunC.lerp(G.col, nK*.85); sI = sunI*(1 - nK + nK*.85*G.fl); on = sunW*(1 - nK) + OPEN*nK; }
+    return { sunDir: toSun.negate(), sunCol: sunC, sunI: sI, sunOn: on*(sunI > 0 ? 1 : 0), sky: neon(Cl(a.sky, b.sky)), skyI: L(a.skyI, b.skyI),
       hemi: [Cl(a.hemi[0], b.hemi[0]), Cl(a.hemi[1], b.hemi[1]), L(a.hemi[2], b.hemi[2])*dimK], amb: L(a.amb, b.amb)*dimK, fill: [Cl(a.fill[0], b.fill[0]), L(a.fill[1], b.fill[1])*dimK],
-      density: L(a.density, b.density), lampsK: L(a.lamps, b.lamps), grade: [0, 1].map(j => [0, 1, 2].map(k => L(a.grade[j][k], b.grade[j][k]))), open: OPEN,
-      barOn: BAR_ON, bounceK: (.25 + .75*sunW)*.45*OPEN*(sunI > 0 ? Math.min(1, sunI/5) : .3) };
+      density: L(a.density, b.density)*(1 - .5*nK), lampsK: L(a.lamps, b.lamps), grade: [0, 1].map(j => [0, 1, 2].map(k => L(a.grade[j][k], b.grade[j][k]))), open: OPEN,
+      barOn: BAR_ON, bounceK: (.25 + .75*on)*.45*OPEN*(sunI > 0 ? Math.min(1, sI/5) : .3) };
   }
   let BAR_ON = 1;
   function drawLive(now){ if (!live || now - liveAt < (TP && TP.every != null ? TP.every : 0)) return; liveAt = now; live.draw(now/1000); drawPool(); }

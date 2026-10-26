@@ -5,12 +5,12 @@ It is played by the game itself: open the game with `#trailer` at the end of the
 
 | Time | Shot |
 |---|---|
-| 0 to 8.4 s | Four separate sectors (residential, commercial, luxury, industrial) joined by one metro line, turning while the day runs from morning haze through golden hour to dusk |
-| 8.4 to 13.5 s | The camera dives onto a resident walking home; the person cam opens and their profile fills in (close-ups swing round or tilt up so no building blocks the view) |
+| 0 to 8.4 s | Four separate sectors (residential, commercial, luxury, industrial) joined by one metro line, turning while the day runs from morning haze through golden hour to dusk; new buildings are placed round their outer edges with the game's build animation |
+| 8.4 to 13.5 s | The camera dives onto a street corner where a resident meets a neighbor; the person cam opens and the log fills in from their conversation (the corner is picked so no building blocks the view) |
 | 13.5 to 19 s | Their own apartment opens in Furnish pod: the hologram scan, then two pieces of furniture are set down while the room turns |
-| 19 to 21.72 s | The lull in the music: the picture glitches into the coast (waves and shorebirds) and glitches back out on the drop |
-| 21.72 s | The drop: 3 a.m. in the rain. The crime boss's people clean out the safehouse and walk off with the crates |
-| 26.22 s | Four officers hurry to the same door (arriving 29.5 s), knock, two go in, and come back out with one empty crate |
+| 19 to 21.72 s | The lull in the music: the picture glitches into the coast, a town grown along the cliffs seen whole at midday (waves and shorebirds), and glitches back out on the drop |
+| 21.72 s | The drop: 3 a.m. in the rain. The crime boss's people slip out the back of the safehouse with the crates |
+| 26.22 s | Four officers hurry to its front door (arriving 29.5 s), knock, two go in, and come back out with one empty crate |
 | 33.72 s | The camera rises over the whole city at night, trains running between the sectors |
 | 41.22 s | The logo |
 

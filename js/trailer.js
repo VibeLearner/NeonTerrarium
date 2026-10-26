@@ -17,6 +17,7 @@
 const TRAILER = (() => {
   const TR = { on: !!window.NT_TRAILER, ready: false, playing: false, done: false, t: -1, stage: 'off', log: [], info: {} };
   if (!TR.on) return TR;
+  maybeSpawnMegas = () => {};   // (the opening shot's builds never bring in a megastructure of their own)
   const CAP = !!window.__TR_CAPTURE;   // (set by the recorder's clock shim: no click, no sound, the recorder steps the frames)
   const say = (...a) => { TR.log.push(a.join(' ')); console.log('[trailer]', ...a); };
   const warn = (what, e) => { TR.log.push('! ' + what + ': ' + (e && e.message || e)); console.warn('[trailer] ' + what, e); };
@@ -81,6 +82,28 @@ const TRAILER = (() => {
   }
   TR.city = () => safe('city', city);
 
+  // the opening shot builds the city out: new plots grow from each sector's outer edges into the open sky (the areas marked on the
+  // Oct 26 still), each one with the game's own build sweep, some stacked a section higher a moment later
+  const GROW = [
+    ['ind',  [[-13, 0], [-13, 1], [-13, 2], [-14, 1], [-13, 3], [-14, 2]]],          // west of the industrial sector
+    ['low',  [[-13, -11], [-13, -10], [-13, -9], [-14, -10], [-13, -8], [-14, -9]]],  // west of the residential sector
+    ['mid',  [[1, -13], [2, -13], [3, -13], [2, -14], [4, -13], [3, -14]]],          // north of the commercial sector
+    ['ind',  [[-12, 7], [-11, 7], [-10, 7], [-11, 8], [-9, 7], [-10, 8]]],           // south of the industrial sector
+    ['high', [[0, 7], [1, 7], [2, 7], [1, 8], [3, 7], [2, 8]]],                      // south of the luxury sector
+    ['mid',  [[7, -9], [7, -8], [7, -7], [8, -8]]],                                  // east of the commercial sector
+    ['high', [[7, 0], [7, 1], [7, 2], [8, 1]]]];                                     // east of the luxury sector
+  const GROW_T0 = .7, GROW_T1 = 7.7;
+  function growPlan(){
+    const R = mulberry32(7026), q = [], n = Math.max(...GROW.map(g => g[1].length));
+    for (let k = 0; k < n; k++) for (const [zone, list] of GROW) if (list[k]) q.push({ zone, i: list[k][0], j: list[k][1], up: R() < .45 ? (R() < .3 ? 2 : 1) : 0 });
+    q.forEach((b, k) => { b.t = GROW_T0 + (GROW_T1 - GROW_T0)*k/(q.length - 1); });
+    return q;
+  }
+  function grow(b){
+    const c = addPlatform(b.i, b.j, b.zone); if (!c) return;
+    for (let k = 1; k <= b.up; k++) at(b.t + .55*k, () => { if (c.sections.length < MAX_SECTIONS) addSection(c, b.zone); }, 'stack ' + b.i + ',' + b.j);
+  }
+
   /* ---------- the page: hide the game's interface, add ours ---------- */
   function overlay(){
     document.documentElement.classList.add('tr-on');
@@ -90,7 +113,7 @@ const TRAILER = (() => {
       html.tr-on #cctv, html.tr-on #cctvFade{display:none!important}
       html.tr-on, html.tr-on *{cursor:none!important}
       html.tr-on #trOv.ask, html.tr-on #trOv.ask *{cursor:pointer!important}
-      html.tr-on #monitor.tr-keep{transform:scale(1.4);transform-origin:top right;top:32px!important;right:36px!important}
+      html.tr-on #monitor.tr-keep{transform:scale(1.4);transform-origin:top right;top:32px!important;right:36px!important;max-height:calc((100vh - 64px)/1.4)!important;overflow:hidden}
       #trCoast{position:fixed;inset:0;width:100vw;height:100vh;border:0;opacity:0;pointer-events:none;z-index:9000;background:#000}
       #trOv{position:fixed;inset:0;z-index:9001;pointer-events:none}
       #trOv.ask{pointer-events:auto}
@@ -157,46 +180,64 @@ const TRAILER = (() => {
   const inSector = (c, zone) => { const s = SECT.find(x => x.zone === zone); return c && c.i >= s.i0 && c.i < s.i0 + N && c.j >= s.j0 && c.j < s.j0 + N; };
 
   /* ---------- the cast: picked once the city has its people ---------- */
+  const resCell = c => c && inSector(c, 'low') && !c.mega && c.sections.length;
+  const placeOf = c => places.get('c:' + c.i + ',' + c.j);
   function cast(){
     const pol = megasOfKind('police')[0]; if (!pol) throw new Error('no police station');
     const station = places.get('m:' + pol.id), sDoor = doorOf(station); if (!sDoor) throw new Error('the station has no street door');
-    // the safehouse: a residential building a short walk from the station (so the raid arrives on the beat)
+    // the safehouse: a residential building a short walk from the station, with a building back to back with it whose door opens on the
+    // other street. The crew slip out that way (it reads as the safehouse's back door) while the officers come to the front
     let best = null;
     for (const c of cells.values()){
-      if (!inSector(c, 'low') || c.mega || !c.sections.length) continue;
-      const pl = places.get('c:' + c.i + ',' + c.j), d = doorOf(pl); if (!d) continue;
+      if (!resCell(c)) continue;
+      const pl = placeOf(c), d = doorOf(pl); if (!d) continue;
+      const n = outward(d), bc = cells.get(ckey(c.i - Math.round(n.x), c.j - Math.round(n.z))); if (!resCell(bc)) continue;
+      const bpl = placeOf(bc), bd = doorOf(bpl); if (!bd) continue;
+      const bn = outward(bd); if (n.x*bn.x + n.z*bn.z > -.7) continue;   // (its door faces the other way)
       const sd = nearDoor(station, d), pts = sd && route(sd.node, d.node); if (!pts) continue;
       const L = pathLen(pts), score = Math.abs(L - 2.4) + (c.sections.length < 2 ? .8 : 0);
-      if (L > 1 && L < 4.5 && (!best || score < best.score)) best = { c, pl, d, L, sd, score };
+      if (L > 1 && L < 6 && (!best || score < best.score)) best = { c, pl, d, L, sd, bpl, bd, score };
     }
-    if (!best) throw new Error('no safehouse near the station');
-    const sh = best.pl, shDoor = best.d, out = outward(shDoor);
-    // where the crew walks off to: a street point well away from the door and away from the station
+    if (!best) throw new Error('no safehouse with a back way out near the station');
+    const sh = best.pl, shDoor = best.d, out = outward(shDoor), bk = best.bpl, bkDoor = best.bd, bkOut = outward(bkDoor);
+    // where the crew walks off to: a street point away from the back door, away from the front and the station
     let away = null;
     for (let n = 0; n < NG.x.length; n++){
-      const x = NG.x[n], z = NG.z[n], dd = Math.hypot(x - shDoor.wall.x, z - shDoor.wall.z); if (dd < 6 || dd > 10) continue;
-      const fromSt = Math.hypot(x - sDoor.wall.x, z - sDoor.wall.z), pts = route(shDoor.node, n); if (!pts) continue;
+      const x = NG.x[n], z = NG.z[n], dd = Math.hypot(x - bkDoor.wall.x, z - bkDoor.wall.z); if (dd < 6 || dd > 10) continue;
+      const fromSt = Math.min(Math.hypot(x - sDoor.wall.x, z - sDoor.wall.z), Math.hypot(x - shDoor.wall.x, z - shDoor.wall.z)), pts = route(bkDoor.node, n); if (!pts) continue;
       const L = pathLen(pts); if (L > 13) continue;
       const score = fromSt - L*.4; if (!away || score > away.score) away = { n, x, z, score };
     }
     if (!away) throw new Error('nowhere for the crew to go');
     const used = new Set();
-    const free = p => p && !p.cop && !p.guard && !p.visitor && !p.archivist && !used.has(p.id);
-    // the person cam's subject: a resident with a pod (so Furnish pod can open their home), in a block with a few floors, not the safehouse
-    const subj = pplList.filter(p => free(p) && p.pod && p.home !== sh.id && cellOf(p.home) && inSector(cellOf(p.home), 'low') && cellOf(p.home).sections.length >= 2)
-      .map(p => { const c = cellOf(p.home); return { p, d: Math.hypot(c.x - (-8.5*LOT), c.z - (-8.5*LOT)) }; }).sort((a, b) => a.d - b.d).map(x => x.p);
-    const subject = subj[0]; if (!subject) throw new Error('no resident with a pod'); used.add(subject.id);
-    // their walk: to another residential building 6 to 14 units off, reachable
-    const home = places.get(subject.home), hDoor = doorOf(home); if (!hDoor) throw new Error('the resident\'s home has no street door'); let dest = null;
-    for (const c of cells.values()){
-      if (!inSector(c, 'low') || c.mega || !c.sections.length) continue;
-      const pl = places.get('c:' + c.i + ',' + c.j), d = doorOf(pl); if (!d || pl.id === home.id || pl.id === sh.id) continue;
-      const pts = route(hDoor.node, d.node); if (!pts) continue; const L = pathLen(pts);
-      if (L > 6 && L < 14 && (!dest || Math.abs(L - 9) < Math.abs(dest.L - 9))) dest = { pl, L };
+    const free = p => p && !p.cop && !p.guard && !p.visitor && !p.archivist && !p.onBike && !used.has(p.id);
+    const homeCell = p => cellOf(p.home);
+    // the person cam: a resident with a pod (so Furnish pod can open their home) meets a neighbor on a street corner the camera can see
+    // from low down, a few steps from both their doors
+    const subjects = pplList.filter(p => free(p) && p.pod && p.home !== sh.id && p.home !== bk.id && resCell(homeCell(p)) && homeCell(p).sections.length >= 2)
+      .map(p => { const c = homeCell(p); return { p, d: Math.hypot(c.x - (-8.5*LOT), c.z - (-8.5*LOT)) }; }).sort((a, b) => a.d - b.d).slice(0, 24).map(x => x.p);
+    let meet = null;
+    for (const p of subjects){
+      const home = places.get(p.home), hd = doorOf(home); if (!hd) continue;
+      for (let n = 0; n < NG.x.length; n++){
+        const x = NG.x[n], z = NG.z[n], dh = Math.hypot(x - hd.wall.x, z - hd.wall.z); if (dh < 1.6 || dh > 4.5) continue;
+        const ph = route(hd.node, n); if (!ph || pathLen(ph) > 6) continue;
+        // a neighbor from another building close by
+        const fr = pplList.find(q => free(q) && q !== p && q.home && q.home !== p.home && q.home !== sh.id && q.home !== bk.id && resCell(homeCell(q))
+          && (() => { const d2 = doorOf(places.get(q.home)); if (!d2 || Math.hypot(d2.wall.x - x, d2.wall.z - z) > 6) return false; const pf = route(d2.node, n); return pf && pathLen(pf) < 7.5; })());
+        if (!fr) continue;
+        const v = pickView([at3(x, z), at3(x + .5, z), at3(x - .5, z), at3(x, z + .5), at3(x, z - .5)], 1.65, 34, null, 47, 7);
+        if (v.pitch > 46*DEG) continue;
+        const score = v.pitch/DEG + Math.abs(wrapA(v.yaw - 1.65))*4 + dh;
+        if (!meet || score < meet.score) meet = { p, fr, n, x, z, v, score };
+      }
+      if (meet && meet.score < 44) break;
     }
-    if (!dest) throw new Error('nowhere for the resident to walk to');
+    if (!meet) throw new Error('no open street corner for the person cam');
+    const subject = meet.p, friend = meet.fr; used.add(subject.id); used.add(friend.id);
+    const walkT = q => { const d = doorOf(places.get(q.home)), pts = route(d.node, meet.n); return (pathLen(pts) + 1.2)/PPL_SPEED + 1.0; };
     // the crew: the go-between and a resident, and three more to carry crates
-    const crew = pplList.filter(p => free(p) && !p.onBike && p.home && cellOf(p.home) && inSector(cellOf(p.home), 'low')).slice(0, 5);
+    const crew = pplList.filter(p => free(p) && p.home && resCell(homeCell(p))).slice(0, 5);
     if (crew.length < 2) throw new Error('not enough people for the cleanout');
     crew.forEach(p => used.add(p.id));
     // four officers from the station (spire guards excluded)
@@ -205,30 +246,31 @@ const TRAILER = (() => {
     if (cops.length < 4) cops = cops.concat(pplList.filter(p => okCop(p) && p.job === station.id && !cops.includes(p)), pplList.filter(p => okCop(p) && p.job !== station.id && !cops.includes(p)));
     cops = cops.slice(0, 4);
     if (cops.length < 2) throw new Error('not enough officers');
-    const raidLen = best.L;
-    TR.c = { station, sDoor, sh, shDoor, out, away, subject, home, dest: dest && dest.pl, crew, cops, raidLen };
-    TR.info.cast = { safehouse: sh.id, raidWalk: +raidLen.toFixed(2), subject: subject.id, pod: subject.pod, crew: crew.length, cops: cops.length };
+    TR.c = { station, sDoor, sh, shDoor, out, bk, bkDoor, bkOut, away, subject, friend, home: places.get(subject.home), meet: { n: meet.n, x: meet.x, z: meet.z, view: meet.v, walk: Math.max(walkT(subject), walkT(friend)) },
+      crew, cops, raidLen: best.L };
+    TR.info.cast = { safehouse: sh.id, backWay: bk.id, raidWalk: +best.L.toFixed(2), subject: subject.id, friend: friend.id, pod: subject.pod,
+      meetPitch: +(meet.v.pitch/DEG).toFixed(1), meetWalk: +TR.c.meet.walk.toFixed(1), crew: crew.length, cops: cops.length };
     say('cast:', JSON.stringify(TR.info.cast));
   }
 
-  /* ---------- the person cam ---------- */
-  function reveal(id, tmpl, fact, channel = 'document', ctx = {}){
-    const c = { A: id };
-    const learned = STORY.learnFrom(tmpl, c, new Set(['A']), channel, null, ctx);
+  /* ---------- the person cam: what the camera picks up from their conversation ---------- */
+  function reveal(c, tmpl, fact, channel = 'document', ctx = {}){
+    const id = c.A, learned = STORY.learnFrom(tmpl, c, new Set(Object.keys(c)), channel, null, ctx);
     if (typeof PACE !== 'undefined') PACE.mine = true;
     try { STORY.logLine(tmpl, c, ctx, 'reveal', { channel, fact: 'A.' + fact, paced: true }); } finally { if (typeof PACE !== 'undefined') PACE.mine = false; }
     STORY.note(id, { t: STORY.clock, who: id, fact: 'A.' + fact, channel, verified: channel === 'document' || channel === 'introduction', tmpl, cast: c, ctx, learned });
     if (typeof MON !== 'undefined') MON.refresh();
   }
   function revealStep(k){
-    const p = TR.c.subject, id = p.id;
+    const p = TR.c.subject, c = { A: p.id, B: TR.c.friend.id };
     const job = safe('job', () => STORY.JOB_WORD[STORY.jobKind(p)]) || 'line worker';
     const emp = safe('employer', () => STORY.employerName(p)) || 'the night market';
-    [() => reveal(id, 'Name tag on {A}: "{A.first}."', 'first-name'),
-     () => reveal(id, '{A} keys open {place}. Door plate: {A.full}.', 'home', 'document', { placeId: p.home }),
-     () => reveal(id, 'Badge clipped to {A.his} jacket: ' + job + '.', 'job'),
-     () => reveal(id, 'Lanyard on {A}: ' + emp + '.', 'employer'),
-     () => reveal(id, '{A} back at {place} by {when}. Same hour, give or take, {seen} days running.', 'habit', 'seen', { placeId: p.home, when: '19:40', seen: 6 })][k]();
+    const floor = +((p.pod || '').split('|')[2] || 0) + 1, nth = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth'][floor - 1] || floor + 'th';
+    [() => reveal(c, '{B} waves {A} down across the street: "{A.first}!"', 'first-name', 'introduction'),
+     () => reveal(c, '{A} tells {B} the shift at ' + emp + ' ran long again.', 'employer'),
+     () => reveal(c, '{B} asks how a ' + job + ' ever gets an evening off. {A} laughs.', 'job'),
+     () => reveal(c, '{A} points up at {place}. Home: the ' + nth + ' floor.', 'home', 'document', { placeId: p.home }),
+     () => reveal(c, '{A} and {B}, same corner, same hour. {seen} evenings running.', 'habit', 'seen', { seen: 6 })][k]();
   }
   const monTab = tab => { const b = document.querySelector('#monTabs button[data-tab=' + tab + ']'); if (b) b.click(); };
   const keep = (el, on) => { if (el) el.classList.toggle('tr-keep', on); };
@@ -294,26 +336,65 @@ const TRAILER = (() => {
       w.document.head.appendChild(st);
       CO.raf = w.requestAnimationFrame.bind(w);
       w.requestAnimationFrame = fn => { if (CO.paused){ CO.pend.push(fn); return 0; } return CO.raf(fn); };
-      CO.paused = false;   // (a few frames to build its first view, then it rests)
-      setTimeout(() => { CO.paused = true; }, 1500);
+      CO.paused = false;   // (it draws while the town goes up and its view streams in; setup rests it once that's done)
+      // nothing the trailer builds on the coast is kept: the frame's own saves of the coast are dropped
+      const sp = w.Storage.prototype, os = sp.setItem, orm = sp.removeItem;
+      sp.setItem = function (k, v){ if (this === w.localStorage && /^neonIsland\./.test(k)) return; return os.call(this, k, v); };
+      sp.removeItem = function (k){ if (this === w.localStorage && /^neonIsland\./.test(k)) return; return orm.call(this, k); };
       // the coast's own soundtrack stays silent: the trailer has Bytes and its own waves. (COASTMUSIC is a top-level const in the frame, not a
       // window property, so it is reached through the frame's eval; and every later play() in that page is turned into a silent no-op)
       w.HTMLMediaElement.prototype.play = function (){ this.muted = true; try { this.pause(); } catch (e) {} return Promise.resolve(); };
       const mute = () => { try { const el = w.eval('typeof COASTMUSIC !== "undefined" && COASTMUSIC.el'); if (el){ el.muted = true; el.volume = 0; el.pause(); } } catch (e) {}
         for (const m of w.document.querySelectorAll('audio,video')){ m.muted = true; try { m.pause(); } catch (e) {} } };
       mute(); CO.muteT = setInterval(mute, 250);
-      w.COAST.setHour(8.4);
-      const s = w.COAST.state; CO.yaw = s.yaw - .35; CO.zoom = 21;
-      w.COAST.go({ yaw: CO.yaw, zoom: CO.zoom, pitch: 30*DEG });
+      const town = coastTown(w);
+      w.COAST.setHour(12);   // (midday)
+      CO.yaw = Math.PI*3/4 - .25; CO.zoom = 60; CO.x = town.x; CO.z = town.z;   // (as far out as the coast's camera goes: the whole town in view)
+      w.COAST.go({ yaw: CO.yaw, zoom: CO.zoom, pitch: 35*DEG, x: CO.x, z: CO.z });
       setTimeout(restore, 3000); restore();
       CO.ready = true; say('coast ready');
     }));
+  }
+  // a medium-large town on the coast that feels grown rather than planned: several neighborhoods (houses around a harbor-side core, a market
+  // quarter, villas on the headland, farms inland), pieces scattered round each center more thickly near the middle, turned every which way,
+  // some stacked a level or two higher; the coast's own placement check keeps them off the cliff edge, the slopes and each other
+  function coastTown(w){
+    const C = w.COAST, R = mulberry32(4242);
+    try { C.clear(); } catch (e) {}
+    try { C.setPaths([]); } catch (e) {}
+    const K = { res: ['townhouse', 'tower', 'pods', 'villa', 'pagoda', 'terrace'], com: ['noodle', 'lantern', 'kiosk', 'rotunda', 'viaduct'],
+      lux: ['mansion', 'dometower', 'cornerhouse', 'arcvilla', 'pagodatower', 'poolvilla'], farm: ['turbine', 'field', 'dome', 'tunnels', 'barn', 'hive', 'vfarm'] };
+    const SOLO = { com: ['grotto', 'ringcourt'], res: ['lagoon'], lux: ['palace', 'orangery'] }, soloUsed = new Set();
+    const hubs = [{ x: -11, z: -5, s: 8, k: 'res', w: 3 }, { x: -21, z: 5, s: 6, k: 'com', w: 2 }, { x: -7, z: -19, s: 6, k: 'lux', w: 1.5 },
+      { x: -25, z: -13, s: 7, k: 'res', w: 2 }, { x: -6, z: 11, s: 6, k: 'res', w: 1.5 }, { x: -39, z: -3, s: 8, k: 'farm', w: 1.2 }, { x: -34, z: 16, s: 7, k: 'farm', w: 1 }];
+    const W = hubs.reduce((a, h) => a + h.w, 0), pickHub = () => { let u = R()*W; for (const h of hubs){ u -= h.w; if (u <= 0) return h; } return hubs[0]; };
+    const one = a => a[Math.floor(R()*a.length)];
+    const placed = []; let tries = 0, sx = 0, sz = 0;
+    while (placed.length < 88 && tries < 1600){
+      tries++;
+      const h = pickHub(), a = R()*Math.PI*2, rr = Math.pow(R(), .7)*h.s*1.7, x = h.x + Math.cos(a)*rr, z = h.z + Math.sin(a)*rr;
+      let kind = one(K[h.k]);
+      if (h.k !== 'farm' && R() < .12) kind = one(h.k === 'res' ? K.com : K.res);   // (a shop among the houses, a house among the shops)
+      if (SOLO[h.k] && R() < .07){ const sk = SOLO[h.k].find(k => !soloUsed.has(k)); if (sk) kind = sk; }
+      const rot = Math.floor(R()*8)*Math.PI/4 + (R() - .5)*.35, seed = 1 + Math.floor(R()*99999);
+      let pc = null; try { pc = C.place(kind, x, z, rot, seed); } catch (e) { pc = null; }
+      if (!pc || pc.ok === false) continue;
+      placed.push(pc); sx += x; sz += z; if (SOLO[h.k] && SOLO[h.k].includes(kind)) soloUsed.add(kind);
+      const up = h.k === 'lux' ? .45 : h.k === 'res' ? .4 : h.k === 'com' ? .25 : 0;
+      if (!Object.values(SOLO).flat().includes(kind) && R() < up) try {
+        const s1 = C.stack(pc, one(K[h.k === 'com' ? 'res' : h.k]), 1 + Math.floor(R()*99999));
+        if (s1 && R() < .3) C.stack(s1, one(K[h.k === 'com' ? 'res' : h.k]), 1 + Math.floor(R()*99999));
+      } catch (e) {}
+    }
+    TR.info.coastTown = placed.length;
+    say('coast town:', placed.length, 'pieces from', tries, 'tries');
+    return placed.length ? { x: sx/placed.length, z: sz/placed.length } : { x: -16, z: -2 };
   }
   function coastWake(on){ CO.paused = !on; if (on) for (const fn of CO.pend.splice(0)) CO.raf(fn); }
   function coastDrift(t){
     if (!CO.ready || !CO.w || !CO.w.COAST) return;
     const u = seg(t, MK.coastWake, MK.coastOut);
-    CO.w.COAST.go({ yaw: CO.yaw + .22*u, zoom: CO.zoom - 3.5*u, pitch: (30 - 3*u)*DEG });
+    CO.w.COAST.go({ yaw: CO.yaw + .14*u, zoom: CO.zoom, pitch: 35*DEG, x: CO.x, z: CO.z });
   }
 
   /* ---------- setup: city, cast, a warm Furnish pod, the coast, the sound ---------- */
@@ -349,6 +430,11 @@ const TRAILER = (() => {
     } else warn('dry run', 'could not open pod ' + TR.c.subject.pod);
     status('loading the coast');
     await until(() => CO.ready, 120).catch(e => warn('coast', e));
+    if (CO.ready){   // (its whole view, at full zoom-out, streamed in before it rests: no pieces popping in on screen)
+      let last = -1, since = performance.now();
+      await until(() => { const b = CO.w.COAST.state.built; if (b !== last){ last = b; since = performance.now(); } return performance.now() - since > 1500; }, 60).catch(e => warn('coast view', e));
+      coastWake(false);
+    }
     await snd;
     // the opening frame: morning, the city turning, everyone where they would be
     S.hour = 6.9; safe('cam', () => camAt(0, 0));
@@ -362,7 +448,8 @@ const TRAILER = (() => {
   /* ---------- playback ---------- */
   let t0 = 0, lastT = 0, fired = 0;
   const EV = [];
-  const at = (t, f, name) => EV.push({ t, f, name });
+  const at = (t, f, name) => { const e = { t, f, name };   // (added while it plays: slotted in order among the moments still to come)
+    if (!TR.playing){ EV.push(e); return; } let k = fired; while (k < EV.length && EV[k].t <= t) k++; EV.splice(k, 0, e); };
   function play(){
     if (TR.playing || !TR.ready) return;
     if (!CAP && AU.raw) safe('sound', () => {
@@ -399,11 +486,12 @@ const TRAILER = (() => {
     }
     return true;
   }
-  function pickView(pts, pref, pmin, keep){
+  const DK = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8];
+  function pickView(pts, pref, pmin, keep, pmax = 76, dkN = 16){
     const ok = (yw, pt) => pts.every(p => los(p.x, p.y, p.z, yw, pt));
-    const P = []; for (let d = pmin; d < 74; d += 7) P.push(d*DEG); P.push(76*DEG);
+    const P = []; for (let d = pmin; d < Math.min(74, pmax); d += 6) P.push(d*DEG); if (pmax >= 76) P.push(76*DEG);
     if (keep){ for (const pt of P){ if (pt > keep.pitch + 1e-3) break; if (ok(keep.yaw, pt)) return { yaw: keep.yaw, pitch: pt }; } if (ok(keep.yaw, keep.pitch)) return keep; }
-    for (const pt of P) for (const dk of [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8]){ const yw = pref + dk*Math.PI/8; if (ok(yw, pt)) return { yaw: yw, pitch: pt }; }
+    for (const pt of P) for (const dk of DK.slice(0, dkN)){ const yw = pref + dk*Math.PI/8; if (ok(yw, pt)) return { yaw: yw, pitch: pt }; }
     return { yaw: pref, pitch: 76*DEG };
   }
   const VW = { on: false, yaw: 0, pitch: 0, t: null, chk: 0 };
@@ -426,24 +514,20 @@ const TRAILER = (() => {
   function camAt(t, dt){
     const c = TR.c;
     if (t < MK.swoop){ Object.assign(CAM, turntable(t)); }
-    else if (t < MK.follow){   // the dive onto the subject
-      const a = turntable(MK.swoop), p = c.subject, u = ease(seg(t, MK.swoop, MK.follow));
-      if (!sub) sub = { x: p.x ?? a.x, z: p.z ?? a.z };
-      sub.x = follow(sub.x, p.x ?? sub.x, 8, dt); sub.z = follow(sub.z, p.z ?? sub.z, 8, dt);
-      if (subYaw === null){ subYaw = a.yaw; resetView(); }
-      aimAt([at3(sub.x, sub.z), ahead(p, 1.2)], subYaw, 36, dt);
-      Object.assign(CAM, { x: lerp(a.x, sub.x, u), z: lerp(a.z, sub.z, u), y: lerp(TARGET_Y, (p._ey ?? CURB) + .5, u), yaw: a.yaw + wrapA(VW.yaw - a.yaw)*u, zoom: elerp(a.zoom, 4.4, u), pitch: lerp(a.pitch, VW.pitch, u) });
+    else if (t < MK.follow){   // the dive onto the street corner where the two of them meet
+      const a = turntable(MK.swoop), m = c.meet, u = ease(seg(t, MK.swoop, MK.follow));
+      Object.assign(CAM, { x: lerp(a.x, m.x, u), z: lerp(a.z, m.z, u), y: lerp(TARGET_Y, CURB + .5, u), yaw: a.yaw + wrapA(m.view.yaw - a.yaw)*u,
+        zoom: elerp(a.zoom, 4.2, u), pitch: lerp(a.pitch, m.view.pitch, u) });
     }
-    else if (t < MK.coastIn){   // with the subject on the person cam (the apartment covers the screen from 15 s)
-      const p = c.subject; if (!sub) sub = { x: p.x, z: p.z };
-      if (p.x !== undefined){ sub.x = follow(sub.x, p.x, 6, dt); sub.z = follow(sub.z, p.z, 6, dt); }
-      const u = seg(t, MK.follow, MK.furn);
-      aimAt([at3(sub.x, sub.z), ahead(p, 1.2)], subYaw, 36, dt);
-      Object.assign(CAM, { x: sub.x, z: sub.z, y: (p._ey ?? CURB) + .5, yaw: VW.yaw + .12*u, zoom: lerp(4.4, 3.9, ss(u)), pitch: VW.pitch });
+    else if (t < MK.coastIn){   // the two of them talking (the apartment covers the screen from 13.5 s)
+      const m = c.meet, u = seg(t, MK.follow, MK.furn), cc = centroid([c.subject, c.friend].filter(outside));
+      if (!sub) sub = { x: m.x, z: m.z };
+      if (cc){ sub.x = follow(sub.x, cc.x, 1.5, dt); sub.z = follow(sub.z, cc.z, 1.5, dt); }
+      Object.assign(CAM, { x: sub.x, z: sub.z, y: CURB + .5, yaw: m.view.yaw + .08*u, zoom: lerp(4.2, 3.7, ss(u)), pitch: m.view.pitch });
     }
-    else if (t < MK.cut2){   // the safehouse door, then the crew walking off
-      const d = c.shDoor, door = { x: d.wall.x + c.out.x*1.2, z: d.wall.z + c.out.z*1.2 };
-      if (cutYaw === null){ grp = { x: door.x, z: door.z }; cutYaw = Math.atan2(c.out.x, c.out.z) + .5; resetView(); }
+    else if (t < MK.cut2){   // the safehouse's back way out, then the crew walking off
+      const d = c.bkDoor, o = c.bkOut, door = { x: d.wall.x + o.x*1.2, z: d.wall.z + o.z*1.2 };
+      if (cutYaw === null){ grp = { x: door.x, z: door.z }; cutYaw = Math.atan2(o.x, o.z) + .5; resetView(); }
       const vis = c.crew.filter(outside), cc = t > MK.coastOut + .4 && vis.length ? centroid(vis) : null;
       if (cc){ grp.x = follow(grp.x, cc.x, 2.6, dt); grp.z = follow(grp.z, cc.z, 2.6, dt); }
       aimAt(cc ? [at3(door.x, door.z), at3(cc.x, cc.z)] : [at3(door.x, door.z)], cutYaw, 28, dt);
@@ -498,14 +582,23 @@ const TRAILER = (() => {
     if (!sc) throw new Error(id + ' did not start');
     return sc;
   }
+  function meetScene(){
+    const c = TR.c, anc = { kind: 'point', x: NG.x[c.meet.n], z: NG.z[c.meet.n], node: c.meet.n };
+    for (const p of [c.subject, c.friend]){ p.speed = PPL_SPEED; p.hurry = false; }
+    TR.meetSc = scene('trailer.meet', { A: c.subject.id, B: c.friend.id }, [
+      { id: 'm0', who: ['A', 'B'], with: [], at: 'case', do: 'walk', anc, hold: .2 },
+      { id: 'm1', who: ['B'], with: ['A'], at: 'case', do: 'wave', anc, hold: .9 },
+      { id: 'm2', who: ['A'], with: ['B'], at: 'case', do: 'chat', anc, hold: 60 }],
+      { m0: ['{A} and {B} come out onto the same corner.'], m1: ['{B} waves {A} over.'], m2: ['{A} and {B} talk on the corner.'] });
+  }
   function stageNight(){
     const c = TR.c;
-    for (const p of c.crew){ putInside(p, c.sh.id); dry(p); p.speed = PPL_SPEED; }
+    for (const p of c.crew){ putInside(p, c.bk.id); dry(p); p.speed = PPL_SPEED; }
     for (const p of c.cops){ putInside(p, c.station.id); p.speed = PPL_SPEED; }
   }
   function cleanout(){
     const c = TR.c, L = 'ABCDE', m = {}; c.crew.forEach((p, k) => { m[L[k]] = p.id; });
-    const front = ptAnc(c.shDoor.wall.x + c.out.x*1.4, c.shDoor.wall.z + c.out.z*1.4), off = ptAnc(c.away.x, c.away.z);
+    const front = ptAnc(c.bkDoor.wall.x + c.bkOut.x*1.4, c.bkDoor.wall.z + c.bkOut.z*1.4), off = ptAnc(c.away.x, c.away.z);
     const who = Object.keys(m);
     scene('trailer.cleanout', m, [
       { id: 'b0', who, with: [], at: 'case', do: 'carry', held: 'crate', anc: front, hold: .35 },
@@ -530,7 +623,9 @@ const TRAILER = (() => {
 
   /* ---------- the timeline's moments ---------- */
   at(0, () => { S.hour = 6.9; }, 'open');
-  at(MK.subjectOut, () => { const c = TR.c, p = c.subject; putInside(p, p.home); p.until = pplNow; if (c.dest && !startTrip(p, c.dest.id)) warn('subject', 'no trip'); }, 'subject out');
+  at(0, () => { for (const p of [TR.c.subject, TR.c.friend]) putInside(p, p.home); }, 'the two at home');
+  for (const b of growPlan()) at(b.t, () => grow(b), 'build ' + b.i + ',' + b.j);
+  at(-1, () => meetScene(), 'meet');   // (its time is worked out from their walks: see timeRaid)
   at(MK.monOpen, () => { MON.open(TR.c.subject.id); keep(document.getElementById('monitor'), true); keep(document.getElementById('npcSel'), true); monTab('log'); }, 'person cam');
   [10.5, 10.95, 11.4, 11.85].forEach((t, k) => at(t, () => revealStep(k), 'reveal ' + k));
   at(MK.notes, () => monTab('notes'), 'notebook');
@@ -538,14 +633,16 @@ const TRAILER = (() => {
   at(MK.monClose, () => { keep(document.getElementById('monitor'), false); keep(document.getElementById('npcSel'), false); MON.close(); }, 'cam off');
   at(MK.furn, () => { if (!FURN.openKey(TR.c.subject.pod)) warn('furnish', 'did not open'); }, 'furnish');
   at(MK.coastWake, () => coastWake(true), 'coast wakes');
-  at(MK.coastIn, () => { if (FURN.open || FURN.hold) labExit(); LK.setWeather('rain', true, true); stageNight(); }, 'night falls behind the coast');
+  at(MK.coastIn, () => { if (TR.meetSc) safe('meet end', () => STORY.endScene(TR.meetSc, 'done')); if (FURN.open || FURN.hold) labExit(); LK.setWeather('rain', true, true); stageNight(); }, 'night falls behind the coast');
   at(MK.clean, () => cleanout(), 'cleanout');
   at(MK.coastOut, () => { glitchOff(); flash(.45); coastWake(false); }, 'drop');
   at(-1, () => raid(), 'raid');   // (its time is worked out from the walk: see setup)
   at(MK.end, () => { TR.playing = false; TR.done = true; say('done'); if (!CAP){ TR.el.msg.hidden = false; TR.el.status.innerHTML = 'click to play again'; TR.el.ov.classList.add('ask'); TR.el.ov.addEventListener('click', () => location.reload(), { once: true }); } }, 'end');
   function timeRaid(){   // leave the station so the four reach the door at MK.arrive (hurried walk, plus the two doorways)
     const v = PPL_SPEED*2.3, walk = (TR.c.raidLen + 1.2)/v + 1.0, e = EV.find(x => x.name === 'raid');
-    e.t = Math.max(MK.raidEarliest, MK.arrive - walk); TR.info.raidAt = +e.t.toFixed(2); EV.sort((a, b) => a.t - b.t);
+    e.t = Math.max(MK.raidEarliest, MK.arrive - walk); TR.info.raidAt = +e.t.toFixed(2);
+    const em = EV.find(x => x.name === 'meet'); em.t = Math.max(.3, 9.3 - TR.c.meet.walk); TR.info.meetAt = +em.t.toFixed(2);   // (both on the corner by the time the camera gets there)
+    EV.sort((a, b) => a.t - b.t);
   }
 
   /* ---------- the overlay's moments, drawn from the clock (not CSS animations: the recorder steps time) ---------- */

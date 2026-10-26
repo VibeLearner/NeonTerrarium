@@ -41,7 +41,7 @@ const SLOTS = (() => {
   function flush(){ try { if (typeof save === 'function') save(); } catch (e) {} try { dispatchEvent(new Event('beforeunload')); dispatchEvent(new Event('pagehide')); } catch (e) {} }
   function liveMeta(){
     let day = 1, residents = 0, plots = 0;
-    try { day = STORY.dayOf(STORY.clock); } catch (e) {}
+    try { day = STORY.day() + 1; } catch (e) {}
     try { for (const p of people.values()) if (!p.visitor && !p.gone) residents++; } catch (e) {}
     try { plots = cells.size; } catch (e) {}
     return { day, residents, plots };

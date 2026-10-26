@@ -10,7 +10,7 @@ const MON = (() => {
   const el = $m('monitor'), cv = $m('monFeed'), g = cv.getContext('2d');
   g.imageSmoothingEnabled = false;
   const view = document.getElementById('view');
-  const clockText = t => { const d = STORY.dayOf ? STORY.dayOf(t) : Math.floor(t/1440) + 1, m = Math.floor(t % 1440); return 'D' + d + ' ' + String(Math.floor(m/60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+  const clockText = t => { const d = Math.floor(t/1440) + 1, m = Math.floor(t % 1440); return 'D' + d + ' ' + String(Math.floor(m/60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 
   /* ---------- picking someone ---------- */
   const _v = new THREE.Vector3(), _w = new THREE.Vector3();
@@ -355,6 +355,6 @@ const MON = (() => {
   document.querySelectorAll('#ffbar button[data-ff]').forEach(b => b.addEventListener('click', () => {
     FF.set(+b.dataset.ff); document.querySelectorAll('#ffbar button[data-ff]').forEach(x => x.classList.toggle('on', x === b));
   }));
-  M.syncBar = () => { if (window.STORY){ const t = STORY.clock, txt = 'Day ' + STORY.dayOf(t); if ($m('ffDay').textContent !== txt) $m('ffDay').textContent = txt; } };
+  M.syncBar = () => { if (window.STORY){ const t = STORY.clock, txt = 'Day ' + (Math.floor(t/1440) + 1); if ($m('ffDay').textContent !== txt) $m('ffDay').textContent = txt; } };
   return M;
 })();

@@ -59,7 +59,7 @@ const DOSSIER = (() => {
   }
   /* ---------- the notebook's Profile ---------- */
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const tc = t => { const d = STORY.dayOf ? STORY.dayOf(t) : Math.floor(t/1440) + 1, m = Math.floor(t % 1440); return 'D' + d + ' ' + String(Math.floor(m/60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+  const tc = t => { const d = Math.floor(t/1440) + 1, m = Math.floor(t % 1440); return 'D' + d + ' ' + String(Math.floor(m/60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
   D.notebook = id => {
     const p = people.get(id); if (!p || !p.pod) return '';
     const r = S.p[id], fl = D.full(id), all = hidden(id), tr = fl ? all.map(t => ({ t, at: r.fullAt || 0 })) : r ? r.tr : [];
@@ -156,6 +156,7 @@ const DOSSIER = (() => {
   let lastT = performance.now();
   setInterval(() => {
     const now = performance.now(), dt = Math.min(1, (now - lastT)/1000); lastT = now;
+    if (window.STORY && STORY.engine === false){ if (T.id || T.cands){ clearTrace(); T.id = null; } return; }   // (the storylet engine is off: the array learns nothing and traces no one: story.js)
     try { watch(dt); } catch (e) {}
     const id = typeof MON !== 'undefined' && MON.id;
     if (!panel) return;

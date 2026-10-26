@@ -16,7 +16,7 @@ const PRECINCT = (() => {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const p2 = n => String(Math.floor(n)).padStart(2, '0');
   const clock = () => safe(() => STORY.clock, 0);
-  const tc = c => 'D' + safe(() => STORY.dayOf(c), Math.floor(c/1440) + 1) + ' ' + p2((c % 1440)/60) + ':' + p2(c % 60);
+  const tc = c => 'D' + (Math.floor(c/1440) + 1) + ' ' + p2((c % 1440)/60) + ':' + p2(c % 60);
   const hm = c => { const m = Math.round(c) % 1440; return p2(m/60) + ':' + p2(m % 60); };   // (rounded to the minute, as the city's own clock is: input.js fmt)
   const hsh = s => { let v = 2166136261; s = String(s); for (let i = 0; i < s.length; i++){ v ^= s.charCodeAt(i); v = Math.imul(v, 16777619); } return v >>> 0; };
   const badge = id => '#' + (1000 + hsh(id + ':badge') % 9000);
@@ -76,6 +76,7 @@ const PRECINCT = (() => {
     if (typeof logEvent !== 'function' || logEvent._pd) return;
     const orig = logEvent;
     const w = function (e){ orig.apply(this, arguments); safe(() => {
+      if (STORY.engine === false) return;
       if (e.kind === 'mugging') addCall({ kind: 'ROBBERY · STREET', pri: 1, x: +e.x.toFixed(1), z: +e.z.toFixed(1), src: 'real', due: clock() + 25 + Math.floor(Math.random()*40), arr: .4 });
       else if (e.kind === 'police'){ const last = [...R.calls].reverse().find(c => c.src === 'real' && c.st === 'open'); if (last && e.officer) { last.unit = e.officer; save(); } }
     }); };
@@ -89,7 +90,7 @@ const PRECINCT = (() => {
     incSeen = R.incSeen = inc.length;
   }
   function tick(){
-    if ((PD.hold && !PD.live) || typeof pplReady === 'undefined' || !pplReady) return;
+    if ((PD.hold && !PD.live) || typeof pplReady === 'undefined' || !pplReady || safe(() => STORY.engine === false, false)) return;   // (no calls while the storylet engine is off)
     hookLog(); caseCalls(); B = bounds();
     const h = Math.floor(clock()/60);
     if (R.lastH < 0 || h - R.lastH > 6) R.lastH = h - 1;   // (a long gap: only the last hour or so is made up)
@@ -162,7 +163,7 @@ const PRECINCT = (() => {
     const arrToday = today.filter(c => c.st === 'ARREST').length;
     const last = calls.find(c => c.pri <= 2 && c.src !== 'case') || calls[0] || null;
     const pts = safe(() => LEDGER.crowds().pts, []);
-    const out = { pts, now, calls, today, recent, hot, byHour, ofc, dr, stn, lidar, closed, arrToday, last, cs: slow ? cases() : slowD.cs, hour: (now % 1440)/60, day: safe(() => STORY.dayOf(now), day0 + 1),
+    const out = { pts, now, calls, today, recent, hot, byHour, ofc, dr, stn, lidar, closed, arrToday, last, cs: slow ? cases() : slowD.cs, hour: (now % 1440)/60, day: day0 + 1,
       bikes: safe(() => POLICE_BIKES.map((b, k) => ({ id: 'B-' + p2(k + 1), ref: b, mode: b.mode, stn: stations().indexOf(b.m), x: b.x, z: b.z, path: b.path && b.mode !== 'park' ? b.path.pts : null })), []) };
     if (slow) slowD = { lidar, cs: out.cs }; return out;
   }
@@ -263,6 +264,8 @@ const PRECINCT = (() => {
   const $ = q => root.querySelector(q);
   function build(){ if (document.getElementById('precCss')) return; const st = document.createElement('style'); st.id = 'precCss'; st.textContent = css; document.head.appendChild(st); }
   const SIGL = { RESPONDING: 4, 'ON BEAT': 4, 'EN ROUTE': 3, 'AT STATION': 2, REPORTING: 2, 'GOING HOME': 1, 'OFF SHIFT': 0, 'STOOD DOWN': 0 };
+  // the storylet engine off (story.js): no calls come in and the story's clock holds, but the sky's hour still moves, and that's the time shown
+  const paused = () => safe(() => STORY.engine === false, false), shownNow = () => paused() ? Math.floor(D.now/1440)*1440 + safe(() => S.hour, 0)*60 : D.now;
   const onDuty = o => o.st !== 'OFF SHIFT' && o.st !== 'STOOD DOWN' && o.st !== 'GOING HOME';
   const onMap = o => o.st !== 'OFF SHIFT' && o.st !== 'STOOD DOWN';
   const DMODE = m => m === 'REST' ? 'DOCKED' : m === 'CHASE' ? 'PURSUIT' : m === 'FLY' ? 'SWEEP' : m === 'HOME' ? 'RTB' : m;
@@ -274,7 +277,7 @@ const PRECINCT = (() => {
     const air = d.dr.list.filter(x => x.mode !== 'REST').length, openCalls = d.calls.filter(c => c.st === 'open').length;
     const isSel = (t, id) => SEL && SEL.type === t && (SEL.id === id || (SEL.c && SEL.c.id === id)) ? ' sel' : '';
     put('top', `<div><small>PRECINCT</small><b>OPERATIONS DESK</b></div><div><small>STATIONS ${d.stn.length}</small><b>${d.stn.map(s => 'STN-' + p2(s.n)).join(' · ') || 'NONE'}</b></div>
-        <div><small>DAY ${d.day} · CITY TIME · <span class="live">● LIVE</span></small><span class="clk">${hm(d.now)}</span></div>
+        <div><small>DAY ${d.day} · CITY TIME · ${paused() ? '<span class="amb">‖ STORY PAUSED</span>' : '<span class="live">● LIVE</span>'}</small><span class="clk">${hm(shownNow())}</span></div>
         <div><small>CALLS · LAST 72 H</small><span class="bigv">${d.recent.length}<small class="dim">${d.recent.length && d.hot.length ? 'PEAK ' + d.hot[0][0] : ''}</small></span></div>
         <div><small>UNITS ON DUTY · OUT</small><b>${nDuty} · ${beat}</b></div><div><small>CALLS TODAY · OPEN</small><b>${d.today.length} · <span class="${openCalls ? 'warn' : ''}">${openCalls}</span></b></div>
         <div><small>ARRESTS TODAY · TOTAL</small><b>${d.arrToday} · ${R.arrests}</b></div><div><small>DRONES UP · POINTS SCANNED</small><b>${air}/${d.dr.list.length} · ${d.dr.scans}</b></div>
@@ -630,7 +633,7 @@ const PRECINCT = (() => {
         if (hov.s.type === 'plot'){ const w = (LOT - .3)*s; g.strokeStyle = 'rgba(214,255,210,.7)'; g.lineWidth = dp; g.strokeRect(x - w/2, y - w/2, w, w); }
         else if (hov.s.m){ const m = hov.s.m, w = m.w*LOT*s, h = m.h*LOT*s; g.strokeStyle = '#d6ffd2'; g.lineWidth = dp; g.strokeRect(x - w/2, y - h/2, w, h); }
         else { g.strokeStyle = '#d6ffd2'; g.lineWidth = dp; g.strokeRect(x - 8*dp, y - 8*dp, 16*dp, 16*dp); } } }
-    const c = $('.clk'); if (c){ const s2 = (now/500 | 0) % 2 ? hm(D.now) : hm(D.now).replace(':', ' '); if (c.textContent !== s2) c.textContent = s2; }
+    const c = $('.clk'); if (c){ const s2 = (now/500 | 0) % 2 ? hm(shownNow()) : hm(shownNow()).replace(':', ' '); if (c.textContent !== s2) c.textContent = s2; }
   }
   function overlay(t){
     const W = F.W, H = F.H, dp = F.dp, s = F.s, P = F.P;

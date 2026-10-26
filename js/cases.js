@@ -263,7 +263,7 @@ const CASES = (() => {
     if (!beats.length) return 'nothing';
     for (const id of Object.values(cast)){ const p = pOf(id); if (p && p.metroPlan && !p.metro) p.metroPlan = null; }   // (walking to the station: they turn back for it)
     const s = { id: 'case.' + arc + '.' + m.id, beats, log, roles: {}, effects: {}, next: null, tier: 'case', prio: m.prio ?? 1 };
-    const sc = STORY.startScene(s, cast, { done: (sc, why) => { delete run.at[m.id]; if (played){ note('end', m.id, why); const n = run.tries[m.id] = (run.tries[m.id] || 0) + 1; if (why === 'done' || why === 'stopped' || n >= 3) played(why); else if (C.run && C.run.sim){ const e = C.run.sim.q.find(x => x.mom && x.wait); if (e) e.wait = false; } save(); } else finish(run, arc, row, m, why); } });
+    const sc = STORY.startScene(s, cast, { done: (sc, why) => { delete run.at[m.id]; if (played){ note('end', m.id, why); if (why === 'paused'){ if (C.run && C.run.sim){ const e = C.run.sim.q.find(x => x.mom && x.wait); if (e) e.wait = false; } save(); return; } const n = run.tries[m.id] = (run.tries[m.id] || 0) + 1; if (why === 'done' || why === 'stopped' || n >= 3) played(why); else if (C.run && C.run.sim){ const e = C.run.sim.q.find(x => x.mom && x.wait); if (e) e.wait = false; } save(); } else finish(run, arc, row, m, why); } });
     if (!sc) return 'could not start';
     run.at[m.id] = true; note('stage', arc, m.id, JSON.stringify(cast));
     if (backup) PACE.backupCalled(cast[backup], anc0);
@@ -271,6 +271,7 @@ const CASES = (() => {
   }
   function finish(run, arc, row, m, why){
     note('end', m.id, why);
+    if (why === 'paused'){ save(); return; }   // (the storylet engine was switched off: played again when it's back on, no try used)
     // it couldn't be played through (no free seat, someone stuck or called away): again later in its window, a few times
     if (why && why !== 'done' && why !== 'stopped'){ const n = run.tries[m.id] = (run.tries[m.id] || 0) + 1; if (n < 4){ save(); return; } }
     run.done[m.id] = why || 'done';

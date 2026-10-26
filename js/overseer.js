@@ -136,7 +136,7 @@ const OVERSEER = (() => {
 
   /* ---------- reading the city (it holds still while the view is open) ---------- */
   function read(){
-    const hour = safe(() => S.hour, 12), day = safe(() => STORY.dayOf(STORY.clock), 1), sleeps = typeof asleep === 'function';
+    const hour = safe(() => S.hour, 12), day = safe(() => STORY.day() + 1, 1), sleeps = typeof asleep === 'function';
     const plots = [], megs = [], hw = [], mt = new Set();
     let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity;
     const grow = (i, j) => { if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; };
@@ -164,7 +164,7 @@ const OVERSEER = (() => {
       inc: LEDGER.inc().slice().reverse(), grow: LEDGER.grow(), count: LEDGER.count(), clock: safe(() => STORY.clock, 0) };
     return D;
   }
-  const whenTxt = c => { const d = STORY.dayOf ? STORY.dayOf(c) : Math.floor(c/1440) + 1, h = (c % 1440)/60; return 'D' + d + ' ' + hm(h); };
+  const whenTxt = c => { const d = Math.floor(c/1440) + 1, h = (c % 1440)/60; return 'D' + d + ' ' + hm(h); };
   const agoTxt = c => { const m = Math.max(0, D.clock - c); return m < 60 ? Math.round(m) + ' min ago' : m < 1440 ? Math.round(m/60) + ' h ago' : Math.round(m/1440) + ' d ago'; };
 
   /* ---------- the view ---------- */

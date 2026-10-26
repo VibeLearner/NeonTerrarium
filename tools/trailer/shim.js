@@ -13,6 +13,13 @@
     const fs = [...q.values()]; q.clear();
     for (const f of fs) try { f(clock); } catch (e) { console.error('frame', e); }
   };
+  // every WebGL canvas keeps its last picture: the game, the apartment lab and the coast each skip drawing on frames where nothing changed,
+  // and a cleared canvas captured on such a frame showed as a black or half-drawn flash
+  const getCtx = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (type, attrs){
+    if (/webgl/i.test(String(type))) attrs = Object.assign({}, attrs || {}, { preserveDrawingBuffer: true });
+    return getCtx.call(this, type, attrs);
+  };
   // the same random numbers on every run (the people's choices, rain, sparks)
   let seed = 0x7a11e5 ^ (window === window.top ? 0 : (location.pathname.length*2654435761 >>> 0));
   Math.random = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0)/4294967296; };

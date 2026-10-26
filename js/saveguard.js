@@ -18,7 +18,8 @@ let NT_SAVE_LOCK = false;
 // #trailer (js/trailer.js) builds a city of its own and changes settings for the film: nothing it does is kept, the player's city and every
 // neonIsland.* preference stay exactly as they were
 window.NT_TRAILER = /trailer/.test(location.hash);
-const NT_LOCKED = k => (NT_SAVE_LOCK && NT_isCityKey(k)) || (window.NT_TRAILER && typeof k === 'string' && k.startsWith('neonIsland.'));
+if (window.NT_TRAILER) NT_SAVE_LOCK = true;   // (and the city slots' checkpoints stand down: slots.js)
+const NT_LOCKED = k => (NT_SAVE_LOCK && NT_isCityKey(k)) || (window.NT_TRAILER && typeof k === 'string' && (k.startsWith('neonIsland.') || k.startsWith('neonLooks.')));
 const NT_RAW = { set: Storage.prototype.setItem, remove: Storage.prototype.removeItem };
 Storage.prototype.setItem = function (k, v){ if (this === window.localStorage && NT_LOCKED(k)) return; return NT_RAW.set.call(this, k, v); };
 Storage.prototype.removeItem = function (k){ if (this === window.localStorage && NT_LOCKED(k)) return; return NT_RAW.remove.call(this, k); };

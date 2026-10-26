@@ -25,7 +25,7 @@ const TRAILER = (() => {
   /* ---------- timing: Bytes runs at 160 bpm; the drop lands at 21.72 s, the lull before it starts at 19.2 s ---------- */
   const LEN = 45, BEAT = 60/160, DROP = 21.72, bar = n => DROP + n*4*BEAT;
   const MK = { swoop: 8.4, follow: 10.0, subjectOut: 7.9, monOpen: 10.25, notes: 13.3, monClose: 14.8, furn: 15.0, coastWake: 18.2, dissolve: 18.95,
-    coastIn: 19.45, coastOut: DROP, clean: 20.85, cut2: bar(3), arrive: 28.6, rise: bar(8), logo: bar(13), end: LEN };
+    coastIn: 19.45, coastOut: DROP, clean: 20.85, cut2: bar(3), raidEarliest: 25.0, arrive: 29.5, rise: bar(8), logo: bar(13), end: LEN };
 
   /* ---------- small maths ---------- */
   const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
@@ -120,17 +120,24 @@ const TRAILER = (() => {
     safe('weather', () => { LK.setAutoWeather(false, true); LK.setWeather('clear', true, true); if (LK.pick !== 'auto') LK.setPick('auto', true); });
     safe('speed', () => { if (typeof FF !== 'undefined' && FF.set) FF.set(1); });
     window.__FULL_RATE = true;   // (everyone stepped every frame: the close-ups follow people exactly)
+    safe('story', () => { if (STORY.engine === false) STORY.setEngine(true); });   // (the scenes need it, whatever this browser's own city had it set to)
+    safe('cases', () => { if (typeof CASES !== 'undefined'){ CASES.paused = true; CASES.noStage = true; } });   // (no case of the player's own takes our crew or officers)
   }
 
   /* ---------- people helpers ---------- */
   const doorOf = pl => pl && STORY.streetDoor(pl);
   const doorAnc = pl => ({ kind: 'door', door: STORY.streetDoor(pl), place: pl.id });
   const ptAnc = (x, z) => { const n = STORY.nearestNode(x, z); return { kind: 'point', x: NG.x[n], z: NG.z[n], node: n }; };
+  const nearDoor = (pl, to) => { let b = null, bd = 1e9; for (const d of pl.doors || []){ if (d.lift) continue; const k = Math.hypot(d.wall.x - to.wall.x, d.wall.z - to.wall.z); if (k < bd){ bd = k; b = d; } } return b; };   // (the door a walk to there leaves by: story.js nearestOf)
   const outward = d => { const dx = d.wall.x - d.inside.x, dz = d.wall.z - d.inside.z, L = Math.hypot(dx, dz) || 1; return { x: dx/L, z: dz/L }; };
   const pathLen = pts => { let L = 0; for (let k = 1; k < pts.length; k++) L += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]); return L; };
   function putInside(p, placeId){
     if (p.scene) safe('end scene', () => STORY.endScene(p.scene, 'preempted'));
     if (p.spot && p.spot.by === p.id) p.spot.by = null;
+    if (p.walk && p.walk.spot && p.walk.spot.by === p.id) p.walk.spot.by = null;
+    if (p.onBike) safe('bike', () => bikeLeave(p.onBike));
+    if (p.metro) safe('train', () => { for (const l of metros) if (l.train && Array.isArray(l.train.load)){ const k = l.train.load.indexOf(p); if (k >= 0) l.train.load.splice(k, 1); } });
+    p.custody = null; p.pause = null; p.rainRun = 0; p.eating = null;
     p.walk = null; p.spot = null; p.patrol = null; p.metro = null; p.metroPlan = null; p.club = null; p.clubbing = false; p.ride = null; p.chain = null;
     p.rush = false; p.hurry = false; p.at = placeId; p.until = pplNow + 9999;
   }
@@ -147,9 +154,9 @@ const TRAILER = (() => {
     for (const c of cells.values()){
       if (!inSector(c, 'low') || c.mega || !c.sections.length) continue;
       const pl = places.get('c:' + c.i + ',' + c.j), d = doorOf(pl); if (!d) continue;
-      const pts = route(sDoor.node, d.node); if (!pts) continue;
-      const L = pathLen(pts), score = Math.abs(L - 4.2) + (c.sections.length < 2 ? .8 : 0);
-      if (L > 2.2 && L < 7 && (!best || score < best.score)) best = { c, pl, d, L, score };
+      const sd = nearDoor(station, d), pts = sd && route(sd.node, d.node); if (!pts) continue;
+      const L = pathLen(pts), score = Math.abs(L - 2.4) + (c.sections.length < 2 ? .8 : 0);
+      if (L > 1 && L < 4.5 && (!best || score < best.score)) best = { c, pl, d, L, sd, score };
     }
     if (!best) throw new Error('no safehouse near the station');
     const sh = best.pl, shDoor = best.d, out = outward(shDoor);
@@ -169,23 +176,25 @@ const TRAILER = (() => {
       .map(p => { const c = cellOf(p.home); return { p, d: Math.hypot(c.x - (-8.5*LOT), c.z - (-8.5*LOT)) }; }).sort((a, b) => a.d - b.d).map(x => x.p);
     const subject = subj[0]; if (!subject) throw new Error('no resident with a pod'); used.add(subject.id);
     // their walk: to another residential building 6 to 14 units off, reachable
-    const home = places.get(subject.home), hDoor = doorOf(home); let dest = null;
+    const home = places.get(subject.home), hDoor = doorOf(home); if (!hDoor) throw new Error('the resident\'s home has no street door'); let dest = null;
     for (const c of cells.values()){
       if (!inSector(c, 'low') || c.mega || !c.sections.length) continue;
       const pl = places.get('c:' + c.i + ',' + c.j), d = doorOf(pl); if (!d || pl.id === home.id || pl.id === sh.id) continue;
       const pts = route(hDoor.node, d.node); if (!pts) continue; const L = pathLen(pts);
       if (L > 6 && L < 14 && (!dest || Math.abs(L - 9) < Math.abs(dest.L - 9))) dest = { pl, L };
     }
+    if (!dest) throw new Error('nowhere for the resident to walk to');
     // the crew: the go-between and a resident, and three more to carry crates
-    const crew = pplList.filter(p => free(p) && p.home && cellOf(p.home) && inSector(cellOf(p.home), 'low')).slice(0, 5);
+    const crew = pplList.filter(p => free(p) && !p.onBike && p.home && cellOf(p.home) && inSector(cellOf(p.home), 'low')).slice(0, 5);
     if (crew.length < 2) throw new Error('not enough people for the cleanout');
     crew.forEach(p => used.add(p.id));
     // four officers from the station (spire guards excluded)
-    let cops = pplList.filter(p => p.cop && !p.guard && p.job === station.id);
-    if (cops.length < 4) cops = cops.concat(pplList.filter(p => p.cop && !p.guard && !cops.includes(p)));
+    const okCop = p => p.cop && !p.guard && !p.custody;
+    let cops = pplList.filter(p => okCop(p) && p.job === station.id && !p.onBike);
+    if (cops.length < 4) cops = cops.concat(pplList.filter(p => okCop(p) && p.job === station.id && !cops.includes(p)), pplList.filter(p => okCop(p) && p.job !== station.id && !cops.includes(p)));
     cops = cops.slice(0, 4);
     if (cops.length < 2) throw new Error('not enough officers');
-    const raidLen = pathLen(route(sDoor.node, shDoor.node));
+    const raidLen = best.L;
     TR.c = { station, sDoor, sh, shDoor, out, away, subject, home, dest: dest && dest.pl, crew, cops, raidLen };
     TR.info.cast = { safehouse: sh.id, raidWalk: +raidLen.toFixed(2), subject: subject.id, pod: subject.pod, crew: crew.length, cops: cops.length };
     say('cast:', JSON.stringify(TR.info.cast));
@@ -222,12 +231,19 @@ const TRAILER = (() => {
     const big = w.innerWidth*w.innerHeight*.45;
     for (const cv of d.querySelectorAll('canvas')){ const r = cv.getBoundingClientRect(); cv.classList.toggle('tr-vis', r.width*r.height > big); }
   }
+  function labExit(){   // through the lab's own Exit: it tells the game, drops the home and is ready for the next (FURN.close alone left it stuck mid-open)
+    const w = labWin(), b = w && w.document && w.document.getElementById('ntExit');
+    if (b) b.click(); else FURN.close();
+    setTimeout(() => { if (FURN.open || FURN.hold) FURN.close(); }, 900);
+  }
   const labBusy = () => { const w = labWin(); return !w || !w.PodContext || w.PodContext.transitioning; };
   function labOrbit(dt){ const w = labWin(); const B = w && w.PodBuilder && w.PodBuilder._B; if (!B || labBusy()) return; B.az += .16*dt; B.camDirty = true; B.needs = true; }
 
   /* ---------- the coast, in a frame of its own, painted only around its moment ---------- */
-  const CO = { el: null, w: null, paused: true, pend: null, raf: null, ready: false, yaw: 0, zoom: 0 };
+  const CO = { el: null, w: null, paused: true, pend: [], raf: null, ready: false, yaw: 0, zoom: 0 };
   function coastMake(){
+    const keep = ['neonIsland.coastPlayed', 'neonIsland.coastPaused', 'neonIsland.coastVolume'].map(k => [k, localStorage.getItem(k)]);
+    const restore = () => { for (const [k, v] of keep) try { if (v === null) NT_RAW.remove.call(localStorage, k); else NT_RAW.set.call(localStorage, k, v); } catch (e) {} };
     const f = document.createElement('iframe'); f.id = 'trCoast'; f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1; f.src = 'coast.html';
     document.body.appendChild(f); CO.el = f;
     f.addEventListener('load', () => safe('coast', () => {
@@ -235,7 +251,7 @@ const TRAILER = (() => {
       const st = w.document.createElement('style'); st.textContent = 'body *{visibility:hidden!important}#view{visibility:visible!important}*{cursor:none!important}';
       w.document.head.appendChild(st);
       CO.raf = w.requestAnimationFrame.bind(w);
-      w.requestAnimationFrame = fn => { if (CO.paused){ CO.pend = fn; return 0; } return CO.raf(fn); };
+      w.requestAnimationFrame = fn => { if (CO.paused){ CO.pend.push(fn); return 0; } return CO.raf(fn); };
       CO.paused = false;   // (a few frames to build its first view, then it rests)
       setTimeout(() => { CO.paused = true; }, 1500);
       // the coast's own soundtrack stays silent: the trailer has Bytes and its own waves. (COASTMUSIC is a top-level const in the frame, not a
@@ -247,10 +263,11 @@ const TRAILER = (() => {
       w.COAST.setHour(8.4);
       const s = w.COAST.state; CO.yaw = s.yaw - .35; CO.zoom = 21;
       w.COAST.go({ yaw: CO.yaw, zoom: CO.zoom, pitch: 30*DEG });
+      setTimeout(restore, 3000); restore();
       CO.ready = true; say('coast ready');
     }));
   }
-  function coastWake(on){ CO.paused = !on; if (on && CO.pend){ const fn = CO.pend; CO.pend = null; CO.raf(fn); } }
+  function coastWake(on){ CO.paused = !on; if (on) for (const fn of CO.pend.splice(0)) CO.raf(fn); }
   function coastShow(a, blur = 0){ if (!CO.el) return; CO.el.style.opacity = String(a); CO.el.style.filter = blur > .05 ? 'blur(' + blur.toFixed(2) + 'px) brightness(' + (1 + blur*.06).toFixed(3) + ')' : ''; }
   function coastDrift(t){
     if (!CO.ready || !CO.w || !CO.w.COAST) return;
@@ -286,7 +303,7 @@ const TRAILER = (() => {
       await until(() => document.getElementById('furnish').classList.contains('live'), 60).catch(e => warn('dry run live', e));
       await until(() => !labBusy(), 60).catch(e => warn('dry run resolve', e));
       await wait(1);
-      FURN.close(); await wait(1.2);
+      labExit(); await until(() => !FURN.open && !FURN.hold, 20).catch(e => warn('dry run close', e)); await wait(1.5);
       if (!FURN.frame){ status('waking the apartment lab again'); FURN.preload(); await until(() => FURN.warmed() && FURN.frame, 240); }   // (a lab that can't be reused is thrown away on close)
     } else warn('dry run', 'could not open pod ' + TR.c.subject.pod);
     status('loading the coast');
@@ -316,7 +333,7 @@ const TRAILER = (() => {
         g.gain.setValueAtTime(1, now + 43.2); g.gain.linearRampToValueAtTime(0, now + 45);
         src.start(now, 0, 45.2); fx.start(now + 19.0);
         AU.start = now; go();
-      });
+      }).catch(e => { warn('sound', e); AU.ctx = null; go(); });
     }); else go();
   }
   function go(){
@@ -329,7 +346,7 @@ const TRAILER = (() => {
 
   /* ---------- the camera: set outright every frame from the timeline (no easing of its own) ---------- */
   const CAM = { x: CENTER.x, z: CENTER.z, y: TARGET_Y, yaw: .35, zoom: 33, pitch: 33*DEG };
-  let sub = null, subYaw = 0, grp = null, cutYaw = 0, raidYaw = 0, riseFrom = null;
+  let sub = null, subYaw = null, grp = null, cutYaw = 0, raidYaw = null, riseFrom = null;
   const outside = p => p && p.x !== undefined && (!!p.walk || !!(p.sc && p.sc.mode === 'out'));   // (out on the street, not behind a door)
   const centroid = list => { let x = 0, z = 0, n = 0; for (const p of list) if (p && p.x !== undefined){ x += p.x; z += p.z; n++; } return n ? { x: x/n, z: z/n } : null; };
   const turntable = t => ({ x: CENTER.x, z: CENTER.z, y: TARGET_Y, yaw: .35 + 1.3*ease(t/10), zoom: elerp(33, 26.5, ss(t/MK.swoop)), pitch: 33*DEG });
@@ -340,7 +357,7 @@ const TRAILER = (() => {
       const a = turntable(MK.swoop), p = c.subject, u = ease(seg(t, MK.swoop, MK.follow));
       if (!sub) sub = { x: p.x ?? a.x, z: p.z ?? a.z };
       sub.x = follow(sub.x, p.x ?? sub.x, 8, dt); sub.z = follow(sub.z, p.z ?? sub.z, 8, dt);
-      if (!subYaw){ const dx = p.dx || 0, dz = p.dz || 1; subYaw = a.yaw + wrapA(Math.atan2(-dx, -dz) + .45 - a.yaw)*.6; }
+      if (subYaw === null){ const dx = p.dx || 0, dz = p.dz || 1; subYaw = a.yaw + wrapA(Math.atan2(-dx, -dz) + .45 - a.yaw)*.6; }
       Object.assign(CAM, { x: lerp(a.x, sub.x, u), z: lerp(a.z, sub.z, u), y: lerp(TARGET_Y, (p._ey ?? CURB) + .5, u), yaw: lerp(a.yaw, subYaw, u), zoom: elerp(a.zoom, 4.4, u), pitch: lerp(33, 40, u)*DEG });
     }
     else if (t < MK.coastIn){   // with the subject on the person cam (the apartment covers the screen from 15 s)
@@ -359,7 +376,7 @@ const TRAILER = (() => {
     }
     else if (t < MK.rise){   // the officers walk up, knock, go in, come out
       const d = c.shDoor, door = { x: d.wall.x + c.out.x*.9, z: d.wall.z + c.out.z*.9 };
-      if (!raidYaw){ raidYaw = Math.atan2(c.out.x, c.out.z) - .55; grp = null; }
+      if (raidYaw === null){ raidYaw = Math.atan2(c.out.x, c.out.z) - .55; grp = null; }
       const there = t > MK.arrive - .3, cc = there ? door : centroid(c.cops.filter(outside)) || door;
       if (!grp) grp = { x: cc.x, z: cc.z };
       grp.x = follow(grp.x, cc.x, there ? 2 : 4, dt); grp.z = follow(grp.z, cc.z, there ? 2 : 4, dt);
@@ -382,6 +399,7 @@ const TRAILER = (() => {
   const _uc = updateCamera;
   updateCamera = function (dt){
     if (TR.playing) safe('frame', () => {
+      TR.t = Math.min(LEN, clock());
       S.hour = hourAt(TR.t);
       if (TR.t > MK.coastIn && TR.t < MK.cut2) LIGHTS_ON.value = LIGHTS_GOAL;   // (straight into the night: every window already lit)
       camAt(TR.t, dt);
@@ -392,7 +410,7 @@ const TRAILER = (() => {
   /* ---------- the scenes ---------- */
   function scene(id, castMap, beats, log){
     for (const pid of Object.values(castMap)) if (!places.get(people.get(pid).at)) throw new Error(id + ': ' + pid + ' is nowhere');
-    const sc = STORY.startScene({ id, beats, log, roles: {}, effects: {}, next: null, tier: 'case', prio: 9 }, castMap, { done: r => say(id, 'ended', r) });
+    const sc = STORY.startScene({ id, beats, log, roles: {}, effects: {}, next: null, tier: 'case', prio: 9 }, castMap, { done: (sc2, why) => say(id, 'ended', why) });
     if (!sc) throw new Error(id + ' did not start');
     return sc;
   }
@@ -412,18 +430,18 @@ const TRAILER = (() => {
     c.crew.forEach((p, k) => { p.held = PG.heldPick(k === 1 ? 'bag' : 'crate', '', p.id); p.hurry = true; });
   }
   function raid(){
-    const c = TR.c, m = {}; c.cops.forEach((p, k) => { m['ABCD'[k]] = p.id; });
+    const c = TR.c, m = {}; TR.cops = c.cops; c.cops.forEach((p, k) => { m['ABCD'[k]] = p.id; });
     const door = doorAnc(c.sh), off = ptAnc(c.shDoor.wall.x + c.out.x*3.2 - c.out.z*1.5, c.shDoor.wall.z + c.out.z*3.2 + c.out.x*1.5);
     const all = Object.keys(m), two = all.slice(0, 2);
-    scene('trailer.raid', m, [
+    TR.raidSc = scene('trailer.raid', m, [
       { id: 'r0', who: all, with: [], at: 'case', do: 'walk-together', anc: door, hold: .15 },
-      { id: 'r1', who: ['A'], with: ['B'], at: 'case', do: 'knock-and-wait', anc: door, hold: 1.05 },
-      { id: 'r2', who: two, with: [], at: 'case', do: 'enter', anc: door, hold: 1.1 },
-      { id: 'r3', who: [two[1] || 'A'], with: ['A'], at: 'case', do: 'shrug', anc: door, hold: 1.4 },
+      { id: 'r1', who: ['A'], with: ['B'], at: 'case', do: 'knock-and-wait', anc: door, hold: .85 },
+      { id: 'r2', who: two, with: [], at: 'case', do: 'enter', anc: door, hold: .6 },
+      { id: 'r3', who: [two[1] || 'A'], with: ['A'], at: 'case', do: 'shrug', anc: door, hold: 1.1 },
       { id: 'r4', who: ['A'], with: [], at: 'case', do: 'carry', held: 'crate', anc: off, hold: .5 }],
       { r0: ['{A}, {B}, {C} and {D} walk out of the station together before dawn.'], r1: ['{A} knocks hard at the door while {B} watches the street.'],
         r2: ['{A} and {B} go in through the door.'], r3: ['{B} comes back out shaking {B.his} head: "Cleared out."'], r4: ['{A} carries out one empty crate, and nothing else.'] });
-    for (const p of c.cops) p.hurry = true;
+    for (const p of c.cops){ p.hurry = false; p.rush = true; }   // (a raid: they move)
   }
 
   /* ---------- the timeline's moments ---------- */
@@ -437,14 +455,14 @@ const TRAILER = (() => {
   at(MK.furn, () => { if (!FURN.openKey(TR.c.subject.pod)) warn('furnish', 'did not open'); }, 'furnish');
   at(MK.coastWake, () => coastWake(true), 'coast wakes');
   at(MK.dissolve, () => { CO.fade = true; }, 'coast dissolves in');
-  at(MK.coastIn, () => { if (FURN.open || FURN.hold) FURN.close(); LK.setWeather('rain', true, true); stageNight(); }, 'night falls behind the coast');
+  at(MK.coastIn, () => { if (FURN.open || FURN.hold) labExit(); LK.setWeather('rain', true, true); stageNight(); }, 'night falls behind the coast');
   at(MK.clean, () => cleanout(), 'cleanout');
   at(MK.coastOut, () => { CO.fade = false; coastShow(0); flash(.45); coastWake(false); }, 'drop');
   at(-1, () => raid(), 'raid');   // (its time is worked out from the walk: see setup)
   at(MK.end, () => { TR.playing = false; TR.done = true; say('done'); if (!CAP){ TR.el.msg.hidden = false; TR.el.status.innerHTML = 'click to play again'; TR.el.ov.classList.add('ask'); TR.el.ov.addEventListener('click', () => location.reload(), { once: true }); } }, 'end');
   function timeRaid(){   // leave the station so the four reach the door at MK.arrive (hurried walk, plus the two doorways)
-    const v = PPL_SPEED*1.6, walk = (TR.c.raidLen + 1.2)/v + 1.0, e = EV.find(x => x.name === 'raid');
-    e.t = Math.max(MK.coastIn + .3, MK.arrive - walk); TR.info.raidAt = +e.t.toFixed(2); EV.sort((a, b) => a.t - b.t);
+    const v = PPL_SPEED*2.3, walk = (TR.c.raidLen + 1.2)/v + 1.0, e = EV.find(x => x.name === 'raid');
+    e.t = Math.max(MK.raidEarliest, MK.arrive - walk); TR.info.raidAt = +e.t.toFixed(2); EV.sort((a, b) => a.t - b.t);
   }
 
   /* ---------- the overlay's moments, drawn from the clock (not CSS animations: the recorder steps time) ---------- */
@@ -469,9 +487,11 @@ const TRAILER = (() => {
     const t = Math.min(LEN, clock()), dt = Math.max(0, Math.min(.1, t - lastT)); lastT = t; TR.t = t;
     while (fired < EV.length && EV[fired].t <= t){ const e = EV[fired++]; safe(e.name, e.f); TR.log.push(t.toFixed(2) + ' ' + e.name); }
     paint(t);
+    if (TR.raidSc && TR.raidSc.phase && t > MK.arrive){ const k = TR.raidSc.beatIx ?? TR.raidSc.k ?? TR.raidSc.i, b = TR.raidSc.b || (typeof k === 'number' && TR.raidSc.s.beats[k]);
+      const A = TR.cops && TR.cops[0]; if (A && !A.held && b && b.id === 'r4') A.held = PG.heldPick('crate', '', A.id); }
     if (t >= MK.furn && t < MK.coastIn && FURN.open){ safe('lab', labClean); safe('orbit', () => labOrbit(dt)); }
     if (t >= MK.coastWake && t < MK.coastOut) coastDrift(t);
-    if (FURN.hold && !(t >= MK.furn && t < MK.coastIn + .1)) safe('furnish', () => FURN.close());   // (never left covering the city)
+    if (FURN.hold && !(t >= MK.furn && t < MK.coastIn + 1.2)) safe('furnish', () => FURN.close());   // (never left covering the city)
   }
   // capture: the recorder asks for this once the page reports ready, then steps the frames itself
   TR.start = () => { if (!TR.ready) return false; go(); return true; };

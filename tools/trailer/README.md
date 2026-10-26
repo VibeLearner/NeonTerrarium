@@ -1,18 +1,19 @@
 # The trailer
 
-A 45 second film of the game, cut to **Bytes** (`assets/audio/music/Bytes.mp3`), with no text except the logo at the end.
+A 48 second film of the game, cut to **Bytes** (`assets/audio/music/Bytes.mp3`), with no text except the logo at the end.
 It is played by the game itself: open the game with `#trailer` at the end of the address. Code: `js/trailer.js`.
 
 | Time | Shot |
 |---|---|
-| 0 to 8.4 s | Four separate sectors (residential, commercial, luxury, industrial) joined by one metro line, turning while the day runs from morning haze through golden hour to dusk; new buildings are placed round their outer edges with the game's build animation |
-| 8.4 to 13.5 s | The camera dives onto a street corner where a resident meets a neighbor; the person cam opens and the log fills in from their conversation (the corner is picked so no building blocks the view) |
-| 13.5 to 19 s | Their own apartment opens in Furnish pod: the hologram scan, then two pieces of furniture are set down while the room turns |
-| 19 to 21.72 s | The lull in the music: the picture glitches into the coast, a town grown along the cliffs seen whole at midday (waves and shorebirds), and glitches back out on the drop |
-| 21.72 s | The drop: 3 a.m. in the rain. The crime boss's people slip out the back of the safehouse with the crates |
+| 0 to 8.4 s | Four sectors (residential, commercial, luxury, industrial) joined by a metro, turning while the day runs from morning haze to dusk; about a hundred new buildings are placed round their outer edges with the game's build animation until the city fills the frame |
+| 8.4 to 13.5 s | The camera dives onto a small lawn where two neighbors meet; the person cam opens and the log fills in from their conversation |
+| 13.5 to 19 s | The resident's own apartment opens in Furnish pod: the hologram scan, then two pieces of furniture are set down while the room turns |
+| 19 to 21.72 s | The lull in the music: the picture glitches into the coast (a town filling the cliffs, at midday, seen from the coast's farthest zoom; waves and shorebirds) and glitches back out on the drop |
+| 21.72 s | The drop: 3 a.m. in the rain, in a district built for the heist. The crime boss's people slip out the back of the safehouse with the crates |
 | 26.22 s | Four officers hurry to its front door (arriving 29.5 s), knock, two go in, and come back out with one empty crate |
-| 33.72 s | The camera rises over the whole city at night, trains running between the sectors |
-| 41.22 s | The logo |
+| 33.72 s | The lights go out and the camera rises over the whole district in the dark |
+| 38.22 s | The city's lights flicker on |
+| 42.72 s | The logo |
 
 The cuts land on the music's bars (160 bpm; the drop is at 21.72 s and the lull before it starts at 19.2 s).
 

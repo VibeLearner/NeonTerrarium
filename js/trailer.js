@@ -18,15 +18,16 @@ const TRAILER = (() => {
   const TR = { on: !!window.NT_TRAILER, ready: false, playing: false, done: false, t: -1, stage: 'off', log: [], info: {} };
   if (!TR.on) return TR;
   maybeSpawnMegas = () => {};   // (the opening shot's builds never bring in a megastructure of their own)
+  sfx.play = () => {};   // (and make no sound: the trailer's sound is Bytes and the coast)
   const CAP = !!window.__TR_CAPTURE;   // (set by the recorder's clock shim: no click, no sound, the recorder steps the frames)
   const say = (...a) => { TR.log.push(a.join(' ')); console.log('[trailer]', ...a); };
   const warn = (what, e) => { TR.log.push('! ' + what + ': ' + (e && e.message || e)); console.warn('[trailer] ' + what, e); };
   const safe = (what, f) => { try { return f(); } catch (e) { warn(what, e); return null; } };
 
   /* ---------- timing: Bytes runs at 160 bpm; the drop lands at 21.72 s, the lull before it starts at 19.2 s ---------- */
-  const LEN = 45, BEAT = 60/160, DROP = 21.72, bar = n => DROP + n*4*BEAT;
+  const LEN = 48, BEAT = 60/160, DROP = 21.72, bar = n => DROP + n*4*BEAT;
   const MK = { swoop: 8.4, follow: 10.0, subjectOut: 7.9, monOpen: 10.15, notes: 12.35, monClose: 13.4, furn: 13.5, coastWake: 18.2, glIn: 19.0,
-    coastIn: 19.45, glOut: 21.48, coastOut: DROP, clean: 20.85, cut2: bar(3), raidEarliest: 25.0, arrive: 29.5, rise: bar(8), logo: bar(13), end: LEN };
+    coastIn: 19.45, glOut: 21.48, coastOut: DROP, clean: 20.85, cut2: bar(3), raidEarliest: 25.0, arrive: 29.5, rise: bar(8), zoomed: bar(11), lit: bar(12), logo: bar(14), end: LEN };
 
   /* ---------- small maths ---------- */
   const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
@@ -39,63 +40,93 @@ const TRAILER = (() => {
   const DEG = Math.PI/180;
   const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
 
-  /* ---------- the city: four sectors of 7 x 7 plots, one zone each, five plots of open sky between them ---------- */
-  const N = 7;
-  const SECT = [{ zone: 'low', i0: -12, j0: -12 }, { zone: 'mid', i0: 0, j0: -12 }, { zone: 'high', i0: 0, j0: 0 }, { zone: 'ind', i0: -12, j0: 0 }];
-  // landmarks, each two plots clear of the metro: police (the raid needs it, and so does the person cam), the Neon Dome, the Cloud Pagoda, the foundry
-  const MEGAS = [['police', -12, -12, 3, 3], ['club', 3, -12, 4, 4], ['pagoda', 3, 2, 4, 5], ['foundry', -12, 1, 4, 6]];
+  /* ---------- the city: four sectors of 10 x 10 plots, one zone each, four plots of open sky between them ---------- */
+  const N = 10;
+  const SECT = [{ zone: 'low', i0: -14, j0: -14 }, { zone: 'mid', i0: 0, j0: -14 }, { zone: 'high', i0: 0, j0: 0 }, { zone: 'ind', i0: -14, j0: 0 }];
+  // landmarks, each well clear of the metro: police (the person cam needs one), the Neon Dome, the Cloud Pagoda, the foundry
+  const MEGAS = [['police', -14, -14, 3, 3], ['club', 5, -14, 4, 4], ['pagoda', 5, 4, 4, 5], ['foundry', -14, 3, 4, 6]];
   // the metro: one line round the inside corners of the four sectors, over the open sky between them; it starts and ends in the industrial sector
-  const MT_WAY = [[-7, 0], [-7, -7], [1, -7], [1, 1], [-6, 1]], MT_STOPS = [[-6, -7], [0, -7], [1, 0]];
-  const CENTER = { x: -3*LOT, z: -3*LOT };
-  function metroTiles(){
+  const MT_WAY = [[-6, 0], [-6, -6], [1, -6], [1, 1], [-5, 1]], MT_STOPS = [[-5, -6], [0, -6], [1, 0]];
+  const CENTER = { x: -2.5*LOT, z: -2.5*LOT };
+  // the person cam's corner: a small open lawn in the residential sector with low tenements round it, so the two people are always in view
+  const PARK = { i0: -10, j0: -10, n: 3, ring: 1, floors: 4 };
+  const inPark = (i, j) => i >= PARK.i0 && i < PARK.i0 + PARK.n && j >= PARK.j0 && j < PARK.j0 + PARK.n;
+  const nearPark = (i, j) => !inPark(i, j) && i >= PARK.i0 - PARK.ring && i < PARK.i0 + PARK.n + PARK.ring && j >= PARK.j0 - PARK.ring && j < PARK.j0 + PARK.n + PARK.ring;
+  // the heist: a district of its own for the night scenes, far out of the opening shot's view. Laid out round them: a block of low
+  // tenements in the middle (the safehouse is one of them), the police station just north of it, open lawns dotted through, taller buildings
+  // only further out, and a metro along the south edge for the closing shot
+  const HEIST = { i0: 30, j0: -12, n: 24, bi0: 34, bj0: -3, bn: 7, floors: 3 };
+  const HEIST_MEGAS = [['police', 35, -6, 3, 3]];
+  const HEIST_MT = [[30, 11], [53, 11]], HEIST_MT_STOPS = [[35, 11], [47, 11]], HEIST_MT2 = [[30, -12], [53, -12]], HEIST_MT2_STOPS = [[38, -12], [48, -12]];
+  const HEIST_CENTER = { x: 41.5*LOT, z: -.5*LOT };
+  const inHeist = (i, j) => i >= HEIST.i0 && i < HEIST.i0 + HEIST.n && j >= HEIST.j0 && j < HEIST.j0 + HEIST.n;
+  const inBlock = (i, j) => i >= HEIST.bi0 && i < HEIST.bi0 + HEIST.bn && j >= HEIST.bj0 && j < HEIST.bj0 + HEIST.bn;
+  function lineTiles(way){
     const t = [];
-    for (let k = 0; k < MT_WAY.length - 1; k++){
-      const [i0, j0] = MT_WAY[k], [i1, j1] = MT_WAY[k + 1], di = Math.sign(i1 - i0), dj = Math.sign(j1 - j0);
+    for (let k = 0; k < way.length - 1; k++){
+      const [i0, j0] = way[k], [i1, j1] = way[k + 1], di = Math.sign(i1 - i0), dj = Math.sign(j1 - j0);
       let i = i0, j = j0; if (k > 0){ i += di; j += dj; }
       for (;;){ t.push({ i, j }); if (i === i1 && j === j1) break; i += di; j += dj; }
     }
     return t;
   }
+  const metroTiles = () => lineTiles(MT_WAY);
   function city(){
     const R = mulberry32(20261026);
-    const tiles = metroTiles(), onTrack = new Set(tiles.map(t => t.i + ',' + t.j));
-    const inMega = (i, j) => MEGAS.some(([, mi, mj, w, h]) => i >= mi && i < mi + w && j >= mj && j < mj + h);
+    const tiles = metroTiles(), htiles = lineTiles(HEIST_MT), htiles2 = lineTiles(HEIST_MT2), onTrack = new Set(tiles.concat(htiles, htiles2).map(t => t.i + ',' + t.j));
+    const allMegas = MEGAS.concat(HEIST_MEGAS);
+    const inMega = (i, j) => allMegas.some(([, mi, mj, w, h]) => i >= mi && i < mi + w && j >= mj && j < mj + h);
+    const secs = (zone, k, mf) => { const out = []; for (let q = 0; q < k; q++) out.push(Object.assign({ zone, seed: Math.floor(R()*1e9), style: DEFAULT_STYLE }, mf ? { mf } : {})); return out; };
+    const put = (i, j, f) => { const c = newCell(i, j); c.style = DEFAULT_STYLE; c.green = 'some'; f(c); cells.set(ckey(i, j), c); n++; };
     let n = 0;
-    for (const s of SECT) for (let i = s.i0; i < s.i0 + N; i++) for (let j = s.j0; j < s.j0 + N; j++){
-      const c = newCell(i, j); c.style = DEFAULT_STYLE; c.green = 'some';
-      if (onTrack.has(i + ',' + j)) c.green = 'grass';   // (lawns under the metro: its pillars stand on them and nothing grows into the track)
-      else if (!inMega(i, j)){
-        const u = R();
-        if (u < .12) c.green = 'grass';   // (a few open lawns and parks: a calm city, not a packed one)
-        else { const k = u < .62 ? 1 : u < .92 ? 2 : 3;
-          for (let q = 0; q < k; q++) c.sections.push({ zone: s.zone, seed: Math.floor(R()*1e9), style: DEFAULT_STYLE }); }
-      }
-      cells.set(ckey(i, j), c); n++;
-    }
-    for (const [kind, i, j, w, h] of MEGAS){ const m = placeMega(kind, i, j, Math.floor(R()*1e9), w, h, 1); if (!m) warn('megastructure ' + kind, 'did not fit'); else if (kind === 'square') m.centre = 'pond'; }
-    const l = { id: mtNext++, tiles, done: true, st: MT_STOPS.map(([i, j]) => tiles.findIndex(t => t.i === i && t.j === j)).filter(k => k > 0 && k < tiles.length - 1), sides: {} };
-    metros.push(l); mtReindex();
+    for (const s of SECT) for (let i = s.i0; i < s.i0 + N; i++) for (let j = s.j0; j < s.j0 + N; j++) put(i, j, c => {
+      if (onTrack.has(i + ',' + j) || inPark(i, j)) { c.green = 'grass'; return; }   // (lawns under the metro, and the person cam's lawn)
+      if (inMega(i, j)) return;
+      if (nearPark(i, j)){ c.sections = secs('low', 1, PARK.floors); return; }   // (low round the lawn: nothing to stand in the camera's way)
+      const u = R();
+      if (u < .1) c.green = 'grass';
+      else c.sections = secs(s.zone, u < .58 ? 1 : u < .9 ? 2 : 3);
+    });
+    // the heist district: mixed, like an old neighborhood at night
+    for (let i = HEIST.i0; i < HEIST.i0 + HEIST.n; i++) for (let j = HEIST.j0; j < HEIST.j0 + HEIST.n; j++) put(i, j, c => {
+      if (onTrack.has(i + ',' + j)) { c.green = 'grass'; return; }
+      if (inMega(i, j)) return;
+      const u = R();
+      if (inBlock(i, j)){ if (u < .22) c.green = 'grass'; else c.sections = secs('low', 1, HEIST.floors); return; }   // (the low middle: the camera sees over all of it)
+      const far = Math.max(Math.abs(i - 37), Math.abs(j)) > 5, z = u < .42 ? 'low' : u < .78 ? 'mid' : 'high';
+      if (!far){ c.sections = secs(z, 1, 5); return; }   // (a ring of mid-height round the block)
+      if (R() < .05) c.green = 'grass'; else { const v = R(); c.sections = secs(z, v < .3 ? 1 : v < .75 ? 2 : 3); }   // (dense and tall further out)
+    });
+    for (const [kind, i, j, w, h] of allMegas){ const m = placeMega(kind, i, j, Math.floor(R()*1e9), w, h, 1); if (!m) warn('megastructure ' + kind, 'did not fit'); }
+    const mk = (t, stops) => ({ id: mtNext++, tiles: t, done: true, st: stops.map(([i, j]) => t.findIndex(x => x.i === i && x.j === j)).filter(k => k > 0 && k < t.length - 1), sides: {} });
+    const l = mk(tiles, MT_STOPS), l2 = mk(htiles, HEIST_MT_STOPS), l3 = mk(htiles2, HEIST_MT2_STOPS);
+    metros.push(l, l2, l3); mtReindex();
     rebuildAll(); finishSync();
-    safe('metro', () => mtCommit(l, [])); finishSync();
-    TR.info.city = { plots: n, megas: megas.size, metroTiles: tiles.length, stops: l.st.length + 2 };
+    safe('metro', () => { mtCommit(l, []); mtCommit(l2, []); mtCommit(l3, []); }); finishSync();
+    TR.info.city = { plots: n, megas: megas.size, metros: metros.length };
     say('city built:', JSON.stringify(TR.info.city));
   }
   TR.city = () => safe('city', city);
 
-  // the opening shot builds the city out: new plots grow from each sector's outer edges into the open sky (the areas marked on the
-  // Oct 26 still), each one with the game's own build sweep, some stacked a section higher a moment later
-  const GROW = [
-    ['ind',  [[-13, 0], [-13, 1], [-13, 2], [-14, 1], [-13, 3], [-14, 2]]],          // west of the industrial sector
-    ['low',  [[-13, -11], [-13, -10], [-13, -9], [-14, -10], [-13, -8], [-14, -9]]],  // west of the residential sector
-    ['mid',  [[1, -13], [2, -13], [3, -13], [2, -14], [4, -13], [3, -14]]],          // north of the commercial sector
-    ['ind',  [[-12, 7], [-11, 7], [-10, 7], [-11, 8], [-9, 7], [-10, 8]]],           // south of the industrial sector
-    ['high', [[0, 7], [1, 7], [2, 7], [1, 8], [3, 7], [2, 8]]],                      // south of the luxury sector
-    ['mid',  [[7, -9], [7, -8], [7, -7], [8, -8]]],                                  // east of the commercial sector
-    ['high', [[7, 0], [7, 1], [7, 2], [8, 1]]]];                                     // east of the luxury sector
-  const GROW_T0 = .7, GROW_T1 = 7.7;
+  // the opening shot builds the city out: new plots grow from each sector's outer edges into the open sky (as marked on the Oct 26 still)
+  // until the city fills the frame, each with the game's own build sweep, some stacked a section higher a moment later. Each sector's two
+  // outer sides get a full row and part of a second
+  function edgeRows(s){
+    const out = [], lo = s.i0, hi = s.i0 + N - 1, lj = s.j0, hj = s.j0 + N - 1;
+    const west = s.i0 < 0, north = s.j0 < 0;
+    const ci = west ? lo - 1 : hi + 1, ci2 = west ? lo - 2 : hi + 2, cj = north ? lj - 1 : hj + 1, cj2 = north ? lj - 2 : hj + 2;
+    for (let j = lj; j <= hj; j++) out.push([ci, j]);
+    for (let i = lo; i <= hi; i++) out.push([i, cj]);
+    out.push([ci, cj]);
+    for (let j = lj + 2; j <= hj - 2; j += 2) out.push([ci2, j]);
+    for (let i = lo + 2; i <= hi - 2; i += 2) out.push([i, cj2]);
+    return out;
+  }
+  const GROW = SECT.map(s => [s.zone, edgeRows(s)]);
+  const GROW_T0 = .5, GROW_T1 = 7.9;
   function growPlan(){
     const R = mulberry32(7026), q = [], n = Math.max(...GROW.map(g => g[1].length));
-    for (let k = 0; k < n; k++) for (const [zone, list] of GROW) if (list[k]) q.push({ zone, i: list[k][0], j: list[k][1], up: R() < .45 ? (R() < .3 ? 2 : 1) : 0 });
+    for (let k = 0; k < n; k++) for (const [zone, list] of GROW) if (list[k]) q.push({ zone, i: list[k][0], j: list[k][1], up: R() < .22 ? (R() < .3 ? 2 : 1) : 0 });
     q.forEach((b, k) => { b.t = GROW_T0 + (GROW_T1 - GROW_T0)*k/(q.length - 1); });
     return q;
   }
@@ -183,46 +214,46 @@ const TRAILER = (() => {
   const resCell = c => c && inSector(c, 'low') && !c.mega && c.sections.length;
   const placeOf = c => places.get('c:' + c.i + ',' + c.j);
   function cast(){
-    const pol = megasOfKind('police')[0]; if (!pol) throw new Error('no police station');
+    const pol = megasOfKind('police').find(m => inHeist(m.i, m.j)); if (!pol) throw new Error('no police station in the heist district');
     const station = places.get('m:' + pol.id), sDoor = doorOf(station); if (!sDoor) throw new Error('the station has no street door');
-    // the safehouse: a residential building a short walk from the station, with a building back to back with it whose door opens on the
-    // other street. The crew slip out that way (it reads as the safehouse's back door) while the officers come to the front
-    // (searched in widening rings: straight behind with the door facing the other way is best; any next-door building whose door opens on a
-    // different street will do; failing that, the safehouse's own door, so the trailer still plays)
+    const blockCell = c => c && inBlock(c.i, c.j) && !c.mega && c.sections.length;
+    // the safehouse, in the heist district's low block: a building with a neighbor whose door opens on another street (the crew slip out
+    // that way while the officers come to the front). Straight behind with its door facing the other way is best
     const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     let best = null;
     for (const c of cells.values()){
-      if (!resCell(c)) continue;
+      if (!blockCell(c)) continue;
       const pl = placeOf(c), d = doorOf(pl); if (!d) continue;
       const sd = nearDoor(station, d), pts = sd && route(sd.node, d.node); if (!pts) continue;
-      const L = pathLen(pts); if (L < 1 || L > 9) continue;
+      const L = pathLen(pts); if (L < 1 || L > 10) continue;
       const n = outward(d);
       for (const [di, dj] of N4){
-        const bc = cells.get(ckey(c.i + di, c.j + dj)); if (!resCell(bc)) continue;
+        const bc = cells.get(ckey(c.i + di, c.j + dj)); if (!blockCell(bc)) continue;
         const bpl = placeOf(bc), bd = doorOf(bpl); if (!bd) continue;
         const bn = outward(bd), dot = n.x*bn.x + n.z*bn.z, apart = Math.hypot(bd.wall.x - d.wall.x, bd.wall.z - d.wall.z);
-        if (dot > .3 || apart < 2.5) continue;   // (its door has to open on another street)
+        if (dot > .3 || apart < 2.5) continue;
         const behind = di === -Math.round(n.x) && dj === -Math.round(n.z);
-        const score = Math.abs(L - 2.4) + (dot + 1)*2 + (behind ? 0 : 1.5) + (c.sections.length < 2 ? .8 : 0);
+        const score = Math.abs(L - 3) + (dot + 1)*2 + (behind ? 0 : 1.5);
         if (!best || score < best.score) best = { c, pl, d, L, sd, bpl, bd, score };
       }
     }
     if (!best){
-      warn('safehouse', 'no building with a back way out near the station: the crew use the front door');
+      warn('safehouse', 'no building with a back way out: the crew use the front door');
       for (const c of cells.values()){
-        if (!resCell(c)) continue;
+        if (!blockCell(c)) continue;
         const pl = placeOf(c), d = doorOf(pl); if (!d) continue;
         const sd = nearDoor(station, d), pts = sd && route(sd.node, d.node); if (!pts) continue;
-        const L = pathLen(pts), score = Math.abs(L - 2.4);
-        if (L > 1 && L < 9 && (!best || score < best.score)) best = { c, pl, d, L, sd, bpl: pl, bd: d, score };
+        const L = pathLen(pts), score = Math.abs(L - 3);
+        if (L > 1 && L < 10 && (!best || score < best.score)) best = { c, pl, d, L, sd, bpl: pl, bd: d, score };
       }
     }
-    if (!best) throw new Error('no safehouse near the station');
+    if (!best) throw new Error('no safehouse in the heist district');
     const sh = best.pl, shDoor = best.d, out = outward(shDoor), bk = best.bpl, bkDoor = best.bd, bkOut = outward(bkDoor);
-    // where the crew walks off to: a street point away from the back door, away from the front and the station
+    // where the crew walks off to: a street point in the district away from the back door, the front and the station
     let away = null;
     for (let n = 0; n < NG.x.length; n++){
-      const x = NG.x[n], z = NG.z[n], dd = Math.hypot(x - bkDoor.wall.x, z - bkDoor.wall.z); if (dd < 6 || dd > 10) continue;
+      const x = NG.x[n], z = NG.z[n]; if (!inHeist(Math.round(x/LOT), Math.round(z/LOT))) continue;
+      const dd = Math.hypot(x - bkDoor.wall.x, z - bkDoor.wall.z); if (dd < 6 || dd > 10) continue;
       const fromSt = Math.min(Math.hypot(x - sDoor.wall.x, z - sDoor.wall.z), Math.hypot(x - shDoor.wall.x, z - shDoor.wall.z)), pts = route(bkDoor.node, n); if (!pts) continue;
       const L = pathLen(pts); if (L > 13) continue;
       const score = fromSt - L*.4; if (!away || score > away.score) away = { n, x, z, score };
@@ -231,44 +262,32 @@ const TRAILER = (() => {
     const used = new Set();
     const free = p => p && !p.cop && !p.guard && !p.visitor && !p.archivist && !p.onBike && !used.has(p.id);
     const homeCell = p => cellOf(p.home);
-    // the person cam: a resident with a pod (so Furnish pod can open their home) meets a neighbor on a street corner the camera can see
-    // from low down, a few steps from both their doors
-    const subjects = pplList.filter(p => free(p) && p.pod && p.home !== sh.id && p.home !== bk.id && resCell(homeCell(p)) && homeCell(p).sections.length >= 2)
-      .map(p => { const c = homeCell(p); return { p, d: Math.hypot(c.x - (-8.5*LOT), c.z - (-8.5*LOT)) }; }).sort((a, b) => a.d - b.d).slice(0, 24).map(x => x.p);
-    let meet = null;
-    for (const p of subjects){
-      const home = places.get(p.home), hd = doorOf(home); if (!hd) continue;
-      for (let n = 0; n < NG.x.length; n++){
-        const x = NG.x[n], z = NG.z[n], dh = Math.hypot(x - hd.wall.x, z - hd.wall.z); if (dh < 1.6 || dh > 4.5) continue;
-        const ph = route(hd.node, n); if (!ph || pathLen(ph) > 6) continue;
-        // a neighbor from another building close by
-        const fr = pplList.find(q => free(q) && q !== p && q.home && q.home !== p.home && q.home !== sh.id && q.home !== bk.id && resCell(homeCell(q))
-          && (() => { const d2 = doorOf(places.get(q.home)); if (!d2 || Math.hypot(d2.wall.x - x, d2.wall.z - z) > 6) return false; const pf = route(d2.node, n); return pf && pathLen(pf) < 7.5; })());
-        if (!fr) continue;
-        const v = pickView([at3(x, z), at3(x + .5, z), at3(x - .5, z), at3(x, z + .5), at3(x, z - .5)], 1.65, 34, null, 63, 9);
-        if (v.pitch > 62*DEG) continue;   // (a low angle is best; a steeper one will do; straight down won't)
-        const score = v.pitch/DEG*1.5 + Math.abs(wrapA(v.yaw - 1.65))*4 + dh;
-        if (!meet || score < meet.score) meet = { p, fr, n, x, z, v, score };
-      }
-      if (meet && meet.score < 62) break;
-    }
-    if (!meet) throw new Error('no open street corner for the person cam');
-    const subject = meet.p, friend = meet.fr; used.add(subject.id); used.add(friend.id);
-    const walkT = q => { const d = doorOf(places.get(q.home)), pts = route(d.node, meet.n); return (pathLen(pts) + 1.2)/PPL_SPEED + 1.0; };
-    // the crew: the go-between and a resident, and three more to carry crates
+    // the person cam: two neighbors from the low tenements round the lawn meet in the middle of it
+    const mx = (PARK.i0 + (PARK.n - 1)/2)*LOT, mz = (PARK.j0 + (PARK.n - 1)/2)*LOT, mn = STORY.nearestNode(mx, mz);
+    const ringer = p => { const c = homeCell(p); return c && nearPark(c.i, c.j) && c.sections.length; };
+    const byDist = list => list.map(p => ({ p, d: (() => { const d = doorOf(places.get(p.home)); return d ? Math.hypot(d.wall.x - NG.x[mn], d.wall.z - NG.z[mn]) : 1e9; })() })).sort((a, b) => a.d - b.d).map(x => x.p);
+    const subject = byDist(pplList.filter(p => free(p) && p.pod && ringer(p)))[0] || byDist(pplList.filter(p => free(p) && p.pod && resCell(homeCell(p))))[0];   // (round the lawn if one there has a pod; else the nearest who does)
+    if (!subject) throw new Error('no resident with a pod round the lawn');
+    used.add(subject.id);
+    const friend = byDist(pplList.filter(p => free(p) && ringer(p) && p.home !== subject.home))[0] || byDist(pplList.filter(p => free(p) && ringer(p)))[0];
+    if (!friend) throw new Error('no neighbor round the lawn');
+    used.add(friend.id);
+    const view = pickView([at3(NG.x[mn], NG.z[mn]), at3(NG.x[mn] + .6, NG.z[mn]), at3(NG.x[mn] - .6, NG.z[mn]), at3(NG.x[mn], NG.z[mn] + .6), at3(NG.x[mn], NG.z[mn] - .6)], 1.65, 32, null, 70, 16);
+    const walkT = q => { const d = doorOf(places.get(q.home)), pts = d && route(d.node, mn); return pts ? (pathLen(pts) + 1.2)/PPL_SPEED + 1.0 : 6; };
+    // the crew: five from the residential sector (they are brought over to the district for the night)
     const crew = pplList.filter(p => free(p) && p.home && resCell(homeCell(p))).slice(0, 5);
     if (crew.length < 2) throw new Error('not enough people for the cleanout');
     crew.forEach(p => used.add(p.id));
-    // four officers from the station (spire guards excluded)
+    // four officers from the district's station (spire guards excluded)
     const okCop = p => p.cop && !p.guard && !p.custody;
     let cops = pplList.filter(p => okCop(p) && p.job === station.id && !p.onBike);
     if (cops.length < 4) cops = cops.concat(pplList.filter(p => okCop(p) && p.job === station.id && !cops.includes(p)), pplList.filter(p => okCop(p) && p.job !== station.id && !cops.includes(p)));
     cops = cops.slice(0, 4);
     if (cops.length < 2) throw new Error('not enough officers');
-    TR.c = { station, sDoor, sh, shDoor, out, bk, bkDoor, bkOut, away, subject, friend, home: places.get(subject.home), meet: { n: meet.n, x: meet.x, z: meet.z, view: meet.v, walk: Math.max(walkT(subject), walkT(friend)) },
-      crew, cops, raidLen: best.L };
+    TR.c = { station, sDoor, sh, shDoor, out, bk, bkDoor, bkOut, away, subject, friend, home: places.get(subject.home),
+      meet: { n: mn, x: NG.x[mn], z: NG.z[mn], view, walk: Math.max(walkT(subject), walkT(friend)) }, crew, cops, raidLen: best.L };
     TR.info.cast = { safehouse: sh.id, backWay: bk.id, raidWalk: +best.L.toFixed(2), subject: subject.id, friend: friend.id, pod: subject.pod,
-      meetPitch: +(meet.v.pitch/DEG).toFixed(1), meetWalk: +TR.c.meet.walk.toFixed(1), crew: crew.length, cops: cops.length };
+      meetPitch: +(view.pitch/DEG).toFixed(1), meetWalk: +TR.c.meet.walk.toFixed(1), crew: crew.length, cops: cops.length };
     say('cast:', JSON.stringify(TR.info.cast));
   }
 
@@ -374,40 +393,47 @@ const TRAILER = (() => {
       CO.ready = true; say('coast ready');
     }));
   }
-  // a medium-large town on the coast that feels grown rather than planned: several neighborhoods (houses around a harbor-side core, a market
-  // quarter, villas on the headland, farms inland), pieces scattered round each center more thickly near the middle, turned every which way,
-  // some stacked a level or two higher; the coast's own placement check keeps them off the cliff edge, the slopes and each other
+  // a large town along the coast that feels grown rather than planned: it fills the band of land behind the cliff right across the frame
+  // (the camera is at the coast's farthest zoom), in villages that run into each other with fields and gaps between. Near the cliff: houses,
+  // villas and shops; further in: houses thinning into farms. Pieces are turned every which way and some stacked a level or two; the coast's own
+  // placement check keeps them off the edge, the slopes and each other
   function coastTown(w){
     const C = w.COAST, R = mulberry32(4242);
     try { C.clear(); } catch (e) {}
     try { C.setPaths([]); } catch (e) {}
     const K = { res: ['townhouse', 'tower', 'pods', 'villa', 'pagoda', 'terrace'], com: ['noodle', 'lantern', 'kiosk', 'rotunda', 'viaduct'],
-      lux: ['mansion', 'dometower', 'cornerhouse', 'arcvilla', 'pagodatower', 'poolvilla'], farm: ['turbine', 'field', 'dome', 'tunnels', 'barn', 'hive', 'vfarm'] };
-    const SOLO = { com: ['grotto', 'ringcourt'], res: ['lagoon'], lux: ['palace', 'orangery'] }, soloUsed = new Set();
-    const hubs = [{ x: -11, z: -5, s: 8, k: 'res', w: 3 }, { x: -21, z: 5, s: 6, k: 'com', w: 2 }, { x: -7, z: -19, s: 6, k: 'lux', w: 1.5 },
-      { x: -25, z: -13, s: 7, k: 'res', w: 2 }, { x: -6, z: 11, s: 6, k: 'res', w: 1.5 }, { x: -39, z: -3, s: 8, k: 'farm', w: 1.2 }, { x: -34, z: 16, s: 7, k: 'farm', w: 1 }];
-    const W = hubs.reduce((a, h) => a + h.w, 0), pickHub = () => { let u = R()*W; for (const h of hubs){ u -= h.w; if (u <= 0) return h; } return hubs[0]; };
+      lux: ['mansion', 'dometower', 'cornerhouse', 'arcvilla', 'pagodatower', 'poolvilla'], farm: ['turbine', 'field', 'dome', 'tunnels', 'barn', 'hive', 'vfarm'],
+      solo: ['grotto', 'ringcourt', 'lagoon', 'palace', 'orangery'] };
     const one = a => a[Math.floor(R()*a.length)];
-    const placed = []; let tries = 0, sx = 0, sz = 0;
-    while (placed.length < 88 && tries < 1600){
+    // smooth value noise for where the villages are thick and where the fields open up
+    const nz = (x, z) => { const f = (a, b) => { const h = Math.sin(a*127.1 + b*311.7)*43758.5453; return h - Math.floor(h); };
+      const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi, u = xf*xf*(3 - 2*xf), v = zf*zf*(3 - 2*zf);
+      return (f(xi, zi)*(1 - u) + f(xi + 1, zi)*u)*(1 - v) + (f(xi, zi + 1)*(1 - u) + f(xi + 1, zi + 1)*u)*v; };
+    const CZ = -4, ZR = 105, DEPTH = 50, TARGET = 520;
+    const placed = []; let tries = 0, sx = 0, sz = 0, solos = 0;
+    while (placed.length < TARGET && tries < 7000){
       tries++;
-      const h = pickHub(), a = R()*Math.PI*2, rr = Math.pow(R(), .7)*h.s*1.7, x = h.x + Math.cos(a)*rr, z = h.z + Math.sin(a)*rr;
-      let kind = one(K[h.k]);
-      if (h.k !== 'farm' && R() < .12) kind = one(h.k === 'res' ? K.com : K.res);   // (a shop among the houses, a house among the shops)
-      if (SOLO[h.k] && R() < .07){ const sk = SOLO[h.k].find(k => !soloUsed.has(k)); if (sk) kind = sk; }
+      const z = CZ + (R()*2 - 1)*ZR, d = Math.pow(R(), 1.25)*DEPTH, x = 3 - d;   // (x: inland from about the cliff; the check refuses anything over the edge)
+      const dense = nz(x/14 + 3, z/14 + 7)*.75 + nz(x/5 + 11, z/5 + 2)*.25;
+      if (R() > .25 + .9*dense - d/DEPTH*.35) continue;   // (villages and gaps; thinner inland)
+      let kind;
+      if (d > 30) kind = R() < .55 ? one(K.farm) : one(K.res);
+      else if (d > 14) kind = R() < .7 ? one(K.res) : one(K.com);
+      else { const u = R(); kind = u < .4 ? one(K.res) : u < .7 ? one(K.lux) : one(K.com); }
+      if (solos < 6 && R() < .015){ kind = K.solo[solos % K.solo.length]; solos++; }
       const rot = Math.floor(R()*8)*Math.PI/4 + (R() - .5)*.35, seed = 1 + Math.floor(R()*99999);
       let pc = null; try { pc = C.place(kind, x, z, rot, seed); } catch (e) { pc = null; }
       if (!pc || pc.ok === false) continue;
-      placed.push(pc); sx += x; sz += z; if (SOLO[h.k] && SOLO[h.k].includes(kind)) soloUsed.add(kind);
-      const up = h.k === 'lux' ? .45 : h.k === 'res' ? .4 : h.k === 'com' ? .25 : 0;
-      if (!Object.values(SOLO).flat().includes(kind) && R() < up) try {
-        const s1 = C.stack(pc, one(K[h.k === 'com' ? 'res' : h.k]), 1 + Math.floor(R()*99999));
-        if (s1 && R() < .3) C.stack(s1, one(K[h.k === 'com' ? 'res' : h.k]), 1 + Math.floor(R()*99999));
+      placed.push(pc); sx += x; sz += z;
+      const up = K.lux.includes(kind) ? .4 : K.res.includes(kind) ? .35 : K.com.includes(kind) ? .2 : 0;
+      if (R() < up) try {
+        const grp = K.lux.includes(kind) ? K.lux : K.res, s1 = C.stack(pc, one(grp), 1 + Math.floor(R()*99999));
+        if (s1 && R() < .3) C.stack(s1, one(grp), 1 + Math.floor(R()*99999));
       } catch (e) {}
     }
     TR.info.coastTown = placed.length;
     say('coast town:', placed.length, 'pieces from', tries, 'tries');
-    return placed.length ? { x: sx/placed.length, z: sz/placed.length } : { x: -16, z: -2 };
+    return { x: -20, z: CZ };
   }
   function coastWake(on){ CO.paused = !on; if (on) for (const fn of CO.pend.splice(0)) CO.raf(fn); }
   function coastDrift(t){
@@ -477,8 +503,8 @@ const TRAILER = (() => {
       Promise.all(AU.raw.map(b => ctx.decodeAudioData(b.slice(0)))).then(([m, s]) => {
         const now = ctx.currentTime + .05, src = ctx.createBufferSource(), fx = ctx.createBufferSource(), gf = ctx.createGain();
         src.buffer = m; fx.buffer = s; src.connect(g); fx.connect(gf); gf.connect(g); gf.gain.value = .9;
-        g.gain.setValueAtTime(1, now + 43.2); g.gain.linearRampToValueAtTime(0, now + 45);
-        src.start(now, 0, 45.2); fx.start(now + 19.0);
+        g.gain.setValueAtTime(1, now + LEN - 1.8); g.gain.linearRampToValueAtTime(0, now + LEN);
+        src.start(now, 0, LEN + .2); fx.start(now + 19.0);
         AU.start = now; go();
       }).catch(e => { warn('sound', e); AU.ctx = null; go(); });
     }); else go();
@@ -566,12 +592,20 @@ const TRAILER = (() => {
     }
     else {   // the rise over the whole city at night
       if (!riseFrom) riseFrom = Object.assign({}, CAM);
-      const u = ease(seg(t, MK.rise, MK.logo + .6)), v = seg(t, MK.rise, LEN);
-      Object.assign(CAM, { x: lerp(riseFrom.x, CENTER.x, u), z: lerp(riseFrom.z, CENTER.z, u), y: lerp(riseFrom.y, TARGET_Y, u),
-        yaw: riseFrom.yaw + .75*u + .08*v, zoom: elerp(riseFrom.zoom, 31, u), pitch: lerp(riseFrom.pitch/DEG, 36, u)*DEG });
+      const u = ease(seg(t, MK.rise, MK.zoomed)), v = seg(t, MK.rise, LEN);
+      Object.assign(CAM, { x: lerp(riseFrom.x, HEIST_CENTER.x, u), z: lerp(riseFrom.z, HEIST_CENTER.z, u), y: lerp(riseFrom.y, TARGET_Y, u),
+        yaw: riseFrom.yaw + .75*u + .16*v, zoom: elerp(riseFrom.zoom, 33, u), pitch: lerp(riseFrom.pitch/DEG, 36, u)*DEG });
     }
     camGoal.set(CAM.x, CAM.y, CAM.z); camT.copy(camGoal);
     yaw = yawT = CAM.yaw; zoom = zoomT = CAM.zoom; PITCH = pitchT = CAM.pitch;
+  }
+  // the city's lights at the end: they go out as the camera starts to rise, stay dark while it pulls back, then catch, stutter and come on
+  const FLICK = [[0, 0], [.08, .35], [.14, 0], [.3, .55], [.36, .1], [.5, .8], [.56, .35], [.7, 1], [.78, .7], [.86, 1]];
+  function lightsAt(t){
+    if (t < MK.zoomed) return 1 - ss(seg(t, MK.rise, MK.rise + .45));
+    const u = seg(t, MK.zoomed, MK.lit); let v = 0;
+    for (let k = 0; k < FLICK.length; k++){ if (u >= FLICK[k][0]) v = FLICK[k][1]; }
+    return u >= 1 ? 1 : v;
   }
   // the hour: morning haze, a quick afternoon, golden hour, dusk; 3 a.m. after the coast
   const hourAt = t => t < 3 ? lerp(6.9, 8.8, ss(t/3)) : t < 6.5 ? lerp(8.8, 17.0, ss((t - 3)/3.5)) : t < MK.follow ? lerp(17.0, 19.3, ss((t - 6.5)/3.5))
@@ -589,6 +623,7 @@ const TRAILER = (() => {
       if (!CAP && Math.abs(h - S.hour) > 1e-4) window.HOUR_DRAG_AT = performance.now();   // (live: while the hour runs the shadows redraw every few frames, as when the time slider is dragged)
       S.hour = h;
       if (TR.t > MK.coastIn && TR.t < MK.cut2) LIGHTS_ON.value = LIGHTS_GOAL;   // (straight into the night: every window already lit)
+      if (TR.t >= MK.rise) LIGHTS_ON.value = lightsAt(TR.t)*LIGHTS_GOAL;
       camAt(TR.t, dt);
     });
     return _uc(dt);

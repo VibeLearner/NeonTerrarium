@@ -1,21 +1,20 @@
 # The trailer
 
-A 48 second film of the game, cut to **Bytes** (`assets/audio/music/Bytes.mp3`), with no text except the logo at the end.
+A 68.5 second film of the game, cut to **Bytes** (`assets/audio/music/Bytes.mp3`), with no text except the logo at the end.
 It is played by the game itself: open the game with `#trailer` at the end of the address. Code: `js/trailer.js`.
 
 | Time | Shot |
 |---|---|
-| 0 to 8.4 s | Four sectors (residential, commercial, luxury, industrial) joined by a metro, turning while the day runs from morning haze to dusk; about a hundred new buildings are placed round their outer edges with the game's build animation until the city fills the frame |
-| 8.4 to 13.5 s | The camera dives onto a small lawn where two neighbors meet; the person cam opens and the log fills in from their conversation |
-| 13.5 to 19 s | The resident's own apartment opens in Furnish pod: the hologram scan, then two pieces of furniture are set down while the room turns |
-| 19 to 21.72 s | The lull in the music: the picture glitches into the coast (a town filling the cliffs, at midday, seen from the coast's farthest zoom; waves and shorebirds) and glitches back out on the drop |
-| 21.72 s | The drop: 3 a.m. in the rain, in a district built for the heist. The crime boss's people slip out the back of the safehouse with the crates |
-| 26.22 s | Four officers hurry to its front door (arriving 29.5 s), knock, two go in, and come back out with one empty crate |
-| 33.72 s | The lights go out and the camera rises over the whole district in the dark |
-| 38.22 s | The city's lights flicker on |
-| 42.72 s | The logo |
+| 0 to 8.4 s | Four sectors joined by a metro, turning while the morning comes up; about a hundred buildings are placed round their edges with the game's build animation until the city fills the frame |
+| 8.4 to 27.9 s | The camera dives into a garden; the person cam goes through three people there (about six seconds each), its log filling in from what they say. The third says goodnight and walks into their building |
+| 27.9 to 36.6 s | Their apartment opens in Furnish pod: the hologram scan, then a piece of furniture, a ceiling light and a plant on a table are set down while the room turns |
+| 36.6 to 41.95 s | A glitch into the coast: a town over the cliffs and the land behind them, at midday, seen whole (waves and shorebirds), and a glitch out |
+| 41.95 s | A metro seen from the side, past the foundry and factories, the Neon Dome, the market mall and towers, then out over the clouds at golden hour |
+| 54.45 s | A wall of towers cuts across: behind it it is night. The camera pulls back over a dense neon city in the dark |
+| 61 s | The city's lights flicker on |
+| 64 s | The logo |
 
-The cuts land on the music's bars (160 bpm; the drop is at 21.72 s and the lull before it starts at 19.2 s).
+Bytes plays as it is, from the top.
 
 The trailer builds its own city every time and **never saves anything**: while `#trailer` is open every `neonIsland.*` key in
 the browser is locked (`js/saveguard.js`), so your own city and settings are untouched.

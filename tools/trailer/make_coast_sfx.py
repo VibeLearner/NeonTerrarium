@@ -16,11 +16,13 @@ from scipy.io import wavfile
 from scipy.signal import butter, sosfilt, fftconvolve
 
 SR = 48000
-CLIP_START = 19.0      # trailer seconds where the clip begins
-FLASH_IN = 19.2        # the cut to the coast (music drops out)
-FLASH_OUT = 21.72      # the drop (back to the city)
-GLITCH = [(19.0, 19.45), (21.48, 21.72)]   # the picture glitches into the coast and back out (js/trailer.js MK.glIn / MK.glOut)
-CLIP_END = 21.9
+CLIP_START = 36.4      # trailer seconds where the clip begins (js/trailer.js SFX_AT)
+FLASH_IN = 37.04       # the coast fully in view (js/trailer.js MK.coastIn)
+FLASH_OUT = 41.95      # back out, onto the metro ride (MK.coastOut)
+GLITCH = [(36.6, 37.04), (41.61, 41.95)]   # the picture glitches into the coast and back out (MK.glIn, MK.glOut)
+CLIP_END = 42.1
+SH = FLASH_IN - 19.2   # (the sounds below were first laid out for a coast at 19.2 s: everything moves with it)
+SH2 = SH + 2.45        # (and the longer coast gets a second wave and more birds)
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 OUT = os.path.join(ROOT, 'assets', 'audio', 'trailer', 'coast_flash.wav')
 
@@ -78,9 +80,11 @@ def sea_channel(seed_shift):
     bed *= swell
 
     # one wave breaks just after the cut: a rush of noise whose brightness opens up, then the wash
-    crash_t = 19.42
-    u = t - crash_t
-    crash_env = np.where(u < 0, np.exp(u*9), np.exp(-u*1.25))*(u > -.6)
+    crash_env = 0
+    for crash_t in (19.42 + SH, 19.42 + SH2):
+        u = t - crash_t
+        crash_env = crash_env + np.where(u < 0, np.exp(u*9), np.exp(-u*1.25))*(u > -.6)
+    u = t - (19.42 + SH)
     raw = pink(n)
     lo_part = lp(raw, 700)                                  # the body of the wave
     hi_part = bp(raw, 1800, 7000)                           # the white water
@@ -91,14 +95,15 @@ def sea_channel(seed_shift):
     fizz = hp(rng.standard_normal(n), 3500)*.18
     pops = np.zeros(n)
     for _ in range(420):
-        at = rng.uniform(19.55, 21.7); i = int((at - CLIP_START)*SR)
+        at = rng.uniform(FLASH_IN + .35, FLASH_OUT - .1); i = int((at - CLIP_START)*SR)
         if i < n - 400: pops[i] = rng.uniform(.2, 1)*rng.choice([-1, 1])
     pops = bp(pops, 2500, 9000)*3
-    foam_env = np.where(u < .3, 0, np.exp(-(u - .3)*1.1))
+    u2 = t - (19.42 + SH2)
+    foam_env = np.where(u < .3, 0, np.exp(-(u - .3)*1.1)) + np.where(u2 < .3, 0, np.exp(-(u2 - .3)*1.1))
     foam = (fizz + pops)*foam_env
 
     # the backwash: a soft rising sigh as the water slides back toward the end of the window
-    back = bp(pink(n), 900, 4000)*env(20.6, 21.75, .7, .25)*.45
+    back = bp(pink(n), 900, 4000)*env(FLASH_OUT - 1.2, FLASH_OUT + .03, .7, .25)*.45
     return bed*.55 + crash + foam + back
 
 
@@ -134,13 +139,12 @@ def gull(at, dur=.42, f_hi=1150, f_lo=720, level=1.):
 
 birds_l = np.zeros(N); birds_r = np.zeros(N)
 # small flock of peeps on the shoreline (right side), a couple answering on the left
-for at, f0, side in [(19.48, 3900, .6), (19.6, 4150, .65), (19.71, 3800, .55),
-                     (20.18, 4400, -.5), (20.29, 4250, -.45),
-                     (20.85, 3950, .7), (20.95, 4200, .7), (21.06, 4050, .62), (21.3, 4500, -.3)]:
+PEEPS = [(19.48, 3900, .6), (19.6, 4150, .65), (19.71, 3800, .55), (20.18, 4400, -.5), (20.29, 4250, -.45), (20.85, 3950, .7), (20.95, 4200, .7), (21.06, 4050, .62), (21.3, 4500, -.3)]
+for at, f0, side in [(a + SH, f, sd) for a, f, sd in PEEPS] + [(a + SH2, f*1.04, -sd) for a, f, sd in PEEPS if a + SH2 < FLASH_OUT - .25]:
     s = peep(at, f0, rng.uniform(.06, .095))*rng.uniform(.5, .8)
     st = pan(s, side); birds_l += st[:, 0]; birds_r += st[:, 1]
 # a gull far off over the water, then a shorter second call
-for at, dur, hi, lo, lvl, side in [(19.86, .44, 1150, 720, .5, -.25), (20.55, .3, 1080, 780, .38, -.35)]:
+for at, dur, hi, lo, lvl, side in [(19.86 + SH, .44, 1150, 720, .5, -.25), (20.55 + SH, .3, 1080, 780, .38, -.35), (19.95 + SH2, .4, 1120, 700, .42, .3)]:
     s = gull(at, dur, hi, lo, lvl)
     st = pan(s, side); birds_l += st[:, 0]; birds_r += st[:, 1]
 birds = np.stack([room(birds_l, 1.0, .3), room(birds_r, 1.0, .3)], 1)
@@ -171,7 +175,7 @@ def glitches():
 
 # ---------- mix ----------
 mix = sea*.42 + birds*.32
-window = env(FLASH_IN - .02, FLASH_OUT + .02, .1, .12)     # hard-ish cut in, quick tuck under the drop
+window = env(FLASH_IN - .3, FLASH_OUT + .02, .3, .12)     # hard-ish cut in, quick tuck under the drop
 mix *= window[:, None]
 mix = mix/np.abs(mix).max()*10**(-3/20)                     # the sea and birds peak at -3 dBFS; level is set in the mixer
 gl = glitches(); mix += gl/max(1e-9, np.abs(gl).max())*.42    # the glitches on top, a little under the sea's peak
@@ -183,8 +187,8 @@ print('wrote', os.path.relpath(OUT, ROOT), f'{N/SR:.2f}s, starts at {CLIP_START}
 if '--preview' in sys.argv:
     out = os.path.join(os.path.dirname(OUT), 'coast_flash_preview.mp3')
     music = os.path.join(ROOT, 'assets', 'audio', 'music', 'Bytes.mp3')
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-t', '45', '-i', music, '-i', OUT, '-filter_complex',
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-t', '68.5', '-i', music, '-i', OUT, '-filter_complex',
                     f'[1:a]adelay={int(CLIP_START*1000)}|{int(CLIP_START*1000)},volume=0.9[s];'
-                    '[0:a][s]amix=inputs=2:normalize=0,afade=t=out:st=43.2:d=1.8[a]',
+                    '[0:a][s]amix=inputs=2:normalize=0,afade=t=out:st=66.7:d=1.8[a]',
                     '-map', '[a]', '-b:a', '256k', out], check=True)
     print('preview', os.path.relpath(out, ROOT))

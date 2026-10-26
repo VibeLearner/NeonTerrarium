@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record the Neon Terrarium trailer: 1920 x 1080, 60 fps, 48 s, with Bytes and the coast sounds laid in.
+"""Record the Neon Terrarium trailer: 1920 x 1080, 60 fps, 68.5 s, with Bytes and the coast sounds laid in.
 
 Runs on your own Mac (it needs the graphics card). It serves this folder, opens the game at #trailer in Chrome
 with a stepped clock (tools/trailer/shim.js), waits while the trailer builds its city and warms up, then captures
@@ -17,8 +17,8 @@ import argparse, base64, functools, http.server, json, os, shutil, subprocess, s
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 OUT = os.path.join(HERE, 'out')
-LEN, FPS = 48.0, 60
-STILLS = [0.5, 4, 7.5, 11, 12.5, 15, 17.5, 19.2, 20.5, 22.6, 25, 27.4, 29.8, 32, 36, 38.9, 41, 44.5]
+LEN, FPS = 68.5, 60
+STILLS = [0.5, 4, 7.9, 11, 14, 17, 20, 23, 25.5, 29.5, 32, 34.5, 38.5, 43, 47, 50.5, 54.2, 58, 61.8, 65.5]
 
 
 def serve(port):
@@ -130,13 +130,13 @@ def main():
     if a.stills: print('stills in', os.path.relpath(sd, ROOT)); return
     enc.stdin.close(); enc.wait()
 
-    # the sound: Bytes from the top, the coast flash at 19.0 s, faded out over the last 1.8 s
+    # the sound: Bytes from the top, the coast sounds at 36.4 s, faded out over the last 1.8 s
     music = os.path.join(ROOT, 'assets', 'audio', 'music', 'Bytes.mp3')
     sfx = os.path.join(ROOT, 'assets', 'audio', 'trailer', 'coast_flash.wav')
     dur = frames/FPS
     fade = f',afade=t=out:st={dur - 1.8:.2f}:d=1.8' if dur >= LEN - .01 else ''
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', raw, '-i', music, '-i', sfx, '-filter_complex',
-                    f'[2:a]adelay=19000|19000,volume=0.9[s];[1:a]atrim=0:{dur:.3f}[m];[m][s]amix=inputs=2:normalize=0:duration=first{fade}[a]',
+                    f'[2:a]adelay=36400|36400,volume=0.9[s];[1:a]atrim=0:{dur:.3f}[m];[m][s]amix=inputs=2:normalize=0:duration=first{fade}[a]',
                     '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '320k', '-movflags', '+faststart', a.out], check=True)
     os.remove(raw)
     print('done:', os.path.relpath(a.out, ROOT), f'({(time.time() - t1)/60:.1f} min of capture)')

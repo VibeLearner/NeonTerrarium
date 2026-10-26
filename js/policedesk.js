@@ -16,7 +16,7 @@ const PRECINCT = (() => {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const p2 = n => String(Math.floor(n)).padStart(2, '0');
   const clock = () => safe(() => STORY.clock, 0);
-  const tc = c => 'D' + (Math.floor(c/1440) + 1) + ' ' + p2((c % 1440)/60) + ':' + p2(c % 60);
+  const tc = c => 'D' + safe(() => STORY.dayOf(c), Math.floor(c/1440) + 1) + ' ' + p2((c % 1440)/60) + ':' + p2(c % 60);
   const hm = c => { const m = Math.round(c) % 1440; return p2(m/60) + ':' + p2(m % 60); };   // (rounded to the minute, as the city's own clock is: input.js fmt)
   const hsh = s => { let v = 2166136261; s = String(s); for (let i = 0; i < s.length; i++){ v ^= s.charCodeAt(i); v = Math.imul(v, 16777619); } return v >>> 0; };
   const badge = id => '#' + (1000 + hsh(id + ':badge') % 9000);
@@ -162,7 +162,7 @@ const PRECINCT = (() => {
     const arrToday = today.filter(c => c.st === 'ARREST').length;
     const last = calls.find(c => c.pri <= 2 && c.src !== 'case') || calls[0] || null;
     const pts = safe(() => LEDGER.crowds().pts, []);
-    const out = { pts, now, calls, today, recent, hot, byHour, ofc, dr, stn, lidar, closed, arrToday, last, cs: slow ? cases() : slowD.cs, hour: (now % 1440)/60, day: day0 + 1,
+    const out = { pts, now, calls, today, recent, hot, byHour, ofc, dr, stn, lidar, closed, arrToday, last, cs: slow ? cases() : slowD.cs, hour: (now % 1440)/60, day: safe(() => STORY.dayOf(now), day0 + 1),
       bikes: safe(() => POLICE_BIKES.map((b, k) => ({ id: 'B-' + p2(k + 1), ref: b, mode: b.mode, stn: stations().indexOf(b.m), x: b.x, z: b.z, path: b.path && b.mode !== 'park' ? b.path.pts : null })), []) };
     if (slow) slowD = { lidar, cs: out.cs }; return out;
   }

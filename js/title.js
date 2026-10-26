@@ -136,7 +136,7 @@ const TITLE = (() => {
     if (nK > 0){ const wc = ROOM.winCenter(), d = Ls.position.clone().sub(wc).normalize().lerp(G.toCity, nK).normalize();
       Ls.position.copy(wc).addScaledVector(d, 9); Ls.target.position.copy(wc).addScaledVector(d, -3); Ls.target.updateMatrixWorld(); Ls.updateMatrixWorld();
       Ls.color.set(ROOM.TIMESDATA[TOD].sunC).lerp(G.col, nK*.85); Ls.intensity *= 1 - nK + nK*.85*G.fl; }
-    Ls.intensity *= .6*(sunW*(1 - nK) + OPEN*nK);
+    Ls.intensity *= .6*(sunW*(1 - nK) + OPEN*nK)*sunKNow();
   }
   // the room's light at the city's hour: the four looks the bake knew, blended through the day
   const KEYS = [[-3, 'night'], [5, 'night'], [8, 'morning'], [13, 'day'], [18, 'evening'], [21, 'night'], [29, 'night'], [32, 'morning']];
@@ -156,13 +156,17 @@ const TITLE = (() => {
     const d = Math.max(0, Math.sin(ph*1.3)*Math.sin(ph*.53 + 2) - .72)/.28, fl = 1 - .45*d*(.5 + .5*Math.sin(ph*37));
     return { nK, toCity, col, fl };
   }
+  // how strong the sun comes in at each of the room's hours, against the bake's own numbers: the evening sun is low and weak, far dimmer than
+  // the day's (the bake had it nearly as bright, owner Oct 26), the morning a little under the day
+  const SUNK = { morning: .8, day: 1, evening: .38, night: 1 };
+  function sunKNow(){ const h = ((HOUR % 24) + 24) % 24; let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1][0] <= h) i++; const [h0, k0] = KEYS[i], [h1, k1] = KEYS[i + 1], f = h1 > h0 ? (h - h0)/(h1 - h0) : 0; return (SUNK[k0] ?? 1)*(1 - f) + (SUNK[k1] ?? 1)*f; }
   function lightParams(){
     const T = ROOM.TIMESDATA, h = ((HOUR % 24) + 24) % 24; let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1][0] <= h) i++;
     const [h0, k0] = KEYS[i], [h1, k1] = KEYS[i + 1], f = h1 > h0 ? (h - h0)/(h1 - h0) : 0, a = T[k0], b = T[k1];
     const L = (x, y) => x + (y - x)*f, Cl = (x, y) => new THREE.Color(x).lerp(new THREE.Color(y), f);
     const e = L(a.elev, b.elev)*Math.PI/180, th = sunH*Math.PI/180, out = ROOM.winNormal().negate(), c = Math.cos(th), s_ = Math.sin(th);
     const toSun = new THREE.Vector3(out.x*c - out.z*s_, 0, out.x*s_ + out.z*c).multiplyScalar(Math.cos(e)); toSun.y = Math.sin(e);
-    const dimK = .35 + .65*OPEN, sunI = L(a.sunI, b.sunI);
+    const dimK = .35 + .65*OPEN, sunI = L(a.sunI*(SUNK[k0] ?? 1), b.sunI*(SUNK[k1] ?? 1));
     // at night the city's neon drifts the light slowly between blue and purple (how much night there is: the lamps' weight)
     const nk = Math.min(1, L(a.lamps, b.lamps)), ph = performance.now()/1000, drift = .5 + .5*Math.sin(ph*.45) *Math.sin(ph*.17 + 1);
     const neon = c => nk > 0 ? c.lerp(new THREE.Color(drift > .5 ? 0xb04cff : 0x4c7bff), nk*.35*Math.abs(drift - .5)*2) : c;
@@ -170,7 +174,7 @@ const TITLE = (() => {
     if (nK > 0){ toSun.lerp(G.toCity, nK).normalize(); sunC.lerp(G.col, nK*.85); sI = sunI*(1 - nK + nK*.85*G.fl); on = sunW*(1 - nK) + OPEN*nK; }
     return { sunDir: toSun.negate(), sunCol: sunC, sunI: sI, sunOn: on*(sunI > 0 ? 1 : 0), sky: neon(Cl(a.sky, b.sky)), skyI: L(a.skyI, b.skyI),
       hemi: [Cl(a.hemi[0], b.hemi[0]), Cl(a.hemi[1], b.hemi[1]), L(a.hemi[2], b.hemi[2])*dimK], amb: L(a.amb, b.amb)*dimK, fill: [Cl(a.fill[0], b.fill[0]), L(a.fill[1], b.fill[1])*dimK],
-      density: L(a.density, b.density)*(1 - .5*nK), lampsK: L(a.lamps, b.lamps), grade: [0, 1].map(j => [0, 1, 2].map(k => L(a.grade[j][k], b.grade[j][k]))), open: OPEN,
+      density: L(a.density, b.density)*(1 - .5*nK)*(.4 + .6*sunKNow()), lampsK: L(a.lamps, b.lamps), grade: [0, 1].map(j => [0, 1, 2].map(k => L(a.grade[j][k], b.grade[j][k]))), open: OPEN,
       barOn: BAR_ON, bounceK: (.25 + .75*on)*.45*OPEN*(sunI > 0 ? Math.min(1, sI/5) : .3) };
   }
   let BAR_ON = 1;
@@ -333,7 +337,7 @@ const TITLE = (() => {
   }
   let noteAt = 0;
   function fillNote(){
-    let day = 1, res = 0; try { day = STORY.day() + 1; } catch (e) {} try { for (const p of people.values()) if (!p.visitor && !p.gone) res++; } catch (e) {}
+    let day = 1, res = 0; try { day = STORY.dayOf(STORY.clock); } catch (e) {} try { for (const p of people.values()) if (!p.visitor && !p.gone) res++; } catch (e) {}
     $t('tHoloLine').textContent = 'Day ' + day + ' · ' + res.toLocaleString('en-US') + ' residents';
     if (SLOTS.active) SLOTS.list().then(l => { const a = l.find(x => x.active); if (a) $t('tHoloName').textContent = a.name; }).catch(() => {});
   }

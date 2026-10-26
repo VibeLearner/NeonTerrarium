@@ -1177,12 +1177,22 @@ const STORY = (() => {
 
   /* ---------- every frame ---------- */
   ST.clockReal = 0;
+  ST.shifts = [];   // ([clock, how many]: the hour set back by hand, from that moment on; see the clock below)
+  ST.dayOf = t => { let k = 0; for (const [at, n] of ST.shifts){ if (t >= at) k = n; else break; } return Math.max(1, Math.floor(t/1440) + 1 - k); };   // (the day shown for a moment, from 1)
   ST.tick = rdt => {
     ST.clockReal += rdt;
     // the game clock, in minutes since the first day (the hour slider moving back counts as the next day)
     if (ST.lastHour === null){   // the first frame: the clock picks up at the hour the city is at (on the saved day, or the day after if that hour has passed)
       ST.lastHour = S.hour; const d0 = Math.floor(ST.clock/1440), m = S.hour*60; ST.clock = (m >= ST.clock - d0*1440 ? d0 : d0 + 1)*1440 + m; }
-    let dh = S.hour - ST.lastHour; if (dh < 0) dh += 24; ST.lastHour = S.hour; ST.clock += dh*60;
+    // The hour set by hand (the slider, the time presets) changes the time, not the day. The clock itself never runs back (the storylets'
+    // cooldowns, the cases, the precinct and the director all count on that), so an hour set earlier, or across midnight, still moves the clock
+    // on to that hour: the people live those hours again, as the player watches them. What changes is the day shown: each such step is noted
+    // (ST.shifts), and the day number shown for any moment from then on leaves it out (ST.dayOf). Only the clock running past midnight on its
+    // own makes a new day
+    let dh = S.hour - ST.lastHour;
+    if (dh < 0){ dh += 24; const run = S.cycle ? rdt*24/3600*(FF.clock || 1) : 0;
+      if (dh > run*1.5 + .05){ ST.clock += dh*60; const n = (ST.shifts.length ? ST.shifts[ST.shifts.length - 1][1] : 0) + 1; ST.shifts.push([ST.clock, n]); if (ST.shifts.length > 400) ST.shifts.splice(0, ST.shifts.length - 400); dh = 0; } }
+    ST.lastHour = S.hour; ST.clock += dh*60;
     if (!ST.on || !pplReady) return;
     maybeBuildNet();
     for (const sc of [...SC]){
@@ -1209,7 +1219,7 @@ const STORY = (() => {
       for (const L of LOGS.values()) for (const e of L) for (const id of Object.values(e.cast || {})) ids.add(id);
       const idents = {}; for (const id of ids){ const I = ident(id); if (I.first !== '?') idents[id] = I; }
       const logs = [...LOGS.entries()].slice(-30).map(([k, L]) => [k, L.slice(-200).map(e => ({ t: e.t, tmpl: e.tmpl, cast: e.cast, ctx: e.ctx, kind: e.kind, first: e.first, channel: e.channel }))]);
-      const data = { v: 1, clock: ST.clock, known: [...KN.entries()], logs, notes: [...NOTES.entries()].map(([k, n]) => [k, n.slice(-80)]), idents,
+      const data = { v: 1, clock: ST.clock, shifts: ST.shifts, known: [...KN.entries()], logs, notes: [...NOTES.entries()].map(([k, n]) => [k, n.slice(-80)]), idents,
         flags: [...SPM.values()].filter(s => Object.keys(s.flags).length || Object.keys(s.counts).length).map(s => [s.id, s.flags, s.counts]), pair: PAIR, last: LAST, citylast: CITYLAST, pending: PENDING, extra: extraRels.slice(-200),
         seen: [...SEEN.entries()].map(([id, m]) => [id, [...m.entries()].map(([k, s]) => [k, [...s].slice(-14)])]), dep: [...DEP.entries()].map(([id, m]) => [id, [...m.entries()].slice(-14)]),
         pace: typeof PACE !== 'undefined' && PACE.saveData ? PACE.saveData() : ST.paceSaved || null };
@@ -1223,7 +1233,7 @@ const STORY = (() => {
       // the city picks up at the hour it was left at: the sky's hour (not saved on its own; every load used to open at 15:30) is set from the saved
       // clock, so the two agree and nothing is skipped. This loads after the first frames: kept apart, the game clock ran hours off the sky's,
       // the storylets choosing by one hour while the people and the sky went by the other (and the Precinct desk showed a different time, Oct 26)
-      ST.clock = d.clock || 0;
+      ST.clock = d.clock || 0; ST.shifts = Array.isArray(d.shifts) ? d.shifts : [];
       if (d.clock){ const h = (ST.clock % 1440)/60; S.hour = h; ST.lastHour = h; ST.resumeHour = typeof TITLE !== 'undefined' && TITLE.on ? h : null; if (ST.resumeHour !== null) try { TITLE.setHour(h); } catch (e){} try { syncTimeUI(); } catch (e){} }
       else ST.lastHour = null;
       for (const [k, v] of d.known || []) KN.set(k, v);

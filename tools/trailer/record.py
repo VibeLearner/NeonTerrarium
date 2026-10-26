@@ -9,6 +9,7 @@ dropped or rushed however slow a frame is to draw.
     python3 tools/trailer/record.py                     # the whole film -> tools/trailer/out/neon-terrarium-trailer.mp4
     python3 tools/trailer/record.py --stills            # a contact sheet's worth of stills only (quick look)
     python3 tools/trailer/record.py --until 12          # just the first 12 seconds
+    python3 tools/trailer/record.py --preview --from 24 --until 37   # a quick 720p look at one stretch (here the furnish scene)
 
 Needs: pip install playwright && python3 -m playwright install chromium  (it uses Google Chrome if installed), and ffmpeg.
 """
@@ -45,12 +46,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out', default=os.path.join(OUT, 'neon-terrarium-trailer.mp4'))
     ap.add_argument('--until', type=float, default=LEN, help='stop after this many seconds')
+    ap.add_argument('--from', dest='start', type=float, default=0, help='start the film here (the trailer still plays from the top, the part before is just not captured)')
+    ap.add_argument('--preview', action='store_true', help='a quick look: 30 fps, 1280 x 720, smaller file (the timing is the same as the real film)')
     ap.add_argument('--stills', action='store_true', help='only save stills at key moments (PNG) and stop')
     ap.add_argument('--headless', action='store_true', help='no browser window (some Macs draw WebGL slower or not at all headless)')
     ap.add_argument('--port', type=int, default=8793)
     ap.add_argument('--quality', type=int, default=95, help='JPEG quality of the captured frames before encoding')
     ap.add_argument('--crf', type=int, default=16)
     a = ap.parse_args()
+    if a.preview and a.out == ap.get_default('out'): a.out = os.path.join(OUT, 'trailer-preview.mp4')
+    every = 2 if a.preview else 1   # (a preview keeps every other frame: the trailer runs exactly the same, only half as many pictures are taken)
+    first = int(round(a.start*FPS))
     if not shutil.which('ffmpeg') and not a.stills: sys.exit('ffmpeg is needed: brew install ffmpeg')
     from playwright.sync_api import sync_playwright
     os.makedirs(OUT, exist_ok=True)
@@ -63,9 +69,9 @@ def main():
         # frames are taken straight from Chrome's compositor: Playwright's own screenshot resets the page size around every shot in a
         # visible window, which the game took for a resize and redrew at the other size (the picture flicked between full and a corner)
         cdp = ctx.new_cdp_session(page)
-        def grab(fmt='jpeg'):
+        def grab(fmt='jpeg', quality=None):
             o = {'format': fmt, 'fromSurface': True, 'captureBeyondViewport': False}
-            if fmt == 'jpeg': o['quality'] = a.quality
+            if fmt == 'jpeg': o['quality'] = quality or a.quality
             return base64.b64decode(cdp.send('Page.captureScreenshot', o)['data'])
         page.on('console', lambda m: print('  page:', m.text) if m.text.startswith('[trailer]') or m.type == 'error' else None)
         page.on('pageerror', lambda e: print('  page error:', e))
@@ -108,8 +114,9 @@ def main():
             sd = os.path.join(OUT, 'stills'); os.makedirs(sd, exist_ok=True)
         else:
             raw = os.path.splitext(a.out)[0] + '.video.mp4'
-            enc = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', str(FPS), '-c:v', 'mjpeg', '-i', '-',
-                                    '-vf', 'scale=1920:1080:flags=lanczos', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', str(a.crf), '-pix_fmt', 'yuv420p', '-r', str(FPS), raw],
+            size, fps = ('1280:720', FPS//2) if a.preview else ('1920:1080', FPS)
+            enc = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', str(fps), '-c:v', 'mjpeg', '-i', '-',
+                                    '-vf', f'scale={size}:flags=lanczos', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', str(a.crf + (5 if a.preview else 0)), '-pix_fmt', 'yuv420p', '-r', str(fps), raw],
                                    stdin=subprocess.PIPE)
         t1 = time.time()
         for f in range(frames):
@@ -118,7 +125,8 @@ def main():
                 if f in want:
                     p = os.path.join(sd, f'{f/FPS:05.2f}s.png'); open(p, 'wb').write(grab('png')); print('still', os.path.relpath(p, ROOT))
                 continue
-            enc.stdin.write(grab())
+            if f < first or (f - first) % every: continue
+            enc.stdin.write(grab(**({'quality': 80} if a.preview else {})))
             if f % FPS == 0:
                 el = time.time() - t1; eta = el/(f + 1)*(frames - f - 1)
                 print(f'  {f/FPS:4.0f}s of {frames/FPS:.0f}s   ({el:4.0f}s elapsed, about {eta/60:.1f} min to go)')
@@ -133,10 +141,12 @@ def main():
     # the sound: Bytes from the top, the coast sounds at 36.4 s, faded out over the last 1.8 s
     music = os.path.join(ROOT, 'assets', 'audio', 'music', 'Bytes.mp3')
     sfx = os.path.join(ROOT, 'assets', 'audio', 'trailer', 'coast_flash.wav')
-    dur = frames/FPS
-    fade = f',afade=t=out:st={dur - 1.8:.2f}:d=1.8' if dur >= LEN - .01 else ''
+    end = frames/FPS; dur = end - a.start
+    fade = f',afade=t=out:st={dur - 1.8:.2f}:d=1.8' if end >= LEN - .01 else ''
+    lag = 36.4 - a.start   # (where the coast sounds start in this film: later if it starts early, trimmed if it starts after them)
+    sfxf = f'adelay={int(lag*1000)}|{int(lag*1000)}' if lag >= 0 else f'atrim=start={-lag:.3f},asetpts=PTS-STARTPTS'
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', raw, '-i', music, '-i', sfx, '-filter_complex',
-                    f'[2:a]adelay=36400|36400,volume=0.9[s];[1:a]atrim=0:{dur:.3f}[m];[m][s]amix=inputs=2:normalize=0:duration=first{fade}[a]',
+                    f'[2:a]{sfxf},volume=0.9[s];[1:a]atrim={a.start:.3f}:{end:.3f},asetpts=PTS-STARTPTS[m];[m][s]amix=inputs=2:normalize=0:duration=first{fade}[a]',
                     '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '320k', '-movflags', '+faststart', a.out], check=True)
     os.remove(raw)
     print('done:', os.path.relpath(a.out, ROOT), f'({(time.time() - t1)/60:.1f} min of capture)')

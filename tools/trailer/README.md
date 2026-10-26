@@ -10,7 +10,7 @@ It is played by the game itself: open the game with `#trailer` at the end of the
 | 27.9 to 36.6 s | Their apartment opens in Furnish pod: the hologram scan, then a piece of furniture, a ceiling light and a plant on a table are set down while the room turns |
 | 36.6 to 41.95 s | A glitch into the coast: a town over the cliffs and the land behind them, at midday, seen whole (shorebirds), and a glitch out |
 | 41.95 s | A metro seen from the side (a little zoomed out, so the landmarks show whole), past the foundry and factories, the Neon Dome, the market mall and towers, then out over the clouds at golden hour |
-| 54.2 to 57.4 s | A long arcology at the dense city's edge sweeps across and fills the whole frame for about three seconds while dusk turns to night. The camera pulls back over the dense neon city in the dark, the city and the metro running on past the edges of the frame |
+| 54.2 to 57.4 s | A long arcology at the dense city's front edge sweeps across and fills the whole frame for about three seconds while dusk turns to night. The camera then pulls back and swings round over the dense neon city in the dark, the arcology at the right edge, the city and the metro running on past the edges of the frame |
 | 62 s | The city's lights flicker on |
 | 65 s | The logo |
 
@@ -41,6 +41,9 @@ frame is. Expect roughly 5 to 15 minutes. Leave the Chrome window it opens alone
 
 - `--stills` saves PNGs at 16 key moments to `tools/trailer/out/stills/` instead of a film: the quick way to check framing.
 - `--until 12` records only the first 12 seconds.
+- `--preview --from 24 --until 37` makes a quick 1280 x 720, 30 fps film of just that stretch (here the furnish scene) to
+  `tools/trailer/out/trailer-preview.mp4`. The trailer still plays from the top with the same stepped clock, so it never
+  lags, but only that stretch is captured. Use it to check a scene that stutters when watched live in the browser.
 - `tools/trailer/out/trailer-log.txt` notes what the trailer picked (the safehouse, the resident, the timings) and any problems.
 
 ## The coast sounds

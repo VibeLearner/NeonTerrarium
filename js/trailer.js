@@ -67,7 +67,7 @@ const TRAILER = (() => {
   // sector (the Neon Dome, the market mall and tall towers behind), open sky, then the dense city, whose front edge is a wall of towers
   const RJ = 45;
   const RIDE_IND = { i0: -26, i1: -19, j0: 41, j1: 50, zone: 'ind' }, RIDE_COM = { i0: -18, i1: -9, j0: 41, j1: 51, zone: 'mid' };
-  const DENSE = { i0: -1, i1: 29, j0: 29, j1: 57 }, WALL = { i0: -1, i1: 14, j0: 42, j1: 44 };
+  const DENSE = { i0: -1, i1: 29, j0: 29, j1: 57 }, WALL = { i0: -1, i1: 14, j0: 29, j1: 31 };   // (the arcology: the dense city's front edge, nothing between it and the ride's camera)
   const RIDE_MEGAS = [['foundry', -25, 47, 6, 4], ['club', -17, 47, 4, 4], ['market', -12, 47, 4, 4], ['club', 13, 50, 4, 4]];
   const RIDE_CUTS = [[-22, 44, 'ind'], [-15, 44, 'mid'], [-11, 44, 'mid']];   // (a few tall ones in front: the view is cut as they pass)
   const RIDE_MT = [[-26, RJ], [38, RJ]];
@@ -134,7 +134,7 @@ const TRAILER = (() => {
 
   // It is what wipes day into night on the ride: wider than the frame and taller than it at the ride's zoom, so for a moment it is all there
   // is to see. A stepped skyline, a grid of windows (the game's lit-window material, so they come on with the city's lights), neon bands
-  const ARCO = { x0: (WALL.i0 - .5)*LOT, x1: (WALL.i1 + .5)*LOT, z0: (WALL.j0 - .5)*LOT, z1: (WALL.j1 + .5)*LOT, h: 27 };
+  const ARCO = { x0: (WALL.i0 - .5)*LOT, x1: (WALL.i1 + .5)*LOT, z0: (WALL.j0 - .5)*LOT, z1: (WALL.j1 + .5)*LOT, h: 38 };
   function arcology(){
     const R = mulberry32(31337), G = new THREE.Group(), y0 = CURB;
     const W = ARCO.x1 - ARCO.x0, D = ARCO.z1 - ARCO.z0, cx = (ARCO.x0 + ARCO.x1)/2, cz = (ARCO.z0 + ARCO.z1)/2;
@@ -143,11 +143,16 @@ const TRAILER = (() => {
     // the skyline: towers rising off the block
     const towers = [[.08, .16, 9], [.3, .12, 14], [.5, .2, 7], [.72, .14, 12], [.9, .12, 9]];
     for (const [f, wf, hh] of towers) add(new THREE.BoxGeometry(W*wf, hh, D*.7), M.slabSeam, ARCO.x0 + W*f, y0 + ARCO.h + hh/2, cz + D*.08);
-    // windows on the faces the camera sees (south and west): small panes, most lit at night, a few dark
+    // windows on every face the camera sees (south, west and east, and the towers' south and east sides): small panes, most lit at night, a few dark
     const lit = [], dark = [], strips = [[], []];
     const pane = (x, y, z, ry) => { const g = new THREE.PlaneGeometry(.5, .55); g.rotateY(ry); g.translate(x, y, z); (R() < .72 ? lit : dark).push(g); };
-    for (let y = y0 + 1.4; y < y0 + ARCO.h - .8; y += 1.05) for (let x = ARCO.x0 + .7; x < ARCO.x1 - .5; x += .95) if (R() > .06) pane(x, y, ARCO.z0 - .02, Math.PI);
-    for (let y = y0 + 1.4; y < y0 + ARCO.h - .8; y += 1.05) for (let z = ARCO.z0 + .7; z < ARCO.z1 - .5; z += .95) if (R() > .06) pane(ARCO.x0 - .02, y, z, -Math.PI/2);
+    const rowsX = (xa, xb, ya, yb, z) => { for (let y = ya + 1.4; y < yb - .8; y += 1.05) for (let x = xa + .7; x < xb - .5; x += .95) if (R() > .06) pane(x, y, z - .02, Math.PI); };
+    const rowsZ = (za, zb, ya, yb, x, ry) => { for (let y = ya + 1.4; y < yb - .8; y += 1.05) for (let z = za + .7; z < zb - .5; z += .95) if (R() > .06) pane(x + (ry > 0 ? .02 : -.02), y, z, ry); };
+    rowsX(ARCO.x0, ARCO.x1, y0, y0 + ARCO.h, ARCO.z0);
+    rowsZ(ARCO.z0, ARCO.z1, y0, y0 + ARCO.h, ARCO.x0, -Math.PI/2);
+    rowsZ(ARCO.z0, ARCO.z1, y0, y0 + ARCO.h, ARCO.x1, Math.PI/2);
+    for (const [f, wf, hh] of towers){ const tx = ARCO.x0 + W*f, tz = cz + D*.08, ty = y0 + ARCO.h - .6;
+      rowsX(tx - W*wf/2, tx + W*wf/2, ty, ty + hh + .6, tz - D*.35); rowsZ(tz - D*.35, tz + D*.35, ty, ty + hh + .6, tx + W*wf/2, Math.PI/2); }
     // neon bands across the south face every few floors, pink and cyan
     for (let k = 0, y = y0 + 4.6; y < y0 + ARCO.h - 2; y += 6.3, k++){ const g = new THREE.BoxGeometry(W - .4, .14, .08); g.translate(cx, y, ARCO.z0 - .06); strips[k % 2].push(g); }
     const merge = list => list.length ? THREE.BufferGeometryUtils.mergeBufferGeometries(list) : null;
@@ -324,7 +329,7 @@ const TRAILER = (() => {
     TR.gsc = TR.c.pairs.map((q, k) => {
       for (const p of [q.A, q.B]){ putInside(p, p.home); p.speed = PPL_SPEED; }
       const anc = nodeAnc(q.n);
-      const sc = scene('trailer.garden' + k, { A: q.A.id, B: q.B.id }, [
+      const sc = storyScene('trailer.garden' + k, { A: q.A.id, B: q.B.id }, [
         { id: 'g0', who: ['A', 'B'], with: [], at: 'case', do: 'walk', anc, hold: .2 },
         { id: 'g1', who: ['A'], with: ['B'], at: 'case', do: 'chat', anc, hold: 600 }],
         { g0: ['{A} and {B} come out onto the lawn.'], g1: ['{A} and {B} talk on the lawn.'] });
@@ -333,7 +338,7 @@ const TRAILER = (() => {
     });
   }
   const gathered = () => TR.gsc && TR.gsc.every(sc => sc && sc.b && sc.b.id === 'g1' && sc.phase === 'hold');
-  function scene(id, castMap, beats, log){
+  function storyScene(id, castMap, beats, log){
     for (const pid of Object.values(castMap)){ const p = people.get(pid); if (!p || (!p.walk && !p.spot && !places.get(p.at))) throw new Error(id + ': ' + pid + ' is nowhere'); }
     const sc = STORY.startScene({ id, beats, log, roles: {}, effects: {}, next: null, tier: 'case', prio: 9 }, castMap, { done: (sc2, why) => say(id, 'ended', why) });
     if (!sc) throw new Error(id + ' did not start');
@@ -374,7 +379,7 @@ const TRAILER = (() => {
   function goHome(){
     const q = TR.c.pairs[2], sc = TR.gsc && TR.gsc[2];
     if (sc) safe('garden end', () => STORY.endScene(sc, 'done'));
-    TR.homeSc = scene('trailer.home', { A: q.A.id, B: q.B.id }, [
+    TR.homeSc = storyScene('trailer.home', { A: q.A.id, B: q.B.id }, [
       { id: 'h0', who: ['B'], with: ['A'], at: 'case', do: 'wave', anc: nodeAnc(q.n), hold: .5 },
       { id: 'h1', who: ['A'], with: [], at: 'case', do: 'enter', anc: doorAnc(TR.c.home), hold: 30 }],
       { h0: ['{B} waves {A} off.'], h1: ['{A} goes in through the door.'] });
@@ -673,7 +678,7 @@ const TRAILER = (() => {
       if (!backFrom) backFrom = Object.assign({}, CAM);
       const u = ease(seg(t, MK.back, MK.zoomed)), v = seg(t, MK.back, LEN);
       Object.assign(CAM, { x: lerp(backFrom.x, DENSE_C.x, u), z: lerp(backFrom.z, DENSE_C.z, u), y: lerp(backFrom.y, TARGET_Y, u),
-        yaw: backFrom.yaw + .75*u + .12*v, zoom: elerp(backFrom.zoom, 30, u), pitch: lerp(backFrom.pitch/DEG, 36, u)*DEG });
+        yaw: backFrom.yaw - .87*u - .12*v, /* (turning this way the arcology ends up at the frame's right edge, not in front of the city) */ zoom: elerp(backFrom.zoom, 30, u), pitch: lerp(backFrom.pitch/DEG, 36, u)*DEG });
     }
     camGoal.set(CAM.x, CAM.y, CAM.z); camT.copy(camGoal);
     yaw = yawT = CAM.yaw; zoom = zoomT = CAM.zoom; PITCH = pitchT = CAM.pitch;

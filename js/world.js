@@ -358,6 +358,7 @@ const ATLAS_SIDE = ATLAS.clone(); ATLAS_SIDE.onBeforeCompile = ATLAS.onBeforeCom
 // It sits on layer 6 (OV_BIT): the live pass draws it, the old path (which draws the buildings themselves) doesn't.
 const OV_BIT = 64;
 const ATLAS_OV = ATLAS.clone(); ATLAS_OV.onBeforeCompile = ATLAS.onBeforeCompile; ATLAS_OV.customProgramCacheKey = ATLAS.customProgramCacheKey; ATLAS_OV.depthWrite = false;
+const ovDisposeWith = og => () => og.dispose();
 function glowOverlay(mesh){
   const g = mesh.geometry, fl = g.attributes.aFlk, em = g.attributes.aEm, on = g.attributes.aOn, I = g.index && g.index.array; if (!fl || !em || !on || !I) return;
   const F = fl.array, E = em.array, ON = on.array, u = g.userData.cut, fb = [], win = [];
@@ -387,7 +388,7 @@ function glowOverlay(mesh){
     og.setIndex(new THREE.BufferAttribute(g.attributes.position.count > 65535 ? new Uint32Array(out) : new Uint16Array(out), 1));
   }
   if (!g.boundingSphere) g.computeBoundingSphere(); og.boundingSphere = g.boundingSphere.clone();
-  g.addEventListener('dispose', () => og.dispose());
+  g.addEventListener('dispose', ovDisposeWith(og));   // (made outside: a closure here kept this whole call's working arrays, fb, win, out, alive as long as the mesh, Oct 26)
   const ov = new THREE.Mesh(og, ATLAS_OV); ov.layers.mask = blockKey !== undefined && !ovPerBlock() ? 0 : OV_BIT; ov.receiveShadow = mesh.receiveShadow; ov.castShadow = false; ov.userData.isOv = true;
   ov.userData.ovInfo = { nFB: fb.length, off }; ov.onBeforeRender = ovBefore; ov.onAfterRender = ovAfter;
   mesh.add(ov);

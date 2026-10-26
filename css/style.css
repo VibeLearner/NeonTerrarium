@@ -599,3 +599,5 @@ html.touch .gdeck.pu-min:not(.tmin) .gd-panelbtn{display:grid}
 html.touch #wirelog{top:calc(46px + env(safe-area-inset-top,0px));right:10px}
 html.touch .monitor,html.touch .mon-pins{top:calc(46px + env(safe-area-inset-top,0px))}
 .t-menu button.t-busy{opacity:.6;cursor:progress}
+/* the title's first button while the city loads ("Loading Harbor Row · 40%"): smaller, so it stays on one line on a short screen */
+.t-menu button.t-busy span{font-size:.62em;white-space:nowrap}

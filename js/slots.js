@@ -82,7 +82,8 @@ const SLOTS = (() => {
     for (const k of cityKeysNow()) lsDel(k);
     if (rec && rec.data) for (const [k, v] of Object.entries(rec.data)) if (NT_isCityKey(k)) lsSet(k, v);
     lsSet(ACTIVE_KEY, rec.id);
-    try { sessionStorage.setItem('neonTerrarium.skipTitle', '1'); } catch (e) {}
+    // (the title comes up again, the chosen city loading behind it, named on its first button: title.js)
+    try { sessionStorage.setItem('neonTerrarium.opening', rec.name || 'your city'); } catch (e) {}
     location.reload();
   }
   SL.open = async id => {

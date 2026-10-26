@@ -232,7 +232,9 @@ const TITLE = (() => {
   T._hold = () => { shownAt = 1e15; openFrom = null; };
   T._open = () => { openFrom = -1e9; }; T._hour = h => { HOUR = h; }; T._dbg = () => ({ TOD, HOUR, OPEN, sunH, sunW, RTMODE, rt: !!RT, p: RT && ROOM ? lightParams() : null });   // (testing: keep the shutter shut)
   const furnReady = () => { try { return typeof FURN === 'undefined' || !FURN.warmed || FURN.warmed(); } catch (e) { return true; } };
-  const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady); } catch (e) { return true; } };
+  // (a city with nothing built yet has nobody to wait for: a new one, or one just started)
+  const builtNone = () => { try { for (const c of cells.values()) if (c.sections.length || c.mega) return false; return true; } catch (e) { return false; } };
+  const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady || builtNone()); } catch (e) { return true; } };
   let shutR = null, shutCam = null, shutScene = null;
   function drawShutter(now){
     // the shutter is the loading screen: it opens once the city has loaded and the Furnish page is warm (its shaders compiled), so neither costs anything later
@@ -486,8 +488,8 @@ const TITLE = (() => {
     const act = b.dataset.act;
     if (act === 'continue'){
       // still loading (the shutter's shut): say so, and go when it has opened
-      if (OPEN < 1 && !reduced){ if (b.dataset.wait) return; b.dataset.wait = '1'; const lab = b.innerHTML; b.textContent = 'Loading…'; b.setAttribute('aria-busy', 'true');
-        (function wait(){ if (!T.on){ b.innerHTML = lab; delete b.dataset.wait; b.removeAttribute('aria-busy'); return; } if (OPEN >= 1){ setTimeout(() => { b.innerHTML = lab; delete b.dataset.wait; b.removeAttribute('aria-busy'); T.hide(); }, 400); } else setTimeout(wait, 100); })(); }
+      if (!canEnter()){ if (b.dataset.wait) return; b.dataset.wait = '1';   // (clicked before it's ready: it goes in by itself when it is)
+        (function wait(){ if (!T.on){ delete b.dataset.wait; return; } if (canEnter()){ setTimeout(() => { delete b.dataset.wait; T.hide(); }, 300); } else setTimeout(wait, 100); })(); }
       else T.hide(); }
     else if (act === 'new') openPanel(true);
     else if (act === 'cities') openPanel(false);
@@ -501,6 +503,24 @@ const TITLE = (() => {
     e.stopImmediatePropagation();
   }, true);
   addEventListener('resize', () => { if (T.on) layout(); });
+
+  /* ---------- the city loading behind the title ---------- */
+  // Every load (and opening another city, which loads the page again: slots.js) brings the title up over the city as it builds, seen through
+  // the window. The first button says how far the loading has got, and only lets the player in once the plots are all in and the people are
+  // out; a city just opened from the Cities list is named on it ("Enter Harbor Row")
+  let OPENING = null; try { OPENING = sessionStorage.getItem('neonTerrarium.opening'); sessionStorage.removeItem('neonTerrarium.opening'); } catch (e) {}
+  let openAt = null;
+  // (the shutter itself waits for the city, but gives up after a while: the way in waits for the city too, never longer than 20 s more)
+  const canEnter = () => { const open = OPEN >= 1 || reduced; if (!open){ openAt = null; return false; } if (openAt === null) openAt = performance.now(); return cityReady() || performance.now() - openAt > 20000; };
+  function menuState(){
+    if (!T.on) return; const b = menu.querySelector('[data-act="continue"]'); if (!b) return; const sp = b.querySelector('span') || b;
+    let txt, busy = !canEnter();
+    if (!busy) txt = OPENING ? 'Enter ' + OPENING : 'Continue';
+    else { let pct = null; try { if (LOADP.on && LOADP.total) pct = Math.round(LOADP.placed/LOADP.total*100); } catch (e) {} txt = b.dataset.wait ? 'Entering when ready…' : (OPENING ? 'Loading ' + OPENING : 'Loading city') + (pct !== null ? ' · ' + pct + '%' : '…'); }
+    if (sp.textContent !== txt) sp.textContent = txt;
+    b.classList.toggle('t-busy', busy); if (busy) b.setAttribute('aria-busy', 'true'); else if (b.hasAttribute('aria-busy')){ b.removeAttribute('aria-busy'); if (OPENING && document.activeElement !== b) b.focus({ preventScroll: true }); }
+  }
+  setInterval(menuState, 200);
 
   /* ---------- the cities panel ---------- */
   function ago(t){ if (!t) return ''; const s = (Date.now() - t)/1000; return s < 90 ? 'just now' : s < 3600 ? Math.round(s/60) + ' min ago' : s < 86400*2 ? Math.round(s/3600) + ' h ago' : Math.round(s/86400) + ' days ago'; }
@@ -516,8 +536,10 @@ const TITLE = (() => {
         '<div class="tinfo"><b>' + esc(c.name) + '</b><small>' + line + '</small><small>' + (c.active ? 'Open now' : 'Saved ' + ago(c.updated)) + '</small><div class="ttags">' + tags + '</div></div>' +
         '<div class="tact">' + (c.active ? '' : '<button data-do="open">Open</button>') + '<button data-do="rename">Rename</button>' + (c.local ? '<button data-do="export">Export</button>' : '') + (c.active ? '' : '<button data-do="delete" class="danger">Delete</button>') + '</div></li>';
     }).join('');
-    const u = SLOTS.cloudUser; $t('tUser').value = u || ''; $t('tCloudState').textContent = u ? (SLOTS.cloudErr || 'Signed in as ' + u + '. Your cities sync every few minutes.') : 'Not signed in. Cities stay in this browser.';
-    $t('tCloudBtn').textContent = u ? 'Sync now' : 'Sign in'; $t('tSignOut').hidden = !u;
+    // (the cloud form: only on the dev page, the normal one takes it out (playerui.js), so each piece is looked for first)
+    const u = SLOTS.cloudUser, fUser = $t('tUser'), fState = $t('tCloudState'), fBtn = $t('tCloudBtn'), fOut = $t('tSignOut');
+    if (fUser) fUser.value = u || ''; if (fState) fState.textContent = u ? (SLOTS.cloudErr || 'Signed in as ' + u + '. Your cities sync every few minutes.') : 'Not signed in. Cities stay in this browser.';
+    if (fBtn) fBtn.textContent = u ? 'Sync now' : 'Sign in'; if (fOut) fOut.hidden = !u;
   }
   function openPanel(fresh){
     if (document.documentElement.classList.contains('title-deck')) setDeck(false);
@@ -547,12 +569,12 @@ const TITLE = (() => {
   });
   $t('tNew').addEventListener('submit', async e => { e.preventDefault(); say('Starting a new city…'); try { await SLOTS.create($t('tNewName').value); } catch (err) { say(err.message, true); } });
   $t('tImport').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { const r = await SLOTS.importFile(f); say('Added “' + r.name + '”. Open it from the list.'); render(); } catch (err) { say(err.message, true); } });
-  $t('tCloud').addEventListener('submit', async e => {
+  if ($t('tCloud')) $t('tCloud').addEventListener('submit', async e => {
     e.preventDefault(); const v = $t('tUser').value;
     try { say('Talking to the save server…'); if (v.trim().toLowerCase() !== SLOTS.cloudUser) await SLOTS.setUser(v); else await SLOTS.sync(); say(SLOTS.cloudUser ? 'Synced.' : ''); render(); }
     catch (err) { say(err.message, true); render(); }
   });
-  $t('tSignOut').addEventListener('click', async () => { await SLOTS.setUser(''); say('Signed out. Your cities are still here in this browser.'); render(); });
+  if ($t('tSignOut')) $t('tSignOut').addEventListener('click', async () => { await SLOTS.setUser(''); say('Signed out. Your cities are still here in this browser.'); render(); });
 
   // the title comes up on load (saveguard.js decides), over the city as it builds
   if (window.NT_TITLE) T.show(); else root.hidden = true;

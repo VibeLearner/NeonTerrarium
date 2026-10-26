@@ -62,21 +62,37 @@ def main():
         page = ctx.new_page()
         page.on('console', lambda m: print('  page:', m.text) if m.text.startswith('[trailer]') or m.type == 'error' else None)
         page.on('pageerror', lambda e: print('  page error:', e))
-        page.goto(f'http://127.0.0.1:{a.port}/index.html#trailer', wait_until='load')
+        page.on('crash', lambda *_: print('  the page crashed (the graphics process may have run out of memory)'))
+        url = f'http://127.0.0.1:{a.port}/index.html#trailer'
+        navs = []
+        page.on('framenavigated', lambda fr: (navs.append(fr.url), print('  the page navigated to', fr.url)) if fr == page.main_frame and navs is not None else None)
+        page.goto(url, wait_until='load'); navs.clear()
+
+        def ev(js):
+            # the page can be reloaded under us (it should not be): say where it went, wait for it, and carry on
+            for attempt in range(4):
+                try: return page.evaluate(js)
+                except Exception as e:
+                    if 'context was destroyed' not in str(e) and 'navigation' not in str(e): raise
+                    print(f'  page reloaded while running "{js[:40]}" (now at {page.url})')
+                    if attempt == 3: sys.exit('the page keeps reloading; stopping. Last address: ' + page.url)
+                    if '#trailer' not in page.url: page.goto(url, wait_until='load')
+                    else: page.wait_for_load_state('load')
+                    time.sleep(1)
 
         # setup: keep the clock moving (and give the page real time for its loading work) until it says it is ready
         t0, last = time.time(), ''
         while True:
-            page.evaluate('__step(2)')
-            st = page.evaluate('typeof TRAILER !== "undefined" ? TRAILER.state() : null') or {}
-            fail = page.evaluate('typeof TRAILER !== "undefined" && TRAILER.failed')
+            ev('__step(2)')
+            st = ev('typeof TRAILER !== "undefined" ? TRAILER.state() : null') or {}
+            fail = ev('typeof TRAILER !== "undefined" && TRAILER.failed')
             if fail: sys.exit('the trailer could not set up: ' + str(fail) + '\n' + '\n'.join(st.get('log', [])))
             if st.get('stage') != last: last = st.get('stage'); print(f'[{time.time() - t0:5.1f}s] {last}')
             if st.get('ready'): break
             if time.time() - t0 > 900: sys.exit('setup took over 15 minutes; last stage: ' + str(last))
             time.sleep(.015)
         print('ready:', json.dumps(st.get('info')))
-        page.evaluate('TRAILER.start()')
+        ev('TRAILER.start()')
 
         frames = int(round(min(a.until, LEN)*FPS))
         enc = None
@@ -90,7 +106,7 @@ def main():
                                    stdin=subprocess.PIPE)
         t1 = time.time()
         for f in range(frames):
-            page.evaluate('__step(1)')
+            ev('__step(1)')
             if a.stills:
                 if f in want:
                     p = os.path.join(sd, f'{f/FPS:05.2f}s.png'); page.screenshot(path=p); print('still', os.path.relpath(p, ROOT))
@@ -99,7 +115,7 @@ def main():
             if f % FPS == 0:
                 el = time.time() - t1; eta = el/(f + 1)*(frames - f - 1)
                 print(f'  {f/FPS:4.0f}s of {frames/FPS:.0f}s   ({el:4.0f}s elapsed, about {eta/60:.1f} min to go)')
-        st = page.evaluate('TRAILER.state()')
+        st = ev('TRAILER.state()')
         browser.close()
     srv.shutdown()
     log = os.path.join(OUT, 'trailer-log.txt')

@@ -2517,6 +2517,7 @@ function removePlatform(c){
 }
 const MAX_SECTIONS = 4, MAX_HEIGHT = 24;
 function addSection(c, zone, opt = {}){   // (opt.mf: a single unit, that many floors at most: Space)
+  if (c.wall) return;   // (never on a perimeter wall's plot, whatever asks)
   stageFinishNear([c]);
   if (c.sections.length >= MAX_SECTIONS || c.height > MAX_HEIGHT) return;
   finishAnimsOn(c);
@@ -2563,6 +2564,7 @@ function addSection(c, zone, opt = {}){   // (opt.mf: a single unit, that many f
 }
 // another bracketed pod on a plot that has one: a single home up (or down) the same side, a floor's gap from the others
 function addFloatPod(c, y, zone){
+  if (c.wall) return null;   // (nothing hangs over a perimeter wall)
   if (!c.lift || c.lift.v !== 2 || c.sections.length >= MAX_SECTIONS) return null;
   finishAnimsOn(c); holdRegion(c);
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
@@ -2589,6 +2591,7 @@ function removePodSection(c, k){
 }
 // hang a pod off the side of a taller building, over the empty plot c, its deck at height y
 function addLift(c, y, zone, opt = {}){
+  if (c.wall) return null;   // (nothing hangs over a perimeter wall)
   stageFinishAll();
   if (!c || c.mega || c.lift || c.wall || hwAt(c.i, c.j).length || mtAt(c.i, c.j).length) return null;   // (not under a highway or the metro)
   if (c.sections.length && y < c.height + FH - .05) return null;   // over a shorter building: a floor's gap at least
@@ -3135,6 +3138,9 @@ function targetOf(pk){
     const c = pk.c, gt = groundTop(c), mid = (gt + c.lift.y)/2;
     return pk.kind === 'gap' && pk.p.y > mid ? { type: 'podDown', c } : { type: 'belowUp', c };
   }
+  // a perimeter wall's plot (its paving, its planters, anything of it the pointer finds that isn't the wall itself): nothing builds on it. Only the
+  // Perimeter buttons change a wall (perimeter.js); a click on its paving with a zone picked used to put a building inside the wall
+  if (pk.c && pk.c.wall && !pk.c.mega) return null;
   const c = pk.c, top = pk.top !== undefined ? pk.top : pk.kind === 'plat' ? CURB : pk.kind === 'low' ? groundTop(c) : c.height;
   if (pk.bl && Math.abs(pk.p.y - top) < .03) return { type: 'up', c, after: pk.bl[3] };   // (the roof of a pod with another above it on the same side)
   // the pavement round a building (or a lamp or a bench at its foot): nothing. (It used to add a floor to the building's top.)

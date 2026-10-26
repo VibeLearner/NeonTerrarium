@@ -213,16 +213,17 @@ const PH = (() => {
   // when the report is copied (it walks the whole scene)
   function memLine(){
     try {
-      const seen = new Set(), bytes = g => { if (!g || seen.has(g)) return 0; seen.add(g); let n = 0; const one = a => { if (!a) return; const d = Object.getOwnPropertyDescriptor(a, 'array'); if (d && 'value' in d && d.value && d.value.byteLength) n += d.value.byteLength; };
-        for (const k in g.attributes) one(g.attributes[k]); one(g.index); return n; };
-      let plots = 0, nPlots = 0, held = 0, waiting = 0;
-      for (const c of cells.values()){ const d = c.data; if (!d || !d.geo) continue; let b = 0; for (const g of d.geo.values()) b += bytes(g); if (d.sgeo) b += bytes(d.sgeo); plots += b; nPlots++; if (b > 0) held++;
-        const g = d.geo.get(ATLAS); if (g && g.userData && g.userData.nvWait !== undefined && c._nvGeo !== g) waiting++; }
-      let megaB = 0; for (const m of megas.values()) if (m.data && m.data.geo) for (const g of m.data.geo.values()) megaB += bytes(g);
-      let other = 0; scene.traverse(o => { if (o.geometry) other += bytes(o.geometry); });
+      const seen = new Set(), arr = a => { if (!a) return 0; const d = Object.getOwnPropertyDescriptor(a, 'array'); return d && 'value' in d && d.value && d.value.byteLength ? d.value.byteLength : 0; };
+      const bytes = g => { if (!g || seen.has(g)) return [0, 0]; seen.add(g); let n = 0; for (const k in g.attributes) n += arr(g.attributes[k]); return [n, arr(g.index)]; };
+      let plotsV = 0, plotsI = 0, nPlots = 0, held = 0, waiting = 0;
+      for (const c of cells.values()){ const d = c.data; if (!d || !d.geo) continue; let v = 0; for (const g of d.geo.values()){ const [a, b] = bytes(g); v += a; plotsI += b; } if (d.sgeo){ const [a, b] = bytes(d.sgeo); v += a; plotsI += b; } plotsV += v; nPlots++; if (v > 0) held++;
+        const g = d.geo.get(ATLAS); if (g && g.userData && g.userData.nvWait !== undefined && c._nvGeo !== g.id) waiting++; }
+      let megaB = 0; for (const m of megas.values()) if (m.data && m.data.geo) for (const g of m.data.geo.values()){ const [a, b] = bytes(g); megaB += a + b; }
+      let merged = 0; for (const r of solidRegions.values()) if (r.group) r.group.traverse(o => { if (o.geometry){ const [a, b] = bytes(o.geometry); merged += a + b; } });
+      let other = 0; scene.traverse(o => { if (o.geometry){ const [a, b] = bytes(o.geometry); other += a + b; } });
       let nv = 0; for (const v of NV.store.values()) nv += (v && v.length) || 0;
       const mb = b => (b/1e6).toFixed(0) + ' MB';
-      return 'memory: plots ' + mb(plots) + ' (' + held + ' of ' + nPlots + ' holding their arrays, ' + waiting + ' waiting on never-seen), megastructures ' + mb(megaB) + ', the rest of the scene ' + mb(other) + ', never-seen results ' + mb(nv) + ' (' + NV.store.size + '), people ' + pplList.length + ', JS heap ' + (performance.memory ? (performance.memory.usedJSHeapSize/1e6).toFixed(0) + ' MB' : '?');
+      return 'memory: plots ' + mb(plotsV) + ' of vertex arrays (' + held + ' of ' + nPlots + ' holding them, ' + waiting + ' waiting on never-seen) and ' + mb(plotsI) + ' of index arrays, merged blocks ' + mb(merged) + ', megastructures ' + mb(megaB) + ', the rest of the scene ' + mb(other) + ', never-seen results ' + mb(nv) + ' (' + NV.store.size + '), people ' + pplList.length + ', JS heap ' + (performance.memory ? (performance.memory.usedJSHeapSize/1e6).toFixed(0) + ' MB' : '?');
     } catch (e){ return 'memory: (could not be read: ' + e.message + ')'; }
   }
   function hitchText(){

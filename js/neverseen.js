@@ -266,7 +266,7 @@ function nvApply(c, g, tri, never){
   const L = nvRelayoutOne(g, I, g.userData.cut, hide, key), F = g.userData.far ? nvRelayoutOne(g, g.userData.far.ix, g.userData.far.cut, hide, key) : null;
   if (!g.userData.nvOrig) g.userData.nvOrig = { index: g.index, cut: g.userData.cut, far: g.userData.far };
   g.userData.nvNew = { index: new THREE.BufferAttribute(L.ix, 1), cut: L.cut, far: F };
-  c._nvGeo = g; NV.stats.plots++; NV.stats.removed += never.reduce((a, b) => a + b, 0); NV.stats.drawn += tri.length;
+  c._nvGeo = g.id; NV.stats.plots++; NV.stats.removed += never.reduce((a, b) => a + b, 0); NV.stats.drawn += tri.length;
   nvSwap(g, !NV.keep()); markSolid(c);
 }
 function nvSwap(g, removed){   // which of the two layouts the plot's geometry holds
@@ -291,7 +291,7 @@ const nvFromBits = (bits, T) => { const never = new Uint8Array(T); for (let t = 
 if (!window.__NV_OFF) nvDbOpen(); else NV.dbReady = true;
 // ---- the scheduler: once a frame, from main.js, after the regions are merged ----
 let _nvScan = 0, _nvCells = [], _nvCellsStamp = -1;
-function nvNeeds(c){ if (c.mega || !c.data || c.lift) return null; const g = c.data.geo.get(ATLAS); if (!g || !g.userData.cut || c._nvGeo === g || c.animating) return null; return g; }
+function nvNeeds(c){ if (c.mega || !c.data || c.lift) return null; const g = c.data.geo.get(ATLAS); if (!g || !g.userData.cut || c._nvGeo === g.id || c.animating) return null; return g; }
 function nvTick(){
   if (NV.off()) return;
   if (window.__NV_CFG && !NV.cfgSet){ NV.cfgSet = true; Object.assign(NV, window.__NV_CFG); }   // (tests: a small view set)
@@ -314,7 +314,7 @@ function nvTick(){
     while (NV.queue.length){ const c = NV.queue.shift(), g = nvNeeds(c); if (!g) continue;
       const tri = nvTriangles(g), bits = nvLookup(c, g, tri);
       if (bits){ if (NV.still < 10){ NV.queue.unshift(c); break; } nvApply(c, g, tri, nvFromBits(bits, tri.length)); NV.stats.fromStore++; break; }   // (one plot a frame, and only with the view still: it re-lays the plot's triangles, a few milliseconds on a big one, and the merge after it)
-      if (!c._nvFresh && !(PH.tests.nvBackfill || window.__NV_BACKFILL)){ c._nvGeo = g; continue; }   // (plots that were there at load are not worked out unless the test "never-seen backfill" is on; a stored result above still applies)
+      if (!c._nvFresh && !(PH.tests.nvBackfill || window.__NV_BACKFILL)){ c._nvGeo = g.id; continue; }   // (plots that were there at load are not worked out unless the test "never-seen backfill" is on; a stored result above still applies)
       if (!idle || window.__NV_NO_COMPUTE) { NV.queue.unshift(c); break; }
       NV.job = nvStart(c); break; }
   }

@@ -24,8 +24,8 @@ const TRAILER = (() => {
 
   /* ---------- timing: Bytes runs at 160 bpm; the drop lands at 21.72 s, the lull before it starts at 19.2 s ---------- */
   const LEN = 45, BEAT = 60/160, DROP = 21.72, bar = n => DROP + n*4*BEAT;
-  const MK = { swoop: 8.4, follow: 10.0, subjectOut: 7.9, monOpen: 10.25, notes: 13.3, monClose: 14.8, furn: 15.0, coastWake: 18.2, dissolve: 18.95,
-    coastIn: 19.45, coastOut: DROP, clean: 20.85, cut2: bar(3), raidEarliest: 25.0, arrive: 29.5, rise: bar(8), logo: bar(13), end: LEN };
+  const MK = { swoop: 8.4, follow: 10.0, subjectOut: 7.9, monOpen: 10.15, notes: 12.35, monClose: 13.4, furn: 13.5, coastWake: 18.2, glIn: 19.0,
+    coastIn: 19.45, glOut: 21.48, coastOut: DROP, clean: 20.85, cut2: bar(3), raidEarliest: 25.0, arrive: 29.5, rise: bar(8), logo: bar(13), end: LEN };
 
   /* ---------- small maths ---------- */
   const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
@@ -101,14 +101,22 @@ const TRAILER = (() => {
       #trLogo b{display:block;font-weight:400;line-height:1;opacity:0}
       #trLogo .w1{font-size:132px;letter-spacing:.16em;color:#ffd9ee;text-shadow:0 0 6px #ff4fa3,0 0 18px #ff4fa3,0 0 44px rgba(255,79,163,.75),0 0 90px rgba(255,79,163,.4)}
       #trLogo .w2{font-size:58px;letter-spacing:.42em;margin-right:-.42em;color:#d8fffd;text-shadow:0 0 5px #38e8e0,0 0 16px #38e8e0,0 0 40px rgba(56,232,224,.7),0 0 80px rgba(56,232,224,.35)}
+      #trGl{position:absolute;inset:0;pointer-events:none}
+      #trGl b{position:absolute;left:0;right:0;display:none}
+      #trGl i{position:absolute;inset:0;opacity:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.55) 0 1px,transparent 1px 3px)}
       #trMsg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:13px/1.6 "JetBrains Mono",ui-monospace,monospace;color:#9fdcff;text-align:center;letter-spacing:.06em}
       #trMsg b{display:block;font-family:Silkscreen,ui-monospace,monospace;font-weight:400;font-size:22px;letter-spacing:.14em;color:#38e8e0;margin-bottom:6px}`;
     document.head.appendChild(st);
     const ov = document.createElement('div'); ov.id = 'trOv';
-    ov.innerHTML = '<i id="trBlack"></i><i id="trFlash"></i><div id="trLogo"><b class="w1">Neon</b><b class="w2">Terrarium</b></div><div id="trMsg"><b>Trailer</b><span id="trStatus">building the city</span></div>';
+    ov.innerHTML = '<i id="trBlack"></i><i id="trFlash"></i><div id="trGl">' + '<b></b>'.repeat(10) + '<i></i></div>'
+      + '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="trRGB" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">'
+      + '<feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="r"/><feOffset id="trRo" in="r" dx="6" dy="0" result="ro"/>'
+      + '<feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" result="gb"/><feOffset id="trGo" in="gb" dx="-6" dy="0" result="gbo"/>'
+      + '<feBlend in="ro" in2="gbo" mode="screen"/></filter></svg>'
+      + '<div id="trLogo"><b class="w1">Neon</b><b class="w2">Terrarium</b></div><div id="trMsg"><b>Trailer</b><span id="trStatus">building the city</span></div>';
     document.body.appendChild(ov);
     TR.el = { ov, black: ov.querySelector('#trBlack'), flash: ov.querySelector('#trFlash'), logo: ov.querySelector('#trLogo'),
-      w1: ov.querySelector('.w1'), w2: ov.querySelector('.w2'), msg: ov.querySelector('#trMsg'), status: ov.querySelector('#trStatus') };
+      w1: ov.querySelector('.w1'), gl: [...ov.querySelectorAll('#trGl b')], scan: ov.querySelector('#trGl i'), ro: ov.querySelector('#trRo'), go: ov.querySelector('#trGo'), w2: ov.querySelector('.w2'), msg: ov.querySelector('#trMsg'), status: ov.querySelector('#trStatus') };
     if (CAP) TR.el.msg.hidden = true;
   }
   const status = s => { TR.stage = s; if (TR.el) TR.el.status.textContent = s; };
@@ -239,6 +247,37 @@ const TRAILER = (() => {
     if (b) b.click(); else FURN.close();
     setTimeout(() => { if (FURN.open || FURN.hold) FURN.close(); }, 900);
   }
+  // two pieces of furniture held back while the room resolves, then set down one after the other: dropped in from above, a little bounce as they land
+  const DROPS = { list: null, t0: null, done: false };
+  const NOT_FURN = /wall|window|door|floor|tile|ceiling|skirting|trim|curtain|blind|rail|pipe|vent|socket|switch|outlet|frame/i;
+  function labDrops(t){
+    const w = labWin(), B = w && w.PodBuilder && w.PodBuilder._B; if (!B || !B.inst || !B.inst.size) return;
+    if (!document.getElementById('furnish').classList.contains('live')) return;   // (this open's room, not the warm-up's)
+    if (DROPS.list && DROPS.list.some(d => B.inst.get(d.i.rec && d.i.rec.id) !== d.i)) DROPS.list = null;   // (the room swapped its pieces while it loaded: pick again)
+    if (!DROPS.list){
+      const cand = [];
+      for (const i of B.inst.values()){
+        if (!i.pivot || !i.lbox || (i.rec && i.rec.parent) || (i.pivot.userData && i.pivot.userData.window) || i.kind === 'wall' || NOT_FURN.test(i.name || '')) continue;
+        const sx = i.lbox.max.x - i.lbox.min.x, sy = i.lbox.max.y - i.lbox.min.y, sz = i.lbox.max.z - i.lbox.min.z, a = sx*sz;
+        if (a < .12 || a > 3.2 || sy < .25 || (i.rec && i.rec.wh)) continue;   // (standing on the floor, not too small to see nor the size of the room)
+        cand.push({ i, a: a*Math.min(1.4, sy) });
+      }
+      cand.sort((x, y) => y.a - x.a);
+      if (!cand.length) return;
+      DROPS.list = cand.slice(0, 2).map(c => ({ i: c.i, y: c.i.pivot.position.y }));
+      for (const d of DROPS.list) d.i.pivot.visible = false;
+      TR.info.drops = DROPS.list.map(d => d.i.name || d.i.kind);
+    }
+    if (DROPS.t0 === null && !labBusy()) DROPS.t0 = Math.min(Math.max(t + .35, MK.furn + 3.4), 18.35);   // (once the room is up; never so late it's missed)
+    if (DROPS.t0 === null) return;
+    DROPS.list.forEach((d, k) => {
+      const u = (t - (DROPS.t0 + k*.55))/.6; if (u < 0){ d.i.pivot.visible = false; return; }
+      d.i.pivot.visible = true;
+      const v = Math.min(1, u), fall = 1 - v*v, bounce = v < 1 ? 0 : Math.max(0, Math.sin(Math.min(1, (u - 1)/.35)*Math.PI))*.06*Math.max(0, 1 - (u - 1)/.35);
+      d.i.pivot.position.y = d.y + 1.6*fall + bounce;
+    });
+    B.needs = true;
+  }
   const labBusy = () => { const w = labWin(); return !w || !w.PodContext || w.PodContext.transitioning; };
   function labOrbit(dt){ const w = labWin(); const B = w && w.PodBuilder && w.PodBuilder._B; if (!B || labBusy()) return; B.az += .16*dt; B.camDirty = true; B.needs = true; }
 
@@ -271,7 +310,6 @@ const TRAILER = (() => {
     }));
   }
   function coastWake(on){ CO.paused = !on; if (on) for (const fn of CO.pend.splice(0)) CO.raf(fn); }
-  function coastShow(a, blur = 0){ if (!CO.el) return; CO.el.style.opacity = String(a); CO.el.style.filter = blur > .05 ? 'blur(' + blur.toFixed(2) + 'px) brightness(' + (1 + blur*.06).toFixed(3) + ')' : ''; }
   function coastDrift(t){
     if (!CO.ready || !CO.w || !CO.w.COAST) return;
     const u = seg(t, MK.coastWake, MK.coastOut);
@@ -347,9 +385,41 @@ const TRAILER = (() => {
   TR.play = play;
   const clock = () => AU.ctx && AU.start !== undefined ? AU.ctx.currentTime - AU.start : (performance.now() - t0)/1000;   // (live: the sound is the clock)
 
+  /* ---------- sight lines: the close-ups swing round or tilt up until nothing stands between the camera and the people ---------- */
+  const hAt = (x, z) => { const i = Math.round(x/LOT), j = Math.round(z/LOT), c = cells.get(ckey(i, j)); if (!c) return 0;
+    if (!c.mega && (Math.abs(x - i*LOT) > LOT*.37 || Math.abs(z - j*LOT) > LOT*.37)) return 0;   // (the lanes between plots are open)
+    return hwSurface(c); };
+  function los(x, y, z, yw, pt){
+    const cp = Math.cos(pt), dx = Math.sin(yw)*cp, dy = Math.sin(pt), dz = Math.cos(yw)*cp;
+    for (let s = .3; s < 120; s += .25){
+      const yy = y + dy*s; if (yy > 52) return true;
+      const px = x + dx*s, pz = z + dz*s, h = hAt(px, pz);
+      if (h > CURB + .05 && yy < h - .08) return false;
+      if (yy > MT_Y - .6 && yy < MT_Y + .4 && mtAt(Math.round(px/LOT), Math.round(pz/LOT)).length) return false;   // (the metro deck)
+    }
+    return true;
+  }
+  function pickView(pts, pref, pmin, keep){
+    const ok = (yw, pt) => pts.every(p => los(p.x, p.y, p.z, yw, pt));
+    const P = []; for (let d = pmin; d < 74; d += 7) P.push(d*DEG); P.push(76*DEG);
+    if (keep){ for (const pt of P){ if (pt > keep.pitch + 1e-3) break; if (ok(keep.yaw, pt)) return { yaw: keep.yaw, pitch: pt }; } if (ok(keep.yaw, keep.pitch)) return keep; }
+    for (const pt of P) for (const dk of [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8]){ const yw = pref + dk*Math.PI/8; if (ok(yw, pt)) return { yaw: yw, pitch: pt }; }
+    return { yaw: pref, pitch: 76*DEG };
+  }
+  const VW = { on: false, yaw: 0, pitch: 0, t: null, chk: 0 };
+  const resetView = () => { VW.on = false; VW.t = null; VW.chk = 0; };
+  function aimAt(pts, pref, pmin, dt, k = 2.4){
+    VW.chk -= dt;
+    if (!VW.t || VW.chk <= 0){ VW.chk = .25; VW.t = pickView(pts, pref, pmin, VW.t); }
+    if (!VW.on){ VW.on = true; VW.yaw = VW.t.yaw; VW.pitch = VW.t.pitch; }
+    const a = 1 - Math.exp(-k*dt); VW.yaw += wrapA(VW.t.yaw - VW.yaw)*a; VW.pitch += (VW.t.pitch - VW.pitch)*a;
+  }
+  const at3 = (x, z, y = CURB + .45) => ({ x, y, z });
+  function ahead(p, k){ const L = Math.hypot(p.dx || 0, p.dz || 0) || 1; return at3(p.x + (p.dx || 0)/L*k, p.z + (p.dz || 0)/L*k); }
+
   /* ---------- the camera: set outright every frame from the timeline (no easing of its own) ---------- */
   const CAM = { x: CENTER.x, z: CENTER.z, y: TARGET_Y, yaw: .35, zoom: 33, pitch: 33*DEG };
-  let sub = null, subYaw = null, grp = null, cutYaw = 0, raidYaw = null, riseFrom = null;
+  let sub = null, subYaw = null, grp = null, cutYaw = null, raidYaw = null, riseFrom = null, shot = '';
   const outside = p => p && p.x !== undefined && (!!p.walk || !!(p.sc && p.sc.mode === 'out'));   // (out on the street, not behind a door)
   const centroid = list => { let x = 0, z = 0, n = 0; for (const p of list) if (p && p.x !== undefined){ x += p.x; z += p.z; n++; } return n ? { x: x/n, z: z/n } : null; };
   const turntable = t => ({ x: CENTER.x, z: CENTER.z, y: TARGET_Y, yaw: .35 + 1.3*ease(t/10), zoom: elerp(33, 26.5, ss(t/MK.swoop)), pitch: 33*DEG });
@@ -360,31 +430,36 @@ const TRAILER = (() => {
       const a = turntable(MK.swoop), p = c.subject, u = ease(seg(t, MK.swoop, MK.follow));
       if (!sub) sub = { x: p.x ?? a.x, z: p.z ?? a.z };
       sub.x = follow(sub.x, p.x ?? sub.x, 8, dt); sub.z = follow(sub.z, p.z ?? sub.z, 8, dt);
-      if (subYaw === null){ const dx = p.dx || 0, dz = p.dz || 1; subYaw = a.yaw + wrapA(Math.atan2(-dx, -dz) + .45 - a.yaw)*.6; }
-      Object.assign(CAM, { x: lerp(a.x, sub.x, u), z: lerp(a.z, sub.z, u), y: lerp(TARGET_Y, (p._ey ?? CURB) + .5, u), yaw: lerp(a.yaw, subYaw, u), zoom: elerp(a.zoom, 4.4, u), pitch: lerp(33, 40, u)*DEG });
+      if (subYaw === null){ subYaw = a.yaw; resetView(); }
+      aimAt([at3(sub.x, sub.z), ahead(p, 1.2)], subYaw, 36, dt);
+      Object.assign(CAM, { x: lerp(a.x, sub.x, u), z: lerp(a.z, sub.z, u), y: lerp(TARGET_Y, (p._ey ?? CURB) + .5, u), yaw: a.yaw + wrapA(VW.yaw - a.yaw)*u, zoom: elerp(a.zoom, 4.4, u), pitch: lerp(a.pitch, VW.pitch, u) });
     }
     else if (t < MK.coastIn){   // with the subject on the person cam (the apartment covers the screen from 15 s)
       const p = c.subject; if (!sub) sub = { x: p.x, z: p.z };
       if (p.x !== undefined){ sub.x = follow(sub.x, p.x, 6, dt); sub.z = follow(sub.z, p.z, 6, dt); }
       const u = seg(t, MK.follow, MK.furn);
-      Object.assign(CAM, { x: sub.x, z: sub.z, y: (p._ey ?? CURB) + .5, yaw: subYaw + .14*u, zoom: lerp(4.4, 3.9, ss(u)), pitch: 40*DEG });
+      aimAt([at3(sub.x, sub.z), ahead(p, 1.2)], subYaw, 36, dt);
+      Object.assign(CAM, { x: sub.x, z: sub.z, y: (p._ey ?? CURB) + .5, yaw: VW.yaw + .12*u, zoom: lerp(4.4, 3.9, ss(u)), pitch: VW.pitch });
     }
     else if (t < MK.cut2){   // the safehouse door, then the crew walking off
       const d = c.shDoor, door = { x: d.wall.x + c.out.x*1.2, z: d.wall.z + c.out.z*1.2 };
-      if (!grp){ grp = { x: door.x, z: door.z }; cutYaw = Math.atan2(c.out.x, c.out.z) + .5; }
+      if (cutYaw === null){ grp = { x: door.x, z: door.z }; cutYaw = Math.atan2(c.out.x, c.out.z) + .5; resetView(); }
       const vis = c.crew.filter(outside), cc = t > MK.coastOut + .4 && vis.length ? centroid(vis) : null;
       if (cc){ grp.x = follow(grp.x, cc.x, 2.6, dt); grp.z = follow(grp.z, cc.z, 2.6, dt); }
+      aimAt(cc ? [at3(door.x, door.z), at3(cc.x, cc.z)] : [at3(door.x, door.z)], cutYaw, 28, dt);
       const u = seg(t, MK.coastOut, MK.cut2);
-      Object.assign(CAM, { x: grp.x, z: grp.z, y: CURB + .55, yaw: cutYaw + .18*u, zoom: lerp(5.0, 6.4, ss(u)), pitch: 25*DEG });
+      Object.assign(CAM, { x: grp.x, z: grp.z, y: CURB + .55, yaw: VW.yaw + .14*u, zoom: lerp(5.0, 6.4, ss(u)), pitch: VW.pitch });
     }
     else if (t < MK.rise){   // the officers walk up, knock, go in, come out
       const d = c.shDoor, door = { x: d.wall.x + c.out.x*.9, z: d.wall.z + c.out.z*.9 };
-      if (raidYaw === null){ raidYaw = Math.atan2(c.out.x, c.out.z) - .55; grp = null; }
+      if (raidYaw === null){ raidYaw = Math.atan2(c.out.x, c.out.z) - .55; grp = null; resetView(); }
       const there = t > MK.arrive - .3, cc = there ? door : centroid(c.cops.filter(outside)) || door;
       if (!grp) grp = { x: cc.x, z: cc.z };
       grp.x = follow(grp.x, cc.x, there ? 2 : 4, dt); grp.z = follow(grp.z, cc.z, there ? 2 : 4, dt);
+      const cops = c.cops.filter(outside), cc2 = centroid(cops);
+      aimAt(cc2 ? [at3(door.x, door.z), at3(cc2.x, cc2.z)] : [at3(door.x, door.z)], raidYaw, 28, dt);
       const u = seg(t, MK.cut2, MK.rise);
-      Object.assign(CAM, { x: grp.x, z: grp.z, y: CURB + .55, yaw: raidYaw - .1*u, zoom: lerp(5.6, 5.0, ss(u)), pitch: 27*DEG });
+      Object.assign(CAM, { x: grp.x, z: grp.z, y: CURB + .55, yaw: VW.yaw - .08*u, zoom: lerp(5.6, 5.0, ss(u)), pitch: VW.pitch });
     }
     else {   // the rise over the whole city at night
       if (!riseFrom) riseFrom = Object.assign({}, CAM);
@@ -457,16 +532,15 @@ const TRAILER = (() => {
   at(0, () => { S.hour = 6.9; }, 'open');
   at(MK.subjectOut, () => { const c = TR.c, p = c.subject; putInside(p, p.home); p.until = pplNow; if (c.dest && !startTrip(p, c.dest.id)) warn('subject', 'no trip'); }, 'subject out');
   at(MK.monOpen, () => { MON.open(TR.c.subject.id); keep(document.getElementById('monitor'), true); keep(document.getElementById('npcSel'), true); monTab('log'); }, 'person cam');
-  [10.7, 11.35, 12.0, 12.65].forEach((t, k) => at(t, () => revealStep(k), 'reveal ' + k));
+  [10.5, 10.95, 11.4, 11.85].forEach((t, k) => at(t, () => revealStep(k), 'reveal ' + k));
   at(MK.notes, () => monTab('notes'), 'notebook');
-  at(13.9, () => revealStep(4), 'reveal 4');
+  at(12.85, () => revealStep(4), 'reveal 4');
   at(MK.monClose, () => { keep(document.getElementById('monitor'), false); keep(document.getElementById('npcSel'), false); MON.close(); }, 'cam off');
   at(MK.furn, () => { if (!FURN.openKey(TR.c.subject.pod)) warn('furnish', 'did not open'); }, 'furnish');
   at(MK.coastWake, () => coastWake(true), 'coast wakes');
-  at(MK.dissolve, () => { CO.fade = true; }, 'coast dissolves in');
   at(MK.coastIn, () => { if (FURN.open || FURN.hold) labExit(); LK.setWeather('rain', true, true); stageNight(); }, 'night falls behind the coast');
   at(MK.clean, () => cleanout(), 'cleanout');
-  at(MK.coastOut, () => { CO.fade = false; coastShow(0); flash(.45); coastWake(false); }, 'drop');
+  at(MK.coastOut, () => { glitchOff(); flash(.45); coastWake(false); }, 'drop');
   at(-1, () => raid(), 'raid');   // (its time is worked out from the walk: see setup)
   at(MK.end, () => { TR.playing = false; TR.done = true; say('done'); if (!CAP){ TR.el.msg.hidden = false; TR.el.status.innerHTML = 'click to play again'; TR.el.ov.classList.add('ask'); TR.el.ov.addEventListener('click', () => location.reload(), { once: true }); } }, 'end');
   function timeRaid(){   // leave the station so the four reach the door at MK.arrive (hurried walk, plus the two doorways)
@@ -479,13 +553,51 @@ const TRAILER = (() => {
   function flash(a){ flashA = a; flashT = TR.t; }
   const NEON = [[0, 0], [.05, 1], [.09, .15], [.15, 1], [.22, .35], [.27, 1], [.4, .7], [.46, 1]];
   const neonAt = u => { let v = 0; for (const [k, a] of NEON) if (u >= k) v = a; return v; };
+  // the glitch into and out of the coast: the picture tears into bands, splits its colours and jumps sideways, the two worlds flickering
+  // between each other, ten bars of noise and scanlines over it; it changes 30 times a second (a hash of the frame, the same every run)
+  const hash = n => { let x = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b); x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); x ^= x >>> 16; return (x >>> 0)/4294967296; };
+  const GLCOL = ['rgba(56,232,224,.85)', 'rgba(255,79,163,.85)', 'rgba(255,255,255,.9)', 'rgba(0,0,0,.9)', 'rgba(140,90,255,.8)'];
+  let glOn = false;
+  function bands(f){ const n = 3 + Math.floor(hash(f*7 + 3)*5); let y = 0, out = []; for (let k = 0; k < n && y < 100; k++){ const a = y + hash(f*11 + k)*16, b = Math.min(100, a + 4 + hash(f*13 + k)*22); out.push(`0 ${a}%,100% ${a}%,100% ${b}%,0 ${b}%`); y = b; } return out.length ? 'polygon(' + out.join(',') + ',0 100%,0 0)' : ''; }
+  function glitchOff(){
+    if (!glOn) return; glOn = false;
+    const E = TR.el; for (const b of E.gl) b.style.display = 'none'; E.scan.style.opacity = '0';
+    for (const el of [document.getElementById('view'), document.getElementById('furnish')]) if (el){ el.style.transform = ''; el.style.filter = ''; }
+    if (CO.el){ CO.el.style.transform = ''; CO.el.style.filter = ''; CO.el.style.clipPath = ''; }
+  }
+  function glitch(t){
+    if (!CO.el) return;
+    const inW = t >= MK.glIn && t < MK.coastIn, outW = t >= MK.glOut && t < MK.coastOut;
+    let coast = t >= MK.coastIn && t < MK.glOut ? 1 : 0;
+    if (!inW && !outW){ glitchOff(); CO.el.style.opacity = String(coast); return; }
+    glOn = true;
+    const f = Math.floor(t*30), E = TR.el;
+    const u = inW ? seg(t, MK.glIn, MK.coastIn) : seg(t, MK.glOut, MK.coastOut);
+    const g = .3 + .7*Math.sin(Math.PI*u);
+    coast = inW ? (hash(f*3 + 1) < ss(u)*1.15 - .06 ? 1 : 0) : (hash(f*3 + 2) < 1 - ss(u)*1.12 ? 1 : 0);
+    const jx = (hash(f*5 + 4) - .5)*110*g, split = (5 + 16*g*hash(f*5 + 6)).toFixed(1), rgb = g > .25 && hash(f*5 + 7) < .8;
+    E.ro.setAttribute('dx', split); E.go.setAttribute('dx', '-' + split);
+    CO.el.style.opacity = String(coast);
+    CO.el.style.transform = coast ? `translateX(${jx.toFixed(1)}px)` : '';
+    CO.el.style.clipPath = coast && hash(f*5 + 8) < .55 ? bands(f) : '';
+    CO.el.style.filter = coast && rgb ? 'url(#trRGB) contrast(1.15)' : '';
+    for (const el of [document.getElementById('view'), document.getElementById('furnish')]) if (el){
+      el.style.transform = !coast ? `translateX(${(-jx*.6).toFixed(1)}px)` : '';
+      el.style.filter = !coast && rgb ? 'url(#trRGB) saturate(1.3)' : ''; }
+    E.gl.forEach((b, k) => {
+      const on = hash(f*17 + k*3) < g*.75; b.style.display = on ? 'block' : 'none'; if (!on) return;
+      b.style.top = (hash(f*19 + k)*100).toFixed(1) + '%'; b.style.height = (2 + hash(f*23 + k)*Math.max(4, 46*g)).toFixed(0) + 'px';
+      b.style.background = GLCOL[Math.floor(hash(f*29 + k)*GLCOL.length)]; b.style.mixBlendMode = hash(f*31 + k) < .5 ? 'difference' : 'screen';
+      b.style.transform = `translateX(${((hash(f*37 + k) - .5)*240*g).toFixed(0)}px)`; b.style.opacity = (.35 + .6*hash(f*41 + k)).toFixed(2);
+    });
+    E.scan.style.opacity = (.25 + .35*g).toFixed(2);
+  }
   function paint(t){
     const E = TR.el;
     const black = t < .9 ? 1 - ss(t/.9) : t > LEN - .75 ? ss((t - (LEN - .75))/.75) : t > MK.logo ? .58*ss(seg(t, MK.logo, MK.logo + 1.2)) : 0;
     E.black.style.setProperty('opacity', String(black), 'important');
-    const hz = t > MK.dissolve - .2 && t < MK.coastIn + .45 ? .32*Math.sin(Math.PI*seg(t, MK.dissolve - .2, MK.coastIn + .45)) : 0;   // (a bright haze over the dissolve: a memory surfacing)
-    E.flash.style.opacity = String(Math.max(hz, flashT >= 0 ? flashA*Math.max(0, 1 - (t - flashT)/.14) : 0));
-    if (CO.fade){ const u = ss(seg(t, MK.dissolve, MK.coastIn)); coastShow(u, 9*(1 - u)); }
+    E.flash.style.opacity = flashT >= 0 ? String(flashA*Math.max(0, 1 - (t - flashT)/.14)) : '0';
+    glitch(t);
     const l1 = t > MK.logo + .5 ? neonAt(t - MK.logo - .5) : 0, l2 = t > MK.logo + .85 ? neonAt(t - MK.logo - .85) : 0;
     E.w1.style.opacity = String(l1); E.w2.style.opacity = String(l2);
     E.logo.style.opacity = t > LEN - .5 ? String(1 - ss((t - (LEN - .5))/.5)) : '1';
@@ -498,7 +610,7 @@ const TRAILER = (() => {
     paint(t);
     if (TR.raidSc && TR.raidSc.phase && t > MK.arrive){ const k = TR.raidSc.beatIx ?? TR.raidSc.k ?? TR.raidSc.i, b = TR.raidSc.b || (typeof k === 'number' && TR.raidSc.s.beats[k]);
       const A = TR.cops && TR.cops[0]; if (A && !A.held && b && b.id === 'r4') A.held = PG.heldPick('crate', '', A.id); }
-    if (t >= MK.furn && t < MK.coastIn && FURN.open){ safe('lab', labClean); safe('orbit', () => labOrbit(dt)); }
+    if (t >= MK.furn && t < MK.coastIn && FURN.open){ safe('lab', labClean); safe('orbit', () => labOrbit(dt)); safe('drops', () => labDrops(t)); }
     if (t >= MK.coastWake && t < MK.coastOut) coastDrift(t);
     if (FURN.hold && !(t >= MK.furn && t < MK.coastIn + 1.2)) safe('furnish', () => FURN.close());   // (never left covering the city)
   }

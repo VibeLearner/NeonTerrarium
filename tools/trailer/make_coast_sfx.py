@@ -19,6 +19,7 @@ SR = 48000
 CLIP_START = 19.0      # trailer seconds where the clip begins
 FLASH_IN = 19.2        # the cut to the coast (music drops out)
 FLASH_OUT = 21.72      # the drop (back to the city)
+GLITCH = [(19.0, 19.45), (21.48, 21.72)]   # the picture glitches into the coast and back out (js/trailer.js MK.glIn / MK.glOut)
 CLIP_END = 21.9
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 OUT = os.path.join(ROOT, 'assets', 'audio', 'trailer', 'coast_flash.wav')
@@ -144,12 +145,37 @@ for at, dur, hi, lo, lvl, side in [(19.86, .44, 1150, 720, .5, -.25), (20.55, .3
     st = pan(s, side); birds_l += st[:, 0]; birds_r += st[:, 1]
 birds = np.stack([room(birds_l, 1.0, .3), room(birds_r, 1.0, .3)], 1)
 
+# ---------- the glitches in and out: digital tearing, in 1/30 s slices like the picture's ----------
+def glitches():
+    out = np.zeros((N, 2))
+    slot = int(SR/30)
+    for a, b in GLITCH:
+        i0, i1 = int((a - CLIP_START)*SR), int((b - CLIP_START)*SR)
+        for s0 in range(i0, i1, slot):
+            u = (s0 - i0)/max(1, i1 - i0); g = .3 + .7*np.sin(np.pi*u)
+            if rng.random() > .35 + .6*g: continue
+            n = min(slot, i1 - s0, N - s0)
+            if n <= 0: continue
+            kind = rng.integers(3)
+            if kind == 0:   # bit-crushed noise: held samples, few levels
+                hold = int(rng.integers(6, 40)); x = np.repeat(rng.uniform(-1, 1, n//hold + 2), hold)[:n]; x = np.round(x*4)/4
+            elif kind == 1:   # a buzzing square tone
+                f = rng.uniform(180, 2400); x = np.sign(np.sin(2*np.pi*f*np.arange(n)/SR))*.6
+            else:   # a quick downward data chirp
+                f = np.linspace(rng.uniform(2500, 5000), rng.uniform(300, 900), n); x = np.sign(np.sin(2*np.pi*np.cumsum(f)/SR))*.45
+            e = np.ones(n); k = min(40, n//4); e[:k] = np.linspace(0, 1, k); e[-k:] = np.linspace(1, 0, k)
+            pan_ = rng.uniform(-.6, .6)
+            out[s0:s0 + n] += pan(hp(x, 200)*e*g, pan_)
+    return out
+
+
 # ---------- mix ----------
 mix = sea*.42 + birds*.32
 window = env(FLASH_IN - .02, FLASH_OUT + .02, .1, .12)     # hard-ish cut in, quick tuck under the drop
 mix *= window[:, None]
-peak = np.abs(mix).max()
-mix = mix/peak*10**(-3/20)                                  # peak at -3 dBFS; level is set in the mixer
+mix = mix/np.abs(mix).max()*10**(-3/20)                     # the sea and birds peak at -3 dBFS; level is set in the mixer
+gl = glitches(); mix += gl/max(1e-9, np.abs(gl).max())*.42    # the glitches on top, a little under the sea's peak
+mix = np.clip(mix, -.98, .98)
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 wavfile.write(OUT, SR, (mix*32767).astype(np.int16))
 print('wrote', os.path.relpath(OUT, ROOT), f'{N/SR:.2f}s, starts at {CLIP_START}s')

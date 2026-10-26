@@ -6,11 +6,11 @@ It is played by the game itself: open the game with `#trailer` at the end of the
 | Time | Shot |
 |---|---|
 | 0 to 8.4 s | Four separate sectors (residential, commercial, luxury, industrial) joined by one metro line, turning while the day runs from morning haze through golden hour to dusk |
-| 8.4 to 15 s | The camera dives onto a resident walking home; the person cam opens and their profile fills in |
-| 15 to 19.2 s | Their own apartment opens in Furnish pod: the hologram fly-in, then a slow turn round the room |
-| 19.2 to 21.72 s | The lull in the music: a flash of the coast, with waves and shorebirds |
+| 8.4 to 13.5 s | The camera dives onto a resident walking home; the person cam opens and their profile fills in (close-ups swing round or tilt up so no building blocks the view) |
+| 13.5 to 19 s | Their own apartment opens in Furnish pod: the hologram scan, then two pieces of furniture are set down while the room turns |
+| 19 to 21.72 s | The lull in the music: the picture glitches into the coast (waves and shorebirds) and glitches back out on the drop |
 | 21.72 s | The drop: 3 a.m. in the rain. The crime boss's people clean out the safehouse and walk off with the crates |
-| 26.22 s | Four officers walk up to the same door, knock, two go in, and come back out with one empty crate |
+| 26.22 s | Four officers hurry to the same door (arriving 29.5 s), knock, two go in, and come back out with one empty crate |
 | 33.72 s | The camera rises over the whole city at night, trains running between the sectors |
 | 41.22 s | The logo |
 

@@ -137,7 +137,7 @@ addEventListener('pointerdown', e => { if (!cityPanel.hidden && !cityPanel.conta
 // time and weather
 if (timeSec){ const h = timeSec.querySelector('h2'); if (h) h.textContent = 'Time and weather'; }
 const cycleLab = relabel('cycle', 'Day and night cycle', 'The clock runs by itself: a whole day in an hour');
-const engineLab = relabel('storyEngine', 'Storylet engine', typeof STORY !== 'undefined' && STORY.engineTip || '');
+const engineLab = relabel('storyEngine', 'Storylet engine');   // (its explanation pops up on hover: story.js)
 const wx = looksSec ? looksSec.querySelector('#wxChips') : null, autoWxLab = $('autoWeather') ? $('autoWeather').closest('label') : null, wxStatus = $('lookStatus');
 if (autoWxLab){ for (const n of [...autoWxLab.childNodes]) if (n.nodeType === 3) n.remove(); autoWxLab.append(document.createTextNode(' Weather changes by itself')); }
 if (timeSec){ const togs = timeSec.querySelector('.togs'), wind = $('wind') && $('wind').closest('.slider');

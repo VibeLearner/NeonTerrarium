@@ -519,3 +519,14 @@ body.furnish-open .zonebar,body.furnish-open .deck-toggle,body.furnish-open .hud
 /* the storylet engine on: the time can't be set (story.js lockTime) */
 #hour:disabled,#presets button:disabled,#cycle:disabled,#ffbar button:disabled{opacity:.38;cursor:not-allowed}
 label.tog:has(#cycle:disabled){opacity:.55;cursor:not-allowed}
+/* the storylet engine's switch: a question-mark cursor and its explanation at once (story.js) */
+.eng-lab,.eng-lab input{cursor:help}
+.eng-tip{position:fixed;z-index:9999;width:280px;pointer-events:none;background:rgba(10,12,24,.97);border:1px solid #4be3d6;box-shadow:0 6px 24px rgba(0,0,0,.5);padding:10px 12px;font:12px/1.45 'JetBrains Mono',ui-monospace,monospace;color:#d8dbe8;letter-spacing:.01em}
+.eng-tip[hidden]{display:none}
+.eng-tip b{display:block;color:#4be3d6;font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:11px;margin-bottom:6px}
+.eng-tip p{margin:0 0 6px}
+.eng-tip em{font-style:normal;display:inline-block;min-width:30px;color:#ff5fae;font-weight:600}
+.eng-tip ul{margin:0 0 6px;padding-left:16px} .eng-tip li{margin:1px 0}
+.eng-tip p:last-child{margin:0}
+.eng-tip p.k{display:grid;grid-template-columns:34px 1fr}
+.eng-tip ul{padding-left:50px}

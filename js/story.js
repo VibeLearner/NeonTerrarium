@@ -1224,7 +1224,7 @@ const STORY = (() => {
       // clock, so the two agree and nothing is skipped. This loads after the first frames: kept apart, the game clock ran hours off the sky's,
       // the storylets choosing by one hour while the people and the sky went by the other (and the Precinct desk showed a different time, Oct 26)
       ST.clock = d.clock || 0;
-      if (d.clock){ const h = (ST.clock % 1440)/60; S.hour = h; ST.lastHour = h; ST.resumeHour = typeof TITLE !== 'undefined' && TITLE.on ? h : null; try { syncTimeUI(); } catch (e){} }
+      if (d.clock){ const h = (ST.clock % 1440)/60; S.hour = h; ST.lastHour = h; ST.resumeHour = typeof TITLE !== 'undefined' && TITLE.on ? h : null; if (ST.resumeHour !== null) try { TITLE.setHour(h); } catch (e){} try { syncTimeUI(); } catch (e){} }
       else ST.lastHour = null;
       for (const [k, v] of d.known || []) KN.set(k, v);
       for (const [k, L] of d.logs || []) LOGS.set(k, L.map(e => Object.assign(e, { subject: k })));

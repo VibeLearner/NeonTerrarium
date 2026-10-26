@@ -428,7 +428,10 @@ function pmTick(){
 // being merged, it is being swept
 function pmBusy(c){
   const g = c.data.geo.get(ATLAS); if (!g) return false;
-  if (!NV.off() && !c.mega && !c.lift && g.userData.cut && c._nvGeo !== g && NV.dbReady) return true;
+  // (a plot built during play keeps its arrays for the never-seen job, which only runs while the view is still: a minute at most. Kept for good, every plot built while the
+  //  view kept moving held its arrays all session, the memory growing until a reload let them go (owner Oct 26: lag over a long session, better after a refresh). Past that the plot
+  //  is drawn whole, as a plot loaded with no result is)
+  if (!NV.off() && !c.mega && !c.lift && g.userData.cut && c._nvGeo !== g && NV.dbReady){ const w = g.userData.nvWait ?? (g.userData.nvWait = PM.frame); if (PM.frame - w < 3600) return true; c._nvGeo = g; }
   const k = mergeKey(c.i, c.j); if (solidDirty.has(k) || (SOLID_JOB && SOLID_JOB.key === k)) return true;
   return !!c.animating;
 }

@@ -85,8 +85,8 @@ function frameBody(now){
   updateHighways(dt, now/1000);
   updateMetros(dt, now/1000);
   PH.lap('vehicles, highways, metros');
-  updateVehicleShadows();
-  updateAnims(dt);
+  PH.subBegin(); updateVehicleShadows(); PH.sub('vehicle shadows');
+  updateAnims(dt); PH.sub('build animations');
   updateMegaFx(dt, now/1000);
   PH.lap('megastructures, animations');
   updatePeople(dt*FF.ppl, FF.peopleTime(rdt, now/1000));   // (fast forward: the people's own clock runs quicker too)

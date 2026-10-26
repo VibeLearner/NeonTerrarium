@@ -121,12 +121,20 @@ function cullFrame(camera = cam, area = camera){   // (for the camera about to d
 // Tune from the console (they take effect on the next frame): SD.v0 (px/frame where the first class goes), SD.step (each next class at this multiple),
 // SD.max (classes at most), SD.fast (px/frame where a fast spin may drop fastMax more classes), SD.cursorPx (full detail within this many px of the
 // cursor), SD.hys (margin round a threshold), SD.on = false.
-const SD = { on: true, v0: 6, step: 2, max: 2, fast: 40, fastMax: 1, cursorPx: 200, hys: .25, hist: [0, 0, 0, 0, 0, 0], top: 0, pieces: 0, moving: false,
+const SD = { on: true, tinyPx: 3, v0: 6, step: 2, max: 2, fast: 40, fastMax: 1, cursorPx: 200, hys: .25, hist: [0, 0, 0, 0, 0, 0], top: 0, pieces: 0, moving: false,
   dYaw: 0, dZoom: 0, dPitch: 0, pY: null, pZ: 0, pP: 0, list: [], stamp: -1 };
 function sdTrack(){   // every frame: how far the view turned, tilted and zoomed since the last one
   SD.dYaw = SD.pY === null ? 0 : yaw - SD.pY; SD.dZoom = SD.pY === null ? 0 : (zoom - SD.pZ)/zoom; SD.dPitch = SD.pY === null ? 0 : PITCH - SD.pP;
   SD.pY = yaw; SD.pZ = zoom; SD.pP = PITCH;
+  // (when the view last turned, tilted or zoomed, and since when without a break: merges wait for a turn to end, see flushSolid)
+  if (Math.abs(SD.dYaw) + Math.abs(SD.dZoom) + Math.abs(SD.dPitch) > 1e-6){ if (PM.frame - SD.turnAt > 2) SD.turnFrom = PM.frame; SD.turnAt = PM.frame; }
 }
+SD.turnAt = -99; SD.turnFrom = -99;
+// A turn, tilt or zoom under way (this frame or the last two), for at most SD.holdSec seconds: merges wait for it to end. A merge in a turn costs
+// its slices (1 to 5 ms a frame in the owner's turns, Oct 26), sends the new block to the card, and when it lands the static set changes, which the
+// turn's frames then pay for again (the speed-detail list, the live list). Once the view is still, merges get a bigger share (solidBudget).
+SD.holdSec = 4;
+const sdTurning = () => PM.frame - SD.turnAt <= 2 && PM.frame - SD.turnFrom < pmSec(SD.holdSec) && !(PH.tests.mergeInTurn || window.__MERGE_IN_TURN);
 const _sdVec = new THREE.Vector3(), _sdMat = new THREE.Matrix4();
 function sdApply(){   // for a frame drawn the old way: each plot's extra size classes, from how fast it moves
   CULL.sd = false;
@@ -1950,11 +1958,12 @@ function solidBudget(){
   const still = typeof NV !== 'undefined' && NV.still >= 30, fps = (typeof PM !== 'undefined' && PM.fps) || 60;
   return still && solidDirty.size > 6 && fps > 50 ? Math.max(base, 6 - FRAME_WORK) : base;
 }
+let SOLID_HELD = false;   // (merges waiting for a turn to end: the overlay's line)
 function flushSolid(){
   disposeTick();
   flushSuper();
   if (SYNC_NOW()){ solidFinish(); if (solidDirty.size){ for (const k of solidDirty){ try { rebuildSolid(k); } catch (e){ SOLID_FAIL.n++; if (SOLID_FAIL.n <= 3) console.warn('merging block ' + k + ' failed; its old merge stays drawn.', e); } } solidDirty.clear(); } }
-  else { solidRetry(); if (SOLID_JOB || solidDirty.size) solidStep(TIER.rush ? 14 : solidBudget());   /* (a quarter of a frame at most: 4 ms was half a frame on a 120 Hz screen) */ }
+  else { solidRetry(); SOLID_HELD = !TIER.rush && (SOLID_JOB || solidDirty.size) && sdTurning(); if (!SOLID_HELD && (SOLID_JOB || solidDirty.size)) solidStep(TIER.rush ? 14 : solidBudget());   /* (a quarter of a frame at most: 4 ms was half a frame on a 120 Hz screen) */ }
   tierRushDone();   // (a block's merge in steps over the frames, after the frame's other spread work)
   ovFlush();
 }

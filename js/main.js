@@ -16,9 +16,9 @@ const FRAME_ERR = { n: 0, last: '' };
 let IDLE_SKIP = false, TITLE_SKIP = false;
 const idleNow = now => S.idleRest && !PH.on && now - LAST_INPUT > 10000 && !dragging && !keys.size && Math.abs(yawT - yaw) < 1e-3 && Math.abs(zoomT - zoom) < 1e-3 && camT.distanceTo(camGoal) < 1e-3 && !anims.length && !STAGE_Q.length && !STAGE_READY.length && !STAGE_CHAINS.size;
 // what the hitch catcher (perfhud.js) notes with each frame: the cache, how fast the view turned, the speed classes, the shadow map, merges and tiers
-PH.state = () => 'cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + '; turned ' + (SD.dYaw*180/Math.PI).toFixed(2) + ' deg, speed classes ' + SD.hist.slice(0, 4).join('/') + ' (fastest ' + SD.top.toFixed(0) + ' px)'
+PH.state = () => 'cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + '; turned ' + (SD.dYaw*180/Math.PI).toFixed(2) + ' deg, speed classes ' + SD.hist.slice(0, 4).join('/') + ' (fastest ' + SD.top.toFixed(0) + ' px)' + (SC.tinyCulled ? ', ' + SC.tinyCulled + ' tiny things left out' : '')
   + '; shadows ' + (LIGHT_JUMP ? 'sun jumped' : shJob ? 'strip ' + shJob.k + ' of ' + shJob.K : 'kept')
-  + '; merges waiting ' + solidDirty.size + (SOLID_JOB ? ' (one under way)' : '') + ', tier changes ' + TIER.changes + ', to free ' + DISPOSE_Q.length + '; drag ' + (dragging ? 'held' : 'off');
+  + '; merges waiting ' + solidDirty.size + (SOLID_JOB ? ' (one under way)' : '') + (SOLID_HELD ? ' (held: the view is turning)' : '') + ', tier changes ' + TIER.changes + ', to free ' + DISPOSE_Q.length + '; drag ' + (dragging ? 'held' : 'off');
 function frame(now){
   requestAnimationFrame(frame);
   if (typeof OVERSEER !== 'undefined' && OVERSEER.hold) return;   // (the Overseer's desk covers the screen: the city waits)
@@ -150,7 +150,8 @@ function frameBody(now){
     renderer.setRenderTarget(rtC); renderer.setClearColor(0x000000, 1);
     if (MRT) mrtBegin();   // the normal image is drawn along with the colors (core.js, sky.js)
     sdApply();   // the old way's frames: plots that move fast on screen lose their smallest triangles (world.js, speed-based detail)
-    cam.layers.enableAll(); cam.layers.disable(6); SC.drawView(() => renderer.render(scene, cam), SC.mode === 'oldview');   // (layer 6: the glow overlay, for the cache's frames only)
+    scTinyCull();   // and while it turns, still live things too small to make out are left out (staticcache.js)
+    cam.layers.enableAll(); cam.layers.disable(6); try { SC.drawView(() => renderer.render(scene, cam), SC.mode === 'oldview'); } finally { scLiveRestore(); }   // (layer 6: the glow overlay, for the cache's frames only)
     cam.layers.enableAll(); CULL.sd = false;
     if (MRT) mrtEnd();
   }

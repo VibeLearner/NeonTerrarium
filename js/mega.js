@@ -35,7 +35,7 @@ const MEGA_TYPES = {
            colour: '#5affa8', build: buildWireNest, fx: wireNestFx },
   emitter: { name: 'Emitter Core', need: { any: 120 }, after: ['spire'], odds: 25, w: 2, h: 2, maxLevels: 1,   // the forcefield emitter: 120 buildings and the Data Spire, then a 1 in 25 chance with each build; more can be placed from the menu (their fields join)
            colour: '#7ab8ff', build: buildEmitterCore, fx: emitterFx },
-  lidar: { name: 'LIDAR Array', need: { lowPlots: 12 }, after: ['police'], odds: 6, w: 3, h: 3, maxLevels: 1,   // the scanner: 12 residential buildings and the police station, then a 1 in 6 chance with each build; it unlocks Furnish pod for the homes in its range (furnish.js)
+  lidar: { name: 'LIDAR Array', need: { lowPlots: 50, highPlots: 50 }, after: ['police'], odds: 10, w: 3, h: 3, maxLevels: 1,   // the scanner: 50 residential and 50 luxury buildings and the police station, then a 1 in 10 chance with each build; it unlocks Furnish pod for the homes in its range (furnish.js)
            colour: '#46d4ee', build: buildLidarArray, fx: lidarFx },
   club: { name: 'Neon Dome', need: { highPlots: 30, midPlots: 30, lowPlots: 30 }, odds: 1, w: 4, h: 4, maxLevels: 1,   // arrives once there are 30 each of luxury, commercial and residential buildings
            colour: '#c070ff', build: buildNeonDome, fx: clubFx },

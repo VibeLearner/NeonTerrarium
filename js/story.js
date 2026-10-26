@@ -1216,10 +1216,16 @@ const STORY = (() => {
       localStorage.setItem(KEY, JSON.stringify(data));
     } catch (e){}
   }
+  addEventListener('pagehide', () => { if (ST.on) save(); });   // (the hour the city is left at, to the minute)
   function restore(){
     try {
       const raw = localStorage.getItem(KEY); if (!raw) return; const d = JSON.parse(raw); if (!d || d.v !== 1) return;
-      ST.clock = d.clock || 0; ST.lastHour = null;   // (the saved day, set again to the city's hour on the next frame: this loads after the first frames, and kept as saved the game clock ran hours off the sky's, the Precinct desk showing a different time, owner Oct 26)
+      // the city picks up at the hour it was left at: the sky's hour (not saved on its own; every load used to open at 15:30) is set from the saved
+      // clock, so the two agree and nothing is skipped. This loads after the first frames: kept apart, the game clock ran hours off the sky's,
+      // the storylets choosing by one hour while the people and the sky went by the other (and the Precinct desk showed a different time, Oct 26)
+      ST.clock = d.clock || 0;
+      if (d.clock){ const h = (ST.clock % 1440)/60; S.hour = h; ST.lastHour = h; ST.resumeHour = typeof TITLE !== 'undefined' && TITLE.on ? h : null; try { syncTimeUI(); } catch (e){} }
+      else ST.lastHour = null;
       for (const [k, v] of d.known || []) KN.set(k, v);
       for (const [k, L] of d.logs || []) LOGS.set(k, L.map(e => Object.assign(e, { subject: k })));
       for (const [k, n] of d.notes || []) NOTES.set(k, n);

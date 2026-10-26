@@ -240,7 +240,8 @@ const TITLE = (() => {
   // moved on for 20 s
   let progVal = null, progAt = 0, loadedAt = null;
   function stalled(now){
-    let v = ''; try { v = [LOADP.on, LOADP.phase, LOADP.placed, LOADP.cool > 0, pplReady].join(); } catch (e) {}
+    // (anything moving counts: plots placed, the megastructures and the regions' plants and lights after them, the cool-down counting, the people, a merge)
+    let v = ''; try { v = [LOADP.on, LOADP.phase, LOADP.placed, LOADP.cool, LOADP.megaQ && LOADP.megaQ.length, LOADP.ready && LOADP.ready.length, LOADP.inflight && LOADP.inflight.size, pplReady, solidDirty.size, SOLID_JOB && SOLID_JOB.key].join(); } catch (e) {}
     if (v !== progVal){ progVal = v; progAt = now; } return now - progAt > 20000;
   }
   function settled(now){
@@ -523,7 +524,8 @@ const TITLE = (() => {
   // the window. The first button says how far the loading has got, and only lets the player in once the plots are all in and the people are
   // out; a city just opened from the Cities list is named on it ("Enter Harbor Row")
   let OPENING = null; try { OPENING = sessionStorage.getItem('neonTerrarium.opening'); sessionStorage.removeItem('neonTerrarium.opening'); } catch (e) {}
-  const canEnter = () => { const now = performance.now(); return (OPEN >= 1 || reduced) && (settled(now) || stalled(now)); };   // (the same as the shutter: the city loaded, or a load that has stopped getting anywhere)
+  let canGo = false;   // (once the way in is open it stays open: a merge starting again must not turn it back to Loading)
+  const canEnter = () => { if (canGo) return true; const now = performance.now(); return (canGo = (OPEN >= 1 || reduced) && (settled(now) || stalled(now))); };   // (the same as the shutter: the city loaded, or a load that has stopped getting anywhere)
   function menuState(){
     // (the percentage: the plots are 95 of it; the people, the plants and the merges the rest)
     if (!T.on) return; const b = menu.querySelector('[data-act="continue"]'); if (!b) return; const sp = b.querySelector('span') || b;

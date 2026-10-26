@@ -235,10 +235,25 @@ const TITLE = (() => {
   // (a city with nothing built yet has nobody to wait for: a new one, or one just started)
   const builtNone = () => { try { for (const c of cells.values()) if (c.sections.length || c.mega) return false; return true; } catch (e) { return false; } };
   const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady || builtNone()); } catch (e) { return true; } };
+  // Loaded: the plots are all in, the people out, and the blocks merged (or ten seconds since the rest, merges can go on a while). The shutter used to give up after 15 s and open
+  // on a city still building (owner Oct 26: it opened before the game had loaded); now it waits as long as the load is getting somewhere, and only gives up when nothing has
+  // moved on for 20 s
+  let progVal = null, progAt = 0, loadedAt = null;
+  function stalled(now){
+    // (anything moving counts: plots placed, the megastructures and the regions' plants and lights after them, the cool-down counting, the people, a merge)
+    let v = ''; try { v = [LOADP.on, LOADP.phase, LOADP.placed, LOADP.cool, LOADP.megaQ && LOADP.megaQ.length, LOADP.ready && LOADP.ready.length, LOADP.inflight && LOADP.inflight.size, pplReady, solidDirty.size, SOLID_JOB && SOLID_JOB.key].join(); } catch (e) {}
+    if (v !== progVal){ progVal = v; progAt = now; } return now - progAt > 20000;
+  }
+  function settled(now){
+    if (!cityReady()){ loadedAt = null; return false; }
+    if (loadedAt === null) loadedAt = now;
+    let merging = false; try { merging = !!(solidDirty.size || SOLID_JOB); } catch (e) {}
+    return (!merging && now - loadedAt > 500) || now - loadedAt > 10000;
+  }
   let shutR = null, shutCam = null, shutScene = null;
   function drawShutter(now){
     // the shutter is the loading screen: it opens once the city has loaded and the Furnish page is warm (its shaders compiled), so neither costs anything later
-    if (openFrom === null && shutR && now - shownAt > 900 && ((cityReady() && furnReady()) || now - shownAt > (cityReady() ? 60000 : 15000))) openFrom = now + 300;   // (never stuck shut: 15 s for the city, 60 s with the Furnish warm-up)
+    if (openFrom === null && shutR && now - shownAt > 900){ const ok = settled(now); if ((ok && (furnReady() || now - shownAt > 60000)) || stalled(now)) openFrom = now + 300; }   // (never stuck shut: 60 s at most for the Furnish warm-up once the city has loaded, and a load that stops getting anywhere for 20 s)
     const tt = openFrom === null ? 0 : Math.max(0, Math.min(1, (now - openFrom)/3200)); OPEN = reduced ? (openFrom === null ? 0 : 1) : tt*tt*(3 - 2*tt);
     // the room is dark while it's shut (only what light leaks in, and its own lamps), and the daylight comes up with the plates
     const lit = .3 + .7*Math.pow(OPEN, .8); DIM = lit; if (Math.abs(lit - (drawShutter.lit || 0)) > .004){ drawShutter.lit = lit; const f = lit >= .999 ? '' : 'brightness(' + lit.toFixed(3) + ') saturate(' + (.7 + .3*lit).toFixed(3) + ')'; for (const el of (RTMODE ? [shutCv, stage.querySelector('.t-live')] : [imRoom, imGlass, imOff, shutCv, stage.querySelector('.t-live')])) if (el) el.style.filter = f; }
@@ -509,14 +524,14 @@ const TITLE = (() => {
   // the window. The first button says how far the loading has got, and only lets the player in once the plots are all in and the people are
   // out; a city just opened from the Cities list is named on it ("Enter Harbor Row")
   let OPENING = null; try { OPENING = sessionStorage.getItem('neonTerrarium.opening'); sessionStorage.removeItem('neonTerrarium.opening'); } catch (e) {}
-  let openAt = null;
-  // (the shutter itself waits for the city, but gives up after a while: the way in waits for the city too, never longer than 20 s more)
-  const canEnter = () => { const open = OPEN >= 1 || reduced; if (!open){ openAt = null; return false; } if (openAt === null) openAt = performance.now(); return cityReady() || performance.now() - openAt > 20000; };
+  let canGo = false;   // (once the way in is open it stays open: a merge starting again must not turn it back to Loading)
+  const canEnter = () => { if (canGo) return true; const now = performance.now(); return (canGo = (OPEN >= 1 || reduced) && (settled(now) || stalled(now))); };   // (the same as the shutter: the city loaded, or a load that has stopped getting anywhere)
   function menuState(){
+    // (the percentage: the plots are 95 of it; the people, the plants and the merges the rest)
     if (!T.on) return; const b = menu.querySelector('[data-act="continue"]'); if (!b) return; const sp = b.querySelector('span') || b;
     let txt, busy = !canEnter();
     if (!busy) txt = OPENING ? 'Enter ' + OPENING : 'Continue';
-    else { let pct = null; try { if (LOADP.on && LOADP.total) pct = Math.round(LOADP.placed/LOADP.total*100); } catch (e) {} txt = b.dataset.wait ? 'Entering when ready…' : (OPENING ? 'Loading ' + OPENING : 'Loading city') + (pct !== null ? ' · ' + pct + '%' : '…'); }
+    else { let pct = null; try { if (LOADP.on && LOADP.total) pct = Math.min(99, Math.round(LOADP.placed/LOADP.total*95)); else if (!LOADP.on) pct = 99; } catch (e) {} txt = b.dataset.wait ? 'Entering when ready…' : (OPENING ? 'Loading ' + OPENING : 'Loading city') + (pct !== null ? ' · ' + pct + '%' : '…'); }
     if (sp.textContent !== txt) sp.textContent = txt;
     b.classList.toggle('t-busy', busy); if (busy) b.setAttribute('aria-busy', 'true'); else if (b.hasAttribute('aria-busy')){ b.removeAttribute('aria-busy'); if (OPENING && document.activeElement !== b) b.focus({ preventScroll: true }); }
   }

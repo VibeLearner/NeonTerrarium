@@ -29,7 +29,7 @@ const TRAILER = (() => {
   /* ---------- timing (Bytes as it is: its first drop hits at 21.93 s) ---------- */
   const LEN = 68.5, DROP1 = 21.93;
   const MK = { swoop: 8.4, p: [9.9, 15.9, DROP1], leave: 23.4, furnBy: 28.2, glIn: 36.6, coastIn: 37.04, glOut: 41.61, coastOut: 41.95,
-    coastWake: 35.6, ride: 41.95, wall: 54.45, back: 56.5, zoomed: 61.0, lit: 62.5, logo: 64.0, end: LEN };
+    coastWake: 35.6, ride: 41.95, wall: 55.0, back: 56.6, zoomed: 61.0, lit: 62.5, logo: 64.0, end: LEN };
 
   /* ---------- small maths ---------- */
   const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
@@ -47,7 +47,10 @@ const TRAILER = (() => {
   const N = 10;
   const SECT = [{ zone: 'low', i0: -14, j0: -14 }, { zone: 'mid', i0: 0, j0: -14 }, { zone: 'high', i0: 0, j0: 0 }, { zone: 'ind', i0: -14, j0: 0 }];
   const MEGAS = [['police', -14, -14, 3, 3], ['club', 5, -14, 4, 4], ['pagoda', 5, 4, 4, 5], ['foundry', -14, 3, 4, 6]];
-  const MT_WAY = [[-6, 0], [-6, -6], [1, -6], [1, 1], [-5, 1]], MT_STOPS = [[-5, -6], [0, -6], [1, 0]];
+  // the metro winds through the middle of all four sectors: up through the industrial sector, through the residential sector and back on itself,
+  // across into the commercial sector, zigzagging down through it, and on through the luxury sector (well clear of the landmarks and the garden)
+  const MT_WAY = [[-9, 8], [-9, 4], [-6, 4], [-6, -13], [-10, -13], [-10, -14], [2, -14], [2, -9], [4, -9], [4, -6], [7, -6], [7, 1], [2, 1], [2, 8]];
+  const MT_STOPS = [[-9, 6], [-6, -9], [2, -11], [7, -2], [4, 1]];
   const CENTER = { x: -2.5*LOT, z: -2.5*LOT };
   // the garden: an open lawn in the residential sector with low tenements round it, so the people on it are always in view
   const PARK = { i0: -11, j0: -11, n: 4, ring: 1, floors: 4 };
@@ -59,11 +62,11 @@ const TRAILER = (() => {
   // sector (the Neon Dome, the market mall and tall towers behind), open sky, then the dense city, whose front edge is a wall of towers
   const RJ = 45;
   const RIDE_IND = { i0: -26, i1: -19, j0: 41, j1: 50, zone: 'ind' }, RIDE_COM = { i0: -18, i1: -9, j0: 41, j1: 51, zone: 'mid' };
-  const DENSE = { i0: -1, i1: 20, j0: 34, j1: 57 }, WALL = { i0: -1, i1: 8, j0: 42, j1: 44 };
+  const DENSE = { i0: -1, i1: 29, j0: 29, j1: 57 }, WALL = { i0: -1, i1: 10, j0: 42, j1: 44 };
   const RIDE_MEGAS = [['foundry', -25, 47, 6, 4], ['club', -17, 47, 4, 4], ['market', -12, 47, 4, 4], ['club', 13, 50, 4, 4]];
   const RIDE_CUTS = [[-22, 44, 'ind'], [-15, 44, 'mid'], [-11, 44, 'mid']];   // (a few tall ones in front: the view is cut as they pass)
-  const RIDE_MT = [[-26, RJ], [20, RJ]];
-  const DENSE_C = { x: 9.5*LOT, z: 45.5*LOT };
+  const RIDE_MT = [[-26, RJ], [38, RJ]];
+  const DENSE_C = { x: 12*LOT, z: 42*LOT };
   const inBox = (b, i, j) => i >= b.i0 && i <= b.i1 && j >= b.j0 && j <= b.j1;
   function lineTiles(way){
     const t = [];
@@ -84,30 +87,32 @@ const TRAILER = (() => {
     let n = 0;
     const put = (i, j, f) => { const c = newCell(i, j); c.style = DEFAULT_STYLE; c.green = 'some'; f(c); cells.set(ckey(i, j), c); n++; };
     // the opening city
+    // (lawns only in the garden: everywhere else is built on, low under the metro so it fits beneath the track)
     for (const s of SECT) for (let i = s.i0; i < s.i0 + N; i++) for (let j = s.j0; j < s.j0 + N; j++) put(i, j, c => {
-      if (onTrack.has(i + ',' + j) || inPark(i, j)) { c.green = 'grass'; return; }
+      if (inPark(i, j)) { c.green = 'grass'; return; }
       if (inMega(i, j)) return;
+      if (onTrack.has(i + ',' + j)){ c.sections = secs(s.zone, 1, 2); return; }
       if (nearPark(i, j)){ c.sections = secs('low', 1, PARK.floors); return; }
       const u = R();
-      if (u < .1) c.green = 'grass'; else c.sections = secs(s.zone, u < .58 ? 1 : u < .9 ? 2 : 3);
+      c.sections = secs(s.zone, u < .55 ? 1 : u < .88 ? 2 : 3);
     });
     // the ride's two sectors: low in front of the track (a few tall ones to cut across), the track on a lawn, a lawn row behind it, then the
     // landmarks and tall buildings at the back
     for (const b of [RIDE_IND, RIDE_COM]) for (let i = b.i0; i <= b.i1; i++) for (let j = b.j0; j <= b.j1; j++) put(i, j, c => {
-      if (onTrack.has(i + ',' + j) || j === RJ + 1) { c.green = 'grass'; return; }
       if (inMega(i, j)) return;
+      if (onTrack.has(i + ',' + j) || j === RJ + 1) { c.sections = secs(b.zone, 1, 2); return; }   // (low under the track and just behind it)
       const cut = RIDE_CUTS.find(([ci, cj]) => ci === i && cj === j);
       if (cut){ c.sections = secs(cut[2], 3); return; }
-      if (j < RJ){ c.sections = R() < .15 ? [] : secs(b.zone, 1, 2); if (!c.sections.length) c.green = 'grass'; return; }
+      if (j < RJ){ c.sections = secs(b.zone, 1, 2); return; }
       c.sections = secs(b.zone, j >= b.j1 - 1 ? 3 : R() < .5 ? 2 : 3);
     });
     // the dense city: mostly commercial neon and tenements, a little industry, hardly any white luxury; its front edge a wall of towers
     for (let i = DENSE.i0; i <= DENSE.i1; i++) for (let j = DENSE.j0; j <= DENSE.j1; j++) put(i, j, c => {
-      if (onTrack.has(i + ',' + j)) { c.green = 'grass'; return; }
       if (inMega(i, j)) return;
-      if (inBox(WALL, i, j)){ c.sections = secs(R() < .7 ? 'mid' : 'low', R() < .5 ? 3 : 4); return; }
-      const u = R(), z = u < .55 ? 'mid' : u < .86 ? 'low' : u < .96 ? 'ind' : 'high';
-      if (R() < .04) c.green = 'grass'; else { const v = R(); c.sections = secs(z, v < .2 ? 1 : v < .65 ? 2 : 3); }
+      if (inBox(WALL, i, j)){ c.green = 'none'; return; }   // (the arcology stands here: see ARCO)
+      if (onTrack.has(i + ',' + j)){ c.sections = secs('mid', 1, 2); return; }
+      const u = R(), z = u < .55 ? 'mid' : u < .86 ? 'low' : u < .96 ? 'ind' : 'high', v = R();
+      c.sections = secs(z, v < .2 ? 1 : v < .65 ? 2 : 3);
     });
     for (const [kind, i, j, w, h] of allMegas){ const m = placeMega(kind, i, j, Math.floor(R()*1e9), w, h, 1); if (!m) warn('megastructure ' + kind + ' at ' + i + ',' + j, 'did not fit'); }
     const mk = (t, stops) => ({ id: mtNext++, tiles: t, done: true, st: stops.map(([i, j]) => t.findIndex(x => x.i === i && x.j === j)).filter(k => k > 0 && k < t.length - 1), sides: {} });
@@ -116,10 +121,35 @@ const TRAILER = (() => {
     rebuildAll(); finishSync();
     safe('metro', () => { mtCommit(l, []); mtCommit(lr, []); }); finishSync();
     RIDE.l = lr;
+    safe('arcology', arcology);
     TR.info.city = { plots: n, megas: megas.size, metros: metros.length };
     say('city built:', JSON.stringify(TR.info.city));
   }
   TR.city = () => safe('city', city);
+
+  // It is what wipes day into night on the ride: wider than the frame and taller than it at the ride's zoom, so for a moment it is all there
+  // is to see. A stepped skyline, a grid of windows (the game's lit-window material, so they come on with the city's lights), neon bands
+  const ARCO = { x0: (WALL.i0 - .5)*LOT, x1: (WALL.i1 + .5)*LOT, z0: (WALL.j0 - .5)*LOT, z1: (WALL.j1 + .5)*LOT, h: 27 };
+  function arcology(){
+    const R = mulberry32(31337), G = new THREE.Group(), y0 = CURB;
+    const W = ARCO.x1 - ARCO.x0, D = ARCO.z1 - ARCO.z0, cx = (ARCO.x0 + ARCO.x1)/2, cz = (ARCO.z0 + ARCO.z1)/2;
+    const add = (g, m, x, y, z) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; G.add(o); return o; };
+    add(new THREE.BoxGeometry(W, ARCO.h, D), M.slabSide, cx, y0 + ARCO.h/2, cz);
+    // the skyline: towers rising off the block
+    const towers = [[.08, .16, 9], [.3, .12, 14], [.5, .2, 7], [.72, .14, 12], [.9, .12, 9]];
+    for (const [f, wf, hh] of towers) add(new THREE.BoxGeometry(W*wf, hh, D*.7), M.slabSeam, ARCO.x0 + W*f, y0 + ARCO.h + hh/2, cz + D*.08);
+    // windows on the faces the camera sees (south and west): small panes, most lit at night, a few dark
+    const lit = [], dark = [], strips = [[], []];
+    const pane = (x, y, z, ry) => { const g = new THREE.PlaneGeometry(.5, .55); g.rotateY(ry); g.translate(x, y, z); (R() < .72 ? lit : dark).push(g); };
+    for (let y = y0 + 1.4; y < y0 + ARCO.h - .8; y += 1.05) for (let x = ARCO.x0 + .7; x < ARCO.x1 - .5; x += .95) if (R() > .06) pane(x, y, ARCO.z0 - .02, Math.PI);
+    for (let y = y0 + 1.4; y < y0 + ARCO.h - .8; y += 1.05) for (let z = ARCO.z0 + .7; z < ARCO.z1 - .5; z += .95) if (R() > .06) pane(ARCO.x0 - .02, y, z, -Math.PI/2);
+    // neon bands across the south face every few floors, pink and cyan
+    for (let k = 0, y = y0 + 4.6; y < y0 + ARCO.h - 2; y += 6.3, k++){ const g = new THREE.BoxGeometry(W - .4, .14, .08); g.translate(cx, y, ARCO.z0 - .06); strips[k % 2].push(g); }
+    const merge = list => list.length ? THREE.BufferGeometryUtils.mergeBufferGeometries(list) : null;
+    for (const [list, m] of [[lit, M.winLit], [dark, M.glassDark], [strips[0], M.neonPink], [strips[1], M.neonCyan]]){ const g = merge(list); if (g){ const o = new THREE.Mesh(g, m); G.add(o); } }
+    scene.add(G); ARCO.g = G;
+    try { SC_DIRTY.unknown = true; shadowDirty = true; } catch (e) {}
+  }
 
   // the opening shot builds the city out: new plots grow from each sector's outer edges into the open sky until the city fills the frame,
   // each with the game's own build sweep, some stacked a section higher a moment later
@@ -207,6 +237,7 @@ const TRAILER = (() => {
     safe('resolution', () => { ZOOM_RES = 0; TR.pinRes = true; H = 0; applyRenderRes(zoom); });
     safe('story', () => { if (STORY.engine === false) STORY.setEngine(true); });
     safe('cases', () => { if (typeof CASES !== 'undefined'){ CASES.paused = true; CASES.noStage = true; } });
+    FURN.lightCity = false;   // (the apartment's city in full detail out to 46 units, not 18: furnish.js)
   }
 
   /* ---------- people helpers ---------- */
@@ -372,7 +403,15 @@ const TRAILER = (() => {
     if (b) b.click(); else FURN.close();
     setTimeout(() => { if (FURN.open || FURN.hold) FURN.close(); }, 900);
   }
-  function labOrbit(dt){ const B = labB(); if (!B || labBusy()) return; B.az += .14*dt; B.camDirty = true; B.needs = true; }
+  // the city round the apartment drawn sharp: the lab blends its backdrop with blurred copies by distance (a depth-of-field pass, its kMin and
+  // range set on every bake), so each time that pass is drawn its blur is taken to nothing and its haze thinned
+  function labSharp(){
+    const B = labB(); if (!B || !B.dr || B.dr._trSharp) return;
+    const R = B.dr, render = R.render.bind(R); R._trSharp = true;
+    R.render = (sc, c) => { const m = sc && sc.children && sc.children[0] && sc.children[0].material, u = m && m.uniforms;
+      if (u && u.kMin && u.range && u.hazeK){ u.kMin.value = 0; u.range.value = 1e6; u.hazeK.value = Math.min(u.hazeK.value, .25); }
+      return render(sc, c); };
+  }
   // a point in the room to the lab's canvas, for the pointer: its camera's view and projection by hand (the frame runs its own three.js)
   function labScreen(B, x, y, z){
     const V = B.cam.matrixWorldInverse.elements, P = B.cam.projectionMatrix.elements;
@@ -608,7 +647,7 @@ const TRAILER = (() => {
   let sub = null, backFrom = null;
   const who = t => t < MK.p[1] ? 0 : t < MK.p[2] ? 1 : 2;
   const turntable = t => ({ x: CENTER.x, z: CENTER.z, y: TARGET_Y, yaw: .35 + 1.3*ease(t/10), zoom: elerp(33, 26.5, ss(t/MK.swoop)), pitch: 33*DEG });
-  const RIDE_YAW = Math.PI, RIDE_PITCH = 11*DEG, RIDE_ZOOM = 6;
+  const RIDE_YAW = Math.PI, RIDE_PITCH = 11*DEG, RIDE_ZOOM = 9.5;
   function camAt(t, dt){
     const c = TR.c;
     if (t < MK.swoop) Object.assign(CAM, turntable(t));
@@ -629,7 +668,7 @@ const TRAILER = (() => {
       if (!backFrom) backFrom = Object.assign({}, CAM);
       const u = ease(seg(t, MK.back, MK.zoomed)), v = seg(t, MK.back, LEN);
       Object.assign(CAM, { x: lerp(backFrom.x, DENSE_C.x, u), z: lerp(backFrom.z, DENSE_C.z, u), y: lerp(backFrom.y, TARGET_Y, u),
-        yaw: backFrom.yaw + .75*u + .12*v, zoom: elerp(backFrom.zoom, 33, u), pitch: lerp(backFrom.pitch/DEG, 36, u)*DEG });
+        yaw: backFrom.yaw + .75*u + .12*v, zoom: elerp(backFrom.zoom, 30, u), pitch: lerp(backFrom.pitch/DEG, 36, u)*DEG });
     }
     camGoal.set(CAM.x, CAM.y, CAM.z); camT.copy(camGoal);
     yaw = yawT = CAM.yaw; zoom = zoomT = CAM.zoom; PITCH = pitchT = CAM.pitch;
@@ -668,7 +707,7 @@ const TRAILER = (() => {
     [.6, 1.7, 2.8, 3.9].forEach((d, s) => at(t0_ + d, () => revealStep(k, s), 'reveal ' + (k + 1) + '.' + (s + 1)));
   });
   at(MK.leave, () => goHome(), 'heads home');
-  at(MK.furnBy, () => openHome(), 'apartment (latest)');
+  at(MK.furnBy + .6, () => openHome(), 'apartment (latest)');
   at(MK.coastWake, () => coastWake(true), 'coast wakes');
   at(MK.coastIn, () => { if (FURN.open || FURN.hold) labExit(); for (const sc of TR.gsc || []) safe('garden end', () => STORY.endScene(sc, 'done')); }, 'apartment closes behind the coast');
   at(MK.coastOut, () => { glitchOff(); flash(.45); coastWake(false); LK.setWeather('clear', true, true); }, 'the ride');
@@ -742,8 +781,8 @@ const TRAILER = (() => {
     while (fired < EV.length && EV[fired].t <= t){ const e = EV[fired++]; safe(e.name, e.f); TR.log.push(t.toFixed(2) + ' ' + e.name); }
     paint(t);
     if (t >= MK.p[0] && !TR.furnOpened) safe('brackets', () => brackets(TR.c.pairs[who(t)].A)); else TR.el.sel.style.display = 'none';
-    if (t >= MK.leave + 1.5 && !TR.furnOpened && inHome()) openHome();
-    if (TR.furnOpened && t < MK.coastIn && FURN.open){ safe('lab', labClean); safe('orbit', () => labOrbit(dt)); safe('furnish', () => labFurnish(t)); }
+    if (!TR.furnOpened && t >= MK.leave + 1.5){ if (inHome()){ if (TR.inT === undefined) TR.inT = t; if (t - TR.inT > .8) openHome(); } }   // (through the door and gone, then the apartment)
+    if (TR.furnOpened && t < MK.coastIn && FURN.open){ safe('lab', labClean); safe('sharp', labSharp); safe('furnish', () => labFurnish(t)); }
     if (t >= MK.coastWake && t < MK.coastOut) coastDrift(t);
     if (FURN.hold && !(TR.furnOpened && t < MK.coastIn + 1.2)) safe('furnish', () => FURN.close());
   }

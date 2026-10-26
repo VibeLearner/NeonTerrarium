@@ -5,12 +5,12 @@ It is played by the game itself: open the game with `#trailer` at the end of the
 
 | Time | Shot |
 |---|---|
-| 0 to 8.4 s | Four sectors joined by a metro, turning while the morning comes up; about a hundred buildings are placed round their edges with the game's build animation until the city fills the frame |
+| 0 to 8.4 s | Four sectors with a metro winding through all of them, turning while the morning comes up; about a hundred buildings are placed round their edges with the game's build animation until the city fills the frame |
 | 8.4 to 27.9 s | The camera dives into a garden; the person cam goes through three people there (about six seconds each), its log filling in from what they say. The third says goodnight and walks into their building |
 | 27.9 to 36.6 s | Their apartment opens in Furnish pod: the hologram scan, then a piece of furniture, a ceiling light and a plant on a table are set down while the room turns |
-| 36.6 to 41.95 s | A glitch into the coast: a town over the cliffs and the land behind them, at midday, seen whole (waves and shorebirds), and a glitch out |
-| 41.95 s | A metro seen from the side, past the foundry and factories, the Neon Dome, the market mall and towers, then out over the clouds at golden hour |
-| 54.45 s | A wall of towers cuts across: behind it it is night. The camera pulls back over a dense neon city in the dark |
+| 36.6 to 41.95 s | A glitch into the coast: a town over the cliffs and the land behind them, at midday, seen whole (shorebirds), and a glitch out |
+| 41.95 s | A metro seen from the side (a little zoomed out, so the landmarks show whole), past the foundry and factories, the Neon Dome, the market mall and towers, then out over the clouds at golden hour |
+| 55 s | A long arcology at the dense city's edge sweeps across and fills the frame: behind it it is night. The camera pulls back over the dense neon city in the dark, the city and the metro running on past the edges of the frame |
 | 61 s | The city's lights flicker on |
 | 64 s | The logo |
 

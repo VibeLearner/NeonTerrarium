@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Coast flash sound for the trailer: waves and shorebirds, made entirely in code.
+"""Coast sound for the trailer: shorebirds and the glitches in and out, made entirely in code (the waves are generated but left out of the mix).
 
 No samples and no AI audio: every sound here is noise and sine waves shaped by hand.
 Writes assets/audio/trailer/coast_flash.wav, a short stereo clip that starts at
@@ -174,10 +174,10 @@ def glitches():
 
 
 # ---------- mix ----------
-mix = sea*.42 + birds*.32
+mix = birds*.32   # (shorebirds only: the waves were taken out, Oct 26; the sea code above stays for reference)
 window = env(FLASH_IN - .3, FLASH_OUT + .02, .3, .12)     # hard-ish cut in, quick tuck under the drop
 mix *= window[:, None]
-mix = mix/np.abs(mix).max()*10**(-3/20)                     # the sea and birds peak at -3 dBFS; level is set in the mixer
+mix = mix/np.abs(mix).max()*10**(-6/20)                     # the birds peak at -6 dBFS; level is set in the mixer
 gl = glitches(); mix += gl/max(1e-9, np.abs(gl).max())*.42    # the glitches on top, a little under the sea's peak
 mix = np.clip(mix, -.98, .98)
 os.makedirs(os.path.dirname(OUT), exist_ok=True)

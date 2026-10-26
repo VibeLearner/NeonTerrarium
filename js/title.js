@@ -199,7 +199,7 @@ const TITLE = (() => {
     return out; };
   T._rt = () => RT;
   T._hold = () => { shownAt = 1e15; openFrom = null; };
-  T._open = () => { openFrom = -1e9; }; T._hour = h => { HOUR = h; }; T._dbg = () => ({ OPEN, sunH, sunW, RTMODE, rt: !!RT, p: RT && ROOM ? lightParams() : null });   // (testing: keep the shutter shut)
+  T._open = () => { openFrom = -1e9; }; T._hour = h => { HOUR = h; }; T._dbg = () => ({ TOD, HOUR, OPEN, sunH, sunW, RTMODE, rt: !!RT, p: RT && ROOM ? lightParams() : null });   // (testing: keep the shutter shut)
   const furnReady = () => { try { return typeof FURN === 'undefined' || !FURN.warmed || FURN.warmed(); } catch (e) { return true; } };
   const cityReady = () => { try { return (typeof LOADP === 'undefined' || (!LOADP.on && !(LOADP.cool > 0))) && (typeof pplReady === 'undefined' || pplReady); } catch (e) { return true; } };
   let shutR = null, shutCam = null, shutScene = null;
@@ -342,13 +342,22 @@ const TITLE = (() => {
   function restoreScene(){
     if (!was) return;
     try {
-      // (the hour the saved city was left at, if the story clock came back while the title was up: story.js restore)
-      const rh = typeof STORY !== 'undefined' ? STORY.resumeHour : null; if (rh !== null && rh !== undefined){ STORY.resumeHour = null; S.hour = rh; } else S.hour = was.hour;
+      // (once the story clock is going, the hour stays as it is: it's the saved city's, set while the title was up (story.js restore), and putting
+      //  back an earlier one, even a few minutes, the story clock reads as the next day)
+      if (typeof STORY !== 'undefined' && STORY.on && STORY.lastHour !== null){ if (STORY.resumeHour != null) STORY.resumeHour = null; } else S.hour = was.hour;
       S.cycle = was.cycle;   // (the camera stays where the title left it: the window's view, now the game's)
       if (was.wx && typeof LK !== 'undefined'){ if (was.wx.mode === 'auto') LK.setAutoWeather(true, true); else LK.setWeather(was.wx.set, false, true); }
     } catch (e) {}
     was = null;
   }
+  // the city's hour came back from the save while the title was up (story.js restore: it loads a moment after the title shows): the room is lit
+  // for that hour instead, the light through the shutter, the sun's pictures and the clouds, and Continue keeps it
+  T.setHour = h => {
+    if (!T.on) return; HOUR = h; if (was) was.hour = h;
+    const tod = pickTime(h); if (tod === TOD) return; TOD = tod; preload(tod);
+    if (!RTMODE && RAW){ A = {}; for (const v of ['wide', 'tall']) A[v] = RAW[v][TOD] || RAW[v].morning; }
+    view = null; try { layout(); } catch (e) {} if (live){ live.time(); if (view) live.view(view); }
+  };
   T.show = async () => {
     if (T.on) return; T.on = true; try { if (scWas === null){ scWas = SC.mode; SC.mode = 'off'; } } catch (e) {}   // (the city's still-parts cache: it held frames while the pod turned slowly, so the city stepped)
     document.documentElement.classList.add('title-on'); root.hidden = false; root.classList.remove('leaving');

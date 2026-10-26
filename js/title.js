@@ -342,7 +342,9 @@ const TITLE = (() => {
   function restoreScene(){
     if (!was) return;
     try {
-      S.hour = was.hour; S.cycle = was.cycle;   // (the camera stays where the title left it: the window's view, now the game's)
+      // (the hour the saved city was left at, if the story clock came back while the title was up: story.js restore)
+      const rh = typeof STORY !== 'undefined' ? STORY.resumeHour : null; if (rh !== null && rh !== undefined){ STORY.resumeHour = null; S.hour = rh; } else S.hour = was.hour;
+      S.cycle = was.cycle;   // (the camera stays where the title left it: the window's view, now the game's)
       if (was.wx && typeof LK !== 'undefined'){ if (was.wx.mode === 'auto') LK.setAutoWeather(true, true); else LK.setWeather(was.wx.set, false, true); }
     } catch (e) {}
     was = null;

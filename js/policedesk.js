@@ -17,7 +17,7 @@ const PRECINCT = (() => {
   const p2 = n => String(Math.floor(n)).padStart(2, '0');
   const clock = () => safe(() => STORY.clock, 0);
   const tc = c => 'D' + (Math.floor(c/1440) + 1) + ' ' + p2((c % 1440)/60) + ':' + p2(c % 60);
-  const hm = c => p2((c % 1440)/60) + ':' + p2(c % 60);
+  const hm = c => { const m = Math.round(c) % 1440; return p2(m/60) + ':' + p2(m % 60); };   // (rounded to the minute, as the city's own clock is: input.js fmt)
   const hsh = s => { let v = 2166136261; s = String(s); for (let i = 0; i < s.length; i++){ v ^= s.charCodeAt(i); v = Math.imul(v, 16777619); } return v >>> 0; };
   const badge = id => '#' + (1000 + hsh(id + ':badge') % 9000);
   const fileNo = arc => { const ks = safe(() => [...CASES.arcs.keys()].sort(), []), k = ks.indexOf(arc); return 'CF-' + (k < 0 ? 1000 + hsh(arc + ':file') % 9000 : 1000 + (hsh('cf') % 2000) + k*373); };   // (coded, never named; unique per file)

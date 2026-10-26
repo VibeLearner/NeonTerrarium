@@ -12,7 +12,7 @@ dropped or rushed however slow a frame is to draw.
 
 Needs: pip install playwright && python3 -m playwright install chromium  (it uses Google Chrome if installed), and ffmpeg.
 """
-import argparse, functools, http.server, json, os, shutil, subprocess, sys, threading, time
+import argparse, base64, functools, http.server, json, os, shutil, subprocess, sys, threading, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
@@ -60,6 +60,13 @@ def main():
         ctx = browser.new_context(viewport={'width': 1920, 'height': 1080}, device_scale_factor=1)
         ctx.add_init_script(path=os.path.join(HERE, 'shim.js'))
         page = ctx.new_page()
+        # frames are taken straight from Chrome's compositor: Playwright's own screenshot resets the page size around every shot in a
+        # visible window, which the game took for a resize and redrew at the other size (the picture flicked between full and a corner)
+        cdp = ctx.new_cdp_session(page)
+        def grab(fmt='jpeg'):
+            o = {'format': fmt, 'fromSurface': True, 'captureBeyondViewport': False}
+            if fmt == 'jpeg': o['quality'] = a.quality
+            return base64.b64decode(cdp.send('Page.captureScreenshot', o)['data'])
         page.on('console', lambda m: print('  page:', m.text) if m.text.startswith('[trailer]') or m.type == 'error' else None)
         page.on('pageerror', lambda e: print('  page error:', e))
         page.on('crash', lambda *_: print('  the page crashed (the graphics process may have run out of memory)'))
@@ -102,16 +109,16 @@ def main():
         else:
             raw = os.path.splitext(a.out)[0] + '.video.mp4'
             enc = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', str(FPS), '-c:v', 'mjpeg', '-i', '-',
-                                    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', str(a.crf), '-pix_fmt', 'yuv420p', '-r', str(FPS), raw],
+                                    '-vf', 'scale=1920:1080:flags=lanczos', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', str(a.crf), '-pix_fmt', 'yuv420p', '-r', str(FPS), raw],
                                    stdin=subprocess.PIPE)
         t1 = time.time()
         for f in range(frames):
             ev('__step(1)')
             if a.stills:
                 if f in want:
-                    p = os.path.join(sd, f'{f/FPS:05.2f}s.png'); page.screenshot(path=p); print('still', os.path.relpath(p, ROOT))
+                    p = os.path.join(sd, f'{f/FPS:05.2f}s.png'); open(p, 'wb').write(grab('png')); print('still', os.path.relpath(p, ROOT))
                 continue
-            enc.stdin.write(page.screenshot(type='jpeg', quality=a.quality))
+            enc.stdin.write(grab())
             if f % FPS == 0:
                 el = time.time() - t1; eta = el/(f + 1)*(frames - f - 1)
                 print(f'  {f/FPS:4.0f}s of {frames/FPS:.0f}s   ({el:4.0f}s elapsed, about {eta/60:.1f} min to go)')

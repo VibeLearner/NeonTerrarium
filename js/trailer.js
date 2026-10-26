@@ -187,18 +187,37 @@ const TRAILER = (() => {
     const station = places.get('m:' + pol.id), sDoor = doorOf(station); if (!sDoor) throw new Error('the station has no street door');
     // the safehouse: a residential building a short walk from the station, with a building back to back with it whose door opens on the
     // other street. The crew slip out that way (it reads as the safehouse's back door) while the officers come to the front
+    // (searched in widening rings: straight behind with the door facing the other way is best; any next-door building whose door opens on a
+    // different street will do; failing that, the safehouse's own door, so the trailer still plays)
+    const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     let best = null;
     for (const c of cells.values()){
       if (!resCell(c)) continue;
       const pl = placeOf(c), d = doorOf(pl); if (!d) continue;
-      const n = outward(d), bc = cells.get(ckey(c.i - Math.round(n.x), c.j - Math.round(n.z))); if (!resCell(bc)) continue;
-      const bpl = placeOf(bc), bd = doorOf(bpl); if (!bd) continue;
-      const bn = outward(bd); if (n.x*bn.x + n.z*bn.z > -.7) continue;   // (its door faces the other way)
       const sd = nearDoor(station, d), pts = sd && route(sd.node, d.node); if (!pts) continue;
-      const L = pathLen(pts), score = Math.abs(L - 2.4) + (c.sections.length < 2 ? .8 : 0);
-      if (L > 1 && L < 6 && (!best || score < best.score)) best = { c, pl, d, L, sd, bpl, bd, score };
+      const L = pathLen(pts); if (L < 1 || L > 9) continue;
+      const n = outward(d);
+      for (const [di, dj] of N4){
+        const bc = cells.get(ckey(c.i + di, c.j + dj)); if (!resCell(bc)) continue;
+        const bpl = placeOf(bc), bd = doorOf(bpl); if (!bd) continue;
+        const bn = outward(bd), dot = n.x*bn.x + n.z*bn.z, apart = Math.hypot(bd.wall.x - d.wall.x, bd.wall.z - d.wall.z);
+        if (dot > .3 || apart < 2.5) continue;   // (its door has to open on another street)
+        const behind = di === -Math.round(n.x) && dj === -Math.round(n.z);
+        const score = Math.abs(L - 2.4) + (dot + 1)*2 + (behind ? 0 : 1.5) + (c.sections.length < 2 ? .8 : 0);
+        if (!best || score < best.score) best = { c, pl, d, L, sd, bpl, bd, score };
+      }
     }
-    if (!best) throw new Error('no safehouse with a back way out near the station');
+    if (!best){
+      warn('safehouse', 'no building with a back way out near the station: the crew use the front door');
+      for (const c of cells.values()){
+        if (!resCell(c)) continue;
+        const pl = placeOf(c), d = doorOf(pl); if (!d) continue;
+        const sd = nearDoor(station, d), pts = sd && route(sd.node, d.node); if (!pts) continue;
+        const L = pathLen(pts), score = Math.abs(L - 2.4);
+        if (L > 1 && L < 9 && (!best || score < best.score)) best = { c, pl, d, L, sd, bpl: pl, bd: d, score };
+      }
+    }
+    if (!best) throw new Error('no safehouse near the station');
     const sh = best.pl, shDoor = best.d, out = outward(shDoor), bk = best.bpl, bkDoor = best.bd, bkOut = outward(bkDoor);
     // where the crew walks off to: a street point away from the back door, away from the front and the station
     let away = null;
@@ -226,12 +245,12 @@ const TRAILER = (() => {
         const fr = pplList.find(q => free(q) && q !== p && q.home && q.home !== p.home && q.home !== sh.id && q.home !== bk.id && resCell(homeCell(q))
           && (() => { const d2 = doorOf(places.get(q.home)); if (!d2 || Math.hypot(d2.wall.x - x, d2.wall.z - z) > 6) return false; const pf = route(d2.node, n); return pf && pathLen(pf) < 7.5; })());
         if (!fr) continue;
-        const v = pickView([at3(x, z), at3(x + .5, z), at3(x - .5, z), at3(x, z + .5), at3(x, z - .5)], 1.65, 34, null, 47, 7);
-        if (v.pitch > 46*DEG) continue;
-        const score = v.pitch/DEG + Math.abs(wrapA(v.yaw - 1.65))*4 + dh;
+        const v = pickView([at3(x, z), at3(x + .5, z), at3(x - .5, z), at3(x, z + .5), at3(x, z - .5)], 1.65, 34, null, 63, 9);
+        if (v.pitch > 62*DEG) continue;   // (a low angle is best; a steeper one will do; straight down won't)
+        const score = v.pitch/DEG*1.5 + Math.abs(wrapA(v.yaw - 1.65))*4 + dh;
         if (!meet || score < meet.score) meet = { p, fr, n, x, z, v, score };
       }
-      if (meet && meet.score < 44) break;
+      if (meet && meet.score < 62) break;
     }
     if (!meet) throw new Error('no open street corner for the person cam');
     const subject = meet.p, friend = meet.fr; used.add(subject.id); used.add(friend.id);

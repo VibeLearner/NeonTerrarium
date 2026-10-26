@@ -11,6 +11,11 @@ dropped or rushed however slow a frame is to draw.
     python3 tools/trailer/record.py --until 12          # just the first 12 seconds
     python3 tools/trailer/record.py --preview --from 24 --until 37   # a quick 720p look at one stretch (here the furnish scene)
 
+A trailer made in the trailer maker (the game at #dev&director, Export file) is filmed the same way:
+
+    python3 tools/trailer/record.py --project ~/Downloads/my-trailer.trailer.json            # its length and music come from the file
+    python3 tools/trailer/record.py --project ~/Downloads/my-trailer.trailer.json --preview  # the quick 720p look
+
 Needs: pip install playwright && python3 -m playwright install chromium  (it uses Google Chrome if installed), and ffmpeg.
 """
 import argparse, base64, functools, http.server, json, os, shutil, subprocess, sys, threading, time
@@ -51,10 +56,23 @@ def main():
     ap.add_argument('--stills', action='store_true', help='only save stills at key moments (PNG) and stop')
     ap.add_argument('--headless', action='store_true', help='no browser window (some Macs draw WebGL slower or not at all headless)')
     ap.add_argument('--port', type=int, default=8793)
+    ap.add_argument('--project', help='a trailer file exported from the trailer maker (#dev&director): film that instead of the built-in trailer')
     ap.add_argument('--quality', type=int, default=95, help='JPEG quality of the captured frames before encoding')
     ap.add_argument('--crf', type=int, default=16)
     a = ap.parse_args()
-    if a.preview and a.out == ap.get_default('out'): a.out = os.path.join(OUT, 'trailer-preview.mp4')
+    proj = city = None
+    if a.project:
+        with open(os.path.expanduser(a.project)) as fh: d = json.load(fh)
+        if d.get('format') != 'neon-terrarium-trailer' or not d.get('project'): sys.exit(a.project + ' is not a trailer file (export one from the trailer maker)')
+        proj, city = d['project'], d.get('city') or {}
+        length = float(proj.get('len') or 30)
+        if a.until == LEN: a.until = length
+        slug = ''.join(ch if ch.isalnum() else '-' for ch in (proj.get('name') or 'trailer').lower()).strip('-') or 'trailer'
+        if a.out == ap.get_default('out'): a.out = os.path.join(OUT, slug + ('-preview' if a.preview else '') + '.mp4')
+    else:
+        length = LEN
+    OBJ = 'DIRECTOR' if proj else 'TRAILER'
+    if a.preview and not proj and a.out == ap.get_default('out'): a.out = os.path.join(OUT, 'trailer-preview.mp4')
     every = 2 if a.preview else 1   # (a preview keeps every other frame: the trailer runs exactly the same, only half as many pictures are taken)
     first = int(round(a.start*FPS))
     if not shutil.which('ffmpeg') and not a.stills: sys.exit('ffmpeg is needed: brew install ffmpeg')
@@ -65,6 +83,9 @@ def main():
         browser = launch(pw, a.headless)
         ctx = browser.new_context(viewport={'width': 1920, 'height': 1080}, device_scale_factor=1)
         ctx.add_init_script(path=os.path.join(HERE, 'shim.js'))
+        if proj:   # (the trailer and its city handed straight to the page, before any of the game's scripts run: saveguard.js, director.js)
+            ctx.add_init_script(script='if (window === window.top){ window.__DIR_CITY = ' + json.dumps(city) + '; window.__DIR_PROJ = ' + json.dumps(proj)
+                                + '; window.__DIR_BOOT = { mode: "play", at: 0 }; }')
         page = ctx.new_page()
         # frames are taken straight from Chrome's compositor: Playwright's own screenshot resets the page size around every shot in a
         # visible window, which the game took for a resize and redrew at the other size (the picture flicked between full and a corner)
@@ -76,7 +97,7 @@ def main():
         page.on('console', lambda m: print('  page:', m.text) if m.text.startswith('[trailer]') or m.type == 'error' else None)
         page.on('pageerror', lambda e: print('  page error:', e))
         page.on('crash', lambda *_: print('  the page crashed (the graphics process may have run out of memory)'))
-        url = f'http://127.0.0.1:{a.port}/index.html#trailer'
+        url = f'http://127.0.0.1:{a.port}/index.html' + ('#dev&director' if proj else '#trailer')
         navs = []
         page.on('framenavigated', lambda fr: (navs.append(fr.url), print('  the page navigated to', fr.url)) if fr == page.main_frame and navs is not None else None)
         page.goto(url, wait_until='load'); navs.clear()
@@ -89,7 +110,7 @@ def main():
                     if 'context was destroyed' not in str(e) and 'navigation' not in str(e): raise
                     print(f'  page reloaded while running "{js[:40]}" (now at {page.url})')
                     if attempt == 3: sys.exit('the page keeps reloading; stopping. Last address: ' + page.url)
-                    if '#trailer' not in page.url: page.goto(url, wait_until='load')
+                    if ('director' if proj else '#trailer') not in page.url: page.goto(url, wait_until='load')
                     else: page.wait_for_load_state('load')
                     time.sleep(1)
 
@@ -97,17 +118,17 @@ def main():
         t0, last = time.time(), ''
         while True:
             ev('__step(2)')
-            st = ev('typeof TRAILER !== "undefined" ? TRAILER.state() : null') or {}
-            fail = ev('typeof TRAILER !== "undefined" && TRAILER.failed')
+            st = ev(f'typeof {OBJ} !== "undefined" ? {OBJ}.state() : null') or {}
+            fail = ev(f'typeof {OBJ} !== "undefined" && {OBJ}.failed')
             if fail: sys.exit('the trailer could not set up: ' + str(fail) + '\n' + '\n'.join(st.get('log', [])))
             if st.get('stage') != last: last = st.get('stage'); print(f'[{time.time() - t0:5.1f}s] {last}')
             if st.get('ready'): break
             if time.time() - t0 > 900: sys.exit('setup took over 15 minutes; last stage: ' + str(last))
             time.sleep(.015)
         print('ready:', json.dumps(st.get('info')))
-        ev('TRAILER.start()')
+        if not ev(f'{OBJ}.start()'): sys.exit('the film would not start (is the trailer file empty?)')
 
-        frames = int(round(min(a.until, LEN)*FPS))
+        frames = int(round(min(a.until, length)*FPS))
         enc = None
         if a.stills:
             want = sorted(int(round(s*FPS)) for s in STILLS if s <= a.until)
@@ -130,7 +151,7 @@ def main():
             if f % FPS == 0:
                 el = time.time() - t1; eta = el/(f + 1)*(frames - f - 1)
                 print(f'  {f/FPS:4.0f}s of {frames/FPS:.0f}s   ({el:4.0f}s elapsed, about {eta/60:.1f} min to go)')
-        st = ev('TRAILER.state()')
+        st = ev(f'{OBJ}.state()')
         browser.close()
     srv.shutdown()
     log = os.path.join(OUT, 'trailer-log.txt')
@@ -138,10 +159,21 @@ def main():
     if a.stills: print('stills in', os.path.relpath(sd, ROOT)); return
     enc.stdin.close(); enc.wait()
 
+    end = frames/FPS; dur = end - a.start
+    if proj:   # a trailer from the trailer maker: its own music (from where the film says it starts), nothing else
+        mfile = proj.get('music') or ''
+        music = os.path.join(ROOT, 'assets', 'audio', 'music', mfile) if mfile else None
+        if not music or not os.path.exists(music):
+            if mfile: print('  (the music', mfile, 'is not in assets/audio/music: the film has no sound)')
+            os.replace(raw, a.out); print('done:', os.path.relpath(a.out, ROOT)); return
+        m0 = float(proj.get('musicStart') or 0) + a.start
+        fade = f',afade=t=out:st={max(0, dur - 1.8):.2f}:d=1.8' if proj.get('fadeOut', True) and end >= length - .01 else ''
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', raw, '-i', music, '-filter_complex', f'[1:a]atrim={m0:.3f}:{m0 + dur:.3f},asetpts=PTS-STARTPTS{fade}[a]',
+                        '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '320k', '-shortest', '-movflags', '+faststart', a.out], check=True)
+        os.remove(raw); print('done:', os.path.relpath(a.out, ROOT), f'({(time.time() - t1)/60:.1f} min of capture)'); return
     # the sound: Bytes from the top, the coast sounds at 36.4 s, faded out over the last 1.8 s
     music = os.path.join(ROOT, 'assets', 'audio', 'music', 'Bytes.mp3')
     sfx = os.path.join(ROOT, 'assets', 'audio', 'trailer', 'coast_flash.wav')
-    end = frames/FPS; dur = end - a.start
     fade = f',afade=t=out:st={dur - 1.8:.2f}:d=1.8' if end >= LEN - .01 else ''
     lag = 36.4 - a.start   # (where the coast sounds start in this film: later if it starts early, trimmed if it starts after them)
     sfxf = f'adelay={int(lag*1000)}|{int(lag*1000)}' if lag >= 0 else f'atrim=start={-lag:.3f},asetpts=PTS-STARTPTS'

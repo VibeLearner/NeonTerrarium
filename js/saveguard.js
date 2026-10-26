@@ -19,14 +19,30 @@ let NT_SAVE_LOCK = false;
 // neonIsland.* preference stay exactly as they were
 window.NT_TRAILER = /trailer/.test(location.hash);
 if (window.NT_TRAILER) NT_SAVE_LOCK = true;   // (and the city slots' checkpoints stand down: slots.js)
-const NT_LOCKED = k => (NT_SAVE_LOCK && NT_isCityKey(k)) || (window.NT_TRAILER && typeof k === 'string' && (k.startsWith('neonIsland.') || k.startsWith('neonLooks.')));
-const NT_RAW = { set: Storage.prototype.setItem, remove: Storage.prototype.removeItem };
+// #director (js/director.js, the trailer maker) films a copy of a city: the copy is kept for this tab in sessionStorage (ntDirector.city) and
+// every read of a city key is answered from it, so the game, the people, the stories and the cases all start from that city. Like the
+// trailer it keeps nothing: city keys and neonIsland.* / neonLooks.* settings are left exactly as they were
+window.NT_DIRECTOR = /director/.test(location.hash);
+let NT_DIR_CITY = null;
+if (window.NT_DIRECTOR){
+  NT_SAVE_LOCK = true;
+  NT_DIR_CITY = window.__DIR_CITY || null;   // (the recorder hands the city in directly: tools/trailer/record.py --project)
+  if (!NT_DIR_CITY) try { NT_DIR_CITY = JSON.parse(sessionStorage.getItem('ntDirector.city') || 'null'); } catch (e) {}
+  if (!NT_DIR_CITY || typeof NT_DIR_CITY !== 'object') NT_DIR_CITY = {};
+}
+const NT_FILM = () => window.NT_TRAILER || window.NT_DIRECTOR;
+const NT_LOCKED = k => (NT_SAVE_LOCK && NT_isCityKey(k)) || (NT_FILM() && typeof k === 'string' && (k.startsWith('neonIsland.') || k.startsWith('neonLooks.')));
+const NT_RAW = { set: Storage.prototype.setItem, remove: Storage.prototype.removeItem, get: Storage.prototype.getItem };
+if (window.NT_DIRECTOR) Storage.prototype.getItem = function (k){
+  if (this === window.localStorage && NT_isCityKey(k)) return Object.prototype.hasOwnProperty.call(NT_DIR_CITY, k) ? NT_DIR_CITY[k] : null;
+  return NT_RAW.get.call(this, k);
+};
 Storage.prototype.setItem = function (k, v){ if (this === window.localStorage && NT_LOCKED(k)) return; return NT_RAW.set.call(this, k, v); };
 Storage.prototype.removeItem = function (k){ if (this === window.localStorage && NT_LOCKED(k)) return; return NT_RAW.remove.call(this, k); };
 // the title screen shows on every load, unless a city switch just asked to go straight in
 (() => {
   let skip = false; try { skip = sessionStorage.getItem('neonTerrarium.skipTitle') === '1'; sessionStorage.removeItem('neonTerrarium.skipTitle'); } catch (e) {}
-  if (/[?&](notitle|tv=1)\b/.test(location.search) || navigator.webdriver || window.NT_TRAILER) skip = true;   // (tests and the tools/ harnesses go straight in, and so does a return from the coast)
+  if (/[?&](notitle|tv=1)\b/.test(location.search) || navigator.webdriver || window.NT_TRAILER || window.NT_DIRECTOR) skip = true;   // (tests and the tools/ harnesses go straight in, and so does a return from the coast)
   if (/[?&]title\b/.test(location.search)) skip = false;   // (?title: show it anyway, for looking at it under a test browser)
   window.NT_TITLE = !skip;
   if (!skip) document.documentElement.classList.add('title-on', 'title-boot');   // (title-boot: a dark cover until the room's picture is in, so the city never shows loading first)

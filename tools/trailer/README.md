@@ -1,5 +1,75 @@
 # The trailer
 
+There are two things here: **the trailer maker**, where you make your own trailers in the game (below), and the
+built-in scripted trailer (further down).
+
+## The trailer maker
+
+Open the game with `#dev&director` on the end of the address (for example `http://localhost:8000/#dev&director`).
+The first time, it asks which city to film: the city you play now, any of your save slots, or an empty map. The trailer
+keeps its **own copy** of that city, so nothing you do in the trailer maker ever changes your real city or your settings.
+Trailers are kept in this browser; you can have as many as you like (the menu button at the left of the timeline).
+
+### Words used here
+
+- **Keyframe (key):** a saved value at a moment in time. The camera has keys (where it looks, zoom, turn, tilt) and so does
+  the time of day. Between two keys the game works out every frame in between; that's called *interpolation*.
+- **Easing:** how the movement between two keys speeds up and slows down. Each camera key says how the camera travels to
+  the next one: *flow* (a smooth curve through all the keys at a steady pace, best for long camera moves), *ease* (slows
+  down into each key and pauses there), *linear* (constant speed, sharp corners) or *cut* (jumps straight to the next key,
+  like a film cut).
+- **Playhead:** the pink line on the timeline: the moment you are looking at.
+- **Scrubbing:** dragging the playhead to see the camera at any moment.
+
+### Making a trailer
+
+1. **Camera:** move the view with the game's normal controls, put the playhead where you want it, press **K** (or
+   "+ Camera key"). Do that at a few moments and the path appears in the city as a cyan line with pink markers. Click a key
+   to change it: "Set to my view" updates it to where your camera is now, and its easing is in the panel.
+2. **Building on camera:** put the playhead where the building should start and press **Rec**. Now play the game normally:
+   place plots and floors, stack pods, place megastructures from the menu, draw metro lines and highways, remove things,
+   change greenery. Each action lands on the *Edits* row at the moment you did it, and when the film plays it is built
+   with the game's own build animation, exactly as you built it. Press Stop (or Esc) when done.
+   While recording you can also open someone in the person cam, open an apartment with Furnish pod, change the look or
+   the weather, or drag the time of day: those are recorded too. The camera dropdown sets what the camera does meanwhile:
+   *free* (yours to move), *on path* (it follows your camera keys, so you can build "for the shot"), or *record moves*
+   (your camera moves become camera keys).
+3. **Time of day:** "+ Time key" saves the city's current hour at the playhead. Between keys the day runs forward (22:00
+   to 02:00 goes through midnight).
+4. **Effects:** "+ Effect" adds fades (in from or out to black or white), flashes, glitches, cinema bars, the logo,
+   your own neon text, city lights (flicker on, on, off), a look, the weather, the person cam (optionally following that
+   person, with the highlight brackets), following a metro train, and opening an apartment. Drag an effect to move it,
+   drag its right edge to change its length.
+5. **Watch it:** *Preview* plays the camera, time and effects from the playhead, live, without rebuilding anything.
+   *Play film* reloads the trailer's city and plays the whole thing from the start with every edit built as it happens
+   (*From here* starts at the playhead). Esc stops.
+
+Other things: drag anything on the timeline to retime it (hold Alt to move it freely; otherwise it snaps to 0.05 s);
+double-click a key to jump to it; Delete removes what's picked; Ctrl or Cmd + Z undoes; **T** hides the timeline so you
+can build with the whole screen. On an edit, "Spread out" spaces it and the ones after it evenly up to the next camera
+key, which is handy for turning a quick burst of building into a steady build-up.
+
+If you record from the middle of a trailer, the city first has to look the way it does at that moment, so it asks to
+reload the city with every edit before the playhead built.
+
+### Getting the video
+
+Open the menu (the trailer's name at the left), set the music start and fade, then **Export file**. Then on your Mac:
+
+```
+python3 tools/trailer/record.py --project ~/Downloads/your-trailer.trailer.json --preview   # quick 720p look
+python3 tools/trailer/record.py --project ~/Downloads/your-trailer.trailer.json            # the 1080p 60 fps film
+```
+
+The film lands in `tools/trailer/out/` named after the trailer. The recorder plays it frame by frame (like the built-in
+trailer below), so it never lags however heavy the scene, and the music is laid in afterwards.
+
+What it can't do yet: the furnishing itself inside an apartment (dragging furniture in the lab) isn't recorded, only
+the apartment opening and closing; the coast isn't available as a scene; and megastructures that would normally arrive
+on their own are switched off in the trailer maker (place them from the menu instead, so they are on the timeline).
+
+# The built-in trailer
+
 A 69.5 second film of the game, cut to **Bytes** (`assets/audio/music/Bytes.mp3`), with no text except the logo at the end.
 It is played by the game itself: open the game with `#trailer` at the end of the address. Code: `js/trailer.js`.
 

@@ -2405,7 +2405,9 @@ function syncAgentsA(){
   for (const m of megas.values()) if (m.data) emitters.push(...m.data.emitters);
   for (const m of megas.values()) if (m.data && m.data.ports) ports.push(...m.data.ports);   // e.g. the logistics hub's drone bays   // e.g. steam off the food carts
   for (const d of pairCache.values()) if (d.emitters) emitters.push(...d.emitters);   // steam leaking from the pipework between buildings
-  portLots = [...cells.values()].map(c => ({ x: c.x, z: c.z, height: c.height }));
+  // (a perimeter wall stands as high as its stack, all the way across its plot: drones climb over the whole of it, not just its middle: perimeter.js)
+  portLots = [...cells.values()].map(c => c.wall ? { x: c.x, z: c.z, height: Math.max(c.height, (() => { try { return wallTopOf(c); } catch (e) { return c.height; } })()), r: LOT*.55 } : { x: c.x, z: c.z, height: c.height });
+  portLotAt = new Map(); for (const l of portLots) portLotAt.set(ckey(Math.round(l.x/LOT), Math.round(l.z/LOT)), l);
   VENTS = [...cells.values()].filter(c => c.vent).map(c => c.vent);   // steam vents, for the mist
   setupSteam();
   for (const d of drones) if (!ports.includes(d.at) || (d.phase !== 'inside' && !ports.includes(d.to))){

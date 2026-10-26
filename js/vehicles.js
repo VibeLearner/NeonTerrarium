@@ -201,7 +201,7 @@ for (let i=0;i<DRONES_MAX;i++){
   g.visible = false; scene.add(g);
   drones.push({ idx: i, g, red, redGlow, phase:'inside', timer:0, at:0, to:0, k:0, cruise:0, blink: Math.random()*2 });
 }
-let ports = [], portLots = [];
+let ports = [], portLots = [], portLotAt = new Map();   // (portLotAt: the same lots by plot, for droneCruise)
 // Almost every building gets a compact drone perch: a slim mast on the roof topped by a small deck with a hangar pod.
 // Masts keep the perch clear of whatever else is on the roof.
 function addPerch(l){
@@ -226,7 +226,7 @@ function addPerch(l){
   (curPorts || ports).push({ pad: new THREE.Vector3(.38, .27, 0).applyMatrix4(P), inside: new THREE.Vector3(hx, .27, 0).applyMatrix4(P), busy: false });
 }
 function buildDronePorts(lots){
-  ports = []; portLots = lots;
+  ports = []; portLots = lots; portLotAt = new Map(); for (const l of lots) if (l && isFinite(l.x)) portLotAt.set(ckey(Math.round(l.x/LOT), Math.round(l.z/LOT)), l);
   for (const l of lots) if (l.occupied && !l.plaza && !l.hasCarPad && l.height >= 1.5 && chance(.88)) addPerch(l);
 }
 function resetDrones(){
@@ -239,9 +239,12 @@ function resetDrones(){
 // cruising height: high enough to clear every building the straight line between the two perches passes over
 function droneCruise(a, b){
   let y = Math.max(a.y, b.y) + 1 + Math.random()*1.4;
-  for (let i=0;i<=24;i++){
-    const x = a.x + (b.x-a.x)*i/24, z = a.z + (b.z-a.z)*i/24;
-    for (const l of portLots) if (Math.abs(x-l.x) < 1.6 && Math.abs(z-l.z) < 1.6) y = Math.max(y, l.height + 1.3);
+  // (the path looked at every unit or so, a long flight too: 24 looks used to step right over a thin wall's plot)
+  const n = Math.max(24, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z)));
+  for (let i=0;i<=n;i++){
+    const x = a.x + (b.x-a.x)*i/n, z = a.z + (b.z-a.z)*i/n;
+    const pi = Math.round(x/LOT), pj = Math.round(z/LOT);   // (the lots round this point, looked up by plot rather than walked through)
+    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++){ const l = portLotAt.get(ckey(pi + di, pj + dj)); if (!l) continue; const r = l.r || 1.6; if (Math.abs(x-l.x) < r && Math.abs(z-l.z) < r) y = Math.max(y, l.height + 1.3); }
     if (typeof hwAt === 'function') for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++){   // and over any sky highway in the way (its ramps rise above the deck)
       const ti = Math.round(x/LOT) + di, tj = Math.round(z/LOT) + dj; if (Math.abs(x - ti*LOT) > LOT*.75 || Math.abs(z - tj*LOT) > LOT*.75) continue;
       for (const { h, k } of hwAt(ti, tj)){ const n = h.tiles.length, end = k === 0 || k === n - 1; y = Math.max(y, hwY(h.tiles[k].L) + (end ? HW_RAMP + .5 : .4) + 1.1); }

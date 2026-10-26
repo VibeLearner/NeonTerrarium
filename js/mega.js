@@ -201,7 +201,7 @@ function findMegaBlock(kind, c){
     if (best && d*4 > best.score) continue;   // can't beat what we have
     if (megaHwNear(i, j, w, h, kind)) continue;   // (a highway over or beside it)
     const blk = blockCells(i, j, w, h);
-    if (blk.some(b => b && (b.mega || b.sections.length))) continue;   // something stands there
+    if (blk.some(b => b && (b.mega || b.sections.length || b.wall))) continue;   // something stands there (a perimeter wall too: perimeter.js)
     const missing = blk.filter(b => !b).length;
     let touches = missing < blk.length;
     for (let a = -1; a <= w && !touches; a++) for (let q = -1; q <= h && !touches; q++){

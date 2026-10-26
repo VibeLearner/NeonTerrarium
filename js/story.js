@@ -1219,7 +1219,7 @@ const STORY = (() => {
   function restore(){
     try {
       const raw = localStorage.getItem(KEY); if (!raw) return; const d = JSON.parse(raw); if (!d || d.v !== 1) return;
-      ST.clock = d.clock || 0;
+      ST.clock = d.clock || 0; ST.lastHour = null;   // (the saved day, set again to the city's hour on the next frame: this loads after the first frames, and kept as saved the game clock ran hours off the sky's, the Precinct desk showing a different time, owner Oct 26)
       for (const [k, v] of d.known || []) KN.set(k, v);
       for (const [k, L] of d.logs || []) LOGS.set(k, L.map(e => Object.assign(e, { subject: k })));
       for (const [k, n] of d.notes || []) NOTES.set(k, n);

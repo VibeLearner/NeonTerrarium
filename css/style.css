@@ -530,3 +530,71 @@ label.tog:has(#cycle:disabled){opacity:.55;cursor:not-allowed}
 .eng-tip p:last-child{margin:0}
 .eng-tip p.k{display:grid;grid-template-columns:34px 1fr}
 .eng-tip ul{padding-left:50px}
+
+/* ---------- phones and tablets, round two (Oct 26): as little on screen as possible (js/touch.js; html.tport upright, html.tland sideways) ----------
+   Everything here is under html.touch, which a mouse and keyboard never get: the desktop layout doesn't change. */
+/* the dock: one row of small buttons, the zones under it; the hint floats above and fades */
+html.touch .zonebar{bottom:calc(8px + env(safe-area-inset-bottom,0px));gap:5px}
+html.touch .zonebar > #modeHint{position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);
+  font-size:10px;line-height:1.35;padding:3px 9px;pointer-events:none;transition:opacity .6s ease}
+html.touch #modeHint.tfade{opacity:0}
+html.touch .trow{gap:5px;flex-wrap:nowrap}
+html.touch .trow .bmenu{gap:5px}
+html.touch .bmenu-head,html.touch .pu-citybtn,html.touch .ctlhover{height:28px;padding:0 9px;font-size:9.5px;line-height:1;display:flex;align-items:center}
+html.touch .bmenu-head{gap:7px}
+html.touch .pu-ctlrow{gap:5px}
+html.touch .pu-citybtn{font-family:var(--font-pixel);letter-spacing:.1em;text-transform:uppercase;background:rgba(10,16,32,.88)}
+html.touch .ctlwrap.hint{display:flex}
+html.touch .ctlhover{width:28px;padding:0;justify-content:center;font-size:12px;background:rgba(10,16,32,.88)}
+html.touch .rot.del{width:30px;height:30px;font-size:12px}
+html.touch .furnbtn{height:30px;padding:0 9px;font-size:9.5px}
+/* the zones, upright: one card, with arrows either side; swipe it for the next */
+.zarr{display:none}
+html.tport .zones{gap:4px;align-items:center;touch-action:none}
+html.tport .zones > .zcol:not(.tcur),html.tport .zones > .zone:not(.tcur){display:none}
+html.tport .zones > .tcur{min-width:132px}
+html.tport .zones > .tcur .zone .zin,html.tport .zones > .zone.tcur .zin{align-items:center}
+html.tport .zone.on{transform:none}
+html.tport .zarr{display:grid;place-items:center;width:24px;height:38px;padding:0;font-size:18px;line-height:1;color:var(--z,var(--ink));
+  background:rgba(10,16,32,.88);border:1px solid color-mix(in srgb, var(--z,#5a6a8a) 60%, transparent);border-radius:0}
+html.tport .zarr:active{background:color-mix(in srgb, var(--z,#5a6a8a) 25%, #0a1020)}
+/* the zones, sideways: all four, as small as they read */
+html.tland .zones{gap:4px}
+html.tland .zone .zin{padding:3px 7px 3px}
+html.tland .zone b{font-size:9.5px}
+html.tland .zone small{font-size:7px}
+html.tland .perim{height:13px;font-size:7px}
+html.tland .zone.on{transform:translateY(-2px)}
+html.tland .zonebar > .hwbar{position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);width:max-content}
+html.tland .bmenu-list,html.tland .ctlpanel,html.tland .pu-city{max-height:calc(100vh - 120px)}
+/* the time and the day: one chip, top left */
+.tstatus{display:none}
+html.touch .tstatus{display:block;position:fixed;left:10px;top:calc(10px + env(safe-area-inset-top,0px));z-index:2;pointer-events:none;
+  padding:3px 8px;font-family:var(--font-pixel);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);
+  background:rgba(10,16,32,.78);border:1px solid var(--line);font-variant-numeric:tabular-nums}
+html.touch .hud,html.touch #ffDay{display:none}
+html.touch .ffbar:not(:has(button)){display:none}
+html.touch .ffbar{left:50%;right:auto;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));bottom:auto;padding:2px 4px;font-size:9px}
+/* Settings: a small gear, top right */
+html.touch .deck-toggle{right:10px;top:calc(8px + env(safe-area-inset-top,0px));width:30px;height:30px;padding:0;font-size:0;line-height:0;display:grid;place-items:center}
+html.touch .deck-toggle::before{content:"";width:16px;height:16px;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath fill-rule='evenodd' d='M4 3h8v1h1v8h-1v1H4v-1H3V4h1zM6 6v4h4V6z'/%3E%3Cpath d='M7 0h2v3H7zM7 13h2v3H7zM0 7h3v2H0zM13 7h3v2h-3zM2 2h2v2H2zM12 2h2v2h-2zM2 12h2v2H2zM12 12h2v2h-2z'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath fill-rule='evenodd' d='M4 3h8v1h1v8h-1v1H4v-1H3V4h1zM6 6v4h4V6z'/%3E%3Cpath d='M7 0h2v3H7zM7 13h2v3H7zM0 7h3v2H0zM13 7h3v2h-3zM2 2h2v2H2zM12 2h2v2h-2zM2 12h2v2H2zM12 12h2v2h-2z'/%3E%3C/svg%3E") center/contain no-repeat}
+/* the music player: a small pill under the chip; a tap on the name opens it whole, another folds it back */
+html.touch .gdeck{top:calc(38px + env(safe-area-inset-top,0px));left:10px}
+html.touch .gdeck.tmin{scale:1;width:auto;min-width:0;max-width:min(210px,calc(100vw - 80px));display:flex;align-items:center;gap:6px;padding:3px 4px 3px 8px}
+html.touch .gdeck.tmin > :not(.gd-main):not(.gd-ctl){display:none}
+html.touch .gdeck.tmin .gd-main{display:flex;flex:1;min-width:0;cursor:pointer}
+html.touch .gdeck.tmin .gd-main::before{content:"\266A";color:#f2c94c;font-size:11px;margin-right:6px}
+html.touch .gdeck.tmin .gd-prog{font-size:10.5px;letter-spacing:.1em}
+html.touch .gdeck.tmin .gd-clock,html.touch .gdeck.tmin .gd-ctl > :not(#gdPlay){display:none}
+html.touch .gdeck.tmin #gdPlay{height:22px;min-width:24px;padding:0 6px}
+html.touch .gdeck .pu-fold{display:none}
+html.touch .gdeck:not(.tmin) .gd-head,html.touch .gdeck:not(.tmin) .gd-main{cursor:pointer}
+html.touch .gdeck.pu-min:not(.tmin){width:300px}
+html.touch .gdeck.pu-min:not(.tmin) .gd-main{display:flex}
+html.touch .gdeck.pu-min:not(.tmin) .gd-chord,html.touch .gdeck.pu-min:not(.tmin) .gd-cv{display:block}
+html.touch .gdeck.pu-min:not(.tmin) .gd-panelbtn{display:grid}
+/* the transmission log and the people pinned from the monitor: up a little, under the gear */
+html.touch #wirelog{top:calc(46px + env(safe-area-inset-top,0px));right:10px}
+html.touch .monitor,html.touch .mon-pins{top:calc(46px + env(safe-area-inset-top,0px))}

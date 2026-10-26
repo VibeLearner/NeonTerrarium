@@ -131,11 +131,25 @@ function unitAt(px, py){
   return false;
 }
 let shiftTap = null;
+// a finger, with a zone picked: a tap builds a moment later (about a quarter second), so a second tap can make it a double tap instead.
+// Double tap: one floor (as Space does). Double tap and, still pressing, drag up or down: pick the height (as Shift does); lifting builds.
+// Nothing changes for a mouse.
+let tapPend = null;
+const DT_MS = 250, DT_PX = 40;
+const tapWaits = () => S.zone && !hwMode && !mtMode && !megaPick && !delMode && !PERIM;
+function tapBuild(x, y){ const a = act; act = { done: new Set() }; try { if (hwMode) hwClick(x, y); else if (mtMode) mtClick(x, y); else if (megaPick) placeMegaHere(x, y); else paintAt(x, y); } finally { act = a; } }
+function tapFlush(){ if (!tapPend) return; const p = tapPend; tapPend = null; clearTimeout(p.timer); if (!(typeof LOADP !== 'undefined' && LOADP.on)) tapBuild(p.x, p.y); }
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
+  if (HL && e.pointerType === 'touch') hlStop();   // (a finger's height pick ends when it lifts: a stray one left over just goes)
   if (HL){ if (e.button === 0) hlBuild(); else hlStop(); return; }   // (a height being picked: a click builds there, any other button lets go)
   canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); dragging = true;
-  if (ptrs.size === 2){ if (act && act.timer) clearTimeout(act.timer); act = { kind: 'pinch', touch: e.pointerType === 'touch', ang: pang(), mid: pmid() }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); hover.visible = hoverFill.visible = hoverStrip.visible = false; return; }
+  if (e.pointerType === 'touch' && tapPend){   // a second tap close to the first, soon after: a double tap. Anything else: the first tap builds now
+    if (ptrs.size === 1 && performance.now() - tapPend.t < DT_MS + 150 && Math.hypot(e.clientX - tapPend.x, e.clientY - tapPend.y) < DT_PX){
+      clearTimeout(tapPend.timer); const p = tapPend; tapPend = null;
+      act = { kind: 'dtap', x: p.x, y: p.y, sy: e.clientY, started: false }; return; }
+    tapFlush(); }
+  if (ptrs.size === 2){ if (act && act.timer) clearTimeout(act.timer); if (act && act.kind === 'dtap' && HL) hlStop(); act = { kind: 'pinch', touch: e.pointerType === 'touch', ang: pang(), mid: pmid() }; pinch0 = pdist(); zoom0 = zoomT; pinchX = pmidX(); hover.visible = hoverFill.visible = hoverStrip.visible = false; return; }
   if (delMode && e.button === 0){ act = { kind: 'del', x: e.clientX, y: e.clientY, moved: false, from: groundCellAt(e.clientX, e.clientY) }; return; }   // delete mode: drag selects
   if ((e.button === 0 || e.pointerType === 'touch') && !hwMode && !mtMode && !megaPick){   // someone in the street under the pointer: a click opens the monitor on them (monitor.js)
     // (the quick test here; the exact one, which waits for the graphics card, only once it's a click: a press that starts turning the view never waits for it)
@@ -186,6 +200,11 @@ function pointerMove(e){
   if (act.kind === 'npc'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5){ act.moved = true; if (e.pointerType === 'touch'){ act.kind = 'touch'; touchPan(e.clientX - act.x, e.clientY - act.y); } else act.kind = 'sky'; } return; }
   if (act.kind === 'sky'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); hover.visible = hoverFill.visible = hoverStrip.visible = false; if (megaPick) showMegaGhost(null); } return; }
   if (act.kind === 'right'){ if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true; if (act.moved){ yawT -= dx*.008; tilt(); } return; }
+  if (act.kind === 'dtap'){   // double tap, still pressing: dragging up or down picks the height
+    if (!act.started && Math.abs(e.clientY - act.sy) > 12){ act.started = true; ptrLast = { x: act.x, y: act.sy }; hlStart(); }
+    if (act.started && HL) hlMove(act.x, e.clientY);
+    return;
+  }
   if (act.kind === 'touch'){
     if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) > 10){ act.moved = true; clearTimeout(act.timer); hover.visible = hoverFill.visible = hoverStrip.visible = false; if (megaPick) showMegaGhost(null); touchPan(e.clientX - act.x, e.clientY - act.y); return; }
     if (act.moved) touchPan(dx, dy);
@@ -206,7 +225,12 @@ function endPtr0(e){
     if (act.kind === 'right' && !act.moved && delMode){ delSel = null; showAreaSel(null); }
     else if (act.kind === 'right' && !act.moved){ if (hwMode) hwRightClick(e.clientX, e.clientY); else if (mtMode) mtRightClick(e.clientX, e.clientY); else if (megaPick) selectMega(null); else removeAt(pickAt(e.clientX, e.clientY)); }   // right-click while placing: put it down (highways are only cut in highway mode)
     if (act.kind === 'sky' && !act.moved){ if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
-    if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
+    if (act.kind === 'dtap' && !(typeof LOADP !== 'undefined' && LOADP.on)){
+      if (act.started){ if (HL) hlBuild(); }
+      else if (!unitAt(act.x, act.y)) tapBuild(act.x, act.y);   // (one floor; where one floor can't go, an ordinary tap)
+    }
+    if (act.kind === 'touch' && !act.moved && tapWaits()){ clearTimeout(act.timer); const x = e.clientX, y = e.clientY; tapPend = { x, y, t: performance.now(), timer: setTimeout(() => { if (tapPend && tapPend.x === x && tapPend.y === y) tapFlush(); }, DT_MS) }; }
+    else if (act.kind === 'touch' && !act.moved){ clearTimeout(act.timer); if (hwMode) hwClick(e.clientX, e.clientY); else if (mtMode) mtClick(e.clientX, e.clientY); else if (megaPick) placeMegaHere(e.clientX, e.clientY); else { act.done = new Set(); paintAt(e.clientX, e.clientY); } }
   }
   ptrs.delete(e.pointerId);
   if (!ptrs.size){ dragging = false; act = null; }

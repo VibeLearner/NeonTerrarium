@@ -252,7 +252,7 @@ function mtBuildView(l){
         box(MTM.pillar, F, px, (ya + yh)/2, 0, .16, ya - yh + .06, .22);
         box(MTM.pillar, F, px/2 + .05, ya, 0, Math.abs(px) + .3, .12, .24);
         for (const s of [-1, 1]) box(MTM.pillar2, F, s*.27, MT_OH + MT_OHT/2, 0, .06, MT_OHT + .1, .2);   // the clamp round it
-        box(MTM.green, F, px - .081, (ya + yh)/2, 0, .012, ya - yh - .4, .03);
+        FINE_LIGHT = true; box(MTM.green, F, px - .081, (ya + yh)/2, 0, .012, ya - yh - .4, .03); FINE_LIGHT = false;   // (the post's light strip: thin, so it goes with the fine details far out)
       }
       if (!stop && mtStraight(l, k) && k % 3 === 1){
         for (const s of [-1, 1]){ const F = under(mtFrame(l, k, .5), T(-MT_OL + s*.24, MT_OH + MT_OHT/2, 0, s*PI/2)); box(MTM.board, F, 0, 0, .01, 1.6, .26, .02); fitSign(under(F, T(0, 0, .025, 0)), 'sign_mt_line', 0, 0, 0, 1.5, .5, 'green'); }
@@ -359,8 +359,11 @@ function mtFeet(c){
     if (roof > CURB){ box(MTM.pillar2, F, 0, roof + .06, 0, .62, .14, .62); box(MTM.pillar2, F, 0, roof + .01, 0, .74, .05, .74); }
     else box(MTM.pillar2, F, 0, bot + .05, 0, .56, .1, .56);
     // the light strips up the sides and the bands across the front: about a pixel wide or more at the usual zooms (they were a third of one, and flickered in and out as the view moved)
+    // (thin lights: they go with the fine details as the view goes out, rather than shimmering: core.js FINE_LIGHT)
+    FINE_LIGHT = true;
     for (const s of [-1, 1]) box(MTM.green, F, s*.225, (bot + top)/2, 0, .04, Math.max(.1, top - bot - .5), .07);
     for (let y = bot + 1.2; y < top - .6; y += 2.4) box(MTM.green2, F, 0, y, .225, .22, .05, .04);
+    FINE_LIGHT = false;
   }
   // a station's lift shaft whose foot is on this plot
   for (const l of metros) for (const k of mtStops(l)){

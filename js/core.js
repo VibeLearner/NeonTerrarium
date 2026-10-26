@@ -239,13 +239,16 @@ function keptOut(geo, m){
   const x = e[0]*cx0 + e[4]*cy0 + e[8]*cz0 + e[12], y = e[1]*cx0 + e[5]*cy0 + e[9]*cz0 + e[13], z = e[2]*cx0 + e[6]*cy0 + e[10]*cz0 + e[14];
   return inKeepOut(x, y - hy, z, Math.max(hx, hz));
 }
+// a light thin enough to fall between pixels when zoomed out (the metro pillars' strips): dropped with the fine details as the view goes out, instead of
+// kept like the other lights, where it shimmered in and out as the view moved (owner Oct 26). Set round the pieces that are, then cleared
+let FINE_LIGHT = false;
 function put(geo, mat, m, lean){
   if (PUT_KEEPOUT && keptOut(geo, m)) return;
   if (LUX){ let sub = LUX.mats.get(mat); if (!sub && LUX.auto && mat.userData && mat.userData.glow) sub = LUX.auto(mat); if (sub){ mat = sub; if (LUX.halo) LUX.halo(sub, m); } }
   if (DARK && !KEEP_LIGHT && mat.userData && DARK_SUB[mat.userData.glow] && posHash(m.elements[12], m.elements[13], m.elements[14]) < 82) mat = DARK_SUB[mat.userData.glow];
   let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null, o: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
   const fid = b.f ? (DARK && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow)) : 0;
-  const did = b.f ? 0 : detailId(geo, m), ord = b.f ? litOrder(m.elements[12], m.elements[13], m.elements[14]) : 0;   // lights are never dropped: they carry the look from far away
+  const did = b.f && !FINE_LIGHT ? 0 : detailId(geo, m), ord = b.f ? litOrder(m.elements[12], m.elements[13], m.elements[14]) : 0;   // lights are never dropped: they carry the look from far away
   if (curCover && geo === U.box && did === 0 && atlasable(mat) && !mat.userData.colorOnly) curCover.push(m.elements.slice());   // a solid block: may hide what's inside it (see hideCovered)
   const bp = b.p, base = bp.length/3, w = weldOf(geo);
   bucketIndexUpTo(b);

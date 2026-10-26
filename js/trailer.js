@@ -20,6 +20,11 @@ const TRAILER = (() => {
   const TR = { on: !!window.NT_TRAILER, ready: false, playing: false, done: false, t: -1, stage: 'off', log: [], info: {} };
   if (!TR.on) return TR;
   maybeSpawnMegas = () => {};   // (the opening shot's builds never bring in a megastructure of their own)
+  // residents only in the opening city: the ride's sectors and the dense city get none (thousands of people never seen up close, all of them
+  // stepped every frame, were most of the live preview's lag). Those plots are left out while people.js counts out the residents
+  const _sr = syncResidents;
+  syncResidents = function (){ const away = []; for (const [k, c] of cells) if (c.j >= 25) away.push([k, c]); for (const [k] of away) cells.delete(k);
+    try { return _sr.apply(this, arguments); } finally { for (const [k, c] of away) cells.set(k, c); } };
   sfx.play = () => {};   // (and make no sound: the trailer's sound is Bytes and the coast)
   const CAP = !!window.__TR_CAPTURE;   // (set by the recorder's clock shim: no click, no sound, the recorder steps the frames)
   const say = (...a) => { TR.log.push(a.join(' ')); console.log('[trailer]', ...a); };
@@ -27,9 +32,9 @@ const TRAILER = (() => {
   const safe = (what, f) => { try { return f(); } catch (e) { warn(what, e); return null; } };
 
   /* ---------- timing (Bytes as it is: its first drop hits at 21.93 s) ---------- */
-  const LEN = 68.5, DROP1 = 21.93;
-  const MK = { swoop: 8.4, p: [9.9, 15.9, DROP1], leave: 23.4, furnBy: 28.2, glIn: 36.6, coastIn: 37.04, glOut: 41.61, coastOut: 41.95,
-    coastWake: 35.6, ride: 41.95, wall: 55.0, back: 56.6, zoomed: 61.0, lit: 62.5, logo: 64.0, end: LEN };
+  const LEN = 69.5, DROP1 = 21.93;
+  const MK = { swoop: 8.4, p: [9.9, 15.9, DROP1], leave: 24.4, furnBy: 29.4, glIn: 36.6, coastIn: 37.04, glOut: 41.61, coastOut: 41.95,
+    coastWake: 35.6, ride: 41.95, wall: 55.8, back: 57.6, zoomed: 62.0, lit: 63.5, logo: 65.0, end: LEN };
 
   /* ---------- small maths ---------- */
   const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
@@ -62,7 +67,7 @@ const TRAILER = (() => {
   // sector (the Neon Dome, the market mall and tall towers behind), open sky, then the dense city, whose front edge is a wall of towers
   const RJ = 45;
   const RIDE_IND = { i0: -26, i1: -19, j0: 41, j1: 50, zone: 'ind' }, RIDE_COM = { i0: -18, i1: -9, j0: 41, j1: 51, zone: 'mid' };
-  const DENSE = { i0: -1, i1: 29, j0: 29, j1: 57 }, WALL = { i0: -1, i1: 10, j0: 42, j1: 44 };
+  const DENSE = { i0: -1, i1: 29, j0: 29, j1: 57 }, WALL = { i0: -1, i1: 14, j0: 42, j1: 44 };
   const RIDE_MEGAS = [['foundry', -25, 47, 6, 4], ['club', -17, 47, 4, 4], ['market', -12, 47, 4, 4], ['club', 13, 50, 4, 4]];
   const RIDE_CUTS = [[-22, 44, 'ind'], [-15, 44, 'mid'], [-11, 44, 'mid']];   // (a few tall ones in front: the view is cut as they pass)
   const RIDE_MT = [[-26, RJ], [38, RJ]];
@@ -147,7 +152,7 @@ const TRAILER = (() => {
     for (let k = 0, y = y0 + 4.6; y < y0 + ARCO.h - 2; y += 6.3, k++){ const g = new THREE.BoxGeometry(W - .4, .14, .08); g.translate(cx, y, ARCO.z0 - .06); strips[k % 2].push(g); }
     const merge = list => list.length ? THREE.BufferGeometryUtils.mergeBufferGeometries(list) : null;
     for (const [list, m] of [[lit, M.winLit], [dark, M.glassDark], [strips[0], M.neonPink], [strips[1], M.neonCyan]]){ const g = merge(list); if (g){ const o = new THREE.Mesh(g, m); G.add(o); } }
-    scene.add(G); ARCO.g = G;
+    scene.add(G); ARCO.g = G; TR.info.arcology = { width: +W.toFixed(1), height: ARCO.h, pieces: G.children.length };
     try { SC_DIRTY.unknown = true; shadowDirty = true; } catch (e) {}
   }
 
@@ -308,7 +313,7 @@ const TRAILER = (() => {
     const node = (x, z, avoid) => { let n = STORY.nearestNode(x, z); if (avoid.some(m => Math.hypot(NG.x[m] - NG.x[n], NG.z[m] - NG.z[n]) < 2.2)){ let best = null;
       for (let k = 0; k < NG.x.length; k++){ const dd = Math.hypot(NG.x[k] - x, NG.z[k] - z); if (dd > 6 || avoid.some(m => Math.hypot(NG.x[m] - NG.x[k], NG.z[m] - NG.z[k]) < 2.2)) continue; if (!best || dd < best.d) best = { k, d: dd }; }
       if (best) n = best.k; } return n; };
-    const n3 = node(lerp(d3.x, PARK_C.x, .35), lerp(d3.z, PARK_C.z, .35), []);
+    const n3 = node(lerp(d3.x, PARK_C.x, .12), lerp(d3.z, PARK_C.z, .12), []);   // (a step or two from the door)
     const n1 = node(PARK_C.x - 2.8, PARK_C.z - 1.6, [n3]), n2 = node(PARK_C.x + 2.6, PARK_C.z + 1.8, [n3, n1]);
     TR.c = { view, pairs: [{ A: a1, B: b1, n: n1 }, { A: a2, B: b2, n: n2 }, { A: p3.p, B: b3, n: n3 }], subject: p3.p, home: places.get(p3.p.home) };
     TR.info.cast = { view: { yaw: +view.yaw.toFixed(2), pitch: +(view.pitch/DEG).toFixed(0) }, people: TR.c.pairs.map(q => q.A.id), pod: p3.p.pod };
@@ -675,7 +680,7 @@ const TRAILER = (() => {
   }
   // the hour: morning while the city grows, afternoon in the garden, the ride from mid-afternoon into golden hour, night behind the towers
   const hourAt = t => t < MK.swoop ? lerp(6.9, 11.0, ss(t/MK.swoop)) : t < MK.coastIn ? lerp(13.6, 14.6, seg(t, MK.swoop, MK.coastIn))
-    : t < MK.wall ? lerp(15.6, 18.4, ss(seg(t, MK.ride, MK.wall - .6))) : 21.8;
+    : t < MK.wall - .5 ? lerp(15.6, 18.4, ss(seg(t, MK.ride, MK.wall - .5))) : lerp(18.4, 21.8, ss(seg(t, MK.wall - .5, MK.wall + .5)));   // (dusk to night while the arcology fills the frame)
   // the city's lights at the end: dark through the pull back, then they catch, stutter and come on
   const FLICK = [[0, 0], [.08, .35], [.14, 0], [.3, .55], [.36, .1], [.5, .8], [.56, .35], [.7, 1], [.78, .7], [.86, 1]];
   function lightsAt(t){
@@ -693,7 +698,7 @@ const TRAILER = (() => {
       const h = hourAt(TR.t);
       if (!CAP && Math.abs(h - S.hour) > 1e-4) window.HOUR_DRAG_AT = performance.now();
       S.hour = h;
-      if (TR.t >= MK.wall) LIGHTS_ON.value = lightsAt(TR.t)*LIGHTS_GOAL;
+      if (TR.t >= MK.wall - .5) LIGHTS_ON.value = lightsAt(TR.t)*LIGHTS_GOAL;
       camAt(TR.t, dt);
     });
     return _uc(dt);
@@ -765,8 +770,7 @@ const TRAILER = (() => {
   }
   function paint(t){
     const E = TR.el;
-    const wallDip = Math.max(0, 1 - Math.abs(t - MK.wall)/.16)*.65;   // (a dark beat as the towers fill the frame: day becomes night behind them)
-    const black = t < .9 ? 1 - ss(t/.9) : t > LEN - .75 ? ss((t - (LEN - .75))/.75) : t > MK.logo ? .58*ss(seg(t, MK.logo, MK.logo + 1.2)) : wallDip;
+    const black = t < .9 ? 1 - ss(t/.9) : t > LEN - .75 ? ss((t - (LEN - .75))/.75) : t > MK.logo ? .58*ss(seg(t, MK.logo, MK.logo + 1.2)) : 0;
     E.black.style.setProperty('opacity', String(black), 'important');
     E.flash.style.opacity = flashT >= 0 ? String(flashA*Math.max(0, 1 - (t - flashT)/.14)) : '0';
     glitch(t);

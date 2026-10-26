@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record the Neon Terrarium trailer: 1920 x 1080, 60 fps, 68.5 s, with Bytes and the coast sounds laid in.
+"""Record the Neon Terrarium trailer: 1920 x 1080, 60 fps, 69.5 s, with Bytes and the coast sounds laid in.
 
 Runs on your own Mac (it needs the graphics card). It serves this folder, opens the game at #trailer in Chrome
 with a stepped clock (tools/trailer/shim.js), waits while the trailer builds its city and warms up, then captures
@@ -17,8 +17,8 @@ import argparse, base64, functools, http.server, json, os, shutil, subprocess, s
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 OUT = os.path.join(HERE, 'out')
-LEN, FPS = 68.5, 60
-STILLS = [0.5, 4, 7.9, 11, 14, 17, 20, 23, 25.5, 29.5, 32, 34.5, 38.5, 43, 47, 50.5, 54.2, 58, 61.8, 65.5]
+LEN, FPS = 69.5, 60
+STILLS = [0.5, 4, 7.9, 11, 14, 17, 20, 23, 25.5, 29.5, 32, 34.5, 38.5, 43, 47, 50.5, 54.5, 55.8, 57, 59.5, 62.8, 66.5]
 
 
 def serve(port):

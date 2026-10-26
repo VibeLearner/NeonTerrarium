@@ -1,6 +1,6 @@
 # The trailer
 
-A 68.5 second film of the game, cut to **Bytes** (`assets/audio/music/Bytes.mp3`), with no text except the logo at the end.
+A 69.5 second film of the game, cut to **Bytes** (`assets/audio/music/Bytes.mp3`), with no text except the logo at the end.
 It is played by the game itself: open the game with `#trailer` at the end of the address. Code: `js/trailer.js`.
 
 | Time | Shot |
@@ -10,9 +10,9 @@ It is played by the game itself: open the game with `#trailer` at the end of the
 | 27.9 to 36.6 s | Their apartment opens in Furnish pod: the hologram scan, then a piece of furniture, a ceiling light and a plant on a table are set down while the room turns |
 | 36.6 to 41.95 s | A glitch into the coast: a town over the cliffs and the land behind them, at midday, seen whole (shorebirds), and a glitch out |
 | 41.95 s | A metro seen from the side (a little zoomed out, so the landmarks show whole), past the foundry and factories, the Neon Dome, the market mall and towers, then out over the clouds at golden hour |
-| 55 s | A long arcology at the dense city's edge sweeps across and fills the frame: behind it it is night. The camera pulls back over the dense neon city in the dark, the city and the metro running on past the edges of the frame |
-| 61 s | The city's lights flicker on |
-| 64 s | The logo |
+| 54.2 to 57.4 s | A long arcology at the dense city's edge sweeps across and fills the whole frame for about three seconds while dusk turns to night. The camera pulls back over the dense neon city in the dark, the city and the metro running on past the edges of the frame |
+| 62 s | The city's lights flicker on |
+| 65 s | The logo |
 
 Bytes plays as it is, from the top.
 

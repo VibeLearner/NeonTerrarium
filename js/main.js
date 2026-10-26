@@ -4,7 +4,8 @@
 /* ---------- loop ---------- */
 resize();
 bakeClouds();
-if (!load()) clearIsland(); else if (loadWanted()) loadStart(); else rebuildAll();   // (a saved city is made from its recipes by the worker, nearest the camera first: loadcity.js)
+if (window.NT_TRAILER && typeof TRAILER !== 'undefined') TRAILER.city();   // (#trailer: its own city, never saved: js/trailer.js)
+else if (!load()) clearIsland(); else if (loadWanted()) loadStart(); else rebuildAll();   // (a saved city is made from its recipes by the worker, nearest the camera first: loadcity.js)
 centerView(true);
 selectZone(null);
 let last = performance.now();

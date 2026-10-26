@@ -15,13 +15,17 @@ const NT_CITY_KEYS = ['neonIsland.v2', 'neonIsland.megas', 'neonIsland.highways'
 const NT_CITY_PREFIX = 'neonIsland.coast.', NT_NOT_CITY = new Set(['neonIsland.coast.dayCycle']);
 function NT_isCityKey(k){ return typeof k === 'string' && !NT_NOT_CITY.has(k) && (NT_CITY_KEYS.includes(k) || k.startsWith(NT_CITY_PREFIX)); }
 let NT_SAVE_LOCK = false;
+// #trailer (js/trailer.js) builds a city of its own and changes settings for the film: nothing it does is kept, the player's city and every
+// neonIsland.* preference stay exactly as they were
+window.NT_TRAILER = /trailer/.test(location.hash);
+const NT_LOCKED = k => (NT_SAVE_LOCK && NT_isCityKey(k)) || (window.NT_TRAILER && typeof k === 'string' && k.startsWith('neonIsland.'));
 const NT_RAW = { set: Storage.prototype.setItem, remove: Storage.prototype.removeItem };
-Storage.prototype.setItem = function (k, v){ if (NT_SAVE_LOCK && this === window.localStorage && NT_isCityKey(k)) return; return NT_RAW.set.call(this, k, v); };
-Storage.prototype.removeItem = function (k){ if (NT_SAVE_LOCK && this === window.localStorage && NT_isCityKey(k)) return; return NT_RAW.remove.call(this, k); };
+Storage.prototype.setItem = function (k, v){ if (this === window.localStorage && NT_LOCKED(k)) return; return NT_RAW.set.call(this, k, v); };
+Storage.prototype.removeItem = function (k){ if (this === window.localStorage && NT_LOCKED(k)) return; return NT_RAW.remove.call(this, k); };
 // the title screen shows on every load, unless a city switch just asked to go straight in
 (() => {
   let skip = false; try { skip = sessionStorage.getItem('neonTerrarium.skipTitle') === '1'; sessionStorage.removeItem('neonTerrarium.skipTitle'); } catch (e) {}
-  if (/[?&](notitle|tv=1)\b/.test(location.search) || navigator.webdriver) skip = true;   // (tests and the tools/ harnesses go straight in, and so does a return from the coast)
+  if (/[?&](notitle|tv=1)\b/.test(location.search) || navigator.webdriver || window.NT_TRAILER) skip = true;   // (tests and the tools/ harnesses go straight in, and so does a return from the coast)
   if (/[?&]title\b/.test(location.search)) skip = false;   // (?title: show it anyway, for looking at it under a test browser)
   window.NT_TITLE = !skip;
   if (!skip) document.documentElement.classList.add('title-on', 'title-boot');   // (title-boot: a dark cover until the room's picture is in, so the city never shows loading first)

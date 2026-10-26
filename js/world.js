@@ -358,6 +358,8 @@ const ATLAS_SIDE = ATLAS.clone(); ATLAS_SIDE.onBeforeCompile = ATLAS.onBeforeCom
 // It sits on layer 6 (OV_BIT): the live pass draws it, the old path (which draws the buildings themselves) doesn't.
 const OV_BIT = 64;
 const ATLAS_OV = ATLAS.clone(); ATLAS_OV.onBeforeCompile = ATLAS.onBeforeCompile; ATLAS_OV.customProgramCacheKey = ATLAS.customProgramCacheKey; ATLAS_OV.depthWrite = false;
+const ovDisposeWith = og => () => og.dispose();
+function ovFreeArr(){ this.array = null; }
 function glowOverlay(mesh){
   const g = mesh.geometry, fl = g.attributes.aFlk, em = g.attributes.aEm, on = g.attributes.aOn, I = g.index && g.index.array; if (!fl || !em || !on || !I) return;
   const F = fl.array, E = em.array, ON = on.array, u = g.userData.cut, fb = [], win = [];
@@ -387,7 +389,7 @@ function glowOverlay(mesh){
     og.setIndex(new THREE.BufferAttribute(g.attributes.position.count > 65535 ? new Uint32Array(out) : new Uint16Array(out), 1));
   }
   if (!g.boundingSphere) g.computeBoundingSphere(); og.boundingSphere = g.boundingSphere.clone();
-  g.addEventListener('dispose', () => og.dispose());
+  g.addEventListener('dispose', ovDisposeWith(og));   // (made outside: a closure here kept this whole call's working arrays, fb, win, out, alive as long as the mesh, Oct 26)
   const ov = new THREE.Mesh(og, ATLAS_OV); ov.layers.mask = blockKey !== undefined && !ovPerBlock() ? 0 : OV_BIT; ov.receiveShadow = mesh.receiveShadow; ov.castShadow = false; ov.userData.isOv = true;
   ov.userData.ovInfo = { nFB: fb.length, off }; ov.onBeforeRender = ovBefore; ov.onAfterRender = ovAfter;
   mesh.add(ov);
@@ -430,6 +432,7 @@ function ovFlush(){
       const ix = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni), rec = []; let k = 0, base = 0;
       for (const m of mem){ const g = m.ov.geometry, I = g.index.array; rec.push({ at: k, info: m.ov.userData.ovInfo, c: g.boundingSphere.center, r: g.boundingSphere.radius }); for (let q = 0; q < I.length; q++) ix[k++] = I[q] + base; base += g.attributes.position.count; }
       geo.setIndex(new THREE.BufferAttribute(ix, 1)); geo.computeBoundingSphere();
+      for (const n of names) geo.attributes[n].onUpload(ovFreeArr); geo.index.onUpload(ovFreeArr);   // (on the card its arrays are let go: a change makes the batch again from the blocks' own overlays, so nothing reads them; they doubled the overlays' memory, Oct 26)
       const b = new THREE.Mesh(geo, ATLAS_OV); b.layers.mask = per ? 0 : OV_BIT; b.receiveShadow = rs; b.castShadow = false; b.frustumCulled = false; b.matrixAutoUpdate = false; b.updateMatrix(); b.matrixWorldNeedsUpdate = true;
       b.userData.ovb = rec; b.onBeforeRender = ovbBefore; b.onAfterRender = ovAfter; world.add(b); ovBatches.set(sk + (rs ? 'r' : 'p'), b);
     }
@@ -1940,11 +1943,18 @@ const markSolid = c => { if (c){ const k = mergeKey(c.i, c.j); solidAbort(k); ti
 // every merge block that overlaps a region (REG x REG plots)
 function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
   for (let i = Math.floor(a*REG/MREG); i <= Math.floor((a*REG + REG - 1)/MREG); i++) for (let j = Math.floor(b*REG/MREG); j <= Math.floor((b*REG + REG - 1)/MREG); j++){ solidAbort(i + ',' + j); tierStashDrop(i + ',' + j); solidDirty.add(i + ',' + j); } }
+// how long the block merges may take this frame: a quarter of a frame at most while the view moves; with a backlog and the view still, six milliseconds (a city
+// just loaded left 80 blocks waiting, drawn plot by plot, a minute and more at a few ms a frame: owner's report, Oct 26)
+function solidBudget(){
+  const base = Math.max(1, Math.min(4, 250/Math.max(30, (typeof PM !== 'undefined' && PM.fps) || 60)) - FRAME_WORK);
+  const still = typeof NV !== 'undefined' && NV.still >= 30, fps = (typeof PM !== 'undefined' && PM.fps) || 60;
+  return still && solidDirty.size > 6 && fps > 50 ? Math.max(base, 6 - FRAME_WORK) : base;
+}
 function flushSolid(){
   disposeTick();
   flushSuper();
   if (SYNC_NOW()){ solidFinish(); if (solidDirty.size){ for (const k of solidDirty){ try { rebuildSolid(k); } catch (e){ SOLID_FAIL.n++; if (SOLID_FAIL.n <= 3) console.warn('merging block ' + k + ' failed; its old merge stays drawn.', e); } } solidDirty.clear(); } }
-  else { solidRetry(); if (SOLID_JOB || solidDirty.size) solidStep(TIER.rush ? 14 : Math.max(1, Math.min(4, 250/Math.max(30, (typeof PM !== 'undefined' && PM.fps) || 60)) - FRAME_WORK));   /* (a quarter of a frame at most: 4 ms was half a frame on a 120 Hz screen) */ }
+  else { solidRetry(); if (SOLID_JOB || solidDirty.size) solidStep(TIER.rush ? 14 : solidBudget());   /* (a quarter of a frame at most: 4 ms was half a frame on a 120 Hz screen) */ }
   tierRushDone();   // (a block's merge in steps over the frames, after the frame's other spread work)
   ovFlush();
 }

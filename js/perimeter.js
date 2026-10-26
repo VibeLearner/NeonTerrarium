@@ -11,7 +11,10 @@ const WALL_BASE = 4*FH, WALL_TIER = 2*FH, WALL_T = .44, GATE_H = 2.35, GATE_PIL 
 const WALL_ZONES = { low: 'Residential', mid: 'Commercial', high: 'Luxury', ind: 'Industrial' };
 // which neighbors (in SIDES4 order: +x, -x, +z, -z) are walls, and how high it may go under a highway or the metro: worked out on the page
 // for each build (recipeOf calls this), so the plot worker builds from the recipe alone
+// bumped whenever any wall's layout is worked out again: the walking grids' cache (people.js cellGrid) checks it before working out a wall's stamps again
+let WALL_REV = 0;
 function wallPrep(c){
+  WALL_REV++;
   if (!c.wall){ delete c.wallN; delete c.wallG; delete c.wallB; delete c.wallR; delete c.wallRL; delete c.wallCap; return; }
   const nb = SIDES4.map(([a, b]) => cells.get(ckey(c.i + a, c.j + b)));
   c.wallN = nb.map(n => n && n.wall && !n.mega ? 1 : 0);

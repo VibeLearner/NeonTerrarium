@@ -201,8 +201,12 @@ function wallStamps(c){
 }
 function cellGrid(c){
   const m = c.mega ? megas.get(c.mega) : null, src = m ? m.data : c.data;
+  // (the walls next door only change when one is worked out again: until then the cached grid stands, without making the stamps and their string again. Made on every call,
+  //  they were the largest single source of garbage, 6 MB in 14 frames of a big city, Oct 26)
+  const wrev = typeof WALL_REV !== 'undefined' ? WALL_REV : 0;
+  if (c._pg && c._pg.data === src && c._pg.wrev === wrev) return c._pg;
   const st = wallStamps(c), ws = st ? JSON.stringify(st) : '';
-  if (c._pg && c._pg.data === src && c._pg.ws === ws) return c._pg;
+  if (c._pg && c._pg.data === src && c._pg.ws === ws){ c._pg.wrev = wrev; return c._pg; }
   let r;
   if (m){
     if (!m._pr || m._pr.src !== src) m._pr = { src, r: src ? rasterize(src, m.i*LOT - LOT/2, m.j*LOT - LOT/2, m.w*GN, m.h*GN) : null };
@@ -234,7 +238,7 @@ function cellGrid(c){
     }
   }
   // (src: a new identity whenever the maps change, so what is kept from them, crossings and paths, is found again)
-  return (c._pg = { src: st ? { of: src, ws } : src, data: src, ws, solid, soft, high, mid, free, doors, x0: c.x - LOT/2, z0: c.z - LOT/2 });
+  return (c._pg = { src: st ? { of: src, ws } : src, data: src, ws, wrev, solid, soft, high, mid, free, doors, x0: c.x - LOT/2, z0: c.z - LOT/2 });
 }
 // a plot's footprint maps from its generated data alone (what the plot worker makes with the plot)
 function plotMaps(x, z, src){
@@ -2145,6 +2149,10 @@ function ghPose(p, t, dt){
   const dx = e[0]*g.dir, dz = e[2]*g.dir, sd = dx*_camR.x + dz*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1;
   return true;
 }
+// (the drawing loop's small pieces, made without new objects every person every frame: a facing as a shared pair, read at once and never kept, and the mate
+//  next to a spot found without a new function each time. Garbage made every frame is collected every few frames, and a city of thousands made a lot of it, Oct 26)
+const _FACE = [0, 0], _f2 = (a, b) => { _FACE[0] = a; _FACE[1] = b; return _FACE; };
+function nearMate(sp){ for (const o of sp.near){ if (!o.by) continue; const q = people.get(o.by); if (q && !q.walk) return o; } return null; }
 function updatePeople(dt, t){
   PH.subBegin();
   pplNow = t;
@@ -2307,11 +2315,11 @@ function updatePeople(dt, t){
         let face = sp.face, gest = false;
         if (sp.kind === 'seat'){ y = sp.y - .09*PPL_S; frame = F_SIT + Math.floor(t*1.2 + p.phase) % 4;
           if (newLook && (p.eating === sp || sp.act === 'eat') && Math.floor(t*.22 + p.phase) % 3 > (p.eating === sp ? 0 : 1)) frame = F_SITEAT + Math.floor(t*1.6 + p.phase) % 4;   // eating what they ordered (and at a picnic, now and then)
-          if (sp.act === 'holo'){ face = [sp.hx - sp.x, sp.hz - sp.z]; holoOn.push(p._holo = sp);   // watching the show
+          if (sp.act === 'holo'){ face = _f2(sp.hx - sp.x, sp.hz - sp.z); holoOn.push(p._holo = sp);   // watching the show
             if (!(p.emoUntil > t) && pplRand() < dt*.03) emote(p, pplRand() < .5 ? 'bang' : 'note', 2); }
-          else if (sp.act){ if (sp.pic){ const pk = sp.pic.x.toFixed(2) + ',' + sp.pic.z.toFixed(2) + '|' + sp.pic.ry.toFixed(3) + '|' + sp.pic.col; picOn.add(pk); p._pic = pk; }
-            const mate = sp.near.find(o => o.by && people.get(o.by) && !people.get(o.by).walk);
-            if (mate) face = [mate.x - sp.x, mate.z - sp.z];
+          else if (sp.act){ if (sp.pic){ const pk = sp.pic._k || (sp.pic._k = sp.pic.x.toFixed(2) + ',' + sp.pic.z.toFixed(2) + '|' + sp.pic.ry.toFixed(3) + '|' + sp.pic.col); picOn.add(pk); p._pic = pk; }
+            const mate = nearMate(sp);
+            if (mate) face = _f2(mate.x - sp.x, mate.z - sp.z);
             if (!(p.emoUntil > t)){
               if (sp.act === 'eat' && pplRand() < dt*.09) emote(p, 'bowl', 2.4);                                 // a picnic
               else if (mate && pplRand() < dt*.05) emote(p, pplRand() < .45 ? 'note' : pplRand() < .6 ? 'heart' : 'bang', 2.2); } } }
@@ -2319,8 +2327,8 @@ function updatePeople(dt, t){
           if (sp.kind === 'vendor') gest = queued.has(stallKey(sp)) && Math.floor(t*.5 + p.phase) % 3 > 0;      // serving
           else if (sp.kind === 'queue'){ gest = served.has(stallKey(sp)) && Math.floor(t*.4 + p.phase) % 2 === 0;  // ordering
             if (!served.has(stallKey(sp)) && !(p.emoUntil > t) && pplRand() < dt*.06) emote(p, 'dots', 2); }   // waiting for the keeper
-          else { const mate = sp.near.find(o => o.by && people.get(o.by) && !people.get(o.by).walk);           // chatting
-            if (mate){ face = [mate.x - sp.x, mate.z - sp.z]; gest = Math.floor(t*.45 + p.phase) % 2 === 0;
+          else { const mate = nearMate(sp);           // chatting
+            if (mate){ face = _f2(mate.x - sp.x, mate.z - sp.z); gest = Math.floor(t*.45 + p.phase) % 2 === 0;
               if (!(p.emoUntil > t) && pplRand() < dt*.05) emote(p, pplRand() < .4 ? 'note' : pplRand() < .5 ? 'heart' : 'bang', 2.2); }
             else face = null; }
           frame = gest ? F_SPEC + Math.floor(t*6 + p.phase) % 6 : F_IDLE + Math.floor(t*2.5 + p.phase) % PPL.idle;

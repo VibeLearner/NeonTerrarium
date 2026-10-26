@@ -120,6 +120,9 @@ const TRAILER = (() => {
     safe('weather', () => { LK.setAutoWeather(false, true); LK.setWeather('clear', true, true); if (LK.pick !== 'auto') LK.setPick('auto', true); });
     safe('speed', () => { if (typeof FF !== 'undefined' && FF.set) FF.set(1); });
     window.__FULL_RATE = true;   // (everyone stepped every frame: the close-ups follow people exactly)
+    // one picture size for the whole film: the game sizes its render to the zoom (sky.js applyRenderRes, 4% steps that wait for a zoom to settle), and a
+    // camera that zooms every frame stepped it up and down all the way through. Pinned at the full screen height, the sharpest the game ever draws
+    safe('resolution', () => { ZOOM_RES = 0; TR.pinRes = true; H = 0; applyRenderRes(zoom); });
     safe('story', () => { if (STORY.engine === false) STORY.setEngine(true); });   // (the scenes need it, whatever this browser's own city had it set to)
     safe('cases', () => { if (typeof CASES !== 'undefined'){ CASES.paused = true; CASES.noStage = true; } });   // (no case of the player's own takes our crew or officers)
   }
@@ -395,6 +398,9 @@ const TRAILER = (() => {
   // the hour: morning haze, a quick afternoon, golden hour, dusk; 3 a.m. after the coast
   const hourAt = t => t < 3 ? lerp(6.9, 8.8, ss(t/3)) : t < 6.5 ? lerp(8.8, 17.0, ss((t - 3)/3.5)) : t < MK.follow ? lerp(17.0, 19.3, ss((t - 6.5)/3.5))
     : t < MK.coastIn ? lerp(19.3, 19.8, seg(t, MK.follow, MK.coastIn)) : 3.05 + (t - MK.coastIn)/150;
+  // the render size, pinned (see settle): asked for as if zoomed out to 24, which sizes it to the screen's height
+  const _ar = applyRenderRes;
+  applyRenderRes = function (z){ return _ar(TR.pinRes ? 24 : z); };
   // the camera is set just before the game places it each frame
   const _uc = updateCamera;
   updateCamera = function (dt){

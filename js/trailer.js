@@ -24,8 +24,8 @@ const TRAILER = (() => {
 
   /* ---------- timing: Bytes runs at 160 bpm; the drop lands at 21.72 s, the lull before it starts at 19.2 s ---------- */
   const LEN = 45, BEAT = 60/160, DROP = 21.72, bar = n => DROP + n*4*BEAT;
-  const MK = { swoop: 8.4, follow: 10.0, subjectOut: 7.9, monOpen: 10.25, notes: 13.3, monClose: 14.8, furn: 15.0, coastWake: 18.7,
-    coastIn: 19.2, coastOut: DROP, clean: 20.85, cut2: bar(3), arrive: 28.6, rise: bar(8), logo: bar(13), end: LEN };
+  const MK = { swoop: 8.4, follow: 10.0, subjectOut: 7.9, monOpen: 10.25, notes: 13.3, monClose: 14.8, furn: 15.0, coastWake: 18.2, dissolve: 18.95,
+    coastIn: 19.45, coastOut: DROP, clean: 20.85, cut2: bar(3), arrive: 28.6, rise: bar(8), logo: bar(13), end: LEN };
 
   /* ---------- small maths ---------- */
   const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
@@ -251,7 +251,7 @@ const TRAILER = (() => {
     }));
   }
   function coastWake(on){ CO.paused = !on; if (on && CO.pend){ const fn = CO.pend; CO.pend = null; CO.raf(fn); } }
-  function coastShow(on){ if (CO.el) CO.el.style.opacity = on ? '1' : '0'; }
+  function coastShow(a, blur = 0){ if (!CO.el) return; CO.el.style.opacity = String(a); CO.el.style.filter = blur > .05 ? 'blur(' + blur.toFixed(2) + 'px) brightness(' + (1 + blur*.06).toFixed(3) + ')' : ''; }
   function coastDrift(t){
     if (!CO.ready || !CO.w || !CO.w.COAST) return;
     const u = seg(t, MK.coastWake, MK.coastOut);
@@ -436,9 +436,10 @@ const TRAILER = (() => {
   at(MK.monClose, () => { keep(document.getElementById('monitor'), false); keep(document.getElementById('npcSel'), false); MON.close(); }, 'cam off');
   at(MK.furn, () => { if (!FURN.openKey(TR.c.subject.pod)) warn('furnish', 'did not open'); }, 'furnish');
   at(MK.coastWake, () => coastWake(true), 'coast wakes');
-  at(MK.coastIn, () => { coastShow(true); flash(.85); if (FURN.open || FURN.hold) FURN.close(); LK.setWeather('rain', true, true); stageNight(); }, 'coast');
+  at(MK.dissolve, () => { CO.fade = true; }, 'coast dissolves in');
+  at(MK.coastIn, () => { if (FURN.open || FURN.hold) FURN.close(); LK.setWeather('rain', true, true); stageNight(); }, 'night falls behind the coast');
   at(MK.clean, () => cleanout(), 'cleanout');
-  at(MK.coastOut, () => { coastShow(false); flash(.45); coastWake(false); }, 'drop');
+  at(MK.coastOut, () => { CO.fade = false; coastShow(0); flash(.45); coastWake(false); }, 'drop');
   at(-1, () => raid(), 'raid');   // (its time is worked out from the walk: see setup)
   at(MK.end, () => { TR.playing = false; TR.done = true; say('done'); if (!CAP){ TR.el.msg.hidden = false; TR.el.status.innerHTML = 'click to play again'; TR.el.ov.classList.add('ask'); TR.el.ov.addEventListener('click', () => location.reload(), { once: true }); } }, 'end');
   function timeRaid(){   // leave the station so the four reach the door at MK.arrive (hurried walk, plus the two doorways)
@@ -455,7 +456,9 @@ const TRAILER = (() => {
     const E = TR.el;
     const black = t < .9 ? 1 - ss(t/.9) : t > LEN - .75 ? ss((t - (LEN - .75))/.75) : t > MK.logo ? .58*ss(seg(t, MK.logo, MK.logo + 1.2)) : 0;
     E.black.style.setProperty('opacity', String(black), 'important');
-    E.flash.style.opacity = flashT >= 0 ? String(flashA*Math.max(0, 1 - (t - flashT)/.14)) : '0';
+    const hz = t > MK.dissolve - .2 && t < MK.coastIn + .45 ? .32*Math.sin(Math.PI*seg(t, MK.dissolve - .2, MK.coastIn + .45)) : 0;   // (a bright haze over the dissolve: a memory surfacing)
+    E.flash.style.opacity = String(Math.max(hz, flashT >= 0 ? flashA*Math.max(0, 1 - (t - flashT)/.14) : 0));
+    if (CO.fade){ const u = ss(seg(t, MK.dissolve, MK.coastIn)); coastShow(u, 9*(1 - u)); }
     const l1 = t > MK.logo + .5 ? neonAt(t - MK.logo - .5) : 0, l2 = t > MK.logo + .85 ? neonAt(t - MK.logo - .85) : 0;
     E.w1.style.opacity = String(l1); E.w2.style.opacity = String(l2);
     E.logo.style.opacity = t > LEN - .5 ? String(1 - ss((t - (LEN - .5))/.5)) : '1';

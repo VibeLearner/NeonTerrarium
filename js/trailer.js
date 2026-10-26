@@ -119,7 +119,7 @@ const TRAILER = (() => {
     safe('pixels', () => { if (RENDER_LINES !== 720) setRenderLines(720); });   // (the game's own pixel look; 1.5x up to 1080)
     safe('weather', () => { LK.setAutoWeather(false, true); LK.setWeather('clear', true, true); if (LK.pick !== 'auto') LK.setPick('auto', true); });
     safe('speed', () => { if (typeof FF !== 'undefined' && FF.set) FF.set(1); });
-    window.__FULL_RATE = true;   // (everyone stepped every frame: the close-ups follow people exactly)
+    if (CAP) window.__FULL_RATE = true;   // (recording: everyone stepped every frame; live, the far-off people step every few frames as in the game)
     // one picture size for the whole film: the game sizes its render to the zoom (sky.js applyRenderRes, 4% steps that wait for a zoom to settle), and a
     // camera that zooms every frame stepped it up and down all the way through. Pinned at the full screen height, the sharpest the game ever draws
     safe('resolution', () => { ZOOM_RES = 0; TR.pinRes = true; H = 0; applyRenderRes(zoom); });
@@ -400,13 +400,16 @@ const TRAILER = (() => {
     : t < MK.coastIn ? lerp(19.3, 19.8, seg(t, MK.follow, MK.coastIn)) : 3.05 + (t - MK.coastIn)/150;
   // the render size, pinned (see settle): asked for as if zoomed out to 24, which sizes it to the screen's height
   const _ar = applyRenderRes;
-  applyRenderRes = function (z){ return _ar(TR.pinRes ? 24 : z); };
+  // (recording: the full screen height; live preview: the game's base size, so it plays smoothly while it's checked)
+  applyRenderRes = function (z){ return _ar(TR.pinRes ? (CAP ? 24 : ZOOM_REF) : z); };
   // the camera is set just before the game places it each frame
   const _uc = updateCamera;
   updateCamera = function (dt){
     if (TR.playing) safe('frame', () => {
       TR.t = Math.min(LEN, clock());
-      S.hour = hourAt(TR.t);
+      const h = hourAt(TR.t);
+      if (!CAP && Math.abs(h - S.hour) > 1e-4) window.HOUR_DRAG_AT = performance.now();   // (live: while the hour runs the shadows redraw every few frames, as when the time slider is dragged)
+      S.hour = h;
       if (TR.t > MK.coastIn && TR.t < MK.cut2) LIGHTS_ON.value = LIGHTS_GOAL;   // (straight into the night: every window already lit)
       camAt(TR.t, dt);
     });

@@ -2744,7 +2744,7 @@ function removeArea(r){
   const inR = (i, j) => i >= r.i0 && i <= r.i1 && j >= r.j0 && j <= r.j1;
   stageFinishNear([...cells.values()].filter(c => c.i >= r.i0 - 1 && c.i <= r.i1 + 1 && c.j >= r.j0 - 1 && c.j <= r.j1 + 1));
   const lines = [...(typeof hwRemoveArea === 'function' ? hwRemoveArea(r) : []), ...(typeof mtRemoveArea === 'function' ? mtRemoveArea(r) : [])];
-  for (const m of [...megas.values()]) if (m.i <= r.i1 && m.i + m.w - 1 >= r.i0 && m.j <= r.j1 && m.j + m.h - 1 >= r.j0) removeMega(m);
+  for (const m of [...megas.values()]) if ((m.cells || []).some(b => b && inR(b.i, b.j)) || (m.i <= r.i1 && m.i + m.w - 1 >= r.i0 && m.j <= r.j1 && m.j + m.h - 1 >= r.j0)) removeMega(m);   // (by its own plots too: a turned megastructure's)
   const gone = [], touched = new Set();
   for (const c of [...cells.values()]){
     if (!inR(c.i, c.j) || c.mega) continue;

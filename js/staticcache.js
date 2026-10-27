@@ -130,6 +130,10 @@ function scDrawRect(c0, c1, r0, r1, px, py){
 }
 function scDrawRect0(c0, c1, r0, r1, px, py){
   scCamera();
+  // (the rectangle is placed from where the camera is now, which is what scCamera just copied: not from px, py, which for the ring after a turn are
+  //  where the view was when that began. A pan in between drew the ring's strips that many pixels out of place, a band of the city a few pixels off
+  //  that scrolled into view and stayed until the next whole picture: owner's recording, Oct 27)
+  px = Math.round(camPix.x); py = Math.round(camPix.y);
   const M = SC.Muse, cam_ = SC.camS, pxl = 2*zoom/H, baseC = scCol(px) - M, baseR = scRow(py) - M, rt = SC.rtS;
   for (const [tx, ax, wx] of scPieces(c0, c1 - c0, SC.ox, SC.w)) for (const [ty, ay, wy] of scPieces(r0, r1 - r0, SC.oy, SC.h)){
     const pc0 = c0 + ax, pr0 = r0 + ay;   // (this piece's absolute start)

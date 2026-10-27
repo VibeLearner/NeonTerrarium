@@ -1984,11 +1984,19 @@ function solidBudget(){
   return still && solidDirty.size > 6 && fps > 50 ? Math.max(base, 6 - FRAME_WORK) : base;
 }
 let SOLID_HELD = false;   // (merges waiting for a turn to end: the overlay's line)
+// The rounded boxes' shapes (core.js rbCache) are kept by size while plots are made; once the city is loaded and quiet they are let go (36 MB in the owner's
+// big city, Oct 27) and made again, the same to the byte, when a plot next asks for one. The worker keeps its own copies, and the ones it was sent stay sent.
+const RB_TRIM = { at: 0, keep: 1500 };
+function rbTrim(){
+  if (PM.frame - RB_TRIM.at < 600 || rbCache.size <= RB_TRIM.keep) return; RB_TRIM.at = PM.frame;
+  if ((typeof LOADP !== 'undefined' && LOADP.on) || SYNC_NOW() || STAGE_Q.length || STAGE_READY.length || STAGE_CHAINS.size || SOLID_JOB || (typeof TITLE !== 'undefined' && TITLE.on)) return;
+  rbCache.clear();
+}
 function flushSolid(){
-  disposeTick();
+  disposeTick(); rbTrim();
   flushSuper();
   if (SYNC_NOW()){ solidFinish(); if (solidDirty.size){ for (const k of solidDirty){ try { rebuildSolid(k); } catch (e){ SOLID_FAIL.n++; if (SOLID_FAIL.n <= 3) console.warn('merging block ' + k + ' failed; its old merge stays drawn.', e); } } solidDirty.clear(); } }
-  else { solidRetry(); SOLID_HELD = !TIER.rush && (SOLID_JOB || solidDirty.size) && sdTurning(); if (!SOLID_HELD && (SOLID_JOB || solidDirty.size)) solidStep(TIER.rush ? 14 : solidBudget());   /* (a quarter of a frame at most: 4 ms was half a frame on a 120 Hz screen) */ }
+  else { solidRetry(); SOLID_HELD = !TIER.rush && (SOLID_JOB || solidDirty.size) && (sdTurning() || (typeof SC !== 'undefined' && !!SC.fill && !(PH.tests.mergeInTurn || window.__MERGE_IN_TURN)));   /* (and while the ring round a new picture is being drawn, four frames: merges coming back after a turn landed on exactly those, owner's report Oct 27) */ if (!SOLID_HELD && (SOLID_JOB || solidDirty.size)) solidStep(TIER.rush ? 14 : solidBudget());   /* (a quarter of a frame at most: 4 ms was half a frame on a 120 Hz screen) */ }
   tierRushDone();   // (a block's merge in steps over the frames, after the frame's other spread work)
   ovFlush();
 }

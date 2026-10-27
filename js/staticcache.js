@@ -382,7 +382,11 @@ SC.frame = function(){
   //  (1.01 million). So after a turn the picture is drawn whole on the first still frame, as it once was; the strips stay for the light's slow drift,
   //  where nothing else is drawn the old way. The test "after a turn: the picture in strips" brings the strips back for turns.)
   const stable = scSame(hard, SC.prev); SC.prev = hard.slice();
-  let viewOnly = false;
+  // A whole new picture on a still frame for any other reason (the first after the cache was let go, the light jumping, an edit too big for a
+  // rectangle) is drawn as after a turn: the view now, the ring round it over the next four frames. Drawn whole at once (the view and the margin,
+  // 2.4 times the pixels and every triangle of the wider view) it was the one 50 ms frame as a turn ended in the owner's report of Oct 26.
+  // (The very first picture, and the test "after a turn: the whole picture at once", still draw it whole.)
+  let viewOnly = !!now && now !== 'redrawn every frame' && now !== 'view left the cache' && SC.rebuilds > 0 && SC.R !== undefined && !(PH.tests.wholeAfterTurn || window.__WHOLE_AFTER_TURN);
   if (now === 'something it depends on changed' && SC.ok){
     if (!stable){ SC.state = 'off'; SC.why = 'changing: drawn the old way'; SC.job = null; return false; }
     viewOnly = !(PH.tests.wholeAfterTurn || window.__WHOLE_AFTER_TURN);
@@ -467,6 +471,16 @@ function scLiveCull(){
     for (let q = 0; q < 24; q += 4) if (pl[q]*cx + pl[q + 1]*cy + pl[q + 2]*cz + pl[q + 3] < -r){ o.visible = false; _lcHid.push(o); break; }
   }
   SC.liveCulled = _lcHid.length;
+}
+// A turn's frames (drawn the old way, the cache can't help): the still live things too small to make out, under SD.tinyPx render pixels across
+// (signs, glass, glow points and the like far out in the view), are left out while the view turns, as the plots' smallest triangles are
+// (speed-based detail, world.js). Never on a still frame, so the cache and every still picture keep them. (Test: "turns: keep tiny things".)
+function scTinyCull(){
+  SC.tinyCulled = 0; _lcHid.length = 0;
+  if (!SD.on || !SD.moving || PH.tests.keepTiny || PH.tests.noSpeed || (typeof FARV !== 'undefined' && FARV.far)) return;
+  scLiveList(); const lim = SD.tinyPx*zoom/H;   // (a radius under this many world units is under SD.tinyPx render pixels across: an orthographic view, H/(2 zoom) pixels a unit)
+  for (let i = 0; i < _lcList.length; i += 5){ const o = _lcList[i]; if (o.visible && _lcList[i + 4] < lim){ o.visible = false; _lcHid.push(o); } }
+  SC.tinyCulled = _lcHid.length;
 }
 function scLiveRestore(){ for (let i = 0; i < _lcHid.length; i++) _lcHid[i].visible = true; _lcHid.length = 0; }
 // (the overlay's test: a red frame the frame a whole cache is drawn again, and a red band where a background strip is being drawn)

@@ -278,6 +278,7 @@ function removeMegaTier(m){
   if (!m) return;
   if (m.levels <= 1) return removeMega(m);
   finishAnimsOn(m);
+  solidDrop(m);
   const top = m.top, old = { view: m.view, data: m.data }; m.view = null; m.data = null;
   m.levels--;
   refresh([], [m]);
@@ -287,6 +288,7 @@ function removeMega(m){
   if (!m) return;
   finishAnimsOn(m);
   if (m.fx){ m.fx.dispose(); m.fx = null; }
+  solidDrop(m);   // (out of its block's merge at once: a deleted night market hung on in the old merge, owner's recording Oct 27)
   const old = { view: m.view, data: m.data }; m.view = null; m.data = null;
   megas.delete(m.id);
   for (const b of m.cells) b.mega = null;

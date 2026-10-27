@@ -1972,6 +1972,9 @@ function solidHide(c){
     for (let i = 0; i < pc.length; i++) if (pc[i] === c){ (P.hide || (P.hide = new Uint8Array(P.n)))[i] = 1; P.stamp = -1; } }
   for (const m of rec.members) if (m.userData.cell === c) m.visible = !(m.userData.sideOf && m.geometry.userData.full);
 }
+// A plot or megastructure deleted: its block's old merge goes at once (the block's other plots draw one by one until it is merged again). Hiding only its
+// pieces (solidHide) doesn't reach every merged mesh (the ones made without piece ranges), and what it misses stayed drawn while merges waited for the view
+const solidDrop = c => { if (!c) return; const k = mergeKey(c.i, c.j); solidAbort(k); tierStashDrop(k); const rec = solidRegions.get(k); if (rec && rec.members.some(m => m.userData.cell === c)) solidRemoveOld(k); solidDirty.add(k); };
 const markSolid = c => { if (c){ const k = mergeKey(c.i, c.j); solidAbort(k); tierStashDrop(k); solidHide(c); solidDirty.add(k); } };
 // every merge block that overlaps a region (REG x REG plots)
 function markSolidRegion(rk){ const [a, b] = rk.split(',').map(Number);
@@ -2561,7 +2564,7 @@ function addPlatform(i, j, zone = null){
 }
 function removePlatform(c){
   if (c.sections.length) return;
-  finishAnimsOn(c);
+  finishAnimsOn(c); solidDrop(c);   // (out of its block's merge at once: see removeArea)
   const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
   cells.delete(ckey(c.i, c.j)); dirtyRegions.add(regKey(c.i, c.j));
   refresh(SIDES4.map(([a,b]) => cells.get(ckey(c.i+a, c.j+b))));
@@ -2747,6 +2750,7 @@ function removeArea(r){
     if (!inR(c.i, c.j) || c.mega) continue;
     finishAnimsOn(c);
     const top = c.sections.length ? c.height : CURB, zone = c.sections.length ? c.sections[0].zone : null;
+    solidDrop(c);   // (out of its block's merge now: the merge stayed drawn with them until the block was merged again, which waits while the view moves, so deleted plots came and went as you zoomed: owner's recording, Oct 27)
     const old = { view: c.view, data: c.data }; c.view = null; c.data = null;
     cells.delete(ckey(c.i, c.j)); dirtyRegions.add(regKey(c.i, c.j)); gone.push(c);
     startAnim(c, 'remove', PLAT_BOTTOM, top + 1.4, zone, LOT, old);

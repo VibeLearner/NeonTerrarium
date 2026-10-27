@@ -183,6 +183,17 @@ function mtRemove(l, quiet){
   if (!quiet){ mtCommit(null, touched); sfx.play('remove'); } else mtReindex();
   return touched;
 }
+// delete mode: every metro line reaching into the block is cut there, as a right-click on that plot cuts it (that plot and the rest of the line beyond it go);
+// a station whose lift shaft stands in the block counts as reaching in. The plots it stood on are returned for the rebuild
+function mtRemoveArea(r){
+  const out = [], inR = (i, j) => i >= r.i0 && i <= r.i1 && j >= r.j0 && j <= r.j1;
+  for (const l of [...metros]){
+    let k = l.tiles.findIndex(t => inR(t.i, t.j));
+    for (const s of mtStops(l)){ const c = mtLiftCell(l, s); if (c && inR(c[0], c[1]) && (k < 0 || s < k)) k = s; }
+    if (k >= 0) out.push(...mtCutAt(l, k, true));
+  }
+  return out;
+}
 function mtClearAll(){ for (const l of metros) mtDropView(l); metros = []; mtActive = null; mtReindex(); }
 function mtSave(){ try { localStorage.setItem(MT_SAVE_KEY, JSON.stringify(metros.map(l => ({ id: l.id, done: l.done, st: l.st, sides: l.sides, t: l.tiles.map(t => [t.i, t.j]) })))); } catch (e) {} }
 function mtLoad(){

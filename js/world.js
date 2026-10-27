@@ -2725,8 +2725,14 @@ function removeSection(c){
 }
 // Delete mode: everything in a block of plots goes at once: megastructures that reach into it (whole), and every
 // plot in it, buildings and platform alike, each with the removal sweep. One rebuild for the lot at the end.
+// The sky highways and metro lines reaching into the block are cut there first, so nothing is left standing on plots that are gone (they used to hang
+// over the hole, pillars on nothing: owner, Oct 27). Whoever is walking a way that crosses the block goes home at once (delivery bots back to their shop)
+// instead of walking over the hole until the walking network is made again. The plots round the block are made again by the worker over the next frames,
+// as a new platform's neighbors are, not all on the main thread at the click (a big block's ring of buildings was the lag spike).
 function removeArea(r){
   const inR = (i, j) => i >= r.i0 && i <= r.i1 && j >= r.j0 && j <= r.j1;
+  stageFinishNear([...cells.values()].filter(c => c.i >= r.i0 - 1 && c.i <= r.i1 + 1 && c.j >= r.j0 - 1 && c.j <= r.j1 + 1));
+  const lines = [...(typeof hwRemoveArea === 'function' ? hwRemoveArea(r) : []), ...(typeof mtRemoveArea === 'function' ? mtRemoveArea(r) : [])];
   for (const m of [...megas.values()]) if (m.i <= r.i1 && m.i + m.w - 1 >= r.i0 && m.j <= r.j1 && m.j + m.h - 1 >= r.j0) removeMega(m);
   const gone = [], touched = new Set();
   for (const c of [...cells.values()]){
@@ -2738,8 +2744,23 @@ function removeArea(r){
     startAnim(c, 'remove', PLAT_BOTTOM, top + 1.4, zone, LOT, old);
   }
   for (const c of gone) for (const [a, b] of SIDES4){ const n = cells.get(ckey(c.i + a, c.j + b)); if (n) touched.add(n); }
-  if (gone.length){ refresh([...touched]); save(); sfx.play('remove'); }
+  for (const [i, j] of lines){ const n = cells.get(ckey(i, j)); if (n && !n.mega) touched.add(n); }   // (the plots the lines stood on, outside the block: their pillars and lifts go)
+  if (gone.length) areaAgentsLeave(inR);
+  if (gone.length || lines.length){
+    if (lines.length){ SC_DIRTY.unknown = true; shadowDirty = true; }
+    if (STAGE_ON() && !SYNC_NOW() && RW.usable() && touched.size){ refresh([]); stageRefresh([...touched]); }   // (the removed plots' blocks now; the plots round them by the worker)
+    else refresh([...touched]);
+    save(); sfx.play('remove');
+  }
   return gone.length;
+}
+// everyone whose walk crosses plots that are gone: home now (a bot: back inside its shop), rather than on over the hole until the next sync
+function areaAgentsLeave(inR){
+  if (typeof people === 'undefined') return;
+  NET_HOLE = true; _cellNums = null;   // (no new way over the hole until the network is made again: people.js route)
+  const crosses = pts => { for (let k = 0; k < pts.length; k++) if (inR(Math.round(pts[k][0]/LOT), Math.round(pts[k][1]/LOT))) return true; return false; };
+  for (const p of people.values()){ const w = p.walk, rc = p.ride && p.ride.c; if ((w && w.pts && crosses(w.pts)) || (rc && inR(rc.i, rc.j)) || (!w && inR(Math.round((p.x || 0)/LOT), Math.round((p.z || 0)/LOT)) && p.at !== p.home)){ sendHome(p); p.ride = null; } }
+  if (typeof bots !== 'undefined') for (const b of bots){ const w = b.walk; if ((w && w.pts && crosses(w.pts)) || (b.state !== 'in' && inR(Math.round(b.x/LOT), Math.round(b.z/LOT)))){ b.walk = null; b.ride = null; b.cap = null; b.door = null; b.state = 'in'; b.until = pplNow + 5; } }
 }
 // the selection in delete mode: a red patch over the plots, with an outline
 const selFill = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-PI/2), new THREE.MeshBasicMaterial({ color: 0xff3a4a, transparent: true, opacity: .26, depthTest: false, depthWrite: false }));

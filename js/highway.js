@@ -183,8 +183,12 @@ function hwRemove(h, quiet){
 }
 // delete mode: every highway reaching into the block is cut there (see hwCutAt); the plots it stood on are returned for the rebuild
 function hwRemoveArea(r){
-  const out = [];
-  for (const h of [...highways]){ const k = h.tiles.findIndex(t => t.i >= r.i0 && t.i <= r.i1 && t.j >= r.j0 && t.j <= r.j1); if (k >= 0) out.push(...hwCutAt(h, k, true)); }   // (cut from the first of its plots in the block)
+  const out = [], inR = (i, j) => i >= r.i0 && i <= r.i1 && j >= r.j0 && j <= r.j1;
+  for (const h of [...highways]){
+    let k = h.tiles.findIndex(t => inR(t.i, t.j));   // (cut from the first of its plots in the block)
+    if (k < 0 && h.done){ const L = hwLiftSpot(h, h.side); if (inR(Math.round(L.sx/LOT), Math.round(L.sz/LOT))) k = h.tiles.length - 1; }   // (its drop-off's lift stands in the block: the end goes with it)
+    if (k >= 0) out.push(...hwCutAt(h, k, true));
+  }
   return out;
 }
 function hwClearAll(){ for (const h of highways){ hwDropView(h); hwClearCars(h); } highways = []; hwActive = null; hwReindex(); }

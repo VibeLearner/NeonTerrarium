@@ -454,7 +454,11 @@ function _rhPop(){
 }
 const _rtHz = v => Math.hypot(NG.x[v] - NG.x[_rtB], NG.z[v] - NG.z[_rtB]);
 const _rtVisit = (e, w) => { const d = _rtG[_rtV] + e.cost; if (_rtSeen[w] !== _rtEpC || d < _rtG[w]){ _rtSeen[w] = _rtEpC; _rtG[w] = d; _rtFrom[w] = _rtV; _rhPush(w, d + _rtHz(w)); } };
-function route(a, b){
+// After plots are deleted and before the walking network is made again (a few frames on: the sync), a way that crosses where they were is no way:
+// NET_HOLE is set by the delete (world.js removeArea) and cleared when the new network goes in
+let NET_HOLE = false;
+function route(a, b){ const r = route0(a, b); return NET_HOLE && r && wayGone(r) ? null : r; }
+function route0(a, b){
   if (a === b) return [[NG.x[a], NG.z[a]]];
   const key = a*1048576 + b;   // (a number, not a text key: no string per lookup)
   const hit = routeCache.get(key); if (hit !== undefined) return hit;
@@ -593,7 +597,7 @@ function* makeSpots(pl, list, inside, oldSpots, addEnd){   // (a generator since
   for (const a of pl.spots){ if ((++na & 63) === 0 && NETSPLIT()) yield; if (a.act) for (const b of pl.spots) if (b !== a && b.act === a.act && Math.hypot(a.x - b.x, a.z - b.z) < .9) a.near.push(b); }
 }
 // Rebuild the network, the places and their doors after an edit. Unchanged plots reuse their cached maps and paths.
-function buildNetwork(){ drain(buildNetworkGen(doorByKey, spotByKey)); }
+function buildNetwork(){ drain(buildNetworkGen(doorByKey, spotByKey)); NET_HOLE = false; }
 function* buildNetworkGen(oldDoors, oldSpots){
   NG = { x: [], z: [], adj: [], key: new Map() }; routeCache.clear();
   doorList = []; hiddenDoors = []; doorByKey = new Map(); spotByKey = new Map();
@@ -739,7 +743,7 @@ function* buildNetworkGen(oldDoors, oldSpots){
 // the walking network made in steps: its tables are swapped in only while a step runs, so the people go on using the old ones until the new are done
 let NET_JOB = null;
 const netCap = () => ({ NG, routeCache, doorList, hiddenDoors, doorByKey, spotByKey, patrolNodes, crossAt });
-const netApply = s => { NG = s.NG; routeCache = s.routeCache; doorList = s.doorList; hiddenDoors = s.hiddenDoors; doorByKey = s.doorByKey; spotByKey = s.spotByKey; patrolNodes = s.patrolNodes; crossAt = s.crossAt; };
+const netApply = s => { NET_HOLE = false; NG = s.NG; routeCache = s.routeCache; doorList = s.doorList; hiddenDoors = s.hiddenDoors; doorByKey = s.doorByKey; spotByKey = s.spotByKey; patrolNodes = s.patrolNodes; crossAt = s.crossAt; };
 function netSlice(job){
   const live = netCap(); netApply(job.build); let r;
   try { r = job.gen.next(); } finally { job.build = netCap(); netApply(live); }

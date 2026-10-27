@@ -266,6 +266,9 @@ function scSoft(out){
   out.length = k; return out;
 }
 function scShadowKey(out){ let k = 0; for (const v of sun.shadow.matrix.elements) out[k++] = v; out[k++] = sun.shadow.map ? sun.shadow.map.texture.id : -1; out.length = k; return out; }
+// which parts of the hard key changed since the last frame, by name (the hitch report's "changing" line)
+const SC_HARD_NAMES = ['turn', 'tilt', 'zoom', 'render width', 'render height', 'smooth look', 'fine detail level', 'small triangle level', 'small triangle size', 'far order', 'city lights switching on', 'sun shadows', 'shadow map', 'pinned depth', 'overlay tests'];
+function scWhatChanged(a, b){ if (!a || !b) return '?'; const r = []; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) r.push(SC_HARD_NAMES[i] || '#' + i); return r.join(', ') || '?'; }
 function scSame(a, b){ if (!a || !b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
 function scDelta(a, b){ let m = 0; for (let i = 0; i < a.length; i++){ const d = Math.abs(a[i] - b[i]); if (d > m) m = d; } return m; }
 SC.editsSeen = 0; SC.rects = 0; SC.lt = null;   // (rects: edits drawn as a rectangle; lt: the lights the picture was drawn with)
@@ -381,14 +384,14 @@ SC.frame = function(){
   //  strips drew about 660,000 triangles, 5 million to make a picture that drawn whole is 1.07 million, about what a frame of the turn itself draws
   //  (1.01 million). So after a turn the picture is drawn whole on the first still frame, as it once was; the strips stay for the light's slow drift,
   //  where nothing else is drawn the old way. The test "after a turn: the picture in strips" brings the strips back for turns.)
-  const stable = scSame(hard, SC.prev); SC.prev = hard.slice();
+  const stable = scSame(hard, SC.prev); SC.prevWas = SC.prev; SC.prev = hard.slice();
   // A whole new picture on a still frame for any other reason (the first after the cache was let go, the light jumping, an edit too big for a
   // rectangle) is drawn as after a turn: the view now, the ring round it over the next four frames. Drawn whole at once (the view and the margin,
   // 2.4 times the pixels and every triangle of the wider view) it was the one 50 ms frame as a turn ended in the owner's report of Oct 26.
   // (The very first picture, and the test "after a turn: the whole picture at once", still draw it whole.)
   let viewOnly = !!now && now !== 'redrawn every frame' && now !== 'view left the cache' && SC.rebuilds > 0 && SC.R !== undefined && !(PH.tests.wholeAfterTurn || window.__WHOLE_AFTER_TURN);
   if (now === 'something it depends on changed' && SC.ok){
-    if (!stable){ SC.state = 'off'; SC.why = 'changing: drawn the old way'; SC.job = null; return false; }
+    if (!stable){ SC.state = 'off'; SC.why = 'changing: drawn the old way (' + scWhatChanged(hard, SC.prevWas) + ')'; SC.job = null; return false; }
     viewOnly = !(PH.tests.wholeAfterTurn || window.__WHOLE_AFTER_TURN);
     if (PH.tests.stripsAfterTurn || window.__STRIPS_AFTER_TURN){
       if (SC.job && (!scSame(hard, SC.job.hard) || sun.shadow.map !== SC.job.map || SC.job.edits !== SC_EDITS || !SC.job.afterTurn)) SC.job = null;

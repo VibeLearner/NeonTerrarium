@@ -670,7 +670,7 @@ function standBuckets(bks){
 // the same, a step at a time (body: a generator that yields between its steps): see stageStart
 function* collectGen(body){
   FAR_CFG.lean = !!(PH.tests.leanRound || window.__LEAN_ROUND); FAR_CFG.sticks = !!(PH.tests.thinSticks || window.__THIN_STICKS);   // (both off unless the tests are on)
-  buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {}; curSpots = []; curCover = [];
+  buckets = new Map(); emitters = []; carPads = []; curPorts = []; glowList = {}; curSpots = []; curCover = []; curFine = [];
   for (const k in SPR.size) FOL_LIST[k] = [];
   FX = FX_REPLAY ? { src: FX_REPLAY, at: 0 } : { rec: [] }; FX_REPLAY = null;
   yield* body; yield;
@@ -688,12 +688,36 @@ function* collectGen(body){
   for (const g of geo.values()){ g.computeBoundingSphere(); g.computeBoundingBox(); }   // (the box too: world.add and remove note a plot's box for the static cache, and a plot whose arrays were let go should not need them for it)
   const fol = {}; for (const k in FOL_LIST) if (FOL_LIST[k].length) fol[k] = FOL_LIST[k];
   if (sg){ sg.computeBoundingSphere(); sg.computeBoundingBox(); }
-  const out = { geo, sgeo: sg, fol, glows: glowList, emitters, pads: carPads, ports: curPorts, spots: curSpots, draws: FX.rec ? Float64Array.from(FX.rec) : null };
+  const out = { geo, sgeo: sg, fol, glows: glowList, emitters, pads: carPads, ports: curPorts, spots: curSpots, fine: curFine.length ? Float32Array.from(curFine) : null, draws: FX.rec ? Float64Array.from(FX.rec) : null };
+  curFine = null;
   FX = null; glowList = null; buckets = new Map(); curSpots = null;
   return out;
 }
+// The far lines (core.js curFine): thin lights a steady pixel wide once the view is so far out that their own strips have gone with the fine details. Each line shows
+// exactly when its strip goes (the same detail id against the same level), so the two never show together; lit like the strip (its glow kind, switching on with
+// the city's lights). A line is drawn a pixel wide at any size of render, so it neither shimmers nor disappears.
+const FINE_LINE_MAT = new THREE.ShaderMaterial({
+  uniforms: { lodFine: LOD.fine, emI: EM_I, lightsOn: LIGHTS_ON, fTime: FOL_UNI.time },
+  vertexShader: 'attribute float aFine; attribute float aKind; attribute vec3 aCol; attribute vec3 aEmc; attribute float aOn; uniform float lodFine; uniform float emI[7]; uniform float lightsOn; uniform float fTime; varying vec3 vC;' + LIT_GLSL +
+    ' void main(){ int k = int(aKind + .5); float on = k >= 1 && k <= 4 ? litOn(aOn, lightsOn, fTime) : 1.0; vC = aCol*.35 + aEmc*emI[k]*on; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); if (!(lodFine*255.0 > aFine)) gl_Position = vec4(0.0, 0.0, 2.0, 1.0); }',
+  fragmentShader: 'varying vec3 vC; void main(){ gl_FragColor = vec4(vC, 1.0); }',
+});
+function fineLines(arrs){
+  let n = 0; for (const a of arrs) n += a.length/15;
+  const pos = new Float32Array(n*6), fine = new Float32Array(n*2), kind = new Float32Array(n*2), col = new Float32Array(n*6), emc = new Float32Array(n*6), on = new Float32Array(n*2);
+  let i = 0;
+  for (const a of arrs) for (let q = 0; q < a.length; q += 15, i++){
+    pos.set(a.subarray(q, q + 6), i*6);
+    for (let v = 0; v < 2; v++){ const j = i*2 + v; fine[j] = a[q + 6]; kind[j] = a[q + 7]; col.set(a.subarray(q + 8, q + 11), j*3); emc.set(a.subarray(q + 11, q + 14), j*3); on[j] = a[q + 14]; }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aFine', new THREE.BufferAttribute(fine, 1)); g.setAttribute('aKind', new THREE.BufferAttribute(kind, 1));
+  g.setAttribute('aCol', new THREE.BufferAttribute(col, 3)); g.setAttribute('aEmc', new THREE.BufferAttribute(emc, 3)); g.setAttribute('aOn', new THREE.BufferAttribute(on, 1));
+  g.computeBoundingSphere();
+  const ln = new THREE.LineSegments(g, FINE_LINE_MAT); ln.layers.set(1); ln.frustumCulled = false; ln.userData.fineLines = true; return ln;   // (layer 1: drawn with the colors only, like the glow points)
+}
 function disposeData(d){ if (d) for (const g of d.geo.values()) g.dispose(); }
-function disposeGroup(g){ g.traverse(o => { if (o.isMesh || o.isPoints) o.geometry.dispose(); }); }
+function disposeGroup(g){ g.traverse(o => { if (o.isMesh || o.isPoints || o.isLineSegments) o.geometry.dispose(); }); }
 // A merged block's old meshes are freed on the card a few frames after they stop being drawn, one group a frame, not in the frame they are
 // swapped out: freeing a hundred buffers the card may still be drawing (the frame before is often still in flight) can make the driver wait
 // for it, and that wait fell inside the next frame's color pass (the owner's traces of a fling: 20 to 55 ms of waiting, nothing sent). The
@@ -719,6 +743,7 @@ function batchGroup(datas, withGeo = true){
   for (const k in SPR.size) FOL_LIST[k] = fol[k] || [];
   const saved = city; city = g; buildFoliage(); city = saved;
   if (Object.keys(gl).length) g.add(glowPoints(gl));
+  { const fs = datas.filter(d => d.fine && d.fine.length); if (fs.length) g.add(fineLines(fs.map(d => d.fine))); }
   return freezeTree(g);
 }
 
@@ -2329,23 +2354,23 @@ function flushSuper(){
   if (once) superDirty.delete(todo[0]); else superDirty.clear();
 }
 // geometry a merged batch made itself is freed with it; geometry it shares with a region's own batch is not
-function disposeMerged(g){ g.traverse(o => { if ((o.isMesh || o.isPoints) && o.userData.own) o.geometry.dispose(); }); }
+function disposeMerged(g){ g.traverse(o => { if ((o.isMesh || o.isPoints || o.isLineSegments) && o.userData.own) o.geometry.dispose(); }); }
 // Everything drawn in some region batches, joined: one object per kind (plain mesh per material and settings, plant
 // instances, glow points per layer), in the regions' order.
 function mergeLeaves(groups){
   const cls = new Map();
   groups.forEach((grp, gi) => grp.traverse(o => {
-    if (!(o.isMesh || o.isPoints)) return;
+    if (!(o.isMesh || o.isPoints || o.isLineSegments)) return;
     // (what is culled to the view, the bridges and walkways themselves, stays a mesh per region: a bigger one would be
     // drawn whenever any of it is on screen, all of it, and close up that is a lot of geometry out of sight)
-    const k = (o.isInstancedMesh ? 'I' : o.isPoints ? 'P' : 'M') + o.material.id + '|' + o.layers.mask + '|' + o.renderOrder + '|' + o.castShadow + '|' + o.receiveShadow + '|' + (o.userData.lawn ? 'L' : '') + '|' + (o.userData.fol ? 'f' + Math.floor(o.geometry.boundingSphere.center.x/FOL_BLOCK) + ',' + Math.floor(o.geometry.boundingSphere.center.z/FOL_BLOCK) : o.frustumCulled ? 'cull' + gi : '');   // (plants are joined by blocks of about 2 x 2 regions and culled block by block, with a bounding sphere made below: a block per region would add a draw each, a whole super-region culls hardly anything)
+    const k = (o.isInstancedMesh ? 'I' : o.isPoints ? 'P' : o.isLineSegments ? 'S' : 'M') + o.material.id + '|' + o.layers.mask + '|' + o.renderOrder + '|' + o.castShadow + '|' + o.receiveShadow + '|' + (o.userData.lawn ? 'L' : '') + '|' + (o.userData.fol ? 'f' + Math.floor(o.geometry.boundingSphere.center.x/FOL_BLOCK) + ',' + Math.floor(o.geometry.boundingSphere.center.z/FOL_BLOCK) : o.frustumCulled ? 'cull' + gi : '');   // (plants are joined by blocks of about 2 x 2 regions and culled block by block, with a bounding sphere made below: a block per region would add a draw each, a whole super-region culls hardly anything)
     let l = cls.get(k); if (!l) cls.set(k, l = []); l.push(o);
   }));
   const out = new THREE.Group();
   for (const list of cls.values()){
     const o0 = list[0]; let obj;
     if (list.length === 1){
-      obj = o0.isInstancedMesh ? new THREE.InstancedMesh(o0.geometry, o0.material, o0.count) : o0.isPoints ? new THREE.Points(o0.geometry, o0.material) : new THREE.Mesh(o0.geometry, o0.material);
+      obj = o0.isInstancedMesh ? new THREE.InstancedMesh(o0.geometry, o0.material, o0.count) : o0.isPoints ? new THREE.Points(o0.geometry, o0.material) : o0.isLineSegments ? new THREE.LineSegments(o0.geometry, o0.material) : new THREE.Mesh(o0.geometry, o0.material);
       if (o0.isInstancedMesh) obj.instanceMatrix = o0.instanceMatrix;
     } else if (o0.isInstancedMesh){
       const geo = new THREE.BufferGeometry(), g0 = o0.geometry;
@@ -2369,7 +2394,7 @@ function mergeLeaves(groups){
         for (const g of geos){ const I = g.index.array; for (let q = 0; q < I.length; q++) ix[k++] = I[q] + base; base += g.attributes.position.count; }
         geo.setIndex(new THREE.BufferAttribute(ix, 1)); }
       geo.computeBoundingSphere();
-      obj = o0.isPoints ? new THREE.Points(geo, o0.material) : new THREE.Mesh(geo, o0.material); obj.userData.own = true;
+      obj = o0.isPoints ? new THREE.Points(geo, o0.material) : o0.isLineSegments ? new THREE.LineSegments(geo, o0.material) : new THREE.Mesh(geo, o0.material); obj.userData.own = true;
     }
     if (o0.userData.fol){   // the plants' own settings (sprites.js folMesh), and the joined mesh's bounding sphere: the spheres of the parts, joined
       obj.userData.fol = true; folSettings(obj, obj.count, !!o0.userData.lawn);

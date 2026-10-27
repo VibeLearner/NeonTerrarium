@@ -137,7 +137,7 @@ function recipePack(raw, geoOnly){
   // (the plot's footprint and walking maps, from its geometry, made here so the page need not: people.js cellGrid takes them from the data. Not for a plot inside a megastructure, whose maps come from the megastructure)
   let grids = null; if (!raw.mega && !geoOnly){ grids = plotMaps(raw.x, raw.z, raw.data); for (const k in grids) typed(grids[k]); }
   if (geoOnly) return { msg: { geo, sgeo }, xfer: [...xfer] };   // (a plot made again for its arrays: nothing else is wanted)
-  const d = raw.data, msg = { draws: d.draws ? typed(d.draws) : null, grids, geo, sgeo, fol: pk(d.fol), glows: pk(d.glows), emitters: pk(d.emitters), pads: pk(d.pads), ports: pk(d.ports), spots: pk(d.spots), fields, air: raw._air };
+  const d = raw.data, msg = { draws: d.draws ? typed(d.draws) : null, grids, geo, sgeo, fol: pk(d.fol), glows: pk(d.glows), emitters: pk(d.emitters), pads: pk(d.pads), ports: pk(d.ports), spots: pk(d.spots), fine: d.fine ? typed(d.fine) : null, fields, air: raw._air };
   for (const k of raw._written) if (k !== 'data') fields[k] = pk(raw[k]);
   return { msg, xfer: [...xfer] };
 }
@@ -170,7 +170,7 @@ function recipeUnpack(m){
     if (!mat) throw new Error('recipeUnpack: no material ' + e.key);
     geo.set(mat, unGeo(e));
   }
-  const data = { geo, sgeo: m.sgeo ? unGeo(m.sgeo) : null, fol: up(m.fol), glows: up(m.glows), emitters: up(m.emitters), pads: up(m.pads), ports: up(m.ports), spots: up(m.spots) };
+  const data = { geo, sgeo: m.sgeo ? unGeo(m.sgeo) : null, fol: up(m.fol), glows: up(m.glows), emitters: up(m.emitters), pads: up(m.pads), ports: up(m.ports), spots: up(m.spots), fine: m.fine || null };
   const fields = {}; for (const k in m.fields) fields[k] = up(m.fields[k]);
   if (m.grids) data.grids = m.grids;
   return { data, fields, air: m.air, draws: m.draws };

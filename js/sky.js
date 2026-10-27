@@ -1616,6 +1616,7 @@ function setZoomRes(v){ ZOOM_RES = v; try { localStorage.setItem(ZOOMRES_KEY, St
 const FARV_KEY = 'neonIsland.farView';
 const FARV = { on: (() => { try { return localStorage.getItem(FARV_KEY) !== '0'; } catch (e) { return true; } })(), inZ: 40, outZ: 36, far: false, sharp: false,
   lastMove: 0, p: null, pix: 3e6, ema: 16.7, t: 0, quick: 0, cut: 0, k: 0, up: 0, v0: .25, below: 0, above: 0, since: 99 };   // (k: how far the sharp view has come in, 0 to 1; v0: the speed below which it starts)
+let FAR_SNAP_H = 0;   // (zoomed out: the moving view's height, whose pixel grid the camera keeps to at both sizes; 0 otherwise)
 function setFarView(on){ FARV.on = !!on; try { localStorage.setItem(FARV_KEY, FARV.on ? '1' : '0'); } catch (e) {} }
 function farTrack(now){
   const v = [yaw, zoom, PITCH, camT.x, camT.z], p = FARV.p, dtF = Math.max(1, now - (FARV.lt || now));
@@ -1662,12 +1663,23 @@ function applyRenderRes(z){
   // late, the judder that came and went with the zoom (measured on the owner's M2, Oct 25: 52 fps at 1.6 times, a steady 60 at the base). Never under the base
   h = Math.min(h, Math.max(BASE_H, Math.floor(Math.sqrt(PIX_MAX*DH/DW))));   // ("Cap at 720p" is the apartments' only, owner's choice Oct 25: the city keeps its sharpness)
   H_LOD = h;   // (the detail levels go by this, the size without the sharp view: main.js)
-  if (FARV.k > 0) h = Math.max(h, Math.round(h + (Math.min(DH, SMOOTH_MAX, Math.floor(Math.sqrt(FARV.pix*DH/DW))) - h)*FARV.k));   // (zoomed out and slowing or still: the sharp view, above)
-  if (h === H) return;
+  // Zoomed out, the moving view and the sharp view are two sizes whose pixels line up: the sharp one exactly twice the moving one across and down, and the
+  // camera put on the moving view's pixel grid in both (input.js, FAR_SNAP_H). At sizes that didn't divide, the city was drawn on a different grid when the
+  // view sharpened, a jump of one to three screen pixels as a pan ended and back as the next began (owner, Oct 27). The moving view is half the sharp view
+  // (at most a quarter under what it was), and sharpens in one step. Where that would cost the moving view more (the sharp view under one and a half times
+  // the moving one: a sharp laptop screen with the render near its pixel cap) there's no sharp view: one size, moving or still, and no step to show.
+  // (Test: "zoomed out: sharp view at any size (as before)".)
+  let w = 0; FAR_SNAP_H = 0;
+  if (FARV.far && FARV.on && !(PH.tests.farGridOld || window.__FAR_GRID_OLD)){
+    const hs = Math.min(DH, SMOOTH_MAX, Math.floor(Math.sqrt(FARV.pix*DH/DW))), h0 = Math.min(h, hs >> 1);
+    if (h0 >= .75*h){ FAR_SNAP_H = h0; const w0 = Math.max(1, Math.round(h0*DW/DH)); if (FARV.k >= 1){ h = 2*h0; w = 2*w0; } else { h = h0; w = w0; } }
+  }
+  else if (FARV.k > 0) h = Math.max(h, Math.round(h + (Math.min(DH, SMOOTH_MAX, Math.floor(Math.sqrt(FARV.pix*DH/DW))) - h)*FARV.k));   // (zoomed out and slowing or still: the sharp view, above)
+  if (h === H && (!w || w === W)) return;
   // while the zoom is still gliding, small steps wait: each step remakes every render target (the frame, the depth, the glow, the clouds), and a turn
   // of the wheel crossed a dozen of them in half a second. A big step goes at once (the picture mustn't blur), the rest when the zoom settles
   if (H && !FARV.far && typeof zoomT !== 'undefined' && Math.abs(zoomT - z) > .02*z && Math.abs(h - H) < H*.12) return;   // (zoomed out the sharp view steps in quarters as the view slows: those go through)
-  H = h; W = Math.max(1, Math.round(h*DW/DH)); pxK = BASE_H/H;
+  H = h; W = w || Math.max(1, Math.round(h*DW/DH)); pxK = BASE_H/H;
   FOL_UNI.res.value.set(W, H); comp.uniforms.pxK.value = pxK;
   makeTargets();
 }

@@ -242,6 +242,9 @@ function keptOut(geo, m){
 // a light thin enough to fall between pixels when zoomed out (the metro pillars' strips): dropped with the fine details as the view goes out, instead of
 // kept like the other lights, where it shimmered in and out as the view moved (owner Oct 26). Set round the pieces that are, then cleared
 let FINE_LIGHT = false;
+// and each such light, as the line down its middle (start, end, its detail id, its glow kind, its color and glow color, when it switches on): once the view is far enough out
+// that the strip has gone with the fine details, the line is drawn in its place, a steady pixel wide whatever the zoom (world.js fineLines). Collected while a piece is made
+let curFine = null;
 function put(geo, mat, m, lean){
   if (PUT_KEEPOUT && keptOut(geo, m)) return;
   if (LUX){ let sub = LUX.mats.get(mat); if (!sub && LUX.auto && mat.userData && mat.userData.glow) sub = LUX.auto(mat); if (sub){ mat = sub; if (LUX.halo) LUX.halo(sub, m); } }
@@ -249,6 +252,11 @@ function put(geo, mat, m, lean){
   let b = buckets.get(mat); if (!b){ b = { p: [], n: [], d: [], f: mat.userData && mat.userData.glow ? [] : null, o: mat.userData && mat.userData.glow ? [] : null }; buckets.set(mat, b); }
   const fid = b.f ? (DARK && mat.userData.glow !== 'blink' ? heavyFlickerId() : flickerId(mat.userData.glow)) : 0;
   const did = b.f && !FINE_LIGHT ? 0 : detailId(geo, m), ord = b.f ? litOrder(m.elements[12], m.elements[13], m.elements[14]) : 0;   // lights are never dropped: they carry the look from far away
+  if (FINE_LIGHT && did > 0 && curFine && geo === U.box){
+    const e = m.elements; let a = 0, al = 0; for (let q = 0; q < 3; q++){ const l = Math.hypot(e[q*4], e[q*4 + 1], e[q*4 + 2]); if (l > al){ al = l; a = q; } }
+    const hx = e[a*4]/2, hy = e[a*4 + 1]/2, hz = e[a*4 + 2]/2, c = mat.color, em = mat.emissive || c;
+    curFine.push(e[12] - hx, e[13] - hy, e[14] - hz, e[12] + hx, e[13] + hy, e[14] + hz, did, EM_KIND[mat.userData.glow] || 5, c.r, c.g, c.b, em.r, em.g, em.b, litOrder(e[12], e[13], e[14])/255);
+  }
   if (curCover && geo === U.box && did === 0 && atlasable(mat) && !mat.userData.colorOnly) curCover.push(m.elements.slice());   // a solid block: may hide what's inside it (see hideCovered)
   const bp = b.p, base = bp.length/3, w = weldOf(geo);
   bucketIndexUpTo(b);

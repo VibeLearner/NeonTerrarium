@@ -144,6 +144,9 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', e => {
   if (HL && e.pointerType === 'touch') hlStop();   // (a finger's height pick ends when it lifts: a stray one left over just goes)
   if (HL){ if (e.button === 0) hlBuild(); else hlStop(); return; }   // (a height being picked: a click builds there, any other button lets go)
+  // (a mouse is one pointer: whatever an earlier press left behind, its release missed (the window lost focus mid-press, a menu or dialog took the release),
+  //  is let go here, so this press starts clean instead of carrying on the old one: in delete mode that left the selection following the cursor, unpressed)
+  if (e.pointerType === 'mouse' && ptrs.size){ ptrs.clear(); act = null; }
   canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); dragging = true;
   if (e.pointerType === 'touch' && tapPend){   // a second tap close to the first, soon after: a double tap. Anything else: the first tap builds now
     if (ptrs.size === 1 && performance.now() - tapPend.t < DT_MS + 150 && Math.hypot(e.clientX - tapPend.x, e.clientY - tapPend.y) < DT_PX){
@@ -193,6 +196,8 @@ function pointerMove(e){
     else { const mx = pmidX(); yawT -= (mx - pinchX)*.008; pinchX = mx; } } return; }
   if (act.kind === 'rotate'){ yawT -= dx*.008; tilt(); return; }
   if (act.kind === 'del'){
+    // (the button isn't held any more and its release never came: the drag is over where it stands, the selection kept as it was)
+    if (e.pointerType === 'mouse' && !(e.buttons & 1)){ act = null; ptrs.clear(); dragging = false; return; }
     if (Math.hypot(e.clientX - act.x, e.clientY - act.y) > 5) act.moved = true;
     const to = groundCellAt(e.clientX, e.clientY);
     if (act.moved && act.from && to){ delSel = { i0: Math.min(act.from.i, to.i), i1: Math.max(act.from.i, to.i), j0: Math.min(act.from.j, to.j), j1: Math.max(act.from.j, to.j) }; showAreaSel(delSel); }

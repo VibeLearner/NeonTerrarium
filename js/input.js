@@ -13,7 +13,7 @@ function setTiltMode(on){
   const el = document.getElementById('tiltChip'); if (el) el.hidden = !on;
 }
 const camPosTrue = new THREE.Vector3(), camPix = new THREE.Vector2(), keys = new Set(), _cr = new THREE.Vector3(), _cu = new THREE.Vector3(), _cv = new THREE.Vector3(), _cs = new THREE.Vector3();
-const YAW_MIN = .12;
+const YAW_MIN = .24;   // (was .12: the last stretch of a turn crept at about a tenth of a degree a frame for a quarter of a second, every frame of it drawn the old way, the whole city: owner's report Oct 27)
 function updateCamera(dt){
   if (S.spin && !dragging){ spinT += dt; if (spinT > 6){ spinT = 0; yawT += PI/4; } }
   // the turn eases out, but never slower than YAW_MIN radians a second: an exponential ease alone crawled for about a second at the end (the whole city

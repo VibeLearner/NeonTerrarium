@@ -95,29 +95,46 @@ const TITLE = (() => {
   // drawn each frame from the bake's camera on a canvas over the picture: the lamp swings, the leaves stir, the sun
   // turns with the city.
   const CAMS = { wide: { pos: [2.0, 2.33, 1.01], look: [-1.79, 1.28, -8.18], fov: 45.9 }, tall: { pos: [2.0, 2.33, 1.01], look: [-1.75, 1.28, -8.2], fov: 86 } };
-  let live = null, liveP = null, liveAt = 0;
+  let live = null, liveP = null, liveAt = 0, LIVE_GEN = 0, RM = null, KITCHEN = null, liveCv = null;
+  // Once the city is entered the room is let go: its model (some 50 MB of arrays in a big city's session, owner's memory summary Oct 27), its three
+  // drawing surfaces and what they hold on the graphics card. Opening the title screen again makes it again, about a second, as on the first launch
+  function freeLive(){
+    if (!liveP) return; LIVE_GEN++;
+    const gone = new Set(), drop = o => { if (o && !gone.has(o)){ gone.add(o); try { o.dispose(); } catch (e) {} } };
+    try { if (shutScene) shutScene.traverse(o => { drop(o.geometry); for (const m of [].concat(o.material || [])){ for (const k in m) if (m[k] && m[k].isTexture) drop(m[k]); drop(m); } }); } catch (e) {}
+    for (const r of [live && live.renderer, shutR, RT && RT.renderer]) if (r){ try { r.dispose(); r.forceContextLoss(); } catch (e) {} }
+    if (liveCv){ liveCv.remove(); liveCv = null; } if (rtCv){ rtCv.remove(); rtCv = null; }
+    const fresh = shutCv.cloneNode(false); shutCv.replaceWith(fresh); shutCv = fresh;   // (a canvas whose drawing context was let go can't be drawn on again)
+    live = null; liveP = null; RM = null; RT = null; shutR = null; shutScene = null; shutCam = null;
+  }
+  T._freeLive = freeLive;
   function startLive(){
     if (liveP) return liveP;
-    liveP = new Promise(res => { const sc = document.createElement('script'); sc.src = 'tools/title/kitchen.js?v=' + VER; sc.onload = res; sc.onerror = () => res(); document.head.appendChild(sc); }).then(async () => {
-      if (typeof ROOM === 'undefined' || !ROOM.movers) return;
-      const cv = document.createElement('canvas'); cv.className = 't-layer t-live'; cv.setAttribute('aria-hidden', 'true'); stage.insertBefore(cv, cvDust);
+    // (the room is made from the model's source each time the title screen opens: it's let go when the city is entered, see freeLive; a script tag would
+    //  declare it once for the page, and couldn't be made again)
+    KITCHEN = KITCHEN || fetch('tools/title/kitchen.js?v=' + VER).then(r => r.ok ? r.text() : null).catch(() => null);
+    const gen = ++LIVE_GEN;
+    liveP = KITCHEN.then(src => { if (gen !== LIVE_GEN) return; RM = null; if (src) try { RM = new Function(src + '\n;return ROOM;')(); } catch (e){ console.warn('title room:', e); } }).then(async () => {
+      if (gen !== LIVE_GEN || !RM || !RM.movers) return;
+      const cv = liveCv = document.createElement('canvas'); cv.className = 't-layer t-live'; cv.setAttribute('aria-hidden', 'true'); stage.insertBefore(cv, cvDust);
       const r = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: false }); { const gl = r.getContext(), src = gl.shaderSource.bind(gl); if (r.capabilities.isWebGL2) gl.shaderSource = (sh, t) => src(sh, t.replace('out highp vec4 pc_fragColor;', 'layout(location = 0) out highp vec4 pc_fragColor;\nlayout(location = 1) out highp vec4 pc_fragNormal;')); }   // (the game's shader pieces also write a second image, the normals: declare it here too)
       r.outputEncoding = THREE.sRGBEncoding; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = .72; r.setClearColor(0x000000, 0);   // (a little under: the bake's own grade and shading sit lower)
-      const scene = new THREE.Scene(), tick = ROOM.movers(scene); ROOM.setTime(TOD); const cam = new THREE.PerspectiveCamera(45, 1, .05, 40);
-      ROOM.shutter(scene); shutScene = scene; shutCam = new THREE.PerspectiveCamera(45, 1, .05, 40); shutCam.layers.set(1);
+      const scene = new THREE.Scene(), tick = RM.movers(scene); RM.setTime(TOD); const cam = new THREE.PerspectiveCamera(45, 1, .05, 40);
+      RM.shutter(scene); shutScene = scene; shutCam = new THREE.PerspectiveCamera(45, 1, .05, 40); shutCam.layers.set(1);
       shutR = new THREE.WebGLRenderer({ canvas: shutCv, alpha: true, antialias: true }); { const gl = shutR.getContext(), src = gl.shaderSource.bind(gl); if (shutR.capabilities.isWebGL2) gl.shaderSource = (sh, t) => src(sh, t.replace('out highp vec4 pc_fragColor;', 'layout(location = 0) out highp vec4 pc_fragColor;\nlayout(location = 1) out highp vec4 pc_fragNormal;')); }
       shutR.outputEncoding = THREE.sRGBEncoding; shutR.toneMapping = THREE.ACESFilmicToneMapping; shutR.toneMappingExposure = .8; shutR.setClearColor(0x000000, 0);
       // the room lit live, when the surface bake is there (else the baked pictures, as before)
-      if (GB) await new Promise(res => { const sc = document.createElement('script'); sc.src = 'tools/title/realtime.js?v=' + VER; sc.onload = res; sc.onerror = () => res(); document.head.appendChild(sc); });
+      if (GB && typeof TITLE_RT === 'undefined') await new Promise(res => { const sc = document.createElement('script'); sc.src = 'tools/title/realtime.js?v=' + VER; sc.onload = res; sc.onerror = () => res(); document.head.appendChild(sc); });
+      if (gen !== LIVE_GEN){ try { r.dispose(); r.forceContextLoss(); shutR.dispose(); shutR.forceContextLoss(); } catch (e) {} cv.remove(); shutR = null; return; }   // (the city was entered while this was being made)
       if (GB && typeof TITLE_RT !== 'undefined'){ try { rtCv = document.createElement('canvas'); rtCv.className = 't-layer t-rt'; rtCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(rtCv, imRoom);
-        RT = TITLE_RT.create(rtCv, scene, ROOM, 'assets/title/', GB); } catch (e){ try { console.warn('title lighting:', e); } catch (_) {} RT = null; if (rtCv){ rtCv.remove(); rtCv = null; } } }
+        RT = TITLE_RT.create(rtCv, scene, RM, 'assets/title/', GB); } catch (e){ try { console.warn('title lighting:', e); } catch (_) {} RT = null; if (rtCv){ rtCv.remove(); rtCv = null; } } }
       if (!RT && RTMODE){ RTMODE = false; A = {}; for (const v of ['wide', 'tall']) A[v] = RAW[v][TOD] || RAW[v].morning; view = null; layout(); }
       let vw = null;
       live = {
         view(v){ vw = v; const a = A[v], c = a.cam || CAMS[v]; r.setPixelRatio(1); r.setSize(a.w, a.h, false); cam.fov = c.fov; cam.aspect = a.w/a.h; cam.position.set(...c.pos); cam.lookAt(...c.look); cam.updateProjectionMatrix();
           if (RT) RT.view(v);
           shutR.setPixelRatio(1); shutR.setSize(a.w*2, a.h*2, false); shutCam.fov = cam.fov; shutCam.aspect = cam.aspect; shutCam.position.copy(cam.position); shutCam.quaternion.copy(cam.quaternion); shutCam.updateProjectionMatrix(); },
-        time(){ ROOM.setTime(TOD); const k = { morning: 1.1, day: 1.3, evening: .9, night: .7 }[TOD] || 1; ROOM.shutterLight.lt.intensity = 1.2*k; ROOM.shutterLight.hm.intensity = .45*k; },
+        time(){ RM.setTime(TOD); const k = { morning: 1.1, day: 1.3, evening: .9, night: .7 }[TOD] || 1; RM.shutterLight.lt.intensity = 1.2*k; RM.shutterLight.hm.intensity = .45*k; },
         at(x, y, z){ const v = new THREE.Vector3(x, y, z).project(cam); return [(v.x + 1)/2, (1 - v.y)/2]; },
         draw(t){ tick(reduced ? 0 : t);
           if (TP){ if (RT && RTMODE) TP.time('rt', () => RT.draw(lightParams()), RT.renderer); TP.time('live', () => { liveSun(); r.render(scene, cam); }, r); return; }
@@ -131,11 +148,11 @@ const TITLE = (() => {
   let SUNSGN = 1;
   // the live layer's sun (the plants and the lamp drawn over the room): the same light as the room's, the city's at night
   function liveSun(){
-    const G = cityGlow(), nK = G.nK || 0; ROOM.aimSun(sunW > 0 || nK > 0 ? sunH*Math.PI/180*SUNSGN : null);
-    const Ls = ROOM.L.sun;
-    if (nK > 0){ const wc = ROOM.winCenter(), d = Ls.position.clone().sub(wc).normalize().lerp(G.toCity, nK).normalize();
+    const G = cityGlow(), nK = G.nK || 0; RM.aimSun(sunW > 0 || nK > 0 ? sunH*Math.PI/180*SUNSGN : null);
+    const Ls = RM.L.sun;
+    if (nK > 0){ const wc = RM.winCenter(), d = Ls.position.clone().sub(wc).normalize().lerp(G.toCity, nK).normalize();
       Ls.position.copy(wc).addScaledVector(d, 9); Ls.target.position.copy(wc).addScaledVector(d, -3); Ls.target.updateMatrixWorld(); Ls.updateMatrixWorld();
-      Ls.color.set(ROOM.TIMESDATA[TOD].sunC).lerp(G.col, nK*.85); Ls.intensity *= 1 - nK + nK*.85*G.fl; }
+      Ls.color.set(RM.TIMESDATA[TOD].sunC).lerp(G.col, nK*.85); Ls.intensity *= 1 - nK + nK*.85*G.fl; }
     Ls.intensity *= .6*(sunW*(1 - nK) + OPEN*nK)*sunKNow();
   }
   // the room's light at the city's hour: the four looks the bake knew, blended through the day
@@ -148,9 +165,9 @@ const TITLE = (() => {
   function cityGlow(){
     const h = ((HOUR % 24) + 24) % 24; let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1][0] <= h) i++;
     const [h0, k0] = KEYS[i], [h1, k1] = KEYS[i + 1], f = h1 > h0 ? (h - h0)/(h1 - h0) : 0, nK = (k0 === 'night' ? 1 - f : 0) + (k1 === 'night' ? f : 0);
-    if (nK <= 0) return { nK: 0 };
+    if (nK <= 0 || !RM) return { nK: 0 };
     NEONC = NEONC || [0xff3fd0, 0x2fd8ff, 0x8a5cff, 0xffa040].map(c => new THREE.Color(c));
-    const ph = performance.now()/1000, out = ROOM.winNormal().negate(), e = -26*Math.PI/180;
+    const ph = performance.now()/1000, out = RM.winNormal().negate(), e = -26*Math.PI/180;
     const toCity = new THREE.Vector3(out.x, 0, out.z).normalize().multiplyScalar(Math.cos(e)); toCity.y = Math.sin(e);
     const u = (ph*.045) % NEONC.length, k = Math.floor(u), fr = u - k, sm = fr*fr*(3 - 2*fr), col = NEONC[k].clone().lerp(NEONC[(k + 1) % NEONC.length], sm);
     const d = Math.max(0, Math.sin(ph*1.3)*Math.sin(ph*.53 + 2) - .72)/.28, fl = 1 - .45*d*(.5 + .5*Math.sin(ph*37));
@@ -161,10 +178,10 @@ const TITLE = (() => {
   const SUNK = { morning: .8, day: 1, evening: .38, night: 1 };
   function sunKNow(){ const h = ((HOUR % 24) + 24) % 24; let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1][0] <= h) i++; const [h0, k0] = KEYS[i], [h1, k1] = KEYS[i + 1], f = h1 > h0 ? (h - h0)/(h1 - h0) : 0; return (SUNK[k0] ?? 1)*(1 - f) + (SUNK[k1] ?? 1)*f; }
   function lightParams(){
-    const T = ROOM.TIMESDATA, h = ((HOUR % 24) + 24) % 24; let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1][0] <= h) i++;
+    const T = RM.TIMESDATA, h = ((HOUR % 24) + 24) % 24; let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1][0] <= h) i++;
     const [h0, k0] = KEYS[i], [h1, k1] = KEYS[i + 1], f = h1 > h0 ? (h - h0)/(h1 - h0) : 0, a = T[k0], b = T[k1];
     const L = (x, y) => x + (y - x)*f, Cl = (x, y) => new THREE.Color(x).lerp(new THREE.Color(y), f);
-    const e = L(a.elev, b.elev)*Math.PI/180, th = sunH*Math.PI/180, out = ROOM.winNormal().negate(), c = Math.cos(th), s_ = Math.sin(th);
+    const e = L(a.elev, b.elev)*Math.PI/180, th = sunH*Math.PI/180, out = RM.winNormal().negate(), c = Math.cos(th), s_ = Math.sin(th);
     const toSun = new THREE.Vector3(out.x*c - out.z*s_, 0, out.x*s_ + out.z*c).multiplyScalar(Math.cos(e)); toSun.y = Math.sin(e);
     const dimK = .35 + .65*OPEN, sunI = L(a.sunI*(SUNK[k0] ?? 1), b.sunI*(SUNK[k1] ?? 1));
     // at night the city's neon drifts the light slowly between blue and purple (how much night there is: the lamps' weight)
@@ -182,9 +199,9 @@ const TITLE = (() => {
   // the pendant's light on the table at evening and night: a warm pool under the bulb, moving as the lamp swings
   const poolCv = document.createElement('canvas'), gPo = poolCv.getContext('2d'); poolCv.className = 't-layer t-sun'; poolCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(poolCv, cvDust);
   function drawPool(){ if (RTMODE){ poolCv.hidden = true; return; }
-    const w = poolCv.width = cvDust.width, h = poolCv.height = cvDust.height, k = typeof ROOM !== 'undefined' ? ROOM.lampsK || 0 : 0;
-    if (!live || !k || !ROOM.bulbAt) return;
-    const b = ROOM.bulbAt(), y = 1.145, c = live.at(b.x, y, b.z), px = [live.at(b.x + .55, y, b.z), live.at(b.x - .55, y, b.z), live.at(b.x, y, b.z + .55), live.at(b.x, y, b.z - .55)];
+    const w = poolCv.width = cvDust.width, h = poolCv.height = cvDust.height, k = RM ? RM.lampsK || 0 : 0;
+    if (!live || !k || !RM.bulbAt) return;
+    const b = RM.bulbAt(), y = 1.145, c = live.at(b.x, y, b.z), px = [live.at(b.x + .55, y, b.z), live.at(b.x - .55, y, b.z), live.at(b.x, y, b.z + .55), live.at(b.x, y, b.z - .55)];
     const rx = Math.max(...px.map(p => Math.abs(p[0] - c[0])))*w, ry = Math.max(...px.map(p => Math.abs(p[1] - c[1])))*h;
     gPo.save(); gPo.translate(c[0]*w, c[1]*h); gPo.scale(1, ry/Math.max(1, rx)); const g = gPo.createRadialGradient(0, 0, 0, 0, 0, rx);
     g.addColorStop(0, 'rgba(255,196,120,' + (.55*k).toFixed(3) + ')'); g.addColorStop(.5, 'rgba(255,170,90,' + (.22*k).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,150,70,0)');
@@ -197,7 +214,7 @@ const TITLE = (() => {
   /* ---------- the shutter on the porthole ---------- */
   // An iris of curved plates closes the window while the city loads (it streams in round the camera, nothing to look
   // at); once it's all there the plates swing back into the frame and the sun comes in with them.
-  const shutCv = document.createElement('canvas'); shutCv.className = 't-layer'; shutCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(shutCv, imRoom);
+  let shutCv = document.createElement('canvas'); shutCv.className = 't-layer'; shutCv.setAttribute('aria-hidden', 'true'); stage.insertBefore(shutCv, imRoom);
   let OPEN = 0, openFrom = null, shownAt = 0, DIM = 1;
   // the light bar's own light, kept bright while the room is dim: its glowing pixels (where the lit picture differs from
   // the one with the bar dark) drawn undimmed over the room, with a soft glow round it, both blinking with it
@@ -230,7 +247,7 @@ const TITLE = (() => {
     return out; };
   T._rt = () => RT;
   T._hold = () => { shownAt = 1e15; openFrom = null; };
-  T._open = () => { openFrom = -1e9; }; T._hour = h => { HOUR = h; }; T._dbg = () => ({ TOD, HOUR, OPEN, sunH, sunW, RTMODE, rt: !!RT, p: RT && ROOM ? lightParams() : null });   // (testing: keep the shutter shut)
+  T._open = () => { openFrom = -1e9; }; T._hour = h => { HOUR = h; }; T._dbg = () => ({ TOD, HOUR, OPEN, sunH, sunW, RTMODE, rt: !!RT, p: RT && RM ? lightParams() : null });   // (testing: keep the shutter shut)
   const furnReady = () => { try { return typeof FURN === 'undefined' || !FURN.warmed || FURN.warmed(); } catch (e) { return true; } };
   // (a city with nothing built yet has nobody to wait for: a new one, or one just started)
   const builtNone = () => { try { for (const c of cells.values()) if (c.sections.length || c.mega) return false; return true; } catch (e) { return false; } };
@@ -257,8 +274,8 @@ const TITLE = (() => {
     const tt = openFrom === null ? 0 : Math.max(0, Math.min(1, (now - openFrom)/3200)); OPEN = reduced ? (openFrom === null ? 0 : 1) : tt*tt*(3 - 2*tt);
     // the room is dark while it's shut (only what light leaks in, and its own lamps), and the daylight comes up with the plates
     const lit = .3 + .7*Math.pow(OPEN, .8); DIM = lit; if (Math.abs(lit - (drawShutter.lit || 0)) > .004){ drawShutter.lit = lit; const f = lit >= .999 ? '' : 'brightness(' + lit.toFixed(3) + ') saturate(' + (.7 + .3*lit).toFixed(3) + ')'; for (const el of (RTMODE ? [shutCv, stage.querySelector('.t-live')] : [imRoom, imGlass, imOff, shutCv, stage.querySelector('.t-live')])) if (el) el.style.filter = f; }
-    if (!shutR) return; shutCv.hidden = OPEN >= 1; if (OPEN >= 1){ if (drawShutter.last !== 1){ ROOM.setShutter(1); drawShutter.last = 1; } return; } drawShutter.last = OPEN;
-    ROOM.setShutter(OPEN); if (!(TP && TP.off.has('shutterGL'))) shutR.render(shutScene, shutCam);
+    if (!shutR) return; shutCv.hidden = OPEN >= 1; if (OPEN >= 1){ if (drawShutter.last !== 1){ RM.setShutter(1); drawShutter.last = 1; } return; } drawShutter.last = OPEN;
+    RM.setShutter(OPEN); if (!(TP && TP.off.has('shutterGL'))) shutR.render(shutScene, shutCam);
   }
   /* ---------- steam from the mug ---------- */
   let steam = [], steamAt = 0;
@@ -489,7 +506,7 @@ const TITLE = (() => {
   function unwiden(){ const v = document.getElementById('view'); if (v){ v.style.transition = 'transform 1.2s ease-in-out'; v.style.transform = ''; setTimeout(() => { v.style.transition = ''; }, 1300); } }
   // the pictures for an hour, fetched ahead (they're cached, so the room shows at once when it's needed)
   function preload(t){ const v = innerWidth/innerHeight < .85 ? 'tall' : 'wide'; for (const k of ['room', 'glass', 'signoff']){ const im = new Image(); im.src = 'assets/title/' + k + '-' + v + '-' + t + '.png?v=' + VER; (preload.keep = preload.keep || []).push(im); } }
-  function finish(){ T.leaving = false; try { if (scWas !== null){ SC.mode = scWas; scWas = null; } } catch (e) {} try { WARP.k.value = 0; } catch (e) {} stage.style.opacity = ''; stage.style.scale = ''; stage.style.visibility = ''; unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} try { applyRenderRes(zoom); } catch (e) {} }
+  function finish(){ T.leaving = false; try { if (scWas !== null){ SC.mode = scWas; scWas = null; } } catch (e) {} try { WARP.k.value = 0; } catch (e) {} stage.style.opacity = ''; stage.style.scale = ''; stage.style.visibility = ''; unwiden(); document.documentElement.classList.remove('title-boot'); T.on = false; cancelAnimationFrame(raf); root.hidden = true; root.classList.remove('leaving'); document.documentElement.classList.remove('title-on'); restoreScene(); try { LAST_INPUT = performance.now(); } catch (e) {} try { applyRenderRes(zoom); } catch (e) {} try { freeLive(); } catch (e){ console.warn('title room: letting go', e); } }
 
   /* ---------- the menu ---------- */
   function setDeck(on){

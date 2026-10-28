@@ -424,6 +424,8 @@ const PLAY = (() => {
     if (w) w.Math.random = rng(h32('lab', G.frame));
     safe('lab', labClean); safe('sharp', labSharp);
     if (B) B.needs = true;
+    // the lab stops its own frame loop when it thinks nothing is changing (or it is warming up behind the city): while the apartment is on, it draws every frame
+    if (B && B.on && !B.raf) safe('lab loop', () => { const PB = w.PodBuilder; if (B.warmHold && PB.warmHold) PB.warmHold(false); if (!B.raf && PB.pauseRender) PB.pauseRender(false); if (!B.raf) warn('apartment', 'the lab loop would not start'); });
     const D_ = PC._debug.DUR || 3.05, st = PC._debug.state(), live = ov && ov.classList.contains('live');
     const wait = why => { if (++AP.heldN > 60*120){ if (AP.heldN === 60*120 + 1) warn('apartment', 'waited 120 s for the lab (' + why + '): going on'); return false; } G.held = true; G.info.aptWait = why; return true; };
     if (t < A.room){   // the hologram flies in

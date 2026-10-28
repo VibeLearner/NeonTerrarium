@@ -43,8 +43,8 @@ const FILM = (() => {
   const MT_J = 4;                                       // the metro: straight across the city, west to east, just south of the middle
   const MT_STOP_I = [-8, 0, 7];                         // its stations (on the straight: each has room for its lift)
   const PLAZA = { i0: 5, i1: 7, j0: 5, j1: 6 };         // paved, open, by the east station: where the mugging happens
-  const MEGAS = [['police', 9, 5, 3, 3, 6.0], ['club', -10, 6, 4, 4, 5.2], ['market', 3, -9, 4, 4, 4.4], ['foundry', -12, -12, 4, 6, 3.6]];
-  const LOW_FRONT = { i0: 0, i1: 13, j0: -2, j1: MT_J - 1 };   // south of the track where the side-on shot looks across: kept low so the train shows
+  const MEGAS = [['police', 9, 5, 3, 3, 6.0], ['club', -10, 6, 4, 4, 5.2], ['market', -6, -10, 4, 4, 4.4], ['foundry', -12, -12, 4, 6, 3.6]];
+  const LOW_FRONT = { i0: 3, i1: 13, j0: -9, j1: MT_J - 1 };   // south of the track where the side-on shot looks across: kept low so the train shows
   const inBox = (b, i, j) => i >= b.i0 && i <= b.i1 && j >= b.j0 && j <= b.j1;
   const megaAt = (i, j) => MEGAS.find(([, mi, mj, w, h]) => i >= mi && i < mi + w && j >= mj && j < mj + h);
   const GC = { x: (GARDEN.i0 + GARDEN.i1)/2*LOT, z: (GARDEN.j0 + GARDEN.j1)/2*LOT };
@@ -187,7 +187,10 @@ const FILM = (() => {
   // two pairs out on the lawn, talking
   function garden(){
     const used = new Set(), byDist = home => { const c = cellOf(home); return c ? Math.hypot(c.x - GC.x, c.z - GC.z) : 1e9; };
-    const pool = pplList.filter(p => free(p, used) && byDist(p.home) < 4.5*LOT).sort((a, b) => byDist(a.home) - byDist(b.home));
+    // (whoever is already out in the street near the lawn first: the walk over is short; then those who live round it)
+    const out = p => p.x !== undefined && !(p.sc && p.sc.mode === 'in') && !p.ride && !p.metro;
+    const how = p => out(p) ? Math.hypot(p.x - GC.x, p.z - GC.z) : 50 + byDist(p.home);
+    const pool = pplList.filter(p => free(p, used) && (out(p) ? Math.hypot(p.x - GC.x, p.z - GC.z) < 6*LOT : byDist(p.home) < 4.5*LOT)).sort((a, b) => how(a) - how(b));
     if (pool.length < 4) throw new Error('only ' + pool.length + ' people live round the garden yet');
     const take = () => { const p = pool.find(q => free(q, used)); used.add(p.id); return p; };
     const n1 = freeNode(GC.x - 2.4, GC.z - 1.2, []), n2 = freeNode(GC.x + 2.2, GC.z + 1.6, [n1]);
@@ -271,13 +274,22 @@ const FILM = (() => {
     say('mugging at', F.t.toFixed(2), MUG.drone ? '(drone sent)' : '(no drone free)');
   }
   // the drone after the mugger, if one is up
+  function droneLow(){
+    for (const st of POLICE_STATIONS) for (const d of st.drones){
+      if (d._film) continue; d._film = true; const up = d.update.bind(d);
+      d.update = function (dt, time){ const r = up(dt, time);
+        if (F.playing && MUG.L && d.st.chase && d.st.chase.L === MUG.L){ const cap = CURB + 4.6, g = d.g.position;
+          if (Math.hypot(g.x - MUG.L.x, g.z - MUG.L.z) < 9 && g.y > cap) g.y += (cap - g.y)*.08; }   // (down low as it nears the mugger: the game flies it over the rooftops)
+        return r; };
+    }
+  }
   const chaser = () => { for (const st of POLICE_STATIONS) for (const d of st.drones) if (d.st.chase && d.st.chase.L === MUG.L) return d; return null; };
 
   /* ---------- the camera: set outright every frame ---------- */
   const CAM = { x: GC.x, y: TARGET_Y, z: GC.z, yaw: .55, zoom: 8, pitch: 40*DEG };
   let sub = null, from = null, gview = null, mugCam = null;
   const STREET = { yaw: Math.PI - .8, pitch: 38*DEG, zoom: 7.6 };   // the game's own close view, from the track side: the station in front, the plaza and the people beyond
-  const SIDE = { yaw: Math.PI, pitch: 11*DEG, zoom: 9.5 };            // the metro, side on and low (the ride's angle)
+  const SIDE = { yaw: Math.PI, pitch: 11*DEG, zoom: 9.5, x: 8*LOT };            // the metro, side on and low (the ride's angle)
   const buildCam = t => { const u = ease(seg(t, .3, MK.built + .6));
     return { x: GC.x, y: TARGET_Y, z: GC.z, yaw: .55 + .62*ss(t/MK.dive), zoom: elerp(8, 31, u), pitch: lerp(40, 34, u)*DEG }; };
   const hAt = (x, z) => { const i = Math.round(x/LOT), j = Math.round(z/LOT), c = cells.get(ckey(i, j)); if (!c) return 0;
@@ -299,7 +311,9 @@ const FILM = (() => {
     else if (t < MK.garden){   // into the garden, then from one person to the next
       if (!gview) gview = pickView([[0, 0], [-3, -3], [3, -3], [-3, 3], [3, 3]].map(([a, b]) => ({ x: GC.x + a, y: CURB + .45, z: GC.z + b })), 1.0, 34, 58);
       const a = buildCam(MK.dive), u = ease(seg(t, MK.dive, MK.p[0]));
-      const p = F.pairs ? F.pairs[who(t)].A : null, px = p && p.x !== undefined ? p.x : GC.x, pz = p && p.x !== undefined ? p.z : GC.z;
+      const q = F.pairs ? F.pairs[who(t)] : null, vis = p => p && p.x !== undefined && !(p.sc && p.sc.mode === 'in');
+      const p = q ? (vis(q.A) ? q.A : vis(q.B) ? q.B : null) : null;
+      const px = p ? p.x : q ? NG.x[q.n] : GC.x, pz = p ? p.z : q ? NG.z[q.n] : GC.z;
       if (!sub) sub = { x: px, z: pz };
       sub.x = follow(sub.x, px, t < MK.p[0] ? 8 : 3, dt); sub.z = follow(sub.z, pz, t < MK.p[0] ? 8 : 3, dt);
       Object.assign(CAM, { x: lerp(a.x, sub.x, u), z: lerp(a.z, sub.z, u), y: lerp(TARGET_Y, CURB + .5, u), yaw: a.yaw + wrapA(gview.yaw - a.yaw)*u, zoom: elerp(a.zoom, 4.2, u), pitch: lerp(a.pitch, gview.pitch, u) });
@@ -322,7 +336,7 @@ const FILM = (() => {
     }
     else {   // up to the metro, side on; then back over the city
       if (!F.riseFrom) F.riseFrom = Object.assign({}, CAM);
-      const a = F.riseFrom, u = ease(seg(t, MK.rise, MK.side)), sx = clamp(a.x, -10*LOT, 12*LOT);
+      const a = F.riseFrom, u = ease(seg(t, MK.rise, MK.side)), sx = SIDE.x;
       const side = { x: sx, y: MT_Y + .5, z: MT_J*LOT, yaw: SIDE.yaw, zoom: SIDE.zoom, pitch: SIDE.pitch };
       let p = { x: lerp(a.x, side.x, u), y: lerp(a.y, side.y, u), z: lerp(a.z, side.z, u), yaw: a.yaw + wrapA(side.yaw - a.yaw)*u, zoom: elerp(a.zoom, side.zoom, u), pitch: lerp(a.pitch, side.pitch, u) };
       if (t > MK.side + .6){
@@ -336,7 +350,7 @@ const FILM = (() => {
   }
   // the hour: morning while it's built, early afternoon in the garden, golden hour in the street, night from the metro on
   const hourAt = t => t < MK.dive ? lerp(8, 11.5, ss(t/MK.dive)) : t < MK.garden ? lerp(13.4, 14.2, seg(t, MK.dive, MK.garden))
-    : t < MK.night ? lerp(14.2, 17.3, ss(seg(t, MK.garden, MK.street))) + .25*seg(t, MK.street, MK.night) : lerp(17.55, 22.2, ss(seg(t, MK.night, MK.night + 1.6)));
+    : t < MK.night ? lerp(14.2, 16.7, ss(seg(t, MK.garden, MK.street))) + .2*seg(t, MK.street, MK.night) : lerp(16.9, 22.2, ss(seg(t, MK.night, MK.night + 1.6)));
   // the lights: as the game has them by day; dark once it is night, until the camera pulls back; then on one by one at the game's own pace
   const lightsAt = t => t < MK.night ? null : t < MK.lights ? 0 : clamp01((t - MK.lights)*LIGHTS_RATE);
   // the train on the line: driven so it passes in front of the camera as it settles side on
@@ -345,7 +359,7 @@ const FILM = (() => {
     if (F.playing && LINE && LINE.train && F.t > MK.rise - 1 && F.t < MK.out + 2) safe('train', () => {
       const tr = LINE.train, Pm = mtPath(LINE), stops = Pm.stops || [], v = 2.4*LOT;
       tr.dwell = 0; tr.at = 0; tr.next = Math.max(0, stops.length - 1); tr.dir = 1; tr.v = 0; tr.doors = 0;
-      const xMid = (F.riseFrom ? clamp(F.riseFrom.x, -10*LOT, 12*LOT) : PC.x) - (-R*LOT);   // (where the camera settles, along the line)
+      const xMid = SIDE.x - (-R*LOT);   // (where the camera settles, along the line)
       tr.s = clamp(xMid + (F.t - (MK.side + .9))*v, .5, Pm.len - .5);
     });
     return _um(dt, t);
@@ -365,7 +379,8 @@ const FILM = (() => {
   const EV = []; let fired = 0, t0 = 0, lastT = 0;
   const at = (t, f, name) => EV.push({ t, f, name });
   for (const s of BUILD) at(s.t, () => step(s), s.kind);
-  at(MK.built - 2.4, () => garden(), 'out onto the lawn');
+  // out onto the lawn: as soon as enough people live round it (tried each second from six seconds in)
+  for (let k = 0; k < 7; k++) at(6 + k, () => { if (!F.pairs) try { garden(); } catch (e) { if (k === 6) warn('garden', e); } }, 'out onto the lawn');
   MK.p.forEach((t0_, k) => {
     at(t0_ + .1, () => { MON.open(F.pairs[k].A.id); keep(document.getElementById('monitor'), true); monTab('log'); }, 'person cam ' + (k + 1));
     [.6, 1.8, 3.0, 4.3].forEach((d, s) => at(t0_ + d, () => revealStep(k, s), 'reveal ' + (k + 1) + '.' + (s + 1)));
@@ -396,6 +411,7 @@ const FILM = (() => {
     if (!MUG.struck && t >= MK.strikeBy){ const v = MUG.victim, onPlaza = v && v.x !== undefined && v.walk && Math.hypot(v.x - PC.x, v.z - PC.z) < 1.4*LOT;
       if (onPlaza || t >= MK.strikeLast) safe('mugging', () => strike(t)); }
     // the mugger: in from nowhere as they dart over, and kept in the lurkers (the game's own sweep only keeps those of its dark streets)
+    if (t > 10 && t < MK.rise) droneLow();
     if (MUG.L){ if (!lurkers.has('film') && MUG.L.state !== 'away') lurkers.set('film', MUG.L); if (MUG.L.state === 'strike' || MUG.L.state === 'rob') MUG.L.fade = Math.min(1, MUG.L.fade + dt*3); }
   }
 

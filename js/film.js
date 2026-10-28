@@ -38,21 +38,21 @@ const FILM = (() => {
   const DUR = { toRider: 2.2, riderMax: 22, toSide: 2.2, side: 12, out: 9, lightsIn: 1.5, title: 8.5 };
 
   /* ---------- the city plan ---------- */
-  const R = 13;                                         // plots from -13 to 13 each way: 27 x 27
+  const R = 13, RW = 16, RX = 20;                                // plots from -16 to 13 each way (west and south a little further: the west end's street shots stay over the city)
   const GARDEN = { i0: -2, i1: 1, j0: -2, j1: 1 };      // the lawn in the middle
   const MT_J = 4;                                       // the metro: straight across the city, west to east, just south of the middle
   const MT_STOP_I = [];   // (no stations between: only the line's two ends, either side of the city)                     // its stations (on the straight: each has room for its lift)
   const RIDE = { from: -13, to: 13 };                     // the rider gets on at the station by the square and rides east, across the low part
   // landmarks: [kind, i, j, w, h, when it arrives]
   const MEGAS = [
-    ['square', -12, 6, 5, 5, 3.2],     // the town square at the west end, by the line's west station (the mugging happens in its open middle)
-    ['police', -7, 6, 3, 3, 4.4],      // the police station beside it (the drone and the officers come from here)
-    ['wirenest', -7, 10, 4, 4, 6.4],   // the Wire Nest behind them
+    ['square', -15, 5, 5, 5, 3.2],     // the town square at the west end, right by the line's west station (the mugging happens in its open part)
+    ['police', -10, 5, 3, 3, 4.4],     // the police station beside it (the drone and the officers come from here)
+    ['wirenest', -10, 9, 4, 4, 6.4],   // the Wire Nest behind them
     ['club', 4, 6, 4, 4, 5.4],         // the Neon Dome in the commercial quarter
     ['lidar', 10, 9, 3, 3, 7.2],       // the LIDAR array out at the east edge, watching
     ['market', 2, -11, 4, 4, 4.8],     // the market
     ['foundry', 7, -12, 6, 4, 3.8]];   // the foundry, with the industry
-  const LOW_FRONT = { i0: -13, i1: -3, j0: -9, j1: MT_J - 1 };   // south of the track where the side-on shot looks across: kept low so the train shows
+  const LOW_FRONT = { i0: -20, i1: -3, j0: -12, j1: MT_J - 1 };   // south of the track where the side-on shot looks across: kept low so the train shows
   const inBox = (b, i, j) => i >= b.i0 && i <= b.i1 && j >= b.j0 && j <= b.j1;
   const megaAt = (i, j) => MEGAS.find(([, mi, mj, w, h]) => i >= mi && i < mi + w && j >= mj && j < mj + h);
   const GC = { x: (GARDEN.i0 + GARDEN.i1)/2*LOT, z: (GARDEN.j0 + GARDEN.j1)/2*LOT };
@@ -74,16 +74,16 @@ const FILM = (() => {
   }
   const BUILD = [];
   { const Rnd = mulberry32(2026), all = [];
-    for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++){ if (megaAt(i, j)) continue; all.push(Object.assign({ i, j, d: Math.hypot(i + .5, j + .5) + Rnd()*1.6 }, plotOf(i, j, Rnd))); }
+    for (let i = -RX; i <= R; i++) for (let j = -RW; j <= R; j++){ if (megaAt(i, j)) continue; all.push(Object.assign({ i, j, d: Math.hypot(i + .5, j + .5) + Rnd()*1.6 }, plotOf(i, j, Rnd))); }
     all.sort((a, b) => a.d - b.d);
     const T0 = .35, T1 = 10.5;
     all.forEach((b, k) => { b.t = T0 + (T1 - T0)*Math.pow(k/(all.length - 1), .78); });
     for (const b of all){ BUILD.push({ t: b.t, kind: 'plot', b }); for (let q = 1; q < (b.n || 0); q++) BUILD.push({ t: b.t + .32*q, kind: 'floor', b }); }
     for (const [kind, i, j, w, h, t] of MEGAS) BUILD.push({ t, kind: 'mega', mk: { kind, i, j, w, h } });
-    const tiles = []; for (let i = -R; i <= R; i++) tiles.push([i, MT_J]);
-    tiles.forEach(([i, j], k) => BUILD.push({ t: 10.7 + k*.1, kind: k ? 'mtExtend' : 'mtStart', i, j }));
-    const tEnd = 10.7 + tiles.length*.1;
-    MT_STOP_I.forEach((si, n) => BUILD.push({ t: tEnd + .15 + n*.12, kind: 'mtStop', k: si + R }));
+    const tiles = []; for (let i = -RW; i <= R; i++) tiles.push([i, MT_J]);
+    tiles.forEach(([i, j], k) => BUILD.push({ t: 10.6 + k*.09, kind: k ? 'mtExtend' : 'mtStart', i, j }));
+    const tEnd = 10.6 + tiles.length*.09;
+    MT_STOP_I.forEach((si, n) => BUILD.push({ t: tEnd + .15 + n*.12, kind: 'mtStop', k: si + RW }));
     BUILD.push({ t: tEnd + .7, kind: 'mtFinish' });
     BUILD.sort((a, b) => a.t - b.t);
   }
@@ -374,13 +374,16 @@ const FILM = (() => {
   const MUG = { victim: null, L: null, drone: null, cops: [], caught: 0, mx: SC_.x, mz: SC_.z };
   function muggingCast(){
     // the victim: across the square, west to east, stopping in the middle when the mugger comes at them
-    const vp = routePts(SC_.x - 7, SC_.z + 2.5, SC_.x + 7, SC_.z - 2.5), dC = distNear(vp, SC_.x, SC_.z), VSTOP = pointAt(vp, dC);
+    const tc = { x: Math.sin(STREET.yaw), z: Math.cos(STREET.yaw) }, pp = { x: tc.z, z: -tc.x };   // (towards the camera; across the view)
+    const MP = { x: SC_.x + tc.x*4.6, z: SC_.z + tc.z*4.6 };   // the open ground between the pavilion and the camera
+    const va = nodeNear(MP.x - pp.x*7, MP.z - pp.z*7), vb = nodeNear(MP.x + pp.x*7, MP.z + pp.z*7);
+    const vp = routePts(va.x, va.z, vb.x, vb.z), dC = distNear(vp, MP.x, MP.z), VSTOP = pointAt(vp, dC);
     // the mugger: out from the far side of the square (away from the camera), along the footway to them
-    const fx = -Math.sin(STREET.yaw), fz = -Math.cos(STREET.yaw), m0 = nodeNear(VSTOP.x + fx*3.6 - fz*1.2, VSTOP.z + fz*3.6 + fx*1.2);
+    const m0 = nodeNear(VSTOP.x + pp.x*3.6 - tc.x*.8, VSTOP.z + pp.z*3.6 - tc.z*.8);   // (the mugger: from ahead of them, beside the pavilion, never behind it)
     const mp = routePts(m0.x, m0.z, VSTOP.x, VSTOP.z), mL = pathLen(mp), RUN_ = 3.0, hitD = Math.max(0, mL - .42), tStrike = MG.reach - hitD/RUN_;
     const MHIT = pointAt(mp, hitD);
     // the getaway: out of the square, away from the camera and the station
-    const flee = routePts(MHIT.x, MHIT.z, SC_.x - 12, SC_.z + 8), fL = pathLen(flee), FLEE_V = 2.7, fleeEnd = MG.rob1 + fL/FLEE_V;
+    const fe = nodeNear(MHIT.x + pp.x*11 - tc.x*3, MHIT.z + pp.z*11 - tc.z*3), flee = routePts(MHIT.x, MHIT.z, fe.x, fe.z), fL = pathLen(flee), FLEE_V = 2.7, fleeEnd = MG.rob1 + fL/FLEE_V;
     const v = nearestPeople(SC_.x, SC_.z, 1)[0];
     if (!v) return warn('mugging', 'nobody to cross the square');
     MUG.victim = v; MUG.VSTOP = VSTOP;
@@ -457,7 +460,7 @@ const FILM = (() => {
 
   /* ---------- the passer-by: past the mugging, on to the station, up the lift, onto the train ---------- */
   const RD = { p: null, st: null, cab: null, T: null };
-  const RT = { speed: 2.1, intoCab: .5, lift: 3.0, toPlat: 1.6, trainIn: 2.6, doorsOpen: .7, board: 1.0, wait: .6, close: .7 };
+  const RT = { speed: 2.2, intoCab: .5, lift: 3.0, toPlat: 1.6, trainIn: 2.6, doorsOpen: .7, board: 1.0, wait: .6, close: .7 };
   function riderCast(){
     if (!LINE || !LINE.stn || !LINE.cabs) return warn('station', 'no metro');
     const P = mtPath(LINE), withCab = P.stops.map((s_, i) => ({ s: s_, i, st: LINE.stn.get(s_.k), cab: LINE.cabs.find(c => c.k === s_.k) }))
@@ -496,12 +499,12 @@ const FILM = (() => {
   const _um = updateMetros;
   updateMetros = function (dt, t){
     const T = RD.T, tr = LINE && LINE.train, ft = F.t;
-    if (F.playing && tr && !T && F.t > 13) safe('park', () => { const P = mtPath(LINE), s0 = P.stops[0].s; tr.s = s0; tr.at = 0; tr.next = 0; tr.v = 0; tr.dwell = 50; tr.stopT = 0; tr.fresh = false; });   // (parked at the west end, doors shut)
+    if (F.playing && tr && !T && F.t > 13) safe('park', () => { const P = mtPath(LINE), s0 = P.stops[0].s; tr.s = s0; tr.at = 0; tr.next = 0; tr.v = 0; tr.dwell = 50; tr.stopT = -.5; tr.fresh = false; });   // (parked at the west end, doors shut: stopT below zero, the game's door clock never starts)
     if (F.playing && T && tr) safe('train', () => {
       const P = mtPath(LINE), si = P.stops.findIndex(s => s.k === RD.st.k); if (si < 0) return;
       const s0 = P.stops[si].s;
-      if (ft < T.trainAt){ tr.s = s0; tr.at = si; tr.next = si; tr.v = 0; tr.dwell = 50; tr.stopT = 0; }   // waiting at the platform, doors shut
-      else if (ft < T.close){ if (!(tr.dwell > 0)) tr.stopT = 0; tr.s = s0; tr.at = si; tr.next = si; tr.v = 0; tr.dwell = 50; }   // stopped, doors opening and open
+      if (ft < T.trainAt){ tr.s = s0; tr.at = si; tr.next = si; tr.v = 0; tr.dwell = 50; tr.stopT = -.5; }   // waiting at the platform, doors shut
+      else if (ft < T.close){ if (!(tr.dwell > 0) || tr.stopT < 0) tr.stopT = 0; tr.s = s0; tr.at = si; tr.next = si; tr.v = 0; tr.dwell = 50; }   // stopped, doors opening and open
       else if (ft < T.depart){ tr.s = s0; tr.at = si; tr.v = 0; tr.dwell = Math.max(.001, .7 - (ft - T.close)); }   // doors closing
       else { const nx = Math.min(P.stops.length - 1, si + 1), s1 = P.stops[nx].s, D = s1 - s0, A = MT_ACC, V = MT_VMAX, ta = V/A, da = .5*A*ta*ta;
         // accelerate, run, brake into the next station (a trapezoid: the same easing as the game's own trains)
@@ -520,7 +523,7 @@ const FILM = (() => {
 
   /* ---------- the camera: set outright every frame ---------- */
   const CAM = { x: GC.x, y: TARGET_Y, z: GC.z, yaw: .55, zoom: 8, pitch: 40*DEG };
-  const STREET = { yaw: -2.35, pitch: 38*DEG, zoom: 8.6 };   // (from the south-west, the track side, looking in over the square towards the city)   // the game's own close view, from the track side
+  const STREET = { yaw: -2.35 + Math.PI, pitch: 38*DEG, zoom: 8.6 };   // (from the south-west, the track side, looking in over the square towards the city)   // the game's own close view, from the track side
   const SIDE = { yaw: Math.PI, pitch: 11*DEG, zoom: 9.5 };            // the metro, side on and low
   const PH = { name: 'build', t0: 0, from: null };
   const phase = (name, t) => { PH.name = name; PH.t0 = t; PH.from = Object.assign({}, CAM); say('phase', name, 'at', t.toFixed(2)); };

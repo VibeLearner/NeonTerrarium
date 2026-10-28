@@ -76,7 +76,7 @@ def main():
         slug = ''.join(ch if ch.isalnum() else '-' for ch in (proj.get('name') or 'trailer').lower()).strip('-') or 'trailer'
         if a.out == ap.get_default('out'): a.out = os.path.join(OUT, slug + ('-preview' if a.preview else '') + '.mp4')
     elif a.film:
-        length = 74.0
+        length = 140.0   # (at most: the film runs until it says it's done, about 85 s)
         if a.until == LEN: a.until = length
         if a.out == ap.get_default('out'): a.out = os.path.join(OUT, 'neon-terrarium-film' + ('-preview' if a.preview else '') + '.mp4')
     else:
@@ -153,6 +153,7 @@ def main():
         t1 = time.time()
         for f in range(frames):
             ev('__step(1)')
+            if a.film and f % 15 == 0 and f > 60*FPS and ev('FILM.state().done'): frames = f; break
             if a.stills:
                 if f in want:
                     p = os.path.join(sd, f'{f/FPS:05.2f}s.png'); open(p, 'wb').write(grab('png')); print('still', os.path.relpath(p, ROOT))

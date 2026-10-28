@@ -35,24 +35,24 @@ const FILM = (() => {
 
   /* ---------- the fixed part of the timeline (from the station on, each part starts when the one before it is done) ---------- */
   const MK = { built: 13.6, dive: 14.5, p: [17, 24], garden: 31, square: 33.5, strikeBy: 35, strikeLast: 38.5, chaseFor: 9 };
-  const DUR = { toRider: 2.2, riderMax: 22, toSide: 2.2, side: 10, out: 9, lightsIn: 1.5, title: 8.5 };
+  const DUR = { toRider: 2.2, riderMax: 22, toSide: 2.2, side: 12, out: 9, lightsIn: 1.5, title: 8.5 };
 
   /* ---------- the city plan ---------- */
   const R = 13;                                         // plots from -13 to 13 each way: 27 x 27
   const GARDEN = { i0: -2, i1: 1, j0: -2, j1: 1 };      // the lawn in the middle
   const MT_J = 4;                                       // the metro: straight across the city, west to east, just south of the middle
-  const MT_STOP_I = [-12, -4, 4, 12];   // (eight plots apart: about twelve seconds by train between stations)                     // its stations (on the straight: each has room for its lift)
-  const RIDE = { from: 4, to: 12 };                     // the rider gets on at the station by the square and rides east, across the low part
+  const MT_STOP_I = [];   // (no stations between: only the line's two ends, either side of the city)                     // its stations (on the straight: each has room for its lift)
+  const RIDE = { from: -13, to: 13 };                     // the rider gets on at the station by the square and rides east, across the low part
   // landmarks: [kind, i, j, w, h, when it arrives]
   const MEGAS = [
-    ['square', 2, 6, 5, 5, 3.2],       // the town square: north of the track, east of the middle (the mugging happens in its open middle)
-    ['police', 8, 6, 3, 3, 4.4],       // the police station beside it (the drone comes from here)
-    ['wirenest', 8, 9, 4, 4, 6.4],     // the Wire Nest in the commercial quarter behind
-    ['lidar', -12, 9, 3, 3, 7.2],      // the LIDAR array out at the north-west edge, watching
-    ['club', -10, 5, 4, 4, 5.4],       // the Neon Dome
-    ['market', -6, -10, 4, 4, 4.8],    // the market
-    ['foundry', -12, -12, 6, 4, 3.8]]; // the foundry, with the industry
-  const LOW_FRONT = { i0: 3, i1: 13, j0: -9, j1: MT_J - 1 };   // south of the track where the side-on shot looks across: kept low so the train shows
+    ['square', -12, 6, 5, 5, 3.2],     // the town square at the west end, by the line's west station (the mugging happens in its open middle)
+    ['police', -7, 6, 3, 3, 4.4],      // the police station beside it (the drone and the officers come from here)
+    ['wirenest', -7, 10, 4, 4, 6.4],   // the Wire Nest behind them
+    ['club', 4, 6, 4, 4, 5.4],         // the Neon Dome in the commercial quarter
+    ['lidar', 10, 9, 3, 3, 7.2],       // the LIDAR array out at the east edge, watching
+    ['market', 2, -11, 4, 4, 4.8],     // the market
+    ['foundry', 7, -12, 6, 4, 3.8]];   // the foundry, with the industry
+  const LOW_FRONT = { i0: -13, i1: -3, j0: -9, j1: MT_J - 1 };   // south of the track where the side-on shot looks across: kept low so the train shows
   const inBox = (b, i, j) => i >= b.i0 && i <= b.i1 && j >= b.j0 && j <= b.j1;
   const megaAt = (i, j) => MEGAS.find(([, mi, mj, w, h]) => i >= mi && i < mi + w && j >= mj && j < mj + h);
   const GC = { x: (GARDEN.i0 + GARDEN.i1)/2*LOT, z: (GARDEN.j0 + GARDEN.j1)/2*LOT };
@@ -109,9 +109,9 @@ const FILM = (() => {
     }
     if (s.kind === 'floor'){ const c = cells.get(ckey(s.b.i, s.b.j)); if (c && !c.mega) addSection(c, s.b.zone, s.b.mf ? { mf: s.b.mf } : {}); return; }
     if (s.kind === 'mega'){ const m = spawnMegaAt(s.mk.kind, { i: s.mk.i, j: s.mk.j, w: s.mk.w, h: s.mk.h }); if (!m) warn('mega', s.mk.kind + ' did not fit'); else (F.info.megas = F.info.megas || []).push(s.mk.kind); return; }
-    if (s.kind === 'mtStart'){ mtApply({ type: 'start', i: s.i, j: s.j, ok: true }); LINE = metros[metros.length - 1]; return; }
-    if (s.kind === 'mtExtend'){ if (LINE) mtApply({ type: 'extend', l: LINE, i: s.i, j: s.j, ok: true }); return; }
-    if (s.kind === 'mtStop'){ if (LINE) mtApply({ type: 'stop', l: LINE, k: s.k, ok: true }); return; }
+    if (s.kind === 'mtStart'){ mtApply({ type: 'start', i: s.i, j: s.j, ok: true }); LINE = metros[metros.length - 1]; if (LINE) LINE.train = null; return; }
+    if (s.kind === 'mtExtend'){ if (LINE){ mtApply({ type: 'extend', l: LINE, i: s.i, j: s.j, ok: true }); LINE.train = null; } return; }
+    if (s.kind === 'mtStop'){ if (LINE){ mtApply({ type: 'stop', l: LINE, k: s.k, ok: true }); LINE.train = null; } return; }
     if (s.kind === 'mtFinish'){ if (LINE){ mtApply({ type: 'finish', l: LINE, k: LINE.tiles.length - 1, ok: true }); F.info.metro = { tiles: LINE.tiles.length, stops: LINE.st.length }; } return; }
   }
 
@@ -301,6 +301,61 @@ const FILM = (() => {
       if (d < bd){ bd = d; best = acc + u*l; } acc += l; }
     return best; }
 
+  /* ---------- the extras: everyone else seen in a scripted scene, each on a planned walk or spot ---------- */
+  // While a scene is on (from the dive into the garden to the end of the ride) nobody else is drawn at all (people.js PPL_ONLY): the
+  // people in shot are these, the cast, and nothing the game decides.
+  const EXTRAS = [];
+  const lookAt = (p, st, react) => { const r = react && react(F.t, st); return r; };
+  // walking back and forth along a path from t0; react(ft, st) can take over (to stop and look at something)
+  function stroll(p, pts, t0, speed, react){
+    const L_ = Math.max(.5, pathLen(pts)), st = { x: pts[0][0], z: pts[0][1], dx: 1, dz: 0 };
+    takePerson(p, () => {
+      const ft = F.t, ph = p.phase || 0, r = react && react(ft, st);
+      if (r) return r;
+      const d = Math.max(0, ft - t0)*speed, k = Math.floor(d/L_), u = d - k*L_, back = k % 2 === 1, q = pointAt(pts, back ? L_ - u : u);
+      st.x = q.x; st.z = q.z; st.dx = back ? -q.dx : q.dx; st.dz = back ? -q.dz : q.dz;
+      return { x: q.x, y: CURB, z: q.z, frame: walkF(ft, ph, speed/1.3), dx: st.dx, dz: st.dz };
+    });
+    EXTRAS.push(p); return p;
+  }
+  // standing at a spot facing a way, now and then talking
+  function standAt(p, x, z, fx, fz, talk, react){
+    const st = { x, z, dx: fx, dz: fz };
+    takePerson(p, () => { const ft = F.t, ph = p.phase || 0, r = react && react(ft, st); if (r) return r;
+      return { x, y: CURB, z, frame: talk && Math.floor(ft*.5 + ph) % 3 === 0 ? talkF(ft, ph) : idleF(ft, ph), dx: fx, dz: fz }; });
+    EXTRAS.push(p); return p;
+  }
+  function releaseExtras(near){ for (let k = EXTRAS.length - 1; k >= 0; k--){ const p = EXTRAS[k]; if (near && !near(p)) continue; release(p); EXTRAS.splice(k, 1); } }
+  // the garden: two strolling along its far edges and one standing about, well clear of the two pairs
+  function gardenExtras(){
+    const ex = nearestPeople(GC.x, GC.z, 3); if (ex.length < 3) return;
+    stroll(ex[0], [[GC.x - 6.6, GC.z + 3.0], [GC.x - 6.6, GC.z - 6.4]], 14.3, .85).__area = 'garden';
+    stroll(ex[1], [[GC.x + 3.2, GC.z - 6.6], [GC.x - 5.0, GC.z - 6.6]], 14.3, .8).__area = 'garden';
+    standAt(ex[2], GC.x - 6.2, GC.z + 4.6, 1, -.4, false).__area = 'garden';
+  }
+  // the square: people crossing it and chatting in it; when the mugging starts they stop and stare
+  function squareExtras(react){
+    const ex = nearestPeople(SC_.x, SC_.z, 7); if (ex.length < 7) return;
+    const c = (dx, dz) => nodeNear(SC_.x + dx, SC_.z + dz), R_ = (a, b) => routePts(a.x, a.z, b.x, b.z);
+    stroll(ex[0], R_(c(-7, 6.5), c(7, 6.5)), 29, 1.15, react).__area = 'square';
+    stroll(ex[1], R_(c(6.5, -7), c(6.5, 7)), 29.6, 1.05, react).__area = 'square';
+    stroll(ex[2], R_(c(-6.5, -6.5), c(-6.5, 6)), 30.4, 1.2, react).__area = 'square';
+    const P1 = c(4.2, 4.6), P2 = c(-4.6, 3.8);
+    standAt(ex[3], P1.x - .36, P1.z, 1, 0, true, react).__area = 'square'; standAt(ex[4], P1.x + .36, P1.z, -1, 0, true, react).__area = 'square';
+    standAt(ex[5], P2.x, P2.z - .36, 0, 1, true, react).__area = 'square'; standAt(ex[6], P2.x, P2.z + .36, 0, -1, true, react).__area = 'square';
+  }
+  // by the west station: two walking the street past it (never through its lift)
+  function stationExtras(cab){
+    const ex = nearestPeople(cab.x, cab.z, 6), used = [];
+    for (const [ax, az, bx, bz] of [[-6, 2, 6, 2], [-6, -2.5, 6, -2.5], [2.5, -6, 2.5, 6], [-2.5, -6, -2.5, 6]]){
+      if (used.length >= 2) break;
+      const a = nodeNear(cab.x + ax, cab.z + az), b = nodeNear(cab.x + bx, cab.z + bz), pts = routePts(a.x, a.z, b.x, b.z), L_ = pathLen(pts);
+      let ok = L_ > 4; for (let d = 0; ok && d <= L_; d += .25){ const q = pointAt(pts, d); if (Math.hypot(q.x - cab.x, q.z - cab.z) < 1.4) ok = false; }
+      if (ok && ex[used.length]) used.push(stroll(ex[used.length], pts, 36 + used.length*.9, 1.1));
+    }
+    for (const p of used) p.__area = 'station';
+  }
+
   /* ---------- the mugging, in the open middle of the town square ---------- */
   // fixed times (seconds into the film); the places come from the square's footways
   const MG = { walk0: 31, stop: 35.6, reach: 36.0, rob1: 37.6, alarm: 35.3, copsGo: 37.9, pass: 38.9, release: 52 };
@@ -324,12 +379,12 @@ const FILM = (() => {
       const q = pointAt(vp, dC + (ft - MG.rob1 - .2)*1.9);   // then hurrying on the way they were going
       return { x: q.x, y: CURB, z: q.z, frame: walkF(ft, ph, 1.6), dx: q.dx, dz: q.dz };
     });
-    later(() => { if (MUG.victim) { emote(MUG.victim, 'bang', 1.6); } }, 1);
+
     const L = { key: 'film', cell: cells.get(ckey(SQ[1], SQ[2])), home: { x: m0.x, z: m0.z }, x: m0.x, z: m0.z, state: 'film', rare: false, until: 1e9, row: 10, flip: 1, phase: 3, fade: 0 };
     L.puppet = () => {
       const ft = F.t; let x, z, dx = 0, dz = 1, frame, alpha = 1, emo;
-      if (ft < tStrike){ alpha = 0; x = m0.x; z = m0.z; frame = idleF(ft, 3); }
-      else if (ft < MG.reach){ const q = pointAt(mp, (ft - tStrike)*RUN_); x = q.x; z = q.z; dx = q.dx; dz = q.dz; frame = runF(ft, 3); alpha = Math.min(1, (ft - tStrike)/.25); }
+      if (ft < tStrike){ x = m0.x; z = m0.z; frame = idleF(ft, 3); dx = VSTOP.x - m0.x; dz = VSTOP.z - m0.z; }   // (loitering at the side of the square well before the camera gets there)
+      else if (ft < MG.reach){ const q = pointAt(mp, (ft - tStrike)*RUN_); x = q.x; z = q.z; dx = q.dx; dz = q.dz; frame = runF(ft, 3); }
       else if (ft < MG.rob1){ x = MHIT.x; z = MHIT.z; dx = VSTOP.x - MHIT.x; dz = VSTOP.z - MHIT.z; frame = talkF(ft*1.2, 3); }   // the hold-up
       else if (ft < fleeEnd || !MUG.caught){ const q = pointAt(flee, Math.min(fL, (ft - MG.rob1)*FLEE_V)); x = q.x; z = q.z; dx = q.dx; dz = q.dz; frame = ft < fleeEnd ? runF(ft, 3) : idleF(ft, 3); }
       else { const q = pointAt(flee, fL); x = q.x; z = q.z; frame = idleF(ft, 3); emo = ft - MUG.caught < 2.5 ? EMO.sweat : undefined; }
@@ -352,14 +407,20 @@ const FILM = (() => {
     });
     MUG.cops = cops; F.info.cops = cops.map(c => c.id); if (cops.length < 2) warn('mugging', 'only ' + cops.length + ' officers in the city');
     MUG.MHIT = MHIT; F.info.mugging = { victim: v.id, strike: +tStrike.toFixed(2), flee: +fleeEnd.toFixed(2) };
+    squareExtras((ft, st) => {
+      if (ft < tStrike + .4 || ft > MG.rob1 + 2.4 || Math.hypot(st.x - MHIT.x, st.z - MHIT.z) > 11) return null;
+      if (!st.saw){ st.saw = true; }
+      return { x: st.x, y: CURB, z: st.z, frame: F_IDLE + Math.floor(ft*2.5) % PPL.idle, dx: MUG.mx - st.x, dz: MUG.mz - st.z };
+    });
+    later(() => { for (const p of EXTRAS) if (p.__area === 'square') emote(p, 'bang', 1.4); }, 1);
     say('mugging cast', v.id, JSON.stringify(F.info.mugging));
   }
   // the drone: up from its pad when the alarm goes, over the square with its light on, red once it's on the mugger, keeping low over them
   function droneCast(){
     let d = null; for (const st of POLICE_STATIONS) for (const x of st.drones){ if (!d || Math.hypot(x.pos.x - SC_.x, x.pos.z - SC_.z) < Math.hypot(d.pos.x - SC_.x, d.pos.z - SC_.z)) d = x; }
     if (!d) return warn('drone', 'no police drone');
-    const pos = d.g.position.clone(), pad = pos.clone(); let red = 0, yawD = d.st.yaw;
-    d.st.mode = 'fly';
+    const pos = (d._held || d.g.position).clone(), pad = pos.clone(); let red = 0, yawD = d.st.yaw;
+    d.st.mode = 'fly'; d._still = false; d.g.visible = true;   // (the one drone allowed out while the scene is on)
     d.st.puppet = (dt, time) => {
       const ft = F.t;
       if (ft < MG.alarm) return { x: pad.x, y: pad.y, z: pad.z, yaw: yawD, light: 0, red: 0 };
@@ -421,11 +482,11 @@ const FILM = (() => {
   const _um = updateMetros;
   updateMetros = function (dt, t){
     const T = RD.T, tr = LINE && LINE.train, ft = F.t;
+    if (F.playing && tr && !T && F.t > 13) safe('park', () => { const P = mtPath(LINE), s0 = P.stops[0].s; tr.s = s0; tr.at = 0; tr.next = 0; tr.v = 0; tr.dwell = 50; tr.stopT = 0; tr.fresh = false; });   // (parked at the west end, doors shut)
     if (F.playing && T && tr) safe('train', () => {
       const P = mtPath(LINE), si = P.stops.findIndex(s => s.k === RD.st.k); if (si < 0) return;
       const s0 = P.stops[si].s;
-      if (ft < T.trainFrom){ tr.dwell = 0; tr.v = 0; tr.at = Math.max(0, si - 1); tr.next = si; tr.s = Math.max(.5, s0 - 30); }   // (out of the way, west along the line)
-      else if (ft < T.trainAt){ const u = seg(ft, T.trainFrom, T.trainAt); tr.dwell = 0; tr.v = 0; tr.at = Math.max(0, si - 1); tr.next = si; tr.s = s0 - 14*(1 - u)*(1 - u) - .02; }   // easing in
+      if (ft < T.trainAt){ tr.s = s0; tr.at = si; tr.next = si; tr.v = 0; tr.dwell = 50; tr.stopT = 0; }   // waiting at the platform, doors shut
       else if (ft < T.close){ if (!(tr.dwell > 0)) tr.stopT = 0; tr.s = s0; tr.at = si; tr.next = si; tr.v = 0; tr.dwell = 50; }   // stopped, doors opening and open
       else if (ft < T.depart){ tr.s = s0; tr.at = si; tr.v = 0; tr.dwell = Math.max(.001, .7 - (ft - T.close)); }   // doors closing
       else { const nx = Math.min(P.stops.length - 1, si + 1), s1 = P.stops[nx].s, D = s1 - s0, A = MT_ACC, V = MT_VMAX, ta = V/A, da = .5*A*ta*ta;
@@ -445,7 +506,7 @@ const FILM = (() => {
 
   /* ---------- the camera: set outright every frame ---------- */
   const CAM = { x: GC.x, y: TARGET_Y, z: GC.z, yaw: .55, zoom: 8, pitch: 40*DEG };
-  const STREET = { yaw: Math.PI - .8, pitch: 38*DEG, zoom: 8.6 };   // the game's own close view, from the track side
+  const STREET = { yaw: -2.35, pitch: 38*DEG, zoom: 8.6 };   // (from the south-west, the track side, looking in over the square towards the city)   // the game's own close view, from the track side
   const SIDE = { yaw: Math.PI, pitch: 11*DEG, zoom: 9.5 };            // the metro, side on and low
   const PH = { name: 'build', t0: 0, from: null };
   const phase = (name, t) => { PH.name = name; PH.t0 = t; PH.from = Object.assign({}, CAM); say('phase', name, 'at', t.toFixed(2)); };
@@ -498,7 +559,7 @@ const FILM = (() => {
     if (t < MK.garden) return lerp(13.4, 14.2, seg(t, MK.dive, MK.garden));
     if (PH.name === 'square') return lerp(14.2, 15.4, ss(seg(t, MK.garden, MK.square))) + .2*seg(t, MK.square, MG.pass);
     if (PH.name === 'rider'){ const T = RD.T; if (F.hR === undefined) F.hR = S.hour; return T ? lerp(F.hR, 16.8, ss(seg(t, PH.t0, T.atTop))) : 16.8; }
-    if (PH.name === 'side'){ if (F.hS === undefined) F.hS = S.hour; return lerp(F.hS, 22.2, ss(seg(t, PH.t0 + 1.2, Math.max(PH.t0 + DUR.side, RD.arrive || 0) - .5))); }
+    if (PH.name === 'side'){ if (F.hS === undefined) F.hS = S.hour; return lerp(F.hS, 22.2, ss(seg(t, PH.t0 + 1.2, PH.t0 + DUR.side - .5))); }
     return 22.2;
   }
   function lightsAt(t){
@@ -525,18 +586,21 @@ const FILM = (() => {
   const at = (t, f, name) => EV.push({ t, f, name });
   for (const s of BUILD) at(s.t, () => step(s), s.kind);
   for (const tm of [3, 5.5, 8.5, 12.5]) at(tm, () => { syncPeopleRest(); F.info['people@' + tm] = pplList.length; }, 'people move in');
-  at(14.2, () => gardenCast(), 'the garden pairs');
+  at(14.2, () => { gardenCast(); gardenExtras(); window.PPL_ONLY = true; }, 'the garden pairs');
   MK.p.forEach((t0_, k) => {
     at(t0_ + .1, () => { if (!F.pairs) return; MON.open(F.pairs[k].A.id); keep(document.getElementById('monitor'), true); monTab('log'); }, 'person cam ' + (k + 1));
     [.6, 1.8, 3.0, 4.3].forEach((d, s) => at(t0_ + d, () => { if (F.pairs) revealStep(k, s); }, 'reveal ' + (k + 1) + '.' + (s + 1)));
   });
   at(MG.walk0 - .2, () => muggingCast(), 'the square: victim, mugger, officers');
   at(MG.alarm - .1, () => droneCast(), 'the drone');
-  at(MK.garden, () => { keep(document.getElementById('monitor'), false); MON.close(); E.sel.style.display = 'none'; phase('square', MK.garden); }, 'to the square');
-  at(MK.square + 1.5, () => { if (F.pairs) for (const q of F.pairs){ release(q.A); release(q.B); } }, 'the garden lets go');   // (once the camera is well away)
-  at(MG.walk0 - .1, () => riderCast(), 'the passer-by');
+  at(MK.garden, () => { E.sel.style.display = 'none'; phase('square', MK.garden); }, 'to the square');
+  at(MK.garden + .6, () => { const m = document.getElementById('monitor'); keep(m, false); MON.close(); if (m) m.style.opacity = ''; }, 'the person cam closes');
+  at(MK.square + 1.5, () => { if (F.pairs) for (const q of F.pairs){ release(q.A); release(q.B); } releaseExtras(p => p.__area === 'garden'); }, 'the garden lets go');   // (once the camera is well away)
+  at(MG.walk0 - .1, () => { riderCast(); if (RD.cab) stationExtras(RD.cab); }, 'the passer-by');
+  at(MG.stop, () => { if (MUG.victim) emote(MUG.victim, 'bang', 1.6); }, 'the victim sees him');
+  at(MG.reach + .4, () => { for (const p of EXTRAS) if (p.__area === 'square') emote(p, 'bang', 1.6); }, 'the square sees it');
   at(MG.pass - .4, () => phase('rider', MG.pass - .4), 'with the passer-by');
-  at(MG.release, () => muggingEnd(), 'the square lets go');
+  at(MG.release, () => { muggingEnd(); releaseExtras(p => p.__area === 'square'); }, 'the square lets go');
   EV.sort((a, b) => a.t - b.t);
 
   const NEON = [[0, 0], [.05, 1], [.09, .15], [.15, 1], [.22, .35], [.27, 1], [.4, .7], [.46, 1]];
@@ -546,6 +610,7 @@ const FILM = (() => {
     const tt = PH.name === 'title' ? t - PH.t0 : -1, end = tt >= 0 && tt > DUR.title - .8;
     const black = t < 1 ? 1 - ss(t) : end ? ss((tt - (DUR.title - .8))/.8) : tt >= 0 ? .4*ss(tt/1.4) : 0;
     E.black.style.opacity = String(black);
+    if (t >= MK.garden && t < MK.garden + .6){ const m = document.getElementById('monitor'); if (m) m.style.opacity = String(1 - ss((t - MK.garden)/.55)); }
     if (E.tNeon){ E.tNeon.style.opacity = String(tt > .5 ? neonAt(tt - .5) : 0); E.tTerr.style.opacity = String(tt > .9 ? neonAt(tt - .9) : 0); }
   }
   const clock = () => (performance.now() - t0)/1000;
@@ -555,12 +620,16 @@ const FILM = (() => {
     const t = clock(); lastT = t; F.t = t;
     while (fired < EV.length && EV[fired].t <= t){ const e = EV[fired++]; safe(e.name, e.f); }
     if (t > 4) quietAlert();
+    if (window.PPL_ONLY) safe('only', () => {
+      for (const st of POLICE_STATIONS) for (const d of st.drones) if (!d.st.puppet){ if (!d._held){ d._held = d.g.position.clone(); } const h = d._held; d.st.puppet = () => ({ x: h.x, y: h.y, z: h.z, light: 0, red: 0 }); d._still = true; d.g.visible = false; }
+      if (typeof POLICE_BIKES !== 'undefined') for (const b of POLICE_BIKES) if (b.spr) b.spr.visible = !b.rider; });
     paint(t);
     if (t >= MK.p[0] && t < MK.garden && F.pairs){ const p = F.pairs[who(t)].A; brackets(p.x, p._ey ?? CURB, p.z); }
     else if (E.sel.style.display !== 'none') E.sel.style.display = 'none';
     if (PH.name === 'rider' && RD.T && t > RD.T.depart + .3) phase('side', t);
     else if (PH.name === 'rider' && !RD.T && t > PH.t0 + 3) phase('side', t);   // (no station: straight on)
-    else if (PH.name === 'side' && t > Math.max(PH.t0 + DUR.side, (RD.arrive || 0) + 1.6)){ F.outT0 = t; phase('out', t); release(RD.p); }
+    else if (PH.name === 'side' && t > PH.t0 + DUR.side){ F.outT0 = t; phase('out', t); release(RD.p); releaseExtras();
+      window.PPL_ONLY = false; for (const st of POLICE_STATIONS) for (const d of st.drones) if (d._still){ d._still = false; d.st.puppet = null; d.g.visible = true; d.st.mode = 'home'; d.st.target = null; } }
     else if (PH.name === 'out' && t > F.outT0 + DUR.out){ phase('title', t); LK.wx.fadeSec = 5; LK.setWeather('rain', false, true); }
     else if (PH.name === 'title' && t > PH.t0 + DUR.title){ F.playing = false; F.done = true; F.len = t; say('done at', t.toFixed(2));
       if (!CAP){ E.msg.hidden = false; E.status.innerHTML = 'click to play again'; E.ov.classList.add('ask'); E.ov.addEventListener('click', () => location.reload(), { once: true }); } }

@@ -2247,6 +2247,7 @@ function updatePeople(dt, t){
         if (p.emoUntil > t && a > .9) emit(r.x, r.y + .8*PPL_S, r.z, ROW_EMO, p.emo, 1, 2); }
       else if (r){ p.x = r.x; p.z = r.z; p._ey = r.y; p._ec = 0; }
       continue; }
+    if (window.PPL_ONLY){ p.acc = (p.acc || 0) + dt0; p._ec = 0; continue; }   // (a scripted scene is on: only its own cast is out, everyone else waits unseen)
     if (full){
       if (!PH.tests.noSlowFar && !p.ride && !p.club && !p.metro && p.x !== undefined && ((pplFrame + pi++) & 3) && offScreen(p.x, p.z)){ p.acc = (p.acc || 0) + dt0; continue; }
     } else if (!p.ride && !p.club && !p.metro && p.x !== undefined){
@@ -2390,7 +2391,7 @@ function updatePeople(dt, t){
         if (L.fade > 0) emit(r.x, r.y ?? CURB, r.z, L.row, r.frame, L.flip, L.fade >= 1 ? 1 : L.fade*.98, false, r.dx, r.dz);
         if (r.emo !== undefined && L.fade > .9) emit(r.x, (r.y ?? CURB) + .8*PPL_S, r.z, ROW_EMO, r.emo, 1, 2); }
       continue; }
-    if (L.fade <= 0 || L.state === 'caught') continue;
+    if (L.fade <= 0 || L.state === 'caught' || window.PPL_ONLY) continue;
     if (L.dx !== undefined){ const sd = L.dx*_camR.x + L.dz*_camR.z; if (Math.abs(sd) > 1e-3) L.flip = sd < 0 ? -1 : 1; }
     const fr = L.state === 'strike' || L.state === 'flee' ? (newLook ? F_RUN + Math.floor(t*11 + L.phase) % PPL.walk : Math.floor(t*16 + L.phase) % PPL.walk)
              : L.state === 'rob' ? F_SPEC + Math.floor(t*7) % 6 : F_IDLE + Math.floor(t*2 + L.phase) % PPL.idle;
@@ -2398,7 +2399,7 @@ function updatePeople(dt, t){
   }
   // the police hoverbikes: the officer astride, and anyone they've picked up on the pillion behind
   if (typeof POLICE_BIKES !== 'undefined') for (const b of POLICE_BIKES){
-    if (!b.rider || b.alpha <= 0) continue;
+    if (!b.rider || b.alpha <= 0 || window.PPL_ONLY) continue;
     const a0 = b.alpha >= 1 ? 1 : b.alpha*.98;
     if (b.walkIn){   // off the bike and walking into the station, the officer leading the mugger by the arm
       const W = b.walkIn, dx = W.x1 - W.x0, dz = W.z1 - W.z0, l = Math.hypot(dx, dz) || 1, x = W.x0 + dx*W.u, z = W.z0 + dz*W.u;

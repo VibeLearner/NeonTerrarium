@@ -32,6 +32,8 @@ const FILM = (() => {
   /* ---------- small maths ---------- */
   const clamp = (x, a, b) => x < a ? a : x > b ? b : x, clamp01 = x => clamp(x, 0, 1);
   const ss = x => { x = clamp01(x); return x*x*(3 - 2*x); };
+  const ss5 = x => { x = clamp01(x); return x*x*x*(x*(x*6 - 15) + 10); };   // (smootherstep: starts and stops even more gently)
+  const H0 = .3;   // (the hologram's own first moment, before its camera starts to move: skipped, so it moves from the first frame)
   const ease = x => { x = clamp01(x); return x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3)/2; };
   const lerp = (a, b, u) => a + (b - a)*u, elerp = (a, b, u) => Math.exp(lerp(Math.log(a), Math.log(b), u));
   const seg = (t, a, b) => clamp01((t - a)/(b - a));
@@ -44,8 +46,8 @@ const FILM = (() => {
   // furnishing (APT.furn), the hologram out (APT.back) and the lab fading off the city (APT.fade); garden: the camera sets off for the
   // square; square: it is there
   const MK = { built: 13.6, dive: 14.5, p: [17, 24], leave2: 27.6, door: 30.2, open: 30.6 };
-  const APT = { holo: 3.05, furn: 5.2, back: 3.05, fade: .45 };
-  MK.room = MK.open + APT.holo; MK.unroom = MK.room + APT.furn; MK.back = MK.unroom + APT.back; MK.garden = MK.back + APT.fade; MK.square = MK.garden + 6.5;
+  const APT = { holo: 4.4, furn: 5.2, back: 4.4, fade: .7 };   // (the hologram's 3 s played over 4.4, on one smooth curve each way)
+  MK.room = MK.open + APT.holo; MK.unroom = MK.room + APT.furn; MK.back = MK.unroom + APT.back; MK.garden = MK.back; MK.square = MK.garden + 6.5;
   const DUR = { out: 9, lightsIn: 1.5, title: 8.5 };
 
   /* ---------- the city plan ---------- */
@@ -767,7 +769,7 @@ const FILM = (() => {
     const D_ = PC._debug.DUR || 3.05, st = PC._debug.state(), live = ov && ov.classList.contains('live');
     const wait = why => { if (++AP.heldN > 60*90){ if (AP.heldN === 60*90 + 1) warn('apartment', 'waited 90 s for the lab (' + why + '): going on'); return false; } F.held = true; F.info.aptWait = why; return true; };
     if (t < MK.room){   // the hologram flies in
-      const u = (t - MK.open)/APT.holo*D_;
+      const u = H0 + (D_ - H0)*ss5((t - MK.open)/APT.holo);
       if (!live && wait('the hologram')) return;
       if (st && st.trans){
         const lw = u >= 1.7 ? labLightWait() : false;
@@ -777,7 +779,7 @@ const FILM = (() => {
         PC._debug.hold(u);
       }
       if (u >= 2.0 && B && !AP.picked){ AP.picked = true; safe('pick', () => labPick(B)); }
-      fr.style.opacity = String(ss((t - MK.open)/.3));
+      fr.style.opacity = String(ss((t - MK.open)/.6));   // (the city dissolving into the hologram as it starts to move)
       return;
     }
     if (t < MK.unroom){   // the furnishing
@@ -800,10 +802,10 @@ const FILM = (() => {
         if (st && !st.trans){ st.trans = { t0: performance.now(), vt: D_, last: performance.now(), drift: 0, gate: false, rm: false, frames: [], onDone: null, resolve(){}, skipped: false, lhDone: true, hold: D_ }; PC.transitioning = true; }
         FURN.hold = false;   // (the city is drawn again underneath, from the camera where it was left)
       }
-      if (st && st.trans){ st.trans.holding = false; PC._debug.hold(Math.max(0, D_*(1 - (t - MK.unroom)/APT.back))); }
+      if (st && st.trans){ st.trans.holding = false; PC._debug.hold(H0 + (D_ - H0)*(1 - ss5((t - MK.unroom)/APT.back))); }
+      fr.style.opacity = String(1 - ss(seg(t, MK.back - APT.fade, MK.back)));   // (and the hologram dissolving into the city as it comes to rest)
       return;
     }
-    if (t < MK.garden){ if (st && st.trans) PC._debug.hold(0); fr.style.opacity = String(1 - ss(seg(t, MK.back, MK.garden))); return; }   // and the city again
     aptEnd();
   }
   function aptEnd(why){

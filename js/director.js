@@ -244,9 +244,10 @@ const DIRECTOR = (() => {
     if (f.mode === 'rise') return clamp01(u);   // (each light has its own switch-on point: sweeping through them lights the city one by one, as the game does at dusk)
     let v = 0; for (const [k, a] of FLICK) if (u >= k) v = a; return v;
   }
-  function personOf(f){
+  function personOf(f, used){
+    if (RUN.frozen && RUN.frozen.has(f.id)){ const q = people.get(RUN.frozen.get(f.id)); if (q) return q; }
     let p = f.who != null ? people.get(f.who) : null;
-    if (!p && f.x != null){ let best = null; for (const q of people.values()){ if (q.x === undefined) continue; const d = Math.hypot(q.x - f.x, q.z - f.z); if (!best || d < best.d) best = { q, d }; } if (best && best.d < 12) p = best.q; }
+    if (!p && f.x != null){ let best = null; for (const q of people.values()){ if (q.x === undefined || (used && used.has(q.id))) continue; const d = Math.hypot(q.x - f.x, q.z - f.z); if (!best || d < best.d) best = { q, d }; } if (best && best.d < 12) p = best.q; }
     return p || null;
   }
   function followPos(f){
@@ -495,8 +496,24 @@ const DIRECTOR = (() => {
     }
     return E.sort((a, b) => a.t - b.t || a.o - b.o);
   }
+  // people held in place for their person cam: picked when the film (or preview) starts, so the same person is there when the cam gets to them
+  function freezePick(t0){
+    RUN.frozen = new Map(); const used = new Set();
+    for (const f of keysSorted(P.fx)){ if (f.type !== 'person' || !f.freeze || f.t + f.d <= t0) continue;
+      const p = personOf(f, used); if (!p){ warn('keep in place', 'nobody near ' + (f.who || 'the spot')); continue; }
+      RUN.frozen.set(f.id, p.id); used.add(p.id); }
+  }
+  function freezeTick(t){
+    if (!RUN.frozen || !RUN.frozen.size) return;
+    for (const f of P.fx){ const id = RUN.frozen.get(f.id); if (id === undefined || t > f.t + f.d) continue;
+      const p = people.get(id); if (!p) continue;
+      if (p.walk) p.pause = Math.max(p.pause || 0, pplNow + .4);   // (a paused walker stands and idles where it is: people.js)
+      p.until = Math.max(p.until || 0, pplNow + 6);                 // (and whoever is standing at a spot stays there)
+    }
+  }
   function startRun(kind, t0){
     RUN.kind = kind; RUN.t0 = t0; RUN.wall0 = performance.now(); RUN.k = 0; RUN.open = new Map();
+    if (kind === 'play' || kind === 'preview') freezePick(t0); else RUN.frozen = null;
     RUN.ev = kind === 'rec' ? [] : buildEvents(t0, kind);
     D.t = t0; D.playing = kind === 'play'; D.done = false;
     document.documentElement.classList.toggle('dr-clean', kind === 'play' || kind === 'preview');
@@ -510,7 +527,7 @@ const DIRECTOR = (() => {
     const kind = RUN.kind; if (!kind) return;
     for (const f of P.fx) if (RUN.open.has(f.id)) fxEnd(f);
     if (kind === 'rec') recStop();
-    RUN.kind = null; D.playing = false; musicStop();
+    RUN.kind = null; RUN.frozen = null; D.playing = false; musicStop();
     paint(0, false); OV.sel.style.display = 'none';
     document.documentElement.classList.remove('dr-clean', 'dr-play');
     safe('game music', () => music.hold(false));
@@ -539,7 +556,7 @@ const DIRECTOR = (() => {
     while (RUN.k < RUN.ev.length && RUN.ev[RUN.k].t <= t){ const e = RUN.ev[RUN.k++]; safe(e.name, e.f); if (RUN.kind === 'play') D.log.push(t.toFixed(2) + ' ' + e.name); }
     if (RUN.kind === 'rec') recTick(t);
     else {
-      paint(t, true); brackets(t);
+      paint(t, true); brackets(t); freezeTick(t);
       if (FURN.open && [...RUN.open.keys()].some(id => (P.fx.find(f => f.id === id) || {}).type === 'apartment')){ safe('lab', labClean); safe('sharp', labSharp); }
     }
     uiTime();
@@ -613,7 +630,7 @@ const DIRECTOR = (() => {
     lights: { name: 'City lights', d: 9.1, col: '#ffcf7a', params: { mode: 'rise' } },
     look: { name: 'Look', d: .6, col: '#c08bff', params: { look: 'night' } },
     weather: { name: 'Weather', d: .6, col: '#7fb2ff', params: { weather: 'rain' } },
-    person: { name: 'Person cam', d: 6, col: '#38e8b0', params: { who: null, follow: true, brackets: true, panel: true } },
+    person: { name: 'Person cam', d: 6, col: '#38e8b0', params: { who: null, follow: true, brackets: true, panel: true, freeze: true } },
     train: { name: 'Follow a train', d: 6, col: '#ffb347', params: { line: null, drive: true, from: 0, speed: 2.2 } },
     apartment: { name: 'Apartment', d: 6, col: '#ff8a5c', params: { key: null } },
   };
@@ -958,10 +975,12 @@ const DIRECTOR = (() => {
       if (it.type === 'weather') h += `<label>Weather ${sel('weather', [['clear', 'clear'], ['overcast', 'overcast'], ['rain', 'rain']])}</label>`;
       if (it.type === 'person'){ const p = it.who != null && people.get(it.who);
         h += `<div class="note">${p ? 'Watching ' + esc(p.name || it.who) : it.who ? 'Person ' + esc(it.who) + ' (not in this city: the nearest to where they were is used)' : 'Nobody picked yet'}</div>
+          <label class="ck"><input type="checkbox" data-f="freeze"${it.freeze ? ' checked' : ''}> keep them in place</label>
           <label class="ck"><input type="checkbox" data-f="follow"${it.follow ? ' checked' : ''}> camera follows them</label>
           <label class="ck"><input type="checkbox" data-f="brackets"${it.brackets !== false ? ' checked' : ''}> highlight brackets</label>
           <label class="ck"><input type="checkbox" data-f="panel"${it.panel !== false ? ' checked' : ''}> show the person cam panel</label>
-          <div class="row"><button class="dr-btn" data-i="whoNow">Use the person cam's person</button></div>`; }
+          <div class="row"><button class="dr-btn" data-i="whoNow">Use the person cam's person</button></div>
+          <div class="note">"Keep them in place": from the start of the film until this ends they don't walk anywhere (they still idle, gesture and turn on the spot), so the same person is waiting there every time it plays.</div>`; }
       if (it.type === 'train') h += `<label>Line ${sel('line', metros.map(l => [l.id, 'line ' + l.id + ' (' + l.tiles.length + ' plots)']))}</label>
           <label class="ck"><input type="checkbox" data-f="drive"${it.drive !== false ? ' checked' : ''}> drive the train (no stops)</label>
           <label>Starts at <input type="number" step="0.5" min="0" data-f="from" value="${it.from ?? 0}" title="How far along the line the train is when the effect starts, in plots"></label>

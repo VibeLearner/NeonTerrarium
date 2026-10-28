@@ -36,24 +36,30 @@ window.NT_FILM2 = /#film\b/.test(location.hash);   // (#film: js/film.js, a scri
 // built, blocks merged, plot arrays kept), nothing is swapped for a stand-in or dropped by distance (tiers, never-seen faces, small triangles,
 // speed detail, people's update rate), and the soft effects draw at full size. main.js, sky.js, input.js, monitor.js and people.js read NT_RENDER
 // for the rest: shadows and clouds drawn whole every frame, no shadow-box steps, no whole-pixel camera snap, the person cam's feed every frame
-if (window.NT_FILM2){
+if (window.NT_FILM2 || window.NT_STAGE){
   window.NT_RENDER = true;
   window.__NV_OFF = window.__SYNC_NOW = window.__STAGE_NOW = window.__GEN_MAIN = window.__KEEP_GEO = window.__ALERT_NOW = window.__DISPOSE_NOW = true;
   window.__TIER_OFF = window.__SOFT_FULL = window.__FULL_RATE = true;
 }
-const NT_FILM = () => window.NT_TRAILER || window.NT_DIRECTOR || window.NT_FILM2;
+// #stage: js/stage.js, the film as a play (the game draws, the stage decides everything). Like #film it keeps nothing, and it reads nothing of the
+// player's either: every city key and setting it asks for is answered from the stage's own (STAGE_KEYS, js/stage_scene.js) or as never set
+window.NT_STAGE = /#stage\b/.test(location.hash);
+const NT_FILM = () => window.NT_TRAILER || window.NT_DIRECTOR || window.NT_FILM2 || window.NT_STAGE;
 const NT_LOCKED = k => (NT_SAVE_LOCK && NT_isCityKey(k)) || (NT_FILM() && typeof k === 'string' && (k.startsWith('neonIsland.') || k.startsWith('neonLooks.')));
 const NT_RAW = { set: Storage.prototype.setItem, remove: Storage.prototype.removeItem, get: Storage.prototype.getItem };
 if (window.NT_DIRECTOR) Storage.prototype.getItem = function (k){
   if (this === window.localStorage && NT_isCityKey(k)) return Object.prototype.hasOwnProperty.call(NT_DIR_CITY, k) ? NT_DIR_CITY[k] : null;
   return NT_RAW.get.call(this, k);
 };
+if (window.NT_STAGE){ NT_SAVE_LOCK = true; Storage.prototype.getItem = function (k){
+  if (this === window.localStorage && typeof k === 'string' && /^(neonIsland|neonLooks|neonTerrarium)\./.test(k)){ const K = window.STAGE_KEYS || {}; return Object.prototype.hasOwnProperty.call(K, k) ? K[k] : null; }
+  return NT_RAW.get.call(this, k); }; }
 Storage.prototype.setItem = function (k, v){ if (this === window.localStorage && NT_LOCKED(k)) return; return NT_RAW.set.call(this, k, v); };
 Storage.prototype.removeItem = function (k){ if (this === window.localStorage && NT_LOCKED(k)) return; return NT_RAW.remove.call(this, k); };
 // the title screen shows on every load, unless a city switch just asked to go straight in
 (() => {
   let skip = false; try { skip = sessionStorage.getItem('neonTerrarium.skipTitle') === '1'; sessionStorage.removeItem('neonTerrarium.skipTitle'); } catch (e) {}
-  if (/[?&](notitle|tv=1)\b/.test(location.search) || navigator.webdriver || window.NT_TRAILER || window.NT_DIRECTOR || window.NT_FILM2) skip = true;   // (tests and the tools/ harnesses go straight in, and so does a return from the coast)
+  if (/[?&](notitle|tv=1)\b/.test(location.search) || navigator.webdriver || window.NT_TRAILER || window.NT_DIRECTOR || window.NT_FILM2 || window.NT_STAGE) skip = true;   // (tests and the tools/ harnesses go straight in, and so does a return from the coast)
   if (/[?&]title\b/.test(location.search)) skip = false;   // (?title: show it anyway, for looking at it under a test browser)
   window.NT_TITLE = !skip;
   if (!skip) document.documentElement.classList.add('title-on', 'title-boot');   // (title-boot: a dark cover until the room's picture is in, so the city never shows loading first)

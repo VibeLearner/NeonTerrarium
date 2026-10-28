@@ -80,13 +80,13 @@ def main():
         slug = ''.join(ch if ch.isalnum() else '-' for ch in (proj.get('name') or 'trailer').lower()).strip('-') or 'trailer'
         if a.out == ap.get_default('out'): a.out = os.path.join(OUT, slug + ('-preview' if a.preview else '') + '.mp4')
     elif a.film:
-        length = 140.0   # (at most: the film runs until it says it's done, about 85 s)
+        length = 180.0   # (at most: the film runs until it says it's done)
         if a.until == LEN: a.until = length
         if a.out == ap.get_default('out'): a.out = os.path.join(OUT, 'neon-terrarium-film' + ('-preview' if a.preview else '') + '.mp4')
     else:
         length = LEN
-    OBJ = 'DIRECTOR' if proj else 'FILM' if a.film else 'TRAILER'
-    HASH = '#dev&director' if proj else '#film' if a.film else '#trailer'
+    OBJ = 'DIRECTOR' if proj else 'PLAY' if a.film else 'TRAILER'   # (the film is the stage's: js/stage.js plays js/stage_scene.js)
+    HASH = '#dev&director' if proj else '#stage' if a.film else '#trailer'
     if a.preview and not proj and not a.film and a.out == ap.get_default('out'): a.out = os.path.join(OUT, 'trailer-preview.mp4')
     every = 2 if a.preview else 1   # (a preview keeps every other frame: the trailer runs exactly the same, only half as many pictures are taken)
     first = int(round(a.start*FPS))
@@ -109,7 +109,7 @@ def main():
             o = {'format': fmt, 'fromSurface': True, 'captureBeyondViewport': False}
             if fmt == 'jpeg': o['quality'] = quality or a.quality
             return base64.b64decode(cdp.send('Page.captureScreenshot', o)['data'])
-        page.on('console', lambda m: print('  page:', m.text[:300]) if m.text.startswith(('[trailer]', '[film]')) or m.type == 'error' else None)
+        page.on('console', lambda m: print('  page:', m.text[:300]) if m.text.startswith(('[trailer]', '[film]', '[stage]')) or m.type == 'error' else None)
         page.on('pageerror', lambda e: print('  page error:', e))
         page.on('crash', lambda *_: print('  the page crashed (the graphics process may have run out of memory)'))
         url = f'http://127.0.0.1:{a.port}/index.html' + HASH
@@ -128,7 +128,7 @@ def main():
                 ctx.add_init_script(path=os.path.join(HERE, 'shim.js'))
                 if proj: ctx.add_init_script(script='if (window === window.top){ window.__DIR_CITY = ' + json.dumps(city) + '; window.__DIR_PROJ = ' + json.dumps(proj) + '; window.__DIR_BOOT = { mode: "play", at: 0 }; }')
                 page = ctx.new_page(); cdp = ctx.new_cdp_session(page)
-                page.on('console', lambda m: print('  page:', m.text[:300]) if m.text.startswith(('[trailer]', '[film]')) or m.type == 'error' else None)
+                page.on('console', lambda m: print('  page:', m.text[:300]) if m.text.startswith(('[trailer]', '[film]', '[stage]')) or m.type == 'error' else None)
                 page.on('pageerror', lambda e: print('  page error:', e))
                 page.goto(url, wait_until='load'); navs.clear()
 
@@ -171,14 +171,16 @@ def main():
                                    stdin=subprocess.PIPE)
         t1 = time.time()
         for f in range(frames):
-            ev('__step(1)')
-            if a.film:   # the film's clock waits while the apartment's lab works (FILM.held): step on without taking pictures until it goes on
-                n = 0
-                while ev('FILM.held === true'):
-                    ev('__step(1)'); n += 1; time.sleep(.004)
-                    if n % 600 == 0: print(f'  waiting for the apartment ({n} frames so far)')
-                if n: print(f'  the apartment was ready after {n} more frames')
-            if a.film and f % 15 == 0 and f > 60*FPS and ev('FILM.state().done'): frames = f; break
+            if a.film:   # one picture per frame the stage draws: while it waits (the apartment's lab working) the clock steps on and no picture is taken
+                n = 0; d0 = ev('PLAY.drawn')
+                while True:
+                    ev('__step(1)')
+                    if ev('PLAY.drawn') != d0: break
+                    n += 1; time.sleep(.004)
+                    if n % 600 == 0: print(f'  waiting for the apartment ({n} steps so far)')
+                if n > 2: print(f'  the apartment was ready after {n} steps')
+                if f % 15 == 0 and ev('PLAY.done'): frames = f; break
+            else: ev('__step(1)')
             if a.stills:
                 if f in want:
                     p = os.path.join(sd, f'{f/FPS:05.2f}s.png'); open(p, 'wb').write(grab('png')); print('still', os.path.relpath(p, ROOT))

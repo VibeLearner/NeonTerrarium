@@ -5,7 +5,8 @@
 resize();
 bakeClouds();
 if (window.NT_TRAILER && typeof TRAILER !== 'undefined') TRAILER.city();
-else if (window.NT_FILM2 && typeof FILM !== 'undefined') FILM.city();   // (#film: built on camera from empty sky: js/film.js)   // (#trailer: its own city, never saved: js/trailer.js)
+else if (window.NT_FILM2 && typeof FILM !== 'undefined') FILM.city();
+else if (window.NT_STAGE && typeof PLAY !== 'undefined') PLAY.city();   // (#stage: the film as a play, js/stage.js)   // (#film: built on camera from empty sky: js/film.js)   // (#trailer: its own city, never saved: js/trailer.js)
 else if (!load()) clearIsland(); else if (loadWanted()) loadStart(); else rebuildAll();   // (a saved city is made from its recipes by the worker, nearest the camera first: loadcity.js)
 centerView(true);
 selectZone(null);
@@ -23,6 +24,7 @@ PH.state = () => 'cache: ' + SC.state + (SC.why ? ' (' + SC.why + ')' : '') + ';
   + '; merges waiting ' + solidDirty.size + (SOLID_JOB ? ' (one under way)' : '') + ', tier changes ' + TIER.changes + ', to free ' + DISPOSE_Q.length + '; drag ' + (dragging ? 'held' : 'off');
 function frame(now){
   requestAnimationFrame(frame);
+  if (window.NT_STAGE && typeof PLAY !== 'undefined'){ const n = PLAY.frameNow(); if (n === null) return; now = n; }   // (#stage: the film's own clock, and nothing runs before it starts or while it waits)
   if (typeof OVERSEER !== 'undefined' && OVERSEER.hold) return;   // (the Overseer's desk covers the screen: the city waits)
   if (typeof PRECINCT !== 'undefined' && PRECINCT.hold){ if (PRECINCT.live) try { simBody(now); } catch (e){ console.warn('desk sim', e); } return; }   // (and the Precinct desk: the city goes on under it undrawn, so its plan is live, policedesk.js)
   if (typeof GRIDPANEL !== 'undefined' && GRIDPANEL.hold) return;   // (so does the Acoustic Panel; the broadcast plays on)

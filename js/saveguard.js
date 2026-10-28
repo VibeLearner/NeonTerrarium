@@ -31,6 +31,7 @@ if (window.NT_DIRECTOR){
   if (!NT_DIR_CITY || typeof NT_DIR_CITY !== 'object') NT_DIR_CITY = {};
 }
 window.NT_FILM2 = /#film\b/.test(location.hash);   // (#film: js/film.js, a scripted film built from empty sky: keeps nothing, like #trailer)
+window.NT_STAGE = /#stage\b/.test(location.hash);   // (#stage: js/stage.js, set before the render block below so its switches apply)
 // Render mode (#film): the film is drawn a frame at a time for a video, with all the time there is for each frame, so every shortcut the
 // game takes for a playable frame rate is off. Work that the game spreads over frames or hands to its worker is done at once (edits sync, plots
 // built, blocks merged, plot arrays kept), nothing is swapped for a stand-in or dropped by distance (tiers, never-seen faces, small triangles,
@@ -43,7 +44,6 @@ if (window.NT_FILM2 || window.NT_STAGE){
 }
 // #stage: js/stage.js, the film as a play (the game draws, the stage decides everything). Like #film it keeps nothing, and it reads nothing of the
 // player's either: every city key and setting it asks for is answered from the stage's own (STAGE_KEYS, js/stage_scene.js) or as never set
-window.NT_STAGE = /#stage\b/.test(location.hash);
 const NT_FILM = () => window.NT_TRAILER || window.NT_DIRECTOR || window.NT_FILM2 || window.NT_STAGE;
 const NT_LOCKED = k => (NT_SAVE_LOCK && NT_isCityKey(k)) || (NT_FILM() && typeof k === 'string' && (k.startsWith('neonIsland.') || k.startsWith('neonLooks.')));
 const NT_RAW = { set: Storage.prototype.setItem, remove: Storage.prototype.removeItem, get: Storage.prototype.getItem };

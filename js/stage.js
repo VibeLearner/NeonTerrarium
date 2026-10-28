@@ -513,6 +513,8 @@ const PLAY = (() => {
     G.frame = 0; rendered = false; G.t = 0; rolling = true; G.playing = true;
     last = 1000 - 1000/FPS;   // (main.js: the first frame is one frame after this)
     cloudMat.uniforms.cloudOff.value.set(0, 0); clouds.rotation.y = 0; comp.uniforms.rainT.value = 0;   // (what the frames add up from: from nothing)
+    const jm = /[&#]from=([\d.]+)/.exec(location.hash);   // (#stage&from=<seconds>: checking only, never recorded: the city up to then built at once and the film started there)
+    if (jm){ G.frame = Math.round(+jm[1]*FPS); prep(); while (anims.length) endAnim(0); finishSync(); say('jumped to', jm[1]); }
     prep(); say('rolling'); return true;
   };
   G.state = () => ({ ready: G.ready, playing: G.playing, done: G.done, held: G.held, t: G.t, frame: G.frame, drawn: G.drawn, info: G.info, log: G.log.slice(-30) });

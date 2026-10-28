@@ -18,7 +18,7 @@ const srv = http.createServer((q, r) => { const f = path.join(ROOT, decodeURICom
   p.on('console', m => { const s = m.text(); if (m.type() === 'error' || /\[stage\]/.test(s)){ console.log('  ', s.slice(0, 260)); log.write(s + '\n'); } });
   const cdp = await ctx.newCDPSession(p);
   const grab = async () => Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true })).data, 'base64');
-  await p.goto(`http://127.0.0.1:${PORT}/index.html#stage`, { waitUntil: 'load', timeout: 0 });
+  await p.goto(`http://127.0.0.1:${PORT}/index.html#stage${process.env.JUMP ? '&from=' + process.env.JUMP : ''}`, { waitUntil: 'load', timeout: 0 });
   for (let i = 0; ; i++){ await p.evaluate(() => __step(2)); const st = await p.evaluate(() => typeof PLAY !== 'undefined' ? { r: PLAY.ready, f: PLAY.failed } : {}); if (st.r || st.f) break; await p.waitForTimeout(15); }
   if (process.env.DBG) await p.evaluate(() => { for (const C of [THREE.BufferAttribute, THREE.InterleavedBuffer]){ const d = Object.getOwnPropertyDescriptor(C.prototype, 'needsUpdate'); if (!d || !d.set) continue;
       Object.defineProperty(C.prototype, 'needsUpdate', { configurable: true, set(v){ if (v && this.array == null && !this.__told){ this.__told = true; console.error('[stage] null array flagged ' + (new Error().stack || '').split('\n').slice(2, 9).join(' | ')); } d.set.call(this, v); } }); } });
@@ -30,7 +30,7 @@ const srv = http.createServer((q, r) => { const f = path.join(ROOT, decodeURICom
   await p.evaluate(() => PLAY.start());
   const hashes = fs.createWriteStream(path.join(OUT, 'hashes.txt'));
   let si = 0; const t0 = Date.now();
-  for (let f = 0; f <= UNTIL*60; f++){
+  for (let f = Math.round(+(process.env.JUMP || 0)*60); f <= UNTIL*60; f++){
     const keep = f >= FROM*60 && (f % EVERY === 0 || (si < STILLS.length && f >= STILLS[si]*60));
     await p.evaluate(k => { window.__CAP = k; }, keep);
     let d0 = await p.evaluate(() => PLAY.drawn), n = 0;

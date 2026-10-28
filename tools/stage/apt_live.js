@@ -21,8 +21,10 @@ const srv = http.createServer((q, r) => { const f = path.join(ROOT, decodeURICom
   await shot('a-as-is');
   const info = await p.evaluate(() => { const w = FURN.frame.contentWindow, B = w.PodBuilder._B; return { cw: B.cw, ch: B.ch, zoom: B.zoom, tx: B.tx, tz: B.tz, az: B.az, pitch: B.pitch, walls: B.walls, frame: [FURN.frame.clientWidth, FURN.frame.clientHeight], root: B.root && B.root.position.toArray(), cam: B.cam.position.toArray(), ctx: !!w.PodContext.active() }; });
   console.log(JSON.stringify(info));
-  await p.evaluate(() => { const B = FURN.frame.contentWindow.PodBuilder._B; B.tx = 0; B.tz = 0; B.zoom = 1; B.camDirty = true; B.needs = true; });
-  await shot('b-no-pan');
+  // LOOKS="zoom,tx,tz;zoom,tx,tz": a picture at each
+  for (const lk of (process.env.LOOKS || '1,0,0').split(';')){ const [z, x, zz] = lk.split(',').map(Number);
+    await p.evaluate(([z, x, zz]) => { const B = FURN.frame.contentWindow.PodBuilder._B; B.zoom = z; B.tx = x; B.tz = zz; B.camDirty = true; B.needs = true; }, [z, x, zz]);
+    await shot('b-' + lk.replace(/,/g, '_')); }
   await p.evaluate(() => { const w = FURN.frame.contentWindow; w.PodContext.exit(); const B = w.PodBuilder._B; B.camDirty = true; B.needs = true; });
   await shot('c-no-context');
   await b.close(); srv.close();

@@ -280,7 +280,7 @@ const PLAY = (() => {
       html.tr-on, html.tr-on *{cursor:none!important}
       html.tr-on #monitor.tr-keep{transform:scale(var(--monk,1.4));transform-origin:top right;top:3vh!important;right:2vh!important;max-height:calc(94vh/var(--monk,1.4))!important;overflow:hidden;transition:none!important;animation:none!important}
       html.tr-on #monitor.tr-keep *{transition:none!important;animation:none!important}
-      html.tr-on #monitor.tr-keep #monPin, html.tr-on #monitor.tr-keep #monClose{visibility:hidden!important}
+      html.tr-on #monitor.tr-keep #monPin, html.tr-on #monitor.tr-keep #monClose, html.tr-on #monitor.tr-keep #monTabs{visibility:hidden!important}
       #stOv{position:fixed;inset:0;z-index:9001;pointer-events:none}
       #stOv > i{position:absolute;inset:0;display:block;opacity:0;background:#000}
       #stSel{position:absolute;left:0;top:0;width:0;height:0;display:none;pointer-events:none}
@@ -507,6 +507,9 @@ const PLAY = (() => {
     const tk = () => { let ok = false; try { ok = cond(); } catch (e) {} if (ok) return res(); if (performance.now() - s0 > secs*1000) return rej(new Error('timed out')); requestAnimationFrame(tk); }; tk(); });
   async function setup(){
     if (PROBE) return;
+    // every font the frames use, loaded before anything rolls (the page asks for them with display=swap: otherwise one could arrive mid-film and swap in)
+    await Promise.race([Promise.all(['12px Silkscreen', '400 12px "JetBrains Mono"', '600 12px "JetBrains Mono"', '500 12px "Chakra Petch"', '600 12px "Chakra Petch"'].map(f => document.fonts.load(f).catch(() => null))).then(() => document.fonts.ready), new Promise(r => setTimeout(r, 20000))]).catch(() => null);
+    say('fonts', [...document.fonts].filter(f => f.status === 'loaded').map(f => f.family + ' ' + f.weight).join(', ') || 'none loaded (the fallbacks, throughout)');
     overlay(); monSetup(); compileCast();
     await title().catch(e => warn('title', e));
     if (SC_ && SC_.apartment){ safe('lab', () => FURN.preload()); await until(() => FURN.frame && FURN.ready, 400).catch(e => warn('apartment lab', e)); }

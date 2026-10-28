@@ -3827,7 +3827,9 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
       const ph = (time*2.2) % 2, a = ph < 1, fl = (time*14) % 1 < .6;
       red.b.visible = red.sp.visible = on && a && fl; blue.b.visible = blue.sp.visible = on && !a && fl;
       let light = 0;
-      if (st.mode === 'rest'){
+      if (st.puppet){   // flown by a script (the film: js/film.js): where it is, which way it faces, its searchlight and how red it is
+        const r = st.puppet(dt, time); if (r){ g.position.set(r.x, r.y, r.z); if (r.yaw !== undefined) st.yaw = r.yaw; light = r.light || 0; st.redOn = r.red || 0; st.aim = r.aim || null; } }
+      else if (st.mode === 'rest'){
         st.timer -= dt;
         if (st.chase){ st.mode = 'up'; st.k = 0; st.way = []; }   // scrambled to a mugging
         else if (st.timer <= 0){
@@ -3887,7 +3889,7 @@ function policeDrone(m, idx = 0, padM = m.dronePad, crew = null){
       g.rotation.y = st.yaw;
       // searchlight down to the street
       const h = g.position.y - CURB;
-      if (st.mode !== 'chase') st.redOn = Math.max(0, (st.redOn || 0) - dt*2);
+      if (st.mode !== 'chase' && !st.puppet) st.redOn = Math.max(0, (st.redOn || 0) - dt*2);
       const redK = st.redOn || 0;
       cone.visible = spot.visible = light > 0 || redK > 0;
       if (cone.visible){

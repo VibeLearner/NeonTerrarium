@@ -1525,6 +1525,7 @@ function lurkVictim(L, t){
 function updateLurkers(dt, t){
   const night = isNight(S.hour) && !(typeof STORY !== 'undefined' && STORY.engine === false);   // (no street crime while the storylet engine is off: story.js)
   for (const L of lurkers.values()){
+    if (L.puppet) continue;   // (played by a script: js/film.js)
     switch (L.state){
       case 'away':      // not out (daytime, or lying low after a job)
         L.fade = Math.max(0, L.fade - dt*2);
@@ -2237,6 +2238,15 @@ function updatePeople(dt, t){
   for (const p of pplList){
     idx++;
     if (p.onBike){ p.acc = 0; continue; }   // (out on a hoverbike: drawn with it, below)
+    if (p.puppet){   // played by a script (the film: js/film.js): where they are and what they're doing come from it, the simulation leaves them be
+      p.acc = 0; const r = p.puppet(t, dt0, p);
+      if (r && (r.alpha ?? 1) > 0){ p.x = r.x; p.z = r.z; p._ey = r.y; if (r.dx !== undefined){ const sd = r.dx*_camR.x + r.dz*_camR.z; if (Math.abs(sd) > 1e-3) p.flip = sd < 0 ? -1 : 1; }
+        const row = p.cop ? p.copRow || ROW_COP : p.row, a = Math.max(0, Math.min(1, r.alpha ?? 1));
+        p._ec = 1; p._er = row; p._ef = r.frame; p._ea = a; p._eo = .8*PPL_S; p._eoOn = a > .9; p._fx = r.dx; p._fz = r.dz;
+        emit(r.x, r.y, r.z, row, r.frame, p.flip, a, false, r.dx, r.dz);
+        if (p.emoUntil > t && a > .9) emit(r.x, r.y + .8*PPL_S, r.z, ROW_EMO, p.emo, 1, 2); }
+      else if (r){ p.x = r.x; p.z = r.z; p._ey = r.y; p._ec = 0; }
+      continue; }
     if (full){
       if (!PH.tests.noSlowFar && !p.ride && !p.club && !p.metro && p.x !== undefined && ((pplFrame + pi++) & 3) && offScreen(p.x, p.z)){ p.acc = (p.acc || 0) + dt0; continue; }
     } else if (!p.ride && !p.club && !p.metro && p.x !== undefined){
@@ -2375,6 +2385,11 @@ function updatePeople(dt, t){
   lawnHolos(); lawnPicnics(dt);
   // lurkers on the dark streets
   for (const L of lurkers.values()){
+    if (L.puppet){ const r = L.puppet(t); if (r){ L.x = r.x; L.z = r.z; L.dx = r.dx; L.dz = r.dz; L.fade = r.alpha ?? 1;
+        if (r.dx !== undefined){ const sd = r.dx*_camR.x + r.dz*_camR.z; if (Math.abs(sd) > 1e-3) L.flip = sd < 0 ? -1 : 1; }
+        if (L.fade > 0) emit(r.x, r.y ?? CURB, r.z, L.row, r.frame, L.flip, L.fade >= 1 ? 1 : L.fade*.98, false, r.dx, r.dz);
+        if (r.emo !== undefined && L.fade > .9) emit(r.x, (r.y ?? CURB) + .8*PPL_S, r.z, ROW_EMO, r.emo, 1, 2); }
+      continue; }
     if (L.fade <= 0 || L.state === 'caught') continue;
     if (L.dx !== undefined){ const sd = L.dx*_camR.x + L.dz*_camR.z; if (Math.abs(sd) > 1e-3) L.flip = sd < 0 ? -1 : 1; }
     const fr = L.state === 'strike' || L.state === 'flee' ? (newLook ? F_RUN + Math.floor(t*11 + L.phase) % PPL.walk : Math.floor(t*16 + L.phase) % PPL.walk)

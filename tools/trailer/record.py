@@ -37,7 +37,11 @@ def serve(port):
         def log_message(self, *a): pass
         def end_headers(self):
             self.send_header('Cache-Control', 'no-store'); super().end_headers()
-    srv = http.server.ThreadingHTTPServer(('127.0.0.1', port), functools.partial(Quiet, directory=ROOT))
+    class Server(http.server.ThreadingHTTPServer):
+        def handle_error(self, request, address):   # a page that stops a download part way (closed, reloaded, or the browser cancelled it): nothing to report
+            if isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError)): return
+            super().handle_error(request, address)
+    srv = Server(('127.0.0.1', port), functools.partial(Quiet, directory=ROOT))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv
 

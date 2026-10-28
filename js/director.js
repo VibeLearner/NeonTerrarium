@@ -241,6 +241,7 @@ const DIRECTOR = (() => {
     if (f.mode === 'off') return 0;
     if (f.mode === 'on') return 1;
     const u = (t - f.t)/Math.max(.05, f.d); if (u >= 1) return 1;
+    if (f.mode === 'rise') return clamp01(u);   // (each light has its own switch-on point: sweeping through them lights the city one by one, as the game does at dusk)
     let v = 0; for (const [k, a] of FLICK) if (u >= k) v = a; return v;
   }
   function personOf(f){
@@ -266,6 +267,21 @@ const DIRECTOR = (() => {
     }
     if (p) applyPose(p);
   }
+  // a driven train: put on its line from the effect's clock, so where it is at any moment is the same live, in the recorder and when scrubbing
+  const _um = updateMetros;
+  updateMetros = function (dt, t){
+    if (P) safe('drive train', () => {
+      const now = RUN.kind && RUN.kind !== 'rec' ? clockT() : D.t;
+      for (const f of P.fx){
+        if (f.type !== 'train' || f.drive === false || now < f.t || now > f.t + f.d) continue;
+        const l = metros.find(x => x.id === f.line); if (!l || !l.train) continue;
+        const tr = l.train, Pm = mtPath(l), stops = Pm.stops || [];
+        tr.dwell = 0; tr.at = 0; tr.next = Math.max(0, stops.length - 1); tr.dir = 1; tr.v = 0; tr.doors = 0;
+        tr.s = clamp(((+f.from || 0) + (+f.speed || 0)*(now - f.t))*LOT, .5, Pm.len - .5);
+      }
+    });
+    return _um(dt, t);
+  };
   const _uc = updateCamera;
   updateCamera = function (dt){
     if (RUN.kind === 'play' || RUN.kind === 'preview') safe('drive', () => driveAt(clockT()));
@@ -594,11 +610,11 @@ const DIRECTOR = (() => {
     bars: { name: 'Cinema bars', d: 6, col: '#3b4254', params: { size: 10 } },
     logo: { name: 'Logo', d: 4.5, col: '#ff4fa3', params: {} },
     text: { name: 'Text', d: 3, col: '#38e8e0', params: { text: 'Neon Terrarium', size: 64, color: 'cyan' } },
-    lights: { name: 'City lights', d: 1.5, col: '#ffcf7a', params: { mode: 'flicker' } },
+    lights: { name: 'City lights', d: 9.1, col: '#ffcf7a', params: { mode: 'rise' } },
     look: { name: 'Look', d: .6, col: '#c08bff', params: { look: 'night' } },
     weather: { name: 'Weather', d: .6, col: '#7fb2ff', params: { weather: 'rain' } },
     person: { name: 'Person cam', d: 6, col: '#38e8b0', params: { who: null, follow: true, brackets: true, panel: true } },
-    train: { name: 'Follow a train', d: 6, col: '#ffb347', params: { line: null } },
+    train: { name: 'Follow a train', d: 6, col: '#ffb347', params: { line: null, drive: true, from: 0, speed: 2.2 } },
     apartment: { name: 'Apartment', d: 6, col: '#ff8a5c', params: { key: null } },
   };
   function fxLabel(f){
@@ -937,7 +953,7 @@ const DIRECTOR = (() => {
       if (it.type === 'glitch') h += `<label>Strength <input type="range" min="0.2" max="2" step="0.05" data-f="power" value="${it.power ?? 1}"></label>`;
       if (it.type === 'bars') h += `<label>Size <input type="range" min="3" max="20" step="0.5" data-f="size" value="${it.size ?? 10}"></label>`;
       if (it.type === 'text') h += `<label>Text <input type="text" data-f="text" value="${esc(it.text)}"></label><label>Size <input type="number" min="12" max="240" data-f="size" value="${it.size ?? 64}"></label><label>Colour ${sel('color', [['cyan', 'cyan'], ['pink', 'pink'], ['amber', 'amber'], ['white', 'white']])}</label>`;
-      if (it.type === 'lights') h += `<label>Lights ${sel('mode', [['flicker', 'flicker on'], ['on', 'on'], ['off', 'off'], ['auto', 'as the game has them']])}</label><div class="note">Holds until the next lights effect.</div>`;
+      if (it.type === 'lights') h += `<label>Lights ${sel('mode', [['rise', 'come on one by one'], ['flicker', 'flicker on'], ['on', 'on'], ['off', 'off'], ['auto', 'as the game has them']])}</label><div class="note">Holds until the next lights effect. "One by one" is the game's own way: over the length of the effect every light switches on at its own moment (the game takes about 9 s).</div>`;
       if (it.type === 'look') h += `<label>Look ${sel('look', [['auto', 'auto (by the hour)'], ...((LK.order || []).map(id => [id, (LK.looks[id] && LK.looks[id].name) || id]))])}</label>`;
       if (it.type === 'weather') h += `<label>Weather ${sel('weather', [['clear', 'clear'], ['overcast', 'overcast'], ['rain', 'rain']])}</label>`;
       if (it.type === 'person'){ const p = it.who != null && people.get(it.who);
@@ -946,7 +962,11 @@ const DIRECTOR = (() => {
           <label class="ck"><input type="checkbox" data-f="brackets"${it.brackets !== false ? ' checked' : ''}> highlight brackets</label>
           <label class="ck"><input type="checkbox" data-f="panel"${it.panel !== false ? ' checked' : ''}> show the person cam panel</label>
           <div class="row"><button class="dr-btn" data-i="whoNow">Use the person cam's person</button></div>`; }
-      if (it.type === 'train') h += `<label>Line ${sel('line', metros.map(l => [l.id, 'line ' + l.id + ' (' + l.tiles.length + ' plots)']))}</label><div class="note">The camera's target rides with the train; zoom, turn and tilt still come from the camera keys.</div>`;
+      if (it.type === 'train') h += `<label>Line ${sel('line', metros.map(l => [l.id, 'line ' + l.id + ' (' + l.tiles.length + ' plots)']))}</label>
+          <label class="ck"><input type="checkbox" data-f="drive"${it.drive !== false ? ' checked' : ''}> drive the train (no stops)</label>
+          <label>Starts at <input type="number" step="0.5" min="0" data-f="from" value="${it.from ?? 0}" title="How far along the line the train is when the effect starts, in plots"></label>
+          <label>Speed <input type="number" step="0.1" min="0" data-f="speed" value="${it.speed ?? 2.2}" title="Plots a second"></label>
+          <div class="note">The camera's target rides with the train; zoom, turn and tilt still come from the camera keys. Driven, the train runs from "Starts at" (plots from the start of the line) at a steady speed for the whole effect, wherever it was before; scrub the playhead to see where it is.</div>`;
       if (it.type === 'apartment') h += `<div class="note">${it.key ? 'Home ' + esc(it.key) : 'No home picked yet'}</div><div class="row"><button class="dr-btn" data-i="homeNow">Use the person cam's home</button></div><div class="note">Opens that apartment in Furnish pod for this long (only when the film plays, not in Preview).</div>`;
       h += `<div class="row"><button class="dr-btn" data-i="goto">Go to it</button><button class="dr-btn" data-i="del">Delete</button></div>`;
     }

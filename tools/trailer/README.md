@@ -37,8 +37,8 @@ Trailers are kept in this browser; you can have as many as you like (the menu bu
 3. **Time of day:** "+ Time key" saves the city's current hour at the playhead. Between keys the day runs forward (22:00
    to 02:00 goes through midnight).
 4. **Effects:** "+ Effect" adds fades (in from or out to black or white), flashes, glitches, cinema bars, the logo,
-   your own neon text, city lights (flicker on, on, off), a look, the weather, the person cam (optionally following that
-   person, with the highlight brackets), following a metro train, and opening an apartment. Drag an effect to move it,
+   your own neon text, city lights (one by one like the game, flicker on, on, off), a look, the weather, the person cam (optionally following that
+   person, with the highlight brackets), following a metro train (it can drive the train along its line at a set speed, so it's where you want it), and opening an apartment. Drag an effect to move it,
    drag its right edge to change its length.
 5. **Watch it:** *Preview* plays the camera, time and effects from the playhead, live, without rebuilding anything.
    *Play film* reloads the trailer's city and plays the whole thing from the start with every edit built as it happens
@@ -56,10 +56,11 @@ reload the city with every edit before the playhead built.
 
 `tools/trailer/neon-terrarium.trailer.json` is the built-in trailer remade for the trailer maker (without the apartment
 and the coast, so it runs 53.55 s and everything from the metro ride on is 15.95 s earlier than in the scripted one).
-Import it from the menu ("Import a trailer file"). It has the trailer's city, the 139 builds of the opening build-up on
+Import it from the menu ("Import a trailer file"). It runs 61.15 s and has the trailer's city, the 139 builds of the opening build-up on
 the Edits row, the camera path (the turntable, the dive into the garden, the ride past the landmarks, the pull back over
 the dense city), the time of day, three person cam stretches in the garden (each follows whoever is nearest that spot),
-a flash into the ride, a fade through black for the night, the lights flickering on, the logo and the fade out. The
+a flash into the ride, the ride train driven along its line with the camera on it, a fade through black for the night,
+the lights coming on one by one as they do in the game (about 9 s), the logo and the fade out. The
 arcology (trailer-only geometry) is replaced by ordinary towers and the night comes in through a fade to black instead.
 
 ### Getting the video

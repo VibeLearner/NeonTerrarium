@@ -8,7 +8,7 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const srv = http.createServer((q, r) => { const f = path.join(ROOT, decodeURIComponent(q.url.split('?')[0])); fs.readFile(f, (e, d) => { if (e){ r.writeHead(404); r.end(); return; } r.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream' }); r.end(d); }); }).listen(PORT);
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  const ctx = await b.newContext({ viewport: { width: 640, height: 360 } });
+  const ctx = await b.newContext({ viewport: { width: +(process.env.W || 640), height: +(process.env.H || 360) } });
   await ctx.addInitScript({ path: path.join(ROOT, 'tools/trailer/shim.js') });
   const p = await ctx.newPage(); p.setDefaultTimeout(0);
   p.on('pageerror', e => console.log('ERR', e.message));

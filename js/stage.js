@@ -393,10 +393,11 @@ const PLAY = (() => {
   const labWin = () => { const f = FURN.frame; return f && f.contentWindow; };
   const labPC = () => { const w = labWin(); return w && w.PodContext; };
   const labB = () => { const w = labWin(); return w && w.PodBuilder && w.PodBuilder._B; };
+  function B_fit(w){ try { const B = w.PodBuilder && w.PodBuilder._B; if (B){ B.cw = 0; B.camDirty = true; B.needs = true; } w.dispatchEvent(new w.Event('resize')); } catch (e) {} }   // (the lab's picture sized to its window again, after the stage's own layout above)
   function labClean(){
     const w = labWin(); if (!w || !w.document || !w.document.head) return;
     const d = w.document;
-    if (!d.getElementById('stLab')){ const st = d.createElement('style'); st.id = 'stLab'; st.textContent = 'body *{visibility:hidden!important}.st-vis{visibility:visible!important}*{cursor:none!important;transition:none!important;animation:none!important}'; d.head.appendChild(st); }
+    if (!d.getElementById('stLab')){ const st = d.createElement('style'); st.id = 'stLab'; st.textContent = 'body *{visibility:hidden!important}.st-vis{visibility:visible!important}*{cursor:none!important;transition:none!important;animation:none!important}html,body{overflow:hidden!important}#bStage{position:fixed!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;min-width:0!important;min-height:0!important;max-height:none!important;margin:0!important}'; d.head.appendChild(st); B_fit(w); }
     const big = w.innerWidth*w.innerHeight*.45;
     for (const cv of d.querySelectorAll('canvas')){ const r = cv.getBoundingClientRect(); cv.classList.toggle('st-vis', r.width*r.height > big); }
   }

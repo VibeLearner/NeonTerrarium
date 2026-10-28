@@ -4,7 +4,8 @@
 /* ---------- loop ---------- */
 resize();
 bakeClouds();
-if (window.NT_TRAILER && typeof TRAILER !== 'undefined') TRAILER.city();   // (#trailer: its own city, never saved: js/trailer.js)
+if (window.NT_TRAILER && typeof TRAILER !== 'undefined') TRAILER.city();
+else if (window.NT_FILM2 && typeof FILM !== 'undefined') FILM.city();   // (#film: built on camera from empty sky: js/film.js)   // (#trailer: its own city, never saved: js/trailer.js)
 else if (!load()) clearIsland(); else if (loadWanted()) loadStart(); else rebuildAll();   // (a saved city is made from its recipes by the worker, nearest the camera first: loadcity.js)
 centerView(true);
 selectZone(null);

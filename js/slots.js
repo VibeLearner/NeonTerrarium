@@ -65,7 +65,7 @@ const SLOTS = (() => {
   }
   // the active city's slot brought up to date: its keys, its card, its picture
   // (a film page, #trailer or #director, reads a city of its own: nothing it shows may ever be copied into a slot, and no slot is opened from it)
-  const FILM = () => !!(window.NT_TRAILER || window.NT_DIRECTOR);
+  const FILM = () => !!(window.NT_TRAILER || window.NT_DIRECTOR || window.NT_FILM2);
   async function checkpoint(opts = {}){
     if (!SL.active || FILM()) return null;
     if (!opts.noFlush) flush();

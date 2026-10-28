@@ -30,7 +30,8 @@ if (window.NT_DIRECTOR){
   if (!NT_DIR_CITY) try { NT_DIR_CITY = JSON.parse(sessionStorage.getItem('ntDirector.city') || 'null'); } catch (e) {}
   if (!NT_DIR_CITY || typeof NT_DIR_CITY !== 'object') NT_DIR_CITY = {};
 }
-const NT_FILM = () => window.NT_TRAILER || window.NT_DIRECTOR;
+window.NT_FILM2 = /#film\b/.test(location.hash);   // (#film: js/film.js, a scripted film built from empty sky: keeps nothing, like #trailer)
+const NT_FILM = () => window.NT_TRAILER || window.NT_DIRECTOR || window.NT_FILM2;
 const NT_LOCKED = k => (NT_SAVE_LOCK && NT_isCityKey(k)) || (NT_FILM() && typeof k === 'string' && (k.startsWith('neonIsland.') || k.startsWith('neonLooks.')));
 const NT_RAW = { set: Storage.prototype.setItem, remove: Storage.prototype.removeItem, get: Storage.prototype.getItem };
 if (window.NT_DIRECTOR) Storage.prototype.getItem = function (k){
@@ -42,7 +43,7 @@ Storage.prototype.removeItem = function (k){ if (this === window.localStorage &&
 // the title screen shows on every load, unless a city switch just asked to go straight in
 (() => {
   let skip = false; try { skip = sessionStorage.getItem('neonTerrarium.skipTitle') === '1'; sessionStorage.removeItem('neonTerrarium.skipTitle'); } catch (e) {}
-  if (/[?&](notitle|tv=1)\b/.test(location.search) || navigator.webdriver || window.NT_TRAILER || window.NT_DIRECTOR) skip = true;   // (tests and the tools/ harnesses go straight in, and so does a return from the coast)
+  if (/[?&](notitle|tv=1)\b/.test(location.search) || navigator.webdriver || window.NT_TRAILER || window.NT_DIRECTOR || window.NT_FILM2) skip = true;   // (tests and the tools/ harnesses go straight in, and so does a return from the coast)
   if (/[?&]title\b/.test(location.search)) skip = false;   // (?title: show it anyway, for looking at it under a test browser)
   window.NT_TITLE = !skip;
   if (!skip) document.documentElement.classList.add('title-on', 'title-boot');   // (title-boot: a dark cover until the room's picture is in, so the city never shows loading first)

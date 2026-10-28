@@ -16,6 +16,11 @@ A trailer made in the trailer maker (the game at #dev&director, Export file) is 
     python3 tools/trailer/record.py --project ~/Downloads/my-trailer.trailer.json            # its length and music come from the file
     python3 tools/trailer/record.py --project ~/Downloads/my-trailer.trailer.json --preview  # the quick 720p look
 
+The #film trailer (built from empty sky, no music):
+
+    python3 tools/trailer/record.py --film --preview     # quick 720p look -> tools/trailer/out/neon-terrarium-film-preview.mp4
+    python3 tools/trailer/record.py --film               # 1080p 60 fps    -> tools/trailer/out/neon-terrarium-film.mp4
+
 Needs: pip install playwright && python3 -m playwright install chromium  (it uses Google Chrome if installed), and ffmpeg.
 """
 import argparse, base64, functools, http.server, json, os, shutil, subprocess, sys, threading, time
@@ -56,6 +61,7 @@ def main():
     ap.add_argument('--stills', action='store_true', help='only save stills at key moments (PNG) and stop')
     ap.add_argument('--headless', action='store_true', help='no browser window (some Macs draw WebGL slower or not at all headless)')
     ap.add_argument('--port', type=int, default=8793)
+    ap.add_argument('--film', action='store_true', help='film the #film trailer (the city built from empty sky, the garden, the mugging, the night; no sound)')
     ap.add_argument('--project', help='a trailer file exported from the trailer maker (#dev&director): film that instead of the built-in trailer')
     ap.add_argument('--quality', type=int, default=95, help='JPEG quality of the captured frames before encoding')
     ap.add_argument('--crf', type=int, default=16)
@@ -69,10 +75,15 @@ def main():
         if a.until == LEN: a.until = length
         slug = ''.join(ch if ch.isalnum() else '-' for ch in (proj.get('name') or 'trailer').lower()).strip('-') or 'trailer'
         if a.out == ap.get_default('out'): a.out = os.path.join(OUT, slug + ('-preview' if a.preview else '') + '.mp4')
+    elif a.film:
+        length = 74.0
+        if a.until == LEN: a.until = length
+        if a.out == ap.get_default('out'): a.out = os.path.join(OUT, 'neon-terrarium-film' + ('-preview' if a.preview else '') + '.mp4')
     else:
         length = LEN
-    OBJ = 'DIRECTOR' if proj else 'TRAILER'
-    if a.preview and not proj and a.out == ap.get_default('out'): a.out = os.path.join(OUT, 'trailer-preview.mp4')
+    OBJ = 'DIRECTOR' if proj else 'FILM' if a.film else 'TRAILER'
+    HASH = '#dev&director' if proj else '#film' if a.film else '#trailer'
+    if a.preview and not proj and not a.film and a.out == ap.get_default('out'): a.out = os.path.join(OUT, 'trailer-preview.mp4')
     every = 2 if a.preview else 1   # (a preview keeps every other frame: the trailer runs exactly the same, only half as many pictures are taken)
     first = int(round(a.start*FPS))
     if not shutil.which('ffmpeg') and not a.stills: sys.exit('ffmpeg is needed: brew install ffmpeg')
@@ -97,7 +108,7 @@ def main():
         page.on('console', lambda m: print('  page:', m.text) if m.text.startswith('[trailer]') or m.type == 'error' else None)
         page.on('pageerror', lambda e: print('  page error:', e))
         page.on('crash', lambda *_: print('  the page crashed (the graphics process may have run out of memory)'))
-        url = f'http://127.0.0.1:{a.port}/index.html' + ('#dev&director' if proj else '#trailer')
+        url = f'http://127.0.0.1:{a.port}/index.html' + HASH
         navs = []
         page.on('framenavigated', lambda fr: (navs.append(fr.url), print('  the page navigated to', fr.url)) if fr == page.main_frame and navs is not None else None)
         page.goto(url, wait_until='load'); navs.clear()
@@ -110,7 +121,7 @@ def main():
                     if 'context was destroyed' not in str(e) and 'navigation' not in str(e): raise
                     print(f'  page reloaded while running "{js[:40]}" (now at {page.url})')
                     if attempt == 3: sys.exit('the page keeps reloading; stopping. Last address: ' + page.url)
-                    if ('director' if proj else '#trailer') not in page.url: page.goto(url, wait_until='load')
+                    if HASH.split('&')[-1].lstrip('#') not in page.url: page.goto(url, wait_until='load')
                     else: page.wait_for_load_state('load')
                     time.sleep(1)
 
@@ -160,6 +171,8 @@ def main():
     enc.stdin.close(); enc.wait()
 
     end = frames/FPS; dur = end - a.start
+    if a.film:   # no sound: the picture is the film
+        os.replace(raw, a.out); print('done:', os.path.relpath(a.out, ROOT), f'({(time.time() - t1)/60:.1f} min of capture)'); return
     if proj:   # a trailer from the trailer maker: its own music (from where the film says it starts), nothing else
         mfile = proj.get('music') or ''
         music = os.path.join(ROOT, 'assets', 'audio', 'music', mfile) if mfile else None

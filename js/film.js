@@ -33,7 +33,8 @@ const FILM = (() => {
   const clamp = (x, a, b) => x < a ? a : x > b ? b : x, clamp01 = x => clamp(x, 0, 1);
   const ss = x => { x = clamp01(x); return x*x*(3 - 2*x); };
   const ss5 = x => { x = clamp01(x); return x*x*x*(x*(x*6 - 15) + 10); };   // (smootherstep: starts and stops even more gently)
-  const H0 = .3;   // (the hologram's own first moment, before its camera starts to move: skipped, so it moves from the first frame)
+  const H0 = .3;
+  const holoCurve = x => { x = clamp01(x); return .55*x + .45*ss5(x); };   // (an even pace with soft ends: the hologram's own moves are eased already)   // (the hologram's own first moment, before its camera starts to move: skipped, so it moves from the first frame)
   const ease = x => { x = clamp01(x); return x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3)/2; };
   const lerp = (a, b, u) => a + (b - a)*u, elerp = (a, b, u) => Math.exp(lerp(Math.log(a), Math.log(b), u));
   const seg = (t, a, b) => clamp01((t - a)/(b - a));
@@ -45,8 +46,8 @@ const FILM = (() => {
   // leave2: the second person sets off home; door: they are through it; open: the apartment opens; the hologram in (APT.holo), the
   // furnishing (APT.furn), the hologram out (APT.back) and the lab fading off the city (APT.fade); garden: the camera sets off for the
   // square; square: it is there
-  const MK = { built: 13.6, dive: 14.5, p: [17, 24], leave2: 27.6, door: 30.2, open: 30.6 };
-  const APT = { holo: 4.4, furn: 5.2, back: 4.4, fade: .7 };   // (the hologram's 3 s played over 4.4, on one smooth curve each way)
+  const MK = { built: 13.6, dive: 14.5, p: [17, 24], leave2: 28.6, door: 33.0, open: 33.4 };
+  const APT = { holo: 5.4, furn: 5.4, back: 5.4, fade: .8 };   // (the hologram's 3 s played over 5.4, on one smooth curve each way)
   MK.room = MK.open + APT.holo; MK.unroom = MK.room + APT.furn; MK.back = MK.unroom + APT.back; MK.garden = MK.back; MK.square = MK.garden + 6.5;
   const DUR = { out: 9, lightsIn: 1.5, title: 8.5 };
 
@@ -256,14 +257,24 @@ const FILM = (() => {
     for (let r = .5; r < 60; r += .3){ const h = plotTop(x + sx*r, z + sz*r); if (h > -1e8) worst = Math.min(worst, CURB + 1.2 + r*k - h); }
     return worst;
   }
-  function bestSpot(yaw, ok, score){
-    let best = null;
+  // the best spot for a view; accept(spot) can turn the best ones down in order (the second person's: their way home must be short and in sight)
+  function bestSpot(yaw, ok, score, accept){
+    const all = [];
     for (let x = LAWN.x0; x <= LAWN.x1; x += .5) for (let z = LAWN.z0; z <= LAWN.z1; z += .5){
       if (XW.some(([a, b]) => segD(x, z, a, b) < 1.4) || !ok(x, z)) continue;
       const c = clearance(x, z, yaw, GV.pitch); if (c < .8) continue;
-      const v = Math.min(c, 6) + (score ? score(x, z) : 0); if (!best || v > best.v) best = { x, z, v, c };
+      all.push({ x, z, v: Math.min(c, 6) + (score ? score(x, z) : 0), c });
     }
-    return best;
+    all.sort((a, b) => b.v - a.v);
+    if (!accept) return all[0] || null;
+    for (const q of all.slice(0, 80)) if (accept(q)) return q;
+    return null;
+  }
+  const HOME_V = .9, HOME_MAX = (MK.door - .5 - MK.leave2)*HOME_V;   // (the walk home: at a brisk walk, from the end of the talk to the door)
+  function homeOk(q){   // a short way home, every step of it in sight of the second view
+    const way = routePts(q.x, q.z, APTH.out.x, APTH.out.z), L_ = pathLen(way); if (!(L_ <= HOME_MAX)) return false;
+    for (let d = 0; d <= L_; d += .3){ const w = pointAt(way, d); if (clearance(w.x, w.z, GV.y2, GV.pitch) < .3) return false; }
+    q.way = way; q.L = L_; return true;
   }
   const APTH = { p: null, pod: null, door: null, out: null };   // the second person's home: their pod and its street door
   F.pairs = null;
@@ -280,7 +291,9 @@ const FILM = (() => {
       GV.y2 = Math.atan2(home.o.x, home.o.z) + .45;   // (the camera on the side the door faces, a little round: the door seen three-quarters on)
       if (Math.abs(wrapA(GV.y2 - GV.y1)) < .7) GV.y2 = GV.y1 + Math.sign(wrapA(GV.y2 - GV.y1) || 1)*.7;   // (and a clear change of angle from the first)
     } else { warn('garden', 'nobody near the lawn with a pod and a street door: no apartment'); GV.y2 = GV.y1 - 1.1; }
-    const s2 = bestSpot(GV.y2, () => true, home ? (x, z) => -.35*Math.hypot(x - APTH.out.x, z - APTH.out.z) : null);
+    let s2 = home ? bestSpot(GV.y2, (x, z) => Math.hypot(x - APTH.out.x, z - APTH.out.z) < HOME_MAX, (x, z) => -.35*Math.hypot(x - APTH.out.x, z - APTH.out.z), homeOk) : null;
+    if (home && !s2){ warn('garden', 'no spot in sight with a short way to the door: no apartment'); APTH.pod = null; }
+    if (!s2) s2 = bestSpot(GV.y2, () => true);
     const s1 = s2 && bestSpot(GV.y1, (x, z) => Math.hypot(x - s2.x, z - s2.z) > 4.5);
     if (!s1 || !s2) return warn('garden', 'no spot on the lawn the camera can see');
     F.info.spots = [s1, s2].map(q => q.x.toFixed(1) + ',' + q.z.toFixed(1) + ' clear ' + q.c.toFixed(1));
@@ -293,9 +306,9 @@ const FILM = (() => {
       const from = (pos, s) => ({ x: pos.x + Math.cos(ang + s)*2.2, z: pos.z + Math.sin(ang + s)*2.2 });   // (walking in from either side of the lawn)
       // the second person, once they have talked: home along the footways to their door, and in
       let homeW = null;
-      if (k === 1 && home){
-        const way = routePts(posA.x, posA.z, APTH.out.x, APTH.out.z), L_ = pathLen(way), v = clamp(L_/(MK.door - .5 - MK.leave2), .45, 1.1);
-        homeW = { way, L_, v, t0: MK.door - .5 - L_/v };
+      if (k === 1 && home && APTH.pod){
+        const way = routePts(posA.x, posA.z, APTH.out.x, APTH.out.z), L_ = pathLen(way), v = HOME_V;
+        homeW = { way, L_, v, t0: MK.door - .5 - L_/v };   // (setting off so as to reach the door just as the time comes: never before the talk is over)
       }
       const role = (me, pos, other, first) => {
         const f0 = from(pos, first ? 2.6 : -.5), path = [{ t: GT.walkIn + (first ? 0 : .25), x: f0.x, z: f0.z }, { t: GT.there + (first ? 0 : .25), x: pos.x, z: pos.z }];
@@ -319,6 +332,7 @@ const FILM = (() => {
       role(A, posA, posB, true); role(B, posB, posA, false);
       return { A, B, spot, posA, homeW };
     });
+    safe('names', () => [['Deepa', 'Rao'], ['Marcus', 'Okafor'], ['Kwame', 'Mensah'], ['Eun', 'Seo']].forEach(([f, l], n) => { const p = [F.pairs[0].A, F.pairs[0].B, F.pairs[1].A, F.pairs[1].B][n], sp = STORY.sp(p); if (sp){ sp.first = f; sp.last = l; sp.nick = null; } }));
     F.info.garden = F.pairs.map(q => q.A.id);
     say('garden cast', JSON.stringify(F.info.garden), JSON.stringify(F.info.spots), 'views', GV.y1.toFixed(2), GV.y2.toFixed(2), 'pod', APTH.pod);
   }
@@ -690,7 +704,7 @@ const FILM = (() => {
   // built, its light baked) the film waits for it (F.held) rather than letting the hologram wait on screen. Then a couch, a floor lamp and a
   // plant are set down, and the same hologram plays backwards, out of the pod and up to the game's view as it was left, where the city
   // takes over again.
-  const AP = { on: false, pick: {}, drops: [], done: new Set(), closed: false, heldN: 0, rev: false };
+  const AP = { on: false, pick: [], drops: [], done: new Set(), closed: false, heldN: 0, rev: false };
   const labWin = () => { const f = FURN.frame; return f && f.contentWindow; };
   const labPC = () => { const w = labWin(); return w && w.PodContext; };
   const labB = () => { const w = labWin(); return w && w.PodBuilder && w.PodBuilder._B; };
@@ -731,21 +745,25 @@ const FILM = (() => {
     const id = [...B.inst.keys()].find(k => !before.has(k));
     return id !== undefined ? B.inst.get(id) : null;
   }
-  // the three pieces are the room's own, in the places its layout gave them (so nothing is dumped in the middle or into something else): a couch
-  // (or failing that a bed or a chair), a light, a plant (or failing that a storage piece or a table). Hidden while the hologram covers the room,
-  // then set down one after another
-  const CATS = {
-    couch: [['modular', 'futon', 'retro', 'pallet', 'corner', 'carseat', 'cloud'], ['cryo', 'container', 'bunks', 'suspended', 'murphy', 'netrunner', 'hover', 'platform', 'capsule', 'loft', 'floorbed'], ['lounge', 'shell', 'gamer', 'floorseat', 'folding', 'barstool', 'cratestool']],
-    light: [['floorlamp', 'lamp', 'pendant', 'tube', 'neon', 'stringlights']],
-    plant: [['monstera', 'fern', 'snake', 'bamboo', 'bonsai', 'hydro', 'hanging'], ['rack', 'cubby', 'locker', 'dresser', 'crateshelf', 'server', 'wardrobe'], ['slab', 'crate', 'spool', 'holo', 'loop', 'block', 'cafe', 'kotatsu', 'fold', 'bar', 'drum']] };
-  const DROP = { couch: .45, light: 1.85, plant: 3.25 };   // (seconds into the furnishing)
+  // The three pieces are the room's own, in the places its layout gave them (nothing dumped, nothing inside anything else): its biggest
+  // freestanding pieces (a couch, a bed, a table, a kitchen island, shelving...) in plain view of the lab's camera: not against the far walls,
+  // not small. Hidden while the hologram covers the room, then set down one after another, the biggest last
+  const SMALL = /lamp|light|tube|neon|string|pendant|bonsai|fern|snake|hanging|poster|screen|clock|ac|shel|peg|collage|stool|folding/;
+  const DROP = [.5, 1.9, 3.3];   // (seconds into the furnishing)
   function labPick(B){
-    const all = [...B.inst.values()].filter(i => i.pivot && i.rec && !i.rec.parent && i.pivot.visible), used = new Set();
-    const size = i => i.lbox ? (i.lbox.max.x - i.lbox.min.x)*(i.lbox.max.z - i.lbox.min.z) : 0;
-    for (const k in CATS) for (const archs of CATS[k]){
-      const c = all.filter(i => !used.has(i) && archs.includes(i.rec.arch)).sort((a, b) => size(b) - size(a))[0];
-      if (c){ used.add(c); AP.pick[k] = { i: c, y: c.pivot.position.y }; c.pivot.visible = false; break; } }
-    F.info.apt = Object.keys(CATS).map(k => k + ':' + (AP.pick[k] ? AP.pick[k].i.rec.arch : 'none')).join(' ');
+    const w = labWin(), all = [...B.inst.values()].filter(i => i.pivot && i.rec && !i.rec.parent && i.pivot.visible && i.lbox && i.kind !== 'wall' && !(i.pivot.userData && i.pivot.userData.window) && !i.rec.wh && !SMALL.test(i.rec.arch || ''));
+    const root = B.root.position, cv = w && (w.document.getElementById('bCanvas') || w.document.querySelector('canvas.fl-vis')), r = cv && cv.getBoundingClientRect();
+    const score = i => {
+      const a = (i.lbox.max.x - i.lbox.min.x)*(i.lbox.max.z - i.lbox.min.z), h = i.lbox.max.y - i.lbox.min.y; if (a < .45 || h < .25) return -1;
+      const p = i.pivot.position, sc = safe('screen', () => labScreen(B, p.x + root.x, p.y + root.y + h*.5, p.z + root.z));
+      // in view, and towards the near side and the middle of the picture (the far walls hide what stands against them)
+      const near = sc && r ? clamp01((sc.y - r.top)/r.height) : .5, mid = sc && r ? 1 - Math.min(1, Math.abs((sc.x - r.left)/r.width - .5)*2) : .5;
+      if (sc && r && (sc.x < r.left + r.width*.08 || sc.x > r.right - r.width*.08 || sc.y < r.top + r.height*.08 || sc.y > r.bottom - r.height*.05)) return -1;
+      return a*Math.min(h, 1.2)*(.5 + .7*near + .4*mid); };
+    const ranked = all.map(i => ({ i, v: score(i) })).filter(q => q.v > 0).sort((a, b) => b.v - a.v).slice(0, 3).reverse();   // (smallest of the three first, the biggest last)
+    AP.pick = ranked.map(q => { q.i.pivot.visible = false; return { i: q.i, y: q.i.pivot.position.y }; });
+    F.info.apt = ranked.map(q => q.i.rec.arch).join(' ');
+    say('apartment pieces', F.info.apt);
   }
   function aptOpen(){
     if (!APTH.pod){ warn('apartment', 'no pod'); return; }
@@ -769,16 +787,21 @@ const FILM = (() => {
     const D_ = PC._debug.DUR || 3.05, st = PC._debug.state(), live = ov && ov.classList.contains('live');
     const wait = why => { if (++AP.heldN > 60*90){ if (AP.heldN === 60*90 + 1) warn('apartment', 'waited 90 s for the lab (' + why + '): going on'); return false; } F.held = true; F.info.aptWait = why; return true; };
     if (t < MK.room){   // the hologram flies in
-      const u = H0 + (D_ - H0)*ss5((t - MK.open)/APT.holo);
+      // nothing moves until the lab has everything (the city, the home built, its light baked): the hologram then plays through in one go
+      // (waiting part way through, the city filled in or the room changed between one picture and the next)
+      const u = H0 + (D_ - H0)*holoCurve((t - MK.open)/APT.holo);
       if (!live && wait('the hologram')) return;
-      if (st && st.trans){
-        const lw = u >= 1.7 ? labLightWait() : false;
+      if (!st || !st.trans){ if (t - MK.open < .05 && wait('the hologram to start')) return; }
+      else {
+        const lw = labLightWait();
         st.trans.holding = !!lw; st.trans.holdBuild = lw === 'build';   // (so the lab draws the room under the hologram and can bake its light)
-        if (u >= .55 && !(st.ready && st.shown && !st.pendingHome) && wait('the city')) return;
-        if (lw && wait(lw)) return;
+        if (t - MK.open < .05){
+          if (!(st.ready && st.shown && !st.pendingHome)){ PC._debug.hold(H0); if (wait('the city')) return; }
+          if (lw){ PC._debug.hold(H0); if (wait(lw)) return; }
+          if (!AP.picked && B){ AP.picked = true; safe('pick', () => labPick(B)); }
+        }
         PC._debug.hold(u);
       }
-      if (u >= 2.0 && B && !AP.picked){ AP.picked = true; safe('pick', () => labPick(B)); }
       fr.style.opacity = String(ss((t - MK.open)/.6));   // (the city dissolving into the hologram as it starts to move)
       return;
     }
@@ -787,8 +810,7 @@ const FILM = (() => {
       if (PC.transitioning && wait('the hologram to end')) return;
       fr.style.opacity = '1';
       const k = t - MK.room;
-      for (const c of ['couch', 'light', 'plant']) if (k >= DROP[c] && !AP.done.has(c) && B){ AP.done.add(c);
-        const q = AP.pick[c]; if (q) AP.drops.push({ i: q.i, y: q.y, t }); }
+      (AP.pick || []).forEach((q, n) => { if (k >= DROP[n] && !AP.done.has(n)){ AP.done.add(n); AP.drops.push({ i: q.i, y: q.y, t }); } });
       for (const d of AP.drops){   // lowered into its place, settling softly
         const u = (t - d.t)/.75; d.i.pivot.visible = u >= 0; if (u < 0) continue;
         const v = Math.min(1, u), e = 1 - Math.pow(1 - v, 3);
@@ -799,10 +821,10 @@ const FILM = (() => {
     if (t < MK.back){   // the hologram flies back out, to the game's view as it was left
       for (const d of AP.drops){ d.i.pivot.visible = true; d.i.pivot.position.y = d.y; }
       if (!AP.rev){ AP.rev = true;
-        if (st && !st.trans){ st.trans = { t0: performance.now(), vt: D_, last: performance.now(), drift: 0, gate: false, rm: false, frames: [], onDone: null, resolve(){}, skipped: false, lhDone: true, hold: D_ }; PC.transitioning = true; }
+        if (st && !st.trans){ st.trans = { t0: performance.now(), vt: D_ - .01, last: performance.now(), drift: 0, gate: false, rm: false, frames: [], onDone: null, resolve(){}, skipped: false, lhDone: true, hold: D_ - .01 }; PC.transitioning = true; }
         FURN.hold = false;   // (the city is drawn again underneath, from the camera where it was left)
       }
-      if (st && st.trans){ st.trans.holding = false; PC._debug.hold(H0 + (D_ - H0)*(1 - ss5((t - MK.unroom)/APT.back))); }
+      if (st && st.trans){ st.trans.holding = false; PC._debug.hold(Math.min(D_ - .01, H0 + (D_ - H0)*(1 - holoCurve((t - MK.unroom)/APT.back)))); }   // (from just under its end: at its end the lab closes it)
       fr.style.opacity = String(1 - ss(seg(t, MK.back - APT.fade, MK.back)));   // (and the hologram dissolving into the city as it comes to rest)
       return;
     }

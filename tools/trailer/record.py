@@ -23,7 +23,7 @@ The #film trailer (built from empty sky, no music):
 
 Needs: pip install playwright && python3 -m playwright install chromium  (it uses Google Chrome if installed), and ffmpeg.
 """
-import argparse, base64, functools, http.server, json, os, shutil, subprocess, sys, threading, time
+import struct, argparse, base64, functools, http.server, json, os, shutil, subprocess, sys, threading, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
@@ -112,6 +112,21 @@ def main():
         navs = []
         page.on('framenavigated', lambda fr: (navs.append(fr.url), print('  the page navigated to', fr.url)) if fr == page.main_frame and navs is not None else None)
         page.goto(url, wait_until='load'); navs.clear()
+        # the frames are what the window shows: on a screen too small for a 1920 x 1080 window (a MacBook's, say) the window is clipped
+        # and every frame would be the top-left part of the picture, stretched. Then the film is made without a window instead
+        if not a.headless:
+            png = grab('png'); w, h = struct.unpack('>II', png[16:24])
+            if (w, h) != (1920, 1080):
+                print(f'  the browser window only shows {w} x {h} of the 1920 x 1080 picture (the screen is too small): filming without a window instead')
+                browser.close(); a.headless = True
+                browser = launch(pw, True)
+                ctx = browser.new_context(viewport={'width': 1920, 'height': 1080}, device_scale_factor=1)
+                ctx.add_init_script(path=os.path.join(HERE, 'shim.js'))
+                if proj: ctx.add_init_script(script='if (window === window.top){ window.__DIR_CITY = ' + json.dumps(city) + '; window.__DIR_PROJ = ' + json.dumps(proj) + '; window.__DIR_BOOT = { mode: "play", at: 0 }; }')
+                page = ctx.new_page(); cdp = ctx.new_cdp_session(page)
+                page.on('console', lambda m: print('  page:', m.text) if m.text.startswith('[trailer]') or m.type == 'error' else None)
+                page.on('pageerror', lambda e: print('  page error:', e))
+                page.goto(url, wait_until='load'); navs.clear()
 
         def ev(js):
             # the page can be reloaded under us (it should not be): say where it went, wait for it, and carry on

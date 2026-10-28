@@ -609,6 +609,10 @@ const FILM = (() => {
   const EV = []; let fired = 0, t0 = 0, lastT = 0;
   const at = (t, f, name) => EV.push({ t, f, name });
   for (const s of BUILD) at(s.t, () => step(s), s.kind);
+  // the steam map (the mist that hangs over the industrial vents: sky.js) is normally redrawn a stage a frame once building pauses, so in
+  // the film it appeared over the whole district at once; here it is redrawn with every floor, so the haze thickens as the vents go in
+  let steamAt = -1;
+  function steamSync(t){ if (t > MK.built + 1 || t - steamAt < .25) return; steamAt = t; safe('steam', () => { if (typeof syncSteamMap === 'function') syncSteamMap(); }); }
   for (const tm of [3, 5.5, 8.5, 12.5]) at(tm, () => { syncPeopleRest(); F.info['people@' + tm] = pplList.length; }, 'people move in');
   at(14.2, () => { gardenCast(); gardenExtras(); window.PPL_ONLY = true; }, 'the garden pairs');
   MK.p.forEach((t0_, k) => {
@@ -643,6 +647,7 @@ const FILM = (() => {
     const t = clock(); lastT = t; F.t = t;
     while (fired < EV.length && EV[fired].t <= t){ const e = EV[fired++]; safe(e.name, e.f); }
     if (t > 4) quietAlert();
+    steamSync(t);
     // the square is let go once the passer-by is up in the lift and it is out of shot (anyone let go earlier would vanish from the picture: PPL_ONLY)
     if (RD.T && !F.sqDone && t > RD.T.inCab + 1){ F.sqDone = true; safe('the square lets go', () => { muggingEnd(); releaseExtras(p => p.__area === 'square'); }); }
     if (window.PPL_ONLY) safe('only', () => {

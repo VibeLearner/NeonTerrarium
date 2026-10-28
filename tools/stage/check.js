@@ -38,7 +38,7 @@ const srv = http.createServer((q, r) => { const f = path.join(ROOT, decodeURICom
     if (f < FROM*60) continue;
     if (f % EVERY === 0 || (si < STILLS.length && f >= STILLS[si]*60)){
       const png = await grab();
-      if (f % EVERY === 0) hashes.write(f + ' ' + crypto.createHash('sha1').update(png).digest('hex') + '\n');
+      if (f % EVERY === 0){ hashes.write(f + ' ' + crypto.createHash('sha1').update(png).digest('hex') + '\n'); if (process.env.SAVE) fs.writeFileSync(path.join(OUT, 'f-' + f + '.png'), png); }
       if (si < STILLS.length && f >= STILLS[si]*60){ fs.writeFileSync(path.join(OUT, 's-' + STILLS[si] + '.png'), png); si++; }
     }
     if (process.env.DBG && f % 30 === 0){ const fd = await p.evaluate(() => window.__findDisposed && __findDisposed()); if (fd && fd.length){ console.log('DISPOSED at', f, JSON.stringify(fd).slice(0, 1500)); } }

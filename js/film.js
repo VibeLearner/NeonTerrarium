@@ -341,7 +341,7 @@ const FILM = (() => {
       let p = { x: lerp(a.x, side.x, u), y: lerp(a.y, side.y, u), z: lerp(a.z, side.z, u), yaw: a.yaw + wrapA(side.yaw - a.yaw)*u, zoom: elerp(a.zoom, side.zoom, u), pitch: lerp(a.pitch, side.pitch, u) };
       if (t > MK.side + .6){
         const v = ease(seg(t, MK.side + .6, MK.out)), w = seg(t, MK.side + .6, LEN);
-        p = { x: lerp(side.x, GC.x + 1.5*LOT, v), y: lerp(side.y, TARGET_Y, v), z: lerp(side.z, GC.z + 1.5*LOT, v), yaw: side.yaw - .5*v - .08*w, zoom: elerp(side.zoom, 33, v), pitch: lerp(side.pitch, 31*DEG, v) };
+        p = { x: lerp(side.x, GC.x + 1.5*LOT, v), y: lerp(side.y, TARGET_Y, v), z: lerp(side.z, GC.z + 1.5*LOT, v), yaw: side.yaw - .5*v - .08*w, zoom: elerp(side.zoom, 27, v), pitch: lerp(side.pitch, 31*DEG, v) };
       }
       Object.assign(CAM, p);
     }
@@ -379,6 +379,8 @@ const FILM = (() => {
   const EV = []; let fired = 0, t0 = 0, lastT = 0;
   const at = (t, f, name) => EV.push({ t, f, name });
   for (const s of BUILD) at(s.t, () => step(s), s.kind);
+  // the people move in to what is built so far, at once (the game does it a little at a time in the background: stepped frame by frame, that ran late)
+  for (const tm of [4.5, 8.5, 12.5]) at(tm, () => { syncPeopleRest(); F.info['people@' + tm] = pplList.length; }, 'people move in');
   // out onto the lawn: as soon as enough people live round it (tried each second from six seconds in)
   for (let k = 0; k < 7; k++) at(6 + k, () => { if (!F.pairs) try { garden(); } catch (e) { if (k === 6) warn('garden', e); } }, 'out onto the lawn');
   MK.p.forEach((t0_, k) => {

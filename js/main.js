@@ -125,10 +125,12 @@ function frameBody(now){
     // (plants thin later and more gently than the fine pieces: they are a few percent of a frame (tools/procfol/MEASURE.md), and tufts vanishing while
     //  still a pixel tall showed as pop-in with the render fixed; from loss 1.6, fully thinned only by 3.2)
     const tp = clamp((loss - 1.6)/1.6, 0, 1), ep = tp*tp*(3 - 2*tp);
-    LOD.fine.value = e; LOD.plants.value = ep; LOD.lines.value = e; folFar(loss); }
+    LOD.fine.value = e; LOD.plants.value = ep; LOD.lines.value = e; folFar(loss);
+    if (window.NT_RENDER) LOD.fine.value = LOD.plants.value = LOD.lines.value = 0; }   // (render mode: every building keeps all its pixels at every zoom)
   PH.lap('steam, rain, camera');
   PH.subBegin();
   runLater(); PH.sub('upkeep: later');
+  if (window.NT_RENDER){ if (typeof ART !== 'undefined' && ART.later) while (ART.later.length) ART.later.shift()(); finishSync(); stageFinishAll(); }   // (render mode: nothing left for a later frame)
   stageStep(); PH.sub('upkeep: staged builds');   // a plot being built in steps: a few milliseconds of it (world.js)
   loadTick(); PH.sub('upkeep: loading');    // a city being made from its recipes (loadcity.js)
   pmTick(); PH.sub('upkeep: plot arrays');      // plots' own arrays let go once merged (recipe.js)
@@ -144,6 +146,7 @@ function frameBody(now){
   sideArc(); PH.sub('view: side arc');   // which way the buildings' walls can face the camera this frame (world.js)
   cullFrame(); PH.sub('view: culling');   // and which merged pieces are in view
   sdTrack();   // how fast the view is turning and zooming (world.js)
+  if (window.NT_RENDER){ shadowDirty = true; window.HOUR_DRAG_AT = -1e9; }   // (render mode: the whole shadow map drawn again every frame, never held back)
   cam.layers.enableAll(); shadowFrame(); PH.sub('view: shadows');   // shadows: redrawn at once, a strip in the background, or not at all (sky.js)
   PH.shadow(); PH.begin(renderer.shadowMap.needsUpdate ? 'color + shadow redraw' : 'color');
   const pt = PH.tests;   // (the overlay's tests: perfhud.js)
@@ -201,6 +204,7 @@ function frameBody(now){
     comp.uniforms.rayI.value = (1-nt)*(0.45 + 1.1*(1-el)) + nt*.12; }
   clouds.visible = !S.vclouds;
   PH.lap('pass setup');
+  if (window.NT_RENDER && typeof CLOUDT !== 'undefined') CLOUDT.reset = true;   // (render mode: every cloud pixel marched at full size, nothing carried from the last frame)
   if (S.vclouds){ PH.begin('clouds'); cloudFrame(); PH.end(); }   // (a share of the pixels marched, the rest carried over: sky.js)
   compVariant();   // (sky.js)
   PH.begin('soft effects (half resolution)'); softEffects(Math.round(camPix.x), Math.round(camPix.y)); PH.end();   // the wet-ground reflections, mist and light shafts, 2 x 2 pixels at a time (sky.js)

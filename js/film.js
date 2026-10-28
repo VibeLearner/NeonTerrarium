@@ -35,6 +35,7 @@ const FILM = (() => {
 
   /* ---------- the fixed part of the timeline (from the station on, each part starts when the one before it is done) ---------- */
   const MK = { built: 13.6, dive: 14.5, p: [17, 24], garden: 31, square: 33.5, strikeBy: 35, strikeLast: 38.5, chaseFor: 9 };
+  const CUT = .35;   // half the dip to black at a cut, seconds
   const DUR = { toRider: 2.2, riderMax: 22, toSide: 2.2, side: 16, out: 9, lightsIn: 1.5, title: 8.5 };
 
   /* ---------- the city plan ---------- */
@@ -184,7 +185,9 @@ const FILM = (() => {
     // every frame drawn the same way: the static cache's frames and the frames between them (when the shadows are redrawn, every other frame
     // while the hour moves) placed the metro a little differently, so it shook from side to side
     safe('cache', () => { SC.mode = 'off'; });
-    safe('haze', () => { LK.set('morning', 'hazeAmt', .18); LK.set('afternoon', 'hazeAmt', .18); });   // (the looks' far haze read as smog rolling in as the camera pulled back; thinner for the film. Nothing is saved)
+    // render mode (saveguard.js sets the switches read at load; these are the ones set at run time): no speed-based or small-triangle detail loss, no
+    // slow updates for people off screen, no sharp far view
+    safe('render', () => { const T = window.PERF_HUD && window.PERF_HUD.tests; if (T) T.noSlowFar = T.noSmall = T.noSpeed = true; if (typeof SD !== 'undefined') SD.on = false; if (typeof FARV !== 'undefined') FARV.on = false; });
   }
   const _ar = applyRenderRes;
   applyRenderRes = function (z){ return _ar(F.pinRes ? (CAP ? 24 : ZOOM_REF) : z); };
@@ -547,8 +550,8 @@ const FILM = (() => {
       const sx = smooth('gx', tx, t < MK.p[0] ? 8 : 3, dt), sz = smooth('gz', tz, t < MK.p[0] ? 8 : 3, dt);
       Object.assign(CAM, { x: lerp(a.x, sx, u), z: lerp(a.z, sz, u), y: lerp(TARGET_Y, CURB + .5, u), yaw: a.yaw + wrapA(gview.yaw - a.yaw)*u, zoom: elerp(a.zoom, 4.4, u), pitch: lerp(a.pitch, gview.pitch, u) });
     }
-    else if (PH.name === 'square'){   // the square: on the victim as they cross, then the mugger, the drone over them, the officers coming
-      const u = ease(seg(t, PH.t0, MK.square)), v = MUG.victim;
+    else if (PH.name === 'square'){   // the square (a cut, under a dip to black): on the victim as they cross, then the mugger, the drone over them, the officers coming
+      const u = 1, v = MUG.victim;
       let tx = SC_.x, tz = SC_.z, ty = CURB + .5, need = STREET.zoom;
       if (t < MG.strike && v && v.x !== undefined){ tx = lerp(SC_.x, v.x, .5); tz = lerp(SC_.z, v.z, .5); }
       else if (MUG.L){ tx = MUG.mx; tz = MUG.mz;
@@ -577,13 +580,16 @@ const FILM = (() => {
   // the hour: morning while it's built, early afternoon in the garden, late afternoon in the square, golden hour as the rider reaches the
   // platform, night as the train pulls away
   function hourAt(t){
-    if (t < MK.dive) return lerp(8.6, 10.4, ss(t/MK.dive));                       // the whole build in the morning look (its hand-off to afternoon starts at 10.5)
-    if (t < MK.garden) return lerp(10.4, 12.6, seg(t, MK.dive, MK.garden));        // the hand-off happens close in on the garden, where the haze can't be seen
-    if (PH.name === 'square') return lerp(12.6, 15.8, ss(seg(t, MK.garden, MK.square))) + .6*seg(t, MK.square, MG.pass);   // the light going golden over the square
-    if (PH.name === 'rider'){ const T = RD.T; if (F.hR === undefined) F.hR = S.hour; return T ? lerp(F.hR, 17.2, ss(seg(t, PH.t0, T.atTop))) : 17.2; }
-    if (PH.name === 'side'){   // golden for most of the ride; the sun goes down and night comes on over its last third
+    // each scene has its own time of day, and within a scene the sun barely moves (the morning look for the build and the garden; the cut to the
+    // square lands in golden hour, which deepens a little through the mugging and the walk to the lift; the sun goes down and night comes on over
+    // the last third of the ride). The afternoon look, the palest, is never used
+    if (t < MK.dive) return lerp(8.6, 10.0, ss(t/MK.dive));
+    if (t < MK.garden) return lerp(10.0, 10.6, seg(t, MK.dive, MK.garden));
+    if (PH.name === 'square') return lerp(16.9, 17.3, seg(t, PH.t0, MG.pass));
+    if (PH.name === 'rider'){ const T = RD.T; if (F.hR === undefined) F.hR = S.hour; return T ? lerp(F.hR, 17.5, seg(t, PH.t0, T.atTop)) : 17.5; }
+    if (PH.name === 'side'){
       if (F.hS === undefined) F.hS = S.hour; const tS = PH.t0 + DUR.side*.6;
-      return t < tS ? lerp(F.hS, 17.7, seg(t, PH.t0, tS)) : lerp(17.7, 22.2, ss(seg(t, tS, PH.t0 + DUR.side - .4))); }
+      return t < tS ? lerp(F.hS, 17.8, seg(t, PH.t0, tS)) : lerp(17.8, 22.2, ss(seg(t, tS, PH.t0 + DUR.side - .4))); }
     return 22.2;
   }
   function lightsAt(t){
@@ -595,7 +601,7 @@ const FILM = (() => {
   updateCamera = function (dt){
     if (F.playing) safe('frame', () => {
       F.t = clock();
-      const h = hourAt(F.t); if (!CAP && Math.abs(h - S.hour) > 1e-4) window.HOUR_DRAG_AT = performance.now(); S.hour = h;
+      S.hour = hourAt(F.t);
       const lv = lightsAt(F.t); if (lv !== null) LIGHTS_ON.value = lv;
       camAt(F.t, dt);
     });
@@ -609,10 +615,6 @@ const FILM = (() => {
   const EV = []; let fired = 0, t0 = 0, lastT = 0;
   const at = (t, f, name) => EV.push({ t, f, name });
   for (const s of BUILD) at(s.t, () => step(s), s.kind);
-  // the steam map (the mist that hangs over the industrial vents: sky.js) is normally redrawn a stage a frame once building pauses, so in
-  // the film it appeared over the whole district at once; here it is redrawn with every floor, so the haze thickens as the vents go in
-  let steamAt = -1;
-  function steamSync(t){ if (t > MK.built + 1 || t - steamAt < .25) return; steamAt = t; safe('steam', () => { if (typeof syncSteamMap === 'function') syncSteamMap(); }); }
   for (const tm of [3, 5.5, 8.5, 12.5]) at(tm, () => { syncPeopleRest(); F.info['people@' + tm] = pplList.length; }, 'people move in');
   at(14.2, () => { gardenCast(); gardenExtras(); window.PPL_ONLY = true; }, 'the garden pairs');
   MK.p.forEach((t0_, k) => {
@@ -635,7 +637,8 @@ const FILM = (() => {
   F.len = 0;
   function paint(t){
     const tt = PH.name === 'title' ? t - PH.t0 : -1, end = tt >= 0 && tt > DUR.title - .8;
-    const black = t < 1 ? 1 - ss(t) : end ? ss((tt - (DUR.title - .8))/.8) : tt >= 0 ? .4*ss(tt/1.4) : 0;
+    const dip = t > MK.garden && t < MK.garden + CUT*2 ? 1 - Math.abs(t - MK.garden - CUT)/CUT : 0;   // (the cut from the garden to the square)
+    const black = t < 1 ? 1 - ss(t) : end ? ss((tt - (DUR.title - .8))/.8) : tt >= 0 ? .4*ss(tt/1.4) : dip;
     E.black.style.opacity = String(black);
     if (t >= MK.garden && t < MK.garden + .6){ const m = document.getElementById('monitor'); if (m) m.style.opacity = String(1 - ss((t - MK.garden)/.55)); }
     if (E.tNeon){ E.tNeon.style.opacity = String(tt > .5 ? neonAt(tt - .5) : 0); E.tTerr.style.opacity = String(tt > .9 ? neonAt(tt - .9) : 0); }
@@ -647,7 +650,6 @@ const FILM = (() => {
     const t = clock(); lastT = t; F.t = t;
     while (fired < EV.length && EV[fired].t <= t){ const e = EV[fired++]; safe(e.name, e.f); }
     if (t > 4) quietAlert();
-    steamSync(t);
     // the square is let go once the passer-by is up in the lift and it is out of shot (anyone let go earlier would vanish from the picture: PPL_ONLY)
     if (RD.T && !F.sqDone && t > RD.T.inCab + 1){ F.sqDone = true; safe('the square lets go', () => { muggingEnd(); releaseExtras(p => p.__area === 'square'); }); }
     if (window.PPL_ONLY) safe('only', () => {

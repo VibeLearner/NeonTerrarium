@@ -31,6 +31,16 @@ if (window.NT_DIRECTOR){
   if (!NT_DIR_CITY || typeof NT_DIR_CITY !== 'object') NT_DIR_CITY = {};
 }
 window.NT_FILM2 = /#film\b/.test(location.hash);   // (#film: js/film.js, a scripted film built from empty sky: keeps nothing, like #trailer)
+// Render mode (#film): the film is drawn a frame at a time for a video, with all the time there is for each frame, so every shortcut the
+// game takes for a playable frame rate is off. Work that the game spreads over frames or hands to its worker is done at once (edits sync, plots
+// built, blocks merged, plot arrays kept), nothing is swapped for a stand-in or dropped by distance (tiers, never-seen faces, small triangles,
+// speed detail, people's update rate), and the soft effects draw at full size. main.js, sky.js, input.js, monitor.js and people.js read NT_RENDER
+// for the rest: shadows and clouds drawn whole every frame, no shadow-box steps, no whole-pixel camera snap, the person cam's feed every frame
+if (window.NT_FILM2){
+  window.NT_RENDER = true;
+  window.__NV_OFF = window.__SYNC_NOW = window.__STAGE_NOW = window.__GEN_MAIN = window.__KEEP_GEO = window.__ALERT_NOW = window.__DISPOSE_NOW = true;
+  window.__TIER_OFF = window.__SOFT_FULL = window.__FULL_RATE = true;
+}
 const NT_FILM = () => window.NT_TRAILER || window.NT_DIRECTOR || window.NT_FILM2;
 const NT_LOCKED = k => (NT_SAVE_LOCK && NT_isCityKey(k)) || (NT_FILM() && typeof k === 'string' && (k.startsWith('neonIsland.') || k.startsWith('neonLooks.')));
 const NT_RAW = { set: Storage.prototype.setItem, remove: Storage.prototype.removeItem, get: Storage.prototype.getItem };

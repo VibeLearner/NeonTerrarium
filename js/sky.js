@@ -43,7 +43,7 @@ const _lx = new THREE.Vector3(), _ly = new THREE.Vector3(), _lz = new THREE.Vect
 const shNeed = { half: 0, c: new THREE.Vector3(), dir: new THREE.Vector3(0, 1, 0) };
 function placeSun(){
   const asp = Math.max(1, W/H), reach = Math.hypot(zoomT*asp, zoomT/Math.sin(PITCH)) + 30;   // +30: tall rooftops at the screen edge, and the box's steps
-  const half = 30*Math.pow(1.2, Math.max(0, Math.ceil(Math.log(reach/30)/Math.log(1.2))));
+  const half = window.NT_RENDER ? Math.max(30, reach) : 30*Math.pow(1.2, Math.max(0, Math.ceil(Math.log(reach/30)/Math.log(1.2))));   // (render mode: continuous, the map is drawn every frame anyway)
   // the sun camera's axes, as three.js's lookAt builds them: z toward the sun, x = up x z, y = z x x
   _lz.copy(SUN_DIR); _lx.crossVectors(_lUp, _lz).normalize(); _ly.crossVectors(_lz, _lx);
   const texel = 2*half/2048, step = texel*Math.max(1, Math.round(6/texel));

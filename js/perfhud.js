@@ -277,3 +277,4 @@ const PH = (() => {
     if (e.shiftKey){ if (!on) toggle(); setExact(!exact); } else toggle(); } });
   return { frameStart, abort, lap, sub, subBegin, laps, begin, end, shadow, frameEnd, toggle, setExact, text, tests, plainMat, traceStart, traceStop, outside, drawTimed, hitchText, state: null, get on(){ return on; }, get exact(){ return exact; } };
 })();
+window.PERF_HUD = PH;   // (for scripts with a PH of their own: js/film.js reaches the tests through this)

@@ -164,7 +164,7 @@ const MON = (() => {
   // frames a second is enough for a security feed), read back without stalling (a pixel-pack buffer and a fence, picked up a frame or two later) and
   // drawn into the panel's canvas. The camera keeps them in sight: every quarter second it checks the line from them up to the camera against the
   // buildings' heights, and if it's blocked turns to another of eight angles (the nearest clear one), or tilts steeper toward looking straight down.
-  const RW = 192, RH = 108, HALF = 2.6, EVERY = 3;   // (render size, the view's half height in world units, a frame drawn every EVERY frames)
+  const RW = 192, RH = 108, HALF = 2.6, EVERY = window.NT_RENDER ? 1 : 3;   // (render size, the view's half height in world units, a frame drawn every EVERY frames)
   const FC = { init: false, yaw: 0, pitch: PITCH0, tyaw: 0, tpitch: PITCH0, at: null, check: 0, frame: 0, fence: null, ready: false, x: 0, z: 0, y: 0 };
   let rt = null, fcam = null, pbo = null, pix = null, img = null, off = null, og = null;
   const glc = renderer.getContext();
@@ -217,10 +217,10 @@ const MON = (() => {
       if (typeof pplFeedPre === 'function') pplFeedPre(fcam); if (typeof bikeFeedPre === 'function') bikeFeedPre(fcam);   // (people, bikes and drones turned to face this camera, not the main view's)
       renderer.setRenderTarget(rt); renderer.setClearColor(0x05080f, 1); renderer.autoClear = true;
       renderer.render(scene, fcam);
-      if (pbo && !FC.fence){
+      if (pbo && !FC.fence && !window.NT_RENDER){
         glc.bindBuffer(glc.PIXEL_PACK_BUFFER, pbo); glc.readPixels(0, 0, RW, RH, glc.RGBA, glc.UNSIGNED_BYTE, 0); glc.bindBuffer(glc.PIXEL_PACK_BUFFER, null);
         FC.fence = glc.fenceSync(glc.SYNC_GPU_COMMANDS_COMPLETE, 0); glc.flush();
-      } else if (!pbo){ glc.readPixels(0, 0, RW, RH, glc.RGBA, glc.UNSIGNED_BYTE, pix); FC.ready = true; }
+      } else if (!pbo || window.NT_RENDER){ glc.readPixels(0, 0, RW, RH, glc.RGBA, glc.UNSIGNED_BYTE, pix); FC.ready = true; }
     } finally {
       if (typeof pplFeedPost === 'function') pplFeedPost(); if (typeof bikeFeedPost === 'function') bikeFeedPost();
       FOL_UNI.res.value.copy(res0); SIDE_ARC.all = all0; renderer.autoClear = ac; renderer.setRenderTarget(rt0); sideArc(); cullFrame();   // (the main view's culling back as it was)

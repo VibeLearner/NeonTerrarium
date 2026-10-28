@@ -280,6 +280,7 @@ const PLAY = (() => {
       html.tr-on, html.tr-on *{cursor:none!important}
       html.tr-on #monitor.tr-keep{transform:scale(var(--monk,1.4));transform-origin:top right;top:3vh!important;right:2vh!important;max-height:calc(94vh/var(--monk,1.4))!important;overflow:hidden;transition:none!important;animation:none!important}
       html.tr-on #monitor.tr-keep *{transition:none!important;animation:none!important}
+      html.tr-on #monitor.tr-keep #monPin, html.tr-on #monitor.tr-keep #monClose{visibility:hidden!important}
       #stOv{position:fixed;inset:0;z-index:9001;pointer-events:none}
       #stOv > i{position:absolute;inset:0;display:block;opacity:0;background:#000}
       #stSel{position:absolute;left:0;top:0;width:0;height:0;display:none;pointer-events:none}

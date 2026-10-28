@@ -34,7 +34,7 @@ const srv = http.createServer((q, r) => { const f = path.join(ROOT, decodeURICom
     const keep = f >= FROM*60 && (f % EVERY === 0 || (si < STILLS.length && f >= STILLS[si]*60));
     await p.evaluate(k => { window.__CAP = k; }, keep);
     let d0 = await p.evaluate(() => PLAY.drawn), n = 0;
-    for (;;){ await p.evaluate(() => __step(1)); if (await p.evaluate(() => PLAY.drawn) !== d0) break; if (++n % 300 === 0) console.log('  held', n); await p.waitForTimeout(4); }
+    for (;;){ await p.evaluate(() => __step(1)); if (await p.evaluate(() => PLAY.drawn) !== d0) break; if (++n === 1) await p.evaluate(() => { window.__CAP = true; }); if (n % 300 === 0) console.log('  held', n); await p.waitForTimeout(4); }
     if (f < FROM*60) continue;
     if (f % EVERY === 0 || (si < STILLS.length && f >= STILLS[si]*60)){
       const png = await grab();

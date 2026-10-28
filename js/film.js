@@ -41,7 +41,7 @@ const FILM = (() => {
   const R = 13;                                         // plots from -13 to 13 each way: 27 x 27
   const GARDEN = { i0: -2, i1: 1, j0: -2, j1: 1 };      // the lawn in the middle
   const MT_J = 4;                                       // the metro: straight across the city, west to east, just south of the middle
-  const MT_STOP_I = [-8, 0, 4, 12];                     // its stations (on the straight: each has room for its lift)
+  const MT_STOP_I = [-12, -4, 4, 12];   // (eight plots apart: about twelve seconds by train between stations)                     // its stations (on the straight: each has room for its lift)
   const RIDE = { from: 4, to: 12 };                     // the rider gets on at the station by the square and rides east, across the low part
   // landmarks: [kind, i, j, w, h, when it arrives]
   const MEGAS = [
@@ -386,8 +386,12 @@ const FILM = (() => {
   const RT = { speed: 1.55, intoCab: .5, lift: 3.0, toPlat: 1.6, trainIn: 2.6, doorsOpen: .7, board: 1.0, wait: .6, close: .7 };
   function riderCast(){
     if (!LINE || !LINE.stn || !LINE.cabs) return warn('station', 'no metro');
-    const st = LINE.stn.get(RIDE.from + R), cab = st && LINE.cabs.find(c => c.k === st.k);
-    if (!st || !cab || !MUG.MHIT) return warn('station', 'no station by the square');
+    const P = mtPath(LINE), withCab = P.stops.map((s_, i) => ({ s: s_, i, st: LINE.stn.get(s_.k), cab: LINE.cabs.find(c => c.k === s_.k) }))
+      .filter(o => o.st && o.cab && P.stops[o.i + 1] && P.stops[o.i + 1].s - o.s.s >= 7.5*LOT);
+    const pick = withCab.sort((a, b) => Math.hypot(a.cab.x - SC_.x, a.cab.z - SC_.z) - Math.hypot(b.cab.x - SC_.x, b.cab.z - SC_.z))[0];
+    F.info.stations = P.stops.map(s_ => ({ k: s_.k, lift: !!LINE.cabs.find(c => c.k === s_.k) }));
+    if (!pick || !MUG.MHIT) return warn('station', 'no station with a lift by the square: ' + JSON.stringify(F.info.stations));
+    const st = pick.st, cab = pick.cab;
     RD.st = st; RD.cab = cab;
     // past the hold-up on the camera's side of it, then on along the footways to the lift
     const H_ = MUG.MHIT, cx = Math.sin(STREET.yaw), cz = Math.cos(STREET.yaw), by = nodeNear(H_.x + cx*1.6 + cz*.8, H_.z + cz*1.6 - cx*.8);
@@ -424,8 +428,13 @@ const FILM = (() => {
       else if (ft < T.trainAt){ const u = seg(ft, T.trainFrom, T.trainAt); tr.dwell = 0; tr.v = 0; tr.at = Math.max(0, si - 1); tr.next = si; tr.s = s0 - 14*(1 - u)*(1 - u) - .02; }   // easing in
       else if (ft < T.close){ if (!(tr.dwell > 0)) tr.stopT = 0; tr.s = s0; tr.at = si; tr.next = si; tr.v = 0; tr.dwell = 50; }   // stopped, doors opening and open
       else if (ft < T.depart){ tr.s = s0; tr.at = si; tr.v = 0; tr.dwell = Math.max(.001, .7 - (ft - T.close)); }   // doors closing
-      else { const u = ft - T.depart; tr.dwell = 0; tr.dir = 1; tr.at = si; tr.next = Math.min(P.stops.length - 1, si + 1); tr.v = 0;
-        tr.s = Math.min(P.len - .5, s0 + (u < MT_VMAX/MT_ACC ? .5*MT_ACC*u*u : MT_VMAX*MT_VMAX/(2*MT_ACC) + MT_VMAX*(u - MT_VMAX/MT_ACC))); }
+      else { const nx = Math.min(P.stops.length - 1, si + 1), s1 = P.stops[nx].s, D = s1 - s0, A = MT_ACC, V = MT_VMAX, ta = V/A, da = .5*A*ta*ta;
+        // accelerate, run, brake into the next station (a trapezoid: the same easing as the game's own trains)
+        const tRun = Math.max(0, (D - 2*da)/V), tAll = 2*ta + tRun, u = Math.min(ft - T.depart, tAll);
+        const s = u < ta ? .5*A*u*u : u < ta + tRun ? da + V*(u - ta) : D - .5*A*(tAll - u)*(tAll - u);
+        RD.arrive = T.depart + tAll;
+        if (ft < RD.arrive){ tr.dwell = 0; tr.dir = 1; tr.at = si; tr.next = nx; tr.v = 0; tr.s = s0 + s; }
+        else { if (!(tr.dwell > 0)) tr.stopT = 0; tr.s = s1; tr.at = nx; tr.next = nx; tr.v = 0; tr.dwell = 50; } }
     });
     const r = _um(dt, t);
     if (F.playing && T && RD.cab) safe('cab', () => { const c = RD.cab;
@@ -489,7 +498,7 @@ const FILM = (() => {
     if (t < MK.garden) return lerp(13.4, 14.2, seg(t, MK.dive, MK.garden));
     if (PH.name === 'square') return lerp(14.2, 15.4, ss(seg(t, MK.garden, MK.square))) + .2*seg(t, MK.square, MG.pass);
     if (PH.name === 'rider'){ const T = RD.T; if (F.hR === undefined) F.hR = S.hour; return T ? lerp(F.hR, 16.8, ss(seg(t, PH.t0, T.atTop))) : 16.8; }
-    if (PH.name === 'side'){ if (F.hS === undefined) F.hS = S.hour; return lerp(F.hS, 22.2, ss(seg(t, PH.t0 + 1.2, PH.t0 + DUR.side - 1))); }
+    if (PH.name === 'side'){ if (F.hS === undefined) F.hS = S.hour; return lerp(F.hS, 22.2, ss(seg(t, PH.t0 + 1.2, Math.max(PH.t0 + DUR.side, RD.arrive || 0) - .5))); }
     return 22.2;
   }
   function lightsAt(t){
@@ -523,7 +532,8 @@ const FILM = (() => {
   });
   at(MG.walk0 - .2, () => muggingCast(), 'the square: victim, mugger, officers');
   at(MG.alarm - .1, () => droneCast(), 'the drone');
-  at(MK.garden, () => { keep(document.getElementById('monitor'), false); MON.close(); E.sel.style.display = 'none'; if (F.pairs) for (const q of F.pairs){ release(q.A); release(q.B); } phase('square', MK.garden); }, 'to the square');
+  at(MK.garden, () => { keep(document.getElementById('monitor'), false); MON.close(); E.sel.style.display = 'none'; phase('square', MK.garden); }, 'to the square');
+  at(MK.square + 1.5, () => { if (F.pairs) for (const q of F.pairs){ release(q.A); release(q.B); } }, 'the garden lets go');   // (once the camera is well away)
   at(MG.walk0 - .1, () => riderCast(), 'the passer-by');
   at(MG.pass - .4, () => phase('rider', MG.pass - .4), 'with the passer-by');
   at(MG.release, () => muggingEnd(), 'the square lets go');
@@ -550,7 +560,7 @@ const FILM = (() => {
     else if (E.sel.style.display !== 'none') E.sel.style.display = 'none';
     if (PH.name === 'rider' && RD.T && t > RD.T.depart + .3) phase('side', t);
     else if (PH.name === 'rider' && !RD.T && t > PH.t0 + 3) phase('side', t);   // (no station: straight on)
-    else if (PH.name === 'side' && t > PH.t0 + DUR.side){ F.outT0 = t; phase('out', t); release(RD.p); }
+    else if (PH.name === 'side' && t > Math.max(PH.t0 + DUR.side, (RD.arrive || 0) + 1.6)){ F.outT0 = t; phase('out', t); release(RD.p); }
     else if (PH.name === 'out' && t > F.outT0 + DUR.out){ phase('title', t); LK.wx.fadeSec = 5; LK.setWeather('rain', false, true); }
     else if (PH.name === 'title' && t > PH.t0 + DUR.title){ F.playing = false; F.done = true; F.len = t; say('done at', t.toFixed(2));
       if (!CAP){ E.msg.hidden = false; E.status.innerHTML = 'click to play again'; E.ov.classList.add('ask'); E.ov.addEventListener('click', () => location.reload(), { once: true }); } }

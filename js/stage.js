@@ -435,7 +435,8 @@ const PLAY = (() => {
         if (first){
           if (!(st.ready && st.shown && !st.pendingHome)){ PC._debug.hold(H0); if (wait('the city')) return; }
           if (lw){ PC._debug.hold(H0); if (wait(lw)) return; }
-          if (!AP.picked && B){ AP.picked = true;   // the pieces that are set down later, hidden for now
+          if (!AP.picked && B){ AP.picked = true;   // the lab's camera as the script has it (the whole flat in the frame), and the pieces that are set down later, hidden for now
+            if (A.labZoom){ B.zoom = A.labZoom; B.camDirty = true; } if (A.labPan){ B.tx = A.labPan[0]; B.tz = A.labPan[1]; B.camDirty = true; }
             for (const d of A.drops || []){ const i = B.inst.get(d.id); if (i && i.pivot){ AP.hidden.push({ i, y: i.pivot.position.y, t: A.room + d.at }); i.pivot.visible = false; } else warn('apartment', 'no piece ' + d.id); } }
         }
         PC._debug.hold(u);
@@ -504,7 +505,7 @@ const PLAY = (() => {
     if (PROBE) return;
     overlay(); monSetup(); compileCast();
     await title().catch(e => warn('title', e));
-    if (SC_ && SC_.apartment){ safe('lab', () => FURN.preload()); await until(() => FURN.warmed() && FURN.frame && FURN.ready, 400).catch(e => warn('apartment lab', e)); }
+    if (SC_ && SC_.apartment){ safe('lab', () => FURN.preload()); await until(() => FURN.frame && FURN.ready, 400).catch(e => warn('apartment lab', e)); }
     G.ready = true; say('ready', CAST.size, 'people in the cast');
   }
   G.start = () => {

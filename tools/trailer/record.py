@@ -109,7 +109,7 @@ def main():
             o = {'format': fmt, 'fromSurface': True, 'captureBeyondViewport': False}
             if fmt == 'jpeg': o['quality'] = quality or a.quality
             return base64.b64decode(cdp.send('Page.captureScreenshot', o)['data'])
-        page.on('console', lambda m: print('  page:', m.text) if m.text.startswith('[trailer]') or m.type == 'error' else None)
+        page.on('console', lambda m: print('  page:', m.text[:300]) if m.text.startswith(('[trailer]', '[film]')) or m.type == 'error' else None)
         page.on('pageerror', lambda e: print('  page error:', e))
         page.on('crash', lambda *_: print('  the page crashed (the graphics process may have run out of memory)'))
         url = f'http://127.0.0.1:{a.port}/index.html' + HASH
@@ -128,7 +128,7 @@ def main():
                 ctx.add_init_script(path=os.path.join(HERE, 'shim.js'))
                 if proj: ctx.add_init_script(script='if (window === window.top){ window.__DIR_CITY = ' + json.dumps(city) + '; window.__DIR_PROJ = ' + json.dumps(proj) + '; window.__DIR_BOOT = { mode: "play", at: 0 }; }')
                 page = ctx.new_page(); cdp = ctx.new_cdp_session(page)
-                page.on('console', lambda m: print('  page:', m.text) if m.text.startswith('[trailer]') or m.type == 'error' else None)
+                page.on('console', lambda m: print('  page:', m.text[:300]) if m.text.startswith(('[trailer]', '[film]')) or m.type == 'error' else None)
                 page.on('pageerror', lambda e: print('  page error:', e))
                 page.goto(url, wait_until='load'); navs.clear()
 

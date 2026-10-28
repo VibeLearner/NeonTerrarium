@@ -35,7 +35,7 @@ const FILM = (() => {
 
   /* ---------- the fixed part of the timeline (from the station on, each part starts when the one before it is done) ---------- */
   const MK = { built: 13.6, dive: 14.5, p: [17, 24], garden: 31, square: 33.5, strikeBy: 35, strikeLast: 38.5, chaseFor: 9 };
-  const DUR = { toRider: 2.2, riderMax: 22, toSide: 2.2, side: 12, out: 9, lightsIn: 1.5, title: 8.5 };
+  const DUR = { toRider: 2.2, riderMax: 22, toSide: 2.2, side: 16, out: 9, lightsIn: 1.5, title: 8.5 };
 
   /* ---------- the city plan ---------- */
   const R = 13, RW = 16, RX = 20;                                // plots from -16 to 13 each way (west and south a little further: the west end's street shots stay over the city)
@@ -184,6 +184,7 @@ const FILM = (() => {
     // every frame drawn the same way: the static cache's frames and the frames between them (when the shadows are redrawn, every other frame
     // while the hour moves) placed the metro a little differently, so it shook from side to side
     safe('cache', () => { SC.mode = 'off'; });
+    safe('haze', () => { LK.set('morning', 'hazeAmt', .18); LK.set('afternoon', 'hazeAmt', .18); });   // (the looks' far haze read as smog rolling in as the camera pulled back; thinner for the film. Nothing is saved)
   }
   const _ar = applyRenderRes;
   applyRenderRes = function (z){ return _ar(F.pinRes ? (CAP ? 24 : ZOOM_REF) : z); };
@@ -191,7 +192,8 @@ const FILM = (() => {
   /* ---------- the cast, played by the film: every move planned here, nothing left to the game's own people ---------- */
   // A puppet is drawn where its script says, with the frames it says (people.js, mega.js: p.puppet, L.puppet, a drone's st.puppet).
   const camR = () => ({ x: Math.cos(yaw), z: -Math.sin(yaw) });
-  const walkF = (t, ph, sp = 1) => Math.floor(t*9*sp + ph) % PPL.walk;
+  const walkF = (t, ph, sp = 1) => Math.floor(t*9*sp + ph) % PPL.walk;   // (sp: the pace as a multiple of the game's walking speed)
+  const PACE = v => v/PPL_SPEED;   // the stride rate for a speed in world units a second
   const runF = (t, ph) => F_RUN + Math.floor(t*11 + ph) % PPL.walk;
   const idleF = (t, ph) => F_IDLE + Math.floor(t*2.5 + ph) % PPL.idle;
   const talkF = (t, ph) => F_SPEC + Math.floor(t*6 + ph) % 6;
@@ -221,8 +223,8 @@ const FILM = (() => {
   }
 
   /* ---------- the garden: two pairs walk out onto the lawn and talk; the person cam on one of each ---------- */
-  const G1 = { x: GC.x - 4.4, z: GC.z - 1.2 }, G2 = { x: GC.x - 1.2, z: GC.z - 4.4 };   // where each pair stands
-  const GT = { walkIn: 14.7, there: 16.9 };
+  const G1 = { x: GC.x - 4.4, z: GC.z - 1.2 }, G2 = { x: GC.x - .6, z: GC.z + 2.4 };   // where each pair stands (both out on the open lawn, nowhere near its edge, so no building stands in front of either)
+  const GW = .5, GT = { walkIn: 14.7, there: 14.7 + 2.2/GW };   // (walking in at the game's pace)
   F.pairs = null;
   function gardenCast(){
     const people = nearestPeople(GC.x, GC.z, 4);
@@ -230,12 +232,12 @@ const FILM = (() => {
     F.pairs = [[people[0], people[1], G1, 0], [people[2], people[3], G2, 1]].map(([A, B, spot, k]) => {
       const ang = k ? 2.3 : -.6, ox = Math.cos(ang)*.38, oz = Math.sin(ang)*.38;   // the two of them face each other across the spot
       const posA = { x: spot.x - ox, z: spot.z - oz }, posB = { x: spot.x + ox, z: spot.z + oz };
-      const from = (pos, s) => ({ x: pos.x + Math.cos(ang + s)*3.2, z: pos.z + Math.sin(ang + s)*3.2 });   // (walking in from either side of the lawn)
+      const from = (pos, s) => ({ x: pos.x + Math.cos(ang + s)*2.2, z: pos.z + Math.sin(ang + s)*2.2 });   // (walking in from either side of the lawn)
       const role = (me, pos, other, first) => {
         const f0 = from(pos, first ? 2.6 : -.5), path = [{ t: GT.walkIn + (first ? 0 : .25), x: f0.x, z: f0.z }, { t: GT.there + (first ? 0 : .25), x: pos.x, z: pos.z }];
         return takePerson(me, t => {
           const ft = F.t, a = along(path, ft);
-          if (a.moving) return { x: a.x, y: CURB, z: a.z, frame: walkF(ft, me.phase || 0), dx: a.dx, dz: a.dz };
+          if (a.moving) return { x: a.x, y: CURB, z: a.z, frame: walkF(ft, me.phase || 0, PACE(GW)), dx: a.dx, dz: a.dz };
           // they take turns talking, a couple of seconds each, facing each other
           const turn = Math.floor((ft - GT.there)/2.3) % 2 === (first ? 0 : 1);
           return { x: pos.x, y: CURB, z: pos.z, frame: turn && Math.floor(ft*.9 + (me.phase || 0)) % 3 ? talkF(ft, me.phase || 0) : idleF(ft, me.phase || 0), dx: other.x - pos.x, dz: other.z - pos.z };
@@ -315,7 +317,7 @@ const FILM = (() => {
       if (r) return r;
       const d = Math.max(0, ft - t0)*speed, k = Math.floor(d/L_), u = d - k*L_, back = k % 2 === 1, q = pointAt(pts, back ? L_ - u : u);
       st.x = q.x; st.z = q.z; st.dx = back ? -q.dx : q.dx; st.dz = back ? -q.dz : q.dz;
-      return { x: q.x, y: CURB, z: q.z, frame: walkF(ft, ph, speed/1.3), dx: st.dx, dz: st.dz };
+      return { x: q.x, y: CURB, z: q.z, frame: walkF(ft, ph, PACE(speed)), dx: st.dx, dz: st.dz };
     });
     EXTRAS.push(p); return p;
   }
@@ -349,7 +351,7 @@ const FILM = (() => {
       const pts = routePts(a.x, a.z, b.x, b.z), L_ = pathLen(pts); if (L_ < 4 || L_ > rad*3.5) continue;
       let ok = true; for (let d = 0; ok && d <= L_; d += .3){ const q = pointAt(pts, d); if (!clear(q.x, q.z)) ok = false; }
       if (!ok) continue;
-      stroll(pool[used++], pts, t0 - Rn()*L_/1.1, .85 + Rn()*.5, react).__area = area; w++; made++;
+      const sp = .38 + Rn()*.18; stroll(pool[used++], pts, t0 - Rn()*L_/sp, sp, react).__area = area; w++; made++;
     }
     for (let g = 0, tries = 0; g < nGroups && tries < nGroups*14 && used + 1 < pool.length; tries++){
       const c = nodes[Math.floor(Rn()*nodes.length)]; if (!clear(c.x, c.z, 1.2)) continue;
@@ -372,6 +374,7 @@ const FILM = (() => {
   /* ---------- the mugging, in the open middle of the town square ---------- */
   // fixed times (seconds into the film); the places come from the square's footways
   const MG = { walk0: 31, stop: 35.6, reach: 36.0, rob1: 37.6, alarm: 35.3, copsGo: 37.9, pass: 38.9, release: 52 };
+  const VW = .5;   // the victim's walking speed (the game's own pace)
   const MUG = { victim: null, L: null, drone: null, cops: [], caught: 0, mx: SC_.x, mz: SC_.z };
   function muggingCast(){
     // the victim: across the square, west to east, stopping in the middle when the mugger comes at them
@@ -381,19 +384,19 @@ const FILM = (() => {
     const vp = routePts(va.x, va.z, vb.x, vb.z), dC = distNear(vp, MP.x, MP.z), VSTOP = pointAt(vp, dC);
     // the mugger: out from the far side of the square (away from the camera), along the footway to them
     const m0 = nodeNear(VSTOP.x + pp.x*3.6 - tc.x*.8, VSTOP.z + pp.z*3.6 - tc.z*.8);   // (the mugger: from ahead of them, beside the pavilion, never behind it)
-    const mp = routePts(m0.x, m0.z, VSTOP.x, VSTOP.z), mL = pathLen(mp), RUN_ = 3.0, hitD = Math.max(0, mL - .42), tStrike = MG.reach - hitD/RUN_;
+    const mp = routePts(m0.x, m0.z, VSTOP.x, VSTOP.z), mL = pathLen(mp), RUN_ = 1.7, hitD = Math.max(0, mL - .42), tStrike = MG.reach - hitD/RUN_;
     const MHIT = pointAt(mp, hitD);
     // the getaway: out of the square, away from the camera and the station
-    const fe = nodeNear(MHIT.x + pp.x*11 - tc.x*3, MHIT.z + pp.z*11 - tc.z*3), flee = routePts(MHIT.x, MHIT.z, fe.x, fe.z), fL = pathLen(flee), FLEE_V = 2.7, fleeEnd = MG.rob1 + fL/FLEE_V;
+    const fe = nodeNear(MHIT.x + pp.x*11 - tc.x*3, MHIT.z + pp.z*11 - tc.z*3), flee = routePts(MHIT.x, MHIT.z, fe.x, fe.z), fL = pathLen(flee), FLEE_V = 1.6, fleeEnd = MG.rob1 + fL/FLEE_V;
     const v = nearestPeople(SC_.x, SC_.z, 1)[0];
     if (!v) return warn('mugging', 'nobody to cross the square');
     MUG.victim = v; MUG.VSTOP = VSTOP;
     takePerson(v, () => {
       const ft = F.t, ph = v.phase || 0;
-      if (ft < MG.stop){ const d = dC - (MG.stop - ft)*1.25, q = pointAt(vp, Math.max(0, d)); return { x: q.x, y: CURB, z: q.z, frame: d > 0 ? walkF(ft, ph) : idleF(ft, ph), dx: q.dx, dz: q.dz }; }
+      if (ft < MG.stop){ const d = dC - (MG.stop - ft)*VW, q = pointAt(vp, Math.max(0, d)); return { x: q.x, y: CURB, z: q.z, frame: d > 0 ? walkF(ft, ph, PACE(VW)) : idleF(ft, ph), dx: q.dx, dz: q.dz }; }
       if (ft < MG.rob1 + .2) return { x: VSTOP.x, y: CURB, z: VSTOP.z, frame: idleF(ft, ph), dx: MHIT.x - VSTOP.x, dz: MHIT.z - VSTOP.z };   // frozen, facing the mugger
-      const q = pointAt(vp, dC + (ft - MG.rob1 - .2)*1.9);   // then hurrying on the way they were going
-      return { x: q.x, y: CURB, z: q.z, frame: walkF(ft, ph, 1.6), dx: q.dx, dz: q.dz };
+      const q = pointAt(vp, dC + (ft - MG.rob1 - .2)*1.0);   // then hurrying on the way they were going
+      return { x: q.x, y: CURB, z: q.z, frame: walkF(ft, ph, 2), dx: q.dx, dz: q.dz };
     });
 
     const L = { key: 'film', cell: cells.get(ckey(SQ[1], SQ[2])), home: { x: m0.x, z: m0.z }, x: m0.x, z: m0.z, state: 'film', rare: false, until: 1e9, row: 10, flip: 1, phase: 3, fade: 0 };
@@ -412,7 +415,7 @@ const FILM = (() => {
     const PS = MEGAS[1], door = nodeNear((PS[1] - .5)*LOT - .8, (PS[2] + 1)*LOT), end = pointAt(flee, fL);
     const cops = pplList.filter(p => p.cop && !p.onBike && !p.custody && !p.puppet).sort((a, b) => (a.x === undefined) - (b.x === undefined)).slice(0, 2);
     cops.forEach((c, k) => {
-      const cp = routePts(door.x, door.z, end.x + (k ? .6 : -.6), end.z + (k ? .3 : -.3)), cL = pathLen(cp), V = 3.4, tGo = MG.copsGo + k*.35, tAt = tGo + cL/V;
+      const cp = routePts(door.x, door.z, end.x + (k ? .6 : -.6), end.z + (k ? .3 : -.3)), cL = pathLen(cp), V = 1.9, tGo = MG.copsGo + k*.35, tAt = tGo + cL/V;
       takePerson(c, () => {
         const ft = F.t;
         if (ft < tGo) return { x: door.x, y: CURB, z: door.z, frame: idleF(ft, k), alpha: 0 };   // (inside, until the alarm)
@@ -461,7 +464,8 @@ const FILM = (() => {
 
   /* ---------- the passer-by: past the mugging, on to the station, up the lift, onto the train ---------- */
   const RD = { p: null, st: null, cab: null, T: null };
-  const RT = { speed: 2.2, intoCab: .5, lift: 3.0, toPlat: 1.6, trainIn: 2.6, doorsOpen: .7, board: 1.0, wait: .6, close: .7 };
+  const RIDE_V = 6.5, RIDE_A = 2.0;   // the train's speed and pick-up for the ride, world units a second (the game's own 2.8 looks parked from the side)
+  const RT = { speed: 1.0, intoCab: .5, lift: 3.0, toPlat: 1.6, trainIn: 2.6, doorsOpen: .7, board: 1.0, wait: .6, close: .7 };
   function riderCast(){
     if (!LINE || !LINE.stn || !LINE.cabs) return warn('station', 'no metro');
     const P = mtPath(LINE), withCab = P.stops.map((s_, i) => ({ s: s_, i, st: LINE.stn.get(s_.k), cab: LINE.cabs.find(c => c.k === s_.k) }))
@@ -473,7 +477,7 @@ const FILM = (() => {
     RD.st = st; RD.cab = cab;
     // past the hold-up on the camera's side of it, then on along the footways to the lift
     const H_ = MUG.MHIT, by = nodeNear(H_.x + (cab.x - H_.x)*.12, H_.z + (cab.z - H_.z)*.12 + .6);   // (a step towards the station from the hold-up)
-    const ax = -(cab.z - H_.z), az = cab.x - H_.x, al = Math.hypot(ax, az) || 1, from = nodeNear(by.x + ax/al*6, by.z + az/al*6);   // (coming across it from the side)
+    const ax = -(cab.z - H_.z), az = cab.x - H_.x, al = Math.hypot(ax, az) || 1, from = nodeNear(by.x + ax/al*5, by.z + az/al*5);   // (coming across it from the side)
     const leg1 = routePts(from.x, from.z, by.x, by.z), leg2 = routePts(by.x, by.z, cab.x, cab.z), pts = leg1.concat(leg2.slice(1));
     const dPass = pathLen(leg1), L_ = pathLen(pts), t0 = MG.pass - dPass/RT.speed;
     RD.way = pts;
@@ -486,7 +490,7 @@ const FILM = (() => {
     const p = nearestPeople(from.x, from.z, 1)[0]; if (!p) return warn('station', 'nobody to ride');
     RD.p = takePerson(p, () => {
       const ft = F.t, ph = p.phase || 0;
-      if (ft < T.atLift){ const q = pointAt(pts, Math.max(0, (ft - t0)*RT.speed)); return { x: q.x, y: CURB, z: q.z, frame: ft < t0 ? idleF(ft, ph) : walkF(ft, ph, 1.45), dx: q.dx, dz: q.dz }; }
+      if (ft < T.atLift){ const q = pointAt(pts, Math.max(0, (ft - t0)*RT.speed)); return { x: q.x, y: CURB, z: q.z, frame: ft < t0 ? idleF(ft, ph) : walkF(ft, ph, 2), dx: q.dx, dz: q.dz }; }
       if (ft < T.atTop){ const u = ss(seg(ft, T.inCab, T.atTop)); return { x: cab.x, y: lerp(CURB, yPlat, u) + .02, z: cab.z, frame: idleF(ft, ph), dx: door[0] - cab.x, dz: door[1] - cab.z }; }   // in the cab, going up
       if (ft < T.onPlat){ const u = seg(ft, T.atTop, T.onPlat); return { x: lerp(top[0], door[0], u), y: yPlat, z: lerp(top[1], door[1], u), frame: walkF(ft, ph), dx: door[0] - top[0], dz: door[1] - top[1] }; }
       if (ft < T.doorsOpen) return { x: door[0], y: yPlat, z: door[1], frame: idleF(ft, ph), dx: inn[0] - door[0], dz: inn[1] - door[1] };   // the train pulls in
@@ -507,7 +511,7 @@ const FILM = (() => {
       if (ft < T.trainAt){ tr.s = s0; tr.at = si; tr.next = si; tr.v = 0; tr.dwell = 50; tr.stopT = -.5; }   // waiting at the platform, doors shut
       else if (ft < T.close){ if (!(tr.dwell > 0) || tr.stopT < 0) tr.stopT = 0; tr.s = s0; tr.at = si; tr.next = si; tr.v = 0; tr.dwell = 50; }   // stopped, doors opening and open
       else if (ft < T.depart){ tr.s = s0; tr.at = si; tr.v = 0; tr.dwell = Math.max(.001, .7 - (ft - T.close)); }   // doors closing
-      else { const nx = Math.min(P.stops.length - 1, si + 1), s1 = P.stops[nx].s, D = s1 - s0, A = MT_ACC, V = MT_VMAX, ta = V/A, da = .5*A*ta*ta;
+      else { const nx = Math.min(P.stops.length - 1, si + 1), s1 = P.stops[nx].s, D = s1 - s0, A = RIDE_A, V = RIDE_V, ta = V/A, da = .5*A*ta*ta;
         // accelerate, run, brake into the next station (a trapezoid: the same easing as the game's own trains)
         const tRun = Math.max(0, (D - 2*da)/V), tAll = 2*ta + tRun, u = Math.min(ft - T.depart, tAll);
         const s = u < ta ? .5*A*u*u : u < ta + tRun ? da + V*(u - ta) : D - .5*A*(tAll - u)*(tAll - u);
@@ -573,11 +577,13 @@ const FILM = (() => {
   // the hour: morning while it's built, early afternoon in the garden, late afternoon in the square, golden hour as the rider reaches the
   // platform, night as the train pulls away
   function hourAt(t){
-    if (t < MK.dive) return lerp(8, 11.5, ss(t/MK.dive));
-    if (t < MK.garden) return lerp(13.4, 14.2, seg(t, MK.dive, MK.garden));
-    if (PH.name === 'square') return lerp(14.2, 15.4, ss(seg(t, MK.garden, MK.square))) + .2*seg(t, MK.square, MG.pass);
-    if (PH.name === 'rider'){ const T = RD.T; if (F.hR === undefined) F.hR = S.hour; return T ? lerp(F.hR, 16.8, ss(seg(t, PH.t0, T.atTop))) : 16.8; }
-    if (PH.name === 'side'){ if (F.hS === undefined) F.hS = S.hour; return lerp(F.hS, 22.2, ss(seg(t, PH.t0 + 1.2, PH.t0 + DUR.side - .5))); }
+    if (t < MK.dive) return lerp(8.6, 10.4, ss(t/MK.dive));                       // the whole build in the morning look (its hand-off to afternoon starts at 10.5)
+    if (t < MK.garden) return lerp(10.4, 12.6, seg(t, MK.dive, MK.garden));        // the hand-off happens close in on the garden, where the haze can't be seen
+    if (PH.name === 'square') return lerp(12.6, 15.8, ss(seg(t, MK.garden, MK.square))) + .6*seg(t, MK.square, MG.pass);   // the light going golden over the square
+    if (PH.name === 'rider'){ const T = RD.T; if (F.hR === undefined) F.hR = S.hour; return T ? lerp(F.hR, 17.2, ss(seg(t, PH.t0, T.atTop))) : 17.2; }
+    if (PH.name === 'side'){   // golden for most of the ride; the sun goes down and night comes on over its last third
+      if (F.hS === undefined) F.hS = S.hour; const tS = PH.t0 + DUR.side*.6;
+      return t < tS ? lerp(F.hS, 17.7, seg(t, PH.t0, tS)) : lerp(17.7, 22.2, ss(seg(t, tS, PH.t0 + DUR.side - .4))); }
     return 22.2;
   }
   function lightsAt(t){
@@ -618,7 +624,6 @@ const FILM = (() => {
   at(MG.stop, () => { if (MUG.victim) emote(MUG.victim, 'bang', 1.6); }, 'the victim sees him');
   at(MG.reach + .4, () => { for (const p of EXTRAS) if (p.__area === 'square') emote(p, 'bang', 1.6); }, 'the square sees it');
   at(MG.pass - .4, () => phase('rider', MG.pass - .4), 'with the passer-by');
-  at(MG.release, () => { muggingEnd(); releaseExtras(p => p.__area === 'square'); }, 'the square lets go');
   EV.sort((a, b) => a.t - b.t);
 
   const NEON = [[0, 0], [.05, 1], [.09, .15], [.15, 1], [.22, .35], [.27, 1], [.4, .7], [.46, 1]];
@@ -638,6 +643,8 @@ const FILM = (() => {
     const t = clock(); lastT = t; F.t = t;
     while (fired < EV.length && EV[fired].t <= t){ const e = EV[fired++]; safe(e.name, e.f); }
     if (t > 4) quietAlert();
+    // the square is let go once the passer-by is up in the lift and it is out of shot (anyone let go earlier would vanish from the picture: PPL_ONLY)
+    if (RD.T && !F.sqDone && t > RD.T.inCab + 1){ F.sqDone = true; safe('the square lets go', () => { muggingEnd(); releaseExtras(p => p.__area === 'square'); }); }
     if (window.PPL_ONLY) safe('only', () => {
       for (const st of POLICE_STATIONS) for (const d of st.drones) if (!d.st.puppet){ if (!d._held){ d._held = d.g.position.clone(); } const h = d._held; d.st.puppet = () => ({ x: h.x, y: h.y, z: h.z, light: 0, red: 0 }); d._still = true; d.g.visible = false; }
       if (typeof POLICE_BIKES !== 'undefined') for (const b of POLICE_BIKES) if (b.spr) b.spr.visible = !b.rider; });

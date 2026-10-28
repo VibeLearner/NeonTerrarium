@@ -42,6 +42,7 @@ const srv = http.createServer((q, r) => { const f = path.join(ROOT, decodeURICom
       if (si < STILLS.length && f >= STILLS[si]*60){ fs.writeFileSync(path.join(OUT, 's-' + STILLS[si] + '.png'), png); si++; }
     }
     if (process.env.DBG && f % 30 === 0){ const fd = await p.evaluate(() => window.__findDisposed && __findDisposed()); if (fd && fd.length){ console.log('DISPOSED at', f, JSON.stringify(fd).slice(0, 1500)); } }
+    if (process.env.DUMP && f % 60 === 0){ const v = await p.evaluate(e => { try { return JSON.stringify((0, eval)(e)); } catch (x) { return 'ERR ' + x.message; } }, process.env.DUMP); console.log('DUMP', (f/60).toFixed(1), String(v).slice(0, 700)); }
     if (f % 300 === 0){ const st = await p.evaluate(() => PLAY.state()); console.log((f/60).toFixed(1) + 's', ((Date.now() - t0)/1000).toFixed(0) + 's real', JSON.stringify(st.info).slice(0, 160)); if (st.done) break; }
   }
   hashes.end(); log.end();

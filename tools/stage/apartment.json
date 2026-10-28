@@ -1,0 +1,214 @@
+{
+ "recipe": {
+  "v": 1,
+  "app": "podlab-build",
+  "home": {
+   "tier": "small",
+   "W": 13,
+   "D": 10,
+   "room": "1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,0,0",
+   "rooms": [
+    {
+     "kind": "living",
+     "label": "Living + kitchen"
+    },
+    {
+     "kind": "bed",
+     "label": "Bedroom"
+    },
+    {
+     "kind": "bath",
+     "label": "Bath"
+    }
+   ],
+   "doorways": [
+    "57-58",
+    "120-121"
+   ],
+   "door": {
+    "k": 103,
+    "side": "E"
+   },
+   "night": false,
+   "hh": 20261021,
+   "variant": "small A",
+   "pod": {
+    "cell": [
+     2,
+     -1
+    ],
+    "section": 0,
+    "floor": 1,
+    "zone": "low",
+    "kind": "tower"
+   },
+   "facade": {
+    "main": "N",
+    "tier": "small",
+    "band": false,
+    "faces": [
+     {
+      "side": "S",
+      "exterior": false,
+      "n": 0
+     },
+     {
+      "side": "N",
+      "exterior": true,
+      "n": 1
+     },
+     {
+      "side": "W",
+      "exterior": false,
+      "n": 0
+     },
+     {
+      "side": "E",
+      "exterior": false,
+      "n": 0
+     }
+    ]
+   }
+  },
+  "walls": "cutaway",
+  "fin": {
+   "floor": {
+    "0": {
+     "arch": "hbfloorwave",
+     "seed": 178199
+    },
+    "1": {
+     "arch": "hbfloorwave",
+     "seed": 178199
+    },
+    "2": {
+     "arch": "flstone",
+     "seed": 482004
+    }
+   },
+   "wall": {
+    "0": {
+     "arch": "hbwallposter",
+     "seed": 702056
+    },
+    "1": {
+     "arch": "wcpod",
+     "seed": 723082
+    },
+    "2": {
+     "arch": "wcpod",
+     "seed": 334083
+    }
+   },
+   "seg": {}
+  },
+  "pieces": [
+   {
+    "id": 1,
+    "arch": "windrape",
+    "seed": 486457,
+    "x": 3.252,
+    "y": 0,
+    "z": 0,
+    "ry": 0,
+    "wh": 0.1,
+    "anc": "b",
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 2,
+    "arch": "counter",
+    "seed": 51207,
+    "x": 5.4,
+    "y": 0,
+    "z": 0.35,
+    "ry": 0,
+    "wh": 0,
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 3,
+    "arch": "platform",
+    "seed": 30311,
+    "x": 1.3,
+    "y": 0,
+    "z": 1.3,
+    "ry": 0,
+    "wh": 0,
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 4,
+    "arch": "slab",
+    "seed": 77015,
+    "x": 4.6,
+    "y": 0,
+    "z": 3.1,
+    "ry": 0,
+    "wh": 0,
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 5,
+    "arch": "retro",
+    "seed": 11811,
+    "x": 4.6,
+    "y": 0,
+    "z": 4.3,
+    "ry": 3.1416,
+    "wh": 0,
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 6,
+    "arch": "floorlamp",
+    "seed": 7707,
+    "x": 5.9,
+    "y": 0,
+    "z": 4.4,
+    "ry": 0,
+    "wh": 0,
+    "parent": 0,
+    "colors": {},
+    "light": null
+   },
+   {
+    "id": 7,
+    "arch": "monstera",
+    "seed": 5505,
+    "x": 3.0,
+    "y": 0,
+    "z": 4.3,
+    "ry": 0,
+    "wh": 0,
+    "parent": 0,
+    "colors": {},
+    "light": null
+   }
+  ]
+ },
+ "drops": [
+  {
+   "id": 7,
+   "at": 0.5
+  },
+  {
+   "id": 6,
+   "at": 1.9
+  },
+  {
+   "id": 5,
+   "at": 3.3
+  }
+ ]
+}

@@ -9,3 +9,7 @@ assets/sprites/originals/robot/
 build/
 assets/audio/trailer/*_preview.mp3
 tools/trailer/out/
+tools/stage/probe.json
+tools/stage/apartment_base.*
+tools/stage/apt_check.*
+tools/stage/check*/
